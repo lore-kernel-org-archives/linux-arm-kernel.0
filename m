@@ -1,47 +1,78 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 16 Jan 2015 16:30:19 +0000
-Subject: Regression with legacy IRQ numbers caused by 9a1091ef0017
-In-Reply-To: <20150116162119.GK18552@atomide.com>
-References: <20150114221407.GS2419@atomide.com>
- <20150115105035.GU11502@n2100.arm.linux.org.uk>
- <20150115152838.GB18552@atomide.com>
- <20150115171924.GV11502@n2100.arm.linux.org.uk>
- <20150116162119.GK18552@atomide.com>
-Message-ID: <20150116163019.GW11502@n2100.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 16 Jan 2015 16:32:54 +0000
+Subject: [PATCH 2/3] arm64: Consolidate hotplug notifier for instruction
+ emulation
+In-Reply-To: <20150116160730.GY7091@arm.com>
+References: <1421325366-13263-1-git-send-email-suzuki.poulose@arm.com>
+ <1421325366-13263-3-git-send-email-suzuki.poulose@arm.com>
+ <20150116160730.GY7091@arm.com>
+Message-ID: <20150116163254.GC32155@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 08:21:20AM -0800, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [150115 09:22]:
-> > On Thu, Jan 15, 2015 at 07:28:39AM -0800, Tony Lindgren wrote:
-> > > * Russell King - ARM Linux <linux@arm.linux.org.uk> [150115 02:53]:
-> > > > I don't think we've proven a link there.  While you're right that it
-> > > > causes the wrong interrupt to be claimed, I have two kernels here,
-> > > > both claim the same interrupt, one which is multi-platform and issues
-> > > > that strange warning, and one which targets only OMAP4 which doesn't.
-> > > > 
-> > > > There's something else going on which causes the bus errors which we
-> > > > haven't found.
-> > > 
-> > > I think it gets triggered if you enable PREEMPT.
+On Fri, Jan 16, 2015 at 04:07:30PM +0000, Will Deacon wrote:
+> On Thu, Jan 15, 2015 at 12:36:05PM +0000, Suzuki K. Poulose wrote:
+> > From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 > > 
-> > That's something which we can try to prove... build running now with
-> > CONFIG_PREEMPT=y
+> > As of now each insn_emulation has a cpu hotplug notifier that
+> > enables/disables the CPU feature bit for the functionality. This
+> > patch re-arranges the code, such that there is only one notifier
+> > that runs through the list of registered emulation hooks and runs
+> > their corresponding set_hw_mode.
+> > 
+> > We do nothing when a CPU is dying as we will set the appropriate bits
+> > as it comes back online based on the state of the hooks.
+> > 
+> > Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > ---
+> >  Documentation/arm64/legacy_instructions.txt |    4 +
+> >  arch/arm64/include/asm/cpufeature.h         |    2 +
+> >  arch/arm64/kernel/armv8_deprecated.c        |  113 +++++++++++++++------------
+> >  3 files changed, 69 insertions(+), 50 deletions(-)
+> > 
+> > diff --git a/Documentation/arm64/legacy_instructions.txt b/Documentation/arm64/legacy_instructions.txt
+> > index a3b3da2..0a4dc26 100644
+> > --- a/Documentation/arm64/legacy_instructions.txt
+> > +++ b/Documentation/arm64/legacy_instructions.txt
+> > @@ -27,6 +27,10 @@ behaviours and the corresponding values of the sysctl nodes -
+> >    instructions. Using hardware execution generally provides better
+> >    performance, but at the loss of ability to gather runtime statistics
+> >    about the use of the deprecated instructions.
+> > +  Note: Emulation of a deprecated instruction depends on the availability
+> > +  of the feature on all the active CPUs. In case of CPU hotplug, if a new
+> > +  CPU doesn't support a feature, it could result in the abortion of the
+> > +  hotplug operation.
 > 
-> Looks like you now have the omap_l3_noc error appear for sdp4430 in
-> your logs after enabling PREEMPT.
-> 
-> I guess that means case closed for this one?
+> Is this true? We should be able to *emulate* the instruction anywhere,
+> it's the "hardware execution" setting that needs CPU support.
 
-I would still like to understand /why/ enabling preempt causes the error.
-Changing the preempt configuration really should not change what happens
-on the bus.  (Think about it.)  It's an indication that there is some
-other error present.
+Not quite. In ARMv8 there are three possible cases for endianness
+support:
 
-Unfortunately, the OMAP hardware appears to make it impossible to
-determine what the access that caused the error was, so it looks like
-it's pretty much undebuggable.
+(a) Mixed endian support at all levels
+    ID_AA64MMFR0_EL1.BigEnd == 0b0001
+    ID_AA64MMFR0_EL1.BigEnd0 == 0b0000 (RES0, invalid)
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+(b) Mixed endian support at EL0 only
+    ID_AA64MMFR0_EL1.BigEnd == 0b0000
+    ID_AA64MMFR0_EL1.BigEnd0 == 0b0001
+    SCTLR_EL1.EE has a fixed value
+
+(c) No mixed endian support at all
+    ID_AA64MMFR0_EL1.BigEnd == 0b0000
+    ID_AA64MMFR0_EL1.BigEnd0 == 0b0000
+    SCTLR_EL1.{EE,E0E} have fixed values
+
+We can emulate setend in cases (a) and (b), but not (c) unless we
+trapped every single instruction that could access memory. I don't think
+that's feasible.
+
+Also fun in case (c) is that the kernel may not be able to run on all
+CPUs (consider a BE kernel where some CPUs are fixed to LE at EL1).
+
+I hope no-one builds a system where CPUs are mismatched w.r.t.
+endianness support.
+
+Thanks,
+Mark.
