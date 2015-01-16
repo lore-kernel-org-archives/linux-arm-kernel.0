@@ -1,70 +1,136 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 16 Jan 2015 18:25:41 +0100
-Subject: [GIT PULL] at91: cleanup for 3.20 #2
-Message-ID: <1421429141-5405-1-git-send-email-nicolas.ferre@atmel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 16 Jan 2015 17:30:05 +0000
+Subject: [PATCH] soc: tegra: Add Tegra132 SoC to the DT list of Tegra SoCs
+In-Reply-To: <20150116170926.GA17763@ulmo.nvidia.com>
+References: <alpine.DEB.2.02.1501161137351.9776@utopia.booyaka.com>
+ <20150116150749.GA32155@leverpostej>
+ <20150116170926.GA17763@ulmo.nvidia.com>
+Message-ID: <20150116173005.GH32155@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+On Fri, Jan 16, 2015 at 05:09:28PM +0000, Thierry Reding wrote:
+> On Fri, Jan 16, 2015 at 03:07:49PM +0000, Mark Rutland wrote:
+> > Hi Paul,
+> > 
+> > /me opens a delicious can of Lumbricus terrestris
+> > 
+> > My comments below aren't so much about this patch alone, but more about
+> > the entire strategy with drivers/soc and the kind of code living there.
+> > 
+> > On Fri, Jan 16, 2015 at 11:39:13AM +0000, Paul Walmsley wrote:
+> > > 
+> > > Add "nvidia,tegra132" as a compatible string that denotes a Tegra SoC.
+> > > 
+> > > Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> > > Cc: Paul Walmsley <pwalmsley@nvidia.com>
+> > > Cc: Stephen Warren <swarren@wwwdotorg.org>
+> > > Cc: Thierry Reding <thierry.reding@gmail.com>
+> > > Cc: Alexandre Courbot <gnurou@gmail.com>
+> > > ---
+> > >  drivers/soc/tegra/common.c | 1 +
+> > >  1 file changed, 1 insertion(+)
+> > > 
+> > > diff --git a/drivers/soc/tegra/common.c b/drivers/soc/tegra/common.c
+> > > index a71cb74..a952986 100644
+> > > --- a/drivers/soc/tegra/common.c
+> > > +++ b/drivers/soc/tegra/common.c
+> > > @@ -15,6 +15,7 @@ static const struct of_device_id tegra_machine_match[] = {
+> > >  	{ .compatible = "nvidia,tegra30", },
+> > >  	{ .compatible = "nvidia,tegra114", },
+> > >  	{ .compatible = "nvidia,tegra124", },
+> > > +	{ .compatible = "nvidia,tegra132", },
+> > >  	{ }
+> > >  };
+> > 
+> > I'm rather worried by this.
+> > 
+> > The only user of this table is soc_is_tegra(), which seems to guard
+> > several probe paths in drivers which are DT driven. Given that, I don't
+> > see why this is necessary at all, because the presence of the
+> > appropriate nodes should be sufficient to handle the early return from
+> > an initcall.
+> 
+> We need this to preserve backward-compatibility. There are some
+> instances where any device tree nodes that could be used to guard the
+> code execution were only added after the fact. So in order to keep
+> systems with an old DTB running we need to continue running with hard
+> coded physical addresses.
 
-This is another cleanup pull-request for AT91. This one depends on the Device
-Tree material that I posted yesterday, so I merged the at91-dt tag just before
-stacking up Alexandre's patches. This dependency is needed to make sure that
-SRAM gets initialized before using it.
-More cleanup will come soon to reach multi-platform.
+Except that you don't need them for arm64 systems, becuase we don't yet
+have that legacy for arm64...
 
-Thanks, best regards,
+> > More worryingly, if soc_is_tegra() returns true but the node isn't
+> > found, the drivers decide to do things. If tegra_pmc_early_init passes
+> > soc_is_tegra() (because we happened to match "nvidia,tegra132"), but
+> > doesn't find a DTB entry for the pmc, it then pokes an assumed
+> > hard-coded physical address.
+> 
+> And that's (currently) safe. It at least makes sure that breakage (if
+> any) is restricted to Tegra boards. There are other occurrences where
+> drivers don't even bother checking for this at all and simply use an
+> initcall to unconditionally create a platform device which then goes
+> and tries to access physical addresses on *every* board in a multi-
+> platform kernel.
 
-The following changes since commit eca6f17253f33313eeb3020d0634a60d10f650c4:
+So doing the wrong thing on a subset of boards is fine because it's not
+all boards?
 
-  Merge tag 'at91-dt' into at91-3.20-cleanup (2015-01-16 17:18:34 +0100)
+Imagine I make a typo in a DT for a 64-bit system, and suddnely hit
+youre legacy code. Things happen to work, because I don't botehr reading
+the splat in dmesg for whatever reason.
 
-are available in the git repository at:
+Later we do some cleanup of the existing legacy, for whatever reason,
+and we get rid of this particular path for arm64.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-cleanup2
+Suddenly my board won't boot, and to fix that we have to reintroduce
+legacy support code only because said legacy support was enabled where
+it should never have been in the first place. Another OS trying to
+target/use these DTBs has barely any chance of success.
 
-for you to fetch changes up to 29ee506d0d56f6d39cc237de2512f9cb5629cbf7:
+> > Assuming things because of the _lack_ of a node has been a major pain
+> > point on 32-bit as DTBs advanced and code was changed, resulting in boot
+> > breaking or DTB compatibility breaking over time as old and new kernels
+> > made conflicting assumptions.
+> 
+> So what are you saying? We can't support 64-bit ARM because we need to
+> keep backwards-compatibility with old DTBs and weren't smart enough to
+> see this through all the way three years ago?
 
-  ARM: at91: move at91rm9200_idle() to clk/at91/pmc.c (2015-01-16 18:08:42 +0100)
+No. I'm saying that the workarounds we have in place for legacy DTBs
+should be constrained to those cases where legacy DTBs actually exist.
+There is no reason for that legacy to carry across to 64-bit.
 
-----------------------------------------------------------------
-Second batch of cleanup for 3.20:
-- By reworking the PM code, we can remove the AT91 more specific initialization
-- We are using DT for SRAM initialization now, so we can remove its explicit
-  mapping
-- The PMC clock driver now hosts IDLE function for at91rm9200 with other
-  SoCs ones.
+> > I don't want to see arm64 kernels making assumptions in that manner (nor
+> > would I like to see it in new code for 32-bit ARM); it always leads to
+> > boot breakage, and it's completely avoidable. The only thing we can know
+> > is what is described in the DTB.
+> 
+> I guess we could always make this conditional on 32-bit ARM. Or we could
+> decide that we don't care about DTB backwards-compatibility anymore. In
+> fact we're quite likely going to break it soon anyway because of Marc's
+> gic_arch_extn rework, so might as well start with a clean plate after
+> that...
 
-----------------------------------------------------------------
-Alexandre Belloni (8):
-      ARM: at91: pm: rework cpu detection
-      ARM: at91: pm: use the mmio-sram pool to access SRAM
-      ARM: at91: pm: add UDP and UHP checks to newer SoCs
-      ARM: at91: pm: prepare for multiplatform
-      ARM: at91: remove useless map_io
-      ARM: at91: sama5d4: remove useless call to at91_init_sram
-      ARM: at91: remove unused at91_init_sram
-      ARM: at91: move at91rm9200_idle() to clk/at91/pmc.c
+At the very least I think the soc_is_tegra stuff needs to be constrained
+to fallback paths that can only possibly run on 32-bit.
 
- arch/arm/mach-at91/Kconfig           |   1 +
- arch/arm/mach-at91/at91rm9200.c      |  15 -----
- arch/arm/mach-at91/at91sam9260.c     |  27 ---------
- arch/arm/mach-at91/at91sam9261.c     |   9 ---
- arch/arm/mach-at91/at91sam9263.c     |   7 ---
- arch/arm/mach-at91/at91sam9g45.c     |   7 ---
- arch/arm/mach-at91/at91sam9n12.c     |   6 --
- arch/arm/mach-at91/at91sam9rl.c      |  18 ------
- arch/arm/mach-at91/at91sam9x5.c      |   6 --
- arch/arm/mach-at91/board-dt-rm9200.c |  11 ++++
- arch/arm/mach-at91/board-dt-sam9.c   |  27 +++++++++
- arch/arm/mach-at91/board-dt-sama5.c  |   1 +
- arch/arm/mach-at91/generic.h         |  15 ++++-
- arch/arm/mach-at91/pm.c              | 109 ++++++++++++++++++++++++++---------
- arch/arm/mach-at91/sama5d3.c         |   6 --
- arch/arm/mach-at91/sama5d4.c         |   1 -
- arch/arm/mach-at91/setup.c           |  20 -------
- drivers/clk/at91/pmc.c               |   9 +++
- 18 files changed, 145 insertions(+), 150 deletions(-)
+> > So NAK to this addition while soc_is_tegra is in use in that way, and
+> > NAK to any DTS patches adding any of the strings that would cause
+> > soc_is_tegra to return true on arm64.
+> > 
+> > There's also the worrying pattern of initcalls that look for particular
+> > compatible strings -- why can't these use the existing DT probing
+> > infrastructure rather than rolling their own? It would be nice to not
+> > accumulate initcalls that only make sense on one platform.
+> 
+> You make it sound like the "existing DT probing infrastructure" is in
+> any way different from initcalls. Furthermore it's typically associated
+> with a specific subsystem or class of devices, so adding custom OF init
+> tables for a driver that's used on a single platform doesn't strike me
+> as something that people would be willing to merge.
 
--- 
-Nicolas Ferre
+Fair point. 
+
+Thanks,
+Mark.
