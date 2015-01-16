@@ -1,56 +1,97 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 16 Jan 2015 12:08:48 +0100
-Subject: [PATCH v2] ARM: shmobile: sh73a0 dtsi: Add Cortex-A9 TWD node
-Message-ID: <1421406528-26704-1-git-send-email-geert+renesas@glider.be>
+From: mpeg.blue@free.fr (Mason)
+Date: Fri, 16 Jan 2015 12:10:23 +0100
+Subject: RFC on cpufreq implementation
+In-Reply-To: <1421399293.11224.7.camel@AMDC1943>
+References: <54B7F7CD.7030903@free.fr> <1421399293.11224.7.camel@AMDC1943>
+Message-ID: <54B8F19F.8060108@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a node for the Private Timer and Watchdog, as found in the Cortex-A9
-MPCore.
+On 16/01/2015 10:08, Krzysztof Kozlowski wrote:
 
-Without this, there's no clocksource available during early kernel
-initialization, before cmt1 is initialized, leading to a lock-up if
-CONFIG_CPU_IDLE=y.
+> On 2015-01-15 at 18:24 +0100, Mason wrote:
+>  
+>> This is a follow-up to my previous thread.
+>> "How many frequencies would cpufreq optimally like to manage?"
+>> http://thread.gmane.org/gmane.linux.ports.arm.kernel/373669
+>>
+>> As I originally wrote, I'm running 3.14 on an ARM Cortex-A9
+>> based SoC (namely Tango4 from Sigma Designs). I'd like to get
+>> some feedback on the cpufreq driver I wrote for that platform.
+>>
+>> I decided to expose only a small subset of frequencies (namely
+>> {999,500,333,111} MHz) because, in my tests, the ondemand gov
+>> chose mostly min and max, and the intermediate frequencies not
+>> so much; so I figured "2 intermediate freqs" is good enough.
+>> (I'm ready to hear otherwise.)
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-As the TWD driver does not support DT without CCF, this should NOT be
-applied to a branch that still has kzm9g-reference support, as this
-would lead to another lock-up.
-Hence the first choice "dt-for-v3.20" is NOT OK.
-"sh73a0-multiplatform-for-v3.20" is OK.
+I'll take a closer look at other drivers, but I'd like to hear
+opinions on the subject.
 
-v2:
-  - The clock is twd_clk
----
- arch/arm/boot/dts/sh73a0.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+>> I tried to use as much generic framework as possible, but I've
+>> read about the clk framework, and it looks to be an even greater
+>> generalization. Are new platforms encouraged to use that, rather
+>> than provide a cpufreq driver? Does it work when voltage scaling
+>> comes in play? (This SoC doesn't have it, but the next will.)
+>
+> The clock framework generalizes clocks, not cpufreq. Ideally you should
+> use clock framework in cpufreq driver. So instead manually setting
+> divider just do something like:
+>
+> ret = clk_set_rate(cpu_clk, freq_exact);
+> if (ret) {
+> 	dev_err(cpu_dev, "failed to set clock rate: %d\n", ret);
+> 	return ret;
+> }
 
-diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-index 121bbeba8f3f6695..9aa55d52b556b4b1 100644
---- a/arch/arm/boot/dts/sh73a0.dtsi
-+++ b/arch/arm/boot/dts/sh73a0.dtsi
-@@ -11,6 +11,7 @@
- /include/ "skeleton.dtsi"
- 
- #include <dt-bindings/clock/sh73a0-clock.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- 
- / {
-@@ -37,6 +38,13 @@
- 		};
- 	};
- 
-+	timer at f0000600 {
-+		compatible = "arm,cortex-a9-twd-timer";
-+		reg = <0xf0000600 0x20>;
-+		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
-+		clocks = <&twd_clk>;
-+	};
-+
- 	gic: interrupt-controller at f0001000 {
- 		compatible = "arm,cortex-a9-gic";
- 		#interrupt-cells = <3>;
--- 
-1.9.1
+I will give clk a closer look.
+
+> For voltage scaling you should use regulator framework.
+
+OK. I'm also interested in frequency-throttling when temperatures
+rise beyond specific thresholds. What subsystem ties sensors and
+cpufreq together?
+
+> Actually I think existing cpufreq-dt could serve your purpose. Why don't
+> you try it? Or look at it and use as an example.
+
+Will do. I've heard of device tree, but know nothing about it.
+
+>> I'm also wondering how cpufreq and cpuidle interact? Is one a
+>> subset of the other? Are they orthogonal?
+>
+> cpuidle and cpufreq are different subsystems. They don't interact, yet.
+> There are efforts to combine scheduler, cpufreq and cpuidle but this is
+> future. If your SoC has some deeper low power states than developing
+> cpuidle driver makes sense. If not - WFI will be used.
+
+AFAIU, there are no deeper power states on the Cortex-A9.
+
+I didn't find where WFI is called :-(
+
+In kernel/cpu/idle.c (file seems to have been removed in 3.15)
+cpu_idle_loop() calls arch_cpu_idle()
+http://lxr.free-electrons.com/source/kernel/cpu/idle.c?v=3.14#L98
+
+In arch/kernel/process.c
+http://lxr.free-electrons.com/source/arch/arm/kernel/process.c?v=3.14#L173
+/*
+  * Called from the core idle loop.
+  */
+void arch_cpu_idle(void)
+{
+	if (cpuidle_idle_call())
+		default_idle();
+}
+
+default_idle calls cpu_do_idle (by default), a macro for cpu_v7_do_idle
+which executes dsb+wfi, BUT...
+
+ifndef CONFIG_CPU_IDLE then
+static inline int cpuidle_idle_call(void) { return -ENODEV; }
+
+Does that mean I MUST define CONFIG_CPU_IDLE if I want the idle
+loop to call wfi (to save power), even if I don't have a cpuidle
+driver?
+
+Regards.
