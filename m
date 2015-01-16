@@ -1,161 +1,265 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 16 Jan 2015 11:10:18 +0100
-Subject: [PATCH v4 4/4] ARM: mvebu: Armada 385 GP: Add regulators to the
- SATA port
-In-Reply-To: <54B8D97B.3090908@free-electrons.com>
-References: <1421330978-9694-1-git-send-email-gregory.clement@free-electrons.com>
- <1421330978-9694-5-git-send-email-gregory.clement@free-electrons.com>
- <54B8C933.7020502@redhat.com> <54B8D97B.3090908@free-electrons.com>
-Message-ID: <54B8E38A.6020709@redhat.com>
+From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
+Date: Fri, 16 Jan 2015 18:00:09 +0800
+Subject: [PATCH v5 3/5] arm64: dts: Add support for Spreadtrum SC9836 SoC in
+ dts and Makefile
+In-Reply-To: <1421402411-3479-1-git-send-email-chunyan.zhang@spreadtrum.com>
+References: <sc9836-v5>
+ <1421402411-3479-1-git-send-email-chunyan.zhang@spreadtrum.com>
+Message-ID: <1421402411-3479-4-git-send-email-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Zhizhou Zhang <zhizhou.zhang@spreadtrum.com>
 
-On 16-01-15 10:27, Gregory CLEMENT wrote:
-> Hi Hans,
->
-> On 16/01/2015 09:17, Hans de Goede wrote:
->> Hi,
->>
->> On 15-01-15 15:09, Gregory CLEMENT wrote:
->>> Add the regulators to each SATA port.
->>>
->>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->>> ---
->>>    arch/arm/boot/dts/armada-388-gp.dts | 126 ++++++++++++++++++++++++++++++++++++
->>>    1 file changed, 126 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
->>> index 4df22bf91683..590b383db323 100644
->>> --- a/arch/arm/boot/dts/armada-388-gp.dts
->>> +++ b/arch/arm/boot/dts/armada-388-gp.dts
->>> @@ -173,6 +173,16 @@
->>>    				status = "okay";
->>>    				#address-cells = <1>;
->>>    				#size-cells = <0>;
->>> +
->>> +				sata0: sata-port at 0 {
->>> +					reg = <0>;
->>> +					target-supply = <&reg_5v_sata0>;
->>> +				};
->>> +
->>> +				sata1: sata-port at 1 {
->>> +					reg = <1>;
->>> +					target-supply = <&reg_5v_sata1>;
->>> +				};
->>>    			};
->>>
->>>    			sata at e0000 {
->>> @@ -181,6 +191,16 @@
->>>    				status = "okay";
->>>    				#address-cells = <1>;
->>>    				#size-cells = <0>;
->>> +
->>> +				sata2: sata-port at 0 {
->>> +					reg = <0>;
->>> +					target-supply = <&reg_5v_sata2>;
->>> +				};
->>> +
->>> +				sata3: sata-port at 1 {
->>> +					reg = <1>;
->>> +					target-supply = <&reg_5v_sata3>;
->>> +				};
->>>    			};
->>>
->>>    			sdhci at d8000 {
->>> @@ -278,6 +298,112 @@
->>>    		regulator-always-on;
->>>    		gpio = <&expander0 4 GPIO_ACTIVE_HIGH>;
->>>    	};
->>> +
->>> +	reg_sata0: pwr-sata0 {
->>> +		compatible = "regulator-fixed";
->>> +		regulator-name = "pwr_en_sata0";
->>> +		enable-active-high;
->>> +		regulator-always-on;
->>> +
->>> +	};
->>> +
->>> +	reg_5v_sata0: v5-sata0 {
->>> +		compatible = "regulator-fixed";
->>> +		regulator-name = "v5.0-sata0";
->>> +		regulator-min-microvolt = <5000000>;
->>> +		regulator-max-microvolt = <5000000>;
->>> +		regulator-always-on;
->>> +		vin-supply = <&reg_sata0>;
->>> +	};
->>> +
->>> +	reg_12v_sata0: v12-sata0 {
->>> +		compatible = "regulator-fixed";
->>> +		regulator-name = "v12.0-sata0";
->>> +		regulator-min-microvolt = <12000000>;
->>> +		regulator-max-microvolt = <12000000>;
->>> +		regulator-always-on;
->>> +		vin-supply = <&reg_sata0>;
->>> +	};
->>
->> AFAIK the separate v5 / 12v regulators you're creating here
->> are not used anywhere. So I guess there just here to
->> accurately / completely describe the power topology ?
->
-> Yes it was the point.
+Adds the device tree support for Spreadtrum SC9836 SoC which is based on
+Sharkl64 platform.
 
-Ok.
+Sharkl64 platform contains the common nodes of Spreadtrum's arm64-based SoCs.
 
->>> +
->>> +	reg_sata1: pwr-sata1 {
->>> +		regulator-name = "pwr_en_sata1";
->>> +		compatible = "regulator-fixed";
->>> +		regulator-min-microvolt = <12000000>;
->>> +		regulator-max-microvolt = <12000000>;
->>> +		enable-active-high;
->>> +		regulator-always-on;
->>
->>
->> The always on here seems to a bit weird, wasn't the
->> whole purpose of this patch set to teach ahci_platform
->> to turn it on as needed ?
->
-> Maybe I misunderstood the regulator binding, but I thought
-> that (once the suspend will be available on this platform) I
-> could use:
->
-> regulator-state-mem {
-> 			regulator-off-in-suspend;
-> 		};
->
->>
->> You do probably want to put a regulator-boot-on here so
->> that disks do not get an unwanted powercycle (bad for
->> their lifetime) when the firmware has already turned on
->> the disk. Downside of using regulator-boot-on is that if
->> the power is not actually turned on no power-on-delay is
->
-> That's why I didn't use it
->
->> done, but we're not using a power on delay anyways.
->
-> But if regulator-always-on prevent to switch it off in
-> suspend then yes using regulator-boot-on is better.
+Signed-off-by: Zhizhou Zhang <zhizhou.zhang@spreadtrum.com>
+Signed-off-by: Orson Zhai <orson.zhai@spreadtrum.com>
+Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+---
+ arch/arm64/boot/dts/Makefile                  |    1 +
+ arch/arm64/boot/dts/sprd/Makefile             |    5 ++
+ arch/arm64/boot/dts/sprd/sc9836-openphone.dts |   49 +++++++++++++++++
+ arch/arm64/boot/dts/sprd/sc9836.dtsi          |   73 +++++++++++++++++++++++++
+ arch/arm64/boot/dts/sprd/sharkl64.dtsi        |   67 +++++++++++++++++++++++
+ 5 files changed, 195 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/sprd/Makefile
+ create mode 100644 arch/arm64/boot/dts/sprd/sc9836-openphone.dts
+ create mode 100644 arch/arm64/boot/dts/sprd/sc9836.dtsi
+ create mode 100644 arch/arm64/boot/dts/sprd/sharkl64.dtsi
 
-AFAIK regulator-always-on means exactly that and thus likely
-is not what you want. As for using regulator-off-in-suspend
-that is not necessary as the suspend method for the acpi
-driver will already turn it off.
-
-Note that you can test this today by doing (IIRC):
-
-echo devices > /sys/power/pm_test
-echo mem > /sys/power/state
-
-This is how I tested ahci_platform suspend handling on
-the freescale imx processor on the wandboard.
-
-It is probably a good idea to use regulator-boot-on and
-then test things this way, and if that works use
-regulator-boot-on.
-
-Regards,
-
-Hans
+diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+index 3b8d427..806a717 100644
+--- a/arch/arm64/boot/dts/Makefile
++++ b/arch/arm64/boot/dts/Makefile
+@@ -2,6 +2,7 @@ dts-dirs += amd
+ dts-dirs += apm
+ dts-dirs += arm
+ dts-dirs += cavium
++dts-dirs += sprd
+ 
+ always		:= $(dtb-y)
+ subdir-y	:= $(dts-dirs)
+diff --git a/arch/arm64/boot/dts/sprd/Makefile b/arch/arm64/boot/dts/sprd/Makefile
+new file mode 100644
+index 0000000..b658c5e
+--- /dev/null
++++ b/arch/arm64/boot/dts/sprd/Makefile
+@@ -0,0 +1,5 @@
++dtb-$(CONFIG_ARCH_SPRD) += sc9836-openphone.dtb
++
++always		:= $(dtb-y)
++subdir-y	:= $(dts-dirs)
++clean-files	:= *.dtb
+diff --git a/arch/arm64/boot/dts/sprd/sc9836-openphone.dts b/arch/arm64/boot/dts/sprd/sc9836-openphone.dts
+new file mode 100644
+index 0000000..b8a69b2
+--- /dev/null
++++ b/arch/arm64/boot/dts/sprd/sc9836-openphone.dts
+@@ -0,0 +1,49 @@
++/*
++ * Spreadtrum SC9836 openphone board DTS file
++ *
++ * Copyright (C) 2014, Spreadtrum Communications Inc.
++ *
++ * This file is licensed under a dual GPLv2 or X11 license.
++ */
++
++/dts-v1/;
++
++#include "sc9836.dtsi"
++
++/ {
++	model = "Spreadtrum SC9836 Openphone Board";
++
++	compatible = "sprd,sc9836-openphone", "sprd,sc9836";
++
++	aliases {
++		serial0 = &uart0;
++		serial1 = &uart1;
++		serial2 = &uart2;
++		serial3 = &uart3;
++	};
++
++	memory at 80000000 {
++		device_type = "memory";
++		reg = <0 0x80000000 0 0x20000000>;
++	};
++
++	chosen {
++		stdout-path = &uart0;
++	};
++};
++
++&uart0 {
++	status = "okay";
++};
++
++&uart1 {
++	status = "okay";
++};
++
++&uart2 {
++	status = "okay";
++};
++
++&uart3 {
++	status = "okay";
++};
+diff --git a/arch/arm64/boot/dts/sprd/sc9836.dtsi b/arch/arm64/boot/dts/sprd/sc9836.dtsi
+new file mode 100644
+index 0000000..2559d09
+--- /dev/null
++++ b/arch/arm64/boot/dts/sprd/sc9836.dtsi
+@@ -0,0 +1,73 @@
++/*
++ * Spreadtrum SC9836 SoC DTS file
++ *
++ * Copyright (C) 2014, Spreadtrum Communications Inc.
++ *
++ * This file is licensed under a dual GPLv2 or X11 license.
++ */
++
++#include "sharkl64.dtsi"
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++
++/ {
++	compatible = "sprd,sc9836";
++
++	cpus {
++		#address-cells = <2>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0 0x0>;
++			enable-method = "psci";
++		};
++
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0 0x1>;
++			enable-method = "psci";
++		};
++
++		cpu at 2 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0 0x2>;
++			enable-method = "psci";
++		};
++
++		cpu at 3 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0 0x3>;
++			enable-method = "psci";
++		};
++	};
++
++	gic: interrupt-controller at 12001000 {
++		compatible = "arm,gic-400";
++		#interrupt-cells = <3>;
++		interrupt-controller;
++		reg = <0 0x12001000 0 0x1000>,
++		      <0 0x12002000 0 0x2000>,
++		      <0 0x12004000 0 0x2000>,
++		      <0 0x12006000 0 0x2000>;
++	};
++
++	psci {
++		compatible	= "arm,psci";
++		method		= "smc";
++		cpu_on		= <0xc4000003>;
++		cpu_off		= <0x84000002>;
++		cpu_suspend	= <0xc4000001>;
++	};
++
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
++	};
++};
+diff --git a/arch/arm64/boot/dts/sprd/sharkl64.dtsi b/arch/arm64/boot/dts/sprd/sharkl64.dtsi
+new file mode 100644
+index 0000000..b08989d
+--- /dev/null
++++ b/arch/arm64/boot/dts/sprd/sharkl64.dtsi
+@@ -0,0 +1,67 @@
++/*
++ * Spreadtrum Sharkl64 platform DTS file
++ *
++ * Copyright (C) 2014, Spreadtrum Communications Inc.
++ *
++ * This file is licensed under a dual GPLv2 or X11 license.
++ */
++
++/ {
++	interrupt-parent = <&gic>;
++	#address-cells = <2>;
++	#size-cells = <2>;
++
++	soc {
++		compatible = "simple-bus";
++		reg = <0x0 0x0 0x0 0x80000000>;
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		ap_apb: apb at 70000000 {
++			compatible = "simple-bus";
++			reg = <0x0 0x70000000 0x0 0x10000000>;
++			#address-cells = <2>;
++			#size-cells = <2>;
++			ranges;
++
++			uart0: serial at 70000000 {
++				compatible = "sprd,sc9836-uart";
++				reg = <0 0x70000000 0 0x100>;
++				interrupts = <0 2 0xf04>;
++				clocks = <&clk26mhz>;
++				status = "disabled";
++			};
++
++			uart1: serial at 70100000 {
++				compatible = "sprd,sc9836-uart";
++				reg = <0 0x70100000 0 0x100>;
++				interrupts = <0 3 0xf04>;
++				clocks = <&clk26mhz>;
++				status = "disabled";
++			};
++
++			uart2: serial at 70200000 {
++				compatible = "sprd,sc9836-uart";
++				reg = <0 0x70200000 0 0x100>;
++				interrupts = <0 2 0xf04>;
++				clocks = <&clk26mhz>;
++				status = "disabled";
++			};
++
++			uart3: serial at 70300000 {
++				compatible = "sprd,sc9836-uart";
++				reg = <0 0x70300000 0 0x100>;
++				interrupts = <0 3 0xf04>;
++				clocks = <&clk26mhz>;
++				status = "disabled";
++			};
++		};
++	};
++
++	clk26mhz: clk26mhz {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <26000000>;
++	};
++};
+-- 
+1.7.9.5
