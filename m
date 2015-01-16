@@ -1,48 +1,74 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 16 Jan 2015 16:54:22 +0000
-Subject: [PATCH v7 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <20150116122922.GO7091@arm.com>
-References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
- <CACxGe6v_BvCQqp8d=LaQ8HeaOU1Zh_HPpwFTdwOjHUbqXsnQ8g@mail.gmail.com>
- <20150115182346.GE2329@e104818-lin.cambridge.arm.com>
- <20150115190220.GF3043@sirena.org.uk>
- <20150115200437.GF24989@titan.lakedaemon.net>
- <20150116101034.GC13634@e104818-lin.cambridge.arm.com>
- <20150116120518.GK3043@sirena.org.uk>
- <20150116122922.GO7091@arm.com>
-Message-ID: <20150116165422.GE3856@sirena.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 16 Jan 2015 16:56:00 +0000
+Subject: [PATCH 3/3] arm64:  Emulate SETEND for AArch32 tasks
+In-Reply-To: <1421325366-13263-4-git-send-email-suzuki.poulose@arm.com>
+References: <1421325366-13263-1-git-send-email-suzuki.poulose@arm.com>
+ <1421325366-13263-4-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20150116165600.GF32155@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 12:29:22PM +0000, Will Deacon wrote:
-> On Fri, Jan 16, 2015 at 12:05:18PM +0000, Mark Brown wrote:
+On Thu, Jan 15, 2015 at 12:36:06PM +0000, Suzuki K. Poulose wrote:
+> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+> 
+> Emulate deprecated 'setend' instruction for AArch32 bit tasks.
+> 
+> 	setend [le/be] - Sets the endianness of EL0
+> 
+> On systems with CPUs which support mixed endian at EL0, the hardware
+> support for the instruction can be enabled by setting the SCTLR_EL1.SED
+> bit. Like the other emulated instructions it is controlled by an entry in
+> /proc/sys/abi/. For more information see :
+> 	Documentation/arm64/legacy_instructions.txt
+> 
+> The instruction is emulated by setting/clearing the SPSR_EL1.E bit, which
+> will be reflected in the PSTATE.E in AArch32 context.
+> 
+> This patch also restores the native endianness for the execution of signal
+> handlers, since the process could have changed the endianness.
+> 
+> Note: All CPUs on the system should support for mixed endian at EL0. Once the
+> handler is registered a CPU which doesn't support mixed endian, cannot be
+> hotplugged in.
+> 
+> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+> ---
+>  Documentation/arm64/legacy_instructions.txt |    9 +++
+>  arch/arm64/Kconfig                          |   10 ++++
+>  arch/arm64/include/asm/cpufeature.h         |    1 +
+>  arch/arm64/include/asm/ptrace.h             |    7 +++
+>  arch/arm64/kernel/armv8_deprecated.c        |   82 +++++++++++++++++++++++++++
+>  arch/arm64/kernel/signal32.c                |    5 +-
+>  6 files changed, 113 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/arm64/legacy_instructions.txt b/Documentation/arm64/legacy_instructions.txt
+> index 0a4dc26..92b7945 100644
+> --- a/Documentation/arm64/legacy_instructions.txt
+> +++ b/Documentation/arm64/legacy_instructions.txt
+> @@ -47,3 +47,12 @@ Default: Undef (0)
+>  Node: /proc/sys/abi/cp15_barrier
+>  Status: Deprecated
+>  Default: Emulate (1)
+> +
+> +* SETEND
+> +Node: /proc/sys/abi/setend
+> +Status: Deprecated
+> +Default: Emulate (1)*
+> +Note: All the cpus on the system should support mixed endian at EL0
+> +(ID_AA64MMFR0_EL1:BigEnd or BigEndEL0), for this feature to be enabled.
 
-> > Actually, another thing that might help would be if you and/or Will were
-> > to prod the relevant people for review, letting them know that the
-> > controversy isn't likely to affect their bits.
+This might read a little better as:
 
-> Hmm, we *could*, but having maintainers go round poking other people to
-> review patches feels like the wrong way round to me. The authors should
-> be taking ownership of this series and that's half of the problem we
-> had in previous versions.
+  Note: all CPUs in the system must have mixed-endian support at EL0 for
+  this feature to be enabled.
 
-> It needs to be clear that Hanjun/Al/Graeme are the ones running the show,
-> not just now, but (even more importantly) when people start building on
-> top of the base support. If Catalin and I have to go around asking for
-> review, it sets us off on the wrong foot imo.
+That matches the ARM ARM wording for ID_AA64MMFR0_EL1. We shouldn't need
+to mention the particular register fields here.
 
-That's true in general but equally right now it's also fairly clear that
-this isn't going anywhere immediately (and one might assume potentially
-may end up needing substantial rework) for arm64 related reasons which
-creates a bit of stop energy that's more easily unblocked by the arm64
-maintainers than others.  From that point of view I guess just giving
-the ACPI folks something to point at to indicate that the remaining
-issues on the architecture side aren't likely to affect the relevant
-code would probably help also.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150116/5f375ae2/attachment.sig>
+Also, we should probably add a note at the top like:
+
+  Note: instruction emulation may not be possible in all cases. See
+  below for further information.
+
+Thanks,
+Mark.
