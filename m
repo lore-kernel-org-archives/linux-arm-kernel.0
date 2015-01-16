@@ -1,49 +1,52 @@
-From: vincent.yang.fujitsu@gmail.com (Vincent Yang)
-Date: Sat, 17 Jan 2015 01:09:54 +0800
-Subject: [PATCH v3 4/4] mmc: sdhci: host: add new f_sdh30
-In-Reply-To: <CAPDyKFp+sF5J2geen0K1SmU67O9vNDc_w8q92vq+ywZhv9snuw@mail.gmail.com>
-References: <1420803705-4539-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <1420803705-4539-5-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <CAPDyKFqHk5cqFziwsDRa+RttjdiWZ9fYx9UP5nQdWEAJS=Cstg@mail.gmail.com>
- <CAOEd-H3eU=OJQp5+-yzP02ccpzZdoBJ1BUeFoZiu-DhLYDhGWA@mail.gmail.com>
- <CAPDyKFp+sF5J2geen0K1SmU67O9vNDc_w8q92vq+ywZhv9snuw@mail.gmail.com>
-Message-ID: <CAOEd-H0+2eNgwXf9Hm9puKC=8J2zwvj5Ak9Y+isp0dPP74xxHQ@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 16 Jan 2015 09:11:06 -0800
+Subject: [PATCH] clk: rockchip: fix deadlock possibility in cpuclk
+In-Reply-To: <355359386.nxMIlHNuqO@phil>
+References: <355359386.nxMIlHNuqO@phil>
+Message-ID: <CAD=FV=Xc_yabbrC0c0i-wJS+7eW3gq+pHDa81uxNin55jUciNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-01-16 16:36 GMT+08:00 Ulf Hansson <ulf.hansson@linaro.org>:
-> [...]
->
->>>> +       pm_runtime_set_active(&pdev->dev);
->>>> +       pm_runtime_enable(&pdev->dev);
->>>> +       ret = pm_runtime_get_sync(&pdev->dev);
->>>> +       if (ret < 0)
->>>> +               dev_err(dev, "Failed to pm_runtime_get_sync: %d\n", ret);
->>>
->>> As I stated earlier I think this is a strange behaviour of how to
->>> implement runtime PM support. Could you elaborate one more time why
->>> this actually is needed?
->>
->> Thanks for pointing out this.
->> We studied again and realized that this runtime PM support was only there for
->> powerdomain management, but we have not yet upstreamed the powerdomain
->> support. Thus we would like to remove it in next version.
->
-> I am fine with you removing the runtime PM support in the next
-> version. I also hope you to upstream the power domain support later
-> on, that would be nice.
->
-> A small note:
-> From a driver perspective, you shall be able to implement runtime PM
-> support even if you haven't upstreamed the power domain support yet.
-> But, let's then deal with that as a separate patch later on.
+Heiko,
 
-Yes, I got it.
-Thanks a lot for your review and comments!
-
-Kind regards
-Vincent
-
+On Fri, Jan 16, 2015 at 8:52 AM, Heiko St?bner <heiko@sntech.de> wrote:
+> Lockdep reported a possible deadlock between the cpuclk lock and for example
+> the i2c driver.
 >
-> Kind regards
-> Uffe
+>        CPU0                    CPU1
+>        ----                    ----
+>   lock(clk_lock);
+>                                local_irq_disable();
+>                                lock(&(&i2c->lock)->rlock);
+>                                lock(clk_lock);
+>   <Interrupt>
+>     lock(&(&i2c->lock)->rlock);
+>
+>  *** DEADLOCK ***
+>
+> The generic clock-types of the core ccf already use spin_lock_irqsave when
+> touching clock registers, so do the same for the cpuclk.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  drivers/clk/rockchip/clk-cpu.c | 10 ++++++----
+>  1 file changed, 6 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/clk/rockchip/clk-cpu.c b/drivers/clk/rockchip/clk-cpu.c
+> index 75c8c45..3ecdf7d 100644
+> --- a/drivers/clk/rockchip/clk-cpu.c
+> +++ b/drivers/clk/rockchip/clk-cpu.c
+> @@ -124,10 +124,11 @@ static int rockchip_cpuclk_pre_rate_change(struct rockchip_cpuclk *cpuclk,
+>  {
+>         const struct rockchip_cpuclk_reg_data *reg_data = cpuclk->reg_data;
+>         unsigned long alt_prate, alt_div;
+> +       unsigned long flags = 0;
+
+nit: I don't often see flags initted to 0 here when using
+spin_lock_irqsave().  I don't think it's needed...
+
+I doubt it really matters though, and this looks fine to me.
+
+Reviewed-by: Doug Anderson <dianders@chromium.org>
+
+-Doug
