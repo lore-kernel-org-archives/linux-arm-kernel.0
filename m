@@ -1,43 +1,80 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Fri, 16 Jan 2015 15:18:44 +0800
-Subject: [PATCH 1/1] ARM: imx_v6_v7_defconfig: enable more USB functions
-In-Reply-To: <20141008114557.GA3830@dragon>
-References: <1412060581-13963-1-git-send-email-peter.chen@freescale.com>
- <20141008114557.GA3830@dragon>
-Message-ID: <CAL411-rVUd5cPyD-HyZUSZ2uepRC++Q1F-KxxudGr3To9uhAjg@mail.gmail.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Fri, 16 Jan 2015 15:19:43 +0800
+Subject: [PATCH 1/2] ASoC: atmel_ssc_dai: fix start event for I2S mode
+Message-ID: <1421392784-32298-1-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 8, 2014 at 7:46 PM, Shawn Guo <shawn.guo@freescale.com> wrote:
-> On Tue, Sep 30, 2014 at 03:03:01PM +0800, Peter Chen wrote:
->> USB Ethernet function at host mode
->> USB Media function(webcam) at host mode
->> USB Audio function at host mode
->> USB Serial function at host mode
->> USB EHSET driver at host mode (for OTG & EH Certification test)
->> Several USB Gadget functions:
->>       - Configfs
->>       - NCM
->>       - Zero (used for test)
->>       - Gadgetfs
->>       - Serial
->>
->> Above functions are built as module.
->>
->> Signed-off-by: Peter Chen <peter.chen@freescale.com>
->
-> Applied, thanks.
->
+According to the I2S specification information as following:
+  - WS = 0, channel 1 (left)
+  - WS = 1, channel 2 (right)
+So, the start event should be TF/RF falling edge.
 
-(Using Shawn's current email address)
+Reported-by: Songjun Wu <songjun.wu@atmel.com>
+Signed-off-by: Bo Shen <voice.shen@atmel.com>
+---
 
-Hi Shawn,
+ sound/soc/atmel/atmel_ssc_dai.c | 18 ++++--------------
+ 1 file changed, 4 insertions(+), 14 deletions(-)
 
-
-It seems this patch is missed by unknown reason, I can't find it at
-current mainline.
-
-
+diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
+index 99ff35e..e691aab 100644
+--- a/sound/soc/atmel/atmel_ssc_dai.c
++++ b/sound/soc/atmel/atmel_ssc_dai.c
+@@ -348,7 +348,6 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
+ 	struct atmel_pcm_dma_params *dma_params;
+ 	int dir, channels, bits;
+ 	u32 tfmr, rfmr, tcmr, rcmr;
+-	int start_event;
+ 	int ret;
+ 	int fslen, fslen_ext;
+ 
+@@ -457,19 +456,10 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
+ 		 * The SSC transmit clock is obtained from the BCLK signal on
+ 		 * on the TK line, and the SSC receive clock is
+ 		 * generated from the transmit clock.
+-		 *
+-		 *  For single channel data, one sample is transferred
+-		 * on the falling edge of the LRC clock.
+-		 * For two channel data, one sample is
+-		 * transferred on both edges of the LRC clock.
+ 		 */
+-		start_event = ((channels == 1)
+-				? SSC_START_FALLING_RF
+-				: SSC_START_EDGE_RF);
+-
+ 		rcmr =	  SSC_BF(RCMR_PERIOD, 0)
+ 			| SSC_BF(RCMR_STTDLY, START_DELAY)
+-			| SSC_BF(RCMR_START, start_event)
++			| SSC_BF(RCMR_START, SSC_START_FALLING_RF)
+ 			| SSC_BF(RCMR_CKI, SSC_CKI_RISING)
+ 			| SSC_BF(RCMR_CKO, SSC_CKO_NONE)
+ 			| SSC_BF(RCMR_CKS, ssc->clk_from_rk_pin ?
+@@ -478,14 +468,14 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
+ 		rfmr =	  SSC_BF(RFMR_FSEDGE, SSC_FSEDGE_POSITIVE)
+ 			| SSC_BF(RFMR_FSOS, SSC_FSOS_NONE)
+ 			| SSC_BF(RFMR_FSLEN, 0)
+-			| SSC_BF(RFMR_DATNB, 0)
++			| SSC_BF(RFMR_DATNB, (channels - 1))
+ 			| SSC_BIT(RFMR_MSBF)
+ 			| SSC_BF(RFMR_LOOP, 0)
+ 			| SSC_BF(RFMR_DATLEN, (bits - 1));
+ 
+ 		tcmr =	  SSC_BF(TCMR_PERIOD, 0)
+ 			| SSC_BF(TCMR_STTDLY, START_DELAY)
+-			| SSC_BF(TCMR_START, start_event)
++			| SSC_BF(TCMR_START, SSC_START_FALLING_RF)
+ 			| SSC_BF(TCMR_CKI, SSC_CKI_FALLING)
+ 			| SSC_BF(TCMR_CKO, SSC_CKO_NONE)
+ 			| SSC_BF(TCMR_CKS, ssc->clk_from_rk_pin ?
+@@ -495,7 +485,7 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
+ 			| SSC_BF(TFMR_FSDEN, 0)
+ 			| SSC_BF(TFMR_FSOS, SSC_FSOS_NONE)
+ 			| SSC_BF(TFMR_FSLEN, 0)
+-			| SSC_BF(TFMR_DATNB, 0)
++			| SSC_BF(TFMR_DATNB, (channels - 1))
+ 			| SSC_BIT(TFMR_MSBF)
+ 			| SSC_BF(TFMR_DATDEF, 0)
+ 			| SSC_BF(TFMR_DATLEN, (bits - 1));
 -- 
-BR,
-Peter Chen
+2.3.0.rc0
