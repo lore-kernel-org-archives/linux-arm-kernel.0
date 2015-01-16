@@ -1,53 +1,37 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Fri, 16 Jan 2015 09:42:23 +0800
-Subject: [RFC V6 2/3] arm:add bitrev.h file to support rbit instruction
-In-Reply-To: <20150114163800.GZ12302@n2100.arm.linux.org.uk>
-References: <35FD53F367049845BC99AC72306C23D103E010D18273@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18275@CNBJMBX05.corpusers.net>
- <20141113235322.GC4042@n2100.arm.linux.org.uk>
- <35FD53F367049845BC99AC72306C23D103E010D1829B@CNBJMBX05.corpusers.net>
- <20141114095812.GG4042@n2100.arm.linux.org.uk>
- <35FD53F367049845BC99AC72306C23D103E688B313C6@CNBJMBX05.corpusers.net>
- <20150108184059.GZ12302@n2100.arm.linux.org.uk>
- <35FD53F367049845BC99AC72306C23D103EDAF89E195@CNBJMBX05.corpusers.net>
- <20150109111048.GE12302@n2100.arm.linux.org.uk>
- <35FD53F367049845BC99AC72306C23D103EDAF89E198@CNBJMBX05.corpusers.net>
- <20150114163800.GZ12302@n2100.arm.linux.org.uk>
-Message-ID: <35FD53F367049845BC99AC72306C23D103EDAF89E1B0@CNBJMBX05.corpusers.net>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Fri, 16 Jan 2015 10:49:33 +0900
+Subject: [PATCH v2 2/2] ARM: shmobile: r8a7790: Correct mask for GIC PPI
+ interrupts
+In-Reply-To: <1421329844-19707-3-git-send-email-geert+renesas@glider.be>
+References: <1421329844-19707-1-git-send-email-geert+renesas@glider.be>
+ <1421329844-19707-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <CANqRtoQOs_VFku4+PKvyY1Gu0M56nfGXwratrP5qqVYxMCAMpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Thursday, January 15, 2015 12:38 AM
-> To: Wang, Yalin
-> Cc: 'Ard Biesheuvel'; 'Will Deacon'; 'linux-kernel at vger.kernel.org';
-> 'akinobu.mita at gmail.com'; 'linux-mm at kvack.org'; 'Joe Perches'; 'linux-arm-
-> kernel at lists.infradead.org'
-> Subject: Re: [RFC V6 2/3] arm:add bitrev.h file to support rbit instruction
-> 
-> On Fri, Jan 09, 2015 at 08:40:56PM +0800, Wang, Yalin wrote:
-> > Oh, I see,
-> > How about change like this:
-> > +	select HAVE_ARCH_BITREVERSE if ((CPU_V7M || CPU_V7) && !CPU_V6 &&
-> > +!CPU_V6K)
-> > I am not sure if I also need add some older CPU types like !CPU_ARM9TDMI
-> &&?!CPU_ARM940T ?
-> >
-> > Another solution is:
-> > +	select HAVE_ARCH_BITREVERSE if ((CPU_32V7M || CPU_32V7) && !CPU_32V6
-> > +&& !CPU_32V5 && !CPU_32V4 && !CPU_32V4T && !CPU_32V3)
-> >
-> > By the way, I am not clear about the difference between CPU_V6 and
-> > CPU_V6K, could you tell me? :)
-> 
-> I think
-> 
-> 	select HAVE_ARCH_BITREVERSE if (CPU_32v7M || CPU_32v7) && !CPU_32v6
-> 
-> is sufficient - we don't support mixing pre-v6 and v6+ CPU architectures
-> into a single kernel.
-> 
-Ok, I will re-send a patch. 
+Hi Geert,
 
-Thanks
+On Thu, Jan 15, 2015 at 10:50 PM, Geert Uytterhoeven
+<geert+renesas@glider.be> wrote:
+> R-Car H2 (r8a7790) contains four Cortex-A15 and four Cortex-A7 cores,
+> hence the second interrupt specifier cell for Private Peripheral
+> Interrupts should use "GIC_CPU_MASK_SIMPLE(8)", to make sure interrupts
+> can be delivered to all 8 processor cores.
+>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+> Untested
+>
+> v2:
+>   - Drop RFC status after receiving confirmation from Liviu Dudau.
+
+Thanks for your work on this.
+
+I see the "untested" word above which makes me think we should test
+both Big and Little boot modes on r8a7790. The default "Big" mode
+where CA15 is used usually gets a lot of attention, but little mode
+with CA7 boot should also work with the same kernel image.
+
+Cheers,
+
+/ magnus
