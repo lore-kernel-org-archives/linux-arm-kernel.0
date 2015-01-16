@@ -1,38 +1,45 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 16 Jan 2015 18:40:16 +0100
-Subject: [PATCH] ARM: dts: Fix CLK_MOUT_CAMn parent clocks assignment for
- Trats2
-Message-ID: <1421430016-32248-1-git-send-email-s.nawrocki@samsung.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 16 Jan 2015 18:45:16 +0100
+Subject: [PATCH v2 0/2] clocksource: don't suspend/resume when unused
+In-Reply-To: <1421427439-11699-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1421427439-11699-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20150116184516.735cd2de@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to get exact 24MHz clock frequency value for the camera
-sensor and avoid rounding errors the parent clock must be CLK_XUSBXTI,
-not CLK_MOUT_MPLL_USER_T.  Currently the sensor's master clock
-frequency is too high and the sensor doesn't work properly.
+On Fri, 16 Jan 2015 17:57:17 +0100
+Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
 
-This fixes commit 0357a4438d531ef3cf529e80ffcd208eb8e35f55
-("ARM: dts: Specify default clocks for Exynos4 camera devices").
+> This is a quite naive implementation to track whether a clocksource is enabled.
+> I chose not to add a member in struct clocksource and use a flag instead.
+> 
+> I found that timekeeping.c is the only consumer for clocksource and I converted
+> it to use clocksource_enable and clocksource_disable.
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
----
- arch/arm/boot/dts/exynos4412-trats2.dts |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+To the whole series:
 
-diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
-index 29231b4..9ae62c2 100644
---- a/arch/arm/boot/dts/exynos4412-trats2.dts
-+++ b/arch/arm/boot/dts/exynos4412-trats2.dts
-@@ -721,8 +721,8 @@
- 		status = "okay";
- 		assigned-clocks = <&clock CLK_MOUT_CAM0>,
- 				  <&clock CLK_MOUT_CAM1>;
--		assigned-clock-parents = <&clock CLK_MOUT_MPLL_USER_T>,
--					 <&clock CLK_MOUT_MPLL_USER_T>;
-+		assigned-clock-parents = <&clock CLK_XUSBXTI>,
-+					 <&clock CLK_XUSBXTI>;
+Reviewed-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
- 		fimc_0: fimc at 11800000 {
- 			status = "okay";
---
-1.7.9.5
+> 
+> Changes in v2:
+>  - removed the check on enable in timekeeping.c to ensure all clocksources are
+>    going through clocksource_enable
+>  - rework clocksource_enable to set CLOCK_SOURCE_USED when enable is successful
+>    if present
+> 
+> Alexandre Belloni (2):
+>   clocksource: track usage
+>   clocksource: don't suspend/resume when unused
+> 
+>  include/linux/clocksource.h |  4 ++++
+>  kernel/time/clocksource.c   | 34 ++++++++++++++++++++++++++++++++--
+>  kernel/time/timekeeping.c   |  8 +++-----
+>  3 files changed, 39 insertions(+), 7 deletions(-)
+> 
+
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
