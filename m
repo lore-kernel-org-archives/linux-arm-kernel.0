@@ -1,43 +1,44 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 16 Jan 2015 10:58:04 +0000
-Subject: SPCR table parsing
-In-Reply-To: <54B880B5.6010907@redhat.com>
-References: <54B880B5.6010907@redhat.com>
-Message-ID: <20150116105804.GF21809@leverpostej>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 16 Jan 2015 11:59:33 +0100
+Subject: [RFC 2/2] clocksource: don't suspend/resume when unused
+In-Reply-To: <20150116104804.GE3843@piout.net>
+References: <1421399874-29119-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1421399874-29119-3-git-send-email-alexandre.belloni@free-electrons.com>
+ <alpine.DEB.2.11.1501161122320.5526@nanos> <20150116103530.GB3843@piout.net>
+ <54B8EA54.5020002@linaro.org> <20150116104804.GE3843@piout.net>
+Message-ID: <54B8EF15.4000602@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 03:08:37AM +0000, Jon Masters wrote:
-> Hi Folks,
-> 
-> We're implementing support for SPCR table parsing shortly[0], since it
-> will allow to deprecate supplying a "console=" (and eventually, also
-> "earlycon=") on 64-bit ARM servers, where it's not always the case that
-> we can assume a 16550 at a specific address. SPCR has been provided on
-> x86 systems since 2000 but is not (yet) supported by Linux.
+On 01/16/2015 11:48 AM, Alexandre Belloni wrote:
+> Hi,
+>
+> On 16/01/2015 at 11:39:16 +0100, Daniel Lezcano wrote :
+>>> Isn't that already the case?
+>>> Right now, if you call clocksource_suspend, it doesn't matter whether
+>>> the clocksource has an enable or not, it will be suspended. Maybe I'm
+>>> mistaken but my patch doesn't seem to change that behaviour.
+>>
+>> Actually, if there is no enable/disable callback, then CLOCK_SOURCE_USED
+>> will be never set, hence the condition will always fail and the suspend
+>> callback won't be called.
+>>
+>
+> It is set in clocksource_enable/disable, even if there is no
+> enable/disable callback.
 
-For anyone using DT rather than ACPI, the same can be achieved in
-mainline with /chosen/stdout-path as of:
+Ah, right. But shouldn't we set the flag only if the callback is present 
+and succeed as Boris mentioned it ?
 
-7914a7c5651a5161 "of: support passing console options with stdout-path"
+> I only found direct calls to ->enable() in
+> timekeeper.c, did I miss some?
 
-Documented in:
 
-2a9d832cc9aae21e "of: Add bindings for chosen node, stdout-path"
 
-e.g.
 
-uart: serial at f00 {
-	reg = <0xf00 0x200>;
-	compatible = "vendor,some-serial-device";
-};
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-chosen {
-	stdout-path = "/serial at f00:115200n8";
-};
-
-This will be used for both the console and earlycon. Please make use of
-this where possible.
-
-Thanks,
-Mark.
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
