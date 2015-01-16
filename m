@@ -1,44 +1,42 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 16 Jan 2015 14:11:25 +0000
-Subject: [PATCH v7 15/20] arm/arm64: KVM: add virtual GICv3 distributor
- emulation
-In-Reply-To: <20150115122145.GU26222@cbox>
-References: <1421253084-9663-1-git-send-email-andre.przywara@arm.com>
- <1421253084-9663-16-git-send-email-andre.przywara@arm.com>
- <20150115122145.GU26222@cbox>
-Message-ID: <54B91C0D.1050804@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 16 Jan 2015 14:11:09 +0000
+Subject: [PATCH v5 2/5] Documentation: DT: Add bindings for Spreadtrum
+ SoC Platform
+In-Reply-To: <CAAfSe-teDdPzRUnvzM+NErfZwmqM04yUMgic--hyZL8-Jjd8jw@mail.gmail.com>
+References: <1421402411-3479-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1421402411-3479-3-git-send-email-chunyan.zhang@spreadtrum.com>
+ <20150116102135.GC21809@leverpostej>
+ <CAAfSe-teDdPzRUnvzM+NErfZwmqM04yUMgic--hyZL8-Jjd8jw@mail.gmail.com>
+Message-ID: <20150116141109.GC22569@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
-
-On 15/01/15 12:21, Christoffer Dall wrote:
-> On Wed, Jan 14, 2015 at 04:31:19PM +0000, Andre Przywara wrote:
->> With everything separated and prepared, we implement a model of a
->> GICv3 distributor and redistributors by using the existing framework
->> to provide handler functions for each register group.
->>
->> Currently we limit the emulation to a model enforcing a single
->> security state, with SRE==1 (forcing system register access) and
->> ARE==1 (allowing more than 8 VCPUs).
->>
->> We share some of the functions provided for GICv2 emulation, but take
->> the different ways of addressing (v)CPUs into account.
->> Save and restore is currently not implemented.
->>
->> Similar to the split-off of the GICv2 specific code, the new emulation
->> code goes into a new file (vgic-v3-emul.c).
->>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+On Fri, Jan 16, 2015 at 12:53:16PM +0000, Lyra Zhang wrote:
+> Hi, Mark
 > 
+> >> +
+> >> +Required properties:
+> >> +- compatible: must be "sprd,sc9836-uart"
+> >> +- reg: offset and length of the register set for the device
+> >> +- interrupts: exactly one interrupt specifier
+> >> +- clocks: phandles to input clocks.
+> >
+> > The order and relevance of each should be specified. If you have
+> > multiple clocks I would strongly recommend you use clock-names to
+> > distinguish them.
+> >
 > 
-> Drum roll....
-> 
-> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Thank you for the recommendation.
+> but, since we haven't made the clock driver ready, for this initial
+> commit, we just let 4 UARTs share a single fixed 26 MHz clock source.
+> we'll do like you've recommended when we will submit the clock driver
+> in the future.
 
-Awesome, many thanks for that!
-If you need any help with any kind of merging/rebasing GIC related
-patches (the VFIO stuff for instance), please let me know.
+I'm on about the clock input lines on the UART instance, not the
+providers they come from.
 
-Cheers,
-Andre.
+Is there only a single clock input line on each UART? Perhaps multiple
+input lines which are currently fed by the same clock?
+
+Thanks,
+Mark.
