@@ -1,39 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Jan 2015 10:18:59 +0100
-Subject: [PATCH 10/28] PCI: Save sysdata in pci_host_bridge drvdata
-In-Reply-To: <1421372666-12288-11-git-send-email-wangyijing@huawei.com>
-References: <1421372666-12288-1-git-send-email-wangyijing@huawei.com>
- <1421372666-12288-11-git-send-email-wangyijing@huawei.com>
-Message-ID: <18973877.BYCS6vtzoq@wuerfel>
+From: sylvain.rochet@finsecur.com (Sylvain Rochet)
+Date: Fri, 16 Jan 2015 10:20:14 +0100
+Subject: [PATCH] clockevents: don't suspend/resume if unused
+In-Reply-To: <1421399151-26800-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1421399151-26800-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20150116092014.GA27945@gradator.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 January 2015 09:44:08 Yijing Wang wrote:
-> @@ -2066,11 +2064,11 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, u32 db,
->  {
->         struct pci_host_bridge *host;
->  
-> -       host = pci_create_host_bridge(parent, db, resources);
-> +       host = pci_create_host_bridge(parent, db, resources, sysdata);
->         if (!host)
->                 return NULL;
->  
-> -       return __pci_scan_root_bus(host, ops, sysdata);
-> +       return __pci_scan_root_bus(host, ops);
->  }
->  EXPORT_SYMBOL(pci_scan_root_bus);
+Hello Alexandre,
+
+
+On Fri, Jan 16, 2015 at 10:05:51AM +0100, Alexandre Belloni wrote:
+> There is no point in calling suspend/resume for unused
+> clockevents as they are already stopped and disabled.
 > 
+> Furthermore, it can take some time to wait for some IPs to stop counting.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Reported-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
 
-How about keeping the sysdata out of the pci_create_host_bridge interface, and
-refactoring it so that the call sequence becomes
+Indeed, this is way better from what I did.
 
-	host = pci_create_host_bridge(parent, db, resources);
-	host->sysdata = sysdata;
-	__pci_scan_root_bus(host, ops);
 
-This way, we can make sysdata completely option. I assume that more of the
-fields we have in sysdata today can get moved into pci_host_bridge
-over time, so a host bridge driver can just assign those members individually
-between pci_create_host_bridge and __pci_scan_root_bus.
+> +		if (dev->suspend && dev->mode != CLOCK_EVT_MODE_UNUSED)
 
-	Arnd
+I wonder if we should use > CLOCK_EVT_MODE_SHUTDOWN
+(or CLOCK_EVT_MODE_UNUSED || CLOCK_EVT_MODE_SHUTDOWN) instead of 
+!CLOCK_EVT_MODE_UNUSED.
+
+
+Sylvain
