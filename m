@@ -1,141 +1,63 @@
-From: r.peniaev@gmail.com (Roman Peniaev)
-Date: Sat, 17 Jan 2015 00:57:02 +0900
-Subject: [PATCH 1/2] ARM: entry-common: fix forgotten set of
- thread_info->syscall
-In-Reply-To: <CAGXu5j+O6znN=7-gc3PqwqFA5MFRPLGBUzabOmQjWn_9WTjvpg@mail.gmail.com>
-References: <1420986751-30364-1-git-send-email-r.peniaev@gmail.com>
- <1420986751-30364-2-git-send-email-r.peniaev@gmail.com>
- <20150112183955.GO13360@arm.com>
- <CACZ9PQXW9G4Vw-dcPwkdVE=uoYmDYEQnJWDnnpup1LxC3s5QPg@mail.gmail.com>
- <CAGXu5jLO-YSaF8P9o3jcXP4VZCPYVshz73krnchYuv9pPGY6Sw@mail.gmail.com>
- <CACZ9PQVo0SF4Z-rdNk4e=yY17Xt9n5hAqm4ZRNLEw3jGYYcvtA@mail.gmail.com>
- <CAGXu5j+O6znN=7-gc3PqwqFA5MFRPLGBUzabOmQjWn_9WTjvpg@mail.gmail.com>
-Message-ID: <CACZ9PQUEprgKrpHazDULA5mf-OaoX=MAjEeWdspZTXT_+iUKWw@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 16 Jan 2015 16:55:53 +0100
+Subject: [PATCHv3 0/2] Driver for TI tlc59116 16 Channel i2c LED driver
+In-Reply-To: <54B9259C.3070403@ti.com>
+References: <1421277308-3477-1-git-send-email-andrew@lunn.ch>
+ <54B9259C.3070403@ti.com>
+Message-ID: <20150116155553.GC17658@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 7:54 AM, Kees Cook <keescook@chromium.org> wrote:
-> On Wed, Jan 14, 2015 at 5:54 PM, Roman Peniaev <r.peniaev@gmail.com> wrote:
->> On Thu, Jan 15, 2015 at 5:51 AM, Kees Cook <keescook@chromium.org> wrote:
->>> On Tue, Jan 13, 2015 at 12:35 AM, Roman Peniaev <r.peniaev@gmail.com> wrote:
->>>> On Tue, Jan 13, 2015 at 3:39 AM, Will Deacon <will.deacon@arm.com> wrote:
->>>>> On Sun, Jan 11, 2015 at 02:32:30PM +0000, Roman Pen wrote:
->>>>>> thread_info->syscall is used only for ptrace, but syscall number
->>>>>> is also used by syscall_get_nr and returned to userspace by the
->>>>>> following proc file access:
->>>>>>
->>>>>>  $ cat /proc/self/syscall
->>>>>>  0 0x3 0xbe928bd8 0x1000 0x0 0xac9e0 0x3 0xbe928bb4 0xb6f5dfbc
->>>>>>  ^
->>>>>> The first number is the syscall number, currently it is zero.
->>>>>> Patch fixes this:
->>>>>>
->>>>>>  $ cat /proc/self/syscall
->>>>>>  3 0x3 0xbefc7bd8 0x1000 0x0 0xac9e0 0x3 0xbefc7bb4 0xb6e82fbc
->>>>>>  ^
->>>>>> Right, read syscall
->>>>>
->>>>> Yes, it seems that despite requiring CONFIG_HAVE_ARCH_TRACEHOOK,
->>>>> the /proc code requires syscall_get_nr to work regardless of
->>>>> TIF_SYSCALL_TRACE.
->>>>>
->>>>>> Signed-off-by: Roman Pen <r.peniaev@gmail.com>
->>>>>> Cc: Russell King <linux@arm.linux.org.uk>
->>>>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>>>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>>>>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
->>>>>> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
->>>>>> Cc: Sekhar Nori <nsekhar@ti.com>
->>>>>> Cc: linux-arm-kernel at lists.infradead.org
->>>>>> Cc: linux-kernel at vger.kernel.org
->>>>>> Cc: stable at vger.kernel.org
->>>>>> ---
->>>>>>  arch/arm/kernel/asm-offsets.c  | 1 +
->>>>>>  arch/arm/kernel/entry-common.S | 1 +
->>>>>>  2 files changed, 2 insertions(+)
->>>>>>
->>>>>> diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
->>>>>> index 2d2d608..6911bad 100644
->>>>>> --- a/arch/arm/kernel/asm-offsets.c
->>>>>> +++ b/arch/arm/kernel/asm-offsets.c
->>>>>> @@ -70,6 +70,7 @@ int main(void)
->>>>>>    DEFINE(TI_CPU,             offsetof(struct thread_info, cpu));
->>>>>>    DEFINE(TI_CPU_DOMAIN,              offsetof(struct thread_info, cpu_domain));
->>>>>>    DEFINE(TI_CPU_SAVE,                offsetof(struct thread_info, cpu_context));
->>>>>> +  DEFINE(TI_SYSCALL,         offsetof(struct thread_info, syscall));
->>>>>>    DEFINE(TI_USED_CP,         offsetof(struct thread_info, used_cp));
->>>>>>    DEFINE(TI_TP_VALUE,                offsetof(struct thread_info, tp_value));
->>>>>>    DEFINE(TI_FPSTATE,         offsetof(struct thread_info, fpstate));
->>>>>> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
->>>>>> index f8ccc21..89452ff 100644
->>>>>> --- a/arch/arm/kernel/entry-common.S
->>>>>> +++ b/arch/arm/kernel/entry-common.S
->>>>>> @@ -189,6 +189,7 @@ ENTRY(vector_swi)
->>>>>>  #endif
->>>>>>
->>>>>>  local_restart:
->>>>>> +     str scno, [tsk, #TI_SYSCALL]            @ set syscall number
->>>>>>       ldr     r10, [tsk, #TI_FLAGS]           @ check for syscall tracing
->>>>>>       stmdb   sp!, {r4, r5}                   @ push fifth and sixth args
->>>>>
->>>>> Do we definitely want to update scno on syscall restarting?
->>>>
->>>>
->>>> Good question.
->>>>
->>>> First thing to mention is __sys_trace will trace 'restart_syscall',
->>>> not the real syscall we are going to restart.
->>>>
->>>> E.g. in test application we do infinite poll and then send STOP and
->>>> CONT to this app:
->>>>
->>>>     test-243   [002] ...1  1792.067726: sys_enter: NR 168 (0, 0,
->>>> ffffffff, 0, 0, 0)
->>>>     test-243   [002] ...1  1802.299073: sys_exit: NR 168 = -516
->>>>     test-243   [004] ...1  1814.716264: sys_enter: NR 0 (0, 0,
->>>> ffffffff, 0, 0, 0)
->>>>     test-243   [004] ...1  2183.687225: sys_exit: NR 0 = -516
->>>>
->>>> the poll was restarted and trace shows that we are in restart_syscall.
->>>>
->>>> Is that expected?
->>>>
->>>> And the second thing is that my next patch did some tweaks in
->>>> 'syscall_trace_enter', where we take scno not from param we passed,
->>>> but from thread_info->syscall we previously set.
->>>>
->>>> So, regarding your question, if I set scno only once - I will break
->>>> previous behavior, and __sys_trace will trace the syscall we restarted.
->>>>
->>>> And I think this is what we need, because according to the
->>>> 'syscall_trace_enter' code we do 'secure_computing' and
->>>> 'audit_syscall_entry', which definitely expect original syscall, not
->>>> the 'restart_syscall'.
->>>
->>> Seccomp expects to see the __NR_restart_syscall syscall, since it
->>> interposes the syscall entry points.
->>
->>
->> Aha, thanks. So I should not break anything.
->
-> I've tested on ARM now, seccomp doesn't see any change in behavior.
-> Please consider both patches:
->
-> Tested-by: Kees Cook <keescook@chromium.org>
->
+On Fri, Jan 16, 2015 at 04:52:12PM +0200, Tomi Valkeinen wrote:
+> Hi,
+> 
+> On 15/01/15 01:15, Andrew Lunn wrote:
+> > This patchset is a driver for the TI tlc59116 16 Channel i2c LED
+> > driver. This driver is used on the Belkin WRT1900AC access point and
+> > the C code is derived from code Belkin contributed to OpenWRT.
+> > However it has been extensively re-written, and a device tree binding
+> > added to replace platform data.
+> 
+> We have a TLC59108 on one of our boards, and with a quick glance it
+> looks about the same as TLC59116, except the amount of outputs. Vignesh
+> wrote a driver for it and was about to send it for review.
+> 
+> However, Vignesh implemented it as a PWM driver. We use it for LCD
+> backlight (via pwm-backlight).
+> 
+> I'm not very familiar with LED and PWM drivers, but doesn't implementing
+> this as a LED driver prevent us from using it as a backlight? Whereas it
+> looks like PWM can be used as a led via pwm-leds (I think).
+> 
+Hi Tomi
 
-Thanks.
+I've no idea about backlighting....
 
-> One interesting thing I noticed (which is unchanged by this series),
-> but pulling ARM_r7 during the seccomp ptrace event shows __NR_poll,
-> not __NR_restart_syscall, even though it was a __NR_restart_syscall
-> trap from seccomp. Is there a better place to see the actual syscall?
+But the driver does fully implement brightness. So on my board:
 
-As I understand we do not push new r7 to the stack, and ptrace uses the
-old value.
+echo 128 > /sys/class/leds/wrt1900ac\:white\:wan/brightness
 
-I checked x86, x86-64 - ptrace returns __NR_restart_syscall.
-So, probably, this should be fixed for ARM.
+will set that LED to 128/256 brightness. You have 255 steps of
+brightness.
 
---
-Roman
+The reason i did not model it as a PWM, is that it cannot fulfil the
+PWM interface. The configure interface is:
+
+int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns);
+
+However with this device, you have no control over the period. It is
+fixed, from a 97-kHz clock. All you can change is the duty as a ratio
+between 0 and 256. There is the group PWM, where you do have control
+over the period. But as the name implies, this PWM is shared for all
+outputs, which is not what the PWM interface expects, it wants to be
+able to control them individually. Also, it only has a range of 24 Hz
+to 10.73 s. Again, i have no idea about backlights, but i suspect if
+it is driven at 24Hz, i'm going to get a headache. 
+
+The LED interface can be fully implemented. So that is what i have
+done.
+
+So i think modeling this as an LED driver is correct, and maybe you
+need to implemented an led_bl.c driver?
+
+	Andrew
