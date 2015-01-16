@@ -1,35 +1,62 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 16 Jan 2015 15:24:15 +0800
-Subject: [PATCH v7 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <20150115203159.GG3043@sirena.org.uk>
-References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
- <CACxGe6v_BvCQqp8d=LaQ8HeaOU1Zh_HPpwFTdwOjHUbqXsnQ8g@mail.gmail.com>
- <20150115182346.GE2329@e104818-lin.cambridge.arm.com>
- <20150115190220.GF3043@sirena.org.uk>
- <20150115200437.GF24989@titan.lakedaemon.net>
- <20150115203159.GG3043@sirena.org.uk>
-Message-ID: <54B8BC9F.3020106@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 16 Jan 2015 08:27:16 +0100
+Subject: [PATCH] i.MX6-SabreAuto: WEIM: add steering-gpios to set WEIM
+ for NOR
+In-Reply-To: <1421347571-9239-2-git-send-email-alison_chaiken@mentor.com>
+References: <20150115075646.GM23940@pengutronix.de>
+ <1421347571-9239-1-git-send-email-alison_chaiken@mentor.com>
+ <1421347571-9239-2-git-send-email-alison_chaiken@mentor.com>
+Message-ID: <20150116072716.GD18220@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?01?16? 04:31, Mark Brown wrote:
-> On Thu, Jan 15, 2015 at 03:04:37PM -0500, Jason Cooper wrote:
->> On Thu, Jan 15, 2015 at 07:02:20PM +0000, Mark Brown wrote:
->
->>> There's probably a bit of a process problem here - these patches are all
->>> being posted as part of big and apparently controversial threads with
->>> subject lines in the form "ARM / ACPI:" so people could be forgiven for
->>> just not even reading the e-mails enough to notice changes to their
->>> subsystems.  Is it worth posting those patches separately more directly
->>> to the relevant maintainers?
->
->> I think it's beneficial to post the entire series as one thread, but to
->> change the subject line of each patch to adequately reflect the affected
->> subsystem.
->
-> Just changing the subject lines to be more suitable would help, but
+On Thu, Jan 15, 2015 at 10:46:11AM -0800, alison at she-devel.com wrote:
+> From: Alison Chaiken <alison_chaiken@mentor.com>
+> 
+> EIM_D18 pin of i.MX6 CPU is connected to the WEIM switch, to which pin
+> DQ2 of the parallel NOR is also attached.  Use GPIO5, pin 4 to steer
+> the switch to connect the pin to the parallel NOR at boot.  If the
+> GPIO is not set LOW, the probe of the NOR fails when cfi_qry_present()
+> returns "U-V-]" rather than "Q-R-Y" because bit 2 is erroneously high.
+> Implement control of the GPIO by adding a steering-gpios property to
+> the nor child node of the WEIM in the SabreAuto device-tree. Also add
+> a function to the imx-weim probe to set GPIO5 to drive the pad.
+> 
+> Signed-off-by: Alison Chaiken <alison_chaiken@mentor.com>
+> ---
+>  Documentation/devicetree/bindings/bus/imx-weim.txt | 10 +++++
+>  arch/arm/boot/dts/imx6qdl-sabreauto.dtsi           |  1 +
+>  drivers/bus/imx-weim.c                             | 46 ++++++++++++++++++++++
+>  3 files changed, 57 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/bus/imx-weim.txt b/Documentation/devicetree/bindings/bus/imx-weim.txt
+> index 6630d84..359fb26 100644
+> --- a/Documentation/devicetree/bindings/bus/imx-weim.txt
+> +++ b/Documentation/devicetree/bindings/bus/imx-weim.txt
+> @@ -59,6 +59,15 @@ Timing property for child nodes. It is mandatory, not optional.
+>  			there are six registers: CSxGCR1, CSxGCR2, CSxRCR1,
+>  			CSxRCR2, CSxWCR1, CSxWCR2.
+>  
+> +Steering property for child nodes is optional.  Steering is needed if
+> +the bootloader doesn't set the GPIOs driving the EIM switch to connect
+> +the WEIM to the CPU rather than to the peripherals with which the WEIM
+> +has a pin conflict.
+> +
+> + - fsl,steering-gpios:  For i.mx6q-sabreauto, the connectivity of CPU
+> +			pins EIM_D18 and EIM_D30 can be controlled via
+> +			GPIOs.
 
-OK, I will repost this patch set as you and Jason suggested soon.
+It seems to be common that some GPIOs which are not regulators or reset
+pins must be switched into the right direction for stuff to work. Adding
+board specific properties to the device tree to solve this common
+problem for a single usecase doesn't sound like a good solution. I
+suggest that you take a look at the GPIO hogging mechanism patches from
+Benoit Parrot instead: https://lkml.org/lkml/2014/12/19/342
 
-Thanks
-Hanjun
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
