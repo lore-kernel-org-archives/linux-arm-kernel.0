@@ -1,24 +1,27 @@
-From: javi.merino@arm.com (Javi Merino)
-Date: Fri, 16 Jan 2015 12:10:50 +0000
-Subject: RFC on cpufreq implementation
-In-Reply-To: <54B8F19F.8060108@free.fr>
-References: <54B7F7CD.7030903@free.fr> <1421399293.11224.7.camel@AMDC1943>
- <54B8F19F.8060108@free.fr>
-Message-ID: <20150116121049.GB2898@e104805>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 16 Jan 2015 13:28:20 +0100
+Subject: [PATCH] pinctrl: fix up device tree bindings
+In-Reply-To: <CAL_JsqKQJzUOWE2oJsABH3Aa1cCD+526L0G7-WRH=LbKFxesyQ@mail.gmail.com>
+References: <1420924457-12730-1-git-send-email-linus.walleij@linaro.org>
+ <CAL_JsqKQJzUOWE2oJsABH3Aa1cCD+526L0G7-WRH=LbKFxesyQ@mail.gmail.com>
+Message-ID: <CACRpkda9YXi2MJnC_r_CWcfHM7i10oZ2d6VZUQnkix9r_M8fhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mason,
+On Tue, Jan 13, 2015 at 9:06 PM, Rob Herring <robherring2@gmail.com> wrote:
+> On Sat, Jan 10, 2015 at 3:14 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> After the Nomadik pin controller was force migrated to generic pin
+>> control bindings, some leftovers in the documentation need to be
+>> cleaned up. The code and device trees are already migrated.
+>>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> Applied for 3.20. Thanks.
 
-On Fri, Jan 16, 2015 at 11:10:23AM +0000, Mason wrote:
-[...]
-> OK. I'm also interested in frequency-throttling when temperatures
-> rise beyond specific thresholds. What subsystem ties sensors and
-> cpufreq together?
+Oh thanks! :)
 
-The thermal framework.  Have a look at
-Documentation/thermal/sysfs-api.txt and
-Documentation/thermal/cpu-cooling-api.txt
+I was thinking I'd take it through the pinctrl tree but the
+DT tree is even better.
 
-Cheers,
-Javi
+Yours,
+Linus Walleij
