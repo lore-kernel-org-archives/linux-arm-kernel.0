@@ -1,155 +1,79 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 16 Jan 2015 08:42:31 +0100
-Subject: Including empty regulator nodes in axp209.dtsi is a BAD idea
-In-Reply-To: <20150115220438.GD5567@lukather>
-References: <54B4E7B5.6060304@redhat.com> <20150113164606.GA4891@lukather>
- <54B61DD3.6010105@redhat.com>
- <CAGb2v67uGV2HBKciRVGhf-vb7K=whruiaUvv8L7Lqz=8=kBnQQ@mail.gmail.com>
- <20150115220438.GD5567@lukather>
-Message-ID: <54B8C0E7.4040001@redhat.com>
+Date: Fri, 16 Jan 2015 08:58:18 +0100
+Subject: [PATCH v4 0/4] ata: libahci: Allow using a regulator for each port
+In-Reply-To: <1421330978-9694-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1421330978-9694-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <54B8C49A.9070302@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 15-01-15 23:04, Maxime Ripard wrote:
-> On Fri, Jan 16, 2015 at 12:54:58AM +0800, Chen-Yu Tsai wrote:
->> Hi,
->>
->> On Wed, Jan 14, 2015 at 3:42 PM, Hans de Goede <hdegoede@redhat.com> wrote:
->>> Hi,
->>>
->>>
->>> On 13-01-15 17:46, Maxime Ripard wrote:
->>>>
->>>> On Tue, Jan 13, 2015 at 10:39:01AM +0100, Hans de Goede wrote:
->>>>>
->>>>> Hi ChenYu, Maxime,
->>>>>
->>>>> During the review of a few dts files for new boards Maxime asked me to
->>>>> use
->>>>> axp209.dtsi to avoid the standard axp209 "boilerplate" present in most
->>>>> boards using the axp209 pmic.
->>>>>
->>>>> But axp209.dtsi includes empty regulator nodes, e.g. :
->>>>>
->>>>>                   reg_dcdc3: dcdc3 {
->>>>>                           regulator-name = "dcdc3";
->>>>>                   };
->>>>>
->>>>> This is a BAD idea, the presence of these empty nodes causes the
->>>>> axp20x-regulator driver to actually register regulators for them,
->>>>> and then on late_init the regulator subsys turns them off, since
->>>>> they have absolutely no constraints set (nor users registered)
->>>>> and the regulator subsys assumes that when devicetree is used their
->>>>> is always a compete set of constraints and that thus turning them
->>>>> off is safe.
->>>>>
->>>>> So when I switched to using axp209.dtsi for the bananapro.dts,
->>>>> and booted the bananapro this is the last message I got from the
->>>>> kernel while booting:
->>>>>
->>>>> [    2.314014] dcdc3: disabling
->>>>>
->>>>> And away went our DRAM power-supply, oops.
->>>>>
->>>>> So for dcdc2 (CPU) and dcdc3 (DRAM), the boilerplate
->>>>> should contain reasonable constraints (eg the operating range
->>>>> from the datasheet)
->>>>
->>>>
->>>> Indeed.
->>>>
->>>>> and an always-on property.
->>>>
->>>>
->>>> I disagree. The regulator disabling is a feature, and how the board is
->>>> wired is, well, up to the board.
->>>
->>>
->>> And here I was thinking you wanted to reduce the amount of boilerplate
->>> in our dts files ..
->>>
->>> IOW I disagree with your disagreeing all boards we know of have dcdc2
->>> wired to Vcpu and dcdc3 wired to Vddr, so not having this in the dtsi
->>> will lead to a lot of extra boilerplate in each dts file. We're not
->>> talking about our main dtsi file here, if we ever encounter a board
->>> which is wired in a different way, then its dts can simply not use
->>> axp209.dtsi and instead define the nodes itself, it needs to do that
->>> anyways if we do include the standard CPU and DDR constrains in the
->>> dtsi since those will not make sense either in that case.
->>
->> I think Maxime is only disagreeing to the "always-on" part. And I
->> somewhat agree with him, but on a technical level. It doesn't seem
->> possible to negate at the board level the "always-on" set in the dtsi,
->> or it is not obvious to me how to do so. With properties with values
->> you just set a new value. How do you "unset" a boolean flag?
+On 15-01-15 15:09, Gregory CLEMENT wrote:
+> The current implementation of the libahci allows using one PHY per
+> port but we still have one single regulator for the whole
+> controller. This series adds the support of multiple regulators.
 >
-> You don't, but Hans suggestion was to not use the DTSI then and define
-> the nodes yourself in your DTS.
+> This is the forth version of the series.
 >
-> Another solution would be if this case comes up at some point to just
-> push the always-on constraints to the boards, but assume for now that
-> all boards will want it to be always on.
+> The improvement of this version is the use of
+> ahci_platform_put_resources to put the reference to the regulators.
 >
->> As for the constraints, I think we can agree that everyone will use
->> the reference design if they choose to include the PMIC on a board.
+> Thanks,
 >
-> I'm not sure to get what you mean here. The PMIC has constraints of
-> its own (the min/max voltage it can deliver), and boards will have
-> some too (ie the min/max voltage the components can handle). So I
-> guess we will end up with constraints defined at both levels.
->
->>>> If an always-on property is needed, then it's in the DTS, not in the
->>>> AXP DTSI.
->>>>
->>>>> The ldo-s are trickier, since we simply do not know how those
->>>>> are used, I think ldo2 is used for Avcc on most boards, so it
->>>>> too should be always on, since almost any board will have some
->>>>> analog parts on it (be it the ir receiver, lradc, rtp, lvds, vga,
->>>>> or analog audio in/out). Assuming that we're willing to assume
->>>>> that ldo2 is used this way, we should give it matching constraints
->>>>> and always mark it always-on.
->>>>
->>>>
->>>> Ideally, all the drivers that have a analogic component should have a
->>>> reference to the regulator they use. But again, at the board
->>>> level. And more realistically, putting always-on should also happen at
->>>> the board level.
->>>>
->>>>> As for ldo3 - 5 I've no idea when / for what these are used, but
->>>>> if we do not know it is better to just leave them be then to turn
->>>>> them off IMHO, so we should remove the nodes for these from axp209.dtsi
->>>>>
->>>>> Anyways sorting this all out is going to take some time, so I'm
->>>>> not going to use axp209.dtsi in dts files for new boards for now.
->>>>
->>>>
->>>> I'm afraid it's an "all or nothing" situation.
->>>
->>>
->>> No it is not, the PMIC is a mfd, and we can use some of its functions
->>> fine without actually loading the regulator bits. This is already
->>> done on most boards with the axp209, even without touching the regulators
->>> it is nice to have the axp209 mfd driver loaded so that we get support
->>> for the powerbutton, and support for poweroff, esp. the latter is quite
->>> nice to have.
->>
->> I agree that a) the PMIC is an mfd, and b) we can use other bits without
->> loading the regulator bits. But if adding the regulator bits results in
->> some sort of crash or issue, just because some regulator got turned off,
->> it seems to me that the dt is not accurately describing the hardware.
->
-> Yeah, that's kind of the same argument than the one we had with
-> simplefb clocks. So I guess we can agree that we can allow the MFD
-> part alone to work, but if regulator support is introduced, then *all*
-> regulators must be described accurately.
+> Gr?gory
 
-Hmm, I would prefer to have all listed regulators described accurately,
-if we do not know how a regulator is used it may be best to just leave it
-out (leaving it at whatever setting the bootloader has configured it) AFAIK
-there is no technical reason why we must describe all or no regulators.
+Thanks, patches 1 - 3 look good and are:
+
+Acked-by: Hans de Goede <hdegoede@redhat.com>
+
+Tejun, can you please queue up 1 - 3 ?
+
+I still have some remarks wrt patch 4 (*), and it should probably go
+upstream through another tree anyways.
 
 Regards,
 
 Hans
+
+
+*) I didn't look closely at patch 4 as it seemed trivial, until now
+that is ...
+
+
+
+>
+> Changelog:
+>
+>   v3 -> v4
+> - Moved putting the reference to the regulators into the
+>    ahci_platform_put_resources function.
+> - Tested the port_dev pointer before dereferencing.
+>
+>   v2 -> v3:
+> - put back the regulator inside the sub-node ports
+> - made the ports platform devices when the device tree is used
+> - released the regulator in case of error in the probe function
+>
+>   v1 -> v2:
+> - Kept the case when no child node are present under the ahci node
+> - Fix the test done under the label disable_target_pwrs
+> - No more use an of_ version of the regulator framework and instead
+>    associate each regulator of a port with an unique name.
+> - Added the acked-by on the clean-up patch
+>
+> Gregory CLEMENT (4):
+>    ata: libahci: Clean-up the ahci_platform_en/disable_phys functions
+>    Documentation: bindings: Add the regulator property to the sub-nodes
+>      AHCI bindings
+>    ata: libahci: Allow using multiple regulators
+>    ARM: mvebu: Armada 385 GP: Add regulators to the SATA port
+>
+>   .../devicetree/bindings/ata/ahci-platform.txt      |   9 +-
+>   arch/arm/boot/dts/armada-388-gp.dts                | 126 +++++++++++
+>   drivers/ata/ahci.h                                 |   2 +-
+>   drivers/ata/ahci_imx.c                             |  14 +-
+>   drivers/ata/libahci_platform.c                     | 236 ++++++++++++++-------
+>   include/linux/ahci_platform.h                      |   2 +
+>   6 files changed, 305 insertions(+), 84 deletions(-)
+>
