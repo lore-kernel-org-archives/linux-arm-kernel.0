@@ -1,72 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Jan 2015 11:35:23 +0900
-Subject: [PATCH 11/17] ARM: shmobile: sh73a0: Introduce generic setup callback
+Date: Fri, 16 Jan 2015 11:35:26 +0900
+Subject: [PATCH 14/17] ARM: shmobile: kzm9g: Build DTS for Multiplatform
 In-Reply-To: <cover.1421371996.git.horms+renesas@verge.net.au>
 References: <cover.1421371996.git.horms+renesas@verge.net.au>
-Message-ID: <fcbd924a694351eb1583e8fa3671c7353b43b67d.1421371996.git.horms+renesas@verge.net.au>
+Message-ID: <9ccba8abd0a7ceb4a2e1b2763d3964184ef8985d.1421371996.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm+renesas@opensource.se>
 
-Add a generic sh73a0 machine setup callback for the upcoming
-sh73a0 multiplatform case. Cache needs to be configured, and
-legacy clocks must be omitted.
+Build the sh73a0 KZM9G board DTB in case of Multiplatform.
+The DT reference case will be removed in the future and
+can be ignored for now.
 
 Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-sh73a0.c | 16 +++++++++++++---
- 1 file changed, 13 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/Makefile | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
-index 354cab1..34b5a78 100644
---- a/arch/arm/mach-shmobile/setup-sh73a0.c
-+++ b/arch/arm/mach-shmobile/setup-sh73a0.c
-@@ -30,6 +30,7 @@
- #include <linux/platform_data/sh_ipmmu.h>
- #include <linux/platform_data/irq-renesas-intc-irqpin.h>
- 
-+#include <asm/hardware/cache-l2x0.h>
- #include <asm/mach-types.h>
- #include <asm/mach/map.h>
- #include <asm/mach/arch.h>
-@@ -779,8 +780,6 @@ void __init sh73a0_add_early_devices(void)
- 	shmobile_setup_console();
- }
- 
--#ifdef CONFIG_USE_OF
--
- void __init sh73a0_add_standard_devices_dt(void)
- {
- 	/* clocks are setup late during boot in the case of DT */
-@@ -797,6 +796,17 @@ static void sh73a0_restart(enum reboot_mode mode, const char *cmd)
- 	writel((1 << 31), RESCNT2);
- }
- 
-+#ifdef CONFIG_USE_OF
-+
-+static void __init sh73a0_generic_init(void)
-+{
-+#ifdef CONFIG_CACHE_L2X0
-+	/* Shared attribute override enable, 64K*8way */
-+	l2x0_init(IOMEM(0xf0100000), 0x00400000, 0xc20f0fff);
-+#endif
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+}
-+
- static const char *sh73a0_boards_compat_dt[] __initdata = {
- 	"renesas,sh73a0",
- 	NULL,
-@@ -806,7 +816,7 @@ DT_MACHINE_START(SH73A0_DT, "Generic SH73A0 (Flattened Device Tree)")
- 	.smp		= smp_ops(sh73a0_smp_ops),
- 	.map_io		= sh73a0_map_io,
- 	.init_early	= shmobile_init_delay,
--	.init_machine	= sh73a0_add_standard_devices_dt,
-+	.init_machine	= sh73a0_generic_init,
- 	.init_late	= shmobile_init_late,
- 	.restart	= sh73a0_restart,
- 	.dt_compat	= sh73a0_boards_compat_dt,
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 91bd5bd..7fa843a 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -421,7 +421,8 @@ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += emev2-kzm9d.dtb \
+ 	r8a7790-lager.dtb \
+ 	r8a7791-henninger.dtb \
+ 	r8a7791-koelsch.dtb \
+-	r8a7794-alt.dtb
++	r8a7794-alt.dtb \
++	sh73a0-kzm9g.dtb
+ dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_arria5_socdk.dtb \
+ 	socfpga_arria10_socdk.dtb \
+ 	socfpga_cyclone5_socdk.dtb \
 -- 
 2.1.4
