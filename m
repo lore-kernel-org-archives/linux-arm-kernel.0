@@ -1,97 +1,60 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 16 Jan 2015 14:52:44 -0800
-Subject: Regression with legacy IRQ numbers caused by 9a1091ef0017
-In-Reply-To: <20150116172905.GM18552@atomide.com>
-References: <20150114221407.GS2419@atomide.com>
- <20150115105035.GU11502@n2100.arm.linux.org.uk>
- <20150115152838.GB18552@atomide.com>
- <20150115171924.GV11502@n2100.arm.linux.org.uk>
- <20150116162119.GK18552@atomide.com>
- <20150116163019.GW11502@n2100.arm.linux.org.uk>
- <20150116164105.GL18552@atomide.com>
- <20150116172223.GX11502@n2100.arm.linux.org.uk>
- <20150116172905.GM18552@atomide.com>
-Message-ID: <20150116225243.GN18552@atomide.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 16 Jan 2015 16:55:50 -0600
+Subject: [PATCH 1/1] gpio: omap: Fix bad device access with setup_irq()
+In-Reply-To: <1421448650-15904-1-git-send-email-tony@atomide.com>
+References: <1421448650-15904-1-git-send-email-tony@atomide.com>
+Message-ID: <20150116225550.GA6254@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [150116 09:36]:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [150116 09:25]:
-> > On Fri, Jan 16, 2015 at 08:41:06AM -0800, Tony Lindgren wrote:
-> > > * Russell King - ARM Linux <linux@arm.linux.org.uk> [150116 08:33]:
-> > > > I would still like to understand /why/ enabling preempt causes the error.
-> > > > Changing the preempt configuration really should not change what happens
-> > > > on the bus.  (Think about it.)  It's an indication that there is some
-> > > > other error present.
-> > > 
-> > > We have a wrong irq number caused by $subject. And the wrong irq
-> > > gets triggered before the dma hardware is configured during dma
-> > > init. And then we get the invalid access error from omap_l3_noc.
-> > 
-> > ... which should happen whether or not preempt is enabled, which is
-> > really my point.
-> > 
-> > We know tha the wrong IRQ gets requested by the driver - and that wrong
-> > IRQ is requested whether or not we have preempt enabled.  Yet we get
-> > the warning whether or not preempt is enabled.
-> > 
-> > The DMA handler is not registered as a threaded handler, so it's not
-> > depending on a context switch to execute omap2_dma_irq_handler().
-> > 
-> > Another reason why I don't agree with your explanation is that by the
-> > time setup_irq() is called, we have already poked at the DMA hardware
-> > several times - omap_clear_dma() and omap2_disable_irq_lch() will have
-> > been called for each DMA channel - and both will write to the hardware.
-> > 
-> > What's more is that the only things left after setup_irq() has been
-> > called is to possibly reserve the first two DMA channels and print
-> > the DMA message (via show_dma_caps).  So I see nothing after setup_irq()
-> > which would "finish" any unfinished hardware initialisation.
-> > 
-> > The final reason I don't agree is that I've put a printk() in
-> > omap2_dma_irq_handler(), and this does not trigger.
+On Fri, Jan 16, 2015 at 02:50:50PM -0800, Tony Lindgren wrote:
+> Similar to omap_gpio_irq_type() let's make sure that the GPIO
+> is usable as an interrupt if the platform init code did not
+> call gpio_request(). Otherwise we can get invalid device access
+> after setup_irq():
 > 
-> Oh, yes that blows my theory completely then.
->  
-> > So, I think this has nothing to do with the DMA hardware /at all/,
-> > but more to do with the GPIO code, and it suggests that the GPIO code
-> > publishes IRQs before it is safe for those IRQs to be used.
-> > 
-> > Maybe it has to do with omap_gpio_irq_handler() being called... added
-> > printk(), nope, that's not called either.  So it's not an IRQ which
-> > gets triggered at all.
-> > 
-> > What is called are (in order):
-> > 
-> > omap_gpio_unmask_irq()
-> > omap_set_gpio_irqenable()
-> > omap_enable_gpio_irqbank()
-> > 
-> > and this reveals where the problem is, especially when you then add
-> > instrumentation into the runtime PM functions - and this reveals that
-> > when a GPIO IRQ is requested, these functions are called while the
-> > GPIO is runtime suspended.
-> > 
-> > _That_ is where the *real* problem lies - requesting a GPIO interrupt
-> > results in the kernel touching possibly runtime-suspended hardware.
-> > 
-> > The reason it happens with preempt is that preempt introduces scheduling
-> > points during the kernel boot which would not otherwise be there (with
-> > preempt disabled, you have to hit an explicit context switch due to
-> > contention on some lock or a wait in order for some other thread to run.)
+> WARNING: CPU: 0 PID: 1 at drivers/bus/omap_l3_noc.c:147 l3_interrupt_handler+0x214/0x340()
+> 44000000.ocp:L3 Custom Error: MASTER MPU TARGET L4CFG (Idle): Data Access in Supervisor mode during Functional access
+> ...
+> [<c05f21e4>] (__irq_svc) from [<c05f1974>] (_raw_spin_unlock_irqrestore+0x34/0x44)
+> [<c05f1974>] (_raw_spin_unlock_irqrestore) from [<c00914a8>] (__setup_irq+0x244/0x530)
+> [<c00914a8>] (__setup_irq) from [<c00917d4>] (setup_irq+0x40/0x8c)
+> [<c00917d4>] (setup_irq) from [<c0039c8c>] (omap_system_dma_probe+0x1d4/0x2b4)
+> [<c0039c8c>] (omap_system_dma_probe) from [<c03b2200>] (platform_drv_probe+0x44/0xa4)
+> ...
 > 
-> OK makes sense.
->  
-> > So, the GPIO driver really needs fixing - and I'd suggest fixing it
-> > first, before fixing the DMA problem, because the DMA problem allows
-> > us to see the GPIO problem.
+> We can fix this the same way omap_gpio_irq_type() is handling it.
 > 
-> Yes we need to fix that.
+> Note that the long term solution is to change the gpio-omap driver
+> to handle the banks as separate driver instances. This will allow
+> us to rely on just runtime PM for tracking the bank specific state.
+> 
+> Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Javier Martinez Canillas <javier@dowhile0.org>
+> Cc: Kevin Hilman <khilman@kernel.org>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> Cc: Santosh Shilimkar <ssantosh@kernel.org>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-Posted a minimal fix for that one as a separate thread:
+Tony sent me this patch privately for testing, I've boot tested with
+AM437x IDK, AM437x SK and BBB with CONFIG_PREEMPT.
 
-[PATCH 1/1] gpio: omap: Fix bad device access with setup_irq()
+Here are the logs:
 
-Regards,
+http://hastebin.com/vabenibema
+http://hastebin.com/weyukexuzi
+http://hastebin.com/siceyiwite
 
-Tony
+Tested-by: Felipe Balbi <balbi@ti.com>
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150116/d7a4db5f/attachment.sig>
