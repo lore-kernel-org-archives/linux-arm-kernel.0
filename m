@@ -1,66 +1,302 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Fri, 16 Jan 2015 11:24:09 -0800
-Subject: [PATCH v4 3/3] ARM: dts: add I2C device nodes for Broadcom Cygnus
-In-Reply-To: <20150115084456.GO22880@pengutronix.de>
-References: <rjui@broadcom.com>
- <1421274213-3544-1-git-send-email-rjui@broadcom.com>
- <1421274213-3544-4-git-send-email-rjui@broadcom.com>
- <20150115084456.GO22880@pengutronix.de>
-Message-ID: <54B96559.1010007@broadcom.com>
+From: dave.long@linaro.org (David Long)
+Date: Fri, 16 Jan 2015 14:28:34 -0500
+Subject: [PATCH v4 3/6] arm64: Kprobes with single stepping support
+In-Reply-To: <CAHM4w1no=A1kTxN26znXD42USzO+ByHWHy76F2UMnmXhPKH0kQ@mail.gmail.com>
+References: <1420949002-3726-1-git-send-email-dave.long@linaro.org>	<1420949002-3726-4-git-send-email-dave.long@linaro.org>
+ <CAHM4w1no=A1kTxN26znXD42USzO+ByHWHy76F2UMnmXhPKH0kQ@mail.gmail.com>
+Message-ID: <54B96662.3030201@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 1/15/2015 12:44 AM, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> On Wed, Jan 14, 2015 at 02:23:33PM -0800, Ray Jui wrote:
->> Add I2C device nodes and its properties in bcm-cygnus.dtsi but keep
->> them disabled there. Individual I2C devices can be enabled in board
->> specific dts file when I2C slave devices are enabled in the future
-> s/$/./
-> 
+On 01/14/15 04:30, Pratyush Anand wrote:
+> Hi Dave,
+>
+> On Sun, Jan 11, 2015 at 9:33 AM, David Long <dave.long@linaro.org> wrote:
+>> From: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
 >>
->> Signed-off-by: Ray Jui <rjui@broadcom.com>
->> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+>> Add support for basic kernel probes(kprobes) and jump probes
+>> (jprobes) for ARM64.
+>>
+>> Kprobes will utilize software breakpoint and single step debug
+>> exceptions supported on ARM v8.
+>>
+>> Software breakpoint is placed at the probe address to trap the
+>> kernel execution into kprobe handler.
+>>
+>> ARM v8 supports single stepping to be enabled while exception return
+>> (ERET) with next PC in exception return address (ELR_EL1). The
+>> kprobe handler prepares an executable memory slot for out-of-line
+>> execution with a copy of the original instruction being probed, and
+>> enables single stepping from the instruction slot. With this scheme,
+>> the instruction is executed with the exact same register context
+>> 'except PC' that points to instruction slot.
+>>
+>> Debug mask(PSTATE.D) is enabled only when single stepping a recursive
+>> kprobe, e.g.: during kprobes reenter so that probed instruction can be
+>> single stepped within the kprobe handler -exception- context.
+>> The recursion depth of kprobe is always 2, i.e. upon probe re-entry,
+>> any further re-entry is prevented by not calling handlers and the case
+>> counted as a missed kprobe).
+>>
+>> Single stepping from slot has a drawback on PC-relative accesses
+>> like branching and symbolic literals access as offset from new PC
+>> (slot address) may not be ensured to fit in immediate value of
+>> opcode. Such instructions needs simulation, so reject
+>> probing such instructions.
+>>
+>> Instructions generating exceptions or cpu mode change are rejected,
+>> and not allowed to insert probe for these instructions.
+>>
+>> Instructions using Exclusive Monitor are rejected too.
+>>
+>> System instructions are mostly enabled for stepping, except MSR
+>> immediate that updates "daif" flags in PSTATE, which are not safe
+>> for probing.
+>>
+>> Changes since v3:
+>> from David Long:
+>> 1) Removed unnecessary addtion of NOP after out-of-line instruction.
+>> 2) Replaced table-driven instruction parsing with calls to external
+>>     test functions.
+>> from Steve Capper:
+>> 3) Disable local irq while executing out of line instruction.
+>>
+>> Signed-off-by: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
+>> Signed-off-by: Steve Capper <steve.capper@linaro.org>
+>> Signed-off-by: David A. Long <dave.long@linaro.org>
 >> ---
->>  arch/arm/boot/dts/bcm-cygnus.dtsi |   20 ++++++++++++++++++++
->>  1 file changed, 20 insertions(+)
+>>   arch/arm64/Kconfig                |   1 +
+>>   arch/arm64/include/asm/kprobes.h  |  60 +++++
+>>   arch/arm64/include/asm/probes.h   |  50 ++++
+>>   arch/arm64/include/asm/ptrace.h   |   3 +-
+>>   arch/arm64/kernel/Makefile        |   1 +
+>>   arch/arm64/kernel/kprobes-arm64.c |  65 +++++
+>>   arch/arm64/kernel/kprobes-arm64.h |  28 ++
+>>   arch/arm64/kernel/kprobes.c       | 551 ++++++++++++++++++++++++++++++++++++++
+>>   arch/arm64/kernel/kprobes.h       |  30 +++
+>>   arch/arm64/kernel/vmlinux.lds.S   |   1 +
+>>   10 files changed, 789 insertions(+), 1 deletion(-)
+>>   create mode 100644 arch/arm64/include/asm/kprobes.h
+>>   create mode 100644 arch/arm64/include/asm/probes.h
+>>   create mode 100644 arch/arm64/kernel/kprobes-arm64.c
+>>   create mode 100644 arch/arm64/kernel/kprobes-arm64.h
+>>   create mode 100644 arch/arm64/kernel/kprobes.c
+>>   create mode 100644 arch/arm64/kernel/kprobes.h
 >>
->> diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
->> index 5126f9e..f7d6c1d 100644
->> --- a/arch/arm/boot/dts/bcm-cygnus.dtsi
->> +++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
->> @@ -70,6 +70,26 @@
->>  		};
->>  	};
->>  
->> +	i2c0: i2c at 18008000 {
->> +		compatible = "brcm,iproc-i2c";
-> in patch 2 you wrote the driver is for a family of SoCs, right? Then I'd
-> make this:
-> 
-> 	compatible = "brcm,$mysoc-iproc-i2c", "brcm,iproc-i2c";
-> 
-Sorry could you please help to explain the intention here? Note the
-iProc I2C IP can be found in various iProc family of SoCs, but to my
-best knowledge, there hasn't been any changes of the IP in any of those
-SoCs.
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 12b3fd6..b3f61ba 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -67,6 +67,7 @@ config ARM64
+>>          select HAVE_REGS_AND_STACK_ACCESS_API
+>>          select HAVE_RCU_TABLE_FREE
+>>          select HAVE_SYSCALL_TRACEPOINTS
+>> +       select HAVE_KPROBES if !XIP_KERNEL
+>>          select IRQ_DOMAIN
+>>          select MODULES_USE_ELF_RELA
+>>          select NO_BOOTMEM
+>> diff --git a/arch/arm64/include/asm/kprobes.h b/arch/arm64/include/asm/kprobes.h
+>> new file mode 100644
+>> index 0000000..b35d3b9
+>> --- /dev/null
+>> +++ b/arch/arm64/include/asm/kprobes.h
+>> @@ -0,0 +1,60 @@
+>> +/*
+>> + * arch/arm64/include/asm/kprobes.h
+>> + *
+>> + * Copyright (C) 2013 Linaro Limited
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+>> + * General Public License for more details.
+>> + */
+>> +
+>> +#ifndef _ARM_KPROBES_H
+>> +#define _ARM_KPROBES_H
+>> +
+>> +#include <linux/types.h>
+>> +#include <linux/ptrace.h>
+>> +#include <linux/percpu.h>
+>> +
+>> +#define __ARCH_WANT_KPROBES_INSN_SLOT
+>> +#define MAX_INSN_SIZE                  1
+>> +#define MAX_STACK_SIZE                 128
+>> +
+>> +#define flush_insn_slot(p)             do { } while (0)
+>> +#define kretprobe_blacklist_size       0
+>> +
+>> +#include <asm/probes.h>
+>> +
+>> +struct prev_kprobe {
+>> +       struct kprobe *kp;
+>> +       unsigned int status;
+>> +};
+>> +
+>> +/* Single step context for kprobe */
+>> +struct kprobe_step_ctx {
+>> +#define KPROBES_STEP_NONE      0x0
+>> +#define KPROBES_STEP_PENDING   0x1
+>> +       unsigned long ss_status;
+>> +       unsigned long match_addr;
+>> +};
+>> +
+>> +/* per-cpu kprobe control block */
+>> +struct kprobe_ctlblk {
+>> +       unsigned int kprobe_status;
+>> +       unsigned long saved_irqflag;
+>> +       struct prev_kprobe prev_kprobe;
+>> +       struct kprobe_step_ctx ss_ctx;
+>> +       struct pt_regs jprobe_saved_regs;
+>> +       char jprobes_stack[MAX_STACK_SIZE];
+>> +};
+>> +
+>> +void arch_remove_kprobe(struct kprobe *);
+>> +int kprobe_fault_handler(struct pt_regs *regs, unsigned int fsr);
+>> +int kprobe_exceptions_notify(struct notifier_block *self,
+>> +                            unsigned long val, void *data);
+>> +
+>> +#endif /* _ARM_KPROBES_H */
+>> diff --git a/arch/arm64/include/asm/probes.h b/arch/arm64/include/asm/probes.h
+>> new file mode 100644
+>> index 0000000..9dba74d
+>> --- /dev/null
+>> +++ b/arch/arm64/include/asm/probes.h
+>> @@ -0,0 +1,50 @@
+>> +/*
+>> + * arch/arm64/include/asm/probes.h
+>> + *
+>> + * Copyright (C) 2013 Linaro Limited
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+>> + * General Public License for more details.
+>> + */
+>> +#ifndef _ARM_PROBES_H
+>> +#define _ARM_PROBES_H
+>> +
+>> +struct kprobe;
+>> +struct arch_specific_insn;
+>> +
+>> +typedef u32 kprobe_opcode_t;
+>> +typedef unsigned long (kprobes_pstate_check_t)(unsigned long);
+>> +typedef unsigned long
+>> +(kprobes_condition_check_t)(struct kprobe *p, struct pt_regs *);
+>
+> Can we make kprobes_condition_check_t as struct kprobe indepedent, so
+> that it is usable by uprobe as
+> well..
+>
+>   typedef unsigned long
+> (kprobes_condition_check_t)(u32 opcode, struct arch_specific_insn *asi,
+>                 struct pt_regs *);
+>
 
-Is the compatible ID "brcm,$mysoc-iproc-i2c" only to clarify that it's
-for a specific SoC? If so, what should the compatible ID array look
-like? Should it be changed to the following?
+We can.  I had intended that to happen with the uprobes patch, but we 
+can do that up front.
 
-static const struct of_device_id bcm_iproc_i2c_of_match[] = {
-	{ .compatible = "brcm,iproc-i2c" },
-	{ .compatible = "brcm,$mysoc-iproc-i2c" },
-	{},
-};
+>> +typedef void
+>> +(kprobes_prepare_t)(struct kprobe *, struct arch_specific_insn *);
+>
+> Similarly,
+>
+>   typedef void
+> (kprobes_prepare_t)(u32 insn, struct arch_specific_insn *);
+>
 
+Yes.
 
-> (or maybe s/$mysoc-iproc-i2c/$mysoc-i2c/).
-> 
-> Best regards
-> Uwe
-> 
+>> +typedef void (kprobes_handler_t) (u32 opcode, long addr, struct pt_regs *);
+>> +
+>> +enum pc_restore_type {
+>> +       NO_RESTORE,
+>> +       RESTORE_PC,
+>> +};
+>> +
+>
+> [...]
+>
+>> +static bool aarch64_insn_is_steppable(u32 insn)
+>> +{
+>> +       if (aarch64_get_insn_class(insn) == AARCH64_INSN_CLS_BR_SYS) {
+>> +               if (aarch64_insn_is_branch(insn))
+>> +                       return false;
+>> +
+>> +               /* modification of daif creates issues */
+>> +               if (aarch64_insn_is_msr_daif(insn))
+>> +                       return false;
+>> +
+>> +               if (aarch64_insn_is_hint(insn))
+>> +                       return aarch64_insn_is_nop(insn);
+>> +
+>> +               return true;
+>> +       }
+>> +
+>> +       if (aarch64_insn_uses_literal(insn))
+>> +               return false;
+>> +
+>> +       if (aarch64_insn_is_exclusive(insn))
+>> +               return false;
+>> +
+>> +       return true;
+>
+> Default true return may not be a good idea until we are sure that we
+> are returning false for all possible
+> simulation and rejection cases. In my opinion, its better to return
+> true only for steppable and false for
+> all remaining.
+>
+
+I struggled a little with this when I did it but I decided if the 
+question was:  "should we have to recognize every instruction before 
+deciding it was single-steppable or should we only recognize 
+instructions that are *not* single-steppable", maybe it was OK to do the 
+latter while recognizing extensions to the instruction set *could* end 
+up (temporarly) allowing us to try and fail (badly) at single-stepping 
+any problematic new instructions.  Certainly opinions could differ.  If 
+the consensus is that we can't allow this to ever happen (because old 
+kprobe code is running on new hardware) then I think the only choice is 
+to return to parsing binary tables.  Hopefully I could still find a way 
+to leverage insn.c in that case.
+
+>> +}
+>
+> [...]
+>
+>> +#ifndef _ARM_KERNEL_KPROBES_H
+>> +#define _ARM_KERNEL_KPROBES_H
+>> +
+>> +/* BRK opcodes with ESR encoding  */
+>> +#define BRK64_ESR_MASK         0xFFFF
+>> +#define BRK64_ESR_KPROBES      0x0004
+>> +#define BRK64_OPCODE_KPROBES   0xD4200080      /* "brk 0x4" */
+>
+> As will deacon suggested, these can be moved to debug-monitor.h and
+> then uprobe can also add
+> its defines there only.
+>
+
+Not seeing an earlier email about this that I've been copied on, but it 
+makes sense.
+
+>> +#define ARCH64_NOP_OPCODE      0xD503201F
+>
+> It is not being used, so can be removed.
+>
+
+A leftover from the previous patchset.  I'll remove it, assuming it 
+doesn't become needed again in v5.
+
+> ~Pratyush
+>
+
+-dl
