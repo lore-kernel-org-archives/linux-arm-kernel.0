@@ -1,52 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 16 Jan 2015 15:33:20 +0000
-Subject: [PATCH v7 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <2198633.UpIyI82Yon@wuerfel>
-References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
- <54B9240A.7060003@amd.com> <20150116145545.GR7091@arm.com>
- <2198633.UpIyI82Yon@wuerfel>
-Message-ID: <20150116153320.GU7091@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 16 Jan 2015 15:34:51 +0000
+Subject: [PATCH v4 4/4] ARM: mvebu: Armada 385 GP: Add regulators to the
+ SATA port
+In-Reply-To: <54B91FB4.5080707@free-electrons.com>
+References: <1421330978-9694-1-git-send-email-gregory.clement@free-electrons.com>
+ <1421330978-9694-5-git-send-email-gregory.clement@free-electrons.com>
+ <54B8C933.7020502@redhat.com> <54B8D97B.3090908@free-electrons.com>
+ <54B8E38A.6020709@redhat.com> <20150116123705.GM3043@sirena.org.uk>
+ <54B91FB4.5080707@free-electrons.com>
+Message-ID: <20150116153451.GA3856@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 03:14:13PM +0000, Arnd Bergmann wrote:
-> On Friday 16 January 2015 14:55:45 Will Deacon wrote:
-> > On Fri, Jan 16, 2015 at 02:45:30PM +0000, Tom Lendacky wrote:
-> > > I have tested ACPI-enablement patches for the amd-xgbe/amd-xgbe-phy
-> > > drivers that I'm about to submit upstream with the V7 patch series
-> > > on the AMD Seattle server platform. There does not appear to be support
-> > > for the _CCA attribute in this patch series. The amd-xgbe driver will
-> > > setup the device domain and cache attributes based on the presence of
-> > > this attribute, but it requires the arch support to assign the proper
-> > > DMA operations in order for it to all work correctly.
-> > > 
-> > > Overriding the _CCA attribute in the driver, I was able to successfully
-> > > test the driver and this patch series.
-> > 
-> > Hopefully this will all be addressed when the IORT parts of ACPI have
-> > settled down (the current proposal allows for these attributes to be
-> > described as well as their interaction with things like IOMMUs).
-> > 
-> > In the meantime, are you falling back to non-coherent DMA? If so, what
-> > attributes have you settled on? We need to be really careful not to
-> > corrupt data during cache invalidatation when mapping a non-coherent
-> > buffer for the CPU.
-> 
-> I think in case of ACPI we should use cache-coherent as the default,
-> as this is what all servers will use for DMA masters.
+On Fri, Jan 16, 2015 at 03:27:00PM +0100, Gregory CLEMENT wrote:
+> On 16/01/2015 13:37, Mark Brown wrote:
 
-I don't agree. The dma-coherent we have for device-tree isn't nearly
-expressive enough for the kind of things we want to describe and there's
-no reason to make the same mistake in ACPI, especially as it *is* being
-addressed by IORT. If we run with _CCA, then we're going to be stuck
-supporting something that isn't fit for purpose and which will likely be
-abused to describe both fixed features of the system and software
-configuration preferences. It also opens up a can of worms if we have to
-support a mixture of _CCA and IORT in the future.
+> > regulator-always-on is a bit fuzzy for suspend, if the regulator has
+> > suspend control it'll kick in - it's really about the Linux refcounting
+> > while it's running.  What's more concerning here is that the quick
+> > sample of the regulators flagged as always on like the above that I
+> > looked at in the patch don't seem to have any enable control in the DT
+> > so this will have absolutely no effect.
 
-Or are you suggesting that we ignore _CCA and just assume cache-coherency?
-In that case, how do we support systems that aren't cache coherent, where
-not being cache coherent includes devices that require either device or
-IOMMU configuration to enable cacheable transactions?
+> Actually the reg_sata[0-4] are controlled by gpio, so there is a mean
+> to enable/disable them. For the reg_5v_sata[0-4] and reg_12v_sata[0-4]
+> they depend on their respective reg_sata and I just propagated the
+> regulator-always-on, this was maybe a mistake.
 
-Will
+It certainly makes everything confusing if you have control related
+stuff on regulators that are not directly controllable.
+
+> >> It is probably a good idea to use regulator-boot-on and
+> >> then test things this way, and if that works use
+> >> regulator-boot-on.
+
+> > No, it's unlikely that boot-on makes sense here - it's there for cases
+> > where we can't read back the hardware state at power on.  Generally
+> > drivers should work regardless of the initial state of the regulator
+> > (and modular drivers will actually break if they try to rely on boot-on
+> > since we clean up unused regulators at boot).
+
+> As pointed by Hans my concern here was be sure that during boot the disk
+> are not power off. In this case which property would be accurate?
+
+None, the core won't do anything with the regulator until the end of
+init anyway.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150116/291ff5cd/attachment.sig>
