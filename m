@@ -1,56 +1,65 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Fri, 16 Jan 2015 08:09:00 +0200
-Subject: [PATCH v7 1/4] Documentation: dt: add common bindings for
- hwspinlock
-In-Reply-To: <CAL_JsqL2LZAooMk-V8+xeF2g6acZE21M+-OBRw8aEVa-5wVHuQ@mail.gmail.com>
-References: <1421269101-51105-1-git-send-email-s-anna@ti.com>
- <1421269101-51105-2-git-send-email-s-anna@ti.com>
- <20150115135201.GG16217@leverpostej>
- <20150115135556.GH16217@leverpostej>
- <CAL_JsqL2LZAooMk-V8+xeF2g6acZE21M+-OBRw8aEVa-5wVHuQ@mail.gmail.com>
-Message-ID: <CAK=WgbYQ=BbinqJ5fsw2Y+FKdy=nasLsw9mX8pw6S_o3owy9-g@mail.gmail.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Fri, 16 Jan 2015 14:22:46 +0800
+Subject: [PATCH] AT91, DT, usb gadget: disable pull-up on vbus-gpio (PB16)
+ to reduce power consumption
+In-Reply-To: <1421337643-24074-1-git-send-email-sylvain.rochet@finsecur.com>
+References: <1421337643-24074-1-git-send-email-sylvain.rochet@finsecur.com>
+Message-ID: <54B8AE36.6090904@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 15, 2015 at 4:42 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On Thu, Jan 15, 2015 at 7:55 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->> On Thu, Jan 15, 2015 at 01:52:01PM +0000, Mark Rutland wrote:
->>> On Wed, Jan 14, 2015 at 08:58:18PM +0000, Suman Anna wrote:
->>> > +- hwlock-base-id:  An unique base Id for the locks for a particular hwlock
->>> > +                   device. This property is mandatory for all platform
->>> > +                   implementations.
->>>
->>> This property makes no sense. The ID encoded in the hwlock cells is
->>> relative to the instance (identified by phandle), not global. So the DT
->>> has no global ID space.
->>>
->>> Why do you think you need this?
->>
->> Having looked at the way this proeprty is used, NAK.
->>
->> If you need to carve up a Linux-internal ID space, do that dynamically.
->> There is no need for this property.
+Hi Sylvain Rochet,
+
+On 01/16/2015 12:00 AM, Sylvain Rochet wrote:
+> There is an external resistor divider on PB16, acting like a pull-down,
+> the pull-up increase power consumption and prevent the vbus detect pin
+> to reach Vss voltage, ~1.5V mesured on my board, it might no even work
+> if the pull-up is stronger than usual.
 >
-> Better yet, don't create a Linux ID space for this. Everywhere we have
-> one, we want to get rid of it.
+> Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
 
-Rob, Mark,
+Thanks for your patch.
 
-The hwlock is a basic hardware primitive that allow synchronization
-between different processors in the system, which may be running Linux
-as well as other operating systems, and may have no other means of
-communication.
+Acked-by: Bo Shen <voice.shen@atmel.com>
 
-The hwlock id numbers are predefined, global and static across the
-entire system: Linux may boot well after other operating systems are
-already running and using these hwlocks to communicate, and therefore,
-in order to use these hardware devices, it must not enumerate them
-differently than the rest of the system.
+> ---
+>   arch/arm/boot/dts/at91sam9x5ek.dtsi | 9 +++++++++
+>   1 file changed, 9 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/at91sam9x5ek.dtsi b/arch/arm/boot/dts/at91sam9x5ek.dtsi
+> index 3a9f6fa..f622f96 100644
+> --- a/arch/arm/boot/dts/at91sam9x5ek.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9x5ek.dtsi
+> @@ -53,6 +53,8 @@
+>   			};
+>
+>   			usb2: gadget at f803c000 {
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_board_usb2>;
+>   				atmel,vbus-gpio = <&pioB 16 GPIO_ACTIVE_HIGH>;
+>   				status = "okay";
+>   			};
+> @@ -80,6 +82,13 @@
+>   							<AT91_PIOD 14 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;	/* PD14 gpio CD pin pull up and deglitch */
+>   					};
+>   				};
+> +
+> +				usb2 {
+> +					pinctrl_board_usb2: usb2-board {
+> +						atmel,pins =
+> +							<AT91_PIOB 16 AT91_PERIPH_GPIO AT91_PINCTRL_DEGLITCH>;		/* PB16, no pull up and deglitch */
 
-Given that these id numbers are global, system-wide, static and
-predefined, where Linux may just be one user of them, please
-reconsider the approach as implemented by Suman, or suggest an
-alternative one you may prefer.
+Nitpick:
+I think comments as "PB16 gpio vbus sense, deglitch" will be better. Or 
+else change "pinctrl_board_usb2" to "pinctrl_usb2_vbus_sense". These 
+will be help the user easily to understand the function of this pin.
 
-Thanks,
-Ohad.
+> +					};
+> +				};
+>   			};
+>
+>   			spi0: spi at f0000000 {
+>
+
+Best Regards,
+Bo Shen
