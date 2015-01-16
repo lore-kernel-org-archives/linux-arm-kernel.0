@@ -1,43 +1,155 @@
-From: yvo@apm.com (Y Vo)
-Date: Fri, 16 Jan 2015 14:34:21 +0700
-Subject: [PATCH v3 3/3] arm64: dts: Add APM X-Gene standby GPIO controller DTS
- entries
-In-Reply-To: <1421393661-4311-1-git-send-email-yvo@apm.com>
-References: <1421393661-4311-1-git-send-email-yvo@apm.com>
-Message-ID: <1421393661-4311-4-git-send-email-yvo@apm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 16 Jan 2015 08:42:31 +0100
+Subject: Including empty regulator nodes in axp209.dtsi is a BAD idea
+In-Reply-To: <20150115220438.GD5567@lukather>
+References: <54B4E7B5.6060304@redhat.com> <20150113164606.GA4891@lukather>
+ <54B61DD3.6010105@redhat.com>
+ <CAGb2v67uGV2HBKciRVGhf-vb7K=whruiaUvv8L7Lqz=8=kBnQQ@mail.gmail.com>
+ <20150115220438.GD5567@lukather>
+Message-ID: <54B8C0E7.4040001@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add standby domain gpio controller for APM X-Gene SoC platform.
+Hi,
 
-Signed-off-by: Y Vo <yvo@apm.com>
----
- arch/arm64/boot/dts/apm/apm-storm.dtsi |   13 +++++++++++++
- 1 files changed, 13 insertions(+), 0 deletions(-)
+On 15-01-15 23:04, Maxime Ripard wrote:
+> On Fri, Jan 16, 2015 at 12:54:58AM +0800, Chen-Yu Tsai wrote:
+>> Hi,
+>>
+>> On Wed, Jan 14, 2015 at 3:42 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+>>> Hi,
+>>>
+>>>
+>>> On 13-01-15 17:46, Maxime Ripard wrote:
+>>>>
+>>>> On Tue, Jan 13, 2015 at 10:39:01AM +0100, Hans de Goede wrote:
+>>>>>
+>>>>> Hi ChenYu, Maxime,
+>>>>>
+>>>>> During the review of a few dts files for new boards Maxime asked me to
+>>>>> use
+>>>>> axp209.dtsi to avoid the standard axp209 "boilerplate" present in most
+>>>>> boards using the axp209 pmic.
+>>>>>
+>>>>> But axp209.dtsi includes empty regulator nodes, e.g. :
+>>>>>
+>>>>>                   reg_dcdc3: dcdc3 {
+>>>>>                           regulator-name = "dcdc3";
+>>>>>                   };
+>>>>>
+>>>>> This is a BAD idea, the presence of these empty nodes causes the
+>>>>> axp20x-regulator driver to actually register regulators for them,
+>>>>> and then on late_init the regulator subsys turns them off, since
+>>>>> they have absolutely no constraints set (nor users registered)
+>>>>> and the regulator subsys assumes that when devicetree is used their
+>>>>> is always a compete set of constraints and that thus turning them
+>>>>> off is safe.
+>>>>>
+>>>>> So when I switched to using axp209.dtsi for the bananapro.dts,
+>>>>> and booted the bananapro this is the last message I got from the
+>>>>> kernel while booting:
+>>>>>
+>>>>> [    2.314014] dcdc3: disabling
+>>>>>
+>>>>> And away went our DRAM power-supply, oops.
+>>>>>
+>>>>> So for dcdc2 (CPU) and dcdc3 (DRAM), the boilerplate
+>>>>> should contain reasonable constraints (eg the operating range
+>>>>> from the datasheet)
+>>>>
+>>>>
+>>>> Indeed.
+>>>>
+>>>>> and an always-on property.
+>>>>
+>>>>
+>>>> I disagree. The regulator disabling is a feature, and how the board is
+>>>> wired is, well, up to the board.
+>>>
+>>>
+>>> And here I was thinking you wanted to reduce the amount of boilerplate
+>>> in our dts files ..
+>>>
+>>> IOW I disagree with your disagreeing all boards we know of have dcdc2
+>>> wired to Vcpu and dcdc3 wired to Vddr, so not having this in the dtsi
+>>> will lead to a lot of extra boilerplate in each dts file. We're not
+>>> talking about our main dtsi file here, if we ever encounter a board
+>>> which is wired in a different way, then its dts can simply not use
+>>> axp209.dtsi and instead define the nodes itself, it needs to do that
+>>> anyways if we do include the standard CPU and DDR constrains in the
+>>> dtsi since those will not make sense either in that case.
+>>
+>> I think Maxime is only disagreeing to the "always-on" part. And I
+>> somewhat agree with him, but on a technical level. It doesn't seem
+>> possible to negate at the board level the "always-on" set in the dtsi,
+>> or it is not obvious to me how to do so. With properties with values
+>> you just set a new value. How do you "unset" a boolean flag?
+>
+> You don't, but Hans suggestion was to not use the DTSI then and define
+> the nodes yourself in your DTS.
+>
+> Another solution would be if this case comes up at some point to just
+> push the always-on constraints to the boards, but assume for now that
+> all boards will want it to be always on.
+>
+>> As for the constraints, I think we can agree that everyone will use
+>> the reference design if they choose to include the PMIC on a board.
+>
+> I'm not sure to get what you mean here. The PMIC has constraints of
+> its own (the min/max voltage it can deliver), and boards will have
+> some too (ie the min/max voltage the components can handle). So I
+> guess we will end up with constraints defined at both levels.
+>
+>>>> If an always-on property is needed, then it's in the DTS, not in the
+>>>> AXP DTSI.
+>>>>
+>>>>> The ldo-s are trickier, since we simply do not know how those
+>>>>> are used, I think ldo2 is used for Avcc on most boards, so it
+>>>>> too should be always on, since almost any board will have some
+>>>>> analog parts on it (be it the ir receiver, lradc, rtp, lvds, vga,
+>>>>> or analog audio in/out). Assuming that we're willing to assume
+>>>>> that ldo2 is used this way, we should give it matching constraints
+>>>>> and always mark it always-on.
+>>>>
+>>>>
+>>>> Ideally, all the drivers that have a analogic component should have a
+>>>> reference to the regulator they use. But again, at the board
+>>>> level. And more realistically, putting always-on should also happen at
+>>>> the board level.
+>>>>
+>>>>> As for ldo3 - 5 I've no idea when / for what these are used, but
+>>>>> if we do not know it is better to just leave them be then to turn
+>>>>> them off IMHO, so we should remove the nodes for these from axp209.dtsi
+>>>>>
+>>>>> Anyways sorting this all out is going to take some time, so I'm
+>>>>> not going to use axp209.dtsi in dts files for new boards for now.
+>>>>
+>>>>
+>>>> I'm afraid it's an "all or nothing" situation.
+>>>
+>>>
+>>> No it is not, the PMIC is a mfd, and we can use some of its functions
+>>> fine without actually loading the regulator bits. This is already
+>>> done on most boards with the axp209, even without touching the regulators
+>>> it is nice to have the axp209 mfd driver loaded so that we get support
+>>> for the powerbutton, and support for poweroff, esp. the latter is quite
+>>> nice to have.
+>>
+>> I agree that a) the PMIC is an mfd, and b) we can use other bits without
+>> loading the regulator bits. But if adding the regulator bits results in
+>> some sort of crash or issue, just because some regulator got turned off,
+>> it seems to me that the dt is not accurately describing the hardware.
+>
+> Yeah, that's kind of the same argument than the one we had with
+> simplefb clocks. So I guess we can agree that we can allow the MFD
+> part alone to work, but if regulator support is introduced, then *all*
+> regulators must be described accurately.
 
-diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-index f1ad9c2..2e1c438 100644
---- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-@@ -587,6 +587,19 @@
- 			phy-names = "sata-phy";
- 		};
- 
-+		sbgpio: sbgpio at 17001000{
-+			compatible = "apm,xgene-gpio-sb";
-+			reg = <0x0 0x17001000 0x0 0x400>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			interrupts = 	<0x0 0x28 0x1>,
-+					<0x0 0x29 0x1>,
-+					<0x0 0x2a 0x1>,
-+					<0x0 0x2b 0x1>,
-+					<0x0 0x2c 0x1>,
-+					<0x0 0x2d 0x1>;
-+		};
-+
- 		rtc: rtc at 10510000 {
- 			compatible = "apm,xgene-rtc";
- 			reg = <0x0 0x10510000 0x0 0x400>;
--- 
-1.7.1
+Hmm, I would prefer to have all listed regulators described accurately,
+if we do not know how a regulator is used it may be best to just leave it
+out (leaving it at whatever setting the bootloader has configured it) AFAIK
+there is no technical reason why we must describe all or no regulators.
+
+Regards,
+
+Hans
