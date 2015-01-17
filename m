@@ -1,66 +1,76 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 17 Jan 2015 09:44:00 +0100
-Subject: Making udev emit a signal when it is done loading modules
-Message-ID: <54BA20D0.7060402@redhat.com>
+Date: Sat, 17 Jan 2015 09:48:57 +0100
+Subject: [PATCH v4 4/4] ARM: mvebu: Armada 385 GP: Add regulators to the
+ SATA port
+In-Reply-To: <20150116202516.GL3856@sirena.org.uk>
+References: <1421330978-9694-1-git-send-email-gregory.clement@free-electrons.com>
+ <1421330978-9694-5-git-send-email-gregory.clement@free-electrons.com>
+ <54B8C933.7020502@redhat.com> <54B8D97B.3090908@free-electrons.com>
+ <54B8E38A.6020709@redhat.com> <20150116123705.GM3043@sirena.org.uk>
+ <54B9629C.9090800@redhat.com> <20150116202516.GL3856@sirena.org.uk>
+Message-ID: <54BA21F9.5050408@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear udev developers,
+Hi,
 
-We (me and some kernel devs mostly) would like to add support to
-the kernel for userspace telling the kernel that it is done with
-the *initial* loading of modules, with the purpose of cleaning up
-(disabling) unused harware resources like e.g. regulators and
-clocks.
+On 16-01-15 21:25, Mark Brown wrote:
+> On Fri, Jan 16, 2015 at 08:12:28PM +0100, Hans de Goede wrote:
+>> On 16-01-15 13:37, Mark Brown wrote:
+>
+>>>> It is probably a good idea to use regulator-boot-on and
+>>>> then test things this way, and if that works use
+>>>> regulator-boot-on.
+>
+>>> No, it's unlikely that boot-on makes sense here - it's there for cases
+>>> where we can't read back the hardware state at power on.
+>
+>> Which we cannot here since we've a gpio driven regulator, with the pin
+>> in output mode, so we cannot read it back. Or at least the current kernel
+>> implementation relies on regulator-boot-on rather then reading the
+>> state back from the hardware.
+>
+> Right, this always seems like a problem with the GPIO API - not being
+> able to read the state back is a total pain for boot handover, we should
+> really have a way of reading back the current output state.  This is one
+> of the few cases where boot-on can be useful, though ideally it'd be set
+> by the bootloader rather than as a static thing since otherwise you have
+> the opposite problem in the case where the disk isn't being used at the
+> current time.
+>
+>> While we're discussing this I would also like to advocate to change the
+>> behavior for regulator-boot-on to be the same as always-on when it comes
+>> to regulator_init_complete(), iow regulator-boot-on regulators should
+>> not be touched by regulator_init_complete(). It makes no sense to have
+>> different behavior for build in versus module drivers here.
+>
+> Like I say boot-on is *only* intended to support bootstrapping, if you
+> want the regulator to be always on then mark it as always on.  If you
+> want some way of marking the end of userspace init so we can defer
+> cleanup of unused resources then go do that - it's a change I've
+> advocated before, it'd help with modular drivers in general.
 
-Currently the kernel does this cleanup just before it starts init
-(which may very well be init from a ramdisk). In some cases this
-is too early really, because later on a module may get loaded
-which needs this resources, these resources will then get turned
-on again by the loaded driver, and most of the time this is not
-an issue, but sometimes it is.
+The problem is there is no clear end of userspace init in modern event
+driven systems, I think it would be much clearer to simply be consistent
+and leave these regulators on, rather then turn them of $random time,
+because as I've advocated before (see the simplefb thread) there is
+no simple magic moment when it is right to turn things off, so doing
+it when userspace starts is more or less as good as any moment, and if
+it turns out that that is not a good moment, then maybe we need to
+re-think the turning off in general.
 
-I realize very well that there is no magic moment where udev is
-really ever done loading modules, but the case which we want to
-support only involves devices which are *already enumerated*, but
-may not yet have a driver loaded, when udev starts. We would like
-udev to emit a signal (ABI to be discussed) when it is done
-trying to load modules for everything which was already enumerated
-when it starts, iow when there are no new device events pending
-anymore when udev does its initial hotplug replay.
+With that said, since this is a re-occuring theme I've send a mail to
+the systemd-devel list with you (Mark) in the CC, as well as the ide,
+arm and devicetree lists. In this mail I'm asking the udev developers
+if they would be willing to implement some sort of call into the kernel
+to tell the kernel that udev is done with loading modules. This will
+only cover devices which are already enumerated at late_init_call time,
+if we've some slow scanning bus still enumerating stuff in a thread
+(e.g. usb, scsi) then all bets are of, which is why I'm not enthusiastic
+about this solution TBH.
 
-So the question to you is would you be willing to include such
-functionality in udev ?  Note this signal would need to be emitted
-when udev from the real rootfs is done with the initial module
-loading, as the real rootfs may very well have more modules
-available then the initrd.
-
-###
-
-With the generic story above told let me also give the concrete
-example / problem which has let to me asking this (note this has
-been brought up before on various kernel lists, it is a
-re-occuring theme, this is just an example really) :
-
-The problem at hand is a sata connector which also has a sata-power
-connector on an embedded (ish) board where the sata-power is
-controlled through a gpio. The sata-power connector is modeled
-in devicetree as a power-supply and this supply gets controlled
-by the ahci_platform driver.
-
-The disk power may very well have already been turned on by the
-bootloader, so we add a regulator-boot-on property to the regulator
-node in devicetree to make sure that it is left untouched when the
-regulator driver loads. If the ahci_platform driver is build into
-the kernel, it will then take control of the regulator and
-everything works well.
-
-If however the ahci_platform driver is a module, then as soon as
-the kernel is ready to start init, unused regulators are turned off
-and the disk looses its power while spinning and ends up doing an
-emergency heads park. Then as soon as the ahci_platform module
-loads the disk is spin up again. This is not good (quite bad
-actually) for the lifetime of the disk.
+A simpler solution for the use-case at hand may be to simply disallow
+building of the ahci_platform driver as a module.
 
 Regards,
 
