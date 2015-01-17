@@ -1,108 +1,68 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Sat, 17 Jan 2015 12:51:50 -0800
-Subject: [PATCH v4 2/3] i2c: iproc: Add Broadcom iProc I2C Driver
-In-Reply-To: <20150117201849.GC22880@pengutronix.de>
-References: <rjui@broadcom.com>
- <1421274213-3544-1-git-send-email-rjui@broadcom.com>
- <1421274213-3544-3-git-send-email-rjui@broadcom.com>
- <20150115084119.GN22880@pengutronix.de> <54B98C18.4080807@broadcom.com>
- <20150117160113.GA22880@pengutronix.de> <54BABEE9.8070801@broadcom.com>
- <20150117201849.GC22880@pengutronix.de>
-Message-ID: <54BACB66.6040909@broadcom.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat, 17 Jan 2015 20:59:02 +0000
+Subject: SMBIOS/DMI data under CONFIG_STRICT_DEVMEM
+In-Reply-To: <54BAC21D.9040009@redhat.com>
+References: <54BAC21D.9040009@redhat.com>
+Message-ID: <CAKv+Gu_kZ+b8CBbiWLW3KW5Nw7qewpN7+N6a910dFaiRcs1xKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 17 January 2015 at 20:12, Jon Masters <jcm@redhat.com> wrote:
+> Hi Catalin, all,
+>
+> I would like to ensure that the SMBIOS data provided by firmware is
+> always readable from userspace on AArch64, through /dev/mem.
+>
+
+This has been on our radar for a while
+
+> When building a kernel with CONFIG_STRICT_DEVMEM, arm64 follows broadly
+> x86 with the exception of an assumption surrounding the low range of
+> memory (which doesn't apply on AArch64 platforms universally anyway).
+> Thus on x86, they can directly read the SMBIOS table from dmidecode when
+> it tries to map /dev/mem due to its location. I'm hacking something up
+> for the moment, but I would like to solve this.
+>
+
+Check out my series here
+http://article.gmane.org/gmane.linux.kernel.efi/5133
+
+The general idea is to remove all UEFI runtime regions (including
+config tables) from the linear mapping, and allow r/o access via
+/dev/mem to such regions, using a mapping type which can support
+unaligned access (which is required for SMBIOS). As for the iomem
+resources, we need to reserve the regions we know are in use,
+regardless of how that affects the existing logic around
+devmem_is_allowed (and I am sure we can do better than what
+page_is_ram currently does, which is matching the string 'System RAM'
+against the iomem resource table)
+
+-- 
+Ard.
 
 
-On 1/17/2015 12:18 PM, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> On Sat, Jan 17, 2015 at 11:58:33AM -0800, Ray Jui wrote:
->> On 1/17/2015 8:01 AM, Uwe Kleine-K?nig wrote:
->>> On Fri, Jan 16, 2015 at 02:09:28PM -0800, Ray Jui wrote:
->>>> On 1/15/2015 12:41 AM, Uwe Kleine-K?nig wrote:
->>>>> On Wed, Jan 14, 2015 at 02:23:32PM -0800, Ray Jui wrote:
->>>>>> +	 */
->>>>>> +	val = 1 << M_CMD_START_BUSY_SHIFT;
->>>>>> +	if (msg->flags & I2C_M_RD) {
->>>>>> +		val |= (M_CMD_PROTOCOL_BLK_RD << M_CMD_PROTOCOL_SHIFT) |
->>>>>> +		       (msg->len << M_CMD_RD_CNT_SHIFT);
->>>>>> +	} else {
->>>>>> +		val |= (M_CMD_PROTOCOL_BLK_WR << M_CMD_PROTOCOL_SHIFT);
->>>>>> +	}
->>>>>> +	writel(val, iproc_i2c->base + M_CMD_OFFSET);
->>>>>> +
->>>>>> +	time_left = wait_for_completion_timeout(&iproc_i2c->done, time_left);
->>>>>
->>>>> When the interrupt fires here after the complete timed out and before
->>>>> you disable the irq you still throw the result away.
->>>> Yes, but then this comes down to the fact that if it has reached the
->>>> point that is determined to be a timeout condition in the driver, one
->>>> should really treat it as timeout error. In a normal condition,
->>>> time_left should never reach zero.
->>> I don't agree here. I'm not sure there is a real technical reason,
->>> though. But still if you're in a "success after timeout already over"
->>> situation it's IMHO better to interpret it as success, not timeout.
->>>
->> The thing is, the interrupt should never fire after
->> wait_for_completion_timeout returns zero here. If it does, then the
->> issue is really that the timeout value set in the driver is probably not
->> long enough. I just checked other I2C drivers. I think the way how
->> timeout is handled here is consistent with other I2C drivers.
-> In the presence of Clock stretching there is no (theorethical) upper
-> limit for the time needed to transfer a given message, is there? So
-> (theoretically) you can never be sure not to interrupt an ongoing
-> transfer.
-> 
-Yes. No theoretical upper limit in the case when clock is stretched by
-the slave. But how would adding an additional interrupt completion check
-below help? I assume you want the the check to be like the following?
-
-	time_left = wait_for_completion_timeout(&iproc_i2c->done, time_left);
-
-	/* disable all interrupts */
-	writel(0, iproc_i2c->base + IE_OFFSET);
-
-	if (!time_left && !completion_done()) {
-		dev_err(iproc_i2c->device, "transaction timed out\n");
-
-		/* flush FIFOs */
-		val = (1 << M_FIFO_RX_FLUSH_SHIFT) |
-		      (1 << M_FIFO_TX_FLUSH_SHIFT);
-		writel(val, iproc_i2c->base + M_FIFO_CTRL_OFFSET);
-		return -ETIMEDOUT;
-	}
-
-Does the above code make sense logically? That is,
-wait_for_completion_timeout has timed out, and we are doing an
-additional check below to make sure it really has timed out?
-
-> And other drivers doing the same is only an excuse to start similar, but
-> not to not improve :-)
-> 
->>>>>> +static int bcm_iproc_i2c_remove(struct platform_device *pdev)
->>>>>> +{
->>>>>> +	struct bcm_iproc_i2c_dev *iproc_i2c = platform_get_drvdata(pdev);
->>>>>> +
->>>>>> +	i2c_del_adapter(&iproc_i2c->adapter);
->>>>> You need to free the irq before i2c_del_adapter.
->>>>>
->>>> Yes. Thanks. Change back to use devm_request_irq, and use disable_irq
->>>> here before removing the adapter.
->>> The more lightweight approach is to set your device's irq-enable
->>> register to zero and call synchronize_irq. (For a shared irq calling
->>> disable_irq is even wrong here.)
->>>
->> The fact that IRQF_SHARED flag is not set indicates this is a dedicated
->> IRQ line, so I thought using disable_irq here makes sense. But if both
->> you and Wolfram think masking all I2C interrupts at the block level +
->> synchronize_irq is a better approach, I can change to that. Thanks!
-> I don't care much. Using synchronize_irq is the more universal approach
-> and so more likely correct for someone copying from your driver.
-> 
-Sure, more universal approach and a good example for others. It takes
-care of both cases of dedicated and shared interrupt. I will make that
-change. Thanks.
-> Best regards
-> Uwe
-> 
+> Here are two questions:
+>
+> 1). Would you prefer to add e.g. a devmem_is_firmware_table() function
+> that is called by devmem_is_allowed and carves out a couple exceptions
+> based upon knowing .e.g dmi_base and other dynamic data during boot?
+>
+> 2). Would you prefer to reserve the DMI region is an iomem resource?
+> That's a hack but it would seem to work since your check should then
+> result in the kernel's resource management saying this is not RAM. The
+> problem with this option is that you would then only be able to read the
+> SMBIOS tables from userspace if the kernel also recognized them (i.e.
+> option 1 above just checks the reported range from EFI, but this option
+> would rely on the kernel DMI code also validating the tables, so if you
+> were debugging or whatever you wouldn't be able to read them without
+> building your kernel without CONFIG_STRICT_DEVMEM for e.g.).
+>
+> I'm also curious whether x86 is interested in changing the way that the
+> SMBIOS tables are accounted or if there are other suggestions.
+>
+> Jon.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
