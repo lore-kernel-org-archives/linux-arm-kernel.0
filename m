@@ -1,58 +1,98 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Fri, 16 Jan 2015 16:19:41 -0800
-Subject: [PATCH 1/1] gpio: omap: Fix bad device access with setup_irq()
-In-Reply-To: <1421448650-15904-1-git-send-email-tony@atomide.com>
-References: <1421448650-15904-1-git-send-email-tony@atomide.com>
-Message-ID: <54B9AA9D.7080300@oracle.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Sat, 17 Jan 2015 00:23:34 +0000
+Subject: [PATCH 6/8] arm64/kexec: Add pr_devel output
+In-Reply-To: <cover.1421449714.git.geoff@infradead.org>
+References: <cover.1421449714.git.geoff@infradead.org>
+Message-ID: <87d3faa4db6d996be10bcd69eba01f168c6422f3.1421449714.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/16/2015 2:50 PM, Tony Lindgren wrote:
-> Similar to omap_gpio_irq_type() let's make sure that the GPIO
-> is usable as an interrupt if the platform init code did not
-> call gpio_request(). Otherwise we can get invalid device access
-> after setup_irq():
->
-I let Linus W comment on it but IIRC we chewed this issue last
-time and the conclusion was the gpio_request() must have to be called
-directly or indirectly in case of irq line.
+To aid in debugging kexec problems or when adding new functionality to kexec add
+a new routine kexec_image_info() and several inline pr_devel statements.
 
-One old thread on possibly similar issue is here[1]
+Signed-off-by: Geoff Levand <geoff@infradead.org>
+---
+ arch/arm64/kernel/machine_kexec.c | 54 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 54 insertions(+)
 
-
-> WARNING: CPU: 0 PID: 1 at drivers/bus/omap_l3_noc.c:147 l3_interrupt_handler+0x214/0x340()
-> 44000000.ocp:L3 Custom Error: MASTER MPU TARGET L4CFG (Idle): Data Access in Supervisor mode during Functional access
-> ...
-> [<c05f21e4>] (__irq_svc) from [<c05f1974>] (_raw_spin_unlock_irqrestore+0x34/0x44)
-> [<c05f1974>] (_raw_spin_unlock_irqrestore) from [<c00914a8>] (__setup_irq+0x244/0x530)
-> [<c00914a8>] (__setup_irq) from [<c00917d4>] (setup_irq+0x40/0x8c)
-> [<c00917d4>] (setup_irq) from [<c0039c8c>] (omap_system_dma_probe+0x1d4/0x2b4)
-> [<c0039c8c>] (omap_system_dma_probe) from [<c03b2200>] (platform_drv_probe+0x44/0xa4)
-> ...
->
-> We can fix this the same way omap_gpio_irq_type() is handling it.
->
-> Note that the long term solution is to change the gpio-omap driver
-> to handle the banks as separate driver instances. This will allow
-> us to rely on just runtime PM for tracking the bank specific state.
->
-> Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Javier Martinez Canillas <javier@dowhile0.org>
-> Cc: Kevin Hilman <khilman@kernel.org>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> Cc: Santosh Shilimkar <ssantosh@kernel.org>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->   drivers/gpio/gpio-omap.c | 39 +++++++++++++++++++++++++++++++++------
->   1 file changed, 33 insertions(+), 6 deletions(-)
->
-Is it really OMAP specific issue ? On OMAP, clocks needs to enabled for 
-GPIO's to work which is what the init is doing but I believe the same
-should apply to other GPIO controllers as well.
-
-regards,
-Santosh
-
-[1] https://lkml.org/lkml/2013/8/27/509
+diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+index b0e5d76..3d84759 100644
+--- a/arch/arm64/kernel/machine_kexec.c
++++ b/arch/arm64/kernel/machine_kexec.c
+@@ -35,6 +35,37 @@ static bool kexec_is_dtb(const void *dtb)
+ }
+ 
+ /**
++ * kexec_image_info - For debugging output.
++ */
++#define kexec_image_info(_i) _kexec_image_info(__func__, __LINE__, _i)
++static void _kexec_image_info(const char *func, int line,
++	const struct kimage *image)
++{
++	unsigned long i;
++
++#if !defined(DEBUG)
++	return;
++#endif
++	pr_devel("%s:%d:\n", func, line);
++	pr_devel("  kexec image info:\n");
++	pr_devel("    type:        %d\n", image->type);
++	pr_devel("    start:       %lx\n", image->start);
++	pr_devel("    head:        %lx\n", image->head);
++	pr_devel("    nr_segments: %lu\n", image->nr_segments);
++
++	for (i = 0; i < image->nr_segments; i++) {
++		pr_devel("      segment[%lu]: %016lx - %016lx, %lx bytes, %lu pages%s\n",
++			i,
++			image->segment[i].mem,
++			image->segment[i].mem + image->segment[i].memsz,
++			image->segment[i].memsz,
++			image->segment[i].memsz /  PAGE_SIZE,
++			(kexec_is_dtb(image->segment[i].buf) ?
++				", dtb segment" : ""));
++	}
++}
++
++/**
+  * kexec_find_dtb_seg - Helper routine to find the dtb segment.
+  */
+ static const struct kexec_segment *kexec_find_dtb_seg(
+@@ -67,6 +98,8 @@ int machine_kexec_prepare(struct kimage *image)
+ 	arm64_kexec_dtb_addr = dtb_seg ? dtb_seg->mem : 0;
+ 	arm64_kexec_kimage_start = image->start;
+ 
++	kexec_image_info(image);
++
+ 	return 0;
+ }
+ 
+@@ -121,6 +154,27 @@ void machine_kexec(struct kimage *image)
+ 	reboot_code_buffer_phys = page_to_phys(image->control_code_page);
+ 	reboot_code_buffer = phys_to_virt(reboot_code_buffer_phys);
+ 
++	kexec_image_info(image);
++
++	pr_devel("%s:%d: control_code_page:        %p\n", __func__, __LINE__,
++		image->control_code_page);
++	pr_devel("%s:%d: reboot_code_buffer_phys:  %pa\n", __func__, __LINE__,
++		&reboot_code_buffer_phys);
++	pr_devel("%s:%d: reboot_code_buffer:       %p\n", __func__, __LINE__,
++		reboot_code_buffer);
++	pr_devel("%s:%d: relocate_new_kernel:      %p\n", __func__, __LINE__,
++		relocate_new_kernel);
++	pr_devel("%s:%d: relocate_new_kernel_size: 0x%lx(%lu) bytes\n",
++		__func__, __LINE__, relocate_new_kernel_size,
++		relocate_new_kernel_size);
++
++	pr_devel("%s:%d: kexec_dtb_addr:           %lx\n", __func__, __LINE__,
++		arm64_kexec_dtb_addr);
++	pr_devel("%s:%d: kexec_kimage_head:        %lx\n", __func__, __LINE__,
++		arm64_kexec_kimage_head);
++	pr_devel("%s:%d: kexec_kimage_start:       %lx\n", __func__, __LINE__,
++		arm64_kexec_kimage_start);
++
+ 	/*
+ 	 * Copy relocate_new_kernel to the reboot_code_buffer for use
+ 	 * after the kernel is shut down.
+-- 
+2.1.0
