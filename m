@@ -1,23 +1,35 @@
 From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Sat, 17 Jan 2015 22:27:48 +0100
-Subject: [PATCH 1/3] USB: host: ehci_atmel: Move global variables to
- private struct
-In-Reply-To: <Pine.LNX.4.44L0.1501171524050.13485-100000@netrider.rowland.org>
-References: <1421519013-22123-1-git-send-email-sylvain.rochet@finsecur.com>
- <Pine.LNX.4.44L0.1501171524050.13485-100000@netrider.rowland.org>
-Message-ID: <20150117212748.GA21783@gradator.net>
+Date: Sat, 17 Jan 2015 22:49:56 +0100
+Subject: [PATCH] AT91: DT: Watchdog, remove property idle halt by default
+Message-ID: <1421531396-20188-1-git-send-email-sylvain.rochet@finsecur.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Alan,
+The behavior changed when watchdog properties were added to DT, it makes
+the watchdog not counting when CPU is in idle state, therefore the
+watchdog reset time depend on mean CPU usage and will not reset at all
+if the CPU stop working while it is in idle state, which is a very weird
+behavior.
 
-On Sat, Jan 17, 2015 at 03:30:45PM -0500, Alan Stern wrote:
-> 
-> This is not the right way to do it.  For an example of the right way, 
-> see the ehci-platform.c file.  Your private structure is stored in 
-> ehci->priv, and its size is specified by the .extra_priv_size member of 
-> an ehci_driver_overrides structure passed to ehci_init_driver().
+Apply principle of least surprise on at91sam9260-wdt by removing idle
+halt flag by default.
 
-Dammit? reworked this way, thanks for the heads-up !
+Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+---
+ arch/arm/boot/dts/at91sam9x5.dtsi | 1 -
+ 1 file changed, 1 deletion(-)
 
-Sylvain
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index bbb3ba6..ce61f91 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -1125,7 +1125,6 @@
+ 				atmel,watchdog-type = "hardware";
+ 				atmel,reset-type = "all";
+ 				atmel,dbg-halt;
+-				atmel,idle-halt;
+ 				status = "disabled";
+ 			};
+ 
+-- 
+2.1.4
