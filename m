@@ -1,119 +1,107 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 16 Jan 2015 15:54:45 -0800
-Subject: [PATCH 1/2] ARM: entry-common: fix forgotten set of
- thread_info->syscall
-In-Reply-To: <CAGXu5j+XHFNyhaBndQr1Q2uthsFP9ZQGbaw5hofDmXyKXZ-H5g@mail.gmail.com>
-References: <1420986751-30364-1-git-send-email-r.peniaev@gmail.com>
- <1420986751-30364-2-git-send-email-r.peniaev@gmail.com>
- <20150112183955.GO13360@arm.com>
- <CACZ9PQXW9G4Vw-dcPwkdVE=uoYmDYEQnJWDnnpup1LxC3s5QPg@mail.gmail.com>
- <CAGXu5jLO-YSaF8P9o3jcXP4VZCPYVshz73krnchYuv9pPGY6Sw@mail.gmail.com>
- <CACZ9PQVo0SF4Z-rdNk4e=yY17Xt9n5hAqm4ZRNLEw3jGYYcvtA@mail.gmail.com>
- <CAGXu5j+O6znN=7-gc3PqwqFA5MFRPLGBUzabOmQjWn_9WTjvpg@mail.gmail.com>
- <CACZ9PQUEprgKrpHazDULA5mf-OaoX=MAjEeWdspZTXT_+iUKWw@mail.gmail.com>
- <20150116155923.GK12302@n2100.arm.linux.org.uk>
- <CACZ9PQUVFtCQg6XjDbokEPy_R2fZcHiq6+EEUZnx4FVfpfZxJg@mail.gmail.com>
- <20150116161752.GL12302@n2100.arm.linux.org.uk>
- <CAGXu5j+XHFNyhaBndQr1Q2uthsFP9ZQGbaw5hofDmXyKXZ-H5g@mail.gmail.com>
-Message-ID: <CAGXu5j+9p1T29NoHnCNywd0T=H2mzWhCou5nSRfXZktEOC7_=A@mail.gmail.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Fri, 16 Jan 2015 16:11:14 -0800
+Subject: [PATCH v6 2/3] gpio: Cygnus: add GPIO driver
+In-Reply-To: <CACRpkdZef8S-EAbShjJ1eg+-3wQKn+yx4u1k_Mf8F7uFkJYdFw@mail.gmail.com>
+References: <rjui@broadcom.com>	<1418696307-19392-1-git-send-email-rjui@broadcom.com>	<1418696307-19392-3-git-send-email-rjui@broadcom.com>	<CACRpkdYGksEseGaO49=1rUi5WBdOxwAd-F1gpgZn+BFatRCdDg@mail.gmail.com>	<54B55068.8050500@broadcom.com>
+ <CACRpkdZef8S-EAbShjJ1eg+-3wQKn+yx4u1k_Mf8F7uFkJYdFw@mail.gmail.com>
+Message-ID: <54B9A8A2.6090209@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 11:57 AM, Kees Cook <keescook@chromium.org> wrote:
-> On Fri, Jan 16, 2015 at 8:17 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Sat, Jan 17, 2015 at 01:08:11AM +0900, Roman Peniaev wrote:
->>> On Sat, Jan 17, 2015 at 12:59 AM, Russell King - ARM Linux
->>> <linux@arm.linux.org.uk> wrote:
->>> > On Sat, Jan 17, 2015 at 12:57:02AM +0900, Roman Peniaev wrote:
->>> >> On Fri, Jan 16, 2015 at 7:54 AM, Kees Cook <keescook@chromium.org> wrote:
->>> >> > One interesting thing I noticed (which is unchanged by this series),
->>> >> > but pulling ARM_r7 during the seccomp ptrace event shows __NR_poll,
->>> >> > not __NR_restart_syscall, even though it was a __NR_restart_syscall
->>> >> > trap from seccomp. Is there a better place to see the actual syscall?
->>> >>
->>> >> As I understand we do not push new r7 to the stack, and ptrace uses the
->>> >> old value.
->>> >
->>> > And why should we push r7 to the stack?  ptrace should be using the
->>> > recorded system call number, rather than poking about on the stack
->>> > itself.
+
+
+On 1/16/2015 2:14 AM, Linus Walleij wrote:
+> On Tue, Jan 13, 2015 at 6:05 PM, Ray Jui <rjui@broadcom.com> wrote:
+>> On 1/13/2015 12:53 AM, Linus Walleij wrote:
+>>> On Tue, Dec 16, 2014 at 3:18 AM, Ray Jui <rjui@broadcom.com> wrote:
 >>>
->>> Probably we should not, but the behaviour comparing arm to x86 is different.
+>>>> +/* drive strength control for ASIU GPIO */
+>>>> +#define CYGNUS_GPIO_ASIU_DRV0_CTRL_OFFSET 0x58
+>>>> +
+>>>> +/* drive strength control for CCM GPIO */
+>>>> +#define CYGNUS_GPIO_CCM_DRV0_CTRL_OFFSET  0x00
+>>>
+>>> This stuff (drive strength) is pin control, pin config.
+>>> It does not belong in a pure GPIO driver. If you're
+>>> making a combined pin control + GPIO driver, it
+>>> shall be put in drivers/pinctrl/*
+>>>
+>> Okay, I have some questions here. Are you suggesting me to register this
+>> driver to both the pinctrl subsystem and gpiolib and move it to under
+>> drivers/pinctrl/*?
+> 
+> Either you can have a combined driver in drivers/pinctrl/*
+> which has one probe() function calling pinctrl_register(),
+> gpiochip_add(), gpiochip_add_pin_range(), having the gpio
+> parts call into the pin control backend with
+> pinctrl_request_gpio(), pinctrl_free_gpio(),
+> pinctrl_gpio_direction_input(), pinctrl_gpio_direction_output().
+> 
+> Or you can split it in one driver in drivers/pinctrl/*
+> dealing with just the pin control stuff, and another driver
+> in drivers/gpio/* dealing with the GPIO stuff, each with one
+> probe() function.
+> 
+> If they are using the same register range, the first approach
+> is probably most intuitive. If the pin control and GPIO parts
+> are separated in different register ranges, probably the
+> second approach is the best.
+> 
+>> Or Are you suggesting me to combine this driver with the other Cygnus
+>> pinctrl driver (which only supports pinmux)?
+> 
+> Depends on which hardware block the pin control-like
+> registers belongs in. See per above.
+> 
+>> Note in Cygnus, all pinmux logic is done in the pinmux block. And there
+>> are 3 GPIO controllers, that handle GPIO, drive strength of the GPIO
+>> pins, internal pull up/down of the GPIO pins, which are handled in this
+>> driver. So this driver is generic to all 3 GPIO controllers, as you can
+>> see from the device tree bindings, there are 3 nodes.
 >>
->> We definitely should not, because changing the stacked value changes the
->> value in r7 after the syscall has returned.  We have guaranteed that the
->> value will be preserved across syscalls for years, so we really should
->> not be changing that.
->
-> Yeah, we can't mess with the registers. I was just asking for
-> clarification on how this is visible to userspace.
->
->>
->>> Also there is no any way from userspace to figure out what syscall was
->>> restarted, if you do not trace each syscall enter and exit from the
->>> very beginning.
->>
->> Thinking about ptrace, that's been true for years.
->>
->> It really depends whether you consider the restart syscall a userspace
->> thing or a kernelspace thing.  When you consider that the vast majority
->> of syscall restarts are done internally in the kernel, and we just
->> re-issue the syscall, it immediately brings up the question "why is
->> the restart block method different?" and "should the restart block
->> method be visible to userspace?"
->>
->> IMHO, it is prudent not to expose kernel internals to userspace unless
->> there is a real reason to, otherwise they become part of the userspace
->> API.
->
-> I couldn't agree more, but restart_syscall is already visible to
-> userspace: it can be called directly, for example. And it's visible to
-> tracers.
->
-> Unfortunately, the difference here is the visibility during trace
-> trap. On x86, it's exposed but on ARM, there's no way (that I can
-> find) to query the "true" syscall, even though the true syscall is
-> what triggers the tracer. The syscall number isn't provided by any
-> element of the ptrace event system, nor through siginfo, and must be
-> examined on a per-arch basis from registers.
->
-> Seccomp does, however, provide a mechanism to pass arbitrary event
-> data on a TRACE event, so poll vs restart_syscall can be distinguished
-> that way.
->
-> It seems even strace doesn't know how to find this information. For example:
->
-> x86:
-> poll([{fd=3, events=POLLIN}], 1, 4294967295
-> ) = ? ERESTART_RESTARTBLOCK (Interrupted by signal)
-> --- SIGSTOP {si_signo=SIGSTOP, si_code=SI_USER, si_pid=994, si_uid=1000} ---
-> --- stopped by SIGSTOP ---
-> --- SIGCONT {si_signo=SIGCONT, si_code=SI_USER, si_pid=994, si_uid=1000} ---
-> restart_syscall(<... resuming interrupted call ...>
->
-> ARM:
-> poll([{fd=3, events=POLLIN}], 1, -1
-> )    = ? ERESTART_RESTARTBLOCK (Interrupted by signal)
-> --- SIGSTOP {si_signo=SIGSTOP, si_code=SI_USER, si_pid=20563, si_uid=0} ---
-> --- stopped by SIGSTOP ---
-> --- SIGCONT {si_signo=SIGCONT, si_code=SI_USER, si_pid=20563, si_uid=0} ---
-> poll([{fd=3, events=POLLIN}], 1, -1
->
-> Would it make sense to add REGSET_SYSTEM_CALL to ARM? (Though this
-> begs the question, "Is restart_syscall visible during a trace on
-> arm64?", which I'll have to go check...)
+>> Therefore, I think it makes sense to have one pinmux driver that handles
+>> the pinmux block, and one generic pinctrl + gpio driver that handles
+>> functions supported by all 3 GPIO controllers. Does this make sense to you?
+> 
+> Yep.
+> 
+> Some hardware designs put the software-controlled biasing
+> resistors in the GPIO block electronically connected to the actual
+> pins, so that e.g. the biasing will be available if some MMC or
+> whatever is using the same pins in another muxing. In such
+> situations it's quite evident that they need to be a combined
+> GPIO and pin controller.
+> 
+> I have some regrets that bolting a second pin controller to the
+> GPIO chip make things a bit complex but it's a price we have
+> to pay for getting some kind of generic interface.
+> 
+> Yours,
+> Linus Walleij
+> 
+Okay. In summary, I think both of us think the following approach makes
+sense in my situation:
+- leave pinmux in pinctrl-bcm-cygnus.c
+- leave pinctrl + gpio in pinctrl-bcm-cygnus-gpio.c under drivers/pinctrl/*
 
-So, some further testing:
-- native arm64 presents "poll" again even to seccomp when
-restart_syscall is triggered (both via regs[8] and
-NT_ARM_SYSTEM_CALL).
-- compat mode on arm64 _does_ show syscall_restart (via ARM_r7).
+But by thinking about this more, I thought this would create duplicated
+pinctrl descriptors in our system, one from the pinmux driver, and the
+other from this pinctrl+gpio driver. That is probably undesirable?
 
-Which of these behaviors is intentional? :)
+By reviewing various drivers in the pinctrl directory, I found what
+pinctrl-u300.c and pinctrl-coh901.c does seems to serve as a good model
+for me to follow:
+- pinctrl-u300.c is the pinmux driver
+- pinctrl-coh901.c is the gpio+pinctrl driver
 
--Kees
+The GPIO pinctrl logic is in the coh901 block, so pinctrl-coh901.c
+exposed two public functions u300_gpio_config_get, u300_gpio_config_set
+that pinctrl-u300.c can use. The u300 populates all pinmux/pinctrl
+related functions into the subsystem. This way there's only one pinctrl
+descriptor, populated through pinctrl-u300.c.
 
--- 
-Kees Cook
-Chrome OS Security
+Does that model make more sense to you?
+
+Thanks,
+
+Ray
