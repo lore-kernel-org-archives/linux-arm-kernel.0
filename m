@@ -1,101 +1,132 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Sat, 17 Jan 2015 10:09:02 -0500
-Subject: [PATCHv4] arm64: dmi: Add SMBIOS/DMI support
-In-Reply-To: <20150117121247.GL3827@bivouac.eciton.net>
-References: <1412437603-3394-1-git-send-email-yi.li@linaro.org>
- <54B9F9D2.6000104@redhat.com> <20150117121247.GL3827@bivouac.eciton.net>
-Message-ID: <54BA7B0E.5020207@redhat.com>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Sat, 17 Jan 2015 10:23:21 -0500
+Subject: [systemd-devel] Making udev emit a signal when it is done loading
+ modules
+In-Reply-To: <20150117135630.GA25585@kroah.com>
+References: <54BA20D0.7060402@redhat.com>
+	<20150117135630.GA25585@kroah.com>
+Message-ID: <CAKON4Ox-7YBqEkvor5wt6erSR1sFyz1N1t-0XUXO5cvN3pGtsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/17/2015 07:12 AM, Leif Lindholm wrote:
-> Hi Jon,
-> 
-> On Sat, Jan 17, 2015 at 12:57:38AM -0500, Jon Masters wrote:
->> Hi Yi Li,
-> 
-> Yi has gone back to work inside Huawei, so probably did not receive
-> your messags.
-
-Good to know. I was at one point tracking all of the engineers involved
-but it's getting harder to do that :)
-
->> I would like some advice on the below patch. First, a little background.
+On Sat, Jan 17, 2015 at 8:56 AM, Greg KH <greg@kroah.com> wrote:
+> On Sat, Jan 17, 2015 at 09:44:00AM +0100, Hans de Goede wrote:
+>> Dear udev developers,
 >>
->> I /may/ need to use SMBIOS provided data on ARMv8 systems to enumerate
->> the number of physical underlying CPU sockets present.
-> 
-> This sounds like a very risky precedent to set. Hardware description for
-> the kernel comes in the form of DT or ACPI. SMBIOS is hardware
-> description for userland.
+>> We (me and some kernel devs mostly) would like to add support to
+>> the kernel for userspace telling the kernel that it is done with
+>> the *initial* loading of modules, with the purpose of cleaning up
+>> (disabling) unused harware resources like e.g. regulators and
+>> clocks.
+>
+> But you don't "know" when that happens.  Especially with discoverable
+> busses (PCI, USB, etc.), you know this :)
 
-Agreed. I don't actually want to set this precedent on ARM yet :)
+Consider the ARM multi-arch kernels where everything is a loadable
+device driver.
 
-> x86 added internal access to SMBIOS tables to be able to work around
-> known-bad firmware. I would say we're in a much better place today
-> with regards to people actually testing hardware with Linux than when
-> that happened, so would really like to avoid opening those floodgates
-> on ARM*.
+1) BIOS does basic system setup
+2) Core kernel boots with very few drivers.
+3) Late-init calls runs - does power/clock clean up and turns everything off
+--everything in system blinks---
+4) Now the modules start loading and devices all get turned back on.
+These are loadable modules for hardware that is known to be present
+since it is listed in the device tree.
+-- better place to be doing power/clock clean up
+5) Doesn't matter now if you load a module an hour later, you wanted
+the clock/power turned off for that hour.
 
-Fair enough. I suspect we may get there one day, but I'm certainly not
-going to try to move that along :) I have btw pushed every vendor to rev
-their build information each time they build new firmware (when we build
-the RH reference firmware for Mustang and - other boards I won't mention
-on list - we do rev the version), and we'll require it in SBBR. That's
-on my todo list for a clarification.
+I know of two ways to fix this interval where the system blinks....
+1) An enumerated protection scheme. Device tree lists out all of the
+clock/regulators/etc... that it doesn't want the power cleanup turning
+off. Then it hopes that a driver gets loaded that uses these devices.
+If not those clock/regulators stay on forever. This is fragile and
+requires coordination with the BIOS.
+2) in my opinion power clean is happening too early. In needs to moved
+after the initial phase of loading modules for device tree enumerated
+devices.
 
-> The rest of this email is therefore assuming we are talking about a
-> temporary out-of-tree patch kept for development purposes until a
-> better solution can be devised to upstream.
+Power/clock clean up does not need to be at an exact point in system
+boot. It is just a clean up to reduce power consumption from things
+the BIOS turned on that kernel does not use. It is usually not fatal
+if it runs at the wrong point, but it makes everything blink when it
+runs too early.
 
-Yup. I'm just exploring all of the options. Currently, there is no
-reliable way to extract the exact number of sockets present, even with
-the DT binding, and I need to know precisely how many sockets there are,
-with this information correctly provided in the sysfs topology.
+For example the automatic clean up could be removed from late_init
+calls and turned into something that could be triggered from a script.
+Then runs that script action late in the boot. Or if udev is smart
+enough it could trigger cleanup after it has loaded modules for all
+devices it is aware of. But any way you look at it, cleaning up in
+late-init call for a multi-arch kernel is the too early.
 
->> This is provided
->> in one Type4 DMI structure per physical socket. Using that fact (such
->> data is already provided by all of the reference ARMv8 server systems),
->> and a variable interpretation of the CPU affinity data, we can refactor
->> the topology.c code to understand threads vs cores vs sockets without
->> getting confused by the extra levels of hierarchy for clusters.
+>
+>> Currently the kernel does this cleanup just before it starts init
+>> (which may very well be init from a ramdisk). In some cases this
+>> is too early really, because later on a module may get loaded
+>> which needs this resources, these resources will then get turned
+>> on again by the loaded driver, and most of the time this is not
+>> an issue, but sometimes it is.
 >>
->> I am going back over some older patches, including this one to
->> understand the DMI port, and I notice that you call dmi_scan_machine
->> from an early_initcall. This will run from the init thread, after we've
->> done basic SMP setup in smp_prepare_cpus, which is where we stash
->> cpu_topology data, which is after I already need DMI data available.
-> 
-> Yep.
-> 
->> So. If I wanted this available prior to early_initcall time, would it be
->> reasonable to follow e.g. x86 and move this early in the boot? I'm not
->> necessarily going to ask to upstream such a change (since I expect to be
->> able to solve the underlying problem I am looking to address in a
->> different fashion soon), but first want to know if it would be
->> reasonable to ask to do that anyway.
-> 
-> My suggestion would be to not try to over-engineer a patch not going
-> upstream. Move the call before smp_prepare_cpus() in init/main.c.
+>> I realize very well that there is no magic moment where udev is
+>> really ever done loading modules, but the case which we want to
+>> support only involves devices which are *already enumerated*, but
+>> may not yet have a driver loaded, when udev starts. We would like
+>> udev to emit a signal (ABI to be discussed) when it is done
+>> trying to load modules for everything which was already enumerated
+>> when it starts, iow when there are no new device events pending
+>> anymore when udev does its initial hotplug replay.
+>
+> The kernel doesn't even "know" when this type of thing is, how can udev
+> know this?
+>
+>> So the question to you is would you be willing to include such
+>> functionality in udev ?  Note this signal would need to be emitted
+>> when udev from the real rootfs is done with the initial module
+>> loading, as the real rootfs may very well have more modules
+>> available then the initrd.
+>>
+>> ###
+>>
+>> With the generic story above told let me also give the concrete
+>> example / problem which has let to me asking this (note this has
+>> been brought up before on various kernel lists, it is a
+>> re-occuring theme, this is just an example really) :
+>>
+>> The problem at hand is a sata connector which also has a sata-power
+>> connector on an embedded (ish) board where the sata-power is
+>> controlled through a gpio. The sata-power connector is modeled
+>> in devicetree as a power-supply and this supply gets controlled
+>> by the ahci_platform driver.
+>>
+>> The disk power may very well have already been turned on by the
+>> bootloader, so we add a regulator-boot-on property to the regulator
+>> node in devicetree to make sure that it is left untouched when the
+>> regulator driver loads. If the ahci_platform driver is build into
+>> the kernel, it will then take control of the regulator and
+>> everything works well.
+>>
+>> If however the ahci_platform driver is a module, then as soon as
+>> the kernel is ready to start init, unused regulators are turned off
+>> and the disk looses its power while spinning and ends up doing an
+>> emergency heads park.
+>
+> What turns off the power in this situation?  The kernel?  Or userspace?
+> Don't you have control of this?
+>
+> Have you tried to even create a patch that could do this type of thing
+> to udev to see if it is even possible?
+>
+> thanks,
+>
+> greg k-h
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-I guess. I don't like not overdoing things. You've met me right? ;)
 
-> Or, if you can be fairly certain your SMBIOS table is covered by the
-> linear mapping, move the call to setup_arch().
 
-I thought about that. I think I can assume this, but I am not certain.
-I'm going to ponder that. For now, the above (move before SMP setup) is
-probably the way I'll go with it as a hackish kludge.
-
->> P.S. I'm not interested at all in replies pointing me to the existing DT
->> cpu topology binding, which I am well aware of, but it does also not
->> actually solve the problem I have :)
-> 
-> Not going to point, but perhaps the correct answer is to ensure the
-> information you need is provided via DT/ACPI. As your email hints at.
-
-Yep. I've multiple threads going to get this addressed properly.
-
-Thanks Leif!
-
-Jon.
+-- 
+Jon Smirl
+jonsmirl at gmail.com
