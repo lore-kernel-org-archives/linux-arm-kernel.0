@@ -1,33 +1,39 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Sat, 17 Jan 2015 22:59:31 +0900
-Subject: [PATCH] arm64: Add dtb files to archclean rule
-Message-ID: <FF2CE3A3-56DA-4637-833F-264DD986F28C@gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Sat, 17 Jan 2015 15:12:19 +0100
+Subject: [PATCH v2 0/6] ARM: shmobile: sh73a0: DT PM domain support
+In-Reply-To: <20150117011414.GC397@verge.net.au>
+References: <1421237484-16847-1-git-send-email-geert+renesas@glider.be>
+ <20150114235302.GC10479@verge.net.au>
+ <CAMuHMdVANePZ-fLzaLCEOm0vHR735C=u5_fDa4Uywi_P5ggjBg@mail.gmail.com>
+ <20150116011315.GA7830@verge.net.au>
+ <20150116024724.GA31654@verge.net.au>
+ <CAMuHMdU4hj2p-N8abT-BSadznqF7=0-08o9F4_7+qjdvv6Whmw@mail.gmail.com>
+ <20150116124502.GC6285@verge.net.au>
+ <20150117011414.GC397@verge.net.au>
+Message-ID: <CAMuHMdX40LTdKt_nBb_U4eXWMuPXSYfC0Q4PvA42grdocCZfAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As dts files have been reorganised under vendor subdirs, dtb files
-cannot be removed with "make distclean" now. Thus, this patch adds
-dtb files to archclean rule.
+Hi Simon,
 
-Cc: Robert Richter <rrichter@cavium.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Jungseok Lee <jungseoklee85@gmail.com>
----
- arch/arm64/Makefile | 1 +
- 1 file changed, 1 insertion(+)
+On Sat, Jan 17, 2015 at 2:14 AM, Simon Horman <horms@verge.net.au> wrote:
+>> > If you add patch 6 to sh-drivers-for-v3.20 and merge it in -next,
+>> > everything is fine!
+>>
+>> Thanks, I thought I had that one but I must have missed it somehow.
+>
+> I have made a second attempt and this time I hope that I haven't missed
+> anything. Please see renesas-next-20150117-v3.19-rc1.
 
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 1c43cec..0666888 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -85,6 +85,7 @@ vdso_install:
- # We use MRPROPER_FILES and CLEAN_FILES now
- archclean:
- 	$(Q)$(MAKE) $(clean)=$(boot)
-+	$(Q)$(MAKE) $(clean)=$(boot)/dts
- 
- define archhelp
-   echo  '* Image.gz      - Compressed kernel image (arch/$(ARCH)/boot/Image.gz)'
--- 
-1.9.1
+Thanks, looks better!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
