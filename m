@@ -1,115 +1,192 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sat, 17 Jan 2015 02:42:31 +0100
-Subject: [PATCH] USB: gadget: atmel_usba_udc: Enable/disable USB PLL on
- Vbus change
-In-Reply-To: <1421446870-26653-1-git-send-email-sylvain.rochet@finsecur.com>
-References: <1421446870-26653-1-git-send-email-sylvain.rochet@finsecur.com>
-Message-ID: <20150117014231.GW3843@piout.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 16 Jan 2015 17:57:01 -0800
+Subject: [PATCH RESEND v8 2/2] clk: Add floor and ceiling constraints to
+ clock rates
+In-Reply-To: <1421071809-17402-3-git-send-email-tomeu.vizoso@collabora.com>
+References: <1421071809-17402-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1421071809-17402-3-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <20150117015701.GB27202@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 16/01/2015 at 23:21:10 +0100, Sylvain Rochet wrote :
-> Prepare_enable on rising edge, disable_unprepare on falling edge. Reduce
-> power consumption if USB PLL is not already necessary for OHCI or EHCI.
-> If USB host is not connected we can sleep with USB PLL stopped.
-> 
-> This driver does not support suspend/resume yet, not suspending if we
-> are still attached to an USB host is fine for what I need, this patch
-> allow suspending with USB PLL stopped when USB device is not currently
-> used.
-> 
-
-Same as your previous patch, the maintainers are:
-Felipe Balbi <balbi@ti.com> (maintainer:USB GADGET/PERIPH...)
-Greg Kroah-Hartman <gregkh@linuxfoundation.org> (supporter:USB SUBSYSTEM)
-
-
-> diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-> index ce88237..8ea0a63 100644
-> --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
-> +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-> +			ret = clk_prepare_enable(udc->pclk);
-> +			if (ret)
-> +				goto out;
-> +			ret = clk_prepare_enable(udc->hclk);
-> +			if (ret) {
-> +				clk_disable_unprepare(udc->pclk);
-> +				goto out;
-
-
-You probably got a warning at some point in time, you can't use
-clk_prepare or clk_unprepare in an irq handler as they may sleep (that
-is exactly the point of having clk_prepare ans clk_enable)
-
-So, use clk_enable and clk_disable here.
-
-
->  			reset_all_endpoints(udc);
->  			toggle_bias(0);
->  			usba_writel(udc, CTRL, USBA_DISABLE_MASK);
-> +
-> +			clk_disable_unprepare(udc->hclk);
-> +			clk_disable_unprepare(udc->pclk);
-> +
-
-Ditto
-
->  			if (udc->driver->disconnect) {
->  				spin_unlock(&udc->lock);
->  				udc->driver->disconnect(&udc->gadget);
-> @@ -1772,15 +1786,6 @@ static int atmel_usba_start(struct usb_gadget *gadget,
->  	udc->driver = driver;
->  	spin_unlock_irqrestore(&udc->lock, flags);
+On 01/12, Tomeu Vizoso wrote:
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 7eddfd8..2793bd7 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -1013,8 +1015,8 @@ static unsigned long clk_core_round_rate_nolock(struct clk_core *clk,
 >  
-> -	ret = clk_prepare_enable(udc->pclk);
-> -	if (ret)
-> -		return ret;
-> -	ret = clk_prepare_enable(udc->hclk);
-> -	if (ret) {
-> -		clk_disable_unprepare(udc->pclk);
-> -		return ret;
-> -	}
-> -
-
-Keep clk_prepare and clk_unprepare here.
-
->  	udc->vbus_prev = 0;
->  	if (gpio_is_valid(udc->vbus_pin))
->  		enable_irq(gpio_to_irq(udc->vbus_pin));
-> @@ -1788,13 +1793,27 @@ static int atmel_usba_start(struct usb_gadget *gadget,
->  	/* If Vbus is present, enable the controller and wait for reset */
->  	spin_lock_irqsave(&udc->lock, flags);
->  	if (vbus_is_present(udc) && udc->vbus_prev == 0) {
-> +		ret = clk_prepare_enable(udc->pclk);
-> +		if (ret)
-> +			goto out;
-> +		ret = clk_prepare_enable(udc->hclk);
-> +		if (ret) {
-> +			clk_disable_unprepare(udc->pclk);
-> +			goto out;
+>  	if (clk->ops->determine_rate) {
+>  		parent_hw = parent ? parent->hw : NULL;
+> -		return clk->ops->determine_rate(clk->hw, rate, &parent_rate,
+> -						&parent_hw);
+> +		return clk->ops->determine_rate(clk->hw, rate, 0, ULONG_MAX,
+> +						&parent_rate, &parent_hw);
+>  	} else if (clk->ops->round_rate)
+>  		return clk->ops->round_rate(clk->hw, rate, &parent_rate);
+>  	else if (clk->flags & CLK_SET_RATE_PARENT)
+> @@ -1453,8 +1458,20 @@ static struct clk_core *clk_calc_new_rates(struct clk_core *clk,
+>  
+>  	/* find the closest rate and parent clk/rate */
+>  	if (clk->ops->determine_rate) {
+> +		hlist_for_each_entry(clk_user, &clk->clks, child_node) {
+> +			floor_rate = max(floor_rate,
+> +					 clk_user->floor_constraint);
 > +		}
 > +
+> +		hlist_for_each_entry(clk_user, &clk->clks, child_node) {
+> +			ceiling_rate = min(ceiling_rate,
+> +					   clk_user->ceiling_constraint);
+> +		}
 
-clk_enable/clk_disable here.
+I would think we need to do this in the clk_round_rate() path as
+well. We can't just pass 0 and ULONG_MAX there or we'll determine
+one rate here and another rate in round_rate(), violating the
+contract between set_rate() and round_rate().
 
->  		toggle_bias(1);
->  		usba_writel(udc, CTRL, USBA_ENABLE_MASK);
->  		usba_writel(udc, INT_ENB, USBA_END_OF_RESET);
 > +
-> +		udc->vbus_prev = 1;
->  	}
->  	spin_unlock_irqrestore(&udc->lock, flags);
+>  		parent_hw = parent ? parent->hw : NULL;
+>  		new_rate = clk->ops->determine_rate(clk->hw, rate,
+> +						    floor_rate,
+> +						    ceiling_rate,
+>  						    &best_parent_rate,
+>  						    &parent_hw);
+>  		parent = parent_hw ? parent_hw->core : NULL;
+
+We should enforce a constraint if the clk is using the
+round_rate() op too. If the .round_rate() op returns some rate
+within range it should be ok.  Otherwise we can fail the rate
+change because it's out of range.
+
+We'll also need to introduce some sort of
+clk_core_determine_rate(core, rate, min, max) so that clock
+providers can ask parent clocks to find a rate within some range
+that they can tolerate. If we update __clk_mux_determine_rate()
+we can see how that would work out.
+
+> @@ -1660,13 +1657,92 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
+[...]
+> + */
+> +int clk_set_rate(struct clk *clk, unsigned long rate)
+> +{
+> +	return clk_core_set_rate(clk->core, rate);
+
+clk could be NULL.
+
+> +}
+>  EXPORT_SYMBOL_GPL(clk_set_rate);
 >  
->  	return 0;
-> +out:
-> +	spin_unlock_irqrestore(&udc->lock, flags);
-> +	return ret;
->  }
+> +int clk_set_rate_range(struct clk *clk, unsigned long min, unsigned long max)
+> +{
+> +	int ret = 0;
+
+Check for NULL clk.
+
+> +
+> +/**
+> + * clk_set_floor_rate - set a minimum clock rate for a clock source
+> + * @clk: clock source
+> + * @rate: desired minimum clock rate in Hz
+> + *
+> + * Returns success (0) or negative errno.
+> + */
+> +int clk_set_floor_rate(struct clk *clk, unsigned long rate)
+> +{
+> +	return clk_set_rate_range(clk, rate, clk->ceiling_constraint);
+
+clk could be NULL.
+
+> +}
+> +EXPORT_SYMBOL_GPL(clk_set_floor_rate);
+> +
+> +/**
+> + * clk_set_ceiling_rate - set a maximum clock rate for a clock source
+> + * @clk: clock source
+> + * @rate: desired maximum clock rate in Hz
+> + *
+> + * Returns success (0) or negative errno.
+> + */
+> +int clk_set_ceiling_rate(struct clk *clk, unsigned long rate)
+> +{
+> +	return clk_set_rate_range(clk, clk->floor_constraint, rate);
+
+clk could be NULL.
+
+> +}
+> +EXPORT_SYMBOL_GPL(clk_set_ceiling_rate);
+> +
+>  static struct clk_core *clk_core_get_parent(struct clk_core *core)
+>  {
+>  	struct clk_core *parent;
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index 2e65419..ae5c800 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -175,9 +175,12 @@ struct clk_ops {
+>  					unsigned long parent_rate);
+>  	long		(*round_rate)(struct clk_hw *hw, unsigned long rate,
+>  					unsigned long *parent_rate);
+> -	long		(*determine_rate)(struct clk_hw *hw, unsigned long rate,
+> -					unsigned long *best_parent_rate,
+> -					struct clk_hw **best_parent_hw);
+> +	long		(*determine_rate)(struct clk_hw *hw,
+> +					  unsigned long rate,
+> +					  unsigned long floor_rate,
+> +					  unsigned long ceiling_rate,
+
+I wonder if we should call this min_rate and max_rate?
+
+> +					  unsigned long *best_parent_rate,
+> +					  struct clk_hw **best_parent_hw);
+>  	int		(*set_parent)(struct clk_hw *hw, u8 index);
+>  	u8		(*get_parent)(struct clk_hw *hw);
+>  	int		(*set_rate)(struct clk_hw *hw, unsigned long rate,
+> diff --git a/include/linux/clk.h b/include/linux/clk.h
+> index c7f258a..f99ae67 100644
+> --- a/include/linux/clk.h
+> +++ b/include/linux/clk.h
+> @@ -302,6 +302,34 @@ long clk_round_rate(struct clk *clk, unsigned long rate);
+>  int clk_set_rate(struct clk *clk, unsigned long rate);
 >  
+>  /**
+> + * clk_set_rate_range - set a rate range for a clock source
+> + * @clk: clock source
+> + * @min: desired minimum clock rate in Hz
+> + * @max: desired maximum clock rate in Hz
+> + *
+> + * Returns success (0) or negative errno.
+> + */
+> +int clk_set_rate_range(struct clk *clk, unsigned long min, unsigned long max);
+> +
+> +/**
+> + * clk_set_floor_rate - set a minimum clock rate for a clock source
+> + * @clk: clock source
+> + * @rate: desired minimum clock rate in Hz
+> + *
+> + * Returns success (0) or negative errno.
+> + */
+> +int clk_set_floor_rate(struct clk *clk, unsigned long rate);
+
+And this called clk_set_max_rate()?
+
+> +
+> +/**
+> + * clk_set_ceiling_rate - set a maximum clock rate for a clock source
+> + * @clk: clock source
+> + * @rate: desired maximum clock rate in Hz
+> + *
+> + * Returns success (0) or negative errno.
+> + */
+> +int clk_set_ceiling_rate(struct clk *clk, unsigned long rate);
+
+And this called clk_set_min_rate()?
+
+> +
+> +/**
+>   * clk_set_parent - set the parent clock source for this clock
+>   * @clk: clock source
+>   * @parent: parent clock source
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
