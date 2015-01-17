@@ -1,163 +1,128 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 17 Jan 2015 12:15:23 +0100
-Subject: sun9i pll4 upstream kernel code seems wrong
-In-Reply-To: <54BA4395.4060403@redhat.com>
-References: <54BA2C96.7050102@redhat.com>
- <CAGb2v66j8=VNkX_C=aEEO0cq53ELGnkZoNSk=wCy8n5j0w0mWw@mail.gmail.com>
- <54BA4395.4060403@redhat.com>
-Message-ID: <54BA444B.7050304@redhat.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sat, 17 Jan 2015 11:52:37 +0000
+Subject: [PATCH v7 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
+In-Reply-To: <20150116162944.EE0E3C40BF1@trevor.secretlab.ca>
+References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
+ <CACxGe6v_BvCQqp8d=LaQ8HeaOU1Zh_HPpwFTdwOjHUbqXsnQ8g@mail.gmail.com>
+ <20150115182346.GE2329@e104818-lin.cambridge.arm.com>
+ <20150116162944.EE0E3C40BF1@trevor.secretlab.ca>
+Message-ID: <20150117115237.GA30886@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Jan 16, 2015 at 04:29:44PM +0000, Grant Likely wrote:
+> On Thu, 15 Jan 2015 18:23:47 +0000, Catalin Marinas <catalin.marinas@arm.com>  wrote:
+> > On Thu, Jan 15, 2015 at 04:26:20PM +0000, Grant Likely wrote:
+> > > On Wed, Jan 14, 2015 at 3:04 PM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> > > > This is the v7 of ACPI core patches for ARM64 based on ACPI 5.1
+> > >
+> > > I'll get right to the point: Can we please have this series queued up
+> > > for v3.20?
+> >
+> > Before you even ask for this, please look at the patches and realise
+> > that there is a complete lack of Reviewed-by tags on the code (well,
+> > apart from trivial Kconfig changes). In addition, the series touches on
+> > other subsystems like clocksource, irqchip, acpi and I don't see any
+> > acks from the corresponding maintainers. So even if I wanted to merge
+> > the series, there is no way it can be done without additional
+> > reviews/acks. On the document (last patch), I'd like to see a statement
+> > from HP as they've been vocal in private but no public endorsement of
+> > this doc.
+> 
+> I have to ask. We've got no idea what you are thinking in terms of merge
+> timeline. The ToDo list is part of the question, certainly, but if I
+> have to ask flat-out to get some progress, then I will. Up to this
+> point, the primary objections have been coming from you and other ARM
+> maintainers, not the ACPI maintainer, and not other subsystem
+> maintainers, so of course I'm going to address my arguments to you and
+> Will.
 
-On 17-01-15 12:12, Hans de Goede wrote:
-> Hi,
->
-> On 17-01-15 11:37, Chen-Yu Tsai wrote:
->> Hi,
->>
->> On Sat, Jan 17, 2015 at 5:34 PM, Hans de Goede <hdegoede@redhat.com> wrote:
->>> Hi ChenYu,
->>>
->>> Looking at drivers/clk/sunxi/clk-sun9i-core.c:
->>>
->>> sun9i_a80_get_pll4_factors(), and comparing it with
->>> the A80 user manual, things seem way off, this seems
->>> more accurate (although also possibly not quite)
->>> for pll1 / pll2 then for pll4, and the comment at
->>> the top does mention PLL1 once.
->>
->> PLL1 was mentioned as I forgot to change that one in
->> the comment. I copied the comment section from others.
->>
->> Other than that, I'm not sure what part is off. The
->> code was done without the user manual, only with the
->> SDK bits. I think in the SDK the minimum value of 12
->> for N factor was not mentioned. But other than that,
->> it should work fine.
->
-> Ok, so looking at the code again it is not that much
-> of, just hard to read, and it does contain some errors:
->
->          /* divs above 256 cannot be odd */
->          if (div > 256)
->                  div = round_up(div, 2);
->
-> Should be:
->
->          /* divs above 255 must be a multiple of 2 */
->          if (div > 255)
->                  div = round_up(div, 2);
->
-> Note the 255, and replacing must be odd with
-> a multiple of 2, as this had nothing to do with odd /
-> even (more on that later).
->
-> Likewise this:
->
->      /* divs above 512 must be a multiple of 4 */
->          if (div > 512)
->                  div = round_up(div, 4);
->
-> Should have s/512/511/ done on it.
->
-> And this:
->
->          /* m will be 1 if div is odd */
->          if (div & 1)
->                  *m = 1;
->          else
->                  *m = 0;
->
-> Is nonsense, the div may have been odd all along,
-> (never been rounded) and we should still use m = 1, e.g.
-> to make 78 MHz.
+I'm not entirely sure the other maintainers looked at the patches at
+all, mainly because they thought it's all too ARM specific. Pushing to
+linux-next is a first step but I wouldn't do it without acks from the
+corresponding maintainers.
 
-Correction this should read:
+> > > Instead, keeping these patches out means that hardware is getting
+> > > developed and tested against Fedora, early access RHEL and Linaro
+> > > kernels. It means that we're abdicating on any influence mainline has
+> > > over how those platforms are developed. The longer these patches stay
+> > > out of mainline, the greater the potential for delta between what is
+> > > in the vendor kernels and what we accept into mainline.
+> >
+> > I'm not buying this argument. Putting pressure on maintainers to merge
+> > something because Fedora or some other distro has merged them is not the
+> > right approach. If such Linux vendors ignore arguments on the list just
+> > for the sake of providing ACPI support, there is a high chance that they
+> > will accept non-standard code any other time when the kernel community
+> > disagrees.
+> 
+> It's not like I'm arguing for stuff that isn't ready to be merged. Even
+> back last October there was broad agreement from all of us (Will, Olof,
+> Marc Z. Mark R., myself) that these patches are correct and that the
+> remaining objections are related to larger questions of ecosystem. My
+> argument is that for all the outstanding issues, we've either got a
+> solution, or a process for working it out with hardware vendors. Keeping
+> things out of mainline now I think has hit the point of actively hurting
+> development. We're still having to dicker about with the core patches
+> that aren't supposed to be contentious anymore, and we're making the
+> hardware vendors work out of tree unnecessarily.
 
-Is nonsense, the div may have been *even* all along,
-(never been rounded) and we should still use m = 1, e.g.
-to make *72* MHz.
+Things are getting better but if we didn't have objections starting a
+year ago, I don't think as much effort would have been dedicated to
+things like arm-acpi.txt, clarifying the ACPI spec around GIC support
+etc. From my perspective, pushing a non-working (IOW not fully
+functional) implementation in the kernel with a plan to sort things out
+later doesn't really work. I wasn't fully convinced that Linaro will
+dedicate the same effort once the code goes into mainline. So maybe not
+the nicest approach but blocking ACPI merging is a way to see longer
+term plans thought out.
 
-Regards,
+Anyway, we now got to a point where the core patches are ok (-ish, there
+are some comments to be addressed), we have some documents and guidance
+that can evolve in time and we can show this working on real hardware
+(well, not fully functional, for example you don't yet have lower CPU
+power states). I'll have a look at the branch Al pointed me at (I would
+have preferred linux-arm-kernel discussions rather than linaro-acpi
+which I don't follow) but in the meantime I trust Arnd to have
+scrutinised the Seattle patches ;).
 
-Hans
+I'll do another review of the ACPI core patches next week but with the
+current comments addressed and acks from the subsystem maintainers
+affected by these patches, we could try to push them to linux-next (but
+no commitment for a specific kernel version). Once in -next, subsequent
+fixes would have to go on top to avoid rebasing.
 
->
-> So this should be:
->
->          if (div < 256)
->                  *m = 1;
->          else
->                  *m = 0;
->
-> Preferably I would like to see the entire thing rewritten
-> into something IMHO much more readable / less error prone,
-> like this:
->
-> {
->      u8 n;
->      u8 m = 1;
->      u8 p = 1;
->
->      /* Normalize value to a 6M multiple */
->      n = DIV_ROUND_UP(*freq, 6000000);
->
->      if (n > 255) {
->          m = 0;
->          n = (n + 1) / 2;
->      }
->
->      if (n > 255) {
->          p = 0;
->          n = (n + 1) / 2;
->      }
->
->      if (n > 255)
->          n = 255;
->      else if (n < 12)
->          n = 12;
->
->      *freq = ((24000000 * n) >> p) / (m + 1);
->
->      if (n_ret == NULL)
->          return;
->
->      *n_ret = n;
->      *m_ret = m;
->      *p_ret = p;
-> }
->
-> With the n / m / p function parameters renamed to foo_ret.
->
-> Regards,
->
-> Hans
->
->
->>
->> Note the "div" variable uses a base frequency of 6,
->> not 24. I used a spreadsheet to do some calculations
->> to see if the code does output the right numbers.
->> Unfortunately I don't have either the notes or the
->> spreadsheet I used back then. It would take me a bit
->> of time to check.
->>
->>> Note according to the datasheet pll4 should be treated
->>> as an inmutable pll fixed at 960 MHz, so maybe we should
->>> just drop the get_factors function for it ?
->>
->> Is that acceptable? Or is there a readonly flag we should
->> set for the clock?
->>
->> Regards,
->> ChenYu
->>
->>> Luckily the struct clk_factors_config sun9i_a80_pll4_config
->>> is correct, so as long as we do not try to change the
->>> rate the current upstream code for pll4 does work.
->>>
->>> Regards,
->>>
->>> Hans
+> > > 6. How does the kernel handle_DSD usage?
+> > > While important, these issues are separate from whether or not to
+> > > merge the core aarch64 code. This work was defined and driven by Intel
+> > > for their embedded platforms, and it is already in mainline. Keeping
+> > > aarch64 support out isn't going to prevent drivers using it from being
+> > > merged. I don't think this should be a reason for blocking this
+> > > series.
+> >
+> > Intel folk is coming from the other direction, relatively standard
+> > hardware getting slightly more non-standard and they need a few bits
+> > added in _DSD. On ARM, we have completely non-standard hardware with DT
+> > used to describe complex topology (clocks, pin controls, voltage
+> > regulators etc.) with a high risk that vendors see _DSD as a work around
+> > standardising hardware or doing it properly in ACPI (whatever that
+> > means, AML?).
+[...]
+> However, what we do have is a rule that bindings must be documented,
+> whether they be DT or ACPI. So, regardless of what vendors try to shove
+> into ACPI, the rule is that driver support shouldn't be merged without
+> documented bindings (either in the kernel tree, or UEFI forum's repo),
+> and that gives us some leverage.
+
+The problem I have with this process is that the _DSD properties would
+not be reviewed by the kernel maintainers before they are approved by
+the UEFI forum. So the kernel community are just faced with a set of
+patches to support approved _DSD bindings and at that point it's late to
+push back, especially when such bindings were already implemented in
+firmware.
+
+I'd like to see some proper guidance for _DSD bindings rather than some
+examples like "linux,trigger" currently on the UEFI website.
+
+-- 
+Catalin
