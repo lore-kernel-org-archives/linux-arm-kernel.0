@@ -1,71 +1,63 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sat, 17 Jan 2015 10:43:58 +0100
-Subject: [PATCH] USB: gadget: atmel_usba_udc: Enable/disable USB PLL on
- Vbus change
-In-Reply-To: <20150117014231.GW3843@piout.net>
-References: <1421446870-26653-1-git-send-email-sylvain.rochet@finsecur.com>
- <20150117014231.GW3843@piout.net>
-Message-ID: <20150117104358.0282b27f@bbrezillon>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Sat, 17 Jan 2015 11:46:52 +0200
+Subject: [PATCH] clocksource: arm_arch_timer: Rename arch_timer_probed to
+ reflect behaviour
+Message-ID: <1421488012-5098-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The arch_timer_probed function returns whether the given time doesn't
+need to be probed. This can be the case when the timer has been probed
+already, but also when it has no corresponding enabled node in DT.
 
-On Sat, 17 Jan 2015 02:42:31 +0100
-Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+Rename the function to arch_timer_need_probe and invert its return value
+to better reflect the function's purpose and behaviour.
 
-> Hi,
-> 
-> On 16/01/2015 at 23:21:10 +0100, Sylvain Rochet wrote :
-> > Prepare_enable on rising edge, disable_unprepare on falling edge. Reduce
-> > power consumption if USB PLL is not already necessary for OHCI or EHCI.
-> > If USB host is not connected we can sleep with USB PLL stopped.
-> > 
-> > This driver does not support suspend/resume yet, not suspending if we
-> > are still attached to an USB host is fine for what I need, this patch
-> > allow suspending with USB PLL stopped when USB device is not currently
-> > used.
-> > 
-> 
-> Same as your previous patch, the maintainers are:
-> Felipe Balbi <balbi@ti.com> (maintainer:USB GADGET/PERIPH...)
-> Greg Kroah-Hartman <gregkh@linuxfoundation.org> (supporter:USB SUBSYSTEM)
-> 
-> 
-> > diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-> > index ce88237..8ea0a63 100644
-> > --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
-> > +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-> > +			ret = clk_prepare_enable(udc->pclk);
-> > +			if (ret)
-> > +				goto out;
-> > +			ret = clk_prepare_enable(udc->hclk);
-> > +			if (ret) {
-> > +				clk_disable_unprepare(udc->pclk);
-> > +				goto out;
-> 
-> 
-> You probably got a warning at some point in time, you can't use
-> clk_prepare or clk_unprepare in an irq handler as they may sleep (that
-> is exactly the point of having clk_prepare ans clk_enable)
-> 
-> So, use clk_enable and clk_disable here.
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+---
+ drivers/clocksource/arm_arch_timer.c | 13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
 
-You're right, except that calling enable/disable on the PLL clk in irq
-context is pretty much useless since the activation/deactivation code
-of the PLL is in prepare/unprepare, so you won't save much power by
-doing that (gating the peripheral clk should save a bit though). 
-
-To solve that issue I thought we could move to a threaded_irq (where we
-can safely sleep), but you'll also have to take of not calling
-prepare/unprepare in sections where at least one spinlock is taken (for
-the same reason => you cannot sleep with while you hold spinlocks).
-
-Best Regards,
-
-Boris
-
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 095c1774592c..3cbdd563a967 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -660,17 +660,17 @@ static const struct of_device_id arch_timer_mem_of_match[] __initconst = {
+ };
+ 
+ static bool __init
+-arch_timer_probed(int type, const struct of_device_id *matches)
++arch_timer_need_probe(int type, const struct of_device_id *matches)
+ {
+ 	struct device_node *dn;
+-	bool probed = true;
++	bool need_probe = false;
+ 
+ 	dn = of_find_matching_node(NULL, matches);
+ 	if (dn && of_device_is_available(dn) && !(arch_timers_present & type))
+-		probed = false;
++		need_probe = true;
+ 	of_node_put(dn);
+ 
+-	return probed;
++	return need_probe;
+ }
+ 
+ static void __init arch_timer_common_init(void)
+@@ -679,9 +679,10 @@ static void __init arch_timer_common_init(void)
+ 
+ 	/* Wait until both nodes are probed if we have two timers */
+ 	if ((arch_timers_present & mask) != mask) {
+-		if (!arch_timer_probed(ARCH_MEM_TIMER, arch_timer_mem_of_match))
++		if (arch_timer_need_probe(ARCH_MEM_TIMER,
++					  arch_timer_mem_of_match))
+ 			return;
+-		if (!arch_timer_probed(ARCH_CP15_TIMER, arch_timer_of_match))
++		if (arch_timer_need_probe(ARCH_CP15_TIMER, arch_timer_of_match))
+ 			return;
+ 	}
+ 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Regards,
+
+Laurent Pinchart
