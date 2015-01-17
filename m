@@ -1,45 +1,84 @@
 From: horms+renesas@verge.net.au (Simon Horman)
 Date: Sat, 17 Jan 2015 09:59:24 +0900
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Updates for v3.20
-Message-ID: <cover.1421379958.git.horms+renesas@verge.net.au>
+Subject: [PATCH 1/3] ARM: shmobile: R-Mobile: Use
+ generic_pm_domain.attach_dev() for pm_clk setup
+In-Reply-To: <cover.1421379958.git.horms+renesas@verge.net.au>
+References: <cover.1421379958.git.horms+renesas@verge.net.au>
+Message-ID: <4b9d62e02a0124d06fbbb9c4b01bd69f3c4dcd35.1421379958.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these second round of Renesas ARM based SoC updates for v3.20.
+Use the just introduced genpd attach/detach callbacks to register the
+devices' module clocks, instead of doing it directly, to make it
+DT-proof.
 
-This pull request is based on the previous round of
-such requests, tagged as renesas-soc-for-v3.20,
-which you have already pulled.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/pm-rmobile.c | 34 ++++++++++++++++++++++++++++++++--
+ 1 file changed, 32 insertions(+), 2 deletions(-)
 
-
-The following changes since commit 39695882d3d642a73bca551e682426e4e3bcd158:
-
-  ARM: shmobile: r8a73a4: Multiplatform support (2014-12-21 17:11:22 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc2-for-v3.20
-
-for you to fetch changes up to 2173fc7cb681c38b9e5bc526211045caecf96e44:
-
-  ARM: shmobile: R-Mobile: Add DT support for PM domains (2015-01-15 08:38:14 +0900)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM Based SoC Updates for v3.20
-
-* Add DT support for PM domains
-
-----------------------------------------------------------------
-Geert Uytterhoeven (3):
-      ARM: shmobile: R-Mobile: Use generic_pm_domain.attach_dev() for pm_clk setup
-      ARM: shmobile: R-Mobile: Store SYSC base address in rmobile_pm_domain
-      ARM: shmobile: R-Mobile: Add DT support for PM domains
-
- arch/arm/mach-shmobile/Kconfig      |   3 +-
- arch/arm/mach-shmobile/pm-r8a7740.c |  14 ++
- arch/arm/mach-shmobile/pm-rmobile.c | 275 ++++++++++++++++++++++++++++++++++--
- arch/arm/mach-shmobile/pm-rmobile.h |   3 +-
- arch/arm/mach-shmobile/pm-sh7372.c  |  11 ++
- 5 files changed, 289 insertions(+), 17 deletions(-)
+diff --git a/arch/arm/mach-shmobile/pm-rmobile.c b/arch/arm/mach-shmobile/pm-rmobile.c
+index 6f7d56e..4ea458d 100644
+--- a/arch/arm/mach-shmobile/pm-rmobile.c
++++ b/arch/arm/mach-shmobile/pm-rmobile.c
+@@ -101,6 +101,36 @@ static bool rmobile_pd_active_wakeup(struct device *dev)
+ 	return true;
+ }
+ 
++static int rmobile_pd_attach_dev(struct generic_pm_domain *domain,
++				 struct device *dev)
++{
++	int error;
++
++	error = pm_clk_create(dev);
++	if (error) {
++		dev_err(dev, "pm_clk_create failed %d\n", error);
++		return error;
++	}
++
++	error = pm_clk_add(dev, NULL);
++	if (error) {
++		dev_err(dev, "pm_clk_add failed %d\n", error);
++		goto fail;
++	}
++
++	return 0;
++
++fail:
++	pm_clk_destroy(dev);
++	return error;
++}
++
++static void rmobile_pd_detach_dev(struct generic_pm_domain *domain,
++				  struct device *dev)
++{
++	pm_clk_destroy(dev);
++}
++
+ static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
+ {
+ 	struct generic_pm_domain *genpd = &rmobile_pd->genpd;
+@@ -111,6 +141,8 @@ static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
+ 	genpd->dev_ops.active_wakeup	= rmobile_pd_active_wakeup;
+ 	genpd->power_off		= rmobile_pd_power_down;
+ 	genpd->power_on			= rmobile_pd_power_up;
++	genpd->attach_dev		= rmobile_pd_attach_dev;
++	genpd->detach_dev		= rmobile_pd_detach_dev;
+ 	__rmobile_pd_power_up(rmobile_pd, false);
+ }
+ 
+@@ -129,8 +161,6 @@ void rmobile_add_device_to_domain_td(const char *domain_name,
+ 	struct device *dev = &pdev->dev;
+ 
+ 	__pm_genpd_name_add_device(domain_name, dev, td);
+-	if (pm_clk_no_clocks(dev))
+-		pm_clk_add(dev, NULL);
+ }
+ 
+ void rmobile_add_devices_to_domains(struct pm_domain_device data[],
+-- 
+2.1.4
