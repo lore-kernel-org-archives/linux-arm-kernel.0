@@ -1,59 +1,76 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sat, 17 Jan 2015 17:01:13 +0100
-Subject: [PATCH v4 2/3] i2c: iproc: Add Broadcom iProc I2C Driver
-In-Reply-To: <54B98C18.4080807@broadcom.com>
-References: <rjui@broadcom.com>
- <1421274213-3544-1-git-send-email-rjui@broadcom.com>
- <1421274213-3544-3-git-send-email-rjui@broadcom.com>
- <20150115084119.GN22880@pengutronix.de>
- <54B98C18.4080807@broadcom.com>
-Message-ID: <20150117160113.GA22880@pengutronix.de>
+From: sylvain.rochet@finsecur.com (Sylvain Rochet)
+Date: Sat, 17 Jan 2015 17:03:04 +0100
+Subject: [PATCH] USB: host: ehci_atmel: Add suspend/resume support
+In-Reply-To: <20150117135857.71dae08f@bbrezillon>
+References: <1421437274-31615-1-git-send-email-sylvain.rochet@finsecur.com>
+ <20150117013442.GV3843@piout.net>
+ <20150117103609.276efecf@bbrezillon>
+ <20150117104259.GA24176@gradator.net>
+ <20150117135857.71dae08f@bbrezillon>
+Message-ID: <20150117160304.GA21820@gradator.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hello Boris,
 
-On Fri, Jan 16, 2015 at 02:09:28PM -0800, Ray Jui wrote:
-> On 1/15/2015 12:41 AM, Uwe Kleine-K?nig wrote:
-> > On Wed, Jan 14, 2015 at 02:23:32PM -0800, Ray Jui wrote:
-> >> +	 */
-> >> +	val = 1 << M_CMD_START_BUSY_SHIFT;
-> >> +	if (msg->flags & I2C_M_RD) {
-> >> +		val |= (M_CMD_PROTOCOL_BLK_RD << M_CMD_PROTOCOL_SHIFT) |
-> >> +		       (msg->len << M_CMD_RD_CNT_SHIFT);
-> >> +	} else {
-> >> +		val |= (M_CMD_PROTOCOL_BLK_WR << M_CMD_PROTOCOL_SHIFT);
-> >> +	}
-> >> +	writel(val, iproc_i2c->base + M_CMD_OFFSET);
-> >> +
-> >> +	time_left = wait_for_completion_timeout(&iproc_i2c->done, time_left);
+
+On Sat, Jan 17, 2015 at 01:58:57PM +0100, Boris Brezillon wrote:
+> On Sat, 17 Jan 2015 11:43:00 +0100 Sylvain Rochet <sylvain.rochet@finsecur.com> wrote:
 > > 
-> > When the interrupt fires here after the complete timed out and before
-> > you disable the irq you still throw the result away.
-> Yes, but then this comes down to the fact that if it has reached the
-> point that is determined to be a timeout condition in the driver, one
-> should really treat it as timeout error. In a normal condition,
-> time_left should never reach zero.
-I don't agree here. I'm not sure there is a real technical reason,
-though. But still if you're in a "success after timeout already over"
-situation it's IMHO better to interpret it as success, not timeout.
+> > I agree, but it depends on what we mean with standby vs mem, there 
+> > should be a difference between the two sleep mode.
+> 
+> AFAIU PM_SUSPEND_MEM mode only implies putting the SDRAM in
+> self-refresh mode to avoid waking the processor up for periodic SDRAM
+> bank refresh.
+> IMO this should not impact other peripherals behavior (BTW I haven't
+> found any USB driver testing for this suspend state before disabling
+> their clks).
 
-> >> +static int bcm_iproc_i2c_remove(struct platform_device *pdev)
-> >> +{
-> >> +	struct bcm_iproc_i2c_dev *iproc_i2c = platform_get_drvdata(pdev);
-> >> +
-> >> +	i2c_del_adapter(&iproc_i2c->adapter);
-> > You need to free the irq before i2c_del_adapter.
+This is my understanding as well.
+
+
+> And what if we decide to implement runtime PM for this peripheral ?
+> Shouldn't we disable these clks (which are one of the main source of
+> power consumption of this IP) ?
+
+Of course we should, disengaging clocks and stopping unused PLL and 
+crystals is almost the only way to save power.
+
+
+Should I have added the "Acked-by: Alexandre Belloni 
+<alexandre.belloni@free-electrons.com>" on 1/2 ?
+
+
+> > This behavior follows what the Atmel OHCI driver is currently doing.
+> 
+> Yes, but it doesn't mean we should do the same ;-), especially since
+> we're trying to remove this at91_suspend_entering_slow_clock function.
+
+Arrg, this is not what I meant ;-), anyway, proposing as well a change 
+which remove the at91_suspend_entering_slow_clock() from OHCI.
+
+I am not so happy with the global clocked boolean, but I guess this is 
+necessary if a suspended device gets removed.
+
+
+> > > Is there such a big penalty when resuming the device if the PLL and
+> > > peripheral clocks are disabled ?
 > > 
-> Yes. Thanks. Change back to use devm_request_irq, and use disable_irq
-> here before removing the adapter.
-The more lightweight approach is to set your device's irq-enable
-register to zero and call synchronize_irq. (For a shared irq calling
-disable_irq is even wrong here.)
+> > There is a penalty, starting up a PLL takes about 500 ?s, however I 
+> > can't decide if this is a small or a big penalty.
+> 
+> That's indeed not negligible, but when one enters suspend, I guess it
+> does expect some latency to resume from the suspended state.
 
-Best regards
-Uwe
+Overall resume of all drivers takes about 300 ms, whichever chosen 
+suspend mode. Suspend to ram with slow clock mode enabled adds about 15 ms
+of resume time.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+As a side note, unfortunately AT91 slow clock mode only work on "recent" 
+boards with Wenyou changes on linux4sam/linux-at91/linux-3.10-at91 
+branch and is why I am still stuck to this branch (and the HLCDC FB 
+driver, but this is going to be merged soon from what I saw, YAY !).
+
+
+Sylvain
