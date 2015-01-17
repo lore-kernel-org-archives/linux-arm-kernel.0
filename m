@@ -1,66 +1,38 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sat, 17 Jan 2015 13:58:57 +0100
-Subject: [PATCH] USB: host: ehci_atmel: Add suspend/resume support
-In-Reply-To: <20150117104259.GA24176@gradator.net>
-References: <1421437274-31615-1-git-send-email-sylvain.rochet@finsecur.com>
- <20150117013442.GV3843@piout.net>
- <20150117103609.276efecf@bbrezillon>
- <20150117104259.GA24176@gradator.net>
-Message-ID: <20150117135857.71dae08f@bbrezillon>
+From: broonie@kernel.org (Mark Brown)
+Date: Sat, 17 Jan 2015 13:14:05 +0000
+Subject: [PATCH v4 4/4] ARM: mvebu: Armada 385 GP: Add regulators to the
+ SATA port
+In-Reply-To: <54BA21F9.5050408@redhat.com>
+References: <1421330978-9694-1-git-send-email-gregory.clement@free-electrons.com>
+ <1421330978-9694-5-git-send-email-gregory.clement@free-electrons.com>
+ <54B8C933.7020502@redhat.com> <54B8D97B.3090908@free-electrons.com>
+ <54B8E38A.6020709@redhat.com> <20150116123705.GM3043@sirena.org.uk>
+ <54B9629C.9090800@redhat.com> <20150116202516.GL3856@sirena.org.uk>
+ <54BA21F9.5050408@redhat.com>
+Message-ID: <20150117131404.GA6414@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 17 Jan 2015 11:43:00 +0100
-Sylvain Rochet <sylvain.rochet@finsecur.com> wrote:
+On Sat, Jan 17, 2015 at 09:48:57AM +0100, Hans de Goede wrote:
 
-> Hi Boris,
-> 
-> 
-> On Sat, Jan 17, 2015 at 10:36:09AM +0100, Boris Brezillon wrote:
-> > On Sat, 17 Jan 2015 02:34:42 +0100 Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
-> > > 
-> > > We should definitely find a way to get rid of
-> > > at91_suspend_entering_slow_clock() at some point in time.
-> > 
-> > Can't we just disable clocks without testing for target_state ==
-> > PM_SUSPEND_MEM (which is exactly what at91_suspend_entering_slow_clock
-> > does [1]) when entering suspend ?
-> > I mean, IMHO other kind of suspend should still benefit from the power
-> > save induced by this PLL deactivation.
-> 
-> I agree, but it depends on what we mean with standby vs mem, there 
-> should be a difference between the two sleep mode.
+> and leave these regulators on, rather then turn them of $random time,
+> because as I've advocated before (see the simplefb thread) there is
+> no simple magic moment when it is right to turn things off, so doing
+> it when userspace starts is more or less as good as any moment, and if
+> it turns out that that is not a good moment, then maybe we need to
+> re-think the turning off in general.
 
-AFAIU PM_SUSPEND_MEM mode only implies putting the SDRAM in
-self-refresh mode to avoid waking the processor up for periodic SDRAM
-bank refresh.
-IMO this should not impact other peripherals behavior (BTW I haven't
-found any USB driver testing for this suspend state before disabling
-their clks).
-
-And what if we decide to implement runtime PM for this peripheral ?
-Shouldn't we disable these clks (which are one of the main source of
-power consumption of this IP) ?
-
-> 
-> This behavior follows what the Atmel OHCI driver is currently doing.
-
-Yes, but it doesn't mean we should do the same ;-), especially since
-we're trying to remove this at91_suspend_entering_slow_clock function.
-
-> 
-> 
-> > Is there such a big penalty when resuming the device if the PLL and
-> > peripheral clocks are disabled ?
-> 
-> There is a penalty, starting up a PLL takes about 500 ?s, however I 
-> can't decide if this is a small or a big penalty.
-
-That's indeed not negligible, but when one enters suspend, I guess it
-does expect some latency to resume from the suspended state.
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Following your argument to the logical conclusion means we can never
+turn any regualtor off - we always have the risk that there's another
+shared user which is going to get a power bounce if we power down.  More
+directly we'll also get people complaining that we're burning power
+pointlessly on their systems for devices they've not even got drivers
+enabled for.  This powering down is something there's been user demand
+for.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150117/eb85c4fd/attachment.sig>
