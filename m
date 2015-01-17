@@ -1,152 +1,67 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Sat, 17 Jan 2015 08:39:08 +0000
-Subject: Issue on reserving memory with no-map flag  in  DT
-In-Reply-To: <54B9ABAA.9060908@codeaurora.org>
-References: <54B8F63C.1060300@linaro.org> <54B9ABAA.9060908@codeaurora.org>
-Message-ID: <54BA1FAC.6090902@linaro.org>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat, 17 Jan 2015 09:44:00 +0100
+Subject: Making udev emit a signal when it is done loading modules
+Message-ID: <54BA20D0.7060402@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dear udev developers,
 
+We (me and some kernel devs mostly) would like to add support to
+the kernel for userspace telling the kernel that it is done with
+the *initial* loading of modules, with the purpose of cleaning up
+(disabling) unused harware resources like e.g. regulators and
+clocks.
 
-On 17/01/15 00:24, Laura Abbott wrote:
-> (Adding linux-mm and relevant people because this looks like an issue
-> there)
->
-> On 1/16/2015 3:30 AM, Srinivas Kandagatla wrote:
->> Hi All,
->>
->> I am hitting boot failures when I did try to reserve memory with
->> no-map flag using DT. Basically kernel just hangs with no indication
->> of whats going on. Added some debug to find out the location, it was
->> some where while dma mapping at kmap_atomic() in __dma_clear_buffer().
->> reserving.
->>
->> The issue is very much identical to
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/294773.html
->> but the memory reserve in my case is at start of the memory. I tried
->> the same fixes on this thread but it did not help.
->>
->> Platform: IFC6410 with APQ8064 which is a v7 platform with 2GB of
->> memory starting at 0x80000000 and kernel is always loaded at 0x80200000
->> And am using multi_v7_defconfig.
->>
->> Meminfo without memory reserve:
->> 80000000-88dfffff : System RAM
->>    80208000-80e5d307 : Kernel code
->>    80f64000-810be397 : Kernel data
->> 8a000000-8d9fffff : System RAM
->> 8ec00000-8effffff : System RAM
->> 8f700000-8fdfffff : System RAM
->> 90000000-af7fffff : System RAM
->>
->> DT entry:
->>         reserved-memory {
->>                 #address-cells = <1>;
->>                 #size-cells = <1>;
->>                 ranges;
->>                 smem at 80000000 {
->>                         reg = <0x80000000 0x200000>;
->>                         no-map;
->>                 };
->>         };
->>
->> If I remove the no-map flag, then I can boot the board. But I don?t
->> want kernel to map this memory at all, as this a IPC memory.
->>
->> I just wanted to understand whats going on here, Am guessing that
->> kernel would never touch that 2MB memory.
->>
->> Does arm-kernel has limitation on unmapping/memblock_remove() such
->> memory locations?
->> Or
->> Is this a known issue?
->>
->> Any pointers to debug this issue?
->>
->> Before the kernel hangs it reports 2 errors like:
->>
->> BUG: Bad page state in process swapper  pfn:fffa8
->> page:ef7fb500 count:0 mapcount:0 mapping:  (null) index:0x0
->> flags: 0x96640253(locked|error|dirty|active|arch_1|reclaim|mlocked)
->> page dumped because: PAGE_FLAGS_CHECK_AT_FREE flag(s) set
->> bad because of flags:
->> flags: 0x200041(locked|active|mlocked)
->> Modules linked in:
->> CPU: 0 PID: 0 Comm: swapper Not tainted
->> 3.19.0-rc3-00007-g412f9ba-dirty #816
->> Hardware name: Qualcomm (Flattened Device Tree)
->> [<c0218280>] (unwind_backtrace) from [<c0212be8>] (show_stack+0x20/0x24)
->> [<c0212be8>] (show_stack) from [<c0af7124>] (dump_stack+0x80/0x9c)
->> [<c0af7124>] (dump_stack) from [<c0301570>] (bad_page+0xc8/0x128)
->> [<c0301570>] (bad_page) from [<c03018a8>]
->> (free_pages_prepare+0x168/0x1e0)
->> [<c03018a8>] (free_pages_prepare) from [<c030369c>]
->> (free_hot_cold_page+0x3c/0x174)
->> [<c030369c>] (free_hot_cold_page) from [<c0303828>]
->> (__free_pages+0x54/0x58)
->> [<c0303828>] (__free_pages) from [<c030395c>]
->> (free_highmem_page+0x38/0x88)
->> [<c030395c>] (free_highmem_page) from [<c0f62d5c>] (mem_init+0x240/0x430)
->> [<c0f62d5c>] (mem_init) from [<c0f5db3c>] (start_kernel+0x1e4/0x3c8)
->> [<c0f5db3c>] (start_kernel) from [<80208074>] (0x80208074)
->> Disabling lock debugging due to kernel taint
->>
->>
->> Full kernel log with memblock debug at http://paste.ubuntu.com/9761000/
->>
->
-> I don't have an IFC handy but I was able to reproduce the same issue on
-> another board.
-> I think this is an underlying issue in mm code.
->
-> Removing the first 2MB changes the start address of the zone. This means
-> the start
-> address is no longer pageblock aligned (4MB on this system). With a little
-> digging, it looks like the issue is we're running off the end of the end
-> of the
-> mem_map array because the memmap array is too small. This is similar to
-> an issue fixed by 7c45512 mm: fix pageblock bitmap allocation and the
-> following
-> fixes it for me:
+Currently the kernel does this cleanup just before it starts init
+(which may very well be init from a ramdisk). In some cases this
+is too early really, because later on a module may get loaded
+which needs this resources, these resources will then get turned
+on again by the loaded driver, and most of the time this is not
+an issue, but sometimes it is.
 
-Thanks Laura, This patch indeed fixes issue for me too.
+I realize very well that there is no magic moment where udev is
+really ever done loading modules, but the case which we want to
+support only involves devices which are *already enumerated*, but
+may not yet have a driver loaded, when udev starts. We would like
+udev to emit a signal (ABI to be discussed) when it is done
+trying to load modules for everything which was already enumerated
+when it starts, iow when there are no new device events pending
+anymore when udev does its initial hotplug replay.
 
-Tested-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+So the question to you is would you be willing to include such
+functionality in udev ?  Note this signal would need to be emitted
+when udev from the real rootfs is done with the initial module
+loading, as the real rootfs may very well have more modules
+available then the initrd.
 
->
-> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-> index 7633c50..32d9436 100644
-> --- a/mm/page_alloc.c
-> +++ b/mm/page_alloc.c
-> @@ -5012,7 +5012,7 @@ static void __init_refok alloc_node_mem_map(struct
-> pglist_data *pgdat)
->   #ifdef CONFIG_FLAT_NODE_MEM_MAP
->          /* ia64 gets its own node_mem_map, before this, without bootmem */
->          if (!pgdat->node_mem_map) {
-> -               unsigned long size, start, end;
-> +               unsigned long size, start, end, offset;
->                  struct page *map;
->
->                  /*
-> @@ -5020,10 +5020,11 @@ static void __init_refok
-> alloc_node_mem_map(struct pglist_data *pgdat)
->                   * aligned but the node_mem_map endpoints must be in order
->                   * for the buddy allocator to function correctly.
->                   */
-> +               offset = pgdat->node_start_pfn & (pageblock_nr_pages - 1);
->                  start = pgdat->node_start_pfn & ~(MAX_ORDER_NR_PAGES - 1);
->                  end = pgdat_end_pfn(pgdat);
->                  end = ALIGN(end, MAX_ORDER_NR_PAGES);
-> -               size =  (end - start) * sizeof(struct page);
-> +               size =  ((end - start) + offset) * sizeof(struct page);
->                  map = alloc_remap(pgdat->node_id, size);
->                  if (!map)
->                          map = memblock_virt_alloc_node_nopanic(size,
->
-> If there is agreement on this approach, I can turn this into a proper
-> patch.
->
-> Thanks,
-> Laura
->
+###
+
+With the generic story above told let me also give the concrete
+example / problem which has let to me asking this (note this has
+been brought up before on various kernel lists, it is a
+re-occuring theme, this is just an example really) :
+
+The problem at hand is a sata connector which also has a sata-power
+connector on an embedded (ish) board where the sata-power is
+controlled through a gpio. The sata-power connector is modeled
+in devicetree as a power-supply and this supply gets controlled
+by the ahci_platform driver.
+
+The disk power may very well have already been turned on by the
+bootloader, so we add a regulator-boot-on property to the regulator
+node in devicetree to make sure that it is left untouched when the
+regulator driver loads. If the ahci_platform driver is build into
+the kernel, it will then take control of the regulator and
+everything works well.
+
+If however the ahci_platform driver is a module, then as soon as
+the kernel is ready to start init, unused regulators are turned off
+and the disk looses its power while spinning and ends up doing an
+emergency heads park. Then as soon as the ahci_platform module
+loads the disk is spin up again. This is not good (quite bad
+actually) for the lifetime of the disk.
+
+Regards,
+
+Hans
