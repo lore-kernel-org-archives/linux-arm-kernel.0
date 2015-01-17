@@ -1,152 +1,191 @@
 From: geoff@infradead.org (Geoff Levand)
 Date: Sat, 17 Jan 2015 00:23:34 +0000
-Subject: [PATCH 4/8] arm64: Add EL2 switch to soft_restart
+Subject: [PATCH 2/8] arm64: Convert hcalls to use ISS field
 In-Reply-To: <cover.1421449714.git.geoff@infradead.org>
 References: <cover.1421449714.git.geoff@infradead.org>
-Message-ID: <bb44d4eee4fab15278e4a8829a0981878bc9acd7.1421449714.git.geoff@infradead.org>
+Message-ID: <6719b2520095926ae0e8ac888663b87f2098f565.1421449714.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a CPU is reset it needs to be put into the exception level it had when it
-entered the kernel.  Update cpu_reset() to accept an argument el2_switch which
-signals cpu_reset() to enter the soft reset address at EL2.  If el2_switch is
-not set the soft reset address will be entered at EL1.
+To allow for additional hcalls to be defined and to make the arm64 hcall API
+more consistent across exception vector routines, change the hcall implementations
+to use the ISS field of the ESR_EL2 register to specify the hcall type.
 
-Update cpu_soft_restart() and soft_restart() to pass the return of
-is_hyp_mode_available() as the el2_switch value to cpu_reset().  Also update the
-comments of cpu_reset(), cpu_soft_restart() and soft_restart() to reflect this
-change.
+The existing arm64 hcall implementations are limited in that they only allow
+for two distinct hcalls; with the x0 register either zero, or not zero.  Also,
+the API of the hyp-stub exception vector routines and the KVM exception vector
+routines differ; hyp-stub uses a non-zero value in x0 to implement
+__hyp_set_vectors, whereas KVM uses it to implement kvm_call_hyp.
+
+Define three new preprocessor macros HVC_GET_VECTORS, HVC_SET_VECTORS and
+HVC_CALL_HYP and to be used as hcall type specifiers and convert the
+existing __hyp_get_vectors(), __hyp_set_vectors() and kvm_call_hyp() routines
+to use these new macros when executing an HVC call.  Also change the
+corresponding hyp-stub and KVM el1_sync exception vector routines to use these
+new macros.
 
 Signed-off-by: Geoff Levand <geoff@infradead.org>
 ---
- arch/arm64/include/asm/proc-fns.h |  4 ++--
- arch/arm64/kernel/process.c       | 10 ++++++++-
- arch/arm64/mm/proc.S              | 47 +++++++++++++++++++++++++++++----------
- 3 files changed, 46 insertions(+), 15 deletions(-)
+ arch/arm64/include/asm/virt.h | 20 ++++++++++++++++++++
+ arch/arm64/kernel/hyp-stub.S  | 34 ++++++++++++++++++++++------------
+ arch/arm64/kvm/hyp.S          | 18 +++++++++++-------
+ 3 files changed, 53 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm64/include/asm/proc-fns.h b/arch/arm64/include/asm/proc-fns.h
-index 9a8fd84..339394d 100644
---- a/arch/arm64/include/asm/proc-fns.h
-+++ b/arch/arm64/include/asm/proc-fns.h
-@@ -32,8 +32,8 @@ extern void cpu_cache_off(void);
- extern void cpu_do_idle(void);
- extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
- extern void cpu_reset(unsigned long addr) __attribute__((noreturn));
--void cpu_soft_restart(phys_addr_t cpu_reset,
--		unsigned long addr) __attribute__((noreturn));
-+void cpu_soft_restart(phys_addr_t cpu_reset, unsigned long el2_switch,
-+		      unsigned long addr) __attribute__((noreturn));
- extern void cpu_do_suspend(struct cpu_suspend_ctx *ptr);
- extern u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
- 
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index fde9923..371bbf1 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -50,6 +50,7 @@
- #include <asm/mmu_context.h>
- #include <asm/processor.h>
- #include <asm/stacktrace.h>
-+#include <asm/virt.h>
- 
- #ifdef CONFIG_CC_STACKPROTECTOR
- #include <linux/stackprotector.h>
-@@ -60,7 +61,14 @@ EXPORT_SYMBOL(__stack_chk_guard);
- void soft_restart(unsigned long addr)
- {
- 	setup_mm_for_reboot();
--	cpu_soft_restart(virt_to_phys(cpu_reset), addr);
-+
-+	/* TODO: Remove this conditional when KVM can support CPU restart. */
-+	if (IS_ENABLED(CONFIG_KVM))
-+		cpu_soft_restart(virt_to_phys(cpu_reset), 0, addr);
-+	else
-+		cpu_soft_restart(virt_to_phys(cpu_reset),
-+				 is_hyp_mode_available(), addr);
-+
- 	/* Should never get here */
- 	BUG();
- }
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index c507e25..b767032 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -26,6 +26,7 @@
- #include <asm/pgtable-hwdef.h>
- #include <asm/pgtable.h>
- #include <asm/proc-macros.S>
-+#include <asm/virt.h>
- 
- #ifdef CONFIG_ARM64_64K_PAGES
- #define TCR_TG_FLAGS	TCR_TG0_64K | TCR_TG1_64K
-@@ -58,27 +59,48 @@ ENTRY(cpu_cache_off)
- ENDPROC(cpu_cache_off)
- 
- /*
-- *	cpu_reset(loc)
-+ * cpu_reset(el2_switch, loc) - Helper for cpu_soft_restart.
-  *
-- *	Perform a soft reset of the system.  Put the CPU into the same state
-- *	as it would be if it had been reset, and branch to what would be the
-- *	reset vector. It must be executed with the flat identity mapping.
-+ * @cpu_reset: Physical address of the cpu_reset routine.
-+ * @el2_switch: Flag to indicate a swich to EL2 is needed.
-+ * @addr: Location to jump to for soft reset.
-  *
-- *	- loc   - location to jump to for soft reset
-+ * Put the CPU into the same state as it would be if it had been reset, and
-+ * branch to what would be the reset vector. It must be executed with the
-+ * flat identity mapping.
-  */
-+
- 	.align	5
-+
- ENTRY(cpu_reset)
--	mrs	x1, sctlr_el1
--	bic	x1, x1, #1
--	msr	sctlr_el1, x1			// disable the MMU
-+	mrs	x2, sctlr_el1
-+	bic	x2, x2, #1
-+	msr	sctlr_el1, x2			// disable the MMU
- 	isb
--	ret	x0
-+
-+	cbz	x0, 1f				// el2_switch?
-+	mov	x0, x1
-+	mov	x1, xzr
-+	mov	x2, xzr
-+	mov	x3, xzr
-+	hvc	#HVC_CALL_FUNC			// no return
-+
-+1:	ret	x1
- ENDPROC(cpu_reset)
+diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+index 7a5df52..99c319c 100644
+--- a/arch/arm64/include/asm/virt.h
++++ b/arch/arm64/include/asm/virt.h
+@@ -21,6 +21,26 @@
+ #define BOOT_CPU_MODE_EL1	(0xe11)
+ #define BOOT_CPU_MODE_EL2	(0xe12)
  
 +/*
-+ * cpu_soft_restart(cpu_reset, el2_switch, addr) - Perform a cpu soft reset.
-+ *
-+ * @cpu_reset: Physical address of the cpu_reset routine.
-+ * @el2_switch: Flag to indicate a swich to EL2 is needed, passed to cpu_reset.
-+ * @addr: Location to jump to for soft reset, passed to cpu_reset.
-+ *
++ * HVC_GET_VECTORS - Return the value of the vbar_el2 register.
 + */
 +
- ENTRY(cpu_soft_restart)
--	/* Save address of cpu_reset() and reset address */
--	mov	x19, x0
--	mov	x20, x1
-+	mov	x19, x0				// cpu_reset
-+	mov	x20, x1				// el2_switch
-+	mov	x21, x2				// addr
++#define HVC_GET_VECTORS 1
++
++/*
++ * HVC_SET_VECTORS - Set the value of the vbar_el2 register.
++ *
++ * @x0: Physical address of the new vector table.
++ */
++
++#define HVC_SET_VECTORS 2
++
++/*
++ * HVC_CALL_HYP - Execute a hyp routine.
++ */
++
++#define HVC_CALL_HYP 3
++
+ #ifndef __ASSEMBLY__
  
- 	/* Turn D-cache off */
- 	bl	cpu_cache_off
-@@ -87,6 +109,7 @@ ENTRY(cpu_soft_restart)
- 	bl	flush_cache_all
+ /*
+diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
+index a272f33..e3db3fd 100644
+--- a/arch/arm64/kernel/hyp-stub.S
++++ b/arch/arm64/kernel/hyp-stub.S
+@@ -22,6 +22,7 @@
+ #include <linux/irqchip/arm-gic-v3.h>
  
- 	mov	x0, x20
-+	mov	x1, x21
- 	ret	x19
- ENDPROC(cpu_soft_restart)
+ #include <asm/assembler.h>
++#include <asm/kvm_arm.h>
+ #include <asm/ptrace.h>
+ #include <asm/virt.h>
  
+@@ -53,14 +54,22 @@ ENDPROC(__hyp_stub_vectors)
+ 	.align 11
+ 
+ el1_sync:
+-	mrs	x1, esr_el2
+-	lsr	x1, x1, #26
+-	cmp	x1, #0x16
+-	b.ne	2f				// Not an HVC trap
+-	cbz	x0, 1f
+-	msr	vbar_el2, x0			// Set vbar_el2
++	mrs	x18, esr_el2
++	lsr	x17, x18, #ESR_ELx_EC_SHIFT
++	and	x18, x18, #ESR_ELx_ISS_MASK
++
++	cmp     x17, #ESR_ELx_EC_HVC64
++	b.ne    2f				// Not an HVC trap
++
++	cmp	x18, #HVC_GET_VECTORS
++	b.ne	1f
++	mrs	x0, vbar_el2
+ 	b	2f
+-1:	mrs	x0, vbar_el2			// Return vbar_el2
++
++1:	cmp	x18, #HVC_SET_VECTORS
++	b.ne	2f
++	msr	vbar_el2, x0
++
+ 2:	eret
+ ENDPROC(el1_sync)
+ 
+@@ -100,11 +109,12 @@ ENDPROC(\label)
+  * initialisation entry point.
+  */
+ 
+-ENTRY(__hyp_get_vectors)
+-	mov	x0, xzr
+-	// fall through
+ ENTRY(__hyp_set_vectors)
+-	hvc	#0
++	hvc	#HVC_SET_VECTORS
+ 	ret
+-ENDPROC(__hyp_get_vectors)
+ ENDPROC(__hyp_set_vectors)
++
++ENTRY(__hyp_get_vectors)
++	hvc	#HVC_GET_VECTORS
++	ret
++ENDPROC(__hyp_get_vectors)
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index c0d8202..1916c89 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -27,6 +27,7 @@
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_mmu.h>
+ #include <asm/memory.h>
++#include <asm/virt.h>
+ 
+ #define CPU_GP_REG_OFFSET(x)	(CPU_GP_REGS + x)
+ #define CPU_XREG_OFFSET(x)	CPU_GP_REG_OFFSET(CPU_USER_PT_REGS + 8*x)
+@@ -1106,12 +1107,9 @@ __hyp_panic_str:
+  * in Hyp mode (see init_hyp_mode in arch/arm/kvm/arm.c).  Return values are
+  * passed in r0 and r1.
+  *
+- * A function pointer with a value of 0 has a special meaning, and is
+- * used to implement __hyp_get_vectors in the same way as in
+- * arch/arm64/kernel/hyp_stub.S.
+  */
+ ENTRY(kvm_call_hyp)
+-	hvc	#0
++	hvc	#HVC_CALL_HYP
+ 	ret
+ ENDPROC(kvm_call_hyp)
+ 
+@@ -1142,6 +1140,7 @@ el1_sync:					// Guest trapped into EL2
+ 
+ 	mrs	x1, esr_el2
+ 	lsr	x2, x1, #ESR_ELx_EC_SHIFT
++	and	x0, x1, #ESR_ELx_ISS_MASK
+ 
+ 	cmp	x2, #ESR_ELx_EC_HVC64
+ 	b.ne	el1_trap
+@@ -1150,15 +1149,19 @@ el1_sync:					// Guest trapped into EL2
+ 	cbnz	x3, el1_trap			// called HVC
+ 
+ 	/* Here, we're pretty sure the host called HVC. */
++	mov	x18, x0
+ 	pop	x2, x3
+ 	pop	x0, x1
+ 
+-	/* Check for __hyp_get_vectors */
+-	cbnz	x0, 1f
++	cmp	x18, #HVC_GET_VECTORS
++	b.ne	1f
+ 	mrs	x0, vbar_el2
+ 	b	2f
+ 
+-1:	push	lr, xzr
++1:	cmp	x18, #HVC_CALL_HYP
++	b.ne	2f
++
++	push	lr, xzr
+ 
+ 	/*
+ 	 * Compute the function address in EL2, and shuffle the parameters.
+@@ -1171,6 +1174,7 @@ el1_sync:					// Guest trapped into EL2
+ 	blr	lr
+ 
+ 	pop	lr, xzr
++
+ 2:	eret
+ 
+ el1_trap:
 -- 
 2.1.0
