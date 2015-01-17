@@ -1,55 +1,40 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 17 Jan 2015 18:37:50 +0800
-Subject: sun9i pll4 upstream kernel code seems wrong
-In-Reply-To: <54BA2C96.7050102@redhat.com>
-References: <54BA2C96.7050102@redhat.com>
-Message-ID: <CAGb2v66j8=VNkX_C=aEEO0cq53ELGnkZoNSk=wCy8n5j0w0mWw@mail.gmail.com>
+From: sylvain.rochet@finsecur.com (Sylvain Rochet)
+Date: Sat, 17 Jan 2015 11:43:00 +0100
+Subject: [PATCH] USB: host: ehci_atmel: Add suspend/resume support
+In-Reply-To: <20150117103609.276efecf@bbrezillon>
+References: <1421437274-31615-1-git-send-email-sylvain.rochet@finsecur.com>
+ <20150117013442.GV3843@piout.net>
+ <20150117103609.276efecf@bbrezillon>
+Message-ID: <20150117104259.GA24176@gradator.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Boris,
 
-On Sat, Jan 17, 2015 at 5:34 PM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Hi ChenYu,
->
-> Looking at drivers/clk/sunxi/clk-sun9i-core.c:
->
-> sun9i_a80_get_pll4_factors(), and comparing it with
-> the A80 user manual, things seem way off, this seems
-> more accurate (although also possibly not quite)
-> for pll1 / pll2 then for pll4, and the comment at
-> the top does mention PLL1 once.
 
-PLL1 was mentioned as I forgot to change that one in
-the comment. I copied the comment section from others.
+On Sat, Jan 17, 2015 at 10:36:09AM +0100, Boris Brezillon wrote:
+> On Sat, 17 Jan 2015 02:34:42 +0100 Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+> > 
+> > We should definitely find a way to get rid of
+> > at91_suspend_entering_slow_clock() at some point in time.
+> 
+> Can't we just disable clocks without testing for target_state ==
+> PM_SUSPEND_MEM (which is exactly what at91_suspend_entering_slow_clock
+> does [1]) when entering suspend ?
+> I mean, IMHO other kind of suspend should still benefit from the power
+> save induced by this PLL deactivation.
 
-Other than that, I'm not sure what part is off. The
-code was done without the user manual, only with the
-SDK bits. I think in the SDK the minimum value of 12
-for N factor was not mentioned. But other than that,
-it should work fine.
+I agree, but it depends on what we mean with standby vs mem, there 
+should be a difference between the two sleep mode.
 
-Note the "div" variable uses a base frequency of 6,
-not 24. I used a spreadsheet to do some calculations
-to see if the code does output the right numbers.
-Unfortunately I don't have either the notes or the
-spreadsheet I used back then. It would take me a bit
-of time to check.
+This behavior follows what the Atmel OHCI driver is currently doing.
 
-> Note according to the datasheet pll4 should be treated
-> as an inmutable pll fixed at 960 MHz, so maybe we should
-> just drop the get_factors function for it ?
 
-Is that acceptable? Or is there a readonly flag we should
-set for the clock?
+> Is there such a big penalty when resuming the device if the PLL and
+> peripheral clocks are disabled ?
 
-Regards,
-ChenYu
+There is a penalty, starting up a PLL takes about 500 ?s, however I 
+can't decide if this is a small or a big penalty.
 
-> Luckily the struct clk_factors_config sun9i_a80_pll4_config
-> is correct, so as long as we do not try to change the
-> rate the current upstream code for pll4 does work.
->
-> Regards,
->
-> Hans
+
+Sylvain
