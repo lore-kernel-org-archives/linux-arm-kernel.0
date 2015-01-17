@@ -1,81 +1,66 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 17 Jan 2015 12:43:48 +0000
-Subject: [RFC][PATCH] arm64: efi: Obey EFI memory type in dmi_remap
-In-Reply-To: <20150117115616.GK3827@bivouac.eciton.net>
-References: <1421461479-31608-1-git-send-email-lauraa@codeaurora.org>
- <CAKv+Gu8y428H0QQznV9SqhKNLMf6NVmNw5Lup3LiZYinRVMU-A@mail.gmail.com>
- <20150117115616.GK3827@bivouac.eciton.net>
-Message-ID: <CAKv+Gu_ppM7UNTt7=iCRgk6tsO8kj+TkA0Eg1CeXRSEL0t8__g@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Sat, 17 Jan 2015 13:58:57 +0100
+Subject: [PATCH] USB: host: ehci_atmel: Add suspend/resume support
+In-Reply-To: <20150117104259.GA24176@gradator.net>
+References: <1421437274-31615-1-git-send-email-sylvain.rochet@finsecur.com>
+ <20150117013442.GV3843@piout.net>
+ <20150117103609.276efecf@bbrezillon>
+ <20150117104259.GA24176@gradator.net>
+Message-ID: <20150117135857.71dae08f@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 January 2015 at 11:56, Leif Lindholm <leif.lindholm@linaro.org> wrote:
-> On Sat, Jan 17, 2015 at 08:24:15AM +0000, Ard Biesheuvel wrote:
->> On 17 January 2015 at 02:24, Laura Abbott <lauraa@codeaurora.org> wrote:
->> > Currently, dmi_remap unconditionally calls ioremap_cache for dmi_remap.
->> > The memory that's being remapped may be part of the existing EFI
->> > memory map and already remapped as uncached. Remapping as cached can
->> > created unexpected behavior so check the physical address against the
->> > EFI memory type before remapping.
->>
->> Mapping the SMBIOS tables as uncached is a bad idea, as 'uncached'
->> implies MT_DEVICE_nGnRnE in the arm64 kernel, and the SMBIOS structure
->> tables are not guaranteed to be aligned. So you should at least use
->> MT_NORMAL_NC here.
->>
->> Why does it end up mapped uncached in the first place? Is it backed by
->> a ROM instead of normal RAM?
->
-> Makes no difference - the SMBIOS spec contains some not naturally
-> aligned fields. So regardless of the backing store, the tables must be
-> accessible by Normal memory accesses.
->
+On Sat, 17 Jan 2015 11:43:00 +0100
+Sylvain Rochet <sylvain.rochet@finsecur.com> wrote:
 
-It should be mapped MT_NORMAL regardless, but it would be good to
-understand how we ended up in this situation, and whether it is
-something allowed by the spec. We currently assume that every
-EfiRuntimeServicesData or EfiReserved region is carved out of
-EfiConventionalMemory that has the EFI_MEMORY_WB attribute set, but I
-suspect that this is a non-RAM region. Note that the spec defines
-EFI_MEMORY_UC memory as MT_DEVICE_nGnRnE on AArch64, so if this region
-is only UC then it is a firmware bug. If it has WT/WC set, but not WB,
-I think we are dealing with a compliant firmware that is not handled
-correctly by the kernel. More specifically, we only distinguish
-between EFI_MEMORY_WB and !EFI_MEMORY_WB, where we treat the former as
-RAM and the latter as device memory. WT and WC are completely ignored.
+> Hi Boris,
+> 
+> 
+> On Sat, Jan 17, 2015 at 10:36:09AM +0100, Boris Brezillon wrote:
+> > On Sat, 17 Jan 2015 02:34:42 +0100 Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+> > > 
+> > > We should definitely find a way to get rid of
+> > > at91_suspend_entering_slow_clock() at some point in time.
+> > 
+> > Can't we just disable clocks without testing for target_state ==
+> > PM_SUSPEND_MEM (which is exactly what at91_suspend_entering_slow_clock
+> > does [1]) when entering suspend ?
+> > I mean, IMHO other kind of suspend should still benefit from the power
+> > save induced by this PLL deactivation.
+> 
+> I agree, but it depends on what we mean with standby vs mem, there 
+> should be a difference between the two sleep mode.
 
+AFAIU PM_SUSPEND_MEM mode only implies putting the SDRAM in
+self-refresh mode to avoid waking the processor up for periodic SDRAM
+bank refresh.
+IMO this should not impact other peripherals behavior (BTW I haven't
+found any USB driver testing for this suspend state before disabling
+their clks).
 
->> And does the region have any of the WT/W
->> attributes set in addition to UC? What type is it? I suppose it has
->> the EFI_MEMORY_RUNTIME bit set as well? (Note that the spec seems to
->> assume that configuration tables always reside in system RAM [UEFI
->> spec 2.4A 2.3.6])
->>
->> Also, with my latest virtmap changes, UEFI runtime regions are only
->> mapped during runtime service invocations, and explicitly when e.g.
->> the SMBIOS or ACPI layer needs to get at the data. Currently, regions
->> backed by system RAM are still covered by the linear mapping as well,
->> but that is something we intend to change too. So if the region is not
->> system RAM (!EFI_MEMORY_WB), the latest code will not have this region
->> mapped at DMI scan time, afaict.
->
-> Which seems like correct behaviour to me. If your firmware gives you
-> bogus data, most bets are off.
->
+And what if we decide to implement runtime PM for this peripheral ?
+Shouldn't we disable these clks (which are one of the main source of
+power consumption of this IP) ?
 
-Let's not point fingers just yet :-)
+> 
+> This behavior follows what the Atmel OHCI driver is currently doing.
 
-> What might make sense would be to if(efi_enabled(EFI_CONFIG_TABLES)),
-> verify WT/WC are set for the location, and bail out otherwise.
->
-> But this would effectively be a pre-emptive firmware bug workaround.
->
+Yes, but it doesn't mean we should do the same ;-), especially since
+we're trying to remove this at91_suspend_entering_slow_clock function.
 
-As I said, I would like to understand better what the nature of the
-region in question is.
-If it is a EfiRuntimeServicesData or EfiReserved region with WT|WC set
-and WB|UC cleared, for instance, then we are doing the wrong thing by
-mapping it as device memory.
+> 
+> 
+> > Is there such a big penalty when resuming the device if the PLL and
+> > peripheral clocks are disabled ?
+> 
+> There is a penalty, starting up a PLL takes about 500 ?s, however I 
+> can't decide if this is a small or a big penalty.
+
+That's indeed not negligible, but when one enters suspend, I guess it
+does expect some latency to resume from the suspended state.
+
 
 -- 
-Ard.
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
