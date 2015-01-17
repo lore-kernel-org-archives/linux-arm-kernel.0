@@ -1,152 +1,174 @@
 From: geoff@infradead.org (Geoff Levand)
 Date: Sat, 17 Jan 2015 00:23:34 +0000
-Subject: [PATCH 0/8] arm64 kexec kernel patches V7
-In-Reply-To: <cover.1415926876.git.geoff@infradead.orgg>
-References: <cover.1415926876.git.geoff@infradead.orgg>
-Message-ID: <cover.1421449714.git.geoff@infradead.org>
+Subject: [PATCH 1/8] arm64: Move proc-macros.S to include/asm
+In-Reply-To: <cover.1421449714.git.geoff@infradead.org>
+References: <cover.1421449714.git.geoff@infradead.org>
+Message-ID: <e81815fb841db3ea40ce8e2fd18cf021ec9c6cf7.1421449714.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+To allow the assembler macros defined in proc-macros.S to be used outside
+the mm code move the proc-macros.S file from arch/arm64/mm/ to
+arch/arm64/include/asm/ and fix up any preprocessor includes to use the new
+file location.
 
-This series adds the core support for kexec re-boots on arm64.  This v7 of the
-series is mainly just a rebase to the latest arm64 for-next/core branch
-(v3.19-rc4), and a few very minor changes requested for v6.
-
-I have tested with the ARM VE fast model, the ARM Base model and the ARM
-Foundation model with various kernel config options for both the first and
-second stage kernels.
-
-To load a second stage kernel and execute a kexec re-boot on arm64 my patches to
-kexec-tools [2], which have not yet been merged upstream, are needed.
-
-Patch 1 here moves proc-macros.S from arm64/mm to arm64/include/asm so that the
-dcache_line_size macro it defines can be uesd by kexec's relocate kernel
-routine.
-
-Patches 2-4 rework the arm64 hcall mechanism to give the arm64 soft_restart()
-routine the ability to switch exception levels from EL1 to EL2 for kernels that
-were entered in EL2.
-
-Patches 5-8 add the actual kexec support.
-
-Please consider all patches for inclusion.
-
-Note that the location of my development repositories has changed:
-
-[1]  https://git.kernel.org/cgit/linux/kernel/git/geoff/linux-kexec.git
-[2]  https://git.kernel.org/cgit/linux/kernel/git/geoff/kexec-tools.git
-
-Several things are known to have problems on kexec re-boot:
-
-spin-table
-----------
-
-PROBLEM: The spin-table enable method does not implement all the methods needed
-for CPU hot-plug, so the first stage kernel cannot be shutdown properly.
-
-WORK-AROUND: Upgrade to system firmware that provides PSCI enable method
-support, OR build the first stage kernel with CONFIG_SMP=n, OR pass 'maxcpus=1'
-on the first stage kernel command line.
-
-FIX: Upgrade system firmware to provide PSCI enable method support or add
-missing spin-table support to the kernel.
-
-KVM
+Signed-off-by: Geoff Levand <geoff@infradead.org>
 ---
+ arch/arm64/include/asm/proc-macros.S | 54 ++++++++++++++++++++++++++++++++++++
+ arch/arm64/mm/cache.S                |  3 +-
+ arch/arm64/mm/proc-macros.S          | 54 ------------------------------------
+ arch/arm64/mm/proc.S                 |  3 +-
+ 4 files changed, 56 insertions(+), 58 deletions(-)
+ create mode 100644 arch/arm64/include/asm/proc-macros.S
+ delete mode 100644 arch/arm64/mm/proc-macros.S
 
-PROBLEM: KVM acquires hypervisor resources on startup, but does not free those
-resources on shutdown, so the first stage kernel cannot be shutdown properly
-when using kexec.
-
-WORK-AROUND:  Build the first stage kernel with CONFIG_KVM=n.
-
-FIX: Fix KVM to support soft_restart().  KVM needs to restore default exception
-vectors, etc.
-
-UEFI
-----
-
-PROBLEM: UEFI does not manage its runtime services virtual mappings in a way
-that is compatible with a kexec re-boot, so the second stage kernel hangs on
-boot-up.
-
-WORK-AROUND:  Disable UEFI in firmware.
-
-FIX: Ard Biesheuvel has done work to fix this.  Basic kexec re-boot has been
-tested and works.  More comprehensive testing is needed.
-
-/memreserve/
-----------
-
-PROBLEM: The use of device tree /memreserve/ entries is not compatible with
-kexec re-boot.  The second stage kernel will use the reserved regions and the
-system will become unstable.
-
-WORK-AROUND: Pass a user specified DTB using the kexec --dtb option.
-
-FIX: An interface to expose a binary device tree to user space has been
-proposed.  User kexec utilities will need to be updated to add support for this
-new interface.
-
-ACPI
-----
-
-PROBLEM: The kernel for ACPI based systems does not export a device tree to the
-standard user space location of 'proc/device-tree'.  Current applications
-expect to access device tree information from this standard location.
-
-WORK-AROUND: Disable ACPI in firmware, OR pass 'acpi=off' on the first stage
-kernel command line, OR pass a user specified DTB using the kexec --dtb option.
-
-FIX: FIX: An interface to expose a binary device tree to user space has been
-proposed.  User kexec utilities will need to be updated to add support for this
-new interface.
-
-----------------------------------------------------------------
-The following changes since commit 6083fe74b7bfffc2c7be8c711596608bda0cda6e:
-
-  arm64: respect mem= for EFI (2015-01-16 16:21:58 +0000)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/geoff/linux-kexec.git kexec-v7
-
-for you to fetch changes up to 7db998d9533d5efab816edfad3d7010fc2f7e62c:
-
-  arm64/kexec: Enable kexec in the arm64 defconfig (2015-01-16 14:55:28 -0800)
-
-----------------------------------------------------------------
-Geoff Levand (8):
-      arm64: Move proc-macros.S to include/asm
-      arm64: Convert hcalls to use ISS field
-      arm64: Add new hcall HVC_CALL_FUNC
-      arm64: Add EL2 switch to soft_restart
-      arm64/kexec: Add core kexec support
-      arm64/kexec: Add pr_devel output
-      arm64/kexec: Add checks for KVM
-      arm64/kexec: Enable kexec in the arm64 defconfig
-
- arch/arm64/Kconfig                           |   9 ++
- arch/arm64/configs/defconfig                 |   1 +
- arch/arm64/include/asm/kexec.h               |  47 ++++++
- arch/arm64/include/asm/proc-fns.h            |   4 +-
- arch/arm64/{mm => include/asm}/proc-macros.S |   0
- arch/arm64/include/asm/virt.h                |  33 ++++
- arch/arm64/kernel/Makefile                   |   1 +
- arch/arm64/kernel/hyp-stub.S                 |  45 ++++--
- arch/arm64/kernel/machine_kexec.c            | 219 +++++++++++++++++++++++++++
- arch/arm64/kernel/process.c                  |  10 +-
- arch/arm64/kernel/relocate_kernel.S          | 160 +++++++++++++++++++
- arch/arm64/kvm/hyp.S                         |  18 ++-
- arch/arm64/mm/cache.S                        |   3 +-
- arch/arm64/mm/proc.S                         |  50 ++++--
- include/uapi/linux/kexec.h                   |   1 +
- 15 files changed, 563 insertions(+), 38 deletions(-)
- create mode 100644 arch/arm64/include/asm/kexec.h
- rename arch/arm64/{mm => include/asm}/proc-macros.S (100%)
- create mode 100644 arch/arm64/kernel/machine_kexec.c
- create mode 100644 arch/arm64/kernel/relocate_kernel.S
-
+diff --git a/arch/arm64/include/asm/proc-macros.S b/arch/arm64/include/asm/proc-macros.S
+new file mode 100644
+index 0000000..005d29e
+--- /dev/null
++++ b/arch/arm64/include/asm/proc-macros.S
+@@ -0,0 +1,54 @@
++/*
++ * Based on arch/arm/mm/proc-macros.S
++ *
++ * Copyright (C) 2012 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <asm/asm-offsets.h>
++#include <asm/thread_info.h>
++
++/*
++ * vma_vm_mm - get mm pointer from vma pointer (vma->vm_mm)
++ */
++	.macro	vma_vm_mm, rd, rn
++	ldr	\rd, [\rn, #VMA_VM_MM]
++	.endm
++
++/*
++ * mmid - get context id from mm pointer (mm->context.id)
++ */
++	.macro	mmid, rd, rn
++	ldr	\rd, [\rn, #MM_CONTEXT_ID]
++	.endm
++
++/*
++ * dcache_line_size - get the minimum D-cache line size from the CTR register.
++ */
++	.macro	dcache_line_size, reg, tmp
++	mrs	\tmp, ctr_el0			// read CTR
++	ubfm	\tmp, \tmp, #16, #19		// cache line size encoding
++	mov	\reg, #4			// bytes per word
++	lsl	\reg, \reg, \tmp		// actual cache line size
++	.endm
++
++/*
++ * icache_line_size - get the minimum I-cache line size from the CTR register.
++ */
++	.macro	icache_line_size, reg, tmp
++	mrs	\tmp, ctr_el0			// read CTR
++	and	\tmp, \tmp, #0xf		// cache line size encoding
++	mov	\reg, #4			// bytes per word
++	lsl	\reg, \reg, \tmp		// actual cache line size
++	.endm
+diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+index 2560e1e..4fcfffa 100644
+--- a/arch/arm64/mm/cache.S
++++ b/arch/arm64/mm/cache.S
+@@ -23,8 +23,7 @@
+ #include <asm/assembler.h>
+ #include <asm/cpufeature.h>
+ #include <asm/alternative-asm.h>
+-
+-#include "proc-macros.S"
++#include <asm/proc-macros.S>
+ 
+ /*
+  *	__flush_dcache_all()
+diff --git a/arch/arm64/mm/proc-macros.S b/arch/arm64/mm/proc-macros.S
+deleted file mode 100644
+index 005d29e..0000000
+--- a/arch/arm64/mm/proc-macros.S
++++ /dev/null
+@@ -1,54 +0,0 @@
+-/*
+- * Based on arch/arm/mm/proc-macros.S
+- *
+- * Copyright (C) 2012 ARM Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+- */
+-
+-#include <asm/asm-offsets.h>
+-#include <asm/thread_info.h>
+-
+-/*
+- * vma_vm_mm - get mm pointer from vma pointer (vma->vm_mm)
+- */
+-	.macro	vma_vm_mm, rd, rn
+-	ldr	\rd, [\rn, #VMA_VM_MM]
+-	.endm
+-
+-/*
+- * mmid - get context id from mm pointer (mm->context.id)
+- */
+-	.macro	mmid, rd, rn
+-	ldr	\rd, [\rn, #MM_CONTEXT_ID]
+-	.endm
+-
+-/*
+- * dcache_line_size - get the minimum D-cache line size from the CTR register.
+- */
+-	.macro	dcache_line_size, reg, tmp
+-	mrs	\tmp, ctr_el0			// read CTR
+-	ubfm	\tmp, \tmp, #16, #19		// cache line size encoding
+-	mov	\reg, #4			// bytes per word
+-	lsl	\reg, \reg, \tmp		// actual cache line size
+-	.endm
+-
+-/*
+- * icache_line_size - get the minimum I-cache line size from the CTR register.
+- */
+-	.macro	icache_line_size, reg, tmp
+-	mrs	\tmp, ctr_el0			// read CTR
+-	and	\tmp, \tmp, #0xf		// cache line size encoding
+-	mov	\reg, #4			// bytes per word
+-	lsl	\reg, \reg, \tmp		// actual cache line size
+-	.endm
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 4e778b1..c507e25 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -25,8 +25,7 @@
+ #include <asm/hwcap.h>
+ #include <asm/pgtable-hwdef.h>
+ #include <asm/pgtable.h>
+-
+-#include "proc-macros.S"
++#include <asm/proc-macros.S>
+ 
+ #ifdef CONFIG_ARM64_64K_PAGES
+ #define TCR_TG_FLAGS	TCR_TG0_64K | TCR_TG1_64K
 -- 
 2.1.0
