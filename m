@@ -1,452 +1,125 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Sat, 17 Jan 2015 00:23:34 +0000
-Subject: [PATCH 5/8] arm64/kexec: Add core kexec support
-In-Reply-To: <cover.1421449714.git.geoff@infradead.org>
-References: <cover.1421449714.git.geoff@infradead.org>
-Message-ID: <a5c232448c1d8fa1da73a9005fa9f3927c635578.1421449714.git.geoff@infradead.org>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Fri, 16 Jan 2015 16:24:10 -0800
+Subject: Issue on reserving memory with no-map flag  in  DT
+In-Reply-To: <54B8F63C.1060300@linaro.org>
+References: <54B8F63C.1060300@linaro.org>
+Message-ID: <54B9ABAA.9060908@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add three new files, kexec.h, machine_kexec.c and relocate_kernel.S to the
-arm64 architecture that add support for the kexec re-boot mechanism
-(CONFIG_KEXEC) on arm64 platforms.
+(Adding linux-mm and relevant people because this looks like an issue there)
 
-Signed-off-by: Geoff Levand <geoff@infradead.org>
----
- arch/arm64/Kconfig                  |   9 ++
- arch/arm64/include/asm/kexec.h      |  47 +++++++++++
- arch/arm64/kernel/Makefile          |   1 +
- arch/arm64/kernel/machine_kexec.c   | 155 ++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/relocate_kernel.S | 160 ++++++++++++++++++++++++++++++++++++
- include/uapi/linux/kexec.h          |   1 +
- 6 files changed, 373 insertions(+)
- create mode 100644 arch/arm64/include/asm/kexec.h
- create mode 100644 arch/arm64/kernel/machine_kexec.c
- create mode 100644 arch/arm64/kernel/relocate_kernel.S
+On 1/16/2015 3:30 AM, Srinivas Kandagatla wrote:
+> Hi All,
+>
+> I am hitting boot failures when I did try to reserve memory with no-map flag using DT. Basically kernel just hangs with no indication of whats going on. Added some debug to find out the location, it was some where while dma mapping at kmap_atomic() in __dma_clear_buffer().
+> reserving.
+>
+> The issue is very much identical to http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/294773.html but the memory reserve in my case is at start of the memory. I tried the same fixes on this thread but it did not help.
+>
+> Platform: IFC6410 with APQ8064 which is a v7 platform with 2GB of memory starting at 0x80000000 and kernel is always loaded at 0x80200000
+> And am using multi_v7_defconfig.
+>
+> Meminfo without memory reserve:
+> 80000000-88dfffff : System RAM
+>    80208000-80e5d307 : Kernel code
+>    80f64000-810be397 : Kernel data
+> 8a000000-8d9fffff : System RAM
+> 8ec00000-8effffff : System RAM
+> 8f700000-8fdfffff : System RAM
+> 90000000-af7fffff : System RAM
+>
+> DT entry:
+>         reserved-memory {
+>                 #address-cells = <1>;
+>                 #size-cells = <1>;
+>                 ranges;
+>                 smem at 80000000 {
+>                         reg = <0x80000000 0x200000>;
+>                         no-map;
+>                 };
+>         };
+>
+> If I remove the no-map flag, then I can boot the board. But I don?t want kernel to map this memory at all, as this a IPC memory.
+>
+> I just wanted to understand whats going on here, Am guessing that kernel would never touch that 2MB memory.
+>
+> Does arm-kernel has limitation on unmapping/memblock_remove() such memory locations?
+> Or
+> Is this a known issue?
+>
+> Any pointers to debug this issue?
+>
+> Before the kernel hangs it reports 2 errors like:
+>
+> BUG: Bad page state in process swapper  pfn:fffa8
+> page:ef7fb500 count:0 mapcount:0 mapping:  (null) index:0x0
+> flags: 0x96640253(locked|error|dirty|active|arch_1|reclaim|mlocked)
+> page dumped because: PAGE_FLAGS_CHECK_AT_FREE flag(s) set
+> bad because of flags:
+> flags: 0x200041(locked|active|mlocked)
+> Modules linked in:
+> CPU: 0 PID: 0 Comm: swapper Not tainted 3.19.0-rc3-00007-g412f9ba-dirty #816
+> Hardware name: Qualcomm (Flattened Device Tree)
+> [<c0218280>] (unwind_backtrace) from [<c0212be8>] (show_stack+0x20/0x24)
+> [<c0212be8>] (show_stack) from [<c0af7124>] (dump_stack+0x80/0x9c)
+> [<c0af7124>] (dump_stack) from [<c0301570>] (bad_page+0xc8/0x128)
+> [<c0301570>] (bad_page) from [<c03018a8>] (free_pages_prepare+0x168/0x1e0)
+> [<c03018a8>] (free_pages_prepare) from [<c030369c>] (free_hot_cold_page+0x3c/0x174)
+> [<c030369c>] (free_hot_cold_page) from [<c0303828>] (__free_pages+0x54/0x58)
+> [<c0303828>] (__free_pages) from [<c030395c>] (free_highmem_page+0x38/0x88)
+> [<c030395c>] (free_highmem_page) from [<c0f62d5c>] (mem_init+0x240/0x430)
+> [<c0f62d5c>] (mem_init) from [<c0f5db3c>] (start_kernel+0x1e4/0x3c8)
+> [<c0f5db3c>] (start_kernel) from [<80208074>] (0x80208074)
+> Disabling lock debugging due to kernel taint
+>
+>
+> Full kernel log with memblock debug at http://paste.ubuntu.com/9761000/
+>
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index b1f9a20..d9eb9cd 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -474,6 +474,15 @@ config SECCOMP
- 	  and the task is only allowed to execute a few safe syscalls
- 	  defined by each seccomp mode.
- 
-+config KEXEC
-+	depends on (!SMP || PM_SLEEP_SMP)
-+	bool "kexec system call"
-+	---help---
-+	  kexec is a system call that implements the ability to shutdown your
-+	  current kernel, and to start another kernel.  It is like a reboot
-+	  but it is independent of the system firmware.   And like a reboot
-+	  you can start any kernel with it, not just Linux.
-+
- config XEN_DOM0
- 	def_bool y
- 	depends on XEN
-diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
-new file mode 100644
-index 0000000..e7bd7ab
---- /dev/null
-+++ b/arch/arm64/include/asm/kexec.h
-@@ -0,0 +1,47 @@
-+/*
-+ * kexec for arm64
-+ *
-+ * Copyright (C) Linaro.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#if !defined(_ARM64_KEXEC_H)
-+#define _ARM64_KEXEC_H
-+
-+/* Maximum physical address we can use pages from */
-+
-+#define KEXEC_SOURCE_MEMORY_LIMIT (-1UL)
-+
-+/* Maximum address we can reach in physical address mode */
-+
-+#define KEXEC_DESTINATION_MEMORY_LIMIT (-1UL)
-+
-+/* Maximum address we can use for the control code buffer */
-+
-+#define KEXEC_CONTROL_MEMORY_LIMIT (-1UL)
-+
-+#define KEXEC_CONTROL_PAGE_SIZE	4096
-+
-+#define KEXEC_ARCH KEXEC_ARCH_ARM64
-+
-+#if !defined(__ASSEMBLY__)
-+
-+/**
-+ * crash_setup_regs() - save registers for the panic kernel
-+ *
-+ * @newregs: registers are saved here
-+ * @oldregs: registers to be saved (may be %NULL)
-+ */
-+
-+static inline void crash_setup_regs(struct pt_regs *newregs,
-+				    struct pt_regs *oldregs)
-+{
-+	/* Empty routine needed to avoid build errors. */
-+}
-+
-+#endif /* !defined(__ASSEMBLY__) */
-+
-+#endif
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 77d3d95..eff1625 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -34,6 +34,7 @@ arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
- arm64-obj-$(CONFIG_EFI)			+= efi.o efi-stub.o efi-entry.o
- arm64-obj-$(CONFIG_PCI)			+= pci.o
- arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
-+arm64-obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o
- 
- obj-y					+= $(arm64-obj-y) vdso/
- obj-m					+= $(arm64-obj-m)
-diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-new file mode 100644
-index 0000000..b0e5d76
---- /dev/null
-+++ b/arch/arm64/kernel/machine_kexec.c
-@@ -0,0 +1,155 @@
-+/*
-+ * kexec for arm64
-+ *
-+ * Copyright (C) Linaro.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/kexec.h>
-+#include <linux/of_fdt.h>
-+#include <linux/slab.h>
-+#include <linux/uaccess.h>
-+
-+#include <asm/cacheflush.h>
-+#include <asm/system_misc.h>
-+
-+/* Global variables for the relocate_kernel routine. */
-+extern const unsigned char relocate_new_kernel[];
-+extern const unsigned long relocate_new_kernel_size;
-+extern unsigned long arm64_kexec_dtb_addr;
-+extern unsigned long arm64_kexec_kimage_head;
-+extern unsigned long arm64_kexec_kimage_start;
-+
-+/**
-+ * kexec_is_dtb - Helper routine to check the device tree header signature.
-+ */
-+static bool kexec_is_dtb(const void *dtb)
-+{
-+	__be32 magic;
-+
-+	return get_user(magic, (__be32 *)dtb) ? false :
-+		(be32_to_cpu(magic) == OF_DT_HEADER);
-+}
-+
-+/**
-+ * kexec_find_dtb_seg - Helper routine to find the dtb segment.
-+ */
-+static const struct kexec_segment *kexec_find_dtb_seg(
-+	const struct kimage *image)
-+{
-+	int i;
-+
-+	for (i = 0; i < image->nr_segments; i++) {
-+		if (kexec_is_dtb(image->segment[i].buf))
-+			return &image->segment[i];
-+	}
-+
-+	return NULL;
-+}
-+
-+void machine_kexec_cleanup(struct kimage *image)
-+{
-+	/* Empty routine needed to avoid build errors. */
-+}
-+
-+/**
-+ * machine_kexec_prepare - Prepare for a kexec reboot.
-+ *
-+ * Called from the core kexec code when a kernel image is loaded.
-+ */
-+int machine_kexec_prepare(struct kimage *image)
-+{
-+	const struct kexec_segment *dtb_seg = kexec_find_dtb_seg(image);
-+
-+	arm64_kexec_dtb_addr = dtb_seg ? dtb_seg->mem : 0;
-+	arm64_kexec_kimage_start = image->start;
-+
-+	return 0;
-+}
-+
-+/**
-+ * kexec_list_flush - Helper to flush the kimage list to PoC.
-+ */
-+static void kexec_list_flush(unsigned long kimage_head)
-+{
-+	void *dest;
-+	unsigned long *entry;
-+
-+	for (entry = &kimage_head, dest = NULL; ; entry++) {
-+		unsigned int flag = *entry &
-+			(IND_DESTINATION | IND_INDIRECTION | IND_DONE |
-+			IND_SOURCE);
-+		void *addr = phys_to_virt(*entry & PAGE_MASK);
-+
-+		switch (flag) {
-+		case IND_INDIRECTION:
-+			entry = (unsigned long *)addr - 1;
-+			__flush_dcache_area(addr, PAGE_SIZE);
-+			break;
-+		case IND_DESTINATION:
-+			dest = addr;
-+			break;
-+		case IND_SOURCE:
-+			__flush_dcache_area(addr, PAGE_SIZE);
-+			dest += PAGE_SIZE;
-+			break;
-+		case IND_DONE:
-+			return;
-+		default:
-+			BUG();
-+		}
-+	}
-+}
-+
-+/**
-+ * machine_kexec - Do the kexec reboot.
-+ *
-+ * Called from the core kexec code for a sys_reboot with LINUX_REBOOT_CMD_KEXEC.
-+ */
-+void machine_kexec(struct kimage *image)
-+{
-+	phys_addr_t reboot_code_buffer_phys;
-+	void *reboot_code_buffer;
-+
-+	BUG_ON(num_online_cpus() > 1);
-+
-+	arm64_kexec_kimage_head = image->head;
-+
-+	reboot_code_buffer_phys = page_to_phys(image->control_code_page);
-+	reboot_code_buffer = phys_to_virt(reboot_code_buffer_phys);
-+
-+	/*
-+	 * Copy relocate_new_kernel to the reboot_code_buffer for use
-+	 * after the kernel is shut down.
-+	 */
-+	memcpy(reboot_code_buffer, relocate_new_kernel,
-+		relocate_new_kernel_size);
-+
-+	/* Flush the reboot_code_buffer in preparation for its execution. */
-+	__flush_dcache_area(reboot_code_buffer, relocate_new_kernel_size);
-+
-+	/* Flush the kimage list. */
-+	kexec_list_flush(image->head);
-+
-+	pr_info("Bye!\n");
-+
-+	/* Disable all DAIF exceptions. */
-+	asm volatile ("msr daifset, #0xf" : : : "memory");
-+
-+	/*
-+	 * soft_restart() will shutdown the MMU, disable data caches, then
-+	 * transfer control to the reboot_code_buffer which contains a copy of
-+	 * the relocate_new_kernel routine.  relocate_new_kernel will use
-+	 * physical addressing to relocate the new kernel to its final position
-+	 * and then will transfer control to the entry point of the new kernel.
-+	 */
-+	soft_restart(reboot_code_buffer_phys);
-+}
-+
-+void machine_crash_shutdown(struct pt_regs *regs)
-+{
-+	/* Empty routine needed to avoid build errors. */
-+}
-diff --git a/arch/arm64/kernel/relocate_kernel.S b/arch/arm64/kernel/relocate_kernel.S
-new file mode 100644
-index 0000000..1c1514d
---- /dev/null
-+++ b/arch/arm64/kernel/relocate_kernel.S
-@@ -0,0 +1,160 @@
-+/*
-+ * kexec for arm64
-+ *
-+ * Copyright (C) Linaro.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <asm/assembler.h>
-+#include <asm/kexec.h>
-+#include <asm/memory.h>
-+#include <asm/page.h>
-+#include <asm/proc-macros.S>
-+
-+/* The list entry flags. */
-+
-+#define IND_DESTINATION_BIT 0
-+#define IND_INDIRECTION_BIT 1
-+#define IND_DONE_BIT        2
-+#define IND_SOURCE_BIT      3
-+
-+/*
-+ * relocate_new_kernel - Put a 2nd stage kernel image in place and boot it.
-+ *
-+ * The memory that the old kernel occupies may be overwritten when coping the
-+ * new image to its final location.  To assure that the relocate_new_kernel
-+ * routine which does that copy is not overwritten all code and data needed
-+ * by relocate_new_kernel must be between the symbols relocate_new_kernel and
-+ * relocate_new_kernel_end.  The machine_kexec() routine will copy
-+ * relocate_new_kernel to the kexec control_code_page, a special page which
-+ * has been set up to be preserved during the copy operation.
-+ */
-+.globl relocate_new_kernel
-+relocate_new_kernel:
-+
-+	/* Setup the list loop variables. */
-+	ldr	x18, arm64_kexec_kimage_head	/* x18 = list entry */
-+	dcache_line_size x17, x0		/* x17 = dcache line size */
-+	mov	x16, xzr			/* x16 = segment start */
-+	mov	x15, xzr			/* x15 = entry ptr */
-+	mov	x14, xzr			/* x14 = copy dest */
-+
-+	/* Check if the new image needs relocation. */
-+	cbz	x18, .Ldone
-+	tbnz	x18, IND_DONE_BIT, .Ldone
-+
-+.Lloop:
-+	and	x13, x18, PAGE_MASK		/* x13 = addr */
-+
-+	/* Test the entry flags. */
-+.Ltest_source:
-+	tbz	x18, IND_SOURCE_BIT, .Ltest_indirection
-+
-+	mov x20, x14				/*  x20 = copy dest */
-+	mov x21, x13				/*  x21 = copy src */
-+
-+	/* Invalidate dest page to PoC. */
-+	mov	x0, x20
-+	add	x19, x0, #PAGE_SIZE
-+	sub	x1, x17, #1
-+	bic	x0, x0, x1
-+1:	dc	ivac, x0
-+	add	x0, x0, x17
-+	cmp	x0, x19
-+	b.lo	1b
-+	dsb	sy
-+
-+	/* Copy page. */
-+1:	ldp	x22, x23, [x21]
-+	ldp	x24, x25, [x21, #16]
-+	ldp	x26, x27, [x21, #32]
-+	ldp	x28, x29, [x21, #48]
-+	add	x21, x21, #64
-+	stnp	x22, x23, [x20]
-+	stnp	x24, x25, [x20, #16]
-+	stnp	x26, x27, [x20, #32]
-+	stnp	x28, x29, [x20, #48]
-+	add	x20, x20, #64
-+	tst	x21, #(PAGE_SIZE - 1)
-+	b.ne	1b
-+
-+	/* dest += PAGE_SIZE */
-+	add	x14, x14, PAGE_SIZE
-+	b	.Lnext
-+
-+.Ltest_indirection:
-+	tbz	x18, IND_INDIRECTION_BIT, .Ltest_destination
-+
-+	/* ptr = addr */
-+	mov	x15, x13
-+	b	.Lnext
-+
-+.Ltest_destination:
-+	tbz	x18, IND_DESTINATION_BIT, .Lnext
-+
-+	mov	x16, x13
-+
-+	/* dest = addr */
-+	mov	x14, x13
-+
-+.Lnext:
-+	/* entry = *ptr++ */
-+	ldr	x18, [x15], #8
-+
-+	/* while (!(entry & DONE)) */
-+	tbz	x18, IND_DONE_BIT, .Lloop
-+
-+.Ldone:
-+	dsb	sy
-+	isb
-+	ic	ialluis
-+	dsb	sy
-+	isb
-+
-+	/* Start new image. */
-+	ldr	x4, arm64_kexec_kimage_start
-+	ldr	x0, arm64_kexec_dtb_addr
-+	mov	x1, xzr
-+	mov	x2, xzr
-+	mov	x3, xzr
-+	br	x4
-+
-+.align 3	/* To keep the 64-bit values below naturally aligned. */
-+
-+/* The machine_kexec routines set these variables. */
-+
-+/*
-+ * arm64_kexec_kimage_start - Copy of image->start, the entry point of the new
-+ * image.
-+ */
-+.globl arm64_kexec_kimage_start
-+arm64_kexec_kimage_start:
-+	.quad	0x0
-+
-+/*
-+ * arm64_kexec_dtb_addr - Physical address of a device tree.
-+ */
-+.globl arm64_kexec_dtb_addr
-+arm64_kexec_dtb_addr:
-+	.quad	0x0
-+
-+/*
-+ * arm64_kexec_kimage_head - Copy of image->head, the list of kimage entries.
-+ */
-+.globl arm64_kexec_kimage_head
-+arm64_kexec_kimage_head:
-+	.quad	0x0
-+
-+.Lrelocate_new_kernel_end:
-+
-+/*
-+ * relocate_new_kernel_size - Number of bytes to copy to the control_code_page.
-+ */
-+.globl relocate_new_kernel_size
-+relocate_new_kernel_size:
-+	.quad .Lrelocate_new_kernel_end - relocate_new_kernel
-+
-+.org	KEXEC_CONTROL_PAGE_SIZE
-diff --git a/include/uapi/linux/kexec.h b/include/uapi/linux/kexec.h
-index 6925f5b..04626b9 100644
---- a/include/uapi/linux/kexec.h
-+++ b/include/uapi/linux/kexec.h
-@@ -39,6 +39,7 @@
- #define KEXEC_ARCH_SH      (42 << 16)
- #define KEXEC_ARCH_MIPS_LE (10 << 16)
- #define KEXEC_ARCH_MIPS    ( 8 << 16)
-+#define KEXEC_ARCH_ARM64   (183 << 16)
- 
- /* The artificial cap on the number of segments passed to kexec_load. */
- #define KEXEC_SEGMENT_MAX 16
+I don't have an IFC handy but I was able to reproduce the same issue on another board.
+I think this is an underlying issue in mm code.
+
+Removing the first 2MB changes the start address of the zone. This means the start
+address is no longer pageblock aligned (4MB on this system). With a little
+digging, it looks like the issue is we're running off the end of the end of the
+mem_map array because the memmap array is too small. This is similar to
+an issue fixed by 7c45512 mm: fix pageblock bitmap allocation and the following
+fixes it for me:
+
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 7633c50..32d9436 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -5012,7 +5012,7 @@ static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
+  #ifdef CONFIG_FLAT_NODE_MEM_MAP
+         /* ia64 gets its own node_mem_map, before this, without bootmem */
+         if (!pgdat->node_mem_map) {
+-               unsigned long size, start, end;
++               unsigned long size, start, end, offset;
+                 struct page *map;
+  
+                 /*
+@@ -5020,10 +5020,11 @@ static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
+                  * aligned but the node_mem_map endpoints must be in order
+                  * for the buddy allocator to function correctly.
+                  */
++               offset = pgdat->node_start_pfn & (pageblock_nr_pages - 1);
+                 start = pgdat->node_start_pfn & ~(MAX_ORDER_NR_PAGES - 1);
+                 end = pgdat_end_pfn(pgdat);
+                 end = ALIGN(end, MAX_ORDER_NR_PAGES);
+-               size =  (end - start) * sizeof(struct page);
++               size =  ((end - start) + offset) * sizeof(struct page);
+                 map = alloc_remap(pgdat->node_id, size);
+                 if (!map)
+                         map = memblock_virt_alloc_node_nopanic(size,
+
+If there is agreement on this approach, I can turn this into a proper patch.
+
+Thanks,
+Laura
+
 -- 
-2.1.0
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
