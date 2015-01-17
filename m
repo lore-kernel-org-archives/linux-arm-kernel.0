@@ -1,39 +1,60 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sat, 17 Jan 2015 20:18:37 +0100
-Subject: [PATCH 1/3] USB: host: ehci_atmel: Move global variables to
- private struct
-In-Reply-To: <1421519013-22123-1-git-send-email-sylvain.rochet@finsecur.com>
-References: <20150117160304.GA21820@gradator.net>
- <1421519013-22123-1-git-send-email-sylvain.rochet@finsecur.com>
-Message-ID: <20150117201837.0784fb26@bbrezillon>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Sat, 17 Jan 2015 11:23:29 -0800
+Subject: [PATCH] clk: rockchip: fix deadlock possibility in cpuclk
+In-Reply-To: <CAD=FV=Xc_yabbrC0c0i-wJS+7eW3gq+pHDa81uxNin55jUciNg@mail.gmail.com>
+References: <355359386.nxMIlHNuqO@phil>
+ <CAD=FV=Xc_yabbrC0c0i-wJS+7eW3gq+pHDa81uxNin55jUciNg@mail.gmail.com>
+Message-ID: <20150117192329.22722.62615@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylvain,
+Quoting Doug Anderson (2015-01-16 09:11:06)
+> Heiko,
+> 
+> On Fri, Jan 16, 2015 at 8:52 AM, Heiko St?bner <heiko@sntech.de> wrote:
+> > Lockdep reported a possible deadlock between the cpuclk lock and for example
+> > the i2c driver.
+> >
+> >        CPU0                    CPU1
+> >        ----                    ----
+> >   lock(clk_lock);
+> >                                local_irq_disable();
+> >                                lock(&(&i2c->lock)->rlock);
+> >                                lock(clk_lock);
+> >   <Interrupt>
+> >     lock(&(&i2c->lock)->rlock);
+> >
+> >  *** DEADLOCK ***
+> >
+> > The generic clock-types of the core ccf already use spin_lock_irqsave when
+> > touching clock registers, so do the same for the cpuclk.
+> >
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > ---
+> >  drivers/clk/rockchip/clk-cpu.c | 10 ++++++----
+> >  1 file changed, 6 insertions(+), 4 deletions(-)
+> >
+> > diff --git a/drivers/clk/rockchip/clk-cpu.c b/drivers/clk/rockchip/clk-cpu.c
+> > index 75c8c45..3ecdf7d 100644
+> > --- a/drivers/clk/rockchip/clk-cpu.c
+> > +++ b/drivers/clk/rockchip/clk-cpu.c
+> > @@ -124,10 +124,11 @@ static int rockchip_cpuclk_pre_rate_change(struct rockchip_cpuclk *cpuclk,
+> >  {
+> >         const struct rockchip_cpuclk_reg_data *reg_data = cpuclk->reg_data;
+> >         unsigned long alt_prate, alt_div;
+> > +       unsigned long flags = 0;
+> 
+> nit: I don't often see flags initted to 0 here when using
+> spin_lock_irqsave().  I don't think it's needed...
+> 
+> I doubt it really matters though, and this looks fine to me.
+> 
+> Reviewed-by: Doug Anderson <dianders@chromium.org>
 
-On Sat, 17 Jan 2015 19:23:31 +0100
-Sylvain Rochet <sylvain.rochet@finsecur.com> wrote:
+Applied to clk-fixes and removed flags initialization locally.
 
-> This patch move Atmel EHCI global variables (clocks ptr and clocked
-> boolean) to private struct atmel_ehci, appended at the end of the parent
-> struct usb_hcd.
-
-Maybe you should add a cover letter to clearly state that this series
-depends on another one: [1].
-
-Anyway, thanks for removing these global variables.
+Regards,
+Mike
 
 > 
-> Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
-
-To the whole series:
-
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-
-[1]https://www.mail-archive.com/linux-usb at vger.kernel.org/msg54675.html
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> -Doug
