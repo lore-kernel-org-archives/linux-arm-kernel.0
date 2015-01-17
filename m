@@ -1,192 +1,83 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 16 Jan 2015 17:57:01 -0800
-Subject: [PATCH RESEND v8 2/2] clk: Add floor and ceiling constraints to
- clock rates
-In-Reply-To: <1421071809-17402-3-git-send-email-tomeu.vizoso@collabora.com>
-References: <1421071809-17402-1-git-send-email-tomeu.vizoso@collabora.com>
- <1421071809-17402-3-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <20150117015701.GB27202@codeaurora.org>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Fri, 16 Jan 2015 18:24:39 -0800
+Subject: [RFC][PATCH] arm64: efi: Obey EFI memory type in dmi_remap
+Message-ID: <1421461479-31608-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12, Tomeu Vizoso wrote:
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 7eddfd8..2793bd7 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -1013,8 +1015,8 @@ static unsigned long clk_core_round_rate_nolock(struct clk_core *clk,
->  
->  	if (clk->ops->determine_rate) {
->  		parent_hw = parent ? parent->hw : NULL;
-> -		return clk->ops->determine_rate(clk->hw, rate, &parent_rate,
-> -						&parent_hw);
-> +		return clk->ops->determine_rate(clk->hw, rate, 0, ULONG_MAX,
-> +						&parent_rate, &parent_hw);
->  	} else if (clk->ops->round_rate)
->  		return clk->ops->round_rate(clk->hw, rate, &parent_rate);
->  	else if (clk->flags & CLK_SET_RATE_PARENT)
-> @@ -1453,8 +1458,20 @@ static struct clk_core *clk_calc_new_rates(struct clk_core *clk,
->  
->  	/* find the closest rate and parent clk/rate */
->  	if (clk->ops->determine_rate) {
-> +		hlist_for_each_entry(clk_user, &clk->clks, child_node) {
-> +			floor_rate = max(floor_rate,
-> +					 clk_user->floor_constraint);
-> +		}
-> +
-> +		hlist_for_each_entry(clk_user, &clk->clks, child_node) {
-> +			ceiling_rate = min(ceiling_rate,
-> +					   clk_user->ceiling_constraint);
-> +		}
+Currently, dmi_remap unconditionally calls ioremap_cache for dmi_remap.
+The memory that's being remapped may be part of the existing EFI
+memory map and already remapped as uncached. Remapping as cached can
+created unexpected behavior so check the physical address against the
+EFI memory type before remapping.
 
-I would think we need to do this in the clk_round_rate() path as
-well. We can't just pass 0 and ULONG_MAX there or we'll determine
-one rate here and another rate in round_rate(), violating the
-contract between set_rate() and round_rate().
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+---
+Actual bug, not just theoretical problem. I'm marking this as RFC
+because I'm not sure what any kind of specificaiton may have to say.
+---
+ arch/arm64/include/asm/dmi.h |  5 +++--
+ arch/arm64/kernel/efi.c      | 23 +++++++++++++++++++++++
+ 2 files changed, 26 insertions(+), 2 deletions(-)
 
-> +
->  		parent_hw = parent ? parent->hw : NULL;
->  		new_rate = clk->ops->determine_rate(clk->hw, rate,
-> +						    floor_rate,
-> +						    ceiling_rate,
->  						    &best_parent_rate,
->  						    &parent_hw);
->  		parent = parent_hw ? parent_hw->core : NULL;
-
-We should enforce a constraint if the clk is using the
-round_rate() op too. If the .round_rate() op returns some rate
-within range it should be ok.  Otherwise we can fail the rate
-change because it's out of range.
-
-We'll also need to introduce some sort of
-clk_core_determine_rate(core, rate, min, max) so that clock
-providers can ask parent clocks to find a rate within some range
-that they can tolerate. If we update __clk_mux_determine_rate()
-we can see how that would work out.
-
-> @@ -1660,13 +1657,92 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
-[...]
-> + */
-> +int clk_set_rate(struct clk *clk, unsigned long rate)
-> +{
-> +	return clk_core_set_rate(clk->core, rate);
-
-clk could be NULL.
-
-> +}
->  EXPORT_SYMBOL_GPL(clk_set_rate);
->  
-> +int clk_set_rate_range(struct clk *clk, unsigned long min, unsigned long max)
-> +{
-> +	int ret = 0;
-
-Check for NULL clk.
-
-> +
-> +/**
-> + * clk_set_floor_rate - set a minimum clock rate for a clock source
-> + * @clk: clock source
-> + * @rate: desired minimum clock rate in Hz
-> + *
-> + * Returns success (0) or negative errno.
-> + */
-> +int clk_set_floor_rate(struct clk *clk, unsigned long rate)
-> +{
-> +	return clk_set_rate_range(clk, rate, clk->ceiling_constraint);
-
-clk could be NULL.
-
-> +}
-> +EXPORT_SYMBOL_GPL(clk_set_floor_rate);
-> +
-> +/**
-> + * clk_set_ceiling_rate - set a maximum clock rate for a clock source
-> + * @clk: clock source
-> + * @rate: desired maximum clock rate in Hz
-> + *
-> + * Returns success (0) or negative errno.
-> + */
-> +int clk_set_ceiling_rate(struct clk *clk, unsigned long rate)
-> +{
-> +	return clk_set_rate_range(clk, clk->floor_constraint, rate);
-
-clk could be NULL.
-
-> +}
-> +EXPORT_SYMBOL_GPL(clk_set_ceiling_rate);
-> +
->  static struct clk_core *clk_core_get_parent(struct clk_core *core)
->  {
->  	struct clk_core *parent;
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index 2e65419..ae5c800 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -175,9 +175,12 @@ struct clk_ops {
->  					unsigned long parent_rate);
->  	long		(*round_rate)(struct clk_hw *hw, unsigned long rate,
->  					unsigned long *parent_rate);
-> -	long		(*determine_rate)(struct clk_hw *hw, unsigned long rate,
-> -					unsigned long *best_parent_rate,
-> -					struct clk_hw **best_parent_hw);
-> +	long		(*determine_rate)(struct clk_hw *hw,
-> +					  unsigned long rate,
-> +					  unsigned long floor_rate,
-> +					  unsigned long ceiling_rate,
-
-I wonder if we should call this min_rate and max_rate?
-
-> +					  unsigned long *best_parent_rate,
-> +					  struct clk_hw **best_parent_hw);
->  	int		(*set_parent)(struct clk_hw *hw, u8 index);
->  	u8		(*get_parent)(struct clk_hw *hw);
->  	int		(*set_rate)(struct clk_hw *hw, unsigned long rate,
-> diff --git a/include/linux/clk.h b/include/linux/clk.h
-> index c7f258a..f99ae67 100644
-> --- a/include/linux/clk.h
-> +++ b/include/linux/clk.h
-> @@ -302,6 +302,34 @@ long clk_round_rate(struct clk *clk, unsigned long rate);
->  int clk_set_rate(struct clk *clk, unsigned long rate);
->  
->  /**
-> + * clk_set_rate_range - set a rate range for a clock source
-> + * @clk: clock source
-> + * @min: desired minimum clock rate in Hz
-> + * @max: desired maximum clock rate in Hz
-> + *
-> + * Returns success (0) or negative errno.
-> + */
-> +int clk_set_rate_range(struct clk *clk, unsigned long min, unsigned long max);
-> +
-> +/**
-> + * clk_set_floor_rate - set a minimum clock rate for a clock source
-> + * @clk: clock source
-> + * @rate: desired minimum clock rate in Hz
-> + *
-> + * Returns success (0) or negative errno.
-> + */
-> +int clk_set_floor_rate(struct clk *clk, unsigned long rate);
-
-And this called clk_set_max_rate()?
-
-> +
-> +/**
-> + * clk_set_ceiling_rate - set a maximum clock rate for a clock source
-> + * @clk: clock source
-> + * @rate: desired maximum clock rate in Hz
-> + *
-> + * Returns success (0) or negative errno.
-> + */
-> +int clk_set_ceiling_rate(struct clk *clk, unsigned long rate);
-
-And this called clk_set_min_rate()?
-
-> +
-> +/**
->   * clk_set_parent - set the parent clock source for this clock
->   * @clk: clock source
->   * @parent: parent clock source
-
+diff --git a/arch/arm64/include/asm/dmi.h b/arch/arm64/include/asm/dmi.h
+index 69d37d8..f0cc8d0 100644
+--- a/arch/arm64/include/asm/dmi.h
++++ b/arch/arm64/include/asm/dmi.h
+@@ -22,9 +22,10 @@
+  * request a virtual mapping for configuration tables such as SMBIOS.
+  * This means we have to map them before use.
+  */
+-#define dmi_early_remap(x, l)		ioremap_cache(x, l)
++#define dmi_early_remap(x, l)		dmi_remap(x, l)
+ #define dmi_early_unmap(x, l)		iounmap(x)
+-#define dmi_remap(x, l)			ioremap_cache(x, l)
++
++extern void __iomem *dmi_remap(phys_addr_t phys_addr, size_t size);
+ #define dmi_unmap(x)			iounmap(x)
+ #define dmi_alloc(l)			kzalloc(l, GFP_KERNEL)
+ 
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index 82f27c3..139666e 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -22,6 +22,7 @@
+ #include <linux/slab.h>
+ 
+ #include <asm/cacheflush.h>
++#include <asm/io.h>
+ #include <asm/efi.h>
+ #include <asm/tlbflush.h>
+ #include <asm/mmu_context.h>
+@@ -321,6 +322,28 @@ void __init efi_init(void)
+ 	reserve_regions();
+ }
+ 
++static bool is_phys_addr_normal_ram(unsigned long phys_addr)
++{
++	efi_memory_desc_t *md;
++
++	for_each_efi_memory_desc(&memmap, md) {
++		if ((md->phys_addr <= phys_addr) &&
++		    (phys_addr < (md->phys_addr +
++				  (md->num_pages << EFI_PAGE_SHIFT))))
++			return is_normal_ram(md);
++	}
++	return false;
++}
++
++void __iomem *dmi_remap(phys_addr_t phys_addr, size_t size)
++{
++	if (is_phys_addr_normal_ram(phys_addr))
++		return ioremap_cache(phys_addr, size);
++	else
++		return ioremap(phys_addr, size);
++}
++
++
+ void __init efi_idmap_init(void)
+ {
+ 	if (!efi_enabled(EFI_BOOT))
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
