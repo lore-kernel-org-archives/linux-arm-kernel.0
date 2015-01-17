@@ -1,60 +1,70 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Sat, 17 Jan 2015 11:23:29 -0800
-Subject: [PATCH] clk: rockchip: fix deadlock possibility in cpuclk
-In-Reply-To: <CAD=FV=Xc_yabbrC0c0i-wJS+7eW3gq+pHDa81uxNin55jUciNg@mail.gmail.com>
-References: <355359386.nxMIlHNuqO@phil>
- <CAD=FV=Xc_yabbrC0c0i-wJS+7eW3gq+pHDa81uxNin55jUciNg@mail.gmail.com>
-Message-ID: <20150117192329.22722.62615@quantum>
+From: rjui@broadcom.com (Ray Jui)
+Date: Sat, 17 Jan 2015 11:58:33 -0800
+Subject: [PATCH v4 2/3] i2c: iproc: Add Broadcom iProc I2C Driver
+In-Reply-To: <20150117160113.GA22880@pengutronix.de>
+References: <rjui@broadcom.com>
+ <1421274213-3544-1-git-send-email-rjui@broadcom.com>
+ <1421274213-3544-3-git-send-email-rjui@broadcom.com>
+ <20150115084119.GN22880@pengutronix.de> <54B98C18.4080807@broadcom.com>
+ <20150117160113.GA22880@pengutronix.de>
+Message-ID: <54BABEE9.8070801@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Doug Anderson (2015-01-16 09:11:06)
-> Heiko,
-> 
-> On Fri, Jan 16, 2015 at 8:52 AM, Heiko St?bner <heiko@sntech.de> wrote:
-> > Lockdep reported a possible deadlock between the cpuclk lock and for example
-> > the i2c driver.
-> >
-> >        CPU0                    CPU1
-> >        ----                    ----
-> >   lock(clk_lock);
-> >                                local_irq_disable();
-> >                                lock(&(&i2c->lock)->rlock);
-> >                                lock(clk_lock);
-> >   <Interrupt>
-> >     lock(&(&i2c->lock)->rlock);
-> >
-> >  *** DEADLOCK ***
-> >
-> > The generic clock-types of the core ccf already use spin_lock_irqsave when
-> > touching clock registers, so do the same for the cpuclk.
-> >
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> >  drivers/clk/rockchip/clk-cpu.c | 10 ++++++----
-> >  1 file changed, 6 insertions(+), 4 deletions(-)
-> >
-> > diff --git a/drivers/clk/rockchip/clk-cpu.c b/drivers/clk/rockchip/clk-cpu.c
-> > index 75c8c45..3ecdf7d 100644
-> > --- a/drivers/clk/rockchip/clk-cpu.c
-> > +++ b/drivers/clk/rockchip/clk-cpu.c
-> > @@ -124,10 +124,11 @@ static int rockchip_cpuclk_pre_rate_change(struct rockchip_cpuclk *cpuclk,
-> >  {
-> >         const struct rockchip_cpuclk_reg_data *reg_data = cpuclk->reg_data;
-> >         unsigned long alt_prate, alt_div;
-> > +       unsigned long flags = 0;
-> 
-> nit: I don't often see flags initted to 0 here when using
-> spin_lock_irqsave().  I don't think it's needed...
-> 
-> I doubt it really matters though, and this looks fine to me.
-> 
-> Reviewed-by: Doug Anderson <dianders@chromium.org>
 
-Applied to clk-fixes and removed flags initialization locally.
 
-Regards,
-Mike
-
+On 1/17/2015 8:01 AM, Uwe Kleine-K?nig wrote:
+> Hello,
 > 
-> -Doug
+> On Fri, Jan 16, 2015 at 02:09:28PM -0800, Ray Jui wrote:
+>> On 1/15/2015 12:41 AM, Uwe Kleine-K?nig wrote:
+>>> On Wed, Jan 14, 2015 at 02:23:32PM -0800, Ray Jui wrote:
+>>>> +	 */
+>>>> +	val = 1 << M_CMD_START_BUSY_SHIFT;
+>>>> +	if (msg->flags & I2C_M_RD) {
+>>>> +		val |= (M_CMD_PROTOCOL_BLK_RD << M_CMD_PROTOCOL_SHIFT) |
+>>>> +		       (msg->len << M_CMD_RD_CNT_SHIFT);
+>>>> +	} else {
+>>>> +		val |= (M_CMD_PROTOCOL_BLK_WR << M_CMD_PROTOCOL_SHIFT);
+>>>> +	}
+>>>> +	writel(val, iproc_i2c->base + M_CMD_OFFSET);
+>>>> +
+>>>> +	time_left = wait_for_completion_timeout(&iproc_i2c->done, time_left);
+>>>
+>>> When the interrupt fires here after the complete timed out and before
+>>> you disable the irq you still throw the result away.
+>> Yes, but then this comes down to the fact that if it has reached the
+>> point that is determined to be a timeout condition in the driver, one
+>> should really treat it as timeout error. In a normal condition,
+>> time_left should never reach zero.
+> I don't agree here. I'm not sure there is a real technical reason,
+> though. But still if you're in a "success after timeout already over"
+> situation it's IMHO better to interpret it as success, not timeout.
+> 
+The thing is, the interrupt should never fire after
+wait_for_completion_timeout returns zero here. If it does, then the
+issue is really that the timeout value set in the driver is probably not
+long enough. I just checked other I2C drivers. I think the way how
+timeout is handled here is consistent with other I2C drivers.
+
+>>>> +static int bcm_iproc_i2c_remove(struct platform_device *pdev)
+>>>> +{
+>>>> +	struct bcm_iproc_i2c_dev *iproc_i2c = platform_get_drvdata(pdev);
+>>>> +
+>>>> +	i2c_del_adapter(&iproc_i2c->adapter);
+>>> You need to free the irq before i2c_del_adapter.
+>>>
+>> Yes. Thanks. Change back to use devm_request_irq, and use disable_irq
+>> here before removing the adapter.
+> The more lightweight approach is to set your device's irq-enable
+> register to zero and call synchronize_irq. (For a shared irq calling
+> disable_irq is even wrong here.)
+> 
+The fact that IRQF_SHARED flag is not set indicates this is a dedicated
+IRQ line, so I thought using disable_irq here makes sense. But if both
+you and Wolfram think masking all I2C interrupts at the block level +
+synchronize_irq is a better approach, I can change to that. Thanks!
+
+> Best regards
+> Uwe
+> 
