@@ -1,32 +1,64 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Sat, 17 Jan 2015 09:37:44 +0900
-Subject: [PATCH v2] ARM: shmobile: sh73a0 dtsi: Add Cortex-A9 TWD node
-In-Reply-To: <1421406528-26704-1-git-send-email-geert+renesas@glider.be>
-References: <1421406528-26704-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20150117003743.GB15403@verge.net.au>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Sat, 17 Jan 2015 02:46:46 +0200
+Subject: [PATCH v7 1/4] Documentation: dt: add common bindings for
+ hwspinlock
+In-Reply-To: <20150116101746.GA21809@leverpostej>
+References: <1421269101-51105-1-git-send-email-s-anna@ti.com>
+ <1421269101-51105-2-git-send-email-s-anna@ti.com>
+ <20150115135201.GG16217@leverpostej>
+ <20150115135556.GH16217@leverpostej>
+ <CAL_JsqL2LZAooMk-V8+xeF2g6acZE21M+-OBRw8aEVa-5wVHuQ@mail.gmail.com>
+ <CAK=WgbYQ=BbinqJ5fsw2Y+FKdy=nasLsw9mX8pw6S_o3owy9-g@mail.gmail.com>
+ <20150116101746.GA21809@leverpostej>
+Message-ID: <CAK=WgbYBqPoUm9byx0du_g5ZmHdYaUVLpSPZYHoCVzNoatNKpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 12:08:48PM +0100, Geert Uytterhoeven wrote:
-> Add a node for the Private Timer and Watchdog, as found in the Cortex-A9
-> MPCore.
-> 
-> Without this, there's no clocksource available during early kernel
-> initialization, before cmt1 is initialized, leading to a lock-up if
-> CONFIG_CPU_IDLE=y.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> As the TWD driver does not support DT without CCF, this should NOT be
-> applied to a branch that still has kzm9g-reference support, as this
-> would lead to another lock-up.
-> Hence the first choice "dt-for-v3.20" is NOT OK.
-> "sh73a0-multiplatform-for-v3.20" is OK.
-> 
-> v2:
->   - The clock is twd_clk
+Mark,
 
-Thanks, for your detailed notes regarding branches.
+On Fri, Jan 16, 2015 at 12:17 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> The hwlock is a basic hardware primitive that allow synchronization
+>> between different processors in the system, which may be running Linux
+>> as well as other operating systems, and may have no other means of
+>> communication.
+>>
+>> The hwlock id numbers are predefined, global and static across the
+>> entire system: Linux may boot well after other operating systems are
+>> already running and using these hwlocks to communicate, and therefore,
+>> in order to use these hardware devices, it must not enumerate them
+>> differently than the rest of the system.
+>
+> That's not true.
+>
+> In order to communicate it must agree with the other users as to the
+> meaning of each instance, and the protocol for use. That doesn't
+> necessarily mean that Linux needs to know the numerical ID from a
+> datasheet, and regardless that ID is separate from the logical ID Linux
+> uses internally.
 
-I plan to push this a little later today. Please take a moment
-to check that I flowed your advice correctly.
+Let me describe hwspinlocks a bit more so we all get to know it better
+and can then agree on a proper solution.
+
+- What makes handling of hwspinlock ID numbers convenient is the fact
+that it's not based on random datasheet numbers. In fact, hwspinlocks
+is just special memory: usually datasheets just define the base
+address and the size of the hwspinlock area. So any numerical ID we
+use to call the locks themselves are already logical and sane, similar
+to the way we handle memory (i.e. if we have 32 locks we'll always use
+0..31). So hwlocks ids are very much like memory addressing, and not
+irq numbers.
+
+- Sometimes Linux will have to dynamically allocate a hwlock, and send
+the ID of the allocated lock to a remote processor (which may not be
+running Linux).
+- Sometimes a remote processor, which may not be running Linux, will
+have to dynamically allocate a hwlock, and send the ID of the
+allocated lock to us (another processor running Linux)
+
+We cannot tell in advance what kind of IPC is going to be used for
+sending and receiving this hwlock ID. Some are handled by Linux
+(kernel) and some by the user space. So we must be able to expose an
+ID the system will understand as well as receive one.
+
+Thanks,
+Ohad.
