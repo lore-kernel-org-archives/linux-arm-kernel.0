@@ -1,58 +1,69 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Sat, 17 Jan 2015 00:57:38 -0500
-Subject: [PATCHv4] arm64: dmi: Add SMBIOS/DMI support
-In-Reply-To: <1412437603-3394-1-git-send-email-yi.li@linaro.org>
-References: <1412437603-3394-1-git-send-email-yi.li@linaro.org>
-Message-ID: <54B9F9D2.6000104@redhat.com>
+From: orsonzhai@gmail.com (Orson Zhai)
+Date: Sat, 17 Jan 2015 16:10:32 +0800
+Subject: [PATCH v5 2/5] Documentation: DT: Add bindings for Spreadtrum SoC
+ Platform
+In-Reply-To: <20150116141109.GC22569@leverpostej>
+References: <1421402411-3479-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1421402411-3479-3-git-send-email-chunyan.zhang@spreadtrum.com>
+ <20150116102135.GC21809@leverpostej>
+ <CAAfSe-teDdPzRUnvzM+NErfZwmqM04yUMgic--hyZL8-Jjd8jw@mail.gmail.com>
+ <20150116141109.GC22569@leverpostej>
+Message-ID: <CA+H2tpHA7PRL98VMd3d3jeaOr_6Q5ktmM3fbdaBKRpm_pXVqVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yi Li,
+On Fri, Jan 16, 2015 at 10:11 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Fri, Jan 16, 2015 at 12:53:16PM +0000, Lyra Zhang wrote:
+>> Hi, Mark
+>>
+>> >> +
+>> >> +Required properties:
+>> >> +- compatible: must be "sprd,sc9836-uart"
+>> >> +- reg: offset and length of the register set for the device
+>> >> +- interrupts: exactly one interrupt specifier
+>> >> +- clocks: phandles to input clocks.
+>> >
+>> > The order and relevance of each should be specified. If you have
+>> > multiple clocks I would strongly recommend you use clock-names to
+>> > distinguish them.
+>> >
+>>
+>> Thank you for the recommendation.
+>> but, since we haven't made the clock driver ready, for this initial
+>> commit, we just let 4 UARTs share a single fixed 26 MHz clock source.
+>> we'll do like you've recommended when we will submit the clock driver
+>> in the future.
+>
+> I'm on about the clock input lines on the UART instance, not the
+> providers they come from.
+>
+> Is there only a single clock input line on each UART? Perhaps multiple
+> input lines which are currently fed by the same clock?
 
-I would like some advice on the below patch. First, a little background.
+________
+| 26MHz |-------------------------------------------------
+-------------        |                  |
+                     |                  |
+                _______       ________
+               | UART1 |      | UART2 |    .........
+               --------------      -------------
 
-I /may/ need to use SMBIOS provided data on ARMv8 systems to enumerate
-the number of physical underlying CPU sockets present. This is provided
-in one Type4 DMI structure per physical socket. Using that fact (such
-data is already provided by all of the reference ARMv8 server systems),
-and a variable interpretation of the CPU affinity data, we can refactor
-the topology.c code to understand threads vs cores vs sockets without
-getting confused by the extra levels of hierarchy for clusters.
+the hardware is something like the diagram.
 
-I am going back over some older patches, including this one to
-understand the DMI port, and I notice that you call dmi_scan_machine
-from an early_initcall. This will run from the init thread, after we've
-done basic SMP setup in smp_prepare_cpus, which is where we stash
-cpu_topology data, which is after I already need DMI data available.
+4 Uart modules are all connected to a fixed 26Mhz crystal by power-on default.
 
-So. If I wanted this available prior to early_initcall time, would it be
-reasonable to follow e.g. x86 and move this early in the boot? I'm not
-necessarily going to ask to upstream such a change (since I expect to be
-able to solve the underlying problem I am looking to address in a
-different fashion soon), but first want to know if it would be
-reasonable to ask to do that anyway.
+There should be a clock-mux between uart and 26Mhz which
+could select other clock source such as some pll output.
 
-Jon.
+But as initial commit , we are not ready to describe other inputs by
+these muxes.
+So  we treat the UART as a simple model with only one fixed-clock input.
+And we plan to add the other inputs path back in a not very far future.
+Is it appropriate  to do like this?
 
-P.S. I'm not interested at all in replies pointing me to the existing DT
-cpu topology binding, which I am well aware of, but it does also not
-actually solve the problem I have :)
+  Orson
 
-On 10/04/2014 11:46 AM, Yi Li wrote:
 
-<snip>
-
-> +
-> +static int __init arm64_core_init(void)
-> +{
-> +/*
-> + * DMI depends on EFI on arm64, and dmi_scan_machine() needs to be
-> + * called early because dmi_id_init(), which is an arch_initcall itself,
-> + * depends on dmi_scan_machine() having been called already.
-> + */
-> +
-> +	dmi_scan_machine();
-> +	return 0;
-> +}
-> +core_initcall(arm64_core_init);
-> 
+>
+> Thanks,
+> Mark.
