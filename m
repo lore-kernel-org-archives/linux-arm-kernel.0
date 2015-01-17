@@ -1,39 +1,44 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sat, 17 Jan 2015 14:12:48 +0000
-Subject: [systemd-devel] Making udev emit a signal when it is done
- loading modules
-In-Reply-To: <20150117135630.GA25585@kroah.com>
-References: <54BA20D0.7060402@redhat.com>
- <20150117135630.GA25585@kroah.com>
-Message-ID: <20150117141248.GD6414@sirena.org.uk>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat, 17 Jan 2015 15:28:39 +0100
+Subject: [PATCH v4 4/4] ARM: mvebu: Armada 385 GP: Add regulators to the
+ SATA port
+In-Reply-To: <20150117131404.GA6414@sirena.org.uk>
+References: <1421330978-9694-1-git-send-email-gregory.clement@free-electrons.com>
+ <1421330978-9694-5-git-send-email-gregory.clement@free-electrons.com>
+ <54B8C933.7020502@redhat.com> <54B8D97B.3090908@free-electrons.com>
+ <54B8E38A.6020709@redhat.com> <20150116123705.GM3043@sirena.org.uk>
+ <54B9629C.9090800@redhat.com> <20150116202516.GL3856@sirena.org.uk>
+ <54BA21F9.5050408@redhat.com> <20150117131404.GA6414@sirena.org.uk>
+Message-ID: <54BA7197.40301@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 17, 2015 at 05:56:30AM -0800, Greg KH wrote:
-> On Sat, Jan 17, 2015 at 09:44:00AM +0100, Hans de Goede wrote:
+Hi,
 
-> > If however the ahci_platform driver is a module, then as soon as
-> > the kernel is ready to start init, unused regulators are turned off
-> > and the disk looses its power while spinning and ends up doing an
-> > emergency heads park.
+On 17-01-15 14:14, Mark Brown wrote:
+> On Sat, Jan 17, 2015 at 09:48:57AM +0100, Hans de Goede wrote:
+>
+>> and leave these regulators on, rather then turn them of $random time,
+>> because as I've advocated before (see the simplefb thread) there is
+>> no simple magic moment when it is right to turn things off, so doing
+>> it when userspace starts is more or less as good as any moment, and if
+>> it turns out that that is not a good moment, then maybe we need to
+>> re-think the turning off in general.
+>
+> Following your argument to the logical conclusion means we can never
+> turn any regualtor off - we always have the risk that there's another
+> shared user which is going to get a power bounce if we power down.  More
+> directly we'll also get people complaining that we're burning power
+> pointlessly on their systems for devices they've not even got drivers
+> enabled for.  This powering down is something there's been user demand
+> for.
 
-> What turns off the power in this situation?  The kernel?  Or userspace?
-> Don't you have control of this?
+Right, note I'm only advocating to not turn off regulators marked as
+regulator-boot-on. I would expect any regulator to have such a
+marking to have at least one user with an actual driver. If people decide
+to not build that driver, and then complain we can simply tell them to
+build the driver ...
 
-The kernel turns off the power in late_initcall because it noticed that
-nothing is using the regulator, it does this because otherwise we're
-just left with whatever the bootloader had which will may well be
-wasting power on unused rails due to inflexible PMICs (we do similar
-things for other subsystems like clocks).  This works fine for most use
-cases since in embedded systems anything critical tends to end up built
-in.
+Regards,
 
-There is configurability to allow things to be flagged as always on so
-they never get turned off.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150117/d69f50dd/attachment-0001.sig>
+Hans
