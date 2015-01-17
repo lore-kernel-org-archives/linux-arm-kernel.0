@@ -1,84 +1,84 @@
 From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Sat, 17 Jan 2015 16:36:34 +0100
-Subject: [PATCHv2 1/2] USB: host: ehci_atmel: Add suspend/resume support
-In-Reply-To: <20150117135857.71dae08f@bbrezillon>
+Date: Sat, 17 Jan 2015 16:36:35 +0100
+Subject: [PATCHv2 2/2] USB: host: ohci_at91: Stop/start USB PLL for all sleep
+ modes
+In-Reply-To: <1421508995-21290-1-git-send-email-sylvain.rochet@finsecur.com>
 References: <20150117135857.71dae08f@bbrezillon>
-Message-ID: <1421508995-21290-1-git-send-email-sylvain.rochet@finsecur.com>
+ <1421508995-21290-1-git-send-email-sylvain.rochet@finsecur.com>
+Message-ID: <1421508995-21290-2-git-send-email-sylvain.rochet@finsecur.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add suspend/resume support for Atmel EHCI, mostly
-about disabling and unpreparing clocks so USB PLL is stopped
-before entering sleep state.
+Disable/unprepare clocks without testing the sleep target_state, removed
+the at91_suspend_entering_slow_clock() call (which is only a
+target_state == PM_SUSPEND_MEM).
+
+Other kind of suspend now benefit from the power save induced by this
+PLL deactivation. The resume penalty is about 500 us, which is not
+negligible but acceptable considering the amount of power we are saving.
 
 Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+Reported-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/usb/host/ehci-atmel.c | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+ drivers/usb/host/ohci-at91.c | 25 +++++++++++++------------
+ 1 file changed, 13 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/usb/host/ehci-atmel.c b/drivers/usb/host/ehci-atmel.c
-index 56a8850..2e0043b 100644
---- a/drivers/usb/host/ehci-atmel.c
-+++ b/drivers/usb/host/ehci-atmel.c
-@@ -37,6 +37,8 @@ static int clocked;
+diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+index dc9e4e6..f0da734 100644
+--- a/drivers/usb/host/ohci-at91.c
++++ b/drivers/usb/host/ohci-at91.c
+@@ -49,6 +49,8 @@ extern int usb_disabled(void);
  
- static void atmel_start_clock(void)
+ static void at91_start_clock(void)
  {
 +	if (clocked)
 +		return;
  	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
  		clk_set_rate(uclk, 48000000);
  		clk_prepare_enable(uclk);
-@@ -48,6 +50,8 @@ static void atmel_start_clock(void)
+@@ -61,6 +63,8 @@ static void at91_start_clock(void)
  
- static void atmel_stop_clock(void)
+ static void at91_stop_clock(void)
  {
 +	if (!clocked)
 +		return;
  	clk_disable_unprepare(fclk);
  	clk_disable_unprepare(iclk);
- 	if (IS_ENABLED(CONFIG_COMMON_CLK))
-@@ -174,6 +178,32 @@ static int ehci_atmel_drv_remove(struct platform_device *pdev)
- 	return 0;
- }
+ 	clk_disable_unprepare(hclk);
+@@ -615,16 +619,14 @@ ohci_hcd_at91_drv_suspend(struct platform_device *pdev, pm_message_t mesg)
+ 	 *
+ 	 * REVISIT: some boards will be able to turn VBUS off...
+ 	 */
+-	if (at91_suspend_entering_slow_clock()) {
+-		ohci->hc_control = ohci_readl(ohci, &ohci->regs->control);
+-		ohci->hc_control &= OHCI_CTRL_RWC;
+-		ohci_writel(ohci, ohci->hc_control, &ohci->regs->control);
+-		ohci->rh_state = OHCI_RH_HALTED;
+-
+-		/* flush the writes */
+-		(void) ohci_readl (ohci, &ohci->regs->control);
+-		at91_stop_clock();
+-	}
++	ohci->hc_control = ohci_readl(ohci, &ohci->regs->control);
++	ohci->hc_control &= OHCI_CTRL_RWC;
++	ohci_writel(ohci, ohci->hc_control, &ohci->regs->control);
++	ohci->rh_state = OHCI_RH_HALTED;
++
++	/* flush the writes */
++	(void) ohci_readl (ohci, &ohci->regs->control);
++	at91_stop_clock();
  
-+#ifdef CONFIG_PM
-+static int ehci_atmel_drv_suspend(struct platform_device *pdev, pm_message_t mesg)
-+{
-+	struct usb_hcd *hcd = platform_get_drvdata(pdev);
-+	int ret;
-+
-+	ret = ehci_suspend(hcd, false);
-+	if (ret)
-+		return ret;
-+
-+	atmel_stop_clock();
-+	return 0;
-+}
-+
-+static int ehci_atmel_drv_resume(struct platform_device *pdev)
-+{
-+	struct usb_hcd *hcd = platform_get_drvdata(pdev);
-+
-+	atmel_start_clock();
-+	return ehci_resume(hcd, false);
-+}
-+#else
-+#define ehci_atmel_drv_suspend NULL
-+#define ehci_atmel_drv_resume  NULL
-+#endif
-+
- #ifdef CONFIG_OF
- static const struct of_device_id atmel_ehci_dt_ids[] = {
- 	{ .compatible = "atmel,at91sam9g45-ehci" },
-@@ -187,6 +217,8 @@ static struct platform_driver ehci_atmel_driver = {
- 	.probe		= ehci_atmel_drv_probe,
- 	.remove		= ehci_atmel_drv_remove,
- 	.shutdown	= usb_hcd_platform_shutdown,
-+	.suspend	= ehci_atmel_drv_suspend,
-+	.resume		= ehci_atmel_drv_resume,
- 	.driver		= {
- 		.name	= "atmel-ehci",
- 		.of_match_table	= of_match_ptr(atmel_ehci_dt_ids),
+ 	return ret;
+ }
+@@ -636,8 +638,7 @@ static int ohci_hcd_at91_drv_resume(struct platform_device *pdev)
+ 	if (device_may_wakeup(&pdev->dev))
+ 		disable_irq_wake(hcd->irq);
+ 
+-	if (!clocked)
+-		at91_start_clock();
++	at91_start_clock();
+ 
+ 	ohci_resume(hcd, false);
+ 	return 0;
 -- 
 2.1.4
