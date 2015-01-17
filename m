@@ -1,28 +1,63 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 17 Jan 2015 10:34:14 +0100
-Subject: sun9i pll4 upstream kernel code seems wrong
-Message-ID: <54BA2C96.7050102@redhat.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Sat, 17 Jan 2015 10:36:09 +0100
+Subject: [PATCH] USB: host: ehci_atmel: Add suspend/resume support
+In-Reply-To: <20150117013442.GV3843@piout.net>
+References: <1421437274-31615-1-git-send-email-sylvain.rochet@finsecur.com>
+ <20150117013442.GV3843@piout.net>
+Message-ID: <20150117103609.276efecf@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ChenYu,
+Hi Sylvain,
 
-Looking at drivers/clk/sunxi/clk-sun9i-core.c:
+On Sat, 17 Jan 2015 02:34:42 +0100
+Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
 
-sun9i_a80_get_pll4_factors(), and comparing it with
-the A80 user manual, things seem way off, this seems
-more accurate (although also possibly not quite)
-for pll1 / pll2 then for pll4, and the comment at
-the top does mention PLL1 once.
+> Hi,
+> 
+> You should probably put the susbsytem maintainers in copy too. As
+> reported by get_maintainer.pl:
+> Alan Stern <stern@rowland.harvard.edu> (maintainer:USB EHCI DRIVER)
+> Greg Kroah-Hartman <gregkh@linuxfoundation.org> (supporter:USB SUBSYSTEM)
+> 
+> They will be the one taking the patch.
+> 
+> And when dealing with PM on AT91, please copy
+> Wenyou Yang <wenyou.yang@atmel.com>
+> 
+> 
+> On 16/01/2015 at 20:41:14 +0100, Sylvain Rochet wrote :
+> > This patch add suspend/resume support for Atmel EHCI, mostly
+> > about disabling and unpreparing clocks so USB PLL is stopped
+> > before entering sleep state.
+> > 
+> > Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+> 
+> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> 
+> > +
+> > +	if (at91_suspend_entering_slow_clock())
+> > +		atmel_stop_clock();
+> > +
+> 
+> We should definitely find a way to get rid of
+> at91_suspend_entering_slow_clock() at some point in time.
+> 
+> 
 
-Note according to the datasheet pll4 should be treated
-as an inmutable pll fixed at 960 MHz, so maybe we should
-just drop the get_factors function for it ?
+Can't we just disable clocks without testing for target_state ==
+PM_SUSPEND_MEM (which is exactly what at91_suspend_entering_slow_clock
+does [1]) when entering suspend ?
+I mean, IMHO other kind of suspend should still benefit from the power
+save induced by this PLL deactivation.
 
-Luckily the struct clk_factors_config sun9i_a80_pll4_config
-is correct, so as long as we do not try to change the
-rate the current upstream code for pll4 does work.
+Is there such a big penalty when resuming the device if the PLL and
+peripheral clocks are disabled ?
 
-Regards,
+[1]http://lxr.free-electrons.com/source/arch/arm/mach-at91/pm.c#L116
 
-Hans
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
