@@ -1,120 +1,152 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 17 Jan 2015 08:24:15 +0000
-Subject: [RFC][PATCH] arm64: efi: Obey EFI memory type in dmi_remap
-In-Reply-To: <1421461479-31608-1-git-send-email-lauraa@codeaurora.org>
-References: <1421461479-31608-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <CAKv+Gu8y428H0QQznV9SqhKNLMf6NVmNw5Lup3LiZYinRVMU-A@mail.gmail.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Sat, 17 Jan 2015 08:39:08 +0000
+Subject: Issue on reserving memory with no-map flag  in  DT
+In-Reply-To: <54B9ABAA.9060908@codeaurora.org>
+References: <54B8F63C.1060300@linaro.org> <54B9ABAA.9060908@codeaurora.org>
+Message-ID: <54BA1FAC.6090902@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 January 2015 at 02:24, Laura Abbott <lauraa@codeaurora.org> wrote:
-> Currently, dmi_remap unconditionally calls ioremap_cache for dmi_remap.
-> The memory that's being remapped may be part of the existing EFI
-> memory map and already remapped as uncached. Remapping as cached can
-> created unexpected behavior so check the physical address against the
-> EFI memory type before remapping.
+
+
+On 17/01/15 00:24, Laura Abbott wrote:
+> (Adding linux-mm and relevant people because this looks like an issue
+> there)
 >
-
-Mapping the SMBIOS tables as uncached is a bad idea, as 'uncached'
-implies MT_DEVICE_nGnRnE in the arm64 kernel, and the SMBIOS structure
-tables are not guaranteed to be aligned. So you should at least use
-MT_NORMAL_NC here.
-
-Why does it end up mapped uncached in the first place? Is it backed by
-a ROM instead of normal RAM? And does the region have any of the WT/WC
-attributes set in addition to UC? What type is it? I suppose it has
-the EFI_MEMORY_RUNTIME bit set as well? (Note that the spec seems to
-assume that configuration tables always reside in system RAM [UEFI
-spec 2.4A 2.3.6])
-
-Also, with my latest virtmap changes, UEFI runtime regions are only
-mapped during runtime service invocations, and explicitly when e.g.
-the SMBIOS or ACPI layer needs to get at the data. Currently, regions
-backed by system RAM are still covered by the linear mapping as well,
-but that is something we intend to change too. So if the region is not
-system RAM (!EFI_MEMORY_WB), the latest code will not have this region
-mapped at DMI scan time, afaict.
-
-Finally, I have been looking into classifying memory as system RAM or
-not myself[0]. Even if SMBIOS is UEFI only in arm64, I would prefer
-not to add infrastructure that allows us to answer these kind of
-questions only when booted via UEFI.
-
-[0] http://article.gmane.org/gmane.linux.kernel.efi/5133
-
-
-Regards,
-Ard.
-
-
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> ---
-> Actual bug, not just theoretical problem. I'm marking this as RFC
-> because I'm not sure what any kind of specificaiton may have to say.
-> ---
->  arch/arm64/include/asm/dmi.h |  5 +++--
->  arch/arm64/kernel/efi.c      | 23 +++++++++++++++++++++++
->  2 files changed, 26 insertions(+), 2 deletions(-)
+> On 1/16/2015 3:30 AM, Srinivas Kandagatla wrote:
+>> Hi All,
+>>
+>> I am hitting boot failures when I did try to reserve memory with
+>> no-map flag using DT. Basically kernel just hangs with no indication
+>> of whats going on. Added some debug to find out the location, it was
+>> some where while dma mapping at kmap_atomic() in __dma_clear_buffer().
+>> reserving.
+>>
+>> The issue is very much identical to
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/294773.html
+>> but the memory reserve in my case is at start of the memory. I tried
+>> the same fixes on this thread but it did not help.
+>>
+>> Platform: IFC6410 with APQ8064 which is a v7 platform with 2GB of
+>> memory starting at 0x80000000 and kernel is always loaded at 0x80200000
+>> And am using multi_v7_defconfig.
+>>
+>> Meminfo without memory reserve:
+>> 80000000-88dfffff : System RAM
+>>    80208000-80e5d307 : Kernel code
+>>    80f64000-810be397 : Kernel data
+>> 8a000000-8d9fffff : System RAM
+>> 8ec00000-8effffff : System RAM
+>> 8f700000-8fdfffff : System RAM
+>> 90000000-af7fffff : System RAM
+>>
+>> DT entry:
+>>         reserved-memory {
+>>                 #address-cells = <1>;
+>>                 #size-cells = <1>;
+>>                 ranges;
+>>                 smem at 80000000 {
+>>                         reg = <0x80000000 0x200000>;
+>>                         no-map;
+>>                 };
+>>         };
+>>
+>> If I remove the no-map flag, then I can boot the board. But I don?t
+>> want kernel to map this memory at all, as this a IPC memory.
+>>
+>> I just wanted to understand whats going on here, Am guessing that
+>> kernel would never touch that 2MB memory.
+>>
+>> Does arm-kernel has limitation on unmapping/memblock_remove() such
+>> memory locations?
+>> Or
+>> Is this a known issue?
+>>
+>> Any pointers to debug this issue?
+>>
+>> Before the kernel hangs it reports 2 errors like:
+>>
+>> BUG: Bad page state in process swapper  pfn:fffa8
+>> page:ef7fb500 count:0 mapcount:0 mapping:  (null) index:0x0
+>> flags: 0x96640253(locked|error|dirty|active|arch_1|reclaim|mlocked)
+>> page dumped because: PAGE_FLAGS_CHECK_AT_FREE flag(s) set
+>> bad because of flags:
+>> flags: 0x200041(locked|active|mlocked)
+>> Modules linked in:
+>> CPU: 0 PID: 0 Comm: swapper Not tainted
+>> 3.19.0-rc3-00007-g412f9ba-dirty #816
+>> Hardware name: Qualcomm (Flattened Device Tree)
+>> [<c0218280>] (unwind_backtrace) from [<c0212be8>] (show_stack+0x20/0x24)
+>> [<c0212be8>] (show_stack) from [<c0af7124>] (dump_stack+0x80/0x9c)
+>> [<c0af7124>] (dump_stack) from [<c0301570>] (bad_page+0xc8/0x128)
+>> [<c0301570>] (bad_page) from [<c03018a8>]
+>> (free_pages_prepare+0x168/0x1e0)
+>> [<c03018a8>] (free_pages_prepare) from [<c030369c>]
+>> (free_hot_cold_page+0x3c/0x174)
+>> [<c030369c>] (free_hot_cold_page) from [<c0303828>]
+>> (__free_pages+0x54/0x58)
+>> [<c0303828>] (__free_pages) from [<c030395c>]
+>> (free_highmem_page+0x38/0x88)
+>> [<c030395c>] (free_highmem_page) from [<c0f62d5c>] (mem_init+0x240/0x430)
+>> [<c0f62d5c>] (mem_init) from [<c0f5db3c>] (start_kernel+0x1e4/0x3c8)
+>> [<c0f5db3c>] (start_kernel) from [<80208074>] (0x80208074)
+>> Disabling lock debugging due to kernel taint
+>>
+>>
+>> Full kernel log with memblock debug at http://paste.ubuntu.com/9761000/
+>>
 >
-> diff --git a/arch/arm64/include/asm/dmi.h b/arch/arm64/include/asm/dmi.h
-> index 69d37d8..f0cc8d0 100644
-> --- a/arch/arm64/include/asm/dmi.h
-> +++ b/arch/arm64/include/asm/dmi.h
-> @@ -22,9 +22,10 @@
->   * request a virtual mapping for configuration tables such as SMBIOS.
->   * This means we have to map them before use.
->   */
-> -#define dmi_early_remap(x, l)          ioremap_cache(x, l)
-> +#define dmi_early_remap(x, l)          dmi_remap(x, l)
->  #define dmi_early_unmap(x, l)          iounmap(x)
-> -#define dmi_remap(x, l)                        ioremap_cache(x, l)
-> +
-> +extern void __iomem *dmi_remap(phys_addr_t phys_addr, size_t size);
->  #define dmi_unmap(x)                   iounmap(x)
->  #define dmi_alloc(l)                   kzalloc(l, GFP_KERNEL)
+> I don't have an IFC handy but I was able to reproduce the same issue on
+> another board.
+> I think this is an underlying issue in mm code.
 >
-> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> index 82f27c3..139666e 100644
-> --- a/arch/arm64/kernel/efi.c
-> +++ b/arch/arm64/kernel/efi.c
-> @@ -22,6 +22,7 @@
->  #include <linux/slab.h>
+> Removing the first 2MB changes the start address of the zone. This means
+> the start
+> address is no longer pageblock aligned (4MB on this system). With a little
+> digging, it looks like the issue is we're running off the end of the end
+> of the
+> mem_map array because the memmap array is too small. This is similar to
+> an issue fixed by 7c45512 mm: fix pageblock bitmap allocation and the
+> following
+> fixes it for me:
+
+Thanks Laura, This patch indeed fixes issue for me too.
+
+Tested-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+
 >
->  #include <asm/cacheflush.h>
-> +#include <asm/io.h>
->  #include <asm/efi.h>
->  #include <asm/tlbflush.h>
->  #include <asm/mmu_context.h>
-> @@ -321,6 +322,28 @@ void __init efi_init(void)
->         reserve_regions();
->  }
+> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+> index 7633c50..32d9436 100644
+> --- a/mm/page_alloc.c
+> +++ b/mm/page_alloc.c
+> @@ -5012,7 +5012,7 @@ static void __init_refok alloc_node_mem_map(struct
+> pglist_data *pgdat)
+>   #ifdef CONFIG_FLAT_NODE_MEM_MAP
+>          /* ia64 gets its own node_mem_map, before this, without bootmem */
+>          if (!pgdat->node_mem_map) {
+> -               unsigned long size, start, end;
+> +               unsigned long size, start, end, offset;
+>                  struct page *map;
 >
-> +static bool is_phys_addr_normal_ram(unsigned long phys_addr)
-> +{
-> +       efi_memory_desc_t *md;
-> +
-> +       for_each_efi_memory_desc(&memmap, md) {
-> +               if ((md->phys_addr <= phys_addr) &&
-> +                   (phys_addr < (md->phys_addr +
-> +                                 (md->num_pages << EFI_PAGE_SHIFT))))
-> +                       return is_normal_ram(md);
-> +       }
-> +       return false;
-> +}
-> +
-> +void __iomem *dmi_remap(phys_addr_t phys_addr, size_t size)
-> +{
-> +       if (is_phys_addr_normal_ram(phys_addr))
-> +               return ioremap_cache(phys_addr, size);
-> +       else
-> +               return ioremap(phys_addr, size);
-> +}
-> +
-> +
->  void __init efi_idmap_init(void)
->  {
->         if (!efi_enabled(EFI_BOOT))
-> --
-> Qualcomm Innovation Center, Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+>                  /*
+> @@ -5020,10 +5020,11 @@ static void __init_refok
+> alloc_node_mem_map(struct pglist_data *pgdat)
+>                   * aligned but the node_mem_map endpoints must be in order
+>                   * for the buddy allocator to function correctly.
+>                   */
+> +               offset = pgdat->node_start_pfn & (pageblock_nr_pages - 1);
+>                  start = pgdat->node_start_pfn & ~(MAX_ORDER_NR_PAGES - 1);
+>                  end = pgdat_end_pfn(pgdat);
+>                  end = ALIGN(end, MAX_ORDER_NR_PAGES);
+> -               size =  (end - start) * sizeof(struct page);
+> +               size =  ((end - start) + offset) * sizeof(struct page);
+>                  map = alloc_remap(pgdat->node_id, size);
+>                  if (!map)
+>                          map = memblock_virt_alloc_node_nopanic(size,
+>
+> If there is agreement on this approach, I can turn this into a proper
+> patch.
+>
+> Thanks,
+> Laura
 >
