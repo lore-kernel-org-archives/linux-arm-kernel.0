@@ -1,33 +1,148 @@
-From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Sat, 17 Jan 2015 12:07:10 +0100
-Subject: [PATCH] USB: gadget: atmel_usba_udc: Enable/disable USB PLL on
- Vbus change
-In-Reply-To: <20150117104358.0282b27f@bbrezillon>
-References: <1421446870-26653-1-git-send-email-sylvain.rochet@finsecur.com>
- <20150117014231.GW3843@piout.net>
- <20150117104358.0282b27f@bbrezillon>
-Message-ID: <20150117110710.GB24176@gradator.net>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat, 17 Jan 2015 12:12:21 +0100
+Subject: sun9i pll4 upstream kernel code seems wrong
+In-Reply-To: <CAGb2v66j8=VNkX_C=aEEO0cq53ELGnkZoNSk=wCy8n5j0w0mWw@mail.gmail.com>
+References: <54BA2C96.7050102@redhat.com>
+ <CAGb2v66j8=VNkX_C=aEEO0cq53ELGnkZoNSk=wCy8n5j0w0mWw@mail.gmail.com>
+Message-ID: <54BA4395.4060403@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Boris,
+Hi,
 
-On Sat, Jan 17, 2015 at 10:43:58AM +0100, Boris Brezillon wrote:
-> 
-> You're right, except that calling enable/disable on the PLL clk in irq
-> context is pretty much useless since the activation/deactivation code
-> of the PLL is in prepare/unprepare, so you won't save much power by
-> doing that (gating the peripheral clk should save a bit though). 
-> 
-> To solve that issue I thought we could move to a threaded_irq (where we
-> can safely sleep), but you'll also have to take of not calling
-> prepare/unprepare in sections where at least one spinlock is taken (for
-> the same reason => you cannot sleep with while you hold spinlocks).
+On 17-01-15 11:37, Chen-Yu Tsai wrote:
+> Hi,
+>
+> On Sat, Jan 17, 2015 at 5:34 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+>> Hi ChenYu,
+>>
+>> Looking at drivers/clk/sunxi/clk-sun9i-core.c:
+>>
+>> sun9i_a80_get_pll4_factors(), and comparing it with
+>> the A80 user manual, things seem way off, this seems
+>> more accurate (although also possibly not quite)
+>> for pll1 / pll2 then for pll4, and the comment at
+>> the top does mention PLL1 once.
+>
+> PLL1 was mentioned as I forgot to change that one in
+> the comment. I copied the comment section from others.
+>
+> Other than that, I'm not sure what part is off. The
+> code was done without the user manual, only with the
+> SDK bits. I think in the SDK the minimum value of 12
+> for N factor was not mentioned. But other than that,
+> it should work fine.
 
-Hummm, I must admit I waited for such a useful tip, adding the 
-prepare/unprepare in interrupt context looked dirty at first sight, 
-thank you very much :)
+Ok, so looking at the code again it is not that much
+of, just hard to read, and it does contain some errors:
 
-I will try with a threaded_irq.
+         /* divs above 256 cannot be odd */
+         if (div > 256)
+                 div = round_up(div, 2);
 
-Sylvain
+Should be:
+
+         /* divs above 255 must be a multiple of 2 */
+         if (div > 255)
+                 div = round_up(div, 2);
+
+Note the 255, and replacing must be odd with
+a multiple of 2, as this had nothing to do with odd /
+even (more on that later).
+
+Likewise this:
+
+	/* divs above 512 must be a multiple of 4 */
+         if (div > 512)
+                 div = round_up(div, 4);
+
+Should have s/512/511/ done on it.
+
+And this:
+
+         /* m will be 1 if div is odd */
+         if (div & 1)
+                 *m = 1;
+         else
+                 *m = 0;
+
+Is nonsense, the div may have been odd all along,
+(never been rounded) and we should still use m = 1, e.g.
+to make 78 MHz.
+
+So this should be:
+
+         if (div < 256)
+                 *m = 1;
+         else
+                 *m = 0;
+
+Preferably I would like to see the entire thing rewritten
+into something IMHO much more readable / less error prone,
+like this:
+
+{
+	u8 n;
+	u8 m = 1;
+	u8 p = 1;
+
+	/* Normalize value to a 6M multiple */
+	n = DIV_ROUND_UP(*freq, 6000000);
+
+	if (n > 255) {
+		m = 0;
+		n = (n + 1) / 2;
+	}
+		
+	if (n > 255) {
+		p = 0;
+		n = (n + 1) / 2;
+	}
+
+	if (n > 255)
+		n = 255;
+	else if (n < 12)
+		n = 12;
+
+	*freq = ((24000000 * n) >> p) / (m + 1);
+
+	if (n_ret == NULL)
+		return;
+
+	*n_ret = n;
+	*m_ret = m;
+	*p_ret = p;
+}
+
+With the n / m / p function parameters renamed to foo_ret.
+
+Regards,
+
+Hans
+
+
+>
+> Note the "div" variable uses a base frequency of 6,
+> not 24. I used a spreadsheet to do some calculations
+> to see if the code does output the right numbers.
+> Unfortunately I don't have either the notes or the
+> spreadsheet I used back then. It would take me a bit
+> of time to check.
+>
+>> Note according to the datasheet pll4 should be treated
+>> as an inmutable pll fixed at 960 MHz, so maybe we should
+>> just drop the get_factors function for it ?
+>
+> Is that acceptable? Or is there a readonly flag we should
+> set for the clock?
+>
+> Regards,
+> ChenYu
+>
+>> Luckily the struct clk_factors_config sun9i_a80_pll4_config
+>> is correct, so as long as we do not try to change the
+>> rate the current upstream code for pll4 does work.
+>>
+>> Regards,
+>>
+>> Hans
