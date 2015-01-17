@@ -1,39 +1,39 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sat, 17 Jan 2015 15:12:19 +0100
-Subject: [PATCH v2 0/6] ARM: shmobile: sh73a0: DT PM domain support
-In-Reply-To: <20150117011414.GC397@verge.net.au>
-References: <1421237484-16847-1-git-send-email-geert+renesas@glider.be>
- <20150114235302.GC10479@verge.net.au>
- <CAMuHMdVANePZ-fLzaLCEOm0vHR735C=u5_fDa4Uywi_P5ggjBg@mail.gmail.com>
- <20150116011315.GA7830@verge.net.au>
- <20150116024724.GA31654@verge.net.au>
- <CAMuHMdU4hj2p-N8abT-BSadznqF7=0-08o9F4_7+qjdvv6Whmw@mail.gmail.com>
- <20150116124502.GC6285@verge.net.au>
- <20150117011414.GC397@verge.net.au>
-Message-ID: <CAMuHMdX40LTdKt_nBb_U4eXWMuPXSYfC0Q4PvA42grdocCZfAA@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Sat, 17 Jan 2015 14:12:48 +0000
+Subject: [systemd-devel] Making udev emit a signal when it is done
+ loading modules
+In-Reply-To: <20150117135630.GA25585@kroah.com>
+References: <54BA20D0.7060402@redhat.com>
+ <20150117135630.GA25585@kroah.com>
+Message-ID: <20150117141248.GD6414@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Sat, Jan 17, 2015 at 05:56:30AM -0800, Greg KH wrote:
+> On Sat, Jan 17, 2015 at 09:44:00AM +0100, Hans de Goede wrote:
 
-On Sat, Jan 17, 2015 at 2:14 AM, Simon Horman <horms@verge.net.au> wrote:
->> > If you add patch 6 to sh-drivers-for-v3.20 and merge it in -next,
->> > everything is fine!
->>
->> Thanks, I thought I had that one but I must have missed it somehow.
->
-> I have made a second attempt and this time I hope that I haven't missed
-> anything. Please see renesas-next-20150117-v3.19-rc1.
+> > If however the ahci_platform driver is a module, then as soon as
+> > the kernel is ready to start init, unused regulators are turned off
+> > and the disk looses its power while spinning and ends up doing an
+> > emergency heads park.
 
-Thanks, looks better!
+> What turns off the power in this situation?  The kernel?  Or userspace?
+> Don't you have control of this?
 
-Gr{oetje,eeting}s,
+The kernel turns off the power in late_initcall because it noticed that
+nothing is using the regulator, it does this because otherwise we're
+just left with whatever the bootloader had which will may well be
+wasting power on unused rails due to inflexible PMICs (we do similar
+things for other subsystems like clocks).  This works fine for most use
+cases since in embedded systems anything critical tends to end up built
+in.
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+There is configurability to allow things to be flagged as always on so
+they never get turned off.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150117/d69f50dd/attachment-0001.sig>
