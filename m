@@ -1,44 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 17 Jan 2015 09:40:28 -0800
-Subject: [PATCH v2] ARM: OMAP: Work around hardcoded interrupts
-In-Reply-To: <1421490068-20385-1-git-send-email-marc.zyngier@arm.com>
-References: <1421490068-20385-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150117174028.GU18552@atomide.com>
+From: matthijsvanduin@gmail.com (Matthijs van Duin)
+Date: Sat, 17 Jan 2015 18:51:19 +0100
+Subject: [PATCH 4/4] ARM: dts: Add minimal support for dm8168-evm
+In-Reply-To: <20150117164709.GS18552@atomide.com>
+References: <1421192272-20754-1-git-send-email-tony@atomide.com>
+ <1421192272-20754-5-git-send-email-tony@atomide.com>
+ <20150117164709.GS18552@atomide.com>
+Message-ID: <CAALWOA-v=-KZ5W+Giwq9Z7rdA8JM2Q+zgqZPz-5sDrHD_b-_7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Marc Zyngier <marc.zyngier@arm.com> [150117 02:24]:
-> Commit 9a1091ef0017 (irqchip: gic: Support hierarchy irq domain)
-> changed the GIC driver to use a non-legacy IRQ domain on DT
-> platforms. This patch assumes that DT-driven systems are getting
-> all of their interrupts from device tree.
-> 
-> Turns out that OMAP has quite a few hidden gems, and still uses
-> hardcoded interrupts despite having fairly complete DTs.
-> 
-> This patch attempts to work around these by offering a translation
-> method that can be called directly from the hwmod code, if present.
-> The same hack is sprinkled over PRCM and TWL.
-> 
-> It isn't pretty, but it seems to do the job without having to add
-> more hacks to the interrupt controller code.
-> 
-> Tested on OMAP4 (Panda-ES) and OMAP5 (UEVM5432).
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
-> >From v1:
-> - OMAP4 can either get the PRM interrupt from hwmod or from device tree.
->   In the latter case, remove the xlate_irq method.
+On 17 January 2015 at 17:47, Tony Lindgren <tony@atomide.com> wrote:
+> Also looks like the PULL_ENA bit is inverted on dm816x like on am33xx
 
-OK looks good to me. Let's wait for Nishanth to run his tests
-one more time.
+Yes, ditto on dm814x but there things get even more interesting:
 
-BTW, looks like we already have the omap4 prm interrupt in the
-omap4.dtsi file but removing the legacy code would add the
-"old DT with newer kernel" issues to the mixture.. So best
-leave that for later clean up patches and keep this fix as is.
+It has the same four config bits as am335x but moved them to bits
+16-19, while bits 0-7 contains 1 << mode.  The benefit is that you can
+also select no mode@all (high-Z or just the pull if enabled) and
+this is in fact the default, though I'm curious what would happen if
+multiple bits are set (though not curious enough to risk my hardware
+:P ).
 
-Regards,
+It also means you can change mode with a byte-write to avoid touching
+the upper bits, which is nice especially since slew is preconfigured
+per pin to match I/O timings and you're supposed to never change it
+(after fixing the ones ROM messed up due to bugs).  Also on rev 2.x
+silicon you're not allowed to disable the receiver if using 3.3V I/O.
 
-Tony
+
+> +#define DM816X_IOPAD(pa, val)          OMAP_IOPAD_OFFSET((pa), 0x0800) (val)
+> #define AM33XX_IOPAD(pa, val)          OMAP_IOPAD_OFFSET((pa), 0x0800) (val)
+> #define AM4372_IOPAD(pa, val)          OMAP_IOPAD_OFFSET((pa), 0x0800) (val)
+
+The overall control module layout is actually compatible across the
+whole happy family; basically any register they have in common is at
+the same offset (with notable exception of ADC and eCAP event muxes on
+am335x versus c6a811x/dra62x, but the latter is a semi-mythical device
+anyway, not even a product brief in circulation). They often even have
+the same semantics, though padconf shows this isn't always true
+unfortunately.
+
+A similar thing is true for the overall device memory map actually:
+https://docs.google.com/spreadsheets/d/1hRgpmJ-4Yeojyl8XPO9n3IoYSWKPkg6oRnEvdfV_RaM/view
