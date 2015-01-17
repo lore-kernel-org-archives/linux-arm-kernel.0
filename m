@@ -1,78 +1,74 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 16 Jan 2015 19:15:33 -0800
-Subject: [PATCH] leds: netxbig: fix oops at probe time
-In-Reply-To: <CAK5ve-J+wBf08_2-XBiK2qaJ3Uy9ATZG-hZQSs7bHKUFfcnTFQ@mail.gmail.com>
-References: <1417534330-13154-1-git-send-email-simon.guinot@sequanux.org>
- <20141211090400.GB18449@kw.sim.vm.gnt>
- <CAK5ve-KVSXS3PgafAJjstiYqezpG83p-NChS6Rt=mNMdgsB3GQ@mail.gmail.com>
- <20150113201602.GI14570@lunn.ch>
- <CAK5ve-J+wBf08_2-XBiK2qaJ3Uy9ATZG-hZQSs7bHKUFfcnTFQ@mail.gmail.com>
-Message-ID: <CAOesGMgPVmX2zTjxMtn0GrbzOuRuUtFdLzL2EZjm5EDeekL+Pg@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 17 Jan 2015 13:19:28 +0800
+Subject: [PATCH v4 3/9] ARM: dts: sun9i: Add clock-indices property for bus
+ gate clocks
+In-Reply-To: <1421471974-32719-1-git-send-email-wens@csie.org>
+References: <1421471974-32719-1-git-send-email-wens@csie.org>
+Message-ID: <1421471974-32719-4-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 13, 2015 at 12:24 PM, Bryan Wu <cooloney@gmail.com> wrote:
-> On Tue, Jan 13, 2015 at 12:16 PM, Andrew Lunn <andrew@lunn.ch> wrote:
->> On Tue, Jan 13, 2015 at 12:14:08PM -0800, Bryan Wu wrote:
->>> On Thu, Dec 11, 2014 at 1:04 AM, Simon Guinot <simon.guinot@sequanux.org> wrote:
->>> > On Tue, Dec 02, 2014 at 04:32:10PM +0100, Simon Guinot wrote:
->>> >> This patch fixes a NULL pointer dereference on led_dat->mode_val. Due to
->>> >> this bug, a kernel oops can be observed at probe time on the LaCie 2Big
->>> >> and 5Big v2 boards:
->>> >>
->>> >> Unable to handle kernel NULL pointer dereference at virtual address 00000008
->>> >> [...]
->>> >> [<c03f244c>] (netxbig_led_probe) from [<c02c8c6c>] (platform_drv_probe+0x4c/0x9c)
->>> >> [<c02c8c6c>] (platform_drv_probe) from [<c02c72d0>] (driver_probe_device+0x98/0x25c)
->>> >> [<c02c72d0>] (driver_probe_device) from [<c02c7520>] (__driver_attach+0x8c/0x90)
->>> >> [<c02c7520>] (__driver_attach) from [<c02c5c24>] (bus_for_each_dev+0x68/0x94)
->>> >> [<c02c5c24>] (bus_for_each_dev) from [<c02c6408>] (bus_add_driver+0x124/0x1dc)
->>> >> [<c02c6408>] (bus_add_driver) from [<c02c7ac0>] (driver_register+0x78/0xf8)
->>> >> [<c02c7ac0>] (driver_register) from [<c000888c>] (do_one_initcall+0x80/0x1cc)
->>> >> [<c000888c>] (do_one_initcall) from [<c0733618>] (kernel_init_freeable+0xe4/0x1b4)
->>> >> [<c0733618>] (kernel_init_freeable) from [<c058db9c>] (kernel_init+0xc/0xec)
->>> >> [<c058db9c>] (kernel_init) from [<c0009850>] (ret_from_fork+0x14/0x24)
->>> >> [...]
->>> >>
->>> >> This bug was introduced by commit 588a6a99286ae30afb1339d8bc2163517b1b7dd1
->>> >> ("leds: netxbig: fix attribute-creation race").
->>> >>
->>> >> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
->>> >> Cc: <stable@vger.kernel.org> # 3.17+
->>> >> ---
->>> >>  drivers/leds/leds-netxbig.c | 12 ++++++------
->>> >>  1 file changed, 6 insertions(+), 6 deletions(-)
->>> >
->>> > Hi Bryan,
->>> >
->>> > Please apply up this patch.
->>> >
->>> > Thanks.
->>> >
->>> > Simon
->>>
->>> Sorry for the delay. I will merge it.
->>
->> Hi Bryan
->>
->> It has already been sent to arm-soc. If you are going to merge it,
->> please ask Olof to drop it.
->>
->>        Andrew
->
-> Olof, could you please drop this from your arm-soc tree. I've merged
-> it to my tree. and will send a fix for Linus soon
+of_clk_get_parent_name() uses the clock-indices property to resolve
+clock phandle arguments in case that the argument index does not
+match the clock-output-names sequence.
 
-Sigh. Andrew even told you it's already been merged, and _then_ you
-send up a single patch pull request with _just_ this to Linus after
-having been completely unresponsive for a month?
+This is the case on sunxi, where we use the actual bit index as the
+argument to the phandle. Add the clock-indices property so that
+of_clk_get_parent_name() resolves the names correctly.
 
-Anyway, dropped the last fixes branch from mvebu now.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun9i-a80.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-Btw: Andrew, in the future it's useful to get these kind of requests
-cc:d to arm at kernel.org, since I don't monitor my inbox the same way I
-keep an eye on that folder. I didn't notice this until several days
-later. Not your fault, but it'd help me. :-)
-
-
--Olof
+diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
+index 267ed149a5fa..820b4c5995f3 100644
+--- a/arch/arm/boot/dts/sun9i-a80.dtsi
++++ b/arch/arm/boot/dts/sun9i-a80.dtsi
+@@ -260,6 +260,9 @@
+ 			compatible = "allwinner,sun9i-a80-ahb0-gates-clk";
+ 			reg = <0x06000580 0x4>;
+ 			clocks = <&ahb0>;
++			clock-indices = <0>, <1>, <3>, <5>, <8>, <12>, <13>,
++					<14>, <15>, <16>, <18>, <20>, <21>,
++					<22>, <23>;
+ 			clock-output-names = "ahb0_fd", "ahb0_ve", "ahb0_gpu",
+ 					"ahb0_ss", "ahb0_sd", "ahb0_nand1",
+ 					"ahb0_nand0", "ahb0_sdram",
+@@ -273,6 +276,7 @@
+ 			compatible = "allwinner,sun9i-a80-ahb1-gates-clk";
+ 			reg = <0x06000584 0x4>;
+ 			clocks = <&ahb1>;
++			clock-indices = <0>, <1>, <17>, <21>, <22>, <23>, <24>;
+ 			clock-output-names = "ahb1_usbotg", "ahb1_usbhci",
+ 					"ahb1_gmac", "ahb1_msgbox",
+ 					"ahb1_spinlock", "ahb1_hstimer",
+@@ -284,6 +288,8 @@
+ 			compatible = "allwinner,sun9i-a80-ahb2-gates-clk";
+ 			reg = <0x06000588 0x4>;
+ 			clocks = <&ahb2>;
++			clock-indices = <0>, <1>, <2>, <4>, <5>, <7>, <8>,
++					<11>;
+ 			clock-output-names = "ahb2_lcd0", "ahb2_lcd1",
+ 					"ahb2_edp", "ahb2_csi", "ahb2_hdmi",
+ 					"ahb2_de", "ahb2_mp", "ahb2_mipi_dsi";
+@@ -294,6 +300,8 @@
+ 			compatible = "allwinner,sun9i-a80-apb0-gates-clk";
+ 			reg = <0x06000590 0x4>;
+ 			clocks = <&apb0>;
++			clock-indices = <1>, <5>, <11>, <12>, <13>, <15>,
++					<17>, <18>, <19>;
+ 			clock-output-names = "apb0_spdif", "apb0_pio",
+ 					"apb0_ac97", "apb0_i2s0", "apb0_i2s1",
+ 					"apb0_lradc", "apb0_gpadc", "apb0_twd",
+@@ -305,6 +313,8 @@
+ 			compatible = "allwinner,sun9i-a80-apb1-gates-clk";
+ 			reg = <0x06000594 0x4>;
+ 			clocks = <&apb1>;
++			clock-indices = <0>, <1>, <2>, <3>, <4>,
++					<16>, <17>, <18>, <19>, <20>, <21>;
+ 			clock-output-names = "apb1_i2c0", "apb1_i2c1",
+ 					"apb1_i2c2", "apb1_i2c3", "apb1_i2c4",
+ 					"apb1_uart0", "apb1_uart1",
+-- 
+2.1.4
