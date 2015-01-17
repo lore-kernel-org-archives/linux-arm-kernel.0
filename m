@@ -1,63 +1,33 @@
-From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Sat, 17 Jan 2015 11:46:52 +0200
-Subject: [PATCH] clocksource: arm_arch_timer: Rename arch_timer_probed to
- reflect behaviour
-Message-ID: <1421488012-5098-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 17 Jan 2015 10:10:57 +0000
+Subject: [PATCH 1/1] gpio: omap: Fix bad device access with setup_irq()
+In-Reply-To: <54B9AA9D.7080300@oracle.com>
+References: <1421448650-15904-1-git-send-email-tony@atomide.com>
+ <54B9AA9D.7080300@oracle.com>
+Message-ID: <20150117101057.GZ11502@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arch_timer_probed function returns whether the given time doesn't
-need to be probed. This can be the case when the timer has been probed
-already, but also when it has no corresponding enabled node in DT.
+On Fri, Jan 16, 2015 at 04:19:41PM -0800, santosh shilimkar wrote:
+> On 1/16/2015 2:50 PM, Tony Lindgren wrote:
+> >Similar to omap_gpio_irq_type() let's make sure that the GPIO
+> >is usable as an interrupt if the platform init code did not
+> >call gpio_request(). Otherwise we can get invalid device access
+> >after setup_irq():
+> >
+> I let Linus W comment on it but IIRC we chewed this issue last
+> time and the conclusion was the gpio_request() must have to be called
+> directly or indirectly in case of irq line.
 
-Rename the function to arch_timer_need_probe and invert its return value
-to better reflect the function's purpose and behaviour.
+That's really not the issue here.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
----
- drivers/clocksource/arm_arch_timer.c | 13 +++++++------
- 1 file changed, 7 insertions(+), 6 deletions(-)
+The issue is that it's possible to claim the interrupt, and then the
+driver goes wrong - not only does it attempt in that case to access
+hardware which is runtime suspended, if the interrupt is subsequently
+freed, it will then do a pm_runtime_put().
 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 095c1774592c..3cbdd563a967 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -660,17 +660,17 @@ static const struct of_device_id arch_timer_mem_of_match[] __initconst = {
- };
- 
- static bool __init
--arch_timer_probed(int type, const struct of_device_id *matches)
-+arch_timer_need_probe(int type, const struct of_device_id *matches)
- {
- 	struct device_node *dn;
--	bool probed = true;
-+	bool need_probe = false;
- 
- 	dn = of_find_matching_node(NULL, matches);
- 	if (dn && of_device_is_available(dn) && !(arch_timers_present & type))
--		probed = false;
-+		need_probe = true;
- 	of_node_put(dn);
- 
--	return probed;
-+	return need_probe;
- }
- 
- static void __init arch_timer_common_init(void)
-@@ -679,9 +679,10 @@ static void __init arch_timer_common_init(void)
- 
- 	/* Wait until both nodes are probed if we have two timers */
- 	if ((arch_timers_present & mask) != mask) {
--		if (!arch_timer_probed(ARCH_MEM_TIMER, arch_timer_mem_of_match))
-+		if (arch_timer_need_probe(ARCH_MEM_TIMER,
-+					  arch_timer_mem_of_match))
- 			return;
--		if (!arch_timer_probed(ARCH_CP15_TIMER, arch_timer_of_match))
-+		if (arch_timer_need_probe(ARCH_CP15_TIMER, arch_timer_of_match))
- 			return;
- 	}
- 
+The interrupt code is wrong there, plain and simple.
+
 -- 
-Regards,
-
-Laurent Pinchart
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
