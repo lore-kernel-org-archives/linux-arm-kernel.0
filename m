@@ -1,46 +1,47 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Sat, 17 Jan 2015 17:56:32 -0500
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Sat, 17 Jan 2015 23:21:42 +0000
 Subject: SMBIOS/DMI data under CONFIG_STRICT_DEVMEM
-In-Reply-To: <54BAE7CB.2010705@redhat.com>
+In-Reply-To: <54BAC21D.9040009@redhat.com>
 References: <54BAC21D.9040009@redhat.com>
- <CAOesGMi3=QkiQ326nFfGTjsOKrGqgO-q+r+A4Uc_9YWCDrAtwA@mail.gmail.com>
- <54BAE7CB.2010705@redhat.com>
-Message-ID: <54BAE8A0.6070408@redhat.com>
+Message-ID: <20150117232142.GN3827@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/17/2015 05:52 PM, Jon Masters wrote:
-> Hi Olof,
+On Sat, Jan 17, 2015 at 03:12:13PM -0500, Jon Masters wrote:
+> Hi Catalin, all,
 > 
-> On 01/17/2015 04:10 PM, Olof Johansson wrote:
->> Hi,
->>
->> On Sat, Jan 17, 2015 at 12:12 PM, Jon Masters <jcm@redhat.com> wrote:
->>> Hi Catalin, all,
->>>
->>> I would like to ensure that the SMBIOS data provided by firmware is
->>> always readable from userspace on AArch64, through /dev/mem.
->>
->> Seems like this would be a good opportunity for cleanup and fixing
->> userspace to use /sys/firmware/dmi interfaces instead of having to go
->> poking through /dev/mem. That way they don't have to be privileged
->> process any more and is a general security benefit for everybody.
-> 
-> I don't disagree :)
-> 
-> Indeed, I was pushing within RH years ago to help get it into
-> /sys/firmware/dmi where it lives today. Someone went over this code for
-> us a few months ago and the determination was that there's a chunk of
-> refactoring that needs doing to get it to do the right thing. I think in
-> the interim some of the vendor kernels might need another solution, but
-> I've already asked that Linaro refactor the tool to do it right.
-> 
-> There's probably good reasons to be able to poke at the tables directly
-> from userspace under certain circumstances too. For example, one of the
-> reference platforms I am using has bogus checksums in the tables so they
-> fail to load in the Linux interpreter which means you never see the
-> entries in /sys/firmware/dmi being created and could not debug why if
-> you had no direct access to read the raw ones. That means that probably
-> people would still carry hacks to allow such access.
+> I would like to ensure that the SMBIOS data provided by firmware is
+> always readable from userspace on AArch64, through /dev/mem.
 
-(the reference platform in question above will be corrected shortly)
+No, we need to ensure /dev/mem can be completely disabled on any
+system that ever wants to have any level of reliability.
+
+Fortunately, for SMBIOS there is /sys/firmware/dmi. Expect to see some
+patches from Ivan Khoronzhuk on this next week. (He has a working
+prototype of dmidecode, and a couple of minor kernel patches, as of
+yesterday.)
+
+For acpidump, there is /sys/firmware/acpi, and we're looking into that
+as well.
+
+> When building a kernel with CONFIG_STRICT_DEVMEM, arm64 follows broadly
+> x86 with the exception of an assumption surrounding the low range of
+> memory (which doesn't apply on AArch64 platforms universally anyway).
+> Thus on x86, they can directly read the SMBIOS table from dmidecode when
+> it tries to map /dev/mem due to its location. I'm hacking something up
+> for the moment, but I would like to solve this.
+
+STRICT_DEVMEM is a trainwreck on all architectures, but particularly
+bad on ARM*, since we don't have anything resembling a predictable
+memory map. While I like Ard's approach to improve it with data
+actually available, I would also like add the ability to make it
+tweakable as read-write, read-only or no access.
+
+I sent out a series looking to consolidate STRICT_DEVMEM handling
+across architectures (i.e. not have separate definitions per
+architecture Kconfig), but had little response. If anyone is
+interested in seeing that happening, let me know and I'll resend with
+you on cc.
+
+/
+    Leif
