@@ -1,84 +1,59 @@
-From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Sat, 17 Jan 2015 16:36:35 +0100
-Subject: [PATCHv2 2/2] USB: host: ohci_at91: Stop/start USB PLL for all sleep
- modes
-In-Reply-To: <1421508995-21290-1-git-send-email-sylvain.rochet@finsecur.com>
-References: <20150117135857.71dae08f@bbrezillon>
- <1421508995-21290-1-git-send-email-sylvain.rochet@finsecur.com>
-Message-ID: <1421508995-21290-2-git-send-email-sylvain.rochet@finsecur.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sat, 17 Jan 2015 17:01:13 +0100
+Subject: [PATCH v4 2/3] i2c: iproc: Add Broadcom iProc I2C Driver
+In-Reply-To: <54B98C18.4080807@broadcom.com>
+References: <rjui@broadcom.com>
+ <1421274213-3544-1-git-send-email-rjui@broadcom.com>
+ <1421274213-3544-3-git-send-email-rjui@broadcom.com>
+ <20150115084119.GN22880@pengutronix.de>
+ <54B98C18.4080807@broadcom.com>
+Message-ID: <20150117160113.GA22880@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Disable/unprepare clocks without testing the sleep target_state, removed
-the at91_suspend_entering_slow_clock() call (which is only a
-target_state == PM_SUSPEND_MEM).
+Hello,
 
-Other kind of suspend now benefit from the power save induced by this
-PLL deactivation. The resume penalty is about 500 us, which is not
-negligible but acceptable considering the amount of power we are saving.
+On Fri, Jan 16, 2015 at 02:09:28PM -0800, Ray Jui wrote:
+> On 1/15/2015 12:41 AM, Uwe Kleine-K?nig wrote:
+> > On Wed, Jan 14, 2015 at 02:23:32PM -0800, Ray Jui wrote:
+> >> +	 */
+> >> +	val = 1 << M_CMD_START_BUSY_SHIFT;
+> >> +	if (msg->flags & I2C_M_RD) {
+> >> +		val |= (M_CMD_PROTOCOL_BLK_RD << M_CMD_PROTOCOL_SHIFT) |
+> >> +		       (msg->len << M_CMD_RD_CNT_SHIFT);
+> >> +	} else {
+> >> +		val |= (M_CMD_PROTOCOL_BLK_WR << M_CMD_PROTOCOL_SHIFT);
+> >> +	}
+> >> +	writel(val, iproc_i2c->base + M_CMD_OFFSET);
+> >> +
+> >> +	time_left = wait_for_completion_timeout(&iproc_i2c->done, time_left);
+> > 
+> > When the interrupt fires here after the complete timed out and before
+> > you disable the irq you still throw the result away.
+> Yes, but then this comes down to the fact that if it has reached the
+> point that is determined to be a timeout condition in the driver, one
+> should really treat it as timeout error. In a normal condition,
+> time_left should never reach zero.
+I don't agree here. I'm not sure there is a real technical reason,
+though. But still if you're in a "success after timeout already over"
+situation it's IMHO better to interpret it as success, not timeout.
 
-Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
-Reported-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- drivers/usb/host/ohci-at91.c | 25 +++++++++++++------------
- 1 file changed, 13 insertions(+), 12 deletions(-)
+> >> +static int bcm_iproc_i2c_remove(struct platform_device *pdev)
+> >> +{
+> >> +	struct bcm_iproc_i2c_dev *iproc_i2c = platform_get_drvdata(pdev);
+> >> +
+> >> +	i2c_del_adapter(&iproc_i2c->adapter);
+> > You need to free the irq before i2c_del_adapter.
+> > 
+> Yes. Thanks. Change back to use devm_request_irq, and use disable_irq
+> here before removing the adapter.
+The more lightweight approach is to set your device's irq-enable
+register to zero and call synchronize_irq. (For a shared irq calling
+disable_irq is even wrong here.)
 
-diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-index dc9e4e6..f0da734 100644
---- a/drivers/usb/host/ohci-at91.c
-+++ b/drivers/usb/host/ohci-at91.c
-@@ -49,6 +49,8 @@ extern int usb_disabled(void);
- 
- static void at91_start_clock(void)
- {
-+	if (clocked)
-+		return;
- 	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
- 		clk_set_rate(uclk, 48000000);
- 		clk_prepare_enable(uclk);
-@@ -61,6 +63,8 @@ static void at91_start_clock(void)
- 
- static void at91_stop_clock(void)
- {
-+	if (!clocked)
-+		return;
- 	clk_disable_unprepare(fclk);
- 	clk_disable_unprepare(iclk);
- 	clk_disable_unprepare(hclk);
-@@ -615,16 +619,14 @@ ohci_hcd_at91_drv_suspend(struct platform_device *pdev, pm_message_t mesg)
- 	 *
- 	 * REVISIT: some boards will be able to turn VBUS off...
- 	 */
--	if (at91_suspend_entering_slow_clock()) {
--		ohci->hc_control = ohci_readl(ohci, &ohci->regs->control);
--		ohci->hc_control &= OHCI_CTRL_RWC;
--		ohci_writel(ohci, ohci->hc_control, &ohci->regs->control);
--		ohci->rh_state = OHCI_RH_HALTED;
--
--		/* flush the writes */
--		(void) ohci_readl (ohci, &ohci->regs->control);
--		at91_stop_clock();
--	}
-+	ohci->hc_control = ohci_readl(ohci, &ohci->regs->control);
-+	ohci->hc_control &= OHCI_CTRL_RWC;
-+	ohci_writel(ohci, ohci->hc_control, &ohci->regs->control);
-+	ohci->rh_state = OHCI_RH_HALTED;
-+
-+	/* flush the writes */
-+	(void) ohci_readl (ohci, &ohci->regs->control);
-+	at91_stop_clock();
- 
- 	return ret;
- }
-@@ -636,8 +638,7 @@ static int ohci_hcd_at91_drv_resume(struct platform_device *pdev)
- 	if (device_may_wakeup(&pdev->dev))
- 		disable_irq_wake(hcd->irq);
- 
--	if (!clocked)
--		at91_start_clock();
-+	at91_start_clock();
- 
- 	ohci_resume(hcd, false);
- 	return 0;
+Best regards
+Uwe
+
 -- 
-2.1.4
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
