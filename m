@@ -1,54 +1,44 @@
-From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Sat, 17 Jan 2015 23:49:00 +0100
-Subject: [PATCHv3 1/5] USB: host: ehci_atmel: Add suspend/resume support
-In-Reply-To: <54BAE0AE.5060705@cogentembedded.com>
-References: <Pine.LNX.4.44L0.1501171524050.13485-100000@netrider.rowland.org>
- <1421529942-18437-1-git-send-email-sylvain.rochet@finsecur.com>
- <1421529942-18437-2-git-send-email-sylvain.rochet@finsecur.com>
- <54BAE0AE.5060705@cogentembedded.com>
-Message-ID: <20150117224900.GA22439@gradator.net>
+From: jcm@redhat.com (Jon Masters)
+Date: Sat, 17 Jan 2015 17:52:59 -0500
+Subject: SMBIOS/DMI data under CONFIG_STRICT_DEVMEM
+In-Reply-To: <CAOesGMi3=QkiQ326nFfGTjsOKrGqgO-q+r+A4Uc_9YWCDrAtwA@mail.gmail.com>
+References: <54BAC21D.9040009@redhat.com>
+ <CAOesGMi3=QkiQ326nFfGTjsOKrGqgO-q+r+A4Uc_9YWCDrAtwA@mail.gmail.com>
+Message-ID: <54BAE7CB.2010705@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+Hi Olof,
 
-
-On Sun, Jan 18, 2015 at 01:22:38AM +0300, Sergei Shtylyov wrote:
+On 01/17/2015 04:10 PM, Olof Johansson wrote:
+> Hi,
 > 
->    There's little inconsistency in your patch subjects: you're using
-> '_' but the files you're modifying are named using '-'...
-
-Indeed.
-
-
-> >@@ -187,6 +217,8 @@ static struct platform_driver ehci_atmel_driver = {
-> >  	.probe		= ehci_atmel_drv_probe,
-> >  	.remove		= ehci_atmel_drv_remove,
-> >  	.shutdown	= usb_hcd_platform_shutdown,
-> >+	.suspend	= ehci_atmel_drv_suspend,
-> >+	.resume		= ehci_atmel_drv_resume,
+> On Sat, Jan 17, 2015 at 12:12 PM, Jon Masters <jcm@redhat.com> wrote:
+>> Hi Catalin, all,
+>>
+>> I would like to ensure that the SMBIOS data provided by firmware is
+>> always readable from userspace on AArch64, through /dev/mem.
 > 
->    I think you should use 'struct dev_pm_ops' now.
+> Seems like this would be a good opportunity for cleanup and fixing
+> userspace to use /sys/firmware/dmi interfaces instead of having to go
+> poking through /dev/mem. That way they don't have to be privileged
+> process any more and is a general security benefit for everybody.
 
-This way ?
+I don't disagree :)
 
-static int ehci_atmel_drv_suspend(struct device *dev)
-{
-	struct usb_hcd *hcd = dev_get_drvdata(dev);
-(...)
+Indeed, I was pushing within RH years ago to help get it into
+/sys/firmware/dmi where it lives today. Someone went over this code for
+us a few months ago and the determination was that there's a chunk of
+refactoring that needs doing to get it to do the right thing. I think in
+the interim some of the vendor kernels might need another solution, but
+I've already asked that Linaro refactor the tool to do it right.
 
+There's probably good reasons to be able to poke at the tables directly
+from userspace under certain circumstances too. For example, one of the
+reference platforms I am using has bogus checksums in the tables so they
+fail to load in the Linux interpreter which means you never see the
+entries in /sys/firmware/dmi being created and could not debug why if
+you had no direct access to read the raw ones. That means that probably
+people would still carry hacks to allow such access.
 
-static SIMPLE_DEV_PM_OPS(ehci_atmel_pm_ops, ehci_atmel_drv_suspend, ehci_atmel_drv_resume);
-
-(...)
-	.driver         = {
-		.pm     = &ehci_atmel_pm_ops,
-	}
-(...)
-
-
-Should I send a v4 or can I send this change separately on top of the 
-previous change ?
-
-
-Sylvain
+Jon.
