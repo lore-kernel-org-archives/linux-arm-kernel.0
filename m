@@ -1,342 +1,438 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Sat, 17 Jan 2015 09:59:26 +0900
-Subject: [PATCH 3/3] ARM: shmobile: R-Mobile: Add DT support for PM domains
-In-Reply-To: <cover.1421379958.git.horms+renesas@verge.net.au>
-References: <cover.1421379958.git.horms+renesas@verge.net.au>
-Message-ID: <2173fc7cb681c38b9e5bc526211045caecf96e44.1421379958.git.horms+renesas@verge.net.au>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 16 Jan 2015 17:02:38 -0800
+Subject: [PATCH RESEND v8 1/2] clk: Make clk API return per-user struct
+ clk instances
+In-Reply-To: <1421071809-17402-2-git-send-email-tomeu.vizoso@collabora.com>
+References: <1421071809-17402-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1421071809-17402-2-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <20150117010238.GA27202@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+On 01/12, Tomeu Vizoso wrote:
+> Moves clock state to struct clk_core, but takes care to change as little API as
+> possible.
+> 
+> struct clk_hw still has a pointer to a struct clk, which is the
+> implementation's per-user clk instance, for backwards compatibility.
+> 
+> The struct clk that clk_get_parent() returns isn't owned by the caller, but by
+> the clock implementation, so the former shouldn't call clk_put() on it.
+> 
+> Because some boards in mach-omap2 still register clocks statically, their clock
+> registration had to be updated to take into account that the clock information
+> is stored in struct clk_core now.
+> 
+> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> 
 
-Populate the PM domains from DT, and provide support to hook up devices
-to their respective PM domain.
+Looks mostly good. Missing some NULL checks mostly.
 
-The always-on power area (e.g. C5 on r8a7740) is created as a PM domain
-without software control, to allow Run-Time management of module clocks
-for hardware blocks inside this area.
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index f4963b7..7eddfd8 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -114,7 +123,7 @@ static struct hlist_head *orphan_list[] = {
+> +static void clk_summary_show_one(struct seq_file *s, struct clk_core *c, int level)
+>  {
+>  	if (!c)
+>  		return;
+> @@ -122,14 +131,14 @@ static void clk_summary_show_one(struct seq_file *s, struct clk *c, int level)
+[...]
+> -static void clk_summary_show_subtree(struct seq_file *s, struct clk *c,
+> +static void clk_summary_show_subtree(struct seq_file *s, struct clk_core *c,
+>  				     int level)
+>  {
+> -	struct clk *child;
+> +	struct clk_core *child;
+>  
+>  	if (!c)
+>  		return;
+> @@ -172,7 +181,7 @@ static const struct file_operations clk_summary_fops = {
+>  	.release	= single_release,
+>  };
+>  
+> -static void clk_dump_one(struct seq_file *s, struct clk *c, int level)
+> +static void clk_dump_one(struct seq_file *s, struct clk_core *c, int level)
+>  {
+>  	if (!c)
+>  		return;
+> @@ -180,14 +189,14 @@ static void clk_dump_one(struct seq_file *s, struct clk *c, int level)
+[...]
+> -static void clk_dump_subtree(struct seq_file *s, struct clk *c, int level)
+> +static void clk_dump_subtree(struct seq_file *s, struct clk_core *c, int level)
+>  {
+> -	struct clk *child;
+> +	struct clk_core *child;
+>  
+>  	if (!c)
+>  		return;
+> @@ -418,19 +427,20 @@ static int __init clk_debug_init(void)
+[...]
+>  
+>  /* caller must hold prepare_lock */
+> -static void clk_unprepare_unused_subtree(struct clk *clk)
+> +static void clk_unprepare_unused_subtree(struct clk_core *clk)
+>  {
+> -	struct clk *child;
+> +	struct clk_core *child;
+>  
+>  	if (!clk)
+>  		return;
+> @@ -453,9 +463,9 @@ static void clk_unprepare_unused_subtree(struct clk *clk)
+>  }
+>  
+>  /* caller must hold prepare_lock */
+> -static void clk_disable_unused_subtree(struct clk *clk)
+> +static void clk_disable_unused_subtree(struct clk_core *clk)
+>  {
+> -	struct clk *child;
+> +	struct clk_core *child;
+>  	unsigned long flags;
+>  
+>  	if (!clk)
 
-Special cases like PM domains containing CPUs, the console device, or
-Coresight-ETM, are handled by scanning the DT topology.
+Note: These NULL checks look bogus. No need to fix them here, but
+a patch to remove them would be nice.
 
-As long as the ARM debug/perf code doesn't use resource management with
-runtime PM support, the power area containing Coresight-ETM (e.g. D4 on
-r8a7740) must be kept powered to avoid a crash during resume from s2ram
-(dbg_cpu_pm_notify() calls reset_ctrl_regs() unconditionally, causing an
-undefined instruction oops).
+> @@ -532,48 +542,59 @@ late_initcall_sync(clk_disable_unused);
+[...]
+> +
+> +struct clk *clk_get_parent_by_index(struct clk *clk, u8 index)
+> +{
+> +	struct clk_core *parent;
+> +
+> +	parent = clk_core_get_parent_by_index(clk->core, index);
 
-Initialization is done from core_initcall(), as the
-"renesas,intc-irqpin" driver uses postcore_initcall().
+I suppose clk could be NULL here (although this is mostly a
+clk-provider function). At least before we would return NULL in
+such a case so we should keep the same behavior instead of NULL
+deref.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/Kconfig      |   3 +-
- arch/arm/mach-shmobile/pm-rmobile.c | 217 +++++++++++++++++++++++++++++++++++-
- arch/arm/mach-shmobile/pm-rmobile.h |   2 +-
- 3 files changed, 218 insertions(+), 4 deletions(-)
+> +
+> +	return !parent ? NULL : parent->hw->clk;
+> +}
+>  EXPORT_SYMBOL_GPL(clk_get_parent_by_index);
+>  
+> @@ -593,9 +614,14 @@ unsigned long __clk_get_rate(struct clk *clk)
+>  out:
+>  	return ret;
+>  }
+> +
+> +unsigned long __clk_get_rate(struct clk *clk)
+> +{
+> +	return clk_core_get_rate_nolock(clk->core);
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index d107b93..894c6876 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -7,6 +7,7 @@ config PM_RCAR
- 
- config PM_RMOBILE
- 	bool
-+	select PM_GENERIC_DOMAINS
- 
- config ARCH_RCAR_GEN1
- 	bool
-@@ -23,7 +24,7 @@ config ARCH_RCAR_GEN2
- 
- config ARCH_RMOBILE
- 	bool
--	select PM_RMOBILE if PM && !ARCH_SHMOBILE_MULTI
-+	select PM_RMOBILE if PM
- 	select SYS_SUPPORTS_SH_CMT
- 	select SYS_SUPPORTS_SH_TMU
- 
-diff --git a/arch/arm/mach-shmobile/pm-rmobile.c b/arch/arm/mach-shmobile/pm-rmobile.c
-index a4fcd2c..85a7fdd 100644
---- a/arch/arm/mach-shmobile/pm-rmobile.c
-+++ b/arch/arm/mach-shmobile/pm-rmobile.c
-@@ -3,6 +3,7 @@
-  *
-  * Copyright (C) 2012  Renesas Solutions Corp.
-  * Copyright (C) 2012  Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-+ * Copyright (C) 2014  Glider bvba
-  *
-  * based on pm-sh7372.c
-  *  Copyright (C) 2011 Magnus Damm
-@@ -13,10 +14,16 @@
-  */
- #include <linux/console.h>
- #include <linux/delay.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_platform.h>
- #include <linux/platform_device.h>
- #include <linux/pm.h>
- #include <linux/pm_clock.h>
-+#include <linux/slab.h>
-+
- #include <asm/io.h>
-+
- #include "pm-rmobile.h"
- 
- /* SYSC */
-@@ -30,8 +37,12 @@
- static int rmobile_pd_power_down(struct generic_pm_domain *genpd)
- {
- 	struct rmobile_pm_domain *rmobile_pd = to_rmobile_pd(genpd);
--	unsigned int mask = 1 << rmobile_pd->bit_shift;
-+	unsigned int mask;
-+
-+	if (rmobile_pd->bit_shift == ~0)
-+		return -EBUSY;
- 
-+	mask = 1 << rmobile_pd->bit_shift;
- 	if (rmobile_pd->suspend) {
- 		int ret = rmobile_pd->suspend();
- 
-@@ -61,10 +72,14 @@ static int rmobile_pd_power_down(struct generic_pm_domain *genpd)
- static int __rmobile_pd_power_up(struct rmobile_pm_domain *rmobile_pd,
- 				 bool do_resume)
- {
--	unsigned int mask = 1 << rmobile_pd->bit_shift;
-+	unsigned int mask;
- 	unsigned int retry_count;
- 	int ret = 0;
- 
-+	if (rmobile_pd->bit_shift == ~0)
-+		return 0;
-+
-+	mask = 1 << rmobile_pd->bit_shift;
- 	if (__raw_readl(rmobile_pd->base + PSTR) & mask)
- 		goto out;
- 
-@@ -148,6 +163,8 @@ static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
- 	__rmobile_pd_power_up(rmobile_pd, false);
- }
- 
-+#ifdef CONFIG_ARCH_SHMOBILE_LEGACY
-+
- void rmobile_init_domains(struct rmobile_pm_domain domains[], int num)
- {
- 	int j;
-@@ -180,3 +197,199 @@ void rmobile_add_devices_to_domains(struct pm_domain_device data[],
- 		rmobile_add_device_to_domain_td(data[j].domain_name,
- 						data[j].pdev, &latencies);
- }
-+
-+#else /* !CONFIG_ARCH_SHMOBILE_LEGACY */
-+
-+static int rmobile_pd_suspend_cpu(void)
-+{
-+	/*
-+	 * This domain contains the CPU core and therefore it should
-+	 * only be turned off if the CPU is not in use.
-+	 */
-+	return -EBUSY;
-+}
-+
-+static int rmobile_pd_suspend_console(void)
-+{
-+	/*
-+	 * Serial consoles make use of SCIF hardware located in this domain,
-+	 * hence keep the power domain on if "no_console_suspend" is set.
-+	 */
-+	return console_suspend_enabled ? 0 : -EBUSY;
-+}
-+
-+static int rmobile_pd_suspend_debug(void)
-+{
-+	/*
-+	 * This domain contains the Coresight-ETM hardware block and
-+	 * therefore it should only be turned off if the debug module is
-+	 * not in use.
-+	 */
-+	return -EBUSY;
-+}
-+
-+#define MAX_NUM_CPU_PDS		8
-+
-+static unsigned int num_cpu_pds __initdata;
-+static struct device_node *cpu_pds[MAX_NUM_CPU_PDS] __initdata;
-+static struct device_node *console_pd __initdata;
-+static struct device_node *debug_pd __initdata;
-+
-+static void __init get_special_pds(void)
-+{
-+	struct device_node *np, *pd;
-+	unsigned int i;
-+
-+	/* PM domains containing CPUs */
-+	for_each_node_by_type(np, "cpu") {
-+		pd = of_parse_phandle(np, "power-domains", 0);
-+		if (!pd)
-+			continue;
-+
-+		for (i = 0; i < num_cpu_pds; i++)
-+			if (pd == cpu_pds[i])
-+				break;
-+
-+		if (i < num_cpu_pds) {
-+			of_node_put(pd);
-+			continue;
-+		}
-+
-+		if (num_cpu_pds == MAX_NUM_CPU_PDS) {
-+			pr_warn("Too many CPU PM domains\n");
-+			of_node_put(pd);
-+			continue;
-+		}
-+
-+		cpu_pds[num_cpu_pds++] = pd;
-+	}
-+
-+	/* PM domain containing console */
-+	if (of_stdout)
-+		console_pd = of_parse_phandle(of_stdout, "power-domains", 0);
-+
-+	/* PM domain containing Coresight-ETM */
-+	np = of_find_compatible_node(NULL, NULL, "arm,coresight-etm3x");
-+	if (np) {
-+		debug_pd = of_parse_phandle(np, "power-domains", 0);
-+		of_node_put(np);
-+	}
-+}
-+
-+static void __init put_special_pds(void)
-+{
-+	unsigned int i;
-+
-+	for (i = 0; i < num_cpu_pds; i++)
-+		of_node_put(cpu_pds[i]);
-+	of_node_put(console_pd);
-+	of_node_put(debug_pd);
-+}
-+
-+static bool __init pd_contains_cpu(const struct device_node *pd)
-+{
-+	unsigned int i;
-+
-+	for (i = 0; i < num_cpu_pds; i++)
-+		if (pd == cpu_pds[i])
-+			return true;
-+
-+	return false;
-+}
-+
-+static void __init rmobile_setup_pm_domain(struct device_node *np,
-+					   struct rmobile_pm_domain *pd)
-+{
-+	const char *name = pd->genpd.name;
-+
-+	if (pd_contains_cpu(np)) {
-+		pr_debug("PM domain %s contains CPU\n", name);
-+		pd->gov = &pm_domain_always_on_gov;
-+		pd->suspend = rmobile_pd_suspend_cpu;
-+	} else if (np == console_pd) {
-+		pr_debug("PM domain %s contains serial console\n", name);
-+		pd->gov = &pm_domain_always_on_gov;
-+		pd->suspend = rmobile_pd_suspend_console;
-+	} else if (np == debug_pd) {
-+		pr_debug("PM domain %s contains Coresight-ETM\n", name);
-+		pd->gov = &pm_domain_always_on_gov;
-+		pd->suspend = rmobile_pd_suspend_debug;
-+	}
-+
-+	rmobile_init_pm_domain(pd);
-+}
-+
-+static int __init rmobile_add_pm_domains(void __iomem *base,
-+					 struct device_node *parent,
-+					 struct generic_pm_domain *genpd_parent)
-+{
-+	struct device_node *np;
-+
-+	for_each_child_of_node(parent, np) {
-+		struct rmobile_pm_domain *pd;
-+		u32 idx = ~0;
-+
-+		if (of_property_read_u32(np, "reg", &idx)) {
-+			/* always-on domain */
-+		}
-+
-+		pd = kzalloc(sizeof(*pd), GFP_KERNEL);
-+		if (!pd)
-+			return -ENOMEM;
-+
-+		pd->genpd.name = np->name;
-+		pd->base = base;
-+		pd->bit_shift = idx;
-+
-+		rmobile_setup_pm_domain(np, pd);
-+		if (genpd_parent)
-+			pm_genpd_add_subdomain(genpd_parent, &pd->genpd);
-+		of_genpd_add_provider_simple(np, &pd->genpd);
-+
-+		rmobile_add_pm_domains(base, np, &pd->genpd);
-+	}
-+	return 0;
-+}
-+
-+static int __init rmobile_init_pm_domains(void)
-+{
-+	struct device_node *np, *pmd;
-+	bool scanned = false;
-+	void __iomem *base;
-+	int ret = 0;
-+
-+	for_each_compatible_node(np, NULL, "renesas,sysc-rmobile") {
-+		base = of_iomap(np, 0);
-+		if (!base) {
-+			pr_warn("%s cannot map reg 0\n", np->full_name);
-+			continue;
-+		}
-+
-+		pmd = of_get_child_by_name(np, "pm-domains");
-+		if (!pmd) {
-+			pr_warn("%s lacks pm-domains node\n", np->full_name);
-+			continue;
-+		}
-+
-+		if (!scanned) {
-+			/* Find PM domains containing special blocks */
-+			get_special_pds();
-+			scanned = true;
-+		}
-+
-+		ret = rmobile_add_pm_domains(base, pmd, NULL);
-+		of_node_put(pmd);
-+		if (ret) {
-+			of_node_put(np);
-+			break;
-+		}
-+	}
-+
-+	put_special_pds();
-+
-+	return ret;
-+}
-+
-+core_initcall(rmobile_init_pm_domains);
-+
-+#endif /* !CONFIG_ARCH_SHMOBILE_LEGACY */
-diff --git a/arch/arm/mach-shmobile/pm-rmobile.h b/arch/arm/mach-shmobile/pm-rmobile.h
-index 0602130..5321978 100644
---- a/arch/arm/mach-shmobile/pm-rmobile.h
-+++ b/arch/arm/mach-shmobile/pm-rmobile.h
-@@ -37,7 +37,7 @@ struct pm_domain_device {
- 	struct platform_device *pdev;
- };
- 
--#ifdef CONFIG_PM_RMOBILE
-+#if defined(CONFIG_PM_RMOBILE) && defined(CONFIG_ARCH_SHMOBILE_LEGACY)
- extern void rmobile_init_domains(struct rmobile_pm_domain domains[], int num);
- extern void rmobile_add_device_to_domain_td(const char *domain_name,
- 					    struct platform_device *pdev,
+Oops. clk can be NULL here. We should check for that and return
+0.
+
+> +}
+>  EXPORT_SYMBOL_GPL(__clk_get_rate);
+>  
+> @@ -630,7 +656,12 @@ out:
+>  	return !!ret;
+>  }
+>  
+> -bool __clk_is_enabled(struct clk *clk)
+> +bool __clk_is_prepared(struct clk *clk)
+> +{
+> +	return clk_core_is_prepared(clk->core);
+
+Oops. clk can be NULL here. Return false if so. Or drop the
+function entirely? It looks like it may become unused.
+
+> +}
+> @@ -650,12 +681,17 @@ bool __clk_is_enabled(struct clk *clk)
+>  out:
+>  	return !!ret;
+>  }
+> +
+> +bool __clk_is_enabled(struct clk *clk)
+> +{
+> +	return clk_core_is_enabled(clk->core);
+
+Oops. clk can be NULL here. Return false if so.
+
+> +}
+>  EXPORT_SYMBOL_GPL(__clk_is_enabled);
+>  
+> @@ -762,7 +805,12 @@ void __clk_unprepare(struct clk *clk)
+>  	if (clk->ops->unprepare)
+>  		clk->ops->unprepare(clk->hw);
+>  
+> -	__clk_unprepare(clk->parent);
+> +	clk_core_unprepare(clk->parent);
+> +}
+> +
+> +void __clk_unprepare(struct clk *clk)
+> +{
+> +	clk_core_unprepare(clk->core);
+
+OOps. clk can be NULL here. Bail early if so.
+
+>  }
+>  
+>  /**
+> @@ -813,6 +861,11 @@ int __clk_prepare(struct clk *clk)
+>  	return 0;
+>  }
+>  
+> +int __clk_prepare(struct clk *clk)
+> +{
+> +	return clk_core_prepare(clk->core);
+
+Oops. clk can be NULL here. Return 0 if so.
+
+> +}
+> +
+> @@ -851,7 +904,12 @@ static void __clk_disable(struct clk *clk)
+[...]
+> +
+> +static void __clk_disable(struct clk *clk)
+> +{
+> +	clk_core_disable(clk->core);
+
+Oops. clk can be NULL here. Bail early if so. Is this function
+used though?
+
+>  }
+>  
+>  /**
+> @@ -908,6 +966,11 @@ static int __clk_enable(struct clk *clk)
+>  	return 0;
+>  }
+>  
+> +static int __clk_enable(struct clk *clk)
+> +{
+> +	return clk_core_enable(clk->core);
+> +}
+
+Same problem. Is this function used either?
+
+> +
+>  /**
+>   * clk_enable - ungate a clock
+>   * @clk: the clk being ungated
+> @@ -961,12 +1018,35 @@ unsigned long __clk_round_rate(struct clk *clk, unsigned long rate)
+[...]
+> +unsigned long __clk_round_rate(struct clk *clk, unsigned long rate)
+> +{
+> +	return clk_core_round_rate_nolock(clk->core, rate);
+
+Oops. clk can be NULL here. Return 0 if so.
+
+> +}
+>  EXPORT_SYMBOL_GPL(__clk_round_rate);
+>  
+> @@ -978,13 +1058,7 @@ EXPORT_SYMBOL_GPL(__clk_round_rate);
+>   */
+>  long clk_round_rate(struct clk *clk, unsigned long rate)
+>  {
+> -	unsigned long ret;
+> -
+> -	clk_prepare_lock();
+> -	ret = __clk_round_rate(clk, rate);
+> -	clk_prepare_unlock();
+> -
+> -	return ret;
+> +	return clk_core_round_rate(clk->core, rate);
+
+Oops. clk can be NULL here. Return 0 if so.
+
+>  }
+>  EXPORT_SYMBOL_GPL(clk_round_rate);
+>  
+> @@ -1002,22 +1076,21 @@ EXPORT_SYMBOL_GPL(clk_round_rate);
+>   * called if all went well, or NOTIFY_STOP or NOTIFY_BAD immediately if
+>   * a driver returns that.
+>   */
+> -static int __clk_notify(struct clk *clk, unsigned long msg,
+> +static int __clk_notify(struct clk_core *clk, unsigned long msg,
+>  		unsigned long old_rate, unsigned long new_rate)
+>  {
+>  	struct clk_notifier *cn;
+>  	struct clk_notifier_data cnd;
+>  	int ret = NOTIFY_DONE;
+>  
+> -	cnd.clk = clk;
+>  	cnd.old_rate = old_rate;
+>  	cnd.new_rate = new_rate;
+>  
+>  	list_for_each_entry(cn, &clk_notifier_list, node) {
+> -		if (cn->clk == clk) {
+> +		if (cn->clk->core == clk) {
+> +			cnd.clk = cn->clk;
+>  			ret = srcu_notifier_call_chain(&cn->notifier_head, msg,
+>  					&cnd);
+> -			break;
+
+Ah now the list is full of struct clk pointers that are unique so
+we drop the break here? It would be good if someone:
+
+ 1) Made a notifier_head per clk_core structure
+ 2) Hooked up clk notifiers to that head instead of a global list
+ 3) Hid struct clk_notifier in clk.c
+
+This way when we notify the chain we don't have to loop through
+all possible notifiers to find blocks containing clks that we care about
+and then notify that chain which is probably only ever going to
+be a single notifier long because struct clk is unique now.
+
+>  		}
+>  	}
+>  
+> @@ -1139,14 +1210,29 @@ unsigned long clk_get_rate(struct clk *clk)
+>  	if (clk && (clk->flags & CLK_GET_RATE_NOCACHE))
+>  		__clk_recalc_rates(clk, 0);
+>  
+> -	rate = __clk_get_rate(clk);
+> +	rate = clk_core_get_rate_nolock(clk);
+>  	clk_prepare_unlock();
+>  
+>  	return rate;
+>  }
+> +EXPORT_SYMBOL_GPL(clk_core_get_rate);
+> +
+> +/**
+> + * clk_get_rate - return the rate of clk
+> + * @clk: the clk whose rate is being returned
+> + *
+> + * Simply returns the cached rate of the clk, unless CLK_GET_RATE_NOCACHE flag
+> + * is set, which means a recalc_rate will be issued.
+> + * If clk is NULL then returns 0.
+> + */
+> +unsigned long clk_get_rate(struct clk *clk)
+> +{
+> +	return clk_core_get_rate(clk->core);
+> +}
+>  EXPORT_SYMBOL_GPL(clk_get_rate);
+>  
+> -static int clk_fetch_parent_index(struct clk *clk, struct clk *parent)
+> +static int clk_fetch_parent_index(struct clk_core *clk,
+> +				  struct clk_core *parent)
+>  {
+>  	int i;
+>  
+> @@ -1366,7 +1457,7 @@ static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
+>  		new_rate = clk->ops->determine_rate(clk->hw, rate,
+>  						    &best_parent_rate,
+>  						    &parent_hw);
+> -		parent = parent_hw->clk;
+> +		parent = parent_hw ? parent_hw->core : NULL;
+
+Here's the fix!
+
+>  	} else if (clk->ops->round_rate) {
+>  		new_rate = clk->ops->round_rate(clk->hw, rate,
+>  						&best_parent_rate);
+> @@ -1574,6 +1667,18 @@ out:
+>  }
+>  EXPORT_SYMBOL_GPL(clk_set_rate);
+>  
+> +static struct clk_core *clk_core_get_parent(struct clk_core *core)
+> +{
+> +	struct clk_core *parent;
+> +
+> +	clk_prepare_lock();
+> +	parent = !core ? NULL : core->parent;
+
+Looks wrong. core should never be NULL?
+
+> +	clk_prepare_unlock();
+> +
+> +	return parent;
+> +}
+> +EXPORT_SYMBOL_GPL(clk_core_get_parent);
+> +
+>  /**
+>   * clk_get_parent - return the parent of a clk
+>   * @clk: the clk whose parent gets returned
+> @@ -1582,13 +1687,11 @@ EXPORT_SYMBOL_GPL(clk_set_rate);
+>   */
+>  struct clk *clk_get_parent(struct clk *clk)
+>  {
+> -	struct clk *parent;
+> +	struct clk_core *parent;
+>  
+> -	clk_prepare_lock();
+> -	parent = __clk_get_parent(clk);
+> -	clk_prepare_unlock();
+> +	parent = clk_core_get_parent(clk->core);
+
+Oops if clk is NULL. So far we've allowed that and returned NULL.
+
+>  
+> -	return parent;
+> +	return !parent ? NULL : parent->hw->clk;
+>  }
+>  EXPORT_SYMBOL_GPL(clk_get_parent);
+> @@ -2258,33 +2381,42 @@ void devm_clk_unregister(struct device *dev, struct clk *clk)
+>  }
+>  EXPORT_SYMBOL_GPL(devm_clk_unregister);
+>  
+> +static void clk_core_put(struct clk_core *core)
+> +{
+> +	struct module *owner;
+> +
+> +	if (!core || WARN_ON_ONCE(IS_ERR(core)))
+> +		return;
+
+This doesn't look right. When would the clk_core structure ever
+be NULL or some error pointer? I would think we want to leave
+this check in __clk_put() and leave it checking the struct clk
+instance that we may get from some random driver.
+
+> +
+> +	owner = core->owner;
+> +
+> +	clk_prepare_lock();
+> +	kref_put(&core->ref, __clk_release);
+> +	clk_prepare_unlock();
+> +
+> +	module_put(owner);
+> +}
+
+Can you also move this next to __clk_put() and after __clk_get() please?
+
+> +
+>  /*
+>   * clkdev helpers
+>   */
+>  int __clk_get(struct clk *clk)
+>  {
+> -	if (clk) {
+> -		if (!try_module_get(clk->owner))
+> +	struct clk_core *core = !clk ? NULL : clk->core;
+> +
+> +	if (core) {
+> +		if (!try_module_get(core->owner))
+>  			return 0;
+>  
+> -		kref_get(&clk->ref);
+> +		kref_get(&core->ref);
+>  	}
+>  	return 1;
+>  }
+>  
+>  void __clk_put(struct clk *clk)
+>  {
+> -	struct module *owner;
+> -
+> -	if (!clk || WARN_ON_ONCE(IS_ERR(clk)))
+> -		return;
+> -
+> -	clk_prepare_lock();
+> -	owner = clk->owner;
+> -	kref_put(&clk->ref, __clk_release);
+> -	clk_prepare_unlock();
+> -
+> -	module_put(owner);
+> +	clk_core_put(clk->core);
+
+clk can be NULL here.
+
+> +	kfree(clk);
+>  }
 -- 
-2.1.4
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
