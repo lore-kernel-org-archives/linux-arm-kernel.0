@@ -1,35 +1,63 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 17 Jan 2015 19:02:37 +0100
-Subject: [PULL REQUEST] mvebu fixes #3
-Message-ID: <20150117180237.GA19604@lunn.ch>
+From: b.galvani@gmail.com (Beniamino Galvani)
+Date: Sat, 17 Jan 2015 19:15:13 +0100
+Subject: [PATCH v4 0/3] Amlogic Meson pinctrl driver
+Message-ID: <1421518516-26976-1-git-send-email-b.galvani@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof
+Hi,
 
-Another fixes pull request for mvebu. A single patch which disables
-hardware I/O coherency.
+this series adds a pinctrl driver for Amlogic Meson, providing common
+code for all the SoCs of the family and configuration data specific
+for Meson8.
 
-The following changes since commit eaa27f34e91a14cdceed26ed6c6793ec1d186115:
+DT binding documentation for the driver has already been merged and is
+not included in the series. The first patch is for the pinctrl/devel
+tree, the others for Carlo's meson tree.
 
-  linux 3.19-rc4 (2015-01-11 12:44:53 -0800)
+Thanks,
+Beniamino
 
-are available in the git repository at:
+Changes since v3 [ https://lkml.org/lkml/2014/11/16/171 ]
+ - add 'static' to meson8 structs and arrays
+ - use ERR_CAST() to avoid sparse warning in meson_map_resource()
+ - declare group list as 'const char * const *'
 
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-3.19-3
+Changes since v2 [ https://lkml.org/lkml/2014/10/14/423 ]
+ - move modifications to mach-meson Kconfig to a separate patch
+ - use regmap_mmio
+ - use generic gpio xlate function
+ - don't hardcode gpio base number
+ - use gpiochip_add_pin_range()
+ - add kerneldoc documentation
+ - use plain module_platform_driver() instead of postcore_initcall
+ - avoid unneeded copies of platform data
 
-for you to fetch changes up to 8f1e8ee28660018a935c7576b9af8ffe1feab54c:
+Changes since v1 [ https://lkml.org/lkml/2014/10/7/712 ]
+ - added missing checks of return values
+ - indentation fixes
+ - added missing definitions of groups and functions for Meson8
 
-  ARM: mvebu: completely disable hardware I/O coherency (2015-01-17 11:46:55 -0600)
+Beniamino Galvani (3):
+  pinctrl: add driver for Amlogic Meson SoCs
+  ARM: meson: select PINCTRL_MESON and ARCH_REQUIRE_GPIOLIB
+  ARM: dts: meson8: add pinctrl node
 
-----------------------------------------------------------------
-mvebu fixes for 3.19-rc (part #3)
+ arch/arm/boot/dts/meson8.dtsi          |   68 ++
+ arch/arm/mach-meson/Kconfig            |    3 +
+ drivers/pinctrl/Kconfig                |    8 +
+ drivers/pinctrl/Makefile               |    1 +
+ drivers/pinctrl/meson/Makefile         |    2 +
+ drivers/pinctrl/meson/pinctrl-meson.c  |  761 ++++++++++++++++++++++
+ drivers/pinctrl/meson/pinctrl-meson.h  |  209 ++++++
+ drivers/pinctrl/meson/pinctrl-meson8.c | 1089 ++++++++++++++++++++++++++++++++
+ include/dt-bindings/gpio/meson8-gpio.h |  157 +++++
+ 9 files changed, 2298 insertions(+)
+ create mode 100644 drivers/pinctrl/meson/Makefile
+ create mode 100644 drivers/pinctrl/meson/pinctrl-meson.c
+ create mode 100644 drivers/pinctrl/meson/pinctrl-meson.h
+ create mode 100644 drivers/pinctrl/meson/pinctrl-meson8.c
+ create mode 100644 include/dt-bindings/gpio/meson8-gpio.h
 
-mvebu: completely disable hardware I/O coherency
-
-----------------------------------------------------------------
-Thomas Petazzoni (1):
-      ARM: mvebu: completely disable hardware I/O coherency
-
- arch/arm/mach-mvebu/coherency.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+-- 
+2.1.4
