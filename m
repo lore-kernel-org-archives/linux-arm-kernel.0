@@ -1,99 +1,58 @@
-From: trblinux@gmail.com (Tushar Behera)
-Date: Sat, 17 Jan 2015 14:21:46 +0900
-Subject: [PATCH V3 09/15] ASoC: samsung: i2s: Protect more registers with
- a spinlock
-In-Reply-To: <1421260962-16892-10-git-send-email-s.nawrocki@samsung.com>
-References: <1421260962-16892-1-git-send-email-s.nawrocki@samsung.com>
- <1421260962-16892-10-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <CAC5m3BxTkS3KtwUC6itMRF=545PoWJw1gYV6av3p7QjtVMFXTQ@mail.gmail.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Sat, 17 Jan 2015 00:57:38 -0500
+Subject: [PATCHv4] arm64: dmi: Add SMBIOS/DMI support
+In-Reply-To: <1412437603-3394-1-git-send-email-yi.li@linaro.org>
+References: <1412437603-3394-1-git-send-email-yi.li@linaro.org>
+Message-ID: <54B9F9D2.6000104@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 15, 2015 at 3:42 AM, Sylwester Nawrocki
-<s.nawrocki@samsung.com> wrote:
-> Ensure the I2SMOD, I2SPSR registers, which are also exposed through
-> clk API are only accessed with the i2s->spinlock spinlock held.
->
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> ---
->  sound/soc/samsung/i2s.c |   81 +++++++++++++++++++++++++++++------------------
->  1 file changed, 51 insertions(+), 30 deletions(-)
->
-> diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
-> index 20cc51f..05fc2f0 100644
-> --- a/sound/soc/samsung/i2s.c
-> +++ b/sound/soc/samsung/i2s.c
-> @@ -472,17 +472,22 @@ static int i2s_set_sysclk(struct snd_soc_dai *dai,
->  {
->         struct i2s_dai *i2s = to_info(dai);
->         struct i2s_dai *other = get_other_dai(i2s);
-> -       u32 mod = readl(i2s->addr + I2SMOD);
->         const struct samsung_i2s_variant_regs *i2s_regs = i2s->variant_regs;
->         unsigned int cdcon_mask = 1 << i2s_regs->cdclkcon_off;
->         unsigned int rsrc_mask = 1 << i2s_regs->rclksrc_off;
-> +       u32 mod, mask, val = 0;
+Hi Yi Li,
+
+I would like some advice on the below patch. First, a little background.
+
+I /may/ need to use SMBIOS provided data on ARMv8 systems to enumerate
+the number of physical underlying CPU sockets present. This is provided
+in one Type4 DMI structure per physical socket. Using that fact (such
+data is already provided by all of the reference ARMv8 server systems),
+and a variable interpretation of the CPU affinity data, we can refactor
+the topology.c code to understand threads vs cores vs sockets without
+getting confused by the extra levels of hierarchy for clusters.
+
+I am going back over some older patches, including this one to
+understand the DMI port, and I notice that you call dmi_scan_machine
+from an early_initcall. This will run from the init thread, after we've
+done basic SMP setup in smp_prepare_cpus, which is where we stash
+cpu_topology data, which is after I already need DMI data available.
+
+So. If I wanted this available prior to early_initcall time, would it be
+reasonable to follow e.g. x86 and move this early in the boot? I'm not
+necessarily going to ask to upstream such a change (since I expect to be
+able to solve the underlying problem I am looking to address in a
+different fashion soon), but first want to know if it would be
+reasonable to ask to do that anyway.
+
+Jon.
+
+P.S. I'm not interested at all in replies pointing me to the existing DT
+cpu topology binding, which I am well aware of, but it does also not
+actually solve the problem I have :)
+
+On 10/04/2014 11:46 AM, Yi Li wrote:
+
+<snip>
+
 > +
-> +       spin_lock(i2s->lock);
-> +       mod = readl(i2s->addr + I2SMOD);
-> +       spin_unlock(i2s->lock);
->
-
-'mod' is now updated only at the bottom of this function. The above
-readl can be omitted.
-
->         switch (clk_id) {
->         case SAMSUNG_I2S_OPCLK:
-> -               mod &= ~MOD_OPCLK_MASK;
-> -               mod |= dir;
-> +               mask = MOD_OPCLK_MASK;
-> +               val = dir;
->                 break;
->         case SAMSUNG_I2S_CDCLK:
-> +               mask = 1 << i2s_regs->cdclkcon_off;
-
-Use BIT() macro instead?
-
->                 /* Shouldn't matter in GATING(CLOCK_IN) mode */
->                 if (dir == SND_SOC_CLOCK_IN)
->                         rfs = 0;
-> @@ -499,15 +504,15 @@ static int i2s_set_sysclk(struct snd_soc_dai *dai,
->                 }
->
->                 if (dir == SND_SOC_CLOCK_IN)
-> -                       mod |= 1 << i2s_regs->cdclkcon_off;
-> -               else
-> -                       mod &= ~(1 << i2s_regs->cdclkcon_off);
-> +                       val = 1 << i2s_regs->cdclkcon_off;
->
-
-Same as above.
-
->                 i2s->rfs = rfs;
->                 break;
->
->         case SAMSUNG_I2S_RCLKSRC_0: /* clock corrsponding to IISMOD[10] := 0 */
->         case SAMSUNG_I2S_RCLKSRC_1: /* clock corrsponding to IISMOD[10] := 1 */
-> +               mask = 1 << i2s_regs->rclksrc_off;
+> +static int __init arm64_core_init(void)
+> +{
+> +/*
+> + * DMI depends on EFI on arm64, and dmi_scan_machine() needs to be
+> + * called early because dmi_id_init(), which is an arch_initcall itself,
+> + * depends on dmi_scan_machine() having been called already.
+> + */
 > +
-
-Same as above.
-
->                 if ((i2s->quirks & QUIRK_NO_MUXPSR)
->                                 || (clk_id == SAMSUNG_I2S_RCLKSRC_0))
->                         clk_id = 0;
-> @@ -557,18 +562,19 @@ static int i2s_set_sysclk(struct snd_soc_dai *dai,
->                         return 0;
->                 }
->
-> -               if (clk_id == 0)
-> -                       mod &= ~(1 << i2s_regs->rclksrc_off);
-> -               else
-> -                       mod |= 1 << i2s_regs->rclksrc_off;
-> -
-> +               if (clk_id == 1)
-> +                       val = 1 << i2s_regs->rclksrc_off;
-
-Same as above.
-
--- 
-Tushar Behera
+> +	dmi_scan_machine();
+> +	return 0;
+> +}
+> +core_initcall(arm64_core_init);
+> 
