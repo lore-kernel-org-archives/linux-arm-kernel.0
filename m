@@ -1,228 +1,111 @@
-From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Sat, 17 Jan 2015 22:25:41 +0100
-Subject: [PATCHv3 4/5] USB: host: ohci_at91: Move global variables to private
- struct
-In-Reply-To: <1421529942-18437-1-git-send-email-sylvain.rochet@finsecur.com>
-References: <Pine.LNX.4.44L0.1501171524050.13485-100000@netrider.rowland.org>
- <1421529942-18437-1-git-send-email-sylvain.rochet@finsecur.com>
-Message-ID: <1421529942-18437-5-git-send-email-sylvain.rochet@finsecur.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Sat, 17 Jan 2015 13:26:41 -0800
+Subject: [PATCH v4 2/3] i2c: iproc: Add Broadcom iProc I2C Driver
+In-Reply-To: <20150117211017.GD22880@pengutronix.de>
+References: <rjui@broadcom.com>
+ <1421274213-3544-1-git-send-email-rjui@broadcom.com>
+ <1421274213-3544-3-git-send-email-rjui@broadcom.com>
+ <20150115084119.GN22880@pengutronix.de> <54B98C18.4080807@broadcom.com>
+ <20150117160113.GA22880@pengutronix.de> <54BABEE9.8070801@broadcom.com>
+ <20150117201849.GC22880@pengutronix.de> <54BACB66.6040909@broadcom.com>
+ <20150117211017.GD22880@pengutronix.de>
+Message-ID: <54BAD391.9080909@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch move AT91 OHCI global variables (clocks ptr and clocked
-boolean) to private struct ohci_at91_priv, stored in ohci->priv.
 
-Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
----
- drivers/usb/host/ohci-at91.c | 85 ++++++++++++++++++++++++++------------------
- 1 file changed, 51 insertions(+), 34 deletions(-)
 
-diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-index f0da734..ab39b94 100644
---- a/drivers/usb/host/ohci-at91.c
-+++ b/drivers/usb/host/ohci-at91.c
-@@ -33,7 +33,15 @@
- 		for ((index) = 0; (index) < AT91_MAX_USBH_PORTS; (index)++)
- 
- /* interface, function and usb clocks; sometimes also an AHB clock */
--static struct clk *iclk, *fclk, *uclk, *hclk;
-+#define hcd_to_ohci_at91_priv(h) ((struct ohci_at91_priv *)hcd_to_ohci(h)->priv)
-+
-+struct ohci_at91_priv {
-+	struct clk *iclk;
-+	struct clk *fclk;
-+	struct clk *uclk;
-+	struct clk *hclk;
-+	bool clocked;
-+};
- /* interface and function clocks; sometimes also an AHB clock */
- 
- #define DRIVER_DESC "OHCI Atmel driver"
-@@ -41,49 +49,53 @@ static struct clk *iclk, *fclk, *uclk, *hclk;
- static const char hcd_name[] = "ohci-atmel";
- 
- static struct hc_driver __read_mostly ohci_at91_hc_driver;
--static int clocked;
-+
-+static const struct ohci_driver_overrides ohci_at91_drv_overrides __initconst = {
-+	.extra_priv_size = sizeof(struct ohci_at91_priv),
-+};
- 
- extern int usb_disabled(void);
- 
- /*-------------------------------------------------------------------------*/
- 
--static void at91_start_clock(void)
-+static void at91_start_clock(struct ohci_at91_priv *ohci_at91)
- {
--	if (clocked)
-+	if (ohci_at91->clocked)
- 		return;
- 	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
--		clk_set_rate(uclk, 48000000);
--		clk_prepare_enable(uclk);
-+		clk_set_rate(ohci_at91->uclk, 48000000);
-+		clk_prepare_enable(ohci_at91->uclk);
- 	}
--	clk_prepare_enable(hclk);
--	clk_prepare_enable(iclk);
--	clk_prepare_enable(fclk);
--	clocked = 1;
-+	clk_prepare_enable(ohci_at91->hclk);
-+	clk_prepare_enable(ohci_at91->iclk);
-+	clk_prepare_enable(ohci_at91->fclk);
-+	ohci_at91->clocked = true;
- }
- 
--static void at91_stop_clock(void)
-+static void at91_stop_clock(struct ohci_at91_priv *ohci_at91)
- {
--	if (!clocked)
-+	if (!ohci_at91->clocked)
- 		return;
--	clk_disable_unprepare(fclk);
--	clk_disable_unprepare(iclk);
--	clk_disable_unprepare(hclk);
-+	clk_disable_unprepare(ohci_at91->fclk);
-+	clk_disable_unprepare(ohci_at91->iclk);
-+	clk_disable_unprepare(ohci_at91->hclk);
- 	if (IS_ENABLED(CONFIG_COMMON_CLK))
--		clk_disable_unprepare(uclk);
--	clocked = 0;
-+		clk_disable_unprepare(ohci_at91->uclk);
-+	ohci_at91->clocked = false;
- }
- 
- static void at91_start_hc(struct platform_device *pdev)
- {
- 	struct usb_hcd *hcd = platform_get_drvdata(pdev);
- 	struct ohci_regs __iomem *regs = hcd->regs;
-+	struct ohci_at91_priv *ohci_at91 = hcd_to_ohci_at91_priv(hcd);
- 
- 	dev_dbg(&pdev->dev, "start\n");
- 
- 	/*
- 	 * Start the USB clocks.
- 	 */
--	at91_start_clock();
-+	at91_start_clock(ohci_at91);
- 
- 	/*
- 	 * The USB host controller must remain in reset.
-@@ -95,6 +107,7 @@ static void at91_stop_hc(struct platform_device *pdev)
- {
- 	struct usb_hcd *hcd = platform_get_drvdata(pdev);
- 	struct ohci_regs __iomem *regs = hcd->regs;
-+	struct ohci_at91_priv *ohci_at91 = hcd_to_ohci_at91_priv(hcd);
- 
- 	dev_dbg(&pdev->dev, "stop\n");
- 
-@@ -106,7 +119,7 @@ static void at91_stop_hc(struct platform_device *pdev)
- 	/*
- 	 * Stop the USB clocks.
- 	 */
--	at91_stop_clock();
-+	at91_stop_clock(ohci_at91);
- }
- 
- 
-@@ -133,6 +146,7 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
- 	struct ohci_hcd *ohci;
- 	int retval;
- 	struct usb_hcd *hcd = NULL;
-+	struct ohci_at91_priv *ohci_at91;
- 	struct device *dev = &pdev->dev;
- 	struct resource *res;
- 	int irq;
-@@ -146,6 +160,7 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
- 	hcd = usb_create_hcd(driver, dev, "at91");
- 	if (!hcd)
- 		return -ENOMEM;
-+	ohci_at91 = hcd_to_ohci_at91_priv(hcd);
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	hcd->regs = devm_ioremap_resource(dev, res);
-@@ -156,29 +171,29 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
- 	hcd->rsrc_start = res->start;
- 	hcd->rsrc_len = resource_size(res);
- 
--	iclk = devm_clk_get(dev, "ohci_clk");
--	if (IS_ERR(iclk)) {
-+	ohci_at91->iclk = devm_clk_get(dev, "ohci_clk");
-+	if (IS_ERR(ohci_at91->iclk)) {
- 		dev_err(dev, "failed to get ohci_clk\n");
--		retval = PTR_ERR(iclk);
-+		retval = PTR_ERR(ohci_at91->iclk);
- 		goto err;
- 	}
--	fclk = devm_clk_get(dev, "uhpck");
--	if (IS_ERR(fclk)) {
-+	ohci_at91->fclk = devm_clk_get(dev, "uhpck");
-+	if (IS_ERR(ohci_at91->fclk)) {
- 		dev_err(dev, "failed to get uhpck\n");
--		retval = PTR_ERR(fclk);
-+		retval = PTR_ERR(ohci_at91->fclk);
- 		goto err;
- 	}
--	hclk = devm_clk_get(dev, "hclk");
--	if (IS_ERR(hclk)) {
-+	ohci_at91->hclk = devm_clk_get(dev, "hclk");
-+	if (IS_ERR(ohci_at91->hclk)) {
- 		dev_err(dev, "failed to get hclk\n");
--		retval = PTR_ERR(hclk);
-+		retval = PTR_ERR(ohci_at91->hclk);
- 		goto err;
- 	}
- 	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
--		uclk = devm_clk_get(dev, "usb_clk");
--		if (IS_ERR(uclk)) {
-+		ohci_at91->uclk = devm_clk_get(dev, "usb_clk");
-+		if (IS_ERR(ohci_at91->uclk)) {
- 			dev_err(dev, "failed to get uclk\n");
--			retval = PTR_ERR(uclk);
-+			retval = PTR_ERR(ohci_at91->uclk);
- 			goto err;
- 		}
- 	}
-@@ -601,6 +616,7 @@ ohci_hcd_at91_drv_suspend(struct platform_device *pdev, pm_message_t mesg)
- {
- 	struct usb_hcd	*hcd = platform_get_drvdata(pdev);
- 	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
-+	struct ohci_at91_priv *ohci_at91 = hcd_to_ohci_at91_priv(hcd);
- 	bool		do_wakeup = device_may_wakeup(&pdev->dev);
- 	int		ret;
- 
-@@ -626,7 +642,7 @@ ohci_hcd_at91_drv_suspend(struct platform_device *pdev, pm_message_t mesg)
- 
- 	/* flush the writes */
- 	(void) ohci_readl (ohci, &ohci->regs->control);
--	at91_stop_clock();
-+	at91_stop_clock(ohci_at91);
- 
- 	return ret;
- }
-@@ -634,11 +650,12 @@ ohci_hcd_at91_drv_suspend(struct platform_device *pdev, pm_message_t mesg)
- static int ohci_hcd_at91_drv_resume(struct platform_device *pdev)
- {
- 	struct usb_hcd	*hcd = platform_get_drvdata(pdev);
-+	struct ohci_at91_priv *ohci_at91 = hcd_to_ohci_at91_priv(hcd);
- 
- 	if (device_may_wakeup(&pdev->dev))
- 		disable_irq_wake(hcd->irq);
- 
--	at91_start_clock();
-+	at91_start_clock(ohci_at91);
- 
- 	ohci_resume(hcd, false);
- 	return 0;
-@@ -666,7 +683,7 @@ static int __init ohci_at91_init(void)
- 		return -ENODEV;
- 
- 	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
--	ohci_init_driver(&ohci_at91_hc_driver, NULL);
-+	ohci_init_driver(&ohci_at91_hc_driver, &ohci_at91_drv_overrides);
- 
- 	/*
- 	 * The Atmel HW has some unusual quirks, which require Atmel-specific
--- 
-2.1.4
+On 1/17/2015 1:10 PM, Uwe Kleine-K?nig wrote:
+> Hello,
+> 
+> On Sat, Jan 17, 2015 at 12:51:50PM -0800, Ray Jui wrote:
+>> On 1/17/2015 12:18 PM, Uwe Kleine-K?nig wrote:
+>>> Hello,
+>>>
+>>> On Sat, Jan 17, 2015 at 11:58:33AM -0800, Ray Jui wrote:
+>>>> On 1/17/2015 8:01 AM, Uwe Kleine-K?nig wrote:
+>>>>> On Fri, Jan 16, 2015 at 02:09:28PM -0800, Ray Jui wrote:
+>>>>>> On 1/15/2015 12:41 AM, Uwe Kleine-K?nig wrote:
+>>>>>>> On Wed, Jan 14, 2015 at 02:23:32PM -0800, Ray Jui wrote:
+>>>>>>>> +	 */
+>>>>>>>> +	val = 1 << M_CMD_START_BUSY_SHIFT;
+>>>>>>>> +	if (msg->flags & I2C_M_RD) {
+>>>>>>>> +		val |= (M_CMD_PROTOCOL_BLK_RD << M_CMD_PROTOCOL_SHIFT) |
+>>>>>>>> +		       (msg->len << M_CMD_RD_CNT_SHIFT);
+>>>>>>>> +	} else {
+>>>>>>>> +		val |= (M_CMD_PROTOCOL_BLK_WR << M_CMD_PROTOCOL_SHIFT);
+>>>>>>>> +	}
+>>>>>>>> +	writel(val, iproc_i2c->base + M_CMD_OFFSET);
+>>>>>>>> +
+>>>>>>>> +	time_left = wait_for_completion_timeout(&iproc_i2c->done, time_left);
+>>>>>>>
+>>>>>>> When the interrupt fires here after the complete timed out and before
+>>>>>>> you disable the irq you still throw the result away.
+>>>>>> Yes, but then this comes down to the fact that if it has reached the
+>>>>>> point that is determined to be a timeout condition in the driver, one
+>>>>>> should really treat it as timeout error. In a normal condition,
+>>>>>> time_left should never reach zero.
+>>>>> I don't agree here. I'm not sure there is a real technical reason,
+>>>>> though. But still if you're in a "success after timeout already over"
+>>>>> situation it's IMHO better to interpret it as success, not timeout.
+>>>>>
+>>>> The thing is, the interrupt should never fire after
+>>>> wait_for_completion_timeout returns zero here. If it does, then the
+>>>> issue is really that the timeout value set in the driver is probably not
+>>>> long enough. I just checked other I2C drivers. I think the way how
+>>>> timeout is handled here is consistent with other I2C drivers.
+>>> In the presence of Clock stretching there is no (theorethical) upper
+>>> limit for the time needed to transfer a given message, is there? So
+>>> (theoretically) you can never be sure not to interrupt an ongoing
+>>> transfer.
+>>>
+>> Yes. No theoretical upper limit in the case when clock is stretched by
+>> the slave. But how would adding an additional interrupt completion check
+>> below help? I assume you want the the check to be like the following?
+>>
+>> 	time_left = wait_for_completion_timeout(&iproc_i2c->done, time_left);
+>>
+>> 	/* disable all interrupts */
+>> 	writel(0, iproc_i2c->base + IE_OFFSET);
+>>
+>> 	if (!time_left && !completion_done()) {
+>> 		dev_err(iproc_i2c->device, "transaction timed out\n");
+>>
+>> 		/* flush FIFOs */
+>> 		val = (1 << M_FIFO_RX_FLUSH_SHIFT) |
+>> 		      (1 << M_FIFO_TX_FLUSH_SHIFT);
+>> 		writel(val, iproc_i2c->base + M_FIFO_CTRL_OFFSET);
+>> 		return -ETIMEDOUT;
+>> 	}
+> No, I want:
+> 
+> 	time_left = wait_for_completion_timeout(&iproc_i2c->done, time_left);
+> 
+> 	if (!transfer_was_complete) {
+> 		handle_error();
+> 		...
+> 
+> 	}
+> 
+> 	handle_successful_transfer();
+> 
+> and time_left == 0 is not a reliable indicator that the transfer failed.
+> 
+> Best regards
+> Uwe
+> 
+Okay I'll check both time_left and transfer_was_done:
+	time_left = wait_for_completion_timeout(&iproc_i2c->done, time_left);
+
+	/* disable all interrupts */
+	writel(0, iproc_i2c->base + IE_OFFSET);
+
+	if (!time_left && !atomic_read(&iproc_i2c->transfer_is_successful)) {
+		dev_err(iproc_i2c->device, "transaction timed out\n");
+
+		/* flush FIFOs */
+		val = (1 << M_FIFO_RX_FLUSH_SHIFT) |
+		      (1 << M_FIFO_TX_FLUSH_SHIFT);
+		writel(val, iproc_i2c->base + M_FIFO_CTRL_OFFSET);
+		return -ETIMEDOUT;
+	}
