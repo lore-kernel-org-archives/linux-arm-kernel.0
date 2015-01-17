@@ -1,34 +1,45 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Sat, 17 Jan 2015 09:58:44 +0900
-Subject: [PATCH 11/11] PM / Domains: R-Mobile SYSC: Document SH-Mobile AG5
- (sh73a0) binding
-In-Reply-To: <cover.1421380713.git.horms+renesas@verge.net.au>
-References: <cover.1421380713.git.horms+renesas@verge.net.au>
-Message-ID: <fbaa5e694a1240c5f6b829b1e17652e4e228ee12.1421380713.git.horms+renesas@verge.net.au>
+Date: Sat, 17 Jan 2015 09:59:24 +0900
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Updates for v3.20
+Message-ID: <cover.1421379958.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-SH-Mobile AG5 (sh73a0) can be handled by the existing bindings.
+Please consider these second round of Renesas ARM based SoC updates for v3.20.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- Documentation/devicetree/bindings/power/renesas,sysc-rmobile.txt | 1 +
- 1 file changed, 1 insertion(+)
+This pull request is based on the previous round of
+such requests, tagged as renesas-soc-for-v3.20,
+which you have already pulled.
 
-diff --git a/Documentation/devicetree/bindings/power/renesas,sysc-rmobile.txt b/Documentation/devicetree/bindings/power/renesas,sysc-rmobile.txt
-index 2460476..cc3b1f0 100644
---- a/Documentation/devicetree/bindings/power/renesas,sysc-rmobile.txt
-+++ b/Documentation/devicetree/bindings/power/renesas,sysc-rmobile.txt
-@@ -12,6 +12,7 @@ Required properties:
- 	      fallback.
- 	      Examples with soctypes are:
- 		- "renesas,sysc-r8a7740" (R-Mobile A1)
-+		- "renesas,sysc-sh73a0" (SH-Mobile AG5)
- - reg: Two address start and address range blocks for the device:
-          - The first block refers to the normally accessible registers,
-          - the second block refers to the registers protected by the HPB
--- 
-2.1.4
+
+The following changes since commit 39695882d3d642a73bca551e682426e4e3bcd158:
+
+  ARM: shmobile: r8a73a4: Multiplatform support (2014-12-21 17:11:22 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc2-for-v3.20
+
+for you to fetch changes up to 2173fc7cb681c38b9e5bc526211045caecf96e44:
+
+  ARM: shmobile: R-Mobile: Add DT support for PM domains (2015-01-15 08:38:14 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC Updates for v3.20
+
+* Add DT support for PM domains
+
+----------------------------------------------------------------
+Geert Uytterhoeven (3):
+      ARM: shmobile: R-Mobile: Use generic_pm_domain.attach_dev() for pm_clk setup
+      ARM: shmobile: R-Mobile: Store SYSC base address in rmobile_pm_domain
+      ARM: shmobile: R-Mobile: Add DT support for PM domains
+
+ arch/arm/mach-shmobile/Kconfig      |   3 +-
+ arch/arm/mach-shmobile/pm-r8a7740.c |  14 ++
+ arch/arm/mach-shmobile/pm-rmobile.c | 275 ++++++++++++++++++++++++++++++++++--
+ arch/arm/mach-shmobile/pm-rmobile.h |   3 +-
+ arch/arm/mach-shmobile/pm-sh7372.c  |  11 ++
+ 5 files changed, 289 insertions(+), 17 deletions(-)
