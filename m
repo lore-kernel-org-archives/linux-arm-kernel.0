@@ -1,96 +1,44 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sat, 17 Jan 2015 18:05:20 +0100
-Subject: [PATCHv2 2/2] USB: host: ohci_at91: Stop/start USB PLL for all
- sleep modes
-In-Reply-To: <1421508995-21290-2-git-send-email-sylvain.rochet@finsecur.com>
-References: <20150117135857.71dae08f@bbrezillon>
- <1421508995-21290-1-git-send-email-sylvain.rochet@finsecur.com>
- <1421508995-21290-2-git-send-email-sylvain.rochet@finsecur.com>
-Message-ID: <20150117180520.125e456a@bbrezillon>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sat, 17 Jan 2015 09:40:28 -0800
+Subject: [PATCH v2] ARM: OMAP: Work around hardcoded interrupts
+In-Reply-To: <1421490068-20385-1-git-send-email-marc.zyngier@arm.com>
+References: <1421490068-20385-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20150117174028.GU18552@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 17 Jan 2015 16:36:35 +0100
-Sylvain Rochet <sylvain.rochet@finsecur.com> wrote:
-
-> Disable/unprepare clocks without testing the sleep target_state, removed
-> the at91_suspend_entering_slow_clock() call (which is only a
-> target_state == PM_SUSPEND_MEM).
+* Marc Zyngier <marc.zyngier@arm.com> [150117 02:24]:
+> Commit 9a1091ef0017 (irqchip: gic: Support hierarchy irq domain)
+> changed the GIC driver to use a non-legacy IRQ domain on DT
+> platforms. This patch assumes that DT-driven systems are getting
+> all of their interrupts from device tree.
 > 
-> Other kind of suspend now benefit from the power save induced by this
-> PLL deactivation. The resume penalty is about 500 us, which is not
-> negligible but acceptable considering the amount of power we are saving.
+> Turns out that OMAP has quite a few hidden gems, and still uses
+> hardcoded interrupts despite having fairly complete DTs.
 > 
-> Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
-> Reported-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-
+> This patch attempts to work around these by offering a translation
+> method that can be called directly from the hwmod code, if present.
+> The same hack is sprinkled over PRCM and TWL.
+> 
+> It isn't pretty, but it seems to do the job without having to add
+> more hacks to the interrupt controller code.
+> 
+> Tested on OMAP4 (Panda-ES) and OMAP5 (UEVM5432).
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  drivers/usb/host/ohci-at91.c | 25 +++++++++++++------------
->  1 file changed, 13 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-> index dc9e4e6..f0da734 100644
-> --- a/drivers/usb/host/ohci-at91.c
-> +++ b/drivers/usb/host/ohci-at91.c
-> @@ -49,6 +49,8 @@ extern int usb_disabled(void);
->  
->  static void at91_start_clock(void)
->  {
-> +	if (clocked)
-> +		return;
->  	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
->  		clk_set_rate(uclk, 48000000);
->  		clk_prepare_enable(uclk);
-> @@ -61,6 +63,8 @@ static void at91_start_clock(void)
->  
->  static void at91_stop_clock(void)
->  {
-> +	if (!clocked)
-> +		return;
->  	clk_disable_unprepare(fclk);
->  	clk_disable_unprepare(iclk);
->  	clk_disable_unprepare(hclk);
-> @@ -615,16 +619,14 @@ ohci_hcd_at91_drv_suspend(struct platform_device *pdev, pm_message_t mesg)
->  	 *
->  	 * REVISIT: some boards will be able to turn VBUS off...
->  	 */
-> -	if (at91_suspend_entering_slow_clock()) {
-> -		ohci->hc_control = ohci_readl(ohci, &ohci->regs->control);
-> -		ohci->hc_control &= OHCI_CTRL_RWC;
-> -		ohci_writel(ohci, ohci->hc_control, &ohci->regs->control);
-> -		ohci->rh_state = OHCI_RH_HALTED;
-> -
-> -		/* flush the writes */
-> -		(void) ohci_readl (ohci, &ohci->regs->control);
-> -		at91_stop_clock();
-> -	}
-> +	ohci->hc_control = ohci_readl(ohci, &ohci->regs->control);
-> +	ohci->hc_control &= OHCI_CTRL_RWC;
-> +	ohci_writel(ohci, ohci->hc_control, &ohci->regs->control);
-> +	ohci->rh_state = OHCI_RH_HALTED;
-> +
-> +	/* flush the writes */
-> +	(void) ohci_readl (ohci, &ohci->regs->control);
-> +	at91_stop_clock();
->  
->  	return ret;
->  }
-> @@ -636,8 +638,7 @@ static int ohci_hcd_at91_drv_resume(struct platform_device *pdev)
->  	if (device_may_wakeup(&pdev->dev))
->  		disable_irq_wake(hcd->irq);
->  
-> -	if (!clocked)
-> -		at91_start_clock();
-> +	at91_start_clock();
->  
->  	ohci_resume(hcd, false);
->  	return 0;
+> >From v1:
+> - OMAP4 can either get the PRM interrupt from hwmod or from device tree.
+>   In the latter case, remove the xlate_irq method.
 
+OK looks good to me. Let's wait for Nishanth to run his tests
+one more time.
 
+BTW, looks like we already have the omap4 prm interrupt in the
+omap4.dtsi file but removing the legacy code would add the
+"old DT with newer kernel" issues to the mixture.. So best
+leave that for later clean up patches and keep this fix as is.
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Regards,
+
+Tony
