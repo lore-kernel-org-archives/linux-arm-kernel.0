@@ -1,58 +1,67 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sun, 18 Jan 2015 09:08:20 +0100
-Subject: [PATCH] AT91: DT: Watchdog, remove property idle halt by default
-In-Reply-To: <1421531396-20188-1-git-send-email-sylvain.rochet@finsecur.com>
-References: <1421531396-20188-1-git-send-email-sylvain.rochet@finsecur.com>
-Message-ID: <20150118090820.07856398@bbrezillon>
+Date: Sun, 18 Jan 2015 09:14:40 +0100
+Subject: [PATCHv3 1/5] USB: host: ehci_atmel: Add suspend/resume support
+In-Reply-To: <20150117224900.GA22439@gradator.net>
+References: <Pine.LNX.4.44L0.1501171524050.13485-100000@netrider.rowland.org>
+ <1421529942-18437-1-git-send-email-sylvain.rochet@finsecur.com>
+ <1421529942-18437-2-git-send-email-sylvain.rochet@finsecur.com>
+ <54BAE0AE.5060705@cogentembedded.com>
+ <20150117224900.GA22439@gradator.net>
+Message-ID: <20150118091440.40e3d233@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Sylvain,
 
-On Sat, 17 Jan 2015 22:49:56 +0100
+On Sat, 17 Jan 2015 23:49:00 +0100
 Sylvain Rochet <sylvain.rochet@finsecur.com> wrote:
 
-> The behavior changed when watchdog properties were added to DT, it makes
-> the watchdog not counting when CPU is in idle state, therefore the
-> watchdog reset time depend on mean CPU usage and will not reset at all
-> if the CPU stop working while it is in idle state, which is a very weird
-> behavior.
+> Hi Sergei,
 > 
-> Apply principle of least surprise on at91sam9260-wdt by removing idle
-> halt flag by default.
 > 
-> Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+> On Sun, Jan 18, 2015 at 01:22:38AM +0300, Sergei Shtylyov wrote:
+> > 
+> >    There's little inconsistency in your patch subjects: you're using
+> > '_' but the files you're modifying are named using '-'...
+> 
+> Indeed.
+> 
+> 
+> > >@@ -187,6 +217,8 @@ static struct platform_driver ehci_atmel_driver = {
+> > >  	.probe		= ehci_atmel_drv_probe,
+> > >  	.remove		= ehci_atmel_drv_remove,
+> > >  	.shutdown	= usb_hcd_platform_shutdown,
+> > >+	.suspend	= ehci_atmel_drv_suspend,
+> > >+	.resume		= ehci_atmel_drv_resume,
+> > 
+> >    I think you should use 'struct dev_pm_ops' now.
+> 
+> This way ?
+> 
+> static int ehci_atmel_drv_suspend(struct device *dev)
+> {
+> 	struct usb_hcd *hcd = dev_get_drvdata(dev);
+> (...)
+> 
+> 
+> static SIMPLE_DEV_PM_OPS(ehci_atmel_pm_ops, ehci_atmel_drv_suspend, ehci_atmel_drv_resume);
+> 
+> (...)
+> 	.driver         = {
+> 		.pm     = &ehci_atmel_pm_ops,
+> 	}
+> (...)
+> 
+> 
+> Should I send a v4 or can I send this change separately on top of the 
+> previous change ?
 
-Can you do this change for all impacted SoCs (here is a patch
-doing it [1]) ?
-
-Apart from that you can add my:
-
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+I think it's better to send a v4 reworking this patch (you'll have to
+change your commit subject anyway ;-)).
 
 Best Regards,
 
 Boris
-
-[1]http://code.bulix.org/weg3zv-87745
-
-> ---
->  arch/arm/boot/dts/at91sam9x5.dtsi | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-> index bbb3ba6..ce61f91 100644
-> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-> @@ -1125,7 +1125,6 @@
->  				atmel,watchdog-type = "hardware";
->  				atmel,reset-type = "all";
->  				atmel,dbg-halt;
-> -				atmel,idle-halt;
->  				status = "disabled";
->  			};
->  
-
 
 
 -- 
