@@ -1,33 +1,35 @@
 From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Sun, 18 Jan 2015 15:51:19 +0100
-Subject: [PATCHv2 0/2] USB: gadget: atmel_usba_udc: Enable/disable USB PLL on
- Vbus change
-In-Reply-To: <20150117110710.GB24176@gradator.net>
+Date: Sun, 18 Jan 2015 15:51:20 +0100
+Subject: [PATCHv2 1/2] USB: gadget: atmel_usba_udc: Fixed vbus_prev initial
+ state
+In-Reply-To: <1421592681-28317-1-git-send-email-sylvain.rochet@finsecur.com>
 References: <20150117110710.GB24176@gradator.net>
-Message-ID: <1421592681-28317-1-git-send-email-sylvain.rochet@finsecur.com>
+ <1421592681-28317-1-git-send-email-sylvain.rochet@finsecur.com>
+Message-ID: <1421592681-28317-2-git-send-email-sylvain.rochet@finsecur.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prepare_enable on rising edge, disable_unprepare on falling edge. Reduce
-power consumption if USB PLL is not already necessary for OHCI or EHCI.
-If USB host is not connected we can sleep with USB PLL stopped.
+If vbus gpio is high at init, we should set vbus_prev to true
+accordingly to the current vbus state. Without that, we skip the first
+vbus interrupt because the saved vbus state is not consistent.
 
-This driver does not support suspend/resume yet, not suspending if we
-are still attached to an USB host is fine for what I need, this patch
-allow suspending with USB PLL stopped when USB device is not currently
-used.
+Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+---
+ drivers/usb/gadget/udc/atmel_usba_udc.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Change since v1:
-  * Using a threaded irq and mutex instead of spinclock as suggested
-  * Moved a silently fixed bug in a separate patch (1/2)
-
-Sylvain Rochet (2):
-  USB: gadget: atmel_usba_udc: Fixed vbus_prev initial state
-  USB: gadget: atmel_usba_udc: Enable/disable USB PLL on Vbus change
-
- drivers/usb/gadget/udc/atmel_usba_udc.c | 97 ++++++++++++++++++++++++---------
- drivers/usb/gadget/udc/atmel_usba_udc.h |  4 ++
- 2 files changed, 75 insertions(+), 26 deletions(-)
-
+diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+index ce88237..e207d75 100644
+--- a/drivers/usb/gadget/udc/atmel_usba_udc.c
++++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+@@ -1791,6 +1791,8 @@ static int atmel_usba_start(struct usb_gadget *gadget,
+ 		toggle_bias(1);
+ 		usba_writel(udc, CTRL, USBA_ENABLE_MASK);
+ 		usba_writel(udc, INT_ENB, USBA_END_OF_RESET);
++
++		udc->vbus_prev = 1;
+ 	}
+ 	spin_unlock_irqrestore(&udc->lock, flags);
+ 
 -- 
 2.1.4
