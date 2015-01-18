@@ -1,239 +1,60 @@
-From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Sun, 18 Jan 2015 15:51:21 +0100
-Subject: [PATCH 2/2] USB: gadget: atmel_usba_udc: Enable/disable USB PLL on
- Vbus change
-In-Reply-To: <1421592681-28317-1-git-send-email-sylvain.rochet@finsecur.com>
-References: <20150117110710.GB24176@gradator.net>
- <1421592681-28317-1-git-send-email-sylvain.rochet@finsecur.com>
-Message-ID: <1421592681-28317-3-git-send-email-sylvain.rochet@finsecur.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 18 Jan 2015 16:29:02 +0100
+Subject: [PATCH v4 4/4] ARM: mvebu: Armada 385 GP: Add regulators to the
+ SATA port
+In-Reply-To: <20150118123531.GA2809@sirena.org.uk>
+References: <1421330978-9694-5-git-send-email-gregory.clement@free-electrons.com>
+ <54B8C933.7020502@redhat.com> <54B8D97B.3090908@free-electrons.com>
+ <54B8E38A.6020709@redhat.com> <20150116123705.GM3043@sirena.org.uk>
+ <54B9629C.9090800@redhat.com> <20150116202516.GL3856@sirena.org.uk>
+ <54BA21F9.5050408@redhat.com> <20150117131404.GA6414@sirena.org.uk>
+ <54BA7197.40301@redhat.com> <20150118123531.GA2809@sirena.org.uk>
+Message-ID: <54BBD13E.6030901@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prepare_enable on rising edge, disable_unprepare on falling edge. Reduce
-power consumption if USB PLL is not already necessary for OHCI or EHCI.
-If USB host is not connected we can sleep with USB PLL stopped.
+Hi,
 
-This driver does not support suspend/resume yet, not suspending if we
-are still attached to an USB host is fine for what I need, this patch
-allow suspending with USB PLL stopped when USB device is not currently
-used.
+On 18-01-15 13:35, Mark Brown wrote:
+> On Sat, Jan 17, 2015 at 03:28:39PM +0100, Hans de Goede wrote:
+>> On 17-01-15 14:14, Mark Brown wrote:
+>
+>>> Following your argument to the logical conclusion means we can never
+>>> turn any regualtor off - we always have the risk that there's another
+>>> shared user which is going to get a power bounce if we power down.  More
+>>> directly we'll also get people complaining that we're burning power
+>>> pointlessly on their systems for devices they've not even got drivers
+>>> enabled for.  This powering down is something there's been user demand
+>>> for.
+>
+>> Right, note I'm only advocating to not turn off regulators marked as
+>> regulator-boot-on. I would expect any regulator to have such a
+>> marking to have at least one user with an actual driver. If people decide
+>> to not build that driver, and then complain we can simply tell them to
+>> build the driver ...
+>
+> Right, but that's not what regulator-boot-on actually means (and I'm not
+> sure why you would think it would TBH)
 
-Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
----
- drivers/usb/gadget/udc/atmel_usba_udc.c | 95 ++++++++++++++++++++++++---------
- drivers/usb/gadget/udc/atmel_usba_udc.h |  4 ++
- 2 files changed, 73 insertions(+), 26 deletions(-)
+Well, the meaning of regulator-boot-on is not clearly defined really, to
+begin we need with fixing that, currently all the bindings file says is:
 
-diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-index e207d75..986677b 100644
---- a/drivers/usb/gadget/udc/atmel_usba_udc.c
-+++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-@@ -315,6 +315,38 @@ static inline void usba_cleanup_debugfs(struct usba_udc *udc)
- }
- #endif
- 
-+static int start_clock(struct usba_udc *udc)
-+{
-+	int ret;
-+
-+	if (udc->clocked)
-+		return 0;
-+
-+	ret = clk_prepare_enable(udc->pclk);
-+	if (ret)
-+		return ret;
-+	ret = clk_prepare_enable(udc->hclk);
-+	if (ret) {
-+		clk_disable_unprepare(udc->pclk);
-+		return ret;
-+	}
-+
-+	udc->clocked = true;
-+	return ret;
-+}
-+
-+static int stop_clock(struct usba_udc *udc)
-+{
-+	if (!udc->clocked)
-+		return 0;
-+
-+	clk_disable_unprepare(udc->hclk);
-+	clk_disable_unprepare(udc->pclk);
-+
-+	udc->clocked = false;
-+	return 0;
-+}
-+
- static int vbus_is_present(struct usba_udc *udc)
- {
- 	if (gpio_is_valid(udc->vbus_pin))
-@@ -1719,42 +1751,55 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
- 	return IRQ_HANDLED;
- }
- 
--static irqreturn_t usba_vbus_irq(int irq, void *devid)
-+static irqreturn_t usba_vbus_irq_thread(int irq, void *devid)
- {
- 	struct usba_udc *udc = devid;
- 	int vbus;
-+	int ret;
- 
- 	/* debounce */
- 	udelay(10);
- 
--	spin_lock(&udc->lock);
-+	mutex_lock(&udc->vbus_mutex);
- 
- 	/* May happen if Vbus pin toggles during probe() */
--	if (!udc->driver)
-+	spin_lock(&udc->lock);
-+	if (!udc->driver) {
-+		spin_unlock(&udc->lock);
- 		goto out;
-+	}
-+	spin_unlock(&udc->lock);
- 
- 	vbus = vbus_is_present(udc);
- 	if (vbus != udc->vbus_prev) {
- 		if (vbus) {
-+			ret = start_clock(udc);
-+			if (ret)
-+				goto out;
-+
-+			spin_lock(&udc->lock);
- 			toggle_bias(1);
- 			usba_writel(udc, CTRL, USBA_ENABLE_MASK);
- 			usba_writel(udc, INT_ENB, USBA_END_OF_RESET);
-+			spin_unlock(&udc->lock);
- 		} else {
-+			spin_lock(&udc->lock);
- 			udc->gadget.speed = USB_SPEED_UNKNOWN;
- 			reset_all_endpoints(udc);
- 			toggle_bias(0);
- 			usba_writel(udc, CTRL, USBA_DISABLE_MASK);
--			if (udc->driver->disconnect) {
--				spin_unlock(&udc->lock);
-+			spin_unlock(&udc->lock);
-+
-+			stop_clock(udc);
-+
-+			if (udc->driver->disconnect)
- 				udc->driver->disconnect(&udc->gadget);
--				spin_lock(&udc->lock);
--			}
- 		}
- 		udc->vbus_prev = vbus;
- 	}
- 
- out:
--	spin_unlock(&udc->lock);
-+	mutex_unlock(&udc->vbus_mutex);
- 
- 	return IRQ_HANDLED;
- }
-@@ -1762,7 +1807,7 @@ out:
- static int atmel_usba_start(struct usb_gadget *gadget,
- 		struct usb_gadget_driver *driver)
- {
--	int ret;
-+	int ret = 0;
- 	struct usba_udc *udc = container_of(gadget, struct usba_udc, gadget);
- 	unsigned long flags;
- 
-@@ -1772,31 +1817,29 @@ static int atmel_usba_start(struct usb_gadget *gadget,
- 	udc->driver = driver;
- 	spin_unlock_irqrestore(&udc->lock, flags);
- 
--	ret = clk_prepare_enable(udc->pclk);
--	if (ret)
--		return ret;
--	ret = clk_prepare_enable(udc->hclk);
--	if (ret) {
--		clk_disable_unprepare(udc->pclk);
--		return ret;
--	}
--
-+	mutex_lock(&udc->vbus_mutex);
- 	udc->vbus_prev = 0;
- 	if (gpio_is_valid(udc->vbus_pin))
- 		enable_irq(gpio_to_irq(udc->vbus_pin));
- 
- 	/* If Vbus is present, enable the controller and wait for reset */
--	spin_lock_irqsave(&udc->lock, flags);
- 	if (vbus_is_present(udc) && udc->vbus_prev == 0) {
-+		ret = start_clock(udc);
-+		if (ret)
-+			goto out;
-+
-+		spin_lock_irqsave(&udc->lock, flags);
- 		toggle_bias(1);
- 		usba_writel(udc, CTRL, USBA_ENABLE_MASK);
- 		usba_writel(udc, INT_ENB, USBA_END_OF_RESET);
-+		spin_unlock_irqrestore(&udc->lock, flags);
- 
- 		udc->vbus_prev = 1;
- 	}
--	spin_unlock_irqrestore(&udc->lock, flags);
- 
--	return 0;
-+out:
-+	mutex_unlock(&udc->vbus_mutex);
-+	return ret;
- }
- 
- static int atmel_usba_stop(struct usb_gadget *gadget)
-@@ -1816,8 +1859,7 @@ static int atmel_usba_stop(struct usb_gadget *gadget)
- 	toggle_bias(0);
- 	usba_writel(udc, CTRL, USBA_DISABLE_MASK);
- 
--	clk_disable_unprepare(udc->hclk);
--	clk_disable_unprepare(udc->pclk);
-+	stop_clock(udc);
- 
- 	udc->driver = NULL;
- 
-@@ -1997,6 +2039,7 @@ static int usba_udc_probe(struct platform_device *pdev)
- 		return PTR_ERR(hclk);
- 
- 	spin_lock_init(&udc->lock);
-+	mutex_init(&udc->vbus_mutex);
- 	udc->pdev = pdev;
- 	udc->pclk = pclk;
- 	udc->hclk = hclk;
-@@ -2049,9 +2092,9 @@ static int usba_udc_probe(struct platform_device *pdev)
- 
- 	if (gpio_is_valid(udc->vbus_pin)) {
- 		if (!devm_gpio_request(&pdev->dev, udc->vbus_pin, "atmel_usba_udc")) {
--			ret = devm_request_irq(&pdev->dev,
--					gpio_to_irq(udc->vbus_pin),
--					usba_vbus_irq, 0,
-+			ret = devm_request_threaded_irq(&pdev->dev,
-+					gpio_to_irq(udc->vbus_pin), NULL,
-+					usba_vbus_irq_thread, IRQF_NO_SUSPEND | IRQF_ONESHOT,
- 					"atmel_usba_udc", udc);
- 			if (ret) {
- 				udc->vbus_pin = -ENODEV;
-diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.h b/drivers/usb/gadget/udc/atmel_usba_udc.h
-index a70706e..3ceed76 100644
---- a/drivers/usb/gadget/udc/atmel_usba_udc.h
-+++ b/drivers/usb/gadget/udc/atmel_usba_udc.h
-@@ -308,6 +308,9 @@ struct usba_udc {
- 	/* Protect hw registers from concurrent modifications */
- 	spinlock_t lock;
- 
-+	/* Mutex to prevent concurrent start or stop */
-+	struct mutex vbus_mutex;
-+
- 	void __iomem *regs;
- 	void __iomem *fifo;
- 
-@@ -321,6 +324,7 @@ struct usba_udc {
- 	struct clk *pclk;
- 	struct clk *hclk;
- 	struct usba_ep *usba_ep;
-+	bool clocked;
- 
- 	u16 devstatus;
- 
--- 
-2.1.4
+- regulator-boot-on: bootloader/firmware enabled regulator
+
+One could easily argue that the bootloader likely has a good reason to turn
+the regulator on, and that unless there is a specific driver which claims
+the regulator and thus knows what to do with it it is best left alone ...
+
+> so this will disrupt existing
+> users who are expecting the current behaviour.  We could try adding a
+> new property but it doesn't feel very idiomatic for DT which isn't very
+> nice.
+>
+> Telling people not to build the driver doesn't in general work any
+> better than telling them to build it in I fear, it seems like it's
+> essentially just shuffling things around so people have to change their
+> kernel config in a different way to avoid issues.
+
+Regards,
+
+Hans
