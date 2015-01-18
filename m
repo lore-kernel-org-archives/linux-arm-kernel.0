@@ -1,43 +1,45 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 18 Jan 2015 13:09:44 +0100
-Subject: [PATCH v3 2/3] ARM: dts: sun4i: Add mk802ii board
+Date: Sun, 18 Jan 2015 13:09:45 +0100
+Subject: [PATCH v3 3/3] ARM: dts: sun5i: Add mk802_a10s board
 In-Reply-To: <1421582985-26087-1-git-send-email-hdegoede@redhat.com>
 References: <1421582985-26087-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1421582985-26087-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <1421582985-26087-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mk802ii is a revised version of the mk802 A10 based hdmi tv-stick, it
-features 1G RAM, 4G nand, a hdmi male connector, USB-A receptacle, 2 micro
-usb receptacles (OTG & power) and USB-wifi, and does come with an axp209 pmic.
+The mk802_a10s re-uses is the "classic" mk802 case and functionality, but has
+an A10s SoC inside rather then the A10, it features 512M or 1G RAM, 4G nand,
+a mini-hdmi female connector, USB-A receptacle, mini-usb receptacle (OTG)
+and a sdio realtek wifi chip. Unlike the original mk802 it does have a pmic,
+the axp152.
 
-For more details see: http://linux-sunxi.org/Rikomagic_mk802ii
+For more details see: http://linux-sunxi.org/Semitime_g2
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/Makefile              |   1 +
- arch/arm/boot/dts/sun4i-a10-mk802ii.dts | 113 ++++++++++++++++++++++++++++++++
- 2 files changed, 114 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun4i-a10-mk802ii.dts
+ arch/arm/boot/dts/Makefile             |   1 +
+ arch/arm/boot/dts/sun5i-a10s-mk802.dts | 125 +++++++++++++++++++++++++++++++++
+ 2 files changed, 126 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun5i-a10s-mk802.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index dfb6885..b543e7d 100644
+index b543e7d..a3f58cf 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -449,6 +449,7 @@ dtb-$(CONFIG_MACH_SUN4I) += \
- 	sun4i-a10-cubieboard.dtb \
- 	sun4i-a10-mini-xplus.dtb \
- 	sun4i-a10-mk802.dtb \
-+	sun4i-a10-mk802ii.dtb \
- 	sun4i-a10-hackberry.dtb \
- 	sun4i-a10-inet97fv2.dtb \
- 	sun4i-a10-olinuxino-lime.dtb \
-diff --git a/arch/arm/boot/dts/sun4i-a10-mk802ii.dts b/arch/arm/boot/dts/sun4i-a10-mk802ii.dts
+@@ -456,6 +456,7 @@ dtb-$(CONFIG_MACH_SUN4I) += \
+ 	sun4i-a10-pcduino.dtb
+ dtb-$(CONFIG_MACH_SUN5I) += \
+ 	sun5i-a10s-auxtek-t004.dtb \
++	sun5i-a10s-mk802.dtb \
+ 	sun5i-a10s-olinuxino-micro.dtb \
+ 	sun5i-a10s-r7-tv-dongle.dtb \
+ 	sun5i-a13-hsg-h702.dtb \
+diff --git a/arch/arm/boot/dts/sun5i-a10s-mk802.dts b/arch/arm/boot/dts/sun5i-a10s-mk802.dts
 new file mode 100644
-index 0000000..802eda4
+index 0000000..399866a
 --- /dev/null
-+++ b/arch/arm/boot/dts/sun4i-a10-mk802ii.dts
-@@ -0,0 +1,113 @@
++++ b/arch/arm/boot/dts/sun5i-a10s-mk802.dts
+@@ -0,0 +1,125 @@
 +/*
 + * Copyright 2015 Hans de Goede <hdegoede@redhat.com>
 + *
@@ -86,44 +88,36 @@ index 0000000..802eda4
 + */
 +
 +/dts-v1/;
-+#include "sun4i-a10.dtsi"
++#include "sun5i-a10s.dtsi"
 +#include "sunxi-common-regulators.dtsi"
 +#include <dt-bindings/gpio/gpio.h>
 +
 +/ {
-+	model = "MK802ii";
-+	compatible = "allwinner,mk802ii", "allwinner,sun4i-a10";
++	model = "MK802-A10s";
++	compatible = "allwinner,mk802_a10s", "allwinner,sun5i-a10s";
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&led_pins_mk802_a10s>;
++
++		red {
++			label = "mk802:red:usr";
++			gpios = <&pio 1 2 GPIO_ACTIVE_HIGH>; /* PB2 */
++		};
++	};
 +};
 +
 +&ehci0 {
 +	status = "okay";
 +};
 +
-+&ehci1 {
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "okay";
-+
-+	axp209: pmic at 34 {
-+		compatible = "x-powers,axp209";
-+		reg = <0x34>;
-+		interrupts = <0>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
-+	};
-+};
-+
 +&mmc0 {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_mk802_a10s>;
 +	vmmc-supply = <&reg_vcc3v3>;
 +	bus-width = <4>;
-+	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
++	cd-gpios = <&pio 6 1 GPIO_ACTIVE_HIGH>; /* PG1 */
 +	cd-inverted;
 +	status = "okay";
 +};
@@ -132,11 +126,32 @@ index 0000000..802eda4
 +	status = "okay";
 +};
 +
-+&reg_usb1_vbus {
-+	status = "okay";
++&pio {
++	led_pins_mk802_a10s: led_pins at 0 {
++		allwinner,pins = "PB2";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
++	mmc0_cd_pin_mk802_a10s: mmc0_cd_pin at 0 {
++		allwinner,pins = "PG1";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++	};
++
++	usb1_vbus_pin_mk802_a10s: usb1_vbus_pin at 0 {
++		allwinner,pins = "PB10";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
 +};
 +
-+&reg_usb2_vbus {
++&reg_usb1_vbus {
++	pinctrl-0 = <&usb1_vbus_pin_mk802_a10s>;
++	gpio = <&pio 1 10 GPIO_ACTIVE_HIGH>; /* PB10 */
 +	status = "okay";
 +};
 +
@@ -148,7 +163,6 @@ index 0000000..802eda4
 +
 +&usbphy {
 +	usb1_vbus-supply = <&reg_usb1_vbus>;
-+	usb2_vbus-supply = <&reg_usb2_vbus>;
 +	status = "okay";
 +};
 -- 
