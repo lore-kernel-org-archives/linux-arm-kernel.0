@@ -1,59 +1,47 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sun, 18 Jan 2015 22:55:00 +0300
-Subject: [PATCHv3 1/5] USB: host: ehci_atmel: Add suspend/resume support
-In-Reply-To: <20150117224900.GA22439@gradator.net>
-References: <Pine.LNX.4.44L0.1501171524050.13485-100000@netrider.rowland.org>
- <1421529942-18437-1-git-send-email-sylvain.rochet@finsecur.com>
- <1421529942-18437-2-git-send-email-sylvain.rochet@finsecur.com>
- <54BAE0AE.5060705@cogentembedded.com> <20150117224900.GA22439@gradator.net>
-Message-ID: <54BC0F94.6030402@cogentembedded.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 18 Jan 2015 21:18:21 +0100
+Subject: [PATCH] ti-soc-thermal: implement eocz bit to make driver useful
+ on omap3
+In-Reply-To: <20150105213557.GD31536@developer>
+References: <20150103114632.GA21883@amd> <20150103122634.GB22356@developer>
+ <20150103162241.GA26680@amd> <20150105213557.GD31536@developer>
+Message-ID: <20150118201821.GA28530@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi!
 
-On 01/18/2015 01:49 AM, Sylvain Rochet wrote:
+> > Ok, what do you suggest? AFAICT, without MODE_CONFIG, continuous ADC
+> > mode is not available, so we have to force it periodically, so this
+> > should be correct.
+> 
+> I will have a better look and let you know. for now, adding a single
+> read should not hurt ( but I will double check)
 
->>     There's little inconsistency in your patch subjects: you're using
->> '_' but the files you're modifying are named using '-'...
+Any news there?
 
-> Indeed.
+> > > > +		if (ret)
+> > > > +			return ret;
+> > > > +	}
+> > > > +
+> > > >  	spin_lock(&bgp->lock);
+> > > >  	temp = ti_bandgap_read_temp(bgp, id);
+> > > >  	spin_unlock(&bgp->lock);
+> > > >  
+> > > > -	ret |= ti_bandgap_adc_to_mcelsius(bgp, temp, &temp);
+> > > > +	ret = ti_bandgap_adc_to_mcelsius(bgp, temp, &temp);
+> > > 
+> > > this one should be part of your clean up patch
+> > 
+> > Ok, can you apply the cleanup patch and I'll prepare one on the top of
+> > it?
+> 
+> I mean, you should resend the cleanup patch including the above '|=' removal, as you are already doing in the cleanup patch.
+> 
 
->>> @@ -187,6 +217,8 @@ static struct platform_driver ehci_atmel_driver = {
->>>   	.probe		= ehci_atmel_drv_probe,
->>>   	.remove		= ehci_atmel_drv_remove,
->>>   	.shutdown	= usb_hcd_platform_shutdown,
->>> +	.suspend	= ehci_atmel_drv_suspend,
->>> +	.resume		= ehci_atmel_drv_resume,
->>
->>     I think you should use 'struct dev_pm_ops' now.
+Ok, little patch-editing can not hurt :-).
 
-    I'm not sure but perhaps scripts/checkpatch.pl would complain about the 
-old-style PM methods... should check.
-
-> This way ?
-
-> static int ehci_atmel_drv_suspend(struct device *dev)
-> {
-> 	struct usb_hcd *hcd = dev_get_drvdata(dev);
-> (...)
->
->
-> static SIMPLE_DEV_PM_OPS(ehci_atmel_pm_ops, ehci_atmel_drv_suspend, ehci_atmel_drv_resume);
->
-> (...)
-> 	.driver         = {
-> 		.pm     = &ehci_atmel_pm_ops,
-> 	}
-> (...)
-
-    Yes, probably.
-
-> Should I send a v4 or can I send this change separately on top of the
-> previous change ?
-
-    v4 please.
-
-> Sylvain
-
-WBR, Sergei
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
