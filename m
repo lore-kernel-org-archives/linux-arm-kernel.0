@@ -1,46 +1,29 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sun, 18 Jan 2015 14:11:36 +0100
-Subject: [PATCH 01/12] mfd: syscon: Add atmel-matrix registers definition
-In-Reply-To: <20150118125259.GW3574@x1>
-References: <1421252524-24452-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1421252524-24452-2-git-send-email-alexandre.belloni@free-electrons.com>
- <20150118125259.GW3574@x1>
-Message-ID: <20150118141136.5f871014@bbrezillon>
+From: sylvain.rochet@finsecur.com (Sylvain Rochet)
+Date: Sun, 18 Jan 2015 14:26:49 +0100
+Subject: [PATCHv2 0/2] dts: AT91 Watchdog, remove property idle halt by default
+In-Reply-To: <20150118090820.07856398@bbrezillon>
+References: <20150118090820.07856398@bbrezillon>
+Message-ID: <1421587611-32708-1-git-send-email-sylvain.rochet@finsecur.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Change since v1:
+  * Apply this change for all impacted SoCs
+  * Improved DTS documentation about this property
 
-On Sun, 18 Jan 2015 12:52:59 +0000
-Lee Jones <lee.jones@linaro.org> wrote:
+Sylvain Rochet (2):
+  dts: Documentation: AT91 Watchdog, explain what atmel,idle-halt
+    property really do
+  dts: AT91 Watchdog, remove property idle halt by default
 
-> On Wed, 14 Jan 2015, Alexandre Belloni wrote:
-> 
-> > From: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > 
-> > AT91 SoCs have a memory range reserved for internal bus configuration.
-> > Expose those registers so that drivers can make use of the matrix syscon
-> > declared in at91 DTs.
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > Acked-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  include/linux/mfd/syscon/atmel-matrix.h | 117 ++++++++++++++++++++++++++++++++
-> >  1 file changed, 117 insertions(+)
-> >  create mode 100644 include/linux/mfd/syscon/atmel-matrix.h
-> 
-> Applied, thanks.
-
-Actually Nicolas took all the patches in his tree and already sent a PR
-to the arm-soc maintainers [1].
-
-Best Regards,
-
-Boris
-
-[1]https://lkml.org/lkml/2015/1/15/542
+ Documentation/devicetree/bindings/watchdog/atmel-wdt.txt | 5 +++++
+ arch/arm/boot/dts/at91sam9260.dtsi                       | 1 -
+ arch/arm/boot/dts/at91sam9263.dtsi                       | 1 -
+ arch/arm/boot/dts/at91sam9g45.dtsi                       | 1 -
+ arch/arm/boot/dts/at91sam9n12.dtsi                       | 1 -
+ arch/arm/boot/dts/at91sam9x5.dtsi                        | 1 -
+ arch/arm/boot/dts/sama5d3.dtsi                           | 1 -
+ 7 files changed, 5 insertions(+), 6 deletions(-)
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.1.4
