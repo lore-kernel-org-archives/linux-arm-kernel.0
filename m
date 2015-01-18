@@ -1,101 +1,45 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Sun, 18 Jan 2015 11:21:33 -0800
-Subject: [PATCH v1] thermal: rockchip: make temperature reporting much
- more accurate
-In-Reply-To: <1421597753-2082-2-git-send-email-wxt@rock-chips.com>
-References: <1421597753-2082-1-git-send-email-wxt@rock-chips.com>
- <1421597753-2082-2-git-send-email-wxt@rock-chips.com>
-Message-ID: <20150118192133.GA15457@dtor-glaptop>
+From: broonie@kernel.org (Mark Brown)
+Date: Sun, 18 Jan 2015 19:28:34 +0000
+Subject: [PATCH v4 4/4] ARM: mvebu: Armada 385 GP: Add regulators to the
+ SATA port
+In-Reply-To: <54BBD13E.6030901@redhat.com>
+References: <54B8D97B.3090908@free-electrons.com> <54B8E38A.6020709@redhat.com>
+ <20150116123705.GM3043@sirena.org.uk> <54B9629C.9090800@redhat.com>
+ <20150116202516.GL3856@sirena.org.uk> <54BA21F9.5050408@redhat.com>
+ <20150117131404.GA6414@sirena.org.uk> <54BA7197.40301@redhat.com>
+ <20150118123531.GA2809@sirena.org.uk> <54BBD13E.6030901@redhat.com>
+Message-ID: <20150118192834.GE2809@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 19, 2015 at 12:15:53AM +0800, Caesar Wang wrote:
-> In general, the kernel should report temperature readings exactly as
-> reported by the hardware. The cpu / gpu thermal driver works in 5 degree
-> increments,but we ought to do more accurate. The temperature will do
-> linear interpolation between the entries in the table.
-> 
-> Test= $md5sum /dev/zero &
-> $while true; do grep "" /sys/class/thermal/thermal_zone[1-2]/temp;
-> sleep .5; done
-> 
-> e.g. We can get the result as follows:
->     /sys/class/thermal/thermal_zone1/temp:39994
->     /sys/class/thermal/thermal_zone2/temp:39086
->     /sys/class/thermal/thermal_zone1/temp:39994
->     /sys/class/thermal/thermal_zone2/temp:39540
->     /sys/class/thermal/thermal_zone1/temp:39540
->     /sys/class/thermal/thermal_zone2/temp:39540
->     /sys/class/thermal/thermal_zone1/temp:39540
->     /sys/class/thermal/thermal_zone2/temp:39994
-> 
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+On Sun, Jan 18, 2015 at 04:29:02PM +0100, Hans de Goede wrote:
+> On 18-01-15 13:35, Mark Brown wrote:
 
-I did several review this patch on the Chrome OS gerrit, so
+> >Right, but that's not what regulator-boot-on actually means (and I'm not
+> >sure why you would think it would TBH)
 
-Reviewed-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> Well, the meaning of regulator-boot-on is not clearly defined really, to
+> begin we need with fixing that, currently all the bindings file says is:
 
-> 
-> ---
-> 
->  drivers/thermal/rockchip_thermal.c | 26 +++++++++++++++++---------
->  1 file changed, 17 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
-> index 1bcddfc..a7ae23a 100644
-> --- a/drivers/thermal/rockchip_thermal.c
-> +++ b/drivers/thermal/rockchip_thermal.c
-> @@ -193,19 +193,18 @@ static u32 rk_tsadcv2_temp_to_code(long temp)
->  
->  static long rk_tsadcv2_code_to_temp(u32 code)
->  {
-> -	int high, low, mid;
-> -
-> -	low = 0;
-> -	high = ARRAY_SIZE(v2_code_table) - 1;
-> -	mid = (high + low) / 2;
-> +	unsigned int low = 0;
-> +	unsigned int high = ARRAY_SIZE(v2_code_table) - 1;
-> +	unsigned int mid = (low + high) / 2;
-> +	unsigned int scale;
->  
->  	if (code > v2_code_table[low].code || code < v2_code_table[high].code)
->  		return 125000; /* No code available, return max temperature */
->  
->  	while (low <= high) {
-> -		if (code >= v2_code_table[mid].code && code <
-> -		    v2_code_table[mid - 1].code)
-> -			return v2_code_table[mid].temp;
-> +		if (code >= v2_code_table[mid].code &&
-> +		    code < v2_code_table[mid - 1].code)
-> +			break;
->  		else if (code < v2_code_table[mid].code)
->  			low = mid + 1;
->  		else
-> @@ -213,7 +212,16 @@ static long rk_tsadcv2_code_to_temp(u32 code)
->  		mid = (low + high) / 2;
->  	}
->  
-> -	return 125000;
-> +	/*
-> +	 * The 5C granularity provided by the table is too much. Let's
-> +	 * assume that the relationship between sensor readings and
-> +	 * temperature between 2 table entries is linear and extrapolate
-> +	 * to produce less granular result.
-> +	 */
-> +	scale = (v2_code_table[mid].temp - v2_code_table[mid - 1].temp) /
-> +		(v2_code_table[mid - 1].code - v2_code_table[mid].code);
-> +	return v2_code_table[mid - 1].temp +
-> +			(v2_code_table[mid - 1].code - code) * scale;
->  }
->  
->  /**
-> -- 
-> 1.9.1
-> 
-> 
+> - regulator-boot-on: bootloader/firmware enabled regulator
 
-Thanks.
+If that meant anything about what to do with the regulator at runtime it
+would say so - it means exactly what it says.
 
--- 
-Dmitry
+> One could easily argue that the bootloader likely has a good reason to turn
+> the regulator on, and that unless there is a specific driver which claims
+> the regulator and thus knows what to do with it it is best left alone ...
+
+That's an excessively big stretch; it doesn't reflect the reality that
+the bootloader is often just leaving the settings it found on initial
+power up alone nor the general quality of implementation concerns one
+often sees with bootloaders.  A big use case for this feature is that
+there is a fairly large class of systems where the bootloader can't be
+relied on.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150118/30390c74/attachment.sig>
