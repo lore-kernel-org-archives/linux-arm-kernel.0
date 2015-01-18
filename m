@@ -1,31 +1,109 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Sun, 18 Jan 2015 14:46:35 +0800
-Subject: [PATCH v7 06/17] ARM64 / ACPI: Make PCI optional for ACPI on ARM64
-In-Reply-To: <508480149.12941388.1421562696311.JavaMail.zimbra@zmail15.collab.prod.int.phx2.redhat.com>
-References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
- <1421247905-3749-7-git-send-email-hanjun.guo@linaro.org>
- <20150116094913.GA13634@e104818-lin.cambridge.arm.com>
- <54BB51F1.8000900@linaro.org>
- <508480149.12941388.1421562696311.JavaMail.zimbra@zmail15.collab.prod.int.phx2.redhat.com>
-Message-ID: <54BB56CB.7040701@linaro.org>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Sun, 18 Jan 2015 15:54:34 +0900
+Subject: [PATCH v6 8/8] arm: dma-mapping: plumb our iommu mapping ops
+ into arch_setup_dma_ops
+In-Reply-To: <2804479.ZFl06ysk3j@avalon>
+References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
+ <20150115082843.GB30799@ulmo> <20150115111211.GF23475@arm.com>
+ <2804479.ZFl06ysk3j@avalon>
+Message-ID: <54BB58AA.5070407@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?01?18? 14:31, Jon Masters wrote:
-> Hi Folks,
+On 01/16/2015 08:18 AM, Laurent Pinchart wrote:
+> On Thursday 15 January 2015 11:12:17 Will Deacon wrote:
+>> On Thu, Jan 15, 2015 at 08:28:44AM +0000, Thierry Reding wrote:
+>>> On Wed, Jan 14, 2015 at 10:46:10AM +0000, Will Deacon wrote:
+>>>> On Wed, Jan 14, 2015 at 09:00:24AM +0000, Alexandre Courbot wrote:
+>>> [...]
+>>>
+>>>>> 2) Say you want to use the IOMMU API in your driver, and have an iommu
+>>>>> property in your device's DT node. If by chance your IOMMU is
+>>>>> registered early, you will already have a mapping automatically
+>>>>> created even before your probe function is called. Can this be
+>>>>> avoided? Is it even safe?
+>>>>
+>>>> Currently, I think you have to either teardown the ops manually or
+>>>> return an error from of_xlate. Thierry was also looking at this sort of
+>>>> thing, so it might be worth talking to him.
+>>>
+>>> I already explained in earlier threads why I think this is a bad idea.
+>>> It's completely unnatural for any driver to manually tear down something
+>>> that it didn't want set up in the first place. It also means that you
+>>> have to carefully audit any users of these IOMMU APIs to make sure that
+>>> they do tear down. That doesn't sound like a good incremental approach,
+>>> as evidenced by the breakage that Alex and Heiko have encountered.
+>>
+>> Well, perhaps we hide that behind a get_iommu API or something. We *do*
+>> need this manual teardown step to support things like VFIO, so it makes
+>> sense to reuse it for other users too imo.
+>>
+>>> The solution for me has been to completely side-step the issue and not
+>>> register the IOMMU with the new mechanism at all. That is, there's no
+>>> .of_xlate() implementation, which means that the ARM DMA API glue won't
+>>> try to be smart and use the IOMMU in ways it's not meant to be used.
 >
-> Sorry for top posting from bed. The mainstream servers will all likely do
- > PCIe but there are several that may not. They should not be excluded. 
-That said,
- >if we booted a previously built kernel on a system without an MCFG and
- > got no ECAM/root then things would probably still work.
+> That will break when someone will want to use the same IOMMU type for devices
+> that use the DMA mapping API to hide the IOMMU. That might not be the case for
+> your IOMMU today, but it's pretty fragile, we need to fix it.
 >
-> I think it'll work out either way but for the record there is no requirement to do PCIe on ARM servers that conform to spec.
+>>> This has several advantages, such as that I can also use the regular
+>>> driver model for suspend/resume of the IOMMU, and I get to enjoy the
+>>> benefits of devres in the IOMMU driver. Probe ordering is still a tiny
+>>> issue, but we can easily solve that using explicit initcall ordering
+>>> (which really isn't any worse than IOMMU_OF_DECLARE()).
+>>
+>> That's a pity. I'd much rather extend what we currently have to satisfy
+>> your use-case. Ho-hum.
+>
+> Assuming we want the IOMMU to be handled transparently for the majority of
+> devices I only see two ways to fix this,
+>
+> The first way is to create a default DMA mapping unconditionally and let
+> drivers that can't live with it tear it down. That's what is implemented
+> today.
 
-OK, Catalin already said that was not the main point of the
-comments for this patch, I think the title and change log
-of the patch is inconsistent with the code makes Catalin confused,
-I will update them in next version.
+I strongly support Thierry's point that drivers should not have to tear 
+down things they don't need. The issue we are facing today is a very 
+good illustration of why one should not have to do this.
 
-Thanks
-Hanjun
+Everybody hates to receive unsollicited email with a link that says "to 
+unsubscribe, click here". Let's not import that unpleasant culture into 
+the kernel.
+
+I am arriving late in this discussion, but what is wrong with asking 
+drivers to explicitly state that they want the DMA API to be backed by 
+the IOMMU instead of forcibly making it work that way?
+
+>
+> The second way is to implement a mechanism to let drivers signal that they
+> want to handle DMA mappings themselves. As the mappings need in the general
+> case to be created before the probe function  is called
+
+Sorry for being ignorant here, but why is that?
+
+ > we can't signal this by
+> calling a function in probe(). A new flag field for struct device_driver is a
+> possible solution. This would however require delaying the creation of DMA
+> mappings until right before probe time. Attaching to the IOMMU could be pushed
+> to right before probe() as well, which would have the added benefit of making
+> IOMMU driver implementable as real platform drivers.
+
+Keeping the ability to write IOMMU drivers as platform drivers would be 
+nice indeed.
+
+The problem with the opt-out flag though is that one will need to check 
+every single driver out there to see whether it stills behave correctly 
+if its hardware is suddently put behind a IOMMU. Doing it the other way 
+(a flag that enables IOMMU if available) sounds safer to me.
+
+What we have right now is a mechanism that basically makes it impossible 
+to use the DMA API on many ARM platforms if ARM_DMA_USE_IOMMU is set 
+(and I suspect it would also make the IOMMU unusable as well, without 
+any way to fix things). This is quite concerning.
+
+Even more concerning is that -rc5 is about to be released and we have 
+in-tree drivers (Rockchip DRM) that are not working as they should 
+because of this patch. Will, what is your plan to fix this? Do we have 
+stuff that absolutely depends on this patch? If not, can we just revert 
+it until all these issues are solved?
