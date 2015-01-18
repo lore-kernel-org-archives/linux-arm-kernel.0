@@ -1,49 +1,104 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sun, 18 Jan 2015 12:35:31 +0000
-Subject: [PATCH v4 4/4] ARM: mvebu: Armada 385 GP: Add regulators to the
- SATA port
-In-Reply-To: <54BA7197.40301@redhat.com>
-References: <1421330978-9694-5-git-send-email-gregory.clement@free-electrons.com>
- <54B8C933.7020502@redhat.com> <54B8D97B.3090908@free-electrons.com>
- <54B8E38A.6020709@redhat.com> <20150116123705.GM3043@sirena.org.uk>
- <54B9629C.9090800@redhat.com> <20150116202516.GL3856@sirena.org.uk>
- <54BA21F9.5050408@redhat.com> <20150117131404.GA6414@sirena.org.uk>
- <54BA7197.40301@redhat.com>
-Message-ID: <20150118123531.GA2809@sirena.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Sun, 18 Jan 2015 12:51:17 +0000
+Subject: [PATCH v5 00/11] memory: add Atmel EBI (External Bus Interface)
+ driver
+In-Reply-To: <20150113085027.GA3843@piout.net>
+References: <1417639455-17410-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20150113085027.GA3843@piout.net>
+Message-ID: <20150118125117.GV3574@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 17, 2015 at 03:28:39PM +0100, Hans de Goede wrote:
-> On 17-01-15 14:14, Mark Brown wrote:
+On Tue, 13 Jan 2015, Alexandre Belloni wrote:
 
-> >Following your argument to the logical conclusion means we can never
-> >turn any regualtor off - we always have the risk that there's another
-> >shared user which is going to get a power bounce if we power down.  More
-> >directly we'll also get people complaining that we're burning power
-> >pointlessly on their systems for devices they've not even got drivers
-> >enabled for.  This powering down is something there's been user demand
-> >for.
+> Hi Lee,
+> 
+> There has not been any comment on that series since a while and we have
+> other series on hold, waiting for the first 4 patches to be taken.
+> 
+> Could you have a look at those 4 patches and take them if you don't have
+> any comment ?
 
-> Right, note I'm only advocating to not turn off regulators marked as
-> regulator-boot-on. I would expect any regulator to have such a
-> marking to have at least one user with an actual driver. If people decide
-> to not build that driver, and then complain we can simply tell them to
-> build the driver ...
+Sorry for the delay, I have been on vacation.
 
-Right, but that's not what regulator-boot-on actually means (and I'm not
-sure why you would think it would TBH) so this will disrupt existing
-users who are expecting the current behaviour.  We could try adding a
-new property but it doesn't feel very idiomatic for DT which isn't very
-nice.
+I'm not sure why why those patches are preventing the application of
+the remainder of the set.  They are only documentation entries and I
+have Acked them already?
 
-Telling people not to build the driver doesn't in general work any
-better than telling them to build it in I fear, it seems like it's
-essentially just shuffling things around so people have to change their
-kernel config in a different way to avoid issues.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150118/d6cfb150/attachment.sig>
+> On 03/12/2014 at 21:44:04 +0100, Boris Brezillon wrote :
+> > The EBI (External Bus Interface) is used to access external peripherals
+> > (NOR, SRAM, NAND, and other specific devices like ethernet controllers).
+> > Each device is assigned a CS line and an address range and can have its
+> > own configuration (timings, access mode, bus width, ...).
+> > This driver provides a generic DT binding to configure a device according
+> > to its requirements.
+> > For specific device controllers (like the NAND one) the SMC timings
+> > should be configured by the controller driver through the matrix and
+> > smc syscon regmaps.
+> > 
+> > The first 4 patches introduce 2 syscon devices needed to configure the
+> > EBI bus, patch 5 and 6 adds support for the EBI bus, and the remaining
+> > patches declares the EBI related nodes in sama5d3 dts[i] files.
+> > 
+> > Changes since v4:
+> > - fix inconsistencies in SMC and MATRIX registers definition
+> > - add missing compatible strings for at91sam9rl SoC
+> > - fix DT bindings documentation
+> > - replace "atmel,generic-dev" property by "atmel,specialized-logic"
+> > 
+> > Changes since v3:
+> > - added AT91_MATRIX_USBPUCR_PUON definition
+> > - removed useless macros (those directly returning SoC specific register
+> >   offsets)
+> > - use syscon_regmap_lookup_by_phandle instead of of_parse_phandle +
+> >   syscon_node_to_regmap
+> > - drop AT91_EBICSA_REGFIELD and AT91_MULTI_EBICSA_REGFIELD macros
+> > 
+> > Changes since v2:
+> > - minor fixes int DT bindings doc
+> > - fix SMC macros
+> > - make use of SMC macros defined in include/linux/mfd/syscon/atmel-smc.h
+> > 
+> > Changes since v1:
+> > - almost everything :-)
+> > 
+> > Boris Brezillon (11):
+> >   mfd: syscon: Add atmel-matrix registers definition
+> >   mfd: syscon: Add Atmel Matrix bus DT binding documentation
+> >   mfd: syscon: Add atmel-smc registers definition
+> >   mfd: syscon: Add Atmel SMC binding doc
+> >   memory: add Atmel EBI (External Bus Interface) driver
+> >   memory: atmel-ebi: add DT bindings documentation
+> >   ARM: at91: select ATMEL_EBI when compiling a kernel for at91sam9 or
+> >     sama5d3
+> >   ARM: at91/dt: add HSMC (Static Memory Controller) node in sama5d3 dtsi
+> >   ARM: at91/dt: add matrix node in sama5d3 dtsi
+> >   ARM: at91/dt: add EBI (External Bus Interface) node in sama5d3 dtsi
+> >   ARM: at91/dt: add NOR definition in sama5d3xcm dtsi
+> > 
+> >  .../bindings/memory-controllers/atmel-ebi.txt      | 155 ++++++
+> >  .../devicetree/bindings/mfd/atmel-matrix.txt       |  24 +
+> >  .../devicetree/bindings/mfd/atmel-smc.txt          |  19 +
+> >  arch/arm/boot/dts/sama5d3.dtsi                     |  93 ++++
+> >  arch/arm/boot/dts/sama5d3xcm.dtsi                  |  33 ++
+> >  arch/arm/mach-at91/Kconfig                         |   2 +
+> >  drivers/memory/Kconfig                             |  11 +
+> >  drivers/memory/Makefile                            |   1 +
+> >  drivers/memory/atmel-ebi.c                         | 579 +++++++++++++++++++++
+> >  include/linux/mfd/syscon/atmel-matrix.h            | 117 +++++
+> >  include/linux/mfd/syscon/atmel-smc.h               | 173 ++++++
+> >  11 files changed, 1207 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt
+> >  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-matrix.txt
+> >  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-smc.txt
+> >  create mode 100644 drivers/memory/atmel-ebi.c
+> >  create mode 100644 include/linux/mfd/syscon/atmel-matrix.h
+> >  create mode 100644 include/linux/mfd/syscon/atmel-smc.h
+> > 
+> 
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
