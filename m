@@ -1,109 +1,105 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Sun, 18 Jan 2015 15:54:34 +0900
-Subject: [PATCH v6 8/8] arm: dma-mapping: plumb our iommu mapping ops
- into arch_setup_dma_ops
-In-Reply-To: <2804479.ZFl06ysk3j@avalon>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <20150115082843.GB30799@ulmo> <20150115111211.GF23475@arm.com>
- <2804479.ZFl06ysk3j@avalon>
-Message-ID: <54BB58AA.5070407@nvidia.com>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Sun, 18 Jan 2015 16:04:22 +0900
+Subject: [PATCH v4 3/4] gpio: Add find GPIO base in increasing order
+In-Reply-To: <CACRpkdYeiaWxPeeoJjX6BKDmnk2swKCnGgJCW6p9AZ3fdFVSpQ@mail.gmail.com>
+References: <1417750722-14027-1-git-send-email-wangzhou.bry@gmail.com>
+ <1417750722-14027-4-git-send-email-wangzhou.bry@gmail.com>
+ <CAAVeFu+Hn1Fk7PDcc4wGHFyJurX0hsW1N1prnPs2j=taGQKrKw@mail.gmail.com>
+ <CACRpkdZccD_FM+m3US3e40LitH4OsX-8cSS_ju+C541330PdXw@mail.gmail.com>
+ <CAAVeFuJkr9mFwJq0GdbLO7EgbffvD25bjBVdXAFZubq5Sz4MZQ@mail.gmail.com>
+ <CACRpkdYeiaWxPeeoJjX6BKDmnk2swKCnGgJCW6p9AZ3fdFVSpQ@mail.gmail.com>
+Message-ID: <CAAVeFu+niUcjEaDCc6BxyZ7SY66U5y+fZh4zz-4A8vZn60syCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/16/2015 08:18 AM, Laurent Pinchart wrote:
-> On Thursday 15 January 2015 11:12:17 Will Deacon wrote:
->> On Thu, Jan 15, 2015 at 08:28:44AM +0000, Thierry Reding wrote:
->>> On Wed, Jan 14, 2015 at 10:46:10AM +0000, Will Deacon wrote:
->>>> On Wed, Jan 14, 2015 at 09:00:24AM +0000, Alexandre Courbot wrote:
->>> [...]
->>>
->>>>> 2) Say you want to use the IOMMU API in your driver, and have an iommu
->>>>> property in your device's DT node. If by chance your IOMMU is
->>>>> registered early, you will already have a mapping automatically
->>>>> created even before your probe function is called. Can this be
->>>>> avoided? Is it even safe?
+On Sat, Jan 17, 2015 at 12:24 AM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
+> On Wed, Jan 14, 2015 at 9:17 AM, Alexandre Courbot <gnurou@gmail.com> wrote:
+>> On Wed, Jan 14, 2015 at 5:13 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>>> On Wed, Dec 10, 2014 at 9:51 AM, Alexandre Courbot <gnurou@gmail.com> wrote:
+>>>> On Fri, Dec 5, 2014 at 12:38 PM, Zhou Wang <wangzhou.bry@gmail.com> wrote:
+>>>>> In function gpiochip_find_base, base number of a GPIO controller
+>>>>> is found in decreasing order. ARCH_NR_GPIOS is used to define from
+>>>>> which number we begin to search for base number of a GPIO controller.
+>>>>>
+>>>>> In fact, ARCH_NR_GPIOS brings us some multiplatform problems, like:
+>>>>> http://www.spinics.net/lists/devicetree/msg60433.html
+>>>>>
+>>>>> This patch adds the support to find base number of a GPIO controller
+>>>>> in increasing order. It will assign base number from 0.
+>>>>> A new dts property called gpio-number-forward must be add to the related
+>>>>> GPIO dts nodes if you want it works well.
 >>>>
->>>> Currently, I think you have to either teardown the ops manually or
->>>> return an error from of_xlate. Thierry was also looking at this sort of
->>>> thing, so it might be worth talking to him.
+>>>> Global GPIO numbers are a Linux-only concept, so your property should
+>>>> be named linux,gpio-number-forward.
+>>>>
+>>>> But even that way I don't think I like this idea. This just adds some
+>>>> more mess to how the GPIO number space is constructed, and it is
+>>>> already quite messy as it is. You have no guarantee over the probe
+>>>> order of your GPIO controllers, so they may very well be probed in a
+>>>> different order and end up with different base numbers anytime.
 >>>
->>> I already explained in earlier threads why I think this is a bad idea.
->>> It's completely unnatural for any driver to manually tear down something
->>> that it didn't want set up in the first place. It also means that you
->>> have to carefully audit any users of these IOMMU APIs to make sure that
->>> they do tear down. That doesn't sound like a good incremental approach,
->>> as evidenced by the breakage that Alex and Heiko have encountered.
+>>> Yup.
+>>>
+>>> The way stuff is usually forced ordered in device tree is to use
+>>> aliases, e.g.:
+>>>
+>>>         aliases {
+>>>                 serial0 = &pb1176_serial0;
+>>>                 serial1 = &pb1176_serial1;
+>>>                 serial2 = &pb1176_serial2;
+>>>                 serial3 = &pb1176_serial3;
+>>>                 serial4 = &fpga_serial;
+>>>         };
+>>>
+>>> By getting the alias ID with of_alias_get_id(np, "serial")
+>>> a certain serial port is assigned to be
+>>> 0, 1, 2 ...
+>>>
+>>> I think I could accept a tweak of this patch that will register
+>>> GPIOs beginning from 0 if and only if the alias mechanism is
+>>> used.
+>>>
+>>>         aliases {
+>>>                 gpio0 = &foo_gpio0;
+>>>                 gpio1 = &expander;
+>>>         };
+>>>
+>>>
+>>> The actual Linux-specific integer base will *NOT* be in the
+>>> device tree, but if you know how many GPIOs are on each
+>>> controller the number space is still stable and predictable
+>>> beginning from 0. If one want to keep track of the Linux
+>>> number space one can do so with comments in the device
+>>> tree or something.
+>>>
+>>>> I know we pushed back against this kind of solution in the past, but
+>>>> it is still more reliable than having a property that affects how the
+>>>> kernel's base finding function works, and will offer us a way to
+>>>> eventually put ARCH_NR_GPIOS and gpiochip_find_base() to rest (at the
+>>>> cost of backwards-compatibility, but we just cannot do without it).
+>>>> Linus, do you agree?
+>>>
+>>> What do you think about the above?
 >>
->> Well, perhaps we hide that behind a get_iommu API or something. We *do*
->> need this manual teardown step to support things like VFIO, so it makes
->> sense to reuse it for other users too imo.
->>
->>> The solution for me has been to completely side-step the issue and not
->>> register the IOMMU with the new mechanism at all. That is, there's no
->>> .of_xlate() implementation, which means that the ARM DMA API glue won't
->>> try to be smart and use the IOMMU in ways it's not meant to be used.
+>> It would definitely help with the probe order, but unfortunately not
+>> with the fact that GPIO bases are allocated in decreasing order
+>> starting from the potentially varying ARCH_NR_GPIOS. So that alone
+>> will not be able to ensure stable GPIO numbers.
 >
-> That will break when someone will want to use the same IOMMU type for devices
-> that use the DMA mapping API to hide the IOMMU. That might not be the case for
-> your IOMMU today, but it's pretty fragile, we need to fix it.
+> What I mean is that if and only if aliases are used, we
+> allocate GPIOs in ascending order starting at 0.
 >
->>> This has several advantages, such as that I can also use the regular
->>> driver model for suspend/resume of the IOMMU, and I get to enjoy the
->>> benefits of devres in the IOMMU driver. Probe ordering is still a tiny
->>> issue, but we can easily solve that using explicit initcall ordering
->>> (which really isn't any worse than IOMMU_OF_DECLARE()).
->>
->> That's a pity. I'd much rather extend what we currently have to satisfy
->> your use-case. Ho-hum.
+> Let us remember why this is done: dynamic GPIO numbers are
+> allocated in descending order because it was assumed that some
+> static GPIOs are already allocated starting from 0, like on-chip
+> GPIOs.
 >
-> Assuming we want the IOMMU to be handled transparently for the majority of
-> devices I only see two ways to fix this,
->
-> The first way is to create a default DMA mapping unconditionally and let
-> drivers that can't live with it tear it down. That's what is implemented
-> today.
+> We can also make it a Kconfig option, because for a large chunk
+> of systems only using device tree we can
+> actually allocate from zero. Notably any ARCH_MULTIPLATFORM
+> should just do this if we can make a quick survey of such systems
+> and see that they don't fool around setting .base in their GPIO
+> chips.
 
-I strongly support Thierry's point that drivers should not have to tear 
-down things they don't need. The issue we are facing today is a very 
-good illustration of why one should not have to do this.
-
-Everybody hates to receive unsollicited email with a link that says "to 
-unsubscribe, click here". Let's not import that unpleasant culture into 
-the kernel.
-
-I am arriving late in this discussion, but what is wrong with asking 
-drivers to explicitly state that they want the DMA API to be backed by 
-the IOMMU instead of forcibly making it work that way?
-
->
-> The second way is to implement a mechanism to let drivers signal that they
-> want to handle DMA mappings themselves. As the mappings need in the general
-> case to be created before the probe function  is called
-
-Sorry for being ignorant here, but why is that?
-
- > we can't signal this by
-> calling a function in probe(). A new flag field for struct device_driver is a
-> possible solution. This would however require delaying the creation of DMA
-> mappings until right before probe time. Attaching to the IOMMU could be pushed
-> to right before probe() as well, which would have the added benefit of making
-> IOMMU driver implementable as real platform drivers.
-
-Keeping the ability to write IOMMU drivers as platform drivers would be 
-nice indeed.
-
-The problem with the opt-out flag though is that one will need to check 
-every single driver out there to see whether it stills behave correctly 
-if its hardware is suddently put behind a IOMMU. Doing it the other way 
-(a flag that enables IOMMU if available) sounds safer to me.
-
-What we have right now is a mechanism that basically makes it impossible 
-to use the DMA API on many ARM platforms if ARM_DMA_USE_IOMMU is set 
-(and I suspect it would also make the IOMMU unusable as well, without 
-any way to fix things). This is quite concerning.
-
-Even more concerning is that -rc5 is about to be released and we have 
-in-tree drivers (Rockchip DRM) that are not working as they should 
-because of this patch. Will, what is your plan to fix this? Do we have 
-stuff that absolutely depends on this patch? If not, can we just revert 
-it until all these issues are solved?
+Ah, in that case yes, I agree it would probably work fine.
