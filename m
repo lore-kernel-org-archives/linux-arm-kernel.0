@@ -1,15 +1,31 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Sun, 18 Jan 2015 14:25:53 +0800
+From: jcm@redhat.com (Jon Masters)
+Date: Sun, 18 Jan 2015 01:31:36 -0500 (EST)
 Subject: [PATCH v7 06/17] ARM64 / ACPI: Make PCI optional for ACPI on ARM64
-In-Reply-To: <20150116094913.GA13634@e104818-lin.cambridge.arm.com>
+In-Reply-To: <54BB51F1.8000900@linaro.org>
 References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
  <1421247905-3749-7-git-send-email-hanjun.guo@linaro.org>
  <20150116094913.GA13634@e104818-lin.cambridge.arm.com>
-Message-ID: <54BB51F1.8000900@linaro.org>
+ <54BB51F1.8000900@linaro.org>
+Message-ID: <508480149.12941388.1421562696311.JavaMail.zimbra@zmail15.collab.prod.int.phx2.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?01?16? 17:49, Catalin Marinas wrote:
+Hi Folks,
+
+Sorry for top posting from bed. The mainstream servers will all likely do PCIe but there are several that may not. They should not be excluded. That said, if we booted a previously built kernel on a system without an MCFG and got no ECAM/root then things would probably still work.
+
+I think it'll work out either way but for the record there is no requirement to do PCIe on ARM servers that conform to spec.
+
+Jon.
+
+-- 
+Computer Architect | Sent from my #ARM Powered Mobile Device
+
+On Jan 18, 2015 1:26 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+>
+> On 2015?01?16? 17:49, Catalin Marinas wrote: 
+> > On Wed, Jan 14, 2015 at 03:04:54PM +0000, Hanjun Guo wrote: 
+> >> Since PCI iOn 2015?01?16? 17:49, Catalin Marinas wrote:
 > On Wed, Jan 14, 2015 at 03:04:54PM +0000, Hanjun Guo wrote:
 >> Since PCI is not required in ACPI spec and ARM can run without
 >> it, introduce some stub functions to make PCI optional for ACPI,
@@ -212,3 +228,7 @@ return -ENOSYS in the arm64 CONFIG_PCI ones next version :)
 
 Thanks
 Hanjun
+--
+To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+the body of a message to majordomo at vger.kernel.org
+More majordomo info at  http://vger.kernel.org/majordomo-info.html
