@@ -1,60 +1,57 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 18 Jan 2015 16:29:02 +0100
-Subject: [PATCH v4 4/4] ARM: mvebu: Armada 385 GP: Add regulators to the
- SATA port
-In-Reply-To: <20150118123531.GA2809@sirena.org.uk>
-References: <1421330978-9694-5-git-send-email-gregory.clement@free-electrons.com>
- <54B8C933.7020502@redhat.com> <54B8D97B.3090908@free-electrons.com>
- <54B8E38A.6020709@redhat.com> <20150116123705.GM3043@sirena.org.uk>
- <54B9629C.9090800@redhat.com> <20150116202516.GL3856@sirena.org.uk>
- <54BA21F9.5050408@redhat.com> <20150117131404.GA6414@sirena.org.uk>
- <54BA7197.40301@redhat.com> <20150118123531.GA2809@sirena.org.uk>
-Message-ID: <54BBD13E.6030901@redhat.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 18 Jan 2015 16:50:14 +0100
+Subject: [PATCH] bus: mvebu-mbus: fix support of MBus window 13
+In-Reply-To: <1419943428-18491-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1419943428-18491-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1421596214-15924-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Armada XP, 375 and 38x the MBus window 13 has the remap capability,
+like windows 0 to 7. However, the mvebu-mbus driver isn't currently
+taking into account this special case, which means that when window 13
+is actually used, the remap registers are left to 0, making the device
+using this MBus window unavailable.
 
-On 18-01-15 13:35, Mark Brown wrote:
-> On Sat, Jan 17, 2015 at 03:28:39PM +0100, Hans de Goede wrote:
->> On 17-01-15 14:14, Mark Brown wrote:
->
->>> Following your argument to the logical conclusion means we can never
->>> turn any regualtor off - we always have the risk that there's another
->>> shared user which is going to get a power bounce if we power down.  More
->>> directly we'll also get people complaining that we're burning power
->>> pointlessly on their systems for devices they've not even got drivers
->>> enabled for.  This powering down is something there's been user demand
->>> for.
->
->> Right, note I'm only advocating to not turn off regulators marked as
->> regulator-boot-on. I would expect any regulator to have such a
->> marking to have at least one user with an actual driver. If people decide
->> to not build that driver, and then complain we can simply tell them to
->> build the driver ...
->
-> Right, but that's not what regulator-boot-on actually means (and I'm not
-> sure why you would think it would TBH)
+As a minimal fix for stable, don't use window 13. A full fix will
+follow later.
 
-Well, the meaning of regulator-boot-on is not clearly defined really, to
-begin we need with fixing that, currently all the bindings file says is:
+Fixes: fddddb52a6c ("bus: introduce an Marvell EBU MBus driver")
+Cc: <stable@vger.kernel.org> # v3.10+
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
+ drivers/bus/mvebu-mbus.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-- regulator-boot-on: bootloader/firmware enabled regulator
-
-One could easily argue that the bootloader likely has a good reason to turn
-the regulator on, and that unless there is a specific driver which claims
-the regulator and thus knows what to do with it it is best left alone ...
-
-> so this will disrupt existing
-> users who are expecting the current behaviour.  We could try adding a
-> new property but it doesn't feel very idiomatic for DT which isn't very
-> nice.
->
-> Telling people not to build the driver doesn't in general work any
-> better than telling them to build it in I fear, it seems like it's
-> essentially just shuffling things around so people have to change their
-> kernel config in a different way to avoid issues.
-
-Regards,
-
-Hans
+diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+index eb7682dc123b..81bf297f1034 100644
+--- a/drivers/bus/mvebu-mbus.c
++++ b/drivers/bus/mvebu-mbus.c
+@@ -210,12 +210,25 @@ static void mvebu_mbus_disable_window(struct mvebu_mbus_state *mbus,
+ }
+ 
+ /* Checks whether the given window number is available */
++
++/* On Armada XP, 375 and 38x the MBus window 13 has the remap
++ * capability, like windows 0 to 7. However, the mvebu-mbus driver
++ * isn't currently taking into account this special case, which means
++ * that when window 13 is actually used, the remap registers are left
++ * to 0, making the device using this MBus window unavailable. The
++ * quick fix for stable is to not use window 13. A follow up patch
++ * will correctly handle this window.
++*/
+ static int mvebu_mbus_window_is_free(struct mvebu_mbus_state *mbus,
+ 				     const int win)
+ {
+ 	void __iomem *addr = mbus->mbuswins_base +
+ 		mbus->soc->win_cfg_offset(win);
+ 	u32 ctrl = readl(addr + WIN_CTRL_OFF);
++
++	if (win == 13)
++		return false;
++
+ 	return !(ctrl & WIN_CTRL_ENABLE);
+ }
+ 
+-- 
+2.1.4
