@@ -1,28 +1,42 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Sun, 18 Jan 2015 23:29:45 +0100
-Subject: [PATCH 0/4] Drop legacy support for omap3517
-In-Reply-To: <20150118210217.GB31807@amd>
-References: <1421171865-5209-1-git-send-email-tony@atomide.com>
- <10549142.7lWnPtPtZG@wuerfel> <20150113204219.GJ2419@atomide.com>
- <201501132150.56938@pali> <20150118210217.GB31807@amd>
-Message-ID: <20150118222944.GA1698@earth.universe>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 19 Jan 2015 01:44:12 +0300
+Subject: [PATCH 12/23] ohci-s3c2410: use HUB_CHAR_*
+In-Reply-To: <4018572.5hhhepRR0W@wasted.cogentembedded.com>
+References: <4018572.5hhhepRR0W@wasted.cogentembedded.com>
+Message-ID: <2189806.lsQmK0PScD@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 18, 2015 at 10:02:17PM +0100, Pavel Machek wrote:
-> > He reported also some (still not fixed) regressions on n900.
-> 
-> adp1653 flash driver does not have device tree bindings, yet. Patches
-> were submitted, but I guess I'll need to push them some more.
+Fix  using the  bare numbers to set the 'wHubCharacteristics' field of the Hub
+Descriptor while the values are #define'd in <linux/usb/ch11.h>.
 
-Yes, but that's not a regression, since mainline kernel does not
-load adp1653 when booted in legacy mode.
+While at it, stop setting already set HUB_CHAR_INDV_PORT_LPSM once again.
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150118/7af19704/attachment-0001.sig>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
+---
+ drivers/usb/host/ohci-s3c2410.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+Index: usb/drivers/usb/host/ohci-s3c2410.c
+===================================================================
+--- usb.orig/drivers/usb/host/ohci-s3c2410.c
++++ usb/drivers/usb/host/ohci-s3c2410.c
+@@ -249,14 +249,14 @@ static int ohci_s3c2410_hub_control(
+ 		 */
+ 
+ 		desc->wHubCharacteristics &= ~cpu_to_le16(HUB_CHAR_LPSM);
+-		desc->wHubCharacteristics |= cpu_to_le16(0x0001);
++		desc->wHubCharacteristics |= cpu_to_le16(
++			HUB_CHAR_INDV_PORT_LPSM);
+ 
+ 		if (info->enable_oc) {
+ 			desc->wHubCharacteristics &= ~cpu_to_le16(
+ 				HUB_CHAR_OCPM);
+ 			desc->wHubCharacteristics |=  cpu_to_le16(
+-				0x0008 |
+-				0x0001);
++				HUB_CHAR_INDV_PORT_OCPM);
+ 		}
+ 
+ 		dev_dbg(hcd->self.controller, "wHubCharacteristics after 0x%04x\n",
