@@ -1,54 +1,31 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Sun, 18 Jan 2015 14:36:11 +0800
-Subject: [PATCH v7 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <20150116101034.GC13634@e104818-lin.cambridge.arm.com>
+Date: Sun, 18 Jan 2015 14:46:35 +0800
+Subject: [PATCH v7 06/17] ARM64 / ACPI: Make PCI optional for ACPI on ARM64
+In-Reply-To: <508480149.12941388.1421562696311.JavaMail.zimbra@zmail15.collab.prod.int.phx2.redhat.com>
 References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
- <CACxGe6v_BvCQqp8d=LaQ8HeaOU1Zh_HPpwFTdwOjHUbqXsnQ8g@mail.gmail.com>
- <20150115182346.GE2329@e104818-lin.cambridge.arm.com>
- <20150115190220.GF3043@sirena.org.uk>
- <20150115200437.GF24989@titan.lakedaemon.net>
- <20150116101034.GC13634@e104818-lin.cambridge.arm.com>
-Message-ID: <54BB545B.5060800@linaro.org>
+ <1421247905-3749-7-git-send-email-hanjun.guo@linaro.org>
+ <20150116094913.GA13634@e104818-lin.cambridge.arm.com>
+ <54BB51F1.8000900@linaro.org>
+ <508480149.12941388.1421562696311.JavaMail.zimbra@zmail15.collab.prod.int.phx2.redhat.com>
+Message-ID: <54BB56CB.7040701@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?01?16? 18:10, Catalin Marinas wrote:
-> On Thu, Jan 15, 2015 at 08:04:37PM +0000, Jason Cooper wrote:
->> On Thu, Jan 15, 2015 at 07:02:20PM +0000, Mark Brown wrote:
->>> On Thu, Jan 15, 2015 at 06:23:47PM +0000, Catalin Marinas wrote:
->>>> On Thu, Jan 15, 2015 at 04:26:20PM +0000, Grant Likely wrote:
->>>
->>>>> I'll get right to the point: Can we please have this series queued up
->>>>> for v3.20?
->>>
->>>> Before you even ask for this, please look at the patches and realise
->>>> that there is a complete lack of Reviewed-by tags on the code (well,
->>>> apart from trivial Kconfig changes). In addition, the series touches on
->>>> other subsystems like clocksource, irqchip, acpi and I don't see any
->>>> acks from the corresponding maintainers. So even if I wanted to merge
->>>> the series, there is no way it can be done without additional
->>>> reviews/acks. On the document (last patch), I'd like to see a statement
->>>
->>> There's probably a bit of a process problem here - these patches are all
->>> being posted as part of big and apparently controversial threads with
->>> subject lines in the form "ARM / ACPI:" so people could be forgiven for
->>> just not even reading the e-mails enough to notice changes to their
->>> subsystems.  Is it worth posting those patches separately more directly
->>> to the relevant maintainers?
->>
->> I think it's beneficial to post the entire series as one thread, but to
->> change the subject line of each patch to adequately reflect the affected
->> subsystem.
+On 2015?01?18? 14:31, Jon Masters wrote:
+> Hi Folks,
 >
-> Indeed, keeping the series as one thread is better. Apart from a
-> slightly less misleading subject, I suggest Hanjun that he passes each
-> patch via get_maintainer.pl and adds the corresponding Cc: lines to the
-> commit log. I think that's a clearer way keep track of who needs to
-> ack/review the patches.
+> Sorry for top posting from bed. The mainstream servers will all likely do
+ > PCIe but there are several that may not. They should not be excluded. 
+That said,
+ >if we booted a previously built kernel on a system without an MCFG and
+ > got no ECAM/root then things would probably still work.
+>
+> I think it'll work out either way but for the record there is no requirement to do PCIe on ARM servers that conform to spec.
 
-I already checked all the patches with get_maintainer.pl, and CC the 
-maintainers in the CC list, I will add the corresponding Cc: lines in
-next version.
+OK, Catalin already said that was not the main point of the
+comments for this patch, I think the title and change log
+of the patch is inconsistent with the code makes Catalin confused,
+I will update them in next version.
 
 Thanks
 Hanjun
