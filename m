@@ -1,200 +1,28 @@
-From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Sun, 18 Jan 2015 23:25:32 +0100
-Subject: [PATCHv5 3/6] USB: host: ehci-atmel: Move global variables to private
- struct
-In-Reply-To: <1421619935-5022-1-git-send-email-sylvain.rochet@finsecur.com>
-References: <20150118211728.GA21128@gradator.net>
- <1421619935-5022-1-git-send-email-sylvain.rochet@finsecur.com>
-Message-ID: <1421619935-5022-4-git-send-email-sylvain.rochet@finsecur.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Sun, 18 Jan 2015 23:29:45 +0100
+Subject: [PATCH 0/4] Drop legacy support for omap3517
+In-Reply-To: <20150118210217.GB31807@amd>
+References: <1421171865-5209-1-git-send-email-tony@atomide.com>
+ <10549142.7lWnPtPtZG@wuerfel> <20150113204219.GJ2419@atomide.com>
+ <201501132150.56938@pali> <20150118210217.GB31807@amd>
+Message-ID: <20150118222944.GA1698@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch move Atmel EHCI global variables (clocks ptr and clocked
-boolean) to private struct atmel_ehci_priv, stored in ehci->priv.
+On Sun, Jan 18, 2015 at 10:02:17PM +0100, Pavel Machek wrote:
+> > He reported also some (still not fixed) regressions on n900.
+> 
+> adp1653 flash driver does not have device tree bindings, yet. Patches
+> were submitted, but I guess I'll need to push them some more.
 
-Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
----
- drivers/usb/host/ehci-atmel.c | 79 +++++++++++++++++++++++++++----------------
- 1 file changed, 50 insertions(+), 29 deletions(-)
+Yes, but that's not a regression, since mainline kernel does not
+load adp1653 when booted in legacy mode.
 
-diff --git a/drivers/usb/host/ehci-atmel.c b/drivers/usb/host/ehci-atmel.c
-index 5a15e3d..663f790 100644
---- a/drivers/usb/host/ehci-atmel.c
-+++ b/drivers/usb/host/ehci-atmel.c
-@@ -27,48 +27,66 @@
- #define DRIVER_DESC "EHCI Atmel driver"
- 
- static const char hcd_name[] = "ehci-atmel";
--static struct hc_driver __read_mostly ehci_atmel_hc_driver;
- 
- /* interface and function clocks */
--static struct clk *iclk, *fclk, *uclk;
--static int clocked;
-+#define hcd_to_atmel_ehci_priv(h) \
-+	((struct atmel_ehci_priv *)hcd_to_ehci(h)->priv)
-+
-+struct atmel_ehci_priv {
-+	struct clk *iclk;
-+	struct clk *fclk;
-+	struct clk *uclk;
-+	bool clocked;
-+};
-+
-+static struct hc_driver __read_mostly ehci_atmel_hc_driver;
-+
-+static const struct ehci_driver_overrides ehci_atmel_drv_overrides __initconst = {
-+	.extra_priv_size = sizeof(struct atmel_ehci_priv),
-+};
- 
- /*-------------------------------------------------------------------------*/
- 
--static void atmel_start_clock(void)
-+static void atmel_start_clock(struct atmel_ehci_priv *atmel_ehci)
- {
--	if (clocked)
-+	if (atmel_ehci->clocked)
- 		return;
- 	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
--		clk_set_rate(uclk, 48000000);
--		clk_prepare_enable(uclk);
-+		clk_set_rate(atmel_ehci->uclk, 48000000);
-+		clk_prepare_enable(atmel_ehci->uclk);
- 	}
--	clk_prepare_enable(iclk);
--	clk_prepare_enable(fclk);
--	clocked = 1;
-+	clk_prepare_enable(atmel_ehci->iclk);
-+	clk_prepare_enable(atmel_ehci->fclk);
-+	atmel_ehci->clocked = true;
- }
- 
--static void atmel_stop_clock(void)
-+static void atmel_stop_clock(struct atmel_ehci_priv *atmel_ehci)
- {
--	if (!clocked)
-+	if (!atmel_ehci->clocked)
- 		return;
--	clk_disable_unprepare(fclk);
--	clk_disable_unprepare(iclk);
-+	clk_disable_unprepare(atmel_ehci->fclk);
-+	clk_disable_unprepare(atmel_ehci->iclk);
- 	if (IS_ENABLED(CONFIG_COMMON_CLK))
--		clk_disable_unprepare(uclk);
--	clocked = 0;
-+		clk_disable_unprepare(atmel_ehci->uclk);
-+	atmel_ehci->clocked = false;
- }
- 
- static void atmel_start_ehci(struct platform_device *pdev)
- {
-+	struct usb_hcd *hcd = platform_get_drvdata(pdev);
-+	struct atmel_ehci_priv *atmel_ehci = hcd_to_atmel_ehci_priv(hcd);
-+
- 	dev_dbg(&pdev->dev, "start\n");
--	atmel_start_clock();
-+	atmel_start_clock(atmel_ehci);
- }
- 
- static void atmel_stop_ehci(struct platform_device *pdev)
- {
-+	struct usb_hcd *hcd = platform_get_drvdata(pdev);
-+	struct atmel_ehci_priv *atmel_ehci = hcd_to_atmel_ehci_priv(hcd);
-+
- 	dev_dbg(&pdev->dev, "stop\n");
--	atmel_stop_clock();
-+	atmel_stop_clock(atmel_ehci);
- }
- 
- /*-------------------------------------------------------------------------*/
-@@ -79,6 +97,7 @@ static int ehci_atmel_drv_probe(struct platform_device *pdev)
- 	const struct hc_driver *driver = &ehci_atmel_hc_driver;
- 	struct resource *res;
- 	struct ehci_hcd *ehci;
-+	struct atmel_ehci_priv *atmel_ehci;
- 	int irq;
- 	int retval;
- 
-@@ -109,6 +128,7 @@ static int ehci_atmel_drv_probe(struct platform_device *pdev)
- 		retval = -ENOMEM;
- 		goto fail_create_hcd;
- 	}
-+	atmel_ehci = hcd_to_atmel_ehci_priv(hcd);
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	hcd->regs = devm_ioremap_resource(&pdev->dev, res);
-@@ -120,23 +140,23 @@ static int ehci_atmel_drv_probe(struct platform_device *pdev)
- 	hcd->rsrc_start = res->start;
- 	hcd->rsrc_len = resource_size(res);
- 
--	iclk = devm_clk_get(&pdev->dev, "ehci_clk");
--	if (IS_ERR(iclk)) {
-+	atmel_ehci->iclk = devm_clk_get(&pdev->dev, "ehci_clk");
-+	if (IS_ERR(atmel_ehci->iclk)) {
- 		dev_err(&pdev->dev, "Error getting interface clock\n");
- 		retval = -ENOENT;
- 		goto fail_request_resource;
- 	}
--	fclk = devm_clk_get(&pdev->dev, "uhpck");
--	if (IS_ERR(fclk)) {
-+	atmel_ehci->fclk = devm_clk_get(&pdev->dev, "uhpck");
-+	if (IS_ERR(atmel_ehci->fclk)) {
- 		dev_err(&pdev->dev, "Error getting function clock\n");
- 		retval = -ENOENT;
- 		goto fail_request_resource;
- 	}
- 	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
--		uclk = devm_clk_get(&pdev->dev, "usb_clk");
--		if (IS_ERR(uclk)) {
-+		atmel_ehci->uclk = devm_clk_get(&pdev->dev, "usb_clk");
-+		if (IS_ERR(atmel_ehci->uclk)) {
- 			dev_err(&pdev->dev, "failed to get uclk\n");
--			retval = PTR_ERR(uclk);
-+			retval = PTR_ERR(atmel_ehci->uclk);
- 			goto fail_request_resource;
- 		}
- 	}
-@@ -173,7 +193,6 @@ static int ehci_atmel_drv_remove(struct platform_device *pdev)
- 	usb_put_hcd(hcd);
- 
- 	atmel_stop_ehci(pdev);
--	fclk = iclk = NULL;
- 
- 	return 0;
- }
-@@ -182,21 +201,23 @@ static int ehci_atmel_drv_remove(struct platform_device *pdev)
- static int ehci_atmel_drv_suspend(struct device *dev)
- {
- 	struct usb_hcd *hcd = dev_get_drvdata(dev);
-+	struct atmel_ehci_priv *atmel_ehci = hcd_to_atmel_ehci_priv(hcd);
- 	int ret;
- 
- 	ret = ehci_suspend(hcd, false);
- 	if (ret)
- 		return ret;
- 
--	atmel_stop_clock();
-+	atmel_stop_clock(atmel_ehci);
- 	return 0;
- }
- 
- static int ehci_atmel_drv_resume(struct device *dev)
- {
- 	struct usb_hcd *hcd = dev_get_drvdata(dev);
-+	struct atmel_ehci_priv *atmel_ehci = hcd_to_atmel_ehci_priv(hcd);
- 
--	atmel_start_clock();
-+	atmel_start_clock(atmel_ehci);
- 	return ehci_resume(hcd, false);
- }
- #endif
-@@ -230,7 +251,7 @@ static int __init ehci_atmel_init(void)
- 		return -ENODEV;
- 
- 	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
--	ehci_init_driver(&ehci_atmel_hc_driver, NULL);
-+	ehci_init_driver(&ehci_atmel_hc_driver, &ehci_atmel_drv_overrides);
- 	return platform_driver_register(&ehci_atmel_driver);
- }
- module_init(ehci_atmel_init);
--- 
-2.1.4
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150118/7af19704/attachment-0001.sig>
