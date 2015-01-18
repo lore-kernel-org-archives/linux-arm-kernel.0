@@ -1,72 +1,87 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 18 Jan 2015 16:53:47 +0100
-Subject: [PATCH] bus: mvebu-mbus: fix support of MBus window 13
-In-Reply-To: <1421596214-15924-1-git-send-email-andrew@lunn.ch>
-References: <1419943428-18491-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <1421596214-15924-1-git-send-email-andrew@lunn.ch>
-Message-ID: <20150118155347.GE19604@lunn.ch>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Mon, 19 Jan 2015 00:15:53 +0800
+Subject: [PATCH v1] thermal: rockchip: make temperature reporting much more
+ accurate
+In-Reply-To: <1421597753-2082-1-git-send-email-wxt@rock-chips.com>
+References: <1421597753-2082-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <1421597753-2082-2-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 18, 2015 at 04:50:14PM +0100, Andrew Lunn wrote:
-> On Armada XP, 375 and 38x the MBus window 13 has the remap capability,
-> like windows 0 to 7. However, the mvebu-mbus driver isn't currently
-> taking into account this special case, which means that when window 13
-> is actually used, the remap registers are left to 0, making the device
-> using this MBus window unavailable.
-> 
-> As a minimal fix for stable, don't use window 13. A full fix will
-> follow later.
+In general, the kernel should report temperature readings exactly as
+reported by the hardware. The cpu / gpu thermal driver works in 5 degree
+increments,but we ought to do more accurate. The temperature will do
+linear interpolation between the entries in the table.
 
-Hi Gregory, Michal
+Test= $md5sum /dev/zero &
+$while true; do grep "" /sys/class/thermal/thermal_zone[1-2]/temp;
+sleep .5; done
 
-We need a minimal fix which can be back ported to stable, since the
-real fix is large. Thomas is now on vacation for a week, so i've tried
-to produce a fix. Please could you test this and let me know if it
-works.
+e.g. We can get the result as follows:
+    /sys/class/thermal/thermal_zone1/temp:39994
+    /sys/class/thermal/thermal_zone2/temp:39086
+    /sys/class/thermal/thermal_zone1/temp:39994
+    /sys/class/thermal/thermal_zone2/temp:39540
+    /sys/class/thermal/thermal_zone1/temp:39540
+    /sys/class/thermal/thermal_zone2/temp:39540
+    /sys/class/thermal/thermal_zone1/temp:39540
+    /sys/class/thermal/thermal_zone2/temp:39994
 
-Thanks
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 
-	Andrew
+---
 
-> 
-> Fixes: fddddb52a6c ("bus: introduce an Marvell EBU MBus driver")
-> Cc: <stable@vger.kernel.org> # v3.10+
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
->  drivers/bus/mvebu-mbus.c | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
-> 
-> diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-> index eb7682dc123b..81bf297f1034 100644
-> --- a/drivers/bus/mvebu-mbus.c
-> +++ b/drivers/bus/mvebu-mbus.c
-> @@ -210,12 +210,25 @@ static void mvebu_mbus_disable_window(struct mvebu_mbus_state *mbus,
->  }
->  
->  /* Checks whether the given window number is available */
-> +
-> +/* On Armada XP, 375 and 38x the MBus window 13 has the remap
-> + * capability, like windows 0 to 7. However, the mvebu-mbus driver
-> + * isn't currently taking into account this special case, which means
-> + * that when window 13 is actually used, the remap registers are left
-> + * to 0, making the device using this MBus window unavailable. The
-> + * quick fix for stable is to not use window 13. A follow up patch
-> + * will correctly handle this window.
-> +*/
->  static int mvebu_mbus_window_is_free(struct mvebu_mbus_state *mbus,
->  				     const int win)
->  {
->  	void __iomem *addr = mbus->mbuswins_base +
->  		mbus->soc->win_cfg_offset(win);
->  	u32 ctrl = readl(addr + WIN_CTRL_OFF);
-> +
-> +	if (win == 13)
-> +		return false;
-> +
->  	return !(ctrl & WIN_CTRL_ENABLE);
->  }
->  
-> -- 
-> 2.1.4
-> 
+ drivers/thermal/rockchip_thermal.c | 26 +++++++++++++++++---------
+ 1 file changed, 17 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
+index 1bcddfc..a7ae23a 100644
+--- a/drivers/thermal/rockchip_thermal.c
++++ b/drivers/thermal/rockchip_thermal.c
+@@ -193,19 +193,18 @@ static u32 rk_tsadcv2_temp_to_code(long temp)
+ 
+ static long rk_tsadcv2_code_to_temp(u32 code)
+ {
+-	int high, low, mid;
+-
+-	low = 0;
+-	high = ARRAY_SIZE(v2_code_table) - 1;
+-	mid = (high + low) / 2;
++	unsigned int low = 0;
++	unsigned int high = ARRAY_SIZE(v2_code_table) - 1;
++	unsigned int mid = (low + high) / 2;
++	unsigned int scale;
+ 
+ 	if (code > v2_code_table[low].code || code < v2_code_table[high].code)
+ 		return 125000; /* No code available, return max temperature */
+ 
+ 	while (low <= high) {
+-		if (code >= v2_code_table[mid].code && code <
+-		    v2_code_table[mid - 1].code)
+-			return v2_code_table[mid].temp;
++		if (code >= v2_code_table[mid].code &&
++		    code < v2_code_table[mid - 1].code)
++			break;
+ 		else if (code < v2_code_table[mid].code)
+ 			low = mid + 1;
+ 		else
+@@ -213,7 +212,16 @@ static long rk_tsadcv2_code_to_temp(u32 code)
+ 		mid = (low + high) / 2;
+ 	}
+ 
+-	return 125000;
++	/*
++	 * The 5C granularity provided by the table is too much. Let's
++	 * assume that the relationship between sensor readings and
++	 * temperature between 2 table entries is linear and extrapolate
++	 * to produce less granular result.
++	 */
++	scale = (v2_code_table[mid].temp - v2_code_table[mid - 1].temp) /
++		(v2_code_table[mid - 1].code - v2_code_table[mid].code);
++	return v2_code_table[mid - 1].temp +
++			(v2_code_table[mid - 1].code - code) * scale;
+ }
+ 
+ /**
+-- 
+1.9.1
