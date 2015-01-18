@@ -1,28 +1,54 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sun, 18 Jan 2015 19:28:58 +0100
-Subject: [PATCH RESEND] pxa_timer: fix session missmatch warning
-In-Reply-To: <1421286860-23296-1-git-send-email-dbaryshkov@gmail.com>
-References: <1421286860-23296-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <54BBFB6A.5060104@linaro.org>
+Date: Sun, 18 Jan 2015 19:40:56 +0100
+Subject: [PATCH 1/5] clocksource: sun5i: Switch to request_irq
+In-Reply-To: <1420976410-7826-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1420976410-7826-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1420976410-7826-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <54BBFE38.5000204@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/15/2015 02:54 AM, Dmitry Eremin-Solenikov wrote:
-> Fix the following warning:
+On 01/11/2015 12:40 PM, Maxime Ripard wrote:
+> The current code uses setup_irq, while it could perfectly use the much simpler
+> request_irq. Switch to that.
 >
-> WARNING: drivers/clocksource/built-in.o(.text.unlikely+0x70): Section mismatch in reference from the function pxa_timer_common_init() to the function .init.text:clocksource_mmio_init()
-> The function pxa_timer_common_init() references
-> the function __init clocksource_mmio_init().
-> This is often because pxa_timer_common_init lacks a __init
-> annotation or the annotation of clocksource_mmio_init is wrong.
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>   drivers/clocksource/timer-sun5i.c | 10 ++--------
+>   1 file changed, 2 insertions(+), 8 deletions(-)
 >
-> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com
+> diff --git a/drivers/clocksource/timer-sun5i.c b/drivers/clocksource/timer-sun5i.c
+> index 02268448dc85..738853873a3b 100644
+> --- a/drivers/clocksource/timer-sun5i.c
+> +++ b/drivers/clocksource/timer-sun5i.c
+> @@ -130,13 +130,6 @@ static irqreturn_t sun5i_timer_interrupt(int irq, void *dev_id)
+>   	return IRQ_HANDLED;
+>   }
+>
+> -static struct irqaction sun5i_timer_irq = {
+> -	.name = "sun5i_timer0",
+> -	.flags = IRQF_TIMER | IRQF_IRQPOLL,
+> -	.handler = sun5i_timer_interrupt,
+> -	.dev_id = &sun5i_clockevent,
+> -};
+> -
+>   static u64 sun5i_timer_sched_read(void)
+>   {
+>   	return ~readl(timer_base + TIMER_CNTVAL_LO_REG(1));
+> @@ -178,7 +171,8 @@ static void __init sun5i_timer_init(struct device_node *node)
+>
+>   	ticks_per_jiffy = DIV_ROUND_UP(rate, HZ);
+>
+> -	ret = setup_irq(irq, &sun5i_timer_irq);
+> +	ret = request_irq(irq, sun5i_timer_interrupt, IRQF_TIMER | IRQF_IRQPOLL,
+> +			  "sun5i_timer", &sun5i_clockevent);
 
-Applied to my tree.
+Is the timer name change done in purpose ?
 
-Thanks !
-
-   -- Daniel
+>   	if (ret)
+>   		pr_warn("failed to setup irq %d\n", irq);
+>
+>
 
 
 -- 
