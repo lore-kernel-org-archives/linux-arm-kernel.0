@@ -1,50 +1,68 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 18 Jan 2015 10:47:41 +0100
-Subject: [PATCH v5 2/3] i2c: iproc: Add Broadcom iProc I2C Driver
-In-Reply-To: <54BB795C.6040402@broadcom.com>
-References: <rjui@broadcom.com>
- <1421451737-7107-1-git-send-email-rjui@broadcom.com>
- <1421451737-7107-3-git-send-email-rjui@broadcom.com>
- <54BB795C.6040402@broadcom.com>
-Message-ID: <20150118094741.GE22880@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Sun, 18 Jan 2015 09:52:14 +0000
+Subject: [PATCH 1/5] mfd: tps65218: make INT[12] and STATUS registers
+ volatile
+In-Reply-To: <1419622104-25812-2-git-send-email-balbi@ti.com>
+References: <1419622104-25812-1-git-send-email-balbi@ti.com>
+ <1419622104-25812-2-git-send-email-balbi@ti.com>
+Message-ID: <20150118095214.GA3574@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, 26 Dec 2014, Felipe Balbi wrote:
 
-On Sun, Jan 18, 2015 at 10:14:04AM +0100, Arend van Spriel wrote:
-> On 01/17/15 00:42, Ray Jui wrote:
+> STATUS register can be modified by the HW, so we
+> should bypass cache because of that.
 > 
-> [...]
+> In the case of INT[12] registers, they are the ones
+> that actually clear the IRQ source at the time they
+> are read. If we rely on the cache for them, we will
+> never be able to clear the interrupt, which will cause
+> our IRQ line to be disabled due to IRQ throttling.
 > 
-> >+/*
-> >+ * Can be expanded in the future if more interrupt status bits are utilized
-> >+ */
-> >+#define ISR_MASK (1<<  IS_M_START_BUSY_SHIFT)
-> >+
-> >+static irqreturn_t bcm_iproc_i2c_isr(int irq, void *data)
-> >+{
-> >+	struct bcm_iproc_i2c_dev *iproc_i2c = data;
-> >+	u32 status = readl(iproc_i2c->base + IS_OFFSET);
-> >+
-> >+	status&= ISR_MASK;
-> >+
-> >+	if (!status)
-> >+		return IRQ_NONE;
-> >+
-> >+	writel(status, iproc_i2c->base + IS_OFFSET);
-> >+	complete_all(&iproc_i2c->done);
-> 
-> Looking over this code it seems to me there is always a single
-> process waiting for iproc_i2c->done to complete. So using complete()
-> here would suffice.
-Yeah, there is always only a single thread waiting. That means both
-complete and complete_all are suitable. AFAIK there is no reason to pick
-one over the other in this case.
+> Fixes: 44b4dc6 mfd: tps65218: Add driver for the TPS65218 PMIC
+> Cc: <stable@vger.kernel.org> # v3.15+
+> Cc: Keerthy <j-keerthy@ti.com>
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+>  drivers/mfd/tps65218.c | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
 
-Best regards
-Uwe
+Sorry for the delay.  It's difficult to get a WiFi signal 2000m up in
+an Austrian mountain. :)
+
+Applied now, thanks.
+
+> diff --git a/drivers/mfd/tps65218.c b/drivers/mfd/tps65218.c
+> index 0d256cb..2243f75 100644
+> --- a/drivers/mfd/tps65218.c
+> +++ b/drivers/mfd/tps65218.c
+> @@ -125,10 +125,21 @@ int tps65218_clear_bits(struct tps65218 *tps, unsigned int reg,
+>  }
+>  EXPORT_SYMBOL_GPL(tps65218_clear_bits);
+>  
+> +static const struct regmap_range tps65218_yes_ranges[] = {
+> +	regmap_reg_range(TPS65218_REG_INT1, TPS65218_REG_INT2),
+> +	regmap_reg_range(TPS65218_REG_STATUS, TPS65218_REG_STATUS),
+> +};
+> +
+> +static const struct regmap_access_table tps65218_volatile_table = {
+> +	.yes_ranges = tps65218_yes_ranges,
+> +	.n_yes_ranges = ARRAY_SIZE(tps65218_yes_ranges),
+> +};
+> +
+>  static struct regmap_config tps65218_regmap_config = {
+>  	.reg_bits = 8,
+>  	.val_bits = 8,
+>  	.cache_type = REGCACHE_RBTREE,
+> +	.volatile_table = &tps65218_volatile_table,
+>  };
+>  
+>  static const struct regmap_irq tps65218_irqs[] = {
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
