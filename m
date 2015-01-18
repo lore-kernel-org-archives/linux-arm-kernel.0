@@ -1,60 +1,90 @@
 From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Sun, 18 Jan 2015 23:25:29 +0100
-Subject: [PATCHv5 0/6] USB: host: Atmel OHCI and EHCI drivers improvements
-In-Reply-To: <20150118211728.GA21128@gradator.net>
+Date: Sun, 18 Jan 2015 23:25:30 +0100
+Subject: [PATCHv5 1/6] USB: host: ehci-atmel: Add suspend/resume support
+In-Reply-To: <1421619935-5022-1-git-send-email-sylvain.rochet@finsecur.com>
 References: <20150118211728.GA21128@gradator.net>
-Message-ID: <1421619935-5022-1-git-send-email-sylvain.rochet@finsecur.com>
+ <1421619935-5022-1-git-send-email-sylvain.rochet@finsecur.com>
+Message-ID: <1421619935-5022-2-git-send-email-sylvain.rochet@finsecur.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-USB: host: Atmel OHCI and EHCI drivers improvements
+This patch add suspend/resume support for Atmel EHCI, mostly
+about disabling and unpreparing clocks so USB PLL is stopped
+before entering sleep state.
 
-Suspend/resume support for EHCI.
-struct dev_pm_ops for OHCI.
-Removed global variables from both.
-Fixed OHCI wake up support for STANDBY(wake-up enabled) and MEM(wake-up 
-disabled) sleep targets.
+Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+---
+ drivers/usb/host/ehci-atmel.c | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
-Changes since v4:
-  * Re-add at91_suspend_entering_slow_clock() to OHCI, we can't naively
-    remove this one, this device needs to be continuously clocked to
-    provide wake up support.
-    The removal of at91_suspend_entering_slow_clock() actually lighted up
-    an issue on wake up support, which is now fixed.
-
-Changes since v3:
-  * Using struct dev_pm_ops instead of static struct platform_driver
-    resume and suspend bindings for both EHCI and OHCI
-  * Fixed inconsistency in patch subjects, _ intead of - for file names
-  * Patch cleaning with the help of checkpatch.pl, fixed lines over
-    80 characters
-
-Changes since v2:
-  * Added patchs from an other submission, because this series
-    depended on this one
-    * EHCI: Move global variables to private struct
-    * OHCI: Move global variables to private struct
-  * Using ohci->priv and ehci->priv instead of hcd->hcd_priv,
-    which were not the right way to do that
-
-Changes since v1:
-  * Don't use at91_suspend_entering_slow_clock() on EHCI,
-    we are trying to get read of this of this function
-  * Removed at91_suspend_entering_slow_clock() from OHCI
-
-Sylvain Rochet (6):
-  USB: host: ehci-atmel: Add suspend/resume support
-  USB: host: ohci-at91: Use struct dev_pm_ops instead of struct
-    platform_driver
-  USB: host: ehci-atmel: Move global variables to private struct
-  USB: host: ohci-at91: Fix wake-up support
-  USB: host: ohci-at91: Move global variables to private struct
-  USB: host: ohci-at91: usb_hcd_at91_probe(), remove useless stack
-    initialisation
-
- drivers/usb/host/ehci-atmel.c | 102 ++++++++++++++++++++++++++---------
- drivers/usb/host/ohci-at91.c  | 120 +++++++++++++++++++++++++-----------------
- 2 files changed, 150 insertions(+), 72 deletions(-)
-
+diff --git a/drivers/usb/host/ehci-atmel.c b/drivers/usb/host/ehci-atmel.c
+index 56a8850..5a15e3d 100644
+--- a/drivers/usb/host/ehci-atmel.c
++++ b/drivers/usb/host/ehci-atmel.c
+@@ -37,6 +37,8 @@ static int clocked;
+ 
+ static void atmel_start_clock(void)
+ {
++	if (clocked)
++		return;
+ 	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
+ 		clk_set_rate(uclk, 48000000);
+ 		clk_prepare_enable(uclk);
+@@ -48,6 +50,8 @@ static void atmel_start_clock(void)
+ 
+ static void atmel_stop_clock(void)
+ {
++	if (!clocked)
++		return;
+ 	clk_disable_unprepare(fclk);
+ 	clk_disable_unprepare(iclk);
+ 	if (IS_ENABLED(CONFIG_COMMON_CLK))
+@@ -174,6 +178,29 @@ static int ehci_atmel_drv_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM
++static int ehci_atmel_drv_suspend(struct device *dev)
++{
++	struct usb_hcd *hcd = dev_get_drvdata(dev);
++	int ret;
++
++	ret = ehci_suspend(hcd, false);
++	if (ret)
++		return ret;
++
++	atmel_stop_clock();
++	return 0;
++}
++
++static int ehci_atmel_drv_resume(struct device *dev)
++{
++	struct usb_hcd *hcd = dev_get_drvdata(dev);
++
++	atmel_start_clock();
++	return ehci_resume(hcd, false);
++}
++#endif
++
+ #ifdef CONFIG_OF
+ static const struct of_device_id atmel_ehci_dt_ids[] = {
+ 	{ .compatible = "atmel,at91sam9g45-ehci" },
+@@ -183,12 +210,16 @@ static const struct of_device_id atmel_ehci_dt_ids[] = {
+ MODULE_DEVICE_TABLE(of, atmel_ehci_dt_ids);
+ #endif
+ 
++static SIMPLE_DEV_PM_OPS(ehci_atmel_pm_ops, ehci_atmel_drv_suspend,
++					ehci_atmel_drv_resume);
++
+ static struct platform_driver ehci_atmel_driver = {
+ 	.probe		= ehci_atmel_drv_probe,
+ 	.remove		= ehci_atmel_drv_remove,
+ 	.shutdown	= usb_hcd_platform_shutdown,
+ 	.driver		= {
+ 		.name	= "atmel-ehci",
++		.pm	= &ehci_atmel_pm_ops,
+ 		.of_match_table	= of_match_ptr(atmel_ehci_dt_ids),
+ 	},
+ };
 -- 
 2.1.4
