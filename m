@@ -1,41 +1,33 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 18 Jan 2015 13:01:39 +0100
-Subject: 3.19 on Nokia n900: audio quality awful
-In-Reply-To: <20150106170433.GA5408@amd>
-References: <20150106170433.GA5408@amd>
-Message-ID: <20150118120139.GA1509@amd>
+Date: Sun, 18 Jan 2015 13:02:38 +0100
+Subject: [PATCH] bluetooth: Add hci_h4p driver
+In-Reply-To: <20141223130219.GA5731@amd>
+References: <20141223130219.GA5731@amd>
+Message-ID: <20150118120238.GA16357@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi!
 
-If you have any idea about playback problems, help would be still
-welcome. I'll have to do bisect, otherwise, and it will not be easy.
-
-> In 3.18, sound is nice and clear.
+> Add HCI driver for H4 with Nokia extensions. This device is used on
+> Nokia N900 cell phone.
 > 
-> In 3.19, sound is unusable. It produces nasty tone when it should be
-> quiet, and there's at least as much noise as is sound.
-> 
-> Unfortunately, list of mixers also changed (and there's cca 120
-> settings), but a) it does not work with the old list and b) nothing I
-> could figure out did make the sound usable. Some setting resulted in
-> even more noise.
-> 
-> Any idea what could have caused it?
+> Older version of this driver lived in staging, before being reverted
+> in a4102f90e87cfaa3fdbed6fdf469b23f0eeb4bfd .
 
-I tried audio recording this time.
+Any news here? I'd like the driver to hit 3.20...
 
-In 2.6.28-nokia, it is neccessary to set "Input select" na "digital
-mic", then it works. Input select being in "playback" option makes it
-easy to miss.
+								Pavel
 
-In 3.18 and 3.19-rc3, all I can record are zeros.
 
-Does playback/recording work for you on OMAP 3430-based machines?
+>  Kconfig      |   10 
+>  Makefile     |    4 
+>  nokia_core.c | 1149 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+>  nokia_fw.c   |   99 +++++
+>  nokia_h4p.h  |  214 ++++++++++
+>  nokia_uart.c |  171 ++++++++
+>  7 files changed, 1667 insertions(+)
 
-Thanks,
-									Pavel
 -- 
 (english) http://www.livejournal.com/~pavelmachek
 (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
