@@ -1,42 +1,30 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 19 Jan 2015 01:44:12 +0300
-Subject: [PATCH 12/23] ohci-s3c2410: use HUB_CHAR_*
-In-Reply-To: <4018572.5hhhepRR0W@wasted.cogentembedded.com>
-References: <4018572.5hhhepRR0W@wasted.cogentembedded.com>
-Message-ID: <2189806.lsQmK0PScD@wasted.cogentembedded.com>
+From: daniel@zonque.org (Daniel Mack)
+Date: Mon, 19 Jan 2015 00:16:08 +0100
+Subject: [PATCH 1/2] clk: pxa: add pxa3xx clock driver
+In-Reply-To: <87ppar4onn.fsf@free.fr>
+References: <1420577139-30556-1-git-send-email-robert.jarzmik@free.fr>
+ <87ppar4onn.fsf@free.fr>
+Message-ID: <54BC3EB8.9020304@zonque.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix  using the  bare numbers to set the 'wHubCharacteristics' field of the Hub
-Descriptor while the values are #define'd in <linux/usb/ch11.h>.
+Hi Robert,
 
-While at it, stop setting already set HUB_CHAR_INDV_PORT_LPSM once again.
+On 01/06/2015 09:53 PM, Robert Jarzmik wrote:
+> I'd need a test to see if the pxa3xx clocks are actually working.
+> I prepared a tree in here :
+>   git fetch https://github.com/rjarzmik/linux work/clocks-pxa
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Very sorry for the long delay on this. I finally got around to give this
+a try, and at a glance, things look fine.
 
----
- drivers/usb/host/ohci-s3c2410.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+However, I noticed a number of regressions in the PXA3xx area which I
+will investigate on later this week, one of which causing the system to
+crash on suspend. But that seems unrelated to the clocking patches, so
+I'd say they're good to go in the next merge window.
 
-Index: usb/drivers/usb/host/ohci-s3c2410.c
-===================================================================
---- usb.orig/drivers/usb/host/ohci-s3c2410.c
-+++ usb/drivers/usb/host/ohci-s3c2410.c
-@@ -249,14 +249,14 @@ static int ohci_s3c2410_hub_control(
- 		 */
- 
- 		desc->wHubCharacteristics &= ~cpu_to_le16(HUB_CHAR_LPSM);
--		desc->wHubCharacteristics |= cpu_to_le16(0x0001);
-+		desc->wHubCharacteristics |= cpu_to_le16(
-+			HUB_CHAR_INDV_PORT_LPSM);
- 
- 		if (info->enable_oc) {
- 			desc->wHubCharacteristics &= ~cpu_to_le16(
- 				HUB_CHAR_OCPM);
- 			desc->wHubCharacteristics |=  cpu_to_le16(
--				0x0008 |
--				0x0001);
-+				HUB_CHAR_INDV_PORT_OCPM);
- 		}
- 
- 		dev_dbg(hcd->self.controller, "wHubCharacteristics after 0x%04x\n",
+Will get back once I figured out the other issues that I'm seeing.
+
+
+Thanks for working on this,
+Daniel
