@@ -1,35 +1,102 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 18 Jan 2015 17:29:58 +0100
-Subject: [PATCH] bus: mvebu-mbus: fix support of MBus window 13
-In-Reply-To: <1421596214-15924-1-git-send-email-andrew@lunn.ch>
-References: <1419943428-18491-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <1421596214-15924-1-git-send-email-andrew@lunn.ch>
-Message-ID: <20150118172958.0fc11eb5@free-electrons.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Sun, 18 Jan 2015 17:56:21 +0100
+Subject: [PATCH 2/2] USB: gadget: atmel_usba_udc: Enable/disable USB PLL
+ on Vbus change
+In-Reply-To: <1421592681-28317-3-git-send-email-sylvain.rochet@finsecur.com>
+References: <20150117110710.GB24176@gradator.net>
+ <1421592681-28317-1-git-send-email-sylvain.rochet@finsecur.com>
+ <1421592681-28317-3-git-send-email-sylvain.rochet@finsecur.com>
+Message-ID: <20150118175621.6b519cdc@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
+On Sun, 18 Jan 2015 15:51:21 +0100
+Sylvain Rochet <sylvain.rochet@finsecur.com> wrote:
 
-On Sun, 18 Jan 2015 16:50:14 +0100, Andrew Lunn wrote:
-> On Armada XP, 375 and 38x the MBus window 13 has the remap capability,
-> like windows 0 to 7. However, the mvebu-mbus driver isn't currently
-> taking into account this special case, which means that when window 13
-> is actually used, the remap registers are left to 0, making the device
-> using this MBus window unavailable.
+> Prepare_enable on rising edge, disable_unprepare on falling edge. Reduce
+> power consumption if USB PLL is not already necessary for OHCI or EHCI.
+> If USB host is not connected we can sleep with USB PLL stopped.
 > 
-> As a minimal fix for stable, don't use window 13. A full fix will
-> follow later.
+> This driver does not support suspend/resume yet, not suspending if we
+> are still attached to an USB host is fine for what I need, this patch
+> allow suspending with USB PLL stopped when USB device is not currently
+> used.
 > 
-> Fixes: fddddb52a6c ("bus: introduce an Marvell EBU MBus driver")
-> Cc: <stable@vger.kernel.org> # v3.10+
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+> ---
+>  drivers/usb/gadget/udc/atmel_usba_udc.c | 95 ++++++++++++++++++++++++---------
+>  drivers/usb/gadget/udc/atmel_usba_udc.h |  4 ++
+>  2 files changed, 73 insertions(+), 26 deletions(-)
+> 
+> diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+> index e207d75..986677b 100644
+> --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
+> +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+> @@ -315,6 +315,38 @@ static inline void usba_cleanup_debugfs(struct usba_udc *udc)
+>  }
+>  #endif
+>  
+> +static int start_clock(struct usba_udc *udc)
+> +{
+> +	int ret;
+> +
+> +	if (udc->clocked)
+> +		return 0;
+> +
+> +	ret = clk_prepare_enable(udc->pclk);
+> +	if (ret)
+> +		return ret;
+> +	ret = clk_prepare_enable(udc->hclk);
+> +	if (ret) {
+> +		clk_disable_unprepare(udc->pclk);
+> +		return ret;
+> +	}
+> +
+> +	udc->clocked = true;
+> +	return ret;
+> +}
+> +
+> +static int stop_clock(struct usba_udc *udc)
+> +{
+> +	if (!udc->clocked)
+> +		return 0;
+> +
+> +	clk_disable_unprepare(udc->hclk);
+> +	clk_disable_unprepare(udc->pclk);
+> +
+> +	udc->clocked = false;
+> +	return 0;
+> +}
+> +
+>  static int vbus_is_present(struct usba_udc *udc)
+>  {
+>  	if (gpio_is_valid(udc->vbus_pin))
+> @@ -1719,42 +1751,55 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
+>  	return IRQ_HANDLED;
+>  }
+>  
+> -static irqreturn_t usba_vbus_irq(int irq, void *devid)
+> +static irqreturn_t usba_vbus_irq_thread(int irq, void *devid)
+>  {
+>  	struct usba_udc *udc = devid;
+>  	int vbus;
+> +	int ret;
+>  
+>  	/* debounce */
+>  	udelay(10);
+>  
+> -	spin_lock(&udc->lock);
+> +	mutex_lock(&udc->vbus_mutex);
+>  
+>  	/* May happen if Vbus pin toggles during probe() */
+> -	if (!udc->driver)
+> +	spin_lock(&udc->lock);
 
-Thanks a lot for doing this!
+Since this lock is taken in irq context (usba_udc_irq) and this
+handler is not called in irq context anymore you should use
+spin_lock_irqsave/unlock_irqrestore here.
 
-Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
 http://free-electrons.com
