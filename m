@@ -1,19 +1,14 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 18 Jan 2015 13:08:20 +0100
-Subject: [PATCH v3 2/2] ARM: dts: sun4i: Add dts file for Chuwi V7 CW0825
- tablet
-In-Reply-To: <1421582900-26040-1-git-send-email-hdegoede@redhat.com>
-References: <1421582900-26040-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1421582900-26040-2-git-send-email-hdegoede@redhat.com>
+Date: Sun, 18 Jan 2015 13:08:19 +0100
+Subject: [PATCH v3 1/2] ARM: dts: sun7i: Add dts file for Bananapro board
+Message-ID: <1421582900-26040-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Chuwi V7 is an A10 (sun4i) based tablet with 1G of RAM, 16G of nand flash,
-microsd slot, 7" 1024x768 lvds ips panel, mini hdmi out, headphones out,
-stereo speakers, front & back camera and usb wifi.
-
-It is clearly marked "CHUWI", "V7" and "Model: CW0825" on the back of the
-tablet.
+Add support for the new Bananapro A20 development board from lemaker.org.
+This board features 1G RAM, 2 USB A receptacles, 1 micro USB receptacle for
+OTG, 1 micro USB receptacle for power, HDMI, sata, Gbit ethernet, ir receiver,
+3.5 mm jack for a/v out, on board microphone, 40 gpio pins and sdio wifi.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
@@ -25,29 +20,29 @@ Changes in v2:
 Changes in v3:
 - Sort nodes alphabetically
 ---
- arch/arm/boot/dts/Makefile                      |   1 +
- arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts | 100 ++++++++++++++++++++++++
- 2 files changed, 101 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
+ arch/arm/boot/dts/Makefile                |   1 +
+ arch/arm/boot/dts/sun7i-a20-bananapro.dts | 262 ++++++++++++++++++++++++++++++
+ 2 files changed, 263 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-bananapro.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 34281aa..fa8fd93 100644
+index 601eb3d..34281aa 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -445,6 +445,7 @@ dtb-$(CONFIG_ARCH_STI)+= stih407-b2120.dtb \
- dtb-$(CONFIG_MACH_SUN4I) += \
- 	sun4i-a10-a1000.dtb \
- 	sun4i-a10-ba10-tvbox.dtb \
-+	sun4i-a10-chuwi-v7-cw0825.dtb \
- 	sun4i-a10-cubieboard.dtb \
- 	sun4i-a10-mini-xplus.dtb \
- 	sun4i-a10-hackberry.dtb \
-diff --git a/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts b/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
+@@ -465,6 +465,7 @@ dtb-$(CONFIG_MACH_SUN6I) += \
+ 	sun6i-a31s-cs908.dtb
+ dtb-$(CONFIG_MACH_SUN7I) += \
+ 	sun7i-a20-bananapi.dtb \
++	sun7i-a20-bananapro.dtb \
+ 	sun7i-a20-cubieboard2.dtb \
+ 	sun7i-a20-cubietruck.dtb \
+ 	sun7i-a20-hummingbird.dtb \
+diff --git a/arch/arm/boot/dts/sun7i-a20-bananapro.dts b/arch/arm/boot/dts/sun7i-a20-bananapro.dts
 new file mode 100644
-index 0000000..58214f2
+index 0000000..fb89fe7
 --- /dev/null
-+++ b/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
-@@ -0,0 +1,100 @@
++++ b/arch/arm/boot/dts/sun7i-a20-bananapro.dts
+@@ -0,0 +1,262 @@
 +/*
 + * Copyright 2015 Hans de Goede <hdegoede@redhat.com>
 + *
@@ -96,17 +91,78 @@ index 0000000..58214f2
 + */
 +
 +/dts-v1/;
-+#include "sun4i-a10.dtsi"
++#include "sun7i-a20.dtsi"
 +#include "sunxi-common-regulators.dtsi"
 +#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
 +
 +/ {
-+	model = "Chuwi V7 CW0825";
-+	compatible = "chuwi,v7-cw0825", "allwinner,sun4i-a10";
++	model = "LeMaker Banana Pro";
++	compatible = "lemaker,bananapro", "allwinner,sun7i-a20";
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&led_pins_bananapro>;
++
++		blue {
++			label = "bananapro:blue:usr";
++			gpios = <&pio 6 2 GPIO_ACTIVE_HIGH>;
++		};
++
++		green {
++			label = "bananapro:green:usr";
++			gpios = <&pio 7 24 GPIO_ACTIVE_HIGH>;
++		};
++	};
++
++	reg_gmac_3v3: gmac-3v3 {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&gmac_power_pin_bananapro>;
++		regulator-name = "gmac-3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		startup-delay-us = <100000>;
++		enable-active-high;
++		gpio = <&pio 7 23 GPIO_ACTIVE_HIGH>;
++	};
++
++	reg_vmmc3: vmmc3 {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&vmmc3_pin_bananapro>;
++		regulator-name = "vmmc3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		enable-active-high;
++		gpio = <&pio 7 22 GPIO_ACTIVE_HIGH>;
++	};
++};
++
++&ahci {
++	status = "okay";
++};
++
++&ehci0 {
++	status = "okay";
 +};
 +
 +&ehci1 {
 +	status = "okay";
++};
++
++&gmac {
++	pinctrl-names = "default";
++	pinctrl-0 = <&gmac_pins_rgmii_a>;
++	phy = <&phy1>;
++	phy-mode = "rgmii";
++	phy-supply = <&reg_gmac_3v3>;
++	status = "okay";
++
++	phy1: ethernet-phy at 1 {
++		reg = <1>;
++	};
 +};
 +
 +&i2c0 {
@@ -117,24 +173,112 @@ index 0000000..58214f2
 +	axp209: pmic at 34 {
 +		compatible = "x-powers,axp209";
 +		reg = <0x34>;
-+		interrupts = <0>;
++		interrupt-parent = <&nmi_intc>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
 +
 +		interrupt-controller;
 +		#interrupt-cells = <1>;
 +	};
 +};
 +
++&i2c2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c2_pins_a>;
++	status = "okay";
++};
++
++&ir0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&ir0_pins_a>;
++	status = "okay";
++};
++
 +&mmc0 {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_bananapro>;
 +	vmmc-supply = <&reg_vcc3v3>;
 +	bus-width = <4>;
-+	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
++	cd-gpios = <&pio 7 10 GPIO_ACTIVE_HIGH>; /* PH10 */
 +	cd-inverted;
 +	status = "okay";
 +};
 +
++&mmc3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc3_pins_a>;
++	vmmc-supply = <&reg_vmmc3>;
++	bus-width = <4>;
++	non-removable;
++	status = "okay";
++};
++
++&ohci0 {
++	status = "okay";
++};
++
++&ohci1 {
++	status = "okay";
++};
++
++&pio {
++	gmac_power_pin_bananapro: gmac_power_pin at 0 {
++		allwinner,pins = "PH23";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
++	led_pins_bananapro: led_pins at 0 {
++		allwinner,pins = "PH24", "PG2";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
++	mmc0_cd_pin_bananapro: mmc0_cd_pin at 0 {
++		allwinner,pins = "PH10";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++	};
++
++	usb1_vbus_pin_bananapro: usb1_vbus_pin at 0 {
++		allwinner,pins = "PH0";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
++	usb2_vbus_pin_bananapro: usb2_vbus_pin at 0 {
++		allwinner,pins = "PH1";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
++	vmmc3_pin_bananapro: vmmc3_pin at 0 {
++		allwinner,pins = "PH22";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++};
++
++&reg_usb1_vbus {
++	pinctrl-0 = <&usb1_vbus_pin_bananapro>;
++	gpio = <&pio 7 0 GPIO_ACTIVE_HIGH>; /* PH0 */
++	status = "okay";
++};
++
 +&reg_usb2_vbus {
++	pinctrl-0 = <&usb2_vbus_pin_bananapro>;
++	gpio = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
++	status = "okay";
++};
++
++&spi0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&spi0_pins_a>;
 +	status = "okay";
 +};
 +
@@ -144,7 +288,20 @@ index 0000000..58214f2
 +	status = "okay";
 +};
 +
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart2_pins_a>;
++	status = "okay";
++};
++
++&uart7 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart7_pins_a>;
++	status = "okay";
++};
++
 +&usbphy {
++	usb1_vbus-supply = <&reg_usb1_vbus>;
 +	usb2_vbus-supply = <&reg_usb2_vbus>;
 +	status = "okay";
 +};
