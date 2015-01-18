@@ -1,150 +1,214 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 17 Jan 2015 21:57:36 -0800
-Subject: [GIT PULL] ARM: SoC fixes
-Message-ID: <20150118055736.GA24081@quad.lixom.net>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Sun, 18 Jan 2015 14:25:53 +0800
+Subject: [PATCH v7 06/17] ARM64 / ACPI: Make PCI optional for ACPI on ARM64
+In-Reply-To: <20150116094913.GA13634@e104818-lin.cambridge.arm.com>
+References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
+ <1421247905-3749-7-git-send-email-hanjun.guo@linaro.org>
+ <20150116094913.GA13634@e104818-lin.cambridge.arm.com>
+Message-ID: <54BB51F1.8000900@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 2015?01?16? 17:49, Catalin Marinas wrote:
+> On Wed, Jan 14, 2015 at 03:04:54PM +0000, Hanjun Guo wrote:
+>> Since PCI is not required in ACPI spec and ARM can run without
+>> it, introduce some stub functions to make PCI optional for ACPI,
+>> and make ACPI core run without CONFIG_PCI on ARM64.
+>>
+>> When PCI is enabled on ARM64, ACPI core will need some PCI functions
+>> to make it functional, so introduce some empty functions here and
+>> implement it later.
+>>
+>> Since ACPI on X86 and IA64 depends on PCI and this patch only makes
+>> PCI optional for ARM64, it will not break anything on X86 and IA64.
+>>
+>> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>> Tested-by: Yijing Wang <wangyijing@huawei.com>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>
+> Is this patch still required, now that we have PCI for arm64? I know the
+> ACPI spec doesn't require PCI but do we expect any arm64 servers aimed
+> at ACPI without PCIe?
 
-The following changes since commit eaa27f34e91a14cdceed26ed6c6793ec1d186115:
+I think so, how about make ACPI depends on PCI on ARM64 too?
 
-  linux 3.19-rc4 (2015-01-11 12:44:53 -0800)
+>
+> Anyway, that's not the main point, see more below.
+>
+>> diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
+>> index 872ba93..fded096 100644
+>> --- a/arch/arm64/include/asm/pci.h
+>> +++ b/arch/arm64/include/asm/pci.h
+>> @@ -24,6 +24,12 @@
+>>    */
+>>   #define PCI_DMA_BUS_IS_PHYS	(0)
+>>
+>> +static inline int pci_get_legacy_ide_irq(struct pci_dev *dev, int channel)
+>> +{
+>> +	/* no legacy IRQ on arm64 */
+>> +	return -ENODEV;
+>> +}
+>> +
+>>   extern int isa_dma_bridge_buggy;
+>>
+>>   #ifdef CONFIG_PCI
+>> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+>> index ce5836c..42fb195 100644
+>> --- a/arch/arm64/kernel/pci.c
+>> +++ b/arch/arm64/kernel/pci.c
+>> @@ -10,6 +10,7 @@
+>>    *
+>>    */
+>>
+>> +#include <linux/acpi.h>
+>>   #include <linux/init.h>
+>>   #include <linux/io.h>
+>>   #include <linux/kernel.h>
+>> @@ -68,3 +69,30 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+>>   	bus->domain_nr = domain;
+>>   }
+>>   #endif
+>> +
+>> +/*
+>> + * raw_pci_read/write - Platform-specific PCI config space access.
+>> + *
+>> + * Default empty implementation.  Replace with an architecture-specific setup
+>> + * routine, if necessary.
+>> + */
+>> +int raw_pci_read(unsigned int domain, unsigned int bus,
+>> +		  unsigned int devfn, int reg, int len, u32 *val)
+>> +{
+>> +	return -EINVAL;
+>> +}
+>> +
+>> +int raw_pci_write(unsigned int domain, unsigned int bus,
+>> +		unsigned int devfn, int reg, int len, u32 val)
+>> +{
+>> +	return -EINVAL;
+>> +}
+>> +
+>> +#ifdef CONFIG_ACPI
+>> +/* Root bridge scanning */
+>> +struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+>> +{
+>> +	/* TODO: Should be revisited when implementing PCI on ACPI */
+>> +	return NULL;
+>> +}
+>> +#endif
+>
+> Do these functions have anything to do with the subject? You add them in
+> arch/arm64/kernel/pci.c which is compiled only when CONFIG_PCI while the
+> commit log implies that you add them to allow CONFIG_PCI to be off.
 
-are available in the git repository at:
+My bad, I can update the change log to make it explicit it is needed
+when PCI is enabled.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-for-linus
+>
+> When PCI is enabled and the above functions are compiled in, do they
+> need to return any useful data or just -EINVAL. Are they ever called?
 
-for you to fetch changes up to 966903a98fd80ae5f5c4a7ca121d36ea0ba23143:
+They will be called if PCI root bridge is defined in DSDT, should I
+print some warning message before it is implemented?
 
-  Merge tag 'samsung-fixes-3.19' of git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung into fixes (2015-01-16 19:11:37 -0800)
+>
+>> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+>> index 39f3ec1..c346011 100644
+>> --- a/drivers/acpi/Makefile
+>> +++ b/drivers/acpi/Makefile
+>> @@ -43,7 +43,7 @@ acpi-y				+= processor_core.o
+>>   acpi-$(CONFIG_ARCH_MIGHT_HAVE_ACPI_PDC) += processor_pdc.o
+>>   acpi-y				+= ec.o
+>>   acpi-$(CONFIG_ACPI_DOCK)	+= dock.o
+>> -acpi-y				+= pci_root.o pci_link.o pci_irq.o
+>> +acpi-$(CONFIG_PCI)		+= pci_root.o pci_link.o pci_irq.o
+>>   acpi-y				+= acpi_lpss.o
+>>   acpi-y				+= acpi_platform.o
+>>   acpi-y				+= acpi_pnp.o
+>> diff --git a/drivers/acpi/internal.h b/drivers/acpi/internal.h
+>> index 163e82f..c5ff8ba 100644
+>> --- a/drivers/acpi/internal.h
+>> +++ b/drivers/acpi/internal.h
+>> @@ -26,8 +26,13 @@
+>>   acpi_status acpi_os_initialize1(void);
+>>   int init_acpi_device_notify(void);
+>>   int acpi_scan_init(void);
+>> +#ifdef CONFIG_PCI
+>>   void acpi_pci_root_init(void);
+>>   void acpi_pci_link_init(void);
+>> +#else
+>> +static inline void acpi_pci_root_init(void) {}
+>> +static inline void acpi_pci_link_init(void) {}
+>> +#endif
+>>   void acpi_processor_init(void);
+>>   void acpi_platform_init(void);
+>>   void acpi_pnp_init(void);
+>
+> That's a good clean-up.
 
-----------------------------------------------------------------
-ARM: SoC fixes
+If we make ACPI depends on PCI on ARM64, these two stub functions
+are not needed anymore.
 
-We've been sitting on our fixes branch for a while, so this batch is
-unfortunately on the large side.
+>
+>> diff --git a/include/linux/pci.h b/include/linux/pci.h
+>> index 360a966..1476a66 100644
+>> --- a/include/linux/pci.h
+>> +++ b/include/linux/pci.h
+>> @@ -564,15 +564,6 @@ struct pci_ops {
+>>   	int (*write)(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 val);
+>>   };
+>>
+>> -/*
+>> - * ACPI needs to be able to access PCI config space before we've done a
+>> - * PCI bus scan and created pci_bus structures.
+>> - */
+>> -int raw_pci_read(unsigned int domain, unsigned int bus, unsigned int devfn,
+>> -		 int reg, int len, u32 *val);
+>> -int raw_pci_write(unsigned int domain, unsigned int bus, unsigned int devfn,
+>> -		  int reg, int len, u32 val);
+>> -
+>>   struct pci_bus_region {
+>>   	dma_addr_t start;
+>>   	dma_addr_t end;
+>> @@ -1329,6 +1320,16 @@ typedef int (*arch_set_vga_state_t)(struct pci_dev *pdev, bool decode,
+>>   		      unsigned int command_bits, u32 flags);
+>>   void pci_register_set_vga_state(arch_set_vga_state_t func);
+>>
+>> +/*
+>> + * ACPI needs to be able to access PCI config space before we've done a
+>> + * PCI bus scan and created pci_bus structures.
+>> + */
+>> +int raw_pci_read(unsigned int domain, unsigned int bus, unsigned int devfn,
+>> +		 int reg, int len, u32 *val);
+>> +int raw_pci_write(unsigned int domain, unsigned int bus, unsigned int devfn,
+>> +		  int reg, int len, u32 val);
+>> +void pcibios_penalize_isa_irq(int irq, int active);
+>> +
+>>   #else /* CONFIG_PCI is not enabled */
+>>
+>>   /*
+>> @@ -1430,6 +1431,23 @@ static inline struct pci_dev *pci_get_bus_and_slot(unsigned int bus,
+>>   						unsigned int devfn)
+>>   { return NULL; }
+>>
+>> +static inline struct pci_bus *pci_find_bus(int domain, int busnr)
+>> +{ return NULL; }
+>> +
+>> +static inline int pci_bus_write_config_byte(struct pci_bus *bus,
+>> +				unsigned int devfn, int where, u8 val)
+>> +{ return -ENOSYS; }
+>> +
+>> +static inline int raw_pci_read(unsigned int domain, unsigned int bus,
+>> +			unsigned int devfn, int reg, int len, u32 *val)
+>> +{ return -ENOSYS; }
+>> +
+>> +static inline int raw_pci_write(unsigned int domain, unsigned int bus,
+>> +			unsigned int devfn, int reg, int len, u32 val)
+>> +{ return -ENOSYS; }
+>
+> So you implement the !CONFIG_PCI functions here to return -ENOSYS while
+> the arm64 CONFIG_PCI ones would return -EINVAL. I'm confused.
 
-A lot of these are tweaks and fixes to device trees, fixing various bugs
-around clocks, reg ranges, etc. There's also a few defconfig updates
-(which are on the late side, no more of those).
+return -ENOSYS in the arm64 CONFIG_PCI ones next version :)
 
-All in all the diffstat is bigger than ideal at this time, but the nothing
-in here seems particularly risky.
-
-----------------------------------------------------------------
-Abhilash Kesavan (2):
-      drivers: bus: check cci device tree node status
-      ARM: dts: disable CCI on exynos5420 based arndale-octa
-
-Alexander Stein (1):
-      ARM: at91/dt: sam9263: Add missing clocks to lcdc node
-
-Andreas Faerber (1):
-      ARM: exynos_defconfig: Enable LM90 driver
-
-Bo Shen (2):
-      ARM: at91/dt: sama5d4: fix the timer reg length
-      ARM: at91: sama5d3: dt: correct the sound route
-
-Doug Anderson (1):
-      ARM: dts: rockchip: bump sd card pin drive strength up on rk3288-evb
-
-Fabio Estevam (3):
-      ARM: dts: imx25: Fix the SPI1 clocks
-      ARM: imx6sx: Set PLL2 as parent of QSPI clocks
-      ARM: dts: imx51-babbage: Fix ULPI PHY reset modelling
-
-Gary Bisson (1):
-      ARM: clk-imx6q: fix video divider for rev T0 1.0
-
-Geert Uytterhoeven (2):
-      ARM: shmobile: r8a7740: Instantiate GIC from C board code in legacy builds
-      ARM: shmobile: sh73a0 legacy: Set .control_parent for all irqpin instances
-
-Heiko St?bner (1):
-      ARM: rockchip: disable jtag/sdmmc autoswitching on rk3288
-
-Javier Martinez Canillas (1):
-      ARM: exynos_defconfig: Enable options for display panel support
-
-Jisheng Zhang (3):
-      ARM: dts: berlin: fix io clk and add missing core clk for BG2Q sdhci2 host
-      ARM: dts: berlin: add broken-cd and set bus width for eMMC in Marvell DMP DT
-      ARM: dts: berlin: correct BG2Q's SM GPIO location.
-
-Lennart Sorensen (3):
-      ARM: omap5/dra7xx: Fix frequency typos
-      ARM: dra7xx: Fix counter frequency drift for AM572x errata i856
-      ARM: omap5/dra7xx: Enable booting secondary CPU in HYP mode
-
-Linus Walleij (1):
-      ARM: nomadik: fix up leftover device tree pins
-
-Mugunthan V N (1):
-      ARM: dts: dra7-evm: fix qspi device tree partition size
-
-Nishanth Menon (1):
-      ARM: omap2plus_defconfig: use CONFIG_CPUFREQ_DT
-
-Olof Johansson (7):
-      Merge tag 'v3.19-rockchip-dtsfixes1' of git://git.kernel.org/.../mmind/linux-rockchip into fixes
-      Merge tag 'imx-fixes-3.19' of git://git.kernel.org/.../shawnguo/linux into fixes
-      Merge tag 'omap-for-v3.19/fixes-rc1' of git://git.kernel.org/.../tmlind/linux-omap into fixes
-      Merge tag 'berlin-fixes-for-3.19-1' of git://git.infradead.org/users/hesselba/linux-berlin into fixes
-      Merge tag 'at91-fixes' of git://git.kernel.org/.../nferre/linux-at91 into fixes
-      Merge tag 'renesas-soc-fixes-for-v3.19' of git://git.kernel.org/.../horms/renesas into fixes
-      Merge tag 'samsung-fixes-3.19' of git://git.kernel.org/.../kgene/linux-samsung into fixes
-
-Philipp Zabel (1):
-      ARM: dts: imx6qdl: Fix CODA960 interrupt order
-
-Tony Lindgren (2):
-      ARM: OMAP2+: Fix n900 board name for legacy user space
-      ARM: dts: Revert disabling of smc91x for n900
-
-Tyler Baker (1):
-      reset: sunxi: fix spinlock initialization
-
-Vivek Gautam (1):
-      arm: dts: Use pmu_system_controller phandle for dp phy
-
-Wenyou Yang (1):
-      ARM: at91: board-dt-sama5: add phy_fixup to override NAND_Tree
-
-Xiubo Li (1):
-      ARM: ls1021a: dtsi: add 'big-endian' property for scfg node
-
- arch/arm/boot/dts/at91sam9263.dtsi            |  2 +
- arch/arm/boot/dts/berlin2q-marvell-dmp.dts    |  2 +
- arch/arm/boot/dts/berlin2q.dtsi               | 63 ++++++++++++++-------------
- arch/arm/boot/dts/dra7-evm.dts                | 10 ++---
- arch/arm/boot/dts/exynos5250.dtsi             |  2 +-
- arch/arm/boot/dts/exynos5420-arndale-octa.dts |  4 ++
- arch/arm/boot/dts/exynos5420.dtsi             |  6 +--
- arch/arm/boot/dts/imx25.dtsi                  |  2 +-
- arch/arm/boot/dts/imx51-babbage.dts           | 22 +++-------
- arch/arm/boot/dts/imx6qdl.dtsi                |  4 +-
- arch/arm/boot/dts/ls1021a.dtsi                |  1 +
- arch/arm/boot/dts/omap3-n900.dts              |  4 +-
- arch/arm/boot/dts/rk3288-evb.dtsi             | 30 +++++++++++++
- arch/arm/boot/dts/sama5d3xmb.dtsi             |  2 +-
- arch/arm/boot/dts/sama5d4.dtsi                |  2 +-
- arch/arm/boot/dts/ste-nomadik-nhk15.dts       |  8 ++--
- arch/arm/configs/exynos_defconfig             | 18 +++++++-
- arch/arm/configs/omap2plus_defconfig          |  2 +-
- arch/arm/mach-at91/board-dt-sama5.c           | 18 ++++++++
- arch/arm/mach-imx/clk-imx6q.c                 |  2 +-
- arch/arm/mach-imx/clk-imx6sx.c                |  3 ++
- arch/arm/mach-omap2/board-generic.c           | 18 ++++++++
- arch/arm/mach-omap2/common.h                  |  1 +
- arch/arm/mach-omap2/control.h                 |  4 ++
- arch/arm/mach-omap2/omap-headsmp.S            | 21 +++++++++
- arch/arm/mach-omap2/omap-smp.c                | 13 +++++-
- arch/arm/mach-omap2/timer.c                   | 44 ++++++++++++++++---
- arch/arm/mach-rockchip/rockchip.c             | 27 ++++++++++++
- arch/arm/mach-shmobile/setup-r8a7740.c        |  7 +++
- arch/arm/mach-shmobile/setup-sh73a0.c         |  3 ++
- drivers/bus/arm-cci.c                         |  3 ++
- drivers/reset/reset-sunxi.c                   |  4 ++
- 32 files changed, 272 insertions(+), 80 deletions(-)
+Thanks
+Hanjun
