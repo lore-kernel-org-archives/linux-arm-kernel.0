@@ -1,24 +1,18 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Sun, 18 Jan 2015 09:52:14 +0000
-Subject: [PATCH 1/5] mfd: tps65218: make INT[12] and STATUS registers
- volatile
-In-Reply-To: <1419622104-25812-2-git-send-email-balbi@ti.com>
+Date: Sun, 18 Jan 2015 09:52:39 +0000
+Subject: [PATCH 2/5] mfd: tps65218: make INT1 our status_base register
+In-Reply-To: <1419622104-25812-3-git-send-email-balbi@ti.com>
 References: <1419622104-25812-1-git-send-email-balbi@ti.com>
- <1419622104-25812-2-git-send-email-balbi@ti.com>
-Message-ID: <20150118095214.GA3574@x1>
+ <1419622104-25812-3-git-send-email-balbi@ti.com>
+Message-ID: <20150118095239.GB3574@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, 26 Dec 2014, Felipe Balbi wrote:
 
-> STATUS register can be modified by the HW, so we
-> should bypass cache because of that.
-> 
-> In the case of INT[12] registers, they are the ones
-> that actually clear the IRQ source at the time they
-> are read. If we rely on the cache for them, we will
-> never be able to clear the interrupt, which will cause
-> our IRQ line to be disabled due to IRQ throttling.
+> If we don't tell regmap-irq that our first status
+> register is at offset 1, it will try to read offset
+> zero, which is the chipid register.
 > 
 > Fixes: 44b4dc6 mfd: tps65218: Add driver for the TPS65218 PMIC
 > Cc: <stable@vger.kernel.org> # v3.15+
@@ -26,8 +20,8 @@ On Fri, 26 Dec 2014, Felipe Balbi wrote:
 > Cc: Lee Jones <lee.jones@linaro.org>
 > Signed-off-by: Felipe Balbi <balbi@ti.com>
 > ---
->  drivers/mfd/tps65218.c | 11 +++++++++++
->  1 file changed, 11 insertions(+)
+>  drivers/mfd/tps65218.c | 1 +
+>  1 file changed, 1 insertion(+)
 
 Sorry for the delay.  It's difficult to get a WiFi signal 2000m up in
 an Austrian mountain. :)
@@ -35,31 +29,17 @@ an Austrian mountain. :)
 Applied now, thanks.
 
 > diff --git a/drivers/mfd/tps65218.c b/drivers/mfd/tps65218.c
-> index 0d256cb..2243f75 100644
+> index 2243f75..d6b7643 100644
 > --- a/drivers/mfd/tps65218.c
 > +++ b/drivers/mfd/tps65218.c
-> @@ -125,10 +125,21 @@ int tps65218_clear_bits(struct tps65218 *tps, unsigned int reg,
->  }
->  EXPORT_SYMBOL_GPL(tps65218_clear_bits);
+> @@ -204,6 +204,7 @@ static struct regmap_irq_chip tps65218_irq_chip = {
 >  
-> +static const struct regmap_range tps65218_yes_ranges[] = {
-> +	regmap_reg_range(TPS65218_REG_INT1, TPS65218_REG_INT2),
-> +	regmap_reg_range(TPS65218_REG_STATUS, TPS65218_REG_STATUS),
-> +};
-> +
-> +static const struct regmap_access_table tps65218_volatile_table = {
-> +	.yes_ranges = tps65218_yes_ranges,
-> +	.n_yes_ranges = ARRAY_SIZE(tps65218_yes_ranges),
-> +};
-> +
->  static struct regmap_config tps65218_regmap_config = {
->  	.reg_bits = 8,
->  	.val_bits = 8,
->  	.cache_type = REGCACHE_RBTREE,
-> +	.volatile_table = &tps65218_volatile_table,
+>  	.num_regs = 2,
+>  	.mask_base = TPS65218_REG_INT_MASK1,
+> +	.status_base = TPS65218_REG_INT1,
 >  };
 >  
->  static const struct regmap_irq tps65218_irqs[] = {
+>  static const struct of_device_id of_tps65218_match_table[] = {
 
 -- 
 Lee Jones
