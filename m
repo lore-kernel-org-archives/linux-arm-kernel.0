@@ -1,42 +1,43 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 18 Jan 2015 13:09:43 +0100
-Subject: [PATCH v3 1/3] ARM: dts: sun4i: Add mk802 board
-Message-ID: <1421582985-26087-1-git-send-email-hdegoede@redhat.com>
+Date: Sun, 18 Jan 2015 13:09:44 +0100
+Subject: [PATCH v3 2/3] ARM: dts: sun4i: Add mk802ii board
+In-Reply-To: <1421582985-26087-1-git-send-email-hdegoede@redhat.com>
+References: <1421582985-26087-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1421582985-26087-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mk802 is the "classic" Allwinner A10 based hdmi tv-stick, it features
-512M or 1G RAM, 4G nand, a mini-hdmi female connector, USB-A receptacle,
-mini-usb receptacle (OTG) and USB-wifi. Somewhat unique the mk802 does not
-use the AXP209 pmic, it does not have a pmic at all.
+The mk802ii is a revised version of the mk802 A10 based hdmi tv-stick, it
+features 1G RAM, 4G nand, a hdmi male connector, USB-A receptacle, 2 micro
+usb receptacles (OTG & power) and USB-wifi, and does come with an axp209 pmic.
 
-For more details see: http://linux-sunxi.org/Rikomagic_mk802
+For more details see: http://linux-sunxi.org/Rikomagic_mk802ii
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/Makefile            |   1 +
- arch/arm/boot/dts/sun4i-a10-mk802.dts | 109 ++++++++++++++++++++++++++++++++++
- 2 files changed, 110 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun4i-a10-mk802.dts
+ arch/arm/boot/dts/Makefile              |   1 +
+ arch/arm/boot/dts/sun4i-a10-mk802ii.dts | 113 ++++++++++++++++++++++++++++++++
+ 2 files changed, 114 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun4i-a10-mk802ii.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 7f66bab..dfb6885 100644
+index dfb6885..b543e7d 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -448,6 +448,7 @@ dtb-$(CONFIG_MACH_SUN4I) += \
- 	sun4i-a10-chuwi-v7-cw0825.dtb \
+@@ -449,6 +449,7 @@ dtb-$(CONFIG_MACH_SUN4I) += \
  	sun4i-a10-cubieboard.dtb \
  	sun4i-a10-mini-xplus.dtb \
-+	sun4i-a10-mk802.dtb \
+ 	sun4i-a10-mk802.dtb \
++	sun4i-a10-mk802ii.dtb \
  	sun4i-a10-hackberry.dtb \
  	sun4i-a10-inet97fv2.dtb \
  	sun4i-a10-olinuxino-lime.dtb \
-diff --git a/arch/arm/boot/dts/sun4i-a10-mk802.dts b/arch/arm/boot/dts/sun4i-a10-mk802.dts
+diff --git a/arch/arm/boot/dts/sun4i-a10-mk802ii.dts b/arch/arm/boot/dts/sun4i-a10-mk802ii.dts
 new file mode 100644
-index 0000000..e9a6886
+index 0000000..802eda4
 --- /dev/null
-+++ b/arch/arm/boot/dts/sun4i-a10-mk802.dts
-@@ -0,0 +1,109 @@
++++ b/arch/arm/boot/dts/sun4i-a10-mk802ii.dts
+@@ -0,0 +1,113 @@
 +/*
 + * Copyright 2015 Hans de Goede <hdegoede@redhat.com>
 + *
@@ -90,8 +91,8 @@ index 0000000..e9a6886
 +#include <dt-bindings/gpio/gpio.h>
 +
 +/ {
-+	model = "MK802";
-+	compatible = "allwinner,mk802", "allwinner,sun4i-a10";
++	model = "MK802ii";
++	compatible = "allwinner,mk802ii", "allwinner,sun4i-a10";
 +};
 +
 +&ehci0 {
@@ -100,6 +101,21 @@ index 0000000..e9a6886
 +
 +&ehci1 {
 +	status = "okay";
++};
++
++&i2c0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_pins_a>;
++	status = "okay";
++
++	axp209: pmic at 34 {
++		compatible = "x-powers,axp209";
++		reg = <0x34>;
++		interrupts = <0>;
++
++		interrupt-controller;
++		#interrupt-cells = <1>;
++	};
 +};
 +
 +&mmc0 {
@@ -116,22 +132,11 @@ index 0000000..e9a6886
 +	status = "okay";
 +};
 +
-+&pio {
-+	usb2_vbus_pin_mk802: usb2_vbus_pin at 0 {
-+		allwinner,pins = "PH12";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
 +&reg_usb1_vbus {
 +	status = "okay";
 +};
 +
 +&reg_usb2_vbus {
-+	pinctrl-0 = <&usb2_vbus_pin_mk802>;
-+	gpio = <&pio 7 12 GPIO_ACTIVE_HIGH>; /* PH12 */
 +	status = "okay";
 +};
 +
