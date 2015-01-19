@@ -1,58 +1,54 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 19 Jan 2015 19:24:32 +0900
-Subject: [RESEND PATCH v3] clocksource: exynos_mct: Add the support for
- Exynos 64bit SoC
-In-Reply-To: <54BCCE16.8050607@linaro.org>
-References: <1421213603-5020-1-git-send-email-cw00.choi@samsung.com>
- <54B69072.4080607@kernel.org> <54B692FB.7030703@linaro.org>
- <54BC55BB.7050809@samsung.com> <54BCCE16.8050607@linaro.org>
-Message-ID: <54BCDB60.1020509@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 19 Jan 2015 11:25:35 +0100
+Subject: [PATCH 5/9] dts: versatile: add sysregs nodes
+In-Reply-To: <20150115160635.GA1576@red-moon>
+References: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
+ <1419967718-26909-6-git-send-email-robherring2@gmail.com>
+ <CACRpkdbinR3Uvi5zZmQJFxJgnWfvE6JZouMVxxRRGVtMNXkBQQ@mail.gmail.com>
+ <CAL_JsqKBLx03E1w0NMH8CH+Pm_L8yQvnR6VTTDxqnpOwAoDhXg@mail.gmail.com>
+ <20150115160635.GA1576@red-moon>
+Message-ID: <CACRpkdbLdtXeVYWvd5DSmEVkMBT8YGs0kXPC+fktiNtgJhpp=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Thu, Jan 15, 2015 at 5:06 PM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Thu, Jan 08, 2015 at 11:53:15PM +0000, Rob Herring wrote:
+>> On Thu, Jan 8, 2015 at 1:44 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> > On Tue, Dec 30, 2014 at 8:28 PM, Rob Herring <robherring2@gmail.com> wrote:
 
-On 01/19/2015 06:27 PM, Daniel Lezcano wrote:
-> On 01/19/2015 01:54 AM, Chanwoo Choi wrote:
->> Dear Daniel and Kukjin,
+>> >> +                               reg = <0x00000 0x1000>;
+>> >> +
+>> >> +                               v2m_led_gpios: sys_led at 08 {
+>> >> +                                       compatible = "arm,vexpress-sysreg,sys_led";
+>> >> +                                       gpio-controller;
+>> >> +                                       #gpio-cells = <2>;
+>> >> +                               };
+>> >
+>> > These are not GPIOs. These are LED registers really.
 >>
->> On 01/15/2015 01:02 AM, Daniel Lezcano wrote:
->>> On 01/14/2015 04:51 PM, Kukjin Kim wrote:
->>>> On 01/14/15 14:33, Chanwoo Choi wrote:
->>>>
->>>> Hi,
->>>>
->>>> + Doug, Olof
->>>>
->>>>> This patch adds the support for Exynos 64bit SoC. The delay_timer is only used
->>>>> for Exynos 32bit SoC.
->>>>>
->>>> Yes, the Exynos MCT(Multi-Core Timer) is 64bit timer and it is available
->>>> on 64bit exynos SoC such as exynos7. But basically ARMv8 architecture is
->>>> including ARM ARCH timer (ARM Generic Timer) and exynos7 also has
->>>> implemented it and additionally its access is faster than using memory
->>>> mapped register called SFR for MCT...so Doug submitted patch to use MCT
->>>> on 32bit exynos SoCs before.
->>>>
->>>> I know using MCT on 64bit exynos is usefulness for Power Management and
->>>> I need to talk to relevant guys in office again. If anything, I'll let
->>>> you know.
->>>
->>> I will wait for your answer before digging more the patch.
-> 
-> Hi Chanwoo,
-> 
-> [ ... ]
-> 
->> Do you have any comment about this patch?
-> 
-> Yes, a similar patch has been posted for the tegra2 timer to run on arm64. The patch in question put macros #ifdef CONFIG_ARM64 to disable some parts of the code. That ended, the tegra2 timer was not needed for the moment because of the arch timer present, so it has been disabled from the compilation until a proper fix without macros could be proposed.
-> 
-> It is happening exactly the same with this patch. As Kukjin pointed it, the exynos_mct may not be needed (at least until a backup timer is needed at PM time).
-> 
-> I suggest you look at a nicer way to fix that instead of introducing macros (which is by the way valid but not recommended by the CodingStyle rules) and perhaps sync with Paul and Thierry [cc'ed] to find a common solution.
+>> A register bit that controls an i/o signal sounds like a GPIO to me.
+>
+> To me too. I agree that definining a gpio-controller for every possible
+> gpio pin would soon get unwieldy, but hey, the choice made for vexpress
+> leds makes perfect sense to me, after all they are gpio signals
+> connected to leds, and there is a driver for that in the kernel:
+>
+> drivers/leds/leds-gpio.c
+>
+> we could move this stuff to syscon-leds, but honestly I think is one of those
+> things we could argue forever about that.
 
-OK, I understand your opinion. I'll try to consider it without adding '#ifdef'.
+OK it's just so that the GPIO maintainer disagrees with the way
+gpio-controller is being used here, and I consequently NACK it
+so for the record add my:
 
-Best Regards,
-Chanwoo Choi
+Nacked-by: Linus Walleij <linus.walleij@linaro.org>
+
+To this patch if/when merging it through ARM SoC.
+
+If the DT people think it is a good way to describe the hardware
+and override this then I will live with it I guess...
+
+Yours,
+Linus Walleij
