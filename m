@@ -1,32 +1,38 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 19 Jan 2015 10:38:00 +0100
-Subject: [PATCH] ARM: sun6i: Enable ARM arch timers
-In-Reply-To: <1421004824-17525-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1421004824-17525-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20150119093800.GA4367@lukather>
+From: b38611@freescale.com (Fugang Duan)
+Date: Mon, 19 Jan 2015 17:38:02 +0800
+Subject: [PATCH net-next 1/1] ARM: dts: imx6sx: correct i.MX6sx sdb board enet
+ phy address
+Message-ID: <1421660282-29494-1-git-send-email-b38611@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 11, 2015 at 08:33:44PM +0100, Maxime Ripard wrote:
-> The A31 has non-initialized architected timers, without CNTFRQ or CNTVOFF set
-> by the Allwinner's bootloader.
-> 
-> Use the new DT property for such case, and enable the arch timers.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+The commit (3d125f9c91c5) cause i.MX6SX sdb enet cannot work. The cause is
+the commit add mdio node with un-correct phy address.
 
-Applied.
+The patch just correct i.MX6sx sdb board enet phy address.
 
-Maxime
+Signed-off-by: Fugang Duan <B38611@freescale.com>
+---
+ arch/arm/boot/dts/imx6sx-sdb.dts |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
+index 8c1febd..9db123f 100644
+--- a/arch/arm/boot/dts/imx6sx-sdb.dts
++++ b/arch/arm/boot/dts/imx6sx-sdb.dts
+@@ -167,11 +167,11 @@
+ 		#size-cells = <0>;
+ 
+ 		ethphy1: ethernet-phy at 0 {
+-			reg = <0>;
++			reg = <1>;
+ 		};
+ 
+ 		ethphy2: ethernet-phy at 1 {
+-			reg = <1>;
++			reg = <2>;
+ 		};
+ 	};
+ };
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150119/631ef335/attachment.sig>
+1.7.8
