@@ -1,73 +1,49 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 19 Jan 2015 14:22:35 +0100
-Subject: [PATCH V2 3/8] [media] exynos-gsc: Make driver functional when
- CONFIG_PM is unset
-In-Reply-To: <1421673760-2600-1-git-send-email-ulf.hansson@linaro.org>
-References: <1421673760-2600-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1421673760-2600-4-git-send-email-ulf.hansson@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 19 Jan 2015 14:31:06 +0100
+Subject: [PATCH 10/10] drivers: PL011: add support for the ARM SBSA
+ generic UART
+In-Reply-To: <20150116183717.GM32155@leverpostej>
+References: <1421428986-11300-1-git-send-email-andre.przywara@arm.com>
+ <54B95960.9070906@arm.com> <20150116183717.GM32155@leverpostej>
+Message-ID: <5407007.ZAjCvvOzus@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver depended on CONFIG_PM to be functional. Let's remove that
-dependency, by enable the runtime PM resourses during ->probe() and
-update the device's runtime PM status to reflect this.
+On Friday 16 January 2015 18:37:17 Mark Rutland wrote:
+> 
+> > Makes some sense, so what about:
+> > -----------------------
+> > Required properties:
+> > - compatible: must be "arm,sbsa-uart"
+> > - reg: exactly one register range
+> > - interrupts: exactly one interrupt specifier
+> > 
+> > Optional properties:
+> > - current-speed : the current active speed of the UART
+> > - fifo-size : always 32 as per the SBSA specification
+> > - word-size : the number of payload bits per word
+> > - parity : used parity method, can be:
+> >       "n": no parity
+> >       "e": even parity
+> >       "o": odd parity
+> >       "m": always mark (logical 1)
+> >       "s": always space (logical 0)
+> > - stop-bits : the number of stop bits after the payload
+> 
+> Generally those look fine, though someone more familiar with serial
+> should take a look.
+> 
+> We can drop fifo-size given it's fixed. Anything that we know outright
+> doesn't need to be described.
+> 
+> We might want to make them mandatory. I don't see any value in not
+> knowing.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/media/platform/exynos-gsc/gsc-core.c | 19 +++++++++----------
- 1 file changed, 9 insertions(+), 10 deletions(-)
+I think making them optional is useless, so either make them mandatory or
+drop them if we can avoid it. Unfortunately, LCR is not part of SBSA,
+that would let us drop the properties and still report the correct settings.
 
-diff --git a/drivers/media/platform/exynos-gsc/gsc-core.c b/drivers/media/platform/exynos-gsc/gsc-core.c
-index 1865738..532daa8 100644
---- a/drivers/media/platform/exynos-gsc/gsc-core.c
-+++ b/drivers/media/platform/exynos-gsc/gsc-core.c
-@@ -1088,7 +1088,7 @@ static int gsc_probe(struct platform_device *pdev)
- 		return PTR_ERR(gsc->clock);
- 	}
- 
--	ret = clk_prepare(gsc->clock);
-+	ret = clk_prepare_enable(gsc->clock);
- 	if (ret) {
- 		dev_err(&gsc->pdev->dev, "clock prepare failed for clock: %s\n",
- 			GSC_CLOCK_GATE_NAME);
-@@ -1111,30 +1111,29 @@ static int gsc_probe(struct platform_device *pdev)
- 		goto err_v4l2;
- 
- 	platform_set_drvdata(pdev, gsc);
--	pm_runtime_enable(dev);
--	ret = pm_runtime_get_sync(&pdev->dev);
--	if (ret < 0)
--		goto err_m2m;
-+
-+	gsc_hw_set_sw_reset(gsc);
-+	gsc_wait_reset(gsc);
- 
- 	/* Initialize continious memory allocator */
- 	gsc->alloc_ctx = vb2_dma_contig_init_ctx(dev);
- 	if (IS_ERR(gsc->alloc_ctx)) {
- 		ret = PTR_ERR(gsc->alloc_ctx);
--		goto err_pm;
-+		goto err_m2m;
- 	}
- 
- 	dev_dbg(dev, "gsc-%d registered successfully\n", gsc->id);
- 
--	pm_runtime_put(dev);
-+	pm_runtime_set_active(dev);
-+	pm_runtime_enable(dev);
-+
- 	return 0;
--err_pm:
--	pm_runtime_put(dev);
- err_m2m:
- 	gsc_unregister_m2m_device(gsc);
- err_v4l2:
- 	v4l2_device_unregister(&gsc->v4l2_dev);
- err_clk:
--	clk_unprepare(gsc->clock);
-+	clk_disable_unprepare(gsc->clock);
- 	return ret;
- }
- 
--- 
-1.9.1
+Would we be better off documenting that 8-n-1 is the only allowed settting?
+I can't think of a reason why anyone would use something else.
+
+	Arnd
