@@ -1,53 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 19 Jan 2015 11:43:06 -0800
-Subject: [GIT PULL] ARM: OMAP: hwmod fixes for v3.19-rc
-In-Reply-To: <alpine.DEB.2.02.1501042334250.28771@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1501042334250.28771@utopia.booyaka.com>
-Message-ID: <20150119194305.GE18552@atomide.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Mon, 19 Jan 2015 21:01:57 +0100
+Subject: [PATCH] i2c: drop ancient protection against sysfs refcounting
+ issues
+In-Reply-To: <1421693756-12917-1-git-send-email-wsa@the-dreams.de>
+References: <1421693756-12917-1-git-send-email-wsa@the-dreams.de>
+Message-ID: <54BD62B5.7050205@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [150104 15:38]:
-> Hi Tony
-> 
-> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
-> 
->   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.19-rc/omap-fixes-a
-> 
-> for you to fetch changes up to 99d076b747455449b2eec9e37f3fb0bfdf51af32:
-> 
->   MAINTAINERS: add maintainer for OMAP hwmod data (2015-01-02 16:24:27 -0700)
-> 
-> ----------------------------------------------------------------
-> For v3.19-rc, fix some hwmod structure details for the OMAP DSS modules
-> for DRA7xx and AM43xx.  Also update the MAINTAINERS file to encourage
-> folks to cc me on hwmod data patches.
-> 
-> Basic build, boot, and PM testlogs are available here:
-> 
-> http://www.pwsan.com/omap/testlogs/omap-fixes-a-for-v3.19-rc/20150103144242/
+On 01/19/2015 07:55 PM, Wolfram Sang wrote:
+[...]
+>
+> Let's get rid of this code before really nobody knows/understands
+> anymore what this was for and if it has a subtle use.
 
-Paul, got any updates on this? Anyways, I'll just untag this email as
-you asked me to wait on pulling this.
+Getting rid of this is the right thing, cause it's just not how it should be 
+done, but unfortunately it is not as simple as this. The problem is that the 
+adapter is typically embedded in the parent device's state struct. This state 
+struct is typically freed directly after calling i2c_del_adapter(). If there is 
+still something holding a reference to the adapter this will result in a use 
+after free. To do this properly i2c_add_adapter() needs to be changed to 
+i2c_alloc_adapter() that returns a pointer to a newly allocated adapter. 
+i2c_free_adapter() will then only drop a reference to the adapter, but not free 
+any memory. Once the last reference has been removed the memory can then be 
+freed in the release callback.
 
-Regards,
+The other issue is as long as something has a reference to the adapter they can 
+run operations on the adapter. So freeing the adapter also has to make sure 
+that any further operations that are performed on the adapter do no longer call 
+into the device specific ops, but rather returns -ENODEV, or similar.
 
-Tony
- 
-> ----------------------------------------------------------------
-> Paul Walmsley (1):
->       MAINTAINERS: add maintainer for OMAP hwmod data
-> 
-> Tomi Valkeinen (2):
->       ARM: AM43xx: hwmod: set DSS submodule parent hwmods
->       ARM: DRA7xx: hwmod: set DSS submodule parent hwmods
-> 
->  MAINTAINERS                                | 6 ++++++
->  arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 2 ++
->  arch/arm/mach-omap2/omap_hwmod_7xx_data.c  | 2 ++
->  3 files changed, 10 insertions(+)
-> 
+- Lars
