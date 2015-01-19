@@ -1,47 +1,70 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 19 Jan 2015 09:44:10 +0000
-Subject: [PATCH v4 16/21] DT: exynos: update PMU binding
+Date: Mon, 19 Jan 2015 09:44:03 +0000
+Subject: [PATCH v4 09/21] DT: update ti,irq-crossbar binding
 In-Reply-To: <1421660655-21394-1-git-send-email-marc.zyngier@arm.com>
 References: <1421660655-21394-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1421660655-21394-17-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1421660655-21394-10-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the fact that some Exynos PMUs are capable of acting as
-an interrupt controller.
+Make it look like a real interrupt controller.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- Documentation/devicetree/bindings/arm/samsung/pmu.txt | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ .../devicetree/bindings/arm/omap/crossbar.txt          | 18 +++++-------------
+ 1 file changed, 5 insertions(+), 13 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/samsung/pmu.txt b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
-index 1e1979b..d698e74 100644
---- a/Documentation/devicetree/bindings/arm/samsung/pmu.txt
-+++ b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
-@@ -28,10 +28,23 @@ Properties:
-  - clocks : list of phandles and specifiers to all input clocks listed in
- 		clock-names property.
+diff --git a/Documentation/devicetree/bindings/arm/omap/crossbar.txt b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
+index 4139db3..a9b28d7 100644
+--- a/Documentation/devicetree/bindings/arm/omap/crossbar.txt
++++ b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
+@@ -9,7 +9,9 @@ inputs.
+ Required properties:
+ - compatible : Should be "ti,irq-crossbar"
+ - reg: Base address and the size of the crossbar registers.
+-- ti,max-irqs: Total number of irqs available at the interrupt controller.
++- interrupt-controller: indicates that this block is an interrupt controller.
++- interrupt-parent: the interrupt controller this block is connected to.
++- ti,max-irqs: Total number of irqs available at the parent interrupt controller.
+ - ti,max-crossbar-sources: Maximum number of crossbar sources that can be routed.
+ - ti,reg-size: Size of a individual register in bytes. Every individual
+ 	    register is assumed to be of same size. Valid sizes are 1, 2, 4.
+@@ -27,13 +29,13 @@ Optional properties:
+   when the interrupt controller irq is unused (when not provided, default is 0)
  
-+Optional properties:
-+
-+Some PMUs are capable of behaving as an interrupt controller (mostly
-+to wake up a suspended PMU). In which case, they can have the
-+following properties:
-+
-+- interrupt-controller: indicate that said PMU is an interrupt controller
-+
-+- interrupt-parent: a phandle indicating which interrupt controller
-+  this PMU signals interrupts to.
-+
- Example :
- pmu_system_controller: system-controller at 10040000 {
- 	compatible = "samsung,exynos5250-pmu", "syscon";
- 	reg = <0x10040000 0x5000>;
-+	interrupt-controller;
-+	interrupt-parent = <&gic>;
- 	#clock-cells = <1>;
- 	clock-names = "clkout0", "clkout1", "clkout2", "clkout3",
- 			"clkout4", "clkout8", "clkout9";
+ Examples:
+-		crossbar_mpu: @4a020000 {
++		crossbar_mpu: crossbar at 4a002a48 {
+ 			compatible = "ti,irq-crossbar";
+ 			reg = <0x4a002a48 0x130>;
+ 			ti,max-irqs = <160>;
+ 			ti,max-crossbar-sources = <400>;
+ 			ti,reg-size = <2>;
+-			ti,irqs-reserved = <0 1 2 3 5 6 131 132 139 140>;
++			ti,irqs-reserved = <0 1 2 3 5 6 131 132>;
+ 			ti,irqs-skip = <10 133 139 140>;
+ 		};
+ 
+@@ -44,10 +46,6 @@ Documentation/devicetree/bindings/arm/gic.txt for further details.
+ 
+ An interrupt consumer on an SoC using crossbar will use:
+ 	interrupts = <GIC_SPI request_number interrupt_level>
+-When the request number is between 0 to that described by
+-"ti,max-crossbar-sources", it is assumed to be a crossbar mapping. If the
+-request_number is greater than "ti,max-crossbar-sources", then it is mapped as a
+-quirky hardware mapping direct to GIC.
+ 
+ Example:
+ 	device_x at 0x4a023000 {
+@@ -55,9 +53,3 @@ Example:
+ 		interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
+ 		...
+ 	};
+-
+-	device_y at 0x4a033000 {
+-		/* Direct mapped GIC SPI 1 used */
+-		interrupts = <GIC_SPI DIRECT_IRQ(1) IRQ_TYPE_LEVEL_HIGH>;
+-		...
+-	};
 -- 
 2.1.4
