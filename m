@@ -1,32 +1,56 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 19 Jan 2015 10:40:04 +0100
-Subject: [PATCH v3 1/2] ARM: dts: sun7i: Add dts file for Bananapro board
-In-Reply-To: <1421582900-26040-1-git-send-email-hdegoede@redhat.com>
-References: <1421582900-26040-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150119094004.GB4367@lukather>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 19 Jan 2015 09:44:06 +0000
+Subject: [PATCH v4 12/21] DT: omap4/5: add binding for the wake-up generator
+In-Reply-To: <1421660655-21394-1-git-send-email-marc.zyngier@arm.com>
+References: <1421660655-21394-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1421660655-21394-13-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 18, 2015 at 01:08:19PM +0100, Hans de Goede wrote:
-> Add support for the new Bananapro A20 development board from lemaker.org.
-> This board features 1G RAM, 2 USB A receptacles, 1 micro USB receptacle for
-> OTG, 1 micro USB receptacle for power, HDMI, sata, Gbit ethernet, ir receiver,
-> 3.5 mm jack for a/v out, on board microphone, 40 gpio pins and sdio wifi.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ .../interrupt-controller/ti,omap4-wugen-mpu        | 33 ++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/ti,omap4-wugen-mpu
 
-Applied the two, thanks!
-
-Maxime
-
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/ti,omap4-wugen-mpu b/Documentation/devicetree/bindings/interrupt-controller/ti,omap4-wugen-mpu
+new file mode 100644
+index 0000000..43effa0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/ti,omap4-wugen-mpu
+@@ -0,0 +1,33 @@
++TI OMAP4 Wake-up Generator
++
++All TI OMAP4/5 (and their derivatives) an interrupt controller that
++routes interrupts to the GIC, and also serves as a wakeup source. It
++is also referred to as "WUGEN-MPU", hence the name of the binding.
++
++Reguired properties:
++
++- compatible : should contain at least "ti,omap4-wugen-mpu" or
++  "ti,omap5-wugen-mpu"
++- reg : Specifies base physical address and size of the registers.
++- interrupt-controller : Identifies the node as an interrupt controller.
++- #interrupt-cells : Specifies the number of cells needed to encode an
++  interrupt source. The value must be 3.
++- interrupt-parent : a phandle to the GIC these interrupts are routed
++  to.
++
++Notes:
++
++- Because this HW ultimately routes interrupts to the GIC, the
++  interrupt specifier must be that of the GIC.
++- Only SPIs can use the WUGEN as an interrupt parent. SGIs and PPIs
++  are explicitly forbiden.
++
++Example:
++
++       wakeupgen: interrupt-controller at 48281000 {
++               compatible = "ti,omap5-wugen-mpu", "ti,omap4-wugen-mpu";
++               interrupt-controller;
++               #interrupt-cells = <3>;
++               reg = <0x48281000 0x1000>;
++               interrupt-parent = <&gic>;
++       };
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150119/2142e230/attachment-0001.sig>
+2.1.4
