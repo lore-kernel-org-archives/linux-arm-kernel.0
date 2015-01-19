@@ -1,83 +1,74 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Mon, 19 Jan 2015 18:05:04 +0900
-Subject: [PATCH] kprobes: bugfix: checks kprobes_all_disarmed in
- unoptimized_kprobe().
-In-Reply-To: <54BC742E.80006@huawei.com>
-References: <54B3B32E.7070709@hitachi.com>
- <1421064563-77831-1-git-send-email-wangnan0@huawei.com>
- <54B3C3A0.6010708@hitachi.com> <54BC742E.80006@huawei.com>
-Message-ID: <54BCC8C0.40706@hitachi.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 19 Jan 2015 10:13:00 +0100
+Subject: [PATCH V4 0/4] mmc: core: Add support for MMC power sequences
+Message-ID: <1421658784-11980-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wang,
+Changes in v4:
+	- Fixed call to kfree() in patch3 and patch4.
 
-I've found a problem on this patch, since kprobes calls unoptioize_kprobe
-with kprobes_all_disarmed=true when trying to disable all kprobes, this
-cause a serious problem.
+Changes in v3:
+	Fixed comments from Mark Rutland:
+	- Document binding in one patch to get the big picture.
+	- Keep code and DT document consistent around how many GPIO resets we
+	  support. I decided to go for one GPIO, we can extend that if needed
+	  later on.
+	- Change compatible string for simple MMC power sequence and renamed the
+	  file for its documentation.
+	- Updated commit messages according to above changes.
 
-Moreover, I couldn't reproduce your reported bug on my 3.19-rc4 kernel.
-Could you test it again?
+Changes in v2:
+	Fixed comments from Russell King:
+	- Renamed pwrseq callbacks and corresponding interface functions.
+	- Move the call to the previous namned ->power_on() callback, to the
+	  end of mmc_power_up() to get consistent behavior.
 
-Unless I could reproduce this bug, I'd like to keep this uncommitted.
 
-Thank you,
+This is yet another try to solve the issues of dealing with power sequences for
+the MMC subsystem. The latest attempt, see link below, took a generic approach
+by adding a new top level driver layer. That's was rejected by several reasons.
+http://lwn.net/Articles/602855/
 
-(2015/01/19 12:04), Wang Nan wrote:
-> Hi Masami Hiramatsu,
-> 
-> I can't find this patch and '[PATCH] kprobes: bugfix: checks kprobes_all_disarmed
-> in unoptimized_kprobe().' in current mainline. How do these patches get there?
-> Should they be merged into Russell King's tree first?
-> 
-> Thank you!
-> 
-> On 2015/1/12 20:52, Masami Hiramatsu wrote:
->> (2015/01/12 21:09), Wang Nan wrote:
->>> Original code failed to disarm the probed instruction after
->>>
->>> echo 0 > /sys/kernel/debug/kprobes/enabled
->>>
->>> if OPTPROBE is enabled.
->>>
->>> This patch checks kprobes_all_disarmed in unoptimized_kprobe().
->>>
->>
->> Looks good :)
->>
->> Acked-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
->>
->> Thank you!
->>
->>> Signed-off-by: Wang Nan <wangnan0@huawei.com>
->>> ---
->>>  kernel/kprobes.c | 3 +++
->>>  1 file changed, 3 insertions(+)
->>>
->>> diff --git a/kernel/kprobes.c b/kernel/kprobes.c
->>> index 9471710..f16936b 100644
->>> --- a/kernel/kprobes.c
->>> +++ b/kernel/kprobes.c
->>> @@ -630,6 +630,9 @@ static void unoptimize_kprobe(struct kprobe *p, bool force)
->>>  {
->>>  	struct optimized_kprobe *op;
->>>  
->>> +	if (kprobes_all_disarmed)
->>> +		return;
->>> +
->>>  	if (!kprobe_aggrprobe(p) || kprobe_disarmed(p))
->>>  		return; /* This is not an optprobe nor optimized */
->>>  
->>>
->>
->>
-> 
-> 
-> 
+This time the approach is focused to fix the issues for MMC only.
 
+To give a short background, SOCs may specify a specific MMC power sequence. To
+successfully detect an (e)MMC/SD/SDIO card, that power sequence must be followed
+while initializing the card.
+
+To be able to handle these SOC specific power sequences, we add a MMC power
+sequence interface, which helps the mmc core to deal with such.
+
+A MMC power sequence provider then implements a set of callbacks from the above
+mentioned interface. The provider has a corresponding DT compatibility string
+and relies on CONFIG_OF to be set to find it's various resourses, like for
+example a GPIO reset.
+
+The mmc core will from mmc_of_parse() try find a "mmc-pwrseq" DT node and then
+call the corresponding MMC power sequence provider's initialization function.
+
+
+Ulf Hansson (4):
+  mmc: core: Initial support for MMC power sequences
+  mmc: pwrseq: Document DT bindings for the simple MMC power sequence
+  mmc: pwrseq: Initial support for the simple MMC power sequence
+    provider
+  mmc: pwrseq_simple: Add support for a reset GPIO pin
+
+ .../devicetree/bindings/mmc/mmc-pwrseq-simple.txt  |  20 ++++
+ Documentation/devicetree/bindings/mmc/mmc.txt      |  14 +++
+ drivers/mmc/core/Makefile                          |   2 +-
+ drivers/mmc/core/core.c                            |   7 ++
+ drivers/mmc/core/host.c                            |   4 +-
+ drivers/mmc/core/pwrseq.c                          | 109 +++++++++++++++++++++
+ drivers/mmc/core/pwrseq.h                          |  42 ++++++++
+ drivers/mmc/core/pwrseq_simple.c                   |  86 ++++++++++++++++
+ include/linux/mmc/host.h                           |   2 +
+ 9 files changed, 284 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
+ create mode 100644 drivers/mmc/core/pwrseq.c
+ create mode 100644 drivers/mmc/core/pwrseq.h
+ create mode 100644 drivers/mmc/core/pwrseq_simple.c
 
 -- 
-Masami HIRAMATSU
-Software Platform Research Dept. Linux Technology Research Center
-Hitachi, Ltd., Yokohama Research Laboratory
-E-mail: masami.hiramatsu.pt at hitachi.com
+1.9.1
