@@ -1,122 +1,58 @@
-From: vincent.yang.fujitsu@gmail.com (Vincent Yang)
-Date: Mon, 19 Jan 2015 18:23:36 +0800
-Subject: [PATCH v4 0/8] Support for Fujitsu MB86S7X SoCs
-Message-ID: <1421663016-1327-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 19 Jan 2015 19:24:32 +0900
+Subject: [RESEND PATCH v3] clocksource: exynos_mct: Add the support for
+ Exynos 64bit SoC
+In-Reply-To: <54BCCE16.8050607@linaro.org>
+References: <1421213603-5020-1-git-send-email-cw00.choi@samsung.com>
+ <54B69072.4080607@kernel.org> <54B692FB.7030703@linaro.org>
+ <54BC55BB.7050809@samsung.com> <54BCCE16.8050607@linaro.org>
+Message-ID: <54BCDB60.1020509@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Daniel,
 
-  Fujitsu have a series of SoC already shipping based around
-variations of 2xCA7+2xCA15 big.LITTLE architecture, and we would like
-to upstream the basic support in this series.
+On 01/19/2015 06:27 PM, Daniel Lezcano wrote:
+> On 01/19/2015 01:54 AM, Chanwoo Choi wrote:
+>> Dear Daniel and Kukjin,
+>>
+>> On 01/15/2015 01:02 AM, Daniel Lezcano wrote:
+>>> On 01/14/2015 04:51 PM, Kukjin Kim wrote:
+>>>> On 01/14/15 14:33, Chanwoo Choi wrote:
+>>>>
+>>>> Hi,
+>>>>
+>>>> + Doug, Olof
+>>>>
+>>>>> This patch adds the support for Exynos 64bit SoC. The delay_timer is only used
+>>>>> for Exynos 32bit SoC.
+>>>>>
+>>>> Yes, the Exynos MCT(Multi-Core Timer) is 64bit timer and it is available
+>>>> on 64bit exynos SoC such as exynos7. But basically ARMv8 architecture is
+>>>> including ARM ARCH timer (ARM Generic Timer) and exynos7 also has
+>>>> implemented it and additionally its access is faster than using memory
+>>>> mapped register called SFR for MCT...so Doug submitted patch to use MCT
+>>>> on 32bit exynos SoCs before.
+>>>>
+>>>> I know using MCT on 64bit exynos is usefulness for Power Management and
+>>>> I need to talk to relevant guys in office again. If anything, I'll let
+>>>> you know.
+>>>
+>>> I will wait for your answer before digging more the patch.
+> 
+> Hi Chanwoo,
+> 
+> [ ... ]
+> 
+>> Do you have any comment about this patch?
+> 
+> Yes, a similar patch has been posted for the tegra2 timer to run on arm64. The patch in question put macros #ifdef CONFIG_ARM64 to disable some parts of the code. That ended, the tegra2 timer was not needed for the moment because of the arch timer present, so it has been disabled from the compilation until a proper fix without macros could be proposed.
+> 
+> It is happening exactly the same with this patch. As Kukjin pointed it, the exynos_mct may not be needed (at least until a backup timer is needed at PM time).
+> 
+> I suggest you look at a nicer way to fix that instead of introducing macros (which is by the way valid but not recommended by the CodingStyle rules) and perhaps sync with Paul and Thierry [cc'ed] to find a common solution.
 
-  MB86S70 is a big.LITTLE platform with 2xCA7+2xCA15 and an additional
-CM3 as the master. MB86S73 is a simple 2xCA7 and an additional CM3
-master.
+OK, I understand your opinion. I'll try to consider it without adding '#ifdef'.
 
-  The DT includes references to sdhci patches which are being sent to
-the mmc list at the same time.
-
-  We welcome any comments or questions.
-
-Changes since v3:
-* Identify platform, by checking presence of DT node
-"fujitsu,mb86s70-scb-1.0" before populating cpu clocks and MCPM
-support.
-* Disable clock upon gpio module remove
-* Lower init level of gpio driver from subsys_initcall to module_init
-* Use managed device resource allocation in MHU driver
-
-Changes since v2:
-* Minor cleanup of MCPM as suggested by Nicolas Pitre.
-
-Changes since v1:
-* Thanks to Arnd, modified clock driver to populate clocks only when
-some user need them. Node name changed from "fujitsu,mb86s70-clk" to
-"fujitsu,mb86s70-crg11" . Controller+Domain+Port of a clock are now
-three cells specified by the user node.
-* aliases moved into board DTS files
-* Voltage supply moved as per-board DT node.
-* Removed default overly verbose loglevel=8
-* Specify -march=armv7-a flag for mcpm.c and smc.S that contain ARMv7
-specific code.
-* Removed wrongly put outer_flush_all(), now using standard
-v7_exit_coherency_flush() instead of platform specific macro.
-* Simplified GPIO offset calculations in gpio-mb86s70.c driver. And
-added .remove() for the driver
-* ARM MHU driver provided a .remove() to enable module unloading.
-* A few other misc cleanups suggested in v1 submission.
-
-Thanks.
-
-Jassi Brar (8):
-  ARM: Add platform support for Fujitsu MB86S7X SoCs
-  mailbox: arm_mhu: add driver for ARM MHU controller
-  ARM: MB86S7X: Add MCPM support
-  clk: Add clock driver for mb86s7x
-  gpio: Add Fujitsu MB86S7x GPIO driver
-  dt: mb86s7x: add dt files for MB86S7x evbs
-  of: add Fujitsu vendor prefix
-  ARM: MB86S7x: Add configs
-
- Documentation/devicetree/bindings/arm/mb86s7x.txt  |   8 +
- .../bindings/clock/fujitsu,mb86s70-crg11.txt       |  26 +
- .../bindings/gpio/fujitsu,mb86s70-gpio.txt         |  20 +
- .../devicetree/bindings/mailbox/arm-mhu.txt        |  33 ++
- .../devicetree/bindings/soc/mb86s7x/scb_mhu.txt    |  35 ++
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- MAINTAINERS                                        |   7 +
- arch/arm/Kconfig                                   |   2 +
- arch/arm/Makefile                                  |   1 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/mb86s70.dtsi                     |  91 ++++
- arch/arm/boot/dts/mb86s70eb.dts                    |  57 +++
- arch/arm/boot/dts/mb86s73.dtsi                     |  63 +++
- arch/arm/boot/dts/mb86s73eb.dts                    |  44 ++
- arch/arm/boot/dts/mb86s7x.dtsi                     | 140 ++++++
- arch/arm/configs/fujitsu_defconfig                 | 232 +++++++++
- arch/arm/configs/multi_v7_defconfig                |   5 +
- arch/arm/mach-mb86s7x/Kconfig                      |  19 +
- arch/arm/mach-mb86s7x/Makefile                     |   3 +
- arch/arm/mach-mb86s7x/board.c                      |  23 +
- arch/arm/mach-mb86s7x/mcpm.c                       | 318 +++++++++++++
- arch/arm/mach-mb86s7x/smc.S                        |  27 ++
- drivers/clk/Makefile                               |   1 +
- drivers/clk/clk-mb86s7x.c                          | 386 +++++++++++++++
- drivers/gpio/Kconfig                               |   6 +
- drivers/gpio/Makefile                              |   1 +
- drivers/gpio/gpio-mb86s7x.c                        | 232 +++++++++
- drivers/mailbox/Kconfig                            |   7 +
- drivers/mailbox/Makefile                           |   2 +
- drivers/mailbox/arm_mhu.c                          | 211 ++++++++
- drivers/soc/Makefile                               |   1 +
- drivers/soc/mb86s7x/Makefile                       |   4 +
- drivers/soc/mb86s7x/scb_mhu.c                      | 528 +++++++++++++++++++++
- include/soc/mb86s7x/scb_mhu.h                      | 105 ++++
- 34 files changed, 2640 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/mb86s7x.txt
- create mode 100644 Documentation/devicetree/bindings/clock/fujitsu,mb86s70-crg11.txt
- create mode 100644 Documentation/devicetree/bindings/gpio/fujitsu,mb86s70-gpio.txt
- create mode 100644 Documentation/devicetree/bindings/mailbox/arm-mhu.txt
- create mode 100644 Documentation/devicetree/bindings/soc/mb86s7x/scb_mhu.txt
- create mode 100644 arch/arm/boot/dts/mb86s70.dtsi
- create mode 100644 arch/arm/boot/dts/mb86s70eb.dts
- create mode 100644 arch/arm/boot/dts/mb86s73.dtsi
- create mode 100644 arch/arm/boot/dts/mb86s73eb.dts
- create mode 100644 arch/arm/boot/dts/mb86s7x.dtsi
- create mode 100644 arch/arm/configs/fujitsu_defconfig
- create mode 100644 arch/arm/mach-mb86s7x/Kconfig
- create mode 100644 arch/arm/mach-mb86s7x/Makefile
- create mode 100644 arch/arm/mach-mb86s7x/board.c
- create mode 100644 arch/arm/mach-mb86s7x/mcpm.c
- create mode 100644 arch/arm/mach-mb86s7x/smc.S
- create mode 100644 drivers/clk/clk-mb86s7x.c
- create mode 100644 drivers/gpio/gpio-mb86s7x.c
- create mode 100644 drivers/mailbox/arm_mhu.c
- create mode 100644 drivers/soc/mb86s7x/Makefile
- create mode 100644 drivers/soc/mb86s7x/scb_mhu.c
- create mode 100644 include/soc/mb86s7x/scb_mhu.h
-
--- 
-1.9.0
+Best Regards,
+Chanwoo Choi
