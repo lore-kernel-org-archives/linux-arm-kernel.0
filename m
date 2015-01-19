@@ -1,76 +1,94 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 19 Jan 2015 19:28:05 +0000
-Subject: [PATCH v4 2/3] i2c: iproc: Add Broadcom iProc I2C Driver
-In-Reply-To: <54BAFEA9.9040900@broadcom.com>
-References: <20150115084119.GN22880@pengutronix.de>
- <54B98C18.4080807@broadcom.com>
- <20150117160113.GA22880@pengutronix.de>
- <54BABEE9.8070801@broadcom.com>
- <20150117201849.GC22880@pengutronix.de>
- <54BACB66.6040909@broadcom.com>
- <20150117211017.GD22880@pengutronix.de>
- <54BAD391.9080909@broadcom.com>
- <20150117224021.GA26493@n2100.arm.linux.org.uk>
- <54BAFEA9.9040900@broadcom.com>
-Message-ID: <20150119192805.GF26493@n2100.arm.linux.org.uk>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 19 Jan 2015 20:29:40 +0100
+Subject: [PATCH v3 1/3] dt-bindings: mfd: add lubbock-io binding
+In-Reply-To: <20150119083533.GF21886@x1> (Lee Jones's message of "Mon, 19 Jan
+ 2015 08:35:33 +0000")
+References: <1421406010-14851-1-git-send-email-robert.jarzmik@free.fr>
+ <20150119083533.GF21886@x1>
+Message-ID: <87lhkyh8m3.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 17, 2015 at 04:30:33PM -0800, Ray Jui wrote:
-> 
-> 
-> On 1/17/2015 2:40 PM, Russell King - ARM Linux wrote:
-> > On Sat, Jan 17, 2015 at 01:26:41PM -0800, Ray Jui wrote:
-> >> 	time_left = wait_for_completion_timeout(&iproc_i2c->done, time_left);
-> >>
-> >> 	/* disable all interrupts */
-> >> 	writel(0, iproc_i2c->base + IE_OFFSET);
-> >>
-> >> 	if (!time_left && !atomic_read(&iproc_i2c->transfer_is_successful)) {
-> > 
-> > Why are you using atomic_read() here?
-> > 
-> transfer_is_successful 1) will be reset to 0 in this function (before
-> kick start the I2C transfer), 2) will be set to 1 in the ISR (to signal
-> completion of the I2C transfer), and 3) will be checked in this function
-> here. I thought that means I should declare it volatile, because it can
-> be modified in both the process context and interrupt context (and I use
-> atomic because I remember Linux checkpatch warns against using volatile)?
+Lee Jones <lee.jones@linaro.org> writes:
 
-You don't need volatile or atomic_t for that.
+> On Fri, 16 Jan 2015, Robert Jarzmik wrote:
+>
+>> Add a binding for lubbock motherboard IO board.
+>> 
+>> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+>> ---
+>>  .../devicetree/bindings/mfd/lubbock-io.txt         | 26 ++++++++++++++++++++++
+>>  1 file changed, 26 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/mfd/lubbock-io.txt
+>> 
+>> diff --git a/Documentation/devicetree/bindings/mfd/lubbock-io.txt b/Documentation/devicetree/bindings/mfd/lubbock-io.txt
+>> new file mode 100644
+>> index 0000000..33c9e21
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mfd/lubbock-io.txt
+>> @@ -0,0 +1,26 @@
+>> +Intel's pxa255 system development platform motherboard.
+>
+> s/pxa25/PXA25/
+Ok.
+>
+> "system development platform motherboard" doesn't quite sit right with me.
+>
+> How about "Intel Xscale PXA255 development platform (Lubbock)"?
+OK.
 
-Rather than switching to atomic_t when seeing the checkpatch warning,
-you'd do better to read Documentation/volatile-considered-harmful.txt
-to understand why checkpatch issues the warning, and realise that you
-don't need it for the above.
+>
+>> +This is the motherboard, or IO board, of the pxa25x development system,
+>> +supporting a lubbock pxa25x SoC board.
+>
+> Again, this sounds weird.
+Would it sound better with :
+  This regroups all the CPLDs on the Lubbock motherboard, providing interrupt
+  muxing, leds handling, ...
+>
+>> +Required properties:
+>> +  - compatible : One of the following chip-specific strings:
+>> +        "intel,lubbock-io"
+>
+> An odd thing to say with only one entry.
+Right, a simple "should be" would fit better.
+>
+>> +  - interrupts : The first interrupt is the line the /IRQ signal the IO board
+>> +                 multiplex is connected to. The only known case is GPIO0 on the
+>> +                 pxa25x SoC.
+>
+> Can you get someone to help you re-word this into a more fluid
+> sentence?
+Aouch, how about this :
+interrupts : The first interrupt is the SoC input interrupt connected to the
+             lubbock IO board interrupt multiplexer output. The only known
+             working configuration is GPIO0 on the pxa25x SoC.
 
-Note that in the above code, the compiler can't make an assumption
-about iproc_i2c->transfer_is_successful because it can't tell whether
-a called function (eg, wait_for_completion_timeout()) could modify it.
+>
+>> +Optional properties:
+>> +  - interrupts : The second optional interrupt is the base of the interrupts
+>> +                 multiplexed by the lubbock motherboard. If unspecified, the
+>> +                 range is fully dynamic, and the irqdomain will generate its
+>> +                 interrupt base on the fly.
+>> +
+>> +Example:
+>> +
+>> +mb: lubbock-mb at 0 {
+>> +	compatible = "intel,lubbock-io";
+>> +	interrupts = <0 IRQ_TYPE_EDGE_FALLING 400 IRQ_TYPE_NONE>;
+>> +	#interrupt-cells = <2>;
+>> +        interrupt-parent = <&pxairq>;
+>
+> Whitespace error.
+Right.
 
-Another possible issue with the above code are these lines:
+> I'm guessing mb means motherboard?  I think it's unusual for a
+> motherboard to have it's own driver.  Usually we provide drivers for
+> the individual components/peripherals situated on the board.
+Yes, mb for motherboard. Well, this driver is actually for the CPLDs on the
+motherboard.  Would "lubbock-cplds" be a better choice ?
 
-	/* disable all interrupts */
-	writel(0, iproc_i2c->base + IE_OFFSET);
-
-It would be nice to think that would hit the hardware immediately, but
-that's making assumptions about hardware which are not necessary true.
-Your interrupt handler could even be running on another CPU after you've
-asked for that register to be written.
-
-Depending on what you're trying to achieve here, you may need:
-
-	/* disable all interrupts */
-	writel(0, iproc_i2c->base + IE_OFFSET);
-	/* read it back to ensure the write has hit */
-	readl(iproc_i2c->base + IE_OFFSET);
-
-	/* make sure the interrupt handler isn't running */
-	synchronize_irq(...->irq);
-
-if what you're trying to do is to ensure that the interrupt handler has
-finished running.
+Cheers.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Robert
