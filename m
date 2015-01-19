@@ -1,106 +1,45 @@
-From: wangnan0@huawei.com (Wang Nan)
-Date: Mon, 19 Jan 2015 20:59:00 +0800
-Subject: [PATCH] kprobes: bugfix: checks kprobes_all_disarmed in
- unoptimized_kprobe().
-In-Reply-To: <54BCFC6E.1080007@hitachi.com>
-References: <54B3B32E.7070709@hitachi.com>
- <1421064563-77831-1-git-send-email-wangnan0@huawei.com>
- <54B3C3A0.6010708@hitachi.com> <54BC742E.80006@huawei.com>
- <54BCC8C0.40706@hitachi.com> <54BCE8C3.4080903@huawei.com>
- <54BCFC6E.1080007@hitachi.com>
-Message-ID: <54BCFF94.1030009@huawei.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 19 Jan 2015 14:01:17 +0100
+Subject: [PATCH] ARM: dts: sun4i: Add simplefb node with
+ de_fe0-de_be0-lcd0-hdmi pipeline
+In-Reply-To: <1421672477-12978-1-git-send-email-hdegoede@redhat.com>
+References: <1421672477-12978-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1421672477-12978-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/1/19 20:45, Masami Hiramatsu wrote:
-> (2015/01/19 20:21), Wang Nan wrote:
->> On 2015/1/19 17:05, Masami Hiramatsu wrote:
->>> Hi Wang,
->>>
->>> I've found a problem on this patch, since kprobes calls unoptioize_kprobe
->>> with kprobes_all_disarmed=true when trying to disable all kprobes, this
->>> cause a serious problem.
->>>
->>> Moreover, I couldn't reproduce your reported bug on my 3.19-rc4 kernel.
->>> Could you test it again?
->>>
->>
->> I tested it again based on 3.19-rc5 and found that the problem still exists.
->> My testing is based on QEMU.
->>
->> First I tested my kprobeopt for ARM, then on x86_64. The test results are pasted
->> at the bottom of this mail. Commands after 'gdb attaches to QEMU' is my actions
->> on a gdb console attached to QEMU; commands after 'inside virtual machine' is
->> what I do in Linux run under QEMU.
-> 
-> Thank you for the reporting.
-> So, now I know what happened, the problem is "debugfs/kprobes/enabled doesn't work
-> correctly on optimized kprobes". Please make update the patch description.
-> 
-> I also reproduced the bug without gdb.
-> Here is the log.
-> 
-> ----
-> [root at localhost ~]# cd /sys/kernel/debug/tracing/
-> [root at localhost tracing]# echo p do_fork+5 > kprobe_events	# setup new event
-> [root at localhost tracing]# echo $$ > set_ftrace_pid		# trace only this process
-> [root at localhost tracing]# echo 1 > events/kprobes/p_do_fork_5/enable	# enable it
-> [root at localhost tracing]# cat trace				# check the trace data
-> # tracer: nop
-> #
-> # entries-in-buffer/entries-written: 1/1   #P:8
-> #
-> #                              _-----=> irqs-off
-> #                             / _----=> need-resched
-> #                            | / _---=> hardirq/softirq
-> #                            || / _--=> preempt-depth
-> #                            ||| /     delay
-> #           TASK-PID   CPU#  ||||    TIMESTAMP  FUNCTION
-> #              | |       |   ||||       |         |
->             bash-3883  [006] d...   279.799023: p_do_fork_5: (do_fork+0x5/0x360) # OK, now tracing
-> [root at localhost tracing]# cat ../kprobes/list
-> ffffffff810bc1c5  k  do_fork+0x5    [OPTIMIZED]			# and it is actually optimized
-> [root at localhost tracing]# echo 0 > ../kprobes/enabled		# disable *ALL* kprobes
-> [root at localhost tracing]# echo > trace				# clear events
-> [root at localhost tracing]# cat trace				# this should show empty buffer
-> # tracer: nop
-> #
-> # entries-in-buffer/entries-written: 1/1   #P:8
-> #
-> #                              _-----=> irqs-off
-> #                             / _----=> need-resched
-> #                            | / _---=> hardirq/softirq
-> #                            || / _--=> preempt-depth
-> #                            ||| /     delay
-> #           TASK-PID   CPU#  ||||    TIMESTAMP  FUNCTION
-> #              | |       |   ||||       |         |
->             bash-3883  [006] d...   337.770785: p_do_fork_5: (do_fork+0x5/0x360)  # But still tracing!
-> [root at localhost tracing]# cat trace				# Check again
-> # tracer: nop
-> #
-> # entries-in-buffer/entries-written: 2/2   #P:8
-> #
-> #                              _-----=> irqs-off
-> #                             / _----=> need-resched
-> #                            | / _---=> hardirq/softirq
-> #                            || / _--=> preempt-depth
-> #                            ||| /     delay
-> #           TASK-PID   CPU#  ||||    TIMESTAMP  FUNCTION
-> #              | |       |   ||||       |         |
->             bash-3883  [006] d...   337.770785: p_do_fork_5: (do_fork+0x5/0x360)
->             bash-3883  [006] d...   345.592178: p_do_fork_5: (do_fork+0x5/0x360) # We are tracing!!
-> 
-> So, after global disabling kprobes, ALL kprobes event should be disabled, but not.
-> 
-> OK, I think your first patch is better than the second one, but not enough.
-> What we should do is use kprobes_all_disarmed for force option like below.
-> 
-> 	unoptimize_kprobe(p, kprobes_all_disarmed);    /* Try to unoptimize */
-> 
-> We also would better to check the flag in unregistering path for skipping unneeded
-> disarming process when kprobes globally disarmed.
-> 
-> Thank you,
-> 
+Testing has shown that on sun4i the display backend engine does not have
+deep enough fifo-s causing flickering / tearing in full-hd mode due to
+fifo underruns. This can be avoided by letting the display frontend engine
+do the dma from memory, and then letting it feed the data directly into
+the backend unmodified, as the frontend does have deep enough fifo-s.
 
-Thanks to your quick reply. I'll post an improved v1 patch tomorrow.
+Note since u-boot-v2015.01 has been released using the de_be0-lcd0-hdmi
+pipeline on sun4i, we need to keep that one around too (unfortunately).
+
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/sun4i-a10.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index f5e35b5..ccd60e3 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -44,6 +44,14 @@
+ 				 <&ahb_gates 44>;
+ 			status = "disabled";
+ 		};
++
++		framebuffer at 1 {
++			compatible = "allwinner,simple-framebuffer", "simple-framebuffer";
++			allwinner,pipeline = "de_fe0-de_be0-lcd0-hdmi";
++			clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 43>,
++				 <&ahb_gates 44>, <&ahb_gates 46>;
++			status = "disabled";
++		};
+ 	};
+ 
+ 	cpus {
+-- 
+2.1.0
