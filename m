@@ -1,34 +1,110 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 19 Jan 2015 14:22:32 +0100
-Subject: [PATCH V2 0/8] [media] exynos-gsc: Fixup PM support
-Message-ID: <1421673760-2600-1-git-send-email-ulf.hansson@linaro.org>
+Date: Mon, 19 Jan 2015 14:22:33 +0100
+Subject: [PATCH V2 1/8] [media] exynos-gsc: Simplify clock management
+In-Reply-To: <1421673760-2600-1-git-send-email-ulf.hansson@linaro.org>
+References: <1421673760-2600-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1421673760-2600-2-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes in v2:
-	- Rebase patches.
-	- Adapt to changes for the PM core. Especially, the Kconfig option for
-	  CONFIG_PM_RUNTIME has been removed and the runtime PM core is now
-	  build for CONFIG_PM.
+Instead of having separate functions that fecthes, prepares and
+unprepares the clock, let's encapsulate this code into ->probe().
 
-This patchset fixup the PM support and adds some minor improvements to
-potentially save some more power at runtime PM suspend.
+This makes error handling easier and decreases the lines of code.
 
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ drivers/media/platform/exynos-gsc/gsc-core.c | 49 ++++++++--------------------
+ 1 file changed, 14 insertions(+), 35 deletions(-)
 
-Ulf Hansson (8):
-  [media] exynos-gsc: Simplify clock management
-  [media] exynos-gsc: Convert gsc_m2m_resume() from int to void
-  [media] exynos-gsc: Make driver functional when CONFIG_PM is unset
-  [media] exynos-gsc: Make runtime PM callbacks available for CONFIG_PM
-  [media] exynos-gsc: Fixup clock management at ->remove()
-  [media] exynos-gsc: Do full clock gating at runtime PM suspend
-  [media] exynos-gsc: Make system PM callbacks available for
-    CONFIG_PM_SLEEP
-  [media] exynos-gsc: Simplify system PM
-
- drivers/media/platform/exynos-gsc/gsc-core.c | 183 +++++++++++----------------
- drivers/media/platform/exynos-gsc/gsc-core.h |   3 -
- 2 files changed, 72 insertions(+), 114 deletions(-)
-
+diff --git a/drivers/media/platform/exynos-gsc/gsc-core.c b/drivers/media/platform/exynos-gsc/gsc-core.c
+index fd2891c..bd769d4 100644
+--- a/drivers/media/platform/exynos-gsc/gsc-core.c
++++ b/drivers/media/platform/exynos-gsc/gsc-core.c
+@@ -1003,36 +1003,6 @@ static void *gsc_get_drv_data(struct platform_device *pdev)
+ 	return driver_data;
+ }
+ 
+-static void gsc_clk_put(struct gsc_dev *gsc)
+-{
+-	if (!IS_ERR(gsc->clock))
+-		clk_unprepare(gsc->clock);
+-}
+-
+-static int gsc_clk_get(struct gsc_dev *gsc)
+-{
+-	int ret;
+-
+-	dev_dbg(&gsc->pdev->dev, "gsc_clk_get Called\n");
+-
+-	gsc->clock = devm_clk_get(&gsc->pdev->dev, GSC_CLOCK_GATE_NAME);
+-	if (IS_ERR(gsc->clock)) {
+-		dev_err(&gsc->pdev->dev, "failed to get clock~~~: %s\n",
+-			GSC_CLOCK_GATE_NAME);
+-		return PTR_ERR(gsc->clock);
+-	}
+-
+-	ret = clk_prepare(gsc->clock);
+-	if (ret < 0) {
+-		dev_err(&gsc->pdev->dev, "clock prepare failed for clock: %s\n",
+-			GSC_CLOCK_GATE_NAME);
+-		gsc->clock = ERR_PTR(-EINVAL);
+-		return ret;
+-	}
+-
+-	return 0;
+-}
+-
+ static int gsc_m2m_suspend(struct gsc_dev *gsc)
+ {
+ 	unsigned long flags;
+@@ -1101,7 +1071,6 @@ static int gsc_probe(struct platform_device *pdev)
+ 	init_waitqueue_head(&gsc->irq_queue);
+ 	spin_lock_init(&gsc->slock);
+ 	mutex_init(&gsc->lock);
+-	gsc->clock = ERR_PTR(-EINVAL);
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	gsc->regs = devm_ioremap_resource(dev, res);
+@@ -1114,9 +1083,19 @@ static int gsc_probe(struct platform_device *pdev)
+ 		return -ENXIO;
+ 	}
+ 
+-	ret = gsc_clk_get(gsc);
+-	if (ret)
++	gsc->clock = devm_clk_get(dev, GSC_CLOCK_GATE_NAME);
++	if (IS_ERR(gsc->clock)) {
++		dev_err(dev, "failed to get clock~~~: %s\n",
++			GSC_CLOCK_GATE_NAME);
++		return PTR_ERR(gsc->clock);
++	}
++
++	ret = clk_prepare(gsc->clock);
++	if (ret) {
++		dev_err(&gsc->pdev->dev, "clock prepare failed for clock: %s\n",
++			GSC_CLOCK_GATE_NAME);
+ 		return ret;
++	}
+ 
+ 	ret = devm_request_irq(dev, res->start, gsc_irq_handler,
+ 				0, pdev->name, gsc);
+@@ -1157,7 +1136,7 @@ err_m2m:
+ err_v4l2:
+ 	v4l2_device_unregister(&gsc->v4l2_dev);
+ err_clk:
+-	gsc_clk_put(gsc);
++	clk_unprepare(gsc->clock);
+ 	return ret;
+ }
+ 
+@@ -1170,7 +1149,7 @@ static int gsc_remove(struct platform_device *pdev)
+ 
+ 	vb2_dma_contig_cleanup_ctx(gsc->alloc_ctx);
+ 	pm_runtime_disable(&pdev->dev);
+-	gsc_clk_put(gsc);
++	clk_unprepare(gsc->clock);
+ 
+ 	dev_dbg(&pdev->dev, "%s driver unloaded\n", pdev->name);
+ 	return 0;
 -- 
 1.9.1
