@@ -1,66 +1,168 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 19 Jan 2015 17:30:45 +0100
-Subject: [PATCH V8 00/14] drm/exynos: few patches to enhance bridge chip
- support
-In-Reply-To: <54BCDC28.7080003@collabora.co.uk>
-References: <1416045309-13359-1-git-send-email-ajaykumar.rs@samsung.com>
- <CAEC9eQOrKw2Z1q-ztFfadXmsL3CTcAkkv9kcS2QnDOAVSh2AuQ@mail.gmail.com>
- <548ABAB6.6010200@collabora.co.uk> <3197445.qizQc0zeRb@avalon>
- <54914D7D.9060108@collabora.co.uk>
- <CAPj87rN4HZzDt5JBLyTRmKZs7XcOG=0ha7ZQf9hmjPAFgTyhYQ@mail.gmail.com>
- <20150105135015.GA12010@ulmo.nvidia.com>
- <54BCDC28.7080003@collabora.co.uk>
-Message-ID: <20150119163043.GB7751@ulmo.nvidia.com>
+From: joshua.clayton@uniwest.com (Joshua Clayton)
+Date: Mon, 19 Jan 2015 08:35:29 -0800
+Subject: [RFC PATCH 5/5] arm: perf: Use FIQ to handle PMU events.
+In-Reply-To: <1421166931-14134-6-git-send-email-daniel.thompson@linaro.org>
+References: <1421166931-14134-1-git-send-email-daniel.thompson@linaro.org>
+ <1421166931-14134-6-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <2406925.7Z4R9iEkTD@jclayton-pc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 19, 2015 at 11:27:52AM +0100, Javier Martinez Canillas wrote:
-> Hello Thierry,
+On Tuesday, January 13, 2015 04:35:31 PM Daniel Thompson wrote:
+> Using FIQ (if it is available) gives perf a better insight into the
+> system by allowing code run with interrupts disabled to be profiled.
 > 
-> On 01/05/2015 02:50 PM, Thierry Reding wrote:
-> > On Fri, Jan 02, 2015 at 01:10:14PM +0000, Daniel Stone wrote:
-> >> >
-> >> > Ajay's series don't apply cleanly anymore because it has been a while since
-> >> > he posted it but he can rebase on top of 3.19-rc1 once it is released and
-> >> > re-resend.
-> >> >
-> >> 
-> >> Do you have any plans to rebase this so it's ready for merging?
-> >> 
-> >> Thierry, Daniel, Dave - whose tree would this be best to merge through?
-> > 
-> > The plan is for me to take the bridge patches through the drm/panel
-> > tree. I'm going to look at these patches again later this week but from
-> > a very quick peek there don't seem to be any major issues left.
-> >
+> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+> ---
+>  arch/arm/include/asm/pmu.h       |  4 ++++
+>  arch/arm/kernel/perf_event.c     |  2 +-
+>  arch/arm/kernel/perf_event_cpu.c | 35 ++++++++++++++++++++++++++++++++---
+>  arch/arm/kernel/traps.c          |  3 ++-
+>  4 files changed, 39 insertions(+), 5 deletions(-)
 > 
-> I know you probably are very busy but it would be great if you can take a look
-> to this series to avoid another kernel release to be missed since we are already
-> at v3.19-rc5.
+> diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
+> index b1596bd59129..2a7ea97a4a14 100644
+> --- a/arch/arm/include/asm/pmu.h
+> +++ b/arch/arm/include/asm/pmu.h
+> @@ -123,6 +123,8 @@ struct arm_pmu {
 > 
-> Only this version was posted 2 months ago and the first version of the series
-> was sent on May, 2014 so it has been on the list for almost a year now...
+>  extern const struct dev_pm_ops armpmu_dev_pm_ops;
 > 
-> Tomi and Laurent had already agreed with the DT binging so I think that we can
-> already merge these and if there are any remaining issues, those can be fixed
-> during the 3.20 -rc cycle.
+> +irqreturn_t armpmu_dispatch_irq(int irq, void *dev);
+> +
+>  int armpmu_register(struct arm_pmu *armpmu, int type);
+> 
+>  u64 armpmu_event_update(struct perf_event *event);
+> @@ -136,6 +138,8 @@ int armpmu_map_event(struct perf_event *event,
+>  						[PERF_COUNT_HW_CACHE_RESULT_MAX],
+>  		     u32 raw_event_mask);
+> 
+> +void cpu_pmu_handle_fiq(int irq);
+> +
+>  struct pmu_probe_info {
+>  	unsigned int cpuid;
+>  	unsigned int mask;
+> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+> index f7c65adaa428..5ae9adf7f18e 100644
+> --- a/arch/arm/kernel/perf_event.c
+> +++ b/arch/arm/kernel/perf_event.c
+> @@ -296,7 +296,7 @@ validate_group(struct perf_event *event)
+>  	return 0;
+>  }
+> 
+> -static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
+> +irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
+>  {
+>  	struct arm_pmu *armpmu;
+>  	struct platform_device *plat_device;
+> diff --git a/arch/arm/kernel/perf_event_cpu.c
+> b/arch/arm/kernel/perf_event_cpu.c index a80309087a7b..5c4e9ce23389 100644
+> --- a/arch/arm/kernel/perf_event_cpu.c
+> +++ b/arch/arm/kernel/perf_event_cpu.c
+> @@ -36,6 +36,9 @@
+>  /* Set at runtime when we know what CPU type we are. */
+>  static struct arm_pmu *cpu_pmu;
+> 
+> +/* Allows us to find out if an IRQ is for us (mostly used from NMI context)
+> */ +static DEFINE_PER_CPU(int, cpu_pmu_irqs);
+> +
+>  /*
+>   * Despite the names, these two functions are CPU-specific and are used
+>   * by the OProfile/perf code.
+> @@ -127,6 +130,24 @@ static void cpu_pmu_free_irq(struct arm_pmu *cpu_pmu)
+>  	}
+>  }
+> 
+> +/*
+> + * This handler is called *unconditionally* from the default NMI/FIQ
+> + * handler. The irq may not be anything to do with us so the main
+> + * job of this function is to figure out if the irq passed in is ours
+> + * or not.
+> + */
 
-I see only a single Tested-by on this series and that seems to be with a
-bunch of out-of-tree patches applied on top. Does this now actually work
-applied on top of upstream? Also it seems like many people actually want
-this to get merged but there's been no Reviewed-bys and only a single
-Tested-by? Is that as good as it's going to get?
+This comment is an indicator that all the code in cpu_pmu_handle_fiq is
+in the wrong place.
+It (or something like it) belongs at the level of the default 
+FIQ handler, and not in perf_event_cpu.c
 
-Also I think the last update was that Ajay was going to resend this
-based on v3.19-rc1 or something. Is that still going to happen?
-Otherwise I can probably try to apply as-is, but not sure how well it
-will.
+> +void cpu_pmu_handle_fiq(int irq)
+> +{
+> +	int cpu = smp_processor_id();
+> +
+> +	if (irq != get_cpu_var(cpu_pmu_irqs))
+> +		return;
+> +
+> +	(void)armpmu_dispatch_irq(irq,
+> +				  get_cpu_ptr(&cpu_pmu->hw_events->percpu_pmu));
+> +}
+> +
+> +
+>  static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t
+> handler) {
+>  	int i, err, irq, irqs;
+> @@ -170,9 +191,16 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu,
+> irq_handler_t handler) continue;
+>  			}
+> 
+> -			err = request_irq(irq, handler,
+> -					  IRQF_NOBALANCING | IRQF_NO_THREAD, "arm-pmu",
+> -					  per_cpu_ptr(&hw_events->percpu_pmu, i));
+> +			err = request_nmi_irq(
+> +			    irq, IRQF_NOBALANCING, "arm-pmu",
+> +			    per_cpu_ptr(&hw_events->percpu_pmu, i));
+> +			if (err) {
+> +				err = request_irq(
+> +				    irq, handler,
+> +				    IRQF_NOBALANCING | IRQF_NO_THREAD,
+> +				    "arm-pmu",
+> +				    per_cpu_ptr(&hw_events->percpu_pmu, i));
+> +			}
+>  			if (err) {
+>  				pr_err("unable to request IRQ%d for ARM PMU counters\n",
+>  					irq);
+> @@ -180,6 +208,7 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu,
+> irq_handler_t handler) }
+> 
+>  			cpumask_set_cpu(i, &cpu_pmu->active_irqs);
+> +			per_cpu(cpu_pmu_irqs, i) = irq;
+>  		}
+>  	}
+> 
+> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+> index 74c752b9db68..c581e07517ff 100644
+> --- a/arch/arm/kernel/traps.c
+> +++ b/arch/arm/kernel/traps.c
+> @@ -38,6 +38,7 @@
+>  #include <asm/tls.h>
+>  #include <asm/system_misc.h>
+>  #include <asm/opcodes.h>
+> +#include <asm/pmu.h>
+> 
+> 
+>  static const char *handler[]= {
+> @@ -485,7 +486,7 @@ asmlinkage void __exception_irq_entry
+> handle_fiq_as_nmi(struct pt_regs *regs) irq = gic_ack_fiq();
+> 
+>  	if (irq) {
+> -		/* empty - no SPI handlers (yet) */
+> +		cpu_pmu_handle_fiq(irq);
+>  	} else {
+>  #ifdef CONFIG_SMP
+>  		ipi_cpu_backtrace(regs);
+> --
+> 1.9.3
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150119/bb07cee3/attachment-0001.sig>
+-- 
+Joshua Clayton
+Software Engineer
+UniWest
+122 S. 4th Avenue
+Pasco, WA 99301
+Ph: (509) 544-0720
+Fx: (509) 544-0868 
