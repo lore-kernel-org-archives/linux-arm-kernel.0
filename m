@@ -1,65 +1,37 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Mon, 19 Jan 2015 13:51:48 -0800
-Subject: [PATCH v7 1/3] i2c: iProc: define Broadcom iProc I2C binding
-In-Reply-To: <1421704310-26857-1-git-send-email-rjui@broadcom.com>
-References: <Ray Jui <rjui@broadcom.com>
- <1421704310-26857-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1421704310-26857-2-git-send-email-rjui@broadcom.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Mon, 19 Jan 2015 22:52:56 +0100
+Subject: [PATCH] MAINTAINERS: add omap2plus_defconfig under OMAP SUPPORT
+In-Reply-To: <1421703901-28295-1-git-send-email-balbi@ti.com>
+References: <1421703901-28295-1-git-send-email-balbi@ti.com>
+Message-ID: <CABxcv=keBgUme5mrNKg_h_h1WZHsaz4QOOyEPLa3XJYaEPE0Jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the I2C device tree binding for Broadcom iProc family of
-SoCs
+Hello Felipe,
 
-Signed-off-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
----
- .../devicetree/bindings/i2c/brcm,iproc-i2c.txt     |   37 ++++++++++++++++++++
- 1 file changed, 37 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt
+On Mon, Jan 19, 2015 at 10:45 PM, Felipe Balbi <balbi@ti.com> wrote:
+> omap2plus_defconfig is also part of the OMAP Support
+> maintained, because of that it's best to list it
+> under OMAP SUPPORT on MAINTAINERS so people know
+> to Cc linux-omap when patching that file.
+>
+> Reported-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+>  MAINTAINERS | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 97de006f38f0..abc6281892e7 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -6783,6 +6783,7 @@ Q:        http://patchwork.kernel.org/project/linux-omap/list/
+>  T:     git git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
+>  S:     Maintained
+>  F:     arch/arm/*omap*/
+> +F:     arch/arm/configs/omap2plus_defconfig
 
-diff --git a/Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt b/Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt
-new file mode 100644
-index 0000000..81f982c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt
-@@ -0,0 +1,37 @@
-+Broadcom iProc I2C controller
-+
-+Required properties:
-+
-+- compatible:
-+    Must be "brcm,iproc-i2c"
-+
-+- reg:
-+    Define the base and range of the I/O address space that contain the iProc
-+    I2C controller registers
-+
-+- interrupts:
-+    Should contain the I2C interrupt
-+
-+- clock-frequency:
-+    This is the I2C bus clock. Need to be either 100000 or 400000
-+
-+- #address-cells:
-+    Always 1 (for I2C addresses)
-+
-+- #size-cells:
-+    Always 0
-+
-+Example:
-+	i2c0: i2c at 18008000 {
-+		compatible = "brcm,iproc-i2c";
-+		reg = <0x18008000 0x100>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		interrupts = <GIC_SPI 85 IRQ_TYPE_NONE>;
-+		clock-frequency = <100000>;
-+
-+		codec: wm8750 at 1a {
-+			compatible = "wlf,wm8750";
-+			reg = <0x1a>;
-+		};
-+	};
--- 
-1.7.9.5
+While been there, could you please also add omap1_defconfig?
+
+Best regards,
+Javier
