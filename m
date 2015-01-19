@@ -1,50 +1,69 @@
-From: amit.kucheria@verdurent.com (Amit Kucheria)
-Date: Mon, 19 Jan 2015 14:52:52 +0530
-Subject: RFC on cpufreq implementation
-In-Reply-To: <54B7F7CD.7030903@free.fr>
-References: <54B7F7CD.7030903@free.fr>
-Message-ID: <CAHLCerMq0HnhS3ki3U1te5A8+NiDwpFNL_5_bm-CR4LoYFLo=A@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 19 Jan 2015 10:27:50 +0100
+Subject: [RESEND PATCH v3] clocksource: exynos_mct: Add the support for
+ Exynos 64bit SoC
+In-Reply-To: <54BC55BB.7050809@samsung.com>
+References: <1421213603-5020-1-git-send-email-cw00.choi@samsung.com>
+ <54B69072.4080607@kernel.org> <54B692FB.7030703@linaro.org>
+ <54BC55BB.7050809@samsung.com>
+Message-ID: <54BCCE16.8050607@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 15, 2015 at 10:54 PM, Mason <mpeg.blue@free.fr> wrote:
-> Hello,
+On 01/19/2015 01:54 AM, Chanwoo Choi wrote:
+> Dear Daniel and Kukjin,
 >
-> This is a follow-up to my previous thread.
-> "How many frequencies would cpufreq optimally like to manage?"
-> http://thread.gmane.org/gmane.linux.ports.arm.kernel/373669
->
-> As I originally wrote, I'm running 3.14 on an ARM Cortex-A9
-> based SoC (namely Tango4 from Sigma Designs). I'd like to get
-> some feedback on the cpufreq driver I wrote for that platform.
->
-> I decided to expose only a small subset of frequencies (namely
-> {999,500,333,111} MHz) because, in my tests, the ondemand gov
-> chose mostly min and max, and the intermediate frequencies not
-> so much; so I figured "2 intermediate freqs" is good enough.
-> (I'm ready to hear otherwise.)
+> On 01/15/2015 01:02 AM, Daniel Lezcano wrote:
+>> On 01/14/2015 04:51 PM, Kukjin Kim wrote:
+>>> On 01/14/15 14:33, Chanwoo Choi wrote:
+>>>
+>>> Hi,
+>>>
+>>> + Doug, Olof
+>>>
+>>>> This patch adds the support for Exynos 64bit SoC. The delay_timer is only used
+>>>> for Exynos 32bit SoC.
+>>>>
+>>> Yes, the Exynos MCT(Multi-Core Timer) is 64bit timer and it is available
+>>> on 64bit exynos SoC such as exynos7. But basically ARMv8 architecture is
+>>> including ARM ARCH timer (ARM Generic Timer) and exynos7 also has
+>>> implemented it and additionally its access is faster than using memory
+>>> mapped register called SFR for MCT...so Doug submitted patch to use MCT
+>>> on 32bit exynos SoCs before.
+>>>
+>>> I know using MCT on 64bit exynos is usefulness for Power Management and
+>>> I need to talk to relevant guys in office again. If anything, I'll let
+>>> you know.
+>>
+>> I will wait for your answer before digging more the patch.
 
-How many states are really enough depends on the main workloads
-running on your system. In a closed system (limited number of
-applications) you can easily characterise your workloads and see what
-operating points (OPP = voltage, frequency pair) the system spends
-most of its time in (CPU_FREQ_STAT_DETAILS) and optimize out the
-remaining OPPs.
+Hi Chanwoo,
 
-In an open-ended system where you don't control what applications will
-run on the system (e.g. android phone), it is probably a good idea to
-expose more OPPs while keeping in mind that exposing 50 frequencies is
-probably overkill (and silly) since you're spending more time reaching
-the "optimum" OPP. Pick some high-impact ones e.g. ones that allow you
-to lower your voltage.
+[ ... ]
 
-> I tried to use as much generic framework as possible, but I've
-> read about the clk framework, and it looks to be an even greater
-> generalization. Are new platforms encouraged to use that, rather
-> than provide a cpufreq driver? Does it work when voltage scaling
-> comes in play? (This SoC doesn't have it, but the next will.)
->
-> I'm also wondering how cpufreq and cpuidle interact? Is one a
-> subset of the other? Are they orthogonal?
+> Do you have any comment about this patch?
 
-These queries have been answered by Krzysztof.
+Yes, a similar patch has been posted for the tegra2 timer to run on 
+arm64. The patch in question put macros #ifdef CONFIG_ARM64 to disable 
+some parts of the code. That ended, the tegra2 timer was not needed for 
+the moment because of the arch timer present, so it has been disabled 
+from the compilation until a proper fix without macros could be proposed.
+
+It is happening exactly the same with this patch. As Kukjin pointed it, 
+the exynos_mct may not be needed (at least until a backup timer is 
+needed at PM time).
+
+I suggest you look at a nicer way to fix that instead of introducing 
+macros (which is by the way valid but not recommended by the CodingStyle 
+rules) and perhaps sync with Paul and Thierry [cc'ed] to find a common 
+solution.
+
+   -- Daniel
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
