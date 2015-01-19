@@ -1,54 +1,61 @@
-From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Mon, 19 Jan 2015 14:43:53 +0100
-Subject: [PATCHv5 0/6] USB: host: Atmel OHCI and EHCI drivers improvements
-In-Reply-To: <54BD07DC.6020802@atmel.com>
-References: <20150118211728.GA21128@gradator.net>
- <1421619935-5022-1-git-send-email-sylvain.rochet@finsecur.com>
- <54BD07DC.6020802@atmel.com>
-Message-ID: <20150119134353.GA3868@gradator.net>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 19 Jan 2015 13:44:41 +0000
+Subject: [PATCH 10/10] drivers: PL011: add support for the ARM SBSA generic
+ UART
+In-Reply-To: <5407007.ZAjCvvOzus@wuerfel>
+References: <1421428986-11300-1-git-send-email-andre.przywara@arm.com>
+ <54B95960.9070906@arm.com> <20150116183717.GM32155@leverpostej>
+ <5407007.ZAjCvvOzus@wuerfel>
+Message-ID: <54BD0A49.8030107@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Nicolas,
+Hi,
 
-
-On Mon, Jan 19, 2015 at 02:34:20PM +0100, Nicolas Ferre wrote:
-> Le 18/01/2015 23:25, Sylvain Rochet a ?crit :
-> > USB: host: Atmel OHCI and EHCI drivers improvements
-> > 
-> > Suspend/resume support for EHCI.
-> > struct dev_pm_ops for OHCI.
-> > Removed global variables from both.
-> > Fixed OHCI wake up support for STANDBY(wake-up enabled) and MEM(wake-up 
-> > disabled) sleep targets.
+On 19/01/15 13:31, Arnd Bergmann wrote:
+> On Friday 16 January 2015 18:37:17 Mark Rutland wrote:
+>>
+>>> Makes some sense, so what about:
+>>> -----------------------
+>>> Required properties:
+>>> - compatible: must be "arm,sbsa-uart"
+>>> - reg: exactly one register range
+>>> - interrupts: exactly one interrupt specifier
+>>>
+>>> Optional properties:
+>>> - current-speed : the current active speed of the UART
+>>> - fifo-size : always 32 as per the SBSA specification
+>>> - word-size : the number of payload bits per word
+>>> - parity : used parity method, can be:
+>>>       "n": no parity
+>>>       "e": even parity
+>>>       "o": odd parity
+>>>       "m": always mark (logical 1)
+>>>       "s": always space (logical 0)
+>>> - stop-bits : the number of stop bits after the payload
+>>
+>> Generally those look fine, though someone more familiar with serial
+>> should take a look.
+>>
+>> We can drop fifo-size given it's fixed. Anything that we know outright
+>> doesn't need to be described.
+>>
+>> We might want to make them mandatory. I don't see any value in not
+>> knowing.
 > 
-> I'm okay with the whole series:
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-Oops, you missed that, but there is a v6 I sent this morning, which 
-fixes a small mistake I made in v5.
-
-
-> Alan, It seems that Boris and Alexandre also add their tag to the 
-> series already. Do you want us to collect them in a new series sent to 
-> you?
+> I think making them optional is useless, so either make them mandatory or
+> drop them if we can avoid it. Unfortunately, LCR is not part of SBSA,
+> that would let us drop the properties and still report the correct settings.
 > 
-> Sylvain,
-> Thanks a lot for this nice series built at a high pace ;-)
+> Would we be better off documenting that 8-n-1 is the only allowed settting?
+> I can't think of a reason why anyone would use something else.
 
-Yeah, I have the feeling I messed up a "little" :-)
+Reading the spec again I see that 8-bit word len is mandated:
+"The generic UART uses 8-bit words, equivalent to UARTLCR_H.WLEN == b11."
+So given this I guess anything other than (8)n1 is pretty useless and
+wouldn't probably be used anyways. This means that we can get rid of the
+optional properties altogether and just add "current-speed" to the list
+of required ones. I am about to implement this.
 
-Anyway, v6 is fine, I hope.
-
-
-> Even if I'm not sure to keep the separation between "slow clock" PM and
-> "normal" PM on AT91 but more likely to use the "slow clock" for all the
-> PM modes, let's go forward with this step for now. I mean, we will
-> certainly rework this at91_suspend_entering_slow_clock() aspect in the
-> future.
-
-I agree, I discussed privately with Boris about that, this require a 
-larger rework, lets only fix the OHCI wakeup bug for now.
-
-
-Sylvain
+Cheers,
+Andre.
