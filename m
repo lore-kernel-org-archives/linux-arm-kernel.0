@@ -1,48 +1,45 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 19 Jan 2015 11:04:34 +0100
-Subject: [PATCH net-next 1/1] ARM: dts: imx6sx: correct i.MX6sx sdb
- board enet phy address
-In-Reply-To: <1421660282-29494-1-git-send-email-b38611@freescale.com>
-References: <1421660282-29494-1-git-send-email-b38611@freescale.com>
-Message-ID: <c590198f7ed3de207da6d7c821a6779b@agner.ch>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 19 Jan 2015 11:05:27 +0100
+Subject: [PATCH 1/2] pinctrl: exynos: Add AUDIO pin controller for exynos7
+In-Reply-To: <CA+Ln22GhnW5jcXdQfYaJ_aM4Wq9OHXvShHHaxLKjJi+dp6Afcg@mail.gmail.com>
+References: <1418994659-5222-1-git-send-email-padma.v@samsung.com>
+ <1418994659-5222-2-git-send-email-padma.v@samsung.com>
+ <CACRpkdZopjCN_GMEPQFd_NWa0Ddocqt3aViLrZ7Yh3ui_YcBAg@mail.gmail.com>
+ <CA+Ln22GhnW5jcXdQfYaJ_aM4Wq9OHXvShHHaxLKjJi+dp6Afcg@mail.gmail.com>
+Message-ID: <CACRpkdaE8fY1OWy6VPucWVDRmTCRuE4fENZwsu6M3oSYv0DTvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-01-19 10:38, Fugang Duan wrote:
-> The commit (3d125f9c91c5) cause i.MX6SX sdb enet cannot work. The cause is
-> the commit add mdio node with un-correct phy address.
+On Wed, Jan 14, 2015 at 3:27 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> 2015-01-14 20:40 GMT+09:00 Linus Walleij <linus.walleij@linaro.org>:
+>> On Fri, Dec 19, 2014 at 2:10 PM, Padmavathi Venna <padma.v@samsung.com> wrote:
+>>
+>>> Audio IPs on Exynos7 require gpios available in AUDIO
+>>> pin controller block. So adding the AUDIO pinctrl support.
+>>>
+>>> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+>> (...)
+>>> --- a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+>>> +++ b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+>>> @@ -181,6 +181,7 @@ Aliases for controllers compatible with "samsung,exynos7-pinctrl":
+>>>  - pinctrl6: pin controller of FSYS0 block,
+>>>  - pinctrl7: pin controller of FSYS1 block,
+>>>  - pinctrl8: pin controller of BUS1 block,
+>>> +- pinctrl9: pin controller of AUDIO block,
+>>
+>> This doesn't apply at all, the list has never been in the document merged
+>> upstream.
+>
+> I believe this patch depends on patch [1], which was mentioned in
+> cover letter and which you seem to have applied two days ago. If it
+> still doesn't apply, please let me know if I should collect the
+> patches myself and prepare a pull request for you.
+>
+> [1] https://patchwork.kernel.org/patch/5467321/
 
-Sorry about that, somehow I did not take in consideration that that
-could be different on the SoloX board.. Just checked again on Vybrid, it
-is correct there, the dual PHY DP83849I addresses the two ports with 0
-and 1 respectively.
+It applied when I tried it now, sorry I must have screwed up or something :(
 
-> 
-> The patch just correct i.MX6sx sdb board enet phy address.
+Patch applied!
 
-Acked-by: Stefan Agner <stefan@agner.ch>
-
-> 
-> Signed-off-by: Fugang Duan <B38611@freescale.com>
-> ---
->  arch/arm/boot/dts/imx6sx-sdb.dts |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
-> index 8c1febd..9db123f 100644
-> --- a/arch/arm/boot/dts/imx6sx-sdb.dts
-> +++ b/arch/arm/boot/dts/imx6sx-sdb.dts
-> @@ -167,11 +167,11 @@
->  		#size-cells = <0>;
->  
->  		ethphy1: ethernet-phy at 0 {
-> -			reg = <0>;
-> +			reg = <1>;
->  		};
->  
->  		ethphy2: ethernet-phy at 1 {
-> -			reg = <1>;
-> +			reg = <2>;
->  		};
->  	};
->  };
+Yours,
+Linus Walleij
