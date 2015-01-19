@@ -1,93 +1,58 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Mon, 19 Jan 2015 18:11:14 +0100
-Subject: [PATCH v2 03/11] ARM: tegra: Set the sound card model that
- alsaucm expects
-In-Reply-To: <54BD3A75.80009@wwwdotorg.org>
-References: <1421338359-27467-1-git-send-email-tomeu.vizoso@collabora.com>
- <1421338359-27467-4-git-send-email-tomeu.vizoso@collabora.com>
- <54B7F757.5060002@wwwdotorg.org>
- <CAAObsKCad9O_=TUQrF7fVbBvjDTmfJsLPgr+EasCyhvY+xhdHg@mail.gmail.com>
- <CAAObsKBKnU_wBaxNFN-buz71qL-te4s6bqrrnxao_N-TwBVkAQ@mail.gmail.com>
- <54BD3A75.80009@wwwdotorg.org>
-Message-ID: <CAAObsKBm5mesGqrLQnveKQMy__uEOU1vcLGptnKxqHjV-T9C0g@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 19 Jan 2015 09:15:21 -0800
+Subject: [GIT PULL] clk: more Exynos7 clock tree definitions
+In-Reply-To: <54B95A44.50105@samsung.com>
+References: <54B95A44.50105@samsung.com>
+Message-ID: <20150119171521.22722.84999@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 January 2015 at 18:10, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 01/16/2015 02:01 AM, Tomeu Vizoso wrote:
->>
->> On 16 January 2015 at 09:50, Tomeu Vizoso <tomeu.vizoso@collabora.com>
->> wrote:
->>>
->>> On 15 January 2015 at 18:22, Stephen Warren <swarren@wwwdotorg.org>
->>> wrote:
->>>>
->>>> On 01/15/2015 09:12 AM, Tomeu Vizoso wrote:
->>>>>
->>>>>
->>>>> Patches are on its way to add a config file to alsaucm for the Nyan
->>>>> boards. Use the same card ID that alsaucm will expect.
->>>>>
->>>>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
->>>>> ---
->>>>>    arch/arm/boot/dts/tegra124-nyan-big.dts | 4 ++--
->>>>>    1 file changed, 2 insertions(+), 2 deletions(-)
->>>>>
->>>>> diff --git a/arch/arm/boot/dts/tegra124-nyan-big.dts
->>>>> b/arch/arm/boot/dts/tegra124-nyan-big.dts
->>>>> index 43e58a4..9a9cffe 100644
->>>>> --- a/arch/arm/boot/dts/tegra124-nyan-big.dts
->>>>> +++ b/arch/arm/boot/dts/tegra124-nyan-big.dts
->>>>> @@ -1976,9 +1976,9 @@
->>>>>          };
->>>>>
->>>>>          sound {
->>>>> -               compatible = "nvidia,tegra-audio-max98090-nyan-big",
->>>>> +               compatible = "nvidia,tegra-audio-max98090-nyan",
->>>>>                               "nvidia,tegra-audio-max98090";
->>>>
->>>>
->>>>
->>>> If all the boards that are derived from Nyan truly have identical audio
->>>> HW
->>>> (or at least any differences can be described by this binding), then it
->>>> seems fine to add "nvidia,tegra-audio-max98090-nyan" to the compatible
->>>> value.
->>>
->>>
->>>
->>>
->>>> However, I don't see a reason to remove the board-specific compatible
->>>> value
->>>> "nvidia,tegra-audio-max98090-nyan-big"; we should always include all the
->>>> values that are relevant.
->>>
->>>
->>> Ok.
->>
->>
->> Oh, actually, my intention was to move the whole sound node to the
->> nyan dtsi, as there isn't anything specific to the blaze regarding
->> sound.
->
->
-> There are zero differences between the sound circuits of the boards? If so,
-> that sounds fine. I suppose if we do need to apply a quirk to one board but
-> not the other, we can always fall back on the top-level compatible value if
-> we absolutely have to.
+Quoting Sylwester Nawrocki (2015-01-16 10:36:52)
+> 
+> Hi Mike,
+> 
+> Please find below a few clk updates for exynos7 SoC. I kept them on
+> a separate branch as there will likely be depending dts patches.
+> Please pull for 3.20.
+> 
+> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+> 
+>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://linuxtv.org/snawrocki/samsung.git tags/for-v3.20-exynos7-clk
 
-Yeah, this is what Dylan said in other thread:
-
-"ChromeOS uses one config for both.  The only audio difference between
-these two boards is the speakers, that isn't represented in UCM, so
-one config file is fine."
+Pulled.
 
 Regards,
+Mike
 
-Tomeu
-
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> 
+> for you to fetch changes up to 9f930a39e135d370d17e7a1ab73ddebcfb896f98:
+> 
+>   clk: samsung: exynos7: add clocks for audio block (2015-01-15 15:18:51 +0100)
+> 
+> ----------------------------------------------------------------
+> - Clock definitions for Exynos7 SoC peripheral devices:
+>   video scaler, USB, DMA, SPI and the audio subsystem.
+> 
+> ----------------------------------------------------------------
+> Padmavathi Venna (3):
+>       clk: samsung: exynos7: add gate clock for DMA block
+>       clk: samsung: exynos7: add clocks for SPI block
+>       clk: samsung: exynos7: add clocks for audio block
+> 
+> Tony K Nadackal (1):
+>       clk: samsung: exynos7: Add clocks for MSCL block
+> 
+> Vivek Gautam (1):
+>       clk: samsung: exynos7: Add required clock tree for USB
+> 
+>  .../devicetree/bindings/clock/exynos7-clock.txt    |   15 +
+>  drivers/clk/samsung/clk-exynos7.c                  |  408 +++++++++++++++++++-
+>  include/dt-bindings/clock/exynos7-clk.h            |   88 ++++-
+>  3 files changed, 505 insertions(+), 6 deletions(-)
+> 
+> Thanks,
+> Sylwester
