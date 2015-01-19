@@ -1,84 +1,72 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 19 Jan 2015 18:53:28 +0800
-Subject: [PATCH 18/28] PCI/sparc: Use pci_scan_root_bridge() for simplicity
-In-Reply-To: <7748275.Tf0dzsPZdA@wuerfel>
+Date: Mon, 19 Jan 2015 18:56:26 +0800
+Subject: [PATCH 08/28] PCI: Introduce pci_host_assign_domain_nr() to assign
+ domain
+In-Reply-To: <2124926.gSbG0l1jIy@wuerfel>
 References: <1421372666-12288-1-git-send-email-wangyijing@huawei.com>
- <2658988.B0VmbMPdJ9@wuerfel> <54BC772E.6020103@huawei.com>
- <7748275.Tf0dzsPZdA@wuerfel>
-Message-ID: <54BCE228.2020907@huawei.com>
+ <3026954.09KG7UaUTi@wuerfel> <54BC6894.6060500@huawei.com>
+ <2124926.gSbG0l1jIy@wuerfel>
+Message-ID: <54BCE2DA.1000405@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/1/19 16:44, Arnd Bergmann wrote:
-> On Monday 19 January 2015 11:17:02 Yijing Wang wrote:
->> On 2015/1/16 18:01, Arnd Bergmann wrote:
->>> On Friday 16 January 2015 09:44:16 Yijing Wang wrote:
->>>> +static void pci_host_bridge_probe_mode(
->>>> +               struct pci_host_bridge *host)
->>>> +{
->>>> +       host->of_scan = true;
->>>> +}
+On 2015/1/19 17:50, Arnd Bergmann wrote:
+> On Monday 19 January 2015 10:14:44 Yijing Wang wrote:
+>>>> I'm confused: the same code is already part of the PCI tree, but with
+>>>> Lorenzo Pieralisi listed as the patch author. The code is good,
+>>>> and I acked it in the past, but one of you is (probably by accident)
+>>>> misattributing the patch.
+>>>>
+>>>> Assuming that the patch that is already merged in next is the right
+>>>> one, I think you should rebase your series on top of
+>>>>
+>>>> git://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git#next
+>>>>
+>>>> to avoid conflicts like this one.
 >>>>
 >>>
->>> I probably missed something here, but where does host->of_scan
->>> get used?
+>>> I think I just got confused because the code duplicates most of
+>>> pci_bus_assign_domain_nr(). Maybe this can be done in a better way
+>>> by splitting the existing function into 
+>>>
+>>> static int pci_assign_domain_nr(struct device *)
+>>> {
+>>>       ... /* most of pci_bus_assign_domain_nr */
+>>>
+>>>       return domain;
+>>> }
+>>>
+>>> void pci_host_assign_domain_nr(struct pci_host_bridge *host)
+>>> {
+>>>       host->domain = pci_assign_domain_nr(host->dev.parent);
+>>> }
+>>>
+>>> void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+>>> {
+>>>       bus->domain_nr = pci_assign_domain_nr(parent);
+>>> }
 >>>
 >>
->> It is used in __pci_scan_root_bus() to detect whether of scan bus is needed in patch 11.
-> 
-> Ok, I see it now.
-> 
->> @@ -2051,10 +2053,17 @@ static struct pci_bus *__pci_scan_root_bus(
->>  		pci_bus_insert_busn_res(b, host->busnum, 255);
->>  	}
->>
->> -	max = pci_scan_child_bus(b);
->> +	if (host->ops && host->ops->phb_probe_mode)
->> +		host->ops->phb_probe_mode(host);
->>
->> -	if (!found)
->> -		pci_bus_update_busn_res_end(b, max);
->> +	if (host->of_scan) {
->> +		if (host->ops &&host->ops->phb_of_scan_bus)
->> +			host->ops->phb_of_scan_bus(host);
->> +	} else {
->> +		max = pci_scan_child_bus(b);
->> +		if (!found)
->> +			pci_bus_update_busn_res_end(b, max);
->> +	}
+>> Hi Arnd,
+>>    I kept the almost duplicated pci_host_assign_domain_nr() and
+>> pci_bus_assign_domain_nr() here for building happy, because now
+>> platform specific pci_domain_nr() still exists which may get domain
+>> number from pci_bus. pci_bus_assign_domain_nr() will be removed in
+>> the last patch.
 >>
 > 
-> I think we can simplify this based on the knowledge that this code
-> will remain powerpc specific. How about removing the phb_probe_mode()
-> callback and replacing it with just a phb_scan_bus() callback that
-> will always get set on sparc, and do this on powerpc:
-> 
-> +static void pci_host_bridge_of_scan_bus(struct pci_host_bridge *host)
-> +{
-> +       int mode = PCI_PROBE_NORMAL;
-> +       struct pci_bus *bus = host->bus;
-> +       struct pci_controller *hose = dev_get_drvdata(&host->dev);
-> +
-> +       /* Get probe mode and perform scan */
-> +       if (hose->dn && ppc_md.pci_probe_mode)
-> +               mode = ppc_md.pci_probe_mode(bus);
-> +
-> +       pr_debug("    probe mode: %d\n", mode);
-> +       if (mode == PCI_PROBE_DEVTREE) {
-> +               of_scan_bus(host->dn, bus);
-> +		return max; // XXX need to get this from somewhere
-> +	}
-> +	return pci_scan_child_bus(b);
-> +}
-> 
-> Would that work?
+> I'm not sure I get your point: the approach I showed above seems to have
+> the same effect, except it doesn't duplicate code temporarily, which
+> makes it less error-prone in case your patch gets merged at the
+> same time as another patch that modifies pci_bus_assign_domain_nr.
 
-This looks good to me, it is more simple.
+OK, I got it, will update it, thanks!
+
 
 Thanks!
 Yijing.
 
-
+> 
 > 	Arnd
 > 
 > .
