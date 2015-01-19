@@ -1,62 +1,83 @@
-From: gustavo@padovan.org (Gustavo Padovan)
-Date: Mon, 19 Jan 2015 15:01:25 -0200
-Subject: [PATCH V8 00/14] drm/exynos: few patches to enhance bridge chip
- support
-In-Reply-To: <20150119163043.GB7751@ulmo.nvidia.com>
-References: <1416045309-13359-1-git-send-email-ajaykumar.rs@samsung.com>
- <CAEC9eQOrKw2Z1q-ztFfadXmsL3CTcAkkv9kcS2QnDOAVSh2AuQ@mail.gmail.com>
- <548ABAB6.6010200@collabora.co.uk> <3197445.qizQc0zeRb@avalon>
- <54914D7D.9060108@collabora.co.uk>
- <CAPj87rN4HZzDt5JBLyTRmKZs7XcOG=0ha7ZQf9hmjPAFgTyhYQ@mail.gmail.com>
- <20150105135015.GA12010@ulmo.nvidia.com>
- <54BCDC28.7080003@collabora.co.uk>
- <20150119163043.GB7751@ulmo.nvidia.com>
-Message-ID: <20150119170125.GH2001@joana>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 19 Jan 2015 18:02:59 +0100
+Subject: [PATCH v6 8/8] arm: dma-mapping: plumb our iommu mapping ops into
+ arch_setup_dma_ops
+In-Reply-To: <20150119162111.GA7751@ulmo.nvidia.com>
+References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
+ <2253719.6TRpaaEdiI@wuerfel> <20150119162111.GA7751@ulmo.nvidia.com>
+Message-ID: <14678444.nef4iEKbzI@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-01-19 Thierry Reding <thierry.reding@gmail.com>:
-
-> On Mon, Jan 19, 2015 at 11:27:52AM +0100, Javier Martinez Canillas wrote:
-> > Hello Thierry,
-> > 
-> > On 01/05/2015 02:50 PM, Thierry Reding wrote:
-> > > On Fri, Jan 02, 2015 at 01:10:14PM +0000, Daniel Stone wrote:
-> > >> >
-> > >> > Ajay's series don't apply cleanly anymore because it has been a while since
-> > >> > he posted it but he can rebase on top of 3.19-rc1 once it is released and
-> > >> > re-resend.
-> > >> >
-> > >> 
-> > >> Do you have any plans to rebase this so it's ready for merging?
-> > >> 
-> > >> Thierry, Daniel, Dave - whose tree would this be best to merge through?
+On Monday 19 January 2015 17:21:14 Thierry Reding wrote:
+> On Mon, Jan 19, 2015 at 04:52:41PM +0100, Arnd Bergmann wrote:
+> > On Monday 19 January 2015 13:36:24 Thierry Reding wrote:
+> > > On Fri, Jan 16, 2015 at 01:18:21AM +0200, Laurent Pinchart wrote:
+> > > > On Thursday 15 January 2015 11:12:17 Will Deacon wrote:
+> > > > > On Thu, Jan 15, 2015 at 08:28:44AM +0000, Thierry Reding wrote:
+> > > > > > On Wed, Jan 14, 2015 at 10:46:10AM +0000, Will Deacon wrote:
+> > > > > > > On Wed, Jan 14, 2015 at 09:00:24AM +0000, Alexandre Courbot wrote:
+> > > > > > [...]
+> > > > > > 
+> > > > > >>> 2) Say you want to use the IOMMU API in your driver, and have an iommu
+> > > > > >>> property in your device's DT node. If by chance your IOMMU is
+> > > > > >>> registered early, you will already have a mapping automatically
+> > > > > >>> created even before your probe function is called. Can this be
+> > > > > >>> avoided? Is it even safe?
+> > > > > >> 
+> > > > > >> Currently, I think you have to either teardown the ops manually or
+> > > > > >> return an error from of_xlate. Thierry was also looking at this sort of
+> > > > > >> thing, so it might be worth talking to him.
+> > > > > > 
+> > > > > > I already explained in earlier threads why I think this is a bad idea.
+> > > > > > It's completely unnatural for any driver to manually tear down something
+> > > > > > that it didn't want set up in the first place. It also means that you
+> > > > > > have to carefully audit any users of these IOMMU APIs to make sure that
+> > > > > > they do tear down. That doesn't sound like a good incremental approach,
+> > > > > > as evidenced by the breakage that Alex and Heiko have encountered.
+> > > > > 
+> > > > > Well, perhaps we hide that behind a get_iommu API or something. We *do*
+> > > > > need this manual teardown step to support things like VFIO, so it makes
+> > > > > sense to reuse it for other users too imo.
+> > > > > 
+> > > > > > The solution for me has been to completely side-step the issue and not
+> > > > > > register the IOMMU with the new mechanism at all. That is, there's no
+> > > > > > .of_xlate() implementation, which means that the ARM DMA API glue won't
+> > > > > > try to be smart and use the IOMMU in ways it's not meant to be used.
+> > > > 
+> > > > That will break when someone will want to use the same IOMMU type for devices 
+> > > > that use the DMA mapping API to hide the IOMMU. That might not be the case for 
+> > > > your IOMMU today, but it's pretty fragile, we need to fix it.
 > > > 
-> > > The plan is for me to take the bridge patches through the drm/panel
-> > > tree. I'm going to look at these patches again later this week but from
-> > > a very quick peek there don't seem to be any major issues left.
-> > >
+> > > No, there's absolutely no issue here. It simply means that you can't do
+> > > this on Tegra. So far I'm not sure I even see an advantage in using the
+> > > IOMMU for devices that don't care about it anyway. Consider the example
+> > > of the SD/MMC or HDA. They typically allocate fairly small buffers, the
+> > > order of a single page typically. They can simply use memory handed out
+> > > by the CMA.
+> > > 
+> > > So as long as we don't add a .of_xlate() implementation or instantiate
+> > > via the IOMMU_OF_DECLARE() mechanism we simply don't support IOMMU-over-
+> > > DMA on Tegra.
 > > 
-> > I know you probably are very busy but it would be great if you can take a look
-> > to this series to avoid another kernel release to be missed since we are already
-> > at v3.19-rc5.
-> > 
-> > Only this version was posted 2 months ago and the first version of the series
-> > was sent on May, 2014 so it has been on the list for almost a year now...
-> > 
-> > Tomi and Laurent had already agreed with the DT binging so I think that we can
-> > already merge these and if there are any remaining issues, those can be fixed
-> > during the 3.20 -rc cycle.
+> > It breaks as soon as you have a system with memory above the 4GB boundary,
+> > which is the whole point of iommus for most users.
 > 
-> I see only a single Tested-by on this series and that seems to be with a
-> bunch of out-of-tree patches applied on top. Does this now actually work
-> applied on top of upstream? Also it seems like many people actually want
-> this to get merged but there's been no Reviewed-bys and only a single
-> Tested-by? Is that as good as it's going to get?
+> Why does it break? The IOMMU API simply gets a list of pages and gets
+> the physical addresses from those pages when it maps them to the IO
+> virtual addresses. How is .of_xlate() or of_iommu_configure() related?
 
-I've been using this series on top of exynos-drm for more than a month and it 
-works fine for me so..
+Because almost no drivers use the IOMMU API, and they expect the dma-mapping
+API to do the right thing independent of the hardware configuration.
 
-Tested-by: Gustavo Padovan <gustavo.padovan@collabora.co.uk>
+> > CMA does not work for streaming mappings, only for the coherent API.
+> 
+> Why not? And if it doesn't I'm not sure we currently care on Tegra since
+> we've gotten away with using CMA just fine so far.
 
-	Gustavo
+CMA is used as the backing for the dma_alloc_* API. It's impossible to
+use it for streaming data that originates from arbitrary page cache
+pages, like a send() operation on a user space network socket, or
+writing to disk.
+
+	Arnd
