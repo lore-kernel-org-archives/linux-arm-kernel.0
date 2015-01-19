@@ -1,50 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 19 Jan 2015 15:09:51 -0800
-Subject: [GIT PULL] Urgent omap4 legacy interrupt regression fix for v3.19-rc
- series
-Message-ID: <20150119230950.GA7718@atomide.com>
+From: b.galvani@gmail.com (Beniamino Galvani)
+Date: Tue, 20 Jan 2015 00:22:56 +0100
+Subject: [PATCH 0/3] ARM: meson: add support for MINIX NEO-X8
+Message-ID: <1421709779-25691-1-git-send-email-b.galvani@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 7ac72746aa9bb305fa74b44ec73eae99bbbe9b66:
+This series adds support for MINIX NEO-X8, a digital media player
+based on a Amlogic S802 (Meson8) SoC. It depends on the pinctrl
+support for Meson8 submitted here:
 
-  ARM: dts: Revert disabling of smc91x for n900 (2015-01-06 08:49:57 -0800)
+  https://lkml.org/lkml/2015/1/17/87
 
-are available in the git repository at:
+Beniamino Galvani (3):
+  of: Add vendor prefix for MINIX
+  of: Define board compatible for MINIX NEO-X8
+  ARM: dts: meson: add DTS file for MINIX NEO-X8
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.19/gic-regression-v2
+ Documentation/devicetree/bindings/arm/amlogic.txt  |   4 +
+ .../devicetree/bindings/arm/geniatech.txt          |   5 -
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/meson8-minix-neo-x8.dts          | 128 +++++++++++++++++++++
+ 5 files changed, 134 insertions(+), 5 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/arm/geniatech.txt
+ create mode 100644 arch/arm/boot/dts/meson8-minix-neo-x8.dts
 
-for you to fetch changes up to 0fb22a8fb7f3bc1b00a36d4a97ce4f93191f7559:
-
-  ARM: OMAP: Work around hardcoded interrupts (2015-01-17 08:56:12 -0800)
-
-----------------------------------------------------------------
-A rather urgent pull request to fix omap4 legacy interrupts.
-
-The legacy interrupts on omap4 got broken when gic got changed to
-use irq_domain_add_linear() instead of the irq_domain_add_legacy(). We
-still have the hardcoded legacy IRQ numbers in use in several places,
-most notably the in the legacy DMA. It took a while to figure out
-what the problem was and how it should be fixed for the -rc series.
-
-Also include is a regression fix for the dra7 dwc3 suspend.
-
-----------------------------------------------------------------
-Felipe Balbi (1):
-      arm: boot: dts: dra7: enable dwc3 suspend PHY quirk
-
-Marc Zyngier (1):
-      ARM: OMAP: Work around hardcoded interrupts
-
- arch/arm/boot/dts/dra7.dtsi                |  6 ++++++
- arch/arm/mach-omap2/common.h               |  1 +
- arch/arm/mach-omap2/omap4-common.c         | 32 ++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/omap_hwmod.c           | 10 ++++++++--
- arch/arm/mach-omap2/omap_hwmod.h           |  1 +
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  5 +++++
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c |  1 +
- arch/arm/mach-omap2/prcm-common.h          |  1 +
- arch/arm/mach-omap2/prm44xx.c              |  5 ++++-
- arch/arm/mach-omap2/prm_common.c           | 14 +++++++++++--
- arch/arm/mach-omap2/twl-common.c           |  7 ++++++-
- 11 files changed, 77 insertions(+), 6 deletions(-)
+-- 
+2.1.4
