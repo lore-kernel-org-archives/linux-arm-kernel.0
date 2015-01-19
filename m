@@ -1,33 +1,80 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Mon, 19 Jan 2015 16:33:07 +0800
-Subject: [PATCH 2/2] ARM: at91: sama5d4: dts: change the nand compatible string
-In-Reply-To: <1421656387-12538-1-git-send-email-josh.wu@atmel.com>
-References: <1421656387-12538-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1421656387-12538-2-git-send-email-josh.wu@atmel.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 19 Jan 2015 08:35:33 +0000
+Subject: [PATCH v3 1/3] dt-bindings: mfd: add lubbock-io binding
+In-Reply-To: <1421406010-14851-1-git-send-email-robert.jarzmik@free.fr>
+References: <1421406010-14851-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <20150119083533.GF21886@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we introduce a new "atmel,sama5d4-nand" compatible string for sama5d4,
-so we need to apply it for sama5d4 chip.
+On Fri, 16 Jan 2015, Robert Jarzmik wrote:
 
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
----
+> Add a binding for lubbock motherboard IO board.
+> 
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> ---
+>  .../devicetree/bindings/mfd/lubbock-io.txt         | 26 ++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/lubbock-io.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/lubbock-io.txt b/Documentation/devicetree/bindings/mfd/lubbock-io.txt
+> new file mode 100644
+> index 0000000..33c9e21
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/lubbock-io.txt
+> @@ -0,0 +1,26 @@
+> +Intel's pxa255 system development platform motherboard.
 
- arch/arm/boot/dts/sama5d4.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+s/pxa25/PXA25/
 
-diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
-index 1b0f30c..02d67c2 100644
---- a/arch/arm/boot/dts/sama5d4.dtsi
-+++ b/arch/arm/boot/dts/sama5d4.dtsi
-@@ -267,7 +267,7 @@
- 		};
- 
- 		nand0: nand at 80000000 {
--			compatible = "atmel,at91rm9200-nand";
-+			compatible = "atmel,sama5d4-nand";
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			ranges;
+"system development platform motherboard" doesn't quite sit right with me.
+
+How about "Intel Xscale PXA255 development platform (Lubbock)"?
+
+> +This is the motherboard, or IO board, of the pxa25x development system,
+> +supporting a lubbock pxa25x SoC board.
+
+Again, this sounds weird.
+
+> +Required properties:
+> +  - compatible : One of the following chip-specific strings:
+> +        "intel,lubbock-io"
+
+An odd thing to say with only one entry.
+
+Also, please line it up to the right of the ':' above.
+
+> +  - interrupts : The first interrupt is the line the /IRQ signal the IO board
+> +                 multiplex is connected to. The only known case is GPIO0 on the
+> +                 pxa25x SoC.
+
+Can you get someone to help you re-word this into a more fluid
+sentence?
+
+> +Optional properties:
+> +  - interrupts : The second optional interrupt is the base of the interrupts
+> +                 multiplexed by the lubbock motherboard. If unspecified, the
+> +                 range is fully dynamic, and the irqdomain will generate its
+> +                 interrupt base on the fly.
+> +
+> +Example:
+> +
+> +mb: lubbock-mb at 0 {
+> +	compatible = "intel,lubbock-io";
+> +	interrupts = <0 IRQ_TYPE_EDGE_FALLING 400 IRQ_TYPE_NONE>;
+> +	#interrupt-cells = <2>;
+> +        interrupt-parent = <&pxairq>;
+
+Whitespace error.
+
+> +};
+
+I'm guessing mb means motherboard?  I think it's unusual for a
+motherboard to have it's own driver.  Usually we provide drivers for
+the individual components/peripherals situated on the board.
+
 -- 
-1.9.1
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
