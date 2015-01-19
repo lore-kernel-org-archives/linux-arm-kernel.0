@@ -1,36 +1,78 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 19 Jan 2015 22:30:50 +0100
-Subject: [PATCH] i2c: drop ancient protection against sysfs refcounting
- issues
-In-Reply-To: <20150119190142.GA9451@kroah.com>
-References: <1421693756-12917-1-git-send-email-wsa@the-dreams.de>
- <20150119190142.GA9451@kroah.com>
-Message-ID: <20150119213050.GA32176@katana>
+From: rjui@broadcom.com (Ray Jui)
+Date: Mon, 19 Jan 2015 13:31:25 -0800
+Subject: [PATCH v6 2/3] i2c: iproc: Add Broadcom iProc I2C Driver
+In-Reply-To: <20150119194420.GG26493@n2100.arm.linux.org.uk>
+References: <rjui@broadcom.com>
+ <1421695428-19102-1-git-send-email-rjui@broadcom.com>
+ <1421695428-19102-3-git-send-email-rjui@broadcom.com>
+ <20150119194420.GG26493@n2100.arm.linux.org.uk>
+Message-ID: <54BD77AD.3080209@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > @@ -1184,8 +1183,7 @@ EXPORT_SYMBOL_GPL(i2c_new_dummy);
-> >  
-> >  static void i2c_adapter_dev_release(struct device *dev)
-> >  {
-> > -	struct i2c_adapter *adap = to_i2c_adapter(dev);
-> > -	complete(&adap->dev_released);
-> > +	/* empty, but the driver core insists we need a release function */
-> 
-> Yeah, it does, but I hate to see this in "real" code as something is
-> probably wrong with it if it happens.
-> 
-> Please move the rest of 'i2c_del_adapter' into the release function
-> (what was after the wait_for_completion() call), and then all should be
-> fine.
 
-I was about to do this as a follow-up patch. But Russell's and
-Lars-Peter's responses made this obsolete already.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150119/d45fc4fc/attachment-0001.sig>
+On 1/19/2015 11:44 AM, Russell King - ARM Linux wrote:
+> To see why atomic_t is pure obfuscation:
+> 
+> typedef struct {
+>         int counter;
+> } atomic_t;
+> 
+> So, counter is a plain int.
+> 
+> On Mon, Jan 19, 2015 at 11:23:47AM -0800, Ray Jui wrote:
+>> +static irqreturn_t bcm_iproc_i2c_isr(int irq, void *data)
+>> +{
+>> +	struct bcm_iproc_i2c_dev *iproc_i2c = data;
+>> +	u32 status = readl(iproc_i2c->base + IS_OFFSET);
+>> +
+>> +	status &= ISR_MASK;
+>> +
+>> +	if (!status)
+>> +		return IRQ_NONE;
+>> +
+>> +	writel(status, iproc_i2c->base + IS_OFFSET);
+>> +	atomic_set(&iproc_i2c->xfer_is_done, 1);
+> 
+> #define atomic_set(v,i) (((v)->counter) = (i))
+> 
+> So, this is the same as doing:
+> 
+> 	iproc_i2c->xfer_is_done.counter = 1;
+> 
+> which is merely setting the 'int' to 1.
+> 
+>> +	time_left = wait_for_completion_timeout(&iproc_i2c->done, time_left);
+>> +
+>> +	/* disable all interrupts */
+>> +	writel(0, iproc_i2c->base + IE_OFFSET);
+>> +
+>> +	if (!time_left && !atomic_read(&iproc_i2c->xfer_is_done)) {
+> 
+> #define atomic_read(v)  ACCESS_ONCE((v)->counter)
+> 
+> This is practically the same as:
+> 
+> 	if (!time_left && !iproc_i2c->xfer_is_done.counter) {
+> 
+> except that this access will be guaranteed to happen just once at this
+> location (see ACCESS_ONCE() in include/linux/compiler.h).
+> 
+> However, complete()..wait_for_completion() ensures that there are
+> barriers in the way: complete takes a spinlock on the waiter, so the
+> write to iproc_i2c->xfer_is_done.counter will be visible by the time
+> wait_for_completion() returns, and wait_for_completion() also does.
+> The same spinlock is also manipulated by wait_for_completion(), which
+> means there's barriers there as well, so it can't cache the value of
+> "counter" across that call.
+> 
+> So, the "volatile" access guaranteed by ACCESS_ONCE() isn't even
+> needed here.
+> 
+> (It would be needed if you were spinning in a loop, calling no other
+> functions - but then you're supposed to use cpu_relax() in that
+> circumstance, which has a compiler barrier in it, which ensures that
+> it will re-read such a variable each time.)
+> 
+I really learned a good lesson here. Thanks for the thorough explanation!
