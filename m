@@ -1,73 +1,93 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Mon, 19 Jan 2015 12:27:15 -0600 (CST)
-Subject: [GIT PULL] qcom SoC changes for v3.20
-Message-ID: <alpine.DEB.2.02.1501191226010.2973@galak-ubuntu.qualcomm.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Mon, 19 Jan 2015 18:32:29 +0000
+Subject: [RFC PATCH 1/3] drivers: of: fix resources freeing in
+ of_pci_get_host_bridge_resources()
+In-Reply-To: <1420644571-18928-2-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1420644571-18928-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1420644571-18928-2-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20150119183228.GE10762@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+On Wed, Jan 07, 2015 at 03:29:29PM +0000, Lorenzo Pieralisi wrote:
+> In the function of_pci_get_host_bridge_resources() if the parsing of
+> ranges fails, previously allocated resources inclusive of bus_range
+> are not freed and are not expected to be freed by the function caller
+> on error return.
+> 
+> This patch fixes the issues by adding code that properly frees resources
+> and bus_range before exiting the function with an error return value.
+> 
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Liviu Dudau <liviu.dudau@arm.com>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
+>  drivers/of/of_pci.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+> index 88471d3..6fbfe99 100644
+> --- a/drivers/of/of_pci.c
+> +++ b/drivers/of/of_pci.c
+> @@ -146,6 +146,7 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
+>  	struct of_pci_range_parser parser;
+>  	char range_type[4];
+>  	int err;
+> +	struct pci_host_bridge_window *window;
+>  
+>  	if (io_base)
+>  		*io_base = (resource_size_t)OF_BAD_ADDR;
+> @@ -225,7 +226,10 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
+>  conversion_failed:
+>  	kfree(res);
+>  parse_failed:
+> +	list_for_each_entry(window, resources, list)
+> +		kfree(window->res);
+>  	pci_free_resource_list(resources);
+> +	kfree(bus_range);
+>  	return err;
+>  }
+>  EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
 
-   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+Hi Lorenzo et all,
 
-are available in the git repository at:
+Here is my personal view and I am happy to hear from others on the desired
+behaviour:
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-soc-for-3.20
+When I wrote this function what I had in mind was that it will parse as
+much as possible from the device tree and return a list of resources that
+could be successfully converted. If the entire list of ranges could not
+be converted then an error code will be returned, but the caller still
+had the list as constructed up to the error. It was the job of the caller
+to free the list in either cases, as stated in the comment.
 
-for you to fetch changes up to ae0a6075c046f9c8dbac18f53a779592f97b402e:
+The historical reason why the function was written that way was because at
+some moment after parsing I've had an additional step where arches could
+cleanup / veto the list and they could return an error value to signal
+their discontent. Also I was (am) not sure how lenient we could be with
+the device tree not being sane (at least one host bridge binding lists the
+config space as a range, which was accepted as broken).
 
-   soc: qcom: scm: Clarify boot interface (2015-01-19 11:55:12 -0600)
+So, from that point of view, I would NAK this patch, as the function works
+as intended. If others find this mode of operation too convoluted, then
+the patch should probably make clear that cleanup only needs to be done on
+function returning success.
 
-----------------------------------------------------------------
-Qualcomm ARM Based SoC Updates for v3.20
+Best regards,
 
-* Moved scm support into drivers/soc/qcom (allows for use by drivers)
-* Various bug fixes and minor feature additions to scm code
-* Added big-endian support to debug MSM uart
-* Added big-endian support to ARCH_QCOM
+> -- 
+> 2.2.1
+> 
+> 
 
-----------------------------------------------------------------
-Lina Iyer (2):
-       ARM: qcom: Add SCM warmboot flags for quad core targets.
-       soc: qcom: scm: Move scm-boot files to drivers/soc and include/soc
-
-Olav Haugan (1):
-       ARM: qcom: scm: Add logging of actual return code from scm call
-
-Saravana Kannan (1):
-       ARM: qcom: scm: Add API to query for service/command availability.
-
-Stephen Boyd (9):
-       ARM: debug: Update MSM and QCOM DEBUG_LL help
-       ARM: debug: msm: Support big-endian CPUs
-       ARM: qcom: Select ARCH_SUPPORTS_BIG_ENDIAN
-       ARM: qcom: scm: Fix incorrect cache invalidation
-       ARM: qcom: scm: Get cacheline size from CTR
-       ARM: qcom: scm: Add a feat version query API
-       soc: qcom: scm: Move the scm driver to drivers/soc/qcom
-       soc: qcom: scm: Add atomic SCM APIs
-       soc: qcom: scm: Clarify boot interface
-
-Vikram Mulukutla (1):
-       ARM: qcom: scm: Flush the command buffer only instead of the entire cache
-
-  arch/arm/Kconfig.debug                             |   5 +-
-  arch/arm/include/debug/msm.S                       |   6 +
-  arch/arm/mach-qcom/Kconfig                         |   4 +-
-  arch/arm/mach-qcom/Makefile                        |   3 -
-  arch/arm/mach-qcom/platsmp.c                       |   2 +-
-  drivers/soc/qcom/Kconfig                           |   2 +
-  drivers/soc/qcom/Makefile                          |   2 +
-  .../arm/mach-qcom => drivers/soc/qcom}/scm-boot.c  |   6 +-
-  {arch/arm/mach-qcom => drivers/soc/qcom}/scm.c     | 162 ++++++++++++++++++---
-  .../arm/mach-qcom => include/soc/qcom}/scm-boot.h  |   4 +-
-  {arch/arm/mach-qcom => include/soc/qcom}/scm.h     |   8 +-
-  11 files changed, 173 insertions(+), 31 deletions(-)
-  rename {arch/arm/mach-qcom => drivers/soc/qcom}/scm-boot.c (91%)
-  rename {arch/arm/mach-qcom => drivers/soc/qcom}/scm.c (62%)
-  rename {arch/arm/mach-qcom => include/soc/qcom}/scm-boot.h (87%)
-  rename {arch/arm/mach-qcom => include/soc/qcom}/scm.h (70%)
-
---
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
