@@ -1,95 +1,68 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 19 Jan 2015 13:34:59 -0800
-Subject: [PATCH] irqchip: omap-intc: improve IRQ handler
-In-Reply-To: <1420224433-27001-1-git-send-email-balbi@ti.com>
-References: <1420224433-27001-1-git-send-email-balbi@ti.com>
-Message-ID: <20150119213458.GK18552@atomide.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 19 Jan 2015 15:41:13 -0600
+Subject: [PATCH] ARM: omap2plus_defconfig: Enable OHCI & EHCI HCD support
+In-Reply-To: <1421702475.6818.19.camel@collabora.co.uk>
+References: <1421701046-17367-1-git-send-email-sjoerd.simons@collabora.co.uk>
+ <20150119210341.GR20386@saruman> <20150119210832.GS20386@saruman>
+ <1421702475.6818.19.camel@collabora.co.uk>
+Message-ID: <20150119214113.GU20386@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [150102 10:50]:
-> as it turns out the current IRQ number will
-> *always* be available from SIR register which
-> renders the reads of PENDING registers as plain
-> unnecessary overhead.
-> 
-> In order to catch any situation where SIR reads
-> as zero, we're adding a WARN() to turn it into
-> a very verbose error and users actually report
-> it.
-> 
-> With this patch average running time of
-> omap_intc_handle_irq() reduced from about 28.5us
-> to 19.8us as measured by the kernel function
-> profiler.
-> 
-> Tested with BeagleBoneBlack Rev A5C.
-> 
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
+Hi,
 
-Jason, looks like this is not showing up in Linux next. The
-same for the changes I did for dm81xx.
+On Mon, Jan 19, 2015 at 10:21:15PM +0100, Sjoerd Simons wrote:
+> On Mon, 2015-01-19 at 15:08 -0600, Felipe Balbi wrote:
+> > On Mon, Jan 19, 2015 at 03:03:41PM -0600, Felipe Balbi wrote:
+> > > On Mon, Jan 19, 2015 at 09:57:26PM +0100, Sjoerd Simons wrote:
+> > > > Enable CONFIG_USB_EHCI_HCD and CONFIG_USB_OHCI_HCD to get USB supports
+> > > > with omap2plus_defconfig.
+> > > > 
+> > > > Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+> > > > ---
+> > > >  arch/arm/configs/omap2plus_defconfig | 2 ++
+> > > >  1 file changed, 2 insertions(+)
+> > > > 
+> > > > diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+> > > > index c2c3a85..295af70 100644
+> > > > --- a/arch/arm/configs/omap2plus_defconfig
+> > > > +++ b/arch/arm/configs/omap2plus_defconfig
+> > > > @@ -159,6 +159,8 @@ CONFIG_USB_NET_SMSC95XX=y
+> > > >  CONFIG_USB_ALI_M5632=y
+> > > >  CONFIG_USB_AN2720=y
+> > > >  CONFIG_USB_EPSON2888=y
+> > > > +CONFIG_USB_EHCI_HCD=y
+> > > > +CONFIG_USB_OHCI_HCD=y
+> > > 
+> > > should be modules as they break PM.
+> > 
+> > oh, and when resending, please add linux-omap to Cc, that's listed in
+> > MAINTAINERS.
+> 
+> Hrm,
+> 
+> Seems like MAINTAINERS is missing an entry to make get_maintainer.pl
+> recognize linux-omap should be cc'd:
+> 
+> $ ./scripts/get_maintainer.pl -f arch/arm/configs/omap2plus_defconfig
+> Russell King <linux@arm.linux.org.uk> (maintainer:ARM PORT)
+> Tony Lindgren <tony@atomide.com>
+> (commit_signer:23/24=96%,authored:10/24=42%,added_lines:74/107=69%,removed_lines:21/24=88%)
+> Felipe Balbi <balbi@ti.com>
+> (commit_signer:7/24=29%,authored:5/24=21%,added_lines:22/107=21%)
+> Arnd Bergmann <arnd@arndb.de> (commit_signer:6/24=25%)
+> Nishanth Menon <nm@ti.com> (commit_signer:2/24=8%)
+> linux-arm-kernel at lists.infradead.org (moderated list:ARM PORT)
+> linux-kernel at vger.kernel.org (open list)
 
-Regards,
+I'll send a patch (unless Tony wants to do it), thanks for reporting.
 
-Tony
-
-> ---
-> 
-> Before applying, it would be very nice to get reports
-> from other folks on different platforms, specially OMAP2/3
-> ones which I don't have (easy) access.
-> 
->  drivers/irqchip/irq-omap-intc.c | 35 +++++------------------------------
->  1 file changed, 5 insertions(+), 30 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-omap-intc.c b/drivers/irqchip/irq-omap-intc.c
-> index 28718d3..a2da6d5 100644
-> --- a/drivers/irqchip/irq-omap-intc.c
-> +++ b/drivers/irqchip/irq-omap-intc.c
-> @@ -315,37 +315,12 @@ static int __init omap_init_irq(u32 base, struct device_node *node)
->  static asmlinkage void __exception_irq_entry
->  omap_intc_handle_irq(struct pt_regs *regs)
->  {
-> -	u32 irqnr = 0;
-> -	int handled_irq = 0;
-> -	int i;
-> -
-> -	do {
-> -		for (i = 0; i < omap_nr_pending; i++) {
-> -			irqnr = intc_readl(INTC_PENDING_IRQ0 + (0x20 * i));
-> -			if (irqnr)
-> -				goto out;
-> -		}
-> -
-> -out:
-> -		if (!irqnr)
-> -			break;
-> -
-> -		irqnr = intc_readl(INTC_SIR);
-> -		irqnr &= ACTIVEIRQ_MASK;
-> +	u32 irqnr;
->  
-> -		if (irqnr) {
-> -			handle_domain_irq(domain, irqnr, regs);
-> -			handled_irq = 1;
-> -		}
-> -	} while (irqnr);
-> -
-> -	/*
-> -	 * If an irq is masked or deasserted while active, we will
-> -	 * keep ending up here with no irq handled. So remove it from
-> -	 * the INTC with an ack.
-> -	 */
-> -	if (!handled_irq)
-> -		omap_ack_irq(NULL);
-> +	irqnr = intc_readl(INTC_SIR);
-> +	irqnr &= ACTIVEIRQ_MASK;
-> +	WARN(!irqnr, "Spuriour IRQ ?\n");
-> +	handle_domain_irq(domain, irqnr, regs);
->  }
->  
->  void __init omap2_init_irq(void)
-> -- 
-> 2.2.0
-> 
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150119/a7b6456d/attachment.sig>
