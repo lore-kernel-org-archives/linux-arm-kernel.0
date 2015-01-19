@@ -1,98 +1,39 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 19 Jan 2015 10:40:39 -0600
-Subject: [RFC PATCH 0/3] drivers: port PCIe designware to new DT parsing
- API
-In-Reply-To: <1420644571-18928-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1420644571-18928-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <CAL_JsqLYg9vhFVmf=O4YLPfboj-dyoCR0H5dzBbMC3PeAEOwhQ@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 19 Jan 2015 10:42:04 -0600
+Subject: [next-20150119]regression (mm)?
+Message-ID: <54BD33DC.40200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 7, 2015 at 9:29 AM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> The introduction of the DT API:
->
-> of_pci_get_host_bridge_resources()
->
-> allows to retrieve PCI resources from the device tree in a generic way.
->
-> Some PCI host controllers, in addition to standard IO and MEM resources and
-> corresponding CPU addresses, require to retrieve the addresses that are used
-> for bus routing of IO/MEM regions as seen at the bus level corresponding
-> to the bus segment the host controller is sitting on, so that the host
-> controller can programme its inbound/outbound memory regions correctly to
-> respond to bus transactions coming from the CPU on the host controller bus
-> ports.
->
-> The DT generic layer provides functions that carry out the PCI
-> ranges <-> resources translation from PCI addresses to CPU addresses (as
-> seen at the CPU top level bus, through all required hierarchical bus layers),
-> but there is no generic API to retrieve the PCI range CPU untranslated
-> addresses, so PCI host controllers have to do it in a driver specific way
-> through the DT property parsing methods.
->
-> This patchset converts the PCIe designware host controller driver to
-> use the API:
->
-> of_pci_get_host_bridge_resources()
->
-> in order to retrieve the PCI regions resources. To achieve generality, it
-> also augments the parsing API so that a new DT struct is created out of
-> PCI ranges, that contains the PCI resource and the range parser itself
-> so that it can be passed back to PCI host controllers drivers that
-> can, if needed, use it to parse the CPU untranslated addresses
-> corresponding to the resource in question.
+Hi,
 
-I don't really like exposing ranges to host drivers. We've worked to
-not do that. So perhaps we need to rethink the API. I think we need to
-provide each range as a pair of resources which are the CPU address
-and PCI address. Perhaps an iterator is kind of pointless here. We do
-different things for each one. Are there cases with more than a single
-i/o space, non-prefetch memory and prefetch memory range? Perhaps we
-should just get the i/o and memory resources as separate calls. Just
-tossing out some ideas here.
+Most platforms seem broken intoday's next tag.
 
-> The first patch in the series is a fix/update for the parsing function:
->
-> of_pci_get_host_bridge_resources()
+https://github.com/nmenon/kernel-test-logs/tree/next-20150119
+(defconfig: omap2plus_defconfig)
 
-This one stands on its own and should go to stable perhap? If so, send
-it separately.
+> [    7.166600] ------------[ cut here ]------------
+> [    7.171676] WARNING: CPU: 0 PID: 54 at mm/mmap.c:2859 exit_mmap+0x1a8/0x21c()
+> [    7.179194] Modules linked in:
+> [    7.182479] CPU: 0 PID: 54 Comm: init Not tainted 3.19.0-rc5-next-20150119-00002-gfdefcded1272 #1
+> [    7.191863] Hardware name: Generic AM33XX (Flattened Device Tree)
+> [    7.198318] [<c00153f0>] (unwind_backtrace) from [<c0011a74>] (show_stack+0x10/0x14)
+> [    7.206528] [<c0011a74>] (show_stack) from [<c0580150>] (dump_stack+0x78/0x94)
+> [    7.214191] [<c0580150>] (dump_stack) from [<c003d4d0>] (warn_slowpath_common+0x7c/0xb4)
+> [    7.222751] [<c003d4d0>] (warn_slowpath_common) from [<c003d524>] (warn_slowpath_null+0x1c/0x24)
+> [    7.232038] [<c003d524>] (warn_slowpath_null) from [<c012de64>] (exit_mmap+0x1a8/0x21c)
+> [    7.240536] [<c012de64>] (exit_mmap) from [<c003abb8>] (mmput+0x44/0xec)
+> [    7.247612] [<c003abb8>] (mmput) from [<c0151368>] (flush_old_exec+0x300/0x5a4)
+> [    7.255357] [<c0151368>] (flush_old_exec) from [<c0195c10>] (load_elf_binary+0x2ec/0x1144)
+> [    7.264111] [<c0195c10>] (load_elf_binary) from [<c0150ea0>] (search_binary_handler+0x88/0x1ac)
+> [    7.273311] [<c0150ea0>] (search_binary_handler) from [<c019554c>] (load_script+0x260/0x280)
+> [    7.282232] [<c019554c>] (load_script) from [<c0150ea0>] (search_binary_handler+0x88/0x1ac)
+> [    7.291066] [<c0150ea0>] (search_binary_handler) from [<c0151f0c>] (do_execveat_common+0x538/0x6c4)
+> [    7.300628] [<c0151f0c>] (do_execveat_common) from [<c01520c4>] (do_execve+0x2c/0x34)
+> [    7.308881] [<c01520c4>] (do_execve) from [<c000e5e0>] (ret_fast_syscall+0x0/0x4c)
+> [    7.316881] ---[ end trace 3b8a46b1b280f423 ]---
 
-Rob
 
->
-> It is part of the RFC series since it is a controversial fix to be
-> discussed before getting merged.
->
-> Patch [2-3] augment the parsing API and convert the PCIe designware
-> driver code.
->
-> The current API stays unchanged, so that the existing drivers using it
-> do not need patching and changes are limited.
->
-> Tested on an iMX6 Sabrelite board.
->
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Liviu Dudau <liviu.dudau@arm.com>
-> Cc: Mohit Kumar <mohit.kumar@st.com>
-> Cc: Jingoo Han <jg1.han@samsung.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
->
-> Lorenzo Pieralisi (3):
->   drivers: of: fix resources freeing in
->     of_pci_get_host_bridge_resources()
->   drivers: of: of_pci_get_host_bridge_resources() range parsing update
->   drivers: pci: host: update the pcie designware driver to new range
->     parsing API
->
->  drivers/of/of_pci.c                |  36 +++++++--
->  drivers/pci/host/pcie-designware.c | 145 +++++++++++++++++--------------------
->  drivers/pci/host/pcie-designware.h |   5 +-
->  include/linux/of_address.h         |   5 ++
->  4 files changed, 104 insertions(+), 87 deletions(-)
->
-> --
-> 2.2.1
->
+-- 
+Regards,
+Nishanth Menon
