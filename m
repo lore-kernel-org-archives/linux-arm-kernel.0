@@ -1,64 +1,37 @@
-From: mpeg.blue@free.fr (Mason)
-Date: Mon, 19 Jan 2015 23:13:53 +0100
-Subject: RFC on cpufreq implementation
-In-Reply-To: <CAHLCerMq0HnhS3ki3U1te5A8+NiDwpFNL_5_bm-CR4LoYFLo=A@mail.gmail.com>
-References: <54B7F7CD.7030903@free.fr>
- <CAHLCerMq0HnhS3ki3U1te5A8+NiDwpFNL_5_bm-CR4LoYFLo=A@mail.gmail.com>
-Message-ID: <54BD81A1.6030301@free.fr>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 19 Jan 2015 16:13:53 -0600
+Subject: [PATCH v2] MAINTAINERS: add OMAP defconfigs under OMAP SUPPORT
+Message-ID: <1421705633-29056-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/01/2015 10:22, Amit Kucheria wrote:
+omap2plus_defconfig and omap1_defconfig are also
+part of the OMAP Support maintained, because of
+that it's best to list them under OMAP SUPPORT on
+MAINTAINERS so people know to Cc linux-omap when
+patching them.
 
-> On Thu, Jan 15, 2015 at 10:54 PM, Mason wrote:
-> 
->> This is a follow-up to my previous thread.
->> "How many frequencies would cpufreq optimally like to manage?"
->> http://thread.gmane.org/gmane.linux.ports.arm.kernel/373669
->>
->> As I originally wrote, I'm running 3.14 on an ARM Cortex-A9
->> based SoC (namely Tango4 from Sigma Designs). I'd like to get
->> some feedback on the cpufreq driver I wrote for that platform.
->>
->> I decided to expose only a small subset of frequencies (namely
->> {999,500,333,111} MHz) because, in my tests, the ondemand gov
->> chose mostly min and max, and the intermediate frequencies not
->> so much; so I figured "2 intermediate freqs" is good enough.
->> (I'm ready to hear otherwise.)
-> 
-> How many states are really enough depends on the main workloads
-> running on your system. In a closed system (limited number of
-> applications) you can easily characterise your workloads and see what
-> operating points (OPP = voltage, frequency pair) the system spends
-> most of its time in (CPU_FREQ_STAT_DETAILS) and optimize out the
-> remaining OPPs.
+Reported-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
 
-Testing with CPU_FREQ_STAT_DETAILS enabled is on my TODO list.
-Thanks for reminding me!
+Add omap1_defconfig too
 
-> In an open-ended system where you don't control what applications will
-> run on the system (e.g. android phone), it is probably a good idea to
-> expose more OPPs while keeping in mind that exposing 50 frequencies is
-> probably overkill (and silly) since you're spending more time reaching
-> the "optimum" OPP. Pick some high-impact ones e.g. ones that allow you
-> to lower your voltage.
+ MAINTAINERS | 2 ++
+ 1 file changed, 2 insertions(+)
 
-The current SoC does not support dynamic voltage scaling at all.
-So I'm just tweaking the frequency. IIUC, if I divide freq by 4,
-power should be divided by 4?
-
->> I tried to use as much generic framework as possible, but I've
->> read about the clk framework, and it looks to be an even greater
->> generalization. Are new platforms encouraged to use that, rather
->> than provide a cpufreq driver? Does it work when voltage scaling
->> comes in play? (This SoC doesn't have it, but the next will.)
->>
->> I'm also wondering how cpufreq and cpuidle interact? Is one a
->> subset of the other? Are they orthogonal?
-> 
-> These queries have been answered by Krzysztof.
-
-The current SoC does not support any "deep" sleep; I was told that
-the core just powers "itself" down after a WFI, nothing fancier.
-
-Regards.
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 97de006f38f0..7423e9759187 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -6783,6 +6783,8 @@ Q:	http://patchwork.kernel.org/project/linux-omap/list/
+ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
+ S:	Maintained
+ F:	arch/arm/*omap*/
++F:	arch/arm/configs/omap1_defconfig
++F:	arch/arm/configs/omap2plus_defconfig
+ F:	drivers/i2c/busses/i2c-omap.c
+ F:	drivers/irqchip/irq-omap-intc.c
+ F:	drivers/mfd/*omap*.c
+-- 
+2.2.0
