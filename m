@@ -1,66 +1,44 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 19 Jan 2015 11:17:02 +0800
-Subject: [PATCH 18/28] PCI/sparc: Use pci_scan_root_bridge() for simplicity
-In-Reply-To: <2658988.B0VmbMPdJ9@wuerfel>
-References: <1421372666-12288-1-git-send-email-wangyijing@huawei.com>
- <1421372666-12288-19-git-send-email-wangyijing@huawei.com>
- <2658988.B0VmbMPdJ9@wuerfel>
-Message-ID: <54BC772E.6020103@huawei.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Sun, 18 Jan 2015 22:30:26 -0500
+Subject: =?gbk?Q?=B4=F0=B8=B4=3A_=5BPATCHv4=5D_arm64=3A_dmi=3A_?=
+ =?gbk?Q?Add_SMBIOS/DMI_support?=
+In-Reply-To: <D0F5605BA99F0B4594FB1EEC24E785CC6549F905@SZXEMA510-MBX.china.huawei.com>
+References: <1412437603-3394-1-git-send-email-yi.li@linaro.org>
+ <54B9F9D2.6000104@redhat.com> <20150117121247.GL3827@bivouac.eciton.net>
+ <54BA7B0E.5020207@redhat.com>
+ <D0F5605BA99F0B4594FB1EEC24E785CC6549F905@SZXEMA510-MBX.china.huawei.com>
+Message-ID: <54BC7A52.6040006@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/1/16 18:01, Arnd Bergmann wrote:
-> On Friday 16 January 2015 09:44:16 Yijing Wang wrote:
->> +static void pci_host_bridge_probe_mode(
->> +               struct pci_host_bridge *host)
->> +{
->> +       host->of_scan = true;
->> +}
->>
+On 01/18/2015 08:27 PM, liyi 00215672 wrote:
+> Hi Jon, Leif,
 > 
-> I probably missed something here, but where does host->of_scan
-> get used?
+> 	I am reviving with phoenix.liyi at huawei.com :)
 > 
-
-It is used in __pci_scan_root_bus() to detect whether of scan bus is needed in patch 11.
-
-
-@@ -2051,10 +2053,17 @@ static struct pci_bus *__pci_scan_root_bus(
- 		pci_bus_insert_busn_res(b, host->busnum, 255);
- 	}
-
--	max = pci_scan_child_bus(b);
-+	if (host->ops && host->ops->phb_probe_mode)
-+		host->ops->phb_probe_mode(host);
-
--	if (!found)
--		pci_bus_update_busn_res_end(b, max);
-+	if (host->of_scan) {
-+		if (host->ops &&host->ops->phb_of_scan_bus)
-+			host->ops->phb_of_scan_bus(host);
-+	} else {
-+		max = pci_scan_child_bus(b);
-+		if (!found)
-+			pci_bus_update_busn_res_end(b, max);
-+	}
-
- 	return b;
-
-Thanks!
-Yijing.
-
-
-> 	Arnd
+> 	Agreed with Leif, The DMI/SMBIOS data are available for user space not for kernel level on x86, which means if DMI has some bad descriptions, it should not affect the kernel boot normally.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 	So ARM platform will do the same thing, DMI data just as a reference for system configuration, and don't depend them to boot the sytem. :)
 > 
-> .
-> 
+> 	Thanks!
 
+Thanks for the feedback! Looking forward to another visit to Shenzen soon :)
 
--- 
-Thanks!
-Yijing
+I'm afraid I think we'll need to use the socket information in DMI to
+populate topology in the short term or for a vendor kernel or two. It's
+important that certain tooling accurately account the number of sockets
+present. It's awesome that ARM is going multi-socket. It's less awesome
+to see the magic words "IMPLEMENTATION DEFINED". That always means
+"abandon all hope ye who enter here". It'll need fixing in the form of a
+rigidly defined standard.
+
+I've just spent the weekend going through a variety of vendor tables and
+manually validating/correcting them/harassing people to fix various ones
+or convert to SMBIOS3. Depending upon how well this goes, we might be in
+a position to have usable data for now. With a few sanity checks, we can
+avoid using the data if it is incorrect. And in the medium term, we will
+work on a better solution such as adding topology description to ACPI
+tables. Then, we'll come back to this thread to see what is good
+upstream, once we've some informed data about what is a practical solution.
+
+Jon.
