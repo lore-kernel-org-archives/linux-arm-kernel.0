@@ -1,32 +1,39 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 19 Jan 2015 15:45:01 -0600
-Subject: [PATCH] MAINTAINERS: add omap2plus_defconfig under OMAP SUPPORT
-Message-ID: <1421703901-28295-1-git-send-email-balbi@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 19 Jan 2015 22:49:11 +0100
+Subject: [PATCH v4 1/9] clk: sunxi: Add mod0 and mmc module clock support
+ for A80
+In-Reply-To: <1421471974-32719-2-git-send-email-wens@csie.org>
+References: <1421471974-32719-1-git-send-email-wens@csie.org>
+ <1421471974-32719-2-git-send-email-wens@csie.org>
+Message-ID: <20150119214911.GK4367@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-omap2plus_defconfig is also part of the OMAP Support
-maintained, because of that it's best to list it
-under OMAP SUPPORT on MAINTAINERS so people know
-to Cc linux-omap when patching that file.
+On Sat, Jan 17, 2015 at 01:19:26PM +0800, Chen-Yu Tsai wrote:
+> The module 0 style clocks, or storage module clocks as named in the
+> official SDK, are almost the same as the module 0 clocks on earlier
+> Allwinner SoCs. The only difference is wider mux register bits.
+> 
+> As with earlier Allwinner SoCs, mmc module clocks are a special case
+> of mod0 clocks, with phase controls for 2 child clocks, output and
+> sample.
+> 
+> This patch adds support for both.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Reported-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- MAINTAINERS | 1 +
- 1 file changed, 1 insertion(+)
+Applied, thanks!
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 97de006f38f0..abc6281892e7 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -6783,6 +6783,7 @@ Q:	http://patchwork.kernel.org/project/linux-omap/list/
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
- S:	Maintained
- F:	arch/arm/*omap*/
-+F:	arch/arm/configs/omap2plus_defconfig
- F:	drivers/i2c/busses/i2c-omap.c
- F:	drivers/irqchip/irq-omap-intc.c
- F:	drivers/mfd/*omap*.c
+Maxime
+
 -- 
-2.2.0
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150119/0847492e/attachment.sig>
