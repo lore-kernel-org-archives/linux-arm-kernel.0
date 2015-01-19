@@ -1,78 +1,89 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 19 Jan 2015 18:56:26 +0800
-Subject: [PATCH 08/28] PCI: Introduce pci_host_assign_domain_nr() to assign
- domain
-In-Reply-To: <2124926.gSbG0l1jIy@wuerfel>
-References: <1421372666-12288-1-git-send-email-wangyijing@huawei.com>
- <3026954.09KG7UaUTi@wuerfel> <54BC6894.6060500@huawei.com>
- <2124926.gSbG0l1jIy@wuerfel>
-Message-ID: <54BCE2DA.1000405@huawei.com>
+From: sylvain.rochet@finsecur.com (Sylvain Rochet)
+Date: Mon, 19 Jan 2015 12:06:02 +0100
+Subject: [PATCHv6 1/6] USB: host: ehci-atmel: Add suspend/resume support
+In-Reply-To: <1421665567-31759-1-git-send-email-sylvain.rochet@finsecur.com>
+References: <1421665567-31759-1-git-send-email-sylvain.rochet@finsecur.com>
+Message-ID: <1421665567-31759-2-git-send-email-sylvain.rochet@finsecur.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/1/19 17:50, Arnd Bergmann wrote:
-> On Monday 19 January 2015 10:14:44 Yijing Wang wrote:
->>>> I'm confused: the same code is already part of the PCI tree, but with
->>>> Lorenzo Pieralisi listed as the patch author. The code is good,
->>>> and I acked it in the past, but one of you is (probably by accident)
->>>> misattributing the patch.
->>>>
->>>> Assuming that the patch that is already merged in next is the right
->>>> one, I think you should rebase your series on top of
->>>>
->>>> git://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git#next
->>>>
->>>> to avoid conflicts like this one.
->>>>
->>>
->>> I think I just got confused because the code duplicates most of
->>> pci_bus_assign_domain_nr(). Maybe this can be done in a better way
->>> by splitting the existing function into 
->>>
->>> static int pci_assign_domain_nr(struct device *)
->>> {
->>>       ... /* most of pci_bus_assign_domain_nr */
->>>
->>>       return domain;
->>> }
->>>
->>> void pci_host_assign_domain_nr(struct pci_host_bridge *host)
->>> {
->>>       host->domain = pci_assign_domain_nr(host->dev.parent);
->>> }
->>>
->>> void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
->>> {
->>>       bus->domain_nr = pci_assign_domain_nr(parent);
->>> }
->>>
->>
->> Hi Arnd,
->>    I kept the almost duplicated pci_host_assign_domain_nr() and
->> pci_bus_assign_domain_nr() here for building happy, because now
->> platform specific pci_domain_nr() still exists which may get domain
->> number from pci_bus. pci_bus_assign_domain_nr() will be removed in
->> the last patch.
->>
-> 
-> I'm not sure I get your point: the approach I showed above seems to have
-> the same effect, except it doesn't duplicate code temporarily, which
-> makes it less error-prone in case your patch gets merged at the
-> same time as another patch that modifies pci_bus_assign_domain_nr.
+This patch add suspend/resume support for Atmel EHCI, mostly
+about disabling and unpreparing clocks so USB PLL is stopped
+before entering sleep state.
 
-OK, I got it, will update it, thanks!
+Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+---
+ drivers/usb/host/ehci-atmel.c | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
-
-Thanks!
-Yijing.
-
-> 
-> 	Arnd
-> 
-> .
-> 
-
-
+diff --git a/drivers/usb/host/ehci-atmel.c b/drivers/usb/host/ehci-atmel.c
+index 56a8850..5a15e3d 100644
+--- a/drivers/usb/host/ehci-atmel.c
++++ b/drivers/usb/host/ehci-atmel.c
+@@ -37,6 +37,8 @@ static int clocked;
+ 
+ static void atmel_start_clock(void)
+ {
++	if (clocked)
++		return;
+ 	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
+ 		clk_set_rate(uclk, 48000000);
+ 		clk_prepare_enable(uclk);
+@@ -48,6 +50,8 @@ static void atmel_start_clock(void)
+ 
+ static void atmel_stop_clock(void)
+ {
++	if (!clocked)
++		return;
+ 	clk_disable_unprepare(fclk);
+ 	clk_disable_unprepare(iclk);
+ 	if (IS_ENABLED(CONFIG_COMMON_CLK))
+@@ -174,6 +178,29 @@ static int ehci_atmel_drv_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM
++static int ehci_atmel_drv_suspend(struct device *dev)
++{
++	struct usb_hcd *hcd = dev_get_drvdata(dev);
++	int ret;
++
++	ret = ehci_suspend(hcd, false);
++	if (ret)
++		return ret;
++
++	atmel_stop_clock();
++	return 0;
++}
++
++static int ehci_atmel_drv_resume(struct device *dev)
++{
++	struct usb_hcd *hcd = dev_get_drvdata(dev);
++
++	atmel_start_clock();
++	return ehci_resume(hcd, false);
++}
++#endif
++
+ #ifdef CONFIG_OF
+ static const struct of_device_id atmel_ehci_dt_ids[] = {
+ 	{ .compatible = "atmel,at91sam9g45-ehci" },
+@@ -183,12 +210,16 @@ static const struct of_device_id atmel_ehci_dt_ids[] = {
+ MODULE_DEVICE_TABLE(of, atmel_ehci_dt_ids);
+ #endif
+ 
++static SIMPLE_DEV_PM_OPS(ehci_atmel_pm_ops, ehci_atmel_drv_suspend,
++					ehci_atmel_drv_resume);
++
+ static struct platform_driver ehci_atmel_driver = {
+ 	.probe		= ehci_atmel_drv_probe,
+ 	.remove		= ehci_atmel_drv_remove,
+ 	.shutdown	= usb_hcd_platform_shutdown,
+ 	.driver		= {
+ 		.name	= "atmel-ehci",
++		.pm	= &ehci_atmel_pm_ops,
+ 		.of_match_table	= of_match_ptr(atmel_ehci_dt_ids),
+ 	},
+ };
 -- 
-Thanks!
-Yijing
+2.1.4
