@@ -1,193 +1,36 @@
-From: wangnan0@huawei.com (Wang Nan)
-Date: Mon, 19 Jan 2015 18:37:00 +0800
-Subject: [PATCH] ARM: kprobes: check register usage for probed instruction
-In-Reply-To: <1421165628.4215.63.camel@linaro.org>
-References: <1420457284-76923-1-git-send-email-wangnan0@huawei.com>	
- <1420457384-77449-1-git-send-email-wangnan0@huawei.com>	
- <1421161268.4215.56.camel@linaro.org> <1421165628.4215.63.camel@linaro.org>
-Message-ID: <54BCDE4C.5000305@huawei.com>
+From: vincent.yang.fujitsu@gmail.com (Vincent Yang)
+Date: Mon, 19 Jan 2015 18:38:29 +0800
+Subject: [PATCH v4 7/8] of: add Fujitsu vendor prefix
+In-Reply-To: <1421663016-1327-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+References: <1421663016-1327-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+Message-ID: <1421663909-1700-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I think this patch is better than mo original one.
+From: Jassi Brar <jaswinder.singh@linaro.org>
 
-Thanks to Tixy.
+Add 'fujitsu' as the vendor prefix for Fujitsu Semiconductor Ltd.
 
-On 2015/1/14 0:13, Jon Medhurst (Tixy) wrote:
-> This patch utilizes the previously introduced checker to check
-> register usage for probed ARM instruction and saves it in a mask.
-> A further patch will use such information to avoid simulation or
-> emulation.
-> 
-> Signed-off-by: Wang Nan <wangnan0@huawei.com>
-> Reviewed-by: Jon Medhurst <tixy@linaro.org>
-> Signed-off-by: Jon Medhurst <tixy@linaro.org>
-> ---
-> 
-> This patch applies my review comments on "[PATCH v19 10/11] ARM:
-> kprobes: check register usage for probed instruction."
-> 
-> It is also rebased on top of the kprobes-opt branch at
-> git://git.linaro.org/people/tixy/kernel.git
-> 
->  arch/arm/include/asm/probes.h          |  1 +
->  arch/arm/probes/decode.c               |  7 +++
->  arch/arm/probes/kprobes/actions-arm.c  |  2 +-
->  arch/arm/probes/kprobes/checkers-arm.c | 93 ++++++++++++++++++++++++++++++++++
->  arch/arm/probes/kprobes/checkers.h     |  1 +
->  5 files changed, 103 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/include/asm/probes.h b/arch/arm/include/asm/probes.h
-> index cd9e815..b668e60 100644
-> --- a/arch/arm/include/asm/probes.h
-> +++ b/arch/arm/include/asm/probes.h
-> @@ -41,6 +41,7 @@ struct arch_probes_insn {
->  	probes_insn_singlestep_t	*insn_singlestep;
->  	probes_insn_fn_t		*insn_fn;
->  	int				stack_space;
-> +	unsigned long			register_usage_flags;
->  };
->  
->  #endif /* __ASSEMBLY__ */
-> diff --git a/arch/arm/probes/decode.c b/arch/arm/probes/decode.c
-> index f9d7c42..880ebe0 100644
-> --- a/arch/arm/probes/decode.c
-> +++ b/arch/arm/probes/decode.c
-> @@ -435,6 +435,13 @@ probes_decode_insn(probes_opcode_t insn, struct arch_probes_insn *asi,
->  	 */
->  	asi->stack_space = 0;
->  
-> +	/*
-> +	 * Similarly to stack_space, register_usage_flags is filled by
-> +	 * checkers. Its default value is set to ~0, which is 'all
-> +	 * registers are used', to prevent any potential optimization.
-> +	 */
-> +	asi->register_usage_flags = ~0UL;
-> +
->  	if (emulate)
->  		insn = prepare_emulated_insn(insn, asi, thumb);
->  
-> diff --git a/arch/arm/probes/kprobes/actions-arm.c b/arch/arm/probes/kprobes/actions-arm.c
-> index 06988ef..b9056d6 100644
-> --- a/arch/arm/probes/kprobes/actions-arm.c
-> +++ b/arch/arm/probes/kprobes/actions-arm.c
-> @@ -341,4 +341,4 @@ const union decode_action kprobes_arm_actions[NUM_PROBES_ARM_ACTIONS] = {
->  	[PROBES_LDMSTM] = {.decoder = kprobe_decode_ldmstm}
->  };
->  
-> -const struct decode_checker *kprobes_arm_checkers[] = {arm_stack_checker, NULL};
-> +const struct decode_checker *kprobes_arm_checkers[] = {arm_stack_checker, arm_regs_checker, NULL};
-> diff --git a/arch/arm/probes/kprobes/checkers-arm.c b/arch/arm/probes/kprobes/checkers-arm.c
-> index f817663..7b98173 100644
-> --- a/arch/arm/probes/kprobes/checkers-arm.c
-> +++ b/arch/arm/probes/kprobes/checkers-arm.c
-> @@ -97,3 +97,96 @@ const struct decode_checker arm_stack_checker[NUM_PROBES_ARM_ACTIONS] = {
->  	[PROBES_STORE] = {.checker = arm_check_stack},
->  	[PROBES_LDMSTM] = {.checker = arm_check_stack},
->  };
-> +
-> +static enum probes_insn __kprobes arm_check_regs_nouse(probes_opcode_t insn,
-> +		struct arch_probes_insn *asi,
-> +		const struct decode_header *h)
-> +{
-> +	asi->register_usage_flags = 0;
-> +	return INSN_GOOD;
-> +}
-> +
-> +static enum probes_insn arm_check_regs_normal(probes_opcode_t insn,
-> +		struct arch_probes_insn *asi,
-> +		const struct decode_header *h)
-> +{
-> +	u32 regs = h->type_regs.bits >> DECODE_TYPE_BITS;
-> +	int i;
-> +
-> +	asi->register_usage_flags = 0;
-> +	for (i = 0; i < 5; regs >>= 4, insn >>= 4, i++)
-> +		if (regs & 0xf)
-> +			asi->register_usage_flags |= 1 << (insn & 0xf);
-> +
-> +	return INSN_GOOD;
-> +}
-> +
-> +
-> +static enum probes_insn arm_check_regs_ldmstm(probes_opcode_t insn,
-> +		struct arch_probes_insn *asi,
-> +		const struct decode_header *h)
-> +{
-> +	unsigned int reglist = insn & 0xffff;
-> +	unsigned int rn = (insn >> 16) & 0xf;
-> +	asi->register_usage_flags = reglist | (1 << rn);
-> +	return INSN_GOOD;
-> +}
-> +
-> +static enum probes_insn arm_check_regs_mov_ip_sp(probes_opcode_t insn,
-> +		struct arch_probes_insn *asi,
-> +		const struct decode_header *h)
-> +{
-> +	/* Instruction is 'mov ip, sp' i.e. 'mov r12, r13' */
-> +	asi->register_usage_flags = (1 << 12) | (1<< 13);
-> +	return INSN_GOOD;
-> +}
-> +
-> +/*
-> + *                                    | Rn |Rt/d|         | Rm |
-> + * LDRD (register)      cccc 000x x0x0 xxxx xxxx xxxx 1101 xxxx
-> + * STRD (register)      cccc 000x x0x0 xxxx xxxx xxxx 1111 xxxx
-> + *                                    | Rn |Rt/d|         |imm4L|
-> + * LDRD (immediate)     cccc 000x x1x0 xxxx xxxx xxxx 1101 xxxx
-> + * STRD (immediate)     cccc 000x x1x0 xxxx xxxx xxxx 1111 xxxx
-> + *
-> + * Such instructions access Rt/d and its next register, so different
-> + * from others, a specific checker is required to handle this extra
-> + * implicit register usage.
-> + */
-> +static enum probes_insn arm_check_regs_ldrdstrd(probes_opcode_t insn,
-> +		struct arch_probes_insn *asi,
-> +		const struct decode_header *h)
-> +{
-> +	int rdt = (insn >> 12) & 0xf;
-> +	arm_check_regs_normal(insn, asi, h);
-> +	asi->register_usage_flags |= 1 << (rdt + 1);
-> +	return INSN_GOOD;
-> +}
-> +
-> +
-> +const struct decode_checker arm_regs_checker[NUM_PROBES_ARM_ACTIONS] = {
-> +	[PROBES_MRS] = {.checker = arm_check_regs_normal},
-> +	[PROBES_SATURATING_ARITHMETIC] = {.checker = arm_check_regs_normal},
-> +	[PROBES_MUL1] = {.checker = arm_check_regs_normal},
-> +	[PROBES_MUL2] = {.checker = arm_check_regs_normal},
-> +	[PROBES_MUL_ADD_LONG] = {.checker = arm_check_regs_normal},
-> +	[PROBES_MUL_ADD] = {.checker = arm_check_regs_normal},
-> +	[PROBES_LOAD] = {.checker = arm_check_regs_normal},
-> +	[PROBES_LOAD_EXTRA] = {.checker = arm_check_regs_normal},
-> +	[PROBES_STORE] = {.checker = arm_check_regs_normal},
-> +	[PROBES_STORE_EXTRA] = {.checker = arm_check_regs_normal},
-> +	[PROBES_DATA_PROCESSING_REG] = {.checker = arm_check_regs_normal},
-> +	[PROBES_DATA_PROCESSING_IMM] = {.checker = arm_check_regs_normal},
-> +	[PROBES_SEV] = {.checker = arm_check_regs_nouse},
-> +	[PROBES_WFE] = {.checker = arm_check_regs_nouse},
-> +	[PROBES_SATURATE] = {.checker = arm_check_regs_normal},
-> +	[PROBES_REV] = {.checker = arm_check_regs_normal},
-> +	[PROBES_MMI] = {.checker = arm_check_regs_normal},
-> +	[PROBES_PACK] = {.checker = arm_check_regs_normal},
-> +	[PROBES_EXTEND] = {.checker = arm_check_regs_normal},
-> +	[PROBES_EXTEND_ADD] = {.checker = arm_check_regs_normal},
-> +	[PROBES_BITFIELD] = {.checker = arm_check_regs_normal},
-> +	[PROBES_LDMSTM] = {.checker = arm_check_regs_ldmstm},
-> +	[PROBES_MOV_IP_SP] = {.checker = arm_check_regs_mov_ip_sp},
-> +	[PROBES_LDRSTRD] = {.checker = arm_check_regs_ldrdstrd},
-> +};
-> diff --git a/arch/arm/probes/kprobes/checkers.h b/arch/arm/probes/kprobes/checkers.h
-> index bddfa0e..cf6c9e7 100644
-> --- a/arch/arm/probes/kprobes/checkers.h
-> +++ b/arch/arm/probes/kprobes/checkers.h
-> @@ -47,6 +47,7 @@ extern const union decode_action stack_check_actions[];
->  
->  #ifndef CONFIG_THUMB2_KERNEL
->  extern const struct decode_checker arm_stack_checker[];
-> +extern const struct decode_checker arm_regs_checker[];
->  #else
->  #endif
->  extern const struct decode_checker t32_stack_checker[];
-> 
+Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+Signed-off-by: Andy Green <andy.green@linaro.org>
+Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Tetsuya Nuriya <nuriya.tetsuya@jp.fujitsu.com>
+---
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index b1df0ad..4bc8103 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -59,6 +59,7 @@ everest	Everest Semiconductor Co. Ltd.
+ excito	Excito
+ fcs	Fairchild Semiconductor
+ fsl	Freescale Semiconductor
++fujitsu Fujitsu Semiconductor Ltd.
+ GEFanuc	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
+ gef	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
+ geniatech	Geniatech, Inc.
+-- 
+1.9.0
