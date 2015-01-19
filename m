@@ -1,37 +1,65 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 19 Jan 2015 16:13:53 -0600
-Subject: [PATCH v2] MAINTAINERS: add OMAP defconfigs under OMAP SUPPORT
-Message-ID: <1421705633-29056-1-git-send-email-balbi@ti.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 19 Jan 2015 23:14:46 +0100
+Subject: [PATCH] bus: mvebu-mbus: fix support of MBus window 13
+In-Reply-To: <1421596214-15924-1-git-send-email-andrew@lunn.ch>
+References: <1419943428-18491-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1421596214-15924-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20150119221446.GD2938@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-omap2plus_defconfig and omap1_defconfig are also
-part of the OMAP Support maintained, because of
-that it's best to list them under OMAP SUPPORT on
-MAINTAINERS so people know to Cc linux-omap when
-patching them.
+On Sun, Jan 18, 2015 at 04:50:14PM +0100, Andrew Lunn wrote:
+> On Armada XP, 375 and 38x the MBus window 13 has the remap capability,
+> like windows 0 to 7. However, the mvebu-mbus driver isn't currently
+> taking into account this special case, which means that when window 13
+> is actually used, the remap registers are left to 0, making the device
+> using this MBus window unavailable.
+> 
+> As a minimal fix for stable, don't use window 13. A full fix will
+> follow later.
+> 
+> Fixes: fddddb52a6c ("bus: introduce an Marvell EBU MBus driver")
+> Cc: <stable@vger.kernel.org> # v3.10+
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 
-Reported-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
+Added to mvebu/fixes-3 with Thomas's Reviewed-by:
 
-Add omap1_defconfig too
+      Andrew 
 
- MAINTAINERS | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 97de006f38f0..7423e9759187 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -6783,6 +6783,8 @@ Q:	http://patchwork.kernel.org/project/linux-omap/list/
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
- S:	Maintained
- F:	arch/arm/*omap*/
-+F:	arch/arm/configs/omap1_defconfig
-+F:	arch/arm/configs/omap2plus_defconfig
- F:	drivers/i2c/busses/i2c-omap.c
- F:	drivers/irqchip/irq-omap-intc.c
- F:	drivers/mfd/*omap*.c
--- 
-2.2.0
+> ---
+>  drivers/bus/mvebu-mbus.c | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+> 
+> diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+> index eb7682dc123b..81bf297f1034 100644
+> --- a/drivers/bus/mvebu-mbus.c
+> +++ b/drivers/bus/mvebu-mbus.c
+> @@ -210,12 +210,25 @@ static void mvebu_mbus_disable_window(struct mvebu_mbus_state *mbus,
+>  }
+>  
+>  /* Checks whether the given window number is available */
+> +
+> +/* On Armada XP, 375 and 38x the MBus window 13 has the remap
+> + * capability, like windows 0 to 7. However, the mvebu-mbus driver
+> + * isn't currently taking into account this special case, which means
+> + * that when window 13 is actually used, the remap registers are left
+> + * to 0, making the device using this MBus window unavailable. The
+> + * quick fix for stable is to not use window 13. A follow up patch
+> + * will correctly handle this window.
+> +*/
+>  static int mvebu_mbus_window_is_free(struct mvebu_mbus_state *mbus,
+>  				     const int win)
+>  {
+>  	void __iomem *addr = mbus->mbuswins_base +
+>  		mbus->soc->win_cfg_offset(win);
+>  	u32 ctrl = readl(addr + WIN_CTRL_OFF);
+> +
+> +	if (win == 13)
+> +		return false;
+> +
+>  	return !(ctrl & WIN_CTRL_ENABLE);
+>  }
+>  
+> -- 
+> 2.1.4
+> 
