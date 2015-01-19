@@ -1,56 +1,47 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 19 Jan 2015 09:44:06 +0000
-Subject: [PATCH v4 12/21] DT: omap4/5: add binding for the wake-up generator
+Date: Mon, 19 Jan 2015 09:44:10 +0000
+Subject: [PATCH v4 16/21] DT: exynos: update PMU binding
 In-Reply-To: <1421660655-21394-1-git-send-email-marc.zyngier@arm.com>
 References: <1421660655-21394-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1421660655-21394-13-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1421660655-21394-17-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Document the fact that some Exynos PMUs are capable of acting as
+an interrupt controller.
+
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- .../interrupt-controller/ti,omap4-wugen-mpu        | 33 ++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/ti,omap4-wugen-mpu
+ Documentation/devicetree/bindings/arm/samsung/pmu.txt | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/ti,omap4-wugen-mpu b/Documentation/devicetree/bindings/interrupt-controller/ti,omap4-wugen-mpu
-new file mode 100644
-index 0000000..43effa0
---- /dev/null
-+++ b/Documentation/devicetree/bindings/interrupt-controller/ti,omap4-wugen-mpu
-@@ -0,0 +1,33 @@
-+TI OMAP4 Wake-up Generator
+diff --git a/Documentation/devicetree/bindings/arm/samsung/pmu.txt b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
+index 1e1979b..d698e74 100644
+--- a/Documentation/devicetree/bindings/arm/samsung/pmu.txt
++++ b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
+@@ -28,10 +28,23 @@ Properties:
+  - clocks : list of phandles and specifiers to all input clocks listed in
+ 		clock-names property.
+ 
++Optional properties:
 +
-+All TI OMAP4/5 (and their derivatives) an interrupt controller that
-+routes interrupts to the GIC, and also serves as a wakeup source. It
-+is also referred to as "WUGEN-MPU", hence the name of the binding.
++Some PMUs are capable of behaving as an interrupt controller (mostly
++to wake up a suspended PMU). In which case, they can have the
++following properties:
 +
-+Reguired properties:
++- interrupt-controller: indicate that said PMU is an interrupt controller
 +
-+- compatible : should contain at least "ti,omap4-wugen-mpu" or
-+  "ti,omap5-wugen-mpu"
-+- reg : Specifies base physical address and size of the registers.
-+- interrupt-controller : Identifies the node as an interrupt controller.
-+- #interrupt-cells : Specifies the number of cells needed to encode an
-+  interrupt source. The value must be 3.
-+- interrupt-parent : a phandle to the GIC these interrupts are routed
-+  to.
++- interrupt-parent: a phandle indicating which interrupt controller
++  this PMU signals interrupts to.
 +
-+Notes:
-+
-+- Because this HW ultimately routes interrupts to the GIC, the
-+  interrupt specifier must be that of the GIC.
-+- Only SPIs can use the WUGEN as an interrupt parent. SGIs and PPIs
-+  are explicitly forbiden.
-+
-+Example:
-+
-+       wakeupgen: interrupt-controller at 48281000 {
-+               compatible = "ti,omap5-wugen-mpu", "ti,omap4-wugen-mpu";
-+               interrupt-controller;
-+               #interrupt-cells = <3>;
-+               reg = <0x48281000 0x1000>;
-+               interrupt-parent = <&gic>;
-+       };
+ Example :
+ pmu_system_controller: system-controller at 10040000 {
+ 	compatible = "samsung,exynos5250-pmu", "syscon";
+ 	reg = <0x10040000 0x5000>;
++	interrupt-controller;
++	interrupt-parent = <&gic>;
+ 	#clock-cells = <1>;
+ 	clock-names = "clkout0", "clkout1", "clkout2", "clkout3",
+ 			"clkout4", "clkout8", "clkout9";
 -- 
 2.1.4
