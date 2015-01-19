@@ -1,40 +1,32 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 19 Jan 2015 10:38:58 +0100
-Subject: [PATCH v4] ARM: mvebu: remove two selects of ARM_ERRATA_753970
-In-Reply-To: <1421659937.9655.16.camel@x220>
-References: <1421659937.9655.16.camel@x220>
-Message-ID: <1421660338.9655.21.camel@x220>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 19 Jan 2015 10:38:00 +0100
+Subject: [PATCH] ARM: sun6i: Enable ARM arch timers
+In-Reply-To: <1421004824-17525-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1421004824-17525-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20150119093800.GA4367@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andy, Joe,
-
-On Mon, 2015-01-19 at 10:32 +0100, Paul Bolle wrote:
-> ARM_ERRATA_753970 was renamed to PL310_ERRATA_753970 in v3.2, through
-> commit fa0ce4035d48 ("ARM: 7162/1: errata: tidy up Kconfig options for
-> PL310 errata workarounds"). Still, two selects were added in v3.15 that
-> used the previous name. So these selects have always been nops.
+On Sun, Jan 11, 2015 at 08:33:44PM +0100, Maxime Ripard wrote:
+> The A31 has non-initialized architected timers, without CNTFRQ or CNTVOFF set
+> by the Allwinner's bootloader.
 > 
-> It is clear that the intention here was to select PL310_ERRATA_753970.
-> But as, apparently, nothing broke for four releases we can assume
-> PL310_ERRATA_753970 isn't actually needed. So let's not rename these two
-> selects but just drop them instead.
+> Use the new DT property for such case, and enable the arch timers.
 > 
-> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Checkpatch in next-21050119 complains:
-    ERROR: Please use git commit description style 'commit <12+ chars of sha1> ("<title line>")' - ie: 'commit fa0ce4035d48 ("ARM: 7162/1: errata: tidy up Kconfig options for PL310 errata workarounds")'
-    #7: 
-    commit fa0ce4035d48 ("ARM: 7162/1: errata: tidy up Kconfig options for
-    
-    total: 1 errors, 0 warnings, 14 lines checked
-    
-    Your patch has style problems, please review.
+Applied.
 
-Perhaps it doesn't notice the quote spans two lines. Can this be fixed
-please?
+Maxime
 
-Thanks,
-
-
-Paul Bolle
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150119/631ef335/attachment.sig>
