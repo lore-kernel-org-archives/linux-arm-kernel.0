@@ -1,302 +1,275 @@
-From: vincent.yang.fujitsu@gmail.com (Vincent Yang)
-Date: Mon, 19 Jan 2015 18:39:30 +0800
-Subject: [PATCH v4 8/8] ARM: MB86S7x: Add configs
-In-Reply-To: <1421663016-1327-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
-References: <1421663016-1327-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
-Message-ID: <1421663970-1743-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 19 Jan 2015 11:40:59 +0100
+Subject: [PATCH v3 1/3] pinctrl: at91: allow to have disabled gpio bank
+In-Reply-To: <1421422267-2934-2-git-send-email-ludovic.desroches@atmel.com>
+References: <1421422267-2934-1-git-send-email-ludovic.desroches@atmel.com>
+ <1421422267-2934-2-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <54BCDF3B.4060707@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jassi Brar <jaswinder.singh@linaro.org>
+Le 16/01/2015 16:31, Ludovic Desroches a ?crit :
+> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> 
+> Today we expect that all the bank are enabled, and count the number of banks
+> used by the pinctrl based on it instead of using the last bank id enabled.
+> 
+> So switch to it, set the chained IRQ at runtime based on enabled banks
+> and wait only the number of enabled gpio controllers at probe time.
+> 
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> 
+> Cc: <stable@vger.kernel.org> # 3.18
 
-Fujitsu's ARCH_MB86S7X is multi_v7 compatible, so add options to
-multi_v7_defconfig. Also add a new defconfig for MB86S7X for those
-who want the kernel built specifically for ARCH_MB86S7X.
+As I acknowledged a comparable solution previously, and after reading,
+this patch seems okay:
 
-Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
-Signed-off-by: Andy Green <andy.green@linaro.org>
-Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
-Signed-off-by: Tetsuya Nuriya <nuriya.tetsuya@jp.fujitsu.com>
----
- arch/arm/configs/fujitsu_defconfig  | 232 ++++++++++++++++++++++++++++++++++++
- arch/arm/configs/multi_v7_defconfig |   5 +
- 2 files changed, 237 insertions(+)
- create mode 100644 arch/arm/configs/fujitsu_defconfig
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-diff --git a/arch/arm/configs/fujitsu_defconfig b/arch/arm/configs/fujitsu_defconfig
-new file mode 100644
-index 0000000..2d922e4
---- /dev/null
-+++ b/arch/arm/configs/fujitsu_defconfig
-@@ -0,0 +1,232 @@
-+# CONFIG_LOCALVERSION_AUTO is not set
-+CONFIG_DEFAULT_HOSTNAME="MB86S7x"
-+CONFIG_SYSVIPC=y
-+CONFIG_POSIX_MQUEUE=y
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_IKCONFIG=y
-+CONFIG_IKCONFIG_PROC=y
-+CONFIG_NAMESPACES=y
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_RD_BZIP2=y
-+CONFIG_RD_LZMA=y
-+CONFIG_RD_XZ=y
-+CONFIG_RD_LZO=y
-+CONFIG_CC_OPTIMIZE_FOR_SIZE=y
-+CONFIG_EXPERT=y
-+# CONFIG_COMPAT_BRK is not set
-+CONFIG_SLAB=y
-+CONFIG_PROFILING=y
-+CONFIG_MODULES=y
-+CONFIG_MODULE_UNLOAD=y
-+CONFIG_ARCH_MB86S7X=y
-+CONFIG_ARM_LPAE=y
-+CONFIG_ARM_ERRATA_754322=y
-+CONFIG_ARM_ERRATA_754327=y
-+CONFIG_ARM_ERRATA_764369=y
-+CONFIG_ARM_ERRATA_775420=y
-+CONFIG_ARM_ERRATA_798181=y
-+CONFIG_PCI=y
-+CONFIG_SMP=y
-+CONFIG_SCHED_MC=y
-+CONFIG_SCHED_SMT=y
-+CONFIG_VMSPLIT_2G=y
-+CONFIG_PREEMPT=y
-+CONFIG_THUMB2_KERNEL=y
-+CONFIG_HIGHMEM=y
-+CONFIG_CMA=y
-+CONFIG_CMA_AREAS=8
-+# CONFIG_ATAGS is not set
-+CONFIG_ZBOOT_ROM_TEXT=0x0
-+CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_CMDLINE="mem=2048M console=ttyS0,115200 root=/dev/mmcblk1p1 rootfstype=ext4 rootwait rw"
-+CONFIG_KEXEC=y
-+CONFIG_CPU_FREQ=y
-+CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
-+CONFIG_CPUFREQ_DT=m
-+CONFIG_CPU_IDLE=y
-+CONFIG_VFP=y
-+CONFIG_NEON=y
-+CONFIG_PM_WAKELOCKS=y
-+CONFIG_PM_RUNTIME=y
-+CONFIG_PM_DEBUG=y
-+CONFIG_NET=y
-+CONFIG_PACKET=y
-+CONFIG_UNIX=y
-+CONFIG_INET=y
-+CONFIG_IP_MULTICAST=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+CONFIG_IP_PNP_BOOTP=y
-+# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
-+# CONFIG_INET_XFRM_MODE_TUNNEL is not set
-+# CONFIG_INET_XFRM_MODE_BEET is not set
-+# CONFIG_INET_LRO is not set
-+# CONFIG_IPV6 is not set
-+# CONFIG_WIRELESS is not set
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
-+CONFIG_DMA_CMA=y
-+CONFIG_CMA_SIZE_MBYTES=192
-+CONFIG_MTD=y
-+CONFIG_MTD_CMDLINE_PARTS=y
-+CONFIG_MTD_BLOCK=y
-+CONFIG_MTD_CFI=y
-+CONFIG_MTD_CFI_ADV_OPTIONS=y
-+CONFIG_MTD_CFI_AMDSTD=y
-+CONFIG_MTD_ROM=y
-+CONFIG_MTD_COMPLEX_MAPPINGS=y
-+CONFIG_MTD_PHYSMAP=y
-+CONFIG_MTD_PHYSMAP_OF=y
-+CONFIG_MTD_PLATRAM=y
-+CONFIG_MTD_M25P80=y
-+CONFIG_MTD_SPI_NOR=y
-+CONFIG_BLK_DEV_LOOP=m
-+CONFIG_BLK_DEV_CRYPTOLOOP=m
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_BLK_DEV_RAM_COUNT=2
-+CONFIG_BLK_DEV_RAM_SIZE=1024
-+CONFIG_BLK_DEV_SD=m
-+CONFIG_ATA=m
-+# CONFIG_ATA_VERBOSE_ERROR is not set
-+# CONFIG_SATA_PMP is not set
-+CONFIG_SATA_AHCI_PLATFORM=m
-+# CONFIG_ATA_SFF is not set
-+CONFIG_NETDEVICES=y
-+CONFIG_TUN=m
-+# CONFIG_NET_CADENCE is not set
-+# CONFIG_NET_VENDOR_BROADCOM is not set
-+# CONFIG_NET_VENDOR_CIRRUS is not set
-+# CONFIG_NET_VENDOR_FARADAY is not set
-+# CONFIG_NET_VENDOR_INTEL is not set
-+# CONFIG_NET_VENDOR_MARVELL is not set
-+# CONFIG_NET_VENDOR_MICREL is not set
-+# CONFIG_NET_VENDOR_MICROCHIP is not set
-+# CONFIG_NET_VENDOR_NATSEMI is not set
-+# CONFIG_NET_VENDOR_SEEQ is not set
-+# CONFIG_NET_VENDOR_SMSC is not set
-+# CONFIG_NET_VENDOR_STMICRO is not set
-+# CONFIG_NET_VENDOR_WIZNET is not set
-+CONFIG_PHYLIB=y
-+# CONFIG_WLAN is not set
-+# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-+CONFIG_INPUT_MOUSEDEV_SCREEN_X=800
-+CONFIG_INPUT_MOUSEDEV_SCREEN_Y=480
-+CONFIG_INPUT_EVDEV=m
-+# CONFIG_KEYBOARD_ATKBD is not set
-+CONFIG_KEYBOARD_GPIO_POLLED=y
-+# CONFIG_MOUSE_PS2 is not set
-+CONFIG_MOUSE_GPIO=m
-+CONFIG_INPUT_TOUCHSCREEN=y
-+CONFIG_TOUCHSCREEN_EGALAX=m
-+CONFIG_TOUCHSCREEN_ILI210X=m
-+# CONFIG_SERIO_SERPORT is not set
-+CONFIG_LEGACY_PTY_COUNT=16
-+# CONFIG_DEVKMEM is not set
-+CONFIG_SERIAL_8250=y
-+# CONFIG_SERIAL_8250_DEPRECATED_OPTIONS is not set
-+CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_8250_EXTENDED=y
-+CONFIG_SERIAL_8250_DW=y
-+CONFIG_SERIAL_OF_PLATFORM=y
-+# CONFIG_HW_RANDOM is not set
-+# CONFIG_I2C_COMPAT is not set
-+CONFIG_I2C_CHARDEV=m
-+# CONFIG_I2C_HELPER_AUTO is not set
-+CONFIG_SPI=y
-+CONFIG_GPIO_SYSFS=y
-+CONFIG_GPIO_MB86S7X=y
-+CONFIG_GPIO_MCP23S08=m
-+# CONFIG_HWMON is not set
-+CONFIG_REGULATOR=y
-+CONFIG_REGULATOR_GPIO=y
-+# CONFIG_VGA_ARB is not set
-+CONFIG_DRM=y
-+CONFIG_FB=y
-+CONFIG_FIRMWARE_EDID=y
-+CONFIG_FB_MODE_HELPERS=y
-+CONFIG_FB_TILEBLITTING=y
-+CONFIG_BACKLIGHT_LCD_SUPPORT=y
-+CONFIG_FRAMEBUFFER_CONSOLE=y
-+CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
-+CONFIG_FRAMEBUFFER_CONSOLE_ROTATION=y
-+CONFIG_LOGO=y
-+# CONFIG_LOGO_LINUX_MONO is not set
-+# CONFIG_LOGO_LINUX_VGA16 is not set
-+CONFIG_SOUND=m
-+CONFIG_SND=m
-+CONFIG_SND_DYNAMIC_MINORS=y
-+# CONFIG_SND_SUPPORT_OLD_API is not set
-+# CONFIG_SND_VERBOSE_PROCFS is not set
-+# CONFIG_SND_ARM is not set
-+# CONFIG_SND_SPI is not set
-+CONFIG_SND_SOC=m
-+CONFIG_HID=m
-+CONFIG_HID_PID=y
-+CONFIG_USB_HIDDEV=y
-+CONFIG_USB=m
-+CONFIG_USB_OTG=y
-+CONFIG_USB_XHCI_HCD=m
-+CONFIG_USB_EHCI_HCD=m
-+CONFIG_USB_EHCI_HCD_PLATFORM=m
-+CONFIG_USB_OHCI_HCD=m
-+# CONFIG_USB_OHCI_HCD_PCI is not set
-+CONFIG_USB_OHCI_HCD_PLATFORM=m
-+CONFIG_USB_ACM=m
-+CONFIG_USB_STORAGE=m
-+CONFIG_USB_DWC3=m
-+CONFIG_USB_DWC3_HOST=y
-+CONFIG_USB_DWC3_DEBUG=y
-+CONFIG_USB_GADGET=m
-+CONFIG_USB_MASS_STORAGE=m
-+CONFIG_USB_G_MULTI=m
-+CONFIG_MMC=y
-+CONFIG_MMC_CLKGATE=y
-+CONFIG_MMC_SDHCI=y
-+CONFIG_MMC_SDHCI_PLTFM=y
-+CONFIG_MMC_SDHCI_F_SDH30=y
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_GPIO=y
-+CONFIG_LEDS_TRIGGERS=y
-+CONFIG_LEDS_TRIGGER_TIMER=y
-+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-+CONFIG_LEDS_TRIGGER_BACKLIGHT=m
-+CONFIG_LEDS_TRIGGER_CPU=y
-+CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
-+CONFIG_LEDS_TRIGGER_TRANSIENT=m
-+CONFIG_DMADEVICES=y
-+CONFIG_STAGING=y
-+CONFIG_ANDROID=y
-+CONFIG_ANDROID_BINDER_IPC=y
-+CONFIG_ASHMEM=y
-+CONFIG_ANDROID_LOGGER=m
-+CONFIG_ANDROID_LOW_MEMORY_KILLER=y
-+CONFIG_ION=y
-+CONFIG_ARM_MHU=y
-+CONFIG_ARM_SMMU=y
-+CONFIG_EXT4_FS=y
-+CONFIG_EXT4_FS_POSIX_ACL=y
-+CONFIG_EXT4_FS_SECURITY=y
-+CONFIG_VFAT_FS=m
-+CONFIG_TMPFS=y
-+CONFIG_JFFS2_FS=m
-+CONFIG_CRAMFS=y
-+CONFIG_ROMFS_FS=y
-+CONFIG_ROMFS_BACKED_BY_BOTH=y
-+# CONFIG_NETWORK_FILESYSTEMS is not set
-+CONFIG_NLS_CODEPAGE_437=m
-+CONFIG_NLS_ISO8859_1=m
-+CONFIG_PRINTK_TIME=y
-+CONFIG_DEBUG_INFO=y
-+CONFIG_DEBUG_FS=y
-+CONFIG_MAGIC_SYSRQ=y
-+CONFIG_DEBUG_MEMORY_INIT=y
-+# CONFIG_DEBUG_PREEMPT is not set
-+# CONFIG_RCU_CPU_STALL_VERBOSE is not set
-+# CONFIG_FTRACE is not set
-+CONFIG_DEBUG_USER=y
-+# CONFIG_CRYPTO_ANSI_CPRNG is not set
-+# CONFIG_CRYPTO_HW is not set
-+CONFIG_FONTS=y
-+CONFIG_FONT_SUN8x16=y
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index bc393b7..102e457 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -49,6 +49,7 @@ CONFIG_SOC_AM43XX=y
- CONFIG_SOC_DRA7XX=y
- CONFIG_ARCH_QCOM=y
- CONFIG_ARCH_MEDIATEK=y
-+CONFIG_ARCH_MB86S7X=y
- CONFIG_ARCH_MSM8X60=y
- CONFIG_ARCH_MSM8960=y
- CONFIG_ARCH_MSM8974=y
-@@ -259,6 +260,7 @@ CONFIG_GPIO_TWL4030=y
- CONFIG_GPIO_PALMAS=y
- CONFIG_GPIO_TPS6586X=y
- CONFIG_GPIO_TPS65910=y
-+CONFIG_GPIO_MB86S7X=y
- CONFIG_BATTERY_SBS=y
- CONFIG_CHARGER_TPS65090=y
- CONFIG_POWER_RESET_AS3722=y
-@@ -370,6 +372,7 @@ CONFIG_MMC_SDHCI_SPEAR=y
- CONFIG_MMC_SDHCI_S3C=y
- CONFIG_MMC_SDHCI_S3C_DMA=y
- CONFIG_MMC_SDHCI_BCM_KONA=y
-+CONFIG_MMC_SDHCI_F_SDH30=y
- CONFIG_MMC_SDHCI_ST=y
- CONFIG_MMC_OMAP=y
- CONFIG_MMC_OMAP_HS=y
-@@ -457,6 +460,8 @@ CONFIG_TI_PIPE3=y
- CONFIG_PHY_MIPHY365X=y
- CONFIG_PHY_STIH41X_USB=y
- CONFIG_PHY_SUN4I_USB=y
-+CONFIG_MAILBOX=y
-+CONFIG_ARM_MHU=y
- CONFIG_EXT4_FS=y
- CONFIG_AUTOFS4_FS=y
- CONFIG_MSDOS_FS=y
+Thanks, bye.
+
+
+> ---
+>  drivers/pinctrl/pinctrl-at91.c | 108 +++++++++++++++++++++--------------------
+>  1 file changed, 55 insertions(+), 53 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+> index dfd021e..f4cd0b9 100644
+> --- a/drivers/pinctrl/pinctrl-at91.c
+> +++ b/drivers/pinctrl/pinctrl-at91.c
+> @@ -177,7 +177,7 @@ struct at91_pinctrl {
+>  	struct device		*dev;
+>  	struct pinctrl_dev	*pctl;
+>  
+> -	int			nbanks;
+> +	int			nactive_banks;
+>  
+>  	uint32_t		*mux_mask;
+>  	int			nmux;
+> @@ -653,12 +653,18 @@ static int pin_check_config(struct at91_pinctrl *info, const char *name,
+>  	int mux;
+>  
+>  	/* check if it's a valid config */
+> -	if (pin->bank >= info->nbanks) {
+> +	if (pin->bank >= gpio_banks) {
+>  		dev_err(info->dev, "%s: pin conf %d bank_id %d >= nbanks %d\n",
+> -			name, index, pin->bank, info->nbanks);
+> +			name, index, pin->bank, gpio_banks);
+>  		return -EINVAL;
+>  	}
+>  
+> +	if (!gpio_chips[pin->bank]) {
+> +		dev_err(info->dev, "%s: pin conf %d bank_id %d not enabled\n",
+> +			name, index, pin->bank);
+> +		return -ENXIO;
+> +	}
+> +
+>  	if (pin->pin >= MAX_NB_GPIO_PER_BANK) {
+>  		dev_err(info->dev, "%s: pin conf %d pin_bank_id %d >= %d\n",
+>  			name, index, pin->pin, MAX_NB_GPIO_PER_BANK);
+> @@ -981,7 +987,8 @@ static void at91_pinctrl_child_count(struct at91_pinctrl *info,
+>  
+>  	for_each_child_of_node(np, child) {
+>  		if (of_device_is_compatible(child, gpio_compat)) {
+> -			info->nbanks++;
+> +			if (of_device_is_available(child))
+> +				info->nactive_banks++;
+>  		} else {
+>  			info->nfunctions++;
+>  			info->ngroups += of_get_child_count(child);
+> @@ -1003,11 +1010,11 @@ static int at91_pinctrl_mux_mask(struct at91_pinctrl *info,
+>  	}
+>  
+>  	size /= sizeof(*list);
+> -	if (!size || size % info->nbanks) {
+> -		dev_err(info->dev, "wrong mux mask array should be by %d\n", info->nbanks);
+> +	if (!size || size % gpio_banks) {
+> +		dev_err(info->dev, "wrong mux mask array should be by %d\n", gpio_banks);
+>  		return -EINVAL;
+>  	}
+> -	info->nmux = size / info->nbanks;
+> +	info->nmux = size / gpio_banks;
+>  
+>  	info->mux_mask = devm_kzalloc(info->dev, sizeof(u32) * size, GFP_KERNEL);
+>  	if (!info->mux_mask) {
+> @@ -1131,7 +1138,7 @@ static int at91_pinctrl_probe_dt(struct platform_device *pdev,
+>  		of_match_device(at91_pinctrl_of_match, &pdev->dev)->data;
+>  	at91_pinctrl_child_count(info, np);
+>  
+> -	if (info->nbanks < 1) {
+> +	if (gpio_banks < 1) {
+>  		dev_err(&pdev->dev, "you need to specify at least one gpio-controller\n");
+>  		return -EINVAL;
+>  	}
+> @@ -1144,7 +1151,7 @@ static int at91_pinctrl_probe_dt(struct platform_device *pdev,
+>  
+>  	dev_dbg(&pdev->dev, "mux-mask\n");
+>  	tmp = info->mux_mask;
+> -	for (i = 0; i < info->nbanks; i++) {
+> +	for (i = 0; i < gpio_banks; i++) {
+>  		for (j = 0; j < info->nmux; j++, tmp++) {
+>  			dev_dbg(&pdev->dev, "%d:%d\t0x%x\n", i, j, tmp[0]);
+>  		}
+> @@ -1162,7 +1169,7 @@ static int at91_pinctrl_probe_dt(struct platform_device *pdev,
+>  	if (!info->groups)
+>  		return -ENOMEM;
+>  
+> -	dev_dbg(&pdev->dev, "nbanks = %d\n", info->nbanks);
+> +	dev_dbg(&pdev->dev, "nbanks = %d\n", gpio_banks);
+>  	dev_dbg(&pdev->dev, "nfunctions = %d\n", info->nfunctions);
+>  	dev_dbg(&pdev->dev, "ngroups = %d\n", info->ngroups);
+>  
+> @@ -1185,7 +1192,7 @@ static int at91_pinctrl_probe(struct platform_device *pdev)
+>  {
+>  	struct at91_pinctrl *info;
+>  	struct pinctrl_pin_desc *pdesc;
+> -	int ret, i, j, k;
+> +	int ret, i, j, k, ngpio_chips_enabled = 0;
+>  
+>  	info = devm_kzalloc(&pdev->dev, sizeof(*info), GFP_KERNEL);
+>  	if (!info)
+> @@ -1200,23 +1207,27 @@ static int at91_pinctrl_probe(struct platform_device *pdev)
+>  	 * to obtain references to the struct gpio_chip * for them, and we
+>  	 * need this to proceed.
+>  	 */
+> -	for (i = 0; i < info->nbanks; i++) {
+> -		if (!gpio_chips[i]) {
+> -			dev_warn(&pdev->dev, "GPIO chip %d not registered yet\n", i);
+> -			devm_kfree(&pdev->dev, info);
+> -			return -EPROBE_DEFER;
+> -		}
+> +	for (i = 0; i < gpio_banks; i++)
+> +		if (gpio_chips[i])
+> +			ngpio_chips_enabled++;
+> +
+> +	if (ngpio_chips_enabled < info->nactive_banks) {
+> +		dev_warn(&pdev->dev,
+> +			 "All GPIO chips are not registered yet (%d/%d)\n",
+> +			 ngpio_chips_enabled, info->nactive_banks);
+> +		devm_kfree(&pdev->dev, info);
+> +		return -EPROBE_DEFER;
+>  	}
+>  
+>  	at91_pinctrl_desc.name = dev_name(&pdev->dev);
+> -	at91_pinctrl_desc.npins = info->nbanks * MAX_NB_GPIO_PER_BANK;
+> +	at91_pinctrl_desc.npins = gpio_banks * MAX_NB_GPIO_PER_BANK;
+>  	at91_pinctrl_desc.pins = pdesc =
+>  		devm_kzalloc(&pdev->dev, sizeof(*pdesc) * at91_pinctrl_desc.npins, GFP_KERNEL);
+>  
+>  	if (!at91_pinctrl_desc.pins)
+>  		return -ENOMEM;
+>  
+> -	for (i = 0 , k = 0; i < info->nbanks; i++) {
+> +	for (i = 0, k = 0; i < gpio_banks; i++) {
+>  		for (j = 0; j < MAX_NB_GPIO_PER_BANK; j++, k++) {
+>  			pdesc->number = k;
+>  			pdesc->name = kasprintf(GFP_KERNEL, "pio%c%d", i + 'A', j);
+> @@ -1234,8 +1245,9 @@ static int at91_pinctrl_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	/* We will handle a range of GPIO pins */
+> -	for (i = 0; i < info->nbanks; i++)
+> -		pinctrl_add_gpio_range(info->pctl, &gpio_chips[i]->range);
+> +	for (i = 0; i < gpio_banks; i++)
+> +		if (gpio_chips[i])
+> +			pinctrl_add_gpio_range(info->pctl, &gpio_chips[i]->range);
+>  
+>  	dev_info(&pdev->dev, "initialized AT91 pinctrl driver\n");
+>  
+> @@ -1613,9 +1625,10 @@ static void gpio_irq_handler(unsigned irq, struct irq_desc *desc)
+>  static int at91_gpio_of_irq_setup(struct platform_device *pdev,
+>  				  struct at91_gpio_chip *at91_gpio)
+>  {
+> +	struct gpio_chip	*gpiochip_prev = NULL;
+>  	struct at91_gpio_chip   *prev = NULL;
+>  	struct irq_data		*d = irq_get_irq_data(at91_gpio->pioc_virq);
+> -	int ret;
+> +	int ret, i;
+>  
+>  	at91_gpio->pioc_hwirq = irqd_to_hwirq(d);
+>  
+> @@ -1641,24 +1654,33 @@ static int at91_gpio_of_irq_setup(struct platform_device *pdev,
+>  		return ret;
+>  	}
+>  
+> -	/* Setup chained handler */
+> -	if (at91_gpio->pioc_idx)
+> -		prev = gpio_chips[at91_gpio->pioc_idx - 1];
+> -
+>  	/* The top level handler handles one bank of GPIOs, except
+>  	 * on some SoC it can handle up to three...
+>  	 * We only set up the handler for the first of the list.
+>  	 */
+> -	if (prev && prev->next == at91_gpio)
+> +	gpiochip_prev = irq_get_handler_data(at91_gpio->pioc_virq);
+> +	if (!gpiochip_prev) {
+> +		/* Then register the chain on the parent IRQ */
+> +		gpiochip_set_chained_irqchip(&at91_gpio->chip,
+> +					     &gpio_irqchip,
+> +					     at91_gpio->pioc_virq,
+> +					     gpio_irq_handler);
+>  		return 0;
+> +	}
+>  
+> -	/* Then register the chain on the parent IRQ */
+> -	gpiochip_set_chained_irqchip(&at91_gpio->chip,
+> -				     &gpio_irqchip,
+> -				     at91_gpio->pioc_virq,
+> -				     gpio_irq_handler);
+> +	prev = container_of(gpiochip_prev, struct at91_gpio_chip, chip);
+>  
+> -	return 0;
+> +	/* we can only have 2 banks before */
+> +	for (i = 0; i < 2; i++) {
+> +		if (prev->next) {
+> +			prev = prev->next;
+> +		} else {
+> +			prev->next = at91_gpio;
+> +			return 0;
+> +		}
+> +	}
+> +
+> +	return -EINVAL;
+>  }
+>  
+>  /* This structure is replicated for each GPIO block allocated at probe time */
+> @@ -1675,24 +1697,6 @@ static struct gpio_chip at91_gpio_template = {
+>  	.ngpio			= MAX_NB_GPIO_PER_BANK,
+>  };
+>  
+> -static void at91_gpio_probe_fixup(void)
+> -{
+> -	unsigned i;
+> -	struct at91_gpio_chip *at91_gpio, *last = NULL;
+> -
+> -	for (i = 0; i < gpio_banks; i++) {
+> -		at91_gpio = gpio_chips[i];
+> -
+> -		/*
+> -		 * GPIO controller are grouped on some SoC:
+> -		 * PIOC, PIOD and PIOE can share the same IRQ line
+> -		 */
+> -		if (last && last->pioc_virq == at91_gpio->pioc_virq)
+> -			last->next = at91_gpio;
+> -		last = at91_gpio;
+> -	}
+> -}
+> -
+>  static struct of_device_id at91_gpio_of_match[] = {
+>  	{ .compatible = "atmel,at91sam9x5-gpio", .data = &at91sam9x5_ops, },
+>  	{ .compatible = "atmel,at91rm9200-gpio", .data = &at91rm9200_ops },
+> @@ -1805,8 +1809,6 @@ static int at91_gpio_probe(struct platform_device *pdev)
+>  	gpio_chips[alias_idx] = at91_chip;
+>  	gpio_banks = max(gpio_banks, alias_idx + 1);
+>  
+> -	at91_gpio_probe_fixup();
+> -
+>  	ret = at91_gpio_of_irq_setup(pdev, at91_chip);
+>  	if (ret)
+>  		goto irq_setup_err;
+> 
+
+
 -- 
-1.9.0
+Nicolas Ferre
