@@ -1,53 +1,131 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Sun, 18 Jan 2015 22:35:47 -0500
-Subject: =?gbk?Q?=B4=F0=B8=B4=3A_=5BPATCHv4=5D_arm64=3A_dmi=3A_?=
- =?gbk?Q?Add_SMBIOS/DMI_support?=
-In-Reply-To: <54BC7A52.6040006@redhat.com>
-References: <1412437603-3394-1-git-send-email-yi.li@linaro.org>
- <54B9F9D2.6000104@redhat.com> <20150117121247.GL3827@bivouac.eciton.net>
- <54BA7B0E.5020207@redhat.com>
- <D0F5605BA99F0B4594FB1EEC24E785CC6549F905@SZXEMA510-MBX.china.huawei.com>
- <54BC7A52.6040006@redhat.com>
-Message-ID: <54BC7B93.3090306@redhat.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 19 Jan 2015 04:23:23 +0000 (UTC)
+Subject: OMAP baseline test results for v3.19-rc4
+Message-ID: <alpine.DEB.2.02.1501190422070.5450@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/18/2015 10:30 PM, Jon Masters wrote:
-> On 01/18/2015 08:27 PM, liyi 00215672 wrote:
->> Hi Jon, Leif,
->>
->> 	I am reviving with phoenix.liyi at huawei.com :)
->>
->> 	Agreed with Leif, The DMI/SMBIOS data are available for user space not for kernel level on x86, which means if DMI has some bad descriptions, it should not affect the kernel boot normally.
->>
->> 	So ARM platform will do the same thing, DMI data just as a reference for system configuration, and don't depend them to boot the sytem. :)
->>
->> 	Thanks!
-> 
-> Thanks for the feedback! Looking forward to another visit to Shenzen soon :)
-> 
-> I'm afraid I think we'll need to use the socket information in DMI to
-> populate topology in the short term or for a vendor kernel or two. It's
-> important that certain tooling accurately account the number of sockets
-> present. It's awesome that ARM is going multi-socket. It's less awesome
-> to see the magic words "IMPLEMENTATION DEFINED". That always means
-> "abandon all hope ye who enter here". It'll need fixing in the form of a
-> rigidly defined standard.
-> 
-> I've just spent the weekend going through a variety of vendor tables and
-> manually validating/correcting them/harassing people to fix various ones
-> or convert to SMBIOS3. Depending upon how well this goes, we might be in
-> a position to have usable data for now. With a few sanity checks, we can
-> avoid using the data if it is incorrect. And in the medium term, we will
-> work on a better solution such as adding topology description to ACPI
-> tables. Then, we'll come back to this thread to see what is good
-> upstream, once we've some informed data about what is a practical solution.
 
-Quick footnote that I have an *embarrassingly hackish* kludged version
-of dmidecode that understands how to read SMBIOS3 tables from /dev/mem
-and it's working on various hardware here (using it to sanity check
-vendor tables and provide feedback). I'll share a patch if useful
-off-list, but I'm waiting on Linaro to post the /sys/firmware/dmi patch
-this week for the solution we'd like to see in the tools upstream.
+Here are some basic OMAP test results for Linux v3.19-rc4.
+Logs and other details at:
 
-Jon.
+    http://www.pwsan.com/omap/testlogs/test_v3.19-rc4/20150118192109/
+
+
+Test summary
+------------
+
+Build: uImage:
+    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
+
+Build: uImage+dtb:
+    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es,
+		  omap2plus_defconfig/omap4-var-som,
+		  omap2plus_defconfig/omap3-evm-37xx,
+		  omap2plus_defconfig_n800_only_a/omap2420-n800,
+		  omap2plus_defconfig/omap2430-sdp,
+		  omap2plus_defconfig/am3517-evm,
+		  omap2plus_defconfig/omap3-beagle,
+		  omap2plus_defconfig/omap3-beagle-xm,
+		  omap2plus_defconfig/omap3-sbc-t3517,
+		  omap2plus_defconfig/omap5-uevm,
+		  omap2plus_defconfig/omap5-sbc-t54
+
+Build: zImage:
+    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  omap2plus_defconfig_omap5_only,
+		  omap2plus_defconfig_dra7xx_only,
+		  omap2plus_defconfig_am43xx_only,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
+
+Build warnings from toolchain: uImage:
+    FAIL ( 1/ 3): omap1_defconfig_1510innovator_only
+
+Build warnings from toolchain: uImage+dtb:
+    (none)
+
+Build warnings from toolchain: zImage:
+    FAIL ( 2/17): omap2plus_defconfig_no_pm, multi_v7_defconfig
+
+Boot to userspace:
+    FAIL ( 1/17): 2430sdp
+    skip ( 2/17): 5912osk, 3517evm
+    Pass (14/17): am335xbonelt, am335xbone, 4430es2panda, 4460pandaes,
+		  4460varsomom, 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm, cmt3517, 5430es2uevm,
+		  5430es2sbct54, 2420n800
+
+Kernel warnings during boot to userspace:
+    FAIL ( 3/17): 4430es2panda, 4460varsomom, cmt3517
+
+PM: chip retention via suspend:
+    FAIL ( 6/12): am335xbonelt, 4430es2panda, 4460varsomom, 2430sdp,
+		  5430es2uevm, 5430es2sbct54
+    Pass ( 6/12): 4460pandaes, 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm
+
+PM: chip retention via dynamic idle:
+    FAIL ( 7/12): am335xbonelt, 4430es2panda, 4460pandaes,
+		  4460varsomom, 2430sdp, 5430es2uevm, 5430es2sbct54
+    Pass ( 5/12): 37xxevm, 3530es3beagle, 3530es31beagle, 3730beaglexm,
+		  3730es12beaglexm
+
+PM: chip off (except CORE, due to errata) via suspend:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off (except CORE, due to errata) via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730es12beaglexm
+
+PM: chip off via dynamic idle:
+    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730es12beaglexm
+
+Kernel warnings during PM test:
+    FAIL ( 7/17): 4430es2panda, 4460varsomom, 37xxevm, 3530es3beagle,
+		  3530es31beagle, 3730beaglexm, 3730es12beaglexm
+
+
+vmlinux object size
+(delta in bytes from test_v3.19-rc3 (b1940cd21c0f4abdce101253e860feff547291b0)):
+   text     data      bss    total  kernel
+   +216        0        0     +216  omap1_defconfig
+   +216        0        0     +216  omap1_defconfig_1510innovator_only
+   +216        0        0     +216  omap1_defconfig_5912osk_only
+   +888     +144        0    +1032  multi_v7_defconfig
+    -64        0        0      -64  omap2plus_defconfig
+   -200        0        0     -200  omap2plus_defconfig_2430sdp_only
+      0        0        0        0  omap2plus_defconfig_am33xx_only
+      0        0        0        0  omap2plus_defconfig_am43xx_only
+    -64        0        0      -64  omap2plus_defconfig_cpupm
+      0        0        0        0  omap2plus_defconfig_dra7xx_only
+    -12        0        0      -12  omap2plus_defconfig_n800_multi_omap2xxx
+   +180       -8        0     +172  omap2plus_defconfig_n800_only_a
+      0        0        0        0  omap2plus_defconfig_no_pm
+    -64        0        0      -64  omap2plus_defconfig_omap2_4_only
+      0        0        0        0  omap2plus_defconfig_omap3_4_only
+    -64        0        0      -64  omap2plus_defconfig_omap5_only
+   +220        0      -28     +192  rmk_omap3430_ldp_allnoconfig
+   +160        0        0     +160  rmk_omap3430_ldp_oldconfig
+   +236        0      -44     +192  rmk_omap4430_sdp_allnoconfig
+ +37686    +1008        0   +38694  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.19-rc3 (b1940cd21c0f4abdce101253e860feff547291b0))
+  avail  rsrvd   high  freed  board          kconfig
+  (no differences)
