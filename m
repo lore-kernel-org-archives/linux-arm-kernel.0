@@ -1,73 +1,42 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 19 Jan 2015 14:22:40 +0100
-Subject: [PATCH V2 8/8] [media] exynos-gsc: Simplify system PM
+Date: Mon, 19 Jan 2015 14:22:38 +0100
+Subject: [PATCH V2 6/8] [media] exynos-gsc: Do full clock gating at runtime PM
+ suspend
 In-Reply-To: <1421673760-2600-1-git-send-email-ulf.hansson@linaro.org>
 References: <1421673760-2600-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1421673760-2600-9-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1421673760-2600-7-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's not needed to keep a local flag about the current system PM state.
-Let's just remove that code and the corresponding debug print.
+To potentially save more power in runtime PM suspend state, let's also
+prepare/unprepare the clock from the runtime PM callbacks.
 
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/media/platform/exynos-gsc/gsc-core.c | 21 ---------------------
- drivers/media/platform/exynos-gsc/gsc-core.h |  3 ---
- 2 files changed, 24 deletions(-)
+ drivers/media/platform/exynos-gsc/gsc-core.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/media/platform/exynos-gsc/gsc-core.c b/drivers/media/platform/exynos-gsc/gsc-core.c
-index 194f9fc..71b227c 100644
+index 5d3cfe8..0b126eb 100644
 --- a/drivers/media/platform/exynos-gsc/gsc-core.c
 +++ b/drivers/media/platform/exynos-gsc/gsc-core.c
-@@ -1191,20 +1191,6 @@ static int gsc_runtime_suspend(struct device *dev)
- #ifdef CONFIG_PM_SLEEP
- static int gsc_resume(struct device *dev)
- {
--	struct gsc_dev *gsc = dev_get_drvdata(dev);
--	unsigned long flags;
--
--	pr_debug("gsc%d: state: 0x%lx", gsc->id, gsc->state);
--
--	/* Do not resume if the device was idle before system suspend */
--	spin_lock_irqsave(&gsc->slock, flags);
--	if (!test_and_clear_bit(ST_SUSPEND, &gsc->state) ||
--	    !gsc_m2m_opened(gsc)) {
--		spin_unlock_irqrestore(&gsc->slock, flags);
--		return 0;
--	}
--	spin_unlock_irqrestore(&gsc->slock, flags);
--
- 	if (!pm_runtime_suspended(dev))
- 		return gsc_runtime_resume(dev);
+@@ -1163,7 +1163,7 @@ static int gsc_runtime_resume(struct device *dev)
  
-@@ -1213,13 +1199,6 @@ static int gsc_resume(struct device *dev)
+ 	pr_debug("gsc%d: state: 0x%lx", gsc->id, gsc->state);
  
- static int gsc_suspend(struct device *dev)
- {
--	struct gsc_dev *gsc = dev_get_drvdata(dev);
--
--	pr_debug("gsc%d: state: 0x%lx", gsc->id, gsc->state);
--
--	if (test_and_set_bit(ST_SUSPEND, &gsc->state))
--		return 0;
--
- 	if (!pm_runtime_suspended(dev))
- 		return gsc_runtime_suspend(dev);
+-	ret = clk_enable(gsc->clock);
++	ret = clk_prepare_enable(gsc->clock);
+ 	if (ret)
+ 		return ret;
  
-diff --git a/drivers/media/platform/exynos-gsc/gsc-core.h b/drivers/media/platform/exynos-gsc/gsc-core.h
-index fa572aa..2f62271 100644
---- a/drivers/media/platform/exynos-gsc/gsc-core.h
-+++ b/drivers/media/platform/exynos-gsc/gsc-core.h
-@@ -48,9 +48,6 @@
- #define	GSC_CTX_ABORT			(1 << 7)
+@@ -1181,7 +1181,7 @@ static int gsc_runtime_suspend(struct device *dev)
  
- enum gsc_dev_flags {
--	/* for global */
--	ST_SUSPEND,
--
- 	/* for m2m node */
- 	ST_M2M_OPEN,
- 	ST_M2M_RUN,
+ 	ret = gsc_m2m_suspend(gsc);
+ 	if (!ret)
+-		clk_disable(gsc->clock);
++		clk_disable_unprepare(gsc->clock);
+ 
+ 	pr_debug("gsc%d: state: 0x%lx", gsc->id, gsc->state);
+ 	return ret;
 -- 
 1.9.1
