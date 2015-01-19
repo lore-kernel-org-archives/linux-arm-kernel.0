@@ -1,52 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 19 Jan 2015 23:04:27 +0000
-Subject: [PATCH] i2c: drop ancient protection against sysfs refcounting
- issues
-In-Reply-To: <20150119190142.GA9451@kroah.com>
-References: <1421693756-12917-1-git-send-email-wsa@the-dreams.de>
- <20150119190142.GA9451@kroah.com>
-Message-ID: <20150119230427.GH26493@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 19 Jan 2015 15:09:51 -0800
+Subject: [GIT PULL] Urgent omap4 legacy interrupt regression fix for v3.19-rc
+ series
+Message-ID: <20150119230950.GA7718@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 20, 2015 at 03:01:42AM +0800, Greg Kroah-Hartman wrote:
-> On Mon, Jan 19, 2015 at 07:55:56PM +0100, Wolfram Sang wrote:
-> > diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-> > index 39d25a8cb1ad..15cc5902cf89 100644
-> > --- a/drivers/i2c/i2c-core.c
-> > +++ b/drivers/i2c/i2c-core.c
-> > @@ -41,7 +41,6 @@
-> >  #include <linux/of_device.h>
-> >  #include <linux/of_irq.h>
-> >  #include <linux/clk/clk-conf.h>
-> > -#include <linux/completion.h>
-> >  #include <linux/hardirq.h>
-> >  #include <linux/irqflags.h>
-> >  #include <linux/rwsem.h>
-> > @@ -1184,8 +1183,7 @@ EXPORT_SYMBOL_GPL(i2c_new_dummy);
-> >  
-> >  static void i2c_adapter_dev_release(struct device *dev)
-> >  {
-> > -	struct i2c_adapter *adap = to_i2c_adapter(dev);
-> > -	complete(&adap->dev_released);
-> > +	/* empty, but the driver core insists we need a release function */
-> 
-> Yeah, it does, but I hate to see this in "real" code as something is
-> probably wrong with it if it happens.
-> 
-> Please move the rest of 'i2c_del_adapter' into the release function
-> (what was after the wait_for_completion() call), and then all should be
-> fine.
+The following changes since commit 7ac72746aa9bb305fa74b44ec73eae99bbbe9b66:
 
-Are you sure about that?  Some drivers do this, eg,
+  ARM: dts: Revert disabling of smc91x for n900 (2015-01-06 08:49:57 -0800)
 
-        i2c_del_adapter(&drv_data->adapter);
-        free_irq(drv_data->irq, drv_data);
+are available in the git repository at:
 
-where drv_data was allocated using devm_kzalloc(), and so will be
-released when the ->remove callback (which calls the above
-i2c_del_adapter()) returns... freeing the embedded device struct.
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.19/gic-regression-v2
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+for you to fetch changes up to 0fb22a8fb7f3bc1b00a36d4a97ce4f93191f7559:
+
+  ARM: OMAP: Work around hardcoded interrupts (2015-01-17 08:56:12 -0800)
+
+----------------------------------------------------------------
+A rather urgent pull request to fix omap4 legacy interrupts.
+
+The legacy interrupts on omap4 got broken when gic got changed to
+use irq_domain_add_linear() instead of the irq_domain_add_legacy(). We
+still have the hardcoded legacy IRQ numbers in use in several places,
+most notably the in the legacy DMA. It took a while to figure out
+what the problem was and how it should be fixed for the -rc series.
+
+Also include is a regression fix for the dra7 dwc3 suspend.
+
+----------------------------------------------------------------
+Felipe Balbi (1):
+      arm: boot: dts: dra7: enable dwc3 suspend PHY quirk
+
+Marc Zyngier (1):
+      ARM: OMAP: Work around hardcoded interrupts
+
+ arch/arm/boot/dts/dra7.dtsi                |  6 ++++++
+ arch/arm/mach-omap2/common.h               |  1 +
+ arch/arm/mach-omap2/omap4-common.c         | 32 ++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod.c           | 10 ++++++++--
+ arch/arm/mach-omap2/omap_hwmod.h           |  1 +
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  5 +++++
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c |  1 +
+ arch/arm/mach-omap2/prcm-common.h          |  1 +
+ arch/arm/mach-omap2/prm44xx.c              |  5 ++++-
+ arch/arm/mach-omap2/prm_common.c           | 14 +++++++++++--
+ arch/arm/mach-omap2/twl-common.c           |  7 ++++++-
+ 11 files changed, 77 insertions(+), 6 deletions(-)
