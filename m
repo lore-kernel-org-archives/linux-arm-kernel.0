@@ -1,32 +1,38 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Mon, 19 Jan 2015 18:26:57 +0100
-Subject: [PATCH v3 7/7] ARM: dts: exynos5250: add display power domain
-In-Reply-To: <1421243091-10778-8-git-send-email-m.szyprowski@samsung.com>
-References: <1421243091-10778-1-git-send-email-m.szyprowski@samsung.com>
- <1421243091-10778-8-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CABxcv=m7Q5v3wH1FU9S0E-dMgebZ_+M_dLELr39h7_VA0Oc8cw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 19 Jan 2015 17:27:50 +0000
+Subject: [PATCH] ARM: kprobes: Eliminate test code's use of BX
+ instruction on ARMv4 CPUs
+In-Reply-To: <1421687930.4201.21.camel@linaro.org>
+References: <1421687930.4201.21.camel@linaro.org>
+Message-ID: <20150119172750.GC26493@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Marek and Andrzej,
+On Mon, Jan 19, 2015 at 05:18:50PM +0000, Jon Medhurst (Tixy) wrote:
+> diff --git a/arch/arm/probes/kprobes/test-arm.c b/arch/arm/probes/kprobes/test-arm.c
+> index e72b07e..5c6e37e 100644
+> --- a/arch/arm/probes/kprobes/test-arm.c
+> +++ b/arch/arm/probes/kprobes/test-arm.c
+> @@ -215,9 +215,11 @@ void kprobe_arm_test_cases(void)
+>  	TEST_UNSUPPORTED("msr	cpsr_f, lr")
+>  	TEST_UNSUPPORTED("msr	spsr, r0")
+>  
+> +#if (__LINUX_ARM_ARCH__ >= 5) || defined(CONFIG_CPU_32v4T)
+>  	TEST_BF_R("bx	r",0,2f,"")
+>  	TEST_BB_R("bx	r",7,2f,"")
+>  	TEST_BF_R("bxeq	r",14,2f,"")
+> +#endif
 
-On Wed, Jan 14, 2015 at 2:44 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> From: Andrzej Hajda <a.hajda@samsung.com>
->
-> The patch adds domain definition and references to it in appropriate devices.
->
-> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-> [mszyprow: rebased onto generic power domains dt bindings]
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos5250.dtsi | 10 ++++++++++
->  1 file changed, 10 insertions(+)
+Unnecessary ()... and this isn't correct.  With a multi-platform kernel, we
+can end up with CONFIG_CPU_32v4 and CONFIG_CPU_32v4T both set.
 
-This patch makes HDMI to work on my Exynos5250 Snow Chromebook:
+I think:
 
-Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+#if __LINUX_ARM_ARCH__ >= 5 || \
+    (__LINUX_ARM_ARCH__ == 4 && !defined(CONFIG_CPU_32v4))
 
-Best regards,
-Javier
+would cover it.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
