@@ -1,131 +1,132 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 19 Jan 2015 04:23:23 +0000 (UTC)
-Subject: OMAP baseline test results for v3.19-rc4
-Message-ID: <alpine.DEB.2.02.1501190422070.5450@utopia.booyaka.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Mon, 19 Jan 2015 12:23:49 +0800
+Subject: [PATCH v2] thermal: rockchip: make temperature reporting much
+ more accurate
+In-Reply-To: <1421625349-14101-2-git-send-email-wxt@rock-chips.com>
+References: <1421625349-14101-1-git-send-email-wxt@rock-chips.com>
+ <1421625349-14101-2-git-send-email-wxt@rock-chips.com>
+Message-ID: <CAGS+omDiajqKxYFqdBXTeax+eeE-TD1WJ+C5odCbZBg6FELXDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Caesar,
 
-Here are some basic OMAP test results for Linux v3.19-rc4.
-Logs and other details at:
+Some drive-by review comments inline...
 
-    http://www.pwsan.com/omap/testlogs/test_v3.19-rc4/20150118192109/
+On Mon, Jan 19, 2015 at 7:55 AM, Caesar Wang <wxt@rock-chips.com> wrote:
+> In general, the kernel should report temperature readings exactly as
+> reported by the hardware. The cpu / gpu thermal driver works in 5 degree
+> increments,but we ought to do more accurate. The temperature will do
+> linear interpolation between the entries in the table.
+>
+> Test= $md5sum /dev/zero &
+> $while true; do grep "" /sys/class/thermal/thermal_zone[1-2]/temp;
+> sleep .5; done
+>
+> e.g. We can get the result as follows:
+>     /sys/class/thermal/thermal_zone1/temp:39994
+>     /sys/class/thermal/thermal_zone2/temp:39086
+>     /sys/class/thermal/thermal_zone1/temp:39994
+>     /sys/class/thermal/thermal_zone2/temp:39540
+>     /sys/class/thermal/thermal_zone1/temp:39540
+>     /sys/class/thermal/thermal_zone2/temp:39540
+>     /sys/class/thermal/thermal_zone1/temp:39540
+>     /sys/class/thermal/thermal_zone2/temp:39994
+>
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> Reviewed-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+>
+> ---
+>
+> Changes in v2:
+> Reviewed-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+>
+>  drivers/thermal/rockchip_thermal.c | 26 +++++++++++++++++---------
+>  1 file changed, 17 insertions(+), 9 deletions(-)
+>
+> diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
+> index 1bcddfc..a7ae23a 100644
+> --- a/drivers/thermal/rockchip_thermal.c
+> +++ b/drivers/thermal/rockchip_thermal.c
+> @@ -193,19 +193,18 @@ static u32 rk_tsadcv2_temp_to_code(long temp)
+>
+>  static long rk_tsadcv2_code_to_temp(u32 code)
+>  {
+> -       int high, low, mid;
+> -
+> -       low = 0;
+> -       high = ARRAY_SIZE(v2_code_table) - 1;
+> -       mid = (high + low) / 2;
+> +       unsigned int low = 0;
+> +       unsigned int high = ARRAY_SIZE(v2_code_table) - 1;
+> +       unsigned int mid = (low + high) / 2;
+> +       unsigned int scale;
+>
+>         if (code > v2_code_table[low].code || code < v2_code_table[high].code)
+>                 return 125000; /* No code available, return max temperature */
 
+I think if the temp sensor reading was invalid we should return an
+error code rather than just silently returning "max temp".
+Returning an error here could then be propagated up by its only
+caller, the ->get_temp() callback.
 
-Test summary
-------------
+Note: 'code < v2_code_table[high].code' is always false, since code is
+unsigned, and the last entry is 0.
 
-Build: uImage:
-    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only
+Also, the check above doesn't reject "code == 0xfff".
+Even worse, I believe in that case the below algorithm will eventually
+set mid=0 and access v2_code_table[-1].code.
 
-Build: uImage+dtb:
-    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es,
-		  omap2plus_defconfig/omap4-var-som,
-		  omap2plus_defconfig/omap3-evm-37xx,
-		  omap2plus_defconfig_n800_only_a/omap2420-n800,
-		  omap2plus_defconfig/omap2430-sdp,
-		  omap2plus_defconfig/am3517-evm,
-		  omap2plus_defconfig/omap3-beagle,
-		  omap2plus_defconfig/omap3-beagle-xm,
-		  omap2plus_defconfig/omap3-sbc-t3517,
-		  omap2plus_defconfig/omap5-uevm,
-		  omap2plus_defconfig/omap5-sbc-t54
+>
+>         while (low <= high) {
+> -               if (code >= v2_code_table[mid].code && code <
+> -                   v2_code_table[mid - 1].code)
+> -                       return v2_code_table[mid].temp;
+> +               if (code >= v2_code_table[mid].code &&
+> +                   code < v2_code_table[mid - 1].code)
+> +                       break;
+>                 else if (code < v2_code_table[mid].code)
+>                         low = mid + 1;
+>                 else
+> @@ -213,7 +212,16 @@ static long rk_tsadcv2_code_to_temp(u32 code)
+>                 mid = (low + high) / 2;
+>         }
+>
+> -       return 125000;
+> +       /*
+> +        * The 5C granularity provided by the table is too much. Let's
+> +        * assume that the relationship between sensor readings and
+> +        * temperature between 2 table entries is linear and extrapolate
 
-Build: zImage:
-    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  omap2plus_defconfig_omap5_only,
-		  omap2plus_defconfig_dra7xx_only,
-		  omap2plus_defconfig_am43xx_only,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap4430_sdp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
+I think this is "interpolate", not "extrapolate".
 
-Build warnings from toolchain: uImage:
-    FAIL ( 1/ 3): omap1_defconfig_1510innovator_only
+> +        * to produce less granular result.
+> +        */
+> +       scale = (v2_code_table[mid].temp - v2_code_table[mid - 1].temp) /
+> +               (v2_code_table[mid - 1].code - v2_code_table[mid].code);
+> +       return v2_code_table[mid - 1].temp +
+> +                       (v2_code_table[mid - 1].code - code) * scale;
 
-Build warnings from toolchain: uImage+dtb:
-    (none)
+Assuming the product fits in an unsigned long (and it will, since code
+is only 12-bits), it is more precise to multiply first and then
+divide, something like this:
 
-Build warnings from toolchain: zImage:
-    FAIL ( 2/17): omap2plus_defconfig_no_pm, multi_v7_defconfig
+   num = v2_code_table[mid].temp - v2_code_table[mid - 1].temp;
+   num *= v2_code_table[mid - 1].code - code;
+   denom = v2_code_table[mid - 1].code - v2_code_table[mid].code;
+   return v2_code_table[mid - 1].temp + (num / denom);
 
-Boot to userspace:
-    FAIL ( 1/17): 2430sdp
-    skip ( 2/17): 5912osk, 3517evm
-    Pass (14/17): am335xbonelt, am335xbone, 4430es2panda, 4460pandaes,
-		  4460varsomom, 37xxevm, 3530es3beagle, 3530es31beagle,
-		  3730beaglexm, 3730es12beaglexm, cmt3517, 5430es2uevm,
-		  5430es2sbct54, 2420n800
+-Daniel
 
-Kernel warnings during boot to userspace:
-    FAIL ( 3/17): 4430es2panda, 4460varsomom, cmt3517
-
-PM: chip retention via suspend:
-    FAIL ( 6/12): am335xbonelt, 4430es2panda, 4460varsomom, 2430sdp,
-		  5430es2uevm, 5430es2sbct54
-    Pass ( 6/12): 4460pandaes, 37xxevm, 3530es3beagle, 3530es31beagle,
-		  3730beaglexm, 3730es12beaglexm
-
-PM: chip retention via dynamic idle:
-    FAIL ( 7/12): am335xbonelt, 4430es2panda, 4460pandaes,
-		  4460varsomom, 2430sdp, 5430es2uevm, 5430es2sbct54
-    Pass ( 5/12): 37xxevm, 3530es3beagle, 3530es31beagle, 3730beaglexm,
-		  3730es12beaglexm
-
-PM: chip off (except CORE, due to errata) via suspend:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off (except CORE, due to errata) via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
-		  3730es12beaglexm
-
-PM: chip off via dynamic idle:
-    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
-		  3730es12beaglexm
-
-Kernel warnings during PM test:
-    FAIL ( 7/17): 4430es2panda, 4460varsomom, 37xxevm, 3530es3beagle,
-		  3530es31beagle, 3730beaglexm, 3730es12beaglexm
-
-
-vmlinux object size
-(delta in bytes from test_v3.19-rc3 (b1940cd21c0f4abdce101253e860feff547291b0)):
-   text     data      bss    total  kernel
-   +216        0        0     +216  omap1_defconfig
-   +216        0        0     +216  omap1_defconfig_1510innovator_only
-   +216        0        0     +216  omap1_defconfig_5912osk_only
-   +888     +144        0    +1032  multi_v7_defconfig
-    -64        0        0      -64  omap2plus_defconfig
-   -200        0        0     -200  omap2plus_defconfig_2430sdp_only
-      0        0        0        0  omap2plus_defconfig_am33xx_only
-      0        0        0        0  omap2plus_defconfig_am43xx_only
-    -64        0        0      -64  omap2plus_defconfig_cpupm
-      0        0        0        0  omap2plus_defconfig_dra7xx_only
-    -12        0        0      -12  omap2plus_defconfig_n800_multi_omap2xxx
-   +180       -8        0     +172  omap2plus_defconfig_n800_only_a
-      0        0        0        0  omap2plus_defconfig_no_pm
-    -64        0        0      -64  omap2plus_defconfig_omap2_4_only
-      0        0        0        0  omap2plus_defconfig_omap3_4_only
-    -64        0        0      -64  omap2plus_defconfig_omap5_only
-   +220        0      -28     +192  rmk_omap3430_ldp_allnoconfig
-   +160        0        0     +160  rmk_omap3430_ldp_oldconfig
-   +236        0      -44     +192  rmk_omap4430_sdp_allnoconfig
- +37686    +1008        0   +38694  rmk_omap4430_sdp_oldconfig
-
-Boot-time memory difference
-(delta in bytes from test_v3.19-rc3 (b1940cd21c0f4abdce101253e860feff547291b0))
-  avail  rsrvd   high  freed  board          kconfig
-  (no differences)
+>  }
+>
+>  /**
+> --
+> 1.9.1
+>
+>
+>
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
