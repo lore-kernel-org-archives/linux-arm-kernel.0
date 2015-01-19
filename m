@@ -1,137 +1,124 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 19 Jan 2015 15:10:24 -0600
-Subject: [PATCH 1/4] ARM: OMAP2+: Add board-generic.c entry for ti81xx
-In-Reply-To: <20150119210544.GG18552@atomide.com>
-References: <1421192272-20754-1-git-send-email-tony@atomide.com>
- <1421192272-20754-2-git-send-email-tony@atomide.com>
- <54B67461.9010402@cogentembedded.com>
- <20150115000713.GV2419@atomide.com>
- <20150119191833.GC18552@atomide.com>
- <20150119204201.GQ20386@saruman>
- <20150119210544.GG18552@atomide.com>
-Message-ID: <20150119211024.GT20386@saruman>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 20 Jan 2015 03:01:42 +0800
+Subject: [PATCH] i2c: drop ancient protection against sysfs refcounting
+ issues
+In-Reply-To: <1421693756-12917-1-git-send-email-wsa@the-dreams.de>
+References: <1421693756-12917-1-git-send-email-wsa@the-dreams.de>
+Message-ID: <20150119190142.GA9451@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 19, 2015 at 01:05:45PM -0800, Tony Lindgren wrote:
-> * Felipe Balbi <balbi@ti.com> [150119 12:46]:
-> > On Mon, Jan 19, 2015 at 11:18:34AM -0800, Tony Lindgren wrote:
-> > > * Tony Lindgren <tony@atomide.com> [150114 16:14]:
-> > > > * Sergei Shtylyov <sergei.shtylyov@cogentembedded.com> [150114 05:54]:
-> > > > > Hello.
-> > > > > 
-> > > > > On 1/14/2015 2:37 AM, Tony Lindgren wrote:
-> > > > > 
-> > > > > >This allows booting ti81xx boards with with when a .dts
-> > > > > 
-> > > > >    So, with, with or when? :-)
-> > > > 
-> > > > Heh thanks will updated to:
-> > > > 
-> > > > This allows booting ti81xx boards when a .dts file
-> > > > is in place.
-> > > 
-> > > This too needs to be in a separate ifdef CONFIG_SOC_TI81XX block
-> > > to avoid make randconfig build errors. Updated patch below.
-> > > 
-> > > Regards,
-> > > 
-> > > Tony
-> > > 
-> > > 8< -----------------
-> > > From: Tony Lindgren <tony@atomide.com>
-> > > Date: Mon, 19 Jan 2015 10:38:07 -0800
-> > > Subject: [PATCH] ARM: OMAP2+: Add board-generic.c entry for ti81xx
-> > > 
-> > > This allows booting ti81xx boards when a .dts file
-> > > is in place.
-> > > 
-> > > Cc: Brian Hutchinson <b.hutchman@gmail.com>
-> > > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > > 
-> > > --- a/arch/arm/mach-omap2/board-generic.c
-> > > +++ b/arch/arm/mach-omap2/board-generic.c
-> > > @@ -142,6 +142,42 @@ DT_MACHINE_START(AM3517_DT, "Generic AM3517 (Flattened Device Tree)")
-> > >  	.dt_compat	= am3517_boards_compat,
-> > >  	.restart	= omap3xxx_restart,
-> > >  MACHINE_END
-> > > +
-> > > +static const char *const ti814x_boards_compat[] __initconst = {
-> > 
-> > should this definition be within that ifdef too ?
+On Mon, Jan 19, 2015 at 07:55:56PM +0100, Wolfram Sang wrote:
+> Back in the days, sysfs seemed to have refcounting issues and subsystems
+> needed a completion to be safe. This is not the case anymore, so I2C can
+> get rid of this code. There is noone else besides I2C doing something
+> like this currently (checked with the attached coccinelle script which
+> checks if a release function exists and if it contains a completion).
 > 
-> Oops yes totally thanks for catching that. Updated patch below.
+> I have been digging through the history of linux.git and
+> linux-history.git and found that e.g. w1 used to have such a mechanism
+> and also simply removed it later.
 > 
-> Regards,
+> Some more info from Greg Kroah-Hartman:
+> "Having that call "wait" for the other release call to happen is really
+> old, as Jean points out, from 2003.  We have "fixed" sysfs since then to
+> detach the files from the devices easier, we used to have some nasy
+> reference count issues in that area."
 > 
-> Tony
+> And some testing from Jean Delvare which matches my results:
+> "However I just tested unloading an i2c bus driver while its adapter's
+> new_device attribute was opened and rmmod returned immediately. So it
+> doesn't look like accessing sysfs attributes actually takes a reference
+> to the underlying i2c_adapter."
 > 
-> 8< -----------------
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Mon, 19 Jan 2015 10:38:07 -0800
-> Subject: [PATCH] ARM: OMAP2+: Add board-generic.c entry for ti81xx
+> Let's get rid of this code before really nobody knows/understands
+> anymore what this was for and if it has a subtle use.
 > 
-> This allows booting ti81xx boards when a .dts file
-> is in place.
+> Reported-by: Pantelis Antoniou <pantelis.antoniou@konsulko.com>
+> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Jean Delvare <jdelvare@suse.de>
+> Cc: Julia Lawall <julia.lawall@lip6.fr>
+> ---
 > 
-> Cc: Brian Hutchinson <b.hutchman@gmail.com>
-
-Reviewed-by: Felipe Balbi <balbi@ti.com>
-
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> Of course, more testing is appreciated. Here is the coccinelle script:
 > 
-> --- a/arch/arm/mach-omap2/board-generic.c
-> +++ b/arch/arm/mach-omap2/board-generic.c
-> @@ -144,6 +144,42 @@ DT_MACHINE_START(AM3517_DT, "Generic AM3517 (Flattened Device Tree)")
->  MACHINE_END
->  #endif
+> ===
+> 
+> @has_type@
+> identifier d_type, rel_f;
+> @@
+> 
+> struct device_type d_type = {
+> 	.release = rel_f,
+> };
+> 
+> @has_device@
+> struct device *d;
+> identifier rel_f, p;
+> @@
+> 
+> (
+> 	p->dev.release = &rel_f;
+> |
+> 	d->release = &rel_f;
+> )
+> 
+> @find_type depends on has_type@
+> identifier has_type.rel_f, d;
+> @@
+> 
+> void rel_f(struct device *d)
+> {
+> 	...
+> *	complete(...);
+> 	...
+> }
+> 
+> @find_device depends on has_device@
+> identifier has_device.rel_f, d;
+> @@
+> 
+> void rel_f(struct device *d)
+> {
+> 	...
+> *	complete(...);
+> 	...
+> }
+> 
+> ===
+> 
+>  drivers/i2c/i2c-core.c | 10 +---------
+>  include/linux/i2c.h    |  1 -
+>  2 files changed, 1 insertion(+), 10 deletions(-)
+> 
+> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+> index 39d25a8cb1ad..15cc5902cf89 100644
+> --- a/drivers/i2c/i2c-core.c
+> +++ b/drivers/i2c/i2c-core.c
+> @@ -41,7 +41,6 @@
+>  #include <linux/of_device.h>
+>  #include <linux/of_irq.h>
+>  #include <linux/clk/clk-conf.h>
+> -#include <linux/completion.h>
+>  #include <linux/hardirq.h>
+>  #include <linux/irqflags.h>
+>  #include <linux/rwsem.h>
+> @@ -1184,8 +1183,7 @@ EXPORT_SYMBOL_GPL(i2c_new_dummy);
 >  
-> +#ifdef CONFIG_SOC_TI81XX
-> +static const char *const ti814x_boards_compat[] __initconst = {
-> +	"ti,dm8148",
-> +	"ti,dm814",
-> +	NULL,
-> +};
-> +
-> +DT_MACHINE_START(TI81XX_DT, "Generic ti814x (Flattened Device Tree)")
-> +	.reserve	= omap_reserve,
-> +	.map_io		= ti81xx_map_io,
-> +	.init_early	= ti814x_init_early,
-> +	.init_machine	= omap_generic_init,
-> +	.init_late	= ti81xx_init_late,
-> +	.init_time	= omap3_gptimer_timer_init,
-> +	.dt_compat	= ti814x_boards_compat,
-> +	.restart	= ti81xx_restart,
-> +MACHINE_END
-> +
-> +static const char *const ti816x_boards_compat[] __initconst = {
-> +	"ti,dm8168",
-> +	"ti,dm816",
-> +	NULL,
-> +};
-> +
-> +DT_MACHINE_START(TI816X_DT, "Generic ti816x (Flattened Device Tree)")
-> +	.reserve	= omap_reserve,
-> +	.map_io		= ti81xx_map_io,
-> +	.init_early	= ti816x_init_early,
-> +	.init_machine	= omap_generic_init,
-> +	.init_late	= ti81xx_init_late,
-> +	.init_time	= omap3_gptimer_timer_init,
-> +	.dt_compat	= ti816x_boards_compat,
-> +	.restart	= ti81xx_restart,
-> +MACHINE_END
-> +#endif
-> +
->  #ifdef CONFIG_SOC_AM33XX
->  static const char *const am33xx_boards_compat[] __initconst = {
->  	"ti,am33xx",
+>  static void i2c_adapter_dev_release(struct device *dev)
+>  {
+> -	struct i2c_adapter *adap = to_i2c_adapter(dev);
+> -	complete(&adap->dev_released);
+> +	/* empty, but the driver core insists we need a release function */
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150119/3d1c8a18/attachment.sig>
+Yeah, it does, but I hate to see this in "real" code as something is
+probably wrong with it if it happens.
+
+Please move the rest of 'i2c_del_adapter' into the release function
+(what was after the wait_for_completion() call), and then all should be
+fine.
+
+thanks,
+
+greg k-h
