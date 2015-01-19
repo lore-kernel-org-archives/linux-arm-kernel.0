@@ -1,76 +1,105 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 19 Jan 2015 19:44:20 +0000
-Subject: [PATCH v6 2/3] i2c: iproc: Add Broadcom iProc I2C Driver
-In-Reply-To: <1421695428-19102-3-git-send-email-rjui@broadcom.com>
-References: <rjui@broadcom.com>
- <1421695428-19102-1-git-send-email-rjui@broadcom.com>
- <1421695428-19102-3-git-send-email-rjui@broadcom.com>
-Message-ID: <20150119194420.GG26493@n2100.arm.linux.org.uk>
+From: riproute@gmail.com (Dan Haab)
+Date: Mon, 19 Jan 2015 12:45:37 -0700
+Subject: [PATCH] ARM: BCM5301X: Add DT for Luxul XWC-1000
+Message-ID: <1421696737-11779-1-git-send-email-riproute@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To see why atomic_t is pure obfuscation:
+From: Dan Haab <dhaab@luxul.com>
 
-typedef struct {
-        int counter;
-} atomic_t;
+Luxul XWC-1000 is a controller device based on BCM4708 SoC. The only
+unusual thing in its DTS file is "ubi" partition on NAND flash.
 
-So, counter is a plain int.
+Signed-off-by: Dan Haab <dhaab@luxul.com>
+---
+As requested, I'm resending this patch including Linux ARM ML.
 
-On Mon, Jan 19, 2015 at 11:23:47AM -0800, Ray Jui wrote:
-> +static irqreturn_t bcm_iproc_i2c_isr(int irq, void *data)
-> +{
-> +	struct bcm_iproc_i2c_dev *iproc_i2c = data;
-> +	u32 status = readl(iproc_i2c->base + IS_OFFSET);
-> +
-> +	status &= ISR_MASK;
-> +
-> +	if (!status)
-> +		return IRQ_NONE;
-> +
-> +	writel(status, iproc_i2c->base + IS_OFFSET);
-> +	atomic_set(&iproc_i2c->xfer_is_done, 1);
+P.S.
+We've successfully tested our device with earlyprintk which you may want to
+enable in the future.
+---
+ arch/arm/boot/dts/Makefile                   |  1 +
+ arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts | 60 ++++++++++++++++++++++++++++
+ 2 files changed, 61 insertions(+)
+ create mode 100644 arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
 
-#define atomic_set(v,i) (((v)->counter) = (i))
-
-So, this is the same as doing:
-
-	iproc_i2c->xfer_is_done.counter = 1;
-
-which is merely setting the 'int' to 1.
-
-> +	time_left = wait_for_completion_timeout(&iproc_i2c->done, time_left);
-> +
-> +	/* disable all interrupts */
-> +	writel(0, iproc_i2c->base + IE_OFFSET);
-> +
-> +	if (!time_left && !atomic_read(&iproc_i2c->xfer_is_done)) {
-
-#define atomic_read(v)  ACCESS_ONCE((v)->counter)
-
-This is practically the same as:
-
-	if (!time_left && !iproc_i2c->xfer_is_done.counter) {
-
-except that this access will be guaranteed to happen just once at this
-location (see ACCESS_ONCE() in include/linux/compiler.h).
-
-However, complete()..wait_for_completion() ensures that there are
-barriers in the way: complete takes a spinlock on the waiter, so the
-write to iproc_i2c->xfer_is_done.counter will be visible by the time
-wait_for_completion() returns, and wait_for_completion() also does.
-The same spinlock is also manipulated by wait_for_completion(), which
-means there's barriers there as well, so it can't cache the value of
-"counter" across that call.
-
-So, the "volatile" access guaranteed by ACCESS_ONCE() isn't even
-needed here.
-
-(It would be needed if you were spinning in a loop, calling no other
-functions - but then you're supposed to use cpu_relax() in that
-circumstance, which has a compiler barrier in it, which ensures that
-it will re-read such a variable each time.)
-
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 2ca4bab..a03afbd 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -57,6 +57,7 @@ dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
+ dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b-plus.dtb
+ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+ 	bcm4708-buffalo-wzr-1750dhp.dtb \
++	bcm4708-luxul-xwc-1000.dtb \
+ 	bcm4708-netgear-r6250.dtb \
+ 	bcm4708-netgear-r6300-v2.dtb \
+ 	bcm47081-asus-rt-n18u.dtb \
+diff --git a/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts b/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
+new file mode 100644
+index 0000000..946c728
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
+@@ -0,0 +1,60 @@
++/*
++ * Broadcom BCM470X / BCM5301X ARM platform code.
++ * DTS for Luxul XWC-1000
++ *
++ * Copyright 2014 Luxul Inc.
++ *
++ * Licensed under the GNU/GPL. See COPYING for details.
++ */
++
++/dts-v1/;
++
++#include "bcm4708.dtsi"
++
++/ {
++	compatible = "luxul,xwc-1000", "brcm,bcm4708";
++	model = "Luxul XWC-1000 (BCM4708)";
++
++	chosen {
++		bootargs = "console=ttyS0,115200";
++	};
++
++	memory {
++		reg = <0x00000000 0x08000000>;
++	};
++
++	axi at 18000000 {
++		nand at 28000 {
++			reg = <0x00028000 0x1000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			partition at 0 {
++				label = "ubi";
++				reg = <0x00000000 0x08000000>;
++			};
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		status {
++			label = "bcm53xx:green:status";
++			gpios = <&chipcommon 0 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "timer";
++		};
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		restart {
++			label = "Reset";
++			linux,code = <KEY_RESTART>;
++			gpios = <&chipcommon 7 GPIO_ACTIVE_LOW>;
++		};
++	};
++};
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+1.8.4.5
