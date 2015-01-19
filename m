@@ -1,65 +1,60 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 19 Jan 2015 23:14:46 +0100
-Subject: [PATCH] bus: mvebu-mbus: fix support of MBus window 13
-In-Reply-To: <1421596214-15924-1-git-send-email-andrew@lunn.ch>
-References: <1419943428-18491-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <1421596214-15924-1-git-send-email-andrew@lunn.ch>
-Message-ID: <20150119221446.GD2938@lunn.ch>
+Date: Mon, 19 Jan 2015 23:25:15 +0100
+Subject: [PATCH 1/6] dt: bindings: update mvebu-mbus DT binding with new
+ compatible properties
+In-Reply-To: <1419943428-18491-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1419943428-18491-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1419943428-18491-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20150119222515.GE2938@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 18, 2015 at 04:50:14PM +0100, Andrew Lunn wrote:
-> On Armada XP, 375 and 38x the MBus window 13 has the remap capability,
-> like windows 0 to 7. However, the mvebu-mbus driver isn't currently
-> taking into account this special case, which means that when window 13
-> is actually used, the remap registers are left to 0, making the device
-> using this MBus window unavailable.
+On Tue, Dec 30, 2014 at 01:43:42PM +0100, Thomas Petazzoni wrote:
+> Contrary to what was originally thought, the Armada 375 and Armada 38x
+> MBus windows hardware block is *not* compatible with the Armada 370,
+> due to a difference in how window 13 is handled. It was rather
+> compatible with the Armada XP MBus hardware block.
 > 
-> As a minimal fix for stable, don't use window 13. A full fix will
-> follow later.
+> However, the DTs for Armada 375 and Armada 38x encode the following
+> compatible string for MBus:
 > 
-> Fixes: fddddb52a6c ("bus: introduce an Marvell EBU MBus driver")
-> Cc: <stable@vger.kernel.org> # v3.10+
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+>   compatible = "marvell,armada375-mbus", "marvell,armada370-mbus", "simple-bus";
+>   compatible = "marvell,armada380-mbus", "marvell,armada370-mbus", "simple-bus";
+> 
+> So, by extending the mvebu-mbus DT binding to also cover the
+> marvell,armada375-mbus and marvell,armada380-mbus compatible strings,
+> we can define a new behavior for those SoCs without changing the DT.
+> 
+> Therefore, this commit adds those two new compatible strings to the DT
+> binding documentation of mvebu-mbus. Note that it re-uses two existing
+> duplicated lines for the armada370-mbus and armadaxp-mbus compatible
+> strings.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Added to mvebu/fixes-3 with Thomas's Reviewed-by:
+Added to mvebu/dt
 
-      Andrew 
+      Andrew
 
 > ---
->  drivers/bus/mvebu-mbus.c | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
+>  Documentation/devicetree/bindings/bus/mvebu-mbus.txt | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-> index eb7682dc123b..81bf297f1034 100644
-> --- a/drivers/bus/mvebu-mbus.c
-> +++ b/drivers/bus/mvebu-mbus.c
-> @@ -210,12 +210,25 @@ static void mvebu_mbus_disable_window(struct mvebu_mbus_state *mbus,
->  }
->  
->  /* Checks whether the given window number is available */
-> +
-> +/* On Armada XP, 375 and 38x the MBus window 13 has the remap
-> + * capability, like windows 0 to 7. However, the mvebu-mbus driver
-> + * isn't currently taking into account this special case, which means
-> + * that when window 13 is actually used, the remap registers are left
-> + * to 0, making the device using this MBus window unavailable. The
-> + * quick fix for stable is to not use window 13. A follow up patch
-> + * will correctly handle this window.
-> +*/
->  static int mvebu_mbus_window_is_free(struct mvebu_mbus_state *mbus,
->  				     const int win)
->  {
->  	void __iomem *addr = mbus->mbuswins_base +
->  		mbus->soc->win_cfg_offset(win);
->  	u32 ctrl = readl(addr + WIN_CTRL_OFF);
-> +
-> +	if (win == 13)
-> +		return false;
-> +
->  	return !(ctrl & WIN_CTRL_ENABLE);
->  }
->  
+> diff --git a/Documentation/devicetree/bindings/bus/mvebu-mbus.txt b/Documentation/devicetree/bindings/bus/mvebu-mbus.txt
+> index 5e16c3c..fa6cde4 100644
+> --- a/Documentation/devicetree/bindings/bus/mvebu-mbus.txt
+> +++ b/Documentation/devicetree/bindings/bus/mvebu-mbus.txt
+> @@ -6,8 +6,8 @@ Required properties:
+>  - compatible:	 Should be set to one of the following:
+>  		 marvell,armada370-mbus
+>  		 marvell,armadaxp-mbus
+> -		 marvell,armada370-mbus
+> -		 marvell,armadaxp-mbus
+> +		 marvell,armada375-mbus
+> +		 marvell,armada380-mbus
+>  		 marvell,kirkwood-mbus
+>  		 marvell,dove-mbus
+>  		 marvell,orion5x-88f5281-mbus
 > -- 
-> 2.1.4
+> 2.1.0
 > 
