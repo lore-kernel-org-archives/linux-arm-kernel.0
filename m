@@ -1,53 +1,82 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 19 Jan 2015 10:32:17 +0100
-Subject: [PATCH v4] ARM: mvebu: remove two selects of ARM_ERRATA_753970
-Message-ID: <1421659937.9655.16.camel@x220>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 19 Jan 2015 18:35:27 +0900
+Subject: [PATCH v4 1/9] devfreq: exynos: Add generic exynos memory bus
+ frequency driver
+In-Reply-To: <27342443.1253691421659213933.JavaMail.weblogic@epmlwas05d>
+References: <27342443.1253691421659213933.JavaMail.weblogic@epmlwas05d>
+Message-ID: <54BCCFDF.5040305@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM_ERRATA_753970 was renamed to PL310_ERRATA_753970 in v3.2, through
-commit fa0ce4035d48 ("ARM: 7162/1: errata: tidy up Kconfig options for
-PL310 errata workarounds"). Still, two selects were added in v3.15 that
-used the previous name. So these selects have always been nops.
+Dear Myungjoo,
 
-It is clear that the intention here was to select PL310_ERRATA_753970.
-But as, apparently, nothing broke for four releases we can assume
-PL310_ERRATA_753970 isn't actually needed. So let's not rename these two
-selects but just drop them instead.
+On 01/19/2015 06:20 PM, MyungJoo Ham wrote:
+>>   
+>>  This patch adds the generic exynos bus frequency driver for memory bus
+>> with DEVFREQ framework. The Samsung Exynos SoCs have the common architecture
+>> for memory bus between DRAM memory and MMC/sub IP in SoC. This driver can
+>> support the memory bus frequency driver for Exynos SoCs.
+>>
+>> Each memory bus block has a clock for memory bus speed and frequency
+>> table which is changed according to the utilization of memory bus on runtime.
+>> And then each memory bus group has the one more memory bus blocks and
+>> OPP table (including frequency and voltage), regulator, devfreq-event
+>> devices.
+>>
+>> There are a little difference about the number of memory bus because each Exynos
+>> SoC have the different sub-IP and different memory bus speed. In spite of this
+>> difference among Exynos SoCs, we can support almost Exynos SoC by adding
+>> unique data of memory bus to devicetree file.
+>>
+>> Cc: Myungjoo Ham <myungjoo.ham@samsung.com>
+>> Cc: Kyungmin Park <kyungmin.park@samsung.com>
+>> Cc: Kukjin Kim <kgene@kernel.org>
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> ---
+>>  drivers/devfreq/Kconfig             |  15 +
+>>  drivers/devfreq/Makefile            |   1 +
+>>  drivers/devfreq/exynos/Makefile     |   1 +
+>>  drivers/devfreq/exynos/exynos-bus.c | 598 ++++++++++++++++++++++++++++++++++++
+>>  4 files changed, 615 insertions(+)
+>>  create mode 100644 drivers/devfreq/exynos/exynos-bus.c
+>>
+> 
+> []
+> 
+>> +static void exynos_bus_exit(struct device *dev)
+>> +{
+>> +	struct exynos_memory_bus *bus = dev_get_drvdata(dev);
+>> +	int i, ret;
+>> +
+>> +	ret = exynos_bus_disable_edev(bus);
+>> +	if (ret < 0)
+>> +		dev_warn(dev, "failed to disable the devfreq-event devices\n");
+>> +
+>> +	for (i = 0; i < bus->block_count; i++)
+>> +		clk_disable_unprepare(bus->block[i].clk);
+>> +
+>> +	if (regulator_is_enabled(bus->regulator))
+>> +		regulator_disable(bus->regulator);
+> 
+> This is_enabled check is itchy.
+> 
+> Why do you need this here?
+> Please let me know what kind of errors here.
+> (note that this may simply hide errors made by other drivers)
+> 
+> Adding this condition does not introduce additional error, but
+> could you please let me know why it is here? This is supposed to be
+> paired with probe.
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-v4: Do no bother anymore to rename these selects. I've tried to do that
-a few times ever since v3.15-rc1 was released. Last time, v3, was in
-https://lkml.org/lkml/2014/9/12/231 . And since the people who
-intruduced this issue apparently aren't bothered by it, neither should
-I. So just do the safe and easy thing, which is removing these two
-selects, as they are nops now.
+The regulator_is_enabled() is not necessary according to your comment.
+I'll remove it.
 
-Done on top of next-20150119.
+> 
+> 
+> Except this point (valid if addressed or {explained and understood}),
+> Acked-by: MyungJoo Ham <myungjoo.ham@samsung.com>
 
- arch/arm/mach-mvebu/Kconfig | 2 --
- 1 file changed, 2 deletions(-)
+Thanks for your review.
 
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index c1e4567a5ab3..e8e5fa25121c 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -37,7 +37,6 @@ config MACH_ARMADA_370
- config MACH_ARMADA_375
- 	bool "Marvell Armada 375 boards" if ARCH_MULTI_V7
- 	select ARM_ERRATA_720789
--	select ARM_ERRATA_753970
- 	select ARM_GIC
- 	select ARMADA_375_CLK
- 	select HAVE_ARM_SCU
-@@ -52,7 +51,6 @@ config MACH_ARMADA_375
- config MACH_ARMADA_38X
- 	bool "Marvell Armada 380/385 boards" if ARCH_MULTI_V7
- 	select ARM_ERRATA_720789
--	select ARM_ERRATA_753970
- 	select ARM_GIC
- 	select ARMADA_38X_CLK
- 	select HAVE_ARM_SCU
--- 
-1.9.3
+Best Regards,
+Chanwoo Choi
