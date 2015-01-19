@@ -1,39 +1,26 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 19 Jan 2015 15:56:42 +0200
-Subject: [PATCH v2 0/5] Generic IOMMU page table framework
-In-Reply-To: <20150119131843.GJ32131@arm.com>
-References: <1420811657-21321-1-git-send-email-will.deacon@arm.com>
- <20150119130940.GJ6343@8bytes.org> <20150119131843.GJ32131@arm.com>
-Message-ID: <2897578.zknPhjxUSB@avalon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 19 Jan 2015 14:56:02 +0100
+Subject: [PATCH 10/10] drivers: PL011: add support for the ARM SBSA
+ generic UART
+In-Reply-To: <54BD0A49.8030107@arm.com>
+References: <1421428986-11300-1-git-send-email-andre.przywara@arm.com>
+ <5407007.ZAjCvvOzus@wuerfel> <54BD0A49.8030107@arm.com>
+Message-ID: <45882386.HAzdnpUX2E@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-On Monday 19 January 2015 13:18:43 Will Deacon wrote:
-> On Mon, Jan 19, 2015 at 01:09:41PM +0000, joro at 8bytes.org wrote:
-> > On Fri, Jan 16, 2015 at 02:01:31PM +0000, Will Deacon wrote:
-> >> I've not received any feedback on this revision of the series, but it's
-> >> working well for me and Laurent showed that it works with his IOMMU too.
-> >> 
-> >> Joerg -- can I include this in my pull request for 3.20, or is there
-> >> anything further you'd like me to address? The code is completely
-> >> self-contained, so I wouldn't expect any impact on IOMMU drivers that
-> >> don't explicitly use the new page table API.
-> > 
-> > The patch-set looks good to me. But with code generification in general,
-> > what are the plans for other arm iommu drivers to adopt this?
+On Monday 19 January 2015 13:44:41 Andre Przywara wrote:
 > 
-> I think Laurent was going to make use of it and I'm working on a driver
-> that will use it too.
+> > Would we be better off documenting that 8-n-1 is the only allowed settting?
+> > I can't think of a reason why anyone would use something else.
 > 
-> Laurent -- you had patches ready to go for v1, right?
+> Reading the spec again I see that 8-bit word len is mandated:
+> "The generic UART uses 8-bit words, equivalent to UARTLCR_H.WLEN == b11."
+> So given this I guess anything other than (8)n1 is pretty useless and
+> wouldn't probably be used anyways. This means that we can get rid of the
+> optional properties altogether and just add "current-speed" to the list
+> of required ones. I am about to implement this.
 
-Yes, and I've rebased them (or actually it, it's a single patch) on v2. I 
-haven't had time to test the result yet, I'll try to do so later tonight or 
-tomorrow.
+Ok, great!
 
--- 
-Regards,
-
-Laurent Pinchart
+	Arnd
