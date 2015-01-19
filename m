@@ -1,33 +1,34 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 19 Jan 2015 13:19:31 +0000
-Subject: [Query] ARM64 : arm_pm_restart intialization
-In-Reply-To: <BLUPR03MB167FE14DFB49FB4251C503F904A0@BLUPR03MB167.namprd03.prod.outlook.com>
- (Pankaj Chauhan's message of "Mon, 19 Jan 2015 12:27:04 +0000")
-References: <BLUPR03MB167FE14DFB49FB4251C503F904A0@BLUPR03MB167.namprd03.prod.outlook.com>
-Message-ID: <87fvb6hpr0.fsf@approximate.cambridge.arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 19 Jan 2015 14:22:32 +0100
+Subject: [PATCH V2 0/8] [media] exynos-gsc: Fixup PM support
+Message-ID: <1421673760-2600-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 19 2015 at 12:27:04 pm GMT, Pankaj Chauhan <Pankaj.Chauhan@freescale.com> wrote:
-> Hello,
->
-> I have a small query regarding machine_restart() for ARM64.
->
-> For both ARM64 and ARM32 machine_restart()
-> (arch/arm*/kernel/process.c) calls arm_pm_restart, for doing machine
-> specific restart. For ARM32 arm_pm_restart, gets initialized by
-> 'machine_desc.restart' provided by each machine/platform
-> implementation.
->
-> For ARM64 how are different platforms supposed to initialize
-> arm_pm_restart pointer?  (As there is no struct machine_desc defined
-> for ARM64). Is there a framework similar to machine_desc for setting
-> up the restart handlers?
+Changes in v2:
+	- Rebase patches.
+	- Adapt to changes for the PM core. Especially, the Kconfig option for
+	  CONFIG_PM_RUNTIME has been removed and the runtime PM core is now
+	  build for CONFIG_PM.
 
-Have a look at the stuff implemented in drivers/power/reset. The main
-idea is to use a restart notifier, which works for both 32 and 64bit
-kernels.
+This patchset fixup the PM support and adds some minor improvements to
+potentially save some more power at runtime PM suspend.
 
-	M.
+
+Ulf Hansson (8):
+  [media] exynos-gsc: Simplify clock management
+  [media] exynos-gsc: Convert gsc_m2m_resume() from int to void
+  [media] exynos-gsc: Make driver functional when CONFIG_PM is unset
+  [media] exynos-gsc: Make runtime PM callbacks available for CONFIG_PM
+  [media] exynos-gsc: Fixup clock management at ->remove()
+  [media] exynos-gsc: Do full clock gating at runtime PM suspend
+  [media] exynos-gsc: Make system PM callbacks available for
+    CONFIG_PM_SLEEP
+  [media] exynos-gsc: Simplify system PM
+
+ drivers/media/platform/exynos-gsc/gsc-core.c | 183 +++++++++++----------------
+ drivers/media/platform/exynos-gsc/gsc-core.h |   3 -
+ 2 files changed, 72 insertions(+), 114 deletions(-)
+
 -- 
-Jazz is not dead. It just smells funny.
+1.9.1
