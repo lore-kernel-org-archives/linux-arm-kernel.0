@@ -1,95 +1,63 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 19 Jan 2015 14:35:41 +0100
-Subject: [PATCH] ARM: dts: sun4i: Add simplefb node with
- de_fe0-de_be0-lcd0-hdmi pipeline
-In-Reply-To: <20150119132002.GD4367@lukather>
-References: <1421672477-12978-1-git-send-email-hdegoede@redhat.com>
- <1421672477-12978-2-git-send-email-hdegoede@redhat.com>
- <20150119132002.GD4367@lukather>
-Message-ID: <54BD082D.6030905@redhat.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 19 Jan 2015 14:36:38 +0100
+Subject: [PATCH v6 8/8] arm: dma-mapping: plumb our iommu mapping ops
+ into arch_setup_dma_ops
+In-Reply-To: <20150119125051.GI32131@arm.com>
+References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
+ <2804479.ZFl06ysk3j@avalon> <54BB58AA.5070407@nvidia.com>
+ <5043167.LEiljZnGai@avalon> <20150119124305.GC7312@ulmo.nvidia.com>
+ <20150119125051.GI32131@arm.com>
+Message-ID: <20150119133633.GA23778@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jan 19, 2015 at 12:50:52PM +0000, Will Deacon wrote:
+> On Mon, Jan 19, 2015 at 12:43:06PM +0000, Thierry Reding wrote:
+> > On Sun, Jan 18, 2015 at 01:18:51PM +0200, Laurent Pinchart wrote:
+> > > On Sunday 18 January 2015 15:54:34 Alexandre Courbot wrote:
+> > > > On 01/16/2015 08:18 AM, Laurent Pinchart wrote:
+> > [...]
+> > > > > The second way is to implement a mechanism to let drivers signal that they
+> > > > > want to handle DMA mappings themselves. As the mappings need in the
+> > > > > general case to be created before the probe function  is called
+> > > > 
+> > > > Sorry for being ignorant here, but why is that?
+> > > 
+> > > Because a driver can call the DMA mapping API in its probe function, to 
+> > > allocate DMA coherent memory for instance. We need to ensure that the DMA 
+> > > mapping IOMMU has set up the required IOMMU ops by that time. As explained 
+> > > above I don't like the idea of sprinkling explicit calls to initialize IOMMU 
+> > > support in the vast majority of drivers, especially when they shouldn't be 
+> > > IOMMU-aware, so we then need to initialize everything that is needed before 
+> > > the first call to the DMA mapping API.
+> > 
+> > The original patch that Hiroshi posted based on my comments was to have
+> > the driver core call iommu_attach(), which would then set up everything
+> > needed right before calling into the driver's ->probe(). This works
+> > quite nicely because by definition the driver can't allocate any DMA
+> > before ->probe(). And, like you said, this allows deferred probe to be
+> > used.
+> > 
+> > To me it's so obviously the right solution that I remain flabbergasted
+> > with how much resistance it's received (or how much it's being ignored).
+> 
+> Have you considered reposting the patches based on what we currently have
+> (which has the advantage of identifying a specific IOMMU instance)?
 
-On 19-01-15 14:20, Maxime Ripard wrote:
-> Hi Hans,
->
-> On Mon, Jan 19, 2015 at 02:01:17PM +0100, Hans de Goede wrote:
->> Testing has shown that on sun4i the display backend engine does not have
->> deep enough fifo-s causing flickering / tearing in full-hd mode due to
->> fifo underruns. This can be avoided by letting the display frontend engine
->> do the dma from memory, and then letting it feed the data directly into
->> the backend unmodified, as the frontend does have deep enough fifo-s.
->>
->> Note since u-boot-v2015.01 has been released using the de_be0-lcd0-hdmi
->> pipeline on sun4i, we need to keep that one around too (unfortunately).
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>   arch/arm/boot/dts/sun4i-a10.dtsi | 8 ++++++++
->>   1 file changed, 8 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
->> index f5e35b5..ccd60e3 100644
->> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
->> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
->> @@ -44,6 +44,14 @@
->>   				 <&ahb_gates 44>;
->>   			status = "disabled";
->>   		};
->> +
->> +		framebuffer at 1 {
->> +			compatible = "allwinner,simple-framebuffer", "simple-framebuffer";
->> +			allwinner,pipeline = "de_fe0-de_be0-lcd0-hdmi";
->> +			clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 43>,
->> +				 <&ahb_gates 44>, <&ahb_gates 46>;
->> +			status = "disabled";
->> +		};
->
-> Thanks for this.
->
-> I do have a question though, maybe I'm missing something, but what
-> would prevent us from using the existing node already? The output
-> pipeline seems to be the same, at least for which output we
-> use. Wether we use or not the display frontend looks like an
-> implementation detail.
+No, I hadn't. Initially my patches included a solution for identifying
+individual IOMMU instances, too. There was a small registry with a list
+of struct iommus. That was supposed to get used to store per-instance
+data (by being embedded in a driver-specific structure). I'd need to
+look in more detail how that could be done with the infrastructure that
+your patchset creates. I'm somewhat burried below other tasks right now
+so don't expect to have any time to look into this anytime before -rc6
+or -rc7 at the earliest.
 
-The purpose of having a node per pipeline is to have the rights clocks
-listed for the pipeline chosen. So the "de_fe0-de_be0-lcd0-hdmi" node
-has one ahb_gates entry more so as to make sure the kernel does not gate
-off the frontend.
-
-The idea of having different nodes per pipeline is that when we get
-support for more module clocks in place, as a preparation for kms
-support, we can add the module clocks to the relevant nodes, to also
-ensure the module clocks will not get turned off.
-
-By having this info in the dtb, rather then in u-boot we can update
-the clocks list as we add new clock nodes in the dtb, ensuring that
-an older u-boot will keep working as we add support for module
-clocks, etc.
-
-> That or just having several strings in allwinner,pipeline.
->
-> If this simplefb binding is just going to be a collection of all the
-> various combinations we have, plus the legacy options, I'm a bit
-> worried that this is just going to be a hell to maintain, without any
-> way to remove it at compile time (if such feature is ever merged in
-> DTC).
-
-I can understand where you're coming from, I wish I could say there
-will be no more surprises / additions, but I don't want to make
-promises I cannot keep. I do not see u-boot adding support for multiple
-displays anytime soon, so things should stay limited to 3 nodes (one for
-hdmi, lcd and vga each) or 2 nodes on socs without hdmi.
-
-Except on sun4i where we need 2 for hdmi for compat reasons for a total
-of 4.
-
-But my crystal ball is defunct, so I cannot promise things will stay
-limited to this.
-
-Regards,
-
-Hans
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150119/aa153d5a/attachment.sig>
