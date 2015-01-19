@@ -1,49 +1,38 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Mon, 19 Jan 2015 23:57:00 +0900
-Subject: [PATCH v2] arm64: Add dtb files to archclean rule
-Message-ID: <9C1EA6B5-CCD0-4D1A-B71C-1233F2A7BEA3@gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 19 Jan 2015 16:00:11 +0100
+Subject: [RFC 01/11] i2c: add quirk structure to describe adapter flaws
+In-Reply-To: <1421396295.11671.50.camel@mtksdaap41>
+References: <1420824103-24169-1-git-send-email-wsa@the-dreams.de>
+ <1420824103-24169-2-git-send-email-wsa@the-dreams.de>
+ <1421396295.11671.50.camel@mtksdaap41>
+Message-ID: <20150119150010.GA3820@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As dts files have been reorganised under vendor subdirs, dtb files
-cannot be removed with "make distclean" now. Thus, this patch moves
-dtb files under archclean rule and removes unnecessary entries.
+Hi,
 
-Cc: Robert Richter <rrichter@cavium.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Jungseok Lee <jungseoklee85@gmail.com>
----
-Changes [v1 -> v2]:
-- Remove unnecessary entries from arch/arm64/boot/dts/Makefile
-  per Will's comment
+> This can describe the behavior of our current upstream driver[1], which
+> only support combine write-then-read.
+> 
+> After checking with Xudong & HW guys, it seems our HW can do more. 
+> On MT8135, it can support at most 2 messages, no matter read or write,
+> with the limitation that the length of the second message must <=
+> 31bytes.
+> 
+> So this RFC is enough for our driver, but it would be better if we could
+> also support other case.
 
- arch/arm64/Makefile          | 1 +
- arch/arm64/boot/dts/Makefile | 2 --
- 2 files changed, 1 insertion(+), 2 deletions(-)
+Hmm, I think we can convert max_comb_{read|write}_len to
+max_comb_{1st|2nd}_msg_len or similar.
 
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 1c43cec..0666888 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -85,6 +85,7 @@ vdso_install:
- # We use MRPROPER_FILES and CLEAN_FILES now
- archclean:
- 	$(Q)$(MAKE) $(clean)=$(boot)
-+	$(Q)$(MAKE) $(clean)=$(boot)/dts
- 
- define archhelp
-   echo  '* Image.gz      - Compressed kernel image (arch/$(ARCH)/boot/Image.gz)'
-diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-index 3b8d427..c62b0f4 100644
---- a/arch/arm64/boot/dts/Makefile
-+++ b/arch/arm64/boot/dts/Makefile
-@@ -3,6 +3,4 @@ dts-dirs += apm
- dts-dirs += arm
- dts-dirs += cavium
- 
--always		:= $(dtb-y)
- subdir-y	:= $(dts-dirs)
--clean-files	:= *.dtb
--- 
-1.9.1
+I'll check but it will probably not before next week.
+
+Thanks for the input!
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150119/033f350b/attachment.sig>
