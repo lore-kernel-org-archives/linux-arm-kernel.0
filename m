@@ -1,134 +1,94 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 19 Jan 2015 15:17:03 +0100
-Subject: [linux-sunxi] [PATCH v2 04/13] rc: sunxi-cir: Add support for
- an optional reset controller
-In-Reply-To: <CAGb2v676uRnKRNbBLPvcW4oTVzjWnNbVUTtw=DLoDyr2vn3Dgw@mail.gmail.com>
-References: <1418836704-15689-1-git-send-email-hdegoede@redhat.com>
- <1418836704-15689-5-git-send-email-hdegoede@redhat.com>
- <CAGb2v65BW7NABQXK877DkMNqDdBeuZ55wQHFkTexbWACFC4zFA@mail.gmail.com>
- <54929552.8090707@redhat.com> <20141219181708.GQ4820@lukather>
- <54954D5B.2020904@redhat.com>
- <CAGb2v676uRnKRNbBLPvcW4oTVzjWnNbVUTtw=DLoDyr2vn3Dgw@mail.gmail.com>
-Message-ID: <54BD11DF.1020907@redhat.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 19 Jan 2015 14:22:53 +0000
+Subject: [PATCH v7 04/17] ARM64 / ACPI: Introduce early_param for "acpi"
+ and pass acpi=force to enable ACPI
+In-Reply-To: <CAKv+Gu_KmJOHM5-QHQFHc5eDtUMQjmf=7jD4+e32aq0JerTcLg@mail.gmail.com>
+References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
+ <1421247905-3749-5-git-send-email-hanjun.guo@linaro.org>
+ <20150119114255.GF11835@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu8vPKAdsNg7QC7xW+i8_BemWEx4mvBx6NrnAHi8Y+bNtw@mail.gmail.com>
+ <20150119135144.GI11835@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu_KmJOHM5-QHQFHc5eDtUMQjmf=7jD4+e32aq0JerTcLg@mail.gmail.com>
+Message-ID: <20150119142253.GJ11835@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jan 19, 2015 at 02:00:24PM +0000, Ard Biesheuvel wrote:
+> On 19 January 2015 at 13:51, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Mon, Jan 19, 2015 at 11:55:32AM +0000, Ard Biesheuvel wrote:
+> >> On 19 January 2015 at 11:42, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> >> > On Wed, Jan 14, 2015 at 03:04:52PM +0000, Hanjun Guo wrote:
+> >> >> From: Al Stone <al.stone@linaro.org>
+> >> >>
+> >> >> Introduce one early parameters "off" and "force" for "acpi", acpi=off
+> >> >> will be the default behavior for ARM64, so introduce acpi=force to
+> >> >> enable ACPI on ARM64.
+> >> >>
+> >> >> Disable ACPI before early parameters parsed, and enable it to pass
+> >> >> "acpi=force" if people want use ACPI on ARM64. This ensures DT be
+> >> >> the prefer one if ACPI table and DT both are provided at this moment.
+> >> > [...]
+> >> >> --- a/arch/arm64/kernel/setup.c
+> >> >> +++ b/arch/arm64/kernel/setup.c
+> >> >> @@ -62,6 +62,7 @@
+> >> >>  #include <asm/memblock.h>
+> >> >>  #include <asm/psci.h>
+> >> >>  #include <asm/efi.h>
+> >> >> +#include <asm/acpi.h>
+> >> >>
+> >> >>  unsigned int processor_id;
+> >> >>  EXPORT_SYMBOL(processor_id);
+> >> >> @@ -388,6 +389,8 @@ void __init setup_arch(char **cmdline_p)
+> >> >>       early_fixmap_init();
+> >> >>       early_ioremap_init();
+> >> >>
+> >> >> +     disable_acpi();
+> >> >> +
+> >> >>       parse_early_param();
+> >> >>
+> >> >>       /*
+> >> >
+> >> > Did we get to any conclusion here? DT being the preferred one is fine
+> >> > when both DT and ACPI are present but do we still want the kernel to
+> >> > ignore ACPI altogether if DT is not present? It's a bit harder to detect
+> >> > the presence of DT at this point since the EFI_STUB added one already. I
+> >> > guess we could move the "acpi=force" argument passing to EFI_STUB if no
+> >> > DT is present at boot.
+> >>
+> >> Since the EFI stub populates the /chosen node in DT, I would prefer
+> >> for it to add a property there to indicate whether it created the DT
+> >> from scratch rather than adding ACPI specific stuff in there (even if
+> >> it is just a string to concatenate)
+> >
+> > This works for me. So we could pass "acpi=force" in EFI stub if it
+> > created the DT from scratch *and* ACPI tables are present (can it detect
+> > the latter? And maybe it could print something if none are available).
+> > If that works, the actual kernel can assume that ACPI needs to be
+> > explicitly enabled via acpi=force, irrespective of how much information
+> > it has in DT.
+> 
+> Erm, that is not at all what I meant. What I meant was, that if it is
+> interesting to the kernel proper to know whether the DT was created
+> from scratch by the stub rather than received from the firmware, we
+> can record that particular fact in the /chosen node, and nothing else.
+> How this is interpreted is up to the kernel proper entirely.
 
-On 19-01-15 15:10, Chen-Yu Tsai wrote:
-> Hi,
->
-> On Sat, Dec 20, 2014 at 6:20 PM, Hans de Goede <hdegoede@redhat.com> wrote:
->> Hi,
->>
->>
->> On 19-12-14 19:17, Maxime Ripard wrote:
->>>
->>> Hi,
->>>
->>> On Thu, Dec 18, 2014 at 09:50:26AM +0100, Hans de Goede wrote:
->>>>
->>>> Hi,
->>>>
->>>> On 18-12-14 03:48, Chen-Yu Tsai wrote:
->>>>>
->>>>> Hi,
->>>>>
->>>>> On Thu, Dec 18, 2014 at 1:18 AM, Hans de Goede <hdegoede@redhat.com>
->>>>> wrote:
->>>>>>
->>>>>> On sun6i the cir block is attached to the reset controller, add support
->>>>>> for de-asserting the reset if a reset controller is specified in dt.
->>>>>>
->>>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>>>>> Acked-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
->>>>>> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->>>>>> ---
->>>>>>    .../devicetree/bindings/media/sunxi-ir.txt         |  2 ++
->>>>>>    drivers/media/rc/sunxi-cir.c                       | 25
->>>>>> ++++++++++++++++++++--
->>>>>>    2 files changed, 25 insertions(+), 2 deletions(-)
->>>>>>
->>>>>> diff --git a/Documentation/devicetree/bindings/media/sunxi-ir.txt
->>>>>> b/Documentation/devicetree/bindings/media/sunxi-ir.txt
->>>>>> index 23dd5ad..6b70b9b 100644
->>>>>> --- a/Documentation/devicetree/bindings/media/sunxi-ir.txt
->>>>>> +++ b/Documentation/devicetree/bindings/media/sunxi-ir.txt
->>>>>> @@ -10,6 +10,7 @@ Required properties:
->>>>>>
->>>>>>    Optional properties:
->>>>>>    - linux,rc-map-name : Remote control map name.
->>>>>> +- resets : phandle + reset specifier pair
->>>>>
->>>>>
->>>>> Should it be optional? Or should we use a sun6i compatible with
->>>>> a mandatory reset phandle? I mean, the driver/hardware is not
->>>>> going to work with the reset missing on sun6i.
->>>>>
->>>>> Seems we are doing it one way for some of our drivers, and
->>>>> the other (optional) way for more generic ones, like USB.
->>>>
->>>>
->>>> I do not believe that we should add a new compatible just because
->>>> the reset line of a block is hooked up differently. It is the
->>>> exact same ip-block. Only now the reset is not controlled
->>>> through the apb-gate, but controlled separately.
->>>
->>>
->>> He has a point though. Your driver might very well probe nicely and
->>> everything, but still wouldn't be functional at all because the reset
->>> line wouldn't have been specified in the DT.
->>
->>
->> Right, just like other drivers we've, see e.g.:
->>
->> Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
->>
->> Which is dealing with this in the same way.
->>
->>> The easiest way to deal with that would be in the bindings doc to
->>> update it with a compatible for the A31, and mentionning that the
->>> reset property is mandatory there.
->>
->>
->> No the easiest way to deal with this is to expect people writing
->> the dts to know what they are doing, just like we do for a lot
->> of the other blocks in sun6i.
->>
->> Maybe put a generic note somewhere that sun6i has a reset controller,
->> and that for all the blocks with optional resets property it should
->> be considered mandatory on sun6i ?
->>
->> I'm sorry but I'm not going to make this change for the ir bindings
->> given that we've the same situation in a lot of other places.
->>
->> Consistency is important. Moreover I believe that having a sun6i
->> specific compatible string is just wrong, since it is the exact
->> same hardware block as on sun5i, just with its reset line routed
->> differently, just like e.g. the mmc controller, the uarts or the gmac
->> all of which also do not have a sun6i specific compatible to enforce
->> reset controller usage.
->>
->> Regards,
->>
->> Hans
->>
->>
->>
->>
->>> Note that the code itself might not change at all though. I'd just
->>> like to avoid any potential breaking of the DT bindings themselves. If
->>> we further want to refine the code, we can do that however we want.
->>>
->>> I have a slight preference for a clean error if reset is missing, but
->>> I won't get in the way just for that.
->
-> Seems this patch and the following patch were overlooked after the
-> discussion. Any chance we could get this in?
+That works as well and I agree with you that splitting the decision
+between EFI stub and the kernel could cause trouble.
 
-I'm a linux/media sub-maintainer, so I've already send a pull-req for
-these 2 to the linux/media maintainer, iow this is taken care of :)
+Basically what we need is to know whether DT has platform description or
+just the chosen node. There could be many ways to achieve this but EFI
+stub passing such information is a good place (and acpi=force went a bit
+too far ;)).
 
-Regards,
+> Note that the stub may outlive many subsequent kexec reboots, so
+> dividing policy like this across the stub/kernel boundary is asking
+> for trouble imo. For instance, booting with a DT via kexec would be
+> impossible unless we add special handling for this case, which is
+> exactly what I tried to avoid with my latest virtmap series.
 
-Hans
+I haven't paid much attention to the kexec series yet but I assume a
+kexec'ed kernel doesn't go through EFI stub again.
+
+-- 
+Catalin
