@@ -1,36 +1,29 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 19 Jan 2015 11:33:15 +0100
-Subject: [PATCH v3 3/3] MAINTAINERS: add maintainer for pinctrl-at91
-In-Reply-To: <1421422267-2934-4-git-send-email-ludovic.desroches@atmel.com>
-References: <1421422267-2934-1-git-send-email-ludovic.desroches@atmel.com>
- <1421422267-2934-4-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <54BCDD6B.3010201@atmel.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Mon, 19 Jan 2015 11:34:21 +0100
+Subject: [PATCH 1/2] pinctrl: at91: allow disabled gpio controllers
+In-Reply-To: <CACRpkdZ0X_9TX_R7OJJxNynBq0gZd8i_iUE11VXtiKSN+uqpmQ@mail.gmail.com>
+References: <1417193367-12422-1-git-send-email-ludovic.desroches@atmel.com>
+ <20150114204512.GB14457@ns203013.ovh.net>
+ <CACRpkdZ0X_9TX_R7OJJxNynBq0gZd8i_iUE11VXtiKSN+uqpmQ@mail.gmail.com>
+Message-ID: <20150119103421.GC19014@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 16/01/2015 16:31, Ludovic Desroches a ?crit :
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> ---
->  MAINTAINERS | 1 +
->  1 file changed, 1 insertion(+)
+On Mon, Jan 19, 2015 at 11:16:30AM +0100, Linus Walleij wrote:
+> On Wed, Jan 14, 2015 at 9:45 PM, Jean-Christophe PLAGNIOL-VILLARD
+> <plagnioj@jcrosoft.com> wrote:
 > 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 3589d67..455630d 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -7406,6 +7406,7 @@ F:	include/linux/pinctrl/
->  
->  PIN CONTROLLER - ATMEL AT91
->  M:	Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> +M:	Ludovic Desroches <ludovic.desroches@atmel.com>
->  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->  S:	Maintained
->  F:	drivers/pinctrl/pinctrl-at91.*
+> > attached a patch we the idea how to handle the current issue
+> > only compiled not tested (too late here)
+> 
+> Ludovic have you tested Jean-Christophe's patch?
+> 
+> Does it solve the boot issue?
 
-Yes, as I've just said for the v2 of this series:
+Yes I have tested it. I have send a new version since it doesn't totally
+solved the boot issue. It corrects some potential problems I have missed
+but there is still an error in the pinctrl probe.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Regards
 
-Thanks, bye,
--- 
-Nicolas Ferre
+Ludovic
