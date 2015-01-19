@@ -1,103 +1,266 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 19 Jan 2015 11:12:02 +0000
-Subject: [PATCH v6 8/8] arm: dma-mapping: plumb our iommu mapping ops
- into arch_setup_dma_ops
-In-Reply-To: <5043167.LEiljZnGai@avalon>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <2804479.ZFl06ysk3j@avalon> <54BB58AA.5070407@nvidia.com>
- <5043167.LEiljZnGai@avalon>
-Message-ID: <20150119111202.GD32131@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 19 Jan 2015 11:12:46 +0000
+Subject: [PATCH v4 14/21] ARM: imx6: convert GPC to stacked domains
+In-Reply-To: <1421664450.3388.14.camel@pengutronix.de>
+References: <1421660655-21394-1-git-send-email-marc.zyngier@arm.com>	
+ <1421660655-21394-15-git-send-email-marc.zyngier@arm.com>
+ <1421664450.3388.14.camel@pengutronix.de>
+Message-ID: <54BCE6AE.4020908@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 18, 2015 at 11:18:51AM +0000, Laurent Pinchart wrote:
-> On Sunday 18 January 2015 15:54:34 Alexandre Courbot wrote:
-> > On 01/16/2015 08:18 AM, Laurent Pinchart wrote:
-> > > On Thursday 15 January 2015 11:12:17 Will Deacon wrote:
-> > >> On Thu, Jan 15, 2015 at 08:28:44AM +0000, Thierry Reding wrote:
-> > >>> On Wed, Jan 14, 2015 at 10:46:10AM +0000, Will Deacon wrote:
-> > >>>> On Wed, Jan 14, 2015 at 09:00:24AM +0000, Alexandre Courbot wrote:
-> > >>> [...]
-> > >>> 
-> > >>>>> 2) Say you want to use the IOMMU API in your driver, and have an iommu
-> > >>>>> property in your device's DT node. If by chance your IOMMU is
-> > >>>>> registered early, you will already have a mapping automatically
-> > >>>>> created even before your probe function is called. Can this be
-> > >>>>> avoided? Is it even safe?
-> > >>>> 
-> > >>>> Currently, I think you have to either teardown the ops manually or
-> > >>>> return an error from of_xlate. Thierry was also looking at this sort of
-> > >>>> thing, so it might be worth talking to him.
-> > >>> 
-> > >>> I already explained in earlier threads why I think this is a bad idea.
-> > >>> It's completely unnatural for any driver to manually tear down something
-> > >>> that it didn't want set up in the first place. It also means that you
-> > >>> have to carefully audit any users of these IOMMU APIs to make sure that
-> > >>> they do tear down. That doesn't sound like a good incremental approach,
-> > >>> as evidenced by the breakage that Alex and Heiko have encountered.
-> > >> 
-> > >> Well, perhaps we hide that behind a get_iommu API or something. We *do*
-> > >> need this manual teardown step to support things like VFIO, so it makes
-> > >> sense to reuse it for other users too imo.
-> > >> 
-> > >>> The solution for me has been to completely side-step the issue and not
-> > >>> register the IOMMU with the new mechanism at all. That is, there's no
-> > >>> .of_xlate() implementation, which means that the ARM DMA API glue won't
-> > >>> try to be smart and use the IOMMU in ways it's not meant to be used.
-> > > 
-> > > That will break when someone will want to use the same IOMMU type for
-> > > devices that use the DMA mapping API to hide the IOMMU. That might not be
-> > > the case for your IOMMU today, but it's pretty fragile, we need to fix
-> > > it.
-> > > 
-> > >>> This has several advantages, such as that I can also use the regular
-> > >>> driver model for suspend/resume of the IOMMU, and I get to enjoy the
-> > >>> benefits of devres in the IOMMU driver. Probe ordering is still a tiny
-> > >>> issue, but we can easily solve that using explicit initcall ordering
-> > >>> (which really isn't any worse than IOMMU_OF_DECLARE()).
-> > >> 
-> > >> That's a pity. I'd much rather extend what we currently have to satisfy
-> > >> your use-case. Ho-hum.
-> > > 
-> > > Assuming we want the IOMMU to be handled transparently for the majority of
-> > > devices I only see two ways to fix this,
-> > > 
-> > > The first way is to create a default DMA mapping unconditionally and let
-> > > drivers that can't live with it tear it down. That's what is implemented
-> > > today.
-> > 
-> > I strongly support Thierry's point that drivers should not have to tear
-> > down things they don't need. The issue we are facing today is a very
-> > good illustration of why one should not have to do this.
-> > 
-> > Everybody hates to receive unsollicited email with a link that says "to
-> > unsubscribe, click here". Let's not import that unpleasant culture into
-> > the kernel.
-> > 
-> > I am arriving late in this discussion, but what is wrong with asking
-> > drivers to explicitly state that they want the DMA API to be backed by
-> > the IOMMU instead of forcibly making it work that way?
+On 19/01/15 10:47, Lucas Stach wrote:
+> Am Montag, den 19.01.2015, 09:44 +0000 schrieb Marc Zyngier:
+>> IMX6 has been (ab)using the gic_arch_extn to provide
+>> wakeup from suspend, and it makes a lot of sense to convert
+>> this code to use stacked domains instead.
+>>
+>> This patch does just this, updating the DT files to actually
+>> reflect what the HW provides.
+>>
+>> BIG FAT WARNING: because the DTs were so far lying by not
+>> exposing the fact that the GPC block is actually the first
+>> interrupt controller in the chain, kernels with this patch
+>> applied wont have any suspend-resume facility when booted
+>> with old DTs, and old kernels with updated DTs won't even boot.
+>>
+>> Tested-by: Stefan Agner <stefan@agner.ch>
+>> Acked-by: Stefan Agner <stefan@agner.ch>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm/boot/dts/imx6qdl.dtsi  |   7 ++-
+>>  arch/arm/boot/dts/imx6sl.dtsi   |   6 +-
+>>  arch/arm/boot/dts/imx6sx.dtsi   |   6 +-
+>>  arch/arm/mach-imx/common.h      |   1 -
+>>  arch/arm/mach-imx/gpc.c         | 127 ++++++++++++++++++++++++++++++++--------
+>>  arch/arm/mach-imx/mach-imx6q.c  |   1 -
+>>  arch/arm/mach-imx/mach-imx6sl.c |   1 -
+>>  arch/arm/mach-imx/mach-imx6sx.c |   1 -
+>>  8 files changed, 119 insertions(+), 31 deletions(-)
+>>
+> [...]
 > 
-> The vast majority of the drivers are not IOMMU-aware. We would thus need to 
-> add a call at the beginning of the probe function of nearly every driver that 
-> can perform DMA to state that the driver doesn't need to handle any IOMMU that 
-> might be present in the system itself. I don't think that's a better solution.
+>> --- a/arch/arm/mach-imx/common.h
+>> +++ b/arch/arm/mach-imx/common.h
+>> @@ -102,7 +102,6 @@ static inline void imx_scu_map_io(void) {}
+>>  static inline void imx_smp_prepare(void) {}
+>>  #endif
+>>  void imx_src_init(void);
+>> -void imx_gpc_init(void);
+>>  void imx_gpc_pre_suspend(bool arm_power_off);
+>>  void imx_gpc_post_resume(void);
+>>  void imx_gpc_mask_all(void);
+>> diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
+>> index 5f3602e..838da3c 100644
+>> --- a/arch/arm/mach-imx/gpc.c
+>> +++ b/arch/arm/mach-imx/gpc.c
+>> @@ -22,6 +22,7 @@
+>>  #define GPC_PGC_CPU_PDN		0x2a0
+>>  
+>>  #define IMR_NUM			4
+>> +#define GPC_MAX_IRQS		(IMR_NUM * 32)
+>>  
+>>  static void __iomem *gpc_base;
+>>  static u32 gpc_wake_irqs[IMR_NUM];
+>> @@ -56,17 +57,17 @@ void imx_gpc_post_resume(void)
+>>  
+>>  static int imx_gpc_irq_set_wake(struct irq_data *d, unsigned int on)
+>>  {
+>> -	unsigned int idx = d->hwirq / 32 - 1;
+>> +	unsigned int idx = d->hwirq / 32;
+>>  	u32 mask;
+>>  
+>> -	/* Sanity check for SPI irq */
+>> -	if (d->hwirq < 32)
+>> -		return -EINVAL;
+>> -
+>>  	mask = 1 << d->hwirq % 32;
+>>  	gpc_wake_irqs[idx] = on ? gpc_wake_irqs[idx] | mask :
+>>  				  gpc_wake_irqs[idx] & ~mask;
+>>  
+>> +	/*
+>> +	 * Do *not* call into the parent, as the GIC doesn't have any
+>> +	 * wake-up facility...
+>> +	 */
+>>  	return 0;
+>>  }
+>>  
+>> @@ -96,7 +97,7 @@ void imx_gpc_hwirq_unmask(unsigned int hwirq)
+>>  	void __iomem *reg;
+>>  	u32 val;
+>>  
+>> -	reg = gpc_base + GPC_IMR1 + (hwirq / 32 - 1) * 4;
+>> +	reg = gpc_base + GPC_IMR1 + hwirq / 32 * 4;
+>>  	val = readl_relaxed(reg);
+>>  	val &= ~(1 << hwirq % 32);
+>>  	writel_relaxed(val, reg);
+>> @@ -107,7 +108,7 @@ void imx_gpc_hwirq_mask(unsigned int hwirq)
+>>  	void __iomem *reg;
+>>  	u32 val;
+>>  
+>> -	reg = gpc_base + GPC_IMR1 + (hwirq / 32 - 1) * 4;
+>> +	reg = gpc_base + GPC_IMR1 + hwirq / 32 * 4;
+>>  	val = readl_relaxed(reg);
+>>  	val |= 1 << (hwirq % 32);
+>>  	writel_relaxed(val, reg);
+>> @@ -115,37 +116,115 @@ void imx_gpc_hwirq_mask(unsigned int hwirq)
+>>  
+>>  static void imx_gpc_irq_unmask(struct irq_data *d)
+>>  {
+>> -	/* Sanity check for SPI irq */
+>> -	if (d->hwirq < 32)
+>> -		return;
+>> -
+>>  	imx_gpc_hwirq_unmask(d->hwirq);
+>> +	irq_chip_unmask_parent(d);
+>>  }
+>>  
+>>  static void imx_gpc_irq_mask(struct irq_data *d)
+>>  {
+>> -	/* Sanity check for SPI irq */
+>> -	if (d->hwirq < 32)
+>> -		return;
+>> -
+>>  	imx_gpc_hwirq_mask(d->hwirq);
+>> +	irq_chip_mask_parent(d);
+>> +}
+>> +
+>> +static struct irq_chip imx_gpc_chip = {
+>> +	.name		= "GPC",
+>> +	.irq_eoi	= irq_chip_eoi_parent,
+>> +	.irq_mask	= imx_gpc_irq_mask,
+>> +	.irq_unmask	= imx_gpc_irq_unmask,
+>> +	.irq_retrigger	= irq_chip_retrigger_hierarchy,
+>> +	.irq_set_wake	= imx_gpc_irq_set_wake,
+>> +};
+>> +
+>> +static int imx_gpc_domain_xlate(struct irq_domain *domain,
+>> +				struct device_node *controller,
+>> +				const u32 *intspec,
+>> +				unsigned int intsize,
+>> +				unsigned long *out_hwirq,
+>> +				unsigned int *out_type)
+>> +{
+>> +	if (domain->of_node != controller)
+>> +		return -EINVAL;	/* Shouldn't happen, really... */
+>> +	if (intsize != 3)
+>> +		return -EINVAL;	/* Not GIC compliant */
+>> +	if (intspec[0] != 0)
+>> +		return -EINVAL;	/* No PPI should point to this domain */
+>> +
+>> +	*out_hwirq = intspec[1];
+>> +	*out_type = intspec[2];
+>> +	return 0;
+>> +}
+>> +
+>> +static int imx_gpc_domain_alloc(struct irq_domain *domain,
+>> +				  unsigned int irq,
+>> +				  unsigned int nr_irqs, void *data)
+>> +{
+>> +	struct of_phandle_args *args = data;
+>> +	struct of_phandle_args parent_args;
+>> +	irq_hw_number_t hwirq;
+>> +	int i;
+>> +
+>> +	if (args->args_count != 3)
+>> +		return -EINVAL;	/* Not GIC compliant */
+>> +	if (args->args[0] != 0)
+>> +		return -EINVAL;	/* No PPI should point to this domain */
+>> +
+>> +	hwirq = args->args[1];
+>> +	if (hwirq >= GPC_MAX_IRQS)
+>> +		return -EINVAL;	/* Can't deal with this */
+>> +
+>> +	for (i = 0; i < nr_irqs; i++)
+>> +		irq_domain_set_hwirq_and_chip(domain, irq + i, hwirq + i,
+>> +					      &imx_gpc_chip, NULL);
+>> +
+>> +	parent_args = *args;
+>> +	parent_args.np = domain->parent->of_node;
+>> +	return irq_domain_alloc_irqs_parent(domain, irq, nr_irqs, &parent_args);
+>>  }
+>>  
+>> -void __init imx_gpc_init(void)
+>> +static struct irq_domain_ops imx_gpc_domain_ops = {
+>> +	.xlate	= imx_gpc_domain_xlate,
+>> +	.alloc	= imx_gpc_domain_alloc,
+>> +	.free	= irq_domain_free_irqs_common,
+>> +};
+>> +
+>> +static int __init imx_gpc_init(struct device_node *node,
+>> +			       struct device_node *parent)
+>>  {
+>> -	struct device_node *np;
+>> +	struct irq_domain *parent_domain, *domain;
+>>  	int i;
+>>  
+>> -	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-gpc");
+>> -	gpc_base = of_iomap(np, 0);
+>> -	WARN_ON(!gpc_base);
+>> +	if (!parent) {
+>> +		pr_err("%s: no parent, giving up\n", node->full_name);
+>> +		return -ENODEV;
+>> +	}
+>> +
+>> +	parent_domain = irq_find_host(parent);
+>> +	if (!parent_domain) {
+>> +		pr_err("%s: unable to obtain parent domain\n", node->full_name);
+>> +		return -ENXIO;
+>> +	}
+>> +
+>> +	gpc_base = of_iomap(node, 0);
+>> +	if (WARN_ON(!gpc_base))
+>> +	        return -ENOMEM;
+>> +
+>> +	domain = irq_domain_add_hierarchy(parent_domain, 0, GPC_MAX_IRQS,
+>> +					  node, &imx_gpc_domain_ops,
+>> +					  NULL);
+>> +	if (!domain) {
+>> +		iounmap(gpc_base);
+>> +		return -ENOMEM;
+>> +	}
+>>  
+>>  	/* Initially mask all interrupts */
+>>  	for (i = 0; i < IMR_NUM; i++)
+>>  		writel_relaxed(~0, gpc_base + GPC_IMR1 + i * 4);
+>>  
+>> -	/* Register GPC as the secondary interrupt controller behind GIC */
+>> -	gic_arch_extn.irq_mask = imx_gpc_irq_mask;
+>> -	gic_arch_extn.irq_unmask = imx_gpc_irq_unmask;
+>> -	gic_arch_extn.irq_set_wake = imx_gpc_irq_set_wake;
+>> +	return 0;
+>>  }
+>> +
+>> +/*
+>> + * We cannot use the IRQCHIP_DECLARE macro that lives in
+>> + * drivers/irqchip, so we're forced to roll our own. Not very nice.
+>> + */
+>> +OF_DECLARE_2(irqchip, imx_gpc, "fsl,imx6q-gpc", imx_gpc_init);
 > 
-> Explicitly tearing down mappings in drivers that want to manage IOMMUs isn't a 
-> solution I like either. A possibly better solution would be to call a function 
-> to state that the DMA mapping API shouldn't not handle IOMMUs. Something like
-> 
-> 	dma_mapping_ignore_iommu(dev);
-> 
-> at the beginning of the probe function of such drivers could do. The function 
-> would perform behind the scene all operations needed to tear down everything 
-> that shouldn't have been set up.
+> The above seems to be a recurring pattern, so it might be a good idea to
+> expose the irqchip header.
 
-An alternative would be to add a flag to platform_driver, like we have for
-"prevent_deferred_probe" which is something like "prevent_dma_configure".
+My theory is that by keeping it ugly, the maintainers will get the
+message and move the code around on their own. Probably wishful
+thinking, but hey...
 
-For the moment, that would actually teardown the DMA configuration in
-platform_drv_probe, but if things are reordering in future then we can avoid
-setting up the ops altogether without an API change.
+> But in the case of the GPC I don't see anything after your patch that
+> would make it tied into the arch. So can you just move this driver to
+> the irqchip directory?
 
-Will
+At least imx_gpc_hwirq_[un]mask are directly used from the PM code, and
+I have no idea how this interacts with the rest of the platform.
+
+It would be possible to force the creation of an irq mapped to hwirq #32
+at boot time, and then use that to drive the mask/unmask using the
+standard kernel API, but that will also have an impact on the GIC
+masking, and someone needs to find out if that breaks anything.
+
+Furthermore, I do not have access to the HW, so whoever cares about it
+should go ahead and fix it.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
