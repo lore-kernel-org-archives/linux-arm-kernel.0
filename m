@@ -1,92 +1,109 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 19 Jan 2015 01:18:30 +0100
-Subject: [PATCHv2 2/2] USB: host: ohci_at91: Stop/start USB PLL for all
- sleep modes
-In-Reply-To: <1421508995-21290-2-git-send-email-sylvain.rochet@finsecur.com>
-References: <20150117135857.71dae08f@bbrezillon>
- <1421508995-21290-1-git-send-email-sylvain.rochet@finsecur.com>
- <1421508995-21290-2-git-send-email-sylvain.rochet@finsecur.com>
-Message-ID: <20150119001830.GB5014@piout.net>
+Date: Mon, 19 Jan 2015 01:40:15 +0100
+Subject: [PATCH v5 00/11] memory: add Atmel EBI (External Bus Interface)
+ driver
+In-Reply-To: <20150118125117.GV3574@x1>
+References: <1417639455-17410-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20150113085027.GA3843@piout.net> <20150118125117.GV3574@x1>
+Message-ID: <20150119004015.GC5014@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/01/2015 at 16:36:35 +0100, Sylvain Rochet wrote :
-> Disable/unprepare clocks without testing the sleep target_state, removed
-> the at91_suspend_entering_slow_clock() call (which is only a
-> target_state == PM_SUSPEND_MEM).
-> 
-> Other kind of suspend now benefit from the power save induced by this
-> PLL deactivation. The resume penalty is about 500 us, which is not
-> negligible but acceptable considering the amount of power we are saving.
-> 
-> Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
-> Reported-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Hi Lee,
 
-> ---
->  drivers/usb/host/ohci-at91.c | 25 +++++++++++++------------
->  1 file changed, 13 insertions(+), 12 deletions(-)
+On 18/01/2015 at 12:51:17 +0000, Lee Jones wrote :
+> Sorry for the delay, I have been on vacation.
 > 
-> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-> index dc9e4e6..f0da734 100644
-> --- a/drivers/usb/host/ohci-at91.c
-> +++ b/drivers/usb/host/ohci-at91.c
-> @@ -49,6 +49,8 @@ extern int usb_disabled(void);
->  
->  static void at91_start_clock(void)
->  {
-> +	if (clocked)
-> +		return;
->  	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
->  		clk_set_rate(uclk, 48000000);
->  		clk_prepare_enable(uclk);
-> @@ -61,6 +63,8 @@ static void at91_start_clock(void)
->  
->  static void at91_stop_clock(void)
->  {
-> +	if (!clocked)
-> +		return;
->  	clk_disable_unprepare(fclk);
->  	clk_disable_unprepare(iclk);
->  	clk_disable_unprepare(hclk);
-> @@ -615,16 +619,14 @@ ohci_hcd_at91_drv_suspend(struct platform_device *pdev, pm_message_t mesg)
->  	 *
->  	 * REVISIT: some boards will be able to turn VBUS off...
->  	 */
-> -	if (at91_suspend_entering_slow_clock()) {
-> -		ohci->hc_control = ohci_readl(ohci, &ohci->regs->control);
-> -		ohci->hc_control &= OHCI_CTRL_RWC;
-> -		ohci_writel(ohci, ohci->hc_control, &ohci->regs->control);
-> -		ohci->rh_state = OHCI_RH_HALTED;
-> -
-> -		/* flush the writes */
-> -		(void) ohci_readl (ohci, &ohci->regs->control);
-> -		at91_stop_clock();
-> -	}
-> +	ohci->hc_control = ohci_readl(ohci, &ohci->regs->control);
-> +	ohci->hc_control &= OHCI_CTRL_RWC;
-> +	ohci_writel(ohci, ohci->hc_control, &ohci->regs->control);
-> +	ohci->rh_state = OHCI_RH_HALTED;
-> +
-> +	/* flush the writes */
-> +	(void) ohci_readl (ohci, &ohci->regs->control);
-> +	at91_stop_clock();
->  
->  	return ret;
->  }
-> @@ -636,8 +638,7 @@ static int ohci_hcd_at91_drv_resume(struct platform_device *pdev)
->  	if (device_may_wakeup(&pdev->dev))
->  		disable_irq_wake(hcd->irq);
->  
-> -	if (!clocked)
-> -		at91_start_clock();
-> +	at91_start_clock();
->  
->  	ohci_resume(hcd, false);
->  	return 0;
+> I'm not sure why why those patches are preventing the application of
+> the remainder of the set.  They are only documentation entries and I
+> have Acked them already?
+> 
+
+We had some series depending on the new syscon headers introduced by
+those patches.
+
+Indeed, at the time I wrote that email, I forgot you acked them. As
+Felipe Balbi wanted to ensure that the dependency would be handled
+correctly, we asked Nicolas to take those patches (as I explained in one
+of my mails).
+
+> > On 03/12/2014 at 21:44:04 +0100, Boris Brezillon wrote :
+> > > The EBI (External Bus Interface) is used to access external peripherals
+> > > (NOR, SRAM, NAND, and other specific devices like ethernet controllers).
+> > > Each device is assigned a CS line and an address range and can have its
+> > > own configuration (timings, access mode, bus width, ...).
+> > > This driver provides a generic DT binding to configure a device according
+> > > to its requirements.
+> > > For specific device controllers (like the NAND one) the SMC timings
+> > > should be configured by the controller driver through the matrix and
+> > > smc syscon regmaps.
+> > > 
+> > > The first 4 patches introduce 2 syscon devices needed to configure the
+> > > EBI bus, patch 5 and 6 adds support for the EBI bus, and the remaining
+> > > patches declares the EBI related nodes in sama5d3 dts[i] files.
+> > > 
+> > > Changes since v4:
+> > > - fix inconsistencies in SMC and MATRIX registers definition
+> > > - add missing compatible strings for at91sam9rl SoC
+> > > - fix DT bindings documentation
+> > > - replace "atmel,generic-dev" property by "atmel,specialized-logic"
+> > > 
+> > > Changes since v3:
+> > > - added AT91_MATRIX_USBPUCR_PUON definition
+> > > - removed useless macros (those directly returning SoC specific register
+> > >   offsets)
+> > > - use syscon_regmap_lookup_by_phandle instead of of_parse_phandle +
+> > >   syscon_node_to_regmap
+> > > - drop AT91_EBICSA_REGFIELD and AT91_MULTI_EBICSA_REGFIELD macros
+> > > 
+> > > Changes since v2:
+> > > - minor fixes int DT bindings doc
+> > > - fix SMC macros
+> > > - make use of SMC macros defined in include/linux/mfd/syscon/atmel-smc.h
+> > > 
+> > > Changes since v1:
+> > > - almost everything :-)
+> > > 
+> > > Boris Brezillon (11):
+> > >   mfd: syscon: Add atmel-matrix registers definition
+> > >   mfd: syscon: Add Atmel Matrix bus DT binding documentation
+> > >   mfd: syscon: Add atmel-smc registers definition
+> > >   mfd: syscon: Add Atmel SMC binding doc
+> > >   memory: add Atmel EBI (External Bus Interface) driver
+> > >   memory: atmel-ebi: add DT bindings documentation
+> > >   ARM: at91: select ATMEL_EBI when compiling a kernel for at91sam9 or
+> > >     sama5d3
+> > >   ARM: at91/dt: add HSMC (Static Memory Controller) node in sama5d3 dtsi
+> > >   ARM: at91/dt: add matrix node in sama5d3 dtsi
+> > >   ARM: at91/dt: add EBI (External Bus Interface) node in sama5d3 dtsi
+> > >   ARM: at91/dt: add NOR definition in sama5d3xcm dtsi
+> > > 
+> > >  .../bindings/memory-controllers/atmel-ebi.txt      | 155 ++++++
+> > >  .../devicetree/bindings/mfd/atmel-matrix.txt       |  24 +
+> > >  .../devicetree/bindings/mfd/atmel-smc.txt          |  19 +
+> > >  arch/arm/boot/dts/sama5d3.dtsi                     |  93 ++++
+> > >  arch/arm/boot/dts/sama5d3xcm.dtsi                  |  33 ++
+> > >  arch/arm/mach-at91/Kconfig                         |   2 +
+> > >  drivers/memory/Kconfig                             |  11 +
+> > >  drivers/memory/Makefile                            |   1 +
+> > >  drivers/memory/atmel-ebi.c                         | 579 +++++++++++++++++++++
+> > >  include/linux/mfd/syscon/atmel-matrix.h            | 117 +++++
+> > >  include/linux/mfd/syscon/atmel-smc.h               | 173 ++++++
+> > >  11 files changed, 1207 insertions(+)
+> > >  create mode 100644 Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt
+> > >  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-matrix.txt
+> > >  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-smc.txt
+> > >  create mode 100644 drivers/memory/atmel-ebi.c
+> > >  create mode 100644 include/linux/mfd/syscon/atmel-matrix.h
+> > >  create mode 100644 include/linux/mfd/syscon/atmel-smc.h
+> > > 
+> > 
+> 
 > -- 
-> 2.1.4
-> 
+> Lee Jones
+> Linaro STMicroelectronics Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
 
 -- 
 Alexandre Belloni, Free Electrons
