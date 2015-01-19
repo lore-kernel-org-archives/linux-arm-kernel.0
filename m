@@ -1,59 +1,60 @@
-From: wangnan0@huawei.com (Wang Nan)
-Date: Mon, 19 Jan 2015 11:04:14 +0800
-Subject: [PATCH] kprobes: bugfix: checks kprobes_all_disarmed in
- unoptimized_kprobe().
-In-Reply-To: <54B3C3A0.6010708@hitachi.com>
-References: <54B3B32E.7070709@hitachi.com>
- <1421064563-77831-1-git-send-email-wangnan0@huawei.com>
- <54B3C3A0.6010708@hitachi.com>
-Message-ID: <54BC742E.80006@huawei.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Mon, 19 Jan 2015 11:12:50 +0800
+Subject: [PATCH 10/28] PCI: Save sysdata in pci_host_bridge drvdata
+In-Reply-To: <18973877.BYCS6vtzoq@wuerfel>
+References: <1421372666-12288-1-git-send-email-wangyijing@huawei.com>
+ <1421372666-12288-11-git-send-email-wangyijing@huawei.com>
+ <18973877.BYCS6vtzoq@wuerfel>
+Message-ID: <54BC7632.1080003@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Masami Hiramatsu,
-
-I can't find this patch and '[PATCH] kprobes: bugfix: checks kprobes_all_disarmed
-in unoptimized_kprobe().' in current mainline. How do these patches get there?
-Should they be merged into Russell King's tree first?
-
-Thank you!
-
-On 2015/1/12 20:52, Masami Hiramatsu wrote:
-> (2015/01/12 21:09), Wang Nan wrote:
->> Original code failed to disarm the probed instruction after
->>
->> echo 0 > /sys/kernel/debug/kprobes/enabled
->>
->> if OPTPROBE is enabled.
->>
->> This patch checks kprobes_all_disarmed in unoptimized_kprobe().
->>
-> 
-> Looks good :)
-> 
-> Acked-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
-> 
-> Thank you!
-> 
->> Signed-off-by: Wang Nan <wangnan0@huawei.com>
->> ---
->>  kernel/kprobes.c | 3 +++
->>  1 file changed, 3 insertions(+)
->>
->> diff --git a/kernel/kprobes.c b/kernel/kprobes.c
->> index 9471710..f16936b 100644
->> --- a/kernel/kprobes.c
->> +++ b/kernel/kprobes.c
->> @@ -630,6 +630,9 @@ static void unoptimize_kprobe(struct kprobe *p, bool force)
+On 2015/1/16 17:18, Arnd Bergmann wrote:
+> On Friday 16 January 2015 09:44:08 Yijing Wang wrote:
+>> @@ -2066,11 +2064,11 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, u32 db,
 >>  {
->>  	struct optimized_kprobe *op;
+>>         struct pci_host_bridge *host;
 >>  
->> +	if (kprobes_all_disarmed)
->> +		return;
->> +
->>  	if (!kprobe_aggrprobe(p) || kprobe_disarmed(p))
->>  		return; /* This is not an optprobe nor optimized */
+>> -       host = pci_create_host_bridge(parent, db, resources);
+>> +       host = pci_create_host_bridge(parent, db, resources, sysdata);
+>>         if (!host)
+>>                 return NULL;
 >>  
+>> -       return __pci_scan_root_bus(host, ops, sysdata);
+>> +       return __pci_scan_root_bus(host, ops);
+>>  }
+>>  EXPORT_SYMBOL(pci_scan_root_bus);
 >>
 > 
+> How about keeping the sysdata out of the pci_create_host_bridge interface, and
+> refactoring it so that the call sequence becomes
 > 
+> 	host = pci_create_host_bridge(parent, db, resources);
+> 	host->sysdata = sysdata;
+> 	__pci_scan_root_bus(host, ops);
+> 
+> This way, we can make sysdata completely option. I assume that more of the
+> fields we have in sysdata today can get moved into pci_host_bridge
+> over time, so a host bridge driver can just assign those members individually
+> between pci_create_host_bridge and __pci_scan_root_bus.
+
+I put the sysdata in pci_host_bridge, because some platforms x86/ia64
+need to call pcibios_root_bridge_prepare() before pci_host_bridge registration
+in pci_create_host_bridge(), and pcibios_root_bridge_prepare() need the companion
+acpi device pointer which is stored in sysdata.
+
+I like you idea, but I haven't find a better way yet.
+
+Thanks!
+Yijing.
+
+> 
+> 	Arnd
+> 
+> .
+> 
+
+
+-- 
+Thanks!
+Yijing
