@@ -1,40 +1,38 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 19 Jan 2015 12:55:47 -0600
-Subject: [PATCHv3 1/2] USB: gadget: atmel_usba_udc: Fixed vbus_prev
- initial state
-In-Reply-To: <54BD1028.20303@atmel.com>
-References: <20150118175621.6b519cdc@bbrezillon>
- <1421601875-9436-1-git-send-email-sylvain.rochet@finsecur.com>
- <1421601875-9436-2-git-send-email-sylvain.rochet@finsecur.com>
- <54BD1028.20303@atmel.com>
-Message-ID: <20150119185547.GM20386@saruman>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 19 Jan 2015 10:58:25 -0800
+Subject: [GIT PULL RESEND] CSR atlas7 init dts for 3.20
+In-Reply-To: <CAGsJ_4w8=P6GDcW+z3DT4-C7Rdf_OjoBPHmoMA7wvNoTCLFYeA@mail.gmail.com>
+References: <CAGsJ_4w8=P6GDcW+z3DT4-C7Rdf_OjoBPHmoMA7wvNoTCLFYeA@mail.gmail.com>
+Message-ID: <20150119185825.GA16883@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 19, 2015 at 03:09:44PM +0100, Nicolas Ferre wrote:
-> Le 18/01/2015 18:24, Sylvain Rochet a ?crit :
-> > If vbus gpio is high at init, we should set vbus_prev to true
-> > accordingly to the current vbus state. Without that, we skip the first
-> > vbus interrupt because the saved vbus state is not consistent.
-> > 
-> > Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+On Wed, Jan 14, 2015 at 09:22:36PM +0800, Barry Song wrote:
+> Hi Arnd, Kevin, Olof,
 > 
-> Indeed:
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> The following changes since commit b7392d2247cfe6771f95d256374f1a8e6a6f48d6:
 > 
-> We can also add the following tags:
-> Fixes: 914a3f3b3754 ("USB: add atmel_usba_udc driver")
-> Cc: <stable@vger.kernel.org> # 2.6.x-ish
+>   Linux 3.19-rc2 (2014-12-28 16:49:37 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
+> tags/atlas7-init-dts-for-3.20
+> 
+> for you to fetch changes up to 7d76d03b9be8ea8977df45176336cc4fec6ac603:
+> 
+>   ARM: dts: add init dts file for CSR atlas7 SoC (2015-01-13 22:19:23 +0800)
+> 
+> ----------------------------------------------------------------
+> drop Marco and add init dts stuff for Atlas7
+> 
+> CSR Marco SoC has never shipped to customers that could be interested
+> in mainline support. and new Atlas7 is a replacement SoC that is in
+> development.
+> 
+> so we drop Marco dts stuff, and add dts stuff for Atlas7.
 
-Please resend with the proper stable format. Also, this 2.6.x-ish should
-be 2.6.24+, git describe helps a lot figuring these out.
+Merged, thanks.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150119/d7afe913/attachment-0001.sig>
+
+-Olof
