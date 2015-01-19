@@ -1,177 +1,275 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 19 Jan 2015 15:28:02 +0000
-Subject: [PATCH] soc: tegra: Add Tegra132 SoC to the DT list of Tegra SoCs
-In-Reply-To: <20150119132453.GG7312@ulmo.nvidia.com>
-References: <alpine.DEB.2.02.1501161137351.9776@utopia.booyaka.com>
- <20150116150749.GA32155@leverpostej>
- <20150116170926.GA17763@ulmo.nvidia.com>
- <20150116173005.GH32155@leverpostej>
- <20150119132453.GG7312@ulmo.nvidia.com>
-Message-ID: <20150119152801.GG21553@leverpostej>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 19 Jan 2015 07:35:49 -0800
+Subject: [PATCH v3 1/4] clk: dts: mediatek: add Mediatek MT8135 clock
+ bindings
+In-Reply-To: <1420601123-25859-2-git-send-email-jamesjj.liao@mediatek.com>
+References: <1420601123-25859-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1420601123-25859-2-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <20150119153549.22722.67372@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 19, 2015 at 01:24:55PM +0000, Thierry Reding wrote:
-> On Fri, Jan 16, 2015 at 05:30:05PM +0000, Mark Rutland wrote:
-> > On Fri, Jan 16, 2015 at 05:09:28PM +0000, Thierry Reding wrote:
-> > > On Fri, Jan 16, 2015 at 03:07:49PM +0000, Mark Rutland wrote:
-> > > > Hi Paul,
-> > > > 
-> > > > /me opens a delicious can of Lumbricus terrestris
-> > > > 
-> > > > My comments below aren't so much about this patch alone, but more about
-> > > > the entire strategy with drivers/soc and the kind of code living there.
-> > > > 
-> > > > On Fri, Jan 16, 2015 at 11:39:13AM +0000, Paul Walmsley wrote:
-> > > > > 
-> > > > > Add "nvidia,tegra132" as a compatible string that denotes a Tegra SoC.
-> > > > > 
-> > > > > Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> > > > > Cc: Paul Walmsley <pwalmsley@nvidia.com>
-> > > > > Cc: Stephen Warren <swarren@wwwdotorg.org>
-> > > > > Cc: Thierry Reding <thierry.reding@gmail.com>
-> > > > > Cc: Alexandre Courbot <gnurou@gmail.com>
-> > > > > ---
-> > > > >  drivers/soc/tegra/common.c | 1 +
-> > > > >  1 file changed, 1 insertion(+)
-> > > > > 
-> > > > > diff --git a/drivers/soc/tegra/common.c b/drivers/soc/tegra/common.c
-> > > > > index a71cb74..a952986 100644
-> > > > > --- a/drivers/soc/tegra/common.c
-> > > > > +++ b/drivers/soc/tegra/common.c
-> > > > > @@ -15,6 +15,7 @@ static const struct of_device_id tegra_machine_match[] = {
-> > > > >  	{ .compatible = "nvidia,tegra30", },
-> > > > >  	{ .compatible = "nvidia,tegra114", },
-> > > > >  	{ .compatible = "nvidia,tegra124", },
-> > > > > +	{ .compatible = "nvidia,tegra132", },
-> > > > >  	{ }
-> > > > >  };
-> > > > 
-> > > > I'm rather worried by this.
-> > > > 
-> > > > The only user of this table is soc_is_tegra(), which seems to guard
-> > > > several probe paths in drivers which are DT driven. Given that, I don't
-> > > > see why this is necessary at all, because the presence of the
-> > > > appropriate nodes should be sufficient to handle the early return from
-> > > > an initcall.
-> > > 
-> > > We need this to preserve backward-compatibility. There are some
-> > > instances where any device tree nodes that could be used to guard the
-> > > code execution were only added after the fact. So in order to keep
-> > > systems with an old DTB running we need to continue running with hard
-> > > coded physical addresses.
-> > 
-> > Except that you don't need them for arm64 systems, becuase we don't yet
-> > have that legacy for arm64...
-> > 
-> > > > More worryingly, if soc_is_tegra() returns true but the node isn't
-> > > > found, the drivers decide to do things. If tegra_pmc_early_init passes
-> > > > soc_is_tegra() (because we happened to match "nvidia,tegra132"), but
-> > > > doesn't find a DTB entry for the pmc, it then pokes an assumed
-> > > > hard-coded physical address.
-> > > 
-> > > And that's (currently) safe. It at least makes sure that breakage (if
-> > > any) is restricted to Tegra boards. There are other occurrences where
-> > > drivers don't even bother checking for this at all and simply use an
-> > > initcall to unconditionally create a platform device which then goes
-> > > and tries to access physical addresses on *every* board in a multi-
-> > > platform kernel.
-> > 
-> > So doing the wrong thing on a subset of boards is fine because it's not
-> > all boards?
+Quoting James Liao (2015-01-06 19:25:20)
+> Document the device-tree binding of Mediatek MT8135 SoC, including
+> TOPCKGEN, PLLs, INFRA and PERI clock controller.
 > 
-> It's not doing anything wrong. If the string is added to the above table
-> then the assumption is that it supports the (very few) cases where we've
-> needed physical addresses. For anything sufficiently recent we already
-> have all the nodes in the DTB, so there's no issue.
+> Change-Id: Ie9175adebdb2d3b6aa1854d3bc11c57c191b3255
+> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> ---
+>  .../bindings/clock/mediatek,mt8135-clock.txt       |  36 ++++
+>  include/dt-bindings/clock/mt8135-clk.h             | 190 +++++++++++++++++++++
+>  2 files changed, 226 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/mediatek,mt8135-clock.txt
+>  create mode 100644 include/dt-bindings/clock/mt8135-clk.h
 > 
-> > Imagine I make a typo in a DT for a 64-bit system, and suddnely hit
-> > youre legacy code. Things happen to work, because I don't botehr reading
-> > the splat in dmesg for whatever reason.
+> diff --git a/Documentation/devicetree/bindings/clock/mediatek,mt8135-clock.txt b/Documentation/devicetree/bindings/clock/mediatek,mt8135-clock.txt
+> new file mode 100644
+> index 0000000..e23df49
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/mediatek,mt8135-clock.txt
+> @@ -0,0 +1,36 @@
+> +Mediatek MT8135 Clock Controller
+> +
+> +This binding uses the common clock binding:
+> +Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +
+> +The Mediatek MT8135 clock controller generates and supplies clock to various
+> +controllers within Mediatek MT8135 SoC.
+> +
+> +Required Properties:
+> +
+> +- compatible: should be one of following:
+> +       - "mediatek,mt8135-topckgen" : for topckgen clock controller of MT8135.
+> +       - "mediatek,mt8135-apmixedsys" : for apmixed_sys (PLLs) of MT8135.
+> +       - "mediatek,mt8135-infracfg" : for infra_sys clock controller of MT8135.
+> +       - "mediatek,mt8135-pericfg" : for peri_sys clock controller of MT8135.
+> +
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +
+> +- #clock-cells: should be 1.
+> +
+> +All available clocks are defined as preprocessor macros in
+> +dt-bindings/clock/mt8135-clk.h header and can be used in device tree sources.
+> +
+> +Example: I2C controller node that consumes the clock generated by the clock
+> +  controller (refer to the standard clock bindings for information about
+> +  "clocks" and "clock-names" properties):
+> +
+> +       i2c0: i2c at 1100d000 {
+> +               compatible = "mediatek,mt8135-i2c", "mediatek,mt6589-i2c";
+> +               reg = <0 0x1100d000 0 0x70>, <0 0x11000300 0 0x80>;
+> +               interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_LOW>;
+> +               clock-div = <16>;
+> +               clocks = <&pericfg PERI_I2C0_CK>, <&pericfg PERI_AP_DMA_CK>;
+> +               clock-names = "main", "dma";
+> +       };
+
+Hello,
+
+Patch looks good to me overall. One suggestion for the next version is
+that your example above include a node for the clock controller itself,
+followed by the i2c controller example above.
+
+Regards,
+Mike
+
+> diff --git a/include/dt-bindings/clock/mt8135-clk.h b/include/dt-bindings/clock/mt8135-clk.h
+> new file mode 100644
+> index 0000000..8aea762
+> --- /dev/null
+> +++ b/include/dt-bindings/clock/mt8135-clk.h
+> @@ -0,0 +1,190 @@
+> +/*
+> + * Copyright (c) 2014 MediaTek Inc.
+> + * Author: James Liao <jamesjj.liao@mediatek.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#ifndef _DT_BINDINGS_CLK_MT8135_H
+> +#define _DT_BINDINGS_CLK_MT8135_H
+> +
+> +/* TOPCKGEN */
+> +
+> +#define TOP_DSI0_LNTC_DSICLK   1
+> +#define TOP_HDMITX_CLKDIG_CTS  2
+> +#define TOP_CLKPH_MCK          3
+> +#define TOP_CPUM_TCK_IN                4
+> +#define TOP_MAINPLL_806M       5
+> +#define TOP_MAINPLL_537P3M     6
+> +#define TOP_MAINPLL_322P4M     7
+> +#define TOP_MAINPLL_230P3M     8
+> +#define TOP_UNIVPLL_624M       9
+> +#define TOP_UNIVPLL_416M       10
+> +#define TOP_UNIVPLL_249P6M     11
+> +#define TOP_UNIVPLL_178P3M     12
+> +#define TOP_UNIVPLL_48M                13
+> +#define TOP_MMPLL_D2           14
+> +#define TOP_MMPLL_D3           15
+> +#define TOP_MMPLL_D5           16
+> +#define TOP_MMPLL_D7           17
+> +#define TOP_MMPLL_D4           18
+> +#define TOP_MMPLL_D6           19
+> +#define TOP_SYSPLL_D2          20
+> +#define TOP_SYSPLL_D4          21
+> +#define TOP_SYSPLL_D6          22
+> +#define TOP_SYSPLL_D8          23
+> +#define TOP_SYSPLL_D10         24
+> +#define TOP_SYSPLL_D12         25
+> +#define TOP_SYSPLL_D16         26
+> +#define TOP_SYSPLL_D24         27
+> +#define TOP_SYSPLL_D3          28
+> +#define TOP_SYSPLL_D2P5                29
+> +#define TOP_SYSPLL_D5          30
+> +#define TOP_SYSPLL_D3P5                31
+> +#define TOP_UNIVPLL1_D2                32
+> +#define TOP_UNIVPLL1_D4                33
+> +#define TOP_UNIVPLL1_D6                34
+> +#define TOP_UNIVPLL1_D8                35
+> +#define TOP_UNIVPLL1_D10       36
+> +#define TOP_UNIVPLL2_D2                37
+> +#define TOP_UNIVPLL2_D4                38
+> +#define TOP_UNIVPLL2_D6                39
+> +#define TOP_UNIVPLL2_D8                40
+> +#define TOP_UNIVPLL_D3         41
+> +#define TOP_UNIVPLL_D5         42
+> +#define TOP_UNIVPLL_D7         43
+> +#define TOP_UNIVPLL_D10                44
+> +#define TOP_UNIVPLL_D26                45
+> +#define TOP_APLL_CK            46
+> +#define TOP_APLL_D4            47
+> +#define TOP_APLL_D8            48
+> +#define TOP_APLL_D16           49
+> +#define TOP_APLL_D24           50
+> +#define TOP_LVDSPLL_D2         51
+> +#define TOP_LVDSPLL_D4         52
+> +#define TOP_LVDSPLL_D8         53
+> +#define TOP_LVDSTX_CLKDIG_CT   54
+> +#define TOP_VPLL_DPIX_CK       55
+> +#define TOP_TVHDMI_H_CK                56
+> +#define TOP_HDMITX_CLKDIG_D2   57
+> +#define TOP_HDMITX_CLKDIG_D3   58
+> +#define TOP_TVHDMI_D2          59
+> +#define TOP_TVHDMI_D4          60
+> +#define TOP_MEMPLL_MCK_D4      61
+> +#define TOP_AXI_SEL            62
+> +#define TOP_SMI_SEL            63
+> +#define TOP_MFG_SEL            64
+> +#define TOP_IRDA_SEL           65
+> +#define TOP_CAM_SEL            66
+> +#define TOP_AUD_INTBUS_SEL     67
+> +#define TOP_JPG_SEL            68
+> +#define TOP_DISP_SEL           69
+> +#define TOP_MSDC30_1_SEL       70
+> +#define TOP_MSDC30_2_SEL       71
+> +#define TOP_MSDC30_3_SEL       72
+> +#define TOP_MSDC30_4_SEL       73
+> +#define TOP_USB20_SEL          74
+> +#define TOP_VENC_SEL           75
+> +#define TOP_SPI_SEL            76
+> +#define TOP_UART_SEL           77
+> +#define TOP_MEM_SEL            78
+> +#define TOP_CAMTG_SEL          79
+> +#define TOP_AUDIO_SEL          80
+> +#define TOP_FIX_SEL            81
+> +#define TOP_VDEC_SEL           82
+> +#define TOP_DDRPHYCFG_SEL      83
+> +#define TOP_DPILVDS_SEL                84
+> +#define TOP_PMICSPI_SEL                85
+> +#define TOP_MSDC30_0_SEL       86
+> +#define TOP_SMI_MFG_AS_SEL     87
+> +#define TOP_GCPU_SEL           88
+> +#define TOP_DPI1_SEL           89
+> +#define TOP_CCI_SEL            90
+> +#define TOP_APLL_SEL           91
+> +#define TOP_HDMIPLL_SEL                92
+> +#define TOP_NR_CLK             93
+> +
+> +/* APMIXED_SYS */
+> +
+> +#define APMIXED_ARMPLL1                1
+> +#define APMIXED_ARMPLL2                2
+> +#define APMIXED_MAINPLL                3
+> +#define APMIXED_UNIVPLL                4
+> +#define APMIXED_MMPLL          5
+> +#define APMIXED_MSDCPLL                6
+> +#define APMIXED_TVDPLL         7
+> +#define APMIXED_LVDSPLL                8
+> +#define APMIXED_AUDPLL         9
+> +#define APMIXED_VDECPLL                10
+> +#define APMIXED_NR_CLK         11
+> +
+> +/* INFRA_SYS */
+> +
+> +#define INFRA_PMIC_WRAP_CK     1
+> +#define INFRA_PMICSPI_CK       2
+> +#define INFRA_CCIF1_AP_CTRL    3
+> +#define INFRA_CCIF0_AP_CTRL    4
+> +#define INFRA_KP_CK            5
+> +#define INFRA_CPUM_CK          6
+> +#define INFRA_M4U_CK           7
+> +#define INFRA_MFGAXI_CK                8
+> +#define INFRA_DEVAPC_CK                9
+> +#define INFRA_AUDIO_CK         10
+> +#define INFRA_MFG_BUS_CK       11
+> +#define INFRA_SMI_CK           12
+> +#define INFRA_DBGCLK_CK                13
+> +#define INFRA_NR_CLK           14
+> +
+> +/* PERI_SYS */
+> +
+> +#define PERI_I2C5_CK           1
+> +#define PERI_I2C4_CK           2
+> +#define PERI_I2C3_CK           3
+> +#define PERI_I2C2_CK           4
+> +#define PERI_I2C1_CK           5
+> +#define PERI_I2C0_CK           6
+> +#define PERI_UART3_CK          7
+> +#define PERI_UART2_CK          8
+> +#define PERI_UART1_CK          9
+> +#define PERI_UART0_CK          10
+> +#define PERI_IRDA_CK           11
+> +#define PERI_NLI_CK            12
+> +#define PERI_MD_HIF_CK         13
+> +#define PERI_AP_HIF_CK         14
+> +#define PERI_MSDC30_3_CK       15
+> +#define PERI_MSDC30_2_CK       16
+> +#define PERI_MSDC30_1_CK       17
+> +#define PERI_MSDC20_2_CK       18
+> +#define PERI_MSDC20_1_CK       19
+> +#define PERI_AP_DMA_CK         20
+> +#define PERI_USB1_CK           21
+> +#define PERI_USB0_CK           22
+> +#define PERI_PWM_CK            23
+> +#define PERI_PWM7_CK           24
+> +#define PERI_PWM6_CK           25
+> +#define PERI_PWM5_CK           26
+> +#define PERI_PWM4_CK           27
+> +#define PERI_PWM3_CK           28
+> +#define PERI_PWM2_CK           29
+> +#define PERI_PWM1_CK           30
+> +#define PERI_THERM_CK          31
+> +#define PERI_NFI_CK            32
+> +#define PERI_USBSLV_CK         33
+> +#define PERI_USB1_MCU_CK       34
+> +#define PERI_USB0_MCU_CK       35
+> +#define PERI_GCPU_CK           36
+> +#define PERI_FHCTL_CK          37
+> +#define PERI_SPI1_CK           38
+> +#define PERI_AUXADC_CK         39
+> +#define PERI_PERI_PWRAP_CK     40
+> +#define PERI_I2C6_CK           41
+> +#define PERI_NR_CLK            42
+> +
+> +#endif /* _DT_BINDINGS_CLK_MT8135_H */
+> -- 
+> 1.8.1.1.dirty
 > 
-> That's a bit of a stretch. You'd have to typo the top-level compatible
-> string of some future board that happens not to have this IP anymore.
-> Catching those types of mistakes is what we have the review process for.
-
-I was imagining that the root was correct, but a particular device was
-wrong. A typo in the root is also a possibility.
-
-Even if review is perfect in-tree, people are going to use out-of-tree
-DTBs to some extent, and I'm not sure we can argue that's an entirely
-wrong thing to do. So review may not help.
-
-> If you're concerned about the splat, we could probably turn it into a
-> WARN() to make it abundantly clear that you've done something wrong.
-> 
-> > Later we do some cleanup of the existing legacy, for whatever reason,
-> > and we get rid of this particular path for arm64.
-> > 
-> > Suddenly my board won't boot, and to fix that we have to reintroduce
-> > legacy support code only because said legacy support was enabled where
-> > it should never have been in the first place. Another OS trying to
-> > target/use these DTBs has barely any chance of success.
-> 
-> We've had cases in the past where it was argued that clearly broken DTBs
-> didn't have to be considered for ABI stability. I'd argue that whatever
-> kind of typo you're referring to falls into this obviously wrong
-> category.
-
-The line here is extremely fuzzy; I don't know what we can class as 
-"clearly broken".
-
-> > > > Assuming things because of the _lack_ of a node has been a major pain
-> > > > point on 32-bit as DTBs advanced and code was changed, resulting in boot
-> > > > breaking or DTB compatibility breaking over time as old and new kernels
-> > > > made conflicting assumptions.
-> > > 
-> > > So what are you saying? We can't support 64-bit ARM because we need to
-> > > keep backwards-compatibility with old DTBs and weren't smart enough to
-> > > see this through all the way three years ago?
-> > 
-> > No. I'm saying that the workarounds we have in place for legacy DTBs
-> > should be constrained to those cases where legacy DTBs actually exist.
-> > There is no reason for that legacy to carry across to 64-bit.
-> 
-> That's fair. Note, though, that we're bound to make mistakes on 64-bit
-> too, so it's wishful thinking that we'll live without legacy on 64-bit
-> forever. But that's of course not to say we should start out with
-> supporting legacy from the beginning.
-
-I agree that we will accumulate legacy no matter how careful we are.
-
-I would like to ensure that we avoid as much of that as possible. For
-cases like these where the DTB has insufficient information, we can
-avoid those for now by requiring the information to be in the DT and
-doing nothing otherwise -- there's no legacy DT to support yet.
-
-I can imagine that we may need to add workarounds of this sort in
-future, and I'd like to ensure they are precisely targeted (e.g. have
-needs_missing_dt_pmc rather than soc_is_tegra, and ideally warning).
-
-I'm hoping that by being as explicit as possible now in the DT (e.g.
-requiring enable-method), we can allow for future variation and not get
-stuck in painful corners w.r.t. wide-reaching assumptions in platform
-code. I'm also hoping that this will make sharing DTs with other
-software more feasible, as it won't be necessary to make identical
-assumptions regarding the platform.
-
-> > > > I don't want to see arm64 kernels making assumptions in that manner (nor
-> > > > would I like to see it in new code for 32-bit ARM); it always leads to
-> > > > boot breakage, and it's completely avoidable. The only thing we can know
-> > > > is what is described in the DTB.
-> > > 
-> > > I guess we could always make this conditional on 32-bit ARM. Or we could
-> > > decide that we don't care about DTB backwards-compatibility anymore. In
-> > > fact we're quite likely going to break it soon anyway because of Marc's
-> > > gic_arch_extn rework, so might as well start with a clean plate after
-> > > that...
-> > 
-> > At the very least I think the soc_is_tegra stuff needs to be constrained
-> > to fallback paths that can only possibly run on 32-bit.
-> 
-> I think that's something we can do.
-
-Exactly what I was hoping to hear :)
-
-Thanks,
-Mark.
