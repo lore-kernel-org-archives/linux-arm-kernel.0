@@ -1,146 +1,416 @@
-From: r.peniaev@gmail.com (Roman Peniaev)
-Date: Mon, 19 Jan 2015 14:58:57 +0900
-Subject: [PATCH 1/2] ARM: entry-common: fix forgotten set of
- thread_info->syscall
-In-Reply-To: <CAGXu5j+9p1T29NoHnCNywd0T=H2mzWhCou5nSRfXZktEOC7_=A@mail.gmail.com>
-References: <1420986751-30364-1-git-send-email-r.peniaev@gmail.com>
- <1420986751-30364-2-git-send-email-r.peniaev@gmail.com>
- <20150112183955.GO13360@arm.com>
- <CACZ9PQXW9G4Vw-dcPwkdVE=uoYmDYEQnJWDnnpup1LxC3s5QPg@mail.gmail.com>
- <CAGXu5jLO-YSaF8P9o3jcXP4VZCPYVshz73krnchYuv9pPGY6Sw@mail.gmail.com>
- <CACZ9PQVo0SF4Z-rdNk4e=yY17Xt9n5hAqm4ZRNLEw3jGYYcvtA@mail.gmail.com>
- <CAGXu5j+O6znN=7-gc3PqwqFA5MFRPLGBUzabOmQjWn_9WTjvpg@mail.gmail.com>
- <CACZ9PQUEprgKrpHazDULA5mf-OaoX=MAjEeWdspZTXT_+iUKWw@mail.gmail.com>
- <20150116155923.GK12302@n2100.arm.linux.org.uk>
- <CACZ9PQUVFtCQg6XjDbokEPy_R2fZcHiq6+EEUZnx4FVfpfZxJg@mail.gmail.com>
- <20150116161752.GL12302@n2100.arm.linux.org.uk>
- <CAGXu5j+XHFNyhaBndQr1Q2uthsFP9ZQGbaw5hofDmXyKXZ-H5g@mail.gmail.com>
- <CAGXu5j+9p1T29NoHnCNywd0T=H2mzWhCou5nSRfXZktEOC7_=A@mail.gmail.com>
-Message-ID: <CACZ9PQXw3hER11qG1ni5Qb+AcNK2hqcP6NgQDOOufjkuMs-u8g@mail.gmail.com>
+From: vishnupatekar0510@gmail.com (Vishnu Patekar)
+Date: Mon, 19 Jan 2015 11:37:38 +0530
+Subject: [PATCH v4 2/5] ARM:sunxi:drivers:input Add support for A10/A20 PS2
+In-Reply-To: <20150117222529.GC38334@dtor-ws>
+References: <1421417021-3247-1-git-send-email-vishnupatekar0510@gmail.com>
+ <1421417021-3247-3-git-send-email-vishnupatekar0510@gmail.com>
+ <20150117222529.GC38334@dtor-ws>
+Message-ID: <CAEzqOZtOBOdpdUHvRqqf+d5GoR_8gpumZX9hfFntXDOzNog+mQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 17, 2015 at 8:54 AM, Kees Cook <keescook@chromium.org> wrote:
-> On Fri, Jan 16, 2015 at 11:57 AM, Kees Cook <keescook@chromium.org> wrote:
->> On Fri, Jan 16, 2015 at 8:17 AM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->>> On Sat, Jan 17, 2015 at 01:08:11AM +0900, Roman Peniaev wrote:
->>>> On Sat, Jan 17, 2015 at 12:59 AM, Russell King - ARM Linux
->>>> <linux@arm.linux.org.uk> wrote:
->>>> > On Sat, Jan 17, 2015 at 12:57:02AM +0900, Roman Peniaev wrote:
->>>> >> On Fri, Jan 16, 2015 at 7:54 AM, Kees Cook <keescook@chromium.org> wrote:
->>>> >> > One interesting thing I noticed (which is unchanged by this series),
->>>> >> > but pulling ARM_r7 during the seccomp ptrace event shows __NR_poll,
->>>> >> > not __NR_restart_syscall, even though it was a __NR_restart_syscall
->>>> >> > trap from seccomp. Is there a better place to see the actual syscall?
->>>> >>
->>>> >> As I understand we do not push new r7 to the stack, and ptrace uses the
->>>> >> old value.
->>>> >
->>>> > And why should we push r7 to the stack?  ptrace should be using the
->>>> > recorded system call number, rather than poking about on the stack
->>>> > itself.
->>>>
->>>> Probably we should not, but the behaviour comparing arm to x86 is different.
->>>
->>> We definitely should not, because changing the stacked value changes the
->>> value in r7 after the syscall has returned.  We have guaranteed that the
->>> value will be preserved across syscalls for years, so we really should
->>> not be changing that.
->>
->> Yeah, we can't mess with the registers. I was just asking for
->> clarification on how this is visible to userspace.
->>
->>>
->>>> Also there is no any way from userspace to figure out what syscall was
->>>> restarted, if you do not trace each syscall enter and exit from the
->>>> very beginning.
->>>
->>> Thinking about ptrace, that's been true for years.
->>>
->>> It really depends whether you consider the restart syscall a userspace
->>> thing or a kernelspace thing.  When you consider that the vast majority
->>> of syscall restarts are done internally in the kernel, and we just
->>> re-issue the syscall, it immediately brings up the question "why is
->>> the restart block method different?" and "should the restart block
->>> method be visible to userspace?"
->>>
->>> IMHO, it is prudent not to expose kernel internals to userspace unless
->>> there is a real reason to, otherwise they become part of the userspace
->>> API.
->>
->> I couldn't agree more, but restart_syscall is already visible to
->> userspace: it can be called directly, for example. And it's visible to
->> tracers.
->>
->> Unfortunately, the difference here is the visibility during trace
->> trap. On x86, it's exposed but on ARM, there's no way (that I can
->> find) to query the "true" syscall, even though the true syscall is
->> what triggers the tracer. The syscall number isn't provided by any
->> element of the ptrace event system, nor through siginfo, and must be
->> examined on a per-arch basis from registers.
->>
->> Seccomp does, however, provide a mechanism to pass arbitrary event
->> data on a TRACE event, so poll vs restart_syscall can be distinguished
->> that way.
->>
->> It seems even strace doesn't know how to find this information. For example:
->>
->> x86:
->> poll([{fd=3, events=POLLIN}], 1, 4294967295
->> ) = ? ERESTART_RESTARTBLOCK (Interrupted by signal)
->> --- SIGSTOP {si_signo=SIGSTOP, si_code=SI_USER, si_pid=994, si_uid=1000} ---
->> --- stopped by SIGSTOP ---
->> --- SIGCONT {si_signo=SIGCONT, si_code=SI_USER, si_pid=994, si_uid=1000} ---
->> restart_syscall(<... resuming interrupted call ...>
->>
->> ARM:
->> poll([{fd=3, events=POLLIN}], 1, -1
->> )    = ? ERESTART_RESTARTBLOCK (Interrupted by signal)
->> --- SIGSTOP {si_signo=SIGSTOP, si_code=SI_USER, si_pid=20563, si_uid=0} ---
->> --- stopped by SIGSTOP ---
->> --- SIGCONT {si_signo=SIGCONT, si_code=SI_USER, si_pid=20563, si_uid=0} ---
->> poll([{fd=3, events=POLLIN}], 1, -1
->>
->> Would it make sense to add REGSET_SYSTEM_CALL to ARM? (Though this
->> begs the question, "Is restart_syscall visible during a trace on
->> arm64?", which I'll have to go check...)
+Hello Dmitry,
+
+Thank you for review comments. Please see in-lined.
+
+On Sun, Jan 18, 2015 at 3:55 AM, Dmitry Torokhov
+<dmitry.torokhov@gmail.com> wrote:
+> Hi Vishnu,
 >
-> So, some further testing:
-> - native arm64 presents "poll" again even to seccomp when
-> restart_syscall is triggered (both via regs[8] and
-> NT_ARM_SYSTEM_CALL).
-> - compat mode on arm64 _does_ show syscall_restart (via ARM_r7).
+> On Fri, Jan 16, 2015 at 07:33:38PM +0530, Vishnu Patekar wrote:
+>> Signed-off-by: VishnuPatekar <vishnupatekar0510@gmail.com>
+>> ---
+>>  drivers/input/serio/Kconfig     |   11 ++
+>>  drivers/input/serio/Makefile    |    1 +
+>>  drivers/input/serio/sun4i-ps2.c |  330 +++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 342 insertions(+)
+>>  create mode 100644 drivers/input/serio/sun4i-ps2.c
+>>
+>> diff --git a/drivers/input/serio/Kconfig b/drivers/input/serio/Kconfig
+>> index bc2d474..964afc5 100644
+>> --- a/drivers/input/serio/Kconfig
+>> +++ b/drivers/input/serio/Kconfig
+>> @@ -281,4 +281,15 @@ config HYPERV_KEYBOARD
+>>         To compile this driver as a module, choose M here: the module will
+>>         be called hyperv_keyboard.
+>>
+>> +config SERIO_SUN4I_PS2
+>> +     tristate "Allwinner A10 PS/2 controller support"
+>> +     default n
+>> +     depends on ARCH_SUNXI || COMPILE_TEST
+>> +     help
+>> +       This selects support for the PS/2 Host Controller on
+>> +       Allwinner A10.
+>> +
+>> +       To compile this driver as a module, choose M here: the
+>> +       module will be called sun4i-ps2.
+>> +
+>>  endif
+>> diff --git a/drivers/input/serio/Makefile b/drivers/input/serio/Makefile
+>> index 815d874..c600089 100644
+>> --- a/drivers/input/serio/Makefile
+>> +++ b/drivers/input/serio/Makefile
+>> @@ -29,3 +29,4 @@ obj-$(CONFIG_SERIO_ARC_PS2) += arc_ps2.o
+>>  obj-$(CONFIG_SERIO_APBPS2)   += apbps2.o
+>>  obj-$(CONFIG_SERIO_OLPC_APSP)        += olpc_apsp.o
+>>  obj-$(CONFIG_HYPERV_KEYBOARD)        += hyperv-keyboard.o
+>> +obj-$(CONFIG_SERIO_SUN4I_PS2)        += sun4i-ps2.o
+>> diff --git a/drivers/input/serio/sun4i-ps2.c b/drivers/input/serio/sun4i-ps2.c
+>> new file mode 100644
+>> index 0000000..06b3fef
+>> --- /dev/null
+>> +++ b/drivers/input/serio/sun4i-ps2.c
+>> @@ -0,0 +1,330 @@
+>> +/*
+>> + *   Driver for Allwinner A10 PS2 host controller
+>> + *
+>> + *   Author: Vishnu Patekar <vishnupatekar0510@gmail.com>
+>> + *           Aaron.maoye <leafy.myeh@newbietech.com>
+>> + *
+>> + *
+>> + */
+>> +
+>> +#include <linux/module.h>
+>> +#include <linux/serio.h>
+>> +#include <linux/interrupt.h>
+>> +#include <linux/errno.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/list.h>
+>> +#include <linux/io.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/of_device.h>
+>> +#include <linux/of_irq.h>
+>> +#include <linux/of_platform.h>
+>> +#include <linux/clk.h>
+>> +#include <linux/delay.h>
+>> +
+>> +#define DRIVER_NAME          "sun4i-ps2"
+>> +
+>> +/* register offset definitions */
+>> +#define PS2_REG_GCTL         0x00    /*  PS2 Module Global Control Reg */
+>> +#define PS2_REG_DATA         0x04    /*  PS2 Module Data Reg         */
+>> +#define PS2_REG_LCTL         0x08    /*  PS2 Module Line Control Reg */
+>> +#define PS2_REG_LSTS         0x0C    /*  PS2 Module Line Status Reg  */
+>> +#define PS2_REG_FCTL         0x10    /*  PS2 Module FIFO Control Reg */
+>> +#define PS2_REG_FSTS         0x14    /*  PS2 Module FIFO Status Reg  */
+>> +#define PS2_REG_CLKDR                0x18    /*  PS2 Module Clock Divider Reg*/
+>> +
+>> +/*  PS2 GLOBAL CONTROL REGISTER PS2_GCTL */
+>> +#define PS2_GCTL_INTFLAG     BIT(4)
+>> +#define PS2_GCTL_INTEN               BIT(3)
+>> +#define PS2_GCTL_RESET               BIT(2)
+>> +#define PS2_GCTL_MASTER              BIT(1)
+>> +#define PS2_GCTL_BUSEN               BIT(0)
+>> +
+>> +/* PS2 LINE CONTROL REGISTER */
+>> +#define PS2_LCTL_NOACK               BIT(18)
+>> +#define PS2_LCTL_TXDTOEN     BIT(8)
+>> +#define PS2_LCTL_STOPERREN   BIT(3)
+>> +#define PS2_LCTL_ACKERREN    BIT(2)
+>> +#define PS2_LCTL_PARERREN    BIT(1)
+>> +#define PS2_LCTL_RXDTOEN     BIT(0)
+>> +
+>> +/* PS2 LINE STATUS REGISTER */
+>> +#define PS2_LSTS_TXTDO               BIT(8)
+>> +#define PS2_LSTS_STOPERR     BIT(3)
+>> +#define PS2_LSTS_ACKERR              BIT(2)
+>> +#define PS2_LSTS_PARERR              BIT(1)
+>> +#define PS2_LSTS_RXTDO               BIT(0)
+>> +
+>> +#define PS2_LINE_ERROR_BIT \
+>> +     (PS2_LSTS_TXTDO | PS2_LSTS_STOPERR | PS2_LSTS_ACKERR | \
+>> +     PS2_LSTS_PARERR | PS2_LSTS_RXTDO)
+>> +
+>> +/* PS2 FIFO CONTROL REGISTER */
+>> +#define PS2_FCTL_TXRST               BIT(17)
+>> +#define PS2_FCTL_RXRST               BIT(16)
+>> +#define PS2_FCTL_TXUFIEN     BIT(10)
+>> +#define PS2_FCTL_TXOFIEN     BIT(9)
+>> +#define PS2_FCTL_TXRDYIEN    BIT(8)
+>> +#define PS2_FCTL_RXUFIEN     BIT(2)
+>> +#define PS2_FCTL_RXOFIEN     BIT(1)
+>> +#define PS2_FCTL_RXRDYIEN    BIT(0)
+>> +
+>> +/* PS2 FIFO STATUS REGISTER */
+>> +#define PS2_FSTS_TXUF                BIT(10)
+>> +#define PS2_FSTS_TXOF                BIT(9)
+>> +#define PS2_FSTS_TXRDY               BIT(8)
+>> +#define PS2_FSTS_RXUF                BIT(2)
+>> +#define PS2_FSTS_RXOF                BIT(1)
+>> +#define PS2_FSTS_RXRDY               BIT(0)
+>> +
+>> +#define PS2_FIFO_ERROR_BIT \
+>> +     (PS2_FSTS_TXUF | PS2_FSTS_TXOF | PS2_FSTS_RXUF | PS2_FSTS_RXOF)
+>> +
+>> +#define PS2_SAMPLE_CLK               1000000
+>> +#define PS2_SCLK             125000
+>> +
+>> +struct sun4i_ps2data {
+>> +     struct serio *serio;
+>> +     struct device *dev;
+>> +
+>> +     /* IO mapping base */
+>> +     void __iomem    *reg_base;
+>> +
+>> +     /* clock management */
+>> +     struct clk      *clk;
+>> +
+>> +     /* irq */
+>> +     spinlock_t      lock;
+>> +     int             irq;
+>> +};
+>> +
+>> +/*********************/
+>> +/* Interrupt handler */
+>> +/*********************/
+>> +static irqreturn_t sun4i_ps2_interrupt(int irq, void *dev_id)
+>> +{
+>> +     struct sun4i_ps2data *drvdata = dev_id;
+>> +     u32 intr_status;
+>> +     u32 fifo_status;
+>> +     unsigned char byte;
+>> +     unsigned int rxflags = 0;
+>> +     u32 rval;
+>> +
+>> +     spin_lock(&drvdata->lock);
+>> +
+>> +     /* Get the PS/2 interrupts and clear them */
+>> +     intr_status  = readl(drvdata->reg_base + PS2_REG_LSTS);
+>> +     fifo_status  = readl(drvdata->reg_base + PS2_REG_FSTS);
+>> +
+>> +     /*Check Line Status Register*/
+>> +     if (intr_status & PS2_LINE_ERROR_BIT) {
+>> +             rxflags = (intr_status & PS2_LINE_ERROR_BIT) ? SERIO_FRAME : 0;
+>> +             rxflags |= (intr_status & PS2_LSTS_PARERR) ? SERIO_PARITY : 0;
+>> +             rxflags |= (intr_status & PS2_LSTS_PARERR) ? SERIO_TIMEOUT : 0;
+>> +
+>> +             rval = PS2_LSTS_TXTDO | PS2_LSTS_STOPERR | PS2_LSTS_ACKERR |
+>> +                     PS2_LSTS_PARERR | PS2_LSTS_RXTDO;
+>> +             writel(rval, drvdata->reg_base + PS2_REG_LSTS);
+>> +     }
+>> +
+>> +     /*Check FIFO Status Register*/
+>> +     if (fifo_status & PS2_FIFO_ERROR_BIT) {
+>> +             rval = PS2_FSTS_TXUF | PS2_FSTS_TXOF | PS2_FSTS_TXRDY |
+>> +                     PS2_FSTS_RXUF | PS2_FSTS_RXOF | PS2_FSTS_RXRDY;
+>> +             writel(rval, drvdata->reg_base + PS2_REG_FSTS);
+>> +     }
+>> +
+>> +     rval = (fifo_status >> 16) & 0x3;
+>> +     while (rval--) {
+>> +             byte = readl(drvdata->reg_base + PS2_REG_DATA) & 0xff;
+>> +             serio_interrupt(drvdata->serio, byte, rxflags);
+>> +     }
+>> +
+>> +     writel(intr_status, drvdata->reg_base + PS2_REG_LSTS);
+>> +     writel(fifo_status, drvdata->reg_base + PS2_REG_FSTS);
+>> +
+>> +     spin_unlock(&drvdata->lock);
+>> +
+>> +     return IRQ_HANDLED;
+>> +}
+>> +
+>> +
+>> +static int sun4i_ps2_open(struct serio *pserio)
+>> +{
+>> +     struct sun4i_ps2data *drvdata = pserio->port_data;
+>> +     u32 src_clk = 0;
+>> +     u32 clk_scdf;
+>> +     u32 clk_pcdf;
+>> +     u32 rval;
+>> +     unsigned long flags;
+>> +
+>> +     /*Set Line Control And Enable Interrupt*/
+>> +     rval = PS2_LCTL_STOPERREN | PS2_LCTL_ACKERREN
+>> +             | PS2_LCTL_PARERREN | PS2_LCTL_RXDTOEN;
+>> +     writel(rval, drvdata->reg_base + PS2_REG_LCTL);
+>> +
+>> +     /*Reset FIFO*/
+>> +     rval = PS2_FCTL_TXRST | PS2_FCTL_RXRST | PS2_FCTL_TXUFIEN
+>> +             | PS2_FCTL_TXOFIEN | PS2_FCTL_RXUFIEN
+>> +             | PS2_FCTL_RXOFIEN | PS2_FCTL_RXRDYIEN;
+>> +
+>> +     writel(rval, drvdata->reg_base + PS2_REG_FCTL);
+>> +
+>> +     src_clk = clk_get_rate(drvdata->clk);
+>> +     /*Set Clock Divider Register*/
+>> +     clk_scdf = src_clk / PS2_SAMPLE_CLK - 1;
+>> +     clk_pcdf = PS2_SAMPLE_CLK / PS2_SCLK - 1;
+>> +     rval = (clk_scdf<<8) | clk_pcdf;
+>> +     writel(rval, drvdata->reg_base + PS2_REG_CLKDR);
+>> +
+>> +
+>> +     /*Set Global Control Register*/
+>> +     rval = PS2_GCTL_RESET | PS2_GCTL_INTEN | PS2_GCTL_MASTER
+>> +             | PS2_GCTL_BUSEN;
+>> +
+>> +     spin_lock_irqsave(&drvdata->lock, flags);
+>> +     writel(rval, drvdata->reg_base + PS2_REG_GCTL);
+>> +     spin_unlock_irqrestore(&drvdata->lock, flags);
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static void sun4i_ps2_close(struct serio *pserio)
+>> +{
+>> +     struct sun4i_ps2data *drvdata = pserio->port_data;
+>> +
+>> +     synchronize_irq(drvdata->irq);
 >
-> Which of these behaviors is intentional? :)
+> synchronize_irq() on it's own is not very useful. You also need to shut
+> off interrupts on the chip (I suppose by clearing PS2_GCTL_INTEN?)
+> before calling synchronize_irq.
+Okie, I'll do it. Yes, clearing PS2_GCTL_INTEN will shut off the interrupts.
 >
+>> +}
+>> +
+>> +static int sun4i_ps2_write(struct serio *pserio, unsigned char val)
+>> +{
+>> +     unsigned long expire = jiffies + msecs_to_jiffies(10000);
+>> +     struct sun4i_ps2data *drvdata;
+>> +
+>> +     drvdata = (struct sun4i_ps2data *)pserio->port_data;
+>> +
+>> +     do {
+>> +             if (readl(drvdata->reg_base + PS2_REG_FSTS) & PS2_FSTS_TXRDY) {
+>> +                     writel(val, drvdata->reg_base + PS2_REG_DATA);
+>> +                     return 0;
+>> +             }
+>> +     } while (time_before(jiffies, expire));
+>> +
+>> +     return SERIO_TIMEOUT;
+>> +}
+>> +
+>> +static int sun4i_ps2_probe(struct platform_device *pdev)
+>> +{
+>> +     struct resource *res; /* IO mem resources */
+>> +     struct sun4i_ps2data *drvdata;
+>> +     struct serio *serio;
+>> +     struct device *dev = &pdev->dev;
+>> +     unsigned int irq;
+>> +     int error;
+>> +
+>> +     drvdata = devm_kzalloc(dev, sizeof(struct sun4i_ps2data), GFP_KERNEL);
+>> +     serio = kzalloc(sizeof(struct serio), GFP_KERNEL);
+>> +     if (!drvdata || !serio) {
+>> +             error = -ENOMEM;
+>> +             goto err_free_mem;
+>> +     }
+>> +
+>> +     spin_lock_init(&drvdata->lock);
+>> +
+>> +     /* IO */
+>> +     res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +     drvdata->reg_base = devm_ioremap_resource(dev, res);
+>> +     if (IS_ERR(drvdata->reg_base)) {
+>> +             dev_err(dev, "failed to map registers\n");
+>> +             error = PTR_ERR(drvdata->reg_base);
+>> +             goto err_free_mem;
+>> +     }
+>> +
+>> +     drvdata->clk = devm_clk_get(dev, NULL);
+>> +     if (IS_ERR(drvdata->clk)) {
+>> +             error = PTR_ERR(drvdata->clk);
+>> +             dev_err(dev, "couldn't get clock %d\n", error);
+>> +             goto err_free_mem;
+>> +     }
+>> +
+>> +     error = clk_prepare_enable(drvdata->clk);
+>> +     if (error) {
+>> +             dev_err(dev, "failed to enable clock %d\n", error);
+>> +             goto err_free_mem;
+>> +     }
+>> +
+>> +     serio->id.type = SERIO_8042;
+>> +     serio->write = sun4i_ps2_write;
+>> +     serio->open = sun4i_ps2_open;
+>> +     serio->close = sun4i_ps2_close;
+>> +     serio->port_data = drvdata;
+>> +     serio->dev.parent = dev;
+>> +     strlcpy(serio->name, dev_name(dev), sizeof(serio->name));
+>> +     strlcpy(serio->phys, dev_name(dev), sizeof(serio->phys));
+>> +
+>> +     /* Get IRQ for the device */
+>> +     irq = platform_get_irq(pdev, 0);
+>> +     if (!irq) {
+>> +             dev_err(dev, "no IRQ found\n");
+>> +             error = -ENXIO;
+>> +             goto error_disable_clk;
+>> +     }
+>> +
+>> +     drvdata->irq = irq;
+>> +     drvdata->serio = serio;
+>> +     drvdata->dev = dev;
+>> +     error = devm_request_threaded_irq(dev, drvdata->irq,
+>> +             sun4i_ps2_interrupt, NULL, 0, DRIVER_NAME, drvdata);
+>> +
+>> +     if (error) {
+>> +             dev_err(drvdata->dev, "Interrupt alloc failed %d:error:%d\n",
+>> +                     drvdata->irq, error);
+>> +             goto error_disable_clk;
+>> +     }
+>> +
+>> +     serio_register_port(serio);
+>> +     platform_set_drvdata(pdev, drvdata);
+>> +
+>> +     return 0;       /* success */
+>> +
+>> +error_disable_clk:
+>> +     clk_disable_unprepare(drvdata->clk);
+>> +
+>> +err_free_mem:
+>> +     kfree(serio);
+>> +     return error;
+>> +}
+>> +
+>> +static int sun4i_ps2_remove(struct platform_device *pdev)
+>> +{
+>> +     struct sun4i_ps2data *drvdata = platform_get_drvdata(pdev);
+>> +
+>> +     serio_unregister_port(drvdata->serio);
+>> +
+>> +     if (!IS_ERR(drvdata->clk))
+>> +             clk_disable_unprepare(drvdata->clk);
+>> +     kfree(drvdata->serio);
+>
+> Serio is refcounted, you do not free it after its has been registered.
+> Overall I'd rather you did not use devm* interfaces here since you are
+> forced to mix managed and manually freed resources.
+Okie, No need to free serio here.
+If serio is not manually freed here, It is not freeing anything else manually.
 
-
-Just want to summarize the difference.
-(please, correct me if i am mistaken)
-
-Userspace has two ways to see actual syscall number:
-   1. /proc/pid/syscall file
-   2. ptrace
-
-So the following is the table showing what syscall number
-userspace sees using proc file or doing ptrace in case of restarted poll:
-
-                         x86           ARM              ARM64     ARM64 compat
-cat /proc/pid/syscall:   NR_restart    Not supported    ?????     ?????
-               ptrace:   NR_restart    NR_poll          NR_poll   NR_restart
-
-
-Not supported - should be fixed by these two patches, the behaviour should
-                be similar to x86, i.e. userspace will see NR_restart
-
-         ???? - I do not have ARM64 for testing.
-                Kees, could you please cat /proc/pid/syscall for those two?
-                I took a quick look into arm64 syscall.h/entry.S and seems it
-                is supported fine and the result should be equal to ptrace.
-
-So, yes, compatibility is important, but /proc/pid/syscall never works on ARM
-and ptrace output is different even among ARM architectures.
-
---
-Roman
+do you still feel I should not use devm* interfaces here?
+>
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static const struct of_device_id sun4i_ps2_match[] = {
+>> +     { .compatible = "allwinner,sun4i-a10-ps2", },
+>> +     { },
+>> +};
+>> +
+>> +MODULE_DEVICE_TABLE(of, sun4i_ps2_match);
+>> +
+>> +static struct platform_driver sun4i_ps2_driver = {
+>> +     .probe          = sun4i_ps2_probe,
+>> +     .remove         = sun4i_ps2_remove,
+>> +     .driver = {
+>> +             .name = DRIVER_NAME,
+>> +             .of_match_table = sun4i_ps2_match,
+>> +     },
+>> +};
+>> +module_platform_driver(sun4i_ps2_driver);
+>> +
+>> +MODULE_AUTHOR("Vishnu Patekar <vishnupatekar0510@gmail.com>");
+>> +MODULE_AUTHOR("Aaron.maoye <leafy.myeh@newbietech.com>");
+>> +MODULE_DESCRIPTION("Allwinner A10/Sun4i PS/2 driver");
+>> +MODULE_LICENSE("GPL v2");
+>> --
+>> 1.7.9.5
+>>
+>
+> Thanks.
+>
+> --
+> Dmitry
