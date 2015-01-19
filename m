@@ -1,40 +1,77 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 19 Jan 2015 14:01:16 +0100
-Subject: [PATCH fix for 3.19] ARM: dts: sun4i: Add simplefb node with
- de_fe0-de_be0-lcd0-hdmi pipeline
-Message-ID: <1421672477-12978-1-git-send-email-hdegoede@redhat.com>
+From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
+Date: Mon, 19 Jan 2015 14:04:39 +0100
+Subject: [PATCH 2/5] PCI: st: Add Device Tree bindings for sti pcie
+In-Reply-To: <2165161.8vJctS1yVa@wuerfel>
+References: <1418812486-12394-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1418812486-12394-3-git-send-email-gabriel.fernandez@linaro.org>
+ <2165161.8vJctS1yVa@wuerfel>
+Message-ID: <CAG374jB5fcG2-2WnxkN5U-qOw=xP3A5tnTO04Gcqt3cSRhhKmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hi Arnd,
 
-As I already mailed you about yesterday as a headsup here is a fix for
-the simplefb dt nodes introduced for sunxi in 3.19, I would like to get
-this into 3.19 to avoid the need for carrying compatibility code for the old
-nodes in u-boot (as 3.19 is going to be the first kernel release with sunxi
-simplefb support).
+Thanks for reviewing
 
->From the commit message of the attached patch:
+On 17 December 2014 at 23:01, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 17 December 2014 11:34:43 Gabriel FERNANDEZ wrote:
+>> sti pcie is built around a Synopsis Designware PCIe IP.
+>>
+>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+>> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+>> ---
+>>  Documentation/devicetree/bindings/pci/st-pcie.txt | 53 +++++++++++++++++++++++
+>>  1 file changed, 53 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/pci/st-pcie.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/pci/st-pcie.txt b/Documentation/devicetree/bindings/pci/st-pcie.txt
+>> new file mode 100644
+>> index 0000000..bd3488f
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/pci/st-pcie.txt
+>> @@ -0,0 +1,53 @@
+>> +STMicroelectronics STi PCIe controller
+>> +
+>> +This PCIe host controller is based on the Synopsis Designware PCIe IP
+>> +and thus inherits all the common properties defined in designware-pcie.txt.
+>> +
+>> +Required properties:
+>> + - compatible: "st,stih407-pcie"
+>> + - reg: base address and length of the pcie controller, mem-window address
+>> +   and length available to the controller.
+>> + - interrupts: A list of interrupt outputs of the controller.
+>> + - interrupt-names: Must include the following entries:
+>> +   "msi": STi interrupt that is asserted when an MSI is received
+>
+> You should specify that only one interrupt may be present.
+> If you extend the binding, you will need to describe what the
+> second one is as well.
+>
 
-###
+ok, i will change into:
+"
+ - interrupts: A list of interrupt outputs of the controller. Must contain an
+  entry for each entry in the interrupt-names property.
 
-Testing has shown that on sun4i the display backend engine does not have
-deep enough fifo-s causing flickering / tearing in full-hd mode due to
-fifo underruns. This can be avoided by letting the display frontend engine
-do the dma from memory, and then letting it feed the data directly into
-the backend unmodified, as the frontend does have deep enough fifo-s.
+>> + - st,syscfg : should be a phandle of the syscfg node. Also contains syscfg
+>> +   offset for IP configuration.
+>> + - resets, reset-names: the power-down and soft-reset lines of PCIe IP.
+>> +   Associated names must be "powerdown" and "softreset".
+>> + - phys, phy-names: the phandle for the PHY device.
+>> +   Associated name must be "pcie_phy"
+>
+> Names should not have underscores in them in general. "pcie-phy" would
+> be fine, but just "pcie" seems good enough, unless there are existing
+> drivers that have established a specific naming.
+>
 
-Note since u-boot-v2015.01 has been released using the de_be0-lcd0-hdmi
-pipeline on sun4i, we need to keep that one around too (unfortunately).
+just "pcie" is fine for me
 
-###
 
-I've send a patch to the u-boot mailinglist this morning to make u-boot
-v2015.04 (and later) use a de_fe0-de_be0-lcd0-hdmi pipeline on sun4i thus
-fixing the tearing / flickering.
+BR
 
-Can you please queue this patch up as a fix for 3.19 ?
+Gabriel
 
-Thanks & Regards,
-
-Hans
+>
+>         Arnd
+>
