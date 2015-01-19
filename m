@@ -1,73 +1,53 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Mon, 19 Jan 2015 15:13:50 +0000
-Subject: [PATCH v7 04/17] ARM64 / ACPI: Introduce early_param for
- =?iso-8859-1?Q?=22acpi=22=0D?= and pass acpi=force to enable ACPI
-In-Reply-To: <20150119135144.GI11835@e104818-lin.cambridge.arm.com>
-References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
- <1421247905-3749-5-git-send-email-hanjun.guo@linaro.org>
- <20150119114255.GF11835@e104818-lin.cambridge.arm.com>
- <CAKv+Gu8vPKAdsNg7QC7xW+i8_BemWEx4mvBx6NrnAHi8Y+bNtw@mail.gmail.com>
- <20150119135144.GI11835@e104818-lin.cambridge.arm.com>
-Message-ID: <20150119151350.21B65C40948@trevor.secretlab.ca>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 19 Jan 2015 16:17:39 +0100
+Subject: [PATCH v3 2/3] arm64: dts: Add APM X-Gene DMA device and DMA
+ clock DTS nodes
+In-Reply-To: <CAFd313wyVqsqGNdxrAzmGCCYd-RAEcrX6f4y2Gngi44OOkbx-Q@mail.gmail.com>
+References: <1421671269-19441-1-git-send-email-rsahu@apm.com>
+ <2407238.x2YxDm0cd4@wuerfel>
+ <CAFd313wyVqsqGNdxrAzmGCCYd-RAEcrX6f4y2Gngi44OOkbx-Q@mail.gmail.com>
+Message-ID: <4015362.jQuStL4p6a@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 19 Jan 2015 13:51:45 +0000
-, Catalin Marinas <catalin.marinas@arm.com>
- wrote:
-> On Mon, Jan 19, 2015 at 11:55:32AM +0000, Ard Biesheuvel wrote:
-> > On 19 January 2015 at 11:42, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > > On Wed, Jan 14, 2015 at 03:04:52PM +0000, Hanjun Guo wrote:
-> > >> From: Al Stone <al.stone@linaro.org>
-> > >>
-> > >> Introduce one early parameters "off" and "force" for "acpi", acpi=off
-> > >> will be the default behavior for ARM64, so introduce acpi=force to
-> > >> enable ACPI on ARM64.
-> > >>
-> > >> Disable ACPI before early parameters parsed, and enable it to pass
-> > >> "acpi=force" if people want use ACPI on ARM64. This ensures DT be
-> > >> the prefer one if ACPI table and DT both are provided at this moment.
-> > > [...]
-> > >> --- a/arch/arm64/kernel/setup.c
-> > >> +++ b/arch/arm64/kernel/setup.c
-> > >> @@ -62,6 +62,7 @@
-> > >>  #include <asm/memblock.h>
-> > >>  #include <asm/psci.h>
-> > >>  #include <asm/efi.h>
-> > >> +#include <asm/acpi.h>
-> > >>
-> > >>  unsigned int processor_id;
-> > >>  EXPORT_SYMBOL(processor_id);
-> > >> @@ -388,6 +389,8 @@ void __init setup_arch(char **cmdline_p)
-> > >>       early_fixmap_init();
-> > >>       early_ioremap_init();
-> > >>
-> > >> +     disable_acpi();
-> > >> +
-> > >>       parse_early_param();
-> > >>
-> > >>       /*
-> > >
-> > > Did we get to any conclusion here? DT being the preferred one is fine
-> > > when both DT and ACPI are present but do we still want the kernel to
-> > > ignore ACPI altogether if DT is not present? It's a bit harder to detect
-> > > the presence of DT at this point since the EFI_STUB added one already. I
-> > > guess we could move the "acpi=force" argument passing to EFI_STUB if no
-> > > DT is present at boot.
-> > 
-> > Since the EFI stub populates the /chosen node in DT, I would prefer
-> > for it to add a property there to indicate whether it created the DT
-> > from scratch rather than adding ACPI specific stuff in there (even if
-> > it is just a string to concatenate)
+On Monday 19 January 2015 20:11:22 Rameshwar Sahu wrote:
 > 
-> This works for me. So we could pass "acpi=force" in EFI stub if it
-> created the DT from scratch *and* ACPI tables are present (can it detect
-> the latter? And maybe it could print something if none are available).
-> If that works, the actual kernel can assume that ACPI needs to be
-> explicitly enabled via acpi=force, irrespective of how much information
-> it has in DT.
+> >
+> > The value should be
+> >
+> >         dma-ranges = <0x40 0x0 0x40 0x0 0x200 0>;
+> >
+> 
+> then it should be :
+> 
+> dma-ranges = <0x40 0x0 0x40 0x0 0x400 0>;
+> 
+> 
+> to say that any DMA to physical addresses from 0 to 0x3f.ffffffff
 
-Ditto for me. I think this is a fine solution. And, yes, the stub can
-easily detect the presence of ACPI by looking in the UEFI config table.
+No, the property above is for a bus that extends from
+0x40.00000000 to 0x43f.ffffffff
 
-g.
+The first tuple is the address that is used for the local
+bus, the second one is the address that it gets translated to
+on the parent bus, and the third tuple is the length.
+
+> > is disallowed and dma to physical addresses from 0x40.00000000
+> > to 0x23f.ffffffff is allowed and gets translated using an
+> > identity mapping.
+> >
+> > I also see that on Mustang, all memory is outside of this range,
+> >
+> 
+> Do you mean all other device controller node in DT here??
+> Basically these are all device controller memory, as what I understood is
+> dma-ranges tells about DDR ranges like start address of DDR
+> and length.
+
+It has absolutely nothing to do with where the DDR memory resides,
+only which addresses are valid on a particular bus, like the
+ranges property for the opposite direction. This is usually set
+up in some control register for the bus, and you should use the
+same value here.
+
+	Arnd
