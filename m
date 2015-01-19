@@ -1,44 +1,95 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 19 Jan 2015 22:35:07 +0100
-Subject: [PATCH v2 0/3] ARM: mvebu: Enable XHCI on the Armada 385 AP
-In-Reply-To: <1421672474-2945-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1421672474-2945-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20150119213507.GC2938@lunn.ch>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 19 Jan 2015 13:34:59 -0800
+Subject: [PATCH] irqchip: omap-intc: improve IRQ handler
+In-Reply-To: <1420224433-27001-1-git-send-email-balbi@ti.com>
+References: <1420224433-27001-1-git-send-email-balbi@ti.com>
+Message-ID: <20150119213458.GK18552@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 19, 2015 at 02:01:11PM +0100, Maxime Ripard wrote:
-> Hi all,
+* Felipe Balbi <balbi@ti.com> [150102 10:50]:
+> as it turns out the current IRQ number will
+> *always* be available from SIR register which
+> renders the reads of PENDING registers as plain
+> unnecessary overhead.
 > 
-> This serie enables the Armada 385 AP XHCI controller.
+> In order to catch any situation where SIR reads
+> as zero, we're adding a WARN() to turn it into
+> a very verbose error and users actually report
+> it.
 > 
-> Since the controller uses a GPIO-controlled VBUS, we used the
-> phy-generic driver, and made the needed additions to the xhci-plat
-> driver to retrieve a USB phy.
+> With this patch average running time of
+> omap_intc_handle_irq() reduced from about 28.5us
+> to 19.8us as measured by the kernel function
+> profiler.
 > 
-> Unfortunately, some glitches were also found along the way, mostly
-> because of the probe deferring that was introduced by this phy
-> retrieval.
+> Tested with BeagleBoneBlack Rev A5C.
 > 
-> Since the introduction of the Armada 38x support in 3.16, the driver
-> was attempting to write into registers while the clock wasn't enabled
-> yet. This was working because the bootloader left it enabled, but in
-> the case of a deferred probing, the clock would have been disabled by
-> the error path of our driver, and this would fail. This should go in
-> 3.19, and any stable kernel for 3.16+.
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+
+Jason, looks like this is not showing up in Linux next. The
+same for the changes I did for dm81xx.
+
+Regards,
+
+Tony
+
+> ---
 > 
-> The two patches remaining are "regular" patches, and are aimed at
-> 3.20. The last patch depend on my previous serie to introduce support
-> for the the A385 AP board.
-
-Hi Maxime
-
-I assume you want me to take 3/3? Any other route is not simple, since
-this file only exists in mvebu/dt and maybe a staging branch of
-arm-soc.
-
-What route do you think the other patches will take?
-
-Thanks
-
-	Andrew
+> Before applying, it would be very nice to get reports
+> from other folks on different platforms, specially OMAP2/3
+> ones which I don't have (easy) access.
+> 
+>  drivers/irqchip/irq-omap-intc.c | 35 +++++------------------------------
+>  1 file changed, 5 insertions(+), 30 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-omap-intc.c b/drivers/irqchip/irq-omap-intc.c
+> index 28718d3..a2da6d5 100644
+> --- a/drivers/irqchip/irq-omap-intc.c
+> +++ b/drivers/irqchip/irq-omap-intc.c
+> @@ -315,37 +315,12 @@ static int __init omap_init_irq(u32 base, struct device_node *node)
+>  static asmlinkage void __exception_irq_entry
+>  omap_intc_handle_irq(struct pt_regs *regs)
+>  {
+> -	u32 irqnr = 0;
+> -	int handled_irq = 0;
+> -	int i;
+> -
+> -	do {
+> -		for (i = 0; i < omap_nr_pending; i++) {
+> -			irqnr = intc_readl(INTC_PENDING_IRQ0 + (0x20 * i));
+> -			if (irqnr)
+> -				goto out;
+> -		}
+> -
+> -out:
+> -		if (!irqnr)
+> -			break;
+> -
+> -		irqnr = intc_readl(INTC_SIR);
+> -		irqnr &= ACTIVEIRQ_MASK;
+> +	u32 irqnr;
+>  
+> -		if (irqnr) {
+> -			handle_domain_irq(domain, irqnr, regs);
+> -			handled_irq = 1;
+> -		}
+> -	} while (irqnr);
+> -
+> -	/*
+> -	 * If an irq is masked or deasserted while active, we will
+> -	 * keep ending up here with no irq handled. So remove it from
+> -	 * the INTC with an ack.
+> -	 */
+> -	if (!handled_irq)
+> -		omap_ack_irq(NULL);
+> +	irqnr = intc_readl(INTC_SIR);
+> +	irqnr &= ACTIVEIRQ_MASK;
+> +	WARN(!irqnr, "Spuriour IRQ ?\n");
+> +	handle_domain_irq(domain, irqnr, regs);
+>  }
+>  
+>  void __init omap2_init_irq(void)
+> -- 
+> 2.2.0
+> 
