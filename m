@@ -1,55 +1,47 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 19 Jan 2015 11:12:50 +0800
-Subject: [PATCH 10/28] PCI: Save sysdata in pci_host_bridge drvdata
-In-Reply-To: <18973877.BYCS6vtzoq@wuerfel>
+Date: Mon, 19 Jan 2015 11:17:47 +0800
+Subject: [PATCH 23/28] PCI/designware: Use pci_scan_root_bus() for
+ simplicity
+In-Reply-To: <54BA9052.9080904@cogentembedded.com>
 References: <1421372666-12288-1-git-send-email-wangyijing@huawei.com>
- <1421372666-12288-11-git-send-email-wangyijing@huawei.com>
- <18973877.BYCS6vtzoq@wuerfel>
-Message-ID: <54BC7632.1080003@huawei.com>
+ <1421372666-12288-24-git-send-email-wangyijing@huawei.com>
+ <54BA9052.9080904@cogentembedded.com>
+Message-ID: <54BC775B.5020400@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/1/16 17:18, Arnd Bergmann wrote:
-> On Friday 16 January 2015 09:44:08 Yijing Wang wrote:
->> @@ -2066,11 +2064,11 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, u32 db,
->>  {
->>         struct pci_host_bridge *host;
->>  
->> -       host = pci_create_host_bridge(parent, db, resources);
->> +       host = pci_create_host_bridge(parent, db, resources, sysdata);
->>         if (!host)
->>                 return NULL;
->>  
->> -       return __pci_scan_root_bus(host, ops, sysdata);
->> +       return __pci_scan_root_bus(host, ops);
->>  }
->>  EXPORT_SYMBOL(pci_scan_root_bus);
+On 2015/1/18 0:39, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 1/16/2015 4:44 AM, Yijing Wang wrote:
+> 
+>> Use pci_scan_root_bus() instead of pci_create_root_bus() +
+>> pci_scan_child_bus() for simplicity.
+> 
+>> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+>> ---
+>>   drivers/pci/host/pcie-designware.c |    4 +---
+>>   1 files changed, 1 insertions(+), 3 deletions(-)
+> 
+>> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+>> index eef3111..d37fe27 100644
+>> --- a/drivers/pci/host/pcie-designware.c
+>> +++ b/drivers/pci/host/pcie-designware.c
+>> @@ -725,13 +725,11 @@ static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+>>       struct pcie_port *pp = sys_to_pcie(sys);
 >>
+>>       pp->root_bus_nr = sys->busnr;
+>> -    bus = pci_create_root_bus(pp->dev, sys->busnr,
+>> +    bus = pci_scan_root_bus(pp->dev, sys->busnr,
+>>                     &dw_pcie_ops, sys, &sys->resources);
 > 
-> How about keeping the sysdata out of the pci_create_host_bridge interface, and
-> refactoring it so that the call sequence becomes
-> 
-> 	host = pci_create_host_bridge(parent, db, resources);
-> 	host->sysdata = sysdata;
-> 	__pci_scan_root_bus(host, ops);
-> 
-> This way, we can make sysdata completely option. I assume that more of the
-> fields we have in sysdata today can get moved into pci_host_bridge
-> over time, so a host bridge driver can just assign those members individually
-> between pci_create_host_bridge and __pci_scan_root_bus.
+>    Please realign this line, so that it still starts under 'pp'.
 
-I put the sysdata in pci_host_bridge, because some platforms x86/ia64
-need to call pcibios_root_bridge_prepare() before pci_host_bridge registration
-in pci_create_host_bridge(), and pcibios_root_bridge_prepare() need the companion
-acpi device pointer which is stored in sysdata.
-
-I like you idea, but I haven't find a better way yet.
-
-Thanks!
-Yijing.
+ok.
 
 > 
-> 	Arnd
+> WBR, Sergei
+> 
 > 
 > .
 > 
