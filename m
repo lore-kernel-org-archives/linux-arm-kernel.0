@@ -1,46 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 Jan 2015 21:34:17 +0100
-Subject: [PATCH net-next v13 3/3] net: hisilicon: new hip04 ethernet driver
-In-Reply-To: <54BD48BF.3050707@suse.de>
-References: <1421217254-12008-1-git-send-email-dingtianhong@huawei.com>
- <1421217254-12008-4-git-send-email-dingtianhong@huawei.com>
- <54BD48BF.3050707@suse.de>
-Message-ID: <9314032.C8yR0htxiP@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 19 Jan 2015 21:39:41 +0100
+Subject: [PATCH] ARM: dts: sunxi: Add missing mdio label
+In-Reply-To: <1421696122-5389-1-git-send-email-mamlinav@gmail.com>
+References: <1421696122-5389-1-git-send-email-mamlinav@gmail.com>
+Message-ID: <20150119203941.GG4367@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 19 January 2015 19:11:11 Alexander Graf wrote:
+On Mon, Jan 19, 2015 at 10:35:22PM +0300, Aleksei Mamlin wrote:
+> This patch add missing mdio label for sun[457]i.
 > 
-> After hammering on the box a bit again, I'm in a situation where I get 
-> lots of
-> 
-> [302398.232603] hip04-ether e28b0000.ethernet eth0: rx drop
-> [302398.377309] hip04-ether e28b0000.ethernet eth0: rx drop
-> [302398.395198] hip04-ether e28b0000.ethernet eth0: rx drop
-> [302398.466118] hip04-ether e28b0000.ethernet eth0: rx drop
-> [302398.659009] hip04-ether e28b0000.ethernet eth0: rx drop
-> [302399.053389] hip04-ether e28b0000.ethernet eth0: rx drop
-> [302399.122067] hip04-ether e28b0000.ethernet eth0: rx drop
-> [302399.268192] hip04-ether e28b0000.ethernet eth0: rx drop
-> [302399.286081] hip04-ether e28b0000.ethernet eth0: rx drop
-> [302399.594201] hip04-ether e28b0000.ethernet eth0: rx drop
-> [302399.683416] hip04-ether e28b0000.ethernet eth0: rx drop
-> [302399.701307] hip04-ether e28b0000.ethernet eth0: rx drop
-> 
-> and I really am getting a lot of drops - I can't even ping the machine 
-> anymore.
-> 
-> However, as it is there's a good chance the machine is simply 
-> unreachable because it's busy writing to the UART, and even if not all 
-> useful messages indicating anything have scrolled out. I really don't 
-> think you should emit any message over and over again to the user. Once 
-> or twice is enough.
->
-> Please make sure to rate limit it.
+> Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
 
-I would argue that packet loss is not an error condition at all
-and you should not print this at netdev_err() level. You could make
-this a netdev_dbg(), or just make it silent because it's already
-counted in the statistics.
+Applied, thanks.
 
-	Arnd
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150119/d1403e57/attachment-0001.sig>
