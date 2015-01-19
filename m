@@ -1,33 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 19 Jan 2015 13:18:43 +0000
-Subject: [PATCH v2 0/5] Generic IOMMU page table framework
-In-Reply-To: <20150119130940.GJ6343@8bytes.org>
-References: <1420811657-21321-1-git-send-email-will.deacon@arm.com>
- <20150116140130.GQ7091@arm.com> <20150119130940.GJ6343@8bytes.org>
-Message-ID: <20150119131843.GJ32131@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 19 Jan 2015 13:19:31 +0000
+Subject: [Query] ARM64 : arm_pm_restart intialization
+In-Reply-To: <BLUPR03MB167FE14DFB49FB4251C503F904A0@BLUPR03MB167.namprd03.prod.outlook.com>
+ (Pankaj Chauhan's message of "Mon, 19 Jan 2015 12:27:04 +0000")
+References: <BLUPR03MB167FE14DFB49FB4251C503F904A0@BLUPR03MB167.namprd03.prod.outlook.com>
+Message-ID: <87fvb6hpr0.fsf@approximate.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+On Mon, Jan 19 2015 at 12:27:04 pm GMT, Pankaj Chauhan <Pankaj.Chauhan@freescale.com> wrote:
+> Hello,
+>
+> I have a small query regarding machine_restart() for ARM64.
+>
+> For both ARM64 and ARM32 machine_restart()
+> (arch/arm*/kernel/process.c) calls arm_pm_restart, for doing machine
+> specific restart. For ARM32 arm_pm_restart, gets initialized by
+> 'machine_desc.restart' provided by each machine/platform
+> implementation.
+>
+> For ARM64 how are different platforms supposed to initialize
+> arm_pm_restart pointer?  (As there is no struct machine_desc defined
+> for ARM64). Is there a framework similar to machine_desc for setting
+> up the restart handlers?
 
-Thanks for the reply.
+Have a look at the stuff implemented in drivers/power/reset. The main
+idea is to use a restart notifier, which works for both 32 and 64bit
+kernels.
 
-On Mon, Jan 19, 2015 at 01:09:41PM +0000, joro at 8bytes.org wrote:
-> On Fri, Jan 16, 2015 at 02:01:31PM +0000, Will Deacon wrote:
-> > I've not received any feedback on this revision of the series, but it's
-> > working well for me and Laurent showed that it works with his IOMMU too.
-> > 
-> > Joerg -- can I include this in my pull request for 3.20, or is there
-> > anything further you'd like me to address? The code is completely
-> > self-contained, so I wouldn't expect any impact on IOMMU drivers that
-> > don't explicitly use the new page table API.
-> 
-> The patch-set looks good to me. But with code generification in general,
-> what are the plans for other arm iommu drivers to adopt this?
-
-I think Laurent was going to make use of it and I'm working on a driver
-that will use it too.
-
-Laurent -- you had patches ready to go for v1, right?
-
-Will
+	M.
+-- 
+Jazz is not dead. It just smells funny.
