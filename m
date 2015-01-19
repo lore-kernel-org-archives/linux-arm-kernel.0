@@ -1,304 +1,151 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 19 Jan 2015 14:14:04 -0600
-Subject: [PATCH v2] ARM: OMAP: Work around hardcoded interrupts
-In-Reply-To: <1421490068-20385-1-git-send-email-marc.zyngier@arm.com>
-References: <1421490068-20385-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150119201404.GA18738@kahuna>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 19 Jan 2015 21:15:32 +0100
+Subject: [PATCHv3 2/2] USB: gadget: atmel_usba_udc: Enable/disable USB
+ PLL on Vbus change
+In-Reply-To: <20150119174631.GA26716@gradator.net>
+References: <20150118175621.6b519cdc@bbrezillon>
+ <1421601875-9436-1-git-send-email-sylvain.rochet@finsecur.com>
+ <1421601875-9436-3-git-send-email-sylvain.rochet@finsecur.com>
+ <54BD36F6.8030408@atmel.com> <20150119174631.GA26716@gradator.net>
+Message-ID: <20150119211532.0759b537@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:21-20150117, Marc Zyngier wrote:
-> Commit 9a1091ef0017 (irqchip: gic: Support hierarchy irq domain)
-should have been
-Commit 9a1091ef0017 ("irqchip: gic: Support hierarchy irq domain")
+On Mon, 19 Jan 2015 18:46:31 +0100
+Sylvain Rochet <sylvain.rochet@finsecur.com> wrote:
 
-> changed the GIC driver to use a non-legacy IRQ domain on DT
-> platforms. This patch assumes that DT-driven systems are getting
-> all of their interrupts from device tree.
+> Hello Nicolas,
 > 
-> Turns out that OMAP has quite a few hidden gems, and still uses
-> hardcoded interrupts despite having fairly complete DTs.
 > 
-> This patch attempts to work around these by offering a translation
-> method that can be called directly from the hwmod code, if present.
-> The same hack is sprinkled over PRCM and TWL.
+> On Mon, Jan 19, 2015 at 05:55:18PM +0100, Nicolas Ferre wrote:
+> > Le 18/01/2015 18:24, Sylvain Rochet a ?crit :
+> > > Prepare_enable on rising edge, disable_unprepare on falling edge. Reduce
+> >
+> > Please re-write which "edge" we are talking about: "... falling edge of
+> > the Vbus signal" for example.
+> >
+> > > power consumption if USB PLL is not already necessary for OHCI or EHCI.
+> >
+> > Is a verb missing in the previous sentence?
+> >
+> > > If USB host is not connected we can sleep with USB PLL stopped.
+> > >
+> > > This driver does not support suspend/resume yet, not suspending if we
+> > > are still attached to an USB host is fine for what I need, this patch
+> > > allow suspending with USB PLL stopped when USB device is not currently
+> > > used.
+> >
+> > Can you please make it more clear. Several separated sentences seem
+> > necessary here.
 > 
-> It isn't pretty, but it seems to do the job without having to add
-> more hacks to the interrupt controller code.
+> Maybe :)
 > 
-> Tested on OMAP4 (Panda-ES) and OMAP5 (UEVM5432).
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Proposal:
+> 
+> Start clocks on rising edge of the Vbus signal, stop clocks on 
+> falling edge of the Vbus signal.
+> 
+> If USB PLL is not necessary for other USB drivers (e.g. OHCI and EHCI) 
+> it will reduce power consumption by switching off the USB PLL if no USB 
+> Host is currently connected to this USB Device.
+> 
+> We are using Vbus GPIO signal to detect Host presence. If Vbus signal is 
+> not available then the device stay continuously clocked.
+> 
+> Note this driver does not support suspend/resume yet, it may stay 
+> clocked if USB Host is still connected when suspending. For what I need, 
+> forbidding suspend from userland if we are still attached to an USB host 
+> is fine, but we might as well add suspend/resume to this driver in the 
+> future.
+> 
+> 
+> 
+> > >  	/* May happen if Vbus pin toggles during probe() */
+> > > -	if (!udc->driver)
+> > > +	spin_lock_irqsave(&udc->lock, flags);
+> > > +	if (!udc->driver) {
+> > > +		spin_unlock_irqrestore(&udc->lock, flags);
+> > >  		goto out;
+> > > +	}
+> > > +	spin_unlock_irqrestore(&udc->lock, flags);
+> > 
+> > I'm not sure that the protection by spin_lock is needed above.
+> 
+> I'm not sure too, it was already in a spinlock area, I obviously kept it 
+> because it was not the purpose of this patch.
 
-Other than that, This looks good to me.
-Acked-by: Nishanth Menon <nm@ti.com>
+According to the comment placed above this test it's here to prevent
+any action triggered by the vbus pin irq while the driver is not
+properly probed yet.
+You could use:
 
-> ---
-> From v1:
-> - OMAP4 can either get the PRM interrupt from hwmod or from device tree.
->   In the latter case, remove the xlate_irq method.
+set_irq_flags(vbus_irq, IRQF_NOAUTOEN);
+
+before calling devm_request_threaded_irq.
+This will keep the irq disabled instead of enabling it at request time.
+Moreover, this simplify the vbus_irq request code (which disables the
+irq just after requesting it).
+
 > 
->  arch/arm/mach-omap2/common.h               |  1 +
->  arch/arm/mach-omap2/omap4-common.c         | 32 ++++++++++++++++++++++++++++++
->  arch/arm/mach-omap2/omap_hwmod.c           | 10 ++++++++--
->  arch/arm/mach-omap2/omap_hwmod.h           |  1 +
->  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  5 +++++
->  arch/arm/mach-omap2/omap_hwmod_54xx_data.c |  1 +
->  arch/arm/mach-omap2/prcm-common.h          |  1 +
->  arch/arm/mach-omap2/prm44xx.c              |  5 ++++-
->  arch/arm/mach-omap2/prm_common.c           | 14 +++++++++++--
->  arch/arm/mach-omap2/twl-common.c           |  5 ++++-
->  10 files changed, 69 insertions(+), 6 deletions(-)
+> This seem to be in mirror of atmel_usba_start() which does:
 > 
-> diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-> index 377eea8..b664494 100644
-> --- a/arch/arm/mach-omap2/common.h
-> +++ b/arch/arm/mach-omap2/common.h
-> @@ -211,6 +211,7 @@ extern struct device *omap2_get_iva_device(void);
->  extern struct device *omap2_get_l3_device(void);
->  extern struct device *omap4_get_dsp_device(void);
->  
-> +unsigned int omap4_xlate_irq(unsigned int hwirq);
->  void omap_gic_of_init(void);
->  
->  #ifdef CONFIG_CACHE_L2X0
-> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-> index b7cb44a..cc30e49 100644
-> --- a/arch/arm/mach-omap2/omap4-common.c
-> +++ b/arch/arm/mach-omap2/omap4-common.c
-> @@ -256,6 +256,38 @@ static int __init omap4_sar_ram_init(void)
->  }
->  omap_early_initcall(omap4_sar_ram_init);
->  
-> +static struct of_device_id gic_match[] = {
-> +	{ .compatible = "arm,cortex-a9-gic", },
-> +	{ .compatible = "arm,cortex-a15-gic", },
-> +	{ },
-> +};
-> +
-> +static struct device_node *gic_node;
-> +
-> +unsigned int omap4_xlate_irq(unsigned int hwirq)
-> +{
-> +	struct of_phandle_args irq_data;
-> +	unsigned int irq;
-> +
-> +	if (!gic_node)
-> +		gic_node = of_find_matching_node(NULL, gic_match);
-> +
-> +	if (WARN_ON(!gic_node))
-> +		return hwirq;
-> +
-> +	irq_data.np = gic_node;
-> +	irq_data.args_count = 3;
-> +	irq_data.args[0] = 0;
-> +	irq_data.args[1] = hwirq - OMAP44XX_IRQ_GIC_START;
-> +	irq_data.args[2] = IRQ_TYPE_LEVEL_HIGH;
-> +
-> +	irq = irq_create_of_mapping(&irq_data);
-> +	if (WARN_ON(!irq))
-> +		irq = hwirq;
-> +
-> +	return irq;
-> +}
-> +
->  void __init omap_gic_of_init(void)
->  {
->  	struct device_node *np;
-> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> index cbb908d..9025fff 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> @@ -3534,9 +3534,15 @@ int omap_hwmod_fill_resources(struct omap_hwmod *oh, struct resource *res)
->  
->  	mpu_irqs_cnt = _count_mpu_irqs(oh);
->  	for (i = 0; i < mpu_irqs_cnt; i++) {
-> +		unsigned int irq;
-> +
-> +		if (oh->xlate_irq)
-> +			irq = oh->xlate_irq((oh->mpu_irqs + i)->irq);
-> +		else
-> +			irq = (oh->mpu_irqs + i)->irq;
->  		(res + r)->name = (oh->mpu_irqs + i)->name;
-> -		(res + r)->start = (oh->mpu_irqs + i)->irq;
-> -		(res + r)->end = (oh->mpu_irqs + i)->irq;
-> +		(res + r)->start = irq;
-> +		(res + r)->end = irq;
->  		(res + r)->flags = IORESOURCE_IRQ;
->  		r++;
->  	}
-> diff --git a/arch/arm/mach-omap2/omap_hwmod.h b/arch/arm/mach-omap2/omap_hwmod.h
-> index 35ca6ef..5b42faf 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod.h
-> +++ b/arch/arm/mach-omap2/omap_hwmod.h
-> @@ -676,6 +676,7 @@ struct omap_hwmod {
->  	spinlock_t			_lock;
->  	struct list_head		node;
->  	struct omap_hwmod_ocp_if	*_mpu_port;
-> +	unsigned int			(*xlate_irq)(unsigned int);
->  	u16				flags;
->  	u8				mpu_rt_idx;
->  	u8				response_lat;
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> index c314b3c..f5e68a7 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> @@ -479,6 +479,7 @@ static struct omap_hwmod omap44xx_dma_system_hwmod = {
->  	.class		= &omap44xx_dma_hwmod_class,
->  	.clkdm_name	= "l3_dma_clkdm",
->  	.mpu_irqs	= omap44xx_dma_system_irqs,
-> +	.xlate_irq	= omap4_xlate_irq,
->  	.main_clk	= "l3_div_ck",
->  	.prcm = {
->  		.omap4 = {
-> @@ -640,6 +641,7 @@ static struct omap_hwmod omap44xx_dss_dispc_hwmod = {
->  	.class		= &omap44xx_dispc_hwmod_class,
->  	.clkdm_name	= "l3_dss_clkdm",
->  	.mpu_irqs	= omap44xx_dss_dispc_irqs,
-> +	.xlate_irq	= omap4_xlate_irq,
->  	.sdma_reqs	= omap44xx_dss_dispc_sdma_reqs,
->  	.main_clk	= "dss_dss_clk",
->  	.prcm = {
-> @@ -693,6 +695,7 @@ static struct omap_hwmod omap44xx_dss_dsi1_hwmod = {
->  	.class		= &omap44xx_dsi_hwmod_class,
->  	.clkdm_name	= "l3_dss_clkdm",
->  	.mpu_irqs	= omap44xx_dss_dsi1_irqs,
-> +	.xlate_irq	= omap4_xlate_irq,
->  	.sdma_reqs	= omap44xx_dss_dsi1_sdma_reqs,
->  	.main_clk	= "dss_dss_clk",
->  	.prcm = {
-> @@ -726,6 +729,7 @@ static struct omap_hwmod omap44xx_dss_dsi2_hwmod = {
->  	.class		= &omap44xx_dsi_hwmod_class,
->  	.clkdm_name	= "l3_dss_clkdm",
->  	.mpu_irqs	= omap44xx_dss_dsi2_irqs,
-> +	.xlate_irq	= omap4_xlate_irq,
->  	.sdma_reqs	= omap44xx_dss_dsi2_sdma_reqs,
->  	.main_clk	= "dss_dss_clk",
->  	.prcm = {
-> @@ -784,6 +788,7 @@ static struct omap_hwmod omap44xx_dss_hdmi_hwmod = {
->  	 */
->  	.flags		= HWMOD_SWSUP_SIDLE,
->  	.mpu_irqs	= omap44xx_dss_hdmi_irqs,
-> +	.xlate_irq	= omap4_xlate_irq,
->  	.sdma_reqs	= omap44xx_dss_hdmi_sdma_reqs,
->  	.main_clk	= "dss_48mhz_clk",
->  	.prcm = {
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-> index 3e95230..7c3fac0 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-> @@ -288,6 +288,7 @@ static struct omap_hwmod omap54xx_dma_system_hwmod = {
->  	.class		= &omap54xx_dma_hwmod_class,
->  	.clkdm_name	= "dma_clkdm",
->  	.mpu_irqs	= omap54xx_dma_system_irqs,
-> +	.xlate_irq	= omap4_xlate_irq,
->  	.main_clk	= "l3_iclk_div",
->  	.prcm = {
->  		.omap4 = {
-> diff --git a/arch/arm/mach-omap2/prcm-common.h b/arch/arm/mach-omap2/prcm-common.h
-> index a8e4b58..6163d66 100644
-> --- a/arch/arm/mach-omap2/prcm-common.h
-> +++ b/arch/arm/mach-omap2/prcm-common.h
-> @@ -498,6 +498,7 @@ struct omap_prcm_irq_setup {
->  	u8 nr_irqs;
->  	const struct omap_prcm_irq *irqs;
->  	int irq;
-> +	unsigned int (*xlate_irq)(unsigned int);
->  	void (*read_pending_irqs)(unsigned long *events);
->  	void (*ocp_barrier)(void);
->  	void (*save_and_clear_irqen)(u32 *saved_mask);
-> diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
-> index cc170fb..408c64e 100644
-> --- a/arch/arm/mach-omap2/prm44xx.c
-> +++ b/arch/arm/mach-omap2/prm44xx.c
-> @@ -49,6 +49,7 @@ static struct omap_prcm_irq_setup omap4_prcm_irq_setup = {
->  	.irqs			= omap4_prcm_irqs,
->  	.nr_irqs		= ARRAY_SIZE(omap4_prcm_irqs),
->  	.irq			= 11 + OMAP44XX_IRQ_GIC_START,
-> +	.xlate_irq		= omap4_xlate_irq,
->  	.read_pending_irqs	= &omap44xx_prm_read_pending_irqs,
->  	.ocp_barrier		= &omap44xx_prm_ocp_barrier,
->  	.save_and_clear_irqen	= &omap44xx_prm_save_and_clear_irqen,
-> @@ -751,8 +752,10 @@ static int omap44xx_prm_late_init(void)
->  		}
->  
->  		/* Once OMAP4 DT is filled as well */
-> -		if (irq_num >= 0)
-> +		if (irq_num >= 0) {
->  			omap4_prcm_irq_setup.irq = irq_num;
-> +			omap4_prcm_irq_setup.xlate_irq = NULL;
-> +		}
->  	}
->  
->  	omap44xx_prm_enable_io_wakeup();
-> diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
-> index 779940c..dea2833 100644
-> --- a/arch/arm/mach-omap2/prm_common.c
-> +++ b/arch/arm/mach-omap2/prm_common.c
-> @@ -187,6 +187,7 @@ int omap_prcm_event_to_irq(const char *name)
->   */
->  void omap_prcm_irq_cleanup(void)
->  {
-> +	unsigned int irq;
->  	int i;
->  
->  	if (!prcm_irq_setup) {
-> @@ -211,7 +212,11 @@ void omap_prcm_irq_cleanup(void)
->  	kfree(prcm_irq_setup->priority_mask);
->  	prcm_irq_setup->priority_mask = NULL;
->  
-> -	irq_set_chained_handler(prcm_irq_setup->irq, NULL);
-> +	if (prcm_irq_setup->xlate_irq)
-> +		irq = prcm_irq_setup->xlate_irq(prcm_irq_setup->irq);
-> +	else
-> +		irq = prcm_irq_setup->irq;
-> +	irq_set_chained_handler(irq, NULL);
->  
->  	if (prcm_irq_setup->base_irq > 0)
->  		irq_free_descs(prcm_irq_setup->base_irq,
-> @@ -259,6 +264,7 @@ int omap_prcm_register_chain_handler(struct omap_prcm_irq_setup *irq_setup)
->  	int offset, i;
->  	struct irq_chip_generic *gc;
->  	struct irq_chip_type *ct;
-> +	unsigned int irq;
->  
->  	if (!irq_setup)
->  		return -EINVAL;
-> @@ -298,7 +304,11 @@ int omap_prcm_register_chain_handler(struct omap_prcm_irq_setup *irq_setup)
->  				1 << (offset & 0x1f);
->  	}
->  
-> -	irq_set_chained_handler(irq_setup->irq, omap_prcm_irq_handler);
-> +	if (irq_setup->xlate_irq)
-> +		irq = irq_setup->xlate_irq(irq_setup->irq);
-> +	else
-> +		irq = irq_setup->irq;
-> +	irq_set_chained_handler(irq, omap_prcm_irq_handler);
->  
->  	irq_setup->base_irq = irq_alloc_descs(-1, 0, irq_setup->nr_regs * 32,
->  		0);
-> diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
-> index 4457e73..3031ee1 100644
-> --- a/arch/arm/mach-omap2/twl-common.c
-> +++ b/arch/arm/mach-omap2/twl-common.c
-> @@ -71,9 +71,12 @@ void __init omap4_pmic_init(const char *pmic_type,
->  		    struct i2c_board_info *devices, int nr_devices)
->  {
->  	/* PMIC part*/
-> +	unsigned int irq;
-> +
->  	omap_mux_init_signal("sys_nirq1", OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_WAKEUPENABLE);
->  	omap_mux_init_signal("fref_clk0_out.sys_drm_msecure", OMAP_PIN_OUTPUT);
-> -	omap_pmic_init(1, 400, pmic_type, 7 + OMAP44XX_IRQ_GIC_START, pmic_data);
-> +	irq = omap4_xlate_irq(7 + OMAP44XX_IRQ_GIC_START);
-> +	omap_pmic_init(1, 400, pmic_type, irq, pmic_data);
->  
->  	/* Register additional devices on i2c1 bus if needed */
->  	if (devices)
-> -- 
-> 2.1.3
+>   spin_lock_irqsave(&udc->lock, flags);
+>   udc->devstatus = 1 << USB_DEVICE_SELF_POWERED;
+>   udc->driver = driver;
+>   spin_unlock_irqrestore(&udc->lock, flags);
 > 
+> ? but vbus_pin IRQ is not yet enabled.
+> 
+> 
+> Same for atmel_usba_stop() which disable vbus_pin IRQ before setting 
+> udc->driver to NULL, but without spinlock this time (why?, this should 
+> be consistent IMHO).
+> 
+> 
+> I don't know if it is guaranteed that IRQ does not fire nor continue to 
+> run after disable_irq() returns, especially for threaded IRQ.
+
+And yes, disable_irq waits for all irq handler termination, including
+threaded irqs: see [1], [2]. 
+
+> 
+> 
+> If the following sequence might happen:
+>   atmel_usba_stop()
+>     disable_irq(vbus)
+>                                   usba_vbus_irq_thread() called lately
+>                                     check for (!udc->driver) and continue
+>     udc->driver = NULL;
+>                                     if (udc->driver->disconnect)
+>                                  *CRASH*
+> 
+> Then the patch should be modified to protect udc->driver with the vbus 
+> mutex.
+> 
+> In this case the previous implementation wasn't perfect too, the 
+> atmel_usba_stop() does not lock around the NULLification of driver, 
+> 
+> Moreover the spinlock is (and was) unlocked in VBUS interrupt just 
+> before calling udc->driver->disconnect, which makes udc->driver actually 
+> not locked anywere.
+> 
+> If the previous sequence possible ?  If no, udc->driver does not need 
+> locking, if yes, it is currently not locked enough.
+
+If you rework the vbus_irq request as I suggested I think you can get
+rid of this !udc->driver test, and thus drop the locking around it ;-).
+
+Best Regards,
+
+Boris
+
+[1]http://lxr.free-electrons.com/source/kernel/irq/manage.c#L432
+[2]http://lxr.free-electrons.com/source/kernel/irq/manage.c#L92
+
+
 
 -- 
-Regards,
-Nishanth Menon
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
