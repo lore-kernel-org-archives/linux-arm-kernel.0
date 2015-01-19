@@ -1,80 +1,74 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 19 Jan 2015 08:35:33 +0000
-Subject: [PATCH v3 1/3] dt-bindings: mfd: add lubbock-io binding
-In-Reply-To: <1421406010-14851-1-git-send-email-robert.jarzmik@free.fr>
-References: <1421406010-14851-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <20150119083533.GF21886@x1>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 19 Jan 2015 09:44:31 +0100
+Subject: [PATCH 18/28] PCI/sparc: Use pci_scan_root_bridge() for simplicity
+In-Reply-To: <54BC772E.6020103@huawei.com>
+References: <1421372666-12288-1-git-send-email-wangyijing@huawei.com>
+ <2658988.B0VmbMPdJ9@wuerfel> <54BC772E.6020103@huawei.com>
+Message-ID: <7748275.Tf0dzsPZdA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 16 Jan 2015, Robert Jarzmik wrote:
-
-> Add a binding for lubbock motherboard IO board.
+On Monday 19 January 2015 11:17:02 Yijing Wang wrote:
+> On 2015/1/16 18:01, Arnd Bergmann wrote:
+> > On Friday 16 January 2015 09:44:16 Yijing Wang wrote:
+> >> +static void pci_host_bridge_probe_mode(
+> >> +               struct pci_host_bridge *host)
+> >> +{
+> >> +       host->of_scan = true;
+> >> +}
+> >>
+> > 
+> > I probably missed something here, but where does host->of_scan
+> > get used?
+> > 
 > 
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> ---
->  .../devicetree/bindings/mfd/lubbock-io.txt         | 26 ++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/lubbock-io.txt
+> It is used in __pci_scan_root_bus() to detect whether of scan bus is needed in patch 11.
+
+Ok, I see it now.
+
+> @@ -2051,10 +2053,17 @@ static struct pci_bus *__pci_scan_root_bus(
+>  		pci_bus_insert_busn_res(b, host->busnum, 255);
+>  	}
 > 
-> diff --git a/Documentation/devicetree/bindings/mfd/lubbock-io.txt b/Documentation/devicetree/bindings/mfd/lubbock-io.txt
-> new file mode 100644
-> index 0000000..33c9e21
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/lubbock-io.txt
-> @@ -0,0 +1,26 @@
-> +Intel's pxa255 system development platform motherboard.
+> -	max = pci_scan_child_bus(b);
+> +	if (host->ops && host->ops->phb_probe_mode)
+> +		host->ops->phb_probe_mode(host);
+> 
+> -	if (!found)
+> -		pci_bus_update_busn_res_end(b, max);
+> +	if (host->of_scan) {
+> +		if (host->ops &&host->ops->phb_of_scan_bus)
+> +			host->ops->phb_of_scan_bus(host);
+> +	} else {
+> +		max = pci_scan_child_bus(b);
+> +		if (!found)
+> +			pci_bus_update_busn_res_end(b, max);
+> +	}
+> 
 
-s/pxa25/PXA25/
+I think we can simplify this based on the knowledge that this code
+will remain powerpc specific. How about removing the phb_probe_mode()
+callback and replacing it with just a phb_scan_bus() callback that
+will always get set on sparc, and do this on powerpc:
 
-"system development platform motherboard" doesn't quite sit right with me.
++static void pci_host_bridge_of_scan_bus(struct pci_host_bridge *host)
++{
++       int mode = PCI_PROBE_NORMAL;
++       struct pci_bus *bus = host->bus;
++       struct pci_controller *hose = dev_get_drvdata(&host->dev);
++
++       /* Get probe mode and perform scan */
++       if (hose->dn && ppc_md.pci_probe_mode)
++               mode = ppc_md.pci_probe_mode(bus);
++
++       pr_debug("    probe mode: %d\n", mode);
++       if (mode == PCI_PROBE_DEVTREE) {
++               of_scan_bus(host->dn, bus);
++		return max; // XXX need to get this from somewhere
++	}
++	return pci_scan_child_bus(b);
++}
 
-How about "Intel Xscale PXA255 development platform (Lubbock)"?
+Would that work?
 
-> +This is the motherboard, or IO board, of the pxa25x development system,
-> +supporting a lubbock pxa25x SoC board.
-
-Again, this sounds weird.
-
-> +Required properties:
-> +  - compatible : One of the following chip-specific strings:
-> +        "intel,lubbock-io"
-
-An odd thing to say with only one entry.
-
-Also, please line it up to the right of the ':' above.
-
-> +  - interrupts : The first interrupt is the line the /IRQ signal the IO board
-> +                 multiplex is connected to. The only known case is GPIO0 on the
-> +                 pxa25x SoC.
-
-Can you get someone to help you re-word this into a more fluid
-sentence?
-
-> +Optional properties:
-> +  - interrupts : The second optional interrupt is the base of the interrupts
-> +                 multiplexed by the lubbock motherboard. If unspecified, the
-> +                 range is fully dynamic, and the irqdomain will generate its
-> +                 interrupt base on the fly.
-> +
-> +Example:
-> +
-> +mb: lubbock-mb at 0 {
-> +	compatible = "intel,lubbock-io";
-> +	interrupts = <0 IRQ_TYPE_EDGE_FALLING 400 IRQ_TYPE_NONE>;
-> +	#interrupt-cells = <2>;
-> +        interrupt-parent = <&pxairq>;
-
-Whitespace error.
-
-> +};
-
-I'm guessing mb means motherboard?  I think it's unusual for a
-motherboard to have it's own driver.  Usually we provide drivers for
-the individual components/peripherals situated on the board.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+	Arnd
