@@ -1,43 +1,69 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 19 Jan 2015 11:42:45 +0100
-Subject: [PATCH 3/4] ASoC: samsung: MACH_SMDKC100 isn't supported anymore
-Message-ID: <1421664165.9655.54.camel@x220>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 19 Jan 2015 10:42:40 +0000
+Subject: [PATCH v7 06/17] ARM64 / ACPI: Make PCI optional for ACPI on ARM64
+In-Reply-To: <54BB51F1.8000900@linaro.org>
+References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
+ <1421247905-3749-7-git-send-email-hanjun.guo@linaro.org>
+ <20150116094913.GA13634@e104818-lin.cambridge.arm.com>
+ <54BB51F1.8000900@linaro.org>
+Message-ID: <20150119104240.GE11835@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit b8529ec1c1b0 ("ARM: S5PC100: no more support S5PC100 SoC")
-removed Kconfig symbol MACH_SMDKC100. But there are still two references
-to that symbol left. These are now pointless. Remove them too.
+On Sun, Jan 18, 2015 at 06:25:53AM +0000, Hanjun Guo wrote:
+> On 2015?01?16? 17:49, Catalin Marinas wrote:
+> > On Wed, Jan 14, 2015 at 03:04:54PM +0000, Hanjun Guo wrote:
+> >> --- a/arch/arm64/kernel/pci.c
+> >> +++ b/arch/arm64/kernel/pci.c
+> >> @@ -10,6 +10,7 @@
+> >>    *
+> >>    */
+> >>
+> >> +#include <linux/acpi.h>
+> >>   #include <linux/init.h>
+> >>   #include <linux/io.h>
+> >>   #include <linux/kernel.h>
+> >> @@ -68,3 +69,30 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+> >>   	bus->domain_nr = domain;
+> >>   }
+> >>   #endif
+> >> +
+> >> +/*
+> >> + * raw_pci_read/write - Platform-specific PCI config space access.
+> >> + *
+> >> + * Default empty implementation.  Replace with an architecture-specific setup
+> >> + * routine, if necessary.
+> >> + */
+> >> +int raw_pci_read(unsigned int domain, unsigned int bus,
+> >> +		  unsigned int devfn, int reg, int len, u32 *val)
+> >> +{
+> >> +	return -EINVAL;
+> >> +}
+> >> +
+> >> +int raw_pci_write(unsigned int domain, unsigned int bus,
+> >> +		unsigned int devfn, int reg, int len, u32 val)
+> >> +{
+> >> +	return -EINVAL;
+> >> +}
+> >> +
+> >> +#ifdef CONFIG_ACPI
+> >> +/* Root bridge scanning */
+> >> +struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+> >> +{
+> >> +	/* TODO: Should be revisited when implementing PCI on ACPI */
+> >> +	return NULL;
+> >> +}
+> >> +#endif
+[...]
+> > When PCI is enabled and the above functions are compiled in, do they
+> > need to return any useful data or just -EINVAL. Are they ever called?
+> 
+> They will be called if PCI root bridge is defined in DSDT, should I
+> print some warning message before it is implemented?
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-Apparently Kukjin had a fixup queued (see
-http://mailman.alsa-project.org/pipermail/alsa-devel/2014-September/081482.html ). But that fixup never entered the tree, so let's try again.
+My point: do they need to return real data when a PCI root bridge is
+defined in DSDT or you always expect them to always return some -E*? Can
+you explain why?
 
- sound/soc/samsung/Kconfig | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
-index 3be649098b30..5f983d064920 100644
---- a/sound/soc/samsung/Kconfig
-+++ b/sound/soc/samsung/Kconfig
-@@ -53,7 +53,7 @@ config SND_SOC_SAMSUNG_JIVE_WM8750
- 
- config SND_SOC_SAMSUNG_SMDK_WM8580
- 	tristate "SoC I2S Audio support for WM8580 on SMDK"
--	depends on SND_SOC_SAMSUNG && (MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110)
-+	depends on SND_SOC_SAMSUNG && (MACH_SMDK6410 || MACH_SMDKV210 || MACH_SMDKC110)
- 	depends on REGMAP_I2C
- 	select SND_SOC_WM8580
- 	select SND_SAMSUNG_I2S
-@@ -134,7 +134,7 @@ config SND_SOC_SAMSUNG_RX1950_UDA1380
- 
- config SND_SOC_SAMSUNG_SMDK_WM9713
- 	tristate "SoC AC97 Audio support for SMDK with WM9713"
--	depends on SND_SOC_SAMSUNG && (MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110)
-+	depends on SND_SOC_SAMSUNG && (MACH_SMDK6410 || MACH_SMDKV210 || MACH_SMDKC110)
- 	select SND_SOC_WM9713
- 	select SND_SAMSUNG_AC97
- 	help
 -- 
-1.9.3
+Catalin
