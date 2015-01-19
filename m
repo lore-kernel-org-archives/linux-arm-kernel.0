@@ -1,74 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 Jan 2015 09:44:31 +0100
-Subject: [PATCH 18/28] PCI/sparc: Use pci_scan_root_bridge() for simplicity
-In-Reply-To: <54BC772E.6020103@huawei.com>
-References: <1421372666-12288-1-git-send-email-wangyijing@huawei.com>
- <2658988.B0VmbMPdJ9@wuerfel> <54BC772E.6020103@huawei.com>
-Message-ID: <7748275.Tf0dzsPZdA@wuerfel>
+From: tomeu@tomeuvizoso.net (Tomeu Vizoso)
+Date: Mon, 19 Jan 2015 10:01:49 +0100
+Subject: [PATCH 1/2] ARM: tegra: add Acer Chromebook 13 device tree
+In-Reply-To: <1407894967-18300-1-git-send-email-dgreid@chromium.org>
+References: <1407894967-18300-1-git-send-email-dgreid@chromium.org>
+Message-ID: <CAAObsKA9EgdmqAe8JxJ=8nKJy6MsenHv8cpDO6fBiutBtgEpGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 19 January 2015 11:17:02 Yijing Wang wrote:
-> On 2015/1/16 18:01, Arnd Bergmann wrote:
-> > On Friday 16 January 2015 09:44:16 Yijing Wang wrote:
-> >> +static void pci_host_bridge_probe_mode(
-> >> +               struct pci_host_bridge *host)
-> >> +{
-> >> +       host->of_scan = true;
-> >> +}
-> >>
-> > 
-> > I probably missed something here, but where does host->of_scan
-> > get used?
-> > 
-> 
-> It is used in __pci_scan_root_bus() to detect whether of scan bus is needed in patch 11.
+On 13 August 2014 at 03:56, Dylan Reid <dgreid@chromium.org> wrote:
+> The Acer Chromebook 13, codenamed "Big", contains an NVIDIA tegra124
+> processor and is similar to the Venice2 reference platform.
+>
+> The keyboard, USB 2, audio, HDMI, sdcard and emmc have been tested
+> and work on the 1366x768 models.  I haven't tried on the HD systems
+> yet.
+>
+> WiFi does not yet work, it needs at least some PMIC changes to enable
+> the 32k clock.
+>
+> The elan trackpad is not yet functional but hopefully will be soon as
+> there are patches under review.
+>
+> There is also an issue on reboot because the TPM isn't reset.  It will
+> cause the stock firmware to enter recovery mode.  This can be worked
+> around by an EC-reset, press refresh and power at the same time.
 
-Ok, I see it now.
+Hi Dylan,
 
-> @@ -2051,10 +2053,17 @@ static struct pci_bus *__pci_scan_root_bus(
->  		pci_bus_insert_busn_res(b, host->busnum, 255);
->  	}
-> 
-> -	max = pci_scan_child_bus(b);
-> +	if (host->ops && host->ops->phb_probe_mode)
-> +		host->ops->phb_probe_mode(host);
-> 
-> -	if (!found)
-> -		pci_bus_update_busn_res_end(b, max);
-> +	if (host->of_scan) {
-> +		if (host->ops &&host->ops->phb_of_scan_bus)
-> +			host->ops->phb_of_scan_bus(host);
-> +	} else {
-> +		max = pci_scan_child_bus(b);
-> +		if (!found)
-> +			pci_bus_update_busn_res_end(b, max);
-> +	}
-> 
+do you have any more information regarding this problem that could
+save me some investigation?
 
-I think we can simplify this based on the knowledge that this code
-will remain powerpc specific. How about removing the phb_probe_mode()
-callback and replacing it with just a phb_scan_bus() callback that
-will always get set on sparc, and do this on powerpc:
+Thanks,
 
-+static void pci_host_bridge_of_scan_bus(struct pci_host_bridge *host)
-+{
-+       int mode = PCI_PROBE_NORMAL;
-+       struct pci_bus *bus = host->bus;
-+       struct pci_controller *hose = dev_get_drvdata(&host->dev);
-+
-+       /* Get probe mode and perform scan */
-+       if (hose->dn && ppc_md.pci_probe_mode)
-+               mode = ppc_md.pci_probe_mode(bus);
-+
-+       pr_debug("    probe mode: %d\n", mode);
-+       if (mode == PCI_PROBE_DEVTREE) {
-+               of_scan_bus(host->dn, bus);
-+		return max; // XXX need to get this from somewhere
-+	}
-+	return pci_scan_child_bus(b);
-+}
-
-Would that work?
-
-	Arnd
+Tomeu
