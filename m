@@ -1,50 +1,32 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 19 Jan 2015 15:41:48 -0600
-Subject: [PATCH v2] ARM: omap2plus_defconfig: Enable OHCI & EHCI HCD
- support
-In-Reply-To: <1421702916-19018-1-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1421702916-19018-1-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <20150119214148.GV20386@saruman>
+Date: Mon, 19 Jan 2015 15:45:01 -0600
+Subject: [PATCH] MAINTAINERS: add omap2plus_defconfig under OMAP SUPPORT
+Message-ID: <1421703901-28295-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 19, 2015 at 10:28:36PM +0100, Sjoerd Simons wrote:
-> Enable CONFIG_USB_EHCI_HCD and CONFIG_USB_OHCI_HCD to get USB supports
-> with omap2plus_defconfig.
-> 
-> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+omap2plus_defconfig is also part of the OMAP Support
+maintained, because of that it's best to list it
+under OMAP SUPPORT on MAINTAINERS so people know
+to Cc linux-omap when patching that file.
 
-Reviewed-by: Felipe Balbi <balbi@ti.com>
+Reported-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
 
-> ---
-> Changes in v2: Enable as modules rather then builtin
-> 
->  arch/arm/configs/omap2plus_defconfig | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-> index c2c3a85..f4009a2 100644
-> --- a/arch/arm/configs/omap2plus_defconfig
-> +++ b/arch/arm/configs/omap2plus_defconfig
-> @@ -159,6 +159,8 @@ CONFIG_USB_NET_SMSC95XX=y
->  CONFIG_USB_ALI_M5632=y
->  CONFIG_USB_AN2720=y
->  CONFIG_USB_EPSON2888=y
-> +CONFIG_USB_EHCI_HCD=m
-> +CONFIG_USB_OHCI_HCD=m
->  CONFIG_USB_KC2190=y
->  CONFIG_LIBERTAS=m
->  CONFIG_LIBERTAS_USB=m
-> -- 
-> 2.1.4
-> 
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 97de006f38f0..abc6281892e7 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -6783,6 +6783,7 @@ Q:	http://patchwork.kernel.org/project/linux-omap/list/
+ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
+ S:	Maintained
+ F:	arch/arm/*omap*/
++F:	arch/arm/configs/omap2plus_defconfig
+ F:	drivers/i2c/busses/i2c-omap.c
+ F:	drivers/irqchip/irq-omap-intc.c
+ F:	drivers/mfd/*omap*.c
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150119/fcc75b36/attachment-0001.sig>
+2.2.0
