@@ -1,66 +1,83 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 Jan 2015 16:52:41 +0100
-Subject: [PATCH v6 8/8] arm: dma-mapping: plumb our iommu mapping ops into
- arch_setup_dma_ops
-In-Reply-To: <20150119123623.GB7312@ulmo.nvidia.com>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <2804479.ZFl06ysk3j@avalon> <20150119123623.GB7312@ulmo.nvidia.com>
-Message-ID: <2253719.6TRpaaEdiI@wuerfel>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 19 Jan 2015 08:00:39 -0800
+Subject: [PATCH 2/2] cpufreq: add cpufreq driver for Mediatek MT8173 SoC
+In-Reply-To: <1420797291-15972-3-git-send-email-pi-cheng.chen@linaro.org>
+References: <1420797291-15972-1-git-send-email-pi-cheng.chen@linaro.org>
+ <1420797291-15972-3-git-send-email-pi-cheng.chen@linaro.org>
+Message-ID: <20150119160039.22722.67992@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 19 January 2015 13:36:24 Thierry Reding wrote:
-> On Fri, Jan 16, 2015 at 01:18:21AM +0200, Laurent Pinchart wrote:
-> > On Thursday 15 January 2015 11:12:17 Will Deacon wrote:
-> > > On Thu, Jan 15, 2015 at 08:28:44AM +0000, Thierry Reding wrote:
-> > > > On Wed, Jan 14, 2015 at 10:46:10AM +0000, Will Deacon wrote:
-> > > > > On Wed, Jan 14, 2015 at 09:00:24AM +0000, Alexandre Courbot wrote:
-> > > > [...]
-> > > > 
-> > > >>> 2) Say you want to use the IOMMU API in your driver, and have an iommu
-> > > >>> property in your device's DT node. If by chance your IOMMU is
-> > > >>> registered early, you will already have a mapping automatically
-> > > >>> created even before your probe function is called. Can this be
-> > > >>> avoided? Is it even safe?
-> > > >> 
-> > > >> Currently, I think you have to either teardown the ops manually or
-> > > >> return an error from of_xlate. Thierry was also looking at this sort of
-> > > >> thing, so it might be worth talking to him.
-> > > > 
-> > > > I already explained in earlier threads why I think this is a bad idea.
-> > > > It's completely unnatural for any driver to manually tear down something
-> > > > that it didn't want set up in the first place. It also means that you
-> > > > have to carefully audit any users of these IOMMU APIs to make sure that
-> > > > they do tear down. That doesn't sound like a good incremental approach,
-> > > > as evidenced by the breakage that Alex and Heiko have encountered.
-> > > 
-> > > Well, perhaps we hide that behind a get_iommu API or something. We *do*
-> > > need this manual teardown step to support things like VFIO, so it makes
-> > > sense to reuse it for other users too imo.
-> > > 
-> > > > The solution for me has been to completely side-step the issue and not
-> > > > register the IOMMU with the new mechanism at all. That is, there's no
-> > > > .of_xlate() implementation, which means that the ARM DMA API glue won't
-> > > > try to be smart and use the IOMMU in ways it's not meant to be used.
-> > 
-> > That will break when someone will want to use the same IOMMU type for devices 
-> > that use the DMA mapping API to hide the IOMMU. That might not be the case for 
-> > your IOMMU today, but it's pretty fragile, we need to fix it.
-> 
-> No, there's absolutely no issue here. It simply means that you can't do
-> this on Tegra. So far I'm not sure I even see an advantage in using the
-> IOMMU for devices that don't care about it anyway. Consider the example
-> of the SD/MMC or HDA. They typically allocate fairly small buffers, the
-> order of a single page typically. They can simply use memory handed out
-> by the CMA.
-> 
-> So as long as we don't add a .of_xlate() implementation or instantiate
-> via the IOMMU_OF_DECLARE() mechanism we simply don't support IOMMU-over-
-> DMA on Tegra.
+Quoting pi-cheng.chen (2015-01-09 01:54:51)
+> diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mt8173-cpufreq.c
+> new file mode 100644
+> index 0000000..b578c10
+> --- /dev/null
+> +++ b/drivers/cpufreq/mt8173-cpufreq.c
+> @@ -0,0 +1,459 @@
 
-It breaks as soon as you have a system with memory above the 4GB boundary,
-which is the whole point of iommus for most users.
+Hello Pi-Cheng,
 
-CMA does not work for streaming mappings, only for the coherent API.
+<snip>
 
-	Arnd
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/cpufreq.h>
+> +#include <linux/cpufreq-dt.h>
+> +#include <linux/cpumask.h>
+> +#include <linux/slab.h>
+> +#include <linux/clk.h>
+> +#include <linux/clk-provider.h>
+
+I'll echo what Viresh said here. CPUfreq drivers should typically be
+clock consumers and only require clk.h, not clk-provider.h. More on that
+below.
+
+<snip>
+
+> +static void cpuclk_mux_set(int cluster, u32 sel)
+> +{
+> +       u32 val;
+> +       u32 mask = 0x3;
+> +
+> +       if (cluster == BIG_CLUSTER) {
+> +               mask <<= 2;
+> +               sel <<= 2;
+> +       }
+> +
+> +       spin_lock(&lock);
+> +
+> +       val = readl(clk_mux_regs);
+> +       val = (val & ~mask) | sel;
+> +       writel(val, clk_mux_regs);
+> +
+> +       spin_unlock(&lock);
+> +}
+
+Is cpuclk a mux that is represented in the MT8173 clock driver? It looks
+like a clock that belong to the clock driver, but this cpufreq driver is
+writing to that register directly.
+
+<snip>
+
+> +static int mt8173_cpufreq_dvfs_info_init(void)
+> +{
+
+<snip>
+
+> +       mainpll = __clk_lookup("mainpll");
+> +       if (!mainpll) {
+> +               pr_err("failed to get mainpll clk\n");
+> +               ret = -ENOENT;
+> +               goto dvfs_info_release;
+> +       }
+> +       mainpll_freq = clk_get_rate(mainpll);
+
+This is definitely bad. Why not use clk_get() here? __clk_lookup should
+not be exposed to clock consumer drivers (and I hope to get rid of it
+completely some day).
+
+Regards,
+Mike
