@@ -1,212 +1,62 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Mon, 19 Jan 2015 18:00:56 +0100
-Subject: [PATCH RESEND v8 2/2] clk: Add floor and ceiling constraints to
- clock rates
-In-Reply-To: <20150117015701.GB27202@codeaurora.org>
-References: <1421071809-17402-1-git-send-email-tomeu.vizoso@collabora.com>
- <1421071809-17402-3-git-send-email-tomeu.vizoso@collabora.com>
- <20150117015701.GB27202@codeaurora.org>
-Message-ID: <CAAObsKA=6tPiR2MMwJ2Wn7mcL-nr_5NtpLL6wmURLGubnVdX6A@mail.gmail.com>
+From: gustavo@padovan.org (Gustavo Padovan)
+Date: Mon, 19 Jan 2015 15:01:25 -0200
+Subject: [PATCH V8 00/14] drm/exynos: few patches to enhance bridge chip
+ support
+In-Reply-To: <20150119163043.GB7751@ulmo.nvidia.com>
+References: <1416045309-13359-1-git-send-email-ajaykumar.rs@samsung.com>
+ <CAEC9eQOrKw2Z1q-ztFfadXmsL3CTcAkkv9kcS2QnDOAVSh2AuQ@mail.gmail.com>
+ <548ABAB6.6010200@collabora.co.uk> <3197445.qizQc0zeRb@avalon>
+ <54914D7D.9060108@collabora.co.uk>
+ <CAPj87rN4HZzDt5JBLyTRmKZs7XcOG=0ha7ZQf9hmjPAFgTyhYQ@mail.gmail.com>
+ <20150105135015.GA12010@ulmo.nvidia.com>
+ <54BCDC28.7080003@collabora.co.uk>
+ <20150119163043.GB7751@ulmo.nvidia.com>
+Message-ID: <20150119170125.GH2001@joana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 January 2015 at 02:57, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 01/12, Tomeu Vizoso wrote:
->> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
->> index 7eddfd8..2793bd7 100644
->> --- a/drivers/clk/clk.c
->> +++ b/drivers/clk/clk.c
->> @@ -1013,8 +1015,8 @@ static unsigned long clk_core_round_rate_nolock(struct clk_core *clk,
->>
->>       if (clk->ops->determine_rate) {
->>               parent_hw = parent ? parent->hw : NULL;
->> -             return clk->ops->determine_rate(clk->hw, rate, &parent_rate,
->> -                                             &parent_hw);
->> +             return clk->ops->determine_rate(clk->hw, rate, 0, ULONG_MAX,
->> +                                             &parent_rate, &parent_hw);
->>       } else if (clk->ops->round_rate)
->>               return clk->ops->round_rate(clk->hw, rate, &parent_rate);
->>       else if (clk->flags & CLK_SET_RATE_PARENT)
->> @@ -1453,8 +1458,20 @@ static struct clk_core *clk_calc_new_rates(struct clk_core *clk,
->>
->>       /* find the closest rate and parent clk/rate */
->>       if (clk->ops->determine_rate) {
->> +             hlist_for_each_entry(clk_user, &clk->clks, child_node) {
->> +                     floor_rate = max(floor_rate,
->> +                                      clk_user->floor_constraint);
->> +             }
->> +
->> +             hlist_for_each_entry(clk_user, &clk->clks, child_node) {
->> +                     ceiling_rate = min(ceiling_rate,
->> +                                        clk_user->ceiling_constraint);
->> +             }
->
-> I would think we need to do this in the clk_round_rate() path as
-> well. We can't just pass 0 and ULONG_MAX there or we'll determine
-> one rate here and another rate in round_rate(), violating the
-> contract between set_rate() and round_rate().
+2015-01-19 Thierry Reding <thierry.reding@gmail.com>:
 
-Right, I have added a test for this.
+> On Mon, Jan 19, 2015 at 11:27:52AM +0100, Javier Martinez Canillas wrote:
+> > Hello Thierry,
+> > 
+> > On 01/05/2015 02:50 PM, Thierry Reding wrote:
+> > > On Fri, Jan 02, 2015 at 01:10:14PM +0000, Daniel Stone wrote:
+> > >> >
+> > >> > Ajay's series don't apply cleanly anymore because it has been a while since
+> > >> > he posted it but he can rebase on top of 3.19-rc1 once it is released and
+> > >> > re-resend.
+> > >> >
+> > >> 
+> > >> Do you have any plans to rebase this so it's ready for merging?
+> > >> 
+> > >> Thierry, Daniel, Dave - whose tree would this be best to merge through?
+> > > 
+> > > The plan is for me to take the bridge patches through the drm/panel
+> > > tree. I'm going to look at these patches again later this week but from
+> > > a very quick peek there don't seem to be any major issues left.
+> > >
+> > 
+> > I know you probably are very busy but it would be great if you can take a look
+> > to this series to avoid another kernel release to be missed since we are already
+> > at v3.19-rc5.
+> > 
+> > Only this version was posted 2 months ago and the first version of the series
+> > was sent on May, 2014 so it has been on the list for almost a year now...
+> > 
+> > Tomi and Laurent had already agreed with the DT binging so I think that we can
+> > already merge these and if there are any remaining issues, those can be fixed
+> > during the 3.20 -rc cycle.
+> 
+> I see only a single Tested-by on this series and that seems to be with a
+> bunch of out-of-tree patches applied on top. Does this now actually work
+> applied on top of upstream? Also it seems like many people actually want
+> this to get merged but there's been no Reviewed-bys and only a single
+> Tested-by? Is that as good as it's going to get?
 
->> +
->>               parent_hw = parent ? parent->hw : NULL;
->>               new_rate = clk->ops->determine_rate(clk->hw, rate,
->> +                                                 floor_rate,
->> +                                                 ceiling_rate,
->>                                                   &best_parent_rate,
->>                                                   &parent_hw);
->>               parent = parent_hw ? parent_hw->core : NULL;
->
-> We should enforce a constraint if the clk is using the
-> round_rate() op too. If the .round_rate() op returns some rate
-> within range it should be ok.  Otherwise we can fail the rate
-> change because it's out of range.
+I've been using this series on top of exynos-drm for more than a month and it 
+works fine for me so..
 
-Ok.
+Tested-by: Gustavo Padovan <gustavo.padovan@collabora.co.uk>
 
-> We'll also need to introduce some sort of
-> clk_core_determine_rate(core, rate, min, max) so that clock
-> providers can ask parent clocks to find a rate within some range
-> that they can tolerate. If we update __clk_mux_determine_rate()
-> we can see how that would work out.
-
-Ok, I'm testing this case as well now.
-
->> @@ -1660,13 +1657,92 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
-> [...]
->> + */
->> +int clk_set_rate(struct clk *clk, unsigned long rate)
->> +{
->> +     return clk_core_set_rate(clk->core, rate);
->
-> clk could be NULL.
->
->> +}
->>  EXPORT_SYMBOL_GPL(clk_set_rate);
->>
->> +int clk_set_rate_range(struct clk *clk, unsigned long min, unsigned long max)
->> +{
->> +     int ret = 0;
->
-> Check for NULL clk.
->
->> +
->> +/**
->> + * clk_set_floor_rate - set a minimum clock rate for a clock source
->> + * @clk: clock source
->> + * @rate: desired minimum clock rate in Hz
->> + *
->> + * Returns success (0) or negative errno.
->> + */
->> +int clk_set_floor_rate(struct clk *clk, unsigned long rate)
->> +{
->> +     return clk_set_rate_range(clk, rate, clk->ceiling_constraint);
->
-> clk could be NULL.
->
->> +}
->> +EXPORT_SYMBOL_GPL(clk_set_floor_rate);
->> +
->> +/**
->> + * clk_set_ceiling_rate - set a maximum clock rate for a clock source
->> + * @clk: clock source
->> + * @rate: desired maximum clock rate in Hz
->> + *
->> + * Returns success (0) or negative errno.
->> + */
->> +int clk_set_ceiling_rate(struct clk *clk, unsigned long rate)
->> +{
->> +     return clk_set_rate_range(clk, clk->floor_constraint, rate);
->
-> clk could be NULL.
->
->> +}
->> +EXPORT_SYMBOL_GPL(clk_set_ceiling_rate);
->> +
->>  static struct clk_core *clk_core_get_parent(struct clk_core *core)
->>  {
->>       struct clk_core *parent;
->> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
->> index 2e65419..ae5c800 100644
->> --- a/include/linux/clk-provider.h
->> +++ b/include/linux/clk-provider.h
->> @@ -175,9 +175,12 @@ struct clk_ops {
->>                                       unsigned long parent_rate);
->>       long            (*round_rate)(struct clk_hw *hw, unsigned long rate,
->>                                       unsigned long *parent_rate);
->> -     long            (*determine_rate)(struct clk_hw *hw, unsigned long rate,
->> -                                     unsigned long *best_parent_rate,
->> -                                     struct clk_hw **best_parent_hw);
->> +     long            (*determine_rate)(struct clk_hw *hw,
->> +                                       unsigned long rate,
->> +                                       unsigned long floor_rate,
->> +                                       unsigned long ceiling_rate,
->
-> I wonder if we should call this min_rate and max_rate?
-
-I have gone ahead and replaced all floor/ceiling instances for
-min/max. I don't even remember why I went with the formers any more.
-
->> +                                       unsigned long *best_parent_rate,
->> +                                       struct clk_hw **best_parent_hw);
->>       int             (*set_parent)(struct clk_hw *hw, u8 index);
->>       u8              (*get_parent)(struct clk_hw *hw);
->>       int             (*set_rate)(struct clk_hw *hw, unsigned long rate,
->> diff --git a/include/linux/clk.h b/include/linux/clk.h
->> index c7f258a..f99ae67 100644
->> --- a/include/linux/clk.h
->> +++ b/include/linux/clk.h
->> @@ -302,6 +302,34 @@ long clk_round_rate(struct clk *clk, unsigned long rate);
->>  int clk_set_rate(struct clk *clk, unsigned long rate);
->>
->>  /**
->> + * clk_set_rate_range - set a rate range for a clock source
->> + * @clk: clock source
->> + * @min: desired minimum clock rate in Hz
->> + * @max: desired maximum clock rate in Hz
->> + *
->> + * Returns success (0) or negative errno.
->> + */
->> +int clk_set_rate_range(struct clk *clk, unsigned long min, unsigned long max);
->> +
->> +/**
->> + * clk_set_floor_rate - set a minimum clock rate for a clock source
->> + * @clk: clock source
->> + * @rate: desired minimum clock rate in Hz
->> + *
->> + * Returns success (0) or negative errno.
->> + */
->> +int clk_set_floor_rate(struct clk *clk, unsigned long rate);
->
-> And this called clk_set_max_rate()?
->
->> +
->> +/**
->> + * clk_set_ceiling_rate - set a maximum clock rate for a clock source
->> + * @clk: clock source
->> + * @rate: desired maximum clock rate in Hz
->> + *
->> + * Returns success (0) or negative errno.
->> + */
->> +int clk_set_ceiling_rate(struct clk *clk, unsigned long rate);
->
-> And this called clk_set_min_rate()?
->
->> +
->> +/**
->>   * clk_set_parent - set the parent clock source for this clock
->>   * @clk: clock source
->>   * @parent: parent clock source
-
-Thanks for the review!
-
-Tomeu
-
-> --
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+	Gustavo
