@@ -1,76 +1,50 @@
-From: rsahu@apm.com (Rameshwar Prasad Sahu)
-Date: Mon, 19 Jan 2015 18:11:09 +0530
-Subject: [PATCH v3 3/3] Documentation: dma: Add APM X-Gene SoC DMA engine
- driver documentation
-In-Reply-To: <1421671269-19441-1-git-send-email-rsahu@apm.com>
-References: <1421671269-19441-1-git-send-email-rsahu@apm.com>
-Message-ID: <1421671269-19441-4-git-send-email-rsahu@apm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 19 Jan 2015 13:43:06 +0100
+Subject: [PATCH v6 8/8] arm: dma-mapping: plumb our iommu mapping ops
+ into arch_setup_dma_ops
+In-Reply-To: <5043167.LEiljZnGai@avalon>
+References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
+ <2804479.ZFl06ysk3j@avalon> <54BB58AA.5070407@nvidia.com>
+ <5043167.LEiljZnGai@avalon>
+Message-ID: <20150119124305.GC7312@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device tree binding for APM X-Gene SoC DMA engine driver.
+On Sun, Jan 18, 2015 at 01:18:51PM +0200, Laurent Pinchart wrote:
+> Hi Alexandre,
+> 
+> On Sunday 18 January 2015 15:54:34 Alexandre Courbot wrote:
+> > On 01/16/2015 08:18 AM, Laurent Pinchart wrote:
+[...]
+> > > The second way is to implement a mechanism to let drivers signal that they
+> > > want to handle DMA mappings themselves. As the mappings need in the
+> > > general case to be created before the probe function  is called
+> > 
+> > Sorry for being ignorant here, but why is that?
+> 
+> Because a driver can call the DMA mapping API in its probe function, to 
+> allocate DMA coherent memory for instance. We need to ensure that the DMA 
+> mapping IOMMU has set up the required IOMMU ops by that time. As explained 
+> above I don't like the idea of sprinkling explicit calls to initialize IOMMU 
+> support in the vast majority of drivers, especially when they shouldn't be 
+> IOMMU-aware, so we then need to initialize everything that is needed before 
+> the first call to the DMA mapping API.
 
-Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
-Signed-off-by: Loc Ho <lho@apm.com>
----
- .../devicetree/bindings/dma/apm-xgene-dma.txt      | 49 ++++++++++++++++++++++
- 1 file changed, 49 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/dma/apm-xgene-dma.txt
+The original patch that Hiroshi posted based on my comments was to have
+the driver core call iommu_attach(), which would then set up everything
+needed right before calling into the driver's ->probe(). This works
+quite nicely because by definition the driver can't allocate any DMA
+before ->probe(). And, like you said, this allows deferred probe to be
+used.
 
-diff --git a/Documentation/devicetree/bindings/dma/apm-xgene-dma.txt b/Documentation/devicetree/bindings/dma/apm-xgene-dma.txt
-new file mode 100644
-index 0000000..c661cc6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/dma/apm-xgene-dma.txt
-@@ -0,0 +1,49 @@
-+Applied Micro X-Gene SoC DMA nodes
-+
-+DMA nodes are defined to describe on-chip DMA interfaces in
-+APM X-Gene SoC.
-+
-+Required properties for DMA interfaces:
-+- compatible: Should be "apm,xgene-dma".
-+- device_type: set to "dma".
-+- reg: Address and length of the register set for the device.
-+  It contains the information of registers in the same order
-+  as described by reg-names.
-+- reg-names: Should contain the register set names.
-+  - "dma_csr": DMA control and status register address space.
-+  - "ring_csr": Descriptor ring control and status register
-+                address space.
-+  - "ring_cmd": Descriptor ring command register address space.
-+- interrupts: DMA has 5 interrupts sources. 1st interrupt is
-+  DMA error reporting interrupt. 2nd, 3rd, 4th and 5th interrupts
-+  are completion interrupts for each DMA channels.
-+- clocks: Reference to the clock entry.
-+
-+Optional properties:
-+- dma-coherent : Present if dma operations are coherent
-+
-+Example:
-+	dmaclk: dmaclk at 1f27c000 {
-+		compatible = "apm,xgene-device-clock";
-+		#clock-cells = <1>;
-+		clocks = <&socplldiv2 0>;
-+		reg = <0x0 0x1f27c000 0x0 0x1000>;
-+		reg-names = "csr-reg";
-+		clock-output-names = "dmaclk";
-+	};
-+
-+	dma: dma at 1f270000 {
-+		compatible = "apm,xgene-dma";
-+		device_type = "dma";
-+		reg = <0x0 0x1f270000 0x0 0x10000>,
-+		      <0x0 0x1f200000 0x0 0x10000>,
-+		      <0x0 0x1b008000 0x0 0x2000>;
-+		reg-names = "dma_csr", "ring_csr", "ring_cmd";
-+		interrupts = <0x0 0xb8 0x4>,
-+			     <0x0 0xb9 0x4>,
-+			     <0x0 0xba 0x4>,
-+			     <0x0 0xbb 0x4>,
-+			     <0x0 0x82 0x4>;
-+		dma-coherent;
-+		clocks = <&dmaclk 0>;
-+	};
---
-1.8.2.1
+To me it's so obviously the right solution that I remain flabbergasted
+with how much resistance it's received (or how much it's being ignored).
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150119/7415b52c/attachment.sig>
