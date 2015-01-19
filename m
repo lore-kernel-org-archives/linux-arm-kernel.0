@@ -1,68 +1,31 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 19 Jan 2015 13:36:24 +0100
-Subject: [PATCH v6 8/8] arm: dma-mapping: plumb our iommu mapping ops
- into arch_setup_dma_ops
-In-Reply-To: <2804479.ZFl06ysk3j@avalon>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <20150115082843.GB30799@ulmo> <20150115111211.GF23475@arm.com>
- <2804479.ZFl06ysk3j@avalon>
-Message-ID: <20150119123623.GB7312@ulmo.nvidia.com>
+From: rsahu@apm.com (Rameshwar Prasad Sahu)
+Date: Mon, 19 Jan 2015 18:11:06 +0530
+Subject: [PATCH v3 0/3] dmaengine: APM X-Gene SoC DMA engine driver support
+Message-ID: <1421671269-19441-1-git-send-email-rsahu@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 01:18:21AM +0200, Laurent Pinchart wrote:
-> On Thursday 15 January 2015 11:12:17 Will Deacon wrote:
-> > On Thu, Jan 15, 2015 at 08:28:44AM +0000, Thierry Reding wrote:
-> > > On Wed, Jan 14, 2015 at 10:46:10AM +0000, Will Deacon wrote:
-> > > > On Wed, Jan 14, 2015 at 09:00:24AM +0000, Alexandre Courbot wrote:
-> > > [...]
-> > > 
-> > >>> 2) Say you want to use the IOMMU API in your driver, and have an iommu
-> > >>> property in your device's DT node. If by chance your IOMMU is
-> > >>> registered early, you will already have a mapping automatically
-> > >>> created even before your probe function is called. Can this be
-> > >>> avoided? Is it even safe?
-> > >> 
-> > >> Currently, I think you have to either teardown the ops manually or
-> > >> return an error from of_xlate. Thierry was also looking at this sort of
-> > >> thing, so it might be worth talking to him.
-> > > 
-> > > I already explained in earlier threads why I think this is a bad idea.
-> > > It's completely unnatural for any driver to manually tear down something
-> > > that it didn't want set up in the first place. It also means that you
-> > > have to carefully audit any users of these IOMMU APIs to make sure that
-> > > they do tear down. That doesn't sound like a good incremental approach,
-> > > as evidenced by the breakage that Alex and Heiko have encountered.
-> > 
-> > Well, perhaps we hide that behind a get_iommu API or something. We *do*
-> > need this manual teardown step to support things like VFIO, so it makes
-> > sense to reuse it for other users too imo.
-> > 
-> > > The solution for me has been to completely side-step the issue and not
-> > > register the IOMMU with the new mechanism at all. That is, there's no
-> > > .of_xlate() implementation, which means that the ARM DMA API glue won't
-> > > try to be smart and use the IOMMU in ways it's not meant to be used.
-> 
-> That will break when someone will want to use the same IOMMU type for devices 
-> that use the DMA mapping API to hide the IOMMU. That might not be the case for 
-> your IOMMU today, but it's pretty fragile, we need to fix it.
+This patch set implements the APM X-Gene SoC DMA driver
+support to offload the DMA operations such as memory copy(memcpy),
+scatter gathering.
 
-No, there's absolutely no issue here. It simply means that you can't do
-this on Tegra. So far I'm not sure I even see an advantage in using the
-IOMMU for devices that don't care about it anyway. Consider the example
-of the SD/MMC or HDA. They typically allocate fairly small buffers, the
-order of a single page typically. They can simply use memory handed out
-by the CMA.
+Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
+Signed-off-by: Loc Ho <lho@apm.com>
+---
 
-So as long as we don't add a .of_xlate() implementation or instantiate
-via the IOMMU_OF_DECLARE() mechanism we simply don't support IOMMU-over-
-DMA on Tegra.
+Rameshwar Prasad Sahu (3):
+  dmaengine: Add support for APM X-Gene SoC DMA engine driver
+  arm64: dts: Add APM X-Gene DMA device and DMA clock DTS nodes
+  Documentation: dma: Add APM X-Gene SoC DMA engine driver documentation
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150119/79b595a5/attachment.sig>
+ .../devicetree/bindings/dma/apm-xgene-dma.txt      |   49 +
+ arch/arm64/boot/dts/apm/apm-storm.dtsi             |   28 +
+ drivers/dma/Kconfig                                |    8 +
+ drivers/dma/Makefile                               |    1 +
+ drivers/dma/xgene-dma.c                            | 1566 ++++++++++++++++++++
+ 5 files changed, 1652 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/apm-xgene-dma.txt
+ create mode 100644 drivers/dma/xgene-dma.c
+
+--
+1.8.2.1
