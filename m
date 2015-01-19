@@ -1,90 +1,65 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 19 Jan 2015 11:18:34 -0800
-Subject: [PATCH 1/4] ARM: OMAP2+: Add board-generic.c entry for ti81xx
-In-Reply-To: <20150115000713.GV2419@atomide.com>
-References: <1421192272-20754-1-git-send-email-tony@atomide.com>
- <1421192272-20754-2-git-send-email-tony@atomide.com>
- <54B67461.9010402@cogentembedded.com>
- <20150115000713.GV2419@atomide.com>
-Message-ID: <20150119191833.GC18552@atomide.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Mon, 19 Jan 2015 11:23:46 -0800
+Subject: [PATCH v6 1/3] i2c: iProc: define Broadcom iProc I2C binding
+In-Reply-To: <1421695428-19102-1-git-send-email-rjui@broadcom.com>
+References: <Ray Jui <rjui@broadcom.com>
+ <1421695428-19102-1-git-send-email-rjui@broadcom.com>
+Message-ID: <1421695428-19102-2-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [150114 16:14]:
-> * Sergei Shtylyov <sergei.shtylyov@cogentembedded.com> [150114 05:54]:
-> > Hello.
-> > 
-> > On 1/14/2015 2:37 AM, Tony Lindgren wrote:
-> > 
-> > >This allows booting ti81xx boards with with when a .dts
-> > 
-> >    So, with, with or when? :-)
-> 
-> Heh thanks will updated to:
-> 
-> This allows booting ti81xx boards when a .dts file
-> is in place.
+Document the I2C device tree binding for Broadcom iProc family of
+SoCs
 
-This too needs to be in a separate ifdef CONFIG_SOC_TI81XX block
-to avoid make randconfig build errors. Updated patch below.
+Signed-off-by: Ray Jui <rjui@broadcom.com>
+Reviewed-by: Scott Branden <sbranden@broadcom.com>
+---
+ .../devicetree/bindings/i2c/brcm,iproc-i2c.txt     |   37 ++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt
 
-Regards,
-
-Tony
-
-8< -----------------
-From: Tony Lindgren <tony@atomide.com>
-Date: Mon, 19 Jan 2015 10:38:07 -0800
-Subject: [PATCH] ARM: OMAP2+: Add board-generic.c entry for ti81xx
-
-This allows booting ti81xx boards when a .dts file
-is in place.
-
-Cc: Brian Hutchinson <b.hutchman@gmail.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -142,6 +142,42 @@ DT_MACHINE_START(AM3517_DT, "Generic AM3517 (Flattened Device Tree)")
- 	.dt_compat	= am3517_boards_compat,
- 	.restart	= omap3xxx_restart,
- MACHINE_END
+diff --git a/Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt b/Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt
+new file mode 100644
+index 0000000..81f982c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt
+@@ -0,0 +1,37 @@
++Broadcom iProc I2C controller
 +
-+static const char *const ti814x_boards_compat[] __initconst = {
-+	"ti,dm8148",
-+	"ti,dm814",
-+	NULL,
-+};
-+#endif
++Required properties:
 +
-+#ifdef CONFIG_SOC_TI81XX
-+DT_MACHINE_START(TI81XX_DT, "Generic ti814x (Flattened Device Tree)")
-+	.reserve	= omap_reserve,
-+	.map_io		= ti81xx_map_io,
-+	.init_early	= ti814x_init_early,
-+	.init_machine	= omap_generic_init,
-+	.init_late	= ti81xx_init_late,
-+	.init_time	= omap3_gptimer_timer_init,
-+	.dt_compat	= ti814x_boards_compat,
-+	.restart	= ti81xx_restart,
-+MACHINE_END
++- compatible:
++    Must be "brcm,iproc-i2c"
 +
-+static const char *const ti816x_boards_compat[] __initconst = {
-+	"ti,dm8168",
-+	"ti,dm816",
-+	NULL,
-+};
++- reg:
++    Define the base and range of the I/O address space that contain the iProc
++    I2C controller registers
 +
-+DT_MACHINE_START(TI816X_DT, "Generic ti816x (Flattened Device Tree)")
-+	.reserve	= omap_reserve,
-+	.map_io		= ti81xx_map_io,
-+	.init_early	= ti816x_init_early,
-+	.init_machine	= omap_generic_init,
-+	.init_late	= ti81xx_init_late,
-+	.init_time	= omap3_gptimer_timer_init,
-+	.dt_compat	= ti816x_boards_compat,
-+	.restart	= ti81xx_restart,
-+MACHINE_END
- #endif
- 
- #ifdef CONFIG_SOC_AM33XX
++- interrupts:
++    Should contain the I2C interrupt
++
++- clock-frequency:
++    This is the I2C bus clock. Need to be either 100000 or 400000
++
++- #address-cells:
++    Always 1 (for I2C addresses)
++
++- #size-cells:
++    Always 0
++
++Example:
++	i2c0: i2c at 18008000 {
++		compatible = "brcm,iproc-i2c";
++		reg = <0x18008000 0x100>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		interrupts = <GIC_SPI 85 IRQ_TYPE_NONE>;
++		clock-frequency = <100000>;
++
++		codec: wm8750 at 1a {
++			compatible = "wlf,wm8750";
++			reg = <0x1a>;
++		};
++	};
+-- 
+1.7.9.5
