@@ -1,267 +1,364 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 19 Jan 2015 11:41:20 +0100
-Subject: [linux-sunxi] [PATCH] ARM: dts: sun4i: Add Marsboard A10 board
-In-Reply-To: <1421661748-8390-1-git-send-email-mamlinav@gmail.com>
-References: <1421661748-8390-1-git-send-email-mamlinav@gmail.com>
-Message-ID: <54BCDF50.2070702@redhat.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 19 Jan 2015 11:41:41 +0100
+Subject: [PATCH 1/4] ASoC: samsung: Remove goni or aquila with the WM8994
+Message-ID: <1421664101.9655.52.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Commit 28c8331d386a ("ARM: S5PV210: Remove support for board files")
+removed the Kconfig symbols MACH_GONI and MACH_AQUILA. As a result the
+dependencies of SND_SOC_GONI_AQUILA_WM8994 can never be met. So remove
+the unbuildable "SoC I2S Audio support for AQUILA/GONI - WM8994".
 
-On 19-01-15 11:02, Aleksei Mamlin wrote:
-> This patch add support for Marsboard A10 board.
->
-> The Marsboard A10 is a A10 based development board with 1G RAM, 1G NAND,
-> micro SD card slot, SATA 2.0 socket, 10/100 ethernet, mini HDMI port,
-> 1 USB OTG port and 2 USB 2.0 ports. Board does not use the AXP209 pmic,
-> it does not have a pmic at all.
-> Board also have 2 expansion 70 pin headers.
->
->
-> Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+---
+Suggested by Arnd Bergmann (see https://lkml.org/lkml/2014/9/4/381 ).
 
-Thanks, we've recently moved over from using a full node
-hierarchy to using label references in board dts files, see e.g. :
+Previously submitted in https://lkml.org/lkml/2014/9/18/128 , but in an
+awkward way. So this is basically a resend.
 
-https://git.kernel.org/cgit/linux/kernel/git/mripard/linux.git/commit/?h=sunxi/dt-for-3.20&id=327f121fea91fd79d6b71f47a8e1bc62a7fd86e5
+ sound/soc/samsung/Kconfig       |  11 --
+ sound/soc/samsung/Makefile      |   2 -
+ sound/soc/samsung/goni_wm8994.c | 289 ----------------------------------------
+ 3 files changed, 302 deletions(-)
+ delete mode 100644 sound/soc/samsung/goni_wm8994.c
 
-Can you please respin this to follow that style (the nodes should
-be sorted alphabetically).
-
-Also like with the u-boot patch, when submitting patches for upstream
-they should not be send to the linux-sunxi list, sunxi dts patches
-should go to Maxime Ripard (added to the Cc) with the linux-arm and
-devicetree lists both in the Cc (also added to the Cc) note you do
-not need to be subscribed to these lists.
-
-This makes me realize that we should probably write a manual on
-how to add a new sunxi board to upstream u-boot / a dts to the
-kernel. Since you've just gone through the process, could you
-perhaps write a manual for this on linux-sunxi.org, it is a wiki
-so you should be able to add an account and create a new page.
-
-Thanks & Regards,
-
-Hans
-
-
-
-
-> ---
->   arch/arm/boot/dts/Makefile                |   1 +
->   arch/arm/boot/dts/sun4i-a10-marsboard.dts | 192 ++++++++++++++++++++++++++++++
->   2 files changed, 193 insertions(+)
->   create mode 100644 arch/arm/boot/dts/sun4i-a10-marsboard.dts
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 66a4282..20957b5 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -446,6 +446,7 @@ dtb-$(CONFIG_MACH_SUN4I) += \
->   	sun4i-a10-a1000.dtb \
->   	sun4i-a10-ba10-tvbox.dtb \
->   	sun4i-a10-cubieboard.dtb \
-> +	sun4i-a10-marsboard.dtb \
->   	sun4i-a10-mini-xplus.dtb \
->   	sun4i-a10-hackberry.dtb \
->   	sun4i-a10-inet97fv2.dtb \
-> diff --git a/arch/arm/boot/dts/sun4i-a10-marsboard.dts b/arch/arm/boot/dts/sun4i-a10-marsboard.dts
-> new file mode 100644
-> index 0000000..041dd95
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sun4i-a10-marsboard.dts
-> @@ -0,0 +1,192 @@
-> +/*
-> + * Copyright 2015 Aleksei Mamlin
-> + * Aleksei Mamlin <mamlinav@gmail.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + *     You should have received a copy of the GNU General Public
-> + *     License along with this file; if not, write to the Free
-> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-> + *     MA 02110-1301 USA
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +#include "sun4i-a10.dtsi"
-> +#include "sunxi-common-regulators.dtsi"
-> +
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/pinctrl/sun4i-a10.h>
-> +
-> +/ {
-> +	model = "HAOYU Electronics Marsboard A10";
-> +	compatible = "haoyu,a10-marsboard", "allwinner,sun4i-a10";
-> +
-> +	soc at 01c00000 {
-> +		emac: ethernet at 01c0b000 {
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&emac_pins_a>;
-> +			phy = <&phy1>;
-> +			status = "okay";
-> +		};
-> +
-> +		mdio at 01c0b080 {
-> +			status = "okay";
-> +
-> +			phy1: ethernet-phy at 1 {
-> +				reg = <1>;
-> +			};
-> +		};
-> +
-> +		mmc0: mmc at 01c0f000 {
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
-> +			vmmc-supply = <&reg_vcc3v3>;
-> +			bus-width = <4>;
-> +			cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
-> +			cd-inverted;
-> +			status = "okay";
-> +		};
-> +
-> +		usbphy: phy at 01c13400 {
-> +			usb1_vbus-supply = <&reg_usb1_vbus>;
-> +			usb2_vbus-supply = <&reg_usb2_vbus>;
-> +			status = "okay";
-> +		};
-> +
-> +		ehci0: usb at 01c14000 {
-> +			status = "okay";
-> +		};
-> +
-> +		ohci0: usb at 01c14400 {
-> +			status = "okay";
-> +		};
-> +
-> +		ahci: sata at 01c18000 {
-> +			status = "okay";
-> +		};
-> +
-> +		ehci1: usb at 01c1c000 {
-> +			status = "okay";
-> +		};
-> +
-> +		ohci1: usb at 01c1c400 {
-> +			status = "okay";
-> +		};
-> +
-> +		pinctrl at 01c20800 {
-> +			led_pins_marsboard: led_pins at 0 {
-> +				allwinner,pins = "PB5", "PB6", "PB7", "PB8";
-> +				allwinner,function = "gpio_out";
-> +				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> +			};
-> +		};
-> +
-> +		uart0: serial at 01c28000 {
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&uart0_pins_a>;
-> +			status = "okay";
-> +		};
-> +
-> +		i2c0: i2c at 01c2ac00 {
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&i2c0_pins_a>;
-> +			status = "okay";
-> +		};
-> +
-> +		i2c1: i2c at 01c2b000 {
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&i2c1_pins_a>;
-> +			status = "okay";
-> +		};
-> +
-> +		spi0: spi at 01c05000 {
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&spi0_pins_a>;
-> +			status = "okay";
-> +		};
-> +
-> +		spi1: spi at 01c06000 {
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&spi1_pins_a>;
-> +			status = "okay";
-> +		};
-> +
-> +		spi2: spi at 01c17000 {
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&spi2_pins_a>;
-> +			status = "okay";
-> +		};
-> +	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&led_pins_marsboard>;
-> +
-> +		red1 {
-> +			label = "marsboard:red1:usr";
-> +			gpios = <&pio 1 5 GPIO_ACTIVE_HIGH>; /* LED1 */
-> +			linux,default-trigger = "heartbeat";
-> +		};
-> +
-> +		red2 {
-> +			label = "marsboard:red2:usr";
-> +			gpios = <&pio 1 6 GPIO_ACTIVE_HIGH>; /* LED2 */
-> +		};
-> +
-> +		red3 {
-> +			label = "marsboard:red3:usr";
-> +			gpios = <&pio 1 7 GPIO_ACTIVE_HIGH>; /* LED3 */
-> +		};
-> +
-> +		red4 {
-> +			label = "marsboard:red4:usr";
-> +			gpios = <&pio 1 8 GPIO_ACTIVE_HIGH>; /* LED4 */
-> +		};
-> +	};
-> +
-> +	reg_usb1_vbus: usb1-vbus {
-> +		status = "okay";
-> +	};
-> +
-> +	reg_usb2_vbus: usb2-vbus {
-> +		status = "okay";
-> +	};
-> +};
->
+diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
+index fc67f97f19f6..da6d0229cfa2 100644
+--- a/sound/soc/samsung/Kconfig
++++ b/sound/soc/samsung/Kconfig
+@@ -146,17 +146,6 @@ config SND_SOC_SMARTQ
+ 	select SND_SAMSUNG_I2S
+ 	select SND_SOC_WM8750
+ 
+-config SND_SOC_GONI_AQUILA_WM8994
+-	tristate "SoC I2S Audio support for AQUILA/GONI - WM8994"
+-	depends on SND_SOC_SAMSUNG && (MACH_GONI || MACH_AQUILA)
+-	depends on I2C=y
+-	select SND_SAMSUNG_I2S
+-	select MFD_WM8994
+-	select SND_SOC_WM8994
+-	help
+-	  Say Y if you want to add support for SoC audio on goni or aquila
+-	  with the WM8994.
+-
+ config SND_SOC_SAMSUNG_SMDK_SPDIF
+ 	tristate "SoC S/PDIF Audio support for SMDK"
+ 	depends on SND_SOC_SAMSUNG
+diff --git a/sound/soc/samsung/Makefile b/sound/soc/samsung/Makefile
+index 31e3dba7e3b5..052fe71be518 100644
+--- a/sound/soc/samsung/Makefile
++++ b/sound/soc/samsung/Makefile
+@@ -35,7 +35,6 @@ snd-soc-smdk-wm8994-objs := smdk_wm8994.o
+ snd-soc-snow-objs := snow.o
+ snd-soc-smdk-wm9713-objs := smdk_wm9713.o
+ snd-soc-s3c64xx-smartq-wm8987-objs := smartq_wm8987.o
+-snd-soc-goni-wm8994-objs := goni_wm8994.o
+ snd-soc-smdk-spdif-objs := smdk_spdif.o
+ snd-soc-smdk-wm8580pcm-objs := smdk_wm8580pcm.o
+ snd-soc-smdk-wm8994pcm-objs := smdk_wm8994pcm.o
+@@ -63,7 +62,6 @@ obj-$(CONFIG_SND_SOC_SNOW) += snd-soc-snow.o
+ obj-$(CONFIG_SND_SOC_SAMSUNG_SMDK_WM9713) += snd-soc-smdk-wm9713.o
+ obj-$(CONFIG_SND_SOC_SMARTQ) += snd-soc-s3c64xx-smartq-wm8987.o
+ obj-$(CONFIG_SND_SOC_SAMSUNG_SMDK_SPDIF) += snd-soc-smdk-spdif.o
+-obj-$(CONFIG_SND_SOC_GONI_AQUILA_WM8994) += snd-soc-goni-wm8994.o
+ obj-$(CONFIG_SND_SOC_SMDK_WM8580_PCM) += snd-soc-smdk-wm8580pcm.o
+ obj-$(CONFIG_SND_SOC_SMDK_WM8994_PCM) += snd-soc-smdk-wm8994pcm.o
+ obj-$(CONFIG_SND_SOC_SPEYSIDE) += snd-soc-speyside.o
+diff --git a/sound/soc/samsung/goni_wm8994.c b/sound/soc/samsung/goni_wm8994.c
+deleted file mode 100644
+index fad56b9e7369..000000000000
+--- a/sound/soc/samsung/goni_wm8994.c
++++ /dev/null
+@@ -1,289 +0,0 @@
+-/*
+- * goni_wm8994.c
+- *
+- * Copyright (C) 2010 Samsung Electronics Co.Ltd
+- * Author: Chanwoo Choi <cw00.choi@samsung.com>
+- *
+- *  This program is free software; you can redistribute  it and/or modify it
+- *  under  the terms of  the GNU General  Public License as published by the
+- *  Free Software Foundation;  either version 2 of the  License, or (at your
+- *  option) any later version.
+- *
+- */
+-
+-#include <linux/module.h>
+-#include <sound/soc.h>
+-#include <sound/jack.h>
+-
+-#include <asm/mach-types.h>
+-#include <mach/gpio-samsung.h>
+-
+-#include "../codecs/wm8994.h"
+-
+-#define MACHINE_NAME	0
+-#define CPU_VOICE_DAI	1
+-
+-static const char *aquila_str[] = {
+-	[MACHINE_NAME] = "aquila",
+-	[CPU_VOICE_DAI] = "aquila-voice-dai",
+-};
+-
+-static struct snd_soc_card goni;
+-static struct platform_device *goni_snd_device;
+-
+-/* 3.5 pie jack */
+-static struct snd_soc_jack jack;
+-
+-/* 3.5 pie jack detection DAPM pins */
+-static struct snd_soc_jack_pin jack_pins[] = {
+-	{
+-		.pin = "Headset Mic",
+-		.mask = SND_JACK_MICROPHONE,
+-	}, {
+-		.pin = "Headset Stereophone",
+-		.mask = SND_JACK_HEADPHONE | SND_JACK_MECHANICAL |
+-			SND_JACK_AVOUT,
+-	},
+-};
+-
+-/* 3.5 pie jack detection gpios */
+-static struct snd_soc_jack_gpio jack_gpios[] = {
+-	{
+-		.gpio = S5PV210_GPH0(6),
+-		.name = "DET_3.5",
+-		.report = SND_JACK_HEADSET | SND_JACK_MECHANICAL |
+-			SND_JACK_AVOUT,
+-		.debounce_time = 200,
+-	},
+-};
+-
+-static const struct snd_soc_dapm_widget goni_dapm_widgets[] = {
+-	SND_SOC_DAPM_SPK("Ext Left Spk", NULL),
+-	SND_SOC_DAPM_SPK("Ext Right Spk", NULL),
+-	SND_SOC_DAPM_SPK("Ext Rcv", NULL),
+-	SND_SOC_DAPM_HP("Headset Stereophone", NULL),
+-	SND_SOC_DAPM_MIC("Headset Mic", NULL),
+-	SND_SOC_DAPM_MIC("Main Mic", NULL),
+-	SND_SOC_DAPM_MIC("2nd Mic", NULL),
+-	SND_SOC_DAPM_LINE("Radio In", NULL),
+-};
+-
+-static const struct snd_soc_dapm_route goni_dapm_routes[] = {
+-	{"Ext Left Spk", NULL, "SPKOUTLP"},
+-	{"Ext Left Spk", NULL, "SPKOUTLN"},
+-
+-	{"Ext Right Spk", NULL, "SPKOUTRP"},
+-	{"Ext Right Spk", NULL, "SPKOUTRN"},
+-
+-	{"Ext Rcv", NULL, "HPOUT2N"},
+-	{"Ext Rcv", NULL, "HPOUT2P"},
+-
+-	{"Headset Stereophone", NULL, "HPOUT1L"},
+-	{"Headset Stereophone", NULL, "HPOUT1R"},
+-
+-	{"IN1RN", NULL, "Headset Mic"},
+-	{"IN1RP", NULL, "Headset Mic"},
+-
+-	{"IN1RN", NULL, "2nd Mic"},
+-	{"IN1RP", NULL, "2nd Mic"},
+-
+-	{"IN1LN", NULL, "Main Mic"},
+-	{"IN1LP", NULL, "Main Mic"},
+-
+-	{"IN2LN", NULL, "Radio In"},
+-	{"IN2RN", NULL, "Radio In"},
+-};
+-
+-static int goni_wm8994_init(struct snd_soc_pcm_runtime *rtd)
+-{
+-	struct snd_soc_codec *codec = rtd->codec;
+-	struct snd_soc_dapm_context *dapm = &codec->dapm;
+-	int ret;
+-
+-	/* set endpoints to not connected */
+-	snd_soc_dapm_nc_pin(dapm, "IN2LP:VXRN");
+-	snd_soc_dapm_nc_pin(dapm, "IN2RP:VXRP");
+-	snd_soc_dapm_nc_pin(dapm, "LINEOUT1N");
+-	snd_soc_dapm_nc_pin(dapm, "LINEOUT1P");
+-	snd_soc_dapm_nc_pin(dapm, "LINEOUT2N");
+-	snd_soc_dapm_nc_pin(dapm, "LINEOUT2P");
+-
+-	if (machine_is_aquila()) {
+-		snd_soc_dapm_nc_pin(dapm, "SPKOUTRN");
+-		snd_soc_dapm_nc_pin(dapm, "SPKOUTRP");
+-	}
+-
+-	/* Headset jack detection */
+-	ret = snd_soc_jack_new(codec, "Headset Jack",
+-			SND_JACK_HEADSET | SND_JACK_MECHANICAL | SND_JACK_AVOUT,
+-			&jack);
+-	if (ret)
+-		return ret;
+-
+-	ret = snd_soc_jack_add_pins(&jack, ARRAY_SIZE(jack_pins), jack_pins);
+-	if (ret)
+-		return ret;
+-
+-	ret = snd_soc_jack_add_gpios(&jack, ARRAY_SIZE(jack_gpios), jack_gpios);
+-	if (ret)
+-		return ret;
+-
+-	return 0;
+-}
+-
+-static int goni_hifi_hw_params(struct snd_pcm_substream *substream,
+-		struct snd_pcm_hw_params *params)
+-{
+-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+-	struct snd_soc_dai *codec_dai = rtd->codec_dai;
+-	unsigned int pll_out = 24000000;
+-	int ret = 0;
+-
+-	/* set the codec FLL */
+-	ret = snd_soc_dai_set_pll(codec_dai, WM8994_FLL1, 0, pll_out,
+-			params_rate(params) * 256);
+-	if (ret < 0)
+-		return ret;
+-
+-	/* set the codec system clock */
+-	ret = snd_soc_dai_set_sysclk(codec_dai, WM8994_SYSCLK_FLL1,
+-			params_rate(params) * 256, SND_SOC_CLOCK_IN);
+-	if (ret < 0)
+-		return ret;
+-
+-	return 0;
+-}
+-
+-static struct snd_soc_ops goni_hifi_ops = {
+-	.hw_params = goni_hifi_hw_params,
+-};
+-
+-static int goni_voice_hw_params(struct snd_pcm_substream *substream,
+-		struct snd_pcm_hw_params *params)
+-{
+-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+-	struct snd_soc_dai *codec_dai = rtd->codec_dai;
+-	unsigned int pll_out = 24000000;
+-	int ret = 0;
+-
+-	if (params_rate(params) != 8000)
+-		return -EINVAL;
+-
+-	/* set the codec FLL */
+-	ret = snd_soc_dai_set_pll(codec_dai, WM8994_FLL2, 0, pll_out,
+-			params_rate(params) * 256);
+-	if (ret < 0)
+-		return ret;
+-
+-	/* set the codec system clock */
+-	ret = snd_soc_dai_set_sysclk(codec_dai, WM8994_SYSCLK_FLL2,
+-			params_rate(params) * 256, SND_SOC_CLOCK_IN);
+-	if (ret < 0)
+-		return ret;
+-
+-	return 0;
+-}
+-
+-static struct snd_soc_dai_driver voice_dai = {
+-	.name = "goni-voice-dai",
+-	.id = 0,
+-	.playback = {
+-		.channels_min = 1,
+-		.channels_max = 2,
+-		.rates = SNDRV_PCM_RATE_8000,
+-		.formats = SNDRV_PCM_FMTBIT_S16_LE,},
+-	.capture = {
+-		.channels_min = 1,
+-		.channels_max = 2,
+-		.rates = SNDRV_PCM_RATE_8000,
+-		.formats = SNDRV_PCM_FMTBIT_S16_LE,},
+-};
+-
+-static const struct snd_soc_component_driver voice_component = {
+-	.name		= "goni-voice",
+-};
+-
+-static struct snd_soc_ops goni_voice_ops = {
+-	.hw_params = goni_voice_hw_params,
+-};
+-
+-static struct snd_soc_dai_link goni_dai[] = {
+-{
+-	.name = "WM8994",
+-	.stream_name = "WM8994 HiFi",
+-	.cpu_dai_name = "samsung-i2s.0",
+-	.codec_dai_name = "wm8994-aif1",
+-	.platform_name = "samsung-i2s.0",
+-	.codec_name = "wm8994-codec.0-001a",
+-	.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
+-		   SND_SOC_DAIFMT_CBM_CFM,
+-	.init = goni_wm8994_init,
+-	.ops = &goni_hifi_ops,
+-}, {
+-	.name = "WM8994 Voice",
+-	.stream_name = "Voice",
+-	.cpu_dai_name = "goni-voice-dai",
+-	.codec_dai_name = "wm8994-aif2",
+-	.codec_name = "wm8994-codec.0-001a",
+-	.dai_fmt = SND_SOC_DAIFMT_LEFT_J | SND_SOC_DAIFMT_IB_IF |
+-		   SND_SOC_DAIFMT_CBM_CFM,
+-	.ops = &goni_voice_ops,
+-},
+-};
+-
+-static struct snd_soc_card goni = {
+-	.name = "goni",
+-	.owner = THIS_MODULE,
+-	.dai_link = goni_dai,
+-	.num_links = ARRAY_SIZE(goni_dai),
+-
+-	.dapm_widgets = goni_dapm_widgets,
+-	.num_dapm_widgets = ARRAY_SIZE(goni_dapm_widgets),
+-	.dapm_routes = goni_dapm_routes,
+-	.num_dapm_routes = ARRAY_SIZE(goni_dapm_routes),
+-};
+-
+-static int __init goni_init(void)
+-{
+-	int ret;
+-
+-	if (machine_is_aquila()) {
+-		voice_dai.name = aquila_str[CPU_VOICE_DAI];
+-		goni_dai[1].cpu_dai_name = aquila_str[CPU_VOICE_DAI];
+-		goni.name = aquila_str[MACHINE_NAME];
+-	} else if (!machine_is_goni())
+-		return -ENODEV;
+-
+-	goni_snd_device = platform_device_alloc("soc-audio", -1);
+-	if (!goni_snd_device)
+-		return -ENOMEM;
+-
+-	/* register voice DAI here */
+-	ret = devm_snd_soc_register_component(&goni_snd_device->dev,
+-			&voice_component, &voice_dai, 1);
+-	if (ret) {
+-		platform_device_put(goni_snd_device);
+-		return ret;
+-	}
+-
+-	platform_set_drvdata(goni_snd_device, &goni);
+-	ret = platform_device_add(goni_snd_device);
+-
+-	if (ret)
+-		platform_device_put(goni_snd_device);
+-
+-	return ret;
+-}
+-
+-static void __exit goni_exit(void)
+-{
+-	platform_device_unregister(goni_snd_device);
+-}
+-
+-module_init(goni_init);
+-module_exit(goni_exit);
+-
+-/* Module information */
+-MODULE_DESCRIPTION("ALSA SoC WM8994 GONI(S5PV210)");
+-MODULE_AUTHOR("Chanwoo Choi <cw00.choi@samsung.com>");
+-MODULE_LICENSE("GPL");
+-- 
+1.9.3
