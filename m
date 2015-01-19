@@ -1,43 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 19 Jan 2015 12:12:54 -0800
-Subject: [PATCH v2] ARM: OMAP: Work around hardcoded interrupts
-In-Reply-To: <20150119201404.GA18738@kahuna>
-References: <1421490068-20385-1-git-send-email-marc.zyngier@arm.com>
- <20150119201404.GA18738@kahuna>
-Message-ID: <20150119201253.GF18552@atomide.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 19 Jan 2015 21:19:29 +0100
+Subject: [PATCH v1 0/4] net: stmmac: dwmac-rk: Fix phy regulator issues
+In-Reply-To: <1421690889-11901-1-git-send-email-romain.perier@gmail.com>
+References: <1421690889-11901-1-git-send-email-romain.perier@gmail.com>
+Message-ID: <1446006.BXnWRvK5p3@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [150119 12:17]:
-> On 10:21-20150117, Marc Zyngier wrote:
-> > Commit 9a1091ef0017 (irqchip: gic: Support hierarchy irq domain)
-> should have been
-> Commit 9a1091ef0017 ("irqchip: gic: Support hierarchy irq domain")
+Hi Romain
+
+Am Montag, 19. Januar 2015, 18:08:05 schrieb Romain Perier:
+> This series fixes few issues in dwmac-rk:
 > 
-> > changed the GIC driver to use a non-legacy IRQ domain on DT
-> > platforms. This patch assumes that DT-driven systems are getting
-> > all of their interrupts from device tree.
-> > 
-> > Turns out that OMAP has quite a few hidden gems, and still uses
-> > hardcoded interrupts despite having fairly complete DTs.
-> > 
-> > This patch attempts to work around these by offering a translation
-> > method that can be called directly from the hwmod code, if present.
-> > The same hack is sprinkled over PRCM and TWL.
-> > 
-> > It isn't pretty, but it seems to do the job without having to add
-> > more hacks to the interrupt controller code.
-> > 
-> > Tested on OMAP4 (Panda-ES) and OMAP5 (UEVM5432).
-> > 
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> 1. Voltage settings was hardcoded into the driver for the phy regulator.
+>    The driver now uses the default voltage settings found in the devicetree,
+> which are applied throught the regulator framework.
+> 2. The regulator name used to power on or power off the phy was put in the
+> devicetree variable "phy_regulator", which is not standard and added a lot
+> of code for nothing. The driver now uses the devicetree property
+> "phy-supply" and the corresponding functions to manipulate this regulator.
 > 
-> Other than that, This looks good to me.
-> Acked-by: Nishanth Menon <nm@ti.com>
+> The corresponding devicetree files are also updated. As, dwmac-rk was
+> recently pushed in the development tree, I don't care about devicetree
+> backward compatibility issues.
 
-OK thanks applying into omap-for-v3.19/fixes and will send out a
-pull request later on today after some make randconfig builds.
+This last sentence is slightly misleading :-) .
 
-Regards,
+The actual fact is, that these new bindings for the rk3288 gmac have not been 
+released with any official kernel release yet ... i.e. the will be released with 
+3.20 in whatever form, so we don't _need_ to care about keeping compatibility 
+still for the next 2.5 weeks or so.
 
-Tony
+@Dave: it would be good if this series (when fixed) could still go into the 
+3.20 material so we don't get stuck with the non-standard regulator property.
+
+
+As we'll probably need a v2 due to at the issue in patch3, could you also 
+switch places of patch1 and 2, which would keep bisecatbility (i.e. regulator 
+property before removing the voltage setting from the driver).
+
+
+Otherwise this series:
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+Tested-by: Heiko Stuebner <heiko@sntech.de>
