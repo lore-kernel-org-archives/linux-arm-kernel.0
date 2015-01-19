@@ -1,62 +1,80 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 19 Jan 2015 10:04:01 +0800
-Subject: [PATCH 01/28] PCI: Rip out pci_bus_add_devices() from
- pci_scan_bus()
-In-Reply-To: <CAE9FiQV97PuDWBZYRxh8R0ADnUFTbo1NO3wAufj97en0yseYSQ@mail.gmail.com>
-References: <1421372666-12288-1-git-send-email-wangyijing@huawei.com>	<1421372666-12288-2-git-send-email-wangyijing@huawei.com>	<CAE9FiQUoocCzBKsHL_D4ypH1-DV7XxZMdREX7n=Tz1Kq3kHHeA@mail.gmail.com>
- <CAE9FiQV97PuDWBZYRxh8R0ADnUFTbo1NO3wAufj97en0yseYSQ@mail.gmail.com>
-Message-ID: <54BC6611.9020002@huawei.com>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Mon, 19 Jan 2015 10:10:33 +0800
+Subject: [PATCH v2 1/8] device core: Introduce per-device MSI domain
+ pointer
+In-Reply-To: <CALRxmdDVUoYNg3QC0LdvKmCz9x4nzE9+TDiV9K9OH=Gxk-Cd9w@mail.gmail.com>
+References: <1420736772-11088-1-git-send-email-marc.zyngier@arm.com>	<1420736772-11088-2-git-send-email-marc.zyngier@arm.com>
+ <CALRxmdDVUoYNg3QC0LdvKmCz9x4nzE9+TDiV9K9OH=Gxk-Cd9w@mail.gmail.com>
+Message-ID: <54BC6799.2040907@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/1/17 7:16, Yinghai Lu wrote:
-> On Fri, Jan 16, 2015 at 3:15 PM, Yinghai Lu <yinghai@kernel.org> wrote:
->> On Thu, Jan 15, 2015 at 5:43 PM, Yijing Wang <wangyijing@huawei.com> wrote:
->>> Pci_bus_add_devices() should not be placed in pci_scan_bus().
->>> Now pci device will be added to driver core once its
->>> creation. All things left in pci_bus_add_devices() are
->>> driver attachment and other trivial sysfs things.
->>> Pci_scan_bus() should be the function responsible for
->>> scanning PCI devices, not including driver attachment.
->>> Other, some callers(m68k,unicore32,alpha) of pci_scan_bus()
->>> will call pci_bus_size_bridges() and pci_bus_assign_resources()
->>> after pci_scan_bus().
->>>
->>> E.g.
->>> In m68k
->>> mcf_pci_init()
->>>         pci_scan_bus()
->>>                 ...
->>>                 pci_bus_add_devices() --- try to attach driver
->>>         pci_fixup_irqs()
->>>         pci_bus_size_bridges()
->>>         pci_bus_assign_resources()
->>>
->>> It is not correct, resources should be assigned correctly
->>> before attaching driver.
+
+
+On 2015/1/16 4:35, Stuart Yoder wrote:
+> On Thu, Jan 8, 2015 at 11:06 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> As MSI-type features are creeping into non-PCI devices, it is
+>> starting to make sense to give our struct device some form of
+>> support for this, by allowing a pointer to an MSI irq domain to
+>> be set/retrieved.
 >>
-> No, for booting path, at that time pci drivers are *NOT* loaded yet.
-
-Hi Yinghai, I knew code flow here would not cause problems, sorry the log
-confused you, I will refresh it. But I think pci_scan_bus()/pci_scan_root_bus()
-which could only be used during system boot up(before module_init) make
-the pci scan logic obscure. Because most callers additionally call
-pci_bus_size_bridges() and pci_bus_assign_resources() later,
-so rip out pci_bus_add_devices() from pci_scan_bus()/pci_scan_root_bus()
-make code have better readability.
-
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  include/linux/device.h | 20 ++++++++++++++++++++
+>>  1 file changed, 20 insertions(+)
+>>
+>> diff --git a/include/linux/device.h b/include/linux/device.h
+>> index fb50673..ec4cee5 100644
+>> --- a/include/linux/device.h
+>> +++ b/include/linux/device.h
+>> @@ -690,6 +690,7 @@ struct acpi_dev_node {
+>>   *             along with subsystem-level and driver-level callbacks.
+>>   * @pins:      For device pin management.
+>>   *             See Documentation/pinctrl.txt for details.
+>> + * @msi_domain: The generic MSI domain this device is using.
+>>   * @numa_node: NUMA node this device is close to.
+>>   * @dma_mask:  Dma mask (if dma'ble device).
+>>   * @coherent_dma_mask: Like dma_mask, but for alloc_coherent mapping as not all
+>> @@ -750,6 +751,9 @@ struct device {
+>>         struct dev_pm_info      power;
+>>         struct dev_pm_domain    *pm_domain;
+>>
+>> +#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
+>> +       struct irq_domain       *msi_domain; /* MSI domain device uses */
+>> +#endif
+> 
+> This is not a comment on this patch specifically, but a question about other
+> MSI specific fields that might be needed in struct device.
+> 
+> Currently the generic MSI domain handling has hardcoded assumptions
+> that devices are PCI-- see the for_each_msi_entry() iterator in msi.h:
+> 
+>   #define dev_to_msi_list(dev)            (&to_pci_dev((dev))->msi_list)
+> 
+>   #define for_each_msi_entry(desc, dev)   \
+>         list_for_each_entry((desc), dev_to_msi_list((dev)), list)
+> 
+> One approach would be to move the msi_list out of pci_dev and put
+> it in struct device, so all devices can have an msi_list.
+> 
+> The other approach would be to keep msi_list in a bus specific
+> device struct, and then dev_to_msi_list() would need to be
+> implemented as a bus specific callback of some kind.
+> 
+> The above hardcoded PCI assumption isn't going to work.   Wanted to
+> see if there is any advice in which direction to go.
+Hi Stuart,
+	I already have some a patch set to go that direction waiting
+send out for review:)
 Thanks!
-Yijing.
+Gerry
 
 > 
-> Thanks
+> Thanks,
+> Stuart Yoder
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
 > 
-> Yinghai
-> 
-> .
-> 
-
-
--- 
-Thanks!
-Yijing
