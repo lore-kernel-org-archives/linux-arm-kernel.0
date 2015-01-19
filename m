@@ -1,40 +1,40 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 19 Jan 2015 09:38:01 +0000
-Subject: [PATCH v8 2/6] dt-bindings: add vendor-prefix for X-Powers
-In-Reply-To: <1419303194-3075-3-git-send-email-wens@csie.org>
-References: <1419303194-3075-1-git-send-email-wens@csie.org>
- <1419303194-3075-3-git-send-email-wens@csie.org>
-Message-ID: <20150119093801.GI21886@x1>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 19 Jan 2015 10:38:58 +0100
+Subject: [PATCH v4] ARM: mvebu: remove two selects of ARM_ERRATA_753970
+In-Reply-To: <1421659937.9655.16.camel@x220>
+References: <1421659937.9655.16.camel@x220>
+Message-ID: <1421660338.9655.21.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Dec 2014, Chen-Yu Tsai wrote:
+Andy, Joe,
 
-> From: Carlo Caione <carlo@caione.org>
+On Mon, 2015-01-19 at 10:32 +0100, Paul Bolle wrote:
+> ARM_ERRATA_753970 was renamed to PL310_ERRATA_753970 in v3.2, through
+> commit fa0ce4035d48 ("ARM: 7162/1: errata: tidy up Kconfig options for
+> PL310 errata workarounds"). Still, two selects were added in v3.15 that
+> used the previous name. So these selects have always been nops.
 > 
-> Signed-off-by: Carlo Caione <carlo@caione.org>
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->  1 file changed, 1 insertion(+)
+> It is clear that the intention here was to select PL310_ERRATA_753970.
+> But as, apparently, nothing broke for four releases we can assume
+> PL310_ERRATA_753970 isn't actually needed. So let's not rename these two
+> selects but just drop them instead.
+> 
+> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
+Checkpatch in next-21050119 complains:
+    ERROR: Please use git commit description style 'commit <12+ chars of sha1> ("<title line>")' - ie: 'commit fa0ce4035d48 ("ARM: 7162/1: errata: tidy up Kconfig options for PL310 errata workarounds")'
+    #7: 
+    commit fa0ce4035d48 ("ARM: 7162/1: errata: tidy up Kconfig options for
+    
+    total: 1 errors, 0 warnings, 14 lines checked
+    
+    Your patch has style problems, please review.
 
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index b1df0ad1306c..1794fce3de80 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -172,6 +172,7 @@ voipac	Voipac Technologies s.r.o.
->  winbond Winbond Electronics corp.
->  wlf	Wolfson Microelectronics
->  wm	Wondermedia Technologies, Inc.
-> +x-powers	X-Powers
->  xes	Extreme Engineering Solutions (X-ES)
->  xillybus	Xillybus Ltd.
->  xlnx	Xilinx
+Perhaps it doesn't notice the quote spans two lines. Can this be fixed
+please?
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks,
+
+
+Paul Bolle
