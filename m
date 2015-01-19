@@ -1,105 +1,319 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 Jan 2015 17:13:14 +0100
-Subject: [PATCH v6 8/8] arm: dma-mapping: plumb our iommu mapping ops into
- arch_setup_dma_ops
-In-Reply-To: <5043167.LEiljZnGai@avalon>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <54BB58AA.5070407@nvidia.com> <5043167.LEiljZnGai@avalon>
-Message-ID: <3782946.UYvzT31Xfc@wuerfel>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Mon, 19 Jan 2015 17:13:38 +0100
+Subject: [PATCH v3] ARM: multi_v7_defconfig: Enable shmobile platforms
+Message-ID: <1421684018-11894-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 18 January 2015 13:18:51 Laurent Pinchart wrote:
-> On Sunday 18 January 2015 15:54:34 Alexandre Courbot wrote:
-> > On 01/16/2015 08:18 AM, Laurent Pinchart wrote:
-> > > On Thursday 15 January 2015 11:12:17 Will Deacon wrote:
-> > >> On Thu, Jan 15, 2015 at 08:28:44AM +0000, Thierry Reding wrote:
-> > >>> This has several advantages, such as that I can also use the regular
-> > >>> driver model for suspend/resume of the IOMMU, and I get to enjoy the
-> > >>> benefits of devres in the IOMMU driver. Probe ordering is still a tiny
-> > >>> issue, but we can easily solve that using explicit initcall ordering
-> > >>> (which really isn't any worse than IOMMU_OF_DECLARE()).
-> > >> 
-> > >> That's a pity. I'd much rather extend what we currently have to satisfy
-> > >> your use-case. Ho-hum.
-> > > 
-> > > Assuming we want the IOMMU to be handled transparently for the majority of
-> > > devices I only see two ways to fix this,
-> > > 
-> > > The first way is to create a default DMA mapping unconditionally and let
-> > > drivers that can't live with it tear it down. That's what is implemented
-> > > today.
-> > 
-> > I strongly support Thierry's point that drivers should not have to tear
-> > down things they don't need. The issue we are facing today is a very
-> > good illustration of why one should not have to do this.
-> > 
-> > Everybody hates to receive unsollicited email with a link that says "to
-> > unsubscribe, click here". Let's not import that unpleasant culture into
-> > the kernel.
-> > 
-> > I am arriving late in this discussion, but what is wrong with asking
-> > drivers to explicitly state that they want the DMA API to be backed by
-> > the IOMMU instead of forcibly making it work that way?
-> 
-> The vast majority of the drivers are not IOMMU-aware. We would thus need to 
-> add a call at the beginning of the probe function of nearly every driver that 
-> can perform DMA to state that the driver doesn't need to handle any IOMMU that 
-> might be present in the system itself. I don't think that's a better solution.
+Tested on:
+  - r8a7740/armadillo (kexec works, hermit boot loader fails),
+  - r8a7791/koelsch,
+  - sh73a0/kzm9g (kexec works, zImage+DTB from U-Boot needs
+		  CONFIG_ARM_ATAG_DTB_COMPAT=n),
+  - am335x/boneblack.
 
-Right, abstracting the presence of an IOMMU (along with things like
-cache management) is the whole point for having the dma-mapping API.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+This is against today's arm-soc/for-next
 
-The iommu driver should instead be able to make the decision on whether
-the device uses the iommu for DMA or not. In some cases, it's not an
-option because the iommu is mandatory for all DMA and there is no working
-passthrough mode. In other cases, it depends on the dma mask: as long as
-the device's dma_mask covers all of RAM, we can avoid using the IOMMU
-and get better performance (and also avoid setting up tables that may
-need to be removed again), but when the dma mask is too small, we have
-to use the iommu or fall back to swiotlb (which is currently not implemeted
-on arm32).
+v3:
+  - Update for boardless r8a7790/Lager support (cfr. commits
+    174b7a54c925a068 ("ARM: shmobile: Enable MICREL_PHY in
+    shmobile_defconfig") and be2902416cc6f26d ("ARM: shmobile:
+    lager-reference: DTS-only board support"),
+  - Added sh73a0/kzm9g, as it became multi-platform aware,
+  - Synced with recent shmobile_defconfig updates (e.g. RCAR_DMAC),
+v2:
+  - Added r8a7740/armadillo, as this does work with kexec,
+  - Synced with recent shmobile_defconfig updates (e.g. r8a7794).
+---
+ arch/arm/configs/multi_v7_defconfig | 81 ++++++++++++++++++++++++++++++++++---
+ 1 file changed, 76 insertions(+), 5 deletions(-)
 
-> > > we can't signal this by calling a function in probe(). A new flag field
-> > > for struct device_driver is a possible solution. This would however
-> > > require delaying the creation of DMA mappings until right before probe
-> > > time. Attaching to the IOMMU could be pushed to right before probe() as
-> > > well, which would have the added benefit of making IOMMU driver
-> > > implementable as real platform drivers.
-> > 
-> > Keeping the ability to write IOMMU drivers as platform drivers would be
-> > nice indeed.
-> > 
-> > The problem with the opt-out flag though is that one will need to check
-> > every single driver out there to see whether it stills behave correctly
-> > if its hardware is suddently put behind a IOMMU.
-> 
-> That's actually my default assumption :-) On ARM platforms at least, for many 
-> devices, whether an IOMMU is present or not is an integration property, not a 
-> property of the device. The same way a device shouldn't care about the exact 
-> bus topology that connects it to the CPU and memory, it shouldn't care about 
-> whether an IOMMU is present on that bus, except in special cases.
-
-Agreed. This must work by default, or basically all arm64 machines are
-broken. At the moment, arm64 does not support IOMMUs properly and uses
-uses swiotlb instead, but it's a huge performance bottleneck. On arm32,
-very few systems need an IOMMU at the moment, but it's getting more common.
-
-> > Doing it the other way (a flag that enables IOMMU if available) sounds safer
-> > to me.
-> >
-> > What we have right now is a mechanism that basically makes it impossible
-> > to use the DMA API on many ARM platforms if ARM_DMA_USE_IOMMU is set
-> > (and I suspect it would also make the IOMMU unusable as well, without
-> > any way to fix things). This is quite concerning.
-> > 
-> > Even more concerning is that -rc5 is about to be released and we have
-> > in-tree drivers (Rockchip DRM) that are not working as they should
-> > because of this patch. Will, what is your plan to fix this? Do we have
-> > stuff that absolutely depends on this patch? If not, can we just revert
-> > it until all these issues are solved?
-
-keystone, shmobile, mvebu and highbank all have PCI buses that are unable
-to access all of RAM, with different kinds of hacks to work around that.
-
-	Arnd
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index bc525e3459cce519..38d56879d47799cb 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -61,6 +61,16 @@ CONFIG_MACH_SPEAR1310=y
+ CONFIG_MACH_SPEAR1340=y
+ CONFIG_ARCH_STI=y
+ CONFIG_ARCH_EXYNOS=y
++CONFIG_ARCH_SHMOBILE_MULTI=y
++CONFIG_ARCH_EMEV2=y
++CONFIG_ARCH_R7S72100=y
++CONFIG_ARCH_R8A7740=y
++CONFIG_ARCH_R8A7779=y
++CONFIG_ARCH_R8A7790=y
++CONFIG_ARCH_R8A7791=y
++CONFIG_ARCH_R8A7794=y
++CONFIG_ARCH_SH73A0=y
++CONFIG_MACH_MARZEN=y
+ CONFIG_ARCH_SUNXI=y
+ CONFIG_ARCH_SIRF=y
+ CONFIG_ARCH_TEGRA=y
+@@ -83,6 +93,8 @@ CONFIG_PCI_KEYSTONE=y
+ CONFIG_PCI_MSI=y
+ CONFIG_PCI_MVEBU=y
+ CONFIG_PCI_TEGRA=y
++CONFIG_PCI_RCAR_GEN2=y
++CONFIG_PCI_RCAR_GEN2_PCIE=y
+ CONFIG_PCIEPORTBUS=y
+ CONFIG_SMP=y
+ CONFIG_NR_CPUS=8
+@@ -129,6 +141,7 @@ CONFIG_DEVTMPFS_MOUNT=y
+ CONFIG_DMA_CMA=y
+ CONFIG_CMA_SIZE_MBYTES=64
+ CONFIG_OMAP_OCP2SCP=y
++CONFIG_SIMPLE_PM_BUS=y
+ CONFIG_MTD=y
+ CONFIG_MTD_CMDLINE_PARTS=y
+ CONFIG_MTD_BLOCK=y
+@@ -156,6 +169,7 @@ CONFIG_AHCI_SUNXI=y
+ CONFIG_AHCI_TEGRA=y
+ CONFIG_SATA_HIGHBANK=y
+ CONFIG_SATA_MV=y
++CONFIG_SATA_RCAR=y
+ CONFIG_NETDEVICES=y
+ CONFIG_HIX5HD2_GMAC=y
+ CONFIG_SUN4I_EMAC=y
+@@ -166,14 +180,17 @@ CONFIG_MV643XX_ETH=y
+ CONFIG_MVNETA=y
+ CONFIG_KS8851=y
+ CONFIG_R8169=y
++CONFIG_SH_ETH=y
+ CONFIG_SMSC911X=y
+ CONFIG_STMMAC_ETH=y
+ CONFIG_TI_CPSW=y
+ CONFIG_XILINX_EMACLITE=y
+ CONFIG_AT803X_PHY=y
+ CONFIG_MARVELL_PHY=y
++CONFIG_SMSC_PHY=y
+ CONFIG_BROADCOM_PHY=y
+ CONFIG_ICPLUS_PHY=y
++CONFIG_MICREL_PHY=y
+ CONFIG_USB_PEGASUS=y
+ CONFIG_USB_USBNET=y
+ CONFIG_USB_NET_SMSC75XX=y
+@@ -191,13 +208,17 @@ CONFIG_KEYBOARD_CROS_EC=y
+ CONFIG_MOUSE_PS2_ELANTECH=y
+ CONFIG_INPUT_TOUCHSCREEN=y
+ CONFIG_TOUCHSCREEN_ATMEL_MXT=y
++CONFIG_TOUCHSCREEN_ST1232=y
+ CONFIG_TOUCHSCREEN_STMPE=y
+ CONFIG_INPUT_MISC=y
+ CONFIG_INPUT_MPU3050=y
++CONFIG_INPUT_ADXL34X=y
+ CONFIG_SERIO_AMBAKMI=y
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_8250_EXTENDED=y
+ CONFIG_SERIAL_8250_DW=y
++CONFIG_SERIAL_8250_EM=y
+ CONFIG_SERIAL_8250_MT6577=y
+ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+@@ -210,6 +231,9 @@ CONFIG_SERIAL_SIRFSOC_CONSOLE=y
+ CONFIG_SERIAL_TEGRA=y
+ CONFIG_SERIAL_IMX=y
+ CONFIG_SERIAL_IMX_CONSOLE=y
++CONFIG_SERIAL_SH_SCI=y
++CONFIG_SERIAL_SH_SCI_NR_UARTS=20
++CONFIG_SERIAL_SH_SCI_CONSOLE=y
+ CONFIG_SERIAL_MSM=y
+ CONFIG_SERIAL_MSM_CONSOLE=y
+ CONFIG_SERIAL_VT8500=y
+@@ -230,19 +254,26 @@ CONFIG_I2C_MUX_PCA954x=y
+ CONFIG_I2C_MUX_PINCTRL=y
+ CONFIG_I2C_CADENCE=y
+ CONFIG_I2C_DESIGNWARE_PLATFORM=y
++CONFIG_I2C_GPIO=y
+ CONFIG_I2C_EXYNOS5=y
+ CONFIG_I2C_MV64XXX=y
++CONFIG_I2C_RIIC=y
+ CONFIG_I2C_S3C2410=y
++CONFIG_I2C_SH_MOBILE=y
+ CONFIG_I2C_SIRF=y
+-CONFIG_I2C_TEGRA=y
+ CONFIG_I2C_ST=y
+-CONFIG_SPI=y
++CONFIG_I2C_TEGRA=y
+ CONFIG_I2C_XILINX=y
+-CONFIG_SPI_DAVINCI=y
++CONFIG_I2C_RCAR=y
++CONFIG_SPI=y
+ CONFIG_SPI_CADENCE=y
++CONFIG_SPI_DAVINCI=y
+ CONFIG_SPI_OMAP24XX=y
+ CONFIG_SPI_ORION=y
+ CONFIG_SPI_PL022=y
++CONFIG_SPI_RSPI=y
++CONFIG_SPI_SH_MSIOF=y
++CONFIG_SPI_SH_HSPI=y
+ CONFIG_SPI_SIRF=y
+ CONFIG_SPI_SUN4I=y
+ CONFIG_SPI_SUN6I=y
+@@ -256,12 +287,15 @@ CONFIG_PINCTRL_PALMAS=y
+ CONFIG_PINCTRL_APQ8084=y
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIO_GENERIC_PLATFORM=y
+-CONFIG_GPIO_DWAPB=y
+ CONFIG_GPIO_DAVINCI=y
++CONFIG_GPIO_DWAPB=y
++CONFIG_GPIO_EM=y
++CONFIG_GPIO_RCAR=y
+ CONFIG_GPIO_XILINX=y
+ CONFIG_GPIO_ZYNQ=y
+ CONFIG_GPIO_PCA953X=y
+ CONFIG_GPIO_PCA953X_IRQ=y
++CONFIG_GPIO_PCF857X=y
+ CONFIG_GPIO_TWL4030=y
+ CONFIG_GPIO_PALMAS=y
+ CONFIG_GPIO_SYSCON=y
+@@ -276,6 +310,8 @@ CONFIG_POWER_RESET_SUN6I=y
+ CONFIG_SENSORS_LM90=y
+ CONFIG_SENSORS_LM95245=y
+ CONFIG_THERMAL=y
++CONFIG_CPU_THERMAL=y
++CONFIG_RCAR_THERMAL=y
+ CONFIG_ARMADA_THERMAL=y
+ CONFIG_DAVINCI_WATCHDOG
+ CONFIG_ST_THERMAL_SYSCFG=y
+@@ -286,6 +322,7 @@ CONFIG_ARM_SP805_WATCHDOG=y
+ CONFIG_ORION_WATCHDOG=y
+ CONFIG_SUNXI_WATCHDOG=y
+ CONFIG_MESON_WATCHDOG=y
++CONFIG_MFD_AS3711=y
+ CONFIG_MFD_AS3722=y
+ CONFIG_MFD_BCM590XX=y
+ CONFIG_MFD_CROS_EC=y
+@@ -299,8 +336,10 @@ CONFIG_MFD_TPS65090=y
+ CONFIG_MFD_TPS6586X=y
+ CONFIG_MFD_TPS65910=y
+ CONFIG_REGULATOR_AB8500=y
++CONFIG_REGULATOR_AS3711=y
+ CONFIG_REGULATOR_AS3722=y
+ CONFIG_REGULATOR_BCM590XX=y
++CONFIG_REGULATOR_DA9210=y
+ CONFIG_REGULATOR_GPIO=y
+ CONFIG_MFD_SYSCON=y
+ CONFIG_POWER_RESET_SYSCON=y
+@@ -318,18 +357,32 @@ CONFIG_REGULATOR_TWL4030=y
+ CONFIG_REGULATOR_VEXPRESS=y
+ CONFIG_MEDIA_SUPPORT=y
+ CONFIG_MEDIA_CAMERA_SUPPORT=y
++CONFIG_MEDIA_CONTROLLER=y
++CONFIG_VIDEO_V4L2_SUBDEV_API=y
+ CONFIG_MEDIA_USB_SUPPORT=y
+ CONFIG_USB_VIDEO_CLASS=y
+ CONFIG_USB_GSPCA=y
++CONFIG_V4L_PLATFORM_DRIVERS=y
++CONFIG_SOC_CAMERA=y
++CONFIG_SOC_CAMERA_PLATFORM=y
++CONFIG_VIDEO_RCAR_VIN=y
++CONFIG_V4L_MEM2MEM_DRIVERS=y
++CONFIG_VIDEO_RENESAS_VSP1=y
++# CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
++CONFIG_VIDEO_ADV7180=y
+ CONFIG_DRM=y
++CONFIG_DRM_RCAR_DU=y
+ CONFIG_DRM_TEGRA=y
+ CONFIG_DRM_PANEL_SIMPLE=y
+ CONFIG_FB_ARMCLCD=y
+ CONFIG_FB_WM8505=y
++CONFIG_FB_SH_MOBILE_LCDC=y
+ CONFIG_FB_SIMPLE=y
++CONFIG_FB_SH_MOBILE_MERAM=y
+ CONFIG_BACKLIGHT_LCD_SUPPORT=y
+ CONFIG_BACKLIGHT_CLASS_DEVICE=y
+ CONFIG_BACKLIGHT_PWM=y
++CONFIG_BACKLIGHT_AS3711=y
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+ CONFIG_FRAMEBUFFER_CONSOLE_ROTATION=y
+ CONFIG_SOUND=y
+@@ -337,6 +390,8 @@ CONFIG_SND=y
+ CONFIG_SND_DYNAMIC_MINORS=y
+ CONFIG_SND_USB_AUDIO=y
+ CONFIG_SND_SOC=y
++CONFIG_SND_SOC_SH4_FSI=y
++CONFIG_SND_SOC_RCAR=y
+ CONFIG_SND_SOC_TEGRA=y
+ CONFIG_SND_SOC_TEGRA_RT5640=y
+ CONFIG_SND_SOC_TEGRA_WM8753=y
+@@ -344,6 +399,8 @@ CONFIG_SND_SOC_TEGRA_WM8903=y
+ CONFIG_SND_SOC_TEGRA_TRIMSLICE=y
+ CONFIG_SND_SOC_TEGRA_ALC5632=y
+ CONFIG_SND_SOC_TEGRA_MAX98090=y
++CONFIG_SND_SOC_AK4642=y
++CONFIG_SND_SOC_WM8978=y
+ CONFIG_USB=y
+ CONFIG_USB_XHCI_HCD=y
+ CONFIG_USB_XHCI_MVEBU=y
+@@ -356,6 +413,8 @@ CONFIG_USB_ISP1760_HCD=y
+ CONFIG_USB_OHCI_HCD=y
+ CONFIG_USB_OHCI_HCD_STI=y
+ CONFIG_USB_OHCI_HCD_PLATFORM=y
++CONFIG_USB_R8A66597_HCD=y
++CONFIG_USB_RENESAS_USBHS=y
+ CONFIG_USB_STORAGE=y
+ CONFIG_USB_DWC3=y
+ CONFIG_USB_CHIPIDEA=y
+@@ -368,6 +427,10 @@ CONFIG_SAMSUNG_USB3PHY=y
+ CONFIG_USB_GPIO_VBUS=y
+ CONFIG_USB_ISP1301=y
+ CONFIG_USB_MXS_PHY=y
++CONFIG_USB_RCAR_PHY=y
++CONFIG_USB_RCAR_GEN2_PHY=y
++CONFIG_USB_GADGET=y
++CONFIG_USB_RENESAS_USBHS_UDC=y
+ CONFIG_MMC=y
+ CONFIG_MMC_BLOCK_MINORS=16
+ CONFIG_MMC_ARMMMCI=y
+@@ -386,12 +449,14 @@ CONFIG_MMC_SDHCI_ST=y
+ CONFIG_MMC_OMAP=y
+ CONFIG_MMC_OMAP_HS=y
+ CONFIG_MMC_MVSDIO=y
+-CONFIG_MMC_SUNXI=y
++CONFIG_MMC_SDHI=y
+ CONFIG_MMC_DW=y
+ CONFIG_MMC_DW_IDMAC=y
+ CONFIG_MMC_DW_PLTFM=y
+ CONFIG_MMC_DW_EXYNOS=y
+ CONFIG_MMC_DW_ROCKCHIP=y
++CONFIG_MMC_SH_MMCIF=y
++CONFIG_MMC_SUNXI=y
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_GPIO=y
+@@ -415,10 +480,12 @@ CONFIG_RTC_DRV_AS3722=y
+ CONFIG_RTC_DRV_DS1307=y
+ CONFIG_RTC_DRV_MAX8907=y
+ CONFIG_RTC_DRV_MAX77686=y
++CONFIG_RTC_DRV_RS5C372=y
+ CONFIG_RTC_DRV_PALMAS=y
+ CONFIG_RTC_DRV_TWL4030=y
+ CONFIG_RTC_DRV_TPS6586X=y
+ CONFIG_RTC_DRV_TPS65910=y
++CONFIG_RTC_DRV_S35390A=y
+ CONFIG_RTC_DRV_EM3027=y
+ CONFIG_RTC_DRV_PL031=y
+ CONFIG_RTC_DRV_VT8500=y
+@@ -430,6 +497,9 @@ CONFIG_DMADEVICES=y
+ CONFIG_DW_DMAC=y
+ CONFIG_MV_XOR=y
+ CONFIG_TEGRA20_APB_DMA=y
++CONFIG_SH_DMAE=y
++CONFIG_RCAR_AUDMAC_PP=y
++CONFIG_RCAR_DMAC=y
+ CONFIG_STE_DMA40=y
+ CONFIG_SIRF_DMA=y
+ CONFIG_TI_EDMA=y
+@@ -462,6 +532,7 @@ CONFIG_IIO=y
+ CONFIG_XILINX_XADC=y
+ CONFIG_AK8975=y
+ CONFIG_PWM=y
++CONFIG_PWM_RENESAS_TPU=y
+ CONFIG_PWM_TEGRA=y
+ CONFIG_PWM_VT8500=y
+ CONFIG_PHY_HIX5HD2_SATA=y
+-- 
+1.9.1
