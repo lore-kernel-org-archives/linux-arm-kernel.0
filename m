@@ -1,70 +1,67 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 19 Jan 2015 09:44:03 +0000
-Subject: [PATCH v4 09/21] DT: update ti,irq-crossbar binding
+Date: Mon, 19 Jan 2015 09:43:59 +0000
+Subject: [PATCH v4 05/21] DT: tegra: add binding for the legacy interrupt
+ controller
 In-Reply-To: <1421660655-21394-1-git-send-email-marc.zyngier@arm.com>
 References: <1421660655-21394-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1421660655-21394-10-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1421660655-21394-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make it look like a real interrupt controller.
-
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- .../devicetree/bindings/arm/omap/crossbar.txt          | 18 +++++-------------
- 1 file changed, 5 insertions(+), 13 deletions(-)
+ .../interrupt-controller/nvidia,tegra-ictlr.txt    | 43 ++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra-ictlr.txt
 
-diff --git a/Documentation/devicetree/bindings/arm/omap/crossbar.txt b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
-index 4139db3..a9b28d7 100644
---- a/Documentation/devicetree/bindings/arm/omap/crossbar.txt
-+++ b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
-@@ -9,7 +9,9 @@ inputs.
- Required properties:
- - compatible : Should be "ti,irq-crossbar"
- - reg: Base address and the size of the crossbar registers.
--- ti,max-irqs: Total number of irqs available at the interrupt controller.
-+- interrupt-controller: indicates that this block is an interrupt controller.
-+- interrupt-parent: the interrupt controller this block is connected to.
-+- ti,max-irqs: Total number of irqs available at the parent interrupt controller.
- - ti,max-crossbar-sources: Maximum number of crossbar sources that can be routed.
- - ti,reg-size: Size of a individual register in bytes. Every individual
- 	    register is assumed to be of same size. Valid sizes are 1, 2, 4.
-@@ -27,13 +29,13 @@ Optional properties:
-   when the interrupt controller irq is unused (when not provided, default is 0)
- 
- Examples:
--		crossbar_mpu: @4a020000 {
-+		crossbar_mpu: crossbar at 4a002a48 {
- 			compatible = "ti,irq-crossbar";
- 			reg = <0x4a002a48 0x130>;
- 			ti,max-irqs = <160>;
- 			ti,max-crossbar-sources = <400>;
- 			ti,reg-size = <2>;
--			ti,irqs-reserved = <0 1 2 3 5 6 131 132 139 140>;
-+			ti,irqs-reserved = <0 1 2 3 5 6 131 132>;
- 			ti,irqs-skip = <10 133 139 140>;
- 		};
- 
-@@ -44,10 +46,6 @@ Documentation/devicetree/bindings/arm/gic.txt for further details.
- 
- An interrupt consumer on an SoC using crossbar will use:
- 	interrupts = <GIC_SPI request_number interrupt_level>
--When the request number is between 0 to that described by
--"ti,max-crossbar-sources", it is assumed to be a crossbar mapping. If the
--request_number is greater than "ti,max-crossbar-sources", then it is mapped as a
--quirky hardware mapping direct to GIC.
- 
- Example:
- 	device_x at 0x4a023000 {
-@@ -55,9 +53,3 @@ Example:
- 		interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
- 		...
- 	};
--
--	device_y at 0x4a033000 {
--		/* Direct mapped GIC SPI 1 used */
--		interrupts = <GIC_SPI DIRECT_IRQ(1) IRQ_TYPE_LEVEL_HIGH>;
--		...
--	};
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra-ictlr.txt b/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra-ictlr.txt
+new file mode 100644
+index 0000000..1099fe0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra-ictlr.txt
+@@ -0,0 +1,43 @@
++NVIDIA Legacy Interrupt Controller
++
++All Tegra SoCs contain a legacy interrupt controller that routes
++interrupts to the GIC, and also serves as a wakeup source. It is also
++referred to as "ictlr", hence the name of the binding.
++
++The HW block exposes a number of interrupt controllers, each
++implementing a set of 32 interrupts.
++
++Required properties:
++
++- compatible : should be: "nvidia,tegra<chip>-ictlr". The LIC on
++  subsequent SoCs remained backwards-compatible with Tegra30, so on
++  Tegra generations later than Tegra30 the compatible value should
++  include "nvidia,tegra30-ictlr".	
++- reg : Specifies base physical address and size of the registers.
++  Each controller must be described separately (Tegra20 has 4 of them,
++  whereas Tegra30 and later have 5"  
++- interrupt-controller : Identifies the node as an interrupt controller.
++- #interrupt-cells : Specifies the number of cells needed to encode an
++  interrupt source. The value must be 3.
++- interrupt-parent : a phandle to the GIC these interrupts are routed
++  to.
++
++Notes:
++
++- Because this HW ultimately routes interrupts to the GIC, the
++  interrupt specifier must be that of the GIC.
++- Only SPIs can use the ictlr as an interrupt parent. SGIs and PPIs
++  are explicitly forbidden.
++
++Example:
++
++	ictlr: interrupt-controller at 60004000 {
++		compatible = "nvidia,tegra20-ictlr", "nvidia,tegra-ictlr";
++		reg = <0x60004000 64>,
++		      <0x60004100 64>,
++		      <0x60004200 64>,
++		      <0x60004300 64>;
++		interrupt-controller;
++		#interrupt-cells = <3>;
++		interrupt-parent = <&intc>;
++	};
 -- 
 2.1.4
