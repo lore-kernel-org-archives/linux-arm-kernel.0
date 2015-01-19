@@ -1,42 +1,39 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Mon, 19 Jan 2015 23:48:12 +0900
-Subject: [PATCH] arm64: Add dtb files to archclean rule
-In-Reply-To: <20150119103926.GC32131@arm.com>
-References: <FF2CE3A3-56DA-4637-833F-264DD986F28C@gmail.com>
- <20150119103926.GC32131@arm.com>
-Message-ID: <629B498D-6162-4D6A-A566-946F5457DD3A@gmail.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Mon, 19 Jan 2015 09:54:13 -0500
+Subject: [PATCH v4 0/4] ata: libahci: Allow using a regulator for each port
+In-Reply-To: <54B8C49A.9070302@redhat.com>
+References: <1421330978-9694-1-git-send-email-gregory.clement@free-electrons.com>
+ <54B8C49A.9070302@redhat.com>
+Message-ID: <20150119145413.GJ8140@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Jan 19, 2015, at 7:39 PM, Will Deacon wrote:
-> On Sat, Jan 17, 2015 at 01:59:31PM +0000, Jungseok Lee wrote:
->> As dts files have been reorganised under vendor subdirs, dtb files
->> cannot be removed with "make distclean" now. Thus, this patch adds
->> dtb files to archclean rule.
->> 
->> Cc: Robert Richter <rrichter@cavium.com>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Signed-off-by: Jungseok Lee <jungseoklee85@gmail.com>
->> ---
->> arch/arm64/Makefile | 1 +
->> 1 file changed, 1 insertion(+)
->> 
->> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
->> index 1c43cec..0666888 100644
->> --- a/arch/arm64/Makefile
->> +++ b/arch/arm64/Makefile
->> @@ -85,6 +85,7 @@ vdso_install:
->> # We use MRPROPER_FILES and CLEAN_FILES now
->> archclean:
->> 	$(Q)$(MAKE) $(clean)=$(boot)
->> +	$(Q)$(MAKE) $(clean)=$(boot)/dts
+On Fri, Jan 16, 2015 at 08:58:18AM +0100, Hans de Goede wrote:
+> Hi,
 > 
-> Looks sensible. I think we can also remove the always/clean-files entries
-> from arch/arm64/boot/dts/Makefile.
+> On 15-01-15 15:09, Gregory CLEMENT wrote:
+> >The current implementation of the libahci allows using one PHY per
+> >port but we still have one single regulator for the whole
+> >controller. This series adds the support of multiple regulators.
+> >
+> >This is the forth version of the series.
+> >
+> >The improvement of this version is the use of
+> >ahci_platform_put_resources to put the reference to the regulators.
+> >
+> >Thanks,
+> >
+> >Gr?gory
+> 
+> Thanks, patches 1 - 3 look good and are:
+> 
+> Acked-by: Hans de Goede <hdegoede@redhat.com>
+> 
+> Tejun, can you please queue up 1 - 3 ?
 
-I agree with the point.
-I will do respin with that change.
+Applied 1-3 to libata/for-3.20.
 
-Best Regards
-Jungseok Lee
+Thanks.
+
+-- 
+tejun
