@@ -1,91 +1,151 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 19 Jan 2015 09:57:13 +0000
-Subject: [PATCH] clk: Fix debugfs clk removal before inited
-Message-ID: <1421661433-27141-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 19 Jan 2015 19:01:40 +0900
+Subject: [PATCHv8 7/9] ARM: dts: Add PPMU dt node for Exynos5260 SoC
+In-Reply-To: <1421066097-26237-8-git-send-email-cw00.choi@samsung.com>
+References: <1421066097-26237-1-git-send-email-cw00.choi@samsung.com>
+ <1421066097-26237-8-git-send-email-cw00.choi@samsung.com>
+Message-ID: <54BCD604.3030105@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some of the clks can be registered & unregistered before the clk related debugfs
-entries are initialized at late_initcall. In the unregister path checking for only
-dentry before clk_debug_init() would lead dangling pointers in the debug clk list,
-because the list is already populated in register path and the clk pointer freed in
-unregister path.
-The side effect of not removing it from the list is either a null pointer
-dereference or if lucky to boot the system, the number of clk entries in
-debugfs disappear.
+Dear all,
 
-We could add more checks like if (inited && !clk->dentry) but just removing
-the check for dentry made more sense as debugfs_remove_recursive() seems to be
-safe with null pointers. This will ensure that the unregistering clk would be
-removed from the debug list in all the code paths.
+I'll drop this patch because I can't test it on Exynos5260-based board.
 
-Without this patch kernel would crash with log:
-Unable to handle kernel NULL pointer dereference at virtual address 00000000
-pgd = c0204000
-[00000000] *pgd=00000000
-Internal error: Oops: 5 [#1] SMP ARM
-Modules linked in:
-CPU: 1 PID: 1 Comm: swapper/0 Tainted: G    B          3.19.0-rc3-00007-g412f9ba-dirty #840
-Hardware name: Qualcomm (Flattened Device Tree)
-task: ed948000 ti: ed944000 task.ti: ed944000
-PC is at strlen+0xc/0x40
-LR is at __create_file+0x64/0x1dc
-pc : [<c04ee604>]    lr : [<c049f1c4>]    psr: 60000013
-sp : ed945e40  ip : ed945e50  fp : ed945e4c
-r10: 00000000  r9 : c1006094  r8 : 00000000
-r7 : 000041ed  r6 : 00000000  r5 : ed4af998  r4 : c11b5e28
-r3 : 00000000  r2 : ed945e38  r1 : a0000013  r0 : 00000000
-Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
-Control: 10c5787d  Table: 8020406a  DAC: 00000015
-Process swapper/0 (pid: 1, stack limit = 0xed944248)
-Stack: (0xed945e40 to 0xed946000)
-5e40: ed945e7c ed945e50 c049f1c4 c04ee604 c0fc2fa4 00000000 ecb748c0 c11c2b80
-5e60: c0beec04 0000011c c0fc2fa4 00000000 ed945e94 ed945e80 c049f3e0 c049f16c
-5e80: 00000000 00000000 ed945eac ed945e98 c08cbc50 c049f3c0 ecb748c0 c11c2b80
-5ea0: ed945ed4 ed945eb0 c0fc3080 c08cbc30 c0beec04 c107e1d8 ecdf0600 c107e1d8
-5ec0: c107e1d8 ecdf0600 ed945f54 ed945ed8 c0208ed4 c0fc2fb0 c026a784 c04ee628
-5ee0: ed945f0c ed945ef0 c0f5d600 c04ee604 c0f5d5ec ef7fcc7d c0b40ecc 0000011c
-5f00: ed945f54 ed945f10 c026a994 c0f5d5f8 c04ecc00 00000007 ef7fcc95 00000007
-5f20: c0e90744 c0dd0884 ed945f54 c106cde0 00000007 c117f8c0 0000011c c0f5d5ec
-5f40: c1006094 c100609c ed945f94 ed945f58 c0f5de34 c0208e50 00000007 00000007
-5f60: c0f5d5ec be9b5ae0 00000000 c117f8c0 c0af1680 00000000 00000000 00000000
-5f80: 00000000 00000000 ed945fac ed945f98 c0af169c c0f5dd2c ed944000 00000000
-5fa0: 00000000 ed945fb0 c020f298 c0af168c 00000000 00000000 00000000 00000000
-5fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-5fe0: 00000000 00000000 00000000 00000000 00000013 00000000 ebcc6d33 bfffca73
-[<c04ee604>] (strlen) from [<c049f1c4>] (__create_file+0x64/0x1dc)
-[<c049f1c4>] (__create_file) from [<c049f3e0>] (debugfs_create_dir+0x2c/0x34)
-[<c049f3e0>] (debugfs_create_dir) from [<c08cbc50>] (clk_debug_create_one+0x2c/0x16c)
-[<c08cbc50>] (clk_debug_create_one) from [<c0fc3080>] (clk_debug_init+0xdc/0x144)
-[<c0fc3080>] (clk_debug_init) from [<c0208ed4>] (do_one_initcall+0x90/0x1e0)
-[<c0208ed4>] (do_one_initcall) from [<c0f5de34>] (kernel_init_freeable+0x114/0x1e0)
-[<c0f5de34>] (kernel_init_freeable) from [<c0af169c>] (kernel_init+0x1c/0xfc)
-[<c0af169c>] (kernel_init) from [<c020f298>] (ret_from_fork+0x14/0x3c)
-Code: c0b40ecc e1a0c00d e92dd800 e24cb004 (e5d02000)
----[ end trace b940e45b5e25c1e7 ]---
+Best Regards,
+Chanwoo Choi
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- drivers/clk/clk.c | 4 ----
- 1 file changed, 4 deletions(-)
-
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index f4963b7..e310691 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -343,13 +343,9 @@ unlock:
- static void clk_debug_unregister(struct clk *clk)
- {
- 	mutex_lock(&clk_debug_lock);
--	if (!clk->dentry)
--		goto out;
--
- 	hlist_del_init(&clk->debug_node);
- 	debugfs_remove_recursive(clk->dentry);
- 	clk->dentry = NULL;
--out:
- 	mutex_unlock(&clk_debug_lock);
- }
- 
--- 
-1.9.1
+On 01/12/2015 09:34 PM, Chanwoo Choi wrote:
+> This patch adds PPMU (Performance Profiling Monitoring Unit) dt node
+> Exynos5260 SoC.
+> 
+> Exynos5260 SoC has following PPMU IPs:
+> - PPMU_DREX0_S0 0x10c60000
+> - PPMU_DREX0_S1 0x10c70000
+> - PPMU_DREX1_S0 0x10c80000
+> - PPMU_DREX1_S1 0x10c90000
+> - PPMU_EAGLE    0x10cc0000
+> - PPMU_KFC      0x10cd0000
+> - PPMU_MFC      0x11040000
+> - PPMU_G3D      0x11880000
+> - PPMU_FSYS     0x12220000
+> - PPMU_ISP      0x13370000
+> - PPMU_FICM     0x13cb0000
+> - PPMU_GSCL     0x13e60000
+> - PPMU_MSCL     0x13ee0000
+> - PPMU_FIMD0X   0x145b0000
+> - PPMU_FIMD1X   0x145c0000
+> 
+> The drivers/devfreq/exynos/exynos5_bus.c supports the memory bus frequency/
+> voltage scaling of Exynos5260 SoC with DEVFREQ framework.
+> 
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Abhilash Kesavan <a.kesavan@samsung.com>
+> Cc: Jonghwan Choi <jhbird.choi@samsung.com>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5260.dtsi | 90 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 90 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5260.dtsi b/arch/arm/boot/dts/exynos5260.dtsi
+> index 36da38e..26f3074 100644
+> --- a/arch/arm/boot/dts/exynos5260.dtsi
+> +++ b/arch/arm/boot/dts/exynos5260.dtsi
+> @@ -307,6 +307,96 @@
+>  			fifo-depth = <64>;
+>  			status = "disabled";
+>  		};
+> +
+> +		ppmu_drex0_s0: ppmu_drex0_s0 at 10c60000 {
+> +			compatible = "samsung,exynos-ppmu";
+> +			reg = <0x10c60000 0x2000>;
+> +			status = "disabled";
+> +		};
+> +
+> +		ppmu_drex0_s1: ppmu_drex0_s1 at 10c70000 {
+> +			compatible = "samsung,exynos-ppmu";
+> +			reg = <0x10c70000 0x2000>;
+> +			status = "disabled";
+> +		};
+> +
+> +		ppmu_drex1_s0: ppmu_drex1_s0 at 10c80000 {
+> +			compatible = "samsung,exynos-ppmu";
+> +			reg = <0x10c80000 0x2000>;
+> +			status = "disabled";
+> +		};
+> +
+> +		ppmu_drex1_s1: ppmu_drex1_s1 at 10c90000 {
+> +			compatible = "samsung,exynos-ppmu";
+> +			reg = <0x10c90000 0x2000>;
+> +			status = "disabled";
+> +		};
+> +
+> +		ppmu_eagle: ppmu_eagle at 10cc0000 {
+> +			compatible = "samsung,exynos-ppmu";
+> +			reg = <0x10cc0000 0x2000>;
+> +			status = "disabled";
+> +		};
+> +
+> +		ppmu_kfc: ppmu_kfc at 10cd0000 {
+> +			compatible = "samsung,exynos-ppmu";
+> +			reg = <0x10cd0000 0x2000>;
+> +			status = "disabled";
+> +		};
+> +
+> +		ppmu_mfc: ppmu_mfc at 11040000 {
+> +			compatible = "samsung,exynos-ppmu";
+> +			reg = <0x11040000 0x2000>;
+> +			status = "disabled";
+> +		};
+> +
+> +		ppmu_g3d: ppmu_g3d at 11880000 {
+> +			compatible = "samsung,exynos-ppmu";
+> +			reg = <0x11880000 0x2000>;
+> +			status = "disabled";
+> +		};
+> +
+> +		ppmu_fsys: ppmu_fsys at 12220000 {
+> +			compatible = "samsung,exynos-ppmu";
+> +			reg = <0x12220000 0x2000>;
+> +			status = "disabled";
+> +		};
+> +
+> +		ppmu_isp: ppmu_isp at 13370000 {
+> +			compatible = "samsung,exynos-ppmu";
+> +			reg = <0x13370000 0x2000>;
+> +			status = "disabled";
+> +		};
+> +
+> +		ppmu_fimc: ppmu_fimc at 13cb0000 {
+> +			compatible = "samsung,exynos-ppmu";
+> +			reg = <0x13cb0000 0x2000>;
+> +			status = "disabled";
+> +		};
+> +
+> +		ppmu_gscl: ppmu_gscl at 13e60000 {
+> +			compatible = "samsung,exynos-ppmu";
+> +			reg = <0x13e60000 0x2000>;
+> +			status = "disabled";
+> +		};
+> +
+> +		ppmu_mscl: ppmu_gscl at 13ee0000 {
+> +			compatible = "samsung,exynos-ppmu";
+> +			reg = <0x13ee0000 0x2000>;
+> +			status = "disabled";
+> +		};
+> +
+> +		ppmu_fimd0x: ppmu_fimd0x at 145b0000 {
+> +			compatible = "samsung,exynos-ppmu";
+> +			reg = <0x145b0000 0x2000>;
+> +			status = "disabled";
+> +		};
+> +
+> +		ppmu_fimd1x: ppmu_fimd1x at 145c0000 {
+> +			compatible = "samsung,exynos-ppmu";
+> +			reg = <0x145c0000 0x2000>;
+> +			status = "disabled";
+> +		};
+>  	};
+>  };
+>  
+> 
