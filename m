@@ -1,45 +1,106 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 19 Jan 2015 12:50:52 +0000
-Subject: [PATCH v6 8/8] arm: dma-mapping: plumb our iommu mapping ops
- into arch_setup_dma_ops
-In-Reply-To: <20150119124305.GC7312@ulmo.nvidia.com>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <2804479.ZFl06ysk3j@avalon> <54BB58AA.5070407@nvidia.com>
- <5043167.LEiljZnGai@avalon> <20150119124305.GC7312@ulmo.nvidia.com>
-Message-ID: <20150119125051.GI32131@arm.com>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Mon, 19 Jan 2015 20:59:00 +0800
+Subject: [PATCH] kprobes: bugfix: checks kprobes_all_disarmed in
+ unoptimized_kprobe().
+In-Reply-To: <54BCFC6E.1080007@hitachi.com>
+References: <54B3B32E.7070709@hitachi.com>
+ <1421064563-77831-1-git-send-email-wangnan0@huawei.com>
+ <54B3C3A0.6010708@hitachi.com> <54BC742E.80006@huawei.com>
+ <54BCC8C0.40706@hitachi.com> <54BCE8C3.4080903@huawei.com>
+ <54BCFC6E.1080007@hitachi.com>
+Message-ID: <54BCFF94.1030009@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 19, 2015 at 12:43:06PM +0000, Thierry Reding wrote:
-> On Sun, Jan 18, 2015 at 01:18:51PM +0200, Laurent Pinchart wrote:
-> > On Sunday 18 January 2015 15:54:34 Alexandre Courbot wrote:
-> > > On 01/16/2015 08:18 AM, Laurent Pinchart wrote:
-> [...]
-> > > > The second way is to implement a mechanism to let drivers signal that they
-> > > > want to handle DMA mappings themselves. As the mappings need in the
-> > > > general case to be created before the probe function  is called
-> > > 
-> > > Sorry for being ignorant here, but why is that?
-> > 
-> > Because a driver can call the DMA mapping API in its probe function, to 
-> > allocate DMA coherent memory for instance. We need to ensure that the DMA 
-> > mapping IOMMU has set up the required IOMMU ops by that time. As explained 
-> > above I don't like the idea of sprinkling explicit calls to initialize IOMMU 
-> > support in the vast majority of drivers, especially when they shouldn't be 
-> > IOMMU-aware, so we then need to initialize everything that is needed before 
-> > the first call to the DMA mapping API.
+On 2015/1/19 20:45, Masami Hiramatsu wrote:
+> (2015/01/19 20:21), Wang Nan wrote:
+>> On 2015/1/19 17:05, Masami Hiramatsu wrote:
+>>> Hi Wang,
+>>>
+>>> I've found a problem on this patch, since kprobes calls unoptioize_kprobe
+>>> with kprobes_all_disarmed=true when trying to disable all kprobes, this
+>>> cause a serious problem.
+>>>
+>>> Moreover, I couldn't reproduce your reported bug on my 3.19-rc4 kernel.
+>>> Could you test it again?
+>>>
+>>
+>> I tested it again based on 3.19-rc5 and found that the problem still exists.
+>> My testing is based on QEMU.
+>>
+>> First I tested my kprobeopt for ARM, then on x86_64. The test results are pasted
+>> at the bottom of this mail. Commands after 'gdb attaches to QEMU' is my actions
+>> on a gdb console attached to QEMU; commands after 'inside virtual machine' is
+>> what I do in Linux run under QEMU.
 > 
-> The original patch that Hiroshi posted based on my comments was to have
-> the driver core call iommu_attach(), which would then set up everything
-> needed right before calling into the driver's ->probe(). This works
-> quite nicely because by definition the driver can't allocate any DMA
-> before ->probe(). And, like you said, this allows deferred probe to be
-> used.
+> Thank you for the reporting.
+> So, now I know what happened, the problem is "debugfs/kprobes/enabled doesn't work
+> correctly on optimized kprobes". Please make update the patch description.
 > 
-> To me it's so obviously the right solution that I remain flabbergasted
-> with how much resistance it's received (or how much it's being ignored).
+> I also reproduced the bug without gdb.
+> Here is the log.
+> 
+> ----
+> [root at localhost ~]# cd /sys/kernel/debug/tracing/
+> [root at localhost tracing]# echo p do_fork+5 > kprobe_events	# setup new event
+> [root at localhost tracing]# echo $$ > set_ftrace_pid		# trace only this process
+> [root at localhost tracing]# echo 1 > events/kprobes/p_do_fork_5/enable	# enable it
+> [root at localhost tracing]# cat trace				# check the trace data
+> # tracer: nop
+> #
+> # entries-in-buffer/entries-written: 1/1   #P:8
+> #
+> #                              _-----=> irqs-off
+> #                             / _----=> need-resched
+> #                            | / _---=> hardirq/softirq
+> #                            || / _--=> preempt-depth
+> #                            ||| /     delay
+> #           TASK-PID   CPU#  ||||    TIMESTAMP  FUNCTION
+> #              | |       |   ||||       |         |
+>             bash-3883  [006] d...   279.799023: p_do_fork_5: (do_fork+0x5/0x360) # OK, now tracing
+> [root at localhost tracing]# cat ../kprobes/list
+> ffffffff810bc1c5  k  do_fork+0x5    [OPTIMIZED]			# and it is actually optimized
+> [root at localhost tracing]# echo 0 > ../kprobes/enabled		# disable *ALL* kprobes
+> [root at localhost tracing]# echo > trace				# clear events
+> [root at localhost tracing]# cat trace				# this should show empty buffer
+> # tracer: nop
+> #
+> # entries-in-buffer/entries-written: 1/1   #P:8
+> #
+> #                              _-----=> irqs-off
+> #                             / _----=> need-resched
+> #                            | / _---=> hardirq/softirq
+> #                            || / _--=> preempt-depth
+> #                            ||| /     delay
+> #           TASK-PID   CPU#  ||||    TIMESTAMP  FUNCTION
+> #              | |       |   ||||       |         |
+>             bash-3883  [006] d...   337.770785: p_do_fork_5: (do_fork+0x5/0x360)  # But still tracing!
+> [root at localhost tracing]# cat trace				# Check again
+> # tracer: nop
+> #
+> # entries-in-buffer/entries-written: 2/2   #P:8
+> #
+> #                              _-----=> irqs-off
+> #                             / _----=> need-resched
+> #                            | / _---=> hardirq/softirq
+> #                            || / _--=> preempt-depth
+> #                            ||| /     delay
+> #           TASK-PID   CPU#  ||||    TIMESTAMP  FUNCTION
+> #              | |       |   ||||       |         |
+>             bash-3883  [006] d...   337.770785: p_do_fork_5: (do_fork+0x5/0x360)
+>             bash-3883  [006] d...   345.592178: p_do_fork_5: (do_fork+0x5/0x360) # We are tracing!!
+> 
+> So, after global disabling kprobes, ALL kprobes event should be disabled, but not.
+> 
+> OK, I think your first patch is better than the second one, but not enough.
+> What we should do is use kprobes_all_disarmed for force option like below.
+> 
+> 	unoptimize_kprobe(p, kprobes_all_disarmed);    /* Try to unoptimize */
+> 
+> We also would better to check the flag in unregistering path for skipping unneeded
+> disarming process when kprobes globally disarmed.
+> 
+> Thank you,
+> 
 
-Have you considered reposting the patches based on what we currently have
-(which has the advantage of identifying a specific IOMMU instance)?
-
-Will
+Thanks to your quick reply. I'll post an improved v1 patch tomorrow.
