@@ -1,82 +1,119 @@
-From: p.pisati@gmail.com (Paolo Pisati)
-Date: Mon, 19 Jan 2015 10:17:13 +0100
-Subject: beaglebone black: is mem=... broken?
-In-Reply-To: <CAMuHMdX07-5xUt8KpS_biZMhpeoZcQFHvZL9ZFQGvKm9-CEKng@mail.gmail.com>
-References: <20150118143448.GA4023@luxor.wired.org>
- <CAMuHMdX07-5xUt8KpS_biZMhpeoZcQFHvZL9ZFQGvKm9-CEKng@mail.gmail.com>
-Message-ID: <20150119091713.GA7829@luxor.wired.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 19 Jan 2015 09:20:03 +0000
+Subject: [PATCH 1/2] ARM: entry-common: fix forgotten set of
+ thread_info->syscall
+In-Reply-To: <CAGXu5j+9p1T29NoHnCNywd0T=H2mzWhCou5nSRfXZktEOC7_=A@mail.gmail.com>
+References: <CACZ9PQXW9G4Vw-dcPwkdVE=uoYmDYEQnJWDnnpup1LxC3s5QPg@mail.gmail.com>
+ <CAGXu5jLO-YSaF8P9o3jcXP4VZCPYVshz73krnchYuv9pPGY6Sw@mail.gmail.com>
+ <CACZ9PQVo0SF4Z-rdNk4e=yY17Xt9n5hAqm4ZRNLEw3jGYYcvtA@mail.gmail.com>
+ <CAGXu5j+O6znN=7-gc3PqwqFA5MFRPLGBUzabOmQjWn_9WTjvpg@mail.gmail.com>
+ <CACZ9PQUEprgKrpHazDULA5mf-OaoX=MAjEeWdspZTXT_+iUKWw@mail.gmail.com>
+ <20150116155923.GK12302@n2100.arm.linux.org.uk>
+ <CACZ9PQUVFtCQg6XjDbokEPy_R2fZcHiq6+EEUZnx4FVfpfZxJg@mail.gmail.com>
+ <20150116161752.GL12302@n2100.arm.linux.org.uk>
+ <CAGXu5j+XHFNyhaBndQr1Q2uthsFP9ZQGbaw5hofDmXyKXZ-H5g@mail.gmail.com>
+ <CAGXu5j+9p1T29NoHnCNywd0T=H2mzWhCou5nSRfXZktEOC7_=A@mail.gmail.com>
+Message-ID: <20150119092002.GA32131@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 18, 2015 at 06:38:46PM +0100, Geert Uytterhoeven wrote:
+On Fri, Jan 16, 2015 at 11:54:45PM +0000, Kees Cook wrote:
+> On Fri, Jan 16, 2015 at 11:57 AM, Kees Cook <keescook@chromium.org> wrote:
+> > On Fri, Jan 16, 2015 at 8:17 AM, Russell King - ARM Linux
+> > <linux@arm.linux.org.uk> wrote:
+> >> On Sat, Jan 17, 2015 at 01:08:11AM +0900, Roman Peniaev wrote:
+> >>> On Sat, Jan 17, 2015 at 12:59 AM, Russell King - ARM Linux
+> >>> <linux@arm.linux.org.uk> wrote:
+> >>> > On Sat, Jan 17, 2015 at 12:57:02AM +0900, Roman Peniaev wrote:
+> >>> >> On Fri, Jan 16, 2015 at 7:54 AM, Kees Cook <keescook@chromium.org> wrote:
+> >>> >> > One interesting thing I noticed (which is unchanged by this series),
+> >>> >> > but pulling ARM_r7 during the seccomp ptrace event shows __NR_poll,
+> >>> >> > not __NR_restart_syscall, even though it was a __NR_restart_syscall
+> >>> >> > trap from seccomp. Is there a better place to see the actual syscall?
+> >>> >>
+> >>> >> As I understand we do not push new r7 to the stack, and ptrace uses the
+> >>> >> old value.
+> >>> >
+> >>> > And why should we push r7 to the stack?  ptrace should be using the
+> >>> > recorded system call number, rather than poking about on the stack
+> >>> > itself.
+> >>>
+> >>> Probably we should not, but the behaviour comparing arm to x86 is different.
+> >>
+> >> We definitely should not, because changing the stacked value changes the
+> >> value in r7 after the syscall has returned.  We have guaranteed that the
+> >> value will be preserved across syscalls for years, so we really should
+> >> not be changing that.
+> >
+> > Yeah, we can't mess with the registers. I was just asking for
+> > clarification on how this is visible to userspace.
+> >
+> >>
+> >>> Also there is no any way from userspace to figure out what syscall was
+> >>> restarted, if you do not trace each syscall enter and exit from the
+> >>> very beginning.
+> >>
+> >> Thinking about ptrace, that's been true for years.
+> >>
+> >> It really depends whether you consider the restart syscall a userspace
+> >> thing or a kernelspace thing.  When you consider that the vast majority
+> >> of syscall restarts are done internally in the kernel, and we just
+> >> re-issue the syscall, it immediately brings up the question "why is
+> >> the restart block method different?" and "should the restart block
+> >> method be visible to userspace?"
+> >>
+> >> IMHO, it is prudent not to expose kernel internals to userspace unless
+> >> there is a real reason to, otherwise they become part of the userspace
+> >> API.
+> >
+> > I couldn't agree more, but restart_syscall is already visible to
+> > userspace: it can be called directly, for example. And it's visible to
+> > tracers.
+> >
+> > Unfortunately, the difference here is the visibility during trace
+> > trap. On x86, it's exposed but on ARM, there's no way (that I can
+> > find) to query the "true" syscall, even though the true syscall is
+> > what triggers the tracer. The syscall number isn't provided by any
+> > element of the ptrace event system, nor through siginfo, and must be
+> > examined on a per-arch basis from registers.
+> >
+> > Seccomp does, however, provide a mechanism to pass arbitrary event
+> > data on a TRACE event, so poll vs restart_syscall can be distinguished
+> > that way.
+> >
+> > It seems even strace doesn't know how to find this information. For example:
+> >
+> > x86:
+> > poll([{fd=3, events=POLLIN}], 1, 4294967295
+> > ) = ? ERESTART_RESTARTBLOCK (Interrupted by signal)
+> > --- SIGSTOP {si_signo=SIGSTOP, si_code=SI_USER, si_pid=994, si_uid=1000} ---
+> > --- stopped by SIGSTOP ---
+> > --- SIGCONT {si_signo=SIGCONT, si_code=SI_USER, si_pid=994, si_uid=1000} ---
+> > restart_syscall(<... resuming interrupted call ...>
+> >
+> > ARM:
+> > poll([{fd=3, events=POLLIN}], 1, -1
+> > )    = ? ERESTART_RESTARTBLOCK (Interrupted by signal)
+> > --- SIGSTOP {si_signo=SIGSTOP, si_code=SI_USER, si_pid=20563, si_uid=0} ---
+> > --- stopped by SIGSTOP ---
+> > --- SIGCONT {si_signo=SIGCONT, si_code=SI_USER, si_pid=20563, si_uid=0} ---
+> > poll([{fd=3, events=POLLIN}], 1, -1
+> >
+> > Would it make sense to add REGSET_SYSTEM_CALL to ARM? (Though this
+> > begs the question, "Is restart_syscall visible during a trace on
+> > arm64?", which I'll have to go check...)
 > 
-> The boot loader copied the DT to the end of real RAM, not to the end of
-> the 256 MiB block? Hence the kernel accesses unmapped memory
-> when checking the FDT header?
+> So, some further testing:
+> - native arm64 presents "poll" again even to seccomp when
+> restart_syscall is triggered (both via regs[8] and
+> NT_ARM_SYSTEM_CALL).
 
-actually everything is below 256M since physical memory starts at
-0x80000000:
+I'm fine either way for the native case, but we should stick with whetever
+we end up with. Being compatible with ARM is probably a good idea. Do you
+have a preference?
 
-U-Boot# printenv loadaddr
-loadaddr=0x82000000
-U-Boot# printenv fdtaddr
-fdtaddr=0x88000000
-U-Boot# load mmc 0:1 ${loadaddr} zimage
-reading zimage
-5694816 bytes read in 318 ms (17.1 MiB/s)
-U-Boot# load mmc 0:1 ${fdtaddr} am335x-boneblack.dtb
-reading am335x-boneblack.dtb
-29985 bytes read in 10 ms (2.9 MiB/s)
-U-Boot# setenv bootargs console=ttyO0,115200n8 root=/dev/mmcblk0p2 ro
-rootfstype=ext4 rootwait debug earlyprintk mem=256M
-U-Boot# bootz ${loadaddr} - ${fdtaddr}
-Kernel image @ 0x82000000 [ 0x000000 - 0x56e560 ]
-## Flattened Device Tree blob at 88000000
-   Booting using the fdt blob at 0x88000000
-   Loading Device Tree to 8fff5000, end 8ffff520 ... OK
+> - compat mode on arm64 _does_ show syscall_restart (via ARM_r7).
 
-Starting kernel ...
+That sounds like a bug, then. Any chance you could look into a patch?
 
-hangs there, and after i reset i found the aforementioned oops in __log_buf.
-
-Here is without the mem= argument:
-
-U-Boot SPL 2015.01 (Jan 16 2015 - 10:20:36)
-MMC: block number 0x100 exceeds max(0x0)
-MMC: block number 0x200 exceeds max(0x0)
-*** Error - No Valid Environment Area found
-Using default environment
-
-
-
-U-Boot 2015.01 (Jan 16 2015 - 10:20:36)
-
-       Watchdog enabled
-I2C:   ready
-DRAM:  512 MiB
-MMC:   OMAP SD/MMC: 0, OMAP SD/MMC: 1
-Net:   <ethaddr> not set. Validating first E-fuse MAC
-cpsw, usb_ether
-Hit any key to stop autoboot:  0 
-U-Boot# load mmc 0:1 ${loadaddr} zimage
-reading zimage
-5694816 bytes read in 318 ms (17.1 MiB/s)
-U-Boot# load mmc 0:1 ${fdtaddr} am335x-boneblack.dtb
-reading am335x-boneblack.dtb
-29985 bytes read in 11 ms (2.6 MiB/s)
-U-Boot# setenv bootargs console=ttyO0,115200n8 root=/dev/mmcblk0p2 ro
-rootfstype=ext4 rootwait debug earlyprintk       
-U-Boot# bootz ${loadaddr} - ${fdtaddr}
-Kernel image @ 0x82000000 [ 0x000000 - 0x56e560 ]
-## Flattened Device Tree blob at 88000000
-   Booting using the fdt blob at 0x88000000
-   Loading Device Tree to 8fff5000, end 8ffff520 ... OK
-
-Starting kernel ...
-
-[    0.000000] Booting Linux on physical CPU 0x0
-[    0.000000] Linux version 3.19.0-rc4-00001-g45aa0b7 (flag at luxor) (gcc version 4.8.2 (Ubuntu/Linaro 4.8.2-16ubuntu4) ) #1 SMP Fri Jan 16 10:33:22 CET5
-...
--- 
-bye,
-p.
+Will
