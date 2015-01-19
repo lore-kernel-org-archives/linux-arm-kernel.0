@@ -1,43 +1,68 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Mon, 19 Jan 2015 11:45:01 +0100
-Subject: [PATCH v2 0/4] dmaengine: at_xdmac: several improvements
-In-Reply-To: <1418380615-12171-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1418380615-12171-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20150119104501.GD19014@odux.rfo.atmel.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 19 Jan 2015 11:46:20 +0100
+Subject: [PATCH v3 2/3] ARM: at91/dt: sama5d4: add pioD controller
+In-Reply-To: <1421422267-2934-3-git-send-email-ludovic.desroches@atmel.com>
+References: <1421422267-2934-1-git-send-email-ludovic.desroches@atmel.com>
+ <1421422267-2934-3-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <54BCE07C.8060601@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+Le 16/01/2015 16:31, Ludovic Desroches a ?crit :
+> PioD controller was not described in the device tree since we don't use
+> it. As pinctrl-at91 allows disabled gpio controllers in the device
+> tree, we can add it to complete the device description.
+> 
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-Any issue with this patch series?
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Regards
+Linus,
 
-Ludovic
+As there is no dependency with the other patches in the series, I can
+take this patch or you can keep it together with the other ones. Just
+tell me once we agree all on a solution.
 
-On Fri, Dec 12, 2014 at 11:36:51AM +0100, Ludovic Desroches wrote:
-> Hi,
+Bye,
+
+
+> ---
+>  arch/arm/boot/dts/sama5d4.dtsi | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
 > 
-> This series is based on vkoul/slave-dma/topic/slave_caps_device_control_fix
-> branch.
+> diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
+> index 1b0f30c..368973e 100644
+> --- a/arch/arm/boot/dts/sama5d4.dtsi
+> +++ b/arch/arm/boot/dts/sama5d4.dtsi
+> @@ -62,6 +62,7 @@
+>  		gpio0 = &pioA;
+>  		gpio1 = &pioB;
+>  		gpio2 = &pioC;
+> +		gpio3 = &pioD;
+>  		gpio4 = &pioE;
+>  		tcb0 = &tcb0;
+>  		tcb1 = &tcb1;
+> @@ -1111,6 +1112,18 @@
+>  					clocks = <&pioC_clk>;
+>  				};
+>  
+> +				pioD: gpio at fc068000 {
+> +					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+> +					reg = <0xfc068000 0x100>;
+> +					interrupts = <5 IRQ_TYPE_LEVEL_HIGH 1>;
+> +					#gpio-cells = <2>;
+> +					gpio-controller;
+> +					interrupt-controller;
+> +					#interrupt-cells = <2>;
+> +					clocks = <&pioD_clk>;
+> +					status = "disabled";
+> +				};
+> +
+>  				pioE: gpio at fc06d000 {
+>  					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+>  					reg = <0xfc06d000 0x100>;
 > 
-> Changes from v1:
-> - put save_cc field addition in a single patch
-> - update commit log of patch 3/4
-> - remove AT_XDMAC_CUR_CFG since it is no more used
-> 
-> Cyrille Pitchen (1):
->   dmaengine: at_xdmac: wait for in-progress transaction to complete
->     after     pausing a channel
-> 
-> Ludovic Desroches (3):
->   dmaengine: at_xdmac: introduce save_cc field
->   dmaengine: at_xdmac: simplify channel configuration stuff
->   dmaengine: at_xdmac: allow muliple dwidths when doing slave transfers
-> 
->  drivers/dma/at_xdmac.c | 60 ++++++++++++++++++++++++++------------------------
->  1 file changed, 31 insertions(+), 29 deletions(-)
-> 
-> -- 
-> 2.0.3
-> 
+
+
+-- 
+Nicolas Ferre
