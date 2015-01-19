@@ -1,69 +1,56 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 19 Jan 2015 14:01:13 +0100
-Subject: [PATCH v2 2/3] usb: xhci: plat: Add USB phy support
-In-Reply-To: <1421672474-2945-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1421672474-2945-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1421672474-2945-3-git-send-email-maxime.ripard@free-electrons.com>
+Date: Mon, 19 Jan 2015 14:01:11 +0100
+Subject: [PATCH v2 0/3] ARM: mvebu: Enable XHCI on the Armada 385 AP
+Message-ID: <1421672474-2945-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Marvell Armada 385 AP needs a dumb phy in order to enable the USB3 VBUS.
+Hi all,
 
-Add a call to retrieve a USB PHY to XHCI plat in order to support this.
+This serie enables the Armada 385 AP XHCI controller.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/usb/host/xhci-plat.c | 19 ++++++++++++++++++-
- 1 file changed, 18 insertions(+), 1 deletion(-)
+Since the controller uses a GPIO-controlled VBUS, we used the
+phy-generic driver, and made the needed additions to the xhci-plat
+driver to retrieve a USB phy.
 
-diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-index 0e11d61408ff..783e819139a7 100644
---- a/drivers/usb/host/xhci-plat.c
-+++ b/drivers/usb/host/xhci-plat.c
-@@ -16,6 +16,7 @@
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/platform_device.h>
-+#include <linux/usb/phy.h>
- #include <linux/slab.h>
- #include <linux/usb/xhci_pdriver.h>
- 
-@@ -155,12 +156,27 @@ static int xhci_plat_probe(struct platform_device *pdev)
- 	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
- 		xhci->shared_hcd->can_do_streams = 1;
- 
-+	hcd->usb_phy = devm_usb_get_phy_by_phandle(&pdev->dev, "usb-phy", 0);
-+	if (IS_ERR(hcd->usb_phy)) {
-+		ret = PTR_ERR(hcd->usb_phy);
-+		if (ret == -EPROBE_DEFER)
-+			goto put_usb3_hcd;
-+		hcd->usb_phy = NULL;
-+	} else {
-+		ret = usb_phy_init(hcd->usb_phy);
-+		if (ret)
-+			goto put_usb3_hcd;
-+	}
-+
- 	ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
- 	if (ret)
--		goto put_usb3_hcd;
-+		goto disable_usb_phy;
- 
- 	return 0;
- 
-+disable_usb_phy:
-+	usb_phy_shutdown(hcd->usb_phy);
-+
- put_usb3_hcd:
- 	usb_put_hcd(xhci->shared_hcd);
- 
-@@ -184,6 +200,7 @@ static int xhci_plat_remove(struct platform_device *dev)
- 	struct clk *clk = xhci->clk;
- 
- 	usb_remove_hcd(xhci->shared_hcd);
-+	usb_phy_shutdown(hcd->usb_phy);
- 	usb_put_hcd(xhci->shared_hcd);
- 
- 	usb_remove_hcd(hcd);
+Unfortunately, some glitches were also found along the way, mostly
+because of the probe deferring that was introduced by this phy
+retrieval.
+
+Since the introduction of the Armada 38x support in 3.16, the driver
+was attempting to write into registers while the clock wasn't enabled
+yet. This was working because the bootloader left it enabled, but in
+the case of a deferred probing, the clock would have been disabled by
+the error path of our driver, and this would fail. This should go in
+3.19, and any stable kernel for 3.16+.
+
+The two patches remaining are "regular" patches, and are aimed at
+3.20. The last patch depend on my previous serie to introduce support
+for the the A385 AP board.
+
+Thanks,
+Maxime
+
+Changes from v1:
+  - Removed the patch 1 that fixes the deferred probing that was
+    merged
+  - Fixed the error path of the mvebu quirks code to avoid leaking a
+    clock reference and the main HCD.
+  - Removed the extra PHY field private to the struct xhci, and used
+    the usb_phy field in the main HCD instead
+  - Fixed the error path of the phy retrieval code in order to avoid
+    leaving the phy up if an error was to happen, or the remove
+    callback to be called.
+
+Maxime Ripard (3):
+  usb: XHCI: platform: Move the Marvell quirks after the enabling the
+    clocks
+  usb: xhci: plat: Add USB phy support
+  ARM: mvebu: armada-385-ap: Enable USB3 port
+
+ arch/arm/boot/dts/armada-385-db-ap.dts | 28 +++++++++++++++++++++++++
+ drivers/usb/host/xhci-plat.c           | 38 ++++++++++++++++++++++++----------
+ 2 files changed, 55 insertions(+), 11 deletions(-)
+
 -- 
 2.2.2
