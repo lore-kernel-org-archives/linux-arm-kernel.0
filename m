@@ -1,54 +1,50 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 19 Jan 2015 11:25:35 +0100
-Subject: [PATCH 5/9] dts: versatile: add sysregs nodes
-In-Reply-To: <20150115160635.GA1576@red-moon>
-References: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
- <1419967718-26909-6-git-send-email-robherring2@gmail.com>
- <CACRpkdbinR3Uvi5zZmQJFxJgnWfvE6JZouMVxxRRGVtMNXkBQQ@mail.gmail.com>
- <CAL_JsqKBLx03E1w0NMH8CH+Pm_L8yQvnR6VTTDxqnpOwAoDhXg@mail.gmail.com>
- <20150115160635.GA1576@red-moon>
-Message-ID: <CACRpkdbLdtXeVYWvd5DSmEVkMBT8YGs0kXPC+fktiNtgJhpp=w@mail.gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Mon, 19 Jan 2015 11:27:52 +0100
+Subject: [PATCH V8 00/14] drm/exynos: few patches to enhance bridge chip
+ support
+In-Reply-To: <20150105135015.GA12010@ulmo.nvidia.com>
+References: <1416045309-13359-1-git-send-email-ajaykumar.rs@samsung.com>
+ <CAEC9eQOrKw2Z1q-ztFfadXmsL3CTcAkkv9kcS2QnDOAVSh2AuQ@mail.gmail.com>
+ <548ABAB6.6010200@collabora.co.uk> <3197445.qizQc0zeRb@avalon>
+ <54914D7D.9060108@collabora.co.uk>
+ <CAPj87rN4HZzDt5JBLyTRmKZs7XcOG=0ha7ZQf9hmjPAFgTyhYQ@mail.gmail.com>
+ <20150105135015.GA12010@ulmo.nvidia.com>
+Message-ID: <54BCDC28.7080003@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 15, 2015 at 5:06 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On Thu, Jan 08, 2015 at 11:53:15PM +0000, Rob Herring wrote:
->> On Thu, Jan 8, 2015 at 1:44 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> > On Tue, Dec 30, 2014 at 8:28 PM, Rob Herring <robherring2@gmail.com> wrote:
+Hello Thierry,
 
->> >> +                               reg = <0x00000 0x1000>;
->> >> +
->> >> +                               v2m_led_gpios: sys_led at 08 {
->> >> +                                       compatible = "arm,vexpress-sysreg,sys_led";
->> >> +                                       gpio-controller;
->> >> +                                       #gpio-cells = <2>;
->> >> +                               };
+On 01/05/2015 02:50 PM, Thierry Reding wrote:
+> On Fri, Jan 02, 2015 at 01:10:14PM +0000, Daniel Stone wrote:
 >> >
->> > These are not GPIOs. These are LED registers really.
->>
->> A register bit that controls an i/o signal sounds like a GPIO to me.
+>> > Ajay's series don't apply cleanly anymore because it has been a while since
+>> > he posted it but he can rebase on top of 3.19-rc1 once it is released and
+>> > re-resend.
+>> >
+>> 
+>> Do you have any plans to rebase this so it's ready for merging?
+>> 
+>> Thierry, Daniel, Dave - whose tree would this be best to merge through?
+> 
+> The plan is for me to take the bridge patches through the drm/panel
+> tree. I'm going to look at these patches again later this week but from
+> a very quick peek there don't seem to be any major issues left.
 >
-> To me too. I agree that definining a gpio-controller for every possible
-> gpio pin would soon get unwieldy, but hey, the choice made for vexpress
-> leds makes perfect sense to me, after all they are gpio signals
-> connected to leds, and there is a driver for that in the kernel:
+
+I know you probably are very busy but it would be great if you can take a look
+to this series to avoid another kernel release to be missed since we are already
+at v3.19-rc5.
+
+Only this version was posted 2 months ago and the first version of the series
+was sent on May, 2014 so it has been on the list for almost a year now...
+
+Tomi and Laurent had already agreed with the DT binging so I think that we can
+already merge these and if there are any remaining issues, those can be fixed
+during the 3.20 -rc cycle.
+
+> Thierry
 >
-> drivers/leds/leds-gpio.c
->
-> we could move this stuff to syscon-leds, but honestly I think is one of those
-> things we could argue forever about that.
 
-OK it's just so that the GPIO maintainer disagrees with the way
-gpio-controller is being used here, and I consequently NACK it
-so for the record add my:
-
-Nacked-by: Linus Walleij <linus.walleij@linaro.org>
-
-To this patch if/when merging it through ARM SoC.
-
-If the DT people think it is a good way to describe the hardware
-and override this then I will live with it I guess...
-
-Yours,
-Linus Walleij
+Thanks a lot and best regards,
+Javier
