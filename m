@@ -1,49 +1,81 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 Jan 2015 14:31:06 +0100
-Subject: [PATCH 10/10] drivers: PL011: add support for the ARM SBSA
- generic UART
-In-Reply-To: <20150116183717.GM32155@leverpostej>
-References: <1421428986-11300-1-git-send-email-andre.przywara@arm.com>
- <54B95960.9070906@arm.com> <20150116183717.GM32155@leverpostej>
-Message-ID: <5407007.ZAjCvvOzus@wuerfel>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 19 Jan 2015 14:34:20 +0100
+Subject: [PATCHv5 0/6] USB: host: Atmel OHCI and EHCI drivers improvements
+In-Reply-To: <1421619935-5022-1-git-send-email-sylvain.rochet@finsecur.com>
+References: <20150118211728.GA21128@gradator.net>
+ <1421619935-5022-1-git-send-email-sylvain.rochet@finsecur.com>
+Message-ID: <54BD07DC.6020802@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 January 2015 18:37:17 Mark Rutland wrote:
+Le 18/01/2015 23:25, Sylvain Rochet a ?crit :
+> USB: host: Atmel OHCI and EHCI drivers improvements
 > 
-> > Makes some sense, so what about:
-> > -----------------------
-> > Required properties:
-> > - compatible: must be "arm,sbsa-uart"
-> > - reg: exactly one register range
-> > - interrupts: exactly one interrupt specifier
-> > 
-> > Optional properties:
-> > - current-speed : the current active speed of the UART
-> > - fifo-size : always 32 as per the SBSA specification
-> > - word-size : the number of payload bits per word
-> > - parity : used parity method, can be:
-> >       "n": no parity
-> >       "e": even parity
-> >       "o": odd parity
-> >       "m": always mark (logical 1)
-> >       "s": always space (logical 0)
-> > - stop-bits : the number of stop bits after the payload
-> 
-> Generally those look fine, though someone more familiar with serial
-> should take a look.
-> 
-> We can drop fifo-size given it's fixed. Anything that we know outright
-> doesn't need to be described.
-> 
-> We might want to make them mandatory. I don't see any value in not
-> knowing.
+> Suspend/resume support for EHCI.
+> struct dev_pm_ops for OHCI.
+> Removed global variables from both.
+> Fixed OHCI wake up support for STANDBY(wake-up enabled) and MEM(wake-up 
+> disabled) sleep targets.
 
-I think making them optional is useless, so either make them mandatory or
-drop them if we can avoid it. Unfortunately, LCR is not part of SBSA,
-that would let us drop the properties and still report the correct settings.
+I'm okay with the whole series:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Would we be better off documenting that 8-n-1 is the only allowed settting?
-I can't think of a reason why anyone would use something else.
+Alan,
+It seems that Boris and Alexandre also add their tag to the series
+already. Do you want us to collect them in a new series sent to you?
 
-	Arnd
+Sylvain,
+Thanks a lot for this nice series built at a high pace ;-)
+Even if I'm not sure to keep the separation between "slow clock" PM and
+"normal" PM on AT91 but more likely to use the "slow clock" for all the
+PM modes, let's go forward with this step for now. I mean, we will
+certainly rework this at91_suspend_entering_slow_clock() aspect in the
+future.
+
+Bye,
+
+> Changes since v4:
+>   * Re-add at91_suspend_entering_slow_clock() to OHCI, we can't naively
+>     remove this one, this device needs to be continuously clocked to
+>     provide wake up support.
+>     The removal of at91_suspend_entering_slow_clock() actually lighted up
+>     an issue on wake up support, which is now fixed.
+> 
+> Changes since v3:
+>   * Using struct dev_pm_ops instead of static struct platform_driver
+>     resume and suspend bindings for both EHCI and OHCI
+>   * Fixed inconsistency in patch subjects, _ intead of - for file names
+>   * Patch cleaning with the help of checkpatch.pl, fixed lines over
+>     80 characters
+> 
+> Changes since v2:
+>   * Added patchs from an other submission, because this series
+>     depended on this one
+>     * EHCI: Move global variables to private struct
+>     * OHCI: Move global variables to private struct
+>   * Using ohci->priv and ehci->priv instead of hcd->hcd_priv,
+>     which were not the right way to do that
+> 
+> Changes since v1:
+>   * Don't use at91_suspend_entering_slow_clock() on EHCI,
+>     we are trying to get read of this of this function
+>   * Removed at91_suspend_entering_slow_clock() from OHCI
+> 
+> Sylvain Rochet (6):
+>   USB: host: ehci-atmel: Add suspend/resume support
+>   USB: host: ohci-at91: Use struct dev_pm_ops instead of struct
+>     platform_driver
+>   USB: host: ehci-atmel: Move global variables to private struct
+>   USB: host: ohci-at91: Fix wake-up support
+>   USB: host: ohci-at91: Move global variables to private struct
+>   USB: host: ohci-at91: usb_hcd_at91_probe(), remove useless stack
+>     initialisation
+> 
+>  drivers/usb/host/ehci-atmel.c | 102 ++++++++++++++++++++++++++---------
+>  drivers/usb/host/ohci-at91.c  | 120 +++++++++++++++++++++++++-----------------
+>  2 files changed, 150 insertions(+), 72 deletions(-)
+> 
+
+
+-- 
+Nicolas Ferre
