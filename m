@@ -1,60 +1,59 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 19 Jan 2015 10:39:42 +0800
-Subject: [PATCH 09/28] PCI: Separate pci_host_bridge creation out of
- pci_create_root_bus()
-In-Reply-To: <11966423.5s0rO0b8cE@wuerfel>
-References: <1421372666-12288-1-git-send-email-wangyijing@huawei.com>
- <1421372666-12288-10-git-send-email-wangyijing@huawei.com>
- <11966423.5s0rO0b8cE@wuerfel>
-Message-ID: <54BC6E6E.9090200@huawei.com>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Mon, 19 Jan 2015 11:04:14 +0800
+Subject: [PATCH] kprobes: bugfix: checks kprobes_all_disarmed in
+ unoptimized_kprobe().
+In-Reply-To: <54B3C3A0.6010708@hitachi.com>
+References: <54B3B32E.7070709@hitachi.com>
+ <1421064563-77831-1-git-send-email-wangnan0@huawei.com>
+ <54B3C3A0.6010708@hitachi.com>
+Message-ID: <54BC742E.80006@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/1/16 17:34, Arnd Bergmann wrote:
-> On Friday 16 January 2015 09:44:07 Yijing Wang wrote:
->> We want to make a generic pci_host_bridge, then we could
->> place common PCI infos like domain number in it. Ripping
->> out pci_host_bridge creation from pci_create_root_bus()
->> make code more better readability. Further more, we could
->> use the generic pci_host_bridge to hold host bridge specific
->> operations like pcibios_root_bridge_prepare().
+Hi Masami Hiramatsu,
+
+I can't find this patch and '[PATCH] kprobes: bugfix: checks kprobes_all_disarmed
+in unoptimized_kprobe().' in current mainline. How do these patches get there?
+Should they be merged into Russell King's tree first?
+
+Thank you!
+
+On 2015/1/12 20:52, Masami Hiramatsu wrote:
+> (2015/01/12 21:09), Wang Nan wrote:
+>> Original code failed to disarm the probed instruction after
 >>
->> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+>> echo 0 > /sys/kernel/debug/kprobes/enabled
+>>
+>> if OPTPROBE is enabled.
+>>
+>> This patch checks kprobes_all_disarmed in unoptimized_kprobe().
 >>
 > 
-> I assume this patch is doing the right thing, but the description
-> above doesn't really tell me enough to be sure.
+> Looks good :)
 > 
-> This is supposed to be transparent to the callers, right? If
-> so, please mention it explicitly in the text.
-
-Sorry, I will refresh the patch log for better description.
-
-In this series I have no plan to export the pci_create_host_bridge()
-to callers, because I think pci_host_bridge_ops could make callers
-have the ability to setup the platform specific operations. But if this
-is needed, we could introduce another patches to export it.
-
+> Acked-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
 > 
-> Also you don't explain what the list of host bridges is
-> used for. Maybe you can split this out into a separate patch
-> so you have one patch that just moves code from one file
-> to the other but no functional changes, and a second patch
-> that exports pci_create_host_bridge and introduces the list,
-> with an explanation of what it is used for.
+> Thank you!
 > 
-
-pci_host_bridge_list is used to find out whether the pci_host_bridge
-in domain:bus is already existed, I will split the related code
-to another patch, thanks.
-
-
-> 	Arnd
+>> Signed-off-by: Wang Nan <wangnan0@huawei.com>
+>> ---
+>>  kernel/kprobes.c | 3 +++
+>>  1 file changed, 3 insertions(+)
+>>
+>> diff --git a/kernel/kprobes.c b/kernel/kprobes.c
+>> index 9471710..f16936b 100644
+>> --- a/kernel/kprobes.c
+>> +++ b/kernel/kprobes.c
+>> @@ -630,6 +630,9 @@ static void unoptimize_kprobe(struct kprobe *p, bool force)
+>>  {
+>>  	struct optimized_kprobe *op;
+>>  
+>> +	if (kprobes_all_disarmed)
+>> +		return;
+>> +
+>>  	if (!kprobe_aggrprobe(p) || kprobe_disarmed(p))
+>>  		return; /* This is not an optprobe nor optimized */
+>>  
+>>
 > 
-> .
 > 
-
-
--- 
-Thanks!
-Yijing
