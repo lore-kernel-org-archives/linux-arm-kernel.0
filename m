@@ -1,26 +1,17 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 Jan 2015 14:56:02 +0100
-Subject: [PATCH 10/10] drivers: PL011: add support for the ARM SBSA
- generic UART
-In-Reply-To: <54BD0A49.8030107@arm.com>
-References: <1421428986-11300-1-git-send-email-andre.przywara@arm.com>
- <5407007.ZAjCvvOzus@wuerfel> <54BD0A49.8030107@arm.com>
-Message-ID: <45882386.HAzdnpUX2E@wuerfel>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Mon, 19 Jan 2015 14:59:54 +0100
+Subject: [PATCH 0/4] Genericise the IOVA allocator
+In-Reply-To: <cover.1420822848.git.robin.murphy@arm.com>
+References: <cover.1420822848.git.robin.murphy@arm.com>
+Message-ID: <20150119135954.GL6343@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 19 January 2015 13:44:41 Andre Przywara wrote:
-> 
-> > Would we be better off documenting that 8-n-1 is the only allowed settting?
-> > I can't think of a reason why anyone would use something else.
-> 
-> Reading the spec again I see that 8-bit word len is mandated:
-> "The generic UART uses 8-bit words, equivalent to UARTLCR_H.WLEN == b11."
-> So given this I guess anything other than (8)n1 is pretty useless and
-> wouldn't probably be used anyways. This means that we can get rid of the
-> optional properties altogether and just add "current-speed" to the list
-> of required ones. I am about to implement this.
+On Mon, Jan 12, 2015 at 05:51:12PM +0000, Robin Murphy wrote:
+> Robin Murphy (4):
+>   iommu: allow building iova.c independently
+>   iommu: consolidate IOVA allocator code
+>   iommu: make IOVA domain low limit flexible
+>   iommu: make IOVA domain page size explicit
 
-Ok, great!
-
-	Arnd
+Applied to core, thanks Robin.
