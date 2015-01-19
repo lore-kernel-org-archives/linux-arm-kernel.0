@@ -1,77 +1,69 @@
-From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
-Date: Mon, 19 Jan 2015 14:04:39 +0100
-Subject: [PATCH 2/5] PCI: st: Add Device Tree bindings for sti pcie
-In-Reply-To: <2165161.8vJctS1yVa@wuerfel>
-References: <1418812486-12394-1-git-send-email-gabriel.fernandez@linaro.org>
- <1418812486-12394-3-git-send-email-gabriel.fernandez@linaro.org>
- <2165161.8vJctS1yVa@wuerfel>
-Message-ID: <CAG374jB5fcG2-2WnxkN5U-qOw=xP3A5tnTO04Gcqt3cSRhhKmw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 19 Jan 2015 14:01:13 +0100
+Subject: [PATCH v2 2/3] usb: xhci: plat: Add USB phy support
+In-Reply-To: <1421672474-2945-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1421672474-2945-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1421672474-2945-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+The Marvell Armada 385 AP needs a dumb phy in order to enable the USB3 VBUS.
 
-Thanks for reviewing
+Add a call to retrieve a USB PHY to XHCI plat in order to support this.
 
-On 17 December 2014 at 23:01, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 17 December 2014 11:34:43 Gabriel FERNANDEZ wrote:
->> sti pcie is built around a Synopsis Designware PCIe IP.
->>
->> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
->> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
->> ---
->>  Documentation/devicetree/bindings/pci/st-pcie.txt | 53 +++++++++++++++++++++++
->>  1 file changed, 53 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/pci/st-pcie.txt
->>
->> diff --git a/Documentation/devicetree/bindings/pci/st-pcie.txt b/Documentation/devicetree/bindings/pci/st-pcie.txt
->> new file mode 100644
->> index 0000000..bd3488f
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/pci/st-pcie.txt
->> @@ -0,0 +1,53 @@
->> +STMicroelectronics STi PCIe controller
->> +
->> +This PCIe host controller is based on the Synopsis Designware PCIe IP
->> +and thus inherits all the common properties defined in designware-pcie.txt.
->> +
->> +Required properties:
->> + - compatible: "st,stih407-pcie"
->> + - reg: base address and length of the pcie controller, mem-window address
->> +   and length available to the controller.
->> + - interrupts: A list of interrupt outputs of the controller.
->> + - interrupt-names: Must include the following entries:
->> +   "msi": STi interrupt that is asserted when an MSI is received
->
-> You should specify that only one interrupt may be present.
-> If you extend the binding, you will need to describe what the
-> second one is as well.
->
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/usb/host/xhci-plat.c | 19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
 
-ok, i will change into:
-"
- - interrupts: A list of interrupt outputs of the controller. Must contain an
-  entry for each entry in the interrupt-names property.
-
->> + - st,syscfg : should be a phandle of the syscfg node. Also contains syscfg
->> +   offset for IP configuration.
->> + - resets, reset-names: the power-down and soft-reset lines of PCIe IP.
->> +   Associated names must be "powerdown" and "softreset".
->> + - phys, phy-names: the phandle for the PHY device.
->> +   Associated name must be "pcie_phy"
->
-> Names should not have underscores in them in general. "pcie-phy" would
-> be fine, but just "pcie" seems good enough, unless there are existing
-> drivers that have established a specific naming.
->
-
-just "pcie" is fine for me
-
-
-BR
-
-Gabriel
-
->
->         Arnd
->
+diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+index 0e11d61408ff..783e819139a7 100644
+--- a/drivers/usb/host/xhci-plat.c
++++ b/drivers/usb/host/xhci-plat.c
+@@ -16,6 +16,7 @@
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/platform_device.h>
++#include <linux/usb/phy.h>
+ #include <linux/slab.h>
+ #include <linux/usb/xhci_pdriver.h>
+ 
+@@ -155,12 +156,27 @@ static int xhci_plat_probe(struct platform_device *pdev)
+ 	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
+ 		xhci->shared_hcd->can_do_streams = 1;
+ 
++	hcd->usb_phy = devm_usb_get_phy_by_phandle(&pdev->dev, "usb-phy", 0);
++	if (IS_ERR(hcd->usb_phy)) {
++		ret = PTR_ERR(hcd->usb_phy);
++		if (ret == -EPROBE_DEFER)
++			goto put_usb3_hcd;
++		hcd->usb_phy = NULL;
++	} else {
++		ret = usb_phy_init(hcd->usb_phy);
++		if (ret)
++			goto put_usb3_hcd;
++	}
++
+ 	ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
+ 	if (ret)
+-		goto put_usb3_hcd;
++		goto disable_usb_phy;
+ 
+ 	return 0;
+ 
++disable_usb_phy:
++	usb_phy_shutdown(hcd->usb_phy);
++
+ put_usb3_hcd:
+ 	usb_put_hcd(xhci->shared_hcd);
+ 
+@@ -184,6 +200,7 @@ static int xhci_plat_remove(struct platform_device *dev)
+ 	struct clk *clk = xhci->clk;
+ 
+ 	usb_remove_hcd(xhci->shared_hcd);
++	usb_phy_shutdown(hcd->usb_phy);
+ 	usb_put_hcd(xhci->shared_hcd);
+ 
+ 	usb_remove_hcd(hcd);
+-- 
+2.2.2
