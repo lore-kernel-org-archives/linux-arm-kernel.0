@@ -1,34 +1,55 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 19 Jan 2015 20:39:15 +0100
-Subject: [PATCH] i2c: drop ancient protection against sysfs refcounting
- issues
-In-Reply-To: <20150119191210.GE26493@n2100.arm.linux.org.uk>
-References: <1421693756-12917-1-git-send-email-wsa@the-dreams.de>
- <20150119191210.GE26493@n2100.arm.linux.org.uk>
-Message-ID: <20150119193915.GA9969@katana>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 19 Jan 2015 11:39:43 -0800
+Subject: [GIT PULL] at91: drivers for 3.20 #1
+In-Reply-To: <1421341350-13936-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1421341350-13936-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20150119193943.GH16883@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 19, 2015 at 07:12:10PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Jan 19, 2015 at 07:55:56PM +0100, Wolfram Sang wrote:
-> > Back in the days, sysfs seemed to have refcounting issues and subsystems
-> > needed a completion to be safe. This is not the case anymore, so I2C can
-> > get rid of this code. There is noone else besides I2C doing something
-> > like this currently (checked with the attached coccinelle script which
-> > checks if a release function exists and if it contains a completion).
+On Thu, Jan 15, 2015 at 06:02:30PM +0100, Nicolas Ferre wrote:
+> Arnd, Olof, Kevin,
 > 
-> Have you validated this with DEBUG_KOBJECT_RELEASE enabled?
+> This is a pull-request about AT91 drivers for 3.20. We took the USB gadget part
+> with us as it depends on the Matrix syscon part. There is no dependency anyway.
+> 
+> Thanks, best regards,
+> 
+> The following changes since commit eaa27f34e91a14cdceed26ed6c6793ec1d186115:
+> 
+>   linux 3.19-rc4 (2015-01-11 12:44:53 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-drivers
+> 
+> for you to fetch changes up to a5514d142e7f5cff8e02a6fb4cfcb3e301c0eb59:
+> 
+>   usb: gadget: at91_udc: Allocate udc instance (2015-01-15 14:53:23 +0100)
+> 
+> ----------------------------------------------------------------
+> First batch of drivers changes for 3.20:
+> - Internal AHB bus matrix (Matrix) and Static Memory Controller (SMC) are now
+>   mfd/syscon drivers.
+> - USB gadget full speed (at91_udc): fixes, simplification and multi-platform awareness
+>   DT enhancement.
+> 
+> ----------------------------------------------------------------
+> Boris Brezillon (12):
+>       mfd: syscon: Add atmel-matrix registers definition
+>       mfd: syscon: Add Atmel Matrix bus DT binding documentation
+>       mfd: syscon: Add atmel-smc registers definition
+>       mfd: syscon: Add Atmel SMC binding doc
+>       usb: gadget: at91_udc: Fix clock names
+>       usb: gadget: at91_udc: Drop uclk clock
+>       usb: gadget: at91_udc: Document DT clocks and clock-names property
+>       usb: gadget: at91_udc: Remove non-DT handling code
+>       usb: gadget: at91_udc: Simplify probe and remove functions
+>       usb: gadget: at91_udc: Rework for multi-platform kernel support
+>       usb: gadget: at91_udc: Update DT binding documentation
+>       usb: gadget: at91_udc: Allocate udc instance
 
-You saved me, thank you a lot for this pointer! Patch discarded.
+Merged into next/drivers. Thanks.
 
-I assume other subsystems also moved away from 'struct device_type' for
-the release function as well; but this is just a guess for now and I'll
-call it a day for today.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150119/fd943b8a/attachment.sig>
+-Olof
