@@ -1,39 +1,39 @@
-From: peda@lysator.liu.se (Peter Rosin)
-Date: Mon, 19 Jan 2015 14:54:45 +0100
-Subject: [PATCH 2/2] ASoC: atmel_ssc_dai: remove clock pin comments
-In-Reply-To: <1421392784-32298-2-git-send-email-voice.shen@atmel.com>
-Message-ID: <54BD0CA5.4070207@lysator.liu.se>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 19 Jan 2015 15:56:42 +0200
+Subject: [PATCH v2 0/5] Generic IOMMU page table framework
+In-Reply-To: <20150119131843.GJ32131@arm.com>
+References: <1420811657-21321-1-git-send-email-will.deacon@arm.com>
+ <20150119130940.GJ6343@8bytes.org> <20150119131843.GJ32131@arm.com>
+Message-ID: <2897578.zknPhjxUSB@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> As the clock can be get from TK/RK pin, so remove the comments.
+Hi Will,
+
+On Monday 19 January 2015 13:18:43 Will Deacon wrote:
+> On Mon, Jan 19, 2015 at 01:09:41PM +0000, joro at 8bytes.org wrote:
+> > On Fri, Jan 16, 2015 at 02:01:31PM +0000, Will Deacon wrote:
+> >> I've not received any feedback on this revision of the series, but it's
+> >> working well for me and Laurent showed that it works with his IOMMU too.
+> >> 
+> >> Joerg -- can I include this in my pull request for 3.20, or is there
+> >> anything further you'd like me to address? The code is completely
+> >> self-contained, so I wouldn't expect any impact on IOMMU drivers that
+> >> don't explicitly use the new page table API.
+> > 
+> > The patch-set looks good to me. But with code generification in general,
+> > what are the plans for other arm iommu drivers to adopt this?
 > 
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
-> ---
->  sound/soc/atmel/atmel_ssc_dai.c | 4 ----
->  1 file changed, 4 deletions(-)
-> diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
-> index e691aab..198661b 100644
-> --- a/sound/soc/atmel/atmel_ssc_dai.c
-> +++ b/sound/soc/atmel/atmel_ssc_dai.c
-> @@ -452,10 +452,6 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
->  	case SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBM_CFM:
->  		/*
->  		 * I2S format, CODEC supplies BCLK and LRC clocks.
-> -		 *
-> -		 * The SSC transmit clock is obtained from the BCLK signal on
-> -		 * on the TK line, and the SSC receive clock is
-> -		 * generated from the transmit clock.
->  		 */
->  		rcmr =	  SSC_BF(RCMR_PERIOD, 0)
->  			| SSC_BF(RCMR_STTDLY, START_DELAY)
-> -- 
-> 2.3.0.rc0
+> I think Laurent was going to make use of it and I'm working on a driver
+> that will use it too.
+> 
+> Laurent -- you had patches ready to go for v1, right?
 
-Hi!
+Yes, and I've rebased them (or actually it, it's a single patch) on v2. I 
+haven't had time to test the result yet, I'll try to do so later tonight or 
+tomorrow.
 
-You should probably remove that comment from the case with
-SND_SOC_DAIFMT_DSP_A | SND_SOC_DAIFMT_CBM_CFM as well...
+-- 
+Regards,
 
-Cheers,
-Peter
+Laurent Pinchart
