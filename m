@@ -1,56 +1,70 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 19 Jan 2015 14:01:11 +0100
-Subject: [PATCH v2 0/3] ARM: mvebu: Enable XHCI on the Armada 385 AP
-Message-ID: <1421672474-2945-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Mon, 19 Jan 2015 14:01:14 +0100
+Subject: [PATCH v2 3/3] ARM: mvebu: armada-385-ap: Enable USB3 port
+In-Reply-To: <1421672474-2945-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1421672474-2945-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1421672474-2945-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+The Armada 385 AP board has a USB3 port exposed that uses a GPIO to drive the
+VBUS line. Enable the needed drivers to support this.
 
-This serie enables the Armada 385 AP XHCI controller.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-385-db-ap.dts | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-Since the controller uses a GPIO-controlled VBUS, we used the
-phy-generic driver, and made the needed additions to the xhci-plat
-driver to retrieve a USB phy.
-
-Unfortunately, some glitches were also found along the way, mostly
-because of the probe deferring that was introduced by this phy
-retrieval.
-
-Since the introduction of the Armada 38x support in 3.16, the driver
-was attempting to write into registers while the clock wasn't enabled
-yet. This was working because the bootloader left it enabled, but in
-the case of a deferred probing, the clock would have been disabled by
-the error path of our driver, and this would fail. This should go in
-3.19, and any stable kernel for 3.16+.
-
-The two patches remaining are "regular" patches, and are aimed at
-3.20. The last patch depend on my previous serie to introduce support
-for the the A385 AP board.
-
-Thanks,
-Maxime
-
-Changes from v1:
-  - Removed the patch 1 that fixes the deferred probing that was
-    merged
-  - Fixed the error path of the mvebu quirks code to avoid leaking a
-    clock reference and the main HCD.
-  - Removed the extra PHY field private to the struct xhci, and used
-    the usb_phy field in the main HCD instead
-  - Fixed the error path of the phy retrieval code in order to avoid
-    leaving the phy up if an error was to happen, or the remove
-    callback to be called.
-
-Maxime Ripard (3):
-  usb: XHCI: platform: Move the Marvell quirks after the enabling the
-    clocks
-  usb: xhci: plat: Add USB phy support
-  ARM: mvebu: armada-385-ap: Enable USB3 port
-
- arch/arm/boot/dts/armada-385-db-ap.dts | 28 +++++++++++++++++++++++++
- drivers/usb/host/xhci-plat.c           | 38 ++++++++++++++++++++++++----------
- 2 files changed, 55 insertions(+), 11 deletions(-)
-
+diff --git a/arch/arm/boot/dts/armada-385-db-ap.dts b/arch/arm/boot/dts/armada-385-db-ap.dts
+index 3a51531eb37b..b891b4c897f5 100644
+--- a/arch/arm/boot/dts/armada-385-db-ap.dts
++++ b/arch/arm/boot/dts/armada-385-db-ap.dts
+@@ -98,6 +98,13 @@
+ 				status = "okay";
+ 			};
+ 
++			pinctrl at 18000 {
++				xhci0_vbus_pins: xhci0-vbus-pins {
++					marvell,pins = "mpp44";
++					marvell,function = "gpio";
++				};
++			};
++
+ 			ethernet at 30000 {
+ 				status = "okay";
+ 				phy = <&phy2>;
+@@ -122,6 +129,11 @@
+ 				phy = <&phy0>;
+ 				phy-mode = "rgmii-id";
+ 			};
++
++			usb3 at f0000 {
++				status = "okay";
++				usb-phy = <&usb3_phy>;
++			};
+ 		};
+ 
+ 		pcie-controller {
+@@ -147,4 +159,20 @@
+ 			};
+ 		};
+ 	};
++
++	usb3_phy: usb3_phy {
++		compatible = "usb-nop-xceiv";
++		vcc-supply = <&reg_xhci0_vbus>;
++	};
++
++	reg_xhci0_vbus: xhci0-vbus {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&xhci0_vbus_pins>;
++		regulator-name = "xhci0-vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		enable-active-high;
++		gpio = <&gpio1 12 GPIO_ACTIVE_HIGH>;
++	};
+ };
 -- 
 2.2.2
