@@ -1,122 +1,67 @@
-From: wangnan0@huawei.com (Wang Nan)
-Date: Mon, 19 Jan 2015 19:21:39 +0800
-Subject: [PATCH] kprobes: bugfix: checks kprobes_all_disarmed in
- unoptimized_kprobe().
-In-Reply-To: <54BCC8C0.40706@hitachi.com>
-References: <54B3B32E.7070709@hitachi.com>
- <1421064563-77831-1-git-send-email-wangnan0@huawei.com>
- <54B3C3A0.6010708@hitachi.com> <54BC742E.80006@huawei.com>
- <54BCC8C0.40706@hitachi.com>
-Message-ID: <54BCE8C3.4080903@huawei.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 19 Jan 2015 11:33:31 +0000
+Subject: [PATCH v4 17/18] iommu: exynos: init from dt-specific callback
+ instead of initcall
+In-Reply-To: <10691050.Z5RGmE4fp0@avalon>
+References: <1421399592-7482-1-git-send-email-m.szyprowski@samsung.com>
+ <1421399592-7482-18-git-send-email-m.szyprowski@samsung.com>
+ <10691050.Z5RGmE4fp0@avalon>
+Message-ID: <20150119113331.GG32131@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/1/19 17:05, Masami Hiramatsu wrote:
-> Hi Wang,
+On Mon, Jan 19, 2015 at 01:11:07AM +0000, Laurent Pinchart wrote:
+> On Friday 16 January 2015 10:13:11 Marek Szyprowski wrote:
+> > This patch introduces IOMMU_OF_DECLARE-based initialization to the
+> > driver, which replaces subsys_initcall-based procedure.
+> > exynos_iommu_of_setup ensures that each sysmmu controller is probed
+> > before its master device.
+
+[...]
+
+> > +static int __init exynos_iommu_of_setup(struct device_node *np)
+> > +{
+> > +	struct platform_device *pdev;
+> > +
+> > +	if (!init_done)
+> > +		exynos_iommu_init();
+> > +
+> > +	pdev = of_platform_device_create(np, NULL, platform_bus_type.dev_root);
+> > +	if (IS_ERR(pdev))
+> > +		return PTR_ERR(pdev);
 > 
-> I've found a problem on this patch, since kprobes calls unoptioize_kprobe
-> with kprobes_all_disarmed=true when trying to disable all kprobes, this
-> cause a serious problem.
+> This feels like a hack to me. What happens here is that you're using the 
+> IOMMU_OF_DECLARE mechanism to make sure that the iommu platform device will be 
+> created and registered before the normal OF bus populate mechanism kicks in, 
+> thus ensuring that the iommu gets probed before other devices. In practice 
+> this is pretty similar to using different init levels, which is what Will's 
+> patch set was trying to avoid in the first place. Creating a new kind of init 
+> levels mechanism doesn't sound very good to me.
 > 
-> Moreover, I couldn't reproduce your reported bug on my 3.19-rc4 kernel.
-> Could you test it again?
+> The existing exynos-iommu driver is based on classic instantiation of a 
+> platform device from DT, using the normal device probing mechanism. As such it 
+> relies on the availability of a struct device for various helper functions. I 
+> thus understand why you want a struct device being registered for the iommu, 
+> instead of initializing the device right from the exynos_iommu_of_setup() 
+> function without a corresponding struct device being registered.
 > 
+> This leads me to question whether we should really introduce IOMMU_OF_DECLARE. 
+> Using regular deferred probing seems more and more like a better solution to 
+> me.
 
-I tested it again based on 3.19-rc5 and found that the problem still exists.
-My testing is based on QEMU.
+We seem to be going round and round on this argument. I said before that
+I'm not against changing this [1], but somebody would need to propose
+patches, which hasn't happened in recent history.
 
-First I tested my kprobeopt for ARM, then on x86_64. The test results are pasted
-at the bottom of this mail. Commands after 'gdb attaches to QEMU' is my actions
-on a gdb console attached to QEMU; commands after 'inside virtual machine' is
-what I do in Linux run under QEMU.
+Arnd also makes some good arguments against using probing [2], which would
+need further discussion.
 
+Basically, it looks like there are two sides to this argument and I don't
+see anything changing without patch proposals. The only thing that the
+current discussions seem to be achieving is blocking people like Marek,
+who are trying to make use of what we have in mainline today!
 
+Will
 
-** ARM result **
-
------- gdb attaches to QEMU -------
-(gdb) x/3i sys_open
-   0xc013619c <SyS_open>:	mov	r12, sp          <--- *original insn*
-   0xc01361a0 <SyS_open+4>:	push	{r11, r12, lr, pc}
-   0xc01361a4 <SyS_open+8>:	sub	r11, r12, #4
-
------- inside virtual machine -------
-# echo 'p:myprobe sys_open' > /sys/kernel/debug/tracing/kprobe_events
-# echo 1 > /sys/kernel/debug/tracing/events/kprobes/myprobe/enable
-
------- gdb attaches to QEMU -------
-cpu_v7_do_idle () at /home/w00229757/kernel-hydrogen/arch/arm/mm/proc-v7.S:74
-74		ret	lr
-(gdb) x/3i sys_open
-   0xc013619c <SyS_open>:	b	0xbf000000        <--- *optimized*
-   0xc01361a0 <SyS_open+4>:	push	{r11, r12, lr, pc}
-   0xc01361a4 <SyS_open+8>:	sub	r11, r12, #4
-(gdb) c
-
------- inside virtual machine -------
-# echo 0 > /sys/kernel/debug/kprobes/enabled
-
------- gdb attaches to QEMU -------
-cpu_v7_do_idle () at /home/w00229757/kernel-hydrogen/arch/arm/mm/proc-v7.S:74
-74		ret	lr
-(gdb) x/3i sys_open
-   0xc013619c <SyS_open>:			; <UNDEFINED> instruction: 0xe7f001f8    <--- *BREAKPOINT*
-   0xc01361a0 <SyS_open+4>:	push	{r11, r12, lr, pc}
-   0xc01361a4 <SyS_open+8>:	sub	r11, r12, #4
-(gdb) c
-
-
-
-** x86_64 result **
-
------- gdb attaches to QEMU -------
-(gdb) x/10i sys_open
-   0xffffffff81184fe0 <SyS_open>:	data32 data32 data32 xchg %ax,%ax
-   0xffffffff81184fe5 <SyS_open+5>:	push   %rbp
-   0xffffffff81184fe6 <SyS_open+6>:	movzwl %dx,%ecx
-   0xffffffff81184fe9 <SyS_open+9>:	mov    %esi,%edx
-   0xffffffff81184feb <SyS_open+11>:	mov    %rsp,%rbp
-   0xffffffff81184fee <SyS_open+14>:	mov    %rdi,%rsi
-   0xffffffff81184ff1 <SyS_open+17>:	or     $0x80,%dh
-   0xffffffff81184ff4 <SyS_open+20>:	mov    $0xffffff9c,%edi
-   0xffffffff81184ff9 <SyS_open+25>:	callq  0xffffffff81184da0 <do_sys_open>
-   0xffffffff81184ffe <SyS_open+30>:	pop    %rbp
-(gdb) c
-Continuing
-
-
------- inside virtual machine -------
-# echo 'p:myprobe sys_open+20' > /sys/kernel/debug/tracing/kprobe_events
-# echo 1 > /sys/kernel/debug/tracing/events/kprobes/myprobe/enable
-
------- gdb attaches to QEMU -------
-(gdb) x/10i sys_open
-   0xffffffff81184fe0 <SyS_open>:	data32 data32 data32 xchg %ax,%ax
-   0xffffffff81184fe5 <SyS_open+5>:	push   %rbp
-   0xffffffff81184fe6 <SyS_open+6>:	movzwl %dx,%ecx
-   0xffffffff81184fe9 <SyS_open+9>:	mov    %esi,%edx
-   0xffffffff81184feb <SyS_open+11>:	mov    %rsp,%rbp
-   0xffffffff81184fee <SyS_open+14>:	mov    %rdi,%rsi
-   0xffffffff81184ff1 <SyS_open+17>:	or     $0x80,%dh
-   0xffffffff81184ff4 <SyS_open+20>:	jmpq   0xffffffffa0002000         <--- *optimized*
-   0xffffffff81184ff9 <SyS_open+25>:	callq  0xffffffff81184da0 <do_sys_open>
-   0xffffffff81184ffe <SyS_open+30>:	pop    %rbp
-(gdb) c
-Continuing.
-
------- inside virtual machine -------
-# echo 0 > /sys/kernel/debug/kprobes/enabled
-
------- gdb attaches to QEMU -------
-(gdb) x/10i sys_open
-   0xffffffff81184fe0 <SyS_open>:	data32 data32 data32 xchg %ax,%ax
-   0xffffffff81184fe5 <SyS_open+5>:	push   %rbp
-   0xffffffff81184fe6 <SyS_open+6>:	movzwl %dx,%ecx
-   0xffffffff81184fe9 <SyS_open+9>:	mov    %esi,%edx
-   0xffffffff81184feb <SyS_open+11>:	mov    %rsp,%rbp
-   0xffffffff81184fee <SyS_open+14>:	mov    %rdi,%rsi
-   0xffffffff81184ff1 <SyS_open+17>:	or     $0x80,%dh
-   0xffffffff81184ff4 <SyS_open+20>:	int3          <-- **BREAKPOINT**
-   0xffffffff81184ff5 <SyS_open+21>:	pushfq
-   0xffffffff81184ff6 <SyS_open+22>:	(bad)
-(gdb)
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/310783.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/310992.html
