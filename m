@@ -1,69 +1,53 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 19 Jan 2015 10:27:50 +0100
-Subject: [RESEND PATCH v3] clocksource: exynos_mct: Add the support for
- Exynos 64bit SoC
-In-Reply-To: <54BC55BB.7050809@samsung.com>
-References: <1421213603-5020-1-git-send-email-cw00.choi@samsung.com>
- <54B69072.4080607@kernel.org> <54B692FB.7030703@linaro.org>
- <54BC55BB.7050809@samsung.com>
-Message-ID: <54BCCE16.8050607@linaro.org>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 19 Jan 2015 10:32:17 +0100
+Subject: [PATCH v4] ARM: mvebu: remove two selects of ARM_ERRATA_753970
+Message-ID: <1421659937.9655.16.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/19/2015 01:54 AM, Chanwoo Choi wrote:
-> Dear Daniel and Kukjin,
->
-> On 01/15/2015 01:02 AM, Daniel Lezcano wrote:
->> On 01/14/2015 04:51 PM, Kukjin Kim wrote:
->>> On 01/14/15 14:33, Chanwoo Choi wrote:
->>>
->>> Hi,
->>>
->>> + Doug, Olof
->>>
->>>> This patch adds the support for Exynos 64bit SoC. The delay_timer is only used
->>>> for Exynos 32bit SoC.
->>>>
->>> Yes, the Exynos MCT(Multi-Core Timer) is 64bit timer and it is available
->>> on 64bit exynos SoC such as exynos7. But basically ARMv8 architecture is
->>> including ARM ARCH timer (ARM Generic Timer) and exynos7 also has
->>> implemented it and additionally its access is faster than using memory
->>> mapped register called SFR for MCT...so Doug submitted patch to use MCT
->>> on 32bit exynos SoCs before.
->>>
->>> I know using MCT on 64bit exynos is usefulness for Power Management and
->>> I need to talk to relevant guys in office again. If anything, I'll let
->>> you know.
->>
->> I will wait for your answer before digging more the patch.
+ARM_ERRATA_753970 was renamed to PL310_ERRATA_753970 in v3.2, through
+commit fa0ce4035d48 ("ARM: 7162/1: errata: tidy up Kconfig options for
+PL310 errata workarounds"). Still, two selects were added in v3.15 that
+used the previous name. So these selects have always been nops.
 
-Hi Chanwoo,
+It is clear that the intention here was to select PL310_ERRATA_753970.
+But as, apparently, nothing broke for four releases we can assume
+PL310_ERRATA_753970 isn't actually needed. So let's not rename these two
+selects but just drop them instead.
 
-[ ... ]
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+---
+v4: Do no bother anymore to rename these selects. I've tried to do that
+a few times ever since v3.15-rc1 was released. Last time, v3, was in
+https://lkml.org/lkml/2014/9/12/231 . And since the people who
+intruduced this issue apparently aren't bothered by it, neither should
+I. So just do the safe and easy thing, which is removing these two
+selects, as they are nops now.
 
-> Do you have any comment about this patch?
+Done on top of next-20150119.
 
-Yes, a similar patch has been posted for the tegra2 timer to run on 
-arm64. The patch in question put macros #ifdef CONFIG_ARM64 to disable 
-some parts of the code. That ended, the tegra2 timer was not needed for 
-the moment because of the arch timer present, so it has been disabled 
-from the compilation until a proper fix without macros could be proposed.
+ arch/arm/mach-mvebu/Kconfig | 2 --
+ 1 file changed, 2 deletions(-)
 
-It is happening exactly the same with this patch. As Kukjin pointed it, 
-the exynos_mct may not be needed (at least until a backup timer is 
-needed at PM time).
-
-I suggest you look at a nicer way to fix that instead of introducing 
-macros (which is by the way valid but not recommended by the CodingStyle 
-rules) and perhaps sync with Paul and Thierry [cc'ed] to find a common 
-solution.
-
-   -- Daniel
-
-
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index c1e4567a5ab3..e8e5fa25121c 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -37,7 +37,6 @@ config MACH_ARMADA_370
+ config MACH_ARMADA_375
+ 	bool "Marvell Armada 375 boards" if ARCH_MULTI_V7
+ 	select ARM_ERRATA_720789
+-	select ARM_ERRATA_753970
+ 	select ARM_GIC
+ 	select ARMADA_375_CLK
+ 	select HAVE_ARM_SCU
+@@ -52,7 +51,6 @@ config MACH_ARMADA_375
+ config MACH_ARMADA_38X
+ 	bool "Marvell Armada 380/385 boards" if ARCH_MULTI_V7
+ 	select ARM_ERRATA_720789
+-	select ARM_ERRATA_753970
+ 	select ARM_GIC
+ 	select ARMADA_38X_CLK
+ 	select HAVE_ARM_SCU
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.9.3
