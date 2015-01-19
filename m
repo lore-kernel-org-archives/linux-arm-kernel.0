@@ -1,89 +1,83 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 19 Jan 2015 17:52:33 +0000
-Subject: [PATCH v7 04/17] ARM64 / ACPI: Introduce early_param for "acpi"
- and pass acpi=force to enable ACPI
-In-Reply-To: <54BD3803.6020307@redhat.com>
-References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
- <1421247905-3749-5-git-send-email-hanjun.guo@linaro.org>
- <20150119114255.GF11835@e104818-lin.cambridge.arm.com>
- <CAKv+Gu8vPKAdsNg7QC7xW+i8_BemWEx4mvBx6NrnAHi8Y+bNtw@mail.gmail.com>
- <20150119135144.GI11835@e104818-lin.cambridge.arm.com>
- <20150119151350.21B65C40948@trevor.secretlab.ca>
- <54BD3803.6020307@redhat.com>
-Message-ID: <20150119175233.GK11835@e104818-lin.cambridge.arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 19 Jan 2015 18:53:50 +0100
+Subject: [PATCH 1/3] ARM: Marvell: Remove init cpus function
+In-Reply-To: <1421686381-12397-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1421686381-12397-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <54BD44AE.20006@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 19, 2015 at 04:59:47PM +0000, Jon Masters wrote:
-> On 01/19/2015 10:13 AM, Grant Likely wrote:
-> > On Mon, 19 Jan 2015 13:51:45 +0000
-> > , Catalin Marinas <catalin.marinas@arm.com>
-> >  wrote:
-> >> On Mon, Jan 19, 2015 at 11:55:32AM +0000, Ard Biesheuvel wrote:
-> >>> On 19 January 2015 at 11:42, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> >>>> On Wed, Jan 14, 2015 at 03:04:52PM +0000, Hanjun Guo wrote:
-> >>>>> From: Al Stone <al.stone@linaro.org>
-> >>>>>
-> >>>>> Introduce one early parameters "off" and "force" for "acpi", acpi=off
-> >>>>> will be the default behavior for ARM64, so introduce acpi=force to
-> >>>>> enable ACPI on ARM64.
-> >>>>>
-> >>>>> Disable ACPI before early parameters parsed, and enable it to pass
-> >>>>> "acpi=force" if people want use ACPI on ARM64. This ensures DT be
-> >>>>> the prefer one if ACPI table and DT both are provided at this moment.
-> >>>> [...]
-> >>>>> --- a/arch/arm64/kernel/setup.c
-> >>>>> +++ b/arch/arm64/kernel/setup.c
-> >>>>> @@ -62,6 +62,7 @@
-> >>>>>  #include <asm/memblock.h>
-> >>>>>  #include <asm/psci.h>
-> >>>>>  #include <asm/efi.h>
-> >>>>> +#include <asm/acpi.h>
-> >>>>>
-> >>>>>  unsigned int processor_id;
-> >>>>>  EXPORT_SYMBOL(processor_id);
-> >>>>> @@ -388,6 +389,8 @@ void __init setup_arch(char **cmdline_p)
-> >>>>>       early_fixmap_init();
-> >>>>>       early_ioremap_init();
-> >>>>>
-> >>>>> +     disable_acpi();
-> >>>>> +
-> >>>>>       parse_early_param();
-> >>>>>
-> >>>>>       /*
-> >>>>
-> >>>> Did we get to any conclusion here? DT being the preferred one is fine
-> >>>> when both DT and ACPI are present but do we still want the kernel to
-> >>>> ignore ACPI altogether if DT is not present? It's a bit harder to detect
-> >>>> the presence of DT at this point since the EFI_STUB added one already. I
-> >>>> guess we could move the "acpi=force" argument passing to EFI_STUB if no
-> >>>> DT is present at boot.
-> >>>
-> >>> Since the EFI stub populates the /chosen node in DT, I would prefer
-> >>> for it to add a property there to indicate whether it created the DT
-> >>> from scratch rather than adding ACPI specific stuff in there (even if
-> >>> it is just a string to concatenate)
-> >>
-> >> This works for me. So we could pass "acpi=force" in EFI stub if it
-> >> created the DT from scratch *and* ACPI tables are present (can it detect
-> >> the latter? And maybe it could print something if none are available).
-> >> If that works, the actual kernel can assume that ACPI needs to be
-> >> explicitly enabled via acpi=force, irrespective of how much information
-> >> it has in DT.
-> > 
-> > Ditto for me. I think this is a fine solution. And, yes, the stub can
-> > easily detect the presence of ACPI by looking in the UEFI config table.
-> 
-> I get the point behind doing this, but could we not have it pass in a
-> different parameter than =force? Perhaps something new? I'd like to
-> separate out the case that it was enabled automatically vs explicitly
-> forced on by a user wanting to use ACPI on a system with both tables.
+Hi Daniel,
 
-Ard had a point, so we should probably not pass acpi=force from EFI stub
-(especially since a user may explicitly pass acpi=off irrespective of DT
-presence). Some other property in the chosen node? It's not even an ABI
-since that's a contract between EFI stub and the rest of the kernel, so
-an in-kernel only interface.
+On 19/01/2015 17:52, Daniel Lezcano wrote:
+> With the next patches, the init cpus function will be changed to be factored
+> out.
+> 
+> The function 'armada_xp_smp_init_cpus' does nothing more than a sanity check
+> after the DT has been parsed. Even if this code is valid, it does not give a
+> real benefit as the DT should be correctly filled.
+> 
+> Remove this callback.
+
+In the course of the factorization of the smp functions, this function
+has been more and more reduced. As stated, the remaining part is not so
+useful now, it makes sens to remove it now.
+
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+
+Thanks,
+
+Gregory
+
+
+> 
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
+>  arch/arm/mach-mvebu/platsmp.c | 11 -----------
+>  1 file changed, 11 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
+> index 58cc8c1..3e93422 100644
+> --- a/arch/arm/mach-mvebu/platsmp.c
+> +++ b/arch/arm/mach-mvebu/platsmp.c
+> @@ -30,8 +30,6 @@
+>  #include "pmsu.h"
+>  #include "coherency.h"
+>  
+> -#define ARMADA_XP_MAX_CPUS 4
+> -
+>  #define AXP_BOOTROM_BASE 0xfff00000
+>  #define AXP_BOOTROM_SIZE 0x100000
+>  
+> @@ -114,14 +112,6 @@ static void armada_xp_secondary_init(unsigned int cpu)
+>  	mvebu_v7_pmsu_idle_exit();
+>  }
+>  
+> -static void __init armada_xp_smp_init_cpus(void)
+> -{
+> -	unsigned int ncores = num_possible_cpus();
+> -
+> -	if (ncores == 0 || ncores > ARMADA_XP_MAX_CPUS)
+> -		panic("Invalid number of CPUs in DT\n");
+> -}
+> -
+>  static void __init armada_xp_smp_prepare_cpus(unsigned int max_cpus)
+>  {
+>  	struct device_node *node;
+> @@ -171,7 +161,6 @@ static int armada_xp_cpu_kill(unsigned int cpu)
+>  #endif
+>  
+>  struct smp_operations armada_xp_smp_ops __initdata = {
+> -	.smp_init_cpus		= armada_xp_smp_init_cpus,
+>  	.smp_prepare_cpus	= armada_xp_smp_prepare_cpus,
+>  	.smp_boot_secondary	= armada_xp_boot_secondary,
+>  	.smp_secondary_init     = armada_xp_secondary_init,
+> 
+
 
 -- 
-Catalin
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
