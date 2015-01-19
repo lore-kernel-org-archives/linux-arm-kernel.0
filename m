@@ -1,32 +1,67 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Mon, 19 Jan 2015 22:28:36 +0100
-Subject: [PATCH v2] ARM: omap2plus_defconfig: Enable OHCI & EHCI HCD support
-Message-ID: <1421702916-19018-1-git-send-email-sjoerd.simons@collabora.co.uk>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 19 Jan 2015 22:27:18 +0100
+Subject: [PATCH] [linux-next] ARM: mvebu: make DTS comments reflect
+ DEBUG_LL changes
+In-Reply-To: <1421696425.9655.65.camel@x220>
+References: <1421696425.9655.65.camel@x220>
+Message-ID: <20150119212718.GA2938@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable CONFIG_USB_EHCI_HCD and CONFIG_USB_OHCI_HCD to get USB supports
-with omap2plus_defconfig.
+On Mon, Jan 19, 2015 at 08:40:25PM +0100, Paul Bolle wrote:
+> The Kconfig symbol DEBUG_MVEBU_UART_ALTERNATE was renamed to
+> DEBUG_MVEBU_UART0_ALTERNATE. And the symbol DEBUG_MVEBU_UART1_ALTERNATE
+> was added to allow UART1 as a DEBUG_LL target. Make the comment at the
+> top of this DTS reflect those changes.
+> 
+> Since we're touching this DTS add comments to show which blocks describe
+> UART0 and UART1.
+> 
+> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
 
-Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
----
-Changes in v2: Enable as modules rather then builtin
+Hi Paul
 
- arch/arm/configs/omap2plus_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+Thanks for this. I have added it to mvebu/dt.
 
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index c2c3a85..f4009a2 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -159,6 +159,8 @@ CONFIG_USB_NET_SMSC95XX=y
- CONFIG_USB_ALI_M5632=y
- CONFIG_USB_AN2720=y
- CONFIG_USB_EPSON2888=y
-+CONFIG_USB_EHCI_HCD=m
-+CONFIG_USB_OHCI_HCD=m
- CONFIG_USB_KC2190=y
- CONFIG_LIBERTAS=m
- CONFIG_LIBERTAS_USB=m
--- 
-2.1.4
+       Andrew
+
+
+> ---
+> Created on top of next-20150119. Untested! Note that I know nothing
+> about this board or about DT source files, so all changes are nothing
+> more than guesses.
+> 
+>  arch/arm/boot/dts/armada-xp-axpwifiap.dts | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/armada-xp-axpwifiap.dts b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
+> index ca0200e20751..28174ab019f9 100644
+> --- a/arch/arm/boot/dts/armada-xp-axpwifiap.dts
+> +++ b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
+> @@ -3,8 +3,8 @@
+>   *
+>   * Note: this board is shipped with a new generation boot loader that
+>   * remaps internal registers at 0xf1000000. Therefore, if earlyprintk
+> - * is used, the CONFIG_DEBUG_MVEBU_UART_ALTERNATE option should be
+> - * used.
+> + * is used, the CONFIG_DEBUG_MVEBU_UART0_ALTERNATE option or the
+> + * CONFIG_DEBUG_MVEBU_UART1_ALTERNATE option should be used.
+>   *
+>   * Copyright (C) 2013 Marvell
+>   *
+> @@ -60,10 +60,12 @@
+>  		};
+>  
+>  		internal-regs {
+> +			/* UART0 */
+>  			serial at 12000 {
+>  				status = "okay";
+>  			};
+>  
+> +			/* UART1 */
+>  			serial at 12100 {
+>  				status = "okay";
+>  			};
+> -- 
+> 1.9.3
+> 
