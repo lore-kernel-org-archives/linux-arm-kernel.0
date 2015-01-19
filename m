@@ -1,71 +1,24 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 19 Jan 2015 14:01:12 +0100
-Subject: [PATCH v2 1/3] usb: XHCI: platform: Move the Marvell quirks after the
- enabling the clocks
-In-Reply-To: <1421672474-2945-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1421672474-2945-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1421672474-2945-2-git-send-email-maxime.ripard@free-electrons.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 19 Jan 2015 14:05:11 +0100
+Subject: [PATCH v2] ARM: dts: sunxi: Add simplefb nodes for lcd and vga output
+Message-ID: <1421672712-13298-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit 973747928514 ("usb: host: xhci-plat: add support for the Armada
-375/38x XHCI controllers") extended the xhci-plat driver to support the Armada
-375/38x SoCs, mostly by adding a quirk configuring the MBUS window.
+Hi Maxime,
 
-However, that quirk was run before the clock the controllers needs has been
-enabled. This usually worked because the clock was first enabled by the
-bootloader, and left as such until the driver is probe, where it tries to
-access the MBUS configuration registers before enabling the clock.
+When the simplefb dt node fix for 3.19 which I just posted lands, the
+"ARM: dts: sunxi: Add simplefb nodes for de_be0-lcd0, de_be0-lcd0-tve0 pipelines"
+you've currently queued up will no longer apply due to a conflict in
+sun4i-a10.dtsi .
 
-Things get messy when EPROBE_DEFER is involved during the probe, since as part
-of its error path, the driver will rightfully disable the clock. When the
-driver will be reprobed, it will retry to access the MBUS registers, but this
-time with the clock disabled, which hangs forever.
+Here is a v2 of said patch fixing the conflict, it also changes the
+added simplefb nodes on _sun4i_ to be of the de_fe0-de_be0-lcd* variant rather
+then of the de_be0-lcd* variant. We can safely make this change since no
+official u-boot release using the de_be0-lcd* variants was ever done.
 
-Fix this by running the quirks after the clock has been enabled by the driver.
+Please drop v1 of this patch from your queue and use this one instead.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: <stable@vger.kernel.org> # v3.16+
----
- drivers/usb/host/xhci-plat.c | 19 +++++++++----------
- 1 file changed, 9 insertions(+), 10 deletions(-)
+Thanks,
 
-diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-index 08d402b15482..0e11d61408ff 100644
---- a/drivers/usb/host/xhci-plat.c
-+++ b/drivers/usb/host/xhci-plat.c
-@@ -83,16 +83,6 @@ static int xhci_plat_probe(struct platform_device *pdev)
- 	if (irq < 0)
- 		return -ENODEV;
- 
--
--	if (of_device_is_compatible(pdev->dev.of_node,
--				    "marvell,armada-375-xhci") ||
--	    of_device_is_compatible(pdev->dev.of_node,
--				    "marvell,armada-380-xhci")) {
--		ret = xhci_mvebu_mbus_init_quirk(pdev);
--		if (ret)
--			return ret;
--	}
--
- 	/* Initialize dma_mask and coherent_dma_mask to 32-bits */
- 	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
- 	if (ret)
-@@ -127,6 +117,15 @@ static int xhci_plat_probe(struct platform_device *pdev)
- 			goto put_hcd;
- 	}
- 
-+	if (of_device_is_compatible(pdev->dev.of_node,
-+				    "marvell,armada-375-xhci") ||
-+	    of_device_is_compatible(pdev->dev.of_node,
-+				    "marvell,armada-380-xhci")) {
-+		ret = xhci_mvebu_mbus_init_quirk(pdev);
-+		if (ret)
-+			goto disable_clk;
-+	}
-+
- 	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
- 	if (ret)
- 		goto disable_clk;
--- 
-2.2.2
+Hans
