@@ -1,366 +1,82 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 19 Jan 2015 09:17:05 +0000
-Subject: [PATCH v3 2/3] mfd: lubbock_io: add lubbock_io board
-In-Reply-To: <1421406010-14851-2-git-send-email-robert.jarzmik@free.fr>
-References: <1421406010-14851-1-git-send-email-robert.jarzmik@free.fr>
- <1421406010-14851-2-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <20150119091705.GG21886@x1>
+From: p.pisati@gmail.com (Paolo Pisati)
+Date: Mon, 19 Jan 2015 10:17:13 +0100
+Subject: beaglebone black: is mem=... broken?
+In-Reply-To: <CAMuHMdX07-5xUt8KpS_biZMhpeoZcQFHvZL9ZFQGvKm9-CEKng@mail.gmail.com>
+References: <20150118143448.GA4023@luxor.wired.org>
+ <CAMuHMdX07-5xUt8KpS_biZMhpeoZcQFHvZL9ZFQGvKm9-CEKng@mail.gmail.com>
+Message-ID: <20150119091713.GA7829@luxor.wired.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 16 Jan 2015, Robert Jarzmik wrote:
-
-> Lubbock () board is the IO motherboard of the Intel PXA25x Development
-> Platform, which supports the Lubbock pxa25x soc board.
+On Sun, Jan 18, 2015 at 06:38:46PM +0100, Geert Uytterhoeven wrote:
 > 
-> Historically, this support was in arch/arm/mach-pxa/lubbock.c. When
-> gpio-pxa was moved to drivers/pxa, it became a driver, and its
-> initialization and probing happened at postcore initcall. The lubbock
-> code used to install the chained lubbock interrupt handler at init_irq()
-> time.
-> 
-> The consequence of the gpio-pxa change is that the installed chained irq
-> handler lubbock_irq_handler() was overwritten in pxa_gpio_probe(_dt)(),
-> removing :
->  - the handler
->  - the falling edge detection setting of GPIO0, which revealed the
->    interrupt request from the lubbock IO board.
-> 
-> As a fix, move the gpio0 chained handler setup to a place where we have
-> the guarantee that pxa_gpio_probe() was called before, so that lubbock
-> handler becomes the true IRQ chained handler of GPIO0, demuxing the
-> lubbock IO board interrupts.
+> The boot loader copied the DT to the end of real RAM, not to the end of
+> the 256 MiB block? Hence the kernel accesses unmapped memory
+> when checking the FDT header?
 
-How is this guaranteed?
+actually everything is below 256M since physical memory starts at
+0x80000000:
 
-> This patch moves all that handling to a mfd driver. It's only purpose
-> for the time being is the interrupt handling, but in the future it
-> should encompass all the motherboard CPLDs handling :
->  - leds
->  - switches
->  - hexleds
-> 
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> ---
-> Since v1: change the name from cottula to lubbock_io
->             Dmitry pointed out the Cottula was the pxa25x family name,
-> 	    lubbock was the pxa25x development board name. Therefore the
-> 	    name was changed to lubbock_io (lubbock IO board)
-> 	  change the resources to bi-irq ioresource
-> 	    Discussion between Arnd and Robert to change the gpio
-> 	    request by a irq request.
-> Since v2: take into account Mark's review
->       	    Use irq flags from resources (DT case and pdata case).
-> 	    Change of name from lubbock_io to lubbock-io
-> ---
->  drivers/mfd/Kconfig   |  10 +++
->  drivers/mfd/Makefile  |   1 +
->  drivers/mfd/lubbock.c | 196 ++++++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 207 insertions(+)
->  create mode 100644 drivers/mfd/lubbock.c
-> 
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index 2e6b731..4d8939f 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -91,6 +91,16 @@ config MFD_AXP20X
->  	  components like regulators or the PEK (Power Enable Key) under the
->  	  corresponding menus.
->  
-> +config MFD_LUBBOCK
-> +	bool "Lubbock Motherboard"
-> +	def_bool ARCH_LUBBOCK
-> +	select MFD_CORE
-> +	help
-> +	  This driver supports the Lubbock multifunction chip found on the
-> +	  pxa25x development platform system (named Lubbock). This IO board
-> +	  supports the interrupts handling, ethernet controller, flash chips,
-> +	  etc ...
-> +
->  config MFD_CROS_EC
->  	tristate "ChromeOS Embedded Controller"
->  	select MFD_CORE
-> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-> index 53467e2..aff1f4f 100644
-> --- a/drivers/mfd/Makefile
-> +++ b/drivers/mfd/Makefile
-> @@ -9,6 +9,7 @@ obj-$(CONFIG_MFD_88PM805)	+= 88pm805.o 88pm80x.o
->  obj-$(CONFIG_MFD_SM501)		+= sm501.o
->  obj-$(CONFIG_MFD_ASIC3)		+= asic3.o tmio_core.o
->  obj-$(CONFIG_MFD_BCM590XX)	+= bcm590xx.o
-> +obj-$(CONFIG_MFD_LUBBOCK)	+= lubbock.o
->  obj-$(CONFIG_MFD_CROS_EC)	+= cros_ec.o
->  obj-$(CONFIG_MFD_CROS_EC_I2C)	+= cros_ec_i2c.o
->  obj-$(CONFIG_MFD_CROS_EC_SPI)	+= cros_ec_spi.o
-> diff --git a/drivers/mfd/lubbock.c b/drivers/mfd/lubbock.c
-> new file mode 100644
-> index 0000000..6025135
-> --- /dev/null
-> +++ b/drivers/mfd/lubbock.c
-> @@ -0,0 +1,196 @@
-> +/*
-> + * Intel Cotulla MFD - lubbock motherboard
-> + *
-> + * Copyright (C) 2014 Robert Jarzmik
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * Lubbock motherboard driver, supporting lubbock (aka. pxa25x) soc board.
+U-Boot# printenv loadaddr
+loadaddr=0x82000000
+U-Boot# printenv fdtaddr
+fdtaddr=0x88000000
+U-Boot# load mmc 0:1 ${loadaddr} zimage
+reading zimage
+5694816 bytes read in 318 ms (17.1 MiB/s)
+U-Boot# load mmc 0:1 ${fdtaddr} am335x-boneblack.dtb
+reading am335x-boneblack.dtb
+29985 bytes read in 10 ms (2.9 MiB/s)
+U-Boot# setenv bootargs console=ttyO0,115200n8 root=/dev/mmcblk0p2 ro
+rootfstype=ext4 rootwait debug earlyprintk mem=256M
+U-Boot# bootz ${loadaddr} - ${fdtaddr}
+Kernel image @ 0x82000000 [ 0x000000 - 0x56e560 ]
+## Flattened Device Tree blob at 88000000
+   Booting using the fdt blob at 0x88000000
+   Loading Device Tree to 8fff5000, end 8ffff520 ... OK
 
-Please use uppercase characters i.e. Lubbock, PXA25X, SoC, etc.
+Starting kernel ...
 
-> + *
+hangs there, and after i reset i found the aforementioned oops in __log_buf.
 
-Superfluous '\n'.
+Here is without the mem= argument:
 
-> + */
-> +
-> +#include <linux/bitops.h>
-> +#include <linux/gpio.h>
-> +#include <linux/gpio/consumer.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/io.h>
-> +#include <linux/irq.h>
-> +#include <linux/irqdomain.h>
-> +#include <linux/mfd/core.h>
-> +#include <linux/module.h>
+U-Boot SPL 2015.01 (Jan 16 2015 - 10:20:36)
+MMC: block number 0x100 exceeds max(0x0)
+MMC: block number 0x200 exceeds max(0x0)
+*** Error - No Valid Environment Area found
+Using default environment
 
-Can this be built as a module?
 
-If so, why isn't it a tristate?
 
-> +#include <linux/of_platform.h>
-> +
-> +#define COT_IRQ_MASK_EN 0xc0
-> +#define COT_IRQ_SET_CLR 0xd0
-> +
-> +#define LUBBOCK_NB_IRQ	8
-> +
-> +struct lubbock {
-> +	void __iomem	*base;
+U-Boot 2015.01 (Jan 16 2015 - 10:20:36)
 
-Random spacing.
+       Watchdog enabled
+I2C:   ready
+DRAM:  512 MiB
+MMC:   OMAP SD/MMC: 0, OMAP SD/MMC: 1
+Net:   <ethaddr> not set. Validating first E-fuse MAC
+cpsw, usb_ether
+Hit any key to stop autoboot:  0 
+U-Boot# load mmc 0:1 ${loadaddr} zimage
+reading zimage
+5694816 bytes read in 318 ms (17.1 MiB/s)
+U-Boot# load mmc 0:1 ${fdtaddr} am335x-boneblack.dtb
+reading am335x-boneblack.dtb
+29985 bytes read in 11 ms (2.6 MiB/s)
+U-Boot# setenv bootargs console=ttyO0,115200n8 root=/dev/mmcblk0p2 ro
+rootfstype=ext4 rootwait debug earlyprintk       
+U-Boot# bootz ${loadaddr} - ${fdtaddr}
+Kernel image @ 0x82000000 [ 0x000000 - 0x56e560 ]
+## Flattened Device Tree blob at 88000000
+   Booting using the fdt blob at 0x88000000
+   Loading Device Tree to 8fff5000, end 8ffff520 ... OK
 
-> +	int irq;
-> +	unsigned int irq_mask;
-> +	struct gpio_desc *gpio0;
-> +	struct irq_domain *irqdomain;
-> +};
-> +
-> +static irqreturn_t lubbock_irq_handler(int in_irq, void *d)
-> +{
-> +	struct lubbock *cot = d;
-> +	unsigned long pending;
-> +	unsigned int bit;
-> +
-> +	pending = readl(cot->base + COT_IRQ_SET_CLR) & cot->irq_mask;
-> +	for_each_set_bit(bit, &pending, LUBBOCK_NB_IRQ)
-> +		generic_handle_irq(irq_find_mapping(cot->irqdomain, bit));
+Starting kernel ...
 
-I'd like to see a '\n' here.
-
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static void lubbock_irq_mask_ack(struct irq_data *d)
-> +{
-> +	struct lubbock *cot = irq_data_get_irq_chip_data(d);
-> +	unsigned int lubbock_irq = irqd_to_hwirq(d);
-> +	unsigned int set, bit = BIT(lubbock_irq);
-> +
-> +	cot->irq_mask &= ~bit;
-> +	writel(cot->irq_mask, cot->base + COT_IRQ_MASK_EN);
-> +	set = readl(cot->base + COT_IRQ_SET_CLR);
-> +	writel(set & ~bit, cot->base + COT_IRQ_SET_CLR);
-> +}
-> +
-> +static void lubbock_irq_unmask(struct irq_data *d)
-> +{
-> +	struct lubbock *cot = irq_data_get_irq_chip_data(d);
-> +	unsigned int lubbock_irq = irqd_to_hwirq(d);
-> +	unsigned int bit = BIT(lubbock_irq);
-> +
-> +	cot->irq_mask |= bit;
-> +	writel(cot->irq_mask, cot->base + COT_IRQ_MASK_EN);
-> +}
-> +
-> +static struct irq_chip lubbock_irq_chip = {
-> +	.name		= "lubbock",
-> +	.irq_mask_ack	= lubbock_irq_mask_ack,
-> +	.irq_unmask	= lubbock_irq_unmask,
-> +	.flags		= IRQCHIP_MASK_ON_SUSPEND | IRQCHIP_SKIP_SET_WAKE,
-> +};
-> +
-> +static int lubbock_irq_domain_map(struct irq_domain *d, unsigned int irq,
-> +				   irq_hw_number_t hwirq)
-> +{
-> +	struct lubbock *cot = d->host_data;
-> +
-> +	irq_set_chip_and_handler(irq, &lubbock_irq_chip, handle_level_irq);
-> +	irq_set_chip_data(irq, cot);
-
-Again, I'd prefer some separation between code and the return.
-
-(same in all cases below).
-
-> +	return 0;
-> +}
-> +
-> +static const struct irq_domain_ops lubbock_irq_domain_ops = {
-> +	.xlate = irq_domain_xlate_twocell,
-> +	.map = lubbock_irq_domain_map,
-> +};
-> +
-> +static int lubbock_resume(struct platform_device *pdev)
-> +{
-> +	struct lubbock *cot = platform_get_drvdata(pdev);
-> +
-> +	writel(cot->irq_mask, cot->base + COT_IRQ_MASK_EN);
-> +	return 0;
-> +}
-> +
-> +static int lubbock_probe(struct platform_device *pdev)
-> +{
-> +	struct resource *res;
-> +	struct lubbock *cot;
-> +	int ret;
-> +	unsigned int base_irq = 0;
-> +	unsigned long irqflags;
-> +
-> +	cot = devm_kzalloc(&pdev->dev, sizeof(*cot), GFP_KERNEL);
-> +	if (!cot)
-> +		return -ENOMEM;
-
-'\n' here.
-
-> +	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-
-platform_get_irq()?
-
-> +	if (res) {
-> +		cot->irq = (unsigned int)res->start;
-> +		irqflags = res->flags;
-> +	}
-> +	if (!cot->irq)
-> +		return -ENODEV;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_IRQ, 1);
-
-platform_get_irq()?
-
-> +	if (res)
-> +		base_irq = (unsigned int)res->start;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	cot->base = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(cot->base))
-> +		return PTR_ERR(cot->base);
-> +
-> +	platform_set_drvdata(pdev, cot);
-> +
-> +	writel(cot->irq_mask, cot->base + COT_IRQ_MASK_EN);
-> +	writel(0, cot->base + COT_IRQ_SET_CLR);
-
-'\n'
-
-> +	ret = devm_request_irq(&pdev->dev, cot->irq, lubbock_irq_handler,
-> +			       irqflags, dev_name(&pdev->dev), cot);
-> +	if (ret == -ENOSYS)
-> +		return -EPROBE_DEFER;
-
-I haven't seen anyone do this after devm_request_irq() before.
-
-Why is it required here?
-
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "Couldn't request main irq : ret = %d\n",
-> +			ret);
-
-I'm not keen on this type of formatting.  Besides the system will
-print out the returned error on failure.
-
-> +		return ret;
-> +	}
-> +	irq_set_irq_wake(cot->irq, 1);
-> +
-> +	cot->irqdomain =
-> +		irq_domain_add_linear(pdev->dev.of_node, LUBBOCK_NB_IRQ,
-> +				      &lubbock_irq_domain_ops, cot);
-
-As a personal preference, I would prefer to see:
-
-	cot->irqdomain = irq_domain_add_linear(pdev->dev.of_node,
-					       LUBBOCK_NB_IRQ,
-					       &lubbock_irq_domain_ops, cot);
-
-> +	if (!cot->irqdomain)
-> +		return -ENODEV;
-> +
-> +	ret = 0;
-
-'ret' will be zero here, or we would have returned already.
-
-> +	if (base_irq)
-> +		ret = irq_create_strict_mappings(cot->irqdomain, base_irq, 0,
-> +						 LUBBOCK_NB_IRQ);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "Couldn't create the irq mapping %d..%d\n",
-> +			base_irq, base_irq + LUBBOCK_NB_IRQ);
-> +		return ret;
-> +	}
-
-Is this solely the check from irq_create_strict_mappings(), therefore
-it should be inside the previous if () { ... }.
-
-> +	dev_info(&pdev->dev, "base=%p, irq=%d, base_irq=%d\n",
-> +		 cot->base, cot->irq, base_irq);
-
-Please remove this line.
-
-> +	return 0;
-> +}
-> +
-> +static int lubbock_remove(struct platform_device *pdev)
-> +{
-> +	struct lubbock *cot = platform_get_drvdata(pdev);
-> +
-> +	irq_set_chip_and_handler(cot->irq, NULL, NULL);
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id lubbock_id_table[] = {
-> +	{ .compatible = "intel,lubbock-io", },
-> +	{ }
-> +};
-> +MODULE_DEVICE_TABLE(of, lubbock_id_table);
-> +
-> +static struct platform_driver lubbock_driver = {
-> +	.driver		= {
-> +		.name	= "lubbock_io",
-> +		.of_match_table = of_match_ptr(lubbock_id_table),
-> +	},
-> +	.probe		= lubbock_probe,
-> +	.remove		= lubbock_remove,
-> +	.resume		= lubbock_resume,
-> +};
-> +
-> +module_platform_driver(lubbock_driver);
-> +
-> +MODULE_DESCRIPTION("Lubbock driver");
-
-"Lubbock MFD Driver"?
-
-> +MODULE_AUTHOR("Robert Jarzmik");
-
-Email.
-
-> +MODULE_LICENSE("GPL");
-
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Linux version 3.19.0-rc4-00001-g45aa0b7 (flag at luxor) (gcc version 4.8.2 (Ubuntu/Linaro 4.8.2-16ubuntu4) ) #1 SMP Fri Jan 16 10:33:22 CET5
+...
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+bye,
+p.
