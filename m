@@ -1,36 +1,124 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 19 Jan 2015 12:08:21 -0600
-Subject: [PATCH v4 01/21] serial: rewrite pxa2xx-uart to use 8250_core
-In-Reply-To: <1397668411-27162-2-git-send-email-ynvich@gmail.com>
-References: <1387309071-22382-1-git-send-email-ynvich@gmail.com>
- <1397668411-27162-1-git-send-email-ynvich@gmail.com>
- <1397668411-27162-2-git-send-email-ynvich@gmail.com>
-Message-ID: <CAL_JsqJUWRhGA_8NU+O=fLFdMiVNz0LV6G0LU=ikgk=zah2q2A@mail.gmail.com>
+From: agraf@suse.de (Alexander Graf)
+Date: Mon, 19 Jan 2015 19:11:11 +0100
+Subject: [PATCH net-next v13 3/3] net: hisilicon: new hip04 ethernet driver
+In-Reply-To: <1421217254-12008-4-git-send-email-dingtianhong@huawei.com>
+References: <1421217254-12008-1-git-send-email-dingtianhong@huawei.com>
+ <1421217254-12008-4-git-send-email-dingtianhong@huawei.com>
+Message-ID: <54BD48BF.3050707@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 16, 2014 at 12:13 PM, Sergei Ianovich <ynvich@gmail.com> wrote:
-> pxa2xx-uart was a separate uart platform driver. It was declaring
-> the same device names and numbers as 8250 driver. As a result,
-> it was impossible to use 8250 driver on PXA SoCs.
+On 01/14/15 07:34, Ding Tianhong wrote:
+> Support Hisilicon hip04 ethernet driver, including 100M / 1000M controller.
+> The controller has no tx done interrupt, reclaim xmitted buffer in the poll.
 >
-> Upon closer examination pxa2xx-uart turned out to be a clone of
-> 8250_core driver.
+> v13: Fix the problem of alignment parameters for function and checkpatch warming.
 >
-> Workaround for Erratum #19 according to Marvel(R) PXA270M Processor
-> Specification Update (April 19, 2010) is dropped. 8250_core reads
-> from FIFO immediately after checking DR bit in LSR.
+> v12: According Alex's suggestion, modify the changelog and add MODULE_DEVICE_TABLE
+>       for hip04 ethernet.
 >
-> Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
-> Reviewed-by: Heikki Krogerus <heikki.krogerus@linux.intel.com>
-> Reviewed-by: James Cameron <quozl@laptop.org>
-> Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> v11: Add ethtool support for tx coalecse getting and setting, the xmit_more
+>       is not supported for this patch, but I think it could work for hip04,
+>       will support it later after some tests for performance better.
+>
+>       Here are some performance test results by ping and iperf(add tx_coalesce_frames/users),
+>       it looks that the performance and latency is more better by tx_coalesce_frames/usecs.
+>
+>       - Before:
+>       $ ping 192.168.1.1 ...
+>       === 192.168.1.1 ping statistics ===
+>       24 packets transmitted, 24 received, 0% packet loss, time 22999ms
+>       rtt min/avg/max/mdev = 0.180/0.202/0.403/0.043 ms
+>
+>       $ iperf -c 192.168.1.1 ...
+>       [ ID] Interval       Transfer     Bandwidth
+>       [  3]  0.0- 1.0 sec   115 MBytes   945 Mbits/sec
+>
+>       - After:
+>       $ ping 192.168.1.1 ...
+>       === 192.168.1.1 ping statistics ===
+>       24 packets transmitted, 24 received, 0% packet loss, time 22999ms
+>       rtt min/avg/max/mdev = 0.178/0.190/0.380/0.041 ms
+>
+>       $ iperf -c 192.168.1.1 ...
+>       [ ID] Interval       Transfer     Bandwidth
+>       [  3]  0.0- 1.0 sec   115 MBytes   965 Mbits/sec
+>
+> v10: According David Miller and Arnd Bergmann's suggestion, add some modification
+>       for v9 version
+>       - drop the workqueue
+>       - batch cleanup based on tx_coalesce_frames/usecs for better throughput
+>       - use a reasonable default tx timeout (200us, could be shorted
+>         based on measurements) with a range timer
+>       - fix napi poll function return value
+>       - use a lockless queue for cleanup
+>
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
 > ---
->  Resenging together with the rest of the series as the series
->  breaks without this one at [PATCH 12/21]
+>   drivers/net/ethernet/hisilicon/Makefile    |   2 +-
+>   drivers/net/ethernet/hisilicon/hip04_eth.c | 969 +++++++++++++++++++++++++++++
+>   2 files changed, 970 insertions(+), 1 deletion(-)
+>   create mode 100644 drivers/net/ethernet/hisilicon/hip04_eth.c
+>
+> diff --git a/drivers/net/ethernet/hisilicon/Makefile b/drivers/net/ethernet/hisilicon/Makefile
+> index 40115a7..6c14540 100644
+> --- a/drivers/net/ethernet/hisilicon/Makefile
+> +++ b/drivers/net/ethernet/hisilicon/Makefile
+> @@ -3,4 +3,4 @@
+>   #
+>   
+>   obj-$(CONFIG_HIX5HD2_GMAC) += hix5hd2_gmac.o
+> -obj-$(CONFIG_HIP04_ETH) += hip04_mdio.o
+> +obj-$(CONFIG_HIP04_ETH) += hip04_mdio.o hip04_eth.o
 
-Whatever happened with merging this? I'm asking because either this or
-fixes to PXA uart are needed to coexist with the 8250 driver and for
-earlycon to work.
+[...]
 
-Rob
+> +static irqreturn_t hip04_mac_interrupt(int irq, void *dev_id)
+> +{
+> +	struct net_device *ndev = (struct net_device *)dev_id;
+> +	struct hip04_priv *priv = netdev_priv(ndev);
+> +	struct net_device_stats *stats = &ndev->stats;
+> +	u32 ists = readl_relaxed(priv->base + PPE_INTSTS);
+> +
+> +	if (!ists)
+> +		return IRQ_NONE;
+> +
+> +	writel_relaxed(DEF_INT_MASK, priv->base + PPE_RINT);
+> +
+> +	if (unlikely(ists & DEF_INT_ERR)) {
+> +		if (ists & (RCV_NOBUF | RCV_DROP))
+> +			stats->rx_errors++;
+> +			stats->rx_dropped++;
+> +			netdev_err(ndev, "rx drop\n");
+
+After hammering on the box a bit again, I'm in a situation where I get 
+lots of
+
+[302398.232603] hip04-ether e28b0000.ethernet eth0: rx drop
+[302398.377309] hip04-ether e28b0000.ethernet eth0: rx drop
+[302398.395198] hip04-ether e28b0000.ethernet eth0: rx drop
+[302398.466118] hip04-ether e28b0000.ethernet eth0: rx drop
+[302398.659009] hip04-ether e28b0000.ethernet eth0: rx drop
+[302399.053389] hip04-ether e28b0000.ethernet eth0: rx drop
+[302399.122067] hip04-ether e28b0000.ethernet eth0: rx drop
+[302399.268192] hip04-ether e28b0000.ethernet eth0: rx drop
+[302399.286081] hip04-ether e28b0000.ethernet eth0: rx drop
+[302399.594201] hip04-ether e28b0000.ethernet eth0: rx drop
+[302399.683416] hip04-ether e28b0000.ethernet eth0: rx drop
+[302399.701307] hip04-ether e28b0000.ethernet eth0: rx drop
+
+and I really am getting a lot of drops - I can't even ping the machine 
+anymore.
+
+However, as it is there's a good chance the machine is simply 
+unreachable because it's busy writing to the UART, and even if not all 
+useful messages indicating anything have scrolled out. I really don't 
+think you should emit any message over and over again to the user. Once 
+or twice is enough.
+
+Please make sure to rate limit it.
+
+
+Alex
