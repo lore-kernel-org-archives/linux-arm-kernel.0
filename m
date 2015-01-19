@@ -1,319 +1,82 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 19 Jan 2015 17:13:38 +0100
-Subject: [PATCH v3] ARM: multi_v7_defconfig: Enable shmobile platforms
-Message-ID: <1421684018-11894-1-git-send-email-geert+renesas@glider.be>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 19 Jan 2015 17:21:14 +0100
+Subject: [PATCH v6 8/8] arm: dma-mapping: plumb our iommu mapping ops
+ into arch_setup_dma_ops
+In-Reply-To: <2253719.6TRpaaEdiI@wuerfel>
+References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
+ <2804479.ZFl06ysk3j@avalon> <20150119123623.GB7312@ulmo.nvidia.com>
+ <2253719.6TRpaaEdiI@wuerfel>
+Message-ID: <20150119162111.GA7751@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tested on:
-  - r8a7740/armadillo (kexec works, hermit boot loader fails),
-  - r8a7791/koelsch,
-  - sh73a0/kzm9g (kexec works, zImage+DTB from U-Boot needs
-		  CONFIG_ARM_ATAG_DTB_COMPAT=n),
-  - am335x/boneblack.
+On Mon, Jan 19, 2015 at 04:52:41PM +0100, Arnd Bergmann wrote:
+> On Monday 19 January 2015 13:36:24 Thierry Reding wrote:
+> > On Fri, Jan 16, 2015 at 01:18:21AM +0200, Laurent Pinchart wrote:
+> > > On Thursday 15 January 2015 11:12:17 Will Deacon wrote:
+> > > > On Thu, Jan 15, 2015 at 08:28:44AM +0000, Thierry Reding wrote:
+> > > > > On Wed, Jan 14, 2015 at 10:46:10AM +0000, Will Deacon wrote:
+> > > > > > On Wed, Jan 14, 2015 at 09:00:24AM +0000, Alexandre Courbot wrote:
+> > > > > [...]
+> > > > > 
+> > > > >>> 2) Say you want to use the IOMMU API in your driver, and have an iommu
+> > > > >>> property in your device's DT node. If by chance your IOMMU is
+> > > > >>> registered early, you will already have a mapping automatically
+> > > > >>> created even before your probe function is called. Can this be
+> > > > >>> avoided? Is it even safe?
+> > > > >> 
+> > > > >> Currently, I think you have to either teardown the ops manually or
+> > > > >> return an error from of_xlate. Thierry was also looking at this sort of
+> > > > >> thing, so it might be worth talking to him.
+> > > > > 
+> > > > > I already explained in earlier threads why I think this is a bad idea.
+> > > > > It's completely unnatural for any driver to manually tear down something
+> > > > > that it didn't want set up in the first place. It also means that you
+> > > > > have to carefully audit any users of these IOMMU APIs to make sure that
+> > > > > they do tear down. That doesn't sound like a good incremental approach,
+> > > > > as evidenced by the breakage that Alex and Heiko have encountered.
+> > > > 
+> > > > Well, perhaps we hide that behind a get_iommu API or something. We *do*
+> > > > need this manual teardown step to support things like VFIO, so it makes
+> > > > sense to reuse it for other users too imo.
+> > > > 
+> > > > > The solution for me has been to completely side-step the issue and not
+> > > > > register the IOMMU with the new mechanism at all. That is, there's no
+> > > > > .of_xlate() implementation, which means that the ARM DMA API glue won't
+> > > > > try to be smart and use the IOMMU in ways it's not meant to be used.
+> > > 
+> > > That will break when someone will want to use the same IOMMU type for devices 
+> > > that use the DMA mapping API to hide the IOMMU. That might not be the case for 
+> > > your IOMMU today, but it's pretty fragile, we need to fix it.
+> > 
+> > No, there's absolutely no issue here. It simply means that you can't do
+> > this on Tegra. So far I'm not sure I even see an advantage in using the
+> > IOMMU for devices that don't care about it anyway. Consider the example
+> > of the SD/MMC or HDA. They typically allocate fairly small buffers, the
+> > order of a single page typically. They can simply use memory handed out
+> > by the CMA.
+> > 
+> > So as long as we don't add a .of_xlate() implementation or instantiate
+> > via the IOMMU_OF_DECLARE() mechanism we simply don't support IOMMU-over-
+> > DMA on Tegra.
+> 
+> It breaks as soon as you have a system with memory above the 4GB boundary,
+> which is the whole point of iommus for most users.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-This is against today's arm-soc/for-next
+Why does it break? The IOMMU API simply gets a list of pages and gets
+the physical addresses from those pages when it maps them to the IO
+virtual addresses. How is .of_xlate() or of_iommu_configure() related?
 
-v3:
-  - Update for boardless r8a7790/Lager support (cfr. commits
-    174b7a54c925a068 ("ARM: shmobile: Enable MICREL_PHY in
-    shmobile_defconfig") and be2902416cc6f26d ("ARM: shmobile:
-    lager-reference: DTS-only board support"),
-  - Added sh73a0/kzm9g, as it became multi-platform aware,
-  - Synced with recent shmobile_defconfig updates (e.g. RCAR_DMAC),
-v2:
-  - Added r8a7740/armadillo, as this does work with kexec,
-  - Synced with recent shmobile_defconfig updates (e.g. r8a7794).
----
- arch/arm/configs/multi_v7_defconfig | 81 ++++++++++++++++++++++++++++++++++---
- 1 file changed, 76 insertions(+), 5 deletions(-)
+> CMA does not work for streaming mappings, only for the coherent API.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index bc525e3459cce519..38d56879d47799cb 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -61,6 +61,16 @@ CONFIG_MACH_SPEAR1310=y
- CONFIG_MACH_SPEAR1340=y
- CONFIG_ARCH_STI=y
- CONFIG_ARCH_EXYNOS=y
-+CONFIG_ARCH_SHMOBILE_MULTI=y
-+CONFIG_ARCH_EMEV2=y
-+CONFIG_ARCH_R7S72100=y
-+CONFIG_ARCH_R8A7740=y
-+CONFIG_ARCH_R8A7779=y
-+CONFIG_ARCH_R8A7790=y
-+CONFIG_ARCH_R8A7791=y
-+CONFIG_ARCH_R8A7794=y
-+CONFIG_ARCH_SH73A0=y
-+CONFIG_MACH_MARZEN=y
- CONFIG_ARCH_SUNXI=y
- CONFIG_ARCH_SIRF=y
- CONFIG_ARCH_TEGRA=y
-@@ -83,6 +93,8 @@ CONFIG_PCI_KEYSTONE=y
- CONFIG_PCI_MSI=y
- CONFIG_PCI_MVEBU=y
- CONFIG_PCI_TEGRA=y
-+CONFIG_PCI_RCAR_GEN2=y
-+CONFIG_PCI_RCAR_GEN2_PCIE=y
- CONFIG_PCIEPORTBUS=y
- CONFIG_SMP=y
- CONFIG_NR_CPUS=8
-@@ -129,6 +141,7 @@ CONFIG_DEVTMPFS_MOUNT=y
- CONFIG_DMA_CMA=y
- CONFIG_CMA_SIZE_MBYTES=64
- CONFIG_OMAP_OCP2SCP=y
-+CONFIG_SIMPLE_PM_BUS=y
- CONFIG_MTD=y
- CONFIG_MTD_CMDLINE_PARTS=y
- CONFIG_MTD_BLOCK=y
-@@ -156,6 +169,7 @@ CONFIG_AHCI_SUNXI=y
- CONFIG_AHCI_TEGRA=y
- CONFIG_SATA_HIGHBANK=y
- CONFIG_SATA_MV=y
-+CONFIG_SATA_RCAR=y
- CONFIG_NETDEVICES=y
- CONFIG_HIX5HD2_GMAC=y
- CONFIG_SUN4I_EMAC=y
-@@ -166,14 +180,17 @@ CONFIG_MV643XX_ETH=y
- CONFIG_MVNETA=y
- CONFIG_KS8851=y
- CONFIG_R8169=y
-+CONFIG_SH_ETH=y
- CONFIG_SMSC911X=y
- CONFIG_STMMAC_ETH=y
- CONFIG_TI_CPSW=y
- CONFIG_XILINX_EMACLITE=y
- CONFIG_AT803X_PHY=y
- CONFIG_MARVELL_PHY=y
-+CONFIG_SMSC_PHY=y
- CONFIG_BROADCOM_PHY=y
- CONFIG_ICPLUS_PHY=y
-+CONFIG_MICREL_PHY=y
- CONFIG_USB_PEGASUS=y
- CONFIG_USB_USBNET=y
- CONFIG_USB_NET_SMSC75XX=y
-@@ -191,13 +208,17 @@ CONFIG_KEYBOARD_CROS_EC=y
- CONFIG_MOUSE_PS2_ELANTECH=y
- CONFIG_INPUT_TOUCHSCREEN=y
- CONFIG_TOUCHSCREEN_ATMEL_MXT=y
-+CONFIG_TOUCHSCREEN_ST1232=y
- CONFIG_TOUCHSCREEN_STMPE=y
- CONFIG_INPUT_MISC=y
- CONFIG_INPUT_MPU3050=y
-+CONFIG_INPUT_ADXL34X=y
- CONFIG_SERIO_AMBAKMI=y
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_8250_EXTENDED=y
- CONFIG_SERIAL_8250_DW=y
-+CONFIG_SERIAL_8250_EM=y
- CONFIG_SERIAL_8250_MT6577=y
- CONFIG_SERIAL_AMBA_PL011=y
- CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
-@@ -210,6 +231,9 @@ CONFIG_SERIAL_SIRFSOC_CONSOLE=y
- CONFIG_SERIAL_TEGRA=y
- CONFIG_SERIAL_IMX=y
- CONFIG_SERIAL_IMX_CONSOLE=y
-+CONFIG_SERIAL_SH_SCI=y
-+CONFIG_SERIAL_SH_SCI_NR_UARTS=20
-+CONFIG_SERIAL_SH_SCI_CONSOLE=y
- CONFIG_SERIAL_MSM=y
- CONFIG_SERIAL_MSM_CONSOLE=y
- CONFIG_SERIAL_VT8500=y
-@@ -230,19 +254,26 @@ CONFIG_I2C_MUX_PCA954x=y
- CONFIG_I2C_MUX_PINCTRL=y
- CONFIG_I2C_CADENCE=y
- CONFIG_I2C_DESIGNWARE_PLATFORM=y
-+CONFIG_I2C_GPIO=y
- CONFIG_I2C_EXYNOS5=y
- CONFIG_I2C_MV64XXX=y
-+CONFIG_I2C_RIIC=y
- CONFIG_I2C_S3C2410=y
-+CONFIG_I2C_SH_MOBILE=y
- CONFIG_I2C_SIRF=y
--CONFIG_I2C_TEGRA=y
- CONFIG_I2C_ST=y
--CONFIG_SPI=y
-+CONFIG_I2C_TEGRA=y
- CONFIG_I2C_XILINX=y
--CONFIG_SPI_DAVINCI=y
-+CONFIG_I2C_RCAR=y
-+CONFIG_SPI=y
- CONFIG_SPI_CADENCE=y
-+CONFIG_SPI_DAVINCI=y
- CONFIG_SPI_OMAP24XX=y
- CONFIG_SPI_ORION=y
- CONFIG_SPI_PL022=y
-+CONFIG_SPI_RSPI=y
-+CONFIG_SPI_SH_MSIOF=y
-+CONFIG_SPI_SH_HSPI=y
- CONFIG_SPI_SIRF=y
- CONFIG_SPI_SUN4I=y
- CONFIG_SPI_SUN6I=y
-@@ -256,12 +287,15 @@ CONFIG_PINCTRL_PALMAS=y
- CONFIG_PINCTRL_APQ8084=y
- CONFIG_GPIO_SYSFS=y
- CONFIG_GPIO_GENERIC_PLATFORM=y
--CONFIG_GPIO_DWAPB=y
- CONFIG_GPIO_DAVINCI=y
-+CONFIG_GPIO_DWAPB=y
-+CONFIG_GPIO_EM=y
-+CONFIG_GPIO_RCAR=y
- CONFIG_GPIO_XILINX=y
- CONFIG_GPIO_ZYNQ=y
- CONFIG_GPIO_PCA953X=y
- CONFIG_GPIO_PCA953X_IRQ=y
-+CONFIG_GPIO_PCF857X=y
- CONFIG_GPIO_TWL4030=y
- CONFIG_GPIO_PALMAS=y
- CONFIG_GPIO_SYSCON=y
-@@ -276,6 +310,8 @@ CONFIG_POWER_RESET_SUN6I=y
- CONFIG_SENSORS_LM90=y
- CONFIG_SENSORS_LM95245=y
- CONFIG_THERMAL=y
-+CONFIG_CPU_THERMAL=y
-+CONFIG_RCAR_THERMAL=y
- CONFIG_ARMADA_THERMAL=y
- CONFIG_DAVINCI_WATCHDOG
- CONFIG_ST_THERMAL_SYSCFG=y
-@@ -286,6 +322,7 @@ CONFIG_ARM_SP805_WATCHDOG=y
- CONFIG_ORION_WATCHDOG=y
- CONFIG_SUNXI_WATCHDOG=y
- CONFIG_MESON_WATCHDOG=y
-+CONFIG_MFD_AS3711=y
- CONFIG_MFD_AS3722=y
- CONFIG_MFD_BCM590XX=y
- CONFIG_MFD_CROS_EC=y
-@@ -299,8 +336,10 @@ CONFIG_MFD_TPS65090=y
- CONFIG_MFD_TPS6586X=y
- CONFIG_MFD_TPS65910=y
- CONFIG_REGULATOR_AB8500=y
-+CONFIG_REGULATOR_AS3711=y
- CONFIG_REGULATOR_AS3722=y
- CONFIG_REGULATOR_BCM590XX=y
-+CONFIG_REGULATOR_DA9210=y
- CONFIG_REGULATOR_GPIO=y
- CONFIG_MFD_SYSCON=y
- CONFIG_POWER_RESET_SYSCON=y
-@@ -318,18 +357,32 @@ CONFIG_REGULATOR_TWL4030=y
- CONFIG_REGULATOR_VEXPRESS=y
- CONFIG_MEDIA_SUPPORT=y
- CONFIG_MEDIA_CAMERA_SUPPORT=y
-+CONFIG_MEDIA_CONTROLLER=y
-+CONFIG_VIDEO_V4L2_SUBDEV_API=y
- CONFIG_MEDIA_USB_SUPPORT=y
- CONFIG_USB_VIDEO_CLASS=y
- CONFIG_USB_GSPCA=y
-+CONFIG_V4L_PLATFORM_DRIVERS=y
-+CONFIG_SOC_CAMERA=y
-+CONFIG_SOC_CAMERA_PLATFORM=y
-+CONFIG_VIDEO_RCAR_VIN=y
-+CONFIG_V4L_MEM2MEM_DRIVERS=y
-+CONFIG_VIDEO_RENESAS_VSP1=y
-+# CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
-+CONFIG_VIDEO_ADV7180=y
- CONFIG_DRM=y
-+CONFIG_DRM_RCAR_DU=y
- CONFIG_DRM_TEGRA=y
- CONFIG_DRM_PANEL_SIMPLE=y
- CONFIG_FB_ARMCLCD=y
- CONFIG_FB_WM8505=y
-+CONFIG_FB_SH_MOBILE_LCDC=y
- CONFIG_FB_SIMPLE=y
-+CONFIG_FB_SH_MOBILE_MERAM=y
- CONFIG_BACKLIGHT_LCD_SUPPORT=y
- CONFIG_BACKLIGHT_CLASS_DEVICE=y
- CONFIG_BACKLIGHT_PWM=y
-+CONFIG_BACKLIGHT_AS3711=y
- CONFIG_FRAMEBUFFER_CONSOLE=y
- CONFIG_FRAMEBUFFER_CONSOLE_ROTATION=y
- CONFIG_SOUND=y
-@@ -337,6 +390,8 @@ CONFIG_SND=y
- CONFIG_SND_DYNAMIC_MINORS=y
- CONFIG_SND_USB_AUDIO=y
- CONFIG_SND_SOC=y
-+CONFIG_SND_SOC_SH4_FSI=y
-+CONFIG_SND_SOC_RCAR=y
- CONFIG_SND_SOC_TEGRA=y
- CONFIG_SND_SOC_TEGRA_RT5640=y
- CONFIG_SND_SOC_TEGRA_WM8753=y
-@@ -344,6 +399,8 @@ CONFIG_SND_SOC_TEGRA_WM8903=y
- CONFIG_SND_SOC_TEGRA_TRIMSLICE=y
- CONFIG_SND_SOC_TEGRA_ALC5632=y
- CONFIG_SND_SOC_TEGRA_MAX98090=y
-+CONFIG_SND_SOC_AK4642=y
-+CONFIG_SND_SOC_WM8978=y
- CONFIG_USB=y
- CONFIG_USB_XHCI_HCD=y
- CONFIG_USB_XHCI_MVEBU=y
-@@ -356,6 +413,8 @@ CONFIG_USB_ISP1760_HCD=y
- CONFIG_USB_OHCI_HCD=y
- CONFIG_USB_OHCI_HCD_STI=y
- CONFIG_USB_OHCI_HCD_PLATFORM=y
-+CONFIG_USB_R8A66597_HCD=y
-+CONFIG_USB_RENESAS_USBHS=y
- CONFIG_USB_STORAGE=y
- CONFIG_USB_DWC3=y
- CONFIG_USB_CHIPIDEA=y
-@@ -368,6 +427,10 @@ CONFIG_SAMSUNG_USB3PHY=y
- CONFIG_USB_GPIO_VBUS=y
- CONFIG_USB_ISP1301=y
- CONFIG_USB_MXS_PHY=y
-+CONFIG_USB_RCAR_PHY=y
-+CONFIG_USB_RCAR_GEN2_PHY=y
-+CONFIG_USB_GADGET=y
-+CONFIG_USB_RENESAS_USBHS_UDC=y
- CONFIG_MMC=y
- CONFIG_MMC_BLOCK_MINORS=16
- CONFIG_MMC_ARMMMCI=y
-@@ -386,12 +449,14 @@ CONFIG_MMC_SDHCI_ST=y
- CONFIG_MMC_OMAP=y
- CONFIG_MMC_OMAP_HS=y
- CONFIG_MMC_MVSDIO=y
--CONFIG_MMC_SUNXI=y
-+CONFIG_MMC_SDHI=y
- CONFIG_MMC_DW=y
- CONFIG_MMC_DW_IDMAC=y
- CONFIG_MMC_DW_PLTFM=y
- CONFIG_MMC_DW_EXYNOS=y
- CONFIG_MMC_DW_ROCKCHIP=y
-+CONFIG_MMC_SH_MMCIF=y
-+CONFIG_MMC_SUNXI=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_GPIO=y
-@@ -415,10 +480,12 @@ CONFIG_RTC_DRV_AS3722=y
- CONFIG_RTC_DRV_DS1307=y
- CONFIG_RTC_DRV_MAX8907=y
- CONFIG_RTC_DRV_MAX77686=y
-+CONFIG_RTC_DRV_RS5C372=y
- CONFIG_RTC_DRV_PALMAS=y
- CONFIG_RTC_DRV_TWL4030=y
- CONFIG_RTC_DRV_TPS6586X=y
- CONFIG_RTC_DRV_TPS65910=y
-+CONFIG_RTC_DRV_S35390A=y
- CONFIG_RTC_DRV_EM3027=y
- CONFIG_RTC_DRV_PL031=y
- CONFIG_RTC_DRV_VT8500=y
-@@ -430,6 +497,9 @@ CONFIG_DMADEVICES=y
- CONFIG_DW_DMAC=y
- CONFIG_MV_XOR=y
- CONFIG_TEGRA20_APB_DMA=y
-+CONFIG_SH_DMAE=y
-+CONFIG_RCAR_AUDMAC_PP=y
-+CONFIG_RCAR_DMAC=y
- CONFIG_STE_DMA40=y
- CONFIG_SIRF_DMA=y
- CONFIG_TI_EDMA=y
-@@ -462,6 +532,7 @@ CONFIG_IIO=y
- CONFIG_XILINX_XADC=y
- CONFIG_AK8975=y
- CONFIG_PWM=y
-+CONFIG_PWM_RENESAS_TPU=y
- CONFIG_PWM_TEGRA=y
- CONFIG_PWM_VT8500=y
- CONFIG_PHY_HIX5HD2_SATA=y
--- 
-1.9.1
+Why not? And if it doesn't I'm not sure we currently care on Tegra since
+we've gotten away with using CMA just fine so far.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150119/00f9d081/attachment.sig>
