@@ -1,56 +1,60 @@
-From: gregungerer@westnet.com.au (Greg Ungerer)
-Date: Mon, 19 Jan 2015 14:59:44 +1000
-Subject: [PATCH 01/28] PCI: Rip out pci_bus_add_devices() from
- pci_scan_bus()
-In-Reply-To: <54BC6611.9020002@huawei.com>
-References: <1421372666-12288-1-git-send-email-wangyijing@huawei.com>	<1421372666-12288-2-git-send-email-wangyijing@huawei.com>	<CAE9FiQUoocCzBKsHL_D4ypH1-DV7XxZMdREX7n=Tz1Kq3kHHeA@mail.gmail.com>
- <CAE9FiQV97PuDWBZYRxh8R0ADnUFTbo1NO3wAufj97en0yseYSQ@mail.gmail.com>
- <54BC6611.9020002@huawei.com>
-Message-ID: <54BC8F40.1080405@westnet.com.au>
+From: jy0922.shim@samsung.com (Joonyoung Shim)
+Date: Mon, 19 Jan 2015 14:43:49 +0900
+Subject: [PATCH] ARM: exynos_defconfig: Enable CONFIG_FHANDLE
+In-Reply-To: <54786C1D.3050306@collabora.co.uk>
+References: <1417176414-21558-1-git-send-email-sjoerd.simons@collabora.co.uk>
+ <54786C1D.3050306@collabora.co.uk>
+Message-ID: <54BC9995.4020300@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/01/15 12:04, Yijing Wang wrote:
-> On 2015/1/17 7:16, Yinghai Lu wrote:
->> On Fri, Jan 16, 2015 at 3:15 PM, Yinghai Lu <yinghai@kernel.org> wrote:
->>> On Thu, Jan 15, 2015 at 5:43 PM, Yijing Wang <wangyijing@huawei.com> wrote:
->>>> Pci_bus_add_devices() should not be placed in pci_scan_bus().
->>>> Now pci device will be added to driver core once its
->>>> creation. All things left in pci_bus_add_devices() are
->>>> driver attachment and other trivial sysfs things.
->>>> Pci_scan_bus() should be the function responsible for
->>>> scanning PCI devices, not including driver attachment.
->>>> Other, some callers(m68k,unicore32,alpha) of pci_scan_bus()
->>>> will call pci_bus_size_bridges() and pci_bus_assign_resources()
->>>> after pci_scan_bus().
->>>>
->>>> E.g.
->>>> In m68k
->>>> mcf_pci_init()
->>>>         pci_scan_bus()
->>>>                 ...
->>>>                 pci_bus_add_devices() --- try to attach driver
->>>>         pci_fixup_irqs()
->>>>         pci_bus_size_bridges()
->>>>         pci_bus_assign_resources()
->>>>
->>>> It is not correct, resources should be assigned correctly
->>>> before attaching driver.
->>>
->> No, for booting path, at that time pci drivers are *NOT* loaded yet.
+Hi Kukjin,
+
+On 11/28/2014 09:35 PM, Javier Martinez Canillas wrote:
+> Hello Sjoerd,
 > 
-> Hi Yinghai, I knew code flow here would not cause problems, sorry the log
-> confused you, I will refresh it. But I think pci_scan_bus()/pci_scan_root_bus()
-> which could only be used during system boot up(before module_init) make
-> the pci scan logic obscure. Because most callers additionally call
-> pci_bus_size_bridges() and pci_bus_assign_resources() later,
-> so rip out pci_bus_add_devices() from pci_scan_bus()/pci_scan_root_bus()
-> make code have better readability.
+> On 11/28/2014 01:06 PM, Sjoerd Simons wrote:
+>> CONFIG_FHANDLE is required by systemd, which is the default init system
+>> in more and more distributions. So lets enable it for Exynos as well
+>> (it's already enabled in multi_v7_defconfig)
+>>
+>> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+>> ---
+>>  arch/arm/configs/exynos_defconfig | 1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+>> index e419fac..d4751ef 100644
+>> --- a/arch/arm/configs/exynos_defconfig
+>> +++ b/arch/arm/configs/exynos_defconfig
+>> @@ -1,4 +1,5 @@
+>>  CONFIG_SYSVIPC=y
+>> +CONFIG_FHANDLE=y
+> 
 
-I agree that ordering seems odd. I recall there was a reason I had
-to put it in that order (at that time - which is a few years back now).
-I can't remember exactly now, but it was something like bridges
-didn't get resourced properly without a pci scan first.
+I also hope merge this, already multi_v7_defconfig supports this.
 
-Regards
-Greg
+Thanks.
+
+> This is certainly required for newer systemd and has to be enabled.
+> 
+> But it would also be great to have enabled all the config symbols
+> that are listed as requirements in the systemd README file:
+> 
+> http://cgit.freedesktop.org/systemd/systemd/tree/README.
+> 
+> Tony added that support to OMAP2+ defconfig in commit 673ce00c
+> ("ARM: omap2plus_defconfig: Add support for distros with systemd")
+> so the same should be done in exynos_defconfig.
+> 
+> That can of course be a follow-up patch though, so for $subject:
+> 
+> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> 
+> Best regards,
+> Javier
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
