@@ -1,39 +1,129 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 19 Jan 2015 10:42:04 -0600
-Subject: [next-20150119]regression (mm)?
-Message-ID: <54BD33DC.40200@ti.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 19 Jan 2015 17:43:08 +0100
+Subject: [PATCH v8 0/5] irqfd support for arm/arm64
+Message-ID: <1421685793-3547-1-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch series enables irqfd on arm and arm64.
 
-Most platforms seem broken intoday's next tag.
+Irqfd framework enables to inject a virtual IRQ into a guest upon an
+eventfd trigger. User-side uses KVM_IRQFD VM ioctl to provide KVM with
+a kvm_irqfd struct that associates a VM, an eventfd, a virtual IRQ number
+(aka. the gsi). When an actor signals the eventfd (typically a VFIO
+platform driver), the kvm irqfd subsystem injects the gsi into the VM.
 
-https://github.com/nmenon/kernel-test-logs/tree/next-20150119
-(defconfig: omap2plus_defconfig)
+Resamplefd also is supported for level sensitive interrupts, ie. the
+user can provide another eventfd that is triggered when the completion
+of the virtual IRQ (gsi) is detected by the GIC.
 
-> [    7.166600] ------------[ cut here ]------------
-> [    7.171676] WARNING: CPU: 0 PID: 54 at mm/mmap.c:2859 exit_mmap+0x1a8/0x21c()
-> [    7.179194] Modules linked in:
-> [    7.182479] CPU: 0 PID: 54 Comm: init Not tainted 3.19.0-rc5-next-20150119-00002-gfdefcded1272 #1
-> [    7.191863] Hardware name: Generic AM33XX (Flattened Device Tree)
-> [    7.198318] [<c00153f0>] (unwind_backtrace) from [<c0011a74>] (show_stack+0x10/0x14)
-> [    7.206528] [<c0011a74>] (show_stack) from [<c0580150>] (dump_stack+0x78/0x94)
-> [    7.214191] [<c0580150>] (dump_stack) from [<c003d4d0>] (warn_slowpath_common+0x7c/0xb4)
-> [    7.222751] [<c003d4d0>] (warn_slowpath_common) from [<c003d524>] (warn_slowpath_null+0x1c/0x24)
-> [    7.232038] [<c003d524>] (warn_slowpath_null) from [<c012de64>] (exit_mmap+0x1a8/0x21c)
-> [    7.240536] [<c012de64>] (exit_mmap) from [<c003abb8>] (mmput+0x44/0xec)
-> [    7.247612] [<c003abb8>] (mmput) from [<c0151368>] (flush_old_exec+0x300/0x5a4)
-> [    7.255357] [<c0151368>] (flush_old_exec) from [<c0195c10>] (load_elf_binary+0x2ec/0x1144)
-> [    7.264111] [<c0195c10>] (load_elf_binary) from [<c0150ea0>] (search_binary_handler+0x88/0x1ac)
-> [    7.273311] [<c0150ea0>] (search_binary_handler) from [<c019554c>] (load_script+0x260/0x280)
-> [    7.282232] [<c019554c>] (load_script) from [<c0150ea0>] (search_binary_handler+0x88/0x1ac)
-> [    7.291066] [<c0150ea0>] (search_binary_handler) from [<c0151f0c>] (do_execveat_common+0x538/0x6c4)
-> [    7.300628] [<c0151f0c>] (do_execveat_common) from [<c01520c4>] (do_execve+0x2c/0x34)
-> [    7.308881] [<c01520c4>] (do_execve) from [<c000e5e0>] (ret_fast_syscall+0x0/0x4c)
-> [    7.316881] ---[ end trace 3b8a46b1b280f423 ]---
+The gsi must correspond to a shared peripheral interrupt (SPI), ie the
+GIC interrupt ID is gsi + 32.
 
+The rationale behind not supporting PPI irqfd injection is that
+any device using a PPI would be a private-to-the-CPU device (timer for
+instance), so its state would have to be context-switched along with the
+VCPU and would require in-kernel wiring anyhow. It is not a relevant use
+case for irqfds.
+
+This patch enables CONFIG_HAVE_KVM_EVENTFD and CONFIG_HAVE_KVM_IRQFD.
+
+No IRQ routing table is used, enabling to remove CONFIG_HAVE_KVM_IRQCHIP
+
+The ARM virtual interrupt controller, the VGIC, is dynamically
+instantiated. The user-space may attempt to assign an irqfd before
+the virtual interrupt controller is ready. For that reason a
+check is added in the generic irqfd code to test whether the virtual
+interrupt controller is ready.
+
+This work was tested with Calxeda Midway xgmac main interrupt with
+qemu-system-arm and QEMU VFIO platform device. Also irqfd was proven
+functional on several vhost-net prototypes.
+
+Available on ssh://git.linaro.org/people/eric.auger/linux.git
+branch irqfd_v8_integrated_official_release
+
+v7 -> v8:
+- Address Andre's comments:
+  - introduce a separate patch file for coarse grain dist lock removal at
+    kvm_vgic_sync_hwstate level
+  - update comment above __kvm_vgic_sync_hwstate
+  - remove kvm_irq_has_notifier call
+  - remove gic_initialized() check in kvm_set_irq
+  - fix a typo in one comment (kvm_host.h)
+
+v6 -> v7:
+- kvm_arch_intc_initialized call introduced in first patch file
+  related to kvm_arch_intc_initialized (generic part)
+- add Christoffer's acks
+
+v5 -> v6:
+- take into account Christoffer's comments:
+  - rename macro and function enabling to check the state of virtual
+    interrupt controller (kvm_arch_intc_initialized)
+  - kvm_arch_intc_initialized is declared in kvm_host.h whatever the
+    archi support.
+  - squash v5 patch files 3 & 4
+  - KVM_CAP_IRQFD support depends on vgic_present
+  - add Christoffer's Reviewed-by on last patch file
+
+v4 -> v5:
+- add the capability to check whether vgic is initialized when
+  assigning an irqfd.  objective is to avoid injecting IRQ before
+  this vgic is ready: this corresponds to new patch files 2, 3, 4.
+- do not specifically handle early virtual IRQ injections in
+  kvm_set_irq.  In case of injection when vgic is not yet ready,
+  simply return an error.  User-space now has means to force vgic
+  init and get notified if irqfd assign takes place too early.
+- squash [PATCH v4 2/3] KVM: arm: add irqfd support and
+         [PATCH v4 3/3] KVM: arm64: add irqfd support
+- add Acked-by's in KVM: arm/arm64: unset CONFIG_HAVE_KVM_IRQCHIP
+- some comment rewording in vgic
+
+v3 -> v4:
+- rebase on 3.18rc5
+- vgic dynamic instantiation brought new challenges:
+  handling of irqfd injection when vgic is not ready
+- unset of CONFIG_HAVE_KVM_IRQCHIP in a separate patch
+- add arm64 enable
+- vgic.c style modifications according to Christoffer comments
+
+v2 -> v3:
+- removal of irq.h from eventfd.c put in a separate patch to increase
+  visibility
+- properly expose KVM_CAP_IRQFD capability in arm.c
+- remove CONFIG_HAVE_KVM_IRQCHIP meaningfull only if irq_comm.c is used
+
+v1 -> v2:
+- rebase on 3.17rc1
+- move of the dist unlock in process_maintenance
+- remove of dist lock in __kvm_vgic_sync_hwstate
+- rewording of the commit message (add resamplefd reference)
+- remove irq.h
+
+
+Eric Auger (5):
+  KVM: arm/arm64: unset CONFIG_HAVE_KVM_IRQCHIP
+  KVM: introduce kvm_arch_intc_initialized and use it in irqfd
+  KVM: arm/arm64: implement kvm_arch_intc_initialized
+  KVM: arm/arm64: remove coarse grain dist locking at
+    kvm_vgic_sync_hwstate
+  KVM: arm/arm64: add irqfd support
+
+ Documentation/virtual/kvm/api.txt |  6 +++-
+ arch/arm/include/asm/kvm_host.h   |  2 ++
+ arch/arm/include/uapi/asm/kvm.h   |  3 ++
+ arch/arm/kvm/Kconfig              |  4 +--
+ arch/arm/kvm/Makefile             |  2 +-
+ arch/arm/kvm/arm.c                | 10 +++++++
+ arch/arm64/include/asm/kvm_host.h |  2 ++
+ arch/arm64/include/uapi/asm/kvm.h |  3 ++
+ arch/arm64/kvm/Kconfig            |  3 +-
+ arch/arm64/kvm/Makefile           |  2 +-
+ include/linux/kvm_host.h          | 14 ++++++++++
+ virt/kvm/arm/vgic.c               | 58 +++++++++++++++++++++++++++++++++------
+ virt/kvm/eventfd.c                |  3 ++
+ 13 files changed, 98 insertions(+), 14 deletions(-)
 
 -- 
-Regards,
-Nishanth Menon
+1.9.1
