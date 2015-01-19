@@ -1,57 +1,50 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 19 Jan 2015 14:36:38 +0100
-Subject: [PATCH v6 8/8] arm: dma-mapping: plumb our iommu mapping ops
- into arch_setup_dma_ops
-In-Reply-To: <20150119125051.GI32131@arm.com>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <2804479.ZFl06ysk3j@avalon> <54BB58AA.5070407@nvidia.com>
- <5043167.LEiljZnGai@avalon> <20150119124305.GC7312@ulmo.nvidia.com>
- <20150119125051.GI32131@arm.com>
-Message-ID: <20150119133633.GA23778@ulmo.nvidia.com>
+Date: Mon, 19 Jan 2015 14:38:56 +0100
+Subject: [PATCHv10 0/2] Add Allwinner SoCs PWM support
+In-Reply-To: <1418850940-30835-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1418850940-30835-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20150119133855.GB23778@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 19, 2015 at 12:50:52PM +0000, Will Deacon wrote:
-> On Mon, Jan 19, 2015 at 12:43:06PM +0000, Thierry Reding wrote:
-> > On Sun, Jan 18, 2015 at 01:18:51PM +0200, Laurent Pinchart wrote:
-> > > On Sunday 18 January 2015 15:54:34 Alexandre Courbot wrote:
-> > > > On 01/16/2015 08:18 AM, Laurent Pinchart wrote:
-> > [...]
-> > > > > The second way is to implement a mechanism to let drivers signal that they
-> > > > > want to handle DMA mappings themselves. As the mappings need in the
-> > > > > general case to be created before the probe function  is called
-> > > > 
-> > > > Sorry for being ignorant here, but why is that?
-> > > 
-> > > Because a driver can call the DMA mapping API in its probe function, to 
-> > > allocate DMA coherent memory for instance. We need to ensure that the DMA 
-> > > mapping IOMMU has set up the required IOMMU ops by that time. As explained 
-> > > above I don't like the idea of sprinkling explicit calls to initialize IOMMU 
-> > > support in the vast majority of drivers, especially when they shouldn't be 
-> > > IOMMU-aware, so we then need to initialize everything that is needed before 
-> > > the first call to the DMA mapping API.
-> > 
-> > The original patch that Hiroshi posted based on my comments was to have
-> > the driver core call iommu_attach(), which would then set up everything
-> > needed right before calling into the driver's ->probe(). This works
-> > quite nicely because by definition the driver can't allocate any DMA
-> > before ->probe(). And, like you said, this allows deferred probe to be
-> > used.
-> > 
-> > To me it's so obviously the right solution that I remain flabbergasted
-> > with how much resistance it's received (or how much it's being ignored).
+On Wed, Dec 17, 2014 at 10:15:38PM +0100, Alexandre Belloni wrote:
+> Hi,
 > 
-> Have you considered reposting the patches based on what we currently have
-> (which has the advantage of identifying a specific IOMMU instance)?
+> This patch series adds support for the PWM controller found on the Allwinner
+> SoCs.
+> 
+> The first patch adds the driver itself.
+> The second patch adds the DT binding documentation
+> 
+> Changes in v8:
+>  - renamed the driver sun4i as the PWM IP is different in the next sunxi SoCs
+>  - Took into account comments from Thierry
+> 
+> Changes in v9:
+>  - moved from using a mutex to a spinlock
+> 
+> Changes in v10:
+>  - rebased on v3.18
+>  - corrected the module name in Kconfig
+>  - Added dependancy on HAS_IOMEM and COMMON_CLK
+>  - changes clk_rate in sun4i_pwm_config() to be a u64 to avoid unnecessary
+>    casting
+>  - removed unnecessary braces
+> 
+> Alexandre Belloni (2):
+>   pwm: Add Allwinner SoC support
+>   pwm: sunxi: document OF bindings
+> 
+>  .../devicetree/bindings/pwm/pwm-sun4i.txt          |  20 ++
+>  drivers/pwm/Kconfig                                |  10 +
+>  drivers/pwm/Makefile                               |   1 +
+>  drivers/pwm/pwm-sun4i.c                            | 366 +++++++++++++++++++++
+>  4 files changed, 397 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-sun4i.txt
+>  create mode 100644 drivers/pwm/pwm-sun4i.c
 
-No, I hadn't. Initially my patches included a solution for identifying
-individual IOMMU instances, too. There was a small registry with a list
-of struct iommus. That was supposed to get used to store per-instance
-data (by being embedded in a driver-specific structure). I'd need to
-look in more detail how that could be done with the infrastructure that
-your patchset creates. I'm somewhat burried below other tasks right now
-so don't expect to have any time to look into this anytime before -rc6
-or -rc7 at the earliest.
+I've applied this series. If anyone still wants to offer a Tested-by or
+Reviewed-by, hurry up.
 
 Thierry
 -------------- next part --------------
@@ -60,4 +53,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150119/aa153d5a/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150119/7112e8c3/attachment-0001.sig>
