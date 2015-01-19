@@ -1,72 +1,83 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Mon, 19 Jan 2015 14:33:14 +0530
-Subject: [PATCH v4 3/6] arm64: Kprobes with single stepping support
-In-Reply-To: <54B96662.3030201@linaro.org>
-References: <1420949002-3726-1-git-send-email-dave.long@linaro.org>	<1420949002-3726-4-git-send-email-dave.long@linaro.org>
- <CAHM4w1no=A1kTxN26znXD42USzO+ByHWHy76F2UMnmXhPKH0kQ@mail.gmail.com>
- <54B96662.3030201@linaro.org>
-Message-ID: <54BCC852.60203@redhat.com>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Mon, 19 Jan 2015 18:05:04 +0900
+Subject: [PATCH] kprobes: bugfix: checks kprobes_all_disarmed in
+ unoptimized_kprobe().
+In-Reply-To: <54BC742E.80006@huawei.com>
+References: <54B3B32E.7070709@hitachi.com>
+ <1421064563-77831-1-git-send-email-wangnan0@huawei.com>
+ <54B3C3A0.6010708@hitachi.com> <54BC742E.80006@huawei.com>
+Message-ID: <54BCC8C0.40706@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Wang,
 
+I've found a problem on this patch, since kprobes calls unoptioize_kprobe
+with kprobes_all_disarmed=true when trying to disable all kprobes, this
+cause a serious problem.
 
-On Saturday 17 January 2015 12:58 AM, David Long wrote:
->>> +static bool aarch64_insn_is_steppable(u32 insn)
->>> +{
->>> +       if (aarch64_get_insn_class(insn) == AARCH64_INSN_CLS_BR_SYS) {
->>> +               if (aarch64_insn_is_branch(insn))
->>> +                       return false;
->>> +
->>> +               /* modification of daif creates issues */
->>> +               if (aarch64_insn_is_msr_daif(insn))
->>> +                       return false;
->>> +
->>> +               if (aarch64_insn_is_hint(insn))
->>> +                       return aarch64_insn_is_nop(insn);
->>> +
->>> +               return true;
->>> +       }
->>> +
->>> +       if (aarch64_insn_uses_literal(insn))
->>> +               return false;
->>> +
->>> +       if (aarch64_insn_is_exclusive(insn))
->>> +               return false;
->>> +
->>> +       return true;
+Moreover, I couldn't reproduce your reported bug on my 3.19-rc4 kernel.
+Could you test it again?
+
+Unless I could reproduce this bug, I'd like to keep this uncommitted.
+
+Thank you,
+
+(2015/01/19 12:04), Wang Nan wrote:
+> Hi Masami Hiramatsu,
+> 
+> I can't find this patch and '[PATCH] kprobes: bugfix: checks kprobes_all_disarmed
+> in unoptimized_kprobe().' in current mainline. How do these patches get there?
+> Should they be merged into Russell King's tree first?
+> 
+> Thank you!
+> 
+> On 2015/1/12 20:52, Masami Hiramatsu wrote:
+>> (2015/01/12 21:09), Wang Nan wrote:
+>>> Original code failed to disarm the probed instruction after
+>>>
+>>> echo 0 > /sys/kernel/debug/kprobes/enabled
+>>>
+>>> if OPTPROBE is enabled.
+>>>
+>>> This patch checks kprobes_all_disarmed in unoptimized_kprobe().
+>>>
 >>
->> Default true return may not be a good idea until we are sure that we
->> are returning false for all possible
->> simulation and rejection cases. In my opinion, its better to return
->> true only for steppable and false for
->> all remaining.
+>> Looks good :)
 >>
->
-> I struggled a little with this when I did it but I decided if the
-> question was:  "should we have to recognize every instruction before
-> deciding it was single-steppable or should we only recognize
-> instructions that are *not* single-steppable", maybe it was OK to do the
-> latter while recognizing extensions to the instruction set *could* end
-> up (temporarly) allowing us to try and fail (badly) at single-stepping
-> any problematic new instructions.  Certainly opinions could differ.  If
+>> Acked-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+>>
+>> Thank you!
+>>
+>>> Signed-off-by: Wang Nan <wangnan0@huawei.com>
+>>> ---
+>>>  kernel/kprobes.c | 3 +++
+>>>  1 file changed, 3 insertions(+)
+>>>
+>>> diff --git a/kernel/kprobes.c b/kernel/kprobes.c
+>>> index 9471710..f16936b 100644
+>>> --- a/kernel/kprobes.c
+>>> +++ b/kernel/kprobes.c
+>>> @@ -630,6 +630,9 @@ static void unoptimize_kprobe(struct kprobe *p, bool force)
+>>>  {
+>>>  	struct optimized_kprobe *op;
+>>>  
+>>> +	if (kprobes_all_disarmed)
+>>> +		return;
+>>> +
+>>>  	if (!kprobe_aggrprobe(p) || kprobe_disarmed(p))
+>>>  		return; /* This is not an optprobe nor optimized */
+>>>  
+>>>
+>>
+>>
+> 
+> 
+> 
 
-Lets see what others say, but I see that this approach will result in 
-undesired behavior. For example: a probe has been tried to insert to svc 
-instruction. SVC or any other exception generation instruction is 
-expected to be rejected. But, current aarch64_insn_is_steppable will 
-return true for it and then kprobe/uprobe code will allow to insert 
-probe at that instruction, which will be wrong, no? I mean, I do not see 
-a way to get into last else (INSN_REJECTED) of arm_kprobe_decode_insn.
 
-So, if we go with this approach we need to insure that we cover all 
-simulation-able and reject-able cases in aarch64_insn_is_steppable.
-
-~Pratyush
-
-
-
-> the consensus is that we can't allow this to ever happen (because old
-> kprobe code is running on new hardware) then I think the only choice is
-> to return to parsing binary tables.  Hopefully I could still find a way
-> to leverage insn.c in that case.
+-- 
+Masami HIRAMATSU
+Software Platform Research Dept. Linux Technology Research Center
+Hitachi, Ltd., Yokohama Research Laboratory
+E-mail: masami.hiramatsu.pt at hitachi.com
