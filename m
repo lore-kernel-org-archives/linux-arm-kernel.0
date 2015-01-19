@@ -1,98 +1,66 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 19 Jan 2015 08:28:08 -0800
-Subject: [PATCH v3 2/4] clk: mediatek: Add initial common clock support for
- Mediatek SoCs.
-In-Reply-To: <1420685701.27952.44.camel@mtksdaap41>
-References: <1420601123-25859-1-git-send-email-jamesjj.liao@mediatek.com>
- <1420601123-25859-3-git-send-email-jamesjj.liao@mediatek.com>
- <CABuKBeLQkTBYWkBWAYXjYudMAza+1zueRSqGFPd+480p1rYNwg@mail.gmail.com>
- <1420685701.27952.44.camel@mtksdaap41>
-Message-ID: <20150119162808.22722.33140@quantum>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 19 Jan 2015 17:30:45 +0100
+Subject: [PATCH V8 00/14] drm/exynos: few patches to enhance bridge chip
+ support
+In-Reply-To: <54BCDC28.7080003@collabora.co.uk>
+References: <1416045309-13359-1-git-send-email-ajaykumar.rs@samsung.com>
+ <CAEC9eQOrKw2Z1q-ztFfadXmsL3CTcAkkv9kcS2QnDOAVSh2AuQ@mail.gmail.com>
+ <548ABAB6.6010200@collabora.co.uk> <3197445.qizQc0zeRb@avalon>
+ <54914D7D.9060108@collabora.co.uk>
+ <CAPj87rN4HZzDt5JBLyTRmKZs7XcOG=0ha7ZQf9hmjPAFgTyhYQ@mail.gmail.com>
+ <20150105135015.GA12010@ulmo.nvidia.com>
+ <54BCDC28.7080003@collabora.co.uk>
+Message-ID: <20150119163043.GB7751@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting James Liao (2015-01-07 18:55:01)
-> Hi Matthias,
+On Mon, Jan 19, 2015 at 11:27:52AM +0100, Javier Martinez Canillas wrote:
+> Hello Thierry,
 > 
-> On Wed, 2015-01-07 at 18:22 +0100, Matthias Brugger wrote:
-> > 2015-01-07 4:25 GMT+01:00 James Liao <jamesjj.liao@mediatek.com>:
-> > > +
-> > > +static void cg_set_mask(struct mtk_clk_gate *cg, u32 mask)
+> On 01/05/2015 02:50 PM, Thierry Reding wrote:
+> > On Fri, Jan 02, 2015 at 01:10:14PM +0000, Daniel Stone wrote:
+> >> >
+> >> > Ajay's series don't apply cleanly anymore because it has been a while since
+> >> > he posted it but he can rebase on top of 3.19-rc1 once it is released and
+> >> > re-resend.
+> >> >
+> >> 
+> >> Do you have any plans to rebase this so it's ready for merging?
+> >> 
+> >> Thierry, Daniel, Dave - whose tree would this be best to merge through?
 > > 
-> > Please add mtk_ prefix to all functions generic for the mediatek SoCs.
+> > The plan is for me to take the bridge patches through the drm/panel
+> > tree. I'm going to look at these patches again later this week but from
+> > a very quick peek there don't seem to be any major issues left.
+> >
 > 
-> OK.
+> I know you probably are very busy but it would be great if you can take a look
+> to this series to avoid another kernel release to be missed since we are already
+> at v3.19-rc5.
 > 
-> > 
-> > > +       if (cg->flags & CLK_GATE_NO_SETCLR_REG) {
-> > 
-> > Is the CLK_GATE_NO_SETCLR_REG ever used?
-> > As far as I can see, in this patch set it is not.
+> Only this version was posted 2 months ago and the first version of the series
+> was sent on May, 2014 so it has been on the list for almost a year now...
 > 
-> No, this flag is not used in this patch. I'll remove it or add clocks
-> which use this flag in next patch.
-> 
-> > > +
-> > > +       if (cg->flags & CLK_GATE_INVERSE)
-> > > +               cg_set_mask(cg, mask);
-> > > +       else
-> > > +               cg_clr_mask(cg, mask);
-> > > +
-> > > +       mtk_clk_unlock(flags);
-> > > +
-> > > +       return 0;
-> > > +}
-> > 
-> > Actually we should use CLK_GATE_SET_TO_DISABLE instead of inventing a
-> > new bit, right?
-> 
-> CLK_GATE_SET_TO_DISABLE is used by struct clk_gate, which is different
-> from struct mtk_clk_gate. Should we use the same constant in these 2
-> different implementation? If yes, how do we avoid bit conflict between
-> clk_gate and mtk_clk_gate if we both add more flags in the future?
+> Tomi and Laurent had already agreed with the DT binging so I think that we can
+> already merge these and if there are any remaining issues, those can be fixed
+> during the 3.20 -rc cycle.
 
-I think that CLK_GATE_INVERSE is fine. This clock gate implementation is
-sufficiently different from the simple drivers/clk/clk-gate.c
-implementation (e.g. separate registers for setting bits, clearing bits
-and getting status).
+I see only a single Tested-by on this series and that seems to be with a
+bunch of out-of-tree patches applied on top. Does this now actually work
+applied on top of upstream? Also it seems like many people actually want
+this to get merged but there's been no Reviewed-bys and only a single
+Tested-by? Is that as good as it's going to get?
 
-Regards,
-Mike
+Also I think the last update was that Ajay was going to resend this
+based on v3.19-rc1 or something. Is that still going to happen?
+Otherwise I can probably try to apply as-is, but not sure how well it
+will.
 
-> 
-> 
-> > > +       pr_debug("%s(): %d, %s, bit[%d]\n",
-> > > +               __func__, r, __clk_get_name(hw->clk), (int)cg->bit);
-> > 
-> > Same here. Please review all debug messages.
-> 
-> OK, I'll remove them in next patch.
-> 
-> 
-> > > +
-> > > +#define CLK_DEBUG              0
-> > > +#define DUMMY_REG_TEST         0
-> > 
-> > This defines are not used, delete them.
-> 
-> OK.
-> 
-> > > +
-> > > +extern spinlock_t *get_mtk_clk_lock(void);
-> > > +
-> > > +#define mtk_clk_lock(flags)    spin_lock_irqsave(get_mtk_clk_lock(), flags)
-> > > +#define mtk_clk_unlock(flags)  \
-> > > +       spin_unlock_irqrestore(get_mtk_clk_lock(), flags)
-> > 
-> > Please use the spinlock directly without this akward defines.
-> 
-> Do you mean we should export clk_ops_lock (from clk-mtk.c) directly
-> instead of get_mtk_clk_lock()? Or simply remove mtk_clk_lock/unlock()?
-> 
-> 
-> Best regards,
-> 
-> James
-> 
-> 
-> 
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150119/bb07cee3/attachment-0001.sig>
