@@ -1,64 +1,44 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 19 Jan 2015 10:14:44 +0800
-Subject: [PATCH 08/28] PCI: Introduce pci_host_assign_domain_nr() to assign
- domain
-In-Reply-To: <3026954.09KG7UaUTi@wuerfel>
-References: <1421372666-12288-1-git-send-email-wangyijing@huawei.com>
- <1421372666-12288-9-git-send-email-wangyijing@huawei.com>
- <13182982.DnZJMY2KHL@wuerfel> <3026954.09KG7UaUTi@wuerfel>
-Message-ID: <54BC6894.6060500@huawei.com>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Sun, 18 Jan 2015 19:24:54 -0700
+Subject: Tegra baseline test results for v3.19-rc5
+Message-ID: <54BC6AF6.6010407@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> I'm confused: the same code is already part of the PCI tree, but with
->> Lorenzo Pieralisi listed as the patch author. The code is good,
->> and I acked it in the past, but one of you is (probably by accident)
->> misattributing the patch.
->>
->> Assuming that the patch that is already merged in next is the right
->> one, I think you should rebase your series on top of
->>
->> git://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git#next
->>
->> to avoid conflicts like this one.
->>
-> 
-> I think I just got confused because the code duplicates most of
-> pci_bus_assign_domain_nr(). Maybe this can be done in a better way
-> by splitting the existing function into 
-> 
-> static int pci_assign_domain_nr(struct device *)
-> {
-> 	... /* most of pci_bus_assign_domain_nr */
-> 
-> 	return domain;
-> }
-> 
-> void pci_host_assign_domain_nr(struct pci_host_bridge *host)
-> {
-> 	host->domain = pci_assign_domain_nr(host->dev.parent);
-> }
-> 
-> void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
-> {
-> 	bus->domain_nr = pci_assign_domain_nr(parent);
-> }
-> 
+Here are some basic Tegra test results for Linux v3.19-rc5.
+Logs and other details at:
 
-Hi Arnd,
-   I kept the almost duplicated pci_host_assign_domain_nr() and
-pci_bus_assign_domain_nr() here for building happy, because now
-platform specific pci_domain_nr() still exists which may get domain
-number from pci_bus. pci_bus_assign_domain_nr() will be removed in
-the last patch.
-
-Thanks!
-Yijing.
-
-> .
-> 
+     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.19-rc5/20150118174923/
 
 
--- 
-Thanks!
-Yijing
+Test summary
+------------
+
+Build: zImage:
+     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Boot to userspace: multi_v7_defconfig:
+     Pass: ( 3/ 3): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+     Pass: ( 3/ 3): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v3.19-rc4 (eaa27f34e91a14cdceed26ed6c6793ec1d186115)):
+    text     data      bss    total  kernel
+   +1808     +416        0    +2224  multi_v7_defconfig
+   +1188      +96        0    +1284  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v3.19-rc4 (eaa27f34e91a14cdceed26ed6c6793ec1d186115))
+     avail    rsrvd     high    freed                board              kconfig                  dtb
+       -8k       8k        .       8k tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+         .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+       -8k       8k        .       8k  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+         .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+       -8k       8k        .       8k       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
