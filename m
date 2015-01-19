@@ -1,61 +1,95 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 19 Jan 2015 13:44:41 +0000
-Subject: [PATCH 10/10] drivers: PL011: add support for the ARM SBSA generic
- UART
-In-Reply-To: <5407007.ZAjCvvOzus@wuerfel>
-References: <1421428986-11300-1-git-send-email-andre.przywara@arm.com>
- <54B95960.9070906@arm.com> <20150116183717.GM32155@leverpostej>
- <5407007.ZAjCvvOzus@wuerfel>
-Message-ID: <54BD0A49.8030107@arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 19 Jan 2015 14:46:00 +0100
+Subject: [PATCH] ARM: dts: sun4i: Add simplefb node with
+ de_fe0-de_be0-lcd0-hdmi pipeline
+In-Reply-To: <54BD082D.6030905@redhat.com>
+References: <1421672477-12978-1-git-send-email-hdegoede@redhat.com>
+ <1421672477-12978-2-git-send-email-hdegoede@redhat.com>
+ <20150119132002.GD4367@lukather> <54BD082D.6030905@redhat.com>
+Message-ID: <54BD0A98.9030309@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 19/01/15 13:31, Arnd Bergmann wrote:
-> On Friday 16 January 2015 18:37:17 Mark Rutland wrote:
+On 19-01-15 14:35, Hans de Goede wrote:
+> Hi,
+>
+> On 19-01-15 14:20, Maxime Ripard wrote:
+>> Hi Hans,
 >>
->>> Makes some sense, so what about:
->>> -----------------------
->>> Required properties:
->>> - compatible: must be "arm,sbsa-uart"
->>> - reg: exactly one register range
->>> - interrupts: exactly one interrupt specifier
+>> On Mon, Jan 19, 2015 at 02:01:17PM +0100, Hans de Goede wrote:
+>>> Testing has shown that on sun4i the display backend engine does not have
+>>> deep enough fifo-s causing flickering / tearing in full-hd mode due to
+>>> fifo underruns. This can be avoided by letting the display frontend engine
+>>> do the dma from memory, and then letting it feed the data directly into
+>>> the backend unmodified, as the frontend does have deep enough fifo-s.
 >>>
->>> Optional properties:
->>> - current-speed : the current active speed of the UART
->>> - fifo-size : always 32 as per the SBSA specification
->>> - word-size : the number of payload bits per word
->>> - parity : used parity method, can be:
->>>       "n": no parity
->>>       "e": even parity
->>>       "o": odd parity
->>>       "m": always mark (logical 1)
->>>       "s": always space (logical 0)
->>> - stop-bits : the number of stop bits after the payload
+>>> Note since u-boot-v2015.01 has been released using the de_be0-lcd0-hdmi
+>>> pipeline on sun4i, we need to keep that one around too (unfortunately).
+>>>
+>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>> ---
+>>>   arch/arm/boot/dts/sun4i-a10.dtsi | 8 ++++++++
+>>>   1 file changed, 8 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+>>> index f5e35b5..ccd60e3 100644
+>>> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
+>>> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+>>> @@ -44,6 +44,14 @@
+>>>                    <&ahb_gates 44>;
+>>>               status = "disabled";
+>>>           };
+>>> +
+>>> +        framebuffer at 1 {
+>>> +            compatible = "allwinner,simple-framebuffer", "simple-framebuffer";
+>>> +            allwinner,pipeline = "de_fe0-de_be0-lcd0-hdmi";
+>>> +            clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 43>,
+>>> +                 <&ahb_gates 44>, <&ahb_gates 46>;
+>>> +            status = "disabled";
+>>> +        };
 >>
->> Generally those look fine, though someone more familiar with serial
->> should take a look.
+>> Thanks for this.
 >>
->> We can drop fifo-size given it's fixed. Anything that we know outright
->> doesn't need to be described.
->>
->> We might want to make them mandatory. I don't see any value in not
->> knowing.
-> 
-> I think making them optional is useless, so either make them mandatory or
-> drop them if we can avoid it. Unfortunately, LCR is not part of SBSA,
-> that would let us drop the properties and still report the correct settings.
-> 
-> Would we be better off documenting that 8-n-1 is the only allowed settting?
-> I can't think of a reason why anyone would use something else.
+>> I do have a question though, maybe I'm missing something, but what
+>> would prevent us from using the existing node already? The output
+>> pipeline seems to be the same, at least for which output we
+>> use. Wether we use or not the display frontend looks like an
+>> implementation detail.
+>
+> The purpose of having a node per pipeline is to have the rights clocks
+> listed for the pipeline chosen. So the "de_fe0-de_be0-lcd0-hdmi" node
+> has one ahb_gates entry more so as to make sure the kernel does not gate
+> off the frontend.
+>
+> The idea of having different nodes per pipeline is that when we get
+> support for more module clocks in place, as a preparation for kms
+> support, we can add the module clocks to the relevant nodes, to also
+> ensure the module clocks will not get turned off.
+>
+> By having this info in the dtb, rather then in u-boot we can update
+> the clocks list as we add new clock nodes in the dtb, ensuring that
+> an older u-boot will keep working as we add support for module
+> clocks, etc.
 
-Reading the spec again I see that 8-bit word len is mandated:
-"The generic UART uses 8-bit words, equivalent to UARTLCR_H.WLEN == b11."
-So given this I guess anything other than (8)n1 is pretty useless and
-wouldn't probably be used anyways. This means that we can get rid of the
-optional properties altogether and just add "current-speed" to the list
-of required ones. I am about to implement this.
+Hmm, thinking more about this, and about how u-boot searches for
+the simplefb node, I think that having a single node like this:
 
-Cheers,
-Andre.
+         framebuffer at 0 {
+             compatible = "allwinner,simple-framebuffer", "simple-framebuffer";
+             /* This node is for de_fe0-de_be0-lcd0-hdmi, but we also declare de_be0-lcd0-hdmi
+                for compatibility with u-boot-v2015.01 which does not use the frontend */
+             allwinner,pipeline = "de_fe0-de_be0-lcd0-hdmi", "de_be0-lcd0-hdmi";
+             clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 43>,
+                  <&ahb_gates 44>, <&ahb_gates 46>;
+             status = "disabled";
+         };
+
+Should work, but this will cause simplefb to enable the frontend ahb gate
+even if it is not used (this will only impact u-boot-v2015.01 users), and as
+such feels wrong, so I would prefer to go with my patch as is.
+
+Regards,
+
+Hans
