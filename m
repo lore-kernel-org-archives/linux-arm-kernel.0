@@ -1,117 +1,91 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 19 Jan 2015 03:11:07 +0200
-Subject: [PATCH v4 17/18] iommu: exynos: init from dt-specific callback
- instead of initcall
-In-Reply-To: <1421399592-7482-18-git-send-email-m.szyprowski@samsung.com>
-References: <1421399592-7482-1-git-send-email-m.szyprowski@samsung.com>
- <1421399592-7482-18-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <10691050.Z5RGmE4fp0@avalon>
+From: naobsd@gmail.com (Naoki FUKAUMI)
+Date: Mon, 19 Jan 2015 10:16:50 +0900
+Subject: [PATCH v3 2/3] ARM: dts: rockchip: add dts for Firefly
+ Firefly-RK3288 boards
+In-Reply-To: <8724226.Kbpk2bALNd@phil>
+References: <1421464140-29903-1-git-send-email-naobsd@gmail.com>
+ <1421464140-29903-3-git-send-email-naobsd@gmail.com>
+ <8724226.Kbpk2bALNd@phil>
+Message-ID: <CAFnsNoSY=Zu2tZ7h7uJKHPyZ3cAW=HxDRTJc2BGvSrNwM5N3gQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+Hi,
 
-Thank you for the patch.
+On Mon, Jan 19, 2015 at 8:36 AM, Heiko St?bner <heiko@sntech.de> wrote:
+>> +     ext_gmac: external-gmac-clock {
+>> +             compatible = "fixed-clock";
+>> +             #clock-cells = <0>;
+>> +             clock-frequency = <125000000>;
+>> +             clock-output-names = "phy_clkout125";
+>
+> This should be named "ext_gmac". See the rockchip,rk3288-cru.txt binding
+> document.
 
-On Friday 16 January 2015 10:13:11 Marek Szyprowski wrote:
-> This patch introduces IOMMU_OF_DECLARE-based initialization to the
-> driver, which replaces subsys_initcall-based procedure.
-> exynos_iommu_of_setup ensures that each sysmmu controller is probed
-> before its master device.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  drivers/iommu/exynos-iommu.c | 28 +++++++++++++++++++++++++++-
->  1 file changed, 27 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> index c53cc8f61176..ea2659159e63 100644
-> --- a/drivers/iommu/exynos-iommu.c
-> +++ b/drivers/iommu/exynos-iommu.c
-> @@ -13,16 +13,21 @@
->  #endif
-> 
->  #include <linux/clk.h>
-> +#include <linux/dma-mapping.h>
->  #include <linux/err.h>
->  #include <linux/io.h>
->  #include <linux/iommu.h>
->  #include <linux/interrupt.h>
->  #include <linux/list.h>
-> +#include <linux/of.h>
-> +#include <linux/of_iommu.h>
-> +#include <linux/of_platform.h>
->  #include <linux/platform_device.h>
->  #include <linux/pm_runtime.h>
->  #include <linux/slab.h>
-> 
->  #include <asm/cacheflush.h>
-> +#include <asm/dma-iommu.h>
->  #include <asm/pgtable.h>
-> 
->  typedef u32 sysmmu_iova_t;
-> @@ -1084,6 +1089,8 @@ static const struct iommu_ops exynos_iommu_ops = {
->  	.pgsize_bitmap = SECT_SIZE | LPAGE_SIZE | SPAGE_SIZE,
->  };
-> 
-> +static int init_done;
-> +
->  static int __init exynos_iommu_init(void)
->  {
->  	int ret;
-> @@ -1116,6 +1123,8 @@ static int __init exynos_iommu_init(void)
->  		goto err_set_iommu;
->  	}
-> 
-> +	init_done = true;
-> +
->  	return 0;
->  err_set_iommu:
->  	kmem_cache_free(lv2table_kmem_cache, zero_lv2_table);
-> @@ -1125,4 +1134,21 @@ err_reg_driver:
->  	kmem_cache_destroy(lv2table_kmem_cache);
->  	return ret;
->  }
-> -subsys_initcall(exynos_iommu_init);
-> +
-> +static int __init exynos_iommu_of_setup(struct device_node *np)
-> +{
-> +	struct platform_device *pdev;
-> +
-> +	if (!init_done)
-> +		exynos_iommu_init();
-> +
-> +	pdev = of_platform_device_create(np, NULL, platform_bus_type.dev_root);
-> +	if (IS_ERR(pdev))
-> +		return PTR_ERR(pdev);
+I'll revert this to use "ext_gmac".
 
-This feels like a hack to me. What happens here is that you're using the 
-IOMMU_OF_DECLARE mechanism to make sure that the iommu platform device will be 
-created and registered before the normal OF bus populate mechanism kicks in, 
-thus ensuring that the iommu gets probed before other devices. In practice 
-this is pretty similar to using different init levels, which is what Will's 
-patch set was trying to avoid in the first place. Creating a new kind of init 
-levels mechanism doesn't sound very good to me.
+>> +&gmac {
+>> +     assigned-clocks = <&cru SCLK_MAC>;
+>> +     assigned-clock-parents = <&ext_gmac>;
+>> +     clock_in_out = "input";
+>> +     pinctrl-names = "default";
+>> +     pinctrl-0 = <&rgmii_pins>, <&phy_rst>, <&phy_pmeb>, <&phy_int>;
+>> +     phy_regulator = "vcc_lan";
+>
+> This is wrong in the dwmac-rk implementation at the moment which Romain Perier
+> was/is trying to rectify. I.e. there is an established devicetree api for
+> handling regulators, thus the approach the current net-code takes is just
+> wrong and thus this will need to change after.
 
-The existing exynos-iommu driver is based on classic instantiation of a 
-platform device from DT, using the normal device probing mechanism. As such it 
-relies on the availability of a struct device for various helper functions. I 
-thus understand why you want a struct device being registered for the iommu, 
-instead of initializing the device right from the exynos_iommu_of_setup() 
-function without a corresponding struct device being registered.
+I see.
 
-This leads me to question whether we should really introduce IOMMU_OF_DECLARE. 
-Using regular deferred probing seems more and more like a better solution to 
-me.
+>> +     hym8563: hym8563 at 51 {
+>> +             compatible = "haoyu,hym8563";
+>> +             reg = <0x51>;
+>> +             #clock-cells = <0>;
+>> +             clock-frequency = <32768>;
+>> +             clock-output-names = "rtc_clkout";
+>
+> this should be named "xin32k" . See radxarock.dts (as a rk3188 based similar
+> example) and the rk3288 clock controller devicetree binding.
 
-> +	of_iommu_set_ops(np, &exynos_iommu_ops);
-> +	return 0;
-> +}
-> +
-> +IOMMU_OF_DECLARE(exynos_iommu_of, "samsung,exynos-sysmmu",
-> +		 exynos_iommu_of_setup);
+I'll revert this to use "xin32k".
 
--- 
+> This is due to the fact that this is also the input for the suspend clock and
+> the core clock code expects the specific naming according to the soc
+> documentation.
+
+can I assume clock named "xin32k" is always enabled?
+no need to describe consumer explicitly?
+
+>> +&sdio0 {
+>> +     broken-cd;
+>> +     bus-width = <4>;
+>> +     clocks = <&hym8563>;
+>> +     clock-names = "lpo";
+>
+> why are you _overriding_ the clocks of the sdio controller?
+
+sorry, I was just wrong. I'll remove clocks and clock-names from here.
+
+>> +&spi2 {
+>> +     pinctrl-names = "default";
+>> +     pinctrl-0 = <&spi2_clk>, <&spi2_cs0>;
+>
+> you're enabling only the clk and chipselect, what about the data signals?
+
+no idea, I just follow schematic. if it's really unusable on mainline,
+I'll disable(remove) spi2.
+
+>> +&tsadc {
+>> +     clocks = <&hym8563>;
+>> +     clock-names = "clkin_32k";
+>
+> The tsadc driver only recognizes the clocks "tsadc", "apb_pclk" so I'm not
+> sure what you're doing with the clkin_32k name here? Also you're again
+> overwriting the existing property.
+
+I was wrong here too. I'll remove clocks and clock-names from here.
+and if it makes tsadc non-working, I'll remove tsadc too for now.
+
 Regards,
-
-Laurent Pinchart
