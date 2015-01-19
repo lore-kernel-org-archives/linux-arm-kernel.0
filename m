@@ -1,91 +1,42 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Mon, 19 Jan 2015 07:55:49 +0800
-Subject: [PATCH v2] thermal: rockchip: make temperature reporting much more
- accurate
-In-Reply-To: <1421625349-14101-1-git-send-email-wxt@rock-chips.com>
-References: <1421625349-14101-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1421625349-14101-2-git-send-email-wxt@rock-chips.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 19 Jan 2015 01:17:05 +0100
+Subject: [PATCH] USB: host: ehci_atmel: Add suspend/resume support
+In-Reply-To: <20150117160304.GA21820@gradator.net>
+References: <1421437274-31615-1-git-send-email-sylvain.rochet@finsecur.com>
+ <20150117013442.GV3843@piout.net>
+ <20150117103609.276efecf@bbrezillon>
+ <20150117104259.GA24176@gradator.net>
+ <20150117135857.71dae08f@bbrezillon>
+ <20150117160304.GA21820@gradator.net>
+Message-ID: <20150119001705.GA5014@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In general, the kernel should report temperature readings exactly as
-reported by the hardware. The cpu / gpu thermal driver works in 5 degree
-increments,but we ought to do more accurate. The temperature will do
-linear interpolation between the entries in the table.
+On 17/01/2015 at 17:03:04 +0100, Sylvain Rochet wrote :
+> Should I have added the "Acked-by: Alexandre Belloni 
+> <alexandre.belloni@free-electrons.com>" on 1/2 ?
+> 
 
-Test= $md5sum /dev/zero &
-$while true; do grep "" /sys/class/thermal/thermal_zone[1-2]/temp;
-sleep .5; done
+Yes, you could. Just a small remark, you send both patches as separate
+in v1, you should have kept them separate so it is easier to understand
+what v2 is relating to. Also, I don't think you need to use
+--in-reply-to when sending v2.
 
-e.g. We can get the result as follows:
-    /sys/class/thermal/thermal_zone1/temp:39994
-    /sys/class/thermal/thermal_zone2/temp:39086
-    /sys/class/thermal/thermal_zone1/temp:39994
-    /sys/class/thermal/thermal_zone2/temp:39540
-    /sys/class/thermal/thermal_zone1/temp:39540
-    /sys/class/thermal/thermal_zone2/temp:39540
-    /sys/class/thermal/thermal_zone1/temp:39540
-    /sys/class/thermal/thermal_zone2/temp:39994
+Finally, please including a changelog after the '---' marker in each patch
+or in the cover letter.
 
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-Reviewed-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Those are simply small things and your work is great.
 
----
+> As a side note, unfortunately AT91 slow clock mode only work on "recent" 
+> boards with Wenyou changes on linux4sam/linux-at91/linux-3.10-at91 
+> branch and is why I am still stuck to this branch (and the HLCDC FB 
+> driver, but this is going to be merged soon from what I saw, YAY !).
+> 
 
-Changes in v2:
-Reviewed-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Work is in progress to get that in 3.20 or 3.21.
 
- drivers/thermal/rockchip_thermal.c | 26 +++++++++++++++++---------
- 1 file changed, 17 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
-index 1bcddfc..a7ae23a 100644
---- a/drivers/thermal/rockchip_thermal.c
-+++ b/drivers/thermal/rockchip_thermal.c
-@@ -193,19 +193,18 @@ static u32 rk_tsadcv2_temp_to_code(long temp)
- 
- static long rk_tsadcv2_code_to_temp(u32 code)
- {
--	int high, low, mid;
--
--	low = 0;
--	high = ARRAY_SIZE(v2_code_table) - 1;
--	mid = (high + low) / 2;
-+	unsigned int low = 0;
-+	unsigned int high = ARRAY_SIZE(v2_code_table) - 1;
-+	unsigned int mid = (low + high) / 2;
-+	unsigned int scale;
- 
- 	if (code > v2_code_table[low].code || code < v2_code_table[high].code)
- 		return 125000; /* No code available, return max temperature */
- 
- 	while (low <= high) {
--		if (code >= v2_code_table[mid].code && code <
--		    v2_code_table[mid - 1].code)
--			return v2_code_table[mid].temp;
-+		if (code >= v2_code_table[mid].code &&
-+		    code < v2_code_table[mid - 1].code)
-+			break;
- 		else if (code < v2_code_table[mid].code)
- 			low = mid + 1;
- 		else
-@@ -213,7 +212,16 @@ static long rk_tsadcv2_code_to_temp(u32 code)
- 		mid = (low + high) / 2;
- 	}
- 
--	return 125000;
-+	/*
-+	 * The 5C granularity provided by the table is too much. Let's
-+	 * assume that the relationship between sensor readings and
-+	 * temperature between 2 table entries is linear and extrapolate
-+	 * to produce less granular result.
-+	 */
-+	scale = (v2_code_table[mid].temp - v2_code_table[mid - 1].temp) /
-+		(v2_code_table[mid - 1].code - v2_code_table[mid].code);
-+	return v2_code_table[mid - 1].temp +
-+			(v2_code_table[mid - 1].code - code) * scale;
- }
- 
- /**
 -- 
-1.9.1
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
