@@ -1,83 +1,32 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Mon, 19 Jan 2015 13:25:05 -0800
-Subject: [PATCH v4 2/3] i2c: iproc: Add Broadcom iProc I2C Driver
-In-Reply-To: <20150119192805.GF26493@n2100.arm.linux.org.uk>
-References: <20150115084119.GN22880@pengutronix.de>
- <54B98C18.4080807@broadcom.com> <20150117160113.GA22880@pengutronix.de>
- <54BABEE9.8070801@broadcom.com> <20150117201849.GC22880@pengutronix.de>
- <54BACB66.6040909@broadcom.com> <20150117211017.GD22880@pengutronix.de>
- <54BAD391.9080909@broadcom.com>
- <20150117224021.GA26493@n2100.arm.linux.org.uk>
- <54BAFEA9.9040900@broadcom.com>
- <20150119192805.GF26493@n2100.arm.linux.org.uk>
-Message-ID: <54BD7631.50205@broadcom.com>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Mon, 19 Jan 2015 22:28:36 +0100
+Subject: [PATCH v2] ARM: omap2plus_defconfig: Enable OHCI & EHCI HCD support
+Message-ID: <1421702916-19018-1-git-send-email-sjoerd.simons@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Enable CONFIG_USB_EHCI_HCD and CONFIG_USB_OHCI_HCD to get USB supports
+with omap2plus_defconfig.
 
+Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+---
+Changes in v2: Enable as modules rather then builtin
 
-On 1/19/2015 11:28 AM, Russell King - ARM Linux wrote:
-> On Sat, Jan 17, 2015 at 04:30:33PM -0800, Ray Jui wrote:
->>
->>
->> On 1/17/2015 2:40 PM, Russell King - ARM Linux wrote:
->>> On Sat, Jan 17, 2015 at 01:26:41PM -0800, Ray Jui wrote:
->>>> 	time_left = wait_for_completion_timeout(&iproc_i2c->done, time_left);
->>>>
->>>> 	/* disable all interrupts */
->>>> 	writel(0, iproc_i2c->base + IE_OFFSET);
->>>>
->>>> 	if (!time_left && !atomic_read(&iproc_i2c->transfer_is_successful)) {
->>>
->>> Why are you using atomic_read() here?
->>>
->> transfer_is_successful 1) will be reset to 0 in this function (before
->> kick start the I2C transfer), 2) will be set to 1 in the ISR (to signal
->> completion of the I2C transfer), and 3) will be checked in this function
->> here. I thought that means I should declare it volatile, because it can
->> be modified in both the process context and interrupt context (and I use
->> atomic because I remember Linux checkpatch warns against using volatile)?
-> 
-> You don't need volatile or atomic_t for that.
-> 
-> Rather than switching to atomic_t when seeing the checkpatch warning,
-> you'd do better to read Documentation/volatile-considered-harmful.txt
-> to understand why checkpatch issues the warning, and realise that you
-> don't need it for the above.
-> 
-> Note that in the above code, the compiler can't make an assumption
-> about iproc_i2c->transfer_is_successful because it can't tell whether
-> a called function (eg, wait_for_completion_timeout()) could modify it.
-> 
-Got it. Thanks.
+ arch/arm/configs/omap2plus_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-> Another possible issue with the above code are these lines:
-> 
-> 	/* disable all interrupts */
-> 	writel(0, iproc_i2c->base + IE_OFFSET);
-> 
-> It would be nice to think that would hit the hardware immediately, but
-> that's making assumptions about hardware which are not necessary true.
-> Your interrupt handler could even be running on another CPU after you've
-> asked for that register to be written.
-> 
-> Depending on what you're trying to achieve here, you may need:
-> 
-> 	/* disable all interrupts */
-> 	writel(0, iproc_i2c->base + IE_OFFSET);
-> 	/* read it back to ensure the write has hit */
-> 	readl(iproc_i2c->base + IE_OFFSET);
-> 
-> 	/* make sure the interrupt handler isn't running */
-> 	synchronize_irq(...->irq);
-> 
-> if what you're trying to do is to ensure that the interrupt handler has
-> finished running.
-> 
-This will be the most robust way of handling this. Given that we've
-added an additional flag to check to make sure there's no interrupt
-missed after wait_for_completion_timeout times out, it makes sense to
-ensure that by the time when we check the flag there's no pending irq.
-I'll add this to the driver and make 'xfer_is_done' an 'int' instead of
-'atomic_t'. I will also add the call to readl to flush the write in the
-remove function after interrupts are disabled.
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index c2c3a85..f4009a2 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -159,6 +159,8 @@ CONFIG_USB_NET_SMSC95XX=y
+ CONFIG_USB_ALI_M5632=y
+ CONFIG_USB_AN2720=y
+ CONFIG_USB_EPSON2888=y
++CONFIG_USB_EHCI_HCD=m
++CONFIG_USB_OHCI_HCD=m
+ CONFIG_USB_KC2190=y
+ CONFIG_LIBERTAS=m
+ CONFIG_LIBERTAS_USB=m
+-- 
+2.1.4
