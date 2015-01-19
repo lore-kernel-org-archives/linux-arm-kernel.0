@@ -1,124 +1,63 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 20 Jan 2015 03:01:42 +0800
-Subject: [PATCH] i2c: drop ancient protection against sysfs refcounting
- issues
-In-Reply-To: <1421693756-12917-1-git-send-email-wsa@the-dreams.de>
-References: <1421693756-12917-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <20150119190142.GA9451@kroah.com>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Mon, 19 Jan 2015 22:21:15 +0100
+Subject: [PATCH] ARM: omap2plus_defconfig:  Enable OHCI & EHCI HCD support
+In-Reply-To: <20150119210832.GS20386@saruman>
+References: <1421701046-17367-1-git-send-email-sjoerd.simons@collabora.co.uk>
+ <20150119210341.GR20386@saruman> <20150119210832.GS20386@saruman>
+Message-ID: <1421702475.6818.19.camel@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 19, 2015 at 07:55:56PM +0100, Wolfram Sang wrote:
-> Back in the days, sysfs seemed to have refcounting issues and subsystems
-> needed a completion to be safe. This is not the case anymore, so I2C can
-> get rid of this code. There is noone else besides I2C doing something
-> like this currently (checked with the attached coccinelle script which
-> checks if a release function exists and if it contains a completion).
+On Mon, 2015-01-19 at 15:08 -0600, Felipe Balbi wrote:
+> On Mon, Jan 19, 2015 at 03:03:41PM -0600, Felipe Balbi wrote:
+> > On Mon, Jan 19, 2015 at 09:57:26PM +0100, Sjoerd Simons wrote:
+> > > Enable CONFIG_USB_EHCI_HCD and CONFIG_USB_OHCI_HCD to get USB supports
+> > > with omap2plus_defconfig.
+> > > 
+> > > Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+> > > ---
+> > >  arch/arm/configs/omap2plus_defconfig | 2 ++
+> > >  1 file changed, 2 insertions(+)
+> > > 
+> > > diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+> > > index c2c3a85..295af70 100644
+> > > --- a/arch/arm/configs/omap2plus_defconfig
+> > > +++ b/arch/arm/configs/omap2plus_defconfig
+> > > @@ -159,6 +159,8 @@ CONFIG_USB_NET_SMSC95XX=y
+> > >  CONFIG_USB_ALI_M5632=y
+> > >  CONFIG_USB_AN2720=y
+> > >  CONFIG_USB_EPSON2888=y
+> > > +CONFIG_USB_EHCI_HCD=y
+> > > +CONFIG_USB_OHCI_HCD=y
+> > 
+> > should be modules as they break PM.
 > 
-> I have been digging through the history of linux.git and
-> linux-history.git and found that e.g. w1 used to have such a mechanism
-> and also simply removed it later.
-> 
-> Some more info from Greg Kroah-Hartman:
-> "Having that call "wait" for the other release call to happen is really
-> old, as Jean points out, from 2003.  We have "fixed" sysfs since then to
-> detach the files from the devices easier, we used to have some nasy
-> reference count issues in that area."
-> 
-> And some testing from Jean Delvare which matches my results:
-> "However I just tested unloading an i2c bus driver while its adapter's
-> new_device attribute was opened and rmmod returned immediately. So it
-> doesn't look like accessing sysfs attributes actually takes a reference
-> to the underlying i2c_adapter."
-> 
-> Let's get rid of this code before really nobody knows/understands
-> anymore what this was for and if it has a subtle use.
-> 
-> Reported-by: Pantelis Antoniou <pantelis.antoniou@konsulko.com>
-> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Jean Delvare <jdelvare@suse.de>
-> Cc: Julia Lawall <julia.lawall@lip6.fr>
-> ---
-> 
-> Of course, more testing is appreciated. Here is the coccinelle script:
-> 
-> ===
-> 
-> @has_type@
-> identifier d_type, rel_f;
-> @@
-> 
-> struct device_type d_type = {
-> 	.release = rel_f,
-> };
-> 
-> @has_device@
-> struct device *d;
-> identifier rel_f, p;
-> @@
-> 
-> (
-> 	p->dev.release = &rel_f;
-> |
-> 	d->release = &rel_f;
-> )
-> 
-> @find_type depends on has_type@
-> identifier has_type.rel_f, d;
-> @@
-> 
-> void rel_f(struct device *d)
-> {
-> 	...
-> *	complete(...);
-> 	...
-> }
-> 
-> @find_device depends on has_device@
-> identifier has_device.rel_f, d;
-> @@
-> 
-> void rel_f(struct device *d)
-> {
-> 	...
-> *	complete(...);
-> 	...
-> }
-> 
-> ===
-> 
->  drivers/i2c/i2c-core.c | 10 +---------
->  include/linux/i2c.h    |  1 -
->  2 files changed, 1 insertion(+), 10 deletions(-)
-> 
-> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-> index 39d25a8cb1ad..15cc5902cf89 100644
-> --- a/drivers/i2c/i2c-core.c
-> +++ b/drivers/i2c/i2c-core.c
-> @@ -41,7 +41,6 @@
->  #include <linux/of_device.h>
->  #include <linux/of_irq.h>
->  #include <linux/clk/clk-conf.h>
-> -#include <linux/completion.h>
->  #include <linux/hardirq.h>
->  #include <linux/irqflags.h>
->  #include <linux/rwsem.h>
-> @@ -1184,8 +1183,7 @@ EXPORT_SYMBOL_GPL(i2c_new_dummy);
->  
->  static void i2c_adapter_dev_release(struct device *dev)
->  {
-> -	struct i2c_adapter *adap = to_i2c_adapter(dev);
-> -	complete(&adap->dev_released);
-> +	/* empty, but the driver core insists we need a release function */
+> oh, and when resending, please add linux-omap to Cc, that's listed in
+> MAINTAINERS.
 
-Yeah, it does, but I hate to see this in "real" code as something is
-probably wrong with it if it happens.
+Hrm,
 
-Please move the rest of 'i2c_del_adapter' into the release function
-(what was after the wait_for_completion() call), and then all should be
-fine.
+Seems like MAINTAINERS is missing an entry to make get_maintainer.pl
+recognize linux-omap should be cc'd:
 
-thanks,
+$ ./scripts/get_maintainer.pl -f arch/arm/configs/omap2plus_defconfig
+Russell King <linux@arm.linux.org.uk> (maintainer:ARM PORT)
+Tony Lindgren <tony@atomide.com>
+(commit_signer:23/24=96%,authored:10/24=42%,added_lines:74/107=69%,removed_lines:21/24=88%)
+Felipe Balbi <balbi@ti.com>
+(commit_signer:7/24=29%,authored:5/24=21%,added_lines:22/107=21%)
+Arnd Bergmann <arnd@arndb.de> (commit_signer:6/24=25%)
+Nishanth Menon <nm@ti.com> (commit_signer:2/24=8%)
+linux-arm-kernel at lists.infradead.org (moderated list:ARM PORT)
+linux-kernel at vger.kernel.org (open list)
 
-greg k-h
+-- 
+Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Collabora Ltd.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 6170 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150119/e66a6ddd/attachment-0001.bin>
