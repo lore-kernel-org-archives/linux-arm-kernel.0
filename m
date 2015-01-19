@@ -1,36 +1,36 @@
-From: vincent.yang.fujitsu@gmail.com (Vincent Yang)
-Date: Mon, 19 Jan 2015 18:38:29 +0800
-Subject: [PATCH v4 7/8] of: add Fujitsu vendor prefix
-In-Reply-To: <1421663016-1327-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
-References: <1421663016-1327-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
-Message-ID: <1421663909-1700-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 19 Jan 2015 10:39:27 +0000
+Subject: [PATCH] arm64: Add dtb files to archclean rule
+In-Reply-To: <FF2CE3A3-56DA-4637-833F-264DD986F28C@gmail.com>
+References: <FF2CE3A3-56DA-4637-833F-264DD986F28C@gmail.com>
+Message-ID: <20150119103926.GC32131@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jassi Brar <jaswinder.singh@linaro.org>
+On Sat, Jan 17, 2015 at 01:59:31PM +0000, Jungseok Lee wrote:
+> As dts files have been reorganised under vendor subdirs, dtb files
+> cannot be removed with "make distclean" now. Thus, this patch adds
+> dtb files to archclean rule.
+> 
+> Cc: Robert Richter <rrichter@cavium.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Jungseok Lee <jungseoklee85@gmail.com>
+> ---
+>  arch/arm64/Makefile | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+> index 1c43cec..0666888 100644
+> --- a/arch/arm64/Makefile
+> +++ b/arch/arm64/Makefile
+> @@ -85,6 +85,7 @@ vdso_install:
+>  # We use MRPROPER_FILES and CLEAN_FILES now
+>  archclean:
+>  	$(Q)$(MAKE) $(clean)=$(boot)
+> +	$(Q)$(MAKE) $(clean)=$(boot)/dts
 
-Add 'fujitsu' as the vendor prefix for Fujitsu Semiconductor Ltd.
+Looks sensible. I think we can also remove the always/clean-files entries
+from arch/arm64/boot/dts/Makefile.
 
-Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
-Signed-off-by: Andy Green <andy.green@linaro.org>
-Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Tetsuya Nuriya <nuriya.tetsuya@jp.fujitsu.com>
----
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index b1df0ad..4bc8103 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -59,6 +59,7 @@ everest	Everest Semiconductor Co. Ltd.
- excito	Excito
- fcs	Fairchild Semiconductor
- fsl	Freescale Semiconductor
-+fujitsu Fujitsu Semiconductor Ltd.
- GEFanuc	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
- gef	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
- geniatech	Geniatech, Inc.
--- 
-1.9.0
+Will
