@@ -1,56 +1,44 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 19 Jan 2015 14:38:56 +0100
-Subject: [PATCHv10 0/2] Add Allwinner SoCs PWM support
-In-Reply-To: <1418850940-30835-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1418850940-30835-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20150119133855.GB23778@ulmo.nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 19 Jan 2015 14:40:36 +0100
+Subject: [PATCH v3 2/3] arm64: dts: Add APM X-Gene DMA device and DMA
+ clock DTS nodes
+In-Reply-To: <1421671269-19441-3-git-send-email-rsahu@apm.com>
+References: <1421671269-19441-1-git-send-email-rsahu@apm.com>
+ <1421671269-19441-3-git-send-email-rsahu@apm.com>
+Message-ID: <2407238.x2YxDm0cd4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 17, 2014 at 10:15:38PM +0100, Alexandre Belloni wrote:
-> Hi,
+On Monday 19 January 2015 18:11:08 Rameshwar Prasad Sahu wrote:
+> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+> index f1ad9c2..e20da23 100644
+> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
+> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+> @@ -103,6 +103,9 @@
+>                 #size-cells = <2>;
+>                 ranges;
 > 
-> This patch series adds support for the PWM controller found on the Allwinner
-> SoCs.
+> +               /* DDR range is 42-bit addressing */
+> +               dma-ranges = <0x40 0x0 0x40 0x0 0x1ff 0xffffffff>;
+> +
 > 
-> The first patch adds the driver itself.
-> The second patch adds the DT binding documentation
-> 
-> Changes in v8:
->  - renamed the driver sun4i as the PWM IP is different in the next sunxi SoCs
->  - Took into account comments from Thierry
-> 
-> Changes in v9:
->  - moved from using a mutex to a spinlock
-> 
-> Changes in v10:
->  - rebased on v3.18
->  - corrected the module name in Kconfig
->  - Added dependancy on HAS_IOMEM and COMMON_CLK
->  - changes clk_rate in sun4i_pwm_config() to be a u64 to avoid unnecessary
->    casting
->  - removed unnecessary braces
-> 
-> Alexandre Belloni (2):
->   pwm: Add Allwinner SoC support
->   pwm: sunxi: document OF bindings
-> 
->  .../devicetree/bindings/pwm/pwm-sun4i.txt          |  20 ++
->  drivers/pwm/Kconfig                                |  10 +
->  drivers/pwm/Makefile                               |   1 +
->  drivers/pwm/pwm-sun4i.c                            | 366 +++++++++++++++++++++
->  4 files changed, 397 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-sun4i.txt
->  create mode 100644 drivers/pwm/pwm-sun4i.c
 
-I've applied this series. If anyone still wants to offer a Tested-by or
-Reviewed-by, hurry up.
+The comment above is misleading, and the value is wrong. I assume you
+copied these from the AMD patch that introduced the respective property.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150119/7112e8c3/attachment-0001.sig>
+The value should be
+
+	dma-ranges = <0x40 0x0 0x40 0x0 0x200 0>;
+
+to say that any DMA to physical addresses from 0 to 0x3f.ffffffff
+is disallowed and dma to physical addresses from 0x40.00000000
+to 0x23f.ffffffff is allowed and gets translated using an
+identity mapping.
+
+I also see that on Mustang, all memory is outside of this range,
+which is a bit suspicious, while your PCI memory space is
+included.
+
+It would be best to match the numbers up with your data sheet.
+
+	Arnd
