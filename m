@@ -1,22 +1,107 @@
-From: jroedel@suse.de (Joerg Roedel)
-Date: Mon, 19 Jan 2015 13:43:48 +0100
-Subject: [PATCH v10] iopoll: Introduce memory-mapped IO polling macros
-In-Reply-To: <20150115102511.GB23475@arm.com>
-References: <1418687243-16395-1-git-send-email-mitchelh@codeaurora.org>
- <20141216094527.GC6580@arm.com>
- <vnkwtwztp2rm.fsf@mitchelh-linux.qualcomm.com>
- <20150115102511.GB23475@arm.com>
-Message-ID: <20150119124348.GA2806@suse.de>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Mon, 19 Jan 2015 21:45:34 +0900
+Subject: [PATCH] kprobes: bugfix: checks kprobes_all_disarmed in
+ unoptimized_kprobe().
+In-Reply-To: <54BCE8C3.4080903@huawei.com>
+References: <54B3B32E.7070709@hitachi.com>
+ <1421064563-77831-1-git-send-email-wangnan0@huawei.com>
+ <54B3C3A0.6010708@hitachi.com> <54BC742E.80006@huawei.com>
+ <54BCC8C0.40706@hitachi.com> <54BCE8C3.4080903@huawei.com>
+Message-ID: <54BCFC6E.1080007@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 15, 2015 at 10:25:11AM +0000, Will Deacon wrote:
-> If you get an Ack from any of Arnd/Joerg/akpm then I'm happy to take it via
-> the arm-smmu pull (along with the patch making use of it).
+(2015/01/19 20:21), Wang Nan wrote:
+> On 2015/1/19 17:05, Masami Hiramatsu wrote:
+>> Hi Wang,
+>>
+>> I've found a problem on this patch, since kprobes calls unoptioize_kprobe
+>> with kprobes_all_disarmed=true when trying to disable all kprobes, this
+>> cause a serious problem.
+>>
+>> Moreover, I couldn't reproduce your reported bug on my 3.19-rc4 kernel.
+>> Could you test it again?
+>>
 > 
-> Joerg, would you be ok with that?
+> I tested it again based on 3.19-rc5 and found that the problem still exists.
+> My testing is based on QEMU.
+> 
+> First I tested my kprobeopt for ARM, then on x86_64. The test results are pasted
+> at the bottom of this mail. Commands after 'gdb attaches to QEMU' is my actions
+> on a gdb console attached to QEMU; commands after 'inside virtual machine' is
+> what I do in Linux run under QEMU.
 
-I am ok with that, but like to have another Ack for it.
+Thank you for the reporting.
+So, now I know what happened, the problem is "debugfs/kprobes/enabled doesn't work
+correctly on optimized kprobes". Please make update the patch description.
 
+I also reproduced the bug without gdb.
+Here is the log.
 
-	Joerg
+----
+[root at localhost ~]# cd /sys/kernel/debug/tracing/
+[root at localhost tracing]# echo p do_fork+5 > kprobe_events	# setup new event
+[root at localhost tracing]# echo $$ > set_ftrace_pid		# trace only this process
+[root at localhost tracing]# echo 1 > events/kprobes/p_do_fork_5/enable	# enable it
+[root at localhost tracing]# cat trace				# check the trace data
+# tracer: nop
+#
+# entries-in-buffer/entries-written: 1/1   #P:8
+#
+#                              _-----=> irqs-off
+#                             / _----=> need-resched
+#                            | / _---=> hardirq/softirq
+#                            || / _--=> preempt-depth
+#                            ||| /     delay
+#           TASK-PID   CPU#  ||||    TIMESTAMP  FUNCTION
+#              | |       |   ||||       |         |
+            bash-3883  [006] d...   279.799023: p_do_fork_5: (do_fork+0x5/0x360) # OK, now tracing
+[root at localhost tracing]# cat ../kprobes/list
+ffffffff810bc1c5  k  do_fork+0x5    [OPTIMIZED]			# and it is actually optimized
+[root at localhost tracing]# echo 0 > ../kprobes/enabled		# disable *ALL* kprobes
+[root at localhost tracing]# echo > trace				# clear events
+[root at localhost tracing]# cat trace				# this should show empty buffer
+# tracer: nop
+#
+# entries-in-buffer/entries-written: 1/1   #P:8
+#
+#                              _-----=> irqs-off
+#                             / _----=> need-resched
+#                            | / _---=> hardirq/softirq
+#                            || / _--=> preempt-depth
+#                            ||| /     delay
+#           TASK-PID   CPU#  ||||    TIMESTAMP  FUNCTION
+#              | |       |   ||||       |         |
+            bash-3883  [006] d...   337.770785: p_do_fork_5: (do_fork+0x5/0x360)  # But still tracing!
+[root at localhost tracing]# cat trace				# Check again
+# tracer: nop
+#
+# entries-in-buffer/entries-written: 2/2   #P:8
+#
+#                              _-----=> irqs-off
+#                             / _----=> need-resched
+#                            | / _---=> hardirq/softirq
+#                            || / _--=> preempt-depth
+#                            ||| /     delay
+#           TASK-PID   CPU#  ||||    TIMESTAMP  FUNCTION
+#              | |       |   ||||       |         |
+            bash-3883  [006] d...   337.770785: p_do_fork_5: (do_fork+0x5/0x360)
+            bash-3883  [006] d...   345.592178: p_do_fork_5: (do_fork+0x5/0x360) # We are tracing!!
+
+So, after global disabling kprobes, ALL kprobes event should be disabled, but not.
+
+OK, I think your first patch is better than the second one, but not enough.
+What we should do is use kprobes_all_disarmed for force option like below.
+
+	unoptimize_kprobe(p, kprobes_all_disarmed);    /* Try to unoptimize */
+
+We also would better to check the flag in unregistering path for skipping unneeded
+disarming process when kprobes globally disarmed.
+
+Thank you,
+
+-- 
+Masami HIRAMATSU
+Software Platform Research Dept. Linux Technology Research Center
+Hitachi, Ltd., Yokohama Research Laboratory
+E-mail: masami.hiramatsu.pt at hitachi.com
