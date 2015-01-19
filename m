@@ -1,78 +1,110 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 19 Jan 2015 22:30:28 +0100
-Subject: [PATCH 1/3] ARM: Marvell: Remove init cpus function
-In-Reply-To: <1421686381-12397-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1421686381-12397-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <20150119213028.GB2938@lunn.ch>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 19 Jan 2015 22:32:39 +0100
+Subject: [PATCH] ARM: dts: sun4i: Add simplefb node with
+ de_fe0-de_be0-lcd0-hdmi pipeline
+In-Reply-To: <54BD0A98.9030309@redhat.com>
+References: <1421672477-12978-1-git-send-email-hdegoede@redhat.com>
+ <1421672477-12978-2-git-send-email-hdegoede@redhat.com>
+ <20150119132002.GD4367@lukather> <54BD082D.6030905@redhat.com>
+ <54BD0A98.9030309@redhat.com>
+Message-ID: <20150119213239.GI4367@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 19, 2015 at 05:52:59PM +0100, Daniel Lezcano wrote:
-> With the next patches, the init cpus function will be changed to be factored
-> out.
+On Mon, Jan 19, 2015 at 02:46:00PM +0100, Hans de Goede wrote:
+> Hi,
 > 
-> The function 'armada_xp_smp_init_cpus' does nothing more than a sanity check
-> after the DT has been parsed. Even if this code is valid, it does not give a
-> real benefit as the DT should be correctly filled.
+> On 19-01-15 14:35, Hans de Goede wrote:
+> >Hi,
+> >
+> >On 19-01-15 14:20, Maxime Ripard wrote:
+> >>Hi Hans,
+> >>
+> >>On Mon, Jan 19, 2015 at 02:01:17PM +0100, Hans de Goede wrote:
+> >>>Testing has shown that on sun4i the display backend engine does not have
+> >>>deep enough fifo-s causing flickering / tearing in full-hd mode due to
+> >>>fifo underruns. This can be avoided by letting the display frontend engine
+> >>>do the dma from memory, and then letting it feed the data directly into
+> >>>the backend unmodified, as the frontend does have deep enough fifo-s.
+> >>>
+> >>>Note since u-boot-v2015.01 has been released using the de_be0-lcd0-hdmi
+> >>>pipeline on sun4i, we need to keep that one around too (unfortunately).
+> >>>
+> >>>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >>>---
+> >>>  arch/arm/boot/dts/sun4i-a10.dtsi | 8 ++++++++
+> >>>  1 file changed, 8 insertions(+)
+> >>>
+> >>>diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+> >>>index f5e35b5..ccd60e3 100644
+> >>>--- a/arch/arm/boot/dts/sun4i-a10.dtsi
+> >>>+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+> >>>@@ -44,6 +44,14 @@
+> >>>                   <&ahb_gates 44>;
+> >>>              status = "disabled";
+> >>>          };
+> >>>+
+> >>>+        framebuffer at 1 {
+> >>>+            compatible = "allwinner,simple-framebuffer", "simple-framebuffer";
+> >>>+            allwinner,pipeline = "de_fe0-de_be0-lcd0-hdmi";
+> >>>+            clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 43>,
+> >>>+                 <&ahb_gates 44>, <&ahb_gates 46>;
+> >>>+            status = "disabled";
+> >>>+        };
+> >>
+> >>Thanks for this.
+> >>
+> >>I do have a question though, maybe I'm missing something, but what
+> >>would prevent us from using the existing node already? The output
+> >>pipeline seems to be the same, at least for which output we
+> >>use. Wether we use or not the display frontend looks like an
+> >>implementation detail.
+> >
+> >The purpose of having a node per pipeline is to have the rights clocks
+> >listed for the pipeline chosen. So the "de_fe0-de_be0-lcd0-hdmi" node
+> >has one ahb_gates entry more so as to make sure the kernel does not gate
+> >off the frontend.
+> >
+> >The idea of having different nodes per pipeline is that when we get
+> >support for more module clocks in place, as a preparation for kms
+> >support, we can add the module clocks to the relevant nodes, to also
+> >ensure the module clocks will not get turned off.
+> >
+> >By having this info in the dtb, rather then in u-boot we can update
+> >the clocks list as we add new clock nodes in the dtb, ensuring that
+> >an older u-boot will keep working as we add support for module
+> >clocks, etc.
 > 
-> Remove this callback.
+> Hmm, thinking more about this, and about how u-boot searches for
+> the simplefb node, I think that having a single node like this:
+> 
+>         framebuffer at 0 {
+>             compatible = "allwinner,simple-framebuffer", "simple-framebuffer";
+>             /* This node is for de_fe0-de_be0-lcd0-hdmi, but we also declare de_be0-lcd0-hdmi
+>                for compatibility with u-boot-v2015.01 which does not use the frontend */
+>             allwinner,pipeline = "de_fe0-de_be0-lcd0-hdmi", "de_be0-lcd0-hdmi";
+>             clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 43>,
+>                  <&ahb_gates 44>, <&ahb_gates 46>;
+>             status = "disabled";
+>         };
+> 
+> Should work, but this will cause simplefb to enable the frontend ahb gate
+> even if it is not used (this will only impact u-boot-v2015.01 users), and as
+> such feels wrong, so I would prefer to go with my patch as is.
 
-Hi Daniel
+That's actually what I had in mind. It didn't feel that wrong, since
+it pretty much mimics the compatible behaviour, but it's your call.
 
-What is your plan for getting these merged? Do you want me to take the
-mvebu patch? Or are you thinking of sending the complete series to the
-arm-soc maintainers?
+Maxime
 
-Thanks
-	Andrew
-
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
->  arch/arm/mach-mvebu/platsmp.c | 11 -----------
->  1 file changed, 11 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
-> index 58cc8c1..3e93422 100644
-> --- a/arch/arm/mach-mvebu/platsmp.c
-> +++ b/arch/arm/mach-mvebu/platsmp.c
-> @@ -30,8 +30,6 @@
->  #include "pmsu.h"
->  #include "coherency.h"
->  
-> -#define ARMADA_XP_MAX_CPUS 4
-> -
->  #define AXP_BOOTROM_BASE 0xfff00000
->  #define AXP_BOOTROM_SIZE 0x100000
->  
-> @@ -114,14 +112,6 @@ static void armada_xp_secondary_init(unsigned int cpu)
->  	mvebu_v7_pmsu_idle_exit();
->  }
->  
-> -static void __init armada_xp_smp_init_cpus(void)
-> -{
-> -	unsigned int ncores = num_possible_cpus();
-> -
-> -	if (ncores == 0 || ncores > ARMADA_XP_MAX_CPUS)
-> -		panic("Invalid number of CPUs in DT\n");
-> -}
-> -
->  static void __init armada_xp_smp_prepare_cpus(unsigned int max_cpus)
->  {
->  	struct device_node *node;
-> @@ -171,7 +161,6 @@ static int armada_xp_cpu_kill(unsigned int cpu)
->  #endif
->  
->  struct smp_operations armada_xp_smp_ops __initdata = {
-> -	.smp_init_cpus		= armada_xp_smp_init_cpus,
->  	.smp_prepare_cpus	= armada_xp_smp_prepare_cpus,
->  	.smp_boot_secondary	= armada_xp_boot_secondary,
->  	.smp_secondary_init     = armada_xp_secondary_init,
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150119/6120e86f/attachment.sig>
