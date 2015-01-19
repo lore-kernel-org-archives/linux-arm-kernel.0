@@ -1,16 +1,17 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 19 Jan 2015 11:21:04 -0800
-Subject: [GIT PULL] at91: cleanup for 3.20 #1
-In-Reply-To: <1421340170-13241-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1421340170-13241-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20150119192104.GF16883@quad.lixom.net>
+Date: Mon, 19 Jan 2015 11:22:00 -0800
+Subject: [GIT PULL] at91: dt for 3.20 #1
+In-Reply-To: <1421340738-13487-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1421340738-13487-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20150119192200.GG16883@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 15, 2015 at 05:42:50PM +0100, Nicolas Ferre wrote:
+On Thu, Jan 15, 2015 at 05:52:18PM +0100, Nicolas Ferre wrote:
 > Arnd, Olof, Kevin,
 > 
-> Some AT91 cleanup for 3.20, but definitively, more to come soon.
+> Some Device Tree updates for 3.20. There is no dependency for this material as
+> the drivers are already updated or not needed (syscon).
 > 
 > Thanks, best regards,
 > 
@@ -20,18 +21,7 @@ On Thu, Jan 15, 2015 at 05:42:50PM +0100, Nicolas Ferre wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-cleanup
-> 
-> for you to fetch changes up to bd87373229e3e8b1a2a42b9eeed4c60fd4418ec6:
-> 
->   ARM: at91: remove useless at91rm9200_set_type() (2015-01-15 15:24:06 +0100)
-> 
-> ----------------------------------------------------------------
-> First batch of cleanup for 3.20:
-> - Documentation for AT91 SoC
-> - Config options, files and functions removal to continue the big !DT
->   cleanup done in 3.19
-> - move of debug-macro.S to its usual location
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-dt
 
 Merged, thanks.
 
