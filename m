@@ -1,108 +1,117 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 19 Jan 2015 09:54:19 +0900
-Subject: [RESEND PATCH v3] clocksource: exynos_mct: Add the support for
- Exynos 64bit SoC
-In-Reply-To: <54B692FB.7030703@linaro.org>
-References: <1421213603-5020-1-git-send-email-cw00.choi@samsung.com>
- <54B69072.4080607@kernel.org> <54B692FB.7030703@linaro.org>
-Message-ID: <54BC55BB.7050809@samsung.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 19 Jan 2015 03:11:07 +0200
+Subject: [PATCH v4 17/18] iommu: exynos: init from dt-specific callback
+ instead of initcall
+In-Reply-To: <1421399592-7482-18-git-send-email-m.szyprowski@samsung.com>
+References: <1421399592-7482-1-git-send-email-m.szyprowski@samsung.com>
+ <1421399592-7482-18-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <10691050.Z5RGmE4fp0@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Daniel and Kukjin,
+Hi Marek,
 
-On 01/15/2015 01:02 AM, Daniel Lezcano wrote:
-> On 01/14/2015 04:51 PM, Kukjin Kim wrote:
->> On 01/14/15 14:33, Chanwoo Choi wrote:
->>
->> Hi,
->>
->> + Doug, Olof
->>
->>> This patch adds the support for Exynos 64bit SoC. The delay_timer is only used
->>> for Exynos 32bit SoC.
->>>
->> Yes, the Exynos MCT(Multi-Core Timer) is 64bit timer and it is available
->> on 64bit exynos SoC such as exynos7. But basically ARMv8 architecture is
->> including ARM ARCH timer (ARM Generic Timer) and exynos7 also has
->> implemented it and additionally its access is faster than using memory
->> mapped register called SFR for MCT...so Doug submitted patch to use MCT
->> on 32bit exynos SoCs before.
->>
->> I know using MCT on 64bit exynos is usefulness for Power Management and
->> I need to talk to relevant guys in office again. If anything, I'll let
->> you know.
-> 
-> I will wait for your answer before digging more the patch.
-> 
-> Thanks
->   -- Daniel
-> 
->>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
->>> Cc: Thomas Gleixner <tglx@linutronix.de>
->>> Cc: Kukjin Kim <kgene.kim@samsung.com>
->>> Cc: Mark Rutland <mark.rutland@arm.com>
->>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->>> ---
->>> This patch set is tested on 64-bit Exynos SoC. I send only this patch from
->>> following patchst[1].
->>> [1] https://lkml.org/lkml/2014/12/2/134
->>>
->>> Changes from v2:
->>> - None
->>> Changes from v1:
->>> - Use CONFIG_ARM instead of CONFIG_ARM64
->>>
->>>   drivers/clocksource/Kconfig      | 1 -
->>>   drivers/clocksource/exynos_mct.c | 4 ++++
->>>   2 files changed, 4 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
->>> index fc01ec2..be38119 100644
->>> --- a/drivers/clocksource/Kconfig
->>> +++ b/drivers/clocksource/Kconfig
->>> @@ -135,7 +135,6 @@ config CLKSRC_METAG_GENERIC
->>>
->>>   config CLKSRC_EXYNOS_MCT
->>>       def_bool y if ARCH_EXYNOS
->>> -    depends on !ARM64
->>>       help
->>>         Support for Multi Core Timer controller on Exynos SoCs.
->>>
->>> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
->>> index 9403061..b840ea1 100644
->>> --- a/drivers/clocksource/exynos_mct.c
->>> +++ b/drivers/clocksource/exynos_mct.c
->>> @@ -223,6 +223,7 @@ static u64 notrace exynos4_read_sched_clock(void)
->>>       return exynos4_read_count_32();
->>>   }
->>>
->>> +#if defined(CONFIG_ARM)
->>>   static struct delay_timer exynos4_delay_timer;
->>>
->>>   static cycles_t exynos4_read_current_timer(void)
->>> @@ -231,14 +232,17 @@ static cycles_t exynos4_read_current_timer(void)
->>>                "cycles_t needs to move to 32-bit for ARM64 usage");
->>>       return exynos4_read_count_32();
->>>   }
->>> +#endif
->>>
->>>   static void __init exynos4_clocksource_init(void)
->>>   {
->>>       exynos4_mct_frc_start();
->>>
->>> +#if defined(CONFIG_ARM)
->>>       exynos4_delay_timer.read_current_timer = &exynos4_read_current_timer;
->>>       exynos4_delay_timer.freq = clk_rate;
->>>       register_current_timer_delay(&exynos4_delay_timer);
->>> +#endif
->>>
->>>       if (clocksource_register_hz(&mct_frc, clk_rate))
->>>           panic("%s: can't register clocksource\n", mct_frc.name);
-> 
-> 
+Thank you for the patch.
 
-Do you have any comment about this patch?
+On Friday 16 January 2015 10:13:11 Marek Szyprowski wrote:
+> This patch introduces IOMMU_OF_DECLARE-based initialization to the
+> driver, which replaces subsys_initcall-based procedure.
+> exynos_iommu_of_setup ensures that each sysmmu controller is probed
+> before its master device.
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  drivers/iommu/exynos-iommu.c | 28 +++++++++++++++++++++++++++-
+>  1 file changed, 27 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+> index c53cc8f61176..ea2659159e63 100644
+> --- a/drivers/iommu/exynos-iommu.c
+> +++ b/drivers/iommu/exynos-iommu.c
+> @@ -13,16 +13,21 @@
+>  #endif
+> 
+>  #include <linux/clk.h>
+> +#include <linux/dma-mapping.h>
+>  #include <linux/err.h>
+>  #include <linux/io.h>
+>  #include <linux/iommu.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/list.h>
+> +#include <linux/of.h>
+> +#include <linux/of_iommu.h>
+> +#include <linux/of_platform.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/pm_runtime.h>
+>  #include <linux/slab.h>
+> 
+>  #include <asm/cacheflush.h>
+> +#include <asm/dma-iommu.h>
+>  #include <asm/pgtable.h>
+> 
+>  typedef u32 sysmmu_iova_t;
+> @@ -1084,6 +1089,8 @@ static const struct iommu_ops exynos_iommu_ops = {
+>  	.pgsize_bitmap = SECT_SIZE | LPAGE_SIZE | SPAGE_SIZE,
+>  };
+> 
+> +static int init_done;
+> +
+>  static int __init exynos_iommu_init(void)
+>  {
+>  	int ret;
+> @@ -1116,6 +1123,8 @@ static int __init exynos_iommu_init(void)
+>  		goto err_set_iommu;
+>  	}
+> 
+> +	init_done = true;
+> +
+>  	return 0;
+>  err_set_iommu:
+>  	kmem_cache_free(lv2table_kmem_cache, zero_lv2_table);
+> @@ -1125,4 +1134,21 @@ err_reg_driver:
+>  	kmem_cache_destroy(lv2table_kmem_cache);
+>  	return ret;
+>  }
+> -subsys_initcall(exynos_iommu_init);
+> +
+> +static int __init exynos_iommu_of_setup(struct device_node *np)
+> +{
+> +	struct platform_device *pdev;
+> +
+> +	if (!init_done)
+> +		exynos_iommu_init();
+> +
+> +	pdev = of_platform_device_create(np, NULL, platform_bus_type.dev_root);
+> +	if (IS_ERR(pdev))
+> +		return PTR_ERR(pdev);
 
-Best Regards,
-Chanwoo Choi
+This feels like a hack to me. What happens here is that you're using the 
+IOMMU_OF_DECLARE mechanism to make sure that the iommu platform device will be 
+created and registered before the normal OF bus populate mechanism kicks in, 
+thus ensuring that the iommu gets probed before other devices. In practice 
+this is pretty similar to using different init levels, which is what Will's 
+patch set was trying to avoid in the first place. Creating a new kind of init 
+levels mechanism doesn't sound very good to me.
+
+The existing exynos-iommu driver is based on classic instantiation of a 
+platform device from DT, using the normal device probing mechanism. As such it 
+relies on the availability of a struct device for various helper functions. I 
+thus understand why you want a struct device being registered for the iommu, 
+instead of initializing the device right from the exynos_iommu_of_setup() 
+function without a corresponding struct device being registered.
+
+This leads me to question whether we should really introduce IOMMU_OF_DECLARE. 
+Using regular deferred probing seems more and more like a better solution to 
+me.
+
+> +	of_iommu_set_ops(np, &exynos_iommu_ops);
+> +	return 0;
+> +}
+> +
+> +IOMMU_OF_DECLARE(exynos_iommu_of, "samsung,exynos-sysmmu",
+> +		 exynos_iommu_of_setup);
+
+-- 
+Regards,
+
+Laurent Pinchart
