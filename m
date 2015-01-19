@@ -1,44 +1,60 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Sun, 18 Jan 2015 19:24:54 -0700
-Subject: Tegra baseline test results for v3.19-rc5
-Message-ID: <54BC6AF6.6010407@nvidia.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Mon, 19 Jan 2015 10:39:42 +0800
+Subject: [PATCH 09/28] PCI: Separate pci_host_bridge creation out of
+ pci_create_root_bus()
+In-Reply-To: <11966423.5s0rO0b8cE@wuerfel>
+References: <1421372666-12288-1-git-send-email-wangyijing@huawei.com>
+ <1421372666-12288-10-git-send-email-wangyijing@huawei.com>
+ <11966423.5s0rO0b8cE@wuerfel>
+Message-ID: <54BC6E6E.9090200@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v3.19-rc5.
-Logs and other details at:
+On 2015/1/16 17:34, Arnd Bergmann wrote:
+> On Friday 16 January 2015 09:44:07 Yijing Wang wrote:
+>> We want to make a generic pci_host_bridge, then we could
+>> place common PCI infos like domain number in it. Ripping
+>> out pci_host_bridge creation from pci_create_root_bus()
+>> make code more better readability. Further more, we could
+>> use the generic pci_host_bridge to hold host bridge specific
+>> operations like pcibios_root_bridge_prepare().
+>>
+>> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+>>
+> 
+> I assume this patch is doing the right thing, but the description
+> above doesn't really tell me enough to be sure.
+> 
+> This is supposed to be transparent to the callers, right? If
+> so, please mention it explicitly in the text.
 
-     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.19-rc5/20150118174923/
+Sorry, I will refresh the patch log for better description.
+
+In this series I have no plan to export the pci_create_host_bridge()
+to callers, because I think pci_host_bridge_ops could make callers
+have the ability to setup the platform specific operations. But if this
+is needed, we could introduce another patches to export it.
+
+> 
+> Also you don't explain what the list of host bridges is
+> used for. Maybe you can split this out into a separate patch
+> so you have one patch that just moves code from one file
+> to the other but no functional changes, and a second patch
+> that exports pci_create_host_bridge and introduces the list,
+> with an explanation of what it is used for.
+> 
+
+pci_host_bridge_list is used to find out whether the pci_host_bridge
+in domain:bus is already existed, I will split the related code
+to another patch, thanks.
 
 
-Test summary
-------------
-
-Build: zImage:
-     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Boot to userspace: multi_v7_defconfig:
-     Pass: ( 3/ 3): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-     Pass: ( 3/ 3): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra30-beaver
+> 	Arnd
+> 
+> .
+> 
 
 
-vmlinux object size
-(delta in bytes from test_v3.19-rc4 (eaa27f34e91a14cdceed26ed6c6793ec1d186115)):
-    text     data      bss    total  kernel
-   +1808     +416        0    +2224  multi_v7_defconfig
-   +1188      +96        0    +1284  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v3.19-rc4 (eaa27f34e91a14cdceed26ed6c6793ec1d186115))
-     avail    rsrvd     high    freed                board              kconfig                  dtb
-       -8k       8k        .       8k tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-         .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-       -8k       8k        .       8k  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-         .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-       -8k       8k        .       8k       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+-- 
+Thanks!
+Yijing
