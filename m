@@ -1,82 +1,150 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 19 Jan 2015 18:35:27 +0900
-Subject: [PATCH v4 1/9] devfreq: exynos: Add generic exynos memory bus
- frequency driver
-In-Reply-To: <27342443.1253691421659213933.JavaMail.weblogic@epmlwas05d>
-References: <27342443.1253691421659213933.JavaMail.weblogic@epmlwas05d>
-Message-ID: <54BCCFDF.5040305@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 19 Jan 2015 09:37:18 +0000
+Subject: [PATCH v8 1/6] mfd: AXP20x: Add bindings documentation
+In-Reply-To: <1419303194-3075-2-git-send-email-wens@csie.org>
+References: <1419303194-3075-1-git-send-email-wens@csie.org>
+ <1419303194-3075-2-git-send-email-wens@csie.org>
+Message-ID: <20150119093718.GH21886@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Myungjoo,
+On Tue, 23 Dec 2014, Chen-Yu Tsai wrote:
 
-On 01/19/2015 06:20 PM, MyungJoo Ham wrote:
->>   
->>  This patch adds the generic exynos bus frequency driver for memory bus
->> with DEVFREQ framework. The Samsung Exynos SoCs have the common architecture
->> for memory bus between DRAM memory and MMC/sub IP in SoC. This driver can
->> support the memory bus frequency driver for Exynos SoCs.
->>
->> Each memory bus block has a clock for memory bus speed and frequency
->> table which is changed according to the utilization of memory bus on runtime.
->> And then each memory bus group has the one more memory bus blocks and
->> OPP table (including frequency and voltage), regulator, devfreq-event
->> devices.
->>
->> There are a little difference about the number of memory bus because each Exynos
->> SoC have the different sub-IP and different memory bus speed. In spite of this
->> difference among Exynos SoCs, we can support almost Exynos SoC by adding
->> unique data of memory bus to devicetree file.
->>
->> Cc: Myungjoo Ham <myungjoo.ham@samsung.com>
->> Cc: Kyungmin Park <kyungmin.park@samsung.com>
->> Cc: Kukjin Kim <kgene@kernel.org>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> ---
->>  drivers/devfreq/Kconfig             |  15 +
->>  drivers/devfreq/Makefile            |   1 +
->>  drivers/devfreq/exynos/Makefile     |   1 +
->>  drivers/devfreq/exynos/exynos-bus.c | 598 ++++++++++++++++++++++++++++++++++++
->>  4 files changed, 615 insertions(+)
->>  create mode 100644 drivers/devfreq/exynos/exynos-bus.c
->>
+> From: Carlo Caione <carlo@caione.org>
 > 
-> []
+> Bindings documentation for the AXP20x driver. In this file also
+> sub-nodes are documented.
 > 
->> +static void exynos_bus_exit(struct device *dev)
->> +{
->> +	struct exynos_memory_bus *bus = dev_get_drvdata(dev);
->> +	int i, ret;
->> +
->> +	ret = exynos_bus_disable_edev(bus);
->> +	if (ret < 0)
->> +		dev_warn(dev, "failed to disable the devfreq-event devices\n");
->> +
->> +	for (i = 0; i < bus->block_count; i++)
->> +		clk_disable_unprepare(bus->block[i].clk);
->> +
->> +	if (regulator_is_enabled(bus->regulator))
->> +		regulator_disable(bus->regulator);
+> Signed-off-by: Carlo Caione <carlo@caione.org>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> [wens at csie.org: clarify interrupt source for the axp PMIC]
+> [wens at csie.org: explain dcdc-workmode in detail and trim lines to 80 chars]
+> [wens at csie.org: make regulator supplies optional if using unregulated input]
+> [wens at csie.org: use cubieboard2 regulator nodes as example]
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  Documentation/devicetree/bindings/mfd/axp20x.txt | 97 ++++++++++++++++++++++++
+>  1 file changed, 97 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/axp20x.txt
 > 
-> This is_enabled check is itchy.
-> 
-> Why do you need this here?
-> Please let me know what kind of errors here.
-> (note that this may simply hide errors made by other drivers)
-> 
-> Adding this condition does not introduce additional error, but
-> could you please let me know why it is here? This is supposed to be
-> paired with probe.
+> diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+> new file mode 100644
+> index 000000000000..b775d8ccbc7c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+> @@ -0,0 +1,97 @@
+> +AXP202/AXP209 device tree bindings
+> +
+> +The axp20x family current members :
+> +axp202 (X-Powers)
+> +axp209 (X-Powers)
+> +
+> +Required properties:
+> +- compatible: "x-powers,axp202" or "x-powers,axp209"
+> +- reg: The I2C slave address for the AXP chip
+> +- interrupt-parent: The parent interrupt controller
+> +- interrupts: SoC NMI / GPIO interrupt connected to the PMIC's IRQ pin
+> +- interrupt-controller: axp20x has its own internal IRQs
+> +- #interrupt-cells: Should be set to 1
+> +- regulators: A node that houses a sub-node for each regulator. The regulators
+> +	      are bound using their name as listed here: dcdc2, dcdc3, ldo1,
+> +	      ldo2, ldo3, ldo4, ldo5.  The bindings details of individual
+> +	      regulator device can be found in:
+> +	      Documentation/devicetree/bindings/regulator/regulator.txt with
+> +	      the exception of x-powers,dcdc-freq. Regulators not used should
+> +	      still be listed for completeness and that the regulator subsystem
+> +	      properly registers them.
+> +
+> +- x-powers,dcdc-freq: defines the work frequency of DC-DC in KHz
+> +		      (range: 750-1875). Default: 1.5MHz
 
-The regulator_is_enabled() is not necessary according to your comment.
-I'll remove it.
+I'm not keen on defining new properties when existing properties would
+suffice.  How about using clock-frequency here instead?  Also it's not
+common to issue this stuff using metric prefixes (KHz, MHz, etc).
+Please use HZ.
 
-> 
-> 
-> Except this point (valid if addressed or {explained and understood}),
-> Acked-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+> +Optional properties:
+> +- regulator supplies - may be omitted if inputs are unregulated, such as using
+> +		       the IPSOUT output from the PMIC
+> +  - acin-supply: The input supply for LDO1
+> +  - vin2-supply: The input supply for DCDC2
+> +  - vin3-supply: The input supply for DCDC3
+> +  - ldo24in-supply: The input supply for LDO2, LDO4
+> +  - ldo3in-supply: The input supply for LDO3
+> +  - ldo5in-supply: The input supply for LDO5
+> +
+> +Optional properties for DCDC regulators:
+> +- x-powers,dcdc-workmode: 1 for PWM mode, 0 for AUTO (PWM/PFM) mode
 
-Thanks for your review.
+If there only two options, please use bool.
 
-Best Regards,
-Chanwoo Choi
+'x-powers,dcdc-workmode-pwm' and default to auto if it's not present.
+
+> +			  Default: AUTO mode
+> +			  The DCDC regulators work in a mixed PWM/PFM mode,
+> +			  using PFM under light loads and switching to PWM
+> +			  for heavier loads. Forcing PWM mode trades efficiency
+> +			  under light loads for lower output noise. This
+> +			  probably makes sense for HiFi audio related
+> +			  applications that aren't battery constrained.
+> +
+> +Example:
+> +
+> +axp209: pmic at 34 {
+> +	compatible = "x-powers,axp209";
+> +	reg = <0x34>;
+> +	interrupt-parent = <&nmi_intc>;
+> +	interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+> +	interrupt-controller;
+> +	#interrupt-cells = <1>;
+> +
+> +	regulators {
+> +		x-powers,dcdc-freq = <1500>;
+> +
+> +		vdd_cpu: dcdc2 {
+> +			regulator-always-on;
+> +			regulator-min-microvolt = <1000000>;
+> +			regulator-max-microvolt = <1450000>;
+> +			regulator-name = "vdd-cpu";
+> +		};
+> +
+> +		vdd_int_dll: dcdc3 {
+> +			regulator-always-on;
+> +			regulator-min-microvolt = <1000000>;
+> +			regulator-max-microvolt = <1400000>;
+> +			regulator-name = "vdd-int-dll";
+> +		};
+> +
+> +		vdd_rtc: ldo1 {
+> +			regulator-always-on;
+> +			regulator-min-microvolt = <1200000>;
+> +			regulator-max-microvolt = <1400000>;
+> +			regulator-name = "vdd-rtc";
+> +		};
+> +
+> +		avcc: ldo2 {
+> +			regulator-always-on;
+> +			regulator-min-microvolt = <2700000>;
+> +			regulator-max-microvolt = <3300000>;
+> +			regulator-name = "avcc";
+> +		};
+> +
+> +		ldo3 {
+> +			/* unused */
+> +		};
+
+Does this need to be in the example?
+
+> +		csi1_io_2v8: ldo4 {
+> +			/* output on extension headers */
+> +			regulator-name = "csi1-io-2v8";
+> +		};
+> +	};
+> +};
+> +
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
