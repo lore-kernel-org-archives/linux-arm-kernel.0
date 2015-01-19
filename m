@@ -1,81 +1,95 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 19 Jan 2015 14:34:20 +0100
-Subject: [PATCHv5 0/6] USB: host: Atmel OHCI and EHCI drivers improvements
-In-Reply-To: <1421619935-5022-1-git-send-email-sylvain.rochet@finsecur.com>
-References: <20150118211728.GA21128@gradator.net>
- <1421619935-5022-1-git-send-email-sylvain.rochet@finsecur.com>
-Message-ID: <54BD07DC.6020802@atmel.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 19 Jan 2015 14:35:41 +0100
+Subject: [PATCH] ARM: dts: sun4i: Add simplefb node with
+ de_fe0-de_be0-lcd0-hdmi pipeline
+In-Reply-To: <20150119132002.GD4367@lukather>
+References: <1421672477-12978-1-git-send-email-hdegoede@redhat.com>
+ <1421672477-12978-2-git-send-email-hdegoede@redhat.com>
+ <20150119132002.GD4367@lukather>
+Message-ID: <54BD082D.6030905@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 18/01/2015 23:25, Sylvain Rochet a ?crit :
-> USB: host: Atmel OHCI and EHCI drivers improvements
-> 
-> Suspend/resume support for EHCI.
-> struct dev_pm_ops for OHCI.
-> Removed global variables from both.
-> Fixed OHCI wake up support for STANDBY(wake-up enabled) and MEM(wake-up 
-> disabled) sleep targets.
+Hi,
 
-I'm okay with the whole series:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+On 19-01-15 14:20, Maxime Ripard wrote:
+> Hi Hans,
+>
+> On Mon, Jan 19, 2015 at 02:01:17PM +0100, Hans de Goede wrote:
+>> Testing has shown that on sun4i the display backend engine does not have
+>> deep enough fifo-s causing flickering / tearing in full-hd mode due to
+>> fifo underruns. This can be avoided by letting the display frontend engine
+>> do the dma from memory, and then letting it feed the data directly into
+>> the backend unmodified, as the frontend does have deep enough fifo-s.
+>>
+>> Note since u-boot-v2015.01 has been released using the de_be0-lcd0-hdmi
+>> pipeline on sun4i, we need to keep that one around too (unfortunately).
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>   arch/arm/boot/dts/sun4i-a10.dtsi | 8 ++++++++
+>>   1 file changed, 8 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+>> index f5e35b5..ccd60e3 100644
+>> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
+>> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+>> @@ -44,6 +44,14 @@
+>>   				 <&ahb_gates 44>;
+>>   			status = "disabled";
+>>   		};
+>> +
+>> +		framebuffer at 1 {
+>> +			compatible = "allwinner,simple-framebuffer", "simple-framebuffer";
+>> +			allwinner,pipeline = "de_fe0-de_be0-lcd0-hdmi";
+>> +			clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 43>,
+>> +				 <&ahb_gates 44>, <&ahb_gates 46>;
+>> +			status = "disabled";
+>> +		};
+>
+> Thanks for this.
+>
+> I do have a question though, maybe I'm missing something, but what
+> would prevent us from using the existing node already? The output
+> pipeline seems to be the same, at least for which output we
+> use. Wether we use or not the display frontend looks like an
+> implementation detail.
 
-Alan,
-It seems that Boris and Alexandre also add their tag to the series
-already. Do you want us to collect them in a new series sent to you?
+The purpose of having a node per pipeline is to have the rights clocks
+listed for the pipeline chosen. So the "de_fe0-de_be0-lcd0-hdmi" node
+has one ahb_gates entry more so as to make sure the kernel does not gate
+off the frontend.
 
-Sylvain,
-Thanks a lot for this nice series built at a high pace ;-)
-Even if I'm not sure to keep the separation between "slow clock" PM and
-"normal" PM on AT91 but more likely to use the "slow clock" for all the
-PM modes, let's go forward with this step for now. I mean, we will
-certainly rework this at91_suspend_entering_slow_clock() aspect in the
-future.
+The idea of having different nodes per pipeline is that when we get
+support for more module clocks in place, as a preparation for kms
+support, we can add the module clocks to the relevant nodes, to also
+ensure the module clocks will not get turned off.
 
-Bye,
+By having this info in the dtb, rather then in u-boot we can update
+the clocks list as we add new clock nodes in the dtb, ensuring that
+an older u-boot will keep working as we add support for module
+clocks, etc.
 
-> Changes since v4:
->   * Re-add at91_suspend_entering_slow_clock() to OHCI, we can't naively
->     remove this one, this device needs to be continuously clocked to
->     provide wake up support.
->     The removal of at91_suspend_entering_slow_clock() actually lighted up
->     an issue on wake up support, which is now fixed.
-> 
-> Changes since v3:
->   * Using struct dev_pm_ops instead of static struct platform_driver
->     resume and suspend bindings for both EHCI and OHCI
->   * Fixed inconsistency in patch subjects, _ intead of - for file names
->   * Patch cleaning with the help of checkpatch.pl, fixed lines over
->     80 characters
-> 
-> Changes since v2:
->   * Added patchs from an other submission, because this series
->     depended on this one
->     * EHCI: Move global variables to private struct
->     * OHCI: Move global variables to private struct
->   * Using ohci->priv and ehci->priv instead of hcd->hcd_priv,
->     which were not the right way to do that
-> 
-> Changes since v1:
->   * Don't use at91_suspend_entering_slow_clock() on EHCI,
->     we are trying to get read of this of this function
->   * Removed at91_suspend_entering_slow_clock() from OHCI
-> 
-> Sylvain Rochet (6):
->   USB: host: ehci-atmel: Add suspend/resume support
->   USB: host: ohci-at91: Use struct dev_pm_ops instead of struct
->     platform_driver
->   USB: host: ehci-atmel: Move global variables to private struct
->   USB: host: ohci-at91: Fix wake-up support
->   USB: host: ohci-at91: Move global variables to private struct
->   USB: host: ohci-at91: usb_hcd_at91_probe(), remove useless stack
->     initialisation
-> 
->  drivers/usb/host/ehci-atmel.c | 102 ++++++++++++++++++++++++++---------
->  drivers/usb/host/ohci-at91.c  | 120 +++++++++++++++++++++++++-----------------
->  2 files changed, 150 insertions(+), 72 deletions(-)
-> 
+> That or just having several strings in allwinner,pipeline.
+>
+> If this simplefb binding is just going to be a collection of all the
+> various combinations we have, plus the legacy options, I'm a bit
+> worried that this is just going to be a hell to maintain, without any
+> way to remove it at compile time (if such feature is ever merged in
+> DTC).
 
+I can understand where you're coming from, I wish I could say there
+will be no more surprises / additions, but I don't want to make
+promises I cannot keep. I do not see u-boot adding support for multiple
+displays anytime soon, so things should stay limited to 3 nodes (one for
+hdmi, lcd and vga each) or 2 nodes on socs without hdmi.
 
--- 
-Nicolas Ferre
+Except on sun4i where we need 2 for hdmi for compat reasons for a total
+of 4.
+
+But my crystal ball is defunct, so I cannot promise things will stay
+limited to this.
+
+Regards,
+
+Hans
