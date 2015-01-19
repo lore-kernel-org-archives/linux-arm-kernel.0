@@ -1,57 +1,34 @@
-From: mamlinav@gmail.com (Aleksei Mamlin)
-Date: Mon, 19 Jan 2015 22:35:22 +0300
-Subject: [PATCH] ARM: dts: sunxi: Add missing mdio label
-Message-ID: <1421696122-5389-1-git-send-email-mamlinav@gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 19 Jan 2015 20:39:15 +0100
+Subject: [PATCH] i2c: drop ancient protection against sysfs refcounting
+ issues
+In-Reply-To: <20150119191210.GE26493@n2100.arm.linux.org.uk>
+References: <1421693756-12917-1-git-send-email-wsa@the-dreams.de>
+ <20150119191210.GE26493@n2100.arm.linux.org.uk>
+Message-ID: <20150119193915.GA9969@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add missing mdio label for sun[457]i.
+On Mon, Jan 19, 2015 at 07:12:10PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Jan 19, 2015 at 07:55:56PM +0100, Wolfram Sang wrote:
+> > Back in the days, sysfs seemed to have refcounting issues and subsystems
+> > needed a completion to be safe. This is not the case anymore, so I2C can
+> > get rid of this code. There is noone else besides I2C doing something
+> > like this currently (checked with the attached coccinelle script which
+> > checks if a release function exists and if it contains a completion).
+> 
+> Have you validated this with DEBUG_KOBJECT_RELEASE enabled?
 
-Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
----
- arch/arm/boot/dts/sun4i-a10.dtsi  | 2 +-
- arch/arm/boot/dts/sun5i-a10s.dtsi | 2 +-
- arch/arm/boot/dts/sun7i-a20.dtsi  | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+You saved me, thank you a lot for this pointer! Patch discarded.
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index ca79172..6a57f5b 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -464,7 +464,7 @@
- 			status = "disabled";
- 		};
- 
--		mdio at 01c0b080 {
-+		mdio: mdio at 01c0b080 {
- 			compatible = "allwinner,sun4i-a10-mdio";
- 			reg = <0x01c0b080 0x14>;
- 			status = "disabled";
-diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
-index 76c20c5..74b201a 100644
---- a/arch/arm/boot/dts/sun5i-a10s.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
-@@ -367,7 +367,7 @@
- 			status = "disabled";
- 		};
- 
--		mdio at 01c0b080 {
-+		mdio: mdio at 01c0b080 {
- 			compatible = "allwinner,sun4i-a10-mdio";
- 			reg = <0x01c0b080 0x14>;
- 			status = "disabled";
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 49ae6e6..e10c2b8 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -588,7 +588,7 @@
- 			status = "disabled";
- 		};
- 
--		mdio at 01c0b080 {
-+		mdio: mdio at 01c0b080 {
- 			compatible = "allwinner,sun4i-a10-mdio";
- 			reg = <0x01c0b080 0x14>;
- 			status = "disabled";
--- 
-2.0.5
+I assume other subsystems also moved away from 'struct device_type' for
+the release function as well; but this is just a guess for now and I'll
+call it a day for today.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150119/fd943b8a/attachment.sig>
