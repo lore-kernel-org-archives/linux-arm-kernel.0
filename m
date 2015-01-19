@@ -1,132 +1,40 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 19 Jan 2015 12:59:08 -0800
-Subject: [PATCH v9 2/3] clk: Make clk API return per-user struct clk
- instances
-In-Reply-To: <1421688067-24426-3-git-send-email-tomeu.vizoso@collabora.com>
-References: <1421688067-24426-1-git-send-email-tomeu.vizoso@collabora.com>
- <1421688067-24426-3-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <20150119205908.GC27202@codeaurora.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 19 Jan 2015 15:03:41 -0600
+Subject: [PATCH] ARM: omap2plus_defconfig: Enable OHCI & EHCI HCD support
+In-Reply-To: <1421701046-17367-1-git-send-email-sjoerd.simons@collabora.co.uk>
+References: <1421701046-17367-1-git-send-email-sjoerd.simons@collabora.co.uk>
+Message-ID: <20150119210341.GR20386@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/19, Tomeu Vizoso wrote:
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 97f3425..f2a1ff3 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -694,32 +751,32 @@ long __clk_mux_determine_rate(struct clk_hw *hw, unsigned long rate,
->  			      unsigned long *best_parent_rate,
->  			      struct clk_hw **best_parent_p)
->  {
-> -	struct clk *clk = hw->clk, *parent, *best_parent = NULL;
-> +	struct clk_core *core = hw->clk->core, *parent, *best_parent = NULL;
+On Mon, Jan 19, 2015 at 09:57:26PM +0100, Sjoerd Simons wrote:
+> Enable CONFIG_USB_EHCI_HCD and CONFIG_USB_OHCI_HCD to get USB supports
+> with omap2plus_defconfig.
+> 
+> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+> ---
+>  arch/arm/configs/omap2plus_defconfig | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+> index c2c3a85..295af70 100644
+> --- a/arch/arm/configs/omap2plus_defconfig
+> +++ b/arch/arm/configs/omap2plus_defconfig
+> @@ -159,6 +159,8 @@ CONFIG_USB_NET_SMSC95XX=y
+>  CONFIG_USB_ALI_M5632=y
+>  CONFIG_USB_AN2720=y
+>  CONFIG_USB_EPSON2888=y
+> +CONFIG_USB_EHCI_HCD=y
+> +CONFIG_USB_OHCI_HCD=y
 
-Can't we just use hw->core here?
-
->  	int i, num_parents;
->  	unsigned long parent_rate, best = 0;
->  
->  
-> @@ -820,15 +877,18 @@ int clk_prepare(struct clk *clk)
->  {
->  	int ret;
->  
-> +	if (IS_ERR_OR_NULL(clk))
-> +		return PTR_ERR(clk);
-
-What's going on here? Should be if (!clk)?
-
-> +
->  	clk_prepare_lock();
-> -	ret = __clk_prepare(clk);
-> +	ret = clk_core_prepare(clk->core);
->  	clk_prepare_unlock();
->  
->  	return ret;
->  }
->  EXPORT_SYMBOL_GPL(clk_prepare);
-> @@ -1066,9 +1149,24 @@ long clk_get_accuracy(struct clk *clk)
->  
->  	return accuracy;
->  }
-> +
-> +/**
-> + * clk_get_accuracy - return the accuracy of clk
-> + * @clk: the clk whose accuracy is being returned
-> + *
-> + * Simply returns the cached accuracy of the clk, unless
-> + * CLK_GET_ACCURACY_NOCACHE flag is set, which means a recalc_rate will be
-> + * issued.
-> + * If clk is NULL then returns 0.
-> + */
-> +long clk_get_accuracy(struct clk *clk)
-> +{
-> +	return clk_core_get_accuracy(clk->core);
-
-Oops. Missing NULL check.
-
-> +}
->  EXPORT_SYMBOL_GPL(clk_get_accuracy);
->  
-> @@ -1130,14 +1220,29 @@ unsigned long clk_get_rate(struct clk *clk)
-[...]
-> + *
-> + * Simply returns the cached rate of the clk, unless CLK_GET_RATE_NOCACHE flag
-> + * is set, which means a recalc_rate will be issued.
-> + * If clk is NULL then returns 0.
-> + */
-> +unsigned long clk_get_rate(struct clk *clk)
-> +{
-> +	return clk_core_get_rate(clk->core);
-
-Oops. Missing NULL check.
-
-> +}
->  EXPORT_SYMBOL_GPL(clk_get_rate);
-> @@ -1629,37 +1741,26 @@ static struct clk *__clk_init_parent(struct clk *clk)
-[...]
-> -int clk_set_parent(struct clk *clk, struct clk *parent)
-> +void __clk_reparent(struct clk *clk, struct clk *new_parent)
-> +{
-> +	clk_core_reparent(clk->core, new_parent->core);
-> +}
-
-Is this used? Looks like we can remove it. Sorry, not sure how I
-missed this last time.
-
-> +
-> +static int clk_core_set_parent(struct clk_core *clk, struct clk_core *parent)
->  {
->  	int ret = 0;
->  	int p_index = 0;
-> @@ -1719,6 +1820,28 @@ out:
-[...]
-> +int clk_set_parent(struct clk *clk, struct clk *parent)
-> +{
-> +	return clk_core_set_parent(clk->core, parent->core);
-
-Oops. Missing NULL check for both inputs.
-
-> +}
->  EXPORT_SYMBOL_GPL(clk_set_parent);
->  
->  /**
-> @@ -1793,18 +1909,31 @@ out:
->  }
->  
->  /**
-> + * clk_get_phase - return the phase shift of a clock signal
-> + * @clk: clock signal source
-> + *
-> + * Returns the phase shift of a clock node in degrees, otherwise returns
-> + * -EERROR.
-> + */
-> +int clk_get_phase(struct clk *clk)
-> +{
-> +	return clk_core_get_phase(clk->core);
-
-Oops. Missing NULL check.
+should be modules as they break PM.
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150119/b32a1e52/attachment.sig>
