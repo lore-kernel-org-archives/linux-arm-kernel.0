@@ -1,83 +1,100 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 Jan 2015 18:02:59 +0100
-Subject: [PATCH v6 8/8] arm: dma-mapping: plumb our iommu mapping ops into
- arch_setup_dma_ops
-In-Reply-To: <20150119162111.GA7751@ulmo.nvidia.com>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <2253719.6TRpaaEdiI@wuerfel> <20150119162111.GA7751@ulmo.nvidia.com>
-Message-ID: <14678444.nef4iEKbzI@wuerfel>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 19 Jan 2015 11:04:48 -0600
+Subject: [next-20150119]regression (mm)?
+In-Reply-To: <CANMBJr6DudDBSs+rM-e2QnC5ztxAYLuSvZ0khvx7OZdQpcu_3A@mail.gmail.com>
+References: <54BD33DC.40200@ti.com>
+ <CANMBJr6DudDBSs+rM-e2QnC5ztxAYLuSvZ0khvx7OZdQpcu_3A@mail.gmail.com>
+Message-ID: <54BD3930.7010105@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 19 January 2015 17:21:14 Thierry Reding wrote:
-> On Mon, Jan 19, 2015 at 04:52:41PM +0100, Arnd Bergmann wrote:
-> > On Monday 19 January 2015 13:36:24 Thierry Reding wrote:
-> > > On Fri, Jan 16, 2015 at 01:18:21AM +0200, Laurent Pinchart wrote:
-> > > > On Thursday 15 January 2015 11:12:17 Will Deacon wrote:
-> > > > > On Thu, Jan 15, 2015 at 08:28:44AM +0000, Thierry Reding wrote:
-> > > > > > On Wed, Jan 14, 2015 at 10:46:10AM +0000, Will Deacon wrote:
-> > > > > > > On Wed, Jan 14, 2015 at 09:00:24AM +0000, Alexandre Courbot wrote:
-> > > > > > [...]
-> > > > > > 
-> > > > > >>> 2) Say you want to use the IOMMU API in your driver, and have an iommu
-> > > > > >>> property in your device's DT node. If by chance your IOMMU is
-> > > > > >>> registered early, you will already have a mapping automatically
-> > > > > >>> created even before your probe function is called. Can this be
-> > > > > >>> avoided? Is it even safe?
-> > > > > >> 
-> > > > > >> Currently, I think you have to either teardown the ops manually or
-> > > > > >> return an error from of_xlate. Thierry was also looking at this sort of
-> > > > > >> thing, so it might be worth talking to him.
-> > > > > > 
-> > > > > > I already explained in earlier threads why I think this is a bad idea.
-> > > > > > It's completely unnatural for any driver to manually tear down something
-> > > > > > that it didn't want set up in the first place. It also means that you
-> > > > > > have to carefully audit any users of these IOMMU APIs to make sure that
-> > > > > > they do tear down. That doesn't sound like a good incremental approach,
-> > > > > > as evidenced by the breakage that Alex and Heiko have encountered.
-> > > > > 
-> > > > > Well, perhaps we hide that behind a get_iommu API or something. We *do*
-> > > > > need this manual teardown step to support things like VFIO, so it makes
-> > > > > sense to reuse it for other users too imo.
-> > > > > 
-> > > > > > The solution for me has been to completely side-step the issue and not
-> > > > > > register the IOMMU with the new mechanism at all. That is, there's no
-> > > > > > .of_xlate() implementation, which means that the ARM DMA API glue won't
-> > > > > > try to be smart and use the IOMMU in ways it's not meant to be used.
-> > > > 
-> > > > That will break when someone will want to use the same IOMMU type for devices 
-> > > > that use the DMA mapping API to hide the IOMMU. That might not be the case for 
-> > > > your IOMMU today, but it's pretty fragile, we need to fix it.
-> > > 
-> > > No, there's absolutely no issue here. It simply means that you can't do
-> > > this on Tegra. So far I'm not sure I even see an advantage in using the
-> > > IOMMU for devices that don't care about it anyway. Consider the example
-> > > of the SD/MMC or HDA. They typically allocate fairly small buffers, the
-> > > order of a single page typically. They can simply use memory handed out
-> > > by the CMA.
-> > > 
-> > > So as long as we don't add a .of_xlate() implementation or instantiate
-> > > via the IOMMU_OF_DECLARE() mechanism we simply don't support IOMMU-over-
-> > > DMA on Tegra.
-> > 
-> > It breaks as soon as you have a system with memory above the 4GB boundary,
-> > which is the whole point of iommus for most users.
+
+On 01/19/2015 10:59 AM, Tyler Baker wrote:
+> I can confirm, I am observing the same issue in my lab. 15 platforms
+> failed to boot on next-20150119.
 > 
-> Why does it break? The IOMMU API simply gets a list of pages and gets
-> the physical addresses from those pages when it maps them to the IO
-> virtual addresses. How is .of_xlate() or of_iommu_configure() related?
+> http://kernelci.org/boot/?next-20150119&fail
 
-Because almost no drivers use the IOMMU API, and they expect the dma-mapping
-API to do the right thing independent of the hardware configuration.
+http://kernelci.org/boot/all/job/next/kernel/next-20150119/
+I see many platforms succeed in lab-khilman, but fails in your farm as
+well :(
 
-> > CMA does not work for streaming mappings, only for the coherent API.
+For example:
+http://storage.kernelci.org/next/next-20150119/arm-imx_v6_v7_defconfig/lab-khilman/boot-imx6q-wandboard.txt
+has the same errors, but marked success.
+http://storage.kernelci.org/next/next-20150119/arm-imx_v6_v7_defconfig/lab-tbaker/boot-imx6q-wandboard.txt
+is marked fail.
+
+I suppose this is much worse than the "pass" status indicates.
 > 
-> Why not? And if it doesn't I'm not sure we currently care on Tegra since
-> we've gotten away with using CMA just fine so far.
+> 
+> On Monday, 19 January 2015, Nishanth Menon <nm@ti.com
+> <mailto:nm@ti.com>> wrote:
+> 
+>     Hi,
+> 
+>     Most platforms seem broken intoday's next tag.
+> 
+>     https://github.com/nmenon/kernel-test-logs/tree/next-20150119
+>     (defconfig: omap2plus_defconfig)
+> 
+>     > [    7.166600] ------------[ cut here ]------------
+>     > [    7.171676] WARNING: CPU: 0 PID: 54 at mm/mmap.c:2859
+>     exit_mmap+0x1a8/0x21c()
+>     > [    7.179194] Modules linked in:
+>     > [    7.182479] CPU: 0 PID: 54 Comm: init Not tainted
+>     3.19.0-rc5-next-20150119-00002-gfdefcded1272 #1
+>     > [    7.191863] Hardware name: Generic AM33XX (Flattened Device Tree)
+>     > [    7.198318] [<c00153f0>] (unwind_backtrace) from [<c0011a74>]
+>     (show_stack+0x10/0x14)
+>     > [    7.206528] [<c0011a74>] (show_stack) from [<c0580150>]
+>     (dump_stack+0x78/0x94)
+>     > [    7.214191] [<c0580150>] (dump_stack) from [<c003d4d0>]
+>     (warn_slowpath_common+0x7c/0xb4)
+>     > [    7.222751] [<c003d4d0>] (warn_slowpath_common) from
+>     [<c003d524>] (warn_slowpath_null+0x1c/0x24)
+>     > [    7.232038] [<c003d524>] (warn_slowpath_null) from
+>     [<c012de64>] (exit_mmap+0x1a8/0x21c)
+>     > [    7.240536] [<c012de64>] (exit_mmap) from [<c003abb8>]
+>     (mmput+0x44/0xec)
+>     > [    7.247612] [<c003abb8>] (mmput) from [<c0151368>]
+>     (flush_old_exec+0x300/0x5a4)
+>     > [    7.255357] [<c0151368>] (flush_old_exec) from [<c0195c10>]
+>     (load_elf_binary+0x2ec/0x1144)
+>     > [    7.264111] [<c0195c10>] (load_elf_binary) from [<c0150ea0>]
+>     (search_binary_handler+0x88/0x1ac)
+>     > [    7.273311] [<c0150ea0>] (search_binary_handler) from
+>     [<c019554c>] (load_script+0x260/0x280)
+>     > [    7.282232] [<c019554c>] (load_script) from [<c0150ea0>]
+>     (search_binary_handler+0x88/0x1ac)
+>     > [    7.291066] [<c0150ea0>] (search_binary_handler) from
+>     [<c0151f0c>] (do_execveat_common+0x538/0x6c4)
+>     > [    7.300628] [<c0151f0c>] (do_execveat_common) from
+>     [<c01520c4>] (do_execve+0x2c/0x34)
+>     > [    7.308881] [<c01520c4>] (do_execve) from [<c000e5e0>]
+>     (ret_fast_syscall+0x0/0x4c)
+>     > [    7.316881] ---[ end trace 3b8a46b1b280f423 ]---
+> 
+> 
+>     --
+>     Regards,
+>     Nishanth Menon
+> 
+>     _______________________________________________
+>     linux-arm-kernel mailing list
+>     linux-arm-kernel at lists.infradead.org <javascript:;>
+>     http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> 
+> 
+> -- 
+> Tyler Baker
+> Tech Lead, LAVA
+> Linaro.org | Open source software for ARM SoCs
+> Follow Linaro: http://www.facebook.com/pages/Linaro
+> http://twitter.com/#!/linaroorg - http://www.linaro.org/linaro-blog
 
-CMA is used as the backing for the dma_alloc_* API. It's impossible to
-use it for streaming data that originates from arbitrary page cache
-pages, like a send() operation on a user space network socket, or
-writing to disk.
 
-	Arnd
+-- 
+Regards,
+Nishanth Menon
