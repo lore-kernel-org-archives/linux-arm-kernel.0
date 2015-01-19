@@ -1,61 +1,52 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Mon, 19 Jan 2015 15:02:47 -0800
-Subject: [RFC][PATCH] arm64: efi: Obey EFI memory type in dmi_remap
-In-Reply-To: <CAKv+Gu8y428H0QQznV9SqhKNLMf6NVmNw5Lup3LiZYinRVMU-A@mail.gmail.com>
-References: <1421461479-31608-1-git-send-email-lauraa@codeaurora.org>
- <CAKv+Gu8y428H0QQznV9SqhKNLMf6NVmNw5Lup3LiZYinRVMU-A@mail.gmail.com>
-Message-ID: <54BD8D17.10202@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 19 Jan 2015 23:04:27 +0000
+Subject: [PATCH] i2c: drop ancient protection against sysfs refcounting
+ issues
+In-Reply-To: <20150119190142.GA9451@kroah.com>
+References: <1421693756-12917-1-git-send-email-wsa@the-dreams.de>
+ <20150119190142.GA9451@kroah.com>
+Message-ID: <20150119230427.GH26493@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/17/2015 12:24 AM, Ard Biesheuvel wrote:
-> On 17 January 2015 at 02:24, Laura Abbott <lauraa@codeaurora.org> wrote:
->> Currently, dmi_remap unconditionally calls ioremap_cache for dmi_remap.
->> The memory that's being remapped may be part of the existing EFI
->> memory map and already remapped as uncached. Remapping as cached can
->> created unexpected behavior so check the physical address against the
->> EFI memory type before remapping.
->>
->
-> Mapping the SMBIOS tables as uncached is a bad idea, as 'uncached'
-> implies MT_DEVICE_nGnRnE in the arm64 kernel, and the SMBIOS structure
-> tables are not guaranteed to be aligned. So you should at least use
-> MT_NORMAL_NC here.
->
-> Why does it end up mapped uncached in the first place? Is it backed by
-> a ROM instead of normal RAM? And does the region have any of the WT/WC
-> attributes set in addition to UC? What type is it? I suppose it has
-> the EFI_MEMORY_RUNTIME bit set as well? (Note that the spec seems to
-> assume that configuration tables always reside in system RAM [UEFI
-> spec 2.4A 2.3.6])
->
-> Also, with my latest virtmap changes, UEFI runtime regions are only
-> mapped during runtime service invocations, and explicitly when e.g.
-> the SMBIOS or ACPI layer needs to get at the data. Currently, regions
-> backed by system RAM are still covered by the linear mapping as well,
-> but that is something we intend to change too. So if the region is not
-> system RAM (!EFI_MEMORY_WB), the latest code will not have this region
-> mapped at DMI scan time, afaict.
->
-> Finally, I have been looking into classifying memory as system RAM or
-> not myself[0]. Even if SMBIOS is UEFI only in arm64, I would prefer
-> not to add infrastructure that allows us to answer these kind of
-> questions only when booted via UEFI.
->
-> [0] http://article.gmane.org/gmane.linux.kernel.efi/5133
->
->
+On Tue, Jan 20, 2015 at 03:01:42AM +0800, Greg Kroah-Hartman wrote:
+> On Mon, Jan 19, 2015 at 07:55:56PM +0100, Wolfram Sang wrote:
+> > diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+> > index 39d25a8cb1ad..15cc5902cf89 100644
+> > --- a/drivers/i2c/i2c-core.c
+> > +++ b/drivers/i2c/i2c-core.c
+> > @@ -41,7 +41,6 @@
+> >  #include <linux/of_device.h>
+> >  #include <linux/of_irq.h>
+> >  #include <linux/clk/clk-conf.h>
+> > -#include <linux/completion.h>
+> >  #include <linux/hardirq.h>
+> >  #include <linux/irqflags.h>
+> >  #include <linux/rwsem.h>
+> > @@ -1184,8 +1183,7 @@ EXPORT_SYMBOL_GPL(i2c_new_dummy);
+> >  
+> >  static void i2c_adapter_dev_release(struct device *dev)
+> >  {
+> > -	struct i2c_adapter *adap = to_i2c_adapter(dev);
+> > -	complete(&adap->dev_released);
+> > +	/* empty, but the driver core insists we need a release function */
+> 
+> Yeah, it does, but I hate to see this in "real" code as something is
+> probably wrong with it if it happens.
+> 
+> Please move the rest of 'i2c_del_adapter' into the release function
+> (what was after the wait_for_completion() call), and then all should be
+> fine.
 
-Thanks for the feedback. The tables aren't in ROM, they are in external
-memory which needs to be accessed by other devices (e.g. BMC) which
-necessitates having it marked as uncached without WT/WC attributes.
-I think for now we are going to re-evaluate the need for the support
-provided by this patch based on the feedback given.
+Are you sure about that?  Some drivers do this, eg,
 
-Thanks,
-Laura
+        i2c_del_adapter(&drv_data->adapter);
+        free_irq(drv_data->irq, drv_data);
+
+where drv_data was allocated using devm_kzalloc(), and so will be
+released when the ->remove callback (which calls the above
+i2c_del_adapter()) returns... freeing the embedded device struct.
 
 -- 
-Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
