@@ -1,115 +1,36 @@
-From: romain.perier@gmail.com (Romain Perier)
-Date: Mon, 19 Jan 2015 18:08:08 +0000
-Subject: [PATCH v1 3/4] net: stmmac: dwmac-rk: Use standard devicetree
- property for phy regulator
-In-Reply-To: <1421690889-11901-1-git-send-email-romain.perier@gmail.com>
-References: <1421690889-11901-1-git-send-email-romain.perier@gmail.com>
-Message-ID: <1421690889-11901-4-git-send-email-romain.perier@gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 19 Jan 2015 12:08:21 -0600
+Subject: [PATCH v4 01/21] serial: rewrite pxa2xx-uart to use 8250_core
+In-Reply-To: <1397668411-27162-2-git-send-email-ynvich@gmail.com>
+References: <1387309071-22382-1-git-send-email-ynvich@gmail.com>
+ <1397668411-27162-1-git-send-email-ynvich@gmail.com>
+ <1397668411-27162-2-git-send-email-ynvich@gmail.com>
+Message-ID: <CAL_JsqJUWRhGA_8NU+O=fLFdMiVNz0LV6G0LU=ikgk=zah2q2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, dwmac-rk uses a custom propety "phy_regulator" to get the name of the
-right regulator to use to power on or power off the phy. This commit converts the
-driver to use phy-supply devicetree property and the corresponding API, it cleans
-the code a bit and make it simpler to maintain.
+On Wed, Apr 16, 2014 at 12:13 PM, Sergei Ianovich <ynvich@gmail.com> wrote:
+> pxa2xx-uart was a separate uart platform driver. It was declaring
+> the same device names and numbers as 8250 driver. As a result,
+> it was impossible to use 8250 driver on PXA SoCs.
+>
+> Upon closer examination pxa2xx-uart turned out to be a clone of
+> 8250_core driver.
+>
+> Workaround for Erratum #19 according to Marvel(R) PXA270M Processor
+> Specification Update (April 19, 2010) is dropped. 8250_core reads
+> from FIFO immediately after checking DR bit in LSR.
+>
+> Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
+> Reviewed-by: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+> Reviewed-by: James Cameron <quozl@laptop.org>
+> Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> ---
+>  Resenging together with the rest of the series as the series
+>  breaks without this one at [PATCH 12/21]
 
-Signed-off-by: Romain Perier <romain.perier@gmail.com>
----
- drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c | 61 ++++++++------------------
- 1 file changed, 19 insertions(+), 42 deletions(-)
+Whatever happened with merging this? I'm asking because either this or
+fixes to PXA uart are needed to coexist with the 8250 driver and for
+earlycon to work.
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
-index 06e1637..8a8091c 100644
---- a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
-@@ -32,7 +32,7 @@
- struct rk_priv_data {
- 	struct platform_device *pdev;
- 	int phy_iface;
--	char regulator[32];
-+	struct regulator *regulator;
- 
- 	bool clk_enabled;
- 	bool clock_input;
-@@ -287,46 +287,25 @@ static int gmac_clk_enable(struct rk_priv_data *bsp_priv, bool enable)
- 
- static int phy_power_on(struct rk_priv_data *bsp_priv, bool enable)
- {
--	struct regulator *ldo;
--	char *ldostr = bsp_priv->regulator;
-+	struct regulator *ldo = bsp_priv->regulator;
- 	int ret;
- 	struct device *dev = &bsp_priv->pdev->dev;
- 
--	if (!ldostr) {
--		dev_err(dev, "%s: no ldo found\n", __func__);
-+	if (!ldo) {
-+		dev_err(dev, "%s: no regulator found\n", __func__);
- 		return -1;
- 	}
- 
--	ldo = regulator_get(NULL, ldostr);
--	if (!ldo) {
--		dev_err(dev, "\n%s get ldo %s failed\n", __func__, ldostr);
-+	if (enable) {
-+		ret = regulator_enable(ldo);
-+		if (ret)
-+			dev_err(dev, "%s: fail to enable phy-supply\n",
-+				__func__);
- 	} else {
--		if (enable) {
--			if (!regulator_is_enabled(ldo)) {
--				ret = regulator_enable(ldo);
--				if (ret != 0)
--					dev_err(dev, "%s: fail to enable %s\n",
--						__func__, ldostr);
--				else
--					dev_info(dev, "turn on ldo done.\n");
--			} else {
--				dev_warn(dev, "%s is enabled before enable",
--					 ldostr);
--			}
--		} else {
--			if (regulator_is_enabled(ldo)) {
--				ret = regulator_disable(ldo);
--				if (ret != 0)
--					dev_err(dev, "%s: fail to disable %s\n",
--						__func__, ldostr);
--				else
--					dev_info(dev, "turn off ldo done.\n");
--			} else {
--				dev_warn(dev, "%s is disabled before disable",
--					 ldostr);
--			}
--		}
--		regulator_put(ldo);
-+		ret = regulator_disable(ldo);
-+		if (ret)
-+			dev_err(dev, "%s: fail to disable phy-supply\n",
-+				__func__);
- 	}
- 
- 	return 0;
-@@ -346,14 +325,12 @@ static void *rk_gmac_setup(struct platform_device *pdev)
- 
- 	bsp_priv->phy_iface = of_get_phy_mode(dev->of_node);
- 
--	ret = of_property_read_string(dev->of_node, "phy_regulator", &strings);
--	if (ret) {
--		dev_warn(dev, "%s: Can not read property: phy_regulator.\n",
--			 __func__);
--	} else {
--		dev_info(dev, "%s: PHY power controlled by regulator(%s).\n",
--			 __func__, strings);
--		strcpy(bsp_priv->regulator, strings);
-+	bsp_priv->regulator = devm_regulator_get_optional(dev, "phy");
-+	if (IS_ERR(bsp_priv->regulator)) {
-+		if (PTR_ERR(bsp_priv->regulator) == -EPROBE_DEFER)
-+			return -EPROBE_DEFER;
-+		dev_err(dev, "no regulator found\n");
-+		bsp_priv->regulator = NULL;
- 	}
- 
- 	ret = of_property_read_string(dev->of_node, "clock_in_out", &strings);
--- 
-1.9.1
+Rob
