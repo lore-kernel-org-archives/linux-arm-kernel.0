@@ -1,91 +1,112 @@
-From: naobsd@gmail.com (Naoki FUKAUMI)
-Date: Mon, 19 Jan 2015 10:16:50 +0900
-Subject: [PATCH v3 2/3] ARM: dts: rockchip: add dts for Firefly
- Firefly-RK3288 boards
-In-Reply-To: <8724226.Kbpk2bALNd@phil>
-References: <1421464140-29903-1-git-send-email-naobsd@gmail.com>
- <1421464140-29903-3-git-send-email-naobsd@gmail.com>
- <8724226.Kbpk2bALNd@phil>
-Message-ID: <CAFnsNoSY=Zu2tZ7h7uJKHPyZ3cAW=HxDRTJc2BGvSrNwM5N3gQ@mail.gmail.com>
+From: phoenix.liyi@huawei.com (liyi 00215672)
+Date: Mon, 19 Jan 2015 01:27:02 +0000
+Subject: =?gb2312?B?tPC4tDogW1BBVENIdjRdIGFybTY0OiBkbWk6IEFkZCBTTUJJT1MvRE1JIHN1?=
+ =?gb2312?Q?pport?=
+In-Reply-To: <54BA7B0E.5020207@redhat.com>
+References: <1412437603-3394-1-git-send-email-yi.li@linaro.org>
+ <54B9F9D2.6000104@redhat.com> <20150117121247.GL3827@bivouac.eciton.net>
+ <54BA7B0E.5020207@redhat.com>
+Message-ID: <D0F5605BA99F0B4594FB1EEC24E785CC6549F905@SZXEMA510-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Jon, Leif,
 
-On Mon, Jan 19, 2015 at 8:36 AM, Heiko St?bner <heiko@sntech.de> wrote:
->> +     ext_gmac: external-gmac-clock {
->> +             compatible = "fixed-clock";
->> +             #clock-cells = <0>;
->> +             clock-frequency = <125000000>;
->> +             clock-output-names = "phy_clkout125";
->
-> This should be named "ext_gmac". See the rockchip,rk3288-cru.txt binding
-> document.
+	I am reviving with phoenix.liyi at huawei.com :)
 
-I'll revert this to use "ext_gmac".
+	Agreed with Leif, The DMI/SMBIOS data are available for user space not for kernel level on x86, which means if DMI has some bad descriptions, it should not affect the kernel boot normally.
 
->> +&gmac {
->> +     assigned-clocks = <&cru SCLK_MAC>;
->> +     assigned-clock-parents = <&ext_gmac>;
->> +     clock_in_out = "input";
->> +     pinctrl-names = "default";
->> +     pinctrl-0 = <&rgmii_pins>, <&phy_rst>, <&phy_pmeb>, <&phy_int>;
->> +     phy_regulator = "vcc_lan";
->
-> This is wrong in the dwmac-rk implementation at the moment which Romain Perier
-> was/is trying to rectify. I.e. there is an established devicetree api for
-> handling regulators, thus the approach the current net-code takes is just
-> wrong and thus this will need to change after.
+	So ARM platform will do the same thing, DMI data just as a reference for system configuration, and don't depend them to boot the sytem. :)
 
-I see.
+	Thanks!
 
->> +     hym8563: hym8563 at 51 {
->> +             compatible = "haoyu,hym8563";
->> +             reg = <0x51>;
->> +             #clock-cells = <0>;
->> +             clock-frequency = <32768>;
->> +             clock-output-names = "rtc_clkout";
->
-> this should be named "xin32k" . See radxarock.dts (as a rk3188 based similar
-> example) and the rk3288 clock controller devicetree binding.
+Yi
 
-I'll revert this to use "xin32k".
+-----????-----
+???: Jon Masters [mailto:jcm at redhat.com] 
+????: 2015?1?17? 23:09
+???: Leif Lindholm
+??: msalter at redhat.com; catalin.marinas at arm.com; will.deacon at arm.com; linux-arm-kernel at lists.infradead.org; grant.likely at linaro.org; liyi 00215672; ard.biesheuvel at linaro.org
+??: Re: [PATCHv4] arm64: dmi: Add SMBIOS/DMI support
 
-> This is due to the fact that this is also the input for the suspend clock and
-> the core clock code expects the specific naming according to the soc
-> documentation.
+On 01/17/2015 07:12 AM, Leif Lindholm wrote:
+> Hi Jon,
+> 
+> On Sat, Jan 17, 2015 at 12:57:38AM -0500, Jon Masters wrote:
+>> Hi Yi Li,
+> 
+> Yi has gone back to work inside Huawei, so probably did not receive 
+> your messags.
 
-can I assume clock named "xin32k" is always enabled?
-no need to describe consumer explicitly?
+Good to know. I was at one point tracking all of the engineers involved but it's getting harder to do that :)
 
->> +&sdio0 {
->> +     broken-cd;
->> +     bus-width = <4>;
->> +     clocks = <&hym8563>;
->> +     clock-names = "lpo";
->
-> why are you _overriding_ the clocks of the sdio controller?
+>> I would like some advice on the below patch. First, a little background.
+>>
+>> I /may/ need to use SMBIOS provided data on ARMv8 systems to 
+>> enumerate the number of physical underlying CPU sockets present.
+> 
+> This sounds like a very risky precedent to set. Hardware description 
+> for the kernel comes in the form of DT or ACPI. SMBIOS is hardware 
+> description for userland.
 
-sorry, I was just wrong. I'll remove clocks and clock-names from here.
+Agreed. I don't actually want to set this precedent on ARM yet :)
 
->> +&spi2 {
->> +     pinctrl-names = "default";
->> +     pinctrl-0 = <&spi2_clk>, <&spi2_cs0>;
->
-> you're enabling only the clk and chipselect, what about the data signals?
+> x86 added internal access to SMBIOS tables to be able to work around 
+> known-bad firmware. I would say we're in a much better place today 
+> with regards to people actually testing hardware with Linux than when 
+> that happened, so would really like to avoid opening those floodgates 
+> on ARM*.
 
-no idea, I just follow schematic. if it's really unusable on mainline,
-I'll disable(remove) spi2.
+Fair enough. I suspect we may get there one day, but I'm certainly not going to try to move that along :) I have btw pushed every vendor to rev their build information each time they build new firmware (when we build the RH reference firmware for Mustang and - other boards I won't mention on list - we do rev the version), and we'll require it in SBBR. That's on my todo list for a clarification.
 
->> +&tsadc {
->> +     clocks = <&hym8563>;
->> +     clock-names = "clkin_32k";
->
-> The tsadc driver only recognizes the clocks "tsadc", "apb_pclk" so I'm not
-> sure what you're doing with the clkin_32k name here? Also you're again
-> overwriting the existing property.
+> The rest of this email is therefore assuming we are talking about a 
+> temporary out-of-tree patch kept for development purposes until a 
+> better solution can be devised to upstream.
 
-I was wrong here too. I'll remove clocks and clock-names from here.
-and if it makes tsadc non-working, I'll remove tsadc too for now.
+Yup. I'm just exploring all of the options. Currently, there is no reliable way to extract the exact number of sockets present, even with the DT binding, and I need to know precisely how many sockets there are, with this information correctly provided in the sysfs topology.
 
-Regards,
+>> This is provided
+>> in one Type4 DMI structure per physical socket. Using that fact (such 
+>> data is already provided by all of the reference ARMv8 server 
+>> systems), and a variable interpretation of the CPU affinity data, we 
+>> can refactor the topology.c code to understand threads vs cores vs 
+>> sockets without getting confused by the extra levels of hierarchy for clusters.
+>>
+>> I am going back over some older patches, including this one to 
+>> understand the DMI port, and I notice that you call dmi_scan_machine 
+>> from an early_initcall. This will run from the init thread, after 
+>> we've done basic SMP setup in smp_prepare_cpus, which is where we 
+>> stash cpu_topology data, which is after I already need DMI data available.
+> 
+> Yep.
+> 
+>> So. If I wanted this available prior to early_initcall time, would it 
+>> be reasonable to follow e.g. x86 and move this early in the boot? I'm 
+>> not necessarily going to ask to upstream such a change (since I 
+>> expect to be able to solve the underlying problem I am looking to 
+>> address in a different fashion soon), but first want to know if it 
+>> would be reasonable to ask to do that anyway.
+> 
+> My suggestion would be to not try to over-engineer a patch not going 
+> upstream. Move the call before smp_prepare_cpus() in init/main.c.
+
+I guess. I don't like not overdoing things. You've met me right? ;)
+
+> Or, if you can be fairly certain your SMBIOS table is covered by the 
+> linear mapping, move the call to setup_arch().
+
+I thought about that. I think I can assume this, but I am not certain.
+I'm going to ponder that. For now, the above (move before SMP setup) is probably the way I'll go with it as a hackish kludge.
+
+>> P.S. I'm not interested at all in replies pointing me to the existing 
+>> DT cpu topology binding, which I am well aware of, but it does also 
+>> not actually solve the problem I have :)
+> 
+> Not going to point, but perhaps the correct answer is to ensure the 
+> information you need is provided via DT/ACPI. As your email hints at.
+
+Yep. I've multiple threads going to get this addressed properly.
+
+Thanks Leif!
+
+Jon.
