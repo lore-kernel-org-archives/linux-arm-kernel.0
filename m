@@ -1,209 +1,98 @@
-From: joshua.clayton@uniwest.com (Joshua Clayton)
-Date: Mon, 19 Jan 2015 08:21:54 -0800
-Subject: [RFC PATCH 2/5] irq: Allow interrupts to routed to NMI (or
- similar)
-In-Reply-To: <1421166931-14134-3-git-send-email-daniel.thompson@linaro.org>
-References: <1421166931-14134-1-git-send-email-daniel.thompson@linaro.org>
- <1421166931-14134-3-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <11284577.ZthGdGvihU@jclayton-pc>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 19 Jan 2015 08:28:08 -0800
+Subject: [PATCH v3 2/4] clk: mediatek: Add initial common clock support for
+ Mediatek SoCs.
+In-Reply-To: <1420685701.27952.44.camel@mtksdaap41>
+References: <1420601123-25859-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1420601123-25859-3-git-send-email-jamesjj.liao@mediatek.com>
+ <CABuKBeLQkTBYWkBWAYXjYudMAza+1zueRSqGFPd+480p1rYNwg@mail.gmail.com>
+ <1420685701.27952.44.camel@mtksdaap41>
+Message-ID: <20150119162808.22722.33140@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel, feel free to ignore my comments.
-I know less about this than anybody :)
-I am especially unfamiliar with NMI, but I will risk exposing my ignorance 
+Quoting James Liao (2015-01-07 18:55:01)
+> Hi Matthias,
+> 
+> On Wed, 2015-01-07 at 18:22 +0100, Matthias Brugger wrote:
+> > 2015-01-07 4:25 GMT+01:00 James Liao <jamesjj.liao@mediatek.com>:
+> > > +
+> > > +static void cg_set_mask(struct mtk_clk_gate *cg, u32 mask)
+> > 
+> > Please add mtk_ prefix to all functions generic for the mediatek SoCs.
+> 
+> OK.
+> 
+> > 
+> > > +       if (cg->flags & CLK_GATE_NO_SETCLR_REG) {
+> > 
+> > Is the CLK_GATE_NO_SETCLR_REG ever used?
+> > As far as I can see, in this patch set it is not.
+> 
+> No, this flag is not used in this patch. I'll remove it or add clocks
+> which use this flag in next patch.
+> 
+> > > +
+> > > +       if (cg->flags & CLK_GATE_INVERSE)
+> > > +               cg_set_mask(cg, mask);
+> > > +       else
+> > > +               cg_clr_mask(cg, mask);
+> > > +
+> > > +       mtk_clk_unlock(flags);
+> > > +
+> > > +       return 0;
+> > > +}
+> > 
+> > Actually we should use CLK_GATE_SET_TO_DISABLE instead of inventing a
+> > new bit, right?
+> 
+> CLK_GATE_SET_TO_DISABLE is used by struct clk_gate, which is different
+> from struct mtk_clk_gate. Should we use the same constant in these 2
+> different implementation? If yes, how do we avoid bit conflict between
+> clk_gate and mtk_clk_gate if we both add more flags in the future?
 
-On Tuesday, January 13, 2015 04:35:28 PM Daniel Thompson wrote:
-> Some combinations of architectures and interrupt controllers make it
-> possible for abitrary interrupt signals to be selectively made immune to
-> masking by local_irq_disable(). For example, on ARM platforms, many
-> interrupt controllers allow interrupts to be routed to FIQ rather than IRQ.
-> 
-> These features could be exploited to implement debug and tracing features
-> that can be implemented using NMI on x86 platforms (perf, hard lockup,
-> kgdb).
-> 
-> This patch assumes that the management of the NMI handler itself will be
-> architecture specific (maybe notifier list like x86, hard coded like ARM,
-> or something else entirely). The generic layer can still manage the irq
-> as normal (affinity, enable/disable, free) but is not responsible for
-> dispatching.
-> 
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> ---
->  include/linux/interrupt.h | 20 ++++++++++++++++++++
->  include/linux/irq.h       |  2 ++
->  kernel/irq/manage.c       | 29 +++++++++++++++++++++++++++--
->  3 files changed, 49 insertions(+), 2 deletions(-)
-> 
-> diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
-> index d9b05b5bf8c7..b95dc28f4cc3 100644
-> --- a/include/linux/interrupt.h
-> +++ b/include/linux/interrupt.h
-> @@ -57,6 +57,9 @@
->   * IRQF_NO_THREAD - Interrupt cannot be threaded
->   * IRQF_EARLY_RESUME - Resume IRQ early during syscore instead of at device
-> *                resume time.
-> + * __IRQF_NMI - Route the interrupt to an NMI or some similar signal that
-> is not + *              masked by local_irq_disable(). Used internally by +
-> *              request_nmi_irq().
->   */
->  #define IRQF_DISABLED		0x00000020
->  #define IRQF_SHARED		0x00000080
-> @@ -70,6 +73,7 @@
->  #define IRQF_FORCE_RESUME	0x00008000
->  #define IRQF_NO_THREAD		0x00010000
->  #define IRQF_EARLY_RESUME	0x00020000
-> +#define __IRQF_NMI		0x00040000
-> 
->  #define IRQF_TIMER		(__IRQF_TIMER | IRQF_NO_SUSPEND | IRQF_NO_THREAD)
-> 
-> @@ -139,6 +143,22 @@ extern int __must_check
->  request_percpu_irq(unsigned int irq, irq_handler_t handler,
->  		   const char *devname, void __percpu *percpu_dev_id);
-> 
-> +static inline int __must_check request_nmi_irq(unsigned int irq,
-> +					       unsigned long flags,
-> +					       const char *name, void *dev_id)
+I think that CLK_GATE_INVERSE is fine. This clock gate implementation is
+sufficiently different from the simple drivers/clk/clk-gate.c
+implementation (e.g. separate registers for setting bits, clearing bits
+and getting status).
 
-Why not pass your handler in here, instead of adding explicitly it to the 
-default FIQ handler?
+Regards,
+Mike
 
-request_nmi_irq need not exist at all. Your __IRQF_NMI flag is sufficient with 
-request_irq.
-> +{
-> +	/*
-> +	 * no_action unconditionally returns IRQ_NONE which is exactly
-> +	 * what we need. The handler might be expected to be unreachable
-> +	 * but some controllers may spuriously ack the NMI from the IRQ
-> +	 * handling code. When this happens it occurs very rarely, thus
-> +	 * by returning IRQ_NONE we can rely on the spurious interrupt
-> +	 * logic to do the right thing.
-> +	 */
-> +	return request_irq(irq, no_action, flags | IRQF_NO_THREAD | __IRQF_NMI,
-> +			   name, dev_id);
-no_action here looks kind of evil to me.
-I'd prefer to see the nonsecure irq handler check for __IRQF_NMI and call 
-no_action. 
-
-diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
-index 6f1c7a5..f810cff 100644
---- a/kernel/irq/chip.c
-+++ b/kernel/irq/chip.c
-@@ -711,7 +711,10 @@ void handle_percpu_devid_irq(unsigned int irq, struct 
-irq_desc *desc)
-                chip->irq_ack(&desc->irq_data);
- 
-        trace_irq_handler_entry(irq, action);
--       res = action->handler(irq, dev_id);
-+       if (action->flags & __IRQF_NMI)
-+               res = no_action(irq, dev_id);
-+       else
-+               res = action->handler(irq, dev_id);
-        trace_irq_handler_exit(irq, action, res);
- 
-        if (chip->irq_eoi)
-
-
-
-> +}
-> +
->  extern void free_irq(unsigned int, void *);
->  extern void free_percpu_irq(unsigned int, void __percpu *);
-> 
-> diff --git a/include/linux/irq.h b/include/linux/irq.h
-> index d09ec7a1243e..695eb37f04ae 100644
-> --- a/include/linux/irq.h
-> +++ b/include/linux/irq.h
-> @@ -307,6 +307,7 @@ static inline irq_hw_number_t irqd_to_hwirq(struct
-> irq_data *d) * @irq_eoi:		end of interrupt
->   * @irq_set_affinity:	set the CPU affinity on SMP machines
->   * @irq_retrigger:	resend an IRQ to the CPU
-> + * @irq_set_nmi_routing:set whether interrupt can act like NMI
->   * @irq_set_type:	set the flow type (IRQ_TYPE_LEVEL/etc.) of an IRQ
->   * @irq_set_wake:	enable/disable power-management wake-on of an IRQ
->   * @irq_bus_lock:	function to lock access to slow bus (i2c) chips
-> @@ -341,6 +342,7 @@ struct irq_chip {
-> 
->  	int		(*irq_set_affinity)(struct irq_data *data, const struct cpumask
-> *dest, bool force); int		(*irq_retrigger)(struct irq_data *data);
-> +	int		(*irq_set_nmi_routing)(struct irq_data *data, unsigned int nmi);
->  	int		(*irq_set_type)(struct irq_data *data, unsigned int flow_type);
->  	int		(*irq_set_wake)(struct irq_data *data, unsigned int on);
-> 
-> diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
-> index 80692373abd6..8e669051759d 100644
-> --- a/kernel/irq/manage.c
-> +++ b/kernel/irq/manage.c
-> @@ -571,6 +571,17 @@ int can_request_irq(unsigned int irq, unsigned long
-> irqflags) return canrequest;
->  }
-> 
-> +int __irq_set_nmi_routing(struct irq_desc *desc, unsigned int irq,
-> +			   unsigned int nmi)
-> +{
-> +	struct irq_chip *chip = desc->irq_data.chip;
-> +
-> +	if (!chip || !chip->irq_set_nmi_routing)
-> +		return -EINVAL;
-> +
-> +	return chip->irq_set_nmi_routing(&desc->irq_data, nmi);
-> +}
-> +
->  int __irq_set_trigger(struct irq_desc *desc, unsigned int irq,
->  		      unsigned long flags)
->  {
-> @@ -1058,11 +1069,12 @@ __setup_irq(unsigned int irq, struct irq_desc *desc,
-> struct irqaction *new) * the same type (level, edge, polarity). So both
-> flag
->  		 * fields must have IRQF_SHARED set and the bits which
->  		 * set the trigger type must match. Also all must
-> -		 * agree on ONESHOT.
-> +		 * agree on ONESHOT and NMI
->  		 */
->  		if (!((old->flags & new->flags) & IRQF_SHARED) ||
->  		    ((old->flags ^ new->flags) & IRQF_TRIGGER_MASK) ||
-> -		    ((old->flags ^ new->flags) & IRQF_ONESHOT))
-> +		    ((old->flags ^ new->flags) & IRQF_ONESHOT) ||
-> +		    ((old->flags ^ new->flags) & __IRQF_NMI))
->  			goto mismatch;
-> 
->  		/* All handlers must agree on per-cpuness */
-> @@ -1153,6 +1165,19 @@ __setup_irq(unsigned int irq, struct irq_desc *desc,
-> struct irqaction *new)
-> 
->  		init_waitqueue_head(&desc->wait_for_threads);
-> 
-> +		if (new->flags & __IRQF_NMI) {
-> +			ret = __irq_set_nmi_routing(desc, irq, true);
-> +			if (ret != 1)
-> +				goto out_mask;
-> +		} else {
-> +			ret = __irq_set_nmi_routing(desc, irq, false);
-> +			if (ret == 1) {
-> +				pr_err("Failed to disable NMI routing for irq %d\n",
-> +				       irq);
-> +				goto out_mask;
-> +			}
-> +		}
-> +
->  		/* Setup the type (level, edge polarity) if configured: */
->  		if (new->flags & IRQF_TRIGGER_MASK) {
->  			ret = __irq_set_trigger(desc, irq,
-> --
-> 1.9.3
 > 
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-Joshua Clayton
-Software Engineer
-UniWest
-122 S. 4th Avenue
-Pasco, WA 99301
-Ph: (509) 544-0720
-Fx: (509) 544-0868 
+> > > +       pr_debug("%s(): %d, %s, bit[%d]\n",
+> > > +               __func__, r, __clk_get_name(hw->clk), (int)cg->bit);
+> > 
+> > Same here. Please review all debug messages.
+> 
+> OK, I'll remove them in next patch.
+> 
+> 
+> > > +
+> > > +#define CLK_DEBUG              0
+> > > +#define DUMMY_REG_TEST         0
+> > 
+> > This defines are not used, delete them.
+> 
+> OK.
+> 
+> > > +
+> > > +extern spinlock_t *get_mtk_clk_lock(void);
+> > > +
+> > > +#define mtk_clk_lock(flags)    spin_lock_irqsave(get_mtk_clk_lock(), flags)
+> > > +#define mtk_clk_unlock(flags)  \
+> > > +       spin_unlock_irqrestore(get_mtk_clk_lock(), flags)
+> > 
+> > Please use the spinlock directly without this akward defines.
+> 
+> Do you mean we should export clk_ops_lock (from clk-mtk.c) directly
+> instead of get_mtk_clk_lock()? Or simply remove mtk_clk_lock/unlock()?
+> 
+> 
+> Best regards,
+> 
+> James
+> 
+> 
+> 
