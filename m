@@ -1,145 +1,246 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 19 Jan 2015 09:29:14 -0800
-Subject: [PATCH 4/4] ARM: dts: Add minimal support for dm8168-evm
-In-Reply-To: <CAALWOA-cdqPbLo4JvykGFODy2xUOozWg6OjzoGPLasJA022kJg@mail.gmail.com>
-References: <1421192272-20754-1-git-send-email-tony@atomide.com>
- <1421192272-20754-5-git-send-email-tony@atomide.com>
- <20150117164709.GS18552@atomide.com>
- <CAALWOA-v=-KZ5W+Giwq9Z7rdA8JM2Q+zgqZPz-5sDrHD_b-_7A@mail.gmail.com>
- <20150117181404.GW18552@atomide.com>
- <CAALWOA-cdqPbLo4JvykGFODy2xUOozWg6OjzoGPLasJA022kJg@mail.gmail.com>
-Message-ID: <20150119172914.GY18552@atomide.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Mon, 19 Jan 2015 17:33:29 +0000
+Subject: [RFC PATCH 2/5] irq: Allow interrupts to routed to NMI (or
+ similar)
+In-Reply-To: <11284577.ZthGdGvihU@jclayton-pc>
+References: <1421166931-14134-1-git-send-email-daniel.thompson@linaro.org>
+ <1421166931-14134-3-git-send-email-daniel.thompson@linaro.org>
+ <11284577.ZthGdGvihU@jclayton-pc>
+Message-ID: <54BD3FE9.8030305@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Matthijs van Duin <matthijsvanduin@gmail.com> [150117 14:41]:
-> On 17 January 2015 at 19:14, Tony Lindgren <tony@atomide.com> wrote:
-> > Oh OK. And looks like dm814x trm claims to have PINCNTL[7:0]
-> > bits for MUXMODE instead of just bits [2:0]?
+On 19/01/15 16:21, Joshua Clayton wrote:
+> Daniel, feel free to ignore my comments.
+> I know less about this than anybody :)
+> I am especially unfamiliar with NMI, but I will risk exposing my ignorance
+
+Not at all! Thanks for the review.
+
+
+> On Tuesday, January 13, 2015 04:35:28 PM Daniel Thompson wrote:
+>> Some combinations of architectures and interrupt controllers make it
+>> possible for abitrary interrupt signals to be selectively made immune to
+>> masking by local_irq_disable(). For example, on ARM platforms, many
+>> interrupt controllers allow interrupts to be routed to FIQ rather than IRQ.
+>>
+>> These features could be exploited to implement debug and tracing features
+>> that can be implemented using NMI on x86 platforms (perf, hard lockup,
+>> kgdb).
+>>
+>> This patch assumes that the management of the NMI handler itself will be
+>> architecture specific (maybe notifier list like x86, hard coded like ARM,
+>> or something else entirely). The generic layer can still manage the irq
+>> as normal (affinity, enable/disable, free) but is not responsible for
+>> dispatching.
+>>
+>> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+>> ---
+>>  include/linux/interrupt.h | 20 ++++++++++++++++++++
+>>  include/linux/irq.h       |  2 ++
+>>  kernel/irq/manage.c       | 29 +++++++++++++++++++++++++++--
+>>  3 files changed, 49 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
+>> index d9b05b5bf8c7..b95dc28f4cc3 100644
+>> --- a/include/linux/interrupt.h
+>> +++ b/include/linux/interrupt.h
+>> @@ -57,6 +57,9 @@
+>>   * IRQF_NO_THREAD - Interrupt cannot be threaded
+>>   * IRQF_EARLY_RESUME - Resume IRQ early during syscore instead of at device
+>> *                resume time.
+>> + * __IRQF_NMI - Route the interrupt to an NMI or some similar signal that
+>> is not + *              masked by local_irq_disable(). Used internally by +
+>> *              request_nmi_irq().
+>>   */
+>>  #define IRQF_DISABLED		0x00000020
+>>  #define IRQF_SHARED		0x00000080
+>> @@ -70,6 +73,7 @@
+>>  #define IRQF_FORCE_RESUME	0x00008000
+>>  #define IRQF_NO_THREAD		0x00010000
+>>  #define IRQF_EARLY_RESUME	0x00020000
+>> +#define __IRQF_NMI		0x00040000
+>>
+>>  #define IRQF_TIMER		(__IRQF_TIMER | IRQF_NO_SUSPEND | IRQF_NO_THREAD)
+>>
+>> @@ -139,6 +143,22 @@ extern int __must_check
+>>  request_percpu_irq(unsigned int irq, irq_handler_t handler,
+>>  		   const char *devname, void __percpu *percpu_dev_id);
+>>
+>> +static inline int __must_check request_nmi_irq(unsigned int irq,
+>> +					       unsigned long flags,
+>> +					       const char *name, void *dev_id)
 > 
-> However, the datasheet's table of possible mux modes per pin has as
-> column headers: 0x1, 0x2, 0x4, 0x8, 0x10, 0x20, 0x40, 0x80. (mode 0,
-> called "safe mode" is mentioned separately)
+> Why not pass your handler in here, instead of adding explicitly it to the 
+> default FIQ handler?
 > 
-> For compatibility sake I'm personally more inclined to consider them
-> modes 0-7 with "safe mode" being -1.
+> request_nmi_irq need not exist at all. Your __IRQF_NMI flag is sufficient with 
+> request_irq.
+
+The approach currently taken is designed to avoid indirection within the
+default FIQ handler and ultimately resulted from this thread:
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/331027/focus=1778426
+
+IIRC Russell King wanted to ensure that any code that tried to execute
+from the default FIQ handler received sufficient code review. Avoiding
+indirection was a simple way to do that (since traps.c tends to be well
+reviewed).
+
+However other than Russell's concerns about code review I am not aware
+of any other reason *not* to install the handler using the normal IRQ
+machinery. Specifically:
+
+ * The first level data structure (irq to irq_desc) uses RCU and should
+   be NMI-safe.
+
+ * We prohibit IRQF_SHARED and can trust users of __IRQF_NMI
+   to take care not to free the IRQ whilst the handler could be
+   running[1] then I think it is safe to lookup an irqaction without
+   taking the irqdesc lock.
+
+[1] Most uses of __IRQF_NMI that I've looked at will trivially ensure
+    this by never uninstalling the handler...
+
+
+>> +{
+>> +	/*
+>> +	 * no_action unconditionally returns IRQ_NONE which is exactly
+>> +	 * what we need. The handler might be expected to be unreachable
+>> +	 * but some controllers may spuriously ack the NMI from the IRQ
+>> +	 * handling code. When this happens it occurs very rarely, thus
+>> +	 * by returning IRQ_NONE we can rely on the spurious interrupt
+>> +	 * logic to do the right thing.
+>> +	 */
+>> +	return request_irq(irq, no_action, flags | IRQF_NO_THREAD | __IRQF_NMI,
+>> +			   name, dev_id);
+> no_action here looks kind of evil to me.
+> I'd prefer to see the nonsecure irq handler check for __IRQF_NMI and call 
+> no_action. 
 > 
-> Oh, and I just remembered: while 811x is mostly compatible with 814x,
-> it has up to 12 mux modes per pin. So replace "byte-write" by
-> "u16-write" in my previous post ;-)
+> diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
+> index 6f1c7a5..f810cff 100644
+> --- a/kernel/irq/chip.c
+> +++ b/kernel/irq/chip.c
+> @@ -711,7 +711,10 @@ void handle_percpu_devid_irq(unsigned int irq, struct 
+> irq_desc *desc)
+>                 chip->irq_ack(&desc->irq_data);
+>  
+>         trace_irq_handler_entry(irq, action);
+> -       res = action->handler(irq, dev_id);
+> +       if (action->flags & __IRQF_NMI)
+> +               res = no_action(irq, dev_id);
+> +       else
+> +               res = action->handler(irq, dev_id);
+>         trace_irq_handler_exit(irq, action, res);
+>  
+>         if (chip->irq_eoi)
 
-Luckily those can be defined which ever way in pinctrl single just
-by changing the pinctrl-single,register-width entry.
- 
-> > Got any generic naming in mind for the helper macro we could use?
+Hmnnn... there should be no need to check for __IRQF_NMI in this bit of
+code.
+
+*If* action->handler pointed to a real NMI handler then we should just
+call it even though were are "only" running from IRQ.
+
+When the problem occurs the GIC priority filtering will prevent further
+FIQs from being delivered so we might as well just make the call. Note
+that the issue that makes us occasionally spuriously ack is *extremely*
+ARM specific (an obscure GIC/TrustZone interaction) so there is little
+need to consider other architectures here.
+
+
 > 
-> I've already been pondering what to call this family, since
-> architecturally they do very clearly form a fairly close family
-> related to, but also clearly distinct from, the omap4/5 line.
 > 
-> As you may notice from my spreadsheet I already generally prefer to
-> use their names (Netra, Centaurus, Subarctic, Aegis), both because
-> names are rather more memorable and distinguishable for humans than
-> 4-digit numbers and because each actually has a flurry of wildly
-> different part codes depending on which subsystems happen to fail the
-> factory test and get disabled (which may of course be a big deal
-> featurewise but is rather irrelevant to the kernel).
 > 
-> Still leaves four names to unify... I may be biased but I'm leaning
-> towards "Centauroid": Centaurus (814x) seems to have a fairly central
-> position, being memory-map compatible with the there other members
-> (i.e. no subsystem/peripheral of Centaurus overlaps a different one of
-> another device), while the same is not true between Netra (816x) and
-> subarctic (335x).  I suspect this may be because Centaurus and Netra
-> form a single product line (DM81xx) iin one market segment (video)
-> while Centaurus and Subarctic form a single product line (DRA6xx) in
-> another market segment (automotive).
-
-Well sounds like no need to start messing with the existing ti81xx
-defines excemt maybe rename cpu_is_ti81xx to soc_is_dm81xx and so
-on. There are only very few places referencing that now. 
- 
-> > Cool, that certainly helps. To me it looks dm814x needs it's own
-> > clock driver for the source clocks, but after that the dividers
-> > are similar to dm816x and am33xx. Have not looked at the am814x
-> > beyond that though.
+>> +}
+>> +
+>>  extern void free_irq(unsigned int, void *);
+>>  extern void free_percpu_irq(unsigned int, void __percpu *);
+>>
+>> diff --git a/include/linux/irq.h b/include/linux/irq.h
+>> index d09ec7a1243e..695eb37f04ae 100644
+>> --- a/include/linux/irq.h
+>> +++ b/include/linux/irq.h
+>> @@ -307,6 +307,7 @@ static inline irq_hw_number_t irqd_to_hwirq(struct
+>> irq_data *d) * @irq_eoi:		end of interrupt
+>>   * @irq_set_affinity:	set the CPU affinity on SMP machines
+>>   * @irq_retrigger:	resend an IRQ to the CPU
+>> + * @irq_set_nmi_routing:set whether interrupt can act like NMI
+>>   * @irq_set_type:	set the flow type (IRQ_TYPE_LEVEL/etc.) of an IRQ
+>>   * @irq_set_wake:	enable/disable power-management wake-on of an IRQ
+>>   * @irq_bus_lock:	function to lock access to slow bus (i2c) chips
+>> @@ -341,6 +342,7 @@ struct irq_chip {
+>>
+>>  	int		(*irq_set_affinity)(struct irq_data *data, const struct cpumask
+>> *dest, bool force); int		(*irq_retrigger)(struct irq_data *data);
+>> +	int		(*irq_set_nmi_routing)(struct irq_data *data, unsigned int nmi);
+>>  	int		(*irq_set_type)(struct irq_data *data, unsigned int flow_type);
+>>  	int		(*irq_set_wake)(struct irq_data *data, unsigned int on);
+>>
+>> diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
+>> index 80692373abd6..8e669051759d 100644
+>> --- a/kernel/irq/manage.c
+>> +++ b/kernel/irq/manage.c
+>> @@ -571,6 +571,17 @@ int can_request_irq(unsigned int irq, unsigned long
+>> irqflags) return canrequest;
+>>  }
+>>
+>> +int __irq_set_nmi_routing(struct irq_desc *desc, unsigned int irq,
+>> +			   unsigned int nmi)
+>> +{
+>> +	struct irq_chip *chip = desc->irq_data.chip;
+>> +
+>> +	if (!chip || !chip->irq_set_nmi_routing)
+>> +		return -EINVAL;
+>> +
+>> +	return chip->irq_set_nmi_routing(&desc->irq_data, nmi);
+>> +}
+>> +
+>>  int __irq_set_trigger(struct irq_desc *desc, unsigned int irq,
+>>  		      unsigned long flags)
+>>  {
+>> @@ -1058,11 +1069,12 @@ __setup_irq(unsigned int irq, struct irq_desc *desc,
+>> struct irqaction *new) * the same type (level, edge, polarity). So both
+>> flag
+>>  		 * fields must have IRQF_SHARED set and the bits which
+>>  		 * set the trigger type must match. Also all must
+>> -		 * agree on ONESHOT.
+>> +		 * agree on ONESHOT and NMI
+>>  		 */
+>>  		if (!((old->flags & new->flags) & IRQF_SHARED) ||
+>>  		    ((old->flags ^ new->flags) & IRQF_TRIGGER_MASK) ||
+>> -		    ((old->flags ^ new->flags) & IRQF_ONESHOT))
+>> +		    ((old->flags ^ new->flags) & IRQF_ONESHOT) ||
+>> +		    ((old->flags ^ new->flags) & __IRQF_NMI))
+>>  			goto mismatch;
+>>
+>>  		/* All handlers must agree on per-cpuness */
+>> @@ -1153,6 +1165,19 @@ __setup_irq(unsigned int irq, struct irq_desc *desc,
+>> struct irqaction *new)
+>>
+>>  		init_waitqueue_head(&desc->wait_for_threads);
+>>
+>> +		if (new->flags & __IRQF_NMI) {
+>> +			ret = __irq_set_nmi_routing(desc, irq, true);
+>> +			if (ret != 1)
+>> +				goto out_mask;
+>> +		} else {
+>> +			ret = __irq_set_nmi_routing(desc, irq, false);
+>> +			if (ret == 1) {
+>> +				pr_err("Failed to disable NMI routing for irq %d\n",
+>> +				       irq);
+>> +				goto out_mask;
+>> +			}
+>> +		}
+>> +
+>>  		/* Setup the type (level, edge polarity) if configured: */
+>>  		if (new->flags & IRQF_TRIGGER_MASK) {
+>>  			ret = __irq_set_trigger(desc, irq,
+>> --
+>> 1.9.3
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
-> dm814x you mean... the downfeatured Sitara version got called am387x,
-> naturally. ;-)
-
-Yes I mean dm814x sorry :)
- 
-> The biggest architectural differences between three chips are indeed
-> in PRCM, where each member has its own peculiarities:
-> 
-> Netra and Centaurus both have the simple but clean omap4-subset PRCM.
-> No fancy auto-management by hardware but at least a clean
-> well-organised interface, with the biggest blemish being the
-> register-swap in PRM_SGX.  (Subarctic's PRCM is of course shocking in
-> contrast, being organized by "sort -R", incompatibility with the
-> omap4/5 register layouts, and a seemingly endless supply of novel ways
-> of being inconsistent.)
-
-Uhh yeah.
- 
-> Netra however has the FAPLL experiment, which apparently wasn't a
-> success so while Centaurus retained much of the clock tree it reverted
-> to using normal PLLs by replacing the FAPLLs with its PLL subsystem
-> containing additional clock muxes to sort of glue it onto the existing
-> clock tree, making the clock tree a bit messier. (Especially older
-> versions of the TRM were very confusing to those unfamiliar with this
-> Netra-heritage since FAPLL names were still all over the place.)  In
-> line with the "fully software managed" tradition, it seems to wire
-> *all* control/status signals of the PLLs directly into registers. They
-> can be slightly fickle (and mucking up the MPU PLL can leave you
-> pretty screwed, especially since the watchdog reset doesn't reset the
-> PLLs).
-
-Hmm I sort of got the idea that dm814x and dm816x were done about
-the same time. Are you saying dm814x was actually done after dm816x? 
- 
-> Also important: Centaurus has very similar Ethernet subsystem to that
-> of subarctic, though some components are a slightly older minor
-> revision. In violation of what a "minor revision" normally means, they
-> are however software-incompatible thanks to moving blocks of registers
-> around to different offsets, and some per-port settings became global
-> or vice versa.  This however seems to be a tradition for the 3-port
-> gigabit switch subsystem: out of curiosity I examined the ones in
-> other TI SoCs, and it turns out that literally *all* of them have
-> different, incompatible register layouts (sometimes also extending to
-> the switch table entries and/or DMA descriptors).
-
-Yeah this davinci_emac vs cpsw stuff is messy and I noticed too that
-the registers are different. 
- 
-> Other than this, the subsystems and peripherals are mostly familiar
-> omap4-generation stuff, but with a standard C674x DSP instead of
-> omap4's weird custom "Tesla" DSP (although some Tesla documentation
-> accidentally got copy-pasted into Netra's TRM). An overview of the
-> video situation on Centaurus (afaik, I'm not deeply into the video
-> stuff) can be found in this post, where I was also cheerleading your
-> efforts towards mainline dm81xx support:
-> http://e2e.ti.com/support/dsp/davinci_digital_media_processors/f/716/p/246653/1396681#1396681
-
-Yeah all the add on devices are a whole different project.. But if
-we get the basics working then at least somebody can work on that
-if they want to.
- 
-> There's also an interesting Security Subsystem, which houses the
-> crypto accelerators (2x AES, 2x Hash, DES, PKA, RNG), an SDMA engine,
-> 128 KB + 16 KB of local RAM, a cortex-M3, some timers for its benefit,
-> irq routing, and an elaborate L3 firewall instance covering both
-> external and internal access. It is about as well-documented as the
-> crypto accelerators on the am335x are :P  Still, it's not hard to get
-> it operational, and allows e.g. sequencing of composite crypto
-> operations combined with DMA without the kernel having to micro-manage
-> it, along with secure local key storage.
-
-Hmm that's a lot of accelerators..
- 
-> Once the basics work there's definitely some neat gear on these chips
-> to play with
-
-Yup :)
-
-Tony
