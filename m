@@ -1,121 +1,103 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 Jan 2015 14:49:42 +0100
-Subject: [PATCH 3/5] PCI: st: Provide support for the sti PCIe controller
-In-Reply-To: <CAG374jDmUyEX0_iu4wG8LjM6YGMjsB-3PjnyZy_0Se=nLcn16g@mail.gmail.com>
-References: <1418812486-12394-1-git-send-email-gabriel.fernandez@linaro.org>
- <8467440.C7CR1EqfOe@wuerfel>
- <CAG374jDmUyEX0_iu4wG8LjM6YGMjsB-3PjnyZy_0Se=nLcn16g@mail.gmail.com>
-Message-ID: <1682713.ac5OoTJoOr@wuerfel>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 19 Jan 2015 21:33:28 +0100
+Subject: [PATCH v6 17/17] Documentation: ACPI for ARM64
+In-Reply-To: <1420368918-5086-18-git-send-email-hanjun.guo@linaro.org>
+References: <1420368918-5086-1-git-send-email-hanjun.guo@linaro.org>
+ <1420368918-5086-18-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20150119203328.GB3766@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 19 January 2015 13:37:33 Gabriel Fernandez wrote:
-> On 17 December 2014 at 23:14, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Wednesday 17 December 2014 11:34:44 Gabriel FERNANDEZ wrote:
-> > > +/*
-> > > + * On ARM platforms, we actually get a bus error returned when the PCIe
-> > IP
-> > > + * returns a UR or CRS instead of an OK.
-> > > + */
-> > > +static int st_pcie_abort_
-> > ??
-> > handler(unsigned long addr, unsigned int fsr,
-> > > +                              struct pt_regs *regs)
-> > > +{
-> > > +     return 0;
-> > > +}
-> >
-> > You should check that it's actually PCI that caused the abort. Don't
-> > just ignore a hard error condition.
-> >
-> > Usually there are registers in the PCI core that let you identify what
-> > happened.
-> >
+Hi,
+
+On Sun, Jan 04, 2015 at 06:55:18PM +0800, Hanjun Guo wrote:
+> From: Graeme Gregory <graeme.gregory@linaro.org>
 > 
-> ?
-> We return 0 because abort handler is not activated during boot.
+> Add documentation for the guidelines of how to use ACPI
+> on ARM64.
 > 
-
-Can you just remove the handler then? We should never have exception
-handlers that unconditionally return 0.
-
-> > > +      * we must retry for up to a second before we decide the device is
-> > > +      * dead. If we are still dead then we assume there is nothing
-> > there and
-> > > +      * return ~0
-> > > +      *
-> > > +      * The downside of this is that we incur a delay of 1s for every
-> > pci
-> > > +      * express link that doesn't have a device connected.
-> > > +      */
-> > > +     if (((where & ~3) == 0) && devfn == 0 && (data == 0 || data ==
-> > ~0)) {
-> > > +             if (retry_count++ < 1000) {
-> > > +                     mdelay(1);
-> > > +                     goto retry;
-> > > +             } else {
-> > > +                     *val = ~0;
-> > > +                     return PCIBIOS_DEVICE_NOT_FOUND;
-> > > +             }
-> > > +     }
-> > > +
-> > > +     *val = data;
-> > > +     return ret;
-> > > +}
-> >
-> > A busy-loop is extremely nasty. If this is only during the initial bus
-> > scan, could you use an msleep instead?
-> >
-> > ?yes it's during the initial bus scan.
-> But we can't use msleep because we are under raw_spin_lock_irqsave()
-> see PCI_OP_READ() macro in drivers/pci/access.c
-
-Ah, I see. Better use a loop with 'time_before()' and a much shorter
-delay then. Even a single mdelay(1) with irqs disabled can be annoying,
-so try to make the time as short as possible.
-
-> > Also, it sounds like the error you get is actually the fault that you
-> > are catching above. If this is correct, then use the fault handler to
-> > communicate this to the probe function.
-> >
+> Reviewed-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> Signed-off-by: Al Stone <al.stone@linaro.org>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  Documentation/arm64/arm-acpi.txt | 327 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 327 insertions(+)
+>  create mode 100644 Documentation/arm64/arm-acpi.txt
 > 
-> ?Same as above the handler is not activated during the boot and initial bus
-> scan.?
+> diff --git a/Documentation/arm64/arm-acpi.txt b/Documentation/arm64/arm-acpi.txt
+> new file mode 100644
+> index 0000000..21e7020
+> --- /dev/null
+> +++ b/Documentation/arm64/arm-acpi.txt
+> @@ -0,0 +1,327 @@
+> +ACPI on ARMv8 Servers
+> +---------------------
+> +ACPI can be used for ARMv8 general purpose servers designed to follow
+> +the ARM SBSA (Server Base System Architecture) and SBBR (Server Base
+> +Boot Requirements) specifications, currently available to those with
+> +an ARM login at http://silver.arm.com.
+> +
+> +The ARMv8 kernel implements the reduced hardware model of ACPI version
+> +5.1 and later.  Links to the specification and all external documents
+> +it refers to are managed by the UEFI Forum.  The specification is
+> +available at http://www.uefi.org/specifications and external documents
+> +can be found via http://www.uefi.org/acpi.
+> +
+> +If an ARMv8 system does not meet the requirements of the SBSA, or cannot
+> +be described using the mechanisms defined in the required ACPI specifications,
+> +then it is likely that Device Tree (DT) is more suitable than ACPI for the
+> +hardware.
+> +
+> +
+> +Relationship with Device Tree
+> +-----------------------------
+> +ACPI support in drivers and subsystems for ARMv8 should never be mutually
+> +exclusive with DT support at compile time.
+> +
+> +At boot time the kernel will only use one description method depending on
+> +parameters passed from the bootloader (including kernel bootargs).
+> +
+> +Regardless of whether DT or ACPI is used, the kernel must always be capable
+> +of booting with either scheme (in kernels with both schemes enabled at compile
+> +time).
+> +
+> +
+> +Booting using ACPI tables
+> +-------------------------
+> +The only defined method for passing ACPI tables to the kernel on ARMv8
+> +is via the UEFI system configuration table.
+> +
 
-Maybe you could enable the handler during boot to catch this case, and
-then disable it later?
+This is a bit concerning for the approach we are currently taking to
+support ACPI on Xen [1].
 
-> >
-> > > +static void st_msi_init_one(struct pcie_port *pp)
-> > > +{
-> > > +     struct st_pcie *pcie = to_st_pcie(pp);
-> > > +
-> > > +     /*
-> > > +      * Set the magic address the hardware responds to. This has to be
-> > in
-> > > +      * the range the PCI controller can write to.
-> > > +      */
-> > > +     dw_pcie_msi_init(pp);
-> > > +
-> > > +     if ((virt_to_phys((void *)pp->msi_data) < pcie->lmi->start) ||
-> > > +         (virt_to_phys((void *)pp->msi_data) > pcie->lmi->end))
-> > > +             dev_err(pp->dev, "MSI addr miss-configured\n");
-> > > +}
-> >
-> > Why do you call virt_to_phys() here? Isn't
-> > ??
-> > msi_data a physical address?
-> >
-> ??
-> 
-> ?
-> msi_data is a virtual address, it's obtained through a   __get_free_pages()
-> function in dw_pcie_msi_init() procedure.
+Background: Xen is a tiny hypervisor which cannot parse the DSDT or any
+other non-static table. Xen relies on Linux in Dom0 to manage most
+(basically everything except the GIC, serial port, SMMU, and timers)
+hardware resources and relies on Dom0 to parse the ACPI tables.
 
-I guess you need dma_map_single() then, or use dma_alloc_coherent instead
-of __get_free_pages(). There is no guarantee that the page you allocate
-there is actually visible to the PCI host at the same address that the CPU
-uses, so you need to map from a CPU address to a DMA address that the PCI
-host bridge uses.
+While Xen itself is typically booted by UEFI and finds RSDP through the
+UEFI system table, Xen does NOT run another UEFI instance to boot Dom0
+nor does it pass through the presence of UEFI to Dom0 in any way.
+Instead, it just created a DT (with modifications concerning the
+hardware mentioned above) and boots Linux in Dom0 directly (on x86 any
+required UEFI call is performed through paravirtualized hypercalls).
 
-	Arnd
+In the case of ACPI, Xen adds a property to the chosen node and
+populates it with the RDSP in Dom0's address space.  Patches have not
+been posted yet, but we do have a working prototype of the
+implementation and the Linux changes are minimal to support this
+approach.  Parth Dixit (cc'ed) can provide more details on this if
+needed/wanted.
+
+With the current wording in this patch, it seems Xen is forced to
+emulate EFI or run a full UEFI instance for Dom0 which results in a
+really heavy boot sequnce for Xen.  Should we be concerned about this
+use case at this point and does anyone have suggestions on how to solve
+this?
+
+[1]: https://wiki.linaro.org/LEG/Engineering/Virtualization/ACPI_on_Xen
+
+Thanks,
+-Christoffer
