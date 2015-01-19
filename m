@@ -1,219 +1,61 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 19 Jan 2015 23:59:23 +0100
-Subject: [PATCH v3 2/8] mfd: Add atmel-st driver
-In-Reply-To: <20150119094224.GJ21886@x1>
-References: <1421077023-30954-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1421077023-30954-3-git-send-email-alexandre.belloni@free-electrons.com>
- <20150119094224.GJ21886@x1>
-Message-ID: <20150119225923.GG5014@piout.net>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Mon, 19 Jan 2015 15:02:47 -0800
+Subject: [RFC][PATCH] arm64: efi: Obey EFI memory type in dmi_remap
+In-Reply-To: <CAKv+Gu8y428H0QQznV9SqhKNLMf6NVmNw5Lup3LiZYinRVMU-A@mail.gmail.com>
+References: <1421461479-31608-1-git-send-email-lauraa@codeaurora.org>
+ <CAKv+Gu8y428H0QQznV9SqhKNLMf6NVmNw5Lup3LiZYinRVMU-A@mail.gmail.com>
+Message-ID: <54BD8D17.10202@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+On 1/17/2015 12:24 AM, Ard Biesheuvel wrote:
+> On 17 January 2015 at 02:24, Laura Abbott <lauraa@codeaurora.org> wrote:
+>> Currently, dmi_remap unconditionally calls ioremap_cache for dmi_remap.
+>> The memory that's being remapped may be part of the existing EFI
+>> memory map and already remapped as uncached. Remapping as cached can
+>> created unexpected behavior so check the physical address against the
+>> EFI memory type before remapping.
+>>
+>
+> Mapping the SMBIOS tables as uncached is a bad idea, as 'uncached'
+> implies MT_DEVICE_nGnRnE in the arm64 kernel, and the SMBIOS structure
+> tables are not guaranteed to be aligned. So you should at least use
+> MT_NORMAL_NC here.
+>
+> Why does it end up mapped uncached in the first place? Is it backed by
+> a ROM instead of normal RAM? And does the region have any of the WT/WC
+> attributes set in addition to UC? What type is it? I suppose it has
+> the EFI_MEMORY_RUNTIME bit set as well? (Note that the spec seems to
+> assume that configuration tables always reside in system RAM [UEFI
+> spec 2.4A 2.3.6])
+>
+> Also, with my latest virtmap changes, UEFI runtime regions are only
+> mapped during runtime service invocations, and explicitly when e.g.
+> the SMBIOS or ACPI layer needs to get at the data. Currently, regions
+> backed by system RAM are still covered by the linear mapping as well,
+> but that is something we intend to change too. So if the region is not
+> system RAM (!EFI_MEMORY_WB), the latest code will not have this region
+> mapped at DMI scan time, afaict.
+>
+> Finally, I have been looking into classifying memory as system RAM or
+> not myself[0]. Even if SMBIOS is UEFI only in arm64, I would prefer
+> not to add infrastructure that allows us to answer these kind of
+> questions only when booted via UEFI.
+>
+> [0] http://article.gmane.org/gmane.linux.kernel.efi/5133
+>
+>
 
-On 19/01/2015 at 09:42:24 +0000, Lee Jones wrote :
-> On Mon, 12 Jan 2015, Alexandre Belloni wrote:
-> 
-> > The Atmel System Timer IP available on the at91rm9200 exposes both a timer and a
-> > watchdog.
-> > 
-> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > ---
-> >  drivers/mfd/Kconfig          |  7 ++++
-> >  drivers/mfd/Makefile         |  1 +
-> >  drivers/mfd/atmel-st.c       | 77 ++++++++++++++++++++++++++++++++++++++++++++
-> >  include/linux/mfd/atmel-st.h | 47 +++++++++++++++++++++++++++
-> >  4 files changed, 132 insertions(+)
-> >  create mode 100644 drivers/mfd/atmel-st.c
-> >  create mode 100644 include/linux/mfd/atmel-st.h
-> 
-> This driver looks pretty pointless.  Why can't you request the sysconf
-> registers from within the drivers themselves?
-> 
+Thanks for the feedback. The tables aren't in ROM, they are in external
+memory which needs to be accessed by other devices (e.g. BMC) which
+necessitates having it marked as uncached without WT/WC attributes.
+I think for now we are going to re-evaluate the need for the support
+provided by this patch based on the feedback given.
 
-How would you probe the watchdog driver then? Would you had the
-"atmel,at91rm9200-st" compatible there?
-
-At some point in time, we should add the reset driver, would you also
-match it on "atmel,at91rm9200-st"?
-
-I'm fine with that as this allows to avoid the mfd driver.
-
-> > diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> > index 2e6b7311fabc..3c5185c0cf06 100644
-> > --- a/drivers/mfd/Kconfig
-> > +++ b/drivers/mfd/Kconfig
-> > @@ -78,6 +78,13 @@ config MFD_BCM590XX
-> >  	help
-> >  	  Support for the BCM590xx PMUs from Broadcom
-> >  
-> > +config MFD_ATMEL_ST
-> > +	bool "Atmel System Timer"
-> > +	select MFD_CORE
-> > +	default SOC_AT91RM9200
-> > +	help
-> > +	  If you say Y here you get support for the Atmel System Timer.
-> > +
-> >  config MFD_AXP20X
-> >  	bool "X-Powers AXP20X"
-> >  	select MFD_CORE
-> > diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-> > index 53467e211381..1ecd416f25c5 100644
-> > --- a/drivers/mfd/Makefile
-> > +++ b/drivers/mfd/Makefile
-> > @@ -104,6 +104,7 @@ obj-$(CONFIG_PMIC_DA9052)	+= da9052-core.o
-> >  obj-$(CONFIG_MFD_DA9052_SPI)	+= da9052-spi.o
-> >  obj-$(CONFIG_MFD_DA9052_I2C)	+= da9052-i2c.o
-> >  obj-$(CONFIG_MFD_AXP20X)	+= axp20x.o
-> > +obj-$(CONFIG_MFD_ATMEL_ST)	+= atmel-st.o
-> >  
-> >  obj-$(CONFIG_MFD_LP3943)	+= lp3943.o
-> >  obj-$(CONFIG_MFD_LP8788)	+= lp8788.o lp8788-irq.o
-> > diff --git a/drivers/mfd/atmel-st.c b/drivers/mfd/atmel-st.c
-> > new file mode 100644
-> > index 000000000000..54106fcfe898
-> > --- /dev/null
-> > +++ b/drivers/mfd/atmel-st.c
-> > @@ -0,0 +1,77 @@
-> > +/*
-> > + * Copyright (C) 2014 Free Electrons
-> > + * Copyright (C) 2014 Atmel
-> > + *
-> > + * Author: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify it
-> > + * under the terms of the GNU General Public License version 2 as published by
-> > + * the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful, but WITHOUT
-> > + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> > + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> > + * more details.
-> > + *
-> > + * You should have received a copy of the GNU General Public License along with
-> > + * this program.  If not, see <http://www.gnu.org/licenses/>.
-> > + */
-> > +
-> > +#include <linux/mfd/atmel-st.h>
-> > +#include <linux/mfd/core.h>
-> > +#include <linux/mfd/syscon.h>
-> > +#include <linux/module.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/regmap.h>
-> > +
-> > +static const struct mfd_cell atmel_st_cells[] = {
-> > +	{
-> > +		.name = "atmel_st_timer",
-> > +	},
-> > +	{
-> > +		.name = "atmel_st_watchdog",
-> > +	},
-> > +};
-> > +
-> > +static int atmel_st_probe(struct platform_device *pdev)
-> > +{
-> > +	struct device *dev = &pdev->dev;
-> > +	struct regmap *regmap_st;
-> > +
-> > +	regmap_st = syscon_node_to_regmap(dev->of_node);
-> > +	if (IS_ERR(regmap_st))
-> > +		return PTR_ERR(regmap_st);
-> > +	dev_set_drvdata(dev, regmap_st);
-> > +
-> > +	return mfd_add_devices(dev, -1, atmel_st_cells,
-> > +			       ARRAY_SIZE(atmel_st_cells),
-> > +			       NULL, 0, NULL);
-> > +}
-> > +
-> > +static int atmel_st_remove(struct platform_device *pdev)
-> > +{
-> > +	mfd_remove_devices(&pdev->dev);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static const struct of_device_id atmel_st_match[] = {
-> > +	{ .compatible = "atmel,at91rm9200-st" },
-> > +	{ /* sentinel */ },
-> > +};
-> > +
-> > +static struct platform_driver atmel_st_driver = {
-> > +	.probe = atmel_st_probe,
-> > +	.remove = atmel_st_remove,
-> > +	.driver = {
-> > +		.name = "atmel-system-timer",
-> > +		.owner = THIS_MODULE,
-> > +		.of_match_table = atmel_st_match,
-> > +	},
-> > +};
-> > +module_platform_driver(atmel_st_driver);
-> > +
-> > +MODULE_ALIAS("platform:atmel-st");
-> > +MODULE_AUTHOR("Alexandre Belloni <alexandre.belloni@free-electrons.com>");
-> > +MODULE_DESCRIPTION("Atmel ST (System Timer) driver");
-> > +MODULE_LICENSE("GPL");
-> > diff --git a/include/linux/mfd/atmel-st.h b/include/linux/mfd/atmel-st.h
-> > new file mode 100644
-> > index 000000000000..88c6cf8eeb2b
-> > --- /dev/null
-> > +++ b/include/linux/mfd/atmel-st.h
-> > @@ -0,0 +1,47 @@
-> > +/*
-> > + * Copyright (C) 2005 Ivan Kokshaysky
-> > + * Copyright (C) SAN People
-> > + *
-> > + * System Timer (ST) - System peripherals registers.
-> > + * Based on AT91RM9200 datasheet revision E.
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License as published by
-> > + * the Free Software Foundation; either version 2 of the License, or
-> > + * (at your option) any later version.
-> > + */
-> > +
-> > +#ifndef __LINUX_MFD_ATMEL_ST_H
-> > +#define __LINUX_MFD_ATMEL_ST_H
-> > +
-> > +#define	AT91_ST_CR		0x00			/* Control Register */
-> > +#define 	AT91_ST_WDRST		(1 << 0)		/* Watchdog Timer Restart */
-> > +
-> > +#define	AT91_ST_PIMR		0x04			/* Period Interval Mode Register */
-> > +#define		AT91_ST_PIV		(0xffff <<  0)		/* Period Interval Value */
-> > +
-> > +#define	AT91_ST_WDMR		0x08			/* Watchdog Mode Register */
-> > +#define		AT91_ST_WDV		(0xffff <<  0)		/* Watchdog Counter Value */
-> > +#define		AT91_ST_RSTEN		(1	<< 16)		/* Reset Enable */
-> > +#define		AT91_ST_EXTEN		(1	<< 17)		/* External Signal Assertion Enable */
-> > +
-> > +#define	AT91_ST_RTMR		0x0c			/* Real-time Mode Register */
-> > +#define		AT91_ST_RTPRES		(0xffff <<  0)		/* Real-time Prescalar Value */
-> > +
-> > +#define	AT91_ST_SR		0x10			/* Status Register */
-> > +#define		AT91_ST_PITS		(1 << 0)		/* Period Interval Timer Status */
-> > +#define		AT91_ST_WDOVF		(1 << 1) 		/* Watchdog Overflow */
-> > +#define		AT91_ST_RTTINC		(1 << 2) 		/* Real-time Timer Increment */
-> > +#define		AT91_ST_ALMS		(1 << 3) 		/* Alarm Status */
-> > +
-> > +#define	AT91_ST_IER		0x14			/* Interrupt Enable Register */
-> > +#define	AT91_ST_IDR		0x18			/* Interrupt Disable Register */
-> > +#define	AT91_ST_IMR		0x1c			/* Interrupt Mask Register */
-> > +
-> > +#define	AT91_ST_RTAR		0x20			/* Real-time Alarm Register */
-> > +#define		AT91_ST_ALMV		(0xfffff << 0)		/* Alarm Value */
-> > +
-> > +#define	AT91_ST_CRTR		0x24			/* Current Real-time Register */
-> > +#define		AT91_ST_CRTV		(0xfffff << 0)		/* Current Real-Time Value */
-> > +
-> > +#endif /* __LINUX_MFD_ATMEL_ST_H */
-> 
-> -- 
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+Thanks,
+Laura
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
