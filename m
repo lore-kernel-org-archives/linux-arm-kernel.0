@@ -1,23 +1,225 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 20 Jan 2015 09:51:18 -0800
-Subject: [PATCH v2] ARM: omap2plus_defconfig: Enable OHCI & EHCI HCD
- support
-In-Reply-To: <20150119214148.GV20386@saruman>
-References: <1421702916-19018-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <20150119214148.GV20386@saruman>
-Message-ID: <20150120175117.GI7718@atomide.com>
+From: mamlinav@gmail.com (Aleksei Mamlin)
+Date: Tue, 20 Jan 2015 22:03:28 +0400
+Subject: [PATCH] ARM: dts: sun4i: Add Marsboard A10 board
+Message-ID: <1421777008-15408-1-git-send-email-mamlinav@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [150119 13:45]:
-> On Mon, Jan 19, 2015 at 10:28:36PM +0100, Sjoerd Simons wrote:
-> > Enable CONFIG_USB_EHCI_HCD and CONFIG_USB_OHCI_HCD to get USB supports
-> > with omap2plus_defconfig.
-> > 
-> > Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-> 
-> Reviewed-by: Felipe Balbi <balbi@ti.com>
+This patch add support for Marsboard A10 board.
 
-Applying into omap-for-v3.20/defconfig thanks.
+The Marsboard A10 is a A10 based development board with 1G RAM, 1G NAND,
+micro SD card slot, SATA 2.0 socket, 10/100 ethernet, mini HDMI port,
+1 USB OTG port and 2 USB 2.0 ports. Board does not use the AXP209 pmic,
+it does not have a pmic at all.
+Board also have 2 expansion 70 pin headers.
 
-Tony
+Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
+---
+ arch/arm/boot/dts/Makefile                |   1 +
+ arch/arm/boot/dts/sun4i-a10-marsboard.dts | 184 ++++++++++++++++++++++++++++++
+ 2 files changed, 185 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun4i-a10-marsboard.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 3de0142..7df26a2 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -447,6 +447,7 @@ dtb-$(CONFIG_MACH_SUN4I) += \
+ 	sun4i-a10-ba10-tvbox.dtb \
+ 	sun4i-a10-chuwi-v7-cw0825.dtb \
+ 	sun4i-a10-cubieboard.dtb \
++	sun4i-a10-marsboard.dtb \
+ 	sun4i-a10-mini-xplus.dtb \
+ 	sun4i-a10-mk802.dtb \
+ 	sun4i-a10-mk802ii.dtb \
+diff --git a/arch/arm/boot/dts/sun4i-a10-marsboard.dts b/arch/arm/boot/dts/sun4i-a10-marsboard.dts
+new file mode 100644
+index 0000000..ebf0914
+--- /dev/null
++++ b/arch/arm/boot/dts/sun4i-a10-marsboard.dts
+@@ -0,0 +1,183 @@
++/*
++ * Copyright 2015 Aleksei Mamlin
++ * Aleksei Mamlin <mamlinav@gmail.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *     You should have received a copy of the GNU General Public
++ *     License along with this file; if not, write to the Free
++ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
++ *     MA 02110-1301 USA
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "sun4i-a10.dtsi"
++#include "sunxi-common-regulators.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/pinctrl/sun4i-a10.h>
++
++/ {
++	model = "HAOYU Electronics Marsboard A10";
++	compatible = "haoyu,a10-marsboard", "allwinner,sun4i-a10";
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&led_pins_marsboard>;
++
++		red1 {
++			label = "marsboard:red1:usr";
++			gpios = <&pio 1 5 GPIO_ACTIVE_HIGH>;
++		};
++
++		red2 {
++			label = "marsboard:red2:usr";
++			gpios = <&pio 1 6 GPIO_ACTIVE_HIGH>;
++		};
++
++		red3 {
++			label = "marsboard:red3:usr";
++			gpios = <&pio 1 7 GPIO_ACTIVE_HIGH>;
++		};
++
++		red4 {
++			label = "marsboard:red4:usr";
++			gpios = <&pio 1 8 GPIO_ACTIVE_HIGH>;
++		};
++	};
++};
++
++&ahci {
++	status = "okay";
++};
++
++&ehci0 {
++	status = "okay";
++};
++
++&ehci1 {
++	status = "okay";
++};
++
++&emac {
++	pinctrl-names = "default";
++	pinctrl-0 = <&emac_pins_a>;
++	phy = <&phy1>;
++	status = "okay";
++};
++
++&i2c0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_pins_a>;
++	status = "okay";
++};
++
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins_a>;
++	status = "okay";
++};
++
++&i2c2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c2_pins_a>;
++	status = "okay";
++};
++
++&mdio {
++	status = "okay";
++
++	phy1: ethernet-phy at 1 {
++		reg = <1>;
++	};
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
++	cd-inverted;
++	status = "okay";
++};
++
++&ohci0 {
++	status = "okay";
++};
++
++&ohci1 {
++	status = "okay";
++};
++
++&pio {
++	led_pins_marsboard: led_pins at 0 {
++		allwinner,pins = "PB5", "PB6", "PB7", "PB8";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++};
++
++&reg_usb1_vbus {
++	status = "okay";
++};
++
++&reg_usb2_vbus {
++	status = "okay";
++};
++
++&spi0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&spi0_pins_a>;
++	status = "okay";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&usbphy {
++	usb1_vbus-supply = <&reg_usb1_vbus>;
++	usb2_vbus-supply = <&reg_usb2_vbus>;
++	status = "okay";
++};
+-- 
+2.0.5
