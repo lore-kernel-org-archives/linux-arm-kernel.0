@@ -1,100 +1,59 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue, 20 Jan 2015 15:32:44 +0000
-Subject: [PATCH 4/4] ARM: STi: DT: STiH407: Add dt nodes for sdhci and emmc.
-In-Reply-To: <1421767964-8798-1-git-send-email-peter.griffin@linaro.org>
-References: <1421767964-8798-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1421767964-8798-5-git-send-email-peter.griffin@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 20 Jan 2015 15:33:01 +0000
+Subject: [PATCH v4 2/6] mfd: MT6397: Add support for PMIC MT6397 MFD
+In-Reply-To: <20150120150512.GA12209@pengutronix.de>
+References: <1419577768-12037-1-git-send-email-flora.fu@mediatek.com>
+ <1419577768-12037-3-git-send-email-flora.fu@mediatek.com>
+ <20150120144309.GT13701@x1> <20150120150512.GA12209@pengutronix.de>
+Message-ID: <20150120153301.GZ13701@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The nodes have been split to allow as much commonality as possible.
-The stih407 has a silicon bug with eMMC UHS modes (with top regs)
-and as such doesn't have any of the uhs dt properties.
+On Tue, 20 Jan 2015, Sascha Hauer wrote:
 
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- arch/arm/boot/dts/stih407-family.dtsi | 30 ++++++++++++++++++++++++++++++
- arch/arm/boot/dts/stih410-b2120.dts   | 10 ++++++++++
- arch/arm/boot/dts/stihxxx-b2120.dtsi  |  8 ++++++++
- 3 files changed, 48 insertions(+)
+> Hi Lee,
+> 
+> On Tue, Jan 20, 2015 at 02:43:09PM +0000, Lee Jones wrote:
+> > On Fri, 26 Dec 2014, Flora Fu wrote:
+> > 
+> > > Add core files for MT6397 MFD driver.
+> > > 
+> > > Signed-off-by: Flora Fu <flora.fu@mediatek.com>
+> > > ---
+> > >  drivers/mfd/Kconfig                  |  10 +
+> > >  drivers/mfd/Makefile                 |   1 +
+> > >  drivers/mfd/mt6397-core.c            |  94 +++++++++
+> > >  include/linux/mfd/mt6397/core.h      |  23 +++
+> > >  include/linux/mfd/mt6397/registers.h | 362 +++++++++++++++++++++++++++++++++++
+> > >  5 files changed, 490 insertions(+)
+> > >  create mode 100644 drivers/mfd/mt6397-core.c
+> > >  create mode 100644 include/linux/mfd/mt6397/core.h
+> > >  create mode 100644 include/linux/mfd/mt6397/registers.h
+> > 
+> > Looks okay.
+> > 
+> > I assume there are dependancies on this patch.  What are they?
+> > 
+> > How would you like this set to be handled?
+> 
+> This patch is outdated, I sent an updated series today (you are on Cc).
 
-diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-index d4a8f84..df0284b 100644
---- a/arch/arm/boot/dts/stih407-family.dtsi
-+++ b/arch/arm/boot/dts/stih407-family.dtsi
-@@ -283,5 +283,35 @@
- 				 <&picophyreset STIH407_PICOPHY0_RESET>;
- 			reset-names = "global", "port";
- 		};
-+
-+		mmc0: sdhci at 09060000 {
-+			compatible = "st,sdhci-stih407", "st,sdhci";
-+			status = "disabled";
-+			reg = <0x09060000 0x7ff>, <0x9061008 0x20>;
-+			reg-names = "mmc", "top-mmc-delay";
-+			interrupts = <GIC_SPI 92 IRQ_TYPE_NONE>;
-+			interrupt-names = "mmcirq";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_mmc0>;
-+			clock-names = "mmc";
-+			clocks = <&clk_s_c0_flexgen CLK_MMC_0>;
-+			bus-width = <8>;
-+			non-removable;
-+		};
-+
-+		mmc1: sdhci at 09080000 {
-+			compatible = "st,sdhci-stih407", "st,sdhci";
-+			status = "disabled";
-+			reg = <0x09080000 0x7ff>;
-+			reg-names = "mmc";
-+			interrupts = <GIC_SPI 90 IRQ_TYPE_NONE>;
-+			interrupt-names = "mmcirq";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_sd1>;
-+			clock-names = "mmc";
-+			clocks = <&clk_s_c0_flexgen CLK_MMC_1>;
-+			resets = <&softreset STIH407_MMC1_SOFTRESET>;
-+			bus-width = <4>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/stih410-b2120.dts b/arch/arm/boot/dts/stih410-b2120.dts
-index 2f61a99..16f02c5 100644
---- a/arch/arm/boot/dts/stih410-b2120.dts
-+++ b/arch/arm/boot/dts/stih410-b2120.dts
-@@ -26,4 +26,14 @@
- 	aliases {
- 		ttyAS0 = &sbc_serial0;
- 	};
-+
-+	soc {
-+
-+		mmc0: sdhci at 09060000 {
-+			max-frequency = <200000000>;
-+			sd-uhs-sdr50;
-+			sd-uhs-sdr104;
-+			sd-uhs-ddr50;
-+		};
-+	};
- };
-diff --git a/arch/arm/boot/dts/stihxxx-b2120.dtsi b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-index 0074bd4..19082ed 100644
---- a/arch/arm/boot/dts/stihxxx-b2120.dtsi
-+++ b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-@@ -47,6 +47,14 @@
- 			status = "okay";
- 		};
- 
-+		mmc0: sdhci at 09060000 {
-+			status = "okay";
-+		};
-+
-+		mmc1: sdhci at 09080000 {
-+			status = "okay";
-+		};
-+
- 		/* SSC11 to HDMI */
- 		i2c at 9541000 {
- 			status = "okay";
+Okay, thanks.
+
+> There are no compile time dependencies to the PMIC wrapper, but without
+> it the mfd part is pretty useless. I prefer to keep the series together
+> and merge it through arm-soc, but I would be fine with merging it
+> through mfd aswell.
+
+Yes, everyone feels the same about their cross-subsystem patch-sets. ;)
+
+If there are build-time dependencies I am always happy to take sets
+in via MFD and send out pull-requests to other subsystem Maintainers;
+however, if there are only run-time dependencies I prefer to save
+everyone the hassle and have them go in via their own subsystems.
+
 -- 
-1.9.1
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
