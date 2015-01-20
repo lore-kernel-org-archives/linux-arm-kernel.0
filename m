@@ -1,67 +1,66 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 20 Jan 2015 10:53:07 +0100
-Subject: [PATCH v6 2/3] gpio: Cygnus: add GPIO driver
-In-Reply-To: <54B9A8A2.6090209@broadcom.com>
-References: <rjui@broadcom.com>
- <1418696307-19392-1-git-send-email-rjui@broadcom.com>
- <1418696307-19392-3-git-send-email-rjui@broadcom.com>
- <CACRpkdYGksEseGaO49=1rUi5WBdOxwAd-F1gpgZn+BFatRCdDg@mail.gmail.com>
- <54B55068.8050500@broadcom.com>
- <CACRpkdZef8S-EAbShjJ1eg+-3wQKn+yx4u1k_Mf8F7uFkJYdFw@mail.gmail.com>
- <54B9A8A2.6090209@broadcom.com>
-Message-ID: <CACRpkdYydCO9Wu3fMyh0qt=e_hxT5ch2gqNhEsfQpf5WYUS-kQ@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 20 Jan 2015 11:53:14 +0200
+Subject: [PATCHv3 0/2] Driver for TI tlc59116 16 Channel i2c LED driver
+In-Reply-To: <20150116191734.GB31577@lunn.ch>
+References: <1421277308-3477-1-git-send-email-andrew@lunn.ch>
+ <54B9259C.3070403@ti.com> <20150116191734.GB31577@lunn.ch>
+Message-ID: <54BE258A.10808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 17, 2015 at 1:11 AM, Ray Jui <rjui@broadcom.com> wrote:
-> On 1/16/2015 2:14 AM, Linus Walleij wrote:
-
->> Some hardware designs put the software-controlled biasing
->> resistors in the GPIO block electronically connected to the actual
->> pins, so that e.g. the biasing will be available if some MMC or
->> whatever is using the same pins in another muxing. In such
->> situations it's quite evident that they need to be a combined
->> GPIO and pin controller.
+On 16/01/15 21:17, Andrew Lunn wrote:
+> On Fri, Jan 16, 2015 at 04:52:12PM +0200, Tomi Valkeinen wrote:
+>> Hi,
 >>
->> I have some regrets that bolting a second pin controller to the
->> GPIO chip make things a bit complex but it's a price we have
->> to pay for getting some kind of generic interface.
->
-> Okay. In summary, I think both of us think the following approach makes
-> sense in my situation:
-> - leave pinmux in pinctrl-bcm-cygnus.c
-> - leave pinctrl + gpio in pinctrl-bcm-cygnus-gpio.c under drivers/pinctrl/*
->
-> But by thinking about this more, I thought this would create duplicated
-> pinctrl descriptors in our system, one from the pinmux driver, and the
-> other from this pinctrl+gpio driver. That is probably undesirable?
+>> On 15/01/15 01:15, Andrew Lunn wrote:
+>>> This patchset is a driver for the TI tlc59116 16 Channel i2c LED
+>>> driver. This driver is used on the Belkin WRT1900AC access point and
+>>> the C code is derived from code Belkin contributed to OpenWRT.
+>>> However it has been extensively re-written, and a device tree binding
+>>> added to replace platform data.
+>>
+>> We have a TLC59108 on one of our boards, and with a quick glance it
+>> looks about the same as TLC59116, except the amount of outputs.
+> 
+> Hi Tomi
+> 
+> I took a look at the TLC59108. The hardware designs have not made it
+> easy, but it does look similar enough that my driver can be extended
+> to cover both. These extensions It will not change the DT binding, it
+> will just gain a new compatibility string. So i would prefer my driver
+> is first fully reviewed and accepted, and then i will take a stab at
+> extending it for the TLC59108. I will need help testing it, but i hope
+> you can help there.
 
-No, there are several systems with multiple pin controllers and the
-framework easily handles multiple pin controllers in the same
-system just as well as we handle multiple GPIO chips.
+Ok.
 
-> By reviewing various drivers in the pinctrl directory, I found what
-> pinctrl-u300.c and pinctrl-coh901.c does seems to serve as a good model
-> for me to follow:
-> - pinctrl-u300.c is the pinmux driver
-> - pinctrl-coh901.c is the gpio+pinctrl driver
+I'm not familiar with the LED/PWM frameworks, so I want to summarize our
+use case and how I guess this should be done:
 
-Yeah, I don't know if the separation between them is as beautiful
-as it should be. I used it when developing the pin control
-subsystem.
+We use the TLC59108 to provide backlight to a LCD, but in addition to
+that, it is used as a GPIO expander (or GPO, as it cannot do input). In
+your earlier patch versions there were some 'gpio' leftovers. Does your
+board have such GPIO use also?
 
-> The GPIO pinctrl logic is in the coh901 block, so pinctrl-coh901.c
-> exposed two public functions u300_gpio_config_get, u300_gpio_config_set
-> that pinctrl-u300.c can use. The u300 populates all pinmux/pinctrl
-> related functions into the subsystem. This way there's only one pinctrl
-> descriptor, populated through pinctrl-u300.c.
->
-> Does that model make more sense to you?
+So my current thinking is that TLC591xx should be a LED driver (as it
+sounded to me that PWM is not quite suitable for it). On top of that, we
+need generic 'led-backlight' and 'led-gpio' drivers, each of which uses
+the given LED driver to do the hardware manipulation, and they expose a
+backlight device and gpio device, respectively.
 
-Yeah I wrote it myself so I'm maybe blind for any dumbness in
-the code. But I think it's kind of elegant. But it is not using the
-generic pinctrl device tree bindings so it's kind of oldstyle and
-bloated in that sense.
+Another option would be an mfd device, but that doesn't sound good as I
+think the backlight and gpio functionality here is not related to
+TLC591xx as such, but to a LED device in general.
 
-Yours,
-Linus Walleij
+Does this sound sane?
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150120/b78d1571/attachment.sig>
