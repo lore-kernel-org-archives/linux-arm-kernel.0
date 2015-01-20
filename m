@@ -1,25 +1,66 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 20 Jan 2015 16:14:06 +0000
-Subject: [PATCH v8 3/3] regulator: qcom-rpm: Add missing state flag in
- call to RPM
-In-Reply-To: <20150120141954.GS13701@x1>
-References: <1417038661-30209-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1417038661-30209-4-git-send-email-bjorn.andersson@sonymobile.com>
- <20150120141954.GS13701@x1>
-Message-ID: <20150120161406.GB21293@sirena.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 20 Jan 2015 16:14:03 +0000
+Subject: [PATCH 1/8] soc: Add MediaTek infracfg controller support
+In-Reply-To: <1421747231-554-2-git-send-email-s.hauer@pengutronix.de>
+References: <1421747231-554-1-git-send-email-s.hauer@pengutronix.de>
+ <1421747231-554-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20150120161403.GG15924@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 20, 2015 at 02:19:54PM +0000, Lee Jones wrote:
+On Tue, Jan 20, 2015 at 09:47:04AM +0000, Sascha Hauer wrote:
+> This adds support for the MediaTek infracfg controller found
+> on the MT8135/MT8173 SoCs. The infracfg controller contains
+> miscellaneous registers for controlling peripheral resets and
+> clocks.
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  .../devicetree/bindings/soc/mediatek/infracfg.txt  |  19 +++
+>  drivers/soc/Kconfig                                |   1 +
+>  drivers/soc/Makefile                               |   1 +
+>  drivers/soc/mediatek/Kconfig                       |  12 ++
+>  drivers/soc/mediatek/Makefile                      |   1 +
+>  drivers/soc/mediatek/mtk-infracfg.c                | 127 ++++++++++++++++++++
+>  drivers/soc/mediatek/mtk-pericfg.c                 | 128 +++++++++++++++++++++
+>  7 files changed, 289 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/soc/mediatek/infracfg.txt
+>  create mode 100644 drivers/soc/mediatek/Kconfig
+>  create mode 100644 drivers/soc/mediatek/Makefile
+>  create mode 100644 drivers/soc/mediatek/mtk-infracfg.c
+>  create mode 100644 drivers/soc/mediatek/mtk-pericfg.c
+> 
+> diff --git a/Documentation/devicetree/bindings/soc/mediatek/infracfg.txt b/Documentation/devicetree/bindings/soc/mediatek/infracfg.txt
+> new file mode 100644
+> index 0000000..042083a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/soc/mediatek/infracfg.txt
+> @@ -0,0 +1,19 @@
+> +MediaTek infracfg Controller
+> +
+> +The infracfg controller contains miscellaneous registers for controlling
+> +clocks, resets and bus settings.
+> +
+> +Required properties:
+> +- compatible: must be one of:
+> +       mediatek,mt8135-infracfg
+> +       mediatek,mt8173-infracfg
+> +- reg: Address range for the infracfg controller
+> +
+> +Example:
+> +
+> +       infracfg: infracfg at 10003000 {
+> +               #reset-cells = <1>;
+> +               #clock-cells = <1>;
 
-> Do you want a pull-request for this, or can I absorb it right into my
-> tree?
+These weren't listed as required or optional above.
 
-Just apply it.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150120/404def69/attachment.sig>
+Please document these, along with the values a given clock-specifier or
+reset-specifier may take.
+
+> +               compatible = "mediatek,mt8135-infracfg";
+> +               reg = <0 0x10003000 0 0x1000>;
+> +       };
+
+Thanks,
+Mark.
