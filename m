@@ -1,33 +1,36 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Tue, 20 Jan 2015 09:51:26 +0200
-Subject: [PATCH v4 02/21] irqchip: tegra: add DT-based support for legacy
- interrupt controller
-In-Reply-To: <1421660655-21394-3-git-send-email-marc.zyngier@arm.com>
-References: <1421660655-21394-1-git-send-email-marc.zyngier@arm.com>
- <1421660655-21394-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150120075126.GA31060@tbergstrom-lnx.Nvidia.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 20 Jan 2015 15:54:05 +0800
+Subject: [PATCH] ARM: clk-imx6q: refine esai_ipg's parent
+In-Reply-To: <1421377024-29699-1-git-send-email-shengjiu.wang@freescale.com>
+References: <1421377024-29699-1-git-send-email-shengjiu.wang@freescale.com>
+Message-ID: <20150120075404.GV2766@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 19, 2015 at 09:43:56AM +0000, Marc Zyngier wrote:
-> Tegra's LIC (Legacy Interrupt Controller) has been so far only
-> supported as a weird extension of the GIC, which is not exactly
-> pretty.
+On Fri, Jan 16, 2015 at 10:57:04AM +0800, Shengjiu Wang wrote:
+> esai_ipg clock's parent is ahb, not ipg.
 > 
-> The stacked IRQ domain framework fits this pretty well, and allows
-> the LIC code to be turned into a standalone irqchip. In the process,
-> make the driver DT aware, something that was sorely missing from
-> the mach-tegra implementation.
+> Signed-off-by: Shengjiu Wang <shengjiu.wang@freescale.com>
+
+Applied, thanks.
+
+> ---
+>  arch/arm/mach-imx/clk-imx6q.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-
-Note that the GIC isn't really stacked on top of the LIC. Each IRQ is
-presented to both the LIC and the GIC (as an SPI). The LIC is only used
-to wakeup the CPU in case the GIC is not powered. The LIC can also
-generate interrupts towards the AVP/ARM7, but that's outside the scope
-of Linux ofcourse. The LIC can also be used to force an IRQ and that
-forced IRQ will be propagated to the GIC. (see also figure 2, page 36
-of the Tegra K1 TRM)
-
-Cheers,
-
-Peter.
+> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+> index 2daef61..d04a430 100644
+> --- a/arch/arm/mach-imx/clk-imx6q.c
+> +++ b/arch/arm/mach-imx/clk-imx6q.c
+> @@ -386,7 +386,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+>  		clk[IMX6Q_CLK_ECSPI5] = imx_clk_gate2("ecspi5",        "ecspi_root",        base + 0x6c, 8);
+>  	clk[IMX6QDL_CLK_ENET]         = imx_clk_gate2("enet",          "ipg",               base + 0x6c, 10);
+>  	clk[IMX6QDL_CLK_ESAI_EXTAL]   = imx_clk_gate2_shared("esai_extal",   "esai_podf",   base + 0x6c, 16, &share_count_esai);
+> -	clk[IMX6QDL_CLK_ESAI_IPG]     = imx_clk_gate2_shared("esai_ipg",   "ipg",           base + 0x6c, 16, &share_count_esai);
+> +	clk[IMX6QDL_CLK_ESAI_IPG]     = imx_clk_gate2_shared("esai_ipg",   "ahb",           base + 0x6c, 16, &share_count_esai);
+>  	clk[IMX6QDL_CLK_ESAI_MEM]     = imx_clk_gate2_shared("esai_mem", "ahb",             base + 0x6c, 16, &share_count_esai);
+>  	clk[IMX6QDL_CLK_GPT_IPG]      = imx_clk_gate2("gpt_ipg",       "ipg",               base + 0x6c, 20);
+>  	clk[IMX6QDL_CLK_GPT_IPG_PER]  = imx_clk_gate2("gpt_ipg_per",   "ipg_per",           base + 0x6c, 22);
+> -- 
+> 1.7.9.5
+> 
