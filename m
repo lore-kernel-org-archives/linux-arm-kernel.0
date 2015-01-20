@@ -1,147 +1,82 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Tue, 20 Jan 2015 13:12:53 +0530
-Subject: [PATCH v4 15/21] ARM: exynos4/5: convert pmu wakeup to stacked
- domains
-In-Reply-To: <1421660655-21394-16-git-send-email-marc.zyngier@arm.com>
-References: <1421660655-21394-1-git-send-email-marc.zyngier@arm.com>
- <1421660655-21394-16-git-send-email-marc.zyngier@arm.com>
-Message-ID: <54BE06FD.2020702@samsung.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Tue, 20 Jan 2015 15:43:16 +0800
+Subject: [PATCH v2 1/2] ASoC: atmel_ssc_dai: fix start event for I2S mode
+Message-ID: <1421739797-25988-1-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+According to the I2S specification information as following:
+  - WS = 0, channel 1 (left)
+  - WS = 1, channel 2 (right)
+So, the start event should be TF/RF falling edge.
 
-On Monday 19 January 2015 03:14 PM, Marc Zyngier wrote:
-> Exynos has been (ab)using the gic_arch_extn to provide
-> wakeup from suspend, and it makes a lot of sense to convert
-> this code to use stacked domains instead.
->
-> This patch does just this, updating the DT files to actually
-> reflect what the HW provides.
->
-> BIG FAT WARNING: because the DTs were so far lying by not
-> exposing the fact that the PMU block is actually the first
-> interrupt controller in the chain for RTC, kernels with this patch
-> applied wont have any suspend-resume facility when booted
-> with old DTs, and old kernels with updated DTs may not even boot.
->
-> Also, I stronly suspect that there is more than two wake-up
-> interrupts on these platforms, but I leave it to the maintainers
-> to fix their mess.
->
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
+Reported-by: Songjun Wu <songjun.wu@atmel.com>
+Signed-off-by: Bo Shen <voice.shen@atmel.com>
+---
 
-I tested this patch series on SMDK5250 board.
+Changes in v2: None
 
-With the addition of "#interrupt-cells = <3>;"in PMU device node S2R is 
-working on Exynos5250 based SMDK board.
+ sound/soc/atmel/atmel_ssc_dai.c | 18 ++++--------------
+ 1 file changed, 4 insertions(+), 14 deletions(-)
 
->   arch/arm/boot/dts/exynos4.dtsi    |   4 ++
->   arch/arm/boot/dts/exynos5250.dtsi |   4 ++
->   arch/arm/boot/dts/exynos5420.dtsi |   4 ++
->   arch/arm/mach-exynos/exynos.c     |  14 ++---
->   arch/arm/mach-exynos/suspend.c    | 122 ++++++++++++++++++++++++++++++++++----
->   5 files changed, 129 insertions(+), 19 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-> index b8168f1..0e7d74e 100644
-> --- a/arch/arm/boot/dts/exynos4.dtsi
-> +++ b/arch/arm/boot/dts/exynos4.dtsi
-> @@ -141,6 +141,9 @@
->   	pmu_system_controller: system-controller at 10020000 {
->   		compatible = "samsung,exynos4210-pmu", "syscon";
->   		reg = <0x10020000 0x4000>;
-> +		interrupt-controller;
-> +		#interrupt-cells = <3>;
-> +		interrupt-parent = <&gic>;
->   	};
->
->   	dsi_0: dsi at 11C80000 {
-> @@ -253,6 +256,7 @@
->   	rtc at 10070000 {
->   		compatible = "samsung,s3c6410-rtc";
->   		reg = <0x10070000 0x100>;
-> +		interrupt-parent = <&pmu_system_controller>;
->   		interrupts = <0 44 0>, <0 45 0>;
->   		clocks = <&clock CLK_RTC>;
->   		clock-names = "rtc";
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-> index 0a229fc..1dc5f6b 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -194,6 +194,9 @@
->   		clock-names = "clkout16";
->   		clocks = <&clock CLK_FIN_PLL>;
->   		#clock-cells = <1>;
-> +		interrupt-controller;
-> +		#interrupt-cells = <3>;
-> +		interrupt-parent = <&gic>;
->   	};
->
->   	sysreg_system_controller: syscon at 10050000 {
-> @@ -230,6 +233,7 @@
->   	rtc: rtc at 101E0000 {
->   		clocks = <&clock CLK_RTC>;
->   		clock-names = "rtc";
-> +		interrupt-parent = <&pmu_system_controller>;
->   		status = "disabled";
->   	};
->
-> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-> index 517e50f..35ecd36 100644
-> --- a/arch/arm/boot/dts/exynos5420.dtsi
-> +++ b/arch/arm/boot/dts/exynos5420.dtsi
-> @@ -309,6 +309,7 @@
->   	rtc: rtc at 101E0000 {
->   		clocks = <&clock CLK_RTC>;
->   		clock-names = "rtc";
-> +		interrupt-parent = <&pmu_system_controller>;
->   		status = "disabled";
->   	};
->
-> @@ -748,6 +749,9 @@
->   		clock-names = "clkout16";
->   		clocks = <&clock CLK_FIN_PLL>;
->   		#clock-cells = <1>;
-> +		interrupt-controller;
-> +		#interrupt-cells = <3>;
-> +		interrupt-parent = <&gic>;
->   	};
->
->   	sysreg_system_controller: syscon at 10050000 {
-> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-> index c13d083..e417fdc 100644
-> --- a/arch/arm/mach-exynos/exynos.c
-> +++ b/arch/arm/mach-exynos/exynos.c
-> @@ -175,16 +175,15 @@ static void __init exynos_init_io(void)
->   	exynos_map_io();
->   }
->
-> +/*
-> + * Apparently, these SoCs are not able to wake-up from suspend using
-> + * the PMU. Too bad. Should they suddenly become capable of such a
-> + * feat, the matches below should be moved to suspend.c.
-> + */
->   static const struct of_device_id exynos_dt_pmu_match[] = {
->   	{ .compatible = "samsung,exynos3250-pmu" },
-
-As I know Exynos3250, S2R support has been added in kgene/for-next and 
-should work as expected so we may need to do update "exynos_wkup_irq" 
-for exynos3250 and remove it from this list, so that it's S2R should not 
-break. I am adding concern engineer (+cc: Chanwoo Choi) in the loop.
-
-> -	{ .compatible = "samsung,exynos4210-pmu" },
-> -	{ .compatible = "samsung,exynos4212-pmu" },
-> -	{ .compatible = "samsung,exynos4412-pmu" },
-> -	{ .compatible = "samsung,exynos4415-pmu" },
-> -	{ .compatible = "samsung,exynos5250-pmu" },
->   	{ .compatible = "samsung,exynos5260-pmu" },
->   	{ .compatible = "samsung,exynos5410-pmu" },
-> -	{ .compatible = "samsung,exynos5420-pmu" },
->   	{ /*sentinel*/ },
->   };
->
-
-Thanks,
-Pankaj Dubey
+diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
+index 99ff35e..e691aab 100644
+--- a/sound/soc/atmel/atmel_ssc_dai.c
++++ b/sound/soc/atmel/atmel_ssc_dai.c
+@@ -348,7 +348,6 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
+ 	struct atmel_pcm_dma_params *dma_params;
+ 	int dir, channels, bits;
+ 	u32 tfmr, rfmr, tcmr, rcmr;
+-	int start_event;
+ 	int ret;
+ 	int fslen, fslen_ext;
+ 
+@@ -457,19 +456,10 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
+ 		 * The SSC transmit clock is obtained from the BCLK signal on
+ 		 * on the TK line, and the SSC receive clock is
+ 		 * generated from the transmit clock.
+-		 *
+-		 *  For single channel data, one sample is transferred
+-		 * on the falling edge of the LRC clock.
+-		 * For two channel data, one sample is
+-		 * transferred on both edges of the LRC clock.
+ 		 */
+-		start_event = ((channels == 1)
+-				? SSC_START_FALLING_RF
+-				: SSC_START_EDGE_RF);
+-
+ 		rcmr =	  SSC_BF(RCMR_PERIOD, 0)
+ 			| SSC_BF(RCMR_STTDLY, START_DELAY)
+-			| SSC_BF(RCMR_START, start_event)
++			| SSC_BF(RCMR_START, SSC_START_FALLING_RF)
+ 			| SSC_BF(RCMR_CKI, SSC_CKI_RISING)
+ 			| SSC_BF(RCMR_CKO, SSC_CKO_NONE)
+ 			| SSC_BF(RCMR_CKS, ssc->clk_from_rk_pin ?
+@@ -478,14 +468,14 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
+ 		rfmr =	  SSC_BF(RFMR_FSEDGE, SSC_FSEDGE_POSITIVE)
+ 			| SSC_BF(RFMR_FSOS, SSC_FSOS_NONE)
+ 			| SSC_BF(RFMR_FSLEN, 0)
+-			| SSC_BF(RFMR_DATNB, 0)
++			| SSC_BF(RFMR_DATNB, (channels - 1))
+ 			| SSC_BIT(RFMR_MSBF)
+ 			| SSC_BF(RFMR_LOOP, 0)
+ 			| SSC_BF(RFMR_DATLEN, (bits - 1));
+ 
+ 		tcmr =	  SSC_BF(TCMR_PERIOD, 0)
+ 			| SSC_BF(TCMR_STTDLY, START_DELAY)
+-			| SSC_BF(TCMR_START, start_event)
++			| SSC_BF(TCMR_START, SSC_START_FALLING_RF)
+ 			| SSC_BF(TCMR_CKI, SSC_CKI_FALLING)
+ 			| SSC_BF(TCMR_CKO, SSC_CKO_NONE)
+ 			| SSC_BF(TCMR_CKS, ssc->clk_from_rk_pin ?
+@@ -495,7 +485,7 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
+ 			| SSC_BF(TFMR_FSDEN, 0)
+ 			| SSC_BF(TFMR_FSOS, SSC_FSOS_NONE)
+ 			| SSC_BF(TFMR_FSLEN, 0)
+-			| SSC_BF(TFMR_DATNB, 0)
++			| SSC_BF(TFMR_DATNB, (channels - 1))
+ 			| SSC_BIT(TFMR_MSBF)
+ 			| SSC_BF(TFMR_DATDEF, 0)
+ 			| SSC_BF(TFMR_DATLEN, (bits - 1));
+-- 
+2.3.0.rc0
