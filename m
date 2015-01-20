@@ -1,61 +1,39 @@
 From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 20 Jan 2015 20:03:42 +0800
-Subject: [GIT PULL RESEND] CSR atlas7 debug ports for 3.20
-In-Reply-To: <20150119191258.GB16883@quad.lixom.net>
-References: <CAGsJ_4yJTApS6RwGCEFcBGT+L1f8Gn3DnmzGAKQc3H2SZZJvcw@mail.gmail.com>
- <20150119191258.GB16883@quad.lixom.net>
-Message-ID: <CAGsJ_4ydqDxEqmEbX-NfQx75KOba7-BTU8Rnx0r=pobh4JT=QQ@mail.gmail.com>
+Date: Tue, 20 Jan 2015 20:08:05 +0800
+Subject: [GIT PULL] CSR new atlas7 machine, and delete old marco machine
+ for 3.20
+In-Reply-To: <20150119191438.GC16883@quad.lixom.net>
+References: <CAGsJ_4z=SOxGAcr_2BizVUvxY8NOx1swpHoSJVCPJ5xn7dh6vQ@mail.gmail.com>
+ <20150119191438.GC16883@quad.lixom.net>
+Message-ID: <CAGsJ_4xAfeGdyWxCeY+TBAiPvxfyeEPg8kx4=y3hiQGCs+AJ8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-01-20 3:12 GMT+08:00, Olof Johansson <olof@lixom.net>:
-> On Wed, Jan 14, 2015 at 09:24:19PM +0800, Barry Song wrote:
+2015-01-20 3:14 GMT+08:00, Olof Johansson <olof@lixom.net>:
+> On Wed, Jan 14, 2015 at 09:25:54PM +0800, Barry Song wrote:
 >> Hi Arnd, Kevin, Olof,
 >>
 >> The following changes since commit
->> b7392d2247cfe6771f95d256374f1a8e6a6f48d6:
->>
->>   Linux 3.19-rc2 (2014-12-28 16:49:37 -0800)
->>
->> are available in the git repository at:
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
->> tags/atlas7-lldebug-for-3.20
->>
->> for you to fetch changes up to 98898ee43a94375cf814b86fb7f485c39fb2c072:
+>> 98898ee43a94375cf814b86fb7f485c39fb2c072:
 >>
 >>   ARM: sirf: add two debug ports for CSRatlas7 SoC (2015-01-14 20:56:09
 >> +0800)
 >>
->> ----------------------------------------------------------------
->> add debug ports for CSRatlas7 SoC
+>> are available in the git repository at:
 >>
->> Because Marco chip has never shipped to customers and has been replaced
->> by Atlas7, so we do the below
->> - drop Marco's debug port
->> - add debug ports for Atlas7
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
+>> tags/new-atlas7mach-for-3.20
 >>
->> we also move to use DEBUG_UART_PHYS/VIRT for all CSR ports
+>> for you to fetch changes up to 031a1a58513801a319f45f6ac1233605b13aefd2:
 >>
->> ----------------------------------------------------------------
->> Barry Song (1):
->>       ARM: sirf: drop Marco low-level debug port
->>
->> Guo Zeng (1):
->>       ARM: sirf: add two debug ports for CSRatlas7 SoC
+>>   ARM: sirf: add Atlas7 machine support (2015-01-14 21:09:24 +0800)
 >
-> These entries are not sorted. If you look at the file, in particular
-> DEBUG_UART_PHYS and DEBUG_UART_VIRT, you see that they are sorted in
-> address
-> order. Your new entries are just appended. That's not right.
+> Since this contains the debug_ll changes, this branch needs to be rebased
+> on
+> top of the respin.
 
-Olof, fixed here:
-https://git.kernel.org/cgit/linux/kernel/git/baohua/linux.git/commit/?id=01ea63d99397fcdcb9cc235c77a8e11f4e4a63e9
+tag was rebased, thanks.
 
-and tag was re-built.
-
->
-> Please respin.
 >
 >
 > -Olof
