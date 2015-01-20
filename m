@@ -1,121 +1,46 @@
-From: marcel@holtmann.org (Marcel Holtmann)
-Date: Tue, 20 Jan 2015 10:34:30 -0800
-Subject: [PATCH] bluetooth: Add hci_h4p driver
-In-Reply-To: <20150120173604.GA712@amd>
-References: <20141223130219.GA5731@amd>
- <CB643345-4B50-4ED0-8C3E-296CD225754D@holtmann.org>
- <20150120173604.GA712@amd>
-Message-ID: <7522CAC7-AFD9-470F-B4F8-3C39942DBC04@holtmann.org>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 20 Jan 2015 19:35:09 +0100 (CET)
+Subject: [PATCH V2] clk: mxs: Fix invalid 32-bit access to frac registers
+In-Reply-To: <201412281930.17676.marex@denx.de>
+References: <1419762402-4548-1-git-send-email-stefan.wahren@i2se.com>
+ <201412281930.17676.marex@denx.de>
+Message-ID: <1913991589.463352.1421778909585.JavaMail.open-xchange@oxbaltgw06.schlund.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+Hi,
 
->>> Add HCI driver for H4 with Nokia extensions. This device is used on
->>> Nokia N900 cell phone.
->>> 
->>> Older version of this driver lived in staging, before being reverted
->>> in a4102f90e87cfaa3fdbed6fdf469b23f0eeb4bfd .
->>> 
->>> Signed-off-by: Pavel Machek <pavel@ucw.cz>
->>> Thanks-to: Sebastian Reichel <sre@debian.org>
->>> Thanks-to: Joe Perches <joe@perches.com>
->>> 
->>> ---
->>> 
->>> Please apply,
->>> 								Pavel
->>> 
->>> 
->>> Kconfig      |   10 
->>> Makefile     |    4 
->>> nokia_core.c | 1149 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->>> nokia_fw.c   |   99 +++++
->>> nokia_h4p.h  |  214 ++++++++++
->>> nokia_uart.c |  171 ++++++++
->>> 7 files changed, 1667 insertions(+)
-> 
-> Speaking about formatting, could you properly format your emails, that
-> is inserting newline after ~78 columns, to make them easier to reply
-> to?
+> Marek Vasut <marex@denx.de> hat am 28. Dezember 2014 um 19:30 geschrieben:
+>
+>
+> On Sunday, December 28, 2014 at 11:26:42 AM, Stefan Wahren wrote:
+> > According to i.MX23 and i.MX28 reference manual the fractional
+> > clock control registers must be addressed by byte instructions.
+> >
+> > This patch fixes the erroneous 32-bit access to these registers
+> > and extends the comment in the init functions.
+> >
+> > Btw the imx23 init now uses a R-M-W sequence just like imx28 init
+> > to avoid any clock glitches.
+> >
+> > The changes has been tested only with a i.MX28 board, because i don't
+> > have access to an i.MX23 board.
 
-or you get an email client that can handle that part.
+since i've also a i.MX23 board, i tested this patch successful.
 
->> so when I run this through checkpatch --strict, then I get tons of warning that we have DOS style ^M line breaks. There are also trailing whitespace that need fixing. I can use cleanpatch to do this, but so can you.
->> 
-> 
-> Strange, where do you see DOS style line breaks? Checkpatch here does
-> not warn about that, and they really should not be there.
+Any conserns about it?
 
-If that would be the only pieces, then I would have fixed it already. That is not the big deal. The rest of checkpatch is what I am not going to fix for you.
-
->> Even after doing that there are still obvious plain coding style violation in the patch. For example:
->> 
->> ERROR: space prohibited before that ',' (ctx:WxW)
->> #610: FILE: drivers/bluetooth/nokia_core.c:517:
->> +			__h4p_set_auto_ctsrts(info, 0 , UART_EFR_RTS);
-> 
-> Yeah, I should have catched that one.
-> 
->> CHECK: Alignment should match open parenthesis
->> #662: FILE: drivers/bluetooth/nokia_core.c:569:
->> +		h4p_outb(info, UART_OMAP_SCR,
->> +			     h4p_inb(info, UART_OMAP_SCR) |
->> 
->> CHECK: Blank lines aren't necessary before a close brace '}'
->> #692: FILE: drivers/bluetooth/nokia_core.c:599:
->> +
->> +}
->> 
->> These are only few. They are more and all these need fixing before I
->> even consider it.
-> 
-> Yeah, so first patch was too good for staging, and I "would be allowed
-> to clean it up in tree", and now you run checkpatch --strict,
-> complaining about very serious stuff such as "blank lines before }".
-
-The network subsystem requires the --strict option.
-
-Please stop complaining about staging. The patch went in, it was ignored for month and multiple kernel release and it got removed. Deal with it.
-
-> 
-> Yes, checkpatch produces a lot of junk, like warnings about
-> mdelay(). I'm not sure how you'd want #662 above, formatted.
-> 
-> pavel at amd:/data/l/linux-n900$ scripts/checkpatch.pl --strict --file
-> drivers/bluetooth/*.c | wc -l 3194
-> pavel at amd:/data/l/linux-n900$
-> 
-> ...so I really can't know which checkpatch complains you consider
-> serious and which are ok... And yes, I guess I should trim down those
-> FSF notices.
-
-The FSF notices are the ones I do not care about right now. Even the over 80 characters lines can be ignored if it just makes sense to go over.
-
-The indentations ones need to be fixed.
-
-> 
->> Also this worries me:
->> 
->> WARNING: DT compatible string "brcm,uart,bcm2048" appears un-documented -- check ./Documentation/devicetree/bindings/
->> #1222: FILE: drivers/bluetooth/nokia_core.c:1129:
->> +	{ .compatible = "brcm,uart,bcm2048" },
-> 
-> Yes, that wories me, too. It is one of reasons I wanted this to be
-> merged to staging. Arguing about right bindings will take some time.
-
-Then that needs to be figured out. It is not that I have mentioned DT for the first time. I said that right from the beginning.
-
-> I can fix the checkpatch stuff that makes sense. That does not include
-> uglyfying code just for checkpatch.  Can you then take the patch, as
-> you promised, and let me argue the bindings, and the other stuff that
-> needs to be fixed?
-> 
-> If not, can we agree that the driver in staging should be reverted, as
-> Greg promised would be "easy", and I can clean it up there?
-
-I am refusing to allow this into staging. Get this into shape for drivers/bluetooth/ or keep the driver external.
-
-Regards
-
-Marcel
+> >
+> > Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+>
+> I don't see a problem,
+>
+> Reviewed-by: Marek Vasut <marex@denx.de>
+>
+> Best regards,
+> Marek Vasut
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
