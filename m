@@ -1,47 +1,108 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 20 Jan 2015 16:31:57 +0800
-Subject: [PATCH net-next 1/1] ARM: dts: imx6sx: correct i.MX6sx sdb board
- enet phy address
-In-Reply-To: <1421660282-29494-1-git-send-email-b38611@freescale.com>
-References: <1421660282-29494-1-git-send-email-b38611@freescale.com>
-Message-ID: <20150120083156.GY2766@dragon>
+From: orsonzhai@gmail.com (Orson Zhai)
+Date: Tue, 20 Jan 2015 16:41:44 +0800
+Subject: [PATCH v5 5/5] tty/serial: Add Spreadtrum sc9836-uart driver
+ support
+In-Reply-To: <CAAfSe-tAwURc_P+-0+m22ao9r+Fud6Ae89JF8FGsWgg_49Mdhg@mail.gmail.com>
+References: <1421402411-3479-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1421402411-3479-6-git-send-email-chunyan.zhang@spreadtrum.com>
+ <CAL_JsqJg=BtanmR_rhYthCUhKbErs8viZ7MMMXr-PmPjUV4BRQ@mail.gmail.com>
+ <CAAfSe-vqqpvbYe0bEeD-3_QsLYz4r7pxMuA1-L4cYRw9TY=NgA@mail.gmail.com>
+ <CAL_JsqLTArm1v8ka39_KLq2jMKkK2ZXQ6-an=JSWVgTK1LWmOg@mail.gmail.com>
+ <CAAfSe-tAwURc_P+-0+m22ao9r+Fud6Ae89JF8FGsWgg_49Mdhg@mail.gmail.com>
+Message-ID: <CA+H2tpEFQjG0fFR-D+L2KYr0uLQqYYQM8wGut7ohzLSfotV3zA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 19, 2015 at 05:38:02PM +0800, Fugang Duan wrote:
-> The commit (3d125f9c91c5) cause i.MX6SX sdb enet cannot work. The cause is
-> the commit add mdio node with un-correct phy address.
-> 
-> The patch just correct i.MX6sx sdb board enet phy address.
-> 
-> Signed-off-by: Fugang Duan <B38611@freescale.com>
-> ---
->  arch/arm/boot/dts/imx6sx-sdb.dts |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
-> index 8c1febd..9db123f 100644
-> --- a/arch/arm/boot/dts/imx6sx-sdb.dts
-> +++ b/arch/arm/boot/dts/imx6sx-sdb.dts
-> @@ -167,11 +167,11 @@
->  		#size-cells = <0>;
->  
->  		ethphy1: ethernet-phy at 0 {
+On Tue, Jan 20, 2015 at 3:37 PM, Lyra Zhang <zhang.lyra@gmail.com> wrote:
+> Hi, Rob
+>
+> I still have a question to be conform, specific describes below:
+>
+> On Mon, Jan 19, 2015 at 10:11 PM, Rob Herring <robherring2@gmail.com> wrote:
+>> On Mon, Jan 19, 2015 at 3:55 AM, Lyra Zhang <zhang.lyra@gmail.com> wrote:
+>>> On Sat, Jan 17, 2015 at 12:41 AM, Rob Herring <robherring2@gmail.com> wrote:
+>>>> On Fri, Jan 16, 2015 at 4:00 AM, Chunyan Zhang
+>>>> <chunyan.zhang@spreadtrum.com> wrote:
+>>>>> Add a full sc9836-uart driver for SC9836 SoC which is based on the
+>>>>> spreadtrum sharkl64 platform.
+>>>>> This driver also support earlycon.
+>>>>> This patch also replaced the spaces between the macros and their
+>>>>> values with the tabs in serial_core.h
+>>
+>> [...]
+>>
+>>>>> +static int __init sprd_serial_init(void)
+>>>>> +{
+>>>>> +       int ret = 0;
+>>>>> +
+>>>>> +       ret = uart_register_driver(&sprd_uart_driver);
+>>>>
+>>>> This can be done in probe now. Then you can use module_platform_driver().
+>>>>
+>>>
+>>> Question:
+>>> 1. there are 4 uart ports configured in dt for sprd_serial, so probe
+>>> will be called 4 times, but uart_register_driver only needs to be
+>>> called one time, so can we use uart_driver.state to check if
+>>> uart_register_driver has already been called ?
+>>
+>> Yes.
+>>
+>>> 2. if I use module_platform_driver() instead of
+>>> module_init(sprd_serial_init)  and  module_exit(sprd_serial_exit) , I
+>>> must move uart_unregister_driver() which is now processed in
+>>> sprd_serial_exit() to sprd_remove(), there is a similar problem with
+>>> probe(), sprd_remove() will also be called 4 times, and actually it
+>>> should be called only one time. How can we deal with this case?
+>>
+>> Look at pl01x or Samsung UART drivers which have done this conversion.
+>
+> Samsung UART does use module_platform_driver, but pl010/pl011 doesn't.
+> In the Samsung UART driver, uart_unregister_driver is processed in
+> remove(), like below:
+>
+> static int s3c24xx_serial_remove(struct platform_device *dev)
+> {
+>     struct uart_port *port = s3c24xx_dev_to_port(&dev->dev);
+>
+>     if (port) {
+>         s3c24xx_serial_cpufreq_deregister(to_ourport(port));
+>         uart_remove_one_port(&s3c24xx_uart_drv, port);
+>     }
+>
+>     uart_unregister_driver(&s3c24xx_uart_drv);
+> }
+>
+> if this serial has more than one ports, uart_unregister_driver() must
+> be called multiple times when the device need to be removed.
+> I think there may be a problem because that uart_unregister_driver()
+> will do kfree(drv->state) every time when it's called.
 
-The unit-address should match 'reg' property, so it needs an update too.
+I think it is no appropriate to call uart_unregister_driver() at first
+port removing.
+The drv->state buffer was shared with all uart ports.
+If there are some cases that only 1 port is needed to be removed, that
+will destroy all others, isn't it?
 
-Shawn
+Regards,
+Orson
 
-> -			reg = <0>;
-> +			reg = <1>;
->  		};
->  
->  		ethphy2: ethernet-phy at 1 {
-> -			reg = <1>;
-> +			reg = <2>;
->  		};
->  	};
->  };
-> -- 
-> 1.7.8
-> 
+
+>
+> Thanks,
+> Chunyan
+>
+>>
+>>> 3. for the second question, we can check the platform_device->id, if
+>>> it is equal to the index of last port (e.g. 4 for this case), then
+>>> uart_unregister_driver() can be called. Does it work correctly? since
+>>> for this case, we must keep the order of releasing ports.
+>>
+>> The id will not be the line index in the DT case. I don't think you
+>> can guarantee the order either.
+>>
+>> It would be better to make uart_{un}register_driver deal with being
+>> called multiple times so drivers don't have to deal with getting this
+>> correct. I'm not sure if that is feasible though.
+>>
+>> Rob
