@@ -1,59 +1,55 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 20 Jan 2015 09:41:59 +0800
-Subject: [PATCH] i2c: drop ancient protection against sysfs refcounting
- issues
-In-Reply-To: <20150119230427.GH26493@n2100.arm.linux.org.uk>
-References: <1421693756-12917-1-git-send-email-wsa@the-dreams.de>
- <20150119190142.GA9451@kroah.com>
- <20150119230427.GH26493@n2100.arm.linux.org.uk>
-Message-ID: <20150120014159.GA3349@kroah.com>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Tue, 20 Jan 2015 10:51:51 +0800
+Subject: [PATCH] kprobes: bugfix: makes kprobes/enabled works correctly for
+ optimized kprobes.
+In-Reply-To: <54BCFC6E.1080007@hitachi.com>
+References: <54BCFC6E.1080007@hitachi.com>
+Message-ID: <1421722311-30455-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 19, 2015 at 11:04:27PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Jan 20, 2015 at 03:01:42AM +0800, Greg Kroah-Hartman wrote:
-> > On Mon, Jan 19, 2015 at 07:55:56PM +0100, Wolfram Sang wrote:
-> > > diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-> > > index 39d25a8cb1ad..15cc5902cf89 100644
-> > > --- a/drivers/i2c/i2c-core.c
-> > > +++ b/drivers/i2c/i2c-core.c
-> > > @@ -41,7 +41,6 @@
-> > >  #include <linux/of_device.h>
-> > >  #include <linux/of_irq.h>
-> > >  #include <linux/clk/clk-conf.h>
-> > > -#include <linux/completion.h>
-> > >  #include <linux/hardirq.h>
-> > >  #include <linux/irqflags.h>
-> > >  #include <linux/rwsem.h>
-> > > @@ -1184,8 +1183,7 @@ EXPORT_SYMBOL_GPL(i2c_new_dummy);
-> > >  
-> > >  static void i2c_adapter_dev_release(struct device *dev)
-> > >  {
-> > > -	struct i2c_adapter *adap = to_i2c_adapter(dev);
-> > > -	complete(&adap->dev_released);
-> > > +	/* empty, but the driver core insists we need a release function */
-> > 
-> > Yeah, it does, but I hate to see this in "real" code as something is
-> > probably wrong with it if it happens.
-> > 
-> > Please move the rest of 'i2c_del_adapter' into the release function
-> > (what was after the wait_for_completion() call), and then all should be
-> > fine.
-> 
-> Are you sure about that?  Some drivers do this, eg,
-> 
->         i2c_del_adapter(&drv_data->adapter);
->         free_irq(drv_data->irq, drv_data);
-> 
-> where drv_data was allocated using devm_kzalloc(), and so will be
-> released when the ->remove callback (which calls the above
-> i2c_del_adapter()) returns... freeing the embedded device struct.
+debugfs/kprobes/enabled doesn't work correctly on optimized kprobes.
+Masami Hiramatsu has a test report on x86_64 platform:
 
-But that will fail today if the memory is freed in i2c_del_adapter(), so
-there shouldn't be any change in logic here.
+https://lkml.org/lkml/2015/1/19/274
 
-Or am I missing something obvious?
+This patch forces it to unoptimize kprobe if kprobes_all_disarmed
+is set. It also checks the flag in unregistering path for skipping
+unneeded disarming process when kprobes globally disarmed.
 
-thanks,
+Signed-off-by: Wang Nan <wangnan0@huawei.com>
+---
+ kernel/kprobes.c | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
-greg k-h
+diff --git a/kernel/kprobes.c b/kernel/kprobes.c
+index 9471710..fb995ef 100644
+--- a/kernel/kprobes.c
++++ b/kernel/kprobes.c
+@@ -869,7 +869,8 @@ static void __disarm_kprobe(struct kprobe *p, bool reopt)
+ {
+ 	struct kprobe *_p;
+ 
+-	unoptimize_kprobe(p, false);	/* Try to unoptimize */
++	/* Try to unoptimize */
++	unoptimize_kprobe(p, kprobes_all_disarmed);
+ 
+ 	if (!kprobe_queued(p)) {
+ 		arch_disarm_kprobe(p);
+@@ -1571,7 +1572,13 @@ static struct kprobe *__disable_kprobe(struct kprobe *p)
+ 
+ 		/* Try to disarm and disable this/parent probe */
+ 		if (p == orig_p || aggr_kprobe_disabled(orig_p)) {
+-			disarm_kprobe(orig_p, true);
++			/*
++			 * If kprobes_all_disarmed is set, orig_p
++			 * should have already been disarmed, so
++			 * skip unneed disarming process.
++			 */
++			if (!kprobes_all_disarmed)
++				disarm_kprobe(orig_p, true);
+ 			orig_p->flags |= KPROBE_FLAG_DISABLED;
+ 		}
+ 	}
+-- 
+1.8.4
