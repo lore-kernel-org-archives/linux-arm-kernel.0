@@ -1,52 +1,127 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 20 Jan 2015 09:16:12 -0800
-Subject: [PATCHv2 5/5] arm: omap: specify PMUs are for ARMv7 CPUs
-In-Reply-To: <1421770049-32029-6-git-send-email-mark.rutland@arm.com>
-References: <1421770049-32029-1-git-send-email-mark.rutland@arm.com>
- <1421770049-32029-6-git-send-email-mark.rutland@arm.com>
-Message-ID: <20150120171612.GG7718@atomide.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 20 Jan 2015 17:25:15 +0000
+Subject: [PATCH] mfd: vexpress: Remove non-DT code
+Message-ID: <1421774715-29926-1-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mark Rutland <mark.rutland@arm.com> [150120 08:12]:
-> Now that we can specify which PMU variant we're likely to deal with, do
-> so in the omap board code. This will allow us to split the ARMv6, ARMv7,
-> and XScale PMU drivers.
-> 
-> The unnecessary include of asm/pmu.h is also removed.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Tony Lindgren <tony@atomide.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Olof Johansson <olof@lixom.net>
-> ---
->  arch/arm/mach-omap2/pmu.c | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/pmu.c b/arch/arm/mach-omap2/pmu.c
-> index 33c8846..a69e9a3 100644
-> --- a/arch/arm/mach-omap2/pmu.c
-> +++ b/arch/arm/mach-omap2/pmu.c
-> @@ -13,7 +13,7 @@
->   */
->  #include <linux/of.h>
->  
-> -#include <asm/pmu.h>
-> +#include <asm/system_info.h>
->  
->  #include "soc.h"
->  #include "omap_hwmod.h"
-> @@ -37,7 +37,8 @@ static int __init omap2_init_pmu(unsigned oh_num, char *oh_names[])
->  {
->  	int i;
->  	struct omap_hwmod *oh[3];
-> -	char *dev_name = "arm-pmu";
-> +	char *dev_name = cpu_architecture() == CPU_ARCH_ARMv6 ?
-> +			 "armv6-pmu" : "armv7-pmu";
->  
->  	if ((!oh_num) || (oh_num > 3))
->  		return -EINVAL;
+Now, as all VE platforms have to be booted with DT,
+the code handling non-DT case can be removed.
 
-Looks OK to me and should not conflict with anything I have queued:
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+---
+ drivers/mfd/vexpress-sysreg.c | 71 +++++++++----------------------------------
+ 1 file changed, 15 insertions(+), 56 deletions(-)
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+diff --git a/drivers/mfd/vexpress-sysreg.c b/drivers/mfd/vexpress-sysreg.c
+index 8f43ab8..3e628df 100644
+--- a/drivers/mfd/vexpress-sysreg.c
++++ b/drivers/mfd/vexpress-sysreg.c
+@@ -47,71 +47,26 @@
+ #define SYS_HBI_MASK		0xfff
+ #define SYS_PROCIDx_HBI_SHIFT	0
+ 
+-#define SYS_MCI_CARDIN		(1 << 0)
+-#define SYS_MCI_WPROT		(1 << 1)
+-
+ #define SYS_MISC_MASTERSITE	(1 << 14)
+ 
+-
+-static void __iomem *__vexpress_sysreg_base;
+-
+-static void __iomem *vexpress_sysreg_base(void)
++void vexpress_flags_set(u32 data)
+ {
+-	if (!__vexpress_sysreg_base) {
++	static void __iomem *base;
++
++	if (!base) {
+ 		struct device_node *node = of_find_compatible_node(NULL, NULL,
+ 				"arm,vexpress-sysreg");
+ 
+-		__vexpress_sysreg_base = of_iomap(node, 0);
++		base = of_iomap(node, 0);
+ 	}
+ 
+-	WARN_ON(!__vexpress_sysreg_base);
+-
+-	return __vexpress_sysreg_base;
+-}
+-
+-
+-static int vexpress_sysreg_get_master(void)
+-{
+-	if (readl(vexpress_sysreg_base() + SYS_MISC) & SYS_MISC_MASTERSITE)
+-		return VEXPRESS_SITE_DB2;
+-
+-	return VEXPRESS_SITE_DB1;
+-}
+-
+-void vexpress_flags_set(u32 data)
+-{
+-	writel(~0, vexpress_sysreg_base() + SYS_FLAGSCLR);
+-	writel(data, vexpress_sysreg_base() + SYS_FLAGSSET);
+-}
+-
+-unsigned int vexpress_get_mci_cardin(struct device *dev)
+-{
+-	return readl(vexpress_sysreg_base() + SYS_MCI) & SYS_MCI_CARDIN;
+-}
+-
+-u32 vexpress_get_procid(int site)
+-{
+-	if (site == VEXPRESS_SITE_MASTER)
+-		site = vexpress_sysreg_get_master();
++	if (WARN_ON(!base))
++		return;
+ 
+-	return readl(vexpress_sysreg_base() + (site == VEXPRESS_SITE_DB1 ?
+-			SYS_PROCID0 : SYS_PROCID1));
++	writel(~0, base + SYS_FLAGSCLR);
++	writel(data, base + SYS_FLAGSSET);
+ }
+ 
+-void __iomem *vexpress_get_24mhz_clock_base(void)
+-{
+-	return vexpress_sysreg_base() + SYS_24MHZ;
+-}
+-
+-
+-void __init vexpress_sysreg_early_init(void __iomem *base)
+-{
+-	__vexpress_sysreg_base = base;
+-
+-	vexpress_config_set_master(vexpress_sysreg_get_master());
+-}
+-
+-
+ /* The sysreg block is just a random collection of various functions... */
+ 
+ static struct syscon_platform_data vexpress_sysreg_sys_id_pdata = {
+@@ -210,6 +165,7 @@ static int vexpress_sysreg_probe(struct platform_device *pdev)
+ 	struct resource *mem;
+ 	void __iomem *base;
+ 	struct bgpio_chip *mmc_gpio_chip;
++	int master;
+ 	u32 dt_hbi;
+ 
+ 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+@@ -220,11 +176,14 @@ static int vexpress_sysreg_probe(struct platform_device *pdev)
+ 	if (!base)
+ 		return -ENOMEM;
+ 
+-	vexpress_config_set_master(vexpress_sysreg_get_master());
++	master = readl(base + SYS_MISC) & SYS_MISC_MASTERSITE ?
++			VEXPRESS_SITE_DB2 : VEXPRESS_SITE_DB1;
++	vexpress_config_set_master(master);
+ 
+ 	/* Confirm board type against DT property, if available */
+ 	if (of_property_read_u32(of_root, "arm,hbi", &dt_hbi) == 0) {
+-		u32 id = vexpress_get_procid(VEXPRESS_SITE_MASTER);
++		u32 id = readl(base + (master == VEXPRESS_SITE_DB1 ?
++				 SYS_PROCID0 : SYS_PROCID1));
+ 		u32 hbi = (id >> SYS_PROCIDx_HBI_SHIFT) & SYS_HBI_MASK;
+ 
+ 		if (WARN_ON(dt_hbi != hbi))
+-- 
+2.1.0
