@@ -1,95 +1,32 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 20 Jan 2015 19:29:24 +0530
-Subject: [PATCH] ARM: mach-davinci: Remove driver CDCE949
-In-Reply-To: <54BC8F2B.10509@ti.com>
-References: <1421624259-24127-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
- <54BC8F2B.10509@ti.com>
-Message-ID: <54BE5F3C.50907@ti.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Tue, 20 Jan 2015 14:59:43 +0100
+Subject: [PATCH v2 02/11] ARM: tegra: Use the generated pinmux data
+In-Reply-To: <54B7F7F7.1020202@wwwdotorg.org>
+References: <1421338359-27467-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1421338359-27467-3-git-send-email-tomeu.vizoso@collabora.com>
+ <54B7F7F7.1020202@wwwdotorg.org>
+Message-ID: <CAAObsKAaanrrSYd7gmLAS4K_G9fuU=WmsMXQk0G85hfy_XdE5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 19 January 2015 10:29 AM, Sekhar Nori wrote:
-> Hi,
-> 
-> On Monday 19 January 2015 05:07 AM, Rickard Strandqvist wrote:
->> Remove driver CDCE949 because it is not used anywhere.
+On 15 January 2015 at 18:25, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 01/15/2015 09:12 AM, Tomeu Vizoso wrote:
 >>
->> Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
-> 
-> 
->> diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
->> index ae129bc..8be5aef 100644
->> --- a/arch/arm/mach-davinci/board-dm646x-evm.c
->> +++ b/arch/arm/mach-davinci/board-dm646x-evm.c
->> @@ -45,7 +45,6 @@
->>  #include <mach/irqs.h>
->>  #include <mach/serial.h>
->>  #include <mach/clock.h>
->> -#include <mach/cdce949.h>
->>  
->>  #include "davinci.h"
->>  #include "clock.h"
->> @@ -399,9 +398,6 @@ static struct i2c_board_info __initdata i2c_info[] =  {
->>  	{
->>  		I2C_BOARD_INFO("cpld_video", 0x3b),
->>  	},
->> -	{
->> -		I2C_BOARD_INFO("cdce949", 0x6c),
->> -	},
->>  };
-> 
-> There is cdce_clk_init() and associated data structures that also need
-> to be removed.
+>> Google has submitted a board config for the pinmux programming of the
+>> Nyan Big board. Use the whole of it as it's generated to make it easier
+>> to update as the configuration gets fixed in the future.
+>
+>
+> Submitted to where? I assume you mean tegra-pinmux-scripts. I don't see a
+> Nyan/Nyan-big configuration there yet. IIRC (and I might not) one was
+> posted, but there were some review comments that aren't yet addressed?
 
-In the interest of time, I made this change myself.
-I will be merging the attached patch with this one.
+Yeah, that's what I meant by submitted. TTBOMK the v2 doesn't have any
+comments pending of being addressed?
 
-Thanks,
-Sekhar
+I have just sent a pinmux config file for the blaze that just changes
+the configuration of usb_vbus_en0, usb_vbus_en1 and dp_hpd pins.
 
----8<---
-diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
-index 8be5aef3aca9..846a84ddc28e 100644
---- a/arch/arm/mach-davinci/board-dm646x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm646x-evm.c
-@@ -711,31 +711,6 @@ static void __init evm_init_i2c(void)
- 	evm_init_video();
- }
- 
--#define CDCE949_XIN_RATE	27000000
--
--/* CDCE949 support - "lpsc" field is overridden to work as clock number */
--static struct clk cdce_clk_in = {
--	.name	= "cdce_xin",
--	.rate	= CDCE949_XIN_RATE,
--};
--
--static struct clk_lookup cdce_clks[] = {
--	CLK(NULL, "xin", &cdce_clk_in),
--	CLK(NULL, NULL, NULL),
--};
--
--static void __init cdce_clk_init(void)
--{
--	struct clk_lookup *c;
--	struct clk *clk;
--
--	for (c = cdce_clks; c->clk; c++) {
--		clk = c->clk;
--		clkdev_add(c);
--		clk_register(clk);
--	}
--}
--
- #define DM6467T_EVM_REF_FREQ		33000000
- 
- static void __init davinci_map_io(void)
-@@ -744,8 +719,6 @@ static void __init davinci_map_io(void)
- 
- 	if (machine_is_davinci_dm6467tevm())
- 		davinci_set_refclk_rate(DM6467T_EVM_REF_FREQ);
--
--	cdce_clk_init();
- }
- 
- #define DM646X_EVM_PHY_ID		"davinci_mdio-0:01"
+Regards,
+
+Tomeu
