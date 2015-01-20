@@ -1,84 +1,78 @@
-From: der.herr@hofr.at (Nicholas Mc Guire)
-Date: Tue, 20 Jan 2015 06:23:50 +0100
-Subject: [PATCH] video: treat signal like timeout as failure
-Message-ID: <1421731430-13207-1-git-send-email-der.herr@hofr.at>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Tue, 20 Jan 2015 13:39:38 +0800
+Subject: [GIT PULL v2]Hisilicon hip01 soc and development board updates
+ for 3.20
+In-Reply-To: <20150119191941.GE16883@quad.lixom.net>
+References: <54B723AB.7080506@hisilicon.com>
+ <20150119191941.GE16883@quad.lixom.net>
+Message-ID: <54BDEA1A.3060502@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-if(!wait_for_completion_interruptible_timeout(...))
-only handles the timeout case - this patch adds handling the
-signal case the same as timeout and cleans up.
 
-Signed-off-by: Nicholas Mc Guire <der.herr@hofr.at>
----
 
-Only the timeout case was being handled, return of 0 in 
-wait_for_completion_interruptible_timeout, the signal case (-ERESTARTSYS)
-was treated just like the case of successful completion, which is most 
-likely not reasonable.
+On 2015/1/20 3:19, Olof Johansson wrote:
+> On Thu, Jan 15, 2015 at 10:19:23AM +0800, Wei Xu wrote:
+>> Hi Arnd, Hi Olof, Hi Kevin, 
+>>
+>> Could you please help to merge the pull request of hisilicon hip01 soc for 3.20. 
+>> Thanks!
+>>
+>> Best Regards,
+>> Wei
+>>
+>> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+>>
+>>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+>>
+>> are available in the git repository at:
+>>
+>>   git://github.com/hisilicon/linux-hisi.git tags/hip01-for-3.20-v2
+>>
+>> for you to fetch changes up to 27040189cb050cbe52a81c0e6aeb552872aa0736:
+>>
+>>   ARM: hisi: enable smp for HiP01 (2015-01-15 09:59:51 +0800)
+>>
+>> ----------------------------------------------------------------
+>> ARM: mach-hisi: Hisilicon hip01 soc and development board updates for 3.20
+>>
+>> - Add hip01 debug UART
+>> - Add hip01 DT_MACHINE and ARCH_HIP01 configure item
+>> - Add dts for Hisilicon hip01-ca9x2 board
+>> - Enable ARCH_HIP01 in the hisi_defconfig
+>> - Rename hix5hd2_smp_prepare_cpus to hisi_common_smp_prepare_cpus
+>> - Rename hix5hd2_secondary_startup to hisi_secondary_startup
+>> - Enable smp for hip01
 
-Note that exynos_mipi_dsi_wr_data/exynos_mipi_dsi_rd_data return values
-are not checked at the call sites in s6e8ax0.c (cmd_read/cmd_write)!
+Hi Olof,
 
-This patch simply treats the signal case the same way as the timeout case,
-by releasing locks and returning 0 - which might not be the right thing to
-do - this needs a review by someone knowing the details of this driver.
+> Actually, you're adding a new dts file that's conflicting at the top level now,
+> and we don't want that.
+> 
+> Please split your branches like other maintainers do into soc and dt branches.
+> 
+> dt
+> soc
+> defconfig
 
-Patch is against 3.19.0-rc5 -next-20150119
+Thanks for your patient education!
+I will follow it next time.
 
-Patch was only compile-tested with exynos_defconfig
+> I don't know your workflow, if you have users of your branches. If not, and if
+> your tree isn't in linux-next, I can cherry pick the branch apart as needed
+> here. Just let me know.
 
- drivers/video/fbdev/exynos/exynos_mipi_dsi_common.c |   17 +++++++++++------
- 1 file changed, 11 insertions(+), 6 deletions(-)
+My tree is not in linux-next. I have checked the linux-next.git/tree/Next/Trees.
+Could you please help to cherry pick them this time?
+Thanks!
 
-diff --git a/drivers/video/fbdev/exynos/exynos_mipi_dsi_common.c b/drivers/video/fbdev/exynos/exynos_mipi_dsi_common.c
-index 2358a2f..55a7a45 100644
---- a/drivers/video/fbdev/exynos/exynos_mipi_dsi_common.c
-+++ b/drivers/video/fbdev/exynos/exynos_mipi_dsi_common.c
-@@ -157,6 +157,7 @@ int exynos_mipi_dsi_wr_data(struct mipi_dsim_device *dsim, unsigned int data_id,
- 	const unsigned char *data0, unsigned int data_size)
- {
- 	unsigned int check_rx_ack = 0;
-+	long timeout;
- 
- 	if (dsim->state == DSIM_STATE_ULPS) {
- 		dev_err(dsim->dev, "state is ULPS.\n");
-@@ -244,9 +245,11 @@ int exynos_mipi_dsi_wr_data(struct mipi_dsim_device *dsim, unsigned int data_id,
- 		exynos_mipi_dsi_wr_tx_header(dsim, data_id, data_size & 0xff,
- 			(data_size & 0xff00) >> 8);
- 
--		if (!wait_for_completion_interruptible_timeout(&dsim_wr_comp,
--							MIPI_FIFO_TIMEOUT)) {
--			dev_warn(dsim->dev, "command write timeout.\n");
-+		timeout = wait_for_completion_interruptible_timeout(
-+					&dsim_wr_comp, MIPI_FIFO_TIMEOUT);
-+		if (timeout <= 0) {
-+			dev_warn(dsim->dev,
-+				"command write timed-out/interrupted.\n");
- 			mutex_unlock(&dsim->lock);
- 			return -EAGAIN;
- 		}
-@@ -345,6 +348,7 @@ int exynos_mipi_dsi_rd_data(struct mipi_dsim_device *dsim, unsigned int data_id,
- 	unsigned int rx_data, rcv_pkt, i;
- 	u8 response = 0;
- 	u16 rxsize;
-+	long timeout;
- 
- 	if (dsim->state == DSIM_STATE_ULPS) {
- 		dev_err(dsim->dev, "state is ULPS.\n");
-@@ -380,9 +384,10 @@ int exynos_mipi_dsi_rd_data(struct mipi_dsim_device *dsim, unsigned int data_id,
- 		return -EINVAL;
- 	}
- 
--	if (!wait_for_completion_interruptible_timeout(&dsim_rd_comp,
--				MIPI_FIFO_TIMEOUT)) {
--		pr_err("RX done interrupt timeout\n");
-+	timeout = wait_for_completion_interruptible_timeout(&dsim_rd_comp,
-+				MIPI_FIFO_TIMEOUT);
-+	if (timeout <= 0) {
-+		pr_err("RX done interrupt timeout/interrupted\n");
- 		mutex_unlock(&dsim->lock);
- 		return 0;
- 	}
--- 
-1.7.10.4
+Best Regards,
+Wei
+
+> 
+> Thanks.
+> 
+> -Olof
+> 
+> .
+> 
