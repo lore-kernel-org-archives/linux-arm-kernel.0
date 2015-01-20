@@ -1,133 +1,174 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Tue, 20 Jan 2015 16:17:02 +0800
-Subject: [PATCH 09/12] pm: at91: rename function name:
- at91_slow_clock()-->at91_pm_suspend_sram_fn
-In-Reply-To: <1421741825-18226-1-git-send-email-wenyou.yang@atmel.com>
-References: <1421741825-18226-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1421741825-18226-10-git-send-email-wenyou.yang@atmel.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 20 Jan 2015 17:23:43 +0900
+Subject: [PATCHv3 2/8] devfreq: exynos: Add documentation for generic
+ exynos memory bus frequency driver
+In-Reply-To: <CAKohpomqosqxeDANC=NLBVmOUHyUoqd7Zhph7r6f7+ufYN48EQ@mail.gmail.com>
+References: <1420681257-3078-1-git-send-email-cw00.choi@samsung.com>
+ <1420681257-3078-3-git-send-email-cw00.choi@samsung.com>
+ <CAL_Jsq+5sdsm_-VW-ta+qV-NBao-XTHvsYWcbMdZmbP0Nw43Cw@mail.gmail.com>
+ <CAKohpomqosqxeDANC=NLBVmOUHyUoqd7Zhph7r6f7+ufYN48EQ@mail.gmail.com>
+Message-ID: <54BE108F.8090506@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the file name's renaming, rename the file name at91_slow_clock()-->
-at91_pm_suspend_sram_fn, rename the function handler's name at the same time.
+Hi Viresh,
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/mach-at91/pm.c         |   23 +++++++++++------------
- arch/arm/mach-at91/pm_suspend.S |   26 ++++++++++++--------------
- 2 files changed, 23 insertions(+), 26 deletions(-)
+I explained the relation between memory bus group and memory bus block on following patch[1].
+- [1] https://lkml.org/lkml/2015/1/8/642
 
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index a1010f0..98dfeb2 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -137,13 +137,12 @@ int at91_suspend_entering_slow_clock(void)
- }
- EXPORT_SYMBOL(at91_suspend_entering_slow_clock);
- 
--
--static void (*slow_clock)(void __iomem *pmc, void __iomem *ramc0,
-+static void (*at91_suspend_sram_fn)(void __iomem *pmc, void __iomem *ramc0,
- 			  void __iomem *ramc1, int memctrl);
- 
--extern void at91_slow_clock(void __iomem *pmc, void __iomem *ramc0,
-+extern void at91_pm_suspend_in_sram(void __iomem *pmc, void __iomem *ramc0,
- 			    void __iomem *ramc1, int memctrl);
--extern u32 at91_slow_clock_sz;
-+extern u32 at91_pm_suspend_in_sram_sz;
- 
- static void at91_pm_suspend(suspend_state_t state)
- {
-@@ -152,8 +151,8 @@ static void at91_pm_suspend(suspend_state_t state)
- 	pm_data |= (state == PM_SUSPEND_MEM) ?
- 			(AT91_PM_SLOW_CLOCK << AT91_PM_MODE_OFFSET) : 0;
- 
--	slow_clock(at91_pmc_base, at91_ramc_base[0],
--			at91_ramc_base[1], pm_data);
-+	at91_suspend_sram_fn(at91_pmc_base, at91_ramc_base[0],
-+				at91_ramc_base[1], pm_data);
- }
- 
- static int at91_pm_enter(suspend_state_t state)
-@@ -253,17 +252,19 @@ static void __init at91_pm_sram_init(void)
- 		goto put_node;
- 	}
- 
--	sram_base = gen_pool_alloc(sram_pool, at91_slow_clock_sz);
-+	sram_base = gen_pool_alloc(sram_pool, at91_pm_suspend_in_sram_sz);
- 	if (!sram_base) {
- 		pr_warn("%s: unable to alloc ocram!\n", __func__);
- 		goto put_node;
- 	}
- 
- 	sram_pbase = gen_pool_virt_to_phys(sram_pool, sram_base);
--	slow_clock = __arm_ioremap_exec(sram_pbase, at91_slow_clock_sz, false);
-+	at91_suspend_sram_fn = __arm_ioremap_exec(sram_pbase,
-+					at91_pm_suspend_in_sram_sz, false);
- 
--	/* Copy slow_clock handler to SRAM, and call it */
--	memcpy(slow_clock, at91_slow_clock, at91_slow_clock_sz);
-+	/* Copy pm suspend handler to SRAM, and call it */
-+	memcpy(at91_suspend_sram_fn,
-+		at91_pm_suspend_in_sram, at91_pm_suspend_in_sram_sz);
- 
- put_node:
- 	of_node_put(node);
-@@ -312,8 +313,6 @@ static void __init at91_pm_init(void)
- 
- 	at91_pm_sram_init();
- 
--	pr_info("AT91: Power Management%s\n", (slow_clock ? " (with slow clock mode)" : ""));
--
- 	if (at91_cpuidle_device.dev.platform_data)
- 		platform_device_register(&at91_cpuidle_device);
- 
-diff --git a/arch/arm/mach-at91/pm_suspend.S b/arch/arm/mach-at91/pm_suspend.S
-index 420e730..6c3fc50 100644
---- a/arch/arm/mach-at91/pm_suspend.S
-+++ b/arch/arm/mach-at91/pm_suspend.S
-@@ -54,23 +54,21 @@ mode	.req	r6
- 
- 	.text
- 
--/* void at91_slow_clock(void __iomem *pmc, void __iomem *sdramc,
-+/*
-+ * void at91_pm_suspend_in_sram(void __iomem *pmc, void __iomem *sdramc,
-  *			void __iomem *ramc1, int memctrl)
-+ * @input param:
-+ * 	@r0: the base address of AT91_PMC
-+ *  	@r1: the base address of SDRAM Controller (SDRAM, DDRSDR, or AT91_SYS)
-+ *	@r2: the base address of second SDRAM Controller or 0 if not present
-+ *	@r3: the pm information,
-+ *		least byte: SDRAM controller type
-+ *		2nd byte: 1 -> suspend to memory, 0 -> standby
-  */
--ENTRY(at91_slow_clock)
-+ENTRY(at91_pm_suspend_in_sram)
- 	/* Save registers on stack */
- 	stmfd	sp!, {r4 - r12, lr}
- 
--	/*
--	 * Register usage:
--	 *  R0 = Base address of AT91_PMC
--	 *  R1 = Base address of RAM Controller (SDRAM, DDRSDR, or AT91_SYS)
--	 *  R2 = Base address of second RAM Controller or 0 if not present
--	 *  R3 = Memory controller
--	 *  R4 = temporary register
--	 *  R5 = temporary register
--	 */
--
- 	/* Drain write buffer */
- 	mov	tmp1, #0
- 	mcr	p15, 0, tmp1, c7, c10, 4
-@@ -276,5 +274,5 @@ ram_restored:
- .saved_sam9_mdr1:
- 	.word 0
- 
--ENTRY(at91_slow_clock_sz)
--	.word .-at91_slow_clock
-+ENTRY(at91_pm_suspend_in_sram_sz)
-+	.word .-at91_pm_suspend_in_sram
--- 
-1.7.9.5
+On 01/20/2015 04:19 PM, Viresh Kumar wrote:
+> On 9 January 2015 at 02:48, Rob Herring <robherring2@gmail.com> wrote:
+>> Adding Viresh.
+> 
+> Sorry for being too late, I was very busy with other cpufreq stuff I was doing
+> and saved this thread for later as it required me to understand it properly..
+> 
+>>> +Required properties for memory bus block:
+>>> +- clock-names : the name of clock used by the memory bus, "memory-bus".
+>>> +- clocks : phandles for clock specified in "clock-names" property.
+>>> +- #clock-cells: should be 1.
+>>> +- frequency: the frequency table to support DVFS feature.
+>>
+>> So you have just defined a new OPP table format. We already have one
+>> and Viresh is working to create a more extendable one. He asked about
+>> what's needed in devfreq, so Viresh here you go. :)
+> 
+> I failed to understand what's new here, probably I need more clarity on
+> what we are doing here..
+> 
+> So, this is what I see from OPPs point of view, everything else stripped out.
+> 
+>>> +       memory_bus_int: memory_bus at 1 {
+> 
+>>> +               operating-points = <
+>>> +                       400000 950000
+>>> +                       200000 950000
+>>> +                       133000 925000
+>>> +                       100000 850000
+>>> +                       80000  850000
+>>> +                       50000  850000>;
+> 
+> So these are the OPPs your "groups" support and below ones are
+> the frequencies that each block will support. Right ?
+
+Right.
+But, the frequency of OPPs is only used for devfreq ondemand governor.
+After deciding the proper frequency of memory bus on ondemand governor,
+exynos-bus.c (exynos memory bus frequency driver) use the frequency table
+of memory bus blocks on below to change the clock rate of memory bus block.
+
+> 
+>>> +               blocks {
+> 
+>>> +                               frequency = <
+>>> +                                       100000
+>>> +                                       100000
+>>> +                                       100000
+>>> +                                       100000
+> 
+> Why this replication here ?
+
+Firs of all,
+I explain the hierarchy of Exynos memory buses.
+
+For example of Exynos3250 memory bus,
+This patch divide the memory bus group according to power rail (regulator).
+- MIF (Memory Interface ) memory bus group uses the VDD_MIF regulator.
+- INT (Internal) memory bus group uses the VDD_INT regulator.
+
+Each memory bus group contains only one power rail(regulator) and one more memory bus blocks as follwing:
+
+- MIF memory bus group                     
+power rail(VDD_MIF)-->|--- memory bus for DMC (Dynamic Memory Controller) block (dmc clock)
+
+- INT memory bus group
+                      |--- memory bus for PERI block (aclk_100 clock)
+                      |
+                      |--- memory bus for DISPLAY block (aclk_160 clock)
+                      |  
+                      |--- memory bus for ISP block (aclk_200 clock)
+                      |
+                      |--- memory bus for GPS block (aclk_266 clock)
+power rail(VDD_INT)-->|
+                      |--- memory bus for MCUISP block (aclk_400_mcuisp clock)
+                      |
+                      |--- memory bus for Leftbus block (gdl clock)
+                      |
+                      |--- memory bus for Rightbus block (gdr clock)
+                      |
+                      |--- memory bus for MFC block (mfc clock)
+
+
+Exynos3250 has following table for INT memory bus group:
+All clocks of INT memory bus group have to contain the same entry count
+againt the number of 'virtual freqw'. So, each memory bus clock could have duplicate clocks.
+
+------------------------------------------------------------------------
+Level|virtual freq|PERI's clk|Display's clk|ISP's clk|GPS's clk| voltage|
+------------------------------------------------------------------------
+L6   |400000      |100000    |200000       |200000   |300000   | 95000  |
+L5   |200000      |100000    |160000       |200000   |200000   | 95000  |
+L4   |133000      |100000    |100000       |100000   |133000   | 92500  |
+L3   |100000      |100000    |80000        |80000    |100000   | 85000  |
+L2   |80000       |50000     |80000        |50000    |50000    | 85000  |
+L1   |50000       |50000     |50000        |50000    |50000    | 85000  |
+-------------------------------------------------------------------------
+(Except for mcuisp, leftbus, rightbus, mfc block)
+
+This table is used for devfreq ondemand governor as following:
+1. ondemand governor in devfreq use the 'virtual freq' to devcide the proper
+   frequency for memory bus. 
+2. ondemand governor executes the *_target() function to set clock rate and voltage.
+3. *_target() function in exynos-bus.c changes the clock rate of {PERIS|Display|ISP|GPS} clk
+   according to decided 'Level' by devfreq ondemand governor.
+
+> 
+>>> +                                       50000
+>>> +                                       50000>;
+>>> +                       };
+> 
+> How are the above two tables (operating-points and frequency) related
+> here? What about the voltages at which these frequencies are possible ?
+
+I explained it on the upper.
+
+> 
+>>> +                       display_block: memory_bus_block2 {
+> 
+>>> +                               frequency = <
+>>> +                                       200000
+>>> +                                       160000
+>>> +                                       100000
+>>> +                                       80000
+>>> +                                       80000
+>>> +                                       50000>;
+>>> +                       };
+> 
+>>> +                       isp_block: memory_bus_block3 {
+> 
+>>> +                               frequency = <
+>>> +                                       200000
+>>> +                                       200000
+>>> +                                       100000
+>>> +                                       80000
+>>> +                                       50000
+>>> +                                       50000>;
+>>> +                       };
+> 
+>>> +                       gps_block: memory_bus_block4 {
+> 
+>>> +                               frequency = <
+>>> +                                       300000
+>>> +                                       200000
+>>> +                                       133000
+>>> +                                       100000
+>>> +                                       50000
+>>> +                                       50000>;
+>>> +                       };
+> 
+> same for others as well..
+
+I explained it on the upper.
+
+Best Regards,
+Chanwoo Choi
