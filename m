@@ -1,90 +1,218 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 20 Jan 2015 13:51:38 +0100
-Subject: [PATCH 1/9] ARM: shmobile: r8a73a4: Add CPG register bits header
+Date: Tue, 20 Jan 2015 13:51:41 +0100
+Subject: [PATCH 4/9] ARM: shmobile: r8a73a4: Add MSTP clock assignments to DT
 In-Reply-To: <1421758306-24838-1-git-send-email-geert+renesas@glider.be>
 References: <1421758306-24838-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1421758306-24838-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <1421758306-24838-5-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+
+Assigns clocks to dmac, i2c*, cmt1, thermal, scif*, sdhi*, and mmcif*.
 
 Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- include/dt-bindings/clock/r8a73a4-clock.h | 62 +++++++++++++++++++++++++++++++
- 1 file changed, 62 insertions(+)
- create mode 100644 include/dt-bindings/clock/r8a73a4-clock.h
+ arch/arm/boot/dts/r8a73a4.dtsi | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-diff --git a/include/dt-bindings/clock/r8a73a4-clock.h b/include/dt-bindings/clock/r8a73a4-clock.h
-new file mode 100644
-index 0000000000000000..9a4b4c9ca44aba70
---- /dev/null
-+++ b/include/dt-bindings/clock/r8a73a4-clock.h
-@@ -0,0 +1,62 @@
-+/*
-+ * Copyright 2014 Ulrich Hecht
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#ifndef __DT_BINDINGS_CLOCK_R8A73A4_H__
-+#define __DT_BINDINGS_CLOCK_R8A73A4_H__
-+
-+/* CPG */
-+#define R8A73A4_CLK_MAIN	0
-+#define R8A73A4_CLK_PLL0	1
-+#define R8A73A4_CLK_PLL1	2
-+#define R8A73A4_CLK_PLL2	3
-+#define R8A73A4_CLK_PLL2S	4
-+#define R8A73A4_CLK_PLL2H	5
-+#define R8A73A4_CLK_Z		6
-+#define R8A73A4_CLK_Z2		7
-+#define R8A73A4_CLK_I		8
-+#define R8A73A4_CLK_M3		9
-+#define R8A73A4_CLK_B		10
-+#define R8A73A4_CLK_M1		11
-+#define R8A73A4_CLK_M2		12
-+#define R8A73A4_CLK_ZX		13
-+#define R8A73A4_CLK_ZS		14
-+#define R8A73A4_CLK_HP		15
-+
-+/* MSTP2 */
-+#define R8A73A4_CLK_DMAC	18
-+#define R8A73A4_CLK_SCIFB3	17
-+#define R8A73A4_CLK_SCIFB2	16
-+#define R8A73A4_CLK_SCIFB1	7
-+#define R8A73A4_CLK_SCIFB0	6
-+#define R8A73A4_CLK_SCIFA0	4
-+#define R8A73A4_CLK_SCIFA1	3
-+
-+/* MSTP3 */
-+#define R8A73A4_CLK_CMT1	29
-+#define R8A73A4_CLK_IIC1	23
-+#define R8A73A4_CLK_IIC0	18
-+#define R8A73A4_CLK_IIC7	17
-+#define R8A73A4_CLK_IIC6	16
-+#define R8A73A4_CLK_MMCIF0	15
-+#define R8A73A4_CLK_SDHI0	14
-+#define R8A73A4_CLK_SDHI1	13
-+#define R8A73A4_CLK_SDHI2	12
-+#define R8A73A4_CLK_MMCIF1	5
-+#define R8A73A4_CLK_IIC2	0
-+
-+/* MSTP4 */
-+#define R8A73A4_CLK_IIC3	11
-+#define R8A73A4_CLK_IIC4	10
-+#define R8A73A4_CLK_IIC5	9
-+
-+/* MSTP5 */
-+#define R8A73A4_CLK_THERMAL	22
-+#define R8A73A4_CLK_IIC8	15
-+
-+#endif /* __DT_BINDINGS_CLOCK_R8A73A4_H__ */
+diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
+index a1adfe4bc760ba67..fdcca5d0fb61f0bc 100644
+--- a/arch/arm/boot/dts/r8a73a4.dtsi
++++ b/arch/arm/boot/dts/r8a73a4.dtsi
+@@ -88,6 +88,7 @@
+ 					"ch8", "ch9", "ch10", "ch11",
+ 					"ch12", "ch13", "ch14", "ch15",
+ 					"ch16", "ch17", "ch18", "ch19";
++			clocks = <&mstp2_clks R8A73A4_CLK_DMAC>;
+ 		};
+ 	};
+ 
+@@ -120,6 +121,7 @@
+ 		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
+ 		reg = <0 0xe60b0000 0 0x428>;
+ 		interrupts = <0 179 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp4_clks R8A73A4_CLK_IIC5>;
+ 
+ 		status = "disabled";
+ 	};
+@@ -128,6 +130,8 @@
+ 		compatible = "renesas,cmt-48-r8a73a4", "renesas,cmt-48-gen2";
+ 		reg = <0 0xe6130000 0 0x1004>;
+ 		interrupts = <0 120 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp3_clks R8A73A4_CLK_CMT1>;
++		clock-names = "fck";
+ 
+ 		renesas,channels-mask = <0xff>;
+ 
+@@ -211,6 +215,7 @@
+ 		reg = <0 0xe61f0000 0 0x14>, <0 0xe61f0100 0 0x38>,
+ 			 <0 0xe61f0200 0 0x38>, <0 0xe61f0300 0 0x38>;
+ 		interrupts = <0 69 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp5_clks R8A73A4_CLK_THERMAL>;
+ 	};
+ 
+ 	i2c0: i2c at e6500000 {
+@@ -219,6 +224,7 @@
+ 		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
+ 		reg = <0 0xe6500000 0 0x428>;
+ 		interrupts = <0 174 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp3_clks R8A73A4_CLK_IIC0>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -228,6 +234,7 @@
+ 		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
+ 		reg = <0 0xe6510000 0 0x428>;
+ 		interrupts = <0 175 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp3_clks R8A73A4_CLK_IIC1>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -237,6 +244,7 @@
+ 		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
+ 		reg = <0 0xe6520000 0 0x428>;
+ 		interrupts = <0 176 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp3_clks R8A73A4_CLK_IIC2>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -246,6 +254,7 @@
+ 		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
+ 		reg = <0 0xe6530000 0 0x428>;
+ 		interrupts = <0 177 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp4_clks R8A73A4_CLK_IIC3>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -255,6 +264,7 @@
+ 		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
+ 		reg = <0 0xe6540000 0 0x428>;
+ 		interrupts = <0 178 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp4_clks R8A73A4_CLK_IIC4>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -264,6 +274,7 @@
+ 		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
+ 		reg = <0 0xe6550000 0 0x428>;
+ 		interrupts = <0 184 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp3_clks R8A73A4_CLK_IIC6>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -273,6 +284,7 @@
+ 		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
+ 		reg = <0 0xe6560000 0 0x428>;
+ 		interrupts = <0 185 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp3_clks R8A73A4_CLK_IIC7>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -282,6 +294,7 @@
+ 		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
+ 		reg = <0 0xe6570000 0 0x428>;
+ 		interrupts = <0 173 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp5_clks R8A73A4_CLK_IIC8>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -289,6 +302,8 @@
+ 		compatible = "renesas,scifb-r8a73a4", "renesas,scifb";
+ 		reg = <0 0xe6c20000 0 0x100>;
+ 		interrupts = <0 148 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp2_clks R8A73A4_CLK_SCIFB0>;
++		clock-names = "sci_ick";
+ 		status = "disabled";
+ 	};
+ 
+@@ -296,6 +311,8 @@
+ 		compatible = "renesas,scifb-r8a73a4", "renesas,scifb";
+ 		reg = <0 0xe6c30000 0 0x100>;
+ 		interrupts = <0 149 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp2_clks R8A73A4_CLK_SCIFB1>;
++		clock-names = "sci_ick";
+ 		status = "disabled";
+ 	};
+ 
+@@ -303,6 +320,8 @@
+ 		compatible = "renesas,scifa-r8a73a4", "renesas,scifa";
+ 		reg = <0 0xe6c40000 0 0x100>;
+ 		interrupts = <0 144 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp2_clks R8A73A4_CLK_SCIFA0>;
++		clock-names = "sci_ick";
+ 		status = "disabled";
+ 	};
+ 
+@@ -310,6 +329,8 @@
+ 		compatible = "renesas,scifa-r8a73a4", "renesas,scifa";
+ 		reg = <0 0xe6c50000 0 0x100>;
+ 		interrupts = <0 145 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp2_clks R8A73A4_CLK_SCIFA1>;
++		clock-names = "sci_ick";
+ 		status = "disabled";
+ 	};
+ 
+@@ -317,6 +338,8 @@
+ 		compatible = "renesas,scifb-r8a73a4", "renesas,scifb";
+ 		reg = <0 0xe6ce0000 0 0x100>;
+ 		interrupts = <0 150 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp2_clks R8A73A4_CLK_SCIFB2>;
++		clock-names = "sci_ick";
+ 		status = "disabled";
+ 	};
+ 
+@@ -324,6 +347,8 @@
+ 		compatible = "renesas,scifb-r8a73a4", "renesas,scifb";
+ 		reg = <0 0xe6cf0000 0 0x100>;
+ 		interrupts = <0 151 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp2_clks R8A73A4_CLK_SCIFB3>;
++		clock-names = "sci_ick";
+ 		status = "disabled";
+ 	};
+ 
+@@ -331,6 +356,7 @@
+ 		compatible = "renesas,sdhi-r8a73a4";
+ 		reg = <0 0xee100000 0 0x100>;
+ 		interrupts = <0 165 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp3_clks R8A73A4_CLK_SDHI0>;
+ 		cap-sd-highspeed;
+ 		status = "disabled";
+ 	};
+@@ -339,6 +365,7 @@
+ 		compatible = "renesas,sdhi-r8a73a4";
+ 		reg = <0 0xee120000 0 0x100>;
+ 		interrupts = <0 166 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp3_clks R8A73A4_CLK_SDHI1>;
+ 		cap-sd-highspeed;
+ 		status = "disabled";
+ 	};
+@@ -347,6 +374,7 @@
+ 		compatible = "renesas,sdhi-r8a73a4";
+ 		reg = <0 0xee140000 0 0x100>;
+ 		interrupts = <0 167 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp3_clks R8A73A4_CLK_SDHI2>;
+ 		cap-sd-highspeed;
+ 		status = "disabled";
+ 	};
+@@ -355,6 +383,7 @@
+ 		compatible = "renesas,sh-mmcif";
+ 		reg = <0 0xee200000 0 0x80>;
+ 		interrupts = <0 169 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp3_clks R8A73A4_CLK_MMCIF0>;
+ 		reg-io-width = <4>;
+ 		status = "disabled";
+ 	};
+@@ -363,6 +392,7 @@
+ 		compatible = "renesas,sh-mmcif";
+ 		reg = <0 0xee220000 0 0x80>;
+ 		interrupts = <0 170 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp3_clks R8A73A4_CLK_MMCIF1>;
+ 		reg-io-width = <4>;
+ 		status = "disabled";
+ 	};
 -- 
 1.9.1
