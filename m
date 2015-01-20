@@ -1,74 +1,110 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 20 Jan 2015 12:35:08 +0100
-Subject: [PATCH] i2c: drop ancient protection against sysfs refcounting
- issues
-In-Reply-To: <20150120101752.GI26493@n2100.arm.linux.org.uk>
-References: <1421693756-12917-1-git-send-email-wsa@the-dreams.de>
- <20150119190142.GA9451@kroah.com>
- <20150119230427.GH26493@n2100.arm.linux.org.uk>
- <20150120014159.GA3349@kroah.com> <54BDFE30.5090303@metafoo.de>
- <20150120071256.GA18983@kroah.com>
- <20150120101752.GI26493@n2100.arm.linux.org.uk>
-Message-ID: <20150120113508.GA1067@katana>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 20 Jan 2015 20:37:52 +0900
+Subject: [PATCHv3 2/8] devfreq: exynos: Add documentation for generic
+ exynos memory bus frequency driver
+In-Reply-To: <CAKohpokSuVhH3hHFF+mLtJXvjt=bmJy1oZRBOttCNXORBS1Y0A@mail.gmail.com>
+References: <1420681257-3078-1-git-send-email-cw00.choi@samsung.com>
+ <1420681257-3078-3-git-send-email-cw00.choi@samsung.com>
+ <CAL_Jsq+5sdsm_-VW-ta+qV-NBao-XTHvsYWcbMdZmbP0Nw43Cw@mail.gmail.com>
+ <CAKohpomqosqxeDANC=NLBVmOUHyUoqd7Zhph7r6f7+ufYN48EQ@mail.gmail.com>
+ <54BE108F.8090506@samsung.com>
+ <CAKohpokSuVhH3hHFF+mLtJXvjt=bmJy1oZRBOttCNXORBS1Y0A@mail.gmail.com>
+Message-ID: <54BE3E10.2080906@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> > Right, and I'm not saying it should be, just move the existing logic
-> > into the release callback, and the code flow should be the same and we
-> > don't end up with an "empty" release callback.
-
-But as Russell says, even if we don't have the empty callback, we still
-create the problem shown by DEBUG_KOBJECT_RELEASE which wasn't there
-before?
-
-> IMHO there are two possibilities here:
+On 01/20/2015 08:22 PM, Viresh Kumar wrote:
+> On 20 January 2015 at 13:53, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+>> But, the frequency of OPPs is only used for devfreq ondemand governor.
+>> After deciding the proper frequency of memory bus on ondemand governor,
+>> exynos-bus.c (exynos memory bus frequency driver) use the frequency table
+>> of memory bus blocks on below to change the clock rate of memory bus block.
 > 
-> 1. leave it as-is, where we ensure that the remainder of i2c_del_adapter
->    does not complete until the release callback has been called.
+>> Firs of all,
+>> I explain the hierarchy of Exynos memory buses.
+>>
+>> For example of Exynos3250 memory bus,
+>> This patch divide the memory bus group according to power rail (regulator).
+>> - MIF (Memory Interface ) memory bus group uses the VDD_MIF regulator.
+>> - INT (Internal) memory bus group uses the VDD_INT regulator.
+>>
+>> Each memory bus group contains only one power rail(regulator) and one more memory bus blocks as follwing:
+>>
+>> - MIF memory bus group
+>> power rail(VDD_MIF)-->|--- memory bus for DMC (Dynamic Memory Controller) block (dmc clock)
+>>
+>> - INT memory bus group
+>>                       |--- memory bus for PERI block (aclk_100 clock)
+>>                       |
+>>                       |--- memory bus for DISPLAY block (aclk_160 clock)
+>>                       |
+>>                       |--- memory bus for ISP block (aclk_200 clock)
+>>                       |
+>>                       |--- memory bus for GPS block (aclk_266 clock)
+>> power rail(VDD_INT)-->|
+>>                       |--- memory bus for MCUISP block (aclk_400_mcuisp clock)
+>>                       |
+>>                       |--- memory bus for Leftbus block (gdl clock)
+>>                       |
+>>                       |--- memory bus for Rightbus block (gdr clock)
+>>                       |
+>>                       |--- memory bus for MFC block (mfc clock)
+>>
+>>
+>> Exynos3250 has following table for INT memory bus group:
+>> All clocks of INT memory bus group have to contain the same entry count
+>> againt the number of 'virtual freqw'. So, each memory bus clock could have duplicate clocks.
+>>
+>> ------------------------------------------------------------------------
+>> Level|virtual freq|PERI's clk|Display's clk|ISP's clk|GPS's clk| voltage|
+>> ------------------------------------------------------------------------
+>> L6   |400000      |100000    |200000       |200000   |300000   | 95000  |
+>> L5   |200000      |100000    |160000       |200000   |200000   | 95000  |
+>> L4   |133000      |100000    |100000       |100000   |133000   | 92500  |
+>> L3   |100000      |100000    |80000        |80000    |100000   | 85000  |
+>> L2   |80000       |50000     |80000        |50000    |50000    | 85000  |
+>> L1   |50000       |50000     |50000        |50000    |50000    | 85000  |
+>> -------------------------------------------------------------------------
+>> (Except for mcuisp, leftbus, rightbus, mfc block)
+>>
+>> This table is used for devfreq ondemand governor as following:
+>> 1. ondemand governor in devfreq use the 'virtual freq' to devcide the proper
+>>    frequency for memory bus.
+>> 2. ondemand governor executes the *_target() function to set clock rate and voltage.
+>> 3. *_target() function in exynos-bus.c changes the clock rate of {PERIS|Display|ISP|GPS} clk
+>>    according to decided 'Level' by devfreq ondemand governor.
 > 
-> 2. fix it properly by taking (eg) the netdev approach to i2c_adapter,
->    or an alternative solution which results in decoupling the lifetime
->    of the struct device from the i2c_adapter.
+> I see..
 > 
-> Either of these would be much better than removing the completion and
-> then moving a chunk of code to make it "look" safer than it actually is
-> and thereby introducing potential use-after-free bugs.
+> Please confirm if my understanding is correct.
+> - mem-bus-group: all blocks sharing a regulator
+> - mem-bus-block: individual blocks managing their clock rate
 
-I agree. As much as I'd love option 2) I don't see that on the horizon.
-So, let's keep things as they are. What probably makes sense is to
-update the comment with something like this? I took the liberty and used
-some wording from Russell:
+Right and mem-bus-blcoks are included in a mem-bus-group.
 
-diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-index e227dff62a85..1c89a08fae2a 100644
---- a/drivers/i2c/i2c-core.c
-+++ b/drivers/i2c/i2c-core.c
-@@ -1778,11 +1778,14 @@ void i2c_del_adapter(struct i2c_adapter *adap)
- 	/* device name is gone after device_unregister */
- 	dev_dbg(&adap->dev, "adapter [%s] unregistered\n", adap->name);
- 
--	/* clean up the sysfs representation */
-+	/* wait until all references to the device are gone
-+	 *
-+	 * FIXME: This is old code and should ideally be replaced by an
-+	 * alternative which results in decoupling the lifetime of the struct
-+	 * device from the i2c_adapter, like spi or netdev do.
-+	 */
- 	init_completion(&adap->dev_released);
- 	device_unregister(&adap->dev);
--
--	/* wait for sysfs to drop all references */
- 	wait_for_completion(&adap->dev_released);
- 
- 	/* free bus id */
+> 
+> What you do in kernel is register group as a device (with virtual OPPs)
+> and then manage blocks within the driver. And so you need to do this
+> dummy mapping of virtual to physical frequencies.
 
+Right.
 
-Thanks for all the input, it is very much appreciated!
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150120/69ff1196/attachment.sig>
+> 
+> It *may* not have done it this way, if I was to design this driver.
+> 
+> Each bus-block is a separately controllable device and so must be registered
+> separately. In that case all bus-blocks will have separate OPP tables and
+> all this dummy-v2p mapping will go away.
+
+If each bus-block has separate regulator independently, each bus-block can be registered
+separately. But, exynos bus-blocks in mem-bus-group share the same regulator.
+
+> 
+> I believe that you are over complicating stuff without any need..
+> 
+> --
+> viresh
+> 
+
+Best Regards,
+Chanwoo Choi
