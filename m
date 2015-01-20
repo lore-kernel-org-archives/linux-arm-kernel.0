@@ -1,75 +1,83 @@
 From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Tue, 20 Jan 2015 07:24:56 +0100
-Subject: [PATCH 2/2] ARM: BCM5301X: Add DT for Buffalo WZR-900DHP
-In-Reply-To: <1421735096-8238-1-git-send-email-zajec5@gmail.com>
-References: <1421735096-8238-1-git-send-email-zajec5@gmail.com>
-Message-ID: <1421735096-8238-2-git-send-email-zajec5@gmail.com>
+Date: Tue, 20 Jan 2015 07:24:55 +0100
+Subject: [PATCH 1/2] ARM: BCM5310X: Enable earlyprintk on tested devices
+Message-ID: <1421735096-8238-1-git-send-email-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
 ---
- arch/arm/boot/dts/Makefile                        |  3 +-
- arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts | 37 +++++++++++++++++++++++
- 2 files changed, 39 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
+ arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts  | 2 +-
+ arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts       | 2 +-
+ arch/arm/boot/dts/bcm4708-netgear-r6250.dts        | 2 +-
+ arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts        | 2 +-
+ arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts | 2 +-
+ 5 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index ff4a5ae..0de664e 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -61,7 +61,8 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
- 	bcm4708-netgear-r6250.dtb \
- 	bcm4708-netgear-r6300-v2.dtb \
- 	bcm47081-asus-rt-n18u.dtb \
--	bcm47081-buffalo-wzr-600dhp2.dtb
-+	bcm47081-buffalo-wzr-600dhp2.dtb \
-+	bcm47081-buffalo-wzr-900dhp.dtb
- dtb-$(CONFIG_ARCH_BCM_63XX) += bcm963138dvt.dtb
- dtb-$(CONFIG_ARCH_BCM_CYGNUS) += bcm911360_entphn.dtb \
- 	bcm911360k.dtb \
-diff --git a/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts b/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
-new file mode 100644
-index 0000000..b5352c0
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
-@@ -0,0 +1,37 @@
-+/*
-+ * Broadcom BCM470X / BCM5301X ARM platform code.
-+ * DTS for Buffalo WZR-900DHP
-+ *
-+ * Copyright (C) 2015 Rafa? Mi?ecki <zajec5@gmail.com>
-+ *
-+ * Licensed under the GNU/GPL. See COPYING for details.
-+ */
-+
-+/dts-v1/;
-+
-+#include "bcm47081.dtsi"
-+
-+/ {
-+	compatible = "buffalo,wzr-900dhp", "brcm,bcm47081", "brcm,bcm4708";
-+	model = "Buffalo WZR-900DHP (BCM47081)";
-+
-+	chosen {
+diff --git a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
+index b359c1e..ce083a5 100644
+--- a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
++++ b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
+@@ -16,7 +16,7 @@
+ 	model = "Buffalo WZR-1750DHP (BCM4708)";
+ 
+ 	chosen {
+-		bootargs = "console=ttyS0,115200";
 +		bootargs = "console=ttyS0,115200 earlyprintk";
-+	};
-+
-+	memory {
-+		reg = <0x00000000 0x08000000>;
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		restart {
-+			label = "Reset";
-+			linux,code = <KEY_RESTART>;
-+			gpios = <&chipcommon 11 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+};
+ 	};
+ 
+ 	memory {
+diff --git a/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts b/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
+index 946c728..f57f213 100644
+--- a/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
++++ b/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
+@@ -16,7 +16,7 @@
+ 	model = "Luxul XWC-1000 (BCM4708)";
+ 
+ 	chosen {
+-		bootargs = "console=ttyS0,115200";
++		bootargs = "console=ttyS0,115200 earlyprintk";
+ 	};
+ 
+ 	memory {
+diff --git a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
+index f18c9d9..0a5f561 100644
+--- a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
++++ b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
+@@ -16,7 +16,7 @@
+ 	model = "Netgear R6250 V1 (BCM4708)";
+ 
+ 	chosen {
+-		bootargs = "console=ttyS0,115200";
++		bootargs = "console=ttyS0,115200 earlyprintk";
+ 	};
+ 
+ 	memory {
+diff --git a/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts b/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
+index 0ee85ea..4d87219 100644
+--- a/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
++++ b/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
+@@ -16,7 +16,7 @@
+ 	model = "Asus RT-N18U (BCM47081)";
+ 
+ 	chosen {
+-		bootargs = "console=ttyS0,115200";
++		bootargs = "console=ttyS0,115200 earlyprintk";
+ 	};
+ 
+ 	memory {
+diff --git a/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts b/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
+index db9131e..362f914 100644
+--- a/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
++++ b/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
+@@ -16,7 +16,7 @@
+ 	model = "Buffalo WZR-600DHP2 (BCM47081)";
+ 
+ 	chosen {
+-		bootargs = "console=ttyS0,115200";
++		bootargs = "console=ttyS0,115200 earlyprintk";
+ 	};
+ 
+ 	memory {
 -- 
 1.8.4.5
