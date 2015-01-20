@@ -1,111 +1,48 @@
-From: vincent.yang.fujitsu@gmail.com (Vincent Yang)
-Date: Tue, 20 Jan 2015 16:57:44 +0800
-Subject: [PATCH v5 4/4] mmc: sdhci: host: add new f_sdh30
-In-Reply-To: <CAPDyKFr0a_tyP5UQXOxSZ-C+w7sXPZv6oNdTDvRMcfTimYtOPw@mail.gmail.com>
-References: <1421741118-18743-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <1421741118-18743-5-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <CAPDyKFr0a_tyP5UQXOxSZ-C+w7sXPZv6oNdTDvRMcfTimYtOPw@mail.gmail.com>
-Message-ID: <CAOEd-H2e+0DX024X+fAgSuV=DhWkDKMUNQWQiE3yd0zVa4jC+w@mail.gmail.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue, 20 Jan 2015 09:00:17 +0000
+Subject: [PATCH 3.19-rc2 v15 5/8] arm: omap1: Migrate debug_ll macros
+ to use 8250.S
+In-Reply-To: <20150119213845.GL18552@atomide.com>
+References: <1420461624-4410-1-git-send-email-daniel.thompson@linaro.org>
+ <1420461624-4410-6-git-send-email-daniel.thompson@linaro.org>
+ <20150119213845.GL18552@atomide.com>
+Message-ID: <54BE1921.5050902@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-01-20 16:43 GMT+08:00 Ulf Hansson <ulf.hansson@linaro.org>:
-> On 20 January 2015 at 09:05, Vincent Yang
-> <vincent.yang.fujitsu@gmail.com> wrote:
->> This patch adds new host controller driver for
->> Fujitsu SDHCI controller f_sdh30.
+On 19/01/15 21:38, Tony Lindgren wrote:
+> * Daniel Thompson <daniel.thompson@linaro.org> [150105 04:49]:
+>> The omap1's debug-macro.S is similar to the generic 8250 code. Compared to
+>> the 8520 code the omap1 macro automatically determines what UART to use
+>> based on breadcrumbs left by the bootloader and automatically copes with
+>> the eccentric register layout on OMAP7XX.
 >>
->> Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
->> Signed-off-by: Andy Green <andy.green@linaro.org>
->> Signed-off-by: Tetsuya Takinishi <t.takinishi@jp.fujitsu.com>
->
-> Thanks! I have applied this patchset for next, with the below minor changes.
+>> This patch drops both these features and relies instead on the generic
+>> 8250 macros:
+>>
+>> 1. Dropping support for the bootloader breadcrumbs is identical to the
+>>    way the migration was handled for OMAP2 (see 808b7e07464d...).
+>>
+>> 2. Support for OMAP7XX still exists but it must be configured by hand
+>>    (DEBUG_OMAP7XXUART1/2/3) rather than handled at runtime.
+>>
+>> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Cc: Arnd Bergmann <arnd.bergmann@linaro.org>
+>> Cc: linux-omap at vger.kernel.org
+>> Tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+>> Acked-by: Tony Lindgren <tony@atomide.com>
+> 
+> Daniel, I suggest you upload this patch into Russell's patch tracking
+> system to get it merged. That at least shrinks down your patch series
+> if the other patches need more work.
 
-Thanks a lot for your help and review!
+This has been in the patch tracker for a week or so:
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8271/1
 
-Kind regards
-Vincent
+I'm very aware that this patch (and indeed the whole patch set) has been
+knocking round for longer than it should have. The changelog for this
+patchset is certainly not one to be especially proud off ;-) .
 
->
-> [...]
->
->> +
->> +static int sdhci_f_sdh30_probe(struct platform_device *pdev)
->> +{
->> +       struct sdhci_host *host;
->> +       struct device *dev = &pdev->dev;
->> +       struct resource *res;
->> +       int irq, ctrl = 0, ret = 0;
->> +       struct f_sdhost_priv *priv;
->> +       u32 reg = 0;
->> +
->> +       irq = platform_get_irq(pdev, 0);
->> +       if (irq < 0) {
->> +               dev_err(dev, "%s: no irq specified\n", __func__);
->> +               return irq;
->> +       }
->> +
->> +       host = sdhci_alloc_host(dev, sizeof(struct sdhci_host) +
->> +                                               sizeof(struct f_sdhost_priv));
->> +       if (IS_ERR(host))
->> +               return PTR_ERR(host);
->> +
->> +       priv = sdhci_priv(host);
->> +       priv->dev = dev;
->> +
->> +       host->quirks = SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC |
->> +                      SDHCI_QUIRK_INVERTED_WRITE_PROTECT;
->> +       host->quirks2 = SDHCI_QUIRK2_SUPPORT_SINGLE |
->> +                       SDHCI_QUIRK2_TUNING_WORK_AROUND;
->> +
->> +       ret = mmc_of_parse(host->mmc);
->> +       if (ret)
->> +               goto err;
->> +
->> +       platform_set_drvdata(pdev, host);
->> +
->> +       sdhci_get_of_property(pdev);
->> +       host->hw_name = "f_sdh30";
->> +       host->ops = &sdhci_f_sdh30_ops;
->> +       host->irq = irq;
->> +
->> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +       host->ioaddr = devm_ioremap_resource(&pdev->dev, res);
->> +       if (IS_ERR(host->ioaddr)) {
->> +               ret = PTR_ERR(host);
->> +               goto err;
->> +       }
->> +
->> +       priv->clk_iface = devm_clk_get(&pdev->dev, "iface");
->> +       if (IS_ERR(priv->clk_iface)) {
->> +               ret = PTR_ERR(priv->clk_iface);
->> +               dev_err(&pdev->dev, "iface clk setup failed (%d)\n", ret);
->
-> No need to print this.
->
->> +               goto err;
->> +       }
->> +
->> +       ret = clk_prepare_enable(priv->clk_iface);
->> +       if (ret)
->> +               goto err;
->> +
->> +       priv->clk = devm_clk_get(&pdev->dev, "core");
->> +       if (IS_ERR(priv->clk)) {
->> +               ret = PTR_ERR(priv->clk);
->> +               dev_err(&pdev->dev, "core clk setup failed (%d)\n", ret);
->
-> No need to print this.
->
->> +               goto err_clk;
->> +       }
->> +
->> +       ret = clk_prepare_enable(priv->clk);
->> +       if (ret)
->> +               goto err_clk;
->> +
->
-> [...]
->
-> Kind regards
-> Uffe
+
+Daniel.
