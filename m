@@ -1,54 +1,44 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 20 Jan 2015 14:01:43 +0000
-Subject: [PATCH 6/7] mfd: menelaus: make vcore and regulator controls
- internal
-In-Reply-To: <20150120135840.GO13701@x1>
-References: <1419702779-16001-1-git-send-email-aaro.koskinen@iki.fi>
- <1419702779-16001-7-git-send-email-aaro.koskinen@iki.fi>
- <20150120135840.GO13701@x1>
-Message-ID: <20150120140143.GQ13701@x1>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 20 Jan 2015 15:04:00 +0100
+Subject: [PATCH 1/2] clk: exynos5420: Add IDs for clocks used in DISP1
+ power domain
+In-Reply-To: <1421750127-22536-2-git-send-email-javier.martinez@collabora.co.uk>
+References: <1421750127-22536-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1421750127-22536-2-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <54BE6050.1090205@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 20 Jan 2015, Lee Jones wrote:
+Hi,
 
-> On Sat, 27 Dec 2014, Aaro Koskinen wrote:
+On 20/01/15 11:35, Javier Martinez Canillas wrote:
+> When a power domain is powered off on Exynos5420 SoC, the input clocks of
+> the devices attached to this power domain are re-parented to oscclk and
+> restored to the original parent after powering on the power domain.
 > 
-> > Make vcore and regulator control functions internal to the driver.
-> > 
-> > Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-> > ---
-> >  drivers/mfd/menelaus.c       | 13 +++++++++++--
-> >  include/linux/mfd/menelaus.h | 12 ------------
-> >  2 files changed, 11 insertions(+), 14 deletions(-)
-> > 
-> > diff --git a/drivers/mfd/menelaus.c b/drivers/mfd/menelaus.c
-> > index 4a900cc..8660adf 100644
-> > --- a/drivers/mfd/menelaus.c
-> > +++ b/drivers/mfd/menelaus.c
-> > @@ -163,6 +163,15 @@
-> >  #define MCT_PIN_ST_S1_CD_ST		(1 << 0)
-> >  #define MCT_PIN_ST_S2_CD_ST		(1 << 1)
-> >  
-> > +#define EN_VPLL_SLEEP			(1 << 7)
-> > +#define EN_VMMC_SLEEP			(1 << 6)
-> > +#define EN_VAUX_SLEEP			(1 << 5)
-> > +#define EN_VIO_SLEEP			(1 << 4)
-> > +#define EN_VMEM_SLEEP			(1 << 3)
-> > +#define EN_DC3_SLEEP			(1 << 2)
-> > +#define EN_DC2_SLEEP			(1 << 1)
-> > +#define EN_VC_SLEEP			(1 << 0)
+> So a reference to the input and parent clocks for the devices attached to
+> a power domain are needed to be able to do the re-parenting. The DISP1 pd
+> includes modules which uses the following clocks:
 > 
-> Better to use the BIT() macro for this kind of stuff.
+> ACLK_200_DISP1 (MIXER and HDMILINK)
+> ACLK_300_DISP1 (FIMD1)
+> ACLK_400_DISP1 (Internal Buses)
 > 
-> Please take this opportunity to use it.
+> Each of these clocks are generated as the output of a clock mux so add an
+> ID for all of these clock muxes and their parents to be referenced in the
+> DISP1 power domain device node.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-In fact, nevermind.  I'll do it from here.
+The patch looks OK to me, I'm fine with it being merged via Kukjin's tree
+due to the dts dependencies (including other pending dts patches touching
+the arch/arm/boot/dts/exynos5420.dtsi file).
+I think we need also Mike ACK for that, I could also queue the patch for
+the clk tree and create a topic branch, but merging both patches via
+arm-soc seems a more sane option in this case.
 
-Applied, thanks.
+Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+--
+Thanks,
+Sylwester
