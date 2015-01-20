@@ -1,104 +1,97 @@
-From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
-Date: Tue, 20 Jan 2015 15:18:39 +0800
-Subject: [PATCH 2/2] cpufreq: add cpufreq driver for Mediatek MT8173 SoC
-In-Reply-To: <20150119160039.22722.67992@quantum>
-References: <1420797291-15972-1-git-send-email-pi-cheng.chen@linaro.org>
- <1420797291-15972-3-git-send-email-pi-cheng.chen@linaro.org>
- <20150119160039.22722.67992@quantum>
-Message-ID: <CALx668Xn8Qz-B0RFYusyQPwnCsY8GwTRZw4r8kQyr3T6BRM8oA@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 20 Jan 2015 12:49:15 +0530
+Subject: [PATCHv3 2/8] devfreq: exynos: Add documentation for generic
+ exynos memory bus frequency driver
+In-Reply-To: <CAL_Jsq+5sdsm_-VW-ta+qV-NBao-XTHvsYWcbMdZmbP0Nw43Cw@mail.gmail.com>
+References: <1420681257-3078-1-git-send-email-cw00.choi@samsung.com>
+ <1420681257-3078-3-git-send-email-cw00.choi@samsung.com>
+ <CAL_Jsq+5sdsm_-VW-ta+qV-NBao-XTHvsYWcbMdZmbP0Nw43Cw@mail.gmail.com>
+Message-ID: <CAKohpomqosqxeDANC=NLBVmOUHyUoqd7Zhph7r6f7+ufYN48EQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 January 2015 at 00:00, Mike Turquette <mturquette@linaro.org> wrote:
-> Quoting pi-cheng.chen (2015-01-09 01:54:51)
->> diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mt8173-cpufreq.c
->> new file mode 100644
->> index 0000000..b578c10
->> --- /dev/null
->> +++ b/drivers/cpufreq/mt8173-cpufreq.c
->> @@ -0,0 +1,459 @@
+On 9 January 2015 at 02:48, Rob Herring <robherring2@gmail.com> wrote:
+> Adding Viresh.
 
-Hello Mike,
+Sorry for being too late, I was very busy with other cpufreq stuff I was doing
+and saved this thread for later as it required me to understand it properly..
 
+>> +Required properties for memory bus block:
+>> +- clock-names : the name of clock used by the memory bus, "memory-bus".
+>> +- clocks : phandles for clock specified in "clock-names" property.
+>> +- #clock-cells: should be 1.
+>> +- frequency: the frequency table to support DVFS feature.
 >
-> Hello Pi-Cheng,
->
-> <snip>
->
->> +#include <linux/module.h>
->> +#include <linux/of.h>
->> +#include <linux/of_address.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/cpufreq.h>
->> +#include <linux/cpufreq-dt.h>
->> +#include <linux/cpumask.h>
->> +#include <linux/slab.h>
->> +#include <linux/clk.h>
->> +#include <linux/clk-provider.h>
->
-> I'll echo what Viresh said here. CPUfreq drivers should typically be
-> clock consumers and only require clk.h, not clk-provider.h. More on that
-> below.
->
+> So you have just defined a new OPP table format. We already have one
+> and Viresh is working to create a more extendable one. He asked about
+> what's needed in devfreq, so Viresh here you go. :)
 
-I included it because of the __clk_lookup call. But yes, I will use the clk_get
-to get the intermediate clock to get rid of this.
+I failed to understand what's new here, probably I need more clarity on
+what we are doing here..
 
-> <snip>
->
->> +static void cpuclk_mux_set(int cluster, u32 sel)
->> +{
->> +       u32 val;
->> +       u32 mask = 0x3;
->> +
->> +       if (cluster == BIG_CLUSTER) {
->> +               mask <<= 2;
->> +               sel <<= 2;
->> +       }
->> +
->> +       spin_lock(&lock);
->> +
->> +       val = readl(clk_mux_regs);
->> +       val = (val & ~mask) | sel;
->> +       writel(val, clk_mux_regs);
->> +
->> +       spin_unlock(&lock);
->> +}
->
-> Is cpuclk a mux that is represented in the MT8173 clock driver? It looks
-> like a clock that belong to the clock driver, but this cpufreq driver is
-> writing to that register directly.
->
+So, this is what I see from OPPs point of view, everything else stripped out.
 
-Yes, it's a mux but not presented in MT8173 clock driver yet. Therefore I
-map the HW register and writing them directly to do reparent. I will get
-rid of it once I got those muxes presented in MT8173 clock driver.
+>> +       memory_bus_int: memory_bus at 1 {
 
-> <snip>
->
->> +static int mt8173_cpufreq_dvfs_info_init(void)
->> +{
->
-> <snip>
->
->> +       mainpll = __clk_lookup("mainpll");
->> +       if (!mainpll) {
->> +               pr_err("failed to get mainpll clk\n");
->> +               ret = -ENOENT;
->> +               goto dvfs_info_release;
->> +       }
->> +       mainpll_freq = clk_get_rate(mainpll);
->
-> This is definitely bad. Why not use clk_get() here? __clk_lookup should
-> not be exposed to clock consumer drivers (and I hope to get rid of it
-> completely some day).
->
+>> +               operating-points = <
+>> +                       400000 950000
+>> +                       200000 950000
+>> +                       133000 925000
+>> +                       100000 850000
+>> +                       80000  850000
+>> +                       50000  850000>;
 
-Thanks for pointing me out the right API to do it. I will fix it in
-next version.
+So these are the OPPs your "groups" support and below ones are
+the frequencies that each block will support. Right ?
 
-Best Regards,
-Pi-Cheng
+>> +               blocks {
 
-> Regards,
-> Mike
+>> +                               frequency = <
+>> +                                       100000
+>> +                                       100000
+>> +                                       100000
+>> +                                       100000
+
+Why this replication here ?
+
+>> +                                       50000
+>> +                                       50000>;
+>> +                       };
+
+How are the above two tables (operating-points and frequency) related
+here? What about the voltages at which these frequencies are possible ?
+
+>> +                       display_block: memory_bus_block2 {
+
+>> +                               frequency = <
+>> +                                       200000
+>> +                                       160000
+>> +                                       100000
+>> +                                       80000
+>> +                                       80000
+>> +                                       50000>;
+>> +                       };
+
+>> +                       isp_block: memory_bus_block3 {
+
+>> +                               frequency = <
+>> +                                       200000
+>> +                                       200000
+>> +                                       100000
+>> +                                       80000
+>> +                                       50000
+>> +                                       50000>;
+>> +                       };
+
+>> +                       gps_block: memory_bus_block4 {
+
+>> +                               frequency = <
+>> +                                       300000
+>> +                                       200000
+>> +                                       133000
+>> +                                       100000
+>> +                                       50000
+>> +                                       50000>;
+>> +                       };
+
+same for others as well..
