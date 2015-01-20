@@ -1,189 +1,46 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 20 Jan 2015 19:20:06 +0000
-Subject: [PATCH v7 04/17] ARM64 / ACPI: Introduce early_param for "acpi"
- and pass acpi=force to enable ACPI
-In-Reply-To: <54BE1FEA.5040109@linaro.org>
-References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
- <1421247905-3749-5-git-send-email-hanjun.guo@linaro.org>
- <20150119114255.GF11835@e104818-lin.cambridge.arm.com>
- <CAKv+Gu8vPKAdsNg7QC7xW+i8_BemWEx4mvBx6NrnAHi8Y+bNtw@mail.gmail.com>
- <20150119135144.GI11835@e104818-lin.cambridge.arm.com>
- <20150119151350.21B65C40948@trevor.secretlab.ca>
- <54BD3803.6020307@redhat.com>
- <20150119175233.GK11835@e104818-lin.cambridge.arm.com>
- <20150119180122.GJ21553@leverpostej> <54BE1FEA.5040109@linaro.org>
-Message-ID: <alpine.DEB.2.02.1501201901190.12653@kaball.uk.xensource.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 20 Jan 2015 21:03:31 +0100
+Subject: [PATCH v5] clk: sunxi: Add driver for A80 MMC config clocks/resets
+In-Reply-To: <CAGb2v65y0KPe7UtguEEPJyFtBD7qoJ=-YT82Mwp+qDPi7PCPYw@mail.gmail.com>
+References: <1421768791-20170-1-git-send-email-wens@csie.org>
+ <20150120160413.GU4367@lukather>
+ <CAGb2v65y0KPe7UtguEEPJyFtBD7qoJ=-YT82Mwp+qDPi7PCPYw@mail.gmail.com>
+Message-ID: <20150120200331.GX4367@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 20 Jan 2015, Hanjun Guo wrote:
-> On 2015?01?20? 02:01, Mark Rutland wrote:
-> > On Mon, Jan 19, 2015 at 05:52:33PM +0000, Catalin Marinas wrote:
-> > > On Mon, Jan 19, 2015 at 04:59:47PM +0000, Jon Masters wrote:
-> > > > On 01/19/2015 10:13 AM, Grant Likely wrote:
-> > > > > On Mon, 19 Jan 2015 13:51:45 +0000
-> > > > > , Catalin Marinas <catalin.marinas@arm.com>
-> > > > >   wrote:
-> > > > > > On Mon, Jan 19, 2015 at 11:55:32AM +0000, Ard Biesheuvel wrote:
-> > > > > > > On 19 January 2015 at 11:42, Catalin Marinas
-> > > > > > > <catalin.marinas@arm.com> wrote:
-> > > > > > > > On Wed, Jan 14, 2015 at 03:04:52PM +0000, Hanjun Guo wrote:
-> > > > > > > > > From: Al Stone <al.stone@linaro.org>
-> > > > > > > > > 
-> > > > > > > > > Introduce one early parameters "off" and "force" for "acpi",
-> > > > > > > > > acpi=off
-> > > > > > > > > will be the default behavior for ARM64, so introduce
-> > > > > > > > > acpi=force to
-> > > > > > > > > enable ACPI on ARM64.
-> > > > > > > > > 
-> > > > > > > > > Disable ACPI before early parameters parsed, and enable it to
-> > > > > > > > > pass
-> > > > > > > > > "acpi=force" if people want use ACPI on ARM64. This ensures DT
-> > > > > > > > > be
-> > > > > > > > > the prefer one if ACPI table and DT both are provided at this
-> > > > > > > > > moment.
-> > > > > > > > [...]
-> > > > > > > > > --- a/arch/arm64/kernel/setup.c
-> > > > > > > > > +++ b/arch/arm64/kernel/setup.c
-> > > > > > > > > @@ -62,6 +62,7 @@
-> > > > > > > > >   #include <asm/memblock.h>
-> > > > > > > > >   #include <asm/psci.h>
-> > > > > > > > >   #include <asm/efi.h>
-> > > > > > > > > +#include <asm/acpi.h>
-> > > > > > > > > 
-> > > > > > > > >   unsigned int processor_id;
-> > > > > > > > >   EXPORT_SYMBOL(processor_id);
-> > > > > > > > > @@ -388,6 +389,8 @@ void __init setup_arch(char **cmdline_p)
-> > > > > > > > >        early_fixmap_init();
-> > > > > > > > >        early_ioremap_init();
-> > > > > > > > > 
-> > > > > > > > > +     disable_acpi();
-> > > > > > > > > +
-> > > > > > > > >        parse_early_param();
-> > > > > > > > > 
-> > > > > > > > >        /*
-> > > > > > > > 
-> > > > > > > > Did we get to any conclusion here? DT being the preferred one is
-> > > > > > > > fine
-> > > > > > > > when both DT and ACPI are present but do we still want the
-> > > > > > > > kernel to
-> > > > > > > > ignore ACPI altogether if DT is not present? It's a bit harder
-> > > > > > > > to detect
-> > > > > > > > the presence of DT at this point since the EFI_STUB added one
-> > > > > > > > already. I
-> > > > > > > > guess we could move the "acpi=force" argument passing to
-> > > > > > > > EFI_STUB if no
-> > > > > > > > DT is present at boot.
-> > > > > > > 
-> > > > > > > Since the EFI stub populates the /chosen node in DT, I would
-> > > > > > > prefer
-> > > > > > > for it to add a property there to indicate whether it created the
-> > > > > > > DT
-> > > > > > > from scratch rather than adding ACPI specific stuff in there (even
-> > > > > > > if
-> > > > > > > it is just a string to concatenate)
-> > > > > > 
-> > > > > > This works for me. So we could pass "acpi=force" in EFI stub if it
-> > > > > > created the DT from scratch *and* ACPI tables are present (can it
-> > > > > > detect
-> > > > > > the latter? And maybe it could print something if none are
-> > > > > > available).
-> > > > > > If that works, the actual kernel can assume that ACPI needs to be
-> > > > > > explicitly enabled via acpi=force, irrespective of how much
-> > > > > > information
-> > > > > > it has in DT.
-> > > > > 
-> > > > > Ditto for me. I think this is a fine solution. And, yes, the stub can
-> > > > > easily detect the presence of ACPI by looking in the UEFI config
-> > > > > table.
-> > > > 
-> > > > I get the point behind doing this, but could we not have it pass in a
-> > > > different parameter than =force? Perhaps something new? I'd like to
-> > > > separate out the case that it was enabled automatically vs explicitly
-> > > > forced on by a user wanting to use ACPI on a system with both tables.
-> > > 
-> > > Ard had a point, so we should probably not pass acpi=force from EFI stub
-> > > (especially since a user may explicitly pass acpi=off irrespective of DT
-> > > presence). Some other property in the chosen node? It's not even an ABI
-> > > since that's a contract between EFI stub and the rest of the kernel, so
-> > > an in-kernel only interface.
-> > 
-> > Not strictly true once kexec is in place. Then it becomes a stub ->
-> > kernel -> kernel -> kernel -> ... interface, alnog with the rest of the
-> > properties the stub puts in the DTB.
-> > 
-> > Having something like /chosen/linux,uefi-stub-generated-dtb sounds sane
-> > regardless.
+On Wed, Jan 21, 2015 at 12:09:05AM +0800, Chen-Yu Tsai wrote:
+> On Wed, Jan 21, 2015 at 12:04 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Tue, Jan 20, 2015 at 11:46:31PM +0800, Chen-Yu Tsai wrote:
+> >> On the A80 SoC, the 4 mmc controllers each have a separate register
+> >> controlling their register access clocks and reset controls. These
+> >> registers in turn share a ahb clock gate and reset control.
+> >>
+> >> This patch adds a platform device driver for these controls. It
+> >> requires both clocks and reset controls to be available, so using
+> >> CLK_OF_DECLARE might not be the best way.
+> >>
+> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >
+> > Merged, thanks!
 > 
-> How about the patch (just RFC, maybe it is horrible :) ) below:
+> plaes on IRC just pointed out the copyright year is wrong....
 > 
-> When system supporting both DT and ACPI but firmware providing
-> no dtb, we can use this linux,uefi-stub-generated-dtb property
-> to let kernel know that we can try ACPI configuration data.
-> 
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  Documentation/devicetree/bindings/chosen.txt | 19 ++++++++++++++++
->  arch/arm64/kernel/setup.c                    | 34
-> +++++++++++++++++++++++++++-
->  drivers/firmware/efi/libstub/fdt.c           |  6 +++++
->  3 files changed, 58 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/chosen.txt
-> b/Documentation/devicetree/bindings/chosen.txt
-> index ed838f4..18776b9 100644
-> --- a/Documentation/devicetree/bindings/chosen.txt
-> +++ b/Documentation/devicetree/bindings/chosen.txt
-> @@ -44,3 +44,22 @@ Implementation note: Linux will look for the property
-> "linux,stdout-path" or
->  on PowerPC "stdout" if "stdout-path" is not found.  However, the
->  "linux,stdout-path" and "stdout" properties are deprecated. New platforms
->  should only use the "stdout-path" property.
-> +
-> +
-> +linux,uefi-stub-generated-dtb property
-> +--------------------------------------
-> +
-> +UEFI stub will generate this property in the chosen node to let linux kernel
-> +know that there is no DTB provided by firmware.
-> +
-> +There is a use case for system supporting both DT and ACPI, when firmware
-> +doesn't provide DT, we can try ACPI configration data to boot the system.
-> +
-> +Usage:
-> +
-> +linux,uefi-stub-generated-dtb = "true" means that it is true that the dtb
-> +is generated by uefi stub
-> +
-> +or
-> +
-> +linux,uefi-stub-generated-dtb = "false" is the reverse.
+> Could you fix it before you push it out?
+> Sorry about this.
 
-I am sorry to have to make the discussion even more complex than already
-is, however we have one more use case to consider: Linux booting on Xen
-as Dom0.
+Done, thanks!
+Maxime
 
-When booting as Dom0 on ACPI hardware, Linux doesn't have access to the
-UEFI firmware (no EFI stub). Xen passes a small device tree blob with
-a chosen node, memory information and a pointer to the ACPI tables.
-It looks similar to the DTB passed to Linux by the EFI stub but it is
-generated by Xen instead.
-
-See also Christoffer's explanation:
-
-http://marc.info/?l=linux-arm-kernel&m=142169977401658&w=2
-
-The actual patches haven't been posted to the list yet, but Linaro seems
-to have an internal prototype working already. We really need to
-document this interface properly soon if we expect future Linux and Xen
-to adhere to it (hint hint).
-
-In the Dom0 case Linux should parse the small device tree binary, then
-enable acpi.
-
-Maybe we could generalize the concept of this uefi-stub-generated-dtb
-variable and call it instead "enable_acpi", optionally exporting the
-RDSP, like Parth's patches to Xen are doing (I haven't seen the code yet
-so I don't know the details).
-
-Do you think that would work for you?
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150120/7cffa87d/attachment.sig>
