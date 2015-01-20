@@ -1,107 +1,70 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Wed, 21 Jan 2015 08:02:52 +0900
-Subject: [PATCH v4 2/2] ARM: dts: Add HS400 support for exynos5420 and
- exynos5800
-In-Reply-To: <1421231446-4776-3-git-send-email-alim.akhtar@samsung.com>
-References: <1421231446-4776-1-git-send-email-alim.akhtar@samsung.com>
- <1421231446-4776-3-git-send-email-alim.akhtar@samsung.com>
-Message-ID: <54BEDE9C.5060501@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 20 Jan 2015 23:04:58 +0000
+Subject: [PATCH 1/2] ARM: entry-common: fix forgotten set of
+ thread_info->syscall
+In-Reply-To: <20150120224518.GL26493@n2100.arm.linux.org.uk>
+References: <CAGXu5j+O6znN=7-gc3PqwqFA5MFRPLGBUzabOmQjWn_9WTjvpg@mail.gmail.com>
+ <CACZ9PQUEprgKrpHazDULA5mf-OaoX=MAjEeWdspZTXT_+iUKWw@mail.gmail.com>
+ <20150116155923.GK12302@n2100.arm.linux.org.uk>
+ <CACZ9PQUVFtCQg6XjDbokEPy_R2fZcHiq6+EEUZnx4FVfpfZxJg@mail.gmail.com>
+ <20150116161752.GL12302@n2100.arm.linux.org.uk>
+ <CAGXu5j+XHFNyhaBndQr1Q2uthsFP9ZQGbaw5hofDmXyKXZ-H5g@mail.gmail.com>
+ <CAGXu5j+9p1T29NoHnCNywd0T=H2mzWhCou5nSRfXZktEOC7_=A@mail.gmail.com>
+ <20150119092002.GA32131@arm.com>
+ <CAGXu5jJ8vphdjbqy7OojE=V70vLPs2impJ6i561JafrLYXxvbw@mail.gmail.com>
+ <20150120224518.GL26493@n2100.arm.linux.org.uk>
+Message-ID: <20150120230458.GM26493@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-If you want to enable the hs400 mode, need to add "mmc-hs400-1_8v" or "mmc-hs400-1_2v".
-But this patch didn't add them. do you have any other plan?
-
-On 01/14/2015 07:30 PM, Alim Akhtar wrote:
-> From: Seungwon Jeon <tgih.jun@samsung.com>
+On Tue, Jan 20, 2015 at 10:45:19PM +0000, Russell King - ARM Linux wrote:
+> Well, the whole question is this: is restarting a system call like
+> usleep() really a separate system call, or is it a kernel implementation
+> detail?
 > 
-> HS400 timing values are added for SMDK5420, exynos5420-peach-pit
-> and exynos5800-peach-pi boards.
-> This also adds RCLK GPIO line, this gpio should be in pull-down
-> state.
+> If you wanted seccomp to see this, what would be the use case?  Why
+> would seccomp want to block this syscall?  Does it make sense for
+> seccomp to block this syscall when it doesn't block something like
+> usleep() and then have usleep() fail just because the thread received
+> a signal?
 > 
-> Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
-> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-> [Alim: addressed review comments]
-> ---
->  arch/arm/boot/dts/exynos5420-peach-pit.dts |    4 +++-
->  arch/arm/boot/dts/exynos5420-pinctrl.dtsi  |    7 +++++++
->  arch/arm/boot/dts/exynos5420-smdk5420.dts  |    4 +++-
->  arch/arm/boot/dts/exynos5800-peach-pi.dts  |    4 +++-
->  4 files changed, 16 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> index 9a050e1..7ffaba8 100644
-> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> @@ -569,8 +569,10 @@
->  	samsung,dw-mshc-ciu-div = <3>;
->  	samsung,dw-mshc-sdr-timing = <0 4>;
->  	samsung,dw-mshc-ddr-timing = <0 2>;
-> +	samsung,dw-mshc-hs400-timing = <0 2>;
-> +	read-strobe-delay = <90>;
->  	pinctrl-names = "default";
-> -	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
-> +	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8 &sd0_rclk>;
->  	bus-width = <8>;
->  };
->  
-> diff --git a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-> index ba686e4..8b15316 100644
-> --- a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-> +++ b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-> @@ -201,6 +201,13 @@
->  			samsung,pin-drv = <3>;
->  		};
->  
-> +		sd0_rclk: sd0-rclk {
+> I personally regard the whole restart system call thing as a purely
+> kernel internal thing which should not be exposed to userland.  If
+> we decide that it should be exposed to userland, then it becomes part
+> of the user ABI, and it /could/ become difficult if we needed to
+> change it in future - and I'd rather not get into the "oh shit, we
+> can't change it because that would break app X" crap.
 
-I know it used to "sd0_rdqs", not "sd0_rclk".
-Change name.
+Here's a scenario where it could become a problem:
 
-Best Regards,
-Jaehoon Chung
-> +			samsung,pins = "gpc0-7";
-> +			samsung,pin-function = <2>;
-> +			samsung,pin-pud = <1>;
-> +			samsung,pin-drv = <3>;
-> +		};
-> +
->  		sd1_cmd: sd1-cmd {
->  			samsung,pins = "gpc1-1";
->  			samsung,pin-function = <2>;
-> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> index 8be3d7b..5290e79 100644
-> --- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> @@ -80,8 +80,10 @@
->  		samsung,dw-mshc-ciu-div = <3>;
->  		samsung,dw-mshc-sdr-timing = <0 4>;
->  		samsung,dw-mshc-ddr-timing = <0 2>;
-> +		samsung,dw-mshc-hs400-timing = <0 2>;
-> +		read-strobe-delay = <90>;
->  		pinctrl-names = "default";
-> -		pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
-> +		pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8 &sd0_rclk>;
->  		bus-width = <8>;
->  		cap-mmc-highspeed;
->  	};
-> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> index e8fdda8..fa1c858 100644
-> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> @@ -557,8 +557,10 @@
->  	samsung,dw-mshc-ciu-div = <3>;
->  	samsung,dw-mshc-sdr-timing = <0 4>;
->  	samsung,dw-mshc-ddr-timing = <0 2>;
-> +	samsung,dw-mshc-hs400-timing = <0 2>;
-> +	read-strobe-delay = <90>;
->  	pinctrl-names = "default";
-> -	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
-> +	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8 &sd0_rclk>;
->  	bus-width = <8>;
->  };
->  
-> 
+Let's say that we want to use seccomp to secure some code which issues
+system calls.  We determine that the app uses system calls which don't
+result in the restart system call being issued, so we decide to ask
+seccomp to block the restart system call.  Some of these system calls
+that the app was using are restartable system calls.
+
+When these system calls are restarted, what we see via ptrace etc is
+that the system call simply gets re-issued as its own system call.
+
+In a future kernel version, we decide that we could really do with one
+of those system calls using the restart block feature, so we arrange
+for it to set up the restart block, and return -ERESTART_BLOCK.  That's
+fine for most applications, but this app now breaks.
+
+The side effect of that breakage is that we have to revert that kernel
+change - because we've broken userland, and that's simply not allowed.
+
+Now look at the alternative: we don't make the restart syscall visible.
+This means that we hide that detail, and we actually reflect the
+behaviour that we've had for the other system call restart mechanisms,
+and we don't have to fear userspace breakage as a result of switching
+from one restart mechanism to another.
+
+I am very much of the opinion that we should be trying to limit the
+exposure of inappropriate kernel internal details to userland, because
+userland has a habbit of becoming reliant on them, and when it does,
+it makes kernel maintanence unnecessarily harder.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
