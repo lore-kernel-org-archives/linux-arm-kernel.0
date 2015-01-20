@@ -1,94 +1,37 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Tue, 20 Jan 2015 22:11:59 +0100
-Subject: [PATCH V2 1/2] ARM: BCM5301X: Enable earlyprintk on tested devices
-In-Reply-To: <1421735762-8475-1-git-send-email-zajec5@gmail.com>
-References: <1421735096-8238-1-git-send-email-zajec5@gmail.com>
- <1421735762-8475-1-git-send-email-zajec5@gmail.com>
-Message-ID: <54BEC49F.7030405@hauke-m.de>
+From: sylvain.rochet@finsecur.com (Sylvain Rochet)
+Date: Tue, 20 Jan 2015 22:23:28 +0100
+Subject: [PATCHv4 1/3] USB: gadget: atmel_usba_udc: Fixed vbus_prev initial
+ state
+In-Reply-To: <1421789010-21900-1-git-send-email-sylvain.rochet@finsecur.com>
+References: <1421789010-21900-1-git-send-email-sylvain.rochet@finsecur.com>
+Message-ID: <1421789010-21900-2-git-send-email-sylvain.rochet@finsecur.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/20/2015 07:36 AM, Rafa? Mi?ecki wrote:
-> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
-> ---
-> V2: Typo in commit message: s/BCM5310X/BCM5301X/
-> ---
+If vbus gpio is high at init, we should set vbus_prev to true
+accordingly to the current vbus state. Without that, we skip the first
+vbus interrupt because the saved vbus state is not consistent.
 
-In this pull request Arnd said that enabling early printk is a bad idea:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/304438.html
+Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Fixes: 914a3f3b3754 ("USB: add atmel_usba_udc driver")
+Cc: <stable@vger.kernel.org> #2.6.24+
+---
+ drivers/usb/gadget/udc/atmel_usba_udc.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Hauke
-
->  arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts  | 2 +-
->  arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts       | 2 +-
->  arch/arm/boot/dts/bcm4708-netgear-r6250.dts        | 2 +-
->  arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts        | 2 +-
->  arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts | 2 +-
->  5 files changed, 5 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
-> index b359c1e..ce083a5 100644
-> --- a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
-> +++ b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
-> @@ -16,7 +16,7 @@
->  	model = "Buffalo WZR-1750DHP (BCM4708)";
->  
->  	chosen {
-> -		bootargs = "console=ttyS0,115200";
-> +		bootargs = "console=ttyS0,115200 earlyprintk";
->  	};
->  
->  	memory {
-> diff --git a/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts b/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
-> index 946c728..f57f213 100644
-> --- a/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
-> +++ b/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
-> @@ -16,7 +16,7 @@
->  	model = "Luxul XWC-1000 (BCM4708)";
->  
->  	chosen {
-> -		bootargs = "console=ttyS0,115200";
-> +		bootargs = "console=ttyS0,115200 earlyprintk";
->  	};
->  
->  	memory {
-> diff --git a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
-> index f18c9d9..0a5f561 100644
-> --- a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
-> +++ b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
-> @@ -16,7 +16,7 @@
->  	model = "Netgear R6250 V1 (BCM4708)";
->  
->  	chosen {
-> -		bootargs = "console=ttyS0,115200";
-> +		bootargs = "console=ttyS0,115200 earlyprintk";
->  	};
->  
->  	memory {
-> diff --git a/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts b/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
-> index 0ee85ea..4d87219 100644
-> --- a/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
-> +++ b/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
-> @@ -16,7 +16,7 @@
->  	model = "Asus RT-N18U (BCM47081)";
->  
->  	chosen {
-> -		bootargs = "console=ttyS0,115200";
-> +		bootargs = "console=ttyS0,115200 earlyprintk";
->  	};
->  
->  	memory {
-> diff --git a/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts b/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
-> index db9131e..362f914 100644
-> --- a/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
-> +++ b/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
-> @@ -16,7 +16,7 @@
->  	model = "Buffalo WZR-600DHP2 (BCM47081)";
->  
->  	chosen {
-> -		bootargs = "console=ttyS0,115200";
-> +		bootargs = "console=ttyS0,115200 earlyprintk";
->  	};
->  
->  	memory {
-> 
+diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+index ce88237..e207d75 100644
+--- a/drivers/usb/gadget/udc/atmel_usba_udc.c
++++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+@@ -1791,6 +1791,8 @@ static int atmel_usba_start(struct usb_gadget *gadget,
+ 		toggle_bias(1);
+ 		usba_writel(udc, CTRL, USBA_ENABLE_MASK);
+ 		usba_writel(udc, INT_ENB, USBA_END_OF_RESET);
++
++		udc->vbus_prev = 1;
+ 	}
+ 	spin_unlock_irqrestore(&udc->lock, flags);
+ 
+-- 
+2.1.4
