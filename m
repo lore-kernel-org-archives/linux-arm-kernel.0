@@ -1,79 +1,71 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 20 Jan 2015 21:02:16 +0100
-Subject: [PATCH v4 3/5] ARM: sunxi: dts: Add PS2 nodes to dtsi for A10
- and A20
-In-Reply-To: <1421417021-3247-4-git-send-email-vishnupatekar0510@gmail.com>
+Date: Tue, 20 Jan 2015 21:03:07 +0100
+Subject: [PATCH v4 4/5] ARM: sunxi: dts: Add A10/A20 PS2 pin muxing options
+In-Reply-To: <1421417021-3247-5-git-send-email-vishnupatekar0510@gmail.com>
 References: <1421417021-3247-1-git-send-email-vishnupatekar0510@gmail.com>
- <1421417021-3247-4-git-send-email-vishnupatekar0510@gmail.com>
-Message-ID: <20150120200216.GV4367@lukather>
+ <1421417021-3247-5-git-send-email-vishnupatekar0510@gmail.com>
+Message-ID: <20150120200307.GW4367@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vishnu,
-
-On Fri, Jan 16, 2015 at 07:33:39PM +0530, Vishnu Patekar wrote:
+On Fri, Jan 16, 2015 at 07:33:40PM +0530, Vishnu Patekar wrote:
 > Signed-off-by: VishnuPatekar <vishnupatekar0510@gmail.com>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-
-Why is there Hans Signed-off here?
-
 > ---
->  arch/arm/boot/dts/sun4i-a10.dtsi |   16 ++++++++++++++++
->  arch/arm/boot/dts/sun7i-a20.dtsi |   16 ++++++++++++++++
->  2 files changed, 32 insertions(+)
+>  arch/arm/boot/dts/sun4i-a10.dtsi |   14 ++++++++++++++
+>  arch/arm/boot/dts/sun7i-a20.dtsi |   14 ++++++++++++++
+>  2 files changed, 28 insertions(+)
 > 
 > diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-> index 7b4099f..2c31242 100644
+> index 2c31242..8fade3e 100644
 > --- a/arch/arm/boot/dts/sun4i-a10.dtsi
 > +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-> @@ -795,5 +795,21 @@
->  			#address-cells = <1>;
->  			#size-cells = <0>;
+> @@ -629,6 +629,20 @@
+>  				allwinner,drive = <0>;
+>  				allwinner,pull = <0>;
+>  			};
+> +
+> +			ps20_pins_a: ps20 at 0 {
+> +				allwinner,pins = "PI20", "PI21";
+> +				allwinner,function = "ps2";
+> +				allwinner,drive = <0>;
+> +				allwinner,pull = <0>;
+> +			};
+> +
+> +			ps21_pins_a: ps21 at 0 {
+> +				allwinner,pins = "PH12", "PH13";
+> +				allwinner,function = "ps2";
+> +				allwinner,drive = <0>;
+> +				allwinner,pull = <0>;
+> +			};
 >  		};
-> +
-> +		ps20: ps2 at 01c2a000 {
-> +			compatible = "allwinner,sun4i-a10-ps2";
-> +			reg = <0x01c2a000 0x400>;
-> +			interrupts = <62>;
-> +			clocks = <&apb1_gates 6>;
-> +			status = "disabled";
-> +		};
-> +
-> +		ps21: ps2 at 01c2a400 {
-> +			compatible = "allwinner,sun4i-a10-ps2";
-> +			reg = <0x01c2a400 0x400>;
-> +			interrupts = <63>;
-> +			clocks = <&apb1_gates 7>;
-> +			status = "disabled";
-> +		};
->  	};
->  };
+>  
+>  		timer at 01c20c00 {
 > diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-> index e21ce59..f35c691 100644
+> index f35c691..f9dd274 100644
 > --- a/arch/arm/boot/dts/sun7i-a20.dtsi
 > +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-> @@ -1093,5 +1093,21 @@
->  			#interrupt-cells = <3>;
->  			interrupts = <1 9 0xf04>;
+> @@ -866,6 +866,20 @@
+>  				    allwinner,drive = <0>;
+>  				    allwinner,pull = <0>;
+>  			};
+> +
+> +			ps20_pins_a: ps20 at 0 {
+> +				allwinner,pins = "PI20", "PI21";
+> +				allwinner,function = "ps2";
+> +				allwinner,drive = <0>;
+> +				allwinner,pull = <0>;
+> +			};
+> +
+> +			ps21_pins_a: ps21 at 0 {
+> +				allwinner,pins = "PH12", "PH13";
+> +				allwinner,function = "ps2";
+> +				allwinner,drive = <0>;
+> +				allwinner,pull = <0>;
+> +			};
 >  		};
-> +
-> +		ps20: ps2 at 01c2a000 {
-> +			compatible = "allwinner,sun4i-a10-ps2";
-> +			reg = <0x01c2a000 0x400>;
-> +			interrupts = <0 62 4>;
-> +			clocks = <&apb1_gates 6>;
-> +			status = "disabled";
-> +		};
-> +
-> +		ps21: ps2 at 01c2a400 {
-> +			compatible = "allwinner,sun4i-a10-ps2";
-> +			reg = <0x01c2a400 0x400>;
-> +			interrupts = <0 63 4>;
 
-We recently switched to using includes and defines for these hardcoded
-values.
-
-Could you switch to it as well?
+Same thing here, we're using defines now for the values in ,drive and
+,pull, please use them.
 
 Thanks,
 Maxime
@@ -88,4 +80,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150120/edd97837/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150120/78a0807c/attachment.sig>
