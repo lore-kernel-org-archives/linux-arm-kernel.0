@@ -1,13 +1,14 @@
 From: ajaykumar.rs@samsung.com (Ajay Kumar)
-Date: Tue, 20 Jan 2015 22:08:49 +0530
-Subject: [PATCH V9 08/14] drm/bridge: ptn3460: use gpiod interface
+Date: Tue, 20 Jan 2015 22:08:47 +0530
+Subject: [PATCH V9 06/14] drm/bridge: ptn3460: support drm_panel
 In-Reply-To: <1421771935-31618-1-git-send-email-ajaykumar.rs@samsung.com>
 References: <1421771935-31618-1-git-send-email-ajaykumar.rs@samsung.com>
-Message-ID: <1421771935-31618-9-git-send-email-ajaykumar.rs@samsung.com>
+Message-ID: <1421771935-31618-7-git-send-email-ajaykumar.rs@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Modify driver to support gpiod interface.
+Add drm_panel calls to the driver to make the panel and
+bridge work together in tandem.
 
 Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
 Acked-by: Inki Dae <inki.dae@samsung.com>
@@ -16,156 +17,165 @@ Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 Tested-by: Gustavo Padovan <gustavo.padovan@collabora.co.uk>
 Tested-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
 ---
- drivers/gpu/drm/bridge/ptn3460.c |   88 ++++++++++++++++----------------------
- 1 file changed, 36 insertions(+), 52 deletions(-)
+ .../devicetree/bindings/drm/bridge/ptn3460.txt     |   12 ++++++
+ drivers/gpu/drm/bridge/Kconfig                     |    1 +
+ drivers/gpu/drm/bridge/ptn3460.c                   |   42 ++++++++++++++++++++
+ 3 files changed, 55 insertions(+)
 
+diff --git a/Documentation/devicetree/bindings/drm/bridge/ptn3460.txt b/Documentation/devicetree/bindings/drm/bridge/ptn3460.txt
+index 52b93b2..663fe6c 100644
+--- a/Documentation/devicetree/bindings/drm/bridge/ptn3460.txt
++++ b/Documentation/devicetree/bindings/drm/bridge/ptn3460.txt
+@@ -17,6 +17,11 @@ Required properties:
+ 		|   6   |  1600x900  | ChiMei M215HGE   |
+ 		+-------+------------+------------------+
+ 
++	- video interfaces: Device node can contain video interface port
++			    nodes for panel according to [1].
++
++[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
++
+ Example:
+ 	lvds-bridge at 20 {
+ 		compatible = "nxp,ptn3460";
+@@ -24,4 +29,11 @@ Example:
+ 		powerdown-gpio = <&gpy2 5 1 0 0>;
+ 		reset-gpio = <&gpx1 5 1 0 0>;
+ 		edid-emulation = <5>;
++		ports {
++			port at 0 {
++				bridge_out: endpoint {
++					remote-endpoint = <&panel_in>;
++				};
++			};
++		};
+ 	};
+diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
+index 4254c2b..8b426e2 100644
+--- a/drivers/gpu/drm/bridge/Kconfig
++++ b/drivers/gpu/drm/bridge/Kconfig
+@@ -3,5 +3,6 @@ config DRM_PTN3460
+ 	depends on DRM
+ 	depends on OF && I2C
+ 	select DRM_KMS_HELPER
++	select DRM_PANEL
+ 	---help---
+ 	  ptn3460 eDP-LVDS bridge chip driver.
 diff --git a/drivers/gpu/drm/bridge/ptn3460.c b/drivers/gpu/drm/bridge/ptn3460.c
-index 9f800a1..826833e 100644
+index 7adeb60..e6d5ae7 100644
 --- a/drivers/gpu/drm/bridge/ptn3460.c
 +++ b/drivers/gpu/drm/bridge/ptn3460.c
-@@ -42,8 +42,8 @@ struct ptn3460_bridge {
+@@ -19,6 +19,9 @@
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/of_gpio.h>
++#include <linux/of_graph.h>
++
++#include <drm/drm_panel.h>
+ 
+ #include "bridge/ptn3460.h"
+ 
+@@ -38,6 +41,7 @@ struct ptn3460_bridge {
+ 	struct i2c_client *client;
  	struct drm_bridge bridge;
  	struct edid *edid;
- 	struct drm_panel *panel;
--	int gpio_pd_n;
--	int gpio_rst_n;
-+	struct gpio_desc *gpio_pd_n;
-+	struct gpio_desc *gpio_rst_n;
++	struct drm_panel *panel;
+ 	int gpio_pd_n;
+ 	int gpio_rst_n;
  	u32 edid_emulation;
- 	bool enabled;
- };
-@@ -132,14 +132,11 @@ static void ptn3460_pre_enable(struct drm_bridge *bridge)
- 	if (ptn_bridge->enabled)
- 		return;
- 
--	if (gpio_is_valid(ptn_bridge->gpio_pd_n))
--		gpio_set_value(ptn_bridge->gpio_pd_n, 1);
-+	gpiod_set_value(ptn_bridge->gpio_pd_n, 1);
- 
--	if (gpio_is_valid(ptn_bridge->gpio_rst_n)) {
--		gpio_set_value(ptn_bridge->gpio_rst_n, 0);
--		usleep_range(10, 20);
--		gpio_set_value(ptn_bridge->gpio_rst_n, 1);
--	}
-+	gpiod_set_value(ptn_bridge->gpio_rst_n, 0);
-+	usleep_range(10, 20);
-+	gpiod_set_value(ptn_bridge->gpio_rst_n, 1);
- 
- 	if (drm_panel_prepare(ptn_bridge->panel)) {
- 		DRM_ERROR("failed to prepare panel\n");
-@@ -184,11 +181,8 @@ static void ptn3460_disable(struct drm_bridge *bridge)
- 		return;
+@@ -137,6 +141,11 @@ static void ptn3460_pre_enable(struct drm_bridge *bridge)
+ 		gpio_set_value(ptn_bridge->gpio_rst_n, 1);
  	}
  
--	if (gpio_is_valid(ptn_bridge->gpio_rst_n))
--		gpio_set_value(ptn_bridge->gpio_rst_n, 1);
--
--	if (gpio_is_valid(ptn_bridge->gpio_pd_n))
--		gpio_set_value(ptn_bridge->gpio_pd_n, 0);
-+	gpiod_set_value(ptn_bridge->gpio_rst_n, 1);
-+	gpiod_set_value(ptn_bridge->gpio_pd_n, 0);
++	if (drm_panel_prepare(ptn_bridge->panel)) {
++		DRM_ERROR("failed to prepare panel\n");
++		return;
++	}
++
+ 	/*
+ 	 * There's a bug in the PTN chip where it falsely asserts hotplug before
+ 	 * it is fully functional. We're forced to wait for the maximum start up
+@@ -153,6 +162,12 @@ static void ptn3460_pre_enable(struct drm_bridge *bridge)
+ 
+ static void ptn3460_enable(struct drm_bridge *bridge)
+ {
++	struct ptn3460_bridge *ptn_bridge = bridge_to_ptn3460(bridge);
++
++	if (drm_panel_enable(ptn_bridge->panel)) {
++		DRM_ERROR("failed to enable panel\n");
++		return;
++	}
  }
  
+ static void ptn3460_disable(struct drm_bridge *bridge)
+@@ -164,6 +179,11 @@ static void ptn3460_disable(struct drm_bridge *bridge)
+ 
+ 	ptn_bridge->enabled = false;
+ 
++	if (drm_panel_disable(ptn_bridge->panel)) {
++		DRM_ERROR("failed to disable panel\n");
++		return;
++	}
++
+ 	if (gpio_is_valid(ptn_bridge->gpio_rst_n))
+ 		gpio_set_value(ptn_bridge->gpio_rst_n, 1);
+ 
+@@ -173,6 +193,12 @@ static void ptn3460_disable(struct drm_bridge *bridge)
+ 
  static void ptn3460_post_disable(struct drm_bridge *bridge)
-@@ -335,39 +329,41 @@ static int ptn3460_probe(struct i2c_client *client,
+ {
++	struct ptn3460_bridge *ptn_bridge = bridge_to_ptn3460(bridge);
++
++	if (drm_panel_unprepare(ptn_bridge->panel)) {
++		DRM_ERROR("failed to unprepare panel\n");
++		return;
++	}
+ }
+ 
+ static int ptn3460_get_modes(struct drm_connector *connector)
+@@ -267,6 +293,9 @@ int ptn3460_bridge_attach(struct drm_bridge *bridge)
+ 	drm_mode_connector_attach_encoder(&ptn_bridge->connector,
+ 							bridge->encoder);
+ 
++	if (ptn_bridge->panel)
++		drm_panel_attach(ptn_bridge->panel, &ptn_bridge->connector);
++
+ 	return ret;
+ }
+ 
+@@ -283,6 +312,7 @@ static int ptn3460_probe(struct i2c_client *client,
+ {
+ 	struct device *dev = &client->dev;
+ 	struct ptn3460_bridge *ptn_bridge;
++	struct device_node *endpoint, *panel_node;
+ 	int ret;
+ 
+ 	ptn_bridge = devm_kzalloc(dev, sizeof(*ptn_bridge), GFP_KERNEL);
+@@ -290,6 +320,17 @@ static int ptn3460_probe(struct i2c_client *client,
+ 		return -ENOMEM;
  	}
  
++	endpoint = of_graph_get_next_endpoint(dev->of_node, NULL);
++	if (endpoint) {
++		panel_node = of_graph_get_remote_port_parent(endpoint);
++		if (panel_node) {
++			ptn_bridge->panel = of_drm_find_panel(panel_node);
++			of_node_put(panel_node);
++			if (!ptn_bridge->panel)
++				return -EPROBE_DEFER;
++		}
++	}
++
  	ptn_bridge->client = client;
--	ptn_bridge->gpio_pd_n = of_get_named_gpio(dev->of_node,
--							"powerdown-gpio", 0);
--	if (gpio_is_valid(ptn_bridge->gpio_pd_n)) {
--		ret = gpio_request_one(ptn_bridge->gpio_pd_n,
--				GPIOF_OUT_INIT_HIGH, "PTN3460_PD_N");
--		if (ret) {
--			dev_err(dev, "Request powerdown-gpio failed (%d)\n",
--									ret);
--			return ret;
--		}
-+
-+	ptn_bridge->gpio_pd_n = devm_gpiod_get(&client->dev, "powerdown");
-+	if (IS_ERR(ptn_bridge->gpio_pd_n)) {
-+		ret = PTR_ERR(ptn_bridge->gpio_pd_n);
-+		dev_err(dev, "cannot get gpio_pd_n %d\n", ret);
-+		return ret;
- 	}
- 
--	ptn_bridge->gpio_rst_n = of_get_named_gpio(dev->of_node,
--							"reset-gpio", 0);
--	if (gpio_is_valid(ptn_bridge->gpio_rst_n)) {
--		/*
--		 * Request the reset pin low to avoid the bridge being
--		 * initialized prematurely
--		 */
--		ret = gpio_request_one(ptn_bridge->gpio_rst_n,
--				GPIOF_OUT_INIT_LOW, "PTN3460_RST_N");
--		if (ret) {
--			dev_err(dev, "Request reset-gpio failed (%d)\n", ret);
--			gpio_free(ptn_bridge->gpio_pd_n);
--			return ret;
--		}
-+	ret = gpiod_direction_output(ptn_bridge->gpio_pd_n, 1);
-+	if (ret) {
-+		DRM_ERROR("cannot configure gpio_pd_n\n");
-+		return ret;
-+	}
-+
-+	ptn_bridge->gpio_rst_n = devm_gpiod_get(&client->dev, "reset");
-+	if (IS_ERR(ptn_bridge->gpio_rst_n)) {
-+		ret = PTR_ERR(ptn_bridge->gpio_rst_n);
-+		DRM_ERROR("cannot get gpio_rst_n %d\n", ret);
-+		return ret;
-+	}
-+	/*
-+	 * Request the reset pin low to avoid the bridge being
-+	 * initialized prematurely
-+	 */
-+	ret = gpiod_direction_output(ptn_bridge->gpio_rst_n, 0);
-+	if (ret) {
-+		DRM_ERROR("cannot configure gpio_rst_n\n");
-+		return ret;
- 	}
- 
- 	ret = of_property_read_u32(dev->of_node, "edid-emulation",
- 			&ptn_bridge->edid_emulation);
- 	if (ret) {
- 		dev_err(dev, "Can't read EDID emulation value\n");
--		goto err;
-+		return ret;
+ 	ptn_bridge->gpio_pd_n = of_get_named_gpio(dev->of_node,
+ 							"powerdown-gpio", 0);
+@@ -327,6 +368,7 @@ static int ptn3460_probe(struct i2c_client *client,
  	}
  
  	ptn_bridge->bridge.funcs = &ptn3460_bridge_funcs;
-@@ -375,19 +371,12 @@ static int ptn3460_probe(struct i2c_client *client,
++	ptn_bridge->bridge.of_node = dev->of_node;
  	ret = drm_bridge_add(&ptn_bridge->bridge);
  	if (ret) {
  		DRM_ERROR("Failed to add bridge\n");
--		goto err;
-+		return ret;
- 	}
- 
- 	i2c_set_clientdata(client, ptn_bridge);
- 
- 	return 0;
--
--err:
--	if (gpio_is_valid(ptn_bridge->gpio_pd_n))
--		gpio_free(ptn_bridge->gpio_pd_n);
--	if (gpio_is_valid(ptn_bridge->gpio_rst_n))
--		gpio_free(ptn_bridge->gpio_rst_n);
--	return ret;
- }
- 
- static int ptn3460_remove(struct i2c_client *client)
-@@ -396,11 +385,6 @@ static int ptn3460_remove(struct i2c_client *client)
- 
- 	drm_bridge_remove(&ptn_bridge->bridge);
- 
--	if (gpio_is_valid(ptn_bridge->gpio_pd_n))
--		gpio_free(ptn_bridge->gpio_pd_n);
--	if (gpio_is_valid(ptn_bridge->gpio_rst_n))
--		gpio_free(ptn_bridge->gpio_rst_n);
--
- 	return 0;
- }
- 
 -- 
 1.7.9.5
