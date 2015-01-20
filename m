@@ -1,75 +1,205 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Tue, 20 Jan 2015 08:27:32 +0100
-Subject: [PATCH] i2c: drop ancient protection against sysfs refcounting
- issues
-In-Reply-To: <20150120071256.GA18983@kroah.com>
-References: <1421693756-12917-1-git-send-email-wsa@the-dreams.de>
- <20150119190142.GA9451@kroah.com>
- <20150119230427.GH26493@n2100.arm.linux.org.uk>
- <20150120014159.GA3349@kroah.com> <54BDFE30.5090303@metafoo.de>
- <20150120071256.GA18983@kroah.com>
-Message-ID: <54BE0364.7060404@metafoo.de>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 20 Jan 2015 16:25:39 +0900
+Subject: [PATCHv8 1/9] devfreq: event: Add new devfreq_event class to
+ provide basic data for devfreq governor
+In-Reply-To: <213049974.1319841421737167629.JavaMail.weblogic@epmlwas04a>
+References: <213049974.1319841421737167629.JavaMail.weblogic@epmlwas04a>
+Message-ID: <54BE02F3.4060808@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/20/2015 08:12 AM, Greg Kroah-Hartman wrote:
-> On Tue, Jan 20, 2015 at 08:05:20AM +0100, Lars-Peter Clausen wrote:
->> On 01/20/2015 02:41 AM, Greg Kroah-Hartman wrote:
->>> On Mon, Jan 19, 2015 at 11:04:27PM +0000, Russell King - ARM Linux wrote:
->>>> On Tue, Jan 20, 2015 at 03:01:42AM +0800, Greg Kroah-Hartman wrote:
->>>>> On Mon, Jan 19, 2015 at 07:55:56PM +0100, Wolfram Sang wrote:
->>>>>> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
->>>>>> index 39d25a8cb1ad..15cc5902cf89 100644
->>>>>> --- a/drivers/i2c/i2c-core.c
->>>>>> +++ b/drivers/i2c/i2c-core.c
->>>>>> @@ -41,7 +41,6 @@
->>>>>>   #include <linux/of_device.h>
->>>>>>   #include <linux/of_irq.h>
->>>>>>   #include <linux/clk/clk-conf.h>
->>>>>> -#include <linux/completion.h>
->>>>>>   #include <linux/hardirq.h>
->>>>>>   #include <linux/irqflags.h>
->>>>>>   #include <linux/rwsem.h>
->>>>>> @@ -1184,8 +1183,7 @@ EXPORT_SYMBOL_GPL(i2c_new_dummy);
->>>>>>
->>>>>>   static void i2c_adapter_dev_release(struct device *dev)
->>>>>>   {
->>>>>> -	struct i2c_adapter *adap = to_i2c_adapter(dev);
->>>>>> -	complete(&adap->dev_released);
->>>>>> +	/* empty, but the driver core insists we need a release function */
->>>>>
->>>>> Yeah, it does, but I hate to see this in "real" code as something is
->>>>> probably wrong with it if it happens.
->>>>>
->>>>> Please move the rest of 'i2c_del_adapter' into the release function
->>>>> (what was after the wait_for_completion() call), and then all should be
->>>>> fine.
->>>>
->>>> Are you sure about that?  Some drivers do this, eg,
->>>>
->>>>          i2c_del_adapter(&drv_data->adapter);
->>>>          free_irq(drv_data->irq, drv_data);
->>>>
->>>> where drv_data was allocated using devm_kzalloc(), and so will be
->>>> released when the ->remove callback (which calls the above
->>>> i2c_del_adapter()) returns... freeing the embedded device struct.
->>>
->>> But that will fail today if the memory is freed in i2c_del_adapter(), so
->>> there shouldn't be any change in logic here.
->>>
->>> Or am I missing something obvious?
+Dear Myungjoo,
+
+On 01/20/2015 03:59 PM, MyungJoo Ham wrote:
+>>  
+>> Dear Myungjoo,
 >>
->> The memory is not freed in i2c_del_adapter().
->
-> Right, and I'm not saying it should be, just move the existing logic
-> into the release callback, and the code flow should be the same and we
-> don't end up with an "empty" release callback.
+>> On 01/20/2015 01:34 PM, MyungJoo Ham wrote:
+>>>>   
+> []
+>>>> +
+>>>> +	mutex_lock(&edev->lock);
+>>>> +	if (edev->desc->ops && edev->desc->ops->enable) {
+>>>> +		ret = edev->desc->ops->enable(edev);
+>>>> +		if (ret < 0)
+>>>> +			goto err;
+>>>> +	}
+>>>
+>>> Is there any reason to call enable(edev) even when enable_count is already > 0 
+>>> while you do not call disable(edev) while enable_count > 0?
+>>>
+>>> I think this may incur errors in the related device drivers.
+>>> (e.g., incorrect pairing of clk/runtime-pm/regulator enable/disable
+>>> at the device driver side)
+>>
+>> You're right. This part has potential errors. I'll fix it as following:
+>> If edev is already enabled, devfreq_event_enable_edev() will just return
+>> without any operation because devfreq-event(edev) can handle only one event
+>> at the same time.
+>>
+>> 	mutex_lock(&edev->lock);
+>> 	if (edev->enable_count)
+>> 		dev_warn(&edev->dev, "%s is already enabled\n", edev->desc->name);
+>> 		ret = -EINVAL;
+>> 		goto err;
+>> 	}
+>>
+>> 	if (edev->desc->ops && edev->desc->ops->enable) {		
+>> 		ret = edev->desc->ops->enable(edev);
+>> 		if (ret < 0)
+>> 			goto err;
+>> 	}
+>> 	edev->enable_count++;
+> 
+> No, your suggested modification creates another bug.
+> 
+> It should not emit "warn" when enable_count > 0 at enable().
+> It is a natural behavior from drivers.
+> - You may have multiple drivers using edev.
+> - You may have multiple threads using edev.
 
-But the code flow often is.
+The devfreq-event cannot be used in multiple drivers in current version
+If multiple driver set the event to devfreq-event device by using
+devfreq_event_set_event() at the same time, previous event will be ignored.
 
-i2c_del_adapter(&drvdata->adap);
-kfree(drvdata);
+If multiple drivers want to use devfreq-event device at the same time,
+I have to implement additional feature.
 
-That wont work anymore if i2c_del_adapter() returns before the last reference 
-has been dropped. This needs to be restructured so that the adapter memory can 
-be freed by the release callback.
+> 
+> Thus, the above 12 lines should be replaced with:
+> 
+> 	if (edev->desc->ops && edev->desc->ops->enable &&
+> 	    edev->enable_count == 0) {
+> 		ret = edev->desc->ops->enable(edev);
+> 		if (ret < 0)
+> 			goto err;
+> 	}
+> 	edev->enable_count++;
+> 
+>> 	
+>>
+>>>
+>>>> +	edev->enable_count++;
+>>>> +err:
+>>>> +	mutex_unlock(&edev->lock);
+>>>> +
+>>>> +	return ret;
+>>>> +}
+>>>> +EXPORT_SYMBOL_GPL(devfreq_event_enable_edev);
+>>>> +
+>>>> +/**
+>>>> + * devfreq_event_disable_edev() - Disable the devfreq-event dev and decrease
+>>>> + *				  the enable_count of the devfreq-event dev.
+>>>> + * @edev	: the devfreq-event device
+>>>> + *
+>>>> + * Note that this function decrease the enable_count and disable the
+>>>> + * devfreq-event device. After the devfreq-event device is disabled,
+>>>> + * devfreq device can't use the devfreq-event device for get/set/reset
+>>>> + * operations.
+>>>> + */
+>>>> +int devfreq_event_disable_edev(struct devfreq_event_dev *edev)
+>>>> +{
+>>>> +	int ret = 0;
+>>>> +
+>>>> +	if (!edev || !edev->desc)
+>>>> +		return -EINVAL;
+>>>> +
+>>>> +	mutex_lock(&edev->lock);
+>>>> +	if (edev->enable_count > 0) {
+>>>> +		edev->enable_count--;
+>>>> +	} else {
+>>>> +		dev_warn(&edev->dev, "unbalanced enable_count\n");
+>>>> +		ret = -EINVAL;
+>>>> +		goto err;
+>>>> +	}
+>>>> +
+>>>> +	if (edev->desc->ops && edev->desc->ops->disable) {
+>>>> +		ret = edev->desc->ops->disable(edev);
+>>>> +		if (ret < 0) {
+>>>> +			edev->enable_count++;
+>>>> +			goto err;
+>>>> +		}
+> 
+> Anyway, have you seen other subsystems doing fall-back operations as you've
+> done by "edev->enable_count++" here? Or is this your own idea on falling back
+> from errors with a disable callback?
+
+I removed "edev->enable_count++" when fail to diable devfreq-event
+and modify it as following:
+
+	+int devfreq_event_disable_edev(struct devfreq_event_dev *edev)
+	+{
+	+	int ret = 0;
+	+
+	+	if (!edev || !edev->desc)
+	+		return -EINVAL;
+	+
+	+	mutex_lock(&edev->lock);
+	+	if (!edev->enable_count) {
+	+		dev_warn(&edev->dev,
+	+			"%s is already disabled\n", edev->desc->name);
+	+		goto err;
+	+	}
+	+	
+	+	if (edev->desc->ops && edev->desc->ops->disable) {
+	+		ret = edev->desc->ops->disable(edev);
+	+		if (ret < 0)
+	+			goto err;
+	+	}
+	+	edev->enable_count--;
+	+err:
+	+	mutex_unlock(&edev->lock);
+	+
+	+	return ret;
+	+}
+	+EXPORT_SYMBOL_GPL(devfreq_event_disable_edev);
+
+> 
+>>>> +	}
+>>>
+>>> You did it correctly with disable here;
+>>> not calling it when it is not required.
+> 
+> Uh..yeah.. the original patch was incorrect..
+> 
+>>
+>> As I explained, I'll fix it as following:
+>>
+>> 	mutex_lock(&edev->lock);
+>> 	if (!edev->enable_count) {
+>> 		dev_warn(&edev->dev, "%s is already disabled\n", edev->desc->name);
+>> 		ret = -EINVAL;
+>> 		goto err;
+>> 	}
+>>
+>> 	if (edev->desc->ops && edev->desc->ops->disable) {
+>> 		ret = edev->desc->ops->disable(edev);
+>> 		if (ret < 0)
+>> 			goto err;		
+>> 	}
+>> 	edev->enable_count--;
+> 
+> Uh.... I'd say it is still incorrect.
+
+I explained it about this problem on the upper.
+
+> 
+> 	mutex_lock(&edev->lock);
+> 	if (!edev->enable_count) {
+> 		dev_warn(&edev->dev, "%s is already disabled\n", edev->desc->name);
+> 		ret = -EINVAL;
+> 		goto err;
+> 	}
+> 
+> 	edev->enable_count--;
+> 	if (edev->desc->ops && edev->desc->ops->disable &&
+> 	    !edev->enable_count) {
+> 		ret = edev->desc->ops->disable(edev);
+> 		if (ret < 0)
+> 			goto err;		
+> 	}
+
+[snip]
+
+Best Regards,
+Chanwoo Choi
