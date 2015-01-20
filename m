@@ -1,53 +1,59 @@
-From: romain.perier@gmail.com (Romain Perier)
-Date: Tue, 20 Jan 2015 07:58:43 +0100
-Subject: [PATCH v1 0/4] net: stmmac: dwmac-rk: Fix phy regulator issues
-In-Reply-To: <1446006.BXnWRvK5p3@phil>
-References: <1421690889-11901-1-git-send-email-romain.perier@gmail.com>
- <1446006.BXnWRvK5p3@phil>
-Message-ID: <CABgxDoLXBvrqt5SnGybWa_EbT_wGjwHj80bLvhAE3og-m-7t6A@mail.gmail.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 20 Jan 2015 08:05:20 +0100
+Subject: [PATCH] i2c: drop ancient protection against sysfs refcounting
+ issues
+In-Reply-To: <20150120014159.GA3349@kroah.com>
+References: <1421693756-12917-1-git-send-email-wsa@the-dreams.de>
+ <20150119190142.GA9451@kroah.com>
+ <20150119230427.GH26493@n2100.arm.linux.org.uk>
+ <20150120014159.GA3349@kroah.com>
+Message-ID: <54BDFE30.5090303@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-
-2015-01-19 21:19 GMT+01:00 Heiko St?bner <heiko@sntech.de>:
-> Hi Romain
->
-> Am Montag, 19. Januar 2015, 18:08:05 schrieb Romain Perier:
->> This series fixes few issues in dwmac-rk:
+On 01/20/2015 02:41 AM, Greg Kroah-Hartman wrote:
+> On Mon, Jan 19, 2015 at 11:04:27PM +0000, Russell King - ARM Linux wrote:
+>> On Tue, Jan 20, 2015 at 03:01:42AM +0800, Greg Kroah-Hartman wrote:
+>>> On Mon, Jan 19, 2015 at 07:55:56PM +0100, Wolfram Sang wrote:
+>>>> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+>>>> index 39d25a8cb1ad..15cc5902cf89 100644
+>>>> --- a/drivers/i2c/i2c-core.c
+>>>> +++ b/drivers/i2c/i2c-core.c
+>>>> @@ -41,7 +41,6 @@
+>>>>   #include <linux/of_device.h>
+>>>>   #include <linux/of_irq.h>
+>>>>   #include <linux/clk/clk-conf.h>
+>>>> -#include <linux/completion.h>
+>>>>   #include <linux/hardirq.h>
+>>>>   #include <linux/irqflags.h>
+>>>>   #include <linux/rwsem.h>
+>>>> @@ -1184,8 +1183,7 @@ EXPORT_SYMBOL_GPL(i2c_new_dummy);
+>>>>
+>>>>   static void i2c_adapter_dev_release(struct device *dev)
+>>>>   {
+>>>> -	struct i2c_adapter *adap = to_i2c_adapter(dev);
+>>>> -	complete(&adap->dev_released);
+>>>> +	/* empty, but the driver core insists we need a release function */
+>>>
+>>> Yeah, it does, but I hate to see this in "real" code as something is
+>>> probably wrong with it if it happens.
+>>>
+>>> Please move the rest of 'i2c_del_adapter' into the release function
+>>> (what was after the wait_for_completion() call), and then all should be
+>>> fine.
 >>
->> 1. Voltage settings was hardcoded into the driver for the phy regulator.
->>    The driver now uses the default voltage settings found in the devicetree,
->> which are applied throught the regulator framework.
->> 2. The regulator name used to power on or power off the phy was put in the
->> devicetree variable "phy_regulator", which is not standard and added a lot
->> of code for nothing. The driver now uses the devicetree property
->> "phy-supply" and the corresponding functions to manipulate this regulator.
+>> Are you sure about that?  Some drivers do this, eg,
 >>
->> The corresponding devicetree files are also updated. As, dwmac-rk was
->> recently pushed in the development tree, I don't care about devicetree
->> backward compatibility issues.
+>>          i2c_del_adapter(&drv_data->adapter);
+>>          free_irq(drv_data->irq, drv_data);
+>>
+>> where drv_data was allocated using devm_kzalloc(), and so will be
+>> released when the ->remove callback (which calls the above
+>> i2c_del_adapter()) returns... freeing the embedded device struct.
 >
-> This last sentence is slightly misleading :-) .
+> But that will fail today if the memory is freed in i2c_del_adapter(), so
+> there shouldn't be any change in logic here.
 >
+> Or am I missing something obvious?
 
-Yes, I meant that I don't need to care about it, as you explain it well below.
-Sorry for my misleading sentence ;) . I will fix it in my second serie.
-
-> The actual fact is, that these new bindings for the rk3288 gmac have not been
-> released with any official kernel release yet ... i.e. the will be released with
-> 3.20 in whatever form, so we don't _need_ to care about keeping compatibility
-> still for the next 2.5 weeks or so.
->
-> @Dave: it would be good if this series (when fixed) could still go into the
-> 3.20 material so we don't get stuck with the non-standard regulator property.
->
->
-> As we'll probably need a v2 due to at the issue in patch3, could you also
-> switch places of patch1 and 2, which would keep bisecatbility (i.e. regulator
-> property before removing the voltage setting from the driver).
-
-This sentence about re-ordering patches is for Dave or for me ?
-
-Thanks,
-Romain
+The memory is not freed in i2c_del_adapter().
