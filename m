@@ -1,69 +1,75 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 20 Jan 2015 15:21:43 +0100
-Subject: [PATCH v5 4/5] mfd/regulator: dt-bindings: max77686: Document gpio
- properties
-In-Reply-To: <20150120134111.GI13701@x1>
-References: <1420458525-22576-1-git-send-email-k.kozlowski@samsung.com>
- <1420458525-22576-5-git-send-email-k.kozlowski@samsung.com>
- <20150120134111.GI13701@x1>
-Message-ID: <1421763703.8855.10.camel@AMDC1943>
+From: gg@slimlogic.co.uk (Graeme Gregory)
+Date: Tue, 20 Jan 2015 14:26:12 +0000
+Subject: [PATCH 00/10] drivers: PL011: add ARM SBSA Generic UART support
+In-Reply-To: <54BE5E35.50906@arm.com>
+References: <1421428986-11300-1-git-send-email-andre.przywara@arm.com>
+ <20150120130832.GA6858@xora-yoga-13.xora.org.uk>
+ <54BE5E35.50906@arm.com>
+Message-ID: <20150120142612.GB6858@xora-yoga-13.xora.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On wto, 2015-01-20 at 13:41 +0000, Lee Jones wrote:
-> On Mon, 05 Jan 2015, Krzysztof Kozlowski wrote:
+On Tue, Jan 20, 2015 at 01:55:01PM +0000, Andre Przywara wrote:
+> Hi Graeme,
 > 
-> > Document usage of maxim,ena-gpios properties which turn on external/GPIO
-> > control over regulator.
+> On 20/01/15 13:08, Graeme Gregory wrote:
+> > On Fri, Jan 16, 2015 at 05:22:56PM +0000, Andre Przywara wrote:
+> >> The ARM Server Base System Architecture[1] document describes a
+> >> generic UART which is a subset of the PL011 UART.
+> >> It lacks DMA support, baud rate control and modem status line
+> >> control, among other things.
+> >> The idea is to move the UART initialization and setup into the
+> >> firmware (which does this job today already) and let the kernel just
+> >> use the UART for sending and receiving characters.
+> >>
+> >> This patchset integrates support for this UART subset into the
+> >> existing PL011 driver - basically by refactoring some
+> >> functions and providing a new uart_ops structure for it. It also has
+> >> a separate probe function to be not dependent on AMBA/PrimeCell.
+> >> It provides a device tree binding, but can easily be adapted to other
+> >> device configuration systems.
+> >> Beside the obvious effect of code sharing reusing most of the PL011
+> >> code has the advantage of not introducing another serial device
+> >> prefix, so it can go with ttyAMA, which seems to be pretty common.
+> >>
+> >> This series relies on Dave's recent PL011 fix[2], which gets rid of
+> >> the loopback trick to get the UART going. There is a repo at [3]
+> >> (branch sbsa-uart/v1), which has this patch already integrated.
+> >>
+> >> Patch 1/10 contains a bug fix which applies to the PL011 part also,
+> >> it should be considered regardless of the rest of the series.
+> >> Patch 2-7 refactor some PL011 functions by splitting them up into
+> >> smaller pieces, so that most of the code can be reused later by the
+> >> SBSA part.
+> >> Patch 8 and 9 introduce two new properties for the vendor structure,
+> >> this is for SBSA functionality which cannot be controlled by
+> >> separate uart_ops members only.
+> >> Patch 10 then finally drops in the SBSA specific code, by providing
+> >> a new uart_ops, vendor struct and probe function for it. Also the new
+> >> device tree binding is documented.
+> >>
+> >> For testing you should be able to take any hardware which has a PL011
+> >> and change the DT to use a "arm,sbsa-uart" compatible string.
+> >> Of course testing with a real SBSA Generic UART is welcomed!
+> >>
+> > I have tested this series on Juno where it seems to work and also on FVP
+> > model where there are some issues.
 > > 
-> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > ---
-> >  Documentation/devicetree/bindings/mfd/max77686.txt | 14 ++++++++++++++
-> >  1 file changed, 14 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/mfd/max77686.txt b/Documentation/devicetree/bindings/mfd/max77686.txt
-> > index 75fdfaf41831..e39f0bc1f55e 100644
-> > --- a/Documentation/devicetree/bindings/mfd/max77686.txt
-> > +++ b/Documentation/devicetree/bindings/mfd/max77686.txt
-> > @@ -39,6 +39,12 @@ to get matched with their hardware counterparts as follow:
-> >  	-BUCKn	:	1-4.
-> >    Use standard regulator bindings for it ('regulator-off-in-suspend').
-> >  
-> > +  LDO20, LDO21, LDO22, BUCK8 and BUCK9 can be configured to GPIO enable
-> > +  control. To turn this feature on this property must be added to the regulator
-> > +  sub-node:
-> > +	- maxim,ena-gpios :	one GPIO specifier enable control (the gpio
-> > +				flags are actually ignored and always
-> > +				ACTIVE_HIGH is used)
+> > On the FVP when we enter usespace a couple of 32 character strings are
+> > printed then nothing else. 32 Characters is a suspicious number.
 > 
-> How does this differ to the 'enable-gpio' property which has already
-> been defined?
-
-Strictly speaking - no difference, just a GPIO specifier.
-
-However the 'enable-gpio' property exists only for gpio-regulator. The
-regulator core does not support generic enable-gpio property and each
-driver implements it on its own.
-
-Anyway Mark Brown already applied this patch to his regulator tree.
-
-Best regards,
-Krzysztof
-
+> Can you try to add:
+> -C bp.pl011_uart0.untimed_fifos=0
+> to your model command line? (given that your model supports this option)
 > 
-> >  Example:
-> >  
-> > @@ -65,4 +71,12 @@ Example:
-> >  				regulator-always-on;
-> >  				regulator-boot-on;
-> >  			};
-> > +
-> > +			buck9_reg {
-> > +				regulator-compatible = "BUCK9";
-> > +				regulator-name = "CAM_ISP_CORE_1.2V";
-> > +				regulator-min-microvolt = <1000000>;
-> > +				regulator-max-microvolt = <1200000>;
-> > +				maxim,ena-gpios = <&gpm0 3 GPIO_ACTIVE_HIGH>;
-> > +			};
-> >  	}
+> We discovered that lately, also not sure how the default for this
+> setting is handled these days in the various model versions.
 > 
+> We are about to investigate this here atm.
+> This issue seems to be introduced by Dave's FIFO patch.
+> 
+
+With this setting userspace functions better but loses characters
+fairly regularly.
+
+Graeme
