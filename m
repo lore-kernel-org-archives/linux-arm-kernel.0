@@ -1,41 +1,88 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 20 Jan 2015 10:27:08 +0900
-Subject: [GIT PULL] Third Round of Renesas ARM Based SoC Updates for v3.20
-Message-ID: <cover.1421715134.git.horms+renesas@verge.net.au>
+Date: Tue, 20 Jan 2015 10:27:07 +0900
+Subject: [PATCH 1/3] ARM: shmobile: R-Mobile: Consolidate
+ rmobile_pd_suspend_*()
+In-Reply-To: <cover.1421715134.git.horms+renesas@verge.net.au>
+References: <cover.1421715134.git.horms+renesas@verge.net.au>
+Message-ID: <e43ee86efb68808c8847de17e58f5427b006363c.1421715134.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these third round of Renesas ARM based SoC updates for v3.20.
+Consolidate the identical rmobile_pd_suspend_*() routines that just
+return -EBUSY to prevent a PM domain from being powered down into a
+single rmobile_pd_suspend_busy().
 
-This pull request is based on the previous round of
-such requests, tagged as renesas-soc2-for-v3.20,
-which I have already sent a pull-request for.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/pm-rmobile.c | 28 +++++++++++++---------------
+ 1 file changed, 13 insertions(+), 15 deletions(-)
 
-
-The following changes since commit 2173fc7cb681c38b9e5bc526211045caecf96e44:
-
-  ARM: shmobile: R-Mobile: Add DT support for PM domains (2015-01-15 08:38:14 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc3-for-v3.20
-
-for you to fetch changes up to 1632ff162f305f38667632c465e4bfaab8ef87a2:
-
-  ARM: shmobile: R-Mobile: Special-case PM domains with memory-controllers (2015-01-16 11:02:42 +0900)
-
-----------------------------------------------------------------
-Third Round of Renesas ARM Based SoC Updates for v3.20
-
-* Special-case PM domains with memory-controllers
-
-----------------------------------------------------------------
-Geert Uytterhoeven (3):
-      ARM: shmobile: R-Mobile: Consolidate rmobile_pd_suspend_*()
-      ARM: shmobile: R-Mobile: Generalize adding/looking up special PM domains
-      ARM: shmobile: R-Mobile: Special-case PM domains with memory-controllers
-
- arch/arm/mach-shmobile/pm-rmobile.c | 155 ++++++++++++++++++++++--------------
- 1 file changed, 97 insertions(+), 58 deletions(-)
+diff --git a/arch/arm/mach-shmobile/pm-rmobile.c b/arch/arm/mach-shmobile/pm-rmobile.c
+index 85a7fdd..e1be4b8 100644
+--- a/arch/arm/mach-shmobile/pm-rmobile.c
++++ b/arch/arm/mach-shmobile/pm-rmobile.c
+@@ -200,11 +200,10 @@ void rmobile_add_devices_to_domains(struct pm_domain_device data[],
+ 
+ #else /* !CONFIG_ARCH_SHMOBILE_LEGACY */
+ 
+-static int rmobile_pd_suspend_cpu(void)
++static int rmobile_pd_suspend_busy(void)
+ {
+ 	/*
+-	 * This domain contains the CPU core and therefore it should
+-	 * only be turned off if the CPU is not in use.
++	 * This domain should not be turned off.
+ 	 */
+ 	return -EBUSY;
+ }
+@@ -218,16 +217,6 @@ static int rmobile_pd_suspend_console(void)
+ 	return console_suspend_enabled ? 0 : -EBUSY;
+ }
+ 
+-static int rmobile_pd_suspend_debug(void)
+-{
+-	/*
+-	 * This domain contains the Coresight-ETM hardware block and
+-	 * therefore it should only be turned off if the debug module is
+-	 * not in use.
+-	 */
+-	return -EBUSY;
+-}
+-
+ #define MAX_NUM_CPU_PDS		8
+ 
+ static unsigned int num_cpu_pds __initdata;
+@@ -303,17 +292,26 @@ static void __init rmobile_setup_pm_domain(struct device_node *np,
+ 	const char *name = pd->genpd.name;
+ 
+ 	if (pd_contains_cpu(np)) {
++		/*
++		 * This domain contains the CPU core and therefore it should
++		 * only be turned off if the CPU is not in use.
++		 */
+ 		pr_debug("PM domain %s contains CPU\n", name);
+ 		pd->gov = &pm_domain_always_on_gov;
+-		pd->suspend = rmobile_pd_suspend_cpu;
++		pd->suspend = rmobile_pd_suspend_busy;
+ 	} else if (np == console_pd) {
+ 		pr_debug("PM domain %s contains serial console\n", name);
+ 		pd->gov = &pm_domain_always_on_gov;
+ 		pd->suspend = rmobile_pd_suspend_console;
+ 	} else if (np == debug_pd) {
++		/*
++		 * This domain contains the Coresight-ETM hardware block and
++		 * therefore it should only be turned off if the debug module
++		 * is not in use.
++		 */
+ 		pr_debug("PM domain %s contains Coresight-ETM\n", name);
+ 		pd->gov = &pm_domain_always_on_gov;
+-		pd->suspend = rmobile_pd_suspend_debug;
++		pd->suspend = rmobile_pd_suspend_busy;
+ 	}
+ 
+ 	rmobile_init_pm_domain(pd);
+-- 
+2.1.4
