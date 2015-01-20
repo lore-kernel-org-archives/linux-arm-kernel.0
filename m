@@ -1,69 +1,101 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 20 Jan 2015 12:31:44 -0800
-Subject: [PATCH] mtd: atmel_nand: check NFC busy flag by HSMC_SR instead
- of NFC cmd regs
-In-Reply-To: <1421318753-14960-1-git-send-email-josh.wu@atmel.com>
-References: <1421318753-14960-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <20150120203144.GN9759@ld-irv-0074>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Tue, 20 Jan 2015 14:32:13 -0600
+Subject: [RFC PATCH v5 0/4] ARM: OMAP2+: AM33XX: Add suspend-resume support
+In-Reply-To: <20150120180347.GJ7718@atomide.com>
+References: <cover.1417038624.git.d-gerlach@ti.com>
+ <20150120180347.GJ7718@atomide.com>
+Message-ID: <54BEBB4D.90802@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 15, 2015 at 06:45:53PM +0800, Josh Wu wrote:
-
-Was this written by Boris? If so, then it needs a 'From:' line at the
-start of the body. (Make sure 'Author' is correct in git, then
-git-format-patch/git-send-email will get it right for you.)
-
-> Currently the driver read NFC command registers to get NFC busy flag.
-> Actually this flag also can be get by reading HSMC_SR register.
+Tony,
+On 01/20/2015 12:03 PM, Tony Lindgren wrote:
+> * Dave Gerlach <d-gerlach@ti.com> [141126 13:54]:
+>> Hi,
+>> This series is v5 of the series to add suspend/resume support for Texas
+>> Instruments AM335x SoC. It has gone through a rather major overhaul
+>> since the last version and because of that has been split into multiple
+>> different sets of patches, on which this series depends. Previous discussion
+>> that influenced there changes can be found here [1]. This series depends on
+>> generic sram exec mapping patch here [2], emif series here [3],
+>> and wkup_m3_ipc series here [4]. I have pushed a branch containing the patches
+>> from ALL required series here [5] for testing or a view of the high level
+>> flow of the entire series.
+>>
+>> The largest change with this revision is the introduction of a
+>> wkup_m3_ipc driver which handles all communication with the Cortex M3
+>> present on am335x for handling low power tasks. Previously this was
+>> handled in the wkup_m3_rproc driver (also sent in an earlier series)
+>> but that driver is now only responsible for booting the wkup_m3. The
+>> wkup_m3_ipc driver exposes an API with all required PM functionality
+>> needed by the PM code introduced by this series, so the PM code has
+>> shrunk considerably.
+>>
+>> Another major change is that the EMIF code previously present in the
+>> sleep33xx asm code and pm33xx code for save and restore of EMIF context
+>> and entry into low power mode has all been moved in to a separate EMIF
+>> driver, further reducing the size of the PM code. Because of this, moving
+>> the emif header defines into include/linux/ti_emif.h is no longer necessary.
+>>
+>> Other changes include clean up of the timer suspend/resume handlers, now
+>> look up hwmod in init and use that handle along with renaming to
+>> *_idle/*_unidle to avoid confusion with true suspend handlers. 
+>>
+>> Suspend support requires:
+>> CONFIG_TI_EMIF_SRAM
+>> CONFIG_WKUP_M3_RPROC
+>> CONFIG_WKUP_M3_IPC
+>>
+>> And also requires AM335x USB support to be enabled to work for multiple
+>> cycles. If you want to load firmware from rootfs in /lib/firmware you now
+>> must also select CONFIG_FW_LOADER_USER_HELPER_FALLBACK.
+>>
+>> This code works with version 0x189 of the CM3 firmware found here [6] on
+>> the next branch, /bin/am335x-pm-firmware.elf.
 > 
-> Use the read NFC command registers need mapping a huge memory region.
-> To save the mapped memory region, we change to check NFC busy flag by
-> reading HSMC_SR register.
-
-Are we actually saving anything yet? You didn't change the requested
-region yet.
-
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Acked-by: Josh Wu <josh.wu@atmel.com>
-
-Since this is passing through your hands, Josh, it should be
-'Signed-off-by' not 'Acked-by'.
-
-> ---
+> Dave, does this series have dependencies to the other patches? Can some
+> parts of this already be applied without breaking anything?
 > 
->  drivers/mtd/nand/atmel_nand.c     | 3 +--
->  drivers/mtd/nand/atmel_nand_nfc.h | 1 +
->  2 files changed, 2 insertions(+), 2 deletions(-)
+
+The only patch with no dependencies is patch 1 (ARM: OMAP2+: timer: Add
+suspend-resume callbacks for clkevent device). It's ready to be applied, I just
+applied to v3.19-rc5 and built and booted on am335x-evm with no issue just to be
+sure. It won't actually do anything until suspend is completely implemented.
+
+Regards,
+Dave
+
+> Regards,
 > 
-> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-> index 3853597..125330b 100644
-> --- a/drivers/mtd/nand/atmel_nand.c
-> +++ b/drivers/mtd/nand/atmel_nand.c
-> @@ -1699,8 +1699,7 @@ static int nfc_send_command(struct atmel_nand_host *host,
->  		cmd, addr, cycle0);
+> Tony
 >  
->  	timeout = jiffies + msecs_to_jiffies(NFC_TIME_OUT_MS);
-> -	while (nfc_cmd_readl(NFCADDR_CMD_NFCBUSY, host->nfc->base_cmd_regs)
-> -			& NFCADDR_CMD_NFCBUSY) {
-> +	while (nfc_readl(host->nfc->hsmc_regs, SR) & NFC_SR_BUSY) {
->  		if (time_after(jiffies, timeout)) {
->  			dev_err(host->dev,
->  				"Time out to wait CMD_NFCBUSY ready!\n");
+>> [1] http://www.spinics.net/lists/linux-omap/msg109331.html
+>> [2] http://www.spinics.net/linux/lists/kernel/msg1876629.html
+>> [3] http://www.spinics.net/linux/lists/kernel/msg1876646.html
+>> [4] http://www.spinics.net/linux/lists/kernel/msg1876642.html
+>> [5] https://github.com/dgerlach/linux-pm/tree/rfc-pm-am335x-v3.18-rc6
+>> [6] https://git.ti.com/ti-cm3-pm-firmware/amx3-cm3/commits/next
+>>
+>> Dave Gerlach (3):
+>>   ARM: OMAP2+: AM33XX: Add assembly code for PM operations
+>>   ARM: OMAP2+: AM33XX: Basic suspend resume support
+>>   ARM: OMAP2+: AM33XX: Hookup AM33XX PM code into OMAP builds
+>>
+>> Vaibhav Bedia (1):
+>>   ARM: OMAP2+: timer: Add suspend-resume callbacks for clkevent device
 
-Change the timeout text?
-
-> diff --git a/drivers/mtd/nand/atmel_nand_nfc.h b/drivers/mtd/nand/atmel_nand_nfc.h
-> index 85b8ca6..4d5d262 100644
-> --- a/drivers/mtd/nand/atmel_nand_nfc.h
-> +++ b/drivers/mtd/nand/atmel_nand_nfc.h
-> @@ -35,6 +35,7 @@
->  #define		NFC_CTRL_DISABLE	(1 << 1)
->  
->  #define ATMEL_HSMC_NFC_SR	0x08		/* NFC Status Register */
-> +#define		NFC_SR_BUSY		(1 << 8)
->  #define		NFC_SR_XFR_DONE		(1 << 16)
->  #define		NFC_SR_CMD_DONE		(1 << 17)
->  #define		NFC_SR_DTOE		(1 << 20)
-
-Brian
+>>  arch/arm/boot/dts/am33xx.dtsi   |   2 +
+>>  arch/arm/mach-omap2/Makefile    |   2 +
+>>  arch/arm/mach-omap2/common.h    |   9 ++
+>>  arch/arm/mach-omap2/io.c        |   1 +
+>>  arch/arm/mach-omap2/pm.h        |   6 +
+>>  arch/arm/mach-omap2/pm33xx.c    | 250 ++++++++++++++++++++++++++++++++++++++++
+>>  arch/arm/mach-omap2/sleep33xx.S | 216 ++++++++++++++++++++++++++++++++++
+>>  arch/arm/mach-omap2/timer.c     |  28 +++++
+>>  8 files changed, 514 insertions(+)
+>>  create mode 100644 arch/arm/mach-omap2/pm33xx.c
+>>  create mode 100644 arch/arm/mach-omap2/sleep33xx.S
+>>
+>> -- 
+>> 2.1.0
+>>
