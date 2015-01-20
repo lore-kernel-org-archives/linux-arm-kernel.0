@@ -1,86 +1,36 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 20 Jan 2015 16:16:46 +0000
-Subject: [PATCH v7 11/17] ACPI / processor: Make it possible to get CPU
- hardware ID via GICC
-In-Reply-To: <1421247905-3749-12-git-send-email-hanjun.guo@linaro.org>
-References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
- <1421247905-3749-12-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20150120161646.GJ5398@red-moon>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 20 Jan 2015 09:20:42 -0700
+Subject: [PATCH v2 02/11] ARM: tegra: Use the generated pinmux data
+In-Reply-To: <CAAObsKAaanrrSYd7gmLAS4K_G9fuU=WmsMXQk0G85hfy_XdE5Q@mail.gmail.com>
+References: <1421338359-27467-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1421338359-27467-3-git-send-email-tomeu.vizoso@collabora.com>
+ <54B7F7F7.1020202@wwwdotorg.org>
+ <CAAObsKAaanrrSYd7gmLAS4K_G9fuU=WmsMXQk0G85hfy_XdE5Q@mail.gmail.com>
+Message-ID: <54BE805A.3060300@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 14, 2015 at 03:04:59PM +0000, Hanjun Guo wrote:
-> Introduce a new function map_gicc_mpidr() to allow MPIDRs to be obtained
-> from the GICC Structure introduced by ACPI 5.1.
-> 
-> MPIDR is the CPU hardware ID as local APIC ID on x86 platform, so we use
-> MPIDR not the GIC CPU interface ID to identify CPUs.
-> 
-> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> Tested-by: Yijing Wang <wangyijing@huawei.com>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  arch/arm64/include/asm/acpi.h | 29 +++++++++++++++++++++++++++++
->  arch/arm64/kernel/acpi.c      |  1 -
->  drivers/acpi/processor_core.c | 37 +++++++++++++++++++++++++++++++++++++
->  3 files changed, 66 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-> index c82d4a1..639bb2a 100644
-> --- a/arch/arm64/include/asm/acpi.h
-> +++ b/arch/arm64/include/asm/acpi.h
-> @@ -12,6 +12,8 @@
->  #ifndef _ASM_ACPI_H
->  #define _ASM_ACPI_H
->  
-> +#include <asm/smp_plat.h>
-> +
->  /* Basic configuration for ACPI */
->  #ifdef	CONFIG_ACPI
->  #define acpi_strict 1	/* No out-of-spec workarounds on ARM64 */
-> @@ -45,6 +47,33 @@ static inline void enable_acpi(void)
->  	acpi_noirq = 0;
->  }
->  
-> +/* MPIDR value provided in GICC structure is 64 bits, but the
-> + * existing apic_id (CPU hardware ID) using in acpi processor
-> + * driver is 32-bit, to conform to the same datatype we need
-> + * to repack the GICC structure MPIDR.
-> + *
-> + * Only 32 bits of MPIDR are used:
-> + *
-> + * Bits [0:7] Aff0;
-> + * Bits [8:15] Aff1;
-> + * Bits [16:23] Aff2;
-> + * Bits [32:39] Aff3;
-> + */
-> +static inline u32 pack_mpidr(u64 mpidr)
-> +{
-> +	return (u32) ((mpidr & 0xff00000000) >> 8) | mpidr;
-> +}
-> +
-> +/*
-> + * The ACPI processor driver for ACPI core code needs this macro
-> + * to find out this cpu was already mapped (mapping from CPU hardware
-> + * ID to CPU logical ID) or not.
-> + *
-> + * cpu_logical_map(cpu) is the mapping of MPIDR and the logical cpu,
-> + * and MPIDR is the cpu hardware ID we needed to pack.
-> + */
-> +#define cpu_physical_id(cpu) pack_mpidr(cpu_logical_map(cpu))
+On 01/20/2015 06:59 AM, Tomeu Vizoso wrote:
+> On 15 January 2015 at 18:25, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 01/15/2015 09:12 AM, Tomeu Vizoso wrote:
+>>>
+>>> Google has submitted a board config for the pinmux programming of the
+>>> Nyan Big board. Use the whole of it as it's generated to make it easier
+>>> to update as the configuration gets fixed in the future.
+>>
+>>
+>> Submitted to where? I assume you mean tegra-pinmux-scripts. I don't see a
+>> Nyan/Nyan-big configuration there yet. IIRC (and I might not) one was
+>> posted, but there were some review comments that aren't yet addressed?
+>
+> Yeah, that's what I meant by submitted. TTBOMK the v2 doesn't have any
+> comments pending of being addressed?
 
-Do we need this mpidr packing only because in drivers/acpi/processor_core.c
-phys_id is defined as an int ?
+There's a thread where you and Andrew are discussing the settings for a 
+bunch of the pins, and the differences between Big and Blaze. It didn't 
+seem to me that the resolution was that the V2 patch was fine as is, but 
+perhaps that's what the thread meant!
 
-What you could do, is to typedef a cpuid_t type in arch code (with
-appropriate size and a corresponding invalid value, say ~0) and use that
-instead of an int in drivers/acpi/processor_core.c to store phys_id.
-
-phys_id is used as an error value too (ie -1 as a magic number), see
-drivers/acpi/acpi_processor.c, retrieved through acpi_get_phys_id(),
-it should not be that difficult to change the parsing API to keep current
-code behaviour unchanged and define at the same time a proper type for
-the cpu physical identifier, with no mpidr packing needed whatsoever.
-
-Thanks,
-Lorenzo
+Either way, it'd be nice if Andrew or someone else from ChromeOS could 
+give an acked-by/reviewed-by for the patch if it's OK as is. That way, 
+I'll know it's good without any doubts.
