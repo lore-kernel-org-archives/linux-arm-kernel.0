@@ -1,66 +1,42 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 20 Jan 2015 15:50:22 +0200
-Subject: [PATCH v6 8/8] arm: dma-mapping: plumb our iommu mapping ops into
- arch_setup_dma_ops
-In-Reply-To: <20150119133633.GA23778@ulmo.nvidia.com>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <20150119125051.GI32131@arm.com> <20150119133633.GA23778@ulmo.nvidia.com>
-Message-ID: <8857658.GNuE7rO8TV@avalon>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 20 Jan 2015 13:50:39 +0000
+Subject: [PATCH 1/7] mfd: menelaus: delete omap_has_menelaus
+In-Reply-To: <1419702779-16001-2-git-send-email-aaro.koskinen@iki.fi>
+References: <1419702779-16001-1-git-send-email-aaro.koskinen@iki.fi>
+ <1419702779-16001-2-git-send-email-aaro.koskinen@iki.fi>
+Message-ID: <20150120135039.GL13701@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+On Sat, 27 Dec 2014, Aaro Koskinen wrote:
 
-On Monday 19 January 2015 14:36:38 Thierry Reding wrote:
-> On Mon, Jan 19, 2015 at 12:50:52PM +0000, Will Deacon wrote:
-> > On Mon, Jan 19, 2015 at 12:43:06PM +0000, Thierry Reding wrote:
-> >> On Sun, Jan 18, 2015 at 01:18:51PM +0200, Laurent Pinchart wrote:
-> >> > On Sunday 18 January 2015 15:54:34 Alexandre Courbot wrote:
-> >> > > On 01/16/2015 08:18 AM, Laurent Pinchart wrote:
-> >> [...]
-> >> 
-> >>>>> The second way is to implement a mechanism to let drivers signal
-> >>>>> that they want to handle DMA mappings themselves. As the mappings
-> >>>>> need in the general case to be created before the probe function 
-> >>>>> is called
-> >>>> 
-> >>>> Sorry for being ignorant here, but why is that?
-> >>> 
-> >>> Because a driver can call the DMA mapping API in its probe function,
-> >>> to allocate DMA coherent memory for instance. We need to ensure that
-> >>> the DMA mapping IOMMU has set up the required IOMMU ops by that time.
-> >>> As explained above I don't like the idea of sprinkling explicit calls
-> >>> to initialize IOMMU support in the vast majority of drivers,
-> >>> especially when they shouldn't be IOMMU-aware, so we then need to
-> >>> initialize everything that is needed before the first call to the DMA
-> >>> mapping API.
-> >> 
-> >> The original patch that Hiroshi posted based on my comments was to have
-> >> the driver core call iommu_attach(), which would then set up everything
-> >> needed right before calling into the driver's ->probe(). This works
-> >> quite nicely because by definition the driver can't allocate any DMA
-> >> before ->probe(). And, like you said, this allows deferred probe to be
-> >> used.
-> >> 
-> >> To me it's so obviously the right solution that I remain flabbergasted
-> >> with how much resistance it's received (or how much it's being ignored).
-> > 
-> > Have you considered reposting the patches based on what we currently have
-> > (which has the advantage of identifying a specific IOMMU instance)?
+> Delete unused macro.
 > 
-> No, I hadn't. Initially my patches included a solution for identifying
-> individual IOMMU instances, too. There was a small registry with a list
-> of struct iommus. That was supposed to get used to store per-instance
-> data (by being embedded in a driver-specific structure). I'd need to
-> look in more detail how that could be done with the infrastructure that
-> your patchset creates. I'm somewhat burried below other tasks right now
-> so don't expect to have any time to look into this anytime before -rc6
-> or -rc7 at the earliest.
+> Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+> ---
+>  include/linux/mfd/menelaus.h | 6 ------
+>  1 file changed, 6 deletions(-)
 
-I'm pretty buried below other tasks as well, but if you find time to work on 
-this I'll try to prioritize testing and review.
+Applied, thanks.
+
+> diff --git a/include/linux/mfd/menelaus.h b/include/linux/mfd/menelaus.h
+> index f097e89..a1e12bf3 100644
+> --- a/include/linux/mfd/menelaus.h
+> +++ b/include/linux/mfd/menelaus.h
+> @@ -38,10 +38,4 @@ extern int menelaus_set_vcore_hw(unsigned int roof_mV, unsigned int floor_mV);
+>  
+>  extern int menelaus_set_regulator_sleep(int enable, u32 val);
+>  
+> -#if defined(CONFIG_ARCH_OMAP2) && defined(CONFIG_MENELAUS)
+> -#define omap_has_menelaus()	1
+> -#else
+> -#define omap_has_menelaus()	0
+> -#endif
+> -
+>  #endif
 
 -- 
-Regards,
-
-Laurent Pinchart
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
