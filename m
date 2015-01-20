@@ -1,52 +1,64 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 20 Jan 2015 16:03:39 +0800
-Subject: [PATCH 1/2] ARM: imx6sx-sdb: change default board as reva board
-In-Reply-To: <BN1PR0301MB062873E37C225DD38B2BCE3CFF4B0@BN1PR0301MB0628.namprd03.prod.outlook.com>
-References: <1421220998-3491-1-git-send-email-peter.chen@freescale.com>
- <1421220998-3491-2-git-send-email-peter.chen@freescale.com>
- <20150120073527.GT2766@dragon> <20150120063016.GD13645@shlinux2>
- <BN1PR0301MB062873E37C225DD38B2BCE3CFF4B0@BN1PR0301MB0628.namprd03.prod.outlook.com>
-Message-ID: <20150120080338.GW2766@dragon>
+From: vincent.yang.fujitsu@gmail.com (Vincent Yang)
+Date: Tue, 20 Jan 2015 16:05:14 +0800
+Subject: [PATCH v5 0/4] mmc: sdhci: adding support for a new Fujitsu sdhci IP
+Message-ID: <1421741118-18743-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 20, 2015 at 07:51:31AM +0000, Anson.Huang at freescale.com wrote:
-> > > > +&cpu0 {
-> > > > +	operating-points = <
-> > > > +		/* kHz    uV */
-> > > > +		996000  1250000
-> > > > +		792000  1175000
-> > > > +		396000  1075000
-> > > > +	>;
-> > > > +	fsl,soc-operating-points = <
-> > > > +		/* ARM kHz  SOC uV */
-> > > > +		996000      1175000
-> > > > +		792000      1175000
-> > > > +		396000      1175000
-> > > > +	>;
-> > >
-> > > I'm wondering why different revision of the board require a different
-> > > OPP settings.
-> > >
-> > 
-> > Anson, do you know the reason?
-> 
-> As i.MX6SX SDB Rev-B board uses PFuse 200 which has only one power supply for both
-> VDDARM_IN and VDDSOC_IN, so it needs VDDARM_IN equal VDDSOC_IN, currently
-> we set Rev-B board as default in imx6sx.dtsi, which uses same voltage for both
-> VDDARM_IN and VDDSOC_IN.The Rev-A board uses PFuze 100 which has separate power
-> supply for VDDARM_IN and VDDSOC_IN, so it can use different voltage on VDDARM_IN
-> and VDDSOC_IN according to datasheet.
+Hello,
 
-Thanks for the clarification, Anson.
+  Fujitsu have an sdhci IP which is implemented in a SoC we're 
+adding to mainline, the most recent series for that was sent 
+here:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/317580.html
 
-Peter,
+  We welcome any comment and advice about how to make any
+improvements or better align them with upstream.
 
-OPP is a CPU characteristic defined by data sheet, so we should define
-OPP according to data sheet in imx6sx.dtsi, and only overwrite the
-property in Rev-B dts per board/PMIC quirk.
+Changes since v4:
+* Corrected Kconfig help text.
+* Fixed checking of required clocks.
+* Removed an unnecessary "else".
 
-Also, please put the rationale why we need OPP quick on Rev-B into
-commit log.
+Changes since v3:
+* Cleaned out unnecessary include files.
+* Removed unnecessary goto and error message.
+* Changed both clocks from optional to required.
+* Removed runtime PM support.
 
-Shawn
+Changes since v2:
+* Removed voltage-ranges because it is no longer a required property.
+* Removed unnecessary error message.
+* Used the devm_* managed functions and updated the error handling
+accordingly.
+* Removed #ifdef CONFIG_PM_RUNTIME and also updated some other #ifdef.
+* Moved vendor specfic stuff prior to sdhci_add_host().
+* Handled runtime PM on module removal.
+
+Changes since v1:
+* Thanks to Uffe, removed ARCH_MB86S7X dependency and separated
+mmc patches to this patchset.
+* Node name changed from "fujitsu,mb86s70-sdh30" to
+"fujitsu,mb86s70-sdhci-3.0".
+
+Thanks.
+
+Vincent Yang (4):
+  mmc: sdhci: add a voltage switch callback function
+  mmc: sdhci: add a quirk for tuning work around
+  mmc: sdhci: add a quirk for single block transactions
+  mmc: sdhci: host: add new f_sdh30
+
+ .../devicetree/bindings/mmc/sdhci-fujitsu.txt      |  30 +++
+ drivers/mmc/host/Kconfig                           |  11 +
+ drivers/mmc/host/Makefile                          |   1 +
+ drivers/mmc/host/sdhci.c                           |  14 +-
+ drivers/mmc/host/sdhci.h                           |   1 +
+ drivers/mmc/host/sdhci_f_sdh30.c                   | 239 +++++++++++++++++++++
+ include/linux/mmc/sdhci.h                          |   4 +
+ 7 files changed, 297 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-fujitsu.txt
+ create mode 100644 drivers/mmc/host/sdhci_f_sdh30.c
+
+-- 
+1.9.0
