@@ -1,47 +1,78 @@
-From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Tue, 20 Jan 2015 11:45:55 -0800
-Subject: [PATCH v7 2/2] iommu/arm-smmu: add support for iova_to_phys
- through ATS1PR
-In-Reply-To: <20150120141643.GA1549@arm.com> (Will Deacon's message of "Tue,
- 20 Jan 2015 14:16:43 +0000")
-References: <1414617220-21493-1-git-send-email-mitchelh@codeaurora.org>
- <1414617220-21493-3-git-send-email-mitchelh@codeaurora.org>
- <20150120141643.GA1549@arm.com>
-Message-ID: <vnkwmw5d44ng.fsf@mitchelh-linux.qualcomm.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Tue, 20 Jan 2015 11:46:14 -0800
+Subject: [PATCHv7 2/2] arm64: add better page protections to arm64
+In-Reply-To: <20150120181453.GI25575@e104818-lin.cambridge.arm.com>
+References: <1421276394-20402-1-git-send-email-lauraa@codeaurora.org>
+ <1421276394-20402-3-git-send-email-lauraa@codeaurora.org>
+ <CAKv+Gu8iGAPpR49EQKwmOZp2cHGdg8QJyoh2x1BB9uW6-S5L4g@mail.gmail.com>
+ <54B9AC53.8020903@codeaurora.org>
+ <20150120181453.GI25575@e104818-lin.cambridge.arm.com>
+Message-ID: <54BEB086.7010207@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 20 2015 at 06:16:43 AM, Will Deacon <will.deacon@arm.com> wrote:
-> Hey Mitch,
+On 1/20/2015 10:14 AM, Catalin Marinas wrote:
+> On Sat, Jan 17, 2015 at 12:26:59AM +0000, Laura Abbott wrote:
+>> On 1/15/2015 1:44 AM, Ard Biesheuvel wrote:
+>>> On 14 January 2015 at 22:59, Laura Abbott <lauraa@codeaurora.org> wrote:
+>>>> Add page protections for arm64 similar to those in arm.
+>>>> This is for security reasons to prevent certain classes
+>>>> of exploits. The current method:
+>>>>
+>>>> - Map all memory as either RWX or RW. We round to the nearest
+>>>>     section to avoid creating page tables before everything is mapped
+>>>> - Once everything is mapped, if either end of the RWX section should
+>>>>     not be X, we split the PMD and remap as necessary
+>>>> - When initmem is to be freed, we change the permissions back to
+>>>>     RW (using stop machine if necessary to flush the TLB)
+>>>> - If CONFIG_DEBUG_RODATA is set, the read only sections are set
+>>>>     read only.
+>>>>
+>>>> Tested-by: Kees Cook <keescook@chromium.org>
+>>>> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+>>>> ---
+>>>> v7: Rebased on Ard's patch series. Addressed minor comments from
+>>>> Catalin.
+>>>> ---
+>>>
+>>> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>> Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>>
+>>> With setting DEBUG_RODATA, I lose the ability to write to variables in
+>>> the rodata section. I have not tested executing from !X sections
+>>> though.
+>>>
+>>> My single objection to this patch would be that it is presented as a
+>>> debug option, which I think is a mistake. Especially now, we are in a
+>>> time window with lots of momentum in the arm64 kernel developer
+>>> community and little hardware in the field yet, so we have a huge
+>>> opportunity to make features such as this one opt-out rather than
+>>> opt-in, without having to worry about backward compatibility. This
+>>> applies equally to STRICT_DEVMEM, for instance, which is something
+>>> that is on our radar at Linaro, and will be addressed in the 3.21
+>>> timeframe.
 >
-> On Wed, Oct 29, 2014 at 09:13:40PM +0000, Mitchel Humpherys wrote:
->> Currently, we provide the iommu_ops.iova_to_phys service by doing a
->> table walk in software to translate IO virtual addresses to physical
->> addresses. On SMMUs that support it, it can be useful to ask the SMMU
->> itself to do the translation. This can be used to warm the TLBs for an
->> SMMU. It can also be useful for testing and hardware validation.
->> 
->> Since the address translation registers are optional on SMMUv2, only
->> enable hardware translations when using SMMUv1 or when SMMU_IDR0.S1TS=1
->> and SMMU_IDR0.ATOSNS=0, as described in the ARM SMMU v1-v2 spec.
->> 
->> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
->> ---
->> Changes since v6:
->>   - added missing lock
->>   - fixed physical address mask
+> I agree with STRICT_DEVMEM.
 >
-> I had a go at rebasing this onto my current queue, but ended up making
-> quite a few changes. Can you take a look at the result, please?
+>> I agree. I fully support making this default on if possible. My goal
+>> for the first pass was to get the infrastructure in and then figure
+>> out how to make this default later.
 >
-> Patch below (also on my for-joerg/arm-smmu/updates branch).
+> I don't mind dropping the "debug" naming part from this feature but I
+> wouldn't go as far as making it the default. Do we have any information
+> on what the performance impact is? We lose some big block mappings
+> (could even be 1GB with the right RAM alignment) once we want finer
+> grained permissions.
+>
 
-The modified patch looks good to me.  Thanks!
+I don't have any specific numbers. If you have suggestions for workloads,
+I can collect some.I did add CONFIG_DEBUG_ALIGN_RODATA
+which will align up to the section size at the expense of some wasted
+memory. This won't solve the 1G block issue though.
 
--Mitch
-
+Laura
 
 -- 
 Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 a Linux Foundation Collaborative Project
