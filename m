@@ -1,26 +1,70 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 20 Jan 2015 10:59:08 +0100
-Subject: [PATCH v4 1/3] pinctrl: add driver for Amlogic Meson SoCs
-In-Reply-To: <1421518516-26976-2-git-send-email-b.galvani@gmail.com>
-References: <1421518516-26976-1-git-send-email-b.galvani@gmail.com>
- <1421518516-26976-2-git-send-email-b.galvani@gmail.com>
-Message-ID: <CACRpkdZ6CX1XePa0sOY-0B9He9jYPNLqUtkk3LEGeT6eSQW9ew@mail.gmail.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue, 20 Jan 2015 10:04:50 +0000
+Subject: [RFC PATCH 5/5] arm: perf: Use FIQ to handle PMU events.
+In-Reply-To: <20150119174818.GD26493@n2100.arm.linux.org.uk>
+References: <1421166931-14134-1-git-send-email-daniel.thompson@linaro.org>
+ <1421166931-14134-6-git-send-email-daniel.thompson@linaro.org>
+ <20150119174818.GD26493@n2100.arm.linux.org.uk>
+Message-ID: <54BE2842.5000205@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 17, 2015 at 7:15 PM, Beniamino Galvani <b.galvani@gmail.com> wrote:
+On 19/01/15 17:48, Russell King - ARM Linux wrote:
+> On Tue, Jan 13, 2015 at 04:35:31PM +0000, Daniel Thompson wrote:
+>> +/*
+>> + * This handler is called *unconditionally* from the default NMI/FIQ
+>> + * handler. The irq may not be anything to do with us so the main
+>> + * job of this function is to figure out if the irq passed in is ours
+>> + * or not.
+>> + */
+>> +void cpu_pmu_handle_fiq(int irq)
+>> +{
+>> +	int cpu = smp_processor_id();
+> 
+> This can be either debug_smp_processor_id() or raw_smp_processor_id().
+> raw_smp_processor_id() is fine from FIQ contexts, as seems to be
+> debug_smp_processor_id(), but only because we guarantee that
+> irqs_disabled() in there will be true.
 
-> This is a driver for the pinmux and GPIO controller available in
-> Amlogic Meson SoCs. It currently supports only Meson8, however the
-> common code should be generic enough to work also for other SoCs after
-> having defined the proper set of functions and groups.
->
-> GPIO interrupts are not supported at the moment due to lack of
-> documentation.
->
-> Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
+Curiously I was looking at exactly this yesterday (because I was
+intrigued why the NMI-safe bits of kgdb use raw_smp_processor_id() but
+the x86 arch_trigger_all_cpu_backtrace() implementation uses
+smp_processor_id()).
 
-Patch applied. Great work Beniamino!
+Given the comments make clear smp_processor_id() is the preferred
+variant except for false positives I concluded I would continue with
+smp_processor_id() for any code I write hanging off the default FIQ
+handler. No objections?
 
-Yours,
-Linus Walleij
+
+>> +
+>> +	if (irq != get_cpu_var(cpu_pmu_irqs))
+>> +		return;
+> 
+> get_cpu_var() needs put_cpu_var() to undo its effects.  get_cpu_var()
+> calls preempt_disable(), which calls into lockdep...  I think we
+> determined that was fine last time we went digging?
+
+Yes. We reviewed lockdep from the point-of-view of RCU and found that
+lockdep disabled most of itself when in_nmi() is true.
+
+> put_cpu_var()
+> would call preempt_enable() which I'd hope would be safe in FIQ/NMI
+> contexts?
+
+Yes.
+
+preempt_count_add/sub form part of the work done by nmi_enter() and
+nmi_exit().
+
+However this code gets no benefit from calling get_cpu_var(). I think it
+would be better to switch it to this_cpu_ptr.
+
+
+>> +
+>> +	(void)armpmu_dispatch_irq(irq,
+>> +				  get_cpu_ptr(&cpu_pmu->hw_events->percpu_pmu));
+> 
+> Again, get_cpu_xxx() needs to be balanced with a put_cpu_xxx().
+> 
+> 
