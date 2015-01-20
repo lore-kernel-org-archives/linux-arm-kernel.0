@@ -1,52 +1,57 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Tue, 20 Jan 2015 15:43:17 +0800
-Subject: [PATCH v2 2/2] ASoC: atmel_ssc_dai: remove clock pin comments
-In-Reply-To: <1421739797-25988-1-git-send-email-voice.shen@atmel.com>
-References: <1421739797-25988-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <1421739797-25988-2-git-send-email-voice.shen@atmel.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Tue, 20 Jan 2015 13:17:00 +0530
+Subject: [PATCH v4 16/21] DT: exynos: update PMU binding
+In-Reply-To: <1421660655-21394-17-git-send-email-marc.zyngier@arm.com>
+References: <1421660655-21394-1-git-send-email-marc.zyngier@arm.com>
+ <1421660655-21394-17-git-send-email-marc.zyngier@arm.com>
+Message-ID: <54BE07F4.1000106@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the clock can be get from TK/RK pin, so remove the comments.
+Hi Marc,
 
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
----
+On Monday 19 January 2015 03:14 PM, Marc Zyngier wrote:
+> Document the fact that some Exynos PMUs are capable of acting as
+> an interrupt controller.
+>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>   Documentation/devicetree/bindings/arm/samsung/pmu.txt | 13 +++++++++++++
+>   1 file changed, 13 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/arm/samsung/pmu.txt b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
+> index 1e1979b..d698e74 100644
+> --- a/Documentation/devicetree/bindings/arm/samsung/pmu.txt
+> +++ b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
+> @@ -28,10 +28,23 @@ Properties:
+>    - clocks : list of phandles and specifiers to all input clocks listed in
+>   		clock-names property.
+>
+> +Optional properties:
+> +
+> +Some PMUs are capable of behaving as an interrupt controller (mostly
+> +to wake up a suspended PMU). In which case, they can have the
+> +following properties:
+> +
+> +- interrupt-controller: indicate that said PMU is an interrupt controller
+> +
 
-Changes in v2:
- - remove the comments for DSP mode A, codec as master
+Need to add #interrupt-cells property here.
 
- sound/soc/atmel/atmel_ssc_dai.c | 12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
 
-diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
-index e691aab..3cd7059 100644
---- a/sound/soc/atmel/atmel_ssc_dai.c
-+++ b/sound/soc/atmel/atmel_ssc_dai.c
-@@ -450,13 +450,7 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
- 		break;
- 
- 	case SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBM_CFM:
--		/*
--		 * I2S format, CODEC supplies BCLK and LRC clocks.
--		 *
--		 * The SSC transmit clock is obtained from the BCLK signal on
--		 * on the TK line, and the SSC receive clock is
--		 * generated from the transmit clock.
--		 */
-+		/* I2S format, CODEC supplies BCLK and LRC clocks. */
- 		rcmr =	  SSC_BF(RCMR_PERIOD, 0)
- 			| SSC_BF(RCMR_STTDLY, START_DELAY)
- 			| SSC_BF(RCMR_START, SSC_START_FALLING_RF)
-@@ -535,10 +529,6 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
- 		/*
- 		 * DSP/PCM Mode A format, CODEC supplies BCLK and LRC clocks.
- 		 *
--		 * The SSC transmit clock is obtained from the BCLK signal on
--		 * on the TK line, and the SSC receive clock is
--		 * generated from the transmit clock.
--		 *
- 		 * Data is transferred on first BCLK after LRC pulse rising
- 		 * edge.If stereo, the right channel data is contiguous with
- 		 * the left channel data.
--- 
-2.3.0.rc0
+> +- interrupt-parent: a phandle indicating which interrupt controller
+> +  this PMU signals interrupts to.
+> +
+>   Example :
+>   pmu_system_controller: system-controller at 10040000 {
+>   	compatible = "samsung,exynos5250-pmu", "syscon";
+>   	reg = <0x10040000 0x5000>;
+> +	interrupt-controller;
+> +	interrupt-parent = <&gic>;
+>   	#clock-cells = <1>;
+>   	clock-names = "clkout0", "clkout1", "clkout2", "clkout3",
+>   			"clkout4", "clkout8", "clkout9";
+>
+
+Thanks,
+Pankaj Dubey
