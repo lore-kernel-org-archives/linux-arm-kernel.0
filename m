@@ -1,359 +1,95 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 20 Jan 2015 15:35:29 +0800
-Subject: [PATCH 1/2] ARM: imx6sx-sdb: change default board as reva board
-In-Reply-To: <1421220998-3491-2-git-send-email-peter.chen@freescale.com>
-References: <1421220998-3491-1-git-send-email-peter.chen@freescale.com>
- <1421220998-3491-2-git-send-email-peter.chen@freescale.com>
-Message-ID: <20150120073527.GT2766@dragon>
+From: zhang.lyra@gmail.com (Lyra Zhang)
+Date: Tue, 20 Jan 2015 15:37:38 +0800
+Subject: [PATCH v5 5/5] tty/serial: Add Spreadtrum sc9836-uart driver
+ support
+In-Reply-To: <CAL_JsqLTArm1v8ka39_KLq2jMKkK2ZXQ6-an=JSWVgTK1LWmOg@mail.gmail.com>
+References: <1421402411-3479-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1421402411-3479-6-git-send-email-chunyan.zhang@spreadtrum.com>
+ <CAL_JsqJg=BtanmR_rhYthCUhKbErs8viZ7MMMXr-PmPjUV4BRQ@mail.gmail.com>
+ <CAAfSe-vqqpvbYe0bEeD-3_QsLYz4r7pxMuA1-L4cYRw9TY=NgA@mail.gmail.com>
+ <CAL_JsqLTArm1v8ka39_KLq2jMKkK2ZXQ6-an=JSWVgTK1LWmOg@mail.gmail.com>
+Message-ID: <CAAfSe-tAwURc_P+-0+m22ao9r+Fud6Ae89JF8FGsWgg_49Mdhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 14, 2015 at 03:36:37PM +0800, Peter Chen wrote:
-> The imx6sx sdb board has two revisions, the current mainline one
-> is reva which is mainly for internal use. In this commit, we
-> rename imx6sx-sdb.dts to imx6sx-sdb.dtsi, and move the reva dedicated
-> contents to imx6sx-sdb-reva.dts.
-> 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
->  arch/arm/boot/dts/imx6sx-sdb-reva.dts              | 158 +++++++++++++++++++++
->  .../boot/dts/{imx6sx-sdb.dts => imx6sx-sdb.dtsi}   | 131 -----------------
+Hi, Rob
 
-arch/arm/boot/dts/Makefile needs an update.
+I still have a question to be conform, specific describes below:
 
->  2 files changed, 158 insertions(+), 131 deletions(-)
->  create mode 100644 arch/arm/boot/dts/imx6sx-sdb-reva.dts
->  rename arch/arm/boot/dts/{imx6sx-sdb.dts => imx6sx-sdb.dtsi} (83%)
-> 
-> diff --git a/arch/arm/boot/dts/imx6sx-sdb-reva.dts b/arch/arm/boot/dts/imx6sx-sdb-reva.dts
-> new file mode 100644
-> index 0000000..e7a8c34
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6sx-sdb-reva.dts
-> @@ -0,0 +1,158 @@
-> +/*
-> + * Copyright (C) 2014-2015 Freescale Semiconductor, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include "imx6sx-sdb.dtsi"
-> +
-> +/ {
-> +	model = "Freescale i.MX6 SoloX SDB RevA Board";
-> +};
-> +
-> +&cpu0 {
-> +	operating-points = <
-> +		/* kHz    uV */
-> +		996000  1250000
-> +		792000  1175000
-> +		396000  1075000
-> +	>;
-> +	fsl,soc-operating-points = <
-> +		/* ARM kHz  SOC uV */
-> +		996000      1175000
-> +		792000      1175000
-> +		396000      1175000
-> +	>;
+On Mon, Jan 19, 2015 at 10:11 PM, Rob Herring <robherring2@gmail.com> wrote:
+> On Mon, Jan 19, 2015 at 3:55 AM, Lyra Zhang <zhang.lyra@gmail.com> wrote:
+>> On Sat, Jan 17, 2015 at 12:41 AM, Rob Herring <robherring2@gmail.com> wrote:
+>>> On Fri, Jan 16, 2015 at 4:00 AM, Chunyan Zhang
+>>> <chunyan.zhang@spreadtrum.com> wrote:
+>>>> Add a full sc9836-uart driver for SC9836 SoC which is based on the
+>>>> spreadtrum sharkl64 platform.
+>>>> This driver also support earlycon.
+>>>> This patch also replaced the spaces between the macros and their
+>>>> values with the tabs in serial_core.h
+>
+> [...]
+>
+>>>> +static int __init sprd_serial_init(void)
+>>>> +{
+>>>> +       int ret = 0;
+>>>> +
+>>>> +       ret = uart_register_driver(&sprd_uart_driver);
+>>>
+>>> This can be done in probe now. Then you can use module_platform_driver().
+>>>
+>>
+>> Question:
+>> 1. there are 4 uart ports configured in dt for sprd_serial, so probe
+>> will be called 4 times, but uart_register_driver only needs to be
+>> called one time, so can we use uart_driver.state to check if
+>> uart_register_driver has already been called ?
+>
+> Yes.
+>
+>> 2. if I use module_platform_driver() instead of
+>> module_init(sprd_serial_init)  and  module_exit(sprd_serial_exit) , I
+>> must move uart_unregister_driver() which is now processed in
+>> sprd_serial_exit() to sprd_remove(), there is a similar problem with
+>> probe(), sprd_remove() will also be called 4 times, and actually it
+>> should be called only one time. How can we deal with this case?
+>
+> Look at pl01x or Samsung UART drivers which have done this conversion.
 
-I'm wondering why different revision of the board require a different
-OPP settings.
+Samsung UART does use module_platform_driver, but pl010/pl011 doesn't.
+In the Samsung UART driver, uart_unregister_driver is processed in
+remove(), like below:
 
-Shawn
+static int s3c24xx_serial_remove(struct platform_device *dev)
+{
+    struct uart_port *port = s3c24xx_dev_to_port(&dev->dev);
 
-> +};
-> +
-> +&i2c1 {
-> +	clock-frequency = <100000>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c1>;
-> +	status = "okay";
-> +
-> +	pmic: pfuze100 at 08 {
-> +		compatible = "fsl,pfuze100";
-> +		reg = <0x08>;
-> +
-> +		regulators {
-> +			sw1a_reg: sw1ab {
-> +				regulator-min-microvolt = <300000>;
-> +				regulator-max-microvolt = <1875000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +				regulator-ramp-delay = <6250>;
-> +			};
-> +
-> +			sw1c_reg: sw1c {
-> +				regulator-min-microvolt = <300000>;
-> +				regulator-max-microvolt = <1875000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +				regulator-ramp-delay = <6250>;
-> +			};
-> +
-> +			sw2_reg: sw2 {
-> +				regulator-min-microvolt = <800000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			sw3a_reg: sw3a {
-> +				regulator-min-microvolt = <400000>;
-> +				regulator-max-microvolt = <1975000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			sw3b_reg: sw3b {
-> +				regulator-min-microvolt = <400000>;
-> +				regulator-max-microvolt = <1975000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			sw4_reg: sw4 {
-> +				regulator-min-microvolt = <800000>;
-> +				regulator-max-microvolt = <3300000>;
-> +			};
-> +
-> +			swbst_reg: swbst {
-> +				regulator-min-microvolt = <5000000>;
-> +				regulator-max-microvolt = <5150000>;
-> +			};
-> +
-> +			snvs_reg: vsnvs {
-> +				regulator-min-microvolt = <1000000>;
-> +				regulator-max-microvolt = <3000000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			vref_reg: vrefddr {
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			vgen1_reg: vgen1 {
-> +				regulator-min-microvolt = <800000>;
-> +				regulator-max-microvolt = <1550000>;
-> +				regulator-always-on;
-> +			};
-> +
-> +			vgen2_reg: vgen2 {
-> +				regulator-min-microvolt = <800000>;
-> +				regulator-max-microvolt = <1550000>;
-> +			};
-> +
-> +			vgen3_reg: vgen3 {
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-always-on;
-> +			};
-> +
-> +			vgen4_reg: vgen4 {
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-always-on;
-> +			};
-> +
-> +			vgen5_reg: vgen5 {
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-always-on;
-> +			};
-> +
-> +			vgen6_reg: vgen6 {
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-always-on;
-> +			};
-> +		};
-> +	};
-> +};
-> +
-> +&qspi2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_qspi2>;
-> +	status = "okay";
-> +
-> +	flash0: s25fl128s at 0 {
-> +		reg = <0>;
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		compatible = "spansion,s25fl128s";
-> +		spi-max-frequency = <66000000>;
-> +	};
-> +
-> +	flash1: s25fl128s at 1 {
-> +		reg = <1>;
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		compatible = "spansion,s25fl128s";
-> +		spi-max-frequency = <66000000>;
-> +	};
-> +};
-> diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dtsi
-> similarity index 83%
-> rename from arch/arm/boot/dts/imx6sx-sdb.dts
-> rename to arch/arm/boot/dts/imx6sx-sdb.dtsi
-> index cdffe84..7b02aa7 100644
-> --- a/arch/arm/boot/dts/imx6sx-sdb.dts
-> +++ b/arch/arm/boot/dts/imx6sx-sdb.dtsi
-> @@ -13,7 +13,6 @@
->  #include "imx6sx.dtsi"
->  
->  / {
-> -	model = "Freescale i.MX6 SoloX SDB Board";
->  	compatible = "fsl,imx6sx-sdb", "fsl,imx6sx";
->  
->  	chosen {
-> @@ -169,114 +168,6 @@
->  	status = "okay";
->  };
->  
-> -&i2c1 {
-> -        clock-frequency = <100000>;
-> -        pinctrl-names = "default";
-> -        pinctrl-0 = <&pinctrl_i2c1>;
-> -        status = "okay";
-> -
-> -	pmic: pfuze100 at 08 {
-> -		compatible = "fsl,pfuze100";
-> -		reg = <0x08>;
-> -
-> -		regulators {
-> -			sw1a_reg: sw1ab {
-> -				regulator-min-microvolt = <300000>;
-> -				regulator-max-microvolt = <1875000>;
-> -				regulator-boot-on;
-> -				regulator-always-on;
-> -				regulator-ramp-delay = <6250>;
-> -			};
-> -
-> -			sw1c_reg: sw1c {
-> -				regulator-min-microvolt = <300000>;
-> -				regulator-max-microvolt = <1875000>;
-> -				regulator-boot-on;
-> -				regulator-always-on;
-> -				regulator-ramp-delay = <6250>;
-> -			};
-> -
-> -			sw2_reg: sw2 {
-> -				regulator-min-microvolt = <800000>;
-> -				regulator-max-microvolt = <3300000>;
-> -				regulator-boot-on;
-> -				regulator-always-on;
-> -			};
-> -
-> -			sw3a_reg: sw3a {
-> -				regulator-min-microvolt = <400000>;
-> -				regulator-max-microvolt = <1975000>;
-> -				regulator-boot-on;
-> -				regulator-always-on;
-> -			};
-> -
-> -			sw3b_reg: sw3b {
-> -				regulator-min-microvolt = <400000>;
-> -				regulator-max-microvolt = <1975000>;
-> -				regulator-boot-on;
-> -				regulator-always-on;
-> -			};
-> -
-> -			sw4_reg: sw4 {
-> -				regulator-min-microvolt = <800000>;
-> -				regulator-max-microvolt = <3300000>;
-> -			};
-> -
-> -			swbst_reg: swbst {
-> -				regulator-min-microvolt = <5000000>;
-> -				regulator-max-microvolt = <5150000>;
-> -			};
-> -
-> -			snvs_reg: vsnvs {
-> -				regulator-min-microvolt = <1000000>;
-> -				regulator-max-microvolt = <3000000>;
-> -				regulator-boot-on;
-> -				regulator-always-on;
-> -			};
-> -
-> -			vref_reg: vrefddr {
-> -				regulator-boot-on;
-> -				regulator-always-on;
-> -			};
-> -
-> -			vgen1_reg: vgen1 {
-> -				regulator-min-microvolt = <800000>;
-> -				regulator-max-microvolt = <1550000>;
-> -				regulator-always-on;
-> -			};
-> -
-> -			vgen2_reg: vgen2 {
-> -				regulator-min-microvolt = <800000>;
-> -				regulator-max-microvolt = <1550000>;
-> -			};
-> -
-> -			vgen3_reg: vgen3 {
-> -				regulator-min-microvolt = <1800000>;
-> -				regulator-max-microvolt = <3300000>;
-> -				regulator-always-on;
-> -			};
-> -
-> -			vgen4_reg: vgen4 {
-> -				regulator-min-microvolt = <1800000>;
-> -				regulator-max-microvolt = <3300000>;
-> -				regulator-always-on;
-> -			};
-> -
-> -			vgen5_reg: vgen5 {
-> -				regulator-min-microvolt = <1800000>;
-> -				regulator-max-microvolt = <3300000>;
-> -				regulator-always-on;
-> -			};
-> -
-> -			vgen6_reg: vgen6 {
-> -				regulator-min-microvolt = <1800000>;
-> -				regulator-max-microvolt = <3300000>;
-> -				regulator-always-on;
-> -			};
-> -		};
-> -	};
-> -};
-> -
->  &i2c4 {
->          clock-frequency = <100000>;
->          pinctrl-names = "default";
-> @@ -340,28 +231,6 @@
->  	status = "okay";
->  };
->  
-> -&qspi2 {
-> -	pinctrl-names = "default";
-> -	pinctrl-0 = <&pinctrl_qspi2>;
-> -	status = "okay";
-> -
-> -	flash0: s25fl128s at 0 {
-> -		reg = <0>;
-> -		#address-cells = <1>;
-> -		#size-cells = <1>;
-> -		compatible = "spansion,s25fl128s";
-> -		spi-max-frequency = <66000000>;
-> -	};
-> -
-> -	flash1: s25fl128s at 1 {
-> -		reg = <1>;
-> -		#address-cells = <1>;
-> -		#size-cells = <1>;
-> -		compatible = "spansion,s25fl128s";
-> -		spi-max-frequency = <66000000>;
-> -	};
-> -};
-> -
->  &ssi2 {
->  	status = "okay";
->  };
-> -- 
-> 1.9.1
-> 
+    if (port) {
+        s3c24xx_serial_cpufreq_deregister(to_ourport(port));
+        uart_remove_one_port(&s3c24xx_uart_drv, port);
+    }
+
+    uart_unregister_driver(&s3c24xx_uart_drv);
+}
+
+if this serial has more than one ports, uart_unregister_driver() must
+be called multiple times when the device need to be removed.
+I think there may be a problem because that uart_unregister_driver()
+will do kfree(drv->state) every time when it's called.
+
+Thanks,
+Chunyan
+
+>
+>> 3. for the second question, we can check the platform_device->id, if
+>> it is equal to the index of last port (e.g. 4 for this case), then
+>> uart_unregister_driver() can be called. Does it work correctly? since
+>> for this case, we must keep the order of releasing ports.
+>
+> The id will not be the line index in the DT case. I don't think you
+> can guarantee the order either.
+>
+> It would be better to make uart_{un}register_driver deal with being
+> called multiple times so drivers don't have to deal with getting this
+> correct. I'm not sure if that is feasible though.
+>
+> Rob
