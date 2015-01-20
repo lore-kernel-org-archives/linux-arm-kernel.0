@@ -1,29 +1,94 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 20 Jan 2015 19:19:01 +0800
-Subject: [PATCH v4 14/21] ARM: imx6: convert GPC to stacked domains
-In-Reply-To: <1421660655-21394-15-git-send-email-marc.zyngier@arm.com>
-References: <1421660655-21394-1-git-send-email-marc.zyngier@arm.com>
- <1421660655-21394-15-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150120111900.GB2766@dragon>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 20 Jan 2015 16:52:19 +0530
+Subject: [PATCHv3 2/8] devfreq: exynos: Add documentation for generic
+ exynos memory bus frequency driver
+In-Reply-To: <54BE108F.8090506@samsung.com>
+References: <1420681257-3078-1-git-send-email-cw00.choi@samsung.com>
+ <1420681257-3078-3-git-send-email-cw00.choi@samsung.com>
+ <CAL_Jsq+5sdsm_-VW-ta+qV-NBao-XTHvsYWcbMdZmbP0Nw43Cw@mail.gmail.com>
+ <CAKohpomqosqxeDANC=NLBVmOUHyUoqd7Zhph7r6f7+ufYN48EQ@mail.gmail.com>
+ <54BE108F.8090506@samsung.com>
+Message-ID: <CAKohpokSuVhH3hHFF+mLtJXvjt=bmJy1oZRBOttCNXORBS1Y0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 19, 2015 at 09:44:08AM +0000, Marc Zyngier wrote:
-> IMX6 has been (ab)using the gic_arch_extn to provide
-> wakeup from suspend, and it makes a lot of sense to convert
-> this code to use stacked domains instead.
-> 
-> This patch does just this, updating the DT files to actually
-> reflect what the HW provides.
-> 
-> BIG FAT WARNING: because the DTs were so far lying by not
-> exposing the fact that the GPC block is actually the first
-> interrupt controller in the chain, kernels with this patch
-> applied wont have any suspend-resume facility when booted
-> with old DTs, and old kernels with updated DTs won't even boot.
-> 
-> Tested-by: Stefan Agner <stefan@agner.ch>
-> Acked-by: Stefan Agner <stefan@agner.ch>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+On 20 January 2015 at 13:53, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+> But, the frequency of OPPs is only used for devfreq ondemand governor.
+> After deciding the proper frequency of memory bus on ondemand governor,
+> exynos-bus.c (exynos memory bus frequency driver) use the frequency table
+> of memory bus blocks on below to change the clock rate of memory bus block.
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> Firs of all,
+> I explain the hierarchy of Exynos memory buses.
+>
+> For example of Exynos3250 memory bus,
+> This patch divide the memory bus group according to power rail (regulator).
+> - MIF (Memory Interface ) memory bus group uses the VDD_MIF regulator.
+> - INT (Internal) memory bus group uses the VDD_INT regulator.
+>
+> Each memory bus group contains only one power rail(regulator) and one more memory bus blocks as follwing:
+>
+> - MIF memory bus group
+> power rail(VDD_MIF)-->|--- memory bus for DMC (Dynamic Memory Controller) block (dmc clock)
+>
+> - INT memory bus group
+>                       |--- memory bus for PERI block (aclk_100 clock)
+>                       |
+>                       |--- memory bus for DISPLAY block (aclk_160 clock)
+>                       |
+>                       |--- memory bus for ISP block (aclk_200 clock)
+>                       |
+>                       |--- memory bus for GPS block (aclk_266 clock)
+> power rail(VDD_INT)-->|
+>                       |--- memory bus for MCUISP block (aclk_400_mcuisp clock)
+>                       |
+>                       |--- memory bus for Leftbus block (gdl clock)
+>                       |
+>                       |--- memory bus for Rightbus block (gdr clock)
+>                       |
+>                       |--- memory bus for MFC block (mfc clock)
+>
+>
+> Exynos3250 has following table for INT memory bus group:
+> All clocks of INT memory bus group have to contain the same entry count
+> againt the number of 'virtual freqw'. So, each memory bus clock could have duplicate clocks.
+>
+> ------------------------------------------------------------------------
+> Level|virtual freq|PERI's clk|Display's clk|ISP's clk|GPS's clk| voltage|
+> ------------------------------------------------------------------------
+> L6   |400000      |100000    |200000       |200000   |300000   | 95000  |
+> L5   |200000      |100000    |160000       |200000   |200000   | 95000  |
+> L4   |133000      |100000    |100000       |100000   |133000   | 92500  |
+> L3   |100000      |100000    |80000        |80000    |100000   | 85000  |
+> L2   |80000       |50000     |80000        |50000    |50000    | 85000  |
+> L1   |50000       |50000     |50000        |50000    |50000    | 85000  |
+> -------------------------------------------------------------------------
+> (Except for mcuisp, leftbus, rightbus, mfc block)
+>
+> This table is used for devfreq ondemand governor as following:
+> 1. ondemand governor in devfreq use the 'virtual freq' to devcide the proper
+>    frequency for memory bus.
+> 2. ondemand governor executes the *_target() function to set clock rate and voltage.
+> 3. *_target() function in exynos-bus.c changes the clock rate of {PERIS|Display|ISP|GPS} clk
+>    according to decided 'Level' by devfreq ondemand governor.
+
+I see..
+
+Please confirm if my understanding is correct.
+- mem-bus-group: all blocks sharing a regulator
+- mem-bus-block: individual blocks managing their clock rate
+
+What you do in kernel is register group as a device (with virtual OPPs)
+and then manage blocks within the driver. And so you need to do this
+dummy mapping of virtual to physical frequencies.
+
+It *may* not have done it this way, if I was to design this driver.
+
+Each bus-block is a separately controllable device and so must be registered
+separately. In that case all bus-blocks will have separate OPP tables and
+all this dummy-v2p mapping will go away.
+
+I believe that you are over complicating stuff without any need..
+
+--
+viresh
