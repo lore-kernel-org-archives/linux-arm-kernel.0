@@ -1,159 +1,75 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 20 Jan 2015 12:51:01 +0530
-Subject: [RFC] OPP: Redefine bindings to overcome shortcomings
-In-Reply-To: <CAKohpo=HkixETTSsrRPHhUtWPVgn_7w0E2jYTokAYQRT5awk8Q@mail.gmail.com>
-References: <52c403454c3b8fc201abe7ac74cf657638479311.1417691389.git.viresh.kumar@linaro.org>
- <CAKohpokUXvhqt+z4EPC9k=O8ZnQOqNSGGi8w6w4shYtbvv8mTw@mail.gmail.com>
- <CAL_JsqJabcXe7-juTnJDcVdzpnFokYmt-N=bjZt5a+32Fzr_vg@mail.gmail.com>
- <CAKohpo=HkixETTSsrRPHhUtWPVgn_7w0E2jYTokAYQRT5awk8Q@mail.gmail.com>
-Message-ID: <CAKohpokvkbyWnetSN793am+s4QjxiKwPO2P0QMPWk7Js-btTLg@mail.gmail.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 20 Jan 2015 08:27:32 +0100
+Subject: [PATCH] i2c: drop ancient protection against sysfs refcounting
+ issues
+In-Reply-To: <20150120071256.GA18983@kroah.com>
+References: <1421693756-12917-1-git-send-email-wsa@the-dreams.de>
+ <20150119190142.GA9451@kroah.com>
+ <20150119230427.GH26493@n2100.arm.linux.org.uk>
+ <20150120014159.GA3349@kroah.com> <54BDFE30.5090303@metafoo.de>
+ <20150120071256.GA18983@kroah.com>
+Message-ID: <54BE0364.7060404@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 December 2014 at 10:17, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On 29 December 2014 at 22:35, Rob Herring <robherring2@gmail.com> wrote:
->>> +  - frequency-kHz: Frequency in kHz
+On 01/20/2015 08:12 AM, Greg Kroah-Hartman wrote:
+> On Tue, Jan 20, 2015 at 08:05:20AM +0100, Lars-Peter Clausen wrote:
+>> On 01/20/2015 02:41 AM, Greg Kroah-Hartman wrote:
+>>> On Mon, Jan 19, 2015 at 11:04:27PM +0000, Russell King - ARM Linux wrote:
+>>>> On Tue, Jan 20, 2015 at 03:01:42AM +0800, Greg Kroah-Hartman wrote:
+>>>>> On Mon, Jan 19, 2015 at 07:55:56PM +0100, Wolfram Sang wrote:
+>>>>>> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+>>>>>> index 39d25a8cb1ad..15cc5902cf89 100644
+>>>>>> --- a/drivers/i2c/i2c-core.c
+>>>>>> +++ b/drivers/i2c/i2c-core.c
+>>>>>> @@ -41,7 +41,6 @@
+>>>>>>   #include <linux/of_device.h>
+>>>>>>   #include <linux/of_irq.h>
+>>>>>>   #include <linux/clk/clk-conf.h>
+>>>>>> -#include <linux/completion.h>
+>>>>>>   #include <linux/hardirq.h>
+>>>>>>   #include <linux/irqflags.h>
+>>>>>>   #include <linux/rwsem.h>
+>>>>>> @@ -1184,8 +1183,7 @@ EXPORT_SYMBOL_GPL(i2c_new_dummy);
+>>>>>>
+>>>>>>   static void i2c_adapter_dev_release(struct device *dev)
+>>>>>>   {
+>>>>>> -	struct i2c_adapter *adap = to_i2c_adapter(dev);
+>>>>>> -	complete(&adap->dev_released);
+>>>>>> +	/* empty, but the driver core insists we need a release function */
+>>>>>
+>>>>> Yeah, it does, but I hate to see this in "real" code as something is
+>>>>> probably wrong with it if it happens.
+>>>>>
+>>>>> Please move the rest of 'i2c_del_adapter' into the release function
+>>>>> (what was after the wait_for_completion() call), and then all should be
+>>>>> fine.
+>>>>
+>>>> Are you sure about that?  Some drivers do this, eg,
+>>>>
+>>>>          i2c_del_adapter(&drv_data->adapter);
+>>>>          free_irq(drv_data->irq, drv_data);
+>>>>
+>>>> where drv_data was allocated using devm_kzalloc(), and so will be
+>>>> released when the ->remove callback (which calls the above
+>>>> i2c_del_adapter()) returns... freeing the embedded device struct.
+>>>
+>>> But that will fail today if the memory is freed in i2c_del_adapter(), so
+>>> there shouldn't be any change in logic here.
+>>>
+>>> Or am I missing something obvious?
 >>
->> s/kHz/khz/
->>
->>> +  - voltage-uV: voltage in micro Volts
->>
->> -microvolt is more consistent with regulator binding.
->>
->> The names are a bit redundant. perhaps opp-khz and opp-microvolt instead.
+>> The memory is not freed in i2c_del_adapter().
 >
-> All accepted.
->
->>> +Example 1: Simple case of dual-core cortex A9-single cluster, sharing
->>> clock line.
->>> +
->>> +/ {
->>> +       cpus {
->>> +               #address-cells = <1>;
->>> +               #size-cells = <0>;
->>> +
->>> +               cpu at 0 {
->>> +                       compatible = "arm,cortex-a9";
->>> +                       reg = <0>;
->>> +                       next-level-cache = <&L2>;
->>> +                       operating-points-v2 = <&opp0>;
->>> +
->>> +                       opp0: opp0 {
->>
->> I don't really like having this under cpu0 when it applies to all
->> cpus. I would move it out of /cpus.
->
-> That's how I had it initially, but then Arnd didn't like it much.
->
->>> +                               compatible = "linux,cpu-dvfs";
->>
->> This should not be linux specific. Probably not cpu specific either.
->
-> This was just an example of one of the bindings and there will be others
-> as well.
->
-> 'linux' here doesn't mean linux specific, but just that its first used by
-> Linux. That's what my understanding is atleast.
->
->>> +                               clocks = <&clk-controller 0>;
->>> +                               clock-names = "cpu";
->>
->> clocks are an input to the cpu, not really an opp. You could have a an
->> OPP which uses a different parent clock, but that is most likely a
->> switch within the clock controller rather than 2 clock inputs to the
->> cpu.
->>
->> I think the clock binding for cpus should stand on its own independent of OPPs.
->>
->>> +                               opp-supply = <&cpu-supply0>;
->>
->> Same comment as clocks applies here.
->
-> Both will be kept in the cpu node where they were initially.
->
->>> +                               voltage-tolerance = <2>; /* percentage */
->>> +                               clock-latency = <300000>;
->>
->> These could be per entry. I'm not sure it is worth the savings to not
->> just always specify them per entry.
->
-> Done.
->
->> We should append units (-us) to clock-latency unless there is a good
->> reason to maintain compatibility.
->
-> So you meant something like this:
->
-> clock-latency-us = <300000>;
->
-> right?
->
->>> +                               opp-list = <&opplist0>;
->>
->> With the above changes, having this list is unnecessary.
->
-> It might be for the use case I mentioned earlier about something
-> like Krait.
->
->> So, what I envision is like this:
->>
->> /cpus {
->>   cpu at 0 {
->>     clocks = <...>;
->>     cpu-supply = <...>;
->>     operating-point-v2 = <&cpu0-opp>;
->>    };
->>   cpu at 1 {
->>     clocks = <...>;
->>     cpu-supply = <...>;
->>     operating-point-v2 = <&cpu1-opp>;
->>    };
->> };
->
-> Looks fine..
->
->> cpu0-opp : opp0 {
->>   compatible = "operating-point-table";
->>   entry0 {
->>     opp-khz = <500000>;
->>     opp-microvolt = <900000>;
->>   };
->>   entry1 {
->>     opp-khz = <1000000>;
->>     opp-microvolt = <1000000>;
->>     turbo-mode;
->>   };
->> };
->> cpu1-opp : opp1 {
->>   compatible = "operating-point-table";
->> ...
->> };
->
-> What about something like Krait which wants to use exactly same
-> bindings for all CPUs but want to specify they are controlled separately.
->
-> So I had it like:
->
-> cpu0-opp : opp0 {
->   compatible = "operating-point-table";
->   opp-list = <&opplist0>;
->
->   opplist0: opp-list0 {
->           entry0 {
->             opp-khz = <500000>;
->             opp-microvolt = <900000>;
->           };
->           entry1 {
->             opp-khz = <1000000>;
->             opp-microvolt = <1000000>;
->             turbo-mode;
->           };
->   };
-> };
->
-> cpu1-opp : opp1 {
->   compatible = "operating-point-table";
->   opp-list = <&opplist0>;
-> };
+> Right, and I'm not saying it should be, just move the existing logic
+> into the release callback, and the code flow should be the same and we
+> don't end up with an "empty" release callback.
 
-Gentle reminder, so that we can close this long standing issue soon..
+But the code flow often is.
+
+i2c_del_adapter(&drvdata->adap);
+kfree(drvdata);
+
+That wont work anymore if i2c_del_adapter() returns before the last reference 
+has been dropped. This needs to be restructured so that the adapter memory can 
+be freed by the release callback.
