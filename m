@@ -1,55 +1,57 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 20 Jan 2015 12:11:33 +0100
-Subject: [PATCHv3 1/2] USB: gadget: atmel_usba_udc: Fixed vbus_prev initial
- state
-In-Reply-To: <20150120110240.GA5752@gradator.net>
-References: <20150118175621.6b519cdc@bbrezillon>
- <1421601875-9436-1-git-send-email-sylvain.rochet@finsecur.com>
- <1421601875-9436-2-git-send-email-sylvain.rochet@finsecur.com>
- <54BD1028.20303@atmel.com> <20150119185547.GM20386@saruman>
- <20150120110240.GA5752@gradator.net>
-Message-ID: <54BE37E5.1050508@atmel.com>
+From: jy0922.shim@samsung.com (Joonyoung Shim)
+Date: Tue, 20 Jan 2015 20:12:59 +0900
+Subject: [PATCH v3 00/19] Exynos SYSMMU (IOMMU) integration with DT and
+ DMA-mapping subsystem
+In-Reply-To: <54B5B721.4070309@collabora.co.uk>
+References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
+ <1417514366.21830.22.camel@collabora.co.uk> <54818768.3080303@samsung.com>
+ <CABxcv=n=eNqbyBbOk1Wb87tCnnLZAJQurmCdeTOSqMZMbNaSHw@mail.gmail.com>
+ <54AC93E0.8010705@samsung.com> <54ACFD69.1020500@collabora.co.uk>
+ <54AD0293.70909@samsung.com> <54AEB384.2040005@collabora.co.uk>
+ <54B36C5A.6050109@samsung.com> <54B3F1B7.7090307@collabora.co.uk>
+ <54B4ABFB.5000501@samsung.com> <54B5B5F6.3030607@collabora.co.uk>
+ <54B5B721.4070309@collabora.co.uk>
+Message-ID: <54BE383B.5030505@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 20/01/2015 12:02, Sylvain Rochet a ?crit :
-> Hello,
-> 
-> On Mon, Jan 19, 2015 at 12:55:47PM -0600, Felipe Balbi wrote:
->> On Mon, Jan 19, 2015 at 03:09:44PM +0100, Nicolas Ferre wrote:
->>> Le 18/01/2015 18:24, Sylvain Rochet a ?crit :
->>>> If vbus gpio is high at init, we should set vbus_prev to true
->>>> accordingly to the current vbus state. Without that, we skip the first
->>>> vbus interrupt because the saved vbus state is not consistent.
->>>>
->>>> Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
->>>
->>> Indeed:
->>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->>>
->>> We can also add the following tags:
->>> Fixes: 914a3f3b3754 ("USB: add atmel_usba_udc driver")
->>> Cc: <stable@vger.kernel.org> # 2.6.x-ish
+Hi,
+
+On 01/14/2015 09:24 AM, Javier Martinez Canillas wrote:
+> On 01/14/2015 01:19 AM, Javier Martinez Canillas wrote:
 >>
->> Please resend with the proper stable format. Also, this 2.6.x-ish should
->> be 2.6.24+, git describe helps a lot figuring these out.
-> 
-> Unfortunately I failed to understand what I should do. The "Also" 
-> keyword means for me that there are two differents things to fix:
-> 
-> 1. proper stable format
-> 2. 2.6.x-ish ? 2.6.24+
-> 
->   2. does not imply fixing 1., isn'it ?
+>> I dug further on this issue and found that the cause is that the exynos_mixer
+>> driver needs some clocks (CLK_HDMI and CLK_SCLK_HDMI) grabbed by exynos_hdmi
+>> to be kept enabled after hdmi_poweroff (drivers/gpu/drm/exynos/exynos_hdmi.c).
+>>
+>> Otherwise, any access to mixer device registers leads to an imprecise external
+>> abort error. The following change [0] to the Exynos DRM HDMI driver makes the
+>> issue to not happen and I can successfully execute:
+>>
+>> # echo 1 > /sys/devices/platform/exynos-drm/graphics/fb0/blank
+>> # echo 0 > /sys/devices/platform/exynos-drm/graphics/fb0/blank
+>>
 
-Well, I think it does. My understanding is that fixing '2' is the solution.
+Did you execute this operation repeatedly? Still i get error when i
+execute this more than twice with your change [0].
 
+Thanks.
 
-> I read SubmittingPatches thoroughly and I can't find a reference to 
-> stable format.
+>> Only not disabling the hdmi clock [1]: is enough but doing so makes sometimes the
+>> DISP1 power domain disabling fails. It doesn't seem to have side effect though
+>> since I also see the signal in the HDMI display to go standby and then on again.
+>>
+>> # echo 0 > /sys/devices/platform/exynos-drm/graphics/fb0/blank
+>> # echo 1 > /sys/devices/platform/exynos-drm/graphics/fb0/blank
+>> [   63.089080] Power domain disp1-power-domain disable failed
+>> # echo 0 > /sys/devices/platform/exynos-drm/graphics/fb0/blank
+>> #
+>>
+>> That error message when both clocks are not disabled on hdmi_poweroff() though.
+>>
 > 
-> Sylvain
-
-Bye,
--- 
-Nicolas Ferre
+> This should be: "That error message is not shown when both clocks are disabled".
+> 
+> Best regards,
+> Javier
+> 
