@@ -1,56 +1,76 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Tue, 20 Jan 2015 13:52:30 +0100
-Subject: [PATCH v4 9/9] drm/exynos: add support for 'hdmi' clock
-In-Reply-To: <1421756219-21037-10-git-send-email-m.szyprowski@samsung.com>
-References: <1421756219-21037-1-git-send-email-m.szyprowski@samsung.com>
- <1421756219-21037-10-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <54BE4F8E.50605@collabora.co.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 20 Jan 2015 14:01:03 +0100
+Subject: [PATCHv6 0/6] USB: host: Atmel OHCI and EHCI drivers improvements
+In-Reply-To: <1421665567-31759-1-git-send-email-sylvain.rochet@finsecur.com>
+References: <1421665567-31759-1-git-send-email-sylvain.rochet@finsecur.com>
+Message-ID: <54BE518F.8060007@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Marek,
-
-On 01/20/2015 01:16 PM, Marek Szyprowski wrote:
-> Mixed need to have hdmi clock enabled to properly perform power on/off
-> sequences, so add handling of this clock directly to the mixer driver.
-> Dependency between hdmi clock and mixer module has been observed on
-> Exynos4 based boards.
+Le 19/01/2015 12:06, Sylvain Rochet a ?crit :
+> USB: host: Atmel OHCI and EHCI drivers improvements
 > 
-> Suggested-by: Andrzej Hajda <a.hajda@samsung.com>
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  drivers/gpu/drm/exynos/exynos_mixer.c | 9 +++++++++
->  1 file changed, 9 insertions(+)
+> Suspend/resume support for EHCI.
+> struct dev_pm_ops for OHCI.
+> Removed global variables from both.
+> Fixed OHCI wake up support for STANDBY(wake-up enabled) and MEM(wake-up
+> disabled) sleep targets.
 > 
-> diff --git a/drivers/gpu/drm/exynos/exynos_mixer.c b/drivers/gpu/drm/exynos/exynos_mixer.c
-> index 820b76234ef4..e5ef1fccd8fb 100644
-> --- a/drivers/gpu/drm/exynos/exynos_mixer.c
-> +++ b/drivers/gpu/drm/exynos/exynos_mixer.c
-> @@ -72,6 +72,7 @@ struct mixer_resources {
->  	spinlock_t		reg_slock;
->  	struct clk		*mixer;
->  	struct clk		*vp;
-> +	struct clk		*hdmi;
->  	struct clk		*sclk_mixer;
->  	struct clk		*sclk_hdmi;
->  	struct clk		*mout_mixer;
-> @@ -774,6 +775,12 @@ static int mixer_resources_init(struct mixer_context *mixer_ctx)
->  		return -ENODEV;
->  	}
->  
-> +	mixer_res->hdmi = devm_clk_get(dev, "hdmi");
+> Changes since v5:
+>   * Don't overwrite device wakeup flag with device_init_wakeup(),
+>     now using a private wakeup bool instead.
+> 
+> Changes since v4:
+>   * Re-add at91_suspend_entering_slow_clock() to OHCI, we can't naively
+>     remove this one, this device needs to be continuously clocked to
+>     provide wake up support.
+>     The removal of at91_suspend_entering_slow_clock() actually lighted up
+>     an issue on wake up support, which is now fixed.
+> 
+> Changes since v3:
+>   * Using struct dev_pm_ops instead of static struct platform_driver
+>     resume and suspend bindings for both EHCI and OHCI
+>   * Fixed inconsistency in patch subjects, _ intead of - for file names
+>   * Patch cleaning with the help of checkpatch.pl, fixed lines over
+>     80 characters
+> 
+> Changes since v2:
+>   * Added patchs from an other submission, because this series
+>     depended on this one
+>     * EHCI: Move global variables to private struct
+>     * OHCI: Move global variables to private struct
+>   * Using ohci->priv and ehci->priv instead of hcd->hcd_priv,
+>     which were not the right way to do that
+> 
+> Changes since v1:
+>   * Don't use at91_suspend_entering_slow_clock() on EHCI,
+>     we are trying to get read of this of this function
+>   * Removed at91_suspend_entering_slow_clock() from OHCI
+> 
+> Sylvain Rochet (6):
+>   USB: host: ehci-atmel: Add suspend/resume support
+>   USB: host: ohci-at91: Use struct dev_pm_ops instead of struct
+>     platform_driver
+>   USB: host: ehci-atmel: Move global variables to private struct
+>   USB: host: ohci-at91: Move global variables to private struct
+>   USB: host: ohci-at91: usb_hcd_at91_probe(), remove useless stack
+>     initialisation
+>   USB: host: ohci-at91: Fix wake-up support
+> 
+>  drivers/usb/host/ehci-atmel.c | 102 +++++++++++++++++++++++++---------
+>  drivers/usb/host/ohci-at91.c  | 126 ++++++++++++++++++++++++++----------------
+>  2 files changed, 154 insertions(+), 74 deletions(-)
 
-You need to update the Documentation/devicetree/bindings/video/exynos_mixer.txt
-DT binding docs to also mention the "hdmi" clock in the list of clocks.
+As already mentioned for the v5, I'm okay with the whole series:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-But as I mentioned in "[PATCH v2 0/6] Enable HDMI support on Exynos platforms"
-thread, while this seems to be enough to prevent the issue on Exynos4 is not
-enough on the Exynos5420/5422/5800 boards I've tested.
+So Sylvain, as said by Alan, I think you can now collect all the
+"Acked-by" tags (Alex had also sent some if I recall well) and re-send a
+clean v7 series to Greg KH.
 
-So I wonder if $subject is fixing the root cause or just fixing a symptom and
-the cause is that the exynos_hdmi DPMS handler has to be executed before the
-exynos_mixer DPMS handler for DRM_MODE_DPMS_ON like is the case for DPMS_OFF
-after commit 245f98f269714 ("drm/exynos: hdmi: fix power order issue").
+BTW, for rewriting this series' logs, I suggest you to use:
+"git filter-branch -f --msg-filter ..." ;-)
 
-Best regards,
-Javier
+Bye,
+-- 
+Nicolas Ferre
