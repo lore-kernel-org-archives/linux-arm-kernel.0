@@ -1,77 +1,67 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Tue, 20 Jan 2015 22:42:16 +0100
-Subject: [PATCH V2] ARM: BCM5301X: Add DT for Buffalo WZR-900DHP
-In-Reply-To: <1421735096-8238-2-git-send-email-zajec5@gmail.com>
-References: <1421735096-8238-2-git-send-email-zajec5@gmail.com>
-Message-ID: <1421790136-9920-1-git-send-email-zajec5@gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 20 Jan 2015 22:49:22 +0100
+Subject: [PATCH] bluetooth: Add hci_h4p driver
+In-Reply-To: <20150120082850.GA27162@t440s.lan>
+References: <20141223130219.GA5731@amd>
+ <20150120082850.GA27162@t440s.lan>
+Message-ID: <20150120214922.GA21262@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
----
-V2: Drop earlyprintk from bootargs
----
- arch/arm/boot/dts/Makefile                        |  3 +-
- arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts | 37 +++++++++++++++++++++++
- 2 files changed, 39 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
+On Tue 2015-01-20 10:28:50, Johan Hedberg wrote:
+> Hi Pavel,
+> 
+> On Tue, Dec 23, 2014, Pavel Machek wrote:
+> > +	while (1) {
+> > +		int cmd, len;
+> > +
+> > +		fw_pos += cmd_len;
+> > +
+> > +		if (fw_pos >= fw_entry->size)
+> > +			break;
+> > +
+> > +		if (fw_pos + 2 > fw_entry->size) {
+> > +			dev_err(info->dev, "Corrupted firmware image\n");
+> > +			err = -EMSGSIZE;
+> > +			break;
+> > +		}
+> > +
+> > +		cmd_len = fw_entry->data[fw_pos++];
+> > +		cmd_len += fw_entry->data[fw_pos++] << 8;
+> > +		if (cmd_len == 0)
+> > +			break;
+> > +
+> > +		if (fw_pos + cmd_len > fw_entry->size) {
+> > +			dev_err(info->dev, "Corrupted firmware image\n");
+> > +			err = -EMSGSIZE;
+> > +			break;
+> > +		}
+> > +
+> > +		/* Skip first two packets */
+> > +		if (++num <= 2)
+> > +			continue;
+> > +
+> > +		/* Note that this is timing-critical. If sending packets takes too
+> > +		 * long, initialization will fail.
+> > +		 */
+> > +		cmd = fw_entry->data[fw_pos+1];
+> > +		cmd += fw_entry->data[fw_pos+2] << 8;
+> > +		len = fw_entry->data[fw_pos+3];
+> > +
+> > +		skb = __hci_cmd_sync(info->hdev, cmd, len, fw_entry->data+fw_pos+4, 500);
+> > +		if (IS_ERR(skb)) {
+> > +			dev_err(info->dev, "...sending cmd %x len %d failed %ld\n",
+> > +				cmd, len, PTR_ERR(skb));
+> > +			err = -EIO;
+> > +			break;
+> > +		}
+> > +	}
+> 
+> Looks like the code is leaking skb when __hci_cmd_sync() succeeds.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index ff4a5ae..0de664e 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -61,7 +61,8 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
- 	bcm4708-netgear-r6250.dtb \
- 	bcm4708-netgear-r6300-v2.dtb \
- 	bcm47081-asus-rt-n18u.dtb \
--	bcm47081-buffalo-wzr-600dhp2.dtb
-+	bcm47081-buffalo-wzr-600dhp2.dtb \
-+	bcm47081-buffalo-wzr-900dhp.dtb
- dtb-$(CONFIG_ARCH_BCM_63XX) += bcm963138dvt.dtb
- dtb-$(CONFIG_ARCH_BCM_CYGNUS) += bcm911360_entphn.dtb \
- 	bcm911360k.dtb \
-diff --git a/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts b/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
-new file mode 100644
-index 0000000..7d6868a
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
-@@ -0,0 +1,37 @@
-+/*
-+ * Broadcom BCM470X / BCM5301X ARM platform code.
-+ * DTS for Buffalo WZR-900DHP
-+ *
-+ * Copyright (C) 2015 Rafa? Mi?ecki <zajec5@gmail.com>
-+ *
-+ * Licensed under the GNU/GPL. See COPYING for details.
-+ */
-+
-+/dts-v1/;
-+
-+#include "bcm47081.dtsi"
-+
-+/ {
-+	compatible = "buffalo,wzr-900dhp", "brcm,bcm47081", "brcm,bcm4708";
-+	model = "Buffalo WZR-900DHP (BCM47081)";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200";
-+	};
-+
-+	memory {
-+		reg = <0x00000000 0x08000000>;
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		restart {
-+			label = "Reset";
-+			linux,code = <KEY_RESTART>;
-+			gpios = <&chipcommon 11 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+};
+Fixed, thanks!
+									Pavel
+
 -- 
-1.8.4.5
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
