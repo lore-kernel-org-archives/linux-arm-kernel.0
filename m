@@ -1,42 +1,76 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 20 Jan 2015 17:02:49 +0000
-Subject: [PATCH v8 3/3] regulator: qcom-rpm: Add missing state flag in
- call to RPM
-In-Reply-To: <1417038661-30209-4-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1417038661-30209-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1417038661-30209-4-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <20150120170249.GA32408@x1>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 20 Jan 2015 09:00:22 -0800
+Subject: ARM: OMAP3: MACH_OMAP3517EVM?
+In-Reply-To: <20150120164455.GD7718@atomide.com>
+References: <1421744597.9655.92.camel@x220> <20150120164455.GD7718@atomide.com>
+Message-ID: <20150120170022.GE7718@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Nov 2014, Bjorn Andersson wrote:
-
-> This adds the missing state parameter to the call down to the RPM. This
-> is currently hard coded to the active state, as that's all we're
-> supporting at this moment.
+* Tony Lindgren <tony@atomide.com> [150120 08:52]:
+> * Paul Bolle <pebolle@tiscali.nl> [150120 01:06]:
+> > Tony,
+> > 
+> > Your commit 4d62dbda8561 ("ARM: OMAP3: Remove legacy support for
+> > am3517-evm") is included in today's linux-next (ie, next-20150120). I
+> > noticed because a script I use to check linux-next spotted a problem
+> > caused by it.
 > 
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> ---
->  drivers/regulator/qcom_rpm-regulator.c | 1 +
->  1 file changed, 1 insertion(+)
-
-Applied with Mark's Ack, thanks.
-
-> diff --git a/drivers/regulator/qcom_rpm-regulator.c b/drivers/regulator/qcom_rpm-regulator.c
-> index b55cd5b..8f66040 100644
-> --- a/drivers/regulator/qcom_rpm-regulator.c
-> +++ b/drivers/regulator/qcom_rpm-regulator.c
-> @@ -198,6 +198,7 @@ static int rpm_reg_write(struct qcom_rpm_reg *vreg,
->  	vreg->val[req->word] |= value << req->shift;
+> OK thanks for spotting that.
 >  
->  	return qcom_rpm_write(vreg->rpm,
-> +			      QCOM_RPM_ACTIVE_STATE,
->  			      vreg->resource,
->  			      vreg->val,
->  			      vreg->parts->request_len);
+> > See, your commit removes the Kconfig symbol MACH_OMAP3517EVM. But
+> > there's still a reference to that symbol in sound/soc/omap/Kconfig. This
+> > means that in linux-next a symbol, SND_OMAP_SOC_AM3517EVM, cannot be set
+> > anymore.
+> > 
+> > I assume a patch that address this (either by removing
+> > SND_OMAP_SOC_AM3517EVM or by updating its dependencies) is queued
+> > somewhere. Is that correct?
+> 
+> Not yet, I missed that part sorry. I'll add back the Kconfig symbol.
+> I'll rather do the removal in smaller steps, and first remove the
+> 3517 related board-*.c file before messing with the legacy drivers.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Below is a fix for this.
+
+Regards,
+
+Tony
+
+8< ----------------
+From: Tony Lindgren <tony@atomide.com>
+Date: Tue, 20 Jan 2015 08:49:08 -0800
+Subject: [PATCH] ARM: OMAP3: Add back Kconfig option MACH_OMAP3517EVM for ASoC
+
+We still have SND_OMAP_SOC_AM3517EVM depending on MACH_OMAP3517EVM,
+so let's keep MACH_OMAP3517EVM Kconfig option around for a little
+bit longer.
+
+This removes the dependency between ARM SoC changes and the ASoC
+changes, and allows the following three options for the driver:
+
+1. Update the driver for device tree based booting
+
+2. Initialize the driver with legacy platform data, then update
+   the driver for device tree based booting
+
+3. Just remove the driver if there are no audio users for
+   3517-evm board
+
+Reported-by: Paul Bolle <pebolle@tiscali.nl>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -213,6 +213,11 @@ config MACH_OVERO
+ 	default y
+ 	select OMAP_PACKAGE_CBB
+ 
++config MACH_OMAP3517EVM
++	bool "OMAP3517/ AM3517 EVM board"
++	depends on ARCH_OMAP3
++	default y
++
+ config MACH_OMAP3_PANDORA
+ 	bool "OMAP3 Pandora"
+ 	depends on ARCH_OMAP3
