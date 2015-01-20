@@ -1,66 +1,101 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 20 Jan 2015 16:14:03 +0000
-Subject: [PATCH 1/8] soc: Add MediaTek infracfg controller support
-In-Reply-To: <1421747231-554-2-git-send-email-s.hauer@pengutronix.de>
+Date: Tue, 20 Jan 2015 16:15:55 +0000
+Subject: [PATCH 2/8] soc: Add MediaTek pericfg controller support
+In-Reply-To: <1421747231-554-3-git-send-email-s.hauer@pengutronix.de>
 References: <1421747231-554-1-git-send-email-s.hauer@pengutronix.de>
- <1421747231-554-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20150120161403.GG15924@leverpostej>
+ <1421747231-554-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20150120161555.GH15924@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 20, 2015 at 09:47:04AM +0000, Sascha Hauer wrote:
-> This adds support for the MediaTek infracfg controller found
-> on the MT8135/MT8173 SoCs. The infracfg controller contains
+On Tue, Jan 20, 2015 at 09:47:05AM +0000, Sascha Hauer wrote:
+> This adds support for the MediaTek pericfg controller found
+> on the MT8135/MT8173 SoCs. The pericfg controller contains
 > miscellaneous registers for controlling peripheral resets and
 > clocks.
 > 
 > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 > ---
->  .../devicetree/bindings/soc/mediatek/infracfg.txt  |  19 +++
->  drivers/soc/Kconfig                                |   1 +
->  drivers/soc/Makefile                               |   1 +
->  drivers/soc/mediatek/Kconfig                       |  12 ++
->  drivers/soc/mediatek/Makefile                      |   1 +
->  drivers/soc/mediatek/mtk-infracfg.c                | 127 ++++++++++++++++++++
->  drivers/soc/mediatek/mtk-pericfg.c                 | 128 +++++++++++++++++++++
->  7 files changed, 289 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/soc/mediatek/infracfg.txt
->  create mode 100644 drivers/soc/mediatek/Kconfig
->  create mode 100644 drivers/soc/mediatek/Makefile
->  create mode 100644 drivers/soc/mediatek/mtk-infracfg.c
->  create mode 100644 drivers/soc/mediatek/mtk-pericfg.c
+>  .../devicetree/bindings/soc/mediatek/pericfg.txt      | 19 +++++++++++++++++++
+>  drivers/soc/mediatek/Kconfig                          | 10 ++++++++++
+>  drivers/soc/mediatek/Makefile                         |  1 +
+>  drivers/soc/mediatek/mtk-pericfg.c                    |  1 -
+>  4 files changed, 30 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/soc/mediatek/pericfg.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/soc/mediatek/infracfg.txt b/Documentation/devicetree/bindings/soc/mediatek/infracfg.txt
+> diff --git a/Documentation/devicetree/bindings/soc/mediatek/pericfg.txt b/Documentation/devicetree/bindings/soc/mediatek/pericfg.txt
 > new file mode 100644
-> index 0000000..042083a
+> index 0000000..81d1aee
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/soc/mediatek/infracfg.txt
+> +++ b/Documentation/devicetree/bindings/soc/mediatek/pericfg.txt
 > @@ -0,0 +1,19 @@
-> +MediaTek infracfg Controller
+> +MediaTek pericfg Controller
 > +
-> +The infracfg controller contains miscellaneous registers for controlling
+> +The pericfg controller contains miscellaneous registers for controlling
 > +clocks, resets and bus settings.
 > +
 > +Required properties:
 > +- compatible: must be one of:
-> +       mediatek,mt8135-infracfg
-> +       mediatek,mt8173-infracfg
-> +- reg: Address range for the infracfg controller
+> +	mediatek,mt8135-pericfg
+> +	mediatek,mt8173-pericfg
+> +- reg: Address range for the pericfg controller
 > +
 > +Example:
 > +
-> +       infracfg: infracfg at 10003000 {
-> +               #reset-cells = <1>;
-> +               #clock-cells = <1>;
+> +	pericfg: pericfg at 10003000 {
+> +		#reset-cells = <1>;
+> +		#clock-cells = <1>;
+> +		compatible = "mediatek,mt8135-pericfg";
+> +		reg = <0 0x10003000 0 0x1000>;
+> +	};
 
-These weren't listed as required or optional above.
+This looks identical to the infracfg (same address too). Is that
+deliberate?
 
-Please document these, along with the values a given clock-specifier or
-reset-specifier may take.
-
-> +               compatible = "mediatek,mt8135-infracfg";
-> +               reg = <0 0x10003000 0 0x1000>;
-> +       };
-
-Thanks,
 Mark.
+
+> diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
+> index 3ad39fe..9bdb88f 100644
+> --- a/drivers/soc/mediatek/Kconfig
+> +++ b/drivers/soc/mediatek/Kconfig
+> @@ -10,3 +10,13 @@ config MTK_INFRACFG
+>  	  contains several miscellaneous registers for clock, reset and bus
+>  	  settings. Say yes here if you want to run your kernel on one of these
+>  	  SoCs.
+> +
+> +config MTK_PERICFG
+> +	tristate "MediaTek pericfg controller support"
+> +	depends on ARCH_MEDIATEK || COMPILE_TEST
+> +	select REGMAP
+> +	help
+> +	  The MediaTek pericfg controller found on MT8135 and MT8173 SoCs
+> +	  contains several miscellaneous registers for clock, reset and bus
+> +	  settings. Say yes here if you want to run your kernel on one of these
+> +	  SoCs.
+> diff --git a/drivers/soc/mediatek/Makefile b/drivers/soc/mediatek/Makefile
+> index dbeb627..e67be7c 100644
+> --- a/drivers/soc/mediatek/Makefile
+> +++ b/drivers/soc/mediatek/Makefile
+> @@ -1 +1,2 @@
+>  obj-$(CONFIG_MTK_INFRACFG) += mtk-infracfg.o
+> +obj-$(CONFIG_MTK_PERICFG) += mtk-pericfg.o
+> diff --git a/drivers/soc/mediatek/mtk-pericfg.c b/drivers/soc/mediatek/mtk-pericfg.c
+> index b7ee902..aa9a7eb 100644
+> --- a/drivers/soc/mediatek/mtk-pericfg.c
+> +++ b/drivers/soc/mediatek/mtk-pericfg.c
+> @@ -1,6 +1,5 @@
+>  /*
+>   * Copyright (c) 2014 MediaTek Inc.
+> - * Author: Flora Fu <flora.fu@mediatek.com>
+>   *
+>   * This program is free software; you can redistribute it and/or modify
+>   * it under the terms of the GNU General Public License version 2 as
+> -- 
+> 2.1.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
