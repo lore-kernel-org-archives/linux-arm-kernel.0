@@ -1,46 +1,50 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Tue, 20 Jan 2015 16:16:57 +0800
-Subject: [PATCH 04/12] pm: at91: move the copying the sram function to the
- sram initializationi phase
-In-Reply-To: <1421741825-18226-1-git-send-email-wenyou.yang@atmel.com>
-References: <1421741825-18226-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1421741825-18226-5-git-send-email-wenyou.yang@atmel.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 20 Jan 2015 09:16:07 +0100
+Subject: [PATCH v4 2/9] clk: sunxi: Add driver for A80 MMC config
+ clocks/resets
+In-Reply-To: <CAGb2v64fpt-iw7Yf5OjTeZSJUb4z48jMd5T5nvM1vCzf=xEF3Q@mail.gmail.com>
+References: <1421471974-32719-1-git-send-email-wens@csie.org>
+ <1421471974-32719-3-git-send-email-wens@csie.org>
+ <20150119215734.GL4367@lukather>
+ <CAGb2v64fpt-iw7Yf5OjTeZSJUb4z48jMd5T5nvM1vCzf=xEF3Q@mail.gmail.com>
+Message-ID: <20150120081607.GT4367@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To decrease the suspend time, move the copying the sram function
-to the sram initialization phase, instead of every time go to suspend.
+On Tue, Jan 20, 2015 at 10:13:05AM +0800, Chen-Yu Tsai wrote:
+> >> +     clk_parent = of_clk_get_parent_name(np, 0);
+> >> +     if (!clk_parent)
+> >> +             return -EINVAL;
+> >> +
+> >> +     data->clk = devm_clk_get(&pdev->dev, NULL);
+> >> +     if (IS_ERR(data->clk)) {
+> >> +             dev_err(&pdev->dev, "Could not get clock\n");
+> >> +             return PTR_ERR(data->clk);
+> >> +     }
+> >
+> > I'm wondering, why are you using of_clk_get_parent_name here, instead
+> > of __clk_get_name on data->clk? That would avoid parsing the DT while
+> > we already have that info.
+> 
+> I hadn't thought of that. I was sticking to public consumer APIs.
+> Do you want me to respin this one?
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/mach-at91/pm.c |    7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+I don't think it's really a !consumer API. All it does is returning
+clk->name, which is accessible even to consumers.
 
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index 0990486..609a4f8 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -169,10 +169,6 @@ static int at91_pm_enter(suspend_state_t state)
- 			 * turning off the main oscillator; reverse on wakeup.
- 			 */
- 			if (slow_clock) {
--#ifdef CONFIG_AT91_SLOW_CLOCK
--				/* copy slow_clock handler to SRAM, and call it */
--				memcpy(slow_clock, at91_slow_clock, at91_slow_clock_sz);
--#endif
- 				slow_clock(at91_pmc_base, at91_ramc_base[0],
- 					   at91_ramc_base[1],
- 					   at91_pm_data.memctrl);
-@@ -280,6 +276,9 @@ static void __init at91_pm_sram_init(void)
- 	sram_pbase = gen_pool_virt_to_phys(sram_pool, sram_base);
- 	slow_clock = __arm_ioremap_exec(sram_pbase, at91_slow_clock_sz, false);
- 
-+	/* Copy slow_clock handler to SRAM, and call it */
-+	memcpy(slow_clock, at91_slow_clock, at91_slow_clock_sz);
-+
- put_node:
- 	of_node_put(node);
- }
+But yeah, please resend it.
+
+Thanks!
+Maxime
+
 -- 
-1.7.9.5
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150120/07529805/attachment.sig>
