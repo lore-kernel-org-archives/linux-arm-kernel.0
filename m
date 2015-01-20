@@ -1,48 +1,66 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 20 Jan 2015 13:22:59 -0200
-Subject: using DMA-API on ARM
-In-Reply-To: <20141209102904.GJ11285@n2100.arm.linux.org.uk>
-References: <5481794E.4050406@broadcom.com>
- <F51492713EF10846800D8C0ED37A7DCE01901765@SJEXCHMB15.corp.ad.broadcom.com>
- <F51492713EF10846800D8C0ED37A7DCE01902076@SJEXCHMB15.corp.ad.broadcom.com>
- <2863746.4sUSEYqahB@wuerfel>
- <20141208160316.GM16185@e104818-lin.cambridge.arm.com>
- <5485D97D.1040404@broadcom.com> <5486CCBC.3@broadcom.com>
- <20141209102904.GJ11285@n2100.arm.linux.org.uk>
-Message-ID: <CAOMZO5ADUvWPYVJhKtou-jDrRiiobZ5e=w+FiTX7-Lv+OvbkwA@mail.gmail.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Tue, 20 Jan 2015 15:32:40 +0000
+Subject: [PATCH 0/4] Add sd/emmc support for stih407 family silicon
+Message-ID: <1421767964-8798-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi,
 
-On Tue, Dec 9, 2014 at 8:29 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Dec 09, 2014 at 11:19:40AM +0100, Arend van Spriel wrote:
->> The issue did not trigger overnight so it seems setting bit 22 <Shared
->> Attribute _Override_ Enable> solves the issue over here. Now the question is
->> how to move forward with this. As I understood from Catalin this patch was
->> not included as it was not considered responsibility of the linux kernel.
->
-> It is preferable for firmware to configure the L2 cache appropriately,
-> which includes things like the prefetch offsets as well as feature bits
-> like bit 22.
->
-> I think what I'll do is queue up a patch which adds a warning if bit 22
-> is not set, suggesting that firmware is updated to set this bit.
+This series adds sd/emmc support to the sdhci-st.c driver for stih407
+family silicon. The changes mainly involve congiguring some extra glue
+registers which configure the controller.
 
-Do you mean something like this?
+This series also adds support for UHS modes for eMMC. To allow
+UHS HS200/SD104 modes to function correctly, due to the
+tight timing constriants and data tuning requirement, support
+for PVT independent delay management is also added. Two types
+of delay management are supported, static delay management and
+dynamic delay management (dynamic delay loop), this delay
+management is only available on eMMC pads on stih410 and later
+silicon.
 
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -943,6 +943,10 @@ static int __init __l2c_init(const struct
-l2c_init_data *data,
-     pr_info("%s: CACHE_ID 0x%08x, AUX_CTRL 0x%08x\n",
-         data->type, cache_id, aux);
+This has been tested with stih410-b2120 on eMMC and sd, at various
+clock speeds. As part of this testing a bug was also found in the
+upstream flexgen clock set_rate implementation.
 
-+    if (!(aux & L2C_AUX_CTRL_SHARED_OVERRIDE))
-+        pr_warn("%s: L2C_AUX_CTRL_SHARED_OVERRIDE needs to be set by
-the bootloader\n",
-+            data->type);
-+
-     return 0;
- }
+    max-frequency = 200Mhz
+    /dev/mmcblk0p1:
+     Timing buffered disk reads: 270 MB in  3.02 seconds =  89.54 MB/sec
+    
+    max-frequency = 100Mhz
+    root at debian-armhf:~# hdparm -t /dev/mmcblk0p1
+    /dev/mmcblk0p1:
+     Timing buffered disk reads: 210 MB in  3.00 seconds =  70.00 MB/sec
+    
+    max-frequency = 50Mhz
+    root at debian-armhf:~# hdparm -t /dev/mmcblk0p1
+    /dev/mmcblk0p1:
+     Timing buffered disk reads: 118 MB in  3.00 seconds =  39.28 MB/sec
+
+It has also been tested on stih416-b2020 to ensure we have caused no
+regressions. Finally the dt documentation has been updated to reflect
+the changes in the driver code. Intrestingly it seems we are the first
+upstream platform to be using some of the uhs bindings such as
+sd-uhs-sdr104.
+
+regards,
+
+Peter.
+
+Peter Griffin (4):
+  clk: st: STiH410: Fix pdiv and fdiv divisor when setting rate
+  sdhci-st: Add support for stih407 family silicon.
+  mmc: sdhci-st: Update ST SDHCI binding documentation.
+  ARM: STi: DT: STiH407: Add dt nodes for sdhci and emmc.
+
+ Documentation/devicetree/bindings/mmc/sdhci-st.txt | 100 +++++-
+ arch/arm/boot/dts/stih407-family.dtsi              |  30 ++
+ arch/arm/boot/dts/stih410-b2120.dts                |  10 +
+ arch/arm/boot/dts/stihxxx-b2120.dtsi               |   8 +
+ drivers/clk/st/clk-flexgen.c                       |  19 +-
+ drivers/mmc/host/sdhci-st.c                        | 351 ++++++++++++++++++++-
+ 6 files changed, 496 insertions(+), 22 deletions(-)
+
+-- 
+1.9.1
