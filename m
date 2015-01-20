@@ -1,161 +1,181 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue, 20 Jan 2015 11:14:52 +0100
-Subject: [PATCH v9 2/3] clk: Make clk API return per-user struct clk
- instances
-In-Reply-To: <20150119205908.GC27202@codeaurora.org>
-References: <1421688067-24426-1-git-send-email-tomeu.vizoso@collabora.com>
- <1421688067-24426-3-git-send-email-tomeu.vizoso@collabora.com>
- <20150119205908.GC27202@codeaurora.org>
-Message-ID: <CAAObsKAWH0ExC3hpUMvBcooENo0ZEWzxfPDPiOczD3AZ+KUz9A@mail.gmail.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue, 20 Jan 2015 10:18:10 +0000
+Subject: [RFC PATCH 5/5] arm: perf: Use FIQ to handle PMU events.
+In-Reply-To: <2406925.7Z4R9iEkTD@jclayton-pc>
+References: <1421166931-14134-1-git-send-email-daniel.thompson@linaro.org>
+ <1421166931-14134-6-git-send-email-daniel.thompson@linaro.org>
+ <2406925.7Z4R9iEkTD@jclayton-pc>
+Message-ID: <54BE2B62.6010203@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 January 2015 at 21:59, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 01/19, Tomeu Vizoso wrote:
->> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
->> index 97f3425..f2a1ff3 100644
->> --- a/drivers/clk/clk.c
->> +++ b/drivers/clk/clk.c
->> @@ -694,32 +751,32 @@ long __clk_mux_determine_rate(struct clk_hw *hw, unsigned long rate,
->>                             unsigned long *best_parent_rate,
->>                             struct clk_hw **best_parent_p)
->>  {
->> -     struct clk *clk = hw->clk, *parent, *best_parent = NULL;
->> +     struct clk_core *core = hw->clk->core, *parent, *best_parent = NULL;
->
-> Can't we just use hw->core here?
-
-Yup.
-
->>       int i, num_parents;
->>       unsigned long parent_rate, best = 0;
+On 19/01/15 16:35, Joshua Clayton wrote:
+> On Tuesday, January 13, 2015 04:35:31 PM Daniel Thompson wrote:
+>> Using FIQ (if it is available) gives perf a better insight into the
+>> system by allowing code run with interrupts disabled to be profiled.
 >>
+>> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+>> ---
+>>  arch/arm/include/asm/pmu.h       |  4 ++++
+>>  arch/arm/kernel/perf_event.c     |  2 +-
+>>  arch/arm/kernel/perf_event_cpu.c | 35 ++++++++++++++++++++++++++++++++---
+>>  arch/arm/kernel/traps.c          |  3 ++-
+>>  4 files changed, 39 insertions(+), 5 deletions(-)
 >>
->> @@ -820,15 +877,18 @@ int clk_prepare(struct clk *clk)
->>  {
->>       int ret;
+>> diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
+>> index b1596bd59129..2a7ea97a4a14 100644
+>> --- a/arch/arm/include/asm/pmu.h
+>> +++ b/arch/arm/include/asm/pmu.h
+>> @@ -123,6 +123,8 @@ struct arm_pmu {
 >>
->> +     if (IS_ERR_OR_NULL(clk))
->> +             return PTR_ERR(clk);
->
-> What's going on here? Should be if (!clk)?
-
-Yeah, guess I miscopied it from a function that was expected to be
-called chained with others.
-
+>>  extern const struct dev_pm_ops armpmu_dev_pm_ops;
+>>
+>> +irqreturn_t armpmu_dispatch_irq(int irq, void *dev);
 >> +
->>       clk_prepare_lock();
->> -     ret = __clk_prepare(clk);
->> +     ret = clk_core_prepare(clk->core);
->>       clk_prepare_unlock();
+>>  int armpmu_register(struct arm_pmu *armpmu, int type);
 >>
->>       return ret;
->>  }
->>  EXPORT_SYMBOL_GPL(clk_prepare);
->> @@ -1066,9 +1149,24 @@ long clk_get_accuracy(struct clk *clk)
+>>  u64 armpmu_event_update(struct perf_event *event);
+>> @@ -136,6 +138,8 @@ int armpmu_map_event(struct perf_event *event,
+>>  						[PERF_COUNT_HW_CACHE_RESULT_MAX],
+>>  		     u32 raw_event_mask);
 >>
->>       return accuracy;
->>  }
+>> +void cpu_pmu_handle_fiq(int irq);
 >> +
->> +/**
->> + * clk_get_accuracy - return the accuracy of clk
->> + * @clk: the clk whose accuracy is being returned
->> + *
->> + * Simply returns the cached accuracy of the clk, unless
->> + * CLK_GET_ACCURACY_NOCACHE flag is set, which means a recalc_rate will be
->> + * issued.
->> + * If clk is NULL then returns 0.
->> + */
->> +long clk_get_accuracy(struct clk *clk)
->> +{
->> +     return clk_core_get_accuracy(clk->core);
->
-> Oops. Missing NULL check.
-
-Yup.
-
->> +}
->>  EXPORT_SYMBOL_GPL(clk_get_accuracy);
->>
->> @@ -1130,14 +1220,29 @@ unsigned long clk_get_rate(struct clk *clk)
-> [...]
->> + *
->> + * Simply returns the cached rate of the clk, unless CLK_GET_RATE_NOCACHE flag
->> + * is set, which means a recalc_rate will be issued.
->> + * If clk is NULL then returns 0.
->> + */
->> +unsigned long clk_get_rate(struct clk *clk)
->> +{
->> +     return clk_core_get_rate(clk->core);
->
-> Oops. Missing NULL check.
-
-Agreed.
-
->> +}
->>  EXPORT_SYMBOL_GPL(clk_get_rate);
->> @@ -1629,37 +1741,26 @@ static struct clk *__clk_init_parent(struct clk *clk)
-> [...]
->> -int clk_set_parent(struct clk *clk, struct clk *parent)
->> +void __clk_reparent(struct clk *clk, struct clk *new_parent)
->> +{
->> +     clk_core_reparent(clk->core, new_parent->core);
->> +}
->
-> Is this used? Looks like we can remove it. Sorry, not sure how I
-> missed this last time.
-
-Yes, done.
-
->> +
->> +static int clk_core_set_parent(struct clk_core *clk, struct clk_core *parent)
->>  {
->>       int ret = 0;
->>       int p_index = 0;
->> @@ -1719,6 +1820,28 @@ out:
-> [...]
->> +int clk_set_parent(struct clk *clk, struct clk *parent)
->> +{
->> +     return clk_core_set_parent(clk->core, parent->core);
->
-> Oops. Missing NULL check for both inputs.
-
-Agreed.
-
->> +}
->>  EXPORT_SYMBOL_GPL(clk_set_parent);
->>
->>  /**
->> @@ -1793,18 +1909,31 @@ out:
+>>  struct pmu_probe_info {
+>>  	unsigned int cpuid;
+>>  	unsigned int mask;
+>> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+>> index f7c65adaa428..5ae9adf7f18e 100644
+>> --- a/arch/arm/kernel/perf_event.c
+>> +++ b/arch/arm/kernel/perf_event.c
+>> @@ -296,7 +296,7 @@ validate_group(struct perf_event *event)
+>>  	return 0;
 >>  }
 >>
->>  /**
->> + * clk_get_phase - return the phase shift of a clock signal
->> + * @clk: clock signal source
->> + *
->> + * Returns the phase shift of a clock node in degrees, otherwise returns
->> + * -EERROR.
+>> -static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
+>> +irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
+>>  {
+>>  	struct arm_pmu *armpmu;
+>>  	struct platform_device *plat_device;
+>> diff --git a/arch/arm/kernel/perf_event_cpu.c
+>> b/arch/arm/kernel/perf_event_cpu.c index a80309087a7b..5c4e9ce23389 100644
+>> --- a/arch/arm/kernel/perf_event_cpu.c
+>> +++ b/arch/arm/kernel/perf_event_cpu.c
+>> @@ -36,6 +36,9 @@
+>>  /* Set at runtime when we know what CPU type we are. */
+>>  static struct arm_pmu *cpu_pmu;
+>>
+>> +/* Allows us to find out if an IRQ is for us (mostly used from NMI context)
+>> */ +static DEFINE_PER_CPU(int, cpu_pmu_irqs);
+>> +
+>>  /*
+>>   * Despite the names, these two functions are CPU-specific and are used
+>>   * by the OProfile/perf code.
+>> @@ -127,6 +130,24 @@ static void cpu_pmu_free_irq(struct arm_pmu *cpu_pmu)
+>>  	}
+>>  }
+>>
+>> +/*
+>> + * This handler is called *unconditionally* from the default NMI/FIQ
+>> + * handler. The irq may not be anything to do with us so the main
+>> + * job of this function is to figure out if the irq passed in is ours
+>> + * or not.
 >> + */
->> +int clk_get_phase(struct clk *clk)
+> 
+> This comment is an indicator that all the code in cpu_pmu_handle_fiq is
+> in the wrong place.
+> It (or something like it) belongs at the level of the default 
+> FIQ handler, and not in perf_event_cpu.c
+
+I'm not sure about that.
+
+If we moved this code into the default FIQ handler that means the PMU
+driver would have to explicitly share its irq value with the default FIQ
+handler (which doesn't really care about that).
+
+I'm inclined to view this code as the effect of avoiding indirection in
+the default FIQ handler.
+
+Regular irq code has nothing like this because &armpmu_dispatch_irq, irq
+and get_cpu_ptr(&cpu_pmu->hw_events->percpu_pmu) would all be looked up
+from the irqaction and any unwanted events are naturally filtered by the
+irq dispatch.
+
+After your review I'm very tempted to put together a patch that
+dispatches NMIs indirectly from the default FIQ handler. However I still
+don't have much of an answer to Russell's concerns about code review.
+
+
+>> +void cpu_pmu_handle_fiq(int irq)
 >> +{
->> +     return clk_core_get_phase(clk->core);
->
-> Oops. Missing NULL check.
-
-Agreed.
-
-I have also reworked the changes to __clk_init to maintain the
-existing behaviour.
-
-Thanks,
-
-Tomeu
-
-> --
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+>> +	int cpu = smp_processor_id();
+>> +
+>> +	if (irq != get_cpu_var(cpu_pmu_irqs))
+>> +		return;
+>> +
+>> +	(void)armpmu_dispatch_irq(irq,
+>> +				  get_cpu_ptr(&cpu_pmu->hw_events->percpu_pmu));
+>> +}
+>> +
+>> +
+>>  static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t
+>> handler) {
+>>  	int i, err, irq, irqs;
+>> @@ -170,9 +191,16 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu,
+>> irq_handler_t handler) continue;
+>>  			}
+>>
+>> -			err = request_irq(irq, handler,
+>> -					  IRQF_NOBALANCING | IRQF_NO_THREAD, "arm-pmu",
+>> -					  per_cpu_ptr(&hw_events->percpu_pmu, i));
+>> +			err = request_nmi_irq(
+>> +			    irq, IRQF_NOBALANCING, "arm-pmu",
+>> +			    per_cpu_ptr(&hw_events->percpu_pmu, i));
+>> +			if (err) {
+>> +				err = request_irq(
+>> +				    irq, handler,
+>> +				    IRQF_NOBALANCING | IRQF_NO_THREAD,
+>> +				    "arm-pmu",
+>> +				    per_cpu_ptr(&hw_events->percpu_pmu, i));
+>> +			}
+>>  			if (err) {
+>>  				pr_err("unable to request IRQ%d for ARM PMU counters\n",
+>>  					irq);
+>> @@ -180,6 +208,7 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu,
+>> irq_handler_t handler) }
+>>
+>>  			cpumask_set_cpu(i, &cpu_pmu->active_irqs);
+>> +			per_cpu(cpu_pmu_irqs, i) = irq;
+>>  		}
+>>  	}
+>>
+>> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+>> index 74c752b9db68..c581e07517ff 100644
+>> --- a/arch/arm/kernel/traps.c
+>> +++ b/arch/arm/kernel/traps.c
+>> @@ -38,6 +38,7 @@
+>>  #include <asm/tls.h>
+>>  #include <asm/system_misc.h>
+>>  #include <asm/opcodes.h>
+>> +#include <asm/pmu.h>
+>>
+>>
+>>  static const char *handler[]= {
+>> @@ -485,7 +486,7 @@ asmlinkage void __exception_irq_entry
+>> handle_fiq_as_nmi(struct pt_regs *regs) irq = gic_ack_fiq();
+>>
+>>  	if (irq) {
+>> -		/* empty - no SPI handlers (yet) */
+>> +		cpu_pmu_handle_fiq(irq);
+>>  	} else {
+>>  #ifdef CONFIG_SMP
+>>  		ipi_cpu_backtrace(regs);
+>> --
+>> 1.9.3
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
