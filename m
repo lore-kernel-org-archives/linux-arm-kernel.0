@@ -1,54 +1,33 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 20 Jan 2015 15:32:10 +0200
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 20 Jan 2015 14:33:19 +0100
 Subject: [PATCHv3 0/2] Driver for TI tlc59116 16 Channel i2c LED driver
 In-Reply-To: <20150120132613.GJ2938@lunn.ch>
 References: <1421277308-3477-1-git-send-email-andrew@lunn.ch>
  <54B9259C.3070403@ti.com> <20150116191734.GB31577@lunn.ch>
  <54BE258A.10808@ti.com> <20150120132613.GJ2938@lunn.ch>
-Message-ID: <54BE58DA.7050707@ti.com>
+Message-ID: <CAMuHMdWAVFsVwGFVkPGBCW9hfStbOeFxF44SESkyw7ta9yXcog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/01/15 15:26, Andrew Lunn wrote:
->> I'm not familiar with the LED/PWM frameworks, so I want to summarize our
->> use case and how I guess this should be done:
->>
->> We use the TLC59108 to provide backlight to a LCD, but in addition to
->> that, it is used as a GPIO expander (or GPO, as it cannot do input). In
->> your earlier patch versions there were some 'gpio' leftovers. Does your
->> board have such GPIO use also?
-> 
-> No, only LEDs.
->  
->> So my current thinking is that TLC591xx should be a LED driver (as it
->> sounded to me that PWM is not quite suitable for it). On top of that, we
->> need generic 'led-backlight' and 'led-gpio' drivers, each of which uses
->> the given LED driver to do the hardware manipulation, and they expose a
->> backlight device and gpio device, respectively.
-> 
-> That sounds sensible. led-backlight seems to be mostly implemented
-> already via the led trigger code. Adding a minimal backlight_ops does
-> not look too hard. You might also be able to do some cleanup of the
-> other led based backlight drivers. 
-> 
+On Tue, Jan 20, 2015 at 2:26 PM, Andrew Lunn <andrew@lunn.ch> wrote:
 > led-gpio looks like more work, but i don't see why it should not be
 > possible. One thing i do need to check is that if the brightness is
 > set to 255 the output is not set to 255/256 on and you have a regular
+
+is set to 255/256?
+
 > glitch. For an LED that does not really matter, but for GPIO it would
 > not be good.
 
-Right. TLC591xx has the constant output mode which should be used for
-GPIO. Perhaps that mode could be always used when the brightness is
-turned to maximum. I haven't read the spec carefully enough to know if
-there are some downsides.
+Indeed.
 
- Tomi
+Gr{oetje,eeting}s,
 
+                        Geert, who had a quick look at the data sheet recently
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150120/07a8a6d4/attachment.sig>
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
