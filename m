@@ -1,31 +1,25 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 21 Jan 2015 00:09:05 +0800
-Subject: [PATCH v5] clk: sunxi: Add driver for A80 MMC config clocks/resets
-In-Reply-To: <20150120160413.GU4367@lukather>
-References: <1421768791-20170-1-git-send-email-wens@csie.org>
- <20150120160413.GU4367@lukather>
-Message-ID: <CAGb2v65y0KPe7UtguEEPJyFtBD7qoJ=-YT82Mwp+qDPi7PCPYw@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 20 Jan 2015 16:14:06 +0000
+Subject: [PATCH v8 3/3] regulator: qcom-rpm: Add missing state flag in
+ call to RPM
+In-Reply-To: <20150120141954.GS13701@x1>
+References: <1417038661-30209-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1417038661-30209-4-git-send-email-bjorn.andersson@sonymobile.com>
+ <20150120141954.GS13701@x1>
+Message-ID: <20150120161406.GB21293@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 21, 2015 at 12:04 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Tue, Jan 20, 2015 at 11:46:31PM +0800, Chen-Yu Tsai wrote:
->> On the A80 SoC, the 4 mmc controllers each have a separate register
->> controlling their register access clocks and reset controls. These
->> registers in turn share a ahb clock gate and reset control.
->>
->> This patch adds a platform device driver for these controls. It
->> requires both clocks and reset controls to be available, so using
->> CLK_OF_DECLARE might not be the best way.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->
-> Merged, thanks!
+On Tue, Jan 20, 2015 at 02:19:54PM +0000, Lee Jones wrote:
 
-plaes on IRC just pointed out the copyright year is wrong....
+> Do you want a pull-request for this, or can I absorb it right into my
+> tree?
 
-Could you fix it before you push it out?
-Sorry about this.
-
-ChenYu
+Just apply it.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150120/404def69/attachment.sig>
