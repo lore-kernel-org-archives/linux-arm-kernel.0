@@ -1,87 +1,44 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Tue, 20 Jan 2015 07:36:02 +0100
-Subject: [PATCH V2 1/2] ARM: BCM5301X: Enable earlyprintk on tested devices
-In-Reply-To: <1421735096-8238-1-git-send-email-zajec5@gmail.com>
-References: <1421735096-8238-1-git-send-email-zajec5@gmail.com>
-Message-ID: <1421735762-8475-1-git-send-email-zajec5@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 20 Jan 2015 06:48:29 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP: hwmod fixes for v3.19-rc
+In-Reply-To: <20150119194305.GE18552@atomide.com>
+References: <alpine.DEB.2.02.1501042334250.28771@utopia.booyaka.com>
+ <20150119194305.GE18552@atomide.com>
+Message-ID: <alpine.DEB.2.02.1501200647540.5450@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
----
-V2: Typo in commit message: s/BCM5310X/BCM5301X/
----
- arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts  | 2 +-
- arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts       | 2 +-
- arch/arm/boot/dts/bcm4708-netgear-r6250.dts        | 2 +-
- arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts        | 2 +-
- arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts | 2 +-
- 5 files changed, 5 insertions(+), 5 deletions(-)
+Hi Tony
 
-diff --git a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
-index b359c1e..ce083a5 100644
---- a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
-+++ b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
-@@ -16,7 +16,7 @@
- 	model = "Buffalo WZR-1750DHP (BCM4708)";
- 
- 	chosen {
--		bootargs = "console=ttyS0,115200";
-+		bootargs = "console=ttyS0,115200 earlyprintk";
- 	};
- 
- 	memory {
-diff --git a/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts b/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
-index 946c728..f57f213 100644
---- a/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
-+++ b/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
-@@ -16,7 +16,7 @@
- 	model = "Luxul XWC-1000 (BCM4708)";
- 
- 	chosen {
--		bootargs = "console=ttyS0,115200";
-+		bootargs = "console=ttyS0,115200 earlyprintk";
- 	};
- 
- 	memory {
-diff --git a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
-index f18c9d9..0a5f561 100644
---- a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
-+++ b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
-@@ -16,7 +16,7 @@
- 	model = "Netgear R6250 V1 (BCM4708)";
- 
- 	chosen {
--		bootargs = "console=ttyS0,115200";
-+		bootargs = "console=ttyS0,115200 earlyprintk";
- 	};
- 
- 	memory {
-diff --git a/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts b/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
-index 0ee85ea..4d87219 100644
---- a/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
-+++ b/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
-@@ -16,7 +16,7 @@
- 	model = "Asus RT-N18U (BCM47081)";
- 
- 	chosen {
--		bootargs = "console=ttyS0,115200";
-+		bootargs = "console=ttyS0,115200 earlyprintk";
- 	};
- 
- 	memory {
-diff --git a/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts b/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
-index db9131e..362f914 100644
---- a/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
-+++ b/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
-@@ -16,7 +16,7 @@
- 	model = "Buffalo WZR-600DHP2 (BCM47081)";
- 
- 	chosen {
--		bootargs = "console=ttyS0,115200";
-+		bootargs = "console=ttyS0,115200 earlyprintk";
- 	};
- 
- 	memory {
--- 
-1.8.4.5
+On Mon, 19 Jan 2015, Tony Lindgren wrote:
+
+> * Paul Walmsley <paul@pwsan.com> [150104 15:38]:
+> > The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+> > 
+> >   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.19-rc/omap-fixes-a
+> > 
+> > for you to fetch changes up to 99d076b747455449b2eec9e37f3fb0bfdf51af32:
+> > 
+> >   MAINTAINERS: add maintainer for OMAP hwmod data (2015-01-02 16:24:27 -0700)
+> > 
+> > ----------------------------------------------------------------
+> > For v3.19-rc, fix some hwmod structure details for the OMAP DSS modules
+> > for DRA7xx and AM43xx.  Also update the MAINTAINERS file to encourage
+> > folks to cc me on hwmod data patches.
+> > 
+> > Basic build, boot, and PM testlogs are available here:
+> > 
+> > http://www.pwsan.com/omap/testlogs/omap-fixes-a-for-v3.19-rc/20150103144242/
+> 
+> Paul, got any updates on this? Anyways, I'll just untag this email as
+> you asked me to wait on pulling this.
+
+At this point I think I will just requeue the remaining two valid patches 
+for v3.20.  Thanks for the ping
+
+
+- Paul
