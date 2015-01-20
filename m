@@ -1,225 +1,89 @@
-From: mamlinav@gmail.com (Aleksei Mamlin)
-Date: Tue, 20 Jan 2015 22:03:28 +0400
-Subject: [PATCH] ARM: dts: sun4i: Add Marsboard A10 board
-Message-ID: <1421777008-15408-1-git-send-email-mamlinav@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 20 Jan 2015 10:03:47 -0800
+Subject: [RFC PATCH v5 0/4] ARM: OMAP2+: AM33XX: Add suspend-resume support
+In-Reply-To: <cover.1417038624.git.d-gerlach@ti.com>
+References: <cover.1417038624.git.d-gerlach@ti.com>
+Message-ID: <20150120180347.GJ7718@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add support for Marsboard A10 board.
+* Dave Gerlach <d-gerlach@ti.com> [141126 13:54]:
+> Hi,
+> This series is v5 of the series to add suspend/resume support for Texas
+> Instruments AM335x SoC. It has gone through a rather major overhaul
+> since the last version and because of that has been split into multiple
+> different sets of patches, on which this series depends. Previous discussion
+> that influenced there changes can be found here [1]. This series depends on
+> generic sram exec mapping patch here [2], emif series here [3],
+> and wkup_m3_ipc series here [4]. I have pushed a branch containing the patches
+> from ALL required series here [5] for testing or a view of the high level
+> flow of the entire series.
+> 
+> The largest change with this revision is the introduction of a
+> wkup_m3_ipc driver which handles all communication with the Cortex M3
+> present on am335x for handling low power tasks. Previously this was
+> handled in the wkup_m3_rproc driver (also sent in an earlier series)
+> but that driver is now only responsible for booting the wkup_m3. The
+> wkup_m3_ipc driver exposes an API with all required PM functionality
+> needed by the PM code introduced by this series, so the PM code has
+> shrunk considerably.
+> 
+> Another major change is that the EMIF code previously present in the
+> sleep33xx asm code and pm33xx code for save and restore of EMIF context
+> and entry into low power mode has all been moved in to a separate EMIF
+> driver, further reducing the size of the PM code. Because of this, moving
+> the emif header defines into include/linux/ti_emif.h is no longer necessary.
+> 
+> Other changes include clean up of the timer suspend/resume handlers, now
+> look up hwmod in init and use that handle along with renaming to
+> *_idle/*_unidle to avoid confusion with true suspend handlers. 
+> 
+> Suspend support requires:
+> CONFIG_TI_EMIF_SRAM
+> CONFIG_WKUP_M3_RPROC
+> CONFIG_WKUP_M3_IPC
+> 
+> And also requires AM335x USB support to be enabled to work for multiple
+> cycles. If you want to load firmware from rootfs in /lib/firmware you now
+> must also select CONFIG_FW_LOADER_USER_HELPER_FALLBACK.
+> 
+> This code works with version 0x189 of the CM3 firmware found here [6] on
+> the next branch, /bin/am335x-pm-firmware.elf.
 
-The Marsboard A10 is a A10 based development board with 1G RAM, 1G NAND,
-micro SD card slot, SATA 2.0 socket, 10/100 ethernet, mini HDMI port,
-1 USB OTG port and 2 USB 2.0 ports. Board does not use the AXP209 pmic,
-it does not have a pmic at all.
-Board also have 2 expansion 70 pin headers.
+Dave, does this series have dependencies to the other patches? Can some
+parts of this already be applied without breaking anything?
 
-Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
----
- arch/arm/boot/dts/Makefile                |   1 +
- arch/arm/boot/dts/sun4i-a10-marsboard.dts | 184 ++++++++++++++++++++++++++++++
- 2 files changed, 185 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun4i-a10-marsboard.dts
+Regards,
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 3de0142..7df26a2 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -447,6 +447,7 @@ dtb-$(CONFIG_MACH_SUN4I) += \
- 	sun4i-a10-ba10-tvbox.dtb \
- 	sun4i-a10-chuwi-v7-cw0825.dtb \
- 	sun4i-a10-cubieboard.dtb \
-+	sun4i-a10-marsboard.dtb \
- 	sun4i-a10-mini-xplus.dtb \
- 	sun4i-a10-mk802.dtb \
- 	sun4i-a10-mk802ii.dtb \
-diff --git a/arch/arm/boot/dts/sun4i-a10-marsboard.dts b/arch/arm/boot/dts/sun4i-a10-marsboard.dts
-new file mode 100644
-index 0000000..ebf0914
---- /dev/null
-+++ b/arch/arm/boot/dts/sun4i-a10-marsboard.dts
-@@ -0,0 +1,183 @@
-+/*
-+ * Copyright 2015 Aleksei Mamlin
-+ * Aleksei Mamlin <mamlinav@gmail.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ *     You should have received a copy of the GNU General Public
-+ *     License along with this file; if not, write to the Free
-+ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-+ *     MA 02110-1301 USA
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun4i-a10.dtsi"
-+#include "sunxi-common-regulators.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
-+
-+/ {
-+	model = "HAOYU Electronics Marsboard A10";
-+	compatible = "haoyu,a10-marsboard", "allwinner,sun4i-a10";
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pins_marsboard>;
-+
-+		red1 {
-+			label = "marsboard:red1:usr";
-+			gpios = <&pio 1 5 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		red2 {
-+			label = "marsboard:red2:usr";
-+			gpios = <&pio 1 6 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		red3 {
-+			label = "marsboard:red3:usr";
-+			gpios = <&pio 1 7 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		red4 {
-+			label = "marsboard:red4:usr";
-+			gpios = <&pio 1 8 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+};
-+
-+&ahci {
-+	status = "okay";
-+};
-+
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+&ehci1 {
-+	status = "okay";
-+};
-+
-+&emac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emac_pins_a>;
-+	phy = <&phy1>;
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins_a>;
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_pins_a>;
-+	status = "okay";
-+};
-+
-+&mdio {
-+	status = "okay";
-+
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+	};
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&ohci0 {
-+	status = "okay";
-+};
-+
-+&ohci1 {
-+	status = "okay";
-+};
-+
-+&pio {
-+	led_pins_marsboard: led_pins at 0 {
-+		allwinner,pins = "PB5", "PB6", "PB7", "PB8";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
-+&reg_usb1_vbus {
-+	status = "okay";
-+};
-+
-+&reg_usb2_vbus {
-+	status = "okay";
-+};
-+
-+&spi0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&spi0_pins_a>;
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	usb1_vbus-supply = <&reg_usb1_vbus>;
-+	usb2_vbus-supply = <&reg_usb2_vbus>;
-+	status = "okay";
-+};
--- 
-2.0.5
+Tony
+ 
+> [1] http://www.spinics.net/lists/linux-omap/msg109331.html
+> [2] http://www.spinics.net/linux/lists/kernel/msg1876629.html
+> [3] http://www.spinics.net/linux/lists/kernel/msg1876646.html
+> [4] http://www.spinics.net/linux/lists/kernel/msg1876642.html
+> [5] https://github.com/dgerlach/linux-pm/tree/rfc-pm-am335x-v3.18-rc6
+> [6] https://git.ti.com/ti-cm3-pm-firmware/amx3-cm3/commits/next
+> 
+> Dave Gerlach (3):
+>   ARM: OMAP2+: AM33XX: Add assembly code for PM operations
+>   ARM: OMAP2+: AM33XX: Basic suspend resume support
+>   ARM: OMAP2+: AM33XX: Hookup AM33XX PM code into OMAP builds
+> 
+> Vaibhav Bedia (1):
+>   ARM: OMAP2+: timer: Add suspend-resume callbacks for clkevent device
+> 
+>  arch/arm/boot/dts/am33xx.dtsi   |   2 +
+>  arch/arm/mach-omap2/Makefile    |   2 +
+>  arch/arm/mach-omap2/common.h    |   9 ++
+>  arch/arm/mach-omap2/io.c        |   1 +
+>  arch/arm/mach-omap2/pm.h        |   6 +
+>  arch/arm/mach-omap2/pm33xx.c    | 250 ++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-omap2/sleep33xx.S | 216 ++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-omap2/timer.c     |  28 +++++
+>  8 files changed, 514 insertions(+)
+>  create mode 100644 arch/arm/mach-omap2/pm33xx.c
+>  create mode 100644 arch/arm/mach-omap2/sleep33xx.S
+> 
+> -- 
+> 2.1.0
+> 
