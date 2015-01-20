@@ -1,203 +1,97 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 20 Jan 2015 14:16:43 +0000
-Subject: [PATCH v7 2/2] iommu/arm-smmu: add support for iova_to_phys
- through ATS1PR
-In-Reply-To: <1414617220-21493-3-git-send-email-mitchelh@codeaurora.org>
-References: <1414617220-21493-1-git-send-email-mitchelh@codeaurora.org>
- <1414617220-21493-3-git-send-email-mitchelh@codeaurora.org>
-Message-ID: <20150120141643.GA1549@arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 20 Jan 2015 15:17:12 +0100
+Subject: [PATCH v4 4/9] clk: samsung: exynos4: Add divider clock id for
+ memory bus frequency
+In-Reply-To: <1421286657-4720-5-git-send-email-cw00.choi@samsung.com>
+References: <1421286657-4720-1-git-send-email-cw00.choi@samsung.com>
+ <1421286657-4720-5-git-send-email-cw00.choi@samsung.com>
+Message-ID: <54BE6368.1080609@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Mitch,
-
-On Wed, Oct 29, 2014 at 09:13:40PM +0000, Mitchel Humpherys wrote:
-> Currently, we provide the iommu_ops.iova_to_phys service by doing a
-> table walk in software to translate IO virtual addresses to physical
-> addresses. On SMMUs that support it, it can be useful to ask the SMMU
-> itself to do the translation. This can be used to warm the TLBs for an
-> SMMU. It can also be useful for testing and hardware validation.
+On 15/01/15 02:50, Chanwoo Choi wrote:
+> This patch adds the divider clock id for Exynos4 memory bus frequency.
+> The clock id is used fo DVFS (Dynamic Voltage/Frequency Scaling)
+> feature of exynos memory bus frequency.
 > 
-> Since the address translation registers are optional on SMMUv2, only
-> enable hardware translations when using SMMUv1 or when SMMU_IDR0.S1TS=1
-> and SMMU_IDR0.ATOSNS=0, as described in the ARM SMMU v1-v2 spec.
-> 
-> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
-> ---
-> Changes since v6:
->   - added missing lock
->   - fixed physical address mask
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 
-I had a go at rebasing this onto my current queue, but ended up making
-quite a few changes. Can you take a look at the result, please?
+I've queued this patch for the clk tree, please let me know if a topic
+branch is needed.
 
-Patch below (also on my for-joerg/arm-smmu/updates branch).
-
+--
 Thanks,
+Sylwester
 
-Will
-
---->8
-
->From 859a732e4f713270152c78df6e09accbde006734 Mon Sep 17 00:00:00 2001
-From: Mitchel Humpherys <mitchelh@codeaurora.org>
-Date: Wed, 29 Oct 2014 21:13:40 +0000
-Subject: [PATCH] iommu/arm-smmu: add support for iova_to_phys through ATS1PR
-
-Currently, we provide the iommu_ops.iova_to_phys service by doing a
-table walk in software to translate IO virtual addresses to physical
-addresses. On SMMUs that support it, it can be useful to ask the SMMU
-itself to do the translation. This can be used to warm the TLBs for an
-SMMU. It can also be useful for testing and hardware validation.
-
-Since the address translation registers are optional on SMMUv2, only
-enable hardware translations when using SMMUv1 or when SMMU_IDR0.S1TS=1
-and SMMU_IDR0.ATOSNS=0, as described in the ARM SMMU v1-v2 spec.
-
-Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
-[will: reworked on top of generic iopgtbl changes]
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- drivers/iommu/arm-smmu.c | 69 ++++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 67 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 006f006c35e9..1d6d43bb3395 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -34,6 +34,7 @@
- #include <linux/interrupt.h>
- #include <linux/io.h>
- #include <linux/iommu.h>
-+#include <linux/iopoll.h>
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/pci.h>
-@@ -100,6 +101,7 @@
- #define ID0_S2TS			(1 << 29)
- #define ID0_NTS				(1 << 28)
- #define ID0_SMS				(1 << 27)
-+#define ID0_ATOSNS			(1 << 26)
- #define ID0_CTTW			(1 << 14)
- #define ID0_NUMIRPT_SHIFT		16
- #define ID0_NUMIRPT_MASK		0xff
-@@ -189,6 +191,8 @@
- #define ARM_SMMU_CB_TTBCR		0x30
- #define ARM_SMMU_CB_S1_MAIR0		0x38
- #define ARM_SMMU_CB_S1_MAIR1		0x3c
-+#define ARM_SMMU_CB_PAR_LO		0x50
-+#define ARM_SMMU_CB_PAR_HI		0x54
- #define ARM_SMMU_CB_FSR			0x58
- #define ARM_SMMU_CB_FAR_LO		0x60
- #define ARM_SMMU_CB_FAR_HI		0x64
-@@ -198,6 +202,9 @@
- #define ARM_SMMU_CB_S1_TLBIVAL		0x620
- #define ARM_SMMU_CB_S2_TLBIIPAS2	0x630
- #define ARM_SMMU_CB_S2_TLBIIPAS2L	0x638
-+#define ARM_SMMU_CB_ATS1PR_LO		0x800
-+#define ARM_SMMU_CB_ATS1PR_HI		0x804
-+#define ARM_SMMU_CB_ATSR		0x8f0
- 
- #define SCTLR_S1_ASIDPNE		(1 << 12)
- #define SCTLR_CFCFG			(1 << 7)
-@@ -209,6 +216,10 @@
- #define SCTLR_M				(1 << 0)
- #define SCTLR_EAE_SBOP			(SCTLR_AFE | SCTLR_TRE)
- 
-+#define CB_PAR_F			(1 << 0)
-+
-+#define ATSR_ACTIVE			(1 << 0)
-+
- #define RESUME_RETRY			(0 << 0)
- #define RESUME_TERMINATE		(1 << 0)
- 
-@@ -282,6 +293,7 @@ struct arm_smmu_device {
- #define ARM_SMMU_FEAT_TRANS_S1		(1 << 2)
- #define ARM_SMMU_FEAT_TRANS_S2		(1 << 3)
- #define ARM_SMMU_FEAT_TRANS_NESTED	(1 << 4)
-+#define ARM_SMMU_FEAT_TRANS_OPS		(1 << 5)
- 	u32				features;
- 
- #define ARM_SMMU_OPT_SECURE_CFG_ACCESS (1 << 0)
-@@ -1220,8 +1232,52 @@ static size_t arm_smmu_unmap(struct iommu_domain *domain, unsigned long iova,
- 	return ret;
- }
- 
-+static phys_addr_t arm_smmu_iova_to_phys_hard(struct iommu_domain *domain,
-+					      dma_addr_t iova)
-+{
-+	struct arm_smmu_domain *smmu_domain = domain->priv;
-+	struct arm_smmu_device *smmu = smmu_domain->smmu;
-+	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
-+	struct io_pgtable_ops *ops= smmu_domain->pgtbl_ops;
-+	struct device *dev = smmu->dev;
-+	void __iomem *cb_base;
-+	u32 tmp;
-+	u64 phys;
-+
-+	cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
-+
-+	if (smmu->version == 1) {
-+		u32 reg = iova & ~0xfff;
-+		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
-+	} else {
-+		u32 reg = iova & ~0xfff;
-+		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
-+		reg = (iova & ~0xfff) >> 32;
-+		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_HI);
-+	}
-+
-+	if (readl_poll_timeout_atomic(cb_base + ARM_SMMU_CB_ATSR, tmp,
-+				      !(tmp & ATSR_ACTIVE), 5, 50)) {
-+		dev_err(dev,
-+			"iova to phys timed out on 0x%pad. Falling back to software table walk.\n",
-+			&iova);
-+		return ops->iova_to_phys(ops, iova);
-+	}
-+
-+	phys = readl_relaxed(cb_base + ARM_SMMU_CB_PAR_LO);
-+	phys |= ((u64)readl_relaxed(cb_base + ARM_SMMU_CB_PAR_HI)) << 32;
-+
-+	if (phys & CB_PAR_F) {
-+		dev_err(dev, "translation fault!\n");
-+		dev_err(dev, "PAR = 0x%llx\n", phys);
-+		return 0;
-+	}
-+
-+	return (phys & GENMASK_ULL(39, 12)) | (iova & 0xfff);
-+}
-+
- static phys_addr_t arm_smmu_iova_to_phys(struct iommu_domain *domain,
--					 dma_addr_t iova)
-+					dma_addr_t iova)
- {
- 	phys_addr_t ret;
- 	unsigned long flags;
-@@ -1232,8 +1288,12 @@ static phys_addr_t arm_smmu_iova_to_phys(struct iommu_domain *domain,
- 		return 0;
- 
- 	spin_lock_irqsave(&smmu_domain->pgtbl_lock, flags);
--	ret = ops->iova_to_phys(ops, iova);
-+	if (smmu_domain->smmu->features & ARM_SMMU_FEAT_TRANS_OPS)
-+		ret = arm_smmu_iova_to_phys_hard(domain, iova);
-+	else
-+		ret = ops->iova_to_phys(ops, iova);
- 	spin_unlock_irqrestore(&smmu_domain->pgtbl_lock, flags);
-+
- 	return ret;
- }
- 
-@@ -1496,6 +1556,11 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
- 		return -ENODEV;
- 	}
- 
-+	if (smmu->version == 1 || (!(id & ID0_ATOSNS) && (id & ID0_S1TS))) {
-+		smmu->features |= ARM_SMMU_FEAT_TRANS_OPS;
-+		dev_notice(smmu->dev, "\taddress translation ops\n");
-+	}
-+
- 	if (id & ID0_CTTW) {
- 		smmu->features |= ARM_SMMU_FEAT_COHERENT_WALK;
- 		dev_notice(smmu->dev, "\tcoherent table walk\n");
--- 
-2.1.4
+>  drivers/clk/samsung/clk-exynos4.c   | 10 +++++-----
+>  include/dt-bindings/clock/exynos4.h |  7 ++++++-
+>  2 files changed, 11 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/clk/samsung/clk-exynos4.c
+b/drivers/clk/samsung/clk-exynos4.c
+> index 88e8c6b..51462e8 100644
+> --- a/drivers/clk/samsung/clk-exynos4.c
+> +++ b/drivers/clk/samsung/clk-exynos4.c
+> @@ -703,12 +703,12 @@ static struct samsung_mux_clock exynos4x12_mux_clks[]
+__initdata = {
+>
+>  /* list of divider clocks supported in all exynos4 soc's */
+>  static struct samsung_div_clock exynos4_div_clks[] __initdata = {
+> -	DIV(0, "div_gdl", "mout_gdl", DIV_LEFTBUS, 0, 3),
+> +	DIV(CLK_DIV_GDL, "div_gdl", "mout_gdl", DIV_LEFTBUS, 0, 3),
+>  	DIV(0, "div_gpl", "div_gdl", DIV_LEFTBUS, 4, 3),
+>  	DIV(0, "div_clkout_leftbus", "mout_clkout_leftbus",
+>  			CLKOUT_CMU_LEFTBUS, 8, 6),
+>
+> -	DIV(0, "div_gdr", "mout_gdr", DIV_RIGHTBUS, 0, 3),
+> +	DIV(CLK_DIV_GDR, "div_gdr", "mout_gdr", DIV_RIGHTBUS, 0, 3),
+>  	DIV(0, "div_gpr", "div_gdr", DIV_RIGHTBUS, 4, 3),
+>  	DIV(0, "div_clkout_rightbus", "mout_clkout_rightbus",
+>  			CLKOUT_CMU_RIGHTBUS, 8, 6),
+> @@ -781,10 +781,10 @@ static struct samsung_div_clock exynos4_div_clks[]
+__initdata = {
+>  			CLK_SET_RATE_PARENT, 0),
+>  	DIV(0, "div_clkout_top", "mout_clkout_top", CLKOUT_CMU_TOP, 8, 6),
+>
+> -	DIV(0, "div_acp", "mout_dmc_bus", DIV_DMC0, 0, 3),
+> +	DIV(CLK_DIV_ACP, "div_acp", "mout_dmc_bus", DIV_DMC0, 0, 3),
+>  	DIV(0, "div_acp_pclk", "div_acp", DIV_DMC0, 4, 3),
+>  	DIV(0, "div_dphy", "mout_dphy", DIV_DMC0, 8, 3),
+> -	DIV(0, "div_dmc", "mout_dmc_bus", DIV_DMC0, 12, 3),
+> +	DIV(CLK_DIV_DMC, "div_dmc", "mout_dmc_bus", DIV_DMC0, 12, 3),
+>  	DIV(0, "div_dmcd", "div_dmc", DIV_DMC0, 16, 3),
+>  	DIV(0, "div_dmcp", "div_dmcd", DIV_DMC0, 20, 3),
+>  	DIV(0, "div_pwi", "mout_pwi", DIV_DMC1, 8, 4),
+> @@ -829,7 +829,7 @@ static struct samsung_div_clock exynos4x12_div_clks[]
+__initdata = {
+>  	DIV_F(CLK_DIV_MCUISP1, "div_mcuisp1", "div_mcuisp0", E4X12_DIV_ISP1,
+>  						8, 3, CLK_GET_RATE_NOCACHE, 0),
+>  	DIV(CLK_SCLK_FIMG2D, "sclk_fimg2d", "mout_g2d", DIV_DMC1, 0, 4),
+> -	DIV(0, "div_c2c", "mout_c2c", DIV_DMC1, 4, 3),
+> +	DIV(CLK_DIV_C2C, "div_c2c", "mout_c2c", DIV_DMC1, 4, 3),
+>  	DIV(0, "div_c2c_aclk", "div_c2c", DIV_DMC1, 12, 3),
+>  };
+>
+> diff --git a/include/dt-bindings/clock/exynos4.h
+b/include/dt-bindings/clock/exynos4.h
+> index 34fe28c..c4b1676 100644
+> --- a/include/dt-bindings/clock/exynos4.h
+> +++ b/include/dt-bindings/clock/exynos4.h
+> @@ -262,8 +262,13 @@
+>  #define CLK_DIV_MCUISP1		453 /* Exynos4x12 only */
+>  #define CLK_DIV_ACLK200		454 /* Exynos4x12 only */
+>  #define CLK_DIV_ACLK400_MCUISP	455 /* Exynos4x12 only */
+> +#define CLK_DIV_ACP		456
+> +#define CLK_DIV_DMC		457
+> +#define CLK_DIV_C2C		458 /* Exynos4x12 only */
+> +#define CLK_DIV_GDL		459
+> +#define CLK_DIV_GDR		460
+>
+>  /* must be greater than maximal clock id */
+> -#define CLK_NR_CLKS		456
+> +#define CLK_NR_CLKS		461
+>
+>  #endif /* _DT_BINDINGS_CLOCK_EXYNOS_4_H */
+> -- 1.8.5.5
