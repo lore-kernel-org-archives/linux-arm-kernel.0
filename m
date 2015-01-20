@@ -1,243 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 Jan 2015 13:01:53 +0100
-Subject: [PATCH net-next v13 3/3] net: hisilicon: new hip04 ethernet driver
-In-Reply-To: <54BDBA29.10703@huawei.com>
-References: <1421217254-12008-1-git-send-email-dingtianhong@huawei.com>
- <9314032.C8yR0htxiP@wuerfel> <54BDBA29.10703@huawei.com>
-Message-ID: <17360357.cJoZFH8idi@wuerfel>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 20 Jan 2015 20:03:42 +0800
+Subject: [GIT PULL RESEND] CSR atlas7 debug ports for 3.20
+In-Reply-To: <20150119191258.GB16883@quad.lixom.net>
+References: <CAGsJ_4yJTApS6RwGCEFcBGT+L1f8Gn3DnmzGAKQc3H2SZZJvcw@mail.gmail.com>
+ <20150119191258.GB16883@quad.lixom.net>
+Message-ID: <CAGsJ_4ydqDxEqmEbX-NfQx75KOba7-BTU8Rnx0r=pobh4JT=QQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 January 2015 10:15:05 Ding Tianhong wrote:
-> On 2015/1/20 4:34, Arnd Bergmann wrote:
-> > On Monday 19 January 2015 19:11:11 Alexander Graf wrote:
-> >>
-> >> After hammering on the box a bit again, I'm in a situation where I get 
-> >> lots of
-> >>
-> >> [302398.232603] hip04-ether e28b0000.ethernet eth0: rx drop
-> >> [302398.377309] hip04-ether e28b0000.ethernet eth0: rx drop
-> >> [302398.395198] hip04-ether e28b0000.ethernet eth0: rx drop
-> >> [302398.466118] hip04-ether e28b0000.ethernet eth0: rx drop
-> >> [302398.659009] hip04-ether e28b0000.ethernet eth0: rx drop
-> >> [302399.053389] hip04-ether e28b0000.ethernet eth0: rx drop
-> >> [302399.122067] hip04-ether e28b0000.ethernet eth0: rx drop
-> >> [302399.268192] hip04-ether e28b0000.ethernet eth0: rx drop
-> >> [302399.286081] hip04-ether e28b0000.ethernet eth0: rx drop
-> >> [302399.594201] hip04-ether e28b0000.ethernet eth0: rx drop
-> >> [302399.683416] hip04-ether e28b0000.ethernet eth0: rx drop
-> >> [302399.701307] hip04-ether e28b0000.ethernet eth0: rx drop
-> >>
-> >> and I really am getting a lot of drops - I can't even ping the machine 
-> >> anymore.
-> >>
-> >> However, as it is there's a good chance the machine is simply 
-> >> unreachable because it's busy writing to the UART, and even if not all 
-> >> useful messages indicating anything have scrolled out. I really don't 
-> >> think you should emit any message over and over again to the user. Once 
-> >> or twice is enough.
-> >>
-> >> Please make sure to rate limit it.
-> > 
-> > I would argue that packet loss is not an error condition at all
-> > and you should not print this at netdev_err() level. You could make
-> > this a netdev_dbg(), or just make it silent because it's already
-> > counted in the statistics.
-> > 
-> 
-> I think something wrong with Graf's board, I will try to make it happen on my board, and 
-> in any case I will add rate limit to xx_drop and change to dbg log level.
+2015-01-20 3:12 GMT+08:00, Olof Johansson <olof@lixom.net>:
+> On Wed, Jan 14, 2015 at 09:24:19PM +0800, Barry Song wrote:
+>> Hi Arnd, Kevin, Olof,
+>>
+>> The following changes since commit
+>> b7392d2247cfe6771f95d256374f1a8e6a6f48d6:
+>>
+>>   Linux 3.19-rc2 (2014-12-28 16:49:37 -0800)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
+>> tags/atlas7-lldebug-for-3.20
+>>
+>> for you to fetch changes up to 98898ee43a94375cf814b86fb7f485c39fb2c072:
+>>
+>>   ARM: sirf: add two debug ports for CSRatlas7 SoC (2015-01-14 20:56:09
+>> +0800)
+>>
+>> ----------------------------------------------------------------
+>> add debug ports for CSRatlas7 SoC
+>>
+>> Because Marco chip has never shipped to customers and has been replaced
+>> by Atlas7, so we do the below
+>> - drop Marco's debug port
+>> - add debug ports for Atlas7
+>>
+>> we also move to use DEBUG_UART_PHYS/VIRT for all CSR ports
+>>
+>> ----------------------------------------------------------------
+>> Barry Song (1):
+>>       ARM: sirf: drop Marco low-level debug port
+>>
+>> Guo Zeng (1):
+>>       ARM: sirf: add two debug ports for CSRatlas7 SoC
+>
+> These entries are not sorted. If you look at the file, in particular
+> DEBUG_UART_PHYS and DEBUG_UART_VIRT, you see that they are sorted in
+> address
+> order. Your new entries are just appended. That's not right.
 
-I've looked at the interrupt handling in more detail and came up
-with this patch. Please review, and forward if you are happy with the
-changes.
+Olof, fixed here:
+https://git.kernel.org/cgit/linux/kernel/git/baohua/linux.git/commit/?id=01ea63d99397fcdcb9cc235c77a8e11f4e4a63e9
 
-Alex, could you try if this solves your problem?
+and tag was re-built.
 
-8<----
-Subject: [PATCH] net/hip04: refactor interrupt masking
+>
+> Please respin.
+>
+>
+> -Olof
+>
 
-The hip04 ethernet driver currently acknowledges all interrupts directly
-in the interrupt handler, and leaves all interrupts except the RX data
-enabled the whole time. This causes multiple problems:
-
-- When more packets come in between the original interrupt and the
-  NAPI poll function, we will get an extraneous RX interrupt as soon
-  as interrupts are enabled again.
-
-- The two error interrupts are by definition combining all errors that
-  may have happened since the last time they were handled, but just
-  acknowledging the irq without dealing with the cause of the condition
-  makes it come back immediately. In particular, when NAPI is intentionally
-  stalling the rx queue, this causes a storm of "rx dropped" messages.  
-
-- The access to the 'reg_inten' field in hip_priv is used for serializing
-  access, but is in fact racy itself.
-
-To deal with these issues, the driver is changed to only acknowledge
-the IRQ at the point when it is being handled. The RX interrupts now get
-acked right before reading the number of received frames to keep spurious
-interrupts to the absolute minimum without losing interrupts.
-
-As there is no tx-complete interrupt, only an informational tx-dropped
-one, we now ack that in the tx reclaim handler, hoping that clearing
-the descriptors has also eliminated the error condition.
-
-The only place that reads the reg_inten now just relies on
-napi_schedule_prep() to return whether NAPI is active or not, and
-the poll() function is then going to ack and reenabled the IRQ if
-necessary.
-
-Finally, when we disable interrupts, they are now all disabled
-together, in order to simplify the logic and to avoid getting
-rx-dropped interrupts when NAPI is in control of the rx queue.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/drivers/net/ethernet/hisilicon/hip04_eth.c b/drivers/net/ethernet/hisilicon/hip04_eth.c
-index 525214ef5984..83773247a368 100644
---- a/drivers/net/ethernet/hisilicon/hip04_eth.c
-+++ b/drivers/net/ethernet/hisilicon/hip04_eth.c
-@@ -56,6 +56,8 @@
- #define RCV_DROP			BIT(7)
- #define TX_DROP				BIT(6)
- #define DEF_INT_ERR			(RCV_NOBUF | RCV_DROP | TX_DROP)
-+#define DEF_INT_RX			(RCV_INT | RCV_NOBUF | RCV_DROP)
-+#define DEF_INT_TX			(TX_DROP)
- #define DEF_INT_MASK			(RCV_INT | DEF_INT_ERR)
- 
- /* TX descriptor config */
-@@ -154,7 +156,6 @@ struct hip04_priv {
- 	unsigned int port;
- 	unsigned int speed;
- 	unsigned int duplex;
--	unsigned int reg_inten;
- 
- 	struct napi_struct napi;
- 	struct net_device *ndev;
-@@ -303,17 +304,15 @@ static void hip04_mac_enable(struct net_device *ndev)
- 	val |= GE_RX_PORT_EN | GE_TX_PORT_EN;
- 	writel_relaxed(val, priv->base + GE_PORT_EN);
- 
--	/* clear rx int */
--	val = RCV_INT;
--	writel_relaxed(val, priv->base + PPE_RINT);
-+	/* clear prior interrupts */
-+	writel_relaxed(DEF_INT_MASK, priv->base + PPE_RINT);
- 
- 	/* config recv int */
- 	val = GE_RX_INT_THRESHOLD | GE_RX_TIMEOUT;
- 	writel_relaxed(val, priv->base + PPE_CFG_RX_PKT_INT);
- 
- 	/* enable interrupt */
--	priv->reg_inten = DEF_INT_MASK;
--	writel_relaxed(priv->reg_inten, priv->base + PPE_INTEN);
-+	writel_relaxed(DEF_INT_MASK, priv->base + PPE_INTEN);
- }
- 
- static void hip04_mac_disable(struct net_device *ndev)
-@@ -322,8 +321,7 @@ static void hip04_mac_disable(struct net_device *ndev)
- 	u32 val;
- 
- 	/* disable int */
--	priv->reg_inten &= ~(DEF_INT_MASK);
--	writel_relaxed(priv->reg_inten, priv->base + PPE_INTEN);
-+	writel_relaxed(0, priv->base + PPE_INTEN);
- 
- 	/* disable tx & rx */
- 	val = readl_relaxed(priv->base + GE_PORT_EN);
-@@ -403,6 +401,8 @@ static int hip04_tx_reclaim(struct net_device *ndev, bool force)
- 	priv->tx_tail = tx_tail;
- 	smp_wmb(); /* Ensure tx_tail visible to xmit */
- 
-+	writel_relaxed(DEF_INT_TX, priv->base + PPE_RINT);
-+
- out:
- 	if (pkts_compl || bytes_compl)
- 		netdev_completed_queue(ndev, pkts_compl, bytes_compl);
-@@ -458,9 +458,7 @@ static int hip04_mac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
- 	if (count >= priv->tx_coalesce_frames) {
- 		if (napi_schedule_prep(&priv->napi)) {
- 			/* disable rx interrupt and timer */
--			priv->reg_inten &= ~(RCV_INT);
--			writel_relaxed(DEF_INT_MASK & ~RCV_INT,
--				       priv->base + PPE_INTEN);
-+			writel_relaxed(0, priv->base + PPE_INTEN);
- 			hrtimer_cancel(&priv->tx_coalesce_timer);
- 			__napi_schedule(&priv->napi);
- 		}
-@@ -478,7 +476,7 @@ static int hip04_rx_poll(struct napi_struct *napi, int budget)
- 	struct hip04_priv *priv = container_of(napi, struct hip04_priv, napi);
- 	struct net_device *ndev = priv->ndev;
- 	struct net_device_stats *stats = &ndev->stats;
--	unsigned int cnt = hip04_recv_cnt(priv);
-+	unsigned int cnt;
- 	struct rx_desc *desc;
- 	struct sk_buff *skb;
- 	unsigned char *buf;
-@@ -489,6 +487,10 @@ static int hip04_rx_poll(struct napi_struct *napi, int budget)
- 	u16 len;
- 	u32 err;
- 
-+	/* acknowledge interrupts and read status */
-+	writel_relaxed(DEF_INT_RX, priv->base + PPE_RINT);
-+	cnt = hip04_recv_cnt(priv);
-+
- 	while (cnt && !last) {
- 		buf = priv->rx_buf[priv->rx_head];
- 		skb = build_skb(buf, priv->rx_buf_size);
-@@ -539,11 +541,8 @@ static int hip04_rx_poll(struct napi_struct *napi, int budget)
- 			cnt = hip04_recv_cnt(priv);
- 	}
- 
--	if (!(priv->reg_inten & RCV_INT)) {
--		/* enable rx interrupt */
--		priv->reg_inten |= RCV_INT;
--		writel_relaxed(priv->reg_inten, priv->base + PPE_INTEN);
--	}
-+	/* enable rx interrupt */
-+	writel_relaxed(DEF_INT_MASK, priv->base + PPE_INTEN);
- 	napi_complete(napi);
- done:
- 	/* clean up tx descriptors and start a new timer if necessary */
-@@ -564,23 +563,21 @@ static irqreturn_t hip04_mac_interrupt(int irq, void *dev_id)
- 	if (!ists)
- 		return IRQ_NONE;
- 
--	writel_relaxed(DEF_INT_MASK, priv->base + PPE_RINT);
--
- 	if (unlikely(ists & DEF_INT_ERR)) {
--		if (ists & (RCV_NOBUF | RCV_DROP))
-+		if (ists & (RCV_NOBUF | RCV_DROP)) {
- 			stats->rx_errors++;
- 			stats->rx_dropped++;
--			netdev_err(ndev, "rx drop\n");
-+			netdev_dbg(ndev, "rx drop\n");
-+		}
- 		if (ists & TX_DROP) {
- 			stats->tx_dropped++;
--			netdev_err(ndev, "tx drop\n");
-+			netdev_dbg(ndev, "tx drop\n");
- 		}
- 	}
- 
--	if (ists & RCV_INT && napi_schedule_prep(&priv->napi)) {
--		/* disable rx interrupt */
--		priv->reg_inten &= ~(RCV_INT);
--		writel_relaxed(DEF_INT_MASK & ~RCV_INT, priv->base + PPE_INTEN);
-+	if (napi_schedule_prep(&priv->napi)) {
-+		/* disable interrupt */
-+		writel_relaxed(0, priv->base + PPE_INTEN);
- 		hrtimer_cancel(&priv->tx_coalesce_timer);
- 		__napi_schedule(&priv->napi);
- 	}
-@@ -596,8 +593,7 @@ enum hrtimer_restart tx_done(struct hrtimer *hrtimer)
- 
- 	if (napi_schedule_prep(&priv->napi)) {
- 		/* disable rx interrupt */
--		priv->reg_inten &= ~(RCV_INT);
--		writel_relaxed(DEF_INT_MASK & ~RCV_INT, priv->base + PPE_INTEN);
-+		writel_relaxed(0, priv->base + PPE_INTEN);
- 		__napi_schedule(&priv->napi);
- 	}
- 
+-barry
