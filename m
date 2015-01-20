@@ -1,22 +1,72 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 20 Jan 2015 14:40:43 +0100
-Subject: [PATCHv3 0/2] Driver for TI tlc59116 16 Channel i2c LED driver
-In-Reply-To: <54BE58DA.7050707@ti.com>
-References: <1421277308-3477-1-git-send-email-andrew@lunn.ch>
- <54B9259C.3070403@ti.com> <20150116191734.GB31577@lunn.ch>
- <54BE258A.10808@ti.com> <20150120132613.GJ2938@lunn.ch>
- <54BE58DA.7050707@ti.com>
-Message-ID: <20150120134043.GK2938@lunn.ch>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 20 Jan 2015 15:47:30 +0200
+Subject: [PATCH v6 8/8] arm: dma-mapping: plumb our iommu mapping ops into
+ arch_setup_dma_ops
+In-Reply-To: <20150119162111.GA7751@ulmo.nvidia.com>
+References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
+ <2253719.6TRpaaEdiI@wuerfel> <20150119162111.GA7751@ulmo.nvidia.com>
+Message-ID: <1529759.XStvaeMLn3@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Right. TLC591xx has the constant output mode which should be used for
-> GPIO. Perhaps that mode could be always used when the brightness is
-> turned to maximum. I haven't read the spec carefully enough to know if
-> there are some downsides.
+Hi Thierry,
 
-The original Belkin code did use that mode for full brightness. But it
-added complexity to the code which i did not see a need for. Now you
-need gpio support, i can add it back.
+On Monday 19 January 2015 17:21:14 Thierry Reding wrote:
+> On Mon, Jan 19, 2015 at 04:52:41PM +0100, Arnd Bergmann wrote:
+> > On Monday 19 January 2015 13:36:24 Thierry Reding wrote:
+> >> On Fri, Jan 16, 2015 at 01:18:21AM +0200, Laurent Pinchart wrote:
+> >>> On Thursday 15 January 2015 11:12:17 Will Deacon wrote:
+> >>>> On Thu, Jan 15, 2015 at 08:28:44AM +0000, Thierry Reding wrote:
 
-     Andrew
+[...]
+
+> >>>>> The solution for me has been to completely side-step the issue and
+> >>>>> not register the IOMMU with the new mechanism at all. That is,
+> >>>>> there's no .of_xlate() implementation, which means that the ARM
+> >>>>> DMA API glue won't try to be smart and use the IOMMU in ways it's
+> >>>>> not meant to be used.
+> >>> 
+> >>> That will break when someone will want to use the same IOMMU type for
+> >>> devices that use the DMA mapping API to hide the IOMMU. That might
+> >>> not be the case for your IOMMU today, but it's pretty fragile, we
+> >>> need to fix it.
+> >> 
+> >> No, there's absolutely no issue here. It simply means that you can't do
+> >> this on Tegra. So far I'm not sure I even see an advantage in using the
+> >> IOMMU for devices that don't care about it anyway. Consider the example
+> >> of the SD/MMC or HDA. They typically allocate fairly small buffers, the
+> >> order of a single page typically. They can simply use memory handed out
+> >> by the CMA.
+> >> 
+> >> So as long as we don't add a .of_xlate() implementation or instantiate
+> >> via the IOMMU_OF_DECLARE() mechanism we simply don't support IOMMU-over-
+> >> DMA on Tegra.
+> > 
+> > It breaks as soon as you have a system with memory above the 4GB boundary,
+> > which is the whole point of iommus for most users.
+> 
+> Why does it break? The IOMMU API simply gets a list of pages and gets
+> the physical addresses from those pages when it maps them to the IO
+> virtual addresses. How is .of_xlate() or of_iommu_configure() related?
+
+Arnd's point was that using the IOMMU for devices that deal with small buffers 
+is mandatory in case those devices only support a 32-bit DMA address space, 
+and the system has memory over 4GB that you want to use for DMA purpose. 
+That's the case of Renesas' platforms with LPAE support for instance.
+
+Another use case for IOMMUs is device isolation, which is, depending on your 
+use cases, something you might want for devices that are not IOMMU-aware.
+
+It should also be noted that even DRM drivers don't need to be explicit IOMMU 
+users. The rcar-du driver allocates large frame buffers through the DMA 
+mapping API, without caring about whether an IOMMU is present or not.
+
+> > CMA does not work for streaming mappings, only for the coherent API.
+> 
+> Why not? And if it doesn't I'm not sure we currently care on Tegra since
+> we've gotten away with using CMA just fine so far.
+
+-- 
+Regards,
+
+Laurent Pinchart
