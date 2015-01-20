@@ -1,94 +1,97 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 20 Jan 2015 16:52:19 +0530
-Subject: [PATCHv3 2/8] devfreq: exynos: Add documentation for generic
- exynos memory bus frequency driver
-In-Reply-To: <54BE108F.8090506@samsung.com>
-References: <1420681257-3078-1-git-send-email-cw00.choi@samsung.com>
- <1420681257-3078-3-git-send-email-cw00.choi@samsung.com>
- <CAL_Jsq+5sdsm_-VW-ta+qV-NBao-XTHvsYWcbMdZmbP0Nw43Cw@mail.gmail.com>
- <CAKohpomqosqxeDANC=NLBVmOUHyUoqd7Zhph7r6f7+ufYN48EQ@mail.gmail.com>
- <54BE108F.8090506@samsung.com>
-Message-ID: <CAKohpokSuVhH3hHFF+mLtJXvjt=bmJy1oZRBOttCNXORBS1Y0A@mail.gmail.com>
+From: liviu@dudau.co.uk (Liviu Dudau)
+Date: Tue, 20 Jan 2015 11:20:32 +0000
+Subject: [RFC PATCH 1/3] drivers: of: fix resources freeing in
+ of_pci_get_host_bridge_resources()
+In-Reply-To: <20150120104922.GF5398@red-moon>
+References: <1420644571-18928-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1420644571-18928-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <20150119183228.GE10762@e106497-lin.cambridge.arm.com>
+ <20150120104922.GF5398@red-moon>
+Message-ID: <20150120112031.GA342@bart.dudau.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 January 2015 at 13:53, Chanwoo Choi <cw00.choi@samsung.com> wrote:
-> But, the frequency of OPPs is only used for devfreq ondemand governor.
-> After deciding the proper frequency of memory bus on ondemand governor,
-> exynos-bus.c (exynos memory bus frequency driver) use the frequency table
-> of memory bus blocks on below to change the clock rate of memory bus block.
+On Tue, Jan 20, 2015 at 10:49:22AM +0000, Lorenzo Pieralisi wrote:
+> On Mon, Jan 19, 2015 at 06:32:29PM +0000, Liviu Dudau wrote:
+> 
+> [...]
+> 
+> > > @@ -146,6 +146,7 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
+> > >  	struct of_pci_range_parser parser;
+> > >  	char range_type[4];
+> > >  	int err;
+> > > +	struct pci_host_bridge_window *window;
+> > >  
+> > >  	if (io_base)
+> > >  		*io_base = (resource_size_t)OF_BAD_ADDR;
+> > > @@ -225,7 +226,10 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
+> > >  conversion_failed:
+> > >  	kfree(res);
+> > >  parse_failed:
+> > > +	list_for_each_entry(window, resources, list)
+> > > +		kfree(window->res);
+> > >  	pci_free_resource_list(resources);
+> > > +	kfree(bus_range);
+> > >  	return err;
+> > >  }
+> > >  EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
+> > 
+> > Hi Lorenzo et all,
+> > 
+> > Here is my personal view and I am happy to hear from others on the desired
+> > behaviour:
+> > 
+> > When I wrote this function what I had in mind was that it will parse as
+> > much as possible from the device tree and return a list of resources that
+> > could be successfully converted. If the entire list of ranges could not
+> > be converted then an error code will be returned, but the caller still
+> > had the list as constructed up to the error. It was the job of the caller
+> > to free the list in either cases, as stated in the comment.
+> 
+> That's what I am questioning. If the function takes an error path, the
+> windows list is freed, so the resource pointers are gone. There is no
+> way the caller can grab those resource pointers and free them.
 
-> Firs of all,
-> I explain the hierarchy of Exynos memory buses.
->
-> For example of Exynos3250 memory bus,
-> This patch divide the memory bus group according to power rail (regulator).
-> - MIF (Memory Interface ) memory bus group uses the VDD_MIF regulator.
-> - INT (Internal) memory bus group uses the VDD_INT regulator.
->
-> Each memory bus group contains only one power rail(regulator) and one more memory bus blocks as follwing:
->
-> - MIF memory bus group
-> power rail(VDD_MIF)-->|--- memory bus for DMC (Dynamic Memory Controller) block (dmc clock)
->
-> - INT memory bus group
->                       |--- memory bus for PERI block (aclk_100 clock)
->                       |
->                       |--- memory bus for DISPLAY block (aclk_160 clock)
->                       |
->                       |--- memory bus for ISP block (aclk_200 clock)
->                       |
->                       |--- memory bus for GPS block (aclk_266 clock)
-> power rail(VDD_INT)-->|
->                       |--- memory bus for MCUISP block (aclk_400_mcuisp clock)
->                       |
->                       |--- memory bus for Leftbus block (gdl clock)
->                       |
->                       |--- memory bus for Rightbus block (gdr clock)
->                       |
->                       |--- memory bus for MFC block (mfc clock)
->
->
-> Exynos3250 has following table for INT memory bus group:
-> All clocks of INT memory bus group have to contain the same entry count
-> againt the number of 'virtual freqw'. So, each memory bus clock could have duplicate clocks.
->
-> ------------------------------------------------------------------------
-> Level|virtual freq|PERI's clk|Display's clk|ISP's clk|GPS's clk| voltage|
-> ------------------------------------------------------------------------
-> L6   |400000      |100000    |200000       |200000   |300000   | 95000  |
-> L5   |200000      |100000    |160000       |200000   |200000   | 95000  |
-> L4   |133000      |100000    |100000       |100000   |133000   | 92500  |
-> L3   |100000      |100000    |80000        |80000    |100000   | 85000  |
-> L2   |80000       |50000     |80000        |50000    |50000    | 85000  |
-> L1   |50000       |50000     |50000        |50000    |50000    | 85000  |
-> -------------------------------------------------------------------------
-> (Except for mcuisp, leftbus, rightbus, mfc block)
->
-> This table is used for devfreq ondemand governor as following:
-> 1. ondemand governor in devfreq use the 'virtual freq' to devcide the proper
->    frequency for memory bus.
-> 2. ondemand governor executes the *_target() function to set clock rate and voltage.
-> 3. *_target() function in exynos-bus.c changes the clock rate of {PERIS|Display|ISP|GPS} clk
->    according to decided 'Level' by devfreq ondemand governor.
+I stand corrected. Your patch is needed.
 
-I see..
+Thanks,
+Liviu
 
-Please confirm if my understanding is correct.
-- mem-bus-group: all blocks sharing a regulator
-- mem-bus-block: individual blocks managing their clock rate
+> 
+> So either way, the function needs patching. Either we do not free the
+> windows list (we remove pci_free_resource_list) or we apply my fix (or
+> we refactor the API which is likely to be what I will do).
+> 
+> Lorenzo
+> 
+> > 
+> > The historical reason why the function was written that way was because at
+> > some moment after parsing I've had an additional step where arches could
+> > cleanup / veto the list and they could return an error value to signal
+> > their discontent. Also I was (am) not sure how lenient we could be with
+> > the device tree not being sane (at least one host bridge binding lists the
+> > config space as a range, which was accepted as broken).
+> > 
+> > So, from that point of view, I would NAK this patch, as the function works
+> > as intended. If others find this mode of operation too convoluted, then
+> > the patch should probably make clear that cleanup only needs to be done on
+> > function returning success.
+> > 
+> > Best regards,
+> > 
+> > > -- 
+> > > 2.2.1
+> > > 
+> > > 
 
-What you do in kernel is register group as a device (with virtual OPPs)
-and then manage blocks within the driver. And so you need to do this
-dummy mapping of virtual to physical frequencies.
+-- 
+-------------------
+   .oooO
+   (   )
+    \ (  Oooo.
+     \_) (   )
+          ) /
+         (_/
 
-It *may* not have done it this way, if I was to design this driver.
-
-Each bus-block is a separately controllable device and so must be registered
-separately. In that case all bus-blocks will have separate OPP tables and
-all this dummy-v2p mapping will go away.
-
-I believe that you are over complicating stuff without any need..
-
---
-viresh
+ One small step
+   for me ...
