@@ -1,70 +1,22 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 20 Jan 2015 13:22:12 -0800
-Subject: [RFC PATCH v5 0/4] ARM: OMAP2+: AM33XX: Add suspend-resume support
-In-Reply-To: <54BEBB4D.90802@ti.com>
-References: <cover.1417038624.git.d-gerlach@ti.com>
- <20150120180347.GJ7718@atomide.com> <54BEBB4D.90802@ti.com>
-Message-ID: <20150120212212.GN7718@atomide.com>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Tue, 20 Jan 2015 22:34:14 +0100
+Subject: [PATCH V2 1/2] ARM: BCM5301X: Enable earlyprintk on tested devices
+In-Reply-To: <54BEC49F.7030405@hauke-m.de>
+References: <1421735096-8238-1-git-send-email-zajec5@gmail.com>
+ <1421735762-8475-1-git-send-email-zajec5@gmail.com>
+ <54BEC49F.7030405@hauke-m.de>
+Message-ID: <CACna6rzKG61-27PfLH-Ptquc+BqWgKua9rFpzFTktS3RzY96UQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Gerlach <d-gerlach@ti.com> [150120 12:35]:
-> Tony,
-> On 01/20/2015 12:03 PM, Tony Lindgren wrote:
-> > * Dave Gerlach <d-gerlach@ti.com> [141126 13:54]:
-> >> Hi,
-> >> This series is v5 of the series to add suspend/resume support for Texas
-> >> Instruments AM335x SoC. It has gone through a rather major overhaul
-> >> since the last version and because of that has been split into multiple
-> >> different sets of patches, on which this series depends. Previous discussion
-> >> that influenced there changes can be found here [1]. This series depends on
-> >> generic sram exec mapping patch here [2], emif series here [3],
-> >> and wkup_m3_ipc series here [4]. I have pushed a branch containing the patches
-> >> from ALL required series here [5] for testing or a view of the high level
-> >> flow of the entire series.
-> >>
-> >> The largest change with this revision is the introduction of a
-> >> wkup_m3_ipc driver which handles all communication with the Cortex M3
-> >> present on am335x for handling low power tasks. Previously this was
-> >> handled in the wkup_m3_rproc driver (also sent in an earlier series)
-> >> but that driver is now only responsible for booting the wkup_m3. The
-> >> wkup_m3_ipc driver exposes an API with all required PM functionality
-> >> needed by the PM code introduced by this series, so the PM code has
-> >> shrunk considerably.
-> >>
-> >> Another major change is that the EMIF code previously present in the
-> >> sleep33xx asm code and pm33xx code for save and restore of EMIF context
-> >> and entry into low power mode has all been moved in to a separate EMIF
-> >> driver, further reducing the size of the PM code. Because of this, moving
-> >> the emif header defines into include/linux/ti_emif.h is no longer necessary.
-> >>
-> >> Other changes include clean up of the timer suspend/resume handlers, now
-> >> look up hwmod in init and use that handle along with renaming to
-> >> *_idle/*_unidle to avoid confusion with true suspend handlers. 
-> >>
-> >> Suspend support requires:
-> >> CONFIG_TI_EMIF_SRAM
-> >> CONFIG_WKUP_M3_RPROC
-> >> CONFIG_WKUP_M3_IPC
-> >>
-> >> And also requires AM335x USB support to be enabled to work for multiple
-> >> cycles. If you want to load firmware from rootfs in /lib/firmware you now
-> >> must also select CONFIG_FW_LOADER_USER_HELPER_FALLBACK.
-> >>
-> >> This code works with version 0x189 of the CM3 firmware found here [6] on
-> >> the next branch, /bin/am335x-pm-firmware.elf.
-> > 
-> > Dave, does this series have dependencies to the other patches? Can some
-> > parts of this already be applied without breaking anything?
-> > 
-> 
-> The only patch with no dependencies is patch 1 (ARM: OMAP2+: timer: Add
-> suspend-resume callbacks for clkevent device). It's ready to be applied, I just
-> applied to v3.19-rc5 and built and booted on am335x-evm with no issue just to be
-> sure. It won't actually do anything until suspend is completely implemented.
+On 20 January 2015 at 22:11, Hauke Mehrtens <hauke@hauke-m.de> wrote:
+> On 01/20/2015 07:36 AM, Rafa? Mi?ecki wrote:
+>> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+>> ---
+>> V2: Typo in commit message: s/BCM5310X/BCM5301X/
+>> ---
+>
+> In this pull request Arnd said that enabling early printk is a bad idea:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/304438.html
 
-OK thanks for checking, best to wait until it's usable then.
-
-Regards,
-
-Tony
+Thanks, I didn't know about this. Drop this patch please.
