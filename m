@@ -1,31 +1,47 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 20 Jan 2015 14:56:42 +0100
-Subject: [PATCH] ARM: clocksource: add asm9260_timer driver
-In-Reply-To: <1420708042-22906-2-git-send-email-linux@rempel-privat.de>
-References: <1417193657-31602-2-git-send-email-linux@rempel-privat.de>
- <1420708042-22906-1-git-send-email-linux@rempel-privat.de>
- <1420708042-22906-2-git-send-email-linux@rempel-privat.de>
-Message-ID: <54BE5E9A.8070502@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 20 Jan 2015 13:58:40 +0000
+Subject: [PATCH 6/7] mfd: menelaus: make vcore and regulator controls
+ internal
+In-Reply-To: <1419702779-16001-7-git-send-email-aaro.koskinen@iki.fi>
+References: <1419702779-16001-1-git-send-email-aaro.koskinen@iki.fi>
+ <1419702779-16001-7-git-send-email-aaro.koskinen@iki.fi>
+Message-ID: <20150120135840.GO13701@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/2015 10:07 AM, Oleksij Rempel wrote:
-> In some cases asm9260 looks similar to iMX2x. One of exceptions is
-> timer controller. So this patch introduces new driver for this special case.
->
-> Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
-> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+On Sat, 27 Dec 2014, Aaro Koskinen wrote:
 
-Fixed conflict in the Makefile and applied to my tree.
+> Make vcore and regulator control functions internal to the driver.
+> 
+> Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+> ---
+>  drivers/mfd/menelaus.c       | 13 +++++++++++--
+>  include/linux/mfd/menelaus.h | 12 ------------
+>  2 files changed, 11 insertions(+), 14 deletions(-)
+> 
+> diff --git a/drivers/mfd/menelaus.c b/drivers/mfd/menelaus.c
+> index 4a900cc..8660adf 100644
+> --- a/drivers/mfd/menelaus.c
+> +++ b/drivers/mfd/menelaus.c
+> @@ -163,6 +163,15 @@
+>  #define MCT_PIN_ST_S1_CD_ST		(1 << 0)
+>  #define MCT_PIN_ST_S2_CD_ST		(1 << 1)
+>  
+> +#define EN_VPLL_SLEEP			(1 << 7)
+> +#define EN_VMMC_SLEEP			(1 << 6)
+> +#define EN_VAUX_SLEEP			(1 << 5)
+> +#define EN_VIO_SLEEP			(1 << 4)
+> +#define EN_VMEM_SLEEP			(1 << 3)
+> +#define EN_DC3_SLEEP			(1 << 2)
+> +#define EN_DC2_SLEEP			(1 << 1)
+> +#define EN_VC_SLEEP			(1 << 0)
 
-Thanks !
+Better to use the BIT() macro for this kind of stuff.
 
-   -- Daniel
-
+Please take this opportunity to use it.
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
