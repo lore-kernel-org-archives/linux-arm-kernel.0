@@ -1,38 +1,163 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 20 Jan 2015 10:47:03 +0100
-Subject: MediaTek PMIC support
-Message-ID: <1421747231-554-1-git-send-email-s.hauer@pengutronix.de>
+Date: Tue, 20 Jan 2015 10:47:06 +0100
+Subject: [PATCH 3/8] dt: bindings: Add MediaTek MT8135/MT8173 reset controller
+ defines
+In-Reply-To: <1421747231-554-1-git-send-email-s.hauer@pengutronix.de>
+References: <1421747231-554-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1421747231-554-4-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds initial support for the MediaTek MT6397 PMIC and the
-necessary infrastructure to attach it on the MT8135 / MT8173 SoCs.
+This adds the reset defines for the MT8135/MT8173 pericfg and infracfg
+controllers. Needed for device trees to specify the reset numbers in
+pericfg / infracfg reset consumers
 
-The infrastructure includes:
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ .../dt-bindings/reset-controller/mt8135-resets.h   | 64 ++++++++++++++++++++++
+ .../dt-bindings/reset-controller/mt8173-resets.h   | 63 +++++++++++++++++++++
+ 2 files changed, 127 insertions(+)
+ create mode 100644 include/dt-bindings/reset-controller/mt8135-resets.h
+ create mode 100644 include/dt-bindings/reset-controller/mt8173-resets.h
 
-- pericfg / infracfg controller support
-  The pericfg / infracfg controllers contain miscellaneous registers for
-  reset controllers and clocks.
-
-- PMIC wrapper support
-  On MediaTek MT8135, MT8173 and other SoCs the PMIC is connected via
-  SPI. The SPI master interface is not directly visible to the CPU, but
-  only through the PMIC wrapper inside the SoC. The communication between
-  the SoC and the PMIC can optionally be encrypted. Also a non standard
-  Dual IO SPI mode can be used to increase speed. The MT8135 also supports
-  a special feature named "IP Pairing". With IP Pairing the pins of some
-  SoC internal peripherals can be on the PMIC. The signals of these pins
-  are routed over the SPI bus using the pwrap bridge. Because of these
-  optional non SPI conform features the PMIC driver is not implemented as
-  a SPI bus master driver.
-
-The MT6397 PMIC itself is implemented as a regular mfd device driver which
-uses regmap to access the PMIC registers.
-
-This series also adds regulator support for the MT6397 PMIC.
-
-The first 6 patches can be merged through the ARM SoC tree. The mfd/regulator
-patches are independent of the first 6 patches and can be merged through the
-mfd/regulator maintainer trees.
-
-Sascha
+diff --git a/include/dt-bindings/reset-controller/mt8135-resets.h b/include/dt-bindings/reset-controller/mt8135-resets.h
+new file mode 100644
+index 0000000..b9add04
+--- /dev/null
++++ b/include/dt-bindings/reset-controller/mt8135-resets.h
+@@ -0,0 +1,64 @@
++/*
++ * Copyright (c) 2014 MediaTek Inc.
++ * Author: Flora Fu
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef _DT_BINDINGS_RESET_CONTROLLER_MT8135
++#define _DT_BINDINGS_RESET_CONTROLLER_MT8135
++
++/* INFRACFG resets */
++#define MT8135_INFRA_EMI_REG_RST        0
++#define MT8135_INFRA_DRAMC0_A0_RST      1
++#define MT8135_INFRA_CCIF0_RST          2
++#define MT8135_INFRA_APCIRQ_EINT_RST    3
++#define MT8135_INFRA_APXGPT_RST         4
++#define MT8135_INFRA_SCPSYS_RST         5
++#define MT8135_INFRA_CCIF1_RST          6
++#define MT8135_INFRA_PMIC_WRAP_RST      7
++#define MT8135_INFRA_KP_RST             8
++#define MT8135_INFRA_EMI_RST            32
++#define MT8135_INFRA_DRAMC0_RST         34
++#define MT8135_INFRA_SMI_RST            35
++#define MT8135_INFRA_M4U_RST            36
++
++/*  PERICFG resets */
++#define MT8135_PERI_UART0_SW_RST        0
++#define MT8135_PERI_UART1_SW_RST        1
++#define MT8135_PERI_UART2_SW_RST        2
++#define MT8135_PERI_UART3_SW_RST        3
++#define MT8135_PERI_IRDA_SW_RST         4
++#define MT8135_PERI_PTP_SW_RST          5
++#define MT8135_PERI_AP_HIF_SW_RST       6
++#define MT8135_PERI_GPCU_SW_RST         7
++#define MT8135_PERI_MD_HIF_SW_RST       8
++#define MT8135_PERI_NLI_SW_RST          9
++#define MT8135_PERI_AUXADC_SW_RST       10
++#define MT8135_PERI_DMA_SW_RST          11
++#define MT8135_PERI_NFI_SW_RST          14
++#define MT8135_PERI_PWM_SW_RST          15
++#define MT8135_PERI_THERM_SW_RST        16
++#define MT8135_PERI_MSDC0_SW_RST        17
++#define MT8135_PERI_MSDC1_SW_RST        18
++#define MT8135_PERI_MSDC2_SW_RST        19
++#define MT8135_PERI_MSDC3_SW_RST        20
++#define MT8135_PERI_I2C0_SW_RST         22
++#define MT8135_PERI_I2C1_SW_RST         23
++#define MT8135_PERI_I2C2_SW_RST         24
++#define MT8135_PERI_I2C3_SW_RST         25
++#define MT8135_PERI_I2C4_SW_RST         26
++#define MT8135_PERI_I2C5_SW_RST         27
++#define MT8135_PERI_I2C6_SW_RST         28
++#define MT8135_PERI_USB_SW_RST          29
++#define MT8135_PERI_SPI1_SW_RST         33
++#define MT8135_PERI_PWRAP_BRIDGE_SW_RST 34
++
++#endif  /* _DT_BINDINGS_RESET_CONTROLLER_MT8135 */
+diff --git a/include/dt-bindings/reset-controller/mt8173-resets.h b/include/dt-bindings/reset-controller/mt8173-resets.h
+new file mode 100644
+index 0000000..7648ed5
+--- /dev/null
++++ b/include/dt-bindings/reset-controller/mt8173-resets.h
+@@ -0,0 +1,63 @@
++/*
++ * Copyright (c) 2014 MediaTek Inc.
++ * Author: Flora Fu
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef _DT_BINDINGS_RESET_CONTROLLER_MT8173
++#define _DT_BINDINGS_RESET_CONTROLLER_MT8173
++
++/* INFRACFG resets */
++#define MT8173_INFRA_EMI_REG_RST        0
++#define MT8173_INFRA_DRAMC0_A0_RST      1
++#define MT8173_INFRA_APCIRQ_EINT_RST    3
++#define MT8173_INFRA_APXGPT_RST         4
++#define MT8173_INFRA_SCPSYS_RST         5
++#define MT8173_INFRA_KP_RST             6
++#define MT8173_INFRA_PMIC_WRAP_RST      7
++#define MT8173_INFRA_MPIP_RST           8
++#define MT8173_INFRA_CEC_RST            9
++#define MT8173_INFRA_EMI_RST            32
++#define MT8173_INFRA_DRAMC0_RST         34
++#define MT8173_INFRA_APMIXEDSYS_RST     35
++#define MT8173_INFRA_MIPI_DSI_RST       36
++#define MT8173_INFRA_TRNG_RST           37
++#define MT8173_INFRA_SYSIRQ_RST         38
++#define MT8173_INFRA_MIPI_CSI_RST       39
++#define MT8173_INFRA_GCE_FAXI_RST       40
++#define MT8173_INFRA_MMIOMMURST         47
++
++
++/*  PERICFG resets */
++#define MT8173_PERI_UART0_SW_RST        0
++#define MT8173_PERI_UART1_SW_RST        1
++#define MT8173_PERI_UART2_SW_RST        2
++#define MT8173_PERI_UART3_SW_RST        3
++#define MT8173_PERI_IRRX_SW_RST         4
++#define MT8173_PERI_PWM_SW_RST          8
++#define MT8173_PERI_AUXADC_SW_RST       10
++#define MT8173_PERI_DMA_SW_RST          11
++#define MT8173_PERI_I2C6_SW_RST         13
++#define MT8173_PERI_NFI_SW_RST          14
++#define MT8173_PERI_THERM_SW_RST        16
++#define MT8173_PERI_MSDC2_SW_RST        17
++#define MT8173_PERI_MSDC3_SW_RST        18
++#define MT8173_PERI_MSDC0_SW_RST        19
++#define MT8173_PERI_MSDC1_SW_RST        20
++#define MT8173_PERI_I2C0_SW_RST         22
++#define MT8173_PERI_I2C1_SW_RST         23
++#define MT8173_PERI_I2C2_SW_RST         24
++#define MT8173_PERI_I2C3_SW_RST         25
++#define MT8173_PERI_I2C4_SW_RST         26
++#define MT8173_PERI_HDMI_SW_RST         29
++#define MT8173_PERI_SPI0_SW_RST         33
++
++#endif  /* _DT_BINDINGS_RESET_CONTROLLER_MT8173 */
+-- 
+2.1.4
