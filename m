@@ -1,50 +1,23 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 20 Jan 2015 09:54:02 -0800
-Subject: [PATCH 1/2] clk: exynos5420: Add IDs for clocks used in DISP1
- power domain
-In-Reply-To: <54BE6050.1090205@samsung.com>
-References: <1421750127-22536-1-git-send-email-javier.martinez@collabora.co.uk>
- <1421750127-22536-2-git-send-email-javier.martinez@collabora.co.uk>
- <54BE6050.1090205@samsung.com>
-Message-ID: <20150120175402.22722.84342@quantum>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 20 Jan 2015 09:51:18 -0800
+Subject: [PATCH v2] ARM: omap2plus_defconfig: Enable OHCI & EHCI HCD
+ support
+In-Reply-To: <20150119214148.GV20386@saruman>
+References: <1421702916-19018-1-git-send-email-sjoerd.simons@collabora.co.uk>
+ <20150119214148.GV20386@saruman>
+Message-ID: <20150120175117.GI7718@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sylwester Nawrocki (2015-01-20 06:04:00)
-> Hi,
+* Felipe Balbi <balbi@ti.com> [150119 13:45]:
+> On Mon, Jan 19, 2015 at 10:28:36PM +0100, Sjoerd Simons wrote:
+> > Enable CONFIG_USB_EHCI_HCD and CONFIG_USB_OHCI_HCD to get USB supports
+> > with omap2plus_defconfig.
+> > 
+> > Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
 > 
-> On 20/01/15 11:35, Javier Martinez Canillas wrote:
-> > When a power domain is powered off on Exynos5420 SoC, the input clocks of
-> > the devices attached to this power domain are re-parented to oscclk and
-> > restored to the original parent after powering on the power domain.
-> > 
-> > So a reference to the input and parent clocks for the devices attached to
-> > a power domain are needed to be able to do the re-parenting. The DISP1 pd
-> > includes modules which uses the following clocks:
-> > 
-> > ACLK_200_DISP1 (MIXER and HDMILINK)
-> > ACLK_300_DISP1 (FIMD1)
-> > ACLK_400_DISP1 (Internal Buses)
-> > 
-> > Each of these clocks are generated as the output of a clock mux so add an
-> > ID for all of these clock muxes and their parents to be referenced in the
-> > DISP1 power domain device node.
-> > 
-> > Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> 
-> The patch looks OK to me, I'm fine with it being merged via Kukjin's tree
-> due to the dts dependencies (including other pending dts patches touching
-> the arch/arm/boot/dts/exynos5420.dtsi file).
-> I think we need also Mike ACK for that, I could also queue the patch for
-> the clk tree and create a topic branch, but merging both patches via
-> arm-soc seems a more sane option in this case.
-> 
-> Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Reviewed-by: Felipe Balbi <balbi@ti.com>
 
-Acked-by: Michael Turquette <mturquette@linaro.org>
+Applying into omap-for-v3.20/defconfig thanks.
 
-> 
-> --
-> Thanks,
-> Sylwester
-> 
+Tony
