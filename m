@@ -1,158 +1,87 @@
-From: kaloz@openwrt.org (Imre Kaloz)
-Date: Tue, 20 Jan 2015 11:57:11 +0100
-Subject: [PATCHv2] mvebu: add Linksys WRT1900AC (Mamba) support
-In-Reply-To: <20150119182113.GH32663@lunn.ch>
-References: <1421687701-5667-1-git-send-email-kaloz@openwrt.org>
- <20150119182113.GH32663@lunn.ch>
-Message-ID: <op.xsrcplz12s3iss@ecaz>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 20 Jan 2015 11:00:45 +0000
+Subject: [PATCH v7 06/17] ARM64 / ACPI: Make PCI optional for ACPI on ARM64
+In-Reply-To: <54BDBFD4.7050207@linaro.org>
+References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
+ <1421247905-3749-7-git-send-email-hanjun.guo@linaro.org>
+ <20150116094913.GA13634@e104818-lin.cambridge.arm.com>
+ <54BB51F1.8000900@linaro.org>
+ <20150119104240.GE11835@e104818-lin.cambridge.arm.com>
+ <54BDBFD4.7050207@linaro.org>
+Message-ID: <20150120110045.GD25575@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+On Tue, Jan 20, 2015 at 02:39:16AM +0000, Hanjun Guo wrote:
+> On 2015?01?19? 18:42, Catalin Marinas wrote:
+> > On Sun, Jan 18, 2015 at 06:25:53AM +0000, Hanjun Guo wrote:
+> >> On 2015?01?16? 17:49, Catalin Marinas wrote:
+> >>> On Wed, Jan 14, 2015 at 03:04:54PM +0000, Hanjun Guo wrote:
+> >>>> --- a/arch/arm64/kernel/pci.c
+> >>>> +++ b/arch/arm64/kernel/pci.c
+> >>>> @@ -10,6 +10,7 @@
+> >>>>     *
+> >>>>     */
+> >>>>
+> >>>> +#include <linux/acpi.h>
+> >>>>    #include <linux/init.h>
+> >>>>    #include <linux/io.h>
+> >>>>    #include <linux/kernel.h>
+> >>>> @@ -68,3 +69,30 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+> >>>>    	bus->domain_nr = domain;
+> >>>>    }
+> >>>>    #endif
+> >>>> +
+> >>>> +/*
+> >>>> + * raw_pci_read/write - Platform-specific PCI config space access.
+> >>>> + *
+> >>>> + * Default empty implementation.  Replace with an architecture-specific setup
+> >>>> + * routine, if necessary.
+> >>>> + */
+> >>>> +int raw_pci_read(unsigned int domain, unsigned int bus,
+> >>>> +		  unsigned int devfn, int reg, int len, u32 *val)
+> >>>> +{
+> >>>> +	return -EINVAL;
+> >>>> +}
+> >>>> +
+> >>>> +int raw_pci_write(unsigned int domain, unsigned int bus,
+> >>>> +		unsigned int devfn, int reg, int len, u32 val)
+> >>>> +{
+> >>>> +	return -EINVAL;
+> >>>> +}
+> >>>> +
+> >>>> +#ifdef CONFIG_ACPI
+> >>>> +/* Root bridge scanning */
+> >>>> +struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+> >>>> +{
+> >>>> +	/* TODO: Should be revisited when implementing PCI on ACPI */
+> >>>> +	return NULL;
+> >>>> +}
+> >>>> +#endif
+> > [...]
+> >>> When PCI is enabled and the above functions are compiled in, do they
+> >>> need to return any useful data or just -EINVAL. Are they ever called?
+> >>
+> >> They will be called if PCI root bridge is defined in DSDT, should I
+> >> print some warning message before it is implemented?
+> >
+> > My point: do they need to return real data when a PCI root bridge is
+> > defined in DSDT or you always expect them to always return some -E*? Can
+> > you explain why?
+> 
+> Not always return -E* or NULL;
+> 
+> For raw_pci_read/write(), they are needed to access the PCI config space
+> before the PCI root bus is created. so they will return 0 if access to
+> PCI config space is ok; pci_acpi_scan_root() will return root bus
+> pointer if it is successfully created.
 
-On Mon, 19 Jan 2015 19:21:13 +0100, Andrew Lunn <andrew@lunn.ch> wrote:
+OK. So what's the plan for implementing these functions properly. For
+the raw_pci_read/write, the comment states "replace with an
+architecture-specific setup routine". What does this mean?
 
-> Thanks for the v2. I have a few comments, and some points we will need
-> to discuss.
+For pci_acpi_scan_root(), at least the comment states a "TODO". Is there
+anyone working on this or we don't expect servers with PCIe soon?
 
-Sure thing, thanks.
-
->> + *
->> + * Note: this board is shipped with a new generation boot loader that
->> + * remaps internal registers at 0xf1000000. Therefore, if earlyprintk
->> + * is used, the CONFIG_DEBUG_MVEBU_UART_ALTERNATE option should be
->
-> There is a patch already queued up for this cycle:
->
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/313605.html
->
-> Please can you change CONFIG_DEBUG_MVEBU_UART_ALTERNATE to
-> CONFIG_DEBUG_MVEBU_UART0_ALTERNATE
-
-Ok.
-
->> +	model = "Linksys WRT1900AC (Mamba)";
->> +	compatible = "linksys,mamba", "marvell,armadaxp-mv78230",
->> +		     "marvell,armadaxp", "marvell,armada-370-xp";
->
-> So this is where the discussion starts. I don't like Mamba being so
-> prominent. As far as i understand, Mamba is the board, not the device.
-> In theory, another device could be created using the same board as a
-> basis, but with different PCIe cards, etc. At that point, i would
-> suggest refactoring the common parts out into a
-> armada-xp-linksys-mamba.dtsi which is then included into any device
-> .dts file using the Mamba board.
->
-> This file describes the device. So i would prefer it to be called
-> armada-xp-linksys-wrt1900ac.dts. The first compatible should be
-> "linksys,wrt1900ac". Having "linksys,mamba" second is O.K.
-
-I would like to ask for others' opinion for multiple reasons, and would  
-decide in v3 based on that.
-
-- The device is called the "mamba", the marketing name is the WRT1900AC.  
-As history showed, it's perfectly possible that exactly the same device go  
-on the market under a different name. The E4200v2 is the same device as  
-the EA4500, with a different factory firmware. There the name of the  
-device is "viper".
-
-- OpenWrt is the only firmware/stack other than the official one and  
-people already know this device as "mamba".
-
-- Let's say the same device gets released under the same name or just the  
-radios change - so no redesign takes place at all. In my opinion that  
-hardly justifies adding multiple .dts files just to change the name of the  
-LEDs to reflect that. I think people who want to run mainline on their  
-device wouldn't be concerned about seeing a codename, but on the other  
-hand we could receive patches to "correct" the marketing name in the LEDs.
-
->> +		internal-regs {
->
-> It would be nice to document the jumper and pinout here.
->
->> +			serial at 12000 {
->> +				status = "okay";
->> +			};
-
-Do you mean serial console pinout?
-
-
-> The discussion about the i2c LED controller is still ongoing, but i
-> think TI are unlikely to get a PWM based driver accepted in place of a
-> LED driver. So you could include the LEDs here, and something
-> unexpected happens, we can remove it.
-
-Ok, I have that locally already, too.
-
->
->> +			nand at d0000 {
->> +				status = "okay";
->> +				num-cs = <1>;
->> +				marvell,nand-keep-config;
->> +				marvell,nand-enable-arbiter;
->> +				nand-on-flash-bbt;
->> +				nand-ecc-strength = <4>;
->> +				nand-ecc-step-size = <512>;
->> +
->> +				partition at 0 {
->> +					label = "u-boot";
->> +					reg = <0x0000000 0x100000>;  /* 1MB */
->> +					read-only;
->> +				};
->> +
->> +				partition at 100000 {
->> +					label = "u_env";
->> +					reg = <0x100000 0x40000>;    /* 256KB */
->> +				};
->> +
->> +				partition at 140000 {
->> +					label = "s_env";
->> +					reg = <0x140000 0x40000>;    /* 256KB */
->> +				};
->
-> So there is a big gap here? 768KB of unused space before the devinfo  
-> section?
-
-See below.
-
->> +
->> +				partition at 900000 {
->> +					label = "devinfo";
->> +					reg = <0x900000 0x100000>;    /* 1MB */
->> +					read-only;
->> +				};
->> +
->> +				partition at a00000 {
->> +					label = "kernel1";
->> +					reg = <0xa00000 0x2800000>;    /* 3MB + rootfs1 */
->
-> There are some long lines here. We try to keep to the 80 character
-> rule.
-
-I've thought that would look kinda awkward, hence I left it this way.
-
->
->> +				};
->
-> This partition overlaps the next one? That is new to me. Seems to be
-> accepted practice for OpenWRT, but i'm not aware of any mainline
-> Marvell DT doing this. Comments from others welcome...
-
-The gap and the overlapping partitions (pretty much the whole layout) are  
-straight from the official firmware. The overlap is used to flash a single  
-file which contains the rootfs, too.
-
->> +
->> +		power {
->> +			label = "mamba:white:power";
->
-> Please replace this mamba with wrt1900ac. It is a property of the
-> device, not the board. Another device using the mamba board may use it
-> differently.
->
-
-See above.
-
-
-
-Imre
+-- 
+Catalin
