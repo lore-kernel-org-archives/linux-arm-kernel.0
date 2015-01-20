@@ -1,10 +1,10 @@
 From: ajaykumar.rs@samsung.com (Ajay Kumar)
-Date: Tue, 20 Jan 2015 22:08:54 +0530
-Subject: [PATCH V9 13/14] ARM: dts: snow: represent the connection between
+Date: Tue, 20 Jan 2015 22:08:55 +0530
+Subject: [PATCH V9 14/14] ARM: dts: peach-pit: represent the connection between
  bridge and panel using videoport and endpoints
 In-Reply-To: <1421771935-31618-1-git-send-email-ajaykumar.rs@samsung.com>
 References: <1421771935-31618-1-git-send-email-ajaykumar.rs@samsung.com>
-Message-ID: <1421771935-31618-14-git-send-email-ajaykumar.rs@samsung.com>
+Message-ID: <1421771935-31618-15-git-send-email-ajaykumar.rs@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,38 +18,16 @@ Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 Tested-by: Gustavo Padovan <gustavo.padovan@collabora.co.uk>
 Tested-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
 ---
- arch/arm/boot/dts/exynos5250-snow.dts |   30 ++++++++++++++++++++++++++++--
- 1 file changed, 28 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/exynos5420-peach-pit.dts |   31 ++++++++++++++++++++++++++--
+ 1 file changed, 29 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-index b9aeec4..1bd5d3a 100644
---- a/arch/arm/boot/dts/exynos5250-snow.dts
-+++ b/arch/arm/boot/dts/exynos5250-snow.dts
-@@ -183,7 +183,20 @@
- 			powerdown-gpios = <&gpy2 5 GPIO_ACTIVE_HIGH>;
- 			reset-gpios = <&gpx1 5 GPIO_ACTIVE_HIGH>;
- 			edid-emulation = <5>;
--			panel = <&panel>;
-+
-+			ports {
-+				port at 0 {
-+					bridge_out: endpoint {
-+						remote-endpoint = <&panel_in>;
-+					};
-+				};
-+
-+				port at 1 {
-+					bridge_in: endpoint {
-+						remote-endpoint = <&dp_out>;
-+					};
-+				};
-+			};
- 		};
- 	};
- 
-@@ -228,6 +241,12 @@
+diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+index c47bb70..ec86d95 100644
+--- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
++++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+@@ -118,6 +118,12 @@
  		compatible = "auo,b116xw03";
- 		power-supply = <&fet6>;
+ 		power-supply = <&tps65090_fet6>;
  		backlight = <&backlight>;
 +
 +		port {
@@ -60,11 +38,11 @@ index b9aeec4..1bd5d3a 100644
  	};
  };
  
-@@ -242,7 +261,14 @@
- 	samsung,link-rate = <0x0a>;
+@@ -137,7 +143,14 @@
+ 	samsung,link-rate = <0x06>;
  	samsung,lane-count = <2>;
- 	samsung,hpd-gpio = <&gpx0 7 GPIO_ACTIVE_HIGH>;
--	bridge = <&ptn3460>;
+ 	samsung,hpd-gpio = <&gpx2 6 0>;
+-	bridge = <&ps8625>;
 +
 +	ports {
 +		port at 0 {
@@ -75,6 +53,30 @@ index b9aeec4..1bd5d3a 100644
 +	};
  };
  
- &ehci {
+ &fimd {
+@@ -595,8 +608,22 @@
+ 		sleep-gpios = <&gpx3 5 GPIO_ACTIVE_HIGH>;
+ 		reset-gpios = <&gpy7 7 GPIO_ACTIVE_HIGH>;
+ 		lane-count = <2>;
+-		panel = <&panel>;
+ 		use-external-pwm;
++
++		ports {
++			port at 0 {
++				bridge_out: endpoint {
++					remote-endpoint = <&panel_in>;
++				};
++			};
++
++			port at 1 {
++				bridge_in: endpoint {
++					remote-endpoint = <&dp_out>;
++				};
++			};
++		};
++
+ 	};
+ };
+ 
 -- 
 1.7.9.5
