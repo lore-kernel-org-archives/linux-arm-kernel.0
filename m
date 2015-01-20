@@ -1,336 +1,334 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 20 Jan 2015 13:51:44 +0100
-Subject: [PATCH 7/9] ARM: shmobile: ape6evm-reference: Remove board C code and
- DT file
+Date: Tue, 20 Jan 2015 13:51:39 +0100
+Subject: [PATCH 2/9] ARM: shmobile: r8a73a4: Common clock framework DT
+ description
 In-Reply-To: <1421758306-24838-1-git-send-email-geert+renesas@glider.be>
 References: <1421758306-24838-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1421758306-24838-8-git-send-email-geert+renesas@glider.be>
+Message-ID: <1421758306-24838-3-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 
-Now that the r8a73a4 generic multiplatform case has the same features as the
-APE6EVM DT reference board code, we get rid of the latter.  DT reference
-code in the future shall make use of the r8a73a4 multiplatform support code
-with the generic SoC machine vector.
+Declares all r8a73a4 clocks supported by the legacy clock framework.
 
 Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-Acked-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-[geert: Update Documentation/devicetree/bindings/arm/shmobile.txt]
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- Documentation/devicetree/bindings/arm/shmobile.txt |   2 -
- arch/arm/boot/dts/Makefile                         |   1 -
- arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts    | 156 ---------------------
- arch/arm/mach-shmobile/Kconfig                     |  12 --
- arch/arm/mach-shmobile/Makefile                    |   1 -
- arch/arm/mach-shmobile/Makefile.boot               |   1 -
- arch/arm/mach-shmobile/board-ape6evm-reference.c   |  61 --------
- 7 files changed, 234 deletions(-)
- delete mode 100644 arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
- delete mode 100644 arch/arm/mach-shmobile/board-ape6evm-reference.c
+ arch/arm/boot/dts/r8a73a4.dtsi | 294 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 294 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
-index c69f127d27c3b974..1665013aa12abc11 100644
---- a/Documentation/devicetree/bindings/arm/shmobile.txt
-+++ b/Documentation/devicetree/bindings/arm/shmobile.txt
-@@ -37,8 +37,6 @@ Boards:
-     compatible = "renesas,alt", "renesas,r8a7794"
-   - APE6-EVM
-     compatible = "renesas,ape6evm", "renesas,r8a73a4"
--  - APE6-EVM - Reference Device Tree Implementation
--    compatible = "renesas,ape6evm-reference", "renesas,r8a73a4"
-   - Atmark Techno Armadillo-800 EVA
-     compatible = "renesas,armadillo800eva"
-   - BOCK-W
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 00a8897818c2a931..d5acdd2a5ec48624 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -457,7 +457,6 @@ dtb-$(CONFIG_ARCH_S5PV210) += \
- 	s5pv210-torbreck.dtb
- dtb-$(CONFIG_ARCH_SHMOBILE_LEGACY) += \
- 	r8a73a4-ape6evm.dtb \
--	r8a73a4-ape6evm-reference.dtb \
- 	r8a7740-armadillo800eva.dtb \
- 	r8a7778-bockw.dtb \
- 	r8a7778-bockw-reference.dtb \
-diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts b/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
-deleted file mode 100644
-index b3d8f844b57a8fc2..0000000000000000
---- a/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
-+++ /dev/null
-@@ -1,156 +0,0 @@
--/*
-- * Device Tree Source for the APE6EVM board
-- *
-- * Copyright (C) 2013 Renesas Solutions Corp.
-- *
-- * This file is licensed under the terms of the GNU General Public License
-- * version 2.  This program is licensed "as is" without any warranty of any
-- * kind, whether express or implied.
-- */
--
--/dts-v1/;
--#include "r8a73a4.dtsi"
--#include <dt-bindings/gpio/gpio.h>
--
--/ {
--	model = "APE6EVM";
--	compatible = "renesas,ape6evm-reference", "renesas,r8a73a4";
--
--	aliases {
--		serial0 = &scifa0;
--	};
--
--	chosen {
--		bootargs = "ignore_loglevel rw";
--		stdout-path = &scifa0;
--	};
--
--	memory at 40000000 {
--		device_type = "memory";
--		reg = <0 0x40000000 0 0x40000000>;
--	};
--
--	memory at 200000000 {
--		device_type = "memory";
--		reg = <2 0x00000000 0 0x40000000>;
--	};
--
--	vcc_mmc0: regulator at 0 {
--		compatible = "regulator-fixed";
--		regulator-name = "MMC0 Vcc";
--		regulator-min-microvolt = <2800000>;
--		regulator-max-microvolt = <2800000>;
--		regulator-always-on;
--	};
--
--	vcc_sdhi0: regulator at 1 {
--		compatible = "regulator-fixed";
--
--		regulator-name = "SDHI0 Vcc";
--		regulator-min-microvolt = <3300000>;
--		regulator-max-microvolt = <3300000>;
--
--		gpio = <&pfc 76 GPIO_ACTIVE_HIGH>;
--		enable-active-high;
--	};
--
--	/* Common 3.3V rail, used by several devices on APE6EVM */
--	ape6evm_fixed_3v3: regulator at 2 {
--		compatible = "regulator-fixed";
--		regulator-name = "3V3";
--		regulator-min-microvolt = <3300000>;
--		regulator-max-microvolt = <3300000>;
--		regulator-always-on;
--	};
--
--	lbsc {
--		compatible = "simple-bus";
--		#address-cells = <1>;
--		#size-cells = <1>;
--		ranges = <0 0 0 0x20000000>;
--	};
--};
--
--&i2c5 {
--	status = "okay";
--	vdd_dvfs: max8973 at 1b {
--		compatible = "maxim,max8973";
--		reg = <0x1b>;
--
--		regulator-min-microvolt = <935000>;
--		regulator-max-microvolt = <1200000>;
--		regulator-boot-on;
--		regulator-always-on;
--	};
--};
--
--&cpu0 {
--	cpu0-supply = <&vdd_dvfs>;
--	operating-points = <
--		/* kHz  uV */
--		1950000 1115000
--		1462500  995000
--	>;
--	voltage-tolerance = <1>; /* 1% */
--};
--
--&cmt1 {
--	status = "okay";
--};
--
--&pfc {
--	scifa0_pins: serial0 {
--		renesas,groups = "scifa0_data";
--		renesas,function = "scifa0";
--	};
--
--	mmc0_pins: mmc {
--		renesas,groups = "mmc0_data8", "mmc0_ctrl";
--		renesas,function = "mmc0";
--	};
--
--	sdhi0_pins: sd0 {
--		renesas,groups = "sdhi0_data4", "sdhi0_ctrl", "sdhi0_cd";
--		renesas,function = "sdhi0";
--	};
--
--	sdhi1_pins: sd1 {
--		renesas,groups = "sdhi1_data4", "sdhi1_ctrl";
--		renesas,function = "sdhi1";
--	};
--};
--
--&mmcif0 {
--	vmmc-supply = <&vcc_mmc0>;
--	bus-width = <8>;
--	non-removable;
--	pinctrl-names = "default";
--	pinctrl-0 = <&mmc0_pins>;
--	status = "okay";
--};
--
--&scifa0 {
--	pinctrl-0 = <&scifa0_pins>;
--	pinctrl-names = "default";
--
--	status = "okay";
--};
--
--&sdhi0 {
--	vmmc-supply = <&vcc_sdhi0>;
--	bus-width = <4>;
--	toshiba,mmc-wrprotect-disable;
--	pinctrl-names = "default";
--	pinctrl-0 = <&sdhi0_pins>;
--	status = "okay";
--};
--
--&sdhi1 {
--	vmmc-supply = <&ape6evm_fixed_3v3>;
--	bus-width = <4>;
--	broken-cd;
--	toshiba,mmc-wrprotect-disable;
--	pinctrl-names = "default";
--	pinctrl-0 = <&sdhi1_pins>;
--	status = "okay";
--};
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index f4108d85c03c6a0e..897d314850ba0857 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -147,18 +147,6 @@ config MACH_APE6EVM
- 	select SMSC_PHY if SMSC911X
- 	select USE_OF
+diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
+index 38136d9f6d95a16e..a1adfe4bc760ba67 100644
+--- a/arch/arm/boot/dts/r8a73a4.dtsi
++++ b/arch/arm/boot/dts/r8a73a4.dtsi
+@@ -9,6 +9,7 @@
+  * kind, whether express or implied.
+  */
  
--config MACH_APE6EVM_REFERENCE
--	bool "APE6EVM board - Reference Device Tree Implementation"
--	depends on ARCH_R8A73A4
--	select SMSC_PHY if SMSC911X
--	select USE_OF
--	---help---
--	   Use reference implementation of APE6EVM board support
--	   which makes a greater use of device tree at the expense
--	   of not supporting a number of devices.
--
--	   This is intended to aid developers
--
- config MACH_MACKEREL
- 	bool "mackerel board"
- 	depends on ARCH_SH7372
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 7b9ed9e25e9bc954..c1d94b08b25fc206 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -59,7 +59,6 @@ ifdef CONFIG_ARCH_SHMOBILE_MULTI
- obj-$(CONFIG_MACH_MARZEN)	+= board-marzen-reference.o
- else
- obj-$(CONFIG_MACH_APE6EVM)	+= board-ape6evm.o
--obj-$(CONFIG_MACH_APE6EVM_REFERENCE)	+= board-ape6evm-reference.o
- obj-$(CONFIG_MACH_MACKEREL)	+= board-mackerel.o
- obj-$(CONFIG_MACH_BOCKW)	+= board-bockw.o
- obj-$(CONFIG_MACH_BOCKW_REFERENCE)	+= board-bockw-reference.o
-diff --git a/arch/arm/mach-shmobile/Makefile.boot b/arch/arm/mach-shmobile/Makefile.boot
-index 6ef0e2b29a02440d..5cb50ff32c88bde2 100644
---- a/arch/arm/mach-shmobile/Makefile.boot
-+++ b/arch/arm/mach-shmobile/Makefile.boot
-@@ -1,7 +1,6 @@
- # per-board load address for uImage
- loadaddr-y	:=
- loadaddr-$(CONFIG_MACH_APE6EVM) += 0x40008000
--loadaddr-$(CONFIG_MACH_APE6EVM_REFERENCE) += 0x40008000
- loadaddr-$(CONFIG_MACH_ARMADILLO800EVA) += 0x40008000
- loadaddr-$(CONFIG_MACH_BOCKW) += 0x60008000
- loadaddr-$(CONFIG_MACH_BOCKW_REFERENCE) += 0x60008000
-diff --git a/arch/arm/mach-shmobile/board-ape6evm-reference.c b/arch/arm/mach-shmobile/board-ape6evm-reference.c
-deleted file mode 100644
-index dd5bc63aba421df2..0000000000000000
---- a/arch/arm/mach-shmobile/board-ape6evm-reference.c
-+++ /dev/null
-@@ -1,61 +0,0 @@
--/*
-- * APE6EVM board support
-- *
-- * Copyright (C) 2013  Renesas Solutions Corp.
-- * Copyright (C) 2013  Magnus Damm
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; version 2 of the License.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- */
--
--#include <linux/gpio.h>
--#include <linux/kernel.h>
--#include <linux/of_platform.h>
--#include <linux/pinctrl/machine.h>
--#include <linux/platform_device.h>
--#include <linux/sh_clk.h>
--
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--
--#include "common.h"
--#include "r8a73a4.h"
--
--static void __init ape6evm_add_standard_devices(void)
--{
--#ifndef CONFIG_COMMON_CLK
--	struct clk *parent;
--	struct clk *mp;
--
--	r8a73a4_clock_init();
--
--	/* MP clock parent = extal2 */
--	parent      = clk_get(NULL, "extal2");
--	mp          = clk_get(NULL, "mp");
--	BUG_ON(IS_ERR(parent) || IS_ERR(mp));
--
--	clk_set_parent(mp, parent);
--	clk_put(parent);
--	clk_put(mp);
--#endif
--
--	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
--}
--
--static const char *ape6evm_boards_compat_dt[] __initdata = {
--	"renesas,ape6evm-reference",
--	NULL,
--};
--
--DT_MACHINE_START(APE6EVM_DT, "ape6evm")
--	.init_early	= shmobile_init_delay,
--	.init_machine	= ape6evm_add_standard_devices,
--	.init_late	= shmobile_init_late,
--	.dt_compat	= ape6evm_boards_compat_dt,
--MACHINE_END
++#include <dt-bindings/clock/r8a73a4-clock.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ 
+@@ -377,4 +378,297 @@
+ 			<0 0xf1006000 0 0x2000>;
+ 		interrupts = <1 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+ 	};
++
++	clocks {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		/* External root clocks */
++		extalr_clk: extalr_clk {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <32768>;
++			clock-output-names = "extalr";
++		};
++		extal1_clk: extal1_clk {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <25000000>;
++			clock-output-names = "extal1";
++		};
++		extal2_clk: extal2_clk {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <48000000>;
++			clock-output-names = "extal2";
++		};
++		fsiack_clk: fsiack_clk {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			/* This value must be overridden by the board. */
++			clock-frequency = <0>;
++			clock-output-names = "fsiack";
++		};
++		fsibck_clk: fsibck_clk {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			/* This value must be overridden by the board. */
++			clock-frequency = <0>;
++			clock-output-names = "fsibck";
++		};
++
++		/* Special CPG clocks */
++		cpg_clocks: cpg_clocks at e6150000 {
++			compatible = "renesas,r8a73a4-cpg-clocks";
++			reg = <0 0xe6150000 0 0x10000>;
++			clocks = <&extal1_clk>, <&extal2_clk>;
++			#clock-cells = <1>;
++			clock-output-names = "main", "pll0", "pll1", "pll2",
++					     "pll2s", "pll2h", "z", "z2",
++					     "i", "m3", "b", "m1", "m2",
++					     "zx", "zs", "hp";
++		};
++
++		/* Variable factor clocks (DIV6) */
++		zb_clk: zb_clk at e6150010 {
++			compatible = "renesas,r8a73a4-div6-clock", "renesas,cpg-div6-clock";
++			reg = <0 0xe6150010 0 4>;
++			clocks = <&pll1_div2_clk>, <0>,
++				 <&cpg_clocks R8A73A4_CLK_PLL2S>, <0>;
++			#clock-cells = <0>;
++			clock-output-names = "zb";
++		};
++		sdhi0_clk: sdhi0_clk at e6150074 {
++			compatible = "renesas,r8a73a4-div6-clock", "renesas,cpg-div6-clock";
++			reg = <0 0xe6150074 0 4>;
++			clocks = <&pll1_div2_clk>, <&cpg_clocks R8A73A4_CLK_PLL2S>,
++				 <0>, <&extal2_clk>;
++			#clock-cells = <0>;
++			clock-output-names = "sdhi0ck";
++		};
++		sdhi1_clk: sdhi1_clk at e6150078 {
++			compatible = "renesas,r8a73a4-div6-clock", "renesas,cpg-div6-clock";
++			reg = <0 0xe6150078 0 4>;
++			clocks = <&pll1_div2_clk>, <&cpg_clocks R8A73A4_CLK_PLL2S>,
++				 <0>, <&extal2_clk>;
++			#clock-cells = <0>;
++			clock-output-names = "sdhi1ck";
++		};
++		sdhi2_clk: sdhi2_clk at e615007c {
++			compatible = "renesas,r8a73a4-div6-clock", "renesas,cpg-div6-clock";
++			reg = <0 0xe615007c 0 4>;
++			clocks = <&pll1_div2_clk>, <&cpg_clocks R8A73A4_CLK_PLL2S>,
++				 <0>, <&extal2_clk>;
++			#clock-cells = <0>;
++			clock-output-names = "sdhi2ck";
++		};
++		mmc0_clk: mmc0_clk at e6150240 {
++			compatible = "renesas,r8a73a4-div6-clock", "renesas,cpg-div6-clock";
++			reg = <0 0xe6150240 0 4>;
++			clocks = <&pll1_div2_clk>, <&cpg_clocks R8A73A4_CLK_PLL2S>,
++				 <0>, <&extal2_clk>;
++			#clock-cells = <0>;
++			clock-output-names = "mmc0";
++		};
++		mmc1_clk: mmc1_clk at e6150244 {
++			compatible = "renesas,r8a73a4-div6-clock", "renesas,cpg-div6-clock";
++			reg = <0 0xe6150244 0 4>;
++			clocks = <&pll1_div2_clk>, <&cpg_clocks R8A73A4_CLK_PLL2S>,
++				 <0>, <&extal2_clk>;
++			#clock-cells = <0>;
++			clock-output-names = "mmc1";
++		};
++		vclk1_clk: vclk1_clk at e6150008 {
++			compatible = "renesas,r8a73a4-div6-clock", "renesas,cpg-div6-clock";
++			reg = <0 0xe6150008 0 4>;
++			clocks = <&pll1_div2_clk>, <&cpg_clocks R8A73A4_CLK_PLL2S>,
++				 <0>, <&extal2_clk>, <&main_div2_clk>,
++				 <&extalr_clk>, <0>, <0>;
++			#clock-cells = <0>;
++			clock-output-names = "vclk1";
++		};
++		vclk2_clk: vclk2_clk at e615000c {
++			compatible = "renesas,r8a73a4-div6-clock", "renesas,cpg-div6-clock";
++			reg = <0 0xe615000c 0 4>;
++			clocks = <&pll1_div2_clk>, <&cpg_clocks R8A73A4_CLK_PLL2S>,
++				 <0>, <&extal2_clk>, <&main_div2_clk>,
++				 <&extalr_clk>, <0>, <0>;
++			#clock-cells = <0>;
++			clock-output-names = "vclk2";
++		};
++		vclk3_clk: vclk3_clk at e615001c {
++			compatible = "renesas,r8a73a4-div6-clock", "renesas,cpg-div6-clock";
++			reg = <0 0xe615001c 0 4>;
++			clocks = <&pll1_div2_clk>, <&cpg_clocks R8A73A4_CLK_PLL2S>,
++				 <0>, <&extal2_clk>, <&main_div2_clk>,
++				 <&extalr_clk>, <0>, <0>;
++			#clock-cells = <0>;
++			clock-output-names = "vclk3";
++		};
++		vclk4_clk: vclk4_clk at e6150014 {
++			compatible = "renesas,r8a73a4-div6-clock", "renesas,cpg-div6-clock";
++			reg = <0 0xe6150014 0 4>;
++			clocks = <&pll1_div2_clk>, <&cpg_clocks R8A73A4_CLK_PLL2S>,
++				 <0>, <&extal2_clk>, <&main_div2_clk>,
++				 <&extalr_clk>, <0>, <0>;
++			#clock-cells = <0>;
++			clock-output-names = "vclk4";
++		};
++		vclk5_clk: vclk5_clk at e6150034 {
++			compatible = "renesas,r8a73a4-div6-clock", "renesas,cpg-div6-clock";
++			reg = <0 0xe6150034 0 4>;
++			clocks = <&pll1_div2_clk>, <&cpg_clocks R8A73A4_CLK_PLL2S>,
++				 <0>, <&extal2_clk>, <&main_div2_clk>,
++				 <&extalr_clk>, <0>, <0>;
++			#clock-cells = <0>;
++			clock-output-names = "vclk5";
++		};
++		fsia_clk: fsia_clk at e6150018 {
++			compatible = "renesas,r8a73a4-div6-clock", "renesas,cpg-div6-clock";
++			reg = <0 0xe6150018 0 4>;
++			clocks = <&pll1_div2_clk>, <&cpg_clocks R8A73A4_CLK_PLL2S>,
++				 <&fsiack_clk>, <0>;
++			#clock-cells = <0>;
++			clock-output-names = "fsia";
++		};
++		fsib_clk: fsib_clk at e6150090 {
++			compatible = "renesas,r8a73a4-div6-clock", "renesas,cpg-div6-clock";
++			reg = <0 0xe6150090 0 4>;
++			clocks = <&pll1_div2_clk>, <&cpg_clocks R8A73A4_CLK_PLL2S>,
++				 <&fsibck_clk>, <0>;
++			#clock-cells = <0>;
++			clock-output-names = "fsib";
++		};
++		mp_clk: mp_clk at e6150080 {
++			compatible = "renesas,r8a73a4-div6-clock", "renesas,cpg-div6-clock";
++			reg = <0 0xe6150080 0 4>;
++			clocks = <&pll1_div2_clk>, <&cpg_clocks R8A73A4_CLK_PLL2S>,
++				 <&extal2_clk>, <&extal2_clk>;
++			#clock-cells = <0>;
++			clock-output-names = "mp";
++		};
++		m4_clk: m4_clk at e6150098 {
++			compatible = "renesas,r8a73a4-div6-clock", "renesas,cpg-div6-clock";
++			reg = <0 0xe6150098 0 4>;
++			clocks = <&cpg_clocks R8A73A4_CLK_PLL2S>;
++			#clock-cells = <0>;
++			clock-output-names = "m4";
++		};
++		hsi_clk: hsi_clk at e615026c {
++			compatible = "renesas,r8a73a4-div6-clock", "renesas,cpg-div6-clock";
++			reg = <0 0xe615026c 0 4>;
++			clocks = <&cpg_clocks R8A73A4_CLK_PLL2H>, <&pll1_div2_clk>,
++				 <&cpg_clocks R8A73A4_CLK_PLL2S>, <0>;
++			#clock-cells = <0>;
++			clock-output-names = "hsi";
++		};
++		spuv_clk: spuv_clk at e6150094 {
++			compatible = "renesas,r8a73a4-div6-clock", "renesas,cpg-div6-clock";
++			reg = <0 0xe6150094 0 4>;
++			clocks = <&pll1_div2_clk>, <&cpg_clocks R8A73A4_CLK_PLL2S>,
++				 <&extal2_clk>, <&extal2_clk>;
++			#clock-cells = <0>;
++			clock-output-names = "spuv";
++		};
++
++		/* Fixed factor clocks */
++		main_div2_clk: main_div2_clk {
++			compatible = "fixed-factor-clock";
++			clocks = <&cpg_clocks R8A73A4_CLK_MAIN>;
++			#clock-cells = <0>;
++			clock-div = <2>;
++			clock-mult = <1>;
++			clock-output-names = "main_div2";
++		};
++		pll0_div2_clk: pll0_div2_clk {
++			compatible = "fixed-factor-clock";
++			clocks = <&cpg_clocks R8A73A4_CLK_PLL0>;
++			#clock-cells = <0>;
++			clock-div = <2>;
++			clock-mult = <1>;
++			clock-output-names = "pll0_div2";
++		};
++		pll1_div2_clk: pll1_div2_clk {
++			compatible = "fixed-factor-clock";
++			clocks = <&cpg_clocks R8A73A4_CLK_PLL1>;
++			#clock-cells = <0>;
++			clock-div = <2>;
++			clock-mult = <1>;
++			clock-output-names = "pll1_div2";
++		};
++		extal1_div2_clk: extal1_div2_clk {
++			compatible = "fixed-factor-clock";
++			clocks = <&extal1_clk>;
++			#clock-cells = <0>;
++			clock-div = <2>;
++			clock-mult = <1>;
++			clock-output-names = "extal1_div2";
++		};
++
++		/* Gate clocks */
++		mstp2_clks: mstp2_clks at e6150138 {
++			compatible = "renesas,r8a73a4-mstp-clocks", "renesas,cpg-mstp-clocks";
++			reg = <0 0xe6150138 0 4>, <0 0xe6150040 0 4>;
++			clocks = <&mp_clk>, <&mp_clk>, <&mp_clk>, <&mp_clk>,
++				 <&mp_clk>, <&mp_clk>, <&cpg_clocks R8A73A4_CLK_HP>;
++			#clock-cells = <1>;
++			clock-indices = <
++				R8A73A4_CLK_SCIFA0 R8A73A4_CLK_SCIFA1
++				R8A73A4_CLK_SCIFB0 R8A73A4_CLK_SCIFB1
++				R8A73A4_CLK_SCIFB2 R8A73A4_CLK_SCIFB3
++				R8A73A4_CLK_DMAC
++			>;
++			clock-output-names =
++				"scifa0", "scifa1", "scifb0", "scifb1",
++				"scifb2", "scifb3", "dmac";
++		};
++		mstp3_clks: mstp3_clks at e615013c {
++			compatible = "renesas,r8a73a4-mstp-clocks", "renesas,cpg-mstp-clocks";
++			reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
++			clocks = <&cpg_clocks R8A73A4_CLK_HP>, <&mmc1_clk>,
++				 <&sdhi2_clk>, <&sdhi1_clk>, <&sdhi0_clk>,
++				 <&mmc0_clk>, <&cpg_clocks R8A73A4_CLK_HP>,
++				 <&cpg_clocks R8A73A4_CLK_HP>, <&cpg_clocks
++				 R8A73A4_CLK_HP>, <&cpg_clocks
++				 R8A73A4_CLK_HP>, <&extalr_clk>;
++			#clock-cells = <1>;
++			clock-indices = <
++				R8A73A4_CLK_IIC2 R8A73A4_CLK_MMCIF1
++				R8A73A4_CLK_SDHI2 R8A73A4_CLK_SDHI1
++				R8A73A4_CLK_SDHI0 R8A73A4_CLK_MMCIF0
++				R8A73A4_CLK_IIC6 R8A73A4_CLK_IIC7
++				R8A73A4_CLK_IIC0 R8A73A4_CLK_IIC1
++				R8A73A4_CLK_CMT1
++			>;
++			clock-output-names =
++				"iic2", "mmcif1", "sdhi2", "sdhi1", "sdhi0",
++				"mmcif0", "iic6", "iic7", "iic0", "iic1",
++				"cmt1";
++		};
++		mstp4_clks: mstp4_clks at e6150140 {
++			compatible = "renesas,r8a73a4-mstp-clocks", "renesas,cpg-mstp-clocks";
++			reg = <0 0xe6150140 0 4>, <0 0xe615004c 0 4>;
++			clocks = <&main_div2_clk>, <&cpg_clocks R8A73A4_CLK_HP>,
++				 <&cpg_clocks R8A73A4_CLK_HP>;
++			#clock-cells = <1>;
++			clock-indices = <
++				R8A73A4_CLK_IIC5 R8A73A4_CLK_IIC4
++				R8A73A4_CLK_IIC3
++			>;
++			clock-output-names =
++				"iic5", "iic4", "iic3";
++		};
++		mstp5_clks: mstp5_clks at e6150144 {
++			compatible = "renesas,r8a73a4-mstp-clocks", "renesas,cpg-mstp-clocks";
++			reg = <0 0xe6150144 0 4>, <0 0xe615003c 0 4>;
++			clocks = <&extal2_clk>, <&cpg_clocks R8A73A4_CLK_HP>;
++			#clock-cells = <1>;
++			clock-indices = <
++				R8A73A4_CLK_THERMAL R8A73A4_CLK_IIC8
++			>;
++			clock-output-names =
++				"thermal", "iic8";
++		};
++	};
+ };
 -- 
 1.9.1
