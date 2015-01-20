@@ -1,21 +1,40 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 20 Jan 2015 15:21:15 +0000
-Subject: [PATCH v6 8/8] arm: dma-mapping: plumb our iommu mapping ops
- into arch_setup_dma_ops
-In-Reply-To: <20150120151910.GD1549@arm.com>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <1984907.uTqFPJnJpV@avalon> <20150119123058.GA7312@ulmo.nvidia.com>
- <2060841.mOvatXFir7@avalon> <20150120151910.GD1549@arm.com>
-Message-ID: <20150120152115.GE1549@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 20 Jan 2015 16:22:10 +0100
+Subject: [PATCHv2 0/3] ARM: mvebu: I/O coherency related fixes
+In-Reply-To: <20150119223657.GI2938@lunn.ch>
+References: <1421424689-5971-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20150119223657.GI2938@lunn.ch>
+Message-ID: <20150120162210.087ce5bc@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 20, 2015 at 03:19:10PM +0000, Will Deacon wrote:
-> We could restore the set_dma_ops call in arm_iommu_attach_device as a
-> temporary hack (along with a big fat comment), since arch_setup_dma_ops
-> actually sets the ops correct *after* the call to
-> arm_get_iommu_dma_map_ops...
+Dear Andrew Lunn,
 
-s/arm_get_iommu_dma_map_ops/arm_setup_iommu_dma_ops/
+On Mon, 19 Jan 2015 23:36:57 +0100, Andrew Lunn wrote:
+> On Fri, Jan 16, 2015 at 05:11:26PM +0100, Thomas Petazzoni wrote:
+> > Arnd, Andrew,
+> > 
+> > As we discussed, here is a set of 3 patches related to HW I/O
+> > coherency on mvebu:
+> > 
+> >  * The first patch disables HW I/O coherency entirely, and is meant to
+> >    be backported to stable, until we do enough testing of the new HW
+> >    I/O coherency stuff and backport it to stabel.
+> 
+> Added to mvebu/fixes-3
+> 
+> > 
+> >  * The last two patches add the new HW I/O coherency strategy based on
+> >    automatic I/O synchronization barriers, and obviously re-enable the
+> >    HW I/O coherency.
+> 
+> Added to mvebu/sox. I also removed the comment you forgot to removed
+> in 3/3.
 
-Will
+Thanks a lot!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
