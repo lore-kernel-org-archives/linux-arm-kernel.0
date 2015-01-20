@@ -1,28 +1,77 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 Jan 2015 22:37:14 +0100
-Subject: [PATCH V2 1/2] ARM: BCM5301X: Enable earlyprintk on tested devices
-In-Reply-To: <54BEC49F.7030405@hauke-m.de>
-References: <1421735096-8238-1-git-send-email-zajec5@gmail.com>
- <1421735762-8475-1-git-send-email-zajec5@gmail.com>
- <54BEC49F.7030405@hauke-m.de>
-Message-ID: <3431445.qSs2tca53I@wuerfel>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Tue, 20 Jan 2015 22:42:16 +0100
+Subject: [PATCH V2] ARM: BCM5301X: Add DT for Buffalo WZR-900DHP
+In-Reply-To: <1421735096-8238-2-git-send-email-zajec5@gmail.com>
+References: <1421735096-8238-2-git-send-email-zajec5@gmail.com>
+Message-ID: <1421790136-9920-1-git-send-email-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 January 2015 22:11:59 Hauke Mehrtens wrote:
-> On 01/20/2015 07:36 AM, Rafa? Mi?ecki wrote:
-> > Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
-> > ---
-> > V2: Typo in commit message: s/BCM5310X/BCM5301X/
-> > ---
-> 
-> In this pull request Arnd said that enabling early printk is a bad idea:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/304438.html
-> 
+Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+---
+V2: Drop earlyprintk from bootargs
+---
+ arch/arm/boot/dts/Makefile                        |  3 +-
+ arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts | 37 +++++++++++++++++++++++
+ 2 files changed, 39 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
 
-To clarify my comment from back then: earlycon support for ARM did *not*
-make it into 3.19, although I think it works on x86, arm64 and mips.
-
-I hope this gets resolved for 3.20.
-
-	Arnd
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index ff4a5ae..0de664e 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -61,7 +61,8 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+ 	bcm4708-netgear-r6250.dtb \
+ 	bcm4708-netgear-r6300-v2.dtb \
+ 	bcm47081-asus-rt-n18u.dtb \
+-	bcm47081-buffalo-wzr-600dhp2.dtb
++	bcm47081-buffalo-wzr-600dhp2.dtb \
++	bcm47081-buffalo-wzr-900dhp.dtb
+ dtb-$(CONFIG_ARCH_BCM_63XX) += bcm963138dvt.dtb
+ dtb-$(CONFIG_ARCH_BCM_CYGNUS) += bcm911360_entphn.dtb \
+ 	bcm911360k.dtb \
+diff --git a/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts b/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
+new file mode 100644
+index 0000000..7d6868a
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
+@@ -0,0 +1,37 @@
++/*
++ * Broadcom BCM470X / BCM5301X ARM platform code.
++ * DTS for Buffalo WZR-900DHP
++ *
++ * Copyright (C) 2015 Rafa? Mi?ecki <zajec5@gmail.com>
++ *
++ * Licensed under the GNU/GPL. See COPYING for details.
++ */
++
++/dts-v1/;
++
++#include "bcm47081.dtsi"
++
++/ {
++	compatible = "buffalo,wzr-900dhp", "brcm,bcm47081", "brcm,bcm4708";
++	model = "Buffalo WZR-900DHP (BCM47081)";
++
++	chosen {
++		bootargs = "console=ttyS0,115200";
++	};
++
++	memory {
++		reg = <0x00000000 0x08000000>;
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		restart {
++			label = "Reset";
++			linux,code = <KEY_RESTART>;
++			gpios = <&chipcommon 11 GPIO_ACTIVE_LOW>;
++		};
++	};
++};
+-- 
+1.8.4.5
