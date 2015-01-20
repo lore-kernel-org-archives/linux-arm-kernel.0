@@ -1,35 +1,71 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 20 Jan 2015 12:53:33 -0800
-Subject: [PATCH 3.19-rc2 v14 0/7] arm: Implement
- arch_trigger_all_cpu_backtrace
-In-Reply-To: <54BE2D15.9080606@linaro.org>
-References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
- <1421144818-14036-1-git-send-email-daniel.thompson@linaro.org>
- <54BE2D15.9080606@linaro.org>
-Message-ID: <54BEC04D.1050402@codeaurora.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 20 Jan 2015 22:09:13 +0100
+Subject: [PATCHv2] mvebu: add Linksys WRT1900AC (Mamba) support
+In-Reply-To: <op.xsrcplz12s3iss@ecaz>
+References: <1421687701-5667-1-git-send-email-kaloz@openwrt.org>
+ <20150119182113.GH32663@lunn.ch> <op.xsrcplz12s3iss@ecaz>
+Message-ID: <20150120210913.GA21891@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/20/2015 02:25 AM, Daniel Thompson wrote:
-> On 13/01/15 10:26, Daniel Thompson wrote:
->> Hi Thomas, Hi Jason:
->>     Patches 1 to 3 are for you (and should be separable from the rest
->>     of the series). The patches haven't changes since the last time
->>     I posted them. The changes in v14 tidy up the later part of the
->>     patch set in order to share more code between x86 and arm.
-> No review comments! Have I finally got this right?
->
-> If so it possible and/or sensible to get patches 1-3 in a tree that
-> feeds linux-next. I'd really like the gic changes to meet the various
-> ARM build and boot bots.
+> >
+> >It would be nice to document the jumper and pinout here.
+> >
+> >>+			serial at 12000 {
+> >>+				status = "okay";
+> >>+			};
+> 
+> Do you mean serial console pinout?
 
-With this patchset, is it possible to call sched_clock() from within NMI
-context? I ask because the generic sched_clock() code is not NMI safe
-today. We were planning on making it NMI safe by doing something similar
-to what was done for ktime_get_mono_fast_ns() but we haven't gotten
-around to it. Mostly because no architecture that uses generic
-sched_clock() has support for NMIs right now.
+Yes. Looking at
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+https://github.com/Chadster766/McWRT/wiki/Linksys-WRT1900AC-Serial-Port
+
+it seems to be jumper JP10. 
+
+1 - GND
+2 - RX
+4 - TX
+
+What i don't know is, is Rx and Rx from the perspective of the board
+or the host?
+ 
+> >>+			nand at d0000 {
+> >>+				status = "okay";
+> >>+				num-cs = <1>;
+> >>+				marvell,nand-keep-config;
+> >>+				marvell,nand-enable-arbiter;
+> >>+				nand-on-flash-bbt;
+> >>+				nand-ecc-strength = <4>;
+> >>+				nand-ecc-step-size = <512>;
+> >>+
+> >>+				partition at 0 {
+> >>+					label = "u-boot";
+> >>+					reg = <0x0000000 0x100000>;  /* 1MB */
+> >>+					read-only;
+> >>+				};
+> >>+
+> >>+				partition at 100000 {
+> >>+					label = "u_env";
+> >>+					reg = <0x100000 0x40000>;    /* 256KB */
+> >>+				};
+> >>+
+> >>+				partition at 140000 {
+> >>+					label = "s_env";
+> >>+					reg = <0x140000 0x40000>;    /* 256KB */
+> >>+				};
+> >
+> >So there is a big gap here? 768KB of unused space before the
+> >devinfo section?
+
+... 
+ 
+> The gap and the overlapping partitions (pretty much the whole
+> layout) are straight from the official firmware. The overlap is used
+> to flash a single file which contains the rootfs, too.
+
+We could put a partition in the gap, to make it usable. You could for
+example place the DT blob there. I've not actually checked the version
+of uboot used actually supports this though.
+
+   Andrew
