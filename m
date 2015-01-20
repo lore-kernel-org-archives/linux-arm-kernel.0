@@ -1,84 +1,104 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 20 Jan 2015 07:18:19 +0000 (UTC)
-Subject: [PATCH 1/5] ARM: AM43xx: hwmod: add VPFE hwmod entries
-In-Reply-To: <1418919854-16164-2-git-send-email-prabhakar.csengg@gmail.com>
-References: <1418919854-16164-1-git-send-email-prabhakar.csengg@gmail.com>
- <1418919854-16164-2-git-send-email-prabhakar.csengg@gmail.com>
-Message-ID: <alpine.DEB.2.02.1501200709440.5450@utopia.booyaka.com>
+From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
+Date: Tue, 20 Jan 2015 15:18:39 +0800
+Subject: [PATCH 2/2] cpufreq: add cpufreq driver for Mediatek MT8173 SoC
+In-Reply-To: <20150119160039.22722.67992@quantum>
+References: <1420797291-15972-1-git-send-email-pi-cheng.chen@linaro.org>
+ <1420797291-15972-3-git-send-email-pi-cheng.chen@linaro.org>
+ <20150119160039.22722.67992@quantum>
+Message-ID: <CALx668Xn8Qz-B0RFYusyQPwnCsY8GwTRZw4r8kQyr3T6BRM8oA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On 20 January 2015 at 00:00, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting pi-cheng.chen (2015-01-09 01:54:51)
+>> diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mt8173-cpufreq.c
+>> new file mode 100644
+>> index 0000000..b578c10
+>> --- /dev/null
+>> +++ b/drivers/cpufreq/mt8173-cpufreq.c
+>> @@ -0,0 +1,459 @@
 
-On Thu, 18 Dec 2014, Lad, Prabhakar wrote:
+Hello Mike,
 
-> From: Benoit Parrot <bparrot@ti.com>
-> 
-> this patch adds VPFE HWMOD data for AM43xx.
-> 
-> Signed-off-by: Benoit Parrot <bparrot@ti.com>
-> Signed-off-by: Darren Etheridge <detheridge@ti.com>
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+>
+> Hello Pi-Cheng,
+>
+> <snip>
+>
+>> +#include <linux/module.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/cpufreq.h>
+>> +#include <linux/cpufreq-dt.h>
+>> +#include <linux/cpumask.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/clk.h>
+>> +#include <linux/clk-provider.h>
+>
+> I'll echo what Viresh said here. CPUfreq drivers should typically be
+> clock consumers and only require clk.h, not clk-provider.h. More on that
+> below.
+>
 
-...
+I included it because of the __clk_lookup call. But yes, I will use the clk_get
+to get the intermediate clock to get rid of this.
 
-> ---
->  arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 56 ++++++++++++++++++++++++++++++
->  arch/arm/mach-omap2/prcm43xx.h             |  3 +-
->  2 files changed, 58 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-> index fea01aa..bd9067e 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+> <snip>
+>
+>> +static void cpuclk_mux_set(int cluster, u32 sel)
+>> +{
+>> +       u32 val;
+>> +       u32 mask = 0x3;
+>> +
+>> +       if (cluster == BIG_CLUSTER) {
+>> +               mask <<= 2;
+>> +               sel <<= 2;
+>> +       }
+>> +
+>> +       spin_lock(&lock);
+>> +
+>> +       val = readl(clk_mux_regs);
+>> +       val = (val & ~mask) | sel;
+>> +       writel(val, clk_mux_regs);
+>> +
+>> +       spin_unlock(&lock);
+>> +}
+>
+> Is cpuclk a mux that is represented in the MT8173 clock driver? It looks
+> like a clock that belong to the clock driver, but this cpufreq driver is
+> writing to that register directly.
+>
 
-...
+Yes, it's a mux but not presented in MT8173 clock driver yet. Therefore I
+map the HW register and writing them directly to do reparent. I will get
+rid of it once I got those muxes presented in MT8173 clock driver.
 
-> @@ -750,6 +788,22 @@ static struct omap_hwmod_ocp_if am43xx_l4_ls__dss_rfbi = {
->  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
->  };
->  
-> +static struct omap_hwmod_ocp_if am43xx_l3__vpfe0 = {
-> +	.master         = &am33xx_l3_main_hwmod,
-> +	.slave          = &am43xx_vpfe0_hwmod,
-> +	.clk            = "l3_gclk",
-> +	.flags          = OCPIF_SWSUP_IDLE,
-> +	.user           = OCP_USER_MPU,
-> +};
-> +
-> +static struct omap_hwmod_ocp_if am43xx_l3__vpfe1 = {
-> +	.master         = &am33xx_l3_main_hwmod,
-> +	.slave          = &am43xx_vpfe1_hwmod,
-> +	.clk            = "l3_gclk",
-> +	.flags          = OCPIF_SWSUP_IDLE,
-> +	.user           = OCP_USER_MPU,
-> +};
-> +
->  static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
->  	&am33xx_l4_wkup__synctimer,
->  	&am43xx_l4_ls__timer8,
-> @@ -848,6 +902,8 @@ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
->  	&am43xx_l4_ls__dss,
->  	&am43xx_l4_ls__dss_dispc,
->  	&am43xx_l4_ls__dss_rfbi,
-> +	&am43xx_l3__vpfe0,
-> +	&am43xx_l3__vpfe1,
->  	NULL,
->  };
+> <snip>
+>
+>> +static int mt8173_cpufreq_dvfs_info_init(void)
+>> +{
+>
+> <snip>
+>
+>> +       mainpll = __clk_lookup("mainpll");
+>> +       if (!mainpll) {
+>> +               pr_err("failed to get mainpll clk\n");
+>> +               ret = -ENOENT;
+>> +               goto dvfs_info_release;
+>> +       }
+>> +       mainpll_freq = clk_get_rate(mainpll);
+>
+> This is definitely bad. Why not use clk_get() here? __clk_lookup should
+> not be exposed to clock consumer drivers (and I hope to get rid of it
+> completely some day).
+>
 
-According to SPRUHL7 Figure 14-1 "VPFE Integration" and Table 14-2 "VPFE 
-Connectivity Attributes", a VPFE has two interconnect ports per instance: 
-one L4-Per port as a register target, and one L3 port as a DMA initiator.  
-It's unclear to me whether the L3 port can also serve as a register 
-target, but Section 2.1 "ARM Cortex-A9 Memory Map", Table 4-1 "L3 
-Master-Slave Connectivity", and Figure 4-2 "L4 Topology" suggest that it 
-cannot.
+Thanks for pointing me out the right API to do it. I will fix it in
+next version.
 
-So if that's correct, there should be two more struct omap_hwmod_ocp_if 
-records added in this patch for the register target ports that are 
-connected to the L4.  DSS is a good example: see am43xx_dss__l3_main and 
-am43xx_l4_ls__dss in this same file.
+Best Regards,
+Pi-Cheng
 
-
-- Paul
+> Regards,
+> Mike
