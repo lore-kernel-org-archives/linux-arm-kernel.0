@@ -1,94 +1,63 @@
-From: gg@slimlogic.co.uk (Graeme Gregory)
-Date: Tue, 20 Jan 2015 13:08:32 +0000
-Subject: [PATCH 00/10] drivers: PL011: add ARM SBSA Generic UART support
-In-Reply-To: <1421428986-11300-1-git-send-email-andre.przywara@arm.com>
-References: <1421428986-11300-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <20150120130832.GA6858@xora-yoga-13.xora.org.uk>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 20 Jan 2015 14:08:53 +0100 (CET)
+Subject: [PATCH v2 1/5] irqchip: add dumb demultiplexer implementation
+In-Reply-To: <CAL_JsqLCkU0TA5YCa2h+NyaXxG2vDpGSaNqveAr9XcnFDfuRXA@mail.gmail.com>
+References: <1421174781-4340-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1421174781-4340-2-git-send-email-boris.brezillon@free-electrons.com>
+ <CAL_JsqJ5DSo6jmAuHPDdV6pMca8BVbg5V-GZ5=2qu96_QYXMtQ@mail.gmail.com>
+ <alpine.DEB.2.11.1501141110190.5526@nanos>
+ <CAL_JsqLwBvV5s531_YsA=sCE4_LG=eXTua8mh069ufRjSNFhng@mail.gmail.com>
+ <alpine.DEB.2.11.1501151003430.5526@nanos>
+ <CAL_JsqLCkU0TA5YCa2h+NyaXxG2vDpGSaNqveAr9XcnFDfuRXA@mail.gmail.com>
+Message-ID: <alpine.DEB.2.11.1501201356370.5526@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 05:22:56PM +0000, Andre Przywara wrote:
-> The ARM Server Base System Architecture[1] document describes a
-> generic UART which is a subset of the PL011 UART.
-> It lacks DMA support, baud rate control and modem status line
-> control, among other things.
-> The idea is to move the UART initialization and setup into the
-> firmware (which does this job today already) and let the kernel just
-> use the UART for sending and receiving characters.
+On Thu, 15 Jan 2015, Rob Herring wrote:
+> On Thu, Jan 15, 2015 at 3:11 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
+> > On Wed, 14 Jan 2015, Rob Herring wrote:
+>
+> > We do not change shared interrupts in any way. We provide an
+> > alternative mechanism for braindead hardware. And if the at91 folks
+> > are fine with the DT change, then it's their decision. Nothing forces
+> > this on everyone.
 > 
-> This patchset integrates support for this UART subset into the
-> existing PL011 driver - basically by refactoring some
-> functions and providing a new uart_ops structure for it. It also has
-> a separate probe function to be not dependent on AMBA/PrimeCell.
-> It provides a device tree binding, but can easily be adapted to other
-> device configuration systems.
-> Beside the obvious effect of code sharing reusing most of the PL011
-> code has the advantage of not introducing another serial device
-> prefix, so it can go with ttyAMA, which seems to be pretty common.
-> 
-> This series relies on Dave's recent PL011 fix[2], which gets rid of
-> the loopback trick to get the UART going. There is a repo at [3]
-> (branch sbsa-uart/v1), which has this patch already integrated.
-> 
-> Patch 1/10 contains a bug fix which applies to the PL011 part also,
-> it should be considered regardless of the rest of the series.
-> Patch 2-7 refactor some PL011 functions by splitting them up into
-> smaller pieces, so that most of the code can be reused later by the
-> SBSA part.
-> Patch 8 and 9 introduce two new properties for the vendor structure,
-> this is for SBSA functionality which cannot be controlled by
-> separate uart_ops members only.
-> Patch 10 then finally drops in the SBSA specific code, by providing
-> a new uart_ops, vendor struct and probe function for it. Also the new
-> device tree binding is documented.
-> 
-> For testing you should be able to take any hardware which has a PL011
-> and change the DT to use a "arm,sbsa-uart" compatible string.
-> Of course testing with a real SBSA Generic UART is welcomed!
-> 
-I have tested this series on Juno where it seems to work and also on FVP
-model where there are some issues.
+> We are changing how shared interrupts are described in DT. We don't
+> need 2 ways to describe them. We could say this is only for AT91 and
+> continue to describe shared interrupts as has been done forever. Then
+> the next platform that hits this problem will have to go thru the same
+> ABI breakage. Or we change DT practices to describe all shared
+> interrupts with a demux node. Given the way DTs are incrementally
+> created, it is not something we can check with review or tools, so we
+> will still have the same ABI breakage problem.
 
-On the FVP when we enter usespace a couple of 32 character strings are
-printed then nothing else. 32 Characters is a suspicious number.
+This is not describing the proper shared interrupts. This is a special
+case for a special case of braindamaged hardware. Whats wrong with
+doing that? We dont have to change that for all shared interrupts
+because 99% of them have a proper hardware implementation and are not
+affected by this.
 
-This occurs with both OE based FS from linaro and debian ubstable FS.
+What's wrong with serving the AT91 with a proper solution, which does
+NOT inflict horrible hacks into the core code and does NOT weaken
+sanity checks and does NOT require irq chip specific knowledge in
+device drivers?
 
-My FVP is version 5602
+> >> There are probably ways to do this demux irqchip without a DT change.
 
-Graeme
+So far you have not provided any useful hint how to do so.
 
-> Cheers,
-> Andre
+> > What's the problem with a DT change for a single platform, if the
+> > maintainers are willing to take it and deal with the fallout?
 > 
-> [1] ARM-DEN-0029 Server Base System Architecture, available (click-
->     thru...) from http://infocenter.arm.com
-> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/315248.html
-> [3] http://www.linux-arm.org/git?p=linux-ap.git
->     git://linux-arm.org/linux-ap.git
-> 
-> Andre Przywara (10):
->   drivers: PL011: avoid potential unregister_driver call
->   drivers: PL011: refactor pl011_startup()
->   drivers: PL011: refactor pl011_shutdown()
->   drivers: PL011: refactor pl011_set_termios()
->   drivers: PL011: refactor pl011_probe()
->   drivers: PL011: replace UART_MIS reading with _RIS & _IMSC
->   drivers: PL011: move cts_event workaround into separate function
->   drivers: PL011: allow avoiding UART enabling/disabling
->   drivers: PL011: allow to supply fixed option string
->   drivers: PL011: add support for the ARM SBSA generic UART
-> 
->  .../devicetree/bindings/serial/arm_sbsa_uart.txt   |    9 +
->  drivers/tty/serial/amba-pl011.c                    |  510 ++++++++++++++------
->  2 files changed, 381 insertions(+), 138 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
-> 
-> -- 
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> What's the solution for a platform that an ABI break is not okay and
+> can't deal with the fallout?
+
+There is no other platform affected. This is a break for a specific
+set of devices and the 'fallout' is confined, well known and accepted.
+
+So what's your problem, really?
+
+Thanks,
+
+	tglx
+ 
