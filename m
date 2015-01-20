@@ -1,45 +1,44 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 20 Jan 2015 09:10:38 -0600
-Subject: [next-20150119]regression (mm)?
-In-Reply-To: <CAOMZO5D-Z-FLPmQ4Yy3rxBa-FebLcnG9TSzg3F-MF-TFBBMrwQ@mail.gmail.com>
-References: <54BD33DC.40200@ti.com> <20150119174317.GK20386@saruman>
- <20150120001643.7D15AA8@black.fi.intel.com>
- <20150120114555.GA11502@n2100.arm.linux.org.uk>
- <20150120140546.DDCB8D4@black.fi.intel.com>
- <CAOMZO5D-Z-FLPmQ4Yy3rxBa-FebLcnG9TSzg3F-MF-TFBBMrwQ@mail.gmail.com>
-Message-ID: <20150120151038.GC6556@saruman>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 20 Jan 2015 08:11:56 -0700
+Subject: [PATCH] coresight-etm: remove check for unknown Kconfig macro
+In-Reply-To: <1421689454.9655.58.camel@x220>
+References: <1421689454.9655.58.camel@x220>
+Message-ID: <CANLsYkzgiX_ZkQVEU-o4VE=LQB=daw1a3WCOkm45bdBHWg72tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 20, 2015 at 12:50:59PM -0200, Fabio Estevam wrote:
-> On Tue, Jan 20, 2015 at 12:05 PM, Kirill A. Shutemov
-> <kirill.shutemov@linux.intel.com> wrote:
-> > Russell King - ARM Linux wrote:
-> >> On Tue, Jan 20, 2015 at 02:16:43AM +0200, Kirill A. Shutemov wrote:
-> >> > Better option would be converting 2-lvl ARM configuration to
-> >> > <asm-generic/pgtable-nopmd.h>, but I'm not sure if it's possible.
-> >>
-> >> Well, IMHO the folded approach in asm-generic was done the wrong way
-> >> which barred ARM from ever using it.
-> >
-> > Okay, I see.
-> >
-> > Regarding the topic bug. Completely untested patch is below. Could anybody
-> > check if it helps?
-> 
-> Yes, it helps. Now I can boot mx6 running linux-next 20150120 with
-> your patch applied.
+On 19 January 2015 at 10:44, Paul Bolle <pebolle@tiscali.nl> wrote:
+> The CoreSight ETM/PTM driver contains a check for a
+> CONFIG_CORESIGHT_SOURCE_ETM_DEFAULT_ENABLE macro. But there's no related
+> Kconfig symbol CORESIGHT_SOURCE_ETM_DEFAULT_ENABLE. Remove that check
+> and the single line of code it hides.
+>
+> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+> ---
+> Cross-compile tested only (on top of next-20150119).
+>
+>  drivers/coresight/coresight-etm3x.c | 4 ----
+>  1 file changed, 4 deletions(-)
+>
+> diff --git a/drivers/coresight/coresight-etm3x.c b/drivers/coresight/coresight-etm3x.c
+> index 73c36696f1b6..f312dc4dd95c 100644
+> --- a/drivers/coresight/coresight-etm3x.c
+> +++ b/drivers/coresight/coresight-etm3x.c
+> @@ -34,11 +34,7 @@
+>
+>  #include "coresight-etm.h"
+>
+> -#ifdef CONFIG_CORESIGHT_SOURCE_ETM_DEFAULT_ENABLE
+> -static int boot_enable = 1;
+> -#else
+>  static int boot_enable;
+> -#endif
+>  module_param_named(
+>         boot_enable, boot_enable, int, S_IRUGO
+>  );
+> --
+> 1.9.3
+>
 
-worked fine here too with AM437x SK, AM437x IDK and BeagleBoneBlack.
-
-thanks
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150120/91a52db0/attachment.sig>
+Applied - with a slight modification to keep the "module_param_named"
+macro on the same line.
