@@ -1,76 +1,95 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 20 Jan 2015 14:01:03 +0100
-Subject: [PATCHv6 0/6] USB: host: Atmel OHCI and EHCI drivers improvements
-In-Reply-To: <1421665567-31759-1-git-send-email-sylvain.rochet@finsecur.com>
-References: <1421665567-31759-1-git-send-email-sylvain.rochet@finsecur.com>
-Message-ID: <54BE518F.8060007@atmel.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 20 Jan 2015 15:01:49 +0200
+Subject: [PATCH 6/9] ARM: shmobile: ape6evm dts: Move Ethernet node to BSC
+In-Reply-To: <1421758306-24838-7-git-send-email-geert+renesas@glider.be>
+References: <1421758306-24838-1-git-send-email-geert+renesas@glider.be>
+ <1421758306-24838-7-git-send-email-geert+renesas@glider.be>
+Message-ID: <1868496.12FX9W9aLb@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 19/01/2015 12:06, Sylvain Rochet a ?crit :
-> USB: host: Atmel OHCI and EHCI drivers improvements
-> 
-> Suspend/resume support for EHCI.
-> struct dev_pm_ops for OHCI.
-> Removed global variables from both.
-> Fixed OHCI wake up support for STANDBY(wake-up enabled) and MEM(wake-up
-> disabled) sleep targets.
-> 
-> Changes since v5:
->   * Don't overwrite device wakeup flag with device_init_wakeup(),
->     now using a private wakeup bool instead.
-> 
-> Changes since v4:
->   * Re-add at91_suspend_entering_slow_clock() to OHCI, we can't naively
->     remove this one, this device needs to be continuously clocked to
->     provide wake up support.
->     The removal of at91_suspend_entering_slow_clock() actually lighted up
->     an issue on wake up support, which is now fixed.
-> 
-> Changes since v3:
->   * Using struct dev_pm_ops instead of static struct platform_driver
->     resume and suspend bindings for both EHCI and OHCI
->   * Fixed inconsistency in patch subjects, _ intead of - for file names
->   * Patch cleaning with the help of checkpatch.pl, fixed lines over
->     80 characters
-> 
-> Changes since v2:
->   * Added patchs from an other submission, because this series
->     depended on this one
->     * EHCI: Move global variables to private struct
->     * OHCI: Move global variables to private struct
->   * Using ohci->priv and ehci->priv instead of hcd->hcd_priv,
->     which were not the right way to do that
-> 
-> Changes since v1:
->   * Don't use at91_suspend_entering_slow_clock() on EHCI,
->     we are trying to get read of this of this function
->   * Removed at91_suspend_entering_slow_clock() from OHCI
-> 
-> Sylvain Rochet (6):
->   USB: host: ehci-atmel: Add suspend/resume support
->   USB: host: ohci-at91: Use struct dev_pm_ops instead of struct
->     platform_driver
->   USB: host: ehci-atmel: Move global variables to private struct
->   USB: host: ohci-at91: Move global variables to private struct
->   USB: host: ohci-at91: usb_hcd_at91_probe(), remove useless stack
->     initialisation
->   USB: host: ohci-at91: Fix wake-up support
-> 
->  drivers/usb/host/ehci-atmel.c | 102 +++++++++++++++++++++++++---------
->  drivers/usb/host/ohci-at91.c  | 126 ++++++++++++++++++++++++++----------------
->  2 files changed, 154 insertions(+), 74 deletions(-)
+Hi Geert,
 
-As already mentioned for the v5, I'm okay with the whole series:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Thank you for the patch.
 
-So Sylvain, as said by Alan, I think you can now collect all the
-"Acked-by" tags (Alex had also sent some if I recall well) and re-send a
-clean v7 series to Greg KH.
+On Tuesday 20 January 2015 13:51:43 Geert Uytterhoeven wrote:
+> Move the Ethernet node from the ad-hoc lbsc node to the BSC node,
+> as its connected to the Bus State Controller.  This allows the system to
+> know the right position of the Ethernet node in the clock and PM domain
+> hierarchy, and manage the clock and PM domain appropriately.
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Tested-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 
-BTW, for rewriting this series' logs, I suggest you to use:
-"git filter-branch -f --msg-filter ..." ;-)
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-Bye,
+> ---
+> v3:
+>   - Add Tested-by,
+> 
+> v2:
+>   - New.
+> ---
+>  arch/arm/boot/dts/r8a73a4-ape6evm.dts | 35
+> +++++++++++++++-------------------- 1 file changed, 15 insertions(+), 20
+> deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+> b/arch/arm/boot/dts/r8a73a4-ape6evm.dts index
+> 0d50bef0123449f5..44c4cac1820a4dfe 100644
+> --- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+> +++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+> @@ -72,26 +72,6 @@
+>  		regulator-always-on;
+>  	};
+> 
+> -	lbsc {
+> -		compatible = "simple-bus";
+> -		#address-cells = <1>;
+> -		#size-cells = <1>;
+> -		ranges = <0 0 0 0x20000000>;
+> -
+> -		ethernet at 8000000 {
+> -			compatible = "smsc,lan9220", "smsc,lan9115";
+> -			reg = <0x08000000 0x1000>;
+> -			interrupt-parent = <&irqc1>;
+> -			interrupts = <8 IRQ_TYPE_LEVEL_HIGH>;
+> -			phy-mode = "mii";
+> -			reg-io-width = <4>;
+> -			smsc,irq-active-high;
+> -			smsc,irq-push-pull;
+> -			vdd33a-supply = <&ape6evm_fixed_3v3>;
+> -			vddvario-supply = <&ape6evm_fixed_1v8>;
+> -		};
+> -	};
+> -
+>  	leds {
+>  		compatible = "gpio-leds";
+>  		led1 {
+> @@ -184,6 +164,21 @@
+>  	voltage-tolerance = <1>; /* 1% */
+>  };
+> 
+> +&bsc {
+> +	ethernet at 8000000 {
+> +		compatible = "smsc,lan9220", "smsc,lan9115";
+> +		reg = <0x08000000 0x1000>;
+> +		interrupt-parent = <&irqc1>;
+> +		interrupts = <8 IRQ_TYPE_LEVEL_HIGH>;
+> +		phy-mode = "mii";
+> +		reg-io-width = <4>;
+> +		smsc,irq-active-high;
+> +		smsc,irq-push-pull;
+> +		vdd33a-supply = <&ape6evm_fixed_3v3>;
+> +		vddvario-supply = <&ape6evm_fixed_1v8>;
+> +	};
+> +};
+> +
+>  &cmt1 {
+>  	status = "okay";
+>  };
+
 -- 
-Nicolas Ferre
+Regards,
+
+Laurent Pinchart
