@@ -1,87 +1,46 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 20 Jan 2015 11:00:45 +0000
-Subject: [PATCH v7 06/17] ARM64 / ACPI: Make PCI optional for ACPI on ARM64
-In-Reply-To: <54BDBFD4.7050207@linaro.org>
-References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
- <1421247905-3749-7-git-send-email-hanjun.guo@linaro.org>
- <20150116094913.GA13634@e104818-lin.cambridge.arm.com>
- <54BB51F1.8000900@linaro.org>
- <20150119104240.GE11835@e104818-lin.cambridge.arm.com>
- <54BDBFD4.7050207@linaro.org>
-Message-ID: <20150120110045.GD25575@e104818-lin.cambridge.arm.com>
+From: sylvain.rochet@finsecur.com (Sylvain Rochet)
+Date: Tue, 20 Jan 2015 12:02:40 +0100
+Subject: [PATCHv3 1/2] USB: gadget: atmel_usba_udc: Fixed vbus_prev
+ initial state
+In-Reply-To: <20150119185547.GM20386@saruman>
+References: <20150118175621.6b519cdc@bbrezillon>
+ <1421601875-9436-1-git-send-email-sylvain.rochet@finsecur.com>
+ <1421601875-9436-2-git-send-email-sylvain.rochet@finsecur.com>
+ <54BD1028.20303@atmel.com> <20150119185547.GM20386@saruman>
+Message-ID: <20150120110240.GA5752@gradator.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 20, 2015 at 02:39:16AM +0000, Hanjun Guo wrote:
-> On 2015?01?19? 18:42, Catalin Marinas wrote:
-> > On Sun, Jan 18, 2015 at 06:25:53AM +0000, Hanjun Guo wrote:
-> >> On 2015?01?16? 17:49, Catalin Marinas wrote:
-> >>> On Wed, Jan 14, 2015 at 03:04:54PM +0000, Hanjun Guo wrote:
-> >>>> --- a/arch/arm64/kernel/pci.c
-> >>>> +++ b/arch/arm64/kernel/pci.c
-> >>>> @@ -10,6 +10,7 @@
-> >>>>     *
-> >>>>     */
-> >>>>
-> >>>> +#include <linux/acpi.h>
-> >>>>    #include <linux/init.h>
-> >>>>    #include <linux/io.h>
-> >>>>    #include <linux/kernel.h>
-> >>>> @@ -68,3 +69,30 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
-> >>>>    	bus->domain_nr = domain;
-> >>>>    }
-> >>>>    #endif
-> >>>> +
-> >>>> +/*
-> >>>> + * raw_pci_read/write - Platform-specific PCI config space access.
-> >>>> + *
-> >>>> + * Default empty implementation.  Replace with an architecture-specific setup
-> >>>> + * routine, if necessary.
-> >>>> + */
-> >>>> +int raw_pci_read(unsigned int domain, unsigned int bus,
-> >>>> +		  unsigned int devfn, int reg, int len, u32 *val)
-> >>>> +{
-> >>>> +	return -EINVAL;
-> >>>> +}
-> >>>> +
-> >>>> +int raw_pci_write(unsigned int domain, unsigned int bus,
-> >>>> +		unsigned int devfn, int reg, int len, u32 val)
-> >>>> +{
-> >>>> +	return -EINVAL;
-> >>>> +}
-> >>>> +
-> >>>> +#ifdef CONFIG_ACPI
-> >>>> +/* Root bridge scanning */
-> >>>> +struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
-> >>>> +{
-> >>>> +	/* TODO: Should be revisited when implementing PCI on ACPI */
-> >>>> +	return NULL;
-> >>>> +}
-> >>>> +#endif
-> > [...]
-> >>> When PCI is enabled and the above functions are compiled in, do they
-> >>> need to return any useful data or just -EINVAL. Are they ever called?
-> >>
-> >> They will be called if PCI root bridge is defined in DSDT, should I
-> >> print some warning message before it is implemented?
-> >
-> > My point: do they need to return real data when a PCI root bridge is
-> > defined in DSDT or you always expect them to always return some -E*? Can
-> > you explain why?
+Hello,
+
+On Mon, Jan 19, 2015 at 12:55:47PM -0600, Felipe Balbi wrote:
+> On Mon, Jan 19, 2015 at 03:09:44PM +0100, Nicolas Ferre wrote:
+> > Le 18/01/2015 18:24, Sylvain Rochet a ?crit :
+> > > If vbus gpio is high at init, we should set vbus_prev to true
+> > > accordingly to the current vbus state. Without that, we skip the first
+> > > vbus interrupt because the saved vbus state is not consistent.
+> > > 
+> > > Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+> > 
+> > Indeed:
+> > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > 
+> > We can also add the following tags:
+> > Fixes: 914a3f3b3754 ("USB: add atmel_usba_udc driver")
+> > Cc: <stable@vger.kernel.org> # 2.6.x-ish
 > 
-> Not always return -E* or NULL;
-> 
-> For raw_pci_read/write(), they are needed to access the PCI config space
-> before the PCI root bus is created. so they will return 0 if access to
-> PCI config space is ok; pci_acpi_scan_root() will return root bus
-> pointer if it is successfully created.
+> Please resend with the proper stable format. Also, this 2.6.x-ish should
+> be 2.6.24+, git describe helps a lot figuring these out.
 
-OK. So what's the plan for implementing these functions properly. For
-the raw_pci_read/write, the comment states "replace with an
-architecture-specific setup routine". What does this mean?
+Unfortunately I failed to understand what I should do. The "Also" 
+keyword means for me that there are two differents things to fix:
 
-For pci_acpi_scan_root(), at least the comment states a "TODO". Is there
-anyone working on this or we don't expect servers with PCIe soon?
+1. proper stable format
+2. 2.6.x-ish ? 2.6.24+
 
--- 
-Catalin
+  2. does not imply fixing 1., isn'it ?
+
+I read SubmittingPatches thoroughly and I can't find a reference to 
+stable format.
+
+Sylvain
