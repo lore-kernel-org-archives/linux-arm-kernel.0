@@ -1,39 +1,71 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 20 Jan 2015 13:50:39 +0000
-Subject: [PATCH 1/7] mfd: menelaus: delete omap_has_menelaus
-In-Reply-To: <1419702779-16001-2-git-send-email-aaro.koskinen@iki.fi>
+Date: Tue, 20 Jan 2015 13:52:01 +0000
+Subject: [PATCH 2/7] mfd: menelaus: drop support for SW controller VCORE
+In-Reply-To: <1419702779-16001-3-git-send-email-aaro.koskinen@iki.fi>
 References: <1419702779-16001-1-git-send-email-aaro.koskinen@iki.fi>
- <1419702779-16001-2-git-send-email-aaro.koskinen@iki.fi>
-Message-ID: <20150120135039.GL13701@x1>
+ <1419702779-16001-3-git-send-email-aaro.koskinen@iki.fi>
+Message-ID: <20150120135201.GM13701@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Sat, 27 Dec 2014, Aaro Koskinen wrote:
 
-> Delete unused macro.
+> Drop support for SW controlled VCORE, nobody uses it.
 > 
 > Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
 > ---
->  include/linux/mfd/menelaus.h | 6 ------
->  1 file changed, 6 deletions(-)
+>  drivers/mfd/menelaus.c       | 23 -----------------------
+>  include/linux/mfd/menelaus.h |  1 -
+>  2 files changed, 24 deletions(-)
 
 Applied, thanks.
 
+> diff --git a/drivers/mfd/menelaus.c b/drivers/mfd/menelaus.c
+> index 9f01aef..917fa86 100644
+> --- a/drivers/mfd/menelaus.c
+> +++ b/drivers/mfd/menelaus.c
+> @@ -532,29 +532,6 @@ static const struct menelaus_vtg_value vcore_values[] = {
+>  	{ 1450, 18 },
+>  };
+>  
+> -int menelaus_set_vcore_sw(unsigned int mV)
+> -{
+> -	int val, ret;
+> -	struct i2c_client *c = the_menelaus->client;
+> -
+> -	val = menelaus_get_vtg_value(mV, vcore_values,
+> -				     ARRAY_SIZE(vcore_values));
+> -	if (val < 0)
+> -		return -EINVAL;
+> -
+> -	dev_dbg(&c->dev, "Setting VCORE to %d mV (val 0x%02x)\n", mV, val);
+> -
+> -	/* Set SW mode and the voltage in one go. */
+> -	mutex_lock(&the_menelaus->lock);
+> -	ret = menelaus_write_reg(MENELAUS_VCORE_CTRL1, val);
+> -	if (ret == 0)
+> -		the_menelaus->vcore_hw_mode = 0;
+> -	mutex_unlock(&the_menelaus->lock);
+> -	msleep(1);
+> -
+> -	return ret;
+> -}
+> -
+>  int menelaus_set_vcore_hw(unsigned int roof_mV, unsigned int floor_mV)
+>  {
+>  	int fval, rval, val, ret;
 > diff --git a/include/linux/mfd/menelaus.h b/include/linux/mfd/menelaus.h
-> index f097e89..a1e12bf3 100644
+> index a1e12bf3..9e85ac0 100644
 > --- a/include/linux/mfd/menelaus.h
 > +++ b/include/linux/mfd/menelaus.h
-> @@ -38,10 +38,4 @@ extern int menelaus_set_vcore_hw(unsigned int roof_mV, unsigned int floor_mV);
+> @@ -24,7 +24,6 @@ extern int menelaus_set_vaux(unsigned int mV);
+>  extern int menelaus_set_vdcdc(int dcdc, unsigned int mV);
+>  extern int menelaus_set_slot_sel(int enable);
+>  extern int menelaus_get_slot_pin_states(void);
+> -extern int menelaus_set_vcore_sw(unsigned int mV);
+>  extern int menelaus_set_vcore_hw(unsigned int roof_mV, unsigned int floor_mV);
 >  
->  extern int menelaus_set_regulator_sleep(int enable, u32 val);
->  
-> -#if defined(CONFIG_ARCH_OMAP2) && defined(CONFIG_MENELAUS)
-> -#define omap_has_menelaus()	1
-> -#else
-> -#define omap_has_menelaus()	0
-> -#endif
-> -
->  #endif
+>  #define EN_VPLL_SLEEP	(1 << 7)
 
 -- 
 Lee Jones
