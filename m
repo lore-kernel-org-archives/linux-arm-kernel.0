@@ -1,36 +1,46 @@
-From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
-Date: Tue, 20 Jan 2015 16:47:59 +0800
-Subject: [PATCH 1/2] cpufreq-dt: check CPU clock/power domain during
- initializing
-In-Reply-To: <CAKohponUfB-RJTwPDMPCGogng8nzc=kwTF56GjGfDSD7MLQuAg@mail.gmail.com>
-References: <1420797291-15972-1-git-send-email-pi-cheng.chen@linaro.org>
- <1420797291-15972-2-git-send-email-pi-cheng.chen@linaro.org>
- <CAKohpok7Q3CpMospA=3PAqiLtEERfkAJdHkcH+9GKvYBsof0UQ@mail.gmail.com>
- <CALx668V5TKkx-qGnMjFAspTQ5pu3XsM1012wXsBHvR3CNsuCew@mail.gmail.com>
- <CAKohponUfB-RJTwPDMPCGogng8nzc=kwTF56GjGfDSD7MLQuAg@mail.gmail.com>
-Message-ID: <CALx668WCTPZDWigcDyWKy__Lh+LQrEX9fVnqmfWcjZnJWnBiMw@mail.gmail.com>
+From: b38611@freescale.com (Fugang Duan)
+Date: Tue, 20 Jan 2015 16:48:17 +0800
+Subject: [PATCH net-next v2 1/1] ARM: dts: imx6sx: correct i.MX6sx sdb board
+ enet phy address
+Message-ID: <1421743697-26918-1-git-send-email-b38611@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 January 2015 at 15:39, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On 20 January 2015 at 13:03, Pi-Cheng Chen <pi-cheng.chen@linaro.org> wrote:
->> I will also try to add intermediate frequency support in next version.
->
-> Sure
->
->> BTW, do you think it's a good idea to add a new device tree binding like
->> intermediate_clock = <&clksys MAINPLL>
->> and so that cpufreq-dt could get the intermediate clock?
->
-> Yeah, we need that. I am trying to implement new opp bindings and will
-> take care of that. Until that time, use platform data to do that.
->
+The commit (3d125f9c91c5) cause i.MX6SX sdb enet cannot work. The cause is
+the commit add mdio node with un-correct phy address.
 
-Got it.
-Thanks.
+The patch just correct i.MX6sx sdb board enet phy address.
 
-Best Regards,
-Pi-Cheng
+V2:
+* As Shawn's suggestion that unit-address should match 'reg' property, so
+  update ethernet-phy unit-address.
 
-> --
-> viresh
+Acked-by: Stefan Agner <stefan@agner.ch>
+Signed-off-by: Fugang Duan <B38611@freescale.com>
+---
+ arch/arm/boot/dts/imx6sx-sdb.dts |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
+index 8c1febd..c108bb4 100644
+--- a/arch/arm/boot/dts/imx6sx-sdb.dts
++++ b/arch/arm/boot/dts/imx6sx-sdb.dts
+@@ -166,12 +166,12 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 
+-		ethphy1: ethernet-phy at 0 {
+-			reg = <0>;
++		ethphy1: ethernet-phy at 1 {
++			reg = <1>;
+ 		};
+ 
+-		ethphy2: ethernet-phy at 1 {
+-			reg = <1>;
++		ethphy2: ethernet-phy at 2 {
++			reg = <2>;
+ 		};
+ 	};
+ };
+-- 
+1.7.8
