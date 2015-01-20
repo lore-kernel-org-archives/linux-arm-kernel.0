@@ -1,52 +1,46 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 20 Jan 2015 10:27:34 +0900
-Subject: [PATCH] ARM: shmobile: sh73a0 dtsi: Add Cortex-A9 TWD node
-In-Reply-To: <cover.1421716945.git.horms+renesas@verge.net.au>
-References: <cover.1421716945.git.horms+renesas@verge.net.au>
-Message-ID: <e42c8385cfec0579a103b365d61748f199bfe239.1421716945.git.horms+renesas@verge.net.au>
+Date: Tue, 20 Jan 2015 10:27:43 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC sh73a0 DT PM Updates for v3.20
+Message-ID: <cover.1421716413.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Add a node for the Private Timer and Watchdog, as found in the Cortex-A9
-MPCore.
+Please consider these Renesas ARM based SoC sh73a0 DT PM updates for v3.20.
 
-Without this, there's no clocksource available during early kernel
-initialization, before cmt1 is initialized, leading to a lock-up if
-CONFIG_CPU_IDLE=y.
+This pull request is based on a merge of:
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/sh73a0.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+* "[GIT PULL] Third Round of Renesas ARM Based SoC Updates for v3.20",
+  tagged as renesas-soc3-for-v3.20, which I have sent a pull request for.
 
-diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-index 0c9a357..2558bf4 100644
---- a/arch/arm/boot/dts/sh73a0.dtsi
-+++ b/arch/arm/boot/dts/sh73a0.dtsi
-@@ -11,6 +11,7 @@
- /include/ "skeleton.dtsi"
- 
- #include <dt-bindings/clock/sh73a0-clock.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- 
- / {
-@@ -35,6 +36,13 @@
- 		};
- 	};
- 
-+	timer at f0000600 {
-+		compatible = "arm,cortex-a9-twd-timer";
-+		reg = <0xf0000600 0x20>;
-+		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
-+		clocks = <&twd_clk>;
-+	};
-+
- 	gic: interrupt-controller at f0001000 {
- 		compatible = "arm,cortex-a9-gic";
- 		#interrupt-cells = <3>;
--- 
-2.1.4
+* "[GIT PULL] Second Round of Renesas ARM Based SoC DT Updates for v3.20",
+  tagged as renesas-dt2-for-v3.20, which I have sent a pull request for.
+
+My understanding from to Geert Uytterhoeven both of the above are required
+in order for the system to remain bootable.
+
+
+The following changes since commit 2e828caaf311b5990c652e281d0ffceea382ae16:
+
+  Merge branch 'dt-for-v3.20' into sh73a0-dt-pm-for-v3.20.base (2015-01-16 11:07:31 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-sh73a0-dt-pm-for-v3.20
+
+for you to fetch changes up to 61837def3c23ba2ac662fd26c77979e072deb2e0:
+
+  ARM: shmobile: sh73a0 dtsi: Add PM domain support (2015-01-16 11:07:59 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC sh73a0 DT PM Updates for v3.20
+
+Add PM domain support to sh73a0
+
+----------------------------------------------------------------
+Geert Uytterhoeven (1):
+      ARM: shmobile: sh73a0 dtsi: Add PM domain support
+
+ arch/arm/boot/dts/sh73a0.dtsi | 144 +++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 142 insertions(+), 2 deletions(-)
