@@ -1,93 +1,202 @@
 From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Tue, 20 Jan 2015 14:38:59 +0100
-Subject: [PATCHv7 1/6] USB: host: ehci-atmel: Add suspend/resume support
+Date: Tue, 20 Jan 2015 14:39:01 +0100
+Subject: [PATCHv7 3/6] USB: host: ehci-atmel: Move global variables to private
+ struct
 In-Reply-To: <1421761144-11767-1-git-send-email-sylvain.rochet@finsecur.com>
 References: <1421761144-11767-1-git-send-email-sylvain.rochet@finsecur.com>
-Message-ID: <1421761144-11767-2-git-send-email-sylvain.rochet@finsecur.com>
+Message-ID: <1421761144-11767-4-git-send-email-sylvain.rochet@finsecur.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add suspend/resume support for Atmel EHCI, mostly
-about disabling and unpreparing clocks so USB PLL is stopped
-before entering sleep state.
+This patch move Atmel EHCI global variables (clocks ptr and clocked
+boolean) to private struct atmel_ehci_priv, stored in ehci->priv.
 
 Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
 Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 Acked-by: Alan Stern <stern@rowland.harvard.edu>
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- drivers/usb/host/ehci-atmel.c | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ drivers/usb/host/ehci-atmel.c | 79 +++++++++++++++++++++++++++----------------
+ 1 file changed, 50 insertions(+), 29 deletions(-)
 
 diff --git a/drivers/usb/host/ehci-atmel.c b/drivers/usb/host/ehci-atmel.c
-index 56a8850..5a15e3d 100644
+index 5a15e3d..663f790 100644
 --- a/drivers/usb/host/ehci-atmel.c
 +++ b/drivers/usb/host/ehci-atmel.c
-@@ -37,6 +37,8 @@ static int clocked;
+@@ -27,48 +27,66 @@
+ #define DRIVER_DESC "EHCI Atmel driver"
  
- static void atmel_start_clock(void)
+ static const char hcd_name[] = "ehci-atmel";
+-static struct hc_driver __read_mostly ehci_atmel_hc_driver;
+ 
+ /* interface and function clocks */
+-static struct clk *iclk, *fclk, *uclk;
+-static int clocked;
++#define hcd_to_atmel_ehci_priv(h) \
++	((struct atmel_ehci_priv *)hcd_to_ehci(h)->priv)
++
++struct atmel_ehci_priv {
++	struct clk *iclk;
++	struct clk *fclk;
++	struct clk *uclk;
++	bool clocked;
++};
++
++static struct hc_driver __read_mostly ehci_atmel_hc_driver;
++
++static const struct ehci_driver_overrides ehci_atmel_drv_overrides __initconst = {
++	.extra_priv_size = sizeof(struct atmel_ehci_priv),
++};
+ 
+ /*-------------------------------------------------------------------------*/
+ 
+-static void atmel_start_clock(void)
++static void atmel_start_clock(struct atmel_ehci_priv *atmel_ehci)
  {
-+	if (clocked)
-+		return;
+-	if (clocked)
++	if (atmel_ehci->clocked)
+ 		return;
  	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
- 		clk_set_rate(uclk, 48000000);
- 		clk_prepare_enable(uclk);
-@@ -48,6 +50,8 @@ static void atmel_start_clock(void)
+-		clk_set_rate(uclk, 48000000);
+-		clk_prepare_enable(uclk);
++		clk_set_rate(atmel_ehci->uclk, 48000000);
++		clk_prepare_enable(atmel_ehci->uclk);
+ 	}
+-	clk_prepare_enable(iclk);
+-	clk_prepare_enable(fclk);
+-	clocked = 1;
++	clk_prepare_enable(atmel_ehci->iclk);
++	clk_prepare_enable(atmel_ehci->fclk);
++	atmel_ehci->clocked = true;
+ }
  
- static void atmel_stop_clock(void)
+-static void atmel_stop_clock(void)
++static void atmel_stop_clock(struct atmel_ehci_priv *atmel_ehci)
  {
-+	if (!clocked)
-+		return;
- 	clk_disable_unprepare(fclk);
- 	clk_disable_unprepare(iclk);
+-	if (!clocked)
++	if (!atmel_ehci->clocked)
+ 		return;
+-	clk_disable_unprepare(fclk);
+-	clk_disable_unprepare(iclk);
++	clk_disable_unprepare(atmel_ehci->fclk);
++	clk_disable_unprepare(atmel_ehci->iclk);
  	if (IS_ENABLED(CONFIG_COMMON_CLK))
-@@ -174,6 +178,29 @@ static int ehci_atmel_drv_remove(struct platform_device *pdev)
+-		clk_disable_unprepare(uclk);
+-	clocked = 0;
++		clk_disable_unprepare(atmel_ehci->uclk);
++	atmel_ehci->clocked = false;
+ }
+ 
+ static void atmel_start_ehci(struct platform_device *pdev)
+ {
++	struct usb_hcd *hcd = platform_get_drvdata(pdev);
++	struct atmel_ehci_priv *atmel_ehci = hcd_to_atmel_ehci_priv(hcd);
++
+ 	dev_dbg(&pdev->dev, "start\n");
+-	atmel_start_clock();
++	atmel_start_clock(atmel_ehci);
+ }
+ 
+ static void atmel_stop_ehci(struct platform_device *pdev)
+ {
++	struct usb_hcd *hcd = platform_get_drvdata(pdev);
++	struct atmel_ehci_priv *atmel_ehci = hcd_to_atmel_ehci_priv(hcd);
++
+ 	dev_dbg(&pdev->dev, "stop\n");
+-	atmel_stop_clock();
++	atmel_stop_clock(atmel_ehci);
+ }
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -79,6 +97,7 @@ static int ehci_atmel_drv_probe(struct platform_device *pdev)
+ 	const struct hc_driver *driver = &ehci_atmel_hc_driver;
+ 	struct resource *res;
+ 	struct ehci_hcd *ehci;
++	struct atmel_ehci_priv *atmel_ehci;
+ 	int irq;
+ 	int retval;
+ 
+@@ -109,6 +128,7 @@ static int ehci_atmel_drv_probe(struct platform_device *pdev)
+ 		retval = -ENOMEM;
+ 		goto fail_create_hcd;
+ 	}
++	atmel_ehci = hcd_to_atmel_ehci_priv(hcd);
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	hcd->regs = devm_ioremap_resource(&pdev->dev, res);
+@@ -120,23 +140,23 @@ static int ehci_atmel_drv_probe(struct platform_device *pdev)
+ 	hcd->rsrc_start = res->start;
+ 	hcd->rsrc_len = resource_size(res);
+ 
+-	iclk = devm_clk_get(&pdev->dev, "ehci_clk");
+-	if (IS_ERR(iclk)) {
++	atmel_ehci->iclk = devm_clk_get(&pdev->dev, "ehci_clk");
++	if (IS_ERR(atmel_ehci->iclk)) {
+ 		dev_err(&pdev->dev, "Error getting interface clock\n");
+ 		retval = -ENOENT;
+ 		goto fail_request_resource;
+ 	}
+-	fclk = devm_clk_get(&pdev->dev, "uhpck");
+-	if (IS_ERR(fclk)) {
++	atmel_ehci->fclk = devm_clk_get(&pdev->dev, "uhpck");
++	if (IS_ERR(atmel_ehci->fclk)) {
+ 		dev_err(&pdev->dev, "Error getting function clock\n");
+ 		retval = -ENOENT;
+ 		goto fail_request_resource;
+ 	}
+ 	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
+-		uclk = devm_clk_get(&pdev->dev, "usb_clk");
+-		if (IS_ERR(uclk)) {
++		atmel_ehci->uclk = devm_clk_get(&pdev->dev, "usb_clk");
++		if (IS_ERR(atmel_ehci->uclk)) {
+ 			dev_err(&pdev->dev, "failed to get uclk\n");
+-			retval = PTR_ERR(uclk);
++			retval = PTR_ERR(atmel_ehci->uclk);
+ 			goto fail_request_resource;
+ 		}
+ 	}
+@@ -173,7 +193,6 @@ static int ehci_atmel_drv_remove(struct platform_device *pdev)
+ 	usb_put_hcd(hcd);
+ 
+ 	atmel_stop_ehci(pdev);
+-	fclk = iclk = NULL;
+ 
+ 	return 0;
+ }
+@@ -182,21 +201,23 @@ static int ehci_atmel_drv_remove(struct platform_device *pdev)
+ static int ehci_atmel_drv_suspend(struct device *dev)
+ {
+ 	struct usb_hcd *hcd = dev_get_drvdata(dev);
++	struct atmel_ehci_priv *atmel_ehci = hcd_to_atmel_ehci_priv(hcd);
+ 	int ret;
+ 
+ 	ret = ehci_suspend(hcd, false);
+ 	if (ret)
+ 		return ret;
+ 
+-	atmel_stop_clock();
++	atmel_stop_clock(atmel_ehci);
  	return 0;
  }
  
-+#ifdef CONFIG_PM
-+static int ehci_atmel_drv_suspend(struct device *dev)
-+{
-+	struct usb_hcd *hcd = dev_get_drvdata(dev);
-+	int ret;
-+
-+	ret = ehci_suspend(hcd, false);
-+	if (ret)
-+		return ret;
-+
-+	atmel_stop_clock();
-+	return 0;
-+}
-+
-+static int ehci_atmel_drv_resume(struct device *dev)
-+{
-+	struct usb_hcd *hcd = dev_get_drvdata(dev);
-+
-+	atmel_start_clock();
-+	return ehci_resume(hcd, false);
-+}
-+#endif
-+
- #ifdef CONFIG_OF
- static const struct of_device_id atmel_ehci_dt_ids[] = {
- 	{ .compatible = "atmel,at91sam9g45-ehci" },
-@@ -183,12 +210,16 @@ static const struct of_device_id atmel_ehci_dt_ids[] = {
- MODULE_DEVICE_TABLE(of, atmel_ehci_dt_ids);
- #endif
+ static int ehci_atmel_drv_resume(struct device *dev)
+ {
+ 	struct usb_hcd *hcd = dev_get_drvdata(dev);
++	struct atmel_ehci_priv *atmel_ehci = hcd_to_atmel_ehci_priv(hcd);
  
-+static SIMPLE_DEV_PM_OPS(ehci_atmel_pm_ops, ehci_atmel_drv_suspend,
-+					ehci_atmel_drv_resume);
-+
- static struct platform_driver ehci_atmel_driver = {
- 	.probe		= ehci_atmel_drv_probe,
- 	.remove		= ehci_atmel_drv_remove,
- 	.shutdown	= usb_hcd_platform_shutdown,
- 	.driver		= {
- 		.name	= "atmel-ehci",
-+		.pm	= &ehci_atmel_pm_ops,
- 		.of_match_table	= of_match_ptr(atmel_ehci_dt_ids),
- 	},
- };
+-	atmel_start_clock();
++	atmel_start_clock(atmel_ehci);
+ 	return ehci_resume(hcd, false);
+ }
+ #endif
+@@ -230,7 +251,7 @@ static int __init ehci_atmel_init(void)
+ 		return -ENODEV;
+ 
+ 	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
+-	ehci_init_driver(&ehci_atmel_hc_driver, NULL);
++	ehci_init_driver(&ehci_atmel_hc_driver, &ehci_atmel_drv_overrides);
+ 	return platform_driver_register(&ehci_atmel_driver);
+ }
+ module_init(ehci_atmel_init);
 -- 
 2.1.4
