@@ -1,50 +1,50 @@
 From: arun.ramamurthy@broadcom.com (arun.ramamurthy at broadcom.com)
-Date: Mon, 19 Jan 2015 16:05:29 -0800
-Subject: [PATCHv3 1/2] usb: ehci-platform: add support for multiple phys per
+Date: Mon, 19 Jan 2015 16:05:30 -0800
+Subject: [PATCHv3 2/2] usb: ohci-platform: add support for multiple phys per
  controller
 In-Reply-To: <1421712330-11089-1-git-send-email-arun.ramamurthy@broadcom.com>
 References: <1421712330-11089-1-git-send-email-arun.ramamurthy@broadcom.com>
-Message-ID: <1421712330-11089-2-git-send-email-arun.ramamurthy@broadcom.com>
+Message-ID: <1421712330-11089-3-git-send-email-arun.ramamurthy@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Arun Ramamurthy <arunrama@broadcom.com>
 
 Added support for cases where one controller is connected
-to multiple phys.
+to multiple phys
 
 Signed-off-by: Arun Ramamurthy <arunrama@broadcom.com>
 Reviewed-by: Ray Jui <rjui@broadcom.com>
 Reviewed-by: Scott Branden <sbranden@broadcom.com>
 Tested-by: Scott Branden <sbranden@broadcom.com>
 ---
- drivers/usb/host/ehci-platform.c | 82 +++++++++++++++++++++++++++++-----------
+ drivers/usb/host/ohci-platform.c | 82 +++++++++++++++++++++++++++++-----------
  1 file changed, 60 insertions(+), 22 deletions(-)
 
-diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
-index 8557803..6b4978a 100644
---- a/drivers/usb/host/ehci-platform.c
-+++ b/drivers/usb/host/ehci-platform.c
-@@ -43,7 +43,8 @@
- struct ehci_platform_priv {
- 	struct clk *clks[EHCI_MAX_CLKS];
+diff --git a/drivers/usb/host/ohci-platform.c b/drivers/usb/host/ohci-platform.c
+index b81d202..613d54e 100644
+--- a/drivers/usb/host/ohci-platform.c
++++ b/drivers/usb/host/ohci-platform.c
+@@ -38,7 +38,8 @@
+ struct ohci_platform_priv {
+ 	struct clk *clks[OHCI_MAX_CLKS];
  	struct reset_control *rst;
 -	struct phy *phy;
 +	struct phy **phys;
 +	int num_phys;
  };
  
- static const char hcd_name[] = "ehci-platform";
-@@ -78,7 +79,7 @@ static int ehci_platform_power_on(struct platform_device *dev)
+ static const char hcd_name[] = "ohci-platform";
+@@ -47,7 +48,7 @@ static int ohci_platform_power_on(struct platform_device *dev)
  {
  	struct usb_hcd *hcd = platform_get_drvdata(dev);
- 	struct ehci_platform_priv *priv = hcd_to_ehci_priv(hcd);
+ 	struct ohci_platform_priv *priv = hcd_to_ohci_priv(hcd);
 -	int clk, ret;
 +	int clk, ret, phy_num;
  
- 	for (clk = 0; clk < EHCI_MAX_CLKS && priv->clks[clk]; clk++) {
+ 	for (clk = 0; clk < OHCI_MAX_CLKS && priv->clks[clk]; clk++) {
  		ret = clk_prepare_enable(priv->clks[clk]);
-@@ -86,20 +87,28 @@ static int ehci_platform_power_on(struct platform_device *dev)
+@@ -55,20 +56,28 @@ static int ohci_platform_power_on(struct platform_device *dev)
  			goto err_disable_clks;
  	}
  
@@ -82,10 +82,10 @@ index 8557803..6b4978a 100644
  err_disable_clks:
  	while (--clk >= 0)
  		clk_disable_unprepare(priv->clks[clk]);
-@@ -111,11 +120,13 @@ static void ehci_platform_power_off(struct platform_device *dev)
+@@ -80,11 +89,13 @@ static void ohci_platform_power_off(struct platform_device *dev)
  {
  	struct usb_hcd *hcd = platform_get_drvdata(dev);
- 	struct ehci_platform_priv *priv = hcd_to_ehci_priv(hcd);
+ 	struct ohci_platform_priv *priv = hcd_to_ohci_priv(hcd);
 -	int clk;
 +	int clk, phy_num;
  
@@ -99,20 +99,20 @@ index 8557803..6b4978a 100644
 +		}
  	}
  
- 	for (clk = EHCI_MAX_CLKS - 1; clk >= 0; clk--)
-@@ -143,7 +154,8 @@ static int ehci_platform_probe(struct platform_device *dev)
- 	struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
- 	struct ehci_platform_priv *priv;
- 	struct ehci_hcd *ehci;
+ 	for (clk = OHCI_MAX_CLKS - 1; clk >= 0; clk--)
+@@ -112,7 +123,8 @@ static int ohci_platform_probe(struct platform_device *dev)
+ 	struct usb_ohci_pdata *pdata = dev_get_platdata(&dev->dev);
+ 	struct ohci_platform_priv *priv;
+ 	struct ohci_hcd *ohci;
 -	int err, irq, clk = 0;
 +	const char *phy_name;
 +	int err, irq, phy_num, clk = 0;
  
  	if (usb_disabled())
  		return -ENODEV;
-@@ -185,12 +197,38 @@ static int ehci_platform_probe(struct platform_device *dev)
- 		if (of_property_read_bool(dev->dev.of_node, "big-endian"))
- 			ehci->big_endian_mmio = ehci->big_endian_desc = 1;
+@@ -160,12 +172,38 @@ static int ohci_platform_probe(struct platform_device *dev)
+ 		of_property_read_u32(dev->dev.of_node, "num-ports",
+ 				     &ohci->num_ports);
  
 -		priv->phy = devm_phy_get(&dev->dev, "usb");
 -		if (IS_ERR(priv->phy)) {
@@ -154,6 +154,6 @@ index 8557803..6b4978a 100644
 +				}
  		}
  
- 		for (clk = 0; clk < EHCI_MAX_CLKS; clk++) {
+ 		for (clk = 0; clk < OHCI_MAX_CLKS; clk++) {
 -- 
 2.2.2
