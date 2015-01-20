@@ -1,91 +1,73 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 20 Jan 2015 13:16:56 +0100
-Subject: [PATCH v4 6/9] ARM: dts: exynos4210-universal_c210: enable hdmi
- support
+Date: Tue, 20 Jan 2015 13:16:58 +0100
+Subject: [PATCH v4 8/9] ARM: dts: exynos5250: add display power domain
 In-Reply-To: <1421756219-21037-1-git-send-email-m.szyprowski@samsung.com>
 References: <1421756219-21037-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1421756219-21037-7-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1421756219-21037-9-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Stanislawski <t.stanislaws@samsung.com>
+From: Andrzej Hajda <a.hajda@samsung.com>
 
-This patch adds configuration of hw modules required to enable HDMI
-support on Universal C210 board.
+The patch adds domain definition and references to it in appropriate devices.
 
-Signed-off-by: Tomasz Stanislawski <t.stanislaws@samsung.com>
+Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+[mszyprow: rebased onto generic power domains dt bindings]
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 ---
- arch/arm/boot/dts/exynos4210-universal_c210.dts | 57 +++++++++++++++++++++++++
- 1 file changed, 57 insertions(+)
+ arch/arm/boot/dts/exynos5250.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos4210-universal_c210.dts b/arch/arm/boot/dts/exynos4210-universal_c210.dts
-index aaf0cae4f5e8..01f7d3cfdd02 100644
---- a/arch/arm/boot/dts/exynos4210-universal_c210.dts
-+++ b/arch/arm/boot/dts/exynos4210-universal_c210.dts
-@@ -503,6 +503,63 @@
- 			assigned-clock-rates = <0>, <160000000>;
- 		};
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index e8c67fdb69fb..ae22bd98f956 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -102,6 +102,12 @@
+ 		#power-domain-cells = <0>;
  	};
-+
-+	hdmi_en: voltage-regulator-hdmi-5v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "HDMI_5V";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&gpe0 1 0>;
-+		enable-active-high;
-+	};
-+
-+	hdmi_ddc: i2c-ddc {
-+		compatible = "i2c-gpio";
-+		gpios = <&gpe4 2 0 &gpe4 3 0>;
-+		i2c-gpio,delay-us = <100>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		pinctrl-0 = <&i2c_ddc_bus>;
-+		pinctrl-names = "default";
-+		status = "okay";
-+	};
-+
-+	mixer at 12C10000 {
-+		status = "okay";
-+	};
-+
-+	hdmi at 12D00000 {
-+		hpd-gpio = <&gpx3 7 0>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&hdmi_hpd>;
-+		hdmi-en-supply = <&hdmi_en>;
-+		vdd-supply = <&ldo3_reg>;
-+		vdd_osc-supply = <&ldo4_reg>;
-+		vdd_pll-supply = <&ldo3_reg>;
-+		ddc = <&hdmi_ddc>;
-+		status = "okay";
-+	};
-+
-+	i2c at 138E0000 {
-+		status = "okay";
-+	};
-+};
-+
-+&pinctrl_1 {
-+	hdmi_hpd: hdmi-hpd {
-+		samsung,pins = "gpx3-7";
-+		samsung,pin-pud = <0>;
-+	};
-+};
-+
-+&pinctrl_0 {
-+	i2c_ddc_bus: i2c-ddc-bus {
-+		samsung,pins = "gpe4-2", "gpe4-3";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <0>;
-+	};
- };
  
- &mdma1 {
++	pd_disp1: disp1-power-domain at 100440A0 {
++		compatible = "samsung,exynos4210-pd";
++		reg = <0x100440A0 0x20>;
++		#power-domain-cells = <0>;
++	};
++
+ 	clock: clock-controller at 10010000 {
+ 		compatible = "samsung,exynos5250-clock";
+ 		reg = <0x10010000 0x30000>;
+@@ -719,6 +725,7 @@
+ 	hdmi: hdmi {
+ 		compatible = "samsung,exynos4212-hdmi";
+ 		reg = <0x14530000 0x70000>;
++		power-domains = <&pd_disp1>;
+ 		interrupts = <0 95 0>;
+ 		clocks = <&clock CLK_HDMI>, <&clock CLK_SCLK_HDMI>,
+ 			 <&clock CLK_SCLK_PIXEL>, <&clock CLK_SCLK_HDMIPHY>,
+@@ -731,6 +738,7 @@
+ 	mixer {
+ 		compatible = "samsung,exynos5250-mixer";
+ 		reg = <0x14450000 0x10000>;
++		power-domains = <&pd_disp1>;
+ 		interrupts = <0 94 0>;
+ 		clocks = <&clock CLK_MIXER>, <&clock CLK_HDMI>,
+ 			 <&clock CLK_SCLK_HDMI>;
+@@ -744,6 +752,7 @@
+ 	};
+ 
+ 	dp: dp-controller at 145B0000 {
++		power-domains = <&pd_disp1>;
+ 		clocks = <&clock CLK_DP>;
+ 		clock-names = "dp";
+ 		phys = <&dp_phy>;
+@@ -751,6 +760,7 @@
+ 	};
+ 
+ 	fimd: fimd at 14400000 {
++		power-domains = <&pd_disp1>;
+ 		clocks = <&clock CLK_SCLK_FIMD1>, <&clock CLK_FIMD1>;
+ 		clock-names = "sclk_fimd", "fimd";
+ 	};
 -- 
 1.9.2
