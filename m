@@ -1,89 +1,70 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 20 Jan 2015 10:03:47 -0800
-Subject: [RFC PATCH v5 0/4] ARM: OMAP2+: AM33XX: Add suspend-resume support
-In-Reply-To: <cover.1417038624.git.d-gerlach@ti.com>
-References: <cover.1417038624.git.d-gerlach@ti.com>
-Message-ID: <20150120180347.GJ7718@atomide.com>
+Date: Tue, 20 Jan 2015 10:05:48 -0800
+Subject: [PATCH v7 1/4] Documentation: dt: add common bindings for
+ hwspinlock
+In-Reply-To: <CAK=WgbYBqPoUm9byx0du_g5ZmHdYaUVLpSPZYHoCVzNoatNKpw@mail.gmail.com>
+References: <1421269101-51105-1-git-send-email-s-anna@ti.com>
+ <1421269101-51105-2-git-send-email-s-anna@ti.com>
+ <20150115135201.GG16217@leverpostej>
+ <20150115135556.GH16217@leverpostej>
+ <CAL_JsqL2LZAooMk-V8+xeF2g6acZE21M+-OBRw8aEVa-5wVHuQ@mail.gmail.com>
+ <CAK=WgbYQ=BbinqJ5fsw2Y+FKdy=nasLsw9mX8pw6S_o3owy9-g@mail.gmail.com>
+ <20150116101746.GA21809@leverpostej>
+ <CAK=WgbYBqPoUm9byx0du_g5ZmHdYaUVLpSPZYHoCVzNoatNKpw@mail.gmail.com>
+Message-ID: <20150120180548.GK7718@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Gerlach <d-gerlach@ti.com> [141126 13:54]:
-> Hi,
-> This series is v5 of the series to add suspend/resume support for Texas
-> Instruments AM335x SoC. It has gone through a rather major overhaul
-> since the last version and because of that has been split into multiple
-> different sets of patches, on which this series depends. Previous discussion
-> that influenced there changes can be found here [1]. This series depends on
-> generic sram exec mapping patch here [2], emif series here [3],
-> and wkup_m3_ipc series here [4]. I have pushed a branch containing the patches
-> from ALL required series here [5] for testing or a view of the high level
-> flow of the entire series.
+* Ohad Ben-Cohen <ohad@wizery.com> [150116 16:50]:
+> Mark,
 > 
-> The largest change with this revision is the introduction of a
-> wkup_m3_ipc driver which handles all communication with the Cortex M3
-> present on am335x for handling low power tasks. Previously this was
-> handled in the wkup_m3_rproc driver (also sent in an earlier series)
-> but that driver is now only responsible for booting the wkup_m3. The
-> wkup_m3_ipc driver exposes an API with all required PM functionality
-> needed by the PM code introduced by this series, so the PM code has
-> shrunk considerably.
+> On Fri, Jan 16, 2015 at 12:17 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> >> The hwlock is a basic hardware primitive that allow synchronization
+> >> between different processors in the system, which may be running Linux
+> >> as well as other operating systems, and may have no other means of
+> >> communication.
+> >>
+> >> The hwlock id numbers are predefined, global and static across the
+> >> entire system: Linux may boot well after other operating systems are
+> >> already running and using these hwlocks to communicate, and therefore,
+> >> in order to use these hardware devices, it must not enumerate them
+> >> differently than the rest of the system.
+> >
+> > That's not true.
+> >
+> > In order to communicate it must agree with the other users as to the
+> > meaning of each instance, and the protocol for use. That doesn't
+> > necessarily mean that Linux needs to know the numerical ID from a
+> > datasheet, and regardless that ID is separate from the logical ID Linux
+> > uses internally.
 > 
-> Another major change is that the EMIF code previously present in the
-> sleep33xx asm code and pm33xx code for save and restore of EMIF context
-> and entry into low power mode has all been moved in to a separate EMIF
-> driver, further reducing the size of the PM code. Because of this, moving
-> the emif header defines into include/linux/ti_emif.h is no longer necessary.
+> Let me describe hwspinlocks a bit more so we all get to know it better
+> and can then agree on a proper solution.
 > 
-> Other changes include clean up of the timer suspend/resume handlers, now
-> look up hwmod in init and use that handle along with renaming to
-> *_idle/*_unidle to avoid confusion with true suspend handlers. 
+> - What makes handling of hwspinlock ID numbers convenient is the fact
+> that it's not based on random datasheet numbers. In fact, hwspinlocks
+> is just special memory: usually datasheets just define the base
+> address and the size of the hwspinlock area. So any numerical ID we
+> use to call the locks themselves are already logical and sane, similar
+> to the way we handle memory (i.e. if we have 32 locks we'll always use
+> 0..31). So hwlocks ids are very much like memory addressing, and not
+> irq numbers.
 > 
-> Suspend support requires:
-> CONFIG_TI_EMIF_SRAM
-> CONFIG_WKUP_M3_RPROC
-> CONFIG_WKUP_M3_IPC
+> - Sometimes Linux will have to dynamically allocate a hwlock, and send
+> the ID of the allocated lock to a remote processor (which may not be
+> running Linux).
+> - Sometimes a remote processor, which may not be running Linux, will
+> have to dynamically allocate a hwlock, and send the ID of the
+> allocated lock to us (another processor running Linux)
 > 
-> And also requires AM335x USB support to be enabled to work for multiple
-> cycles. If you want to load firmware from rootfs in /lib/firmware you now
-> must also select CONFIG_FW_LOADER_USER_HELPER_FALLBACK.
-> 
-> This code works with version 0x189 of the CM3 firmware found here [6] on
-> the next branch, /bin/am335x-pm-firmware.elf.
+> We cannot tell in advance what kind of IPC is going to be used for
+> sending and receiving this hwlock ID. Some are handled by Linux
+> (kernel) and some by the user space. So we must be able to expose an
+> ID the system will understand as well as receive one.
 
-Dave, does this series have dependencies to the other patches? Can some
-parts of this already be applied without breaking anything?
+How about default to Linux id space and allow overriding that with
+a module param option if needed?
 
 Regards,
 
 Tony
- 
-> [1] http://www.spinics.net/lists/linux-omap/msg109331.html
-> [2] http://www.spinics.net/linux/lists/kernel/msg1876629.html
-> [3] http://www.spinics.net/linux/lists/kernel/msg1876646.html
-> [4] http://www.spinics.net/linux/lists/kernel/msg1876642.html
-> [5] https://github.com/dgerlach/linux-pm/tree/rfc-pm-am335x-v3.18-rc6
-> [6] https://git.ti.com/ti-cm3-pm-firmware/amx3-cm3/commits/next
-> 
-> Dave Gerlach (3):
->   ARM: OMAP2+: AM33XX: Add assembly code for PM operations
->   ARM: OMAP2+: AM33XX: Basic suspend resume support
->   ARM: OMAP2+: AM33XX: Hookup AM33XX PM code into OMAP builds
-> 
-> Vaibhav Bedia (1):
->   ARM: OMAP2+: timer: Add suspend-resume callbacks for clkevent device
-> 
->  arch/arm/boot/dts/am33xx.dtsi   |   2 +
->  arch/arm/mach-omap2/Makefile    |   2 +
->  arch/arm/mach-omap2/common.h    |   9 ++
->  arch/arm/mach-omap2/io.c        |   1 +
->  arch/arm/mach-omap2/pm.h        |   6 +
->  arch/arm/mach-omap2/pm33xx.c    | 250 ++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-omap2/sleep33xx.S | 216 ++++++++++++++++++++++++++++++++++
->  arch/arm/mach-omap2/timer.c     |  28 +++++
->  8 files changed, 514 insertions(+)
->  create mode 100644 arch/arm/mach-omap2/pm33xx.c
->  create mode 100644 arch/arm/mach-omap2/sleep33xx.S
-> 
-> -- 
-> 2.1.0
-> 
