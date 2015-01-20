@@ -1,62 +1,59 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 20 Jan 2015 16:12:08 +0100
-Subject: [PATCH 08/17] ARM: at91: stop using HAVE_AT91_DBGUx
-In-Reply-To: <54BE2F4D.2080800@atmel.com>
-References: <1421359100-8930-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1421359100-8930-9-git-send-email-alexandre.belloni@free-electrons.com>
- <54BE2F4D.2080800@atmel.com>
-Message-ID: <20150120151208.GI5014@piout.net>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 20 Jan 2015 09:11:44 -0600
+Subject: [RFC/PATCH] arm: omap: hwmod: add debugfs interface
+In-Reply-To: <20150120143603.GB6556@saruman>
+References: <1417818672-11586-1-git-send-email-balbi@ti.com>
+ <alpine.DEB.2.02.1501200515370.5450@utopia.booyaka.com>
+ <alpine.DEB.2.02.1501200810270.5450@utopia.booyaka.com>
+ <20150120143603.GB6556@saruman>
+Message-ID: <20150120151144.GD6556@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/01/2015 at 11:34:53 +0100, Nicolas Ferre wrote :
-> Le 15/01/2015 22:58, Alexandre Belloni a ?crit :
-> > In order to remove SOC_SAM9xxx options, stop using HAVE_AT91_DBGUx.
+On Tue, Jan 20, 2015 at 08:36:03AM -0600, Felipe Balbi wrote:
+> Hi,
+> 
+> On Tue, Jan 20, 2015 at 08:13:57AM +0000, Paul Walmsley wrote:
+> > On Tue, 20 Jan 2015, Paul Walmsley wrote:
 > > 
-> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > ---
-> >  arch/arm/Kconfig.debug     |  6 +++---
-> >  arch/arm/mach-at91/Kconfig | 19 -------------------
-> >  2 files changed, 3 insertions(+), 22 deletions(-)
+> > > On Fri, 5 Dec 2014, Felipe Balbi wrote:
+> > > 
+> > > > By exposing the details of hwmod structures
+> > > > to debugfs we can much more easily verify
+> > > > that changes to hwmod data is correct and won't
+> > > > cause regressions.
+> > > > 
+> > > > The idea is that this can be used to check the
+> > > > state of one hwmod, verify hwmod sysc fields, etc.
+> > > > 
+> > > > For example, this will be used to move some of
+> > > > the sysc fields to DT and later verify that they
+> > > > are correct pre- and post-patch.
+> > > > 
+> > > > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > > 
+> > > This one had a bunch of unnecessary includes and checkpatch issues 
+> > > (below).  I cleaned those up here and have queued the result (also below) 
+> > > for v3.20.
 > > 
-> > diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> > index e34d24949c6a..42a38731da99 100644
-> > --- a/arch/arm/Kconfig.debug
-> > +++ b/arch/arm/Kconfig.debug
-> > @@ -117,17 +117,17 @@ choice
-> >  	config AT91_DEBUG_LL_DBGU0
-> >  		bool "Kernel low-level debugging on rm9200, 9260/9g20, 9261/9g10, 9rl, 9x5, 9n12"
-> >  		select DEBUG_AT91_UART
-> > -		depends on HAVE_AT91_DBGU0
-> > +		depends on SOC_AT91RM9200 || SOC_AT91SAM9
-> >  
-> >  	config AT91_DEBUG_LL_DBGU1
-> >  		bool "Kernel low-level debugging on 9263, 9g45 and sama5d3"
-> >  		select DEBUG_AT91_UART
-> > -		depends on HAVE_AT91_DBGU1
-> > +		depends on SOC_AT91SAM9 || SOC_SAMA5
-> >  
-> >  	config AT91_DEBUG_LL_DBGU2
-> >  		bool "Kernel low-level debugging on sama5d4"
-> >  		select DEBUG_AT91_UART
-> > -		depends on HAVE_AT91_DBGU2
+> > ... and, the patch doesn't even boot.  Dropped.
+> > 
+> > If you really want something like this to be merged, resend a version that 
+> > boots, and has checkpatch warnings fixed and unnecessary includes dropped.  
+> > Otherwise you're just wasting my time.
 > 
-> These values are used below in the file: in:
-> "
-> default "debug/at91.S" if AT91_DEBUG_LL_DBGU0 || AT91_DEBUG_LL_DBGU1 || \
->                        AT91_DEBUG_LL_DBGU2
-> 
-> "
-> 
-> So I guess there is a little patch missing: I answer to the
-> message "[PATCH 5/7] ARM: at91: move debug-macro.S into the common space" by fixing this.
-> Please tell me if it's okay.
-> 
+> you're using a really old version, though. There have been other
+> versions which are still under discussion.
 
-Your correction was right. The patch correcting that was not part of the
-last rebase.
+not to mention that this was an RFC, not meant for merging at the time
+it was sent.
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150120/d50f40c9/attachment.sig>
