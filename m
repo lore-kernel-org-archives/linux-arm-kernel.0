@@ -1,155 +1,77 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 20 Jan 2015 09:43:32 +0000
-Subject: [PATCH v4 15/21] ARM: exynos4/5: convert pmu wakeup to stacked
- domains
-In-Reply-To: <54BE06FD.2020702@samsung.com>
-References: <1421660655-21394-1-git-send-email-marc.zyngier@arm.com>
- <1421660655-21394-16-git-send-email-marc.zyngier@arm.com>
- <54BE06FD.2020702@samsung.com>
-Message-ID: <fb800e47e40b0daf7771347e9a6b2482@www.loen.fr>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 20 Jan 2015 10:45:09 +0100
+Subject: [PATCH v3 2/3] dt-bindings: Add pinctrl bindings for
+ mt65xx/mt81xx.
+In-Reply-To: <1421403805.11671.58.camel@mtksdaap41>
+References: <1415709535-31515-1-git-send-email-hongzhou.yang@mediatek.com>
+ <1415709535-31515-3-git-send-email-hongzhou.yang@mediatek.com>
+ <CACRpkdYSe_BH_qiHma2BA+c2otEi3wd0TBXy83t8vwrNL+3U2g@mail.gmail.com>
+ <20141127101830.GP30369@pengutronix.de>
+ <CACRpkdbMdJT6y-NL36RgQe0-CAFAVGqKiwY9+yFcwA7JDLmA+Q@mail.gmail.com>
+ <20141202135527.GM30369@pengutronix.de>
+ <CACRpkdZeRd+j7d_iRphruHRg8p3XjqWK8_HQzLH2PTZ_pqOrYA@mail.gmail.com>
+ <20150112122200.GC18908@pengutronix.de>
+ <CACRpkdYXrdiRWMV8YpxrSLe2rLEV-ZnX7=36w21zGquh==6WgA@mail.gmail.com>
+ <20150113161614.GF23940@pengutronix.de>
+ <CACRpkdYRrs2=gNM1XGSh1cSo5Pvx6iNLt4HjL6gdTqGPWYSRDw@mail.gmail.com>
+ <1421403805.11671.58.camel@mtksdaap41>
+Message-ID: <CACRpkdYmjrEtds4wLr0cOmCPOLhS9xisfrY-cNZ3r0oh8n489Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pankaj,
-
-On 2015-01-20 07:42, Pankaj Dubey wrote:
-> Hi Marc,
+On Fri, Jan 16, 2015 at 11:23 AM, Yingjoe Chen
+<yingjoe.chen@mediatek.com> wrote:
+> On Fri, 2015-01-16 at 10:53 +0100, Linus Walleij wrote:
+>> On Tue, Jan 13, 2015 at 5:16 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+>> > On Tue, Jan 13, 2015 at 11:05:22AM +0100, Linus Walleij wrote:
+>>
+>> >> > You often talk about ambiguities. Could you give an example what
+>> >> > ambiguities you mean?
+>> >>
+>> >> What happened was this pins = ; arguments were sometimes
+>> >> strings and sometimes integers, that becomes strange to handle
+>> >> in code, ambiguous.
+>> >
+>> > I see. I like naming it 'pinmux' because that's what it is: pins and
+>> > mux settings. A plain 'pinno' suggests that it contains only pin mubers,
+>> > without mux setting. How about 'pin-no-mux'? We also could add an
+>> > explicit "pins-are-numbered" property instead of distinguishing this
+>> > by property names.
+>>
+>> I kind of like this "pins-are-numbered" thing.
+>>
+>> The other property for the pin, whether pinmux or pin-no-mux or
+>> pin-num-and-mux etc is no such big deal, as long as it's
+>> consistent and documented with the generic bindings.
 >
-> On Monday 19 January 2015 03:14 PM, Marc Zyngier wrote:
->> Exynos has been (ab)using the gic_arch_extn to provide
->> wakeup from suspend, and it makes a lot of sense to convert
->> this code to use stacked domains instead.
->>
->> This patch does just this, updating the DT files to actually
->> reflect what the HW provides.
->>
->> BIG FAT WARNING: because the DTs were so far lying by not
->> exposing the fact that the PMU block is actually the first
->> interrupt controller in the chain for RTC, kernels with this patch
->> applied wont have any suspend-resume facility when booted
->> with old DTs, and old kernels with updated DTs may not even boot.
->>
->> Also, I stronly suspect that there is more than two wake-up
->> interrupts on these platforms, but I leave it to the maintainers
->> to fix their mess.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
+> Hi Linus,
 >
-> I tested this patch series on SMDK5250 board.
+> To make sure I understand it correct, you think something like this is
+> OK?
 >
-> With the addition of "#interrupt-cells = <3>;"in PMU device node S2R
-> is working on Exynos5250 based SMDK board.
-
-Thanks for letting me know. Can I add your Tested-by tag on this?
-
->>   arch/arm/boot/dts/exynos4.dtsi    |   4 ++
->>   arch/arm/boot/dts/exynos5250.dtsi |   4 ++
->>   arch/arm/boot/dts/exynos5420.dtsi |   4 ++
->>   arch/arm/mach-exynos/exynos.c     |  14 ++---
->>   arch/arm/mach-exynos/suspend.c    | 122 
->> ++++++++++++++++++++++++++++++++++----
->>   5 files changed, 129 insertions(+), 19 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/exynos4.dtsi 
->> b/arch/arm/boot/dts/exynos4.dtsi
->> index b8168f1..0e7d74e 100644
->> --- a/arch/arm/boot/dts/exynos4.dtsi
->> +++ b/arch/arm/boot/dts/exynos4.dtsi
->> @@ -141,6 +141,9 @@
->>   	pmu_system_controller: system-controller at 10020000 {
->>   		compatible = "samsung,exynos4210-pmu", "syscon";
->>   		reg = <0x10020000 0x4000>;
->> +		interrupt-controller;
->> +		#interrupt-cells = <3>;
->> +		interrupt-parent = <&gic>;
->>   	};
->>
->>   	dsi_0: dsi at 11C80000 {
->> @@ -253,6 +256,7 @@
->>   	rtc at 10070000 {
->>   		compatible = "samsung,s3c6410-rtc";
->>   		reg = <0x10070000 0x100>;
->> +		interrupt-parent = <&pmu_system_controller>;
->>   		interrupts = <0 44 0>, <0 45 0>;
->>   		clocks = <&clock CLK_RTC>;
->>   		clock-names = "rtc";
->> diff --git a/arch/arm/boot/dts/exynos5250.dtsi 
->> b/arch/arm/boot/dts/exynos5250.dtsi
->> index 0a229fc..1dc5f6b 100644
->> --- a/arch/arm/boot/dts/exynos5250.dtsi
->> +++ b/arch/arm/boot/dts/exynos5250.dtsi
->> @@ -194,6 +194,9 @@
->>   		clock-names = "clkout16";
->>   		clocks = <&clock CLK_FIN_PLL>;
->>   		#clock-cells = <1>;
->> +		interrupt-controller;
->> +		#interrupt-cells = <3>;
->> +		interrupt-parent = <&gic>;
->>   	};
->>
->>   	sysreg_system_controller: syscon at 10050000 {
->> @@ -230,6 +233,7 @@
->>   	rtc: rtc at 101E0000 {
->>   		clocks = <&clock CLK_RTC>;
->>   		clock-names = "rtc";
->> +		interrupt-parent = <&pmu_system_controller>;
->>   		status = "disabled";
->>   	};
->>
->> diff --git a/arch/arm/boot/dts/exynos5420.dtsi 
->> b/arch/arm/boot/dts/exynos5420.dtsi
->> index 517e50f..35ecd36 100644
->> --- a/arch/arm/boot/dts/exynos5420.dtsi
->> +++ b/arch/arm/boot/dts/exynos5420.dtsi
->> @@ -309,6 +309,7 @@
->>   	rtc: rtc at 101E0000 {
->>   		clocks = <&clock CLK_RTC>;
->>   		clock-names = "rtc";
->> +		interrupt-parent = <&pmu_system_controller>;
->>   		status = "disabled";
->>   	};
->>
->> @@ -748,6 +749,9 @@
->>   		clock-names = "clkout16";
->>   		clocks = <&clock CLK_FIN_PLL>;
->>   		#clock-cells = <1>;
->> +		interrupt-controller;
->> +		#interrupt-cells = <3>;
->> +		interrupt-parent = <&gic>;
->>   	};
->>
->>   	sysreg_system_controller: syscon at 10050000 {
->> diff --git a/arch/arm/mach-exynos/exynos.c 
->> b/arch/arm/mach-exynos/exynos.c
->> index c13d083..e417fdc 100644
->> --- a/arch/arm/mach-exynos/exynos.c
->> +++ b/arch/arm/mach-exynos/exynos.c
->> @@ -175,16 +175,15 @@ static void __init exynos_init_io(void)
->>   	exynos_map_io();
->>   }
->>
->> +/*
->> + * Apparently, these SoCs are not able to wake-up from suspend 
->> using
->> + * the PMU. Too bad. Should they suddenly become capable of such a
->> + * feat, the matches below should be moved to suspend.c.
->> + */
->>   static const struct of_device_id exynos_dt_pmu_match[] = {
->>   	{ .compatible = "samsung,exynos3250-pmu" },
+>         pinctrl at 01c20800 {
+>                 compatible = "mediatek,mt8135-pinctrl";
+> [...]
+>                 pins-are-numbered;
 >
-> As I know Exynos3250, S2R support has been added in kgene/for-next
-> and should work as expected so we may need to do update
-> "exynos_wkup_irq" for exynos3250 and remove it from this list, so 
-> that
-> it's S2R should not break. I am adding concern engineer (+cc: Chanwoo
-> Choi) in the loop.
+>                 i2c0_pins_a: i2c0 at 0 {
+>                         pins1 {
+>                                 pins = <MT8135_PIN_100_SDA0__FUNC_SDA0>,
+>                                         <MT8135_PIN_101_SCL0__FUNC_SCL0>;
+>                                 bias-disable;
+>                         };
+>                 };
 
-That would have to be an additional patch, unless we decide to delay 
-this series.
+As discussed with Sascha Hauer it is ambigous to use "pins" for
+a numerical value indicating both a mux setting and a pin. Sascha
+suggests using "pinmux" and adding this as a secondary generic
+binding for this type of pin controllers that use numbers and #defines
+to set up bindings.
 
-Thanks,
+We should still move these parsing functions to the core.
 
-         M.
--- 
-Fast, cheap, reliable. Pick two.
+See this discussion earlier in this thread:
+http://marc.info/?l=linux-kernel&m=142116581226500&w=2
+
+Yours,
+Linus Walleij
