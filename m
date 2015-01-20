@@ -1,49 +1,106 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 20 Jan 2015 08:00:20 -0800
-Subject: [GIT PULL] ARM: OMAP: hwmod fixes for v3.19-rc
-In-Reply-To: <alpine.DEB.2.02.1501200647540.5450@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1501042334250.28771@utopia.booyaka.com>
- <20150119194305.GE18552@atomide.com>
- <alpine.DEB.2.02.1501200647540.5450@utopia.booyaka.com>
-Message-ID: <20150120160020.GB7718@atomide.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 20 Jan 2015 16:04:10 +0000
+Subject: [PATCH v6 3/6] mfd: ti_am335x_tscadc: Remove unwanted
+ reg_se_cache save
+In-Reply-To: <54BE4CD1.1020709@ti.com>
+References: <1420609779-11156-1-git-send-email-vigneshr@ti.com>
+ <1420609779-11156-4-git-send-email-vigneshr@ti.com>
+ <20150120115325.GK13701@x1> <54BE4CD1.1020709@ti.com>
+Message-ID: <20150120160410.GL13701@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [150119 22:51]:
-> Hi Tony
-> 
-> On Mon, 19 Jan 2015, Tony Lindgren wrote:
-> 
-> > * Paul Walmsley <paul@pwsan.com> [150104 15:38]:
-> > > The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
-> > > 
-> > >   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
-> > > 
-> > > are available in the git repository at:
-> > > 
-> > >   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.19-rc/omap-fixes-a
-> > > 
-> > > for you to fetch changes up to 99d076b747455449b2eec9e37f3fb0bfdf51af32:
-> > > 
-> > >   MAINTAINERS: add maintainer for OMAP hwmod data (2015-01-02 16:24:27 -0700)
-> > > 
-> > > ----------------------------------------------------------------
-> > > For v3.19-rc, fix some hwmod structure details for the OMAP DSS modules
-> > > for DRA7xx and AM43xx.  Also update the MAINTAINERS file to encourage
-> > > folks to cc me on hwmod data patches.
-> > > 
-> > > Basic build, boot, and PM testlogs are available here:
-> > > 
-> > > http://www.pwsan.com/omap/testlogs/omap-fixes-a-for-v3.19-rc/20150103144242/
+On Tue, 20 Jan 2015, R, Vignesh wrote:
+> On 1/20/2015 5:23 PM, Lee Jones wrote:
+> > On Wed, 07 Jan 2015, Vignesh R wrote:
 > > 
-> > Paul, got any updates on this? Anyways, I'll just untag this email as
-> > you asked me to wait on pulling this.
+> >> In one shot mode, sequencer automatically disables all enabled steps at
+> >> the end of each cycle. (both ADC steps and TSC steps) Hence these steps
+> >> need not be saved in reg_se_cache for clearing these steps at a later
+> >> stage.
+> >> Also, when ADC wakes up Sequencer should not be busy executing any of the
+> >> config steps except for the charge step. Previously charge step was 1 ADC
+> >> clock cycle and hence it was ignored.
+> >> TSC steps are always disabled at the end of each conversion cycle, hence
+> >> there is no need to explicitly disable TSC steps by writing 0 to REG_SE.
+> >>
+> >> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> >> ---
+> >>
+> >> v5:
+> >>  - Remove unnecessary clearing of REG_SE
+> >>
+> >>  drivers/mfd/ti_am335x_tscadc.c       | 13 +++++--------
+> >>  include/linux/mfd/ti_am335x_tscadc.h |  1 +
+> >>  2 files changed, 6 insertions(+), 8 deletions(-)
+> > 
+> > Looks fine.
+> > 
+> > For my own reference:
+> >   Acked-by: Lee Jones <lee.jones@linaro.org>
+> > 
+> > Can this patch be applied on its own?
+> > 
 > 
-> At this point I think I will just requeue the remaining two valid patches 
-> for v3.20.  Thanks for the ping
+> I prefer to wait until input patches are picked up.
 
-OK makes sense for me if they are not critical fixes.
+I have no problem with that, but is there a technical reason why?
 
-Regards,
+> >> diff --git a/drivers/mfd/ti_am335x_tscadc.c b/drivers/mfd/ti_am335x_tscadc.c
+> >> index 467c80e1c4ae..e4e4b22eebc9 100644
+> >> --- a/drivers/mfd/ti_am335x_tscadc.c
+> >> +++ b/drivers/mfd/ti_am335x_tscadc.c
+> >> @@ -68,12 +68,6 @@ static void am335x_tscadc_need_adc(struct ti_tscadc_dev *tsadc)
+> >>  	DEFINE_WAIT(wait);
+> >>  	u32 reg;
+> >>  
+> >> -	/*
+> >> -	 * disable TSC steps so it does not run while the ADC is using it. If
+> >> -	 * write 0 while it is running (it just started or was already running)
+> >> -	 * then it completes all steps that were enabled and stops then.
+> >> -	 */
+> >> -	tscadc_writel(tsadc, REG_SE, 0);
+> >>  	reg = tscadc_readl(tsadc, REG_ADCFSM);
+> >>  	if (reg & SEQ_STATUS) {
+> >>  		tsadc->adc_waiting = true;
+> >> @@ -86,8 +80,12 @@ static void am335x_tscadc_need_adc(struct ti_tscadc_dev *tsadc)
+> >>  		spin_lock_irq(&tsadc->reg_lock);
+> >>  		finish_wait(&tsadc->reg_se_wait, &wait);
+> >>  
+> >> +		/*
+> >> +		 * Sequencer should either be idle or
+> >> +		 * busy applying the charge step.
+> >> +		 */
+> >>  		reg = tscadc_readl(tsadc, REG_ADCFSM);
+> >> -		WARN_ON(reg & SEQ_STATUS);
+> >> +		WARN_ON((reg & SEQ_STATUS) && !(reg & CHARGE_STEP));
+> >>  		tsadc->adc_waiting = false;
+> >>  	}
+> >>  	tsadc->adc_in_use = true;
+> >> @@ -96,7 +94,6 @@ static void am335x_tscadc_need_adc(struct ti_tscadc_dev *tsadc)
+> >>  void am335x_tsc_se_set_once(struct ti_tscadc_dev *tsadc, u32 val)
+> >>  {
+> >>  	spin_lock_irq(&tsadc->reg_lock);
+> >> -	tsadc->reg_se_cache |= val;
+> >>  	am335x_tscadc_need_adc(tsadc);
+> >>  
+> >>  	tscadc_writel(tsadc, REG_SE, val);
+> >> diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
+> >> index 3f4e994ace2b..1fd50dcfe47c 100644
+> >> --- a/include/linux/mfd/ti_am335x_tscadc.h
+> >> +++ b/include/linux/mfd/ti_am335x_tscadc.h
+> >> @@ -128,6 +128,7 @@
+> >>  
+> >>  /* Sequencer Status */
+> >>  #define SEQ_STATUS BIT(5)
+> >> +#define CHARGE_STEP		0x11
+> >>  
+> >>  #define ADC_CLK			3000000
+> >>  #define TOTAL_STEPS		16
+> > 
 
-Tony
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
