@@ -1,77 +1,86 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 20 Jan 2015 13:16:52 +0100
-Subject: [PATCH v4 2/9] ARM: Exynos: add support for sub-power domains
+Date: Tue, 20 Jan 2015 13:16:55 +0100
+Subject: [PATCH v4 5/9] ARM: dts: exynos4412-odroid: enable hdmi support
 In-Reply-To: <1421756219-21037-1-git-send-email-m.szyprowski@samsung.com>
 References: <1421756219-21037-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1421756219-21037-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1421756219-21037-6-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for making one power domain a sub-domain of
-other domain. This is useful for modeling power dependences for devices
-like TV Mixer or Camera ISP, which needs to have more than one power
-domain enabled to be operational.
-
-Based on previous work by Amit Daniel Kachhap <amit.daniel@samsung.com>.
+This patch adds nodes specific to Exynos4412 based Odroid X/X2/U2/U3
+boards required for enabling HDMI display.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- .../bindings/arm/exynos/power_domain.txt           |  2 ++
- arch/arm/mach-exynos/pm_domains.c                  | 28 ++++++++++++++++++++++
- 2 files changed, 30 insertions(+)
+ arch/arm/boot/dts/exynos4412-odroid-common.dtsi | 44 +++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-index f4445e5a2bbb..1e097037349c 100644
---- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-+++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-@@ -22,6 +22,8 @@ Optional Properties:
- 	- pclkN, clkN: Pairs of parent of input clock and input clock to the
- 		devices in this power domain. Maximum of 4 pairs (N = 0 to 3)
- 		are supported currently.
-+- power-domains: phandle pointing to the parent power domain, for more details
-+		 see Documentation/devicetree/bindings/power/power_domain.txt
+diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+index 3fbf588682b9..e10efa88807a 100644
+--- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
++++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+@@ -231,6 +231,20 @@
+ 					regulator-always-on;
+ 				};
  
- Node of a device using power domains must have a power-domains property
- defined with a phandle to respective power domain.
-diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
-index 20f267121b3e..37266a826437 100644
---- a/arch/arm/mach-exynos/pm_domains.c
-+++ b/arch/arm/mach-exynos/pm_domains.c
-@@ -161,6 +161,34 @@ no_clk:
- 		of_genpd_add_provider_simple(np, &pd->pd);
- 	}
++				ldo8_reg: ldo at 8 {
++					regulator-compatible = "LDO8";
++					regulator-name = "VDD10_HDMI_1.0V";
++					regulator-min-microvolt = <1000000>;
++					regulator-max-microvolt = <1000000>;
++				};
++
++				ldo10_reg: ldo at 10 {
++					regulator-compatible = "LDO10";
++					regulator-name = "VDDQ_MIPIHSI_1.8V";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++				};
++
+ 				ldo11_reg: LDO11 {
+ 					regulator-name = "VDD18_ABB1_1.8V";
+ 					regulator-min-microvolt = <1800000>;
+@@ -389,6 +403,31 @@
+ 	ehci: ehci at 12580000 {
+ 		status = "okay";
+ 	};
++
++	mixer: mixer at 12C10000 {
++		status = "okay";
++	};
++
++	hdmi at 12D00000 {
++		hpd-gpio = <&gpx3 7 0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&hdmi_hpd>;
++		vdd-supply = <&ldo8_reg>;
++		vdd_osc-supply = <&ldo10_reg>;
++		vdd_pll-supply = <&ldo8_reg>;
++		ddc = <&hdmi_ddc>;
++		status = "okay";
++	};
++
++	hdmi_ddc: i2c at 13880000 {
++		status = "okay";
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2c2_bus>;
++	};
++
++	i2c at 138E0000 {
++		status = "okay";
++	};
+ };
  
-+	/* Assign the child power domains to their parents */
-+	for_each_compatible_node(np, NULL, "samsung,exynos4210-pd") {
-+		struct generic_pm_domain *child_domain, *parent_domain;
-+		struct of_phandle_args args;
+ &pinctrl_1 {
+@@ -403,4 +442,9 @@
+ 		samsung,pin-pud = <0>;
+ 		samsung,pin-drv = <0>;
+ 	};
 +
-+		args.np = np;
-+		args.args_count = 0;
-+		child_domain = of_genpd_get_from_provider(&args);
-+		if (!child_domain)
-+			continue;
-+
-+		if (of_parse_phandle_with_args(np, "power-domains",
-+					 "#power-domain-cells", 0, &args) != 0)
-+			continue;
-+
-+		parent_domain = of_genpd_get_from_provider(&args);
-+		if (!parent_domain)
-+			continue;
-+
-+		if (pm_genpd_add_subdomain(parent_domain, child_domain))
-+			pr_warn("%s failed to add subdomain: %s\n",
-+				parent_domain->name, child_domain->name);
-+		else
-+			pr_info("%s has as child subdomain: %s.\n",
-+				parent_domain->name, child_domain->name);
-+		of_node_put(np);
-+	}
-+
- 	return 0;
- }
- arch_initcall(exynos4_pm_init_power_domain);
++	hdmi_hpd: hdmi-hpd {
++		samsung,pins = "gpx3-7";
++		samsung,pin-pud = <1>;
++	};
+ };
 -- 
 1.9.2
