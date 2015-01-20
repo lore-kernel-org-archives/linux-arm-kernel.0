@@ -1,36 +1,41 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 20 Jan 2015 09:20:42 -0700
-Subject: [PATCH v2 02/11] ARM: tegra: Use the generated pinmux data
-In-Reply-To: <CAAObsKAaanrrSYd7gmLAS4K_G9fuU=WmsMXQk0G85hfy_XdE5Q@mail.gmail.com>
-References: <1421338359-27467-1-git-send-email-tomeu.vizoso@collabora.com>
- <1421338359-27467-3-git-send-email-tomeu.vizoso@collabora.com>
- <54B7F7F7.1020202@wwwdotorg.org>
- <CAAObsKAaanrrSYd7gmLAS4K_G9fuU=WmsMXQk0G85hfy_XdE5Q@mail.gmail.com>
-Message-ID: <54BE805A.3060300@wwwdotorg.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 20 Jan 2015 16:24:30 +0000
+Subject: [GIT PULL] ARM kprobe updates
+In-Reply-To: <1421746999.4328.3.camel@linaro.org>
+References: <1421746999.4328.3.camel@linaro.org>
+Message-ID: <20150120162430.GK26493@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/20/2015 06:59 AM, Tomeu Vizoso wrote:
-> On 15 January 2015 at 18:25, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 01/15/2015 09:12 AM, Tomeu Vizoso wrote:
->>>
->>> Google has submitted a board config for the pinmux programming of the
->>> Nyan Big board. Use the whole of it as it's generated to make it easier
->>> to update as the configuration gets fixed in the future.
->>
->>
->> Submitted to where? I assume you mean tegra-pinmux-scripts. I don't see a
->> Nyan/Nyan-big configuration there yet. IIRC (and I might not) one was
->> posted, but there were some review comments that aren't yet addressed?
->
-> Yeah, that's what I meant by submitted. TTBOMK the v2 doesn't have any
-> comments pending of being addressed?
+On Tue, Jan 20, 2015 at 09:43:19AM +0000, Jon Medhurst (Tixy) wrote:
+> Hi Russell
+> 
+> Please consider pulling the following changes to ARM kprobes.
+> 
+> This consists of Wang Nan's implementation of optimized kprobes on ARM,
+> which use branch instructions to call the handler rather than using
+> undefined instructions as breakpoints. It also contains various fixes
+> and extensions to the test code which were discovered along the way.
+> 
+> The patch from Masami Hiramatsu is outside of arch/arm but as kprobes
+> maintainer he indicated that it was OK for this simple patch to go
+> through the ARM tree, if you are also amenable. (See
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/317948.html)
+> 
+> Thanks
+> 
+> 
+> The following changes since commit b1940cd21c0f4abdce101253e860feff547291b0:
+> 
+>   Linux 3.19-rc3 (2015-01-05 17:05:20 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.linaro.org/people/tixy/kernel.git kprobes
 
-There's a thread where you and Andrew are discussing the settings for a 
-bunch of the pins, and the differences between Big and Blaze. It didn't 
-seem to me that the resolution was that the V2 patch was fine as is, but 
-perhaps that's what the thread meant!
+Thanks, pulled, though it'll probably be two or so days before it
+shows up in linux-next.
 
-Either way, it'd be nice if Andrew or someone else from ChromeOS could 
-give an acked-by/reviewed-by for the patch if it's OK as is. That way, 
-I'll know it's good without any doubts.
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
