@@ -1,47 +1,99 @@
-From: digetx@gmail.com (Dmitry Osipenko)
-Date: Tue, 20 Jan 2015 15:36:55 +0300
-Subject: [PATCH 2/2] ARM: l2c: Maintain CPU endianness for early resume
- function
-Message-ID: <1421757420-20983-1-git-send-email-digetx@gmail.com>
+From: vigneshr@ti.com (R, Vignesh)
+Date: Tue, 20 Jan 2015 18:10:49 +0530
+Subject: [PATCH v6 3/6] mfd: ti_am335x_tscadc: Remove unwanted reg_se_cache
+ save
+In-Reply-To: <20150120115325.GK13701@x1>
+References: <1420609779-11156-1-git-send-email-vigneshr@ti.com>
+ <1420609779-11156-4-git-send-email-vigneshr@ti.com>
+ <20150120115325.GK13701@x1>
+Message-ID: <54BE4CD1.1020709@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In big endian CPU mode l2x0_saved_regs structure stores registers values in BE
-format. In order to maintain BE CPU mode, these values and immediate constants
-must be converted back to LE format before writing them to cache controller.
 
-Signed-off-by: Dmitry Osipenko <digetx@gmail.com>
----
- arch/arm/mm/l2c-l2x0-resume.S | 10 ++++++++++
- 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/mm/l2c-l2x0-resume.S b/arch/arm/mm/l2c-l2x0-resume.S
-index fda415e..9f99c7e 100644
---- a/arch/arm/mm/l2c-l2x0-resume.S
-+++ b/arch/arm/mm/l2c-l2x0-resume.S
-@@ -30,6 +30,15 @@ ENTRY(l2c310_early_resume)
- 	teq	r1, #0
- 	reteq	lr
- 
-+	@ Reverse for big endian kernel
-+ARM_BE8(rev	r2, r2)
-+ARM_BE8(rev	r3, r3)
-+ARM_BE8(rev	r4, r4)
-+ARM_BE8(rev	r5, r5)
-+ARM_BE8(rev	r6, r6)
-+ARM_BE8(rev	r7, r7)
-+ARM_BE8(rev	r8, r8)
-+
- 	@ The prefetch and power control registers are revision dependent
- 	@ and can be written whether or not the L2 cache is enabled
- 	ldr	r0, [r1, #L2X0_CACHE_ID]
-@@ -51,6 +60,7 @@ ENTRY(l2c310_early_resume)
- 
- 	str	r2, [r1, #L2X0_AUX_CTRL]
- 	mov	r9, #L2X0_CTRL_EN
-+ARM_BE8(rev	r9, r9)
- 	str	r9, [r1, #L2X0_CTRL]
- 	ret	lr
- ENDPROC(l2c310_early_resume)
--- 
-2.2.1
+On 1/20/2015 5:23 PM, Lee Jones wrote:
+> On Wed, 07 Jan 2015, Vignesh R wrote:
+> 
+>> In one shot mode, sequencer automatically disables all enabled steps at
+>> the end of each cycle. (both ADC steps and TSC steps) Hence these steps
+>> need not be saved in reg_se_cache for clearing these steps at a later
+>> stage.
+>> Also, when ADC wakes up Sequencer should not be busy executing any of the
+>> config steps except for the charge step. Previously charge step was 1 ADC
+>> clock cycle and hence it was ignored.
+>> TSC steps are always disabled at the end of each conversion cycle, hence
+>> there is no need to explicitly disable TSC steps by writing 0 to REG_SE.
+>>
+>> Signed-off-by: Vignesh R <vigneshr@ti.com>
+>> ---
+>>
+>> v5:
+>>  - Remove unnecessary clearing of REG_SE
+>>
+>>  drivers/mfd/ti_am335x_tscadc.c       | 13 +++++--------
+>>  include/linux/mfd/ti_am335x_tscadc.h |  1 +
+>>  2 files changed, 6 insertions(+), 8 deletions(-)
+> 
+> Looks fine.
+> 
+> For my own reference:
+>   Acked-by: Lee Jones <lee.jones@linaro.org>
+> 
+> Can this patch be applied on its own?
+> 
+
+I prefer to wait until input patches are picked up.
+
+>> diff --git a/drivers/mfd/ti_am335x_tscadc.c b/drivers/mfd/ti_am335x_tscadc.c
+>> index 467c80e1c4ae..e4e4b22eebc9 100644
+>> --- a/drivers/mfd/ti_am335x_tscadc.c
+>> +++ b/drivers/mfd/ti_am335x_tscadc.c
+>> @@ -68,12 +68,6 @@ static void am335x_tscadc_need_adc(struct ti_tscadc_dev *tsadc)
+>>  	DEFINE_WAIT(wait);
+>>  	u32 reg;
+>>  
+>> -	/*
+>> -	 * disable TSC steps so it does not run while the ADC is using it. If
+>> -	 * write 0 while it is running (it just started or was already running)
+>> -	 * then it completes all steps that were enabled and stops then.
+>> -	 */
+>> -	tscadc_writel(tsadc, REG_SE, 0);
+>>  	reg = tscadc_readl(tsadc, REG_ADCFSM);
+>>  	if (reg & SEQ_STATUS) {
+>>  		tsadc->adc_waiting = true;
+>> @@ -86,8 +80,12 @@ static void am335x_tscadc_need_adc(struct ti_tscadc_dev *tsadc)
+>>  		spin_lock_irq(&tsadc->reg_lock);
+>>  		finish_wait(&tsadc->reg_se_wait, &wait);
+>>  
+>> +		/*
+>> +		 * Sequencer should either be idle or
+>> +		 * busy applying the charge step.
+>> +		 */
+>>  		reg = tscadc_readl(tsadc, REG_ADCFSM);
+>> -		WARN_ON(reg & SEQ_STATUS);
+>> +		WARN_ON((reg & SEQ_STATUS) && !(reg & CHARGE_STEP));
+>>  		tsadc->adc_waiting = false;
+>>  	}
+>>  	tsadc->adc_in_use = true;
+>> @@ -96,7 +94,6 @@ static void am335x_tscadc_need_adc(struct ti_tscadc_dev *tsadc)
+>>  void am335x_tsc_se_set_once(struct ti_tscadc_dev *tsadc, u32 val)
+>>  {
+>>  	spin_lock_irq(&tsadc->reg_lock);
+>> -	tsadc->reg_se_cache |= val;
+>>  	am335x_tscadc_need_adc(tsadc);
+>>  
+>>  	tscadc_writel(tsadc, REG_SE, val);
+>> diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
+>> index 3f4e994ace2b..1fd50dcfe47c 100644
+>> --- a/include/linux/mfd/ti_am335x_tscadc.h
+>> +++ b/include/linux/mfd/ti_am335x_tscadc.h
+>> @@ -128,6 +128,7 @@
+>>  
+>>  /* Sequencer Status */
+>>  #define SEQ_STATUS BIT(5)
+>> +#define CHARGE_STEP		0x11
+>>  
+>>  #define ADC_CLK			3000000
+>>  #define TOTAL_STEPS		16
+> 
