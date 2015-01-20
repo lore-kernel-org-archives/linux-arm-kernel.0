@@ -1,97 +1,159 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 20 Jan 2015 12:49:15 +0530
-Subject: [PATCHv3 2/8] devfreq: exynos: Add documentation for generic
- exynos memory bus frequency driver
-In-Reply-To: <CAL_Jsq+5sdsm_-VW-ta+qV-NBao-XTHvsYWcbMdZmbP0Nw43Cw@mail.gmail.com>
-References: <1420681257-3078-1-git-send-email-cw00.choi@samsung.com>
- <1420681257-3078-3-git-send-email-cw00.choi@samsung.com>
- <CAL_Jsq+5sdsm_-VW-ta+qV-NBao-XTHvsYWcbMdZmbP0Nw43Cw@mail.gmail.com>
-Message-ID: <CAKohpomqosqxeDANC=NLBVmOUHyUoqd7Zhph7r6f7+ufYN48EQ@mail.gmail.com>
+Date: Tue, 20 Jan 2015 12:51:01 +0530
+Subject: [RFC] OPP: Redefine bindings to overcome shortcomings
+In-Reply-To: <CAKohpo=HkixETTSsrRPHhUtWPVgn_7w0E2jYTokAYQRT5awk8Q@mail.gmail.com>
+References: <52c403454c3b8fc201abe7ac74cf657638479311.1417691389.git.viresh.kumar@linaro.org>
+ <CAKohpokUXvhqt+z4EPC9k=O8ZnQOqNSGGi8w6w4shYtbvv8mTw@mail.gmail.com>
+ <CAL_JsqJabcXe7-juTnJDcVdzpnFokYmt-N=bjZt5a+32Fzr_vg@mail.gmail.com>
+ <CAKohpo=HkixETTSsrRPHhUtWPVgn_7w0E2jYTokAYQRT5awk8Q@mail.gmail.com>
+Message-ID: <CAKohpokvkbyWnetSN793am+s4QjxiKwPO2P0QMPWk7Js-btTLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 January 2015 at 02:48, Rob Herring <robherring2@gmail.com> wrote:
-> Adding Viresh.
-
-Sorry for being too late, I was very busy with other cpufreq stuff I was doing
-and saved this thread for later as it required me to understand it properly..
-
->> +Required properties for memory bus block:
->> +- clock-names : the name of clock used by the memory bus, "memory-bus".
->> +- clocks : phandles for clock specified in "clock-names" property.
->> +- #clock-cells: should be 1.
->> +- frequency: the frequency table to support DVFS feature.
+On 31 December 2014 at 10:17, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> On 29 December 2014 at 22:35, Rob Herring <robherring2@gmail.com> wrote:
+>>> +  - frequency-kHz: Frequency in kHz
+>>
+>> s/kHz/khz/
+>>
+>>> +  - voltage-uV: voltage in micro Volts
+>>
+>> -microvolt is more consistent with regulator binding.
+>>
+>> The names are a bit redundant. perhaps opp-khz and opp-microvolt instead.
 >
-> So you have just defined a new OPP table format. We already have one
-> and Viresh is working to create a more extendable one. He asked about
-> what's needed in devfreq, so Viresh here you go. :)
+> All accepted.
+>
+>>> +Example 1: Simple case of dual-core cortex A9-single cluster, sharing
+>>> clock line.
+>>> +
+>>> +/ {
+>>> +       cpus {
+>>> +               #address-cells = <1>;
+>>> +               #size-cells = <0>;
+>>> +
+>>> +               cpu at 0 {
+>>> +                       compatible = "arm,cortex-a9";
+>>> +                       reg = <0>;
+>>> +                       next-level-cache = <&L2>;
+>>> +                       operating-points-v2 = <&opp0>;
+>>> +
+>>> +                       opp0: opp0 {
+>>
+>> I don't really like having this under cpu0 when it applies to all
+>> cpus. I would move it out of /cpus.
+>
+> That's how I had it initially, but then Arnd didn't like it much.
+>
+>>> +                               compatible = "linux,cpu-dvfs";
+>>
+>> This should not be linux specific. Probably not cpu specific either.
+>
+> This was just an example of one of the bindings and there will be others
+> as well.
+>
+> 'linux' here doesn't mean linux specific, but just that its first used by
+> Linux. That's what my understanding is atleast.
+>
+>>> +                               clocks = <&clk-controller 0>;
+>>> +                               clock-names = "cpu";
+>>
+>> clocks are an input to the cpu, not really an opp. You could have a an
+>> OPP which uses a different parent clock, but that is most likely a
+>> switch within the clock controller rather than 2 clock inputs to the
+>> cpu.
+>>
+>> I think the clock binding for cpus should stand on its own independent of OPPs.
+>>
+>>> +                               opp-supply = <&cpu-supply0>;
+>>
+>> Same comment as clocks applies here.
+>
+> Both will be kept in the cpu node where they were initially.
+>
+>>> +                               voltage-tolerance = <2>; /* percentage */
+>>> +                               clock-latency = <300000>;
+>>
+>> These could be per entry. I'm not sure it is worth the savings to not
+>> just always specify them per entry.
+>
+> Done.
+>
+>> We should append units (-us) to clock-latency unless there is a good
+>> reason to maintain compatibility.
+>
+> So you meant something like this:
+>
+> clock-latency-us = <300000>;
+>
+> right?
+>
+>>> +                               opp-list = <&opplist0>;
+>>
+>> With the above changes, having this list is unnecessary.
+>
+> It might be for the use case I mentioned earlier about something
+> like Krait.
+>
+>> So, what I envision is like this:
+>>
+>> /cpus {
+>>   cpu at 0 {
+>>     clocks = <...>;
+>>     cpu-supply = <...>;
+>>     operating-point-v2 = <&cpu0-opp>;
+>>    };
+>>   cpu at 1 {
+>>     clocks = <...>;
+>>     cpu-supply = <...>;
+>>     operating-point-v2 = <&cpu1-opp>;
+>>    };
+>> };
+>
+> Looks fine..
+>
+>> cpu0-opp : opp0 {
+>>   compatible = "operating-point-table";
+>>   entry0 {
+>>     opp-khz = <500000>;
+>>     opp-microvolt = <900000>;
+>>   };
+>>   entry1 {
+>>     opp-khz = <1000000>;
+>>     opp-microvolt = <1000000>;
+>>     turbo-mode;
+>>   };
+>> };
+>> cpu1-opp : opp1 {
+>>   compatible = "operating-point-table";
+>> ...
+>> };
+>
+> What about something like Krait which wants to use exactly same
+> bindings for all CPUs but want to specify they are controlled separately.
+>
+> So I had it like:
+>
+> cpu0-opp : opp0 {
+>   compatible = "operating-point-table";
+>   opp-list = <&opplist0>;
+>
+>   opplist0: opp-list0 {
+>           entry0 {
+>             opp-khz = <500000>;
+>             opp-microvolt = <900000>;
+>           };
+>           entry1 {
+>             opp-khz = <1000000>;
+>             opp-microvolt = <1000000>;
+>             turbo-mode;
+>           };
+>   };
+> };
+>
+> cpu1-opp : opp1 {
+>   compatible = "operating-point-table";
+>   opp-list = <&opplist0>;
+> };
 
-I failed to understand what's new here, probably I need more clarity on
-what we are doing here..
-
-So, this is what I see from OPPs point of view, everything else stripped out.
-
->> +       memory_bus_int: memory_bus at 1 {
-
->> +               operating-points = <
->> +                       400000 950000
->> +                       200000 950000
->> +                       133000 925000
->> +                       100000 850000
->> +                       80000  850000
->> +                       50000  850000>;
-
-So these are the OPPs your "groups" support and below ones are
-the frequencies that each block will support. Right ?
-
->> +               blocks {
-
->> +                               frequency = <
->> +                                       100000
->> +                                       100000
->> +                                       100000
->> +                                       100000
-
-Why this replication here ?
-
->> +                                       50000
->> +                                       50000>;
->> +                       };
-
-How are the above two tables (operating-points and frequency) related
-here? What about the voltages at which these frequencies are possible ?
-
->> +                       display_block: memory_bus_block2 {
-
->> +                               frequency = <
->> +                                       200000
->> +                                       160000
->> +                                       100000
->> +                                       80000
->> +                                       80000
->> +                                       50000>;
->> +                       };
-
->> +                       isp_block: memory_bus_block3 {
-
->> +                               frequency = <
->> +                                       200000
->> +                                       200000
->> +                                       100000
->> +                                       80000
->> +                                       50000
->> +                                       50000>;
->> +                       };
-
->> +                       gps_block: memory_bus_block4 {
-
->> +                               frequency = <
->> +                                       300000
->> +                                       200000
->> +                                       133000
->> +                                       100000
->> +                                       50000
->> +                                       50000>;
->> +                       };
-
-same for others as well..
+Gentle reminder, so that we can close this long standing issue soon..
