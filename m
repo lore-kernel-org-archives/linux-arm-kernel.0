@@ -1,192 +1,85 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Tue, 20 Jan 2015 08:39:25 -0500
-Subject: [PATCH v5 5/5] tty/serial: Add Spreadtrum sc9836-uart driver
- support
-In-Reply-To: <54BE45EA.3030308@gmail.com>
-References: <sc9836-v5>
- <1421402411-3479-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1421402411-3479-6-git-send-email-chunyan.zhang@spreadtrum.com>
- <54B92C4F.8020009@hurleysoftware.com> <54BE45EA.3030308@gmail.com>
-Message-ID: <54BE5A8D.6090303@hurleysoftware.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 20 Jan 2015 15:41:08 +0200
+Subject: [PATCH v4 17/18] iommu: exynos: init from dt-specific callback
+ instead of initcall
+In-Reply-To: <20150119113331.GG32131@arm.com>
+References: <1421399592-7482-1-git-send-email-m.szyprowski@samsung.com>
+ <10691050.Z5RGmE4fp0@avalon> <20150119113331.GG32131@arm.com>
+Message-ID: <1998769.ho0KpoUOzK@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/20/2015 07:11 AM, Orson Zhai wrote:
-> Hi, Peter,
+Hi Will,
+
+On Monday 19 January 2015 11:33:31 Will Deacon wrote:
+> On Mon, Jan 19, 2015 at 01:11:07AM +0000, Laurent Pinchart wrote:
+> > On Friday 16 January 2015 10:13:11 Marek Szyprowski wrote:
+> >> This patch introduces IOMMU_OF_DECLARE-based initialization to the
+> >> driver, which replaces subsys_initcall-based procedure.
+> >> exynos_iommu_of_setup ensures that each sysmmu controller is probed
+> >> before its master device.
 > 
-> Thank you for reviewing our code!
-> Some discussion below.
+> [...]
 > 
-> On 2015?01?16? 23:20, Peter Hurley wrote:
->> On 01/16/2015 05:00 AM, Chunyan Zhang wrote:
->>> Add a full sc9836-uart driver for SC9836 SoC which is based on the
->>> spreadtrum sharkl64 platform.
->>> This driver also support earlycon.
->>> This patch also replaced the spaces between the macros and their
->>> values with the tabs in serial_core.h
->> The locking doesn't look correct. Specific notations below.
-
->>> +static inline void sprd_tx(int irq, void *dev_id)
->>> +{
->>> +    struct uart_port *port = dev_id;
->>> +    struct circ_buf *xmit = &port->state->xmit;
->>> +    int count;
->>> +
->>> +    if (port->x_char) {
->>> +        serial_out(port, SPRD_TXD, port->x_char);
->>> +        port->icount.tx++;
->>> +        port->x_char = 0;
->>> +        return;
->>> +    }
->>> +
->>> +    if (uart_circ_empty(xmit) || uart_tx_stopped(port)) {
->>> +        sprd_stop_tx(port);
->>> +        return;
->>> +    }
->>> +
->>> +    count = THLD_TX_EMPTY;
->>> +    do {
->>> +        serial_out(port, SPRD_TXD, xmit->buf[xmit->tail]);
->>> +        xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
->>> +        port->icount.tx++;
->>> +        if (uart_circ_empty(xmit))
->>> +            break;
->>> +    } while (--count > 0);
->>> +
->>> +    if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
->>> +        uart_write_wakeup(port);
->>> +
->>> +    if (uart_circ_empty(xmit))
->>> +        sprd_stop_tx(port);
->>> +}
->>> +
->>> +/* this handles the interrupt from one port */
->>> +static irqreturn_t sprd_handle_irq(int irq, void *dev_id)
->>> +{
->>> +    struct uart_port *port = (struct uart_port *)dev_id;
->>> +    unsigned int ims;
->> Why does your isr not have to take port->lock ?
+> >> +static int __init exynos_iommu_of_setup(struct device_node *np)
+> >> +{
+> >> +	struct platform_device *pdev;
+> >> +
+> >> +	if (!init_done)
+> >> +		exynos_iommu_init();
+> >> +
+> >> +	pdev = of_platform_device_create(np, NULL,
+> >> platform_bus_type.dev_root);
+> >> +	if (IS_ERR(pdev))
+> >> +		return PTR_ERR(pdev);
+> > 
+> > This feels like a hack to me. What happens here is that you're using the
+> > IOMMU_OF_DECLARE mechanism to make sure that the iommu platform device
+> > will be created and registered before the normal OF bus populate
+> > mechanism kicks in, thus ensuring that the iommu gets probed before other
+> > devices. In practice this is pretty similar to using different init
+> > levels, which is what Will's patch set was trying to avoid in the first
+> > place. Creating a new kind of init levels mechanism doesn't sound very
+> > good to me.
+> > 
+> > The existing exynos-iommu driver is based on classic instantiation of a
+> > platform device from DT, using the normal device probing mechanism. As
+> > such it relies on the availability of a struct device for various helper
+> > functions. I thus understand why you want a struct device being
+> > registered for the iommu, instead of initializing the device right from
+> > the exynos_iommu_of_setup() function without a corresponding struct
+> > device being registered.
+> > 
+> > This leads me to question whether we should really introduce
+> > IOMMU_OF_DECLARE. Using regular deferred probing seems more and more like
+> > a better solution to me.
 > 
-> The original consideration is the registers are accessed by isr only.
-> Interrupt will not be nested because of gic chip driver protection.
-> So there is not other thread will race on it.
-> Does this make sense?
-
-The xmit->buf[] and its indexes could be accessed concurrently.
-For example,
-
-CPU 0                                      | CPU 1
-                                           |
-sprd_handle_irq                            | uart_flush_buffer
-  sprd_tx                                  |   spin_lock_irqsave
-    ...                                    |
-    count = 64                             |
-    do {                                   |     xmit->tail = 0
-      serial_out(xmit->buf[xmit->tail])    |
-
-      whoops - what byte did this just output?
-
-I'm sure there's many more possible races, perhaps with worse
-outcomes than just 1 bad byte output.
-
-
->>
->>> +    ims = serial_in(port, SPRD_IMSR);
->>> +
->>> +    if (!ims)
->>> +        return IRQ_NONE;
->>> +
->>> +    serial_out(port, SPRD_ICLR, ~0);
->>> +
->>> +    if (ims & (SPRD_IMSR_RX_FIFO_FULL |
->>> +        SPRD_IMSR_BREAK_DETECT | SPRD_IMSR_TIMEOUT))
->>> +        sprd_rx(irq, port);
->>> +
->>> +    if (ims & SPRD_IMSR_TX_FIFO_EMPTY)
->>> +        sprd_tx(irq, port);
->>> +
->>> +    return IRQ_HANDLED;
->>> +}
-
-[...]
-
->>> +static void sprd_console_putchar(struct uart_port *port, int ch)
->>> +{
->>> +    wait_for_xmitr(port);
->>> +    serial_out(port, SPRD_TXD, ch);
->>> +}
->>> +
->>> +static void sprd_console_write(struct console *co, const char *s,
->>> +                      unsigned int count)
->>> +{
->>> +    struct uart_port *port = &sprd_port[co->index]->port;
->>> +    int ien;
->>> +    int locked = 1;
->>> +
->>> +    if (oops_in_progress)
->>> +        locked = spin_trylock(&port->lock);
->>> +    else
->>> +        spin_lock(&port->lock);
->> If you do need to take the port->lock in your isr, then you need to
->> disable local irq here.
+> We seem to be going round and round on this argument. I said before that
+> I'm not against changing this [1], but somebody would need to propose
+> patches, which hasn't happened in recent history.
 > 
-> You mean to use spin_lock_irqsave()?
+> Arnd also makes some good arguments against using probing [2], which would
+> need further discussion.
 > 
-> We do disable irq below....
+> Basically, it looks like there are two sides to this argument and I don't
+> see anything changing without patch proposals. The only thing that the
+> current discussions seem to be achieving is blocking people like Marek,
+> who are trying to make use of what we have in mainline today!
 
-But not before an irq could happen with the spin_lock already taken.
+To be perfectly clear, I won't block patches here without submitting a 
+counterproposal (unless there's something fundamentally wrong of course). I 
+still believe the deferred probe approach should be given at least a try, but 
+as I don't have time to implement that myself now, I won't try to block 
+anything.
 
-printk
-  ...
-  sprd_console_write
-    spin_lock
-       <IRQ>
-       sprd_handle_irq
-         spin_lock
+> [1]
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/310783.
+> html
+> [2]
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/310992.
+> html
 
-    ** DEADLOCK **
-
-[
-  Note: some drivers assume that console->write() will always be
-  called with local interrupts disabled. This is a bad idea and I
-  have warned those driver authors when this has come up before.
-]
-
-Also, since you handle sysrq in your isr the above needs to check
-for non-zero port->sysrq and _not_ attempt the spinlock because
-the isr will already have it; for example,
-
-<IRQ>
-sprd_handle_irq
-  spin_lock
-    sprd_rx
-      ...
-      uart_handle_syrq_char
-        handle_sysrq
-          __handle_sysrq
-            printk
-              ...
-              sprd_console_write
-                spin_lock
-
-    ** DEADLOCK **
-
+-- 
 Regards,
-Peter Hurley
 
->>
->>> +    /* save the IEN then disable the interrupts */
->>> +    ien = serial_in(port, SPRD_IEN);
->>> +    serial_out(port, SPRD_IEN, 0x0);
-> 
-> Here, we disable port IEN register.
-> 
->>> +
->>> +    uart_console_write(port, s, count, sprd_console_putchar);
->>> +
->>> +    /* wait for transmitter to become empty and restore the IEN */
->>> +    wait_for_xmitr(port);
->>> +    serial_out(port, SPRD_IEN, ien);
->>> +    if (locked)
->>> +        spin_unlock(&port->lock);
->>> +}
+Laurent Pinchart
