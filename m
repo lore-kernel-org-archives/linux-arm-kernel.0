@@ -1,94 +1,68 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 20 Jan 2015 17:26:11 -0600
-Subject: [next-20150119]regression (mm)?
-In-Reply-To: <20150120140546.DDCB8D4@black.fi.intel.com>
-References: <54BD33DC.40200@ti.com> <20150119174317.GK20386@saruman>
- <20150120001643.7D15AA8@black.fi.intel.com>
- <20150120114555.GA11502@n2100.arm.linux.org.uk>
- <20150120140546.DDCB8D4@black.fi.intel.com>
-Message-ID: <20150120232611.GA14142@kahuna>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 21 Jan 2015 01:37:17 +0200
+Subject: [PATCH V8 00/14] drm/exynos: few patches to enhance bridge chip
+ support
+In-Reply-To: <54BD3943.80402@collabora.co.uk>
+References: <1416045309-13359-1-git-send-email-ajaykumar.rs@samsung.com>
+ <20150119163043.GB7751@ulmo.nvidia.com> <54BD3943.80402@collabora.co.uk>
+Message-ID: <13166907.g68bKfaUGl@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:05-20150120, Kirill A. Shutemov wrote:
-> Russell King - ARM Linux wrote:
-> > On Tue, Jan 20, 2015 at 02:16:43AM +0200, Kirill A. Shutemov wrote:
-> > > Better option would be converting 2-lvl ARM configuration to
-> > > <asm-generic/pgtable-nopmd.h>, but I'm not sure if it's possible.
+Hi,
+
+On Monday 19 January 2015 18:05:07 Javier Martinez Canillas wrote:
+> On 01/19/2015 05:30 PM, Thierry Reding wrote:
+> >> I know you probably are very busy but it would be great if you can take a
+> >> look to this series to avoid another kernel release to be missed since
+> >> we are already at v3.19-rc5.
+> >> 
+> >> Only this version was posted 2 months ago and the first version of the
+> >> series was sent on May, 2014 so it has been on the list for almost a
+> >> year now...
+> >> 
+> >> Tomi and Laurent had already agreed with the DT binging so I think that
+> >> we can already merge these and if there are any remaining issues, those
+> >> can be fixed during the 3.20 -rc cycle.
 > > 
-> > Well, IMHO the folded approach in asm-generic was done the wrong way
-> > which barred ARM from ever using it.
+> > I see only a single Tested-by on this series and that seems to be with a
+> > bunch of out-of-tree patches applied on top. Does this now actually work
+> > applied on top of upstream? Also it seems like many people actually want
+> > this to get merged but there's been no Reviewed-bys and only a single
+> > Tested-by? Is that as good as it's going to get?
 > 
-> Okay, I see.
+> Good point, I provided some feedback on an early version of the series but
+> I'm not an DRM expert so I couldn't review it in detail to provide my
+> Reviewed-by.
 > 
-> Regarding the topic bug. Completely untested patch is below. Could anybody
-> check if it helps?
+> I did provide my Tested-by a long time ago though but looking at the patches
+> it seems those were dropped so here goes again:
 > 
-> From 34b9182d08ef2b541829e305fcc91ef1d26b27ea Mon Sep 17 00:00:00 2001
-> From: "Kirill A. Shutemov" <kirill.shutemov@linux.intel.com>
-> Date: Tue, 20 Jan 2015 15:47:22 +0200
-> Subject: [PATCH] arm: define __PAGETABLE_PMD_FOLDED for !LPAE
+> For the whole series on an Exynos5420 Peach Pit and an Exynos5250 Snow
+> Chromebooks:
 > 
-> ARM uses custom implementation of PMD folding in 2-level page table case.
-> Generic code expects to see __PAGETABLE_PMD_FOLDED to be defined if PMD is
-> folded, but ARM doesn't do this. Let's fix it.
+> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 > 
-> Defining __PAGETABLE_PMD_FOLDED will drop out unused __pmd_alloc().
-> It also fixes problems with recently-introduced pmd accounting on ARM
-> without LPAE.
+> > Also I think the last update was that Ajay was going to resend this
+> > based on v3.19-rc1 or something. Is that still going to happen?
+> > Otherwise I can probably try to apply as-is, but not sure how well it
+> > will.
 > 
-> Signed-off-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
-> Reported-by: Nishanth Menon <nm@ti.com>
-> ---
->  arch/arm/include/asm/pgtable-2level.h | 2 ++
->  1 file changed, 2 insertions(+)
+> Ajay,
 > 
-> diff --git a/arch/arm/include/asm/pgtable-2level.h b/arch/arm/include/asm/pgtable-2level.h
-> index bcc5e300413f..bfd662e49a25 100644
-> --- a/arch/arm/include/asm/pgtable-2level.h
-> +++ b/arch/arm/include/asm/pgtable-2level.h
-> @@ -10,6 +10,8 @@
->  #ifndef _ASM_PGTABLE_2LEVEL_H
->  #define _ASM_PGTABLE_2LEVEL_H
->  
-> +#define __PAGETABLE_PMD_FOLDED
-> +
->  /*
->   * Hardware-wise, we have a two level page table structure, where the first
->   * level has 4096 entries, and the second level has 256 entries.  Each entry
-> -- 
-> 2.1.4
+> Are you going to rebase and resend this series with all the provided tags?
+> Gustavo and I have a rebased branch on top of 3.19-rc5 and one of us can
+> post your series if you are not planning to do it.
+> 
+> Laurent and Tomi,
+> 
+> You said that you are OK with the DT bindings now, does that count as an
+> Acked-by or Reviewed-by for you at least for the DT bindings changes in the
+> series?
 
-Above helps the TI platforms
-1:                     am335x-evm: BOOT: PASS: am335x-evm.txt
-2:                      am335x-sk: BOOT: PASS: am335x-sk.txt
-3:                     am3517-evm: BOOT: PASS: am3517-evm.txt
-4:                      am37x-evm: BOOT: PASS: am37x-evm.txt
-5:                      am437x-sk: BOOT: PASS: am437x-sk.txt
-6:                    am43xx-epos: BOOT: PASS: am43xx-epos.txt
-7:                   am43xx-gpevm: BOOT: PASS: am43xx-gpevm.txt
-8:    BeagleBoard-X15(am57xx-evm): BOOT: PASS: am57xx-evm.txt
-9:                 BeagleBoard-XM: BOOT: PASS: beagleboard.txt
-10:            beagleboard-vanilla: BOOT: PASS: beagleboard-vanilla.txt
-11:               beaglebone-black: BOOT: PASS: beaglebone-black.txt
-12:                     beaglebone: BOOT: PASS: beaglebone.txt
-13:                     craneboard: BOOT: PASS: craneboard.txt
-14:                     dra72x-evm: BOOT: PASS: dra72x-evm.txt
-15:                     dra7xx-evm: BOOT: PASS: dra7xx-evm.txt
-16:         OMAP3430-Labrador(LDP): BOOT: PASS: ldp.txt
-17:                           n900: BOOT: FAIL: n900.txt (legacy issue
-with my farm)
-18:                      omap5-evm: BOOT: PASS: omap5-evm.txt
-19:                  pandaboard-es: BOOT: PASS: pandaboard-es.txt
-20:             pandaboard-vanilla: BOOT: PASS: pandaboard-vanilla.txt
-21:                        sdp2430: BOOT: PASS: sdp2430.txt
-22:                        sdp3430: BOOT: PASS: sdp3430.txt
-23:                        sdp4430: BOOT: PASS: sdp4430.txt
-TOTAL = 23 boards, Booted Boards = 22, No Boot boards = 1
-
-please feel free to add my
-Tested-by: Nishanth Menon <nm@ti.com>
+It counts as an Acked-by for the DT bindings.
 
 -- 
 Regards,
-Nishanth Menon
+
+Laurent Pinchart
