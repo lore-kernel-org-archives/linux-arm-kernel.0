@@ -1,48 +1,31 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 20 Jan 2015 16:07:29 +0000
-Subject: [PATCHv2 5/5] arm: omap: specify PMUs are for ARMv7 CPUs
-In-Reply-To: <1421770049-32029-1-git-send-email-mark.rutland@arm.com>
-References: <1421770049-32029-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1421770049-32029-6-git-send-email-mark.rutland@arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 21 Jan 2015 00:09:05 +0800
+Subject: [PATCH v5] clk: sunxi: Add driver for A80 MMC config clocks/resets
+In-Reply-To: <20150120160413.GU4367@lukather>
+References: <1421768791-20170-1-git-send-email-wens@csie.org>
+ <20150120160413.GU4367@lukather>
+Message-ID: <CAGb2v65y0KPe7UtguEEPJyFtBD7qoJ=-YT82Mwp+qDPi7PCPYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we can specify which PMU variant we're likely to deal with, do
-so in the omap board code. This will allow us to split the ARMv6, ARMv7,
-and XScale PMU drivers.
+On Wed, Jan 21, 2015 at 12:04 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Tue, Jan 20, 2015 at 11:46:31PM +0800, Chen-Yu Tsai wrote:
+>> On the A80 SoC, the 4 mmc controllers each have a separate register
+>> controlling their register access clocks and reset controls. These
+>> registers in turn share a ahb clock gate and reset control.
+>>
+>> This patch adds a platform device driver for these controls. It
+>> requires both clocks and reset controls to be available, so using
+>> CLK_OF_DECLARE might not be the best way.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>
+> Merged, thanks!
 
-The unnecessary include of asm/pmu.h is also removed.
+plaes on IRC just pointed out the copyright year is wrong....
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Tony Lindgren <tony@atomide.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Olof Johansson <olof@lixom.net>
----
- arch/arm/mach-omap2/pmu.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+Could you fix it before you push it out?
+Sorry about this.
 
-diff --git a/arch/arm/mach-omap2/pmu.c b/arch/arm/mach-omap2/pmu.c
-index 33c8846..a69e9a3 100644
---- a/arch/arm/mach-omap2/pmu.c
-+++ b/arch/arm/mach-omap2/pmu.c
-@@ -13,7 +13,7 @@
-  */
- #include <linux/of.h>
- 
--#include <asm/pmu.h>
-+#include <asm/system_info.h>
- 
- #include "soc.h"
- #include "omap_hwmod.h"
-@@ -37,7 +37,8 @@ static int __init omap2_init_pmu(unsigned oh_num, char *oh_names[])
- {
- 	int i;
- 	struct omap_hwmod *oh[3];
--	char *dev_name = "arm-pmu";
-+	char *dev_name = cpu_architecture() == CPU_ARCH_ARMv6 ?
-+			 "armv6-pmu" : "armv7-pmu";
- 
- 	if ((!oh_num) || (oh_num > 3))
- 		return -EINVAL;
--- 
-1.9.1
+ChenYu
