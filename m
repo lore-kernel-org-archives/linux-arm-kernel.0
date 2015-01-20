@@ -1,68 +1,84 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 20 Jan 2015 15:12:56 +0800
-Subject: [PATCH] i2c: drop ancient protection against sysfs refcounting
- issues
-In-Reply-To: <54BDFE30.5090303@metafoo.de>
-References: <1421693756-12917-1-git-send-email-wsa@the-dreams.de>
- <20150119190142.GA9451@kroah.com>
- <20150119230427.GH26493@n2100.arm.linux.org.uk>
- <20150120014159.GA3349@kroah.com> <54BDFE30.5090303@metafoo.de>
-Message-ID: <20150120071256.GA18983@kroah.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 20 Jan 2015 07:18:19 +0000 (UTC)
+Subject: [PATCH 1/5] ARM: AM43xx: hwmod: add VPFE hwmod entries
+In-Reply-To: <1418919854-16164-2-git-send-email-prabhakar.csengg@gmail.com>
+References: <1418919854-16164-1-git-send-email-prabhakar.csengg@gmail.com>
+ <1418919854-16164-2-git-send-email-prabhakar.csengg@gmail.com>
+Message-ID: <alpine.DEB.2.02.1501200709440.5450@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 20, 2015 at 08:05:20AM +0100, Lars-Peter Clausen wrote:
-> On 01/20/2015 02:41 AM, Greg Kroah-Hartman wrote:
-> >On Mon, Jan 19, 2015 at 11:04:27PM +0000, Russell King - ARM Linux wrote:
-> >>On Tue, Jan 20, 2015 at 03:01:42AM +0800, Greg Kroah-Hartman wrote:
-> >>>On Mon, Jan 19, 2015 at 07:55:56PM +0100, Wolfram Sang wrote:
-> >>>>diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-> >>>>index 39d25a8cb1ad..15cc5902cf89 100644
-> >>>>--- a/drivers/i2c/i2c-core.c
-> >>>>+++ b/drivers/i2c/i2c-core.c
-> >>>>@@ -41,7 +41,6 @@
-> >>>>  #include <linux/of_device.h>
-> >>>>  #include <linux/of_irq.h>
-> >>>>  #include <linux/clk/clk-conf.h>
-> >>>>-#include <linux/completion.h>
-> >>>>  #include <linux/hardirq.h>
-> >>>>  #include <linux/irqflags.h>
-> >>>>  #include <linux/rwsem.h>
-> >>>>@@ -1184,8 +1183,7 @@ EXPORT_SYMBOL_GPL(i2c_new_dummy);
-> >>>>
-> >>>>  static void i2c_adapter_dev_release(struct device *dev)
-> >>>>  {
-> >>>>-	struct i2c_adapter *adap = to_i2c_adapter(dev);
-> >>>>-	complete(&adap->dev_released);
-> >>>>+	/* empty, but the driver core insists we need a release function */
-> >>>
-> >>>Yeah, it does, but I hate to see this in "real" code as something is
-> >>>probably wrong with it if it happens.
-> >>>
-> >>>Please move the rest of 'i2c_del_adapter' into the release function
-> >>>(what was after the wait_for_completion() call), and then all should be
-> >>>fine.
-> >>
-> >>Are you sure about that?  Some drivers do this, eg,
-> >>
-> >>         i2c_del_adapter(&drv_data->adapter);
-> >>         free_irq(drv_data->irq, drv_data);
-> >>
-> >>where drv_data was allocated using devm_kzalloc(), and so will be
-> >>released when the ->remove callback (which calls the above
-> >>i2c_del_adapter()) returns... freeing the embedded device struct.
-> >
-> >But that will fail today if the memory is freed in i2c_del_adapter(), so
-> >there shouldn't be any change in logic here.
-> >
-> >Or am I missing something obvious?
+Hi
+
+On Thu, 18 Dec 2014, Lad, Prabhakar wrote:
+
+> From: Benoit Parrot <bparrot@ti.com>
 > 
-> The memory is not freed in i2c_del_adapter().
+> this patch adds VPFE HWMOD data for AM43xx.
+> 
+> Signed-off-by: Benoit Parrot <bparrot@ti.com>
+> Signed-off-by: Darren Etheridge <detheridge@ti.com>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
 
-Right, and I'm not saying it should be, just move the existing logic
-into the release callback, and the code flow should be the same and we
-don't end up with an "empty" release callback.
+...
 
-thanks,
+> ---
+>  arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 56 ++++++++++++++++++++++++++++++
+>  arch/arm/mach-omap2/prcm43xx.h             |  3 +-
+>  2 files changed, 58 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+> index fea01aa..bd9067e 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
 
-greg k-h
+...
+
+> @@ -750,6 +788,22 @@ static struct omap_hwmod_ocp_if am43xx_l4_ls__dss_rfbi = {
+>  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>  };
+>  
+> +static struct omap_hwmod_ocp_if am43xx_l3__vpfe0 = {
+> +	.master         = &am33xx_l3_main_hwmod,
+> +	.slave          = &am43xx_vpfe0_hwmod,
+> +	.clk            = "l3_gclk",
+> +	.flags          = OCPIF_SWSUP_IDLE,
+> +	.user           = OCP_USER_MPU,
+> +};
+> +
+> +static struct omap_hwmod_ocp_if am43xx_l3__vpfe1 = {
+> +	.master         = &am33xx_l3_main_hwmod,
+> +	.slave          = &am43xx_vpfe1_hwmod,
+> +	.clk            = "l3_gclk",
+> +	.flags          = OCPIF_SWSUP_IDLE,
+> +	.user           = OCP_USER_MPU,
+> +};
+> +
+>  static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
+>  	&am33xx_l4_wkup__synctimer,
+>  	&am43xx_l4_ls__timer8,
+> @@ -848,6 +902,8 @@ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
+>  	&am43xx_l4_ls__dss,
+>  	&am43xx_l4_ls__dss_dispc,
+>  	&am43xx_l4_ls__dss_rfbi,
+> +	&am43xx_l3__vpfe0,
+> +	&am43xx_l3__vpfe1,
+>  	NULL,
+>  };
+
+According to SPRUHL7 Figure 14-1 "VPFE Integration" and Table 14-2 "VPFE 
+Connectivity Attributes", a VPFE has two interconnect ports per instance: 
+one L4-Per port as a register target, and one L3 port as a DMA initiator.  
+It's unclear to me whether the L3 port can also serve as a register 
+target, but Section 2.1 "ARM Cortex-A9 Memory Map", Table 4-1 "L3 
+Master-Slave Connectivity", and Figure 4-2 "L4 Topology" suggest that it 
+cannot.
+
+So if that's correct, there should be two more struct omap_hwmod_ocp_if 
+records added in this patch for the register target ports that are 
+connected to the L4.  DSS is a good example: see am43xx_dss__l3_main and 
+am43xx_l4_ls__dss in this same file.
+
+
+- Paul
