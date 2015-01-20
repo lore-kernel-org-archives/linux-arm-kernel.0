@@ -1,104 +1,86 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 20 Jan 2015 18:36:04 +0100
-Subject: [PATCH] bluetooth: Add hci_h4p driver
-In-Reply-To: <CB643345-4B50-4ED0-8C3E-296CD225754D@holtmann.org>
-References: <20141223130219.GA5731@amd>
- <CB643345-4B50-4ED0-8C3E-296CD225754D@holtmann.org>
-Message-ID: <20150120173604.GA712@amd>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 20 Jan 2015 09:37:55 -0800
+Subject: [PATCH 1/4] clk: st: STiH410: Fix pdiv and fdiv divisor when
+ setting rate
+In-Reply-To: <1421767964-8798-2-git-send-email-peter.griffin@linaro.org>
+References: <1421767964-8798-1-git-send-email-peter.griffin@linaro.org>
+ <1421767964-8798-2-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20150120173755.22722.80361@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> > Add HCI driver for H4 with Nokia extensions. This device is used on
-> > Nokia N900 cell phone.
-> > 
-> > Older version of this driver lived in staging, before being reverted
-> > in a4102f90e87cfaa3fdbed6fdf469b23f0eeb4bfd .
-> > 
-> > Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> > Thanks-to: Sebastian Reichel <sre@debian.org>
-> > Thanks-to: Joe Perches <joe@perches.com>
-> > 
-> > ---
-> > 
-> > Please apply,
-> > 								Pavel
-> > 
-> > 
-> > Kconfig      |   10 
-> > Makefile     |    4 
-> > nokia_core.c | 1149 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-> > nokia_fw.c   |   99 +++++
-> > nokia_h4p.h  |  214 ++++++++++
-> > nokia_uart.c |  171 ++++++++
-> > 7 files changed, 1667 insertions(+)
-
-Speaking about formatting, could you properly format your emails, that
-is inserting newline after ~78 columns, to make them easier to reply
-to?
-
-> so when I run this through checkpatch --strict, then I get tons of warning that we have DOS style ^M line breaks. There are also trailing whitespace that need fixing. I can use cleanpatch to do this, but so can you.
->
-
-Strange, where do you see DOS style line breaks? Checkpatch here does
-not warn about that, and they really should not be there.
-
-> Even after doing that there are still obvious plain coding style violation in the patch. For example:
+Quoting Peter Griffin (2015-01-20 07:32:41)
+> Debugging eMMC on upstream kernels it has been noticed that when the
+> targetpack configures MMC0 clock to 200Mhz (required to switch to
+> HS200) then everything works OK. However if the kernel sets the
+> clock rate using clk_set_rate, then the eMMC card initialisation
+> fails with timeouts. Lower clock speeds (the default being 50Mhz)
+> work ok, but they we fail to get good eMMC transfer rates.
 > 
-> ERROR: space prohibited before that ',' (ctx:WxW)
-> #610: FILE: drivers/bluetooth/nokia_core.c:517:
-> +			__h4p_set_auto_ctsrts(info, 0 , UART_EFR_RTS);
-
-Yeah, I should have catched that one.
-
-> CHECK: Alignment should match open parenthesis
-> #662: FILE: drivers/bluetooth/nokia_core.c:569:
-> +		h4p_outb(info, UART_OMAP_SCR,
-> +			     h4p_inb(info, UART_OMAP_SCR) |
+> Looking through the vendor kernel clock driver reveals Giuseppe
+> had already fixed this issue, but the patch hasn't made its way
+> upstream.
 > 
-> CHECK: Blank lines aren't necessary before a close brace '}'
-> #692: FILE: drivers/bluetooth/nokia_core.c:599:
+> The issue is fixed by changing the logic to manage the pdiv and
+> fdiv divisors used for setting the rate inside the flexgen driver code.
+> 
+> Pdiv is mainly targeted for low freq results, while fdiv should be
+> used for divs =< 64. The other way can lead to 'duty cycle'
+> issues.
+> 
+> I have changed the original patch to keep the original behaviour
+> in cases where the div is >64 which matches the original comment
+> and patch description more closely. Although no clocks appear to hit
+> this case currently when booting an upstream kernel.
+> 
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+
+Applied to clk-next.
+
+Regards,
+Mike
+
+> ---
+>  drivers/clk/st/clk-flexgen.c | 19 +++++++++++++++----
+>  1 file changed, 15 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/clk/st/clk-flexgen.c b/drivers/clk/st/clk-flexgen.c
+> index 2282cef..3a484b3 100644
+> --- a/drivers/clk/st/clk-flexgen.c
+> +++ b/drivers/clk/st/clk-flexgen.c
+> @@ -138,16 +138,27 @@ static int flexgen_set_rate(struct clk_hw *hw, unsigned long rate,
+>         struct flexgen *flexgen = to_flexgen(hw);
+>         struct clk_hw *pdiv_hw = &flexgen->pdiv.hw;
+>         struct clk_hw *fdiv_hw = &flexgen->fdiv.hw;
+> -       unsigned long primary_div = 0;
+> +       unsigned long div = 0;
+>         int ret = 0;
+>  
+>         pdiv_hw->clk = hw->clk;
+>         fdiv_hw->clk = hw->clk;
+>  
+> -       primary_div = clk_best_div(parent_rate, rate);
+> +       div = clk_best_div(parent_rate, rate);
+>  
+> -       clk_divider_ops.set_rate(fdiv_hw, parent_rate, parent_rate);
+> -       ret = clk_divider_ops.set_rate(pdiv_hw, rate, rate * primary_div);
+> +       /*
+> +       * pdiv is mainly targeted for low freq results, while fdiv
+> +       * should be used for div <= 64. The other way round can
+> +       * lead to 'duty cycle' issues.
+> +       */
 > +
-> +}
+> +       if (div <= 64) {
+> +               clk_divider_ops.set_rate(pdiv_hw, parent_rate, parent_rate);
+> +               ret = clk_divider_ops.set_rate(fdiv_hw, rate, rate * div);
+> +       } else {
+> +               clk_divider_ops.set_rate(fdiv_hw, parent_rate, parent_rate);
+> +               ret = clk_divider_ops.set_rate(pdiv_hw, rate, rate * div);
+> +       }
+>  
+>         return ret;
+>  }
+> -- 
+> 1.9.1
 > 
-> These are only few. They are more and all these need fixing before I
-> even consider it.
-
-Yeah, so first patch was too good for staging, and I "would be allowed
-to clean it up in tree", and now you run checkpatch --strict,
-complaining about very serious stuff such as "blank lines before }".
-
-Yes, checkpatch produces a lot of junk, like warnings about
-mdelay(). I'm not sure how you'd want #662 above, formatted.
-
-pavel at amd:/data/l/linux-n900$ scripts/checkpatch.pl --strict --file
-drivers/bluetooth/*.c | wc -l 3194
-pavel at amd:/data/l/linux-n900$
-
-...so I really can't know which checkpatch complains you consider
-serious and which are ok... And yes, I guess I should trim down those
-FSF notices.
-
-> Also this worries me:
-> 
-> WARNING: DT compatible string "brcm,uart,bcm2048" appears un-documented -- check ./Documentation/devicetree/bindings/
-> #1222: FILE: drivers/bluetooth/nokia_core.c:1129:
-> +	{ .compatible = "brcm,uart,bcm2048" },
-
-Yes, that wories me, too. It is one of reasons I wanted this to be
-merged to staging. Arguing about right bindings will take some time.
-
-I can fix the checkpatch stuff that makes sense. That does not include
-uglyfying code just for checkpatch.  Can you then take the patch, as
-you promised, and let me argue the bindings, and the other stuff that
-needs to be fixed?
-
-If not, can we agree that the driver in staging should be reverted, as
-Greg promised would be "easy", and I can clean it up there?
-
-Thanks,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
