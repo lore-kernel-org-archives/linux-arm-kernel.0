@@ -1,120 +1,125 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 20 Jan 2015 16:10:06 +0900
-Subject: [PATCH v9 4/7] ARM: dts: Add PPMU dt node for Exynos3250 SoC
+Date: Tue, 20 Jan 2015 16:10:08 +0900
+Subject: [PATCH v9 6/7] ARM: dts: exynos: Add PPMU node for Exynos3250-based
+ Rinato/Monk board
 In-Reply-To: <1421737809-4010-1-git-send-email-cw00.choi@samsung.com>
 References: <1421737809-4010-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1421737809-4010-5-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1421737809-4010-7-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add PPMU (Platform Performance Monitoring Unit) dt node
-to estimate the utilization of each IP in Exynos SoC throught DEVFREQ Event
-subsystem.
-
-This patch adds following PPMU dt nodes:
-- PPMU_DMC0     0x106a0000
-- PPMU_DMC1     0x106b0000
-- PPMU_RIGHTBUS 0x112A0000
-- PPMU_LEFTBUS  0x116A0000
-- PPMU_CAMIF    0x11AC0000
-- PPMU_LCD0     0x11E40000
-- PPMU_FSYS     0x12630000
-- PPMU_3D       0x13220000
-- PPMU_MFC      0x13660000
-- PPMU_CPU      0x106c0000
+This patch add PPMU dt node to Exynos3250-base Rinato/Monk board. The PPMU node
+is used to get the utilization of DMC0/DMC1/LEFTBUS/RIGHTBUS Block.
 
 Cc: Kukjin Kim <kgene@kernel.org>
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-Acked-by: MyungJoo Ham <myungjoo.ham@samsung.com>
 ---
- arch/arm/boot/dts/exynos3250.dtsi | 74 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 74 insertions(+)
+ arch/arm/boot/dts/exynos3250-monk.dts   | 40 +++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos3250-rinato.dts | 40 +++++++++++++++++++++++++++++++++
+ 2 files changed, 80 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
-index d89fdf5..45513ed 100644
---- a/arch/arm/boot/dts/exynos3250.dtsi
-+++ b/arch/arm/boot/dts/exynos3250.dtsi
-@@ -530,6 +530,80 @@
- 			compatible = "arm,cortex-a7-pmu";
- 			interrupts = <0 18 0>, <0 19 0>;
- 		};
-+
-+		ppmu_dmc0: ppmu_dmc0 at 106a0000 {
-+			compatible = "samsung,exynos-ppmu";
-+			reg = <0x106a0000 0x2000>;
-+			status = "disabled";
-+		};
-+
-+		ppmu_dmc1: ppmu_dmc1 at 106b0000 {
-+			compatible = "samsung,exynos-ppmu";
-+			reg = <0x106b0000 0x2000>;
-+			status = "disabled";
-+		};
-+
-+		ppmu_cpu: ppmu_cpu at 106c0000 {
-+			compatible = "samsung,exynos-ppmu";
-+			reg = <0x106c0000 0x2000>;
-+			status = "disabled";
-+		};
-+
-+		ppmu_rightbus: ppmu_rightbus at 112a0000 {
-+			compatible = "samsung,exynos-ppmu";
-+			reg = <0x112a0000 0x2000>;
-+			clocks = <&cmu CLK_PPMURIGHT>;
-+			clock-names = "ppmu";
-+			status = "disabled";
-+		};
-+
-+		ppmu_leftbus: ppmu_leftbus0 at 116a0000 {
-+			compatible = "samsung,exynos-ppmu";
-+			reg = <0x116a0000 0x2000>;
-+			clocks = <&cmu CLK_PPMULEFT>;
-+			clock-names = "ppmu";
-+			status = "disabled";
-+		};
-+
-+		ppmu_camif: ppmu_camif at 11ac0000 {
-+			compatible = "samsung,exynos-ppmu";
-+			reg = <0x11ac0000 0x2000>;
-+			clocks = <&cmu CLK_PPMUCAMIF>;
-+			clock-names = "ppmu";
-+			status = "disabled";
-+		};
-+
-+		ppmu_lcd0: ppmu_lcd0 at 11e40000 {
-+			compatible = "samsung,exynos-ppmu";
-+			reg = <0x11e40000 0x2000>;
-+			clocks = <&cmu CLK_PPMULCD0>;
-+			clock-names = "ppmu";
-+			status = "disabled";
-+		};
-+
-+		ppmu_fsys: ppmu_fsys at 12630000 {
-+			compatible = "samsung,exynos-ppmu";
-+			reg = <0x12630000 0x2000>;
-+			clocks = <&cmu CLK_PPMUFILE>;
-+			clock-names = "ppmu";
-+			status = "disabled";
-+		};
-+
-+		ppmu_g3d: ppmu_g3d at 13220000 {
-+			compatible = "samsung,exynos-ppmu";
-+			reg = <0x13220000 0x2000>;
-+			clocks = <&cmu CLK_PPMUG3D>;
-+			clock-names = "ppmu";
-+			status = "disabled";
-+		};
-+
-+		ppmu_mfc: ppmu_mfc at 13660000 {
-+			compatible = "samsung,exynos-ppmu";
-+			reg = <0x13660000 0x2000>;
-+			clocks = <&cmu CLK_PPMUMFC_L>;
-+			clock-names = "ppmu";
-+			status = "disabled";
-+		};
- 	};
+diff --git a/arch/arm/boot/dts/exynos3250-monk.dts b/arch/arm/boot/dts/exynos3250-monk.dts
+index 24822aa..fcceb59 100644
+--- a/arch/arm/boot/dts/exynos3250-monk.dts
++++ b/arch/arm/boot/dts/exynos3250-monk.dts
+@@ -420,6 +420,46 @@
+ 	status = "okay";
  };
  
++&ppmu_dmc0 {
++	status = "okay";
++
++	events {
++		ppmu_dmc0_3: ppmu-event3-dmc0 {
++			event-name = "ppmu-event3-dmc0";
++		};
++	};
++};
++
++&ppmu_dmc1 {
++	status = "okay";
++
++	events {
++		ppmu_dmc1_3: ppmu-event3-dmc1 {
++			event-name = "ppmu-event3-dmc1";
++		};
++	};
++};
++
++&ppmu_leftbus {
++	status = "okay";
++
++	events {
++		ppmu_leftbus_3: ppmu-event3-leftbus {
++			event-name = "ppmu-event3-leftbus";
++		};
++	};
++};
++
++&ppmu_rightbus {
++	status = "okay";
++
++	events {
++		ppmu_rightbus_3: ppmu-event3-rightbus {
++			event-name = "ppmu-event3-rightbus";
++		};
++	};
++};
++
+ &xusbxti {
+ 	clock-frequency = <24000000>;
+ };
+diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
+index 7cc52b5..9dd1ce1 100644
+--- a/arch/arm/boot/dts/exynos3250-rinato.dts
++++ b/arch/arm/boot/dts/exynos3250-rinato.dts
+@@ -595,6 +595,46 @@
+ 	status = "okay";
+ };
+ 
++&ppmu_dmc0 {
++	status = "okay";
++
++	events {
++		ppmu_dmc0_3: ppmu-event3-dmc0 {
++			event-name = "ppmu-event3-dmc0";
++		};
++	};
++};
++
++&ppmu_dmc1 {
++	status = "okay";
++
++	events {
++		ppmu_dmc1_3: ppmu-event3-dmc1 {
++			event-name = "ppmu-event3-dmc1";
++		};
++	};
++};
++
++&ppmu_leftbus {
++	status = "okay";
++
++	events {
++		ppmu_leftbus_3: ppmu-event3-leftbus {
++			event-name = "ppmu-event3-leftbus";
++		};
++	};
++};
++
++&ppmu_rightbus {
++	status = "okay";
++
++	events {
++		ppmu_rightbus_3: ppmu-event3-rightbus {
++			event-name = "ppmu-event3-rightbus";
++		};
++	};
++};
++
+ &xusbxti {
+ 	clock-frequency = <24000000>;
+ };
 -- 
 1.8.5.5
