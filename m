@@ -1,33 +1,62 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 20 Jan 2015 14:33:19 +0100
-Subject: [PATCHv3 0/2] Driver for TI tlc59116 16 Channel i2c LED driver
-In-Reply-To: <20150120132613.GJ2938@lunn.ch>
-References: <1421277308-3477-1-git-send-email-andrew@lunn.ch>
- <54B9259C.3070403@ti.com> <20150116191734.GB31577@lunn.ch>
- <54BE258A.10808@ti.com> <20150120132613.GJ2938@lunn.ch>
-Message-ID: <CAMuHMdWAVFsVwGFVkPGBCW9hfStbOeFxF44SESkyw7ta9yXcog@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 20 Jan 2015 13:36:17 +0000
+Subject: [RFC PATCHv2 07/19] mfd: ab8500: Use power_supply_*() API for
+ accessing function attrs
+In-Reply-To: <1420472882-10463-8-git-send-email-k.kozlowski@samsung.com>
+References: <1420472882-10463-1-git-send-email-k.kozlowski@samsung.com>
+ <1420472882-10463-8-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20150120133617.GG13701@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 20, 2015 at 2:26 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> led-gpio looks like more work, but i don't see why it should not be
-> possible. One thing i do need to check is that if the brightness is
-> set to 255 the output is not set to 255/256 on and you have a regular
+On Mon, 05 Jan 2015, Krzysztof Kozlowski wrote:
 
-is set to 255/256?
+> Replace direct calls to power supply function attributes with wrappers.
+> Wrappers provide safe access in case of unregistering the power
+> supply (e.g. by removing the driver). Replace:
+>  - get_property -> power_supply_get_property
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Acked-by: Jonghwa Lee <jonghwa3.lee@samusng.com>
+> Acked-by: Pavel Machek <pavel@ucw.cz>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
 
-> glitch. For an LED that does not really matter, but for GPIO it would
-> not be good.
+You've sent this to me already Acked.  I don't see 00/00, so I have no
+idea what's going on.  Do you want me to take this patch?  Can it be
+taking on its own?
 
-Indeed.
+> ---
+>  drivers/mfd/ab8500-sysctrl.c | 7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/mfd/ab8500-sysctrl.c b/drivers/mfd/ab8500-sysctrl.c
+> index cfff0b643f1b..d4a4b24be7c6 100644
+> --- a/drivers/mfd/ab8500-sysctrl.c
+> +++ b/drivers/mfd/ab8500-sysctrl.c
+> @@ -49,7 +49,8 @@ static void ab8500_power_off(void)
+>  		if (!psy)
+>  			continue;
+>  
+> -		ret = psy->get_property(psy, POWER_SUPPLY_PROP_ONLINE, &val);
+> +		ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_ONLINE,
+> +				&val);
+>  
+>  		if (!ret && val.intval) {
+>  			charger_present = true;
+> @@ -63,8 +64,8 @@ static void ab8500_power_off(void)
+>  	/* Check if battery is known */
+>  	psy = power_supply_get_by_name("ab8500_btemp");
+>  	if (psy) {
+> -		ret = psy->get_property(psy, POWER_SUPPLY_PROP_TECHNOLOGY,
+> -					&val);
+> +		ret = power_supply_get_property(psy,
+> +				POWER_SUPPLY_PROP_TECHNOLOGY, &val);
+>  		if (!ret && val.intval != POWER_SUPPLY_TECHNOLOGY_UNKNOWN) {
+>  			printk(KERN_INFO
+>  			       "Charger \"%s\" is connected with known battery."
 
-Gr{oetje,eeting}s,
-
-                        Geert, who had a quick look at the data sheet recently
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
