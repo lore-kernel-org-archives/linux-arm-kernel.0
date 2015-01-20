@@ -1,97 +1,74 @@
-From: liviu@dudau.co.uk (Liviu Dudau)
-Date: Tue, 20 Jan 2015 11:20:32 +0000
-Subject: [RFC PATCH 1/3] drivers: of: fix resources freeing in
- of_pci_get_host_bridge_resources()
-In-Reply-To: <20150120104922.GF5398@red-moon>
-References: <1420644571-18928-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1420644571-18928-2-git-send-email-lorenzo.pieralisi@arm.com>
- <20150119183228.GE10762@e106497-lin.cambridge.arm.com>
- <20150120104922.GF5398@red-moon>
-Message-ID: <20150120112031.GA342@bart.dudau.co.uk>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 20 Jan 2015 12:35:08 +0100
+Subject: [PATCH] i2c: drop ancient protection against sysfs refcounting
+ issues
+In-Reply-To: <20150120101752.GI26493@n2100.arm.linux.org.uk>
+References: <1421693756-12917-1-git-send-email-wsa@the-dreams.de>
+ <20150119190142.GA9451@kroah.com>
+ <20150119230427.GH26493@n2100.arm.linux.org.uk>
+ <20150120014159.GA3349@kroah.com> <54BDFE30.5090303@metafoo.de>
+ <20150120071256.GA18983@kroah.com>
+ <20150120101752.GI26493@n2100.arm.linux.org.uk>
+Message-ID: <20150120113508.GA1067@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 20, 2015 at 10:49:22AM +0000, Lorenzo Pieralisi wrote:
-> On Mon, Jan 19, 2015 at 06:32:29PM +0000, Liviu Dudau wrote:
-> 
-> [...]
-> 
-> > > @@ -146,6 +146,7 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
-> > >  	struct of_pci_range_parser parser;
-> > >  	char range_type[4];
-> > >  	int err;
-> > > +	struct pci_host_bridge_window *window;
-> > >  
-> > >  	if (io_base)
-> > >  		*io_base = (resource_size_t)OF_BAD_ADDR;
-> > > @@ -225,7 +226,10 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
-> > >  conversion_failed:
-> > >  	kfree(res);
-> > >  parse_failed:
-> > > +	list_for_each_entry(window, resources, list)
-> > > +		kfree(window->res);
-> > >  	pci_free_resource_list(resources);
-> > > +	kfree(bus_range);
-> > >  	return err;
-> > >  }
-> > >  EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
-> > 
-> > Hi Lorenzo et all,
-> > 
-> > Here is my personal view and I am happy to hear from others on the desired
-> > behaviour:
-> > 
-> > When I wrote this function what I had in mind was that it will parse as
-> > much as possible from the device tree and return a list of resources that
-> > could be successfully converted. If the entire list of ranges could not
-> > be converted then an error code will be returned, but the caller still
-> > had the list as constructed up to the error. It was the job of the caller
-> > to free the list in either cases, as stated in the comment.
-> 
-> That's what I am questioning. If the function takes an error path, the
-> windows list is freed, so the resource pointers are gone. There is no
-> way the caller can grab those resource pointers and free them.
 
-I stand corrected. Your patch is needed.
+> > Right, and I'm not saying it should be, just move the existing logic
+> > into the release callback, and the code flow should be the same and we
+> > don't end up with an "empty" release callback.
 
-Thanks,
-Liviu
+But as Russell says, even if we don't have the empty callback, we still
+create the problem shown by DEBUG_KOBJECT_RELEASE which wasn't there
+before?
 
+> IMHO there are two possibilities here:
 > 
-> So either way, the function needs patching. Either we do not free the
-> windows list (we remove pci_free_resource_list) or we apply my fix (or
-> we refactor the API which is likely to be what I will do).
+> 1. leave it as-is, where we ensure that the remainder of i2c_del_adapter
+>    does not complete until the release callback has been called.
 > 
-> Lorenzo
+> 2. fix it properly by taking (eg) the netdev approach to i2c_adapter,
+>    or an alternative solution which results in decoupling the lifetime
+>    of the struct device from the i2c_adapter.
 > 
-> > 
-> > The historical reason why the function was written that way was because at
-> > some moment after parsing I've had an additional step where arches could
-> > cleanup / veto the list and they could return an error value to signal
-> > their discontent. Also I was (am) not sure how lenient we could be with
-> > the device tree not being sane (at least one host bridge binding lists the
-> > config space as a range, which was accepted as broken).
-> > 
-> > So, from that point of view, I would NAK this patch, as the function works
-> > as intended. If others find this mode of operation too convoluted, then
-> > the patch should probably make clear that cleanup only needs to be done on
-> > function returning success.
-> > 
-> > Best regards,
-> > 
-> > > -- 
-> > > 2.2.1
-> > > 
-> > > 
+> Either of these would be much better than removing the completion and
+> then moving a chunk of code to make it "look" safer than it actually is
+> and thereby introducing potential use-after-free bugs.
 
--- 
--------------------
-   .oooO
-   (   )
-    \ (  Oooo.
-     \_) (   )
-          ) /
-         (_/
+I agree. As much as I'd love option 2) I don't see that on the horizon.
+So, let's keep things as they are. What probably makes sense is to
+update the comment with something like this? I took the liberty and used
+some wording from Russell:
 
- One small step
-   for me ...
+diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+index e227dff62a85..1c89a08fae2a 100644
+--- a/drivers/i2c/i2c-core.c
++++ b/drivers/i2c/i2c-core.c
+@@ -1778,11 +1778,14 @@ void i2c_del_adapter(struct i2c_adapter *adap)
+ 	/* device name is gone after device_unregister */
+ 	dev_dbg(&adap->dev, "adapter [%s] unregistered\n", adap->name);
+ 
+-	/* clean up the sysfs representation */
++	/* wait until all references to the device are gone
++	 *
++	 * FIXME: This is old code and should ideally be replaced by an
++	 * alternative which results in decoupling the lifetime of the struct
++	 * device from the i2c_adapter, like spi or netdev do.
++	 */
+ 	init_completion(&adap->dev_released);
+ 	device_unregister(&adap->dev);
+-
+-	/* wait for sysfs to drop all references */
+ 	wait_for_completion(&adap->dev_released);
+ 
+ 	/* free bus id */
+
+
+Thanks for all the input, it is very much appreciated!
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150120/69ff1196/attachment.sig>
