@@ -1,41 +1,123 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 20 Jan 2015 16:24:30 +0000
-Subject: [GIT PULL] ARM kprobe updates
-In-Reply-To: <1421746999.4328.3.camel@linaro.org>
-References: <1421746999.4328.3.camel@linaro.org>
-Message-ID: <20150120162430.GK26493@n2100.arm.linux.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 20 Jan 2015 16:26:07 +0000
+Subject: [RFC PATCHv2 07/19] mfd: ab8500: Use power_supply_*() API for
+ accessing function attrs
+In-Reply-To: <1421769706.1199.5.camel@AMDC1943>
+References: <1420472882-10463-1-git-send-email-k.kozlowski@samsung.com>
+ <1420472882-10463-8-git-send-email-k.kozlowski@samsung.com>
+ <20150120133617.GG13701@x1> <1421763376.8855.4.camel@AMDC1943>
+ <20150120155149.GG13701@x1> <1421769706.1199.5.camel@AMDC1943>
+Message-ID: <20150120162607.GA30656@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 20, 2015 at 09:43:19AM +0000, Jon Medhurst (Tixy) wrote:
-> Hi Russell
-> 
-> Please consider pulling the following changes to ARM kprobes.
-> 
-> This consists of Wang Nan's implementation of optimized kprobes on ARM,
-> which use branch instructions to call the handler rather than using
-> undefined instructions as breakpoints. It also contains various fixes
-> and extensions to the test code which were discovered along the way.
-> 
-> The patch from Masami Hiramatsu is outside of arch/arm but as kprobes
-> maintainer he indicated that it was OK for this simple patch to go
-> through the ARM tree, if you are also amenable. (See
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/317948.html)
-> 
-> Thanks
-> 
-> 
-> The following changes since commit b1940cd21c0f4abdce101253e860feff547291b0:
-> 
->   Linux 3.19-rc3 (2015-01-05 17:05:20 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.linaro.org/people/tixy/kernel.git kprobes
+On Tue, 20 Jan 2015, Krzysztof Kozlowski wrote:
 
-Thanks, pulled, though it'll probably be two or so days before it
-shows up in linux-next.
+> On wto, 2015-01-20 at 15:51 +0000, Lee Jones wrote:
+> > On Tue, 20 Jan 2015, Krzysztof Kozlowski wrote:
+> > 
+> > > On wto, 2015-01-20 at 13:36 +0000, Lee Jones wrote:
+> > > > On Mon, 05 Jan 2015, Krzysztof Kozlowski wrote:
+> > > > 
+> > > > > Replace direct calls to power supply function attributes with wrappers.
+> > > > > Wrappers provide safe access in case of unregistering the power
+> > > > > supply (e.g. by removing the driver). Replace:
+> > > > >  - get_property -> power_supply_get_property
+> > > > > 
+> > > > > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > > > > Acked-by: Jonghwa Lee <jonghwa3.lee@samusng.com>
+> > > > > Acked-by: Pavel Machek <pavel@ucw.cz>
+> > > > > Acked-by: Lee Jones <lee.jones@linaro.org>
+> > > > 
+> > > > You've sent this to me already Acked.  I don't see 00/00, so I have no
+> > > > idea what's going on.  Do you want me to take this patch?  Can it be
+> > > > taking on its own?
+> > > 
+> > > git send-email automatically CC-you because you acked this. The depends
+> > > on previous patches adding this API so please do not pick it up. 
+> > 
+> > You should always send MFD related patches to me (either
+> > automatically, or manually).
+> > 
+> > > Everything (with respective acks) should go through one power supply
+> > > tree.
+> > 
+> > That's not how it works.  We need to decide that amongst ourselves
+> > and it needs to culminate in pull-requests being sent out to all of
+> > the effected Maintainers.
+> 
+> OK, I understand. My reply sounded kind a imperative but that was not
+> what I wanted to say... 
+
+It did, hence my response.  Thanks for the clarification.
+
+> The patchset adds some API first so most of
+> patches cannot be picked independently.
+
+I appreciate that and I'm happy for the patches to go in via whichever
+tree is the most appropriate.
+
+> Thank you for proactive concern about the patch.
+
+You are welcome.
+
+> So go ahead and decide. If the patches are ok, I see no problem in it
+> going through power supply tree, and neither should you. I feel you
+> are making it more complex than it is.
+
+I think you are missing the point -- Krzysztof got it.  It's probably
+okay for some patches from one subsystem to go in via another, but
+it's usually prudent to at least tag them and offer others the chance
+of pulling them in to other trees.  This significantly aids in
+lessening the chances of a merge conflict during the merge-window and
+mitigates the possibility of an upset Linus.
+
+As I've already said, I'm happy for this set to go in via the Power
+Supply tree, but assumptions shouldn't be made and all affected
+Maintainers should at least have a vote in cases like this.
+
+> > > The same applies to patch 18/19.
+> > > 
+> > > Best regards,
+> > > Krzysztof
+> > > 
+> > > > 
+> > > > > ---
+> > > > >  drivers/mfd/ab8500-sysctrl.c | 7 ++++---
+> > > > >  1 file changed, 4 insertions(+), 3 deletions(-)
+> > > > > 
+> > > > > diff --git a/drivers/mfd/ab8500-sysctrl.c b/drivers/mfd/ab8500-sysctrl.c
+> > > > > index cfff0b643f1b..d4a4b24be7c6 100644
+> > > > > --- a/drivers/mfd/ab8500-sysctrl.c
+> > > > > +++ b/drivers/mfd/ab8500-sysctrl.c
+> > > > > @@ -49,7 +49,8 @@ static void ab8500_power_off(void)
+> > > > >  		if (!psy)
+> > > > >  			continue;
+> > > > >  
+> > > > > -		ret = psy->get_property(psy, POWER_SUPPLY_PROP_ONLINE, &val);
+> > > > > +		ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_ONLINE,
+> > > > > +				&val);
+> > > > >  
+> > > > >  		if (!ret && val.intval) {
+> > > > >  			charger_present = true;
+> > > > > @@ -63,8 +64,8 @@ static void ab8500_power_off(void)
+> > > > >  	/* Check if battery is known */
+> > > > >  	psy = power_supply_get_by_name("ab8500_btemp");
+> > > > >  	if (psy) {
+> > > > > -		ret = psy->get_property(psy, POWER_SUPPLY_PROP_TECHNOLOGY,
+> > > > > -					&val);
+> > > > > +		ret = power_supply_get_property(psy,
+> > > > > +				POWER_SUPPLY_PROP_TECHNOLOGY, &val);
+> > > > >  		if (!ret && val.intval != POWER_SUPPLY_TECHNOLOGY_UNKNOWN) {
+> > > > >  			printk(KERN_INFO
+> > > > >  			       "Charger \"%s\" is connected with known battery."
+> > > > 
+> > > 
+> > 
+> 
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
