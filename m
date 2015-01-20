@@ -1,36 +1,81 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 20 Jan 2015 21:03:31 +0100
-Subject: [PATCH v5] clk: sunxi: Add driver for A80 MMC config clocks/resets
-In-Reply-To: <CAGb2v65y0KPe7UtguEEPJyFtBD7qoJ=-YT82Mwp+qDPi7PCPYw@mail.gmail.com>
-References: <1421768791-20170-1-git-send-email-wens@csie.org>
- <20150120160413.GU4367@lukather>
- <CAGb2v65y0KPe7UtguEEPJyFtBD7qoJ=-YT82Mwp+qDPi7PCPYw@mail.gmail.com>
-Message-ID: <20150120200331.GX4367@lukather>
+Date: Tue, 20 Jan 2015 21:02:16 +0100
+Subject: [PATCH v4 3/5] ARM: sunxi: dts: Add PS2 nodes to dtsi for A10
+ and A20
+In-Reply-To: <1421417021-3247-4-git-send-email-vishnupatekar0510@gmail.com>
+References: <1421417021-3247-1-git-send-email-vishnupatekar0510@gmail.com>
+ <1421417021-3247-4-git-send-email-vishnupatekar0510@gmail.com>
+Message-ID: <20150120200216.GV4367@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 21, 2015 at 12:09:05AM +0800, Chen-Yu Tsai wrote:
-> On Wed, Jan 21, 2015 at 12:04 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Tue, Jan 20, 2015 at 11:46:31PM +0800, Chen-Yu Tsai wrote:
-> >> On the A80 SoC, the 4 mmc controllers each have a separate register
-> >> controlling their register access clocks and reset controls. These
-> >> registers in turn share a ahb clock gate and reset control.
-> >>
-> >> This patch adds a platform device driver for these controls. It
-> >> requires both clocks and reset controls to be available, so using
-> >> CLK_OF_DECLARE might not be the best way.
-> >>
-> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >
-> > Merged, thanks!
-> 
-> plaes on IRC just pointed out the copyright year is wrong....
-> 
-> Could you fix it before you push it out?
-> Sorry about this.
+Hi Vishnu,
 
-Done, thanks!
+On Fri, Jan 16, 2015 at 07:33:39PM +0530, Vishnu Patekar wrote:
+> Signed-off-by: VishnuPatekar <vishnupatekar0510@gmail.com>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+
+Why is there Hans Signed-off here?
+
+> ---
+>  arch/arm/boot/dts/sun4i-a10.dtsi |   16 ++++++++++++++++
+>  arch/arm/boot/dts/sun7i-a20.dtsi |   16 ++++++++++++++++
+>  2 files changed, 32 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+> index 7b4099f..2c31242 100644
+> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
+> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+> @@ -795,5 +795,21 @@
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+>  		};
+> +
+> +		ps20: ps2 at 01c2a000 {
+> +			compatible = "allwinner,sun4i-a10-ps2";
+> +			reg = <0x01c2a000 0x400>;
+> +			interrupts = <62>;
+> +			clocks = <&apb1_gates 6>;
+> +			status = "disabled";
+> +		};
+> +
+> +		ps21: ps2 at 01c2a400 {
+> +			compatible = "allwinner,sun4i-a10-ps2";
+> +			reg = <0x01c2a400 0x400>;
+> +			interrupts = <63>;
+> +			clocks = <&apb1_gates 7>;
+> +			status = "disabled";
+> +		};
+>  	};
+>  };
+> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+> index e21ce59..f35c691 100644
+> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> @@ -1093,5 +1093,21 @@
+>  			#interrupt-cells = <3>;
+>  			interrupts = <1 9 0xf04>;
+>  		};
+> +
+> +		ps20: ps2 at 01c2a000 {
+> +			compatible = "allwinner,sun4i-a10-ps2";
+> +			reg = <0x01c2a000 0x400>;
+> +			interrupts = <0 62 4>;
+> +			clocks = <&apb1_gates 6>;
+> +			status = "disabled";
+> +		};
+> +
+> +		ps21: ps2 at 01c2a400 {
+> +			compatible = "allwinner,sun4i-a10-ps2";
+> +			reg = <0x01c2a400 0x400>;
+> +			interrupts = <0 63 4>;
+
+We recently switched to using includes and defines for these hardcoded
+values.
+
+Could you switch to it as well?
+
+Thanks,
 Maxime
 
 -- 
@@ -43,4 +88,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150120/7cffa87d/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150120/edd97837/attachment.sig>
