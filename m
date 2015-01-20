@@ -1,60 +1,75 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 20 Jan 2015 14:13:17 +0800
-Subject: [PATCH 3/3] ARM: imx6: Fix procedure to switch the parent of
- LDB_DI_CLK
-In-Reply-To: <54B8D9CE.40300@de.bosch.com>
-References: <1420559265-7333-1-git-send-email-p.zabel@pengutronix.de>
- <1420559265-7333-3-git-send-email-p.zabel@pengutronix.de>
- <20150108130003.GE4928@dragon>
- <CAOMZO5DB1QSg4G9mnWbS_ypQabFaJ8z-a4sR3Cj5cnq75atRKw@mail.gmail.com>
- <54B8D9CE.40300@de.bosch.com>
-Message-ID: <20150120061316.GP2766@dragon>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Tue, 20 Jan 2015 07:24:56 +0100
+Subject: [PATCH 2/2] ARM: BCM5301X: Add DT for Buffalo WZR-900DHP
+In-Reply-To: <1421735096-8238-1-git-send-email-zajec5@gmail.com>
+References: <1421735096-8238-1-git-send-email-zajec5@gmail.com>
+Message-ID: <1421735096-8238-2-git-send-email-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 10:28:46AM +0100, Dirk Behme wrote:
-> On 15.01.2015 17:54, Fabio Estevam wrote:
-> >Hi Shawn,
-> >
-> >On Thu, Jan 8, 2015 at 11:00 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> >
-> >>Before I start reviewing the patch, I would like to know if there is a
-> >>formal errata for this issue, including the bug description, recommended
-> >>workaround, and affected i.MX6 variants etc.
-> >
-> >The latest mx6 reference manual available on the web shows the LDB
-> >clock gate in the correct position now.
-> >
-> >It also adds the following note:
-> >
-> >"NOTE: This clock path is not controlled by a clock gate (CG). For
-> >proper clock switching procedures refer to the Clock Switching
-> >Multiplexers section."
-> >
-> >There is no formal errata available.
-> >
-> >Please consider reviewing this series, as it addresses a real problem
-> >that affect many users.
-> 
-> 
-> Just to get a better understanding for the background of this
-> series: Are the patches in this series somehow related to Shawn's
-> ENGR00318063-x patches in the FSL 3.10.53_1.1.0_ga kernel:
-> 
-> http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/log/?h=imx_3.10.53_1.1.0_ga&qt=grep&q=ENGR00318063
-> 
-> ?
+Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+---
+ arch/arm/boot/dts/Makefile                        |  3 +-
+ arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts | 37 +++++++++++++++++++++++
+ 2 files changed, 39 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
 
-Fabio,
-
-Look, without the errata for this problem, your customer do not even
-know what this patch is for.
-
-
-Dirk,
-
-Yes, it tries to fix the buggy ldb_di_ipu clock output which doesn't
-have a gate between ldb_di_clk_sel and div_3.5_7.  That's also part of
-the issues that ENGR00318063-x patches try to address.
-
-Shawn
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index ff4a5ae..0de664e 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -61,7 +61,8 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+ 	bcm4708-netgear-r6250.dtb \
+ 	bcm4708-netgear-r6300-v2.dtb \
+ 	bcm47081-asus-rt-n18u.dtb \
+-	bcm47081-buffalo-wzr-600dhp2.dtb
++	bcm47081-buffalo-wzr-600dhp2.dtb \
++	bcm47081-buffalo-wzr-900dhp.dtb
+ dtb-$(CONFIG_ARCH_BCM_63XX) += bcm963138dvt.dtb
+ dtb-$(CONFIG_ARCH_BCM_CYGNUS) += bcm911360_entphn.dtb \
+ 	bcm911360k.dtb \
+diff --git a/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts b/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
+new file mode 100644
+index 0000000..b5352c0
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
+@@ -0,0 +1,37 @@
++/*
++ * Broadcom BCM470X / BCM5301X ARM platform code.
++ * DTS for Buffalo WZR-900DHP
++ *
++ * Copyright (C) 2015 Rafa? Mi?ecki <zajec5@gmail.com>
++ *
++ * Licensed under the GNU/GPL. See COPYING for details.
++ */
++
++/dts-v1/;
++
++#include "bcm47081.dtsi"
++
++/ {
++	compatible = "buffalo,wzr-900dhp", "brcm,bcm47081", "brcm,bcm4708";
++	model = "Buffalo WZR-900DHP (BCM47081)";
++
++	chosen {
++		bootargs = "console=ttyS0,115200 earlyprintk";
++	};
++
++	memory {
++		reg = <0x00000000 0x08000000>;
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		restart {
++			label = "Reset";
++			linux,code = <KEY_RESTART>;
++			gpios = <&chipcommon 11 GPIO_ACTIVE_LOW>;
++		};
++	};
++};
+-- 
+1.8.4.5
