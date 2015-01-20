@@ -1,43 +1,52 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 20 Jan 2015 10:27:32 +0900
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC sh73a0 Multiplatform
- Updates for v3.20
-Message-ID: <cover.1421716945.git.horms+renesas@verge.net.au>
+Date: Tue, 20 Jan 2015 10:27:34 +0900
+Subject: [PATCH] ARM: shmobile: sh73a0 dtsi: Add Cortex-A9 TWD node
+In-Reply-To: <cover.1421716945.git.horms+renesas@verge.net.au>
+References: <cover.1421716945.git.horms+renesas@verge.net.au>
+Message-ID: <e42c8385cfec0579a103b365d61748f199bfe239.1421716945.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these second round of Renesas ARM based SoC sh73a0 multiplatform updates for v3.20.
+Add a node for the Private Timer and Watchdog, as found in the Cortex-A9
+MPCore.
 
-This pull request is based on the previous round of
-such requests, tagged as renesas-sh73a0-multiplatform-for-v3.20,
-which I have already sent a pull-request for.
+Without this, there's no clocksource available during early kernel
+initialization, before cmt1 is initialized, leading to a lock-up if
+CONFIG_CPU_IDLE=y.
 
-My understanding from Geert Uytterhoeven is that the above dependency
-is required to avoid a lock-up.
-
-
-The following changes since commit 93c9f0228a3d0a14640f86b3e8aeaf3c9b449bb7:
-
-  ARM: shmobile: kzm9g-reference: Remove board C code and DT file (2015-01-14 09:46:48 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-sh73a0-multiplatform2-for-v3.20
-
-for you to fetch changes up to e42c8385cfec0579a103b365d61748f199bfe239:
-
-  ARM: shmobile: sh73a0 dtsi: Add Cortex-A9 TWD node (2015-01-17 09:36:35 +0900)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM Based SoC sh73a0 Multiplatform Updates for v3.20
-
-* Add Cortex-A9 TWD node
-
-----------------------------------------------------------------
-Geert Uytterhoeven (1):
-      ARM: shmobile: sh73a0 dtsi: Add Cortex-A9 TWD node
-
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm/boot/dts/sh73a0.dtsi | 8 ++++++++
  1 file changed, 8 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+index 0c9a357..2558bf4 100644
+--- a/arch/arm/boot/dts/sh73a0.dtsi
++++ b/arch/arm/boot/dts/sh73a0.dtsi
+@@ -11,6 +11,7 @@
+ /include/ "skeleton.dtsi"
+ 
+ #include <dt-bindings/clock/sh73a0-clock.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ 
+ / {
+@@ -35,6 +36,13 @@
+ 		};
+ 	};
+ 
++	timer at f0000600 {
++		compatible = "arm,cortex-a9-twd-timer";
++		reg = <0xf0000600 0x20>;
++		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
++		clocks = <&twd_clk>;
++	};
++
+ 	gic: interrupt-controller at f0001000 {
+ 		compatible = "arm,cortex-a9-gic";
+ 		#interrupt-cells = <3>;
+-- 
+2.1.4
