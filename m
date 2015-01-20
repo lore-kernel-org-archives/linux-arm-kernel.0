@@ -1,78 +1,45 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Tue, 20 Jan 2015 13:39:38 +0800
-Subject: [GIT PULL v2]Hisilicon hip01 soc and development board updates
- for 3.20
-In-Reply-To: <20150119191941.GE16883@quad.lixom.net>
-References: <54B723AB.7080506@hisilicon.com>
- <20150119191941.GE16883@quad.lixom.net>
-Message-ID: <54BDEA1A.3060502@hisilicon.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 20 Jan 2015 14:00:32 +0800
+Subject: [PATCH 3/3] ARM: imx6: Fix procedure to switch the parent of
+ LDB_DI_CLK
+In-Reply-To: <CAOMZO5DB1QSg4G9mnWbS_ypQabFaJ8z-a4sR3Cj5cnq75atRKw@mail.gmail.com>
+References: <1420559265-7333-1-git-send-email-p.zabel@pengutronix.de>
+ <1420559265-7333-3-git-send-email-p.zabel@pengutronix.de>
+ <20150108130003.GE4928@dragon>
+ <CAOMZO5DB1QSg4G9mnWbS_ypQabFaJ8z-a4sR3Cj5cnq75atRKw@mail.gmail.com>
+Message-ID: <20150120060030.GO2766@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2015/1/20 3:19, Olof Johansson wrote:
-> On Thu, Jan 15, 2015 at 10:19:23AM +0800, Wei Xu wrote:
->> Hi Arnd, Hi Olof, Hi Kevin, 
->>
->> Could you please help to merge the pull request of hisilicon hip01 soc for 3.20. 
->> Thanks!
->>
->> Best Regards,
->> Wei
->>
->> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
->>
->>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
->>
->> are available in the git repository at:
->>
->>   git://github.com/hisilicon/linux-hisi.git tags/hip01-for-3.20-v2
->>
->> for you to fetch changes up to 27040189cb050cbe52a81c0e6aeb552872aa0736:
->>
->>   ARM: hisi: enable smp for HiP01 (2015-01-15 09:59:51 +0800)
->>
->> ----------------------------------------------------------------
->> ARM: mach-hisi: Hisilicon hip01 soc and development board updates for 3.20
->>
->> - Add hip01 debug UART
->> - Add hip01 DT_MACHINE and ARCH_HIP01 configure item
->> - Add dts for Hisilicon hip01-ca9x2 board
->> - Enable ARCH_HIP01 in the hisi_defconfig
->> - Rename hix5hd2_smp_prepare_cpus to hisi_common_smp_prepare_cpus
->> - Rename hix5hd2_secondary_startup to hisi_secondary_startup
->> - Enable smp for hip01
-
-Hi Olof,
-
-> Actually, you're adding a new dts file that's conflicting at the top level now,
-> and we don't want that.
+On Thu, Jan 15, 2015 at 02:54:24PM -0200, Fabio Estevam wrote:
+> Hi Shawn,
 > 
-> Please split your branches like other maintainers do into soc and dt branches.
+> On Thu, Jan 8, 2015 at 11:00 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
 > 
-> dt
-> soc
-> defconfig
+> > Before I start reviewing the patch, I would like to know if there is a
+> > formal errata for this issue, including the bug description, recommended
+> > workaround, and affected i.MX6 variants etc.
+> 
+> The latest mx6 reference manual available on the web shows the LDB
+> clock gate in the correct position now.
+> 
+> It also adds the following note:
+> 
+> "NOTE: This clock path is not controlled by a clock gate (CG). For
+> proper clock switching procedures refer to the Clock Switching
+> Multiplexers section."
 
-Thanks for your patient education!
-I will follow it next time.
-
-> I don't know your workflow, if you have users of your branches. If not, and if
-> your tree isn't in linux-next, I can cherry pick the branch apart as needed
-> here. Just let me know.
-
-My tree is not in linux-next. I have checked the linux-next.git/tree/Next/Trees.
-Could you please help to cherry pick them this time?
-Thanks!
-
-Best Regards,
-Wei
+No.  The Clock Switching Multiplexers section documents the procedure
+for the glitchy multiplexer with a clock gate in the right place, not
+this buggy LDB multiplexer.
 
 > 
-> Thanks.
+> There is no formal errata available.
 > 
-> -Olof
-> 
-> .
-> 
+> Please consider reviewing this series, as it addresses a real problem
+> that affect many users.
+
+I'm not going to review/take the patch until I see a formal errata
+documenting the software workaround procedure for the issue.
+
+Shawn
