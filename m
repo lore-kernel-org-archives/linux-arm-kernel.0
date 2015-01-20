@@ -1,50 +1,38 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 20 Jan 2015 16:05:12 +0100
-Subject: [PATCH v4 2/6] mfd: MT6397: Add support for PMIC MT6397 MFD
-In-Reply-To: <20150120144309.GT13701@x1>
-References: <1419577768-12037-1-git-send-email-flora.fu@mediatek.com>
- <1419577768-12037-3-git-send-email-flora.fu@mediatek.com>
- <20150120144309.GT13701@x1>
-Message-ID: <20150120150512.GA12209@pengutronix.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 20 Jan 2015 16:05:31 +0100
+Subject: [PATCH 2/6] bus: mvebu-mbus: fix support of MBus window 13 on
+ Armada XP/375/38x
+In-Reply-To: <20150119222930.GF2938@lunn.ch>
+References: <1419943428-18491-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1419943428-18491-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20150119222930.GF2938@lunn.ch>
+Message-ID: <20150120160531.481476a8@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Dear Andrew Lunn,
 
-On Tue, Jan 20, 2015 at 02:43:09PM +0000, Lee Jones wrote:
-> On Fri, 26 Dec 2014, Flora Fu wrote:
-> 
-> > Add core files for MT6397 MFD driver.
+On Mon, 19 Jan 2015 23:29:30 +0100, Andrew Lunn wrote:
+
+> > [Thomas: adapted for the mainline kernel, minor clarifications in the
+> > code, reword the commit log.]
 > > 
-> > Signed-off-by: Flora Fu <flora.fu@mediatek.com>
-> > ---
-> >  drivers/mfd/Kconfig                  |  10 +
-> >  drivers/mfd/Makefile                 |   1 +
-> >  drivers/mfd/mt6397-core.c            |  94 +++++++++
-> >  include/linux/mfd/mt6397/core.h      |  23 +++
-> >  include/linux/mfd/mt6397/registers.h | 362 +++++++++++++++++++++++++++++++++++
-> >  5 files changed, 490 insertions(+)
-> >  create mode 100644 drivers/mfd/mt6397-core.c
-> >  create mode 100644 include/linux/mfd/mt6397/core.h
-> >  create mode 100644 include/linux/mfd/mt6397/registers.h
+> > Fixes: fddddb52a6c ("bus: introduce an Marvell EBU MBus driver")
+> > Cc: <stable@vger.kernel.org> # v3.10+
+> > Signed-off-by: Michal Mazur <arg@semihalf.com>
+> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > 
-> Looks okay.
+> I merged in the revert of the simple fix for window 13. So the end
+> patch is below.
 > 
-> I assume there are dependancies on this patch.  What are they?
-> 
-> How would you like this set to be handled?
+> merged into mvebu/soc
 
-This patch is outdated, I sent an updated series today (you are on Cc).
+Quickly looked at it, it looks fine to me.
 
-There are no compile time dependencies to the PMIC wrapper, but without
-it the mfd part is pretty useless. I prefer to keep the series together
-and merge it through arm-soc, but I would be fine with merging it
-through mfd aswell.
+Thanks again for handling this!
 
-Sascha
-
+Thomas
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
