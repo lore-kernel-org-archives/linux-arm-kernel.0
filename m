@@ -1,46 +1,40 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 20 Jan 2015 16:12:25 +0800
-Subject: [PATCH 1/1] ARM: imx_v6_v7_defconfig: enable more USB functions
-In-Reply-To: <CAL411-rVUd5cPyD-HyZUSZ2uepRC++Q1F-KxxudGr3To9uhAjg@mail.gmail.com>
-References: <1412060581-13963-1-git-send-email-peter.chen@freescale.com>
- <20141008114557.GA3830@dragon>
- <CAL411-rVUd5cPyD-HyZUSZ2uepRC++Q1F-KxxudGr3To9uhAjg@mail.gmail.com>
-Message-ID: <20150120081223.GX2766@dragon>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 20 Jan 2015 08:13:57 +0000 (UTC)
+Subject: [RFC/PATCH] arm: omap: hwmod: add debugfs interface
+In-Reply-To: <alpine.DEB.2.02.1501200515370.5450@utopia.booyaka.com>
+References: <1417818672-11586-1-git-send-email-balbi@ti.com>
+ <alpine.DEB.2.02.1501200515370.5450@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.02.1501200810270.5450@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 03:18:44PM +0800, Peter Chen wrote:
-> On Wed, Oct 8, 2014 at 7:46 PM, Shawn Guo <shawn.guo@freescale.com> wrote:
-> > On Tue, Sep 30, 2014 at 03:03:01PM +0800, Peter Chen wrote:
-> >> USB Ethernet function at host mode
-> >> USB Media function(webcam) at host mode
-> >> USB Audio function at host mode
-> >> USB Serial function at host mode
-> >> USB EHSET driver at host mode (for OTG & EH Certification test)
-> >> Several USB Gadget functions:
-> >>       - Configfs
-> >>       - NCM
-> >>       - Zero (used for test)
-> >>       - Gadgetfs
-> >>       - Serial
-> >>
-> >> Above functions are built as module.
-> >>
-> >> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> >
-> > Applied, thanks.
-> >
-> 
-> (Using Shawn's current email address)
-> 
-> Hi Shawn,
-> 
-> 
-> It seems this patch is missed by unknown reason, I can't find it at
-> current mainline.
+On Tue, 20 Jan 2015, Paul Walmsley wrote:
 
-I'm sorry.  It got lost by accident.
+> On Fri, 5 Dec 2014, Felipe Balbi wrote:
+> 
+> > By exposing the details of hwmod structures
+> > to debugfs we can much more easily verify
+> > that changes to hwmod data is correct and won't
+> > cause regressions.
+> > 
+> > The idea is that this can be used to check the
+> > state of one hwmod, verify hwmod sysc fields, etc.
+> > 
+> > For example, this will be used to move some of
+> > the sysc fields to DT and later verify that they
+> > are correct pre- and post-patch.
+> > 
+> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> 
+> This one had a bunch of unnecessary includes and checkpatch issues 
+> (below).  I cleaned those up here and have queued the result (also below) 
+> for v3.20.
 
-Applied now.
+... and, the patch doesn't even boot.  Dropped.
 
-Shawn
+If you really want something like this to be merged, resend a version that 
+boots, and has checkpatch warnings fixed and unnecessary includes dropped.  
+Otherwise you're just wasting my time.
+
+
+- Paul
