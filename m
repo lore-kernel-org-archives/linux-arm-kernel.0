@@ -1,74 +1,42 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Tue, 20 Jan 2015 11:17:03 -0800
-Subject: [PATCH v6 2/3] gpio: Cygnus: add GPIO driver
-In-Reply-To: <CACRpkdYydCO9Wu3fMyh0qt=e_hxT5ch2gqNhEsfQpf5WYUS-kQ@mail.gmail.com>
-References: <rjui@broadcom.com>	<1418696307-19392-1-git-send-email-rjui@broadcom.com>	<1418696307-19392-3-git-send-email-rjui@broadcom.com>	<CACRpkdYGksEseGaO49=1rUi5WBdOxwAd-F1gpgZn+BFatRCdDg@mail.gmail.com>	<54B55068.8050500@broadcom.com>	<CACRpkdZef8S-EAbShjJ1eg+-3wQKn+yx4u1k_Mf8F7uFkJYdFw@mail.gmail.com>	<54B9A8A2.6090209@broadcom.com>
- <CACRpkdYydCO9Wu3fMyh0qt=e_hxT5ch2gqNhEsfQpf5WYUS-kQ@mail.gmail.com>
-Message-ID: <54BEA9AF.7070209@broadcom.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Tue, 20 Jan 2015 11:38:22 -0800
+Subject: [PATCHv7 2/2] arm64: add better page protections to arm64
+In-Reply-To: <20150120184054.GJ25575@e104818-lin.cambridge.arm.com>
+References: <1421276394-20402-1-git-send-email-lauraa@codeaurora.org>
+ <1421276394-20402-3-git-send-email-lauraa@codeaurora.org>
+ <CAKv+Gu8iGAPpR49EQKwmOZp2cHGdg8QJyoh2x1BB9uW6-S5L4g@mail.gmail.com>
+ <54B9AC53.8020903@codeaurora.org>
+ <20150120181453.GI25575@e104818-lin.cambridge.arm.com>
+ <CAGXu5jLSQHC=R7gr+ZbgQ81K=v+zXS+uxyNofg9xGsovO8qssg@mail.gmail.com>
+ <20150120184054.GJ25575@e104818-lin.cambridge.arm.com>
+Message-ID: <54BEAEAE.8010700@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 1/20/2015 10:40 AM, Catalin Marinas wrote:
+> On Tue, Jan 20, 2015 at 06:19:23PM +0000, Kees Cook wrote:
+>> If, however, only the name is stopping it from landing in arm64, then
+>> I don't care what it's called. ;)
+>
+> Apart from couple of comments on this latest series, the patches look
+> fine to me.
+>
 
+Did that message get sent out? I don't see it in my inbox.
 
-On 1/20/2015 1:53 AM, Linus Walleij wrote:
-> On Sat, Jan 17, 2015 at 1:11 AM, Ray Jui <rjui@broadcom.com> wrote:
->> On 1/16/2015 2:14 AM, Linus Walleij wrote:
-> 
->>> Some hardware designs put the software-controlled biasing
->>> resistors in the GPIO block electronically connected to the actual
->>> pins, so that e.g. the biasing will be available if some MMC or
->>> whatever is using the same pins in another muxing. In such
->>> situations it's quite evident that they need to be a combined
->>> GPIO and pin controller.
->>>
->>> I have some regrets that bolting a second pin controller to the
->>> GPIO chip make things a bit complex but it's a price we have
->>> to pay for getting some kind of generic interface.
->>
->> Okay. In summary, I think both of us think the following approach makes
->> sense in my situation:
->> - leave pinmux in pinctrl-bcm-cygnus.c
->> - leave pinctrl + gpio in pinctrl-bcm-cygnus-gpio.c under drivers/pinctrl/*
->>
->> But by thinking about this more, I thought this would create duplicated
->> pinctrl descriptors in our system, one from the pinmux driver, and the
->> other from this pinctrl+gpio driver. That is probably undesirable?
-> 
-> No, there are several systems with multiple pin controllers and the
-> framework easily handles multiple pin controllers in the same
-> system just as well as we handle multiple GPIO chips.
-> 
->> By reviewing various drivers in the pinctrl directory, I found what
->> pinctrl-u300.c and pinctrl-coh901.c does seems to serve as a good model
->> for me to follow:
->> - pinctrl-u300.c is the pinmux driver
->> - pinctrl-coh901.c is the gpio+pinctrl driver
-> 
-> Yeah, I don't know if the separation between them is as beautiful
-> as it should be. I used it when developing the pin control
-> subsystem.
-> 
->> The GPIO pinctrl logic is in the coh901 block, so pinctrl-coh901.c
->> exposed two public functions u300_gpio_config_get, u300_gpio_config_set
->> that pinctrl-u300.c can use. The u300 populates all pinmux/pinctrl
->> related functions into the subsystem. This way there's only one pinctrl
->> descriptor, populated through pinctrl-u300.c.
->>
->> Does that model make more sense to you?
-> 
-> Yeah I wrote it myself so I'm maybe blind for any dumbness in
-> the code. But I think it's kind of elegant. But it is not using the
-> generic pinctrl device tree bindings so it's kind of oldstyle and
-> bloated in that sense.
-> 
-> Yours,
-> Linus Walleij
-> 
-Okay. I think I have a pretty good idea of what you expect. Regarding
-whether or not to keep pinctrl-bcm-cygnus.c and
-pinctrl-bcm-cygnus-gpio.c completely independent with each other and
-therefore have two pinctrl in the system, I'll play with it a bit more
-and make a decision.
+> One question for Laura though: have the patches been tested it with:
+>
+> - 4-levels and 4KB pages?
+> - 3-levels and 64KB pages?
+>
 
-Thanks a lot for spending all these time explaining it to me. Really
-appreciate it!
+Yes, just re-verified once again that both 4 level 4K pages and 3 level
+64K pages work with this series.
+
+Thanks,
+Laura
+
+-- 
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
