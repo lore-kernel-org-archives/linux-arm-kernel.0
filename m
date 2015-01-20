@@ -1,61 +1,55 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 20 Jan 2015 20:58:10 +0900
-Subject: [PATCH 02/03] ARM: shmobile: Remove mach/clkdev.h
+Date: Tue, 20 Jan 2015 20:58:20 +0900
+Subject: [PATCH 03/03] ARM: shmobile: Remove mach/uncompress.h
 In-Reply-To: <20150120115750.11479.95109.sendpatchset@little-apple>
 References: <20150120115750.11479.95109.sendpatchset@little-apple>
-Message-ID: <20150120115810.11479.53290.sendpatchset@little-apple>
+Message-ID: <20150120115820.11479.4763.sendpatchset@little-apple>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm+renesas@opensource.se>
 
-Move over ARCH_SHMOBILE_LEGACY to use the default legacy ARM
-implementations of __clk_get() and __clk_put() in <asm/clkdev.h>
-by deselecting HAVE_MACH_CLKDEV. This has the nice side effect
-that <mach/clkdev.h> is no longer used and can be removed.
+Convert ARCH_SHMOBILE_LEGACY to make use of <debug/uncompress.h>
+and remove the now unused <mach/uncompress.h>.
 
 Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 ---
 
- arch/arm/Kconfig                             |    1 -
- arch/arm/mach-shmobile/clock.c               |   11 -----------
- arch/arm/mach-shmobile/include/mach/clkdev.h |    7 -------
- 3 files changed, 19 deletions(-)
+ arch/arm/Kconfig.debug                           |    3 ++-
+ arch/arm/mach-shmobile/include/mach/uncompress.h |   19 -------------------
+ 2 files changed, 2 insertions(+), 20 deletions(-)
 
---- 0001/arch/arm/Kconfig
-+++ work/arch/arm/Kconfig	2015-01-20 20:27:11.307765682 +0900
-@@ -644,7 +644,6 @@ config ARCH_SHMOBILE_LEGACY
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_ARM_TWD if SMP
--	select HAVE_MACH_CLKDEV
- 	select HAVE_SMP
- 	select MIGHT_HAVE_CACHE_L2X0
- 	select MULTI_IRQ_HANDLER
---- 0001/arch/arm/mach-shmobile/clock.c
-+++ work/arch/arm/mach-shmobile/clock.c	2015-01-20 20:27:11.307765682 +0900
-@@ -45,14 +45,3 @@ int __init shmobile_clk_init(void)
+--- 0001/arch/arm/Kconfig.debug
++++ work/arch/arm/Kconfig.debug	2015-01-20 20:26:10.527765900 +0900
+@@ -1441,7 +1441,8 @@ config DEBUG_UNCOMPRESS
+ config UNCOMPRESS_INCLUDE
+ 	string
+ 	default "debug/uncompress.h" if ARCH_MULTIPLATFORM || ARCH_MSM || \
+-					PLAT_SAMSUNG || ARCH_EFM32
++					PLAT_SAMSUNG || ARCH_EFM32 || \
++					ARCH_SHMOBILE_LEGACY
+ 	default "mach/uncompress.h"
  
- 	return 0;
- }
--
--int __clk_get(struct clk *clk)
--{
--	return 1;
--}
--EXPORT_SYMBOL(__clk_get);
--
--void __clk_put(struct clk *clk)
--{
--}
--EXPORT_SYMBOL(__clk_put);
---- 0001/arch/arm/mach-shmobile/include/mach/clkdev.h
+ config EARLY_PRINTK
+--- 0001/arch/arm/mach-shmobile/include/mach/uncompress.h
 +++ /dev/null	2015-01-13 15:44:39.280208949 +0900
-@@ -1,7 +0,0 @@
--#ifndef __ASM_MACH_CLKDEV_H
--#define __ASM_MACH_CLKDEV_H
+@@ -1,19 +0,0 @@
+-#ifndef __ASM_MACH_UNCOMPRESS_H
+-#define __ASM_MACH_UNCOMPRESS_H
 -
--int __clk_get(struct clk *clk);
--void __clk_put(struct clk *clk);
+-/*
+- * This does not append a newline
+- */
+-static void putc(int c)
+-{
+-}
 -
--#endif /* __ASM_MACH_CLKDEV_H */
+-static inline void flush(void)
+-{
+-}
+-
+-static void arch_decomp_setup(void)
+-{
+-}
+-
+-#endif /* __ASM_MACH_UNCOMPRESS_H */
