@@ -1,33 +1,77 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 20 Jan 2015 09:50:37 +0800
-Subject: [PATCH v4 3/9] ARM: dts: sun9i: Add clock-indices property for
- bus gate clocks
-In-Reply-To: <20150119215912.GM4367@lukather>
-References: <1421471974-32719-1-git-send-email-wens@csie.org>
- <1421471974-32719-4-git-send-email-wens@csie.org>
- <20150119215912.GM4367@lukather>
-Message-ID: <CAGb2v67TDGrgbf1SA6oR8x1j3OMHywfki6QxfvJ4tb8_AHdmCQ@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 19 Jan 2015 18:05:32 -0800
+Subject: [PATCH v3 5/8] dt-bindings: Add #defines for IPQ806x lpass clock
+ control
+In-Reply-To: <1421719535-28398-1-git-send-email-sboyd@codeaurora.org>
+References: <1421719535-28398-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1421719535-28398-6-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 20, 2015 at 5:59 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Sat, Jan 17, 2015 at 01:19:28PM +0800, Chen-Yu Tsai wrote:
->> of_clk_get_parent_name() uses the clock-indices property to resolve
->> clock phandle arguments in case that the argument index does not
->> match the clock-output-names sequence.
->>
->> This is the case on sunxi, where we use the actual bit index as the
->> argument to the phandle. Add the clock-indices property so that
->> of_clk_get_parent_name() resolves the names correctly.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->
-> Did you change anything in that patch?
->
-> I already applied it from v3, so let me know if I need to drop it.
+From: Rajendra Nayak <rnayak@codeaurora.org>
 
-Please drop it. I just didn't realize you merged it after our
-discussion.
+Add defines to make more human readable numbers for the lpass
+clock controller found on IPQ806x SoCs. Also remove the PLL4
+define in gcc to avoid #define conflicts because that clock
+doesn't exist in gcc, instead it lives in lcc.
 
-ChenYu
+Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+[sboyd at codeaurora.org: Split off into separate patch]
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ include/dt-bindings/clock/qcom,gcc-ipq806x.h |  1 -
+ include/dt-bindings/clock/qcom,lcc-ipq806x.h | 30 ++++++++++++++++++++++++++++
+ 2 files changed, 30 insertions(+), 1 deletion(-)
+ create mode 100644 include/dt-bindings/clock/qcom,lcc-ipq806x.h
+
+diff --git a/include/dt-bindings/clock/qcom,gcc-ipq806x.h b/include/dt-bindings/clock/qcom,gcc-ipq806x.h
+index b857cadb0bd4..04fb29ae30e6 100644
+--- a/include/dt-bindings/clock/qcom,gcc-ipq806x.h
++++ b/include/dt-bindings/clock/qcom,gcc-ipq806x.h
+@@ -238,7 +238,6 @@
+ #define PLL0_VOTE				221
+ #define PLL3					222
+ #define PLL3_VOTE				223
+-#define PLL4					224
+ #define PLL4_VOTE				225
+ #define PLL8					226
+ #define PLL8_VOTE				227
+diff --git a/include/dt-bindings/clock/qcom,lcc-ipq806x.h b/include/dt-bindings/clock/qcom,lcc-ipq806x.h
+new file mode 100644
+index 000000000000..4e944b85c56d
+--- /dev/null
++++ b/include/dt-bindings/clock/qcom,lcc-ipq806x.h
+@@ -0,0 +1,30 @@
++/*
++ * Copyright (c) 2014, The Linux Foundation. All rights reserved.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef _DT_BINDINGS_CLK_LCC_IPQ806X_H
++#define _DT_BINDINGS_CLK_LCC_IPQ806X_H
++
++#define PLL4				0
++#define MI2S_OSR_SRC			1
++#define MI2S_OSR_CLK			2
++#define MI2S_DIV_CLK			3
++#define MI2S_BIT_DIV_CLK		4
++#define MI2S_BIT_CLK			5
++#define PCM_SRC				6
++#define PCM_CLK_OUT			7
++#define PCM_CLK				8
++#define SPDIF_SRC			9
++#define SPDIF_CLK			10
++#define AHBIX_CLK			11
++
++#endif
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
