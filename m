@@ -1,50 +1,35 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 20 Jan 2015 17:45:40 +0100
-Subject: [PATCHv4 0/2] Driver for TI tlc591xx 8/16 Channel i2c LED driver
-Message-ID: <1421772342-13810-1-git-send-email-andrew@lunn.ch>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 20 Jan 2015 08:44:55 -0800
+Subject: ARM: OMAP3: MACH_OMAP3517EVM?
+In-Reply-To: <1421744597.9655.92.camel@x220>
+References: <1421744597.9655.92.camel@x220>
+Message-ID: <20150120164455.GD7718@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset is a driver for the TI tlc59116 16 Channel i2c LED
-driver and tlc59108 8 Channel i2c LED driver. This driver is used on
-the Belkin WRT1900AC access point and the C code is derived from code
-Belkin contributed to OpenWRT.  However it has been extensively
-re-written, and a device tree binding added to replace platform data.
+* Paul Bolle <pebolle@tiscali.nl> [150120 01:06]:
+> Tony,
+> 
+> Your commit 4d62dbda8561 ("ARM: OMAP3: Remove legacy support for
+> am3517-evm") is included in today's linux-next (ie, next-20150120). I
+> noticed because a script I use to check linux-next spotted a problem
+> caused by it.
 
-Cc: Matthew.Fatheree at belkin.com
+OK thanks for spotting that.
+ 
+> See, your commit removes the Kconfig symbol MACH_OMAP3517EVM. But
+> there's still a reference to that symbol in sound/soc/omap/Kconfig. This
+> means that in linux-next a symbol, SND_OMAP_SOC_AM3517EVM, cannot be set
+> anymore.
+> 
+> I assume a patch that address this (either by removing
+> SND_OMAP_SOC_AM3517EVM or by updating its dependencies) is queued
+> somewhere. Is that correct?
 
-Since v3:
-      Generalized and added support for tlc59108
-      brightness == 0 and brightness == LED_FULL disable PWM and used
-        fixed OFF/ON mode
+Not yet, I missed that part sorry. I'll add back the Kconfig symbol.
+I'll rather do the removal in smaller steps, and first remove the
+3517 related board-*.c file before messing with the legacy drivers.
 
-Since v2:
-      Remove incorrect /* Mode register ? */ comment
-      Parenthesis around the macro arguments
-      Converted many signed variables into unsigned
-      Saved an initialization
+Regards,
 
-Since v1:
-      s/uint8_t/u8/g
-      Remove empty line
-      Removed #gpio-cells
-      Added select REGMAP_I2C
-      Sorted #includes into alphabetic order
-      Added missing MODULE_DEVICE_TABLE(of, ...)
-      Check return value of regmap_write()
-      Simplified tlc59116_set_mode()
-
-Andrew Lunn (2):
-  leds: tlc59116: Document binding for the TI 16 Channel i2c LED driver
-  leds: tlc59116: Driver for the TI 16 Channel i2c LED driver
-
- .../devicetree/bindings/leds/leds-tlc59116.txt     |  41 ++++
- drivers/leds/Kconfig                               |   7 +
- drivers/leds/Makefile                              |   1 +
- drivers/leds/leds-tlc59116.c                       | 253 +++++++++++++++++++++
- 4 files changed, 302 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/leds/leds-tlc59116.txt
- create mode 100644 drivers/leds/leds-tlc59116.c
-
--- 
-2.1.3
+Tony
