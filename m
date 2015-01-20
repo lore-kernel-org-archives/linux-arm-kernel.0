@@ -1,79 +1,111 @@
-From: ajaynumb@gmail.com (Ajay kumar)
-Date: Tue, 20 Jan 2015 16:26:08 +0530
-Subject: [PATCH V8 00/14] drm/exynos: few patches to enhance bridge chip
- support
-In-Reply-To: <54BD3943.80402@collabora.co.uk>
-References: <1416045309-13359-1-git-send-email-ajaykumar.rs@samsung.com>
- <CAEC9eQOrKw2Z1q-ztFfadXmsL3CTcAkkv9kcS2QnDOAVSh2AuQ@mail.gmail.com>
- <548ABAB6.6010200@collabora.co.uk> <3197445.qizQc0zeRb@avalon>
- <54914D7D.9060108@collabora.co.uk>
- <CAPj87rN4HZzDt5JBLyTRmKZs7XcOG=0ha7ZQf9hmjPAFgTyhYQ@mail.gmail.com>
- <20150105135015.GA12010@ulmo.nvidia.com>
- <54BCDC28.7080003@collabora.co.uk>
- <20150119163043.GB7751@ulmo.nvidia.com>
- <54BD3943.80402@collabora.co.uk>
-Message-ID: <CAEC9eQNna0nMVWTCUfoiiuAkYzPS8iKXGtfsL1S-MkZXpFi6xA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 20 Jan 2015 10:56:55 +0000
+Subject: [PATCH v7 04/17] ARM64 / ACPI: Introduce early_param for "acpi"
+ and pass acpi=force to enable ACPI
+In-Reply-To: <54BE1FEA.5040109@linaro.org>
+References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
+ <1421247905-3749-5-git-send-email-hanjun.guo@linaro.org>
+ <20150119114255.GF11835@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu8vPKAdsNg7QC7xW+i8_BemWEx4mvBx6NrnAHi8Y+bNtw@mail.gmail.com>
+ <20150119135144.GI11835@e104818-lin.cambridge.arm.com>
+ <20150119151350.21B65C40948@trevor.secretlab.ca>
+ <54BD3803.6020307@redhat.com>
+ <20150119175233.GK11835@e104818-lin.cambridge.arm.com>
+ <20150119180122.GJ21553@leverpostej> <54BE1FEA.5040109@linaro.org>
+Message-ID: <20150120105655.GC25575@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 19, 2015 at 10:35 PM, Javier Martinez Canillas
-<javier.martinez@collabora.co.uk> wrote:
-> Hello Thierry,
->
-> On 01/19/2015 05:30 PM, Thierry Reding wrote:
->>>
->>> I know you probably are very busy but it would be great if you can take a look
->>> to this series to avoid another kernel release to be missed since we are already
->>> at v3.19-rc5.
->>>
->>> Only this version was posted 2 months ago and the first version of the series
->>> was sent on May, 2014 so it has been on the list for almost a year now...
->>>
->>> Tomi and Laurent had already agreed with the DT binging so I think that we can
->>> already merge these and if there are any remaining issues, those can be fixed
->>> during the 3.20 -rc cycle.
->>
->> I see only a single Tested-by on this series and that seems to be with a
->> bunch of out-of-tree patches applied on top. Does this now actually work
->> applied on top of upstream? Also it seems like many people actually want
->> this to get merged but there's been no Reviewed-bys and only a single
->> Tested-by? Is that as good as it's going to get?
->>
->
-> Good point, I provided some feedback on an early version of the series but I'm not
-> an DRM expert so I couldn't review it in detail to provide my Reviewed-by.
->
-> I did provide my Tested-by a long time ago though but looking at the patches it
-> seems those were dropped so here goes again:
->
-> For the whole series on an Exynos5420 Peach Pit and an Exynos5250 Snow Chromebooks:
->
-> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->
->> Also I think the last update was that Ajay was going to resend this
->> based on v3.19-rc1 or something. Is that still going to happen?
->> Otherwise I can probably try to apply as-is, but not sure how well it
->> will.
->>
->
-> Ajay,
->
-> Are you going to rebase and resend this series with all the provided tags? Gustavo
-> and I have a rebased branch on top of 3.19-rc5 and one of us can post your series if
-> you are not planning to do it.
-Yes, in a day or so. I am currently rebasing on 3.19-rc5 linux-next.
-I will add Tested-by from from Rahul, Javier, Inki, Sjoerd, and Gustavo.
-Only Inki has acked this till now. So, I will add Inki's Acked-by.
+On Tue, Jan 20, 2015 at 09:29:14AM +0000, Hanjun Guo wrote:
+> On 2015?01?20? 02:01, Mark Rutland wrote:
+> > On Mon, Jan 19, 2015 at 05:52:33PM +0000, Catalin Marinas wrote:
+> >> On Mon, Jan 19, 2015 at 04:59:47PM +0000, Jon Masters wrote:
+> >>> On 01/19/2015 10:13 AM, Grant Likely wrote:
+> >>>> On Mon, 19 Jan 2015 13:51:45 +0000
+> >>>> , Catalin Marinas <catalin.marinas@arm.com>
+> >>>>   wrote:
+> >>>>> On Mon, Jan 19, 2015 at 11:55:32AM +0000, Ard Biesheuvel wrote:
+> >>>>>> On 19 January 2015 at 11:42, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> >>>>>>> On Wed, Jan 14, 2015 at 03:04:52PM +0000, Hanjun Guo wrote:
+> >>>>>>>> From: Al Stone <al.stone@linaro.org>
+> >>>>>>>>
+> >>>>>>>> Introduce one early parameters "off" and "force" for "acpi", acpi=off
+> >>>>>>>> will be the default behavior for ARM64, so introduce acpi=force to
+> >>>>>>>> enable ACPI on ARM64.
+> >>>>>>>>
+> >>>>>>>> Disable ACPI before early parameters parsed, and enable it to pass
+> >>>>>>>> "acpi=force" if people want use ACPI on ARM64. This ensures DT be
+> >>>>>>>> the prefer one if ACPI table and DT both are provided at this moment.
+> >>>>>>> [...]
+> >>>>>>>> --- a/arch/arm64/kernel/setup.c
+> >>>>>>>> +++ b/arch/arm64/kernel/setup.c
+> >>>>>>>> @@ -62,6 +62,7 @@
+> >>>>>>>>   #include <asm/memblock.h>
+> >>>>>>>>   #include <asm/psci.h>
+> >>>>>>>>   #include <asm/efi.h>
+> >>>>>>>> +#include <asm/acpi.h>
+> >>>>>>>>
+> >>>>>>>>   unsigned int processor_id;
+> >>>>>>>>   EXPORT_SYMBOL(processor_id);
+> >>>>>>>> @@ -388,6 +389,8 @@ void __init setup_arch(char **cmdline_p)
+> >>>>>>>>        early_fixmap_init();
+> >>>>>>>>        early_ioremap_init();
+> >>>>>>>>
+> >>>>>>>> +     disable_acpi();
+> >>>>>>>> +
+> >>>>>>>>        parse_early_param();
+> >>>>>>>>
+> >>>>>>>>        /*
+> >>>>>>>
+> >>>>>>> Did we get to any conclusion here? DT being the preferred one is fine
+> >>>>>>> when both DT and ACPI are present but do we still want the kernel to
+> >>>>>>> ignore ACPI altogether if DT is not present? It's a bit harder to detect
+> >>>>>>> the presence of DT at this point since the EFI_STUB added one already. I
+> >>>>>>> guess we could move the "acpi=force" argument passing to EFI_STUB if no
+> >>>>>>> DT is present at boot.
+> >>>>>>
+> >>>>>> Since the EFI stub populates the /chosen node in DT, I would prefer
+> >>>>>> for it to add a property there to indicate whether it created the DT
+> >>>>>> from scratch rather than adding ACPI specific stuff in there (even if
+> >>>>>> it is just a string to concatenate)
+> >>>>>
+> >>>>> This works for me. So we could pass "acpi=force" in EFI stub if it
+> >>>>> created the DT from scratch *and* ACPI tables are present (can it detect
+> >>>>> the latter? And maybe it could print something if none are available).
+> >>>>> If that works, the actual kernel can assume that ACPI needs to be
+> >>>>> explicitly enabled via acpi=force, irrespective of how much information
+> >>>>> it has in DT.
+> >>>>
+> >>>> Ditto for me. I think this is a fine solution. And, yes, the stub can
+> >>>> easily detect the presence of ACPI by looking in the UEFI config table.
+> >>>
+> >>> I get the point behind doing this, but could we not have it pass in a
+> >>> different parameter than =force? Perhaps something new? I'd like to
+> >>> separate out the case that it was enabled automatically vs explicitly
+> >>> forced on by a user wanting to use ACPI on a system with both tables.
+> >>
+> >> Ard had a point, so we should probably not pass acpi=force from EFI stub
+> >> (especially since a user may explicitly pass acpi=off irrespective of DT
+> >> presence). Some other property in the chosen node? It's not even an ABI
+> >> since that's a contract between EFI stub and the rest of the kernel, so
+> >> an in-kernel only interface.
+> >
+> > Not strictly true once kexec is in place. Then it becomes a stub ->
+> > kernel -> kernel -> kernel -> ... interface, alnog with the rest of the
+> > properties the stub puts in the DTB.
+> >
+> > Having something like /chosen/linux,uefi-stub-generated-dtb sounds sane
+> > regardless.
+> 
+> How about the patch (just RFC, maybe it is horrible :) ) below:
+> 
+> When system supporting both DT and ACPI but firmware providing
+> no dtb, we can use this linux,uefi-stub-generated-dtb property
+> to let kernel know that we can try ACPI configuration data.
+> 
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-Ajay
+I'm ok with the idea but I'll let Mark comment on the DT aspects.
 
-> Laurent and Tomi,
->
-> You said that you are OK with the DT bindings now, does that count as an Acked-by or
-> Reviewed-by for you at least for the DT bindings changes in the series?
->
->> Thierry
->>
->
-> Best regards,
-> Javier
+-- 
+Catalin
