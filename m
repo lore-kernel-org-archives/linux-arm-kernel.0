@@ -1,55 +1,65 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 20 Jan 2015 13:36:34 +0000
-Subject: [RFC PATCHv2 18/19] mfd: ab8500: Decrement the power supply's
- device reference counter
-In-Reply-To: <1420472882-10463-19-git-send-email-k.kozlowski@samsung.com>
-References: <1420472882-10463-1-git-send-email-k.kozlowski@samsung.com>
- <1420472882-10463-19-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20150120133634.GH13701@x1>
+From: sylvain.rochet@finsecur.com (Sylvain Rochet)
+Date: Tue, 20 Jan 2015 14:38:58 +0100
+Subject: [PATCHv7 0/6] USB: host: Atmel OHCI and EHCI drivers improvements
+Message-ID: <1421761144-11767-1-git-send-email-sylvain.rochet@finsecur.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 05 Jan 2015, Krzysztof Kozlowski wrote:
+USB: host: Atmel OHCI and EHCI drivers improvements
 
-> Use power_supply_put() to decrement the power supply's device reference
-> counter.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Acked-by: Pavel Machek <pavel@ucw.cz>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> Acked-by: Lee Jones <lee.jones@linaro.org>
+Suspend/resume support for EHCI.
+struct dev_pm_ops for OHCI.
+Removed global variables from both.
+Fixed OHCI wake up support for STANDBY(wake-up enabled) and MEM(wake-up
+disabled) sleep targets.
 
-You've sent this to me already Acked.  I don't see 00/00, so I have no
-idea what's going on.  Do you want me to take this patch?  Can it be
-taking on its own?
+Changes since v6:
+  * Collected Acked-by tags
 
-> ---
->  drivers/mfd/ab8500-sysctrl.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/drivers/mfd/ab8500-sysctrl.c b/drivers/mfd/ab8500-sysctrl.c
-> index d4a4b24be7c6..0d1825696153 100644
-> --- a/drivers/mfd/ab8500-sysctrl.c
-> +++ b/drivers/mfd/ab8500-sysctrl.c
-> @@ -51,6 +51,7 @@ static void ab8500_power_off(void)
->  
->  		ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_ONLINE,
->  				&val);
-> +		power_supply_put(psy);
->  
->  		if (!ret && val.intval) {
->  			charger_present = true;
-> @@ -73,6 +74,7 @@ static void ab8500_power_off(void)
->  			       pss[i]);
->  			machine_restart("charging");
->  		}
-> +		power_supply_put(psy);
->  	}
->  
->  shutdown:
+Changes since v5:
+  * Don't overwrite device wakeup flag with device_init_wakeup(),
+    now using a private wakeup bool instead.
+
+Changes since v4:
+  * Re-add at91_suspend_entering_slow_clock() to OHCI, we can't naively
+    remove this one, this device needs to be continuously clocked to
+    provide wake up support.
+    The removal of at91_suspend_entering_slow_clock() actually lighted up
+    an issue on wake up support, which is now fixed.
+
+Changes since v3:
+  * Using struct dev_pm_ops instead of static struct platform_driver
+    resume and suspend bindings for both EHCI and OHCI
+  * Fixed inconsistency in patch subjects, _ intead of - for file names
+  * Patch cleaning with the help of checkpatch.pl, fixed lines over
+    80 characters
+
+Changes since v2:
+  * Added patchs from an other submission, because this series
+    depended on this one
+    * EHCI: Move global variables to private struct
+    * OHCI: Move global variables to private struct
+  * Using ohci->priv and ehci->priv instead of hcd->hcd_priv,
+    which were not the right way to do that
+
+Changes since v1:
+  * Don't use at91_suspend_entering_slow_clock() on EHCI,
+    we are trying to get read of this of this function
+  * Removed at91_suspend_entering_slow_clock() from OHCI
+
+Sylvain Rochet (6):
+  USB: host: ehci-atmel: Add suspend/resume support
+  USB: host: ohci-at91: Use struct dev_pm_ops instead of struct
+    platform_driver
+  USB: host: ehci-atmel: Move global variables to private struct
+  USB: host: ohci-at91: Move global variables to private struct
+  USB: host: ohci-at91: usb_hcd_at91_probe(), remove useless stack
+    initialisation
+  USB: host: ohci-at91: Fix wake-up support
+
+ drivers/usb/host/ehci-atmel.c | 102 +++++++++++++++++++++++++---------
+ drivers/usb/host/ohci-at91.c  | 126 ++++++++++++++++++++++++++----------------
+ 2 files changed, 154 insertions(+), 74 deletions(-)
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.1.4
