@@ -1,47 +1,95 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 20 Jan 2015 13:58:40 +0000
-Subject: [PATCH 6/7] mfd: menelaus: make vcore and regulator controls
- internal
-In-Reply-To: <1419702779-16001-7-git-send-email-aaro.koskinen@iki.fi>
-References: <1419702779-16001-1-git-send-email-aaro.koskinen@iki.fi>
- <1419702779-16001-7-git-send-email-aaro.koskinen@iki.fi>
-Message-ID: <20150120135840.GO13701@x1>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 20 Jan 2015 19:29:24 +0530
+Subject: [PATCH] ARM: mach-davinci: Remove driver CDCE949
+In-Reply-To: <54BC8F2B.10509@ti.com>
+References: <1421624259-24127-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+ <54BC8F2B.10509@ti.com>
+Message-ID: <54BE5F3C.50907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 27 Dec 2014, Aaro Koskinen wrote:
-
-> Make vcore and regulator control functions internal to the driver.
+On Monday 19 January 2015 10:29 AM, Sekhar Nori wrote:
+> Hi,
 > 
-> Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-> ---
->  drivers/mfd/menelaus.c       | 13 +++++++++++--
->  include/linux/mfd/menelaus.h | 12 ------------
->  2 files changed, 11 insertions(+), 14 deletions(-)
+> On Monday 19 January 2015 05:07 AM, Rickard Strandqvist wrote:
+>> Remove driver CDCE949 because it is not used anywhere.
+>>
+>> Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
 > 
-> diff --git a/drivers/mfd/menelaus.c b/drivers/mfd/menelaus.c
-> index 4a900cc..8660adf 100644
-> --- a/drivers/mfd/menelaus.c
-> +++ b/drivers/mfd/menelaus.c
-> @@ -163,6 +163,15 @@
->  #define MCT_PIN_ST_S1_CD_ST		(1 << 0)
->  #define MCT_PIN_ST_S2_CD_ST		(1 << 1)
->  
-> +#define EN_VPLL_SLEEP			(1 << 7)
-> +#define EN_VMMC_SLEEP			(1 << 6)
-> +#define EN_VAUX_SLEEP			(1 << 5)
-> +#define EN_VIO_SLEEP			(1 << 4)
-> +#define EN_VMEM_SLEEP			(1 << 3)
-> +#define EN_DC3_SLEEP			(1 << 2)
-> +#define EN_DC2_SLEEP			(1 << 1)
-> +#define EN_VC_SLEEP			(1 << 0)
+> 
+>> diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
+>> index ae129bc..8be5aef 100644
+>> --- a/arch/arm/mach-davinci/board-dm646x-evm.c
+>> +++ b/arch/arm/mach-davinci/board-dm646x-evm.c
+>> @@ -45,7 +45,6 @@
+>>  #include <mach/irqs.h>
+>>  #include <mach/serial.h>
+>>  #include <mach/clock.h>
+>> -#include <mach/cdce949.h>
+>>  
+>>  #include "davinci.h"
+>>  #include "clock.h"
+>> @@ -399,9 +398,6 @@ static struct i2c_board_info __initdata i2c_info[] =  {
+>>  	{
+>>  		I2C_BOARD_INFO("cpld_video", 0x3b),
+>>  	},
+>> -	{
+>> -		I2C_BOARD_INFO("cdce949", 0x6c),
+>> -	},
+>>  };
+> 
+> There is cdce_clk_init() and associated data structures that also need
+> to be removed.
 
-Better to use the BIT() macro for this kind of stuff.
+In the interest of time, I made this change myself.
+I will be merging the attached patch with this one.
 
-Please take this opportunity to use it.
+Thanks,
+Sekhar
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+---8<---
+diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
+index 8be5aef3aca9..846a84ddc28e 100644
+--- a/arch/arm/mach-davinci/board-dm646x-evm.c
++++ b/arch/arm/mach-davinci/board-dm646x-evm.c
+@@ -711,31 +711,6 @@ static void __init evm_init_i2c(void)
+ 	evm_init_video();
+ }
+ 
+-#define CDCE949_XIN_RATE	27000000
+-
+-/* CDCE949 support - "lpsc" field is overridden to work as clock number */
+-static struct clk cdce_clk_in = {
+-	.name	= "cdce_xin",
+-	.rate	= CDCE949_XIN_RATE,
+-};
+-
+-static struct clk_lookup cdce_clks[] = {
+-	CLK(NULL, "xin", &cdce_clk_in),
+-	CLK(NULL, NULL, NULL),
+-};
+-
+-static void __init cdce_clk_init(void)
+-{
+-	struct clk_lookup *c;
+-	struct clk *clk;
+-
+-	for (c = cdce_clks; c->clk; c++) {
+-		clk = c->clk;
+-		clkdev_add(c);
+-		clk_register(clk);
+-	}
+-}
+-
+ #define DM6467T_EVM_REF_FREQ		33000000
+ 
+ static void __init davinci_map_io(void)
+@@ -744,8 +719,6 @@ static void __init davinci_map_io(void)
+ 
+ 	if (machine_is_davinci_dm6467tevm())
+ 		davinci_set_refclk_rate(DM6467T_EVM_REF_FREQ);
+-
+-	cdce_clk_init();
+ }
+ 
+ #define DM646X_EVM_PHY_ID		"davinci_mdio-0:01"
