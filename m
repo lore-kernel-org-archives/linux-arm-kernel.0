@@ -1,92 +1,52 @@
-From: b08248@gmail.com (Stuart Yoder)
-Date: Tue, 20 Jan 2015 11:17:29 -0600
-Subject: [PATCH v2 1/8] device core: Introduce per-device MSI domain
- pointer
-In-Reply-To: <54BC6799.2040907@linux.intel.com>
-References: <1420736772-11088-1-git-send-email-marc.zyngier@arm.com>
- <1420736772-11088-2-git-send-email-marc.zyngier@arm.com>
- <CALRxmdDVUoYNg3QC0LdvKmCz9x4nzE9+TDiV9K9OH=Gxk-Cd9w@mail.gmail.com>
- <54BC6799.2040907@linux.intel.com>
-Message-ID: <CALRxmdCRGY2Sw+UyHTp5PP4R=v2301LTqpKq0bCEs08SWsh1bg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 20 Jan 2015 09:16:12 -0800
+Subject: [PATCHv2 5/5] arm: omap: specify PMUs are for ARMv7 CPUs
+In-Reply-To: <1421770049-32029-6-git-send-email-mark.rutland@arm.com>
+References: <1421770049-32029-1-git-send-email-mark.rutland@arm.com>
+ <1421770049-32029-6-git-send-email-mark.rutland@arm.com>
+Message-ID: <20150120171612.GG7718@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gerry,
+* Mark Rutland <mark.rutland@arm.com> [150120 08:12]:
+> Now that we can specify which PMU variant we're likely to deal with, do
+> so in the omap board code. This will allow us to split the ARMv6, ARMv7,
+> and XScale PMU drivers.
+> 
+> The unnecessary include of asm/pmu.h is also removed.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Tony Lindgren <tony@atomide.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Olof Johansson <olof@lixom.net>
+> ---
+>  arch/arm/mach-omap2/pmu.c | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/pmu.c b/arch/arm/mach-omap2/pmu.c
+> index 33c8846..a69e9a3 100644
+> --- a/arch/arm/mach-omap2/pmu.c
+> +++ b/arch/arm/mach-omap2/pmu.c
+> @@ -13,7 +13,7 @@
+>   */
+>  #include <linux/of.h>
+>  
+> -#include <asm/pmu.h>
+> +#include <asm/system_info.h>
+>  
+>  #include "soc.h"
+>  #include "omap_hwmod.h"
+> @@ -37,7 +37,8 @@ static int __init omap2_init_pmu(unsigned oh_num, char *oh_names[])
+>  {
+>  	int i;
+>  	struct omap_hwmod *oh[3];
+> -	char *dev_name = "arm-pmu";
+> +	char *dev_name = cpu_architecture() == CPU_ARCH_ARMv6 ?
+> +			 "armv6-pmu" : "armv7-pmu";
+>  
+>  	if ((!oh_num) || (oh_num > 3))
+>  		return -EINVAL;
 
-So which direction did you take in your patch set--  a) common,
-generic msi_desc, or b)  bus-specific msi_desc like Marc showed
-(mybus_msi_desc)?
+Looks OK to me and should not conflict with anything I have queued:
 
-Thanks,
-Stuart
-
-On Sun, Jan 18, 2015 at 8:10 PM, Jiang Liu <jiang.liu@linux.intel.com> wrote:
->
->
-> On 2015/1/16 4:35, Stuart Yoder wrote:
->> On Thu, Jan 8, 2015 at 11:06 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>> As MSI-type features are creeping into non-PCI devices, it is
->>> starting to make sense to give our struct device some form of
->>> support for this, by allowing a pointer to an MSI irq domain to
->>> be set/retrieved.
->>>
->>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>> ---
->>>  include/linux/device.h | 20 ++++++++++++++++++++
->>>  1 file changed, 20 insertions(+)
->>>
->>> diff --git a/include/linux/device.h b/include/linux/device.h
->>> index fb50673..ec4cee5 100644
->>> --- a/include/linux/device.h
->>> +++ b/include/linux/device.h
->>> @@ -690,6 +690,7 @@ struct acpi_dev_node {
->>>   *             along with subsystem-level and driver-level callbacks.
->>>   * @pins:      For device pin management.
->>>   *             See Documentation/pinctrl.txt for details.
->>> + * @msi_domain: The generic MSI domain this device is using.
->>>   * @numa_node: NUMA node this device is close to.
->>>   * @dma_mask:  Dma mask (if dma'ble device).
->>>   * @coherent_dma_mask: Like dma_mask, but for alloc_coherent mapping as not all
->>> @@ -750,6 +751,9 @@ struct device {
->>>         struct dev_pm_info      power;
->>>         struct dev_pm_domain    *pm_domain;
->>>
->>> +#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
->>> +       struct irq_domain       *msi_domain; /* MSI domain device uses */
->>> +#endif
->>
->> This is not a comment on this patch specifically, but a question about other
->> MSI specific fields that might be needed in struct device.
->>
->> Currently the generic MSI domain handling has hardcoded assumptions
->> that devices are PCI-- see the for_each_msi_entry() iterator in msi.h:
->>
->>   #define dev_to_msi_list(dev)            (&to_pci_dev((dev))->msi_list)
->>
->>   #define for_each_msi_entry(desc, dev)   \
->>         list_for_each_entry((desc), dev_to_msi_list((dev)), list)
->>
->> One approach would be to move the msi_list out of pci_dev and put
->> it in struct device, so all devices can have an msi_list.
->>
->> The other approach would be to keep msi_list in a bus specific
->> device struct, and then dev_to_msi_list() would need to be
->> implemented as a bus specific callback of some kind.
->>
->> The above hardcoded PCI assumption isn't going to work.   Wanted to
->> see if there is any advice in which direction to go.
-> Hi Stuart,
->         I already have some a patch set to go that direction waiting
-> send out for review:)
-> Thanks!
-> Gerry
->
->>
->> Thanks,
->> Stuart Yoder
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> Please read the FAQ at  http://www.tux.org/lkml/
->>
+Acked-by: Tony Lindgren <tony@atomide.com>
