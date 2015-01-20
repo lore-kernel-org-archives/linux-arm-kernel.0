@@ -1,87 +1,80 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 20 Jan 2015 15:51:49 +0000
-Subject: [RFC PATCHv2 07/19] mfd: ab8500: Use power_supply_*() API for
- accessing function attrs
-In-Reply-To: <1421763376.8855.4.camel@AMDC1943>
-References: <1420472882-10463-1-git-send-email-k.kozlowski@samsung.com>
- <1420472882-10463-8-git-send-email-k.kozlowski@samsung.com>
- <20150120133617.GG13701@x1> <1421763376.8855.4.camel@AMDC1943>
-Message-ID: <20150120155149.GG13701@x1>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 20 Jan 2015 16:53:59 +0100
+Subject: [PATCH v4 5/5] ARM: dts: mt8135: Add pinctrl/GPIO/EINT node for
+ mt8135.
+In-Reply-To: <1418772873-19747-6-git-send-email-hongzhou.yang@mediatek.com>
+References: <1418772873-19747-1-git-send-email-hongzhou.yang@mediatek.com>
+ <1418772873-19747-6-git-send-email-hongzhou.yang@mediatek.com>
+Message-ID: <CABuKBe+NxRMM0Yorr4=wi1JyN=ja-1OJV3sKEML5T-cfUpfEvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 20 Jan 2015, Krzysztof Kozlowski wrote:
+2014-12-17 0:34 GMT+01:00 Hongzhou Yang <hongzhou.yang@mediatek.com>:
+> From: Hongzhou Yang <hongzhou.yang@mediatek.com>
+>
+> Add pinctrl,GPIO and EINT node to mt8135.dtsi.
+>
+> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+> ---
+>  arch/arm/boot/dts/mt8135-pinfunc.h | 1304 ++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/mt8135.dtsi      |   24 +
+>  2 files changed, 1328 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/mt8135-pinfunc.h
+>
+[...]
+> diff --git a/arch/arm/boot/dts/mt8135.dtsi b/arch/arm/boot/dts/mt8135.dtsi
+> index 90a56ad..38e3469 100644
+> --- a/arch/arm/boot/dts/mt8135.dtsi
+> +++ b/arch/arm/boot/dts/mt8135.dtsi
+> @@ -15,6 +15,7 @@
+>  #include <dt-bindings/interrupt-controller/irq.h>
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>  #include "skeleton64.dtsi"
+> +#include "mt8135-pinfunc.h"
+>
+>  / {
+>         compatible = "mediatek,mt8135";
+> @@ -94,6 +95,16 @@
+>                 compatible = "simple-bus";
+>                 ranges;
+>
+> +               syscfg_pctl_a: syscfg_pctl_a at 10005000 {
+> +                       compatible = "mediatek,mt8135-pctl-a-syscfg", "syscon";
+> +                       reg = <0 0x10005000 0 0x1000>;
+> +               };
+> +
+> +               syscfg_pctl_b: syscfg_pctl_b at 1020C000 {
+> +                       compatible = "mediatek,mt8135-pctl-b-syscfg", "syscon";
+> +                       reg = <0 0x1020C000 0 0x1000>;
+> +               };
+> +
+>                 timer: timer at 10008000 {
+>                         compatible = "mediatek,mt8135-timer", "mediatek,mt6577-timer";
+>                         reg = <0 0x10008000 0 0x80>;
+> @@ -111,5 +122,18 @@
+>                               <0 0x10214000 0 0x2000>,
+>                               <0 0x10216000 0 0x2000>;
+>                 };
+> +
+> +               pio: pinctrl at 10005000 {
+> +                       compatible = "mediatek,mt8135-pinctrl";
+> +                       reg = <0 0x1000B000 0 0x1000>;
+> +                       mediatek,pctl-regmap = <&syscfg_pctl_a &syscfg_pctl_b>;
+> +                       gpio-controller;
+> +                       #gpio-cells = <2>;
+> +                       interrupt-controller;
+> +                       #interrupt-cells = <2>;
+> +                       interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>,
+> +                                    <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>,
+> +                                    <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
+> +               };
 
-> On wto, 2015-01-20 at 13:36 +0000, Lee Jones wrote:
-> > On Mon, 05 Jan 2015, Krzysztof Kozlowski wrote:
-> > 
-> > > Replace direct calls to power supply function attributes with wrappers.
-> > > Wrappers provide safe access in case of unregistering the power
-> > > supply (e.g. by removing the driver). Replace:
-> > >  - get_property -> power_supply_get_property
-> > > 
-> > > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > > Acked-by: Jonghwa Lee <jonghwa3.lee@samusng.com>
-> > > Acked-by: Pavel Machek <pavel@ucw.cz>
-> > > Acked-by: Lee Jones <lee.jones@linaro.org>
-> > 
-> > You've sent this to me already Acked.  I don't see 00/00, so I have no
-> > idea what's going on.  Do you want me to take this patch?  Can it be
-> > taking on its own?
-> 
-> git send-email automatically CC-you because you acked this. The depends
-> on previous patches adding this API so please do not pick it up. 
+Please order the nodes taking into account the memory address to which
+they are mapped.
 
-You should always send MFD related patches to me (either
-automatically, or manually).
+Cheers,
+Matthias
 
-> Everything (with respective acks) should go through one power supply
-> tree.
-
-That's not how it works.  We need to decide that amongst ourselves
-and it needs to culminate in pull-requests being sent out to all of
-the effected Maintainers.
-
-> The same applies to patch 18/19.
-> 
-> Best regards,
-> Krzysztof
-> 
-> > 
-> > > ---
-> > >  drivers/mfd/ab8500-sysctrl.c | 7 ++++---
-> > >  1 file changed, 4 insertions(+), 3 deletions(-)
-> > > 
-> > > diff --git a/drivers/mfd/ab8500-sysctrl.c b/drivers/mfd/ab8500-sysctrl.c
-> > > index cfff0b643f1b..d4a4b24be7c6 100644
-> > > --- a/drivers/mfd/ab8500-sysctrl.c
-> > > +++ b/drivers/mfd/ab8500-sysctrl.c
-> > > @@ -49,7 +49,8 @@ static void ab8500_power_off(void)
-> > >  		if (!psy)
-> > >  			continue;
-> > >  
-> > > -		ret = psy->get_property(psy, POWER_SUPPLY_PROP_ONLINE, &val);
-> > > +		ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_ONLINE,
-> > > +				&val);
-> > >  
-> > >  		if (!ret && val.intval) {
-> > >  			charger_present = true;
-> > > @@ -63,8 +64,8 @@ static void ab8500_power_off(void)
-> > >  	/* Check if battery is known */
-> > >  	psy = power_supply_get_by_name("ab8500_btemp");
-> > >  	if (psy) {
-> > > -		ret = psy->get_property(psy, POWER_SUPPLY_PROP_TECHNOLOGY,
-> > > -					&val);
-> > > +		ret = power_supply_get_property(psy,
-> > > +				POWER_SUPPLY_PROP_TECHNOLOGY, &val);
-> > >  		if (!ret && val.intval != POWER_SUPPLY_TECHNOLOGY_UNKNOWN) {
-> > >  			printk(KERN_INFO
-> > >  			       "Charger \"%s\" is connected with known battery."
-> > 
-> 
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+motzblog.wordpress.com
