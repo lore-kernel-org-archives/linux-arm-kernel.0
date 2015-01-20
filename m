@@ -1,35 +1,53 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 20 Jan 2015 17:04:13 +0100
-Subject: [PATCH v5] clk: sunxi: Add driver for A80 MMC config clocks/resets
-In-Reply-To: <1421768791-20170-1-git-send-email-wens@csie.org>
-References: <1421768791-20170-1-git-send-email-wens@csie.org>
-Message-ID: <20150120160413.GU4367@lukather>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 20 Jan 2015 17:06:03 +0100
+Subject: [RFC PATCHv2 07/19] mfd: ab8500: Use power_supply_*() API for
+ accessing function attrs
+In-Reply-To: <20150120155149.GG13701@x1>
+References: <1420472882-10463-1-git-send-email-k.kozlowski@samsung.com>
+ <1420472882-10463-8-git-send-email-k.kozlowski@samsung.com>
+ <20150120133617.GG13701@x1> <1421763376.8855.4.camel@AMDC1943>
+ <20150120155149.GG13701@x1>
+Message-ID: <20150120160602.GB32144@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 20, 2015 at 11:46:31PM +0800, Chen-Yu Tsai wrote:
-> On the A80 SoC, the 4 mmc controllers each have a separate register
-> controlling their register access clocks and reset controls. These
-> registers in turn share a ahb clock gate and reset control.
+On Tue 2015-01-20 15:51:49, Lee Jones wrote:
+> On Tue, 20 Jan 2015, Krzysztof Kozlowski wrote:
 > 
-> This patch adds a platform device driver for these controls. It
-> requires both clocks and reset controls to be available, so using
-> CLK_OF_DECLARE might not be the best way.
+> > On wto, 2015-01-20 at 13:36 +0000, Lee Jones wrote:
+> > > On Mon, 05 Jan 2015, Krzysztof Kozlowski wrote:
+> > > 
+> > > > Replace direct calls to power supply function attributes with wrappers.
+> > > > Wrappers provide safe access in case of unregistering the power
+> > > > supply (e.g. by removing the driver). Replace:
+> > > >  - get_property -> power_supply_get_property
+> > > > 
+> > > > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > > > Acked-by: Jonghwa Lee <jonghwa3.lee@samusng.com>
+> > > > Acked-by: Pavel Machek <pavel@ucw.cz>
+> > > > Acked-by: Lee Jones <lee.jones@linaro.org>
+> > > 
+> > > You've sent this to me already Acked.  I don't see 00/00, so I have no
+> > > idea what's going on.  Do you want me to take this patch?  Can it be
+> > > taking on its own?
+> > 
+> > git send-email automatically CC-you because you acked this. The depends
+> > on previous patches adding this API so please do not pick it up. 
 > 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> You should always send MFD related patches to me (either
+> automatically, or manually).
+> 
+> > Everything (with respective acks) should go through one power supply
+> > tree.
+> 
+> That's not how it works.  We need to decide that amongst ourselves
+> and it needs to culminate in pull-requests being sent out to all of
+> the effected Maintainers.
 
-Merged, thanks!
-
-Maxime
-
+So go ahead and decide. If the patches are ok, I see no problem in it
+going through power supply tree, and neither should you. I feel you
+are making it more complex than it is.
+									Pavel
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150120/8cf39ef9/attachment.sig>
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
