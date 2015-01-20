@@ -1,54 +1,79 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 20 Jan 2015 11:54:33 +0100
-Subject: [PATCH 8/8] regulator: MT6397: Add support for MT6397 regulator
-In-Reply-To: <1421748424.9655.107.camel@x220>
-References: <1421747231-554-1-git-send-email-s.hauer@pengutronix.de>
- <1421747231-554-9-git-send-email-s.hauer@pengutronix.de>
- <1421748424.9655.107.camel@x220>
-Message-ID: <20150120105433.GF18908@pengutronix.de>
+From: ajaynumb@gmail.com (Ajay kumar)
+Date: Tue, 20 Jan 2015 16:26:08 +0530
+Subject: [PATCH V8 00/14] drm/exynos: few patches to enhance bridge chip
+ support
+In-Reply-To: <54BD3943.80402@collabora.co.uk>
+References: <1416045309-13359-1-git-send-email-ajaykumar.rs@samsung.com>
+ <CAEC9eQOrKw2Z1q-ztFfadXmsL3CTcAkkv9kcS2QnDOAVSh2AuQ@mail.gmail.com>
+ <548ABAB6.6010200@collabora.co.uk> <3197445.qizQc0zeRb@avalon>
+ <54914D7D.9060108@collabora.co.uk>
+ <CAPj87rN4HZzDt5JBLyTRmKZs7XcOG=0ha7ZQf9hmjPAFgTyhYQ@mail.gmail.com>
+ <20150105135015.GA12010@ulmo.nvidia.com>
+ <54BCDC28.7080003@collabora.co.uk>
+ <20150119163043.GB7751@ulmo.nvidia.com>
+ <54BD3943.80402@collabora.co.uk>
+Message-ID: <CAEC9eQNna0nMVWTCUfoiiuAkYzPS8iKXGtfsL1S-MkZXpFi6xA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 20, 2015 at 11:07:04AM +0100, Paul Bolle wrote:
-> On Tue, 2015-01-20 at 10:47 +0100, Sascha Hauer wrote:
-> > From: Flora Fu <flora.fu@mediatek.com>
-> > 
-> > This adds support for the regulators on the MediaTek MT6397
-> > Multifunction device.
-> > 
-> > Signed-off-by: Flora Fu, MediaTek
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > Cc: Liam Girdwood <lgirdwood@gmail.com>
-> > Cc: Mark Brown <broonie@kernel.org>
-> > ---
-> >  Documentation/devicetree/bindings/mfd/mt6397.txt   |  41 ++-
-> 
-> This looks new for linux-next ...
-> 
-> >  .../bindings/regulator/mt6397-regulator.txt        | 217 ++++++++++++++
-> 
-> but this is already in linux-next. See linux-next commit 269675757901
-> ("regulator: Add document for MT6397 regulator"). And ...
-> 
-> >  drivers/regulator/Kconfig                          |   9 +
-> >  drivers/regulator/Makefile                         |   1 +
-> >  drivers/regulator/mt6397-regulator.c               | 332 +++++++++++++++++++++
-> >  include/linux/regulator/mt6397-regulator.h         |  49 +++
-> 
-> these are too. See linux-next commit 0425e2420c0a ("egulator: mt6397:
-> Add support for MT6397 regulator"). Unless there are difference that
-> can't be spotted by looking at the diffstats of those commist, that is.
+On Mon, Jan 19, 2015 at 10:35 PM, Javier Martinez Canillas
+<javier.martinez@collabora.co.uk> wrote:
+> Hello Thierry,
+>
+> On 01/19/2015 05:30 PM, Thierry Reding wrote:
+>>>
+>>> I know you probably are very busy but it would be great if you can take a look
+>>> to this series to avoid another kernel release to be missed since we are already
+>>> at v3.19-rc5.
+>>>
+>>> Only this version was posted 2 months ago and the first version of the series
+>>> was sent on May, 2014 so it has been on the list for almost a year now...
+>>>
+>>> Tomi and Laurent had already agreed with the DT binging so I think that we can
+>>> already merge these and if there are any remaining issues, those can be fixed
+>>> during the 3.20 -rc cycle.
+>>
+>> I see only a single Tested-by on this series and that seems to be with a
+>> bunch of out-of-tree patches applied on top. Does this now actually work
+>> applied on top of upstream? Also it seems like many people actually want
+>> this to get merged but there's been no Reviewed-bys and only a single
+>> Tested-by? Is that as good as it's going to get?
+>>
+>
+> Good point, I provided some feedback on an early version of the series but I'm not
+> an DRM expert so I couldn't review it in detail to provide my Reviewed-by.
+>
+> I did provide my Tested-by a long time ago though but looking at the patches it
+> seems those were dropped so here goes again:
+>
+> For the whole series on an Exynos5420 Peach Pit and an Exynos5250 Snow Chromebooks:
+>
+> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>
+>> Also I think the last update was that Ajay was going to resend this
+>> based on v3.19-rc1 or something. Is that still going to happen?
+>> Otherwise I can probably try to apply as-is, but not sure how well it
+>> will.
+>>
+>
+> Ajay,
+>
+> Are you going to rebase and resend this series with all the provided tags? Gustavo
+> and I have a rebased branch on top of 3.19-rc5 and one of us can post your series if
+> you are not planning to do it.
+Yes, in a day or so. I am currently rebasing on 3.19-rc5 linux-next.
+I will add Tested-by from from Rahul, Javier, Inki, Sjoerd, and Gustavo.
+Only Inki has acked this till now. So, I will add Inki's Acked-by.
 
-It seems Mark already merged the regulator part to his tree. Ok, in this
-case you can ignore the regulator patch in this series. I think I haven't
-made changes to the regulator part in this series.
-The other patches are still needed though.
+Ajay
 
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> Laurent and Tomi,
+>
+> You said that you are OK with the DT bindings now, does that count as an Acked-by or
+> Reviewed-by for you at least for the DT bindings changes in the series?
+>
+>> Thierry
+>>
+>
+> Best regards,
+> Javier
