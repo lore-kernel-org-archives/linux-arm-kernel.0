@@ -1,83 +1,52 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 20 Jan 2015 11:51:59 +0100 (CET)
-Subject: [PATCH v2 1/2] clocksource: track usage
-In-Reply-To: <1421427439-11699-2-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1421427439-11699-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1421427439-11699-2-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <alpine.DEB.2.11.1501201148550.5526@nanos>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 20 Jan 2015 11:54:28 +0100
+Subject: [PATCH] ARM: at91: fix Kconfig.debug by adding DEBUG_AT91_UART option
+In-Reply-To: <1421745792.9655.98.camel@x220>
+References: <1421745792.9655.98.camel@x220>
+Message-ID: <1421751268-21401-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 16 Jan 2015, Alexandre Belloni wrote:
-> diff --git a/include/linux/clocksource.h b/include/linux/clocksource.h
-> index abcafaa20b86..7735902fc5f6 100644
-> --- a/include/linux/clocksource.h
-> +++ b/include/linux/clocksource.h
-> @@ -210,6 +210,8 @@ struct clocksource {
->  #define CLOCK_SOURCE_SUSPEND_NONSTOP		0x80
->  #define CLOCK_SOURCE_RESELECT			0x100
->  
-> +#define CLOCK_SOURCE_USED			0x200
+The DEBUG_AT91_UART Kconfig option was forgotten when moving the
+AT91 debug-macro.S file. Add it and use it for the at91.S compilation.
 
-You track whether the clocksource is enabled or not, right?
+Reported-by: Paul Bolle <pebolle@tiscali.nl>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+Hi Alexandre,
+Please tell me if this patch makes sense to fix the lack of this
+DEBUG_AT91_UART Kconfig option.
 
->  /* simplify initialization of mask field */
->  #define CLOCKSOURCE_MASK(bits) (cycle_t)((bits) < 64 ? ((1ULL<<(bits))-1) : -1)
->  
-> @@ -282,6 +284,8 @@ static inline s64 clocksource_cyc2ns(cycle_t cycles, u32 mult, u32 shift)
->  
->  extern int clocksource_register(struct clocksource*);
->  extern int clocksource_unregister(struct clocksource*);
-> +extern int clocksource_enable(struct clocksource *);
-> +extern void clocksource_disable(struct clocksource *);
+Paul,
+Thanks for the heads up.
 
-This should be in kernel/time/timekeeping_internal.h
+Bye,
+  Nico.
 
->  extern void clocksource_touch_watchdog(void);
->  extern struct clocksource* clocksource_get_next(void);
->  extern void clocksource_change_rating(struct clocksource *cs, int rating);
-> diff --git a/kernel/time/clocksource.c b/kernel/time/clocksource.c
-> index b79f39bda7e1..03cfc5a08e3b 100644
-> --- a/kernel/time/clocksource.c
-> +++ b/kernel/time/clocksource.c
-> @@ -889,6 +889,36 @@ int clocksource_unregister(struct clocksource *cs)
->  }
->  EXPORT_SYMBOL(clocksource_unregister);
->  
-> +/**
-> + * clocksource_enable - enable a registered clocksource
-> + * @cs:	clocksource to enable
-> + */
-> +int clocksource_enable(struct clocksource *cs)
-> +{
-> +	int ret = 0;
-> +
-> +	if (cs->enable)
-> +		ret = cs->enable(cs);
-> +
-> +	if (!ret)
-> +		cs->flags |= CLOCK_SOURCE_USED;
-> +
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL(clocksource_enable);
+ arch/arm/Kconfig.debug | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-Why on earth do you want to export that?
-
-> +/**
-> + * clocksource_disable - disable a registered clocksource
-> + * @cs:	clocksource to disable
-> + */
-> +void clocksource_disable(struct clocksource *cs)
-> +{
-> +	cs->flags &= ~CLOCK_SOURCE_USED;
-> +	if (cs->disable)
-> +		cs->disable(cs);
-> +}
-> +EXPORT_SYMBOL(clocksource_disable);
-
-Ditto.
-
-Thanks,
-
-	tglx
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index e34d24949c6a..b3d388e5f4ff 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -1164,12 +1164,15 @@ config DEBUG_STI_UART
+ 	bool
+ 	depends on ARCH_STI
+ 
++config DEBUG_AT91_UART
++	bool
++	depends on ARCH_AT91
++
+ config DEBUG_LL_INCLUDE
+ 	string
+ 	default "debug/sa1100.S" if DEBUG_SA1100
+ 	default "debug/8250.S" if DEBUG_LL_UART_8250 || DEBUG_UART_8250
+-	default "debug/at91.S" if AT91_DEBUG_LL_DBGU0 || AT91_DEBUG_LL_DBGU1 || \
+-				AT91_DEBUG_LL_DBGU2
++	default "debug/at91.S" if DEBUG_AT91_UART
+ 	default "debug/asm9260.S" if DEBUG_ASM9260_UART
+ 	default "debug/clps711x.S" if DEBUG_CLPS711X_UART1 || DEBUG_CLPS711X_UART2
+ 	default "debug/meson.S" if DEBUG_MESON_UARTAO
+-- 
+2.1.3
