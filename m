@@ -1,228 +1,87 @@
-From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
-Date: Tue, 20 Jan 2015 11:40:14 +0100
-Subject: [PATCH v7 13/17] ARM64 / ACPI: Add GICv2 specific ACPI boot
- support
-In-Reply-To: <54B8F2E3.80306@arm.com>
-References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
- <1421247905-3749-14-git-send-email-hanjun.guo@linaro.org>
- <54B8F2E3.80306@arm.com>
-Message-ID: <54BE308E.8060407@linaro.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 20 Jan 2015 10:49:22 +0000
+Subject: [RFC PATCH 1/3] drivers: of: fix resources freeing in
+ of_pci_get_host_bridge_resources()
+In-Reply-To: <20150119183228.GE10762@e106497-lin.cambridge.arm.com>
+References: <1420644571-18928-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1420644571-18928-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <20150119183228.GE10762@e106497-lin.cambridge.arm.com>
+Message-ID: <20150120104922.GF5398@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Mon, Jan 19, 2015 at 06:32:29PM +0000, Liviu Dudau wrote:
 
-On 16.01.2015 12:15, Marc Zyngier wrote:
-> On 14/01/15 15:05, Hanjun Guo wrote:
->> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
->>
->> ACPI kernel uses MADT table for proper GIC initialization. It needs to
->> parse GIC related subtables, collect CPU interface and distributor
->> addresses and call driver initialization function (which is hardware
->> abstraction agnostic). In a similar way, FDT initialize GICv1/2.
->>
->> NOTE: This commit allow to initialize GICv1/2 basic functionality.
->> GICv2 vitalization extension, GICv3/4 and ITS are considered as next
->> steps.
->
-> And so is GICv2m, apparently (see below).
->
->>
->> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->> Tested-by: Yijing Wang <wangyijing@huawei.com>
->> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> ---
->>   arch/arm64/kernel/acpi.c             |  26 +++++++++
->>   drivers/irqchip/irq-gic.c            | 108 +++++++++++++++++++++++++++++++++++
->>   drivers/irqchip/irqchip.c            |   3 +
->>   include/linux/irqchip/arm-gic-acpi.h |  31 ++++++++++
->>   4 files changed, 168 insertions(+)
->>   create mode 100644 include/linux/irqchip/arm-gic-acpi.h
->>
->> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
->> index c3e24c4..ea3c9fc 100644
->> --- a/arch/arm64/kernel/acpi.c
->> +++ b/arch/arm64/kernel/acpi.c
->> @@ -23,6 +23,7 @@
->>   #include <linux/irqdomain.h>
->>   #include <linux/bootmem.h>
->>   #include <linux/smp.h>
->> +#include <linux/irqchip/arm-gic-acpi.h>
->>
->>   #include <asm/cputype.h>
->>   #include <asm/cpu_ops.h>
->> @@ -315,6 +316,31 @@ void __init acpi_boot_table_init(void)
->>   		pr_err("Can't find FADT or error happened during parsing FADT\n");
->>   }
->>
->> +void __init acpi_gic_init(void)
->> +{
->> +	struct acpi_table_header *table;
->> +	acpi_status status;
->> +	acpi_size tbl_size;
->> +	int err;
->> +
->> +	if (acpi_disabled)
->> +		return;
->> +
->> +	status = acpi_get_table_with_size(ACPI_SIG_MADT, 0, &table, &tbl_size);
->> +	if (ACPI_FAILURE(status)) {
->> +		const char *msg = acpi_format_exception(status);
->> +
->> +		pr_err("Failed to get MADT table, %s\n", msg);
->> +		return;
->> +	}
->> +
->> +	err = gic_v2_acpi_init(table);
->> +	if (err)
->> +		pr_err("Failed to initialize GIC IRQ controller");
->> +
->> +	early_acpi_os_unmap_memory((char *)table, tbl_size);
->> +}
->> +
->>   static int __init parse_acpi(char *arg)
->>   {
->>   	if (!arg)
->> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->> index d617ee5..89a8120 100644
->> --- a/drivers/irqchip/irq-gic.c
->> +++ b/drivers/irqchip/irq-gic.c
->> @@ -33,12 +33,14 @@
->>   #include <linux/of.h>
->>   #include <linux/of_address.h>
->>   #include <linux/of_irq.h>
->> +#include <linux/acpi.h>
->>   #include <linux/irqdomain.h>
->>   #include <linux/interrupt.h>
->>   #include <linux/percpu.h>
->>   #include <linux/slab.h>
->>   #include <linux/irqchip/chained_irq.h>
->>   #include <linux/irqchip/arm-gic.h>
->> +#include <linux/irqchip/arm-gic-acpi.h>
->>
->>   #include <asm/cputype.h>
->>   #include <asm/irq.h>
->> @@ -1083,3 +1085,109 @@ IRQCHIP_DECLARE(msm_8660_qgic, "qcom,msm-8660-qgic", gic_of_init);
->>   IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", gic_of_init);
->>
->>   #endif
->> +
->> +#ifdef CONFIG_ACPI
->> +static phys_addr_t dist_phy_base, cpu_phy_base;
->> +static int cpu_base_assigned;
->> +
->> +static int __init
->> +gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
->> +			const unsigned long end)
->> +{
->> +	struct acpi_madt_generic_interrupt *processor;
->> +	phys_addr_t gic_cpu_base;
->> +
->> +	processor = (struct acpi_madt_generic_interrupt *)header;
->> +
->> +	if (BAD_MADT_ENTRY(processor, end))
->> +		return -EINVAL;
->> +
->> +	/*
->> +	 * There is no support for non-banked GICv1/2 register in ACPI spec.
->> +	 * All CPU interface addresses have to be the same.
->> +	 */
->> +	gic_cpu_base = processor->base_address;
->> +	if (cpu_base_assigned && gic_cpu_base != cpu_phy_base)
->> +		return -EFAULT;
->
-> EFAULT? That feels weird. This error code should be returned if an
-> access would generate (or has actually generated) a fault, but this is
-> not the case here. Same for the other cases below.
-Right, will fix that and other cases too.
+[...]
 
->
->> +
->> +	cpu_phy_base = gic_cpu_base;
->> +	cpu_base_assigned = 1;
->> +	return 0;
->> +}
->> +
->> +static int __init
->> +gic_acpi_parse_madt_distributor(struct acpi_subtable_header *header,
->> +				const unsigned long end)
->> +{
->> +	struct acpi_madt_generic_distributor *dist;
->> +
->> +	dist = (struct acpi_madt_generic_distributor *)header;
->> +
->> +	if (BAD_MADT_ENTRY(dist, end))
->> +		return -EINVAL;
->> +
->> +	dist_phy_base = dist->base_address;
->> +	return 0;
->> +}
->> +
->> +int __init
->> +gic_v2_acpi_init(struct acpi_table_header *table)
->> +{
->> +	void __iomem *cpu_base, *dist_base;
->> +	int count;
->> +
->> +	/* Collect CPU base addresses */
->> +	count = acpi_parse_entries(ACPI_SIG_MADT,
->> +				   sizeof(struct acpi_table_madt),
->> +				   gic_acpi_parse_madt_cpu, table,
->> +				   ACPI_MADT_TYPE_GENERIC_INTERRUPT, 0);
->> +	if (count < 0) {
->> +		pr_err("Error during GICC entries parsing\n");
->> +		return -EFAULT;
->> +	} else if (!count) {
->> +		pr_err("No valid GICC entries exist\n");
->> +		return -EINVAL;
->> +	}
->> +
->> +	/*
->> +	 * Find distributor base address. We expect one distributor entry since
->> +	 * ACPI 5.1 spec neither support multi-GIC instances nor GIC cascade.
->> +	 */
->> +	count = acpi_parse_entries(ACPI_SIG_MADT,
->> +				   sizeof(struct acpi_table_madt),
->> +				   gic_acpi_parse_madt_distributor, table,
->> +				   ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR, 0);
->> +	if (count <= 0) {
->> +		pr_err("Error during GICD entries parsing\n");
->> +		return -EFAULT;
->> +	} else if (!count) {
->> +		pr_err("No valid GICD entries exist\n");
->> +		return -EINVAL;
->> +	} else if (count > 1) {
->> +		pr_err("More than one GICD entry detected\n");
->> +		return -EINVAL;
->> +	}
->> +
->> +	cpu_base = ioremap(cpu_phy_base, ACPI_GIC_CPU_IF_MEM_SIZE);
->> +	if (!cpu_base) {
->> +		pr_err("Unable to map GICC registers\n");
->> +		return -ENOMEM;
->> +	}
->> +
->> +	dist_base = ioremap(dist_phy_base, ACPI_GICV2_DIST_MEM_SIZE);
->> +	if (!dist_base) {
->> +		pr_err("Unable to map GICD registers\n");
->> +		iounmap(cpu_base);
->> +		return -ENOMEM;
->> +	}
->> +
->> +	/*
->> +	 * Initialize zero GIC instance (no multi-GIC support). Also, set GIC
->> +	 * as default IRQ domain to allow for GSI registration and GSI to IRQ
->> +	 * number translation (see acpi_register_gsi() and acpi_gsi_to_irq()).
->> +	 */
->> +	gic_init_bases(0, -1, dist_base, cpu_base, 0, NULL);
->
-> I assume you never tried to port the GICv2m driver to ACPI, right?
-> Because the above code actively prevents the GIC domain to be defined as
-> a stacked domain, making it impossible for the v2m widget to be
-> implemented on top of GIC. But maybe legacy interrupts are enough?
-Yes, since stacked domain patches were merged to 3.19 we need to go back 
-to this. Some of us have already started addressing your comment.
+> > @@ -146,6 +146,7 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
+> >  	struct of_pci_range_parser parser;
+> >  	char range_type[4];
+> >  	int err;
+> > +	struct pci_host_bridge_window *window;
+> >  
+> >  	if (io_base)
+> >  		*io_base = (resource_size_t)OF_BAD_ADDR;
+> > @@ -225,7 +226,10 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
+> >  conversion_failed:
+> >  	kfree(res);
+> >  parse_failed:
+> > +	list_for_each_entry(window, resources, list)
+> > +		kfree(window->res);
+> >  	pci_free_resource_list(resources);
+> > +	kfree(bus_range);
+> >  	return err;
+> >  }
+> >  EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
+> 
+> Hi Lorenzo et all,
+> 
+> Here is my personal view and I am happy to hear from others on the desired
+> behaviour:
+> 
+> When I wrote this function what I had in mind was that it will parse as
+> much as possible from the device tree and return a list of resources that
+> could be successfully converted. If the entire list of ranges could not
+> be converted then an error code will be returned, but the caller still
+> had the list as constructed up to the error. It was the job of the caller
+> to free the list in either cases, as stated in the comment.
 
-Regards,
-Tomasz
+That's what I am questioning. If the function takes an error path, the
+windows list is freed, so the resource pointers are gone. There is no
+way the caller can grab those resource pointers and free them.
+
+So either way, the function needs patching. Either we do not free the
+windows list (we remove pci_free_resource_list) or we apply my fix (or
+we refactor the API which is likely to be what I will do).
+
+Lorenzo
+
+> 
+> The historical reason why the function was written that way was because at
+> some moment after parsing I've had an additional step where arches could
+> cleanup / veto the list and they could return an error value to signal
+> their discontent. Also I was (am) not sure how lenient we could be with
+> the device tree not being sane (at least one host bridge binding lists the
+> config space as a range, which was accepted as broken).
+> 
+> So, from that point of view, I would NAK this patch, as the function works
+> as intended. If others find this mode of operation too convoluted, then
+> the patch should probably make clear that cleanup only needs to be done on
+> function returning success.
+> 
+> Best regards,
+> 
+> > -- 
+> > 2.2.1
+> > 
+> > 
+> 
+> -- 
+> ====================
+> | I would like to |
+> | fix the world,  |
+> | but they're not |
+> | giving me the   |
+>  \ source code!  /
+>   ---------------
+>     ?\_(?)_/?
