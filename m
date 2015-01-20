@@ -1,79 +1,67 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 20 Jan 2015 10:47:08 +0100
-Subject: [PATCH 5/8] ARM: dts: mt8135: Add pericfg,
- infracfg and pmic wrapper nodes
-In-Reply-To: <1421747231-554-1-git-send-email-s.hauer@pengutronix.de>
-References: <1421747231-554-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1421747231-554-6-git-send-email-s.hauer@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 20 Jan 2015 10:53:07 +0100
+Subject: [PATCH v6 2/3] gpio: Cygnus: add GPIO driver
+In-Reply-To: <54B9A8A2.6090209@broadcom.com>
+References: <rjui@broadcom.com>
+ <1418696307-19392-1-git-send-email-rjui@broadcom.com>
+ <1418696307-19392-3-git-send-email-rjui@broadcom.com>
+ <CACRpkdYGksEseGaO49=1rUi5WBdOxwAd-F1gpgZn+BFatRCdDg@mail.gmail.com>
+ <54B55068.8050500@broadcom.com>
+ <CACRpkdZef8S-EAbShjJ1eg+-3wQKn+yx4u1k_Mf8F7uFkJYdFw@mail.gmail.com>
+ <54B9A8A2.6090209@broadcom.com>
+Message-ID: <CACRpkdYydCO9Wu3fMyh0qt=e_hxT5ch2gqNhEsfQpf5WYUS-kQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the perisys, infracfg and pmic wrapper nodes to the
-MediaTek MT8135 dtsi file.
+On Sat, Jan 17, 2015 at 1:11 AM, Ray Jui <rjui@broadcom.com> wrote:
+> On 1/16/2015 2:14 AM, Linus Walleij wrote:
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/boot/dts/mt8135.dtsi | 34 ++++++++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+>> Some hardware designs put the software-controlled biasing
+>> resistors in the GPIO block electronically connected to the actual
+>> pins, so that e.g. the biasing will be available if some MMC or
+>> whatever is using the same pins in another muxing. In such
+>> situations it's quite evident that they need to be a combined
+>> GPIO and pin controller.
+>>
+>> I have some regrets that bolting a second pin controller to the
+>> GPIO chip make things a bit complex but it's a price we have
+>> to pay for getting some kind of generic interface.
+>
+> Okay. In summary, I think both of us think the following approach makes
+> sense in my situation:
+> - leave pinmux in pinctrl-bcm-cygnus.c
+> - leave pinctrl + gpio in pinctrl-bcm-cygnus-gpio.c under drivers/pinctrl/*
+>
+> But by thinking about this more, I thought this would create duplicated
+> pinctrl descriptors in our system, one from the pinmux driver, and the
+> other from this pinctrl+gpio driver. That is probably undesirable?
 
-diff --git a/arch/arm/boot/dts/mt8135.dtsi b/arch/arm/boot/dts/mt8135.dtsi
-index 7d56a98..14ba41d 100644
---- a/arch/arm/boot/dts/mt8135.dtsi
-+++ b/arch/arm/boot/dts/mt8135.dtsi
-@@ -14,6 +14,7 @@
- 
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/reset-controller/mt8135-resets.h>
- #include "skeleton64.dtsi"
- 
- / {
-@@ -86,6 +87,12 @@
- 			clock-frequency = <32000>;
- 			#clock-cells = <0>;
- 		};
-+
-+		clk_26m: clk26m {
-+			compatible = "fixed-clock";
-+			clock-frequency = <26000000>;
-+			#clock-cells = <0>;
-+		};
- 	};
- 
- 	soc {
-@@ -94,6 +101,33 @@
- 		compatible = "simple-bus";
- 		ranges;
- 
-+		infracfg: infracfg at 10001000 {
-+			#reset-cells = <1>;
-+			#clock-cells = <1>;
-+			compatible = "mediatek,mt8135-infracfg";
-+			reg = <0 0x10001000 0 0x1000>;
-+		};
-+
-+		pericfg: pericfg at 10003000 {
-+			#reset-cells = <1>;
-+			#clock-cells = <1>;
-+			compatible = "mediatek,mt8135-pericfg";
-+			reg = <0 0x10003000 0 0x1000>;
-+		};
-+
-+		pwrap: pwrap at 1000f000 {
-+			compatible = "mediatek,mt8135-pwrap";
-+			reg = <0 0x1000f000 0 0x1000>,
-+				<0 0x11017000 0 0x1000>;
-+			reg-names = "pwrap-base", "pwrap-bridge-base";
-+			interrupts = <GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH>;
-+			resets = <&infracfg MT8135_INFRA_PMIC_WRAP_RST>,
-+					<&pericfg MT8135_PERI_PWRAP_BRIDGE_SW_RST>;
-+			reset-names = "pwrap", "pwrap-bridge";
-+			clocks = <&clk_26m>, <&clk_26m>;
-+			clock-names = "spi", "wrap";
-+		};
-+
- 		timer: timer at 10008000 {
- 			compatible = "mediatek,mt8135-timer",
- 					"mediatek,mt6577-timer";
--- 
-2.1.4
+No, there are several systems with multiple pin controllers and the
+framework easily handles multiple pin controllers in the same
+system just as well as we handle multiple GPIO chips.
+
+> By reviewing various drivers in the pinctrl directory, I found what
+> pinctrl-u300.c and pinctrl-coh901.c does seems to serve as a good model
+> for me to follow:
+> - pinctrl-u300.c is the pinmux driver
+> - pinctrl-coh901.c is the gpio+pinctrl driver
+
+Yeah, I don't know if the separation between them is as beautiful
+as it should be. I used it when developing the pin control
+subsystem.
+
+> The GPIO pinctrl logic is in the coh901 block, so pinctrl-coh901.c
+> exposed two public functions u300_gpio_config_get, u300_gpio_config_set
+> that pinctrl-u300.c can use. The u300 populates all pinmux/pinctrl
+> related functions into the subsystem. This way there's only one pinctrl
+> descriptor, populated through pinctrl-u300.c.
+>
+> Does that model make more sense to you?
+
+Yeah I wrote it myself so I'm maybe blind for any dumbness in
+the code. But I think it's kind of elegant. But it is not using the
+generic pinctrl device tree bindings so it's kind of oldstyle and
+bloated in that sense.
+
+Yours,
+Linus Walleij
