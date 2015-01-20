@@ -1,105 +1,133 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Tue, 20 Jan 2015 16:16:59 +0800
-Subject: [PATCH 06/12] pm: at91: remove the config item CONFIG_AT91_SLOW_CLOCK
+Date: Tue, 20 Jan 2015 16:17:02 +0800
+Subject: [PATCH 09/12] pm: at91: rename function name:
+ at91_slow_clock()-->at91_pm_suspend_sram_fn
 In-Reply-To: <1421741825-18226-1-git-send-email-wenyou.yang@atmel.com>
 References: <1421741825-18226-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1421741825-18226-7-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1421741825-18226-10-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The slow clock always exists, for the suspend to memory mode,
-the master clock always switch to the slow clock.
-
-To simplify the PM config, remove this config item, remove
-the definition code as well.
+As the file name's renaming, rename the file name at91_slow_clock()-->
+at91_pm_suspend_sram_fn, rename the function handler's name at the same time.
 
 Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/mach-at91/Kconfig  |   13 -------------
- arch/arm/mach-at91/Makefile |    2 +-
- arch/arm/mach-at91/pm.c     |    7 +------
- 3 files changed, 2 insertions(+), 20 deletions(-)
+ arch/arm/mach-at91/pm.c         |   23 +++++++++++------------
+ arch/arm/mach-at91/pm_suspend.S |   26 ++++++++++++--------------
+ 2 files changed, 23 insertions(+), 26 deletions(-)
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index 7d5e201..2aed68f 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -127,19 +127,6 @@ menu "Atmel AT91 common options"
- 
- comment "AT91 Feature Selections"
- 
--config AT91_SLOW_CLOCK
--	bool "Suspend-to-RAM disables main oscillator"
--	depends on SUSPEND
--	help
--	  Select this if you want Suspend-to-RAM to save the most power
--	  possible (without powering off the CPU) by disabling the PLLs
--	  and main oscillator so that only the 32 KiHz clock is available.
--
--	  When only that slow-clock is available, some peripherals lose
--	  functionality.  Many can't issue wakeup events unless faster
--	  clocks are available.  Some lose their operating state and
--	  need to be completely re-initialized.
--
- config AT91_TIMER_HZ
- 	int "Kernel HZ (jiffies per second)"
- 	range 32 1024
-diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-index fe30e7e..9c755d9 100644
---- a/arch/arm/mach-at91/Makefile
-+++ b/arch/arm/mach-at91/Makefile
-@@ -18,7 +18,7 @@ obj-$(CONFIG_SOC_SAMA5)		+= board-dt-sama5.o
- 
- # Power Management
- obj-$(CONFIG_PM)		+= pm.o
--obj-$(CONFIG_AT91_SLOW_CLOCK)	+= pm_slowclock.o
-+obj-$(CONFIG_PM)		+= pm_slowclock.o
- 
- ifeq ($(CONFIG_PM_DEBUG),y)
- CFLAGS_pm.o += -DDEBUG
 diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index 609a4f8..691e6db 100644
+index a1010f0..98dfeb2 100644
 --- a/arch/arm/mach-at91/pm.c
 +++ b/arch/arm/mach-at91/pm.c
-@@ -141,11 +141,9 @@ EXPORT_SYMBOL(at91_suspend_entering_slow_clock);
- static void (*slow_clock)(void __iomem *pmc, void __iomem *ramc0,
+@@ -137,13 +137,12 @@ int at91_suspend_entering_slow_clock(void)
+ }
+ EXPORT_SYMBOL(at91_suspend_entering_slow_clock);
+ 
+-
+-static void (*slow_clock)(void __iomem *pmc, void __iomem *ramc0,
++static void (*at91_suspend_sram_fn)(void __iomem *pmc, void __iomem *ramc0,
  			  void __iomem *ramc1, int memctrl);
  
--#ifdef CONFIG_AT91_SLOW_CLOCK
- extern void at91_slow_clock(void __iomem *pmc, void __iomem *ramc0,
+-extern void at91_slow_clock(void __iomem *pmc, void __iomem *ramc0,
++extern void at91_pm_suspend_in_sram(void __iomem *pmc, void __iomem *ramc0,
  			    void __iomem *ramc1, int memctrl);
- extern u32 at91_slow_clock_sz;
--#endif
+-extern u32 at91_slow_clock_sz;
++extern u32 at91_pm_suspend_in_sram_sz;
+ 
+ static void at91_pm_suspend(suspend_state_t state)
+ {
+@@ -152,8 +151,8 @@ static void at91_pm_suspend(suspend_state_t state)
+ 	pm_data |= (state == PM_SUSPEND_MEM) ?
+ 			(AT91_PM_SLOW_CLOCK << AT91_PM_MODE_OFFSET) : 0;
+ 
+-	slow_clock(at91_pmc_base, at91_ramc_base[0],
+-			at91_ramc_base[1], pm_data);
++	at91_suspend_sram_fn(at91_pmc_base, at91_ramc_base[0],
++				at91_ramc_base[1], pm_data);
+ }
  
  static int at91_pm_enter(suspend_state_t state)
- {
-@@ -240,7 +238,6 @@ void at91_pm_set_standby(void (*at91_standby)(void))
+@@ -253,17 +252,19 @@ static void __init at91_pm_sram_init(void)
+ 		goto put_node;
  	}
- }
  
--#ifdef CONFIG_AT91_SLOW_CLOCK
- static void __init at91_pm_sram_init(void)
- {
- 	struct gen_pool *sram_pool;
-@@ -282,7 +279,6 @@ static void __init at91_pm_sram_init(void)
+-	sram_base = gen_pool_alloc(sram_pool, at91_slow_clock_sz);
++	sram_base = gen_pool_alloc(sram_pool, at91_pm_suspend_in_sram_sz);
+ 	if (!sram_base) {
+ 		pr_warn("%s: unable to alloc ocram!\n", __func__);
+ 		goto put_node;
+ 	}
+ 
+ 	sram_pbase = gen_pool_virt_to_phys(sram_pool, sram_base);
+-	slow_clock = __arm_ioremap_exec(sram_pbase, at91_slow_clock_sz, false);
++	at91_suspend_sram_fn = __arm_ioremap_exec(sram_pbase,
++					at91_pm_suspend_in_sram_sz, false);
+ 
+-	/* Copy slow_clock handler to SRAM, and call it */
+-	memcpy(slow_clock, at91_slow_clock, at91_slow_clock_sz);
++	/* Copy pm suspend handler to SRAM, and call it */
++	memcpy(at91_suspend_sram_fn,
++		at91_pm_suspend_in_sram, at91_pm_suspend_in_sram_sz);
+ 
  put_node:
  	of_node_put(node);
- }
--#endif
+@@ -312,8 +313,6 @@ static void __init at91_pm_init(void)
  
- static struct of_device_id ramc_ids[] = {
- 	{ .compatible = "atmel,at91rm9200-sdramc", .data = at91rm9200_standby },
-@@ -324,9 +320,8 @@ static void at91_dt_ramc(void)
- static void __init at91_pm_init(void)
- {
- 	at91_dt_ramc();
--#ifdef CONFIG_AT91_SLOW_CLOCK
-+
  	at91_pm_sram_init();
--#endif
  
- 	pr_info("AT91: Power Management%s\n", (slow_clock ? " (with slow clock mode)" : ""));
+-	pr_info("AT91: Power Management%s\n", (slow_clock ? " (with slow clock mode)" : ""));
+-
+ 	if (at91_cpuidle_device.dev.platform_data)
+ 		platform_device_register(&at91_cpuidle_device);
  
+diff --git a/arch/arm/mach-at91/pm_suspend.S b/arch/arm/mach-at91/pm_suspend.S
+index 420e730..6c3fc50 100644
+--- a/arch/arm/mach-at91/pm_suspend.S
++++ b/arch/arm/mach-at91/pm_suspend.S
+@@ -54,23 +54,21 @@ mode	.req	r6
+ 
+ 	.text
+ 
+-/* void at91_slow_clock(void __iomem *pmc, void __iomem *sdramc,
++/*
++ * void at91_pm_suspend_in_sram(void __iomem *pmc, void __iomem *sdramc,
+  *			void __iomem *ramc1, int memctrl)
++ * @input param:
++ * 	@r0: the base address of AT91_PMC
++ *  	@r1: the base address of SDRAM Controller (SDRAM, DDRSDR, or AT91_SYS)
++ *	@r2: the base address of second SDRAM Controller or 0 if not present
++ *	@r3: the pm information,
++ *		least byte: SDRAM controller type
++ *		2nd byte: 1 -> suspend to memory, 0 -> standby
+  */
+-ENTRY(at91_slow_clock)
++ENTRY(at91_pm_suspend_in_sram)
+ 	/* Save registers on stack */
+ 	stmfd	sp!, {r4 - r12, lr}
+ 
+-	/*
+-	 * Register usage:
+-	 *  R0 = Base address of AT91_PMC
+-	 *  R1 = Base address of RAM Controller (SDRAM, DDRSDR, or AT91_SYS)
+-	 *  R2 = Base address of second RAM Controller or 0 if not present
+-	 *  R3 = Memory controller
+-	 *  R4 = temporary register
+-	 *  R5 = temporary register
+-	 */
+-
+ 	/* Drain write buffer */
+ 	mov	tmp1, #0
+ 	mcr	p15, 0, tmp1, c7, c10, 4
+@@ -276,5 +274,5 @@ ram_restored:
+ .saved_sam9_mdr1:
+ 	.word 0
+ 
+-ENTRY(at91_slow_clock_sz)
+-	.word .-at91_slow_clock
++ENTRY(at91_pm_suspend_in_sram_sz)
++	.word .-at91_pm_suspend_in_sram
 -- 
 1.7.9.5
