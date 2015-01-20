@@ -1,76 +1,38 @@
-From: wangnan0@huawei.com (Wang Nan)
-Date: Tue, 20 Jan 2015 11:02:53 +0800
-Subject: [PATCH] kprobes: bugfix: set kprobes_all_disarmed earlier to
- enable re-optimization.
-In-Reply-To: <54B3AED2.5070000@hitachi.com>
-References: <1420461075-27012-1-git-send-email-wangnan0@huawei.com>
- <54B3AED2.5070000@hitachi.com>
-Message-ID: <54BDC55D.3090200@huawei.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 20 Jan 2015 11:05:28 +0800
+Subject: [PATCH v7 07/17] ARM64 / ACPI: Disable ACPI if FADT revision
+ is less than 5.1
+In-Reply-To: <20150119115017.GH11835@e104818-lin.cambridge.arm.com>
+References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
+ <1421247905-3749-8-git-send-email-hanjun.guo@linaro.org>
+ <20150119115017.GH11835@e104818-lin.cambridge.arm.com>
+Message-ID: <54BDC5F8.5000702@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/1/12 19:24, Masami Hiramatsu wrote:
-> (2015/01/05 21:31), Wang Nan wrote:
->> In original code, the probed instruction doesn't get optimized after
+On 2015?01?19? 19:50, Catalin Marinas wrote:
+> On Wed, Jan 14, 2015 at 03:04:55PM +0000, Hanjun Guo wrote:
+>> --- a/arch/arm64/kernel/acpi.c
+>> +++ b/arch/arm64/kernel/acpi.c
+> [...]
+>> @@ -64,8 +88,13 @@ void __init acpi_boot_table_init(void)
+>>   		return;
 >>
->> echo 0 > /sys/kernel/debug/kprobes/enabled
->> echo 1 > /sys/kernel/debug/kprobes/enabled
->>
->> This is because original code checks kprobes_all_disarmed in
->> optimize_kprobe(), but this flag is turned off after calling that
->> function. Therefore, optimize_kprobe() will see
->> kprobes_all_disarmed == true and doesn't do the optimization.
-> 
-> OK, a workaround is to disable/enable optimizing via sysctl.
-> 
->>
->> This patch simply turns off kprobes_all_disarmed earlier to enable
->> optimization.
->>
-> 
-> Anyway, thank you for finding that! :)
-> 
-> Acked-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
-> 
+>>   	/* Initialize the ACPI boot-time table parser. */
+>> -	if (acpi_table_init())
+>> +	if (acpi_table_init()) {
+>>   		disable_acpi();
+>> +		return;
+>> +	}
+>> +
+>> +	if (acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt))
+>> +		pr_err("Can't find FADT or error happened during parsing FADT\n");
+>>   }
+>
+> Do you need a disable_acpi() call here as well?
 
-Hi Masami Hiramatsu,
+Yes, if we can not find the FADT table, we should disable ACPI, I will
+update it in next version, thanks for pointing this out :)
 
-What about this patch? Are you still thinking on it like
-'[PATCH] kprobes: bugfix: checks kprobes_all_disarmed in unoptimized_kprobe()' ?
-
-Thank you.
-
-> 
->> Signed-off-by: Wang Nan <wangnan0@huawei.com>
->> ---
->>  kernel/kprobes.c | 7 ++++++-
->>  1 file changed, 6 insertions(+), 1 deletion(-)
->>
->> diff --git a/kernel/kprobes.c b/kernel/kprobes.c
->> index bad4e95..b185464 100644
->> --- a/kernel/kprobes.c
->> +++ b/kernel/kprobes.c
->> @@ -2320,6 +2320,12 @@ static void arm_all_kprobes(void)
->>  	if (!kprobes_all_disarmed)
->>  		goto already_enabled;
->>  
->> +	/*
->> +	 * optimize_kprobe() called by arm_kprobe() checks
->> +	 * kprobes_all_disarmed, so set kprobes_all_disarmed before
->> +	 * arm_kprobe.
->> +	 */
->> +	kprobes_all_disarmed = false;
->>  	/* Arming kprobes doesn't optimize kprobe itself */
->>  	for (i = 0; i < KPROBE_TABLE_SIZE; i++) {
->>  		head = &kprobe_table[i];
->> @@ -2328,7 +2334,6 @@ static void arm_all_kprobes(void)
->>  				arm_kprobe(p);
->>  	}
->>  
->> -	kprobes_all_disarmed = false;
->>  	printk(KERN_INFO "Kprobes globally enabled\n");
->>  
->>  already_enabled:
->>
-> 
-> 
+Thanks
+Hanjun
