@@ -1,56 +1,52 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 20 Jan 2015 14:25:16 -0800
-Subject: [PATCH] checkpatch: Add ability to coalesce commit descriptions on
- multiple lines
-In-Reply-To: <1421660338.9655.21.camel@x220>
-References: <1421659937.9655.16.camel@x220> <1421660338.9655.21.camel@x220>
-Message-ID: <1421792716.2724.11.camel@perches.com>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Tue, 20 Jan 2015 23:33:59 +0100
+Subject: [GIT PULL] ARM: BCM5301X: DT changes for v3.20
+Message-ID: <54BED7D7.80207@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a git commit description is split on consecutive lines,
-coalesce it before testing.
+Hi Olof, Hi Arnd,
 
-This allows:
+This is a pull request with some dt updates for BCM5301X for 3.20.
 
-  commit <foo> ("some long
-  description")
+The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
 
-Signed-off-by: Joe Perches <joe@perches.com>
-Noticed-by: Paul Bolle <pebolle@tiscali.nl>
----
-> Checkpatch in next-21050119 complains:
->     ERROR: Please use git commit description style 'commit <12+ chars of sha1> ("<title line>")' - ie: 'commit fa0ce4035d48 ("ARM: 7162/1: errata: tidy up Kconfig options for PL310 errata workarounds")'
->     #7: 
->     commit fa0ce4035d48 ("ARM: 7162/1: errata: tidy up Kconfig options for
->     
->     total: 1 errors, 0 warnings, 14 lines checked
->     
->     Your patch has style problems, please review.
-> 
-> Perhaps it doesn't notice the quote spans two lines. Can this be fixed
-> please?
+  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
 
-Oh bother...
+are available in the git repository at:
 
- scripts/checkpatch.pl | 7 +++++++
- 1 file changed, 7 insertions(+)
+  https://github.com/hauke/linux.git tags/bcm5301x-dt-2015-01-20
 
-diff --git a/scripts/checkpatch.pl b/scripts/checkpatch.pl
-index 41223c9..6a3baa0 100755
---- a/scripts/checkpatch.pl
-+++ b/scripts/checkpatch.pl
-@@ -2198,6 +2198,13 @@ sub process {
- 				 defined $rawlines[$linenr] &&
- 				 $rawlines[$linenr] =~ /^\s*\("([^"]+)"\)/) {
- 				$orig_desc = $1;
-+			} elsif ($line =~ /\bcommit\s+[0-9a-f]{5,}\s+\("[^"]+$/i &&
-+				 defined $rawlines[$linenr] &&
-+				 $rawlines[$linenr] =~ /^\s*[^"]+"\)/) {
-+				$line =~ /\bcommit\s+[0-9a-f]{5,}\s+\("([^"]+)$/i;
-+				$orig_desc = $1;
-+				$rawlines[$linenr] =~ /^\s*([^"]+)"\)/;
-+				$orig_desc .= " " . $1;
- 			}
- 
- 			($id, $description) = git_commit_info($orig_commit,
+for you to fetch changes up to 5b1864b899d2b591402704dd0f6528c8661f1817:
+
+  ARM: BCM5301X: Add DT for Buffalo WZR-900DHP (2015-01-20 23:23:25 +0100)
+
+----------------------------------------------------------------
+bcm5301x-dt-2015-01-20: ARM: BCM5301X: dts updates for 3.20
+
+Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+
+----------------------------------------------------------------
+Dan Haab (1):
+      ARM: BCM5301X: Add DT for Luxul XWC-1000
+
+Rafa? Mi?ecki (3):
+      ARM: BCM5301X: Drop unused poll-interval from gpio-keys
+      ARM: BCM5301X: Add LEDs for Buffalo devices
+      ARM: BCM5301X: Add DT for Buffalo WZR-900DHP
+
+ arch/arm/boot/dts/Makefile                         |  4 +++-
+ arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts  | 68
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts       | 60
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/bcm4708-netgear-r6250.dts        |  1 -
+ arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts     |  1 -
+ arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts        |  1 -
+ arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts | 68
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts  | 37
++++++++++++++++++++++++++++++++++++++
+ 8 files changed, 234 insertions(+), 6 deletions(-)
+ create mode 100644 arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
+ create mode 100644 arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
