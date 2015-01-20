@@ -1,227 +1,94 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Tue, 20 Jan 2015 08:05:34 -0500
-Subject: [PATCH v7 13/17] ARM64 / ACPI: Add GICv2 specific ACPI boot
- support
-In-Reply-To: <54BE308E.8060407@linaro.org>
-References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
- <1421247905-3749-14-git-send-email-hanjun.guo@linaro.org>
- <54B8F2E3.80306@arm.com> <54BE308E.8060407@linaro.org>
-Message-ID: <54BE529E.7070608@redhat.com>
+From: gg@slimlogic.co.uk (Graeme Gregory)
+Date: Tue, 20 Jan 2015 13:08:32 +0000
+Subject: [PATCH 00/10] drivers: PL011: add ARM SBSA Generic UART support
+In-Reply-To: <1421428986-11300-1-git-send-email-andre.przywara@arm.com>
+References: <1421428986-11300-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <20150120130832.GA6858@xora-yoga-13.xora.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/20/2015 05:40 AM, Tomasz Nowicki wrote:
-> Hi Marc,
+On Fri, Jan 16, 2015 at 05:22:56PM +0000, Andre Przywara wrote:
+> The ARM Server Base System Architecture[1] document describes a
+> generic UART which is a subset of the PL011 UART.
+> It lacks DMA support, baud rate control and modem status line
+> control, among other things.
+> The idea is to move the UART initialization and setup into the
+> firmware (which does this job today already) and let the kernel just
+> use the UART for sending and receiving characters.
 > 
-> On 16.01.2015 12:15, Marc Zyngier wrote:
->> On 14/01/15 15:05, Hanjun Guo wrote:
->>> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
->>>
->>> ACPI kernel uses MADT table for proper GIC initialization. It needs to
->>> parse GIC related subtables, collect CPU interface and distributor
->>> addresses and call driver initialization function (which is hardware
->>> abstraction agnostic). In a similar way, FDT initialize GICv1/2.
->>>
->>> NOTE: This commit allow to initialize GICv1/2 basic functionality.
->>> GICv2 vitalization extension, GICv3/4 and ITS are considered as next
->>> steps.
->>
->> And so is GICv2m, apparently (see below).
->>
->>>
->>> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->>> Tested-by: Yijing Wang <wangyijing@huawei.com>
->>> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
->>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->>> ---
->>>   arch/arm64/kernel/acpi.c             |  26 +++++++++
->>>   drivers/irqchip/irq-gic.c            | 108 +++++++++++++++++++++++++++++++++++
->>>   drivers/irqchip/irqchip.c            |   3 +
->>>   include/linux/irqchip/arm-gic-acpi.h |  31 ++++++++++
->>>   4 files changed, 168 insertions(+)
->>>   create mode 100644 include/linux/irqchip/arm-gic-acpi.h
->>>
->>> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
->>> index c3e24c4..ea3c9fc 100644
->>> --- a/arch/arm64/kernel/acpi.c
->>> +++ b/arch/arm64/kernel/acpi.c
->>> @@ -23,6 +23,7 @@
->>>   #include <linux/irqdomain.h>
->>>   #include <linux/bootmem.h>
->>>   #include <linux/smp.h>
->>> +#include <linux/irqchip/arm-gic-acpi.h>
->>>
->>>   #include <asm/cputype.h>
->>>   #include <asm/cpu_ops.h>
->>> @@ -315,6 +316,31 @@ void __init acpi_boot_table_init(void)
->>>   		pr_err("Can't find FADT or error happened during parsing FADT\n");
->>>   }
->>>
->>> +void __init acpi_gic_init(void)
->>> +{
->>> +	struct acpi_table_header *table;
->>> +	acpi_status status;
->>> +	acpi_size tbl_size;
->>> +	int err;
->>> +
->>> +	if (acpi_disabled)
->>> +		return;
->>> +
->>> +	status = acpi_get_table_with_size(ACPI_SIG_MADT, 0, &table, &tbl_size);
->>> +	if (ACPI_FAILURE(status)) {
->>> +		const char *msg = acpi_format_exception(status);
->>> +
->>> +		pr_err("Failed to get MADT table, %s\n", msg);
->>> +		return;
->>> +	}
->>> +
->>> +	err = gic_v2_acpi_init(table);
->>> +	if (err)
->>> +		pr_err("Failed to initialize GIC IRQ controller");
->>> +
->>> +	early_acpi_os_unmap_memory((char *)table, tbl_size);
->>> +}
->>> +
->>>   static int __init parse_acpi(char *arg)
->>>   {
->>>   	if (!arg)
->>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->>> index d617ee5..89a8120 100644
->>> --- a/drivers/irqchip/irq-gic.c
->>> +++ b/drivers/irqchip/irq-gic.c
->>> @@ -33,12 +33,14 @@
->>>   #include <linux/of.h>
->>>   #include <linux/of_address.h>
->>>   #include <linux/of_irq.h>
->>> +#include <linux/acpi.h>
->>>   #include <linux/irqdomain.h>
->>>   #include <linux/interrupt.h>
->>>   #include <linux/percpu.h>
->>>   #include <linux/slab.h>
->>>   #include <linux/irqchip/chained_irq.h>
->>>   #include <linux/irqchip/arm-gic.h>
->>> +#include <linux/irqchip/arm-gic-acpi.h>
->>>
->>>   #include <asm/cputype.h>
->>>   #include <asm/irq.h>
->>> @@ -1083,3 +1085,109 @@ IRQCHIP_DECLARE(msm_8660_qgic, "qcom,msm-8660-qgic", gic_of_init);
->>>   IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", gic_of_init);
->>>
->>>   #endif
->>> +
->>> +#ifdef CONFIG_ACPI
->>> +static phys_addr_t dist_phy_base, cpu_phy_base;
->>> +static int cpu_base_assigned;
->>> +
->>> +static int __init
->>> +gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
->>> +			const unsigned long end)
->>> +{
->>> +	struct acpi_madt_generic_interrupt *processor;
->>> +	phys_addr_t gic_cpu_base;
->>> +
->>> +	processor = (struct acpi_madt_generic_interrupt *)header;
->>> +
->>> +	if (BAD_MADT_ENTRY(processor, end))
->>> +		return -EINVAL;
->>> +
->>> +	/*
->>> +	 * There is no support for non-banked GICv1/2 register in ACPI spec.
->>> +	 * All CPU interface addresses have to be the same.
->>> +	 */
->>> +	gic_cpu_base = processor->base_address;
->>> +	if (cpu_base_assigned && gic_cpu_base != cpu_phy_base)
->>> +		return -EFAULT;
->>
->> EFAULT? That feels weird. This error code should be returned if an
->> access would generate (or has actually generated) a fault, but this is
->> not the case here. Same for the other cases below.
-> Right, will fix that and other cases too.
+> This patchset integrates support for this UART subset into the
+> existing PL011 driver - basically by refactoring some
+> functions and providing a new uart_ops structure for it. It also has
+> a separate probe function to be not dependent on AMBA/PrimeCell.
+> It provides a device tree binding, but can easily be adapted to other
+> device configuration systems.
+> Beside the obvious effect of code sharing reusing most of the PL011
+> code has the advantage of not introducing another serial device
+> prefix, so it can go with ttyAMA, which seems to be pretty common.
 > 
->>
->>> +
->>> +	cpu_phy_base = gic_cpu_base;
->>> +	cpu_base_assigned = 1;
->>> +	return 0;
->>> +}
->>> +
->>> +static int __init
->>> +gic_acpi_parse_madt_distributor(struct acpi_subtable_header *header,
->>> +				const unsigned long end)
->>> +{
->>> +	struct acpi_madt_generic_distributor *dist;
->>> +
->>> +	dist = (struct acpi_madt_generic_distributor *)header;
->>> +
->>> +	if (BAD_MADT_ENTRY(dist, end))
->>> +		return -EINVAL;
->>> +
->>> +	dist_phy_base = dist->base_address;
->>> +	return 0;
->>> +}
->>> +
->>> +int __init
->>> +gic_v2_acpi_init(struct acpi_table_header *table)
->>> +{
->>> +	void __iomem *cpu_base, *dist_base;
->>> +	int count;
->>> +
->>> +	/* Collect CPU base addresses */
->>> +	count = acpi_parse_entries(ACPI_SIG_MADT,
->>> +				   sizeof(struct acpi_table_madt),
->>> +				   gic_acpi_parse_madt_cpu, table,
->>> +				   ACPI_MADT_TYPE_GENERIC_INTERRUPT, 0);
->>> +	if (count < 0) {
->>> +		pr_err("Error during GICC entries parsing\n");
->>> +		return -EFAULT;
->>> +	} else if (!count) {
->>> +		pr_err("No valid GICC entries exist\n");
->>> +		return -EINVAL;
->>> +	}
->>> +
->>> +	/*
->>> +	 * Find distributor base address. We expect one distributor entry since
->>> +	 * ACPI 5.1 spec neither support multi-GIC instances nor GIC cascade.
->>> +	 */
->>> +	count = acpi_parse_entries(ACPI_SIG_MADT,
->>> +				   sizeof(struct acpi_table_madt),
->>> +				   gic_acpi_parse_madt_distributor, table,
->>> +				   ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR, 0);
->>> +	if (count <= 0) {
->>> +		pr_err("Error during GICD entries parsing\n");
->>> +		return -EFAULT;
->>> +	} else if (!count) {
->>> +		pr_err("No valid GICD entries exist\n");
->>> +		return -EINVAL;
->>> +	} else if (count > 1) {
->>> +		pr_err("More than one GICD entry detected\n");
->>> +		return -EINVAL;
->>> +	}
->>> +
->>> +	cpu_base = ioremap(cpu_phy_base, ACPI_GIC_CPU_IF_MEM_SIZE);
->>> +	if (!cpu_base) {
->>> +		pr_err("Unable to map GICC registers\n");
->>> +		return -ENOMEM;
->>> +	}
->>> +
->>> +	dist_base = ioremap(dist_phy_base, ACPI_GICV2_DIST_MEM_SIZE);
->>> +	if (!dist_base) {
->>> +		pr_err("Unable to map GICD registers\n");
->>> +		iounmap(cpu_base);
->>> +		return -ENOMEM;
->>> +	}
->>> +
->>> +	/*
->>> +	 * Initialize zero GIC instance (no multi-GIC support). Also, set GIC
->>> +	 * as default IRQ domain to allow for GSI registration and GSI to IRQ
->>> +	 * number translation (see acpi_register_gsi() and acpi_gsi_to_irq()).
->>> +	 */
->>> +	gic_init_bases(0, -1, dist_base, cpu_base, 0, NULL);
->>
->> I assume you never tried to port the GICv2m driver to ACPI, right?
+> This series relies on Dave's recent PL011 fix[2], which gets rid of
+> the loopback trick to get the UART going. There is a repo at [3]
+> (branch sbsa-uart/v1), which has this patch already integrated.
+> 
+> Patch 1/10 contains a bug fix which applies to the PL011 part also,
+> it should be considered regardless of the rest of the series.
+> Patch 2-7 refactor some PL011 functions by splitting them up into
+> smaller pieces, so that most of the code can be reused later by the
+> SBSA part.
+> Patch 8 and 9 introduce two new properties for the vendor structure,
+> this is for SBSA functionality which cannot be controlled by
+> separate uart_ops members only.
+> Patch 10 then finally drops in the SBSA specific code, by providing
+> a new uart_ops, vendor struct and probe function for it. Also the new
+> device tree binding is documented.
+> 
+> For testing you should be able to take any hardware which has a PL011
+> and change the DT to use a "arm,sbsa-uart" compatible string.
+> Of course testing with a real SBSA Generic UART is welcomed!
+> 
+I have tested this series on Juno where it seems to work and also on FVP
+model where there are some issues.
 
-Just a data point - it's working with an additional patch that we carry
-internally to initialize GICv2m with the appropriate MADT substructures
-(and it works well). Once I get a moment I'll ask why it's not posted.
+On the FVP when we enter usespace a couple of 32 character strings are
+printed then nothing else. 32 Characters is a suspicious number.
 
-Jon.
+This occurs with both OE based FS from linaro and debian ubstable FS.
+
+My FVP is version 5602
+
+Graeme
+
+> Cheers,
+> Andre
+> 
+> [1] ARM-DEN-0029 Server Base System Architecture, available (click-
+>     thru...) from http://infocenter.arm.com
+> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/315248.html
+> [3] http://www.linux-arm.org/git?p=linux-ap.git
+>     git://linux-arm.org/linux-ap.git
+> 
+> Andre Przywara (10):
+>   drivers: PL011: avoid potential unregister_driver call
+>   drivers: PL011: refactor pl011_startup()
+>   drivers: PL011: refactor pl011_shutdown()
+>   drivers: PL011: refactor pl011_set_termios()
+>   drivers: PL011: refactor pl011_probe()
+>   drivers: PL011: replace UART_MIS reading with _RIS & _IMSC
+>   drivers: PL011: move cts_event workaround into separate function
+>   drivers: PL011: allow avoiding UART enabling/disabling
+>   drivers: PL011: allow to supply fixed option string
+>   drivers: PL011: add support for the ARM SBSA generic UART
+> 
+>  .../devicetree/bindings/serial/arm_sbsa_uart.txt   |    9 +
+>  drivers/tty/serial/amba-pl011.c                    |  510 ++++++++++++++------
+>  2 files changed, 381 insertions(+), 138 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
+> 
+> -- 
+> 1.7.9.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
