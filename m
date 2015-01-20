@@ -1,78 +1,59 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 20 Jan 2015 10:39:16 +0800
-Subject: [PATCH v7 06/17] ARM64 / ACPI: Make PCI optional for ACPI on ARM64
-In-Reply-To: <20150119104240.GE11835@e104818-lin.cambridge.arm.com>
-References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
- <1421247905-3749-7-git-send-email-hanjun.guo@linaro.org>
- <20150116094913.GA13634@e104818-lin.cambridge.arm.com>
- <54BB51F1.8000900@linaro.org>
- <20150119104240.GE11835@e104818-lin.cambridge.arm.com>
-Message-ID: <54BDBFD4.7050207@linaro.org>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 20 Jan 2015 09:41:59 +0800
+Subject: [PATCH] i2c: drop ancient protection against sysfs refcounting
+ issues
+In-Reply-To: <20150119230427.GH26493@n2100.arm.linux.org.uk>
+References: <1421693756-12917-1-git-send-email-wsa@the-dreams.de>
+ <20150119190142.GA9451@kroah.com>
+ <20150119230427.GH26493@n2100.arm.linux.org.uk>
+Message-ID: <20150120014159.GA3349@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?01?19? 18:42, Catalin Marinas wrote:
-> On Sun, Jan 18, 2015 at 06:25:53AM +0000, Hanjun Guo wrote:
->> On 2015?01?16? 17:49, Catalin Marinas wrote:
->>> On Wed, Jan 14, 2015 at 03:04:54PM +0000, Hanjun Guo wrote:
->>>> --- a/arch/arm64/kernel/pci.c
->>>> +++ b/arch/arm64/kernel/pci.c
->>>> @@ -10,6 +10,7 @@
->>>>     *
->>>>     */
->>>>
->>>> +#include <linux/acpi.h>
->>>>    #include <linux/init.h>
->>>>    #include <linux/io.h>
->>>>    #include <linux/kernel.h>
->>>> @@ -68,3 +69,30 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
->>>>    	bus->domain_nr = domain;
->>>>    }
->>>>    #endif
->>>> +
->>>> +/*
->>>> + * raw_pci_read/write - Platform-specific PCI config space access.
->>>> + *
->>>> + * Default empty implementation.  Replace with an architecture-specific setup
->>>> + * routine, if necessary.
->>>> + */
->>>> +int raw_pci_read(unsigned int domain, unsigned int bus,
->>>> +		  unsigned int devfn, int reg, int len, u32 *val)
->>>> +{
->>>> +	return -EINVAL;
->>>> +}
->>>> +
->>>> +int raw_pci_write(unsigned int domain, unsigned int bus,
->>>> +		unsigned int devfn, int reg, int len, u32 val)
->>>> +{
->>>> +	return -EINVAL;
->>>> +}
->>>> +
->>>> +#ifdef CONFIG_ACPI
->>>> +/* Root bridge scanning */
->>>> +struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
->>>> +{
->>>> +	/* TODO: Should be revisited when implementing PCI on ACPI */
->>>> +	return NULL;
->>>> +}
->>>> +#endif
-> [...]
->>> When PCI is enabled and the above functions are compiled in, do they
->>> need to return any useful data or just -EINVAL. Are they ever called?
->>
->> They will be called if PCI root bridge is defined in DSDT, should I
->> print some warning message before it is implemented?
->
-> My point: do they need to return real data when a PCI root bridge is
-> defined in DSDT or you always expect them to always return some -E*? Can
-> you explain why?
+On Mon, Jan 19, 2015 at 11:04:27PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Jan 20, 2015 at 03:01:42AM +0800, Greg Kroah-Hartman wrote:
+> > On Mon, Jan 19, 2015 at 07:55:56PM +0100, Wolfram Sang wrote:
+> > > diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+> > > index 39d25a8cb1ad..15cc5902cf89 100644
+> > > --- a/drivers/i2c/i2c-core.c
+> > > +++ b/drivers/i2c/i2c-core.c
+> > > @@ -41,7 +41,6 @@
+> > >  #include <linux/of_device.h>
+> > >  #include <linux/of_irq.h>
+> > >  #include <linux/clk/clk-conf.h>
+> > > -#include <linux/completion.h>
+> > >  #include <linux/hardirq.h>
+> > >  #include <linux/irqflags.h>
+> > >  #include <linux/rwsem.h>
+> > > @@ -1184,8 +1183,7 @@ EXPORT_SYMBOL_GPL(i2c_new_dummy);
+> > >  
+> > >  static void i2c_adapter_dev_release(struct device *dev)
+> > >  {
+> > > -	struct i2c_adapter *adap = to_i2c_adapter(dev);
+> > > -	complete(&adap->dev_released);
+> > > +	/* empty, but the driver core insists we need a release function */
+> > 
+> > Yeah, it does, but I hate to see this in "real" code as something is
+> > probably wrong with it if it happens.
+> > 
+> > Please move the rest of 'i2c_del_adapter' into the release function
+> > (what was after the wait_for_completion() call), and then all should be
+> > fine.
+> 
+> Are you sure about that?  Some drivers do this, eg,
+> 
+>         i2c_del_adapter(&drv_data->adapter);
+>         free_irq(drv_data->irq, drv_data);
+> 
+> where drv_data was allocated using devm_kzalloc(), and so will be
+> released when the ->remove callback (which calls the above
+> i2c_del_adapter()) returns... freeing the embedded device struct.
 
-Not always return -E* or NULL;
+But that will fail today if the memory is freed in i2c_del_adapter(), so
+there shouldn't be any change in logic here.
 
-For raw_pci_read/write(), they are needed to access the PCI config space
-before the PCI root bus is created. so they will return 0 if access to
-PCI config space is ok; pci_acpi_scan_root() will return root bus
-pointer if it is successfully created.
+Or am I missing something obvious?
 
-Thanks
-Hanjun
+thanks,
+
+greg k-h
