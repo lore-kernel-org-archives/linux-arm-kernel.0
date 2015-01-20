@@ -1,64 +1,47 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Tue, 20 Jan 2015 16:26:25 +0800
-Subject: [PATCH 12/12] pm: at91: amend the pm_suspend entry for
- at91_cpuidle_device
-In-Reply-To: <1421741825-18226-1-git-send-email-wenyou.yang@atmel.com>
-References: <1421741825-18226-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1421742385-18470-1-git-send-email-wenyou.yang@atmel.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 20 Jan 2015 16:31:57 +0800
+Subject: [PATCH net-next 1/1] ARM: dts: imx6sx: correct i.MX6sx sdb board
+ enet phy address
+In-Reply-To: <1421660282-29494-1-git-send-email-b38611@freescale.com>
+References: <1421660282-29494-1-git-send-email-b38611@freescale.com>
+Message-ID: <20150120083156.GY2766@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because the at91_xxx_standby() function is substitued by the at91_pm_suspend(),
-the pm_suspend entry for at91_cpuidle_device changes as well.
+On Mon, Jan 19, 2015 at 05:38:02PM +0800, Fugang Duan wrote:
+> The commit (3d125f9c91c5) cause i.MX6SX sdb enet cannot work. The cause is
+> the commit add mdio node with un-correct phy address.
+> 
+> The patch just correct i.MX6sx sdb board enet phy address.
+> 
+> Signed-off-by: Fugang Duan <B38611@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx6sx-sdb.dts |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
+> index 8c1febd..9db123f 100644
+> --- a/arch/arm/boot/dts/imx6sx-sdb.dts
+> +++ b/arch/arm/boot/dts/imx6sx-sdb.dts
+> @@ -167,11 +167,11 @@
+>  		#size-cells = <0>;
+>  
+>  		ethphy1: ethernet-phy at 0 {
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/mach-at91/pm.c |   17 ++++++++++-------
- 1 file changed, 10 insertions(+), 7 deletions(-)
+The unit-address should match 'reg' property, so it needs an update too.
 
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index 07b723f..041adad 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -48,8 +48,6 @@ static struct {
- 	int memctrl;
- } at91_pm_data;
- 
--static void (*at91_pm_standby)(void);
--
- static int at91_pm_valid_state(suspend_state_t state)
- {
- 	switch (state) {
-@@ -218,12 +216,15 @@ static struct platform_device at91_cpuidle_device = {
- 	.name = "cpuidle-at91",
- };
- 
--void at91_pm_set_standby(void (*at91_standby)(void))
-+static void at91_cpuidle_suspend(void)
- {
--	if (at91_standby) {
--		at91_cpuidle_device.dev.platform_data = at91_standby;
--		at91_pm_standby = at91_standby;
--	}
-+	at91_pm_suspend(PM_SUSPEND_ON);
-+}
-+
-+static void at91_cpuidle_set_suspend(void (*at91_suspend)(void))
-+{
-+	if (at91_suspend)
-+		at91_cpuidle_device.dev.platform_data = at91_suspend;
- }
- 
- static void __init at91_pm_sram_init(void)
-@@ -302,6 +303,8 @@ static void __init at91_pm_init(void)
- 
- 	at91_pm_sram_init();
- 
-+	at91_cpuidle_set_suspend(at91_cpuidle_suspend);
-+
- 	if (at91_cpuidle_device.dev.platform_data)
- 		platform_device_register(&at91_cpuidle_device);
- 
--- 
-1.7.9.5
+Shawn
+
+> -			reg = <0>;
+> +			reg = <1>;
+>  		};
+>  
+>  		ethphy2: ethernet-phy at 1 {
+> -			reg = <1>;
+> +			reg = <2>;
+>  		};
+>  	};
+>  };
+> -- 
+> 1.7.8
+> 
