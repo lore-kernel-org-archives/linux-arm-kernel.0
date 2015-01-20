@@ -1,59 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 20 Jan 2015 08:04:48 -0800
-Subject: [PATCH 3.19-rc2 v15 5/8] arm: omap1: Migrate debug_ll macros to
- use 8250.S
-In-Reply-To: <54BE1921.5050902@linaro.org>
-References: <1420461624-4410-1-git-send-email-daniel.thompson@linaro.org>
- <1420461624-4410-6-git-send-email-daniel.thompson@linaro.org>
- <20150119213845.GL18552@atomide.com> <54BE1921.5050902@linaro.org>
-Message-ID: <20150120160448.GC7718@atomide.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 20 Jan 2015 16:07:27 +0000
+Subject: [PATCHv2 3/5] arm: iop: specify PMUs are for XScale CPUs
+In-Reply-To: <1421770049-32029-1-git-send-email-mark.rutland@arm.com>
+References: <1421770049-32029-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1421770049-32029-4-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Daniel Thompson <daniel.thompson@linaro.org> [150120 01:03]:
-> On 19/01/15 21:38, Tony Lindgren wrote:
-> > * Daniel Thompson <daniel.thompson@linaro.org> [150105 04:49]:
-> >> The omap1's debug-macro.S is similar to the generic 8250 code. Compared to
-> >> the 8520 code the omap1 macro automatically determines what UART to use
-> >> based on breadcrumbs left by the bootloader and automatically copes with
-> >> the eccentric register layout on OMAP7XX.
-> >>
-> >> This patch drops both these features and relies instead on the generic
-> >> 8250 macros:
-> >>
-> >> 1. Dropping support for the bootloader breadcrumbs is identical to the
-> >>    way the migration was handled for OMAP2 (see 808b7e07464d...).
-> >>
-> >> 2. Support for OMAP7XX still exists but it must be configured by hand
-> >>    (DEBUG_OMAP7XXUART1/2/3) rather than handled at runtime.
-> >>
-> >> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> >> Cc: Russell King <linux@arm.linux.org.uk>
-> >> Cc: Arnd Bergmann <arnd.bergmann@linaro.org>
-> >> Cc: linux-omap at vger.kernel.org
-> >> Tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-> >> Acked-by: Tony Lindgren <tony@atomide.com>
-> > 
-> > Daniel, I suggest you upload this patch into Russell's patch tracking
-> > system to get it merged. That at least shrinks down your patch series
-> > if the other patches need more work.
-> 
-> This has been in the patch tracker for a week or so:
-> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8271/1
+Now that we can specify which PMU variant we're likely to deal with, do
+so in the iop board code. This will allow us to split the ARMv6, ARMv7,
+and XScale PMU drivers.
 
-OK good to hear thanks.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: Russell King <linux@arm.linux.org.uk>
+---
+ arch/arm/plat-iop/pmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/plat-iop/pmu.c b/arch/arm/plat-iop/pmu.c
+index ad9f974..c6d979a 100644
+--- a/arch/arm/plat-iop/pmu.c
++++ b/arch/arm/plat-iop/pmu.c
+@@ -24,7 +24,7 @@ static struct resource pmu_resource = {
+ };
  
-> I'm very aware that this patch (and indeed the whole patch set) has been
-> knocking round for longer than it should have. The changelog for this
-> patchset is certainly not one to be especially proud off ;-) .
-
-Yeah, it's been floating around for a while :)
-
-Here it may have been doable to first add the Kconfig entries, then
-flip them on and remove the related .S file in a follow up patch. Not
-sure if that would have helped to remove the dependencies for the
-rest of the series though.
-
-Regards,
-
-Tony
+ static struct platform_device pmu_device = {
+-	.name		= "arm-pmu",
++	.name		= "xscale-pmu",
+ 	.id		= -1,
+ 	.resource	= &pmu_resource,
+ 	.num_resources	= 1,
+-- 
+1.9.1
