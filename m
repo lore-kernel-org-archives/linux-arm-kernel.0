@@ -1,27 +1,27 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 20 Jan 2015 15:38:18 +0800
-Subject: [PATCH] ARM: dts: imx25: Fix PWM "per" clocks
-In-Reply-To: <1421241063-8928-1-git-send-email-festevam@gmail.com>
-References: <1421241063-8928-1-git-send-email-festevam@gmail.com>
-Message-ID: <20150120073817.GU2766@dragon>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 20 Jan 2015 13:09:35 +0530
+Subject: [PATCH 1/2] cpufreq-dt: check CPU clock/power domain during
+ initializing
+In-Reply-To: <CALx668V5TKkx-qGnMjFAspTQ5pu3XsM1012wXsBHvR3CNsuCew@mail.gmail.com>
+References: <1420797291-15972-1-git-send-email-pi-cheng.chen@linaro.org>
+ <1420797291-15972-2-git-send-email-pi-cheng.chen@linaro.org>
+ <CAKohpok7Q3CpMospA=3PAqiLtEERfkAJdHkcH+9GKvYBsof0UQ@mail.gmail.com>
+ <CALx668V5TKkx-qGnMjFAspTQ5pu3XsM1012wXsBHvR3CNsuCew@mail.gmail.com>
+Message-ID: <CAKohponUfB-RJTwPDMPCGogng8nzc=kwTF56GjGfDSD7MLQuAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 14, 2015 at 11:11:03AM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Currently PWM functionality is broken on mx25 due to the wrong assignment of the
-> PWM "per" clock.
-> 
-> According to Documentation/devicetree/bindings/clock/imx25-clock.txt:
-> 	pwm_ipg_per		52
-> 
-> ,so update the pwm "per" to use 'pwm_ipg_per' instead of 'per10' clock.
-> 
-> With this change PWM can work fine on mx25.
-> 
-> Cc: <stable@vger.kernel.org> 
-> Reported-by: Carlos Soto <csotoalonso@gmail.com>
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+On 20 January 2015 at 13:03, Pi-Cheng Chen <pi-cheng.chen@linaro.org> wrote:
+> I will also try to add intermediate frequency support in next version.
 
-Applied, thanks.
+Sure
+
+> BTW, do you think it's a good idea to add a new device tree binding like
+> intermediate_clock = <&clksys MAINPLL>
+> and so that cpufreq-dt could get the intermediate clock?
+
+Yeah, we need that. I am trying to implement new opp bindings and will
+take care of that. Until that time, use platform data to do that.
+
+--
+viresh
