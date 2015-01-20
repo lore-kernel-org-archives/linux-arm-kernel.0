@@ -1,32 +1,40 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue, 20 Jan 2015 14:59:43 +0100
-Subject: [PATCH v2 02/11] ARM: tegra: Use the generated pinmux data
-In-Reply-To: <54B7F7F7.1020202@wwwdotorg.org>
-References: <1421338359-27467-1-git-send-email-tomeu.vizoso@collabora.com>
- <1421338359-27467-3-git-send-email-tomeu.vizoso@collabora.com>
- <54B7F7F7.1020202@wwwdotorg.org>
-Message-ID: <CAAObsKAaanrrSYd7gmLAS4K_G9fuU=WmsMXQk0G85hfy_XdE5Q@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 20 Jan 2015 14:01:05 +0000
+Subject: [PATCH 7/7] mfd: menelaus: use macro for magic number
+In-Reply-To: <1419702779-16001-8-git-send-email-aaro.koskinen@iki.fi>
+References: <1419702779-16001-1-git-send-email-aaro.koskinen@iki.fi>
+ <1419702779-16001-8-git-send-email-aaro.koskinen@iki.fi>
+Message-ID: <20150120140105.GP13701@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 January 2015 at 18:25, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 01/15/2015 09:12 AM, Tomeu Vizoso wrote:
->>
->> Google has submitted a board config for the pinmux programming of the
->> Nyan Big board. Use the whole of it as it's generated to make it easier
->> to update as the configuration gets fixed in the future.
->
->
-> Submitted to where? I assume you mean tegra-pinmux-scripts. I don't see a
-> Nyan/Nyan-big configuration there yet. IIRC (and I might not) one was
-> posted, but there were some review comments that aren't yet addressed?
+On Sat, 27 Dec 2014, Aaro Koskinen wrote:
 
-Yeah, that's what I meant by submitted. TTBOMK the v2 doesn't have any
-comments pending of being addressed?
+> Use macro to check a register bit.
+> 
+> Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+> ---
+>  drivers/mfd/menelaus.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-I have just sent a pinmux config file for the blaze that just changes
-the configuration of usb_vbus_en0, usb_vbus_en1 and dp_hpd pins.
+Applied, thanks.
 
-Regards,
+> diff --git a/drivers/mfd/menelaus.c b/drivers/mfd/menelaus.c
+> index 8660adf..05bae40 100644
+> --- a/drivers/mfd/menelaus.c
+> +++ b/drivers/mfd/menelaus.c
+> @@ -1242,7 +1242,7 @@ static int menelaus_probe(struct i2c_client *client,
+>  	err = menelaus_read_reg(MENELAUS_VCORE_CTRL1);
+>  	if (err < 0)
+>  		goto fail;
+> -	if (err & BIT(7))
+> +	if (err & VCORE_CTRL1_HW_NSW)
+>  		menelaus->vcore_hw_mode = 1;
+>  	else
+>  		menelaus->vcore_hw_mode = 0;
 
-Tomeu
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
