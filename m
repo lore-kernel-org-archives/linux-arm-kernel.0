@@ -1,57 +1,54 @@
-From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Tue, 20 Jan 2015 20:12:59 +0900
-Subject: [PATCH v3 00/19] Exynos SYSMMU (IOMMU) integration with DT and
- DMA-mapping subsystem
-In-Reply-To: <54B5B721.4070309@collabora.co.uk>
-References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
- <1417514366.21830.22.camel@collabora.co.uk> <54818768.3080303@samsung.com>
- <CABxcv=n=eNqbyBbOk1Wb87tCnnLZAJQurmCdeTOSqMZMbNaSHw@mail.gmail.com>
- <54AC93E0.8010705@samsung.com> <54ACFD69.1020500@collabora.co.uk>
- <54AD0293.70909@samsung.com> <54AEB384.2040005@collabora.co.uk>
- <54B36C5A.6050109@samsung.com> <54B3F1B7.7090307@collabora.co.uk>
- <54B4ABFB.5000501@samsung.com> <54B5B5F6.3030607@collabora.co.uk>
- <54B5B721.4070309@collabora.co.uk>
-Message-ID: <54BE383B.5030505@samsung.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 20 Jan 2015 12:13:08 +0100 (CET)
+Subject: [PATCH v2 2/2] clocksource: don't suspend/resume when unused
+In-Reply-To: <1421427439-11699-3-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1421427439-11699-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1421427439-11699-3-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <alpine.DEB.2.11.1501201153140.5526@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, 16 Jan 2015, Alexandre Belloni wrote:
 
-On 01/14/2015 09:24 AM, Javier Martinez Canillas wrote:
-> On 01/14/2015 01:19 AM, Javier Martinez Canillas wrote:
->>
->> I dug further on this issue and found that the cause is that the exynos_mixer
->> driver needs some clocks (CLK_HDMI and CLK_SCLK_HDMI) grabbed by exynos_hdmi
->> to be kept enabled after hdmi_poweroff (drivers/gpu/drm/exynos/exynos_hdmi.c).
->>
->> Otherwise, any access to mixer device registers leads to an imprecise external
->> abort error. The following change [0] to the Exynos DRM HDMI driver makes the
->> issue to not happen and I can successfully execute:
->>
->> # echo 1 > /sys/devices/platform/exynos-drm/graphics/fb0/blank
->> # echo 0 > /sys/devices/platform/exynos-drm/graphics/fb0/blank
->>
+> There is no point in calling suspend/resume for unused
+> clocksources.
 
-Did you execute this operation repeatedly? Still i get error when i
-execute this more than twice with your change [0].
-
-Thanks.
-
->> Only not disabling the hdmi clock [1]: is enough but doing so makes sometimes the
->> DISP1 power domain disabling fails. It doesn't seem to have side effect though
->> since I also see the signal in the HDMI display to go standby and then on again.
->>
->> # echo 0 > /sys/devices/platform/exynos-drm/graphics/fb0/blank
->> # echo 1 > /sys/devices/platform/exynos-drm/graphics/fb0/blank
->> [   63.089080] Power domain disp1-power-domain disable failed
->> # echo 0 > /sys/devices/platform/exynos-drm/graphics/fb0/blank
->> #
->>
->> That error message when both clocks are not disabled on hdmi_poweroff() though.
->>
+That's true, but ....
+ 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  kernel/time/clocksource.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> This should be: "That error message is not shown when both clocks are disabled".
-> 
-> Best regards,
-> Javier
-> 
+> diff --git a/kernel/time/clocksource.c b/kernel/time/clocksource.c
+> index 03cfc5a08e3b..da65b3b73a86 100644
+> --- a/kernel/time/clocksource.c
+> +++ b/kernel/time/clocksource.c
+> @@ -493,7 +493,7 @@ void clocksource_suspend(void)
+>  	struct clocksource *cs;
+>  
+>  	list_for_each_entry_reverse(cs, &clocksource_list, list)
+> -		if (cs->suspend)
+> +		if (cs->suspend && (cs->flags & CLOCK_SOURCE_USED))
+>  			cs->suspend(cs);
+>  }
+>  
+> @@ -505,7 +505,7 @@ void clocksource_resume(void)
+>  	struct clocksource *cs;
+>  
+>  	list_for_each_entry(cs, &clocksource_list, list)
+> -		if (cs->resume)
+> +		if (cs->resume && (cs->flags & CLOCK_SOURCE_USED))
+>  			cs->resume(cs);
+
+I had a deeper look at the clocksources which have a resume
+callback. We have implementations, which rely on the resume callback
+being called unconditionally. e.g.: arch/x86/kernel/hpet.c. And there
+are a few others which have extra PM code in the suspend/resume path
+independent of the fact whether the clocksource is enabled or not.
+
+So we really need to make this opt-in with a per clocksource flag.
+
+Thanks,
+
+	tglx
