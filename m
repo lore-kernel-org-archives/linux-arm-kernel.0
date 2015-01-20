@@ -1,73 +1,63 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 20 Jan 2015 13:16:58 +0100
-Subject: [PATCH v4 8/9] ARM: dts: exynos5250: add display power domain
+Date: Tue, 20 Jan 2015 13:16:59 +0100
+Subject: [PATCH v4 9/9] drm/exynos: add support for 'hdmi' clock
 In-Reply-To: <1421756219-21037-1-git-send-email-m.szyprowski@samsung.com>
 References: <1421756219-21037-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1421756219-21037-9-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1421756219-21037-10-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrzej Hajda <a.hajda@samsung.com>
+Mixed need to have hdmi clock enabled to properly perform power on/off
+sequences, so add handling of this clock directly to the mixer driver.
+Dependency between hdmi clock and mixer module has been observed on
+Exynos4 based boards.
 
-The patch adds domain definition and references to it in appropriate devices.
-
-Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-[mszyprow: rebased onto generic power domains dt bindings]
+Suggested-by: Andrzej Hajda <a.hajda@samsung.com>
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 ---
- arch/arm/boot/dts/exynos5250.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/gpu/drm/exynos/exynos_mixer.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index e8c67fdb69fb..ae22bd98f956 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -102,6 +102,12 @@
- 		#power-domain-cells = <0>;
- 	};
+diff --git a/drivers/gpu/drm/exynos/exynos_mixer.c b/drivers/gpu/drm/exynos/exynos_mixer.c
+index 820b76234ef4..e5ef1fccd8fb 100644
+--- a/drivers/gpu/drm/exynos/exynos_mixer.c
++++ b/drivers/gpu/drm/exynos/exynos_mixer.c
+@@ -72,6 +72,7 @@ struct mixer_resources {
+ 	spinlock_t		reg_slock;
+ 	struct clk		*mixer;
+ 	struct clk		*vp;
++	struct clk		*hdmi;
+ 	struct clk		*sclk_mixer;
+ 	struct clk		*sclk_hdmi;
+ 	struct clk		*mout_mixer;
+@@ -774,6 +775,12 @@ static int mixer_resources_init(struct mixer_context *mixer_ctx)
+ 		return -ENODEV;
+ 	}
  
-+	pd_disp1: disp1-power-domain at 100440A0 {
-+		compatible = "samsung,exynos4210-pd";
-+		reg = <0x100440A0 0x20>;
-+		#power-domain-cells = <0>;
-+	};
++	mixer_res->hdmi = devm_clk_get(dev, "hdmi");
++	if (IS_ERR(mixer_res->hdmi)) {
++		dev_err(dev, "failed to get clock 'hdmi'\n");
++		return -ENODEV;
++	}
 +
- 	clock: clock-controller at 10010000 {
- 		compatible = "samsung,exynos5250-clock";
- 		reg = <0x10010000 0x30000>;
-@@ -719,6 +725,7 @@
- 	hdmi: hdmi {
- 		compatible = "samsung,exynos4212-hdmi";
- 		reg = <0x14530000 0x70000>;
-+		power-domains = <&pd_disp1>;
- 		interrupts = <0 95 0>;
- 		clocks = <&clock CLK_HDMI>, <&clock CLK_SCLK_HDMI>,
- 			 <&clock CLK_SCLK_PIXEL>, <&clock CLK_SCLK_HDMIPHY>,
-@@ -731,6 +738,7 @@
- 	mixer {
- 		compatible = "samsung,exynos5250-mixer";
- 		reg = <0x14450000 0x10000>;
-+		power-domains = <&pd_disp1>;
- 		interrupts = <0 94 0>;
- 		clocks = <&clock CLK_MIXER>, <&clock CLK_HDMI>,
- 			 <&clock CLK_SCLK_HDMI>;
-@@ -744,6 +752,7 @@
- 	};
+ 	mixer_res->sclk_hdmi = devm_clk_get(dev, "sclk_hdmi");
+ 	if (IS_ERR(mixer_res->sclk_hdmi)) {
+ 		dev_err(dev, "failed to get clock 'sclk_hdmi'\n");
+@@ -1095,6 +1102,7 @@ static void mixer_poweron(struct exynos_drm_manager *mgr)
+ 	pm_runtime_get_sync(ctx->dev);
  
- 	dp: dp-controller at 145B0000 {
-+		power-domains = <&pd_disp1>;
- 		clocks = <&clock CLK_DP>;
- 		clock-names = "dp";
- 		phys = <&dp_phy>;
-@@ -751,6 +760,7 @@
- 	};
+ 	clk_prepare_enable(res->mixer);
++	clk_prepare_enable(res->hdmi);
+ 	if (ctx->vp_enabled) {
+ 		clk_prepare_enable(res->vp);
+ 		if (ctx->has_sclk)
+@@ -1134,6 +1142,7 @@ static void mixer_poweroff(struct exynos_drm_manager *mgr)
+ 	ctx->powered = false;
+ 	mutex_unlock(&ctx->mixer_mutex);
  
- 	fimd: fimd at 14400000 {
-+		power-domains = <&pd_disp1>;
- 		clocks = <&clock CLK_SCLK_FIMD1>, <&clock CLK_FIMD1>;
- 		clock-names = "sclk_fimd", "fimd";
- 	};
++	clk_disable_unprepare(res->hdmi);
+ 	clk_disable_unprepare(res->mixer);
+ 	if (ctx->vp_enabled) {
+ 		clk_disable_unprepare(res->vp);
 -- 
 1.9.2
