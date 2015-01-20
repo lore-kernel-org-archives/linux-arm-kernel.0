@@ -1,49 +1,58 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Tue, 20 Jan 2015 15:05:38 +0100
-Subject: [PATCH v3 00/19] Exynos SYSMMU (IOMMU) integration with DT and
- DMA-mapping subsystem
-In-Reply-To: <54BE383B.5030505@samsung.com>
-References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
- <1417514366.21830.22.camel@collabora.co.uk> <54818768.3080303@samsung.com>
- <CABxcv=n=eNqbyBbOk1Wb87tCnnLZAJQurmCdeTOSqMZMbNaSHw@mail.gmail.com>
- <54AC93E0.8010705@samsung.com> <54ACFD69.1020500@collabora.co.uk>
- <54AD0293.70909@samsung.com> <54AEB384.2040005@collabora.co.uk>
- <54B36C5A.6050109@samsung.com> <54B3F1B7.7090307@collabora.co.uk>
- <54B4ABFB.5000501@samsung.com> <54B5B5F6.3030607@collabora.co.uk>
- <54B5B721.4070309@collabora.co.uk> <54BE383B.5030505@samsung.com>
-Message-ID: <54BE60B2.1030707@collabora.co.uk>
+From: kirill.shutemov@linux.intel.com (Kirill A. Shutemov)
+Date: Tue, 20 Jan 2015 16:05:46 +0200 (EET)
+Subject: [next-20150119]regression (mm)?
+In-Reply-To: <20150120114555.GA11502@n2100.arm.linux.org.uk>
+References: <54BD33DC.40200@ti.com> <20150119174317.GK20386@saruman>
+ <20150120001643.7D15AA8@black.fi.intel.com>
+ <20150120114555.GA11502@n2100.arm.linux.org.uk>
+Message-ID: <20150120140546.DDCB8D4@black.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Joonyoung,
-
-On 01/20/2015 12:12 PM, Joonyoung Shim wrote:
->>>
->>> I dug further on this issue and found that the cause is that the exynos_mixer
->>> driver needs some clocks (CLK_HDMI and CLK_SCLK_HDMI) grabbed by exynos_hdmi
->>> to be kept enabled after hdmi_poweroff (drivers/gpu/drm/exynos/exynos_hdmi.c).
->>>
->>> Otherwise, any access to mixer device registers leads to an imprecise external
->>> abort error. The following change [0] to the Exynos DRM HDMI driver makes the
->>> issue to not happen and I can successfully execute:
->>>
->>> # echo 1 > /sys/devices/platform/exynos-drm/graphics/fb0/blank
->>> # echo 0 > /sys/devices/platform/exynos-drm/graphics/fb0/blank
->>>
+Russell King - ARM Linux wrote:
+> On Tue, Jan 20, 2015 at 02:16:43AM +0200, Kirill A. Shutemov wrote:
+> > Better option would be converting 2-lvl ARM configuration to
+> > <asm-generic/pgtable-nopmd.h>, but I'm not sure if it's possible.
 > 
-> Did you execute this operation repeatedly? Still i get error when i
-> execute this more than twice with your change [0].
->
+> Well, IMHO the folded approach in asm-generic was done the wrong way
+> which barred ARM from ever using it.
 
-You mean that you are seeing the "Power domain power-domain disable failed"
-message but the system is not crashing or that you are still having the
-system crash?
+Okay, I see.
 
-I've seen the former when running multiple times but I have not seen the
-crash when the hdmi clock is not disabled on hdmi_poweroff().
+Regarding the topic bug. Completely untested patch is below. Could anybody
+check if it helps?
 
-> Thanks.
->
+>From 34b9182d08ef2b541829e305fcc91ef1d26b27ea Mon Sep 17 00:00:00 2001
+From: "Kirill A. Shutemov" <kirill.shutemov@linux.intel.com>
+Date: Tue, 20 Jan 2015 15:47:22 +0200
+Subject: [PATCH] arm: define __PAGETABLE_PMD_FOLDED for !LPAE
 
-Best regards,
-Javier
+ARM uses custom implementation of PMD folding in 2-level page table case.
+Generic code expects to see __PAGETABLE_PMD_FOLDED to be defined if PMD is
+folded, but ARM doesn't do this. Let's fix it.
+
+Defining __PAGETABLE_PMD_FOLDED will drop out unused __pmd_alloc().
+It also fixes problems with recently-introduced pmd accounting on ARM
+without LPAE.
+
+Signed-off-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
+Reported-by: Nishanth Menon <nm@ti.com>
+---
+ arch/arm/include/asm/pgtable-2level.h | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/include/asm/pgtable-2level.h b/arch/arm/include/asm/pgtable-2level.h
+index bcc5e300413f..bfd662e49a25 100644
+--- a/arch/arm/include/asm/pgtable-2level.h
++++ b/arch/arm/include/asm/pgtable-2level.h
+@@ -10,6 +10,8 @@
+ #ifndef _ASM_PGTABLE_2LEVEL_H
+ #define _ASM_PGTABLE_2LEVEL_H
+ 
++#define __PAGETABLE_PMD_FOLDED
++
+ /*
+  * Hardware-wise, we have a two level page table structure, where the first
+  * level has 4096 entries, and the second level has 256 entries.  Each entry
+-- 
+2.1.4
