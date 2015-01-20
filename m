@@ -1,87 +1,77 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 20 Jan 2015 10:49:22 +0000
-Subject: [RFC PATCH 1/3] drivers: of: fix resources freeing in
- of_pci_get_host_bridge_resources()
-In-Reply-To: <20150119183228.GE10762@e106497-lin.cambridge.arm.com>
-References: <1420644571-18928-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1420644571-18928-2-git-send-email-lorenzo.pieralisi@arm.com>
- <20150119183228.GE10762@e106497-lin.cambridge.arm.com>
-Message-ID: <20150120104922.GF5398@red-moon>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 20 Jan 2015 11:51:14 +0100
+Subject: [PATCHv6 0/6] USB: host: Atmel OHCI and EHCI drivers improvements
+In-Reply-To: <1421665567-31759-1-git-send-email-sylvain.rochet@finsecur.com>
+References: <1421665567-31759-1-git-send-email-sylvain.rochet@finsecur.com>
+Message-ID: <20150120115114.45900704@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 19, 2015 at 06:32:29PM +0000, Liviu Dudau wrote:
+On Mon, 19 Jan 2015 12:06:01 +0100
+Sylvain Rochet <sylvain.rochet@finsecur.com> wrote:
 
-[...]
-
-> > @@ -146,6 +146,7 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
-> >  	struct of_pci_range_parser parser;
-> >  	char range_type[4];
-> >  	int err;
-> > +	struct pci_host_bridge_window *window;
-> >  
-> >  	if (io_base)
-> >  		*io_base = (resource_size_t)OF_BAD_ADDR;
-> > @@ -225,7 +226,10 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
-> >  conversion_failed:
-> >  	kfree(res);
-> >  parse_failed:
-> > +	list_for_each_entry(window, resources, list)
-> > +		kfree(window->res);
-> >  	pci_free_resource_list(resources);
-> > +	kfree(bus_range);
-> >  	return err;
-> >  }
-> >  EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
+> USB: host: Atmel OHCI and EHCI drivers improvements
 > 
-> Hi Lorenzo et all,
-> 
-> Here is my personal view and I am happy to hear from others on the desired
-> behaviour:
-> 
-> When I wrote this function what I had in mind was that it will parse as
-> much as possible from the device tree and return a list of resources that
-> could be successfully converted. If the entire list of ranges could not
-> be converted then an error code will be returned, but the caller still
-> had the list as constructed up to the error. It was the job of the caller
-> to free the list in either cases, as stated in the comment.
+> Suspend/resume support for EHCI.
+> struct dev_pm_ops for OHCI.
+> Removed global variables from both.
+> Fixed OHCI wake up support for STANDBY(wake-up enabled) and MEM(wake-up
+> disabled) sleep targets.
 
-That's what I am questioning. If the function takes an error path, the
-windows list is freed, so the resource pointers are gone. There is no
-way the caller can grab those resource pointers and free them.
+To the whole series:
 
-So either way, the function needs patching. Either we do not free the
-windows list (we remove pci_free_resource_list) or we apply my fix (or
-we refactor the API which is likely to be what I will do).
-
-Lorenzo
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
 > 
-> The historical reason why the function was written that way was because at
-> some moment after parsing I've had an additional step where arches could
-> cleanup / veto the list and they could return an error value to signal
-> their discontent. Also I was (am) not sure how lenient we could be with
-> the device tree not being sane (at least one host bridge binding lists the
-> config space as a range, which was accepted as broken).
+> Changes since v5:
+>   * Don't overwrite device wakeup flag with device_init_wakeup(),
+>     now using a private wakeup bool instead.
 > 
-> So, from that point of view, I would NAK this patch, as the function works
-> as intended. If others find this mode of operation too convoluted, then
-> the patch should probably make clear that cleanup only needs to be done on
-> function returning success.
+> Changes since v4:
+>   * Re-add at91_suspend_entering_slow_clock() to OHCI, we can't naively
+>     remove this one, this device needs to be continuously clocked to
+>     provide wake up support.
+>     The removal of at91_suspend_entering_slow_clock() actually lighted up
+>     an issue on wake up support, which is now fixed.
 > 
-> Best regards,
+> Changes since v3:
+>   * Using struct dev_pm_ops instead of static struct platform_driver
+>     resume and suspend bindings for both EHCI and OHCI
+>   * Fixed inconsistency in patch subjects, _ intead of - for file names
+>   * Patch cleaning with the help of checkpatch.pl, fixed lines over
+>     80 characters
 > 
-> > -- 
-> > 2.2.1
-> > 
-> > 
+> Changes since v2:
+>   * Added patchs from an other submission, because this series
+>     depended on this one
+>     * EHCI: Move global variables to private struct
+>     * OHCI: Move global variables to private struct
+>   * Using ohci->priv and ehci->priv instead of hcd->hcd_priv,
+>     which were not the right way to do that
 > 
-> -- 
-> ====================
-> | I would like to |
-> | fix the world,  |
-> | but they're not |
-> | giving me the   |
->  \ source code!  /
->   ---------------
->     ?\_(?)_/?
+> Changes since v1:
+>   * Don't use at91_suspend_entering_slow_clock() on EHCI,
+>     we are trying to get read of this of this function
+>   * Removed at91_suspend_entering_slow_clock() from OHCI
+> 
+> Sylvain Rochet (6):
+>   USB: host: ehci-atmel: Add suspend/resume support
+>   USB: host: ohci-at91: Use struct dev_pm_ops instead of struct
+>     platform_driver
+>   USB: host: ehci-atmel: Move global variables to private struct
+>   USB: host: ohci-at91: Move global variables to private struct
+>   USB: host: ohci-at91: usb_hcd_at91_probe(), remove useless stack
+>     initialisation
+>   USB: host: ohci-at91: Fix wake-up support
+> 
+>  drivers/usb/host/ehci-atmel.c | 102 +++++++++++++++++++++++++---------
+>  drivers/usb/host/ohci-at91.c  | 126 ++++++++++++++++++++++++++----------------
+>  2 files changed, 154 insertions(+), 74 deletions(-)
+> 
+
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
