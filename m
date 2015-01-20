@@ -1,159 +1,70 @@
-From: arun.ramamurthy@broadcom.com (arun.ramamurthy at broadcom.com)
-Date: Mon, 19 Jan 2015 16:05:30 -0800
-Subject: [PATCHv3 2/2] usb: ohci-platform: add support for multiple phys per
- controller
-In-Reply-To: <1421712330-11089-1-git-send-email-arun.ramamurthy@broadcom.com>
-References: <1421712330-11089-1-git-send-email-arun.ramamurthy@broadcom.com>
-Message-ID: <1421712330-11089-3-git-send-email-arun.ramamurthy@broadcom.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 20 Jan 2015 11:09:47 +1100
+Subject: linux-next: manual merge of the omap tree with the arm-soc tree
+Message-ID: <20150120110947.1a92a416@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arun Ramamurthy <arunrama@broadcom.com>
+Hi Tony,
 
-Added support for cases where one controller is connected
-to multiple phys
+Today's linux-next merge of the omap tree got a conflict in
+arch/arm/boot/dts/Makefile between commit cb612390e546 ("ARM: dts: Only
+build dtb if associated Arch and/or SoC is enabled") from the arm-soc
+tree and commit ac7452cee743 ("ARM: dts: Add minimal support for
+dm8168-evm") from the omap tree.
 
-Signed-off-by: Arun Ramamurthy <arunrama@broadcom.com>
-Reviewed-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
-Tested-by: Scott Branden <sbranden@broadcom.com>
----
- drivers/usb/host/ohci-platform.c | 82 +++++++++++++++++++++++++++++-----------
- 1 file changed, 60 insertions(+), 22 deletions(-)
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-diff --git a/drivers/usb/host/ohci-platform.c b/drivers/usb/host/ohci-platform.c
-index b81d202..613d54e 100644
---- a/drivers/usb/host/ohci-platform.c
-+++ b/drivers/usb/host/ohci-platform.c
-@@ -38,7 +38,8 @@
- struct ohci_platform_priv {
- 	struct clk *clks[OHCI_MAX_CLKS];
- 	struct reset_control *rst;
--	struct phy *phy;
-+	struct phy **phys;
-+	int num_phys;
- };
- 
- static const char hcd_name[] = "ohci-platform";
-@@ -47,7 +48,7 @@ static int ohci_platform_power_on(struct platform_device *dev)
- {
- 	struct usb_hcd *hcd = platform_get_drvdata(dev);
- 	struct ohci_platform_priv *priv = hcd_to_ohci_priv(hcd);
--	int clk, ret;
-+	int clk, ret, phy_num;
- 
- 	for (clk = 0; clk < OHCI_MAX_CLKS && priv->clks[clk]; clk++) {
- 		ret = clk_prepare_enable(priv->clks[clk]);
-@@ -55,20 +56,28 @@ static int ohci_platform_power_on(struct platform_device *dev)
- 			goto err_disable_clks;
- 	}
- 
--	if (priv->phy) {
--		ret = phy_init(priv->phy);
--		if (ret)
--			goto err_disable_clks;
--
--		ret = phy_power_on(priv->phy);
--		if (ret)
--			goto err_exit_phy;
-+	for (phy_num = 0; phy_num < priv->num_phys; phy_num++) {
-+		if (priv->phys[phy_num]) {
-+			ret = phy_init(priv->phys[phy_num]);
-+			if (ret)
-+				goto err_exit_phy;
-+			ret = phy_power_on(priv->phys[phy_num]);
-+			if (ret) {
-+				phy_exit(priv->phys[phy_num]);
-+				goto err_exit_phy;
-+			}
-+		}
- 	}
- 
- 	return 0;
- 
- err_exit_phy:
--	phy_exit(priv->phy);
-+	while (--phy_num >= 0) {
-+		if (priv->phys[phy_num]) {
-+			phy_power_off(priv->phys[phy_num]);
-+			phy_exit(priv->phys[phy_num]);
-+		}
-+	}
- err_disable_clks:
- 	while (--clk >= 0)
- 		clk_disable_unprepare(priv->clks[clk]);
-@@ -80,11 +89,13 @@ static void ohci_platform_power_off(struct platform_device *dev)
- {
- 	struct usb_hcd *hcd = platform_get_drvdata(dev);
- 	struct ohci_platform_priv *priv = hcd_to_ohci_priv(hcd);
--	int clk;
-+	int clk, phy_num;
- 
--	if (priv->phy) {
--		phy_power_off(priv->phy);
--		phy_exit(priv->phy);
-+	for (phy_num = 0; phy_num < priv->num_phys; phy_num++) {
-+		if (priv->phys[phy_num]) {
-+			phy_power_off(priv->phys[phy_num]);
-+			phy_exit(priv->phys[phy_num]);
-+		}
- 	}
- 
- 	for (clk = OHCI_MAX_CLKS - 1; clk >= 0; clk--)
-@@ -112,7 +123,8 @@ static int ohci_platform_probe(struct platform_device *dev)
- 	struct usb_ohci_pdata *pdata = dev_get_platdata(&dev->dev);
- 	struct ohci_platform_priv *priv;
- 	struct ohci_hcd *ohci;
--	int err, irq, clk = 0;
-+	const char *phy_name;
-+	int err, irq, phy_num, clk = 0;
- 
- 	if (usb_disabled())
- 		return -ENODEV;
-@@ -160,12 +172,38 @@ static int ohci_platform_probe(struct platform_device *dev)
- 		of_property_read_u32(dev->dev.of_node, "num-ports",
- 				     &ohci->num_ports);
- 
--		priv->phy = devm_phy_get(&dev->dev, "usb");
--		if (IS_ERR(priv->phy)) {
--			err = PTR_ERR(priv->phy);
--			if (err == -EPROBE_DEFER)
--				goto err_put_hcd;
--			priv->phy = NULL;
-+		priv->num_phys = of_count_phandle_with_args(dev->dev.of_node,
-+				"phys", "#phy-cells");
-+		priv->num_phys = priv->num_phys > 0 ? priv->num_phys : 1;
-+
-+		priv->phys = devm_kcalloc(&dev->dev, priv->num_phys,
-+				sizeof(struct phy *), GFP_KERNEL);
-+		if (!priv->phys)
-+			return -ENOMEM;
-+
-+		for (phy_num = 0; phy_num < priv->num_phys; phy_num++) {
-+				err = of_property_read_string_index(
-+						dev->dev.of_node,
-+						"phy-names", phy_num,
-+						&phy_name);
-+
-+				if (err < 0) {
-+					if (priv->num_phys > 1) {
-+						dev_err(&dev->dev, "phy-names not provided");
-+						goto err_put_hcd;
-+					} else
-+						phy_name = "usb";
-+				}
-+
-+				priv->phys[phy_num] = devm_phy_get(&dev->dev,
-+						phy_name);
-+				if (IS_ERR(priv->phys[phy_num])) {
-+					err = PTR_ERR(priv->phys[phy_num]);
-+					if ((priv->num_phys > 1) ||
-+					    (err == -EPROBE_DEFER))
-+						goto err_put_hcd;
-+					priv->phys[phy_num] = NULL;
-+				}
- 		}
- 
- 		for (clk = 0; clk < OHCI_MAX_CLKS; clk++) {
 -- 
-2.2.2
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/boot/dts/Makefile
+index a240d2d07b38,a6ace4d57ea5..000000000000
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@@ -392,8 -348,8 +392,9 @@@ dtb-$(CONFIG_ARCH_OMAP3) += 
+  	omap3-sbc-t3730.dtb \
+  	omap3-thunder.dtb \
+  	omap3-zoom3.dtb
++ dtb-$(CONFIG_SOC_TI81XX) += dm8168-evm.dtb
+ -dtb-$(CONFIG_SOC_AM33XX) += am335x-base0033.dtb \
+ +dtb-$(CONFIG_SOC_AM33XX) += \
+ +	am335x-base0033.dtb \
+  	am335x-bone.dtb \
+  	am335x-boneblack.dtb \
+  	am335x-evm.dtb \
+@@@ -410,20 -365,17 +411,21 @@@ dtb-$(CONFIG_ARCH_OMAP4) += 
+  	omap4-sdp-es23plus.dtb \
+  	omap4-var-dvk-om44.dtb \
+  	omap4-var-stk-om44.dtb
+ -dtb-$(CONFIG_SOC_AM43XX) += am43x-epos-evm.dtb \
+ +dtb-$(CONFIG_SOC_AM43XX) += \
+ +	am43x-epos-evm.dtb \
+  	am437x-sk-evm.dtb \
++ 	am437x-idk-evm.dtb \
+  	am437x-gp-evm.dtb
+ -dtb-$(CONFIG_SOC_OMAP5) += omap5-cm-t54.dtb \
+ +dtb-$(CONFIG_SOC_OMAP5) += \
+ +	omap5-cm-t54.dtb \
+  	omap5-sbc-t54.dtb \
+  	omap5-uevm.dtb
+ -dtb-$(CONFIG_SOC_DRA7XX) += dra7-evm.dtb \
+ +dtb-$(CONFIG_SOC_DRA7XX) += \
+ +	dra7-evm.dtb \
+  	am57xx-beagle-x15.dtb \
+  	dra72-evm.dtb
+ -dtb-$(CONFIG_ARCH_ORION5X) += orion5x-lacie-d2-network.dtb \
+ +dtb-$(CONFIG_ARCH_ORION5X) += \
+ +	orion5x-lacie-d2-network.dtb \
+  	orion5x-lacie-ethernet-disk-mini-v2.dtb \
+  	orion5x-maxtor-shared-storage-2.dtb \
+  	orion5x-rd88f5182-nas.dtb
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150120/fd1969b4/attachment.sig>
