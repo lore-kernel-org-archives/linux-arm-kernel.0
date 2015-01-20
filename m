@@ -1,77 +1,83 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 20 Jan 2015 11:51:14 +0100
-Subject: [PATCHv6 0/6] USB: host: Atmel OHCI and EHCI drivers improvements
-In-Reply-To: <1421665567-31759-1-git-send-email-sylvain.rochet@finsecur.com>
-References: <1421665567-31759-1-git-send-email-sylvain.rochet@finsecur.com>
-Message-ID: <20150120115114.45900704@bbrezillon>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 20 Jan 2015 11:51:59 +0100 (CET)
+Subject: [PATCH v2 1/2] clocksource: track usage
+In-Reply-To: <1421427439-11699-2-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1421427439-11699-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1421427439-11699-2-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <alpine.DEB.2.11.1501201148550.5526@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 19 Jan 2015 12:06:01 +0100
-Sylvain Rochet <sylvain.rochet@finsecur.com> wrote:
+On Fri, 16 Jan 2015, Alexandre Belloni wrote:
+> diff --git a/include/linux/clocksource.h b/include/linux/clocksource.h
+> index abcafaa20b86..7735902fc5f6 100644
+> --- a/include/linux/clocksource.h
+> +++ b/include/linux/clocksource.h
+> @@ -210,6 +210,8 @@ struct clocksource {
+>  #define CLOCK_SOURCE_SUSPEND_NONSTOP		0x80
+>  #define CLOCK_SOURCE_RESELECT			0x100
+>  
+> +#define CLOCK_SOURCE_USED			0x200
 
-> USB: host: Atmel OHCI and EHCI drivers improvements
-> 
-> Suspend/resume support for EHCI.
-> struct dev_pm_ops for OHCI.
-> Removed global variables from both.
-> Fixed OHCI wake up support for STANDBY(wake-up enabled) and MEM(wake-up
-> disabled) sleep targets.
+You track whether the clocksource is enabled or not, right?
 
-To the whole series:
+>  /* simplify initialization of mask field */
+>  #define CLOCKSOURCE_MASK(bits) (cycle_t)((bits) < 64 ? ((1ULL<<(bits))-1) : -1)
+>  
+> @@ -282,6 +284,8 @@ static inline s64 clocksource_cyc2ns(cycle_t cycles, u32 mult, u32 shift)
+>  
+>  extern int clocksource_register(struct clocksource*);
+>  extern int clocksource_unregister(struct clocksource*);
+> +extern int clocksource_enable(struct clocksource *);
+> +extern void clocksource_disable(struct clocksource *);
 
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+This should be in kernel/time/timekeeping_internal.h
 
-> 
-> Changes since v5:
->   * Don't overwrite device wakeup flag with device_init_wakeup(),
->     now using a private wakeup bool instead.
-> 
-> Changes since v4:
->   * Re-add at91_suspend_entering_slow_clock() to OHCI, we can't naively
->     remove this one, this device needs to be continuously clocked to
->     provide wake up support.
->     The removal of at91_suspend_entering_slow_clock() actually lighted up
->     an issue on wake up support, which is now fixed.
-> 
-> Changes since v3:
->   * Using struct dev_pm_ops instead of static struct platform_driver
->     resume and suspend bindings for both EHCI and OHCI
->   * Fixed inconsistency in patch subjects, _ intead of - for file names
->   * Patch cleaning with the help of checkpatch.pl, fixed lines over
->     80 characters
-> 
-> Changes since v2:
->   * Added patchs from an other submission, because this series
->     depended on this one
->     * EHCI: Move global variables to private struct
->     * OHCI: Move global variables to private struct
->   * Using ohci->priv and ehci->priv instead of hcd->hcd_priv,
->     which were not the right way to do that
-> 
-> Changes since v1:
->   * Don't use at91_suspend_entering_slow_clock() on EHCI,
->     we are trying to get read of this of this function
->   * Removed at91_suspend_entering_slow_clock() from OHCI
-> 
-> Sylvain Rochet (6):
->   USB: host: ehci-atmel: Add suspend/resume support
->   USB: host: ohci-at91: Use struct dev_pm_ops instead of struct
->     platform_driver
->   USB: host: ehci-atmel: Move global variables to private struct
->   USB: host: ohci-at91: Move global variables to private struct
->   USB: host: ohci-at91: usb_hcd_at91_probe(), remove useless stack
->     initialisation
->   USB: host: ohci-at91: Fix wake-up support
-> 
->  drivers/usb/host/ehci-atmel.c | 102 +++++++++++++++++++++++++---------
->  drivers/usb/host/ohci-at91.c  | 126 ++++++++++++++++++++++++++----------------
->  2 files changed, 154 insertions(+), 74 deletions(-)
-> 
+>  extern void clocksource_touch_watchdog(void);
+>  extern struct clocksource* clocksource_get_next(void);
+>  extern void clocksource_change_rating(struct clocksource *cs, int rating);
+> diff --git a/kernel/time/clocksource.c b/kernel/time/clocksource.c
+> index b79f39bda7e1..03cfc5a08e3b 100644
+> --- a/kernel/time/clocksource.c
+> +++ b/kernel/time/clocksource.c
+> @@ -889,6 +889,36 @@ int clocksource_unregister(struct clocksource *cs)
+>  }
+>  EXPORT_SYMBOL(clocksource_unregister);
+>  
+> +/**
+> + * clocksource_enable - enable a registered clocksource
+> + * @cs:	clocksource to enable
+> + */
+> +int clocksource_enable(struct clocksource *cs)
+> +{
+> +	int ret = 0;
+> +
+> +	if (cs->enable)
+> +		ret = cs->enable(cs);
+> +
+> +	if (!ret)
+> +		cs->flags |= CLOCK_SOURCE_USED;
+> +
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL(clocksource_enable);
 
+Why on earth do you want to export that?
 
+> +/**
+> + * clocksource_disable - disable a registered clocksource
+> + * @cs:	clocksource to disable
+> + */
+> +void clocksource_disable(struct clocksource *cs)
+> +{
+> +	cs->flags &= ~CLOCK_SOURCE_USED;
+> +	if (cs->disable)
+> +		cs->disable(cs);
+> +}
+> +EXPORT_SYMBOL(clocksource_disable);
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Ditto.
+
+Thanks,
+
+	tglx
