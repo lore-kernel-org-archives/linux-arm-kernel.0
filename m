@@ -1,38 +1,50 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 20 Jan 2015 20:35:25 +0530
-Subject: [GIT PULL] DaVinci cleanups for v3.20
-In-Reply-To: <1421766325-28293-1-git-send-email-nsekhar@ti.com>
-References: <1421766325-28293-1-git-send-email-nsekhar@ti.com>
-Message-ID: <1421766325-28293-2-git-send-email-nsekhar@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 20 Jan 2015 16:05:12 +0100
+Subject: [PATCH v4 2/6] mfd: MT6397: Add support for PMIC MT6397 MFD
+In-Reply-To: <20150120144309.GT13701@x1>
+References: <1419577768-12037-1-git-send-email-flora.fu@mediatek.com>
+ <1419577768-12037-3-git-send-email-flora.fu@mediatek.com>
+ <20150120144309.GT13701@x1>
+Message-ID: <20150120150512.GA12209@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+Hi Lee,
 
-  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+On Tue, Jan 20, 2015 at 02:43:09PM +0000, Lee Jones wrote:
+> On Fri, 26 Dec 2014, Flora Fu wrote:
+> 
+> > Add core files for MT6397 MFD driver.
+> > 
+> > Signed-off-by: Flora Fu <flora.fu@mediatek.com>
+> > ---
+> >  drivers/mfd/Kconfig                  |  10 +
+> >  drivers/mfd/Makefile                 |   1 +
+> >  drivers/mfd/mt6397-core.c            |  94 +++++++++
+> >  include/linux/mfd/mt6397/core.h      |  23 +++
+> >  include/linux/mfd/mt6397/registers.h | 362 +++++++++++++++++++++++++++++++++++
+> >  5 files changed, 490 insertions(+)
+> >  create mode 100644 drivers/mfd/mt6397-core.c
+> >  create mode 100644 include/linux/mfd/mt6397/core.h
+> >  create mode 100644 include/linux/mfd/mt6397/registers.h
+> 
+> Looks okay.
+> 
+> I assume there are dependancies on this patch.  What are they?
+> 
+> How would you like this set to be handled?
 
-are available in the git repository at:
+This patch is outdated, I sent an updated series today (you are on Cc).
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.20/cleanup
+There are no compile time dependencies to the PMIC wrapper, but without
+it the mfd part is pretty useless. I prefer to keep the series together
+and merge it through arm-soc, but I would be fine with merging it
+through mfd aswell.
 
-for you to fetch changes up to 65010564d698ef99b24b04a16e7bcabcd6171c64:
+Sascha
 
-  ARM: davinci: Remove CDCE949 driver (2015-01-20 19:29:58 +0530)
-
-----------------------------------------------------------------
-Removes an unused function and the unused
-support for CDCE949 clock generator.
-
-----------------------------------------------------------------
-Rickard Strandqvist (2):
-      ARM: davinci: serial.c: remove unused serial_read_reg()
-      ARM: davinci: Remove CDCE949 driver
-
- arch/arm/mach-davinci/Makefile               |    2 +-
- arch/arm/mach-davinci/board-dm646x-evm.c     |   31 ---
- arch/arm/mach-davinci/cdce949.c              |  295 --------------------------
- arch/arm/mach-davinci/include/mach/cdce949.h |   19 --
- arch/arm/mach-davinci/serial.c               |   10 -
- 5 files changed, 1 insertion(+), 356 deletions(-)
- delete mode 100644 arch/arm/mach-davinci/cdce949.c
- delete mode 100644 arch/arm/mach-davinci/include/mach/cdce949.h
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
