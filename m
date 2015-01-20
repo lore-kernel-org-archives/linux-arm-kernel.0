@@ -1,69 +1,121 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 20 Jan 2015 13:16:51 +0100
-Subject: [PATCH v4 1/9] PM / Domains: Add a note about power domain subdomains
+Date: Tue, 20 Jan 2015 13:16:53 +0100
+Subject: [PATCH v4 3/9] ARM: dts: exynos4: add hdmi related nodes
 In-Reply-To: <1421756219-21037-1-git-send-email-m.szyprowski@samsung.com>
 References: <1421756219-21037-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1421756219-21037-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1421756219-21037-4-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a note on defining subdomains to generic PM domain
-binding documentation to let power domain providers use common approach
-for defining power domain hierarchy.
+This patch adds entries for HDMI, Mixer and i2c with hdmi-phy modules
+found in Exynos 4210 and 4x12 SoCs.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- .../devicetree/bindings/power/power_domain.txt     | 29 ++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ arch/arm/boot/dts/exynos4.dtsi    | 40 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos4210.dtsi |  8 ++++++++
+ arch/arm/boot/dts/exynos4x12.dtsi | 11 +++++++++++
+ 3 files changed, 59 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
-index 98c16672ab5f..0f8ed3710c66 100644
---- a/Documentation/devicetree/bindings/power/power_domain.txt
-+++ b/Documentation/devicetree/bindings/power/power_domain.txt
-@@ -19,6 +19,16 @@ Required properties:
-    providing multiple PM domains (e.g. power controllers), but can be any value
-    as specified by device tree binding documentation of particular provider.
+diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+index c5dc2efb99ed..d9516471c41e 100644
+--- a/arch/arm/boot/dts/exynos4.dtsi
++++ b/arch/arm/boot/dts/exynos4.dtsi
+@@ -38,6 +38,7 @@
+ 		i2c5 = &i2c_5;
+ 		i2c6 = &i2c_6;
+ 		i2c7 = &i2c_7;
++		i2c8 = &i2c_8;
+ 		csis0 = &csis_0;
+ 		csis1 = &csis_1;
+ 		fimc0 = &fimc_0;
+@@ -544,6 +545,22 @@
+ 		status = "disabled";
+ 	};
  
-+Optional properties:
-+ - power-domains : A phandle and PM domain specifier as defined by bindings of
-+                   the power controller specified by phandle.
-+   Some power domains might be powered from another power domain (or have
-+   other hardware specific dependencies). For representing such dependency
-+   a standard PM domain consumer binding is used. When provided, all domains
-+   created by the given provider should be subdomains of the domain
-+   specified by this binding. More details about power domain specifier are
-+   available in the next section.
++	i2c_8: i2c at 138E0000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "samsung,s3c2440-hdmiphy-i2c";
++		reg = <0x138E0000 0x100>;
++		interrupts = <0 93 0>;
++		clocks = <&clock CLK_I2C_HDMI>;
++		clock-names = "i2c";
++		status = "disabled";
 +
- Example:
- 
- 	power: power-controller at 12340000 {
-@@ -30,6 +40,25 @@ Example:
- The node above defines a power controller that is a PM domain provider and
- expects one cell as its phandle argument.
- 
-+Example 2:
-+
-+	parent: power-controller at 12340000 {
-+		compatible = "foo,power-controller";
-+		reg = <0x12340000 0x1000>;
-+		#power-domain-cells = <1>;
++		hdmi_i2c_phy: hdmiphy at 38 {
++			compatible = "exynos4210-hdmiphy";
++			reg = <0x38>;
++		};
 +	};
 +
-+	child: power-controller at 12340000 {
-+		compatible = "foo,power-controller";
-+		reg = <0x12341000 0x1000>;
-+		power-domains = <&parent 0>;
-+		#power-domain-cells = <1>;
+ 	spi_0: spi at 13920000 {
+ 		compatible = "samsung,exynos4210-spi";
+ 		reg = <0x13920000 0x100>;
+@@ -652,4 +669,27 @@
+ 		samsung,sysreg = <&sys_reg>;
+ 		status = "disabled";
+ 	};
++
++	hdmi: hdmi at 12D00000 {
++		compatible = "samsung,exynos4210-hdmi";
++		reg = <0x12D00000 0x70000>;
++		interrupts = <0 92 0>;
++		clock-names = "hdmi", "sclk_hdmi", "sclk_pixel", "sclk_hdmiphy",
++			"mout_hdmi";
++		clocks = <&clock CLK_HDMI>, <&clock CLK_SCLK_HDMI>,
++			<&clock CLK_SCLK_PIXEL>, <&clock CLK_SCLK_HDMIPHY>,
++			<&clock CLK_MOUT_HDMI>;
++		phy = <&hdmi_i2c_phy>;
++		power-domains = <&pd_tv>;
++		samsung,syscon-phandle = <&pmu_system_controller>;
++		status = "disabled";
 +	};
 +
-+The nodes above define two power controllers: 'parent' and 'child'.
-+Domains created by the 'child' power controller are subdomains of '0' power
-+domain provided by the 'parent' power controller.
++	mixer: mixer at 12C10000 {
++		compatible = "samsung,exynos4210-mixer";
++		interrupts = <0 91 0>;
++		reg = <0x12C10000 0x2100>, <0x12c00000 0x300>;
++		power-domains = <&pd_tv>;
++		status = "disabled";
++	};
+ };
+diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+index 6728aaa2af9d..1b410027bbc8 100644
+--- a/arch/arm/boot/dts/exynos4210.dtsi
++++ b/arch/arm/boot/dts/exynos4210.dtsi
+@@ -193,4 +193,12 @@
+ 			samsung,lcd-wb;
+ 		};
+ 	};
 +
- ==PM domain consumers==
- 
- Required properties:
++	mixer: mixer at 12C10000 {
++		clock-names = "mixer", "hdmi", "sclk_hdmi", "vp", "mout_mixer",
++			"sclk_mixer";
++		clocks = <&clock CLK_MIXER>, <&clock CLK_HDMI>,
++			<&clock CLK_SCLK_HDMI>, <&clock CLK_VP>,
++			<&clock CLK_MOUT_MIXER>, <&clock CLK_SCLK_MIXER>;
++	};
+ };
+diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
+index da8734e25f50..a26503826363 100644
+--- a/arch/arm/boot/dts/exynos4x12.dtsi
++++ b/arch/arm/boot/dts/exynos4x12.dtsi
+@@ -283,4 +283,15 @@
+ 		clock-names = "tmu_apbif";
+ 		status = "disabled";
+ 	};
++
++	hdmi: hdmi at 12D00000 {
++		compatible = "samsung,exynos4212-hdmi";
++	};
++
++	mixer: mixer at 12C10000 {
++		compatible = "samsung,exynos4212-mixer";
++		clock-names = "mixer", "hdmi", "sclk_hdmi", "vp";
++		clocks = <&clock CLK_MIXER>, <&clock CLK_HDMI>,
++			 <&clock CLK_SCLK_HDMI>, <&clock CLK_VP>;
++	};
+ };
 -- 
 1.9.2
