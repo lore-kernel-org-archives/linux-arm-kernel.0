@@ -1,181 +1,40 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 20 Jan 2015 16:46:54 +0100
-Subject: [PATCH v4 2/5] dt-bindings: Add pinctrl bindings for
- mt65xx/mt81xx.
-In-Reply-To: <1418772873-19747-3-git-send-email-hongzhou.yang@mediatek.com>
-References: <1418772873-19747-1-git-send-email-hongzhou.yang@mediatek.com>
- <1418772873-19747-3-git-send-email-hongzhou.yang@mediatek.com>
-Message-ID: <CABuKBe+9wG_Pa0S7A+JGT8mRo9embdYXhse1GFJXm8Rj3OTZQQ@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 20 Jan 2015 16:49:42 +0100
+Subject: [PATCH v3 2/8] mfd: Add atmel-st driver
+In-Reply-To: <20150120150501.GH5014@piout.net>
+References: <1421077023-30954-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1421077023-30954-3-git-send-email-alexandre.belloni@free-electrons.com>
+ <20150119094224.GJ21886@x1> <20150119225923.GG5014@piout.net>
+ <20150120094739.GM5767@x1> <20150120150501.GH5014@piout.net>
+Message-ID: <54BE7916.4060204@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-12-17 0:34 GMT+01:00 Hongzhou Yang <hongzhou.yang@mediatek.com>:
-> From: Hongzhou Yang <hongzhou.yang@mediatek.com>
->
-> Add devicetree bindings for Mediatek SoC pinctrl driver.
->
-> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
-> ---
->  .../devicetree/bindings/pinctrl/pinctrl-mt65xx.txt | 142 +++++++++++++++++++++
->  1 file changed, 142 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt
->
-> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt
-> new file mode 100644
-> index 0000000..3bf34f9
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt
-> @@ -0,0 +1,142 @@
-> +* Mediatek MT65XX Pin Controller
-> +
-> +The Mediatek's Pin controller is used to control SoC pins.
-> +
-> +Required properties:
-> +- compatible: value should be either of the following.
-> +    (a) "mediatek,mt8135-pinctrl", compatible with mt8135 pinctrl.
-> +- mediatek,pctl-regmap: Should be a phandle of the syscfg node.
-> +- gpio-controller : Marks the device node as a gpio controller.
-> +- #gpio-cells: number of cells in GPIO specifier. Since the generic GPIO
-> +  binding is used, the amount of cells must be specified as 2. See the below
-> +  mentioned gpio binding representation for description of particular cells.
-> +
-> +       Eg: <&pio 6 0>
-> +       <[phandle of the gpio controller node]
-> +       [pin number within the gpio controller]
-> +       [flags]>
-> +
-> +       Values for gpio specifier:
-> +       - Pin number: is a value between 0 to 202.
-> +       - Flags:  bit field of flags, as defined in <dt-bindings/gpio/gpio.h>.
-> +            Only the following flags are supported:
-> +            0 - GPIO_ACTIVE_HIGH
-> +            1 - GPIO_ACTIVE_LOW
-> +- reg: physicall address base for EINT registers
-> +- interrupt-controller: Marks the device node as an interrupt controller
-> +- #interrupt-cells: Should be two.
-> +- interrupts : The interrupt outputs from the controller.
-> +
-> +Please refer to pinctrl-bindings.txt in this directory for details of the
-> +common pinctrl bindings used by client devices.
-> +
-> +A pinctrl node should contain at least one subnodes representing the
-> +pinctrl groups available on the machine. Each subnode will list the
-> +pins it needs, and how they should be configured, with regard to muxer
-> +configuration, pullups, drive strngth, input enable/disable and input schmitt.
+Le 20/01/2015 16:05, Alexandre Belloni a ?crit :
+> On 20/01/2015 at 09:47:39 +0000, Lee Jones wrote :
+>>>> This driver looks pretty pointless.  Why can't you request the sysconf
+>>>> registers from within the drivers themselves?
+>>>>
+>>>
+>>> How would you probe the watchdog driver then? Would you had the
+>>> "atmel,at91rm9200-st" compatible there?
+>>>
+>>> At some point in time, we should add the reset driver, would you also
+>>> match it on "atmel,at91rm9200-st"?
+>>>
+>>> I'm fine with that as this allows to avoid the mfd driver.
+>>
+>> I'm sorry, I don't follow.  Why can't each driver have their own
+>> compatible strings?
+>>
+> 
+> The same IP provides a clocksource, a watchdog and is also the reset
+> controller. I think that the DT guidelines requires that the DT
+> describes the hardware and so use one compatible for that IP;
 
-drive strength
+I would add also that the registers within the IP are kind of mixed,
+there is no way to separate by logical functions.
 
-> +
-> +Required subnode-properties:
-> +
-> +- pins: 2 integers array, represents gpio pinmux number and config
-> +  setting. The format as following
-> +
-> +    node {
-> +     pins = <PIN_NUMBER_PINMUX>;
-> +                     GENERIC_PINCONFIG;
-> +    };
-> +
-> +    The PIN_NUMBER_PINMUX is combination of GPIO number and pinmux, it can
-> +    use macros which already defind in boot/dts/mt8135-pinfunc.h directly.
-> +    The GENERIC_PINCONFIG is the generic pinconfig options to use, bias-disable,
-> +    bias-pull-down, bias-pull-up, input-enable, input-disable, output-low, output-high,
-> +    input-schmitt-enable, input-schmitt-disable and drive-strength are valid.
-> +
-> +    Some special pins have extra pull up strength, there are R0 and R1 pull-up
-> +    resistors available, but for user, it's only need to set R1R0 as 00, 01, 10 or 11.
-> +    So when config bias-pull-up, it support arguments for those special pins.
-> +    Some macros have been defined for this usage, such as MTK_PUPD_SET_R1R0_00.
-> +    See dt-bindings/pinctrl/mt65xx.h.
-> +
-> +    When config drive-strength, it can support some arguments, such as
-> +    MTK_DRIVE_4mA, MTK_DRIVE_6mA, etc. See dt-bindings/pinctrl/mt65xx.h.
-> +
-> +Examples:
-> +
-> +#include "mt8135-pinfunc.h"
-> +
-> +...
-> +{
-> +       syscfg_pctl_a: syscfg_pctl_a at 10005000 {
-> +               compatible = "mediatek,mt8135-pctl-a-syscfg", "syscon";
-> +               reg = <0 0x10005000 0 0x1000>;
-> +       };
-> +
-> +       syscfg_pctl_b: syscfg_pctl_b at 1020C020 {
-> +               compatible = "mediatek,mt8135-pctl-b-syscfg", "syscon";
-> +               reg = <0 0x1020C020 0 0x1000>;
-> +       };
-> +
-> +       pinctrl at 01c20800 {
-> +               compatible = "mediatek,mt8135-pinctrl";
-> +               reg = <0 0x1000B000 0 0x1000>;
-> +               mediatek,pctl-regmap = <&syscfg_pctl_a &syscfg_pctl_b>;
-> +               gpio-controller;
-> +               #gpio-cells = <2>;
-> +               interrupt-controller;
-> +               #interrupt-cells = <2>;
-> +               interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>,
-> +                               <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>,
-> +                               <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
-> +
-> +               i2c0_pins_a: i2c0 at 0 {
-> +                       pins1 {
-> +                               pins = <MT8135_PIN_100_SDA0__FUNC_SDA0>,
-> +                                               <MT8135_PIN_101_SCL0__FUNC_SCL0>;
-> +                               bias-disable;
-> +                       };
-> +               };
-> +
-> +               i2c1_pins_a: i2c1 at 0 {
-> +                       pins {
-> +                               pins = <MT8135_PIN_195_SDA1__FUNC_SDA1>,
-> +                                               <MT8135_PIN_196_SCL1__FUNC_SCL1>;
-> +                               bias-pull-up = <55>;
-> +                       };
-> +               };
-> +
-> +               i2c2_pins_a: i2c2 at 0 {
-> +                       pins1 {
-> +                               pins = <MT8135_PIN_193_SDA2__FUNC_SDA2>;
-> +                               bias-pull-down;
-> +                       };
-> +
-> +                       pins2 {
-> +                               pins = <MT8135_PIN_49_WATCHDOG__FUNC_GPIO49>;
-> +                               bias-pull-up;
-> +                       };
-> +               };
-> +
-> +               i2c3_pins_a: i2c3 at 0 {
-> +                       pins1 {
-> +                               pins = <MT8135_PIN_40_DAC_CLK__FUNC_GPIO40>,
-> +                                               <MT8135_PIN_41_DAC_WS__FUNC_GPIO41>;
-> +                               bias-pull-up = <55>;
-> +                       };
-> +
-> +                       pins2 {
-> +                               pins = <MT8135_PIN_35_SCL3__FUNC_SCL3>,
-> +                                               <MT8135_PIN_36_SDA3__FUNC_SDA3>;
-> +                               output-low;
-> +                               bias-pull-up = <55>;
-> +                       };
-> +
-> +                       pins3 {
-> +                               pins = <MT8135_PIN_57_JTCK__FUNC_GPIO57>,
-> +                                               <MT8135_PIN_60_JTDI__FUNC_JTDI>;
-> +                               drive-strength = <32>;
-> +                       };
-> +               };
-> +
-> +               ...
-> +       }
-> +};
-> --
-> 1.8.1.1.dirty
->
-
-
-
+Bye,
 -- 
-motzblog.wordpress.com
+Nicolas Ferre
