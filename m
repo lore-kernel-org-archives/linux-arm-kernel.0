@@ -1,18 +1,37 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 20 Jan 2015 14:27:53 +0800
-Subject: [PATCH] ARM i.MX6q: unmap memory mapped at
- imx6q_opp_check_speed_grading()
-In-Reply-To: <1421171213-19159-1-git-send-email-bigeasy@linutronix.de>
-References: <1421171213-19159-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <20150120062752.GR2766@dragon>
+Date: Tue, 20 Jan 2015 14:29:16 +0800
+Subject: [PATCH v2] ARM: dts: imx6q: enable dma for ecspi5
+In-Reply-To: <1421172248-15765-1-git-send-email-anton_bondarenko@mentor.com>
+References: <315825>
+ <1421172248-15765-1-git-send-email-anton_bondarenko@mentor.com>
+Message-ID: <20150120062915.GS2766@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 13, 2015 at 06:46:53PM +0100, Sebastian Andrzej Siewior wrote:
-> imx6q_opp_check_speed_grading() remaps memory to the base variable and
-> never unmaps it. I can't see how this can be of any use later so here I
-> unmap it.
+On Tue, Jan 13, 2015 at 07:04:08PM +0100, Anton Bondarenko wrote:
+> Enable dma support for ecspi5 controller
 > 
-> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> Signed-off-by: Anton Bondarenko <anton_bondarenko@mentor.com>
 
-Applied, thanks. 
+Applied, thanks.
+
+> ---
+>  arch/arm/boot/dts/imx6q.dtsi | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+> index 37ee4e5..93ec79b 100644
+> --- a/arch/arm/boot/dts/imx6q.dtsi
+> +++ b/arch/arm/boot/dts/imx6q.dtsi
+> @@ -95,6 +95,8 @@
+>  					clocks = <&clks IMX6Q_CLK_ECSPI5>,
+>  						 <&clks IMX6Q_CLK_ECSPI5>;
+>  					clock-names = "ipg", "per";
+> +					dmas = <&sdma 11 7 1>, <&sdma 12 7 2>;
+> +					dma-names = "rx", "tx";
+>  					status = "disabled";
+>  				};
+>  			};
+> -- 
+> 2.2.1
+> 
