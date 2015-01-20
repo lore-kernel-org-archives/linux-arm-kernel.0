@@ -1,94 +1,112 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 20 Jan 2015 13:54:39 +0000
-Subject: [PATCH 5/7] mfd: menelaus: delete platform data support
-In-Reply-To: <1419702779-16001-6-git-send-email-aaro.koskinen@iki.fi>
-References: <1419702779-16001-1-git-send-email-aaro.koskinen@iki.fi>
- <1419702779-16001-6-git-send-email-aaro.koskinen@iki.fi>
-Message-ID: <20150120135439.GN13701@x1>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Tue, 20 Jan 2015 13:55:01 +0000
+Subject: [PATCH 00/10] drivers: PL011: add ARM SBSA Generic UART support
+In-Reply-To: <20150120130832.GA6858@xora-yoga-13.xora.org.uk>
+References: <1421428986-11300-1-git-send-email-andre.przywara@arm.com>
+ <20150120130832.GA6858@xora-yoga-13.xora.org.uk>
+Message-ID: <54BE5E35.50906@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 27 Dec 2014, Aaro Koskinen wrote:
+Hi Graeme,
 
-> Delete platform data support.
+On 20/01/15 13:08, Graeme Gregory wrote:
+> On Fri, Jan 16, 2015 at 05:22:56PM +0000, Andre Przywara wrote:
+>> The ARM Server Base System Architecture[1] document describes a
+>> generic UART which is a subset of the PL011 UART.
+>> It lacks DMA support, baud rate control and modem status line
+>> control, among other things.
+>> The idea is to move the UART initialization and setup into the
+>> firmware (which does this job today already) and let the kernel just
+>> use the UART for sending and receiving characters.
+>>
+>> This patchset integrates support for this UART subset into the
+>> existing PL011 driver - basically by refactoring some
+>> functions and providing a new uart_ops structure for it. It also has
+>> a separate probe function to be not dependent on AMBA/PrimeCell.
+>> It provides a device tree binding, but can easily be adapted to other
+>> device configuration systems.
+>> Beside the obvious effect of code sharing reusing most of the PL011
+>> code has the advantage of not introducing another serial device
+>> prefix, so it can go with ttyAMA, which seems to be pretty common.
+>>
+>> This series relies on Dave's recent PL011 fix[2], which gets rid of
+>> the loopback trick to get the UART going. There is a repo at [3]
+>> (branch sbsa-uart/v1), which has this patch already integrated.
+>>
+>> Patch 1/10 contains a bug fix which applies to the PL011 part also,
+>> it should be considered regardless of the rest of the series.
+>> Patch 2-7 refactor some PL011 functions by splitting them up into
+>> smaller pieces, so that most of the code can be reused later by the
+>> SBSA part.
+>> Patch 8 and 9 introduce two new properties for the vendor structure,
+>> this is for SBSA functionality which cannot be controlled by
+>> separate uart_ops members only.
+>> Patch 10 then finally drops in the SBSA specific code, by providing
+>> a new uart_ops, vendor struct and probe function for it. Also the new
+>> device tree binding is documented.
+>>
+>> For testing you should be able to take any hardware which has a PL011
+>> and change the DT to use a "arm,sbsa-uart" compatible string.
+>> Of course testing with a real SBSA Generic UART is welcomed!
+>>
+> I have tested this series on Juno where it seems to work and also on FVP
+> model where there are some issues.
 > 
-> Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-> ---
->  arch/arm/mach-omap2/common-board-devices.h |  2 --
->  drivers/mfd/menelaus.c                     | 10 +---------
->  include/linux/mfd/menelaus.h               |  6 ------
->  3 files changed, 1 insertion(+), 17 deletions(-)
+> On the FVP when we enter usespace a couple of 32 character strings are
+> printed then nothing else. 32 Characters is a suspicious number.
 
-Applied, thanks.
+Can you try to add:
+-C bp.pl011_uart0.untimed_fifos=0
+to your model command line? (given that your model supports this option)
 
-> diff --git a/arch/arm/mach-omap2/common-board-devices.h b/arch/arm/mach-omap2/common-board-devices.h
-> index 07c88ae..7a30228 100644
-> --- a/arch/arm/mach-omap2/common-board-devices.h
-> +++ b/arch/arm/mach-omap2/common-board-devices.h
-> @@ -2,7 +2,6 @@
->  #define __OMAP_COMMON_BOARD_DEVICES__
->  
->  #include <sound/tlv320aic3x.h>
-> -#include <linux/mfd/menelaus.h>
->  #include "twl-common.h"
->  
->  #define NAND_BLOCK_SIZE	SZ_128K
-> @@ -14,7 +13,6 @@ void omap_ads7846_init(int bus_num, int gpio_pendown, int gpio_debounce,
->  		       struct ads7846_platform_data *board_pdata);
->  void *n8x0_legacy_init(void);
->  
-> -extern struct menelaus_platform_data n8x0_menelaus_platform_data;
->  extern struct aic3x_pdata n810_aic33_data;
->  
->  #endif /* __OMAP_COMMON_BOARD_DEVICES__ */
-> diff --git a/drivers/mfd/menelaus.c b/drivers/mfd/menelaus.c
-> index 3e04c64..4a900cc 100644
-> --- a/drivers/mfd/menelaus.c
-> +++ b/drivers/mfd/menelaus.c
-> @@ -1181,8 +1181,6 @@ static int menelaus_probe(struct i2c_client *client,
->  	int			rev = 0;
->  	int			err = 0;
->  	struct device_node	*np = client->dev.of_node;
-> -	struct menelaus_platform_data *menelaus_pdata =
-> -					dev_get_platdata(&client->dev);
->  
->  	if (the_menelaus) {
->  		dev_dbg(&client->dev, "only one %s for now\n",
-> @@ -1240,13 +1238,7 @@ static int menelaus_probe(struct i2c_client *client,
->  	else
->  		menelaus->vcore_hw_mode = 0;
->  
-> -	if (menelaus_pdata != NULL) {
-> -		if (menelaus_pdata->late_init != NULL) {
-> -			err = menelaus_pdata->late_init(&client->dev);
-> -			if (err < 0)
-> -				goto fail;
-> -		}
-> -	} else if (np) {
-> +	if (np) {
->  		u32 vcore_min;
->  		u32 vcore_max;
->  
-> diff --git a/include/linux/mfd/menelaus.h b/include/linux/mfd/menelaus.h
-> index 9e85ac0..21eeff5 100644
-> --- a/include/linux/mfd/menelaus.h
-> +++ b/include/linux/mfd/menelaus.h
-> @@ -5,12 +5,6 @@
->  #ifndef __ASM_ARCH_MENELAUS_H
->  #define __ASM_ARCH_MENELAUS_H
->  
-> -struct device;
-> -
-> -struct menelaus_platform_data {
-> -	int (* late_init)(struct device *dev);
-> -};
-> -
->  extern int menelaus_register_mmc_callback(void (*callback)(void *data, u8 card_mask),
->  					  void *data);
->  extern void menelaus_unregister_mmc_callback(void);
+We discovered that lately, also not sure how the default for this
+setting is handled these days in the various model versions.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+We are about to investigate this here atm.
+This issue seems to be introduced by Dave's FIFO patch.
+
+Cheers,
+Andre.
+
+> This occurs with both OE based FS from linaro and debian ubstable FS.
+> 
+> My FVP is version 5602
+> 
+> Graeme
+> 
+>> Cheers,
+>> Andre
+>>
+>> [1] ARM-DEN-0029 Server Base System Architecture, available (click-
+>>     thru...) from http://infocenter.arm.com
+>> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/315248.html
+>> [3] http://www.linux-arm.org/git?p=linux-ap.git
+>>     git://linux-arm.org/linux-ap.git
+>>
+>> Andre Przywara (10):
+>>   drivers: PL011: avoid potential unregister_driver call
+>>   drivers: PL011: refactor pl011_startup()
+>>   drivers: PL011: refactor pl011_shutdown()
+>>   drivers: PL011: refactor pl011_set_termios()
+>>   drivers: PL011: refactor pl011_probe()
+>>   drivers: PL011: replace UART_MIS reading with _RIS & _IMSC
+>>   drivers: PL011: move cts_event workaround into separate function
+>>   drivers: PL011: allow avoiding UART enabling/disabling
+>>   drivers: PL011: allow to supply fixed option string
+>>   drivers: PL011: add support for the ARM SBSA generic UART
+>>
+>>  .../devicetree/bindings/serial/arm_sbsa_uart.txt   |    9 +
+>>  drivers/tty/serial/amba-pl011.c                    |  510 ++++++++++++++------
+>>  2 files changed, 381 insertions(+), 138 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
+>>
+>> -- 
+>> 1.7.9.5
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
