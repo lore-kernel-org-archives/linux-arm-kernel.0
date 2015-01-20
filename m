@@ -1,106 +1,35 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 20 Jan 2015 16:04:10 +0000
-Subject: [PATCH v6 3/6] mfd: ti_am335x_tscadc: Remove unwanted
- reg_se_cache save
-In-Reply-To: <54BE4CD1.1020709@ti.com>
-References: <1420609779-11156-1-git-send-email-vigneshr@ti.com>
- <1420609779-11156-4-git-send-email-vigneshr@ti.com>
- <20150120115325.GK13701@x1> <54BE4CD1.1020709@ti.com>
-Message-ID: <20150120160410.GL13701@x1>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 20 Jan 2015 17:04:13 +0100
+Subject: [PATCH v5] clk: sunxi: Add driver for A80 MMC config clocks/resets
+In-Reply-To: <1421768791-20170-1-git-send-email-wens@csie.org>
+References: <1421768791-20170-1-git-send-email-wens@csie.org>
+Message-ID: <20150120160413.GU4367@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 20 Jan 2015, R, Vignesh wrote:
-> On 1/20/2015 5:23 PM, Lee Jones wrote:
-> > On Wed, 07 Jan 2015, Vignesh R wrote:
-> > 
-> >> In one shot mode, sequencer automatically disables all enabled steps at
-> >> the end of each cycle. (both ADC steps and TSC steps) Hence these steps
-> >> need not be saved in reg_se_cache for clearing these steps at a later
-> >> stage.
-> >> Also, when ADC wakes up Sequencer should not be busy executing any of the
-> >> config steps except for the charge step. Previously charge step was 1 ADC
-> >> clock cycle and hence it was ignored.
-> >> TSC steps are always disabled at the end of each conversion cycle, hence
-> >> there is no need to explicitly disable TSC steps by writing 0 to REG_SE.
-> >>
-> >> Signed-off-by: Vignesh R <vigneshr@ti.com>
-> >> ---
-> >>
-> >> v5:
-> >>  - Remove unnecessary clearing of REG_SE
-> >>
-> >>  drivers/mfd/ti_am335x_tscadc.c       | 13 +++++--------
-> >>  include/linux/mfd/ti_am335x_tscadc.h |  1 +
-> >>  2 files changed, 6 insertions(+), 8 deletions(-)
-> > 
-> > Looks fine.
-> > 
-> > For my own reference:
-> >   Acked-by: Lee Jones <lee.jones@linaro.org>
-> > 
-> > Can this patch be applied on its own?
-> > 
+On Tue, Jan 20, 2015 at 11:46:31PM +0800, Chen-Yu Tsai wrote:
+> On the A80 SoC, the 4 mmc controllers each have a separate register
+> controlling their register access clocks and reset controls. These
+> registers in turn share a ahb clock gate and reset control.
 > 
-> I prefer to wait until input patches are picked up.
+> This patch adds a platform device driver for these controls. It
+> requires both clocks and reset controls to be available, so using
+> CLK_OF_DECLARE might not be the best way.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-I have no problem with that, but is there a technical reason why?
+Merged, thanks!
 
-> >> diff --git a/drivers/mfd/ti_am335x_tscadc.c b/drivers/mfd/ti_am335x_tscadc.c
-> >> index 467c80e1c4ae..e4e4b22eebc9 100644
-> >> --- a/drivers/mfd/ti_am335x_tscadc.c
-> >> +++ b/drivers/mfd/ti_am335x_tscadc.c
-> >> @@ -68,12 +68,6 @@ static void am335x_tscadc_need_adc(struct ti_tscadc_dev *tsadc)
-> >>  	DEFINE_WAIT(wait);
-> >>  	u32 reg;
-> >>  
-> >> -	/*
-> >> -	 * disable TSC steps so it does not run while the ADC is using it. If
-> >> -	 * write 0 while it is running (it just started or was already running)
-> >> -	 * then it completes all steps that were enabled and stops then.
-> >> -	 */
-> >> -	tscadc_writel(tsadc, REG_SE, 0);
-> >>  	reg = tscadc_readl(tsadc, REG_ADCFSM);
-> >>  	if (reg & SEQ_STATUS) {
-> >>  		tsadc->adc_waiting = true;
-> >> @@ -86,8 +80,12 @@ static void am335x_tscadc_need_adc(struct ti_tscadc_dev *tsadc)
-> >>  		spin_lock_irq(&tsadc->reg_lock);
-> >>  		finish_wait(&tsadc->reg_se_wait, &wait);
-> >>  
-> >> +		/*
-> >> +		 * Sequencer should either be idle or
-> >> +		 * busy applying the charge step.
-> >> +		 */
-> >>  		reg = tscadc_readl(tsadc, REG_ADCFSM);
-> >> -		WARN_ON(reg & SEQ_STATUS);
-> >> +		WARN_ON((reg & SEQ_STATUS) && !(reg & CHARGE_STEP));
-> >>  		tsadc->adc_waiting = false;
-> >>  	}
-> >>  	tsadc->adc_in_use = true;
-> >> @@ -96,7 +94,6 @@ static void am335x_tscadc_need_adc(struct ti_tscadc_dev *tsadc)
-> >>  void am335x_tsc_se_set_once(struct ti_tscadc_dev *tsadc, u32 val)
-> >>  {
-> >>  	spin_lock_irq(&tsadc->reg_lock);
-> >> -	tsadc->reg_se_cache |= val;
-> >>  	am335x_tscadc_need_adc(tsadc);
-> >>  
-> >>  	tscadc_writel(tsadc, REG_SE, val);
-> >> diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
-> >> index 3f4e994ace2b..1fd50dcfe47c 100644
-> >> --- a/include/linux/mfd/ti_am335x_tscadc.h
-> >> +++ b/include/linux/mfd/ti_am335x_tscadc.h
-> >> @@ -128,6 +128,7 @@
-> >>  
-> >>  /* Sequencer Status */
-> >>  #define SEQ_STATUS BIT(5)
-> >> +#define CHARGE_STEP		0x11
-> >>  
-> >>  #define ADC_CLK			3000000
-> >>  #define TOTAL_STEPS		16
-> > 
+Maxime
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150120/8cf39ef9/attachment.sig>
