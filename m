@@ -1,70 +1,80 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 20 Jan 2015 10:05:48 -0800
-Subject: [PATCH v7 1/4] Documentation: dt: add common bindings for
- hwspinlock
-In-Reply-To: <CAK=WgbYBqPoUm9byx0du_g5ZmHdYaUVLpSPZYHoCVzNoatNKpw@mail.gmail.com>
-References: <1421269101-51105-1-git-send-email-s-anna@ti.com>
- <1421269101-51105-2-git-send-email-s-anna@ti.com>
- <20150115135201.GG16217@leverpostej>
- <20150115135556.GH16217@leverpostej>
- <CAL_JsqL2LZAooMk-V8+xeF2g6acZE21M+-OBRw8aEVa-5wVHuQ@mail.gmail.com>
- <CAK=WgbYQ=BbinqJ5fsw2Y+FKdy=nasLsw9mX8pw6S_o3owy9-g@mail.gmail.com>
- <20150116101746.GA21809@leverpostej>
- <CAK=WgbYBqPoUm9byx0du_g5ZmHdYaUVLpSPZYHoCVzNoatNKpw@mail.gmail.com>
-Message-ID: <20150120180548.GK7718@atomide.com>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 20 Jan 2015 10:12:04 -0800
+Subject: [PATCH net-next v13 3/3] net: hisilicon: new hip04 ethernet driver
+In-Reply-To: <17360357.cJoZFH8idi@wuerfel>
+References: <1421217254-12008-1-git-send-email-dingtianhong@huawei.com>
+ <9314032.C8yR0htxiP@wuerfel> <54BDBA29.10703@huawei.com>
+ <17360357.cJoZFH8idi@wuerfel>
+Message-ID: <1421777524.2724.3.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ohad Ben-Cohen <ohad@wizery.com> [150116 16:50]:
-> Mark,
-> 
-> On Fri, Jan 16, 2015 at 12:17 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> >> The hwlock is a basic hardware primitive that allow synchronization
-> >> between different processors in the system, which may be running Linux
-> >> as well as other operating systems, and may have no other means of
-> >> communication.
-> >>
-> >> The hwlock id numbers are predefined, global and static across the
-> >> entire system: Linux may boot well after other operating systems are
-> >> already running and using these hwlocks to communicate, and therefore,
-> >> in order to use these hardware devices, it must not enumerate them
-> >> differently than the rest of the system.
-> >
-> > That's not true.
-> >
-> > In order to communicate it must agree with the other users as to the
-> > meaning of each instance, and the protocol for use. That doesn't
-> > necessarily mean that Linux needs to know the numerical ID from a
-> > datasheet, and regardless that ID is separate from the logical ID Linux
-> > uses internally.
-> 
-> Let me describe hwspinlocks a bit more so we all get to know it better
-> and can then agree on a proper solution.
-> 
-> - What makes handling of hwspinlock ID numbers convenient is the fact
-> that it's not based on random datasheet numbers. In fact, hwspinlocks
-> is just special memory: usually datasheets just define the base
-> address and the size of the hwspinlock area. So any numerical ID we
-> use to call the locks themselves are already logical and sane, similar
-> to the way we handle memory (i.e. if we have 32 locks we'll always use
-> 0..31). So hwlocks ids are very much like memory addressing, and not
-> irq numbers.
-> 
-> - Sometimes Linux will have to dynamically allocate a hwlock, and send
-> the ID of the allocated lock to a remote processor (which may not be
-> running Linux).
-> - Sometimes a remote processor, which may not be running Linux, will
-> have to dynamically allocate a hwlock, and send the ID of the
-> allocated lock to us (another processor running Linux)
-> 
-> We cannot tell in advance what kind of IPC is going to be used for
-> sending and receiving this hwlock ID. Some are handled by Linux
-> (kernel) and some by the user space. So we must be able to expose an
-> ID the system will understand as well as receive one.
+On Tue, 2015-01-20 at 13:01 +0100, Arnd Bergmann wrote:
+> On Tuesday 20 January 2015 10:15:05 Ding Tianhong wrote:
+> > On 2015/1/20 4:34, Arnd Bergmann wrote:
+> > > On Monday 19 January 2015 19:11:11 Alexander Graf wrote:
+> > >>
+> > >> After hammering on the box a bit again, I'm in a situation where I get 
+> > >> lots of
+> > >>
+> > >> [302398.232603] hip04-ether e28b0000.ethernet eth0: rx drop
+> > >> [302398.377309] hip04-ether e28b0000.ethernet eth0: rx drop
+> > >> [302398.395198] hip04-ether e28b0000.ethernet eth0: rx drop
+> > >> [302398.466118] hip04-ether e28b0000.ethernet eth0: rx drop
+> > >> [302398.659009] hip04-ether e28b0000.ethernet eth0: rx drop
+> > >> [302399.053389] hip04-ether e28b0000.ethernet eth0: rx drop
+> > >> [302399.122067] hip04-ether e28b0000.ethernet eth0: rx drop
+> > >> [302399.268192] hip04-ether e28b0000.ethernet eth0: rx drop
+> > >> [302399.286081] hip04-ether e28b0000.ethernet eth0: rx drop
+> > >> [302399.594201] hip04-ether e28b0000.ethernet eth0: rx drop
+> > >> [302399.683416] hip04-ether e28b0000.ethernet eth0: rx drop
+> > >> [302399.701307] hip04-ether e28b0000.ethernet eth0: rx drop
+> > >>
+> > >> and I really am getting a lot of drops - I can't even ping the machine 
+> > >> anymore.
+> > >>
+> > >> However, as it is there's a good chance the machine is simply 
+> > >> unreachable because it's busy writing to the UART, and even if not all 
+> > >> useful messages indicating anything have scrolled out. I really don't 
+> > >> think you should emit any message over and over again to the user. Once 
+> > >> or twice is enough.
 
-How about default to Linux id space and allow overriding that with
-a module param option if needed?
+[]
 
-Regards,
+> The hip04 ethernet driver currently acknowledges all interrupts directly
+> in the interrupt handler, and leaves all interrupts except the RX data
+> enabled the whole time. This causes multiple problems:
+[]
+> diff --git a/drivers/net/ethernet/hisilicon/hip04_eth.c b/drivers/net/ethernet/hisilicon/hip04_eth.c
+[]
+> @@ -564,23 +563,21 @@ static irqreturn_t hip04_mac_interrupt(int irq, void *dev_id)
+>  	if (!ists)
+>  		return IRQ_NONE;
+>  
+> -	writel_relaxed(DEF_INT_MASK, priv->base + PPE_RINT);
+> -
+>  	if (unlikely(ists & DEF_INT_ERR)) {
+> -		if (ists & (RCV_NOBUF | RCV_DROP))
+> +		if (ists & (RCV_NOBUF | RCV_DROP)) {
+>  			stats->rx_errors++;
+>  			stats->rx_dropped++;
+> -			netdev_err(ndev, "rx drop\n"
+> +			netdev_dbg(ndev, "rx drop\n");
+> +		}
+>  		if (ists & TX_DROP) {
+>  			stats->tx_dropped++;
+> -			netdev_err(ndev, "tx drop\n");
+> +			netdev_dbg(ndev, "tx drop\n");
+>  		}
+>  	}
+>  
 
-Tony
+While these are dubious messages to output at all, it
+probably would benefit to use net_ratelimit() before the
+netdev_dbg() and maybe output the counter as well:
+
+		if (...) {
+			stats++
+			if (net_ratelimit())
+				netdev_dbg(ndev, "[rt]x drop: %u\n", stats);
+		}
