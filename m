@@ -1,28 +1,42 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 20 Jan 2015 18:40:54 +0000
-Subject: [PATCHv7 2/2] arm64: add better page protections to arm64
-In-Reply-To: <CAGXu5jLSQHC=R7gr+ZbgQ81K=v+zXS+uxyNofg9xGsovO8qssg@mail.gmail.com>
-References: <1421276394-20402-1-git-send-email-lauraa@codeaurora.org>
- <1421276394-20402-3-git-send-email-lauraa@codeaurora.org>
- <CAKv+Gu8iGAPpR49EQKwmOZp2cHGdg8QJyoh2x1BB9uW6-S5L4g@mail.gmail.com>
- <54B9AC53.8020903@codeaurora.org>
- <20150120181453.GI25575@e104818-lin.cambridge.arm.com>
- <CAGXu5jLSQHC=R7gr+ZbgQ81K=v+zXS+uxyNofg9xGsovO8qssg@mail.gmail.com>
-Message-ID: <20150120184054.GJ25575@e104818-lin.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 20 Jan 2015 10:40:03 -0800
+Subject: linux-next: manual merge of the omap tree with the arm-soc tree
+In-Reply-To: <CAOesGMjc+q5ZEFU4GugJT2RCSmhv48DAA8JzuCxf63eEO6tWVQ@mail.gmail.com>
+References: <20150120110947.1a92a416@canb.auug.org.au>
+ <20150120171048.GF7718@atomide.com>
+ <CAOesGMjc+q5ZEFU4GugJT2RCSmhv48DAA8JzuCxf63eEO6tWVQ@mail.gmail.com>
+Message-ID: <20150120184002.GM7718@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 20, 2015 at 06:19:23PM +0000, Kees Cook wrote:
-> If, however, only the name is stopping it from landing in arm64, then
-> I don't care what it's called. ;)
+* Olof Johansson <olof@lixom.net> [150120 10:27]:
+> On Tue, Jan 20, 2015 at 9:10 AM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Stephen Rothwell <sfr@canb.auug.org.au> [150119 16:12]:
+> >> Hi Tony,
+> >>
+> >> Today's linux-next merge of the omap tree got a conflict in
+> >> arch/arm/boot/dts/Makefile between commit cb612390e546 ("ARM: dts: Only
+> >> build dtb if associated Arch and/or SoC is enabled") from the arm-soc
+> >> tree and commit ac7452cee743 ("ARM: dts: Add minimal support for
+> >> dm8168-evm") from the omap tree.
+> >>
+> >> I fixed it up (see below) and can carry the fix as necessary (no action
+> >> is required).
+> >
+> > Uhh why is cb612390e546 doing formatting changes all over the place?
+> > That's a sure way to produce merge conflicts..
+> 
+> It's intentional but a but annoying, yes -- we're resolving them as we
+> merge in new DT contents so it won't be exposed outside of our tree
+> (and -next, unfortunately).
 
-Apart from couple of comments on this latest series, the patches look
-fine to me.
+OK. I don't have anything against cleaning up and sorting things to
+avoid merge conflicts naturally :)
 
-One question for Laura though: have the patches been tested it with:
+Maybe for other similar changes you can set up an immutable branch
+abainst v3.xx-rc1 with just the clean-up that people can use as
+a base without having to bring in all the other changes?
 
-- 4-levels and 4KB pages?
-- 3-levels and 64KB pages?
+Regards,
 
--- 
-Catalin
+Tony
