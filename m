@@ -1,54 +1,61 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 20 Jan 2015 12:13:08 +0100 (CET)
-Subject: [PATCH v2 2/2] clocksource: don't suspend/resume when unused
-In-Reply-To: <1421427439-11699-3-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1421427439-11699-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1421427439-11699-3-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <alpine.DEB.2.11.1501201153140.5526@nanos>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 20 Jan 2015 19:15:36 +0800
+Subject: [PATCH net-next v2 1/1] ARM: dts: imx6sx: correct i.MX6sx sdb
+ board enet phy address
+In-Reply-To: <1421743697-26918-1-git-send-email-b38611@freescale.com>
+References: <1421743697-26918-1-git-send-email-b38611@freescale.com>
+Message-ID: <20150120111534.GA2766@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 16 Jan 2015, Alexandre Belloni wrote:
-
-> There is no point in calling suspend/resume for unused
-> clocksources.
-
-That's true, but ....
- 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  kernel/time/clocksource.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+On Tue, Jan 20, 2015 at 04:48:17PM +0800, Fugang Duan wrote:
+> The commit (3d125f9c91c5) cause i.MX6SX sdb enet cannot work. The cause is
+> the commit add mdio node with un-correct phy address.
 > 
-> diff --git a/kernel/time/clocksource.c b/kernel/time/clocksource.c
-> index 03cfc5a08e3b..da65b3b73a86 100644
-> --- a/kernel/time/clocksource.c
-> +++ b/kernel/time/clocksource.c
-> @@ -493,7 +493,7 @@ void clocksource_suspend(void)
->  	struct clocksource *cs;
+> The patch just correct i.MX6sx sdb board enet phy address.
+> 
+> V2:
+> * As Shawn's suggestion that unit-address should match 'reg' property, so
+>   update ethernet-phy unit-address.
+> 
+> Acked-by: Stefan Agner <stefan@agner.ch>
+> Signed-off-by: Fugang Duan <B38611@freescale.com>
+
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+
+David,
+
+I assume that you will send this fix for 3.19, since commit 3d125f9c91c5
+was sent via your tree.  Otherwise, let me know and I will manage to
+send it via arm-soc tree.
+
+Shawn
+
+> ---
+>  arch/arm/boot/dts/imx6sx-sdb.dts |    8 ++++----
+>  1 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
+> index 8c1febd..c108bb4 100644
+> --- a/arch/arm/boot/dts/imx6sx-sdb.dts
+> +++ b/arch/arm/boot/dts/imx6sx-sdb.dts
+> @@ -166,12 +166,12 @@
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
 >  
->  	list_for_each_entry_reverse(cs, &clocksource_list, list)
-> -		if (cs->suspend)
-> +		if (cs->suspend && (cs->flags & CLOCK_SOURCE_USED))
->  			cs->suspend(cs);
->  }
+> -		ethphy1: ethernet-phy at 0 {
+> -			reg = <0>;
+> +		ethphy1: ethernet-phy at 1 {
+> +			reg = <1>;
+>  		};
 >  
-> @@ -505,7 +505,7 @@ void clocksource_resume(void)
->  	struct clocksource *cs;
->  
->  	list_for_each_entry(cs, &clocksource_list, list)
-> -		if (cs->resume)
-> +		if (cs->resume && (cs->flags & CLOCK_SOURCE_USED))
->  			cs->resume(cs);
-
-I had a deeper look at the clocksources which have a resume
-callback. We have implementations, which rely on the resume callback
-being called unconditionally. e.g.: arch/x86/kernel/hpet.c. And there
-are a few others which have extra PM code in the suspend/resume path
-independent of the fact whether the clocksource is enabled or not.
-
-So we really need to make this opt-in with a per clocksource flag.
-
-Thanks,
-
-	tglx
+> -		ethphy2: ethernet-phy at 1 {
+> -			reg = <1>;
+> +		ethphy2: ethernet-phy at 2 {
+> +			reg = <2>;
+>  		};
+>  	};
+>  };
+> -- 
+> 1.7.8
+> 
