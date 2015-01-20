@@ -1,276 +1,73 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 20 Jan 2015 15:16:28 +0000
-Subject: [PATCH v7 10/17] ARM64 / ACPI: Parse MADT for SMP initialization
-In-Reply-To: <54BE53A3.5010706@linaro.org>
-References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
- <1421247905-3749-11-git-send-email-hanjun.guo@linaro.org>
- <20150116181836.GA15836@red-moon> <54BE53A3.5010706@linaro.org>
-Message-ID: <20150120151628.GI5398@red-moon>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 20 Jan 2015 15:19:11 +0000
+Subject: [PATCH v6 8/8] arm: dma-mapping: plumb our iommu mapping ops
+ into arch_setup_dma_ops
+In-Reply-To: <2060841.mOvatXFir7@avalon>
+References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
+ <1984907.uTqFPJnJpV@avalon> <20150119123058.GA7312@ulmo.nvidia.com>
+ <2060841.mOvatXFir7@avalon>
+Message-ID: <20150120151910.GD1549@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 20, 2015 at 01:09:55PM +0000, Hanjun Guo wrote:
-
-[...]
-
-> >> +{
-> >> +       int cpu;
-> >> +
-> >> +       if (mpidr == INVALID_HWID) {
-> >> +               pr_info("Skip MADT cpu entry with invalid MPIDR\n");
-> >> +               return -EINVAL;
-> >> +       }
-> >> +
-> >> +       total_cpus++;
-> >> +       if (!enabled)
-> >> +               return -EINVAL;
-> >> +
-> >> +       if (enabled_cpus >=  NR_CPUS) {
-> >> +               pr_warn("NR_CPUS limit of %d reached, Processor %d/0x%llx ignored.\n",
-> >> +                       NR_CPUS, total_cpus, mpidr);
-> >> +               return -EINVAL;
-> >> +       }
-> >> +
-> >> +       /* No need to check duplicate MPIDRs for the first CPU */
-> >> +       if (enabled_cpus) {
-> >> +               /*
-> >> +                * Duplicate MPIDRs are a recipe for disaster. Scan
-> >> +                * all initialized entries and check for
-> >> +                * duplicates. If any is found just ignore the CPU.
-> >> +                */
-> >> +               for_each_possible_cpu(cpu) {
-> >> +                       if (cpu_logical_map(cpu) == mpidr) {
-> >> +                               pr_err("Firmware bug, duplicate CPU MPIDR: 0x%llx in MADT\n",
-> >> +                                      mpidr);
-> >> +                               return -EINVAL;
-> >> +                       }
-> >> +               }
-> >> +
-> >> +               /* allocate a logical cpu id for the new comer */
-> >> +               cpu = cpumask_next_zero(-1, cpu_possible_mask);
-> >> +       } else {
-> >> +               /*
-> >> +                * First GICC entry must be BSP as ACPI spec said
-> >> +                * in section 5.2.12.15
-> >> +                */
-> >> +               if  (cpu_logical_map(0) != mpidr) {
-> >> +                       pr_err("First GICC entry with MPIDR 0x%llx is not BSP\n",
-> >> +                              mpidr);
-> >> +                       return -EINVAL;
-> >> +               }
-> >> +
-> >> +               /*
-> >> +                * boot_cpu_init() already hold bit 0 in cpu_present_mask
-> >
-> > You mean cpu_possible_mask ? That's what you allocate from above.
+On Tue, Jan 20, 2015 at 03:14:01PM +0000, Laurent Pinchart wrote:
+> On Monday 19 January 2015 13:31:00 Thierry Reding wrote:
+> > On Mon, Jan 19, 2015 at 01:34:24PM +0200, Laurent Pinchart wrote:
+> > > On Monday 19 January 2015 11:12:02 Will Deacon wrote:
+> > >> On Sun, Jan 18, 2015 at 11:18:51AM +0000, Laurent Pinchart wrote:
+> > >>> On Sunday 18 January 2015 15:54:34 Alexandre Courbot wrote:
+> > >>>> On 01/16/2015 08:18 AM, Laurent Pinchart wrote:
+> > >>>>> On Thursday 15 January 2015 11:12:17 Will Deacon wrote:
 > 
-> Another hot-plug piece leaved, will update it.
+> [snip]
 > 
-> >
-> >> +                * for BSP, no need to allocate again.
-> >> +                */
-> >> +               cpu = 0;
-> >> +       }
-> >> +
-> >> +       /* CPU 0 was already initialized */
-> >> +       if (cpu) {
-> >> +               cpu_ops[cpu] = cpu_get_ops(acpi_psci_present() ? "psci" : NULL);
-> >> +               if (!cpu_ops[cpu])
-> >> +                       return -EINVAL;
-> >> +
-> >> +               if (cpu_ops[cpu]->cpu_init(NULL, cpu))
-> >> +                       return -EOPNOTSUPP;
-> >> +
-> >> +               /* map the logical cpu id to cpu MPIDR */
-> >> +               cpu_logical_map(cpu) = mpidr;
-> >> +
-> >> +               set_cpu_possible(cpu, true);
-> >> +       } else {
-> >> +               /* get cpu0's ops, no need to return if ops is null */
-> >> +               cpu_ops[0] = cpu_get_ops(acpi_psci_present() ? "psci" : NULL);
-> >> +       }
-> >
-> > I do not see much point in calling cpu_get_ops with NULL, and adding
-> > the check in it to return NULL when the parameter is NULL.
-> >
-> > What would you expect from cpu_get_ops when called with NULL other than
-> > a NULL pointer ?
+> > >>>> I am arriving late in this discussion, but what is wrong with asking
+> > >>>> drivers to explicitly state that they want the DMA API to be backed
+> > >>>> by the IOMMU instead of forcibly making it work that way?
+> > >>> 
+> > >>> The vast majority of the drivers are not IOMMU-aware. We would thus
+> > >>> need to add a call at the beginning of the probe function of nearly
+> > >>> every driver that can perform DMA to state that the driver doesn't need
+> > >>> to handle any IOMMU that might be present in the system itself. I don't
+> > >>> think that's a better solution.
+> > >>> 
+> > >>> Explicitly tearing down mappings in drivers that want to manage IOMMUs
+> > >>> isn't a solution I like either. A possibly better solution would be to
+> > >>> call a function to state that the DMA mapping API shouldn't not handle
+> > >>> IOMMUs. Something like
+> > >>> 
+> > >>> 	dma_mapping_ignore_iommu(dev);
+> > >>> 
+> > >>> at the beginning of the probe function of such drivers could do. The
+> > >>> function would perform behind the scene all operations needed to tear
+> > >>> down everything that shouldn't have been set up.
+> > >> 
+> > >> An alternative would be to add a flag to platform_driver, like we have
+> > >> for "prevent_deferred_probe" which is something like
+> > >> "prevent_dma_configure".
+> > > 
+> > > That's a solution I have proposed (albeit as a struct device_driver field,
+> > > but that's a small detail), so I'm fine with it :-)
+> > 
+> > I think Marek had proposed something similar initially as well. I don't
+> > see an immediate downside to that solution. It's still somewhat ugly in
+> > that a lot of stuff is set up before it's known to actually be used at
+> > all, but it seems like there's some consensus that this can be improved
+> > later on, so I have no objections to such a patch.
+> > 
+> > Of course that doesn't solve the current breakage for the Rockchip DRM
+> > and OMAP ISP drivers.
 > 
-> I'm lost here since it is best way for the implementation I think, any
-> suggestions?
+> And, as I came to realize after a long bisect yesternight, the Renesas IPMMU 
+> driver :-/ Basically any platform that relied on arm_iommu_attach_device() to 
+> set the IOMMU DMA ops is now broken.
 
-My suggestion is: no PSCI, no secondaries booting, that's what your code
-wants to achieve, right ? What's the point in calling cpu_get_ops() when
-PSCI is not present then ? What do you expect from calling cpu_get_ops(NULL)
-other than a NULL pointer in return ?
+We could restore the set_dma_ops call in arm_iommu_attach_device as a
+temporary hack (along with a big fat comment), since arch_setup_dma_ops
+actually sets the ops correct *after* the call to
+arm_get_iommu_dma_map_ops...
 
-Put it differently, if !acpi_psci_present() parsing code should bail out,
-there are no CPU ops to initialize for secondaries, that's what I think
-your aim is, correct ?
+It doesn't provide any motivation for people to consider moving over to the
+new framework, but it fixes the current issues affecting mainline.
 
-On a side note, if ACPI PSCI is not present you still keep booting on
-the boot processor.
-
-What piece of code initialize cpu_ops[0] in that case ? I could not
-find any, basically you would run the kernel with cpu_ops[0] == NULL.
-
-> 
-> >
-> > You could move:
-> >
-> > cpu_ops[cpu] = cpu_get_ops(acpi_psci_present() ? "psci" : NULL);
-> >
-> > out of the if and remove the else, do not know if it makes code clearer,
-> > shorter for certain.
-> >
-> >> +
-> >> +       enabled_cpus++;
-> >> +       return cpu;
-> >> +}
-> >> +
-> >> +static int __init
-> >> +acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
-> >> +                               const unsigned long end)
-> >> +{
-> >> +       struct acpi_madt_generic_interrupt *processor;
-> >> +
-> >> +       processor = (struct acpi_madt_generic_interrupt *)header;
-> >> +
-> >> +       if (BAD_MADT_ENTRY(processor, end))
-> >> +               return -EINVAL;
-> >> +
-> >> +       acpi_table_print_madt_entry(header);
-> >> +
-> >> +       acpi_map_gic_cpu_interface(processor->arm_mpidr & MPIDR_HWID_BITMASK,
-> >> +               processor->flags & ACPI_MADT_ENABLED);
-> >> +
-> >> +       return 0;
-> >> +}
-> >> +
-> >> +/* Parse GIC cpu interface entries in MADT for SMP init */
-> >> +void __init acpi_smp_init_cpus(void)
-> >> +{
-> >> +       int count;
-> >> +
-> >> +       /*
-> >> +        * do a partial walk of MADT to determine how many CPUs
-> >> +        * we have including disabled CPUs, and get information
-> >> +        * we need for SMP init
-> >> +        */
-> >> +       count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
-> >> +                       acpi_parse_gic_cpu_interface, 0);
-> >> +
-> >> +       if (!count) {
-> >> +               pr_err("No GIC CPU interface entries present\n");
-> >> +               return;
-> >> +       } else if (count < 0) {
-> >> +               pr_err("Error parsing GIC CPU interface entry\n");
-> >> +               return;
-> >> +       }
-> >> +
-> >> +       /* Make boot-up look pretty */
-> >> +       pr_info("%d CPUs enabled, %d CPUs total\n", enabled_cpus, total_cpus);
-> >> +}
-> >> +
-> >>   static int __init acpi_parse_fadt(struct acpi_table_header *table)
-> >>   {
-> >>          struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
-> >> @@ -62,8 +196,20 @@ static int __init acpi_parse_fadt(struct acpi_table_header *table)
-> >>           * to get arm boot flags, or we will disable ACPI.
-> >>           */
-> >>          if (table->revision > 5 ||
-> >> -           (table->revision == 5 && fadt->minor_revision >= 1))
-> >> -               return 0;
-> >> +           (table->revision == 5 && fadt->minor_revision >= 1)) {
-> >> +               /*
-> >> +                * ACPI 5.1 only has two explicit methods to boot up SMP,
-> >> +                * PSCI and Parking protocol, but the Parking protocol is
-> >> +                * only specified for ARMv7 now, so make PSCI as the only
-> >> +                * way for the SMP boot protocol before some updates for
-> >> +                * the ACPI spec or the Parking protocol spec.
-> >> +                */
-> >> +               if (acpi_psci_present())
-> >> +                       return 0;
-> >> +
-> >> +               pr_warn("No PSCI support, will not bring up secondary CPUs\n");
-> >> +               return -EOPNOTSUPP;
-> >> +       }
-> >>
-> >>          pr_warn("Unsupported FADT revision %d.%d, should be 5.1+, will disable ACPI\n",
-> >>                  table->revision, fadt->minor_revision);
-> >> diff --git a/arch/arm64/kernel/cpu_ops.c b/arch/arm64/kernel/cpu_ops.c
-> >> index cce9524..1ea7b9f 100644
-> >> --- a/arch/arm64/kernel/cpu_ops.c
-> >> +++ b/arch/arm64/kernel/cpu_ops.c
-> >> @@ -27,7 +27,7 @@ extern const struct cpu_operations cpu_psci_ops;
-> >>
-> >>   const struct cpu_operations *cpu_ops[NR_CPUS];
-> >>
-> >> -static const struct cpu_operations *supported_cpu_ops[] __initconst = {
-> >> +static const struct cpu_operations *supported_cpu_ops[] = {
-> >
-> > This __initconst removal should be explained either with code needing
-> > it or through a comment. You can't make changes with future patches
-> > in mind, since they may never get merged and you leave code in this
-> > patch incomplete.
-> >
-> > As far as I know if physical CPU hotplug can't/won't be done on ARM64 your
-> > patch would make changes that are not needed, and miss some changes
-> > that are (eg removing enabled_cpus or make it __initdata).
-> 
-> I agree with you :)
-> 
-> >
-> > You can't write a patch with assumptions on subsequent patches.
-> >
-> >>   #ifdef CONFIG_SMP
-> >>          &smp_spin_table_ops,
-> >>   #endif
-> >> @@ -35,10 +35,13 @@ static const struct cpu_operations *supported_cpu_ops[] __initconst = {
-> >>          NULL,
-> >>   };
-> >>
-> >> -static const struct cpu_operations * __init cpu_get_ops(const char *name)
-> >> +const struct cpu_operations *cpu_get_ops(const char *name)
-> >
-> > Ditto.
-> >
-> >>   {
-> >>          const struct cpu_operations **ops = supported_cpu_ops;
-> >>
-> >> +       if (!name)
-> >> +               return NULL;
-> >> +
-> >
-> > See above.
-> >
-> >>          while (*ops) {
-> >>                  if (!strcmp(name, (*ops)->name))
-> >>                          return *ops;
-> >> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> >> index ef5b1e1..54e39e3 100644
-> >> --- a/arch/arm64/kernel/setup.c
-> >> +++ b/arch/arm64/kernel/setup.c
-> >> @@ -414,13 +414,16 @@ void __init setup_arch(char **cmdline_p)
-> >>          if (acpi_disabled) {
-> >>                  unflatten_device_tree();
-> >>                  psci_dt_init();
-> >> +               cpu_read_bootcpu_ops();
-> >> +#ifdef CONFIG_SMP
-> >> +               of_smp_init_cpus();
-> >> +#endif
-> >>          } else {
-> >>                  psci_acpi_init();
-> >> +               acpi_smp_init_cpus();
-> >
-> > With DT you call cpu_read_bootcpu_ops() and then of_smp_init_cpus()
-> > with acpi you have one function that does both, it is not really
-> > neat.
-> 
-> The mechanism for ACPI table entry scanning is that for every matched
-> structure (such as GICC) found, the parse function will be called, so
-> if we separate them it will duplicate the scanning of ACPI tables.
-
-Call it acpi_init_cpus() then.
-
-Lorenzo
+Will
