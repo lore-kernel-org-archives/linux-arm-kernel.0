@@ -1,83 +1,75 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 20 Jan 2015 10:17:52 +0000
-Subject: [PATCH] i2c: drop ancient protection against sysfs refcounting
- issues
-In-Reply-To: <20150120071256.GA18983@kroah.com>
-References: <1421693756-12917-1-git-send-email-wsa@the-dreams.de>
- <20150119190142.GA9451@kroah.com>
- <20150119230427.GH26493@n2100.arm.linux.org.uk>
- <20150120014159.GA3349@kroah.com> <54BDFE30.5090303@metafoo.de>
- <20150120071256.GA18983@kroah.com>
-Message-ID: <20150120101752.GI26493@n2100.arm.linux.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 20 Jan 2015 10:18:56 +0000
+Subject: [PATCH v3 1/3] dt-bindings: mfd: add lubbock-io binding
+In-Reply-To: <87lhkyh8m3.fsf@free.fr>
+References: <1421406010-14851-1-git-send-email-robert.jarzmik@free.fr>
+ <20150119083533.GF21886@x1> <87lhkyh8m3.fsf@free.fr>
+Message-ID: <20150120101856.GO5767@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 20, 2015 at 03:12:56PM +0800, Greg Kroah-Hartman wrote:
-> On Tue, Jan 20, 2015 at 08:05:20AM +0100, Lars-Peter Clausen wrote:
-> > On 01/20/2015 02:41 AM, Greg Kroah-Hartman wrote:
-> > >On Mon, Jan 19, 2015 at 11:04:27PM +0000, Russell King - ARM Linux wrote:
-> > >>On Tue, Jan 20, 2015 at 03:01:42AM +0800, Greg Kroah-Hartman wrote:
-> > >>>On Mon, Jan 19, 2015 at 07:55:56PM +0100, Wolfram Sang wrote:
-> > >>>>diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-> > >>>>index 39d25a8cb1ad..15cc5902cf89 100644
-> > >>>>--- a/drivers/i2c/i2c-core.c
-> > >>>>+++ b/drivers/i2c/i2c-core.c
-> > >>>>@@ -41,7 +41,6 @@
-> > >>>>  #include <linux/of_device.h>
-> > >>>>  #include <linux/of_irq.h>
-> > >>>>  #include <linux/clk/clk-conf.h>
-> > >>>>-#include <linux/completion.h>
-> > >>>>  #include <linux/hardirq.h>
-> > >>>>  #include <linux/irqflags.h>
-> > >>>>  #include <linux/rwsem.h>
-> > >>>>@@ -1184,8 +1183,7 @@ EXPORT_SYMBOL_GPL(i2c_new_dummy);
-> > >>>>
-> > >>>>  static void i2c_adapter_dev_release(struct device *dev)
-> > >>>>  {
-> > >>>>-	struct i2c_adapter *adap = to_i2c_adapter(dev);
-> > >>>>-	complete(&adap->dev_released);
-> > >>>>+	/* empty, but the driver core insists we need a release function */
-> > >>>
-> > >>>Yeah, it does, but I hate to see this in "real" code as something is
-> > >>>probably wrong with it if it happens.
-> > >>>
-> > >>>Please move the rest of 'i2c_del_adapter' into the release function
-> > >>>(what was after the wait_for_completion() call), and then all should be
-> > >>>fine.
-> > >>
-> > >>Are you sure about that?  Some drivers do this, eg,
-> > >>
-> > >>         i2c_del_adapter(&drv_data->adapter);
-> > >>         free_irq(drv_data->irq, drv_data);
-> > >>
-> > >>where drv_data was allocated using devm_kzalloc(), and so will be
-> > >>released when the ->remove callback (which calls the above
-> > >>i2c_del_adapter()) returns... freeing the embedded device struct.
-> > >
-> > >But that will fail today if the memory is freed in i2c_del_adapter(), so
-> > >there shouldn't be any change in logic here.
-> > >
-> > >Or am I missing something obvious?
-> > 
-> > The memory is not freed in i2c_del_adapter().
-> 
-> Right, and I'm not saying it should be, just move the existing logic
-> into the release callback, and the code flow should be the same and we
-> don't end up with an "empty" release callback.
+On Mon, 19 Jan 2015, Robert Jarzmik wrote:
+> Lee Jones <lee.jones@linaro.org> writes:
+> > On Fri, 16 Jan 2015, Robert Jarzmik wrote:
+> >
+> >> Add a binding for lubbock motherboard IO board.
+> >> 
+> >> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> >> ---
+> >>  .../devicetree/bindings/mfd/lubbock-io.txt         | 26 ++++++++++++++++++++++
+> >>  1 file changed, 26 insertions(+)
+> >>  create mode 100644 Documentation/devicetree/bindings/mfd/lubbock-io.txt
+> >> 
+> >> diff --git a/Documentation/devicetree/bindings/mfd/lubbock-io.txt b/Documentation/devicetree/bindings/mfd/lubbock-io.txt
+> >> new file mode 100644
+> >> index 0000000..33c9e21
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/mfd/lubbock-io.txt
+> >> @@ -0,0 +1,26 @@
 
-IMHO there are two possibilities here:
+[...]
 
-1. leave it as-is, where we ensure that the remainder of i2c_del_adapter
-   does not complete until the release callback has been called.
+> >> +This is the motherboard, or IO board, of the pxa25x development system,
+> >> +supporting a lubbock pxa25x SoC board.
+> >
+> > Again, this sounds weird.
+> Would it sound better with :
+>   This regroups all the CPLDs on the Lubbock motherboard, providing interrupt
+>   muxing, leds handling, ...
 
-2. fix it properly by taking (eg) the netdev approach to i2c_adapter,
-   or an alternative solution which results in decoupling the lifetime
-   of the struct device from the i2c_adapter.
+Sounds a lot better, yes.
 
-Either of these would be much better than removing the completion and
-then moving a chunk of code to make it "look" safer than it actually is
-and thereby introducing potential use-after-free bugs.
+[...]
+
+> >> +  - interrupts : The first interrupt is the line the /IRQ signal the IO board
+> >> +                 multiplex is connected to. The only known case is GPIO0 on the
+> >> +                 pxa25x SoC.
+> >
+> > Can you get someone to help you re-word this into a more fluid
+> > sentence?
+> Aouch, how about this :
+
+:)
+
+> interrupts : The first interrupt is the SoC input interrupt connected to the
+>              lubbock IO board interrupt multiplexer output. The only known
+>              working configuration is GPIO0 on the pxa25x SoC.
+
+Perfect.
+
+[...]
+
+> > I'm guessing mb means motherboard?  I think it's unusual for a
+> > motherboard to have it's own driver.  Usually we provide drivers for
+> > the individual components/peripherals situated on the board.
+> Yes, mb for motherboard. Well, this driver is actually for the CPLDs on the
+> motherboard.  Would "lubbock-cplds" be a better choice ?
+
+That would fit better with my current understanding of what requires a
+driver and what does not.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
