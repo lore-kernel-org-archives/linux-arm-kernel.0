@@ -1,81 +1,81 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 20 Jan 2015 13:51:43 +0100
-Subject: [PATCH 6/9] ARM: shmobile: ape6evm dts: Move Ethernet node to BSC
-In-Reply-To: <1421758306-24838-1-git-send-email-geert+renesas@glider.be>
-References: <1421758306-24838-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1421758306-24838-7-git-send-email-geert+renesas@glider.be>
+Date: Tue, 20 Jan 2015 13:51:37 +0100
+Subject: [PATCH 0/9] ARM: shmobile: r8a73a4/ape6evm multiplatform
+Message-ID: <1421758306-24838-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the Ethernet node from the ad-hoc lbsc node to the BSC node,
-as its connected to the Bus State Controller.  This allows the system to
-know the right position of the Ethernet node in the clock and PM domain
-hierarchy, and manage the clock and PM domain appropriately.
+	Hi Simon, Magnus,
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Tested-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
----
-v3:
-  - Add Tested-by,
+This patch series transitions the r8a73a4/ape6evm platform to support
+multiplatform only:
+  - Add CCF information to DT,
+  - Disable legacy clock if CCF is used,
+  - Add Bus State Controller node, and move the Ethernet node to it,
+  - Remove ape6evm-reference,
+  - Remove ape6evm-legacy and legacy support code.
 
-v2:
-  - New.
----
- arch/arm/boot/dts/r8a73a4-ape6evm.dts | 35 +++++++++++++++--------------------
- 1 file changed, 15 insertions(+), 20 deletions(-)
+This series is based on renesas-drivers-2015-01-19-v3.19-rc5.
+It depends on renesas-devel-20150119-v3.19-rc5 (code-wise) and
+clk-shmobile-for-3.20 (functionality-wise), for which I've sent a pull
+request to Mike Turquette yesterday.
 
-diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-index 0d50bef0123449f5..44c4cac1820a4dfe 100644
---- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-+++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-@@ -72,26 +72,6 @@
- 		regulator-always-on;
- 	};
- 
--	lbsc {
--		compatible = "simple-bus";
--		#address-cells = <1>;
--		#size-cells = <1>;
--		ranges = <0 0 0 0x20000000>;
--
--		ethernet at 8000000 {
--			compatible = "smsc,lan9220", "smsc,lan9115";
--			reg = <0x08000000 0x1000>;
--			interrupt-parent = <&irqc1>;
--			interrupts = <8 IRQ_TYPE_LEVEL_HIGH>;
--			phy-mode = "mii";
--			reg-io-width = <4>;
--			smsc,irq-active-high;
--			smsc,irq-push-pull;
--			vdd33a-supply = <&ape6evm_fixed_3v3>;
--			vddvario-supply = <&ape6evm_fixed_1v8>;
--		};
--	};
--
- 	leds {
- 		compatible = "gpio-leds";
- 		led1 {
-@@ -184,6 +164,21 @@
- 	voltage-tolerance = <1>; /* 1% */
- };
- 
-+&bsc {
-+	ethernet at 8000000 {
-+		compatible = "smsc,lan9220", "smsc,lan9115";
-+		reg = <0x08000000 0x1000>;
-+		interrupt-parent = <&irqc1>;
-+		interrupts = <8 IRQ_TYPE_LEVEL_HIGH>;
-+		phy-mode = "mii";
-+		reg-io-width = <4>;
-+		smsc,irq-active-high;
-+		smsc,irq-push-pull;
-+		vdd33a-supply = <&ape6evm_fixed_3v3>;
-+		vddvario-supply = <&ape6evm_fixed_1v8>;
-+	};
-+};
-+
- &cmt1 {
- 	status = "okay";
- };
+All of this was untested by me due to lack of hardware.
+As Mike had previously acked the r8a73a4 CCF implementation, it's safe
+to apply after testing.
+
+Thanks!
+
+Geert Uytterhoeven (2):
+  ARM: shmobile: r8a73a4 dtsi: Add Bus State Controller node
+  ARM: shmobile: ape6evm dts: Move Ethernet node to BSC
+
+Laurent Pinchart (1):
+  ARM: shmobile: r8a73a4: Remove legacy code
+
+Ulrich Hecht (6):
+  ARM: shmobile: r8a73a4: Add CPG register bits header
+  ARM: shmobile: r8a73a4: Common clock framework DT description
+  ARM: shmobile: ape6evm: Disable legacy clock initialization
+  ARM: shmobile: r8a73a4: Add MSTP clock assignments to DT
+  ARM: shmobile: ape6evm-reference: Remove board C code and DT file
+  ARM: shmobile: r8a73a4: ape6evm: Remove legacy platform
+
+ Documentation/devicetree/bindings/arm/shmobile.txt |   2 -
+ MAINTAINERS                                        |   1 -
+ arch/arm/boot/dts/Makefile                         |   2 -
+ arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts    | 156 -----
+ arch/arm/boot/dts/r8a73a4-ape6evm.dts              |  35 +-
+ arch/arm/boot/dts/r8a73a4.dtsi                     | 333 +++++++++++
+ arch/arm/configs/ape6evm_defconfig                 | 109 ----
+ arch/arm/mach-shmobile/Kconfig                     |  25 -
+ arch/arm/mach-shmobile/Makefile                    |   3 -
+ arch/arm/mach-shmobile/Makefile.boot               |   2 -
+ arch/arm/mach-shmobile/board-ape6evm-reference.c   |  60 --
+ arch/arm/mach-shmobile/board-ape6evm.c             | 286 ---------
+ arch/arm/mach-shmobile/clock-r8a73a4.c             | 659 ---------------------
+ arch/arm/mach-shmobile/r8a73a4.h                   |  17 -
+ arch/arm/mach-shmobile/setup-r8a73a4.c             | 273 +--------
+ include/dt-bindings/clock/r8a73a4-clock.h          |  62 ++
+ 16 files changed, 412 insertions(+), 1613 deletions(-)
+ delete mode 100644 arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
+ delete mode 100644 arch/arm/configs/ape6evm_defconfig
+ delete mode 100644 arch/arm/mach-shmobile/board-ape6evm-reference.c
+ delete mode 100644 arch/arm/mach-shmobile/board-ape6evm.c
+ delete mode 100644 arch/arm/mach-shmobile/clock-r8a73a4.c
+ delete mode 100644 arch/arm/mach-shmobile/r8a73a4.h
+ create mode 100644 include/dt-bindings/clock/r8a73a4-clock.h
+
 -- 
 1.9.1
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
