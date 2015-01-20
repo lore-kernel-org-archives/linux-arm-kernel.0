@@ -1,70 +1,50 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 20 Jan 2015 10:04:50 +0000
-Subject: [RFC PATCH 5/5] arm: perf: Use FIQ to handle PMU events.
-In-Reply-To: <20150119174818.GD26493@n2100.arm.linux.org.uk>
-References: <1421166931-14134-1-git-send-email-daniel.thompson@linaro.org>
- <1421166931-14134-6-git-send-email-daniel.thompson@linaro.org>
- <20150119174818.GD26493@n2100.arm.linux.org.uk>
-Message-ID: <54BE2842.5000205@linaro.org>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Tue, 20 Jan 2015 11:07:04 +0100
+Subject: [PATCH 8/8] regulator: MT6397: Add support for MT6397 regulator
+In-Reply-To: <1421747231-554-9-git-send-email-s.hauer@pengutronix.de>
+References: <1421747231-554-1-git-send-email-s.hauer@pengutronix.de>
+ <1421747231-554-9-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1421748424.9655.107.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/01/15 17:48, Russell King - ARM Linux wrote:
-> On Tue, Jan 13, 2015 at 04:35:31PM +0000, Daniel Thompson wrote:
->> +/*
->> + * This handler is called *unconditionally* from the default NMI/FIQ
->> + * handler. The irq may not be anything to do with us so the main
->> + * job of this function is to figure out if the irq passed in is ours
->> + * or not.
->> + */
->> +void cpu_pmu_handle_fiq(int irq)
->> +{
->> +	int cpu = smp_processor_id();
+On Tue, 2015-01-20 at 10:47 +0100, Sascha Hauer wrote:
+> From: Flora Fu <flora.fu@mediatek.com>
 > 
-> This can be either debug_smp_processor_id() or raw_smp_processor_id().
-> raw_smp_processor_id() is fine from FIQ contexts, as seems to be
-> debug_smp_processor_id(), but only because we guarantee that
-> irqs_disabled() in there will be true.
-
-Curiously I was looking at exactly this yesterday (because I was
-intrigued why the NMI-safe bits of kgdb use raw_smp_processor_id() but
-the x86 arch_trigger_all_cpu_backtrace() implementation uses
-smp_processor_id()).
-
-Given the comments make clear smp_processor_id() is the preferred
-variant except for false positives I concluded I would continue with
-smp_processor_id() for any code I write hanging off the default FIQ
-handler. No objections?
-
-
->> +
->> +	if (irq != get_cpu_var(cpu_pmu_irqs))
->> +		return;
+> This adds support for the regulators on the MediaTek MT6397
+> Multifunction device.
 > 
-> get_cpu_var() needs put_cpu_var() to undo its effects.  get_cpu_var()
-> calls preempt_disable(), which calls into lockdep...  I think we
-> determined that was fine last time we went digging?
+> Signed-off-by: Flora Fu, MediaTek
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Liam Girdwood <lgirdwood@gmail.com>
+> Cc: Mark Brown <broonie@kernel.org>
+> ---
+>  Documentation/devicetree/bindings/mfd/mt6397.txt   |  41 ++-
 
-Yes. We reviewed lockdep from the point-of-view of RCU and found that
-lockdep disabled most of itself when in_nmi() is true.
+This looks new for linux-next ...
 
-> put_cpu_var()
-> would call preempt_enable() which I'd hope would be safe in FIQ/NMI
-> contexts?
+>  .../bindings/regulator/mt6397-regulator.txt        | 217 ++++++++++++++
 
-Yes.
+but this is already in linux-next. See linux-next commit 269675757901
+("regulator: Add document for MT6397 regulator"). And ...
 
-preempt_count_add/sub form part of the work done by nmi_enter() and
-nmi_exit().
+>  drivers/regulator/Kconfig                          |   9 +
+>  drivers/regulator/Makefile                         |   1 +
+>  drivers/regulator/mt6397-regulator.c               | 332 +++++++++++++++++++++
+>  include/linux/regulator/mt6397-regulator.h         |  49 +++
 
-However this code gets no benefit from calling get_cpu_var(). I think it
-would be better to switch it to this_cpu_ptr.
+these are too. See linux-next commit 0425e2420c0a ("egulator: mt6397:
+Add support for MT6397 regulator"). Unless there are difference that
+can't be spotted by looking at the diffstats of those commist, that is.
+
+I only noticed because I was looking at the progress of the patch that
+adds MFD_MT6397, and found this series. (MFD_MT6397 is added in 7/8, by
+the way.)
+
+>  6 files changed, 626 insertions(+), 23 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/regulator/mt6397-regulator.txt
+>  create mode 100644 drivers/regulator/mt6397-regulator.c
+>  create mode 100644 include/linux/regulator/mt6397-regulator.h
 
 
->> +
->> +	(void)armpmu_dispatch_irq(irq,
->> +				  get_cpu_ptr(&cpu_pmu->hw_events->percpu_pmu));
-> 
-> Again, get_cpu_xxx() needs to be balanced with a put_cpu_xxx().
-> 
-> 
+Paul Bolle
