@@ -1,337 +1,181 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 20 Jan 2015 23:46:31 +0800
-Subject: [PATCH v5] clk: sunxi: Add driver for A80 MMC config clocks/resets
-Message-ID: <1421768791-20170-1-git-send-email-wens@csie.org>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 20 Jan 2015 16:46:54 +0100
+Subject: [PATCH v4 2/5] dt-bindings: Add pinctrl bindings for
+ mt65xx/mt81xx.
+In-Reply-To: <1418772873-19747-3-git-send-email-hongzhou.yang@mediatek.com>
+References: <1418772873-19747-1-git-send-email-hongzhou.yang@mediatek.com>
+ <1418772873-19747-3-git-send-email-hongzhou.yang@mediatek.com>
+Message-ID: <CABuKBe+9wG_Pa0S7A+JGT8mRo9embdYXhse1GFJXm8Rj3OTZQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the A80 SoC, the 4 mmc controllers each have a separate register
-controlling their register access clocks and reset controls. These
-registers in turn share a ahb clock gate and reset control.
+2014-12-17 0:34 GMT+01:00 Hongzhou Yang <hongzhou.yang@mediatek.com>:
+> From: Hongzhou Yang <hongzhou.yang@mediatek.com>
+>
+> Add devicetree bindings for Mediatek SoC pinctrl driver.
+>
+> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+> ---
+>  .../devicetree/bindings/pinctrl/pinctrl-mt65xx.txt | 142 +++++++++++++++++++++
+>  1 file changed, 142 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt
+>
+> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt
+> new file mode 100644
+> index 0000000..3bf34f9
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt
+> @@ -0,0 +1,142 @@
+> +* Mediatek MT65XX Pin Controller
+> +
+> +The Mediatek's Pin controller is used to control SoC pins.
+> +
+> +Required properties:
+> +- compatible: value should be either of the following.
+> +    (a) "mediatek,mt8135-pinctrl", compatible with mt8135 pinctrl.
+> +- mediatek,pctl-regmap: Should be a phandle of the syscfg node.
+> +- gpio-controller : Marks the device node as a gpio controller.
+> +- #gpio-cells: number of cells in GPIO specifier. Since the generic GPIO
+> +  binding is used, the amount of cells must be specified as 2. See the below
+> +  mentioned gpio binding representation for description of particular cells.
+> +
+> +       Eg: <&pio 6 0>
+> +       <[phandle of the gpio controller node]
+> +       [pin number within the gpio controller]
+> +       [flags]>
+> +
+> +       Values for gpio specifier:
+> +       - Pin number: is a value between 0 to 202.
+> +       - Flags:  bit field of flags, as defined in <dt-bindings/gpio/gpio.h>.
+> +            Only the following flags are supported:
+> +            0 - GPIO_ACTIVE_HIGH
+> +            1 - GPIO_ACTIVE_LOW
+> +- reg: physicall address base for EINT registers
+> +- interrupt-controller: Marks the device node as an interrupt controller
+> +- #interrupt-cells: Should be two.
+> +- interrupts : The interrupt outputs from the controller.
+> +
+> +Please refer to pinctrl-bindings.txt in this directory for details of the
+> +common pinctrl bindings used by client devices.
+> +
+> +A pinctrl node should contain at least one subnodes representing the
+> +pinctrl groups available on the machine. Each subnode will list the
+> +pins it needs, and how they should be configured, with regard to muxer
+> +configuration, pullups, drive strngth, input enable/disable and input schmitt.
 
-This patch adds a platform device driver for these controls. It
-requires both clocks and reset controls to be available, so using
-CLK_OF_DECLARE might not be the best way.
+drive strength
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
+> +
+> +Required subnode-properties:
+> +
+> +- pins: 2 integers array, represents gpio pinmux number and config
+> +  setting. The format as following
+> +
+> +    node {
+> +     pins = <PIN_NUMBER_PINMUX>;
+> +                     GENERIC_PINCONFIG;
+> +    };
+> +
+> +    The PIN_NUMBER_PINMUX is combination of GPIO number and pinmux, it can
+> +    use macros which already defind in boot/dts/mt8135-pinfunc.h directly.
+> +    The GENERIC_PINCONFIG is the generic pinconfig options to use, bias-disable,
+> +    bias-pull-down, bias-pull-up, input-enable, input-disable, output-low, output-high,
+> +    input-schmitt-enable, input-schmitt-disable and drive-strength are valid.
+> +
+> +    Some special pins have extra pull up strength, there are R0 and R1 pull-up
+> +    resistors available, but for user, it's only need to set R1R0 as 00, 01, 10 or 11.
+> +    So when config bias-pull-up, it support arguments for those special pins.
+> +    Some macros have been defined for this usage, such as MTK_PUPD_SET_R1R0_00.
+> +    See dt-bindings/pinctrl/mt65xx.h.
+> +
+> +    When config drive-strength, it can support some arguments, such as
+> +    MTK_DRIVE_4mA, MTK_DRIVE_6mA, etc. See dt-bindings/pinctrl/mt65xx.h.
+> +
+> +Examples:
+> +
+> +#include "mt8135-pinfunc.h"
+> +
+> +...
+> +{
+> +       syscfg_pctl_a: syscfg_pctl_a at 10005000 {
+> +               compatible = "mediatek,mt8135-pctl-a-syscfg", "syscon";
+> +               reg = <0 0x10005000 0 0x1000>;
+> +       };
+> +
+> +       syscfg_pctl_b: syscfg_pctl_b at 1020C020 {
+> +               compatible = "mediatek,mt8135-pctl-b-syscfg", "syscon";
+> +               reg = <0 0x1020C020 0 0x1000>;
+> +       };
+> +
+> +       pinctrl at 01c20800 {
+> +               compatible = "mediatek,mt8135-pinctrl";
+> +               reg = <0 0x1000B000 0 0x1000>;
+> +               mediatek,pctl-regmap = <&syscfg_pctl_a &syscfg_pctl_b>;
+> +               gpio-controller;
+> +               #gpio-cells = <2>;
+> +               interrupt-controller;
+> +               #interrupt-cells = <2>;
+> +               interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>,
+> +                               <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>,
+> +                               <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
+> +
+> +               i2c0_pins_a: i2c0 at 0 {
+> +                       pins1 {
+> +                               pins = <MT8135_PIN_100_SDA0__FUNC_SDA0>,
+> +                                               <MT8135_PIN_101_SCL0__FUNC_SCL0>;
+> +                               bias-disable;
+> +                       };
+> +               };
+> +
+> +               i2c1_pins_a: i2c1 at 0 {
+> +                       pins {
+> +                               pins = <MT8135_PIN_195_SDA1__FUNC_SDA1>,
+> +                                               <MT8135_PIN_196_SCL1__FUNC_SCL1>;
+> +                               bias-pull-up = <55>;
+> +                       };
+> +               };
+> +
+> +               i2c2_pins_a: i2c2 at 0 {
+> +                       pins1 {
+> +                               pins = <MT8135_PIN_193_SDA2__FUNC_SDA2>;
+> +                               bias-pull-down;
+> +                       };
+> +
+> +                       pins2 {
+> +                               pins = <MT8135_PIN_49_WATCHDOG__FUNC_GPIO49>;
+> +                               bias-pull-up;
+> +                       };
+> +               };
+> +
+> +               i2c3_pins_a: i2c3 at 0 {
+> +                       pins1 {
+> +                               pins = <MT8135_PIN_40_DAC_CLK__FUNC_GPIO40>,
+> +                                               <MT8135_PIN_41_DAC_WS__FUNC_GPIO41>;
+> +                               bias-pull-up = <55>;
+> +                       };
+> +
+> +                       pins2 {
+> +                               pins = <MT8135_PIN_35_SCL3__FUNC_SCL3>,
+> +                                               <MT8135_PIN_36_SDA3__FUNC_SDA3>;
+> +                               output-low;
+> +                               bias-pull-up = <55>;
+> +                       };
+> +
+> +                       pins3 {
+> +                               pins = <MT8135_PIN_57_JTCK__FUNC_GPIO57>,
+> +                                               <MT8135_PIN_60_JTDI__FUNC_JTDI>;
+> +                               drive-strength = <32>;
+> +                       };
+> +               };
+> +
+> +               ...
+> +       }
+> +};
+> --
+> 1.8.1.1.dirty
+>
 
-Hi Maxime,
-
-This is the last unmerged patch in the sun9i mmc series.
-
-Changes since v4:
-
-    - Use __clk_get_name() instead of of_clk_get_parent_name() since we
-      already have a reference to the clock.
 
 
-ChenYu
-
----
- Documentation/devicetree/bindings/clock/sunxi.txt |  25 ++-
- drivers/clk/sunxi/Makefile                        |   1 +
- drivers/clk/sunxi/clk-sun9i-mmc.c                 | 219 ++++++++++++++++++++++
- 3 files changed, 244 insertions(+), 1 deletion(-)
- create mode 100644 drivers/clk/sunxi/clk-sun9i-mmc.c
-
-diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-index 0dfd018ba47b..60b44285250d 100644
---- a/Documentation/devicetree/bindings/clock/sunxi.txt
-+++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-@@ -57,6 +57,7 @@ Required properties:
- 	"allwinner,sun5i-a13-mbus-clk" - for the MBUS clock on A13
- 	"allwinner,sun4i-a10-mmc-clk" - for the MMC clock
- 	"allwinner,sun9i-a80-mmc-clk" - for mmc module clocks on A80
-+	"allwinner,sun9i-a80-mmc-config-clk" - for mmc gates + resets on A80
- 	"allwinner,sun4i-a10-mod0-clk" - for the module 0 family of clocks
- 	"allwinner,sun9i-a80-mod0-clk" - for module 0 (storage) clocks on A80
- 	"allwinner,sun8i-a23-mbus-clk" - for the MBUS clock on A23
-@@ -75,7 +76,8 @@ Required properties for all clocks:
- 	the following compatibles where it shall be set to 1:
- 	"allwinner,*-gates-clk", "allwinner,sun4i-pll5-clk",
- 	"allwinner,sun4i-pll6-clk", "allwinner,sun6i-a31-pll6-clk",
--	"allwinner,*-usb-clk", "allwinner,*-mmc-clk"
-+	"allwinner,*-usb-clk", "allwinner,*-mmc-clk",
-+	"allwinner,*-mmc-config-clk"
- - clock-output-names : shall be the corresponding names of the outputs.
- 	If the clock module only has one output, the name shall be the
- 	module name.
-@@ -83,6 +85,10 @@ Required properties for all clocks:
- And "allwinner,*-usb-clk" clocks also require:
- - reset-cells : shall be set to 1
- 
-+The "allwinner,sun9i-a80-mmc-config-clk" clock also requires:
-+- #reset-cells : shall be set to 1
-+- resets : shall be the reset control phandle for the mmc block.
-+
- For "allwinner,sun7i-a20-gmac-clk", the parent clocks shall be fixed rate
- dummy clocks at 25 MHz and 125 MHz, respectively. See example.
- 
-@@ -101,6 +107,10 @@ The "allwinner,*-mmc-clk" clocks have three different outputs: the
- main clock, with the ID 0, and the output and sample clocks, with the
- IDs 1 and 2, respectively.
- 
-+The "allwinner,sun9i-a80-mmc-config-clk" clock has one clock/reset output
-+per mmc controller. The number of outputs is determined by the size of
-+the address block, which is related to the overall mmc block.
-+
- For example:
- 
- osc24M: clk at 01c20050 {
-@@ -176,3 +186,16 @@ gmac_clk: clk at 01c20164 {
- 	clocks = <&mii_phy_tx_clk>, <&gmac_int_tx_clk>;
- 	clock-output-names = "gmac";
- };
-+
-+mmc_config_clk: clk at 01c13000 {
-+	compatible = "allwinner,sun9i-a80-mmc-config-clk";
-+	reg = <0x01c13000 0x10>;
-+	clocks = <&ahb0_gates 8>;
-+	clock-names = "ahb";
-+	resets = <&ahb0_resets 8>;
-+	reset-names = "ahb";
-+	#clock-cells = <1>;
-+	#reset-cells = <1>;
-+	clock-output-names = "mmc0_config", "mmc1_config",
-+			     "mmc2_config", "mmc3_config";
-+};
-diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-index a66953c0f430..3a5292e3fcf8 100644
---- a/drivers/clk/sunxi/Makefile
-+++ b/drivers/clk/sunxi/Makefile
-@@ -8,6 +8,7 @@ obj-y += clk-a20-gmac.o
- obj-y += clk-mod0.o
- obj-y += clk-sun8i-mbus.o
- obj-y += clk-sun9i-core.o
-+obj-y += clk-sun9i-mmc.o
- 
- obj-$(CONFIG_MFD_SUN6I_PRCM) += \
- 	clk-sun6i-ar100.o clk-sun6i-apb0.o clk-sun6i-apb0-gates.o \
-diff --git a/drivers/clk/sunxi/clk-sun9i-mmc.c b/drivers/clk/sunxi/clk-sun9i-mmc.c
-new file mode 100644
-index 000000000000..04b0b34cddcd
---- /dev/null
-+++ b/drivers/clk/sunxi/clk-sun9i-mmc.c
-@@ -0,0 +1,219 @@
-+/*
-+ * Copyright 2013 Chen-Yu Tsai
-+ *
-+ * Chen-Yu Tsai	<wens@csie.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/clkdev.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/reset.h>
-+#include <linux/platform_device.h>
-+#include <linux/reset-controller.h>
-+#include <linux/spinlock.h>
-+
-+#define SUN9I_MMC_WIDTH		4
-+
-+#define SUN9I_MMC_GATE_BIT	16
-+#define SUN9I_MMC_RESET_BIT	18
-+
-+struct sun9i_mmc_clk_data {
-+	spinlock_t			lock;
-+	void __iomem			*membase;
-+	struct clk			*clk;
-+	struct reset_control		*reset;
-+	struct clk_onecell_data		clk_data;
-+	struct reset_controller_dev	rcdev;
-+};
-+
-+static int sun9i_mmc_reset_assert(struct reset_controller_dev *rcdev,
-+			      unsigned long id)
-+{
-+	struct sun9i_mmc_clk_data *data = container_of(rcdev,
-+						       struct sun9i_mmc_clk_data,
-+						       rcdev);
-+	unsigned long flags;
-+	void __iomem *reg = data->membase + SUN9I_MMC_WIDTH * id;
-+	u32 val;
-+
-+	clk_prepare_enable(data->clk);
-+	spin_lock_irqsave(&data->lock, flags);
-+
-+	val = readl(reg);
-+	writel(val & ~BIT(SUN9I_MMC_RESET_BIT), reg);
-+
-+	spin_unlock_irqrestore(&data->lock, flags);
-+	clk_disable_unprepare(data->clk);
-+
-+	return 0;
-+}
-+
-+static int sun9i_mmc_reset_deassert(struct reset_controller_dev *rcdev,
-+				unsigned long id)
-+{
-+	struct sun9i_mmc_clk_data *data = container_of(rcdev,
-+						       struct sun9i_mmc_clk_data,
-+						       rcdev);
-+	unsigned long flags;
-+	void __iomem *reg = data->membase + SUN9I_MMC_WIDTH * id;
-+	u32 val;
-+
-+	clk_prepare_enable(data->clk);
-+	spin_lock_irqsave(&data->lock, flags);
-+
-+	val = readl(reg);
-+	writel(val | BIT(SUN9I_MMC_RESET_BIT), reg);
-+
-+	spin_unlock_irqrestore(&data->lock, flags);
-+	clk_disable_unprepare(data->clk);
-+
-+	return 0;
-+}
-+
-+static struct reset_control_ops sun9i_mmc_reset_ops = {
-+	.assert		= sun9i_mmc_reset_assert,
-+	.deassert	= sun9i_mmc_reset_deassert,
-+};
-+
-+static int sun9i_a80_mmc_config_clk_probe(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct sun9i_mmc_clk_data *data;
-+	struct clk_onecell_data *clk_data;
-+	const char *clk_name = np->name;
-+	const char *clk_parent;
-+	struct resource *r;
-+	int count, i, ret;
-+
-+	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-+	if (!data)
-+		return -ENOMEM;
-+
-+	spin_lock_init(&data->lock);
-+
-+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	/* one clock/reset pair per word */
-+	count = DIV_ROUND_UP((r->end - r->start + 1), SUN9I_MMC_WIDTH);
-+	data->membase = devm_ioremap_resource(&pdev->dev, r);
-+	if (IS_ERR(data->membase))
-+		return PTR_ERR(data->membase);
-+
-+	clk_data = &data->clk_data;
-+	clk_data->clk_num = count;
-+	clk_data->clks = devm_kcalloc(&pdev->dev, count, sizeof(struct clk *),
-+				      GFP_KERNEL);
-+	if (!clk_data->clks)
-+		return -ENOMEM;
-+
-+	data->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(data->clk)) {
-+		dev_err(&pdev->dev, "Could not get clock\n");
-+		return PTR_ERR(data->clk);
-+	}
-+
-+	data->reset = devm_reset_control_get(&pdev->dev, NULL);
-+	if (IS_ERR(data->reset)) {
-+		dev_err(&pdev->dev, "Could not get reset control\n");
-+		return PTR_ERR(data->reset);
-+	}
-+
-+	ret = reset_control_deassert(data->reset);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Reset deassert err %d\n", ret);
-+		return ret;
-+	}
-+
-+	clk_parent = __clk_get_name(data->clk);
-+	for (i = 0; i < count; i++) {
-+		of_property_read_string_index(np, "clock-output-names",
-+					      i, &clk_name);
-+
-+		clk_data->clks[i] = clk_register_gate(&pdev->dev, clk_name,
-+						      clk_parent, 0,
-+						      data->membase + SUN9I_MMC_WIDTH * i,
-+						      SUN9I_MMC_GATE_BIT, 0,
-+						      &data->lock);
-+
-+		if (IS_ERR(clk_data->clks[i])) {
-+			ret = PTR_ERR(clk_data->clks[i]);
-+			goto err_clk_register;
-+		}
-+	}
-+
-+	ret = of_clk_add_provider(np, of_clk_src_onecell_get, clk_data);
-+	if (ret)
-+		goto err_clk_provider;
-+
-+	data->rcdev.owner = THIS_MODULE;
-+	data->rcdev.nr_resets = count;
-+	data->rcdev.ops = &sun9i_mmc_reset_ops;
-+	data->rcdev.of_node = pdev->dev.of_node;
-+
-+	ret = reset_controller_register(&data->rcdev);
-+	if (ret)
-+		goto err_rc_reg;
-+
-+	platform_set_drvdata(pdev, data);
-+
-+	return 0;
-+
-+err_rc_reg:
-+	of_clk_del_provider(np);
-+
-+err_clk_provider:
-+	for (i = 0; i < count; i++)
-+		clk_unregister(clk_data->clks[i]);
-+
-+err_clk_register:
-+	reset_control_assert(data->reset);
-+
-+	return ret;
-+}
-+
-+static int sun9i_a80_mmc_config_clk_remove(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct sun9i_mmc_clk_data *data = platform_get_drvdata(pdev);
-+	struct clk_onecell_data *clk_data = &data->clk_data;
-+	int i;
-+
-+	reset_controller_unregister(&data->rcdev);
-+	of_clk_del_provider(np);
-+	for (i = 0; i < clk_data->clk_num; i++)
-+		clk_unregister(clk_data->clks[i]);
-+
-+	reset_control_assert(data->reset);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id sun9i_a80_mmc_config_clk_dt_ids[] = {
-+	{ .compatible = "allwinner,sun9i-a80-mmc-config-clk" },
-+	{ /* sentinel */ }
-+};
-+
-+static struct platform_driver sun9i_a80_mmc_config_clk_driver = {
-+	.driver = {
-+		.name = "sun9i-a80-mmc-config-clk",
-+		.of_match_table = sun9i_a80_mmc_config_clk_dt_ids,
-+	},
-+	.probe = sun9i_a80_mmc_config_clk_probe,
-+	.remove = sun9i_a80_mmc_config_clk_remove,
-+};
-+module_platform_driver(sun9i_a80_mmc_config_clk_driver);
-+
-+MODULE_AUTHOR("Chen-Yu Tsai <wens@csie.org>");
-+MODULE_DESCRIPTION("Allwinner A80 MMC clock/reset Driver");
-+MODULE_LICENSE("GPL v2");
 -- 
-2.1.4
+motzblog.wordpress.com
