@@ -1,19 +1,31 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 20 Jan 2015 09:25:27 +0530
-Subject: RFC on cpufreq implementation
-In-Reply-To: <54BD7F4A.6020605@free.fr>
-References: <54B7F7CD.7030903@free.fr>
- <CAKohponGjLkniP2=Aj-Jsg7hfAEnW3p0+EwtrobdCymgT-yqgg@mail.gmail.com>
- <54BD7F4A.6020605@free.fr>
-Message-ID: <CAKohpom6v3X1KJAGmyEKYBVjxpoR5k6LyZgJ_02=H5duyao-Bg@mail.gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 20 Jan 2015 13:47:41 +0900
+Subject: [PATCHv8 2/9] devfreq: event: Add resource-managed function for
+ devfreq-event device
+In-Reply-To: <900879710.1308121421729191415.JavaMail.weblogic@epmlwas04a>
+References: <900879710.1308121421729191415.JavaMail.weblogic@epmlwas04a>
+Message-ID: <54BDDDED.7050009@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 January 2015 at 03:33, Mason <mpeg.blue@free.fr> wrote:
-> Good to know, thanks! (I'm on 3.14)
->
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=6393d6a1027ec1d69ec6246f6c7c2186f76c2abb
->
-> Do you have other comments/suggestions regarding my code?
+On 01/20/2015 01:46 PM, MyungJoo Ham wrote:
+>>   
+>>  This patch add the resource-managed function for devfreq-event device as
+>> following functions. The devm_devfreq_event_add_edev() manages automatically
+>> the memory of devfreq-event device using resource management.
+>> - devm_devfreq_event_add_edev()
+>> - devm_devfreq_event_remove_edev()
+>>
+>> Cc: Myungjoo Ham <myungjoo.ham@samsung.com>
+>> Cc: Kyungmin Park <kyungmin.park@samsung.com>
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.comA
+> 
+> Reviewed-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+> 
+> You may merge this patch with 1/9 as well.
+> I don't think this is a major change the requires a seperated patch.
 
-No. It looked fine on the first look..
+OK. I'll merge it. on patch1.
+
+Best Regards,
+Chanwoo Choi
