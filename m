@@ -1,101 +1,86 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 20 Jan 2015 16:15:55 +0000
-Subject: [PATCH 2/8] soc: Add MediaTek pericfg controller support
-In-Reply-To: <1421747231-554-3-git-send-email-s.hauer@pengutronix.de>
-References: <1421747231-554-1-git-send-email-s.hauer@pengutronix.de>
- <1421747231-554-3-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20150120161555.GH15924@leverpostej>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 20 Jan 2015 16:16:46 +0000
+Subject: [PATCH v7 11/17] ACPI / processor: Make it possible to get CPU
+ hardware ID via GICC
+In-Reply-To: <1421247905-3749-12-git-send-email-hanjun.guo@linaro.org>
+References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
+ <1421247905-3749-12-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20150120161646.GJ5398@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 20, 2015 at 09:47:05AM +0000, Sascha Hauer wrote:
-> This adds support for the MediaTek pericfg controller found
-> on the MT8135/MT8173 SoCs. The pericfg controller contains
-> miscellaneous registers for controlling peripheral resets and
-> clocks.
+On Wed, Jan 14, 2015 at 03:04:59PM +0000, Hanjun Guo wrote:
+> Introduce a new function map_gicc_mpidr() to allow MPIDRs to be obtained
+> from the GICC Structure introduced by ACPI 5.1.
 > 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> MPIDR is the CPU hardware ID as local APIC ID on x86 platform, so we use
+> MPIDR not the GIC CPU interface ID to identify CPUs.
+> 
+> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> Tested-by: Yijing Wang <wangyijing@huawei.com>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 > ---
->  .../devicetree/bindings/soc/mediatek/pericfg.txt      | 19 +++++++++++++++++++
->  drivers/soc/mediatek/Kconfig                          | 10 ++++++++++
->  drivers/soc/mediatek/Makefile                         |  1 +
->  drivers/soc/mediatek/mtk-pericfg.c                    |  1 -
->  4 files changed, 30 insertions(+), 1 deletion(-)
->  create mode 100644 Documentation/devicetree/bindings/soc/mediatek/pericfg.txt
+>  arch/arm64/include/asm/acpi.h | 29 +++++++++++++++++++++++++++++
+>  arch/arm64/kernel/acpi.c      |  1 -
+>  drivers/acpi/processor_core.c | 37 +++++++++++++++++++++++++++++++++++++
+>  3 files changed, 66 insertions(+), 1 deletion(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/soc/mediatek/pericfg.txt b/Documentation/devicetree/bindings/soc/mediatek/pericfg.txt
-> new file mode 100644
-> index 0000000..81d1aee
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/soc/mediatek/pericfg.txt
-> @@ -0,0 +1,19 @@
-> +MediaTek pericfg Controller
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index c82d4a1..639bb2a 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -12,6 +12,8 @@
+>  #ifndef _ASM_ACPI_H
+>  #define _ASM_ACPI_H
+>  
+> +#include <asm/smp_plat.h>
 > +
-> +The pericfg controller contains miscellaneous registers for controlling
-> +clocks, resets and bus settings.
+>  /* Basic configuration for ACPI */
+>  #ifdef	CONFIG_ACPI
+>  #define acpi_strict 1	/* No out-of-spec workarounds on ARM64 */
+> @@ -45,6 +47,33 @@ static inline void enable_acpi(void)
+>  	acpi_noirq = 0;
+>  }
+>  
+> +/* MPIDR value provided in GICC structure is 64 bits, but the
+> + * existing apic_id (CPU hardware ID) using in acpi processor
+> + * driver is 32-bit, to conform to the same datatype we need
+> + * to repack the GICC structure MPIDR.
+> + *
+> + * Only 32 bits of MPIDR are used:
+> + *
+> + * Bits [0:7] Aff0;
+> + * Bits [8:15] Aff1;
+> + * Bits [16:23] Aff2;
+> + * Bits [32:39] Aff3;
+> + */
+> +static inline u32 pack_mpidr(u64 mpidr)
+> +{
+> +	return (u32) ((mpidr & 0xff00000000) >> 8) | mpidr;
+> +}
 > +
-> +Required properties:
-> +- compatible: must be one of:
-> +	mediatek,mt8135-pericfg
-> +	mediatek,mt8173-pericfg
-> +- reg: Address range for the pericfg controller
-> +
-> +Example:
-> +
-> +	pericfg: pericfg at 10003000 {
-> +		#reset-cells = <1>;
-> +		#clock-cells = <1>;
-> +		compatible = "mediatek,mt8135-pericfg";
-> +		reg = <0 0x10003000 0 0x1000>;
-> +	};
+> +/*
+> + * The ACPI processor driver for ACPI core code needs this macro
+> + * to find out this cpu was already mapped (mapping from CPU hardware
+> + * ID to CPU logical ID) or not.
+> + *
+> + * cpu_logical_map(cpu) is the mapping of MPIDR and the logical cpu,
+> + * and MPIDR is the cpu hardware ID we needed to pack.
+> + */
+> +#define cpu_physical_id(cpu) pack_mpidr(cpu_logical_map(cpu))
 
-This looks identical to the infracfg (same address too). Is that
-deliberate?
+Do we need this mpidr packing only because in drivers/acpi/processor_core.c
+phys_id is defined as an int ?
 
-Mark.
+What you could do, is to typedef a cpuid_t type in arch code (with
+appropriate size and a corresponding invalid value, say ~0) and use that
+instead of an int in drivers/acpi/processor_core.c to store phys_id.
 
-> diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
-> index 3ad39fe..9bdb88f 100644
-> --- a/drivers/soc/mediatek/Kconfig
-> +++ b/drivers/soc/mediatek/Kconfig
-> @@ -10,3 +10,13 @@ config MTK_INFRACFG
->  	  contains several miscellaneous registers for clock, reset and bus
->  	  settings. Say yes here if you want to run your kernel on one of these
->  	  SoCs.
-> +
-> +config MTK_PERICFG
-> +	tristate "MediaTek pericfg controller support"
-> +	depends on ARCH_MEDIATEK || COMPILE_TEST
-> +	select REGMAP
-> +	help
-> +	  The MediaTek pericfg controller found on MT8135 and MT8173 SoCs
-> +	  contains several miscellaneous registers for clock, reset and bus
-> +	  settings. Say yes here if you want to run your kernel on one of these
-> +	  SoCs.
-> diff --git a/drivers/soc/mediatek/Makefile b/drivers/soc/mediatek/Makefile
-> index dbeb627..e67be7c 100644
-> --- a/drivers/soc/mediatek/Makefile
-> +++ b/drivers/soc/mediatek/Makefile
-> @@ -1 +1,2 @@
->  obj-$(CONFIG_MTK_INFRACFG) += mtk-infracfg.o
-> +obj-$(CONFIG_MTK_PERICFG) += mtk-pericfg.o
-> diff --git a/drivers/soc/mediatek/mtk-pericfg.c b/drivers/soc/mediatek/mtk-pericfg.c
-> index b7ee902..aa9a7eb 100644
-> --- a/drivers/soc/mediatek/mtk-pericfg.c
-> +++ b/drivers/soc/mediatek/mtk-pericfg.c
-> @@ -1,6 +1,5 @@
->  /*
->   * Copyright (c) 2014 MediaTek Inc.
-> - * Author: Flora Fu <flora.fu@mediatek.com>
->   *
->   * This program is free software; you can redistribute it and/or modify
->   * it under the terms of the GNU General Public License version 2 as
-> -- 
-> 2.1.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+phys_id is used as an error value too (ie -1 as a magic number), see
+drivers/acpi/acpi_processor.c, retrieved through acpi_get_phys_id(),
+it should not be that difficult to change the parsing API to keep current
+code behaviour unchanged and define at the same time a proper type for
+the cpu physical identifier, with no mpidr packing needed whatsoever.
+
+Thanks,
+Lorenzo
