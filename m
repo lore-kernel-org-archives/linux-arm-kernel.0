@@ -1,125 +1,130 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 20 Jan 2015 16:10:08 +0900
-Subject: [PATCH v9 6/7] ARM: dts: exynos: Add PPMU node for Exynos3250-based
- Rinato/Monk board
-In-Reply-To: <1421737809-4010-1-git-send-email-cw00.choi@samsung.com>
-References: <1421737809-4010-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1421737809-4010-7-git-send-email-cw00.choi@samsung.com>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Tue, 20 Jan 2015 16:12:13 +0900
+Subject: [PATCH] kprobes: bugfix: set kprobes_all_disarmed earlier
+ to enable re-optimization.
+In-Reply-To: <54BDC55D.3090200@huawei.com>
+References: <1420461075-27012-1-git-send-email-wangnan0@huawei.com>
+ <54B3AED2.5070000@hitachi.com> <54BDC55D.3090200@huawei.com>
+Message-ID: <54BDFFCD.4010500@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add PPMU dt node to Exynos3250-base Rinato/Monk board. The PPMU node
-is used to get the utilization of DMC0/DMC1/LEFTBUS/RIGHTBUS Block.
+(2015/01/20 12:02), Wang Nan wrote:
+> On 2015/1/12 19:24, Masami Hiramatsu wrote:
+>> (2015/01/05 21:31), Wang Nan wrote:
+>>> In original code, the probed instruction doesn't get optimized after
+>>>
+>>> echo 0 > /sys/kernel/debug/kprobes/enabled
+>>> echo 1 > /sys/kernel/debug/kprobes/enabled
+>>>
+>>> This is because original code checks kprobes_all_disarmed in
+>>> optimize_kprobe(), but this flag is turned off after calling that
+>>> function. Therefore, optimize_kprobe() will see
+>>> kprobes_all_disarmed == true and doesn't do the optimization.
+>>
+>> OK, a workaround is to disable/enable optimizing via sysctl.
+>>
+>>>
+>>> This patch simply turns off kprobes_all_disarmed earlier to enable
+>>> optimization.
+>>>
+>>
+>> Anyway, thank you for finding that! :)
+>>
+>> Acked-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+>>
+> 
+> Hi Masami Hiramatsu,
+> 
+> What about this patch? Are you still thinking on it like
+> '[PATCH] kprobes: bugfix: checks kprobes_all_disarmed in unoptimized_kprobe()' ?
 
-Cc: Kukjin Kim <kgene@kernel.org>
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/boot/dts/exynos3250-monk.dts   | 40 +++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/exynos3250-rinato.dts | 40 +++++++++++++++++++++++++++++++++
- 2 files changed, 80 insertions(+)
+Without this patch.
+-----
+[root at localhost tracing]# echo p do_fork+5 > kprobe_events
+[root at localhost tracing]# echo 1 > events/kprobes/p_do_fork_5/enable
+[root at localhost tracing]# cat ../kprobes/list
+ffffffff810bd055  k  do_fork+0x5    [OPTIMIZED]
+[root at localhost tracing]# echo 0 > /sys/kernel/debug/kprobes/enabled
+[root at localhost tracing]# cat ../kprobes/list
+ffffffff810bd055  k  do_fork+0x5
+[root at localhost tracing]# echo 1 > /sys/kernel/debug/kprobes/enabled
+[root at localhost tracing]# cat ../kprobes/list
+ffffffff810bd055  k  do_fork+0x5
+------
+With this patch.
+------
+[root at localhost tracing]# echo p do_fork+5 > kprobe_events
+[root at localhost tracing]# echo 1 > events/kprobes/enable
+[root at localhost tracing]# cat ../kprobes/list
+ffffffff810bc1c5  k  do_fork+0x5    [OPTIMIZED]
+[root at localhost tracing]# echo 0 > ../kprobes/enabled
+[root at localhost tracing]# cat ../kprobes/list
+ffffffff810bc1c5  k  do_fork+0x5
+[root at localhost tracing]# echo 1 > ../kprobes/enabled
+[root at localhost tracing]# cat ../kprobes/list
+ffffffff810bc1c5  k  do_fork+0x5    [OPTIMIZED]
+------
 
-diff --git a/arch/arm/boot/dts/exynos3250-monk.dts b/arch/arm/boot/dts/exynos3250-monk.dts
-index 24822aa..fcceb59 100644
---- a/arch/arm/boot/dts/exynos3250-monk.dts
-+++ b/arch/arm/boot/dts/exynos3250-monk.dts
-@@ -420,6 +420,46 @@
- 	status = "okay";
- };
- 
-+&ppmu_dmc0 {
-+	status = "okay";
-+
-+	events {
-+		ppmu_dmc0_3: ppmu-event3-dmc0 {
-+			event-name = "ppmu-event3-dmc0";
-+		};
-+	};
-+};
-+
-+&ppmu_dmc1 {
-+	status = "okay";
-+
-+	events {
-+		ppmu_dmc1_3: ppmu-event3-dmc1 {
-+			event-name = "ppmu-event3-dmc1";
-+		};
-+	};
-+};
-+
-+&ppmu_leftbus {
-+	status = "okay";
-+
-+	events {
-+		ppmu_leftbus_3: ppmu-event3-leftbus {
-+			event-name = "ppmu-event3-leftbus";
-+		};
-+	};
-+};
-+
-+&ppmu_rightbus {
-+	status = "okay";
-+
-+	events {
-+		ppmu_rightbus_3: ppmu-event3-rightbus {
-+			event-name = "ppmu-event3-rightbus";
-+		};
-+	};
-+};
-+
- &xusbxti {
- 	clock-frequency = <24000000>;
- };
-diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
-index 7cc52b5..9dd1ce1 100644
---- a/arch/arm/boot/dts/exynos3250-rinato.dts
-+++ b/arch/arm/boot/dts/exynos3250-rinato.dts
-@@ -595,6 +595,46 @@
- 	status = "okay";
- };
- 
-+&ppmu_dmc0 {
-+	status = "okay";
-+
-+	events {
-+		ppmu_dmc0_3: ppmu-event3-dmc0 {
-+			event-name = "ppmu-event3-dmc0";
-+		};
-+	};
-+};
-+
-+&ppmu_dmc1 {
-+	status = "okay";
-+
-+	events {
-+		ppmu_dmc1_3: ppmu-event3-dmc1 {
-+			event-name = "ppmu-event3-dmc1";
-+		};
-+	};
-+};
-+
-+&ppmu_leftbus {
-+	status = "okay";
-+
-+	events {
-+		ppmu_leftbus_3: ppmu-event3-leftbus {
-+			event-name = "ppmu-event3-leftbus";
-+		};
-+	};
-+};
-+
-+&ppmu_rightbus {
-+	status = "okay";
-+
-+	events {
-+		ppmu_rightbus_3: ppmu-event3-rightbus {
-+			event-name = "ppmu-event3-rightbus";
-+		};
-+	};
-+};
-+
- &xusbxti {
- 	clock-frequency = <24000000>;
- };
+So, looks OK to me too ;)
+
+Acked-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+Tested-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+
+Ingo,
+Could you also pull this patch to your -tip tree?
+
+Thank you,
+
+> 
+> Thank you.
+> 
+>>
+>>> Signed-off-by: Wang Nan <wangnan0@huawei.com>
+>>> ---
+>>>  kernel/kprobes.c | 7 ++++++-
+>>>  1 file changed, 6 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/kernel/kprobes.c b/kernel/kprobes.c
+>>> index bad4e95..b185464 100644
+>>> --- a/kernel/kprobes.c
+>>> +++ b/kernel/kprobes.c
+>>> @@ -2320,6 +2320,12 @@ static void arm_all_kprobes(void)
+>>>  	if (!kprobes_all_disarmed)
+>>>  		goto already_enabled;
+>>>  
+>>> +	/*
+>>> +	 * optimize_kprobe() called by arm_kprobe() checks
+>>> +	 * kprobes_all_disarmed, so set kprobes_all_disarmed before
+>>> +	 * arm_kprobe.
+>>> +	 */
+>>> +	kprobes_all_disarmed = false;
+>>>  	/* Arming kprobes doesn't optimize kprobe itself */
+>>>  	for (i = 0; i < KPROBE_TABLE_SIZE; i++) {
+>>>  		head = &kprobe_table[i];
+>>> @@ -2328,7 +2334,6 @@ static void arm_all_kprobes(void)
+>>>  				arm_kprobe(p);
+>>>  	}
+>>>  
+>>> -	kprobes_all_disarmed = false;
+>>>  	printk(KERN_INFO "Kprobes globally enabled\n");
+>>>  
+>>>  already_enabled:
+>>>
+>>
+>>
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
+
+
 -- 
-1.8.5.5
+Masami HIRAMATSU
+Software Platform Research Dept. Linux Technology Research Center
+Hitachi, Ltd., Yokohama Research Laboratory
+E-mail: masami.hiramatsu.pt at hitachi.com
