@@ -1,222 +1,392 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 20 Jan 2015 16:52:59 +0000
-Subject: [PATCH v4] irqchip: gic: Allow interrupt level to be set for PPIs.
-Message-ID: <1421772779-25764-1-git-send-email-Liviu.Dudau@arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 20 Jan 2015 18:56:03 +0200
+Subject: [RFC PATCH v4 0/8] Introduce automatic DMA configuration for
+ IOMMU masters
+In-Reply-To: <20150119160620.GB2373@arm.com>
+References: <1415991397-9618-1-git-send-email-will.deacon@arm.com>
+ <2043949.GdM3BkS8d4@wuerfel> <20150119160620.GB2373@arm.com>
+Message-ID: <12178745.U2ZdLpocXO@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During a recent cleanup of the arm64 DTs it has become clear that
-the handling of PPIs in xxxx_set_type() is incorrect. The ARM TRMs
-for GICv2 and later allow for "implementation defined" support for
-setting the edge or level type of the PPI interrupts and don't restrict
-the activation level of the signal. Current ARM implementations
-do restrict the PPI level type to IRQ_TYPE_LEVEL_LOW, but licensees
-of the IP can decide to shoot themselves in the foot at any time.
+Hi Will,
 
-Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
----
+Thank you for the patch.
 
-Changelog:
- v4: Re-enable the interrupt if it was disabled during the configuration
-     change, even if we fail to set the new configuration.
- v3: Fixed the bit test logic from v2.
- v2: Update following comments from Russell King and Marc Zyngier.
-     Thread here: https://lkml.org/lkml/2014/12/1/279
- v1: Initial version. https://lkml.org/lkml/2014/11/28/400
+On Monday 19 January 2015 16:06:20 Will Deacon wrote:
+> (resurrecting an old thread)
+> 
+> On Fri, Nov 14, 2014 at 08:01:56PM +0000, Arnd Bergmann wrote:
+> > On Friday 14 November 2014 19:27:54 Will Deacon wrote:
+> > > > At the moment, iommu_ops is a structure that can get used for any
+> > > > number of iommus of the same type, but by putting per-device private
+> > > > data into the same structure you have to duplicate it per instance.
+> > > 
+> > > I'm not sure I agree -- the pgsize_bitmap, for example, could vary
+> > > between different implementations of the same IOMMU. I think we already
+> > > have this in Juno (some SMMUs can only do 64k pages, whilst others can
+> > > do 4k and 64k).
+> >
+> > Ah, I hadn't noticed that, it should be in the 'struct iommu' then of
+> > course, not in iommu_ops.
+> 
+> Now that of_iommu_get_ops has its own list of iommu_ops, we can actually
+> just move pgsize_bitmap into the iommu_domain, which I think makes a lot
+> more sense anyway.
 
- Documentation/devicetree/bindings/arm/gic.txt |  8 ++++++--
- drivers/irqchip/irq-gic-common.c              | 18 ++++++++++++------
- drivers/irqchip/irq-gic-common.h              |  2 +-
- drivers/irqchip/irq-gic-v3.c                  |  8 ++++----
- drivers/irqchip/irq-gic.c                     |  9 ++++++---
- drivers/irqchip/irq-hip04.c                   |  9 ++++++---
- 6 files changed, 35 insertions(+), 19 deletions(-)
+The code looks good to me, but what does it have to do with of_iommu_get_ops() 
+having its own list of iommu_ops ?
 
-diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
-index 8112d0c..c97484b 100644
---- a/Documentation/devicetree/bindings/arm/gic.txt
-+++ b/Documentation/devicetree/bindings/arm/gic.txt
-@@ -32,12 +32,16 @@ Main node required properties:
-   The 3rd cell is the flags, encoded as follows:
- 	bits[3:0] trigger type and level flags.
- 		1 = low-to-high edge triggered
--		2 = high-to-low edge triggered
-+		2 = high-to-low edge triggered (invalid for SPIs)
- 		4 = active high level-sensitive
--		8 = active low level-sensitive
-+		8 = active low level-sensitive (invalid for SPIs).
- 	bits[15:8] PPI interrupt cpu mask.  Each bit corresponds to each of
- 	the 8 possible cpus attached to the GIC.  A bit set to '1' indicated
- 	the interrupt is wired to that CPU.  Only valid for PPI interrupts.
-+	Also note that the configurability of PPI interrupts is IMPLEMENTATION
-+	DEFINED and as such not guaranteed to be present (most SoC available
-+	in 2014 seem to ignore the setting of this flag and use the hardware
-+	default value).
- 
- - reg : Specifies base physical address(s) and size of the GIC registers. The
-   first region is the GIC distributor register base and size. The 2nd region is
-diff --git a/drivers/irqchip/irq-gic-common.c b/drivers/irqchip/irq-gic-common.c
-index 61541ff..ad96ebb 100644
---- a/drivers/irqchip/irq-gic-common.c
-+++ b/drivers/irqchip/irq-gic-common.c
-@@ -21,7 +21,7 @@
- 
- #include "irq-gic-common.h"
- 
--void gic_configure_irq(unsigned int irq, unsigned int type,
-+int gic_configure_irq(unsigned int irq, unsigned int type,
- 		       void __iomem *base, void (*sync_access)(void))
- {
- 	u32 enablemask = 1 << (irq % 32);
-@@ -29,16 +29,17 @@ void gic_configure_irq(unsigned int irq, unsigned int type,
- 	u32 confmask = 0x2 << ((irq % 16) * 2);
- 	u32 confoff = (irq / 16) * 4;
- 	bool enabled = false;
--	u32 val;
-+	u32 val, oldval;
-+	int ret = 0;
- 
- 	/*
- 	 * Read current configuration register, and insert the config
- 	 * for "irq", depending on "type".
- 	 */
--	val = readl_relaxed(base + GIC_DIST_CONFIG + confoff);
--	if (type == IRQ_TYPE_LEVEL_HIGH)
-+	val = oldval = readl_relaxed(base + GIC_DIST_CONFIG + confoff);
-+	if (type & IRQ_TYPE_LEVEL_MASK)
- 		val &= ~confmask;
--	else if (type == IRQ_TYPE_EDGE_RISING)
-+	else if (type & IRQ_TYPE_EDGE_BOTH)
- 		val |= confmask;
- 
- 	/*
-@@ -54,15 +55,20 @@ void gic_configure_irq(unsigned int irq, unsigned int type,
- 
- 	/*
- 	 * Write back the new configuration, and possibly re-enable
--	 * the interrupt.
-+	 * the interrupt. If we tried to write a new configuration and failed,
-+	 * return an error.
- 	 */
- 	writel_relaxed(val, base + GIC_DIST_CONFIG + confoff);
-+	if (readl_relaxed(base + GIC_DIST_CONFIG + confoff) != val && val != oldval)
-+		ret = -EINVAL;
- 
- 	if (enabled)
- 		writel_relaxed(enablemask, base + GIC_DIST_ENABLE_SET + enableoff);
- 
- 	if (sync_access)
- 		sync_access();
-+
-+	return ret;
- }
- 
- void __init gic_dist_config(void __iomem *base, int gic_irqs,
-diff --git a/drivers/irqchip/irq-gic-common.h b/drivers/irqchip/irq-gic-common.h
-index b41f024..35a9884 100644
---- a/drivers/irqchip/irq-gic-common.h
-+++ b/drivers/irqchip/irq-gic-common.h
-@@ -20,7 +20,7 @@
- #include <linux/of.h>
- #include <linux/irqdomain.h>
- 
--void gic_configure_irq(unsigned int irq, unsigned int type,
-+int gic_configure_irq(unsigned int irq, unsigned int type,
-                        void __iomem *base, void (*sync_access)(void));
- void gic_dist_config(void __iomem *base, int gic_irqs,
- 		     void (*sync_access)(void));
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index 1a146cc..6e50803 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -238,7 +238,9 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
- 	if (irq < 16)
- 		return -EINVAL;
- 
--	if (type != IRQ_TYPE_LEVEL_HIGH && type != IRQ_TYPE_EDGE_RISING)
-+	/* SPIs have restrictions on the supported types */
-+	if (irq >= 32 && type != IRQ_TYPE_LEVEL_HIGH &&
-+			 type != IRQ_TYPE_EDGE_RISING)
- 		return -EINVAL;
- 
- 	if (gic_irq_in_rdist(d)) {
-@@ -249,9 +251,7 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
- 		rwp_wait = gic_dist_wait_for_rwp;
- 	}
- 
--	gic_configure_irq(irq, type, base, rwp_wait);
--
--	return 0;
-+	return gic_configure_irq(irq, type, base, rwp_wait);
- }
- 
- static u64 gic_mpidr_to_affinity(u64 mpidr)
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index d617ee5..4634cf7 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -188,12 +188,15 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
- {
- 	void __iomem *base = gic_dist_base(d);
- 	unsigned int gicirq = gic_irq(d);
-+	int ret;
- 
- 	/* Interrupt configuration for SGIs can't be changed */
- 	if (gicirq < 16)
- 		return -EINVAL;
- 
--	if (type != IRQ_TYPE_LEVEL_HIGH && type != IRQ_TYPE_EDGE_RISING)
-+	/* SPIs have restrictions on the supported types */
-+	if (gicirq >= 32 && type != IRQ_TYPE_LEVEL_HIGH &&
-+			    type != IRQ_TYPE_EDGE_RISING)
- 		return -EINVAL;
- 
- 	raw_spin_lock(&irq_controller_lock);
-@@ -201,11 +204,11 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
- 	if (gic_arch_extn.irq_set_type)
- 		gic_arch_extn.irq_set_type(d, type);
- 
--	gic_configure_irq(gicirq, type, base, NULL);
-+	ret = gic_configure_irq(gicirq, type, base, NULL);
- 
- 	raw_spin_unlock(&irq_controller_lock);
- 
--	return 0;
-+	return ret;
- }
- 
- static int gic_retrigger(struct irq_data *d)
-diff --git a/drivers/irqchip/irq-hip04.c b/drivers/irqchip/irq-hip04.c
-index 29b8f21..d059e66 100644
---- a/drivers/irqchip/irq-hip04.c
-+++ b/drivers/irqchip/irq-hip04.c
-@@ -120,21 +120,24 @@ static int hip04_irq_set_type(struct irq_data *d, unsigned int type)
- {
- 	void __iomem *base = hip04_dist_base(d);
- 	unsigned int irq = hip04_irq(d);
-+	int ret;
- 
- 	/* Interrupt configuration for SGIs can't be changed */
- 	if (irq < 16)
- 		return -EINVAL;
- 
--	if (type != IRQ_TYPE_LEVEL_HIGH && type != IRQ_TYPE_EDGE_RISING)
-+	/* SPIs have restrictions on the supported types */
-+	if (irq >= 32 && type != IRQ_TYPE_LEVEL_HIGH &&
-+			 type != IRQ_TYPE_EDGE_RISING)
- 		return -EINVAL;
- 
- 	raw_spin_lock(&irq_controller_lock);
- 
--	gic_configure_irq(irq, type, base, NULL);
-+	ret = gic_configure_irq(irq, type, base, NULL);
- 
- 	raw_spin_unlock(&irq_controller_lock);
- 
--	return 0;
-+	return ret;
- }
- 
- #ifdef CONFIG_SMP
+> diff below seems to do the trick. The next step would be postponing the
+> pgsize_bitmap initialisation until device attach for the ARM SMMU, since
+> it's at that point that we know the active page table format (and
+> therefore the supported page sizes).
+> 
+> Will
+> 
+> --->8
+> 
+> diff --git a/drivers/iommu/amd_iommu.c b/drivers/iommu/amd_iommu.c
+> index 98024856df07..ab9702d01e9a 100644
+> --- a/drivers/iommu/amd_iommu.c
+> +++ b/drivers/iommu/amd_iommu.c
+> @@ -3257,6 +3257,7 @@ static int amd_iommu_domain_init(struct iommu_domain
+> *dom) dom->geometry.aperture_end   = ~0ULL;
+>  	dom->geometry.force_aperture = true;
+> 
+> +	dom->pgsize_bitmap = AMD_IOMMU_PGSIZES;
+>  	return 0;
+> 
+>  out_free:
+> @@ -3428,7 +3429,6 @@ static const struct iommu_ops amd_iommu_ops = {
+>  	.unmap = amd_iommu_unmap,
+>  	.map_sg = default_iommu_map_sg,
+>  	.iova_to_phys = amd_iommu_iova_to_phys,
+> -	.pgsize_bitmap	= AMD_IOMMU_PGSIZES,
+>  };
+> 
+>  /**************************************************************************
+> *** diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 6cd47b75286f..898fab8d10a0 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -1033,6 +1033,9 @@ static int arm_smmu_domain_init(struct iommu_domain
+> *domain)
+> 
+>  	spin_lock_init(&smmu_domain->lock);
+>  	domain->priv = smmu_domain;
+> +	domain->pgsize_bitmap = (SECTION_SIZE |
+> +				 ARM_SMMU_PTE_CONT_SIZE |
+> +				 PAGE_SIZE);
+>  	return 0;
+> 
+>  out_free_domain:
+> @@ -1729,9 +1732,6 @@ static const struct iommu_ops arm_smmu_ops = {
+>  	.remove_device		= arm_smmu_remove_device,
+>  	.domain_get_attr	= arm_smmu_domain_get_attr,
+>  	.domain_set_attr	= arm_smmu_domain_set_attr,
+> -	.pgsize_bitmap		= (SECTION_SIZE |
+> -				   ARM_SMMU_PTE_CONT_SIZE |
+> -				   PAGE_SIZE),
+>  };
+> 
+>  static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+> index 7ce52737c7a1..404cad25db9b 100644
+> --- a/drivers/iommu/exynos-iommu.c
+> +++ b/drivers/iommu/exynos-iommu.c
+> @@ -735,6 +735,8 @@ static int exynos_iommu_domain_init(struct iommu_domain
+> *domain) domain->geometry.aperture_end   = ~0UL;
+>  	domain->geometry.force_aperture = true;
+> 
+> +	domain->pgsize_bitmap = SECT_SIZE | LPAGE_SIZE | SPAGE_SIZE;
+> +
+>  	domain->priv = priv;
+>  	return 0;
+> 
+> @@ -1181,7 +1183,6 @@ static const struct iommu_ops exynos_iommu_ops = {
+>  	.iova_to_phys = exynos_iommu_iova_to_phys,
+>  	.add_device = exynos_iommu_add_device,
+>  	.remove_device = exynos_iommu_remove_device,
+> -	.pgsize_bitmap = SECT_SIZE | LPAGE_SIZE | SPAGE_SIZE,
+>  };
+> 
+>  static int __init exynos_iommu_init(void)
+> diff --git a/drivers/iommu/intel-iommu.c b/drivers/iommu/intel-iommu.c
+> index 40dfbc0444c0..e2b0f34baa9d 100644
+> --- a/drivers/iommu/intel-iommu.c
+> +++ b/drivers/iommu/intel-iommu.c
+> @@ -4386,6 +4386,7 @@ static int intel_iommu_domain_init(struct iommu_domain
+> *domain) domain->geometry.aperture_end   =
+> __DOMAIN_MAX_ADDR(dmar_domain->gaw); domain->geometry.force_aperture =
+> true;
+> 
+> +	domain->pgsize_bitmap = INTEL_IOMMU_PGSIZES;
+>  	return 0;
+>  }
+> 
+> @@ -4628,7 +4629,6 @@ static const struct iommu_ops intel_iommu_ops = {
+>  	.iova_to_phys	= intel_iommu_iova_to_phys,
+>  	.add_device	= intel_iommu_add_device,
+>  	.remove_device	= intel_iommu_remove_device,
+> -	.pgsize_bitmap	= INTEL_IOMMU_PGSIZES,
+>  };
+> 
+>  static void quirk_iommu_g4x_gfx(struct pci_dev *dev)
+> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+> index f7718d73e984..b8b6b0bc6951 100644
+> --- a/drivers/iommu/iommu.c
+> +++ b/drivers/iommu/iommu.c
+> @@ -1025,7 +1025,7 @@ static size_t iommu_pgsize(struct iommu_domain
+> *domain, pgsize = (1UL << (pgsize_idx + 1)) - 1;
+> 
+>  	/* throw away page sizes not supported by the hardware */
+> -	pgsize &= domain->ops->pgsize_bitmap;
+> +	pgsize &= domain->pgsize_bitmap;
+> 
+>  	/* make sure we're still sane */
+>  	BUG_ON(!pgsize);
+> @@ -1046,11 +1046,11 @@ int iommu_map(struct iommu_domain *domain, unsigned
+> long iova, int ret = 0;
+> 
+>  	if (unlikely(domain->ops->map == NULL ||
+> -		     domain->ops->pgsize_bitmap == 0UL))
+> +		     domain->pgsize_bitmap == 0UL))
+>  		return -ENODEV;
+> 
+>  	/* find out the minimum page size supported */
+> -	min_pagesz = 1 << __ffs(domain->ops->pgsize_bitmap);
+> +	min_pagesz = 1 << __ffs(domain->pgsize_bitmap);
+> 
+>  	/*
+>  	 * both the virtual address and the physical one, as well as
+> @@ -1096,11 +1096,11 @@ size_t iommu_unmap(struct iommu_domain *domain,
+> unsigned long iova, size_t size) unsigned int min_pagesz;
+> 
+>  	if (unlikely(domain->ops->unmap == NULL ||
+> -		     domain->ops->pgsize_bitmap == 0UL))
+> +		     domain->pgsize_bitmap == 0UL))
+>  		return -ENODEV;
+> 
+>  	/* find out the minimum page size supported */
+> -	min_pagesz = 1 << __ffs(domain->ops->pgsize_bitmap);
+> +	min_pagesz = 1 << __ffs(domain->pgsize_bitmap);
+> 
+>  	/*
+>  	 * The virtual address, as well as the size of the mapping, must be
+> @@ -1146,10 +1146,10 @@ size_t default_iommu_map_sg(struct iommu_domain
+> *domain, unsigned long iova, unsigned int i, min_pagesz;
+>  	int ret;
+> 
+> -	if (unlikely(domain->ops->pgsize_bitmap == 0UL))
+> +	if (unlikely(domain->pgsize_bitmap == 0UL))
+>  		return 0;
+> 
+> -	min_pagesz = 1 << __ffs(domain->ops->pgsize_bitmap);
+> +	min_pagesz = 1 << __ffs(domain->pgsize_bitmap);
+> 
+>  	for_each_sg(sg, s, nents, i) {
+>  		phys_addr_t phys = page_to_phys(sg_page(s)) + s->offset;
+> @@ -1230,7 +1230,7 @@ int iommu_domain_get_attr(struct iommu_domain *domain,
+> break;
+>  	case DOMAIN_ATTR_PAGING:
+>  		paging  = data;
+> -		*paging = (domain->ops->pgsize_bitmap != 0UL);
+> +		*paging = (domain->pgsize_bitmap != 0UL);
+>  		break;
+>  	case DOMAIN_ATTR_WINDOWS:
+>  		count = data;
+> diff --git a/drivers/iommu/ipmmu-vmsa.c b/drivers/iommu/ipmmu-vmsa.c
+> index 748693192c20..7e6c6a7afd81 100644
+> --- a/drivers/iommu/ipmmu-vmsa.c
+> +++ b/drivers/iommu/ipmmu-vmsa.c
+> @@ -872,6 +872,7 @@ static int ipmmu_domain_init(struct iommu_domain
+> *io_domain)
+> 
+>  	io_domain->priv = domain;
+>  	domain->io_domain = io_domain;
+> +	domain->pgsize_bitmap = SZ_2M | SZ_64K | SZ_4K;
+> 
+>  	return 0;
+>  }
+> @@ -1131,7 +1132,6 @@ static const struct iommu_ops ipmmu_ops = {
+>  	.iova_to_phys = ipmmu_iova_to_phys,
+>  	.add_device = ipmmu_add_device,
+>  	.remove_device = ipmmu_remove_device,
+> -	.pgsize_bitmap = SZ_2M | SZ_64K | SZ_4K,
+>  };
+> 
+>  /*
+> ---------------------------------------------------------------------------
+> -- diff --git a/drivers/iommu/msm_iommu.c b/drivers/iommu/msm_iommu.c index
+> e1b05379ca0e..8b623dce8161 100644
+> --- a/drivers/iommu/msm_iommu.c
+> +++ b/drivers/iommu/msm_iommu.c
+> @@ -230,6 +230,8 @@ static int msm_iommu_domain_init(struct iommu_domain
+> *domain) domain->geometry.aperture_end   = (1ULL << 32) - 1;
+>  	domain->geometry.force_aperture = true;
+> 
+> +	domain->pgsize_bitmap = MSM_IOMMU_PGSIZES;
+> +
+>  	return 0;
+> 
+>  fail_nomem:
+> @@ -682,7 +684,6 @@ static const struct iommu_ops msm_iommu_ops = {
+>  	.unmap = msm_iommu_unmap,
+>  	.map_sg = default_iommu_map_sg,
+>  	.iova_to_phys = msm_iommu_iova_to_phys,
+> -	.pgsize_bitmap = MSM_IOMMU_PGSIZES,
+>  };
+> 
+>  static int __init get_tex_class(int icp, int ocp, int mt, int nos)
+> diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
+> index bbb7dcef02d3..bc4054967f18 100644
+> --- a/drivers/iommu/omap-iommu.c
+> +++ b/drivers/iommu/omap-iommu.c
+> @@ -1250,6 +1250,8 @@ static int omap_iommu_domain_init(struct iommu_domain
+> *domain) domain->geometry.aperture_end   = (1ULL << 32) - 1;
+>  	domain->geometry.force_aperture = true;
+> 
+> +	domain->pgsize_bitmap = OMAP_IOMMU_PGSIZES;
+> +
+>  	return 0;
+> 
+>  fail_nomem:
+> @@ -1368,7 +1370,6 @@ static const struct iommu_ops omap_iommu_ops = {
+>  	.iova_to_phys	= omap_iommu_iova_to_phys,
+>  	.add_device	= omap_iommu_add_device,
+>  	.remove_device	= omap_iommu_remove_device,
+> -	.pgsize_bitmap	= OMAP_IOMMU_PGSIZES,
+>  };
+> 
+>  static int __init omap_iommu_init(void)
+> diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+> index 6a8b1ec4a48a..5ab63e51e1c0 100644
+> --- a/drivers/iommu/rockchip-iommu.c
+> +++ b/drivers/iommu/rockchip-iommu.c
+> @@ -828,6 +828,7 @@ static int rk_iommu_domain_init(struct iommu_domain
+> *domain) INIT_LIST_HEAD(&rk_domain->iommus);
+> 
+>  	domain->priv = rk_domain;
+> +	domain->pgsize_bitmap = RK_IOMMU_PGSIZE_BITMAP;
+> 
+>  	return 0;
+>  err_dt:
+> @@ -961,7 +962,6 @@ static const struct iommu_ops rk_iommu_ops = {
+>  	.add_device = rk_iommu_add_device,
+>  	.remove_device = rk_iommu_remove_device,
+>  	.iova_to_phys = rk_iommu_iova_to_phys,
+> -	.pgsize_bitmap = RK_IOMMU_PGSIZE_BITMAP,
+>  };
+> 
+>  static int rk_iommu_probe(struct platform_device *pdev)
+> diff --git a/drivers/iommu/shmobile-iommu.c b/drivers/iommu/shmobile-iommu.c
+> index f1b00774e4de..552bde09a69b 100644
+> --- a/drivers/iommu/shmobile-iommu.c
+> +++ b/drivers/iommu/shmobile-iommu.c
+> @@ -101,6 +101,7 @@ static int shmobile_iommu_domain_init(struct
+> iommu_domain *domain) spin_lock_init(&sh_domain->attached_list_lock);
+>  	INIT_LIST_HEAD(&sh_domain->attached_list);
+>  	domain->priv = sh_domain;
+> +	domain->pgsize_bitmap = SZ_1M | SZ_64K | SZ_4K;
+>  	return 0;
+>  }
+> 
+> @@ -364,7 +365,6 @@ static const struct iommu_ops shmobile_iommu_ops = {
+>  	.map_sg = default_iommu_map_sg,
+>  	.iova_to_phys = shmobile_iommu_iova_to_phys,
+>  	.add_device = shmobile_iommu_add_device,
+> -	.pgsize_bitmap = SZ_1M | SZ_64K | SZ_4K,
+>  };
+> 
+>  int ipmmu_iommu_init(struct shmobile_ipmmu *ipmmu)
+> diff --git a/drivers/iommu/tegra-gart.c b/drivers/iommu/tegra-gart.c
+> index f722a0c466cf..6404aba9667a 100644
+> --- a/drivers/iommu/tegra-gart.c
+> +++ b/drivers/iommu/tegra-gart.c
+> @@ -218,6 +218,7 @@ out:
+> 
+>  static int gart_iommu_domain_init(struct iommu_domain *domain)
+>  {
+> +	domain->pgsize_bitmap = GART_IOMMU_PGSIZES;
+>  	return 0;
+>  }
+> 
+> @@ -317,7 +318,6 @@ static const struct iommu_ops gart_iommu_ops = {
+>  	.map		= gart_iommu_map,
+>  	.unmap		= gart_iommu_unmap,
+>  	.iova_to_phys	= gart_iommu_iova_to_phys,
+> -	.pgsize_bitmap	= GART_IOMMU_PGSIZES,
+>  };
+> 
+>  static int tegra_gart_suspend(struct device *dev)
+> diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
+> index 6e134c7c227f..a423ed9a19da 100644
+> --- a/drivers/iommu/tegra-smmu.c
+> +++ b/drivers/iommu/tegra-smmu.c
+> @@ -265,6 +265,7 @@ static int tegra_smmu_domain_init(struct iommu_domain
+> *domain) pd[i] = 0;
+> 
+>  	domain->priv = as;
+> +	domain->pgsize_bitmap = SZ_4K;
+> 
+>  	return 0;
+>  }
+> @@ -643,8 +644,6 @@ static const struct iommu_ops tegra_smmu_ops = {
+>  	.unmap = tegra_smmu_unmap,
+>  	.map_sg = default_iommu_map_sg,
+>  	.iova_to_phys = tegra_smmu_iova_to_phys,
+> -
+> -	.pgsize_bitmap = SZ_4K,
+>  };
+> 
+>  static void tegra_smmu_ahb_enable(void)
+> diff --git a/drivers/vfio/vfio_iommu_type1.c
+> b/drivers/vfio/vfio_iommu_type1.c index 4a9d666f1e91..3bb72499e4e1 100644
+> --- a/drivers/vfio/vfio_iommu_type1.c
+> +++ b/drivers/vfio/vfio_iommu_type1.c
+> @@ -386,7 +386,7 @@ static unsigned long vfio_pgsize_bitmap(struct
+> vfio_iommu *iommu)
+> 
+>  	mutex_lock(&iommu->lock);
+>  	list_for_each_entry(domain, &iommu->domain_list, next)
+> -		bitmap &= domain->domain->ops->pgsize_bitmap;
+> +		bitmap &= domain->domain->pgsize_bitmap;
+>  	mutex_unlock(&iommu->lock);
+> 
+>  	return bitmap;
+> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+> index 38daa453f2e5..ffc023e24b78 100644
+> --- a/include/linux/iommu.h
+> +++ b/include/linux/iommu.h
+> @@ -53,6 +53,7 @@ struct iommu_domain_geometry {
+> 
+>  struct iommu_domain {
+>  	const struct iommu_ops *ops;
+> +	unsigned long pgsize_bitmap;	/* Bitmap of supported page sizes */
+>  	void *priv;
+>  	iommu_fault_handler_t handler;
+>  	void *handler_token;
+> @@ -108,7 +109,6 @@ enum iommu_attr {
+>   * @domain_get_attr: Query domain attributes
+>   * @domain_set_attr: Change domain attributes
+>   * @of_xlate: add OF master IDs to iommu grouping
+> - * @pgsize_bitmap: bitmap of supported page sizes
+>   * @priv: per-instance data private to the iommu driver
+>   */
+>  struct iommu_ops {
+> @@ -144,9 +144,6 @@ struct iommu_ops {
+>  #ifdef CONFIG_OF_IOMMU
+>  	int (*of_xlate)(struct device *dev, struct of_phandle_args *args);
+>  #endif
+> -
+> -	unsigned long pgsize_bitmap;
+> -	void *priv;
+>  };
+> 
+>  #define IOMMU_GROUP_NOTIFY_ADD_DEVICE		1 /* Device added */
+
 -- 
-2.2.2
+Regards,
+
+Laurent Pinchart
