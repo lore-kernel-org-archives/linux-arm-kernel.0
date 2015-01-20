@@ -1,111 +1,158 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 20 Jan 2015 10:56:55 +0000
-Subject: [PATCH v7 04/17] ARM64 / ACPI: Introduce early_param for "acpi"
- and pass acpi=force to enable ACPI
-In-Reply-To: <54BE1FEA.5040109@linaro.org>
-References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
- <1421247905-3749-5-git-send-email-hanjun.guo@linaro.org>
- <20150119114255.GF11835@e104818-lin.cambridge.arm.com>
- <CAKv+Gu8vPKAdsNg7QC7xW+i8_BemWEx4mvBx6NrnAHi8Y+bNtw@mail.gmail.com>
- <20150119135144.GI11835@e104818-lin.cambridge.arm.com>
- <20150119151350.21B65C40948@trevor.secretlab.ca>
- <54BD3803.6020307@redhat.com>
- <20150119175233.GK11835@e104818-lin.cambridge.arm.com>
- <20150119180122.GJ21553@leverpostej> <54BE1FEA.5040109@linaro.org>
-Message-ID: <20150120105655.GC25575@e104818-lin.cambridge.arm.com>
+From: kaloz@openwrt.org (Imre Kaloz)
+Date: Tue, 20 Jan 2015 11:57:11 +0100
+Subject: [PATCHv2] mvebu: add Linksys WRT1900AC (Mamba) support
+In-Reply-To: <20150119182113.GH32663@lunn.ch>
+References: <1421687701-5667-1-git-send-email-kaloz@openwrt.org>
+ <20150119182113.GH32663@lunn.ch>
+Message-ID: <op.xsrcplz12s3iss@ecaz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 20, 2015 at 09:29:14AM +0000, Hanjun Guo wrote:
-> On 2015?01?20? 02:01, Mark Rutland wrote:
-> > On Mon, Jan 19, 2015 at 05:52:33PM +0000, Catalin Marinas wrote:
-> >> On Mon, Jan 19, 2015 at 04:59:47PM +0000, Jon Masters wrote:
-> >>> On 01/19/2015 10:13 AM, Grant Likely wrote:
-> >>>> On Mon, 19 Jan 2015 13:51:45 +0000
-> >>>> , Catalin Marinas <catalin.marinas@arm.com>
-> >>>>   wrote:
-> >>>>> On Mon, Jan 19, 2015 at 11:55:32AM +0000, Ard Biesheuvel wrote:
-> >>>>>> On 19 January 2015 at 11:42, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> >>>>>>> On Wed, Jan 14, 2015 at 03:04:52PM +0000, Hanjun Guo wrote:
-> >>>>>>>> From: Al Stone <al.stone@linaro.org>
-> >>>>>>>>
-> >>>>>>>> Introduce one early parameters "off" and "force" for "acpi", acpi=off
-> >>>>>>>> will be the default behavior for ARM64, so introduce acpi=force to
-> >>>>>>>> enable ACPI on ARM64.
-> >>>>>>>>
-> >>>>>>>> Disable ACPI before early parameters parsed, and enable it to pass
-> >>>>>>>> "acpi=force" if people want use ACPI on ARM64. This ensures DT be
-> >>>>>>>> the prefer one if ACPI table and DT both are provided at this moment.
-> >>>>>>> [...]
-> >>>>>>>> --- a/arch/arm64/kernel/setup.c
-> >>>>>>>> +++ b/arch/arm64/kernel/setup.c
-> >>>>>>>> @@ -62,6 +62,7 @@
-> >>>>>>>>   #include <asm/memblock.h>
-> >>>>>>>>   #include <asm/psci.h>
-> >>>>>>>>   #include <asm/efi.h>
-> >>>>>>>> +#include <asm/acpi.h>
-> >>>>>>>>
-> >>>>>>>>   unsigned int processor_id;
-> >>>>>>>>   EXPORT_SYMBOL(processor_id);
-> >>>>>>>> @@ -388,6 +389,8 @@ void __init setup_arch(char **cmdline_p)
-> >>>>>>>>        early_fixmap_init();
-> >>>>>>>>        early_ioremap_init();
-> >>>>>>>>
-> >>>>>>>> +     disable_acpi();
-> >>>>>>>> +
-> >>>>>>>>        parse_early_param();
-> >>>>>>>>
-> >>>>>>>>        /*
-> >>>>>>>
-> >>>>>>> Did we get to any conclusion here? DT being the preferred one is fine
-> >>>>>>> when both DT and ACPI are present but do we still want the kernel to
-> >>>>>>> ignore ACPI altogether if DT is not present? It's a bit harder to detect
-> >>>>>>> the presence of DT at this point since the EFI_STUB added one already. I
-> >>>>>>> guess we could move the "acpi=force" argument passing to EFI_STUB if no
-> >>>>>>> DT is present at boot.
-> >>>>>>
-> >>>>>> Since the EFI stub populates the /chosen node in DT, I would prefer
-> >>>>>> for it to add a property there to indicate whether it created the DT
-> >>>>>> from scratch rather than adding ACPI specific stuff in there (even if
-> >>>>>> it is just a string to concatenate)
-> >>>>>
-> >>>>> This works for me. So we could pass "acpi=force" in EFI stub if it
-> >>>>> created the DT from scratch *and* ACPI tables are present (can it detect
-> >>>>> the latter? And maybe it could print something if none are available).
-> >>>>> If that works, the actual kernel can assume that ACPI needs to be
-> >>>>> explicitly enabled via acpi=force, irrespective of how much information
-> >>>>> it has in DT.
-> >>>>
-> >>>> Ditto for me. I think this is a fine solution. And, yes, the stub can
-> >>>> easily detect the presence of ACPI by looking in the UEFI config table.
-> >>>
-> >>> I get the point behind doing this, but could we not have it pass in a
-> >>> different parameter than =force? Perhaps something new? I'd like to
-> >>> separate out the case that it was enabled automatically vs explicitly
-> >>> forced on by a user wanting to use ACPI on a system with both tables.
-> >>
-> >> Ard had a point, so we should probably not pass acpi=force from EFI stub
-> >> (especially since a user may explicitly pass acpi=off irrespective of DT
-> >> presence). Some other property in the chosen node? It's not even an ABI
-> >> since that's a contract between EFI stub and the rest of the kernel, so
-> >> an in-kernel only interface.
-> >
-> > Not strictly true once kexec is in place. Then it becomes a stub ->
-> > kernel -> kernel -> kernel -> ... interface, alnog with the rest of the
-> > properties the stub puts in the DTB.
-> >
-> > Having something like /chosen/linux,uefi-stub-generated-dtb sounds sane
-> > regardless.
-> 
-> How about the patch (just RFC, maybe it is horrible :) ) below:
-> 
-> When system supporting both DT and ACPI but firmware providing
-> no dtb, we can use this linux,uefi-stub-generated-dtb property
-> to let kernel know that we can try ACPI configuration data.
-> 
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Hi Andrew,
 
-I'm ok with the idea but I'll let Mark comment on the DT aspects.
+On Mon, 19 Jan 2015 19:21:13 +0100, Andrew Lunn <andrew@lunn.ch> wrote:
 
--- 
-Catalin
+> Thanks for the v2. I have a few comments, and some points we will need
+> to discuss.
+
+Sure thing, thanks.
+
+>> + *
+>> + * Note: this board is shipped with a new generation boot loader that
+>> + * remaps internal registers at 0xf1000000. Therefore, if earlyprintk
+>> + * is used, the CONFIG_DEBUG_MVEBU_UART_ALTERNATE option should be
+>
+> There is a patch already queued up for this cycle:
+>
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/313605.html
+>
+> Please can you change CONFIG_DEBUG_MVEBU_UART_ALTERNATE to
+> CONFIG_DEBUG_MVEBU_UART0_ALTERNATE
+
+Ok.
+
+>> +	model = "Linksys WRT1900AC (Mamba)";
+>> +	compatible = "linksys,mamba", "marvell,armadaxp-mv78230",
+>> +		     "marvell,armadaxp", "marvell,armada-370-xp";
+>
+> So this is where the discussion starts. I don't like Mamba being so
+> prominent. As far as i understand, Mamba is the board, not the device.
+> In theory, another device could be created using the same board as a
+> basis, but with different PCIe cards, etc. At that point, i would
+> suggest refactoring the common parts out into a
+> armada-xp-linksys-mamba.dtsi which is then included into any device
+> .dts file using the Mamba board.
+>
+> This file describes the device. So i would prefer it to be called
+> armada-xp-linksys-wrt1900ac.dts. The first compatible should be
+> "linksys,wrt1900ac". Having "linksys,mamba" second is O.K.
+
+I would like to ask for others' opinion for multiple reasons, and would  
+decide in v3 based on that.
+
+- The device is called the "mamba", the marketing name is the WRT1900AC.  
+As history showed, it's perfectly possible that exactly the same device go  
+on the market under a different name. The E4200v2 is the same device as  
+the EA4500, with a different factory firmware. There the name of the  
+device is "viper".
+
+- OpenWrt is the only firmware/stack other than the official one and  
+people already know this device as "mamba".
+
+- Let's say the same device gets released under the same name or just the  
+radios change - so no redesign takes place at all. In my opinion that  
+hardly justifies adding multiple .dts files just to change the name of the  
+LEDs to reflect that. I think people who want to run mainline on their  
+device wouldn't be concerned about seeing a codename, but on the other  
+hand we could receive patches to "correct" the marketing name in the LEDs.
+
+>> +		internal-regs {
+>
+> It would be nice to document the jumper and pinout here.
+>
+>> +			serial at 12000 {
+>> +				status = "okay";
+>> +			};
+
+Do you mean serial console pinout?
+
+
+> The discussion about the i2c LED controller is still ongoing, but i
+> think TI are unlikely to get a PWM based driver accepted in place of a
+> LED driver. So you could include the LEDs here, and something
+> unexpected happens, we can remove it.
+
+Ok, I have that locally already, too.
+
+>
+>> +			nand at d0000 {
+>> +				status = "okay";
+>> +				num-cs = <1>;
+>> +				marvell,nand-keep-config;
+>> +				marvell,nand-enable-arbiter;
+>> +				nand-on-flash-bbt;
+>> +				nand-ecc-strength = <4>;
+>> +				nand-ecc-step-size = <512>;
+>> +
+>> +				partition at 0 {
+>> +					label = "u-boot";
+>> +					reg = <0x0000000 0x100000>;  /* 1MB */
+>> +					read-only;
+>> +				};
+>> +
+>> +				partition at 100000 {
+>> +					label = "u_env";
+>> +					reg = <0x100000 0x40000>;    /* 256KB */
+>> +				};
+>> +
+>> +				partition at 140000 {
+>> +					label = "s_env";
+>> +					reg = <0x140000 0x40000>;    /* 256KB */
+>> +				};
+>
+> So there is a big gap here? 768KB of unused space before the devinfo  
+> section?
+
+See below.
+
+>> +
+>> +				partition at 900000 {
+>> +					label = "devinfo";
+>> +					reg = <0x900000 0x100000>;    /* 1MB */
+>> +					read-only;
+>> +				};
+>> +
+>> +				partition at a00000 {
+>> +					label = "kernel1";
+>> +					reg = <0xa00000 0x2800000>;    /* 3MB + rootfs1 */
+>
+> There are some long lines here. We try to keep to the 80 character
+> rule.
+
+I've thought that would look kinda awkward, hence I left it this way.
+
+>
+>> +				};
+>
+> This partition overlaps the next one? That is new to me. Seems to be
+> accepted practice for OpenWRT, but i'm not aware of any mainline
+> Marvell DT doing this. Comments from others welcome...
+
+The gap and the overlapping partitions (pretty much the whole layout) are  
+straight from the official firmware. The overlap is used to flash a single  
+file which contains the rootfs, too.
+
+>> +
+>> +		power {
+>> +			label = "mamba:white:power";
+>
+> Please replace this mamba with wrt1900ac. It is a property of the
+> device, not the board. Another device using the mamba board may use it
+> differently.
+>
+
+See above.
+
+
+
+Imre
