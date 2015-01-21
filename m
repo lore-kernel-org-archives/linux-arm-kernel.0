@@ -1,125 +1,41 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Wed, 21 Jan 2015 08:30:05 +0800
-Subject: [PATCH v2 10/30] PCI: Introduce pci_host_bridge_list to manage host
- bridges
-In-Reply-To: <1421800225-26230-1-git-send-email-wangyijing@huawei.com>
-References: <1421800225-26230-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1421800225-26230-11-git-send-email-wangyijing@huawei.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Wed, 21 Jan 2015 09:34:52 +0800
+Subject: [PATCH v2 0/2] ARM: imx6sx-sdb: add revb board
+Message-ID: <1421804094-26379-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce pci_host_bridge_list to manage pci host
-bridges in system, so we could detect whether
-the host in domain:bus is alreay registered.
-Then we could remove bus alreay exist test in
-__pci_create_root_bus().
+Hi Shawn,
 
-Signed-off-by: Yijing Wang <wangyijing@huawei.com>
----
- drivers/pci/host-bridge.c |   24 +++++++++++++++++++++++-
- drivers/pci/probe.c       |    8 +-------
- include/linux/pci.h       |    1 +
- 3 files changed, 25 insertions(+), 8 deletions(-)
+The imx6sx-sdb board has two revisions, the current mainline is the
+reva which is experimental and will not be released, the revb board
+is used widely for internal and external users.
 
-diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
-index 8897581..0de21d5 100644
---- a/drivers/pci/host-bridge.c
-+++ b/drivers/pci/host-bridge.c
-@@ -8,6 +8,9 @@
- 
- #include "pci.h"
- 
-+static LIST_HEAD(pci_host_bridge_list);
-+static DEFINE_MUTEX(phb_mutex);
-+
- static void pci_release_host_bridge_dev(struct device *dev)
- {
- 	struct pci_host_bridge *bridge = to_pci_host_bridge(dev);
-@@ -25,7 +28,7 @@ struct pci_host_bridge *pci_create_host_bridge(
- 	int error;
- 	int bus = PCI_BUSNUM(db);
- 	int domain = PCI_DOMAIN(db);
--	struct pci_host_bridge *host;
-+	struct pci_host_bridge *host, *temp;
- 	struct pci_host_bridge_window *window, *n;
- 
- 	host = kzalloc(sizeof(*host), GFP_KERNEL);
-@@ -40,6 +43,18 @@ struct pci_host_bridge *pci_create_host_bridge(
- 	 */
- 	pci_host_assign_domain_nr(host);
- 
-+	mutex_lock(&phb_mutex);
-+	list_for_each_entry(temp, &pci_host_bridge_list, list)
-+		if (temp->domain == host->domain
-+				&& temp->busnum == host->busnum) {
-+			dev_dbg(&host->dev, "pci host bridge pci%04x:%02x exist\n",
-+					host->domain, host->busnum);
-+			mutex_unlock(&phb_mutex);
-+			kfree(host);
-+			return NULL;
-+		}
-+	mutex_unlock(&phb_mutex);
-+
- 	host->dev.parent = parent;
- 	INIT_LIST_HEAD(&host->windows);
- 	host->dev.release = pci_release_host_bridge_dev;
-@@ -55,12 +70,19 @@ struct pci_host_bridge *pci_create_host_bridge(
- 	list_for_each_entry_safe(window, n, resources, list)
- 		list_move_tail(&window->list, &host->windows);
- 
-+	mutex_lock(&phb_mutex);
-+	list_add_tail(&host->list, &pci_host_bridge_list);
-+	mutex_unlock(&phb_mutex);
- 	return host;
- }
- EXPORT_SYMBOL(pci_create_host_bridge);
- 
- void pci_free_host_bridge(struct pci_host_bridge *host)
- {
-+	mutex_lock(&phb_mutex);
-+	list_del(&host->list);
-+	mutex_unlock(&phb_mutex);
-+
- 	device_unregister(&host->dev);
- }
- 
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 8f97872..4015841 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -1869,7 +1869,7 @@ static struct pci_bus *__pci_create_root_bus(
- 		void *sysdata)
- {
- 	int error;
--	struct pci_bus *b, *b2;
-+	struct pci_bus *b;
- 	struct pci_host_bridge_window *window;
- 	struct device *parent;
- 	struct resource *res;
-@@ -1886,12 +1886,6 @@ static struct pci_bus *__pci_create_root_bus(
- 	b->ops = ops;
- 	b->number = b->busn_res.start = bridge->busnum;
- 	pci_bus_assign_domain_nr(b, parent);
--	b2 = pci_find_bus(pci_domain_nr(b), b->number);
--	if (b2) {
--		/* If we already got to this bus through a different bridge, ignore it */
--		dev_dbg(&b2->dev, "bus already known\n");
--		goto err_out;
--	}
- 
- 	bridge->bus = b;
- 	b->bridge = get_device(&bridge->dev);
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index d991bd2..5ee0033 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -406,6 +406,7 @@ struct pci_host_bridge {
- 	u16 busnum;
- 	struct device dev;
- 	struct pci_bus *bus;		/* root bus */
-+	struct list_head list;
- 	struct list_head windows;	/* pci_host_bridge_windows */
- 	void (*release_fn)(struct pci_host_bridge *);
- 	void *release_data;
+The main changes between reva and revb board:
+- OOP setting
+- pfuse
+- qspi
+- can transceiver (not mainlined)
+
+Changes for v2:
+
+- Add missing Makefile entries for both dts files. [Patch 1/2] and [Patch 2/2]
+- Delete OOP setting changed at imx6sx-sdb-reva, it is SoC feature,
+  it doesn't need to be change unless board limitations. [Patch 1/2]
+- Add explanation why OOP setting need to changed at imx6sx-sdb revb board. [Patch 2/2]
+- Make imx6sx-sdb revb board as default imx6sx-sdb board. [Patch 2/2]
+
+Peter Chen (2):
+  ARM: imx6sx-sdb: change default board as reva board
+  ARM: imx6sx-sdb: add revb board and make it default
+
+ arch/arm/boot/dts/Makefile            |   3 +-
+ arch/arm/boot/dts/imx6sx-sdb-reva.dts | 143 +++++++++
+ arch/arm/boot/dts/imx6sx-sdb.dts      | 588 ++--------------------------------
+ arch/arm/boot/dts/imx6sx-sdb.dtsi     | 547 +++++++++++++++++++++++++++++++
+ 4 files changed, 720 insertions(+), 561 deletions(-)
+ create mode 100644 arch/arm/boot/dts/imx6sx-sdb-reva.dts
+ create mode 100644 arch/arm/boot/dts/imx6sx-sdb.dtsi
+
 -- 
-1.7.1
+1.9.1
