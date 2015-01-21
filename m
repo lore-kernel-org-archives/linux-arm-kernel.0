@@ -1,119 +1,243 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Wed, 21 Jan 2015 12:43:08 +0000
-Subject: [PATCHv3 0/3] Handle SETEND for AArch32 tasks
-Message-ID: <1421844191-9263-1-git-send-email-suzuki.poulose@arm.com>
+Date: Wed, 21 Jan 2015 12:43:10 +0000
+Subject: [PATCH 2/3] arm64: Consolidate hotplug notifier for instruction
+ emulation
+In-Reply-To: <1421844191-9263-2-git-send-email-suzuki.poulose@arm.com>
+References: <1421844191-9263-1-git-send-email-suzuki.poulose@arm.com>
+ <1421844191-9263-2-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1421844191-9263-3-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 
-This series add support for controlling the 'setend' instruction,
-which is deprecated in ARMv8, using the legacy instruction emulation
-framework, introduced by Punit Agrawal.
+As of now each insn_emulation has a cpu hotplug notifier that
+enables/disables the CPU feature bit for the functionality. This
+patch re-arranges the code, such that there is only one notifier
+that runs through the list of registered emulation hooks and runs
+their corresponding set_hw_mode.
 
-Changes since V2:
- - Move ID_AA64MMFR0_EL1 bit definitions to asm/cputype.h
- - Use mask/value pair for the features in ID_AA64MMFR0_EL1
- - Better documentation about the hardware support limitaion under
-   Documentation and the Kconfig help
- - Restore the original 'set_hw_mode' API, with wrappers to invoke
-   the set_hw_mode for on_each_cpu() variants.
- - Print a warning when we detect an incompatibility for a registered
-   insn_emulation hook on a hotplugged CPU.
+We do nothing when a CPU is dying as we will set the appropriate bits
+as it comes back online based on the state of the hooks.
 
-Changes since V1:
- - Added a patch to keep track of the mixed endian support and register
-   the setend emulation only if all the active CPUs supports mixed endian.
- - Fail hotplug operation if the CPU doesn't support a feature
-   required by insn_emulation.
- - Signal handler runs in native endian
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Punit Agrawal <punit.agrawal@arm.com>
+---
+ arch/arm64/include/asm/cputype.h     |    2 +
+ arch/arm64/kernel/armv8_deprecated.c |  125 +++++++++++++++++++++-------------
+ 2 files changed, 79 insertions(+), 48 deletions(-)
 
-Testing :
-
- $ cat setend_sig.c 
- #include <stdio.h>
- #include <signal.h>
-
- #define setend_be(a)	asm __volatile__ ( "setend be" ::: "memory" )
- #define setend_le(a)	asm __volatile__ ( "setend le" ::: "memory" )
-
- volatile int flag = 1;
-
- void sigint(int sig)
- {
-	printf("in sighandler %d\n", sig);
-	flag = 0;
-	return;
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index 44e578d..2c4c852 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -82,6 +82,8 @@
+ #define ID_AA64MMFR0_BIGEND(mmfr0)	\
+ 	(((mmfr0) & ID_AA64MMFR0_BIGEND_MASK) >> ID_AA64MMFR0_BIGEND_SHIFT)
+ 
++#define SCTLR_EL1_CP15BEN	(0x1 << 5)
++
+ #ifndef __ASSEMBLY__
+ 
+ /*
+diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
+index c363671..2c991f1 100644
+--- a/arch/arm64/kernel/armv8_deprecated.c
++++ b/arch/arm64/kernel/armv8_deprecated.c
+@@ -19,6 +19,7 @@
+ #include <asm/system_misc.h>
+ #include <asm/traps.h>
+ #include <asm/uaccess.h>
++#include <asm/cpufeature.h>
+ 
+ #define CREATE_TRACE_POINTS
+ #include "trace-events-emulation.h"
+@@ -85,6 +86,57 @@ static void remove_emulation_hooks(struct insn_emulation_ops *ops)
+ 	pr_notice("Removed %s emulation handler\n", ops->name);
  }
-
- main()
+ 
++static void enable_insn_hw_mode(void *data)
++{
++	struct insn_emulation *insn = (struct insn_emulation *)data;
++	if (insn && insn->ops->set_hw_mode)
++		insn->ops->set_hw_mode(true);
++}
++
++static void disable_insn_hw_mode(void *data)
++{
++	struct insn_emulation *insn = (struct insn_emulation *)data;
++	if (insn && insn->ops->set_hw_mode)
++		insn->ops->set_hw_mode(false);
++}
++
++/* Run set_hw_mode(mode) on all active CPUs */
++static int run_all_cpu_set_hw_mode(struct insn_emulation *insn, bool enable)
++{
++	if (!insn->ops->set_hw_mode)
++		return -EINVAL;
++	if (enable)
++		on_each_cpu(enable_insn_hw_mode, (void *)insn, true);
++	else
++		on_each_cpu(disable_insn_hw_mode, (void *)insn, true);
++	return 0;
++}
++
++/*
++ * Run set_hw_mode for all insns on a starting CPU.
++ * Returns:
++ *  0 		- If all the hooks ran successfully.
++ * -EINVAL	- At least one hook is not supported by the CPU.
++ */
++static int run_all_insn_set_hw_mode(unsigned long cpu)
++{
++	int rc = 0;
++	unsigned long flags;
++	struct insn_emulation *insn;
++
++	raw_spin_lock_irqsave(&insn_emulation_lock, flags);
++	list_for_each_entry(insn, &insn_emulation, node) {
++		bool enable = (insn->current_mode == INSN_HW);
++		if (insn->ops->set_hw_mode && insn->ops->set_hw_mode(enable)) {
++			pr_warn(enable, "CPU[%ld] cannot support the emulation of %s",
++							cpu, insn->ops->name);
++			rc = -EINVAL;
++		}
++	}
++	raw_spin_unlock_irqrestore(&insn_emulation_lock, flags);
++	return rc;
++}
++
+ static int update_insn_emulation_mode(struct insn_emulation *insn,
+ 				       enum insn_emulation_mode prev)
  {
-	volatile int a = 0x0;
-
-	(void)signal(SIGINT, sigint);
-	printf("Press Ctrl+C to continue\n");
-	setend_be();
-	a ++;
-
-	while (flag);
-
-	setend_le();
-	a ++;
-
-	printf("a: 0x%x\n", a);
-	return 0;
+@@ -97,10 +149,8 @@ static int update_insn_emulation_mode(struct insn_emulation *insn,
+ 		remove_emulation_hooks(insn->ops);
+ 		break;
+ 	case INSN_HW:
+-		if (insn->ops->set_hw_mode) {
+-			insn->ops->set_hw_mode(false);
++		if (!run_all_cpu_set_hw_mode(insn, false))
+ 			pr_notice("Disabled %s support\n", insn->ops->name);
+-		}
+ 		break;
+ 	}
+ 
+@@ -111,10 +161,9 @@ static int update_insn_emulation_mode(struct insn_emulation *insn,
+ 		register_emulation_hooks(insn->ops);
+ 		break;
+ 	case INSN_HW:
+-		if (insn->ops->set_hw_mode && insn->ops->set_hw_mode(true))
++		ret = run_all_cpu_set_hw_mode(insn, true);
++		if (!ret)
+ 			pr_notice("Enabled %s support\n", insn->ops->name);
+-		else
+-			ret = -EINVAL;
+ 		break;
+ 	}
+ 
+@@ -133,6 +182,8 @@ static void register_insn_emulation(struct insn_emulation_ops *ops)
+ 	switch (ops->status) {
+ 	case INSN_DEPRECATED:
+ 		insn->current_mode = INSN_EMULATE;
++		/* Disable the HW mode if it was turned on at early boot time */
++		run_all_cpu_set_hw_mode(insn, false);
+ 		insn->max = INSN_HW;
+ 		break;
+ 	case INSN_OBSOLETE:
+@@ -453,8 +504,6 @@ ret:
+ 	return 0;
  }
- $ cat /proc/sys/abi/setend 
- 1
- $ echo 1 > /sys/kernel/debug/tracing/events/emulation/instruction_emulation/enable 
- $ echo 1 > /sys/kernel/debug/tracing/tracing_on 
- $ ./setend_sig_a32 
- Press Ctrl+C to continue
- ^Cin sighandler 2
- a: 0x1000001
- $ cat /sys/kernel/debug/tracing/trace
- # tracer: nop
- #
- # entries-in-buffer/entries-written: 2/2   #P:2
- #
- #                              _-----=> irqs-off
- #                             / _----=> need-resched
- #                            | / _---=> hardirq/softirq
- #                            || / _--=> preempt-depth
- #                            ||| /     delay
- #           TASK-PID   CPU#  ||||    TIMESTAMP  FUNCTION
- #              | |       |   ||||       |         |
-   setend_sig_a32-1373  [000] ...1   491.554499: instruction_emulation: instr="setend be" addr=0x8460
-   setend_sig_a32-1373  [000] ...1   492.833056: instruction_emulation: instr="setend le" addr=0x8488
- $ dmesg | tail
- [  491.554807] "setend_sig_a32" (1373) uses deprecated setend instruction at 0x8460
- [  492.833285] "setend_sig_a32" (1373) uses deprecated setend instruction at 0x8488
- $ echo 2 > /proc/sys/abi/setend
- $ ./setend_sig_t16 
- Press Ctrl+C to continue
- ^Cin sighandler 2
- a: 0x1000001
- $ dmesg | tail
- [  491.554807] "setend_sig_a32" (1373) uses deprecated setend instruction at 0x8460
- [  492.833285] "setend_sig_a32" (1373) uses deprecated setend instruction at 0x8488
- [  537.426216] Removed setend emulation handler
- [  537.426624] Enabled setend support
-
-
-Suzuki K. Poulose (3):
-  arm64: Track system support for mixed endian EL0
-  arm64: Consolidate hotplug notifier for instruction emulation
-  arm64:  Emulate SETEND for AArch32 tasks
-
- Documentation/arm64/legacy_instructions.txt |   12 ++
- arch/arm64/Kconfig                          |   15 ++
- arch/arm64/include/asm/cpufeature.h         |    2 +
- arch/arm64/include/asm/cputype.h            |   17 +++
- arch/arm64/include/asm/ptrace.h             |    7 +
- arch/arm64/kernel/armv8_deprecated.c        |  205 ++++++++++++++++++++-------
- arch/arm64/kernel/cpuinfo.c                 |   22 +++
- arch/arm64/kernel/signal32.c                |    5 +-
- 8 files changed, 236 insertions(+), 49 deletions(-)
-
+ 
+-#define SCTLR_EL1_CP15BEN (1 << 5)
+-
+ static inline void config_sctlr_el1(u32 clear, u32 set)
+ {
+ 	u32 val;
+@@ -465,48 +514,13 @@ static inline void config_sctlr_el1(u32 clear, u32 set)
+ 	asm volatile("msr sctlr_el1, %0" : : "r" (val));
+ }
+ 
+-static void enable_cp15_ben(void *info)
+-{
+-	config_sctlr_el1(0, SCTLR_EL1_CP15BEN);
+-}
+-
+-static void disable_cp15_ben(void *info)
+-{
+-	config_sctlr_el1(SCTLR_EL1_CP15BEN, 0);
+-}
+-
+-static int cpu_hotplug_notify(struct notifier_block *b,
+-			      unsigned long action, void *hcpu)
+-{
+-	switch (action) {
+-	case CPU_STARTING:
+-	case CPU_STARTING_FROZEN:
+-		enable_cp15_ben(NULL);
+-		return NOTIFY_DONE;
+-	case CPU_DYING:
+-	case CPU_DYING_FROZEN:
+-		disable_cp15_ben(NULL);
+-		return NOTIFY_DONE;
+-	}
+-
+-	return NOTIFY_OK;
+-}
+-
+-static struct notifier_block cpu_hotplug_notifier = {
+-	.notifier_call = cpu_hotplug_notify,
+-};
+-
+ static int cp15_barrier_set_hw_mode(bool enable)
+ {
+-	if (enable) {
+-		register_cpu_notifier(&cpu_hotplug_notifier);
+-		on_each_cpu(enable_cp15_ben, NULL, true);
+-	} else {
+-		unregister_cpu_notifier(&cpu_hotplug_notifier);
+-		on_each_cpu(disable_cp15_ben, NULL, true);
+-	}
+-
+-	return true;
++	if (enable)
++		config_sctlr_el1(0, SCTLR_EL1_CP15BEN);
++	else
++		config_sctlr_el1(SCTLR_EL1_CP15BEN, 0);
++	return 0;
+ }
+ 
+ static struct undef_hook cp15_barrier_hooks[] = {
+@@ -534,6 +548,20 @@ static struct insn_emulation_ops cp15_barrier_ops = {
+ 	.set_hw_mode = cp15_barrier_set_hw_mode,
+ };
+ 
++static int insn_cpu_hotplug_notify(struct notifier_block *b,
++			      unsigned long action, void *hcpu)
++{
++	int rc = 0;
++	if ((action & ~CPU_TASKS_FROZEN) == CPU_STARTING)
++		rc = run_all_insn_set_hw_mode((unsigned long)hcpu);
++
++	return notifier_from_errno(rc);
++}
++
++static struct notifier_block insn_cpu_hotplug_notifier = {
++	.notifier_call = insn_cpu_hotplug_notify,
++};
++
+ /*
+  * Invoked as late_initcall, since not needed before init spawned.
+  */
+@@ -545,6 +573,7 @@ static int __init armv8_deprecated_init(void)
+ 	if (IS_ENABLED(CONFIG_CP15_BARRIER_EMULATION))
+ 		register_insn_emulation(&cp15_barrier_ops);
+ 
++	register_cpu_notifier(&insn_cpu_hotplug_notifier);
+ 	register_insn_emulation_sysctl(ctl_abi);
+ 
+ 	return 0;
 -- 
 1.7.9.5
