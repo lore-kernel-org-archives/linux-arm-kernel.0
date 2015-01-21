@@ -1,73 +1,82 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 21 Jan 2015 09:14:59 +0100
-Subject: [PATCH 1/8] soc: Add MediaTek infracfg controller support
-In-Reply-To: <20150120161403.GG15924@leverpostej>
-References: <1421747231-554-1-git-send-email-s.hauer@pengutronix.de>
- <1421747231-554-2-git-send-email-s.hauer@pengutronix.de>
- <20150120161403.GG15924@leverpostej>
-Message-ID: <20150121081459.GB12209@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 21 Jan 2015 09:15:19 +0100
+Subject: [PATCH v4 2/2] I2C: mediatek: Add driver for MediaTek I2C
+ controller
+In-Reply-To: <1421821809.11671.117.camel@mtksdaap41>
+References: <1421404418-50718-1-git-send-email-eddie.huang@mediatek.com>
+ <1421404418-50718-3-git-send-email-eddie.huang@mediatek.com>
+ <20150118101816.GF22880@pengutronix.de>
+ <1421810004.15468.825.camel@mtksdaap41>
+ <1421821809.11671.117.camel@mtksdaap41>
+Message-ID: <20150121081519.GS22880@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 20, 2015 at 04:14:03PM +0000, Mark Rutland wrote:
-> On Tue, Jan 20, 2015 at 09:47:04AM +0000, Sascha Hauer wrote:
-> > This adds support for the MediaTek infracfg controller found
-> > on the MT8135/MT8173 SoCs. The infracfg controller contains
-> > miscellaneous registers for controlling peripheral resets and
-> > clocks.
-> > 
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > ---
-> >  .../devicetree/bindings/soc/mediatek/infracfg.txt  |  19 +++
-> >  drivers/soc/Kconfig                                |   1 +
-> >  drivers/soc/Makefile                               |   1 +
-> >  drivers/soc/mediatek/Kconfig                       |  12 ++
-> >  drivers/soc/mediatek/Makefile                      |   1 +
-> >  drivers/soc/mediatek/mtk-infracfg.c                | 127 ++++++++++++++++++++
-> >  drivers/soc/mediatek/mtk-pericfg.c                 | 128 +++++++++++++++++++++
-> >  7 files changed, 289 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/soc/mediatek/infracfg.txt
-> >  create mode 100644 drivers/soc/mediatek/Kconfig
-> >  create mode 100644 drivers/soc/mediatek/Makefile
-> >  create mode 100644 drivers/soc/mediatek/mtk-infracfg.c
-> >  create mode 100644 drivers/soc/mediatek/mtk-pericfg.c
-> > 
-> > diff --git a/Documentation/devicetree/bindings/soc/mediatek/infracfg.txt b/Documentation/devicetree/bindings/soc/mediatek/infracfg.txt
-> > new file mode 100644
-> > index 0000000..042083a
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/soc/mediatek/infracfg.txt
-> > @@ -0,0 +1,19 @@
-> > +MediaTek infracfg Controller
-> > +
-> > +The infracfg controller contains miscellaneous registers for controlling
-> > +clocks, resets and bus settings.
-> > +
-> > +Required properties:
-> > +- compatible: must be one of:
-> > +       mediatek,mt8135-infracfg
-> > +       mediatek,mt8173-infracfg
-> > +- reg: Address range for the infracfg controller
-> > +
-> > +Example:
-> > +
-> > +       infracfg: infracfg at 10003000 {
-> > +               #reset-cells = <1>;
-> > +               #clock-cells = <1>;
-> 
-> These weren't listed as required or optional above.
-> 
-> Please document these, along with the values a given clock-specifier or
-> reset-specifier may take.
+Hello,
 
-I documented #reset-cells and dropped #clock-cells for now.
-Documentation for #clock-cells can be added along with the clock support
-later.
+On Wed, Jan 21, 2015 at 02:30:09PM +0800, Yingjoe Chen wrote:
+> On Wed, 2015-01-21 at 11:13 +0800, Eddie Huang wrote:
+> <...>
+> > > > +		ret = -EINVAL;
+> > > > +		goto err_exit;
+> > > > +	}
+> > > > +
+> > > > +	if (msgs->buf == NULL) {
+> > > > +		dev_dbg(i2c->dev, " data buffer is NULL.\n");
+> > > > +		ret = -EINVAL;
+> > > > +		goto err_exit;
+> > > > +	}
+> > > > +
+> > > > +	i2c->addr = msgs->addr;
+> > > > +	i2c->msg_len = msgs->len;
+> > > > +	i2c->msg_buf = msgs->buf;
+> > > > +
+> > > > +	if (msgs->flags & I2C_M_RD)
+> > > > +		i2c->op = I2C_MASTER_RD;
+> > > > +	else
+> > > > +		i2c->op = I2C_MASTER_WR;
+> > > > +
+> > > > +	/* combined two messages into one transaction */
+> > > > +	if (num > 1) {
+> > > > +		i2c->msg_aux_len = (msgs + 1)->len;
+> > > > +		i2c->op = I2C_MASTER_WRRD;
+> > > > +	}
+> > > This means "write then read", right? You should check here that the
+> > > first message is really a write and the 2nd a read then.
+> > > Can this happen at all with the quirks defined below (.max_num_msgs =
+> > > 1)?
+> > Yes, mean write then read. Indeed, add check is better.
+> > If msg number is 1, means normal write or read, not "write then read".
+> 
+> The quirks will increase the message count and check 'write then read'
+> for us. We don't have to add check here.
+I have to admit I don't know that quirks stuff, so it's well possible
+that I'm wrong here.
+ 
+> > > > +static int mtk_i2c_remove(struct platform_device *pdev)
+> > > > +{
+> > > > +	struct mtk_i2c *i2c = platform_get_drvdata(pdev);
+> > > > +
+> > > > +	i2c_del_adapter(&i2c->adap);
+> > > > +	free_i2c_dma_bufs(i2c);
+> > > > +	platform_set_drvdata(pdev, NULL);
+> > > > +
+> > > Here you need to make sure that no irq is running when i2c_del_adapter
+> > > is called.
+> > OK, add check here
+> 
+> I thought after i2c_del_adapter() is complete, all i2c_transfer for this
+> adapter is completed. If this is true, then i2c clock is already off and
+> we won't have any on-going transfer/pending irq.
+Consider that there is an ongoing transaction and before it completes
+the adapter-device is unbound from the driver. Then i2c_del_adapter is
+called which frees the resources managed by the core, then the device's
+completion irq triggers and the freed adapter is used which probably
+results in an oops.
 
-Sascha
+Best regards
+Uwe
 
 -- 
-Pengutronix e.K.                           |                             |
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
