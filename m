@@ -1,73 +1,58 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 21 Jan 2015 09:17:18 +0900
-Subject: [PATCHv2 0/5] arm: specify PMU type in platform data
-In-Reply-To: <1421770049-32029-1-git-send-email-mark.rutland@arm.com>
+Date: Wed, 21 Jan 2015 09:17:59 +0900
+Subject: [PATCHv2 4/5] arm: shmobile: specify PMUs are for ARMv7 CPUs
+In-Reply-To: <1421770049-32029-5-git-send-email-mark.rutland@arm.com>
 References: <1421770049-32029-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20150121001717.GB338@verge.net.au>
+ <1421770049-32029-5-git-send-email-mark.rutland@arm.com>
+Message-ID: <20150121001758.GC338@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 20, 2015 at 04:07:24PM +0000, Mark Rutland wrote:
-> Currently the ARMv6, ARMv7, and XScale PMU drivers are coupled with each
-> other, and all included in the same c file. To enable the splitting of
-> the ARMv6, ARMv7, and XScale PMU drivers, and the conversion of the
-> arm_pmu framework to a pure library, we need to be a be more precise
-> when describing PMUs, to enable association of the PMU with the right
-> driver. In device tree this is already implicit in the compatible
-> string, but platform data currently only specifies "arm-pmu".
+On Tue, Jan 20, 2015 at 04:07:28PM +0000, Mark Rutland wrote:
+> Now that we can specify which PMU variant we're likely to deal with, do
+> so in the shmobile board code. This will allow us to split the ARMv6,
+> ARMv7, and XScale PMU drivers
 > 
-> Commit 253d8c3d2518ca6f (arm: perf: add more specific platform device
-> IDs) added "armv6-pmu", "armv7-pmu", and "xscale-pmu" platform device
-> IDs, enabling the three to be distinguished. This series updates
-> platform code to use these strings.
-> 
-> A later patch series will decouple the drivers.
-> 
-> Since v1 [1]:
-> * Rebase to v3.19-rc4.
-> * Add Acks.
-> * Drop vexpress patches (platform code deleted).
-> 
-> Simon, in v1 you mentioned you were happy to take the shmobile patch
-> through your tree. Are you still happy to do so, or to give your ack
-> such that these can go through arm-soc together?
-> 
-> While I'm not too concerned which route these patches take, it would be
-> nice to have a single base for the patches splitting the drivers.
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Magnus Damm <magnus.damm@gmail.com>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Simon Horman <horms@verge.net.au>
 
-Hi Mark,
+Tested-by: Simon Horman <horms+renesas@verge.net.au>
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
 
-assuming that this is targeted at v3.20 then it looks like your
-changes do not conflict with anything I have queued up and
-I am not likely to queue anything more up for the files in question
-for that release. As my main concern is about conflicts I'm therefore
-quite happy for you to take the shmobile patch through your tree.
-I'll supply an ack accordingly.
-
-> Thanks,
-> Mark.
+> ---
+>  arch/arm/mach-shmobile/setup-r8a7740.c | 2 +-
+>  arch/arm/mach-shmobile/setup-sh73a0.c  | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
 > 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/304078.html
-> 
-> Mark Rutland (5):
->   arm: realview: specify PMU types
->   arm: pxa: specify PMUs are for XScale CPUs
->   arm: iop: specify PMUs are for XScale CPUs
->   arm: shmobile: specify PMUs are for ARMv7 CPUs
->   arm: omap: specify PMUs are for ARMv7 CPUs
-> 
->  arch/arm/mach-omap2/pmu.c                | 5 +++--
->  arch/arm/mach-pxa/devices.c              | 2 +-
->  arch/arm/mach-realview/realview_eb.c     | 3 ++-
->  arch/arm/mach-realview/realview_pb1176.c | 2 +-
->  arch/arm/mach-realview/realview_pb11mp.c | 2 +-
->  arch/arm/mach-realview/realview_pba8.c   | 2 +-
->  arch/arm/mach-realview/realview_pbx.c    | 2 +-
->  arch/arm/mach-shmobile/setup-r8a7740.c   | 2 +-
->  arch/arm/mach-shmobile/setup-sh73a0.c    | 2 +-
->  arch/arm/plat-iop/pmu.c                  | 2 +-
->  10 files changed, 13 insertions(+), 11 deletions(-)
-> 
+> diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
+> index 79ad93d..6edde2f 100644
+> --- a/arch/arm/mach-shmobile/setup-r8a7740.c
+> +++ b/arch/arm/mach-shmobile/setup-r8a7740.c
+> @@ -656,7 +656,7 @@ static struct resource pmu_resources[] = {
+>  };
+>  
+>  static struct platform_device pmu_device = {
+> -	.name	= "arm-pmu",
+> +	.name	= "armv7-pmu",
+>  	.id	= -1,
+>  	.num_resources = ARRAY_SIZE(pmu_resources),
+>  	.resource = pmu_resources,
+> diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+> index 93ebe34..bdfa7a5 100644
+> --- a/arch/arm/mach-shmobile/setup-sh73a0.c
+> +++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+> @@ -563,7 +563,7 @@ static struct resource pmu_resources[] = {
+>  };
+>  
+>  static struct platform_device pmu_device = {
+> -	.name		= "arm-pmu",
+> +	.name		= "armv7-pmu",
+>  	.id		= -1,
+>  	.num_resources	= ARRAY_SIZE(pmu_resources),
+>  	.resource	= pmu_resources,
 > -- 
 > 1.9.1
 > 
