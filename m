@@ -1,35 +1,56 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 21 Jan 2015 11:38:27 +0100
-Subject: [Query] should pinmux setting be put into board specific dts
- or SoC specific dtsi?
-In-Reply-To: <20150121153056.1d325708@xhacker>
-References: <20150121153056.1d325708@xhacker>
-Message-ID: <54BF81A3.4060500@gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 21 Jan 2015 11:38:58 +0100
+Subject: [PATCH 1/2] clk: exynos5420: Add IDs for clocks used in DISP1
+ power domain
+In-Reply-To: <20150120175402.22722.84342@quantum>
+References: <1421750127-22536-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1421750127-22536-2-git-send-email-javier.martinez@collabora.co.uk>
+ <54BE6050.1090205@samsung.com> <20150120175402.22722.84342@quantum>
+Message-ID: <54BF81C2.3020000@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/21/2015 08:30 AM, Jisheng Zhang wrote:
-> IIUC, the pinmux setting is board specific. So my question is where to put the
-> pinmux settings? Board specific dts or SoC specific dtsi? Could anyone kindly
-> help me?
+Hello,
 
-Jisheng,
+On 01/20/2015 06:54 PM, Mike Turquette wrote:
+> Quoting Sylwester Nawrocki (2015-01-20 06:04:00)
+>> Hi,
+>> 
+>> On 20/01/15 11:35, Javier Martinez Canillas wrote:
+>> > When a power domain is powered off on Exynos5420 SoC, the input clocks of
+>> > the devices attached to this power domain are re-parented to oscclk and
+>> > restored to the original parent after powering on the power domain.
+>> > 
+>> > So a reference to the input and parent clocks for the devices attached to
+>> > a power domain are needed to be able to do the re-parenting. The DISP1 pd
+>> > includes modules which uses the following clocks:
+>> > 
+>> > ACLK_200_DISP1 (MIXER and HDMILINK)
+>> > ACLK_300_DISP1 (FIMD1)
+>> > ACLK_400_DISP1 (Internal Buses)
+>> > 
+>> > Each of these clocks are generated as the output of a clock mux so add an
+>> > ID for all of these clock muxes and their parents to be referenced in the
+>> > DISP1 power domain device node.
+>> > 
+>> > Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>> 
+>> The patch looks OK to me, I'm fine with it being merged via Kukjin's tree
+>> due to the dts dependencies (including other pending dts patches touching
+>> the arch/arm/boot/dts/exynos5420.dtsi file).
+>> I think we need also Mike ACK for that, I could also queue the patch for
+>> the clk tree and create a topic branch, but merging both patches via
+>> arm-soc seems a more sane option in this case.
+>> 
+>> Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> 
+> Acked-by: Michael Turquette <mturquette@linaro.org>
+> 
 
-it depends on the pinmux setting whether it should go in to SoC dtsi or
-board dts. For example, the pinmux setting for internal devices like
-UART - where there is only one or two possible settings - should go
-into SoC dtsi. Also, if there is only one possible setting or one
-default/common setting, the SoC dtsi node should already have the
-corresponding pinctrl properties. If a specific board uses another
-setting, it can always overwrite the default property with the
-one used at board level.
+Thanks a lot Sylwester and Mike for your acks.
 
-A good example for board specific pinmux settings clearly is GPIO,
-e.g. you have a regulator for USB power that is controlled by GPIO
-then you'll have the regulator node on board level and also the
-corresponding pinmux settings for that very GPIO pin.
+Kukjin, could you please pick $subject and "Patch 2/2 ARM: dts: Add DISP1
+power domain for exynos5420" through your tree?
 
-If you give a specific example of what pinmux setting bothers you,
-we can try to find a good place for it.
-
-Sebastian
+Best regards,
+Javier
