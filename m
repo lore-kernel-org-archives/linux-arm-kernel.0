@@ -1,23 +1,32 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Wed, 21 Jan 2015 07:31:34 -0500
-Subject: next-20150120 broken on Tegra by "ata: libahci: Allow using
- multiple regulators"
-In-Reply-To: <20150121105001.GA9921@ulmo.nvidia.com>
-References: <alpine.DEB.2.02.1501210003010.5450@utopia.booyaka.com>
- <20150121105001.GA9921@ulmo.nvidia.com>
-Message-ID: <20150121123134.GD8684@htj.dyndns.org>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 21 Jan 2015 14:41:00 +0200
+Subject: [PATCH v7 1/4] Documentation: dt: add common bindings for
+ hwspinlock
+In-Reply-To: <20150120180548.GK7718@atomide.com>
+References: <1421269101-51105-1-git-send-email-s-anna@ti.com>
+ <1421269101-51105-2-git-send-email-s-anna@ti.com>
+ <20150115135201.GG16217@leverpostej>
+ <20150115135556.GH16217@leverpostej>
+ <CAL_JsqL2LZAooMk-V8+xeF2g6acZE21M+-OBRw8aEVa-5wVHuQ@mail.gmail.com>
+ <CAK=WgbYQ=BbinqJ5fsw2Y+FKdy=nasLsw9mX8pw6S_o3owy9-g@mail.gmail.com>
+ <20150116101746.GA21809@leverpostej>
+ <CAK=WgbYBqPoUm9byx0du_g5ZmHdYaUVLpSPZYHoCVzNoatNKpw@mail.gmail.com>
+ <20150120180548.GK7718@atomide.com>
+Message-ID: <CAK=WgbZGGtwmQwzWumjpYOsYHTt8vPQpTraABwJBsv5VXOmJ_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 21, 2015 at 11:50:03AM +0100, Thierry Reding wrote:
-> Tejun, preferably the attached patch should be squashed into commit
-> c7d7ddee7e24 ("ata: libahci: Allow using multiple regulators") to avoid
-> breaking bisectability. If you don't want to rewrite history, let me
-> know and I can turn it into a proper patch.
+On Tue, Jan 20, 2015 at 8:05 PM, Tony Lindgren <tony@atomide.com> wrote:
+> How about default to Linux id space and allow overriding that with
+> a module param option if needed?
 
-Yes, please make it a proper patch.
+I'm not sure I'm following.
 
-Thanks a lot!
+If the main point of contention is the base_id field, I'm also fine
+with removing it entirely, as I'm not aware of any actual user for it
+(Suman please confirm?).
 
--- 
-tejun
+Mark? Rob? Will you accept Suman's patches if the base_id field is removed?
+
+Thanks,
+Ohad.
