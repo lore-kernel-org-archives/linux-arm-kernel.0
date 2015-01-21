@@ -1,72 +1,26 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 21 Jan 2015 08:30:31 -0800
-Subject: [PATCH v4 13/21] ARM: omap: convert wakeupgen to stacked domains
-In-Reply-To: <1421660655-21394-14-git-send-email-marc.zyngier@arm.com>
-References: <1421660655-21394-1-git-send-email-marc.zyngier@arm.com>
- <1421660655-21394-14-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150121163031.GR7718@atomide.com>
+From: joe@perches.com (Joe Perches)
+Date: Wed, 21 Jan 2015 08:40:44 -0800
+Subject: unclear ipv6 redirect message (was Re: [PATCH v3 2/3] mfd:
+ lubbock_io: add lubbock_io board)
+In-Reply-To: <20150121161059.GT26493@n2100.arm.linux.org.uk>
+References: <1421406010-14851-1-git-send-email-robert.jarzmik@free.fr>
+ <1421406010-14851-2-git-send-email-robert.jarzmik@free.fr>
+ <20150119091705.GG21886@x1> <87ppaah9k5.fsf@free.fr>
+ <20150120102919.GP5767@x1> <20150120115658.GJ26493@n2100.arm.linux.org.uk>
+ <873874fuei.fsf@free.fr> <20150121094453.GO26493@n2100.arm.linux.org.uk>
+ <1421856321.10574.13.camel@perches.com>
+ <20150121161059.GT26493@n2100.arm.linux.org.uk>
+Message-ID: <1421858444.10574.14.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Marc Zyngier <marc.zyngier@arm.com> [150119 01:48]:
-> OMAP4/5 has been (ab)using the gic_arch_extn to provide
-> wakeup from suspend, and it makes a lot of sense to convert
-> this code to use stacked domains instead.
+On Wed, 2015-01-21 at 16:11 +0000, Russell King - ARM Linux wrote:
+> On Wed, Jan 21, 2015 at 08:05:21AM -0800, Joe Perches wrote:
+> > (adding netdev)
 > 
-> This patch does just this, updating the DT files to actually
-> reflect what the HW provides.
-> 
-> BIG FAT WARNING: because the DTs were so far lying by not
-> exposing the WUGEN HW block, kernels with this patch applied
-> won't have any suspend-resume facility when booted with old DTs,
-> and old kernels with updated DTs won't even boot.
-> 
-> On a platform with this patch applied, the system looks like
-> this:
-> 
-> root at bacon-fat:~# cat /proc/interrupts
->             CPU0       CPU1
->  16:          0          0     WUGEN  37  gp_timer
->  19:     233799     155916       GIC  27  arch_timer
->  23:          0          0     WUGEN   9  l3-dbg-irq
->  24:          1          0     WUGEN  10  l3-app-irq
->  27:        282          0     WUGEN  13  omap-dma-engine
->  44:          0          0  4ae10000.gpio  13  DMA
+> I wasn't actually reporting that as an issue; I was using it as an
+> example.  It's from a very old kernel (2.6.27.21) which I run on one
+> of my old x86 machines.
 
-You may want to update this part for the fix :)
-
-I gave this a quick boot test on am437x-gp-evm and the
-interrupts look OK with the fix also applied:
-
-# cat /proc/interrupts 
-            CPU0       
- 16:        657     WUGEN  68  gp_timer
- 18:          0     WUGEN   9  l3-dbg-irq
- 19:          0     WUGEN  10  l3-app-irq
- 20:          5     WUGEN  12  edma
- 22:          0     WUGEN  14  edma_error
- 23:         96     WUGEN  72  OMAP UART0
- 33:          0  44e07000.gpio   6  mmc0
-158:         52     WUGEN  70  44e0b000.i2c
-159:          0     WUGEN  71  4802a000.i2c
-160:         35     WUGEN  64  mmc0
-161:          0     WUGEN  40  4a100000.ethernet
-162:       7739     WUGEN  41  4a100000.ethernet
-163:       7608     WUGEN  42  4a100000.ethernet
-164:          0     WUGEN  43  4a100000.ethernet
-170:          0     WUGEN 100  gpmc
-180:          0     WUGEN   7  tps65218
-IPI0:          0  CPU wakeup interrupts
-IPI1:          0  Timer broadcast interrupts
-IPI2:          0  Rescheduling interrupts
-IPI3:          0  Function call interrupts
-IPI4:          0  Single function call interrupts
-IPI5:          0  CPU stop interrupts
-IPI6:          0  IRQ work interrupts
-IPI7:          0  completion interrupts
-Err:          0
-
-Also verified that suspend and resume to a serial console event
-works on omap4430-sdp. So please feel free to add:
-
-Acked-by: Tony Lindgren <tony@atomide.com>
+It's still the same code.
+If the message can be improved, why not do it?
