@@ -1,32 +1,99 @@
-From: liquid.acid@gmx.net (Tobias Jakobi)
-Date: Thu, 22 Jan 2015 00:37:28 +0100
-Subject: [PATCH v4 00/18] Exynos SYSMMU (IOMMU) integration with
- DT and DMA-mapping subsystem
-In-Reply-To: <1421399592-7482-1-git-send-email-m.szyprowski@samsung.com>
-References: <1421399592-7482-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <54C03838.4080008@gmx.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 21 Jan 2015 23:39:16 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP2+: hwmod: first set of patches for v3.20
+Message-ID: <alpine.DEB.2.02.1501212338100.5450@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-just some warnings I encountered when compiling this today:
-drivers/iommu/exynos-iommu.c: In function ?exynos_iommu_of_setup?:
-drivers/iommu/exynos-iommu.c:1177:2: warning: passing argument 2 of
-?of_iommu_set_ops? discards ?const? qualifier from pointer target type
-[enabled by default]
-  of_iommu_set_ops(np, &exynos_iommu_ops);
-  ^
-In file included from drivers/iommu/exynos-iommu.c:23:0:
-include/linux/of_iommu.h:34:6: note: expected ?struct iommu_ops *? but
-argument is of type ?const struct iommu_ops *?
- void of_iommu_set_ops(struct device_node *np, struct iommu_ops *ops);
-      ^
+Hi Tony
+
+The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+
+  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.20/omap-hwmod-a
+
+for you to fetch changes up to 1c7e36bfc3e2fb2df5e2d1989a4b6fb9055a0f9b:
+
+  ARM: DRA7: hwmod: Fix boot crash with DEBUG_LL enabled on UART3 (2015-01-20 18:12:17 -0700)
+
+- ----------------------------------------------------------------
+ARM: OMAP2+: hwmod: first set of patches for v3.20
+
+First set of OMAP2+ hwmod patches for Linux v3.20.  These are mostly
+fixes for warnings, although there's one DRA7xx patch that fixes
+CONFIG_DEBUG_LL for AM572x/DRA7xx SoCs that use UART3 for console,
+such as the BeagleBoard-X15.
+
+These patches entered Linux-next starting with the next-20150121 tag.
+
+Basic build, boot, and PM test results can be found here:
+
+http://www.pwsan.com/omap/testlogs/omap-hwmod-a-for-v3.20/20150121142621/
+
+- ----------------------------------------------------------------
+Keerthy (1):
+      ARM: OMAP: DRA7: hwmod: Make gpmc software supervised as the smart idle is broken
+
+Lokesh Vutla (2):
+      ARM: OMAP2+: hwmod: print error if wait_target_ready() failed
+      ARM: DRA7: hwmod: Fix boot crash with DEBUG_LL enabled on UART3
+
+Paul Walmsley (1):
+      MAINTAINERS: add maintainer for OMAP hwmod data
+
+Tomi Valkeinen (1):
+      ARM: AM43xx: hwmod: set DSS submodule parent hwmods
+
+ MAINTAINERS                                | 6 ++++++
+ arch/arm/mach-omap2/omap_hwmod.c           | 4 ++--
+ arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 2 ++
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c  | 5 +++--
+ 4 files changed, 13 insertions(+), 4 deletions(-)
 
 
-I guess the 'const' should be dropped from exynos_iommu_ops, even though
-I wonder why of_iommu_set_ops wants a non-const pointer (can/does it
-modify the struct later on?).
+vmlinux object size
+(delta in bytes from test_v3.19-rc1 (97bf6af1f928216fd6c5a66e8a57bfa95a659672)):
+   text     data      bss    total  kernel
+      0        0        0        0  omap1_defconfig
+      0        0        0        0  omap1_defconfig_1510innovator_only
+      0        0        0        0  omap1_defconfig_5912osk_only
+      0        0        0        0  multi_v7_defconfig
+      0        0        0        0  omap2plus_defconfig
+      0        0        0        0  omap2plus_defconfig_2430sdp_only
+    +64        0        0      +64  omap2plus_defconfig_am33xx_only
+      0        0        0        0  omap2plus_defconfig_am43xx_only
+      0        0        0        0  omap2plus_defconfig_cpupm
+      0        0        0        0  omap2plus_defconfig_dra7xx_only
+    +32        0        0      +32  omap2plus_defconfig_n800_multi_omap2xxx
+      0        0        0        0  omap2plus_defconfig_n800_only_a
+      0        0        0        0  omap2plus_defconfig_no_pm
+      0        0        0        0  omap2plus_defconfig_omap2_4_only
+      0        0        0        0  omap2plus_defconfig_omap3_4_only
+      0        0        0        0  omap2plus_defconfig_omap5_only
+    +56        0      -56        0  rmk_omap3430_ldp_allnoconfig
+      0        0        0        0  rmk_omap3430_ldp_oldconfig
+    +64        0      -64        0  rmk_omap4430_sdp_allnoconfig
+      0        0        0        0  rmk_omap4430_sdp_oldconfig
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1
 
-With best wishes,
-Tobias
+iQIcBAEBAgAGBQJUwDhJAAoJEMePsQ0LvSpLFWsP/38ZfGOlOOex0JDaZSm/tTK2
+WP+0RICxClIKFbvi9YHMW5yrrpEEcp7BZmcWsBf6SmJJs8HTzLjulRepz25gwPCw
+JC0qReQHpHOXIqcIKaJKEP1z0FlXArUF0xInLVRvVObcHKVJ+yuG2vk7Fs6tdZVw
+K7JS9x/6ZU5gZ7DMpTVuY5cuNcXaiuTb9tmKWrcXCNTneN30rpRq4g6R8kp5hSgI
+PR4dCkUpEnkgPfuuLUjSNDtIwGHwulgd85O+6gr6uxOvJR3bEHfYP0jvc9XMuBnY
+/Qy5KvfNjjeItfcBVgZSLusnmFXKFMApPnYJfyaikH9agoy5QFpFdMgS5syLJ5lQ
+ZCLTqg71UC3sycxZGGgPqddzI+rfHH/0QboonW0+LIhB0VTgA64wH2CIoz0nfmSs
+rixWz0+5cS2DaxvXRD98+1T3F1MB6wVmJr8IZaPkHT1G9FnsKNsqGd6Qk76ItdMf
+8MdFxR0qEjZGK0djOyRiAvXkk2g4o3JE/MBT557eH1oHasaHiyABHqgXxEDFrtXy
+/gLYUNYSHvyirFERHF0Ub4xamNNPe6WIqu68/o0yq7HxECiOmji83SpK6NfhPgPW
+mAZxOhHtF67f68sa+nyZV5W9CeQTb23wcmEo9esqARh0IasM7x+mzbxVcemCN9AY
+RoP0xFh/ncaBH8vv9E//
+=wq+i
+-----END PGP SIGNATURE-----
