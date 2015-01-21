@@ -1,68 +1,91 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 21 Jan 2015 16:16:53 +0000
-Subject: [PATCH v7 04/17] ARM64 / ACPI: Introduce early_param for "acpi"
- and pass acpi=force to enable ACPI
-In-Reply-To: <54BFCE4D.2060806@redhat.com>
-References: <20150119151350.21B65C40948@trevor.secretlab.ca>
- <54BD3803.6020307@redhat.com>
- <20150119175233.GK11835@e104818-lin.cambridge.arm.com>
- <20150119180122.GJ21553@leverpostej> <54BE1FEA.5040109@linaro.org>
- <alpine.DEB.2.02.1501201901190.12653@kaball.uk.xensource.com>
- <20150121152326.GD6358@e104818-lin.cambridge.arm.com>
- <54BFC5F0.3020500@redhat.com>
- <20150121154243.GE6358@e104818-lin.cambridge.arm.com>
- <54BFCE4D.2060806@redhat.com>
-Message-ID: <20150121161652.GH6358@e104818-lin.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 21 Jan 2015 16:22:43 +0000
+Subject: [PATCH v2 3/4] ARM: sti: Provide DT nodes for SSC[0..4]
+In-Reply-To: <1417534844-25080-4-git-send-email-lee.jones@linaro.org>
+References: <1417534844-25080-1-git-send-email-lee.jones@linaro.org>
+ <1417534844-25080-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <20150121162243.GG22024@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 21, 2015 at 04:05:33PM +0000, Jon Masters wrote:
-> On 01/21/2015 10:42 AM, Catalin Marinas wrote:
-> > On Wed, Jan 21, 2015 at 03:29:52PM +0000, Jon Masters wrote:
-> >> On 01/21/2015 10:23 AM, Catalin Marinas wrote:
-> >>> I have some questions for the ACPI and EFI folk:
-> >>>
-> >>> 1. When booting with ACPI, are the EFI run-time services required for
-> >>>    anything? If yes, Xen may have a bigger problem
-> >>
-> >> Yes. At least for some things. For example, installing an Operating
-> >> System would require that you make runtime services calls to set the
-> >> BootOrder/BootNext variables, and so on. Further, we use the GetTime
-> >> service and EFI based reboot to avoid having special drivers. I had
-> >> those added to SBBR as requirements for that reason.
-> > 
-> > So what would a kexec'ed kernel do here? Or we usually expect it to be
-> > short lived and doesn't need reboot, nor GetTime.
+Maxime,
+
+Can you ping these up please?
+
+> The Synchronous Serial Controller is used to provide SPI.
 > 
-> In the use case that I have, it'll use EFI Runtime Servies to handle
-> both the time of day (which it will need) and to subsequently reboot.
-> This is currently being worked on (integration into kdump).
-
-So the EFI run-time services (and EFI tables) will be preserved across
-kexec? Could Xen not to something similar?
-
-> >>> 2. Could a boot loader (either kernel doing kexec or Xen) emulate the
-> >>>    EFI system/config tables and still make them useful to the kernel but
-> >>>    without EFI_BOOT or EFI_RUNTIME_SERVICES?
-> >>
-> >> Yes. But again, without the other required pieces (including the
-> >> services function pointers in the systab which are required) you'd crash
-> >> soon after boot trying to make those calls.
-> > 
-> > My point was whether you can still pass information like RSDP address
-> > via EFI tables but explicitly disable runtime services so that the
-> > kernel won't try to make such calls (and crash).
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  arch/arm/boot/dts/stih407.dtsi | 54 ++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 54 insertions(+)
 > 
-> Yes. As Graeme says, it works just to pass in the ACPI information and
-> turn off EFI *BUT* it does not work to say you have EFI and then not
-> provide the correct EFI services. To do so is out of spec, and in fact
-> it's one reason we weren't able to turn the GetTime service on generally
-> for x86 - some older x86 boxes didn't implement it originally (another
-> reason on our end we're requiring all of these services on day one so
-> that there won't be time for someone to miss them in firmware).
-
-OK, thanks for confirming this. So the answer to my second question is
-"not really".
+> diff --git a/arch/arm/boot/dts/stih407.dtsi b/arch/arm/boot/dts/stih407.dtsi
+> index 50637f5..90bc090 100644
+> --- a/arch/arm/boot/dts/stih407.dtsi
+> +++ b/arch/arm/boot/dts/stih407.dtsi
+> @@ -275,5 +275,59 @@
+>  
+>  			status = "disabled";
+>  		};
+> +
+> +		spi at 9840000 {
+> +			compatible = "st,comms-ssc4-spi";
+> +			reg = <0x9840000 0x110>;
+> +			interrupts = <GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>;
+> +			clock-names = "ssc";
+> +			pinctrl-0 = <&pinctrl_spi0_default>;
+> +			pinctrl-names = "default";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			status = "disabled";
+> +		};
+> +
+> +		spi at 9841000 {
+> +			compatible = "st,comms-ssc4-spi";
+> +			reg = <0x9841000 0x110>;
+> +			interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>;
+> +			clock-names = "ssc";
+> +
+> +			status = "disabled";
+> +		};
+> +
+> +		spi at 9842000 {
+> +			compatible = "st,comms-ssc4-spi";
+> +			reg = <0x9842000 0x110>;
+> +			interrupts = <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>;
+> +			clock-names = "ssc";
+> +
+> +			status = "disabled";
+> +		};
+> +
+> +		spi at 9843000 {
+> +			compatible = "st,comms-ssc4-spi";
+> +			reg = <0x9843000 0x110>;
+> +			interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>;
+> +			clock-names = "ssc";
+> +
+> +			status = "disabled";
+> +		};
+> +
+> +		spi at 9844000 {
+> +			compatible = "st,comms-ssc4-spi";
+> +			reg = <0x9844000 0x110>;
+> +			interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>;
+> +			clock-names = "ssc";
+> +
+> +			status = "disabled";
+> +		};
+>  	};
+>  };
 
 -- 
-Catalin
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
