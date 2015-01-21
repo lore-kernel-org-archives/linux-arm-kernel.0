@@ -1,37 +1,28 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 21 Jan 2015 08:46:29 +0100
-Subject: [PATCH v3 2/3] mfd: lubbock_io: add lubbock_io board
-References: <1421406010-14851-1-git-send-email-robert.jarzmik@free.fr>
- <1421406010-14851-2-git-send-email-robert.jarzmik@free.fr>
- <20150119091705.GG21886@x1> <87ppaah9k5.fsf@free.fr>
- <20150120102919.GP5767@x1>
- <20150120115658.GJ26493@n2100.arm.linux.org.uk>
-Message-ID: <873874fuei.fsf@free.fr>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Wed, 21 Jan 2015 15:49:45 +0800
+Subject: [PATCH v3 2/4] clk: mediatek: Add initial common clock support
+ for Mediatek SoCs.
+In-Reply-To: <CABuKBeLFvP4ChnzzUJwoLtCHtH6PejENJueBd7D+xMJhBMDBkg@mail.gmail.com>
+References: <1420601123-25859-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1420601123-25859-3-git-send-email-jamesjj.liao@mediatek.com>
+ <CABuKBeLQkTBYWkBWAYXjYudMAza+1zueRSqGFPd+480p1rYNwg@mail.gmail.com>
+ <1420685701.27952.44.camel@mtksdaap41>
+ <CABuKBeLFvP4ChnzzUJwoLtCHtH6PejENJueBd7D+xMJhBMDBkg@mail.gmail.com>
+Message-ID: <1421826585.2437.3.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+Hi Matthias,
 
-> What I'd suggest (and always have done) is:
->
-> 	dev_err(&pdev->dev, "couldn't request main irq%d: %d\n",
-> 		irq, ret);
-I like it, it's even more compact, I'll use it for next patch version.
+On Tue, 2015-01-20 at 13:39 +0100, Matthias Brugger wrote:
+> I think you should use spin_lock_irqsave(&clk_ops_lock, flags) instead
+> of mtk_clk_lock.
+> In any case I think you should define a spinlock in clk-mt8135.c and
+> pass a reference of it in the init functions.
+> See drivers/clk/berlin as a good example.
 
-> but I guess printing the IRQ number no longer makes sense with todays
-> dynamic mapping of logical IRQ numbers, as it is no longer meaningful.
-Yes ... we're not yet there with pxa gpio interrupts, maybe it will come
-eventually one day.
+I see. I'll change it in next patch.
 
-For Lee:
-> > > platform_get_irq()?
-> > No. I need the flags.
-> Where are they used?
-A couple of lines below, using local "irqflags" variable :
-       ret = devm_request_irq(&pdev->dev, cot->irq, lubbock_irq_handler,
-                              irqflags, dev_name(&pdev->dev), cot);
 
-Cheers.
-
--- 
-Robert
+Best regards,
+James
