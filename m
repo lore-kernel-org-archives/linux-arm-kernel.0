@@ -1,35 +1,25 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 21 Jan 2015 13:48:47 +0000
-Subject: [PATCH 3.19-rc2 v14 0/7] arm: Implement
- arch_trigger_all_cpu_backtrace
-In-Reply-To: <20150121080612.6569ab81@gandalf.local.home>
-References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>	<1421144818-14036-1-git-send-email-daniel.thompson@linaro.org>	<54BE2D15.9080606@linaro.org>	<54BEC04D.1050402@codeaurora.org>	<54BF83C9.5060300@linaro.org>
- <20150121080612.6569ab81@gandalf.local.home>
-Message-ID: <54BFAE3F.7000300@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 21 Jan 2015 13:49:17 +0000
+Subject: Unregisrtering a platform driver from another platform driver.
+In-Reply-To: <CAAVaN8xnO5mE1uwW=SPENwOugLv3n+JeNCE9ZycEK2_9QmXSPw@mail.gmail.com>
+References: <CAAVaN8xnO5mE1uwW=SPENwOugLv3n+JeNCE9ZycEK2_9QmXSPw@mail.gmail.com>
+Message-ID: <20150121134917.GR26493@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/01/15 13:06, Steven Rostedt wrote:
-> On Wed, 21 Jan 2015 10:47:37 +0000
-> Daniel Thompson <daniel.thompson@linaro.org> wrote:
+On Wed, Jan 21, 2015 at 10:27:35AM +0000, Andy Ng wrote:
+> Dear Colleagues,
 > 
+> I would like to call "platform_driver_unregister" for a static module
+> A from a static  module B.
+> The static module A register its name  "physmap-flash".
 > 
->>> With this patchset, is it possible to call sched_clock() from within NMI
->>> context? I ask because the generic sched_clock() code is not NMI safe
-> 
-> That's not good. Better not run function tracing, as that could trace
-> functions in NMI context (I depend on that it does), and it uses
-> sched_clock() as the default clock.
+> Is there any kernel API to search and find the "physmap-flash" device,
+> and then call unregistered with "platform_driver_unregister" from
+> module B.
 
-I think sched_clock is unsafe as in "may sometimes give the wrong value"
-rather than "can lock up arbitrarily".  Thus the impact is unlikely to
-be harmful enough to want to avoid tracing altogether.
+Why do you want to do this?  What is your motivation?
 
-It would require special care be taken when interpreting the timestamps
-however. Also since update_sched_clock() is a notrace function its very
-hard to figure out when timestamps are at risk.
-
-Anyhow, the fix doesn't seem that hard. I can take a look.
-
-
-Daniel.
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
