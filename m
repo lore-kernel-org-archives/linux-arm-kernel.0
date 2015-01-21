@@ -1,51 +1,35 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Wed, 21 Jan 2015 16:34:35 +0800
-Subject: [PATCH v4 2/2] I2C: mediatek: Add driver for MediaTek I2C
- controller
-In-Reply-To: <20150121082022.GT22880@pengutronix.de>
-References: <1421404418-50718-1-git-send-email-eddie.huang@mediatek.com>
- <1421404418-50718-3-git-send-email-eddie.huang@mediatek.com>
- <20150118101816.GF22880@pengutronix.de>
- <1421810004.15468.825.camel@mtksdaap41>
- <20150121082022.GT22880@pengutronix.de>
-Message-ID: <1421829275.6546.6.camel@mtksdaap41>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 21 Jan 2015 09:36:07 +0100
+Subject: [PATCH] ARM: dts: sun4i: Add Marsboard A10 board
+In-Reply-To: <1421777008-15408-1-git-send-email-mamlinav@gmail.com>
+References: <1421777008-15408-1-git-send-email-mamlinav@gmail.com>
+Message-ID: <20150121083607.GA4367@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On Tue, Jan 20, 2015 at 10:03:28PM +0400, Aleksei Mamlin wrote:
+> This patch add support for Marsboard A10 board.
+> 
+> The Marsboard A10 is a A10 based development board with 1G RAM, 1G NAND,
+> micro SD card slot, SATA 2.0 socket, 10/100 ethernet, mini HDMI port,
+> 1 USB OTG port and 2 USB 2.0 ports. Board does not use the AXP209 pmic,
+> it does not have a pmic at all.
+> Board also have 2 expansion 70 pin headers.
+> 
+> Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
 
-On Wed, 2015-01-21 at 09:20 +0100, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> On Wed, Jan 21, 2015 at 11:13:24AM +0800, Eddie Huang wrote:
-> > > > +	/* set when doing the transfer */
-> > > > +	u16 irq_stat;			/* interrupt status */
-> > > > +	unsigned int speed_hz;		/* The speed in transfer */
-> > > > +	bool trans_stop;		/* i2c transfer stop */
-> > > > +	enum mtk_trans_op op;
-> > > > +	u16 msg_len;
-> > > > +	u8 *msg_buf;			/* pointer to msg data */
-> > > > +	u16 msg_aux_len;		/* WRRD mode to set AUX_LEN register*/
-> > > > +	u16 addr;	/* 7bit slave address, without read/write bit */
-> > > Wouldn't it be easier to maintain a pointer to the message to be
-> > > transferred?
-> > I think use mtk_i2c pointer is more flexible than maintain a pointer to
-> > message.
-> Not sure you understood what I intended to suggest. My idea was to drop
-> 
-> 	u16 msg_len;
-> 	u8 *msg_buf;
-> 	u16 msg_aux_len; // maybe
-> 	u16 addr;
-> 
-> from struct mtk_i2c and add a struct i2c_msg *msg instead. Up to you to
-> decide.
-> 
-Because this driver pass mtk_i2c pointer between functions, it's
-flexible to use any member of struct mtk_i2c. The good thing is avoid
-passing one more struct i2c_msg parameter between functions, or another
-struct copy. The bad thing is make struct mtk_i2c larger. I prefer to
-keep as it is now.
+Applied, thanks!
 
-Best Regards
-Eddie
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150121/6cb4f770/attachment-0001.sig>
