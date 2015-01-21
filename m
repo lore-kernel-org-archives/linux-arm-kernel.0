@@ -1,26 +1,45 @@
-From: joe@perches.com (Joe Perches)
-Date: Wed, 21 Jan 2015 08:40:44 -0800
-Subject: unclear ipv6 redirect message (was Re: [PATCH v3 2/3] mfd:
- lubbock_io: add lubbock_io board)
-In-Reply-To: <20150121161059.GT26493@n2100.arm.linux.org.uk>
-References: <1421406010-14851-1-git-send-email-robert.jarzmik@free.fr>
- <1421406010-14851-2-git-send-email-robert.jarzmik@free.fr>
- <20150119091705.GG21886@x1> <87ppaah9k5.fsf@free.fr>
- <20150120102919.GP5767@x1> <20150120115658.GJ26493@n2100.arm.linux.org.uk>
- <873874fuei.fsf@free.fr> <20150121094453.GO26493@n2100.arm.linux.org.uk>
- <1421856321.10574.13.camel@perches.com>
- <20150121161059.GT26493@n2100.arm.linux.org.uk>
-Message-ID: <1421858444.10574.14.camel@perches.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 21 Jan 2015 17:41:51 +0100
+Subject: [PATCH 1/1] gpio: omap: Fix bad device access with setup_irq()
+In-Reply-To: <1421448650-15904-1-git-send-email-tony@atomide.com>
+References: <1421448650-15904-1-git-send-email-tony@atomide.com>
+Message-ID: <CACRpkdZ9pjyH0ZZ3GXOagGDPTa=LhuK5bG+wi2tsgP7=OQTGqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-01-21 at 16:11 +0000, Russell King - ARM Linux wrote:
-> On Wed, Jan 21, 2015 at 08:05:21AM -0800, Joe Perches wrote:
-> > (adding netdev)
-> 
-> I wasn't actually reporting that as an issue; I was using it as an
-> example.  It's from a very old kernel (2.6.27.21) which I run on one
-> of my old x86 machines.
+On Fri, Jan 16, 2015 at 11:50 PM, Tony Lindgren <tony@atomide.com> wrote:
 
-It's still the same code.
-If the message can be improved, why not do it?
+> Similar to omap_gpio_irq_type() let's make sure that the GPIO
+> is usable as an interrupt if the platform init code did not
+> call gpio_request(). Otherwise we can get invalid device access
+> after setup_irq():
+>
+> WARNING: CPU: 0 PID: 1 at drivers/bus/omap_l3_noc.c:147 l3_interrupt_handler+0x214/0x340()
+> 44000000.ocp:L3 Custom Error: MASTER MPU TARGET L4CFG (Idle): Data Access in Supervisor mode during Functional access
+> ...
+> [<c05f21e4>] (__irq_svc) from [<c05f1974>] (_raw_spin_unlock_irqrestore+0x34/0x44)
+> [<c05f1974>] (_raw_spin_unlock_irqrestore) from [<c00914a8>] (__setup_irq+0x244/0x530)
+> [<c00914a8>] (__setup_irq) from [<c00917d4>] (setup_irq+0x40/0x8c)
+> [<c00917d4>] (setup_irq) from [<c0039c8c>] (omap_system_dma_probe+0x1d4/0x2b4)
+> [<c0039c8c>] (omap_system_dma_probe) from [<c03b2200>] (platform_drv_probe+0x44/0xa4)
+> ...
+>
+> We can fix this the same way omap_gpio_irq_type() is handling it.
+>
+> Note that the long term solution is to change the gpio-omap driver
+> to handle the banks as separate driver instances. This will allow
+> us to rely on just runtime PM for tracking the bank specific state.
+>
+> Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Javier Martinez Canillas <javier@dowhile0.org>
+> Cc: Kevin Hilman <khilman@kernel.org>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> Cc: Santosh Shilimkar <ssantosh@kernel.org>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+Patch applied for fixes with Felipe's Tested-by.
+
+Yours,
+Linus Walleij
