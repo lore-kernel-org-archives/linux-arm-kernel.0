@@ -1,55 +1,105 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 21 Jan 2015 15:00:50 +0100
-Subject: [PATCH 00/27] ARM: mvebu: armada-*: Relicense the device tree
- under GPLv2+/X11
-In-Reply-To: <20150107125443.GA8013@red-moon>
-References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
- <54AA7DA6.3030707@free-electrons.com> <20150107125443.GA8013@red-moon>
-Message-ID: <54BFB112.20406@free-electrons.com>
+From: emilio@elopez.com.ar (=?windows-1252?Q?Emilio_L=F3pez?=)
+Date: Wed, 21 Jan 2015 11:04:42 -0300
+Subject: [PATCH] ARM: sunxi: dt: Fix aliases
+In-Reply-To: <1421838263-20332-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1421838263-20332-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <54BFB1FA.6090405@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+Hi Maxime,
 
-On 07/01/2015 13:54, Lorenzo Pieralisi wrote:
-> Hi Gregory,
-> 
-> On Mon, Jan 05, 2015 at 12:03:50PM +0000, Gregory CLEMENT wrote:
-> 
-> [...]
-> 
->> You didn't give your ack (or nack) about the license change for the files
->> you have contributed. I would like to have your answer on the followings
->> patches:
->>
->> For Nobuhiro Iwamatsu:
->> ARM: mvebu: armada-xp-openblocks-ax3-4: Relicense the device tree under GPLv2+/X11
->>
->> For Heikki Krogerus:
->> ARM: mvebu: armada-xp: Relicense the device tree under GPLv2+/X11
->>
->> For Marcin Wojtas:
->> ARM: mvebu: armada-38x: Relicense the device tree under GPLv2+/X11
->> ARM: mvebu: armada-385-db: Relicense the device tree under GPLv2+/X11
->> ARM: mvebu: armada-375: Relicense the device tree under GPLv2+/X11
->>
->> For Lorenzo Pieralisi:
->> ARM: mvebu: armada-370-xp: Relicense the device tree under GPLv2+/X11
-> 
-> It is not something I can control. I asked the relevant people and I am
-> trying to get back to you with a definite reply asap, it can take a
-> while, you have been warned.
+El 21/01/15 a las 08:04, Maxime Ripard escibi?:
+> Commit f77d55a3b56a ("serial: 8250_dw: get index of serial line from DT
+> aliases") made the serial driver now use the serial aliases to get the tty
+> number, pointing out that our aliases have been wrong all along.
+>
+> Remove them from the DTSI and add custom ones in the relevant boards.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>   arch/arm/boot/dts/sun4i-a10.dtsi                 | 12 ------------
+>   arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts |  6 ++++++
+>   arch/arm/boot/dts/sun5i-a10s.dtsi                |  8 --------
+>   arch/arm/boot/dts/sun5i-a13-hsg-h702.dts         |  4 ++++
+>   arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts  |  4 ++++
+>   arch/arm/boot/dts/sun5i-a13-olinuxino.dts        |  4 ++++
+>   arch/arm/boot/dts/sun5i-a13.dtsi                 |  5 -----
+>   arch/arm/boot/dts/sun6i-a31.dtsi                 | 10 ----------
+>   arch/arm/boot/dts/sun7i-a20-bananapi.dts         |  6 ++++++
+>   arch/arm/boot/dts/sun7i-a20-hummingbird.dts      |  8 ++++++++
+>   arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts  |  3 +++
+>   arch/arm/boot/dts/sun7i-a20.dtsi                 | 12 ------------
+>   arch/arm/boot/dts/sun8i-a23.dtsi                 |  9 ---------
+>   arch/arm/boot/dts/sun9i-a80-optimus.dts          |  5 +++++
+>   arch/arm/boot/dts/sun9i-a80.dtsi                 | 10 ----------
+>   15 files changed, 40 insertions(+), 66 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+> index e3422309e54b..e20a5855bef8 100644
+> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
+> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+> @@ -15,18 +15,6 @@
+>   / {
+>   	interrupt-parent = <&intc>;
+>
+> -	aliases {
+> -		ethernet0 = &emac;
 
-I would like to know if you got news about the license change?
+(...)
 
-Thanks,
+> diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+> index 3c3c1920788a..c67e39b4ccb9 100644
+> --- a/arch/arm/boot/dts/sun5i-a10s.dtsi
+> +++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+> @@ -16,14 +16,6 @@
+>   / {
+>   	interrupt-parent = <&intc>;
+>
+> -	aliases {
+> -		ethernet0 = &emac;
 
-Gregory
+(...)
 
+> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
+> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+> @@ -52,16 +52,6 @@
+>   / {
+>   	interrupt-parent = <&gic>;
+>
+> -	aliases {
+> -		serial0 = &uart0;
+> -		serial1 = &uart1;
+> -		serial2 = &uart2;
+> -		serial3 = &uart3;
+> -		serial4 = &uart4;
+> -		serial5 = &uart5;
+> -		ethernet0 = &gmac;
 
+(...)
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+> index e21ce5992d56..cab0eab179df 100644
+> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> @@ -52,18 +52,6 @@
+>   / {
+>   	interrupt-parent = <&gic>;
+>
+> -	aliases {
+> -		ethernet0 = &gmac;
+
+(...)
+
+It worries me that you're dropping the ethernet0 alias while adjusting 
+this; I believe u-boot uses it to fill in the mac address on the DT[1]. 
+This may cause dual IP address assignments to devices (one to u-boot and 
+one to linux), broken connectivity (unexpected IP addr assigned to linux 
+when eg. using static DHCP) or other such interesting stuff.
+
+Cheers!
+
+Emilio
+
+[1] 
+http://git.denx.de/?p=u-boot/u-boot-sunxi.git;a=blob;f=common/fdt_support.c;h=8266bca7d6489a2ca8fb6f1015064184b137d2dd;hb=HEAD#l448
