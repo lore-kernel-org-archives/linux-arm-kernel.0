@@ -1,36 +1,60 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 21 Jan 2015 22:50:41 +0100
-Subject: [GIT PULL 2/2] ARM: rockchip: soc updates for 3.20
-In-Reply-To: <2314612.MtoMVTtzSS@phil>
-References: <2314612.MtoMVTtzSS@phil>
-Message-ID: <1832574.qpHkTgdMBa@phil>
+From: dsahern@gmail.com (David Ahern)
+Date: Wed, 21 Jan 2015 15:00:15 -0700
+Subject: [PATCH 2/2] perf symbols: debuglink should take symfs option
+ into account
+In-Reply-To: <CAA3XUr1BnS=8RTVyxtVOm4Ahb2DQXUuJJQC1w2SvT5fycjRcEQ@mail.gmail.com>
+References: <1421168344-5363-1-git-send-email-victor.kamensky@linaro.org>	<1421168344-5363-2-git-send-email-victor.kamensky@linaro.org>
+ <CAA3XUr1BnS=8RTVyxtVOm4Ahb2DQXUuJJQC1w2SvT5fycjRcEQ@mail.gmail.com>
+Message-ID: <54C0216F.3080404@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+On 1/19/15 10:50 AM, Victor Kamensky wrote:
+>> diff --git a/tools/perf/util/dso.c b/tools/perf/util/dso.c
+>> index 45be944..6a2f663 100644
+>> --- a/tools/perf/util/dso.c
+>> +++ b/tools/perf/util/dso.c
+>> @@ -42,19 +42,30 @@ int dso__read_binary_type_filename(const struct dso *dso,
+>>          size_t len;
+>>
+>>          switch (type) {
+>> -       case DSO_BINARY_TYPE__DEBUGLINK: {
+>> +       case DSO_BINARY_TYPE__DEBUGLINK:
+>> +       {
+>>                  char *debuglink;
+>> -
+>> -               strncpy(filename, dso->long_name, size);
+>> -               debuglink = filename + dso->long_name_len;
+>> -               while (debuglink != filename && *debuglink != '/')
+>> -                       debuglink--;
+>> -               if (*debuglink == '/')
+>> -                       debuglink++;
+>> -               ret = filename__read_debuglink(dso->long_name, debuglink,
+>> -                                              size - (debuglink - filename));
+>> -               }
+>> +               char *filename_copy;
+>> +
+>> +               filename_copy = malloc(PATH_MAX);
+>> +               if (filename_copy) {
+>> +                       len = __symbol__join_symfs(filename, size,
+>> +                                                  dso->long_name);
+>> +                       strncpy(filename_copy, filename, PATH_MAX);
+>> +                       debuglink = filename + len;
+>> +                       while (debuglink != filename && *debuglink != '/')
+>> +                               debuglink--;
+>> +                       if (*debuglink == '/')
+>> +                               debuglink++;
+>> +                       ret = filename__read_debuglink(filename_copy, debuglink,
+>> +                                                      size - (debuglink -
+>> +                                                              filename));
+>> +                       free(filename_copy);
+>> +               } else
+>> +                       ret = -1;
+>>                  break;
+>> +       }
+>> +
 
-  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+I do not believe the filename_copy is needed; just add the symfs path to 
+filename and pass filename to read_debuglink
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.20-rockchip-dts1
-
-for you to fetch changes up to 5963e106df7b601a8f23cbbaac1420e4c740ada6:
-
-  ARM: dts: rockchip: add suspend settings for rk3288-evb-rk808 (2014-12-31 16:19:18 +0100)
-
-----------------------------------------------------------------
-dts part of core suspend support and limiting of rk3288
-sd-card clockspeed to 150mhz
-
-----------------------------------------------------------------
-Addy Ke (1):
-      ARM: dts: rockchip: set dw_mmc max-freq 150Mhz
-
-Chris Zhong (2):
-      ARM: dts: rockchip: add RK3288 suspend support
-      ARM: dts: rockchip: add suspend settings for rk3288-evb-rk808
-
- arch/arm/boot/dts/rk3288-evb-rk808.dts | 53 +++++++++++++++++++++++++++++++++-
- arch/arm/boot/dts/rk3288.dtsi          | 27 +++++++++++++++++
- 2 files changed, 79 insertions(+), 1 deletion(-)
+David
