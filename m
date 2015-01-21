@@ -1,78 +1,40 @@
-From: dave.long@linaro.org (David Long)
-Date: Wed, 21 Jan 2015 13:02:55 -0500
-Subject: [PATCH v4 3/6] arm64: Kprobes with single stepping support
-In-Reply-To: <54BCC852.60203@redhat.com>
-References: <1420949002-3726-1-git-send-email-dave.long@linaro.org>	<1420949002-3726-4-git-send-email-dave.long@linaro.org>
- <CAHM4w1no=A1kTxN26znXD42USzO+ByHWHy76F2UMnmXhPKH0kQ@mail.gmail.com>
- <54B96662.3030201@linaro.org> <54BCC852.60203@redhat.com>
-Message-ID: <54BFE9CF.4030703@linaro.org>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Wed, 21 Jan 2015 10:38:50 -0800
+Subject: [PATCH v16 00/10] KVM/arm/arm64/x86: dirty page logging for
+ ARMv7/8 (3.18.0-rc2)
+In-Reply-To: <20150121110823.GB15076@cbox>
+References: <1421366341-26012-1-git-send-email-m.smarduch@samsung.com>
+ <20150121110823.GB15076@cbox>
+Message-ID: <54BFF23A.30205@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/19/15 04:03, Pratyush Anand wrote:
->
->
-> On Saturday 17 January 2015 12:58 AM, David Long wrote:
->>>> +static bool aarch64_insn_is_steppable(u32 insn)
->>>> +{
->>>> +       if (aarch64_get_insn_class(insn) == AARCH64_INSN_CLS_BR_SYS) {
->>>> +               if (aarch64_insn_is_branch(insn))
->>>> +                       return false;
->>>> +
->>>> +               /* modification of daif creates issues */
->>>> +               if (aarch64_insn_is_msr_daif(insn))
->>>> +                       return false;
->>>> +
->>>> +               if (aarch64_insn_is_hint(insn))
->>>> +                       return aarch64_insn_is_nop(insn);
->>>> +
->>>> +               return true;
->>>> +       }
->>>> +
->>>> +       if (aarch64_insn_uses_literal(insn))
->>>> +               return false;
->>>> +
->>>> +       if (aarch64_insn_is_exclusive(insn))
->>>> +               return false;
->>>> +
->>>> +       return true;
->>>
->>> Default true return may not be a good idea until we are sure that we
->>> are returning false for all possible
->>> simulation and rejection cases. In my opinion, its better to return
->>> true only for steppable and false for
->>> all remaining.
->>>
+On 01/21/2015 03:08 AM, Christoffer Dall wrote:
+> On Thu, Jan 15, 2015 at 03:58:51PM -0800, Mario Smarduch wrote:
+>> Patch series adds support for armv7/8 dirty page logging. As we move
+>> towards generic dirty page logging interface we move some common code to
+>> generic layer shared by x86, armv7 and armv8.
 >>
->> I struggled a little with this when I did it but I decided if the
->> question was:  "should we have to recognize every instruction before
->> deciding it was single-steppable or should we only recognize
->> instructions that are *not* single-steppable", maybe it was OK to do the
->> latter while recognizing extensions to the instruction set *could* end
->> up (temporarly) allowing us to try and fail (badly) at single-stepping
->> any problematic new instructions.  Certainly opinions could differ.  If
->
-> Lets see what others say, but I see that this approach will result in
-> undesired behavior. For example: a probe has been tried to insert to svc
-> instruction. SVC or any other exception generation instruction is
-> expected to be rejected. But, current aarch64_insn_is_steppable will
-> return true for it and then kprobe/uprobe code will allow to insert
-> probe at that instruction, which will be wrong, no? I mean, I do not see
-> a way to get into last else (INSN_REJECTED) of arm_kprobe_decode_insn.
->
-> So, if we go with this approach we need to insure that we cover all
-> simulation-able and reject-able cases in aarch64_insn_is_steppable.
->
+>> armv7/8 Dirty page logging implementation overivew-
+>> - initially write protects memory region 2nd stage page tables
+>> - read dirty page log and again write protect dirty pages for next pass.
+>> - second stage huge pages are dissolved into normal pages to keep track of
+>>   dirty memory at page granularity. Tracking at huge page granularity
+>>   limits granularity of marking dirty memory and migration to a light memory
+>>   load. Small page size logging supports higher memory dirty rates, enables
+>>   rapid migration.
+>>
+>>   armv7 supports 2MB Huge page, and armv8 supports 2MB (4kb) and
+>>   512MB (64kb)
+>> - In the event migration is canceled, normal behavior is resumed huge pages
+>>   are rebuilt over time.
+>>
+> 
+> Thanks, applied.
+> 
+> -Christoffer
+> 
+Thanks! And also to other folks that helped along the way
+in shaping the design and reviews.
 
-yes, of course.  Any case that's missing in the current code needs to be 
-fixed.  If the result starts to look less practical than the 
-table-driven code then the new approach needs to be discarded.
-
-> ~Pratyush
->
->
->
->> the consensus is that we can't allow this to ever happen (because old
->> kprobe code is running on new hardware) then I think the only choice is
->> to return to parsing binary tables.  Hopefully I could still find a way
->> to leverage insn.c in that case.
+- Mario
