@@ -1,40 +1,23 @@
-From: treding@nvidia.com (Thierry Reding)
-Date: Wed, 21 Jan 2015 16:55:21 +0100
-Subject: next-20150120 broken on Tegra by "ata: libahci: Allow using
- multiple regulators"
-In-Reply-To: <20150121123134.GD8684@htj.dyndns.org>
-References: <alpine.DEB.2.02.1501210003010.5450@utopia.booyaka.com>
- <20150121105001.GA9921@ulmo.nvidia.com>
- <20150121123134.GD8684@htj.dyndns.org>
-Message-ID: <20150121155519.GA25166@ulmo.nvidia.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Wed, 21 Jan 2015 17:02:41 +0100
+Subject: [PATCH 1/3] spi/xilinx: Use automatic bus number on device tree
+In-Reply-To: <1421855590-9210-2-git-send-email-ricardo.ribalda@gmail.com>
+References: <1421855590-9210-1-git-send-email-ricardo.ribalda@gmail.com>
+ <1421855590-9210-2-git-send-email-ricardo.ribalda@gmail.com>
+Message-ID: <54BFCDA1.4060205@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 21, 2015 at 07:31:34AM -0500, Tejun Heo wrote:
-> On Wed, Jan 21, 2015 at 11:50:03AM +0100, Thierry Reding wrote:
-> > Tejun, preferably the attached patch should be squashed into commit
-> > c7d7ddee7e24 ("ata: libahci: Allow using multiple regulators") to avoid
-> > breaking bisectability. If you don't want to rewrite history, let me
-> > know and I can turn it into a proper patch.
-> 
-> Yes, please make it a proper patch.
-> 
-> Thanks a lot!
+On 01/21/2015 04:53 PM, Ricardo Ribalda Delgado wrote:
+> If there is more than one spi device on a device tree, the second one
+> will fail to probe due to a duplicated bus_num.
+ > [...]
 
-Attaching the patch.
+This should already be fixed. See commit 4b153a2137c5 ("spi: xilinx: Use 
+pdev->id instead of pdev->dev.id for the SPI bus number")[1]. If the device 
+was registered using devicetree pdev->id is -1, so dynamic numbers will be used.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-ata-libahci-Fix-devres-cleanup-on-failure.patch
-Type: text/x-diff
-Size: 1961 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150121/416f7897/attachment.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150121/416f7897/attachment.sig>
+- Lars
+
+[1] 
+http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/drivers/spi/spi-xilinx.c?id=4b153a2137c5d2914794c8944d78c731c1b0ae9d
