@@ -1,63 +1,95 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Wed, 21 Jan 2015 08:30:18 +0800
-Subject: [PATCH v2 23/30] PCI/mvebu: Use pci_common_init_dev() to simplify code
+Date: Wed, 21 Jan 2015 08:30:12 +0800
+Subject: [PATCH v2 17/30] PCI/powerpc: Rename pcibios_root_bridge_prepare()
 In-Reply-To: <1421800225-26230-1-git-send-email-wangyijing@huawei.com>
 References: <1421800225-26230-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1421800225-26230-24-git-send-email-wangyijing@huawei.com>
+Message-ID: <1421800225-26230-18-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mvebu_pcie_scan_bus() is not necessary, we could use
-pci_common_init_dev() instead of pci_common_init(),
-and pass the device pointer as the parent. Then
-pci_scan_root_bus() will be called to scan the pci busses.
+Pcibios_root_bridge_prepare() in powerpc is used
+to set root bus speed. Rename it to
+pcibios_set_root_bus_speed() for better readability.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-CC: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-CC: Jason Cooper <jason@lakedaemon.net>
+CC: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+CC: linuxppc-dev at lists.ozlabs.org
 ---
- drivers/pci/host/pci-mvebu.c |   18 +-----------------
- 1 files changed, 1 insertions(+), 17 deletions(-)
+ arch/powerpc/include/asm/machdep.h       |    2 +-
+ arch/powerpc/kernel/pci-common.c         |    6 +++---
+ arch/powerpc/platforms/pseries/pci.c     |    2 +-
+ arch/powerpc/platforms/pseries/pseries.h |    2 +-
+ arch/powerpc/platforms/pseries/setup.c   |    2 +-
+ 5 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 1309cfb..d5a2b70 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -750,21 +750,6 @@ static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
- 	return 1;
+diff --git a/arch/powerpc/include/asm/machdep.h b/arch/powerpc/include/asm/machdep.h
+index c8175a3..8e7f2a8 100644
+--- a/arch/powerpc/include/asm/machdep.h
++++ b/arch/powerpc/include/asm/machdep.h
+@@ -129,7 +129,7 @@ struct machdep_calls {
+ 	void		(*pcibios_fixup)(void);
+ 	int		(*pci_probe_mode)(struct pci_bus *);
+ 	void		(*pci_irq_fixup)(struct pci_dev *dev);
+-	int		(*pcibios_root_bridge_prepare)(struct pci_host_bridge
++	int		(*pcibios_set_root_bus_speed)(struct pci_host_bridge
+ 				*bridge);
+ 
+ 	/* To setup PHBs when using automatic OF platform driver for PCI */
+diff --git a/arch/powerpc/kernel/pci-common.c b/arch/powerpc/kernel/pci-common.c
+index 927c3dd..c11bfed 100644
+--- a/arch/powerpc/kernel/pci-common.c
++++ b/arch/powerpc/kernel/pci-common.c
+@@ -769,9 +769,9 @@ int pci_proc_domain(struct pci_bus *bus)
+ 
+ int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+ {
+-	if (ppc_md.pcibios_root_bridge_prepare)
+-		return ppc_md.pcibios_root_bridge_prepare(bridge);
+-
++	if (ppc_md.pcibios_set_root_bus_speed)
++		return ppc_md.pcibios_set_root_bus_speed(bridge);
++
+ 	return 0;
  }
  
--static struct pci_bus *mvebu_pcie_scan_bus(int nr, struct pci_sys_data *sys)
--{
--	struct mvebu_pcie *pcie = sys_to_pcie(sys);
--	struct pci_bus *bus;
--
--	bus = pci_create_root_bus(&pcie->pdev->dev, sys->busnr,
--				  &mvebu_pcie_ops, sys, &sys->resources);
--	if (!bus)
--		return NULL;
--
--	pci_scan_child_bus(bus);
--
--	return bus;
--}
--
- static resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
- 						 const struct resource *res,
- 						 resource_size_t start,
-@@ -808,12 +793,11 @@ static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
- 	hw.nr_controllers = 1;
- 	hw.private_data   = (void **)&pcie;
- 	hw.setup          = mvebu_pcie_setup;
--	hw.scan           = mvebu_pcie_scan_bus;
- 	hw.map_irq        = of_irq_parse_and_map_pci;
- 	hw.ops            = &mvebu_pcie_ops;
- 	hw.align_resource = mvebu_pcie_align_resource;
+diff --git a/arch/powerpc/platforms/pseries/pci.c b/arch/powerpc/platforms/pseries/pci.c
+index fe16a50..af685d6 100644
+--- a/arch/powerpc/platforms/pseries/pci.c
++++ b/arch/powerpc/platforms/pseries/pci.c
+@@ -110,7 +110,7 @@ static void fixup_winbond_82c105(struct pci_dev* dev)
+ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_WINBOND, PCI_DEVICE_ID_WINBOND_82C105,
+ 			 fixup_winbond_82c105);
  
--	pci_common_init(&hw);
-+	pci_common_init_dev(&pcie->pdev->dev, &hw);
- }
+-int pseries_root_bridge_prepare(struct pci_host_bridge *bridge)
++int pseries_set_root_bus_speed(struct pci_host_bridge *bridge)
+ {
+ 	struct device_node *dn, *pdn;
+ 	struct pci_bus *bus;
+diff --git a/arch/powerpc/platforms/pseries/pseries.h b/arch/powerpc/platforms/pseries/pseries.h
+index 1796c54..5d0be3a 100644
+--- a/arch/powerpc/platforms/pseries/pseries.h
++++ b/arch/powerpc/platforms/pseries/pseries.h
+@@ -63,7 +63,7 @@ extern int dlpar_detach_node(struct device_node *);
  
- /*
+ /* PCI root bridge prepare function override for pseries */
+ struct pci_host_bridge;
+-int pseries_root_bridge_prepare(struct pci_host_bridge *bridge);
++int pseries_set_root_bus_speed(struct pci_host_bridge *bridge);
+ 
+ unsigned long pseries_memory_block_size(void);
+ 
+diff --git a/arch/powerpc/platforms/pseries/setup.c b/arch/powerpc/platforms/pseries/setup.c
+index e445b67..b196c0d 100644
+--- a/arch/powerpc/platforms/pseries/setup.c
++++ b/arch/powerpc/platforms/pseries/setup.c
+@@ -496,7 +496,7 @@ static void __init pSeries_setup_arch(void)
+ 		ppc_md.enable_pmcs = power4_enable_pmcs;
+ 	}
+ 
+-	ppc_md.pcibios_root_bridge_prepare = pseries_root_bridge_prepare;
++	ppc_md.pcibios_set_root_bus_speed = pseries_set_root_bus_speed;
+ 
+ 	if (firmware_has_feature(FW_FEATURE_SET_MODE)) {
+ 		long rc;
 -- 
 1.7.1
