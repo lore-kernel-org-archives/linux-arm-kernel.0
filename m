@@ -1,41 +1,40 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 Jan 2015 16:49:57 -0800
-Subject: [GIT PULL 1/3] omap non-urgent fixes for v3.20
-In-Reply-To: <54b99dd1.a21a450a.3fbf.25c5SMTPIN_ADDED_BROKEN@mx.google.com>
-References: <54b99dd1.a21a450a.3fbf.25c5SMTPIN_ADDED_BROKEN@mx.google.com>
-Message-ID: <20150122004957.GD29014@quad.lixom.net>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 22 Jan 2015 00:39:01 +0100
+Subject: [PATCH V2] clk: mxs: Fix invalid 32-bit access to frac registers
+In-Reply-To: <CAHrpEqQ-eoqM3W1hYcS6EPTmur1FSfm8TeEjYrtZ+PquavL86w@mail.gmail.com>
+References: <1419762402-4548-1-git-send-email-stefan.wahren@i2se.com>
+ <CAHrpEqQ-eoqM3W1hYcS6EPTmur1FSfm8TeEjYrtZ+PquavL86w@mail.gmail.com>
+Message-ID: <201501220039.02073.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 03:21:20PM -0800, Tony Lindgren wrote:
-> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+On Wednesday, January 21, 2015 at 05:16:03 PM, Zhi Li wrote:
+> On Sun, Dec 28, 2014 at 4:26 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> > According to i.MX23 and i.MX28 reference manual the fractional
+> > clock control registers must be addressed by byte instructions.
 > 
->   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.20/fixes-not-urgent-pt1
-> 
-> for you to fetch changes up to 13efcb188984f69e1f97b4d9e7d3663fb782946f:
-> 
->   ARM: OMAP2+: Disable omap3 PM init for ti81xx (2015-01-14 17:37:16 -0800)
-> 
-> ----------------------------------------------------------------
-> Non-urgent fixes for omap variant dm816x that has been in a sorry
-> broken half merged state for a few years now. This gets us to the
-> point where we can boot it properly once the related SoC data is
-> added. Note that we've already made dm816x device tree only by
-> removing the known broken board file.
-> 
-> ----------------------------------------------------------------
-> Tony Lindgren (6):
->       ARM: OMAP2+: Fix error handling for omap2_clk_enable_init_clocks
->       ARM: OMAP2+: Fix ti81xx devtype
->       ARM: OMAP2+: Fix ti81xx class type
->       ARM: OMAP2+: Fix dm814 and dm816 for clocks and timer init
->       ARM: OMAP2+: Fix reboot for 81xx
->       ARM: OMAP2+: Disable omap3 PM init for ti81xx
+> I don't think mx23 and mx28 have such limitation. I will double check
+> with IC team about this.
+> RTL is generated from a xml file. All registers implement is unified.
+> I don't think only clock control register have such limitation and
+> other registers not.
 
-Merged, thanks.
+Hi,
 
--Olof
+Section 10.8.24 in the MX28 datasheet (Fractional Clock Control Register 0) 
+states otherwise, but maybe the documentation is simply not matching the
+silicon.
+
+Here's a quote:
+"
+This register controls the 9-phase fractional clock dividers. The fractional 
+clock frequencies are a product of the values in these registers. NOTE: This 
+register can only be addressed by byte instructions. Addressing word or half-
+word are not allowed.
+"
+
+I also recall seeing weird behavior when these registers were accessed by word
+access in U-Boot, so I believe the datasheet is correct.
+
+Best regards,
+Marek Vasut
