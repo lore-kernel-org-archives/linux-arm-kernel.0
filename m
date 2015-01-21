@@ -1,28 +1,45 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 21 Jan 2015 12:02:30 +0530
-Subject: [PATCHv3 2/8] devfreq: exynos: Add documentation for generic
- exynos memory bus frequency driver
-In-Reply-To: <54BF4369.1060900@samsung.com>
-References: <1420681257-3078-1-git-send-email-cw00.choi@samsung.com>
- <1420681257-3078-3-git-send-email-cw00.choi@samsung.com>
- <CAL_Jsq+5sdsm_-VW-ta+qV-NBao-XTHvsYWcbMdZmbP0Nw43Cw@mail.gmail.com>
- <CAKohpomqosqxeDANC=NLBVmOUHyUoqd7Zhph7r6f7+ufYN48EQ@mail.gmail.com>
- <54BE108F.8090506@samsung.com>
- <CAKohpokSuVhH3hHFF+mLtJXvjt=bmJy1oZRBOttCNXORBS1Y0A@mail.gmail.com>
- <54BE3E10.2080906@samsung.com>
- <CAKohpontEntV48XqNcJq+euT9SdEjkgn5Pa=sSUpgM8mfKKCUA@mail.gmail.com>
- <54BF2929.3090107@samsung.com>
- <CAKohpomrAtqedODuzaAe3qO_YppeOU+LYR45eEs0+KcHJKHcQA@mail.gmail.com>
- <54BF4369.1060900@samsung.com>
-Message-ID: <CAKohponCbedTG2fqhUahw3mN_hK9YLpZnVXqxjHaV7UbkRKLYQ@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 21 Jan 2015 08:36:27 +0200
+Subject: [PATCH v3 0/2] clocksource: Conexant CX92755 timers support
+Message-ID: <cover.1421821466.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 January 2015 at 11:42, Chanwoo Choi <cw00.choi@samsung.com> wrote:
-> OK, I understand.
-> I'll try to update exynos memory bus according to your comment.
+This short series adds support for the Conexant CX92755 SoC timers. This SoC is 
+part of the Conexant Digicolor series of SoCs.
 
-Great.
+v3:
+   * Split into a separate clocksource series
 
-@Rob: So there is nothing special required for devfreq drivers in new
-OPP bindings, right ? :)
+v2:
+   http://article.gmane.org/gmane.linux.kernel/1861850
+   http://article.gmane.org/gmane.linux.kernel/1861853
+
+   * Change the timer dt binding, so that the 'reg' property points to the
+     first "Agent Communication" register. This should improve the chance of
+     reusing this binding for other SoCs in this series.
+
+   * Add the CONTROL() and COUNT() macros to the timer driver to make the code
+     clearer.
+
+   * Move arch/arm Kconfig changes from the clocksource driver patch to the
+     base arch support patch to reduce dependency between them             
+
+v1:
+   http://article.gmane.org/gmane.linux.kernel/1855028
+   http://article.gmane.org/gmane.linux.kernel/1855025
+
+
+Baruch Siach (2):
+  clocksource: devicetree: document Conexant Digicolor timer binding
+  clocksource: driver for Conexant Digicolor SoC timer
+
+ .../devicetree/bindings/timer/digicolor-timer.txt  |  18 +++
+ drivers/clocksource/Makefile                       |   1 +
+ drivers/clocksource/timer-digicolor.c              | 164 +++++++++++++++++++++
+ 3 files changed, 183 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/timer/digicolor-timer.txt
+ create mode 100644 drivers/clocksource/timer-digicolor.c
+
+-- 
+2.1.4
