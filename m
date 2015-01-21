@@ -1,42 +1,117 @@
-From: samuel.thibault@ens-lyon.org (Samuel Thibault)
-Date: Wed, 21 Jan 2015 16:21:12 +0100
-Subject: [PATCHv5 0/2] INPUT: Route keyboard LEDs through the generic
- LEDs layer
-In-Reply-To: <20150102195350.GB27538@amd>
-References: <20141226232116.GA5069@type>
- <20150102195350.GB27538@amd>
-Message-ID: <20150121152112.GA24789@type.bordeaux.inria.fr>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Wed, 21 Jan 2015 16:22:17 +0100
+Subject: [RFC PATCHv2 00/19] power_supply: Allow safe usage of power supply
+In-Reply-To: <1420472882-10463-1-git-send-email-k.kozlowski@samsung.com>
+References: <1420472882-10463-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20150121152216.GD13715@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Krzysztof,
 
-Pavel Machek, le Fri 02 Jan 2015 20:53:51 +0100, a ?crit :
-> > Here is v5 coming, with separate patches for the kbd and the input
-> > parts.
-> 
-> After booting with this, capslock led does not seem to work on text
-> console.
-> 
-> input4::capsl/trigger was none by default, that can't be right, right?
-> 
-> I tried putting kbd-capslock and input4-capsl there, but that did not
-> seem to help.
-> 
-> It works with heartbeat trigger, but not with input4-numl
-> trigger. (But numlock led works ok with that trigger, weird).
-> 
-> vt::capsl/brightness controls capslock led, even when
-> input4-capsl/trigger is set to input4-numl.
+On Mon, Jan 05, 2015 at 04:47:43PM +0100, Krzysztof Kozlowski wrote:
+> This is RFC, please don't apply yet but let me know if this approach
+> is OK.
 
-I have just tried what you described on a thinkpad lenovo T500, without
-any problem, except that the thinkpad BIOS does a couple of funky
-things:
+I just reviewed the patchset. It looks fine to me.
 
-- depending on the numlock bios setting, the numlock led will be
-  driven by the OS (synchronized mode) or handled internally in the BIOS
-  (independent mode).
-- in synchronized mode, whenever the internal numlock led is lit, the
-  right part of the internal keyboard acts as the keypad keys.
+> TLDR
+> ====
+> Patchset tries to fix following race scenario:
+> 
+> Thread 1: charger manager, CONSUMER
+> Thread 2: power supply driver, PROVIDER
+> 
+> THREAD 1 (charger manager)         THREAD 2 (power supply driver)
+> ==========================         ==============================
+> psy = power_supply_get_by_name()
+>                                    Driver unbind, .remove
+>                                      power_supply_unregister()
+>                                      Device fully removed
+> psy->get_property()
+> 
+> To properly fix the race the patchset:
+> 1. Adds power_supply_get_property()-like API for safe access by consumer.
+> 2. Moves ownership of power_supply structure from driver (provider) to
+>    power supply core.
+> 3. Adds power_supply_put() which will reclaim memory.
 
-Samuel
+Looks fine to me, thanks for doing this :)
+
+> Description
+> =========== 
+> This is a little different than my previous approaches [1][2] for fixing
+> usage of power supply by some consumer, if driver implementing it is
+> unbound.
+> 
+> The patchset is quite big and touches power supply API so a lot of
+> changes in drivers are needed. These changes *are not finished yet*.
+> I've done them only for:
+>  - bq24190_charger.c
+>  - charger-manager.c
+>  - max14577_charger.c
+>  - max17040_battery.c
+>  - max17042_battery.c
+>  - sbs-battery.c
+>  - tps65090-charger.c
+> So allyesconfig won't build.
+>
+> If this approach is OK, I'll prepare full patchset changing all the
+> drivers.
+
+Please do :)
+
+> My previous approach [1][2] limited the race but did not close it.
+> Still the consumer of power supply by calling power_supply_get_propert(psy...)
+> may reference invalid memory because the producer freed it.
+> 
+> Actually, because struct power_supply is exposed to consumers, the
+> core should be the owner of it. This is accomplished in patch 11/19
+> ("power_supply: Change ownership from driver to core").
+> 
+> What the patchset does in steps
+> ===============================
+> 1. Some preparation steps are necessary - patch 1 and 2. The driver
+>    implementing power supply won't be able to fill structure before
+>    calling power_supply_register(). So 'power_supply_config'
+>    is introduced in patch 2 ("power_supply: Move run-time configuration
+>    to separate structure"). Unfortunately this touches all drivers.
+
+$ grep -l power_supply_register **/*.c | grep -v mod.c | grep -v drivers/power
+drivers/acpi/ac.c
+drivers/acpi/battery.c
+drivers/acpi/sbs.c
+drivers/hid/hid-input.c
+drivers/hid/hid-sony.c
+drivers/hid/hid-wiimote-modules.c
+drivers/hid/wacom_sys.c
+drivers/platform/x86/compal-laptop.c
+drivers/staging/nvec/nvec_power.c
+
+Please make sure to CC the respective maintainers for the patchset
+(e.g. current patch 14 and 15 should have CC'd x86 maintainers), so
+that they can Acknowledge the patchset.
+
+> 2. Safe API wrappers (and usage counter) are added (power_supply_*()).
+> 3. Patch 11: ownership of 'struct power_supply' is moved from driver
+>    to the core.
+> 4. power_supply_put() is added which reclaims resources.
+
+Looks fine to me.
+
+> The patchset is rebased on next-20141226. It should be pulled at once.
+> Bisectability is preserved.
+
+Fine with me, but I need acks from all involved maintainers. So for the
+patchset:
+
+Reviewed-By: Sebastian Reichel <sre@kernel.org>
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150121/92ef74fa/attachment.sig>
