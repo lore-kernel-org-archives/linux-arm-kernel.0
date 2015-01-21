@@ -1,11 +1,12 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 21 Jan 2015 00:00:00 +0000 (UTC)
+Date: Wed, 21 Jan 2015 00:03:41 +0000 (UTC)
 Subject: next-20150120 broken on Tegra by "ata: libahci: Allow using multiple
  regulators"
-Message-ID: <alpine.DEB.2.02.1501202346460.5450@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.02.1501210003010.5450@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+(linux-ide@ added)
 
 Commit c7d7ddee7e24eedde6149eefbcfbfbc7125b9ff0 ("ata: libahci: Allow
 using multiple regulators") in Linux-next 20150120 causes a panic
@@ -121,3 +122,7 @@ struct regulator *.
 [    2.031838] [<c00554cc>] (cpu_startup_entry) from [<80008864>] (0x80008864)
 [    2.038794] ---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
 [    2.038794] 
+--
+To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+the body of a message to majordomo at vger.kernel.org
+More majordomo info at  http://vger.kernel.org/majordomo-info.html
