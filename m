@@ -1,35 +1,169 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Thu, 22 Jan 2015 00:01:49 +0100
-Subject: [PATCH RFC 2/3] power: mxs_power: add driver for mxs power
- subsystem
-In-Reply-To: <1416514477-19190-3-git-send-email-stefan.wahren@i2se.com>
-References: <1416514477-19190-1-git-send-email-stefan.wahren@i2se.com>
- <1416514477-19190-3-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <20150121230148.GJ13715@earth.universe>
+From: rickard_strandqvist@spectrumdigital.se (Rickard Strandqvist)
+Date: Thu, 22 Jan 2015 00:09:42 +0100
+Subject: [PATCH 2/2] ARM: ux500: Remove unused functions and structs
+In-Reply-To: <1421881782-23716-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+References: <1421881782-23716-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+Message-ID: <1421881782-23716-2-git-send-email-rickard_strandqvist@spectrumdigital.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+Remove same unused functions and structs.
 
-Sorry for the big delay.
+Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
+---
+ arch/arm/mach-ux500/board-mop500-regulators.c |  106 -------------------------
+ arch/arm/mach-ux500/board-mop500-regulators.h |    5 --
+ 2 files changed, 111 deletions(-)
 
-On Thu, Nov 20, 2014 at 08:14:36PM +0000, Stefan Wahren wrote:
-> This patch adds a minimal driver for the Freescale i.MX23, i.MX28
-> power subsystem. It's required to trigger the probing of the underlying
-> drivers like on-chip regulators. Additionally the drivers supports
-> the configuration of the DC-DC clock frequency to avoid possible
-> interferences.
-
-I would expect PLL to be board specific and part of DT. Why is it
-specified as parameter?
-
-Apart from that the driver/patch looks fine to me.
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150122/672303ef/attachment.sig>
+diff --git a/arch/arm/mach-ux500/board-mop500-regulators.c b/arch/arm/mach-ux500/board-mop500-regulators.c
+index 32d744e..2b8f685 100644
+--- a/arch/arm/mach-ux500/board-mop500-regulators.c
++++ b/arch/arm/mach-ux500/board-mop500-regulators.c
+@@ -19,17 +19,6 @@ static struct regulator_consumer_supply gpio_en_3v3_consumers[] = {
+        REGULATOR_SUPPLY("vdd33a", "smsc911x.0"),
+ };
+ 
+-struct regulator_init_data gpio_en_3v3_regulator = {
+-       .constraints = {
+-               .name = "EN-3V3",
+-               .min_uV = 3300000,
+-               .max_uV = 3300000,
+-               .valid_ops_mask = REGULATOR_CHANGE_STATUS,
+-       },
+-       .num_consumer_supplies = ARRAY_SIZE(gpio_en_3v3_consumers),
+-       .consumer_supplies = gpio_en_3v3_consumers,
+-};
+-
+ /*
+  * TPS61052 regulator
+  */
+@@ -43,17 +32,6 @@ static struct regulator_consumer_supply tps61052_vaudio_consumers[] = {
+ 	REGULATOR_SUPPLY("vintdclassint", "ab8500-codec.0"),
+ };
+ 
+-struct regulator_init_data tps61052_regulator = {
+-	.constraints = {
+-		.name = "vaudio-hf",
+-		.min_uV = 4500000,
+-		.max_uV = 4500000,
+-		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+-	},
+-	.num_consumer_supplies = ARRAY_SIZE(tps61052_vaudio_consumers),
+-	.consumer_supplies = tps61052_vaudio_consumers,
+-};
+-
+ static struct regulator_consumer_supply ab8500_vaux1_consumers[] = {
+ 	/* Main display, u8500 R3 uib */
+ 	REGULATOR_SUPPLY("vddi", "mcde_disp_sony_acx424akp.0"),
+@@ -483,11 +461,6 @@ static struct regulator_consumer_supply ab8500_ext_supply3_consumers[] = {
+ 	REGULATOR_SUPPLY("vinvsim", "sim-detect.0"),
+ };
+ 
+-/* extended configuration for VextSupply2, only used for HREFP_V20 boards */
+-static struct ab8500_ext_regulator_cfg ab8500_ext_supply2 = {
+-	.hwreq = true,
+-};
+-
+ /*
+  * AB8500 external regulators
+  */
+@@ -984,82 +957,3 @@ struct ab8500_regulator_platform_data ab8500_regulator_plat_data = {
+ 	.ext_regulator          = ab8500_ext_regulators,
+ 	.num_ext_regulator      = ARRAY_SIZE(ab8500_ext_regulators),
+ };
+-
+-struct ab8500_regulator_platform_data ab8505_regulator_plat_data = {
+-	.reg_init               = ab8505_reg_init,
+-	.num_reg_init           = ARRAY_SIZE(ab8505_reg_init),
+-	.regulator              = ab8505_regulators,
+-	.num_regulator          = ARRAY_SIZE(ab8505_regulators),
+-};
+-
+-static void ab8500_modify_reg_init(int id, u8 mask, u8 value)
+-{
+-	int i;
+-
+-	if (cpu_is_u8520()) {
+-		for (i = ARRAY_SIZE(ab8505_reg_init) - 1; i >= 0; i--) {
+-			if (ab8505_reg_init[i].id == id) {
+-				u8 initval = ab8505_reg_init[i].value;
+-				initval = (initval & ~mask) | (value & mask);
+-				ab8505_reg_init[i].value = initval;
+-
+-				BUG_ON(mask & ~ab8505_reg_init[i].mask);
+-				return;
+-			}
+-		}
+-	} else {
+-		for (i = ARRAY_SIZE(ab8500_reg_init) - 1; i >= 0; i--) {
+-			if (ab8500_reg_init[i].id == id) {
+-				u8 initval = ab8500_reg_init[i].value;
+-				initval = (initval & ~mask) | (value & mask);
+-				ab8500_reg_init[i].value = initval;
+-
+-				BUG_ON(mask & ~ab8500_reg_init[i].mask);
+-				return;
+-			}
+-		}
+-	}
+-
+-	BUG_ON(1);
+-}
+-
+-void mop500_regulator_init(void)
+-{
+-	struct regulator_init_data *regulator;
+-
+-	/*
+-	 * Temporarily turn on Vaux2 on 8520 machine
+-	 */
+-	if (cpu_is_u8520()) {
+-		/* Vaux2 initialized to be on */
+-		ab8500_modify_reg_init(AB8505_VAUX12REGU, 0x0f, 0x05);
+-	}
+-
+-	/*
+-	 * Handle AB8500_EXT_SUPPLY2 on HREFP_V20_V50 boards (do it for
+-	 * all HREFP_V20 boards)
+-	 */
+-	if (cpu_is_u8500v20()) {
+-		/* VextSupply2RequestCtrl =  HP/OFF depending on VxRequest */
+-		ab8500_modify_reg_init(AB8500_REGUREQUESTCTRL3, 0x01, 0x01);
+-
+-		/* VextSupply2SysClkReq1HPValid = SysClkReq1 controlled */
+-		ab8500_modify_reg_init(AB8500_REGUSYSCLKREQ1HPVALID2,
+-			0x20, 0x20);
+-
+-		/* VextSupply2 = force HP at initialization */
+-		ab8500_modify_reg_init(AB8500_EXTSUPPLYREGU, 0x0c, 0x04);
+-
+-		/* enable VextSupply2 during platform active */
+-		regulator = &ab8500_ext_regulators[AB8500_EXT_SUPPLY2];
+-		regulator->constraints.always_on = 1;
+-
+-		/* disable VextSupply2 in suspend */
+-		regulator = &ab8500_ext_regulators[AB8500_EXT_SUPPLY2];
+-		regulator->constraints.state_mem.disabled = 1;
+-		regulator->constraints.state_standby.disabled = 1;
+-
+-		/* enable VextSupply2 HW control (used in suspend) */
+-		regulator->driver_data = (void *)&ab8500_ext_supply2;
+-	}
+-}
+diff --git a/arch/arm/mach-ux500/board-mop500-regulators.h b/arch/arm/mach-ux500/board-mop500-regulators.h
+index 9bece38..88da2b8 100644
+--- a/arch/arm/mach-ux500/board-mop500-regulators.h
++++ b/arch/arm/mach-ux500/board-mop500-regulators.h
+@@ -15,10 +15,5 @@
+ #include <linux/regulator/ab8500.h>
+ 
+ extern struct ab8500_regulator_platform_data ab8500_regulator_plat_data;
+-extern struct ab8500_regulator_platform_data ab8505_regulator_plat_data;
+-extern struct regulator_init_data tps61052_regulator;
+-extern struct regulator_init_data gpio_en_3v3_regulator;
+-
+-void mop500_regulator_init(void);
+ 
+ #endif
+-- 
+1.7.10.4
