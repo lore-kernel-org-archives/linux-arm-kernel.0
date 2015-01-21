@@ -1,57 +1,101 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 21 Jan 2015 12:35:51 +0000
-Subject: [PATCH v3 2/3] mfd: lubbock_io: add lubbock_io board
-In-Reply-To: <87y4owedx1.fsf@free.fr>
-References: <1421406010-14851-1-git-send-email-robert.jarzmik@free.fr>
- <1421406010-14851-2-git-send-email-robert.jarzmik@free.fr>
- <20150119091705.GG21886@x1> <87ppaah9k5.fsf@free.fr>
- <20150120102919.GP5767@x1>
- <20150120115658.GJ26493@n2100.arm.linux.org.uk>
- <873874fuei.fsf@free.fr> <20150121081645.GC9258@x1>
- <87y4owedx1.fsf@free.fr>
-Message-ID: <20150121123551.GD9258@x1>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 21 Jan 2015 20:37:00 +0800
+Subject: [PATCH v6 17/17] Documentation: ACPI for ARM64
+In-Reply-To: <20150119203328.GB3766@cbox>
+References: <1420368918-5086-1-git-send-email-hanjun.guo@linaro.org>
+ <1420368918-5086-18-git-send-email-hanjun.guo@linaro.org>
+ <20150119203328.GB3766@cbox>
+Message-ID: <54BF9D6C.7020807@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 21 Jan 2015, Robert Jarzmik wrote:
+Hi Christoffer,
 
-> Lee Jones <lee.jones@linaro.org> writes:
-> 
-> > On Wed, 21 Jan 2015, Robert Jarzmik wrote:
-> >> > > > platform_get_irq()?
-> >> > > No. I need the flags.
-> >> > Where are they used?
-> >> A couple of lines below, using local "irqflags" variable :
-> >>        ret = devm_request_irq(&pdev->dev, cot->irq, lubbock_irq_handler,
-> >>                               irqflags, dev_name(&pdev->dev), cot);
-> >
-> > No, I mean where are they _used_?
-> I don't get your point.
-> 
-> For you, isn't it "using" irqflags by passing them as an argument to devm_request_irq()
+Sorry for the late reply, I got no answer yet but
+with one question below.
 
-No, this is where the argument is being _passed_.
+On 2015?01?20? 04:33, Christoffer Dall wrote:
+> Hi,
+>
+> On Sun, Jan 04, 2015 at 06:55:18PM +0800, Hanjun Guo wrote:
+>> From: Graeme Gregory <graeme.gregory@linaro.org>
+>>
+>> Add documentation for the guidelines of how to use ACPI
+>> on ARM64.
+>>
+>> Reviewed-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+>> Signed-off-by: Al Stone <al.stone@linaro.org>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> ---
+>>   Documentation/arm64/arm-acpi.txt | 327 +++++++++++++++++++++++++++++++++++++++
+>>   1 file changed, 327 insertions(+)
+>>   create mode 100644 Documentation/arm64/arm-acpi.txt
+>>
+>> diff --git a/Documentation/arm64/arm-acpi.txt b/Documentation/arm64/arm-acpi.txt
+>> new file mode 100644
+>> index 0000000..21e7020
+>> --- /dev/null
+>> +++ b/Documentation/arm64/arm-acpi.txt
+>> @@ -0,0 +1,327 @@
+>> +ACPI on ARMv8 Servers
+>> +---------------------
+>> +ACPI can be used for ARMv8 general purpose servers designed to follow
+>> +the ARM SBSA (Server Base System Architecture) and SBBR (Server Base
+>> +Boot Requirements) specifications, currently available to those with
+>> +an ARM login at http://silver.arm.com.
+>> +
+>> +The ARMv8 kernel implements the reduced hardware model of ACPI version
+>> +5.1 and later.  Links to the specification and all external documents
+>> +it refers to are managed by the UEFI Forum.  The specification is
+>> +available at http://www.uefi.org/specifications and external documents
+>> +can be found via http://www.uefi.org/acpi.
+>> +
+>> +If an ARMv8 system does not meet the requirements of the SBSA, or cannot
+>> +be described using the mechanisms defined in the required ACPI specifications,
+>> +then it is likely that Device Tree (DT) is more suitable than ACPI for the
+>> +hardware.
+>> +
+>> +
+>> +Relationship with Device Tree
+>> +-----------------------------
+>> +ACPI support in drivers and subsystems for ARMv8 should never be mutually
+>> +exclusive with DT support at compile time.
+>> +
+>> +At boot time the kernel will only use one description method depending on
+>> +parameters passed from the bootloader (including kernel bootargs).
+>> +
+>> +Regardless of whether DT or ACPI is used, the kernel must always be capable
+>> +of booting with either scheme (in kernels with both schemes enabled at compile
+>> +time).
+>> +
+>> +
+>> +Booting using ACPI tables
+>> +-------------------------
+>> +The only defined method for passing ACPI tables to the kernel on ARMv8
+>> +is via the UEFI system configuration table.
+>> +
+>
+> This is a bit concerning for the approach we are currently taking to
+> support ACPI on Xen [1].
+>
+> Background: Xen is a tiny hypervisor which cannot parse the DSDT or any
+> other non-static table. Xen relies on Linux in Dom0 to manage most
+> (basically everything except the GIC, serial port, SMMU, and timers)
+> hardware resources and relies on Dom0 to parse the ACPI tables.
+>
+> While Xen itself is typically booted by UEFI and finds RSDP through the
+> UEFI system table, Xen does NOT run another UEFI instance to boot Dom0
+> nor does it pass through the presence of UEFI to Dom0 in any way.
+> Instead, it just created a DT (with modifications concerning the
+> hardware mentioned above) and boots Linux in Dom0 directly (on x86 any
+> required UEFI call is performed through paravirtualized hypercalls).
+>
+> In the case of ACPI, Xen adds a property to the chosen node and
+> populates it with the RDSP in Dom0's address space.  Patches have not
 
-> ??? And if you think ahead, then there are used all around in
-> kernel/irq/manage.c, as you probably know.
+Sorry I'm not familiar with hypervisor, I have question here about
+x86 on xen, how ACPI works on XEN for x86?
 
-Perhaps some context would help.
-
-Looking at one of the other patches in the series it appears the flag
-you're trying to capture is IORESOURCE_IRQ_LOWEDGE.  When I grep for
-where this is being _used_ (think 'consumed, rather than passed.  I
-only see a single entry in drivers/pnp/interface.c.
-
-That's what got me thinking... are you sure you're a) making use of
-this flag and b) assuming the answer to 'a' is "no" and if everyting's
-working correctly in the code's current state, are you sure you need
-them at all? 
-
-I think to set an edge trigger on an IRQ, you should instead do so via
-irq_set_irq_type(), or have a missed a line or two?
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks
+Hanjun
