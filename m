@@ -1,135 +1,82 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Wed, 21 Jan 2015 09:34:27 +0800
-Subject: [PATCH v2 1/8] device core: Introduce per-device MSI domain
- pointer
-In-Reply-To: <CALRxmdCRGY2Sw+UyHTp5PP4R=v2301LTqpKq0bCEs08SWsh1bg@mail.gmail.com>
-References: <1420736772-11088-1-git-send-email-marc.zyngier@arm.com>	<1420736772-11088-2-git-send-email-marc.zyngier@arm.com>	<CALRxmdDVUoYNg3QC0LdvKmCz9x4nzE9+TDiV9K9OH=Gxk-Cd9w@mail.gmail.com>	<54BC6799.2040907@linux.intel.com>
- <CALRxmdCRGY2Sw+UyHTp5PP4R=v2301LTqpKq0bCEs08SWsh1bg@mail.gmail.com>
-Message-ID: <54BF0223.90905@linux.intel.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Tue, 20 Jan 2015 17:37:53 -0800
+Subject: [PATCH] mm: Don't offset memmap for flatmem
+In-Reply-To: <54BE25EF.3060004@suse.cz>
+Message-ID: <1421804273-29947-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Srinivas Kandagatla reported bad page messages when trying to
+remove the bottom 2MB on an ARM based IFC6410 board
 
-On 2015/1/21 1:17, Stuart Yoder wrote:
-> Gerry,
-> 
-> So which direction did you take in your patch set--  a) common,
-> generic msi_desc, or b)  bus-specific msi_desc like Marc showed
-> (mybus_msi_desc)?
-Hi Stuart,
-	Currently I'm trying to go the former way as below.
-Regards,
-Gerry
------------------------------------------------------------------------
-struct msi_desc {
-        struct list_head                list;
-        unsigned int                    irq;
-        unsigned int                    nvec_used;      /* number of
-messages */
-        struct device *                 dev;
-        struct msi_msg                  msg;            /* Last set MSI
-message */
+BUG: Bad page state in process swapper  pfn:fffa8
+page:ef7fb500 count:0 mapcount:0 mapping:  (null) index:0x0
+flags: 0x96640253(locked|error|dirty|active|arch_1|reclaim|mlocked)
+page dumped because: PAGE_FLAGS_CHECK_AT_FREE flag(s) set
+bad because of flags:
+flags: 0x200041(locked|active|mlocked)
+Modules linked in:
+CPU: 0 PID: 0 Comm: swapper Not tainted 3.19.0-rc3-00007-g412f9ba-dirty #816
+Hardware name: Qualcomm (Flattened Device Tree)
+[<c0218280>] (unwind_backtrace) from [<c0212be8>] (show_stack+0x20/0x24)
+[<c0212be8>] (show_stack) from [<c0af7124>] (dump_stack+0x80/0x9c)
+[<c0af7124>] (dump_stack) from [<c0301570>] (bad_page+0xc8/0x128)
+[<c0301570>] (bad_page) from [<c03018a8>] (free_pages_prepare+0x168/0x1e0)
+[<c03018a8>] (free_pages_prepare) from [<c030369c>] (free_hot_cold_page+0x3c/0x174)
+[<c030369c>] (free_hot_cold_page) from [<c0303828>] (__free_pages+0x54/0x58)
+[<c0303828>] (__free_pages) from [<c030395c>] (free_highmem_page+0x38/0x88)
+[<c030395c>] (free_highmem_page) from [<c0f62d5c>] (mem_init+0x240/0x430)
+[<c0f62d5c>] (mem_init) from [<c0f5db3c>] (start_kernel+0x1e4/0x3c8)
+[<c0f5db3c>] (start_kernel) from [<80208074>] (0x80208074)
+Disabling lock debugging due to kernel taint
 
-#ifdef CONFIG_PCI_MSI
-        union {
-                struct {                                /* For PCI
-MSI/MSI-X */
-                        u32 masked;                     /* mask bits */
-                        struct {
-                                __u8    is_msix : 1;
-                                __u8    multiple: 3;    /* log2 num of
-messages allocated */
-                                __u8    multi_cap : 3;  /* log2 num of
-messages supported */
-                                __u8    maskbit : 1;    /* mask-pending
-bit supported ? */
-                                __u8    is_64   : 1;    /* Address size:
-0=32bit 1=64bit */
-                                __u16   entry_nr;       /* specific
-enabled entry */
-                                unsigned default_irq;   /* default
-pre-assigned irq */
-                        } msi_attrib;
-                        union {
-                                u8      mask_pos;
-                                void __iomem *mask_base;
-                        };
-                };
-        };
-#endif /* CONFIG_PCI_MSI */
-};
+Removing the lower 2MB made the start of the lowmem zone to no longer
+be page block aligned. IFC6410 uses CONFIG_FLATMEM where
+alloc_node_mem_map allocates memory for the mem_map. alloc_node_mem_map
+will offset for unaligned nodes with the assumption the pfn/page
+translation functions will account for the offset. The functions for
+CONFIG_FLATMEM do not offset however, resulting in overrunning
+the memmap array. Just use the allocated memmap without any offset
+when running with CONFIG_FLATMEM to avoid the overrun.
 
-> 
-> Thanks,
-> Stuart
-> 
-> On Sun, Jan 18, 2015 at 8:10 PM, Jiang Liu <jiang.liu@linux.intel.com> wrote:
->>
->>
->> On 2015/1/16 4:35, Stuart Yoder wrote:
->>> On Thu, Jan 8, 2015 at 11:06 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>> As MSI-type features are creeping into non-PCI devices, it is
->>>> starting to make sense to give our struct device some form of
->>>> support for this, by allowing a pointer to an MSI irq domain to
->>>> be set/retrieved.
->>>>
->>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>> ---
->>>>  include/linux/device.h | 20 ++++++++++++++++++++
->>>>  1 file changed, 20 insertions(+)
->>>>
->>>> diff --git a/include/linux/device.h b/include/linux/device.h
->>>> index fb50673..ec4cee5 100644
->>>> --- a/include/linux/device.h
->>>> +++ b/include/linux/device.h
->>>> @@ -690,6 +690,7 @@ struct acpi_dev_node {
->>>>   *             along with subsystem-level and driver-level callbacks.
->>>>   * @pins:      For device pin management.
->>>>   *             See Documentation/pinctrl.txt for details.
->>>> + * @msi_domain: The generic MSI domain this device is using.
->>>>   * @numa_node: NUMA node this device is close to.
->>>>   * @dma_mask:  Dma mask (if dma'ble device).
->>>>   * @coherent_dma_mask: Like dma_mask, but for alloc_coherent mapping as not all
->>>> @@ -750,6 +751,9 @@ struct device {
->>>>         struct dev_pm_info      power;
->>>>         struct dev_pm_domain    *pm_domain;
->>>>
->>>> +#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
->>>> +       struct irq_domain       *msi_domain; /* MSI domain device uses */
->>>> +#endif
->>>
->>> This is not a comment on this patch specifically, but a question about other
->>> MSI specific fields that might be needed in struct device.
->>>
->>> Currently the generic MSI domain handling has hardcoded assumptions
->>> that devices are PCI-- see the for_each_msi_entry() iterator in msi.h:
->>>
->>>   #define dev_to_msi_list(dev)            (&to_pci_dev((dev))->msi_list)
->>>
->>>   #define for_each_msi_entry(desc, dev)   \
->>>         list_for_each_entry((desc), dev_to_msi_list((dev)), list)
->>>
->>> One approach would be to move the msi_list out of pci_dev and put
->>> it in struct device, so all devices can have an msi_list.
->>>
->>> The other approach would be to keep msi_list in a bus specific
->>> device struct, and then dev_to_msi_list() would need to be
->>> implemented as a bus specific callback of some kind.
->>>
->>> The above hardcoded PCI assumption isn't going to work.   Wanted to
->>> see if there is any advice in which direction to go.
->> Hi Stuart,
->>         I already have some a patch set to go that direction waiting
->> send out for review:)
->> Thanks!
->> Gerry
->>
->>>
->>> Thanks,
->>> Stuart Yoder
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>> Please read the FAQ at  http://www.tux.org/lkml/
->>>
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Reported-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+Srinivas, can you test this version of the patch?
+---
+ mm/page_alloc.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 7633c50..33cef00 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -5014,6 +5014,7 @@ static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
+ 	if (!pgdat->node_mem_map) {
+ 		unsigned long size, start, end;
+ 		struct page *map;
++		unsigned long offset = 0;
+ 
+ 		/*
+ 		 * The zone's endpoints aren't required to be MAX_ORDER
+@@ -5021,6 +5022,8 @@ static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
+ 		 * for the buddy allocator to function correctly.
+ 		 */
+ 		start = pgdat->node_start_pfn & ~(MAX_ORDER_NR_PAGES - 1);
++		if (!IS_ENABLED(CONFIG_FLATMEM))
++			offset = pgdat->node_start_pfn - start;
+ 		end = pgdat_end_pfn(pgdat);
+ 		end = ALIGN(end, MAX_ORDER_NR_PAGES);
+ 		size =  (end - start) * sizeof(struct page);
+@@ -5028,7 +5031,7 @@ static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
+ 		if (!map)
+ 			map = memblock_virt_alloc_node_nopanic(size,
+ 							       pgdat->node_id);
+-		pgdat->node_mem_map = map + (pgdat->node_start_pfn - start);
++		pgdat->node_mem_map = map + offset;
+ 	}
+ #ifndef CONFIG_NEED_MULTIPLE_NODES
+ 	/*
+-- 
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
