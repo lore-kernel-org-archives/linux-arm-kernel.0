@@ -1,89 +1,85 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 21 Jan 2015 22:32:06 +0100
-Subject: [PATCH 1/2] ARM: dts: rockchip: Add rk3288 vop and display-subsystem
+Date: Wed, 21 Jan 2015 22:32:40 +0100
+Subject: [PATCH 2/2] ARM: dts: rockchip: add rk3288 hdmi nodes
 In-Reply-To: <3715086.HVfme6flvD@phil>
 References: <3715086.HVfme6flvD@phil>
-Message-ID: <1773321.tR2A6n6Kmk@phil>
+Message-ID: <3155335.rHyPNic7RI@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add devicetree nodes for rk3288 VOP (Video Output Processors), and the
-top level display-subsystem root node.
+Add an hdmi node, and also add hdmi endpoints to vopb and vopl
+output port nodes.
 
-Later patches add endpoints (eDP, HDMI, LVDS, etc) that attach to the
-VOPs' output ports.
-
-Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
-Signed-off-by: Mark yao <mark.yao@rock-chips.com>
-Reviewed-by: Stephane Marchesin <marcheu@chromium.org>
+Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+Tested-by: Daniel Kurtz <djkurtz@chromium.org>
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/boot/dts/rk3288.dtsi | 39 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+ arch/arm/boot/dts/rk3288.dtsi | 37 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
 diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 2a878a3..1d22238 100644
+index 1d22238..c7235fa 100644
 --- a/arch/arm/boot/dts/rk3288.dtsi
 +++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -149,6 +149,11 @@
- 		clock-frequency = <24000000>;
+@@ -585,6 +585,11 @@
+ 		vopb_out: port {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++
++			vopb_out_hdmi: endpoint at 0 {
++				reg = <0>;
++				remote-endpoint = <&hdmi_in_vopb>;
++			};
+ 		};
  	};
  
-+	display-subsystem {
-+		compatible = "rockchip,display-subsystem";
-+		ports = <&vopl_out>, <&vopb_out>;
-+	};
+@@ -611,6 +616,11 @@
+ 		vopl_out: port {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
 +
- 	sdmmc: dwmmc at ff0c0000 {
- 		compatible = "rockchip,rk3288-dw-mshc";
- 		clock-freq-min-max = <400000 150000000>;
-@@ -566,6 +571,23 @@
++			vopl_out_hdmi: endpoint at 0 {
++				reg = <0>;
++				remote-endpoint = <&hdmi_in_vopl>;
++			};
+ 		};
+ 	};
+ 
+@@ -623,6 +633,33 @@
  		status = "disabled";
  	};
  
-+	vopb: vop at ff930000 {
-+		compatible = "rockchip,rk3288-vop";
-+		reg = <0xff930000 0x19c>;
-+		interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru ACLK_VOP0>, <&cru DCLK_VOP0>, <&cru HCLK_VOP0>;
-+		clock-names = "aclk_vop", "dclk_vop", "hclk_vop";
-+		resets = <&cru SRST_LCDC0_AXI>, <&cru SRST_LCDC0_AHB>, <&cru SRST_LCDC0_DCLK>;
-+		reset-names = "axi", "ahb", "dclk";
-+		iommus = <&vopb_mmu>;
++	hdmi: hdmi at ff980000 {
++		compatible = "rockchip,rk3288-dw-hdmi";
++		reg = <0xff980000 0x20000>;
++		reg-io-width = <4>;
++		ddc-i2c-bus = <&i2c5>;
++		rockchip,grf = <&grf>;
++		interrupts = <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru  PCLK_HDMI_CTRL>, <&cru SCLK_HDMI_HDCP>;
++		clock-names = "iahb", "isfr";
 +		status = "disabled";
 +
-+		vopb_out: port {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
++		ports {
++			hdmi_in: port {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				hdmi_in_vopb: endpoint at 0 {
++					reg = <0>;
++					remote-endpoint = <&vopb_out_hdmi>;
++				};
++				hdmi_in_vopl: endpoint at 1 {
++					reg = <1>;
++					remote-endpoint = <&vopl_out_hdmi>;
++				};
++			};
 +		};
 +	};
 +
- 	vopb_mmu: iommu at ff930300 {
- 		compatible = "rockchip,iommu";
- 		reg = <0xff930300 0x100>;
-@@ -575,6 +597,23 @@
- 		status = "disabled";
- 	};
- 
-+	vopl: vop at ff940000 {
-+		compatible = "rockchip,rk3288-vop";
-+		reg = <0xff940000 0x19c>;
-+		interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru ACLK_VOP1>, <&cru DCLK_VOP1>, <&cru HCLK_VOP1>;
-+		clock-names = "aclk_vop", "dclk_vop", "hclk_vop";
-+		resets = <&cru SRST_LCDC1_AXI>, <&cru SRST_LCDC1_AHB>, <&cru SRST_LCDC1_DCLK>;
-+		reset-names = "axi", "ahb", "dclk";
-+		iommus = <&vopl_mmu>;
-+		status = "disabled";
-+
-+		vopl_out: port {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+	};
-+
- 	vopl_mmu: iommu at ff940300 {
- 		compatible = "rockchip,iommu";
- 		reg = <0xff940300 0x100>;
+ 	gic: interrupt-controller at ffc01000 {
+ 		compatible = "arm,gic-400";
+ 		interrupt-controller;
 -- 
 2.1.1
