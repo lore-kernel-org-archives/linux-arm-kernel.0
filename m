@@ -1,23 +1,11 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 21 Jan 2015 22:49:27 +0100
-Subject: [GIT PULL 1/2] ARM: rockchip: soc updates for 3.20
-Message-ID: <2314612.MtoMVTtzSS@phil>
+Date: Wed, 21 Jan 2015 22:50:41 +0100
+Subject: [GIT PULL 2/2] ARM: rockchip: soc updates for 3.20
+In-Reply-To: <2314612.MtoMVTtzSS@phil>
+References: <2314612.MtoMVTtzSS@phil>
+Message-ID: <1832574.qpHkTgdMBa@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Hi Arnd, Olof,
-
-both pull requests mainly contain the new (basic) suspend support for
-rk3288 and two small fixes. One is the limitting of the sd clock on rk3288
-and the second is the removal of the Cortex-A9 reference from the board
-name.
-
-So if it looks ok, please pull
-
-
-Thanks
-Heiko
-
 
 The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
 
@@ -25,32 +13,24 @@ The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.20-rockchip-soc1
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.20-rockchip-dts1
 
-for you to fetch changes up to 8c4212418b54f360b21cf37b9caa1a226eb420f2:
+for you to fetch changes up to 5963e106df7b601a8f23cbbaac1420e4c740ada6:
 
-  ARM: rockchip: remove cpu-core name from machine name (2015-01-21 21:00:39 +0100)
-
-----------------------------------------------------------------
-SoC parts of basic suspend support and removal of
-Cortex-A9 reference from the machine name.
+  ARM: dts: rockchip: add suspend settings for rk3288-evb-rk808 (2014-12-31 16:19:18 +0100)
 
 ----------------------------------------------------------------
+dts part of core suspend support and limiting of rk3288
+sd-card clockspeed to 150mhz
+
+----------------------------------------------------------------
+Addy Ke (1):
+      ARM: dts: rockchip: set dw_mmc max-freq 150Mhz
+
 Chris Zhong (2):
-      ARM: rockchip: add suspend and resume for RK3288
-      ARM: rockchip: Add pmu-sram binding
+      ARM: dts: rockchip: add RK3288 suspend support
+      ARM: dts: rockchip: add suspend settings for rk3288-evb-rk808
 
-Heiko Stuebner (1):
-      ARM: rockchip: remove cpu-core name from machine name
-
- .../devicetree/bindings/arm/rockchip/pmu-sram.txt  |  16 ++
- arch/arm/mach-rockchip/Makefile                    |   1 +
- arch/arm/mach-rockchip/pm.c                        | 260 +++++++++++++++++++++
- arch/arm/mach-rockchip/pm.h                        |  99 ++++++++
- arch/arm/mach-rockchip/rockchip.c                  |   4 +-
- arch/arm/mach-rockchip/sleep.S                     |  73 ++++++
- 6 files changed, 452 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/arm/rockchip/pmu-sram.txt
- create mode 100644 arch/arm/mach-rockchip/pm.c
- create mode 100644 arch/arm/mach-rockchip/pm.h
- create mode 100644 arch/arm/mach-rockchip/sleep.S
+ arch/arm/boot/dts/rk3288-evb-rk808.dts | 53 +++++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/rk3288.dtsi          | 27 +++++++++++++++++
+ 2 files changed, 79 insertions(+), 1 deletion(-)
