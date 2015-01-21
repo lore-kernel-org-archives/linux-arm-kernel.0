@@ -1,43 +1,56 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Wed, 21 Jan 2015 22:39:54 +0100
-Subject: [PATCH 1/1] gpio: omap: Fix bad device access with setup_irq()
-In-Reply-To: <1421448650-15904-1-git-send-email-tony@atomide.com>
-References: <1421448650-15904-1-git-send-email-tony@atomide.com>
-Message-ID: <CABxcv=nE8F7Jjy3Ojf_PE6LEDi_H2tZSbAwpeu+3spP4zF==RQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 21 Jan 2015 13:37:07 -0800
+Subject: [PATCH v4 13/21] ARM: omap: convert wakeupgen to stacked domains
+In-Reply-To: <54C019EB.5030007@oracle.com>
+References: <1421660655-21394-1-git-send-email-marc.zyngier@arm.com>
+ <1421660655-21394-14-git-send-email-marc.zyngier@arm.com>
+ <20150121163031.GR7718@atomide.com> <54BFE05E.9080403@arm.com>
+ <20150121183615.GS7718@atomide.com> <54C00832.1070807@oracle.com>
+ <20150121204347.GT7718@atomide.com> <54C019EB.5030007@oracle.com>
+Message-ID: <20150121213706.GU7718@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Tony,
+* santosh shilimkar <santosh.shilimkar@oracle.com> [150121 13:31]:
+> On 1/21/2015 12:43 PM, Tony Lindgren wrote:
+> >* santosh shilimkar <santosh.shilimkar@oracle.com> [150121 12:16]:
+> >>
+> >>TWD is useless on this machine since single core and TWD
+> >>as know die in low power states. All the broadcast stuff
+> >>is for SMP machines.
+> >
+> >Hmm it seems we should still use TWD during runtime and
+> >swich over to the gptimer for idle states for wake-up
+> >events.
+> >
+> Well timer wheel code don't support it so if you are serious,
+> some one needs to do that. For me, it is not worth at all.
+> You will have more to loose than gain with these time switching
+> schemes since you have to keep 2 times alive, do switching, loose
+> the idle time.
+> 
+> All of that is to save few CPU cycles since TWD is closer
+> compared to other SOC timer.
+> 
+> Anyways I will let you fight it out but IIRC, I had a
+> discussion a while back with tglx in one of the conference
+> and the conclusion was it not worth doing.
+> Rather TWD hardware on SOC should be made wakeup capable
+> and then everything is good.
+> 
+> Till you have support, using TWD on AM43XX will break CPUIDLE.
+> Not sure if it is supported or some one cares about it. Just
+> keep that aspect in mind.
 
-On Fri, Jan 16, 2015 at 11:50 PM, Tony Lindgren <tony@atomide.com> wrote:
-> Similar to omap_gpio_irq_type() let's make sure that the GPIO
-> is usable as an interrupt if the platform init code did not
-> call gpio_request(). Otherwise we can get invalid device access
-> after setup_irq():
->
-> WARNING: CPU: 0 PID: 1 at drivers/bus/omap_l3_noc.c:147 l3_interrupt_handler+0x214/0x340()
-> 44000000.ocp:L3 Custom Error: MASTER MPU TARGET L4CFG (Idle): Data Access in Supervisor mode during Functional access
-> ...
-> [<c05f21e4>] (__irq_svc) from [<c05f1974>] (_raw_spin_unlock_irqrestore+0x34/0x44)
-> [<c05f1974>] (_raw_spin_unlock_irqrestore) from [<c00914a8>] (__setup_irq+0x244/0x530)
-> [<c00914a8>] (__setup_irq) from [<c00917d4>] (setup_irq+0x40/0x8c)
-> [<c00917d4>] (setup_irq) from [<c0039c8c>] (omap_system_dma_probe+0x1d4/0x2b4)
-> [<c0039c8c>] (omap_system_dma_probe) from [<c03b2200>] (platform_drv_probe+0x44/0xa4)
-> ...
->
-> We can fix this the same way omap_gpio_irq_type() is handling it.
->
+Yes sure I'm aware of this. It should be easy to profile the
+speed gain to see if it would make much of a difference
+before starting to tinker with that.
 
-I see that Linus already picked this patch but fwiw:
+The way I think it's possible to do would be to copy the TWD
+timer value to a wake-up capable gptimer before hitting any
+deeper idle state. Of course some aux timer support might be
+still needed :)
 
-Acked-by: Javier Martinez Canillas <javier@dowhile0.org>
+Regards,
 
-> Note that the long term solution is to change the gpio-omap driver
-> to handle the banks as separate driver instances. This will allow
-> us to rely on just runtime PM for tracking the bank specific state.
->
-
-Agreed.
-
-Best regards,
-Javier
+Tony
