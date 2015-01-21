@@ -1,27 +1,49 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 21 Jan 2015 15:48:29 +0000
-Subject: [PATCH] arm64: Add L2 cache topology to ARM Ltd boards/models
-In-Reply-To: <1542574.d99bFx24pn@wuerfel>
-References: <1421841750-26722-1-git-send-email-sudeep.holla@arm.com>
- <1542574.d99bFx24pn@wuerfel>
-Message-ID: <20150121154828.GG6358@e104818-lin.cambridge.arm.com>
+From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
+Date: Wed, 21 Jan 2015 16:49:39 +0100
+Subject: [PATCH 5/5] PCI: st: disable IO support
+In-Reply-To: <20141217140131.607a1ac7@lxorguk.ukuu.org.uk>
+References: <1418812486-12394-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1418812486-12394-6-git-send-email-gabriel.fernandez@linaro.org>
+ <20141217140131.607a1ac7@lxorguk.ukuu.org.uk>
+Message-ID: <CAG374jD3Y_y1Ugt0Y7_j9kz66yUCx8PPNLkkpWBdpVPMxnoC8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 21, 2015 at 02:43:23PM +0000, Arnd Bergmann wrote:
-> On Wednesday 21 January 2015 12:02:30 Sudeep Holla wrote:
-> > Though this patch and commit 5d425c18653731af6 ("arm64: kernel: add
-> > support for cpu cache information") which is in -next(via arm64) are
-> > dependent to provide desired functionality, then can go indepedently
-> > if you think there could be conflicts if this change is taken via arm64.
-> > If not, Catalin can pick up with your acks after the review.
-> 
-> I think it would be better to take this through arm-soc. It's not
-> extremely likely to cause conflicts, but as you say there are no
-> strict dependencies on which goes in first, so there is no harm
-> in merging them separately.
+Hi,
 
-Fine by me.
+Yes, we don't really care about this corner case.
+Thanks for your reviewing.
 
--- 
-Catalin
+BR
+
+Gabriel
+
+On 17 December 2014 at 15:01, One Thousand Gnomes
+<gnomes@lxorguk.ukuu.org.uk> wrote:
+> On Wed, 17 Dec 2014 11:34:46 +0100
+> Gabriel FERNANDEZ <gabriel.fernandez@st.com> wrote:
+>
+>> sti SoCs PCIe IPs are built around DesignWare IP Core.
+>> But in these SoCs, PCIe IP doesn't support IO.
+>> By default, when no IO space is provided, a default one is assigned.
+>>
+>> Add an empty IO resource to the bus, and disable IO by default.
+>
+> As a point of PCI pedantry I don't think this is quite sufficient. PCI
+> has a weird corner case where I/O resources are implied rather than
+> allocated.
+>
+> For IDE/SATA you may need to something like
+>
+>         if (class == PCI_CLASS_STORAGE_IDE) {
+>                 u8 progif;
+>                 pci_read_config_byte(dev, PCI_CLASS_PROG, &progif);
+>                 progif |= 5;
+>                 pci_write_config_byte(dev, PCI_CLASS_PROG, &progif);
+>         }
+>
+> so that any adapter is kicked out of legacy mode and doesn't get implied
+> I/O resources and interrupts. I don't know if that case matters for your
+> usage.
+>
+>
