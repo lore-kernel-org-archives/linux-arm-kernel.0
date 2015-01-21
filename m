@@ -1,124 +1,152 @@
-From: alim.akhtar@gmail.com (Alim Akhtar)
-Date: Wed, 21 Jan 2015 19:42:29 +0530
-Subject: [PATCH v4 2/2] ARM: dts: Add HS400 support for exynos5420 and
- exynos5800
-In-Reply-To: <54BEDE9C.5060501@samsung.com>
-References: <1421231446-4776-1-git-send-email-alim.akhtar@samsung.com>
- <1421231446-4776-3-git-send-email-alim.akhtar@samsung.com>
- <54BEDE9C.5060501@samsung.com>
-Message-ID: <CAGOxZ5186+9U-6eri6OSGw9awsmr0EPP-gdhu-__oCWP1Oyyxg@mail.gmail.com>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Wed, 21 Jan 2015 01:15:01 -0400
+Subject: [PATCH v2] thermal: rockchip: make temperature reporting much
+ more accurate
+In-Reply-To: <CAGS+omDiajqKxYFqdBXTeax+eeE-TD1WJ+C5odCbZBg6FELXDA@mail.gmail.com>
+References: <1421625349-14101-1-git-send-email-wxt@rock-chips.com>
+ <1421625349-14101-2-git-send-email-wxt@rock-chips.com>
+ <CAGS+omDiajqKxYFqdBXTeax+eeE-TD1WJ+C5odCbZBg6FELXDA@mail.gmail.com>
+Message-ID: <20150121051459.GA13468@developer.hsd1.ca.comcast.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jaehoon
+On Mon, Jan 19, 2015 at 12:23:49PM +0800, Daniel Kurtz wrote:
+> Hi Caesar,
+> 
+> Some drive-by review comments inline...
+> 
+> On Mon, Jan 19, 2015 at 7:55 AM, Caesar Wang <wxt@rock-chips.com> wrote:
+> > In general, the kernel should report temperature readings exactly as
+> > reported by the hardware. The cpu / gpu thermal driver works in 5 degree
+> > increments,but we ought to do more accurate. The temperature will do
+> > linear interpolation between the entries in the table.
+> >
+> > Test= $md5sum /dev/zero &
+> > $while true; do grep "" /sys/class/thermal/thermal_zone[1-2]/temp;
+> > sleep .5; done
+> >
+> > e.g. We can get the result as follows:
+> >     /sys/class/thermal/thermal_zone1/temp:39994
+> >     /sys/class/thermal/thermal_zone2/temp:39086
+> >     /sys/class/thermal/thermal_zone1/temp:39994
+> >     /sys/class/thermal/thermal_zone2/temp:39540
+> >     /sys/class/thermal/thermal_zone1/temp:39540
+> >     /sys/class/thermal/thermal_zone2/temp:39540
+> >     /sys/class/thermal/thermal_zone1/temp:39540
+> >     /sys/class/thermal/thermal_zone2/temp:39994
+> >
+> > Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> > Reviewed-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> >
+> > ---
+> >
+> > Changes in v2:
+> > Reviewed-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> >
+> >  drivers/thermal/rockchip_thermal.c | 26 +++++++++++++++++---------
+> >  1 file changed, 17 insertions(+), 9 deletions(-)
+> >
+> > diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
+> > index 1bcddfc..a7ae23a 100644
+> > --- a/drivers/thermal/rockchip_thermal.c
+> > +++ b/drivers/thermal/rockchip_thermal.c
+> > @@ -193,19 +193,18 @@ static u32 rk_tsadcv2_temp_to_code(long temp)
+> >
+> >  static long rk_tsadcv2_code_to_temp(u32 code)
+> >  {
+> > -       int high, low, mid;
+> > -
+> > -       low = 0;
+> > -       high = ARRAY_SIZE(v2_code_table) - 1;
+> > -       mid = (high + low) / 2;
+> > +       unsigned int low = 0;
+> > +       unsigned int high = ARRAY_SIZE(v2_code_table) - 1;
+> > +       unsigned int mid = (low + high) / 2;
+> > +       unsigned int scale;
+> >
+> >         if (code > v2_code_table[low].code || code < v2_code_table[high].code)
+> >                 return 125000; /* No code available, return max temperature */
+> 
+> I think if the temp sensor reading was invalid we should return an
+> error code rather than just silently returning "max temp".
+> Returning an error here could then be propagated up by its only
+> caller, the ->get_temp() callback.
+> 
 
-On Wed, Jan 21, 2015 at 4:32 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
-> Hi,
->
-> If you want to enable the hs400 mode, need to add "mmc-hs400-1_8v" or "mmc-hs400-1_2v".
-> But this patch didn't add them. do you have any other plan?
->
-Yes, right, plan is to send separate patch to enable hs400, as of now
-I am not sure if all the 5800-peach-pi boards are populated with
-emmc5.0 device or not. So I will enable HS400 after confirming this
-point.
-> On 01/14/2015 07:30 PM, Alim Akhtar wrote:
->> From: Seungwon Jeon <tgih.jun@samsung.com>
->>
->> HS400 timing values are added for SMDK5420, exynos5420-peach-pit
->> and exynos5800-peach-pi boards.
->> This also adds RCLK GPIO line, this gpio should be in pull-down
->> state.
->>
->> Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
->> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
->> [Alim: addressed review comments]
->> ---
->>  arch/arm/boot/dts/exynos5420-peach-pit.dts |    4 +++-
->>  arch/arm/boot/dts/exynos5420-pinctrl.dtsi  |    7 +++++++
->>  arch/arm/boot/dts/exynos5420-smdk5420.dts  |    4 +++-
->>  arch/arm/boot/dts/exynos5800-peach-pi.dts  |    4 +++-
->>  4 files changed, 16 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
->> index 9a050e1..7ffaba8 100644
->> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
->> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
->> @@ -569,8 +569,10 @@
->>       samsung,dw-mshc-ciu-div = <3>;
->>       samsung,dw-mshc-sdr-timing = <0 4>;
->>       samsung,dw-mshc-ddr-timing = <0 2>;
->> +     samsung,dw-mshc-hs400-timing = <0 2>;
->> +     read-strobe-delay = <90>;
->>       pinctrl-names = "default";
->> -     pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
->> +     pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8 &sd0_rclk>;
->>       bus-width = <8>;
->>  };
->>
->> diff --git a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
->> index ba686e4..8b15316 100644
->> --- a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
->> +++ b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
->> @@ -201,6 +201,13 @@
->>                       samsung,pin-drv = <3>;
->>               };
->>
->> +             sd0_rclk: sd0-rclk {
->
-> I know it used to "sd0_rdqs", not "sd0_rclk".
-> Change name.
->
-Ok, I will change as per UM of 5800/5420,
+Agreed here.
 
-> Best Regards,
-> Jaehoon Chung
->> +                     samsung,pins = "gpc0-7";
->> +                     samsung,pin-function = <2>;
->> +                     samsung,pin-pud = <1>;
->> +                     samsung,pin-drv = <3>;
->> +             };
->> +
->>               sd1_cmd: sd1-cmd {
->>                       samsung,pins = "gpc1-1";
->>                       samsung,pin-function = <2>;
->> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
->> index 8be3d7b..5290e79 100644
->> --- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
->> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
->> @@ -80,8 +80,10 @@
->>               samsung,dw-mshc-ciu-div = <3>;
->>               samsung,dw-mshc-sdr-timing = <0 4>;
->>               samsung,dw-mshc-ddr-timing = <0 2>;
->> +             samsung,dw-mshc-hs400-timing = <0 2>;
->> +             read-strobe-delay = <90>;
->>               pinctrl-names = "default";
->> -             pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
->> +             pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8 &sd0_rclk>;
->>               bus-width = <8>;
->>               cap-mmc-highspeed;
->>       };
->> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
->> index e8fdda8..fa1c858 100644
->> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
->> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
->> @@ -557,8 +557,10 @@
->>       samsung,dw-mshc-ciu-div = <3>;
->>       samsung,dw-mshc-sdr-timing = <0 4>;
->>       samsung,dw-mshc-ddr-timing = <0 2>;
->> +     samsung,dw-mshc-hs400-timing = <0 2>;
->> +     read-strobe-delay = <90>;
->>       pinctrl-names = "default";
->> -     pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
->> +     pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8 &sd0_rclk>;
->>       bus-width = <8>;
->>  };
->>
->>
->
+> Note: 'code < v2_code_table[high].code' is always false, since code is
+> unsigned, and the last entry is 0.
+> 
+> Also, the check above doesn't reject "code == 0xfff".
+> Even worse, I believe in that case the below algorithm will eventually
+> set mid=0 and access v2_code_table[-1].code.
+> 
+
+yeah, if that can happen, then it must be fixed.
 
 
+> >
+> >         while (low <= high) {
+> > -               if (code >= v2_code_table[mid].code && code <
+> > -                   v2_code_table[mid - 1].code)
+> > -                       return v2_code_table[mid].temp;
+> > +               if (code >= v2_code_table[mid].code &&
+> > +                   code < v2_code_table[mid - 1].code)
+> > +                       break;
+> >                 else if (code < v2_code_table[mid].code)
+> >                         low = mid + 1;
+> >                 else
+> > @@ -213,7 +212,16 @@ static long rk_tsadcv2_code_to_temp(u32 code)
+> >                 mid = (low + high) / 2;
+> >         }
+> >
+> > -       return 125000;
+> > +       /*
+> > +        * The 5C granularity provided by the table is too much. Let's
+> > +        * assume that the relationship between sensor readings and
+> > +        * temperature between 2 table entries is linear and extrapolate
+> 
+> I think this is "interpolate", not "extrapolate".
 
--- 
-Regards,
-Alim
+
+in this case yes, agreed too.
+
+> 
+> > +        * to produce less granular result.
+> > +        */
+> > +       scale = (v2_code_table[mid].temp - v2_code_table[mid - 1].temp) /
+> > +               (v2_code_table[mid - 1].code - v2_code_table[mid].code);
+> > +       return v2_code_table[mid - 1].temp +
+> > +                       (v2_code_table[mid - 1].code - code) * scale;
+> 
+> Assuming the product fits in an unsigned long (and it will, since code
+> is only 12-bits), it is more precise to multiply first and then
+> divide, something like this:
+> 
+>    num = v2_code_table[mid].temp - v2_code_table[mid - 1].temp;
+>    num *= v2_code_table[mid - 1].code - code;
+>    denom = v2_code_table[mid - 1].code - v2_code_table[mid].code;
+>    return v2_code_table[mid - 1].temp + (num / denom);
+> 
+> -Daniel
+> 
+> >  }
+> >
+> >  /**
+> > --
+> > 1.9.1
+> >
+> >
+> >
+> > _______________________________________________
+> > Linux-rockchip mailing list
+> > Linux-rockchip at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-rockchip
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150121/3a18fb13/attachment.sig>
