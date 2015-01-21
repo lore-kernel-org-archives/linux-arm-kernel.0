@@ -1,77 +1,62 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 21 Jan 2015 20:59:21 +0100
-Subject: [PATCH 3/5] PCI: st: Provide support for the sti PCIe controller
-In-Reply-To: <6574269.bTBzFhcnBx@wuerfel>
-References: <1418812486-12394-1-git-send-email-gabriel.fernandez@linaro.org>
- <1682713.ac5OoTJoOr@wuerfel>
- <CAG374jCRByNZuuYxi5+-mKvV7p5-tCf2G+8mTYfzU4rRV4yfYQ@mail.gmail.com>
- <6574269.bTBzFhcnBx@wuerfel>
-Message-ID: <1421870361.3430.12.camel@pengutronix.de>
+From: santosh.shilimkar@oracle.com (santosh shilimkar)
+Date: Wed, 21 Jan 2015 12:12:34 -0800
+Subject: [PATCH v4 13/21] ARM: omap: convert wakeupgen to stacked domains
+In-Reply-To: <20150121183615.GS7718@atomide.com>
+References: <1421660655-21394-1-git-send-email-marc.zyngier@arm.com>
+ <1421660655-21394-14-git-send-email-marc.zyngier@arm.com>
+ <20150121163031.GR7718@atomide.com> <54BFE05E.9080403@arm.com>
+ <20150121183615.GS7718@atomide.com>
+Message-ID: <54C00832.1070807@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 21.01.2015, 20:35 +0100 schrieb Arnd Bergmann:
-> On Wednesday 21 January 2015 16:47:36 Gabriel Fernandez wrote:
-> > On 19 January 2015 at 14:49, Arnd Bergmann <arnd@arndb.de> wrote:
-> > > On Monday 19 January 2015 13:37:33 Gabriel Fernandez wrote:
-> > >> On 17 December 2014 at 23:14, Arnd Bergmann <arnd@arndb.de> wrote:
-> > >> > On Wednesday 17 December 2014 11:34:44 Gabriel FERNANDEZ wrote:
-> > >> > > +/*
-> > >> > > + * On ARM platforms, we actually get a bus error returned when the PCIe
-> > >> > IP
-> > >> > > + * returns a UR or CRS instead of an OK.
-> > >> > > + */
-> > >> > > +static int st_pcie_abort_
-> > >> >
-> > >> > handler(unsigned long addr, unsigned int fsr,
-> > >> > > +                              struct pt_regs *regs)
-> > >> > > +{
-> > >> > > +     return 0;
-> > >> > > +}
-> > >> >
-> > >> > You should check that it's actually PCI that caused the abort. Don't
-> > >> > just ignore a hard error condition.
-> > >> >
-> > >> > Usually there are registers in the PCI core that let you identify what
-> > >> > happened.
-> > >> >
-> > >>
-> > >>
-> > >> We return 0 because abort handler is not activated during boot.
-> > >>
-> > >
-> > > Can you just remove the handler then? We should never have exception
-> > > handlers that unconditionally return 0.
-> > >
-> > 
-> > Ah sorry, we need the handler because we can received aborts from
-> > user-land after the boot.
-> > 
-> > I have 2 solutions, the first to simplify we can only return 0.
-> > The second is to manage handler during boot. Then i need for that a
-> > new patch from Fabrice
-> > https://lkml.org/lkml/2014/2/7/631
-> 
-> I still don't get it. What is causing the abort? Is that something
-> user space does, or is it just a condition that gets stuck the pcie
-> device after probing that gets delivered once as soon as the aborts
-> are enabled?
-> 
-The abort is caused by the kernel trying to access a non-existent device
-while probing the bus. It isn't delivered to the ARM core, as it is an
-imprecise external abort which are masked during boot.
-Once pid1 is started and we do the first schedule imprecise aborts get
-unmasked and pid1 will be hit by the stale abort.
+On 1/21/2015 10:36 AM, Tony Lindgren wrote:
+> * Marc Zyngier <marc.zyngier@arm.com> [150121 09:25]:
+>> On 21/01/15 16:30, Tony Lindgren wrote:
+>>
+>>> I gave this a quick boot test on am437x-gp-evm and the
+>>> interrupts look OK with the fix also applied:
+>>>
+>>> # cat /proc/interrupts
+>>>              CPU0
+>>>   16:        657     WUGEN  68  gp_timer
+>>>   18:          0     WUGEN   9  l3-dbg-irq
+>>>   19:          0     WUGEN  10  l3-app-irq
+>>>   20:          5     WUGEN  12  edma
+>>>   22:          0     WUGEN  14  edma_error
+>>>   23:         96     WUGEN  72  OMAP UART0
+>>>   33:          0  44e07000.gpio   6  mmc0
+>>> 158:         52     WUGEN  70  44e0b000.i2c
+>>> 159:          0     WUGEN  71  4802a000.i2c
+>>> 160:         35     WUGEN  64  mmc0
+>>> 161:          0     WUGEN  40  4a100000.ethernet
+>>> 162:       7739     WUGEN  41  4a100000.ethernet
+>>> 163:       7608     WUGEN  42  4a100000.ethernet
+>>> 164:          0     WUGEN  43  4a100000.ethernet
+>>> 170:          0     WUGEN 100  gpmc
+>>> 180:          0     WUGEN   7  tps65218
+>>> IPI0:          0  CPU wakeup interrupts
+>>> IPI1:          0  Timer broadcast interrupts
+>>> IPI2:          0  Rescheduling interrupts
+>>> IPI3:          0  Function call interrupts
+>>> IPI4:          0  Single function call interrupts
+>>> IPI5:          0  CPU stop interrupts
+>>> IPI6:          0  IRQ work interrupts
+>>> IPI7:          0  completion interrupts
+>>> Err:          0
+>>
+>> Interesting. No TWD timer on this one?
+>
+> Good question, adding Felipe to cc. It eems to be there in
+> the TRM in "Table 2-3.  L4_PER Peripheral Memory Map" as
+> MPU_PRV_TIMERS. Also seems to actually work with the
+> attached patch:
+>
+TWD is useless on this machine since single core and TWD
+as know die in low power states. All the broadcast stuff
+is for SMP machines.
 
-The above patch does the right thing by unmasking imprecise abort early
-during boot, so they can get handled once they are hit.
-
-The abort handling for the DW PCIe core right now is a complete
-disaster. Hooking the fault code means we possibly overwrite any other
-handler for the same abort. Also as the configuration space is mapped as
-device memory the abort actually happens on the *next* instruction after
-the read that caused it. Improving this is something I had on my to-do
-list for quite some time now. 
+Above is expected and correct and no patching is needed.
 
 Regards,
-Lucas
+Santosh
