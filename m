@@ -1,94 +1,135 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 20 Jan 2015 16:46:55 -0800
-Subject: [PATCH v10 3/3] clk: Add rate constraints to clocks
-In-Reply-To: <1421760306-6301-4-git-send-email-tomeu.vizoso@collabora.com>
-References: <1421760306-6301-1-git-send-email-tomeu.vizoso@collabora.com>
- <1421760306-6301-4-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <20150121004655.GG27202@codeaurora.org>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Wed, 21 Jan 2015 09:34:27 +0800
+Subject: [PATCH v2 1/8] device core: Introduce per-device MSI domain
+ pointer
+In-Reply-To: <CALRxmdCRGY2Sw+UyHTp5PP4R=v2301LTqpKq0bCEs08SWsh1bg@mail.gmail.com>
+References: <1420736772-11088-1-git-send-email-marc.zyngier@arm.com>	<1420736772-11088-2-git-send-email-marc.zyngier@arm.com>	<CALRxmdDVUoYNg3QC0LdvKmCz9x4nzE9+TDiV9K9OH=Gxk-Cd9w@mail.gmail.com>	<54BC6799.2040907@linux.intel.com>
+ <CALRxmdCRGY2Sw+UyHTp5PP4R=v2301LTqpKq0bCEs08SWsh1bg@mail.gmail.com>
+Message-ID: <54BF0223.90905@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's looking fairly close. Thanks for keeping up with the review
-comments.
 
-On 01/20, Tomeu Vizoso wrote:
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index e867d6a..f241e27 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -2143,6 +2280,10 @@ struct clk *__clk_register(struct device *dev, struct clk_hw *hw)
->  	else
->  		clk->owner = NULL;
->  
-> +	INIT_HLIST_HEAD(&clk->clks);
-> +
-> +	hw->clk = __clk_create_clk(hw, NULL, NULL);
-> +
->  	ret = __clk_init(dev, hw->clk);
->  	if (ret)
->  		return ERR_PTR(ret);
+On 2015/1/21 1:17, Stuart Yoder wrote:
+> Gerry,
+> 
+> So which direction did you take in your patch set--  a) common,
+> generic msi_desc, or b)  bus-specific msi_desc like Marc showed
+> (mybus_msi_desc)?
+Hi Stuart,
+	Currently I'm trying to go the former way as below.
+Regards,
+Gerry
+-----------------------------------------------------------------------
+struct msi_desc {
+        struct list_head                list;
+        unsigned int                    irq;
+        unsigned int                    nvec_used;      /* number of
+messages */
+        struct device *                 dev;
+        struct msi_msg                  msg;            /* Last set MSI
+message */
 
-Don't we need to __clk_free_clk() here too?
+#ifdef CONFIG_PCI_MSI
+        union {
+                struct {                                /* For PCI
+MSI/MSI-X */
+                        u32 masked;                     /* mask bits */
+                        struct {
+                                __u8    is_msix : 1;
+                                __u8    multiple: 3;    /* log2 num of
+messages allocated */
+                                __u8    multi_cap : 3;  /* log2 num of
+messages supported */
+                                __u8    maskbit : 1;    /* mask-pending
+bit supported ? */
+                                __u8    is_64   : 1;    /* Address size:
+0=32bit 1=64bit */
+                                __u16   entry_nr;       /* specific
+enabled entry */
+                                unsigned default_irq;   /* default
+pre-assigned irq */
+                        } msi_attrib;
+                        union {
+                                u8      mask_pos;
+                                void __iomem *mask_base;
+                        };
+                };
+        };
+#endif /* CONFIG_PCI_MSI */
+};
 
-> @@ -2151,6 +2292,19 @@ struct clk *__clk_register(struct device *dev, struct clk_hw *hw)
->  }
->  EXPORT_SYMBOL_GPL(__clk_register);
->  
-> +static void __clk_free_clk(struct clk *clk)
-> +{
-> +	struct clk_core *core = clk->core;
-> +
-> +	clk_prepare_lock();
-> +	hlist_del(&clk->child_node);
-> +	clk_prepare_unlock();
-> +
-> +	kfree(clk);
-> +
-> +	clk_core_set_rate(core, core->req_rate);
-
-Is it safe to call this during clock registration? I hope that it
-will just bail out and do nothing because core->rate ==
-core->req_rate. Maybe we can avoid this given my next comment
-below.
-
-> +}
-> +
->  /**
->   * clk_register - allocate a new clock, register it and return an opaque cookie
->   * @dev: device that is registering this clock
-> @@ -2210,12 +2364,14 @@ struct clk *clk_register(struct device *dev, struct clk_hw *hw)
->  		}
->  	}
->  
-> +	INIT_HLIST_HEAD(&clk->clks);
-> +
->  	hw->clk = __clk_create_clk(hw, NULL, NULL);
->  	ret = __clk_init(dev, hw->clk);
->  	if (!ret)
->  		return hw->clk;
->  
-> -	kfree(hw->clk);
-> +	__clk_free_clk(hw->clk);
->  fail_parent_names_copy:
->  	while (--i >= 0)
->  		kfree(clk->parent_names[i]);
-> @@ -2421,7 +2577,7 @@ void __clk_put(struct clk *clk)
->  		return;
->  
->  	clk_core_put(clk->core);
-> -	kfree(clk);
-> +	__clk_free_clk(clk);
-
-This doesn't look right. First we drop the core reference here
-with clk_core_put() and then we call __clk_free_clk() which will
-go and call clk_core_set_rate() on the clk->core which may or may
-not exist anymore. I'd think we want to do these steps:
-
- 1. Unlink clk from clks list
- 2. Recalculate rate and set if changed
- 3. Drop kref on core with clk_core_put()
- 4. kfree the clk
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> 
+> Thanks,
+> Stuart
+> 
+> On Sun, Jan 18, 2015 at 8:10 PM, Jiang Liu <jiang.liu@linux.intel.com> wrote:
+>>
+>>
+>> On 2015/1/16 4:35, Stuart Yoder wrote:
+>>> On Thu, Jan 8, 2015 at 11:06 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>> As MSI-type features are creeping into non-PCI devices, it is
+>>>> starting to make sense to give our struct device some form of
+>>>> support for this, by allowing a pointer to an MSI irq domain to
+>>>> be set/retrieved.
+>>>>
+>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>> ---
+>>>>  include/linux/device.h | 20 ++++++++++++++++++++
+>>>>  1 file changed, 20 insertions(+)
+>>>>
+>>>> diff --git a/include/linux/device.h b/include/linux/device.h
+>>>> index fb50673..ec4cee5 100644
+>>>> --- a/include/linux/device.h
+>>>> +++ b/include/linux/device.h
+>>>> @@ -690,6 +690,7 @@ struct acpi_dev_node {
+>>>>   *             along with subsystem-level and driver-level callbacks.
+>>>>   * @pins:      For device pin management.
+>>>>   *             See Documentation/pinctrl.txt for details.
+>>>> + * @msi_domain: The generic MSI domain this device is using.
+>>>>   * @numa_node: NUMA node this device is close to.
+>>>>   * @dma_mask:  Dma mask (if dma'ble device).
+>>>>   * @coherent_dma_mask: Like dma_mask, but for alloc_coherent mapping as not all
+>>>> @@ -750,6 +751,9 @@ struct device {
+>>>>         struct dev_pm_info      power;
+>>>>         struct dev_pm_domain    *pm_domain;
+>>>>
+>>>> +#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
+>>>> +       struct irq_domain       *msi_domain; /* MSI domain device uses */
+>>>> +#endif
+>>>
+>>> This is not a comment on this patch specifically, but a question about other
+>>> MSI specific fields that might be needed in struct device.
+>>>
+>>> Currently the generic MSI domain handling has hardcoded assumptions
+>>> that devices are PCI-- see the for_each_msi_entry() iterator in msi.h:
+>>>
+>>>   #define dev_to_msi_list(dev)            (&to_pci_dev((dev))->msi_list)
+>>>
+>>>   #define for_each_msi_entry(desc, dev)   \
+>>>         list_for_each_entry((desc), dev_to_msi_list((dev)), list)
+>>>
+>>> One approach would be to move the msi_list out of pci_dev and put
+>>> it in struct device, so all devices can have an msi_list.
+>>>
+>>> The other approach would be to keep msi_list in a bus specific
+>>> device struct, and then dev_to_msi_list() would need to be
+>>> implemented as a bus specific callback of some kind.
+>>>
+>>> The above hardcoded PCI assumption isn't going to work.   Wanted to
+>>> see if there is any advice in which direction to go.
+>> Hi Stuart,
+>>         I already have some a patch set to go that direction waiting
+>> send out for review:)
+>> Thanks!
+>> Gerry
+>>
+>>>
+>>> Thanks,
+>>> Stuart Yoder
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>> Please read the FAQ at  http://www.tux.org/lkml/
+>>>
