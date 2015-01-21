@@ -1,248 +1,524 @@
-From: lyz@rock-chips.com (Yunzhi Li)
-Date: Wed, 21 Jan 2015 18:21:10 +0800
-Subject: [PATCH v7 2/5] phy: add a driver for the Rockchip SoC internal
- USB2.0 PHY
-In-Reply-To: <54BF7B25.2060009@ti.com>
-References: <1418396413-27937-1-git-send-email-lyz@rock-chips.com>
- <1418396866-32625-1-git-send-email-lyz@rock-chips.com>
- <54BF75FF.6020207@ti.com> <54BF7A25.2050000@rock-chips.com>
- <54BF7B25.2060009@ti.com>
-Message-ID: <54BF7D96.6080002@rock-chips.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 21 Jan 2015 11:26:44 +0100
+Subject: [PATCH 2/4] sdhci-st: Add support for stih407 family silicon.
+In-Reply-To: <1421767964-8798-3-git-send-email-peter.griffin@linaro.org>
+References: <1421767964-8798-1-git-send-email-peter.griffin@linaro.org>
+ <1421767964-8798-3-git-send-email-peter.griffin@linaro.org>
+Message-ID: <CAPDyKFqVtCrn8DcKCk4jmeXGLKCqiXy1pgprA+Ku33Qiooe8nA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon :
+On 20 January 2015 at 16:32, Peter Griffin <peter.griffin@linaro.org> wrote:
+> This patch adds support for the extra registers found on
+> stih407 family silicon which has the flashSS subsystem.
+>
+> This mainly consists of some extra glue registers which are
+> used to correctly configure the controller hardware.
+>
+> This patch also adds support for UHS modes for eMMC. To allow
+> UHS HS200/SD104 modes to function correctly, due to the
+> tight timing constriants, and data tuning requirement support
+> for PVT independent delay management is also added. Two types
+> of delay management are supported, static delay management and
+> dynamic delay management (dynamic delay loop), this delay
+> management is only available on eMMC pads on stih410 and later
+> silicon.
+>
+> Testing on stih410-b2120 board achieves the following speeds
+> with HS200 eMMC card.
+>
+> max-frequency = 200Mhz
+> /dev/mmcblk0p1:
+>  Timing buffered disk reads: 270 MB in  3.02 seconds =  89.54 MB/sec
+>
+> max-frequency = 100Mhz
+> root at debian-armhf:~# hdparm -t /dev/mmcblk0p1
+> /dev/mmcblk0p1:
+>  Timing buffered disk reads: 210 MB in  3.00 seconds =  70.00 MB/sec
+>
+> max-frequency = 50Mhz
+> root at debian-armhf:~# hdparm -t /dev/mmcblk0p1
+> /dev/mmcblk0p1:
+>  Timing buffered disk reads: 118 MB in  3.00 seconds =  39.28 MB/sec
+>
+> This is better than the 3.10 kernel which achieves 77.59 MB/sec
+> at 200Mhz clock (same board/soc/eMMC).
+>
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+> ---
+>  drivers/mmc/host/sdhci-st.c | 351 +++++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 343 insertions(+), 8 deletions(-)
 
-> Hi,
+Would it be possible to split this patch, I think it's easier to
+review it in smaller pieces.
+
 >
-> On Wednesday 21 January 2015 03:36 PM, Yunzhi Li wrote:
->> Hi Kishon :
->>> Hi,
->>>
->>> On Friday 12 December 2014 08:37 PM, Yunzhi Li wrote:
->>>> This patch to add a generic PHY driver for ROCKCHIP usb PHYs,
->>>> currently this driver can support RK3288. The RK3288 SoC have
->>>> three independent USB PHY IPs which are all configured through a
->>>> set of registers located in the GRF (general register files)
->>>> module.
->>>>
->>>> Signed-off-by: Yunzhi Li <lyz@rock-chips.com>
->>>>
->>>> ---
->>>>
->>>> Changes in v7:
->>>> - Accept Kishon's comments to use phandle args to find a phy
->>>>     struct directly and get rid of using a custom of_xlate
->>>>     function.
->>>>
->>>> Changes in v6:
->>>> - Rename SIDDQ_MSK to SIDDQ_WRITE_ENA.
->>>>
->>>> Changes in v5: None
->>>> Changes in v4:
->>>> - Get number of PHYs from device tree.
->>>> - Model each PHY as subnode of the phy provider node.
->>>>
->>>> Changes in v3:
->>>> - Use BIT macro instead of bit shift ops.
->>>> - Rename the config entry to PHY_ROCKCHIP_USB.
->>>>
->>>>    drivers/phy/Kconfig            |   7 ++
->>>>    drivers/phy/Makefile           |   1 +
->>>>    drivers/phy/phy-rockchip-usb.c | 158
->>>> +++++++++++++++++++++++++++++++++++++++++
->>>>    3 files changed, 166 insertions(+)
->>>>    create mode 100644 drivers/phy/phy-rockchip-usb.c
->>>>
->>>> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
->>>> index ccad880..b24500a 100644
->>>> --- a/drivers/phy/Kconfig
->>>> +++ b/drivers/phy/Kconfig
->>>> @@ -239,6 +239,13 @@ config PHY_QCOM_IPQ806X_SATA
->>>>        depends on OF
->>>>        select GENERIC_PHY
->>>>    +config PHY_ROCKCHIP_USB
->>>> +    tristate "Rockchip USB2 PHY Driver"
->>>> +    depends on ARCH_ROCKCHIP && OF
->>>> +    select GENERIC_PHY
->>>> +    help
->>>> +      Enable this to support the Rockchip USB 2.0 PHY.
->>>> +
->>>>    config PHY_ST_SPEAR1310_MIPHY
->>>>        tristate "ST SPEAR1310-MIPHY driver"
->>>>        select GENERIC_PHY
->>>> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
->>>> index aa74f96..48bf5a1 100644
->>>> --- a/drivers/phy/Makefile
->>>> +++ b/drivers/phy/Makefile
->>>> @@ -28,6 +28,7 @@ phy-exynos-usb2-$(CONFIG_PHY_EXYNOS5250_USB2)    +=
->>>> phy-exynos5250-usb2.o
->>>>    phy-exynos-usb2-$(CONFIG_PHY_S5PV210_USB2)    += phy-s5pv210-usb2.o
->>>>    obj-$(CONFIG_PHY_EXYNOS5_USBDRD)    += phy-exynos5-usbdrd.o
->>>>    obj-$(CONFIG_PHY_QCOM_APQ8064_SATA)    += phy-qcom-apq8064-sata.o
->>>> +obj-$(CONFIG_PHY_ROCKCHIP_USB) += phy-rockchip-usb.o
->>>>    obj-$(CONFIG_PHY_QCOM_IPQ806X_SATA)    += phy-qcom-ipq806x-sata.o
->>>>    obj-$(CONFIG_PHY_ST_SPEAR1310_MIPHY)    += phy-spear1310-miphy.o
->>>>    obj-$(CONFIG_PHY_ST_SPEAR1340_MIPHY)    += phy-spear1340-miphy.o
->>>> diff --git a/drivers/phy/phy-rockchip-usb.c b/drivers/phy/phy-rockchip-usb.c
->>>> new file mode 100644
->>>> index 0000000..22011c3
->>>> --- /dev/null
->>>> +++ b/drivers/phy/phy-rockchip-usb.c
->>>> @@ -0,0 +1,158 @@
->>>> +/*
->>>> + * Rockchip usb PHY driver
->>>> + *
->>>> + * Copyright (C) 2014 Yunzhi Li <lyz@rock-chips.com>
->>>> + * Copyright (C) 2014 ROCKCHIP, Inc.
->>>> + *
->>>> + * This program is free software; you can redistribute it and/or modify
->>>> + * it under the terms of the GNU General Public License as published by
->>>> + * the Free Software Foundation; either version 2 of the License.
->>>> + *
->>>> + * This program is distributed in the hope that it will be useful,
->>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>>> + * GNU General Public License for more details.
->>>> + */
->>>> +
->>>> +#include <linux/clk.h>
->>>> +#include <linux/io.h>
->>>> +#include <linux/kernel.h>
->>>> +#include <linux/module.h>
->>>> +#include <linux/mutex.h>
->>>> +#include <linux/of.h>
->>>> +#include <linux/of_address.h>
->>>> +#include <linux/phy/phy.h>
->>>> +#include <linux/platform_device.h>
->>>> +#include <linux/regulator/consumer.h>
->>>> +#include <linux/reset.h>
->>>> +#include <linux/regmap.h>
->>>> +#include <linux/mfd/syscon.h>
->>>> +
->>>> +/*
->>>> + * The higher 16-bit of this register is used for write protection
->>>> + * only if BIT(13 + 16) set to 1 the BIT(13) can be written.
->>>> + */
->>>> +#define SIDDQ_WRITE_ENA    BIT(29)
->>>> +#define SIDDQ_ON        BIT(13)
->>>> +#define SIDDQ_OFF        (0 << 13)
->>>> +
->>>> +struct rockchip_usb_phy {
->>>> +    unsigned int    reg_offset;
->>>> +    struct regmap    *reg_base;
->>>> +    struct clk    *clk;
->>>> +    struct phy    *phy;
->>>> +};
->>>> +
->>>> +static int rockchip_usb_phy_power(struct rockchip_usb_phy *phy,
->>>> +                       bool siddq)
->>>> +{
->>>> +    return regmap_write(phy->reg_base, phy->reg_offset,
->>>> +                SIDDQ_WRITE_ENA | (siddq ? SIDDQ_ON : SIDDQ_OFF));
->>>> +}
->>>> +
->>>> +static int rockchip_usb_phy_power_off(struct phy *_phy)
->>>> +{
->>>> +    struct rockchip_usb_phy *phy = phy_get_drvdata(_phy);
->>>> +    int ret = 0;
->>>> +
->>>> +    /* Power down usb phy analog blocks by set siddq 1 */
->>>> +    ret = rockchip_usb_phy_power(phy, 1);
->>>> +    if (ret)
->>>> +        return ret;
->>>> +
->>>> +    clk_disable_unprepare(phy->clk);
->>>> +    if (ret)
->>>> +        return ret;
->>>> +
->>>> +    return 0;
->>>> +}
->>>> +
->>>> +static int rockchip_usb_phy_power_on(struct phy *_phy)
->>>> +{
->>>> +    struct rockchip_usb_phy *phy = phy_get_drvdata(_phy);
->>>> +    int ret = 0;
->>>> +
->>>> +    ret = clk_prepare_enable(phy->clk);
->>>> +    if (ret)
->>>> +        return ret;
->>>> +
->>>> +    /* Power up usb phy analog blocks by set siddq 0 */
->>>> +    ret = rockchip_usb_phy_power(phy, 0);
->>>> +    if (ret)
->>>> +        return ret;
->>>> +
->>>> +    return 0;
->>>> +}
->>>> +
->>>> +static struct phy_ops ops = {
->>>> +    .power_on    = rockchip_usb_phy_power_on,
->>>> +    .power_off    = rockchip_usb_phy_power_off,
->>>> +    .owner        = THIS_MODULE,
->>>> +};
->>>> +
->>>> +static int rockchip_usb_phy_probe(struct platform_device *pdev)
->>>> +{
->>>> +    struct device *dev = &pdev->dev;
->>>> +    struct rockchip_usb_phy *rk_phy;
->>>> +    struct phy_provider *phy_provider;
->>>> +    struct device_node *child;
->>>> +    struct regmap *grf;
->>>> +    unsigned int reg_offset;
->>>> +
->>>> +    grf = syscon_regmap_lookup_by_phandle(dev->of_node, "rockchip,grf");
->>>> +    if (IS_ERR(grf)) {
->>>> +        dev_err(&pdev->dev, "Missing rockchip,grf property\n");
->>>> +        return PTR_ERR(grf);
->>>> +    }
->>>> +
->>>> +    for_each_available_child_of_node(dev->of_node, child) {
->>>> +        rk_phy = devm_kzalloc(dev, sizeof(*rk_phy), GFP_KERNEL);
->>>> +        if (!rk_phy)
->>>> +            return -ENOMEM;
->>>> +
->>>> +        if (of_property_read_u32(child, "reg", &reg_offset)) {
->>>> +            dev_err(dev, "missing reg property in node %s\n",
->>>> +                child->name);
->>>> +            return -EINVAL;
->>>> +        }
->>>> +
->>>> +        rk_phy->reg_offset = reg_offset;
->>>> +        rk_phy->reg_base = grf;
->>>> +
->>>> +        rk_phy->clk = of_clk_get_by_name(child, "phyclk");
->>>> +        if (IS_ERR(rk_phy->clk))
->>>> +            rk_phy->clk = NULL;
->>>> +
->>>> +        rk_phy->phy = devm_phy_create(dev, child, &ops);
->>>> +        if (IS_ERR(rk_phy->phy)) {
->>>> +            dev_err(dev, "failed to create PHY\n");
->>>> +            return PTR_ERR(rk_phy->phy);
->>>> +        }
->>>> +        phy_set_drvdata(rk_phy->phy, rk_phy);
->>>> +    }
->>>> +
->>>> +    phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
->>>> +    return PTR_ERR_OR_ZERO(phy_provider);
->>>> +}
->>>> +
->>>> +static const struct of_device_id rockchip_usb_phy_dt_ids[] = {
->>>> +    { .compatible = "rockchip,rk3288-usb-phy" },
->>> have you added devicetree binding documentation where I can find this
->>> compatible string?
->>>
->>> Thanks
->>> Kishon
->>>
->>>
->> You could find this documentation in this page :
->> https://lkml.org/lkml/2014/12/12/439
-> Okay. I don't seem to have that patch in my mailbox. Is it already queued in
-> some ones tree?
+> diff --git a/drivers/mmc/host/sdhci-st.c b/drivers/mmc/host/sdhci-st.c
+> index 328f348..6a4f46c 100644
+> --- a/drivers/mmc/host/sdhci-st.c
+> +++ b/drivers/mmc/host/sdhci-st.c
+> @@ -1,7 +1,7 @@
+>  /*
+>   * Support for SDHCI on STMicroelectronics SoCs
+>   *
+> - * Copyright (C) 2014 STMicroelectronics Ltd
+> + * Copyright (C) 2015 STMicroelectronics Ltd
+>   * Author: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+>   * Contributors: Peter Griffin <peter.griffin@linaro.org>
+>   *
+> @@ -23,9 +23,293 @@
+>  #include <linux/module.h>
+>  #include <linux/err.h>
+>  #include <linux/mmc/host.h>
+> -
+> +#include <linux/reset.h>
+>  #include "sdhci-pltfm.h"
 >
-> Thanks
-> Kishon
+> +struct st_mmc_platform_data {
+
+Please rename this to st_mmc_data. We don't want this driver to
+support "platform data", since it use DT right. :-)
+
+> +       struct  reset_control *rstc;
+> +       void __iomem *top_ioaddr;
+> +};
+> +
+> +/* MMCSS glue logic to setup the HC on some ST SoCs (e.g. STiH407 family) */
+> +
+> +#define        ST_MMC_CCONFIG_REG_1            0x400
+> +#define ST_MMC_CCONFIG_TIMEOUT_CLK_UNIT        BIT(24)
+> +#define ST_MMC_CCONFIG_TIMEOUT_CLK_FREQ        BIT(12)
+> +#define ST_MMC_CCONFIG_TUNING_COUNT_DEFAULT    BIT(8)
+> +#define ST_MMC_CCONFIG_ASYNC_WAKEUP    BIT(0)
+> +#define ST_MMC_CCONFIG_1_DEFAULT       \
+> +                               ((ST_MMC_CCONFIG_TIMEOUT_CLK_UNIT) | \
+> +                                (ST_MMC_CCONFIG_TIMEOUT_CLK_FREQ) | \
+> +                                (ST_MMC_CCONFIG_TUNING_COUNT_DEFAULT))
+> +
+> +#define ST_MMC_CCONFIG_REG_2           0x404
+> +#define ST_MMC_CCONFIG_HIGH_SPEED      BIT(28)
+> +#define ST_MMC_CCONFIG_ADMA2           BIT(24)
+> +#define ST_MMC_CCONFIG_8BIT            BIT(20)
+> +#define ST_MMC_CCONFIG_MAX_BLK_LEN     16
+> +#define  MAX_BLK_LEN_1024              1
+> +#define  MAX_BLK_LEN_2048              2
+> +#define BASE_CLK_FREQ_200              0xc8
+> +#define BASE_CLK_FREQ_100              0x64
+> +#define BASE_CLK_FREQ_50               0x32
+> +#define ST_MMC_CCONFIG_2_DEFAULT \
+> +       (ST_MMC_CCONFIG_HIGH_SPEED | ST_MMC_CCONFIG_ADMA2 | \
+> +        ST_MMC_CCONFIG_8BIT | \
+> +        (MAX_BLK_LEN_1024 << ST_MMC_CCONFIG_MAX_BLK_LEN))
+> +
+> +#define ST_MMC_CCONFIG_REG_3                   0x408
+> +#define ST_MMC_CCONFIG_EMMC_SLOT_TYPE          BIT(28)
+> +#define ST_MMC_CCONFIG_64BIT                   BIT(24)
+> +#define ST_MMC_CCONFIG_ASYNCH_INTR_SUPPORT     BIT(20)
+> +#define ST_MMC_CCONFIG_1P8_VOLT                        BIT(16)
+> +#define ST_MMC_CCONFIG_3P0_VOLT                        BIT(12)
+> +#define ST_MMC_CCONFIG_3P3_VOLT                        BIT(8)
+> +#define ST_MMC_CCONFIG_SUSP_RES_SUPPORT                BIT(4)
+> +#define ST_MMC_CCONFIG_SDMA                    BIT(0)
+> +#define ST_MMC_CCONFIG_3_DEFAULT       \
+> +                        (ST_MMC_CCONFIG_ASYNCH_INTR_SUPPORT    | \
+> +                         ST_MMC_CCONFIG_3P3_VOLT               | \
+> +                         ST_MMC_CCONFIG_SUSP_RES_SUPPORT       | \
+> +                         ST_MMC_CCONFIG_SDMA)
+> +
+> +#define ST_MMC_CCONFIG_REG_4   0x40c
+> +#define ST_MMC_CCONFIG_D_DRIVER        BIT(20)
+> +#define ST_MMC_CCONFIG_C_DRIVER        BIT(16)
+> +#define ST_MMC_CCONFIG_A_DRIVER        BIT(12)
+> +#define ST_MMC_CCONFIG_DDR50   BIT(8)
+> +#define ST_MMC_CCONFIG_SDR104  BIT(4)
+> +#define ST_MMC_CCONFIG_SDR50   BIT(0)
+> +#define ST_MMC_CCONFIG_4_DEFAULT       0
+> +
+> +#define ST_MMC_CCONFIG_REG_5           0x410
+> +#define ST_MMC_CCONFIG_TUNING_FOR_SDR50        BIT(8)
+> +#define RETUNING_TIMER_CNT_MAX         0xf
+> +#define ST_MMC_CCONFIG_5_DEFAULT       0
+> +
+> +/* I/O configuration for Arasan IP */
+> +#define        ST_MMC_GP_OUTPUT        0x450
+> +#define ST_MMC_GP_OUTPUT_CD    BIT(12)
+> +
+> +#define ST_MMC_STATUS_R                0x460
+> +
+> +#define ST_TOP_MMC_DLY_FIX_OFF(x)      (x - 0x8)
+> +
+> +/* TOP config registers to manage static and dynamic delay */
+> +#define        ST_TOP_MMC_TX_CLK_DLY                   ST_TOP_MMC_DLY_FIX_OFF(0x8)
+> +#define        ST_TOP_MMC_RX_CLK_DLY                   ST_TOP_MMC_DLY_FIX_OFF(0xc)
+> +/* MMC delay control register */
+> +#define        ST_TOP_MMC_DLY_CTRL                     ST_TOP_MMC_DLY_FIX_OFF(0x18)
+> +#define        ST_TOP_MMC_DLY_CTRL_DLL_BYPASS_CMD      BIT(0)
+> +#define        ST_TOP_MMC_DLY_CTRL_DLL_BYPASS_PH_SEL   BIT(1)
+> +#define        ST_TOP_MMC_DLY_CTRL_TX_DLL_ENABLE       BIT(8)
+> +#define        ST_TOP_MMC_DLY_CTRL_RX_DLL_ENABLE       BIT(9)
+> +#define        ST_TOP_MMC_DLY_CTRL_ATUNE_NOT_CFG_DLY   BIT(10)
+> +#define        ST_TOP_MMC_START_DLL_LOCK               BIT(11)
+> +
+> +/* register to provide the phase-shift value for DLL */
+> +#define        ST_TOP_MMC_TX_DLL_STEP_DLY              ST_TOP_MMC_DLY_FIX_OFF(0x1c)
+> +#define        ST_TOP_MMC_RX_DLL_STEP_DLY              ST_TOP_MMC_DLY_FIX_OFF(0x20)
+> +#define        ST_TOP_MMC_RX_CMD_STEP_DLY              ST_TOP_MMC_DLY_FIX_OFF(0x24)
+> +
+> +/* phase shift delay on the tx clk 2.188ns */
+> +#define        ST_TOP_MMC_TX_DLL_STEP_DLY_VALID        0x6
+> +
+> +#define        ST_TOP_MMC_DLY_MAX                      0xf
+> +
+> +#define ST_TOP_MMC_DYN_DLY_CONF        \
+> +               (ST_TOP_MMC_DLY_CTRL_TX_DLL_ENABLE | \
+> +                ST_TOP_MMC_DLY_CTRL_ATUNE_NOT_CFG_DLY | \
+> +                ST_TOP_MMC_START_DLL_LOCK)
+> +
+> +/*
+> + * For clock speeds greater than 90MHz, we need to check that the
+> + * DLL procedure has finished before switching to ultra-speed modes.
+> + */
+> +#define        CLK_TO_CHECK_DLL_LOCK   90000000
+> +
+> +static inline void st_mmcss_set_static_delay(void __iomem *ioaddr)
+> +{
+> +       if (ioaddr) {
+> +               writel_relaxed(0x0, ioaddr + ST_TOP_MMC_DLY_CTRL);
+> +               writel_relaxed(ST_TOP_MMC_DLY_MAX,
+> +                               ioaddr + ST_TOP_MMC_TX_CLK_DLY);
+> +       }
+> +}
+> +
+> +/**
+> + * st_mmcss_cconfig: configure the Arasan HC inside the flashSS.
+> + * @np: dt device node.
+> + * @host: sdhci host
+> + * Description: this function is to configure the Arasan host controller.
+> + * On some ST SoCs, i.e. STiH407 family, the MMC devices inside a dedicated
+> + * flashSS sub-system which needs to be configured to be compliant to eMMC 4.5
+> + * or eMMC4.3.  This has to be done before registering the sdhci host.
+> + */
+> +static void st_mmcss_cconfig(struct device_node *np, struct sdhci_host *host)
+> +{
+> +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +       struct mmc_host *mhost = host->mmc;
+> +       u32 cconf2, cconf3, cconf4, cconf5;
+> +
+> +       if (!of_device_is_compatible(np, "st,sdhci-stih407"))
+> +               return;
+
+I think I would prefer to have this check done only once, during ->probe().
+
+Such a check, would then need to handle assigning corresponding
+function pointers/callbacks in the struct st_mmc_data, which is what
+enables support for this feature.
+
+Those functions pointers then needs to be validated before they are
+invoked, of course.
+
+> +
+> +       cconf2 = ST_MMC_CCONFIG_2_DEFAULT;
+> +       cconf3 = ST_MMC_CCONFIG_3_DEFAULT;
+> +       cconf4 = ST_MMC_CCONFIG_4_DEFAULT;
+> +       cconf5 = ST_MMC_CCONFIG_5_DEFAULT;
+> +
+> +       writel_relaxed(ST_MMC_CCONFIG_1_DEFAULT,
+> +                       host->ioaddr + ST_MMC_CCONFIG_REG_1);
+> +
+> +       /* Set clock frequency, default to 50MHz if max-frequency is not
+> +        * provided */
+> +
+> +       switch (mhost->f_max) {
+> +       case 200000000:
+> +               clk_set_rate(pltfm_host->clk, mhost->f_max);
+> +               cconf2 |= BASE_CLK_FREQ_200;
+> +               break;
+> +       case 100000000:
+> +               clk_set_rate(pltfm_host->clk, mhost->f_max);
+> +               cconf2 |= BASE_CLK_FREQ_100;
+> +               break;
+> +       default:
+> +               clk_set_rate(pltfm_host->clk, 50000000);
+> +               cconf2 |= BASE_CLK_FREQ_50;
+> +       }
+> +
+> +       writel_relaxed(cconf2, host->ioaddr + ST_MMC_CCONFIG_REG_2);
+> +
+> +       if (mhost->caps & MMC_CAP_NONREMOVABLE)
+> +               cconf3 |= ST_MMC_CCONFIG_EMMC_SLOT_TYPE;
+> +       else
+> +               /* CARD _D ET_CTRL */
+> +               writel_relaxed(ST_MMC_GP_OUTPUT_CD,
+> +                               host->ioaddr + ST_MMC_GP_OUTPUT);
+> +
+> +       if (mhost->caps & MMC_CAP_UHS_SDR50) {
+> +               /* use 1.8V */
+> +               cconf3 |= ST_MMC_CCONFIG_1P8_VOLT;
+> +               cconf4 |= ST_MMC_CCONFIG_SDR50;
+> +               /* Use tuning */
+> +               cconf5 |= ST_MMC_CCONFIG_TUNING_FOR_SDR50;
+> +               /* Max timeout for retuning */
+> +               cconf5 |= RETUNING_TIMER_CNT_MAX;
+> +       }
+> +
+> +       if (mhost->caps & MMC_CAP_UHS_SDR104) {
+> +               /*
+> +                * SDR104 implies the HC can support HS200 mode, so
+> +                * it's mandatory to use 1.8V
+> +                */
+> +               cconf3 |= ST_MMC_CCONFIG_1P8_VOLT;
+> +               cconf4 |= ST_MMC_CCONFIG_SDR104;
+> +               /* Max timeout for retuning */
+> +               cconf5 |= RETUNING_TIMER_CNT_MAX;
+> +       }
+> +
+> +       if (mhost->caps & MMC_CAP_UHS_DDR50)
+> +               cconf4 |= ST_MMC_CCONFIG_DDR50;
+> +
+> +       writel_relaxed(cconf3, host->ioaddr + ST_MMC_CCONFIG_REG_3);
+> +       writel_relaxed(cconf4, host->ioaddr + ST_MMC_CCONFIG_REG_4);
+> +       writel_relaxed(cconf5, host->ioaddr + ST_MMC_CCONFIG_REG_5);
+> +}
+> +
+> +static inline void st_mmcss_set_dll(void __iomem *ioaddr)
+> +{
+> +       if (ioaddr) {
+> +               writel_relaxed(ST_TOP_MMC_DYN_DLY_CONF,
+> +                       ioaddr + ST_TOP_MMC_DLY_CTRL);
+> +               writel_relaxed(ST_TOP_MMC_TX_DLL_STEP_DLY_VALID,
+> +                       ioaddr + ST_TOP_MMC_TX_DLL_STEP_DLY);
+> +       }
+> +}
+> +
+> +static int st_mmcss_lock_dll(void __iomem *ioaddr)
+> +{
+> +       unsigned long curr, value;
+> +       unsigned long finish = jiffies + HZ;
+> +
+> +       /* Checks if the DLL procedure is finished */
+> +       do {
+> +               curr = jiffies;
+> +               value = readl(ioaddr + ST_MMC_STATUS_R);
+> +               if (value & 0x1)
+> +                       return 0;
+> +
+> +               cpu_relax();
+> +       } while (!time_after_eq(curr, finish));
+> +
+> +       return -EBUSY;
+> +}
+> +
+> +static int sdhci_st_set_dll_for_clock(struct sdhci_host *host)
+> +{
+> +       int ret = 0;
+> +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +       struct st_mmc_platform_data *pdata = pltfm_host->priv;
+> +
+> +       if (host->clock > CLK_TO_CHECK_DLL_LOCK) {
+> +               st_mmcss_set_dll(pdata->top_ioaddr);
+> +               ret = st_mmcss_lock_dll(host->ioaddr);
+> +       }
+> +
+> +       return ret;
+> +}
+> +
+> +static void sdhci_st_set_uhs_signaling(struct sdhci_host *host,
+> +                                       unsigned int uhs)
+> +{
+> +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +       struct st_mmc_platform_data *pdata = pltfm_host->priv;
+> +       u16 ctrl_2 = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+> +       int ret = 0;
+> +
+> +       /* Select Bus Speed Mode for host */
+> +       ctrl_2 &= ~SDHCI_CTRL_UHS_MASK;
+> +       switch (uhs) {
+> +       /*
+> +        * Set V18_EN -- UHS modes do not work without this.
+> +        * does not change signaling voltage
+> +        */
+> +
+> +       case MMC_TIMING_UHS_SDR12:
+> +               st_mmcss_set_static_delay(pdata->top_ioaddr);
+> +               ctrl_2 |= SDHCI_CTRL_UHS_SDR12 | SDHCI_CTRL_VDD_180;
+> +               break;
+> +       case MMC_TIMING_UHS_SDR25:
+> +               st_mmcss_set_static_delay(pdata->top_ioaddr);
+> +               ctrl_2 |= SDHCI_CTRL_UHS_SDR25 | SDHCI_CTRL_VDD_180;
+> +               break;
+> +       case MMC_TIMING_UHS_SDR50:
+> +               st_mmcss_set_static_delay(pdata->top_ioaddr);
+> +               ctrl_2 |= SDHCI_CTRL_UHS_SDR50 | SDHCI_CTRL_VDD_180;
+> +               ret = sdhci_st_set_dll_for_clock(host);
+> +               break;
+> +       case MMC_TIMING_UHS_SDR104:
+> +       case MMC_TIMING_MMC_HS200:
+> +               st_mmcss_set_static_delay(pdata->top_ioaddr);
+> +               ctrl_2 |= SDHCI_CTRL_UHS_SDR104 | SDHCI_CTRL_VDD_180;
+> +               ret =  sdhci_st_set_dll_for_clock(host);
+> +               break;
+> +       case MMC_TIMING_UHS_DDR50:
+> +       case MMC_TIMING_MMC_DDR52:
+> +               st_mmcss_set_static_delay(pdata->top_ioaddr);
+> +               ctrl_2 |= SDHCI_CTRL_UHS_DDR50 | SDHCI_CTRL_VDD_180;
+> +               break;
+> +       }
+> +
+> +       if (ret)
+> +               dev_warn(mmc_dev(host->mmc), "Error setting dll for clock\n");
+> +
+> +       dev_dbg(mmc_dev(host->mmc), "uhs %d, ctrl_2 %04X\n", uhs, ctrl_2);
+> +
+> +       sdhci_writew(host, ctrl_2, SDHCI_HOST_CONTROL2);
+> +}
+> +
+>  static u32 sdhci_st_readl(struct sdhci_host *host, int reg)
+>  {
+>         u32 ret;
+> @@ -48,22 +332,32 @@ static const struct sdhci_ops sdhci_st_ops = {
+>         .set_bus_width = sdhci_set_bus_width,
+>         .read_l = sdhci_st_readl,
+>         .reset = sdhci_reset,
+> +       .set_uhs_signaling = sdhci_st_set_uhs_signaling,
+>  };
 >
-I will resend this mail to you
-and until now I still don't know anybody have take this commit in his tree.
+>  static const struct sdhci_pltfm_data sdhci_st_pdata = {
+>         .ops = &sdhci_st_ops,
+>         .quirks = SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC |
+> -           SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
+> +               SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN |
+> +               SDHCI_QUIRK_NO_HISPD_BIT,
+> +       .quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN |
+> +               SDHCI_QUIRK2_STOP_WITH_TC,
+>  };
+>
+> -
+>  static int sdhci_st_probe(struct platform_device *pdev)
+>  {
+> +       struct device_node *np = pdev->dev.of_node;
+>         struct sdhci_host *host;
+> +       struct st_mmc_platform_data *pdata;
+>         struct sdhci_pltfm_host *pltfm_host;
+>         struct clk *clk;
+>         int ret = 0;
+>         u16 host_version;
+> +       struct resource *res;
+> +
+> +       pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+> +       if (!pdata)
+> +               return -ENOMEM;
+>
+>         clk =  devm_clk_get(&pdev->dev, "mmc");
+>         if (IS_ERR(clk)) {
+> @@ -71,6 +365,12 @@ static int sdhci_st_probe(struct platform_device *pdev)
+>                 return PTR_ERR(clk);
+>         }
+>
+> +       pdata->rstc = devm_reset_control_get(&pdev->dev, NULL);
+> +       if (IS_ERR(pdata->rstc))
+> +               pdata->rstc = NULL;
+> +       else
+> +               reset_control_deassert(pdata->rstc);
+> +
+>         host = sdhci_pltfm_init(pdev, &sdhci_st_pdata, 0);
+>         if (IS_ERR(host)) {
+>                 dev_err(&pdev->dev, "Failed sdhci_pltfm_init\n");
+> @@ -78,7 +378,6 @@ static int sdhci_st_probe(struct platform_device *pdev)
+>         }
+>
+>         ret = mmc_of_parse(host->mmc);
+> -
+>         if (ret) {
+>                 dev_err(&pdev->dev, "Failed mmc_of_parse\n");
+>                 return ret;
+> @@ -86,9 +385,22 @@ static int sdhci_st_probe(struct platform_device *pdev)
+>
+>         clk_prepare_enable(clk);
+>
+> +       /* Configure the FlashSS Top registers for setting eMMC TX/RX delay */
+> +       res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+> +                                          "top-mmc-delay");
+> +       pdata->top_ioaddr = devm_ioremap_resource(&pdev->dev, res);
+> +       if (IS_ERR(pdata->top_ioaddr)) {
+> +               dev_warn(&pdev->dev, "FlashSS Top Dly registers not available");
+> +               pdata->top_ioaddr = NULL;
+> +       }
+> +
+>         pltfm_host = sdhci_priv(host);
+> +       pltfm_host->priv = pdata;
+>         pltfm_host->clk = clk;
+>
+> +       /* Configure the Arasan HC inside the flashSS */
+> +       st_mmcss_cconfig(np, host);
+> +
+>         ret = sdhci_add_host(host);
+>         if (ret) {
+>                 dev_err(&pdev->dev, "Failed sdhci_add_host\n");
+> @@ -117,10 +429,17 @@ static int sdhci_st_remove(struct platform_device *pdev)
+>  {
+>         struct sdhci_host *host = platform_get_drvdata(pdev);
+>         struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +       struct st_mmc_platform_data *pdata = pltfm_host->priv;
+> +       int ret;
+>
+>         clk_disable_unprepare(pltfm_host->clk);
+>
+> -       return sdhci_pltfm_unregister(pdev);
+> +       ret = sdhci_pltfm_unregister(pdev);
+> +
+> +       if (pdata->rstc)
+> +               reset_control_assert(pdata->rstc);
+> +
+> +       return ret;
+>  }
+>
+>  #ifdef CONFIG_PM_SLEEP
+> @@ -128,12 +447,18 @@ static int sdhci_st_suspend(struct device *dev)
+>  {
+>         struct sdhci_host *host = dev_get_drvdata(dev);
+>         struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> -       int ret = sdhci_suspend_host(host);
+> +       struct st_mmc_platform_data *pdata = pltfm_host->priv;
+> +       int ret;
+>
+> +       ret = sdhci_suspend_host(host);
+>         if (ret)
+>                 goto out;
+>
+> +       if (pdata->rstc)
+> +               reset_control_assert(pdata->rstc);
+> +
+>         clk_disable_unprepare(pltfm_host->clk);
+> +
+>  out:
+>         return ret;
+>  }
+> @@ -142,10 +467,20 @@ static int sdhci_st_resume(struct device *dev)
+>  {
+>         struct sdhci_host *host = dev_get_drvdata(dev);
+>         struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +       struct st_mmc_platform_data *pdata = pltfm_host->priv;
+> +       struct device_node *np = dev->of_node;
+> +       int ret;
+>
+>         clk_prepare_enable(pltfm_host->clk);
+>
+> -       return sdhci_resume_host(host);
+> +       if (pdata->rstc)
+> +               reset_control_deassert(pdata->rstc);
+> +
+> +       st_mmcss_cconfig(np, host);
+> +
+> +       ret = sdhci_resume_host(host);
+> +
+> +       return ret;
+>  }
+>  #endif
+>
+> --
+> 1.9.1
+>
+
+Kind regards
+Uffe
