@@ -1,66 +1,93 @@
-From: binmlist@gmail.com (Bin Liu)
-Date: Wed, 21 Jan 2015 12:53:03 -0600
-Subject: MUSB dual-role on AM335x behaving weirdly
-In-Reply-To: <20150121160631.GH4367@lukather>
-References: <20150121160631.GH4367@lukather>
-Message-ID: <CADYTM3b40_u4Twt27PBVH4dC9ErDnFEi0AUzs_aJRM3mMHaBCQ@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 21 Jan 2015 18:56:57 +0000
+Subject: [RFCv2 1/2] device: add dma_params->max_segment_count
+In-Reply-To: <1421813807-9178-2-git-send-email-sumit.semwal@linaro.org>
+References: <1421813807-9178-1-git-send-email-sumit.semwal@linaro.org>
+ <1421813807-9178-2-git-send-email-sumit.semwal@linaro.org>
+Message-ID: <54BFF679.6010705@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Sumit,
 
-On Wed, Jan 21, 2015 at 10:06 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi Felipe,
+On 21/01/15 04:16, Sumit Semwal wrote:
+> From: Rob Clark <robdclark@gmail.com>
 >
-> I'm currently working on a custom AM335x-based board, that has a OTG
-> connector wired to one of the musb controlers, and Linux 3.17
+> For devices which have constraints about maximum number of segments in
+> an sglist.  For example, a device which could only deal with contiguous
+> buffers would set max_segment_count to 1.
 >
-> This OTG connector seems to behave in a weird way when it comes to
-> switching from one role to another:
+> The initial motivation is for devices sharing buffers via dma-buf,
+> to allow the buffer exporter to know the constraints of other
+> devices which have attached to the buffer.  The dma_mask and fields
+> in 'struct device_dma_parameters' tell the exporter everything else
+> that is needed, except whether the importer has constraints about
+> maximum number of segments.
 >
->   - The host mode works with CONFIG_USB_MUSB_DUAL_ROLE set, only if
->     the dr_mode is set to host in the DT, and only if we plug the USB
->     device after the kernel has booted. Otherwise, even though the
->     controller seems to be set up as host in the kernel logs, it
->     doesn't work. When DR-mode is set to otg, DRVVBUS is not high
->     which surely doesn't help, but there might be some other issues.
+> Signed-off-by: Rob Clark <robdclark@gmail.com>
+>   [sumits: Minor updates wrt comments on the first version]
+> Signed-off-by: Sumit Semwal <sumit.semwal@linaro.org>
+> ---
+>   include/linux/device.h      |  1 +
+>   include/linux/dma-mapping.h | 19 +++++++++++++++++++
+>   2 files changed, 20 insertions(+)
 >
->   - The gadget mode works with CONFIG_USB_MUSB_DUAL_ROLE, if dr_mode
->     is set to otg and not host (obviously), and only if we plug the
->     USB cable after the kernel has booted.
+> diff --git a/include/linux/device.h b/include/linux/device.h
+> index fb50673..a32f9b6 100644
+> --- a/include/linux/device.h
+> +++ b/include/linux/device.h
+> @@ -647,6 +647,7 @@ struct device_dma_parameters {
+>   	 * sg limitations.
+>   	 */
+>   	unsigned int max_segment_size;
+> +	unsigned int max_segment_count;    /* INT_MAX for unlimited */
+>   	unsigned long segment_boundary_mask;
+>   };
 >
->   - The gadget mode works with CONFIG_USB_MUSB_GADGET, and with
->     dr_mode set to otg, even if we cold plug the device.
+> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+> index c3007cb..38e2835 100644
+> --- a/include/linux/dma-mapping.h
+> +++ b/include/linux/dma-mapping.h
+> @@ -154,6 +154,25 @@ static inline unsigned int dma_set_max_seg_size(struct device *dev,
+>   		return -EIO;
+>   }
 >
->   - As you might expect from the two first items, the runtime
->     switching from gadget to host when CONFIG_USB_MUSB_DUAL_ROLE is
->     set and dr_mode is set in otg doesn't work either.
->
-> It looks like it's only waiting for an interrupt to occur to read the
-> ID pin state, without reading its initial value, which would explain
-> why both the host and gadget enumerate only when a device/cable is
-> hotplugged, and that there's some configuration bits that differ
-> whenever dr_mode changes, but I couldn't really see anything standing
-> out in the driver nor the datasheet.
->
-> Have you already experienced something alike with that driver?
+> +#define DMA_SEGMENTS_MAX_SEG_COUNT ((unsigned int) INT_MAX)
+> +
+> +static inline unsigned int dma_get_max_seg_count(struct device *dev)
+> +{
+> +	return dev->dma_parms ?
+> +			dev->dma_parms->max_segment_count :
+> +			DMA_SEGMENTS_MAX_SEG_COUNT;
+> +}
 
-I don't use vanilla mainline kernel very often, but I don't have such
-hotplug issues with TI 3.12/14 kernels [1]. I only use
-CONFIG_USB_MUSB_DUAL_ROLE though.
+I know this copies the style of the existing code, but unfortunately it 
+also copies the subtle brokenness. Plenty of drivers seem to set up a 
+dma_parms struct just for max_segment_size, thus chances are you'll come 
+across a max_segment_count of 0 sooner or later. How badly is that going 
+to break things? I posted a fix recently[1] having hit this problem with 
+segment_boundary_mask in IOMMU code.
 
-[1] git://git.ti.com/ti-linux-kernel/ti-linux-kernel.git, branch
-remote/origin/linux-3.14.y
+> +
+> +static inline int dma_set_max_seg_count(struct device *dev,
+> +						unsigned int count)
+> +{
+> +	if (dev->dma_parms) {
+> +		dev->dma_parms->max_segment_count = count;
+> +		return 0;
+> +	} else
 
-Regards,
--Bin.
+This "else" is just as unnecessary as the other two I've taken out ;)
 
+
+Robin.
+
+[1]:http://article.gmane.org/gmane.linux.kernel.iommu/8175/
+
+> +		return -EIO;
+> +}
+> +
+>   static inline unsigned long dma_get_seg_boundary(struct device *dev)
+>   {
+>   	return dev->dma_parms ?
 >
-> Thanks,
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
