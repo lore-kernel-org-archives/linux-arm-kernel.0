@@ -1,63 +1,63 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Wed, 21 Jan 2015 08:29:59 +0800
-Subject: [PATCH v2 04/30] PCI: Remove deprecated pci_scan_bus_parented()
+Date: Wed, 21 Jan 2015 08:30:18 +0800
+Subject: [PATCH v2 23/30] PCI/mvebu: Use pci_common_init_dev() to simplify code
 In-Reply-To: <1421800225-26230-1-git-send-email-wangyijing@huawei.com>
 References: <1421800225-26230-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1421800225-26230-5-git-send-email-wangyijing@huawei.com>
+Message-ID: <1421800225-26230-24-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No one uses pci_scan_bus_parented() any more,
-remove it.
+Mvebu_pcie_scan_bus() is not necessary, we could use
+pci_common_init_dev() instead of pci_common_init(),
+and pass the device pointer as the parent. Then
+pci_scan_root_bus() will be called to scan the pci busses.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+CC: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+CC: Jason Cooper <jason@lakedaemon.net>
 ---
- drivers/pci/probe.c |   19 -------------------
- include/linux/pci.h |    2 --
- 2 files changed, 0 insertions(+), 21 deletions(-)
+ drivers/pci/host/pci-mvebu.c |   18 +-----------------
+ 1 files changed, 1 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 7cf577f..e44de73 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -2091,25 +2091,6 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index 1309cfb..d5a2b70 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -750,21 +750,6 @@ static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
+ 	return 1;
  }
- EXPORT_SYMBOL(pci_scan_root_bus);
  
--/* Deprecated; use pci_scan_root_bus() instead */
--struct pci_bus *pci_scan_bus_parented(struct device *parent,
--		int bus, struct pci_ops *ops, void *sysdata)
+-static struct pci_bus *mvebu_pcie_scan_bus(int nr, struct pci_sys_data *sys)
 -{
--	LIST_HEAD(resources);
--	struct pci_bus *b;
+-	struct mvebu_pcie *pcie = sys_to_pcie(sys);
+-	struct pci_bus *bus;
 -
--	pci_add_resource(&resources, &ioport_resource);
--	pci_add_resource(&resources, &iomem_resource);
--	pci_add_resource(&resources, &busn_resource);
--	b = pci_create_root_bus(parent, bus, ops, sysdata, &resources);
--	if (b)
--		pci_scan_child_bus(b);
--	else
--		pci_free_resource_list(&resources);
--	return b;
+-	bus = pci_create_root_bus(&pcie->pdev->dev, sys->busnr,
+-				  &mvebu_pcie_ops, sys, &sys->resources);
+-	if (!bus)
+-		return NULL;
+-
+-	pci_scan_child_bus(bus);
+-
+-	return bus;
 -}
--EXPORT_SYMBOL(pci_scan_bus_parented);
 -
- struct pci_bus *pci_scan_bus(int bus, struct pci_ops *ops,
- 					void *sysdata)
- {
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 360a966..55b2c81 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -769,8 +769,6 @@ void pcibios_bus_to_resource(struct pci_bus *bus, struct resource *res,
- void pcibios_scan_specific_bus(int busn);
- struct pci_bus *pci_find_bus(int domain, int busnr);
- void pci_bus_add_devices(const struct pci_bus *bus);
--struct pci_bus *pci_scan_bus_parented(struct device *parent, int bus,
--				      struct pci_ops *ops, void *sysdata);
- struct pci_bus *pci_scan_bus(int bus, struct pci_ops *ops, void *sysdata);
- struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
- 				    struct pci_ops *ops, void *sysdata,
+ static resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
+ 						 const struct resource *res,
+ 						 resource_size_t start,
+@@ -808,12 +793,11 @@ static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
+ 	hw.nr_controllers = 1;
+ 	hw.private_data   = (void **)&pcie;
+ 	hw.setup          = mvebu_pcie_setup;
+-	hw.scan           = mvebu_pcie_scan_bus;
+ 	hw.map_irq        = of_irq_parse_and_map_pci;
+ 	hw.ops            = &mvebu_pcie_ops;
+ 	hw.align_resource = mvebu_pcie_align_resource;
+ 
+-	pci_common_init(&hw);
++	pci_common_init_dev(&pcie->pdev->dev, &hw);
+ }
+ 
+ /*
 -- 
 1.7.1
