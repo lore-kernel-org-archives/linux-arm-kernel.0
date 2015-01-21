@@ -1,106 +1,61 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 21 Jan 2015 15:58:58 +0100
-Subject: [PATCH 2/7] mmc: sdhci-pxav3: Fix Armada 38x controller's caps
- according to erratum ERR-7878951
-In-Reply-To: <CAPv3WKeCPRoZCMP+PJoUqi_Nq85s+-5YwWm5EovDio1OQ-d3zA@mail.gmail.com>
-References: <1421832726-21656-1-git-send-email-gregory.clement@free-electrons.com>	<1421832726-21656-3-git-send-email-gregory.clement@free-electrons.com>
- <CAPv3WKeCPRoZCMP+PJoUqi_Nq85s+-5YwWm5EovDio1OQ-d3zA@mail.gmail.com>
-Message-ID: <54BFBEB2.4070801@free-electrons.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 21 Jan 2015 17:02:06 +0200
+Subject: [RFC PATCH v4 0/8] Introduce automatic DMA configuration for
+ IOMMU masters
+In-Reply-To: <20150121144835.GK4549@arm.com>
+References: <1415991397-9618-1-git-send-email-will.deacon@arm.com>
+ <12178745.U2ZdLpocXO@avalon> <20150121144835.GK4549@arm.com>
+Message-ID: <5599950.ffjJapmhpz@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcin,
+Hi Will,
 
-On 21/01/2015 15:52, Marcin Wojtas wrote:
-> Hi Gregory,
+On Wednesday 21 January 2015 14:48:35 Will Deacon wrote:
+> On Tue, Jan 20, 2015 at 04:56:03PM +0000, Laurent Pinchart wrote:
+> > On Monday 19 January 2015 16:06:20 Will Deacon wrote:
+> > > On Fri, Nov 14, 2014 at 08:01:56PM +0000, Arnd Bergmann wrote:
+> > > > On Friday 14 November 2014 19:27:54 Will Deacon wrote:
+> > > > > > At the moment, iommu_ops is a structure that can get used for any
+> > > > > > number of iommus of the same type, but by putting per-device
+> > > > > > private data into the same structure you have to duplicate it per
+> > > > > > instance.
+> > > > > 
+> > > > > I'm not sure I agree -- the pgsize_bitmap, for example, could vary
+> > > > > between different implementations of the same IOMMU. I think we
+> > > > > already have this in Juno (some SMMUs can only do 64k pages, whilst
+> > > > > others can do 4k and 64k).
+> > > > 
+> > > > Ah, I hadn't noticed that, it should be in the 'struct iommu' then of
+> > > > course, not in iommu_ops.
+> > > 
+> > > Now that of_iommu_get_ops has its own list of iommu_ops, we can actually
+> > > just move pgsize_bitmap into the iommu_domain, which I think makes a lot
+> > > more sense anyway.
+> > 
+> > The code looks good to me, but what does it have to do with
+> > of_iommu_get_ops() having its own list of iommu_ops ?
 > 
-> 2015-01-21 10:32 GMT+01:00 Gregory CLEMENT <gregory.clement@free-electrons.com>:
->> According to erratum 'ERR-7878951' Armada 38x SDHCI controller has
->> different capabilities than the ones shown in its registers:
->>
->> - it doesn't support the voltage switching: it can work either with
->>   3.3V or 1.8V supply
->> - it doesn't support the SDR104 mode
->> - SDR50 mode doesn't need tuning
->>
->> The SDHCI_QUIRK_MISSING_CAPS quirk is used for updating the
->> capabilities accordingly.
->>
->> Fixes: 5491ce3f79ee ("mmc: sdhci-pxav3: add support for the Armada 38x SDHCI controller")
->> Cc: <stable@vger.kernel.org> # v3.15+
->>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> ---
->>  drivers/mmc/host/sdhci-pxav3.c | 21 +++++++++++++++++++--
->>  1 file changed, 19 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
->> index 7b07325b4fba..4daa47a53a62 100644
->> --- a/drivers/mmc/host/sdhci-pxav3.c
->> +++ b/drivers/mmc/host/sdhci-pxav3.c
->> @@ -118,8 +118,11 @@ static int mv_conf_mbus_windows(struct platform_device *pdev,
->>         return 0;
->>  }
->>
->> -static int armada_38x_quirks(struct sdhci_host *host)
->> +static int armada_38x_quirks(struct platform_device *pdev,
->> +                            struct sdhci_host *host)
->>  {
->> +       struct device_node *np = pdev->dev.of_node;
->> +
->>         host->quirks |= SDHCI_QUIRK_MISSING_CAPS;
->>         /*
->>          * According to erratum 'FE-2946959' both SDR50 and DDR50
->> @@ -129,6 +132,20 @@ static int armada_38x_quirks(struct sdhci_host *host)
->>          */
->>         host->caps1 = sdhci_readl(host, SDHCI_CAPABILITIES_1);
->>         host->caps1 &= ~(SDHCI_SUPPORT_SDR50 | SDHCI_SUPPORT_DDR50);
->> +
->> +       /*
->> +        * According to erratum 'ERR-7878951' Armada 38x SDHCI
->> +        * controller has different capabilities than the ones shown
->> +        * in its registers
->> +        */
->> +       host->caps = sdhci_readl(host, SDHCI_CAPABILITIES);
->> +       if (of_get_property(np, "no-1-8-v", NULL)) {
->> +               host->caps &= ~SDHCI_CAN_VDD_180;
->> +               host->mmc->caps &= ~MMC_CAP_1_8V_DDR;
->> +       } else
->> +               host->caps &= ~SDHCI_CAN_VDD_330;
->> +       host->caps1 &= ~(SDHCI_SUPPORT_SDR104 | SDHCI_USE_SDR50_TUNING);
->> +
->>         return 0;
->>  }
->>
->> @@ -333,7 +350,7 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
->>                 clk_prepare_enable(pxa->clk_core);
->>
->>         if (of_device_is_compatible(np, "marvell,armada-380-sdhci")) {
->> -               ret = armada_38x_quirks(host);
->> +               ret = armada_38x_quirks(pdev, host);
->>                 if (ret < 0)
->>                         goto err_quirks;
->>                 ret = mv_conf_mbus_windows(pdev, mv_mbus_dram_info());
->> --
+> So, the initial patches for of_iommu_configure/of_xlate made use of a void
+> *priv field in struct iommu_ops (which actually made it to mainline but
+> isn't used). This was replaced by the list maintained by of_iommu_get_ops,
+> but the discussion highlighted that iommu_ops is not per-IOMMU instance and
+> therefore shouldn't contain the pgsize_bitmap, which can (and does) vary
+> between different IOMMU instances in a running system.
 > 
-> Right here there are lines:
-> /* enable 1/8V DDR capable */
-> host->mmc->caps |= MMC_CAP_1_8V_DDR;
-> 
-> Which make a possible opposite change from armada_38x_quirks cacelled.
+> This patch is an effort to move the pgsize_bitmap field out of iommu_ops
+> (leaving that structure to contain only function pointers) and into
+> iommu_domain, where I think it makes more sense.
 
-Good catch!
+OK, that's what I had understood. Thanks for the clarification. I was just 
+puzzled by what I thought you meant was a dependency on of_iommu_get_ops().
 
-I will remove it in the v2.
-
-Thanks,
-
-Gregory
-
-
+> > > diff below seems to do the trick. The next step would be postponing the
+> > > pgsize_bitmap initialisation until device attach for the ARM SMMU, since
+> > > it's at that point that we know the active page table format (and
+> > > therefore the supported page sizes).
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Regards,
+
+Laurent Pinchart
