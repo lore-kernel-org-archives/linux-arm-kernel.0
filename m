@@ -1,60 +1,65 @@
-From: dsahern@gmail.com (David Ahern)
-Date: Wed, 21 Jan 2015 15:00:15 -0700
-Subject: [PATCH 2/2] perf symbols: debuglink should take symfs option
- into account
-In-Reply-To: <CAA3XUr1BnS=8RTVyxtVOm4Ahb2DQXUuJJQC1w2SvT5fycjRcEQ@mail.gmail.com>
-References: <1421168344-5363-1-git-send-email-victor.kamensky@linaro.org>	<1421168344-5363-2-git-send-email-victor.kamensky@linaro.org>
- <CAA3XUr1BnS=8RTVyxtVOm4Ahb2DQXUuJJQC1w2SvT5fycjRcEQ@mail.gmail.com>
-Message-ID: <54C0216F.3080404@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 21 Jan 2015 14:27:08 -0800
+Subject: [GIT PULL RESEND] CSR atlas7 debug ports for 3.20
+In-Reply-To: <CAGsJ_4ydqDxEqmEbX-NfQx75KOba7-BTU8Rnx0r=pobh4JT=QQ@mail.gmail.com>
+References: <CAGsJ_4yJTApS6RwGCEFcBGT+L1f8Gn3DnmzGAKQc3H2SZZJvcw@mail.gmail.com>
+ <20150119191258.GB16883@quad.lixom.net>
+ <CAGsJ_4ydqDxEqmEbX-NfQx75KOba7-BTU8Rnx0r=pobh4JT=QQ@mail.gmail.com>
+Message-ID: <20150121222708.GA24851@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/19/15 10:50 AM, Victor Kamensky wrote:
->> diff --git a/tools/perf/util/dso.c b/tools/perf/util/dso.c
->> index 45be944..6a2f663 100644
->> --- a/tools/perf/util/dso.c
->> +++ b/tools/perf/util/dso.c
->> @@ -42,19 +42,30 @@ int dso__read_binary_type_filename(const struct dso *dso,
->>          size_t len;
->>
->>          switch (type) {
->> -       case DSO_BINARY_TYPE__DEBUGLINK: {
->> +       case DSO_BINARY_TYPE__DEBUGLINK:
->> +       {
->>                  char *debuglink;
->> -
->> -               strncpy(filename, dso->long_name, size);
->> -               debuglink = filename + dso->long_name_len;
->> -               while (debuglink != filename && *debuglink != '/')
->> -                       debuglink--;
->> -               if (*debuglink == '/')
->> -                       debuglink++;
->> -               ret = filename__read_debuglink(dso->long_name, debuglink,
->> -                                              size - (debuglink - filename));
->> -               }
->> +               char *filename_copy;
->> +
->> +               filename_copy = malloc(PATH_MAX);
->> +               if (filename_copy) {
->> +                       len = __symbol__join_symfs(filename, size,
->> +                                                  dso->long_name);
->> +                       strncpy(filename_copy, filename, PATH_MAX);
->> +                       debuglink = filename + len;
->> +                       while (debuglink != filename && *debuglink != '/')
->> +                               debuglink--;
->> +                       if (*debuglink == '/')
->> +                               debuglink++;
->> +                       ret = filename__read_debuglink(filename_copy, debuglink,
->> +                                                      size - (debuglink -
->> +                                                              filename));
->> +                       free(filename_copy);
->> +               } else
->> +                       ret = -1;
->>                  break;
->> +       }
->> +
+On Tue, Jan 20, 2015 at 08:03:42PM +0800, Barry Song wrote:
+> 2015-01-20 3:12 GMT+08:00, Olof Johansson <olof@lixom.net>:
+> > On Wed, Jan 14, 2015 at 09:24:19PM +0800, Barry Song wrote:
+> >> Hi Arnd, Kevin, Olof,
+> >>
+> >> The following changes since commit
+> >> b7392d2247cfe6771f95d256374f1a8e6a6f48d6:
+> >>
+> >>   Linux 3.19-rc2 (2014-12-28 16:49:37 -0800)
+> >>
+> >> are available in the git repository at:
+> >>
+> >>   git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
+> >> tags/atlas7-lldebug-for-3.20
+> >>
+> >> for you to fetch changes up to 98898ee43a94375cf814b86fb7f485c39fb2c072:
+> >>
+> >>   ARM: sirf: add two debug ports for CSRatlas7 SoC (2015-01-14 20:56:09
+> >> +0800)
+> >>
+> >> ----------------------------------------------------------------
+> >> add debug ports for CSRatlas7 SoC
+> >>
+> >> Because Marco chip has never shipped to customers and has been replaced
+> >> by Atlas7, so we do the below
+> >> - drop Marco's debug port
+> >> - add debug ports for Atlas7
+> >>
+> >> we also move to use DEBUG_UART_PHYS/VIRT for all CSR ports
+> >>
+> >> ----------------------------------------------------------------
+> >> Barry Song (1):
+> >>       ARM: sirf: drop Marco low-level debug port
+> >>
+> >> Guo Zeng (1):
+> >>       ARM: sirf: add two debug ports for CSRatlas7 SoC
+> >
+> > These entries are not sorted. If you look at the file, in particular
+> > DEBUG_UART_PHYS and DEBUG_UART_VIRT, you see that they are sorted in
+> > address
+> > order. Your new entries are just appended. That's not right.
+> 
+> Olof, fixed here:
+> https://git.kernel.org/cgit/linux/kernel/git/baohua/linux.git/commit/?id=01ea63d99397fcdcb9cc235c77a8e11f4e4a63e9
+> 
+> and tag was re-built.
 
-I do not believe the filename_copy is needed; just add the symfs path to 
-filename and pass filename to read_debuglink
+In the future, please always send a full fresh pull request so I see
+the diffstat that you intended to send and can compare it with what I
+actually merged.
 
-David
+Merged into next/soc.
+
+-Olof
