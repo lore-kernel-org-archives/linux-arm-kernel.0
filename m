@@ -1,33 +1,90 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 21 Jan 2015 12:08:23 +0100
-Subject: [PATCH v16 00/10] KVM/arm/arm64/x86: dirty page logging for
- ARMv7/8 (3.18.0-rc2)
-In-Reply-To: <1421366341-26012-1-git-send-email-m.smarduch@samsung.com>
-References: <1421366341-26012-1-git-send-email-m.smarduch@samsung.com>
-Message-ID: <20150121110823.GB15076@cbox>
+From: vishnupatekar0510@gmail.com (Vishnu Patekar)
+Date: Wed, 21 Jan 2015 16:40:28 +0530
+Subject: [PATCH v4 3/5] ARM: sunxi: dts: Add PS2 nodes to dtsi for A10 and
+ A20
+In-Reply-To: <20150120200216.GV4367@lukather>
+References: <1421417021-3247-1-git-send-email-vishnupatekar0510@gmail.com>
+ <1421417021-3247-4-git-send-email-vishnupatekar0510@gmail.com>
+ <20150120200216.GV4367@lukather>
+Message-ID: <CAEzqOZsX-o9HqtjpBKH48S-R+GDzN=kzrfSqC54s4bGxpDf7kA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 15, 2015 at 03:58:51PM -0800, Mario Smarduch wrote:
-> Patch series adds support for armv7/8 dirty page logging. As we move
-> towards generic dirty page logging interface we move some common code to
-> generic layer shared by x86, armv7 and armv8.
-> 
-> armv7/8 Dirty page logging implementation overivew-
-> - initially write protects memory region 2nd stage page tables
-> - read dirty page log and again write protect dirty pages for next pass.
-> - second stage huge pages are dissolved into normal pages to keep track of
->   dirty memory at page granularity. Tracking at huge page granularity
->   limits granularity of marking dirty memory and migration to a light memory
->   load. Small page size logging supports higher memory dirty rates, enables
->   rapid migration.
-> 
->   armv7 supports 2MB Huge page, and armv8 supports 2MB (4kb) and
->   512MB (64kb)
-> - In the event migration is canceled, normal behavior is resumed huge pages
->   are rebuilt over time.
-> 
-
-Thanks, applied.
-
--Christoffer
+On Wed, Jan 21, 2015 at 1:32 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Vishnu,
+>
+> On Fri, Jan 16, 2015 at 07:33:39PM +0530, Vishnu Patekar wrote:
+>> Signed-off-by: VishnuPatekar <vishnupatekar0510@gmail.com>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>
+> Why is there Hans Signed-off here?
+Hans has modified the A10 dtsi and also tested on A10 board.
+Shouldn't I add him as Signed-off?
+>
+>> ---
+>>  arch/arm/boot/dts/sun4i-a10.dtsi |   16 ++++++++++++++++
+>>  arch/arm/boot/dts/sun7i-a20.dtsi |   16 ++++++++++++++++
+>>  2 files changed, 32 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+>> index 7b4099f..2c31242 100644
+>> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
+>> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+>> @@ -795,5 +795,21 @@
+>>                       #address-cells = <1>;
+>>                       #size-cells = <0>;
+>>               };
+>> +
+>> +             ps20: ps2 at 01c2a000 {
+>> +                     compatible = "allwinner,sun4i-a10-ps2";
+>> +                     reg = <0x01c2a000 0x400>;
+>> +                     interrupts = <62>;
+>> +                     clocks = <&apb1_gates 6>;
+>> +                     status = "disabled";
+>> +             };
+>> +
+>> +             ps21: ps2 at 01c2a400 {
+>> +                     compatible = "allwinner,sun4i-a10-ps2";
+>> +                     reg = <0x01c2a400 0x400>;
+>> +                     interrupts = <63>;
+>> +                     clocks = <&apb1_gates 7>;
+>> +                     status = "disabled";
+>> +             };
+>>       };
+>>  };
+>> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+>> index e21ce59..f35c691 100644
+>> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+>> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+>> @@ -1093,5 +1093,21 @@
+>>                       #interrupt-cells = <3>;
+>>                       interrupts = <1 9 0xf04>;
+>>               };
+>> +
+>> +             ps20: ps2 at 01c2a000 {
+>> +                     compatible = "allwinner,sun4i-a10-ps2";
+>> +                     reg = <0x01c2a000 0x400>;
+>> +                     interrupts = <0 62 4>;
+>> +                     clocks = <&apb1_gates 6>;
+>> +                     status = "disabled";
+>> +             };
+>> +
+>> +             ps21: ps2 at 01c2a400 {
+>> +                     compatible = "allwinner,sun4i-a10-ps2";
+>> +                     reg = <0x01c2a400 0x400>;
+>> +                     interrupts = <0 63 4>;
+>
+> We recently switched to using includes and defines for these hardcoded
+> values.
+>
+> Could you switch to it as well?
+Okie, I did not notice that. Thanks for pointing out.
+>
+> Thanks,
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
