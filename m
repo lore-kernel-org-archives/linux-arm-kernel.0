@@ -1,64 +1,56 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Wed, 21 Jan 2015 11:05:33 -0500
-Subject: [PATCH v7 04/17] ARM64 / ACPI: Introduce early_param for "acpi"
- and pass acpi=force to enable ACPI
-In-Reply-To: <20150121154243.GE6358@e104818-lin.cambridge.arm.com>
-References: <CAKv+Gu8vPKAdsNg7QC7xW+i8_BemWEx4mvBx6NrnAHi8Y+bNtw@mail.gmail.com>
- <20150119135144.GI11835@e104818-lin.cambridge.arm.com>
- <20150119151350.21B65C40948@trevor.secretlab.ca>
- <54BD3803.6020307@redhat.com>
- <20150119175233.GK11835@e104818-lin.cambridge.arm.com>
- <20150119180122.GJ21553@leverpostej> <54BE1FEA.5040109@linaro.org>
- <alpine.DEB.2.02.1501201901190.12653@kaball.uk.xensource.com>
- <20150121152326.GD6358@e104818-lin.cambridge.arm.com>
- <54BFC5F0.3020500@redhat.com>
- <20150121154243.GE6358@e104818-lin.cambridge.arm.com>
-Message-ID: <54BFCE4D.2060806@redhat.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 21 Jan 2015 17:06:31 +0100
+Subject: MUSB dual-role on AM335x behaving weirdly
+Message-ID: <20150121160631.GH4367@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/21/2015 10:42 AM, Catalin Marinas wrote:
-> On Wed, Jan 21, 2015 at 03:29:52PM +0000, Jon Masters wrote:
->> On 01/21/2015 10:23 AM, Catalin Marinas wrote:
->>> I have some questions for the ACPI and EFI folk:
->>>
->>> 1. When booting with ACPI, are the EFI run-time services required for
->>>    anything? If yes, Xen may have a bigger problem
->>
->> Yes. At least for some things. For example, installing an Operating
->> System would require that you make runtime services calls to set the
->> BootOrder/BootNext variables, and so on. Further, we use the GetTime
->> service and EFI based reboot to avoid having special drivers. I had
->> those added to SBBR as requirements for that reason.
-> 
-> So what would a kexec'ed kernel do here? Or we usually expect it to be
-> short lived and doesn't need reboot, nor GetTime.
+Hi Felipe,
 
-In the use case that I have, it'll use EFI Runtime Servies to handle
-both the time of day (which it will need) and to subsequently reboot.
-This is currently being worked on (integration into kdump).
+I'm currently working on a custom AM335x-based board, that has a OTG
+connector wired to one of the musb controlers, and Linux 3.17
 
-> Xen is slightly more problematic but I wonder whether it could run a
-> (paravirtualised) UEFI.
-> 
->>> 2. Could a boot loader (either kernel doing kexec or Xen) emulate the
->>>    EFI system/config tables and still make them useful to the kernel but
->>>    without EFI_BOOT or EFI_RUNTIME_SERVICES?
->>
->> Yes. But again, without the other required pieces (including the
->> services function pointers in the systab which are required) you'd crash
->> soon after boot trying to make those calls.
-> 
-> My point was whether you can still pass information like RSDP address
-> via EFI tables but explicitly disable runtime services so that the
-> kernel won't try to make such calls (and crash).
+This OTG connector seems to behave in a weird way when it comes to
+switching from one role to another:
 
-Yes. As Graeme says, it works just to pass in the ACPI information and
-turn off EFI *BUT* it does not work to say you have EFI and then not
-provide the correct EFI services. To do so is out of spec, and in fact
-it's one reason we weren't able to turn the GetTime service on generally
-for x86 - some older x86 boxes didn't implement it originally (another
-reason on our end we're requiring all of these services on day one so
-that there won't be time for someone to miss them in firmware).
+  - The host mode works with CONFIG_USB_MUSB_DUAL_ROLE set, only if
+    the dr_mode is set to host in the DT, and only if we plug the USB
+    device after the kernel has booted. Otherwise, even though the
+    controller seems to be set up as host in the kernel logs, it
+    doesn't work. When DR-mode is set to otg, DRVVBUS is not high
+    which surely doesn't help, but there might be some other issues.
 
-Jon.
+  - The gadget mode works with CONFIG_USB_MUSB_DUAL_ROLE, if dr_mode
+    is set to otg and not host (obviously), and only if we plug the
+    USB cable after the kernel has booted.
+
+  - The gadget mode works with CONFIG_USB_MUSB_GADGET, and with
+    dr_mode set to otg, even if we cold plug the device.
+
+  - As you might expect from the two first items, the runtime
+    switching from gadget to host when CONFIG_USB_MUSB_DUAL_ROLE is
+    set and dr_mode is set in otg doesn't work either.
+
+It looks like it's only waiting for an interrupt to occur to read the
+ID pin state, without reading its initial value, which would explain
+why both the host and gadget enumerate only when a device/cable is
+hotplugged, and that there's some configuration bits that differ
+whenever dr_mode changes, but I couldn't really see anything standing
+out in the driver nor the datasheet.
+
+Have you already experienced something alike with that driver?
+
+Thanks,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150121/01f9c534/attachment-0001.sig>
