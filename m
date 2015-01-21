@@ -1,47 +1,51 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 21 Jan 2015 15:24:28 +0000
-Subject: [PATCH v4 10/10] ARM: STi: stih416: Supply EMI clock reference to FSM
- SPI NOR
-In-Reply-To: <1421853868-8262-1-git-send-email-lee.jones@linaro.org>
-References: <1421853868-8262-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1421853868-8262-11-git-send-email-lee.jones@linaro.org>
+Date: Wed, 21 Jan 2015 15:26:41 +0000
+Subject: [STLinux Kernel] [PATCH 1/1] i2c: i2c-st: Rename clock reference
+ to something that exists
+In-Reply-To: <53FF3D55.40006@st.com>
+References: <1409234523-20240-1-git-send-email-lee.jones@linaro.org>
+ <53FF3D55.40006@st.com>
+Message-ID: <20150121152641.GE22024@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While we're at it we're also adding a new human readable define for the
-aforementioned clock.
+On Thu, 28 Aug 2014, Maxime Coquelin wrote:
+> On 08/28/2014 04:02 PM, Lee Jones wrote:
+> >CLK_S_ICN_REG_0 hasn't existed for a while now.  This was renamed
+> >over a few commits, then finally removed in commit 5aa02b9 (ARM:
+> >STi: DT: STiH415: Remove unused CLK_S_ICN_REG_0 fixed clock).
+> >
+> >Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> Maybe it will be part of my next pull-requests, but in case it is
+> not, you can add my:
+> Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 
-Cc: devicetree at vger.kernel.org
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/boot/dts/stih416.dtsi           | 2 +-
- include/dt-bindings/clock/stih416-clks.h | 1 +
- 2 files changed, 2 insertions(+), 1 deletion(-)
+Still nothing from the big man.
 
-diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-index 2e35bab7..39b856b 100644
---- a/arch/arm/boot/dts/stih416.dtsi
-+++ b/arch/arm/boot/dts/stih416.dtsi
-@@ -219,7 +219,7 @@
- 			compatible	   = "st,stih416-spi-fsm";
- 			reg		   = <0xfe902000 0x1000>;
- 			pinctrl-0	   = <&pinctrl_fsm>;
--
-+			clocks		   = <&clk_s_a0_ls CLK_EMISS>;
- 			st,syscfg	   = <&syscfg_rear>;
- 
- 			status = "disabled";
-diff --git a/include/dt-bindings/clock/stih416-clks.h b/include/dt-bindings/clock/stih416-clks.h
-index f9bdbd1..4a46a47e 100644
---- a/include/dt-bindings/clock/stih416-clks.h
-+++ b/include/dt-bindings/clock/stih416-clks.h
-@@ -7,6 +7,7 @@
- 
- /* CLOCKGEN A0 */
- #define CLK_ICN_REG		0
-+#define CLK_EMISS		3
- #define CLK_ETH1_PHY		4
- 
- /* CLOCKGEN A1 */
+Can you just take this please Maxime?
+
+> >---
+> >  Documentation/devicetree/bindings/i2c/i2c-st.txt | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> >diff --git a/Documentation/devicetree/bindings/i2c/i2c-st.txt b/Documentation/devicetree/bindings/i2c/i2c-st.txt
+> >index 437e0db..4c26fda 100644
+> >--- a/Documentation/devicetree/bindings/i2c/i2c-st.txt
+> >+++ b/Documentation/devicetree/bindings/i2c/i2c-st.txt
+> >@@ -31,7 +31,7 @@ i2c0: i2c at fed40000 {
+> >  	compatible	= "st,comms-ssc4-i2c";
+> >  	reg		= <0xfed40000 0x110>;
+> >  	interrupts	=  <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
+> >-	clocks		= <&CLK_S_ICN_REG_0>;
+> >+	clocks		= <&clk_s_a0_ls CLK_ICN_REG>;
+> >  	clock-names	= "ssc";
+> >  	clock-frequency = <400000>;
+> >  	pinctrl-names	= "default";
+> >
+
 -- 
-1.9.1
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
