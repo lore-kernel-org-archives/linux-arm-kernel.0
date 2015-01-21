@@ -1,50 +1,41 @@
-From: rickard_strandqvist@spectrumdigital.se (Rickard Strandqvist)
-Date: Thu, 22 Jan 2015 00:09:41 +0100
-Subject: [PATCH 1/2] ARM: ux500: Move struct
-Message-ID: <1421881782-23716-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 21 Jan 2015 15:14:02 -0800
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Sh73a0 CCF
+ Updates for v3.20
+In-Reply-To: <cover.1421376276.git.horms+renesas@verge.net.au>
+References: <cover.1421376276.git.horms+renesas@verge.net.au>
+Message-ID: <20150121231402.GG24851@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move struct ab8500_ext_regulator_cfg to  the only file that is now used in.
+On Fri, Jan 16, 2015 at 11:45:50AM +0900, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
+> 
+> Please consider these second round of Renesas ARM based SoC sh73a0 CCF updates for v3.20.
+> 
+> This pull request is based on the previous round of
+> such requests, tagged as renesas-sh73a0-ccf-for-v3.20,
+> which you have already pulled.
+> 
+> 
+> The following changes since commit 09bd745b555c262d1e2c851777317f3adf3cf3d4:
+> 
+>   ARM: shmobile: sh73a0: disable legacy clock initialization (2014-12-21 17:09:25 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-sh73a0-ccf2-for-v3.20
+> 
+> for you to fetch changes up to 16bd794f9432b556ec797cbf16c5e575a18f7030:
+> 
+>   clk: shmobile: fix sparse NULL pointer warning (2015-01-14 13:13:24 +0900)
+> 
+> ----------------------------------------------------------------
+> Second Round of Renesas ARM Based SoC Sh73a0 CCF Updates for v3.20
+> 
+> * Fix sparse NULL pointer warning
 
-Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
----
- drivers/regulator/ab8500-ext.c   |    6 ++++++
- include/linux/regulator/ab8500.h |    5 -----
- 2 files changed, 6 insertions(+), 5 deletions(-)
+Merged.
 
-diff --git a/drivers/regulator/ab8500-ext.c b/drivers/regulator/ab8500-ext.c
-index 84c1ee3..a40c701 100644
---- a/drivers/regulator/ab8500-ext.c
-+++ b/drivers/regulator/ab8500-ext.c
-@@ -25,6 +25,12 @@
- #include <linux/mfd/abx500/ab8500.h>
- #include <linux/regulator/ab8500.h>
- 
-+
-+/* AB8500 external regulators */
-+struct ab8500_ext_regulator_cfg {
-+	bool hwreq; /* requires hw mode or high power mode */
-+};
-+
- /**
-  * struct ab8500_ext_regulator_info - ab8500 regulator information
-  * @dev: device pointer
-diff --git a/include/linux/regulator/ab8500.h b/include/linux/regulator/ab8500.h
-index d8ecefa..802529b 100644
---- a/include/linux/regulator/ab8500.h
-+++ b/include/linux/regulator/ab8500.h
-@@ -300,11 +300,6 @@ enum ab8540_regulator_reg {
- 	AB8540_NUM_REGULATOR_REGISTERS,
- };
- 
--/* AB8500 external regulators */
--struct ab8500_ext_regulator_cfg {
--	bool hwreq; /* requires hw mode or high power mode */
--};
--
- enum ab8500_ext_regulator_id {
- 	AB8500_EXT_SUPPLY1,
- 	AB8500_EXT_SUPPLY2,
--- 
-1.7.10.4
+
+-Olof
