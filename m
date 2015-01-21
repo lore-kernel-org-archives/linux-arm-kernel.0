@@ -1,252 +1,90 @@
-From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Wed, 21 Jan 2015 12:43:11 +0000
-Subject: [PATCH 3/3] arm64:  Emulate SETEND for AArch32 tasks
-In-Reply-To: <1421844191-9263-3-git-send-email-suzuki.poulose@arm.com>
-References: <1421844191-9263-1-git-send-email-suzuki.poulose@arm.com>
- <1421844191-9263-2-git-send-email-suzuki.poulose@arm.com>
- <1421844191-9263-3-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1421844191-9263-4-git-send-email-suzuki.poulose@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 21 Jan 2015 12:49:30 +0000
+Subject: [PATCH v3 00/13] mtd: st_spi_fsm: Align with ST's internal
+ development
+In-Reply-To: <20150113051452.GR9759@ld-irv-0074>
+References: <1418644760-18773-1-git-send-email-lee.jones@linaro.org>
+ <20150113051452.GR9759@ld-irv-0074>
+Message-ID: <20150121124930.GA22024@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+On Mon, 12 Jan 2015, Brian Norris wrote:
+> On Mon, Dec 15, 2014 at 11:59:07AM +0000, Lee Jones wrote:
+> > Hi Brian, all,
+> >  
+> >  [x] Bulid test
+> >  [x] Bisectable
+> >  [x] Smatch
+> >  [x] Sparse
+> 
+> Picked patches 1, 2, and 5 to l2-mtd.git. I requested changes to patch 3
+> and possibly 4. The rest look OK, but I don't want to futz with patch
+> conflicts on the remaining. Please rebase to l2-mtd.git if/when you
+> resend.
 
-Emulate deprecated 'setend' instruction for AArch32 bit tasks.
+Sure.  I'll get on to that now.
 
-	setend [le/be] - Sets the endianness of EL0
+> > v3:
+> >   Further aligned with upstream changes as suggested by Peter Griffin.
+> >   The clk_ignore_unused kernel command line parameter is due to be turned
+> >   off on STiH4* platforms, so we no longer give the driver the chance to
+> >   opt-out of fetching the EMI clock.  We also now provide syscfg offsets
+> >   inside the driver, as it's simpler and reduces the cost of having lots
+> >   of extra DT properties.
+> 
+> Typically "simpler" and "reducing the cost of having lots of extra DT
+> properties" aren't good enough reasons for immediately breaking an
+> existing DT binding. We usually expect to support both for some period
+> of time.
 
-On systems with CPUs which support mixed endian at EL0, the hardware
-support for the instruction can be enabled by setting the SCTLR_EL1.SED
-bit. Like the other emulated instructions it is controlled by an entry in
-/proc/sys/abi/. For more information see :
-	Documentation/arm64/legacy_instructions.txt
+Only once a binding has became ABI.  As there are no users of this
+driver yet (this will change after this sync'ing patch-set has been
+applied), so we can safely consider this binding to be in-progress and
+as such, not yet ABI, thus we can do this ol' switch-aroo without the
+usual 6 month deprecation period.
 
-The instruction is emulated by setting/clearing the SPSR_EL1.E bit, which
-will be reflected in the PSTATE.E in AArch32 context.
+> > v2:
+> >   These are the last remaining patches in the set, all rebased and
+> >   with the DT documentation requested after the last submission.
+> >  
+> > v1:
+> >   This patch-set updates ST's FSM SPI-NOR driver with all the internal
+> >   goodness which has happened since the initial (now upstreamed) snapshot
+> >   was taken. It covers just over 6 months worth of internal development
+> >   and bug-fixes. A final whitespace clean-up is also appended to the set
+> >   - to make it look pretty and stuff. :)
+> > 
+> > Angus Clark (3):
+> >   mtd: st_spi_fsm: Add support for N25Q512 and N25Q00A devices
+> >   mtd: st_spi_fsm: Update Spansion device entries
+> >   mtd: st_spi_fsm: Improve busy wait handling
+> > 
+> > Lee Jones (9):
+> >   mtd: st_spi_fsm: Extend fsm_clear_fifo to handle unwanted bytes
+> >   mtd: st_spi_fsm: Obtain and use EMI clock
+> >   mtd: st_spi_fsm: dt-bindings: Deprecate generic compatible string
+> >   mtd: st_spi_fsm: Fetch boot device locations from DT match tables
+> >   mtd: st_spi_fsm: Fix [-Wsign-compare] build warning
+> >   mtd: st_spi_fsm: Update the JEDEC probe to handle extended READIDs
+> >   mtd: st_spi_fsm: General tidy-up
+> >   ARM: STi: stih416: Use new platform specific compatible string
+> >   ARM: STi: stih416: Supply EMI clock reference to FSM SPI NOR
+> > 
+> > Nunzio Raciti (1):
+> >   mtd: st_spi_fsm: Add support for Micron N25Q512A
+> > 
+> >  Documentation/devicetree/bindings/mtd/st-fsm.txt |  20 +-
+> >  arch/arm/boot/dts/stih416.dtsi                   |   6 +-
+> >  drivers/mtd/devices/st_spi_fsm.c                 | 747 +++++++++++++++--------
+> >  include/dt-bindings/clock/stih416-clks.h         |   1 +
+> >  4 files changed, 519 insertions(+), 255 deletions(-)
+> > 
+> 
+> Brian
 
-This patch also restores the native endianness for the execution of signal
-handlers, since the process could have changed the endianness.
-
-Note: All CPUs on the system must have mixed endian support at EL0. Once the
-handler is registered, hotplugging a CPU which doesn't support mixed endian,
-could lead to unexpected results/behavior in applications.
-
-Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Punit Agrawal <punit.agrawal@arm.com>
----
- Documentation/arm64/legacy_instructions.txt |   12 ++++
- arch/arm64/Kconfig                          |   15 +++++
- arch/arm64/include/asm/cputype.h            |    1 +
- arch/arm64/include/asm/ptrace.h             |    7 +++
- arch/arm64/kernel/armv8_deprecated.c        |   80 +++++++++++++++++++++++++++
- arch/arm64/kernel/signal32.c                |    5 +-
- 6 files changed, 119 insertions(+), 1 deletion(-)
-
-diff --git a/Documentation/arm64/legacy_instructions.txt b/Documentation/arm64/legacy_instructions.txt
-index a3b3da2..01bf3d9 100644
---- a/Documentation/arm64/legacy_instructions.txt
-+++ b/Documentation/arm64/legacy_instructions.txt
-@@ -32,6 +32,9 @@ The default mode depends on the status of the instruction in the
- architecture. Deprecated instructions should default to emulation
- while obsolete instructions must be undefined by default.
- 
-+Note: Instruction emulation may not be possible in all cases. See
-+individual instruction notes for further information.
-+
- Supported legacy instructions
- -----------------------------
- * SWP{B}
-@@ -43,3 +46,12 @@ Default: Undef (0)
- Node: /proc/sys/abi/cp15_barrier
- Status: Deprecated
- Default: Emulate (1)
-+
-+* SETEND
-+Node: /proc/sys/abi/setend
-+Status: Deprecated
-+Default: Emulate (1)*
-+Note: All the cpus on the system must have mixed endian support at EL0
-+for this feature to be enabled. If a new CPU - which doesn't support mixed
-+endian - is hotplugged in after this feature has been enabled, there could
-+be unexpected results in the application.
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index b1f9a20..21a59bf 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -540,6 +540,21 @@ config CP15_BARRIER_EMULATION
- 
- 	  If unsure, say Y
- 
-+config SETEND_EMULATION
-+	bool "Emulate SETEND instruction"
-+	help
-+	  The SETEND instruction alters the data-endianness of the
-+	  AArch32 EL0, and is deprecated in ARMv8.
-+
-+	  Say Y here to enable software emulation of the instruction
-+	  for AArch32 userspace code.
-+
-+	  Note: All the cpus on the system must have mixed endian support at EL0
-+	  for this feature to be enabled. If a new CPU - which doesn't support mixed
-+	  endian - is hotplugged in after this feature has been enabled, there could
-+	  be unexpected results in the applications.
-+
-+	  If unsure, say Y
- endif
- 
- endmenu
-diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-index 2c4c852..241dd2f 100644
---- a/arch/arm64/include/asm/cputype.h
-+++ b/arch/arm64/include/asm/cputype.h
-@@ -83,6 +83,7 @@
- 	(((mmfr0) & ID_AA64MMFR0_BIGEND_MASK) >> ID_AA64MMFR0_BIGEND_SHIFT)
- 
- #define SCTLR_EL1_CP15BEN	(0x1 << 5)
-+#define SCTLR_EL1_SED		(0x1 << 8)
- 
- #ifndef __ASSEMBLY__
- 
-diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-index 41ed9e1..d6dd9fd 100644
---- a/arch/arm64/include/asm/ptrace.h
-+++ b/arch/arm64/include/asm/ptrace.h
-@@ -58,6 +58,13 @@
- #define COMPAT_PSR_Z_BIT	0x40000000
- #define COMPAT_PSR_N_BIT	0x80000000
- #define COMPAT_PSR_IT_MASK	0x0600fc00	/* If-Then execution state mask */
-+
-+#ifdef CONFIG_CPU_BIG_ENDIAN
-+#define COMPAT_PSR_ENDSTATE	COMPAT_PSR_E_BIT
-+#else
-+#define COMPAT_PSR_ENDSTATE	0
-+#endif
-+
- /*
-  * These are 'magic' values for PTRACE_PEEKUSR that return info about where a
-  * process is located in memory.
-diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
-index 2c991f1..dea6f59 100644
---- a/arch/arm64/kernel/armv8_deprecated.c
-+++ b/arch/arm64/kernel/armv8_deprecated.c
-@@ -548,6 +548,79 @@ static struct insn_emulation_ops cp15_barrier_ops = {
- 	.set_hw_mode = cp15_barrier_set_hw_mode,
- };
- 
-+static int setend_set_hw_mode(bool enable)
-+{
-+	if (!cpu_supports_mixed_endian_el0())
-+		return -EINVAL;
-+
-+	if (enable)
-+		config_sctlr_el1(SCTLR_EL1_SED, 0);
-+	else
-+		config_sctlr_el1(0, SCTLR_EL1_SED);
-+	return 0;
-+}
-+
-+static int compat_setend_handler(struct pt_regs *regs, u32 big_endian)
-+{
-+	char *insn;
-+
-+	perf_sw_event(PERF_COUNT_SW_EMULATION_FAULTS, 1, regs, regs->pc);
-+
-+	if (big_endian) {
-+		insn = "setend be";
-+		regs->pstate |= COMPAT_PSR_E_BIT;
-+	} else {
-+		insn = "setend le";
-+		regs->pstate &= ~COMPAT_PSR_E_BIT;
-+	}
-+
-+	trace_instruction_emulation(insn, regs->pc);
-+	pr_warn_ratelimited("\"%s\" (%ld) uses deprecated setend instruction at 0x%llx\n",
-+			current->comm, (unsigned long)current->pid, regs->pc);
-+
-+	return 0;
-+}
-+
-+static int a32_setend_handler(struct pt_regs *regs, u32 instr)
-+{
-+	int rc = compat_setend_handler(regs, (instr >> 9) & 1);
-+	regs->pc += 4;
-+	return rc;
-+}
-+
-+static int t16_setend_handler(struct pt_regs *regs, u32 instr)
-+{
-+	int rc = compat_setend_handler(regs, (instr >> 3) & 1);
-+	regs->pc += 2;
-+	return rc;
-+}
-+
-+static struct undef_hook setend_hooks[] = {
-+	{
-+		.instr_mask	= 0xfffffdff,
-+		.instr_val	= 0xf1010000,
-+		.pstate_mask	= COMPAT_PSR_MODE_MASK,
-+		.pstate_val	= COMPAT_PSR_MODE_USR,
-+		.fn		= a32_setend_handler,
-+	},
-+	{
-+		/* Thumb mode */
-+		.instr_mask	= 0x0000fff7,
-+		.instr_val	= 0x0000b650,
-+		.pstate_mask	= (COMPAT_PSR_T_BIT | COMPAT_PSR_MODE_MASK),
-+		.pstate_val	= (COMPAT_PSR_T_BIT | COMPAT_PSR_MODE_USR),
-+		.fn		= t16_setend_handler,
-+	},
-+	{}
-+};
-+
-+static struct insn_emulation_ops setend_ops = {
-+	.name = "setend",
-+	.status = INSN_DEPRECATED,
-+	.hooks = setend_hooks,
-+	.set_hw_mode = setend_set_hw_mode,
-+};
-+
- static int insn_cpu_hotplug_notify(struct notifier_block *b,
- 			      unsigned long action, void *hcpu)
- {
-@@ -573,6 +646,13 @@ static int __init armv8_deprecated_init(void)
- 	if (IS_ENABLED(CONFIG_CP15_BARRIER_EMULATION))
- 		register_insn_emulation(&cp15_barrier_ops);
- 
-+	if (IS_ENABLED(CONFIG_SETEND_EMULATION)) {
-+		if(system_supports_mixed_endian_el0())
-+			register_insn_emulation(&setend_ops);
-+		else
-+			pr_info("setend instruction emulation is not supported on the system");
-+	}
-+
- 	register_cpu_notifier(&insn_cpu_hotplug_notifier);
- 	register_insn_emulation_sysctl(ctl_abi);
- 
-diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
-index 5a1ba6e..aa763a5 100644
---- a/arch/arm64/kernel/signal32.c
-+++ b/arch/arm64/kernel/signal32.c
-@@ -440,7 +440,7 @@ static void compat_setup_return(struct pt_regs *regs, struct k_sigaction *ka,
- {
- 	compat_ulong_t handler = ptr_to_compat(ka->sa.sa_handler);
- 	compat_ulong_t retcode;
--	compat_ulong_t spsr = regs->pstate & ~PSR_f;
-+	compat_ulong_t spsr = regs->pstate & ~(PSR_f | COMPAT_PSR_E_BIT);
- 	int thumb;
- 
- 	/* Check if the handler is written for ARM or Thumb */
-@@ -454,6 +454,9 @@ static void compat_setup_return(struct pt_regs *regs, struct k_sigaction *ka,
- 	/* The IT state must be cleared for both ARM and Thumb-2 */
- 	spsr &= ~COMPAT_PSR_IT_MASK;
- 
-+	/* Restore the original endianness */
-+	spsr |= COMPAT_PSR_ENDSTATE;
-+
- 	if (ka->sa.sa_flags & SA_RESTORER) {
- 		retcode = ptr_to_compat(ka->sa.sa_restorer);
- 	} else {
 -- 
-1.7.9.5
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
