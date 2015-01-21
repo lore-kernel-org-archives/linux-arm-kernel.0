@@ -1,67 +1,80 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 21 Jan 2015 23:29:23 +0100
-Subject: [PATCHv5 1/2] leds: tlc591xx: Document binding for the TI 8/16
- Channel i2c LED driver
-In-Reply-To: <1421879364-8573-1-git-send-email-andrew@lunn.ch>
-References: <1421879364-8573-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1421879364-8573-2-git-send-email-andrew@lunn.ch>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 21 Jan 2015 14:36:42 -0800
+Subject: [GIT PULL v2]Hisilicon hip01 soc and development board updates
+ for 3.20
+In-Reply-To: <54BDEA1A.3060502@hisilicon.com>
+References: <54B723AB.7080506@hisilicon.com>
+ <20150119191941.GE16883@quad.lixom.net>
+ <54BDEA1A.3060502@hisilicon.com>
+Message-ID: <20150121223642.GC24851@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the binding for the TLC591xx LED driver.
+On Tue, Jan 20, 2015 at 01:39:38PM +0800, Wei Xu wrote:
+> 
+> 
+> On 2015/1/20 3:19, Olof Johansson wrote:
+> > On Thu, Jan 15, 2015 at 10:19:23AM +0800, Wei Xu wrote:
+> >> Hi Arnd, Hi Olof, Hi Kevin, 
+> >>
+> >> Could you please help to merge the pull request of hisilicon hip01 soc for 3.20. 
+> >> Thanks!
+> >>
+> >> Best Regards,
+> >> Wei
+> >>
+> >> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+> >>
+> >>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+> >>
+> >> are available in the git repository at:
+> >>
+> >>   git://github.com/hisilicon/linux-hisi.git tags/hip01-for-3.20-v2
+> >>
+> >> for you to fetch changes up to 27040189cb050cbe52a81c0e6aeb552872aa0736:
+> >>
+> >>   ARM: hisi: enable smp for HiP01 (2015-01-15 09:59:51 +0800)
+> >>
+> >> ----------------------------------------------------------------
+> >> ARM: mach-hisi: Hisilicon hip01 soc and development board updates for 3.20
+> >>
+> >> - Add hip01 debug UART
+> >> - Add hip01 DT_MACHINE and ARCH_HIP01 configure item
+> >> - Add dts for Hisilicon hip01-ca9x2 board
+> >> - Enable ARCH_HIP01 in the hisi_defconfig
+> >> - Rename hix5hd2_smp_prepare_cpus to hisi_common_smp_prepare_cpus
+> >> - Rename hix5hd2_secondary_startup to hisi_secondary_startup
+> >> - Enable smp for hip01
+> 
+> Hi Olof,
+> 
+> > Actually, you're adding a new dts file that's conflicting at the top level now,
+> > and we don't want that.
+> > 
+> > Please split your branches like other maintainers do into soc and dt branches.
+> > 
+> > dt
+> > soc
+> > defconfig
+> 
+> Thanks for your patient education!
+> I will follow it next time.
+> 
+> > I don't know your workflow, if you have users of your branches. If not, and if
+> > your tree isn't in linux-next, I can cherry pick the branch apart as needed
+> > here. Just let me know.
+> 
+> My tree is not in linux-next. I have checked the linux-next.git/tree/Next/Trees.
+> Could you please help to cherry pick them this time?
+> Thanks!
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Cc: Matthew.Fatheree at belkin.com
----
- .../devicetree/bindings/leds/leds-tlc591xx.txt     | 40 ++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/leds/leds-tlc591xx.txt
+Ok, done. The patch "ARM: hisi: enable smp for HiP01" had a change to both code
+and DT contents. I ended up folding the DT change into the patch that
+introduced the dts file instead.
 
-diff --git a/Documentation/devicetree/bindings/leds/leds-tlc591xx.txt b/Documentation/devicetree/bindings/leds/leds-tlc591xx.txt
-new file mode 100644
-index 000000000000..3bbbf7024411
---- /dev/null
-+++ b/Documentation/devicetree/bindings/leds/leds-tlc591xx.txt
-@@ -0,0 +1,40 @@
-+LEDs connected to tlc59116 or tlc59108
-+
-+Required properties
-+- compatible: should be "ti,tlc59116" or "ti,tlc59108"
-+- #address-cells: must be 1
-+- #size-cells: must be 0
-+- reg: typically 0x68
-+
-+Each led is represented as a sub-node of the ti,tlc59116.
-+See Documentation/devicetree/bindings/leds/common.txt
-+
-+LED sub-node properties:
-+- reg: number of LED line, 0 to 15 or 0 to 7
-+- label: (optional) name of LED
-+- linux,default-trigger : (optional)
-+
-+Examples:
-+
-+tlc59116 at 68 {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	compatible = "ti,tlc59116";
-+	reg = <0x68>;
-+
-+	wan at 0 {
-+		label = "wrt1900ac:amber:wan";
-+		reg = <0x0>;
-+	};
-+
-+	2g at 2 {
-+		label = "wrt1900ac:white:2g";
-+		reg = <0x2>;
-+	};
-+
-+	alive at 9 {
-+		label = "wrt1900ac:green:alive";
-+		reg = <0x9>;
-+		linux,default_trigger = "heartbeat";
-+	};
-+};
--- 
-2.1.4
+The rest was split across next/dt, next/soc and next/defconfig.
+
+
+Thanks,
+
+-Olof
