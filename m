@@ -1,46 +1,36 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 21 Jan 2015 09:26:22 +0100
-Subject: [PATCH 8/8] regulator: MT6397: Add support for MT6397 regulator
-In-Reply-To: <1421747231-554-9-git-send-email-s.hauer@pengutronix.de>
-References: <1421747231-554-1-git-send-email-s.hauer@pengutronix.de>
- <1421747231-554-9-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20150121082622.GG18908@pengutronix.de>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 21 Jan 2015 09:27:54 +0100
+Subject: [PATCH v3 2/3] mfd: lubbock_io: add lubbock_io board
+In-Reply-To: <20150121081645.GC9258@x1> (Lee Jones's message of "Wed, 21 Jan
+ 2015 08:16:45 +0000")
+References: <1421406010-14851-1-git-send-email-robert.jarzmik@free.fr>
+ <1421406010-14851-2-git-send-email-robert.jarzmik@free.fr>
+ <20150119091705.GG21886@x1> <87ppaah9k5.fsf@free.fr>
+ <20150120102919.GP5767@x1>
+ <20150120115658.GJ26493@n2100.arm.linux.org.uk>
+ <873874fuei.fsf@free.fr> <20150121081645.GC9258@x1>
+Message-ID: <87y4owedx1.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 20, 2015 at 10:47:11AM +0100, Sascha Hauer wrote:
-> From: Flora Fu <flora.fu@mediatek.com>
-> 
-> This adds support for the regulators on the MediaTek MT6397
-> Multifunction device.
-> 
-> Signed-off-by: Flora Fu, MediaTek
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Liam Girdwood <lgirdwood@gmail.com>
-> Cc: Mark Brown <broonie@kernel.org>
-> ---
->  Documentation/devicetree/bindings/mfd/mt6397.txt   |  41 ++-
->  .../bindings/regulator/mt6397-regulator.txt        | 217 ++++++++++++++
->  drivers/regulator/Kconfig                          |   9 +
->  drivers/regulator/Makefile                         |   1 +
->  drivers/regulator/mt6397-regulator.c               | 332 +++++++++++++++++++++
->  include/linux/regulator/mt6397-regulator.h         |  49 +++
->  6 files changed, 626 insertions(+), 23 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/regulator/mt6397-regulator.txt
->  create mode 100644 drivers/regulator/mt6397-regulator.c
->  create mode 100644 include/linux/regulator/mt6397-regulator.h
-> 
-> diff --git a/Documentation/devicetree/bindings/mfd/mt6397.txt b/Documentation/devicetree/bindings/mfd/mt6397.txt
+Lee Jones <lee.jones@linaro.org> writes:
 
-I'll move this documentation update to the patch adding the MFD driver
-where it belongs to. I'll drop the reset of this patch since it's already
-in Linux-next.
+> On Wed, 21 Jan 2015, Robert Jarzmik wrote:
+>> > > > platform_get_irq()?
+>> > > No. I need the flags.
+>> > Where are they used?
+>> A couple of lines below, using local "irqflags" variable :
+>>        ret = devm_request_irq(&pdev->dev, cot->irq, lubbock_irq_handler,
+>>                               irqflags, dev_name(&pdev->dev), cot);
+>
+> No, I mean where are they _used_?
+I don't get your point.
 
-Sascha
+For you, isn't it "using" irqflags by passing them as an argument to devm_request_irq()
+??? And if you think ahead, then there are used all around in
+kernel/irq/manage.c, as you probably know.
 
+Cheers.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Robert
