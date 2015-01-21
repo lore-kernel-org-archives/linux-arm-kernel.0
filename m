@@ -1,98 +1,77 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 21 Jan 2015 20:58:56 +0100
-Subject: [PATCHv5 4/4] USB: gadget: atmel_usba_udc: Add suspend/resume
- with wakeup support
-In-Reply-To: <1421868674-30757-5-git-send-email-sylvain.rochet@finsecur.com>
-References: <1421868674-30757-1-git-send-email-sylvain.rochet@finsecur.com>
- <1421868674-30757-5-git-send-email-sylvain.rochet@finsecur.com>
-Message-ID: <20150121205856.2f5bec77@bbrezillon>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 21 Jan 2015 20:59:21 +0100
+Subject: [PATCH 3/5] PCI: st: Provide support for the sti PCIe controller
+In-Reply-To: <6574269.bTBzFhcnBx@wuerfel>
+References: <1418812486-12394-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1682713.ac5OoTJoOr@wuerfel>
+ <CAG374jCRByNZuuYxi5+-mKvV7p5-tCf2G+8mTYfzU4rRV4yfYQ@mail.gmail.com>
+ <6574269.bTBzFhcnBx@wuerfel>
+Message-ID: <1421870361.3430.12.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylvain,
-
-On Wed, 21 Jan 2015 20:31:14 +0100
-Sylvain Rochet <sylvain.rochet@finsecur.com> wrote:
-
-> This patch add suspend/resume with wakeup support for Atmel USBA.
+Am Mittwoch, den 21.01.2015, 20:35 +0100 schrieb Arnd Bergmann:
+> On Wednesday 21 January 2015 16:47:36 Gabriel Fernandez wrote:
+> > On 19 January 2015 at 14:49, Arnd Bergmann <arnd@arndb.de> wrote:
+> > > On Monday 19 January 2015 13:37:33 Gabriel Fernandez wrote:
+> > >> On 17 December 2014 at 23:14, Arnd Bergmann <arnd@arndb.de> wrote:
+> > >> > On Wednesday 17 December 2014 11:34:44 Gabriel FERNANDEZ wrote:
+> > >> > > +/*
+> > >> > > + * On ARM platforms, we actually get a bus error returned when the PCIe
+> > >> > IP
+> > >> > > + * returns a UR or CRS instead of an OK.
+> > >> > > + */
+> > >> > > +static int st_pcie_abort_
+> > >> >
+> > >> > handler(unsigned long addr, unsigned int fsr,
+> > >> > > +                              struct pt_regs *regs)
+> > >> > > +{
+> > >> > > +     return 0;
+> > >> > > +}
+> > >> >
+> > >> > You should check that it's actually PCI that caused the abort. Don't
+> > >> > just ignore a hard error condition.
+> > >> >
+> > >> > Usually there are registers in the PCI core that let you identify what
+> > >> > happened.
+> > >> >
+> > >>
+> > >>
+> > >> We return 0 because abort handler is not activated during boot.
+> > >>
+> > >
+> > > Can you just remove the handler then? We should never have exception
+> > > handlers that unconditionally return 0.
+> > >
+> > 
+> > Ah sorry, we need the handler because we can received aborts from
+> > user-land after the boot.
+> > 
+> > I have 2 solutions, the first to simplify we can only return 0.
+> > The second is to manage handler during boot. Then i need for that a
+> > new patch from Fabrice
+> > https://lkml.org/lkml/2014/2/7/631
 > 
-> On suspend: We stay continuously clocked if Vbus signal is not
-> available. If Vbus signal is available we set the Vbus signal as a wake
-> up source then we stop the USBA itself and all clocks used by USBA.
+> I still don't get it. What is causing the abort? Is that something
+> user space does, or is it just a condition that gets stuck the pcie
+> device after probing that gets delivered once as soon as the aborts
+> are enabled?
 > 
-> On resume: We recover clocks and USBA we stopped them. If a device is
-> connected, i.e. connected while we were suspended without wakeup
-> enabled, we enable the controller.
-> 
-> Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
-> ---
->  drivers/usb/gadget/udc/atmel_usba_udc.c | 61 +++++++++++++++++++++++++++++++++
->  1 file changed, 61 insertions(+)
-> 
-> diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-> index 963e398..326725e 100644
-> --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
-> +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-> @@ -2115,6 +2115,7 @@ static int usba_udc_probe(struct platform_device *pdev)
->  	ret = usb_add_gadget_udc(&pdev->dev, &udc->gadget);
->  	if (ret)
->  		return ret;
-> +	device_init_wakeup(&pdev->dev, 1);
->  
->  	usba_init_debugfs(udc);
->  	for (i = 1; i < udc->num_ep; i++)
-> @@ -2130,6 +2131,7 @@ static int __exit usba_udc_remove(struct platform_device *pdev)
->  
->  	udc = platform_get_drvdata(pdev);
->  
-> +	device_init_wakeup(&pdev->dev, 0);
->  	usb_del_gadget_udc(&udc->gadget);
->  
->  	for (i = 1; i < udc->num_ep; i++)
-> @@ -2139,6 +2141,62 @@ static int __exit usba_udc_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_PM
-> +static int usba_udc_suspend(struct device *dev)
-> +{
-> +	struct usba_udc *udc = dev_get_drvdata(dev);
-> +
-> +	/* Not started */
-> +	if (!udc->driver)
-> +		return 0;
-> +
-> +	if (!device_may_wakeup(dev)) {
-> +		usba_stop(udc);
-> +		return 0;
-> +	}
-> +
-> +	/*
-> +	 * Device may wake up. We stay clocked if we failed
-> +	 * to request vbus irq, assuming always on.
-> +	 */
-> +	if (gpio_is_valid(udc->vbus_pin)) {
-> +		usba_stop(udc);
-> +		/* Only wake up on device connection */
-> +		irq_set_irq_type(gpio_to_irq(udc->vbus_pin),
-> +			udc->vbus_pin_inverted ?
-> +			IRQ_TYPE_EDGE_FALLING : IRQ_TYPE_EDGE_RISING);
+The abort is caused by the kernel trying to access a non-existent device
+while probing the bus. It isn't delivered to the ARM core, as it is an
+imprecise external abort which are masked during boot.
+Once pid1 is started and we do the first schedule imprecise aborts get
+unmasked and pid1 will be hit by the stale abort.
 
-If I'm correct, you're testing on a at91sam9x5 platform. Be careful,
-this driver is used by older SoCs (at91sam9rl and avr32 SoCs) which do
-not support configuring the interrupt on a specific edge (they trigger
-on both edges).
+The above patch does the right thing by unmasking imprecise abort early
+during boot, so they can get handled once they are hit.
 
-This leaves two solutions here:
-1) keep the IRQ_TYPE_EDGE_BOTH setting.
-2) add new compatible strings to this driver and make this specific
-edge change dependent on the SoC capability.
+The abort handling for the DW PCIe core right now is a complete
+disaster. Hooking the fault code means we possibly overwrite any other
+handler for the same abort. Also as the configuration space is mapped as
+device memory the abort actually happens on the *next* instruction after
+the read that caused it. Improving this is something I had on my to-do
+list for quite some time now. 
 
-Best Regards,
-
-Boris
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Regards,
+Lucas
