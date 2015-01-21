@@ -1,74 +1,33 @@
-From: vishnupatekar0510@gmail.com (Vishnu Patekar)
-Date: Wed, 21 Jan 2015 16:34:45 +0530
-Subject: [linux-sunxi] [PATCH v4 5/5] ARM: sunxi: dts: Add PS2 nodes for
- A20 lime2 board
-In-Reply-To: <20150120200740.GY4367@lukather>
-References: <1421417021-3247-1-git-send-email-vishnupatekar0510@gmail.com>
- <1421417021-3247-6-git-send-email-vishnupatekar0510@gmail.com>
- <54BE8A0E.30604@gmail.com> <20150120200740.GY4367@lukather>
-Message-ID: <CAEzqOZsWYQ+Aep6HBZXVtKGEJgKYAKJU2b0=nGvP0jPKECxn7g@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 21 Jan 2015 12:08:23 +0100
+Subject: [PATCH v16 00/10] KVM/arm/arm64/x86: dirty page logging for
+ ARMv7/8 (3.18.0-rc2)
+In-Reply-To: <1421366341-26012-1-git-send-email-m.smarduch@samsung.com>
+References: <1421366341-26012-1-git-send-email-m.smarduch@samsung.com>
+Message-ID: <20150121110823.GB15076@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thu, Jan 15, 2015 at 03:58:51PM -0800, Mario Smarduch wrote:
+> Patch series adds support for armv7/8 dirty page logging. As we move
+> towards generic dirty page logging interface we move some common code to
+> generic layer shared by x86, armv7 and armv8.
+> 
+> armv7/8 Dirty page logging implementation overivew-
+> - initially write protects memory region 2nd stage page tables
+> - read dirty page log and again write protect dirty pages for next pass.
+> - second stage huge pages are dissolved into normal pages to keep track of
+>   dirty memory at page granularity. Tracking at huge page granularity
+>   limits granularity of marking dirty memory and migration to a light memory
+>   load. Small page size logging supports higher memory dirty rates, enables
+>   rapid migration.
+> 
+>   armv7 supports 2MB Huge page, and armv8 supports 2MB (4kb) and
+>   512MB (64kb)
+> - In the event migration is canceled, normal behavior is resumed huge pages
+>   are rebuilt over time.
+> 
 
-On Wed, Jan 21, 2015 at 1:37 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
->
-> On Tue, Jan 20, 2015 at 05:02:06PM +0000, Iain Paton wrote:
-> > On 16/01/15 14:03, Vishnu Patekar wrote:
-> > > Signed-off-by: VishnuPatekar <vishnupatekar0510@gmail.com>
-> > > ---
-> > >  arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts |   12 ++++++++++++
-> > >  1 file changed, 12 insertions(+)
-> > >
-> > > diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-> > > index ed364d5..3365f12 100644
-> > > --- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-> > > +++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-> > > @@ -113,6 +113,18 @@
-> > >                     status = "okay";
-> > >             };
-> > >
-> > > +           ps20: ps2 at 01c2a000 {
-> > > +                   pinctrl-names = "default";
-> > > +                   pinctrl-0 = <&ps20_pins_a>;
-> > > +                   status = "okay";
-> > > +           };
-> > > +
-> > > +           ps21: ps2 at 01c2a400 {
-> > > +                   pinctrl-names = "default";
-> > > +                   pinctrl-0 = <&ps21_pins_a>;
-> > > +                   status = "okay";
-> > > +           };
-> > > +
-> > >             i2c0: i2c at 01c2ac00 {
-> > >                     pinctrl-names = "default";
-> > >                     pinctrl-0 = <&i2c0_pins_a>;
-> > >
-> >
-> > As the Lime2 doesn't actually have any PS2 connectors on the board,
-> > I'd prefer that these are not enabled unconditionally. Doing so
-> > only makes it more difficult for people who want to use these pins
-> > for other functions.
-> >
-> > Device tree overlays seem to be close to being merged, perhaps we
-> > could leave enabling this to an overlay?
->
-> I already had the exact same reasoning, and this was even removed at
-> some point. For some reason, it was added back, and I don't really
-> know why.
-This was removed in consideration that these pins conflict with HDMI,
-however, these is not conflict.
+Thanks, applied.
 
-It was kept there as an example. But, as there is no ps2 connector on
-board, I've no problem to remove these nodes from Lime2 dts file.
-
->
-> Maxime
->
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+-Christoffer
