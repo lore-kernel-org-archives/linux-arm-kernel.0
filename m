@@ -1,43 +1,51 @@
-From: yao.yuan@freescale.com (Yuan Yao)
-Date: Wed, 21 Jan 2015 16:32:10 +0800
-Subject: [PATCH] serial: fsl-lpuart: disable interrupt when suspend
-Message-ID: <1421829130-32985-1-git-send-email-yao.yuan@freescale.com>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Wed, 21 Jan 2015 16:34:35 +0800
+Subject: [PATCH v4 2/2] I2C: mediatek: Add driver for MediaTek I2C
+ controller
+In-Reply-To: <20150121082022.GT22880@pengutronix.de>
+References: <1421404418-50718-1-git-send-email-eddie.huang@mediatek.com>
+ <1421404418-50718-3-git-send-email-eddie.huang@mediatek.com>
+ <20150118101816.GF22880@pengutronix.de>
+ <1421810004.15468.825.camel@mtksdaap41>
+ <20150121082022.GT22880@pengutronix.de>
+Message-ID: <1421829275.6546.6.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For power management support, we should disable TX/RX
-interrupts so that kernel can prepare for deep sleep.
+Hi Uwe,
 
-Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
----
- drivers/tty/serial/fsl_lpuart.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+On Wed, 2015-01-21 at 09:20 +0100, Uwe Kleine-K?nig wrote:
+> Hello,
+> 
+> On Wed, Jan 21, 2015 at 11:13:24AM +0800, Eddie Huang wrote:
+> > > > +	/* set when doing the transfer */
+> > > > +	u16 irq_stat;			/* interrupt status */
+> > > > +	unsigned int speed_hz;		/* The speed in transfer */
+> > > > +	bool trans_stop;		/* i2c transfer stop */
+> > > > +	enum mtk_trans_op op;
+> > > > +	u16 msg_len;
+> > > > +	u8 *msg_buf;			/* pointer to msg data */
+> > > > +	u16 msg_aux_len;		/* WRRD mode to set AUX_LEN register*/
+> > > > +	u16 addr;	/* 7bit slave address, without read/write bit */
+> > > Wouldn't it be easier to maintain a pointer to the message to be
+> > > transferred?
+> > I think use mtk_i2c pointer is more flexible than maintain a pointer to
+> > message.
+> Not sure you understood what I intended to suggest. My idea was to drop
+> 
+> 	u16 msg_len;
+> 	u8 *msg_buf;
+> 	u16 msg_aux_len; // maybe
+> 	u16 addr;
+> 
+> from struct mtk_i2c and add a struct i2c_msg *msg instead. Up to you to
+> decide.
+> 
+Because this driver pass mtk_i2c pointer between functions, it's
+flexible to use any member of struct mtk_i2c. The good thing is avoid
+passing one more struct i2c_msg parameter between functions, or another
+struct copy. The bad thing is make struct mtk_i2c larger. I prefer to
+keep as it is now.
 
-diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
-index 1c5d020..bfd6ea2 100644
---- a/drivers/tty/serial/fsl_lpuart.c
-+++ b/drivers/tty/serial/fsl_lpuart.c
-@@ -1449,6 +1449,21 @@ static int lpuart_remove(struct platform_device *pdev)
- static int lpuart_suspend(struct device *dev)
- {
- 	struct lpuart_port *sport = dev_get_drvdata(dev);
-+	unsigned long temp;
-+
-+	if (sport->lpuart32) {
-+		/* disable Rx/Tx and interrupts */
-+		temp = lpuart32_read(sport->port.membase + UARTCTRL);
-+		temp &= ~(UARTCTRL_TE | UARTCTRL_RE |
-+				UARTCTRL_TIE | UARTCTRL_TCIE | UARTCTRL_RIE);
-+		lpuart32_write(temp, sport->port.membase + UARTCTRL);
-+	} else {
-+		/* disable Rx/Tx and interrupts */
-+		temp = readb(sport->port.membase + UARTCR2);
-+		temp &= ~(UARTCR2_TE | UARTCR2_RE |
-+				UARTCR2_TIE | UARTCR2_TCIE | UARTCR2_RIE);
-+		writeb(temp, sport->port.membase + UARTCR2);
-+	}
- 
- 	uart_suspend_port(&lpuart_reg, &sport->port);
- 
--- 
-2.1.0.27.g96db324
+Best Regards
+Eddie
