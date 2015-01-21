@@ -1,59 +1,40 @@
-From: gg@slimlogic.co.uk (Graeme Gregory)
-Date: Wed, 21 Jan 2015 15:56:41 +0000
-Subject: [PATCH v7 04/17] ARM64 / ACPI: Introduce early_param for "acpi"
- and pass acpi=force to enable ACPI
-In-Reply-To: <20150121154243.GE6358@e104818-lin.cambridge.arm.com>
-References: <20150119135144.GI11835@e104818-lin.cambridge.arm.com>
- <20150119151350.21B65C40948@trevor.secretlab.ca>
- <54BD3803.6020307@redhat.com>
- <20150119175233.GK11835@e104818-lin.cambridge.arm.com>
- <20150119180122.GJ21553@leverpostej> <54BE1FEA.5040109@linaro.org>
- <alpine.DEB.2.02.1501201901190.12653@kaball.uk.xensource.com>
- <20150121152326.GD6358@e104818-lin.cambridge.arm.com>
- <54BFC5F0.3020500@redhat.com>
- <20150121154243.GE6358@e104818-lin.cambridge.arm.com>
-Message-ID: <20150121155641.GE6858@xora-yoga-13.xora.org.uk>
+From: treding@nvidia.com (Thierry Reding)
+Date: Wed, 21 Jan 2015 16:55:21 +0100
+Subject: next-20150120 broken on Tegra by "ata: libahci: Allow using
+ multiple regulators"
+In-Reply-To: <20150121123134.GD8684@htj.dyndns.org>
+References: <alpine.DEB.2.02.1501210003010.5450@utopia.booyaka.com>
+ <20150121105001.GA9921@ulmo.nvidia.com>
+ <20150121123134.GD8684@htj.dyndns.org>
+Message-ID: <20150121155519.GA25166@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 21, 2015 at 03:42:43PM +0000, Catalin Marinas wrote:
-> On Wed, Jan 21, 2015 at 03:29:52PM +0000, Jon Masters wrote:
-> > On 01/21/2015 10:23 AM, Catalin Marinas wrote:
-> > > I have some questions for the ACPI and EFI folk:
-> > > 
-> > > 1. When booting with ACPI, are the EFI run-time services required for
-> > >    anything? If yes, Xen may have a bigger problem
-> > 
-> > Yes. At least for some things. For example, installing an Operating
-> > System would require that you make runtime services calls to set the
-> > BootOrder/BootNext variables, and so on. Further, we use the GetTime
-> > service and EFI based reboot to avoid having special drivers. I had
-> > those added to SBBR as requirements for that reason.
+On Wed, Jan 21, 2015 at 07:31:34AM -0500, Tejun Heo wrote:
+> On Wed, Jan 21, 2015 at 11:50:03AM +0100, Thierry Reding wrote:
+> > Tejun, preferably the attached patch should be squashed into commit
+> > c7d7ddee7e24 ("ata: libahci: Allow using multiple regulators") to avoid
+> > breaking bisectability. If you don't want to rewrite history, let me
+> > know and I can turn it into a proper patch.
 > 
-> So what would a kexec'ed kernel do here? Or we usually expect it to be
-> short lived and doesn't need reboot, nor GetTime.
+> Yes, please make it a proper patch.
 > 
-> Xen is slightly more problematic but I wonder whether it could run a
-> (paravirtualised) UEFI.
-> 
-> > > 2. Could a boot loader (either kernel doing kexec or Xen) emulate the
-> > >    EFI system/config tables and still make them useful to the kernel but
-> > >    without EFI_BOOT or EFI_RUNTIME_SERVICES?
-> > 
-> > Yes. But again, without the other required pieces (including the
-> > services function pointers in the systab which are required) you'd crash
-> > soon after boot trying to make those calls.
-> 
-> My point was whether you can still pass information like RSDP address
-> via EFI tables but explicitly disable runtime services so that the
-> kernel won't try to make such calls (and crash).
-> 
-There is no specific dependency from ACPI->EFI its just the only current
-method defind to get the RSDP pointer. It would work just as well
-getting the pointer from /chosen/ if we just pick a node and document it
-for Xen/kexec/other usage.
+> Thanks a lot!
 
-We were running ACPI on machine from u-boot doing exactly this for
-a long time.
+Attaching the patch.
 
-Graeme
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-ata-libahci-Fix-devres-cleanup-on-failure.patch
+Type: text/x-diff
+Size: 1961 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150121/416f7897/attachment.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150121/416f7897/attachment.sig>
