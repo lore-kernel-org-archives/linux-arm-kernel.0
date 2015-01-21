@@ -1,99 +1,40 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 21 Jan 2015 15:44:00 +0100
-Subject: [PATCH 0/7] Fixes and improvements for SDHCI on Armada 38x
-In-Reply-To: <1421832726-21656-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1421832726-21656-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <54BFBB30.9060205@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 21 Jan 2015 14:44:20 +0000
+Subject: [PATCH v2] iommu/ipmmu-vmsa: Use the ARM LPAE page table allocator
+In-Reply-To: <1421771404-22774-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <20150119140106.GM6343@8bytes.org>
+ <1421771404-22774-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <20150121144419.GJ4549@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/01/2015 10:31, Gregory CLEMENT wrote:
-> Hi,
+On Tue, Jan 20, 2015 at 04:30:04PM +0000, Laurent Pinchart wrote:
+> Replace the custom page table allocation implementation with the
+> standard allocator.
 > 
-> this series brings fixes and improvements for the SDHCI controller of
-> the Armada 38x SoCs.
+> The driver loses the ability to map 64kB chunkgs using the PTE
+> contiguous hint, hence the removal of the SZ_64K page size from the
+> IOMMU page sizes bitmap.
 > 
-> The first two patches are fixes and should be also applied on the
-> stable branch (I added stable in copy for this).
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> ---
+>  drivers/iommu/Kconfig      |   1 +
+>  drivers/iommu/ipmmu-vmsa.c | 554 +++++----------------------------------------
+>  2 files changed, 61 insertions(+), 494 deletions(-)
 > 
-> The first one removes the SDR50 and DDR50 mode timing from the
-> capabilities of the controller because the current implementation
-> doesn't support it.
+> This patch depends on Will Deacon's "[PATCH v2 0/5] Generic IOMMU page table
+> framework" series.
 > 
-> The second one fix controller's caps according to the limitation of
-> the hardware.
+> Joerg, if you want to merge Will's patches in v3.20 with one user, this is a
+> good candidate.
 > 
-> The third one extends the Device Tree binding of the Armada 38x. It
-> allows using the SDIO3 configuration register.
+> Changes since v1:
 > 
-> The forth patch adds the support of this new register in the
-> driver. Thanks to this one, specific clock adjustments can be done in
-> order to support the SDR50 and DDR50 modes timing.
-> 
-> The fifth patch is device tree clean-up.
-> 
-> The sixth patch update the SDHCI node on Armada 38x in order to use
-> the new register and then to be able to support the SDR50 and DDR50
-> modes timing.
-> 
-> Finally, the seventh patch add the description of SDHCI for the Armada
-> 388 RD board which was missing.
-> 
-> Patches 1 to 4 should be merged through the mmc tree and patches 5 to
-> 7 should be merged through mvebu and then arm-soc.
-> 
-> Patch 4 depend on patch 2.
-> Patch 2 depend on patch 1.
-> And patch 1 depend on commit aa8165f91442 "mmc: sdhci-pxav3: do the
-> mbus window configuration after enabling clocks" which have been
-> merged.
-> 
-> But as all this patch should be merged through the same tree it would
-> not be a problem
-> 
-> The patches 5 to 7 depend on the patches already merged in mvebu.
-> 
-> As they are fixes, patches 1 and 2 should be merged in 3.18-rc or at
-> least in 3.19 and then they will be part of 3.18.1. For the other
-> patches it would be nice if they could be part of 3.19.
+> - Rebased on top of latest page table framework and iommu next branch.
 
-I shifted the kernel release by one! I meant:
+Laurent, this is really good stuff, thanks!
 
-As they are fixes, patches 1 and 2 should be merged in _3.19-rc_ or at
-least in _3.20_ and then they will be part of _3.19.1_. For the other
-patches it would be nice if they could be part of _3.20_.
+Shall I queue this on top of the iommu/pgtbl patches, or do you have other
+ipmmu patches queued?
 
-Thanks,
-
-Gregory
-
-> 
-> Thanks,
-> 
-> Gregory
-> 
-> Gregory CLEMENT (7):
->   mmc: sdhci-pxav3: Fix SDR50 and DDR50 capabilities for the Armada 38x
->     flavor
->   mmc: sdhci-pxav3: Fix Armada 38x controller's caps according to
->     erratum ERR-7878951
->   mmc: sdhci-pxav3: Extend binding with SDIO3 conf reg for the Armada
->     38x
->   mmc: sdhci-pxav3: Modify clock settings for the SDR50 and DDR50 modes
->   ARM: mvebu: Use macros for interrupt flags on Armada 38x sdhci node
->   ARM: mvebu: Update the SDHCI node on Armada 38x
->   ARM: mvebu: Add Device Tree description of SDHCI for Armada 388 RD
-> 
->  .../devicetree/bindings/mmc/sdhci-pxa.txt          | 15 ++--
->  arch/arm/boot/dts/armada-388-rd.dts                | 10 +++
->  arch/arm/boot/dts/armada-38x.dtsi                  |  7 +-
->  drivers/mmc/host/sdhci-pxav3.c                     | 79 ++++++++++++++++++++++
->  4 files changed, 105 insertions(+), 6 deletions(-)
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Will
