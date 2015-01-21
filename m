@@ -1,82 +1,97 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Tue, 20 Jan 2015 17:37:53 -0800
-Subject: [PATCH] mm: Don't offset memmap for flatmem
-In-Reply-To: <54BE25EF.3060004@suse.cz>
-Message-ID: <1421804273-29947-1-git-send-email-lauraa@codeaurora.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 21 Jan 2015 10:59:27 +0900
+Subject: [PATCH 0/9] ARM: shmobile: r8a73a4/ape6evm multiplatform
+In-Reply-To: <1421758306-24838-1-git-send-email-geert+renesas@glider.be>
+References: <1421758306-24838-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20150121015927.GB30598@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Srinivas Kandagatla reported bad page messages when trying to
-remove the bottom 2MB on an ARM based IFC6410 board
+On Tue, Jan 20, 2015 at 01:51:37PM +0100, Geert Uytterhoeven wrote:
+> 	Hi Simon, Magnus,
+> 
+> This patch series transitions the r8a73a4/ape6evm platform to support
+> multiplatform only:
+>   - Add CCF information to DT,
+>   - Disable legacy clock if CCF is used,
+>   - Add Bus State Controller node, and move the Ethernet node to it,
+>   - Remove ape6evm-reference,
+>   - Remove ape6evm-legacy and legacy support code.
+> 
+> This series is based on renesas-drivers-2015-01-19-v3.19-rc5.
+> It depends on renesas-devel-20150119-v3.19-rc5 (code-wise) and
+> clk-shmobile-for-3.20 (functionality-wise), for which I've sent a pull
+> request to Mike Turquette yesterday.
+> 
+> All of this was untested by me due to lack of hardware.
+> As Mike had previously acked the r8a73a4 CCF implementation, it's safe
+> to apply after testing.
 
-BUG: Bad page state in process swapper  pfn:fffa8
-page:ef7fb500 count:0 mapcount:0 mapping:  (null) index:0x0
-flags: 0x96640253(locked|error|dirty|active|arch_1|reclaim|mlocked)
-page dumped because: PAGE_FLAGS_CHECK_AT_FREE flag(s) set
-bad because of flags:
-flags: 0x200041(locked|active|mlocked)
-Modules linked in:
-CPU: 0 PID: 0 Comm: swapper Not tainted 3.19.0-rc3-00007-g412f9ba-dirty #816
-Hardware name: Qualcomm (Flattened Device Tree)
-[<c0218280>] (unwind_backtrace) from [<c0212be8>] (show_stack+0x20/0x24)
-[<c0212be8>] (show_stack) from [<c0af7124>] (dump_stack+0x80/0x9c)
-[<c0af7124>] (dump_stack) from [<c0301570>] (bad_page+0xc8/0x128)
-[<c0301570>] (bad_page) from [<c03018a8>] (free_pages_prepare+0x168/0x1e0)
-[<c03018a8>] (free_pages_prepare) from [<c030369c>] (free_hot_cold_page+0x3c/0x174)
-[<c030369c>] (free_hot_cold_page) from [<c0303828>] (__free_pages+0x54/0x58)
-[<c0303828>] (__free_pages) from [<c030395c>] (free_highmem_page+0x38/0x88)
-[<c030395c>] (free_highmem_page) from [<c0f62d5c>] (mem_init+0x240/0x430)
-[<c0f62d5c>] (mem_init) from [<c0f5db3c>] (start_kernel+0x1e4/0x3c8)
-[<c0f5db3c>] (start_kernel) from [<80208074>] (0x80208074)
-Disabling lock debugging due to kernel taint
+Hi Geert, Hi Ulrich,
 
-Removing the lower 2MB made the start of the lowmem zone to no longer
-be page block aligned. IFC6410 uses CONFIG_FLATMEM where
-alloc_node_mem_map allocates memory for the mem_map. alloc_node_mem_map
-will offset for unaligned nodes with the assumption the pfn/page
-translation functions will account for the offset. The functions for
-CONFIG_FLATMEM do not offset however, resulting in overrunning
-the memmap array. Just use the allocated memmap without any offset
-when running with CONFIG_FLATMEM to avoid the overrun.
+thanks for all your good work in getting this together.
+I have tested this and queued it up for v3.21.
 
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-Reported-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
-Srinivas, can you test this version of the patch?
----
- mm/page_alloc.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+I plan to push it to my devel branch later today.
+I plan to push it to my next branch and thus linux-next once
+clk-shmobile-for-3.20 appears in a v3.20-rc.
 
-diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-index 7633c50..33cef00 100644
---- a/mm/page_alloc.c
-+++ b/mm/page_alloc.c
-@@ -5014,6 +5014,7 @@ static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
- 	if (!pgdat->node_mem_map) {
- 		unsigned long size, start, end;
- 		struct page *map;
-+		unsigned long offset = 0;
- 
- 		/*
- 		 * The zone's endpoints aren't required to be MAX_ORDER
-@@ -5021,6 +5022,8 @@ static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
- 		 * for the buddy allocator to function correctly.
- 		 */
- 		start = pgdat->node_start_pfn & ~(MAX_ORDER_NR_PAGES - 1);
-+		if (!IS_ENABLED(CONFIG_FLATMEM))
-+			offset = pgdat->node_start_pfn - start;
- 		end = pgdat_end_pfn(pgdat);
- 		end = ALIGN(end, MAX_ORDER_NR_PAGES);
- 		size =  (end - start) * sizeof(struct page);
-@@ -5028,7 +5031,7 @@ static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
- 		if (!map)
- 			map = memblock_virt_alloc_node_nopanic(size,
- 							       pgdat->node_id);
--		pgdat->node_mem_map = map + (pgdat->node_start_pfn - start);
-+		pgdat->node_mem_map = map + offset;
- 	}
- #ifndef CONFIG_NEED_MULTIPLE_NODES
- 	/*
--- 
-Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+> Thanks!
+> 
+> Geert Uytterhoeven (2):
+>   ARM: shmobile: r8a73a4 dtsi: Add Bus State Controller node
+>   ARM: shmobile: ape6evm dts: Move Ethernet node to BSC
+> 
+> Laurent Pinchart (1):
+>   ARM: shmobile: r8a73a4: Remove legacy code
+> 
+> Ulrich Hecht (6):
+>   ARM: shmobile: r8a73a4: Add CPG register bits header
+>   ARM: shmobile: r8a73a4: Common clock framework DT description
+>   ARM: shmobile: ape6evm: Disable legacy clock initialization
+>   ARM: shmobile: r8a73a4: Add MSTP clock assignments to DT
+>   ARM: shmobile: ape6evm-reference: Remove board C code and DT file
+>   ARM: shmobile: r8a73a4: ape6evm: Remove legacy platform
+> 
+>  Documentation/devicetree/bindings/arm/shmobile.txt |   2 -
+>  MAINTAINERS                                        |   1 -
+>  arch/arm/boot/dts/Makefile                         |   2 -
+>  arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts    | 156 -----
+>  arch/arm/boot/dts/r8a73a4-ape6evm.dts              |  35 +-
+>  arch/arm/boot/dts/r8a73a4.dtsi                     | 333 +++++++++++
+>  arch/arm/configs/ape6evm_defconfig                 | 109 ----
+>  arch/arm/mach-shmobile/Kconfig                     |  25 -
+>  arch/arm/mach-shmobile/Makefile                    |   3 -
+>  arch/arm/mach-shmobile/Makefile.boot               |   2 -
+>  arch/arm/mach-shmobile/board-ape6evm-reference.c   |  60 --
+>  arch/arm/mach-shmobile/board-ape6evm.c             | 286 ---------
+>  arch/arm/mach-shmobile/clock-r8a73a4.c             | 659 ---------------------
+>  arch/arm/mach-shmobile/r8a73a4.h                   |  17 -
+>  arch/arm/mach-shmobile/setup-r8a73a4.c             | 273 +--------
+>  include/dt-bindings/clock/r8a73a4-clock.h          |  62 ++
+>  16 files changed, 412 insertions(+), 1613 deletions(-)
+
+More code removed, excellent!
+
+>  delete mode 100644 arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
+>  delete mode 100644 arch/arm/configs/ape6evm_defconfig
+>  delete mode 100644 arch/arm/mach-shmobile/board-ape6evm-reference.c
+>  delete mode 100644 arch/arm/mach-shmobile/board-ape6evm.c
+>  delete mode 100644 arch/arm/mach-shmobile/clock-r8a73a4.c
+>  delete mode 100644 arch/arm/mach-shmobile/r8a73a4.h
+>  create mode 100644 include/dt-bindings/clock/r8a73a4-clock.h
+> 
+> -- 
+> 1.9.1
+> 
+> Gr{oetje,eeting}s,
+> 
+> 						Geert
+> 
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+> 							    -- Linus Torvalds
+> 
