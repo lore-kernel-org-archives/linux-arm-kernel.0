@@ -1,44 +1,78 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Wed, 21 Jan 2015 11:56:37 -0600
-Subject: [PATCH v7 1/4] Documentation: dt: add common bindings for
- hwspinlock
-In-Reply-To: <CAK=WgbZGGtwmQwzWumjpYOsYHTt8vPQpTraABwJBsv5VXOmJ_Q@mail.gmail.com>
-References: <1421269101-51105-1-git-send-email-s-anna@ti.com>
- <1421269101-51105-2-git-send-email-s-anna@ti.com>
- <20150115135201.GG16217@leverpostej> <20150115135556.GH16217@leverpostej>
- <CAL_JsqL2LZAooMk-V8+xeF2g6acZE21M+-OBRw8aEVa-5wVHuQ@mail.gmail.com>
- <CAK=WgbYQ=BbinqJ5fsw2Y+FKdy=nasLsw9mX8pw6S_o3owy9-g@mail.gmail.com>
- <20150116101746.GA21809@leverpostej>
- <CAK=WgbYBqPoUm9byx0du_g5ZmHdYaUVLpSPZYHoCVzNoatNKpw@mail.gmail.com>
- <20150120180548.GK7718@atomide.com>
- <CAK=WgbZGGtwmQwzWumjpYOsYHTt8vPQpTraABwJBsv5VXOmJ_Q@mail.gmail.com>
-Message-ID: <54BFE855.3090200@ti.com>
+From: dave.long@linaro.org (David Long)
+Date: Wed, 21 Jan 2015 13:02:55 -0500
+Subject: [PATCH v4 3/6] arm64: Kprobes with single stepping support
+In-Reply-To: <54BCC852.60203@redhat.com>
+References: <1420949002-3726-1-git-send-email-dave.long@linaro.org>	<1420949002-3726-4-git-send-email-dave.long@linaro.org>
+ <CAHM4w1no=A1kTxN26znXD42USzO+ByHWHy76F2UMnmXhPKH0kQ@mail.gmail.com>
+ <54B96662.3030201@linaro.org> <54BCC852.60203@redhat.com>
+Message-ID: <54BFE9CF.4030703@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/21/2015 06:41 AM, Ohad Ben-Cohen wrote:
-> On Tue, Jan 20, 2015 at 8:05 PM, Tony Lindgren <tony@atomide.com> wrote:
->> How about default to Linux id space and allow overriding that with
->> a module param option if needed?
-> 
-> I'm not sure I'm following.
-> 
-> If the main point of contention is the base_id field, I'm also fine
-> with removing it entirely, as I'm not aware of any actual user for it
-> (Suman please confirm?).
+On 01/19/15 04:03, Pratyush Anand wrote:
+>
+>
+> On Saturday 17 January 2015 12:58 AM, David Long wrote:
+>>>> +static bool aarch64_insn_is_steppable(u32 insn)
+>>>> +{
+>>>> +       if (aarch64_get_insn_class(insn) == AARCH64_INSN_CLS_BR_SYS) {
+>>>> +               if (aarch64_insn_is_branch(insn))
+>>>> +                       return false;
+>>>> +
+>>>> +               /* modification of daif creates issues */
+>>>> +               if (aarch64_insn_is_msr_daif(insn))
+>>>> +                       return false;
+>>>> +
+>>>> +               if (aarch64_insn_is_hint(insn))
+>>>> +                       return aarch64_insn_is_nop(insn);
+>>>> +
+>>>> +               return true;
+>>>> +       }
+>>>> +
+>>>> +       if (aarch64_insn_uses_literal(insn))
+>>>> +               return false;
+>>>> +
+>>>> +       if (aarch64_insn_is_exclusive(insn))
+>>>> +               return false;
+>>>> +
+>>>> +       return true;
+>>>
+>>> Default true return may not be a good idea until we are sure that we
+>>> are returning false for all possible
+>>> simulation and rejection cases. In my opinion, its better to return
+>>> true only for steppable and false for
+>>> all remaining.
+>>>
+>>
+>> I struggled a little with this when I did it but I decided if the
+>> question was:  "should we have to recognize every instruction before
+>> deciding it was single-steppable or should we only recognize
+>> instructions that are *not* single-steppable", maybe it was OK to do the
+>> latter while recognizing extensions to the instruction set *could* end
+>> up (temporarly) allowing us to try and fail (badly) at single-stepping
+>> any problematic new instructions.  Certainly opinions could differ.  If
+>
+> Lets see what others say, but I see that this approach will result in
+> undesired behavior. For example: a probe has been tried to insert to svc
+> instruction. SVC or any other exception generation instruction is
+> expected to be rejected. But, current aarch64_insn_is_steppable will
+> return true for it and then kprobe/uprobe code will allow to insert
+> probe at that instruction, which will be wrong, no? I mean, I do not see
+> a way to get into last else (INSN_REJECTED) of arm_kprobe_decode_insn.
+>
+> So, if we go with this approach we need to insure that we cover all
+> simulation-able and reject-able cases in aarch64_insn_is_steppable.
+>
 
-Yeah, well the current implementations that I am aware of only have a
-single bank, so all of them would be using a value of 0. I am yet to see
-a platform with multiple instances where the property really makes a
-difference. v7 has the property mandatory, so all the implementations
-would need to define this value even if it is 0.
+yes, of course.  Any case that's missing in the current code needs to be 
+fixed.  If the result starts to look less practical than the 
+table-driven code then the new approach needs to be discarded.
 
-regards
-Suman
-
-> 
-> Mark? Rob? Will you accept Suman's patches if the base_id field is removed?
-> 
-> Thanks,
-> Ohad.
-> 
+> ~Pratyush
+>
+>
+>
+>> the consensus is that we can't allow this to ever happen (because old
+>> kprobe code is running on new hardware) then I think the only choice is
+>> to return to parsing binary tables.  Hopefully I could still find a way
+>> to leverage insn.c in that case.
