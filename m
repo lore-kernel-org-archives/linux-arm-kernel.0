@@ -1,45 +1,200 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 21 Jan 2015 17:41:51 +0100
-Subject: [PATCH 1/1] gpio: omap: Fix bad device access with setup_irq()
-In-Reply-To: <1421448650-15904-1-git-send-email-tony@atomide.com>
-References: <1421448650-15904-1-git-send-email-tony@atomide.com>
-Message-ID: <CACRpkdZ9pjyH0ZZ3GXOagGDPTa=LhuK5bG+wi2tsgP7=OQTGqw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 21 Jan 2015 16:46:32 +0000
+Subject: [PATCH] arm64: Add L2 cache topology to ARM Ltd boards/models
+In-Reply-To: <1421841750-26722-1-git-send-email-sudeep.holla@arm.com>
+References: <1421841750-26722-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20150121164632.GK5044@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 11:50 PM, Tony Lindgren <tony@atomide.com> wrote:
+On Wed, Jan 21, 2015 at 12:02:30PM +0000, Sudeep Holla wrote:
+> Commit 5d425c18653731af6 ("arm64: kernel: add support for cpu cache
+> information") adds cacheinfo support for ARM64. Since there's no
+> architectural way of detecting the cpus that share particular cache,
+> device tree can be used and the core cacheinfo already supports the
+> same.
 
-> Similar to omap_gpio_irq_type() let's make sure that the GPIO
-> is usable as an interrupt if the platform init code did not
-> call gpio_request(). Otherwise we can get invalid device access
-> after setup_irq():
->
-> WARNING: CPU: 0 PID: 1 at drivers/bus/omap_l3_noc.c:147 l3_interrupt_handler+0x214/0x340()
-> 44000000.ocp:L3 Custom Error: MASTER MPU TARGET L4CFG (Idle): Data Access in Supervisor mode during Functional access
-> ...
-> [<c05f21e4>] (__irq_svc) from [<c05f1974>] (_raw_spin_unlock_irqrestore+0x34/0x44)
-> [<c05f1974>] (_raw_spin_unlock_irqrestore) from [<c00914a8>] (__setup_irq+0x244/0x530)
-> [<c00914a8>] (__setup_irq) from [<c00917d4>] (setup_irq+0x40/0x8c)
-> [<c00917d4>] (setup_irq) from [<c0039c8c>] (omap_system_dma_probe+0x1d4/0x2b4)
-> [<c0039c8c>] (omap_system_dma_probe) from [<c03b2200>] (platform_drv_probe+0x44/0xa4)
-> ...
->
-> We can fix this the same way omap_gpio_irq_type() is handling it.
->
-> Note that the long term solution is to change the gpio-omap driver
-> to handle the banks as separate driver instances. This will allow
-> us to rely on just runtime PM for tracking the bank specific state.
->
-> Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Javier Martinez Canillas <javier@dowhile0.org>
-> Cc: Kevin Hilman <khilman@kernel.org>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> Cc: Santosh Shilimkar <ssantosh@kernel.org>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+This still leaves the possibility that misleading information is exposed
+for systems from other vendors. I've made a quick attempt to Cc the
+authors of other arm64 dts here.
 
-Patch applied for fixes with Felipe's Tested-by.
+Given that in the absence of these nodes we can't derive a complete view
+of the cache hierarchy, shouldn't we only expose the cacheinfo when we
+have these nodes and can therefore produce correct values?
 
-Yours,
-Linus Walleij
+I can imagine that future dts are likely to appear without these nodes,
+and I imagine that we won't spot all of those cases. We also have
+existing DTBs to take into account.
+
+Thanks,
+Mark.
+
+> 
+> This patch adds the L2 cache topology on Juno board, FVP/RTSM and
+> foundation models.
+> 
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Liviu Dudau <Liviu.Dudau@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
+>  arch/arm64/boot/dts/arm/foundation-v8.dts  |  8 ++++++++
+>  arch/arm64/boot/dts/arm/juno.dts           | 14 ++++++++++++++
+>  arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts |  8 ++++++++
+>  3 files changed, 30 insertions(+)
+> 
+> Hi Arnd/Olof,
+> 
+> Though this patch and commit 5d425c18653731af6 ("arm64: kernel: add
+> support for cpu cache information") which is in -next(via arm64) are
+> dependent to provide desired functionality, then can go indepedently
+> if you think there could be conflicts if this change is taken via arm64.
+> If not, Catalin can pick up with your acks after the review.
+> 
+> Regards,
+> Sudeep
+> 
+> diff --git a/arch/arm64/boot/dts/arm/foundation-v8.dts b/arch/arm64/boot/dts/arm/foundation-v8.dts
+> index 27f32962e55c..4eac8dcea423 100644
+> --- a/arch/arm64/boot/dts/arm/foundation-v8.dts
+> +++ b/arch/arm64/boot/dts/arm/foundation-v8.dts
+> @@ -34,6 +34,7 @@
+>  			reg = <0x0 0x0>;
+>  			enable-method = "spin-table";
+>  			cpu-release-addr = <0x0 0x8000fff8>;
+> +			next-level-cache = <&L2_0>;
+>  		};
+>  		cpu at 1 {
+>  			device_type = "cpu";
+> @@ -41,6 +42,7 @@
+>  			reg = <0x0 0x1>;
+>  			enable-method = "spin-table";
+>  			cpu-release-addr = <0x0 0x8000fff8>;
+> +			next-level-cache = <&L2_0>;
+>  		};
+>  		cpu at 2 {
+>  			device_type = "cpu";
+> @@ -48,6 +50,7 @@
+>  			reg = <0x0 0x2>;
+>  			enable-method = "spin-table";
+>  			cpu-release-addr = <0x0 0x8000fff8>;
+> +			next-level-cache = <&L2_0>;
+>  		};
+>  		cpu at 3 {
+>  			device_type = "cpu";
+> @@ -55,6 +58,11 @@
+>  			reg = <0x0 0x3>;
+>  			enable-method = "spin-table";
+>  			cpu-release-addr = <0x0 0x8000fff8>;
+> +			next-level-cache = <&L2_0>;
+> +		};
+> +
+> +		L2_0: l2-cache0 {
+> +			compatible = "cache";
+>  		};
+>  	};
+>  
+> diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+> index cb3073e4e7a8..15dafbb24426 100644
+> --- a/arch/arm64/boot/dts/arm/juno.dts
+> +++ b/arch/arm64/boot/dts/arm/juno.dts
+> @@ -39,6 +39,7 @@
+>  			reg = <0x0 0x0>;
+>  			device_type = "cpu";
+>  			enable-method = "psci";
+> +			next-level-cache = <&A57_L2>;
+>  		};
+>  
+>  		A57_1: cpu at 1 {
+> @@ -46,6 +47,7 @@
+>  			reg = <0x0 0x1>;
+>  			device_type = "cpu";
+>  			enable-method = "psci";
+> +			next-level-cache = <&A57_L2>;
+>  		};
+>  
+>  		A53_0: cpu at 100 {
+> @@ -53,6 +55,7 @@
+>  			reg = <0x0 0x100>;
+>  			device_type = "cpu";
+>  			enable-method = "psci";
+> +			next-level-cache = <&A53_L2>;
+>  		};
+>  
+>  		A53_1: cpu at 101 {
+> @@ -60,6 +63,7 @@
+>  			reg = <0x0 0x101>;
+>  			device_type = "cpu";
+>  			enable-method = "psci";
+> +			next-level-cache = <&A53_L2>;
+>  		};
+>  
+>  		A53_2: cpu at 102 {
+> @@ -67,6 +71,7 @@
+>  			reg = <0x0 0x102>;
+>  			device_type = "cpu";
+>  			enable-method = "psci";
+> +			next-level-cache = <&A53_L2>;
+>  		};
+>  
+>  		A53_3: cpu at 103 {
+> @@ -74,6 +79,15 @@
+>  			reg = <0x0 0x103>;
+>  			device_type = "cpu";
+>  			enable-method = "psci";
+> +			next-level-cache = <&A53_L2>;
+> +		};
+> +
+> +		A57_L2: l2-cache0 {
+> +			compatible = "cache";
+> +		};
+> +
+> +		A53_L2: l2-cache1 {
+> +			compatible = "cache";
+>  		};
+>  	};
+>  
+> diff --git a/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts b/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
+> index efc59b3baf63..20addabbd127 100644
+> --- a/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
+> +++ b/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
+> @@ -37,6 +37,7 @@
+>  			reg = <0x0 0x0>;
+>  			enable-method = "spin-table";
+>  			cpu-release-addr = <0x0 0x8000fff8>;
+> +			next-level-cache = <&L2_0>;
+>  		};
+>  		cpu at 1 {
+>  			device_type = "cpu";
+> @@ -44,6 +45,7 @@
+>  			reg = <0x0 0x1>;
+>  			enable-method = "spin-table";
+>  			cpu-release-addr = <0x0 0x8000fff8>;
+> +			next-level-cache = <&L2_0>;
+>  		};
+>  		cpu at 2 {
+>  			device_type = "cpu";
+> @@ -51,6 +53,7 @@
+>  			reg = <0x0 0x2>;
+>  			enable-method = "spin-table";
+>  			cpu-release-addr = <0x0 0x8000fff8>;
+> +			next-level-cache = <&L2_0>;
+>  		};
+>  		cpu at 3 {
+>  			device_type = "cpu";
+> @@ -58,6 +61,11 @@
+>  			reg = <0x0 0x3>;
+>  			enable-method = "spin-table";
+>  			cpu-release-addr = <0x0 0x8000fff8>;
+> +			next-level-cache = <&L2_0>;
+> +		};
+> +
+> +		L2_0: l2-cache0 {
+> +			compatible = "cache";
+>  		};
+>  	};
+>  
+> -- 
+> 1.9.1
+> 
+> 
