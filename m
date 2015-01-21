@@ -1,205 +1,221 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 21 Jan 2015 08:36:29 +0200
-Subject: [PATCH v3 2/2] clocksource: driver for Conexant Digicolor SoC timer
-In-Reply-To: <cover.1421821466.git.baruch@tkos.co.il>
-References: <cover.1421821466.git.baruch@tkos.co.il>
-Message-ID: <762d81b2cf12922ba28fb58b3ea4d5b7072abefb.1421821466.git.baruch@tkos.co.il>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 21 Jan 2015 15:43:11 +0900
+Subject: [PATCH v3] pinctrl: exynos: Add support for Exynos5433
+Message-ID: <1421822591-10536-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clocksource driver to the Conexant CX92755 SoC, part of the Digicolor SoCs
-series. Hardware provides 8 timers, A to H. Timer A is dedicated to a future
-watchdog driver so we don't use it here. Use timer B for sched_clock, and timer
-C for clock_event.
+This patch adds driver data for Exynos5433 SoC. Exynos5433 includes 228 multi-
+functional input/output port pins and 135 memory port pins. There are 41 general
+port groups and 2 memory port groups.
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
+Cc: Thomas Abraham <thomas.abraham@linaro.org>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Acked-by: Inki Dae <inki.dae@samsung.com>
 ---
- drivers/clocksource/Makefile          |   1 +
- drivers/clocksource/timer-digicolor.c | 164 ++++++++++++++++++++++++++++++++++
- 2 files changed, 165 insertions(+)
- create mode 100644 drivers/clocksource/timer-digicolor.c
+Changes from v2:
+- Rebase it on v3.19-rc5
 
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 94d90b24b56b..a993c108be67 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -10,6 +10,7 @@ obj-$(CONFIG_SH_TIMER_TMU)	+= sh_tmu.o
- obj-$(CONFIG_EM_TIMER_STI)	+= em_sti.o
- obj-$(CONFIG_CLKBLD_I8253)	+= i8253.o
- obj-$(CONFIG_CLKSRC_MMIO)	+= mmio.o
-+obj-$(CONFIG_ARCH_DIGICOLOR)	+= timer-digicolor.o
- obj-$(CONFIG_DW_APB_TIMER)	+= dw_apb_timer.o
- obj-$(CONFIG_DW_APB_TIMER_OF)	+= dw_apb_timer_of.o
- obj-$(CONFIG_CLKSRC_NOMADIK_MTU)	+= nomadik-mtu.o
-diff --git a/drivers/clocksource/timer-digicolor.c b/drivers/clocksource/timer-digicolor.c
-new file mode 100644
-index 000000000000..014c50675980
---- /dev/null
-+++ b/drivers/clocksource/timer-digicolor.c
-@@ -0,0 +1,164 @@
+Changes from v1:
+- Fix the wrong number of Exynos5433 (four -> ten)
+- Divide pinctrl patch from following patch[1]
+ [1] https://lkml.org/lkml/2014/12/2/134
+
+ drivers/pinctrl/samsung/pinctrl-exynos.c  | 153 ++++++++++++++++++++++++++++++
+ drivers/pinctrl/samsung/pinctrl-samsung.c |   2 +
+ drivers/pinctrl/samsung/pinctrl-samsung.h |   1 +
+ 3 files changed, 156 insertions(+)
+
+diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c
+index becb379..4976441 100644
+--- a/drivers/pinctrl/samsung/pinctrl-exynos.c
++++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
+@@ -1240,6 +1240,159 @@ const struct samsung_pin_ctrl exynos5420_pin_ctrl[] __initconst = {
+ 	},
+ };
+ 
++/* pin banks of exynos5433 pin-controller - ALIVE */
++static const struct samsung_pin_bank_data exynos5433_pin_banks0[] = {
++	EXYNOS_PIN_BANK_EINTW(8, 0x000, "gpa0", 0x00),
++	EXYNOS_PIN_BANK_EINTW(8, 0x020, "gpa1", 0x04),
++	EXYNOS_PIN_BANK_EINTW(8, 0x040, "gpa2", 0x08),
++	EXYNOS_PIN_BANK_EINTW(8, 0x060, "gpa3", 0x0c),
++};
++
++/* pin banks of exynos5433 pin-controller - AUD */
++static const struct samsung_pin_bank_data exynos5433_pin_banks1[] = {
++	EXYNOS_PIN_BANK_EINTG(7, 0x000, "gpz0", 0x00),
++	EXYNOS_PIN_BANK_EINTG(4, 0x020, "gpz1", 0x04),
++};
++
++/* pin banks of exynos5433 pin-controller - CPIF */
++static const struct samsung_pin_bank_data exynos5433_pin_banks2[] = {
++	EXYNOS_PIN_BANK_EINTG(2, 0x000, "gpv6", 0x00),
++};
++
++/* pin banks of exynos5433 pin-controller - eSE */
++static const struct samsung_pin_bank_data exynos5433_pin_banks3[] = {
++	EXYNOS_PIN_BANK_EINTG(3, 0x000, "gpj2", 0x00),
++};
++
++/* pin banks of exynos5433 pin-controller - FINGER */
++static const struct samsung_pin_bank_data exynos5433_pin_banks4[] = {
++	EXYNOS_PIN_BANK_EINTG(4, 0x000, "gpd5", 0x00),
++};
++
++/* pin banks of exynos5433 pin-controller - FSYS */
++static const struct samsung_pin_bank_data exynos5433_pin_banks5[] = {
++	EXYNOS_PIN_BANK_EINTG(6, 0x000, "gph1", 0x00),
++	EXYNOS_PIN_BANK_EINTG(7, 0x020, "gpr4", 0x04),
++	EXYNOS_PIN_BANK_EINTG(5, 0x040, "gpr0", 0x08),
++	EXYNOS_PIN_BANK_EINTG(8, 0x060, "gpr1", 0x0c),
++	EXYNOS_PIN_BANK_EINTG(2, 0x080, "gpr2", 0x10),
++	EXYNOS_PIN_BANK_EINTG(8, 0x0a0, "gpr3", 0x14),
++};
++
++/* pin banks of exynos5433 pin-controller - IMEM */
++static const struct samsung_pin_bank_data exynos5433_pin_banks6[] = {
++	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpf0", 0x00),
++};
++
++/* pin banks of exynos5433 pin-controller - NFC */
++static const struct samsung_pin_bank_data exynos5433_pin_banks7[] = {
++	EXYNOS_PIN_BANK_EINTG(3, 0x000, "gpj0", 0x00),
++};
++
++/* pin banks of exynos5433 pin-controller - PERIC */
++static const struct samsung_pin_bank_data exynos5433_pin_banks8[] = {
++	EXYNOS_PIN_BANK_EINTG(6, 0x000, "gpv7", 0x00),
++	EXYNOS_PIN_BANK_EINTG(5, 0x020, "gpb0", 0x04),
++	EXYNOS_PIN_BANK_EINTG(8, 0x040, "gpc0", 0x08),
++	EXYNOS_PIN_BANK_EINTG(2, 0x060, "gpc1", 0x0c),
++	EXYNOS_PIN_BANK_EINTG(6, 0x080, "gpc2", 0x10),
++	EXYNOS_PIN_BANK_EINTG(8, 0x0a0, "gpc3", 0x14),
++	EXYNOS_PIN_BANK_EINTG(2, 0x0c0, "gpg0", 0x18),
++	EXYNOS_PIN_BANK_EINTG(4, 0x0e0, "gpd0", 0x1c),
++	EXYNOS_PIN_BANK_EINTG(6, 0x100, "gpd1", 0x20),
++	EXYNOS_PIN_BANK_EINTG(8, 0x120, "gpd2", 0x24),
++	EXYNOS_PIN_BANK_EINTG(5, 0x140, "gpd4", 0x28),
++	EXYNOS_PIN_BANK_EINTG(2, 0x160, "gpd8", 0x2c),
++	EXYNOS_PIN_BANK_EINTG(7, 0x180, "gpd6", 0x30),
++	EXYNOS_PIN_BANK_EINTG(3, 0x1a0, "gpd7", 0x34),
++	EXYNOS_PIN_BANK_EINTG(5, 0x1c0, "gpg1", 0x38),
++	EXYNOS_PIN_BANK_EINTG(2, 0x1e0, "gpg2", 0x3c),
++	EXYNOS_PIN_BANK_EINTG(8, 0x200, "gpg3", 0x40),
++};
++
++/* pin banks of exynos5433 pin-controller - TOUCH */
++static const struct samsung_pin_bank_data exynos5433_pin_banks9[] = {
++	EXYNOS_PIN_BANK_EINTG(3, 0x000, "gpj1", 0x00),
++};
++
 +/*
-+ * Conexant Digicolor timer driver
-+ *
-+ * Author: Baruch Siach <baruch@tkos.co.il>
-+ *
-+ * Copyright (C) 2014 Paradox Innovation Ltd.
-+ *
-+ * Based on:
-+ *	Allwinner SoCs hstimer driver
-+ *
-+ * Copyright (C) 2013 Maxime Ripard
-+ *
-+ * Maxime Ripard <maxime.ripard@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
++ * Samsung pinctrl driver data for Exynos5433 SoC. Exynos5433 SoC includes
++ * ten gpio/pin-mux/pinconfig controllers.
 + */
-+
-+/*
-+ * Conexant Digicolor SoCs have 8 configurable timers, named from "Timer A" to
-+ * "Timer H". Timer A is the only one with watchdog support, so it is dedicated
-+ * to the watchdog driver. This driver uses Timer B for sched_clock(), and
-+ * Timer C for clockevents.
-+ */
-+
-+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-+
-+#include <linux/clk.h>
-+#include <linux/clockchips.h>
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/irqreturn.h>
-+#include <linux/sched_clock.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+
-+enum {
-+	TIMER_A,
-+	TIMER_B,
-+	TIMER_C,
-+	TIMER_D,
-+	TIMER_E,
-+	TIMER_F,
-+	TIMER_G,
-+	TIMER_H,
++const struct samsung_pin_ctrl exynos5433_pin_ctrl[] = {
++	{
++		/* pin-controller instance 0 data */
++		.pin_banks	= exynos5433_pin_banks0,
++		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks0),
++		.eint_wkup_init = exynos_eint_wkup_init,
++		.suspend	= exynos_pinctrl_suspend,
++		.resume		= exynos_pinctrl_resume,
++	}, {
++		/* pin-controller instance 1 data */
++		.pin_banks	= exynos5433_pin_banks1,
++		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks1),
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.suspend	= exynos_pinctrl_suspend,
++		.resume		= exynos_pinctrl_resume,
++	}, {
++		/* pin-controller instance 2 data */
++		.pin_banks	= exynos5433_pin_banks2,
++		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks2),
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.suspend	= exynos_pinctrl_suspend,
++		.resume		= exynos_pinctrl_resume,
++	}, {
++		/* pin-controller instance 3 data */
++		.pin_banks	= exynos5433_pin_banks3,
++		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks3),
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.suspend	= exynos_pinctrl_suspend,
++		.resume		= exynos_pinctrl_resume,
++	}, {
++		/* pin-controller instance 4 data */
++		.pin_banks	= exynos5433_pin_banks4,
++		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks4),
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.suspend	= exynos_pinctrl_suspend,
++		.resume		= exynos_pinctrl_resume,
++	}, {
++		/* pin-controller instance 5 data */
++		.pin_banks	= exynos5433_pin_banks5,
++		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks5),
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.suspend	= exynos_pinctrl_suspend,
++		.resume		= exynos_pinctrl_resume,
++	}, {
++		/* pin-controller instance 6 data */
++		.pin_banks	= exynos5433_pin_banks6,
++		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks6),
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.suspend	= exynos_pinctrl_suspend,
++		.resume		= exynos_pinctrl_resume,
++	}, {
++		/* pin-controller instance 7 data */
++		.pin_banks	= exynos5433_pin_banks7,
++		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks7),
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.suspend	= exynos_pinctrl_suspend,
++		.resume		= exynos_pinctrl_resume,
++	}, {
++		/* pin-controller instance 8 data */
++		.pin_banks	= exynos5433_pin_banks8,
++		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks8),
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.suspend	= exynos_pinctrl_suspend,
++		.resume		= exynos_pinctrl_resume,
++	}, {
++		/* pin-controller instance 9 data */
++		.pin_banks	= exynos5433_pin_banks9,
++		.nr_banks	= ARRAY_SIZE(exynos5433_pin_banks9),
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.suspend	= exynos_pinctrl_suspend,
++		.resume		= exynos_pinctrl_resume,
++	},
 +};
 +
-+#define CONTROL(t)	((t)*8)
-+#define COUNT(t)	((t)*8 + 4)
-+
-+static void __iomem *timer_base;
-+static u32 ticks_per_jiffy;
-+
-+static void digicolor_clkevt_mode(enum clock_event_mode mode,
-+				  struct clock_event_device *clk)
-+{
-+	switch (mode) {
-+	case CLOCK_EVT_MODE_PERIODIC:
-+		writeb(0, timer_base + CONTROL(TIMER_C));
-+		writel(ticks_per_jiffy, timer_base + COUNT(TIMER_C));
-+		writeb(0x21, timer_base + CONTROL(TIMER_C));
-+		break;
-+	case CLOCK_EVT_MODE_ONESHOT:
-+		writeb(0, timer_base + CONTROL(TIMER_C));
-+		writeb(0x11, timer_base + CONTROL(TIMER_C));
-+		break;
-+	case CLOCK_EVT_MODE_UNUSED:
-+	case CLOCK_EVT_MODE_SHUTDOWN:
-+	default:
-+		writeb(0, timer_base + CONTROL(TIMER_C));
-+		break;
-+	}
-+}
-+
-+static int digicolor_clkevt_next_event(unsigned long evt,
-+				       struct clock_event_device *unused)
-+{
-+	writeb(0, timer_base + CONTROL(TIMER_C));
-+	writel(evt, timer_base + COUNT(TIMER_C));
-+	writeb(0x11, timer_base + CONTROL(TIMER_C));
-+
-+	return 0;
-+}
-+
-+static struct clock_event_device digicolor_clockevent = {
-+	.name = "digicolor_tick",
-+	.rating = 340,
-+	.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-+	.set_mode = digicolor_clkevt_mode,
-+	.set_next_event = digicolor_clkevt_next_event,
-+};
-+
-+
-+static irqreturn_t digicolor_timer_interrupt(int irq, void *dev_id)
-+{
-+	struct clock_event_device *evt = (struct clock_event_device *)dev_id;
-+
-+	evt->event_handler(evt);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static struct irqaction digicolor_timer_irq = {
-+	.name = "digicolor_timerC",
-+	.flags = IRQF_TIMER | IRQF_IRQPOLL,
-+	.handler = digicolor_timer_interrupt,
-+	.dev_id = &digicolor_clockevent,
-+};
-+
-+static u64 digicolor_timer_sched_read(void)
-+{
-+	return ~readl(timer_base + COUNT(TIMER_B));
-+}
-+
-+static void __init digicolor_timer_init(struct device_node *node)
-+{
-+	unsigned long rate;
-+	struct clk *clk;
-+	int ret, irq;
-+
-+	timer_base = of_iomap(node, 0);
-+	if (!timer_base) {
-+		pr_err("Can't map registers");
-+		return;
-+	}
-+
-+	irq = irq_of_parse_and_map(node, TIMER_C);
-+	if (irq <= 0) {
-+		pr_err("Can't parse IRQ");
-+		return;
-+	}
-+
-+	clk = of_clk_get(node, 0);
-+	if (IS_ERR(clk)) {
-+		pr_err("Can't get timer clock");
-+		return;
-+	}
-+	clk_prepare_enable(clk);
-+	rate = clk_get_rate(clk);
-+
-+	writeb(0, timer_base + CONTROL(TIMER_B));
-+	writel(~0, timer_base + COUNT(TIMER_B));
-+	writeb(1, timer_base + CONTROL(TIMER_B));
-+
-+	sched_clock_register(digicolor_timer_sched_read, 32, rate);
-+	clocksource_mmio_init(timer_base + COUNT(TIMER_B), node->name,
-+			      rate, 340, 32, clocksource_mmio_readl_down);
-+
-+	ticks_per_jiffy = DIV_ROUND_UP(rate, HZ);
-+
-+	ret = setup_irq(irq, &digicolor_timer_irq);
-+	if (ret)
-+		pr_warn("failed to setup timer irq %d (%d)\n", irq, ret);
-+
-+	digicolor_clockevent.cpumask = cpu_possible_mask;
-+	digicolor_clockevent.irq = irq;
-+
-+	clockevents_config_and_register(&digicolor_clockevent, rate, 0,
-+					0xffffffff);
-+}
-+CLOCKSOURCE_OF_DECLARE(conexant_digicolor, "cnxt,cx92755-timer",
-+		       digicolor_timer_init);
+ /* pin banks of exynos7 pin-controller - ALIVE */
+ static const struct samsung_pin_bank_data exynos7_pin_banks0[] __initconst = {
+ 	EXYNOS_PIN_BANK_EINTW(8, 0x000, "gpa0", 0x00),
+diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
+index ec580af..ed165ba 100644
+--- a/drivers/pinctrl/samsung/pinctrl-samsung.c
++++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
+@@ -1239,6 +1239,8 @@ static const struct of_device_id samsung_pinctrl_dt_match[] = {
+ 		.data = (void *)exynos5260_pin_ctrl },
+ 	{ .compatible = "samsung,exynos5420-pinctrl",
+ 		.data = (void *)exynos5420_pin_ctrl },
++	{ .compatible = "samsung,exynos5433-pinctrl",
++		.data = (void *)exynos5433_pin_ctrl },
+ 	{ .compatible = "samsung,s5pv210-pinctrl",
+ 		.data = (void *)s5pv210_pin_ctrl },
+ 	{ .compatible = "samsung,exynos7-pinctrl",
+diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.h b/drivers/pinctrl/samsung/pinctrl-samsung.h
+index 1b8c013..c1239ff 100644
+--- a/drivers/pinctrl/samsung/pinctrl-samsung.h
++++ b/drivers/pinctrl/samsung/pinctrl-samsung.h
+@@ -271,6 +271,7 @@ extern const struct samsung_pin_ctrl exynos4415_pin_ctrl[];
+ extern const struct samsung_pin_ctrl exynos5250_pin_ctrl[];
+ extern const struct samsung_pin_ctrl exynos5260_pin_ctrl[];
+ extern const struct samsung_pin_ctrl exynos5420_pin_ctrl[];
++extern const struct samsung_pin_ctrl exynos5433_pin_ctrl[];
+ extern const struct samsung_pin_ctrl exynos7_pin_ctrl[];
+ extern const struct samsung_pin_ctrl s3c64xx_pin_ctrl[];
+ extern const struct samsung_pin_ctrl s3c2412_pin_ctrl[];
 -- 
-2.1.4
+1.8.5.5
