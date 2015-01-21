@@ -1,106 +1,41 @@
-From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Wed, 21 Jan 2015 11:54:51 +0900
-Subject: [PATCH v2] ARM: dts: exynos5422-odroidxu3: add on-board INA231
- sensors
-In-Reply-To: <1421284089-421-1-git-send-email-khilman@kernel.org>
-References: <1421284089-421-1-git-send-email-khilman@kernel.org>
-Message-ID: <54BF14FB.8050300@samsung.com>
+From: yvo@apm.com (Y Vo)
+Date: Wed, 21 Jan 2015 09:59:25 +0700
+Subject: [PATCH v3 3/3] arm64: dts: Add APM X-Gene standby GPIO controller DTS
+ entries
+Message-ID: <1421809165-8520-1-git-send-email-yvo@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+Add standby domain gpio controller for APM X-Gene SoC platform.
 
-On 01/15/2015 10:08 AM, Kevin Hilman wrote:
-> From: Kevin Hilman <khilman@linaro.org>
-> 
-> The odroid-xu3 has 4 INA231 current sensors on board which can be
-> accessed from the Linux via the hwmon interface.
-> 
-> There is one sensor for each of these power rails:
-> 
-> - A15 cluster: VDD_ARM
-> - A7 cluster: VDD_KFC
-> - GPU: VDD_G3D
-> - memory: VDD_MEM
-> 
-> In addition to adding the sensors, LDO26 from the PMIC needs to be
-> enabled because it's powering these sensor.
-> 
-> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Cc: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-> Signed-off-by: Kevin Hilman <khilman@linaro.org>
-> ---
-> v2: use "ti,ina231" as compatible string.
-> 
-> Applies on top of "ARM: dts: Add dts file for odroid XU3 board" from Sjoerd Simons.
-> 
->  arch/arm/boot/dts/exynos5422-odroidxu3.dts | 39 ++++++++++++++++++++++++++++++
->  1 file changed, 39 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-> index c29123c0734d..50353d023225 100644
-> --- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-> @@ -174,6 +174,13 @@
->  					regulator-always-on;
->  				};
->  
-> +				ldo26_reg: LDO26 {
-> +					regulator-name = "vdd_ldo26";
-> +					regulator-min-microvolt = <3000000>;
-> +					regulator-max-microvolt = <3000000>;
-> +					regulator-always-on;
-> +				};
-> +
->  				buck1_reg: BUCK1 {
->  					regulator-name = "vdd_mif";
->  					regulator-min-microvolt = <800000>;
-> @@ -257,6 +264,38 @@
->  		};
->  	};
->  
-> +	i2c_0: i2c at 12C60000 {
+Signed-off-by: Y Vo <yvo@apm.com>
+---
+ arch/arm64/boot/dts/apm/apm-storm.dtsi |   13 +++++++++++++
+ 1 files changed, 13 insertions(+), 0 deletions(-)
 
-It's ok but IMHO it can split using label reference, e.g. 
-
-&i2c_0 {
-	...
-};
-
-Thanks.
-
-> +		status = "okay";
-> +
-> +		/* A15 cluster: VDD_ARM */
-> +		ina231 at 40 {
-> +			compatible = "ti,ina231";
-> +			reg = <0x40>;
-> +			shunt-resistor = <10000>;
-> +		};
-> +
-> +		/* memory: VDD_MEM */
-> +		ina231 at 41 {
-> +			compatible = "ti,ina231";
-> +			reg = <0x41>;
-> +			shunt-resistor = <10000>;
-> +		};
-> +
-> +		/* GPU: VDD_G3D */
-> +		ina231 at 44 {
-> +			compatible = "ti,ina231";
-> +			reg = <0x44>;
-> +			shunt-resistor = <10000>;
-> +		};
-> +
-> +		/* A7 cluster: VDD_KFC */
-> +		ina231 at 45 {
-> +			compatible = "ti,ina231";
-> +			reg = <0x45>;
-> +			shunt-resistor = <10000>;
-> +		};
-> +	};
-> +
->  	i2c_2: i2c at 12C80000 {
->  		samsung,i2c-sda-delay = <100>;
->  		samsung,i2c-max-bus-freq = <66000>;
-> 
+diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+index f1ad9c2..2e1c438 100644
+--- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
++++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+@@ -587,6 +587,19 @@
+ 			phy-names = "sata-phy";
+ 		};
+ 
++		sbgpio: sbgpio at 17001000{
++			compatible = "apm,xgene-gpio-sb";
++			reg = <0x0 0x17001000 0x0 0x400>;
++			#gpio-cells = <2>;
++			gpio-controller;
++			interrupts = 	<0x0 0x28 0x1>,
++					<0x0 0x29 0x1>,
++					<0x0 0x2a 0x1>,
++					<0x0 0x2b 0x1>,
++					<0x0 0x2c 0x1>,
++					<0x0 0x2d 0x1>;
++		};
++
+ 		rtc: rtc at 10510000 {
+ 			compatible = "apm,xgene-rtc";
+ 			reg = <0x0 0x10510000 0x0 0x400>;
+-- 
+1.7.1
