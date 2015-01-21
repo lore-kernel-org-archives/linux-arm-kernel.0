@@ -1,32 +1,24 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 21 Jan 2015 10:03:55 -0500 (EST)
-Subject: [PATCHv3 1/2] usb: ehci-platform: add support for multiple phys
- per controller
-In-Reply-To: <1421712330-11089-2-git-send-email-arun.ramamurthy@broadcom.com>
-Message-ID: <Pine.LNX.4.44L0.1501211002380.1670-100000@iolanthe.rowland.org>
+From: joro@8bytes.org (joro at 8bytes.org)
+Date: Wed, 21 Jan 2015 16:05:29 +0100
+Subject: [PATCH v2] iommu/ipmmu-vmsa: Use the ARM LPAE page table allocator
+In-Reply-To: <7446358.Tz4W75qRf1@avalon>
+References: <20150119140106.GM6343@8bytes.org>
+ <1421771404-22774-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20150121144419.GJ4549@arm.com> <7446358.Tz4W75qRf1@avalon>
+Message-ID: <20150121150529.GA30345@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 19 Jan 2015 arun.ramamurthy at broadcom.com wrote:
+On Wed, Jan 21, 2015 at 04:58:12PM +0200, Laurent Pinchart wrote:
+> All my other ipmmu patches have been queued by Joerg in his next branch, on 
+> which this patch is based. If you base your series on the same branch you can 
+> just queue this patch on top of it. Do you plan to submit the result to v3.20 
+> or v3.21 ?
 
-> From: Arun Ramamurthy <arunrama@broadcom.com>
-> 
-> Added support for cases where one controller is connected
-> to multiple phys.
-> 
-> Signed-off-by: Arun Ramamurthy <arunrama@broadcom.com>
-> Reviewed-by: Ray Jui <rjui@broadcom.com>
-> Reviewed-by: Scott Branden <sbranden@broadcom.com>
-> Tested-by: Scott Branden <sbranden@broadcom.com>
-> ---
+Hmm, I would prefer to not merge stuff together like this. Preferably I
+would like to put the generic page-table patches for ARM in a seperate
+topic-branch without any other changes merged in, given that this does
+not cause any non-trivial merge conflicts in the end for my next branch.
 
-Right here is where you should explain how v3 of this patch is 
-different from v2.
 
-Anyway, it looks good.
-
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
-
-Did you run it through checkpatch.pl?
-
-Alan Stern
+	Joerg
