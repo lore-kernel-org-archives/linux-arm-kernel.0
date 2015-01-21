@@ -1,45 +1,46 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 21 Jan 2015 09:20:22 +0100
-Subject: [PATCH v4 2/2] I2C: mediatek: Add driver for MediaTek I2C
- controller
-In-Reply-To: <1421810004.15468.825.camel@mtksdaap41>
-References: <1421404418-50718-1-git-send-email-eddie.huang@mediatek.com>
- <1421404418-50718-3-git-send-email-eddie.huang@mediatek.com>
- <20150118101816.GF22880@pengutronix.de>
- <1421810004.15468.825.camel@mtksdaap41>
-Message-ID: <20150121082022.GT22880@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 21 Jan 2015 09:26:22 +0100
+Subject: [PATCH 8/8] regulator: MT6397: Add support for MT6397 regulator
+In-Reply-To: <1421747231-554-9-git-send-email-s.hauer@pengutronix.de>
+References: <1421747231-554-1-git-send-email-s.hauer@pengutronix.de>
+ <1421747231-554-9-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20150121082622.GG18908@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Jan 20, 2015 at 10:47:11AM +0100, Sascha Hauer wrote:
+> From: Flora Fu <flora.fu@mediatek.com>
+> 
+> This adds support for the regulators on the MediaTek MT6397
+> Multifunction device.
+> 
+> Signed-off-by: Flora Fu, MediaTek
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Liam Girdwood <lgirdwood@gmail.com>
+> Cc: Mark Brown <broonie@kernel.org>
+> ---
+>  Documentation/devicetree/bindings/mfd/mt6397.txt   |  41 ++-
+>  .../bindings/regulator/mt6397-regulator.txt        | 217 ++++++++++++++
+>  drivers/regulator/Kconfig                          |   9 +
+>  drivers/regulator/Makefile                         |   1 +
+>  drivers/regulator/mt6397-regulator.c               | 332 +++++++++++++++++++++
+>  include/linux/regulator/mt6397-regulator.h         |  49 +++
+>  6 files changed, 626 insertions(+), 23 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/regulator/mt6397-regulator.txt
+>  create mode 100644 drivers/regulator/mt6397-regulator.c
+>  create mode 100644 include/linux/regulator/mt6397-regulator.h
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/mt6397.txt b/Documentation/devicetree/bindings/mfd/mt6397.txt
 
-On Wed, Jan 21, 2015 at 11:13:24AM +0800, Eddie Huang wrote:
-> > > +	/* set when doing the transfer */
-> > > +	u16 irq_stat;			/* interrupt status */
-> > > +	unsigned int speed_hz;		/* The speed in transfer */
-> > > +	bool trans_stop;		/* i2c transfer stop */
-> > > +	enum mtk_trans_op op;
-> > > +	u16 msg_len;
-> > > +	u8 *msg_buf;			/* pointer to msg data */
-> > > +	u16 msg_aux_len;		/* WRRD mode to set AUX_LEN register*/
-> > > +	u16 addr;	/* 7bit slave address, without read/write bit */
-> > Wouldn't it be easier to maintain a pointer to the message to be
-> > transferred?
-> I think use mtk_i2c pointer is more flexible than maintain a pointer to
-> message.
-Not sure you understood what I intended to suggest. My idea was to drop
+I'll move this documentation update to the patch adding the MFD driver
+where it belongs to. I'll drop the reset of this patch since it's already
+in Linux-next.
 
-	u16 msg_len;
-	u8 *msg_buf;
-	u16 msg_aux_len; // maybe
-	u16 addr;
+Sascha
 
-from struct mtk_i2c and add a struct i2c_msg *msg instead. Up to you to
-decide.
-
-Best regards
-Uwe
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
