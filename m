@@ -1,52 +1,125 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Wed, 21 Jan 2015 19:15:31 +0000
-Subject: [PATCH v2] drm/i2c: tda998x: Set the CEC I2C address based on
- the slave I2C address.
-In-Reply-To: <20150121184658.GX26493@n2100.arm.linux.org.uk>
-References: <545C835D.1050008@arm.com>
- <20150121184405.GI10762@e106497-lin.cambridge.arm.com>
- <20150121184658.GX26493@n2100.arm.linux.org.uk>
-Message-ID: <20150121191531.GJ10762@e106497-lin.cambridge.arm.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 21 Jan 2015 11:21:15 -0800
+Subject: [PATCH v2] ARM: qcom: Fix SCM interface for big-endian kernels
+Message-ID: <1421868075-20471-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 21, 2015 at 06:46:58PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Jan 21, 2015 at 06:44:05PM +0000, Liviu Dudau wrote:
-> > On Fri, Nov 07, 2014 at 08:31:25AM +0000, Andrew Jackson wrote:
-> > > The I2C address for the TDA9989 and TDA19989 is fixed at 0x34
-> > > but the two LSBs of the TDA19988's address are set by two configuration
-> > > pins on the chip.  Irrespective of the chip, the associated CEC
-> > > peripheral's I2C address is based upon the main I2C address.
-> > > 
-> > > This patch avoids any special handling required to support
-> > > systems that contain multiple TDA19988 devices on the same
-> > > I2C bus.
-> > > 
-> > > Signed-off-by: Andrew Jackson <Andrew.Jackson@arm.com>
-> > > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > 
-> > Hi Andrew,
-> > 
-> > What is the status of this patch? Is it going to be pulled by anyone?
-> 
-> It's been sent to David.
+The secure environment only runs in little-endian mode, so any
+buffers shared with the secure environment should have their
+contents converted to little-endian. We also mark such elements
+with __le32 to allow sparse to catch such problems.
 
-Thanks, Russell!
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
 
-Liviu
+Changes since v1:
+ * Rebased onto Kumar's qcom/soc branch
 
-> 
-> -- 
-> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-> according to speedtest.net.
-> 
+ drivers/soc/qcom/scm-boot.c |  8 ++++----
+ drivers/soc/qcom/scm.c      | 30 ++++++++++++++++--------------
+ 2 files changed, 20 insertions(+), 18 deletions(-)
 
+diff --git a/drivers/soc/qcom/scm-boot.c b/drivers/soc/qcom/scm-boot.c
+index 1822b13bbc10..af16fcc8d5cb 100644
+--- a/drivers/soc/qcom/scm-boot.c
++++ b/drivers/soc/qcom/scm-boot.c
+@@ -27,12 +27,12 @@
+ int scm_set_boot_addr(u32 addr, int flags)
+ {
+ 	struct {
+-		unsigned int flags;
+-		phys_addr_t  addr;
++		__le32 flags;
++		__le32 addr;
+ 	} cmd;
+ 
+-	cmd.addr = addr;
+-	cmd.flags = flags;
++	cmd.addr = cpu_to_le32(addr);
++	cmd.flags = cpu_to_le32(flags);
+ 	return scm_call(SCM_SVC_BOOT, SCM_BOOT_ADDR,
+ 			&cmd, sizeof(cmd), NULL, 0);
+ }
+diff --git a/drivers/soc/qcom/scm.c b/drivers/soc/qcom/scm.c
+index 2e98d80e2387..3e724b8af485 100644
+--- a/drivers/soc/qcom/scm.c
++++ b/drivers/soc/qcom/scm.c
+@@ -62,11 +62,11 @@ static DEFINE_MUTEX(scm_lock);
+  * to access the buffers in a safe manner.
+  */
+ struct scm_command {
+-	u32	len;
+-	u32	buf_offset;
+-	u32	resp_hdr_offset;
+-	u32	id;
+-	u32	buf[0];
++	__le32 len;
++	__le32 buf_offset;
++	__le32 resp_hdr_offset;
++	__le32 id;
++	__le32 buf[0];
+ };
+ 
+ /**
+@@ -76,9 +76,9 @@ struct scm_command {
+  * @is_complete: indicates if the command has finished processing
+  */
+ struct scm_response {
+-	u32	len;
+-	u32	buf_offset;
+-	u32	is_complete;
++	__le32 len;
++	__le32 buf_offset;
++	__le32 is_complete;
+ };
+ 
+ /**
+@@ -96,12 +96,14 @@ static struct scm_command *alloc_scm_command(size_t cmd_size, size_t resp_size)
+ 	struct scm_command *cmd;
+ 	size_t len = sizeof(*cmd) + sizeof(struct scm_response) + cmd_size +
+ 		resp_size;
++	u32 offset;
+ 
+ 	cmd = kzalloc(PAGE_ALIGN(len), GFP_KERNEL);
+ 	if (cmd) {
+-		cmd->len = len;
+-		cmd->buf_offset = offsetof(struct scm_command, buf);
+-		cmd->resp_hdr_offset = cmd->buf_offset + cmd_size;
++		cmd->len = cpu_to_le32(len);
++		offset = offsetof(struct scm_command, buf);
++		cmd->buf_offset = cpu_to_le32(offset);
++		cmd->resp_hdr_offset = cpu_to_le32(offset + cmd_size);
+ 	}
+ 	return cmd;
+ }
+@@ -126,7 +128,7 @@ static inline void free_scm_command(struct scm_command *cmd)
+ static inline struct scm_response *scm_command_to_response(
+ 		const struct scm_command *cmd)
+ {
+-	return (void *)cmd + cmd->resp_hdr_offset;
++	return (void *)cmd + le32_to_cpu(cmd->resp_hdr_offset);
+ }
+ 
+ /**
+@@ -148,7 +150,7 @@ static inline void *scm_get_command_buffer(const struct scm_command *cmd)
+  */
+ static inline void *scm_get_response_buffer(const struct scm_response *rsp)
+ {
+-	return (void *)rsp + rsp->buf_offset;
++	return (void *)rsp + le32_to_cpu(rsp->buf_offset);
+ }
+ 
+ static int scm_remap_error(int err)
+@@ -260,7 +262,7 @@ int scm_call(u32 svc_id, u32 cmd_id, const void *cmd_buf, size_t cmd_len,
+ 	if (!cmd)
+ 		return -ENOMEM;
+ 
+-	cmd->id = (svc_id << 10) | cmd_id;
++	cmd->id = cpu_to_le32((svc_id << 10) | cmd_id);
+ 	if (cmd_buf)
+ 		memcpy(scm_get_command_buffer(cmd), cmd_buf, cmd_len);
+ 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
