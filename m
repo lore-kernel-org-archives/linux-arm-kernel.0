@@ -1,97 +1,36 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 21 Jan 2015 10:59:27 +0900
-Subject: [PATCH 0/9] ARM: shmobile: r8a73a4/ape6evm multiplatform
-In-Reply-To: <1421758306-24838-1-git-send-email-geert+renesas@glider.be>
-References: <1421758306-24838-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20150121015927.GB30598@verge.net.au>
+Date: Wed, 21 Jan 2015 10:59:39 +0900
+Subject: [PATCH 00/03] ARM: shmobile: Minor header cleanup
+In-Reply-To: <20150120115750.11479.95109.sendpatchset@little-apple>
+References: <20150120115750.11479.95109.sendpatchset@little-apple>
+Message-ID: <20150121015937.GD30598@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 20, 2015 at 01:51:37PM +0100, Geert Uytterhoeven wrote:
-> 	Hi Simon, Magnus,
+On Tue, Jan 20, 2015 at 08:57:50PM +0900, Magnus Damm wrote:
+> ARM: shmobile: Minor header cleanup
 > 
-> This patch series transitions the r8a73a4/ape6evm platform to support
-> multiplatform only:
->   - Add CCF information to DT,
->   - Disable legacy clock if CCF is used,
->   - Add Bus State Controller node, and move the Ethernet node to it,
->   - Remove ape6evm-reference,
->   - Remove ape6evm-legacy and legacy support code.
+> [PATCH 01/03] ARM: shmobile: Remove mach/system.h
+> [PATCH 02/03] ARM: shmobile: Remove mach/clkdev.h
+> [PATCH 03/03] ARM: shmobile: Remove mach/uncompress.h
 > 
-> This series is based on renesas-drivers-2015-01-19-v3.19-rc5.
-> It depends on renesas-devel-20150119-v3.19-rc5 (code-wise) and
-> clk-shmobile-for-3.20 (functionality-wise), for which I've sent a pull
-> request to Mike Turquette yesterday.
+> Rework the mach-shmobile code a bit more to allow
+> removing the files system.h, clkdev.h and uncompress.h
+> from arch/arm/mach-shmobile/include/mach/
 > 
-> All of this was untested by me due to lack of hardware.
-> As Mike had previously acked the r8a73a4 CCF implementation, it's safe
-> to apply after testing.
+> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 
-Hi Geert, Hi Ulrich,
+Thanks, I have queued this up for v3.21 with Laurent and Geert's Acks.
 
-thanks for all your good work in getting this together.
-I have tested this and queued it up for v3.21.
-
-I plan to push it to my devel branch later today.
-I plan to push it to my next branch and thus linux-next once
-clk-shmobile-for-3.20 appears in a v3.20-rc.
-
-> Thanks!
+> ---
 > 
-> Geert Uytterhoeven (2):
->   ARM: shmobile: r8a73a4 dtsi: Add Bus State Controller node
->   ARM: shmobile: ape6evm dts: Move Ethernet node to BSC
+>  Built on top of renesas-devel-20150119-v3.19-rc5
 > 
-> Laurent Pinchart (1):
->   ARM: shmobile: r8a73a4: Remove legacy code
-> 
-> Ulrich Hecht (6):
->   ARM: shmobile: r8a73a4: Add CPG register bits header
->   ARM: shmobile: r8a73a4: Common clock framework DT description
->   ARM: shmobile: ape6evm: Disable legacy clock initialization
->   ARM: shmobile: r8a73a4: Add MSTP clock assignments to DT
->   ARM: shmobile: ape6evm-reference: Remove board C code and DT file
->   ARM: shmobile: r8a73a4: ape6evm: Remove legacy platform
-> 
->  Documentation/devicetree/bindings/arm/shmobile.txt |   2 -
->  MAINTAINERS                                        |   1 -
->  arch/arm/boot/dts/Makefile                         |   2 -
->  arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts    | 156 -----
->  arch/arm/boot/dts/r8a73a4-ape6evm.dts              |  35 +-
->  arch/arm/boot/dts/r8a73a4.dtsi                     | 333 +++++++++++
->  arch/arm/configs/ape6evm_defconfig                 | 109 ----
->  arch/arm/mach-shmobile/Kconfig                     |  25 -
->  arch/arm/mach-shmobile/Makefile                    |   3 -
->  arch/arm/mach-shmobile/Makefile.boot               |   2 -
->  arch/arm/mach-shmobile/board-ape6evm-reference.c   |  60 --
->  arch/arm/mach-shmobile/board-ape6evm.c             | 286 ---------
->  arch/arm/mach-shmobile/clock-r8a73a4.c             | 659 ---------------------
->  arch/arm/mach-shmobile/r8a73a4.h                   |  17 -
->  arch/arm/mach-shmobile/setup-r8a73a4.c             | 273 +--------
->  include/dt-bindings/clock/r8a73a4-clock.h          |  62 ++
->  16 files changed, 412 insertions(+), 1613 deletions(-)
-
-More code removed, excellent!
-
->  delete mode 100644 arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
->  delete mode 100644 arch/arm/configs/ape6evm_defconfig
->  delete mode 100644 arch/arm/mach-shmobile/board-ape6evm-reference.c
->  delete mode 100644 arch/arm/mach-shmobile/board-ape6evm.c
->  delete mode 100644 arch/arm/mach-shmobile/clock-r8a73a4.c
->  delete mode 100644 arch/arm/mach-shmobile/r8a73a4.h
->  create mode 100644 include/dt-bindings/clock/r8a73a4-clock.h
-> 
-> -- 
-> 1.9.1
-> 
-> Gr{oetje,eeting}s,
-> 
-> 						Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
-> 							    -- Linus Torvalds
+>  arch/arm/Kconfig                                 |    1 -
+>  arch/arm/Kconfig.debug                           |    3 ++-
+>  arch/arm/mach-shmobile/clock.c                   |   11 -----------
+>  arch/arm/mach-shmobile/include/mach/clkdev.h     |    7 -------
+>  arch/arm/mach-shmobile/include/mach/system.h     |   11 -----------
+>  arch/arm/mach-shmobile/include/mach/uncompress.h |   19 -------------------
+>  6 files changed, 2 insertions(+), 50 deletions(-)
 > 
