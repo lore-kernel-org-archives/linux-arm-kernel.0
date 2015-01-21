@@ -1,70 +1,40 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 21 Jan 2015 16:23:09 +0000
-Subject: [PATCH v2 4/4] ARM: sti: Provide DT nodes for SBC SSC[0..2]
-In-Reply-To: <1417534844-25080-5-git-send-email-lee.jones@linaro.org>
-References: <1417534844-25080-1-git-send-email-lee.jones@linaro.org>
- <1417534844-25080-5-git-send-email-lee.jones@linaro.org>
-Message-ID: <20150121162309.GH22024@x1>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 21 Jan 2015 17:23:21 +0100
+Subject: [alsa-devel] [PATCH v2 3/3] ARM: dts: Add sound nodes for
+ exynos4412-trats2
+In-Reply-To: <1421660902-29679-4-git-send-email-ideal.song@samsung.com>
+References: <1421660902-29679-1-git-send-email-ideal.song@samsung.com>
+ <1421660902-29679-4-git-send-email-ideal.song@samsung.com>
+Message-ID: <54BFD279.7080604@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Maxime,
+Hi,
 
-Can you ping these up please?
+On 19/01/15 10:48, Inha Song wrote:
+> --- a/arch/arm/boot/dts/exynos4412-trats2.dts
+> +++ b/arch/arm/boot/dts/exynos4412-trats2.dts
 
-> The Synchronous Serial Controller is used to provide SPI.
-> 
-> These are the ports which are located on the Stand-By Controller (SBC).
-> 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  arch/arm/boot/dts/stih407.dtsi | 31 +++++++++++++++++++++++++++++++
->  1 file changed, 31 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/stih407.dtsi b/arch/arm/boot/dts/stih407.dtsi
-> index 90bc090..80e2407 100644
-> --- a/arch/arm/boot/dts/stih407.dtsi
-> +++ b/arch/arm/boot/dts/stih407.dtsi
-> @@ -329,5 +329,36 @@
->  
->  			status = "disabled";
->  		};
-> +
-> +		/* SBC SSC */
-> +		spi at 9540000 {
-> +			compatible = "st,comms-ssc4-spi";
-> +			reg = <0x9540000 0x110>;
-> +			interrupts = <GIC_SPI 135 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&clk_sysin>;
-> +			clock-names = "ssc";
-> +
-> +			status = "disabled";
-> +		};
-> +
-> +		spi at 9541000 {
-> +			compatible = "st,comms-ssc4-spi";
-> +			reg = <0x9541000 0x110>;
-> +			interrupts = <GIC_SPI 136 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&clk_sysin>;
-> +			clock-names = "ssc";
-> +
-> +			status = "disabled";
-> +		};
-> +
-> +		spi at 9542000 {
-> +			compatible = "st,comms-ssc4-spi";
-> +			reg = <0x9542000 0x110>;
-> +			interrupts = <GIC_SPI 137 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&clk_sysin>;
-> +			clock-names = "ssc";
-> +
-> +			status = "disabled";
-> +		};
->  	};
->  };
+> +	sound {
+> +		compatible = "samsung,trats2-audio";
+
+> +		assigned-clocks = <&pmu_system_controller 0>;
+> +		assigned-clock-parents =  <&clock CLK_XUSBXTI>;
+
+How about putting these properties in the pmu_system_controller
+node?  After all the mux clock being configured here belongs to
+the PMU subsystem. Wouldn't it work that way ?
+
+> +		samsung,i2s-controller = <&i2s0>;
+> +		samsung,model = "Trats2";
+> +		samsung,audio-codec = <&wm1811>;
+> +		samsung,audio-routing =
+> +			"SPK", "SPKOUTLN",
+> +			"SPK", "SPKOUTLP",
+> +			"SPK", "SPKOUTRN",
+> +			"SPK", "SPKOUTRP";
+> +	};
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Regards,
+Sylwester
