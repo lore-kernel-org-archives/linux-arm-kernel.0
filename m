@@ -1,30 +1,57 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 21 Jan 2015 13:54:27 +0900
-Subject: [PATCH 09/13] ARM: shmobile: sh7372: Remove DT binding documentation
+Date: Wed, 21 Jan 2015 13:54:37 +0900
+Subject: [PATCH 10/13] ARM: shmobile: sh7372 dtsi: Remove Legacy DTSI file
 In-Reply-To: <20150121045256.7648.7451.sendpatchset@little-apple>
 References: <20150121045256.7648.7451.sendpatchset@little-apple>
-Message-ID: <20150121045427.7648.51202.sendpatchset@little-apple>
+Message-ID: <20150121045437.7648.13202.sendpatchset@little-apple>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm+renesas@opensource.se>
 
-Remove DT compatible string documentation for the now removed sh7372 SoC.
+Remove the sh7372 DTSI file for the now unsupported sh7372 SoC.
 
 Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 ---
 
- Documentation/devicetree/bindings/arm/shmobile.txt |    2 --
- 1 file changed, 2 deletions(-)
+ arch/arm/boot/dts/sh7372.dtsi |   35 -----------------------------------
+ 1 file changed, 35 deletions(-)
 
---- 0005/Documentation/devicetree/bindings/arm/shmobile.txt
-+++ work/Documentation/devicetree/bindings/arm/shmobile.txt	2015-01-21 11:36:21.787569650 +0900
-@@ -7,8 +7,6 @@ SoCs:
-     compatible = "renesas,emev2"
-   - RZ/A1H (R7S72100)
-     compatible = "renesas,r7s72100"
--  - SH-Mobile AP4 (R8A73720/SH7372)
--    compatible = "renesas,sh7372"
-   - SH-Mobile AG5 (R8A73A00/SH73A0)
-     compatible = "renesas,sh73a0"
-   - R-Mobile APE6 (R8A73A40)
+--- 0001/arch/arm/boot/dts/sh7372.dtsi
++++ /dev/null	2015-01-13 15:44:39.280208949 +0900
+@@ -1,35 +0,0 @@
+-/*
+- * Device Tree Source for the sh7372 SoC
+- *
+- * Copyright (C) 2012 Renesas Solutions Corp.
+- *
+- * This file is licensed under the terms of the GNU General Public License
+- * version 2.  This program is licensed "as is" without any warranty of any
+- * kind, whether express or implied.
+- */
+-
+-/include/ "skeleton.dtsi"
+-
+-/ {
+-	compatible = "renesas,sh7372";
+-
+-	cpus {
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-
+-		cpu at 0 {
+-			compatible = "arm,cortex-a8";
+-			device_type = "cpu";
+-			reg = <0x0>;
+-			clock-frequency = <800000000>;
+-		};
+-	};
+-
+-	pfc: pfc at e6050000 {
+-		compatible = "renesas,pfc-sh7372";
+-		reg = <0xe6050000 0x8000>,
+-		      <0xe605801c 0x1c>;
+-		gpio-controller;
+-		#gpio-cells = <2>;
+-	};
+-};
