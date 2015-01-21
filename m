@@ -1,56 +1,172 @@
 From: hongzhou.yang@mediatek.com (Hongzhou Yang)
-Date: Wed, 21 Jan 2015 13:28:13 +0800
-Subject: [PATCH v5 1/5] ARM: mediatek: Add config options for mediatek SoCs.
+Date: Wed, 21 Jan 2015 13:28:14 +0800
+Subject: [PATCH v5 2/5] dt-bindings: Add pinctrl bindings for mt65xx/mt81xx.
 In-Reply-To: <1421818097-9281-1-git-send-email-hongzhou.yang@mediatek.com>
 References: <1421818097-9281-1-git-send-email-hongzhou.yang@mediatek.com>
-Message-ID: <1421818097-9281-2-git-send-email-hongzhou.yang@mediatek.com>
+Message-ID: <1421818097-9281-3-git-send-email-hongzhou.yang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yingjoe Chen <yingjoe.chen@mediatek.com>
+From: Hongzhou Yang <hongzhou.yang@mediatek.com>
 
-The upcoming MTK pinctrl driver have a big pin table for each SoC
-and we don't want to bloat the kernel binary if we don't need it.
-Add config options so we can build for one SoC only.
+Add devicetree bindings for Mediatek SoC pinctrl driver.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
 Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
 ---
- arch/arm/mach-mediatek/Kconfig | 22 +++++++++++++++++++++-
- 1 file changed, 21 insertions(+), 1 deletion(-)
+ .../devicetree/bindings/pinctrl/pinctrl-mt65xx.txt | 145 +++++++++++++++++++++
+ 1 file changed, 145 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt
 
-diff --git a/arch/arm/mach-mediatek/Kconfig b/arch/arm/mach-mediatek/Kconfig
-index f73f588..f7e463c 100644
---- a/arch/arm/mach-mediatek/Kconfig
-+++ b/arch/arm/mach-mediatek/Kconfig
-@@ -1,6 +1,26 @@
--config ARCH_MEDIATEK
-+menuconfig ARCH_MEDIATEK
- 	bool "Mediatek MT65xx & MT81xx SoC" if ARCH_MULTI_V7
- 	select ARM_GIC
- 	select MTK_TIMER
- 	help
- 	  Support for Mediatek MT65xx & MT81xx SoCs
+diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt
+new file mode 100644
+index 0000000..5868a0f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt
+@@ -0,0 +1,145 @@
++* Mediatek MT65XX Pin Controller
 +
-+if ARCH_MEDIATEK
++The Mediatek's Pin controller is used to control SoC pins.
 +
-+config MACH_MT6589
-+	bool "MediaTek MT6589 SoCs support"
-+	default ARCH_MEDIATEK
++Required properties:
++- compatible: value should be either of the following.
++    (a) "mediatek,mt8135-pinctrl", compatible with mt8135 pinctrl.
++- mediatek,pctl-regmap: Should be a phandle of the syscfg node.
++- pins-are-numbered: Specify the subnodes are using numbered pinmux to
++  specify pins.
++- gpio-controller : Marks the device node as a gpio controller.
++- #gpio-cells: number of cells in GPIO specifier. Since the generic GPIO
++  binding is used, the amount of cells must be specified as 2. See the below
++  mentioned gpio binding representation for description of particular cells.
 +
-+config MACH_MT6592
-+	bool "MediaTek MT6592 SoCs support"
-+	default ARCH_MEDIATEK
++	Eg: <&pio 6 0>
++	<[phandle of the gpio controller node]
++	[line number within the gpio controller]
++	[flags]>
 +
-+config MACH_MT8127
-+	bool "MediaTek MT8127 SoCs support"
-+	default ARCH_MEDIATEK
++	Values for gpio specifier:
++	- Line number: is a value between 0 to 202.
++	- Flags:  bit field of flags, as defined in <dt-bindings/gpio/gpio.h>.
++            Only the following flags are supported:
++            0 - GPIO_ACTIVE_HIGH
++            1 - GPIO_ACTIVE_LOW
++- reg: physicall address base for EINT registers
++- interrupt-controller: Marks the device node as an interrupt controller
++- #interrupt-cells: Should be two.
++- interrupts : The interrupt outputs from the controller.
 +
-+config MACH_MT8135
-+	bool "MediaTek MT8135 SoCs support"
-+	default ARCH_MEDIATEK
++Please refer to pinctrl-bindings.txt in this directory for details of the
++common pinctrl bindings used by client devices.
 +
-+endif
++Subnode format
++A pinctrl node should contain at least one subnodes representing the
++pinctrl groups available on the machine. Each subnode will list the
++pins it needs, and how they should be configured, with regard to muxer
++configuration, pullups, drive strength, input enable/disable and input schmitt.
++
++    node {
++	pinmux = <PIN_NUMBER_PINMUX>;
++	GENERIC_PINCONFIG;
++    };
++
++Required properties:
++- pinmux: integer array, represents gpio pin number and mux setting.
++    Supported pin number and mux varies for different SoCs, and are defined
++    as macros in boot/dts/<soc>-pinfunc.h directly.
++
++Optional properties:
++- GENERIC_PINCONFIG: is the generic pinconfig options to use, bias-disable,
++    bias-pull-down, bias-pull-up, input-enable, input-disable, output-low, output-high,
++    input-schmitt-enable, input-schmitt-disable and drive-strength are valid.
++
++    Some special pins have extra pull up strength, there are R0 and R1 pull-up
++    resistors available, but for user, it's only need to set R1R0 as 00, 01, 10 or 11.
++    So when config bias-pull-up, it support arguments for those special pins.
++    Some macros have been defined for this usage, such as MTK_PUPD_SET_R1R0_00.
++    See dt-bindings/pinctrl/mt65xx.h.
++
++    When config drive-strength, it can support some arguments, such as
++    MTK_DRIVE_4mA, MTK_DRIVE_6mA, etc. See dt-bindings/pinctrl/mt65xx.h.
++
++Examples:
++
++#include "mt8135-pinfunc.h"
++
++...
++{
++	syscfg_pctl_a: syscfg_pctl_a at 10005000 {
++		compatible = "mediatek,mt8135-pctl-a-syscfg", "syscon";
++		reg = <0 0x10005000 0 0x1000>;
++	};
++
++	syscfg_pctl_b: syscfg_pctl_b at 1020C020 {
++		compatible = "mediatek,mt8135-pctl-b-syscfg", "syscon";
++		reg = <0 0x1020C020 0 0x1000>;
++	};
++
++	pinctrl at 01c20800 {
++		compatible = "mediatek,mt8135-pinctrl";
++		reg = <0 0x1000B000 0 0x1000>;
++		mediatek,pctl-regmap = <&syscfg_pctl_a &syscfg_pctl_b>;
++		pins-are-numbered;
++		gpio-controller;
++		#gpio-cells = <2>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++		interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
++
++		i2c0_pins_a: i2c0 at 0 {
++			pins1 {
++				pinmux = <MT8135_PIN_100_SDA0__FUNC_SDA0>,
++					 <MT8135_PIN_101_SCL0__FUNC_SCL0>;
++				bias-disable;
++			};
++		};
++
++		i2c1_pins_a: i2c1 at 0 {
++			pins {
++				pinmux = <MT8135_PIN_195_SDA1__FUNC_SDA1>,
++					 <MT8135_PIN_196_SCL1__FUNC_SCL1>;
++				bias-pull-up = <55>;
++			};
++		};
++
++		i2c2_pins_a: i2c2 at 0 {
++			pins1 {
++				pinmux = <MT8135_PIN_193_SDA2__FUNC_SDA2>;
++				bias-pull-down;
++			};
++
++			pins2 {
++				pinmux = <MT8135_PIN_49_WATCHDOG__FUNC_GPIO49>;
++				bias-pull-up;
++			};
++		};
++
++		i2c3_pins_a: i2c3 at 0 {
++			pins1 {
++				pinmux = <MT8135_PIN_40_DAC_CLK__FUNC_GPIO40>,
++					 <MT8135_PIN_41_DAC_WS__FUNC_GPIO41>;
++				bias-pull-up = <55>;
++			};
++
++			pins2 {
++				pinmux = <MT8135_PIN_35_SCL3__FUNC_SCL3>,
++					 <MT8135_PIN_36_SDA3__FUNC_SDA3>;
++				output-low;
++				bias-pull-up = <55>;
++			};
++
++			pins3 {
++				pinmux = <MT8135_PIN_57_JTCK__FUNC_GPIO57>,
++					 <MT8135_PIN_60_JTDI__FUNC_JTDI>;
++				drive-strength = <32>;
++			};
++		};
++
++		...
++	}
++};
 -- 
 1.8.1.1.dirty
