@@ -1,148 +1,123 @@
-From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
-Date: Wed, 21 Jan 2015 16:32:41 +0100
-Subject: [PATCH 3/5] PCI: st: Provide support for the sti PCIe controller
-In-Reply-To: <20150112184349.GB2776@google.com>
-References: <1418812486-12394-1-git-send-email-gabriel.fernandez@linaro.org>
- <1418812486-12394-4-git-send-email-gabriel.fernandez@linaro.org>
- <20150112184349.GB2776@google.com>
-Message-ID: <CAG374jB6HEUmA3MmB+uY1fxhLPE_4AjgG5z29X=S+rb5vuArtw@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 21 Jan 2015 16:42:43 +0100
+Subject: [RFC PATCHv2 00/19] power_supply: Allow safe usage of power supply
+In-Reply-To: <20150121152216.GD13715@earth.universe>
+References: <1420472882-10463-1-git-send-email-k.kozlowski@samsung.com>
+ <20150121152216.GD13715@earth.universe>
+Message-ID: <1421854963.12894.1.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn Helgaas,
+On ?ro, 2015-01-21 at 16:22 +0100, Sebastian Reichel wrote:
+> Hi Krzysztof,
+> 
+> On Mon, Jan 05, 2015 at 04:47:43PM +0100, Krzysztof Kozlowski wrote:
+> > This is RFC, please don't apply yet but let me know if this approach
+> > is OK.
+> 
+> I just reviewed the patchset. It looks fine to me.
 
-On 12 January 2015 at 19:43, Bjorn Helgaas <bhelgaas@google.com> wrote:
-> On Wed, Dec 17, 2014 at 11:34:44AM +0100, Gabriel FERNANDEZ wrote:
->> sti pcie is built around a Synopsis Designware PCIe IP.
->>
->> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
->> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
->> ---
->>  drivers/pci/host/Kconfig  |   5 +
->>  drivers/pci/host/Makefile |   1 +
->>  drivers/pci/host/pci-st.c | 713 ++++++++++++++++++++++++++++++++++++++++++++++
->
-> Hi Gabriel,
->
-> Can you add a MAINTAINERS update so I know who should ack changes to this
-> driver?
+Great! Thanks for looking at patchset. I'll start working on next
+version adjusting all drivers.
 
-yes no problem
+> 
+> > TLDR
+> > ====
+> > Patchset tries to fix following race scenario:
+> > 
+> > Thread 1: charger manager, CONSUMER
+> > Thread 2: power supply driver, PROVIDER
+> > 
+> > THREAD 1 (charger manager)         THREAD 2 (power supply driver)
+> > ==========================         ==============================
+> > psy = power_supply_get_by_name()
+> >                                    Driver unbind, .remove
+> >                                      power_supply_unregister()
+> >                                      Device fully removed
+> > psy->get_property()
+> > 
+> > To properly fix the race the patchset:
+> > 1. Adds power_supply_get_property()-like API for safe access by consumer.
+> > 2. Moves ownership of power_supply structure from driver (provider) to
+> >    power supply core.
+> > 3. Adds power_supply_put() which will reclaim memory.
+> 
+> Looks fine to me, thanks for doing this :)
+> 
+> > Description
+> > =========== 
+> > This is a little different than my previous approaches [1][2] for fixing
+> > usage of power supply by some consumer, if driver implementing it is
+> > unbound.
+> > 
+> > The patchset is quite big and touches power supply API so a lot of
+> > changes in drivers are needed. These changes *are not finished yet*.
+> > I've done them only for:
+> >  - bq24190_charger.c
+> >  - charger-manager.c
+> >  - max14577_charger.c
+> >  - max17040_battery.c
+> >  - max17042_battery.c
+> >  - sbs-battery.c
+> >  - tps65090-charger.c
+> > So allyesconfig won't build.
+> >
+> > If this approach is OK, I'll prepare full patchset changing all the
+> > drivers.
+> 
+> Please do :)
+> 
+> > My previous approach [1][2] limited the race but did not close it.
+> > Still the consumer of power supply by calling power_supply_get_propert(psy...)
+> > may reference invalid memory because the producer freed it.
+> > 
+> > Actually, because struct power_supply is exposed to consumers, the
+> > core should be the owner of it. This is accomplished in patch 11/19
+> > ("power_supply: Change ownership from driver to core").
+> > 
+> > What the patchset does in steps
+> > ===============================
+> > 1. Some preparation steps are necessary - patch 1 and 2. The driver
+> >    implementing power supply won't be able to fill structure before
+> >    calling power_supply_register(). So 'power_supply_config'
+> >    is introduced in patch 2 ("power_supply: Move run-time configuration
+> >    to separate structure"). Unfortunately this touches all drivers.
+> 
+> $ grep -l power_supply_register **/*.c | grep -v mod.c | grep -v drivers/power
+> drivers/acpi/ac.c
+> drivers/acpi/battery.c
+> drivers/acpi/sbs.c
+> drivers/hid/hid-input.c
+> drivers/hid/hid-sony.c
+> drivers/hid/hid-wiimote-modules.c
+> drivers/hid/wacom_sys.c
+> drivers/platform/x86/compal-laptop.c
+> drivers/staging/nvec/nvec_power.c
+> 
+> Please make sure to CC the respective maintainers for the patchset
+> (e.g. current patch 14 and 15 should have CC'd x86 maintainers), so
+> that they can Acknowledge the patchset.
 
->
->>  3 files changed, 719 insertions(+)
->>  create mode 100644 drivers/pci/host/pci-st.c
->>
->> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
->> index c4b6568..999d2b9 100644
->> --- a/drivers/pci/host/Kconfig
->> +++ b/drivers/pci/host/Kconfig
->> @@ -102,4 +102,9 @@ config PCI_LAYERSCAPE
->>       help
->>         Say Y here if you want PCIe controller support on Layerscape SoCs.
->>
->> +config PCI_ST
->> +     bool "ST STiH41x PCIe controller"
->> +     depends on ARCH_STI
->> +     select PCIE_DW
->
-> Please add help text here.
->
+Right. Probably maintainers should receive full patchset anyway. The
+address list will be quite big.
 
-okay
+> 
+> > 2. Safe API wrappers (and usage counter) are added (power_supply_*()).
+> > 3. Patch 11: ownership of 'struct power_supply' is moved from driver
+> >    to the core.
+> > 4. power_supply_put() is added which reclaims resources.
+> 
+> Looks fine to me.
+> 
+> > The patchset is rebased on next-20141226. It should be pulled at once.
+> > Bisectability is preserved.
+> 
+> Fine with me, but I need acks from all involved maintainers. So for the
+> patchset:
+> 
+> Reviewed-By: Sebastian Reichel <sre@kernel.org>
 
->> +static int st_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
->> +                              unsigned int devfn, int where, int size,
->> +                              u32 *val)
->> +{
->> +     u32 data;
->> +     u32 bdf;
->> +     struct st_pcie *pcie = to_st_pcie(pp);
->> +     int is_root_bus = pci_is_root_bus(bus);
->> +     int retry_count = 0;
->> +     int ret;
->> +     void __iomem *addr;
->> +
->> +     /*
->> +      * Prerequisite
->> +      * PCI express devices will respond to all config type 0 cycles, since
->> +      * they are point to point links. Thus to avoid probing for multiple
->> +      * devices on the root, dw-pcie already check for us if it is on the
->> +      * root bus / other slots. Also, dw-pcie checks for the link being up
->> +      * as we will hang if we issue a config request and the link is down.
->> +      * A switch will reject requests for slots it knows do not exist.
->> +      */
->> +     bdf = bdf_num(bus->number, devfn, is_root_bus);
->> +     addr = pcie->config_area + config_addr(where,
->> +                     bus->parent->number == pp->root_bus_nr);
->> +retry:
->> +     /* Set the config packet devfn */
->> +     writel_relaxed(bdf, pp->dbi_base + FUNC0_BDF_NUM);
->> +     readl_relaxed(pp->dbi_base + FUNC0_BDF_NUM);
->> +
->> +     ret = dw_pcie_cfg_read(addr, where, size, &data);
->> +
->> +     /*
->> +      * This is intended to help with when we are probing the bus. The
->> +      * problem is that the wrapper logic doesn't have any way to
->> +      * interrogate if the configuration request failed or not.
->> +      * On the ARM we actually get a real bus error.
->> +      *
->> +      * Unfortunately this means it is impossible to tell the difference
->> +      * between when a device doesn't exist (the switch will return a UR
->> +      * completion) or the device does exist but isn't yet ready to accept
->> +      * configuration requests (the device will return a CRS completion)
->
-> We do have CRS support in the Linux PCI core, so I guess this comment means
-> that the ST host bridge doesn't handle CRS correctly?
->
+Thanks!
 
-yes, it is.
-
->> +      *
->> +      * The result of this is that we will miss devices when probing.
->> +      *
->> +      * So if we are trying to read the dev/vendor id on devfn 0 and we
->> +      * appear to get zero back, then we retry the request.  We know that
->> +      * zero can never be a valid device/vendor id. The specification says
->> +      * we must retry for up to a second before we decide the device is
->> +      * dead. If we are still dead then we assume there is nothing there and
->> +      * return ~0
->> +      *
->> +      * The downside of this is that we incur a delay of 1s for every pci
->> +      * express link that doesn't have a device connected.
->
-> That sounds pretty bad and I assume is a consequence of CRS handling being
-> broken in hardware.
->
->> +      */
->> +     if (((where & ~3) == 0) && devfn == 0 && (data == 0 || data == ~0)) {
->> +             if (retry_count++ < 1000) {
->> +                     mdelay(1);
->> +                     goto retry;
->> +             } else {
->> +                     *val = ~0;
->> +                     return PCIBIOS_DEVICE_NOT_FOUND;
->> +             }
->> +     }
->> +
->> +     *val = data;
->> +     return ret;
->> +}
->
->> +MODULE_LICENSE("GPLv2");
->
-> See license_is_gpl_compatible().  This string needs to be "GPL v2", not
-> "GPLv2" to avoid tainting the kernel.
->
-
-okay
-
-> Bjorn
-
-
-Thanks for reviewing
-
-BR
-
-Gabriel
+Best regards,
+Krzysztof
