@@ -1,41 +1,35 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Wed, 21 Jan 2015 14:38:10 +0100
-Subject: [PATCH v2 1/3] ARM: shmobile: armadillo800eva: Properly specify HDMI
- audio link format
-Message-ID: <1421847492-8857-1-git-send-email-lars@metafoo.de>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Wed, 21 Jan 2015 13:48:47 +0000
+Subject: [PATCH 3.19-rc2 v14 0/7] arm: Implement
+ arch_trigger_all_cpu_backtrace
+In-Reply-To: <20150121080612.6569ab81@gandalf.local.home>
+References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>	<1421144818-14036-1-git-send-email-daniel.thompson@linaro.org>	<54BE2D15.9080606@linaro.org>	<54BEC04D.1050402@codeaurora.org>	<54BF83C9.5060300@linaro.org>
+ <20150121080612.6569ab81@gandalf.local.home>
+Message-ID: <54BFAE3F.7000300@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DAI link format should be specified for the whole link rather than just
-one component on the link. So move the format specification for the HDMI
-audio link from the CPU component to the link itself.
+On 21/01/15 13:06, Steven Rostedt wrote:
+> On Wed, 21 Jan 2015 10:47:37 +0000
+> Daniel Thompson <daniel.thompson@linaro.org> wrote:
+> 
+> 
+>>> With this patchset, is it possible to call sched_clock() from within NMI
+>>> context? I ask because the generic sched_clock() code is not NMI safe
+> 
+> That's not good. Better not run function tracing, as that could trace
+> functions in NMI context (I depend on that it does), and it uses
+> sched_clock() as the default clock.
 
-Since the sh-mobile-hdmi DAI driver doesn't implement the set_fmt() callback
-in this case there is no functional difference between only specifying the
-the format for the CPU side or for the whole link, but the later it will
-allow us to remove support for just specifying the format for one component.
+I think sched_clock is unsafe as in "may sometimes give the wrong value"
+rather than "can lock up arbitrarily".  Thus the impact is unlikely to
+be harmful enough to want to avoid tracing altogether.
 
-Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
----
-No changes since v1.
----
- arch/arm/mach-shmobile/board-armadillo800eva.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+It would require special care be taken when interpreting the timestamps
+however. Also since update_sched_clock() is a notrace function its very
+hard to figure out when timestamps are at risk.
 
-diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
-index 6d949f1..75de26c 100644
---- a/arch/arm/mach-shmobile/board-armadillo800eva.c
-+++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
-@@ -1040,9 +1040,9 @@ static struct asoc_simple_card_info fsi2_hdmi_info = {
- 	.card		= "FSI2B-HDMI",
- 	.codec		= "sh-mobile-hdmi",
- 	.platform	= "sh_fsi2",
-+	.daifmt		= SND_SOC_DAIFMT_CBS_CFS,
- 	.cpu_dai = {
- 		.name	= "fsib-dai",
--		.fmt	= SND_SOC_DAIFMT_CBS_CFS,
- 	},
- 	.codec_dai = {
- 		.name = "sh_mobile_hdmi-hifi",
--- 
-1.8.0
+Anyhow, the fix doesn't seem that hard. I can take a look.
+
+
+Daniel.
