@@ -1,30 +1,43 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 21 Jan 2015 09:32:38 +0100
-Subject: [PATCH v2 0/4] net: stmmac: dwmac-rk: Fix phy regulator issues
-In-Reply-To: <1421737780-1533-1-git-send-email-romain.perier@gmail.com>
-References: <1421737780-1533-1-git-send-email-romain.perier@gmail.com>
-Message-ID: <1791081.FUojULYATz@phil>
+From: yao.yuan@freescale.com (Yuan Yao)
+Date: Wed, 21 Jan 2015 16:32:10 +0800
+Subject: [PATCH] serial: fsl-lpuart: disable interrupt when suspend
+Message-ID: <1421829130-32985-1-git-send-email-yao.yuan@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 20. Januar 2015, 07:09:36 schrieb Romain Perier:
-> This series fixes few issues in dwmac-rk:
-> 
-> 1. Voltage settings was hardcoded into the driver for the phy regulator.
->    The driver now uses the default voltage settings found in the devicetree,
-> which are applied throught the regulator framework.
-> 2. The regulator name used to power on or power off the phy was put in the
-> devicetree variable "phy_regulator", which is not standard and added a lot
-> of code for nothing. The driver now uses the devicetree property
-> "phy-supply" and the corresponding functions to manipulate this regulator.
-> 
-> The corresponding devicetree files are also updated. As this new binding for
-> rk3288 has not been released with any official kernel yet (not until 3.20),
-> I don't need to care about keeping compatibility with the old non standard
-> property.
+For power management support, we should disable TX/RX
+interrupts so that kernel can prepare for deep sleep.
 
-This series
-Tested-by: Heiko Stuebner <heiko@sntech.de>
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
+---
+ drivers/tty/serial/fsl_lpuart.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-@Dave: as said in the v1 mail, this would be nice to have for 3.20
+diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
+index 1c5d020..bfd6ea2 100644
+--- a/drivers/tty/serial/fsl_lpuart.c
++++ b/drivers/tty/serial/fsl_lpuart.c
+@@ -1449,6 +1449,21 @@ static int lpuart_remove(struct platform_device *pdev)
+ static int lpuart_suspend(struct device *dev)
+ {
+ 	struct lpuart_port *sport = dev_get_drvdata(dev);
++	unsigned long temp;
++
++	if (sport->lpuart32) {
++		/* disable Rx/Tx and interrupts */
++		temp = lpuart32_read(sport->port.membase + UARTCTRL);
++		temp &= ~(UARTCTRL_TE | UARTCTRL_RE |
++				UARTCTRL_TIE | UARTCTRL_TCIE | UARTCTRL_RIE);
++		lpuart32_write(temp, sport->port.membase + UARTCTRL);
++	} else {
++		/* disable Rx/Tx and interrupts */
++		temp = readb(sport->port.membase + UARTCR2);
++		temp &= ~(UARTCR2_TE | UARTCR2_RE |
++				UARTCR2_TIE | UARTCR2_TCIE | UARTCR2_RIE);
++		writeb(temp, sport->port.membase + UARTCR2);
++	}
+ 
+ 	uart_suspend_port(&lpuart_reg, &sport->port);
+ 
+-- 
+2.1.0.27.g96db324
