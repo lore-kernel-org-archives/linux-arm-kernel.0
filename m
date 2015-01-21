@@ -1,41 +1,38 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 21 Jan 2015 09:59:10 +0100
-Subject: [PATCH v2] ARM: early fixmap support for earlycon
-In-Reply-To: <20150120234821.GN26493@n2100.arm.linux.org.uk>
-References: <1421797064-2989-1-git-send-email-stefan@agner.ch>
- <20150120234821.GN26493@n2100.arm.linux.org.uk>
-Message-ID: <111244e22ade6c1e3585cf03cb2f7653@agner.ch>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 21 Jan 2015 09:56:48 +0100
+Subject: [PATCH] ARM: dts: sun4i: Add simplefb node with
+ de_fe0-de_be0-lcd0-hdmi pipeline
+In-Reply-To: <1421672477-12978-2-git-send-email-hdegoede@redhat.com>
+References: <1421672477-12978-1-git-send-email-hdegoede@redhat.com>
+ <1421672477-12978-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150121085648.GB4367@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-01-21 00:48, Russell King - ARM Linux wrote:
-> On Wed, Jan 21, 2015 at 12:37:44AM +0100, Stefan Agner wrote:
->> Add early fixmap support, initially to support permanent, fixed
->> mapping support for early console. A temporary, early pte is
->> created which is migrated to a permanent mapping in paging_init.
->> This is also needed since the attributs may change as the memory
->> types are initialized. The 3MiB range of fixmap spans two pte
->> tables, but currently only one pte is created for early fixmap
->> support.
+On Mon, Jan 19, 2015 at 02:01:17PM +0100, Hans de Goede wrote:
+> Testing has shown that on sun4i the display backend engine does not have
+> deep enough fifo-s causing flickering / tearing in full-hd mode due to
+> fifo underruns. This can be avoided by letting the display frontend engine
+> do the dma from memory, and then letting it feed the data directly into
+> the backend unmodified, as the frontend does have deep enough fifo-s.
 > 
-> I think this needs to be done more carefully - I think the entry(ies)
-> should be removed, the TLBs flushed, and the new entry established.
-> So:
-
-I'm not experienced in mm development, hence please review critical.
- 
+> Note since u-boot-v2015.01 has been released using the de_be0-lcd0-hdmi
+> pipeline on sun4i, we need to keep that one around too (unfortunately).
 > 
->> +static void __init early_fixmap_shutdown(void)
->> +{
->> +	int i;
->> +
->> +	pte_offset_fixmap = &pte_offset_late_fixmap;
->> +	pmd_clear(fixmap_pmd(fix_to_virt(__end_of_permanent_fixed_addresses - 1)));
-> 
-> I think you should flush tlbs here.
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Even this shutdown function is still before preemption or SMP, hence
-local_flush_tlb_kernel_page should be fine here?
+Merged, thanks!
 
---
-Stefan
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150121/6efc9082/attachment.sig>
