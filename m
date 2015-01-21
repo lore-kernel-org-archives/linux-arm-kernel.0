@@ -1,290 +1,49 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 21 Jan 2015 13:54:47 +0900
-Subject: [PATCH 11/13] Documentation: Remove ZBOOT MMC/SDHI utility and docs
+Date: Wed, 21 Jan 2015 13:55:09 +0900
+Subject: [PATCH 13/13] pinctrl: sh-pfc: sh7372: Remove DT binding documentation
 In-Reply-To: <20150121045256.7648.7451.sendpatchset@little-apple>
 References: <20150121045256.7648.7451.sendpatchset@little-apple>
-Message-ID: <20150121045447.7648.23274.sendpatchset@little-apple>
+Message-ID: <20150121045509.7648.3018.sendpatchset@little-apple>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm+renesas@opensource.se>
 
-Remove ZBOOT MMC/SDHI Documentation for sh7372 together
-wit the vrl4 utility. Without sh7372 and Mackerel support
-these files are no longer useful.
+Remove the DT compatible string entry for the now unsupported sh7372 SoC.
 
 Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 ---
 
- Documentation/arm/Makefile                      |    2 
- Documentation/arm/SH-Mobile/Makefile            |    7 
- Documentation/arm/SH-Mobile/vrl4.c              |  170 -----------------------
- Documentation/arm/SH-Mobile/zboot-rom-mmcif.txt |   29 ---
- Documentation/arm/SH-Mobile/zboot-rom-sdhi.txt  |   42 -----
- 5 files changed, 1 insertion(+), 249 deletions(-)
+ Documentation/devicetree/bindings/pinctrl/renesas,pfc-pinctrl.txt |    8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
---- 0001/Documentation/arm/Makefile
-+++ work/Documentation/arm/Makefile	2015-01-21 11:27:40.337571523 +0900
-@@ -1 +1 @@
--subdir-y := SH-Mobile
-+
---- 0001/Documentation/arm/SH-Mobile/Makefile
-+++ /dev/null	2015-01-13 15:44:39.280208949 +0900
-@@ -1,7 +0,0 @@
--# List of programs to build
--hostprogs-y := vrl4
--
--# Tell kbuild to always build the programs
--always := $(hostprogs-y)
--
--HOSTCFLAGS_vrl4.o += -I$(objtree)/usr/include -I$(srctree)/tools/include
---- 0001/Documentation/arm/SH-Mobile/vrl4.c
-+++ /dev/null	2015-01-13 15:44:39.280208949 +0900
-@@ -1,170 +0,0 @@
--/*
-- * vrl4 format generator
-- *
-- * Copyright (C) 2010 Simon Horman
-- *
-- * This file is subject to the terms and conditions of the GNU General Public
-- * License.  See the file "COPYING" in the main directory of this archive
-- * for more details.
-- */
--
--/*
-- * usage: vrl4 < zImage > out
-- *	  dd if=out of=/dev/sdx bs=512 seek=1 # Write the image to sector 1
-- *
-- * Reads a zImage from stdin and writes a vrl4 image to stdout.
-- * In practice this means writing a padded vrl4 header to stdout followed
-- * by the zImage.
-- *
-- * The padding places the zImage at ALIGN bytes into the output.
-- * The vrl4 uses ALIGN + START_BASE as the start_address.
-- * This is where the mask ROM will jump to after verifying the header.
-- *
-- * The header sets copy_size to min(sizeof(zImage), MAX_BOOT_PROG_LEN) + ALIGN.
-- * That is, the mask ROM will load the padded header (ALIGN bytes)
-- * And then MAX_BOOT_PROG_LEN bytes of the image, or the entire image,
-- * whichever is smaller.
-- *
-- * The zImage is not modified in any way.
-- */
--
--#define _BSD_SOURCE
--#include <endian.h>
--#include <unistd.h>
--#include <stdint.h>
--#include <stdio.h>
--#include <errno.h>
--#include <tools/endian.h>
--
--struct hdr {
--	uint32_t magic1;
--	uint32_t reserved1;
--	uint32_t magic2;
--	uint32_t reserved2;
--	uint16_t copy_size;
--	uint16_t boot_options;
--	uint32_t reserved3;
--	uint32_t start_address;
--	uint32_t reserved4;
--	uint32_t reserved5;
--	char     reserved6[308];
--};
--
--#define DECLARE_HDR(h)					\
--	struct hdr (h) = {				\
--		.magic1 =	htole32(0xea000000),	\
--		.reserved1 =	htole32(0x56),		\
--		.magic2 =	htole32(0xe59ff008),	\
--		.reserved3 =	htole16(0x1) }
--
--/* Align to 512 bytes, the MMCIF sector size */
--#define ALIGN_BITS	9
--#define ALIGN		(1 << ALIGN_BITS)
--
--#define START_BASE	0xe55b0000
--
--/*
-- * With an alignment of 512 the header uses the first sector.
-- * There is a 128 sector (64kbyte) limit on the data loaded by the mask ROM.
-- * So there are 127 sectors left for the boot programme. But in practice
-- * Only a small portion of a zImage is needed, 16 sectors should be more
-- * than enough.
-- *
-- * Note that this sets how much of the zImage is copied by the mask ROM.
-- * The entire zImage is present after the header and is loaded
-- * by the code in the boot program (which is the first portion of the zImage).
-- */
--#define	MAX_BOOT_PROG_LEN (16 * 512)
--
--#define ROUND_UP(x)	((x + ALIGN - 1) & ~(ALIGN - 1))
--
--static ssize_t do_read(int fd, void *buf, size_t count)
--{
--	size_t offset = 0;
--	ssize_t l;
--
--	while (offset < count) {
--		l = read(fd, buf + offset, count - offset);
--		if (!l)
--			break;
--		if (l < 0) {
--			if (errno == EAGAIN || errno == EWOULDBLOCK)
--				continue;
--			perror("read");
--			return -1;
--		}
--		offset += l;
--	}
--
--	return offset;
--}
--
--static ssize_t do_write(int fd, const void *buf, size_t count)
--{
--	size_t offset = 0;
--	ssize_t l;
--
--	while (offset < count) {
--		l = write(fd, buf + offset, count - offset);
--		if (l < 0) {
--			if (errno == EAGAIN || errno == EWOULDBLOCK)
--				continue;
--			perror("write");
--			return -1;
--		}
--		offset += l;
--	}
--
--	return offset;
--}
--
--static ssize_t write_zero(int fd, size_t len)
--{
--	size_t i = len;
--
--	while (i--) {
--		const char x = 0;
--		if (do_write(fd, &x, 1) < 0)
--			return -1;
--	}
--
--	return len;
--}
--
--int main(void)
--{
--	DECLARE_HDR(hdr);
--	char boot_program[MAX_BOOT_PROG_LEN];
--	size_t aligned_hdr_len, alligned_prog_len;
--	ssize_t prog_len;
--
--	prog_len = do_read(0, boot_program, sizeof(boot_program));
--	if (prog_len <= 0)
--		return -1;
--
--	aligned_hdr_len = ROUND_UP(sizeof(hdr));
--	hdr.start_address = htole32(START_BASE + aligned_hdr_len);
--	alligned_prog_len = ROUND_UP(prog_len);
--	hdr.copy_size = htole16(aligned_hdr_len + alligned_prog_len);
--
--	if (do_write(1, &hdr, sizeof(hdr)) < 0)
--		return -1;
--	if (write_zero(1, aligned_hdr_len - sizeof(hdr)) < 0)
--		return -1;
--
--	if (do_write(1, boot_program, prog_len) < 0)
--		return 1;
--
--	/* Write out the rest of the kernel */
--	while (1) {
--		prog_len = do_read(0, boot_program, sizeof(boot_program));
--		if (prog_len < 0)
--			return 1;
--		if (prog_len == 0)
--			break;
--		if (do_write(1, boot_program, prog_len) < 0)
--			return 1;
--	}
--
--	return 0;
--}
---- 0001/Documentation/arm/SH-Mobile/zboot-rom-mmcif.txt
-+++ /dev/null	2015-01-13 15:44:39.280208949 +0900
-@@ -1,29 +0,0 @@
--ROM-able zImage boot from MMC
-------------------------------
--
--An ROM-able zImage compiled with ZBOOT_ROM_MMCIF may be written to MMC and
--SuperH Mobile ARM will to boot directly from the MMCIF hardware block.
--
--This is achieved by the mask ROM loading the first portion of the image into
--MERAM and then jumping to it. This portion contains loader code which
--copies the entire image to SDRAM and jumps to it. From there the zImage
--boot code proceeds as normal, uncompressing the image into its final
--location and then jumping to it.
--
--This code has been tested on an AP4EB board using the developer 1A eMMC
--boot mode which is configured using the following jumper settings.
--The board used for testing required a patched mask ROM in order for
--this mode to function.
--
--   8 7 6 5 4 3 2 1
--   x|x|x|x|x| |x|
--S4 -+-+-+-+-+-+-+-
--    | | | | |x| |x on
--
--The zImage must be written to the MMC card at sector 1 (512 bytes) in
--vrl4 format. A utility vrl4 is supplied to accomplish this.
--
--e.g.
--	vrl4 < zImage | dd of=/dev/sdX bs=512 seek=1
--
--A dual-voltage MMC 4.0 card was used for testing.
---- 0001/Documentation/arm/SH-Mobile/zboot-rom-sdhi.txt
-+++ /dev/null	2015-01-13 15:44:39.280208949 +0900
-@@ -1,42 +0,0 @@
--ROM-able zImage boot from eSD
-------------------------------
--
--An ROM-able zImage compiled with ZBOOT_ROM_SDHI may be written to eSD and
--SuperH Mobile ARM will to boot directly from the SDHI hardware block.
--
--This is achieved by the mask ROM loading the first portion of the image into
--MERAM and then jumping to it. This portion contains loader code which
--copies the entire image to SDRAM and jumps to it. From there the zImage
--boot code proceeds as normal, uncompressing the image into its final
--location and then jumping to it.
--
--This code has been tested on an mackerel board using the developer 1A eSD
--boot mode which is configured using the following jumper settings.
--
--   8 7 6 5 4 3 2 1
--   x|x|x|x| |x|x|
--S4 -+-+-+-+-+-+-+-
--    | | | |x| | |x on
--
--The eSD card needs to be present in SDHI slot 1 (CN7).
--As such S1 and S33 also need to be configured as per
--the notes in arch/arm/mach-shmobile/board-mackerel.c.
--
--A partial zImage must be written to physical partition #1 (boot)
--of the eSD at sector 0 in vrl4 format. A utility vrl4 is supplied to
--accomplish this.
--
--e.g.
--	vrl4 < zImage | dd of=/dev/sdX bs=512 count=17
--
--A full copy of _the same_ zImage should be written to physical partition #1
--(boot) of the eSD@sector 0. This should _not_ be in vrl4 format.
--
--	vrl4 < zImage | dd of=/dev/sdX bs=512
--
--Note: The commands above assume that the physical partition has been
--switched. No such facility currently exists in the Linux Kernel.
--
--Physical partitions are described in the eSD specification.  At the time of
--writing they are not the same as partitions that are typically configured
--using fdisk and visible through /proc/partitions
+--- 0001/Documentation/devicetree/bindings/pinctrl/renesas,pfc-pinctrl.txt
++++ work/Documentation/devicetree/bindings/pinctrl/renesas,pfc-pinctrl.txt	2015-01-21 12:12:15.357561911 +0900
+@@ -1,7 +1,7 @@
+ * Renesas Pin Function Controller (GPIO and Pin Mux/Config)
+ 
+-The Pin Function Controller (PFC) is a Pin Mux/Config controller. On SH7372,
+-SH73A0, R8A73A4 and R8A7740 it also acts as a GPIO controller.
++The Pin Function Controller (PFC) is a Pin Mux/Config controller. On SH73A0,
++R8A73A4 and R8A7740 it also acts as a GPIO controller.
+ 
+ 
+ Pin Control
+@@ -16,7 +16,6 @@ Required Properties:
+     - "renesas,pfc-r8a7779": for R8A7779 (R-Car H1) compatible pin-controller.
+     - "renesas,pfc-r8a7790": for R8A7790 (R-Car H2) compatible pin-controller.
+     - "renesas,pfc-r8a7791": for R8A7791 (R-Car M2) compatible pin-controller.
+-    - "renesas,pfc-sh7372": for SH7372 (SH-Mobile AP4) compatible pin-controller.
+     - "renesas,pfc-sh73a0": for SH73A0 (SH-Mobile AG5) compatible pin-controller.
+ 
+   - reg: Base address and length of each memory resource used by the pin
+@@ -75,8 +74,7 @@ bias-disable, bias-pull-up and bias-pull
+ GPIO
+ ----
+ 
+-On SH7372, SH73A0, R8A73A4 and R8A7740 the PFC node is also a GPIO controller
+-node.
++On SH73A0, R8A73A4 and R8A7740 the PFC node is also a GPIO controller node.
+ 
+ Required Properties:
+ 
