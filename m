@@ -1,101 +1,36 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 21 Jan 2015 20:37:00 +0800
-Subject: [PATCH v6 17/17] Documentation: ACPI for ARM64
-In-Reply-To: <20150119203328.GB3766@cbox>
-References: <1420368918-5086-1-git-send-email-hanjun.guo@linaro.org>
- <1420368918-5086-18-git-send-email-hanjun.guo@linaro.org>
- <20150119203328.GB3766@cbox>
-Message-ID: <54BF9D6C.7020807@linaro.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 21 Jan 2015 14:40:15 +0200
+Subject: [PATCH 12/13] pinctrl: sh-pfc: sh7372: Remove PFC support
+In-Reply-To: <20150121045457.7648.93743.sendpatchset@little-apple>
+References: <20150121045256.7648.7451.sendpatchset@little-apple>
+ <20150121045457.7648.93743.sendpatchset@little-apple>
+Message-ID: <1799633.8ThXAhsYET@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+On Wednesday 21 January 2015 13:54:57 Magnus Damm wrote:
+> From: Magnus Damm <damm+renesas@opensource.se>
+> 
+> Remove sh7372 PFC support as part of the sh7372 and Mackerel
+> legacy code removal.
+> 
+> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+> ---
+> 
+>  drivers/pinctrl/sh-pfc/Kconfig      |    5
+>  drivers/pinctrl/sh-pfc/Makefile     |    1
+>  drivers/pinctrl/sh-pfc/core.c       |    9
+>  drivers/pinctrl/sh-pfc/pfc-sh7372.c | 2645 --------------------------------
+>  4 files changed, 2660 deletions(-)
 
-Sorry for the late reply, I got no answer yet but
-with one question below.
+There's a leftover reference to sh7372_pinmux_info in drivers/pinctrl/sh-
+pfc/core.h.
 
-On 2015?01?20? 04:33, Christoffer Dall wrote:
-> Hi,
->
-> On Sun, Jan 04, 2015 at 06:55:18PM +0800, Hanjun Guo wrote:
->> From: Graeme Gregory <graeme.gregory@linaro.org>
->>
->> Add documentation for the guidelines of how to use ACPI
->> on ARM64.
->>
->> Reviewed-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
->> Signed-off-by: Al Stone <al.stone@linaro.org>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> ---
->>   Documentation/arm64/arm-acpi.txt | 327 +++++++++++++++++++++++++++++++++++++++
->>   1 file changed, 327 insertions(+)
->>   create mode 100644 Documentation/arm64/arm-acpi.txt
->>
->> diff --git a/Documentation/arm64/arm-acpi.txt b/Documentation/arm64/arm-acpi.txt
->> new file mode 100644
->> index 0000000..21e7020
->> --- /dev/null
->> +++ b/Documentation/arm64/arm-acpi.txt
->> @@ -0,0 +1,327 @@
->> +ACPI on ARMv8 Servers
->> +---------------------
->> +ACPI can be used for ARMv8 general purpose servers designed to follow
->> +the ARM SBSA (Server Base System Architecture) and SBBR (Server Base
->> +Boot Requirements) specifications, currently available to those with
->> +an ARM login at http://silver.arm.com.
->> +
->> +The ARMv8 kernel implements the reduced hardware model of ACPI version
->> +5.1 and later.  Links to the specification and all external documents
->> +it refers to are managed by the UEFI Forum.  The specification is
->> +available at http://www.uefi.org/specifications and external documents
->> +can be found via http://www.uefi.org/acpi.
->> +
->> +If an ARMv8 system does not meet the requirements of the SBSA, or cannot
->> +be described using the mechanisms defined in the required ACPI specifications,
->> +then it is likely that Device Tree (DT) is more suitable than ACPI for the
->> +hardware.
->> +
->> +
->> +Relationship with Device Tree
->> +-----------------------------
->> +ACPI support in drivers and subsystems for ARMv8 should never be mutually
->> +exclusive with DT support at compile time.
->> +
->> +At boot time the kernel will only use one description method depending on
->> +parameters passed from the bootloader (including kernel bootargs).
->> +
->> +Regardless of whether DT or ACPI is used, the kernel must always be capable
->> +of booting with either scheme (in kernels with both schemes enabled at compile
->> +time).
->> +
->> +
->> +Booting using ACPI tables
->> +-------------------------
->> +The only defined method for passing ACPI tables to the kernel on ARMv8
->> +is via the UEFI system configuration table.
->> +
->
-> This is a bit concerning for the approach we are currently taking to
-> support ACPI on Xen [1].
->
-> Background: Xen is a tiny hypervisor which cannot parse the DSDT or any
-> other non-static table. Xen relies on Linux in Dom0 to manage most
-> (basically everything except the GIC, serial port, SMMU, and timers)
-> hardware resources and relies on Dom0 to parse the ACPI tables.
->
-> While Xen itself is typically booted by UEFI and finds RSDP through the
-> UEFI system table, Xen does NOT run another UEFI instance to boot Dom0
-> nor does it pass through the presence of UEFI to Dom0 in any way.
-> Instead, it just created a DT (with modifications concerning the
-> hardware mentioned above) and boots Linux in Dom0 directly (on x86 any
-> required UEFI call is performed through paravirtualized hypercalls).
->
-> In the case of ACPI, Xen adds a property to the chosen node and
-> populates it with the RDSP in Dom0's address space.  Patches have not
+Apart from that,
 
-Sorry I'm not familiar with hypervisor, I have question here about
-x86 on xen, how ACPI works on XEN for x86?
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-Thanks
-Hanjun
+-- 
+Regards,
+
+Laurent Pinchart
