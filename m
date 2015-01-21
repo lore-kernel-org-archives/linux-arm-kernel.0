@@ -1,40 +1,76 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 21 Jan 2015 16:46:41 +0000
-Subject: unclear ipv6 redirect message (was Re: [PATCH v3 2/3] mfd:
- lubbock_io: add lubbock_io board)
-In-Reply-To: <1421858444.10574.14.camel@perches.com>
-References: <1421406010-14851-2-git-send-email-robert.jarzmik@free.fr>
- <20150119091705.GG21886@x1> <87ppaah9k5.fsf@free.fr>
- <20150120102919.GP5767@x1>
- <20150120115658.GJ26493@n2100.arm.linux.org.uk>
- <873874fuei.fsf@free.fr>
- <20150121094453.GO26493@n2100.arm.linux.org.uk>
- <1421856321.10574.13.camel@perches.com>
- <20150121161059.GT26493@n2100.arm.linux.org.uk>
- <1421858444.10574.14.camel@perches.com>
-Message-ID: <20150121164641.GU26493@n2100.arm.linux.org.uk>
+From: parth.dixit@linaro.org (Parth Dixit)
+Date: Wed, 21 Jan 2015 22:21:16 +0530
+Subject: [PATCH v7 04/17] ARM64 / ACPI: Introduce early_param for "acpi"
+ and pass acpi=force to enable ACPI
+In-Reply-To: <20150121161652.GH6358@e104818-lin.cambridge.arm.com>
+References: <20150119151350.21B65C40948@trevor.secretlab.ca>
+ <54BD3803.6020307@redhat.com>
+ <20150119175233.GK11835@e104818-lin.cambridge.arm.com>
+ <20150119180122.GJ21553@leverpostej> <54BE1FEA.5040109@linaro.org>
+ <alpine.DEB.2.02.1501201901190.12653@kaball.uk.xensource.com>
+ <20150121152326.GD6358@e104818-lin.cambridge.arm.com>
+ <54BFC5F0.3020500@redhat.com>
+ <20150121154243.GE6358@e104818-lin.cambridge.arm.com>
+ <54BFCE4D.2060806@redhat.com>
+ <20150121161652.GH6358@e104818-lin.cambridge.arm.com>
+Message-ID: <CABy3MNmft_tCynd6z5jCGW090XqZ8hUCfM2qPnDfYViSxQUXXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 21, 2015 at 08:40:44AM -0800, Joe Perches wrote:
-> On Wed, 2015-01-21 at 16:11 +0000, Russell King - ARM Linux wrote:
-> > On Wed, Jan 21, 2015 at 08:05:21AM -0800, Joe Perches wrote:
-> > > (adding netdev)
-> > 
-> > I wasn't actually reporting that as an issue; I was using it as an
-> > example.  It's from a very old kernel (2.6.27.21) which I run on one
-> > of my old x86 machines.
-> 
-> It's still the same code.
-> If the message can be improved, why not do it?
-
-I assume you're taking the responsibility to test anything that comes
-out of this then?
-
-I'm not; I tried updating the kernel on the machine to 2.6.32 many
-years ago and that was a no-go because of userspace (udev)
-incompatibilities.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+On 21 January 2015 at 21:46, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Wed, Jan 21, 2015 at 04:05:33PM +0000, Jon Masters wrote:
+>> On 01/21/2015 10:42 AM, Catalin Marinas wrote:
+>> > On Wed, Jan 21, 2015 at 03:29:52PM +0000, Jon Masters wrote:
+>> >> On 01/21/2015 10:23 AM, Catalin Marinas wrote:
+>> >>> I have some questions for the ACPI and EFI folk:
+>> >>>
+>> >>> 1. When booting with ACPI, are the EFI run-time services required for
+>> >>>    anything? If yes, Xen may have a bigger problem
+>> >>
+>> >> Yes. At least for some things. For example, installing an Operating
+>> >> System would require that you make runtime services calls to set the
+>> >> BootOrder/BootNext variables, and so on. Further, we use the GetTime
+>> >> service and EFI based reboot to avoid having special drivers. I had
+>> >> those added to SBBR as requirements for that reason.
+>> >
+>> > So what would a kexec'ed kernel do here? Or we usually expect it to be
+>> > short lived and doesn't need reboot, nor GetTime.
+>>
+>> In the use case that I have, it'll use EFI Runtime Servies to handle
+>> both the time of day (which it will need) and to subsequently reboot.
+>> This is currently being worked on (integration into kdump).
+>
+> So the EFI run-time services (and EFI tables) will be preserved across
+> kexec? Could Xen not to something similar?
+>
+>> >>> 2. Could a boot loader (either kernel doing kexec or Xen) emulate the
+>> >>>    EFI system/config tables and still make them useful to the kernel but
+>> >>>    without EFI_BOOT or EFI_RUNTIME_SERVICES?
+>> >>
+>> >> Yes. But again, without the other required pieces (including the
+>> >> services function pointers in the systab which are required) you'd crash
+>> >> soon after boot trying to make those calls.
+>> >
+>> > My point was whether you can still pass information like RSDP address
+>> > via EFI tables but explicitly disable runtime services so that the
+>> > kernel won't try to make such calls (and crash).
+>>
+>> Yes. As Graeme says, it works just to pass in the ACPI information and
+>> turn off EFI *BUT* it does not work to say you have EFI and then not
+>> provide the correct EFI services. To do so is out of spec, and in fact
+>> it's one reason we weren't able to turn the GetTime service on generally
+>> for x86 - some older x86 boxes didn't implement it originally (another
+>> reason on our end we're requiring all of these services on day one so
+>> that there won't be time for someone to miss them in firmware).
+This is the use case i am talking about, we have a wroking setup with
+efi disabled
+and rsdp passed via dtb, right now its done by adding a "rsdp" field
+in the chosen node.
+Do we have a formal way to pass RSDP without EFI? if not, it would be
+good to have dtb binding
+which we can use to pass RSDP address to kernel for ACPI.
+> OK, thanks for confirming this. So the answer to my second question is
+> "not really".
+>
+> --
+> Catalin
