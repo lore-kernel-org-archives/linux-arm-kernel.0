@@ -1,85 +1,74 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Wed, 21 Jan 2015 09:44:26 +0100
-Subject: [PATCH RFC] ARM: BCM5301X: add restart support
-Message-ID: <1421829866-9769-1-git-send-email-zajec5@gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 21 Jan 2015 14:24:17 +0530
+Subject: [PATCH v2 0/7] Fix sti drivers whcih mix reg address spaces
+In-Reply-To: <1420643052-4506-1-git-send-email-peter.griffin@linaro.org>
+References: <1420643052-4506-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <54BF6939.6050200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
----
-As you can see in the patch code, restarting BCM5301X devices requires
-performing some operation on its bcma bus.
-That of course requires getting a reference to it which I do by calling
-of_find_compatible_node with two NULLs.
+Hi,
 
-Unfortuantely this may not be preferred way to do that. I remember Arnd
-saying following thing when I was looking for chipcommon reference in
-another patch of mine:
-> This doesn't: you are now searching through all nodes starting at the
-> axi node rather than searching just through the children.
+On Wednesday 07 January 2015 08:34 PM, Peter Griffin wrote:
+> Hi folks,
+> 
+> A V2 of this old series incorporating Arnd and Lees Feedback form v1.
+> 
+> Following on from Arnds comments about the picophy driver here
+> https://lkml.org/lkml/2014/11/13/161, this series fixes the
+> remaining upstreamed drivers for STI, which are mixing address spaces
+> in the reg property. We do this in a way similar to the keystone
+> and bcm7445 platforms, by having sysconfig phandle/ offset pair 
+> (where only one register is required). Or phandle / integer array
+> where multiple offsets in the same bank are needed).
+> 
+> This series breaks DT compatability! But the platform support
+> is WIP and only being used by the few developers who are upstreaming
+> support for it. I've made each change to the driver / dt doc / dt
+> file as a single atomic commit so the kernel will remain bisectable. 
+> 
+> This series then also enables the picophy driver, and adds back in
+> the ehci/ohci dt nodes for stih410 which make use of the picophy.
+> 
+> regards,
+> 
+> Peter.
+> 
+> Changes since v1:
+> - Add missing space after */ (Lee)
+> - Change comment to "indexed from" rather than "not indexed from" (Lee)
+> - Change naming to phy1, phy2 rather than phy at 1 phy at 2 if there is no reg property (Arnd / Grant)
+> - Rebased on v3.19-rc3 (me)
+> - Checkpatch "no space before tabs" warning in stih41*.dtsi (me)
+> 
+> Peter Griffin (7):
+>   phy: phy-stih407-usb: Pass sysconfig register offsets via syscfg
+>     property.
+>   phy: miphy365x: Pass sysconfig register offsets via syscfg dt
+>     property.
+>   ARM: STi: DT: STiH407: Add usb2 picophy dt nodes
+>   ARM: STi: DT: STiH410: Add usb2 picophy dt nodes
+>   ARM: STi: DT: STiH410: Add DT nodes for the ehci and ohci usb
+>     controllers.
+>   ARM: multi_v7_defconfig: Enable stih407 usb picophy
+>   stmmac: dwmac-sti: Pass sysconfig register offset via syscon dt
+>     property.
+> 
+>  .../devicetree/bindings/net/sti-dwmac.txt          | 14 ++---
+>  .../devicetree/bindings/phy/phy-miphy365x.txt      | 15 ++---
+>  .../devicetree/bindings/phy/phy-stih407-usb.txt    | 10 +---
+>  arch/arm/boot/dts/stih407-family.dtsi              |  9 +++
+>  arch/arm/boot/dts/stih410.dtsi                     | 70 ++++++++++++++++++++++
+>  arch/arm/boot/dts/stih415.dtsi                     | 12 ++--
+>  arch/arm/boot/dts/stih416.dtsi                     | 22 +++----
+>  arch/arm/configs/multi_v7_defconfig                |  1 +
+>  drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c    | 13 ++--
+>  drivers/phy/phy-miphy365x.c                        | 29 ++++-----
+>  drivers/phy/phy-stih407-usb.c                      | 25 ++++----
+>  11 files changed, 143 insertions(+), 77 deletions(-)
+> 
 
-Is there any better way to get reference to the bus node?
----
- arch/arm/mach-bcm/bcm_5301x.c | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+Queued the first two patches of this series in linux-phy.
 
-diff --git a/arch/arm/mach-bcm/bcm_5301x.c b/arch/arm/mach-bcm/bcm_5301x.c
-index e9bcbdb..5b8cd05 100644
---- a/arch/arm/mach-bcm/bcm_5301x.c
-+++ b/arch/arm/mach-bcm/bcm_5301x.c
-@@ -12,9 +12,26 @@
- #include <asm/siginfo.h>
- #include <asm/signal.h>
- 
-+#include <linux/bcma/bcma.h>
- 
- static bool first_fault = true;
- 
-+static struct bcma_bus *bcm5301x_get_bcma_bus(void)
-+{
-+	struct device_node *np;
-+	struct platform_device *pdev;
-+
-+	np = of_find_compatible_node(NULL, NULL, "brcm,bus-axi");
-+	if (!np)
-+		return NULL;
-+
-+	pdev = of_find_device_by_node(np);
-+	if (!pdev)
-+		return NULL;
-+
-+	return platform_get_drvdata(pdev);
-+}
-+
- static int bcm5301x_abort_handler(unsigned long addr, unsigned int fsr,
- 				 struct pt_regs *regs)
- {
-@@ -43,6 +60,19 @@ static void __init bcm5301x_init_early(void)
- 			"imprecise external abort");
- }
- 
-+static void bcm5301x_restart(enum reboot_mode mode, const char *cmd)
-+{
-+	struct bcma_bus *bus = bcm5301x_get_bcma_bus();
-+
-+	if (bus)
-+		bcma_chipco_watchdog_timer_set(&bus->drv_cc, 1);
-+	else
-+		pr_warn("Unable to access bcma bus\n");
-+
-+	while (1)
-+		;
-+}
-+
- static const char __initconst *bcm5301x_dt_compat[] = {
- 	"brcm,bcm4708",
- 	NULL,
-@@ -52,5 +82,6 @@ DT_MACHINE_START(BCM5301X, "BCM5301X")
- 	.l2c_aux_val	= 0,
- 	.l2c_aux_mask	= ~0,
- 	.init_early	= bcm5301x_init_early,
-+	.restart	= bcm5301x_restart,
- 	.dt_compat	= bcm5301x_dt_compat,
- MACHINE_END
--- 
-1.8.4.5
+Thanks
+Kishon
