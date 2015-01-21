@@ -1,39 +1,24 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 21 Jan 2015 11:22:09 -0800
-Subject: [PATCH] ARM: qcom: Drop unnecessary selects from ARCH_QCOM
-Message-ID: <1421868129-20798-1-git-send-email-sboyd@codeaurora.org>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 21 Jan 2015 20:22:08 +0100
+Subject: [PATCH v3 2/3] mfd: lubbock_io: add lubbock_io board
+In-Reply-To: <20150121151052.GD22024@x1> (Lee Jones's message of "Wed, 21 Jan
+ 2015 15:10:52 +0000")
+References: <20150121123551.GD9258@x1>
+ <332399927.402665086.1421847419490.JavaMail.root@zimbra1-e1.priv.proxad.net>
+ <20150121151052.GD22024@x1>
+Message-ID: <87twzkdjmn.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We don't need to force gpiolib on everyone given that it isn't
-required to actually boot the device and the multiplatform
-Kconfig already selects ARCH_WANT_OPTIONAL_GPIOLIB. CLKSRC_OF is
-already selected by CONFIG_ARCH_MULTIPLATFORM too, so we can drop
-that here.
+Lee Jones <lee.jones@linaro.org> writes:
+> Very well, Russell and yourself have convinced me.  If you fixup the
+> remainder of comments, I'm happy.
+Cool.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
+Let me a couple of days to gather my wits, cross-check I have not forgotten a
+comment, make some testing on the board and then post v4.
 
-Based on qcom/soc at Kumar's tree
+Cheers.
 
- arch/arm/mach-qcom/Kconfig | 2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/arch/arm/mach-qcom/Kconfig b/arch/arm/mach-qcom/Kconfig
-index 5e93814f458a..2256cd1e25d1 100644
---- a/arch/arm/mach-qcom/Kconfig
-+++ b/arch/arm/mach-qcom/Kconfig
-@@ -1,10 +1,8 @@
- menuconfig ARCH_QCOM
- 	bool "Qualcomm Support" if ARCH_MULTI_V7
--	select ARCH_REQUIRE_GPIOLIB
- 	select ARCH_SUPPORTS_BIG_ENDIAN
- 	select ARM_GIC
- 	select ARM_AMBA
--	select CLKSRC_OF
- 	select PINCTRL
- 	select QCOM_SCM if SMP
- 	help
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Robert
