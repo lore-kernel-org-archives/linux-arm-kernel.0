@@ -1,73 +1,35 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 21 Jan 2015 11:42:05 +0100
-Subject: [PATCH v4] ARM: mvebu: remove two selects of ARM_ERRATA_753970
-In-Reply-To: <1421659937.9655.16.camel@x220>
-References: <1421659937.9655.16.camel@x220>
-Message-ID: <54BF827D.8090607@free-electrons.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 21 Jan 2015 11:46:34 +0100
+Subject: [PATCH 06/13] ARM: shmobile: mackerel: Remove defconfig
+In-Reply-To: <20150121045357.7648.6160.sendpatchset@little-apple>
+References: <20150121045256.7648.7451.sendpatchset@little-apple>
+ <20150121045357.7648.6160.sendpatchset@little-apple>
+Message-ID: <CAMuHMdW7WF00LHheNAkQZQizrO0MH91EScuuR1_hwebRqznXrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hi Magnus,
 
-On 19/01/2015 10:32, Paul Bolle wrote:
-> ARM_ERRATA_753970 was renamed to PL310_ERRATA_753970 in v3.2, through
-> commit fa0ce4035d48 ("ARM: 7162/1: errata: tidy up Kconfig options for
-> PL310 errata workarounds"). Still, two selects were added in v3.15 that
-> used the previous name. So these selects have always been nops.
-> 
-> It is clear that the intention here was to select PL310_ERRATA_753970.
-> But as, apparently, nothing broke for four releases we can assume
-> PL310_ERRATA_753970 isn't actually needed. So let's not rename these two
-> selects but just drop them instead.
-> 
-> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+On Wed, Jan 21, 2015 at 5:53 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
+> From: Magnus Damm <damm+renesas@opensource.se>
+>
+> Remove the defconfig for the no longer supported mackerel board.
+>
+> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 > ---
-> v4: Do no bother anymore to rename these selects. I've tried to do that
-> a few times ever since v3.15-rc1 was released. Last time, v3, was in
-> https://lkml.org/lkml/2014/9/12/231 . And since the people who
-> intruduced this issue apparently aren't bothered by it, neither should
-> I. So just do the safe and easy thing, which is removing these two
-> selects, as they are nops now.
-> 
-> Done on top of next-20150119.
+>
+>  arch/arm/configs/mackerel_defconfig |  157 -----------------------------------
+>  1 file changed, 157 deletions(-)
 
-I think you're right, however I am still going to ask the hardware designers
-if we need PL310_ERRATA_753970.
+You forgot the reference to mackerel_defconfig in MAINTAINERS.
 
-Thanks,
+Gr{oetje,eeting}s,
 
-Gregory
+                        Geert
 
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-> 
->  arch/arm/mach-mvebu/Kconfig | 2 --
->  1 file changed, 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-> index c1e4567a5ab3..e8e5fa25121c 100644
-> --- a/arch/arm/mach-mvebu/Kconfig
-> +++ b/arch/arm/mach-mvebu/Kconfig
-> @@ -37,7 +37,6 @@ config MACH_ARMADA_370
->  config MACH_ARMADA_375
->  	bool "Marvell Armada 375 boards" if ARCH_MULTI_V7
->  	select ARM_ERRATA_720789
-> -	select ARM_ERRATA_753970
->  	select ARM_GIC
->  	select ARMADA_375_CLK
->  	select HAVE_ARM_SCU
-> @@ -52,7 +51,6 @@ config MACH_ARMADA_375
->  config MACH_ARMADA_38X
->  	bool "Marvell Armada 380/385 boards" if ARCH_MULTI_V7
->  	select ARM_ERRATA_720789
-> -	select ARM_ERRATA_753970
->  	select ARM_GIC
->  	select ARMADA_38X_CLK
->  	select HAVE_ARM_SCU
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
