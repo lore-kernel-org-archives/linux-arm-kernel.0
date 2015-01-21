@@ -1,41 +1,59 @@
-From: ricardo.ribalda@gmail.com (Ricardo Ribalda Delgado)
-Date: Wed, 21 Jan 2015 16:53:09 +0100
-Subject: [PATCH 2/3] spi/xilinx: Support for spi mode LSB_FIRST
-In-Reply-To: <1421855590-9210-1-git-send-email-ricardo.ribalda@gmail.com>
-References: <1421855590-9210-1-git-send-email-ricardo.ribalda@gmail.com>
-Message-ID: <1421855590-9210-3-git-send-email-ricardo.ribalda@gmail.com>
+From: gg@slimlogic.co.uk (Graeme Gregory)
+Date: Wed, 21 Jan 2015 15:56:41 +0000
+Subject: [PATCH v7 04/17] ARM64 / ACPI: Introduce early_param for "acpi"
+ and pass acpi=force to enable ACPI
+In-Reply-To: <20150121154243.GE6358@e104818-lin.cambridge.arm.com>
+References: <20150119135144.GI11835@e104818-lin.cambridge.arm.com>
+ <20150119151350.21B65C40948@trevor.secretlab.ca>
+ <54BD3803.6020307@redhat.com>
+ <20150119175233.GK11835@e104818-lin.cambridge.arm.com>
+ <20150119180122.GJ21553@leverpostej> <54BE1FEA.5040109@linaro.org>
+ <alpine.DEB.2.02.1501201901190.12653@kaball.uk.xensource.com>
+ <20150121152326.GD6358@e104818-lin.cambridge.arm.com>
+ <54BFC5F0.3020500@redhat.com>
+ <20150121154243.GE6358@e104818-lin.cambridge.arm.com>
+Message-ID: <20150121155641.GE6858@xora-yoga-13.xora.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hardware supports LSB_FIRST mode. Support it also in the driver.
+On Wed, Jan 21, 2015 at 03:42:43PM +0000, Catalin Marinas wrote:
+> On Wed, Jan 21, 2015 at 03:29:52PM +0000, Jon Masters wrote:
+> > On 01/21/2015 10:23 AM, Catalin Marinas wrote:
+> > > I have some questions for the ACPI and EFI folk:
+> > > 
+> > > 1. When booting with ACPI, are the EFI run-time services required for
+> > >    anything? If yes, Xen may have a bigger problem
+> > 
+> > Yes. At least for some things. For example, installing an Operating
+> > System would require that you make runtime services calls to set the
+> > BootOrder/BootNext variables, and so on. Further, we use the GetTime
+> > service and EFI based reboot to avoid having special drivers. I had
+> > those added to SBBR as requirements for that reason.
+> 
+> So what would a kexec'ed kernel do here? Or we usually expect it to be
+> short lived and doesn't need reboot, nor GetTime.
+> 
+> Xen is slightly more problematic but I wonder whether it could run a
+> (paravirtualised) UEFI.
+> 
+> > > 2. Could a boot loader (either kernel doing kexec or Xen) emulate the
+> > >    EFI system/config tables and still make them useful to the kernel but
+> > >    without EFI_BOOT or EFI_RUNTIME_SERVICES?
+> > 
+> > Yes. But again, without the other required pieces (including the
+> > services function pointers in the systab which are required) you'd crash
+> > soon after boot trying to make those calls.
+> 
+> My point was whether you can still pass information like RSDP address
+> via EFI tables but explicitly disable runtime services so that the
+> kernel won't try to make such calls (and crash).
+> 
+There is no specific dependency from ACPI->EFI its just the only current
+method defind to get the RSDP pointer. It would work just as well
+getting the pointer from /chosen/ if we just pick a node and document it
+for Xen/kexec/other usage.
 
-Signed-off-by: Ricardo Ribalda Delgado <ricardo.ribalda@gmail.com>
----
- drivers/spi/spi-xilinx.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+We were running ACPI on machine from u-boot doing exactly this for
+a long time.
 
-diff --git a/drivers/spi/spi-xilinx.c b/drivers/spi/spi-xilinx.c
-index 2ea4ca5..b8ce58d 100644
---- a/drivers/spi/spi-xilinx.c
-+++ b/drivers/spi/spi-xilinx.c
-@@ -34,7 +34,8 @@
- #define XSPI_CR_MASTER_MODE	0x04
- #define XSPI_CR_CPOL		0x08
- #define XSPI_CR_CPHA		0x10
--#define XSPI_CR_MODE_MASK	(XSPI_CR_CPHA | XSPI_CR_CPOL)
-+#define XSPI_CR_MODE_MASK	(XSPI_CR_CPHA | XSPI_CR_CPOL | \
-+				 XSPI_CR_LSB_FIRST)
- #define XSPI_CR_TXFIFO_RESET	0x20
- #define XSPI_CR_RXFIFO_RESET	0x40
- #define XSPI_CR_MANUAL_SSELECT	0x80
-@@ -194,6 +195,8 @@ static void xilinx_spi_chipselect(struct spi_device *spi, int is_on)
- 			cr |= XSPI_CR_CPHA;
- 		if (spi->mode & SPI_CPOL)
- 			cr |= XSPI_CR_CPOL;
-+		if (spi->mode & SPI_LSB_FIRST)
-+			cr |= XSPI_CR_LSB_FIRST;
- 		xspi->write_fn(cr, xspi->regs + XSPI_CR_OFFSET);
- 
- 		/* We do not check spi->max_speed_hz here as the SPI clock
--- 
-2.1.4
+Graeme
