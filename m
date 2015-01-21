@@ -1,95 +1,55 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 21 Jan 2015 13:56:11 +0000
-Subject: [PATCH RFC 1/2] Documentation: arm: define DT bindings for
- system suspend
-In-Reply-To: <20150121213507.695b871b@xhacker>
-References: <1421840155-18990-1-git-send-email-sudeep.holla@arm.com>
- <1421840155-18990-2-git-send-email-sudeep.holla@arm.com>
- <20150121212139.1cdc3fd5@xhacker> <20150121213507.695b871b@xhacker>
-Message-ID: <20150121135610.GA21950@e102568-lin.cambridge.arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 21 Jan 2015 15:00:50 +0100
+Subject: [PATCH 00/27] ARM: mvebu: armada-*: Relicense the device tree
+ under GPLv2+/X11
+In-Reply-To: <20150107125443.GA8013@red-moon>
+References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
+ <54AA7DA6.3030707@free-electrons.com> <20150107125443.GA8013@red-moon>
+Message-ID: <54BFB112.20406@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 21, 2015 at 01:35:07PM +0000, Jisheng Zhang wrote:
-> Dear Sudeep,
-> 
-> On Wed, 21 Jan 2015 05:21:39 -0800
-> Jisheng Zhang <jszhang@marvell.com> wrote:
-> 
-> > Dear Sudeep,
-> > 
-> > On Wed, 21 Jan 2015 03:35:54 -0800
-> > Sudeep Holla <sudeep.holla@arm.com> wrote:
-> > 
-> > > ARM based platforms implement unique ways to enter system suspend
-> > > (i.e. Suspend to RAM). The mechanism and the parameters defining the
-> > > system state vary on a per-platform basis forcing the OS to handle it
-> > > in very platform specific way.
-> > > 
-> > > Since ARM 32-bit systems had machine specific code, no attempts to
-> > > standardize are being made as it provides easy way to implement suspend
-> > > operations in a platform specific manner. However, this approach not
-> > > only makes maintainance more difficult as the number of platforms
-> > > supported increases but also not feasible for ARM64.
-> > > 
-> > > This DT binding aims at standardizing the system suspend for ARM
-> > > platforms. ARM64 platforms mandates entry-method property in DT for
-> > > this system suspend node.
-> > > 
-> > > On system implementing PSCI as an enable-method to enter system suspend,
-> > > the PSCI CPU suspend method is used on versions upto v0.2 and requires
-> > > the power_state parameter to be passed to the PSCI CPU suspend function.
-> > > 
-> > > This parameter is platform specific, therefore must be provided by
-> > > firmware to the OS in order to enable proper call sequence.
-> > > 
-> > > This ARM system suspend DT bindings rely on a property
-> > > (i.e. arm,psci-suspend-param) in the PSCI DT bindings that describes
-> > > how the PSCI CPU suspend power_state parameter should be defined in DT.
-> > > 
-> > > Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> > > ---
-> > >  Documentation/devicetree/bindings/arm/psci.txt     | 11 +++
-> > >  .../devicetree/bindings/arm/system-suspend.txt     | 93
-> > > ++++++++++++++++++++++ 2 files changed, 104 insertions(+)
-> > >  create mode 100644
-> > > Documentation/devicetree/bindings/arm/system-suspend.txt
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/arm/psci.txt
-> > > b/Documentation/devicetree/bindings/arm/psci.txt index
-> > > 5aa40ede0e99..bd3977a2a333 100644 ---
-> > > a/Documentation/devicetree/bindings/arm/psci.txt +++
-> > > b/Documentation/devicetree/bindings/arm/psci.txt @@ -61,6 +61,14 @@ Device
-> > > tree nodes that require usage of PSCI CPU_SUSPEND function (ie idle
-> > > Definition: power_state parameter to pass to the PSCI suspend call.
-> > >  
-> > > +PSCI v0.2 and earlier versions don't have explicit operation for system
-> > > +suspend. However, one can implement system suspend using CPU_SUSPEND by
-> > > +ensuring every other core except the one executing the CPU_SUSPEND call
-> > > +has called into PSCI through a CPU_OFF call.
-> > 
-> > If users explicitly hot-unplug other cores when system load is low to save
-> > power, then we want to suspend at some point, how does the firmware know
-> > this case?
-> 
-> Sorry for confusion. I mean 
-> 
-> If users explicitly hot-unplug other cores when system load is low to save
-> power, then at some point cpuidle want to suspend the cluster, how does the
-> distinguish this case with suspend the system to ram.
+Hi Lorenzo,
 
-Through the arm,psci-suspend-param DT property, ie PSCI CPU_SUSPEND
-power_state parameter.
-
-Did you read the patch :) ?
-
-> > In my private tree, I extend the PSCI spec to tell firmware we want to
-> > suspend the system.
+On 07/01/2015 13:54, Lorenzo Pieralisi wrote:
+> Hi Gregory,
 > 
-> I extend the PSCI suspend function to help firmware distinguish suspend system
-> to ram and other suspend cores/clusters.
+> On Mon, Jan 05, 2015 at 12:03:50PM +0000, Gregory CLEMENT wrote:
+> 
+> [...]
+> 
+>> You didn't give your ack (or nack) about the license change for the files
+>> you have contributed. I would like to have your answer on the followings
+>> patches:
+>>
+>> For Nobuhiro Iwamatsu:
+>> ARM: mvebu: armada-xp-openblocks-ax3-4: Relicense the device tree under GPLv2+/X11
+>>
+>> For Heikki Krogerus:
+>> ARM: mvebu: armada-xp: Relicense the device tree under GPLv2+/X11
+>>
+>> For Marcin Wojtas:
+>> ARM: mvebu: armada-38x: Relicense the device tree under GPLv2+/X11
+>> ARM: mvebu: armada-385-db: Relicense the device tree under GPLv2+/X11
+>> ARM: mvebu: armada-375: Relicense the device tree under GPLv2+/X11
+>>
+>> For Lorenzo Pieralisi:
+>> ARM: mvebu: armada-370-xp: Relicense the device tree under GPLv2+/X11
+> 
+> It is not something I can control. I asked the relevant people and I am
+> trying to get back to you with a definite reply asap, it can take a
+> while, you have been warned.
 
-See above.
+I would like to know if you got news about the license change?
 
 Thanks,
-Lorenzo
+
+Gregory
+
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
