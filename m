@@ -1,33 +1,45 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 21 Jan 2015 09:17:48 +0100
-Subject: [PATCH 2/8] soc: Add MediaTek pericfg controller support
-In-Reply-To: <20150120161555.GH15924@leverpostej>
-References: <1421747231-554-1-git-send-email-s.hauer@pengutronix.de>
- <1421747231-554-3-git-send-email-s.hauer@pengutronix.de>
- <20150120161555.GH15924@leverpostej>
-Message-ID: <20150121081748.GC12209@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 21 Jan 2015 09:20:22 +0100
+Subject: [PATCH v4 2/2] I2C: mediatek: Add driver for MediaTek I2C
+ controller
+In-Reply-To: <1421810004.15468.825.camel@mtksdaap41>
+References: <1421404418-50718-1-git-send-email-eddie.huang@mediatek.com>
+ <1421404418-50718-3-git-send-email-eddie.huang@mediatek.com>
+ <20150118101816.GF22880@pengutronix.de>
+ <1421810004.15468.825.camel@mtksdaap41>
+Message-ID: <20150121082022.GT22880@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 20, 2015 at 04:15:55PM +0000, Mark Rutland wrote:
-> > +
-> > +	pericfg: pericfg at 10003000 {
-> > +		#reset-cells = <1>;
-> > +		#clock-cells = <1>;
-> > +		compatible = "mediatek,mt8135-pericfg";
-> > +		reg = <0 0x10003000 0 0x1000>;
-> > +	};
-> 
-> This looks identical to the infracfg (same address too). Is that
-> deliberate?
+Hello,
 
-Both controllers indeed control clocks and resets, but with a different
-register layout, so the nodes really look identical. I'll change the
-address to the real address of the MT8135 pericfg though to make the
-example more realistic.
+On Wed, Jan 21, 2015 at 11:13:24AM +0800, Eddie Huang wrote:
+> > > +	/* set when doing the transfer */
+> > > +	u16 irq_stat;			/* interrupt status */
+> > > +	unsigned int speed_hz;		/* The speed in transfer */
+> > > +	bool trans_stop;		/* i2c transfer stop */
+> > > +	enum mtk_trans_op op;
+> > > +	u16 msg_len;
+> > > +	u8 *msg_buf;			/* pointer to msg data */
+> > > +	u16 msg_aux_len;		/* WRRD mode to set AUX_LEN register*/
+> > > +	u16 addr;	/* 7bit slave address, without read/write bit */
+> > Wouldn't it be easier to maintain a pointer to the message to be
+> > transferred?
+> I think use mtk_i2c pointer is more flexible than maintain a pointer to
+> message.
+Not sure you understood what I intended to suggest. My idea was to drop
+
+	u16 msg_len;
+	u8 *msg_buf;
+	u16 msg_aux_len; // maybe
+	u16 addr;
+
+from struct mtk_i2c and add a struct i2c_msg *msg instead. Up to you to
+decide.
+
+Best regards
+Uwe
 
 -- 
-Pengutronix e.K.                           |                             |
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
