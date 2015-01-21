@@ -1,20 +1,32 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 21 Jan 2015 10:59:11 +0100
-Subject: [PATCH v3 3/3] MAINTAINERS: add maintainer for pinctrl-at91
-In-Reply-To: <1421422267-2934-4-git-send-email-ludovic.desroches@atmel.com>
-References: <1421422267-2934-1-git-send-email-ludovic.desroches@atmel.com>
- <1421422267-2934-4-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <CACRpkdadymp1yKwMwR45Uny8OcciudM+cmzZHWRZhUV-QNiczA@mail.gmail.com>
+Date: Wed, 21 Jan 2015 11:05:44 +0100
+Subject: [PATCH 1/5] ARM: sa1100: add platform functions to handle PWER
+ settings
+In-Reply-To: <1421316574-10022-1-git-send-email-dbaryshkov@gmail.com>
+References: <1421316574-10022-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <CACRpkdYww-6HbmM9uViyB6ZRp2MQnkTYz-7ZxAVN_GsRTNqaoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 4:31 PM, Ludovic Desroches
-<ludovic.desroches@atmel.com> wrote:
+On Thu, Jan 15, 2015 at 11:09 AM, Dmitry Eremin-Solenikov
+<dbaryshkov@gmail.com> wrote:
 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> PWER settings logically belongs neither to GPIO nor to system IRQ code.
+> Add special functions to handle PWER (for GPIO and for system IRQs)
+> from platform code.
+>
+> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 
-Dropped for now as J-C says he can handle it.
-If a patch queue stacks up I'll revisit the issue.
+> diff --git a/arch/arm/mach-sa1100/generic.c b/arch/arm/mach-sa1100/generic.c
+(...)
+> +int sa11x0_gpio_set_wake(unsigned int gpio, unsigned int on)
+(...)
+> +int sa11x0_sc_set_wake(unsigned int irq, unsigned int on)
+
+Why are these two functions not added to any .h file?
+
+Did you miss to commit something or are there compile
+warnings about this?
 
 Yours,
 Linus Walleij
