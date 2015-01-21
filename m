@@ -1,31 +1,58 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 21 Jan 2015 17:07:03 +0200
-Subject: [PATCH v2] iommu/ipmmu-vmsa: Use the ARM LPAE page table allocator
-In-Reply-To: <20150121150529.GA30345@8bytes.org>
-References: <20150119140106.GM6343@8bytes.org> <7446358.Tz4W75qRf1@avalon>
- <20150121150529.GA30345@8bytes.org>
-Message-ID: <3530276.KVdcG9umfv@avalon>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 21 Jan 2015 15:10:52 +0000
+Subject: [PATCH v3 2/3] mfd: lubbock_io: add lubbock_io board
+In-Reply-To: <332399927.402665086.1421847419490.JavaMail.root@zimbra1-e1.priv.proxad.net>
+References: <20150121123551.GD9258@x1>
+ <332399927.402665086.1421847419490.JavaMail.root@zimbra1-e1.priv.proxad.net>
+Message-ID: <20150121151052.GD22024@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+On Wed, 21 Jan 2015, robert.jarzmik at free.fr wrote:
 
-On Wednesday 21 January 2015 16:05:29 joro at 8bytes.org wrote:
-> On Wed, Jan 21, 2015 at 04:58:12PM +0200, Laurent Pinchart wrote:
-> > All my other ipmmu patches have been queued by Joerg in his next branch,
-> > on which this patch is based. If you base your series on the same branch
-> > you can just queue this patch on top of it. Do you plan to submit the
-> > result to v3.20 or v3.21 ?
+> > ----- Mail original -----
+> > De: "Lee Jones" <lee.jones@linaro.org>
+> First of all, this is my web mail interface, so please be kind with
+> my mail formatting ...
+
+I have no idea what you want me to change or do differently?
+
+Perhaps it might be more prudent for you to switch to a quality
+mailer?
+
+> > Looking at one of the other patches in the series it appears the flag
+> > you're trying to capture is IORESOURCE_IRQ_LOWEDGE.  When I grep for
+> > where this is being _used_ (think 'consumed, rather than passed.  I
+> > only see a single entry in drivers/pnp/interface.c.
+> Look at this call chain :
+> request_irq()
+>   setup_irq()
+>     __setup_irq()
+>       __irq_set_trigger()
+>         pxa_gpio_irq_type() (aka. chip->irq_set_type)
+>           => hardware register manipulation
 > 
-> Hmm, I would prefer to not merge stuff together like this. Preferably I
-> would like to put the generic page-table patches for ARM in a seperate
-> topic-branch without any other changes merged in, given that this does
-> not cause any non-trivial merge conflicts in the end for my next branch.
+> Moreover, you should be aware of the bijection existing between :
+>  - IORESOURCE_IRQ_LOWEDGE and IRQF_TRIGGER_RISING
+>  - it's HIGHEDGE twin
+>  - it is noted in : include/linux/interrupt.h
+> 
+> > That's what got me thinking... are you sure you're a) making use of
+> this flag
+> Yes, I'm quite sure.
+> 
+> > b) assuming the answer to 'a' is "no"
+> I won't :)
+> 
+> > I think to set an edge trigger on an IRQ, you should instead do so via
+> > irq_set_irq_type(), or have a missed a line or two?
+> __setup_irq(), that's the entry point.
 
-As you wish. I just thought you would prefer merging the series with at least 
-one user.
+Very well, Russell and yourself have convinced me.  If you fixup the
+remainder of comments, I'm happy.
 
 -- 
-Regards,
-
-Laurent Pinchart
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
