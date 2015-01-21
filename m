@@ -1,75 +1,66 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 21 Jan 2015 21:46:29 +0100
-Subject: [PATCHv5 0/4] USB: gadget: atmel_usba_udc: Driver improvements
-In-Reply-To: <1421868674-30757-1-git-send-email-sylvain.rochet@finsecur.com>
-References: <1421868674-30757-1-git-send-email-sylvain.rochet@finsecur.com>
-Message-ID: <20150121214629.5b1e3e30@bbrezillon>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 21 Jan 2015 12:43:47 -0800
+Subject: [PATCH v4 13/21] ARM: omap: convert wakeupgen to stacked domains
+In-Reply-To: <54C00832.1070807@oracle.com>
+References: <1421660655-21394-1-git-send-email-marc.zyngier@arm.com>
+ <1421660655-21394-14-git-send-email-marc.zyngier@arm.com>
+ <20150121163031.GR7718@atomide.com> <54BFE05E.9080403@arm.com>
+ <20150121183615.GS7718@atomide.com> <54C00832.1070807@oracle.com>
+Message-ID: <20150121204347.GT7718@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylvain,
+* santosh shilimkar <santosh.shilimkar@oracle.com> [150121 12:16]:
+> On 1/21/2015 10:36 AM, Tony Lindgren wrote:
+> >* Marc Zyngier <marc.zyngier@arm.com> [150121 09:25]:
+> >>On 21/01/15 16:30, Tony Lindgren wrote:
+> >>
+> >>>I gave this a quick boot test on am437x-gp-evm and the
+> >>>interrupts look OK with the fix also applied:
+> >>>
+> >>># cat /proc/interrupts
+> >>>             CPU0
+> >>>  16:        657     WUGEN  68  gp_timer
+> >>>  18:          0     WUGEN   9  l3-dbg-irq
+> >>>  19:          0     WUGEN  10  l3-app-irq
+> >>>  20:          5     WUGEN  12  edma
+> >>>  22:          0     WUGEN  14  edma_error
+> >>>  23:         96     WUGEN  72  OMAP UART0
+> >>>  33:          0  44e07000.gpio   6  mmc0
+> >>>158:         52     WUGEN  70  44e0b000.i2c
+> >>>159:          0     WUGEN  71  4802a000.i2c
+> >>>160:         35     WUGEN  64  mmc0
+> >>>161:          0     WUGEN  40  4a100000.ethernet
+> >>>162:       7739     WUGEN  41  4a100000.ethernet
+> >>>163:       7608     WUGEN  42  4a100000.ethernet
+> >>>164:          0     WUGEN  43  4a100000.ethernet
+> >>>170:          0     WUGEN 100  gpmc
+> >>>180:          0     WUGEN   7  tps65218
+> >>>IPI0:          0  CPU wakeup interrupts
+> >>>IPI1:          0  Timer broadcast interrupts
+> >>>IPI2:          0  Rescheduling interrupts
+> >>>IPI3:          0  Function call interrupts
+> >>>IPI4:          0  Single function call interrupts
+> >>>IPI5:          0  CPU stop interrupts
+> >>>IPI6:          0  IRQ work interrupts
+> >>>IPI7:          0  completion interrupts
+> >>>Err:          0
+> >>
+> >>Interesting. No TWD timer on this one?
+> >
+> >Good question, adding Felipe to cc. It eems to be there in
+> >the TRM in "Table 2-3.  L4_PER Peripheral Memory Map" as
+> >MPU_PRV_TIMERS. Also seems to actually work with the
+> >attached patch:
+> >
+> TWD is useless on this machine since single core and TWD
+> as know die in low power states. All the broadcast stuff
+> is for SMP machines.
 
-On Wed, 21 Jan 2015 20:31:10 +0100
-Sylvain Rochet <sylvain.rochet@finsecur.com> wrote:
+Hmm it seems we should still use TWD during runtime and
+swich over to the gptimer for idle states for wake-up
+events.
 
-> Start clocks on rising edge of the Vbus signal, stop clocks on falling 
-> edge of the Vbus signal.
-> 
-> Add suspend/resume with wakeup support.
+Regards,
 
-Apart from the minor comment I made on patch 4, you can add my:
-
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-
-to the whole series.
-
-Thanks for your patience.
-
-Best Regards,
-
-Boris
-
-> 
-> Changes since v4:
->   * Now using IRQ_NOAUTOEN flag to remove the unused check for 
->     udc->driver is not NULL in the Vbus IRQ.
->   * Reworked the start/stop of clocks on Vbus edges to prepare for 
->     suspend/resume support, factorised start and stop procedures
->   * New patch, suspend/resume for USBA with wakeup support
-> 
-> Changes since v3:
->   * Added stable tag for the first patch
->   * As suggested, removed the unused check for udc->driver is not NULL in
->     Vbus IRQ by requesting IRQ after udc->driver is set and by releasing
->     IRQ before udc->driver is cleared
->   * Rebased the core patch of this series against the just explained changes
-> 
-> Changes since v2:
->   * Use spin_lock_irqsave/unlock_irqrestore instead of spin_lock/unlock in
->     threaded interrupt because we are not in irq context anymore
->   * Removed useless and probably harmful IRQF_NO_SUSPEND from
->     devm_request_threaded_irq() flags
-> 
-> Changes since v1:
->   * Using a threaded irq and mutex instead of spinclock as suggested
->   * Moved a silently fixed bug in a separate patch (1/2)
-> 
-> Sylvain Rochet (4):
->   USB: gadget: atmel_usba_udc: Fixed vbus_prev initial state
->   USB: gadget: atmel_usba_udc: Request an auto disabled Vbus signal IRQ
->     instead of an auto enabled IRQ request followed by IRQ disable
->   USB: gadget: atmel_usba_udc: Start clocks on rising edge of the Vbus
->     signal, stop clocks on falling edge of the Vbus signal
->   USB: gadget: atmel_usba_udc: Add suspend/resume with wakeup support
-> 
->  drivers/usb/gadget/udc/atmel_usba_udc.c | 214 ++++++++++++++++++++++++--------
->  drivers/usb/gadget/udc/atmel_usba_udc.h |   4 +
->  2 files changed, 165 insertions(+), 53 deletions(-)
-> 
-
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Tony
