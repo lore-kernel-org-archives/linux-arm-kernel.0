@@ -1,20 +1,34 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 22 Jan 2015 11:01:44 -0800
-Subject: [PATCH v12 5/6] clkdev: Export clk_register_clkdev
-In-Reply-To: <1421943207-5180-6-git-send-email-tomeu.vizoso@collabora.com>
-References: <1421943207-5180-1-git-send-email-tomeu.vizoso@collabora.com>
- <1421943207-5180-6-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <20150122190144.GN27202@codeaurora.org>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Thu, 22 Jan 2015 11:13:19 -0800
+Subject: KVM: CONFIG_LOCK_DEP and CONFIG_LOCK_DETECTOR?
+In-Reply-To: <1421919245.13638.50.camel@x220>
+References: <1421919245.13638.50.camel@x220>
+Message-ID: <54C14BCF.1050902@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/22, Tomeu Vizoso wrote:
-> So it can be used from modules such as clk-test.ko.
+On 01/22/2015 01:34 AM, Paul Bolle wrote:
+> Mario,
 > 
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> Your commit c64735554c0a ("KVM: arm: Add initial dirty page locking
+> support") is included in today's linux-next (ie, next-20150122). I
+> noticed because a script I use to check linux-next spotted a minor
+> problem with it.
+> 
+> This commit added a comment that mentions CONFIG_LOCK_DEP and
+> CONFIG_LOCK_DETECTOR. It seems CONFIG_LOCKDEP and CONFIG_LOCKUP_DETECTOR
+> should be used instead. Is a trivial patch to fix these typos queued
+> somewhere?
+> 
+> Thanks,
+> 
+> 
+> Paul Bolle
+> 
 
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+Hi Paul,
+  thanks for spotting that. No there is no trivial patch
+queued, didn't notice it until now. Can I submit a follow
+up trivial patch later?
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+- Mario
