@@ -1,49 +1,42 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Wed, 21 Jan 2015 17:53:40 -0800
-Subject: [PATCH 8/8] msm: scm: Move the scm driver to drivers/soc/qcom
-In-Reply-To: <CAOesGMh1HE+hMP0VWr2vaHCp2itVjpQeiiFL6r9WeJUFes5tvw@mail.gmail.com>
-References: <1407202310-3359-1-git-send-email-sboyd@codeaurora.org>
- <1407202310-3359-9-git-send-email-sboyd@codeaurora.org>
- <CAOesGMh1HE+hMP0VWr2vaHCp2itVjpQeiiFL6r9WeJUFes5tvw@mail.gmail.com>
-Message-ID: <CAJAp7OgtnTN3H+zSazK2Xeob6wxpf9Ws=tibAupzP1cF31G=Mw@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 22 Jan 2015 11:01:44 +0900
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC sh73a0
+ Multiplatform Updates for v3.20
+In-Reply-To: <20150122013426.GD31815@quad.lixom.net>
+References: <cover.1421716945.git.horms+renesas@verge.net.au>
+ <20150122013426.GD31815@quad.lixom.net>
+Message-ID: <20150122020144.GA29564@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 21, 2015 at 5:13 PM, Olof Johansson <olof@lixom.net> wrote:
-[..]
-> On Mon, Aug 4, 2014 at 6:31 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> Architectural changes in the ARM Linux kernel tree mandate
->> the eventual removal of the mach-* directories. Move the
->> scm driver to drivers/soc/qcom and the scm header to
->> include/soc/qcom to support that removal.
->
-> The idea is not blindly move one dumping ground to a new place.
->
-> I see only two exported functions from scm.c:
->
-> scm_get_version: This is not used anywhere in the kernel and can just be removed
-> scm_call: This is used by scm-boot, and would be better to translate
-> over to firmware_ops in the first place.
->
+On Wed, Jan 21, 2015 at 05:34:26PM -0800, Olof Johansson wrote:
+> On Tue, Jan 20, 2015 at 10:27:32AM +0900, Simon Horman wrote:
+> > Hi Olof, Hi Kevin, Hi Arnd,
+> > 
+> > Please consider these second round of Renesas ARM based SoC sh73a0 multiplatform updates for v3.20.
+> > 
+> > This pull request is based on the previous round of
+> > such requests, tagged as renesas-sh73a0-multiplatform-for-v3.20,
+> > which I have already sent a pull-request for.
+> > 
+> > My understanding from Geert Uytterhoeven is that the above dependency
+> > is required to avoid a lock-up.
+> > 
+> > 
+> > The following changes since commit 93c9f0228a3d0a14640f86b3e8aeaf3c9b449bb7:
+> > 
+> >   ARM: shmobile: kzm9g-reference: Remove board C code and DT file (2015-01-14 09:46:48 +0900)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-sh73a0-multiplatform2-for-v3.20
+> > 
+> > for you to fetch changes up to e42c8385cfec0579a103b365d61748f199bfe239:
+> > 
+> >   ARM: shmobile: sh73a0 dtsi: Add Cortex-A9 TWD node (2015-01-17 09:36:35 +0900)
+> 
+> 
+> Not pulled based on earlier feedback on preceding branch. Seems like you
+> removed the tag already as well. ;)
 
-Hi Olof,
-
-I started this a while ago, as it felt like the right thing to do <tm>.
-
-The problem with this approach is that e.g. firmware loading is
-partially handled through this interface. So implementing a remoteproc
-driver for wifi etc required me to add 6 new ops to the struct,
-loading the modem looks like it requires one more. HDMI requires one.
-
-Looking at the downstream branch there's a bunch more (20+), so we
-would explode the firmware_ops struct with Qualcomm "specific" ops.
-This is not necessarily a bad idea, but needs to be considered before
-we jump the gun.
-
-
-I haven't looked at the arm64 stuff in detail, but it looks to be
-shared between the two platforms, so either way it seems like the
-right approach to have this moved out to drivers/soc/qcom.
-
-Regards,
-Bjorn
+Yes, I think our emails crossed in flight.
