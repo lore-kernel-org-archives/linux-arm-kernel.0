@@ -1,40 +1,46 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 22 Jan 2015 14:54:40 +0000
-Subject: [PATCH 1/1] i2c: i2c-st: Rename clock reference to something
- that exists
-In-Reply-To: <20150122141427.GA3413@katana>
-References: <1409234523-20240-1-git-send-email-lee.jones@linaro.org>
- <20150122121819.GC9129@x1> <20150122141427.GA3413@katana>
-Message-ID: <20150122145440.GD9129@x1>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Thu, 22 Jan 2015 16:02:19 +0100
+Subject: [RFC] using dt overlays: how to? today?
+Message-ID: <20150122150219.GB26928@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 22 Jan 2015, Wolfram Sang wrote:
+Hi,
 
-> On Thu, Jan 22, 2015 at 12:18:19PM +0000, Lee Jones wrote:
-> > Wolfram,
-> > 
-> > This patch has been on the list since forever.
-> 
-> For reasons :)
-> 
-> a) It was not CCed to the i2c list, so it doesn't show up in patchwork
-> which does the patch tracking for me.
-> 
-> b) I was always under the impression that Maxime is going to take it?
-> He said so.
-> 
-> > I have Acks from the driver author, so I'm going to take this through
-> > the MFD tree.  If you perk up later and decide to take it though the
-> > I2C tree instead, let me know and I'll remove it from MFD.
-> 
-> Well, I2C makes more sense than MFD, so I'll pick it up right now.
-> ST-tree would have also been fine.
+I have assisted to Pantelis' talk about device tree and overlays at ELCE
+2014. Since the patch 'Introduce DT overlay support' is now part of the
+mainline, I wanted to have a look about it and to use it for our boards.
 
-Works for me.  Thanks dude.
+Firstly, this is what I want to achieve by using this feature:
+- manage several revisions of our boards
+- manage modules we can plug on the board, mainly display modules
+  (resistive or capacitive one)
+- manage cpu modules plug on the motherboard
+- I would like to have all this stuff in the kernel. I don't want a
+  dependency on the bootloader or the user space.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+At the moment, we have many dts files to manage these cases (not all are
+in mainline). It is becoming a pain.
+
+I wanted to see if we can use device tree fragments as it seems to be
+closed to be achieved when I had assisted to the talk. I have found a
+thread about 'DT-Overlay configfs interface'
+(http://thread.gmane.org/gmane.linux.drivers.devicetree/101871), there
+are still discussions about security concerns, so it may not be included
+quickly. I have also found an interesting thread about cape manager for
+Beaglebone (http://thread.gmane.org/gmane.linux.documentation/8279) but
+there is no more activity on it, is it canceled or is there a new topic
+I have missed?
+
+Here are my questions:
+- Is it acceptable to manage device tree fragments with a driver such as
+  the cape manager? Or at an other place in the kernel such as
+arch/arm/mach-at91/board-dt-sama5.c for example?
+- Is it possible to get access to eeprom from the kernel? Pantelis did
+  an interface to access it through i2c but it seems it was not
+accepted. In my case, it will be through the one wire interface.
+
+Thanks for sharing your opinion about this or redirecting me to a
+similar thread.
+
+Ludovic
