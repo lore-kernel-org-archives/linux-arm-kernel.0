@@ -1,61 +1,35 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Thu, 22 Jan 2015 10:49:56 -0600
-Subject: [PATCH 8/8] msm: scm: Move the scm driver to drivers/soc/qcom
-In-Reply-To: <CAJAp7OgtnTN3H+zSazK2Xeob6wxpf9Ws=tibAupzP1cF31G=Mw@mail.gmail.com>
-References: <1407202310-3359-1-git-send-email-sboyd@codeaurora.org>
- <1407202310-3359-9-git-send-email-sboyd@codeaurora.org>
- <CAOesGMh1HE+hMP0VWr2vaHCp2itVjpQeiiFL6r9WeJUFes5tvw@mail.gmail.com>
- <CAJAp7OgtnTN3H+zSazK2Xeob6wxpf9Ws=tibAupzP1cF31G=Mw@mail.gmail.com>
-Message-ID: <688373BE-2C67-4427-91A1-C4C3A725F0CC@codeaurora.org>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Thu, 22 Jan 2015 10:53:13 -0600
+Subject: [PATCH 2/2] remoteproc: microblaze: Add support for microblaze
+ on Zynq
+In-Reply-To: <10276362c737fc9da863f1a07737fd91f7340242.1421662385.git.michal.simek@xilinx.com>
+References: <a458462d2dc6901440bded015608f7a9df9e7942.1421662385.git.michal.simek@xilinx.com>
+ <10276362c737fc9da863f1a07737fd91f7340242.1421662385.git.michal.simek@xilinx.com>
+Message-ID: <54C12AF9.40200@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Jan 21, 2015, at 7:53 PM, Bjorn Andersson <bjorn@kryo.se> wrote:
-
-> On Wed, Jan 21, 2015 at 5:13 PM, Olof Johansson <olof@lixom.net> wrote:
-> [..]
->> On Mon, Aug 4, 2014 at 6:31 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->>> Architectural changes in the ARM Linux kernel tree mandate
->>> the eventual removal of the mach-* directories. Move the
->>> scm driver to drivers/soc/qcom and the scm header to
->>> include/soc/qcom to support that removal.
->> 
->> The idea is not blindly move one dumping ground to a new place.
->> 
->> I see only two exported functions from scm.c:
->> 
->> scm_get_version: This is not used anywhere in the kernel and can just be removed
->> scm_call: This is used by scm-boot, and would be better to translate
->> over to firmware_ops in the first place.
->> 
+On 01/19/2015 04:30 AM, Michal Simek wrote:
+> diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
+> index 5e343bab9458..3955f42e9e9c 100644
+> --- a/drivers/remoteproc/Kconfig
+> +++ b/drivers/remoteproc/Kconfig
+> @@ -64,4 +64,15 @@ config DA8XX_REMOTEPROC
+>  	  It's safe to say n here if you're not interested in multimedia
+>  	  offloading.
 > 
-> Hi Olof,
-> 
-> I started this a while ago, as it felt like the right thing to do <tm>.
-> 
-> The problem with this approach is that e.g. firmware loading is
-> partially handled through this interface. So implementing a remoteproc
-> driver for wifi etc required me to add 6 new ops to the struct,
-> loading the modem looks like it requires one more. HDMI requires one.
-> 
-> Looking at the downstream branch there's a bunch more (20+), so we
-> would explode the firmware_ops struct with Qualcomm "specific" ops.
-> This is not necessarily a bad idea, but needs to be considered before
-> we jump the gun.
-> 
-> 
-> I haven't looked at the arm64 stuff in detail, but it looks to be
-> shared between the two platforms, so either way it seems like the
-> right approach to have this moved out to drivers/soc/qcom.
+> +config MB_REMOTEPROC
+> +	tristate "Support Microblaze remoteproc"
+> +	depends on ARCH_ZYNQ && !DEBUG_SG
+> +	select GPIO_XILINX
+> +	select REMOTEPROC
+> +	select RPMSG
+> +	default m
+> +	help
+> +	  Say y here to support Xilinx Microblaze remote processors
+> +	  on the Xilinx Zynq.
+> +
+>  endmenu
 
-As Bjorn says the scm interface ends up having a number of qcom specific calls that I don?t think the firmware ops should be implementing.  I don?t see any value in adding qcom specific function pointers to the ops struct just to create another level of indirection.
-
-I?m fine with adding a firmware_ops implementation that uses scm for those things that firmware_ops has today.  However, I?m not clear on what the view of extending firmware_ops to arm64 is.  If we do this do we move the firmware_ops code into drivers/soc ?
-
-- k
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+The dependency on !DEBUG_SG seems unusual, and worth a comment if it's
+truly needed.  And the module should be disabled by default, no?
