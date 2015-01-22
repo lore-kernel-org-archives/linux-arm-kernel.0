@@ -1,25 +1,94 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 22 Jan 2015 09:34:23 +0000
-Subject: [STLinux Kernel] [PATCH 1/1] i2c: i2c-st: Rename clock reference
- to something that exists
-In-Reply-To: <1409234523-20240-1-git-send-email-lee.jones@linaro.org>
-References: <1409234523-20240-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20150122093423.GA23580@griffinp-ThinkPad-X1-Carbon-2nd>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Thu, 22 Jan 2015 10:34:10 +0100
+Subject: [PATCH v3/resend 1/4] drivers: bus: Sort Kconfig entries
+ alphabetically
+In-Reply-To: <1421919253-4784-1-git-send-email-geert+renesas@glider.be>
+References: <1421919253-4784-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1421919253-4784-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Tested-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+---
+v3:
+  - Add Tested-by,
 
-On Thu, 28 Aug 2014, Lee Jones wrote:
+v2:
+  - New.
+---
+ drivers/bus/Kconfig | 44 ++++++++++++++++++++++----------------------
+ 1 file changed, 22 insertions(+), 22 deletions(-)
 
-> CLK_S_ICN_REG_0 hasn't existed for a while now.  This was renamed
-> over a few commits, then finally removed in commit 5aa02b9 (ARM:
-> STi: DT: STiH415: Remove unused CLK_S_ICN_REG_0 fixed clock).
-> 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-
-Acked-by: Peter Griffin <peter.griffin@linaro.org>
-
-regards,
-
-Peter.
+diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+index b99729e368608bda..626960819e6df16c 100644
+--- a/drivers/bus/Kconfig
++++ b/drivers/bus/Kconfig
+@@ -4,6 +4,21 @@
+ 
+ menu "Bus devices"
+ 
++config ARM_CCI
++	bool "ARM CCI driver support"
++	depends on ARM && OF && CPU_V7
++	help
++	  Driver supporting the CCI cache coherent interconnect for ARM
++	  platforms.
++
++config ARM_CCN
++	bool "ARM CCN driver support"
++	depends on ARM || ARM64
++	depends on PERF_EVENTS
++	help
++	  PMU (perf) driver supporting the ARM CCN (Cache Coherent Network)
++	  interconnect.
++
+ config BRCMSTB_GISB_ARB
+ 	bool "Broadcom STB GISB bus arbiter"
+ 	depends on ARM || MIPS
+@@ -27,15 +42,6 @@ config MVEBU_MBUS
+ 	  Driver needed for the MBus configuration on Marvell EBU SoCs
+ 	  (Kirkwood, Dove, Orion5x, MV78XX0 and Armada 370/XP).
+ 
+-config OMAP_OCP2SCP
+-	tristate "OMAP OCP2SCP DRIVER"
+-	depends on ARCH_OMAP2PLUS
+-	help
+-	  Driver to enable ocp2scp module which transforms ocp interface
+-	  protocol to scp protocol. In OMAP4, USB PHY is connected via
+-	  OCP2SCP and in OMAP5, both USB PHY and SATA PHY is connected via
+-	  OCP2SCP.
+-
+ config OMAP_INTERCONNECT
+ 	tristate "OMAP INTERCONNECT DRIVER"
+ 	depends on ARCH_OMAP2PLUS
+@@ -43,20 +49,14 @@ config OMAP_INTERCONNECT
+ 	help
+ 	  Driver to enable OMAP interconnect error handling driver.
+ 
+-config ARM_CCI
+-	bool "ARM CCI driver support"
+-	depends on ARM && OF && CPU_V7
+-	help
+-	  Driver supporting the CCI cache coherent interconnect for ARM
+-	  platforms.
+-
+-config ARM_CCN
+-	bool "ARM CCN driver support"
+-	depends on ARM || ARM64
+-	depends on PERF_EVENTS
++config OMAP_OCP2SCP
++	tristate "OMAP OCP2SCP DRIVER"
++	depends on ARCH_OMAP2PLUS
+ 	help
+-	  PMU (perf) driver supporting the ARM CCN (Cache Coherent Network)
+-	  interconnect.
++	  Driver to enable ocp2scp module which transforms ocp interface
++	  protocol to scp protocol. In OMAP4, USB PHY is connected via
++	  OCP2SCP and in OMAP5, both USB PHY and SATA PHY is connected via
++	  OCP2SCP.
+ 
+ config VEXPRESS_CONFIG
+ 	bool "Versatile Express configuration bus"
+-- 
+1.9.1
