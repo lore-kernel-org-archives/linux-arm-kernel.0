@@ -1,73 +1,131 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 22 Jan 2015 11:25:59 +0900
-Subject: [PATCH repost] ARM: shmobile: r8a7794: Correct SDHI base address,
- clock labels and output-names
-Message-ID: <20150122022559.GC31170@verge.net.au>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Thu, 22 Jan 2015 11:28:25 +0900
+Subject: [PATCH v4 2/2] ARM: dts: Add HS400 support for exynos5420 and
+ exynos5800
+In-Reply-To: <CAGOxZ5186+9U-6eri6OSGw9awsmr0EPP-gdhu-__oCWP1Oyyxg@mail.gmail.com>
+References: <1421231446-4776-1-git-send-email-alim.akhtar@samsung.com>
+ <1421231446-4776-3-git-send-email-alim.akhtar@samsung.com>
+ <54BEDE9C.5060501@samsung.com>
+ <CAGOxZ5186+9U-6eri6OSGw9awsmr0EPP-gdhu-__oCWP1Oyyxg@mail.gmail.com>
+Message-ID: <54C06049.5070106@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Correct base address of SD3 div6 clk.
-* Update div6 labels and MSTP output names
-  There appears to have been some inconsistency and confusion here as on
-  the r8a7790 these clocks are referred to as SD(HI)1 and SD(HI)2 while on
-  the r8a7791 and r8a7794 they are referred to as SD(HI)2 and SD(HI)3.
+Hi.
 
-This has no run-time affect as the clock nodes are not currently used.
+On 01/21/2015 11:12 PM, Alim Akhtar wrote:
+> Hi Jaehoon
+> 
+> On Wed, Jan 21, 2015 at 4:32 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+>> Hi,
+>>
+>> If you want to enable the hs400 mode, need to add "mmc-hs400-1_8v" or "mmc-hs400-1_2v".
+>> But this patch didn't add them. do you have any other plan?
+>>
+> Yes, right, plan is to send separate patch to enable hs400, as of now
+> I am not sure if all the 5800-peach-pi boards are populated with
+> emmc5.0 device or not. So I will enable HS400 after confirming this
+> point.
 
-Fixes: 8e181633e6ca96049 ("ARM: shmobile: r8a7794: Add SDHI clocks to device tree")
-Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+I know if card is not support hs400, then it should be enabled to other bus mode.
 
----
-* A similar change to update the div6 clock node names and labels,
-  and the MSTP clock output-names is required for the r8a7791.
-  The base addresses appear to be correct there.
----
- arch/arm/boot/dts/r8a7794.dtsi | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+Best Regards,
+Jaehoon Chung
 
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index 8f78da5..b98534e 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -294,16 +294,16 @@
- 					     "lb", "qspi", "sdh", "sd0", "z";
- 		};
- 		/* Variable factor clocks */
--		sd1_clk: sd2_clk at e6150078 {
-+		sd2_clk: sd2_clk at e6150078 {
- 			compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0 0xe6150078 0 4>;
- 			clocks = <&pll1_div2_clk>;
- 			#clock-cells = <0>;
- 			clock-output-names = "sd1";
- 		};
--		sd2_clk: sd3_clk at e615007c {
-+		sd3_clk: sd3_clk at e615026c {
- 			compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
--			reg = <0 0xe615007c 0 4>;
-+			reg = <0 0xe615026c 0 4>;
- 			clocks = <&pll1_div2_clk>;
- 			#clock-cells = <0>;
- 			clock-output-names = "sd2";
-@@ -518,7 +518,7 @@
- 		mstp3_clks: mstp3_clks at e615013c {
- 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
--			clocks = <&sd2_clk>, <&sd1_clk>, <&cpg_clocks R8A7794_CLK_SD0>,
-+			clocks = <&sd3_clk>, <&sd2_clk>, <&cpg_clocks R8A7794_CLK_SD0>,
- 			         <&mmc0_clk>, <&rclk_clk>, <&hp_clk>, <&hp_clk>;
- 			#clock-cells = <1>;
- 			clock-indices = <
-@@ -527,7 +527,7 @@
- 				R8A7794_CLK_USBDMAC0 R8A7794_CLK_USBDMAC1
- 			>;
- 			clock-output-names =
--			        "sdhi2", "sdhi1", "sdhi0",
-+			        "sdhi3", "sdhi2", "sdhi0",
- 				"mmcif0", "cmt1", "usbdmac0", "usbdmac1";
- 		};
- 		mstp7_clks: mstp7_clks at e615014c {
--- 
-2.1.4
+>> On 01/14/2015 07:30 PM, Alim Akhtar wrote:
+>>> From: Seungwon Jeon <tgih.jun@samsung.com>
+>>>
+>>> HS400 timing values are added for SMDK5420, exynos5420-peach-pit
+>>> and exynos5800-peach-pi boards.
+>>> This also adds RCLK GPIO line, this gpio should be in pull-down
+>>> state.
+>>>
+>>> Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
+>>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+>>> [Alim: addressed review comments]
+>>> ---
+>>>  arch/arm/boot/dts/exynos5420-peach-pit.dts |    4 +++-
+>>>  arch/arm/boot/dts/exynos5420-pinctrl.dtsi  |    7 +++++++
+>>>  arch/arm/boot/dts/exynos5420-smdk5420.dts  |    4 +++-
+>>>  arch/arm/boot/dts/exynos5800-peach-pi.dts  |    4 +++-
+>>>  4 files changed, 16 insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+>>> index 9a050e1..7ffaba8 100644
+>>> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
+>>> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+>>> @@ -569,8 +569,10 @@
+>>>       samsung,dw-mshc-ciu-div = <3>;
+>>>       samsung,dw-mshc-sdr-timing = <0 4>;
+>>>       samsung,dw-mshc-ddr-timing = <0 2>;
+>>> +     samsung,dw-mshc-hs400-timing = <0 2>;
+>>> +     read-strobe-delay = <90>;
+>>>       pinctrl-names = "default";
+>>> -     pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
+>>> +     pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8 &sd0_rclk>;
+>>>       bus-width = <8>;
+>>>  };
+>>>
+>>> diff --git a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
+>>> index ba686e4..8b15316 100644
+>>> --- a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
+>>> +++ b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
+>>> @@ -201,6 +201,13 @@
+>>>                       samsung,pin-drv = <3>;
+>>>               };
+>>>
+>>> +             sd0_rclk: sd0-rclk {
+>>
+>> I know it used to "sd0_rdqs", not "sd0_rclk".
+>> Change name.
+>>
+> Ok, I will change as per UM of 5800/5420,
+> 
+>> Best Regards,
+>> Jaehoon Chung
+>>> +                     samsung,pins = "gpc0-7";
+>>> +                     samsung,pin-function = <2>;
+>>> +                     samsung,pin-pud = <1>;
+>>> +                     samsung,pin-drv = <3>;
+>>> +             };
+>>> +
+>>>               sd1_cmd: sd1-cmd {
+>>>                       samsung,pins = "gpc1-1";
+>>>                       samsung,pin-function = <2>;
+>>> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+>>> index 8be3d7b..5290e79 100644
+>>> --- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
+>>> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+>>> @@ -80,8 +80,10 @@
+>>>               samsung,dw-mshc-ciu-div = <3>;
+>>>               samsung,dw-mshc-sdr-timing = <0 4>;
+>>>               samsung,dw-mshc-ddr-timing = <0 2>;
+>>> +             samsung,dw-mshc-hs400-timing = <0 2>;
+>>> +             read-strobe-delay = <90>;
+>>>               pinctrl-names = "default";
+>>> -             pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
+>>> +             pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8 &sd0_rclk>;
+>>>               bus-width = <8>;
+>>>               cap-mmc-highspeed;
+>>>       };
+>>> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+>>> index e8fdda8..fa1c858 100644
+>>> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
+>>> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+>>> @@ -557,8 +557,10 @@
+>>>       samsung,dw-mshc-ciu-div = <3>;
+>>>       samsung,dw-mshc-sdr-timing = <0 4>;
+>>>       samsung,dw-mshc-ddr-timing = <0 2>;
+>>> +     samsung,dw-mshc-hs400-timing = <0 2>;
+>>> +     read-strobe-delay = <90>;
+>>>       pinctrl-names = "default";
+>>> -     pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
+>>> +     pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8 &sd0_rclk>;
+>>>       bus-width = <8>;
+>>>  };
+>>>
+>>>
+>>
+> 
+> 
+> 
