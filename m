@@ -1,85 +1,100 @@
-From: ideal.song@samsung.com (Inha Song)
-Date: Thu, 22 Jan 2015 10:01:30 +0900
-Subject: [PATCH] ARM: dts: exynos5422-odroidxu3: add sound nodes
-In-Reply-To: <54BF9083.5090708@samsung.com>
-References: <1421819923-27575-1-git-send-email-ideal.song@samsung.com>
- <54BF9083.5090708@samsung.com>
-Message-ID: <20150122100130.75c20e9b@songinha-Samsung-DeskTop-System>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 21 Jan 2015 17:01:36 -0800
+Subject: [PATCH v11 2/4] clk: Make clk API return per-user struct clk
+ instances
+In-Reply-To: <1421847039-29544-3-git-send-email-tomeu.vizoso@collabora.com>
+References: <1421847039-29544-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1421847039-29544-3-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <20150122010136.GH27202@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 01/21, Tomeu Vizoso wrote:
+> @@ -2075,10 +2210,12 @@ struct clk *clk_register(struct device *dev, struct clk_hw *hw)
+>  		}
+>  	}
+>  
+> -	ret = __clk_init(dev, clk);
+> +	hw->clk = __clk_create_clk(hw, NULL, NULL);
+> +	ret = __clk_init(dev, hw->clk);
+>  	if (!ret)
+> -		return clk;
+> +		return hw->clk;
+>  
+> +	kfree(hw->clk);
+>  fail_parent_names_copy:
+>  	while (--i >= 0)
+>  		kfree(clk->parent_names[i]);
 
-Thanks for your comment.
+Sigh, this patch is so huge I keep finding more things. Sorry. It
+looks like __clk_create_clk() can return an error pointer, which
+we then send directly to __clk_init. First off, we shouldn't
+kfree() that pointer if it's an error pointer. Second, we
+shouldn't crash in __clk_init() in such a situation so there
+needs to be some sort of check somewhere.
 
-On Wed, 21 Jan 2015 12:41:55 +0100
-Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
+BTW, please try and fixup checkpatch warnings.
 
-> Hi,
-> 
-> On 21/01/15 06:58, Inha Song wrote:
-> > Add MAX98090 audio codec, I2S interface and the sound nodes to support
-> > audio on Odroid-XU3 board.
-> > 
-> > Signed-off-by: Inha Song <ideal.song@samsung.com>
-> > ---
-> >  arch/arm/boot/dts/exynos5422-odroidxu3.dts | 34 ++++++++++++++++++++++++++++++
-> >  1 file changed, 34 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-> > index 7874da2..79493d1 100644
-> > --- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-> > +++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-> > @@ -310,6 +310,40 @@
-> >  	rtc at 101E0000 {
-> >  		status = "okay";
-> >  	};
-> > +
-> > +	sound: sound {
-> > +		compatible = "samsung,odroidu3-audio";
-> 
-> How about using simple-card instead ? I've been trying to switch
-> Odroid X2/U3 to simple card. Here a corresponding dts patch:
-> http://www.spinics.net/lists/linux-samsung-soc/msg41083.html
-> For that recent patches for the I2S driver which area already in -next
-> might be needed.
+> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+> index da4bda8..fac3244 100644
+> --- a/drivers/clk/clkdev.c
+> +++ b/drivers/clk/clkdev.c
+> @@ -69,20 +70,22 @@ struct clk *of_clk_get(struct device_node *np, int index)
+[...]
+> -struct clk *of_clk_get_by_name(struct device_node *np, const char *name)
+> +static struct clk *__of_clk_get_by_name(struct device_node *np, const char *name)
 
-Oh, I missed your patchs.
-I will rework this patch based on your patch.
+It would be nice if this returned an already __clk_create_clk()ed
+pointer.
 
-Best Regards,
-Inha Song.
+>  {
+>  	struct clk *clk = ERR_PTR(-ENOENT);
+>  
+> @@ -119,7 +122,33 @@ struct clk *of_clk_get_by_name(struct device_node *np, const char *name)
+[...]
+> +struct clk *of_clk_get_by_name(struct device_node *np, const char *name)
+> +{
+> +	struct clk *clk = __of_clk_get_by_name(np, name);
+> +
+> +	if (!IS_ERR(clk))
+> +		clk = __clk_create_clk(__clk_get_hw(clk), np->full_name, name);
 
-> 
-> > +		samsung,model = "Odroid-XU3";
-> > +		samsung,i2s-controller = <&i2s0>;
-> > +		samsung,audio-codec = <&max98090>;
-> > +		assigned-clocks = <&clock_audss EXYNOS_MOUT_AUDSS>,
-> > +				  <&clock_audss EXYNOS_MOUT_I2S>;
-> > +		assigned-clock-parents = <&clock CLK_FIN_PLL>,
-> > +				<&clock_audss EXYNOS_MOUT_AUDSS>;
-> > +		samsung,audio-routing =
-> > +			"Headphone Jack", "HPL",
-> > +			"Headphone Jack", "HPR",
-> > +			"Headphone Jack", "MICBIAS",
-> > +			"IN1", "Headphone Jack",
-> > +			"Speakers", "SPKL",
-> > +			"Speakers", "SPKR";
-> > +	};
-> > +};
-> > +
-> > +&hsi2c_5 {
-> > +	status = "okay";
-> > +	max98090: max98090 at 10 {
-> > +		compatible = "maxim,max98090";
-> > +		reg = <0x10>;
-> > +		interrupt-parent = <&gpx3>;
-> > +		interrupts = <2 0>;
-> > +		clocks = <&clock_audss EXYNOS_DOUT_AUD_BUS>;
-> > +		clock-names = "mclk";
-> > +	};
-> > +};
-> 
-> -- 
-> Thanks,
-> Sylwester
+Because we do it here where we know we're CONFIG_COMMON_CLK=y.
+
+> +
+> +	return clk;
+> +}
+>  EXPORT_SYMBOL(of_clk_get_by_name);
+> +
+> +#else /* defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK) */
+> +
+> +static struct clk *__of_clk_get_by_name(struct device_node *np, const char *name)
+> +{
+> +	return ERR_PTR(-ENOENT);
+> +}
+>  #endif
+>  
+>  /*
+> @@ -185,9 +229,13 @@ struct clk *clk_get(struct device *dev, const char *con_id)
+>  	struct clk *clk;
+>  
+>  	if (dev) {
+> -		clk = of_clk_get_by_name(dev->of_node, con_id);
+> -		if (!IS_ERR(clk))
+> +		clk = __of_clk_get_by_name(dev->of_node, con_id);
+> +		if (!IS_ERR(clk)) {
+> +#if defined(CONFIG_COMMON_CLK)
+> +			clk = __clk_create_clk(__clk_get_hw(clk), dev_id, con_id);
+> +#endif
+
+And we do it here where we could remove the #ifdef.
+
+>  			return clk;
+> +		}
+>  		if (PTR_ERR(clk) == -EPROBE_DEFER)
+>  			return clk;
+>  	}
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
