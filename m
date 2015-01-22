@@ -1,43 +1,120 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 22 Jan 2015 12:39:07 +0900
-Subject: [PATCH 0/9] ARM: shmobile: r8a73a4/ape6evm multiplatform
-In-Reply-To: <20150121015927.GB30598@verge.net.au>
-References: <1421758306-24838-1-git-send-email-geert+renesas@glider.be>
- <20150121015927.GB30598@verge.net.au>
-Message-ID: <20150122033907.GO31170@verge.net.au>
+From: sumit.semwal@linaro.org (Sumit Semwal)
+Date: Thu, 22 Jan 2015 09:15:08 +0530
+Subject: [PATCH RESEND] dma-mapping: tidy up dma_parms default handling
+In-Reply-To: <54B4FF30.2030607@samsung.com>
+References: <ffdc5455d698d2525f2d126d0adabf9418fd76b1.1418990609.git.robin.murphy@arm.com>
+ <54B4FF30.2030607@samsung.com>
+Message-ID: <CAO_48GHXaNE4m5TErg0=nkDZrvi65mp8u4h7ao011OL4mhSDUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 21, 2015 at 10:59:27AM +0900, Simon Horman wrote:
-> On Tue, Jan 20, 2015 at 01:51:37PM +0100, Geert Uytterhoeven wrote:
-> > 	Hi Simon, Magnus,
-> > 
-> > This patch series transitions the r8a73a4/ape6evm platform to support
-> > multiplatform only:
-> >   - Add CCF information to DT,
-> >   - Disable legacy clock if CCF is used,
-> >   - Add Bus State Controller node, and move the Ethernet node to it,
-> >   - Remove ape6evm-reference,
-> >   - Remove ape6evm-legacy and legacy support code.
-> > 
-> > This series is based on renesas-drivers-2015-01-19-v3.19-rc5.
-> > It depends on renesas-devel-20150119-v3.19-rc5 (code-wise) and
-> > clk-shmobile-for-3.20 (functionality-wise), for which I've sent a pull
-> > request to Mike Turquette yesterday.
-> > 
-> > All of this was untested by me due to lack of hardware.
-> > As Mike had previously acked the r8a73a4 CCF implementation, it's safe
-> > to apply after testing.
-> 
-> Hi Geert, Hi Ulrich,
-> 
-> thanks for all your good work in getting this together.
-> I have tested this and queued it up for v3.21.
-> 
-> I plan to push it to my devel branch later today.
-> I plan to push it to my next branch and thus linux-next once
-> clk-shmobile-for-3.20 appears in a v3.20-rc.
+Hi Robin,
 
-For the record: Olof has asked for review comments for the BSC driver and
-binding patches. Accordingly I have dropped them, and these patches which
-depend on them, from next.
+On 13 January 2015 at 16:49, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> Hello,
+>
+> On 2015-01-09 17:56, Robin Murphy wrote:
+>>
+>> Many DMA controllers and other devices set max_segment_size to
+>> indicate their scatter-gather capability, but have no interest in
+>> segment_boundary_mask. However, the existence of a dma_parms structure
+>> precludes the use of any default value, leaving them as zeros (assuming
+>> a properly kzalloc'ed structure). If a well-behaved IOMMU (or SWIOTLB)
+>> then tries to respect this by ensuring a mapped segment does not cross
+>> a zero-byte boundary, hilarity ensues.
+>>
+>> Since zero is a nonsensical value for either parameter, treat it as an
+>> indicator for "default", as might be expected. In the process, clean up
+>> a bit by replacing the bare constants with slightly more meaningful
+>> macros and removing the superfluous "else" statements.
+>>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>
+>
+> Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+
+Please feel free to add my
+Reviewed-by: Sumit Semwal <sumit.semwal@linaro.org>
+>
+>> ---
+>>
+>> Hi, various maintainers from Git logs ;)
+>>
+>> This one's a bit tricky to find a home for - I think technically it's
+>> probably an IOMMU patch, but then the long-underlying problem doesn't
+>> seem to have blown up anything until arm64, and my motivation is to
+>> make bits of Juno work, which seems to nudge it towards arm64/arm-soc
+>> territory. Could anyone suggest which tree is most appropriate?
+>>
+>> Thanks,
+>> Robin.
+>>
+>>
+>>   include/linux/dma-mapping.h | 17 ++++++++++-------
+>>   1 file changed, 10 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+>> index c3007cb..99ba736 100644
+>> --- a/include/linux/dma-mapping.h
+>> +++ b/include/linux/dma-mapping.h
+>> @@ -141,7 +141,9 @@ static inline void arch_teardown_dma_ops(struct device
+>> *dev) { }
+>>     static inline unsigned int dma_get_max_seg_size(struct device *dev)
+>>   {
+>> -       return dev->dma_parms ? dev->dma_parms->max_segment_size : 65536;
+>> +       if (dev->dma_parms && dev->dma_parms->max_segment_size)
+>> +               return dev->dma_parms->max_segment_size;
+>> +       return SZ_64K;
+>>   }
+>>     static inline unsigned int dma_set_max_seg_size(struct device *dev,
+>> @@ -150,14 +152,15 @@ static inline unsigned int
+>> dma_set_max_seg_size(struct device *dev,
+>>         if (dev->dma_parms) {
+>>                 dev->dma_parms->max_segment_size = size;
+>>                 return 0;
+>> -       } else
+>> -               return -EIO;
+>> +       }
+>> +       return -EIO;
+>>   }
+>>     static inline unsigned long dma_get_seg_boundary(struct device *dev)
+>>   {
+>> -       return dev->dma_parms ?
+>> -               dev->dma_parms->segment_boundary_mask : 0xffffffff;
+>> +       if (dev->dma_parms && dev->dma_parms->segment_boundary_mask)
+>> +               return dev->dma_parms->segment_boundary_mask;
+>> +       return DMA_BIT_MASK(32);
+>>   }
+>>     static inline int dma_set_seg_boundary(struct device *dev, unsigned
+>> long mask)
+>> @@ -165,8 +168,8 @@ static inline int dma_set_seg_boundary(struct device
+>> *dev, unsigned long mask)
+>>         if (dev->dma_parms) {
+>>                 dev->dma_parms->segment_boundary_mask = mask;
+>>                 return 0;
+>> -       } else
+>> -               return -EIO;
+>> +       }
+>> +       return -EIO;
+>>   }
+>>     #ifndef dma_max_pfn
+>
+>
+> Best regards
+> --
+> Marek Szyprowski, PhD
+> Samsung R&D Institute Poland
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+
+-- 
+Thanks and regards,
+
+Sumit Semwal
+Kernel Team Lead - Linaro Mobile Group
+Linaro.org ? Open source software for ARM SoCs
