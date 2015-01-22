@@ -1,45 +1,51 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 22 Jan 2015 11:34:19 -0800
-Subject: [PATCH] clk: ux500: Drop use of clk-private.h
-Message-ID: <1421955259-8875-1-git-send-email-sboyd@codeaurora.org>
+From: ricardo.ribalda@gmail.com (Ricardo Ribalda Delgado)
+Date: Thu, 22 Jan 2015 20:36:41 +0100
+Subject: [PATCH v2 1/2] spi/xilinx: Support for spi mode LSB_FIRST
+Message-ID: <1421955402-16379-1-git-send-email-ricardo.ribalda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These drivers don't need to include clk-private.h. Remove the
-include.
+Hardware supports LSB_FIRST mode. Support it also in the driver.
 
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Ricardo Ribalda Delgado <ricardo.ribalda@gmail.com>
 ---
- drivers/clk/ux500/clk-prcc.c  | 1 -
- drivers/clk/ux500/clk-prcmu.c | 1 -
- 2 files changed, 2 deletions(-)
 
-diff --git a/drivers/clk/ux500/clk-prcc.c b/drivers/clk/ux500/clk-prcc.c
-index bd4769a84485..0e950769ed03 100644
---- a/drivers/clk/ux500/clk-prcc.c
-+++ b/drivers/clk/ux500/clk-prcc.c
-@@ -8,7 +8,6 @@
-  */
+v2:
+	-add mode_bits
+ drivers/spi/spi-xilinx.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/spi/spi-xilinx.c b/drivers/spi/spi-xilinx.c
+index 79bd84f..d4edeee 100644
+--- a/drivers/spi/spi-xilinx.c
++++ b/drivers/spi/spi-xilinx.c
+@@ -34,7 +34,8 @@
+ #define XSPI_CR_MASTER_MODE	0x04
+ #define XSPI_CR_CPOL		0x08
+ #define XSPI_CR_CPHA		0x10
+-#define XSPI_CR_MODE_MASK	(XSPI_CR_CPHA | XSPI_CR_CPOL)
++#define XSPI_CR_MODE_MASK	(XSPI_CR_CPHA | XSPI_CR_CPOL | \
++				 XSPI_CR_LSB_FIRST)
+ #define XSPI_CR_TXFIFO_RESET	0x20
+ #define XSPI_CR_RXFIFO_RESET	0x40
+ #define XSPI_CR_MANUAL_SSELECT	0x80
+@@ -194,6 +195,8 @@ static void xilinx_spi_chipselect(struct spi_device *spi, int is_on)
+ 			cr |= XSPI_CR_CPHA;
+ 		if (spi->mode & SPI_CPOL)
+ 			cr |= XSPI_CR_CPOL;
++		if (spi->mode & SPI_LSB_FIRST)
++			cr |= XSPI_CR_LSB_FIRST;
+ 		xspi->write_fn(cr, xspi->regs + XSPI_CR_OFFSET);
  
- #include <linux/clk-provider.h>
--#include <linux/clk-private.h>
- #include <linux/slab.h>
- #include <linux/io.h>
- #include <linux/err.h>
-diff --git a/drivers/clk/ux500/clk-prcmu.c b/drivers/clk/ux500/clk-prcmu.c
-index e2d63bc47436..bf63c96acb1a 100644
---- a/drivers/clk/ux500/clk-prcmu.c
-+++ b/drivers/clk/ux500/clk-prcmu.c
-@@ -8,7 +8,6 @@
-  */
+ 		/* We do not check spi->max_speed_hz here as the SPI clock
+@@ -353,7 +356,7 @@ static int xilinx_spi_probe(struct platform_device *pdev)
+ 		return -ENODEV;
  
- #include <linux/clk-provider.h>
--#include <linux/clk-private.h>
- #include <linux/mfd/dbx500-prcmu.h>
- #include <linux/slab.h>
- #include <linux/io.h>
+ 	/* the spi->mode bits understood by this driver: */
+-	master->mode_bits = SPI_CPOL | SPI_CPHA;
++	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_LSB_FIRST;
+ 
+ 	xspi = spi_master_get_devdata(master);
+ 	xspi->bitbang.master = master;
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.1.4
