@@ -1,43 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 22 Jan 2015 19:26:09 +0100
-Subject: [RFC PATCH v4 3/4] arm64:thunder: Add initial dts for Cavium's
- Thunder SoC in 2 Node topology.
-In-Reply-To: <2882934.brFyhkGPyE@wuerfel>
-References: <1421924755-26029-1-git-send-email-gkulkarni@caviumnetworks.com>
- <1421924755-26029-4-git-send-email-gkulkarni@caviumnetworks.com>
- <2882934.brFyhkGPyE@wuerfel>
-Message-ID: <1885509.Z0Gm3e3FlX@wuerfel>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 22 Jan 2015 10:29:47 -0800
+Subject: [PATCH v2] ARM: qcom: Fix SCM interface for big-endian kernels
+In-Reply-To: <EF8384DD-D1D4-40F8-BCD7-D6516E923120@codeaurora.org>
+References: <1421868075-20471-1-git-send-email-sboyd@codeaurora.org>
+ <EF8384DD-D1D4-40F8-BCD7-D6516E923120@codeaurora.org>
+Message-ID: <20150122182947.GK27202@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 22 January 2015 17:47:13 Arnd Bergmann wrote:
+On 01/22, Kumar Gala wrote:
 > 
-> This seems wrong still: The clusters and cores do not have unique
-> numbers. I believe the code will not work correctly, and it won't
-> be compliant with the binding from patch 2.
+> On Jan 21, 2015, at 1:21 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
 > 
-> I think the right way here would be to use 
+> > The secure environment only runs in little-endian mode, so any
+> > buffers shared with the secure environment should have their
+> > contents converted to little-endian. We also mark such elements
+> > with __le32 to allow sparse to catch such problems.
+> > 
+> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> > ---
+> > 
+> > Changes since v1:
+> > * Rebased onto Kumar's qcom/soc branch
+> > 
+> > drivers/soc/qcom/scm-boot.c |  8 ++++----
+> > drivers/soc/qcom/scm.c      | 30 ++++++++++++++++--------------
+> > 2 files changed, 20 insertions(+), 18 deletions(-)
+> > 
+> > diff --git a/drivers/soc/qcom/scm-boot.c b/drivers/soc/qcom/scm-boot.c
+> > index 1822b13bbc10..af16fcc8d5cb 100644
+> > --- a/drivers/soc/qcom/scm-boot.c
+> > +++ b/drivers/soc/qcom/scm-boot.c
+> > @@ -27,12 +27,12 @@
+> > int scm_set_boot_addr(u32 addr, int flags)
+> > {
+> > 	struct {
+> > -		unsigned int flags;
+> > -		phys_addr_t  addr;
+> > +		__le32 flags;
+> > +		__le32 addr;
 > 
->         arm,associativity = <0 2 47>;
-> 
-> for cpu at 20f, and
-> 
->         arm,associativity = <1 3 48>;
-> 
-> for cpu at 10000. Your previous version used the numbers from 
-> the reg property, which should be fine as well if that helps:
-> 
-> 
->         arm,associativity = <0x0 0x200 0x20f>;
-> 
->         arm,associativity = <0x10000 0x10000 0x10000>;
-> 
-> which should have the same effect as above, as long as the code
-> can handle the numbers not being consecutive.
-> 
+> How does this work?  How can we go from phys_addr_t back to __le32 on LPAE or 64-bit systems?
 > 
 
-Upon further consideration, I think your patch is correct after
-all, but let me check again on PowerPC machines.
+I guess I missed updating this in the patch titled "Clarify boot
+interface". In that patch we should have updated addr to be a u32
+(or __le32 as is done here). From what I can tell by looking at
+the codeaurora tree this is still 32 bits wide even on 64-bit
+platforms.
 
-	Arnd
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
