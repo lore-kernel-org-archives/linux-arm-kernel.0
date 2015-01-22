@@ -1,49 +1,48 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Thu, 22 Jan 2015 14:11:22 +0100
-Subject: [PATCH v4 RESEND 9/9] drm/exynos: add support for 'hdmi' clock
-In-Reply-To: <1421929686-19709-1-git-send-email-m.szyprowski@samsung.com>
-References: <54BE4F8E.50605@collabora.co.uk>
- <1421929686-19709-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <54C0F6FA.1020101@collabora.co.uk>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 22 Jan 2015 14:19:08 +0100
+Subject: [GIT PULL] ARM: mediatek: soc changes for v3.20 (round 1)
+Message-ID: <CABuKBe+_Xp7LWExkM6xygM_adtKTVuG3S9zMdc27TonWu0HKNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Marek,
+Hi Arnd and Olof,
 
-On 01/22/2015 01:28 PM, Marek Szyprowski wrote:
-> Mixed need to have hdmi clock enabled to properly perform power on/off
-> sequences, so add handling of this clock directly to the mixer driver.
-> Dependency between hdmi clock and mixer module has been observed on
-> Exynos4 based boards.
-> 
-> Suggested-by: Andrzej Hajda <a.hajda@samsung.com>
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
+Please take the following patches for v3.20.
 
-The patch looks good to me and I tested that it does not regress HDMI on
-other platforms (Exynos5420 Peach Pit). I've just a comment below.
+Thanks a lot,
+Matthias
 
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+---
 
->  Documentation/devicetree/bindings/video/exynos_mixer.txt | 1 +
->  drivers/gpu/drm/exynos/exynos_mixer.c                    | 9 +++++++++
->  2 files changed, 10 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/video/exynos_mixer.txt b/Documentation/devicetree/bindings/video/exynos_mixer.txt
-> index 08b394b..3e38128 100644
-> --- a/Documentation/devicetree/bindings/video/exynos_mixer.txt
-> +++ b/Documentation/devicetree/bindings/video/exynos_mixer.txt
-> @@ -15,6 +15,7 @@ Required properties:
->  	a) mixer: Gate of Mixer IP bus clock.
->  	b) sclk_hdmi: HDMI Special clock, one of the two possible inputs of
->                 mixer mux.
-> +	c) hdmi: Gate of HDMI IP bus clock, needed together with sclk_hdmi.
->
+The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
 
-You are adding as a required property which means that this breaks DT backward
-compatibility. I guess is not a big issue here since HDMI seems to have been
-broken in mainline on most Exynos platforms anyways.
+  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
 
-Best regards,
-Javier
+are available in the git repository at:
+
+  https://github.com/mbgg/linux-mediatek.git tags/v3.20-next-soc1
+
+for you to fetch changes up to 60851d7a81138ba3546dde044a8d629c1f603525:
+
+  ARM: mediatek: Low-level-debug for mt6592 (2015-01-20 17:50:26 +0100)
+
+----------------------------------------------------------------
+This adds config options for the different Mediatek SoC. We need this so that
+the pinctrl driver does not bloat the kernel binary.
+
+Apart we change the Kconfig description and add the config option for mt6592
+low-level debug option.
+
+----------------------------------------------------------------
+Matthias Brugger (1):
+      ARM: mediatek: Low-level-debug for mt6592
+
+Yingjoe Chen (1):
+      ARM: mediatek: Add config options for mediatek SoCs.
+
+ arch/arm/Kconfig.debug         |  2 +-
+ arch/arm/mach-mediatek/Kconfig | 22 +++++++++++++++++++++-
+ 2 files changed, 22 insertions(+), 2 deletions(-)
+
+-- 
+motzblog.wordpress.com
