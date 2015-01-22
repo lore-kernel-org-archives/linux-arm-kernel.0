@@ -1,121 +1,348 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 22 Jan 2015 11:31:21 +0100
-Subject: [PATCH 00/17] AT91 cleanup for 3.20 #3
-In-Reply-To: <1421359100-8930-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1421359100-8930-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <54C0D179.700@atmel.com>
+From: j.uzycki@elproma.com.pl (=?ISO-8859-2?Q?Janusz_U=BFycki?=)
+Date: Thu, 22 Jan 2015 11:33:22 +0100
+Subject: [RFC PATCH v2 1/4] tty: serial_mctrl_gpio: Add irqs helpers for
+ input lines
+In-Reply-To: <1420900366-9169-1-git-send-email-j.uzycki@elproma.com.pl>
+References: <1420900366-9169-1-git-send-email-j.uzycki@elproma.com.pl>
+Message-ID: <54C0D1F2.1020806@elproma.com.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 15/01/2015 22:58, Alexandre Belloni a ?crit :
-> This patch sets is based on AT91 cleanup for 3.20 #2. it goes further in the
-> cleanup.
-> 
-> It merges board-dt ans soc files, ending up with only at91rm9200.c, at91sam9.c,
-> sama5d3.c and sama5d4.c.
+Hi,
 
-I'm not entirely comfortable with this this merge. Maybe I'm too used to
-"board files" ;-)
-On the other hand, there is also a phy fixup that will go into the sama5
-board file (in "fixes for 3.19").
+v3 is almost ready but on the moment I have no time to finish. I think 
+I'll do it for 1-2 weeks.
 
-So, I may delay these changes a little bit.
+best regards
+Janusz
 
-> It merges all the SOC_AT91SAM9xxx config option under SOC_AT91SAM9.
-> 
-> It also removes unused headers.
-> 
-> There is also one fix regarding arm_pm_idle for sam9n12 and sam9g45.
-
-I'm reordering these patches a little bit for creating a at91-cleanup3
-tag that I can send quickly.
-
-So, let's rework this series a little bit.
-
-Bye,
-
-> Alexandre Belloni (15):
->   ARM: at91:remove unused mach/system_rev.h
->   ARM: at91: fix sam9n12 and sam9x5 arm_pm_idle
->   ARM: at91: sam9: set arm_pm_idle from sam9_dt_device_init
->   ARM: at91: remove unused at91_ioremap_matrix and header
->   ARM: at91: remove unused _matrix.h headers
->   ARM: at91: stop using HAVE_AT91_DBGUx
->   ARM: at91: pm: remove warning to remove SOC_AT91SAM9263 usage
->   ARM: at91: merge SOC_AT91SAM9xxx
->   ARM: at91: remove at91_boot_soc
->   ARM: at91: rework initialization for rm9200 based boards
->   ARM: at91: rework initialization for sam9 based boards
->   ARM: at91: rework initialization for sama5 based boards
->   ARM: at91: remove old setup
->   ARM: at91: mark const init data with __initconst instead of __initdata
->   ARM: at91: remove at91_dt_initialize
-> 
-> Arnd Bergmann (2):
->   ARM: at91: merge at91rm9200 files
->   ARM: at91: move sama5 specific code into per-soc files
-> 
->  arch/arm/Kconfig.debug                             |   6 +-
->  arch/arm/configs/at91_dt_defconfig                 |  10 +-
->  arch/arm/mach-at91/Kconfig                         | 111 ++----
->  arch/arm/mach-at91/Makefile                        |  17 +-
->  arch/arm/mach-at91/at91rm9200.c                    |  49 ++-
->  arch/arm/mach-at91/{board-dt-sam9.c => at91sam9.c} |  21 +-
->  arch/arm/mach-at91/at91sam9260.c                   |  32 --
->  arch/arm/mach-at91/at91sam9261.c                   |  31 --
->  arch/arm/mach-at91/at91sam9263.c                   |  30 --
->  arch/arm/mach-at91/at91sam9g45.c                   |  30 --
->  arch/arm/mach-at91/at91sam9n12.c                   |  20 -
->  arch/arm/mach-at91/at91sam9rl.c                    |  32 --
->  arch/arm/mach-at91/at91sam9x5.c                    |  20 -
->  arch/arm/mach-at91/board-dt-rm9200.c               |  54 ---
->  arch/arm/mach-at91/board-dt-sama5.c                |  60 ---
->  arch/arm/mach-at91/generic.h                       |  11 -
->  arch/arm/mach-at91/include/mach/at91_dbgu.h        |  63 ----
->  arch/arm/mach-at91/include/mach/at91_matrix.h      |  23 --
->  arch/arm/mach-at91/include/mach/at91_ramc.h        |   6 -
->  .../mach-at91/include/mach/at91sam9260_matrix.h    |  80 ----
->  .../mach-at91/include/mach/at91sam9261_matrix.h    |  64 ----
->  .../mach-at91/include/mach/at91sam9263_matrix.h    | 129 -------
->  arch/arm/mach-at91/include/mach/at91sam9_smc.h     |   2 -
->  .../mach-at91/include/mach/at91sam9g45_matrix.h    | 153 --------
->  .../mach-at91/include/mach/at91sam9n12_matrix.h    |  53 ---
->  .../arm/mach-at91/include/mach/at91sam9rl_matrix.h |  96 -----
->  .../arm/mach-at91/include/mach/at91sam9x5_matrix.h |  53 ---
->  arch/arm/mach-at91/include/mach/cpu.h              | 240 ------------
->  arch/arm/mach-at91/include/mach/system_rev.h       |  27 --
->  arch/arm/mach-at91/pm.c                            |  48 ++-
->  arch/arm/mach-at91/pm_slowclock.S                  |   9 -
->  arch/arm/mach-at91/sama5d3.c                       |  31 +-
->  arch/arm/mach-at91/sama5d4.c                       |  35 +-
->  arch/arm/mach-at91/setup.c                         | 407 ---------------------
->  arch/arm/mach-at91/soc.h                           |  77 ----
->  35 files changed, 151 insertions(+), 1979 deletions(-)
->  rename arch/arm/mach-at91/{board-dt-sam9.c => at91sam9.c} (71%)
->  delete mode 100644 arch/arm/mach-at91/at91sam9260.c
->  delete mode 100644 arch/arm/mach-at91/at91sam9261.c
->  delete mode 100644 arch/arm/mach-at91/at91sam9263.c
->  delete mode 100644 arch/arm/mach-at91/at91sam9g45.c
->  delete mode 100644 arch/arm/mach-at91/at91sam9n12.c
->  delete mode 100644 arch/arm/mach-at91/at91sam9rl.c
->  delete mode 100644 arch/arm/mach-at91/at91sam9x5.c
->  delete mode 100644 arch/arm/mach-at91/board-dt-rm9200.c
->  delete mode 100644 arch/arm/mach-at91/board-dt-sama5.c
->  delete mode 100644 arch/arm/mach-at91/include/mach/at91_dbgu.h
->  delete mode 100644 arch/arm/mach-at91/include/mach/at91_matrix.h
->  delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9260_matrix.h
->  delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9261_matrix.h
->  delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9263_matrix.h
->  delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9g45_matrix.h
->  delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9n12_matrix.h
->  delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9rl_matrix.h
->  delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9x5_matrix.h
->  delete mode 100644 arch/arm/mach-at91/include/mach/cpu.h
->  delete mode 100644 arch/arm/mach-at91/include/mach/system_rev.h
->  delete mode 100644 arch/arm/mach-at91/setup.c
->  delete mode 100644 arch/arm/mach-at91/soc.h
-> 
-
-
--- 
-Nicolas Ferre
+W dniu 2015-01-10 o 15:32, Janusz Uzycki pisze:
+> A driver using mctrl_gpio called gpiod_get_direction() to check if
+> gpio is input line. However .get_direction callback is not available
+> for all platforms. The patch allows to avoid the function.
+> The patch introduces the following helpers:
+> - mctrl_gpio_request_irqs
+> - mctrl_gpio_free_irqs
+> - mctrl_gpio_enable_ms
+> - mctrl_gpio_disable_ms
+> They allow to:
+> - simplify drivers which use mctrl_gpio
+> - hide irq table in mctrl_gpio
+> - use default irq handler for gpios
+> - better separate code for gpio modem lines from uart's code
+> In addition mctrl_gpio_init() has been renamed to mctrl_gpio_init_dt()
+> to focus DT usage. Also mctrl_gpio_init_dt() initializes irq table for
+> gpios now and passes struct uart_port into struct mctrl_gpios.
+> This resulted in changed mctrl_gpio_init_dt() parameter.
+> It also requires port->dev is set before the function is called.
+>
+> There were also fixed:
+> - irq = 0 means invalid/unused (-EINVAL no more used)
+> - mctrl_gpio_request_irqs() doesn't use negative enum value
+>    if request_irq() failed. It just calls mctrl_gpio_free_irqs().
+>
+> The mctrl_gpio_is_gpio() inline function is under discussion
+> and likely it can replace exported mctrl_gpio_to_gpiod() function.
+>
+> IRQ_NOAUTOEN setting and request_irq() order was not commented
+> but it looks right according to other drivers.
+>
+> Signed-off-by: Janusz Uzycki <j.uzycki@elproma.com.pl>
+> ---
+>
+> The patch requires to update the drivers which use mctrl_gpio:
+> - atmel_serial
+> - mxs-auart
+> - clps711x
+>
+> Changes since RFC v1:
+>   - patch renamed from:
+>     ("serial: mctrl-gpio: Add irqs helpers for input lines")
+>     to:
+>     ("tty: serial_mctrl_gpio: Add irqs helpers for input lines")
+>   - mctrl_gpio_request_irqs: changed mctrl_gpio_free_irqs() and
+>     dev_err() order to make debug easier
+>   - added patches for atmel_serial and clps711x serial drivers
+>
+> The patch applies to next (3.19.0-rc2) and was tested with mxs-auart
+> using kernel 3.14 and 3.18. It wasn't tested on the next (only compiled).
+>
+> The patchset delivers patches for mxs-auart, atmel_serial and clps711x.
+> atmel_serial and clps711x were not tested - only compile tests were done.
+>
+> ---
+>   drivers/tty/serial/serial_mctrl_gpio.c | 109 ++++++++++++++++++++++++++++++++-
+>   drivers/tty/serial/serial_mctrl_gpio.h |  59 +++++++++++++++++-
+>   2 files changed, 163 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/tty/serial/serial_mctrl_gpio.c b/drivers/tty/serial/serial_mctrl_gpio.c
+> index a38596c..215b15c 100644
+> --- a/drivers/tty/serial/serial_mctrl_gpio.c
+> +++ b/drivers/tty/serial/serial_mctrl_gpio.c
+> @@ -19,11 +19,15 @@
+>   #include <linux/device.h>
+>   #include <linux/gpio/consumer.h>
+>   #include <linux/termios.h>
+> +#include <linux/irq.h>
+>   
+>   #include "serial_mctrl_gpio.h"
+>   
+>   struct mctrl_gpios {
+> +	struct uart_port *port;
+>   	struct gpio_desc *gpio[UART_GPIO_MAX];
+> +	int irq[UART_GPIO_MAX];
+> +	unsigned int mctrl_prev;
+>   };
+>   
+>   static const struct {
+> @@ -72,6 +76,12 @@ struct gpio_desc *mctrl_gpio_to_gpiod(struct mctrl_gpios *gpios,
+>   }
+>   EXPORT_SYMBOL_GPL(mctrl_gpio_to_gpiod);
+>   
+> +inline
+> +bool mctrl_gpio_is_gpio(struct mctrl_gpios *gpios, enum mctrl_gpio_idx gidx)
+> +{
+> +	return !IS_ERR_OR_NULL(gpios->gpio[gidx]);
+> +}
+> +
+>   unsigned int mctrl_gpio_get(struct mctrl_gpios *gpios, unsigned int *mctrl)
+>   {
+>   	enum mctrl_gpio_idx i;
+> @@ -96,8 +106,9 @@ unsigned int mctrl_gpio_get(struct mctrl_gpios *gpios, unsigned int *mctrl)
+>   }
+>   EXPORT_SYMBOL_GPL(mctrl_gpio_get);
+>   
+> -struct mctrl_gpios *mctrl_gpio_init(struct device *dev, unsigned int idx)
+> +struct mctrl_gpios *mctrl_gpio_init_dt(struct uart_port *port, unsigned int idx)
+>   {
+> +	struct device *dev = port->dev;
+>   	struct mctrl_gpios *gpios;
+>   	enum mctrl_gpio_idx i;
+>   	int err;
+> @@ -106,6 +117,7 @@ struct mctrl_gpios *mctrl_gpio_init(struct device *dev, unsigned int idx)
+>   	if (!gpios)
+>   		return ERR_PTR(-ENOMEM);
+>   
+> +	gpios->port = port;
+>   	for (i = 0; i < UART_GPIO_MAX; i++) {
+>   		gpios->gpio[i] = devm_gpiod_get_index(dev,
+>   						      mctrl_gpios_desc[i].name,
+> @@ -128,11 +140,13 @@ struct mctrl_gpios *mctrl_gpio_init(struct device *dev, unsigned int idx)
+>   			devm_gpiod_put(dev, gpios->gpio[i]);
+>   			gpios->gpio[i] = NULL;
+>   		}
+> +		if (gpios->gpio[i] && !mctrl_gpios_desc[i].dir_out)
+> +			gpios->irq[i] = gpiod_to_irq(gpios->gpio[i]);
+>   	}
+>   
+>   	return gpios;
+>   }
+> -EXPORT_SYMBOL_GPL(mctrl_gpio_init);
+> +EXPORT_SYMBOL_GPL(mctrl_gpio_init_dt);
+>   
+>   void mctrl_gpio_free(struct device *dev, struct mctrl_gpios *gpios)
+>   {
+> @@ -147,3 +161,94 @@ void mctrl_gpio_free(struct device *dev, struct mctrl_gpios *gpios)
+>   	devm_kfree(dev, gpios);
+>   }
+>   EXPORT_SYMBOL_GPL(mctrl_gpio_free);
+> +
+> +/*
+> + * Dealing with GPIO interrupt
+> + */
+> +#define MCTRL_ANY_DELTA        (TIOCM_RI | TIOCM_DSR | TIOCM_CD | TIOCM_CTS)
+> +static irqreturn_t mctrl_gpio_irq_handle(int irq, void *context)
+> +{
+> +	struct mctrl_gpios *gpios = context;
+> +	struct uart_port *port = gpios->port;
+> +	u32 mctrl = gpios->mctrl_prev;
+> +	u32 mctrl_diff;
+> +
+> +	mctrl_gpio_get(gpios, &mctrl);
+> +
+> +	mctrl_diff = mctrl ^ gpios->mctrl_prev;
+> +	gpios->mctrl_prev = mctrl;
+> +	if (mctrl_diff & MCTRL_ANY_DELTA && port->state != NULL) {
+> +		if (mctrl_diff & TIOCM_RI)
+> +			port->icount.rng++;
+> +		if (mctrl_diff & TIOCM_DSR)
+> +			port->icount.dsr++;
+> +		if (mctrl_diff & TIOCM_CD)
+> +			uart_handle_dcd_change(port, mctrl & TIOCM_CD);
+> +		if (mctrl_diff & TIOCM_CTS)
+> +			uart_handle_cts_change(port, mctrl & TIOCM_CTS);
+> +
+> +		wake_up_interruptible(&port->state->port.delta_msr_wait);
+> +	}
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +int mctrl_gpio_request_irqs(struct mctrl_gpios *gpios)
+> +{
+> +	struct uart_port *port = gpios->port;
+> +	int *irq = gpios->irq;
+> +	enum mctrl_gpio_idx i;
+> +	int err = 0;
+> +
+> +	for (i = 0; i < UART_GPIO_MAX; i++) {
+> +		if (irq[i] <= 0)
+> +			continue;
+> +
+> +		irq_set_status_flags(irq[i], IRQ_NOAUTOEN);
+> +		err = request_irq(irq[i], mctrl_gpio_irq_handle,
+> +				  IRQ_TYPE_EDGE_BOTH,
+> +				  dev_name(port->dev), gpios);
+> +		if (err) {
+> +			dev_err(port->dev, "%s: Can't get %d irq\n",
+> +				__func__, irq[i]);
+> +			mctrl_gpio_free_irqs(gpios);
+> +			break;
+> +		}
+> +	}
+> +
+> +	return err;
+> +}
+> +EXPORT_SYMBOL_GPL(mctrl_gpio_request_irqs);
+> +
+> +void mctrl_gpio_free_irqs(struct mctrl_gpios *gpios)
+> +{
+> +	enum mctrl_gpio_idx i;
+> +
+> +	for (i = 0; i < UART_GPIO_MAX; i++)
+> +		if (gpios->irq[i] > 0)
+> +			free_irq(gpios->irq[i], gpios);
+> +}
+> +EXPORT_SYMBOL_GPL(mctrl_gpio_free_irqs);
+> +
+> +void mctrl_gpio_enable_ms(struct mctrl_gpios *gpios)
+> +{
+> +	enum mctrl_gpio_idx i;
+> +
+> +	/* get initial status of modem lines GPIOs */
+> +	mctrl_gpio_get(gpios, &gpios->mctrl_prev);
+> +
+> +	for (i = 0; i < UART_GPIO_MAX; i++)
+> +		if (gpios->irq[i] > 0)
+> +			enable_irq(gpios->irq[i]);
+> +}
+> +EXPORT_SYMBOL_GPL(mctrl_gpio_enable_ms);
+> +
+> +void mctrl_gpio_disable_ms(struct mctrl_gpios *gpios)
+> +{
+> +	enum mctrl_gpio_idx i;
+> +
+> +	for (i = 0; i < UART_GPIO_MAX; i++)
+> +		if (gpios->irq[i] > 0)
+> +			disable_irq(gpios->irq[i]);
+> +}
+> +EXPORT_SYMBOL_GPL(mctrl_gpio_disable_ms);
+> diff --git a/drivers/tty/serial/serial_mctrl_gpio.h b/drivers/tty/serial/serial_mctrl_gpio.h
+> index 400ba04..13ba3f4 100644
+> --- a/drivers/tty/serial/serial_mctrl_gpio.h
+> +++ b/drivers/tty/serial/serial_mctrl_gpio.h
+> @@ -21,6 +21,7 @@
+>   #include <linux/err.h>
+>   #include <linux/device.h>
+>   #include <linux/gpio/consumer.h>
+> +#include <linux/serial_core.h>
+>   
+>   enum mctrl_gpio_idx {
+>   	UART_GPIO_CTS,
+> @@ -40,6 +41,13 @@ enum mctrl_gpio_idx {
+>    */
+>   struct mctrl_gpios;
+>   
+> +/*
+> + * Return true if gidx is GPIO line, otherwise false.
+> + * It assumes that gpios is allocated and not NULL.
+> + */
+> +inline
+> +bool mctrl_gpio_is_gpio(struct mctrl_gpios *gpios, enum mctrl_gpio_idx gidx);
+> +
+>   #ifdef CONFIG_GPIOLIB
+>   
+>   /*
+> @@ -60,12 +68,13 @@ struct gpio_desc *mctrl_gpio_to_gpiod(struct mctrl_gpios *gpios,
+>   				      enum mctrl_gpio_idx gidx);
+>   
+>   /*
+> - * Request and set direction of modem control lines GPIOs.
+> + * Request and set direction of modem control lines GPIOs. DT is used.
+> + * Initialize irq table for GPIOs.
+>    * devm_* functions are used, so there's no need to call mctrl_gpio_free().
+>    * Returns a pointer to the allocated mctrl structure if ok, -ENOMEM on
+>    * allocation error.
+>    */
+> -struct mctrl_gpios *mctrl_gpio_init(struct device *dev, unsigned int idx);
+> +struct mctrl_gpios *mctrl_gpio_init_dt(struct uart_port *port, unsigned int idx);
+>   
+>   /*
+>    * Free the mctrl_gpios structure.
+> @@ -74,6 +83,28 @@ struct mctrl_gpios *mctrl_gpio_init(struct device *dev, unsigned int idx);
+>    */
+>   void mctrl_gpio_free(struct device *dev, struct mctrl_gpios *gpios);
+>   
+> +/*
+> + * Request irqs for input lines GPIOs. The irqs are set disabled
+> + * and triggered on both edges.
+> + * Returns zero if OK, otherwise an error code.
+> + */
+> +int mctrl_gpio_request_irqs(struct mctrl_gpios *gpios);
+> +
+> +/*
+> + * Free irqs for input lines GPIOs.
+> + */
+> +void mctrl_gpio_free_irqs(struct mctrl_gpios *gpios);
+> +
+> +/*
+> + * Disable modem status interrupts assigned to GPIOs
+> + */
+> +void mctrl_gpio_enable_ms(struct mctrl_gpios *gpios);
+> +
+> +/*
+> + * Enable modem status interrupts assigned to GPIOs
+> + */
+> +void mctrl_gpio_disable_ms(struct mctrl_gpios *gpios);
+> +
+>   #else /* GPIOLIB */
+>   
+>   static inline
+> @@ -95,7 +126,7 @@ struct gpio_desc *mctrl_gpio_to_gpiod(struct mctrl_gpios *gpios,
+>   }
+>   
+>   static inline
+> -struct mctrl_gpios *mctrl_gpio_init(struct device *dev, unsigned int idx)
+> +struct mctrl_gpios *mctrl_gpio_init_dt(struct uart_port *port, unsigned int idx)
+>   {
+>   	return ERR_PTR(-ENOSYS);
+>   }
+> @@ -105,6 +136,28 @@ void mctrl_gpio_free(struct device *dev, struct mctrl_gpios *gpios)
+>   {
+>   }
+>   
+> +static inline
+> +int mctrl_gpio_request_irqs(struct mctrl_gpios *gpios)
+> +{
+> +	/*return -ENOTSUP;*/
+> +	return 0;
+> +}
+> +
+> +static inline
+> +void mctrl_gpio_free_irqs(struct mctrl_gpios *gpios)
+> +{
+> +}
+> +
+> +static inline
+> +void mctrl_gpio_enable_ms(struct mctrl_gpios *gpios)
+> +{
+> +}
+> +
+> +static inline
+> +void mctrl_gpio_disable_ms(struct mctrl_gpios *gpios)
+> +{
+> +}
+> +
+>   #endif /* GPIOLIB */
+>   
+>   #endif
