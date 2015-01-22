@@ -1,41 +1,67 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 22 Jan 2015 23:39:05 +0800
-Subject: [PATCH v9 3/5] regulators: axp20x: Use "clock-frequency" property for
- dcdc work frequency
-In-Reply-To: <1421941147-9682-1-git-send-email-wens@csie.org>
-References: <1421941147-9682-1-git-send-email-wens@csie.org>
-Message-ID: <1421941147-9682-4-git-send-email-wens@csie.org>
+Date: Thu, 22 Jan 2015 23:39:02 +0800
+Subject: [PATCH v9 0/5] mfd: axp20x: add support for AXP202 and AXP209
+Message-ID: <1421941147-9682-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the dcdc regulator work frequency is a property of the regulators
-DT sub-tree, there is no issue of naming collisions, so we can use the
-standard "clock-frequency" binding for this.
+Hi everyone,
 
-The driver sets a reasonable default value (same as the datasheet), and
-only 1 dts has the old binding, with the default value.
+This is v9 of the axp209 series. v9 changes the DT bindings per Lee's
+recommendations. This introduces 3 new patches to update the regulator
+driver and dtsi to use the new bindings.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- drivers/regulator/axp20x-regulator.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+The regulator patches are based on the axp209 topic branch from the
+regulator tree, which atm is just the 2 patches I did to use the
+regulator core DT parsing functions:
 
-diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
-index e4331f5e5d7d..990ac453abc8 100644
---- a/drivers/regulator/axp20x-regulator.c
-+++ b/drivers/regulator/axp20x-regulator.c
-@@ -186,8 +186,10 @@ static int axp20x_regulator_parse_dt(struct platform_device *pdev)
- 	if (!regulators) {
- 		dev_warn(&pdev->dev, "regulators node not found\n");
- 	} else {
--		dcdcfreq = 1500;
--		of_property_read_u32(regulators, "x-powers,dcdc-freq", &dcdcfreq);
-+		dcdcfreq = 1500000;
-+		of_property_read_u32(regulators, "clock-frequency", &dcdcfreq);
-+		/* axp20x_set_dcdc_freq() takes kHZ */
-+		dcdcfreq /= 1000;
- 		ret = axp20x_set_dcdc_freq(pdev, dcdcfreq);
- 		if (ret < 0) {
- 			dev_err(&pdev->dev, "Error setting dcdc frequency: %d\n", ret);
+    regulator: axp20x: Migrate to regulator core's simplified DT parsing code
+    regulator: axp20x: Fill regulators_node and of_match descriptor fields
+
+So far, "x-powers,dcdc-workmode" is not used anywhere. "x-powers,dcdc-freq"
+is only used in axp209.dtsi which was just introduced. It should be fairly
+safe to change the bindings.
+
+Lee, Mark, could you take a look at the new changes? If they're OK, could
+you merge them through your respective trees?
+
+Maxime, could you merge the axp209.dtsi patch after the others are merged?
+
+Thank you!
+
+
+Regards,
+ChenYu
+
+
+Changes since v8:
+
+    - Dropped patches that were merged
+    - Changed "x-powers,dcdc-workmode" to boolean flag
+      "x-powers,dcdc-workmode-pwm", and default to auto when not present.
+    - Use standard "clock-frequency" instead of custom "x-powers,dcdc-freq"
+      and use HZ as unit.
+    - Added missing ldo5 regulator node in DT binding example.
+    - Added 2 patches to update regulator driver to new bindings.
+    - Added patch to update axp209.dtsi to new bindings.
+
+
+Carlo Caione (2):
+  dt-bindings: add vendor-prefix for X-Powers
+  mfd: AXP20x: Add bindings documentation
+
+Chen-Yu Tsai (3):
+  regulators: axp20x: Use "clock-frequency" property for dcdc work
+    frequency
+  regulators: axp20x: Change dcdc-workmode DT property to boolean flag
+  ARM: sunxi: dts: axp209: Use clock-frequency for DC-DC work frequency
+
+ Documentation/devicetree/bindings/mfd/axp20x.txt   | 102 +++++++++++++++++++++
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/boot/dts/axp209.dtsi                      |   2 +-
+ drivers/regulator/axp20x-regulator.c               |  33 +++----
+ 4 files changed, 121 insertions(+), 17 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/axp20x.txt
+
 -- 
 2.1.4
