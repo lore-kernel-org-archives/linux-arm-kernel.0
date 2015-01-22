@@ -1,82 +1,32 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 22 Jan 2015 13:41:15 +0100
-Subject: [PATCH v4 9/9] drm/exynos: add support for 'hdmi' clock
-In-Reply-To: <54BE4F8E.50605@collabora.co.uk>
-References: <1421756219-21037-1-git-send-email-m.szyprowski@samsung.com>
- <1421756219-21037-10-git-send-email-m.szyprowski@samsung.com>
- <54BE4F8E.50605@collabora.co.uk>
-Message-ID: <54C0EFEB.6080201@samsung.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 22 Jan 2015 20:46:43 +0800
+Subject: [PATCH v7 13/17] ARM64 / ACPI: Add GICv2 specific ACPI boot
+ support
+In-Reply-To: <54B92245.6080306@arm.com>
+References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
+ <1421247905-3749-14-git-send-email-hanjun.guo@linaro.org>
+ <54B8F2E3.80306@arm.com>
+ <CACxGe6tBb8L8upS3zenZbrOc_c0E=MA=DqLjkSezEbregaAaaA@mail.gmail.com>
+ <54B92245.6080306@arm.com>
+Message-ID: <54C0F133.8060901@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Marc,
 
-On 2015-01-20 13:52, Javier Martinez Canillas wrote:
-> On 01/20/2015 01:16 PM, Marek Szyprowski wrote:
->> Mixed need to have hdmi clock enabled to properly perform power on/off
->> sequences, so add handling of this clock directly to the mixer driver.
->> Dependency between hdmi clock and mixer module has been observed on
->> Exynos4 based boards.
->>
->> Suggested-by: Andrzej Hajda<a.hajda@samsung.com>
->> Signed-off-by: Marek Szyprowski<m.szyprowski@samsung.com>
->> ---
->>   drivers/gpu/drm/exynos/exynos_mixer.c | 9 +++++++++
->>   1 file changed, 9 insertions(+)
->>
->> diff --git a/drivers/gpu/drm/exynos/exynos_mixer.c b/drivers/gpu/drm/exynos/exynos_mixer.c
->> index 820b76234ef4..e5ef1fccd8fb 100644
->> --- a/drivers/gpu/drm/exynos/exynos_mixer.c
->> +++ b/drivers/gpu/drm/exynos/exynos_mixer.c
->> @@ -72,6 +72,7 @@ struct mixer_resources {
->>   	spinlock_t		reg_slock;
->>   	struct clk		*mixer;
->>   	struct clk		*vp;
->> +	struct clk		*hdmi;
->>   	struct clk		*sclk_mixer;
->>   	struct clk		*sclk_hdmi;
->>   	struct clk		*mout_mixer;
->> @@ -774,6 +775,12 @@ static int mixer_resources_init(struct mixer_context *mixer_ctx)
->>   		return -ENODEV;
->>   	}
->>   
->> +	mixer_res->hdmi = devm_clk_get(dev, "hdmi");
-> You need to update the Documentation/devicetree/bindings/video/exynos_mixer.txt
-> DT binding docs to also mention the "hdmi" clock in the list of clocks.
+We (Tomasz, Suravee and me) are working on supporting stacked domain on
+ACPI, and rework GIC ACPI related patch, before we going further, we
+need your guidance to see if we are going the right direction.
 
-Right, I've send an updated version of the patch.
+   - You said that we spread GIC related code every where, so how
+     about put all the ACPI related GIC init code in one file under
+     drivers/irqchip/ with name irq-gic-acpi.c?
 
-> But as I mentioned in "[PATCH v2 0/6] Enable HDMI support on Exynos platforms"
-> thread, while this seems to be enough to prevent the issue on Exynos4 is not
-> enough on the Exynos5420/5422/5800 boards I've tested.
->
-> So I wonder if $subject is fixing the root cause or just fixing a symptom and
-> the cause is that the exynos_hdmi DPMS handler has to be executed before the
-> exynos_mixer DPMS handler for DRM_MODE_DPMS_ON like is the case for DPMS_OFF
-> after commit 245f98f269714 ("drm/exynos: hdmi: fix power order issue").
+   - ACPI only support one GICD for now, so we assume that there
+    only one gicv2/v3 core domain and every device not using MSI
+     will refer to that irqdomain in default.
 
-I'm aware of the issues with Exynos542x, I've tested it with Odroid XU3, 
-but I
-really have no idea how to fix it. The reference manual (both for power 
-domain
-and mixer/hdmi modules) also doesn't provide any useful information for this
-case.
+Are we going the right direction?
 
-The issue with power on/off sequence definitely IS related to clock 
-configuration,
-but we didn't figure out how to solve it in a generic way. This will be 
-handled in
-Exynos HDMI and mixer drivers anyway, so the DTS part (at least for 
-Exynos4 SoC)
-will not change.
-
-We would really like to have HDMI support for Exynos4 merged, especially 
-that the
-first version of the HDMI patches was posted in v3.16 times and now we 
-are close
-to v3.20 -next merge window end...
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Thanks
+Hanjun
