@@ -1,36 +1,47 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Thu, 22 Jan 2015 15:44:13 -0600
-Subject: [Patch v9 3/3] phy: Add Qualcomm DWC3 HS/SS PHY driver
-In-Reply-To: <20150122185914.GA4114@usblab-sd-06.qualcomm.com>
-References: <1410550088-8754-1-git-send-email-agross@codeaurora.org>
- <1410550088-8754-4-git-send-email-agross@codeaurora.org>
- <20150122185914.GA4114@usblab-sd-06.qualcomm.com>
-Message-ID: <20150122214413.GA8057@qualcomm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 22 Jan 2015 13:40:53 -0800
+Subject: [PATCH 12/13] ARM: dts: omap3-gta04: uart4 is not connected, so
+ mark it "disabled"
+In-Reply-To: <1421959099-28319-13-git-send-email-marek@goldelico.com>
+References: <1421959099-28319-1-git-send-email-marek@goldelico.com>
+ <1421959099-28319-13-git-send-email-marek@goldelico.com>
+Message-ID: <20150122214052.GY7718@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 22, 2015 at 10:59:14AM -0800, Jack Pham wrote:
-> Hi Andy,
+* Marek Belisko <marek@goldelico.com> [150122 12:42]:
+> From: NeilBrown <neil@brown.name>
 > 
-> On Fri, Sep 12, 2014 at 02:28:08PM -0500, Andy Gross wrote:
-> > This patch adds a new driver for the Qualcomm USB 3.0 PHY that exists on some
-> > Qualcomm platforms.  This driver uses the generic PHY framework and will
-> > interact with the DWC3 controller.
-> > 
-> > Signed-off-by: Andy Gross <agross@codeaurora.org>
-> > ---
-> >  drivers/phy/Kconfig         |   11 +
-> >  drivers/phy/Makefile        |    1 +
-> >  drivers/phy/phy-qcom-dwc3.c |  483 +++++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 495 insertions(+)
-> >  create mode 100644 drivers/phy/phy-qcom-dwc3.c
+> Signed-off-by: NeilBrown <neil@brown.name>
+> ---
+>  arch/arm/boot/dts/omap3-gta04.dtsi | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
-> What happened to this patch? Looks like [1/3] & [2/3] made it in during
-> the 3.18 merge, but did this one not get picked up by Kishon?
+> diff --git a/arch/arm/boot/dts/omap3-gta04.dtsi b/arch/arm/boot/dts/omap3-gta04.dtsi
+> index 228e79b..8d2b0a1 100644
+> --- a/arch/arm/boot/dts/omap3-gta04.dtsi
+> +++ b/arch/arm/boot/dts/omap3-gta04.dtsi
+> @@ -357,6 +357,10 @@
+>  	pinctrl-0 = <&uart3_pins>;
+>  };
+>  
+> +&uart4 {
+> +	status = "disabled";
+> +};
+> +
 
-Got sidetracked.  I'll rework and resend in.  It'll be a couple days.
+This you probably want to avoid from PM point of view. Depending on
+bootloader state of uart4, Linux may or may not be able to hit any
+deeper power states.
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Marking something with status = "disabled" in dts causes the device
+entry not even to be created. That means hwmod won't be able to reset
+and idle this device during boot.
+
+The uart4 device is there for sure even if not muxed and in incomplete
+state. You may want to also check other places where you're using
+status = "disabled" for the same reasons.
+
+Regards,
+
+Tony
