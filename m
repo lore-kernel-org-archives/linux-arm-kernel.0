@@ -1,31 +1,36 @@
 From: marek@goldelico.com (Marek Belisko)
-Date: Thu, 22 Jan 2015 21:38:11 +0100
-Subject: [PATCH 05/13] ARM: dts: omap3-gta04: Fix a GPIO line for bma180 node
+Date: Thu, 22 Jan 2015 21:38:12 +0100
+Subject: [PATCH 06/13] ARM: dts: omap3-gta04: Enable power-off using twl4030
 In-Reply-To: <1421959099-28319-1-git-send-email-marek@goldelico.com>
 References: <1421959099-28319-1-git-send-email-marek@goldelico.com>
-Message-ID: <1421959099-28319-6-git-send-email-marek@goldelico.com>
+Message-ID: <1421959099-28319-7-git-send-email-marek@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GPIO_115 used as irq is in &gpio4, not &gpio3.
+From: "H. Nikolaus Schaller" <hns@goldelico.com>
 
-Signed-off-by: Marek Belisko <marek@goldelico.com>
+Enabled poweroff through PMIC on GTA04.
+
+Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
 ---
- arch/arm/boot/dts/omap3-gta04.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/omap3-gta04.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
 diff --git a/arch/arm/boot/dts/omap3-gta04.dtsi b/arch/arm/boot/dts/omap3-gta04.dtsi
-index fd6ac80..0265474 100644
+index 0265474..b56c85b 100644
 --- a/arch/arm/boot/dts/omap3-gta04.dtsi
 +++ b/arch/arm/boot/dts/omap3-gta04.dtsi
-@@ -230,7 +230,7 @@
- 	bma180 at 41 {
- 		compatible = "bosch,bma180";
- 		reg = <0x41>;
--		interrupt-parent = <&gpio3>;
-+		interrupt-parent = <&gpio4>;
- 		interrupts = <19 IRQ_TYPE_LEVEL_HIGH>;
+@@ -209,6 +209,11 @@
+ 			codec {
+ 			};
+ 		};
++
++		twl_power: power {
++			compatible = "ti,twl4030-power";
++			ti,use_poweroff;
++		};
  	};
+ };
  
 -- 
 1.9.1
