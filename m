@@ -1,152 +1,41 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Wed, 21 Jan 2015 16:34:10 -0800
-Subject: [PATCH 2/2] perf symbols: debuglink should take symfs option into
- account
-In-Reply-To: <54C0216F.3080404@gmail.com>
-References: <1421168344-5363-1-git-send-email-victor.kamensky@linaro.org>
- <1421168344-5363-2-git-send-email-victor.kamensky@linaro.org>
- <CAA3XUr1BnS=8RTVyxtVOm4Ahb2DQXUuJJQC1w2SvT5fycjRcEQ@mail.gmail.com>
- <54C0216F.3080404@gmail.com>
-Message-ID: <CAA3XUr0uXykCTVuw-sYmkhsFZ-cimeuJkXTXNdJyhJh7976xEQ@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 21 Jan 2015 16:38:02 -0800
+Subject: [GIT PULL] ARM: STi: DT changes for v3.20, round 1
+In-Reply-To: <54B94C69.5050809@st.com>
+References: <54B94C69.5050809@st.com>
+Message-ID: <20150122003802.GB29014@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David,
+On Fri, Jan 16, 2015 at 06:37:45PM +0100, Maxime Coquelin wrote:
+> Hi Olof, Arnd and Kevin,
+> 
+> Please consider this first round of STi DT updates for v3.20.
+> 
+> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+> 
+>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.stlinux.com/devel/kernel/linux-sti.git tags/sti-dt-for-v3.20-1
+> 
+> for you to fetch changes up to b26373c0da982f8a29406f10db39e287c1f0696b:
+> 
+>   ARM: DT: STi: STiH407: Add DT node for MiPHY28lp (2015-01-16
+> 12:57:12 +0100)
+> 
+> ----------------------------------------------------------------
+> STi DT updates for v3.20, round 1.
+> 
+> Highlights:
+> -----------
+>  - Add USB support for STiH410 & STiH407
+>  - Add DRM DT nodes for STiH410 & STiH407
+>  - Add STiH418 SoC support
+>  - Add DT nodes for MiPHY28lp PHY
 
-Thank you for response!
+Thanks, merged
 
-On 21 January 2015 at 14:00, David Ahern <dsahern@gmail.com> wrote:
-> On 1/19/15 10:50 AM, Victor Kamensky wrote:
->>>
->>> diff --git a/tools/perf/util/dso.c b/tools/perf/util/dso.c
->>> index 45be944..6a2f663 100644
->>> --- a/tools/perf/util/dso.c
->>> +++ b/tools/perf/util/dso.c
->>> @@ -42,19 +42,30 @@ int dso__read_binary_type_filename(const struct dso
->>> *dso,
->>>          size_t len;
->>>
->>>          switch (type) {
->>> -       case DSO_BINARY_TYPE__DEBUGLINK: {
->>> +       case DSO_BINARY_TYPE__DEBUGLINK:
->>> +       {
->>>                  char *debuglink;
->>> -
->>> -               strncpy(filename, dso->long_name, size);
->>> -               debuglink = filename + dso->long_name_len;
->>> -               while (debuglink != filename && *debuglink != '/')
->>> -                       debuglink--;
->>> -               if (*debuglink == '/')
->>> -                       debuglink++;
->>> -               ret = filename__read_debuglink(dso->long_name, debuglink,
->>> -                                              size - (debuglink -
->>> filename));
->>> -               }
->>> +               char *filename_copy;
->>> +
->>> +               filename_copy = malloc(PATH_MAX);
->>> +               if (filename_copy) {
->>> +                       len = __symbol__join_symfs(filename, size,
->>> +                                                  dso->long_name);
->>> +                       strncpy(filename_copy, filename, PATH_MAX);
->>> +                       debuglink = filename + len;
->>> +                       while (debuglink != filename && *debuglink !=
->>> '/')
->>> +                               debuglink--;
->>> +                       if (*debuglink == '/')
->>> +                               debuglink++;
->>> +                       ret = filename__read_debuglink(filename_copy,
->>> debuglink,
->>> +                                                      size - (debuglink
->>> -
->>> +
->>> filename));
->>> +                       free(filename_copy);
->>> +               } else
->>> +                       ret = -1;
->>>                  break;
->>> +       }
->>> +
->
->
-> I do not believe the filename_copy is needed; just add the symfs path to
-> filename and pass filename to read_debuglink
 
-My first version of the fix did not create filename_copy and
-looked like as patch below. But then I noticed that
-filename__read_debuglink function receives two pointers:
-
-'filename' first parameter pointer to executable path from which
-.gnu_debuglink sections content will be read
-
-'debuglink' path to directory that will be updated by the function
-(note  strncpy at line 531) to point to debug symbol file.
-
-Before my change offset within 'filename' parameter of
-dso__read_binary_type_filename function is passed as
-'debuglink' parameter and it will be updated, and
-dso->long_name is separate, passed as 'filename'
-parameter to filename__read_debuglink function.
-
-When in the first version of patch, as below, I pass filename
-buffer to both (filename to open first and pointer within
-filename to be updated as debuglink) as in patch
-below, it will work with current implementation because
-open happens first but update happens after that. But that
-is specific dependency on current implementation of
-filename__read_debuglink function. It did not feel quite
-right to me, but practically it could be OK.
-
-Here is the first version of the without filename_copy.
-Practically I am OK with it. Please let me know if
-you prefer this version:
-
->From cafc06d95886f1d82f7b127af58a51384c0fe931 Mon Sep 17 00:00:00 2001
-From: Victor Kamensky <victor.kamensky@linaro.org>
-Date: Mon, 12 Jan 2015 17:33:06 -0800
-Subject: [PATCH 2/2] perf symbols: debuglink should take symfs option into
- account
-
-Currently code that tries to read corresponding debug symbol
-file from .gnu_debuglink section (DSO_BINARY_TYPE__DEBUGLINK)
-does not take in account symfs option, so filename__read_debuglink
-function cannot open ELF file, if symfs option is used.
-
-Fix is to add proper handling of symfs as it is done in other
-places: use __symbol__join_symfs function to get real file name
-of target ELF file.
-
-Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
----
- tools/perf/util/dso.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/tools/perf/util/dso.c b/tools/perf/util/dso.c
-index 45be944..ca8d8d5 100644
---- a/tools/perf/util/dso.c
-+++ b/tools/perf/util/dso.c
-@@ -45,13 +45,13 @@ int dso__read_binary_type_filename(const struct dso *dso,
-     case DSO_BINARY_TYPE__DEBUGLINK: {
-         char *debuglink;
-
--        strncpy(filename, dso->long_name, size);
--        debuglink = filename + dso->long_name_len;
-+        len = __symbol__join_symfs(filename, size, dso->long_name);
-+        debuglink = filename + len;
-         while (debuglink != filename && *debuglink != '/')
-             debuglink--;
-         if (*debuglink == '/')
-             debuglink++;
--        ret = filename__read_debuglink(dso->long_name, debuglink,
-+        ret = filename__read_debuglink(filename, debuglink,
-                            size - (debuglink - filename));
-         }
-         break;
--- 
-1.9.3
-
-Thanks,
-Victor
-
-> David
->
+-Olof
