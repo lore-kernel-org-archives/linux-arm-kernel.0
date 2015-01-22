@@ -1,51 +1,58 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 22 Jan 2015 11:04:16 +0900
-Subject: [GIT PULL] Third Round of Renesas ARM Based SoC Updates for v3.20
-In-Reply-To: <20150122013301.GC31815@quad.lixom.net>
-References: <cover.1421715134.git.horms+renesas@verge.net.au>
- <20150122013301.GC31815@quad.lixom.net>
-Message-ID: <20150122020416.GB29564@verge.net.au>
+Date: Thu, 22 Jan 2015 11:05:24 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC sh73a0 DT PM Updates for v3.20
+In-Reply-To: <cover.1421716413.git.horms+renesas@verge.net.au>
+References: <cover.1421716413.git.horms+renesas@verge.net.au>
+Message-ID: <20150122020524.GA30863@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 21, 2015 at 05:33:01PM -0800, Olof Johansson wrote:
-> On Tue, Jan 20, 2015 at 10:27:08AM +0900, Simon Horman wrote:
-> > Hi Olof, Hi Kevin, Hi Arnd,
-> > 
-> > Please consider these third round of Renesas ARM based SoC updates for v3.20.
-> > 
-> > This pull request is based on the previous round of
-> > such requests, tagged as renesas-soc2-for-v3.20,
-> > which I have already sent a pull-request for.
-> > 
-> > 
-> > The following changes since commit 2173fc7cb681c38b9e5bc526211045caecf96e44:
-> > 
-> >   ARM: shmobile: R-Mobile: Add DT support for PM domains (2015-01-15 08:38:14 +0900)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc3-for-v3.20
-> > 
-> > for you to fetch changes up to 1632ff162f305f38667632c465e4bfaab8ef87a2:
-> > 
-> >   ARM: shmobile: R-Mobile: Special-case PM domains with memory-controllers (2015-01-16 11:02:42 +0900)
+On Tue, Jan 20, 2015 at 10:27:43AM +0900, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> Simon,
+> Please consider these Renesas ARM based SoC sh73a0 DT PM updates for v3.20.
 > 
-> Doing each merge of a pull request is an amount of work from us. You sent
-> a preceding pull request for the soc branch just three days before this one.
+> This pull request is based on a merge of:
 > 
-> Can you try to reduce the frequency of how often you drain the queue
-> of pending patches, perhaps? I know there's a balance to be had between
-> merge early-merge often and getting more aggregated, but I wonder if it
-> can be tuned back a bit to avoid flooding us.
+> * "[GIT PULL] Third Round of Renesas ARM Based SoC Updates for v3.20",
+>   tagged as renesas-soc3-for-v3.20, which I have sent a pull request for.
 > 
-> Maybe a good balance would be wait to send the next pull request of a
-> branch until the previous one has been taken care of.
+> * "[GIT PULL] Second Round of Renesas ARM Based SoC DT Updates for v3.20",
+>   tagged as renesas-dt2-for-v3.20, which I have sent a pull request for.
+> 
+> My understanding from to Geert Uytterhoeven both of the above are required
+> in order for the system to remain bootable.
 
-Thanks, I will try to find a better balance.
+There is also a dependency, which I apologise for not documenting,
+on "ARM Based SoC Sh73a0 Multiplatform Updates for v3.20",
+tagged as renesas-sh73a0-multiplatform-for-v3.20.
 
-> That being said: Merged.
+As Olof has have asked for further work on that pull-request I am withdrawing
+this pull-request.
 
-Thanks.
+> 
+> 
+> The following changes since commit 2e828caaf311b5990c652e281d0ffceea382ae16:
+> 
+>   Merge branch 'dt-for-v3.20' into sh73a0-dt-pm-for-v3.20.base (2015-01-16 11:07:31 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-sh73a0-dt-pm-for-v3.20
+> 
+> for you to fetch changes up to 61837def3c23ba2ac662fd26c77979e072deb2e0:
+> 
+>   ARM: shmobile: sh73a0 dtsi: Add PM domain support (2015-01-16 11:07:59 +0900)
+> 
+> ----------------------------------------------------------------
+> Renesas ARM Based SoC sh73a0 DT PM Updates for v3.20
+> 
+> Add PM domain support to sh73a0
+> 
+> ----------------------------------------------------------------
+> Geert Uytterhoeven (1):
+>       ARM: shmobile: sh73a0 dtsi: Add PM domain support
+> 
+>  arch/arm/boot/dts/sh73a0.dtsi | 144 +++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 142 insertions(+), 2 deletions(-)
+> 
