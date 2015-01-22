@@ -1,59 +1,32 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 22 Jan 2015 01:42:30 +0100
-Subject: [Request pull] mvebu/dt #2
-Message-ID: <20150122004230.GC9533@lunn.ch>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 21 Jan 2015 16:46:17 -0800
+Subject: [GIT PULL] ARM: STi: Defconfig changes for v3.20, round 1
+In-Reply-To: <54B94CFB.4000900@st.com>
+References: <54B94CFB.4000900@st.com>
+Message-ID: <20150122004617.GC29014@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof
+On Fri, Jan 16, 2015 at 06:40:11PM +0100, Maxime Coquelin wrote:
+> Hi Olof, Arnd and Kevin,
+> 
+> Please consider this first round of STi defconfig updates for v3.20.
+> 
+> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+> 
+>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.stlinux.com/devel/kernel/linux-sti.git
+> tags/sti-defconfig-for-v3.20-1
+> 
+> for you to fetch changes up to 89ae11c41e16460d5b259e8059e73f1785f23880:
+> 
+>   ARM: multi_v7_defconfig: Enable MiPHY28lp - ST's Generic (SATA,
+> PCIe & USB3) PHY (2015-01-16 13:00:55 +0100)
 
-There is the second incremental pull request for mvebu/dt.
+Merged.
 
-Thanks
-	Andrew
 
-The following changes since commit 928413bd859c0936f03f6a3504c4721e83a3d1d7:
-
-  ARM: mvebu: Add Armada 388 General Purpose Development Board support (2015-01-09 09:20:00 -0600)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-3.20-2
-
-for you to fetch changes up to 6cc082a84e13f3a0078973a08adf22f1404acc3d:
-
-  ARM: mvebu: make DTS comments reflect DEBUG_LL changes (2015-01-21 18:36:14 -0600)
-
-----------------------------------------------------------------
-Second set of dt patches for mvebu for v3.20.
-
-ARM: mvebu: make DTS comments reflect DEBUG_LL changes
-ARM: mvebu: Armada 385 GP: Add regulators to the SATA port
-ARM: Kirkwood: Added support for pogoplug e02 (pink/gray)
-ARM: mvebu: fix compatible strings of MBus on Armada 375 and Armada 38x
-dt: bindings: update mvebu-mbus DT binding with new compatible properties
-
-----------------------------------------------------------------
-Christoph Junghans (1):
-      ARM: Kirkwood: Added support for pogoplug e02 (pink/gray)
-
-Gregory CLEMENT (1):
-      ARM: mvebu: Armada 385 GP: Add regulators to the SATA port
-
-Paul Bolle (1):
-      ARM: mvebu: make DTS comments reflect DEBUG_LL changes
-
-Thomas Petazzoni (2):
-      dt: bindings: update mvebu-mbus DT binding with new compatible properties
-      ARM: mvebu: fix compatible strings of MBus on Armada 375 and Armada 38x
-
- .../devicetree/bindings/bus/mvebu-mbus.txt         |   4 +-
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/armada-375.dtsi                  |   2 +-
- arch/arm/boot/dts/armada-388-gp.dts                | 126 +++++++++++++++++++
- arch/arm/boot/dts/armada-38x.dtsi                  |   3 +-
- arch/arm/boot/dts/armada-xp-axpwifiap.dts          |   6 +-
- arch/arm/boot/dts/kirkwood-pogo_e02.dts            | 134 +++++++++++++++++++++
- 8 files changed, 270 insertions(+), 7 deletions(-)
- create mode 100644 arch/arm/boot/dts/kirkwood-pogo_e02.dts
+-Olof
