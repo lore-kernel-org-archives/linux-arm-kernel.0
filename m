@@ -1,97 +1,27 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 21 Jan 2015 17:46:35 -0800
-Subject: [PATCH v11 3/4] clk: Add rate constraints to clocks
-In-Reply-To: <1421847039-29544-4-git-send-email-tomeu.vizoso@collabora.com>
-References: <1421847039-29544-1-git-send-email-tomeu.vizoso@collabora.com>
- <1421847039-29544-4-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <20150122014635.GI27202@codeaurora.org>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Thu, 22 Jan 2015 02:46:35 +0100
+Subject: [PATCH 1/9] power/reset: brcmstb: Make the driver buildable on
+ MIPS
+In-Reply-To: <1416962994-27095-2-git-send-email-cernekee@gmail.com>
+References: <1416962994-27095-1-git-send-email-cernekee@gmail.com>
+ <1416962994-27095-2-git-send-email-cernekee@gmail.com>
+Message-ID: <20150122014635.GM13715@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/21, Tomeu Vizoso wrote:
-> Adds a way for clock consumers to set maximum and minimum rates. This
-> can be used for thermal drivers to set minimum rates, or by misc.
-> drivers to set maximum rates to assure a minimum performance level.
-> 
-> Changes the signature of the determine_rate callback by adding the
-> parameters min_rate and max_rate.
-> 
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> 
-> ---
-> v11:	* Recalculate the rate before putting the reference to clk_core
-> 	* Don't recalculate the rate when freeing the per-user clock
-> 	in the initialization error paths
-> 	* Move __clk_create_clk to be next to __clk_free_clk for more
-> 	comfortable reading
+Hi,
 
-Can we do this in the previous patch where we introduce the
-function?
+On Tue, Nov 25, 2014 at 04:49:46PM -0800, Kevin Cernekee wrote:
+> Now that the driver doesn't use any ARM-specific headers, it is safe
+> to build on MIPS or with COMPILE_TEST.
 
-> @@ -2143,9 +2314,16 @@ struct clk *__clk_register(struct device *dev, struct clk_hw *hw)
->  	else
->  		clk->owner = NULL;
->  
-> +	INIT_HLIST_HEAD(&clk->clks);
-> +
-> +	hw->clk = __clk_create_clk(hw, NULL, NULL);
-> +
->  	ret = __clk_init(dev, hw->clk);
-> -	if (ret)
-> +	if (ret) {
-> +		__clk_free_clk(hw->clk);
-> +		hw->clk = NULL;
->  		return ERR_PTR(ret);
-> +	}
->  
->  	return hw->clk;
->  }
-> @@ -2210,12 +2388,16 @@ struct clk *clk_register(struct device *dev, struct clk_hw *hw)
->  		}
->  	}
->  
-> +	INIT_HLIST_HEAD(&clk->clks);
-> +
->  	hw->clk = __clk_create_clk(hw, NULL, NULL);
->  	ret = __clk_init(dev, hw->clk);
->  	if (!ret)
->  		return hw->clk;
->  
-> -	kfree(hw->clk);
-> +	__clk_free_clk(hw->clk);
-> +	hw->clk = NULL;
+Thanks, applied.
 
-Shouldn't we be assigning to NULL in the previous patch (same
-comment for __clk_register)?
-
->  fail_parent_names_copy:
->  	while (--i >= 0)
->  		kfree(clk->parent_names[i]);
-> @@ -2420,7 +2602,14 @@ void __clk_put(struct clk *clk)
->  	if (!clk || WARN_ON_ONCE(IS_ERR(clk)))
->  		return;
->  
-> +	clk_prepare_lock();
-> +	hlist_del(&clk->child_node);
-> +	clk_prepare_unlock();
-> +
-> +	clk_core_set_rate(clk->core, clk->core->req_rate);
-> +
->  	clk_core_put(clk->core);
-> +
-
-Sad that we take the lock 3 times during __clk_put(). We should
-be able to do it only once if we have a lockless
-clk_core_set_rate() function and put the contents of
-clk_core_put() into this function. Actually we need to do that to
-be thread safe with clk->core->req_rate changing. We can call the
-same function in clk_set_rate_range() too so that we don't have
-to deal with recursive locking there.
-
->  	kfree(clk);
->  }
->  
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150122/8e86ae8d/attachment.sig>
