@@ -1,62 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 22 Jan 2015 17:47:13 +0100
-Subject: [RFC PATCH v4 3/4] arm64:thunder: Add initial dts for Cavium's
- Thunder SoC in 2 Node topology.
-In-Reply-To: <1421924755-26029-4-git-send-email-gkulkarni@caviumnetworks.com>
-References: <1421924755-26029-1-git-send-email-gkulkarni@caviumnetworks.com>
- <1421924755-26029-4-git-send-email-gkulkarni@caviumnetworks.com>
-Message-ID: <2882934.brFyhkGPyE@wuerfel>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Thu, 22 Jan 2015 10:49:56 -0600
+Subject: [PATCH 8/8] msm: scm: Move the scm driver to drivers/soc/qcom
+In-Reply-To: <CAJAp7OgtnTN3H+zSazK2Xeob6wxpf9Ws=tibAupzP1cF31G=Mw@mail.gmail.com>
+References: <1407202310-3359-1-git-send-email-sboyd@codeaurora.org>
+ <1407202310-3359-9-git-send-email-sboyd@codeaurora.org>
+ <CAOesGMh1HE+hMP0VWr2vaHCp2itVjpQeiiFL6r9WeJUFes5tvw@mail.gmail.com>
+ <CAJAp7OgtnTN3H+zSazK2Xeob6wxpf9Ws=tibAupzP1cF31G=Mw@mail.gmail.com>
+Message-ID: <688373BE-2C67-4427-91A1-C4C3A725F0CC@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 22 January 2015 16:35:54 Ganapatrao Kulkarni wrote:
-> +
-> +		cpu at 000 {
-> +			device_type = "cpu";
-> +			compatible = "cavium,thunder", "arm,armv8";
-> +			reg = <0x0 0x000>;
-> +			enable-method = "psci";
-> +			/* socket 0, cluster 0, core 0*/
-> +			arm,associativity = <0 0 0>;
-> +		};
-...
-> +             cpu at 20f {
-> +                     device_type = "cpu";
-> +                     compatible = "cavium,thunder", "arm,armv8";
-> +                     reg = <0x0 0x20f>;
-> +                     enable-method = "psci";
-> +                     arm,associativity = <0 2 15>;
-> +		};
-> +		cpu at 10000 {
-> +			device_type = "cpu";
-> +			compatible = "cavium,thunder", "arm,armv8";
-> +			reg = <0x0 0x10000>;
-> +			enable-method = "psci";
-> +			/* socket 1, cluster 0, core 0*/
-> +			arm,associativity = <1 0 0>;
-> +		};
 
-This seems wrong still: The clusters and cores do not have unique
-numbers. I believe the code will not work correctly, and it won't
-be compliant with the binding from patch 2.
+On Jan 21, 2015, at 7:53 PM, Bjorn Andersson <bjorn@kryo.se> wrote:
 
-I think the right way here would be to use 
+> On Wed, Jan 21, 2015 at 5:13 PM, Olof Johansson <olof@lixom.net> wrote:
+> [..]
+>> On Mon, Aug 4, 2014 at 6:31 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>>> Architectural changes in the ARM Linux kernel tree mandate
+>>> the eventual removal of the mach-* directories. Move the
+>>> scm driver to drivers/soc/qcom and the scm header to
+>>> include/soc/qcom to support that removal.
+>> 
+>> The idea is not blindly move one dumping ground to a new place.
+>> 
+>> I see only two exported functions from scm.c:
+>> 
+>> scm_get_version: This is not used anywhere in the kernel and can just be removed
+>> scm_call: This is used by scm-boot, and would be better to translate
+>> over to firmware_ops in the first place.
+>> 
+> 
+> Hi Olof,
+> 
+> I started this a while ago, as it felt like the right thing to do <tm>.
+> 
+> The problem with this approach is that e.g. firmware loading is
+> partially handled through this interface. So implementing a remoteproc
+> driver for wifi etc required me to add 6 new ops to the struct,
+> loading the modem looks like it requires one more. HDMI requires one.
+> 
+> Looking at the downstream branch there's a bunch more (20+), so we
+> would explode the firmware_ops struct with Qualcomm "specific" ops.
+> This is not necessarily a bad idea, but needs to be considered before
+> we jump the gun.
+> 
+> 
+> I haven't looked at the arm64 stuff in detail, but it looks to be
+> shared between the two platforms, so either way it seems like the
+> right approach to have this moved out to drivers/soc/qcom.
 
-	arm,associativity = <0 2 47>;
+As Bjorn says the scm interface ends up having a number of qcom specific calls that I don?t think the firmware ops should be implementing.  I don?t see any value in adding qcom specific function pointers to the ops struct just to create another level of indirection.
 
-for cpu at 20f, and
+I?m fine with adding a firmware_ops implementation that uses scm for those things that firmware_ops has today.  However, I?m not clear on what the view of extending firmware_ops to arm64 is.  If we do this do we move the firmware_ops code into drivers/soc ?
 
-	arm,associativity = <1 3 48>;
+- k
 
-for cpu at 10000. Your previous version used the numbers from 
-the reg property, which should be fine as well if that helps:
-
-
-	arm,associativity = <0x0 0x200 0x20f>;
-
-	arm,associativity = <0x10000 0x10000 0x10000>;
-
-which should have the same effect as above, as long as the code
-can handle the numbers not being consecutive.
-
-	Arnd
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
