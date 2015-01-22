@@ -1,98 +1,36 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Wed, 21 Jan 2015 17:01:40 -0800
-Subject: [PATCHv2] mm: Don't offset memmap for flatmem
-In-Reply-To: <1421804273-29947-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <1421888500-24364-1-git-send-email-lauraa@codeaurora.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 21 Jan 2015 17:02:41 -0800
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Updates for v3.20
+In-Reply-To: <cover.1421379958.git.horms+renesas@verge.net.au>
+References: <cover.1421379958.git.horms+renesas@verge.net.au>
+Message-ID: <20150122010241.GH29014@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Srinivas Kandagatla reported bad page messages when trying to
-remove the bottom 2MB on an ARM based IFC6410 board
+On Sat, Jan 17, 2015 at 09:59:24AM +0900, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
+> 
+> Please consider these second round of Renesas ARM based SoC updates for v3.20.
+> 
+> This pull request is based on the previous round of
+> such requests, tagged as renesas-soc-for-v3.20,
+> which you have already pulled.
+> 
+> 
+> The following changes since commit 39695882d3d642a73bca551e682426e4e3bcd158:
+> 
+>   ARM: shmobile: r8a73a4: Multiplatform support (2014-12-21 17:11:22 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc2-for-v3.20
+> 
+> for you to fetch changes up to 2173fc7cb681c38b9e5bc526211045caecf96e44:
+> 
+>   ARM: shmobile: R-Mobile: Add DT support for PM domains (2015-01-15 08:38:14 +0900)
+> 
 
-BUG: Bad page state in process swapper  pfn:fffa8
-page:ef7fb500 count:0 mapcount:0 mapping:  (null) index:0x0
-flags: 0x96640253(locked|error|dirty|active|arch_1|reclaim|mlocked)
-page dumped because: PAGE_FLAGS_CHECK_AT_FREE flag(s) set
-bad because of flags:
-flags: 0x200041(locked|active|mlocked)
-Modules linked in:
-CPU: 0 PID: 0 Comm: swapper Not tainted 3.19.0-rc3-00007-g412f9ba-dirty #816
-Hardware name: Qualcomm (Flattened Device Tree)
-[<c0218280>] (unwind_backtrace) from [<c0212be8>] (show_stack+0x20/0x24)
-[<c0212be8>] (show_stack) from [<c0af7124>] (dump_stack+0x80/0x9c)
-[<c0af7124>] (dump_stack) from [<c0301570>] (bad_page+0xc8/0x128)
-[<c0301570>] (bad_page) from [<c03018a8>] (free_pages_prepare+0x168/0x1e0)
-[<c03018a8>] (free_pages_prepare) from [<c030369c>] (free_hot_cold_page+0x3c/0x174)
-[<c030369c>] (free_hot_cold_page) from [<c0303828>] (__free_pages+0x54/0x58)
-[<c0303828>] (__free_pages) from [<c030395c>] (free_highmem_page+0x38/0x88)
-[<c030395c>] (free_highmem_page) from [<c0f62d5c>] (mem_init+0x240/0x430)
-[<c0f62d5c>] (mem_init) from [<c0f5db3c>] (start_kernel+0x1e4/0x3c8)
-[<c0f5db3c>] (start_kernel) from [<80208074>] (0x80208074)
-Disabling lock debugging due to kernel taint
+Merged, thanks.
 
-Removing the lower 2MB made the start of the lowmem zone to no longer
-be page block aligned. IFC6410 uses CONFIG_FLATMEM where
-alloc_node_mem_map allocates memory for the mem_map. alloc_node_mem_map
-will offset for unaligned nodes with the assumption the pfn/page
-translation functions will account for the offset. The functions for
-CONFIG_FLATMEM do not offset however, resulting in overrunning
-the memmap array. Just use the allocated memmap without any offset
-when running with CONFIG_FLATMEM to avoid the overrun.
 
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-Reported-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- mm/page_alloc.c | 16 +++++++++++-----
- 1 file changed, 11 insertions(+), 5 deletions(-)
-
-diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-index 7633c50..269fc93 100644
---- a/mm/page_alloc.c
-+++ b/mm/page_alloc.c
-@@ -5005,6 +5005,8 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat,
- 
- static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
- {
-+	unsigned long __maybe_unused offset = 0;
-+
- 	/* Skip empty nodes */
- 	if (!pgdat->node_spanned_pages)
- 		return;
-@@ -5021,6 +5023,7 @@ static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
- 		 * for the buddy allocator to function correctly.
- 		 */
- 		start = pgdat->node_start_pfn & ~(MAX_ORDER_NR_PAGES - 1);
-+		offset = pgdat->node_start_pfn - start;
- 		end = pgdat_end_pfn(pgdat);
- 		end = ALIGN(end, MAX_ORDER_NR_PAGES);
- 		size =  (end - start) * sizeof(struct page);
-@@ -5028,7 +5031,7 @@ static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
- 		if (!map)
- 			map = memblock_virt_alloc_node_nopanic(size,
- 							       pgdat->node_id);
--		pgdat->node_mem_map = map + (pgdat->node_start_pfn - start);
-+		pgdat->node_mem_map = map + offset;
- 	}
- #ifndef CONFIG_NEED_MULTIPLE_NODES
- 	/*
-@@ -5036,10 +5039,13 @@ static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
- 	 */
- 	if (pgdat == NODE_DATA(0)) {
- 		mem_map = NODE_DATA(0)->node_mem_map;
--#ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
--		if (page_to_pfn(mem_map) != pgdat->node_start_pfn)
--			mem_map -= (pgdat->node_start_pfn - ARCH_PFN_OFFSET);
--#endif /* CONFIG_HAVE_MEMBLOCK_NODE_MAP */
-+#if defined(CONFIG_HAVE_MEMBLOCK_NODE_MAP) || defined(CONFIG_FLATMEM)
-+		if (page_to_pfn(mem_map) != pgdat->node_start_pfn) {
-+			if (IS_ENABLED(CONFIG_HAVE_MEMBLOCK_NODE_MAP))
-+				offset = pgdat->node_start_pfn - ARCH_PFN_OFFSET;
-+			mem_map -= offset;
-+		}
-+#endif /* CONFIG_HAVE_MEMBLOCK_NODE_MAP || CONFIG_FLATMEM */
- 	}
- #endif
- #endif /* CONFIG_FLAT_NODE_MEM_MAP */
--- 
-Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+-Olof
