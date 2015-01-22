@@ -1,110 +1,41 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 Jan 2015 17:40:43 -0800
-Subject: [PATCH 3/3] ARM: edma: Split up header file to platform_data and
- API file
-In-Reply-To: <1417084891-17990-4-git-send-email-peter.ujfalusi@ti.com>
-References: <1417084891-17990-1-git-send-email-peter.ujfalusi@ti.com>
- <1417084891-17990-4-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <CAOesGMgdLB9WkOwCt__iRMnTYZ-tMNS==FL+b6s3CzHK4b0MYQ@mail.gmail.com>
+Date: Wed, 21 Jan 2015 17:41:39 -0800
+Subject: [GIT PULL] DaVinci EDMA updates for v3.20
+In-Reply-To: <1421766325-28293-1-git-send-email-nsekhar@ti.com>
+References: <1421766325-28293-1-git-send-email-nsekhar@ti.com>
+Message-ID: <20150122014139.GF31815@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Jan 20, 2015 at 08:35:24PM +0530, Sekhar Nori wrote:
+> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+> 
+>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.20/edma
+> 
+> for you to fetch changes up to bf92c8471b1db35548482fdc1dbae4c15dcc399b:
+> 
+>   ARM: common: edma.c: Remove some unused functions (2015-01-14 15:29:40 +0530)
+> 
+> ----------------------------------------------------------------
+> Remove EDMA api from platform_data header file.
+> Also, cleans up EDMA header file usage in ASoC
+> (acked by Mark).
+> This is in preparation for eventual removal
+> of arch/arm/common/edma.c
+> 
+> ----------------------------------------------------------------
+> Peter Ujfalusi (3):
+>       ASoC: davinci-evm: Do not include edma headers
+>       ARM: edma: Rename header file for dmaengine filter function definition
+>       ARM: edma: Split up header file to platform_data and API file
 
-On Thu, Nov 27, 2014 at 2:41 AM, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
-> include/linux/platform_data/ is not a correct place to keep the API
-> definitions for edma, it is meant to be only for the pdata for the device.
-> Clean up this by moving the API to include/linux/edma.h
-
-It's a nice net improvement, but it moves some things that should be
-in _neither_ location to a new place where it doesn't belong either --
-and the new location is even more global. See below.
-
-...
-
-> diff --git a/include/linux/edma.h b/include/linux/edma.h
-> new file mode 100644
-> index 000000000000..9df92198c117
-> --- /dev/null
-> +++ b/include/linux/edma.h
-> @@ -0,0 +1,153 @@
-> +/*
-> + * TI EDMA definitions
-> + *
-> + * Copyright (C) 2006-2013 Texas Instruments.
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation version 2.
-> + *
-> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-> + * kind, whether express or implied; without even the implied warranty
-> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +/*
-> + * This EDMA3 programming framework exposes two basic kinds of resource:
-> + *
-> + *  Channel    Triggers transfers, usually from a hardware event but
-> + *             also manually or by "chaining" from DMA completions.
-> + *             Each channel is coupled to a Parameter RAM (PaRAM) slot.
-> + *
-> + *  Slot       Each PaRAM slot holds a DMA transfer descriptor (PaRAM
-> + *             "set"), source and destination addresses, a link to a
-> + *             next PaRAM slot (if any), options for the transfer, and
-> + *             instructions for updating those addresses.  There are
-> + *             more than twice as many slots as event channels.
-> + *
-> + * Each PaRAM set describes a sequence of transfers, either for one large
-> + * buffer or for several discontiguous smaller buffers.  An EDMA transfer
-> + * is driven only from a channel, which performs the transfers specified
-> + * in its PaRAM slot until there are no more transfers.  When that last
-> + * transfer completes, the "link" field may be used to reload the channel's
-> + * PaRAM slot with a new transfer descriptor.
-> + *
-> + * The EDMA Channel Controller (CC) maps requests from channels into physical
-> + * Transfer Controller (TC) requests when the channel triggers (by hardware
-> + * or software events, or by chaining).  The two physical DMA channels provided
-> + * by the TCs are thus shared by many logical channels.
-> + *
-> + * DaVinci hardware also has a "QDMA" mechanism which is not currently
-> + * supported through this interface.  (DSP firmware uses it though.)
-> + */
-> +
-> +#ifndef __LINUX_EDMA_H_
-> +#define __LINUX_EDMA_H_
-> +
-> +#include <linux/platform_data/edma.h>
-> +
-> +/* PaRAM slots are laid out like this */
-> +struct edmacc_param {
-> +       u32 opt;
-> +       u32 src;
-> +       u32 a_b_cnt;
-> +       u32 dst;
-> +       u32 src_dst_bidx;
-> +       u32 link_bcntrld;
-> +       u32 src_dst_cidx;
-> +       u32 ccnt;
-> +} __packed;
-> +
-> +/* fields in edmacc_param.opt */
-> +#define SAM            BIT(0)
-> +#define DAM            BIT(1)
-> +#define SYNCDIM                BIT(2)
-> +#define STATIC         BIT(3)
-> +#define EDMA_FWID      (0x07 << 8)
-> +#define TCCMODE                BIT(11)
-> +#define EDMA_TCC(t)    ((t) << 12)
-> +#define TCINTEN                BIT(20)
-> +#define ITCINTEN       BIT(21)
-> +#define TCCHEN         BIT(22)
-> +#define ITCCHEN                BIT(23)
-
-This seems like the kind of thing that should go with the edma driver
-instead of being globally exported to the kernel through a
-include/linux header file.
+I had some comments on this patch. Holding off merging this until that's been
+resolved (or, if the answers are right, followed up with an incremental patch
+that we can add on top I suppose. :)
 
 
 -Olof
