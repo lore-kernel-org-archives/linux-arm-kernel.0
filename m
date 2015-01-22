@@ -1,100 +1,98 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 21 Jan 2015 17:01:36 -0800
-Subject: [PATCH v11 2/4] clk: Make clk API return per-user struct clk
- instances
-In-Reply-To: <1421847039-29544-3-git-send-email-tomeu.vizoso@collabora.com>
-References: <1421847039-29544-1-git-send-email-tomeu.vizoso@collabora.com>
- <1421847039-29544-3-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <20150122010136.GH27202@codeaurora.org>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Wed, 21 Jan 2015 17:01:40 -0800
+Subject: [PATCHv2] mm: Don't offset memmap for flatmem
+In-Reply-To: <1421804273-29947-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <1421888500-24364-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/21, Tomeu Vizoso wrote:
-> @@ -2075,10 +2210,12 @@ struct clk *clk_register(struct device *dev, struct clk_hw *hw)
->  		}
->  	}
->  
-> -	ret = __clk_init(dev, clk);
-> +	hw->clk = __clk_create_clk(hw, NULL, NULL);
-> +	ret = __clk_init(dev, hw->clk);
->  	if (!ret)
-> -		return clk;
-> +		return hw->clk;
->  
-> +	kfree(hw->clk);
->  fail_parent_names_copy:
->  	while (--i >= 0)
->  		kfree(clk->parent_names[i]);
+Srinivas Kandagatla reported bad page messages when trying to
+remove the bottom 2MB on an ARM based IFC6410 board
 
-Sigh, this patch is so huge I keep finding more things. Sorry. It
-looks like __clk_create_clk() can return an error pointer, which
-we then send directly to __clk_init. First off, we shouldn't
-kfree() that pointer if it's an error pointer. Second, we
-shouldn't crash in __clk_init() in such a situation so there
-needs to be some sort of check somewhere.
+BUG: Bad page state in process swapper  pfn:fffa8
+page:ef7fb500 count:0 mapcount:0 mapping:  (null) index:0x0
+flags: 0x96640253(locked|error|dirty|active|arch_1|reclaim|mlocked)
+page dumped because: PAGE_FLAGS_CHECK_AT_FREE flag(s) set
+bad because of flags:
+flags: 0x200041(locked|active|mlocked)
+Modules linked in:
+CPU: 0 PID: 0 Comm: swapper Not tainted 3.19.0-rc3-00007-g412f9ba-dirty #816
+Hardware name: Qualcomm (Flattened Device Tree)
+[<c0218280>] (unwind_backtrace) from [<c0212be8>] (show_stack+0x20/0x24)
+[<c0212be8>] (show_stack) from [<c0af7124>] (dump_stack+0x80/0x9c)
+[<c0af7124>] (dump_stack) from [<c0301570>] (bad_page+0xc8/0x128)
+[<c0301570>] (bad_page) from [<c03018a8>] (free_pages_prepare+0x168/0x1e0)
+[<c03018a8>] (free_pages_prepare) from [<c030369c>] (free_hot_cold_page+0x3c/0x174)
+[<c030369c>] (free_hot_cold_page) from [<c0303828>] (__free_pages+0x54/0x58)
+[<c0303828>] (__free_pages) from [<c030395c>] (free_highmem_page+0x38/0x88)
+[<c030395c>] (free_highmem_page) from [<c0f62d5c>] (mem_init+0x240/0x430)
+[<c0f62d5c>] (mem_init) from [<c0f5db3c>] (start_kernel+0x1e4/0x3c8)
+[<c0f5db3c>] (start_kernel) from [<80208074>] (0x80208074)
+Disabling lock debugging due to kernel taint
 
-BTW, please try and fixup checkpatch warnings.
+Removing the lower 2MB made the start of the lowmem zone to no longer
+be page block aligned. IFC6410 uses CONFIG_FLATMEM where
+alloc_node_mem_map allocates memory for the mem_map. alloc_node_mem_map
+will offset for unaligned nodes with the assumption the pfn/page
+translation functions will account for the offset. The functions for
+CONFIG_FLATMEM do not offset however, resulting in overrunning
+the memmap array. Just use the allocated memmap without any offset
+when running with CONFIG_FLATMEM to avoid the overrun.
 
-> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-> index da4bda8..fac3244 100644
-> --- a/drivers/clk/clkdev.c
-> +++ b/drivers/clk/clkdev.c
-> @@ -69,20 +70,22 @@ struct clk *of_clk_get(struct device_node *np, int index)
-[...]
-> -struct clk *of_clk_get_by_name(struct device_node *np, const char *name)
-> +static struct clk *__of_clk_get_by_name(struct device_node *np, const char *name)
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Reported-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+ mm/page_alloc.c | 16 +++++++++++-----
+ 1 file changed, 11 insertions(+), 5 deletions(-)
 
-It would be nice if this returned an already __clk_create_clk()ed
-pointer.
-
->  {
->  	struct clk *clk = ERR_PTR(-ENOENT);
->  
-> @@ -119,7 +122,33 @@ struct clk *of_clk_get_by_name(struct device_node *np, const char *name)
-[...]
-> +struct clk *of_clk_get_by_name(struct device_node *np, const char *name)
-> +{
-> +	struct clk *clk = __of_clk_get_by_name(np, name);
-> +
-> +	if (!IS_ERR(clk))
-> +		clk = __clk_create_clk(__clk_get_hw(clk), np->full_name, name);
-
-Because we do it here where we know we're CONFIG_COMMON_CLK=y.
-
-> +
-> +	return clk;
-> +}
->  EXPORT_SYMBOL(of_clk_get_by_name);
-> +
-> +#else /* defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK) */
-> +
-> +static struct clk *__of_clk_get_by_name(struct device_node *np, const char *name)
-> +{
-> +	return ERR_PTR(-ENOENT);
-> +}
->  #endif
->  
->  /*
-> @@ -185,9 +229,13 @@ struct clk *clk_get(struct device *dev, const char *con_id)
->  	struct clk *clk;
->  
->  	if (dev) {
-> -		clk = of_clk_get_by_name(dev->of_node, con_id);
-> -		if (!IS_ERR(clk))
-> +		clk = __of_clk_get_by_name(dev->of_node, con_id);
-> +		if (!IS_ERR(clk)) {
-> +#if defined(CONFIG_COMMON_CLK)
-> +			clk = __clk_create_clk(__clk_get_hw(clk), dev_id, con_id);
-> +#endif
-
-And we do it here where we could remove the #ifdef.
-
->  			return clk;
-> +		}
->  		if (PTR_ERR(clk) == -EPROBE_DEFER)
->  			return clk;
->  	}
-
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 7633c50..269fc93 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -5005,6 +5005,8 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat,
+ 
+ static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
+ {
++	unsigned long __maybe_unused offset = 0;
++
+ 	/* Skip empty nodes */
+ 	if (!pgdat->node_spanned_pages)
+ 		return;
+@@ -5021,6 +5023,7 @@ static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
+ 		 * for the buddy allocator to function correctly.
+ 		 */
+ 		start = pgdat->node_start_pfn & ~(MAX_ORDER_NR_PAGES - 1);
++		offset = pgdat->node_start_pfn - start;
+ 		end = pgdat_end_pfn(pgdat);
+ 		end = ALIGN(end, MAX_ORDER_NR_PAGES);
+ 		size =  (end - start) * sizeof(struct page);
+@@ -5028,7 +5031,7 @@ static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
+ 		if (!map)
+ 			map = memblock_virt_alloc_node_nopanic(size,
+ 							       pgdat->node_id);
+-		pgdat->node_mem_map = map + (pgdat->node_start_pfn - start);
++		pgdat->node_mem_map = map + offset;
+ 	}
+ #ifndef CONFIG_NEED_MULTIPLE_NODES
+ 	/*
+@@ -5036,10 +5039,13 @@ static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
+ 	 */
+ 	if (pgdat == NODE_DATA(0)) {
+ 		mem_map = NODE_DATA(0)->node_mem_map;
+-#ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
+-		if (page_to_pfn(mem_map) != pgdat->node_start_pfn)
+-			mem_map -= (pgdat->node_start_pfn - ARCH_PFN_OFFSET);
+-#endif /* CONFIG_HAVE_MEMBLOCK_NODE_MAP */
++#if defined(CONFIG_HAVE_MEMBLOCK_NODE_MAP) || defined(CONFIG_FLATMEM)
++		if (page_to_pfn(mem_map) != pgdat->node_start_pfn) {
++			if (IS_ENABLED(CONFIG_HAVE_MEMBLOCK_NODE_MAP))
++				offset = pgdat->node_start_pfn - ARCH_PFN_OFFSET;
++			mem_map -= offset;
++		}
++#endif /* CONFIG_HAVE_MEMBLOCK_NODE_MAP || CONFIG_FLATMEM */
+ 	}
+ #endif
+ #endif /* CONFIG_FLAT_NODE_MEM_MAP */
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
