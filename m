@@ -1,32 +1,41 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 Jan 2015 16:46:17 -0800
-Subject: [GIT PULL] ARM: STi: Defconfig changes for v3.20, round 1
-In-Reply-To: <54B94CFB.4000900@st.com>
-References: <54B94CFB.4000900@st.com>
-Message-ID: <20150122004617.GC29014@quad.lixom.net>
+Date: Wed, 21 Jan 2015 16:49:57 -0800
+Subject: [GIT PULL 1/3] omap non-urgent fixes for v3.20
+In-Reply-To: <54b99dd1.a21a450a.3fbf.25c5SMTPIN_ADDED_BROKEN@mx.google.com>
+References: <54b99dd1.a21a450a.3fbf.25c5SMTPIN_ADDED_BROKEN@mx.google.com>
+Message-ID: <20150122004957.GD29014@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 06:40:11PM +0100, Maxime Coquelin wrote:
-> Hi Olof, Arnd and Kevin,
-> 
-> Please consider this first round of STi defconfig updates for v3.20.
-> 
+On Fri, Jan 16, 2015 at 03:21:20PM -0800, Tony Lindgren wrote:
 > The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
 > 
 >   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.stlinux.com/devel/kernel/linux-sti.git
-> tags/sti-defconfig-for-v3.20-1
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.20/fixes-not-urgent-pt1
 > 
-> for you to fetch changes up to 89ae11c41e16460d5b259e8059e73f1785f23880:
+> for you to fetch changes up to 13efcb188984f69e1f97b4d9e7d3663fb782946f:
 > 
->   ARM: multi_v7_defconfig: Enable MiPHY28lp - ST's Generic (SATA,
-> PCIe & USB3) PHY (2015-01-16 13:00:55 +0100)
+>   ARM: OMAP2+: Disable omap3 PM init for ti81xx (2015-01-14 17:37:16 -0800)
+> 
+> ----------------------------------------------------------------
+> Non-urgent fixes for omap variant dm816x that has been in a sorry
+> broken half merged state for a few years now. This gets us to the
+> point where we can boot it properly once the related SoC data is
+> added. Note that we've already made dm816x device tree only by
+> removing the known broken board file.
+> 
+> ----------------------------------------------------------------
+> Tony Lindgren (6):
+>       ARM: OMAP2+: Fix error handling for omap2_clk_enable_init_clocks
+>       ARM: OMAP2+: Fix ti81xx devtype
+>       ARM: OMAP2+: Fix ti81xx class type
+>       ARM: OMAP2+: Fix dm814 and dm816 for clocks and timer init
+>       ARM: OMAP2+: Fix reboot for 81xx
+>       ARM: OMAP2+: Disable omap3 PM init for ti81xx
 
-Merged.
-
+Merged, thanks.
 
 -Olof
