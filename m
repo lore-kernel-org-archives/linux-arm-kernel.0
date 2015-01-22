@@ -1,17 +1,46 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 22 Jan 2015 13:17:25 +0100
-Subject: [alsa-devel] [PATCH v3 2/4] ASoC: samsung: Document Trats2 audio
- subsystem bindings
-In-Reply-To: <1421925482-15861-3-git-send-email-ideal.song@samsung.com>
-References: <1421925482-15861-1-git-send-email-ideal.song@samsung.com>
- <1421925482-15861-3-git-send-email-ideal.song@samsung.com>
-Message-ID: <54C0EA55.5050405@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 22 Jan 2015 12:18:19 +0000
+Subject: [PATCH 1/1] i2c: i2c-st: Rename clock reference to something
+ that exists
+In-Reply-To: <1409234523-20240-1-git-send-email-lee.jones@linaro.org>
+References: <1409234523-20240-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20150122121819.GC9129@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/01/15 12:18, Inha Song wrote:
-> This patch add Trats2 audio subsystem bindings document.
-> 
-> Signed-off-by: Inha Song <ideal.song@samsung.com>
+Wolfram,
 
-Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+This patch has been on the list since forever.
+
+I have Acks from the driver author, so I'm going to take this through
+the MFD tree.  If you perk up later and decide to take it though the
+I2C tree instead, let me know and I'll remove it from MFD.
+
+> CLK_S_ICN_REG_0 hasn't existed for a while now.  This was renamed
+> over a few commits, then finally removed in commit 5aa02b9 (ARM:
+> STi: DT: STiH415: Remove unused CLK_S_ICN_REG_0 fixed clock).
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/i2c/i2c-st.txt | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-st.txt b/Documentation/devicetree/bindings/i2c/i2c-st.txt
+> index 437e0db..4c26fda 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-st.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-st.txt
+> @@ -31,7 +31,7 @@ i2c0: i2c at fed40000 {
+>  	compatible	= "st,comms-ssc4-i2c";
+>  	reg		= <0xfed40000 0x110>;
+>  	interrupts	=  <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
+> -	clocks		= <&CLK_S_ICN_REG_0>;
+> +	clocks		= <&clk_s_a0_ls CLK_ICN_REG>;
+>  	clock-names	= "ssc";
+>  	clock-frequency = <400000>;
+>  	pinctrl-names	= "default";
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
