@@ -1,121 +1,40 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu, 22 Jan 2015 12:15:34 +0100
-Subject: [PATCH v11 2/4] clk: Make clk API return per-user struct clk
- instances
-In-Reply-To: <20150122010136.GH27202@codeaurora.org>
-References: <1421847039-29544-1-git-send-email-tomeu.vizoso@collabora.com>
- <1421847039-29544-3-git-send-email-tomeu.vizoso@collabora.com>
- <20150122010136.GH27202@codeaurora.org>
-Message-ID: <54C0DBD6.2000502@collabora.com>
+From: ideal.song@samsung.com (Inha Song)
+Date: Thu, 22 Jan 2015 20:17:58 +0900
+Subject: [alsa-devel] [PATCH v3 0/4] Sound support for Exynos4412 Trats2 board
+Message-ID: <1421925482-15861-1-git-send-email-ideal.song@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/22/2015 02:01 AM, Stephen Boyd wrote:
-> On 01/21, Tomeu Vizoso wrote:
->> @@ -2075,10 +2210,12 @@ struct clk *clk_register(struct device *dev, struct clk_hw *hw)
->>  		}
->>  	}
->>  
->> -	ret = __clk_init(dev, clk);
->> +	hw->clk = __clk_create_clk(hw, NULL, NULL);
->> +	ret = __clk_init(dev, hw->clk);
->>  	if (!ret)
->> -		return clk;
->> +		return hw->clk;
->>  
->> +	kfree(hw->clk);
->>  fail_parent_names_copy:
->>  	while (--i >= 0)
->>  		kfree(clk->parent_names[i]);
-> 
-> Sigh, this patch is so huge I keep finding more things. Sorry. It
-> looks like __clk_create_clk() can return an error pointer, which
-> we then send directly to __clk_init. First off, we shouldn't
-> kfree() that pointer if it's an error pointer. Second, we
-> shouldn't crash in __clk_init() in such a situation so there
-> needs to be some sort of check somewhere.
+This patch-set adds basic sound support for the Trats2 boards.
+It just support primary I2s and external speaker playback.
 
-Oops, done. I have reused the fail_parent_names_copy label as the
-less-bad possibility. Probably the error labels should be named after
-the target code and not after what the source code does, as per the
-latest CodingStyle additions.
+Changes in v3:
+  - Set clock out parent to XUSBXTI in pmu_system_controller DT node.
 
-> BTW, please try and fixup checkpatch warnings.
+Changes in v2:
+  - Remove unnecessary lines in Trats2 machine driver
+  - move clock enable/disable to .startup / .shutdown
+  - Fix code style issues
+  - Remove mclk DT property in Trats2 sound and add MCLK1 property in WM1811 node.
+    (MCLK1 is optional property in WM8994 node - refer: Document/devicetree/bindings/sound/wm8994.txt)
+  - Use mclk that defined in WM1811 DT node.
+  - Add "samsung,audio-codec" property to required properties.
 
-What were you thinking of specifically? I'm running it with
---max-line-length=106 and the other warnings are in clk-test.c that I
-still have to polish when I get some time.
+Inha Song (4):
+  ASoC: samsung: Add machine driver for Trats2
+  ASoC: samsung: Document Trats2 audio subsystem bindings
+  ARM: dts: set clock out parent to XUSBXTI
+  ARM: dts: Add sound nodes for exynos4412-trats2
 
->> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
->> index da4bda8..fac3244 100644
->> --- a/drivers/clk/clkdev.c
->> +++ b/drivers/clk/clkdev.c
->> @@ -69,20 +70,22 @@ struct clk *of_clk_get(struct device_node *np, int index)
-> [...]
->> -struct clk *of_clk_get_by_name(struct device_node *np, const char *name)
->> +static struct clk *__of_clk_get_by_name(struct device_node *np, const char *name)
-> 
-> It would be nice if this returned an already __clk_create_clk()ed
-> pointer.
-> 
->>  {
->>  	struct clk *clk = ERR_PTR(-ENOENT);
->>  
->> @@ -119,7 +122,33 @@ struct clk *of_clk_get_by_name(struct device_node *np, const char *name)
-> [...]
->> +struct clk *of_clk_get_by_name(struct device_node *np, const char *name)
->> +{
->> +	struct clk *clk = __of_clk_get_by_name(np, name);
->> +
->> +	if (!IS_ERR(clk))
->> +		clk = __clk_create_clk(__clk_get_hw(clk), np->full_name, name);
-> 
-> Because we do it here where we know we're CONFIG_COMMON_CLK=y.
-> 
->> +
->> +	return clk;
->> +}
->>  EXPORT_SYMBOL(of_clk_get_by_name);
->> +
->> +#else /* defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK) */
->> +
->> +static struct clk *__of_clk_get_by_name(struct device_node *np, const char *name)
->> +{
->> +	return ERR_PTR(-ENOENT);
->> +}
->>  #endif
->>  
->>  /*
->> @@ -185,9 +229,13 @@ struct clk *clk_get(struct device *dev, const char *con_id)
->>  	struct clk *clk;
->>  
->>  	if (dev) {
->> -		clk = of_clk_get_by_name(dev->of_node, con_id);
->> -		if (!IS_ERR(clk))
->> +		clk = __of_clk_get_by_name(dev->of_node, con_id);
->> +		if (!IS_ERR(clk)) {
->> +#if defined(CONFIG_COMMON_CLK)
->> +			clk = __clk_create_clk(__clk_get_hw(clk), dev_id, con_id);
->> +#endif
-> 
-> And we do it here where we could remove the #ifdef.
+ .../bindings/sound/samsung,trats2-wm1811.txt       |  25 +++
+ arch/arm/boot/dts/exynos4.dtsi                     |   2 +
+ arch/arm/boot/dts/exynos4412-trats2.dts            |  37 ++++
+ sound/soc/samsung/Kconfig                          |   8 +
+ sound/soc/samsung/Makefile                         |   2 +
+ sound/soc/samsung/trats2_wm1811.c                  | 218 +++++++++++++++++++++
+ 6 files changed, 292 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/samsung,trats2-wm1811.txt
+ create mode 100644 sound/soc/samsung/trats2_wm1811.c
 
-Yeah, I tried to reduce the ifdefing back then and this is the simplest
-I could come up with. The reason for clk_get() to call
-__clk_create_clk() directly is that it has more relevant information
-with which to tag the per-user clk.
-
-of_clk_get_by_name() has the name of the node but not the dev_id, which
-in my testing looked as much less useful when debugging who did what to
-a clock.
-
-Thanks,
-
-Tomeu
-
->>  			return clk;
->> +		}
->>  		if (PTR_ERR(clk) == -EPROBE_DEFER)
->>  			return clk;
->>  	}
-> 
+-- 
+2.0.0.390.gcb682f8
