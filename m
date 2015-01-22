@@ -1,131 +1,118 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Thu, 22 Jan 2015 11:28:25 +0900
-Subject: [PATCH v4 2/2] ARM: dts: Add HS400 support for exynos5420 and
- exynos5800
-In-Reply-To: <CAGOxZ5186+9U-6eri6OSGw9awsmr0EPP-gdhu-__oCWP1Oyyxg@mail.gmail.com>
-References: <1421231446-4776-1-git-send-email-alim.akhtar@samsung.com>
- <1421231446-4776-3-git-send-email-alim.akhtar@samsung.com>
- <54BEDE9C.5060501@samsung.com>
- <CAGOxZ5186+9U-6eri6OSGw9awsmr0EPP-gdhu-__oCWP1Oyyxg@mail.gmail.com>
-Message-ID: <54C06049.5070106@samsung.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 22 Jan 2015 11:44:27 +0900
+Subject: [PATCH v3 0/4] drivers: bus: Add Simple Power-Managed Bus
+In-Reply-To: <1420809155-4015-1-git-send-email-geert+renesas@glider.be>
+References: <1420809155-4015-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20150122024425.GD31170@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi.
-
-On 01/21/2015 11:12 PM, Alim Akhtar wrote:
-> Hi Jaehoon
+On Fri, Jan 09, 2015 at 02:12:31PM +0100, Geert Uytterhoeven wrote:
+> 	Hi Simon, Magnus,
 > 
-> On Wed, Jan 21, 2015 at 4:32 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
->> Hi,
->>
->> If you want to enable the hs400 mode, need to add "mmc-hs400-1_8v" or "mmc-hs400-1_2v".
->> But this patch didn't add them. do you have any other plan?
->>
-> Yes, right, plan is to send separate patch to enable hs400, as of now
-> I am not sure if all the 5800-peach-pi boards are populated with
-> emmc5.0 device or not. So I will enable HS400 after confirming this
-> point.
+> The Renesas Bus State Controller (BSC) provides an external bus for
+> connecting multiple external devices to an SoC, driving several chip
+> select lines, for e.g. NOR FLASH, Ethernet and USB.
+> On the kzm9g and ape6evm development boards, an smsc9220 Ethernet
+> controller is connnected to the BSC of an SH-Mobile AG5 (sh73a0) resp.
+> R-Mobile APE6 (r8a73a4) SoC.
 
-I know if card is not support hs400, then it should be enabled to other bus mode.
+For the record: Olof has asked for review comments for these patches
+so I have dropped them from next pending that activity.
 
-Best Regards,
-Jaehoon Chung
-
->> On 01/14/2015 07:30 PM, Alim Akhtar wrote:
->>> From: Seungwon Jeon <tgih.jun@samsung.com>
->>>
->>> HS400 timing values are added for SMDK5420, exynos5420-peach-pit
->>> and exynos5800-peach-pi boards.
->>> This also adds RCLK GPIO line, this gpio should be in pull-down
->>> state.
->>>
->>> Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
->>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
->>> [Alim: addressed review comments]
->>> ---
->>>  arch/arm/boot/dts/exynos5420-peach-pit.dts |    4 +++-
->>>  arch/arm/boot/dts/exynos5420-pinctrl.dtsi  |    7 +++++++
->>>  arch/arm/boot/dts/exynos5420-smdk5420.dts  |    4 +++-
->>>  arch/arm/boot/dts/exynos5800-peach-pi.dts  |    4 +++-
->>>  4 files changed, 16 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
->>> index 9a050e1..7ffaba8 100644
->>> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
->>> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
->>> @@ -569,8 +569,10 @@
->>>       samsung,dw-mshc-ciu-div = <3>;
->>>       samsung,dw-mshc-sdr-timing = <0 4>;
->>>       samsung,dw-mshc-ddr-timing = <0 2>;
->>> +     samsung,dw-mshc-hs400-timing = <0 2>;
->>> +     read-strobe-delay = <90>;
->>>       pinctrl-names = "default";
->>> -     pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
->>> +     pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8 &sd0_rclk>;
->>>       bus-width = <8>;
->>>  };
->>>
->>> diff --git a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
->>> index ba686e4..8b15316 100644
->>> --- a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
->>> +++ b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
->>> @@ -201,6 +201,13 @@
->>>                       samsung,pin-drv = <3>;
->>>               };
->>>
->>> +             sd0_rclk: sd0-rclk {
->>
->> I know it used to "sd0_rdqs", not "sd0_rclk".
->> Change name.
->>
-> Ok, I will change as per UM of 5800/5420,
+> The BSC is a fairly simple memory-mapped bus, hence a "simple-bus"
+> compatibility seems suitable.  However, the BSC is special in two
+> ways:
+>   1. It is part of a PM domain (A4S),
+>   2. It has a gateable functional clock (ZB).
+> Before a device connected to the BSC can be accessed, the PM domain
+> containing the BSC must be powered on, and the functional clock
+> driving the BSC must be enabled.
 > 
->> Best Regards,
->> Jaehoon Chung
->>> +                     samsung,pins = "gpc0-7";
->>> +                     samsung,pin-function = <2>;
->>> +                     samsung,pin-pud = <1>;
->>> +                     samsung,pin-drv = <3>;
->>> +             };
->>> +
->>>               sd1_cmd: sd1-cmd {
->>>                       samsung,pins = "gpc1-1";
->>>                       samsung,pin-function = <2>;
->>> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
->>> index 8be3d7b..5290e79 100644
->>> --- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
->>> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
->>> @@ -80,8 +80,10 @@
->>>               samsung,dw-mshc-ciu-div = <3>;
->>>               samsung,dw-mshc-sdr-timing = <0 4>;
->>>               samsung,dw-mshc-ddr-timing = <0 2>;
->>> +             samsung,dw-mshc-hs400-timing = <0 2>;
->>> +             read-strobe-delay = <90>;
->>>               pinctrl-names = "default";
->>> -             pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
->>> +             pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8 &sd0_rclk>;
->>>               bus-width = <8>;
->>>               cap-mmc-highspeed;
->>>       };
->>> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
->>> index e8fdda8..fa1c858 100644
->>> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
->>> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
->>> @@ -557,8 +557,10 @@
->>>       samsung,dw-mshc-ciu-div = <3>;
->>>       samsung,dw-mshc-sdr-timing = <0 4>;
->>>       samsung,dw-mshc-ddr-timing = <0 2>;
->>> +     samsung,dw-mshc-hs400-timing = <0 2>;
->>> +     read-strobe-delay = <90>;
->>>       pinctrl-names = "default";
->>> -     pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
->>> +     pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8 &sd0_rclk>;
->>>       bus-width = <8>;
->>>  };
->>>
->>>
->>
+> Both special properties can be described in DT in a standardized way
+> ("power-domains = <&pd_a4s>" and "clocks = <&zb_clk>", cfr. the
+> example in the DT binding documentation).  Externally connected
+> devices are described as children of the BSC node.
 > 
+> Unfortunately this doesn't mean everything will work out-of-the-box.
+> There are two problems:
+>   1. Without a device driver bound to the bus device, this device is
+>      not attached to the PM domain. And although a child device is
+>      present and active, the PM domain may be powered down, as it's
+>      considered unused by the PM domain core.
+>   2. Without a device driver calling pm_runtime_enable(), its
+>      functional clock is not enabled. Once runtime PM is enabled, the
+>      R-Mobile PM domain platform driver manages the functional clock
+>      using runtime PM.
 > 
+> As none of the above is really bus hardware-specific (PM domains and
+> functional clocks in clock domains are handled from genpd and platform
+> code), this series adds a Simple Power-Managed Bus driver for
+> transparent busses, which just enables runtime PM for the bus device.
+> Due to the child-parent relationship of devices connected to the bus,
+> as long as the device drivers for the child devices are runtime PM
+> enabled, the bus's PM domain will be powered, and the bus's clock will
+> be enabled automatically when needed, for both runtime PM and s2ram.
+> 
+> Currently this driver supports the Renesas Bus State Controller only,
+> but support for other SoCs and other bus controllers can easily be
+> added later by adding more compatible values.
+> Note that this driver cannot just bind against "simple-bus", as that
+> may prevent a device-specific driver from taking precedence.
+> 
+> This was tested on sh73a0/kzm9g-multiplatform (by me), and on
+> r8a73a4/ape6evm-multiplatform (by Ulrich Hecht). Without this,
+> Ethernet doesn't work, as the ZB clock is disabled by
+> clk_disable_unused().
+> 
+> As drivers/bus doesn't have a maintainer, and this driver is needed to
+> move two shmobile platforms away from legacy to multiplatform, I think
+> this can go in through Simon's shmobile tree.  There are no conflicts
+> with today's linux-next.
+> 
+> Changes compared to v2:
+>   - Document required properties inherited from "simple-bus",
+>   - Document required "reg" property for "renesas,bsc",
+>   - Move "ranges" before "reg" in the example,
+>   - Add Tested-by,
+>   - Split-off sh73a0/kzm9g and r8a73a4/ape6evm DTS updates.
+> 
+> Changes compared to v1 (more detailed change logs in the individual
+> patches):
+>   - Added sorting of drivers/bus Kconfig and Makefile entries,
+>   - Added DT binding documentation,
+>   - Rename from "Renesas Bus State Controller Driver" (renesas-bsc) to
+>     "Simple Power-Managed Bus Driver" (simple-pm-bus),
+>   - Postponed adding power-domains properties to the dtsi,
+>   - Added updates for r8a73a4/ape6evm.
+> 
+> Thanks for applying!
+> 
+> Geert Uytterhoeven (4):
+>   drivers: bus: Sort Kconfig entries alphabetically
+>   drivers: bus: Sort Makefile entries alphabetically
+>   drivers: bus: Add Simple Power-Managed Bus DT Bindings
+>   drivers: bus: Add Simple Power-Managed Bus Driver
+> 
+>  .../devicetree/bindings/bus/simple-pm-bus.txt      | 52 +++++++++++++++++++++
+>  drivers/bus/Kconfig                                | 53 ++++++++++++++--------
+>  drivers/bus/Makefile                               | 15 +++---
+>  drivers/bus/simple-pm-bus.c                        | 51 +++++++++++++++++++++
+>  4 files changed, 144 insertions(+), 27 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/bus/simple-pm-bus.txt
+>  create mode 100644 drivers/bus/simple-pm-bus.c
+> 
+> -- 
+> 1.9.1
+> 
+> Gr{oetje,eeting}s,
+> 
+> 						Geert
+> 
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+> 							    -- Linus Torvalds
 > 
