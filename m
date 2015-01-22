@@ -1,46 +1,73 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 22 Jan 2015 11:05:26 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC sh73a0 DT PM Updates for v3.20
-In-Reply-To: <20150122013525.GE31815@quad.lixom.net>
-References: <cover.1421716413.git.horms+renesas@verge.net.au>
- <20150122013525.GE31815@quad.lixom.net>
-Message-ID: <20150122020526.GC29564@verge.net.au>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 22 Jan 2015 11:25:59 +0900
+Subject: [PATCH repost] ARM: shmobile: r8a7794: Correct SDHI base address,
+ clock labels and output-names
+Message-ID: <20150122022559.GC31170@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 21, 2015 at 05:35:25PM -0800, Olof Johansson wrote:
-> On Tue, Jan 20, 2015 at 10:27:43AM +0900, Simon Horman wrote:
-> > Hi Olof, Hi Kevin, Hi Arnd,
-> > 
-> > Please consider these Renesas ARM based SoC sh73a0 DT PM updates for v3.20.
-> > 
-> > This pull request is based on a merge of:
-> > 
-> > * "[GIT PULL] Third Round of Renesas ARM Based SoC Updates for v3.20",
-> >   tagged as renesas-soc3-for-v3.20, which I have sent a pull request for.
-> > 
-> > * "[GIT PULL] Second Round of Renesas ARM Based SoC DT Updates for v3.20",
-> >   tagged as renesas-dt2-for-v3.20, which I have sent a pull request for.
-> > 
-> > My understanding from to Geert Uytterhoeven both of the above are required
-> > in order for the system to remain bootable.
-> > 
-> > 
-> > The following changes since commit 2e828caaf311b5990c652e281d0ffceea382ae16:
-> > 
-> >   Merge branch 'dt-for-v3.20' into sh73a0-dt-pm-for-v3.20.base (2015-01-16 11:07:31 +0900)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-sh73a0-dt-pm-for-v3.20
-> > 
-> > for you to fetch changes up to 61837def3c23ba2ac662fd26c77979e072deb2e0:
-> > 
-> >   ARM: shmobile: sh73a0 dtsi: Add PM domain support (2015-01-16 11:07:59 +0900)
-> 
-> Same here, tag gone, based on previous branch that we wanted redone. Just
-> replying so I know I looked at it, etc.
+* Correct base address of SD3 div6 clk.
+* Update div6 labels and MSTP output names
+  There appears to have been some inconsistency and confusion here as on
+  the r8a7790 these clocks are referred to as SD(HI)1 and SD(HI)2 while on
+  the r8a7791 and r8a7794 they are referred to as SD(HI)2 and SD(HI)3.
 
-Thanks, I was just sending you an email about that.
-It depends indirectly on a pull-request you have asked
-for more work on, so I would like to withdraw this pull-request.
+This has no run-time affect as the clock nodes are not currently used.
+
+Fixes: 8e181633e6ca96049 ("ARM: shmobile: r8a7794: Add SDHI clocks to device tree")
+Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
+---
+* A similar change to update the div6 clock node names and labels,
+  and the MSTP clock output-names is required for the r8a7791.
+  The base addresses appear to be correct there.
+---
+ arch/arm/boot/dts/r8a7794.dtsi | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index 8f78da5..b98534e 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -294,16 +294,16 @@
+ 					     "lb", "qspi", "sdh", "sd0", "z";
+ 		};
+ 		/* Variable factor clocks */
+-		sd1_clk: sd2_clk at e6150078 {
++		sd2_clk: sd2_clk at e6150078 {
+ 			compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
+ 			reg = <0 0xe6150078 0 4>;
+ 			clocks = <&pll1_div2_clk>;
+ 			#clock-cells = <0>;
+ 			clock-output-names = "sd1";
+ 		};
+-		sd2_clk: sd3_clk at e615007c {
++		sd3_clk: sd3_clk at e615026c {
+ 			compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
+-			reg = <0 0xe615007c 0 4>;
++			reg = <0 0xe615026c 0 4>;
+ 			clocks = <&pll1_div2_clk>;
+ 			#clock-cells = <0>;
+ 			clock-output-names = "sd2";
+@@ -518,7 +518,7 @@
+ 		mstp3_clks: mstp3_clks at e615013c {
+ 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
+-			clocks = <&sd2_clk>, <&sd1_clk>, <&cpg_clocks R8A7794_CLK_SD0>,
++			clocks = <&sd3_clk>, <&sd2_clk>, <&cpg_clocks R8A7794_CLK_SD0>,
+ 			         <&mmc0_clk>, <&rclk_clk>, <&hp_clk>, <&hp_clk>;
+ 			#clock-cells = <1>;
+ 			clock-indices = <
+@@ -527,7 +527,7 @@
+ 				R8A7794_CLK_USBDMAC0 R8A7794_CLK_USBDMAC1
+ 			>;
+ 			clock-output-names =
+-			        "sdhi2", "sdhi1", "sdhi0",
++			        "sdhi3", "sdhi2", "sdhi0",
+ 				"mmcif0", "cmt1", "usbdmac0", "usbdmac1";
+ 		};
+ 		mstp7_clks: mstp7_clks at e615014c {
+-- 
+2.1.4
