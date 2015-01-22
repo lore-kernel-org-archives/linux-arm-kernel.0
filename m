@@ -1,32 +1,50 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 22 Jan 2015 09:06:47 +0100
-Subject: [PATCH] ARM: decompressor: remove unused cache flush code
-In-Reply-To: <1421904178-30882-1-git-send-email-yamada.m@jp.panasonic.com>
-References: <1421904178-30882-1-git-send-email-yamada.m@jp.panasonic.com>
-Message-ID: <20150122080647.GX22880@pengutronix.de>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 22 Jan 2015 09:08:04 +0100
+Subject: [PATCH RFC 2/3] power: mxs_power: add driver for mxs power
+ subsystem
+In-Reply-To: <20150121230148.GJ13715@earth.universe>
+References: <1416514477-19190-1-git-send-email-stefan.wahren@i2se.com>
+ <1416514477-19190-3-git-send-email-stefan.wahren@i2se.com>
+ <20150121230148.GJ13715@earth.universe>
+Message-ID: <54C0AFE4.3020701@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Sebastian,
 
-On Thu, Jan 22, 2015 at 02:22:58PM +0900, Masahiro Yamada wrote:
-> As ARM ARM says, the bit 19-16 of ID_MMFR1 is always 0b0000 because
-> ARMv7 requires a hierarchical cache implementation.
-> The line "mcr    p15, 0, r10, c7, c14, 0" is not reachable.
-> 
-> Moreover, the v7_flush_dcache_all in arch/arm/mm/cache-v7.S does not
-> check the ID_MMFR1.
-> 
-> Signed-off-by: Masahiro Yamada <yamada.m@jp.panasonic.com>
-I stumbled about this some time ago, too. The thing is however that the
-__armv7_mmu_cache functions are selected if
-CPUID & 0x000f0000 == 0x000f0000, and that is (AFAIK at present only
-theoretically) not implying that we have an ARMv7 machine. Only that it
-uses the "CPUID Identification Scheme" which is required on ARMv7.
+[add Marek]
+
+Am 22.01.2015 um 00:01 schrieb Sebastian Reichel:
+> Hi Stefan,
+>
+> Sorry for the big delay.
+
+a late answer is better than no answer :)
+
+>
+> On Thu, Nov 20, 2014 at 08:14:36PM +0000, Stefan Wahren wrote:
+>> This patch adds a minimal driver for the Freescale i.MX23, i.MX28
+>> power subsystem. It's required to trigger the probing of the underlying
+>> drivers like on-chip regulators. Additionally the drivers supports
+>> the configuration of the DC-DC clock frequency to avoid possible
+>> interferences.
+> I would expect PLL to be board specific and part of DT. Why is it
+> specified as parameter?
+
+I think the switching frequency of the DC-DC belongs to the
+configuration and don't describe how the hardware is connected. But i
+don't have a problem to change it into a DT property.
+
+Does a common property name exists for the switching frequency or would
+it be vendor specific?
+
+> Apart from that the driver/patch looks fine to me.
+
+In the meantime i made some bugfixes on these patches. Now i think it
+would be better to integrate the on-chip regulator driver into the patch
+series. That would clarify the function of the power driver.
+
+> -- Sebastian
 
 Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Stefan
