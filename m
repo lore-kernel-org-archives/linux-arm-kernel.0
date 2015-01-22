@@ -1,23 +1,25 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Thu, 22 Jan 2015 10:34:05 +0100
-Subject: KVM: CONFIG_LOCK_DEP and CONFIG_LOCK_DETECTOR?
-Message-ID: <1421919245.13638.50.camel@x220>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Thu, 22 Jan 2015 09:34:23 +0000
+Subject: [STLinux Kernel] [PATCH 1/1] i2c: i2c-st: Rename clock reference
+ to something that exists
+In-Reply-To: <1409234523-20240-1-git-send-email-lee.jones@linaro.org>
+References: <1409234523-20240-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20150122093423.GA23580@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mario,
+Hi,
 
-Your commit c64735554c0a ("KVM: arm: Add initial dirty page locking
-support") is included in today's linux-next (ie, next-20150122). I
-noticed because a script I use to check linux-next spotted a minor
-problem with it.
+On Thu, 28 Aug 2014, Lee Jones wrote:
 
-This commit added a comment that mentions CONFIG_LOCK_DEP and
-CONFIG_LOCK_DETECTOR. It seems CONFIG_LOCKDEP and CONFIG_LOCKUP_DETECTOR
-should be used instead. Is a trivial patch to fix these typos queued
-somewhere?
+> CLK_S_ICN_REG_0 hasn't existed for a while now.  This was renamed
+> over a few commits, then finally removed in commit 5aa02b9 (ARM:
+> STi: DT: STiH415: Remove unused CLK_S_ICN_REG_0 fixed clock).
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Thanks,
+Acked-by: Peter Griffin <peter.griffin@linaro.org>
 
+regards,
 
-Paul Bolle
+Peter.
