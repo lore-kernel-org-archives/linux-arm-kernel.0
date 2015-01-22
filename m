@@ -1,31 +1,33 @@
-From: ideal.song@samsung.com (Inha Song)
-Date: Thu, 22 Jan 2015 20:18:01 +0900
-Subject: [alsa-devel] [PATCH v3 3/4] ARM: dts: set clock out parent to XUSBXTI
-In-Reply-To: <1421925482-15861-1-git-send-email-ideal.song@samsung.com>
-References: <1421925482-15861-1-git-send-email-ideal.song@samsung.com>
-Message-ID: <1421925482-15861-4-git-send-email-ideal.song@samsung.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 22 Jan 2015 11:21:32 +0000
+Subject: [PATCH] arm64: dts: add baud rate to Juno stdout-path
+Message-ID: <d0f44fbb7ffc85806ab00d7e54a64161ef79cad7.1421924801.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set clock out parent to XUSBXTI.
+Without explicit command-line parameters, the Juno UART ends up running
+at 57600 baud in the kernel, which is at odds with the 115200 baud used
+by the rest of the firmware. Since commit 7914a7c5651a5161 now lets us
+fix this by specifying default options in stdout-path, do so.
 
-Signed-off-by: Inha Song <ideal.song@samsung.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- arch/arm/boot/dts/exynos4.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/boot/dts/arm/juno.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-index b8168f1..020bbaf 100644
---- a/arch/arm/boot/dts/exynos4.dtsi
-+++ b/arch/arm/boot/dts/exynos4.dtsi
-@@ -141,6 +141,8 @@
- 	pmu_system_controller: system-controller at 10020000 {
- 		compatible = "samsung,exynos4210-pmu", "syscon";
- 		reg = <0x10020000 0x4000>;
-+		assigned-clocks = <&pmu_system_controller 0>;
-+		assigned-clock-parents =  <&clock CLK_XUSBXTI>;
+diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+index cb3073e..d429129 100644
+--- a/arch/arm64/boot/dts/arm/juno.dts
++++ b/arch/arm64/boot/dts/arm/juno.dts
+@@ -22,7 +22,7 @@
  	};
  
- 	dsi_0: dsi at 11C80000 {
+ 	chosen {
+-		stdout-path = &soc_uart0;
++		stdout-path = "serial0:115200n8";
+ 	};
+ 
+ 	psci {
 -- 
-2.0.0.390.gcb682f8
+1.9.1
