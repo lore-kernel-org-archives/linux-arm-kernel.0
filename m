@@ -1,118 +1,91 @@
-From: r.peniaev@gmail.com (Roman Peniaev)
-Date: Thu, 22 Jan 2015 10:24:22 +0900
-Subject: [PATCH 1/2] ARM: entry-common: fix forgotten set of
- thread_info->syscall
-In-Reply-To: <CAGXu5jKzif=vp6gn5ZtrTx-JTN367qFphobnt9s=awbaafwoUw@mail.gmail.com>
-References: <CAGXu5j+O6znN=7-gc3PqwqFA5MFRPLGBUzabOmQjWn_9WTjvpg@mail.gmail.com>
- <CACZ9PQUEprgKrpHazDULA5mf-OaoX=MAjEeWdspZTXT_+iUKWw@mail.gmail.com>
- <20150116155923.GK12302@n2100.arm.linux.org.uk>
- <CACZ9PQUVFtCQg6XjDbokEPy_R2fZcHiq6+EEUZnx4FVfpfZxJg@mail.gmail.com>
- <20150116161752.GL12302@n2100.arm.linux.org.uk>
- <CAGXu5j+XHFNyhaBndQr1Q2uthsFP9ZQGbaw5hofDmXyKXZ-H5g@mail.gmail.com>
- <CAGXu5j+9p1T29NoHnCNywd0T=H2mzWhCou5nSRfXZktEOC7_=A@mail.gmail.com>
- <20150119092002.GA32131@arm.com>
- <CAGXu5jJ8vphdjbqy7OojE=V70vLPs2impJ6i561JafrLYXxvbw@mail.gmail.com>
- <20150120224518.GL26493@n2100.arm.linux.org.uk>
- <20150120230458.GM26493@n2100.arm.linux.org.uk>
- <CAGXu5jKzif=vp6gn5ZtrTx-JTN367qFphobnt9s=awbaafwoUw@mail.gmail.com>
-Message-ID: <CACZ9PQXd_UpnDjgdvG884OpVb_oH_VtZB4Ka9K2Ex6JM4zecyQ@mail.gmail.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Thu, 22 Jan 2015 09:30:26 +0800
+Subject: [PATCH v4 2/2] I2C: mediatek: Add driver for MediaTek I2C
+ controller
+In-Reply-To: <20150121153131.GV22880@pengutronix.de>
+References: <1421404418-50718-1-git-send-email-eddie.huang@mediatek.com>
+ <1421404418-50718-3-git-send-email-eddie.huang@mediatek.com>
+ <20150118101816.GF22880@pengutronix.de>
+ <1421810004.15468.825.camel@mtksdaap41>
+ <1421821809.11671.117.camel@mtksdaap41>
+ <20150121081519.GS22880@pengutronix.de>
+ <1421844580.11671.145.camel@mtksdaap41>
+ <20150121153131.GV22880@pengutronix.de>
+Message-ID: <1421890226.5693.4.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 22, 2015 at 8:32 AM, Kees Cook <keescook@chromium.org> wrote:
-> On Tue, Jan 20, 2015 at 3:04 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Tue, Jan 20, 2015 at 10:45:19PM +0000, Russell King - ARM Linux wrote:
->>> Well, the whole question is this: is restarting a system call like
->>> usleep() really a separate system call, or is it a kernel implementation
->>> detail?
->>>
->>> If you wanted seccomp to see this, what would be the use case?  Why
->>> would seccomp want to block this syscall?  Does it make sense for
->>> seccomp to block this syscall when it doesn't block something like
->>> usleep() and then have usleep() fail just because the thread received
->>> a signal?
->>>
->>> I personally regard the whole restart system call thing as a purely
->>> kernel internal thing which should not be exposed to userland.  If
->>> we decide that it should be exposed to userland, then it becomes part
->>> of the user ABI, and it /could/ become difficult if we needed to
->>> change it in future - and I'd rather not get into the "oh shit, we
->>> can't change it because that would break app X" crap.
->>
->> Here's a scenario where it could become a problem:
->>
->> Let's say that we want to use seccomp to secure some code which issues
->> system calls.  We determine that the app uses system calls which don't
->> result in the restart system call being issued, so we decide to ask
->> seccomp to block the restart system call.  Some of these system calls
->> that the app was using are restartable system calls.
->>
->> When these system calls are restarted, what we see via ptrace etc is
->> that the system call simply gets re-issued as its own system call.
->>
->> In a future kernel version, we decide that we could really do with one
->> of those system calls using the restart block feature, so we arrange
->> for it to set up the restart block, and return -ERESTART_BLOCK.  That's
->> fine for most applications, but this app now breaks.
->>
->> The side effect of that breakage is that we have to revert that kernel
->> change - because we've broken userland, and that's simply not allowed.
->>
->> Now look at the alternative: we don't make the restart syscall visible.
->> This means that we hide that detail, and we actually reflect the
->> behaviour that we've had for the other system call restart mechanisms,
->> and we don't have to fear userspace breakage as a result of switching
->> from one restart mechanism to another.
->>
->> I am very much of the opinion that we should be trying to limit the
->> exposure of inappropriate kernel internal details to userland, because
->> userland has a habbit of becoming reliant on them, and when it does,
->> it makes kernel maintanence unnecessarily harder.
->
-> I totally agree with you. :) My question here is more about what we
-> should do with what we currently have since we have some unexpected
-> combinations.
->
-> There is already an __NR_restart_syscall syscall and it seems like
-> it's already part of the userspace ABI:
->  - it is possible to call it from userspace directly
->  - seccomp "sees" it
->  - ptrace doesn't see it
->
-> Native ARM64 hides the restart from both seccomp and ptrace, and this
-> seems like the right idea, except that restart_syscall is still
-> callable from userspace. I don't think there's a way to make that
-> vanish, which means we'll always have an exposed syscall. If anything
-> goes wrong with it (which we've been quite close to recently[1]),
-> there would be no way to have seccomp filter it.
->
-> So, at the least, I'd like arm64 to NOT hide restart_syscall from
-> seccomp, and at best I'd like both arm and arm64 to (somehow) entirely
-> remove restart_syscall from the userspace ABI so it wouldn't need to
-> be filtered, and wouldn't become a weird ABI hiccup as you've
-> described.
->
-> I fail to imagine a way to remove restart_syscall from userspace, so
-> I'm left with wanting parity of behavior between ARM and ARM64 (and
-> x86). What's the right way forward?
 
-My sufferings are an opposite of what seccompt expects: currently I do
-not see any possible way (from userspace) to get syscall number which was
-restarted, because at some given time userspace checks the procfs
-syscall file and sees NR_restart there, without any chance to understand
-what exactly was restarted (I am talking about some kind of debugging
-tool which does dead-lock analysis of stuck tasks).
+Hi,
 
-I totally agree with Russell not to provide kernel guts to userspace,
-but it is already done.  Too late.
+On Wed, 2015-01-21 at 16:31 +0100, Uwe Kleine-K?nig wrote:
+> Hello,
+> 
+> On Wed, Jan 21, 2015 at 08:49:40PM +0800, Yingjoe Chen wrote:
+> > On Wed, 2015-01-21 at 09:15 +0100, Uwe Kleine-K?nig wrote:
+<...>
+> > > > > > > +static int mtk_i2c_remove(struct platform_device *pdev)
+> > > > > > > +{
+> > > > > > > +	struct mtk_i2c *i2c = platform_get_drvdata(pdev);
+> > > > > > > +
+> > > > > > > +	i2c_del_adapter(&i2c->adap);
+> > > > > > > +	free_i2c_dma_bufs(i2c);
+> > > > > > > +	platform_set_drvdata(pdev, NULL);
+> > > > > > > +
+> > > > > > Here you need to make sure that no irq is running when i2c_del_adapter
+> > > > > > is called.
+> > > > > OK, add check here
+> > > > 
+> > > > I thought after i2c_del_adapter() is complete, all i2c_transfer for this
+> > > > adapter is completed. If this is true, then i2c clock is already off and
+> > > > we won't have any on-going transfer/pending irq.
+> > > Consider that there is an ongoing transaction and before it completes
+> > > the adapter-device is unbound from the driver. Then i2c_del_adapter is
+> > > called which frees the resources managed by the core, then the device's
+> > > completion irq triggers and the freed adapter is used which probably
+> > > results in an oops.
+> > 
+> > Not sure if I missed anything. i2c_transfer() is a synchronize call. If
+> > we fixed timeout issue you mentioned in mtk_i2c_transfer(), it will turn
+> > off clock before it return, which disable any transaction and clear all
+> > pending irq.
+> There is no synchronization to prevent unbinding the i2c-bus device
+> while there is a i2c transfer on the wire. i2c_del_adapter only takes
+> i2c-core.c's &core_lock while i2c_transfer takes &adapter->bus_lock.
+> If you want to test for it: do something like that:
+> 
+> 	while true; do dd if=/sys/bus/i2c/.../eeprom of=/dev/null; done
+> 
+> and while this is running do:
+> 
+> 	cd /sys/bus/platform/drivers/mt-i2c
+> 	while true; do
+> 		echo 1100d000.i2c > unbind;
+> 		sleep 1;
+> 		echo 1100d000.i2c > bind;
+> 		sleep 1;
+> 	done
+>  
+> > Your scenario can only happens when one thread is still running in
+> > i2c_transfer/algo->master_xfer and the other thread is trying to remove
+> > the device. If that happened, then every device data access in
+> > mtk_i2c_transfer might cause oops. I looked at some i2c drivers and
+> > can't find any checking for this case, I can't find anything prevent i2c
+> > device removal before pending i2c_transfer complete either. Would you
+> > give me an example?
+> I just noticed that even "my" driver is affected. If the above recipe
+> makes your driver barf there is something to fix, if not ... hmm, then
+> maybe there is more synchronization than I'm aware of or my recipe is
+> wrong.
+> 
+> At least another driver author believed me:
+> http://thread.gmane.org/gmane.linux.drivers.i2c/21531/focus=21662
 
-So probably there is a need to split syscall on two numbers:
-real and effective.  Real number we have right now on x86.
+If there is no synchronization mechanism then every driver is affected.
+We should add the check in the core instead of fixing it in every
+driver. We could take the bus_lock in i2c_del_adapter() and check if the
+adapter is removed in __i2c_transfer(), this should fix the problem.
 
-And this should be done for both ptrace and procfs syscall file.
-(am I right that only for ARM we already have PTRACE_SET_SYSCALL?
- seems we can add also real/effective getter)
+Wolfram, what do you think about this? Is there anything we are missing?
 
---
-Roman
+Joe.C
