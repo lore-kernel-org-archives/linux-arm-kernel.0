@@ -1,120 +1,111 @@
 From: sumit.semwal@linaro.org (Sumit Semwal)
-Date: Thu, 22 Jan 2015 09:15:08 +0530
-Subject: [PATCH RESEND] dma-mapping: tidy up dma_parms default handling
-In-Reply-To: <54B4FF30.2030607@samsung.com>
-References: <ffdc5455d698d2525f2d126d0adabf9418fd76b1.1418990609.git.robin.murphy@arm.com>
- <54B4FF30.2030607@samsung.com>
-Message-ID: <CAO_48GHXaNE4m5TErg0=nkDZrvi65mp8u4h7ao011OL4mhSDUw@mail.gmail.com>
+Date: Thu, 22 Jan 2015 09:16:01 +0530
+Subject: [RFCv2 1/2] device: add dma_params->max_segment_count
+In-Reply-To: <54BFF679.6010705@arm.com>
+References: <1421813807-9178-1-git-send-email-sumit.semwal@linaro.org>
+ <1421813807-9178-2-git-send-email-sumit.semwal@linaro.org>
+ <54BFF679.6010705@arm.com>
+Message-ID: <CAO_48GHLJKLxDxuPWbcTKP6T1Vdt0RLbYYncRihepL5H7KET=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+Hi Robin!
 
-On 13 January 2015 at 16:49, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> Hello,
+On 22 January 2015 at 00:26, Robin Murphy <robin.murphy@arm.com> wrote:
+> Hi Sumit,
 >
-> On 2015-01-09 17:56, Robin Murphy wrote:
+>
+> On 21/01/15 04:16, Sumit Semwal wrote:
 >>
->> Many DMA controllers and other devices set max_segment_size to
->> indicate their scatter-gather capability, but have no interest in
->> segment_boundary_mask. However, the existence of a dma_parms structure
->> precludes the use of any default value, leaving them as zeros (assuming
->> a properly kzalloc'ed structure). If a well-behaved IOMMU (or SWIOTLB)
->> then tries to respect this by ensuring a mapped segment does not cross
->> a zero-byte boundary, hilarity ensues.
+>> From: Rob Clark <robdclark@gmail.com>
 >>
->> Since zero is a nonsensical value for either parameter, treat it as an
->> indicator for "default", as might be expected. In the process, clean up
->> a bit by replacing the bare constants with slightly more meaningful
->> macros and removing the superfluous "else" statements.
+>> For devices which have constraints about maximum number of segments in
+>> an sglist.  For example, a device which could only deal with contiguous
+>> buffers would set max_segment_count to 1.
 >>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->
->
-> Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
-
-Please feel free to add my
-Reviewed-by: Sumit Semwal <sumit.semwal@linaro.org>
->
+>> The initial motivation is for devices sharing buffers via dma-buf,
+>> to allow the buffer exporter to know the constraints of other
+>> devices which have attached to the buffer.  The dma_mask and fields
+>> in 'struct device_dma_parameters' tell the exporter everything else
+>> that is needed, except whether the importer has constraints about
+>> maximum number of segments.
+>>
+>> Signed-off-by: Rob Clark <robdclark@gmail.com>
+>>   [sumits: Minor updates wrt comments on the first version]
+>> Signed-off-by: Sumit Semwal <sumit.semwal@linaro.org>
 >> ---
+>>   include/linux/device.h      |  1 +
+>>   include/linux/dma-mapping.h | 19 +++++++++++++++++++
+>>   2 files changed, 20 insertions(+)
 >>
->> Hi, various maintainers from Git logs ;)
->>
->> This one's a bit tricky to find a home for - I think technically it's
->> probably an IOMMU patch, but then the long-underlying problem doesn't
->> seem to have blown up anything until arm64, and my motivation is to
->> make bits of Juno work, which seems to nudge it towards arm64/arm-soc
->> territory. Could anyone suggest which tree is most appropriate?
->>
->> Thanks,
->> Robin.
->>
->>
->>   include/linux/dma-mapping.h | 17 ++++++++++-------
->>   1 file changed, 10 insertions(+), 7 deletions(-)
+>> diff --git a/include/linux/device.h b/include/linux/device.h
+>> index fb50673..a32f9b6 100644
+>> --- a/include/linux/device.h
+>> +++ b/include/linux/device.h
+>> @@ -647,6 +647,7 @@ struct device_dma_parameters {
+>>          * sg limitations.
+>>          */
+>>         unsigned int max_segment_size;
+>> +       unsigned int max_segment_count;    /* INT_MAX for unlimited */
+>>         unsigned long segment_boundary_mask;
+>>   };
 >>
 >> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
->> index c3007cb..99ba736 100644
+>> index c3007cb..38e2835 100644
 >> --- a/include/linux/dma-mapping.h
 >> +++ b/include/linux/dma-mapping.h
->> @@ -141,7 +141,9 @@ static inline void arch_teardown_dma_ops(struct device
->> *dev) { }
->>     static inline unsigned int dma_get_max_seg_size(struct device *dev)
->>   {
->> -       return dev->dma_parms ? dev->dma_parms->max_segment_size : 65536;
->> +       if (dev->dma_parms && dev->dma_parms->max_segment_size)
->> +               return dev->dma_parms->max_segment_size;
->> +       return SZ_64K;
->>   }
->>     static inline unsigned int dma_set_max_seg_size(struct device *dev,
->> @@ -150,14 +152,15 @@ static inline unsigned int
+>> @@ -154,6 +154,25 @@ static inline unsigned int
 >> dma_set_max_seg_size(struct device *dev,
->>         if (dev->dma_parms) {
->>                 dev->dma_parms->max_segment_size = size;
->>                 return 0;
->> -       } else
->> -               return -EIO;
->> +       }
->> +       return -EIO;
+>>                 return -EIO;
 >>   }
->>     static inline unsigned long dma_get_seg_boundary(struct device *dev)
+>>
+>> +#define DMA_SEGMENTS_MAX_SEG_COUNT ((unsigned int) INT_MAX)
+>> +
+>> +static inline unsigned int dma_get_max_seg_count(struct device *dev)
+>> +{
+>> +       return dev->dma_parms ?
+>> +                       dev->dma_parms->max_segment_count :
+>> +                       DMA_SEGMENTS_MAX_SEG_COUNT;
+>> +}
+>
+>
+> I know this copies the style of the existing code, but unfortunately it also
+> copies the subtle brokenness. Plenty of drivers seem to set up a dma_parms
+> struct just for max_segment_size, thus chances are you'll come across a
+> max_segment_count of 0 sooner or later. How badly is that going to break
+> things? I posted a fix recently[1] having hit this problem with
+> segment_boundary_mask in IOMMU code.
+>
+Thanks very much for reviewing this code; and apologies for missing
+your patch that you mentioned here; sure, I will update my patch
+accordingly as well.
+>> +
+>> +static inline int dma_set_max_seg_count(struct device *dev,
+>> +                                               unsigned int count)
+>> +{
+>> +       if (dev->dma_parms) {
+>> +               dev->dma_parms->max_segment_count = count;
+>> +               return 0;
+>> +       } else
+>
+>
+> This "else" is just as unnecessary as the other two I've taken out ;)
+>
+>
+> Robin.
+>
+> [1]:http://article.gmane.org/gmane.linux.kernel.iommu/8175/
+>
+>
+>> +               return -EIO;
+>> +}
+>> +
+>>   static inline unsigned long dma_get_seg_boundary(struct device *dev)
 >>   {
->> -       return dev->dma_parms ?
->> -               dev->dma_parms->segment_boundary_mask : 0xffffffff;
->> +       if (dev->dma_parms && dev->dma_parms->segment_boundary_mask)
->> +               return dev->dma_parms->segment_boundary_mask;
->> +       return DMA_BIT_MASK(32);
->>   }
->>     static inline int dma_set_seg_boundary(struct device *dev, unsigned
->> long mask)
->> @@ -165,8 +168,8 @@ static inline int dma_set_seg_boundary(struct device
->> *dev, unsigned long mask)
->>         if (dev->dma_parms) {
->>                 dev->dma_parms->segment_boundary_mask = mask;
->>                 return 0;
->> -       } else
->> -               return -EIO;
->> +       }
->> +       return -EIO;
->>   }
->>     #ifndef dma_max_pfn
+>>         return dev->dma_parms ?
+>>
 >
 >
-> Best regards
-> --
-> Marek Szyprowski, PhD
-> Samsung R&D Institute Poland
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
 
--- 
-Thanks and regards,
-
-Sumit Semwal
-Kernel Team Lead - Linaro Mobile Group
-Linaro.org ? Open source software for ARM SoCs
+BR,
+Sumit.
