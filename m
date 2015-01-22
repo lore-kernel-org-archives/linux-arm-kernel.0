@@ -1,41 +1,38 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 Jan 2015 16:38:02 -0800
-Subject: [GIT PULL] ARM: STi: DT changes for v3.20, round 1
-In-Reply-To: <54B94C69.5050809@st.com>
-References: <54B94C69.5050809@st.com>
-Message-ID: <20150122003802.GB29014@quad.lixom.net>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 22 Jan 2015 01:40:03 +0100
+Subject: [Request pull] mvebu/fixes #3
+Message-ID: <20150122004003.GA9533@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 06:37:45PM +0100, Maxime Coquelin wrote:
-> Hi Olof, Arnd and Kevin,
-> 
-> Please consider this first round of STi DT updates for v3.20.
-> 
-> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
-> 
->   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.stlinux.com/devel/kernel/linux-sti.git tags/sti-dt-for-v3.20-1
-> 
-> for you to fetch changes up to b26373c0da982f8a29406f10db39e287c1f0696b:
-> 
->   ARM: DT: STi: STiH407: Add DT node for MiPHY28lp (2015-01-16
-> 12:57:12 +0100)
-> 
-> ----------------------------------------------------------------
-> STi DT updates for v3.20, round 1.
-> 
-> Highlights:
-> -----------
->  - Add USB support for STiH410 & STiH407
->  - Add DRM DT nodes for STiH410 & STiH407
->  - Add STiH418 SoC support
->  - Add DT nodes for MiPHY28lp PHY
+Hi Olof
 
-Thanks, merged
+One more fix for 3.19-rc for mvebu, making this the fourth incremental
+pull request.
 
+Thanks
+	Andrew
 
--Olof
+The following changes since commit 8f1e8ee28660018a935c7576b9af8ffe1feab54c:
+
+  ARM: mvebu: completely disable hardware I/O coherency (2015-01-17 11:46:55 -0600)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-3.19-4
+
+for you to fetch changes up to 38bdf45f4aa5cb6186d50a29e6cbbd9d486a1519:
+
+  bus: mvebu-mbus: fix support of MBus window 13 (2015-01-19 15:40:53 -0600)
+
+----------------------------------------------------------------
+mvebu fixes for 3.19. (Part 4)
+
+bus: mvebu-mbus: fix support of MBus window 13
+
+----------------------------------------------------------------
+Andrew Lunn (1):
+      bus: mvebu-mbus: fix support of MBus window 13
+
+ drivers/bus/mvebu-mbus.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
