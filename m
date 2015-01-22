@@ -1,35 +1,62 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 Jan 2015 17:13:35 -0800
-Subject: [PATCH 8/8] msm: scm: Move the scm driver to drivers/soc/qcom
-In-Reply-To: <1407202310-3359-9-git-send-email-sboyd@codeaurora.org>
-References: <1407202310-3359-1-git-send-email-sboyd@codeaurora.org>
- <1407202310-3359-9-git-send-email-sboyd@codeaurora.org>
-Message-ID: <CAOesGMh1HE+hMP0VWr2vaHCp2itVjpQeiiFL6r9WeJUFes5tvw@mail.gmail.com>
+Date: Wed, 21 Jan 2015 17:15:21 -0800
+Subject: [GIT PULL] qcom SoC changes for v3.20
+In-Reply-To: <alpine.DEB.2.02.1501191226010.2973@galak-ubuntu.qualcomm.com>
+References: <alpine.DEB.2.02.1501191226010.2973@galak-ubuntu.qualcomm.com>
+Message-ID: <20150122011521.GA31815@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I just saw this in the pull request from Kumar, so this is a bit late
-w.r.t. to the patch, but so was his merging of the code. :)
+Hi,
 
 
+On Mon, Jan 19, 2015 at 12:27:15PM -0600, Kumar Gala wrote:
+> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+> 
+>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-soc-for-3.20
+> 
+> for you to fetch changes up to ae0a6075c046f9c8dbac18f53a779592f97b402e:
+> 
+>   soc: qcom: scm: Clarify boot interface (2015-01-19 11:55:12 -0600)
+> 
+> ----------------------------------------------------------------
+> Qualcomm ARM Based SoC Updates for v3.20
+> 
+> * Moved scm support into drivers/soc/qcom (allows for use by drivers)
+> * Various bug fixes and minor feature additions to scm code
+> * Added big-endian support to debug MSM uart
+> * Added big-endian support to ARCH_QCOM
+> 
+> ----------------------------------------------------------------
+> Lina Iyer (2):
+>       ARM: qcom: Add SCM warmboot flags for quad core targets.
+>       soc: qcom: scm: Move scm-boot files to drivers/soc and include/soc
+> 
+> Olav Haugan (1):
+>       ARM: qcom: scm: Add logging of actual return code from scm call
+> 
+> Saravana Kannan (1):
+>       ARM: qcom: scm: Add API to query for service/command availability.
+> 
+> Stephen Boyd (9):
+>       ARM: debug: Update MSM and QCOM DEBUG_LL help
+>       ARM: debug: msm: Support big-endian CPUs
+>       ARM: qcom: Select ARCH_SUPPORTS_BIG_ENDIAN
+>       ARM: qcom: scm: Fix incorrect cache invalidation
+>       ARM: qcom: scm: Get cacheline size from CTR
+>       ARM: qcom: scm: Add a feat version query API
+>       soc: qcom: scm: Move the scm driver to drivers/soc/qcom
 
-On Mon, Aug 4, 2014 at 6:31 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> Architectural changes in the ARM Linux kernel tree mandate
-> the eventual removal of the mach-* directories. Move the
-> scm driver to drivers/soc/qcom and the scm header to
-> include/soc/qcom to support that removal.
+I replied on the patch here just now. This isn't the right thing to do,
+as far as I can tell.
 
-The idea is not blindly move one dumping ground to a new place.
-
-I see only two exported functions from scm.c:
-
-scm_get_version: This is not used anywhere in the kernel and can just be removed
-scm_call: This is used by scm-boot, and would be better to translate
-over to firmware_ops in the first place.
-
-
-So, can you please rework this with the above in mind instead of just
-moving the files over? Thanks!
+Seems like sending a fresh request with the material besides the move
+to drivers/soc should be mergeable though, so feel free to do that while
+the rest is hashed out.
 
 
 -Olof
