@@ -1,36 +1,97 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 Jan 2015 17:43:01 -0800
-Subject: [GIT PULL] DaVinci cleanups for v3.20
-In-Reply-To: <1421766325-28293-2-git-send-email-nsekhar@ti.com>
-References: <1421766325-28293-1-git-send-email-nsekhar@ti.com>
- <1421766325-28293-2-git-send-email-nsekhar@ti.com>
-Message-ID: <20150122014301.GG31815@quad.lixom.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 21 Jan 2015 17:46:35 -0800
+Subject: [PATCH v11 3/4] clk: Add rate constraints to clocks
+In-Reply-To: <1421847039-29544-4-git-send-email-tomeu.vizoso@collabora.com>
+References: <1421847039-29544-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1421847039-29544-4-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <20150122014635.GI27202@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 20, 2015 at 08:35:25PM +0530, Sekhar Nori wrote:
-> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+On 01/21, Tomeu Vizoso wrote:
+> Adds a way for clock consumers to set maximum and minimum rates. This
+> can be used for thermal drivers to set minimum rates, or by misc.
+> drivers to set maximum rates to assure a minimum performance level.
 > 
->   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+> Changes the signature of the determine_rate callback by adding the
+> parameters min_rate and max_rate.
 > 
-> are available in the git repository at:
+> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.20/cleanup
-> 
-> for you to fetch changes up to 65010564d698ef99b24b04a16e7bcabcd6171c64:
-> 
->   ARM: davinci: Remove CDCE949 driver (2015-01-20 19:29:58 +0530)
-> 
-> ----------------------------------------------------------------
-> Removes an unused function and the unused
-> support for CDCE949 clock generator.
-> 
-> ----------------------------------------------------------------
-> Rickard Strandqvist (2):
->       ARM: davinci: serial.c: remove unused serial_read_reg()
->       ARM: davinci: Remove CDCE949 driver
+> ---
+> v11:	* Recalculate the rate before putting the reference to clk_core
+> 	* Don't recalculate the rate when freeing the per-user clock
+> 	in the initialization error paths
+> 	* Move __clk_create_clk to be next to __clk_free_clk for more
+> 	comfortable reading
 
-Thanks, merged into next/cleanups.
+Can we do this in the previous patch where we introduce the
+function?
 
+> @@ -2143,9 +2314,16 @@ struct clk *__clk_register(struct device *dev, struct clk_hw *hw)
+>  	else
+>  		clk->owner = NULL;
+>  
+> +	INIT_HLIST_HEAD(&clk->clks);
+> +
+> +	hw->clk = __clk_create_clk(hw, NULL, NULL);
+> +
+>  	ret = __clk_init(dev, hw->clk);
+> -	if (ret)
+> +	if (ret) {
+> +		__clk_free_clk(hw->clk);
+> +		hw->clk = NULL;
+>  		return ERR_PTR(ret);
+> +	}
+>  
+>  	return hw->clk;
+>  }
+> @@ -2210,12 +2388,16 @@ struct clk *clk_register(struct device *dev, struct clk_hw *hw)
+>  		}
+>  	}
+>  
+> +	INIT_HLIST_HEAD(&clk->clks);
+> +
+>  	hw->clk = __clk_create_clk(hw, NULL, NULL);
+>  	ret = __clk_init(dev, hw->clk);
+>  	if (!ret)
+>  		return hw->clk;
+>  
+> -	kfree(hw->clk);
+> +	__clk_free_clk(hw->clk);
+> +	hw->clk = NULL;
 
--Olof
+Shouldn't we be assigning to NULL in the previous patch (same
+comment for __clk_register)?
+
+>  fail_parent_names_copy:
+>  	while (--i >= 0)
+>  		kfree(clk->parent_names[i]);
+> @@ -2420,7 +2602,14 @@ void __clk_put(struct clk *clk)
+>  	if (!clk || WARN_ON_ONCE(IS_ERR(clk)))
+>  		return;
+>  
+> +	clk_prepare_lock();
+> +	hlist_del(&clk->child_node);
+> +	clk_prepare_unlock();
+> +
+> +	clk_core_set_rate(clk->core, clk->core->req_rate);
+> +
+>  	clk_core_put(clk->core);
+> +
+
+Sad that we take the lock 3 times during __clk_put(). We should
+be able to do it only once if we have a lockless
+clk_core_set_rate() function and put the contents of
+clk_core_put() into this function. Actually we need to do that to
+be thread safe with clk->core->req_rate changing. We can call the
+same function in clk_set_rate_range() too so that we don't have
+to deal with recursive locking there.
+
+>  	kfree(clk);
+>  }
+>  
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
