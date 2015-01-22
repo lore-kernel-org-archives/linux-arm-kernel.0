@@ -1,107 +1,51 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu, 22 Jan 2015 15:42:28 +0100
-Subject: [PATCH v11 3/4] clk: Add rate constraints to clocks
-In-Reply-To: <20150122014635.GI27202@codeaurora.org>
-References: <1421847039-29544-1-git-send-email-tomeu.vizoso@collabora.com>
- <1421847039-29544-4-git-send-email-tomeu.vizoso@collabora.com>
- <20150122014635.GI27202@codeaurora.org>
-Message-ID: <54C10C54.6070500@collabora.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 22 Jan 2015 14:46:09 +0000
+Subject: [PATCH v7 13/17] ARM64 / ACPI: Add GICv2 specific ACPI boot
+ support
+In-Reply-To: <54C0F133.8060901@linaro.org>
+References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
+ <1421247905-3749-14-git-send-email-hanjun.guo@linaro.org>
+ <54B8F2E3.80306@arm.com>
+ <CACxGe6tBb8L8upS3zenZbrOc_c0E=MA=DqLjkSezEbregaAaaA@mail.gmail.com>
+ <54B92245.6080306@arm.com> <54C0F133.8060901@linaro.org>
+Message-ID: <54C10D31.1090203@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/22/2015 02:46 AM, Stephen Boyd wrote:
-> On 01/21, Tomeu Vizoso wrote:
->> Adds a way for clock consumers to set maximum and minimum rates. This
->> can be used for thermal drivers to set minimum rates, or by misc.
->> drivers to set maximum rates to assure a minimum performance level.
->>
->> Changes the signature of the determine_rate callback by adding the
->> parameters min_rate and max_rate.
->>
->> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
->>
->> ---
->> v11:	* Recalculate the rate before putting the reference to clk_core
->> 	* Don't recalculate the rate when freeing the per-user clock
->> 	in the initialization error paths
->> 	* Move __clk_create_clk to be next to __clk_free_clk for more
->> 	comfortable reading
+Hi Hanjun,
+
+On 22/01/15 12:46, Hanjun Guo wrote:
+> Hi Marc,
 > 
-> Can we do this in the previous patch where we introduce the
-> function?
-
-Ok.
-
->> @@ -2143,9 +2314,16 @@ struct clk *__clk_register(struct device *dev, struct clk_hw *hw)
->>  	else
->>  		clk->owner = NULL;
->>  
->> +	INIT_HLIST_HEAD(&clk->clks);
->> +
->> +	hw->clk = __clk_create_clk(hw, NULL, NULL);
->> +
->>  	ret = __clk_init(dev, hw->clk);
->> -	if (ret)
->> +	if (ret) {
->> +		__clk_free_clk(hw->clk);
->> +		hw->clk = NULL;
->>  		return ERR_PTR(ret);
->> +	}
->>  
->>  	return hw->clk;
->>  }
->> @@ -2210,12 +2388,16 @@ struct clk *clk_register(struct device *dev, struct clk_hw *hw)
->>  		}
->>  	}
->>  
->> +	INIT_HLIST_HEAD(&clk->clks);
->> +
->>  	hw->clk = __clk_create_clk(hw, NULL, NULL);
->>  	ret = __clk_init(dev, hw->clk);
->>  	if (!ret)
->>  		return hw->clk;
->>  
->> -	kfree(hw->clk);
->> +	__clk_free_clk(hw->clk);
->> +	hw->clk = NULL;
+> We (Tomasz, Suravee and me) are working on supporting stacked domain on
+> ACPI, and rework GIC ACPI related patch, before we going further, we
+> need your guidance to see if we are going the right direction.
 > 
-> Shouldn't we be assigning to NULL in the previous patch (same
-> comment for __clk_register)?
+>    - You said that we spread GIC related code every where, so how
+>      about put all the ACPI related GIC init code in one file under
+>      drivers/irqchip/ with name irq-gic-acpi.c?
 
-Agreed, though I have gone ahead and removed __clk_register completely
-because AFAICS it has never been used.
+That would certainly be an improvement.
 
->>  fail_parent_names_copy:
->>  	while (--i >= 0)
->>  		kfree(clk->parent_names[i]);
->> @@ -2420,7 +2602,14 @@ void __clk_put(struct clk *clk)
->>  	if (!clk || WARN_ON_ONCE(IS_ERR(clk)))
->>  		return;
->>  
->> +	clk_prepare_lock();
->> +	hlist_del(&clk->child_node);
->> +	clk_prepare_unlock();
->> +
->> +	clk_core_set_rate(clk->core, clk->core->req_rate);
->> +
->>  	clk_core_put(clk->core);
->> +
-> 
-> Sad that we take the lock 3 times during __clk_put(). We should
-> be able to do it only once if we have a lockless
-> clk_core_set_rate() function and put the contents of
-> clk_core_put() into this function. Actually we need to do that to
-> be thread safe with clk->core->req_rate changing. We can call the
-> same function in clk_set_rate_range() too so that we don't have
-> to deal with recursive locking there.
+>    - ACPI only support one GICD for now, so we assume that there
+>     only one gicv2/v3 core domain and every device not using MSI
+>      will refer to that irqdomain in default.
 
-Sweet, done.
+That's good enough, provided that nobody comes up with any form of
+chained interrupt controller (in whatever way that's implemented). ACPI
+doesn't seem to cater for that anyway.
 
->>  	kfree(clk);
->>  }
->>  
-> 
+But default domains are only a quick optimization (it is only there to
+cope with code that didn't know about irq domains at all). What we need
+is a proper integration of the ACPI namespace in the irq domain code.
+Being able to lookup a domain by ACPI table, for example (just like
+irq_find_host returns the domain associated to a DT node).
+
+This would ensure that we can reuse most of the existing code (stacked
+domains, per-device MSI domains [WIP]) without too much effort.
 
 Thanks,
 
-Tomeu
+	M.
+-- 
+Jazz is not dead. It just smells funny...
