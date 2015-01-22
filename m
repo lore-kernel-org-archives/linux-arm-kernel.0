@@ -1,35 +1,87 @@
-From: drake@endlessm.com (Daniel Drake)
-Date: Thu, 22 Jan 2015 14:55:51 -0600
-Subject: CMA region and highmem
-In-Reply-To: <53F5BCC3.2060609@samsung.com>
-References: <20140813191811.GP30401@n2100.arm.linux.org.uk>
- <53F44858.2070906@samsung.com>
- <CAD8Lp47W9UcA7CHSK9xia_b9opLv-5wi_9Omj2DThRo4wYkcNw@mail.gmail.com>
- <53F5BCC3.2060609@samsung.com>
-Message-ID: <CAD8Lp46rqXwQR5L=-Tt_iL0CPDsKt+hVYU7-viS0uHvmVXLqng@mail.gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 22 Jan 2015 15:03:44 -0600
+Subject: [PATCH 00/16] PCI generic configuration space accessors
+In-Reply-To: <1420857290-8373-1-git-send-email-robh@kernel.org>
+References: <1420857290-8373-1-git-send-email-robh@kernel.org>
+Message-ID: <20150122210344.GE13072@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 21, 2014 at 3:32 AM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> You are right, but frankly drivers doing large DMA allocations should take
-> advantage of DMA_ATTR_NO_KERNEL_MAPPING DMA attribute, because all they
-> usually do is just mapping those buffers to userspace. For a bit complex
-> example, see drivers/gpu/drm/exynos/exynos_drm_buf.c or
-> drivers/gpu/drm/msm/msm_drv.c.
+On Fri, Jan 09, 2015 at 08:34:34PM -0600, Rob Herring wrote:
+> This series adds common accessor functions for PCI configuration space
+> accesses. This supports most PCI hosts with memory mapped configuration
+> space like ECAM or hosts with memory mapped address/data registers. ECAM
+> is not generically supported by this series, but could be added on top
+> of this. While some hosts have standard address decoding which could be 
+> common as well, the various checks on bus numbers and device numbers are 
+> quite varied. It is unclear how much of that is really necessary or 
+> could be common. 
+> 
+> The first 4 patches are preparatory cleanup. Patch 5 introduces the
+> common accessors. The remaining patches convert several PCI host
+> controllers. This is in no way a complete list of host controllers. The
+> conversion of more hosts should be possible. The Designware controller
+> in particular should be able to be converted, but its config space
+> accessors are a mess of override-able functions that I've not gotten my
+> head around.
+> 
+> This series is available here [1].
+> 
+> Rob
+> 
+> [1] git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git pci-config-access
+> 
+> Rob Herring (16):
+>   frv: add struct pci_ops member names to initialization
+>   mips: add struct pci_ops member names to initialization
+>   mn10300: add struct pci_ops member names to initialization
+>   powerpc: add struct pci_ops member names to initialization
+>   pci: introduce common pci config space accessors
+>   ARM: cns3xxx: convert PCI to use generic config accesses
+>   ARM: integrator: convert PCI to use generic config accesses
+>   ARM: sa1100: convert PCI to use generic config accesses
+>   ARM: ks8695: convert PCI to use generic config accesses
+>   powerpc: fsl_pci: convert PCI to use generic config accesses
+>   powerpc: powermac: convert PCI to use generic config accesses
+>   pci/host: generic: convert to use generic config accesses
+>   pci/host: rcar-gen2: convert to use generic config accesses
+>   pci/host: tegra: convert to use generic config accesses
+>   pci/host: xgene: convert to use generic config accesses
+>   pci/host: xilinx: convert to use generic config accesses
+> 
+>  arch/arm/mach-cns3xxx/pcie.c                   |  52 ++----
+>  arch/arm/mach-integrator/pci_v3.c              |  61 +-------
+>  arch/arm/mach-ks8695/pci.c                     |  77 +--------
+>  arch/arm/mach-sa1100/pci-nanoengine.c          |  94 +----------
+>  arch/frv/mb93090-mb00/pci-vdk.c                |   4 +-
+>  arch/mips/pci/pci-bcm1480.c                    |   4 +-
+>  arch/mips/pci/pci-octeon.c                     |   4 +-
+>  arch/mips/pci/pcie-octeon.c                    |  12 +-
+>  arch/mn10300/unit-asb2305/pci.c                |   4 +-
+>  arch/powerpc/platforms/cell/celleb_scc_pciex.c |   4 +-
+>  arch/powerpc/platforms/powermac/pci.c          | 209 +++++--------------------
+>  arch/powerpc/sysdev/fsl_pci.c                  |  46 +-----
+>  drivers/pci/access.c                           |  87 ++++++++++
+>  drivers/pci/host/pci-host-generic.c            |  51 +-----
+>  drivers/pci/host/pci-rcar-gen2.c               |  51 +-----
+>  drivers/pci/host/pci-tegra.c                   |  55 +------
+>  drivers/pci/host/pci-xgene.c                   | 150 ++----------------
+>  drivers/pci/host/pcie-xilinx.c                 |  88 ++---------
+>  include/linux/pci.h                            |  11 ++
+>  19 files changed, 212 insertions(+), 852 deletions(-)
 
-Thanks again for the insight here. Revisiting this topic now:
+Really nice cleanups.  I added these with the acks so far to a pci/config
+branch for v3.20.  I'll update it with more acks if they trickle in.
 
-Looking at DMA_ATTR_NO_KERNEL_MAPPING in latest linus git, this only
-seems to be implemented for IOMMU setups.
-On other setups this flag seems to be ignored, so on such setups, your
-change that tends to place the CMA region in high memory now puts
-pressure on the vmalloc area even when the driver asked for
-NO_KERNEL_MAPPING.
+You've structured it nicely so I can also just drop individual arch pieces
+if necessary.  The pieces that haven't been acked yet (hint, hint):
 
-Is there a good reason why the non-IOMMU codepath doesn't obey
-DMA_ATTR_NO_KERNEL_MAPPING? We ran a quick experiment here
-implementing this (i.e. just bailing out of __alloc_from_contiguous
-before mapping the memory into kernel space) and it seems to work.
+    arch/arm/mach-cns3xxx/pcie.c
+    arch/arm/mach-sa1100/pci-nanoengine.c
+    arch/mn10300/unit-asb2305/pci.c
+    arch/powerpc
 
-Daniel
+In addition, nobody has acked the frv and mips parts, but they're trivial
+(they only add struct member names) that I can apply them without worrying.
+
+Bjorn
