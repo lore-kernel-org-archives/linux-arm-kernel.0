@@ -1,145 +1,127 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Thu, 22 Jan 2015 12:25:00 +0800
-Subject: [PATCH v3] thermal: rockchip: make temperature reporting much
- more accurate
-In-Reply-To: <54C07AD7.9020102@rock-chips.com>
-References: <1421861370-19422-1-git-send-email-wxt@rock-chips.com>
- <1421861370-19422-2-git-send-email-wxt@rock-chips.com>
- <CAGS+omAi+F1_1-8wmDMf9oUq6GCjXu8N4kyeNmKRWv8m3eaCrA@mail.gmail.com>
- <54C07AD7.9020102@rock-chips.com>
-Message-ID: <CAGS+omDdbUBn5swOZ23K3MpjzV3UMk3xABLWxj1SFE+s=FcHQA@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 22 Jan 2015 12:33:14 +0800
+Subject: [PATCH RFC 1/2] Documentation: arm: define DT bindings for
+ system suspend
+In-Reply-To: <20150121135610.GA21950@e102568-lin.cambridge.arm.com>
+References: <1421840155-18990-1-git-send-email-sudeep.holla@arm.com>
+ <1421840155-18990-2-git-send-email-sudeep.holla@arm.com>
+ <20150121212139.1cdc3fd5@xhacker> <20150121213507.695b871b@xhacker>
+ <20150121135610.GA21950@e102568-lin.cambridge.arm.com>
+Message-ID: <20150122123314.0dc44b67@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 22, 2015 at 12:21 PM, Caesar Wang
-<caesar.wang@rock-chips.com> wrote:
->
-> ? 2015?01?22? 12:01, Daniel Kurtz ??:
->
->> On Thu, Jan 22, 2015 at 1:29 AM, Caesar Wang <wxt@rock-chips.com> wrote:
->>>
->>> In general, the kernel should report temperature readings exactly as
->>> reported by the hardware. The cpu / gpu thermal driver works in 5 degree
->>> increments,but we ought to do more accurate. The temperature will do
->>> linear interpolation between the entries in the table.
->>>
->>> Test= $md5sum /dev/zero &
->>> $while true; do grep "" /sys/class/thermal/thermal_zone[1-2]/temp;
->>> sleep .5; done
->>>
->>> e.g. We can get the result as follows:
->>>      /sys/class/thermal/thermal_zone1/temp:39994
->>>      /sys/class/thermal/thermal_zone2/temp:39086
->>>      /sys/class/thermal/thermal_zone1/temp:39994
->>>      /sys/class/thermal/thermal_zone2/temp:39540
->>>      /sys/class/thermal/thermal_zone1/temp:39540
->>>      /sys/class/thermal/thermal_zone2/temp:39540
->>>      /sys/class/thermal/thermal_zone1/temp:39540
->>>      /sys/class/thermal/thermal_zone2/temp:39994
->>>
->>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->>> Reviewed-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
->>>
->>> ---
->>>
->>> Changes in v3:
->>> Suggested-by Daniel Kurtz,
->>> the check doesn't reject "code == 0xfff"
->>> Fixed in rk_tsadcv2_code_to_temp(u32 code)
->>>
->>> Changes in v2:
->>> Reviewed-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
->>>
->>>   drivers/thermal/rockchip_thermal.c | 32
->>> ++++++++++++++++++++++----------
->>>   1 file changed, 22 insertions(+), 10 deletions(-)
->>>
->>> diff --git a/drivers/thermal/rockchip_thermal.c
->>> b/drivers/thermal/rockchip_thermal.c
->>> index 1bcddfc..ce18007 100644
->>> --- a/drivers/thermal/rockchip_thermal.c
->>> +++ b/drivers/thermal/rockchip_thermal.c
->>> @@ -193,19 +193,22 @@ static u32 rk_tsadcv2_temp_to_code(long temp)
->>>
->>>   static long rk_tsadcv2_code_to_temp(u32 code)
->>>   {
->>> -       int high, low, mid;
->>> -
->>> -       low = 0;
->>> -       high = ARRAY_SIZE(v2_code_table) - 1;
->>> -       mid = (high + low) / 2;
->>> +       unsigned int low = 0;
->>> +       unsigned int high = ARRAY_SIZE(v2_code_table) - 1;
->>> +       unsigned int mid = (low + high) / 2;
->>> +       unsigned int num;
->>> +       unsigned long denom;
->>>
->>> +       /* No code available, return callback */
->>>          if (code > v2_code_table[low].code || code <
->>> v2_code_table[high].code)
->>> -               return 125000; /* No code available, return max
->>> temperature */
->>> +               return rk_tsadcv2_code_to_temp(code);
->>
->> Isn't this an infinite recursion?
->
->
-> No, I think we can try check if it  is happened.
-> Maybe we can return a warning/error for it.
+Dear Lorenzo,
 
-I mean, if the 'if' condition is true, then this will just call the
-same function again with the same code, and again, and again...
-Just return an error code here, -ENOENT maybe?
-I am not sure what error code is appropriate.
+On Wed, 21 Jan 2015 05:56:11 -0800
+Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+
+> On Wed, Jan 21, 2015 at 01:35:07PM +0000, Jisheng Zhang wrote:
+> > Dear Sudeep,
+> > 
+> > On Wed, 21 Jan 2015 05:21:39 -0800
+> > Jisheng Zhang <jszhang@marvell.com> wrote:
+> > 
+> > > Dear Sudeep,
+> > > 
+> > > On Wed, 21 Jan 2015 03:35:54 -0800
+> > > Sudeep Holla <sudeep.holla@arm.com> wrote:
+> > > 
+> > > > ARM based platforms implement unique ways to enter system suspend
+> > > > (i.e. Suspend to RAM). The mechanism and the parameters defining the
+> > > > system state vary on a per-platform basis forcing the OS to handle it
+> > > > in very platform specific way.
+> > > > 
+> > > > Since ARM 32-bit systems had machine specific code, no attempts to
+> > > > standardize are being made as it provides easy way to implement
+> > > > suspend operations in a platform specific manner. However, this
+> > > > approach not only makes maintainance more difficult as the number of
+> > > > platforms supported increases but also not feasible for ARM64.
+> > > > 
+> > > > This DT binding aims at standardizing the system suspend for ARM
+> > > > platforms. ARM64 platforms mandates entry-method property in DT for
+> > > > this system suspend node.
+> > > > 
+> > > > On system implementing PSCI as an enable-method to enter system
+> > > > suspend, the PSCI CPU suspend method is used on versions upto v0.2
+> > > > and requires the power_state parameter to be passed to the PSCI CPU
+> > > > suspend function.
+> > > > 
+> > > > This parameter is platform specific, therefore must be provided by
+> > > > firmware to the OS in order to enable proper call sequence.
+> > > > 
+> > > > This ARM system suspend DT bindings rely on a property
+> > > > (i.e. arm,psci-suspend-param) in the PSCI DT bindings that describes
+> > > > how the PSCI CPU suspend power_state parameter should be defined in
+> > > > DT.
+> > > > 
+> > > > Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> > > > ---
+> > > >  Documentation/devicetree/bindings/arm/psci.txt     | 11 +++
+> > > >  .../devicetree/bindings/arm/system-suspend.txt     | 93
+> > > > ++++++++++++++++++++++ 2 files changed, 104 insertions(+)
+> > > >  create mode 100644
+> > > > Documentation/devicetree/bindings/arm/system-suspend.txt
+> > > > 
+> > > > diff --git a/Documentation/devicetree/bindings/arm/psci.txt
+> > > > b/Documentation/devicetree/bindings/arm/psci.txt index
+> > > > 5aa40ede0e99..bd3977a2a333 100644 ---
+> > > > a/Documentation/devicetree/bindings/arm/psci.txt +++
+> > > > b/Documentation/devicetree/bindings/arm/psci.txt @@ -61,6 +61,14 @@
+> > > > Device tree nodes that require usage of PSCI CPU_SUSPEND function (ie
+> > > > idle Definition: power_state parameter to pass to the PSCI suspend
+> > > > call. 
+> > > > +PSCI v0.2 and earlier versions don't have explicit operation for
+> > > > system +suspend. However, one can implement system suspend using
+> > > > CPU_SUSPEND by +ensuring every other core except the one executing
+> > > > the CPU_SUSPEND call +has called into PSCI through a CPU_OFF call.
+> > > 
+> > > If users explicitly hot-unplug other cores when system load is low to
+> > > save power, then we want to suspend at some point, how does the
+> > > firmware know this case?
+> > 
+> > Sorry for confusion. I mean 
+> > 
+> > If users explicitly hot-unplug other cores when system load is low to save
+> > power, then at some point cpuidle want to suspend the cluster, how does
+> > the distinguish this case with suspend the system to ram.
+> 
+> Through the arm,psci-suspend-param DT property, ie PSCI CPU_SUSPEND
+> power_state parameter.
+> 
+> Did you read the patch :) ?
+
+Yep, I do read the patch ;) To be honest, I implemented the s2ram similar as
+the patch does. But according to PSCI v0.2, "arm,psci-suspend-param = <0x1010000>"
+means suspend the cluster. I'm not sure I understand it correctly, "can implement
+system suspend using CPU_SUSPEND by ensuring every other core except the one
+executing the CPU_SUSPEND call has called into PSCI through a CPU_OFF call" intend
+to ask firmware to 
+
+suspend the system if other cores has called into PSCI through a CPU_OFF
+
+or
+
+suspend the cpu cluster if other cores are not CPU_OFF.
 
 
->
->>>          while (low <= high) {
->>> -               if (code >= v2_code_table[mid].code && code <
->>> -                   v2_code_table[mid - 1].code)
->>> -                       return v2_code_table[mid].temp;
->>> +               if (code >= v2_code_table[mid].code &&
->>> +                   code < v2_code_table[mid - 1].code)
->>> +                       break;
->>> +               else if (code == TSADCV2_DATA_MASK)
->>> +                       break;
->>>                  else if (code < v2_code_table[mid].code)
->>>                          low = mid + 1;
->>>                  else
->>> @@ -213,7 +216,16 @@ static long rk_tsadcv2_code_to_temp(u32 code)
->>>                  mid = (low + high) / 2;
->>>          }
->>>
->>> -       return 125000;
->>> +       /*
->>> +        * The 5C granularity provided by the table is too much. Let's
->>> +        * assume that the relationship between sensor readings and
->>> +        * temperature between 2 table entries is linear and interpolate
->>> +        * to produce less granular result.
->>> +        */
->>> +       num = v2_code_table[mid].temp - v2_code_table[mid - 1].temp;
->>> +       num *= v2_code_table[mid - 1].code - code;
->>> +       denom = v2_code_table[mid - 1].code - v2_code_table[mid].code;
->>> +       return v2_code_table[mid - 1].temp + (num / denom);
->>>   }
->>>
->>>   /**
->>> --
->>> 1.9.1
->>>
->>>
->>
->>
->
-> --
-> Best regards
-> Caesar Wang (???)
-> ???????????
-> Fuzhou Rockchip Electronics Co.Ltd
-> ?????????????89????A?18??(350003)
-> Addr:No.18 Building, A District, No.89, software Boulevard Fuzhou,
-> Fujian,PRC
-> Email:wxt at rock-chips.com
-> Tel:+86-591-83991906/07->8221
->
->
+I extend the PSCI CPU_SUSPEND function's to use power_state bit[26] to tell firmware
+whether suspend to ram or not.
+
+Could you please correct me if I misunderstand something?
+
+Thank you very much,
+Jisheng
+
+> 
+> > > In my private tree, I extend the PSCI spec to tell firmware we want to
+> > > suspend the system.
+> > 
+> > I extend the PSCI suspend function to help firmware distinguish suspend
+> > system to ram and other suspend cores/clusters.
+> 
+> See above.
+> 
+> Thanks,
+> Lorenzo
+> 
