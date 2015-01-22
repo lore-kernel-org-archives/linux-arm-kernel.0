@@ -1,46 +1,39 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 22 Jan 2015 16:02:19 +0100
-Subject: [RFC] using dt overlays: how to? today?
-Message-ID: <20150122150219.GB26928@odux.rfo.atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 22 Jan 2015 15:27:15 +0000
+Subject: [PATCH V2 1/3] perf symbols: Ignore mapping symbols on aarch64
+In-Reply-To: <1421902378-3634-2-git-send-email-victor.kamensky@linaro.org>
+References: <1421902378-3634-1-git-send-email-victor.kamensky@linaro.org>
+ <1421902378-3634-2-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <20150122152715.GZ26493@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jan 21, 2015 at 08:52:56PM -0800, Victor Kamensky wrote:
+> Aarch64 ELF files use mapping symbols with special names $x, $d
+> to identify regions of Aarch64 code (see Aarch64 ELF ABI - "ARM
+> IHI 0056B", section "4.5.4 Mapping symbols").
+> 
+> The patch filters out these symbols at load time, similar to
+> "696b97a perf symbols: Ignore mapping symbols on ARM" changes
+> done for ARM before V8.
 
-I have assisted to Pantelis' talk about device tree and overlays at ELCE
-2014. Since the patch 'Introduce DT overlay support' is now part of the
-mainline, I wanted to have a look about it and to use it for our boards.
+I thought I'd commented that this should probably use the same test that
+we already have established elsewhere in the kernel, namely in the
+kallsyms and module code:
 
-Firstly, this is what I want to achieve by using this feature:
-- manage several revisions of our boards
-- manage modules we can plug on the board, mainly display modules
-  (resistive or capacitive one)
-- manage cpu modules plug on the motherboard
-- I would like to have all this stuff in the kernel. I don't want a
-  dependency on the bootloader or the user space.
+/*
+ * This ignores the intensely annoying "mapping symbols" found
+ * in ARM ELF files: $a, $t and $d.
+ */
+static inline int is_arm_mapping_symbol(const char *str)
+{ 
+        return str[0] == '$' && strchr("axtd", str[1])
+               && (str[2] == '\0' || str[2] == '.');
+}
 
-At the moment, we have many dts files to manage these cases (not all are
-in mainline). It is becoming a pain.
+We really shouldn't be writing the same check for the same symbols in
+different ways.
 
-I wanted to see if we can use device tree fragments as it seems to be
-closed to be achieved when I had assisted to the talk. I have found a
-thread about 'DT-Overlay configfs interface'
-(http://thread.gmane.org/gmane.linux.drivers.devicetree/101871), there
-are still discussions about security concerns, so it may not be included
-quickly. I have also found an interesting thread about cape manager for
-Beaglebone (http://thread.gmane.org/gmane.linux.documentation/8279) but
-there is no more activity on it, is it canceled or is there a new topic
-I have missed?
-
-Here are my questions:
-- Is it acceptable to manage device tree fragments with a driver such as
-  the cape manager? Or at an other place in the kernel such as
-arch/arm/mach-at91/board-dt-sama5.c for example?
-- Is it possible to get access to eeprom from the kernel? Pantelis did
-  an interface to access it through i2c but it seems it was not
-accepted. In my case, it will be through the one wire interface.
-
-Thanks for sharing your opinion about this or redirecting me to a
-similar thread.
-
-Ludovic
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
