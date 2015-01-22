@@ -1,50 +1,49 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 Jan 2015 22:36:31 -0800
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC sh73a0
- Multiplatform Updates for v3.20
-In-Reply-To: <20150122020144.GA29564@verge.net.au>
-References: <cover.1421716945.git.horms+renesas@verge.net.au>
- <20150122013426.GD31815@quad.lixom.net>
- <20150122020144.GA29564@verge.net.au>
-Message-ID: <CAOesGMjAbn5DLuy12HiuWZr58WK0s4y8u09wLGHMgsmE6735YQ@mail.gmail.com>
+From: s.dyasly@samsung.com (Sergey Dyasly)
+Date: Thu, 22 Jan 2015 10:17:55 +0300
+Subject: [PATCH] ARM: use default ioremap alignment for SMP or LPAE
+Message-ID: <1421911075-8814-1-git-send-email-s.dyasly@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 21, 2015 at 6:01 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Wed, Jan 21, 2015 at 05:34:26PM -0800, Olof Johansson wrote:
->> On Tue, Jan 20, 2015 at 10:27:32AM +0900, Simon Horman wrote:
->> > Hi Olof, Hi Kevin, Hi Arnd,
->> >
->> > Please consider these second round of Renesas ARM based SoC sh73a0 multiplatform updates for v3.20.
->> >
->> > This pull request is based on the previous round of
->> > such requests, tagged as renesas-sh73a0-multiplatform-for-v3.20,
->> > which I have already sent a pull-request for.
->> >
->> > My understanding from Geert Uytterhoeven is that the above dependency
->> > is required to avoid a lock-up.
->> >
->> >
->> > The following changes since commit 93c9f0228a3d0a14640f86b3e8aeaf3c9b449bb7:
->> >
->> >   ARM: shmobile: kzm9g-reference: Remove board C code and DT file (2015-01-14 09:46:48 +0900)
->> >
->> > are available in the git repository at:
->> >
->> >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-sh73a0-multiplatform2-for-v3.20
->> >
->> > for you to fetch changes up to e42c8385cfec0579a103b365d61748f199bfe239:
->> >
->> >   ARM: shmobile: sh73a0 dtsi: Add Cortex-A9 TWD node (2015-01-17 09:36:35 +0900)
->>
->>
->> Not pulled based on earlier feedback on preceding branch. Seems like you
->> removed the tag already as well. ;)
->
-> Yes, I think our emails crossed in flight.
+16MB alignment for ioremap mappings was added by commit a069c896d0d6 ("[ARM]
+3705/1: add supersection support to ioremap()") in order to support supersection
+mappings. But __arm_ioremap_pfn_caller uses section and supersection mappings
+only in !SMP && !LPAE case. There is no need for such big alignment if either
+SMP or LPAE is enabled.
 
-Yep, I often work with an offlineimap-synced mailbox that might be a
-few hours out of date when I do merges. :)
+After this change, ioremap will use default maximum alignment of 128 pages.
 
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+Cc: James Bottomley <JBottomley@parallels.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Arnd Bergmann <arnd.bergmann@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Dmitry Safonov <d.safonov@partner.samsung.com>
+Link: https://lkml.kernel.org/g/1419328813-2211-1-git-send-email-d.safonov at partner.samsung.com
+Signed-off-by: Sergey Dyasly <s.dyasly@samsung.com>
+---
+ arch/arm/include/asm/memory.h |    2 ++
+ 1 file changed, 2 insertions(+)
 
--Olof
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 184def0..c3ef139 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -78,10 +78,12 @@
+  */
+ #define XIP_VIRT_ADDR(physaddr)  (MODULES_VADDR + ((physaddr) & 0x000fffff))
+ 
++#if !defined(CONFIG_SMP) && !defined(CONFIG_ARM_LPAE)
+ /*
+  * Allow 16MB-aligned ioremap pages
+  */
+ #define IOREMAP_MAX_ORDER	24
++#endif
+ 
+ #else /* CONFIG_MMU */
+ 
+-- 
+1.7.9.5
