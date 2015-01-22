@@ -1,67 +1,138 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 22 Jan 2015 23:39:02 +0800
-Subject: [PATCH v9 0/5] mfd: axp20x: add support for AXP202 and AXP209
-Message-ID: <1421941147-9682-1-git-send-email-wens@csie.org>
+Date: Thu, 22 Jan 2015 23:39:04 +0800
+Subject: [PATCH v9 2/5] mfd: AXP20x: Add bindings documentation
+In-Reply-To: <1421941147-9682-1-git-send-email-wens@csie.org>
+References: <1421941147-9682-1-git-send-email-wens@csie.org>
+Message-ID: <1421941147-9682-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+From: Carlo Caione <carlo@caione.org>
 
-This is v9 of the axp209 series. v9 changes the DT bindings per Lee's
-recommendations. This introduces 3 new patches to update the regulator
-driver and dtsi to use the new bindings.
+Bindings documentation for the AXP20x driver. In this file also
+sub-nodes are documented.
 
-The regulator patches are based on the axp209 topic branch from the
-regulator tree, which atm is just the 2 patches I did to use the
-regulator core DT parsing functions:
-
-    regulator: axp20x: Migrate to regulator core's simplified DT parsing code
-    regulator: axp20x: Fill regulators_node and of_match descriptor fields
-
-So far, "x-powers,dcdc-workmode" is not used anywhere. "x-powers,dcdc-freq"
-is only used in axp209.dtsi which was just introduced. It should be fairly
-safe to change the bindings.
-
-Lee, Mark, could you take a look at the new changes? If they're OK, could
-you merge them through your respective trees?
-
-Maxime, could you merge the axp209.dtsi patch after the others are merged?
-
-Thank you!
-
-
-Regards,
-ChenYu
-
-
-Changes since v8:
-
-    - Dropped patches that were merged
-    - Changed "x-powers,dcdc-workmode" to boolean flag
-      "x-powers,dcdc-workmode-pwm", and default to auto when not present.
-    - Use standard "clock-frequency" instead of custom "x-powers,dcdc-freq"
-      and use HZ as unit.
-    - Added missing ldo5 regulator node in DT binding example.
-    - Added 2 patches to update regulator driver to new bindings.
-    - Added patch to update axp209.dtsi to new bindings.
-
-
-Carlo Caione (2):
-  dt-bindings: add vendor-prefix for X-Powers
-  mfd: AXP20x: Add bindings documentation
-
-Chen-Yu Tsai (3):
-  regulators: axp20x: Use "clock-frequency" property for dcdc work
-    frequency
-  regulators: axp20x: Change dcdc-workmode DT property to boolean flag
-  ARM: sunxi: dts: axp209: Use clock-frequency for DC-DC work frequency
-
- Documentation/devicetree/bindings/mfd/axp20x.txt   | 102 +++++++++++++++++++++
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- arch/arm/boot/dts/axp209.dtsi                      |   2 +-
- drivers/regulator/axp20x-regulator.c               |  33 +++----
- 4 files changed, 121 insertions(+), 17 deletions(-)
+Signed-off-by: Carlo Caione <carlo@caione.org>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+[wens at csie.org: clarify interrupt source for the axp PMIC]
+[wens at csie.org: explain dcdc-workmode in detail and trim lines to 80 chars]
+[wens at csie.org: make regulator supplies optional if using unregulated input]
+[wens at csie.org: use cubieboard2 regulator nodes as example]
+[wens at csie.org: change dcdc-workmode to dcdc-workmode-pwm boolean property]
+[wens at csie.org: use clock-frequency for dcdc regulator work frequency]
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ Documentation/devicetree/bindings/mfd/axp20x.txt | 102 +++++++++++++++++++++++
+ 1 file changed, 102 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/mfd/axp20x.txt
 
+diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+new file mode 100644
+index 000000000000..c3c80db242c7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+@@ -0,0 +1,102 @@
++AXP202/AXP209 device tree bindings
++
++The axp20x family current members :
++axp202 (X-Powers)
++axp209 (X-Powers)
++
++Required properties:
++- compatible: "x-powers,axp202" or "x-powers,axp209"
++- reg: The I2C slave address for the AXP chip
++- interrupt-parent: The parent interrupt controller
++- interrupts: SoC NMI / GPIO interrupt connected to the PMIC's IRQ pin
++- interrupt-controller: axp20x has its own internal IRQs
++- #interrupt-cells: Should be set to 1
++- regulators: A node that houses a sub-node for each regulator. The regulators
++	      are bound using their name as listed here: dcdc2, dcdc3, ldo1,
++	      ldo2, ldo3, ldo4, ldo5.  The bindings details of individual
++	      regulator device can be found in:
++	      Documentation/devicetree/bindings/regulator/regulator.txt with
++	      the exception of x-powers,dcdc-freq. Regulators not used should
++	      still be listed for completeness and that the regulator subsystem
++	      properly registers them.
++
++Optional properties:
++- regulator supplies - may be omitted if inputs are unregulated, such as using
++		       the IPSOUT output from the PMIC
++  - acin-supply: The input supply for LDO1
++  - vin2-supply: The input supply for DCDC2
++  - vin3-supply: The input supply for DCDC3
++  - ldo24in-supply: The input supply for LDO2, LDO4
++  - ldo3in-supply: The input supply for LDO3
++  - ldo5in-supply: The input supply for LDO5
++
++Optional properties for regulators node:
++- clock-frequency: defines the work frequency of DC-DC regulators
++		   (range: 750kHz - 1875kHz). Default: 1.5MHz
++
++Optional properties for DCDC regulators:
++- x-powers,dcdc-workmode-pwm: Force the DCDC regulators to run in PWM mode
++			      The DCDC regulators rormally work in a mixed
++			      PWM/PFM mode, using PFM under light loads and
++			      switching to PWM for heavier loads. Forcing
++			      PWM mode trades efficiency under light loads
++			      for lower output noise. This probably makes
++			      sense for HiFi audio related applications that
++			      aren't battery constrained.
++
++Example:
++
++axp209: pmic at 34 {
++	compatible = "x-powers,axp209";
++	reg = <0x34>;
++	interrupt-parent = <&nmi_intc>;
++	interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++	interrupt-controller;
++	#interrupt-cells = <1>;
++
++	regulators {
++		clock-frequency = <1500000>;
++
++		vdd_cpu: dcdc2 {
++			regulator-always-on;
++			regulator-min-microvolt = <1000000>;
++			regulator-max-microvolt = <1450000>;
++			regulator-name = "vdd-cpu";
++		};
++
++		vdd_int_dll: dcdc3 {
++			regulator-always-on;
++			regulator-min-microvolt = <1000000>;
++			regulator-max-microvolt = <1400000>;
++			regulator-name = "vdd-int-dll";
++		};
++
++		vdd_rtc: ldo1 {
++			regulator-always-on;
++			regulator-min-microvolt = <1200000>;
++			regulator-max-microvolt = <1400000>;
++			regulator-name = "vdd-rtc";
++		};
++
++		avcc: ldo2 {
++			regulator-always-on;
++			regulator-min-microvolt = <2700000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-name = "avcc";
++		};
++
++		ldo3 {
++			/* unused */
++		};
++
++		csi1_io_2v8: ldo4 {
++			/* output on extension headers */
++			regulator-name = "csi1-io-2v8";
++		};
++
++		ldo5 {
++			/* unused */
++		};
++	};
++};
++
 -- 
 2.1.4
