@@ -1,54 +1,45 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 22 Jan 2015 11:31:45 -0800
-Subject: [PATCH v2 6/9] watchdog: st_wdt: Add new driver for ST's LPC
- Watchdog
-In-Reply-To: <20150122172100.GF9129@x1>
-References: <1421927767-28889-1-git-send-email-lee.jones@linaro.org>
- <1421927767-28889-7-git-send-email-lee.jones@linaro.org>
- <54C12F10.4090901@roeck-us.net> <20150122172100.GF9129@x1>
-Message-ID: <54C15021.4060907@roeck-us.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 22 Jan 2015 11:34:19 -0800
+Subject: [PATCH] clk: ux500: Drop use of clk-private.h
+Message-ID: <1421955259-8875-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/22/2015 09:21 AM, Lee Jones wrote:
-> On Thu, 22 Jan 2015, Guenter Roeck wrote:
->
->> On 01/22/2015 03:56 AM, Lee Jones wrote:
->>> Signed-off-by: David Paris <david.paris@st.com>
->>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->>> ---
->>>   drivers/watchdog/Kconfig      |  13 ++
->>>   drivers/watchdog/Makefile     |   1 +
->>>   drivers/watchdog/st_lpc_wdt.c | 335 ++++++++++++++++++++++++++++++++++++++++++
->>>   3 files changed, 349 insertions(+)
->>>   create mode 100644 drivers/watchdog/st_lpc_wdt.c
->
-> [...]
->
->>> +struct st_wdog_syscfg {
->>> +	struct regmap *regmap;
->>
->> Hi David & Lee,
->>
->> Why did you add the regmap pointer to this structure and not to st_wdog ?
->> It is not a configuration value, after all, and it is always dereferenced
->> through wt_wdog->syscfg. So all it does is to make the code more complicated.
->>
->> Am I missing something ?
->
-> I guess it was just to group it all together, as it will all be used
-> at the same time:
->
-> 	regmap_update_bits(st_wdog->syscfg->regmap,
-> 			   st_wdog->syscfg->reset_type_reg,
-> 			   st_wdog->syscfg->reset_type_mask,
-> 			   st_wdog->warm_reset);
->
-> It really doesn't matter to me either way.
->
-Having it in syscfg means it is stored in the static configuration data instead
-of the allocated data, which is at least conceptually wrong. So I think it should
-be in st_wdog.
+These drivers don't need to include clk-private.h. Remove the
+include.
 
-Thanks,
-Guenter
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/clk/ux500/clk-prcc.c  | 1 -
+ drivers/clk/ux500/clk-prcmu.c | 1 -
+ 2 files changed, 2 deletions(-)
+
+diff --git a/drivers/clk/ux500/clk-prcc.c b/drivers/clk/ux500/clk-prcc.c
+index bd4769a84485..0e950769ed03 100644
+--- a/drivers/clk/ux500/clk-prcc.c
++++ b/drivers/clk/ux500/clk-prcc.c
+@@ -8,7 +8,6 @@
+  */
+ 
+ #include <linux/clk-provider.h>
+-#include <linux/clk-private.h>
+ #include <linux/slab.h>
+ #include <linux/io.h>
+ #include <linux/err.h>
+diff --git a/drivers/clk/ux500/clk-prcmu.c b/drivers/clk/ux500/clk-prcmu.c
+index e2d63bc47436..bf63c96acb1a 100644
+--- a/drivers/clk/ux500/clk-prcmu.c
++++ b/drivers/clk/ux500/clk-prcmu.c
+@@ -8,7 +8,6 @@
+  */
+ 
+ #include <linux/clk-provider.h>
+-#include <linux/clk-private.h>
+ #include <linux/mfd/dbx500-prcmu.h>
+ #include <linux/slab.h>
+ #include <linux/io.h>
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
