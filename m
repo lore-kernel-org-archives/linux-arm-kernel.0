@@ -1,41 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 21 Jan 2015 16:54:26 -0800
-Subject: [GIT PULL] ARM: OMAP2+: hwmod: first set of patches for v3.20
-In-Reply-To: <alpine.DEB.2.02.1501212338100.5450@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1501212338100.5450@utopia.booyaka.com>
-Message-ID: <20150122005426.GV7718@atomide.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 21 Jan 2015 17:01:07 -0800
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Updates for
+ v3.20
+In-Reply-To: <cover.1421380713.git.horms+renesas@verge.net.au>
+References: <cover.1421380713.git.horms+renesas@verge.net.au>
+Message-ID: <20150122010107.GG29014@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [150121 15:42]:
-> Hi Tony
+On Sat, Jan 17, 2015 at 09:58:16AM +0900, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+> Please consider these second round of Renesas ARM based SoC DT updates for v3.20.
 > 
->   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+> This pull request is based on the previous round of
+> such requests, tagged as renesas-dt-for-v3.20,
+> which you have previously pulled.
+> 
+> 
+> The following changes since commit 7408d3061d2f04181820902fae6e92e4a73d5cc0:
+> 
+>   ARM: shmobile: r8a7791: add MLB+ clock (2014-12-23 09:18:23 +0900)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.20/omap-hwmod-a
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt2-for-v3.20
 > 
-> for you to fetch changes up to 1c7e36bfc3e2fb2df5e2d1989a4b6fb9055a0f9b:
+> for you to fetch changes up to fbaa5e694a1240c5f6b829b1e17652e4e228ee12:
 > 
->   ARM: DRA7: hwmod: Fix boot crash with DEBUG_LL enabled on UART3 (2015-01-20 18:12:17 -0700)
-> 
-> ----------------------------------------------------------------
-> ARM: OMAP2+: hwmod: first set of patches for v3.20
-> 
-> First set of OMAP2+ hwmod patches for Linux v3.20.  These are mostly
-> fixes for warnings, although there's one DRA7xx patch that fixes
-> CONFIG_DEBUG_LL for AM572x/DRA7xx SoCs that use UART3 for console,
-> such as the BeagleBoard-X15.
-> 
-> These patches entered Linux-next starting with the next-20150121 tag.
-> 
-> Basic build, boot, and PM test results can be found here:
-> 
-> http://www.pwsan.com/omap/testlogs/omap-hwmod-a-for-v3.20/20150121142621/
+>   PM / Domains: R-Mobile SYSC: Document SH-Mobile AG5 (sh73a0) binding (2015-01-16 10:59:37 +0900)
 
-Thanks pulling into omap-for-v3.20/fixes-not-urgent.
+Merged, thanks.
 
-Tony
+
+-Olof
