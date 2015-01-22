@@ -1,54 +1,73 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 22 Jan 2015 10:29:47 -0800
-Subject: [PATCH v2] ARM: qcom: Fix SCM interface for big-endian kernels
-In-Reply-To: <EF8384DD-D1D4-40F8-BCD7-D6516E923120@codeaurora.org>
-References: <1421868075-20471-1-git-send-email-sboyd@codeaurora.org>
- <EF8384DD-D1D4-40F8-BCD7-D6516E923120@codeaurora.org>
-Message-ID: <20150122182947.GK27202@codeaurora.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 22 Jan 2015 18:56:22 +0000
+Subject: [PATCH v7 1/4] Documentation: dt: add common bindings for
+ hwspinlock
+In-Reply-To: <54BFE855.3090200@ti.com>
+References: <1421269101-51105-2-git-send-email-s-anna@ti.com>
+ <20150115135201.GG16217@leverpostej>
+ <20150115135556.GH16217@leverpostej>
+ <CAL_JsqL2LZAooMk-V8+xeF2g6acZE21M+-OBRw8aEVa-5wVHuQ@mail.gmail.com>
+ <CAK=WgbYQ=BbinqJ5fsw2Y+FKdy=nasLsw9mX8pw6S_o3owy9-g@mail.gmail.com>
+ <20150116101746.GA21809@leverpostej>
+ <CAK=WgbYBqPoUm9byx0du_g5ZmHdYaUVLpSPZYHoCVzNoatNKpw@mail.gmail.com>
+ <20150120180548.GK7718@atomide.com>
+ <CAK=WgbZGGtwmQwzWumjpYOsYHTt8vPQpTraABwJBsv5VXOmJ_Q@mail.gmail.com>
+ <54BFE855.3090200@ti.com>
+Message-ID: <20150122185622.GE12911@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/22, Kumar Gala wrote:
-> 
-> On Jan 21, 2015, at 1:21 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> 
-> > The secure environment only runs in little-endian mode, so any
-> > buffers shared with the secure environment should have their
-> > contents converted to little-endian. We also mark such elements
-> > with __le32 to allow sparse to catch such problems.
+On Wed, Jan 21, 2015 at 05:56:37PM +0000, Suman Anna wrote:
+> On 01/21/2015 06:41 AM, Ohad Ben-Cohen wrote:
+> > On Tue, Jan 20, 2015 at 8:05 PM, Tony Lindgren <tony@atomide.com> wrote:
+> >> How about default to Linux id space and allow overriding that with
+> >> a module param option if needed?
 > > 
-> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> > ---
+> > I'm not sure I'm following.
 > > 
-> > Changes since v1:
-> > * Rebased onto Kumar's qcom/soc branch
-> > 
-> > drivers/soc/qcom/scm-boot.c |  8 ++++----
-> > drivers/soc/qcom/scm.c      | 30 ++++++++++++++++--------------
-> > 2 files changed, 20 insertions(+), 18 deletions(-)
-> > 
-> > diff --git a/drivers/soc/qcom/scm-boot.c b/drivers/soc/qcom/scm-boot.c
-> > index 1822b13bbc10..af16fcc8d5cb 100644
-> > --- a/drivers/soc/qcom/scm-boot.c
-> > +++ b/drivers/soc/qcom/scm-boot.c
-> > @@ -27,12 +27,12 @@
-> > int scm_set_boot_addr(u32 addr, int flags)
-> > {
-> > 	struct {
-> > -		unsigned int flags;
-> > -		phys_addr_t  addr;
-> > +		__le32 flags;
-> > +		__le32 addr;
+> > If the main point of contention is the base_id field, I'm also fine
+> > with removing it entirely, as I'm not aware of any actual user for it
+> > (Suman please confirm?).
 > 
-> How does this work?  How can we go from phys_addr_t back to __le32 on LPAE or 64-bit systems?
+> Yeah, well the current implementations that I am aware of only have a
+> single bank, so all of them would be using a value of 0. I am yet to see
+> a platform with multiple instances where the property really makes a
+> difference. v7 has the property mandatory, so all the implementations
+> would need to define this value even if it is 0.
 > 
+> regards
+> Suman
+> 
+> > 
+> > Mark? Rob? Will you accept Suman's patches if the base_id field is removed?
 
-I guess I missed updating this in the patch titled "Clarify boot
-interface". In that patch we should have updated addr to be a u32
-(or __le32 as is done here). From what I can tell by looking at
-the codeaurora tree this is still 32 bits wide even on 64-bit
-platforms.
+My concern is that the mapping of hwspinlock IDs doesn't seem to be
+explicit in the DT on a per-context basis, which is what I'd expect.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+e.g.
+
+lck: hwspinlock-device at f00 {
+	...
+	#hwlock-cells = <1>;
+};
+
+some-other-os-interface {
+	...
+	hwlocks = <&lck 0>, <&lck 1>, <&lck 2>, <&lck 3>;
+	hwlock-names = "glbl", "pool0", "pool1", "pool2";
+};
+
+a-different-os-interface {
+	...
+	hwlocks = <&lck 18>, <&lck 21>, <&lck 4>, <&lck 5>;
+	hwlock-names = "init", "teardown", "pool0", "pool1";
+};
+
+That's the only way I would expect this to possibly remain a stable
+over time, and it's the entire reason for #hwlock-cells, no?
+
+How do you expect the other components sharing the hwspinlocks to be
+described?
+
+Thanks,
+Mark.
