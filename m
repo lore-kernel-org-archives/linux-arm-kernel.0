@@ -1,68 +1,50 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Wed, 21 Jan 2015 17:32:23 -0800
-Subject: [PATCH 2/2] perf symbols: debuglink should take symfs option into
- account
-In-Reply-To: <54C04A1B.8040408@gmail.com>
-References: <1421168344-5363-1-git-send-email-victor.kamensky@linaro.org>
- <1421168344-5363-2-git-send-email-victor.kamensky@linaro.org>
- <CAA3XUr1BnS=8RTVyxtVOm4Ahb2DQXUuJJQC1w2SvT5fycjRcEQ@mail.gmail.com>
- <54C0216F.3080404@gmail.com>
- <CAA3XUr0uXykCTVuw-sYmkhsFZ-cimeuJkXTXNdJyhJh7976xEQ@mail.gmail.com>
- <54C04A1B.8040408@gmail.com>
-Message-ID: <CAA3XUr3RJ1RbYTOh2SczZdkGgrk6f=VfoDzu6SQXVu_XwC+FLg@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 21 Jan 2015 17:33:01 -0800
+Subject: [GIT PULL] Third Round of Renesas ARM Based SoC Updates for v3.20
+In-Reply-To: <cover.1421715134.git.horms+renesas@verge.net.au>
+References: <cover.1421715134.git.horms+renesas@verge.net.au>
+Message-ID: <20150122013301.GC31815@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 January 2015 at 16:53, David Ahern <dsahern@gmail.com> wrote:
-> On 1/21/15 5:34 PM, Victor Kamensky wrote:
->>
->> diff --git a/tools/perf/util/dso.c b/tools/perf/util/dso.c
->> index 45be944..ca8d8d5 100644
->> --- a/tools/perf/util/dso.c
->> +++ b/tools/perf/util/dso.c
->> @@ -45,13 +45,13 @@ int dso__read_binary_type_filename(const struct dso
->> *dso,
->>       case DSO_BINARY_TYPE__DEBUGLINK: {
->>           char *debuglink;
->>
->> -        strncpy(filename, dso->long_name, size);
->> -        debuglink = filename + dso->long_name_len;
->> +        len = __symbol__join_symfs(filename, size, dso->long_name);
->> +        debuglink = filename + len;
->>           while (debuglink != filename && *debuglink != '/')
->>               debuglink--;
->>           if (*debuglink == '/')
->>               debuglink++;
->> -        ret = filename__read_debuglink(dso->long_name, debuglink,
->> +        ret = filename__read_debuglink(filename, debuglink,
->>                              size - (debuglink - filename));
->>           }
->>           break;
->>
->
-> I do not see any reason this will not work. Essentially after
-> filename__read_debuglink filename contains symfs + dso path + debuglink read
-> from .gnu_debuglink section which is what is wanted.
+On Tue, Jan 20, 2015 at 10:27:08AM +0900, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
+> 
+> Please consider these third round of Renesas ARM based SoC updates for v3.20.
+> 
+> This pull request is based on the previous round of
+> such requests, tagged as renesas-soc2-for-v3.20,
+> which I have already sent a pull-request for.
+> 
+> 
+> The following changes since commit 2173fc7cb681c38b9e5bc526211045caecf96e44:
+> 
+>   ARM: shmobile: R-Mobile: Add DT support for PM domains (2015-01-15 08:38:14 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc3-for-v3.20
+> 
+> for you to fetch changes up to 1632ff162f305f38667632c465e4bfaab8ef87a2:
+> 
+>   ARM: shmobile: R-Mobile: Special-case PM domains with memory-controllers (2015-01-16 11:02:42 +0900)
 
-OK, I am good with this. Let me repost the whole
-mini-series based on mailing list review comments.
+Simon,
 
-May I use 'Acked-by' (maybe 'Tested-by' as well) with
-your name for the shorter (no filename_copy) as above
-version of the patch for .gnu_debuglink issue fix.
+Doing each merge of a pull request is an amount of work from us. You sent
+a preceding pull request for the soc branch just three days before this one.
 
-ARM/Aarch64 specific change also needs update based on
-discussion with Will and Russell.
+Can you try to reduce the frequency of how often you drain the queue
+of pending patches, perhaps? I know there's a balance to be had between
+merge early-merge often and getting more aggregated, but I wonder if it
+can be tuned back a bit to avoid flooding us.
 
-I'll post updated version 2 latter tonight.
+Maybe a good balance would be wait to send the next pull request of a
+branch until the previous one has been taken care of.
+
+That being said: Merged.
+
 
 Thanks,
-Victor
 
-> Thanks for the example. I used it with both a symfs and non-symfs example
-> and both times this change worked properly -- the correct hang.debug file is
-> read.
->
-> Arnaldo?
->
-> David
+-Olof
