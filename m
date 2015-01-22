@@ -1,74 +1,35 @@
-From: pantelis.antoniou@konsulko.com (Pantelis Antoniou)
-Date: Thu, 22 Jan 2015 22:54:42 +0200
-Subject: [RFC] using dt overlays: how to? today?
-In-Reply-To: <20150122150219.GB26928@odux.rfo.atmel.com>
-References: <20150122150219.GB26928@odux.rfo.atmel.com>
-Message-ID: <2F10D177-6F27-4019-8D2D-8F77361BB310@konsulko.com>
+From: drake@endlessm.com (Daniel Drake)
+Date: Thu, 22 Jan 2015 14:55:51 -0600
+Subject: CMA region and highmem
+In-Reply-To: <53F5BCC3.2060609@samsung.com>
+References: <20140813191811.GP30401@n2100.arm.linux.org.uk>
+ <53F44858.2070906@samsung.com>
+ <CAD8Lp47W9UcA7CHSK9xia_b9opLv-5wi_9Omj2DThRo4wYkcNw@mail.gmail.com>
+ <53F5BCC3.2060609@samsung.com>
+Message-ID: <CAD8Lp46rqXwQR5L=-Tt_iL0CPDsKt+hVYU7-viS0uHvmVXLqng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ludovic,
+On Thu, Aug 21, 2014 at 3:32 AM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> You are right, but frankly drivers doing large DMA allocations should take
+> advantage of DMA_ATTR_NO_KERNEL_MAPPING DMA attribute, because all they
+> usually do is just mapping those buffers to userspace. For a bit complex
+> example, see drivers/gpu/drm/exynos/exynos_drm_buf.c or
+> drivers/gpu/drm/msm/msm_drv.c.
 
-> On Jan 22, 2015, at 17:02 , Ludovic Desroches <ludovic.desroches@atmel.com> wrote:
-> 
-> Hi,
-> 
-> I have assisted to Pantelis' talk about device tree and overlays at ELCE
-> 2014. Since the patch 'Introduce DT overlay support' is now part of the
-> mainline, I wanted to have a look about it and to use it for our boards.
-> 
+Thanks again for the insight here. Revisiting this topic now:
 
-Excellent.
+Looking at DMA_ATTR_NO_KERNEL_MAPPING in latest linus git, this only
+seems to be implemented for IOMMU setups.
+On other setups this flag seems to be ignored, so on such setups, your
+change that tends to place the CMA region in high memory now puts
+pressure on the vmalloc area even when the driver asked for
+NO_KERNEL_MAPPING.
 
-> Firstly, this is what I want to achieve by using this feature:
-> - manage several revisions of our boards
-> - manage modules we can plug on the board, mainly display modules
->  (resistive or capacitive one)
-> - manage cpu modules plug on the motherboard
-> - I would like to have all this stuff in the kernel. I don't want a
->  dependency on the bootloader or the user space.
-> 
+Is there a good reason why the non-IOMMU codepath doesn't obey
+DMA_ATTR_NO_KERNEL_MAPPING? We ran a quick experiment here
+implementing this (i.e. just bailing out of __alloc_from_contiguous
+before mapping the memory into kernel space) and it seems to work.
 
-That?s awesome; that?s exactly what I want to use it for. Maybe this thing
-can be used by others as well ;)
-
-> At the moment, we have many dts files to manage these cases (not all are
-> in mainline). It is becoming a pain.
-> 
-
-Tell me about it.
-
-> I wanted to see if we can use device tree fragments as it seems to be
-> closed to be achieved when I had assisted to the talk. I have found a
-> thread about 'DT-Overlay configfs interface'
-> (http://thread.gmane.org/gmane.linux.drivers.devicetree/101871), there
-> are still discussions about security concerns, so it may not be included
-> quickly. I have also found an interesting thread about cape manager for
-> Beaglebone (http://thread.gmane.org/gmane.linux.documentation/8279) but
-> there is no more activity on it, is it canceled or is there a new topic
-> I have missed?
-> 
-> Here are my questions:
-> - Is it acceptable to manage device tree fragments with a driver such as
->  the cape manager? Or at an other place in the kernel such as
-> arch/arm/mach-at91/board-dt-sama5.c for example?
-> - Is it possible to get access to eeprom from the kernel? Pantelis did
->  an interface to access it through i2c but it seems it was not
-> accepted. In my case, it will be through the one wire interface.
-> 
-> Thanks for sharing your opinion about this or redirecting me to a
-> similar thread.
-> 
-
-I?m waiting for 3.19 to go out and I?ll address everything you described
-above.
-
-Feel free to post specific requirement about your use cases, and I?ll try
-to address them.
-
-> Ludovic
-> ?
-
-Regards
-
-? Pantelis
+Daniel
