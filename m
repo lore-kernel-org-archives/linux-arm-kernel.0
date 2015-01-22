@@ -1,24 +1,121 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 22 Jan 2015 11:23:58 +0100 (CET)
-Subject: [PATCH] treewide: Convert clockevents_notify to use int cpu
-In-Reply-To: <1418254133.18092.22.camel@perches.com>
-References: <1418254133.18092.22.camel@perches.com>
-Message-ID: <alpine.DEB.2.11.1501221121570.5526@nanos>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 22 Jan 2015 11:31:21 +0100
+Subject: [PATCH 00/17] AT91 cleanup for 3.20 #3
+In-Reply-To: <1421359100-8930-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1421359100-8930-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <54C0D179.700@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 10 Dec 2014, Joe Perches wrote:
-> As far as I can tell, there's no value indirecting
-> the cpu passed to this function via a void *.
+Le 15/01/2015 22:58, Alexandre Belloni a ?crit :
+> This patch sets is based on AT91 cleanup for 3.20 #2. it goes further in the
+> cleanup.
 > 
-> Update all the callers and called functions from within
-> clockevents_notify.
+> It merges board-dt ans soc files, ending up with only at91rm9200.c, at91sam9.c,
+> sama5d3.c and sama5d4.c.
 
-Aside of that there is no value for this 'notification' function at
-all. This should be seperate explicit calls. The notify function is a
-leftover from the original implementation which used actual notifier
-chains. I'll send out a cleanup series later today.
+I'm not entirely comfortable with this this merge. Maybe I'm too used to
+"board files" ;-)
+On the other hand, there is also a phy fixup that will go into the sama5
+board file (in "fixes for 3.19").
 
-Thanks,
+So, I may delay these changes a little bit.
 
-	tglx
+> It merges all the SOC_AT91SAM9xxx config option under SOC_AT91SAM9.
+> 
+> It also removes unused headers.
+> 
+> There is also one fix regarding arm_pm_idle for sam9n12 and sam9g45.
+
+I'm reordering these patches a little bit for creating a at91-cleanup3
+tag that I can send quickly.
+
+So, let's rework this series a little bit.
+
+Bye,
+
+> Alexandre Belloni (15):
+>   ARM: at91:remove unused mach/system_rev.h
+>   ARM: at91: fix sam9n12 and sam9x5 arm_pm_idle
+>   ARM: at91: sam9: set arm_pm_idle from sam9_dt_device_init
+>   ARM: at91: remove unused at91_ioremap_matrix and header
+>   ARM: at91: remove unused _matrix.h headers
+>   ARM: at91: stop using HAVE_AT91_DBGUx
+>   ARM: at91: pm: remove warning to remove SOC_AT91SAM9263 usage
+>   ARM: at91: merge SOC_AT91SAM9xxx
+>   ARM: at91: remove at91_boot_soc
+>   ARM: at91: rework initialization for rm9200 based boards
+>   ARM: at91: rework initialization for sam9 based boards
+>   ARM: at91: rework initialization for sama5 based boards
+>   ARM: at91: remove old setup
+>   ARM: at91: mark const init data with __initconst instead of __initdata
+>   ARM: at91: remove at91_dt_initialize
+> 
+> Arnd Bergmann (2):
+>   ARM: at91: merge at91rm9200 files
+>   ARM: at91: move sama5 specific code into per-soc files
+> 
+>  arch/arm/Kconfig.debug                             |   6 +-
+>  arch/arm/configs/at91_dt_defconfig                 |  10 +-
+>  arch/arm/mach-at91/Kconfig                         | 111 ++----
+>  arch/arm/mach-at91/Makefile                        |  17 +-
+>  arch/arm/mach-at91/at91rm9200.c                    |  49 ++-
+>  arch/arm/mach-at91/{board-dt-sam9.c => at91sam9.c} |  21 +-
+>  arch/arm/mach-at91/at91sam9260.c                   |  32 --
+>  arch/arm/mach-at91/at91sam9261.c                   |  31 --
+>  arch/arm/mach-at91/at91sam9263.c                   |  30 --
+>  arch/arm/mach-at91/at91sam9g45.c                   |  30 --
+>  arch/arm/mach-at91/at91sam9n12.c                   |  20 -
+>  arch/arm/mach-at91/at91sam9rl.c                    |  32 --
+>  arch/arm/mach-at91/at91sam9x5.c                    |  20 -
+>  arch/arm/mach-at91/board-dt-rm9200.c               |  54 ---
+>  arch/arm/mach-at91/board-dt-sama5.c                |  60 ---
+>  arch/arm/mach-at91/generic.h                       |  11 -
+>  arch/arm/mach-at91/include/mach/at91_dbgu.h        |  63 ----
+>  arch/arm/mach-at91/include/mach/at91_matrix.h      |  23 --
+>  arch/arm/mach-at91/include/mach/at91_ramc.h        |   6 -
+>  .../mach-at91/include/mach/at91sam9260_matrix.h    |  80 ----
+>  .../mach-at91/include/mach/at91sam9261_matrix.h    |  64 ----
+>  .../mach-at91/include/mach/at91sam9263_matrix.h    | 129 -------
+>  arch/arm/mach-at91/include/mach/at91sam9_smc.h     |   2 -
+>  .../mach-at91/include/mach/at91sam9g45_matrix.h    | 153 --------
+>  .../mach-at91/include/mach/at91sam9n12_matrix.h    |  53 ---
+>  .../arm/mach-at91/include/mach/at91sam9rl_matrix.h |  96 -----
+>  .../arm/mach-at91/include/mach/at91sam9x5_matrix.h |  53 ---
+>  arch/arm/mach-at91/include/mach/cpu.h              | 240 ------------
+>  arch/arm/mach-at91/include/mach/system_rev.h       |  27 --
+>  arch/arm/mach-at91/pm.c                            |  48 ++-
+>  arch/arm/mach-at91/pm_slowclock.S                  |   9 -
+>  arch/arm/mach-at91/sama5d3.c                       |  31 +-
+>  arch/arm/mach-at91/sama5d4.c                       |  35 +-
+>  arch/arm/mach-at91/setup.c                         | 407 ---------------------
+>  arch/arm/mach-at91/soc.h                           |  77 ----
+>  35 files changed, 151 insertions(+), 1979 deletions(-)
+>  rename arch/arm/mach-at91/{board-dt-sam9.c => at91sam9.c} (71%)
+>  delete mode 100644 arch/arm/mach-at91/at91sam9260.c
+>  delete mode 100644 arch/arm/mach-at91/at91sam9261.c
+>  delete mode 100644 arch/arm/mach-at91/at91sam9263.c
+>  delete mode 100644 arch/arm/mach-at91/at91sam9g45.c
+>  delete mode 100644 arch/arm/mach-at91/at91sam9n12.c
+>  delete mode 100644 arch/arm/mach-at91/at91sam9rl.c
+>  delete mode 100644 arch/arm/mach-at91/at91sam9x5.c
+>  delete mode 100644 arch/arm/mach-at91/board-dt-rm9200.c
+>  delete mode 100644 arch/arm/mach-at91/board-dt-sama5.c
+>  delete mode 100644 arch/arm/mach-at91/include/mach/at91_dbgu.h
+>  delete mode 100644 arch/arm/mach-at91/include/mach/at91_matrix.h
+>  delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9260_matrix.h
+>  delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9261_matrix.h
+>  delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9263_matrix.h
+>  delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9g45_matrix.h
+>  delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9n12_matrix.h
+>  delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9rl_matrix.h
+>  delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9x5_matrix.h
+>  delete mode 100644 arch/arm/mach-at91/include/mach/cpu.h
+>  delete mode 100644 arch/arm/mach-at91/include/mach/system_rev.h
+>  delete mode 100644 arch/arm/mach-at91/setup.c
+>  delete mode 100644 arch/arm/mach-at91/soc.h
+> 
+
+
+-- 
+Nicolas Ferre
