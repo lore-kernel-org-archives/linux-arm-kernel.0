@@ -1,72 +1,57 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 22 Jan 2015 19:52:53 +0800
-Subject: [GIT PULL RESEND] CSR atlas7 debug ports for 3.20
-In-Reply-To: <20150121222708.GA24851@quad.lixom.net>
-References: <CAGsJ_4yJTApS6RwGCEFcBGT+L1f8Gn3DnmzGAKQc3H2SZZJvcw@mail.gmail.com>
- <20150119191258.GB16883@quad.lixom.net>
- <CAGsJ_4ydqDxEqmEbX-NfQx75KOba7-BTU8Rnx0r=pobh4JT=QQ@mail.gmail.com>
- <20150121222708.GA24851@quad.lixom.net>
-Message-ID: <CAGsJ_4yFvBu8eG+Z3uTBEjurbB9q1h8N3m6hwBioU9RyRRMTUg@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 22 Jan 2015 11:55:58 +0000
+Subject: [PATCH v2 0/9] mfd: watchdog: rtc: New driver for ST's LPC IP
+Message-ID: <1421927767-28889-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-01-22 6:27 GMT+08:00 Olof Johansson <olof@lixom.net>:
-> On Tue, Jan 20, 2015 at 08:03:42PM +0800, Barry Song wrote:
->> 2015-01-20 3:12 GMT+08:00, Olof Johansson <olof@lixom.net>:
->> > On Wed, Jan 14, 2015 at 09:24:19PM +0800, Barry Song wrote:
->> >> Hi Arnd, Kevin, Olof,
->> >>
->> >> The following changes since commit
->> >> b7392d2247cfe6771f95d256374f1a8e6a6f48d6:
->> >>
->> >>   Linux 3.19-rc2 (2014-12-28 16:49:37 -0800)
->> >>
->> >> are available in the git repository at:
->> >>
->> >>   git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
->> >> tags/atlas7-lldebug-for-3.20
->> >>
->> >> for you to fetch changes up to 98898ee43a94375cf814b86fb7f485c39fb2c072:
->> >>
->> >>   ARM: sirf: add two debug ports for CSRatlas7 SoC (2015-01-14 20:56:09
->> >> +0800)
->> >>
->> >> ----------------------------------------------------------------
->> >> add debug ports for CSRatlas7 SoC
->> >>
->> >> Because Marco chip has never shipped to customers and has been replaced
->> >> by Atlas7, so we do the below
->> >> - drop Marco's debug port
->> >> - add debug ports for Atlas7
->> >>
->> >> we also move to use DEBUG_UART_PHYS/VIRT for all CSR ports
->> >>
->> >> ----------------------------------------------------------------
->> >> Barry Song (1):
->> >>       ARM: sirf: drop Marco low-level debug port
->> >>
->> >> Guo Zeng (1):
->> >>       ARM: sirf: add two debug ports for CSRatlas7 SoC
->> >
->> > These entries are not sorted. If you look at the file, in particular
->> > DEBUG_UART_PHYS and DEBUG_UART_VIRT, you see that they are sorted in
->> > address
->> > order. Your new entries are just appended. That's not right.
->>
->> Olof, fixed here:
->> https://git.kernel.org/cgit/linux/kernel/git/baohua/linux.git/commit/?id=01ea63d99397fcdcb9cc235c77a8e11f4e4a63e9
->>
->> and tag was re-built.
->
-> In the future, please always send a full fresh pull request so I see
-> the diffstat that you intended to send and can compare it with what I
-> actually merged.
->
-> Merged into next/soc.
+ST's Low Power Controller (LPC) controls two devices; watchdog and RTC.
+Only one of the devices can be used at any one time, which is enforced
+by the correlating MFD driver.
 
-ok. will take care next time :-)
+This driver set provides everything you need to choose one (and only
+one) of the LPC devices to run per I/P block, of which there are two
+on the enabled STiH407 h/w.
 
->
-> -Olof
+Version 2:
+ - Only calculate keepalive once in probe()
+ - Check for a 0 clk_rate
+ - Set limits using predefined attributes from watchdog_device
+ - CONFIG_PM => CONFIG_SLEEP
+ - Call st_wdog_setup() on resume
+ - Remove MFD driver -- instead rely on driver probing mechanism
+   which continues attempting to bind to different drivers until
+   one does not return -ENODEV
 
-barry
+Lee Jones (9):
+  mfd: dt-bindings: Provide human readable defines for LPC mode choosing
+  ARM: multi_v7_defconfig: Enable support for ST's LPC Watchdog
+  ARM: multi_v7_defconfig: Enable support for ST's LPC RTC
+  ARM: STi: DT: STiH407: Add Device Tree node for the LPC
+  watchdog: bindings: Provide ST bindings for ST's LPC Watchdog device
+  watchdog: st_wdt: Add new driver for ST's LPC Watchdog
+  rtc: bindings: Provide ST bindings for ST's LPC RTC device
+  rtc: st: add new driver for ST's LPC RTC
+  MAINTAINERS: Add Watchdog and RTC files to STI's maintainer entry
+
+ .../devicetree/bindings/rtc/rtc-st-lpc.txt         |  25 ++
+ .../devicetree/bindings/watchdog/st_lpc_wdt.txt    |  38 +++
+ MAINTAINERS                                        |   2 +
+ arch/arm/boot/dts/stih407-family.dtsi              |  20 ++
+ arch/arm/configs/multi_v7_defconfig                |   2 +
+ drivers/rtc/Kconfig                                |  12 +
+ drivers/rtc/Makefile                               |   1 +
+ drivers/rtc/rtc-st-lpc.c                           | 354 +++++++++++++++++++++
+ drivers/watchdog/Kconfig                           |  13 +
+ drivers/watchdog/Makefile                          |   1 +
+ drivers/watchdog/st_lpc_wdt.c                      | 335 +++++++++++++++++++
+ include/dt-bindings/mfd/st-lpc.h                   |  15 +
+ 12 files changed, 818 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/rtc/rtc-st-lpc.txt
+ create mode 100644 Documentation/devicetree/bindings/watchdog/st_lpc_wdt.txt
+ create mode 100644 drivers/rtc/rtc-st-lpc.c
+ create mode 100644 drivers/watchdog/st_lpc_wdt.c
+ create mode 100644 include/dt-bindings/mfd/st-lpc.h
+
+-- 
+1.9.1
