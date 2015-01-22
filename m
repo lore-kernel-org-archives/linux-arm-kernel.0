@@ -1,39 +1,35 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 Jan 2015 17:04:29 -0800
-Subject: [GIT PULL] qcom DT changes for v3.20
-In-Reply-To: <alpine.DEB.2.02.1501191224310.2973@galak-ubuntu.qualcomm.com>
-References: <alpine.DEB.2.02.1501191224310.2973@galak-ubuntu.qualcomm.com>
-Message-ID: <20150122010429.GI29014@quad.lixom.net>
+Date: Wed, 21 Jan 2015 17:13:35 -0800
+Subject: [PATCH 8/8] msm: scm: Move the scm driver to drivers/soc/qcom
+In-Reply-To: <1407202310-3359-9-git-send-email-sboyd@codeaurora.org>
+References: <1407202310-3359-1-git-send-email-sboyd@codeaurora.org>
+ <1407202310-3359-9-git-send-email-sboyd@codeaurora.org>
+Message-ID: <CAOesGMh1HE+hMP0VWr2vaHCp2itVjpQeiiFL6r9WeJUFes5tvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 19, 2015 at 12:25:51PM -0600, Kumar Gala wrote:
-> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
-> 
->   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-dt-for-3.20
-> 
-> for you to fetch changes up to bb901bd6596e93fc2e0fc6da2f367a651bd8d16e:
-> 
->   ARM: dts: qcom: Correct IPQ8064 tlmm interrupt (2015-01-19 12:11:41 -0600)
-> 
-> ----------------------------------------------------------------
-> Qualcomm ARM Based Device Tree Updates for v3.20
-> 
-> * Correct IPQ8064 tlmm interrupt
-> * Add Support for SD Card Detect for ifc6410 board
-> 
-> ----------------------------------------------------------------
-> Pramod Gurav (1):
->       ARM: dts: qcom: Add Support for SD Card Detect for ifc6410 board
-> 
-> Stephen Boyd (1):
->       ARM: dts: qcom: Correct IPQ8064 tlmm interrupt
+I just saw this in the pull request from Kumar, so this is a bit late
+w.r.t. to the patch, but so was his merging of the code. :)
 
-Merged, thanks.
+
+
+On Mon, Aug 4, 2014 at 6:31 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> Architectural changes in the ARM Linux kernel tree mandate
+> the eventual removal of the mach-* directories. Move the
+> scm driver to drivers/soc/qcom and the scm header to
+> include/soc/qcom to support that removal.
+
+The idea is not blindly move one dumping ground to a new place.
+
+I see only two exported functions from scm.c:
+
+scm_get_version: This is not used anywhere in the kernel and can just be removed
+scm_call: This is used by scm-boot, and would be better to translate
+over to firmware_ops in the first place.
+
+
+So, can you please rework this with the above in mind instead of just
+moving the files over? Thanks!
 
 
 -Olof
