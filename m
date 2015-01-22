@@ -1,32 +1,41 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 Jan 2015 16:57:48 -0800
-Subject: [GIT PULL 3/3] omap device tree changes for v3.20
-In-Reply-To: <54b99dd4.c1ef440a.27a8.ffffc87fSMTPIN_ADDED_BROKEN@mx.google.com>
-References: <pull-1421450357-648499>
- <54b99dd4.c1ef440a.27a8.ffffc87fSMTPIN_ADDED_BROKEN@mx.google.com>
-Message-ID: <20150122005748.GF29014@quad.lixom.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 21 Jan 2015 16:54:26 -0800
+Subject: [GIT PULL] ARM: OMAP2+: hwmod: first set of patches for v3.20
+In-Reply-To: <alpine.DEB.2.02.1501212338100.5450@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1501212338100.5450@utopia.booyaka.com>
+Message-ID: <20150122005426.GV7718@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 03:21:22PM -0800, Tony Lindgren wrote:
+* Paul Walmsley <paul@pwsan.com> [150121 15:42]:
+> Hi Tony
+> 
 > The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
 > 
 >   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.20/dt-pt1
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.20/omap-hwmod-a
 > 
-> for you to fetch changes up to 7300bfff886a1340cfeb252035303e265cd556d9:
+> for you to fetch changes up to 1c7e36bfc3e2fb2df5e2d1989a4b6fb9055a0f9b:
 > 
->   ARM: dts: omap3-gta04: Add handling for tv output (2015-01-13 08:02:21 -0800)
+>   ARM: DRA7: hwmod: Fix boot crash with DEBUG_LL enabled on UART3 (2015-01-20 18:12:17 -0700)
 > 
 > ----------------------------------------------------------------
-> Device tree changes for omaps. Mostly to add support for new
-> am437x-idk and update am437x-sk boards. Also enabling new
-> devices for multiple boards.
+> ARM: OMAP2+: hwmod: first set of patches for v3.20
+> 
+> First set of OMAP2+ hwmod patches for Linux v3.20.  These are mostly
+> fixes for warnings, although there's one DRA7xx patch that fixes
+> CONFIG_DEBUG_LL for AM572x/DRA7xx SoCs that use UART3 for console,
+> such as the BeagleBoard-X15.
+> 
+> These patches entered Linux-next starting with the next-20150121 tag.
+> 
+> Basic build, boot, and PM test results can be found here:
+> 
+> http://www.pwsan.com/omap/testlogs/omap-hwmod-a-for-v3.20/20150121142621/
 
-Merged, thanks.
+Thanks pulling into omap-for-v3.20/fixes-not-urgent.
 
-
--Olof
+Tony
