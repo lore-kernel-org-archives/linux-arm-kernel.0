@@ -1,35 +1,35 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 22 Jan 2015 11:56:03 +0000
-Subject: [PATCH v2 5/9] watchdog: bindings: Provide ST bindings for ST's LPC
- Watchdog device
+Date: Thu, 22 Jan 2015 11:56:05 +0000
+Subject: [PATCH v2 7/9] rtc: bindings: Provide ST bindings for ST's LPC RTC
+ device
 In-Reply-To: <1421927767-28889-1-git-send-email-lee.jones@linaro.org>
 References: <1421927767-28889-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1421927767-28889-6-git-send-email-lee.jones@linaro.org>
+Message-ID: <1421927767-28889-8-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On current ST platforms the LPC controls a number of functions including
 Watchdog and Real Time Clock.  This patch provides the bindings used to
-configure LPC in Watchdog mode.
+configure LPC in RTC mode.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- .../devicetree/bindings/watchdog/st_lpc_wdt.txt    | 38 ++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/watchdog/st_lpc_wdt.txt
+ .../devicetree/bindings/rtc/rtc-st-lpc.txt         | 25 ++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/rtc/rtc-st-lpc.txt
 
-diff --git a/Documentation/devicetree/bindings/watchdog/st_lpc_wdt.txt b/Documentation/devicetree/bindings/watchdog/st_lpc_wdt.txt
+diff --git a/Documentation/devicetree/bindings/rtc/rtc-st-lpc.txt b/Documentation/devicetree/bindings/rtc/rtc-st-lpc.txt
 new file mode 100644
-index 0000000..1bdf023
+index 0000000..aaf9855
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/watchdog/st_lpc_wdt.txt
-@@ -0,0 +1,38 @@
-+STMicroelectronics Low Power Controller (LPC) - Watchdog
-+========================================================
++++ b/Documentation/devicetree/bindings/rtc/rtc-st-lpc.txt
+@@ -0,0 +1,25 @@
++STMicroelectronics Low Power Controller (LPC) - RTC
++===================================================
 +
 +LPC currently supports Watchdog OR Real Time Clock functionality.
 +
-+[See: ../rtc/rtc-st-lpc.txt for RTC options]
++[See: ../watchdog/st_lpc_wdt.txt for Watchdog options]
 +
 +Required properties
 +
@@ -42,25 +42,12 @@ index 0000000..1bdf023
 +		  ST_LPC_MODE_WDT [1].  One (and only one) mode must be
 +		  selected.
 +
-+Required properties [watchdog mode]
-+
-+- st,syscfg	: Phandle to syscfg node used to enable watchdog and configure
-+		  CPU reset type.
-+- timeout-sec	: Watchdog timeout in seconds
-+
-+Optional properties [watchdog mode]
-+
-+- st,warm-reset	: If present reset type will be 'warm' - if not it will be cold
-+
 +Example:
 +	lpc at fde05000 {
 +		compatible	= "st,stih416-lpc-watchdog";
 +		reg		= <0xfde05000 0x1000>;
 +		clocks 		= <&clk_s_d3_flexgen CLK_LPC_0>;
-+		st,syscfg	= <&syscfg_core>;
-+		timeout-sec	= <120>;
-+		st,lpc-mode	= <ST_LPC_MODE_WDT>;
-+		st,warm-reset;
++		st,lpc-mode	= <ST_LPC_MODE_RTC>;
 +	};
 -- 
 1.9.1
