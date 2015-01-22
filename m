@@ -1,72 +1,115 @@
 From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Thu, 22 Jan 2015 17:56:42 +0100
-Subject: [PATCHv6 2/5] USB: gadget: atmel_usba_udc: Request an auto disabled
- Vbus signal IRQ instead of an auto enabled IRQ request followed by IRQ
- disable
+Date: Thu, 22 Jan 2015 17:56:44 +0100
+Subject: [PATCHv6 4/5] USB: gadget: atmel_usba_udc: Prepare for IRQ single
+ edge support
 In-Reply-To: <1421945805-31129-1-git-send-email-sylvain.rochet@finsecur.com>
 References: <1421945805-31129-1-git-send-email-sylvain.rochet@finsecur.com>
-Message-ID: <1421945805-31129-3-git-send-email-sylvain.rochet@finsecur.com>
+Message-ID: <1421945805-31129-5-git-send-email-sylvain.rochet@finsecur.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vbus IRQ handler needs a started UDC driver to work because it uses
-udc->driver, which is set by the UDC start handler. The previous way
-chosen was to return from interrupt if udc->driver is NULL using a
-spinlock around the check.
+Renamed struct usba_udc_errata to struct usba_udc_caps, we are adding a
+new property which is not about errata, this way the struct is not
+misnamed.
 
-We now request an auto disabled (IRQ_NOAUTOEN) Vbus signal IRQ instead
-of an auto enabled IRQ followed by disable_irq(). This way we remove the
-very small timeslot of enabled IRQ which existed previously between
-request() and disable(). We don't need anymore to check if udc->driver
-is NULL in IRQ handler.
+New struct usba_udc_caps property: irq_single_edge_support, boolean,
+set to true if the board supports IRQ_TYPE_EDGE_FALLING and
+IRQ_TYPE_EDGE_RISING, otherwise set to false.
 
 Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
-Suggested-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/usb/gadget/udc/atmel_usba_udc.c | 9 ++-------
- 1 file changed, 2 insertions(+), 7 deletions(-)
+ drivers/usb/gadget/udc/atmel_usba_udc.c | 25 +++++++++++++++----------
+ drivers/usb/gadget/udc/atmel_usba_udc.h |  5 +++--
+ 2 files changed, 18 insertions(+), 12 deletions(-)
 
 diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-index 40e5fc7..f9f305f 100644
+index d554106..361f740 100644
 --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
 +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-@@ -1745,10 +1745,6 @@ static irqreturn_t usba_vbus_irq(int irq, void *devid)
+@@ -338,8 +338,8 @@ static int vbus_is_present(struct usba_udc *udc)
  
- 	spin_lock(&udc->lock);
+ static void toggle_bias(struct usba_udc *udc, int is_on)
+ {
+-	if (udc->errata && udc->errata->toggle_bias)
+-		udc->errata->toggle_bias(udc, is_on);
++	if (udc->caps && udc->caps->toggle_bias)
++		udc->caps->toggle_bias(udc, is_on);
+ }
  
--	/* May happen if Vbus pin toggles during probe() */
--	if (!udc->driver)
--		goto out;
--
- 	vbus = vbus_is_present(udc);
- 	if (vbus != udc->vbus_prev) {
- 		if (vbus) {
-@@ -1769,7 +1765,6 @@ static irqreturn_t usba_vbus_irq(int irq, void *devid)
- 		udc->vbus_prev = vbus;
- 	}
+ static void generate_bias_pulse(struct usba_udc *udc)
+@@ -347,8 +347,8 @@ static void generate_bias_pulse(struct usba_udc *udc)
+ 	if (!udc->bias_pulse_needed)
+ 		return;
  
--out:
- 	spin_unlock(&udc->lock);
+-	if (udc->errata && udc->errata->pulse_bias)
+-		udc->errata->pulse_bias(udc);
++	if (udc->caps && udc->caps->pulse_bias)
++		udc->caps->pulse_bias(udc);
  
- 	return IRQ_HANDLED;
-@@ -2109,6 +2104,8 @@ static int usba_udc_probe(struct platform_device *pdev)
+ 	udc->bias_pulse_needed = false;
+ }
+@@ -1901,18 +1901,23 @@ static void at91sam9g45_pulse_bias(struct usba_udc *udc)
+ 	at91_pmc_write(AT91_CKGR_UCKR, uckr | AT91_PMC_BIASEN);
+ }
  
- 	if (gpio_is_valid(udc->vbus_pin)) {
- 		if (!devm_gpio_request(&pdev->dev, udc->vbus_pin, "atmel_usba_udc")) {
-+			irq_set_status_flags(gpio_to_irq(udc->vbus_pin),
-+					IRQ_NOAUTOEN);
- 			ret = devm_request_irq(&pdev->dev,
- 					gpio_to_irq(udc->vbus_pin),
- 					usba_vbus_irq, 0,
-@@ -2118,8 +2115,6 @@ static int usba_udc_probe(struct platform_device *pdev)
- 				dev_warn(&udc->pdev->dev,
- 					 "failed to request vbus irq; "
- 					 "assuming always on\n");
--			} else {
--				disable_irq(gpio_to_irq(udc->vbus_pin));
- 			}
- 		} else {
- 			/* gpio_request fail so use -EINVAL for gpio_is_valid */
+-static const struct usba_udc_errata at91sam9rl_errata = {
++static const struct usba_udc_caps at91sam9rl_caps = {
+ 	.toggle_bias = at91sam9rl_toggle_bias,
+ };
+ 
+-static const struct usba_udc_errata at91sam9g45_errata = {
++static const struct usba_udc_caps at91sam9g45_caps = {
+ 	.pulse_bias = at91sam9g45_pulse_bias,
++	.irq_single_edge_support = true,
++};
++
++static const struct usba_udc_caps sama5d3_caps = {
++	.irq_single_edge_support = true,
+ };
+ 
+ static const struct of_device_id atmel_udc_dt_ids[] = {
+-	{ .compatible = "atmel,at91sam9rl-udc", .data = &at91sam9rl_errata },
+-	{ .compatible = "atmel,at91sam9g45-udc", .data = &at91sam9g45_errata },
+-	{ .compatible = "atmel,sama5d3-udc" },
++	{ .compatible = "atmel,at91sam9rl-udc", .data = &at91sam9rl_caps },
++	{ .compatible = "atmel,at91sam9g45-udc", .data = &at91sam9g45_caps },
++	{ .compatible = "atmel,sama5d3-udc", .data = &sama5d3_caps },
+ 	{ /* sentinel */ }
+ };
+ 
+@@ -1934,7 +1939,7 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
+ 	if (!match)
+ 		return ERR_PTR(-EINVAL);
+ 
+-	udc->errata = match->data;
++	udc->caps = match->data;
+ 
+ 	udc->num_ep = 0;
+ 
+diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.h b/drivers/usb/gadget/udc/atmel_usba_udc.h
+index 085749a..4fe4c87 100644
+--- a/drivers/usb/gadget/udc/atmel_usba_udc.h
++++ b/drivers/usb/gadget/udc/atmel_usba_udc.h
+@@ -304,9 +304,10 @@ struct usba_request {
+ 	unsigned int				mapped:1;
+ };
+ 
+-struct usba_udc_errata {
++struct usba_udc_caps {
+ 	void (*toggle_bias)(struct usba_udc *udc, int is_on);
+ 	void (*pulse_bias)(struct usba_udc *udc);
++	bool irq_single_edge_support;
+ };
+ 
+ struct usba_udc {
+@@ -322,7 +323,7 @@ struct usba_udc {
+ 	struct usb_gadget gadget;
+ 	struct usb_gadget_driver *driver;
+ 	struct platform_device *pdev;
+-	const struct usba_udc_errata *errata;
++	const struct usba_udc_caps *caps;
+ 	int irq;
+ 	int vbus_pin;
+ 	int vbus_pin_inverted;
 -- 
 2.1.4
