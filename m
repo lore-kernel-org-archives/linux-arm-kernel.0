@@ -1,68 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 22 Jan 2015 16:25:23 +0000
-Subject: [GIT PULL] iommu/arm-smmu: updates for 3.20
-Message-ID: <20150122162523.GE20826@arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 22 Jan 2015 17:36:05 +0100
+Subject: [PATCH 10/17] ARM: at91: merge SOC_AT91SAM9xxx
+In-Reply-To: <54C0CF5D.8020902@atmel.com>
+References: <1421359100-8930-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1421359100-8930-11-git-send-email-alexandre.belloni@free-electrons.com>
+ <54C0CF5D.8020902@atmel.com>
+Message-ID: <20150122163605.GC19922@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+On 22/01/2015 at 11:22:21 +0100, Nicolas Ferre wrote :
+> Le 15/01/2015 22:58, Alexandre Belloni a ?crit :
+> > Only use SOC_AT91SAM9 for all the at91sam9 SoCs.
+> > 
+> > It enables HAVE_AT91_SMD and HAVE_AT91_UTMI for all the sam9 SoCs but this only
+> > represents 96 bytes of uncompressed kernel code.
+> 
+> After this patch that removes all the CONFIG_SOC_AT91SAM9xxxx options
+> excepted CONFIG_SOC_AT91SAM9, I still see a lot of them remaining in the
+> source tree.
+> 
+> So, this patch is not complete in my opinion. Even if you remove these
+> options later on, why not suppress them here?
+> 
 
-Please pull the following ARM SMMU updates for 3.20. The bulk of the
-changes are due to the introduction of a generic page table framework
-for IOMMUs along with an ARM LPAE backend. I've moved the ARM SMMU
-driver over to this and Laurent has a patch to do the same for the
-IPMMU. There's also the MMIO polling macros for iopoll.h, which have
-been acked by Arnd.
+They went through other branches (you were in copy).
 
-I've not included Laurent's patch here, as it depends on some other
-IPMMU changes that you already have queued.
 
-Cheers,
-
-Will
-
---->8
-
-The following changes since commit eaa27f34e91a14cdceed26ed6c6793ec1d186115:
-
-  linux 3.19-rc4 (2015-01-11 12:44:53 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/updates
-
-for you to fetch changes up to 859a732e4f713270152c78df6e09accbde006734:
-
-  iommu/arm-smmu: add support for iova_to_phys through ATS1PR (2015-01-19 18:18:38 +0000)
-
-----------------------------------------------------------------
-Laurent Pinchart (1):
-      iommu: io-pgtable-arm: add non-secure quirk
-
-Matt Wagantall (1):
-      iopoll: Introduce memory-mapped IO polling macros
-
-Mitchel Humpherys (2):
-      iommu/arm-smmu: don't touch the secure STLBIALL register
-      iommu/arm-smmu: add support for iova_to_phys through ATS1PR
-
-Will Deacon (4):
-      iommu: introduce generic page table allocation framework
-      iommu: add ARM LPAE page table allocator
-      iommu: add self-consistency tests to ARM LPAE IO page table allocator
-      iommu/arm-smmu: make use of generic LPAE allocator
-
- MAINTAINERS                    |   1 +
- arch/arm64/Kconfig             |   1 -
- drivers/iommu/Kconfig          |  32 +-
- drivers/iommu/Makefile         |   2 +
- drivers/iommu/arm-smmu.c       | 935 +++++++++++++-------------------------
- drivers/iommu/io-pgtable-arm.c | 986 +++++++++++++++++++++++++++++++++++++++++
- drivers/iommu/io-pgtable.c     |  82 ++++
- drivers/iommu/io-pgtable.h     | 143 ++++++
- include/linux/iopoll.h         | 144 ++++++
- 9 files changed, 1706 insertions(+), 620 deletions(-)
- create mode 100644 drivers/iommu/io-pgtable-arm.c
- create mode 100644 drivers/iommu/io-pgtable.c
- create mode 100644 drivers/iommu/io-pgtable.h
- create mode 100644 include/linux/iopoll.h
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
