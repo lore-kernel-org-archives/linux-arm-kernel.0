@@ -1,89 +1,141 @@
 From: galak@codeaurora.org (Kumar Gala)
-Date: Thu, 22 Jan 2015 11:02:41 -0600
-Subject: [GIT PULL] qcom SoC changes for v3.20
-In-Reply-To: <20150122011521.GA31815@quad.lixom.net>
-References: <alpine.DEB.2.02.1501191226010.2973@galak-ubuntu.qualcomm.com>
- <20150122011521.GA31815@quad.lixom.net>
-Message-ID: <D177DF12-0F31-49CF-B98B-9FAC23AAB24C@codeaurora.org>
+Date: Thu, 22 Jan 2015 11:05:28 -0600
+Subject: [PATCH v2] ARM: qcom: Fix SCM interface for big-endian kernels
+In-Reply-To: <1421868075-20471-1-git-send-email-sboyd@codeaurora.org>
+References: <1421868075-20471-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <EF8384DD-D1D4-40F8-BCD7-D6516E923120@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On Jan 21, 2015, at 7:15 PM, Olof Johansson <olof@lixom.net> wrote:
+On Jan 21, 2015, at 1:21 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
 
-> Hi,
+> The secure environment only runs in little-endian mode, so any
+> buffers shared with the secure environment should have their
+> contents converted to little-endian. We also mark such elements
+> with __le32 to allow sparse to catch such problems.
 > 
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
 > 
-> On Mon, Jan 19, 2015 at 12:27:15PM -0600, Kumar Gala wrote:
->> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
->> 
->>  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
->> 
->> are available in the git repository at:
->> 
->>  git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-soc-for-3.20
->> 
->> for you to fetch changes up to ae0a6075c046f9c8dbac18f53a779592f97b402e:
->> 
->>  soc: qcom: scm: Clarify boot interface (2015-01-19 11:55:12 -0600)
->> 
->> ----------------------------------------------------------------
->> Qualcomm ARM Based SoC Updates for v3.20
->> 
->> * Moved scm support into drivers/soc/qcom (allows for use by drivers)
->> * Various bug fixes and minor feature additions to scm code
->> * Added big-endian support to debug MSM uart
->> * Added big-endian support to ARCH_QCOM
->> 
->> ----------------------------------------------------------------
->> Lina Iyer (2):
->>      ARM: qcom: Add SCM warmboot flags for quad core targets.
->>      soc: qcom: scm: Move scm-boot files to drivers/soc and include/soc
->> 
->> Olav Haugan (1):
->>      ARM: qcom: scm: Add logging of actual return code from scm call
->> 
->> Saravana Kannan (1):
->>      ARM: qcom: scm: Add API to query for service/command availability.
->> 
->> Stephen Boyd (9):
->>      ARM: debug: Update MSM and QCOM DEBUG_LL help
->>      ARM: debug: msm: Support big-endian CPUs
->>      ARM: qcom: Select ARCH_SUPPORTS_BIG_ENDIAN
->>      ARM: qcom: scm: Fix incorrect cache invalidation
->>      ARM: qcom: scm: Get cacheline size from CTR
->>      ARM: qcom: scm: Add a feat version query API
->>      soc: qcom: scm: Move the scm driver to drivers/soc/qcom
+> Changes since v1:
+> * Rebased onto Kumar's qcom/soc branch
 > 
-> I replied on the patch here just now. This isn't the right thing to do,
-> as far as I can tell.
+> drivers/soc/qcom/scm-boot.c |  8 ++++----
+> drivers/soc/qcom/scm.c      | 30 ++++++++++++++++--------------
+> 2 files changed, 20 insertions(+), 18 deletions(-)
 > 
-> Seems like sending a fresh request with the material besides the move
-> to drivers/soc should be mergeable though, so feel free to do that while
-> the rest is hashed out.
+> diff --git a/drivers/soc/qcom/scm-boot.c b/drivers/soc/qcom/scm-boot.c
+> index 1822b13bbc10..af16fcc8d5cb 100644
+> --- a/drivers/soc/qcom/scm-boot.c
+> +++ b/drivers/soc/qcom/scm-boot.c
+> @@ -27,12 +27,12 @@
+> int scm_set_boot_addr(u32 addr, int flags)
+> {
+> 	struct {
+> -		unsigned int flags;
+> -		phys_addr_t  addr;
+> +		__le32 flags;
+> +		__le32 addr;
 
-Would the following be ok (dropped the move to drivers/soc and some additional unused scm APIs as of right now):
+How does this work?  How can we go from phys_addr_t back to __le32 on LPAE or 64-bit systems?
 
-ARM: qcom: Drop unnecessary selects from ARCH_QCOM
-ARM: qcom: scm: Clarify boot interface
-ARM: qcom: Add SCM warmboot flags for quad core targets.
-ARM: qcom: scm: Add logging of actual return code from scm call
-ARM: qcom: scm: Flush the command buffer only instead of the entire cache
-ARM: qcom: scm: Get cacheline size from CTR
-ARM: qcom: scm: Fix incorrect cache invalidation
-ARM: qcom: Select ARCH_SUPPORTS_BIG_ENDIAN
-ARM: debug: msm: Support big-endian CPUs
-ARM: debug: Update MSM and QCOM DEBUG_LL help
-
- Kconfig.debug        |    5 ++--
- include/debug/msm.S  |    6 +++++
- mach-qcom/Kconfig    |    3 --
- mach-qcom/scm-boot.c |    2 -
- mach-qcom/scm-boot.h |    4 ++-
- mach-qcom/scm.c      |   55 +++++++++++++++++++++++++++++++++++++--------------
- 6 files changed, 54 insertions(+), 21 deletions(-)
-
-- k
+> 	} cmd;
+> 
+> -	cmd.addr = addr;
+> -	cmd.flags = flags;
+> +	cmd.addr = cpu_to_le32(addr);
+> +	cmd.flags = cpu_to_le32(flags);
+> 	return scm_call(SCM_SVC_BOOT, SCM_BOOT_ADDR,
+> 			&cmd, sizeof(cmd), NULL, 0);
+> }
+> diff --git a/drivers/soc/qcom/scm.c b/drivers/soc/qcom/scm.c
+> index 2e98d80e2387..3e724b8af485 100644
+> --- a/drivers/soc/qcom/scm.c
+> +++ b/drivers/soc/qcom/scm.c
+> @@ -62,11 +62,11 @@ static DEFINE_MUTEX(scm_lock);
+>  * to access the buffers in a safe manner.
+>  */
+> struct scm_command {
+> -	u32	len;
+> -	u32	buf_offset;
+> -	u32	resp_hdr_offset;
+> -	u32	id;
+> -	u32	buf[0];
+> +	__le32 len;
+> +	__le32 buf_offset;
+> +	__le32 resp_hdr_offset;
+> +	__le32 id;
+> +	__le32 buf[0];
+> };
+> 
+> /**
+> @@ -76,9 +76,9 @@ struct scm_command {
+>  * @is_complete: indicates if the command has finished processing
+>  */
+> struct scm_response {
+> -	u32	len;
+> -	u32	buf_offset;
+> -	u32	is_complete;
+> +	__le32 len;
+> +	__le32 buf_offset;
+> +	__le32 is_complete;
+> };
+> 
+> /**
+> @@ -96,12 +96,14 @@ static struct scm_command *alloc_scm_command(size_t cmd_size, size_t resp_size)
+> 	struct scm_command *cmd;
+> 	size_t len = sizeof(*cmd) + sizeof(struct scm_response) + cmd_size +
+> 		resp_size;
+> +	u32 offset;
+> 
+> 	cmd = kzalloc(PAGE_ALIGN(len), GFP_KERNEL);
+> 	if (cmd) {
+> -		cmd->len = len;
+> -		cmd->buf_offset = offsetof(struct scm_command, buf);
+> -		cmd->resp_hdr_offset = cmd->buf_offset + cmd_size;
+> +		cmd->len = cpu_to_le32(len);
+> +		offset = offsetof(struct scm_command, buf);
+> +		cmd->buf_offset = cpu_to_le32(offset);
+> +		cmd->resp_hdr_offset = cpu_to_le32(offset + cmd_size);
+> 	}
+> 	return cmd;
+> }
+> @@ -126,7 +128,7 @@ static inline void free_scm_command(struct scm_command *cmd)
+> static inline struct scm_response *scm_command_to_response(
+> 		const struct scm_command *cmd)
+> {
+> -	return (void *)cmd + cmd->resp_hdr_offset;
+> +	return (void *)cmd + le32_to_cpu(cmd->resp_hdr_offset);
+> }
+> 
+> /**
+> @@ -148,7 +150,7 @@ static inline void *scm_get_command_buffer(const struct scm_command *cmd)
+>  */
+> static inline void *scm_get_response_buffer(const struct scm_response *rsp)
+> {
+> -	return (void *)rsp + rsp->buf_offset;
+> +	return (void *)rsp + le32_to_cpu(rsp->buf_offset);
+> }
+> 
+> static int scm_remap_error(int err)
+> @@ -260,7 +262,7 @@ int scm_call(u32 svc_id, u32 cmd_id, const void *cmd_buf, size_t cmd_len,
+> 	if (!cmd)
+> 		return -ENOMEM;
+> 
+> -	cmd->id = (svc_id << 10) | cmd_id;
+> +	cmd->id = cpu_to_le32((svc_id << 10) | cmd_id);
+> 	if (cmd_buf)
+> 		memcpy(scm_get_command_buffer(cmd), cmd_buf, cmd_len);
+> 
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
 -- 
 Qualcomm Innovation Center, Inc.
