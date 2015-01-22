@@ -1,25 +1,107 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Thu, 22 Jan 2015 15:40:30 +0100
-Subject: [PATCH 2/2] ARM: sti: Provide DT nodes for SBC SSC[0..2]
-In-Reply-To: <1421921237-8991-2-git-send-email-lee.jones@linaro.org>
-References: <1421921237-8991-1-git-send-email-lee.jones@linaro.org>
- <1421921237-8991-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <54C10BDE.9090702@st.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Thu, 22 Jan 2015 15:42:28 +0100
+Subject: [PATCH v11 3/4] clk: Add rate constraints to clocks
+In-Reply-To: <20150122014635.GI27202@codeaurora.org>
+References: <1421847039-29544-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1421847039-29544-4-git-send-email-tomeu.vizoso@collabora.com>
+ <20150122014635.GI27202@codeaurora.org>
+Message-ID: <54C10C54.6070500@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 01/22/2015 02:46 AM, Stephen Boyd wrote:
+> On 01/21, Tomeu Vizoso wrote:
+>> Adds a way for clock consumers to set maximum and minimum rates. This
+>> can be used for thermal drivers to set minimum rates, or by misc.
+>> drivers to set maximum rates to assure a minimum performance level.
+>>
+>> Changes the signature of the determine_rate callback by adding the
+>> parameters min_rate and max_rate.
+>>
+>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>>
+>> ---
+>> v11:	* Recalculate the rate before putting the reference to clk_core
+>> 	* Don't recalculate the rate when freeing the per-user clock
+>> 	in the initialization error paths
+>> 	* Move __clk_create_clk to be next to __clk_free_clk for more
+>> 	comfortable reading
+> 
+> Can we do this in the previous patch where we introduce the
+> function?
 
-On 01/22/2015 11:07 AM, Lee Jones wrote:
-> The Synchronous Serial Controller is used to provide SPI.
->
-> These are the ports which are located on the Stand-By Controller (SBC).
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->   arch/arm/boot/dts/stih407-family.dtsi | 31 +++++++++++++++++++++++++++++++
->   1 file changed, 31 insertions(+)
->
->
-Applied,
+Ok.
 
-Thanks
+>> @@ -2143,9 +2314,16 @@ struct clk *__clk_register(struct device *dev, struct clk_hw *hw)
+>>  	else
+>>  		clk->owner = NULL;
+>>  
+>> +	INIT_HLIST_HEAD(&clk->clks);
+>> +
+>> +	hw->clk = __clk_create_clk(hw, NULL, NULL);
+>> +
+>>  	ret = __clk_init(dev, hw->clk);
+>> -	if (ret)
+>> +	if (ret) {
+>> +		__clk_free_clk(hw->clk);
+>> +		hw->clk = NULL;
+>>  		return ERR_PTR(ret);
+>> +	}
+>>  
+>>  	return hw->clk;
+>>  }
+>> @@ -2210,12 +2388,16 @@ struct clk *clk_register(struct device *dev, struct clk_hw *hw)
+>>  		}
+>>  	}
+>>  
+>> +	INIT_HLIST_HEAD(&clk->clks);
+>> +
+>>  	hw->clk = __clk_create_clk(hw, NULL, NULL);
+>>  	ret = __clk_init(dev, hw->clk);
+>>  	if (!ret)
+>>  		return hw->clk;
+>>  
+>> -	kfree(hw->clk);
+>> +	__clk_free_clk(hw->clk);
+>> +	hw->clk = NULL;
+> 
+> Shouldn't we be assigning to NULL in the previous patch (same
+> comment for __clk_register)?
+
+Agreed, though I have gone ahead and removed __clk_register completely
+because AFAICS it has never been used.
+
+>>  fail_parent_names_copy:
+>>  	while (--i >= 0)
+>>  		kfree(clk->parent_names[i]);
+>> @@ -2420,7 +2602,14 @@ void __clk_put(struct clk *clk)
+>>  	if (!clk || WARN_ON_ONCE(IS_ERR(clk)))
+>>  		return;
+>>  
+>> +	clk_prepare_lock();
+>> +	hlist_del(&clk->child_node);
+>> +	clk_prepare_unlock();
+>> +
+>> +	clk_core_set_rate(clk->core, clk->core->req_rate);
+>> +
+>>  	clk_core_put(clk->core);
+>> +
+> 
+> Sad that we take the lock 3 times during __clk_put(). We should
+> be able to do it only once if we have a lockless
+> clk_core_set_rate() function and put the contents of
+> clk_core_put() into this function. Actually we need to do that to
+> be thread safe with clk->core->req_rate changing. We can call the
+> same function in clk_set_rate_range() too so that we don't have
+> to deal with recursive locking there.
+
+Sweet, done.
+
+>>  	kfree(clk);
+>>  }
+>>  
+> 
+
+Thanks,
+
+Tomeu
