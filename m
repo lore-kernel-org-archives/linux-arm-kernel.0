@@ -1,51 +1,128 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 22 Jan 2015 14:46:09 +0000
-Subject: [PATCH v7 13/17] ARM64 / ACPI: Add GICv2 specific ACPI boot
- support
-In-Reply-To: <54C0F133.8060901@linaro.org>
-References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
- <1421247905-3749-14-git-send-email-hanjun.guo@linaro.org>
- <54B8F2E3.80306@arm.com>
- <CACxGe6tBb8L8upS3zenZbrOc_c0E=MA=DqLjkSezEbregaAaaA@mail.gmail.com>
- <54B92245.6080306@arm.com> <54C0F133.8060901@linaro.org>
-Message-ID: <54C10D31.1090203@arm.com>
+From: binmlist@gmail.com (Bin Liu)
+Date: Thu, 22 Jan 2015 08:52:33 -0600
+Subject: MUSB dual-role on AM335x behaving weirdly
+In-Reply-To: <20150122140039.GP4367@lukather>
+References: <20150121160631.GH4367@lukather>
+ <CADYTM3b40_u4Twt27PBVH4dC9ErDnFEi0AUzs_aJRM3mMHaBCQ@mail.gmail.com>
+ <54C0A8C9.3040201@visionsystems.de>
+ <20150122104330.GN4367@lukather>
+ <20150122110113.GA17866@pengutronix.de>
+ <20150122140039.GP4367@lukather>
+Message-ID: <CADYTM3bvgiMv9tm_qGTA-Kq2yXgEiACxkBuTP-ZWsraA5dbVEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hanjun,
+Hi,
 
-On 22/01/15 12:46, Hanjun Guo wrote:
-> Hi Marc,
-> 
-> We (Tomasz, Suravee and me) are working on supporting stacked domain on
-> ACPI, and rework GIC ACPI related patch, before we going further, we
-> need your guidance to see if we are going the right direction.
-> 
->    - You said that we spread GIC related code every where, so how
->      about put all the ACPI related GIC init code in one file under
->      drivers/irqchip/ with name irq-gic-acpi.c?
+On Thu, Jan 22, 2015 at 8:00 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Markus,
+>
+> On Thu, Jan 22, 2015 at 12:01:13PM +0100, Markus Pargmann wrote:
+>> Hi,
+>>
+>> On Thu, Jan 22, 2015 at 11:43:30AM +0100, Maxime Ripard wrote:
+>> > Hi Yegor,
+>> >
+>> > On Thu, Jan 22, 2015 at 08:37:45AM +0100, Yegor Yefremov wrote:
+>> > > On 21.01.2015 19:53, Bin Liu wrote:
+>> > > > Hi,
+>> > > >
+>> > > > On Wed, Jan 21, 2015 at 10:06 AM, Maxime Ripard
+>> > > > <maxime.ripard@free-electrons.com> wrote:
+>> > > >> Hi Felipe,
+>> > > >>
+>> > > >> I'm currently working on a custom AM335x-based board, that has a OTG
+>> > > >> connector wired to one of the musb controlers, and Linux 3.17
+>> > > >>
+>> > > >> This OTG connector seems to behave in a weird way when it comes to
+>> > > >> switching from one role to another:
+>> > > >>
+>> > > >>   - The host mode works with CONFIG_USB_MUSB_DUAL_ROLE set, only if
+>> > > >>     the dr_mode is set to host in the DT, and only if we plug the USB
+>> > > >>     device after the kernel has booted. Otherwise, even though the
+>> > > >>     controller seems to be set up as host in the kernel logs, it
+>> > > >>     doesn't work. When DR-mode is set to otg, DRVVBUS is not high
+>> > > >>     which surely doesn't help, but there might be some other issues.
+>> > > >>
+>> > > >>   - The gadget mode works with CONFIG_USB_MUSB_DUAL_ROLE, if dr_mode
+>> > > >>     is set to otg and not host (obviously), and only if we plug the
+>> > > >>     USB cable after the kernel has booted.
+>> > > >>
+>> > > >>   - The gadget mode works with CONFIG_USB_MUSB_GADGET, and with
+>> > > >>     dr_mode set to otg, even if we cold plug the device.
+>> > > >>
+>> > > >>   - As you might expect from the two first items, the runtime
+>> > > >>     switching from gadget to host when CONFIG_USB_MUSB_DUAL_ROLE is
+>> > > >>     set and dr_mode is set in otg doesn't work either.
+>> > > >>
+>> > > >> It looks like it's only waiting for an interrupt to occur to read the
+>> > > >> ID pin state, without reading its initial value, which would explain
+>> > > >> why both the host and gadget enumerate only when a device/cable is
+>> > > >> hotplugged, and that there's some configuration bits that differ
+>> > > >> whenever dr_mode changes, but I couldn't really see anything standing
+>> > > >> out in the driver nor the datasheet.
+>> > > >>
+>> > > >> Have you already experienced something alike with that driver?
+>> > > >
+>> > > > I don't use vanilla mainline kernel very often, but I don't have such
+>> > > > hotplug issues with TI 3.12/14 kernels [1]. I only use
+>> > > > CONFIG_USB_MUSB_DUAL_ROLE though.
+>> > > >
+>> > > > [1] git://git.ti.com/ti-linux-kernel/ti-linux-kernel.git, branch
+>> > > > remote/origin/linux-3.14.y
+>> > >
+>> > > I have the same experience with 3.15. The switching is working when
+>> > > CONFIG_USB_MUSB_DUAL_ROLE is set and dr_mode = "otg". But since 3.16
+>> > > it seems to be broken. Still had no time to bisect this.
+>> >
+>> > I just gave 3.15 a quick try, and it looks like it can now detect when
+>> > the device is acting as a gadget, but the host mode is not working at
+>> > all.
+>> >
+>> > That's a good lead though, I'll dig more into the older versions and
+>> > see if some are working better than others.
+>>
+>> This issue may be related to the fact that the musb controller does not
+>> have an ID pin interrupt. Last year I sent a RFC for a soft detection in
+>> OTG mode. It has a poll loop which toggles the SESSION bit of the
+>> controller to detect devices as host and drops back to device otherwise.
+>> This is far away from a good solution.
+>>
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/204519.html
+>
+> I guess it was a combination of two issues: after giving your patch a
+> try, I found out that (even without your patch), in OTG mode, the
+> gadget device is properly attached even if plugged before the kernel
+> boots. I don't really know how I missed that, but anyway...
+>
+> I also tested to force the ID pin to the ground when a USB device was
+> plugged in, and it then enumerates properly, both when cold and hot
+> plugging. It's a bit weird because the adapter I'm using is working
+> fine on other boards, but maybe the AM335x controller is a bit more
+> picky with the ID pin, or that the other SoC I was testing it on
 
-That would certainly be an improvement.
+On the hw side, for AM335x MUSB controller to work in host mode, the
+ID pin has to be grounded directly or via a resister which is less
+than 10 Ohms.
 
->    - ACPI only support one GICD for now, so we assume that there
->     only one gicv2/v3 core domain and every device not using MSI
->      will refer to that irqdomain in default.
+So, for dr_mode = host, the ID pin is normally grounded directly on
+the board; for dr_mode = org, a micro-A cable should be used to ensure
+the ID pin is properly grounded.
 
-That's good enough, provided that nobody comes up with any form of
-chained interrupt controller (in whatever way that's implemented). ACPI
-doesn't seem to cater for that anyway.
+Regards,
+-Bin.
 
-But default domains are only a quick optimization (it is only there to
-cope with code that didn't know about irq domains at all). What we need
-is a proper integration of the ACPI namespace in the irq domain code.
-Being able to lookup a domain by ACPI table, for example (just like
-irq_find_host returns the domain associated to a DT node).
-
-This would ensure that we can reuse most of the existing code (stacked
-domains, per-device MSI domains [WIP]) without too much effort.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> (Atmel's sama5d4) is quite relaxed about it.
+>
+> I'm guessing that when forced in the host mode, the driver ignores
+> completely the ID pin, hence why it was working properly with that
+> setup.
+>
+> Thanks a lot,
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
