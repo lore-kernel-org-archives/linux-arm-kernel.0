@@ -1,52 +1,51 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 22 Jan 2015 19:14:03 +0100
-Subject: [PATCHv2 1/2] dts: Documentation: AT91 Watchdog, explain what
- atmel,idle-halt property really do
-In-Reply-To: <1421587611-32708-2-git-send-email-sylvain.rochet@finsecur.com>
-References: <20150118090820.07856398@bbrezillon>
- <1421587611-32708-1-git-send-email-sylvain.rochet@finsecur.com>
- <1421587611-32708-2-git-send-email-sylvain.rochet@finsecur.com>
-Message-ID: <20150122191403.322059e3@bbrezillon>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 22 Jan 2015 18:20:34 +0000
+Subject: [PATCHv2 0/2] PCI_IOBASE fixes
+Message-ID: <1421950836-19869-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 18 Jan 2015 14:26:50 +0100
-Sylvain Rochet <sylvain.rochet@finsecur.com> wrote:
+Mark Brown reported [1] build failures in the page table dump code, due
+to lack of an explicit include for PCI_IOBASE.
 
-> atmel,idle-halt property should be used with care, it actually makes the
-> watchdog not counting when the CPU is in idle state, therefore the
-> watchdog reset time depends on mean CPU usage and will not reset at all
-> of the CPU stop working while it is in idle state, which is probably not
-> what you want.
-> 
-> Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+While looking into that I spotted that the VA space allocated for PCI I/O
+overlaps with the fixmap allocation, and that in a couple of places we assume
+that the I/O space is 16MiB while the allocated VA space (and associated
+IO_SPACE_LIMIT) cover 32MiB.
 
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+The first patch fixes the VA space allocation, preventing overlap, and
+introduces common definitions for the I/O space layout, preventing futurre
+issues if the I/O space layout is modified.
 
-> ---
->  Documentation/devicetree/bindings/watchdog/atmel-wdt.txt | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-> index f90e294..a4d8697 100644
-> --- a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-> +++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-> @@ -26,6 +26,11 @@ Optional properties:
->  - atmel,disable : Should be present if you want to disable the watchdog.
->  - atmel,idle-halt : Should be present if you want to stop the watchdog when
->  	entering idle state.
-> +	CAUTION: This property should be used with care, it actually makes the
-> +	watchdog not counting when the CPU is in idle state, therefore the
-> +	watchdog reset time depends on mean CPU usage and will not reset at all
-> +	if the CPU stop working while it is in idle state, which is probably
-> +	not what you want.
->  - atmel,dbg-halt : Should be present if you want to stop the watchdog when
->  	entering debug state.
->  
+The second patch adds the missing explicit includes for the remaining
+definitions used in the dump code, and has been updated from the
+previous posting [2] to take the effects of patch 1 into account.
 
+I've built and boot tested a v3.19-rc4 defconfig with these patches
+applied.
 
+Since v1 [3]:
+* Restore I/O space to 16MiB, per Catalin's request.
+* Add PCI_IO_SIZE along with comment to ensure the I/O space size is
+  consistent through all uses.
+* Reorder mem_init entries for consistency.
+
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/315228.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/315326.html
+[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/315443.html
+
+Mark Rutland (2):
+  arm64: Fix overlapping VA allocations
+  arm64: mm: dump: add missing includes
+
+ arch/arm64/include/asm/io.h     |  5 +++--
+ arch/arm64/include/asm/memory.h | 10 +++++++++-
+ arch/arm64/mm/dump.c            |  8 ++++++--
+ arch/arm64/mm/init.c            |  5 +++--
+ 4 files changed, 21 insertions(+), 7 deletions(-)
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.9.1
