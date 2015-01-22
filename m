@@ -1,50 +1,39 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 22 Jan 2015 10:03:03 +0900
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC sh73a0
- Multiplatform Updates for v3.20
-In-Reply-To: <cover.1421716945.git.horms+renesas@verge.net.au>
-References: <cover.1421716945.git.horms+renesas@verge.net.au>
-Message-ID: <20150122010303.GC25991@verge.net.au>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 21 Jan 2015 17:04:29 -0800
+Subject: [GIT PULL] qcom DT changes for v3.20
+In-Reply-To: <alpine.DEB.2.02.1501191224310.2973@galak-ubuntu.qualcomm.com>
+References: <alpine.DEB.2.02.1501191224310.2973@galak-ubuntu.qualcomm.com>
+Message-ID: <20150122010429.GI29014@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 20, 2015 at 10:27:32AM +0900, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Mon, Jan 19, 2015 at 12:25:51PM -0600, Kumar Gala wrote:
+> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
 > 
-> Please consider these second round of Renesas ARM based SoC sh73a0 multiplatform updates for v3.20.
-> 
-> This pull request is based on the previous round of
-> such requests, tagged as renesas-sh73a0-multiplatform-for-v3.20,
-> which I have already sent a pull-request for.
-
-As Olof has have asked for further work on the above I am withdrawing
-this pull-request.
-
-> My understanding from Geert Uytterhoeven is that the above dependency
-> is required to avoid a lock-up.
-> 
-> 
-> The following changes since commit 93c9f0228a3d0a14640f86b3e8aeaf3c9b449bb7:
-> 
->   ARM: shmobile: kzm9g-reference: Remove board C code and DT file (2015-01-14 09:46:48 +0900)
+>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-sh73a0-multiplatform2-for-v3.20
+>   git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-dt-for-3.20
 > 
-> for you to fetch changes up to e42c8385cfec0579a103b365d61748f199bfe239:
+> for you to fetch changes up to bb901bd6596e93fc2e0fc6da2f367a651bd8d16e:
 > 
->   ARM: shmobile: sh73a0 dtsi: Add Cortex-A9 TWD node (2015-01-17 09:36:35 +0900)
-> 
-> ----------------------------------------------------------------
-> Second Round of Renesas ARM Based SoC sh73a0 Multiplatform Updates for v3.20
-> 
-> * Add Cortex-A9 TWD node
+>   ARM: dts: qcom: Correct IPQ8064 tlmm interrupt (2015-01-19 12:11:41 -0600)
 > 
 > ----------------------------------------------------------------
-> Geert Uytterhoeven (1):
->       ARM: shmobile: sh73a0 dtsi: Add Cortex-A9 TWD node
+> Qualcomm ARM Based Device Tree Updates for v3.20
 > 
->  arch/arm/boot/dts/sh73a0.dtsi | 8 ++++++++
->  1 file changed, 8 insertions(+)
+> * Correct IPQ8064 tlmm interrupt
+> * Add Support for SD Card Detect for ifc6410 board
 > 
+> ----------------------------------------------------------------
+> Pramod Gurav (1):
+>       ARM: dts: qcom: Add Support for SD Card Detect for ifc6410 board
+> 
+> Stephen Boyd (1):
+>       ARM: dts: qcom: Correct IPQ8064 tlmm interrupt
+
+Merged, thanks.
+
+
+-Olof
