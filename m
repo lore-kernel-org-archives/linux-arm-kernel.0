@@ -1,44 +1,32 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 22 Jan 2015 19:18:25 +0000
-Subject: KVM: CONFIG_LOCK_DEP and CONFIG_LOCK_DETECTOR?
-In-Reply-To: <54C14BCF.1050902@samsung.com>
-References: <1421919245.13638.50.camel@x220> <54C14BCF.1050902@samsung.com>
-Message-ID: <54C14D01.2010506@arm.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 22 Jan 2015 11:25:54 -0800
+Subject: [PATCH] PCI: xgene: Include clk.h instead of clk-private.h
+Message-ID: <1421954754-3217-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/01/15 19:13, Mario Smarduch wrote:
-> On 01/22/2015 01:34 AM, Paul Bolle wrote:
->> Mario,
->>
->> Your commit c64735554c0a ("KVM: arm: Add initial dirty page locking
->> support") is included in today's linux-next (ie, next-20150122). I
->> noticed because a script I use to check linux-next spotted a minor
->> problem with it.
->>
->> This commit added a comment that mentions CONFIG_LOCK_DEP and
->> CONFIG_LOCK_DETECTOR. It seems CONFIG_LOCKDEP and CONFIG_LOCKUP_DETECTOR
->> should be used instead. Is a trivial patch to fix these typos queued
->> somewhere?
->>
->> Thanks,
->>
->>
->> Paul Bolle
->>
-> 
-> Hi Paul,
->   thanks for spotting that. No there is no trivial patch
-> queued, didn't notice it until now. Can I submit a follow
-> up trivial patch later?
+This driver should be including clk.h as it's a clock consumer,
+not a clock provider that needs to register clocks early.
 
-Yeah, that can definitely wait. I think we have slightly bigger fish to
-fry for now... ;-)
+Cc: Tanmay Inamdar <tinamdar@apm.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/pci/host/pci-xgene.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-If someone sends us a patch once -rc1 is out, we'll queue it.
-
-Thanks,
-
-	M.
+diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+index b1d0596457c5..fdb348d3ccd3 100644
+--- a/drivers/pci/host/pci-xgene.c
++++ b/drivers/pci/host/pci-xgene.c
+@@ -16,7 +16,7 @@
+  * GNU General Public License for more details.
+  *
+  */
+-#include <linux/clk-private.h>
++#include <linux/clk.h>
+ #include <linux/delay.h>
+ #include <linux/io.h>
+ #include <linux/jiffies.h>
 -- 
-Jazz is not dead. It just smells funny...
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
