@@ -1,29 +1,40 @@
-From: joe@perches.com (Joe Perches)
-Date: Wed, 21 Jan 2015 20:46:45 -0800
-Subject: [PATCH] MAINTAINERS: update Qualcomm support entry
-In-Reply-To: <1421901564-8854-1-git-send-email-agross@codeaurora.org>
-References: <1421901564-8854-1-git-send-email-agross@codeaurora.org>
-Message-ID: <1421902005.18480.3.camel@perches.com>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Wed, 21 Jan 2015 20:52:55 -0800
+Subject: [PATCH V2 0/3] perf symbols: debuglink and arm mapping symbols changes
+Message-ID: <1421902378-3634-1-git-send-email-victor.kamensky@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-01-21 at 22:39 -0600, Andy Gross wrote:
-> Added myself as a co-maintainer.  Updated the files to include the Qualcomm SoC
-> directory.  Added linux-soc mailing list.
-[]
-> diff --git a/MAINTAINERS b/MAINTAINERS
-[]
-> @@ -1284,9 +1284,12 @@ S:	Maintained
->  ARM/QUALCOMM SUPPORT
->  M:	Kumar Gala <galak@codeaurora.org>
->  M:	David Brown <davidb@codeaurora.org>
-> +M:	Andy Gross <agross@codeaurora.org>
->  L:	linux-arm-msm at vger.kernel.org
-> +L:	linux-soc at vger.kernel.org
->  S:	Maintained
->  F:	arch/arm/mach-qcom/
-> +F:	drivers/soc/qcom
+Hi Folks,
 
-Please add a terminating /
+Here is second version of mini-series that addresses couple issues
+in perf symbols handling.
 
-F:	drivers/soc/qcom/
+Changes since V1:
+
+o 'perf symbols: Ignore mapping symbols on aarch64': based on feedback
+from Will Deacon and Russell King [1] added code that handles ARM/Aarch64
+mapping symbols like "$d.<any>". Code uses similar snipet to handle
+ARM mapping symbols as in another places in kernel, but it has its
+own version of the code. Added proper Acked-by.
+
+o 'perf symbols: debuglink should take symfs option into account':
+based on feedback from David Ahern [2] picked more simple version that
+does not make malloced copy of 'filename', that makes patch simpler.
+Added proper 'Acked-and-tested-by'.
+
+[1] https://lkml.org/lkml/2015/1/13/507
+
+[2] https://lkml.org/lkml/2015/1/13/508
+
+Victor Kamensky (3):
+  perf symbols: Ignore mapping symbols on aarch64
+  perf symbols: improve abi compliance in arm mapping symbols handling
+  perf symbols: debuglink should take symfs option into account
+
+ tools/perf/util/dso.c        |  6 +++---
+ tools/perf/util/symbol-elf.c | 13 ++++++++++---
+ 2 files changed, 13 insertions(+), 6 deletions(-)
+
+-- 
+1.9.3
