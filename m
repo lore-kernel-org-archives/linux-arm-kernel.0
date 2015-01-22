@@ -1,51 +1,76 @@
-From: ricardo.ribalda@gmail.com (Ricardo Ribalda Delgado)
-Date: Thu, 22 Jan 2015 20:36:42 +0100
-Subject: [PATCH v2 2/2] spi/xilinx: Support for spi mode LOOP
-In-Reply-To: <1421955402-16379-1-git-send-email-ricardo.ribalda@gmail.com>
-References: <1421955402-16379-1-git-send-email-ricardo.ribalda@gmail.com>
-Message-ID: <1421955402-16379-2-git-send-email-ricardo.ribalda@gmail.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Thu, 22 Jan 2015 11:47:06 -0800
+Subject: [PATCH v2] ARM: dts: exynos5422-odroidxu3: add on-board INA231
+ sensors
+In-Reply-To: <54BF14FB.8050300@samsung.com> (Joonyoung Shim's message of "Wed,
+ 21 Jan 2015 11:54:51 +0900")
+References: <1421284089-421-1-git-send-email-khilman@kernel.org>
+ <54BF14FB.8050300@samsung.com>
+Message-ID: <7hy4ou61j9.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hardware supports LOOP mode. Support it also in the driver.
+Joonyoung Shim <jy0922.shim@samsung.com> writes:
 
-Signed-off-by: Ricardo Ribalda Delgado <ricardo.ribalda@gmail.com>
----
-v2:
-	-add mode_bits
- drivers/spi/spi-xilinx.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+> Hi Kevin,
+>
+> On 01/15/2015 10:08 AM, Kevin Hilman wrote:
+>> From: Kevin Hilman <khilman@linaro.org>
+>> 
+>> The odroid-xu3 has 4 INA231 current sensors on board which can be
+>> accessed from the Linux via the hwmon interface.
+>> 
+>> There is one sensor for each of these power rails:
+>> 
+>> - A15 cluster: VDD_ARM
+>> - A7 cluster: VDD_KFC
+>> - GPU: VDD_G3D
+>> - memory: VDD_MEM
+>> 
+>> In addition to adding the sensors, LDO26 from the PMIC needs to be
+>> enabled because it's powering these sensor.
+>> 
+>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>> Cc: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+>> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+>> ---
+>> v2: use "ti,ina231" as compatible string.
+>> 
+>> Applies on top of "ARM: dts: Add dts file for odroid XU3 board" from Sjoerd Simons.
+>> 
+>>  arch/arm/boot/dts/exynos5422-odroidxu3.dts | 39 ++++++++++++++++++++++++++++++
+>>  1 file changed, 39 insertions(+)
+>> 
+>> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+>> index c29123c0734d..50353d023225 100644
+>> --- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+>> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+>> @@ -174,6 +174,13 @@
+>>  					regulator-always-on;
+>>  				};
+>>  
+>> +				ldo26_reg: LDO26 {
+>> +					regulator-name = "vdd_ldo26";
+>> +					regulator-min-microvolt = <3000000>;
+>> +					regulator-max-microvolt = <3000000>;
+>> +					regulator-always-on;
+>> +				};
+>> +
+>>  				buck1_reg: BUCK1 {
+>>  					regulator-name = "vdd_mif";
+>>  					regulator-min-microvolt = <800000>;
+>> @@ -257,6 +264,38 @@
+>>  		};
+>>  	};
+>>  
+>> +	i2c_0: i2c at 12C60000 {
+>
+> It's ok but IMHO it can split using label reference, e.g. 
+>
+> &i2c_0 {
+> 	...
+> };
 
-diff --git a/drivers/spi/spi-xilinx.c b/drivers/spi/spi-xilinx.c
-index d4edeee..e1d9a20 100644
---- a/drivers/spi/spi-xilinx.c
-+++ b/drivers/spi/spi-xilinx.c
-@@ -35,7 +35,7 @@
- #define XSPI_CR_CPOL		0x08
- #define XSPI_CR_CPHA		0x10
- #define XSPI_CR_MODE_MASK	(XSPI_CR_CPHA | XSPI_CR_CPOL | \
--				 XSPI_CR_LSB_FIRST)
-+				 XSPI_CR_LSB_FIRST | XSPI_CR_LOOP)
- #define XSPI_CR_TXFIFO_RESET	0x20
- #define XSPI_CR_RXFIFO_RESET	0x40
- #define XSPI_CR_MANUAL_SSELECT	0x80
-@@ -197,6 +197,8 @@ static void xilinx_spi_chipselect(struct spi_device *spi, int is_on)
- 			cr |= XSPI_CR_CPOL;
- 		if (spi->mode & SPI_LSB_FIRST)
- 			cr |= XSPI_CR_LSB_FIRST;
-+		if (spi->mode & SPI_LOOP)
-+			cr |= XSPI_CR_LOOP;
- 		xspi->write_fn(cr, xspi->regs + XSPI_CR_OFFSET);
- 
- 		/* We do not check spi->max_speed_hz here as the SPI clock
-@@ -356,7 +358,7 @@ static int xilinx_spi_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 
- 	/* the spi->mode bits understood by this driver: */
--	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_LSB_FIRST;
-+	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_LSB_FIRST | SPI_LOOP;
- 
- 	xspi = spi_master_get_devdata(master);
- 	xspi->bitbang.master = master;
--- 
-2.1.4
+Yes, you're right.  I'll spin a v3.
+
+Kevin
