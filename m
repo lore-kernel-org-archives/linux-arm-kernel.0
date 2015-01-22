@@ -1,36 +1,39 @@
-From: marek@goldelico.com (Marek Belisko)
-Date: Thu, 22 Jan 2015 21:38:19 +0100
-Subject: [PATCH 13/13] ARM: dts: omap3-gta04: Disable keypad
-In-Reply-To: <1421959099-28319-1-git-send-email-marek@goldelico.com>
-References: <1421959099-28319-1-git-send-email-marek@goldelico.com>
-Message-ID: <1421959099-28319-14-git-send-email-marek@goldelico.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 22 Jan 2015 20:52:10 +0000
+Subject: [PATCH] arm64: dump: Fix implicit inclusion of definition for
+ PCI_IOBASE
+Message-ID: <1421959930-26466-1-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: NeilBrown <neil@brown.name>
+Since c9465b4ec37a68425 (arm64: add support to dump the kernel page tables)
+allmodconfig has failed to build on arm64 as a result of:
 
-The twl4030 keypad is not wired up in the gta04, so mark it disabled
-to avoid pointless initialization.
+../arch/arm64/mm/dump.c:55:20: error: 'PCI_IOBASE' undeclared here (not in a function)
 
-Signed-off-by: NeilBrown <neil@brown.name>
+Fix this by explicitly including io.h to ensure that a definition is
+present.
+
+Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- arch/arm/boot/dts/omap3-gta04.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap3-gta04.dtsi b/arch/arm/boot/dts/omap3-gta04.dtsi
-index 8d2b0a1..b3ecf1f 100644
---- a/arch/arm/boot/dts/omap3-gta04.dtsi
-+++ b/arch/arm/boot/dts/omap3-gta04.dtsi
-@@ -342,6 +342,10 @@
- 	status = "disabled";
- };
- 
-+&twl_keypad {
-+	status = "disabled";
-+};
-+
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart1_pins>;
+As discussed the other day the quick stop gap for the implicit inclusion
+issues that are breaking -next builds at the minute.
+
+ arch/arm64/mm/dump.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
+index cf33f33333cc..d54dc9ac4b70 100644
+--- a/arch/arm64/mm/dump.c
++++ b/arch/arm64/mm/dump.c
+@@ -15,6 +15,7 @@
+  */
+ #include <linux/debugfs.h>
+ #include <linux/fs.h>
++#include <linux/io.h>
+ #include <linux/mm.h>
+ #include <linux/sched.h>
+ #include <linux/seq_file.h>
 -- 
-1.9.1
+2.1.4
