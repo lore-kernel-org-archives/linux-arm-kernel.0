@@ -1,36 +1,85 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 Jan 2015 17:01:07 -0800
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Updates for
- v3.20
-In-Reply-To: <cover.1421380713.git.horms+renesas@verge.net.au>
-References: <cover.1421380713.git.horms+renesas@verge.net.au>
-Message-ID: <20150122010107.GG29014@quad.lixom.net>
+From: ideal.song@samsung.com (Inha Song)
+Date: Thu, 22 Jan 2015 10:01:30 +0900
+Subject: [PATCH] ARM: dts: exynos5422-odroidxu3: add sound nodes
+In-Reply-To: <54BF9083.5090708@samsung.com>
+References: <1421819923-27575-1-git-send-email-ideal.song@samsung.com>
+ <54BF9083.5090708@samsung.com>
+Message-ID: <20150122100130.75c20e9b@songinha-Samsung-DeskTop-System>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 17, 2015 at 09:58:16AM +0900, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
-> 
-> Please consider these second round of Renesas ARM based SoC DT updates for v3.20.
-> 
-> This pull request is based on the previous round of
-> such requests, tagged as renesas-dt-for-v3.20,
-> which you have previously pulled.
-> 
-> 
-> The following changes since commit 7408d3061d2f04181820902fae6e92e4a73d5cc0:
-> 
->   ARM: shmobile: r8a7791: add MLB+ clock (2014-12-23 09:18:23 +0900)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt2-for-v3.20
-> 
-> for you to fetch changes up to fbaa5e694a1240c5f6b829b1e17652e4e228ee12:
-> 
->   PM / Domains: R-Mobile SYSC: Document SH-Mobile AG5 (sh73a0) binding (2015-01-16 10:59:37 +0900)
+Hi,
 
-Merged, thanks.
+Thanks for your comment.
 
+On Wed, 21 Jan 2015 12:41:55 +0100
+Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
 
--Olof
+> Hi,
+> 
+> On 21/01/15 06:58, Inha Song wrote:
+> > Add MAX98090 audio codec, I2S interface and the sound nodes to support
+> > audio on Odroid-XU3 board.
+> > 
+> > Signed-off-by: Inha Song <ideal.song@samsung.com>
+> > ---
+> >  arch/arm/boot/dts/exynos5422-odroidxu3.dts | 34 ++++++++++++++++++++++++++++++
+> >  1 file changed, 34 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+> > index 7874da2..79493d1 100644
+> > --- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+> > +++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+> > @@ -310,6 +310,40 @@
+> >  	rtc at 101E0000 {
+> >  		status = "okay";
+> >  	};
+> > +
+> > +	sound: sound {
+> > +		compatible = "samsung,odroidu3-audio";
+> 
+> How about using simple-card instead ? I've been trying to switch
+> Odroid X2/U3 to simple card. Here a corresponding dts patch:
+> http://www.spinics.net/lists/linux-samsung-soc/msg41083.html
+> For that recent patches for the I2S driver which area already in -next
+> might be needed.
+
+Oh, I missed your patchs.
+I will rework this patch based on your patch.
+
+Best Regards,
+Inha Song.
+
+> 
+> > +		samsung,model = "Odroid-XU3";
+> > +		samsung,i2s-controller = <&i2s0>;
+> > +		samsung,audio-codec = <&max98090>;
+> > +		assigned-clocks = <&clock_audss EXYNOS_MOUT_AUDSS>,
+> > +				  <&clock_audss EXYNOS_MOUT_I2S>;
+> > +		assigned-clock-parents = <&clock CLK_FIN_PLL>,
+> > +				<&clock_audss EXYNOS_MOUT_AUDSS>;
+> > +		samsung,audio-routing =
+> > +			"Headphone Jack", "HPL",
+> > +			"Headphone Jack", "HPR",
+> > +			"Headphone Jack", "MICBIAS",
+> > +			"IN1", "Headphone Jack",
+> > +			"Speakers", "SPKL",
+> > +			"Speakers", "SPKR";
+> > +	};
+> > +};
+> > +
+> > +&hsi2c_5 {
+> > +	status = "okay";
+> > +	max98090: max98090 at 10 {
+> > +		compatible = "maxim,max98090";
+> > +		reg = <0x10>;
+> > +		interrupt-parent = <&gpx3>;
+> > +		interrupts = <2 0>;
+> > +		clocks = <&clock_audss EXYNOS_DOUT_AUD_BUS>;
+> > +		clock-names = "mclk";
+> > +	};
+> > +};
+> 
+> -- 
+> Thanks,
+> Sylwester
