@@ -1,45 +1,19 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 22 Jan 2015 10:59:23 -0800
-Subject: [PATCH v11 2/4] clk: Make clk API return per-user struct clk
- instances
-In-Reply-To: <54C0DBD6.2000502@collabora.com>
-References: <1421847039-29544-1-git-send-email-tomeu.vizoso@collabora.com>
- <1421847039-29544-3-git-send-email-tomeu.vizoso@collabora.com>
- <20150122010136.GH27202@codeaurora.org>
- <54C0DBD6.2000502@collabora.com>
-Message-ID: <20150122185923.GL27202@codeaurora.org>
+Date: Thu, 22 Jan 2015 11:01:44 -0800
+Subject: [PATCH v12 5/6] clkdev: Export clk_register_clkdev
+In-Reply-To: <1421943207-5180-6-git-send-email-tomeu.vizoso@collabora.com>
+References: <1421943207-5180-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1421943207-5180-6-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <20150122190144.GN27202@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 01/22, Tomeu Vizoso wrote:
-> On 01/22/2015 02:01 AM, Stephen Boyd wrote:
-> > BTW, please try and fixup checkpatch warnings.
+> So it can be used from modules such as clk-test.ko.
 > 
-> What were you thinking of specifically? I'm running it with
-> --max-line-length=106 and the other warnings are in clk-test.c that I
-> still have to polish when I get some time.
+> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 
-I can see that sometimes we exceed the 80 character limits that
-are configured by default. We mostly stick to 80 in this file it
-seems so I'm not sure why 106 is being used.
-
-> > 
-> > And we do it here where we could remove the #ifdef.
-> 
-> Yeah, I tried to reduce the ifdefing back then and this is the simplest
-> I could come up with. The reason for clk_get() to call
-> __clk_create_clk() directly is that it has more relevant information
-> with which to tag the per-user clk.
-> 
-> of_clk_get_by_name() has the name of the node but not the dev_id, which
-> in my testing looked as much less useful when debugging who did what to
-> a clock.
-> 
-
-Agreed. But didn't we add __of_clk_get_by_name() so that we could
-pass the dev_id and con_id to it? If we did that then all the
-relevant information is there and we can call __clk_create_clk()
-directly instead of relying on the caller to do it.
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
