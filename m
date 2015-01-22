@@ -1,49 +1,61 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 22 Jan 2015 11:17:15 +0100
-Subject: [GIT PULL] Renesas ARM Based SoC Drivers Updates for v3.20
-In-Reply-To: <20150121224417.GD24851@quad.lixom.net>
-References: <cover.1421371868.git.horms+renesas@verge.net.au>
- <20150121224417.GD24851@quad.lixom.net>
-Message-ID: <CAMuHMdVrU1yNDAPGC-qL1EJ7BVe198KDg22Cd654Uzs9OKqiVg@mail.gmail.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Thu, 22 Jan 2015 18:21:30 +0800
+Subject: [PATCH v2] mtd: atmel_nand: check NFC busy flag by HSMC_SR instead of
+ NFC cmd regs
+Message-ID: <1421922090-8803-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+From: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-On Wed, Jan 21, 2015 at 11:44 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Fri, Jan 16, 2015 at 11:35:06AM +0900, Simon Horman wrote:
->> Please consider these Renesas ARM based SoC drivers updates for v3.20.
->>
->> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
->>
->>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
->>
->> are available in the git repository at:
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-drivers-for-v3.20
+Currently the driver read NFC command registers to get NFC busy flag.
+Actually this flag also can be get by reading HSMC_SR register.
 
-> Now, about this branch: There's not a single review by anyone on the
-> drivers/bus pieces, nor on the binding. Please collect some, especially since
-> simple-bus is used by so many.
+Use the read NFC command registers need mapping a huge memory region.
+To save the mapped memory region, we change to check NFC busy flag by
+reading HSMC_SR register.
 
-I did receive review comments on v1, which I implemented in v2.
-Simon applied v3.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+---
 
-Please note that this is not a driver for the common "simple-bus", but an
-extension for buses that rely on clocks and/or PM domains.
-The "simple-bus" base bindings were taken from ePAPR.
+Changes in v2:
+- Change me to signed-off-by.
+- modify the error log.
 
-Anyway, I'm collecting some Ack's...
+ drivers/mtd/nand/atmel_nand.c     | 5 ++---
+ drivers/mtd/nand/atmel_nand_nfc.h | 1 +
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+index d93c849..336cc2d 100644
+--- a/drivers/mtd/nand/atmel_nand.c
++++ b/drivers/mtd/nand/atmel_nand.c
+@@ -1752,11 +1752,10 @@ static int nfc_send_command(struct atmel_nand_host *host,
+ 		cmd, addr, cycle0);
+ 
+ 	timeout = jiffies + msecs_to_jiffies(NFC_TIME_OUT_MS);
+-	while (nfc_cmd_readl(NFCADDR_CMD_NFCBUSY, host->nfc->base_cmd_regs)
+-			& NFCADDR_CMD_NFCBUSY) {
++	while (nfc_readl(host->nfc->hsmc_regs, SR) & NFC_SR_BUSY) {
+ 		if (time_after(jiffies, timeout)) {
+ 			dev_err(host->dev,
+-				"Time out to wait CMD_NFCBUSY ready!\n");
++				"Time out to wait for NFC ready!\n");
+ 			return -ETIMEDOUT;
+ 		}
+ 	}
+diff --git a/drivers/mtd/nand/atmel_nand_nfc.h b/drivers/mtd/nand/atmel_nand_nfc.h
+index 85b8ca6..4d5d262 100644
+--- a/drivers/mtd/nand/atmel_nand_nfc.h
++++ b/drivers/mtd/nand/atmel_nand_nfc.h
+@@ -35,6 +35,7 @@
+ #define		NFC_CTRL_DISABLE	(1 << 1)
+ 
+ #define ATMEL_HSMC_NFC_SR	0x08		/* NFC Status Register */
++#define		NFC_SR_BUSY		(1 << 8)
+ #define		NFC_SR_XFR_DONE		(1 << 16)
+ #define		NFC_SR_CMD_DONE		(1 << 17)
+ #define		NFC_SR_DTOE		(1 << 20)
+-- 
+1.9.1
