@@ -1,35 +1,34 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Thu, 22 Jan 2015 10:53:13 -0600
-Subject: [PATCH 2/2] remoteproc: microblaze: Add support for microblaze
- on Zynq
-In-Reply-To: <10276362c737fc9da863f1a07737fd91f7340242.1421662385.git.michal.simek@xilinx.com>
-References: <a458462d2dc6901440bded015608f7a9df9e7942.1421662385.git.michal.simek@xilinx.com>
- <10276362c737fc9da863f1a07737fd91f7340242.1421662385.git.michal.simek@xilinx.com>
-Message-ID: <54C12AF9.40200@mentor.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Fri, 23 Jan 2015 00:01:27 +0800
+Subject: [PATCH v4 0/1] thermal: rockchip: make temperature reporting much
+ more accurate
+Message-ID: <1421942488-13764-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/19/2015 04:30 AM, Michal Simek wrote:
-> diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
-> index 5e343bab9458..3955f42e9e9c 100644
-> --- a/drivers/remoteproc/Kconfig
-> +++ b/drivers/remoteproc/Kconfig
-> @@ -64,4 +64,15 @@ config DA8XX_REMOTEPROC
->  	  It's safe to say n here if you're not interested in multimedia
->  	  offloading.
-> 
-> +config MB_REMOTEPROC
-> +	tristate "Support Microblaze remoteproc"
-> +	depends on ARCH_ZYNQ && !DEBUG_SG
-> +	select GPIO_XILINX
-> +	select REMOTEPROC
-> +	select RPMSG
-> +	default m
-> +	help
-> +	  Say y here to support Xilinx Microblaze remote processors
-> +	  on the Xilinx Zynq.
-> +
->  endmenu
 
-The dependency on !DEBUG_SG seems unusual, and worth a comment if it's
-truly needed.  And the module should be disabled by default, no?
+This patch is merged on chromiumos/third_party/kernel.
+https://chromium-review.googlesource.com/#/c/239190/
+
+Tested on veyron boards.
+
+
+Changes in v4:
+"return -EAGAIN" instead of "return rk_tsadcv2_code_to_temp(code)"
+
+Changes in v3:
+Suggested-by Daniel Kurtz,
+the check doesn't reject "code == 0xfff"
+Fixed in rk_tsadcv2_code_to_temp(u32 code)
+
+Changes in v2:
+Reviewed-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+
+Caesar Wang (1):
+  thermal: rockchip: make temperature reporting much more accurate
+
+ drivers/thermal/rockchip_thermal.c | 32 ++++++++++++++++++++++----------
+ 1 file changed, 22 insertions(+), 10 deletions(-)
+
+-- 
+1.9.1
