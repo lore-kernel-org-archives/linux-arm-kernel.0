@@ -1,26 +1,49 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 22 Jan 2015 14:48:47 -0800
-Subject: [PATCH v12 4/6] clk: Add rate constraints to clocks
-In-Reply-To: <1421943207-5180-5-git-send-email-tomeu.vizoso@collabora.com>
-References: <1421943207-5180-1-git-send-email-tomeu.vizoso@collabora.com>
- <1421943207-5180-5-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <20150122224847.GQ27202@codeaurora.org>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Thu, 22 Jan 2015 14:50:50 -0800
+Subject: [PATCH] drivers: net: xgene: fix: Out of order descriptor bytes
+ read
+In-Reply-To: <1421957007-720-1-git-send-email-isubramanian@apm.com>
+References: <1421957007-720-1-git-send-email-isubramanian@apm.com>
+Message-ID: <1421967050.3471.14.camel@edumazet-glaptop2.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/22, Tomeu Vizoso wrote:
-> Adds a way for clock consumers to set maximum and minimum rates. This
-> can be used for thermal drivers to set minimum rates, or by misc.
-> drivers to set maximum rates to assure a minimum performance level.
+On Thu, 2015-01-22 at 12:03 -0800, Iyappan Subramanian wrote:
+> This patch fixes the following kernel crash,
 > 
-> Changes the signature of the determine_rate callback by adding the
-> parameters min_rate and max_rate.
-> 
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> 
+> 	WARNING: CPU: 2 PID: 0 at net/ipv4/tcp_input.c:3079 tcp_clean_rtx_queue+0x658/0x80c()
+> 	Call trace:
 
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+> 
+> Software writes poison data into the descriptor bytes[15:8] and upon
+> receiving the interrupt, if those bytes are overwritten by the hardware with
+> the valid data, software also reads bytes[7:0] and executes receive/tx
+> completion logic.
+> 
+> If the CPU executes the above two reads in out of order fashion, then the
+> bytes[7:0] will have older data and causing the kernel panic.  We have to
+> force the order of the reads and thus this patch introduces read memory
+> barrier between these reads.
+> 
+> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+> Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
+> Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
+> ---
+>  drivers/net/ethernet/apm/xgene/xgene_enet_main.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+> index 83a5028..3622cdb 100644
+> --- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+> +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+> @@ -369,6 +369,8 @@ static int xgene_enet_process_ring(struct xgene_enet_desc_ring *ring,
+>  		if (unlikely(xgene_enet_is_desc_slot_empty(raw_desc)))
+>  			break;
+>  
+> +		/* read fpqnum field after dataaddr field */
+> +		smp_rmb();
+>  		if (is_rx_desc(raw_desc))
+>  			ret = xgene_enet_rx_frame(ring, raw_desc);
+>  		else
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Reading your changelog, it looks like you need a plain rmb() here.
