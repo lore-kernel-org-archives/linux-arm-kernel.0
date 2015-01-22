@@ -1,124 +1,67 @@
 From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Thu, 22 Jan 2015 17:56:45 +0100
-Subject: [PATCHv6 5/5] USB: gadget: atmel_usba_udc: Add suspend/resume with
- wakeup support
-In-Reply-To: <1421945805-31129-1-git-send-email-sylvain.rochet@finsecur.com>
-References: <1421945805-31129-1-git-send-email-sylvain.rochet@finsecur.com>
-Message-ID: <1421945805-31129-6-git-send-email-sylvain.rochet@finsecur.com>
+Date: Thu, 22 Jan 2015 17:56:40 +0100
+Subject: [PATCHv6 0/5] USB: gadget: atmel_usba_udc: Driver improvements
+Message-ID: <1421945805-31129-1-git-send-email-sylvain.rochet@finsecur.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add suspend/resume with wakeup support for Atmel USBA.
+Start clocks on rising edge of the Vbus signal, stop clocks on falling
+edge of the Vbus signal.
 
-On suspend: We stay continuously clocked if Vbus signal is not
-available. If Vbus signal is available we set the Vbus signal as a wake
-up source then we stop the USBA itself and all clocks used by USBA.
+Add suspend/resume with wakeup support.
 
-On resume: We recover clocks and USBA if we stopped them. If a device is
-currently connected at resume time we enable the controller.
+This series is based on linux-next and depends on this complete series:
+  https://lkml.org/lkml/2015/1/12/209
+which is currently only partially pushed to linux-next, the following 
+patch should be pushed along with this series:
+  https://lkml.org/lkml/2015/1/12/212
 
-Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- drivers/usb/gadget/udc/atmel_usba_udc.c | 68 +++++++++++++++++++++++++++++++++
- 1 file changed, 68 insertions(+)
+Changes since v5:
+  * Some boards does not support configuring a GPIO interrupt on a specific
+    edge (rising only or falling only). As suggested added a config boolean
+    to distinguish between boards with and without support
+  * Added a missing mutex_lock()/unlock() in usba_udc_suspend(), we need to
+    protect usba_stop() because usba_start() and usba_stop() can still 
+    be called by Vbus IRQ handler.
+  * Rebased the full series on linux-next
+  * Patch cleaning with the help of checkpatch.pl
 
-diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-index 361f740..7942c2f 100644
---- a/drivers/usb/gadget/udc/atmel_usba_udc.c
-+++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-@@ -2178,6 +2178,7 @@ static int usba_udc_probe(struct platform_device *pdev)
- 	ret = usb_add_gadget_udc(&pdev->dev, &udc->gadget);
- 	if (ret)
- 		return ret;
-+	device_init_wakeup(&pdev->dev, 1);
- 
- 	usba_init_debugfs(udc);
- 	for (i = 1; i < udc->num_ep; i++)
-@@ -2193,6 +2194,7 @@ static int __exit usba_udc_remove(struct platform_device *pdev)
- 
- 	udc = platform_get_drvdata(pdev);
- 
-+	device_init_wakeup(&pdev->dev, 0);
- 	usb_del_gadget_udc(&udc->gadget);
- 
- 	for (i = 1; i < udc->num_ep; i++)
-@@ -2202,10 +2204,76 @@ static int __exit usba_udc_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_PM
-+static int usba_udc_suspend(struct device *dev)
-+{
-+	struct usba_udc *udc = dev_get_drvdata(dev);
-+
-+	/* Not started */
-+	if (!udc->driver)
-+		return 0;
-+
-+	mutex_lock(&udc->vbus_mutex);
-+
-+	if (!device_may_wakeup(dev)) {
-+		usba_stop(udc);
-+		goto out;
-+	}
-+
-+	/*
-+	 * Device may wake up. We stay clocked if we failed
-+	 * to request vbus irq, assuming always on.
-+	 */
-+	if (gpio_is_valid(udc->vbus_pin)) {
-+		usba_stop(udc);
-+		/* Only wake up on device connection */
-+		if (udc->caps && udc->caps->irq_single_edge_support)
-+			irq_set_irq_type(gpio_to_irq(udc->vbus_pin),
-+				udc->vbus_pin_inverted ?
-+				IRQ_TYPE_EDGE_FALLING : IRQ_TYPE_EDGE_RISING);
-+
-+		enable_irq_wake(gpio_to_irq(udc->vbus_pin));
-+	}
-+
-+out:
-+	mutex_unlock(&udc->vbus_mutex);
-+	return 0;
-+}
-+
-+static int usba_udc_resume(struct device *dev)
-+{
-+	struct usba_udc *udc = dev_get_drvdata(dev);
-+
-+	/* Not started */
-+	if (!udc->driver)
-+		return 0;
-+
-+	if (device_may_wakeup(dev) && gpio_is_valid(udc->vbus_pin)) {
-+		disable_irq_wake(gpio_to_irq(udc->vbus_pin));
-+
-+		if (udc->caps && udc->caps->irq_single_edge_support)
-+			irq_set_irq_type(gpio_to_irq(udc->vbus_pin),
-+					IRQ_TYPE_EDGE_BOTH);
-+	}
-+
-+	/* If Vbus is present, enable the controller and wait for reset */
-+	mutex_lock(&udc->vbus_mutex);
-+	udc->vbus_prev = vbus_is_present(udc);
-+	if (udc->vbus_prev)
-+		usba_start(udc);
-+	mutex_unlock(&udc->vbus_mutex);
-+
-+	return 0;
-+}
-+#endif
-+
-+static SIMPLE_DEV_PM_OPS(usba_udc_pm_ops, usba_udc_suspend, usba_udc_resume);
-+
- static struct platform_driver udc_driver = {
- 	.remove		= __exit_p(usba_udc_remove),
- 	.driver		= {
- 		.name		= "atmel_usba_udc",
-+		.pm		= &usba_udc_pm_ops,
- 		.of_match_table	= of_match_ptr(atmel_udc_dt_ids),
- 	},
- };
+Changes since v4:
+  * Now using IRQ_NOAUTOEN flag to remove the unused check for
+    udc->driver is not NULL in the Vbus IRQ.
+  * Reworked the start/stop of clocks on Vbus edges to prepare for
+    suspend/resume support, factorised start and stop procedures
+  * New patch, suspend/resume for USBA with wakeup support
+
+Changes since v3:
+  * Added stable tag for the first patch
+  * As suggested, removed the unused check for udc->driver is NULL in
+    Vbus IRQ by requesting IRQ after udc->driver is set and by releasing
+    IRQ before udc->driver is cleared
+  * Rebased the core patch of this series against the just explained changes
+
+Changes since v2:
+  * Use spin_lock_irqsave/unlock_irqrestore instead of spin_lock/unlock in
+    threaded interrupt because we are not in irq context anymore
+  * Removed useless and probably harmful IRQF_NO_SUSPEND from
+    devm_request_threaded_irq() flags
+
+Changes since v1:
+  * Using a threaded irq and mutex instead of spinclock as suggested
+  * Moved a silently fixed bug in a separate patch (1/2)
+
+Sylvain Rochet (5):
+  USB: gadget: atmel_usba_udc: Fixed vbus_prev initial state
+  USB: gadget: atmel_usba_udc: Request an auto disabled Vbus signal IRQ
+    instead of an auto enabled IRQ request followed by IRQ disable
+  USB: gadget: atmel_usba_udc: Start clocks on rising edge of the Vbus
+    signal, stop clocks on falling edge of the Vbus signal
+  USB: gadget: atmel_usba_udc: Prepare for IRQ single edge support
+  USB: gadget: atmel_usba_udc: Add suspend/resume with wakeup support
+
+ drivers/usb/gadget/udc/atmel_usba_udc.c | 244 +++++++++++++++++++++++---------
+ drivers/usb/gadget/udc/atmel_usba_udc.h |   9 +-
+ 2 files changed, 188 insertions(+), 65 deletions(-)
+
 -- 
 2.1.4
