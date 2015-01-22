@@ -1,75 +1,61 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 Jan 2015 14:46:35 +0100
-Subject: [PATCH v3/resend 3/4] drivers: bus: Add Simple Power-Managed Bus
- DT Bindings
-In-Reply-To: <CAMuHMdUMcyXdgv+xdd8Zo67rYnfh6JaSWfr1H3c6NrQs=JsNLg@mail.gmail.com>
-References: <1421919253-4784-1-git-send-email-geert+renesas@glider.be>
- <7hvbjy30an.fsf@deeprootsystems.com>
- <CAMuHMdUMcyXdgv+xdd8Zo67rYnfh6JaSWfr1H3c6NrQs=JsNLg@mail.gmail.com>
-Message-ID: <2160255.41m7rrCYxI@wuerfel>
+Date: Thu, 22 Jan 2015 12:03 +0100
+Subject: [PATCH] ARM: use default ioremap alignment for SMP or LPAE
+In-Reply-To: <20150122100441.GA19811@e104818-lin.cambridge.arm.com>
+References: <1421911075-8814-1-git-send-email-s.dyasly@samsung.com>
+ <20150122100441.GA19811@e104818-lin.cambridge.arm.com>
+Message-ID: <3060178.HEZJjJCl1e@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 23 January 2015 09:56:51 Geert Uytterhoeven wrote:
-> >> diff --git a/Documentation/devicetree/bindings/bus/simple-pm-bus.txt b/Documentation/devicetree/bindings/bus/simple-pm-bus.txt
-> >> new file mode 100644
-> >> index 0000000000000000..d03abf7fd8e3997a
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/bus/simple-pm-bus.txt
-> >> @@ -0,0 +1,52 @@
-> >> +Simple Power-Managed Bus
-> >> +========================
-> >> +
-> >> +A Simple Power-Managed Bus is a transparent bus that doesn't need a real
-> >> +driver, as it's typically initialized by the boot loader.
-> >> +
-> >> +However, its bus controller is part of a PM domain, or under the control of a
-> >> +functional clock.  Hence, the bus controller's PM domain and/or clock must be
-> >> +enabled for child devices connected to the bus (either on-SoC or externally)
-> >> +to function.
-> >> +
-> >> +
-> >> +Generic compatible values and properties
-> >> +----------------------------------------
-> >> +
-> >> +Required properties:
-> >> +  - compatible: Must be at least one of the vendor-specific compatible values
-> >> +             from a vendor-specific section below, and "simple-bus" as a
-> >> +             fallback.
-> >
-> > What happened to the idea of using something like "simple-pm-bus"?
+On Thursday 22 January 2015 10:04:41 Catalin Marinas wrote:
+> On Thu, Jan 22, 2015 at 07:17:55AM +0000, Sergey Dyasly wrote:
+> > 16MB alignment for ioremap mappings was added by commit a069c896d0d6 ("[ARM]
+> > 3705/1: add supersection support to ioremap()") in order to support supersection
+> > mappings. But __arm_ioremap_pfn_caller uses section and supersection mappings
+> > only in !SMP && !LPAE case. There is no need for such big alignment if either
+> > SMP or LPAE is enabled.
+> [...]
+> > diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+> > index 184def0..c3ef139 100644
+> > --- a/arch/arm/include/asm/memory.h
+> > +++ b/arch/arm/include/asm/memory.h
+> > @@ -78,10 +78,12 @@
+> >   */
+> >  #define XIP_VIRT_ADDR(physaddr)  (MODULES_VADDR + ((physaddr) & 0x000fffff))
+> >  
+> > +#if !defined(CONFIG_SMP) && !defined(CONFIG_ARM_LPAE)
+> >  /*
+> >   * Allow 16MB-aligned ioremap pages
+> >   */
+> >  #define IOREMAP_MAX_ORDER    24
+> > +#endif
 > 
-> I think that's a decision to make by the (successor of the) ePAPR committee.
-> At least it would be nice to get some feedback from the DT review team
-> about this.
-> 
-> If we go that road, the vendor-specific compatible value should still be
-> documented, else checkpatch will complain when encountering it in a DTS.
-> Then, should it become
-> 
->     compatible = "renesas,bsc-sh73a0", "renesas,bsc", "simple-pm-bus",
-> "simple-bus";
-> 
-> or should "simple-bus" just be added to of_default_bus_match_table[], so we
-> can drop "simple-bus" from the list in the DTS:
-> 
->     compatible = "renesas,bsc-sh73a0", "renesas,bsc", "simple-pm-bus";
+> Actually, I think we could make this depend only on CONFIG_IO_36. That's
+> the only scenario where we get the supersections matter, and maybe make
+> CONFIG_IO_36 dependent on !SMP or !ARM_LPAE.
 
-I was thinking of the reverse: drop "simple-bus" bus from the list here,
-but not add "simple-pm-bus" to of_default_bus_match_table. This will
-cause child devices to no longer be probed automatically, and you will
-have to call of_platform_populate() from simple_pm_bus_probe(), after
-pm_runtime_enable(). This seems like a cleaner model to me, for two
-reasons:
+Good point, I assumed this was just a performance optimization,
+but it is in fact required for dynamic high mappings on XSC3.
 
-- In the binding, claiming compatibility with "simple-bus" feels
-  wrong to me, because you have a bus that is not as simple as others
+> My assumption is that we
+> don't support single zImage with CPU_XSC3 enabled (but I haven't
+> followed the latest developments here).
 
-- The ordering between pm_runtime_enable() and the probing of the
-  child devices is guaranteed, which I think it is not with your
-  current code.
+I have said in the past that I do not expect any of the xscale or
+strongarm based platforms to be used with a single zImage kernel.
+This has changed slightly given the work that Robert Jarzmik and
+others are doing on mach-pxa with DT conversion. I still don't
+think it's likely that they will move on to multiplatform, but I
+no longer think it's impossible.
 
-Does this make sense, or am I missing an important reason why there
-has to be a "simple-bus" compatible string here?
+Fortunately, PXA also does not have any high physical address mappings
+that I can see. The only platform we have that has these (see
+'git grep ioremap_pfn') is mach-iop13xx, and I am still seeing
+this in the 'never going to be multiplatform' category.
+
+Unrelated to this question however is whether we want to keep
+supersection mappings as a performance optimization to save TLBs.
+It seems useful to me, but not critical.
 
 	Arnd
