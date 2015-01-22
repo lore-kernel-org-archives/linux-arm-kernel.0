@@ -1,40 +1,79 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 22 Jan 2015 00:39:01 +0100
-Subject: [PATCH V2] clk: mxs: Fix invalid 32-bit access to frac registers
-In-Reply-To: <CAHrpEqQ-eoqM3W1hYcS6EPTmur1FSfm8TeEjYrtZ+PquavL86w@mail.gmail.com>
-References: <1419762402-4548-1-git-send-email-stefan.wahren@i2se.com>
- <CAHrpEqQ-eoqM3W1hYcS6EPTmur1FSfm8TeEjYrtZ+PquavL86w@mail.gmail.com>
-Message-ID: <201501220039.02073.marex@denx.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 21 Jan 2015 16:50:45 -0800
+Subject: [GIT PULL 2/3] omap clean-up for v3.20
+In-Reply-To: <54b99dd2.d0bc420a.57d0.ffffc9f5SMTPIN_ADDED_BROKEN@mx.google.com>
+References: <pull-1421450357-648499>
+ <54b99dd2.d0bc420a.57d0.ffffc9f5SMTPIN_ADDED_BROKEN@mx.google.com>
+Message-ID: <20150122005045.GE29014@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, January 21, 2015 at 05:16:03 PM, Zhi Li wrote:
-> On Sun, Dec 28, 2014 at 4:26 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> > According to i.MX23 and i.MX28 reference manual the fractional
-> > clock control registers must be addressed by byte instructions.
+On Fri, Jan 16, 2015 at 03:21:21PM -0800, Tony Lindgren wrote:
+> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
 > 
-> I don't think mx23 and mx28 have such limitation. I will double check
-> with IC team about this.
-> RTL is generated from a xml file. All registers implement is unified.
-> I don't think only clock control register have such limitation and
-> other registers not.
+>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.20/cleanup-pt1
+> 
+> for you to fetch changes up to ca662ee7b8a85c54c1cb9ef34b7c6b4f67933a7e:
+> 
+>   ARM: OMAP2+: Remove unused ti81xx platform init code (2015-01-14 17:21:00 -0800)
+> 
+> ----------------------------------------------------------------
+> Clean-up for omaps to remove dead code found with cppcheck after
+> we've made several SoCs to boot in device tree only mode.
+> 
+> ----------------------------------------------------------------
+> Rickard Strandqvist (10):
+>       ARM: OMAP2+: clkt2xxx_apll.c: Remove some unused functions
+>       ARM: OMAP2+: cm33xx.c: Remove some unused functions
+>       ARM: OMAP2+: dpll44xx.c: Remove unused function
+>       ARM: OMAP2+: omap_hwmod.c: Remove some unused functions
+>       ARM: OMAP2+: powerdomain.c: Remove some unused functions
+>       ARM: OMAP2+: voltage: Remove some unused functions
+>       ARM: OMAP2+: omap-pm-noop.c: Remove some unused functions
+>       ARM: OMAP1: irq.c: Remove unused function
+>       ARM: OMAP1: timer32k.c: Remove unused function
+>       ARM: OMAP: dma.c: Remove unused function
+> 
+> Tero Kristo (3):
+>       ARM: OMAP2: clock: remove unused apll code
+>       ARM: OMAP2: CM: remove unused PLL functions
+>       ARM: OMAP3+: PRM: remove prm_get_reset_sources declaration from headers
+> 
+> Tony Lindgren (1):
+>       ARM: OMAP2+: Remove unused ti81xx platform init code
+> 
+>  arch/arm/mach-omap1/irq.c               |   5 -
+>  arch/arm/mach-omap1/timer32k.c          |   5 -
+>  arch/arm/mach-omap2/Makefile            |   1 -
+>  arch/arm/mach-omap2/cclock3xxx_data.c   |   6 +-
+>  arch/arm/mach-omap2/clkt2xxx_apll.c     | 142 -------------------
+>  arch/arm/mach-omap2/clock.h             |   1 -
+>  arch/arm/mach-omap2/clock2xxx.h         |  11 --
+>  arch/arm/mach-omap2/cm2xxx.c            |  10 --
+>  arch/arm/mach-omap2/cm2xxx.h            |   2 -
+>  arch/arm/mach-omap2/cm33xx.c            |  21 ---
+>  arch/arm/mach-omap2/dpll44xx.c          |  20 ---
+>  arch/arm/mach-omap2/omap-pm-noop.c      | 196 ---------------------------
+>  arch/arm/mach-omap2/omap-pm.h           | 192 --------------------------
+>  arch/arm/mach-omap2/omap_hwmod.c        | 232 --------------------------------
+>  arch/arm/mach-omap2/omap_hwmod.h        |  16 ---
+>  arch/arm/mach-omap2/omap_phy_internal.c |  35 -----
+>  arch/arm/mach-omap2/powerdomain.c       |  82 -----------
+>  arch/arm/mach-omap2/powerdomain.h       |   5 -
+>  arch/arm/mach-omap2/prm3xxx.h           |   1 -
+>  arch/arm/mach-omap2/prm44xx_54xx.h      |   1 -
+>  arch/arm/mach-omap2/usb-musb.c          |  12 +-
+>  arch/arm/mach-omap2/usb.h               |   2 -
+>  arch/arm/mach-omap2/voltage.c           | 110 ---------------
+>  arch/arm/mach-omap2/voltage.h           |  13 --
+>  arch/arm/plat-omap/dma.c                |   8 --
+>  25 files changed, 3 insertions(+), 1126 deletions(-)
+>  delete mode 100644 arch/arm/mach-omap2/clkt2xxx_apll.c
 
-Hi,
+Nice diffstat. Merged.
 
-Section 10.8.24 in the MX28 datasheet (Fractional Clock Control Register 0) 
-states otherwise, but maybe the documentation is simply not matching the
-silicon.
-
-Here's a quote:
-"
-This register controls the 9-phase fractional clock dividers. The fractional 
-clock frequencies are a product of the values in these registers. NOTE: This 
-register can only be addressed by byte instructions. Addressing word or half-
-word are not allowed.
-"
-
-I also recall seeing weird behavior when these registers were accessed by word
-access in U-Boot, so I believe the datasheet is correct.
-
-Best regards,
-Marek Vasut
+-Olof
