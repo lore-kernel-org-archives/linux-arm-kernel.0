@@ -1,122 +1,50 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 22 Jan 2015 14:29:49 +0800
-Subject: [PATCH RFC 1/2] Documentation: arm: define DT bindings for
- system suspend
-In-Reply-To: <20150122123314.0dc44b67@xhacker>
-References: <1421840155-18990-1-git-send-email-sudeep.holla@arm.com>
- <1421840155-18990-2-git-send-email-sudeep.holla@arm.com>
- <20150121212139.1cdc3fd5@xhacker> <20150121213507.695b871b@xhacker>
- <20150121135610.GA21950@e102568-lin.cambridge.arm.com>
- <20150122123314.0dc44b67@xhacker>
-Message-ID: <20150122142949.64c41db6@xhacker>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 21 Jan 2015 22:36:31 -0800
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC sh73a0
+ Multiplatform Updates for v3.20
+In-Reply-To: <20150122020144.GA29564@verge.net.au>
+References: <cover.1421716945.git.horms+renesas@verge.net.au>
+ <20150122013426.GD31815@quad.lixom.net>
+ <20150122020144.GA29564@verge.net.au>
+Message-ID: <CAOesGMjAbn5DLuy12HiuWZr58WK0s4y8u09wLGHMgsmE6735YQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Lorenzo and Sudeep,
+On Wed, Jan 21, 2015 at 6:01 PM, Simon Horman <horms@verge.net.au> wrote:
+> On Wed, Jan 21, 2015 at 05:34:26PM -0800, Olof Johansson wrote:
+>> On Tue, Jan 20, 2015 at 10:27:32AM +0900, Simon Horman wrote:
+>> > Hi Olof, Hi Kevin, Hi Arnd,
+>> >
+>> > Please consider these second round of Renesas ARM based SoC sh73a0 multiplatform updates for v3.20.
+>> >
+>> > This pull request is based on the previous round of
+>> > such requests, tagged as renesas-sh73a0-multiplatform-for-v3.20,
+>> > which I have already sent a pull-request for.
+>> >
+>> > My understanding from Geert Uytterhoeven is that the above dependency
+>> > is required to avoid a lock-up.
+>> >
+>> >
+>> > The following changes since commit 93c9f0228a3d0a14640f86b3e8aeaf3c9b449bb7:
+>> >
+>> >   ARM: shmobile: kzm9g-reference: Remove board C code and DT file (2015-01-14 09:46:48 +0900)
+>> >
+>> > are available in the git repository at:
+>> >
+>> >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-sh73a0-multiplatform2-for-v3.20
+>> >
+>> > for you to fetch changes up to e42c8385cfec0579a103b365d61748f199bfe239:
+>> >
+>> >   ARM: shmobile: sh73a0 dtsi: Add Cortex-A9 TWD node (2015-01-17 09:36:35 +0900)
+>>
+>>
+>> Not pulled based on earlier feedback on preceding branch. Seems like you
+>> removed the tag already as well. ;)
+>
+> Yes, I think our emails crossed in flight.
 
-On Wed, 21 Jan 2015 20:33:14 -0800
-Jisheng Zhang <jszhang@marvell.com> wrote:
+Yep, I often work with an offlineimap-synced mailbox that might be a
+few hours out of date when I do merges. :)
 
-> Dear Lorenzo,
-> 
-> On Wed, 21 Jan 2015 05:56:11 -0800
-> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> 
-> > On Wed, Jan 21, 2015 at 01:35:07PM +0000, Jisheng Zhang wrote:
-> > > Dear Sudeep,
-> > > 
-> > > On Wed, 21 Jan 2015 05:21:39 -0800
-> > > Jisheng Zhang <jszhang@marvell.com> wrote:
-> > > 
-> > > > Dear Sudeep,
-> > > > 
-> > > > On Wed, 21 Jan 2015 03:35:54 -0800
-> > > > Sudeep Holla <sudeep.holla@arm.com> wrote:
-> > > > 
-> > > > > ARM based platforms implement unique ways to enter system suspend
-> > > > > (i.e. Suspend to RAM). The mechanism and the parameters defining the
-> > > > > system state vary on a per-platform basis forcing the OS to handle
-> > > > > it in very platform specific way.
-> > > > > 
-> > > > > Since ARM 32-bit systems had machine specific code, no attempts to
-> > > > > standardize are being made as it provides easy way to implement
-> > > > > suspend operations in a platform specific manner. However, this
-> > > > > approach not only makes maintainance more difficult as the number of
-> > > > > platforms supported increases but also not feasible for ARM64.
-> > > > > 
-> > > > > This DT binding aims at standardizing the system suspend for ARM
-> > > > > platforms. ARM64 platforms mandates entry-method property in DT for
-> > > > > this system suspend node.
-> > > > > 
-> > > > > On system implementing PSCI as an enable-method to enter system
-> > > > > suspend, the PSCI CPU suspend method is used on versions upto v0.2
-> > > > > and requires the power_state parameter to be passed to the PSCI CPU
-> > > > > suspend function.
-> > > > > 
-> > > > > This parameter is platform specific, therefore must be provided by
-> > > > > firmware to the OS in order to enable proper call sequence.
-> > > > > 
-> > > > > This ARM system suspend DT bindings rely on a property
-> > > > > (i.e. arm,psci-suspend-param) in the PSCI DT bindings that describes
-> > > > > how the PSCI CPU suspend power_state parameter should be defined in
-> > > > > DT.
-> > > > > 
-> > > > > Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> > > > > ---
-> > > > >  Documentation/devicetree/bindings/arm/psci.txt     | 11 +++
-> > > > >  .../devicetree/bindings/arm/system-suspend.txt     | 93
-> > > > > ++++++++++++++++++++++ 2 files changed, 104 insertions(+)
-> > > > >  create mode 100644
-> > > > > Documentation/devicetree/bindings/arm/system-suspend.txt
-> > > > > 
-> > > > > diff --git a/Documentation/devicetree/bindings/arm/psci.txt
-> > > > > b/Documentation/devicetree/bindings/arm/psci.txt index
-> > > > > 5aa40ede0e99..bd3977a2a333 100644 ---
-> > > > > a/Documentation/devicetree/bindings/arm/psci.txt +++
-> > > > > b/Documentation/devicetree/bindings/arm/psci.txt @@ -61,6 +61,14 @@
-> > > > > Device tree nodes that require usage of PSCI CPU_SUSPEND function
-> > > > > (ie idle Definition: power_state parameter to pass to the PSCI
-> > > > > suspend call. 
-> > > > > +PSCI v0.2 and earlier versions don't have explicit operation for
-> > > > > system +suspend. However, one can implement system suspend using
-> > > > > CPU_SUSPEND by +ensuring every other core except the one executing
-> > > > > the CPU_SUSPEND call +has called into PSCI through a CPU_OFF call.
-> > > > 
-> > > > If users explicitly hot-unplug other cores when system load is low to
-> > > > save power, then we want to suspend at some point, how does the
-> > > > firmware know this case?
-> > > 
-> > > Sorry for confusion. I mean 
-> > > 
-> > > If users explicitly hot-unplug other cores when system load is low to
-> > > save power, then at some point cpuidle want to suspend the cluster, how
-> > > does the distinguish this case with suspend the system to ram.
-> > 
-> > Through the arm,psci-suspend-param DT property, ie PSCI CPU_SUSPEND
-> > power_state parameter.
-> > 
-> > Did you read the patch :) ?
-> 
-> Yep, I do read the patch ;) To be honest, I implemented the s2ram similar as
-> the patch does. But according to PSCI v0.2, "arm,psci-suspend-param =
-> <0x1010000>" means suspend the cluster. I'm not sure I understand it
-> correctly, "can implement system suspend using CPU_SUSPEND by ensuring
-> every other core except the one executing the CPU_SUSPEND call has called
-> into PSCI through a CPU_OFF call" intend to ask firmware to 
-> 
-> suspend the system if other cores has called into PSCI through a CPU_OFF
-> 
-> or
-> 
-> suspend the cpu cluster if other cores are not CPU_OFF.
-> 
-> 
-> I extend the PSCI CPU_SUSPEND function's to use power_state bit[26] to tell
-> firmware whether suspend to ram or not.
-> 
 
-I read the PSCI spec again, power_state bit[0:15] is "platform specific ID",
-Is one of these bits used for suspend system?
-
-Thanks,
-Jisheng
+-Olof
