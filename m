@@ -1,60 +1,91 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Thu, 22 Jan 2015 15:52:48 -0600
-Subject: [PATCH v3 0/2] couple of generic remoteproc enhancements
-In-Reply-To: <1420838519-15669-1-git-send-email-s-anna@ti.com>
-References: <1420838519-15669-1-git-send-email-s-anna@ti.com>
-Message-ID: <54C17130.5060002@ti.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Thu, 22 Jan 2015 13:54:28 -0800
+Subject: [PATCH v3] ARM: dts: exynos5422-odroidxu3: add on-board INA231 sensors
+Message-ID: <1421963668-28359-1-git-send-email-khilman@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
+From: Kevin Hilman <khilman@linaro.org>
 
-On 01/09/2015 03:21 PM, Suman Anna wrote:
-> Hi Ohad,
-> 
-> The following is an updated patchset addressing the previous pending comments
-> from v1 & v2, and are rebased onto the latest 3.19-rc3 (are rc independent
-> actually). 
-> 
-> The patches are mainly developed to support the WkupM3 remote processor driver
-> on TI AM335x/AM437x SoCs, and I have verified the loading using the latest
-> version of Dave's WkupM3 remoteproc work [1]
-> 
-> The only change in v3 is on the second patch, it mainly leverages the
-> memcpy_toio and memset_io functions for copying/loading code into the
-> internal memory sections. An additional argument has to be added to the
-> rproc_da_to_va function to make this distinction.
+The odroid-xu3 has 4 INA231 current sensors on board which can be
+accessed from the Linux via the hwmon interface.
 
-Any comments on this series, or can I assume that this will make it to
-v3.20?
+There is one sensor for each of these power rails:
 
-regards
-Suman
+- A15 cluster: VDD_ARM
+- A7 cluster: VDD_KFC
+- GPU: VDD_G3D
+- memory: VDD_MEM
 
-> 
-> [1] http://marc.info/?l=linux-omap&m=142022842323885&w=2
-> 
-> v2:
-> http://marc.info/?l=linux-omap&m=141089879412807&w=2
-> - Add explicit setting of the .has_iommu field in each of the existing
->   remoteproc platform drivers
-> - Update patch description to add the usecase details for the change
->   summary
-> - Fixed a minor checkpatch warning.
-> 
-> v1:
-> http://marc.info/?l=linux-omap&m=140483657604924&w=2
-> 
-> Suman Anna (2):
->   remoteproc: use a flag to detect the presence of IOMMU
->   remoteproc: add support to handle internal memories
-> 
->  drivers/remoteproc/da8xx_remoteproc.c      |   1 +
->  drivers/remoteproc/omap_remoteproc.c       |   5 ++
->  drivers/remoteproc/remoteproc_core.c       | 104 ++++++++++++++++++++++++-----
->  drivers/remoteproc/remoteproc_elf_loader.c |  23 +++++--
->  drivers/remoteproc/remoteproc_internal.h   |   6 +-
->  drivers/remoteproc/ste_modem_rproc.c       |   1 +
->  include/linux/remoteproc.h                 |  45 ++++++++++++-
->  7 files changed, 161 insertions(+), 24 deletions(-)
-> 
+In addition to adding the sensors, LDO26 from the PMIC needs to be
+enabled because it's powering these sensor.
+
+Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Cc: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Reviewed-By: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Signed-off-by: Kevin Hilman <khilman@linaro.org>
+---
+v3: extend existing i2c_0 node 
+v2: use "ti,ina231" as compatible string.
+
+Applies on top of "ARM: dts: Add dts file for odroid XU3 board" from Sjoerd Simons.
+
+ arch/arm/boot/dts/exynos5422-odroidxu3.dts | 39 ++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
+
+diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+index c29123c0734d..38694a4a5417 100644
+--- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+@@ -174,6 +174,13 @@
+ 					regulator-always-on;
+ 				};
+ 
++				ldo26_reg: LDO26 {
++					regulator-name = "vdd_ldo26";
++					regulator-min-microvolt = <3000000>;
++					regulator-max-microvolt = <3000000>;
++					regulator-always-on;
++				};
++
+ 				buck1_reg: BUCK1 {
+ 					regulator-name = "vdd_mif";
+ 					regulator-min-microvolt = <800000>;
+@@ -330,3 +337,35 @@
+ &usbdrd_dwc3_1 {
+ 	dr_mode = "otg";
+ };
++
++&i2c_0 {
++	status = "okay";
++
++	/* A15 cluster: VDD_ARM */
++	ina231 at 40 {
++		compatible = "ti,ina231";
++		reg = <0x40>;
++		shunt-resistor = <10000>;
++	};
++
++	/* memory: VDD_MEM */
++	ina231 at 41 {
++		compatible = "ti,ina231";
++		reg = <0x41>;
++		shunt-resistor = <10000>;
++	};
++
++	/* GPU: VDD_G3D */
++	ina231 at 44 {
++		compatible = "ti,ina231";
++		reg = <0x44>;
++		shunt-resistor = <10000>;
++	};
++
++	/* A7 cluster: VDD_KFC */
++	ina231 at 45 {
++		compatible = "ti,ina231";
++		reg = <0x45>;
++		shunt-resistor = <10000>;
++	};
++};
+-- 
+2.1.3
