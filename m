@@ -1,134 +1,192 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 23 Jan 2015 16:43:58 +0100
-Subject: [PATCH 0/7] Start deprecating _OSI on new architectures
-In-Reply-To: <1421973884-13029-1-git-send-email-al.stone@linaro.org>
-References: <1421973884-13029-1-git-send-email-al.stone@linaro.org>
-Message-ID: <11226733.uCXYutOZUW@vostro.rjw.lan>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 23 Jan 2015 15:26:05 +0000
+Subject: [RFC PATCH 4/5] arm64: add IOMMU dma_ops
+In-Reply-To: <aa7de3b1dd189c31eb8b14d0c0eea699183f8a2c.1421086706.git.robin.murphy@arm.com>
+References: <cover.1421086706.git.robin.murphy@arm.com>
+ <aa7de3b1dd189c31eb8b14d0c0eea699183f8a2c.1421086706.git.robin.murphy@arm.com>
+Message-ID: <20150123152605.GA31460@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Al,
+On Mon, Jan 12, 2015 at 08:48:56PM +0000, Robin Murphy wrote:
+> Taking some inspiration from the arch/arm code, implement the
+> arch-specific side of the DMA mapping ops using the new IOMMU-DMA layer.
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  arch/arm64/include/asm/device.h      |   3 +
+>  arch/arm64/include/asm/dma-mapping.h |  12 ++
+>  arch/arm64/mm/dma-mapping.c          | 297 +++++++++++++++++++++++++++++++++++
+>  3 files changed, 312 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/device.h b/arch/arm64/include/asm/device.h
+> index 243ef25..c17f100 100644
+> --- a/arch/arm64/include/asm/device.h
+> +++ b/arch/arm64/include/asm/device.h
+> @@ -20,6 +20,9 @@ struct dev_archdata {
+>  	struct dma_map_ops *dma_ops;
+>  #ifdef CONFIG_IOMMU_API
+>  	void *iommu;			/* private IOMMU data */
+> +#ifdef CONFIG_IOMMU_DMA
+> +	struct iommu_dma_mapping *mapping;
+> +#endif
+>  #endif
+>  	bool dma_coherent;
+>  };
+> diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
+> index 6932bb5..82082c4 100644
+> --- a/arch/arm64/include/asm/dma-mapping.h
+> +++ b/arch/arm64/include/asm/dma-mapping.h
+> @@ -64,11 +64,23 @@ static inline bool is_device_dma_coherent(struct device *dev)
+>  
+>  static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
+>  {
+> +#ifdef CONFIG_IOMMU_DMA
+> +	/* We don't have an easy way of dealing with this... */
+> +	BUG_ON(dev->archdata.mapping);
+> +#endif
+>  	return (dma_addr_t)paddr;
+>  }
+>  
+> +#ifdef CONFIG_IOMMU_DMA
+> +phys_addr_t iova_to_phys(struct device *dev, dma_addr_t dev_addr);
 
-On Thursday, January 22, 2015 05:44:37 PM al.stone at linaro.org wrote:
-> From: Al Stone <al.stone@linaro.org>
-> 
-> The use of the ACPI _OSI method in Linux has a long and sordid history.
-> Instead of perpetuating past complications on new architectures, the 
-> consensus amongst those writing the ACPI specification and those using
-> it seems to be to ultimately deprecate the use of _OSI.  I plan to
-> propose such a change to the ACPI specification in the near future.
-> 
-> In the meantime, these patches rearrange the implementation of _OSI so
-> that it can be deprecated, or ultimately removed completely, on at least
-> arm64 platforms.  This is done by simply moving the functions implementing 
-> _OSI to arch-dependent locations.  For x86, there should be no change
-> in functionality.  For ia64, while it does duplicate some code from x86,
-> there is no longer any connection to the ACPI blacklist code that is only
-> used by x86.  For arm64, any use of the _OSI method generates a warning
-> that it has been deprecated, and then always returns false; i.e., that
-> the capability being queried for, whether OS name or functionality, is
-> not supported.  This is the first six of the patches.
+I think this name is a bit too generic, especially as we already have an
+iommu_iova_to_phys function in drivers/iommu/iommu.c
 
-While I seem to understand the motivation, I don't really like moving code
-around, especially in the ia64 area where we have limited means to test the
-changes.  And I hate code duplication pretty much in any form.
+In fact, can't you just make CONFIG_IOMMU_DMA depend on IOMMU_API and then
+use iommu_iova_to_phys instead?
 
-Also I don't see anything wrong with sharing code between x86 and ia64 like
-we do today.
+> +#endif
+> +
+>  static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
+>  {
+> +#ifdef CONFIG_IOMMU_DMA
+> +	if (dev->archdata.mapping)
+> +		return iova_to_phys(dev, dev_addr);
+> +#endif
+>  	return (phys_addr_t)dev_addr;
+>  }
 
-So, why don't you move the _OSI handling out of osl.c into a separate file
-that will only build if something like CONFIG_ARCH_SPECIFIC_ACPI_OSI is not
-set (and same for blacklist.c).  Then, you'll only need to make ARM64
-set CONFIG_ARCH_SPECIFIC_ACPI_OSI and provide the necessary functions
-and you can leave the other architectures alone.
+It would be cleaner just to define these functions twice; with and without
+the CONFIG_IOMMU_DMA case.
 
-Does that make sense to you?
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index 0a24b9b..8e449a7 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -23,6 +23,7 @@
+>  #include <linux/genalloc.h>
+>  #include <linux/dma-mapping.h>
+>  #include <linux/dma-contiguous.h>
+> +#include <linux/dma-iommu.h>
+>  #include <linux/vmalloc.h>
+>  #include <linux/swiotlb.h>
+>  
+> @@ -426,6 +427,9 @@ static int __init arm64_dma_init(void)
+>  
+>  	ret |= swiotlb_late_init();
+>  	ret |= atomic_pool_init();
+> +#ifdef CONFIG_IOMMU_DMA
+> +	ret |= iommu_dma_init();
+> +#endif
 
-> The final patch changes the default value for the _OS_ method for arm64
-> only.  Since there is no need to pretend to be older versions of Windows,
-> or any other OS at all, the _OS_ method will return "Linux" on arm64.
-> One can still use the acpi_os_name kernel parameter if there is a need
-> to use some other value.
-> 
-> Since we are breaking apart code previously shared, I have tried to make
-> it so that applying the x86 patches alone will continue to compile, at
-> the expense of breaking the build on non-x86 platforms.  However, once
-> all of the patches are applied, we should be able to compile on all three
-> architectures.  It is best to treat these as one whole.
-> 
-> I have only done simple testing with these patches on arm64 and x86 (AMD
-> Seattle and a Lenovo t440s ThinkPad, respectively).  Things seem to work
-> as they should once booted, but this is a very, very small sample of
-> possible machines.  The ia64 patches cross-compile, but I personally have
-> no way to test them.
-> 
-> The arm64 patches also rely on having applied Hanjun's patches for ACPI 5.1
-> on arm64 [0].  The x86 and ia64 parts are not dependent on that patch set,
-> though, and should be usable independently (i.e., patches 1, 3, 4 and 6).
-> 
-> NB: some of the patches do not pass checkpatch.pl; the failures I saw were
-> all part of the original code but are only showing up because that code is
-> changing location, so I have left them as is.  If necessary, they could be
-> fixed but I was more concerned about the number of changes needed on ia64
-> and not having any way to test them.
-> 
-> 
-> [0] https://lkml.org/lkml/2015/1/14/586
-> 
-> 
-> Al Stone (6):
->   ia64: ACPI: move kernel acpi files to a directory
->   arm64: ACPI: move kernel acpi files to a directory
->   x86: ACPI: create arch-dependent version of acpi_osi_handler()
->   ia64: ACPI: create arch-dependent version of acpi_osi_handler()
->   arm64: ACPI: create arch-dependent version of acpi_osi_handler()
->   x86: ia64: arm64: ACPI: move _OSI support functions to arch-dependent
->     locations
-> 
-> Hanjun Guo (1):
->   ACPI: use Linux as ACPI_OS_NAME for _OS on ARM64
-> 
->  arch/arm64/Kconfig               |    1 +
->  arch/arm64/kernel/Makefile       |    2 +-
->  arch/arm64/kernel/acpi.c         |  359 --------------
->  arch/arm64/kernel/acpi/Makefile  |    1 +
->  arch/arm64/kernel/acpi/acpi.c    |  359 ++++++++++++++
->  arch/arm64/kernel/acpi/osi.c     |   26 +
->  arch/ia64/kernel/Makefile        |    2 +-
->  arch/ia64/kernel/acpi-ext.c      |  104 ----
->  arch/ia64/kernel/acpi.c          | 1000 --------------------------------------
->  arch/ia64/kernel/acpi/Makefile   |    1 +
->  arch/ia64/kernel/acpi/acpi-ext.c |  104 ++++
->  arch/ia64/kernel/acpi/acpi.c     | 1000 ++++++++++++++++++++++++++++++++++++++
->  arch/ia64/kernel/acpi/osi.c      |  119 +++++
->  arch/x86/kernel/acpi/Makefile    |    2 +-
->  arch/x86/kernel/acpi/blacklist.c |  327 +++++++++++++
->  arch/x86/kernel/acpi/boot.c      |    5 +-
->  arch/x86/kernel/acpi/osi.c       |  255 ++++++++++
->  drivers/acpi/Kconfig             |    8 +
->  drivers/acpi/Makefile            |    1 -
->  drivers/acpi/blacklist.c         |  323 ------------
->  drivers/acpi/osl.c               |  217 ---------
->  include/acpi/acconfig.h          |    2 +
->  include/acpi/platform/aclinux.h  |    4 +
->  include/linux/acpi.h             |    4 +-
->  24 files changed, 2215 insertions(+), 2011 deletions(-)
->  delete mode 100644 arch/arm64/kernel/acpi.c
->  create mode 100644 arch/arm64/kernel/acpi/Makefile
->  create mode 100644 arch/arm64/kernel/acpi/acpi.c
->  create mode 100644 arch/arm64/kernel/acpi/osi.c
->  delete mode 100644 arch/ia64/kernel/acpi-ext.c
->  delete mode 100644 arch/ia64/kernel/acpi.c
->  create mode 100644 arch/ia64/kernel/acpi/Makefile
->  create mode 100644 arch/ia64/kernel/acpi/acpi-ext.c
->  create mode 100644 arch/ia64/kernel/acpi/acpi.c
->  create mode 100644 arch/ia64/kernel/acpi/osi.c
->  create mode 100644 arch/x86/kernel/acpi/blacklist.c
->  create mode 100644 arch/x86/kernel/acpi/osi.c
->  delete mode 100644 drivers/acpi/blacklist.c
-> 
-> 
+Same here, just make an empty iommu_dma_init if !CONFIG_IOMMU_DMA.
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+>  	return ret;
+>  }
+> @@ -439,3 +443,296 @@ static int __init dma_debug_do_init(void)
+>  	return 0;
+>  }
+>  fs_initcall(dma_debug_do_init);
+> +
+> +
+> +#ifdef CONFIG_IOMMU_DMA
+> +
+> +static struct page **__atomic_get_pages(void *addr)
+> +{
+> +	struct page *page;
+> +	phys_addr_t phys;
+> +
+> +	phys = gen_pool_virt_to_phys(atomic_pool, (unsigned long)addr);
+> +	page = phys_to_page(phys);
+> +
+> +	return (struct page **)page;
+> +}
+> +
+> +static struct page **__iommu_get_pages(void *cpu_addr, struct dma_attrs *attrs)
+> +{
+> +	struct vm_struct *area;
+> +
+> +	if (__in_atomic_pool(cpu_addr, PAGE_SIZE))
+> +		return __atomic_get_pages(cpu_addr);
+> +
+> +	area = find_vm_area(cpu_addr);
+> +	if (!area)
+> +		return NULL;
+> +
+> +	return area->pages;
+> +}
+> +
+> +static void *__iommu_alloc_atomic(struct device *dev, size_t size,
+> +				  dma_addr_t *handle, bool coherent)
+> +{
+> +	struct page *page;
+> +	void *addr;
+> +
+> +	addr = __alloc_from_pool(size, &page);
+> +	if (!addr)
+> +		return NULL;
+> +
+> +	*handle = iommu_dma_create_iova_mapping(dev, &page, size, coherent);
+> +	if (*handle == DMA_ERROR_CODE) {
+> +		__free_from_pool(addr, size);
+> +		return NULL;
+> +	}
+> +	return addr;
+> +}
+> +
+> +static void __iommu_free_atomic(struct device *dev, void *cpu_addr,
+> +				dma_addr_t handle, size_t size)
+> +{
+> +	iommu_dma_release_iova_mapping(dev, handle, size);
+> +	__free_from_pool(cpu_addr, size);
+> +}
+> +
+> +static void __dma_clear_buffer(struct page *page, size_t size)
+> +{
+> +	void *ptr = page_address(page);
+> +
+> +	memset(ptr, 0, size);
+> +	__dma_flush_range(ptr, ptr + size);
+> +}
+> +
+> +static void *__iommu_alloc_attrs(struct device *dev, size_t size,
+> +	    dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs)
+> +{
+> +	bool coherent = is_device_dma_coherent(dev);
+> +	pgprot_t prot = coherent ? __pgprot(PROT_NORMAL) :
+> +				   __pgprot(PROT_NORMAL_NC);
+> +	struct page **pages;
+> +	void *addr = NULL;
+> +
+> +	*handle = DMA_ERROR_CODE;
+> +	size = PAGE_ALIGN(size);
+> +
+> +	if (!(gfp & __GFP_WAIT))
+> +		return __iommu_alloc_atomic(dev, size, handle, coherent);
+> +	/*
+> +	 * Following is a work-around (a.k.a. hack) to prevent pages
+> +	 * with __GFP_COMP being passed to split_page() which cannot
+> +	 * handle them.  The real problem is that this flag probably
+> +	 * should be 0 on ARM as it is not supported on this
+> +	 * platform; see CONFIG_HUGETLBFS.
+> +	 */
+> +	gfp &= ~(__GFP_COMP);
+
+This comment seems to have been copied from avr32 to arm to arm64 and has
+the assumption that the architecture in question doesn't support hugepages.
+That's not a valid assumption on LPAE ARM or arm64, so I'd like to get to
+the bottom of this.
+
+Will
