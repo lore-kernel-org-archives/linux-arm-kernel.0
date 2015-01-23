@@ -1,49 +1,117 @@
-From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Fri, 23 Jan 2015 17:50:20 +0100
-Subject: [PATCH 07/12] pm: at91: the standby mode uses the same sram
- function as the suspend to memory mode
-In-Reply-To: <1421741825-18226-8-git-send-email-wenyou.yang@atmel.com>
-References: <1421741825-18226-1-git-send-email-wenyou.yang@atmel.com>
- <1421741825-18226-8-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20150123165020.GA24210@gradator.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 23 Jan 2015 08:47:56 -0800
+Subject: [PATCH 4/4] ARM: dts: Add minimal support for dm8168-evm
+In-Reply-To: <CAALWOA_54qoQgyCkGy10v+7-eQ87ddeCTG-dbP-P6x493HAswA@mail.gmail.com>
+References: <1421192272-20754-1-git-send-email-tony@atomide.com>
+ <1421192272-20754-5-git-send-email-tony@atomide.com>
+ <20150117164709.GS18552@atomide.com>
+ <CAALWOA-v=-KZ5W+Giwq9Z7rdA8JM2Q+zgqZPz-5sDrHD_b-_7A@mail.gmail.com>
+ <20150117181404.GW18552@atomide.com>
+ <CAALWOA-cdqPbLo4JvykGFODy2xUOozWg6OjzoGPLasJA022kJg@mail.gmail.com>
+ <20150119172914.GY18552@atomide.com>
+ <CAALWOA_54qoQgyCkGy10v+7-eQ87ddeCTG-dbP-P6x493HAswA@mail.gmail.com>
+Message-ID: <20150123164756.GB7718@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Wenyou,
-
-
-On Tue, Jan 20, 2015 at 04:17:00PM +0800, Wenyou Yang wrote:
+* Matthijs van Duin <matthijsvanduin@gmail.com> [150121 19:20]:
+> On 19 January 2015 at 18:29, Tony Lindgren <tony@atomide.com> wrote:
+> > Hmm I sort of got the idea that dm814x and dm816x were done about
+> > the same time. Are you saying dm814x was actually done after dm816x?
 > 
-> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-> index 691e6db..a1010f0 100644
-> --- a/arch/arm/mach-at91/pm.c
-> +++ b/arch/arm/mach-at91/pm.c
+> Well, it's hard to come up with an alternate explanation of netra's
+> FAPLLs showing up in the terminology of centaurus' clock tree (though
+> the amount of references to them in the TRM decreased over time)
+> without the FAPLLs being there themselves.
+> 
+> Of course a radical new design will have much more distance between
+> initial development and public release than a derivative design. An
+> interesting timeline is given by looking at JTAG partcodes, since
+> those obviously have to be assigned somewhere during development,
+> before the first silicon is produced (omap3/4/5 and centauroids
+> listed):
+> 
+> b6d6 - omap34xx 1.0
+> b7ae - omap34xx/35xx 2.x/3.x
+> b81e - netra
+> b852 - omap4430 1.0
+> b868 - am35xx
+> b891 - omap36xx / dm/am37xx
+> b8f2 - centaurus
+> b942 - omap5430
+> b944 - subarctic
+> b94e - omap4460
+> b95c - omap4430 2.x
+> b96b - centaurus eve (dmva3/4 / dm38x)
+> b975 - omap4470
+> b98c - aegis
+> b990 - vayu
+> b998 - omap5432
+> 
+> (The distance between the two omap543x variants suggests to me the ID
+> is assigned early in the development, with the 5432-variant added late
+> in the design, but that's just a guess.)
 
+That's interesting info thanks :) Yeah it seems dm814x was done after
+dm816x and that clears at least some of the clockdomain confusion
+that I though was TRM copy-paste issue. 
+ 
+> > Yeah this davinci_emac vs cpsw stuff is messy and I noticed too that
+> > the registers are different.
+> 
+> BTW, if you spot any piece of the documentation making it sound like
+> port 2 is special somehow, it means port 0 instead. (The host port was
+> port 2 in CPSW in some earlier devices, and iirc a reference to this
+> was still somewhere in the current docs)
+> 
+> 
+> >> There's also an interesting Security Subsystem, which houses the
+> >> crypto accelerators (2x AES, 2x Hash, DES, PKA, RNG), an SDMA engine,
+> >> 128 KB + 16 KB of local RAM, a cortex-M3, some timers for its benefit,
+> >> irq routing, and an elaborate L3 firewall instance covering both
+> >> external and internal access.
+> >
+> > Hmm that's a lot of accelerators..
+> 
+> And there are gaps in the memory map suggesting maybe there were more
+> submodules in earlier versions.  I know it differs from Netra's
+> security subsystem since one module offset is different... hmm, now
+> I'm curious. I'll see if I can find a moment to brush the dust off the
+> evm816x here and make a quick inventory.
 
-> @@ -145,62 +145,51 @@ extern void at91_slow_clock(void __iomem *pmc, void __iomem *ramc0,
->  			    void __iomem *ramc1, int memctrl);
->  extern u32 at91_slow_clock_sz;
->  
-> +static void at91_pm_suspend(suspend_state_t state)
-> +{
-      (...)
-> +	slow_clock(at91_pmc_base, at91_ramc_base[0],
-> +			at91_ramc_base[1], pm_data);
-> +}
+Should be usable for NFSroot with all the patches I've sent using the
+ti u-boot and and appended DTB uImage. Sorry not all of it is yet in
+Linux next though, I'll push a current testing branch at some point
+today. The mainline u-boot was at least missing the davinci_emac
+support the last time I tried.
+ 
+> The DES module and second AES module in subarctic's memory map (and
+> PRCM) appear to be ghost modules, but I'd suspect this means they are
+> present on Aegis. Makes sense in combo with its magstripe card reader.
+> 
+> BTW, someone found genuine documentation of the AES/DES/Hash accelerators:
+> http://e2e.ti.com/support/arm/sitara_arm/f/791/p/291816/1399868#1399868
 
+Oh OK. 
+ 
+> [random thought]  There's another interesting application of the SecSS
+> cortex-M3: on GP devices it is (afaict) the only processor with
+> MReqDomain=1, while this is zero for all others. This 3-bit identifier
+> is used for security partitioning, and is something you can test on in
+> all firewalls. It is also the "connID" for EDMA's integrated memory
+> protection and proxied by EDMA transfers. The processor is also
+> located in the ALWON power domain.
+> 
+> This puts the secM3 in a unique position to act as "device hypervisor"
+> and prevent processors and DMA engines from meddling with hardware
+> resources they aren't supposed to meddle with. Even if security isn't
+> a concern, this would be a good idea for the same reason memory
+> protection is useful to separate processes. With so many initiators
+> around, if one accidently does a bogus write and clobbers someone
+> else's state, the resulting failure is obviously rather hard to debug.
 
-> -			if (slow_clock) {
-> -				slow_clock(at91_pmc_base, at91_ramc_base[0],
-> -					   at91_ramc_base[1],
-> -					   at91_pm_data.memctrl);
-      (...)
-> +               at91_pm_suspend(state);
+Yeah could be handy :)
 
+Regards,
 
-By doing that you removed the condition "if (slow_clock)".
-
-But slow_clock can still be NULL, see commit d2e4679, there are multiple 
-reasons which ends up with a NULL slow_clock.
-
-
-Sylvain
+Tony
