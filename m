@@ -1,91 +1,125 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 23 Jan 2015 11:02:49 +0100
-Subject: [GIT PULL 20/36] arm/arm64: KVM: move kvm_register_device_ops() into
- vGIC probing
+Date: Fri, 23 Jan 2015 11:02:52 +0100
+Subject: [GIT PULL 23/36] arm/arm64: KVM: make the value of ICC_SRE_EL1 a
+ per-VM variable
 In-Reply-To: <1422007385-14730-1-git-send-email-christoffer.dall@linaro.org>
 References: <1422007385-14730-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1422007385-14730-21-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1422007385-14730-24-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andre Przywara <andre.przywara@arm.com>
 
-Currently we unconditionally register the GICv2 emulation device
-during the host's KVM initialization. Since with GICv3 support we
-may end up with only v2 or only v3 or both supported, we move the
-registration into the GIC probing function, where we will later know
-which combination is valid.
+ICC_SRE_EL1 is a system register allowing msr/mrs accesses to the
+GIC CPU interface for EL1 (guests). Currently we force it to 0, but
+for proper GICv3 support we have to allow guests to use it (depending
+on their selected virtual GIC model).
+So add ICC_SRE_EL1 to the list of saved/restored registers on a
+world switch, but actually disallow a guest to change it by only
+restoring a fixed, once-initialized value.
+This value depends on the GIC model userland has chosen for a guest.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- include/linux/kvm_host.h | 1 +
- virt/kvm/arm/vgic-v2.c   | 2 ++
- virt/kvm/arm/vgic-v3.c   | 1 +
- virt/kvm/arm/vgic.c      | 5 ++---
- 4 files changed, 6 insertions(+), 3 deletions(-)
+ arch/arm64/kernel/asm-offsets.c |  1 +
+ arch/arm64/kvm/vgic-v3-switch.S | 14 +++++++++-----
+ include/kvm/arm_vgic.h          |  1 +
+ virt/kvm/arm/vgic-v3.c          |  8 ++++++--
+ 4 files changed, 17 insertions(+), 7 deletions(-)
 
-diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-index 3b934cc..25d7ce3 100644
---- a/include/linux/kvm_host.h
-+++ b/include/linux/kvm_host.h
-@@ -1051,6 +1051,7 @@ void kvm_unregister_device_ops(u32 type);
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index 9a9fce0..9d34486 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -140,6 +140,7 @@ int main(void)
+   DEFINE(VGIC_V2_CPU_ELRSR,	offsetof(struct vgic_cpu, vgic_v2.vgic_elrsr));
+   DEFINE(VGIC_V2_CPU_APR,	offsetof(struct vgic_cpu, vgic_v2.vgic_apr));
+   DEFINE(VGIC_V2_CPU_LR,	offsetof(struct vgic_cpu, vgic_v2.vgic_lr));
++  DEFINE(VGIC_V3_CPU_SRE,	offsetof(struct vgic_cpu, vgic_v3.vgic_sre));
+   DEFINE(VGIC_V3_CPU_HCR,	offsetof(struct vgic_cpu, vgic_v3.vgic_hcr));
+   DEFINE(VGIC_V3_CPU_VMCR,	offsetof(struct vgic_cpu, vgic_v3.vgic_vmcr));
+   DEFINE(VGIC_V3_CPU_MISR,	offsetof(struct vgic_cpu, vgic_v3.vgic_misr));
+diff --git a/arch/arm64/kvm/vgic-v3-switch.S b/arch/arm64/kvm/vgic-v3-switch.S
+index d160469..617a012 100644
+--- a/arch/arm64/kvm/vgic-v3-switch.S
++++ b/arch/arm64/kvm/vgic-v3-switch.S
+@@ -148,17 +148,18 @@
+  * x0: Register pointing to VCPU struct
+  */
+ .macro	restore_vgic_v3_state
+-	// Disable SRE_EL1 access. Necessary, otherwise
+-	// ICH_VMCR_EL2.VFIQEn becomes one, and FIQ happens...
+-	msr_s	ICC_SRE_EL1, xzr
+-	isb
+-
+ 	// Compute the address of struct vgic_cpu
+ 	add	x3, x0, #VCPU_VGIC_CPU
  
- extern struct kvm_device_ops kvm_mpic_ops;
- extern struct kvm_device_ops kvm_xics_ops;
-+extern struct kvm_device_ops kvm_arm_vgic_v2_ops;
- 
- #ifdef CONFIG_HAVE_KVM_CPU_RELAX_INTERCEPT
- 
-diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
-index 2935405..e1cd3cb 100644
---- a/virt/kvm/arm/vgic-v2.c
-+++ b/virt/kvm/arm/vgic-v2.c
-@@ -229,6 +229,8 @@ int vgic_v2_probe(struct device_node *vgic_node,
- 		goto out_unmap;
- 	}
- 
-+	kvm_register_device_ops(&kvm_arm_vgic_v2_ops, KVM_DEV_TYPE_ARM_VGIC_V2);
+ 	// Restore all interesting registers
+ 	ldr	w4, [x3, #VGIC_V3_CPU_HCR]
+ 	ldr	w5, [x3, #VGIC_V3_CPU_VMCR]
++	ldr	w25, [x3, #VGIC_V3_CPU_SRE]
 +
- 	vgic->vcpu_base = vcpu_res.start;
++	msr_s	ICC_SRE_EL1, x25
++
++	// make sure SRE is valid before writing the other registers
++	isb
  
- 	kvm_info("%s@%llx IRQ%d\n", vgic_node->name,
+ 	msr_s	ICH_HCR_EL2, x4
+ 	msr_s	ICH_VMCR_EL2, x5
+@@ -244,9 +245,12 @@
+ 	dsb	sy
+ 
+ 	// Prevent the guest from touching the GIC system registers
++	// if SRE isn't enabled for GICv3 emulation
++	cbnz	x25, 1f
+ 	mrs_s	x5, ICC_SRE_EL2
+ 	and	x5, x5, #~ICC_SRE_EL2_ENABLE
+ 	msr_s	ICC_SRE_EL2, x5
++1:
+ .endm
+ 
+ ENTRY(__save_vgic_v3_state)
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 1c0e9db..ff04afd 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -245,6 +245,7 @@ struct vgic_v3_cpu_if {
+ #ifdef CONFIG_ARM_GIC_V3
+ 	u32		vgic_hcr;
+ 	u32		vgic_vmcr;
++	u32		vgic_sre;	/* Restored only, change ignored */
+ 	u32		vgic_misr;	/* Saved only */
+ 	u32		vgic_eisr;	/* Saved only */
+ 	u32		vgic_elrsr;	/* Saved only */
 diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
-index 1c2c8ee..d14c75f 100644
+index ea39bad..5249048 100644
 --- a/virt/kvm/arm/vgic-v3.c
 +++ b/virt/kvm/arm/vgic-v3.c
-@@ -230,6 +230,7 @@ int vgic_v3_probe(struct device_node *vgic_node,
- 		ret = -ENXIO;
- 		goto out;
- 	}
-+	kvm_register_device_ops(&kvm_arm_vgic_v2_ops, KVM_DEV_TYPE_ARM_VGIC_V2);
+@@ -145,15 +145,19 @@ static void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
  
- 	vgic->vcpu_base = vcpu_res.start;
- 	vgic->vctrl_base = NULL;
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 9b63141..69f6e7a 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -2564,7 +2564,7 @@ static int vgic_create(struct kvm_device *dev, u32 type)
- 	return kvm_vgic_create(dev->kvm, type);
+ static void vgic_v3_enable(struct kvm_vcpu *vcpu)
+ {
++	struct vgic_v3_cpu_if *vgic_v3 = &vcpu->arch.vgic_cpu.vgic_v3;
++
+ 	/*
+ 	 * By forcing VMCR to zero, the GIC will restore the binary
+ 	 * points to their reset values. Anything else resets to zero
+ 	 * anyway.
+ 	 */
+-	vcpu->arch.vgic_cpu.vgic_v3.vgic_vmcr = 0;
++	vgic_v3->vgic_vmcr = 0;
++
++	vgic_v3->vgic_sre = 0;
+ 
+ 	/* Get the show on the road... */
+-	vcpu->arch.vgic_cpu.vgic_v3.vgic_hcr = ICH_HCR_EN;
++	vgic_v3->vgic_hcr = ICH_HCR_EN;
  }
  
--static struct kvm_device_ops kvm_arm_vgic_v2_ops = {
-+struct kvm_device_ops kvm_arm_vgic_v2_ops = {
- 	.name = "kvm-arm-vgic",
- 	.create = vgic_create,
- 	.destroy = vgic_destroy,
-@@ -2643,8 +2643,7 @@ int kvm_vgic_hyp_init(void)
- 
- 	on_each_cpu(vgic_init_maintenance_interrupt, NULL, 1);
- 
--	return kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
--				       KVM_DEV_TYPE_ARM_VGIC_V2);
-+	return 0;
- 
- out_free_irq:
- 	free_percpu_irq(vgic->maint_irq, kvm_get_running_vcpus());
+ static const struct vgic_ops vgic_v3_ops = {
 -- 
 2.1.2.330.g565301e.dirty
