@@ -1,117 +1,110 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 23 Jan 2015 08:47:56 -0800
-Subject: [PATCH 4/4] ARM: dts: Add minimal support for dm8168-evm
-In-Reply-To: <CAALWOA_54qoQgyCkGy10v+7-eQ87ddeCTG-dbP-P6x493HAswA@mail.gmail.com>
-References: <1421192272-20754-1-git-send-email-tony@atomide.com>
- <1421192272-20754-5-git-send-email-tony@atomide.com>
- <20150117164709.GS18552@atomide.com>
- <CAALWOA-v=-KZ5W+Giwq9Z7rdA8JM2Q+zgqZPz-5sDrHD_b-_7A@mail.gmail.com>
- <20150117181404.GW18552@atomide.com>
- <CAALWOA-cdqPbLo4JvykGFODy2xUOozWg6OjzoGPLasJA022kJg@mail.gmail.com>
- <20150119172914.GY18552@atomide.com>
- <CAALWOA_54qoQgyCkGy10v+7-eQ87ddeCTG-dbP-P6x493HAswA@mail.gmail.com>
-Message-ID: <20150123164756.GB7718@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 23 Jan 2015 09:57:19 -0700
+Subject: [PATCH] arm64: dts: Add initial device tree support for Tegra132
+In-Reply-To: <alpine.DEB.2.02.1501231038130.5450@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1501161139180.9776@utopia.booyaka.com>
+ <20150121161313.GI5044@leverpostej>
+ <alpine.DEB.2.02.1501231038130.5450@utopia.booyaka.com>
+Message-ID: <54C27D6F.9000006@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Matthijs van Duin <matthijsvanduin@gmail.com> [150121 19:20]:
-> On 19 January 2015 at 18:29, Tony Lindgren <tony@atomide.com> wrote:
-> > Hmm I sort of got the idea that dm814x and dm816x were done about
-> > the same time. Are you saying dm814x was actually done after dm816x?
-> 
-> Well, it's hard to come up with an alternate explanation of netra's
-> FAPLLs showing up in the terminology of centaurus' clock tree (though
-> the amount of references to them in the TRM decreased over time)
-> without the FAPLLs being there themselves.
-> 
-> Of course a radical new design will have much more distance between
-> initial development and public release than a derivative design. An
-> interesting timeline is given by looking at JTAG partcodes, since
-> those obviously have to be assigned somewhere during development,
-> before the first silicon is produced (omap3/4/5 and centauroids
-> listed):
-> 
-> b6d6 - omap34xx 1.0
-> b7ae - omap34xx/35xx 2.x/3.x
-> b81e - netra
-> b852 - omap4430 1.0
-> b868 - am35xx
-> b891 - omap36xx / dm/am37xx
-> b8f2 - centaurus
-> b942 - omap5430
-> b944 - subarctic
-> b94e - omap4460
-> b95c - omap4430 2.x
-> b96b - centaurus eve (dmva3/4 / dm38x)
-> b975 - omap4470
-> b98c - aegis
-> b990 - vayu
-> b998 - omap5432
-> 
-> (The distance between the two omap543x variants suggests to me the ID
-> is assigned early in the development, with the 5432-variant added late
-> in the design, but that's just a guess.)
+On 01/23/2015 04:31 AM, Paul Walmsley wrote:
+> + Arto, Terje for comments on the host1x section
+> + Stephen Warren for comments on the serial DT data
 
-That's interesting info thanks :) Yeah it seems dm814x was done after
-dm816x and that clears at least some of the clockdomain confusion
-that I though was TRM copy-paste issue. 
- 
-> > Yeah this davinci_emac vs cpsw stuff is messy and I noticed too that
-> > the registers are different.
-> 
-> BTW, if you spot any piece of the documentation making it sound like
-> port 2 is special somehow, it means port 0 instead. (The host port was
-> port 2 in CPSW in some earlier devices, and iirc a reference to this
-> was still somewhere in the current docs)
-> 
-> 
-> >> There's also an interesting Security Subsystem, which houses the
-> >> crypto accelerators (2x AES, 2x Hash, DES, PKA, RNG), an SDMA engine,
-> >> 128 KB + 16 KB of local RAM, a cortex-M3, some timers for its benefit,
-> >> irq routing, and an elaborate L3 firewall instance covering both
-> >> external and internal access.
-> >
-> > Hmm that's a lot of accelerators..
-> 
-> And there are gaps in the memory map suggesting maybe there were more
-> submodules in earlier versions.  I know it differs from Netra's
-> security subsystem since one module offset is different... hmm, now
-> I'm curious. I'll see if I can find a moment to brush the dust off the
-> evm816x here and make a quick inventory.
+> On Wed, 21 Jan 2015, Mark Rutland wrote:
+>
+>> As mentioned in my reply to the DT list patch [1], there are a couple of
+>> bits I'd like to see cleaned up first, but in the meantime I have some
+>> comments from my first pass of the dtsi below. Some of these may equally
+>> apply to existing dts(i) files.
+>>
+>> I see a few undocumented compatible strings (at least when comparing
+>> against mainline). If there are other series or trees I should be
+>> looking at, any pointers would be appreciated. If not, documentation
+>> updates would be nice (checkpatch should complain otherwise).
 
-Should be usable for NFSroot with all the patches I've sent using the
-ti u-boot and and appended DTB uImage. Sorry not all of it is yet in
-Linux next though, I'll push a current testing branch at some point
-today. The mainline u-boot was at least missing the davinci_emac
-support the last time I tried.
- 
-> The DES module and second AES module in subarctic's memory map (and
-> PRCM) appear to be ghost modules, but I'd suspect this means they are
-> present on Aegis. Makes sense in combo with its magstripe card reader.
-> 
-> BTW, someone found genuine documentation of the AES/DES/Hash accelerators:
-> http://e2e.ti.com/support/arm/sitara_arm/f/791/p/291816/1399868#1399868
+>> On Fri, Jan 16, 2015 at 11:45:29AM +0000, Paul Walmsley wrote:
+>>>
+>>> Add an initial device tree file for the Tegra132 SoC.  The DT file is
+>>> based on arch/arm/boot/dts/tegra124.dtsi and
+>>> arch/arm/boot/dts/tegra114.dtsi, with the following significant
+>>> changes:
+>>>
+>>> - Tegra132 uses a Denver CPU cluster rather than an ARMv7 CPU cluster
+>>> - Devices are arranged by bus, rather than in a flat topology
+>>> - No polling delays have been defined for the thermal zones.  I don't
+>>>    believe that this is a property of the SoC hardware, but rather of a
+>>>    given use-case.
 
-Oh OK. 
- 
-> [random thought]  There's another interesting application of the SecSS
-> cortex-M3: on GP devices it is (afaict) the only processor with
-> MReqDomain=1, while this is zero for all others. This 3-bit identifier
-> is used for security partitioning, and is something you can test on in
-> all firewalls. It is also the "connID" for EDMA's integrated memory
-> protection and proxied by EDMA transfers. The processor is also
-> located in the ALWON power domain.
-> 
-> This puts the secM3 in a unique position to act as "device hypervisor"
-> and prevent processors and DMA engines from meddling with hardware
-> resources they aren't supposed to meddle with. Even if security isn't
-> a concern, this would be a good idea for the same reason memory
-> protection is useful to separate processes. With so many initiators
-> around, if one accidently does a bogus write and clobbers someone
-> else's state, the resulting failure is obviously rather hard to debug.
+>>> diff --git a/arch/arm64/boot/dts/tegra/tegra132.dtsi b/arch/arm64/boot/dts/tegra/tegra132.dtsi
+>>> +               /*
+>>> +                * There are two serial drivers: an 8250 based simple
+>>> +                * serial driver and an APB DMA based serial driver
+>>> +                * for higher baudrate and performance. To enable the
+>>> +                * 8250 based driver, the compatible string is
+>>> +                * "nvidia,tegra132-uart", "nvidia,tegra124-uart",
+>>> +                * "nvidia,tegra20-uart" and to enable the APB DMA
+>>> +                * based serial driver, the compatible string is
+>>> +                * "nvidia,tegra132-hsuart", "nvidia,tegra124-hsuart",
+>>> +                * "nvidia,tegra30-hsuart".
+>>> +                */
+>>
+>> Is there any reason to continue with this split?
+>>
+>> Surely if the only difference is DMA, the presence of dmas and dma-names
+>> should be sufficient to get the driver to do the right thing, and if you
+>> need to disable DMA for debugging that could be a command-line option.
 
-Yeah could be handy :)
+I vaguely recall asking for the DMA support to be integrated into the 
+regular 8250 driver instead when the separate DMA-capable driver was 
+first added. I /think/ there was resistance to this because adding lots 
+of different SoC-specific ways to do DMA into the existing 8250 driver 
+would complicate it even more, and hence be unmaintainable.
 
-Regards,
+I assume that reasoning is still valid.
 
-Tony
+Perhaps what we need is more fine-grained driver selection, not just 
+based on compatible value. Something like:
+
+if compatible == nvidia,tegra20-uart:
+   if node.has_prop("enable-dma"):
+     driver = Tegra-specfic DMA capable UART driver
+   else:
+     driver = Common 8250 driver
+
+Is that something that of_serial.c could/should be enhanced to do? That 
+said, the whole reasoning behind separate compatible properties before 
+was that compatible is supposed to "drive" driver selection. At least, 
+that's what I was told then.
+
+>> Does the binding and/or driver support aliases so you can get consistent
+>> numbering? It would be nice to have.
+
+I believe either the serial core or serial driver(s) support DT aliases 
+now, yes.
+
+>> Do these UARTs work with earlycon?
+
+I do not know.
+
+>> It would be nice to have a /chosen/stdout-path (ideally with rate) so as
+>> to get output consistently without command line options being required.
+>
+> Stephen Warren might be the best person to directly respond to these
+> issues.  This is all legacy DT data from previous Tegra SoCs.
+>
+>>
+>>> +               uarta: serial at 0,70006000 {
+>>> +                       compatible = "nvidia,tegra132-uart", "nvidia,tegra124-uart", "nvidia,tegra20-uart";
+>>> +                       reg = <0x0 0x70006000 0x0 0x40>;
+>>> +                       reg-shift = <2>;
+>>> +                       interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
+>>> +                       clocks = <&tegra_car TEGRA124_CLK_UARTA>;
+>>> +                       resets = <&tegra_car 6>;
+>>> +                       reset-names = "serial";
+>>> +                       dmas = <&apbdma 8>, <&apbdma 8>;
+>>> +                       dma-names = "rx", "tx";
+>>> +                       status = "disabled";
+>>> +               };
