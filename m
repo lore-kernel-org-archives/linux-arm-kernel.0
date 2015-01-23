@@ -1,14 +1,14 @@
 From: ricardo.ribalda@gmail.com (Ricardo Ribalda Delgado)
-Date: Fri, 23 Jan 2015 17:08:48 +0100
-Subject: [PATCH 16/18] spi/xilinx: Reset core before buffer_size detection
+Date: Fri, 23 Jan 2015 17:08:50 +0100
+Subject: [PATCH 18/18] spi/xilinx: Check number of slaves range
 In-Reply-To: <1422029330-10971-1-git-send-email-ricardo.ribalda@gmail.com>
 References: <1422029330-10971-1-git-send-email-ricardo.ribalda@gmail.com>
-Message-ID: <1422029330-10971-17-git-send-email-ricardo.ribalda@gmail.com>
+Message-ID: <1422029330-10971-19-git-send-email-ricardo.ribalda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the core had some data on the buffer, the size detection could show
-up a smaller size than real, affecting performance.
+The core only supports up to 32 slaves, and the chipselect function
+expects the same.
 
 Signed-off-by: Ricardo Ribalda Delgado <ricardo.ribalda@gmail.com>
 ---
@@ -16,22 +16,29 @@ Signed-off-by: Ricardo Ribalda Delgado <ricardo.ribalda@gmail.com>
  1 file changed, 7 insertions(+)
 
 diff --git a/drivers/spi/spi-xilinx.c b/drivers/spi/spi-xilinx.c
-index 704613c..8c25c59 100644
+index 026f4c5..134d8cd 100644
 --- a/drivers/spi/spi-xilinx.c
 +++ b/drivers/spi/spi-xilinx.c
-@@ -295,6 +295,13 @@ static int xilinx_spi_find_buffer_size(struct xilinx_spi *xspi)
- 	u8 sr;
- 	int n_words = 0;
+@@ -22,6 +22,8 @@
+ #include <linux/spi/xilinx_spi.h>
+ #include <linux/io.h>
  
-+	/*
-+	 * Before the buffer_size detection we reset the core
-+	 * to make sure we start with a clean state.
-+	 */
-+	xspi->write_fn(XIPIF_V123B_RESET_MASK,
-+		xspi->regs + XIPIF_V123B_RESETR_OFFSET);
++#define MAX_CS			32
 +
- 	/* Fill the Tx FIFO with as many words as possible */
- 	do {
- 		xspi->write_fn(0, xspi->regs + XSPI_TXD_OFFSET);
+ #define XILINX_SPI_NAME "xilinx_spi"
+ 
+ /* Register definitions as per "OPB Serial Peripheral Interface (SPI) (v1.00e)
+@@ -340,6 +342,11 @@ static int xilinx_spi_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
+ 
++	if (num_cs > MAX_CS) {
++		dev_err(&pdev->dev, "Invalid number of spi slaves\n");
++		return -EINVAL;
++	}
++
+ 	master = spi_alloc_master(&pdev->dev, sizeof(struct xilinx_spi));
+ 	if (!master)
+ 		return -ENODEV;
 -- 
 2.1.4
