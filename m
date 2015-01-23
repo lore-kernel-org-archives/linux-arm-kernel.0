@@ -1,211 +1,232 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 23 Jan 2015 11:02:44 +0100
-Subject: [GIT PULL 15/36] arm/arm64: KVM: rework MPIDR assignment and add
- accessors
+Date: Fri, 23 Jan 2015 11:02:40 +0100
+Subject: [GIT PULL 11/36] KVM: arm: page logging 2nd stage fault handling
 In-Reply-To: <1422007385-14730-1-git-send-email-christoffer.dall@linaro.org>
 References: <1422007385-14730-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1422007385-14730-16-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1422007385-14730-12-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andre Przywara <andre.przywara@arm.com>
+From: Mario Smarduch <m.smarduch@samsung.com>
 
-The virtual MPIDR registers (containing topology information) for the
-guest are currently mapped linearily to the vcpu_id. Improve this
-mapping for arm64 by using three levels to not artificially limit the
-number of vCPUs.
-To help this, change and rename the kvm_vcpu_get_mpidr() function to
-mask off the non-affinity bits in the MPIDR register.
-Also add an accessor to later allow easier access to a vCPU with a
-given MPIDR. Use this new accessor in the PSCI emulation.
+This patch adds support for 2nd stage page fault handling while dirty page
+logging. On huge page faults, huge pages are dissolved to normal pages, and
+rebuilding of 2nd stage huge pages is blocked. In case migration is
+canceled this restriction is removed and huge pages may be rebuilt again.
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/include/asm/kvm_emulate.h   |  5 +++--
- arch/arm/include/asm/kvm_host.h      |  2 ++
- arch/arm/kvm/arm.c                   | 13 +++++++++++++
- arch/arm/kvm/psci.c                  | 17 +++++------------
- arch/arm64/include/asm/kvm_emulate.h |  5 +++--
- arch/arm64/include/asm/kvm_host.h    |  2 ++
- arch/arm64/kvm/sys_regs.c            | 13 +++++++++++--
- 7 files changed, 39 insertions(+), 18 deletions(-)
+ arch/arm/kvm/mmu.c | 97 +++++++++++++++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 88 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-index 66ce176..c528615 100644
---- a/arch/arm/include/asm/kvm_emulate.h
-+++ b/arch/arm/include/asm/kvm_emulate.h
-@@ -23,6 +23,7 @@
- #include <asm/kvm_asm.h>
- #include <asm/kvm_mmio.h>
- #include <asm/kvm_arm.h>
-+#include <asm/cputype.h>
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 565e903..6685c68 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -47,6 +47,18 @@ static phys_addr_t hyp_idmap_vector;
+ #define kvm_pmd_huge(_x)	(pmd_huge(_x) || pmd_trans_huge(_x))
+ #define kvm_pud_huge(_x)	pud_huge(_x)
  
- unsigned long *vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num);
- unsigned long *vcpu_spsr(struct kvm_vcpu *vcpu);
-@@ -167,9 +168,9 @@ static inline u32 kvm_vcpu_hvc_get_imm(struct kvm_vcpu *vcpu)
- 	return kvm_vcpu_get_hsr(vcpu) & HSR_HVC_IMM_MASK;
- }
- 
--static inline unsigned long kvm_vcpu_get_mpidr(struct kvm_vcpu *vcpu)
-+static inline unsigned long kvm_vcpu_get_mpidr_aff(struct kvm_vcpu *vcpu)
- {
--	return vcpu->arch.cp15[c0_MPIDR];
-+	return vcpu->arch.cp15[c0_MPIDR] & MPIDR_HWID_BITMASK;
- }
- 
- static inline void kvm_vcpu_set_be(struct kvm_vcpu *vcpu)
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 7d07eb8..2fa5174 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -236,6 +236,8 @@ int kvm_perf_teardown(void);
- 
- void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
- 
-+struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
++#define KVM_S2PTE_FLAG_IS_IOMAP		(1UL << 0)
++#define KVM_S2_FLAG_LOGGING_ACTIVE	(1UL << 1)
 +
- static inline void kvm_arch_hardware_disable(void) {}
- static inline void kvm_arch_hardware_unsetup(void) {}
- static inline void kvm_arch_sync_events(struct kvm *kvm) {}
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 74603a0..a7b94ec 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -1075,6 +1075,19 @@ static void check_kvm_target_cpu(void *ret)
- 	*(int *)ret = kvm_target_cpu();
- }
- 
-+struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr)
++static bool memslot_is_logging(struct kvm_memory_slot *memslot)
 +{
-+	struct kvm_vcpu *vcpu;
-+	int i;
-+
-+	mpidr &= MPIDR_HWID_BITMASK;
-+	kvm_for_each_vcpu(i, vcpu, kvm) {
-+		if (mpidr == kvm_vcpu_get_mpidr_aff(vcpu))
-+			return vcpu;
-+	}
-+	return NULL;
++#ifdef CONFIG_ARM
++	return memslot->dirty_bitmap && !(memslot->flags & KVM_MEM_READONLY);
++#else
++	return false;
++#endif
 +}
 +
- /**
-  * Initialize Hyp-mode and memory mappings on all CPUs.
-  */
-diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-index 58cb324..02fa8ef 100644
---- a/arch/arm/kvm/psci.c
-+++ b/arch/arm/kvm/psci.c
-@@ -22,6 +22,7 @@
- #include <asm/cputype.h>
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_psci.h>
-+#include <asm/kvm_host.h>
- 
- /*
-  * This is an implementation of the Power State Coordination Interface
-@@ -66,25 +67,17 @@ static void kvm_psci_vcpu_off(struct kvm_vcpu *vcpu)
- static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
  {
- 	struct kvm *kvm = source_vcpu->kvm;
--	struct kvm_vcpu *vcpu = NULL, *tmp;
-+	struct kvm_vcpu *vcpu = NULL;
- 	wait_queue_head_t *wq;
- 	unsigned long cpu_id;
- 	unsigned long context_id;
--	unsigned long mpidr;
- 	phys_addr_t target_pc;
--	int i;
+ 	/*
+@@ -59,6 +71,25 @@ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+ 		kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, kvm, ipa);
+ }
  
--	cpu_id = *vcpu_reg(source_vcpu, 1);
-+	cpu_id = *vcpu_reg(source_vcpu, 1) & MPIDR_HWID_BITMASK;
- 	if (vcpu_mode_is_32bit(source_vcpu))
- 		cpu_id &= ~((u32) 0);
++/**
++ * stage2_dissolve_pmd() - clear and flush huge PMD entry
++ * @kvm:	pointer to kvm structure.
++ * @addr:	IPA
++ * @pmd:	pmd pointer for IPA
++ *
++ * Function clears a PMD entry, flushes addr 1st and 2nd stage TLBs. Marks all
++ * pages in the range dirty.
++ */
++static void stage2_dissolve_pmd(struct kvm *kvm, phys_addr_t addr, pmd_t *pmd)
++{
++	if (!kvm_pmd_huge(*pmd))
++		return;
++
++	pmd_clear(pmd);
++	kvm_tlb_flush_vmid_ipa(kvm, addr);
++	put_page(virt_to_page(pmd));
++}
++
+ static int mmu_topup_memory_cache(struct kvm_mmu_memory_cache *cache,
+ 				  int min, int max)
+ {
+@@ -768,10 +799,15 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
+ }
  
--	kvm_for_each_vcpu(i, tmp, kvm) {
--		mpidr = kvm_vcpu_get_mpidr(tmp);
--		if ((mpidr & MPIDR_HWID_BITMASK) == (cpu_id & MPIDR_HWID_BITMASK)) {
--			vcpu = tmp;
--			break;
--		}
--	}
-+	vcpu = kvm_mpidr_to_vcpu(kvm, cpu_id);
+ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+-			  phys_addr_t addr, const pte_t *new_pte, bool iomap)
++			  phys_addr_t addr, const pte_t *new_pte,
++			  unsigned long flags)
+ {
+ 	pmd_t *pmd;
+ 	pte_t *pte, old_pte;
++	bool iomap = flags & KVM_S2PTE_FLAG_IS_IOMAP;
++	bool logging_active = flags & KVM_S2_FLAG_LOGGING_ACTIVE;
++
++	VM_BUG_ON(logging_active && !cache);
+ 
+ 	/* Create stage-2 page table mapping - Levels 0 and 1 */
+ 	pmd = stage2_get_pmd(kvm, cache, addr);
+@@ -783,6 +819,13 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+ 		return 0;
+ 	}
+ 
++	/*
++	 * While dirty page logging - dissolve huge PMD, then continue on to
++	 * allocate page.
++	 */
++	if (logging_active)
++		stage2_dissolve_pmd(kvm, addr, pmd);
++
+ 	/* Create stage-2 page mappings - Level 2 */
+ 	if (pmd_none(*pmd)) {
+ 		if (!cache)
+@@ -839,7 +882,8 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
+ 		if (ret)
+ 			goto out;
+ 		spin_lock(&kvm->mmu_lock);
+-		ret = stage2_set_pte(kvm, &cache, addr, &pte, true);
++		ret = stage2_set_pte(kvm, &cache, addr, &pte,
++						KVM_S2PTE_FLAG_IS_IOMAP);
+ 		spin_unlock(&kvm->mmu_lock);
+ 		if (ret)
+ 			goto out;
+@@ -1067,6 +1111,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 	pfn_t pfn;
+ 	pgprot_t mem_type = PAGE_S2;
+ 	bool fault_ipa_uncached;
++	bool logging_active = memslot_is_logging(memslot);
++	unsigned long flags = 0;
+ 
+ 	write_fault = kvm_is_write_fault(vcpu);
+ 	if (fault_status == FSC_PERM && !write_fault) {
+@@ -1083,7 +1129,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		return -EFAULT;
+ 	}
+ 
+-	if (is_vm_hugetlb_page(vma)) {
++	if (is_vm_hugetlb_page(vma) && !logging_active) {
+ 		hugetlb = true;
+ 		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
+ 	} else {
+@@ -1124,12 +1170,30 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 	if (is_error_pfn(pfn))
+ 		return -EFAULT;
+ 
+-	if (kvm_is_device_pfn(pfn))
++	if (kvm_is_device_pfn(pfn)) {
+ 		mem_type = PAGE_S2_DEVICE;
++		flags |= KVM_S2PTE_FLAG_IS_IOMAP;
++	} else if (logging_active) {
++		/*
++		 * Faults on pages in a memslot with logging enabled
++		 * should not be mapped with huge pages (it introduces churn
++		 * and performance degradation), so force a pte mapping.
++		 */
++		force_pte = true;
++		flags |= KVM_S2_FLAG_LOGGING_ACTIVE;
++
++		/*
++		 * Only actually map the page as writable if this was a write
++		 * fault.
++		 */
++		if (!write_fault)
++			writable = false;
++	}
+ 
+ 	spin_lock(&kvm->mmu_lock);
+ 	if (mmu_notifier_retry(kvm, mmu_seq))
+ 		goto out_unlock;
++
+ 	if (!hugetlb && !force_pte)
+ 		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
+ 
+@@ -1147,17 +1211,17 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
+ 	} else {
+ 		pte_t new_pte = pfn_pte(pfn, mem_type);
++
+ 		if (writable) {
+ 			kvm_set_s2pte_writable(&new_pte);
+ 			kvm_set_pfn_dirty(pfn);
++			mark_page_dirty(kvm, gfn);
+ 		}
+ 		coherent_cache_guest_page(vcpu, hva, PAGE_SIZE,
+ 					  fault_ipa_uncached);
+-		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte,
+-			pgprot_val(mem_type) == pgprot_val(PAGE_S2_DEVICE));
++		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, flags);
+ 	}
+ 
+-
+ out_unlock:
+ 	spin_unlock(&kvm->mmu_lock);
+ 	kvm_release_pfn_clean(pfn);
+@@ -1307,7 +1371,14 @@ static void kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, void *data)
+ {
+ 	pte_t *pte = (pte_t *)data;
+ 
+-	stage2_set_pte(kvm, NULL, gpa, pte, false);
++	/*
++	 * We can always call stage2_set_pte with KVM_S2PTE_FLAG_LOGGING_ACTIVE
++	 * flag clear because MMU notifiers will have unmapped a huge PMD before
++	 * calling ->change_pte() (which in turn calls kvm_set_spte_hva()) and
++	 * therefore stage2_set_pte() never needs to clear out a huge PMD
++	 * through this calling path.
++	 */
++	stage2_set_pte(kvm, NULL, gpa, pte, 0);
+ }
+ 
+ 
+@@ -1461,7 +1532,8 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
+ 	bool writable = !(mem->flags & KVM_MEM_READONLY);
+ 	int ret = 0;
+ 
+-	if (change != KVM_MR_CREATE && change != KVM_MR_MOVE)
++	if (change != KVM_MR_CREATE && change != KVM_MR_MOVE &&
++			change != KVM_MR_FLAGS_ONLY)
+ 		return 0;
  
  	/*
- 	 * Make sure the caller requested a valid CPU and that the CPU is
-@@ -155,7 +148,7 @@ static unsigned long kvm_psci_vcpu_affinity_info(struct kvm_vcpu *vcpu)
- 	 * then ON else OFF
- 	 */
- 	kvm_for_each_vcpu(i, tmp, kvm) {
--		mpidr = kvm_vcpu_get_mpidr(tmp);
-+		mpidr = kvm_vcpu_get_mpidr_aff(tmp);
- 		if (((mpidr & target_affinity_mask) == target_affinity) &&
- 		    !tmp->arch.pause) {
- 			return PSCI_0_2_AFFINITY_LEVEL_ON;
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index a6fa2d2..b3f1def 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -27,6 +27,7 @@
- #include <asm/kvm_arm.h>
- #include <asm/kvm_mmio.h>
- #include <asm/ptrace.h>
-+#include <asm/cputype.h>
+@@ -1512,6 +1584,10 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
+ 			phys_addr_t pa = (vma->vm_pgoff << PAGE_SHIFT) +
+ 					 vm_start - vma->vm_start;
  
- unsigned long *vcpu_reg32(const struct kvm_vcpu *vcpu, u8 reg_num);
- unsigned long *vcpu_spsr32(const struct kvm_vcpu *vcpu);
-@@ -192,9 +193,9 @@ static inline u8 kvm_vcpu_trap_get_fault_type(const struct kvm_vcpu *vcpu)
- 	return kvm_vcpu_get_hsr(vcpu) & ESR_EL2_FSC_TYPE;
- }
- 
--static inline unsigned long kvm_vcpu_get_mpidr(struct kvm_vcpu *vcpu)
-+static inline unsigned long kvm_vcpu_get_mpidr_aff(struct kvm_vcpu *vcpu)
- {
--	return vcpu_sys_reg(vcpu, MPIDR_EL1);
-+	return vcpu_sys_reg(vcpu, MPIDR_EL1) & MPIDR_HWID_BITMASK;
- }
- 
- static inline void kvm_vcpu_set_be(struct kvm_vcpu *vcpu)
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 012af6c..ff8ee3e 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -207,6 +207,8 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
- int kvm_perf_init(void);
- int kvm_perf_teardown(void);
- 
-+struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
++			/* IO region dirty page logging not allowed */
++			if (memslot->flags & KVM_MEM_LOG_DIRTY_PAGES)
++				return -EINVAL;
 +
- static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
- 				       phys_addr_t pgd_ptr,
- 				       unsigned long hyp_stack_ptr,
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 3d7c2df..136e679 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -252,10 +252,19 @@ static void reset_amair_el1(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+ 			ret = kvm_phys_addr_ioremap(kvm, gpa, pa,
+ 						    vm_end - vm_start,
+ 						    writable);
+@@ -1521,6 +1597,9 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
+ 		hva = vm_end;
+ 	} while (hva < reg_end);
  
- static void reset_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
- {
-+	u64 mpidr;
++	if (change == KVM_MR_FLAGS_ONLY)
++		return ret;
 +
- 	/*
--	 * Simply map the vcpu_id into the Aff0 field of the MPIDR.
-+	 * Map the vcpu_id into the first three affinity level fields of
-+	 * the MPIDR. We limit the number of VCPUs in level 0 due to a
-+	 * limitation to 16 CPUs in that level in the ICC_SGIxR registers
-+	 * of the GICv3 to be able to address each CPU directly when
-+	 * sending IPIs.
- 	 */
--	vcpu_sys_reg(vcpu, MPIDR_EL1) = (1UL << 31) | (vcpu->vcpu_id & 0xff);
-+	mpidr = (vcpu->vcpu_id & 0x0f) << MPIDR_LEVEL_SHIFT(0);
-+	mpidr |= ((vcpu->vcpu_id >> 4) & 0xff) << MPIDR_LEVEL_SHIFT(1);
-+	mpidr |= ((vcpu->vcpu_id >> 12) & 0xff) << MPIDR_LEVEL_SHIFT(2);
-+	vcpu_sys_reg(vcpu, MPIDR_EL1) = (1ULL << 31) | mpidr;
- }
- 
- /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
+ 	spin_lock(&kvm->mmu_lock);
+ 	if (ret)
+ 		unmap_stage2_range(kvm, mem->guest_phys_addr, mem->memory_size);
 -- 
 2.1.2.330.g565301e.dirty
