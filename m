@@ -1,138 +1,93 @@
-From: pantelis.antoniou@konsulko.com (Pantelis Antoniou)
-Date: Fri, 23 Jan 2015 14:19:55 +0200
-Subject: [RFC] using dt overlays: how to? today?
-In-Reply-To: <20150123090739.GD26928@odux.rfo.atmel.com>
-References: <20150122150219.GB26928@odux.rfo.atmel.com>
- <2F10D177-6F27-4019-8D2D-8F77361BB310@konsulko.com>
- <20150123090739.GD26928@odux.rfo.atmel.com>
-Message-ID: <A4ABD15A-F714-430B-B239-46E6B1710BBD@konsulko.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 23 Jan 2015 12:22:44 +0000
+Subject: [PATCH] arm64: dts: Add initial device tree support for Tegra132
+In-Reply-To: <54C23B08.6070503@nvidia.com>
+References: <alpine.DEB.2.02.1501161139180.9776@utopia.booyaka.com>
+ <20150121161313.GI5044@leverpostej>
+ <alpine.DEB.2.02.1501231038130.5450@utopia.booyaka.com>
+ <54C23B08.6070503@nvidia.com>
+Message-ID: <20150123122244.GJ23493@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ludovic,
+On Fri, Jan 23, 2015 at 12:14:00PM +0000, Arto Merilainen wrote:
+> Hi all,
+> 
+> On 01/23/2015 01:31 PM, Paul Walmsley wrote:
+> > + Arto, Terje for comments on the host1x section
+> > + Stephen Warren for comments on the serial DT data
+> >
+> > Hi Mark,
+> >
+> > thanks for the review.
+> >
+> > On Wed, 21 Jan 2015, Mark Rutland wrote:
+> >
+> >> As mentioned in my reply to the DT list patch [1], there are a couple of
+> >> bits I'd like to see cleaned up first, but in the meantime I have some
+> >> comments from my first pass of the dtsi below. Some of these may equally
+> >> apply to existing dts(i) files.
+> >>
+> >> I see a few undocumented compatible strings (at least when comparing
+> >> against mainline). If there are other series or trees I should be
+> >> looking at, any pointers would be appreciated. If not, documentation
+> >> updates would be nice (checkpatch should complain otherwise).
+> >
+> > (discussed in the tegra132-pcie comments below)
+> >
+> >>
+> >> On Fri, Jan 16, 2015 at 11:45:29AM +0000, Paul Walmsley wrote:
+> >>> +       host1x at 0,50000000 {
+> >>> +               compatible = "nvidia,tegra132-host1x", "nvidia,tegra124-host1x", "simple-bus";
+> >>
+> >> Regarding simple-bus, are the sub-nodes usable if this didn't probe as
+> >> "nvidia,tegra124-host1x" or "nvidia,tegra132-host1x"?
+> >> Do the subnodes require anything from this node?
+> >>
+> >> It looks like we expect/require the host1x node to be probed and
+> >> initialised before we probe the children. Which would imply the
+> >> simple-bus annotation is wrong.
+> >
+> > Haven't tried booting with just simple-bus here.  I believe these devices
+> > are accessible without the involvement of host1x.  In other words, host1x
+> > is not a bus; I believe it might be most accurately described as a type of
+> > DMA controller.  So in theory it should be possible for the CPU complex to
+> > read and write to these devices directly without the involvement of
+> > host1x, although I believe NVIDIA discourages this.
+> >
+> > Under the theory that DT data should be hardware-specific, not
+> > software-specific, in an ideal world I think we would list these devices
+> > outside the embrace of the host1x node.  However the existing Tegra124 DT
+> > file listed them together, and I am unsure whether that is required for
+> > the host1x code to function correctly.
+> >
+> > Arto may be able to comment further.
+> 
+> Placing the devices behind host1x is an accurate description of 
+> hardware: Despite the direct register access path (writel/readl 
+> targeting a host1x client device) is transparent to the CPU, the host1x 
+> hardware is internally handling the requests and passing them forward to 
+> the host1x client in interest.
+> 
+> Above implies also a strict parent-child dependency on hardware level: 
+> If the CPU tries to access a register in a host1x client before the 
+> host1x clock has been enabled, host1x will not be able to forward the 
+> requests and the access will fail. This also defines the importance of 
+> probe order (i.e. host1x must be initialized before client devices).
 
-> On Jan 23, 2015, at 11:07 , Ludovic Desroches <ludovic.desroches@atmel.com> wrote:
-> 
-> Hi Pantelis,
-> 
-> On Thu, Jan 22, 2015 at 10:54:42PM +0200, Pantelis Antoniou wrote:
->> Hi Ludovic,
->> 
->>> On Jan 22, 2015, at 17:02 , Ludovic Desroches <ludovic.desroches@atmel.com> wrote:
->>> 
->>> Hi,
->>> 
->>> I have assisted to Pantelis' talk about device tree and overlays at ELCE
->>> 2014. Since the patch 'Introduce DT overlay support' is now part of the
->>> mainline, I wanted to have a look about it and to use it for our boards.
->>> 
->> 
->> Excellent.
->> 
->>> Firstly, this is what I want to achieve by using this feature:
->>> - manage several revisions of our boards
->>> - manage modules we can plug on the board, mainly display modules
->>> (resistive or capacitive one)
->>> - manage cpu modules plug on the motherboard
->>> - I would like to have all this stuff in the kernel. I don't want a
->>> dependency on the bootloader or the user space.
->>> 
->> 
->> That?s awesome; that?s exactly what I want to use it for. Maybe this thing
->> can be used by others as well ;)
->> 
-> 
-> It seems quite close from what you want to achieve with cape manager.
-> 
->>> At the moment, we have many dts files to manage these cases (not all are
->>> in mainline). It is becoming a pain.
->>> 
->> 
->> Tell me about it.
-> 
-> You can have a look here:
-> https://github.com/linux4sam/linux-at91/tree/master/arch/arm/boot/dts
-> 
-> For example, we have up to 6 dts files for a single device:
-> sama5d36ek.dts, sama5d36ek_hdmi.dts, sama5d36ek_pda4.dts,
-> sama5d36ek_pda7.dts, sama5d36ek_revc.dts, sama5d36ek_revc_pda4.dts,
-> sama5d36ek_revc_pda7.dts
-> 
-> Our goal is that customers don't have to care about all this stuff. They
-> load a single dtb file which can manage all these cases.
-> The change between revison c and revison d is the i2c device to which
-> the audio codec is connected. Difference between pda4 and pda7 (which
-> are display modules with a capacitive touchscreen) can be the irq used
-> the touch keyboard or the touchscreen.
-> 
-> Information we need are stored in an EEPROM which is accessible through
-> a one wire bus. As I said, we would like that the customers have no
-> dependency on other components if possible: bootloader, userspace,
-> firmware.
-> 
+In that case, it sounds like the "simple-bus" string is bogus unless the
+host1x is at minimum pre-initialised by some firmware and/or bootloader
+into a state where the child devices could theoretically be used on
+their own.
 
-Makes sense. I was wondering if I can find another board to test my patches
-on. If you send me the boards in question I can put them in my lab and run
-my tests against them too.
+So I think "simple-bus" should be dropped here.
 
-The patches for the beagle cape-manager will be forthcoming as soon as 3.19 is out;
-I have some ideas about board revision control too, but I need to run them through
-the maintainers to make sure I don?t go off to the weeds.
+> In addition, the host1x indirect register programming path ("channel 
+> path") is operational only for the host1x client devices and our current 
+> host1x driver relies on parent-child relationship in device tree.
 
->> 
->>> I wanted to see if we can use device tree fragments as it seems to be
->>> closed to be achieved when I had assisted to the talk. I have found a
->>> thread about 'DT-Overlay configfs interface'
->>> (http://thread.gmane.org/gmane.linux.drivers.devicetree/101871), there
->>> are still discussions about security concerns, so it may not be included
->>> quickly. I have also found an interesting thread about cape manager for
->>> Beaglebone (http://thread.gmane.org/gmane.linux.documentation/8279) but
->>> there is no more activity on it, is it canceled or is there a new topic
->>> I have missed?
->>> 
->>> Here are my questions:
->>> - Is it acceptable to manage device tree fragments with a driver such as
->>> the cape manager? Or at an other place in the kernel such as
->>> arch/arm/mach-at91/board-dt-sama5.c for example?
->>> - Is it possible to get access to eeprom from the kernel? Pantelis did
->>> an interface to access it through i2c but it seems it was not
->>> accepted. In my case, it will be through the one wire interface.
->>> 
->>> Thanks for sharing your opinion about this or redirecting me to a
->>> similar thread.
->>> 
->> 
->> I?m waiting for 3.19 to go out and I?ll address everything you described
->> above.
-> 
-> Do you think it's too early to use it? We are currently trying to
-> release a new kernel (based on 3.18) with some patches which have not been
-> sent or accepted yet. Since I could merge easily your patches from Grant
-> branch, I thought we could try to use it but spending time on a oneshoot
-> solution is useless. That's why I would like to know what is the status
-> since it seems only the sysfs part is still in development.
-> 
+So I guess this is more Linux-specific, but still adds to the fuel for
+removing "simple-bus" here.
 
-No it not too early; it just works. The only bit missing is the configfs
-interface but we?re getting there.
-
->> 
->> Feel free to post specific requirement about your use cases, and I?ll try
->> to address them.
-> 
-> Thanks so what is the next step? Posting a new patch series or the cape
-> manager? I mean if you plan to do it, I could have a look on how to
-> access the EEPROM through one wire.
-> 
-
-The next step is the cape-manager/revision manager series, right after 
-3.19 is out.
-
-> 
-> Regards
-> 
-> Ludovic
-
-Regards
-
-? Pantelis
+Thanks,
+Mark.
