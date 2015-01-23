@@ -1,64 +1,43 @@
-From: ideal.song@samsung.com (Inha Song)
-Date: Fri, 23 Jan 2015 09:49:16 +0900
-Subject: [alsa-devel] [PATCH v3 3/4] ARM: dts: set clock out parent to
- XUSBXTI
-In-Reply-To: <54C0EC23.9070209@samsung.com>
-References: <1421925482-15861-1-git-send-email-ideal.song@samsung.com>
- <1421925482-15861-4-git-send-email-ideal.song@samsung.com>
- <54C0EC23.9070209@samsung.com>
-Message-ID: <20150123094916.32beb50f@songinha-Samsung-DeskTop-System>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Thu, 22 Jan 2015 16:51:16 -0800
+Subject: [PATCHv5 2/2] INPUT: Introduce generic trigger/LED pairs to input
+ LEDs
+In-Reply-To: <20150123004429.GD3123@type.youpi.perso.aquilenet.fr>
+References: <20141226232116.GA5069@type> <1756449.aIckN0M451@dtor-glaptop>
+ <20150123004429.GD3123@type.youpi.perso.aquilenet.fr>
+Message-ID: <4596566.1GHUcIZaFc@dtor-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-Thanks for your comment.
-
-On Thu, 22 Jan 2015 13:25:07 +0100
-Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
-
-> On 22/01/15 12:18, Inha Song wrote:
-> > This patch set clock out parent to XUSBXTI.
+On Friday, January 23, 2015 01:44:29 AM Samuel Thibault wrote:
+> Dmitry Torokhov, le Thu 22 Jan 2015 16:37:02 -0800, a ?crit :
+> > On Friday, January 23, 2015 01:30:11 AM Samuel Thibault wrote:
+> > > Samuel Thibault, le Fri 23 Jan 2015 01:10:38 +0100, a ?crit :
+> > > > Dmitry Torokhov, le Sun 04 Jan 2015 15:28:38 -0800, a ?crit :
+> > > > > > +	dev = cdev->dev->platform_data;
+> > > > > 
+> > > > > Umm, platform data is not the best place for storing this. Why not
+> > > > > drvdata?
+> > > > 
+> > > > Ah, actually led_classdev already makes use of it, see the
+> > > > device_create_with_groups call in led_classdev_register.
+> > > 
+> > > Actually I'd say it makes sense to be using the platform_data field:
+> > > from the point of view of the led object, the input object is indeed
+> > > something like a platform.
 > > 
-> > Signed-off-by: Inha Song <ideal.song@samsung.com>
-> > ---
-> >  arch/arm/boot/dts/exynos4.dtsi | 2 ++
-> >  1 file changed, 2 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-> > index b8168f1..020bbaf 100644
-> > --- a/arch/arm/boot/dts/exynos4.dtsi
-> > +++ b/arch/arm/boot/dts/exynos4.dtsi
-> > @@ -141,6 +141,8 @@
-> >  	pmu_system_controller: system-controller at 10020000 {
-> >  		compatible = "samsung,exynos4210-pmu", "syscon";
-> >  		reg = <0x10020000 0x4000>;
-> > +		assigned-clocks = <&pmu_system_controller 0>;
-> > +		assigned-clock-parents =  <&clock CLK_XUSBXTI>;
-> >  	};
+> > No, platform data is what difefrentiates an arm board from another arm
+> > board, or an x86 or mips one.
 > 
-> Looks good, except it needs to be done only for the Trats2 board, i.e.
-> the PMU device node including these properties should be added to
-> exynos4412-trats2.dts.  I think it's fine to make it a one patch including
-> all dts changes.
+> From the point of view of a device connected to that board, yes. But
+> from the point of view of LEDs connected to a keyboard, the platform is
+> the keyboard.
 
-Opps! I understand. I will move this node to exynos4412-trats2.dts.
+No. Please take a look at other users of platform data. Platform is the box we 
+are running on, not parent device. Platform data is supposed to be constant,
+not changing between driver runs.
 
-&pmu_system_controller {
-   assigned-clocks = <&pmu_system_controller 0>;
-   assigned-clock-parents =  <&clock CLK_XUSBXTI>;
-};
+Thanks.
 
-Thanks!
-
-Best Regards,
-Inha Song.
-
-> 
-> 
-> -- 
-> Regards,
-> Sylwester
-> _______________________________________________
-> Alsa-devel mailing list
-> Alsa-devel at alsa-project.org
-> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
+-- 
+Dmitry
