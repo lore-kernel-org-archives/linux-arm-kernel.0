@@ -1,37 +1,37 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 23 Jan 2015 17:17:41 +0800
-Subject: [GIT PULL 3/3] ARM: imx: defconfig update for 3.20
-Message-ID: <20150123091740.GD27337@dragon>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 23 Jan 2015 10:33:23 +0100
+Subject: [PATCH v3 2/3] ARM: at91/dt: sama5d4: add pioD controller
+In-Reply-To: <CACRpkdb3DoqsrqjaRptn=yUTRxy6fYLiPDWhViEe3Xf6jkT8Mg@mail.gmail.com>
+References: <1421422267-2934-1-git-send-email-ludovic.desroches@atmel.com>	<1421422267-2934-3-git-send-email-ludovic.desroches@atmel.com>	<54BCE07C.8060601@atmel.com>
+ <CACRpkdb3DoqsrqjaRptn=yUTRxy6fYLiPDWhViEe3Xf6jkT8Mg@mail.gmail.com>
+Message-ID: <54C21563.2020801@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+Le 21/01/2015 10:49, Linus Walleij a ?crit :
+> On Mon, Jan 19, 2015 at 11:46 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+>> Le 16/01/2015 16:31, Ludovic Desroches a ?crit :
+>>> PioD controller was not described in the device tree since we don't use
+>>> it. As pinctrl-at91 allows disabled gpio controllers in the device
+>>> tree, we can add it to complete the device description.
+>>>
+>>> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+>>
+>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>>
+>> Linus,
+>>
+>> As there is no dependency with the other patches in the series, I can
+>> take this patch or you can keep it together with the other ones. Just
+>> tell me once we agree all on a solution.
+> 
+> Please take this patch along with other AT91 stuff upstream
+> through ARM SoC.
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+Ok, it is now stacked on top of our at91-3.20-dt branch and I'll send it
+to arm-soc soon.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-defconfig-3.20
-
-for you to fetch changes up to ec800d7906df7b24b0706da0013a2f83b4d4efe8:
-
-  ARM: imx_v6_v7_defconfig: enable more USB functions (2015-01-20 16:11:06 +0800)
-
-----------------------------------------------------------------
-The i.MX defconfig update for 3.20:
- - Eneable FB_MXS, SPI_FSL_QUADSPI, POWER_RESET_SYSCON and module build
-   for a bunch of USB functions
-
-----------------------------------------------------------------
-Fabio Estevam (2):
-      ARM: imx_v6_v7_defconfig: Select SPI_FSL_QUADSPI by default
-      ARM: imx_v6_v7_defconfig: Select CONFIG_FB_MXS
-
-Peter Chen (1):
-      ARM: imx_v6_v7_defconfig: enable more USB functions
-
-Stefan Agner (1):
-      ARM: imx_v6_v7_defconfig: add POWER_RESET_SYSCON
-
- arch/arm/configs/imx_v6_v7_defconfig | 39 ++++++++++++++++++++++++++++++++----
- 1 file changed, 35 insertions(+), 4 deletions(-)
+Thanks, bye.
+-- 
+Nicolas Ferre
