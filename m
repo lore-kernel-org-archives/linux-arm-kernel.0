@@ -1,35 +1,26 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 23 Jan 2015 17:46:25 +0100
-Subject: [PATCH v3 5/7] ARM: mvebu: Use macros for interrupt flags on Armada
- 38x sdhci node
-In-Reply-To: <1422031587-18212-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1422031587-18212-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1422031587-18212-6-git-send-email-gregory.clement@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 23 Jan 2015 16:47:59 +0000
+Subject: [RFC PATCH 0/5] arm64: IOMMU-backed DMA mapping
+In-Reply-To: <cover.1421086706.git.robin.murphy@arm.com>
+References: <cover.1421086706.git.robin.murphy@arm.com>
+Message-ID: <20150123164759.GF9557@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of hardcoding the values of the interrupt flags, use the
-macros provided by <include/dt-bindings/interrupt-controller/irq.h>
-and <include/dt-bindings/interrupt-controller/arm-gic.h> for the
-Armada 38x SDHCI node.
+On Mon, Jan 12, 2015 at 08:48:52PM +0000, Robin Murphy wrote:
+> Catalin Marinas (1):
+>   arm64: Combine coherent and non-coherent swiotlb dma_ops
+> 
+> Robin Murphy (4):
+>   arm64: implement generic IOMMU configuration
+>   iommu: implement common IOMMU ops for DMA mapping
+>   arm64: add IOMMU dma_ops
+>   arm64: hook up IOMMU dma_ops
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/boot/dts/armada-38x.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I queued the first two patches in this series for 3.20. The rest need to
+go through some review rounds.
 
-diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index 79c4acf186e2..71d4eca5b497 100644
---- a/arch/arm/boot/dts/armada-38x.dtsi
-+++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -516,7 +516,7 @@
- 			sdhci at d8000 {
- 				compatible = "marvell,armada-380-sdhci";
- 				reg = <0xd8000 0x1000>, <0xdc000 0x100>;
--				interrupts = <0 25 0x4>;
-+				interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&gateclk 17>;
- 				mrvl,clk-delay-cycles = <0x1F>;
- 				status = "disabled";
+Thanks.
+
 -- 
-2.1.0
+Catalin
