@@ -1,76 +1,46 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Fri, 23 Jan 2015 14:48:56 +0100
-Subject: [PATCH v4 18/18] iommu: exynos: add callback for initializing
- devices from device tree
-In-Reply-To: <54C2415A.3020508@samsung.com>
-References: <1421399592-7482-1-git-send-email-m.szyprowski@samsung.com>
- <1421399592-7482-19-git-send-email-m.szyprowski@samsung.com>
- <CABxcv=nkcY0biXuDH1BHDdOZhrzYWr-YNP13QWzdLfZfQrxouA@mail.gmail.com>
- <54C2415A.3020508@samsung.com>
-Message-ID: <CABxcv=nX22+1VcA038yyLJz7dUN-tk9-kWTpSB-FeyLxVeRmZA@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 23 Jan 2015 15:09:55 +0100
+Subject: [PATCH v2] MediaTek PMIC support
+Message-ID: <1422022202-7526-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Marek,
+This series adds initial support for the MediaTek MT6397 PMIC and the
+necessary infrastructure to attach it on the MT8135 / MT8173 SoCs.
 
-On Fri, Jan 23, 2015 at 1:40 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
->>> +
->>> +       list_add_tail(&data->owner_node, &owner->clients);
->>
->> This is the line that causes the kernel to hang, if I comment the
->> list_add_tail() call then the kernel boots.
->>
->> I checked that neither data nor owner are NULL and that the
->> owner->clients list_head is initialized. Do you have any ideas what
->> could be happening?
->
->
-> This is really strange. However the hang is definitely not caused by
-> adding the controller to the list, but rather the fact that it is later
-> being initialized, probably in exynos_iommu_attach_device().
->
+The infrastructure includes:
 
-Yes, I knew adding to the list was not the issue but a side effect of
-being in the list. I'm not familiar with Exynos sysmmu/iommu to figure
-out though.
+- pericfg / infracfg controller support
+  The pericfg / infracfg controllers contain miscellaneous registers for
+  reset controllers and clocks.
 
-> Just a quick question - does bootloader on Exynos5420 Peach Pit sets
-> any image on the display?
->
+- PMIC wrapper support
+  On MediaTek MT8135, MT8173 and other SoCs the PMIC is connected via
+  SPI. The SPI master interface is not directly visible to the CPU, but
+  only through the PMIC wrapper inside the SoC. The communication between
+  the SoC and the PMIC can optionally be encrypted. Also a non standard
+  Dual IO SPI mode can be used to increase speed. The MT8135 also supports
+  a special feature named "IP Pairing". With IP Pairing the pins of some
+  SoC internal peripherals can be on the PMIC. The signals of these pins
+  are routed over the SPI bus using the pwrap bridge. Because of these
+  optional non SPI conform features the PMIC driver is not implemented as
+  a SPI bus master driver.
 
-Yes u-boot does initialize the display, I see the boot messages and
-have an u-boot prompt.
+The MT6397 PMIC itself is implemented as a regular mfd device driver which
+uses regmap to access the PMIC registers.
 
-> If so then we will get IOMMU page fault on init (DMA engine of FIMD is
-> left enabled from bootloader) and such case is not yet handled.
-> Besides that I have no idea for any other reason for such failure.
->
+This series also adds regulator support for the MT6397 PMIC.
 
-I see, that's a reasonable explanation and in fact your patch makes at
-least the kernel to start booting.
+The first 6 patches can be merged through the ARM SoC tree. The mfd
+patch is independent of the first 6 patches and can be merged through the
+mfd maintainer trees.
 
-> To check if this is caused by io page fault, please temporarily add the
-> following hack:
-> --->8---
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 7864797609b3..5e70cf7eb31b 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -2011,6 +2011,9 @@ static bool arm_setup_iommu_dma_ops(struct device
-> *dev, u64 dma_base, u64 size,
->          return false;
->      }
->
-> +    iommu_map(mapping->domain, 0x40000000, 0x40000000, 0x80000000,
-> +          IOMMU_READ | IOMMU_WRITE);
-> +
->      if (arm_iommu_attach_device(dev, mapping)) {
+Changes since v1:
 
-The kernel still hangs but the boot does indeed go further. Here is my
-boot log [0] although I couldn't find an evident cause.
+- document reset bindings for infracfg/pericfg
+- fix base addresses in infracfg binding example
+- Remove more Email addresses from Flora Fu (She is not working at
+  MediaTek anymore, her address is no longer valid)
+- drop Regulator support patch, it's already in next
 
-Best regards,
-Javier
-
-[0]: http://paste.debian.net/plain/141968
+Sascha
