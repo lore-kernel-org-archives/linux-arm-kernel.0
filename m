@@ -1,50 +1,48 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 23 Jan 2015 14:05:22 +0100
-Subject: [PATCH v12 00/15] arm: Fix DEBUG_LL for multi-platform kernels
- (without PL01X)
-In-Reply-To: <1822066.pI6QN22RDx@wuerfel>
-References: <1414148076-12685-1-git-send-email-daniel.thompson@linaro.org>
- <1822066.pI6QN22RDx@wuerfel>
-Message-ID: <CAMuHMdUpNtL+K28DdC8xJ3vUPZGmviWcYGOVUNuhKQoobdL00Q@mail.gmail.com>
+From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
+Date: Fri, 23 Jan 2015 21:01:04 +0800
+Subject: [PATCH v7 0/2] Add Spreadtrum SoC bindings and serial driver support
+In-Reply-To: <sprd-serial-v7>
+References: <sprd-serial-v7>
+Message-ID: <1422018066-24997-1-git-send-email-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+This patch-set split the last version, and addressed the review comments from
+last version on serial driver code.
 
-On Fri, Oct 24, 2014 at 5:46 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> There is still a related bug that we should also fix, but I'd say let's
-> take your current patches first and then add whatever is missing
-> on top. Specifically, a snippet like this
->
->         default 0xd4017000 if DEBUG_MMP_UART2
->         default 0xd4018000 if DEBUG_MMP_UART3
->         default 0xe0000000 if ARCH_SPEAR13XX
->         default 0xe4007000 if DEBUG_HIP04_UART
->         default 0xf0000be0 if ARCH_EBSA110
->
-> still means you get the wrong default when you build a multiplatform
-> kernel that you want to boot on HIP04 and you set DEBUG_HIP04_UART
-> but you happen to also have ARCH_SPEAR13XX enabled.
->
-> I have a patch that I use locally for randconfig builds that tries
-> to fix this. It has some overlaps with your work but most parts are
-> distinct. See below.
+Changes from v6:
+	- Setted SPRD_TIMEOUT with 256 rather than 2048
+	- Used u32 instead of uint32_t
+	- Removed inline of handle_lsr_errors which is a single call site function
+	- Removed unused parameter of sprd_tx & sprd_rx
+	- Used spin_lock_irqsave in sprd_startup() instead of spin_lock
+	- Added a check for port->sysrq in sprd_console_write()
+	- Used a global counter as a condition of calling uart_{un}register_driver
+	- Added pdev->id assignment in probe()
+	- Setted port->flags with UPF_BOOT_AUTOCONF instead of ASYNC_BOOT_AUTOCONF
 
-This is still desperately needed for anyone who wants to enable DEBUG_LL
-on other platforms using multi_v7_defconfig.
+Changes from v5:
+	- Used Spreadtrum instead of SPRD in menus
+	- Changed TTY name to 'ttyS'
+	- Moved uart_register_driver() to probe()
+	- Added spinlock as needed
+	- Removed register states saving and restoring in suspend() and resume()
 
-Can you please upstream it?
+Chunyan Zhang (2):
+  Documentation: DT: Add bindings for Spreadtrum SoC Platform
+  tty/serial: Add Spreadtrum sc9836-uart driver support
 
-Thanks!
+ Documentation/devicetree/bindings/arm/sprd.txt     |   11 +
+ .../devicetree/bindings/serial/sprd-uart.txt       |    7 +
+ .../devicetree/bindings/vendor-prefixes.txt        |    1 +
+ drivers/tty/serial/Kconfig                         |   18 +
+ drivers/tty/serial/Makefile                        |    1 +
+ drivers/tty/serial/sprd_serial.c                   |  799 ++++++++++++++++++++
+ include/uapi/linux/serial_core.h                   |    3 +
+ 7 files changed, 840 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/sprd.txt
+ create mode 100644 Documentation/devicetree/bindings/serial/sprd-uart.txt
+ create mode 100644 drivers/tty/serial/sprd_serial.c
 
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+1.7.9.5
