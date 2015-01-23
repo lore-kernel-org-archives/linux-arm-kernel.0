@@ -1,168 +1,63 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Thu, 22 Jan 2015 22:49:23 -0800
-Subject: [PATCH 1/4] pinctrl: Broadcom Cygnus pinctrl device tree binding
-In-Reply-To: <54C1AE9F.3020407@broadcom.com>
-References: <rjui@broadcom.com>	<1417131990-17954-1-git-send-email-rjui@broadcom.com>	<1417131990-17954-2-git-send-email-rjui@broadcom.com>	<CACRpkdb5pNMbXmWGjrGpAYNLLwv6pWWOJQy0C6BLetNcStFM6A@mail.gmail.com>	<54B01D44.5080601@broadcom.com>
- <CACRpkdbW5P=w0CPYYf_gfBuD7W0WOdAYCKpTXM5MsK9mdYDc5w@mail.gmail.com>
- <54C1AE9F.3020407@broadcom.com>
-Message-ID: <54C1EEF3.4040406@broadcom.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Fri, 23 Jan 2015 15:51:53 +0900
+Subject: [PATCH 1/2] clk: exynos5420: Add IDs for clocks used in DISP1
+ power domain
+In-Reply-To: <54BF81C2.3020000@collabora.co.uk>
+References: <1421750127-22536-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1421750127-22536-2-git-send-email-javier.martinez@collabora.co.uk>
+ <54BE6050.1090205@samsung.com> <20150120175402.22722.84342@quantum>
+ <54BF81C2.3020000@collabora.co.uk>
+Message-ID: <0c2601d036d9$1276e7d0$3764b770$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Javier Martinez Canillas wrote:
+> 
+> Hello,
+> 
+Hi,
 
-
-On 1/22/2015 6:14 PM, Ray Jui wrote:
+> On 01/20/2015 06:54 PM, Mike Turquette wrote:
+> > Quoting Sylwester Nawrocki (2015-01-20 06:04:00)
+> >> Hi,
+> >>
+> >> On 20/01/15 11:35, Javier Martinez Canillas wrote:
+> >> > When a power domain is powered off on Exynos5420 SoC, the input clocks of
+> >> > the devices attached to this power domain are re-parented to oscclk and
+> >> > restored to the original parent after powering on the power domain.
+> >> >
+> >> > So a reference to the input and parent clocks for the devices attached to
+> >> > a power domain are needed to be able to do the re-parenting. The DISP1 pd
+> >> > includes modules which uses the following clocks:
+> >> >
+> >> > ACLK_200_DISP1 (MIXER and HDMILINK)
+> >> > ACLK_300_DISP1 (FIMD1)
+> >> > ACLK_400_DISP1 (Internal Buses)
+> >> >
+> >> > Each of these clocks are generated as the output of a clock mux so add an
+> >> > ID for all of these clock muxes and their parents to be referenced in the
+> >> > DISP1 power domain device node.
+> >> >
+> >> > Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> >>
+> >> The patch looks OK to me, I'm fine with it being merged via Kukjin's tree
+> >> due to the dts dependencies (including other pending dts patches touching
+> >> the arch/arm/boot/dts/exynos5420.dtsi file).
+> >> I think we need also Mike ACK for that, I could also queue the patch for
+> >> the clk tree and create a topic branch, but merging both patches via
+> >> arm-soc seems a more sane option in this case.
+> >>
+> >> Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> >
+> > Acked-by: Michael Turquette <mturquette@linaro.org>
+> >
 > 
+> Thanks a lot Sylwester and Mike for your acks.
 > 
-> On 1/13/2015 12:20 AM, Linus Walleij wrote:
->> On Fri, Jan 9, 2015 at 7:26 PM, Ray Jui <rjui@broadcom.com> wrote:
->>> On 1/9/2015 2:12 AM, Linus Walleij wrote:
->>
->>>> Just use "groups" and "function" and refer to
->>>> Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
->>>>
->>>> Then "alt1", "alt2" etc are non-functional names of functions.
->>>> Use the real function names, like "spi0" or so. This
->>>> alt-business seems to be just a shortcut to make it
->>>> simple, don't do that.
->>>>
->>>> Then you use e.g. "spi0" as a group name. I prefer you
->>>> call that "spi0_grp" or something to say it is a group of
->>>> pins associated with spi0, as spi0 is actually the
->>>> function.
->>>>
->>> Hmmm, I did this by following brcm,bcm11351-pinctrl.txt:
->>> - function: String. Specifies the pin mux selection. Values must be one
->>> of: "alt1", "alt2", "alt3", "alt4"
->>>
->>> But you are right, in the pinctrl binding document it describes the
->>> generic pin multiplexing nodes use "function" and "group".
->>
->> Note "function" and "groups". Note groups is pluralis. You can
->> select multiple groups for a single function.
->>
->>> For example, the group "lcd" covers 30 pins. When I configure "lcd" to
->>> alternate function 1, all 30 pins are muxed to LCD function. When
->>> configured to function 2, all pins are muxed to SRAM function. Now, here
->>> comes the issue, when configured to function 3, pins 1-15 and 20-30
->>> become GPIO function, but pins 16-19 becomes SPI5 function. When it's
->>> configured to function 4, all 30 pins become GPIO.
->>
->> I would split the use case in two groups for LCD and SRAM,
->> and three groups for GPIO:
->> "lcd_grp", "sram_grp", "gpio-1-15_grp",
->> "gpio-16-19_grp", "gpio-20-30_grp", "spi5_grp"
->>
->> Valid combinations become
->>
->> function = "lcd"
->> groups = "lcd_grp";
->>
->> function = "sram"
->> groups = "sram_grp"
->>
->> For all GPIO only this:
->>
->> function = "gpio"
->> groups = "gpio-1-16_grp", "gpio-16-19_grp", "gpio-20-30_grp"
->>
->> For a combined GPIO+SPI:
->>
->> function = "gpio"
->> groups = "gpio-1-16_grp", "gpio-20-30_grp"
->>
->> function = "spi5"
->> groups = "spi5_grp"
->>
->> The pinctrl runtile will protest if you try to combine spi5_grp
->> with gpio-16-19_grp.
->>
->>> In some other cases, when I configure a group to other functions, there
->>> could be spare pins which become unused (not brought out to the pad).
->>> Or, the spare pins may also become a separate function.
->>
->> That's cool.
->>
->>> Based on the LCD example, I'd assume I would do the following for the
->>> default LCD function:
->>>
->>> lcd_node {
->>>         group = "lcd_grp";
->>>         function = "lcd";
->>> };
->>>
->>> And in the case of function 3, I would call the function "spi5" and
->>> assume the rest of pins become either GPIO (or unused)?
->>>
->>> spi5_node {
->>>         group = "lcd_grp";
->>>         function = "spi5";
->>> };
->>
->> Looks cool per above.
->>
->> You need some clever code in the driver to handle double-configuration
->> of registers and so on, but I think it can be done.
->>
->> Using pin control as a GPIO backend can be a bit tricky and will need
->> some testing and elaboration, but the subsystem will block collisions.
->>
->> Yours,
->> Linus Walleij
->>
+> Kukjin, could you please pick $subject and "Patch 2/2 ARM: dts: Add DISP1
+> power domain for exynos5420" through your tree?
 > 
-> Hi Linus,
-> 
-> I have another question here. In the B0 revision of our Cygnus chip, the
-> ASIC team added a feature to allow individual pins to be muxed to GPIO.
-> The pinmux controller can still only do group-based muxing in general,
-> but at the same time, you can override most (but not all) individual
-> pins to GPIO.
-> 
-> I believe this HW design actually forces us to mix use "groups" and
-> "pins" in DT.
-> 
-> For example, assuming we mux pins 1 - 10 as MMC (one cmd line, one clk
-> line, and 8 data lines). One might make the decision that he only needs
-> 4 data lines instead of 8 data lines, and he wants to free up the 4 data
-> lines and uses as GPIO. Based on this example, is the following DT
-> configuration valid?
-> 
-> sd_node {
->     function = "sd";
->     groups = "sd_grps";
-> };
-> 
-> gpio_node {
->     function = "gpio";
->     pins = "gpio_7", "gpio_8", "gpio_9", "gpio_10"; /* assuming 1:1
-> mapping between gpio and pin number to make this example simple */
-> };
-> 
-> Thanks,
-> 
-> Ray
->
-
-I dig into the pinctrl framework code a bit more and found that I can
-use pinctrl_request_gpio from the GPIO driver and implement
-gpio_request_enable in the pinctrl driver.
-
-The only problem I see now is that these APIs seem to expect the use of
-global GPIO numbers? And all pinctrl drivers I checked seem to be hard
-coding the GPIO to pin mapping when declaring the struct
-pinctrl_gpio_range array. How would this work in a system like ours that
-have 3 GPIO controllers and was required to use a dynamic GPIO number
-(i.e., we use gpio->base = -1, so it derives the base from
-CONFIG_ARCH_NR_GPIO and goes backwards)?
-
-I guess I can do some runtime calculation in my pinctrl driver to figure
-out the GPIO->pin mapping based on CONFIG_ARCH_NR_GPIO, but this is
-assuming that we always fix the order of the device nodes of the 3 GPIO
-controllers.
-
-I hope I'm not missing something here?
+Sure, I will after applying Marek's generic power domain patch.
 
 Thanks,
-
-Ray
+Kukjin
