@@ -1,47 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 Jan 2015 18:00:45 +0100
-Subject: [PATCH URGENT] arm: dma-mapping: Set DMA IOMMU ops in
- arm_iommu_attach_device()
-In-Reply-To: <2416515.WUUq1g4kPD@avalon>
-References: <1422022909-31044-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <10179212.ryUUVC9zEx@wuerfel> <2416515.WUUq1g4kPD@avalon>
-Message-ID: <2036088.T8IpDXjCxc@wuerfel>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 23 Jan 2015 18:01:32 +0100
+Subject: [PATCH V4 4/4] mmc: pwrseq_simple: Add support for a reset GPIO
+ pin
+In-Reply-To: <CABxcv=nGWPnkNz1tXJpaTUkroucDgVYzeCrEmZvA8xfzHzROvg@mail.gmail.com>
+References: <1421658784-11980-1-git-send-email-ulf.hansson@linaro.org>
+ <1421658784-11980-5-git-send-email-ulf.hansson@linaro.org>
+ <CABxcv=nGWPnkNz1tXJpaTUkroucDgVYzeCrEmZvA8xfzHzROvg@mail.gmail.com>
+Message-ID: <CAPDyKFqnU3OcyiDYPQ4pLRhOGkiEJ1nuwYSP_+qain63N9CEfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 23 January 2015 17:55:25 Laurent Pinchart wrote:
-> 
-> On Friday 23 January 2015 16:27:24 Arnd Bergmann wrote:
-> > On Friday 23 January 2015 16:21:49 Laurent Pinchart wrote:
-> > > +/**
-> > > + * arm_iommu_detach_device
-> > > + * @dev: valid struct device pointer
-> > > + *
-> > > + * Detaches the provided device from a previously attached map.
-> > > + * This voids the dma operations (dma_map_ops pointer)
-> > > + */
-> > > +void arm_iommu_detach_device(struct device *dev)
-> > > +{
-> > > +       __arm_iommu_detach_device(dev);
-> > > +       set_dma_ops(dev, NULL);
-> > > +}
-> > > 
-> > >  EXPORT_SYMBOL_GPL(arm_iommu_detach_device);
-> > 
-> > Would this introduce a regression in the case where the device is
-> > cache coherent and needs arm_coherent_dma_ops set?
-> 
-> I think we need to handle that case (as well as the coherent IOMMU case in 
-> arm_iommu_attach_device), but this patch only tries to restore the previous 
-> behaviour to fix the bug detailed in the commit message. Would you prefer 
-> fixing both issues in one go ?
-> 
+On 23 January 2015 at 16:56, Javier Martinez Canillas
+<javier@dowhile0.org> wrote:
+> Hello Ulf,
+>
+> On Mon, Jan 19, 2015 at 10:13 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>
+>>  int mmc_pwrseq_simple_alloc(struct mmc_host *host, struct device *dev)
+>>  {
+>>         struct mmc_pwrseq_simple *pwrseq;
+>> +       int ret = 0;
+>>
+>>         pwrseq = kzalloc(sizeof(struct mmc_pwrseq_simple), GFP_KERNEL);
+>>         if (!pwrseq)
+>>                 return -ENOMEM;
+>>
+>> +       pwrseq->reset_gpio = gpiod_get_index(dev, "reset", 0, GPIOD_OUT_HIGH);
+>
+> Any reason to not use the devm_gpiod_get_index() managed version instead?
 
-No, I was specifically trying to find out whether the new behavior would
-be worse than what we had in 3.18. If it's a preexisting bug that nobody
-has run into, there is no hurry.
+This struct device don't have a bound driver to it. Thus this device
+won't be freed automagically from the ->remove() or failed ->probe()
+path.
 
-It's quite likely that to date, all IOMMU users on ARM32 are not
-cache coherent.
+>
+> AFAICT mmc_free_host() will free the device so in that case you won't
+> need to call gpiod_put() in mmc_pwrseq_simple_free().
+>
+> This will also make easier to extend pwrseq_simple to support multiple
+> GPIOs like the DT binding implies.
+>
 
-	Arnd
+Kind regards
+Uffe
