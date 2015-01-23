@@ -1,54 +1,97 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 23 Jan 2015 17:46:23 +0100
-Subject: [PATCH v3 3/7] mmc: sdhci-pxav3: Extend binding with SDIO3 conf reg
- for the Armada 38x
-In-Reply-To: <1422031587-18212-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1422031587-18212-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1422031587-18212-4-git-send-email-gregory.clement@free-electrons.com>
+Date: Fri, 23 Jan 2015 17:46:20 +0100
+Subject: [PATCH v3 0/7] Fixes and improvements for SDHCI on Armada 38x
+Message-ID: <1422031587-18212-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SDHCI unit used on the Armada 38x needs using an extra register to
-do specific clock adjustments in order to support the SDR50 and DDR50
-modes. This patch extends the binding to allow using this register.
+Hi,
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- Documentation/devicetree/bindings/mmc/sdhci-pxa.txt | 15 +++++++++++----
- 1 file changed, 11 insertions(+), 4 deletions(-)
+this series brings fixes and improvements for the SDHCI controller of
+the Armada 38x SoCs.
 
-diff --git a/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt b/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt
-index 4dd6deb90719..3d1b449d6097 100644
---- a/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt
-+++ b/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt
-@@ -9,9 +9,13 @@ Required properties:
- - reg:
-   * for "mrvl,pxav2-mmc" and "mrvl,pxav3-mmc", one register area for
-     the SDHCI registers.
--  * for "marvell,armada-380-sdhci", two register areas. The first one
--    for the SDHCI registers themselves, and the second one for the
--    AXI/Mbus bridge registers of the SDHCI unit.
-+
-+  * for "marvell,armada-380-sdhci", three register areas. The first
-+    one for the SDHCI registers themselves, the second one for the
-+    AXI/Mbus bridge registers of the SDHCI unit, the third one for the
-+    SDIO3 Configuration register
-+- reg names: should be "sdhci", "mbus", "conf-sdio3". only mandatory
-+  for "marvell,armada-380-sdhci"
- - clocks: Array of clocks required for SDHCI; requires at least one for
-     I/O clock.
- - clock-names: Array of names corresponding to clocks property; shall be
-@@ -35,7 +39,10 @@ sdhci at d4280800 {
- 
- sdhci at d8000 {
- 	compatible = "marvell,armada-380-sdhci";
--	reg = <0xd8000 0x1000>, <0xdc000 0x100>;
-+	reg-names = "sdhci", "mbus", "conf-sdio3";
-+	reg = <0xd8000 0x1000>,
-+		<0xdc000 0x100>;
-+		<0x18454 0x4>;
- 	interrupts = <0 25 0x4>;
- 	clocks = <&gateclk 17>;
- 	clock-names = "io";
+The changes for this third version was done on the second patch, see
+the changelog for the details.
+
+The first two patches are fixes and should be also applied on the
+stable branch (I added stable in copy for this).
+
+The first one removes the SDR50 and DDR50 mode timing from the
+capabilities of the controller because the current implementation
+doesn't support it.
+
+The second one fix controller's caps according to the limitation of
+the hardware.
+
+The third one extends the Device Tree binding of the Armada 38x. It
+allows using the SDIO3 configuration register.
+
+The forth patch adds the support of this new register in the
+driver. Thanks to this one, specific clock adjustments can be done in
+order to support the SDR50 and DDR50 modes timing.
+
+The fifth patch is device tree clean-up.
+
+The sixth patch update the SDHCI node on Armada 38x in order to use
+the new register and then to be able to support the SDR50 and DDR50
+modes timing.
+
+Finally, the seventh patch add the description of SDHCI for the Armada
+388 RD board which was missing.
+
+Patches 1 to 4 should be merged through the mmc tree and patches 5 to
+7 should be merged through mvebu and then arm-soc.
+
+Patch 4 depend on patch 2.
+Patch 2 depend on patch 1.
+And patch 1 depend on commit aa8165f91442 "mmc: sdhci-pxav3: do the
+mbus window configuration after enabling clocks" which have been
+merged.
+
+But as all this patch should be merged through the same tree it would
+not be a problem
+
+The patches 5 to 7 depend on the patches already merged in mvebu.
+
+As they are fixes, patches 1 and 2 should be merged in 3.18-rc or at
+least in 3.19 and then they will be part of 3.18.1. For the other
+patches it would be nice if they could be part of 3.19.
+
+Thanks,
+
+Gregory
+
+Changelog:
+
+v2 -> v3:
+- Use of_property_read_bool() instead of of_get_property
+- Brace the else case according to the Documentation/CodingStyle
+- Move the setting of MMC_CAP_1_8V_DDR before the armada_38x_quirks
+  calls
+
+v1 -> v2:
+- Put back Marcin as author of patch 2 and 3
+- Removed MMC_CAP_1_8V_DDR in the probe function
+
+Gregory CLEMENT (5):
+  mmc: sdhci-pxav3: Fix SDR50 and DDR50 capabilities for the Armada 38x
+    flavor
+  mmc: sdhci-pxav3: Extend binding with SDIO3 conf reg for the Armada
+    38x
+  ARM: mvebu: Use macros for interrupt flags on Armada 38x sdhci node
+  ARM: mvebu: Update the SDHCI node on Armada 38x
+  ARM: mvebu: Add Device Tree description of SDHCI for Armada 388 RD
+
+Marcin Wojtas (2):
+  mmc: sdhci-pxav3: Fix Armada 38x controller's caps according to
+    erratum ERR-7878951
+  mmc: sdhci-pxav3: Modify clock settings for the SDR50 and DDR50 modes
+
+ .../devicetree/bindings/mmc/sdhci-pxa.txt          | 15 +++-
+ arch/arm/boot/dts/armada-388-rd.dts                | 10 +++
+ arch/arm/boot/dts/armada-38x.dtsi                  |  7 +-
+ drivers/mmc/host/sdhci-pxav3.c                     | 86 +++++++++++++++++++++-
+ 4 files changed, 109 insertions(+), 9 deletions(-)
+
 -- 
 2.1.0
