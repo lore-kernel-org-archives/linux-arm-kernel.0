@@ -1,44 +1,48 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 23 Jan 2015 10:44:31 +0100
-Subject: KVM: CONFIG_LOCK_DEP and CONFIG_LOCK_DETECTOR?
-In-Reply-To: <54C14D01.2010506@arm.com>
-References: <1421919245.13638.50.camel@x220> <54C14BCF.1050902@samsung.com>
- <54C14D01.2010506@arm.com>
-Message-ID: <20150123094431.GI15076@cbox>
+From: yao.yuan@freescale.com (Yuan Yao)
+Date: Fri, 23 Jan 2015 17:48:54 +0800
+Subject: [PATCH v2] serial: fsl-lpuart: disable interrupt when suspend
+Message-ID: <1422006534-16264-1-git-send-email-yao.yuan@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 22, 2015 at 07:18:25PM +0000, Marc Zyngier wrote:
-> On 22/01/15 19:13, Mario Smarduch wrote:
-> > On 01/22/2015 01:34 AM, Paul Bolle wrote:
-> >> Mario,
-> >>
-> >> Your commit c64735554c0a ("KVM: arm: Add initial dirty page locking
-> >> support") is included in today's linux-next (ie, next-20150122). I
-> >> noticed because a script I use to check linux-next spotted a minor
-> >> problem with it.
-> >>
-> >> This commit added a comment that mentions CONFIG_LOCK_DEP and
-> >> CONFIG_LOCK_DETECTOR. It seems CONFIG_LOCKDEP and CONFIG_LOCKUP_DETECTOR
-> >> should be used instead. Is a trivial patch to fix these typos queued
-> >> somewhere?
-> >>
-> >> Thanks,
-> >>
-> >>
-> >> Paul Bolle
-> >>
-> > 
-> > Hi Paul,
-> >   thanks for spotting that. No there is no trivial patch
-> > queued, didn't notice it until now. Can I submit a follow
-> > up trivial patch later?
-> 
-> Yeah, that can definitely wait. I think we have slightly bigger fish to
-> fry for now... ;-)
-> 
-> If someone sends us a patch once -rc1 is out, we'll queue it.
-> 
-I'll just fix it up before sending the pull request today.
+For power management support, we should disable TX and
+TX interrupt so that kernel can prepare for deep sleep.
 
--Christoffer
+Retain RX and RX interrupt for wakeup the kernel when
+receive the input character.
+
+Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
+---
+
+Changed in v2: 
+	- Retain RX and RX interrupt for wakeup the kernel when
+ receive the input character.
+ drivers/tty/serial/fsl_lpuart.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
+index 1c5d020..b195cfc 100644
+--- a/drivers/tty/serial/fsl_lpuart.c
++++ b/drivers/tty/serial/fsl_lpuart.c
+@@ -1449,6 +1449,19 @@ static int lpuart_remove(struct platform_device *pdev)
+ static int lpuart_suspend(struct device *dev)
+ {
+ 	struct lpuart_port *sport = dev_get_drvdata(dev);
++	unsigned long temp;
++
++	if (sport->lpuart32) {
++		/* disable Rx/Tx and interrupts */
++		temp = lpuart32_read(sport->port.membase + UARTCTRL);
++		temp &= ~(UARTCTRL_TE | UARTCTRL_TIE | UARTCTRL_TCIE);
++		lpuart32_write(temp, sport->port.membase + UARTCTRL);
++	} else {
++		/* disable Rx/Tx and interrupts */
++		temp = readb(sport->port.membase + UARTCR2);
++		temp &= ~(UARTCR2_TE | UARTCR2_TIE | UARTCR2_TCIE);
++		writeb(temp, sport->port.membase + UARTCR2);
++	}
+ 
+ 	uart_suspend_port(&lpuart_reg, &sport->port);
+ 
+-- 
+2.1.0.27.g96db324
