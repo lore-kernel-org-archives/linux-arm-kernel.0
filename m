@@ -1,61 +1,141 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 23 Jan 2015 13:54:23 -0800
-Subject: [GIT PULL RESEND] pxa for v3.20
-In-Reply-To: <87egqpff9m.fsf@free.fr>
-References: <87egqpff9m.fsf@free.fr>
-Message-ID: <20150123215423.GD20896@quad.lixom.net>
+From: plaes@plaes.org (Priit Laes)
+Date: Fri, 23 Jan 2015 23:59:35 +0200
+Subject: [PATCH] ARM: dts: sun4i: Add initial dts for Gemei G9 tablet
+In-Reply-To: <20150123212203.GB8470@lukather>
+References: <1422045409-1251-1-git-send-email-plaes@plaes.org>
+ <20150123212203.GB8470@lukather>
+Message-ID: <1422050375.1799.9.camel@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 20, 2015 at 08:01:09PM +0100, Robert Jarzmik wrote:
-> Hello Arnd, Kevin, Olof,
-> 
-> Please consider this pxa code for next v3.20 cycle. It was a bit early, but I
-> think the upcoming changes around pxa clocks should go for 3.21, and no pending
-> patches are in review for v3.20. And yes, I messed up the previous git pull
-> email address ...
-> 
-> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
-> 
->   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
-> 
-> are available in the git repository at:
-> 
->   https://github.com/rjarzmik/linux.git tags/pxa-for-3.20
-> 
-> for you to fetch changes up to a52d209336f8fc7483a8c7f4a8a7d2a8e1692a6c:
-> 
->   hx4700: regulator: declare full constraints (2014-12-26 18:05:32 +0100)
-> 
-> ----------------------------------------------------------------
-> arm: pxa: pxa for v3.20
-> 
-> This update deals mostly with regulator updates for fixing all the
-> cases where a default regulator is needed, with non device-tree
-> platforms. There's also a kconfig fix for device-tree pxa.
-> 
-> It should be noticed that all interrupts numbers were shifted by
-> 16 (number of legacy interrupts).
 
-Hi Robert,
-
-Branch looks good, I'll merge this into next/fixes-non-critical. One nit below
-though:
-
-> ----------------------------------------------------------------
-> Dmitry Eremin-Solenikov (3):
->       ARM: pxa: add regulator_has_full_constraints to corgi board file
->       ARM: pxa: add regulator_has_full_constraints to poodle board file
->       ARM: pxa: add regulator_has_full_constraints to spitz board file
+On Fri, 2015-01-23 at 22:22 +0100, Maxime Ripard wrote:
+> On Fri, Jan 23, 2015 at 10:36:49PM +0200, Priit Laes wrote:
+> > Gemei G9 is an A10 based tablet, with 1G RAM, 16G NAND, 1024x768 
+> > IPS LCD display, stereo speakers, 1.3MP front camera and 5 MP
+> > rear camera, 8000mAh battery, GT901 2+1 touchscreen, Bosch BMA250 
+> > accelerometer and RTL8188CUS USB wifi. It also has MicroSD slot, 
+> > miniHDMI, 1 x MicroUSB OTG port and 1 x MicroUSB host port and 
+> > 3.5mm headphone jack.
+> > More details are available at: http://linux-sunxi.org/Gemei_G9
+> > 
+[..]
+> > 
+> > +/ {
+> > +    model = "Gemei G9 Tablet";
+> > +    compatible = "gemei,g9", "allwinner,sun4i-a10";
+> > +};
+> > +
+> > +/*
+> > + * http://linux-sunxi.org/Gemei_G9
 > 
-> Martin Vajnar (1):
->       hx4700: regulator: declare full constraints
+> Please don't put URL in the DT. This is very likely to change in the 
+> future, and won't be valid anymore.
 
-Please use consistent patch subjects in the future. We've ended up using ARM:
-<platform>: <foo> across all platforms these days.
+OK! The URL in commit message is ok to stay?
+> 
+> > + *
+> > + * TODO:
+> > + *   2x cameras via CSI
+> > + *   AXP battery management
+> > + *   AXP power enable key
+> > + *   Keys (LRADC)
+> > + *   NAND
+> > + *   OTG
+> > + *   Touchscreen - gt801_2plus1 @ i2c adapter 2 @ 0x48
+> > + */
+> > +
+> > +
+> > +&ehci0 {
+> > +    status = "okay";
+> > +};
+> 
+> Indentation with one tabulation please.
 
-I'm not going to ask you to respin just for this, but please remember to fix
-future patches when you apply them if they're not already correct.
+Oops.. will do.
+> 
+> 
+> > +&ehci1 {
+> > +    status = "okay";
+> > +};
+> > +
+> > +&i2c0 {
+> > +    pinctrl-names = "default";
+> > +    pinctrl-0 = <&i2c0_pins_a>;
+> > +    status = "okay";
+> > +
+> > +    axp209: pmic at 34 {
+> > +        compatible = "x-powers,axp209";
+> > +        reg = <0x34>;
+> > +        interrupts = <0>;
+> > +
+> > +        interrupt-controller;
+> > +        #interrupt-cells = <1>;
+> > +    };
+> > +};
+> > +
+> > +&i2c1 {
+> > +    pinctrl-names = "default";
+> > +    pinctrl-0 = <&i2c1_pins_a>;
+> > +    status = "okay";
+> > +
+> > +    /* Accelerometer */
+> > +    bma250 at 18 {
+> > +        compatible = "bosch,bma250";
+> > +        reg = <0x18>;
+> 
+> Is there a driver for this? It looks weird that it doesn't need more 
+> properties than that.
 
+Yes, it's supported by drivers/iio/accel/bma180.c though I have to 
+admit that this name is a bit misleading. (bosch-bma.c would 
+better, I guess).
 
--Olof
+And I was a bit surprised that it worked out of the box too, but the 
+device was present under /sys and I was able to read x, y, z and 
+temperature values.
+
+> > +    };
+> > +};
+> > +
+> > +&reg_usb1_vbus {
+> > +    status = "okay";
+> > +};
+> > +
+> > +&reg_usb2_vbus {
+> > +    status = "okay";
+> > +};
+> > +
+> > +&mmc0 {
+> > +    pinctrl-names = "default";
+> > +    pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
+> > +    vmmc-supply = <&reg_vcc3v3>;
+> > +    bus-width = <4>;
+> > +    cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH01 */
+> > +    cd-inverted;
+> > +    status = "okay";
+> > +};
+> > +
+> > +
+> 
+> Remove that extra new line.
+
+Will do.
+> 
+> > +&uart0  {
+> > +    pinctrl-names = "default";
+> > +    pinctrl-0 = <&uart0_pins_a>;
+> > +    status = "okay";
+> > +};
+> > +
+> > +&usbphy {
+> > +    usb1_vbus-supply = <&reg_usb1_vbus>;
+> > +    usb2_vbus-supply = <&reg_usb2_vbus>;
+> > +    status = "okay";
+> > +};
+> > --
+> > 2.2.2
+> > 
+> 
+> Looks good otherwise, thanks! Maxime
+> 
