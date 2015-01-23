@@ -1,63 +1,78 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 24 Jan 2015 00:48:55 +0100
-Subject: N900 v3.19-rc5 arm atags_to_fdt.c is broken
-In-Reply-To: <201501232336.36187@pali>
-References: <201501232239.55801@pali>
- <201501232336.36187@pali>
-Message-ID: <20150123234855.GB27111@amd>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Fri, 23 Jan 2015 17:59:11 -0600
+Subject: [RFC PATCH v3 2/2] arm: kernel: fix pci_mmap_page_range() offset
+ calculation
+In-Reply-To: <1415877558-8906-3-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1415877558-8906-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1415877558-8906-3-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20150123235911.GG13072@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2015-01-23 23:36:36, Pali Roh?r wrote:
-> On Friday 23 January 2015 22:39:55 Pali Roh?r wrote:
-> > Hello,
-> > 
-> > when I boot zImage with appended DT n900 in qemu
-> > fdt_open_into() function called from file
-> > arch/arm/boot/compressed/atags_to_fdt.c (in function
-> > atags_to_fdt) always returns -FDT_ERR_NOSPACE.
-> > 
-> > It means that all ATAGS (including cmdline arguments) passed
-> > by bootloader are ignored.
-> > 
-> > On real n900 device I see that booted DT version also ignore
-> > cmdline arguments from bootloader. I cannot debug decompress
-> > code on real device, but I think it is same problem as in
-> > qemu.
+On Thu, Nov 13, 2014 at 11:19:16AM +0000, Lorenzo Pieralisi wrote:
+> The pci_mmap_page_range() API should be written to expect offset
+> values representing PCI memory resource addresses as seen by user
+> space, through the pci_resource_to_user() API.
 > 
-> Looks like this quick patch is fixing above problem:
+> ARM relies on the standard implementation of pci_resource_to_user()
+> which actually is an identity map and exports to user space
+> PCI memory resources as they are stored in PCI devices resources
+> structures, which represent CPU physical addresses (fixed-up using
+> BUS to CPU address conversions) not PCI bus addresses.
+> 
+> Therefore, on ARM platforms where the mapping between CPU and BUS
+> address is not a 1:1 the current pci_mmap_page_range() implementation is
+> erroneous, in that an additional shift is applied to an already fixed-up
+> offset passed from userspace.
+> 
+> Hence, this patch removes the mem_offset from the pgoff calculation
+> since the offset as passed from user space already represents the CPU
+> physical address corresponding to the resource to be mapped, ie no
+> additional offset should be applied.
+> 
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-So... something overruns stack, and bigger stack fixes it...?
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 
-							Pavel
-
-> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> index 68be901..4a7d75b 100644
-> --- a/arch/arm/boot/compressed/head.S
-> +++ b/arch/arm/boot/compressed/head.S
-> @@ -268,7 +268,7 @@ restart:	adr	r0, LC0
->  		 * area.  No GOT fixup has occurred yet, but none of the
->  		 * code we're about to call uses any global variable.
->  		*/
-> -		add	sp, sp, #0x10000
-> +		add	sp, sp, #0x20000
->  		stmfd	sp!, {r0-r3, ip, lr}
->  		mov	r0, r8
->  		mov	r1, r6
-> @@ -289,7 +289,7 @@ restart:	adr	r0, LC0
->  		bleq	atags_to_fdt
+> ---
+>  arch/arm/kernel/bios32.c | 10 ++--------
+>  1 file changed, 2 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+> index 17a26c1..b56fa2d 100644
+> --- a/arch/arm/kernel/bios32.c
+> +++ b/arch/arm/kernel/bios32.c
+> @@ -626,21 +626,15 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
+>  int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
+>  			enum pci_mmap_state mmap_state, int write_combine)
+>  {
+> -	struct pci_sys_data *root = dev->sysdata;
+> -	unsigned long phys;
+> -
+> -	if (mmap_state == pci_mmap_io) {
+> +	if (mmap_state == pci_mmap_io)
+>  		return -EINVAL;
+> -	} else {
+> -		phys = vma->vm_pgoff + (root->mem_offset >> PAGE_SHIFT);
+> -	}
 >  
->  		ldmfd	sp!, {r0-r3, ip, lr}
-> -		sub	sp, sp, #0x10000
-> +		sub	sp, sp, #0x20000
->  #endif
+>  	/*
+>  	 * Mark this as IO
+>  	 */
+>  	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 >  
->  		mov	r8, r6			@ use the appended device tree
+> -	if (remap_pfn_range(vma, vma->vm_start, phys,
+> +	if (remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
+>  			     vma->vm_end - vma->vm_start,
+>  			     vma->vm_page_prot))
+>  		return -EAGAIN;
+> -- 
+> 2.1.2
 > 
-> 
-
-
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
