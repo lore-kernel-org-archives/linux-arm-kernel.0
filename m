@@ -1,31 +1,26 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 23 Jan 2015 14:46:45 -0800
-Subject: [GIT PULL 3/3] ARM: imx: defconfig update for 3.20
-In-Reply-To: <20150123091740.GD27337@dragon>
-References: <20150123091740.GD27337@dragon>
-Message-ID: <20150123224645.GQ20896@quad.lixom.net>
+Date: Fri, 23 Jan 2015 14:50:39 -0800
+Subject: [Request pull] mvebu/fixes #3
+In-Reply-To: <20150123224415.GI21727@lunn.ch>
+References: <20150122004003.GA9533@lunn.ch>
+ <20150123221040.GH20896@quad.lixom.net>
+ <20150123224415.GI21727@lunn.ch>
+Message-ID: <CAOesGMiHAOOuCohfD2cV6eywGFjJK580STNAiDo9nahF-twuBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 23, 2015 at 05:17:41PM +0800, Shawn Guo wrote:
-> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
-> 
->   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-defconfig-3.20
-> 
-> for you to fetch changes up to ec800d7906df7b24b0706da0013a2f83b4d4efe8:
-> 
->   ARM: imx_v6_v7_defconfig: enable more USB functions (2015-01-20 16:11:06 +0800)
-> 
-> ----------------------------------------------------------------
-> The i.MX defconfig update for 3.20:
->  - Eneable FB_MXS, SPI_FSL_QUADSPI, POWER_RESET_SYSCON and module build
->    for a bunch of USB functions
-> 
+On Fri, Jan 23, 2015 at 2:44 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+>> > mvebu fixes for 3.19. (Part 4)
+>>
+>> Subject says #3, tag says part 4. Hmm?
+>
+> Subject is wrong. This is #4.
+>
+> You seemed to of missed #3. At least i've not seen an email said you
+> have pulled it. Could you please look back in your archive to Jan 17th
+> for the real #3.
 
-Merged, thanks.
+The one with 8f1e8ee28660018a935c7576b9af8ffe1feab54c in it? It's
+merged, I merged it on the 18th.
 
 -Olof
