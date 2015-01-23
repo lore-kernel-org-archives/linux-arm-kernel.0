@@ -1,96 +1,116 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 23 Jan 2015 12:37:06 -0600
-Subject: [next-20150119]regression (mm)?
-In-Reply-To: <CANMBJr7w2jZBwRDEsVNvL3XrDZ2ttwFz7qBf4zySAMMmcgAxiw@mail.gmail.com>
-References: <54BD33DC.40200@ti.com> <20150119174317.GK20386@saruman>
- <20150120001643.7D15AA8@black.fi.intel.com>
- <20150120114555.GA11502@n2100.arm.linux.org.uk>
- <20150120140546.DDCB8D4@black.fi.intel.com>
- <20150123172736.GA15392@kahuna>
- <CANMBJr7w2jZBwRDEsVNvL3XrDZ2ttwFz7qBf4zySAMMmcgAxiw@mail.gmail.com>
-Message-ID: <20150123183706.GA15791@kahuna>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 23 Jan 2015 10:43:26 -0800
+Subject: [GIT PULL] qcom SoC changes for v3.20
+In-Reply-To: <DBE63F76-D4CB-49D5-90C6-642CFCA7687F@codeaurora.org>
+References: <alpine.DEB.2.02.1501191226010.2973@galak-ubuntu.qualcomm.com>
+ <20150122011521.GA31815@quad.lixom.net>
+ <D177DF12-0F31-49CF-B98B-9FAC23AAB24C@codeaurora.org>
+ <CAOesGMipp=Odc-cWvrba0e1pd1X7O+PKNH+WoM3fG4xX2GRFuA@mail.gmail.com>
+ <DBE63F76-D4CB-49D5-90C6-642CFCA7687F@codeaurora.org>
+Message-ID: <CAOesGMht4VaNgwr5rOyher081Vk7w_HKTMeOm677rEAkOcCPAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09:39-20150123, Tyler Baker wrote:
-> Hi,
-> 
-> On 23 January 2015 at 09:27, Nishanth Menon <nm@ti.com> wrote:
-> > On 16:05-20150120, Kirill A. Shutemov wrote:
-> > [..]
-> >> Signed-off-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
-> >> Reported-by: Nishanth Menon <nm@ti.com>
-> > Just to close on this thread:
-> > https://github.com/nmenon/kernel-test-logs/tree/next-20150123 looks good
-> > and back to old status. Thank you folks for all the help.
-> 
-> I just reviewed the boot logs for next-20150123 and there still seems
-> to be a related issue. I've been boot testing
-> multi_v7_defconfig+CONFIG_ARM_LPAE=y kernel configurations which still
-> seem broken.
-> 
-> For example here are two boots with exynos5250-arndale, one with
-> multi_v7_defconfig+CONFIG_ARM_LPAE=y [1] and the other with
-> multi_v7_defconfig[2]. You can see the kernel configurations with
-> CONFIG_ARM_LPAE=y show the splat:
-> 
-> [   14.605950] ------------[ cut here ]------------
-> [   14.609163] WARNING: CPU: 1 PID: 63 at ../mm/mmap.c:2858
-> exit_mmap+0x1b8/0x224()
-> [   14.616548] Modules linked in:
-> [   14.619553] CPU: 1 PID: 63 Comm: init Not tainted 3.19.0-rc5-next-20150123 #1
-> [   14.626713] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
-> [   14.632830] [] (unwind_backtrace) from [] (show_stack+0x10/0x14)
-> [   14.640473] [] (show_stack) from [] (dump_stack+0x78/0x94)
-> [   14.647678] [] (dump_stack) from [] (warn_slowpath_common+0x74/0xb0)
-> [   14.655744] [] (warn_slowpath_common) from [] (warn_slowpath_null+0x1c/0x24)
-> [   14.664510] [] (warn_slowpath_null) from [] (exit_mmap+0x1b8/0x224)
-> [   14.672497] [] (exit_mmap) from [] (mmput+0x40/0xf8)
-> [   14.679180] [] (mmput) from [] (flush_old_exec+0x328/0x604)
-> [   14.686471] [] (flush_old_exec) from [] (load_elf_binary+0x26c/0x11f4)
-> [   14.694715] [] (load_elf_binary) from [] (search_binary_handler+0x98/0x244)
-> [   14.703395] [] (search_binary_handler) from []
-> (do_execveat_common+0x4dc/0x5bc)
-> [   14.712421] [] (do_execveat_common) from [] (do_execve+0x28/0x30)
-> [   14.720235] [] (do_execve) from [] (ret_fast_syscall+0x0/0x34)
-> [   14.727782] ---[ end trace 5e3ca48b454c7e0a ]---
-> [   14.733758] ------------[ cut here ]------------
-> 
-> Has anyone else tested with CONFIG_ARM_LPAE=y that can confirm my findings?
-Uggh... I missed since i was looking at non LPAE omap2plus_defconfig.
+On Fri, Jan 23, 2015 at 8:22 AM, Kumar Gala <galak@codeaurora.org> wrote:
+>
+> On Jan 22, 2015, at 9:00 PM, Olof Johansson <olof@lixom.net> wrote:
+>
+>> On Thu, Jan 22, 2015 at 9:02 AM, Kumar Gala <galak@codeaurora.org> wrote:
+>>>
+>>> On Jan 21, 2015, at 7:15 PM, Olof Johansson <olof@lixom.net> wrote:
+>>>
+>>>> Hi,
+>>>>
+>>>>
+>>>> On Mon, Jan 19, 2015 at 12:27:15PM -0600, Kumar Gala wrote:
+>>>>> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+>>>>>
+>>>>> Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+>>>>>
+>>>>> are available in the git repository at:
+>>>>>
+>>>>> git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-soc-for-3.20
+>>>>>
+>>>>> for you to fetch changes up to ae0a6075c046f9c8dbac18f53a779592f97b402e:
+>>>>>
+>>>>> soc: qcom: scm: Clarify boot interface (2015-01-19 11:55:12 -0600)
+>>>>>
+>>>>> ----------------------------------------------------------------
+>>>>> Qualcomm ARM Based SoC Updates for v3.20
+>>>>>
+>>>>> * Moved scm support into drivers/soc/qcom (allows for use by drivers)
+>>>>> * Various bug fixes and minor feature additions to scm code
+>>>>> * Added big-endian support to debug MSM uart
+>>>>> * Added big-endian support to ARCH_QCOM
+>>>>>
+>>>>> ----------------------------------------------------------------
+>>>>> Lina Iyer (2):
+>>>>>     ARM: qcom: Add SCM warmboot flags for quad core targets.
+>>>>>     soc: qcom: scm: Move scm-boot files to drivers/soc and include/soc
+>>>>>
+>>>>> Olav Haugan (1):
+>>>>>     ARM: qcom: scm: Add logging of actual return code from scm call
+>>>>>
+>>>>> Saravana Kannan (1):
+>>>>>     ARM: qcom: scm: Add API to query for service/command availability.
+>>>>>
+>>>>> Stephen Boyd (9):
+>>>>>     ARM: debug: Update MSM and QCOM DEBUG_LL help
+>>>>>     ARM: debug: msm: Support big-endian CPUs
+>>>>>     ARM: qcom: Select ARCH_SUPPORTS_BIG_ENDIAN
+>>>>>     ARM: qcom: scm: Fix incorrect cache invalidation
+>>>>>     ARM: qcom: scm: Get cacheline size from CTR
+>>>>>     ARM: qcom: scm: Add a feat version query API
+>>>>>     soc: qcom: scm: Move the scm driver to drivers/soc/qcom
+>>>>
+>>>> I replied on the patch here just now. This isn't the right thing to do,
+>>>> as far as I can tell.
+>>>>
+>>>> Seems like sending a fresh request with the material besides the move
+>>>> to drivers/soc should be mergeable though, so feel free to do that while
+>>>> the rest is hashed out.
+>>>
+>>> Would the following be ok (dropped the move to drivers/soc and some additional unused scm APIs as of right now):
+>>>
+>>> ARM: qcom: Drop unnecessary selects from ARCH_QCOM
+>>> ARM: qcom: scm: Clarify boot interface
+>>> ARM: qcom: Add SCM warmboot flags for quad core targets.
+>>> ARM: qcom: scm: Add logging of actual return code from scm call
+>>> ARM: qcom: scm: Flush the command buffer only instead of the entire cache
+>>> ARM: qcom: scm: Get cacheline size from CTR
+>>> ARM: qcom: scm: Fix incorrect cache invalidation
+>>> ARM: qcom: Select ARCH_SUPPORTS_BIG_ENDIAN
+>>> ARM: debug: msm: Support big-endian CPUs
+>>> ARM: debug: Update MSM and QCOM DEBUG_LL help
+>>>
+>>> Kconfig.debug        |    5 ++--
+>>> include/debug/msm.S  |    6 +++++
+>>> mach-qcom/Kconfig    |    3 --
+>>> mach-qcom/scm-boot.c |    2 -
+>>> mach-qcom/scm-boot.h |    4 ++-
+>>> mach-qcom/scm.c      |   55 +++++++++++++++++++++++++++++++++++++--------------
+>>> 6 files changed, 54 insertions(+), 21 deletions(-)
+>>
+>> I'd be OK with merging this, send a request and tag. Would that let
+>> the DRM folks make progress too?
+>
+> Will do, I don?t think it will address the DRM folks needs as they need access to make firmware calls from the DRM driver.
+>
+>> If you need a common place for this, drivers/firmware seems like a
+>> better home than drivers/soc.
+>
+> Agreed, what?s you take than on moving to use firmware_ops as defined in arch/arm and extended it or just leaving this as a qcom specific firmware interface?
 
-Dual A15 OMAP5432 with multi_v7_defconfig + CONFIG_ARM_LPAE=y
-https://github.com/nmenon/kernel-test-logs/blob/next-20150123/multi_lpae_defconfig/omap5-evm.txt
+Are there any other SoCs out there with similar requirements on
+firmware interfaces? I think most of them so far have been fairly
+simple compared to the complexity of the qualcomm firmware.
 
-Dual A15 DRA7/AM572x with same configuration as above.
-https://raw.githubusercontent.com/nmenon/kernel-test-logs/next-20150123/multi_lpae_defconfig/dra7xx-evm.txt
-https://github.com/nmenon/kernel-test-logs/blob/next-20150123/multi_lpae_defconfig/am57xx-evm.txt
+Would it make sense to use firmware_ops for the common pieces and have
+direct smc calls for the rest? I'm not sure that would buy us all that
+much. Hm.
 
-Single A15 DRA72 with same configuration as above:
-https://raw.githubusercontent.com/nmenon/kernel-test-logs/next-20150123/multi_lpae_defconfig/dra72x-evm.txt
+Well, at least it's an internal implementation detail. If we move it
+now and find a better way to do it down the road it can be refactored.
 
-You are right. the issue re-appears with LPAE on :(
-Apologies on missing that.
 
-> 
-> 
-> > --
-> > Regards,
-> > Nishanth Menon
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> [1] http://storage.kernelci.org/next/next-20150123/arm-multi_v7_defconfig+CONFIG_ARM_LPAE=y/lab-tbaker/boot-exynos5250-arndale.html
-> 
-> [2] http://storage.kernelci.org/next/next-20150123/arm-multi_v7_defconfig/lab-tbaker/boot-exynos5250-arndale.html
-> 
-> Cheers,
-> 
-> Tyler
-
--- 
-Regards,
-Nishanth Menon
+-Olof
