@@ -1,100 +1,133 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 23 Jan 2015 11:00:05 +0100
-Subject: [PATCH 0/9] ARM: shmobile: r8a73a4/ape6evm multiplatform
-In-Reply-To: <20150123042304.GE17548@verge.net.au>
-References: <1421758306-24838-1-git-send-email-geert+renesas@glider.be>
- <20150121015927.GB30598@verge.net.au>
- <20150122033907.GO31170@verge.net.au>
- <20150123042304.GE17548@verge.net.au>
-Message-ID: <CAMuHMdXR0fWRgPBgUe3=3UZ4jrDQe2Ot9L_OZHgQ1OCBnWdmog@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 23 Jan 2015 11:02:29 +0100
+Subject: [GIT PULL 00/36] KVM/ARM changes for 3.20
+Message-ID: <1422007385-14730-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi Paolo,
 
-On Fri, Jan 23, 2015 at 5:23 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Thu, Jan 22, 2015 at 12:39:07PM +0900, Simon Horman wrote:
->> On Wed, Jan 21, 2015 at 10:59:27AM +0900, Simon Horman wrote:
->> > On Tue, Jan 20, 2015 at 01:51:37PM +0100, Geert Uytterhoeven wrote:
->> > > This patch series transitions the r8a73a4/ape6evm platform to support
->> > > multiplatform only:
->> > >   - Add CCF information to DT,
->> > >   - Disable legacy clock if CCF is used,
->> > >   - Add Bus State Controller node, and move the Ethernet node to it,
->> > >   - Remove ape6evm-reference,
->> > >   - Remove ape6evm-legacy and legacy support code.
->> > >
->> > > This series is based on renesas-drivers-2015-01-19-v3.19-rc5.
->> > > It depends on renesas-devel-20150119-v3.19-rc5 (code-wise) and
->> > > clk-shmobile-for-3.20 (functionality-wise), for which I've sent a pull
->> > > request to Mike Turquette yesterday.
->> > >
->> > > All of this was untested by me due to lack of hardware.
->> > > As Mike had previously acked the r8a73a4 CCF implementation, it's safe
->> > > to apply after testing.
->> >
->> > Hi Geert, Hi Ulrich,
->> >
->> > thanks for all your good work in getting this together.
->> > I have tested this and queued it up for v3.21.
->> >
->> > I plan to push it to my devel branch later today.
->> > I plan to push it to my next branch and thus linux-next once
->> > clk-shmobile-for-3.20 appears in a v3.20-rc.
->>
->> For the record: Olof has asked for review comments for the BSC driver and
->> binding patches. Accordingly I have dropped them, and these patches which
->> depend on them, from next.
->
-> I have now had a chance to re-examine these patches and it seems to me that
-> the first four patches of the series not depend on the BSC driver (or
-> anything else).  With that in mind I have queued them up in a new
-> r8a73a4-ccf-for-v3.21 branch which is present in
-> renesas-devel-20150123-v3.19-rc5.
->
-> Please take a moment to see if what I have done makes sense to you.  In
-> particular it would be nicer if these patches could go into 'regular'
-> branches such as dt-for-v3.21 and soc-for-v3.21. However it seems to me
-> that the SoC patch "ARM: shmobile: ape6evm: Disable legacy clock
-> initialization" depends on the following two DT patche " "ARM: shmobile:
-> r8a73a4: Common clock framework DT description".
->
-> For reference this covers the following patches:
->
-> Enqueued (again):
->
-> Ulrich Hecht (6):
->   ARM: shmobile: r8a73a4: Add CPG register bits header
->   ARM: shmobile: r8a73a4: Common clock framework DT description
->   ARM: shmobile: ape6evm: Disable legacy clock initialization
->   ARM: shmobile: r8a73a4: Add MSTP clock assignments to DT
+Please pull from kvmarm/next for changes adding GICv3 emulation, dirty
+page logging, added trace symbols, and adding an explicit VGIC init
+device control IOCTL.
 
-OK, Thanks!
+The following changes since commit bab5bb398273bb37547a185f7b344b37c700d0b9:
 
-> Left Unqueued:
->
-> Geert Uytterhoeven (2):
->   ARM: shmobile: r8a73a4 dtsi: Add Bus State Controller node
->   ARM: shmobile: ape6evm dts: Move Ethernet node to BSC
->
-> Laurent Pinchart (1):
->   ARM: shmobile: r8a73a4: Remove legacy code
->
-> Ulrich Hecht (6):
->   ARM: shmobile: ape6evm-reference: Remove board C code and DT file
->   ARM: shmobile: r8a73a4: ape6evm: Remove legacy platform
+  kvm: x86: Remove kvm_make_request from lapic.c (2015-01-08 22:48:08 +0100)
 
-That's correct. Due to the non-working Ethernet in ape6evm-multiplatform,
-ape6evm-reference (and -legacy) cannot be removed.
-The same is true for sh73a0/kzm9g.
+are available in the git repository at:
 
-Gr{oetje,eeting}s,
+  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-3.20
 
-                        Geert
+for you to fetch changes up to 4b990589952f0e30aa860184ac6c76219a74632e:
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+  KVM: Remove unused config symbol (2015-01-23 10:52:03 +0100)
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks,
+-Christoffer
+
+---
+
+Andre Przywara (21):
+      ARM: KVM: extend WFI tracepoint to differentiate between wfi and wfe
+      arm/arm64: KVM: rework MPIDR assignment and add accessors
+      arm/arm64: KVM: pass down user space provided GIC type into vGIC code
+      arm/arm64: KVM: refactor vgic_handle_mmio() function
+      arm/arm64: KVM: wrap 64 bit MMIO accesses with two 32 bit ones
+      arm/arm64: KVM: introduce per-VM ops
+      arm/arm64: KVM: move kvm_register_device_ops() into vGIC probing
+      arm/arm64: KVM: dont rely on a valid GICH base address
+      arm/arm64: KVM: make the maximum number of vCPUs a per-VM value
+      arm/arm64: KVM: make the value of ICC_SRE_EL1 a per-VM variable
+      arm/arm64: KVM: refactor MMIO accessors
+      arm/arm64: KVM: refactor/wrap vgic_set/get_attr()
+      arm/arm64: KVM: add vgic.h header file
+      arm/arm64: KVM: split GICv2 specific emulation code from vgic.c
+      arm/arm64: KVM: add opaque private pointer to MMIO data
+      arm/arm64: KVM: add virtual GICv3 distributor emulation
+      arm64: GICv3: introduce symbolic names for GICv3 ICC_SGI1R_EL1 fields
+      arm64: KVM: add SGI generation register emulation
+      arm/arm64: KVM: enable kernel side of GICv3 emulation
+      arm/arm64: KVM: allow userland to request a virtual GICv3
+      arm/arm64: KVM: force alignment of VGIC dist/CPU/redist addresses
+
+Christoffer Dall (2):
+      arm/arm64: KVM: Fixup incorrect config symbol in comment
+      KVM: Remove unused config symbol
+
+Eric Auger (2):
+      KVM: arm/arm64: vgic: vgic_init returns -ENODEV when no online vcpu
+      KVM: arm/arm64: vgic: add init entry to VGIC KVM device
+
+Mario Smarduch (9):
+      KVM: Add architecture-defined TLB flush support
+      KVM: Add generic support for dirty page logging
+      KVM: arm: Add ARMv7 API to flush TLBs
+      KVM: arm: Add initial dirty page locking support
+      KVM: arm: dirty logging write protect support
+      KVM: arm: page logging 2nd stage fault handling
+      KVM: arm64: ARMv8 header changes for page logging
+      KVM: arm64: Add HYP interface to flush VM Stage 1/2 TLB entries
+      KVM: arm/arm64: Enable Dirty Page logging for ARMv8
+
+Paolo Bonzini (1):
+      KVM: x86: switch to kvm_get_dirty_log_protect
+
+Wei Huang (1):
+      arm/arm64: KVM: add tracing support for arm64 exit handler
+
+ Documentation/virtual/kvm/api.txt              |   13 +-
+ Documentation/virtual/kvm/devices/arm-vgic.txt |   37 +-
+ arch/arm/include/asm/kvm_asm.h                 |    1 +
+ arch/arm/include/asm/kvm_emulate.h             |    5 +-
+ arch/arm/include/asm/kvm_host.h                |    5 +
+ arch/arm/include/asm/kvm_mmio.h                |    1 +
+ arch/arm/include/asm/kvm_mmu.h                 |   21 +
+ arch/arm/include/asm/pgtable-3level.h          |    1 +
+ arch/arm/include/uapi/asm/kvm.h                |    2 +
+ arch/arm/kvm/Kconfig                           |    2 +
+ arch/arm/kvm/Makefile                          |    1 +
+ arch/arm/kvm/arm.c                             |   55 +-
+ arch/arm/kvm/handle_exit.c                     |    8 +-
+ arch/arm/kvm/interrupts.S                      |   11 +
+ arch/arm/kvm/mmu.c                             |  257 +++++-
+ arch/arm/kvm/psci.c                            |   17 +-
+ arch/arm/kvm/trace.h                           |   11 +-
+ arch/arm64/include/asm/kvm_arm.h               |    2 +
+ arch/arm64/include/asm/kvm_asm.h               |    1 +
+ arch/arm64/include/asm/kvm_emulate.h           |   10 +-
+ arch/arm64/include/asm/kvm_host.h              |    6 +
+ arch/arm64/include/asm/kvm_mmio.h              |    1 +
+ arch/arm64/include/asm/kvm_mmu.h               |   21 +
+ arch/arm64/include/asm/pgtable-hwdef.h         |    1 +
+ arch/arm64/include/uapi/asm/kvm.h              |    9 +
+ arch/arm64/kernel/asm-offsets.c                |    1 +
+ arch/arm64/kvm/Kconfig                         |    2 +
+ arch/arm64/kvm/Makefile                        |    2 +
+ arch/arm64/kvm/handle_exit.c                   |   13 +-
+ arch/arm64/kvm/hyp.S                           |   22 +
+ arch/arm64/kvm/sys_regs.c                      |   40 +-
+ arch/arm64/kvm/trace.h                         |   55 ++
+ arch/arm64/kvm/vgic-v3-switch.S                |   14 +-
+ arch/x86/include/asm/kvm_host.h                |    3 -
+ arch/x86/kvm/Kconfig                           |    1 +
+ arch/x86/kvm/mmu.c                             |    4 +-
+ arch/x86/kvm/x86.c                             |   72 +-
+ drivers/irqchip/irq-gic-v3.c                   |   14 +-
+ include/kvm/arm_vgic.h                         |   43 +-
+ include/linux/irqchip/arm-gic-v3.h             |   44 +
+ include/linux/kvm_host.h                       |   11 +
+ include/uapi/linux/kvm.h                       |    2 +
+ virt/kvm/Kconfig                               |    6 +
+ virt/kvm/arm/vgic-v2-emul.c                    |  847 ++++++++++++++++++
+ virt/kvm/arm/vgic-v2.c                         |    4 +
+ virt/kvm/arm/vgic-v3-emul.c                    | 1036 ++++++++++++++++++++++
+ virt/kvm/arm/vgic-v3.c                         |   82 +-
+ virt/kvm/arm/vgic.c                            | 1127 ++++++------------------
+ virt/kvm/arm/vgic.h                            |  123 +++
+ virt/kvm/kvm_main.c                            |   82 ++
+ 50 files changed, 3153 insertions(+), 996 deletions(-)
+ create mode 100644 arch/arm64/kvm/trace.h
+ create mode 100644 virt/kvm/arm/vgic-v2-emul.c
+ create mode 100644 virt/kvm/arm/vgic-v3-emul.c
+ create mode 100644 virt/kvm/arm/vgic.h
