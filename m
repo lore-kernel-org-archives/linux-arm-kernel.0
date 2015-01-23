@@ -1,80 +1,78 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri, 23 Jan 2015 10:03:30 +0000
-Subject: [PATCH] irqchip: gicv3-its: fix ITS CPU init
-In-Reply-To: <54AFFD76.7060401@arm.com>
-References: <1420818645-2349-1-git-send-email-vladimir.murzin@arm.com>
- <54AFFD76.7060401@arm.com>
-Message-ID: <54C21C72.2030302@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 23 Jan 2015 11:02:59 +0100
+Subject: [GIT PULL 30/36] arm64: GICv3: introduce symbolic names for GICv3
+ ICC_SGI1R_EL1 fields
+In-Reply-To: <1422007385-14730-1-git-send-email-christoffer.dall@linaro.org>
+References: <1422007385-14730-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1422007385-14730-31-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/01/15 16:10, Marc Zyngier wrote:
-> Hi Vladimir,
-> 
-> On 09/01/15 15:50, Vladimir Murzin wrote:
->> We skip initialisation of ITS in case the device-tree has no
->> corresponding description, but we are still accessing to ITS bits while
->> setting CPU interface what leads to the kernel panic:
->>
->> ITS: No ITS available, not enabling LPIs
->> CPU0: found redistributor 0 region 0:0x000000002f100000
->> Unable to handle kernel NULL pointer dereference at virtual address 00000000
->> pgd = ffffffc0007fb000
->> [00000000] *pgd=00000000fc407003, *pud=00000000fc407003, *pmd=00000000fc408003, *pte=006000002f000707
->> Internal error: Oops: 96000005 [#1] PREEMPT SMP
->> Modules linked in:
->> CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.19.0-rc2+ #318
->> Hardware name: FVP Base (DT)
->> task: ffffffc00077edb0 ti: ffffffc00076c000 task.ti: ffffffc00076c000
->> PC is at its_cpu_init+0x2c/0x320
->> LR is at gic_cpu_init+0x168/0x1bc
->>
->> It happens in gic_rdists_supports_plpis() because gic_rdists is NULL.
->> The gic_rdists is set to non-NULL only when ITS node is presented in
->> the device-tree.
->>
->> Fix this by moving the call to gic_rdists_supports_plpis() inside the
->> !list_empty(&its_nodes) block, because it is that list that guards the
->> validity of the rest of the information in this driver.
->>
->> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> 
-> Looks good to me.
-> 
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> 	M.
-> 
+From: Andre Przywara <andre.przywara@arm.com>
 
-Thomas, Jason, are you OK with this patch?
+The gic_send_sgi() function used hardcoded bit shift values to
+generate the ICC_SGI1R_EL1 register value.
+Replace this with symbolic names to allow reusing them later.
 
-Vladimir
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ drivers/irqchip/irq-gic-v3.c       | 14 +++++++++-----
+ include/linux/irqchip/arm-gic-v3.h | 12 ++++++++++++
+ 2 files changed, 21 insertions(+), 5 deletions(-)
 
->> ---
->>  drivers/irqchip/irq-gic-v3-its.c |    9 ++++-----
->>  1 file changed, 4 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
->> index 86e4684..128a12b 100644
->> --- a/drivers/irqchip/irq-gic-v3-its.c
->> +++ b/drivers/irqchip/irq-gic-v3-its.c
->> @@ -1382,12 +1382,11 @@ static bool gic_rdists_supports_plpis(void)
->>  
->>  int its_cpu_init(void)
->>  {
->> -	if (!gic_rdists_supports_plpis()) {
->> -		pr_info("CPU%d: LPIs not supported\n", smp_processor_id());
->> -		return -ENXIO;
->> -	}
->> -
->>  	if (!list_empty(&its_nodes)) {
->> +		if (!gic_rdists_supports_plpis()) {
->> +			pr_info("CPU%d: LPIs not supported\n", smp_processor_id());
->> +			return -ENXIO;
->> +		}
->>  		its_cpu_init_lpis();
->>  		its_cpu_init_collection();
->>  	}
->>
-> 
-> 
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index 1a146cc..2ab290b 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -481,15 +481,19 @@ out:
+ 	return tlist;
+ }
+ 
++#define MPIDR_TO_SGI_AFFINITY(cluster_id, level) \
++	(MPIDR_AFFINITY_LEVEL(cluster_id, level) \
++		<< ICC_SGI1R_AFFINITY_## level ##_SHIFT)
++
+ static void gic_send_sgi(u64 cluster_id, u16 tlist, unsigned int irq)
+ {
+ 	u64 val;
+ 
+-	val = (MPIDR_AFFINITY_LEVEL(cluster_id, 3) << 48	|
+-	       MPIDR_AFFINITY_LEVEL(cluster_id, 2) << 32	|
+-	       irq << 24			    		|
+-	       MPIDR_AFFINITY_LEVEL(cluster_id, 1) << 16	|
+-	       tlist);
++	val = (MPIDR_TO_SGI_AFFINITY(cluster_id, 3)	|
++	       MPIDR_TO_SGI_AFFINITY(cluster_id, 2)	|
++	       irq << ICC_SGI1R_SGI_ID_SHIFT		|
++	       MPIDR_TO_SGI_AFFINITY(cluster_id, 1)	|
++	       tlist << ICC_SGI1R_TARGET_LIST_SHIFT);
+ 
+ 	pr_debug("CPU%d: ICC_SGI1R_EL1 %llx\n", smp_processor_id(), val);
+ 	gic_write_sgi1r(val);
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index 3fb4d85..800544b 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -280,6 +280,18 @@
+ #define ICC_SRE_EL2_SRE			(1 << 0)
+ #define ICC_SRE_EL2_ENABLE		(1 << 3)
+ 
++#define ICC_SGI1R_TARGET_LIST_SHIFT	0
++#define ICC_SGI1R_TARGET_LIST_MASK	(0xffff << ICC_SGI1R_TARGET_LIST_SHIFT)
++#define ICC_SGI1R_AFFINITY_1_SHIFT	16
++#define ICC_SGI1R_AFFINITY_1_MASK	(0xff << ICC_SGI1R_AFFINITY_1_SHIFT)
++#define ICC_SGI1R_SGI_ID_SHIFT		24
++#define ICC_SGI1R_SGI_ID_MASK		(0xff << ICC_SGI1R_SGI_ID_SHIFT)
++#define ICC_SGI1R_AFFINITY_2_SHIFT	32
++#define ICC_SGI1R_AFFINITY_2_MASK	(0xffULL << ICC_SGI1R_AFFINITY_1_SHIFT)
++#define ICC_SGI1R_IRQ_ROUTING_MODE_BIT	40
++#define ICC_SGI1R_AFFINITY_3_SHIFT	48
++#define ICC_SGI1R_AFFINITY_3_MASK	(0xffULL << ICC_SGI1R_AFFINITY_1_SHIFT)
++
+ /*
+  * System register definitions
+  */
+-- 
+2.1.2.330.g565301e.dirty
