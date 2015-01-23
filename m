@@ -1,219 +1,66 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Fri, 23 Jan 2015 17:32:35 -0500
-Subject: [PATCH v4 2/6] of: move of_dma_configure() to device.c to help re-use
-In-Reply-To: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
-References: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1422052359-12384-3-git-send-email-m-karicheri2@ti.com>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Fri, 23 Jan 2015 14:33:20 -0800
+Subject: [PATCH] iommu/arm-smmu: use a threaded handler for context
+ interrupts
+In-Reply-To: <20150123112415.GD23058@arm.com> (Will Deacon's message of "Fri,
+ 23 Jan 2015 11:24:15 +0000")
+References: <1421970482-11722-1-git-send-email-mitchelh@codeaurora.org>
+ <20150123112415.GD23058@arm.com>
+Message-ID: <vnkw61bx2klr.fsf@mitchelh-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move of_dma_configure() to device.c so that same function can be re-used
-for PCI devices to obtain DMA configuration from DT. Also add a second
-argument so that for PCI, DT node of root bus host bridge can be used to
-obtain the DMA configuration for the slave PCI device.
+On Fri, Jan 23 2015 at 03:24:15 AM, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Mitch,
+>
+> On Thu, Jan 22, 2015 at 11:48:02PM +0000, Mitchel Humpherys wrote:
+>> Context interrupts can call domain-specific handlers which might sleep.
+>> Currently we register our handler with request_irq, so our handler is
+>> called in atomic context, so domain handlers that sleep result in an
+>> invalid context BUG.  Fix this by using request_threaded_irq.
+>> 
+>> This also prepares the way for doing things like enabling clocks within
+>> our interrupt handler.
+>> 
+>> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+>> ---
+>>  drivers/iommu/arm-smmu.c | 5 +++--
+>>  1 file changed, 3 insertions(+), 2 deletions(-)
+>> 
+>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>> index 6cd47b75286f..81f6b54d94b1 100644
+>> --- a/drivers/iommu/arm-smmu.c
+>> +++ b/drivers/iommu/arm-smmu.c
+>> @@ -973,8 +973,9 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
+>>  	spin_unlock_irqrestore(&smmu_domain->lock, flags);
+>>  
+>>  	irq = smmu->irqs[smmu->num_global_irqs + cfg->irptndx];
+>> -	ret = request_irq(irq, arm_smmu_context_fault, IRQF_SHARED,
+>> -			  "arm-smmu-context-fault", domain);
+>> +	ret = request_threaded_irq(irq, NULL, arm_smmu_context_fault,
+>> +				IRQF_ONESHOT | IRQF_SHARED,
+>> +				"arm-smmu-context-fault", domain);
+>>  	if (IS_ERR_VALUE(ret)) {
+>>  		dev_err(smmu->dev, "failed to request context IRQ %d (%u)\n",
+>>  			cfg->irptndx, irq);
+>
+> I think I'd rather keep a simple atomic handler, then have a threaded
+> handler for actually issuing the report_iommu_fault. i.e. we only wake
+> the thread when it looks like there's some work to do. That also works
+> much better for shared interrupts.
 
-Cc: Joerg Roedel <joro@8bytes.org>
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+Are you still against adding clock support to the driver?  If not, we'll
+need to move to a threaded handler when clocks come in anyways...
 
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
----
- drivers/of/device.c       |   59 +++++++++++++++++++++++++++++++++++++++++++++
- drivers/of/platform.c     |   58 ++------------------------------------------
- include/linux/of_device.h |    2 ++
- 3 files changed, 63 insertions(+), 56 deletions(-)
+Can you elaborate what you mean regarding shared interrupts?  Even
+without clocks it seems like the code clarity / performance tradeoff
+would favor a threaded handler, given that performance isn't important
+here.
 
-diff --git a/drivers/of/device.c b/drivers/of/device.c
-index 46d6c75c..2de320d 100644
---- a/drivers/of/device.c
-+++ b/drivers/of/device.c
-@@ -2,6 +2,9 @@
- #include <linux/kernel.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-+#include <linux/of_address.h>
-+#include <linux/of_iommu.h>
-+#include <linux/dma-mapping.h>
- #include <linux/init.h>
- #include <linux/module.h>
- #include <linux/mod_devicetable.h>
-@@ -66,6 +69,62 @@ int of_device_add(struct platform_device *ofdev)
- 	return device_add(&ofdev->dev);
- }
- 
-+/**
-+ * of_dma_configure - Setup DMA configuration
-+ * @dev:	Device to apply DMA configuration
-+ * @np:		ptr to of node having dma configuration
-+ *
-+ * Try to get devices's DMA configuration from DT and update it
-+ * accordingly.
-+ *
-+ * In case if platform code need to use own special DMA configuration,it
-+ * can use Platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE event
-+ * to fix up DMA configuration.
-+ */
-+void of_dma_configure(struct device *dev, struct device_node *np)
-+{
-+	u64 dma_addr, paddr, size;
-+	int ret;
-+	bool coherent;
-+	unsigned long offset;
-+	struct iommu_ops *iommu;
-+
-+	/*
-+	 * Set default dma-mask to 32 bit. Drivers are expected to setup
-+	 * the correct supported dma_mask.
-+	 */
-+	dev->coherent_dma_mask = DMA_BIT_MASK(32);
-+
-+	/*
-+	 * Set it to coherent_dma_mask by default if the architecture
-+	 * code has not set it.
-+	 */
-+	if (!dev->dma_mask)
-+		dev->dma_mask = &dev->coherent_dma_mask;
-+
-+	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
-+	if (ret < 0) {
-+		dma_addr = offset = 0;
-+		size = dev->coherent_dma_mask;
-+	} else {
-+		offset = PFN_DOWN(paddr - dma_addr);
-+		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
-+	}
-+
-+	dev->dma_pfn_offset = offset;
-+
-+	coherent = of_dma_is_coherent(np);
-+	dev_dbg(dev, "device is%sdma coherent\n",
-+		coherent ? " " : " not ");
-+
-+	iommu = of_iommu_configure(dev, np);
-+	dev_dbg(dev, "device is%sbehind an iommu\n",
-+		iommu ? " " : " not ");
-+
-+	arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
-+}
-+EXPORT_SYMBOL_GPL(of_dma_configure);
-+
- int of_device_register(struct platform_device *pdev)
- {
- 	device_initialize(&pdev->dev);
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index 7675b79..6403501 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -19,7 +19,6 @@
- #include <linux/slab.h>
- #include <linux/of_address.h>
- #include <linux/of_device.h>
--#include <linux/of_iommu.h>
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/platform_device.h>
-@@ -150,59 +149,6 @@ struct platform_device *of_device_alloc(struct device_node *np,
- }
- EXPORT_SYMBOL(of_device_alloc);
- 
--/**
-- * of_dma_configure - Setup DMA configuration
-- * @dev:	Device to apply DMA configuration
-- *
-- * Try to get devices's DMA configuration from DT and update it
-- * accordingly.
-- *
-- * In case if platform code need to use own special DMA configuration,it
-- * can use Platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE event
-- * to fix up DMA configuration.
-- */
--static void of_dma_configure(struct device *dev)
--{
--	u64 dma_addr, paddr, size;
--	int ret;
--	bool coherent;
--	unsigned long offset;
--	struct iommu_ops *iommu;
--
--	/*
--	 * Set default dma-mask to 32 bit. Drivers are expected to setup
--	 * the correct supported dma_mask.
--	 */
--	dev->coherent_dma_mask = DMA_BIT_MASK(32);
--
--	/*
--	 * Set it to coherent_dma_mask by default if the architecture
--	 * code has not set it.
--	 */
--	if (!dev->dma_mask)
--		dev->dma_mask = &dev->coherent_dma_mask;
--
--	ret = of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size);
--	if (ret < 0) {
--		dma_addr = offset = 0;
--		size = dev->coherent_dma_mask;
--	} else {
--		offset = PFN_DOWN(paddr - dma_addr);
--		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
--	}
--	dev->dma_pfn_offset = offset;
--
--	coherent = of_dma_is_coherent(dev->of_node);
--	dev_dbg(dev, "device is%sdma coherent\n",
--		coherent ? " " : " not ");
--
--	iommu = of_iommu_configure(dev, dev->of_node);
--	dev_dbg(dev, "device is%sbehind an iommu\n",
--		iommu ? " " : " not ");
--
--	arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
--}
--
- static void of_dma_deconfigure(struct device *dev)
- {
- 	arch_teardown_dma_ops(dev);
-@@ -236,7 +182,7 @@ static struct platform_device *of_platform_device_create_pdata(
- 
- 	dev->dev.bus = &platform_bus_type;
- 	dev->dev.platform_data = platform_data;
--	of_dma_configure(&dev->dev);
-+	of_dma_configure(&dev->dev, dev->dev.of_node);
- 
- 	if (of_device_add(dev) != 0) {
- 		of_dma_deconfigure(&dev->dev);
-@@ -299,7 +245,7 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
- 		dev_set_name(&dev->dev, "%s", bus_id);
- 	else
- 		of_device_make_bus_id(&dev->dev);
--	of_dma_configure(&dev->dev);
-+	of_dma_configure(&dev->dev, dev->dev.of_node);
- 
- 	/* Allow the HW Peripheral ID to be overridden */
- 	prop = of_get_property(node, "arm,primecell-periphid", NULL);
-diff --git a/include/linux/of_device.h b/include/linux/of_device.h
-index ef37021..c661496 100644
---- a/include/linux/of_device.h
-+++ b/include/linux/of_device.h
-@@ -53,6 +53,7 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
- 	return of_node_get(cpu_dev->of_node);
- }
- 
-+void of_dma_configure(struct device *dev, struct device_node *np);
- #else /* CONFIG_OF */
- 
- static inline int of_driver_match_device(struct device *dev,
-@@ -90,6 +91,7 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
- {
- 	return NULL;
- }
-+void of_dma_configure(struct device *dev, struct device_node *np) { }
- #endif /* CONFIG_OF */
- 
- #endif /* _LINUX_OF_DEVICE_H */
+
+-Mitch
+
 -- 
-1.7.9.5
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
