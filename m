@@ -1,114 +1,32 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 23 Jan 2015 14:34:59 +0000
-Subject: [PATCH v3/resend 3/4] drivers: bus: Add Simple Power-Managed Bus
- DT Bindings
-In-Reply-To: <2160255.41m7rrCYxI@wuerfel>
-References: <1421919253-4784-1-git-send-email-geert+renesas@glider.be>
- <7hvbjy30an.fsf@deeprootsystems.com>
- <CAMuHMdUMcyXdgv+xdd8Zo67rYnfh6JaSWfr1H3c6NrQs=JsNLg@mail.gmail.com>
- <2160255.41m7rrCYxI@wuerfel>
-Message-ID: <20150123143459.GN23493@leverpostej>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 23 Jan 2015 14:52:36 +0000
+Subject: [PATCH] ARM: use default ioremap alignment for SMP or LPAE
+In-Reply-To: <3060178.HEZJjJCl1e@wuerfel>
+References: <1421911075-8814-1-git-send-email-s.dyasly@samsung.com>
+ <20150122100441.GA19811@e104818-lin.cambridge.arm.com>
+ <3060178.HEZJjJCl1e@wuerfel>
+Message-ID: <20150123145235.GB21789@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 23, 2015 at 01:46:35PM +0000, Arnd Bergmann wrote:
-> On Friday 23 January 2015 09:56:51 Geert Uytterhoeven wrote:
-> > >> diff --git a/Documentation/devicetree/bindings/bus/simple-pm-bus.txt b/Documentation/devicetree/bindings/bus/simple-pm-bus.txt
-> > >> new file mode 100644
-> > >> index 0000000000000000..d03abf7fd8e3997a
-> > >> --- /dev/null
-> > >> +++ b/Documentation/devicetree/bindings/bus/simple-pm-bus.txt
-> > >> @@ -0,0 +1,52 @@
-> > >> +Simple Power-Managed Bus
-> > >> +========================
-> > >> +
-> > >> +A Simple Power-Managed Bus is a transparent bus that doesn't need a real
-> > >> +driver, as it's typically initialized by the boot loader.
-> > >> +
-> > >> +However, its bus controller is part of a PM domain, or under the control of a
-> > >> +functional clock.  Hence, the bus controller's PM domain and/or clock must be
-> > >> +enabled for child devices connected to the bus (either on-SoC or externally)
-> > >> +to function.
-> > >> +
-> > >> +
-> > >> +Generic compatible values and properties
-> > >> +----------------------------------------
-> > >> +
-> > >> +Required properties:
-> > >> +  - compatible: Must be at least one of the vendor-specific compatible values
-> > >> +             from a vendor-specific section below, and "simple-bus" as a
-> > >> +             fallback.
-> > >
-> > > What happened to the idea of using something like "simple-pm-bus"?
-> > 
-> > I think that's a decision to make by the (successor of the) ePAPR committee.
-> > At least it would be nice to get some feedback from the DT review team
-> > about this.
-> > 
-> > If we go that road, the vendor-specific compatible value should still be
-> > documented, else checkpatch will complain when encountering it in a DTS.
-> > Then, should it become
-> > 
-> >     compatible = "renesas,bsc-sh73a0", "renesas,bsc", "simple-pm-bus",
-> > "simple-bus";
-> > 
-> > or should "simple-bus" just be added to of_default_bus_match_table[], so we
-> > can drop "simple-bus" from the list in the DTS:
-> > 
-> >     compatible = "renesas,bsc-sh73a0", "renesas,bsc", "simple-pm-bus";
-> 
-> I was thinking of the reverse: drop "simple-bus" bus from the list here,
-> but not add "simple-pm-bus" to of_default_bus_match_table. This will
-> cause child devices to no longer be probed automatically, and you will
-> have to call of_platform_populate() from simple_pm_bus_probe(), after
-> pm_runtime_enable().
+On Thu, Jan 22, 2015 at 11:03:00AM +0000, Arnd Bergmann wrote:
+> Unrelated to this question however is whether we want to keep
+> supersection mappings as a performance optimization to save TLBs.
+> It seems useful to me, but not critical.
 
-I am in complete agreement.
+Currently in Linux we allow 16MB mappings only if the phys address is
+over 32-bit and !LPAE which makes it unlikely for normal RAM with
+pre-LPAE hardware.
 
-> This seems like a cleaner model to me, for two reasons:
-> 
-> - In the binding, claiming compatibility with "simple-bus" feels
->   wrong to me, because you have a bus that is not as simple as others
+IIRC a bigger problem was that supersections are optional in the
+architecture but there was no CPUID bit field in ARMv6 (and early ARMv7)
+to check for their presence. The ID_MMFR3 contains this information but
+for example on early Cortex-A8 that bitfield was reserved and the TRM
+states "unpredictable" on read (so probably zero in practice).
 
-Well, it depends. If you _can_ handle it as a "simple-bus" (i.e. it's in
-a sane state by default and you can ignore the bus details entirely),
-then "simple-bus" is appropriate. However, I don't think that we can
-always rely on this, because the state is highly dependent on the FW,
-bootloader, and the rest of the kernel.
+On newer ARMv7 (not necessarily with LPAE), we could indeed revisit the
+16MB section mapping but it won't go well with single zImage if you want
+to support earlier ARMv7 or ARMv6.
 
-We have clock/regulator/whatever controller drivers which disable unused
-outputs (for power saving and/or flushing out FW bugs). The dtb has no
-idea about all of these in-kernel details. If the kernel probes the bus
-as a "simple-bus" (with no pm at all), then the bus may have been
-inadvertently disabled already (or may become so later).
-
-If the kernel is in control of the providers of inputs, then the kernel
-_must_ explicitly handle those inputs (which requires the bus to be
-probed as "simple-pm-bus" and not "simple-bus").
-
-> - The ordering between pm_runtime_enable() and the probing of the
->   child devices is guaranteed, which I think it is not with your
->   current code.
-
-There's also kexec to consider. You'd need to ensure that the bus is
-re-initialised prior to exit from the kernel to keep the bus
-"simple-bus" compatible for the next user. I imagine that enabling a
-device prior to exit from the kernel is the opposite of what the PM code
-does.
-
-Just having "simple-pm-bus" (and requiring the simple-pm-bus driver to
-do sub-node probing _after_ initialisation of the PM'd bus) is much more
-robust. That way if the OS can't acquire all the necessary resources
-(and guarantee the bus will work), it won't start trying to probe the
-children and hang/explode.
-
-> Does this make sense, or am I missing an important reason why there
-> has to be a "simple-bus" compatible string here?
-
-The only reason to have it would be to enable an old kernel to use a new
-DT. However, for the reasons above I believe that would be broken
-anyway, so I do not think that "simple-bus" is an appropriate compatible
-fallback.
-
-Thanks,
-Mark.
+-- 
+Catalin
