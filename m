@@ -1,28 +1,98 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 23 Jan 2015 18:10:41 +0000
-Subject: [Resend Patch v4 03/16] smp, ARM64: Kill SMP single function
- call interrupt
-In-Reply-To: <1421991416-20297-4-git-send-email-jiang.liu@linux.intel.com>
-References: <1421991416-20297-1-git-send-email-jiang.liu@linux.intel.com>
- <1421991416-20297-4-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <20150123181041.GH9557@e104818-lin.cambridge.arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 23 Jan 2015 18:14:03 +0000
+Subject: [RFC PATCH 3/5] iommu: implement common IOMMU ops for DMA mapping
+In-Reply-To: <54C287F7.3060603@codeaurora.org>
+References: <cover.1421086706.git.robin.murphy@arm.com>
+ <09e5515a9afcb3235f4c425520cd18a6032d31b4.1421086706.git.robin.murphy@arm.com>
+ <54C287F7.3060603@codeaurora.org>
+Message-ID: <54C28F6B.4020707@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 23, 2015 at 05:36:42AM +0000, Jiang Liu wrote:
-> Commit 9a46ad6d6df3b54 "smp: make smp_call_function_many() use logic
-> similar to smp_call_function_single()" has unified the way to handle
-> single and multiple cross-CPU function calls. Now only one interrupt
-> is needed for architecture specific code to support generic SMP function
-> call interfaces, so kill the redundant single function call interrupt.
-> 
-> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
+Hi Laura,
 
-I queued the arm64 patch for 3.20. Thanks.
+Thanks for looking
 
--- 
-Catalin
+On 23/01/15 17:42, Laura Abbott wrote:
+> On 1/12/2015 12:48 PM, Robin Murphy wrote:
+>> Taking inspiration from the existing arch/arm code, break out some
+>> generic functions to interface the DMA-API to the IOMMU-API. This will
+>> do the bulk of the heavy lifting for IOMMU-backed dma-mapping.
+>>
+>> Whilst the target is arm64, rather than introduce yet another private
+>> implementation, place this in common code as the first step towards
+>> consolidating the numerous versions spread around between architecture
+>> code and IOMMU drivers.
+>>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>    include/linux/dma-iommu.h |  78 ++++++++
+>>    lib/Kconfig               |   8 +
+>>    lib/Makefile              |   1 +
+>>    lib/dma-iommu.c           | 455 ++++++++++++++++++++++++++++++++++++++++++++++
+>>    4 files changed, 542 insertions(+)
+>>    create mode 100644 include/linux/dma-iommu.h
+>>    create mode 100644 lib/dma-iommu.c
+>>
+>> diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
+>> new file mode 100644
+>> index 0000000..4515407
+>> --- /dev/null
+>> +++ b/include/linux/dma-iommu.h
+> <snip>
+>> +
+>> +struct iommu_dma_mapping *iommu_dma_create_mapping(struct iommu_ops *ops,
+>> +		dma_addr_t base, size_t size)
+>> +{
+>> +	struct iommu_dma_mapping *mapping;
+>> +	struct iommu_domain *domain;
+>> +	struct iova_domain *iovad;
+>> +	struct iommu_domain_geometry *dg;
+>> +	unsigned long order, base_pfn, end_pfn;
+>> +
+>> +	pr_debug("base=%pad\tsize=0x%zx\n", &base, size);
+>> +	mapping = kzalloc(sizeof(*mapping), GFP_KERNEL);
+>> +	if (!mapping)
+>> +		return NULL;
+>> +
+>> +	/*
+>> +	 * HACK: We'd like to ask the relevant IOMMU in ops for a suitable
+>> +	 * domain, but until that happens, bypass the bus nonsense and create
+>> +	 * one directly for this specific device/IOMMU combination...
+>> +	 */
+>> +	domain = kzalloc(sizeof(*domain), GFP_KERNEL);
+>> +
+>> +	if (!domain)
+>> +		goto out_free_mapping;
+>> +	domain->ops = ops;
+>> +
+>> +	if (ops->domain_init(domain))
+>> +		goto out_free_mapping;
+>> +	/*
+>> +	 * ...and do the bare minimum to sanity-check that the domain allows
+>> +	 * at least some access to the device...
+>> +	 */
+>> +	dg = &domain->geometry;
+>> +	if (!(base < dg->aperture_end && base + size > dg->aperture_start)) {
+>> +		pr_warn("DMA range outside IOMMU capability; is DT correct?\n");
+>> +		goto out_free_mapping;
+>> +	}
+>
+> This check seems to always fail with base = 0 because dg->aperture_end is
+> always going to be 0 as well. base <= dg->aperature_end ?
+>
+
+Strictly you're right, since aperture_end should be the highest mappable 
+address thus you could create a valid, if a little silly, 1-byte domain 
+if both were zero. However, it shouldn't really be zero.
+
+I put this bit in since the majority of IOMMU drivers set up the 
+geometry in domain_init and it seemed worth making use of. The ARM SMMU 
+driver is currently one of the odd ones out that don't, however one of 
+my as-yet-unpublished patches porting it to the new of_iommu_configure 
+framework involves fixing domain initialisation and adds geometry setup 
+as well - that's what I've been testing with. I'm hoping to get that 
+series out soon, but among other things it needs a messy merge with 
+Will's pagetable changes.
+
+Robin.
