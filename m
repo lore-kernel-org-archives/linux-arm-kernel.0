@@ -1,125 +1,146 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 23 Jan 2015 11:02:52 +0100
-Subject: [GIT PULL 23/36] arm/arm64: KVM: make the value of ICC_SRE_EL1 a
- per-VM variable
+Date: Fri, 23 Jan 2015 11:02:54 +0100
+Subject: [GIT PULL 25/36] arm/arm64: KVM: refactor/wrap vgic_set/get_attr()
 In-Reply-To: <1422007385-14730-1-git-send-email-christoffer.dall@linaro.org>
 References: <1422007385-14730-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1422007385-14730-24-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1422007385-14730-26-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andre Przywara <andre.przywara@arm.com>
 
-ICC_SRE_EL1 is a system register allowing msr/mrs accesses to the
-GIC CPU interface for EL1 (guests). Currently we force it to 0, but
-for proper GICv3 support we have to allow guests to use it (depending
-on their selected virtual GIC model).
-So add ICC_SRE_EL1 to the list of saved/restored registers on a
-world switch, but actually disallow a guest to change it by only
-restoring a fixed, once-initialized value.
-This value depends on the GIC model userland has chosen for a guest.
+vgic_set_attr() and vgic_get_attr() contain both code specific for
+the emulated GIC as well as code for the userland facing, generic
+part of the GIC.
+Split the guest GIC facing code of from the generic part to allow
+easier splitting later.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kernel/asm-offsets.c |  1 +
- arch/arm64/kvm/vgic-v3-switch.S | 14 +++++++++-----
- include/kvm/arm_vgic.h          |  1 +
- virt/kvm/arm/vgic-v3.c          |  8 ++++++--
- 4 files changed, 17 insertions(+), 7 deletions(-)
+ virt/kvm/arm/vgic.c | 78 ++++++++++++++++++++++++++++++++++++-----------------
+ 1 file changed, 54 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index 9a9fce0..9d34486 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -140,6 +140,7 @@ int main(void)
-   DEFINE(VGIC_V2_CPU_ELRSR,	offsetof(struct vgic_cpu, vgic_v2.vgic_elrsr));
-   DEFINE(VGIC_V2_CPU_APR,	offsetof(struct vgic_cpu, vgic_v2.vgic_apr));
-   DEFINE(VGIC_V2_CPU_LR,	offsetof(struct vgic_cpu, vgic_v2.vgic_lr));
-+  DEFINE(VGIC_V3_CPU_SRE,	offsetof(struct vgic_cpu, vgic_v3.vgic_sre));
-   DEFINE(VGIC_V3_CPU_HCR,	offsetof(struct vgic_cpu, vgic_v3.vgic_hcr));
-   DEFINE(VGIC_V3_CPU_VMCR,	offsetof(struct vgic_cpu, vgic_v3.vgic_vmcr));
-   DEFINE(VGIC_V3_CPU_MISR,	offsetof(struct vgic_cpu, vgic_v3.vgic_misr));
-diff --git a/arch/arm64/kvm/vgic-v3-switch.S b/arch/arm64/kvm/vgic-v3-switch.S
-index d160469..617a012 100644
---- a/arch/arm64/kvm/vgic-v3-switch.S
-+++ b/arch/arm64/kvm/vgic-v3-switch.S
-@@ -148,17 +148,18 @@
-  * x0: Register pointing to VCPU struct
-  */
- .macro	restore_vgic_v3_state
--	// Disable SRE_EL1 access. Necessary, otherwise
--	// ICH_VMCR_EL2.VFIQEn becomes one, and FIQ happens...
--	msr_s	ICC_SRE_EL1, xzr
--	isb
--
- 	// Compute the address of struct vgic_cpu
- 	add	x3, x0, #VCPU_VGIC_CPU
- 
- 	// Restore all interesting registers
- 	ldr	w4, [x3, #VGIC_V3_CPU_HCR]
- 	ldr	w5, [x3, #VGIC_V3_CPU_VMCR]
-+	ldr	w25, [x3, #VGIC_V3_CPU_SRE]
-+
-+	msr_s	ICC_SRE_EL1, x25
-+
-+	// make sure SRE is valid before writing the other registers
-+	isb
- 
- 	msr_s	ICH_HCR_EL2, x4
- 	msr_s	ICH_VMCR_EL2, x5
-@@ -244,9 +245,12 @@
- 	dsb	sy
- 
- 	// Prevent the guest from touching the GIC system registers
-+	// if SRE isn't enabled for GICv3 emulation
-+	cbnz	x25, 1f
- 	mrs_s	x5, ICC_SRE_EL2
- 	and	x5, x5, #~ICC_SRE_EL2_ENABLE
- 	msr_s	ICC_SRE_EL2, x5
-+1:
- .endm
- 
- ENTRY(__save_vgic_v3_state)
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 1c0e9db..ff04afd 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -245,6 +245,7 @@ struct vgic_v3_cpu_if {
- #ifdef CONFIG_ARM_GIC_V3
- 	u32		vgic_hcr;
- 	u32		vgic_vmcr;
-+	u32		vgic_sre;	/* Restored only, change ignored */
- 	u32		vgic_misr;	/* Saved only */
- 	u32		vgic_eisr;	/* Saved only */
- 	u32		vgic_elrsr;	/* Saved only */
-diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
-index ea39bad..5249048 100644
---- a/virt/kvm/arm/vgic-v3.c
-+++ b/virt/kvm/arm/vgic-v3.c
-@@ -145,15 +145,19 @@ static void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
- 
- static void vgic_v3_enable(struct kvm_vcpu *vcpu)
- {
-+	struct vgic_v3_cpu_if *vgic_v3 = &vcpu->arch.vgic_cpu.vgic_v3;
-+
- 	/*
- 	 * By forcing VMCR to zero, the GIC will restore the binary
- 	 * points to their reset values. Anything else resets to zero
- 	 * anyway.
- 	 */
--	vcpu->arch.vgic_cpu.vgic_v3.vgic_vmcr = 0;
-+	vgic_v3->vgic_vmcr = 0;
-+
-+	vgic_v3->vgic_sre = 0;
- 
- 	/* Get the show on the road... */
--	vcpu->arch.vgic_cpu.vgic_v3.vgic_hcr = ICH_HCR_EN;
-+	vgic_v3->vgic_hcr = ICH_HCR_EN;
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 7589e2c..06073fa 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -2440,7 +2440,8 @@ out:
+ 	return ret;
  }
  
- static const struct vgic_ops vgic_v3_ops = {
+-static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
++static int vgic_set_common_attr(struct kvm_device *dev,
++				struct kvm_device_attr *attr)
+ {
+ 	int r;
+ 
+@@ -2456,17 +2457,6 @@ static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
+ 		r = kvm_vgic_addr(dev->kvm, type, &addr, true);
+ 		return (r == -ENODEV) ? -ENXIO : r;
+ 	}
+-
+-	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
+-	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS: {
+-		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
+-		u32 reg;
+-
+-		if (get_user(reg, uaddr))
+-			return -EFAULT;
+-
+-		return vgic_attr_regs_access(dev, attr, &reg, true);
+-	}
+ 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
+ 		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
+ 		u32 val;
+@@ -2510,7 +2500,33 @@ static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
+ 	return -ENXIO;
+ }
+ 
+-static int vgic_get_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
++static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
++{
++	int ret;
++
++	ret = vgic_set_common_attr(dev, attr);
++	if (ret != -ENXIO)
++		return ret;
++
++	switch (attr->group) {
++	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
++	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS: {
++		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
++		u32 reg;
++
++		if (get_user(reg, uaddr))
++			return -EFAULT;
++
++		return vgic_attr_regs_access(dev, attr, &reg, true);
++	}
++
++	}
++
++	return -ENXIO;
++}
++
++static int vgic_get_common_attr(struct kvm_device *dev,
++				struct kvm_device_attr *attr)
+ {
+ 	int r = -ENXIO;
+ 
+@@ -2528,27 +2544,41 @@ static int vgic_get_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
+ 			return -EFAULT;
+ 		break;
+ 	}
++	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
++		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
++
++		r = put_user(dev->kvm->arch.vgic.nr_irqs, uaddr);
++		break;
++	}
++
++	}
++
++	return r;
++}
++
++static int vgic_get_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
++{
++	int ret;
++
++	ret = vgic_get_common_attr(dev, attr);
++	if (ret != -ENXIO)
++		return ret;
+ 
++	switch (attr->group) {
+ 	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
+ 	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS: {
+ 		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
+ 		u32 reg = 0;
+ 
+-		r = vgic_attr_regs_access(dev, attr, &reg, false);
+-		if (r)
+-			return r;
+-		r = put_user(reg, uaddr);
+-		break;
+-	}
+-	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
+-		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
+-		r = put_user(dev->kvm->arch.vgic.nr_irqs, uaddr);
+-		break;
++		ret = vgic_attr_regs_access(dev, attr, &reg, false);
++		if (ret)
++			return ret;
++		return put_user(reg, uaddr);
+ 	}
+ 
+ 	}
+ 
+-	return r;
++	return -ENXIO;
+ }
+ 
+ static int vgic_has_attr_regs(const struct mmio_range *ranges,
 -- 
 2.1.2.330.g565301e.dirty
