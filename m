@@ -1,33 +1,22 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 23 Jan 2015 14:17:38 -0800
-Subject: [Request pull] mvebu/dt #2
-In-Reply-To: <20150122004230.GC9533@lunn.ch>
-References: <20150122004230.GC9533@lunn.ch>
-Message-ID: <20150123221738.GJ20896@quad.lixom.net>
+Date: Fri, 23 Jan 2015 14:18:07 -0800
+Subject: [PATCH] arm64: dts: add baud rate to Juno stdout-path
+In-Reply-To: <d0f44fbb7ffc85806ab00d7e54a64161ef79cad7.1421924801.git.robin.murphy@arm.com>
+References: <d0f44fbb7ffc85806ab00d7e54a64161ef79cad7.1421924801.git.robin.murphy@arm.com>
+Message-ID: <20150123221807.GK20896@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 22, 2015 at 01:42:30AM +0100, Andrew Lunn wrote:
-> Hi Olof
+On Thu, Jan 22, 2015 at 11:21:32AM +0000, Robin Murphy wrote:
+> Without explicit command-line parameters, the Juno UART ends up running
+> at 57600 baud in the kernel, which is at odds with the 115200 baud used
+> by the rest of the firmware. Since commit 7914a7c5651a5161 now lets us
+> fix this by specifying default options in stdout-path, do so.
 > 
-> There is the second incremental pull request for mvebu/dt.
-> 
-> Thanks
-> 	Andrew
-> 
-> The following changes since commit 928413bd859c0936f03f6a3504c4721e83a3d1d7:
-> 
->   ARM: mvebu: Add Armada 388 General Purpose Development Board support (2015-01-09 09:20:00 -0600)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-3.20-2
-> 
-> for you to fetch changes up to 6cc082a84e13f3a0078973a08adf22f1404acc3d:
-> 
->   ARM: mvebu: make DTS comments reflect DEBUG_LL changes (2015-01-21 18:36:14 -0600)
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
-Merged.
 
+Thanks, applied as a fix for 3.19.
 
 -Olof
