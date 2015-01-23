@@ -1,49 +1,121 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 23 Jan 2015 14:01:11 -0800
-Subject: [GIT PULL] ARM: BCM5301X: DT changes for v3.20
-In-Reply-To: <54BED7D7.80207@hauke-m.de>
-References: <54BED7D7.80207@hauke-m.de>
-Message-ID: <20150123220111.GE20896@quad.lixom.net>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Fri, 23 Jan 2015 14:03:20 -0800
+Subject: [PATCH] PCI: keystone: fix incorrect annotations on probe and
+ remove
+In-Reply-To: <20150123214726.GA4688@dtor-ws>
+References: <20150108221736.GA39839@dtor-ws>
+ <20150123213412.GK29776@google.com> <20150123214726.GA4688@dtor-ws>
+Message-ID: <20150123220320.GB4688@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 20, 2015 at 11:33:59PM +0100, Hauke Mehrtens wrote:
-> Hi Olof, Hi Arnd,
+On Fri, Jan 23, 2015 at 01:47:26PM -0800, Dmitry Torokhov wrote:
+> Hi Bjorn,
 > 
-> This is a pull request with some dt updates for BCM5301X for 3.20.
-> 
-> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
-> 
->   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
-> 
-> are available in the git repository at:
-> 
->   https://github.com/hauke/linux.git tags/bcm5301x-dt-2015-01-20
-> 
-> for you to fetch changes up to 5b1864b899d2b591402704dd0f6528c8661f1817:
-> 
->   ARM: BCM5301X: Add DT for Buffalo WZR-900DHP (2015-01-20 23:23:25 +0100)
+> On Fri, Jan 23, 2015 at 03:34:12PM -0600, Bjorn Helgaas wrote:
+> > [+cc Fabio]
+> > 
+> > On Thu, Jan 08, 2015 at 02:17:36PM -0800, Dmitry Torokhov wrote:
+> > > Even though platform bus is not hot-pluggable, devices on it can be unbound
+> > > from the driver and bound back to it via sysfs, so we should not be using
+> > > __init annotations on probe() and __exit annotations on remove() methods.
+> > 
+> > I don't completely understand this problem.  Does this mean there should be
+> > no __init/__exit annotations in these drivers at all?  If other PCI host
+> > bridge drivers have the same problem, I'd like to fix them all at once.
 
-Hi Hauke,
+By the way I think only keystone in drivers/pci has this issue. My
+script to find potential issues is:
 
-I've merged this into next/dt now, comments below.
+#!/bin/bash
+for i in `grep -rl '__exit\(_p\| \).*remove' $*`; do grep -L platform_driver_probe $i; done
+
+it is not 100% correct and generates both false positives and false
+negatives but still fains a few offenders in the tree.
 
 > 
-> ----------------------------------------------------------------
-> bcm5301x-dt-2015-01-20: ARM: BCM5301X: dts updates for 3.20
+> Basically they should not use __init/__exit, unless you take explicit
+> steps to make sure that devices can't be unbound and bound again later
+> via sysfs by setting driver->suppress_bind_attrs and/or using
+> platform_driver_probe(). Note that if you use platform_driver_probe()
+> then your driver can't cope with -EPROBE_DEFER reported by any of the
+> subsystems it might be using.
 > 
-> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+> > 
+> > For example, after applying this patch, ks_pcie_probe() is non-__init, but
+> > it calls ks_add_pcie_port(), which is still __init.  I thought that was
+> > illegal.
+> 
+> My bad, I missed that. The __init marking on ks_add_pcie_port() shoudl
+> be removed as well.
+> 
+> > 
+> > I'm not sure about module_platform_driver_probe() either; it generates
+> > __init and __exit functions.  Should those annotations be removed, too?
+> 
+> module_platform_driver_probe() does internally platform_driver_probe()
+> so it is OK for that probe function be __init (because we'd suppress
+> sysfs bind/unbind and deferred probing so discaring init section is
+> safe).
+> 
+> Note that above applied to driver's ->probe() and ->remove() code paths
+> only.  Marking module init/exit code as __init and __exit is still right
+> thing to do.
+> 
+> Thanks.
+> 
+> > 
+> > > Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> > > ---
+> > > 
+> > > Not tested, found by casual code inspection.
+> > > 
+> > >  drivers/pci/host/pci-keystone.c | 8 ++++----
+> > >  1 file changed, 4 insertions(+), 4 deletions(-)
+> > > 
+> > > diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
+> > > index 1b893bc..7b84e1d 100644
+> > > --- a/drivers/pci/host/pci-keystone.c
+> > > +++ b/drivers/pci/host/pci-keystone.c
+> > > @@ -332,7 +332,7 @@ static const struct of_device_id ks_pcie_of_match[] = {
+> > >  };
+> > >  MODULE_DEVICE_TABLE(of, ks_pcie_of_match);
+> > >  
+> > > -static int __exit ks_pcie_remove(struct platform_device *pdev)
+> > > +static int ks_pcie_remove(struct platform_device *pdev)
+> > >  {
+> > >  	struct keystone_pcie *ks_pcie = platform_get_drvdata(pdev);
+> > >  
+> > > @@ -341,7 +341,7 @@ static int __exit ks_pcie_remove(struct platform_device *pdev)
+> > >  	return 0;
+> > >  }
+> > >  
+> > > -static int __init ks_pcie_probe(struct platform_device *pdev)
+> > > +static int ks_pcie_probe(struct platform_device *pdev)
+> > >  {
+> > >  	struct device *dev = &pdev->dev;
+> > >  	struct keystone_pcie *ks_pcie;
+> > > @@ -398,9 +398,9 @@ fail_clk:
+> > >  	return ret;
+> > >  }
+> > >  
+> > > -static struct platform_driver ks_pcie_driver __refdata = {
+> > > +static struct platform_driver ks_pcie_driver = {
+> > >  	.probe  = ks_pcie_probe,
+> > > -	.remove = __exit_p(ks_pcie_remove),
+> > > +	.remove = ks_pcie_remove,
+> > >  	.driver = {
+> > >  		.name	= "keystone-pcie",
+> > >  		.owner	= THIS_MODULE,
+> > > -- 
+> > > 2.2.0.rc0.207.ga3a616c
+> > > 
+> > > 
+> > > -- 
+> > > Dmitry
+> 
+> -- 
+> Dmitry
 
-No signed-off-by needed in the tag -- the fact that you have signed it is
-enough. We do ask for a few words about what's in the branch though more than
-"dts updates". Something to think about going forward.
-
-Also:
-
-We had asked that broadcom platforms go in together through Florian from
-here on out, so we don't have to deal with merge requests from each and
-every one of you since there are several subplatforms. Would that be ok
-with you?
-
-
--Olof
+-- 
+Dmitry
