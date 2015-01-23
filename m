@@ -1,95 +1,56 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 22 Jan 2015 19:00:49 -0800
-Subject: [GIT PULL] qcom SoC changes for v3.20
-In-Reply-To: <D177DF12-0F31-49CF-B98B-9FAC23AAB24C@codeaurora.org>
-References: <alpine.DEB.2.02.1501191226010.2973@galak-ubuntu.qualcomm.com>
- <20150122011521.GA31815@quad.lixom.net>
- <D177DF12-0F31-49CF-B98B-9FAC23AAB24C@codeaurora.org>
-Message-ID: <CAOesGMipp=Odc-cWvrba0e1pd1X7O+PKNH+WoM3fG4xX2GRFuA@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 22 Jan 2015 20:12:58 -0800
+Subject: [PATCH 1/2] ARM: EXYNOS: add fixed phy support for EXYNOS5440
+In-Reply-To: <1421980893-14475-2-git-send-email-ming.lei@canonical.com>
+References: <1421980893-14475-1-git-send-email-ming.lei@canonical.com>
+ <1421980893-14475-2-git-send-email-ming.lei@canonical.com>
+Message-ID: <54C1CA4A.4030703@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 22, 2015 at 9:02 AM, Kumar Gala <galak@codeaurora.org> wrote:
->
-> On Jan 21, 2015, at 7:15 PM, Olof Johansson <olof@lixom.net> wrote:
->
->> Hi,
->>
->>
->> On Mon, Jan 19, 2015 at 12:27:15PM -0600, Kumar Gala wrote:
->>> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
->>>
->>>  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
->>>
->>> are available in the git repository at:
->>>
->>>  git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-soc-for-3.20
->>>
->>> for you to fetch changes up to ae0a6075c046f9c8dbac18f53a779592f97b402e:
->>>
->>>  soc: qcom: scm: Clarify boot interface (2015-01-19 11:55:12 -0600)
->>>
->>> ----------------------------------------------------------------
->>> Qualcomm ARM Based SoC Updates for v3.20
->>>
->>> * Moved scm support into drivers/soc/qcom (allows for use by drivers)
->>> * Various bug fixes and minor feature additions to scm code
->>> * Added big-endian support to debug MSM uart
->>> * Added big-endian support to ARCH_QCOM
->>>
->>> ----------------------------------------------------------------
->>> Lina Iyer (2):
->>>      ARM: qcom: Add SCM warmboot flags for quad core targets.
->>>      soc: qcom: scm: Move scm-boot files to drivers/soc and include/soc
->>>
->>> Olav Haugan (1):
->>>      ARM: qcom: scm: Add logging of actual return code from scm call
->>>
->>> Saravana Kannan (1):
->>>      ARM: qcom: scm: Add API to query for service/command availability.
->>>
->>> Stephen Boyd (9):
->>>      ARM: debug: Update MSM and QCOM DEBUG_LL help
->>>      ARM: debug: msm: Support big-endian CPUs
->>>      ARM: qcom: Select ARCH_SUPPORTS_BIG_ENDIAN
->>>      ARM: qcom: scm: Fix incorrect cache invalidation
->>>      ARM: qcom: scm: Get cacheline size from CTR
->>>      ARM: qcom: scm: Add a feat version query API
->>>      soc: qcom: scm: Move the scm driver to drivers/soc/qcom
->>
->> I replied on the patch here just now. This isn't the right thing to do,
->> as far as I can tell.
->>
->> Seems like sending a fresh request with the material besides the move
->> to drivers/soc should be mergeable though, so feel free to do that while
->> the rest is hashed out.
->
-> Would the following be ok (dropped the move to drivers/soc and some additional unused scm APIs as of right now):
->
-> ARM: qcom: Drop unnecessary selects from ARCH_QCOM
-> ARM: qcom: scm: Clarify boot interface
-> ARM: qcom: Add SCM warmboot flags for quad core targets.
-> ARM: qcom: scm: Add logging of actual return code from scm call
-> ARM: qcom: scm: Flush the command buffer only instead of the entire cache
-> ARM: qcom: scm: Get cacheline size from CTR
-> ARM: qcom: scm: Fix incorrect cache invalidation
-> ARM: qcom: Select ARCH_SUPPORTS_BIG_ENDIAN
-> ARM: debug: msm: Support big-endian CPUs
-> ARM: debug: Update MSM and QCOM DEBUG_LL help
->
->  Kconfig.debug        |    5 ++--
->  include/debug/msm.S  |    6 +++++
->  mach-qcom/Kconfig    |    3 --
->  mach-qcom/scm-boot.c |    2 -
->  mach-qcom/scm-boot.h |    4 ++-
->  mach-qcom/scm.c      |   55 +++++++++++++++++++++++++++++++++++++--------------
->  6 files changed, 54 insertions(+), 21 deletions(-)
+Le 22/01/2015 18:41, Ming Lei a ?crit :
+> From: Byungho An <bh74.an@samsung.com>
+> 
+> This patch adds fixed phy codes for Exynos5440. This patch can
+> support fixed_phy.
+> 
+> Signed-off-by: Byungho An <bh74.an@samsung.com> Signed-off-by: Ike
+> Panhc <ike.pan@canonical.com> Signed-off-by: Ming Lei
+> <ming.lei@canoncial.com> --- arch/arm/mach-exynos/exynos.c |   15
+> +++++++++++++++ 1 file changed, 15 insertions(+)
+> 
+> diff --git a/arch/arm/mach-exynos/exynos.c
+> b/arch/arm/mach-exynos/exynos.c index 78eca99b..dfd5699 100644 ---
+> a/arch/arm/mach-exynos/exynos.c +++
+> b/arch/arm/mach-exynos/exynos.c @@ -20,6 +20,8 @@ #include
+> <linux/platform_device.h> #include <linux/pm_domain.h> #include
+> <linux/irqchip.h> +#include <linux/phy.h> +#include
+> <linux/phy_fixed.h>
+> 
+> #include <asm/cacheflush.h> #include <asm/hardware/cache-l2x0.h> @@
+> -202,8 +204,21 @@ static void __init exynos_init_irq(void) 
+> exynos_map_pmu(); }
+> 
+> +static struct fixed_phy_status fixed_phy_status __initdata = { +
+> .link           = 1, +       .speed          = 1000, +
+> .duplex         = 1, +}; + static void __init
+> exynos_dt_machine_init(void) { +	struct device_node *gmac_np; +
+> unsigned int tmp; + +	/* add fixed phy in need */ +	gmac_np =
+> of_find_compatible_node(NULL, NULL, "snps,dwmac-3.70a"); +	if
+> (of_find_property(gmac_np, "fixed_phy", NULL)) +		tmp =
+> fixed_phy_add(PHY_POLL, 1, &fixed_phy_status);
 
-I'd be OK with merging this, send a request and tag. Would that let
-the DRM folks make progress too?
+Is there a particular reason you are doing this and not using
+of_phy_is_fixed_link() and of_phy_register_fixed_link()?
 
-If you need a common place for this, drivers/firmware seems like a
-better home than drivers/soc.
+See the gianfar and bcmsysport for examples on how to use it in a
+driver along with the relevant Device Tree binding in
+Documentation/devicetree/bindings/net/fixed-link.txt for examples.
+
+> /* * This is called from smp_prepare_cpus if we've built for SMP,
+> but * we still need to set it up for PM and firmware ops if not.
+> 
 
 
--Olof
+-- 
+Florian
