@@ -1,79 +1,47 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 23 Jan 2015 16:51:16 +0100
-Subject: [PATCH v5 06/18] iommu: exynos: don't read version register on every
- tlb operation
+Date: Fri, 23 Jan 2015 16:51:12 +0100
+Subject: [PATCH v5 02/18] arm: exynos: pm_domains: add support for devices
+ registered before arch_initcall
 In-Reply-To: <1422028288-891-1-git-send-email-m.szyprowski@samsung.com>
 References: <1422028288-891-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1422028288-891-7-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1422028288-891-3-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes reading of REG_MMU_VERSION register on every tlb
-operation and caches SYSMMU version in driver's internal data.
+SYSMMU devices will be registered early before any other devices and
+before calling arch_initcall. To add them to respective power domains,
+additional scan of all platform devices is needed.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c | 13 +++++--------
- 1 file changed, 5 insertions(+), 8 deletions(-)
+ arch/arm/mach-exynos/pm_domains.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 7ce5273..b6c8612 100644
---- a/drivers/iommu/exynos-iommu.c
-+++ b/drivers/iommu/exynos-iommu.c
-@@ -212,6 +212,7 @@ struct sysmmu_drvdata {
- 	spinlock_t lock;
- 	struct iommu_domain *domain;
- 	phys_addr_t pgtable;
-+	int version;
- };
- 
- static bool set_sysmmu_active(struct sysmmu_drvdata *data)
-@@ -238,11 +239,6 @@ static void sysmmu_unblock(void __iomem *sfrbase)
- 	__raw_writel(CTRL_ENABLE, sfrbase + REG_MMU_CTRL);
+diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+index 37266a8..0e2bc36 100644
+--- a/arch/arm/mach-exynos/pm_domains.c
++++ b/arch/arm/mach-exynos/pm_domains.c
+@@ -105,6 +105,12 @@ static int exynos_pd_power_off(struct generic_pm_domain *domain)
+ 	return exynos_pd_power(domain, false);
  }
  
--static unsigned int __raw_sysmmu_version(struct sysmmu_drvdata *data)
--{
--	return MMU_RAW_VER(__raw_readl(data->sfrbase + REG_MMU_VERSION));
--}
--
- static bool sysmmu_block(void __iomem *sfrbase)
++static __init int exynos_pd_init_platform_dev(struct device *dev, void *data)
++{
++	dev_pm_domain_attach(dev, true);
++	return 0;
++}
++
+ static __init int exynos4_pm_init_power_domain(void)
  {
- 	int i = 120;
-@@ -402,7 +398,7 @@ static void __sysmmu_init_config(struct sysmmu_drvdata *data)
- 	unsigned int cfg = CFG_LRU | CFG_QOS(15);
- 	unsigned int ver;
- 
--	ver = __raw_sysmmu_version(data);
-+	ver = MMU_RAW_VER(__raw_readl(data->sfrbase + REG_MMU_VERSION));
- 	if (MMU_MAJ_VER(ver) == 3) {
- 		if (MMU_MIN_VER(ver) >= 2) {
- 			cfg |= CFG_FLPDCACHE;
-@@ -416,6 +412,7 @@ static void __sysmmu_init_config(struct sysmmu_drvdata *data)
+ 	struct platform_device *pdev;
+@@ -189,6 +195,7 @@ no_clk:
+ 		of_node_put(np);
  	}
  
- 	__raw_writel(cfg, data->sfrbase + REG_MMU_CFG);
-+	data->version = ver;
+-	return 0;
++	return bus_for_each_dev(&platform_bus_type, NULL, NULL,
++				exynos_pd_init_platform_dev);
  }
- 
- static void __sysmmu_enable_nocount(struct sysmmu_drvdata *data)
-@@ -525,7 +522,7 @@ static bool exynos_sysmmu_disable(struct device *dev)
- static void __sysmmu_tlb_invalidate_flpdcache(struct sysmmu_drvdata *data,
- 					      sysmmu_iova_t iova)
- {
--	if (__raw_sysmmu_version(data) == MAKE_MMU_VER(3, 3))
-+	if (data->version == MAKE_MMU_VER(3, 3))
- 		__raw_writel(iova | 0x1, data->sfrbase + REG_MMU_FLUSH_ENTRY);
- }
- 
-@@ -574,7 +571,7 @@ static void sysmmu_tlb_invalidate_entry(struct device *dev, sysmmu_iova_t iova,
- 		 * 1MB page can be cached in one of all sets.
- 		 * 64KB page can be one of 16 consecutive sets.
- 		 */
--		if (MMU_MAJ_VER(__raw_sysmmu_version(data)) == 2)
-+		if (MMU_MAJ_VER(data->version) == 2)
- 			num_inv = min_t(unsigned int, size / PAGE_SIZE, 64);
- 
- 		if (sysmmu_block(data->sfrbase)) {
+ arch_initcall(exynos4_pm_init_power_domain);
 -- 
 1.9.2
