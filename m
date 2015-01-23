@@ -1,75 +1,110 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Fri, 23 Jan 2015 09:39:46 -0800
-Subject: [next-20150119]regression (mm)?
-In-Reply-To: <20150123172736.GA15392@kahuna>
-References: <54BD33DC.40200@ti.com> <20150119174317.GK20386@saruman>
- <20150120001643.7D15AA8@black.fi.intel.com>
- <20150120114555.GA11502@n2100.arm.linux.org.uk>
- <20150120140546.DDCB8D4@black.fi.intel.com>
- <20150123172736.GA15392@kahuna>
-Message-ID: <CANMBJr7w2jZBwRDEsVNvL3XrDZ2ttwFz7qBf4zySAMMmcgAxiw@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 23 Jan 2015 17:40:40 +0000
+Subject: [PATCHv2] arm64:mm: free the useless initial page table
+In-Reply-To: <20150123162126.GD9557@e104818-lin.cambridge.arm.com>
+References: <1418110007-13270-1-git-send-email-zhichang.yuan@linaro.org>
+ <20150123162126.GD9557@e104818-lin.cambridge.arm.com>
+Message-ID: <CAKv+Gu8OQB+eziL6X85-v-+9KKPsK6Z=h2+1oDrM9imnSU8drg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 23 January 2015 at 09:27, Nishanth Menon <nm@ti.com> wrote:
-> On 16:05-20150120, Kirill A. Shutemov wrote:
-> [..]
->> Signed-off-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
->> Reported-by: Nishanth Menon <nm@ti.com>
-> Just to close on this thread:
-> https://github.com/nmenon/kernel-test-logs/tree/next-20150123 looks good
-> and back to old status. Thank you folks for all the help.
-
-I just reviewed the boot logs for next-20150123 and there still seems
-to be a related issue. I've been boot testing
-multi_v7_defconfig+CONFIG_ARM_LPAE=y kernel configurations which still
-seem broken.
-
-For example here are two boots with exynos5250-arndale, one with
-multi_v7_defconfig+CONFIG_ARM_LPAE=y [1] and the other with
-multi_v7_defconfig[2]. You can see the kernel configurations with
-CONFIG_ARM_LPAE=y show the splat:
-
-[   14.605950] ------------[ cut here ]------------
-[   14.609163] WARNING: CPU: 1 PID: 63 at ../mm/mmap.c:2858
-exit_mmap+0x1b8/0x224()
-[   14.616548] Modules linked in:
-[   14.619553] CPU: 1 PID: 63 Comm: init Not tainted 3.19.0-rc5-next-20150123 #1
-[   14.626713] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
-[   14.632830] [] (unwind_backtrace) from [] (show_stack+0x10/0x14)
-[   14.640473] [] (show_stack) from [] (dump_stack+0x78/0x94)
-[   14.647678] [] (dump_stack) from [] (warn_slowpath_common+0x74/0xb0)
-[   14.655744] [] (warn_slowpath_common) from [] (warn_slowpath_null+0x1c/0x24)
-[   14.664510] [] (warn_slowpath_null) from [] (exit_mmap+0x1b8/0x224)
-[   14.672497] [] (exit_mmap) from [] (mmput+0x40/0xf8)
-[   14.679180] [] (mmput) from [] (flush_old_exec+0x328/0x604)
-[   14.686471] [] (flush_old_exec) from [] (load_elf_binary+0x26c/0x11f4)
-[   14.694715] [] (load_elf_binary) from [] (search_binary_handler+0x98/0x244)
-[   14.703395] [] (search_binary_handler) from []
-(do_execveat_common+0x4dc/0x5bc)
-[   14.712421] [] (do_execveat_common) from [] (do_execve+0x28/0x30)
-[   14.720235] [] (do_execve) from [] (ret_fast_syscall+0x0/0x34)
-[   14.727782] ---[ end trace 5e3ca48b454c7e0a ]---
-[   14.733758] ------------[ cut here ]------------
-
-Has anyone else tested with CONFIG_ARM_LPAE=y that can confirm my findings?
-
-
-> --
-> Regards,
-> Nishanth Menon
+On 23 January 2015 at 16:21, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Tue, Dec 09, 2014 at 07:26:47AM +0000, zhichang.yuan at linaro.org wrote:
+>> From: "zhichang.yuan" <zhichang.yuan@linaro.org>
+>>
+>> For 64K page system, after mapping a PMD section, the corresponding initial
+>> page table is not needed any more. That page can be freed.
+>>
+>> Changes since v1:
+>>
+>> * make consistent code between alloc_init_pmd and alloc_init_pud;
+>> * flush the TLB before the unused page table is freed;
+>>
+>> Signed-off-by: Zhichang Yuan <zhichang.yuan@linaro.org>
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> I thought about queuing this patch but I realised that
+> alloc_init_pmd/pud may be called in a late context where memblock_free()
+> would no longer make sense. Cc'ing Laura and Ard for any ideas here but
+> I think we may just end up with a few old page table pages sitting
+> around (not many though). In general we don't go from smaller to larger
+> mappings (that's what this patch targets) but given the API, I'm not
+> sure we have any guarantee.
+>
+> One solution would be to check for alloc == early_alloc or something
+> similar. Cc'ing Laura and Ard as they added the create_mapping_late()
+> code.
+>
 
-[1] http://storage.kernelci.org/next/next-20150123/arm-multi_v7_defconfig+CONFIG_ARM_LPAE=y/lab-tbaker/boot-exynos5250-arndale.html
+The UEFI page tables are only built up once, based on a series of
+disjoint memory regions, so that will never hit either of the
+memblock_free() branches.
+And AFAICT, the DEBUG_RODATA code does the splitting early, which
+causes the create_mapping_late() code to only change permissions, not
+change the granularity of any regions.
 
-[2] http://storage.kernelci.org/next/next-20150123/arm-multi_v7_defconfig/lab-tbaker/boot-exynos5250-arndale.html
+Perhaps it's sufficient to add a comment and a BUG_ON(alloc !=
+early_alloc) to the memblock_free() branches?
 
-Cheers,
+-- 
+Ard.
 
-Tyler
+
+>> ---
+>>  arch/arm64/include/asm/pgtable.h |    3 +++
+>>  arch/arm64/mm/mmu.c              |   15 ++++++++++++---
+>>  2 files changed, 15 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+>> index 41a43bf..8a135b6 100644
+>> --- a/arch/arm64/include/asm/pgtable.h
+>> +++ b/arch/arm64/include/asm/pgtable.h
+>> @@ -337,9 +337,12 @@ extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
+>>
+>>  #ifdef CONFIG_ARM64_64K_PAGES
+>>  #define pud_sect(pud)                (0)
+>> +#define pud_table(pud)               (1)
+>>  #else
+>>  #define pud_sect(pud)                ((pud_val(pud) & PUD_TYPE_MASK) == \
+>>                                PUD_TYPE_SECT)
+>> +#define pud_table(pud)               ((pud_val(pud) & PUD_TYPE_MASK) == \
+>> +                                     PUD_TYPE_TABLE)
+>>  #endif
+>>
+>>  static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
+>> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+>> index f4f8b50..515f75b 100644
+>> --- a/arch/arm64/mm/mmu.c
+>> +++ b/arch/arm64/mm/mmu.c
+>> @@ -191,8 +191,14 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
+>>                        * Check for previous table entries created during
+>>                        * boot (__create_page_tables) and flush them.
+>>                        */
+>> -                     if (!pmd_none(old_pmd))
+>> +                     if (!pmd_none(old_pmd)) {
+>>                               flush_tlb_all();
+>> +                             if (pmd_table(old_pmd)) {
+>> +                                     phys_addr_t table = __pa(pte_offset_map(&old_pmd, 0));
+>> +
+>> +                                     memblock_free(table, PAGE_SIZE);
+>> +                             }
+>> +                     }
+>>               } else {
+>>                       alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
+>>                                      prot_pte);
+>> @@ -234,9 +240,12 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
+>>                        * Look up the old pmd table and free it.
+>>                        */
+>>                       if (!pud_none(old_pud)) {
+>> -                             phys_addr_t table = __pa(pmd_offset(&old_pud, 0));
+>> -                             memblock_free(table, PAGE_SIZE);
+>>                               flush_tlb_all();
+>> +                             if (pud_table(old_pud)) {
+>> +                                     phys_addr_t table = __pa(pmd_offset(&old_pud, 0));
+>> +
+>> +                                     memblock_free(table, PAGE_SIZE);
+>> +                             }
+>>                       }
+>>               } else {
+>>                       alloc_init_pmd(pud, addr, next, phys, map_io);
+>> --
+>> 1.7.9.5
