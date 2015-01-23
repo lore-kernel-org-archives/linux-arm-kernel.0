@@ -1,293 +1,369 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 23 Jan 2015 10:36:36 +0000
-Subject: [PATCH v6 1/2] arm64: dts: Add support for Spreadtrum SC9836 SoC
- in dts and Makefile
-In-Reply-To: <1422008491-16452-2-git-send-email-chunyan.zhang@spreadtrum.com>
-References: <sprd-dt-v6>
- <1422008491-16452-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1422008491-16452-2-git-send-email-chunyan.zhang@spreadtrum.com>
-Message-ID: <20150123103636.GA23493@leverpostej>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 23 Jan 2015 16:14:50 +0530
+Subject: [RFC V2] OPP: Redefine bindings to overcome shortcomings
+Message-ID: <cbe949d7a69c3b16a3e9d6e5429eb81d3ae9d8b9.1422009157.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 23, 2015 at 10:21:30AM +0000, Chunyan Zhang wrote:
-> From: Zhizhou Zhang <zhizhou.zhang@spreadtrum.com>
-> 
-> Adds the device tree support for Spreadtrum SC9836 SoC which is based on
-> Sharkl64 platform.
-> 
-> Sharkl64 platform contains the common nodes of Spreadtrum's arm64-based SoCs.
-> 
-> Signed-off-by: Zhizhou Zhang <zhizhou.zhang@spreadtrum.com>
-> Signed-off-by: Orson Zhai <orson.zhai@spreadtrum.com>
-> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
-> ---
->  arch/arm64/boot/dts/Makefile                  |    1 +
->  arch/arm64/boot/dts/sprd/Makefile             |    5 ++
->  arch/arm64/boot/dts/sprd/sc9836-openphone.dts |   49 ++++++++++++++++
->  arch/arm64/boot/dts/sprd/sc9836.dtsi          |   74 +++++++++++++++++++++++++
->  arch/arm64/boot/dts/sprd/sharkl64.dtsi        |   65 ++++++++++++++++++++++
->  5 files changed, 194 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/sprd/Makefile
->  create mode 100644 arch/arm64/boot/dts/sprd/sc9836-openphone.dts
->  create mode 100644 arch/arm64/boot/dts/sprd/sc9836.dtsi
->  create mode 100644 arch/arm64/boot/dts/sprd/sharkl64.dtsi
-> 
-> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-> index 3b8d427..806a717 100644
-> --- a/arch/arm64/boot/dts/Makefile
-> +++ b/arch/arm64/boot/dts/Makefile
-> @@ -2,6 +2,7 @@ dts-dirs += amd
->  dts-dirs += apm
->  dts-dirs += arm
->  dts-dirs += cavium
-> +dts-dirs += sprd
->  
->  always		:= $(dtb-y)
->  subdir-y	:= $(dts-dirs)
-> diff --git a/arch/arm64/boot/dts/sprd/Makefile b/arch/arm64/boot/dts/sprd/Makefile
-> new file mode 100644
-> index 0000000..b658c5e
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/sprd/Makefile
-> @@ -0,0 +1,5 @@
-> +dtb-$(CONFIG_ARCH_SPRD) += sc9836-openphone.dtb
-> +
-> +always		:= $(dtb-y)
-> +subdir-y	:= $(dts-dirs)
-> +clean-files	:= *.dtb
-> diff --git a/arch/arm64/boot/dts/sprd/sc9836-openphone.dts b/arch/arm64/boot/dts/sprd/sc9836-openphone.dts
-> new file mode 100644
-> index 0000000..b8a69b2
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/sprd/sc9836-openphone.dts
-> @@ -0,0 +1,49 @@
-> +/*
-> + * Spreadtrum SC9836 openphone board DTS file
-> + *
-> + * Copyright (C) 2014, Spreadtrum Communications Inc.
-> + *
-> + * This file is licensed under a dual GPLv2 or X11 license.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "sc9836.dtsi"
-> +
-> +/ {
-> +	model = "Spreadtrum SC9836 Openphone Board";
-> +
-> +	compatible = "sprd,sc9836-openphone", "sprd,sc9836";
-> +
-> +	aliases {
-> +		serial0 = &uart0;
-> +		serial1 = &uart1;
-> +		serial2 = &uart2;
-> +		serial3 = &uart3;
-> +	};
-> +
-> +	memory at 80000000 {
-> +		device_type = "memory";
-> +		reg = <0 0x80000000 0 0x20000000>;
-> +	};
-> +
-> +	chosen {
-> +		stdout-path = &uart0;
-> +	};
+Rob et al,
 
-It would be good to use an explicit configuration here. e.g. have:
+This is another attempt to redefine OPP bindings which we concluded to after
+first round of reviews.
 
-	chosen {
-		stdout-path = "serial0:115200n8";
-	};
+Current OPP (Operating performance point) DT bindings are proven to be
+insufficient at multiple instances.
 
-Where '115200n8' is replaced by whatever the bootloader leaves the UART
-configured as on this board.
+There had been multiple band-aid approaches to get them fixed (The latest one
+being: http://www.mail-archive.com/devicetree at vger.kernel.org/msg53398.html).
+For obvious reasons Rob rejected them and shown the right path forward.
 
-That means you won't need a 'console=' to get nice consistent serial
-output at boot, and won't be relying on implicit defaults all over the
-place.
+The shortcomings we are trying to solve here:
 
-> +};
-> +
-> +&uart0 {
-> +	status = "okay";
-> +};
-> +
-> +&uart1 {
-> +	status = "okay";
-> +};
-> +
-> +&uart2 {
-> +	status = "okay";
-> +};
-> +
-> +&uart3 {
-> +	status = "okay";
-> +};
-> diff --git a/arch/arm64/boot/dts/sprd/sc9836.dtsi b/arch/arm64/boot/dts/sprd/sc9836.dtsi
-> new file mode 100644
-> index 0000000..c646123
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/sprd/sc9836.dtsi
-> @@ -0,0 +1,74 @@
-> +/*
-> + * Spreadtrum SC9836 SoC DTS file
-> + *
-> + * Copyright (C) 2014, Spreadtrum Communications Inc.
-> + *
-> + * This file is licensed under a dual GPLv2 or X11 license.
-> + */
-> +
-> +#include "sharkl64.dtsi"
-> +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> +
-> +/ {
-> +	compatible = "sprd,sc9836";
-> +
-> +	cpus {
-> +		#address-cells = <2>;
-> +		#size-cells = <0>;
-> +
-> +		cpu at 0 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a53", "arm,armv8";
-> +			reg = <0x0 0x0>;
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu at 1 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a53", "arm,armv8";
-> +			reg = <0x0 0x1>;
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu at 2 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a53", "arm,armv8";
-> +			reg = <0x0 0x2>;
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu at 3 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a53", "arm,armv8";
-> +			reg = <0x0 0x3>;
-> +			enable-method = "psci";
-> +		};
-> +	};
-> +
-> +	gic: interrupt-controller at 12001000 {
-> +		compatible = "arm,gic-400";
-> +		reg = <0 0x12001000 0 0x1000>,
-> +		      <0 0x12002000 0 0x2000>,
-> +		      <0 0x12004000 0 0x2000>,
-> +		      <0 0x12006000 0 0x2000>;
-> +		#interrupt-cells = <3>;
-> +		interrupt-controller;
-> +		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-> +	};
-> +
-> +	psci {
-> +		compatible	= "arm,psci";
-> +		method		= "smc";
-> +		cpu_on		= <0xc4000003>;
-> +		cpu_off		= <0x84000002>;
-> +		cpu_suspend	= <0xc4000001>;
-> +	};
+- How to select which driver to probe for a platform, when multiple drivers are
+  available. For example: how to choose between cpufreq-dt and arm_big_little
+  drivers.
 
-Given that there are no suspend states in this dts, the cpu_suspend
-property here could be omitted for now (though I guess it doesn't matter
-either way).
+- Getting clock sharing information between CPUs. Single shared clock vs
+  independent clock per core vs shared clock per cluster.
 
-> +
-> +	timer {
-> +		compatible = "arm,armv8-timer";
-> +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-> +	};
-> +};
-> diff --git a/arch/arm64/boot/dts/sprd/sharkl64.dtsi b/arch/arm64/boot/dts/sprd/sharkl64.dtsi
-> new file mode 100644
-> index 0000000..6b4bdc5
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/sprd/sharkl64.dtsi
-> @@ -0,0 +1,65 @@
-> +/*
-> + * Spreadtrum Sharkl64 platform DTS file
-> + *
-> + * Copyright (C) 2014, Spreadtrum Communications Inc.
-> + *
-> + * This file is licensed under a dual GPLv2 or X11 license.
-> + */
-> +
-> +/ {
-> +	interrupt-parent = <&gic>;
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-> +
-> +	soc {
-> +		compatible = "simple-bus";
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		ranges;
-> +
-> +		ap-apb {
-> +			compatible = "simple-bus";
-> +			#address-cells = <2>;
-> +			#size-cells = <2>;
-> +			ranges;
-> +
-> +			uart0: serial at 70000000 {
-> +				compatible = "sprd,sc9836-uart";
-> +				reg = <0 0x70000000 0 0x100>;
-> +				interrupts = <0 2 0xf04>;
-> +				clocks = <&clk26mhz>;
-> +				status = "disabled";
-> +			};
-> +
-> +			uart1: serial at 70100000 {
-> +				compatible = "sprd,sc9836-uart";
-> +				reg = <0 0x70100000 0 0x100>;
-> +				interrupts = <0 3 0xf04>;
-> +				clocks = <&clk26mhz>;
-> +				status = "disabled";
-> +			};
-> +
-> +			uart2: serial at 70200000 {
-> +				compatible = "sprd,sc9836-uart";
-> +				reg = <0 0x70200000 0 0x100>;
-> +				interrupts = <0 2 0xf04>;
-> +				clocks = <&clk26mhz>;
-> +				status = "disabled";
-> +			};
-> +
-> +			uart3: serial at 70300000 {
-> +				compatible = "sprd,sc9836-uart";
-> +				reg = <0 0x70300000 0 0x100>;
-> +				interrupts = <0 3 0xf04>;
-> +				clocks = <&clk26mhz>;
-> +				status = "disabled";
-> +			};
-> +		};
-> +	};
-> +
-> +	clk26mhz: clk26mhz {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <26000000>;
-> +	};
-> +};
+- Support for turbo modes
 
-Other than my comments above, this looks fine to me. I assume the UART
-binding and driver are already queued somewhere else?
+- Support for intermediate frequencies
 
-If so:
+- Other per OPP settings: transition latencies, disabled status, etc.?
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+Please see the below bindings for further details.
 
-Thanks,
-Mark.
+I haven't incorporated the comments given by Mark Brown as I had some doubts.
+@broonie: Is this what you wanted to mention earlier ? : http://pastebin.com/1RZTccmm
+
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+
+ Documentation/devicetree/bindings/power/opp.txt | 309 +++++++++++++++++++++++-
+ 1 file changed, 308 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/power/opp.txt b/Documentation/devicetree/bindings/power/opp.txt
+index 74499e5033fc..9cdc0c9b09af 100644
+--- a/Documentation/devicetree/bindings/power/opp.txt
++++ b/Documentation/devicetree/bindings/power/opp.txt
+@@ -1,9 +1,316 @@
+-* Generic OPP Interface
++Generic OPP (Operating Performance Points) Interface
++----------------------------------------------------
+ 
+ SoCs have a standard set of tuples consisting of frequency and
+ voltage pairs that the device will support per voltage domain. These
+ are called Operating Performance Points or OPPs.
+ 
++This documents defines OPP bindings with its required/optional properties. OPPs
++can be defined for any device, this file uses CPU as an example to illustrate
++how to define OPPs.
++
++opp nodes and opp-lists
++
++- opp-listN:
++  List of nodes defining performance points. Following belong to the nodes
++  within the opp-lists.
++
++  Required properties:
++  - opp-khz: Frequency in kHz
++  - opp-microvolt: voltage in micro Volts
++
++  Optional properties:
++  - turbo-mode: Marks the volt-freq pair as turbo pair.
++  - status: Marks the node enabled/disabled.
++  - voltage-tolerance: Specify the CPU voltage tolerance in percentage.
++  - clock-latency-ns: Specify the possible maximum transition latency (in
++    nanoseconds) for switching to this opp from any other opp.
++
++- oppN:
++  Operating performance point node per device. Devices using it should have its
++  phandle in their "operating-points-v2" property.
++
++  Required properties:
++  - compatible: allow OPPs to express their compatibility.
++  - opp-list: phandle to opp-list defined above.
++
++  Optional properties:
++  - opp-intermediate: Stable opp we *must* switch to, before switching to the
++    target opp. Contains phandle of one of the opp-node present in opp-list.
++
++Example 1: Simple case of dual-core cortex A9-single cluster, sharing clock line.
++
++/ {
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			compatible = "arm,cortex-a9";
++			reg = <0>;
++			next-level-cache = <&L2>;
++			clocks = <&clk_controller 0>;
++			clock-names = "cpu";
++			opp-supply = <&cpu_supply0>;
++			operating-points-v2 = <&cpu0_opp>;
++		};
++
++		cpu at 1 {
++			compatible = "arm,cortex-a9";
++			reg = <1>;
++			next-level-cache = <&L2>;
++			clocks = <&clk_controller 0>;
++			clock-names = "cpu";
++			opp-supply = <&cpu_supply0>;
++			operating-points-v2 = <&cpu0_opp>;
++		};
++	};
++
++	cpu0_opp: opp0 {
++		compatible = "linux,cpu-dvfs";
++		opp-list = <&cpu0_opplist>;
++		opp-intermediate = <&cpu0_intermediate>;
++
++		cpu0_opplist: opp-list0 {
++			entry00 {
++				opp-khz = <1000000>;
++				opp-microvolt = <975000>;
++				voltage-tolerance = <2>;
++				clock-latency-ns = <300000>;
++				status = "okay";
++			};
++			cpu0_intermediate: entry01 {
++				opp-khz = <1100000>;
++				opp-microvolt = <1000000>;
++				voltage-tolerance = <3>;
++				clock-latency-ns = <310000>;
++				status = "okay";
++			};
++			entry02 {
++				opp-khz = <1200000>;
++				opp-microvolt = <1025000>;
++				voltage-tolerance = <1>;
++				clock-latency-ns = <290000>;
++				status = "okay";
++				turbo-mode;
++			};
++		};
++	};
++};
++
++Example 2: Quad-core krait (All CPUs have independent clock lines but have same set of OPPs)
++
++/ {
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			compatible = "qcom,krait";
++			reg = <0>;
++			next-level-cache = <&L2>;
++			clocks = <&clk_controller 0>;
++			clock-names = "cpu";
++			opp-supply = <&cpu_supply0>;
++			operating-points-v2 = <&cpu0_opp>;
++		};
++
++		cpu at 1 {
++			compatible = "qcom,krait";
++			reg = <1>;
++			next-level-cache = <&L2>;
++			clocks = <&clk_controller 1>;
++			clock-names = "cpu";
++			opp-supply = <&cpu_supply1>;
++			operating-points-v2 = <&cpu1_opp>;
++		};
++
++		cpu at 2 {
++			compatible = "qcom,krait";
++			reg = <2>;
++			next-level-cache = <&L2>;
++			clocks = <&clk_controller 2>;
++			clock-names = "cpu";
++			opp-supply = <&cpu_supply2>;
++			operating-points-v2 = <&cpu2_opp>;
++		};
++
++		cpu at 3 {
++			compatible = "qcom,krait";
++			reg = <3>;
++			next-level-cache = <&L2>;
++			clocks = <&clk_controller 3>;
++			clock-names = "cpu";
++			opp-supply = <&cpu_supply3>;
++			operating-points-v2 = <&cpu3_opp>;
++		};
++	};
++
++	cpu0_opp: opp0 {
++		compatible = "linux,cpu-dvfs";
++		opp-list = <&cpu0_opplist>;
++		opp-intermediate = <&cpu0_intermediate>;
++
++		cpu0_opplist: opp-list0 {
++			entry00 {
++				opp-khz = <1000000>;
++				opp-microvolt = <975000>;
++				voltage-tolerance = <2>;
++				clock-latency-ns = <300000>;
++				status = "okay";
++			};
++			cpu0_intermediate: entry01 {
++				opp-khz = <1100000>;
++				opp-microvolt = <1000000>;
++				voltage-tolerance = <2>;
++				clock-latency-ns = <300000>;
++				status = "okay";
++			};
++			entry02 {
++				opp-khz = <1200000>;
++				opp-microvolt = <1025000>;
++				voltage-tolerance = <2>;
++				clock-latency-ns = <300000>;
++				status = "okay";
++				turbo-mode;
++			};
++		};
++	};
++
++	cpu1_opp: opp1 {
++		compatible = "linux,cpu-dvfs";
++		opp-list = <&cpu0_opplist>;
++		opp-intermediate = <&cpu0_intermediate>;
++	};
++
++	cpu2_opp: opp2 {
++		compatible = "linux,cpu-dvfs";
++		opp-list = <&cpu0_opplist>;
++	};
++
++	cpu3_opp: opp3 {
++		compatible = "linux,cpu-dvfs";
++		opp-list = <&cpu0_opplist>;
++		opp-intermediate = <&cpu0_intermediate>;
++	};
++};
++
++Example 3: Multi-cluster system with separate clock line per cluster.
++
++/ {
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			compatible = "arm,cortex-a7";
++			reg = <0>;
++			next-level-cache = <&L2>;
++			clocks = <&clk_controller 0>;
++			clock-names = "cpu";
++			opp-supply = <&cpu_supply0>;
++			operating-points-v2 = <&cpu0_opp>;
++		};
++
++		cpu at 1 {
++			compatible = "arm,cortex-a7";
++			reg = <1>;
++			next-level-cache = <&L2>;
++			clocks = <&clk_controller 0>;
++			clock-names = "cpu";
++			opp-supply = <&cpu_supply0>;
++			operating-points-v2 = <&cpu0_opp>;
++		};
++
++		cpu at 100 {
++			compatible = "arm,cortex-a15";
++			reg = <100>;
++			next-level-cache = <&L2>;
++			clocks = <&clk_controller 1>;
++			clock-names = "cpu";
++			opp-supply = <&cpu_supply1>;
++			operating-points-v2 = <&cpu100_opp>;
++		};
++
++		cpu at 101 {
++			compatible = "arm,cortex-a15";
++			reg = <101>;
++			next-level-cache = <&L2>;
++			clocks = <&clk_controller 1>;
++			clock-names = "cpu";
++			opp-supply = <&cpu_supply1>;
++			operating-points-v2 = <&cpu100_opp>;
++		};
++	};
++
++	cpu0_opp: opp0 {
++		compatible = "linux,cpu-dvfs";
++		opp-list = <&cpu0_opplist>;
++		opp-intermediate = <&cpu0_intermediate>;
++
++		cpu0_opplist: opp-list0 {
++			entry00 {
++				opp-khz = <1000000>;
++				opp-microvolt = <975000>;
++				voltage-tolerance = <2>;
++				clock-latency-ns = <300000>;
++				status = "okay";
++			};
++			cpu0_intermediate: entry01 {
++				opp-khz = <1100000>;
++				opp-microvolt = <1000000>;
++				voltage-tolerance = <2>;
++				clock-latency-ns = <300000>;
++				status = "okay";
++			};
++			entry02 {
++				opp-khz = <1200000>;
++				opp-microvolt = <1025000>;
++				voltage-tolerance = <2>;
++				clock-latency-ns = <300000>;
++				status = "okay";
++				turbo-mode;
++			};
++		};
++	};
++
++	cpu100_opp: opp1 {
++		compatible = "linux,cpu-dvfs";
++		opp-list = <&cpu100_opplist>;
++		opp-intermediate = <&cpu100_intermediate>;
++
++		cpu100_opplist: opp-list1 {
++			entry10 {
++				opp-khz = <1300000>;
++				opp-microvolt = <1050000>;
++				voltage-tolerance = <2>;
++				clock-latency-ns = <400000>;
++				status = "okay";
++			};
++			cpu100_intermediate: entry11 {
++				opp-khz = <1400000>;
++				opp-microvolt = <1075000>;
++				voltage-tolerance = <2>;
++				clock-latency-ns = <400000>;
++				status = "okay";
++			};
++			entry12 {
++				opp-khz = <1500000>;
++				opp-microvolt = <1100000>;
++				voltage-tolerance = <2>;
++				clock-latency-ns = <400000>;
++				status = "okay";
++				turbo-mode;
++			};
++		};
++	};
++};
++
++
++
++Deprecated Bindings
++-------------------
++
+ Properties:
+ - operating-points: An array of 2-tuples items, and each item consists
+   of frequency and voltage like <freq-kHz vol-uV>.
+-- 
+2.3.0.rc0.44.ga94655d
