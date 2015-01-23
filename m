@@ -1,33 +1,41 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 23 Jan 2015 18:25:05 +0530
-Subject: [RFC V2] OPP: Redefine bindings to overcome shortcomings
-In-Reply-To: <20150123115206.GT21293@sirena.org.uk>
-References: <cbe949d7a69c3b16a3e9d6e5429eb81d3ae9d8b9.1422009157.git.viresh.kumar@linaro.org>
- <1422013154.29475.11.camel@pengutronix.de>
- <20150123115206.GT21293@sirena.org.uk>
-Message-ID: <CAKohponBQkhoSDi1RT5nW=TfKO7rgjbz1DjVHpUS+nYKs4RYjA@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 23 Jan 2015 13:55:53 +0100
+Subject: [GIT PULL 03/36] arm/arm64: KVM: add tracing support for arm64
+ exit handler
+In-Reply-To: <54C24365.1000503@redhat.com>
+References: <1422007385-14730-1-git-send-email-christoffer.dall@linaro.org>
+ <1422007385-14730-4-git-send-email-christoffer.dall@linaro.org>
+ <20150123113515.GF23493@leverpostej> <54C2382E.6040800@redhat.com>
+ <54C24365.1000503@redhat.com>
+Message-ID: <20150123125553.GM15076@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 January 2015 at 17:22, Mark Brown <broonie@kernel.org> wrote:
-> On Fri, Jan 23, 2015 at 12:39:14PM +0100, Lucas Stach wrote:
+On Fri, Jan 23, 2015 at 01:49:41PM +0100, Paolo Bonzini wrote:
+> 
+> 
+> On 23/01/2015 13:01, Paolo Bonzini wrote:
+> > 
+> > 
+> > On 23/01/2015 12:35, Mark Rutland wrote:
+> >>
+> >> https://lkml.org/lkml/2015/1/22/7
+> >> https://lkml.org/lkml/2015/1/22/8
+> >>
+> >> I'd hoped we'd be able to fix that before this went further upstream.
+> >>
+> >> The easiest way I could see to do that was to merge my esr branch (which
+> >> is stable and Catalin has pulled) branch into the kvm-arm tree, and fix
+> >> the conflicts there.
+> >>
+> >> Is there any chance we can fix that now?
+> > 
+> > I'll fix the conflicts in the kvm tree.  Please wait for further
+> > instructions...
+> 
+> Ok folks, please check that the resolution in the queue branch of
+> git://git.kernel.org/pub/scm/virt/kvm/kvm.git is okay.
+> 
+Looks great, I gave a quick spin on Juno and no problems, thanks Paolo!
 
-> I tend to agree that this is clearer.  It might be nice to have variants
-> for specifying directly as a percentage but I don't think it's really
-> worth the complexity.
-
-> If we change the binding to be typ/min/max rather than min/typ/max then
-> we could also do this by allowing either one or three values to be
-> specified.  That might be more worth the complexity especially given...
-
-+1
-
->> > +  - voltage-tolerance: Specify the CPU voltage tolerance in percentage.
->
->> Please let's drop this.
->
-> DT bindings are supposed to be stable, this means the code should accept
-> old bindings and they should be documented as deprecated.
-
-Yes, I have marked the earlier OPP bindings as deprecated. Will mark
-this one too separately.
+-Christoffer
