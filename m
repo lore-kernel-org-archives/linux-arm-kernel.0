@@ -1,61 +1,32 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Fri, 23 Jan 2015 23:36:36 +0100
-Subject: N900 v3.19-rc5 arm atags_to_fdt.c is broken
-In-Reply-To: <201501232239.55801@pali>
-References: <201501232239.55801@pali>
-Message-ID: <201501232336.36187@pali>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 23 Jan 2015 16:37:45 -0600
+Subject: perf not capturing stack traces
+In-Reply-To: <20150123205959.GD3073@kernel.org>
+References: <20150123195128.GE26557@saruman.tx.rr.com>
+ <20150123205959.GD3073@kernel.org>
+Message-ID: <20150123223745.GJ26557@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 23 January 2015 22:39:55 Pali Roh?r wrote:
-> Hello,
+On Fri, Jan 23, 2015 at 05:59:59PM -0300, Arnaldo Carvalho de Melo wrote:
+> Em Fri, Jan 23, 2015 at 01:51:28PM -0600, Felipe Balbi escreveu:
+> > I'm using v3.19-rc5 on an ARM Cortex A9 board. Unfortunately, perf is
+> > not able to capture any stack traces even though I CONFIG_STACKTRACE,
+> > CONFIG_FRAME_POINTER and CONFIG_ARM_UNWIND all enabled.
+> > 
+> > I wonder if anybody else is facing similar issues.
 > 
-> when I boot zImage with appended DT n900 in qemu
-> fdt_open_into() function called from file
-> arch/arm/boot/compressed/atags_to_fdt.c (in function
-> atags_to_fdt) always returns -FDT_ERR_NOSPACE.
-> 
-> It means that all ATAGS (including cmdline arguments) passed
-> by bootloader are ignored.
-> 
-> On real n900 device I see that booted DT version also ignore
-> cmdline arguments from bootloader. I cannot debug decompress
-> code on real device, but I think it is same problem as in
-> qemu.
+> Did it work with a previous kernel?
 
-Looks like this quick patch is fixing above problem:
-
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 68be901..4a7d75b 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -268,7 +268,7 @@ restart:	adr	r0, LC0
- 		 * area.  No GOT fixup has occurred yet, but none of the
- 		 * code we're about to call uses any global variable.
- 		*/
--		add	sp, sp, #0x10000
-+		add	sp, sp, #0x20000
- 		stmfd	sp!, {r0-r3, ip, lr}
- 		mov	r0, r8
- 		mov	r1, r6
-@@ -289,7 +289,7 @@ restart:	adr	r0, LC0
- 		bleq	atags_to_fdt
- 
- 		ldmfd	sp!, {r0-r3, ip, lr}
--		sub	sp, sp, #0x10000
-+		sub	sp, sp, #0x20000
- #endif
- 
- 		mov	r8, r6			@ use the appended device tree
-
+haven't checked with this board. First time I tried to use perf for
+anything.
 
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
+balbi
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150123/dffa8dab/attachment.sig>
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150123/b0b612f0/attachment.sig>
