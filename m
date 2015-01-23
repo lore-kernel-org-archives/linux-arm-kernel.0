@@ -1,41 +1,115 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 Jan 2015 16:31:51 +0100
-Subject: [PATCH] ARM: use default ioremap alignment for SMP or LPAE
-In-Reply-To: <20150123145235.GB21789@e104818-lin.cambridge.arm.com>
-References: <1421911075-8814-1-git-send-email-s.dyasly@samsung.com>
- <3060178.HEZJjJCl1e@wuerfel>
- <20150123145235.GB21789@e104818-lin.cambridge.arm.com>
-Message-ID: <52689548.6W7Vnxiz8L@wuerfel>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 23 Jan 2015 16:55:43 +0100
+Subject: [PATCH 7/7] ACPI: use Linux as ACPI_OS_NAME for _OS on ARM64
+In-Reply-To: <1421973884-13029-8-git-send-email-al.stone@linaro.org>
+References: <1421973884-13029-1-git-send-email-al.stone@linaro.org>
+ <1421973884-13029-8-git-send-email-al.stone@linaro.org>
+Message-ID: <3375613.hf7nCUoE0P@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 23 January 2015 14:52:36 Catalin Marinas wrote:
-> On Thu, Jan 22, 2015 at 11:03:00AM +0000, Arnd Bergmann wrote:
-> > Unrelated to this question however is whether we want to keep
-> > supersection mappings as a performance optimization to save TLBs.
-> > It seems useful to me, but not critical.
+On Thursday, January 22, 2015 05:44:44 PM al.stone at linaro.org wrote:
+> From: Hanjun Guo <hanjun.guo@linaro.org>
 > 
-> Currently in Linux we allow 16MB mappings only if the phys address is
-> over 32-bit and !LPAE which makes it unlikely for normal RAM with
-> pre-LPAE hardware.
-
-Ah, I missed this part when looking at the code.
-
-> IIRC a bigger problem was that supersections are optional in the
-> architecture but there was no CPUID bit field in ARMv6 (and early ARMv7)
-> to check for their presence. The ID_MMFR3 contains this information but
-> for example on early Cortex-A8 that bitfield was reserved and the TRM
-> states "unpredictable" on read (so probably zero in practice).
+> ACPI_OS_NAME is globally defined as "Microsoft Windows NT" for now.
+> That doesn't make much sense in the ARM context, so set it to "Linux"
+> when CONFIG_ARM64.
 > 
-> On newer ARMv7 (not necessarily with LPAE), we could indeed revisit the
-> 16MB section mapping but it won't go well with single zImage if you want
-> to support earlier ARMv7 or ARMv6.
+> If it is necessary to change the return value from \_OS_ (that is, return
+> some value other than the default in ACPI_OS_NAME), use the kernel parameter
+> "acpi_os_name=<string>".
+> 
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  arch/arm64/Kconfig              | 1 +
+>  drivers/acpi/Kconfig            | 8 ++++++++
+>  include/acpi/acconfig.h         | 2 ++
+>  include/acpi/platform/aclinux.h | 4 ++++
+>  4 files changed, 15 insertions(+)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 915aa16..20677d1 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -1,5 +1,6 @@
 
-I see. If there is desire to have it as an optimization, we could do
-it for armv7ve-only kernels. We don't currently have an build-time
-option for those, but we should introduce one anyway, in order to
-better make use of the idiv instructions and to prevent one from
-enabling LPAE on a multiplatform kernel that contains pre-lpae armv7
-machines (Cortex a8/a9/a5, and some others I'm not sure about).
+If you added
 
-	Arnd
+	config ACPI_OS_NAME
+		string
+		default "Linux"
+		depends on ACPI
+
+to this file, then you don't need to add the new select below and ->
+
+>  config ARM64
+>  	def_bool y
+> +	select ACPI_OS_NAME_LINUX if ACPI
+>  	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
+>  	select ARCH_BINFMT_ELF_RANDOMIZE_PIE
+>  	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> index 3e3bd35..024c5f0 100644
+> --- a/drivers/acpi/Kconfig
+> +++ b/drivers/acpi/Kconfig
+> @@ -369,6 +369,14 @@ config ACPI_REDUCED_HARDWARE_ONLY
+>  
+>  	  If you are unsure what to do, do not enable this option.
+>  
+> +config ACPI_OS_NAME_LINUX
+> +	bool "Using Linux for _OS method" if EXPERT
+> +	def_bool n
+> +	  When used, this option makes sure the _OS method returns
+> +	  the value "Linux".
+> +
+> +	  If you are unsure what to do, do not enable this option.
+> +
+
+-> you don't need this at all ->>
+
+>  source "drivers/acpi/apei/Kconfig"
+>  
+>  config ACPI_EXTLOG
+> diff --git a/include/acpi/acconfig.h b/include/acpi/acconfig.h
+> index 5a0a3e5..1980bf4 100644
+> --- a/include/acpi/acconfig.h
+> +++ b/include/acpi/acconfig.h
+> @@ -69,7 +69,9 @@
+>   * code that will not execute the _OSI method unless _OS matches the string
+>   * below.  Therefore, change this string at your own risk.
+>   */
+> +#ifndef ACPI_OS_NAME
+>  #define ACPI_OS_NAME                    "Microsoft Windows NT"
+> +#endif
+>  
+>  /* Maximum objects in the various object caches */
+>  
+> diff --git a/include/acpi/platform/aclinux.h b/include/acpi/platform/aclinux.h
+> index 1ba7c19..a8a7ee3 100644
+> --- a/include/acpi/platform/aclinux.h
+> +++ b/include/acpi/platform/aclinux.h
+> @@ -69,6 +69,10 @@
+>  #define ACPI_REDUCED_HARDWARE 1
+>  #endif
+>  
+> +#ifdef CONFIG_ACPI_OS_NAME_LINUX
+> +#define ACPI_OS_NAME "Linux"
+> +#endif
+
+->> and here you can do
+
++#ifdef CONFIG_ACPI_OS_NAME
++#define ACPI_OS_NAME CONFIG_ACPI_OS_NAME
++#endif
+
+unless I'm missing something.
+
+> +
+>  #include <linux/string.h>
+>  #include <linux/kernel.h>
+>  #include <linux/ctype.h>
+> 
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
