@@ -1,85 +1,85 @@
 From: ricardo.ribalda@gmail.com (Ricardo Ribalda Delgado)
-Date: Fri, 23 Jan 2015 17:08:40 +0100
-Subject: [PATCH 08/18] spi/xilinx: Support cores with no interrupt
+Date: Fri, 23 Jan 2015 17:08:49 +0100
+Subject: [PATCH 17/18] spi/xilinx: Remove remaining_words driver data variable
 In-Reply-To: <1422029330-10971-1-git-send-email-ricardo.ribalda@gmail.com>
 References: <1422029330-10971-1-git-send-email-ricardo.ribalda@gmail.com>
-Message-ID: <1422029330-10971-9-git-send-email-ricardo.ribalda@gmail.com>
+Message-ID: <1422029330-10971-18-git-send-email-ricardo.ribalda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The core can run in polling mode. In fact, the performance of the core
-is similar (or even better), due to the fact most of the spi
-transactions are just a couple of bytes and there is one irq per
-transactions.
-
-When an mtd device is connected via spi, reading 8MB of data produces
-more than 80K interrupts (with irq disabling, context swith....)
+The variable never leaves the scope of txrx_bufs.
 
 Signed-off-by: Ricardo Ribalda Delgado <ricardo.ribalda@gmail.com>
 ---
- drivers/spi/spi-xilinx.c | 33 +++++++++++++++++++--------------
- 1 file changed, 19 insertions(+), 14 deletions(-)
+ drivers/spi/spi-xilinx.c | 28 ++++++++++++----------------
+ 1 file changed, 12 insertions(+), 16 deletions(-)
 
 diff --git a/drivers/spi/spi-xilinx.c b/drivers/spi/spi-xilinx.c
-index 3f8450d..8a28cab 100644
+index 8c25c59..026f4c5 100644
 --- a/drivers/spi/spi-xilinx.c
 +++ b/drivers/spi/spi-xilinx.c
-@@ -173,8 +173,11 @@ static void xspi_init_hw(struct xilinx_spi *xspi)
- 	xspi->write_fn(XSPI_INTR_TX_EMPTY,
- 			regs_base + XIPIF_V123B_IIER_OFFSET);
- 	/* Enable the global IPIF interrupt */
--	xspi->write_fn(XIPIF_V123B_GINTR_ENABLE,
--		regs_base + XIPIF_V123B_DGIER_OFFSET);
-+	if (xspi->irq >= 0)
-+		xspi->write_fn(XIPIF_V123B_GINTR_ENABLE,
-+			regs_base + XIPIF_V123B_DGIER_OFFSET);
-+	else
-+		xspi->write_fn(0, regs_base + XIPIF_V123B_DGIER_OFFSET);
- 	/* Deselect the slave on the SPI bus */
- 	xspi->write_fn(0xffff, regs_base + XSPI_SSR_OFFSET);
- 	/* Disable the transmitter, enable Manual Slave Select Assertion,
-@@ -264,7 +267,12 @@ static int xilinx_spi_txrx_bufs(struct spi_device *spi, struct spi_transfer *t)
- 							~XSPI_CR_TRANS_INHIBIT;
- 		xspi->write_fn(cr, xspi->regs + XSPI_CR_OFFSET);
+@@ -86,7 +86,6 @@ struct xilinx_spi {
  
--		wait_for_completion(&xspi->done);
-+		if (xspi->irq >= 0)
-+			wait_for_completion(&xspi->done);
-+		else
-+			while (!(xspi->read_fn(xspi->regs + XSPI_SR_OFFSET) &
-+						XSPI_SR_TX_EMPTY_MASK))
-+				;
+ 	u8 *rx_ptr;		/* pointer in the Tx buffer */
+ 	const u8 *tx_ptr;	/* pointer in the Rx buffer */
+-	int remaining_words;	/* the number of words left to transfer */
+ 	u8 bytes_per_word;
+ 	int buffer_size;	/* buffer size in words */
+ 	u32 cs_inactive;	/* Level of the CS pins when inactive*/
+@@ -209,33 +208,27 @@ static int xilinx_spi_setup_transfer(struct spi_device *spi,
+ 	return 0;
+ }
  
- 		/* A transmit has just completed. Process received data and
- 		 * check for more data to transmit. Always inhibit the
-@@ -412,20 +420,17 @@ static int xilinx_spi_probe(struct platform_device *pdev)
- 
- 	xspi->buffer_size = xilinx_spi_find_buffer_size(xspi);
- 
--	/* SPI controller initializations */
--	xspi_init_hw(xspi);
+-static void xilinx_spi_fill_tx_fifo(struct xilinx_spi *xspi, int n_words)
+-{
+-	xspi->remaining_words -= n_words;
 -
- 	xspi->irq = platform_get_irq(pdev, 0);
--	if (xspi->irq < 0) {
--		ret = xspi->irq;
--		goto put_master;
-+	if (xspi->irq >= 0) {
-+		/* Register for SPI Interrupt */
-+		ret = devm_request_irq(&pdev->dev, xspi->irq, xilinx_spi_irq, 0,
-+				dev_name(&pdev->dev), xspi);
-+		if (ret)
-+			goto put_master;
+-	while (n_words--)
+-		xilinx_spi_tx(xspi);
+-	return;
+-}
+-
+ static int xilinx_spi_txrx_bufs(struct spi_device *spi, struct spi_transfer *t)
+ {
+ 	struct xilinx_spi *xspi = spi_master_get_devdata(spi->master);
++	int remaining_words;	/* the number of words left to transfer */
+ 
+ 	/* We get here with transmitter inhibited */
+ 
+ 	xspi->tx_ptr = t->tx_buf;
+ 	xspi->rx_ptr = t->rx_buf;
+-	xspi->remaining_words = t->len / xspi->bytes_per_word;
++	remaining_words = t->len / xspi->bytes_per_word;
+ 	reinit_completion(&xspi->done);
+ 
+-	while (xspi->remaining_words) {
++	while (remaining_words) {
+ 		u16 cr = 0;
+-		int n_words;
++		int n_words, tx_words, rx_words;
+ 
+-		n_words = min(xspi->remaining_words, xspi->buffer_size);
++		n_words = min(remaining_words, xspi->buffer_size);
+ 
+-		xilinx_spi_fill_tx_fifo(xspi, n_words);
++		tx_words = n_words;
++		while (tx_words--)
++			xilinx_spi_tx(xspi);
+ 
+ 		/* Start the transfer by not inhibiting the transmitter any
+ 		 * longer
+@@ -261,8 +254,11 @@ static int xilinx_spi_txrx_bufs(struct spi_device *spi, struct spi_transfer *t)
+ 			       xspi->regs + XSPI_CR_OFFSET);
+ 
+ 		/* Read out all the data from the Rx FIFO */
+-		while (n_words--)
++		rx_words = n_words;
++		while (rx_words--)
+ 			xilinx_spi_rx(xspi);
++
++		remaining_words -= n_words;
  	}
  
--	/* Register for SPI Interrupt */
--	ret = devm_request_irq(&pdev->dev, xspi->irq, xilinx_spi_irq, 0,
--			       dev_name(&pdev->dev), xspi);
--	if (ret)
--		goto put_master;
-+	/* SPI controller initializations */
-+	xspi_init_hw(xspi);
- 
- 	ret = spi_bitbang_start(&xspi->bitbang);
- 	if (ret) {
+ 	return t->len;
 -- 
 2.1.4
