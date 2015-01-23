@@ -1,93 +1,79 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 23 Jan 2015 12:22:44 +0000
-Subject: [PATCH] arm64: dts: Add initial device tree support for Tegra132
-In-Reply-To: <54C23B08.6070503@nvidia.com>
-References: <alpine.DEB.2.02.1501161139180.9776@utopia.booyaka.com>
- <20150121161313.GI5044@leverpostej>
- <alpine.DEB.2.02.1501231038130.5450@utopia.booyaka.com>
- <54C23B08.6070503@nvidia.com>
-Message-ID: <20150123122244.GJ23493@leverpostej>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 23 Jan 2015 14:26:16 +0200
+Subject: [PATCH 0/9] ARM: shmobile: r8a73a4/ape6evm multiplatform
+In-Reply-To: <20150123042304.GE17548@verge.net.au>
+References: <1421758306-24838-1-git-send-email-geert+renesas@glider.be>
+ <20150122033907.GO31170@verge.net.au> <20150123042304.GE17548@verge.net.au>
+Message-ID: <15458901.vhItGblgjS@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 23, 2015 at 12:14:00PM +0000, Arto Merilainen wrote:
-> Hi all,
+Hi Simon,
+
+On Friday 23 January 2015 13:23:04 Simon Horman wrote:
+> On Thu, Jan 22, 2015 at 12:39:07PM +0900, Simon Horman wrote:
+> > On Wed, Jan 21, 2015 at 10:59:27AM +0900, Simon Horman wrote:
+> >> On Tue, Jan 20, 2015 at 01:51:37PM +0100, Geert Uytterhoeven wrote:
+> >>> Hi Simon, Magnus,
+> >>> 
+> >>> This patch series transitions the r8a73a4/ape6evm platform to support
+> >>> multiplatform only:
+> >>>   - Add CCF information to DT,
+> >>>   - Disable legacy clock if CCF is used,
+> >>>   - Add Bus State Controller node, and move the Ethernet node to it,
+> >>>   - Remove ape6evm-reference,
+> >>>   - Remove ape6evm-legacy and legacy support code.
+> >>> 
+> >>> This series is based on renesas-drivers-2015-01-19-v3.19-rc5.
+> >>> It depends on renesas-devel-20150119-v3.19-rc5 (code-wise) and
+> >>> clk-shmobile-for-3.20 (functionality-wise), for which I've sent a pull
+> >>> request to Mike Turquette yesterday.
+> >>> 
+> >>> All of this was untested by me due to lack of hardware.
+> >>> As Mike had previously acked the r8a73a4 CCF implementation, it's safe
+> >>> to apply after testing.
+> >> 
+> >> Hi Geert, Hi Ulrich,
+> >> 
+> >> thanks for all your good work in getting this together.
+> >> I have tested this and queued it up for v3.21.
+> >> 
+> >> I plan to push it to my devel branch later today.
+> >> I plan to push it to my next branch and thus linux-next once
+> >> clk-shmobile-for-3.20 appears in a v3.20-rc.
+> > 
+> > For the record: Olof has asked for review comments for the BSC driver and
+> > binding patches. Accordingly I have dropped them, and these patches which
+> > depend on them, from next.
 > 
-> On 01/23/2015 01:31 PM, Paul Walmsley wrote:
-> > + Arto, Terje for comments on the host1x section
-> > + Stephen Warren for comments on the serial DT data
-> >
-> > Hi Mark,
-> >
-> > thanks for the review.
-> >
-> > On Wed, 21 Jan 2015, Mark Rutland wrote:
-> >
-> >> As mentioned in my reply to the DT list patch [1], there are a couple of
-> >> bits I'd like to see cleaned up first, but in the meantime I have some
-> >> comments from my first pass of the dtsi below. Some of these may equally
-> >> apply to existing dts(i) files.
-> >>
-> >> I see a few undocumented compatible strings (at least when comparing
-> >> against mainline). If there are other series or trees I should be
-> >> looking at, any pointers would be appreciated. If not, documentation
-> >> updates would be nice (checkpatch should complain otherwise).
-> >
-> > (discussed in the tegra132-pcie comments below)
-> >
-> >>
-> >> On Fri, Jan 16, 2015 at 11:45:29AM +0000, Paul Walmsley wrote:
-> >>> +       host1x at 0,50000000 {
-> >>> +               compatible = "nvidia,tegra132-host1x", "nvidia,tegra124-host1x", "simple-bus";
-> >>
-> >> Regarding simple-bus, are the sub-nodes usable if this didn't probe as
-> >> "nvidia,tegra124-host1x" or "nvidia,tegra132-host1x"?
-> >> Do the subnodes require anything from this node?
-> >>
-> >> It looks like we expect/require the host1x node to be probed and
-> >> initialised before we probe the children. Which would imply the
-> >> simple-bus annotation is wrong.
-> >
-> > Haven't tried booting with just simple-bus here.  I believe these devices
-> > are accessible without the involvement of host1x.  In other words, host1x
-> > is not a bus; I believe it might be most accurately described as a type of
-> > DMA controller.  So in theory it should be possible for the CPU complex to
-> > read and write to these devices directly without the involvement of
-> > host1x, although I believe NVIDIA discourages this.
-> >
-> > Under the theory that DT data should be hardware-specific, not
-> > software-specific, in an ideal world I think we would list these devices
-> > outside the embrace of the host1x node.  However the existing Tegra124 DT
-> > file listed them together, and I am unsure whether that is required for
-> > the host1x code to function correctly.
-> >
-> > Arto may be able to comment further.
+> I have now had a chance to re-examine these patches and it seems to me that
+> the first four patches of the series not depend on the BSC driver (or
+> anything else).  With that in mind I have queued them up in a new
+> r8a73a4-ccf-for-v3.21 branch which is present in
+> renesas-devel-20150123-v3.19-rc5.
 > 
-> Placing the devices behind host1x is an accurate description of 
-> hardware: Despite the direct register access path (writel/readl 
-> targeting a host1x client device) is transparent to the CPU, the host1x 
-> hardware is internally handling the requests and passing them forward to 
-> the host1x client in interest.
-> 
-> Above implies also a strict parent-child dependency on hardware level: 
-> If the CPU tries to access a register in a host1x client before the 
-> host1x clock has been enabled, host1x will not be able to forward the 
-> requests and the access will fail. This also defines the importance of 
-> probe order (i.e. host1x must be initialized before client devices).
+> Please take a moment to see if what I have done makes sense to you.  In
+> particular it would be nicer if these patches could go into 'regular'
+> branches such as dt-for-v3.21 and soc-for-v3.21. However it seems to me
+> that the SoC patch "ARM: shmobile: ape6evm: Disable legacy clock
+> initialization" depends on the following two DT patche " "ARM: shmobile:
+> r8a73a4: Common clock framework DT description".
 
-In that case, it sounds like the "simple-bus" string is bogus unless the
-host1x is at minimum pre-initialised by some firmware and/or bootloader
-into a state where the child devices could theoretically be used on
-their own.
+I've noticed you have dropped the following patches from your devel branch:
 
-So I think "simple-bus" should be dropped here.
+clk: shmobile: div6: Avoid changing divisor in .disable()
+clk: shmobile: Add r8a7793 support
+clk: shmobile: r8a7793: document CPG clock support
+clk: shmobile: r8a73a4 common clock framework implementation
+clk: shmobile: Add r8a73a4 SoC to MSTP bindings
+clk: shmobile: Add R-Car Gen2 RCAN clock support
+clk: shmobile: Add R-Car Gen2 ADSP clock support
 
-> In addition, the host1x indirect register programming path ("channel 
-> path") is operational only for the host1x client devices and our current 
-> host1x driver relies on parent-child relationship in device tree.
+I don't see those patches queued in Mike Turquette's CCF tree.
 
-So I guess this is more Linux-specific, but still adds to the fuel for
-removing "simple-bus" here.
+How should they be handled, and do they need to be delayed to v3.21 ?
 
-Thanks,
-Mark.
+-- 
+Regards,
+
+Laurent Pinchart
