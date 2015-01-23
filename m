@@ -1,26 +1,49 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 23 Jan 2015 16:47:59 +0000
-Subject: [RFC PATCH 0/5] arm64: IOMMU-backed DMA mapping
-In-Reply-To: <cover.1421086706.git.robin.murphy@arm.com>
-References: <cover.1421086706.git.robin.murphy@arm.com>
-Message-ID: <20150123164759.GF9557@e104818-lin.cambridge.arm.com>
+From: sylvain.rochet@finsecur.com (Sylvain Rochet)
+Date: Fri, 23 Jan 2015 17:50:20 +0100
+Subject: [PATCH 07/12] pm: at91: the standby mode uses the same sram
+ function as the suspend to memory mode
+In-Reply-To: <1421741825-18226-8-git-send-email-wenyou.yang@atmel.com>
+References: <1421741825-18226-1-git-send-email-wenyou.yang@atmel.com>
+ <1421741825-18226-8-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20150123165020.GA24210@gradator.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 12, 2015 at 08:48:52PM +0000, Robin Murphy wrote:
-> Catalin Marinas (1):
->   arm64: Combine coherent and non-coherent swiotlb dma_ops
+Hello Wenyou,
+
+
+On Tue, Jan 20, 2015 at 04:17:00PM +0800, Wenyou Yang wrote:
 > 
-> Robin Murphy (4):
->   arm64: implement generic IOMMU configuration
->   iommu: implement common IOMMU ops for DMA mapping
->   arm64: add IOMMU dma_ops
->   arm64: hook up IOMMU dma_ops
+> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+> index 691e6db..a1010f0 100644
+> --- a/arch/arm/mach-at91/pm.c
+> +++ b/arch/arm/mach-at91/pm.c
 
-I queued the first two patches in this series for 3.20. The rest need to
-go through some review rounds.
 
-Thanks.
+> @@ -145,62 +145,51 @@ extern void at91_slow_clock(void __iomem *pmc, void __iomem *ramc0,
+>  			    void __iomem *ramc1, int memctrl);
+>  extern u32 at91_slow_clock_sz;
+>  
+> +static void at91_pm_suspend(suspend_state_t state)
+> +{
+      (...)
+> +	slow_clock(at91_pmc_base, at91_ramc_base[0],
+> +			at91_ramc_base[1], pm_data);
+> +}
 
--- 
-Catalin
+
+> -			if (slow_clock) {
+> -				slow_clock(at91_pmc_base, at91_ramc_base[0],
+> -					   at91_ramc_base[1],
+> -					   at91_pm_data.memctrl);
+      (...)
+> +               at91_pm_suspend(state);
+
+
+By doing that you removed the condition "if (slow_clock)".
+
+But slow_clock can still be NULL, see commit d2e4679, there are multiple 
+reasons which ends up with a NULL slow_clock.
+
+
+Sylvain
