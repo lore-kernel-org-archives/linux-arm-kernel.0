@@ -1,47 +1,26 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Thu, 22 Jan 2015 16:20:21 -0800
-Subject: [PATCHv2] mm: Don't offset memmap for flatmem
-In-Reply-To: <1421888500-24364-1-git-send-email-lauraa@codeaurora.org>
-References: <1421804273-29947-1-git-send-email-lauraa@codeaurora.org>
- <1421888500-24364-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20150122162021.aa861aeb53c22206a19ebbcb@linux-foundation.org>
+From: samuel.thibault@ens-lyon.org (Samuel Thibault)
+Date: Fri, 23 Jan 2015 01:30:11 +0100
+Subject: [PATCHv5 2/2] INPUT: Introduce generic trigger/LED pairs to
+ input LEDs
+In-Reply-To: <20150123001038.GA2940@type.youpi.perso.aquilenet.fr>
+References: <20141226232116.GA5069@type> <20141226232310.GD5069@type>
+ <20150104232838.GA14912@dtor-glaptop>
+ <20150123001038.GA2940@type.youpi.perso.aquilenet.fr>
+Message-ID: <20150123003011.GC3123@type.youpi.perso.aquilenet.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 21 Jan 2015 17:01:40 -0800 Laura Abbott <lauraa@codeaurora.org> wrote:
+Samuel Thibault, le Fri 23 Jan 2015 01:10:38 +0100, a ?crit :
+> Dmitry Torokhov, le Sun 04 Jan 2015 15:28:38 -0800, a ?crit :
+> > > +	dev = cdev->dev->platform_data;
+> > 
+> > Umm, platform data is not the best place for storing this. Why not drvdata?
+> 
+> Ah, actually led_classdev already makes use of it, see the
+> device_create_with_groups call in led_classdev_register.
 
-> Srinivas Kandagatla reported bad page messages when trying to
-> remove the bottom 2MB on an ARM based IFC6410 board
-> 
-> BUG: Bad page state in process swapper  pfn:fffa8
-> page:ef7fb500 count:0 mapcount:0 mapping:  (null) index:0x0
-> flags: 0x96640253(locked|error|dirty|active|arch_1|reclaim|mlocked)
-> page dumped because: PAGE_FLAGS_CHECK_AT_FREE flag(s) set
-> bad because of flags:
-> flags: 0x200041(locked|active|mlocked)
-> Modules linked in:
-> CPU: 0 PID: 0 Comm: swapper Not tainted 3.19.0-rc3-00007-g412f9ba-dirty #816
-> Hardware name: Qualcomm (Flattened Device Tree)
-> [<c0218280>] (unwind_backtrace) from [<c0212be8>] (show_stack+0x20/0x24)
-> [<c0212be8>] (show_stack) from [<c0af7124>] (dump_stack+0x80/0x9c)
-> [<c0af7124>] (dump_stack) from [<c0301570>] (bad_page+0xc8/0x128)
-> [<c0301570>] (bad_page) from [<c03018a8>] (free_pages_prepare+0x168/0x1e0)
-> [<c03018a8>] (free_pages_prepare) from [<c030369c>] (free_hot_cold_page+0x3c/0x174)
-> [<c030369c>] (free_hot_cold_page) from [<c0303828>] (__free_pages+0x54/0x58)
-> [<c0303828>] (__free_pages) from [<c030395c>] (free_highmem_page+0x38/0x88)
-> [<c030395c>] (free_highmem_page) from [<c0f62d5c>] (mem_init+0x240/0x430)
-> [<c0f62d5c>] (mem_init) from [<c0f5db3c>] (start_kernel+0x1e4/0x3c8)
-> [<c0f5db3c>] (start_kernel) from [<80208074>] (0x80208074)
-> Disabling lock debugging due to kernel taint
-> 
-> Removing the lower 2MB made the start of the lowmem zone to no longer
-> be page block aligned. IFC6410 uses CONFIG_FLATMEM where
-> alloc_node_mem_map allocates memory for the mem_map. alloc_node_mem_map
-> will offset for unaligned nodes with the assumption the pfn/page
-> translation functions will account for the offset. The functions for
-> CONFIG_FLATMEM do not offset however, resulting in overrunning
-> the memmap array. Just use the allocated memmap without any offset
-> when running with CONFIG_FLATMEM to avoid the overrun.
-> 
+Actually I'd say it makes sense to be using the platform_data field:
+from the point of view of the led object, the input object is indeed
+something like a platform.
 
-I don't think v2 addressed Vlastimil's review comment?
+Samuel
