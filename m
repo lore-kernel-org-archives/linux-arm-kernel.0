@@ -1,93 +1,106 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 23 Jan 2015 16:21:26 +0000
-Subject: [PATCHv2] arm64:mm: free the useless initial page table
-In-Reply-To: <1418110007-13270-1-git-send-email-zhichang.yuan@linaro.org>
-References: <1418110007-13270-1-git-send-email-zhichang.yuan@linaro.org>
-Message-ID: <20150123162126.GD9557@e104818-lin.cambridge.arm.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Fri, 23 Jan 2015 10:22:09 -0600
+Subject: [GIT PULL] qcom SoC changes for v3.20
+In-Reply-To: <CAOesGMipp=Odc-cWvrba0e1pd1X7O+PKNH+WoM3fG4xX2GRFuA@mail.gmail.com>
+References: <alpine.DEB.2.02.1501191226010.2973@galak-ubuntu.qualcomm.com>
+ <20150122011521.GA31815@quad.lixom.net>
+ <D177DF12-0F31-49CF-B98B-9FAC23AAB24C@codeaurora.org>
+ <CAOesGMipp=Odc-cWvrba0e1pd1X7O+PKNH+WoM3fG4xX2GRFuA@mail.gmail.com>
+Message-ID: <DBE63F76-D4CB-49D5-90C6-642CFCA7687F@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 09, 2014 at 07:26:47AM +0000, zhichang.yuan at linaro.org wrote:
-> From: "zhichang.yuan" <zhichang.yuan@linaro.org>
-> 
-> For 64K page system, after mapping a PMD section, the corresponding initial
-> page table is not needed any more. That page can be freed.
-> 
-> Changes since v1:
-> 
-> * make consistent code between alloc_init_pmd and alloc_init_pud;
-> * flush the TLB before the unused page table is freed;
-> 
-> Signed-off-by: Zhichang Yuan <zhichang.yuan@linaro.org>
 
-I thought about queuing this patch but I realised that
-alloc_init_pmd/pud may be called in a late context where memblock_free()
-would no longer make sense. Cc'ing Laura and Ard for any ideas here but
-I think we may just end up with a few old page table pages sitting
-around (not many though). In general we don't go from smaller to larger
-mappings (that's what this patch targets) but given the API, I'm not
-sure we have any guarantee.
+On Jan 22, 2015, at 9:00 PM, Olof Johansson <olof@lixom.net> wrote:
 
-One solution would be to check for alloc == early_alloc or something
-similar. Cc'ing Laura and Ard as they added the create_mapping_late()
-code.
-
-> ---
->  arch/arm64/include/asm/pgtable.h |    3 +++
->  arch/arm64/mm/mmu.c              |   15 ++++++++++++---
->  2 files changed, 15 insertions(+), 3 deletions(-)
+> On Thu, Jan 22, 2015 at 9:02 AM, Kumar Gala <galak@codeaurora.org> wrote:
+>> 
+>> On Jan 21, 2015, at 7:15 PM, Olof Johansson <olof@lixom.net> wrote:
+>> 
+>>> Hi,
+>>> 
+>>> 
+>>> On Mon, Jan 19, 2015 at 12:27:15PM -0600, Kumar Gala wrote:
+>>>> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+>>>> 
+>>>> Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+>>>> 
+>>>> are available in the git repository at:
+>>>> 
+>>>> git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-soc-for-3.20
+>>>> 
+>>>> for you to fetch changes up to ae0a6075c046f9c8dbac18f53a779592f97b402e:
+>>>> 
+>>>> soc: qcom: scm: Clarify boot interface (2015-01-19 11:55:12 -0600)
+>>>> 
+>>>> ----------------------------------------------------------------
+>>>> Qualcomm ARM Based SoC Updates for v3.20
+>>>> 
+>>>> * Moved scm support into drivers/soc/qcom (allows for use by drivers)
+>>>> * Various bug fixes and minor feature additions to scm code
+>>>> * Added big-endian support to debug MSM uart
+>>>> * Added big-endian support to ARCH_QCOM
+>>>> 
+>>>> ----------------------------------------------------------------
+>>>> Lina Iyer (2):
+>>>>     ARM: qcom: Add SCM warmboot flags for quad core targets.
+>>>>     soc: qcom: scm: Move scm-boot files to drivers/soc and include/soc
+>>>> 
+>>>> Olav Haugan (1):
+>>>>     ARM: qcom: scm: Add logging of actual return code from scm call
+>>>> 
+>>>> Saravana Kannan (1):
+>>>>     ARM: qcom: scm: Add API to query for service/command availability.
+>>>> 
+>>>> Stephen Boyd (9):
+>>>>     ARM: debug: Update MSM and QCOM DEBUG_LL help
+>>>>     ARM: debug: msm: Support big-endian CPUs
+>>>>     ARM: qcom: Select ARCH_SUPPORTS_BIG_ENDIAN
+>>>>     ARM: qcom: scm: Fix incorrect cache invalidation
+>>>>     ARM: qcom: scm: Get cacheline size from CTR
+>>>>     ARM: qcom: scm: Add a feat version query API
+>>>>     soc: qcom: scm: Move the scm driver to drivers/soc/qcom
+>>> 
+>>> I replied on the patch here just now. This isn't the right thing to do,
+>>> as far as I can tell.
+>>> 
+>>> Seems like sending a fresh request with the material besides the move
+>>> to drivers/soc should be mergeable though, so feel free to do that while
+>>> the rest is hashed out.
+>> 
+>> Would the following be ok (dropped the move to drivers/soc and some additional unused scm APIs as of right now):
+>> 
+>> ARM: qcom: Drop unnecessary selects from ARCH_QCOM
+>> ARM: qcom: scm: Clarify boot interface
+>> ARM: qcom: Add SCM warmboot flags for quad core targets.
+>> ARM: qcom: scm: Add logging of actual return code from scm call
+>> ARM: qcom: scm: Flush the command buffer only instead of the entire cache
+>> ARM: qcom: scm: Get cacheline size from CTR
+>> ARM: qcom: scm: Fix incorrect cache invalidation
+>> ARM: qcom: Select ARCH_SUPPORTS_BIG_ENDIAN
+>> ARM: debug: msm: Support big-endian CPUs
+>> ARM: debug: Update MSM and QCOM DEBUG_LL help
+>> 
+>> Kconfig.debug        |    5 ++--
+>> include/debug/msm.S  |    6 +++++
+>> mach-qcom/Kconfig    |    3 --
+>> mach-qcom/scm-boot.c |    2 -
+>> mach-qcom/scm-boot.h |    4 ++-
+>> mach-qcom/scm.c      |   55 +++++++++++++++++++++++++++++++++++++--------------
+>> 6 files changed, 54 insertions(+), 21 deletions(-)
 > 
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index 41a43bf..8a135b6 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -337,9 +337,12 @@ extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
->  
->  #ifdef CONFIG_ARM64_64K_PAGES
->  #define pud_sect(pud)		(0)
-> +#define pud_table(pud)		(1)
->  #else
->  #define pud_sect(pud)		((pud_val(pud) & PUD_TYPE_MASK) == \
->  				 PUD_TYPE_SECT)
-> +#define pud_table(pud)		((pud_val(pud) & PUD_TYPE_MASK) == \
-> +					PUD_TYPE_TABLE)
->  #endif
->  
->  static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index f4f8b50..515f75b 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -191,8 +191,14 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
->  			 * Check for previous table entries created during
->  			 * boot (__create_page_tables) and flush them.
->  			 */
-> -			if (!pmd_none(old_pmd))
-> +			if (!pmd_none(old_pmd)) {
->  				flush_tlb_all();
-> +				if (pmd_table(old_pmd)) {
-> +					phys_addr_t table = __pa(pte_offset_map(&old_pmd, 0));
-> +
-> +					memblock_free(table, PAGE_SIZE);
-> +				}
-> +			}
->  		} else {
->  			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
->  				       prot_pte);
-> @@ -234,9 +240,12 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
->  			 * Look up the old pmd table and free it.
->  			 */
->  			if (!pud_none(old_pud)) {
-> -				phys_addr_t table = __pa(pmd_offset(&old_pud, 0));
-> -				memblock_free(table, PAGE_SIZE);
->  				flush_tlb_all();
-> +				if (pud_table(old_pud)) {
-> +					phys_addr_t table = __pa(pmd_offset(&old_pud, 0));
-> +
-> +					memblock_free(table, PAGE_SIZE);
-> +				}
->  			}
->  		} else {
->  			alloc_init_pmd(pud, addr, next, phys, map_io);
-> -- 
-> 1.7.9.5
+> I'd be OK with merging this, send a request and tag. Would that let
+> the DRM folks make progress too?
+
+Will do, I don?t think it will address the DRM folks needs as they need access to make firmware calls from the DRM driver.
+
+> If you need a common place for this, drivers/firmware seems like a
+> better home than drivers/soc.
+
+Agreed, what?s you take than on moving to use firmware_ops as defined in arch/arm and extended it or just leaving this as a qcom specific firmware interface?
+
+- k
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
