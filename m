@@ -1,59 +1,67 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 23 Jan 2015 15:03:39 -0800
-Subject: [PATCH] ARM: at91: fix Kconfig.debug by adding DEBUG_AT91_UART
- option
-In-Reply-To: <1421751268-21401-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1421745792.9655.98.camel@x220>
- <1421751268-21401-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <CAOesGMjwm=e+GSiPcr-7hAf8uNOP9qdCoWjd7aLEny2=tK9vbg@mail.gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Fri, 23 Jan 2015 17:04:00 -0600
+Subject: [PATCH] PCI: keystone: fix incorrect annotations on probe and
+ remove
+In-Reply-To: <20150108221736.GA39839@dtor-ws>
+References: <20150108221736.GA39839@dtor-ws>
+Message-ID: <20150123230400.GQ29776@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+On Thu, Jan 08, 2015 at 02:17:36PM -0800, Dmitry Torokhov wrote:
+> Even though platform bus is not hot-pluggable, devices on it can be unbound
+> from the driver and bound back to it via sysfs, so we should not be using
+> __init annotations on probe() and __exit annotations on remove() methods.
+> 
+> Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 
-On Tue, Jan 20, 2015 at 2:54 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> The DEBUG_AT91_UART Kconfig option was forgotten when moving the
-> AT91 debug-macro.S file. Add it and use it for the at91.S compilation.
->
-> Reported-by: Paul Bolle <pebolle@tiscali.nl>
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+I also removed the __init annotations from ks_pcie_host_init() and
+ks_add_pcie_port() and applied this to pci/host-keystone for v3.20, thanks!
+
 > ---
-> Hi Alexandre,
-> Please tell me if this patch makes sense to fix the lack of this
-> DEBUG_AT91_UART Kconfig option.
->
-> Paul,
-> Thanks for the heads up.
->
-> Bye,
->   Nico.
->
->  arch/arm/Kconfig.debug | 7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index e34d24949c6a..b3d388e5f4ff 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -1164,12 +1164,15 @@ config DEBUG_STI_UART
->         bool
->         depends on ARCH_STI
->
-> +config DEBUG_AT91_UART
-> +       bool
-> +       depends on ARCH_AT91
-> +
-
-This is not inserted in the list alphabetically. It's not very well
-sorted today either, but it should probably go above exynos.
-
-Also, there are a number of configs that _select_ DEBUG_AT91_UART in
-the list above, but they don't depend on AT91. So what can happen is
-that you can select those, and then they will enable this option
-(which will spit out a warning about unfulfilled dependency).
-
-You should probably make the choices that select this option also
-depend on AT91?
-
-
--Olof
+> 
+> Not tested, found by casual code inspection.
+> 
+>  drivers/pci/host/pci-keystone.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
+> index 1b893bc..7b84e1d 100644
+> --- a/drivers/pci/host/pci-keystone.c
+> +++ b/drivers/pci/host/pci-keystone.c
+> @@ -332,7 +332,7 @@ static const struct of_device_id ks_pcie_of_match[] = {
+>  };
+>  MODULE_DEVICE_TABLE(of, ks_pcie_of_match);
+>  
+> -static int __exit ks_pcie_remove(struct platform_device *pdev)
+> +static int ks_pcie_remove(struct platform_device *pdev)
+>  {
+>  	struct keystone_pcie *ks_pcie = platform_get_drvdata(pdev);
+>  
+> @@ -341,7 +341,7 @@ static int __exit ks_pcie_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> -static int __init ks_pcie_probe(struct platform_device *pdev)
+> +static int ks_pcie_probe(struct platform_device *pdev)
+>  {
+>  	struct device *dev = &pdev->dev;
+>  	struct keystone_pcie *ks_pcie;
+> @@ -398,9 +398,9 @@ fail_clk:
+>  	return ret;
+>  }
+>  
+> -static struct platform_driver ks_pcie_driver __refdata = {
+> +static struct platform_driver ks_pcie_driver = {
+>  	.probe  = ks_pcie_probe,
+> -	.remove = __exit_p(ks_pcie_remove),
+> +	.remove = ks_pcie_remove,
+>  	.driver = {
+>  		.name	= "keystone-pcie",
+>  		.owner	= THIS_MODULE,
+> -- 
+> 2.2.0.rc0.207.ga3a616c
+> 
+> 
+> -- 
+> Dmitry
