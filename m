@@ -1,127 +1,57 @@
-From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Fri, 23 Jan 2015 20:17:19 +0100
-Subject: [PATCH 08/12] pm: at91: rename file name: pm_slowclock.S
- -->pm_suspend.S
-In-Reply-To: <1421741825-18226-9-git-send-email-wenyou.yang@atmel.com>
-References: <1421741825-18226-1-git-send-email-wenyou.yang@atmel.com>
- <1421741825-18226-9-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20150123191719.GA29601@gradator.net>
+From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
+Date: Fri, 23 Jan 2015 12:35:41 -0700
+Subject: [PATCH] coresight: fixing CPU hwid lookup in device tree
+Message-ID: <1422041741-26803-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Wenyou,
+From: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-On Tue, Jan 20, 2015 at 04:17:01PM +0800, Wenyou Yang wrote:
-> 
-> diff --git a/arch/arm/mach-at91/pm_suspend.S b/arch/arm/mach-at91/pm_suspend.S
-> new file mode 100644
-> index 0000000..420e730
-> --- /dev/null
+Some DT specification will represent CPU nodes with address
+cells greater than one, making the current code fail.  Using
+the proper retrieval helper function ensure the correct hwid
+for CPUs is read properly with different address cell size.
 
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ drivers/coresight/of_coresight.c | 16 +++++++++-------
+ 1 file changed, 9 insertions(+), 7 deletions(-)
 
-> +	/* Turn off the main oscillator */
-> +	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
-> +	bic	tmp1, tmp1, #AT91_PMC_MOSCEN
-
-at91sam9x5 and probably others need a key here:
-	orr     tmp1, tmp1, #AT91_PMC_KEY
-
-> +	str	tmp1, [pmc, #AT91_CKGR_MOR]
-
-
-
-> +	/* Wait for interrupt */
-> +	mcr	p15, 0, tmp1, c7, c0, 4
-
-The linux-3.10-at91 branch uses a different approach which seem 
-necessary for newer board, you probably forget to merge the following:
-
-/*
- * Put the processor to enter into Standby mode, wait for interrupt to wakeup
- */
-	.macro _do_wfi
-
-#if defined(CONFIG_CPU_V7)
-	dsb
-
-	/* Disable the processor clock */
-	mov	tmp1, #AT91_PMC_PCK
-	str	tmp1, [pmc, #AT91_PMC_SCDR]
-
-	wfi		@ Wait For Interrupt
-#else
-	mcr	p15, 0, tmp1, c7, c0, 4
-#endif
-
-	.endm
-
-	.text
-
-ENTRY(at91_slow_clock)
-(...)
-	/* Wait for interrupt */
-	_do_wfi
-(...)
-
-
-
-
-> +	/* Turn on the main oscillator */
-> +	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
-> +	orr	tmp1, tmp1, #AT91_PMC_MOSCEN
-
-at91sam9x5 and probably others need a key here:
-        orr     tmp1, tmp1, #AT91_PMC_KEY
-
-> +	str	tmp1, [pmc, #AT91_CKGR_MOR]
-
-
-
-What about the following parts which are also in linux-3.10-at91 branch 
-but not in this rework, are they necessary ?
-
-sdr_sr_done:
-	/* Disable MPDDRC Clock*/
-	cmp	ddrcid, #0
-	beq	2f
-	bic	tmp2, ddrcid, #0xe0 /* fetch lowest 5 bits */
-	mov	tmp1, #0x01
-	mov	tmp1, tmp1, lsl tmp2
-
-	tst	ddrcid, #0x20	/* > 32 ? */
-	beq	1f
-	str	tmp1, [pmc, #AT91_PMC_PCDR1]
-	b	2f
-1:
-	str	tmp1, [pmc, #AT91_PMC_PCDR]
-2:
-
-	/* Disable DDR Clock */
-	mov 	tmp1, #AT91_PMC_SYS_DDR
-	str	tmp1, [pmc, #AT91_PMC_SCDR]
-
-
-
-
-	/* Enable MPDDRC Clock*/
-	cmp	ddrcid, #0
-	beq	4f
-	bic	tmp2, ddrcid, #0xe0 /* fetch lowest 5 bits */
-	mov	tmp1, #0x01
-	mov	tmp1, tmp1, lsl tmp2
-
-	tst	ddrcid, #0x20	/* > 32 ? */
-	beq	3f
-	str	tmp1, [pmc, #AT91_PMC_PCER1]
-	b	4f
-3:
-	str	tmp1, [pmc, #AT91_PMC_PCER]
-4:
-
-	/* Enable DDR clock */
-	mov 	tmp1, #AT91_PMC_SYS_DDR
-	str	tmp1, [pmc, #AT91_PMC_SCER]
-
-
-
-Sylvain
+diff --git a/drivers/coresight/of_coresight.c b/drivers/coresight/of_coresight.c
+index 9a5ff56f34d9..c3efa418a86d 100644
+--- a/drivers/coresight/of_coresight.c
++++ b/drivers/coresight/of_coresight.c
+@@ -117,7 +117,7 @@ struct coresight_platform_data *of_get_coresight_platform_data(
+ 	struct coresight_platform_data *pdata;
+ 	struct of_endpoint endpoint, rendpoint;
+ 	struct device *rdev;
+-	struct device_node *cpu;
++	struct device_node *dn;
+ 	struct device_node *ep = NULL;
+ 	struct device_node *rparent = NULL;
+ 	struct device_node *rport = NULL;
+@@ -186,14 +186,16 @@ struct coresight_platform_data *of_get_coresight_platform_data(
+ 
+ 	/* Affinity defaults to CPU0 */
+ 	pdata->cpu = 0;
+-	cpu = of_parse_phandle(node, "cpu", 0);
+-	if (cpu) {
+-		const u32 *mpidr;
++	dn = of_parse_phandle(node, "cpu", 0);
++	if (dn) {
++		const u32 *cell;
+ 		int len, index;
++		u64 hwid;
+ 
+-		mpidr = of_get_property(cpu, "reg", &len);
+-		if (mpidr && len == 4) {
+-			index = get_logical_index(be32_to_cpup(mpidr));
++		cell = of_get_property(dn, "reg", &len);
++		if (cell) {
++			hwid = of_read_number(cell, of_n_addr_cells(dn));
++			index = get_logical_index(hwid);
+ 			if (index != -EINVAL)
+ 				pdata->cpu = index;
+ 		}
+-- 
+1.9.1
