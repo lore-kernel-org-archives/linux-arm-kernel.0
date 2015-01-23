@@ -1,31 +1,44 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Fri, 23 Jan 2015 12:03:32 +0100
-Subject: [PATCH v13 5/6] clkdev: Export clk_register_clkdev
-In-Reply-To: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1422011024-32283-6-git-send-email-tomeu.vizoso@collabora.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Fri, 23 Jan 2015 12:12:59 +0100
+Subject: [PATCH v2 2/7] mmc: sdhci-pxav3: Fix Armada 38x controller's caps
+ according to erratum ERR-7878951
+In-Reply-To: <20150123110303.GD23493@leverpostej>
+References: <1422010594-1735-1-git-send-email-gregory.clement@free-electrons.com>
+ <1422010594-1735-3-git-send-email-gregory.clement@free-electrons.com>
+ <20150123110303.GD23493@leverpostej>
+Message-ID: <CAPv3WKfGtJOYO+t+OzawhHyK4vpGAFFmK487ybUtZB7RL05c1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So it can be used from modules such as clk-test.ko.
+Hi Mark
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/clk/clkdev.c | 1 +
- 1 file changed, 1 insertion(+)
+2015-01-23 12:03 GMT+01:00 Mark Rutland <mark.rutland@arm.com>:
+> [...]
+>
+>> +     /*
+>> +      * According to erratum 'ERR-7878951' Armada 38x SDHCI
+>> +      * controller has different capabilities than the ones shown
+>> +      * in its registers
+>> +      */
+>> +     host->caps = sdhci_readl(host, SDHCI_CAPABILITIES);
+>> +     if (of_get_property(np, "no-1-8-v", NULL)) {
+>
+> Please use of_property_read_bool(np, "no-1-8-v")
+>
+>> +             host->caps &= ~SDHCI_CAN_VDD_180;
+>> +             host->mmc->caps &= ~MMC_CAP_1_8V_DDR;
+>
+> Is SDHCI_CAN_VDD_330 always set elsewhere in this case?
 
-diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-index 901d242..29a1ab7 100644
---- a/drivers/clk/clkdev.c
-+++ b/drivers/clk/clkdev.c
-@@ -377,6 +377,7 @@ int clk_register_clkdev(struct clk *clk, const char *con_id,
- 
- 	return 0;
- }
-+EXPORT_SYMBOL(clk_register_clkdev);
- 
- /**
-  * clk_register_clkdevs - register a set of clk_lookup for a struct clk
--- 
-1.9.3
+Yes, it's always set in SDHCI_CAPABILITIES register of Armada 38x
+(assigned to host->caps few lines above), as well as
+SDHCI_CAN_VDD_180. The point is, that in reality they can't be used
+simultaneously for this device, i.e. voltage switching is impossible.
+
+Thanks,
+Marcin
+
+>
+>> +     } else
+>> +             host->caps &= ~SDHCI_CAN_VDD_330;
+>
