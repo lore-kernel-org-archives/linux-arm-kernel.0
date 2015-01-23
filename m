@@ -1,105 +1,48 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 23 Jan 2015 16:59:06 +0100
-Subject: [PATCH 1/2] mtd: nand: pxa3xx: Fix PIO FIFO draining
-In-Reply-To: <1422027703-3763-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1422027703-3763-1-git-send-email-maxime.ripard@free-electrons.com>
- <1422027703-3763-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <54C26FCA.5050600@free-electrons.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 23 Jan 2015 16:59:57 +0100
+Subject: [GIT PULL 1/4] ARM: tegra: Device tree changes for v3.20
+Message-ID: <1422028800-759-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hi ARM SoC maintainers,
 
-On 23/01/2015 16:41, Maxime Ripard wrote:
-> The NDDB register holds the data that are needed by the read and write
-> commands.
-> 
-> However, during a read PIO access, the datasheet specifies that after each 32
-> bits read in that register, when BCH is enabled, we have to make sure that the
-> RDDREQ bit is set in the NDSR register.
-> 
-> This fixes an issue that was seen on the Armada 385, and presumably other mvebu
-> SoCs, when a read on a newly erased page would end up in the driver reporting a
-> timeout from the NAND.
-> 
-> Cc: <stable@vger.kernel.org>
+The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
 
-It would help the stable maintainer if you could indicate since which commit or
-kernel release this fix should be applied.
+  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/mtd/nand/pxa3xx_nand.c | 36 ++++++++++++++++++++++++++++++------
->  1 file changed, 30 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-> index 96b0b1d27df1..320c2ab14d4e 100644
-> --- a/drivers/mtd/nand/pxa3xx_nand.c
-> +++ b/drivers/mtd/nand/pxa3xx_nand.c
-> @@ -480,6 +480,30 @@ static void disable_int(struct pxa3xx_nand_info *info, uint32_t int_mask)
->  	nand_writel(info, NDCR, ndcr | int_mask);
->  }
->  
-> +static void drain_fifo(struct pxa3xx_nand_info *info,
-> +		       void *data,
-> +		       int len)
-> +{
-> +	u32 *dst = (u32 *)data;
-> +
-> +	if (info->ecc_bch) {
-> +		while (len--) {
-> +			*dst++ = nand_readl(info, NDDB);
-> +
-> +			/*
-> +			 * According to the datasheet, when reading
-> +			 * from NDDB with BCH enabled, after each 32
-> +			 * bits reads, we have to make sure that the
-> +			 * NDSR.RDDREQ bit is set
-> +			 */
-> +			while (!(nand_readl(info, NDSR) & NDSR_RDDREQ))
-> +				cpu_relax();
+are available in the git repository at:
 
-Are we sure that we won't be blocked here?
-If not, what about adding a timeout?
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-3.20-dt
+
+for you to fetch changes up to 62981239a61bfd5306737effc015deba26c0d198:
+
+  ARM: tegra: Update isl29028 compatible string to use isil vendor prefix (2015-01-09 13:42:04 +0100)
 
 Thanks,
+Thierry
 
-Gregory
-> +		}
-> +	} else {
-> +		__raw_readsl(info->mmio_base + NDDB, data, len);
-> +	}
-> +}
-> +
->  static void handle_data_pio(struct pxa3xx_nand_info *info)
->  {
->  	unsigned int do_bytes = min(info->data_size, info->chunk_size);
-> @@ -496,14 +520,14 @@ static void handle_data_pio(struct pxa3xx_nand_info *info)
->  				      DIV_ROUND_UP(info->oob_size, 4));
->  		break;
->  	case STATE_PIO_READING:
-> -		__raw_readsl(info->mmio_base + NDDB,
-> -			     info->data_buff + info->data_buff_pos,
-> -			     DIV_ROUND_UP(do_bytes, 4));
-> +		drain_fifo(info,
-> +			   info->data_buff + info->data_buff_pos,
-> +			   DIV_ROUND_UP(do_bytes, 4));
->  
->  		if (info->oob_size > 0)
-> -			__raw_readsl(info->mmio_base + NDDB,
-> -				     info->oob_buff + info->oob_buff_pos,
-> -				     DIV_ROUND_UP(info->oob_size, 4));
-> +			drain_fifo(info,
-> +				   info->oob_buff + info->oob_buff_pos,
-> +				   DIV_ROUND_UP(info->oob_size, 4));
->  		break;
->  	default:
->  		dev_err(&info->pdev->dev, "%s: invalid state %d\n", __func__,
-> 
+----------------------------------------------------------------
+ARM: tegra: Device tree changes for v3.20
 
+A couple of unit addresses fixes in device trees, addition of microphone
+detection on Chromebook 13 and a vendor prefix update.
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+----------------------------------------------------------------
+Arnaud Ebalard (1):
+      ARM: tegra: Update isl29028 compatible string to use isil vendor prefix
+
+Dmitry Osipenko (1):
+      ARM: dts: tegra20: fix GR3D, DSI unit and reg base addresses
+
+Dylan Reid (1):
+      ARM: tegra: Enable the mic-detect gpio on Acer Chromebook 13
+
+Thierry Reding (1):
+      ARM: tegra: Fix unit address for Cortex-A9 TWD timer
+
+ arch/arm/boot/dts/tegra124-nyan-big.dts |  2 ++
+ arch/arm/boot/dts/tegra20.dtsi          | 10 +++++-----
+ arch/arm/boot/dts/tegra30-cardhu.dtsi   |  2 +-
+ arch/arm/boot/dts/tegra30.dtsi          |  2 +-
+ 4 files changed, 9 insertions(+), 7 deletions(-)
