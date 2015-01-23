@@ -1,69 +1,68 @@
 From: ricardo.ribalda@gmail.com (Ricardo Ribalda Delgado)
-Date: Fri, 23 Jan 2015 17:08:47 +0100
-Subject: [PATCH 15/18] spi/xilinx: Remove iowrite/ioread wrappers
+Date: Fri, 23 Jan 2015 17:08:45 +0100
+Subject: [PATCH 13/18] spi/xilinx: Convert remainding_bytes in remaining words
 In-Reply-To: <1422029330-10971-1-git-send-email-ricardo.ribalda@gmail.com>
 References: <1422029330-10971-1-git-send-email-ricardo.ribalda@gmail.com>
-Message-ID: <1422029330-10971-16-git-send-email-ricardo.ribalda@gmail.com>
+Message-ID: <1422029330-10971-14-git-send-email-ricardo.ribalda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Save a stack level and cleanup code.
+Simplify the code by using the unit used on most of the code logic.
 
 Signed-off-by: Ricardo Ribalda Delgado <ricardo.ribalda@gmail.com>
 ---
- drivers/spi/spi-xilinx.c | 28 ++++------------------------
- 1 file changed, 4 insertions(+), 24 deletions(-)
+ drivers/spi/spi-xilinx.c | 13 ++++++-------
+ 1 file changed, 6 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/spi/spi-xilinx.c b/drivers/spi/spi-xilinx.c
-index 5d3503a..704613c 100644
+index 514ad01..fce5d0b 100644
 --- a/drivers/spi/spi-xilinx.c
 +++ b/drivers/spi/spi-xilinx.c
-@@ -94,26 +94,6 @@ struct xilinx_spi {
- 	void (*write_fn)(u32, void __iomem *);
- };
+@@ -86,7 +86,7 @@ struct xilinx_spi {
  
--static void xspi_write32(u32 val, void __iomem *addr)
--{
--	iowrite32(val, addr);
--}
--
--static unsigned int xspi_read32(void __iomem *addr)
--{
--	return ioread32(addr);
--}
--
--static void xspi_write32_be(u32 val, void __iomem *addr)
--{
--	iowrite32be(val, addr);
--}
--
--static unsigned int xspi_read32_be(void __iomem *addr)
--{
--	return ioread32be(addr);
--}
--
- static void xilinx_spi_tx(struct xilinx_spi *xspi)
+ 	u8 *rx_ptr;		/* pointer in the Tx buffer */
+ 	const u8 *tx_ptr;	/* pointer in the Rx buffer */
+-	int remaining_bytes;	/* the number of bytes left to transfer */
++	int remaining_words;	/* the number of words left to transfer */
+ 	u8 bits_per_word;
+ 	int buffer_size;	/* buffer size in words */
+ 	u32 cs_inactive;	/* Level of the CS pins when inactive*/
+@@ -231,7 +231,7 @@ static int xilinx_spi_setup_transfer(struct spi_device *spi,
+ 
+ static void xilinx_spi_fill_tx_fifo(struct xilinx_spi *xspi, int n_words)
  {
- 	if (!xspi->tx_ptr) {
-@@ -391,15 +371,15 @@ static int xilinx_spi_probe(struct platform_device *pdev)
- 	 * Setup little endian helper functions first and try to use them
- 	 * and check if bit was correctly setup or not.
- 	 */
--	xspi->read_fn = xspi_read32;
--	xspi->write_fn = xspi_write32;
-+	xspi->read_fn = ioread32;
-+	xspi->write_fn = iowrite32;
+-	xspi->remaining_bytes -= n_words * xspi->bits_per_word / 8;
++	xspi->remaining_words -= n_words;
  
- 	xspi->write_fn(XSPI_CR_LOOP, xspi->regs + XSPI_CR_OFFSET);
- 	tmp = xspi->read_fn(xspi->regs + XSPI_CR_OFFSET);
- 	tmp &= XSPI_CR_LOOP;
- 	if (tmp != XSPI_CR_LOOP) {
--		xspi->read_fn = xspi_read32_be;
--		xspi->write_fn = xspi_write32_be;
-+		xspi->read_fn = ioread32be;
-+		xspi->write_fn = iowrite32be;
+ 	while (n_words--)
+ 		xilinx_spi_tx(xspi);
+@@ -246,15 +246,14 @@ static int xilinx_spi_txrx_bufs(struct spi_device *spi, struct spi_transfer *t)
+ 
+ 	xspi->tx_ptr = t->tx_buf;
+ 	xspi->rx_ptr = t->rx_buf;
+-	xspi->remaining_bytes = t->len;
++	xspi->remaining_words = (t->len * 8) / xspi->bits_per_word;
+ 	reinit_completion(&xspi->done);
+ 
+-	while (xspi->remaining_bytes) {
++	while (xspi->remaining_words) {
+ 		u16 cr = 0;
+ 		int n_words;
+ 
+-		n_words = (xspi->remaining_bytes * 8) / xspi->bits_per_word;
+-		n_words = min(n_words, xspi->buffer_size);
++		n_words = min(xspi->remaining_words, xspi->buffer_size);
+ 
+ 		xilinx_spi_fill_tx_fifo(xspi, n_words);
+ 
+@@ -286,7 +285,7 @@ static int xilinx_spi_txrx_bufs(struct spi_device *spi, struct spi_transfer *t)
+ 			xilinx_spi_rx(xspi);
  	}
  
- 	master->bits_per_word_mask = SPI_BPW_MASK(bits_per_word);
+-	return t->len - xspi->remaining_bytes;
++	return t->len;
+ }
+ 
+ 
 -- 
 2.1.4
