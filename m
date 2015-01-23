@@ -1,51 +1,33 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 23 Jan 2015 18:23:03 +0530
+Date: Fri, 23 Jan 2015 18:25:05 +0530
 Subject: [RFC V2] OPP: Redefine bindings to overcome shortcomings
-In-Reply-To: <1422013154.29475.11.camel@pengutronix.de>
+In-Reply-To: <20150123115206.GT21293@sirena.org.uk>
 References: <cbe949d7a69c3b16a3e9d6e5429eb81d3ae9d8b9.1422009157.git.viresh.kumar@linaro.org>
  <1422013154.29475.11.camel@pengutronix.de>
-Message-ID: <CAKohpokdKby1_aUDTUDkNkYj3C9F83Hn--w7TS=Y-UE1ZdnW6w@mail.gmail.com>
+ <20150123115206.GT21293@sirena.org.uk>
+Message-ID: <CAKohponBQkhoSDi1RT5nW=TfKO7rgjbz1DjVHpUS+nYKs4RYjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 January 2015 at 17:09, Lucas Stach <l.stach@pengutronix.de> wrote:
-> Am Freitag, den 23.01.2015, 16:14 +0530 schrieb Viresh Kumar:
->> I haven't incorporated the comments given by Mark Brown as I had some doubts.
->> @broonie: Is this what you wanted to mention earlier ? : http://pastebin.com/1RZTccmm
->>
->
-> I think we should work this out for the new bindings, as
-> voltage-tolerance is a completely bogus value.
+On 23 January 2015 at 17:22, Mark Brown <broonie@kernel.org> wrote:
+> On Fri, Jan 23, 2015 at 12:39:14PM +0100, Lucas Stach wrote:
 
-Yeah, that's what I was saying. I just wanted to confirm that I understood
-it clearly. And so didn't made the changes here.
+> I tend to agree that this is clearer.  It might be nice to have variants
+> for specifying directly as a percentage but I don't think it's really
+> worth the complexity.
 
->> +  - opp-microvolt: voltage in micro Volts
->
-> Each OPP voltage should be defined by the triplet of minimum,
-> nominal/typical, maximum. This lets you specify exact tolerances in each
-> direction and should cover most use-cases.
->
-> IMHO it would make sense to just define opp-microvolt as an array of
-> those 3 values, so the DT doesn't get bloated with a lot more
-> properties.
->
-> A typical value for a CPU could then look like this:
-> opp-microvolt = <800000 850000 1100000>
->
-> For devices without any tolerance you can just specify the same value
-> three times and be done with it:
-> opp-microvolt = <900000 900000 900000>
+> If we change the binding to be typ/min/max rather than min/typ/max then
+> we could also do this by allowing either one or three values to be
+> specified.  That might be more worth the complexity especially given...
 
-Ok.
++1
 
->> +  Optional properties:
->> +  - turbo-mode: Marks the volt-freq pair as turbo pair.
->> +  - status: Marks the node enabled/disabled.
->> +  - voltage-tolerance: Specify the CPU voltage tolerance in percentage.
+>> > +  - voltage-tolerance: Specify the CPU voltage tolerance in percentage.
 >
-> Please let's drop this.
+>> Please let's drop this.
+>
+> DT bindings are supposed to be stable, this means the code should accept
+> old bindings and they should be documented as deprecated.
 
-Yes, I did dropped it in the pastebin link I gave above.
-
-Thanks again for your feedback.
+Yes, I have marked the earlier OPP bindings as deprecated. Will mark
+this one too separately.
