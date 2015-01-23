@@ -1,37 +1,35 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 23 Jan 2015 11:56:33 +0100
-Subject: [PATCH v2 6/7] ARM: mvebu: Update the SDHCI node on Armada 38x
+Date: Fri, 23 Jan 2015 11:56:32 +0100
+Subject: [PATCH v2 5/7] ARM: mvebu: Use macros for interrupt flags on Armada
+ 38x sdhci node
 In-Reply-To: <1422010594-1735-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1422010594-1735-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1422010594-1735-7-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1422010594-1735-6-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The binding of the armada-380-sdhci has been extended with a new
-register in order to be able to use the SDR50 and DDR50 mode. This
-commit add the resource associated to this new register for the
-Armada 38x.
+Instead of hardcoding the values of the interrupt flags, use the
+macros provided by <include/dt-bindings/interrupt-controller/irq.h>
+and <include/dt-bindings/interrupt-controller/arm-gic.h> for the
+Armada 38x SDHCI node.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-38x.dtsi | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/armada-38x.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index 71d4eca5b497..474b2ebf4a82 100644
+index 79c4acf186e2..71d4eca5b497 100644
 --- a/arch/arm/boot/dts/armada-38x.dtsi
 +++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -515,7 +515,10 @@
- 
+@@ -516,7 +516,7 @@
  			sdhci at d8000 {
  				compatible = "marvell,armada-380-sdhci";
--				reg = <0xd8000 0x1000>, <0xdc000 0x100>;
-+				reg-names = "sdhci", "mbus", "conf-sdio3";
-+				reg = <0xd8000 0x1000>,
-+					<0xdc000 0x100>,
-+					<0x18454 0x4>;
- 				interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
+ 				reg = <0xd8000 0x1000>, <0xdc000 0x100>;
+-				interrupts = <0 25 0x4>;
++				interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
  				clocks = <&gateclk 17>;
  				mrvl,clk-delay-cycles = <0x1F>;
+ 				status = "disabled";
 -- 
 2.1.0
