@@ -1,152 +1,243 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 23 Jan 2015 11:02:35 +0100
-Subject: [GIT PULL 06/36] KVM: Add generic support for dirty page logging
+Date: Fri, 23 Jan 2015 11:02:38 +0100
+Subject: [GIT PULL 09/36] KVM: arm: Add initial dirty page locking support
 In-Reply-To: <1422007385-14730-1-git-send-email-christoffer.dall@linaro.org>
 References: <1422007385-14730-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1422007385-14730-7-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1422007385-14730-10-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Mario Smarduch <m.smarduch@samsung.com>
 
-kvm_get_dirty_log() provides generic handling of dirty bitmap, currently reused
-by several architectures. Building on that we intrdoduce
-kvm_get_dirty_log_protect() adding write protection to mark these pages dirty
-for future write access, before next KVM_GET_DIRTY_LOG ioctl call from user
-space.
+Add support for initial write protection of VM memslots. This patch
+series assumes that huge PUDs will not be used in 2nd stage tables, which is
+always valid on ARMv7
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
 ---
- include/linux/kvm_host.h |  9 ++++++
- virt/kvm/Kconfig         |  6 ++++
- virt/kvm/kvm_main.c      | 80 ++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 95 insertions(+)
+ arch/arm/include/asm/kvm_host.h       |   2 +
+ arch/arm/include/asm/kvm_mmu.h        |  21 ++++++
+ arch/arm/include/asm/pgtable-3level.h |   1 +
+ arch/arm/kvm/mmu.c                    | 135 ++++++++++++++++++++++++++++++++++
+ 4 files changed, 159 insertions(+)
 
-diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-index 26f1060..3b934cc 100644
---- a/include/linux/kvm_host.h
-+++ b/include/linux/kvm_host.h
-@@ -611,6 +611,15 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext);
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index acfced3..38931d4 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -246,6 +246,8 @@ static inline void vgic_arch_setup(const struct vgic_params *vgic)
+ int kvm_perf_init(void);
+ int kvm_perf_teardown(void);
  
- int kvm_get_dirty_log(struct kvm *kvm,
- 			struct kvm_dirty_log *log, int *is_dirty);
++void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
 +
-+int kvm_get_dirty_log_protect(struct kvm *kvm,
-+			struct kvm_dirty_log *log, bool *is_dirty);
-+
-+void kvm_arch_mmu_write_protect_pt_masked(struct kvm *kvm,
-+					struct kvm_memory_slot *slot,
-+					gfn_t gfn_offset,
-+					unsigned long mask);
-+
- int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm,
- 				struct kvm_dirty_log *log);
- 
-diff --git a/virt/kvm/Kconfig b/virt/kvm/Kconfig
-index 3796a21..314950c 100644
---- a/virt/kvm/Kconfig
-+++ b/virt/kvm/Kconfig
-@@ -40,3 +40,9 @@ config KVM_VFIO
- 
- config HAVE_KVM_ARCH_TLB_FLUSH_ALL
-        bool
-+
-+config HAVE_KVM_ARCH_DIRTY_LOG_PROTECT
-+       bool
-+
-+config KVM_GENERIC_DIRTYLOG_READ_PROTECT
-+       bool
-diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-index d03bd22..246cf29 100644
---- a/virt/kvm/kvm_main.c
-+++ b/virt/kvm/kvm_main.c
-@@ -995,6 +995,86 @@ out:
+ static inline void kvm_arch_hardware_disable(void) {}
+ static inline void kvm_arch_hardware_unsetup(void) {}
+ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 63e0ecc..2672cf8 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -114,6 +114,27 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+ 	pmd_val(*pmd) |= L_PMD_S2_RDWR;
  }
- EXPORT_SYMBOL_GPL(kvm_get_dirty_log);
  
-+#ifdef CONFIG_KVM_GENERIC_DIRTYLOG_READ_PROTECT
-+/**
-+ * kvm_get_dirty_log_protect - get a snapshot of dirty pages, and if any pages
-+ *	are dirty write protect them for next write.
-+ * @kvm:	pointer to kvm instance
-+ * @log:	slot id and address to which we copy the log
-+ * @is_dirty:	flag set if any page is dirty
-+ *
-+ * We need to keep it in mind that VCPU threads can write to the bitmap
-+ * concurrently. So, to avoid losing track of dirty pages we keep the
-+ * following order:
-+ *
-+ *    1. Take a snapshot of the bit and clear it if needed.
-+ *    2. Write protect the corresponding page.
-+ *    3. Copy the snapshot to the userspace.
-+ *    4. Upon return caller flushes TLB's if needed.
-+ *
-+ * Between 2 and 4, the guest may write to the page using the remaining TLB
-+ * entry.  This is not a problem because the page is reported dirty using
-+ * the snapshot taken before and step 4 ensures that writes done after
-+ * exiting to userspace will be logged for the next call.
-+ *
-+ */
-+int kvm_get_dirty_log_protect(struct kvm *kvm,
-+			struct kvm_dirty_log *log, bool *is_dirty)
++static inline void kvm_set_s2pte_readonly(pte_t *pte)
 +{
-+	struct kvm_memory_slot *memslot;
-+	int r, i;
-+	unsigned long n;
-+	unsigned long *dirty_bitmap;
-+	unsigned long *dirty_bitmap_buffer;
++	pte_val(*pte) = (pte_val(*pte) & ~L_PTE_S2_RDWR) | L_PTE_S2_RDONLY;
++}
 +
-+	r = -EINVAL;
-+	if (log->slot >= KVM_USER_MEM_SLOTS)
-+		goto out;
++static inline bool kvm_s2pte_readonly(pte_t *pte)
++{
++	return (pte_val(*pte) & L_PTE_S2_RDWR) == L_PTE_S2_RDONLY;
++}
 +
-+	memslot = id_to_memslot(kvm->memslots, log->slot);
++static inline void kvm_set_s2pmd_readonly(pmd_t *pmd)
++{
++	pmd_val(*pmd) = (pmd_val(*pmd) & ~L_PMD_S2_RDWR) | L_PMD_S2_RDONLY;
++}
 +
-+	dirty_bitmap = memslot->dirty_bitmap;
-+	r = -ENOENT;
-+	if (!dirty_bitmap)
-+		goto out;
++static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
++{
++	return (pmd_val(*pmd) & L_PMD_S2_RDWR) == L_PMD_S2_RDONLY;
++}
 +
-+	n = kvm_dirty_bitmap_bytes(memslot);
 +
-+	dirty_bitmap_buffer = dirty_bitmap + n / sizeof(long);
-+	memset(dirty_bitmap_buffer, 0, n);
+ /* Open coded p*d_addr_end that can deal with 64bit addresses */
+ #define kvm_pgd_addr_end(addr, end)					\
+ ({	u64 __boundary = ((addr) + PGDIR_SIZE) & PGDIR_MASK;		\
+diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+index a31ecdad..ae1d30a1 100644
+--- a/arch/arm/include/asm/pgtable-3level.h
++++ b/arch/arm/include/asm/pgtable-3level.h
+@@ -130,6 +130,7 @@
+ #define L_PTE_S2_RDONLY			(_AT(pteval_t, 1) << 6)   /* HAP[1]   */
+ #define L_PTE_S2_RDWR			(_AT(pteval_t, 3) << 6)   /* HAP[2:1] */
+ 
++#define L_PMD_S2_RDONLY			(_AT(pmdval_t, 1) << 6)   /* HAP[1]   */
+ #define L_PMD_S2_RDWR			(_AT(pmdval_t, 3) << 6)   /* HAP[2:1] */
+ 
+ /*
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 1dc9778..c9e5f38 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -45,6 +45,7 @@ static phys_addr_t hyp_idmap_vector;
+ #define hyp_pgd_order get_order(PTRS_PER_PGD * sizeof(pgd_t))
+ 
+ #define kvm_pmd_huge(_x)	(pmd_huge(_x) || pmd_trans_huge(_x))
++#define kvm_pud_huge(_x)	pud_huge(_x)
+ 
+ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+ {
+@@ -905,6 +906,131 @@ static bool kvm_is_device_pfn(unsigned long pfn)
+ 	return !pfn_valid(pfn);
+ }
+ 
++#ifdef CONFIG_ARM
++/**
++ * stage2_wp_ptes - write protect PMD range
++ * @pmd:	pointer to pmd entry
++ * @addr:	range start address
++ * @end:	range end address
++ */
++static void stage2_wp_ptes(pmd_t *pmd, phys_addr_t addr, phys_addr_t end)
++{
++	pte_t *pte;
++
++	pte = pte_offset_kernel(pmd, addr);
++	do {
++		if (!pte_none(*pte)) {
++			if (!kvm_s2pte_readonly(pte))
++				kvm_set_s2pte_readonly(pte);
++		}
++	} while (pte++, addr += PAGE_SIZE, addr != end);
++}
++
++/**
++ * stage2_wp_pmds - write protect PUD range
++ * @pud:	pointer to pud entry
++ * @addr:	range start address
++ * @end:	range end address
++ */
++static void stage2_wp_pmds(pud_t *pud, phys_addr_t addr, phys_addr_t end)
++{
++	pmd_t *pmd;
++	phys_addr_t next;
++
++	pmd = pmd_offset(pud, addr);
++
++	do {
++		next = kvm_pmd_addr_end(addr, end);
++		if (!pmd_none(*pmd)) {
++			if (kvm_pmd_huge(*pmd)) {
++				if (!kvm_s2pmd_readonly(pmd))
++					kvm_set_s2pmd_readonly(pmd);
++			} else {
++				stage2_wp_ptes(pmd, addr, next);
++			}
++		}
++	} while (pmd++, addr = next, addr != end);
++}
++
++/**
++  * stage2_wp_puds - write protect PGD range
++  * @pgd:	pointer to pgd entry
++  * @addr:	range start address
++  * @end:	range end address
++  *
++  * Process PUD entries, for a huge PUD we cause a panic.
++  */
++static void  stage2_wp_puds(pgd_t *pgd, phys_addr_t addr, phys_addr_t end)
++{
++	pud_t *pud;
++	phys_addr_t next;
++
++	pud = pud_offset(pgd, addr);
++	do {
++		next = kvm_pud_addr_end(addr, end);
++		if (!pud_none(*pud)) {
++			/* TODO:PUD not supported, revisit later if supported */
++			BUG_ON(kvm_pud_huge(*pud));
++			stage2_wp_pmds(pud, addr, next);
++		}
++	} while (pud++, addr = next, addr != end);
++}
++
++/**
++ * stage2_wp_range() - write protect stage2 memory region range
++ * @kvm:	The KVM pointer
++ * @addr:	Start address of range
++ * @end:	End address of range
++ */
++static void stage2_wp_range(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
++{
++	pgd_t *pgd;
++	phys_addr_t next;
++
++	pgd = kvm->arch.pgd + pgd_index(addr);
++	do {
++		/*
++		 * Release kvm_mmu_lock periodically if the memory region is
++		 * large. Otherwise, we may see kernel panics with
++		 * CONFIG_DETECT_HUNG_TASK, CONFIG_LOCK_DETECTOR,
++		 * CONFIG_LOCK_DEP. Additionally, holding the lock too long
++		 * will also starve other vCPUs.
++		 */
++		if (need_resched() || spin_needbreak(&kvm->mmu_lock))
++			cond_resched_lock(&kvm->mmu_lock);
++
++		next = kvm_pgd_addr_end(addr, end);
++		if (pgd_present(*pgd))
++			stage2_wp_puds(pgd, addr, next);
++	} while (pgd++, addr = next, addr != end);
++}
++
++/**
++ * kvm_mmu_wp_memory_region() - write protect stage 2 entries for memory slot
++ * @kvm:	The KVM pointer
++ * @slot:	The memory slot to write protect
++ *
++ * Called to start logging dirty pages after memory region
++ * KVM_MEM_LOG_DIRTY_PAGES operation is called. After this function returns
++ * all present PMD and PTEs are write protected in the memory region.
++ * Afterwards read of dirty page log can be called.
++ *
++ * Acquires kvm_mmu_lock. Called with kvm->slots_lock mutex acquired,
++ * serializing operations for VM memory regions.
++ */
++void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot)
++{
++	struct kvm_memory_slot *memslot = id_to_memslot(kvm->memslots, slot);
++	phys_addr_t start = memslot->base_gfn << PAGE_SHIFT;
++	phys_addr_t end = (memslot->base_gfn + memslot->npages) << PAGE_SHIFT;
 +
 +	spin_lock(&kvm->mmu_lock);
-+	*is_dirty = false;
-+	for (i = 0; i < n / sizeof(long); i++) {
-+		unsigned long mask;
-+		gfn_t offset;
-+
-+		if (!dirty_bitmap[i])
-+			continue;
-+
-+		*is_dirty = true;
-+
-+		mask = xchg(&dirty_bitmap[i], 0);
-+		dirty_bitmap_buffer[i] = mask;
-+
-+		offset = i * BITS_PER_LONG;
-+		kvm_arch_mmu_write_protect_pt_masked(kvm, memslot, offset,
-+								mask);
-+	}
-+
++	stage2_wp_range(kvm, start, end);
 +	spin_unlock(&kvm->mmu_lock);
-+
-+	r = -EFAULT;
-+	if (copy_to_user(log->dirty_bitmap, dirty_bitmap_buffer, n))
-+		goto out;
-+
-+	r = 0;
-+out:
-+	return r;
++	kvm_flush_remote_tlbs(kvm);
 +}
-+EXPORT_SYMBOL_GPL(kvm_get_dirty_log_protect);
 +#endif
 +
- bool kvm_largepages_enabled(void)
+ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 			  struct kvm_memory_slot *memslot, unsigned long hva,
+ 			  unsigned long fault_status)
+@@ -1292,6 +1418,15 @@ void kvm_arch_commit_memory_region(struct kvm *kvm,
+ 				   const struct kvm_memory_slot *old,
+ 				   enum kvm_mr_change change)
  {
- 	return largepages_enabled;
++#ifdef CONFIG_ARM
++	/*
++	 * At this point memslot has been committed and there is an
++	 * allocated dirty_bitmap[], dirty pages will be be tracked while the
++	 * memory slot is write protected.
++	 */
++	if (change != KVM_MR_DELETE && mem->flags & KVM_MEM_LOG_DIRTY_PAGES)
++		kvm_mmu_wp_memory_region(kvm, mem->slot);
++#endif
+ }
+ 
+ int kvm_arch_prepare_memory_region(struct kvm *kvm,
 -- 
 2.1.2.330.g565301e.dirty
