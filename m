@@ -1,54 +1,68 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 22 Jan 2015 20:12:58 -0800
-Subject: [PATCH 1/2] ARM: EXYNOS: add fixed phy support for EXYNOS5440
-In-Reply-To: <1421980893-14475-2-git-send-email-ming.lei@canonical.com>
+Date: Thu, 22 Jan 2015 20:15:25 -0800
+Subject: [PATCH 2/2] net: stmmac: add fixed_phy and phy_addr support using
+ DT file
+In-Reply-To: <1421980893-14475-3-git-send-email-ming.lei@canonical.com>
 References: <1421980893-14475-1-git-send-email-ming.lei@canonical.com>
- <1421980893-14475-2-git-send-email-ming.lei@canonical.com>
-Message-ID: <54C1CA4A.4030703@gmail.com>
+ <1421980893-14475-3-git-send-email-ming.lei@canonical.com>
+Message-ID: <54C1CADD.4060103@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Le 22/01/2015 18:41, Ming Lei a ?crit :
 > From: Byungho An <bh74.an@samsung.com>
 > 
-> This patch adds fixed phy codes for Exynos5440. This patch can
-> support fixed_phy.
+> This patch adds codes for DT file support, fixed_phy and phy_addr 
+> can be set in DT file.
 > 
-> Signed-off-by: Byungho An <bh74.an@samsung.com> Signed-off-by: Ike
-> Panhc <ike.pan@canonical.com> Signed-off-by: Ming Lei
-> <ming.lei@canoncial.com> --- arch/arm/mach-exynos/exynos.c |   15
-> +++++++++++++++ 1 file changed, 15 insertions(+)
+> Signed-off-by: Byungho An <bh74.an@samsung.com> (bypass check for
+> fixed phy) Signed-off-by: Ming Lei<ming.lei@canonical.com> --- 
+> drivers/net/ethernet/stmicro/stmmac/stmmac_main.c  |    5 ++++- 
+> .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |    7 +++++++ 2
+> files changed, 11 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/mach-exynos/exynos.c
-> b/arch/arm/mach-exynos/exynos.c index 78eca99b..dfd5699 100644 ---
-> a/arch/arm/mach-exynos/exynos.c +++
-> b/arch/arm/mach-exynos/exynos.c @@ -20,6 +20,8 @@ #include
-> <linux/platform_device.h> #include <linux/pm_domain.h> #include
-> <linux/irqchip.h> +#include <linux/phy.h> +#include
-> <linux/phy_fixed.h>
+> diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
+> b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c index
+> 8c6b7c16..ddb4351 100644 ---
+> a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c +++
+> b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c @@ -847,8
+> +847,11 @@ static int stmmac_init_phy(struct net_device *dev) * 0
+> rather than 0xffff. Catch this here and treat 0 as a non-existent *
+> device as well. * Note: phydev->phy_id is the result of reading the
+> UID PHY registers. +	 * But phy_id returned from fixed phy is
+> always zero, so bypass the +	 * check for fixed phy. */ -	if
+> (phydev->phy_id == 0) { +	if (phydev->phy_id == 0 &&
+> (!priv->plat->phy_bus_name || +
+> strcmp(priv->plat->phy_bus_name,"fixed"))) { 
+> phy_disconnect(phydev); return -ENODEV; } diff --git
+> a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+> b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c index
+> 879e29f..4f11491 100644 ---
+> a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c +++
+> b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c @@ -128,6
+> +128,7 @@ static int stmmac_probe_config_dt(struct platform_device
+> *pdev, struct device_node *np = pdev->dev.of_node; struct
+> stmmac_dma_cfg *dma_cfg; const struct of_device_id *device; +	u32
+> phy_addr;
 > 
-> #include <asm/cacheflush.h> #include <asm/hardware/cache-l2x0.h> @@
-> -202,8 +204,21 @@ static void __init exynos_init_irq(void) 
-> exynos_map_pmu(); }
+> if (!np) return -ENODEV; @@ -217,6 +218,12 @@ static int
+> stmmac_probe_config_dt(struct platform_device *pdev, plat->pmt =
+> 1; }
 > 
-> +static struct fixed_phy_status fixed_phy_status __initdata = { +
-> .link           = 1, +       .speed          = 1000, +
-> .duplex         = 1, +}; + static void __init
-> exynos_dt_machine_init(void) { +	struct device_node *gmac_np; +
-> unsigned int tmp; + +	/* add fixed phy in need */ +	gmac_np =
-> of_find_compatible_node(NULL, NULL, "snps,dwmac-3.70a"); +	if
-> (of_find_property(gmac_np, "fixed_phy", NULL)) +		tmp =
-> fixed_phy_add(PHY_POLL, 1, &fixed_phy_status);
+> +	if (of_find_property(np, "fixed_phy", NULL)) { +
+> plat->phy_bus_name = "fixed"; +		of_property_read_u32(np,
+> "phy_addr", &phy_addr); +		plat->phy_addr = phy_addr; +	}
 
-Is there a particular reason you are doing this and not using
-of_phy_is_fixed_link() and of_phy_register_fixed_link()?
+Humm, same here, it would look like you could use the existing Device
+Tree helpers for parsing and registering a fixed PHY here, provided
+that you use the proper binding though.
 
-See the gianfar and bcmsysport for examples on how to use it in a
-driver along with the relevant Device Tree binding in
-Documentation/devicetree/bindings/net/fixed-link.txt for examples.
+BTW, Ming Lei's email is bouncing, do we have an updated email he
+could be contacted with?
 
-> /* * This is called from smp_prepare_cpus if we've built for SMP,
-> but * we still need to set it up for PM and firmware ops if not.
+> + if (of_device_is_compatible(np, "snps,dwmac-3.610") || 
+> of_device_is_compatible(np, "snps,dwmac-3.710")) { plat->enh_desc =
+> 1;
 > 
 
 
