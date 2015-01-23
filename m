@@ -1,158 +1,40 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 23 Jan 2015 18:09:27 +0100
-Subject: [PATCH v3 1/5] genirq: Authorize chained handlers to remain disabled
- when initialized
+Date: Fri, 23 Jan 2015 18:09:30 +0100
+Subject: [PATCH v3 4/5] ARM: at91/dt: select DUMB_IRQ_DEMUX for all at91 SoCs
 In-Reply-To: <1422032971-14139-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1422032971-14139-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1422032971-14139-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1422032971-14139-5-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently there is no way to keep a chained handler disabled when
-registering it.
-This might be annoying for irq demuxer that want to keep the source irq
-disabled until at least one of their child irq is requested.
-
-Replace the is_chained argument of __irq_set_handler by an enum, thus
-adding a new CHAINED_NOSTARTUP mode which explicitly ask for the
-interruption to remain disabled.
-Update all __irq_set_handler users to use the enum value instead of a
-numerical one and add a new irq_set_chained_handler_nostartup helper
-function (as done for irq_set_handler and irq_set_chained_handler).
+Older at91 SoCs need a virtual dumb irq demuxer to gracefully support the
+fact that irq1 is shared by several devices and a timer.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- include/linux/irq.h    | 26 ++++++++++++++++++++++----
- kernel/irq/chip.c      | 12 +++++++-----
- kernel/irq/irqdomain.c |  2 +-
- kernel/irq/msi.c       |  3 ++-
- 4 files changed, 32 insertions(+), 11 deletions(-)
+ arch/arm/mach-at91/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/include/linux/irq.h b/include/linux/irq.h
-index d09ec7a..247b2d1 100644
---- a/include/linux/irq.h
-+++ b/include/linux/irq.h
-@@ -489,25 +489,43 @@ static inline void irq_set_chip_and_handler(unsigned int irq, struct irq_chip *c
- 
- extern int irq_set_percpu_devid(unsigned int irq);
- 
-+enum chained_mode {
-+	IRQ_CHAINED_NONE,
-+	IRQ_CHAINED_STARTUP,
-+	IRQ_CHAINED_NOSTARTUP,
-+};
-+
- extern void
--__irq_set_handler(unsigned int irq, irq_flow_handler_t handle, int is_chained,
-+__irq_set_handler(unsigned int irq, irq_flow_handler_t handle,
-+		  enum chained_mode chained_mode,
- 		  const char *name);
- 
- static inline void
- irq_set_handler(unsigned int irq, irq_flow_handler_t handle)
- {
--	__irq_set_handler(irq, handle, 0, NULL);
-+	__irq_set_handler(irq, handle, IRQ_CHAINED_NONE, NULL);
- }
- 
- /*
-  * Set a highlevel chained flow handler for a given IRQ.
-- * (a chained handler is automatically enabled and set to
-+ * (this chained handler is automatically enabled and set to
-  *  IRQ_NOREQUEST, IRQ_NOPROBE, and IRQ_NOTHREAD)
-  */
- static inline void
- irq_set_chained_handler(unsigned int irq, irq_flow_handler_t handle)
- {
--	__irq_set_handler(irq, handle, 1, NULL);
-+	__irq_set_handler(irq, handle, IRQ_CHAINED_STARTUP, NULL);
-+}
-+
-+/*
-+ * Set a highlevel chained flow handler for a given IRQ without starting it.
-+ * (this chained handler is kept disabled and set to IRQ_NOREQUEST,
-+ * IRQ_NOPROBE, and IRQ_NOTHREAD)
-+ */
-+static inline void
-+irq_set_chained_handler_nostartup(unsigned int irq, irq_flow_handler_t handle)
-+{
-+	__irq_set_handler(irq, handle, IRQ_CHAINED_NOSTARTUP, NULL);
- }
- 
- void irq_modify_status(unsigned int irq, unsigned long clr, unsigned long set);
-diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
-index 6f1c7a5..5de82dc0 100644
---- a/kernel/irq/chip.c
-+++ b/kernel/irq/chip.c
-@@ -719,7 +719,8 @@ void handle_percpu_devid_irq(unsigned int irq, struct irq_desc *desc)
- }
- 
- void
--__irq_set_handler(unsigned int irq, irq_flow_handler_t handle, int is_chained,
-+__irq_set_handler(unsigned int irq, irq_flow_handler_t handle,
-+		  enum chained_mode chained_mode,
- 		  const char *name)
- {
- 	unsigned long flags;
-@@ -748,7 +749,7 @@ __irq_set_handler(unsigned int irq, irq_flow_handler_t handle, int is_chained,
- 			 * and the interrrupt supposed to be started
- 			 * right away.
- 			 */
--			if (WARN_ON(is_chained))
-+			if (WARN_ON(chained_mode != IRQ_CHAINED_NONE))
- 				goto out;
- 			/* Try the parent */
- 			irq_data = irq_data->parent_data;
-@@ -768,11 +769,12 @@ __irq_set_handler(unsigned int irq, irq_flow_handler_t handle, int is_chained,
- 	desc->handle_irq = handle;
- 	desc->name = name;
- 
--	if (handle != handle_bad_irq && is_chained) {
-+	if (handle != handle_bad_irq && chained_mode != IRQ_CHAINED_NONE) {
- 		irq_settings_set_noprobe(desc);
- 		irq_settings_set_norequest(desc);
- 		irq_settings_set_nothread(desc);
--		irq_startup(desc, true);
-+		if (chained_mode == IRQ_CHAINED_STARTUP)
-+			irq_startup(desc, true);
- 	}
- out:
- 	irq_put_desc_busunlock(desc, flags);
-@@ -784,7 +786,7 @@ irq_set_chip_and_handler_name(unsigned int irq, struct irq_chip *chip,
- 			      irq_flow_handler_t handle, const char *name)
- {
- 	irq_set_chip(irq, chip);
--	__irq_set_handler(irq, handle, 0, name);
-+	__irq_set_handler(irq, handle, IRQ_CHAINED_NONE, name);
- }
- EXPORT_SYMBOL_GPL(irq_set_chip_and_handler_name);
- 
-diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-index 7fac311..d5aee6c 100644
---- a/kernel/irq/irqdomain.c
-+++ b/kernel/irq/irqdomain.c
-@@ -943,7 +943,7 @@ void irq_domain_set_info(struct irq_domain *domain, unsigned int virq,
- 			 void *handler_data, const char *handler_name)
- {
- 	irq_domain_set_hwirq_and_chip(domain, virq, hwirq, chip, chip_data);
--	__irq_set_handler(virq, handler, 0, handler_name);
-+	__irq_set_handler(virq, handler, IRQ_CHAINED_NONE, handler_name);
- 	irq_set_handler_data(virq, handler_data);
- }
- 
-diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
-index 3e18163..84b626c 100644
---- a/kernel/irq/msi.c
-+++ b/kernel/irq/msi.c
-@@ -164,7 +164,8 @@ static int msi_domain_ops_init(struct irq_domain *domain,
- 	irq_domain_set_hwirq_and_chip(domain, virq, hwirq, info->chip,
- 				      info->chip_data);
- 	if (info->handler && info->handler_name) {
--		__irq_set_handler(virq, info->handler, 0, info->handler_name);
-+		__irq_set_handler(virq, info->handler, IRQ_CHAINED_NONE,
-+				  info->handler_name);
- 		if (info->handler_data)
- 			irq_set_handler_data(virq, info->handler_data);
- 	}
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index 2395c68..8ff2c2a 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -28,6 +28,7 @@ config HAVE_AT91_H32MX
+ config SOC_AT91SAM9
+ 	bool
+ 	select ATMEL_AIC_IRQ
++	select DUMB_DEMUX_IRQ
+ 	select COMMON_CLK_AT91
+ 	select CPU_ARM926T
+ 	select GENERIC_CLOCKEVENTS
+@@ -98,6 +99,7 @@ if SOC_SAM_V4_V5
+ config SOC_AT91RM9200
+ 	bool "AT91RM9200"
+ 	select ATMEL_AIC_IRQ
++	select DUMB_DEMUX_IRQ
+ 	select COMMON_CLK_AT91
+ 	select CPU_ARM920T
+ 	select GENERIC_CLOCKEVENTS
 -- 
 1.9.1
