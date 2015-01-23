@@ -1,77 +1,73 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 23 Jan 2015 14:15:31 +0100
-Subject: [PATCH 1/3] ARM: Marvell: Remove init cpus function
-In-Reply-To: <1421686381-12397-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1421686381-12397-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <54C24973.5080801@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 23 Jan 2015 14:28:24 +0100
+Subject: [PATCH v12 00/15] arm: Fix DEBUG_LL for multi-platform kernels
+ (without PL01X)
+In-Reply-To: <20150123130837.GE26493@n2100.arm.linux.org.uk>
+References: <1414148076-12685-1-git-send-email-daniel.thompson@linaro.org>
+ <CAMuHMdUpNtL+K28DdC8xJ3vUPZGmviWcYGOVUNuhKQoobdL00Q@mail.gmail.com>
+ <20150123130837.GE26493@n2100.arm.linux.org.uk>
+Message-ID: <1940932.WxFESz5SgZ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/19/2015 05:52 PM, Daniel Lezcano wrote:
-> With the next patches, the init cpus function will be changed to be factored
-> out.
->
-> The function 'armada_xp_smp_init_cpus' does nothing more than a sanity check
-> after the DT has been parsed. Even if this code is valid, it does not give a
-> real benefit as the DT should be correctly filled.
->
-> Remove this callback.
->
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+On Friday 23 January 2015 13:08:37 Russell King - ARM Linux wrote:
+> > Hi Arnd,
+> > 
+> > On Fri, Oct 24, 2014 at 5:46 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > > There is still a related bug that we should also fix, but I'd say let's
+> > > take your current patches first and then add whatever is missing
+> > > on top. Specifically, a snippet like this
+> > >
+> > >         default 0xd4017000 if DEBUG_MMP_UART2
+> > >         default 0xd4018000 if DEBUG_MMP_UART3
+> > >         default 0xe0000000 if ARCH_SPEAR13XX
+> > >         default 0xe4007000 if DEBUG_HIP04_UART
+> > >         default 0xf0000be0 if ARCH_EBSA110
+> > >
+> > > still means you get the wrong default when you build a multiplatform
+> > > kernel that you want to boot on HIP04 and you set DEBUG_HIP04_UART
+> > > but you happen to also have ARCH_SPEAR13XX enabled.
+> > >
+> > > I have a patch that I use locally for randconfig builds that tries
+> > > to fix this. It has some overlaps with your work but most parts are
+> > > distinct. See below.
+> > 
+> > This is still desperately needed for anyone who wants to enable DEBUG_LL
+> > on other platforms using multi_v7_defconfig.
+> 
+> I'd actually prefer to kill all these defaults and let people enter the
+> value they want - for exactly this reason.
 
-Hi Arnd, Olof,
+I think it almost works right and seems fixable, but I agree with your
+long-term direction.
 
-any comments on this patchset ?
+> However, I realise that would not be popular, because removing them
+> means that people have to refer to some kind of documentation to find
+> the correct value, and that's hassle.
+> 
+> So, the existing defaulting behaviour is my compromise, but as I say,
+> I'd much prefer the unpopular move of killing the entire set of defaults.
 
-Thanks
-   -- Daniel
+We can probably remove the defaults after we have had working earlycon
+support for at least one kernel release. My feeling is that a lot of
+people just enable debug_ll for normal kernels (and pass earlyprintk
+in the DTB-provided command line!) because the normal console support
+is just too late to spot when things go wrong, and debug_ll is
+convenient enough despite the downsides.
 
-> ---
->   arch/arm/mach-mvebu/platsmp.c | 11 -----------
->   1 file changed, 11 deletions(-)
->
-> diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
-> index 58cc8c1..3e93422 100644
-> --- a/arch/arm/mach-mvebu/platsmp.c
-> +++ b/arch/arm/mach-mvebu/platsmp.c
-> @@ -30,8 +30,6 @@
->   #include "pmsu.h"
->   #include "coherency.h"
->
-> -#define ARMADA_XP_MAX_CPUS 4
-> -
->   #define AXP_BOOTROM_BASE 0xfff00000
->   #define AXP_BOOTROM_SIZE 0x100000
->
-> @@ -114,14 +112,6 @@ static void armada_xp_secondary_init(unsigned int cpu)
->   	mvebu_v7_pmsu_idle_exit();
->   }
->
-> -static void __init armada_xp_smp_init_cpus(void)
-> -{
-> -	unsigned int ncores = num_possible_cpus();
-> -
-> -	if (ncores == 0 || ncores > ARMADA_XP_MAX_CPUS)
-> -		panic("Invalid number of CPUs in DT\n");
-> -}
-> -
->   static void __init armada_xp_smp_prepare_cpus(unsigned int max_cpus)
->   {
->   	struct device_node *node;
-> @@ -171,7 +161,6 @@ static int armada_xp_cpu_kill(unsigned int cpu)
->   #endif
->
->   struct smp_operations armada_xp_smp_ops __initdata = {
-> -	.smp_init_cpus		= armada_xp_smp_init_cpus,
->   	.smp_prepare_cpus	= armada_xp_smp_prepare_cpus,
->   	.smp_boot_secondary	= armada_xp_boot_secondary,
->   	.smp_secondary_init     = armada_xp_secondary_init,
->
+earlycon avoids the need for hard configuration and mostly solves the
+problem of the normal console being initialized too late, so I think
+we should migrate platforms to use that over time. It's not a
+problem for backwards compatibility because old dtbs will still work,
+just without working earlycon when there is no "stdout-path" property.
 
+With that in place, we can put debug_ll back into its destined place,
+which is to debug the extremely early boot stages before earlycon,
+and anyone who needs to do that can pick the correct physical addresses
+themselves. Picking the right virtual address seems to be harder
+for a lot of people, and everyone gets stuck on this when they first
+try it. Maybe we can avoid this problem by finding a page into which
+to put the mapping by default. The fixmap support we need for earlycon
+should make this easier too.
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+	Arnd
