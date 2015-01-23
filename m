@@ -1,19 +1,31 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Fri, 23 Jan 2015 17:59:59 -0300
-Subject: perf not capturing stack traces
-In-Reply-To: <20150123195128.GE26557@saruman.tx.rr.com>
-References: <20150123195128.GE26557@saruman.tx.rr.com>
-Message-ID: <20150123205959.GD3073@kernel.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 23 Jan 2015 22:17:46 +0100
+Subject: [PATCH] ARM: dts: sun4i: Add Hyundau A7HD board
+In-Reply-To: <1422027563-7914-1-git-send-email-hdegoede@redhat.com>
+References: <1422027563-7914-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150123211746.GA8470@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Fri, Jan 23, 2015 at 01:51:28PM -0600, Felipe Balbi escreveu:
-> I'm using v3.19-rc5 on an ARM Cortex A9 board. Unfortunately, perf is
-> not able to capture any stack traces even though I CONFIG_STACKTRACE,
-> CONFIG_FRAME_POINTER and CONFIG_ARM_UNWIND all enabled.
+On Fri, Jan 23, 2015 at 04:39:23PM +0100, Hans de Goede wrote:
+> The Hyundai A7HD is a 7" 16:9 A10 powered tablet featuring 1G RAM, 8G
+> nand, 1024x600 IPS screen, a mini hdmi port, mini usb receptacle and a
+> headphones port for details see: http://linux-sunxi.org/Hyundai_A7HD
 > 
-> I wonder if anybody else is facing similar issues.
+> Cc: Mark Janssen <maniac@maniac.nl>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Did it work with a previous kernel?
+Applied, thanks!
+Maxime
 
-- Arnaldo
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150123/10d0cc10/attachment.sig>
