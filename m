@@ -1,22 +1,42 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 23 Jan 2015 14:18:07 -0800
-Subject: [PATCH] arm64: dts: add baud rate to Juno stdout-path
-In-Reply-To: <d0f44fbb7ffc85806ab00d7e54a64161ef79cad7.1421924801.git.robin.murphy@arm.com>
-References: <d0f44fbb7ffc85806ab00d7e54a64161ef79cad7.1421924801.git.robin.murphy@arm.com>
-Message-ID: <20150123221807.GK20896@quad.lixom.net>
+Date: Fri, 23 Jan 2015 14:23:10 -0800
+Subject: [GIT PULL] ARM: mediatek: soc changes for v3.20 (round 1)
+In-Reply-To: <CABuKBe+_Xp7LWExkM6xygM_adtKTVuG3S9zMdc27TonWu0HKNQ@mail.gmail.com>
+References: <CABuKBe+_Xp7LWExkM6xygM_adtKTVuG3S9zMdc27TonWu0HKNQ@mail.gmail.com>
+Message-ID: <20150123222310.GL20896@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 22, 2015 at 11:21:32AM +0000, Robin Murphy wrote:
-> Without explicit command-line parameters, the Juno UART ends up running
-> at 57600 baud in the kernel, which is at odds with the 115200 baud used
-> by the rest of the firmware. Since commit 7914a7c5651a5161 now lets us
-> fix this by specifying default options in stdout-path, do so.
+On Thu, Jan 22, 2015 at 02:19:08PM +0100, Matthias Brugger wrote:
+> Hi Arnd and Olof,
 > 
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> Please take the following patches for v3.20.
+> 
+> Thanks a lot,
+> Matthias
+> 
+> ---
+> 
+> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+> 
+>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+> 
+> are available in the git repository at:
+> 
+>   https://github.com/mbgg/linux-mediatek.git tags/v3.20-next-soc1
+> 
+> for you to fetch changes up to 60851d7a81138ba3546dde044a8d629c1f603525:
+> 
+>   ARM: mediatek: Low-level-debug for mt6592 (2015-01-20 17:50:26 +0100)
+> 
+> ----------------------------------------------------------------
+> This adds config options for the different Mediatek SoC. We need this so that
+> the pinctrl driver does not bloat the kernel binary.
+> 
+> Apart we change the Kconfig description and add the config option for mt6592
+> low-level debug option.
 
+Merged.
 
-Thanks, applied as a fix for 3.19.
 
 -Olof
