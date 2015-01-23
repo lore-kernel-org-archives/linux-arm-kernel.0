@@ -1,10 +1,10 @@
 From: al.stone@linaro.org (al.stone at linaro.org)
-Date: Thu, 22 Jan 2015 17:44:41 -0700
-Subject: [PATCH 4/7] ia64: ACPI: create arch-dependent version of
+Date: Thu, 22 Jan 2015 17:44:40 -0700
+Subject: [PATCH 3/7] x86: ACPI: create arch-dependent version of
  acpi_osi_handler()
 In-Reply-To: <1421973884-13029-1-git-send-email-al.stone@linaro.org>
 References: <1421973884-13029-1-git-send-email-al.stone@linaro.org>
-Message-ID: <1421973884-13029-5-git-send-email-al.stone@linaro.org>
+Message-ID: <1421973884-13029-4-git-send-email-al.stone@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,31 +14,40 @@ In order to deprecate the use of _OSI for arm64 or other new architectures,
 we need to make the default handler something we can change for various
 platforms.  This patch moves the definition of acpi_osi_handler() -- the
 function used by ACPICA as a callback for evaluating _OSI -- into arch-
-dependent ACPI files.  The declaration of acpi_os_handler() was moved in
-a previous patch.
+dependent ACPI files.  This patch also moves the declaration of
+acpi_os_handler() so that the x86 kernel should still compile.
 
-No functional change for ia64.
+NB: this patch may break compilation on ia64 or arm64 (if ACPI is enabled)
+until an upcoming patch adds definitions of acpi_osi_handler() for those
+architectures.
+
+No functional change for x86.
 
 Signed-off-by: Al Stone <al.stone@linaro.org>
 ---
- arch/ia64/kernel/acpi/Makefile |   2 +-
- arch/ia64/kernel/acpi/osi.c    | 119 +++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 120 insertions(+), 1 deletion(-)
- create mode 100644 arch/ia64/kernel/acpi/osi.c
+ arch/x86/kernel/acpi/Makefile |   2 +-
+ arch/x86/kernel/acpi/osi.c    | 100 ++++++++++++++++++++++++++++++++++++++++++
+ drivers/acpi/osl.c            |  24 ----------
+ include/linux/acpi.h          |   1 +
+ 4 files changed, 102 insertions(+), 25 deletions(-)
+ create mode 100644 arch/x86/kernel/acpi/osi.c
 
-diff --git a/arch/ia64/kernel/acpi/Makefile b/arch/ia64/kernel/acpi/Makefile
-index 8c12745..475b530 100644
---- a/arch/ia64/kernel/acpi/Makefile
-+++ b/arch/ia64/kernel/acpi/Makefile
-@@ -1 +1 @@
--obj-$(CONFIG_ACPI)		+= acpi.o acpi-ext.o
-+obj-$(CONFIG_ACPI)		+= acpi.o acpi-ext.o osi.o
-diff --git a/arch/ia64/kernel/acpi/osi.c b/arch/ia64/kernel/acpi/osi.c
+diff --git a/arch/x86/kernel/acpi/Makefile b/arch/x86/kernel/acpi/Makefile
+index 3242e59..e1359c9 100644
+--- a/arch/x86/kernel/acpi/Makefile
++++ b/arch/x86/kernel/acpi/Makefile
+@@ -1,4 +1,4 @@
+-obj-$(CONFIG_ACPI)		+= boot.o
++obj-$(CONFIG_ACPI)		+= boot.o osi.o
+ obj-$(CONFIG_ACPI_SLEEP)	+= sleep.o wakeup_$(BITS).o
+ obj-$(CONFIG_ACPI_APEI)		+= apei.o
+ 
+diff --git a/arch/x86/kernel/acpi/osi.c b/arch/x86/kernel/acpi/osi.c
 new file mode 100644
-index 0000000..80dbc8a
+index 0000000..fff2b0c
 --- /dev/null
-+++ b/arch/ia64/kernel/acpi/osi.c
-@@ -0,0 +1,119 @@
++++ b/arch/x86/kernel/acpi/osi.c
+@@ -0,0 +1,100 @@
 +/*
 + *  osi.c - _OSI implementation (moved from drivers/acpi/osl.c)
 + *
@@ -68,31 +77,12 @@ index 0000000..80dbc8a
 + *
 + */
 +
-+#include <linux/module.h>
-+#include <linux/kernel.h>
-+#include <linux/slab.h>
-+#include <linux/mm.h>
-+#include <linux/highmem.h>
-+#include <linux/pci.h>
-+#include <linux/interrupt.h>
-+#include <linux/kmod.h>
-+#include <linux/delay.h>
-+#include <linux/workqueue.h>
-+#include <linux/nmi.h>
 +#include <linux/acpi.h>
-+#include <linux/efi.h>
-+#include <linux/ioport.h>
-+#include <linux/list.h>
-+#include <linux/jiffies.h>
-+#include <linux/semaphore.h>
-+
-+#include <asm/io.h>
-+#include <asm/uaccess.h>
-+
-+#include "internal.h"
 +
 +#define _COMPONENT		ACPI_OS_SERVICES
 +ACPI_MODULE_NAME("osl");
++
++#define PREFIX			"ACPI: "
 +
 +/*
 + * The story of _OSI(Linux)
@@ -158,5 +148,52 @@ index 0000000..80dbc8a
 +	return supported;
 +}
 +
+diff --git a/drivers/acpi/osl.c b/drivers/acpi/osl.c
+index f9eeae8..c7f1cd6 100644
+--- a/drivers/acpi/osl.c
++++ b/drivers/acpi/osl.c
+@@ -141,30 +141,6 @@ static struct osi_linux {
+ 	unsigned int	default_disabling:1;
+ } osi_linux = {0, 0, 0, 0};
+ 
+-static u32 acpi_osi_handler(acpi_string interface, u32 supported)
+-{
+-	if (!strcmp("Linux", interface)) {
+-
+-		printk_once(KERN_NOTICE FW_BUG PREFIX
+-			"BIOS _OSI(Linux) query %s%s\n",
+-			osi_linux.enable ? "honored" : "ignored",
+-			osi_linux.cmdline ? " via cmdline" :
+-			osi_linux.dmi ? " via DMI" : "");
+-	}
+-
+-	if (!strcmp("Darwin", interface)) {
+-		/*
+-		 * Apple firmware will behave poorly if it receives positive
+-		 * answers to "Darwin" and any other OS. Respond positively
+-		 * to Darwin and then disable all other vendor strings.
+-		 */
+-		acpi_update_interfaces(ACPI_DISABLE_ALL_VENDOR_STRINGS);
+-		supported = ACPI_UINT32_MAX;
+-	}
+-
+-	return supported;
+-}
+-
+ static void __init acpi_request_region (struct acpi_generic_address *gas,
+ 	unsigned int length, char *desc)
+ {
+diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+index 87f365e..ec18ab0 100644
+--- a/include/linux/acpi.h
++++ b/include/linux/acpi.h
+@@ -271,6 +271,7 @@ static inline int acpi_video_display_switch_support(void)
+ extern int acpi_blacklisted(void);
+ extern void acpi_dmi_osi_linux(int enable, const struct dmi_system_id *d);
+ extern void acpi_osi_setup(char *str);
++extern u32 acpi_osi_handler(acpi_string interface, u32 supported);
+ 
+ #ifdef CONFIG_ACPI_NUMA
+ int acpi_get_node(acpi_handle handle);
 -- 
 2.1.0
