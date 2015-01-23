@@ -1,103 +1,65 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 23 Jan 2015 09:59:58 +0100
-Subject: [PATCHv6 2/5] USB: gadget: atmel_usba_udc: Request an auto
- disabled
- Vbus signal IRQ instead of an auto enabled IRQ request followed by IRQ disable
-In-Reply-To: <0F74BBB2-B515-4A36-8C71-25F58A4D1AB6@jcrosoft.com>
-References: <1421945805-31129-1-git-send-email-sylvain.rochet@finsecur.com>
- <1421945805-31129-3-git-send-email-sylvain.rochet@finsecur.com>
- <0F74BBB2-B515-4A36-8C71-25F58A4D1AB6@jcrosoft.com>
-Message-ID: <54C20D8E.4040505@atmel.com>
+From: vbabka@suse.cz (Vlastimil Babka)
+Date: Fri, 23 Jan 2015 10:05:48 +0100
+Subject: [PATCHv2] mm: Don't offset memmap for flatmem
+In-Reply-To: <54C196D0.6040900@codeaurora.org>
+References: <1421804273-29947-1-git-send-email-lauraa@codeaurora.org>	<1421888500-24364-1-git-send-email-lauraa@codeaurora.org>
+ <20150122162021.aa861aeb53c22206a19ebbcb@linux-foundation.org>
+ <54C196D0.6040900@codeaurora.org>
+Message-ID: <54C20EEC.1060809@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 23/01/2015 08:43, Jean-Christophe PLAGNIOL-VILLARD a ?crit :
-> 
->> On Jan 23, 2015, at 12:56 AM, Sylvain Rochet <sylvain.rochet@finsecur.com> wrote:
+On 01/23/2015 01:33 AM, Laura Abbott wrote:
+> On 1/22/2015 4:20 PM, Andrew Morton wrote:
+>> On Wed, 21 Jan 2015 17:01:40 -0800 Laura Abbott <lauraa@codeaurora.org> wrote:
 >>
->> Vbus IRQ handler needs a started UDC driver to work because it uses
->> udc->driver, which is set by the UDC start handler. The previous way
->> chosen was to return from interrupt if udc->driver is NULL using a
->> spinlock around the check.
+>>> Srinivas Kandagatla reported bad page messages when trying to
+>>> remove the bottom 2MB on an ARM based IFC6410 board
+>>>
+>>> BUG: Bad page state in process swapper  pfn:fffa8
+>>> page:ef7fb500 count:0 mapcount:0 mapping:  (null) index:0x0
+>>> flags: 0x96640253(locked|error|dirty|active|arch_1|reclaim|mlocked)
+>>> page dumped because: PAGE_FLAGS_CHECK_AT_FREE flag(s) set
+>>> bad because of flags:
+>>> flags: 0x200041(locked|active|mlocked)
+>>> Modules linked in:
+>>> CPU: 0 PID: 0 Comm: swapper Not tainted 3.19.0-rc3-00007-g412f9ba-dirty #816
+>>> Hardware name: Qualcomm (Flattened Device Tree)
+>>> [<c0218280>] (unwind_backtrace) from [<c0212be8>] (show_stack+0x20/0x24)
+>>> [<c0212be8>] (show_stack) from [<c0af7124>] (dump_stack+0x80/0x9c)
+>>> [<c0af7124>] (dump_stack) from [<c0301570>] (bad_page+0xc8/0x128)
+>>> [<c0301570>] (bad_page) from [<c03018a8>] (free_pages_prepare+0x168/0x1e0)
+>>> [<c03018a8>] (free_pages_prepare) from [<c030369c>] (free_hot_cold_page+0x3c/0x174)
+>>> [<c030369c>] (free_hot_cold_page) from [<c0303828>] (__free_pages+0x54/0x58)
+>>> [<c0303828>] (__free_pages) from [<c030395c>] (free_highmem_page+0x38/0x88)
+>>> [<c030395c>] (free_highmem_page) from [<c0f62d5c>] (mem_init+0x240/0x430)
+>>> [<c0f62d5c>] (mem_init) from [<c0f5db3c>] (start_kernel+0x1e4/0x3c8)
+>>> [<c0f5db3c>] (start_kernel) from [<80208074>] (0x80208074)
+>>> Disabling lock debugging due to kernel taint
+>>>
+>>> Removing the lower 2MB made the start of the lowmem zone to no longer
+>>> be page block aligned. IFC6410 uses CONFIG_FLATMEM where
+>>> alloc_node_mem_map allocates memory for the mem_map. alloc_node_mem_map
+>>> will offset for unaligned nodes with the assumption the pfn/page
+>>> translation functions will account for the offset. The functions for
+>>> CONFIG_FLATMEM do not offset however, resulting in overrunning
+>>> the memmap array. Just use the allocated memmap without any offset
+>>> when running with CONFIG_FLATMEM to avoid the overrun.
+>>>
 >>
->> We now request an auto disabled (IRQ_NOAUTOEN) Vbus signal IRQ instead
->> of an auto enabled IRQ followed by disable_irq(). This way we remove the
->> very small timeslot of enabled IRQ which existed previously between
->> request() and disable(). We don't need anymore to check if udc->driver
->> is NULL in IRQ handler.
+>> I don't think v2 addressed Vlastimil's review comment?
 >>
->> Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
->> Suggested-by: Boris Brezillon <boris.brezillon@free-electrons.com>
->> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
->> ---
->> drivers/usb/gadget/udc/atmel_usba_udc.c | 9 ++-------
->> 1 file changed, 2 insertions(+), 7 deletions(-)
->>
->> diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
->> index 40e5fc7..f9f305f 100644
->> --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
->> +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
->> @@ -1745,10 +1745,6 @@ static irqreturn_t usba_vbus_irq(int irq, void *devid)
->>
->> 	spin_lock(&udc->lock);
->>
->> -	/* May happen if Vbus pin toggles during probe() */
->> -	if (!udc->driver)
->> -		goto out;
->> -
->> 	vbus = vbus_is_present(udc);
->> 	if (vbus != udc->vbus_prev) {
->> 		if (vbus) {
->> @@ -1769,7 +1765,6 @@ static irqreturn_t usba_vbus_irq(int irq, void *devid)
->> 		udc->vbus_prev = vbus;
->> 	}
->>
->> -out:
->> 	spin_unlock(&udc->lock);
->>
->> 	return IRQ_HANDLED;
->> @@ -2109,6 +2104,8 @@ static int usba_udc_probe(struct platform_device *pdev)
->>
->> 	if (gpio_is_valid(udc->vbus_pin)) {
->> 		if (!devm_gpio_request(&pdev->dev, udc->vbus_pin, "atmel_usba_udc")) {
->> +			irq_set_status_flags(gpio_to_irq(udc->vbus_pin),
->> +					IRQ_NOAUTOEN);
-> 
-> not happy about still using the broken gpio_to_irq API
-> 
-> Linus can pass the IRQ via board file?
-> 
-> and via DT we can use IRQ directly
+>
+> We're still adding the offset to node_mem_map and then subtracting it from
+> just mem_map. Did I miss another comment somewhere?
 
-Absolutely not the topic of this patch series.
-Maybe the subject of another patch later?
+Yes that was addressed, thanks. But I don't feel comfortable acking it 
+yet, as I have no idea if we are doing the right thing for 
+CONFIG_HAVE_MEMBLOCK_NODE_MAP && CONFIG_FLATMEM case here.
 
-Best regards,
+Also putting the CONFIG_FLATMEM && !CONFIG_HAVE_MEMBLOCK_NODE_MAP under 
+the "if (page_to_pfn(mem_map) != pgdat->node_start_pfn)" will probably 
+do the right thing, but looks like a weird test for this case here.
 
-
->> 			ret = devm_request_irq(&pdev->dev,
->> 					gpio_to_irq(udc->vbus_pin),
->> 					usba_vbus_irq, 0,
->> @@ -2118,8 +2115,6 @@ static int usba_udc_probe(struct platform_device *pdev)
->> 				dev_warn(&udc->pdev->dev,
->> 					 "failed to request vbus irq; "
->> 					 "assuming always on\n");
->> -			} else {
->> -				disable_irq(gpio_to_irq(udc->vbus_pin));
->> 			}
->> 		} else {
->> 			/* gpio_request fail so use -EINVAL for gpio_is_valid */
->> -- 
->> 2.1.4
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
-
-
--- 
-Nicolas Ferre
+I have no good suggestion though, so let's CC Mel who apparently wrote 
+the ARCH_PFN_OFFSET correction?
