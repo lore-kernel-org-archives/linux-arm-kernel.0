@@ -1,36 +1,56 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 23 Jan 2015 17:11:43 -0600
-Subject: [PATCH 3/4] clk: ti: 43xx: add debugss clocks to DT_CLK() table
+Date: Fri, 23 Jan 2015 17:11:44 -0600
+Subject: [PATCH 4/4] arm: dts: am4372: add pmu DT data
 In-Reply-To: <1422054704-14915-1-git-send-email-balbi@ti.com>
 References: <1422054704-14915-1-git-send-email-balbi@ti.com>
-Message-ID: <1422054704-14915-4-git-send-email-balbi@ti.com>
+Message-ID: <1422054704-14915-5-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-without these entries, omap_hwmod will not be
-able to find debugss clocks.
+with this patch, performance monitors work
+and show sensible data on AM43xx devices:
+
+~# perf stat sleep 5
+
+ Performance counter stats for 'sleep 5':
+
+          6.079585      task-clock (msec)         #    0.001 CPUs utilized
+                 3      context-switches          #    0.493 K/sec
+                 0      cpu-migrations            #    0.000 K/sec
+                35      page-faults               #    0.006 M/sec
+           5888256      cycles                    #    0.969 GHz
+           1458715      stalled-cycles-frontend   #   24.77% frontend cycles idle
+           4632019      stalled-cycles-backend    #   78.67% backend  cycles idle
+           1892556      instructions              #    0.32  insns per cycle
+                                                  #    2.45  stalled cycles per insn
+            141832      branches                  #   23.329 M/sec
+             56093      branch-misses             #   39.55% of all branches
+
+       5.018813000 seconds time elapsed
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/clk/ti/clk-43xx.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/am4372.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/clk/ti/clk-43xx.c b/drivers/clk/ti/clk-43xx.c
-index 3795fce8a830..46a597c815c9 100644
---- a/drivers/clk/ti/clk-43xx.c
-+++ b/drivers/clk/ti/clk-43xx.c
-@@ -83,6 +83,12 @@ static struct ti_dt_clk am43xx_clks[] = {
- 	DT_CLK(NULL, "gfx_fck_div_ck", "gfx_fck_div_ck"),
- 	DT_CLK(NULL, "timer_32k_ck", "clkdiv32k_ick"),
- 	DT_CLK(NULL, "timer_sys_ck", "sys_clkin_ck"),
-+	DT_CLK(NULL, "trace_clk_div_ck", "trace_clk_div_ck"),
-+	DT_CLK(NULL, "trace_pm_clk_mux_ck", "trace_pm_clk_mux_ck"),
-+	DT_CLK(NULL, "dbg_sysclk_ck", "dbg_sysclk_ck"),
-+	DT_CLK(NULL, "dbg_clka_ck", "dbg_clka_ck"),
-+	DT_CLK(NULL, "dbg_clkb_ck", "dbg_clkb_ck"),
-+	DT_CLK(NULL, "dbg_clkc_ck", "dbg_clkc_ck"),
- 	DT_CLK(NULL, "sysclk_div", "sysclk_div"),
- 	DT_CLK(NULL, "disp_clk", "disp_clk"),
- 	DT_CLK(NULL, "clk_32k_mosc_ck", "clk_32k_mosc_ck"),
+diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+index 861f127dfead..ea103aa970f1 100644
+--- a/arch/arm/boot/dts/am4372.dtsi
++++ b/arch/arm/boot/dts/am4372.dtsi
+@@ -51,6 +51,14 @@
+ 		};
+ 	};
+ 
++	pmu {
++		compatible = "arm,cortex-a9-pmu";
++		reg = <0x4b000000 0x800000>;
++		interrutps = <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
++		ti,hwmods = "debugss";
++	};
++
+ 	gic: interrupt-controller at 48241000 {
+ 		compatible = "arm,cortex-a9-gic";
+ 		interrupt-controller;
 -- 
 2.3.0-rc1
