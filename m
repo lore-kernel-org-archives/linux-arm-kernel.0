@@ -1,76 +1,104 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 23 Jan 2015 17:14:26 +0800
-Subject: [GIT PULL 1/3] ARM: imx: soc changes for 3.20
-Message-ID: <20150123091425.GB27337@dragon>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 23 Jan 2015 09:16:20 +0000 (UTC)
+Subject: [PATCH 1/2] ARM: OMAP2+: Add clock domain support for dm816x
+In-Reply-To: <20150121041145.GO7718@atomide.com>
+References: <1421191355-12835-1-git-send-email-tony@atomide.com>
+ <1421191355-12835-2-git-send-email-tony@atomide.com>
+ <alpine.DEB.2.02.1501210128020.5450@utopia.booyaka.com>
+ <20150121041145.GO7718@atomide.com>
+Message-ID: <alpine.DEB.2.02.1501230836020.5450@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+Hi Tony
 
-  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+On Tue, 20 Jan 2015, Tony Lindgren wrote:
 
-are available in the git repository at:
+> * Paul Walmsley <paul@pwsan.com> [150120 18:08]:
+> > On Tue, 13 Jan 2015, Tony Lindgren wrote:
+>  
+> > > +/* Common TI81XX */
+> > 
+> > I can't comment on how many of these are truly common; since I haven't 
+> > cross-checked this file against the 814x TRM.  But if you haven't had the 
+> > chance to cross-check it against the 814x TRM either, I'd suggest starting 
+> > by making this file explicitly 816x-specific.
+> 
+> Seem to be common in the old TI PSP tree too at:
+> http://arago-project.org/git/projects/?p=linux-omap3.git;a=summary
+> 
+> Except it seems that dm814x has CLKDM_CAN_SWSUP while dm816x
+> has CLKDM_CAN_HWSUP_SWSUP. I've booted that tree only on dm816x
+> but let's assume it also works for dm814x as that's the TI tree
+> for it.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-soc-3.20
+Just looked at SPRUGZ8E, the 814x TRM.  According to that, it's the 814x
+that supports HW_AUTO on more of the clockdomains, compared to the 816x 
+TRM which states that on that chip, HW_AUTO is only supported on 
+ALWON_L3_FAST on 816x.
 
-for you to fetch changes up to ade9233f2e0cf4b7bf10fd122c7e9f9310bfd1a5:
+CLKDM_CAN_SWSUP should be safe to use on clockdomains that don't support 
+HW_AUTO.  But using CLKDM_CAN_HWSUP_SWSUP on clockdomains that don't 
+support HW_AUTO will wind up programming register values marked as 
+"reserved" in the TRM.
 
-  ARM: clk-imx6q: refine esai_ipg's parent (2015-01-20 15:53:41 +0800)
+Here's what I'd suggest.  This file is marked as common to all 81xx chips.  
+So the safe thing to do is to mark all of the clockdomains as 
+CLKDM_CAN_SWSUP except for ALWON_L3_FAST.  (ALWON_L3_FAST is documented as 
+supporting HW_AUTO on both chips.)
 
-----------------------------------------------------------------
-The i.MX SoC changes for 3.20:
- - Add .disable_unused function hook for shared gate clock to ensure
-   the clock tree use count matches the hardware state
- - Add a deeper idle state for i.MX6SX cpuidle driver powering off the
-   ARM core
- - One correction on i.MX6Q esai_ipg parent clock setting
- - Add a missing iounmap call for imx6q_opp_check_speed_grading()
- - Add missing clocks for VF610 UART4, UART5 and SNVS blocks
- - Expand VF610 device tree compatible matching table to cover more
-   Vybrid family SoCs
- - Expand i.MX clk-pllv3 a bit with the shift for frequency multiplier
-   to support Vybrid's USB PLL oddity
+Otherwise, if there's some reason why you'd want to keep 
+CLKDM_CAN_HWSUP_SWSUP (I can't really think of any, BTW), please add a 
+comment to the data stating that you're going with the CLKDM_CAN_* 
+settings from the 816x tree, even though they don't match the TRM; and 
+that those should be investigated if there's any problem with full chip 
+idle.
 
-----------------------------------------------------------------
-Anson Huang (3):
-      ARM: imx: correct the hardware clock gate setting for shared nodes
-      ARM: imx: remove unnecessary setting for DSM
-      ARM: imx: support arm power off in cpuidle for i.mx6sx
+> Looks like TI's tree has these ifdef else and 816x seems to
+> have both CAN_HWSUP_SWSUP so probably the TRM is wrong.
+> 
+> My guess the TRM for 816x has tons of copy-paste errors from the
+> dm814x TRM. So I've kept all them the same way as the TI tree has
+> them.
 
-Bhuvanchandra DV (1):
-      ARM: imx: clk-vf610: Add clock for UART4 and UART5
+I'd be pretty skeptical of the TI tree data.  If there were cut-and-paste 
+errors for this data from the 814x TRM, then the 816x TRM would show more 
+clockdomains supporting HW_AUTO.  But given the difference in these 
+documented clockdomain bitfields, I'd say it's unlikely that there are 
+cut-and-paste issues there.
 
-Sanchayan Maity (1):
-      ARM: imx: clk-vf610: Add clock for SNVS
+> > > +static struct clockdomain default_ducati_816x_clkdm = {
+> > 
+> > I can't find any mention of the Ducati in the TRM.  Does this SoC have a 
+> > Ducati?
+> 
+> So it seems for dm816x. Also clock816x_data.c references ducati_ick.
 
-Sebastian Andrzej Siewior (1):
-      ARM i.MX6q: unmap memory mapped at imx6q_opp_check_speed_grading()
+...
 
-Shawn Guo (1):
-      ARM: imx: drop CPUIDLE_FLAG_TIME_VALID from cpuidle-imx6sx
+> > According to the TRM here, looks like this should just be 
+> > "default_816x_clkdm" ?  The corresponding register is named 
+> > CM_DEFAULT_CLKSTCTRL.  It references two clockdomains, GCLKINTR and 
+> > GCLKIN200TR, but I can't find any other mention of those in the TRM, so, 
+> > no idea what they're associated with.
+> 
+> No mention of CM_DEFAULT_CLKSTCTRL in the TI tree. It seems the
+> TRM is wrong here too.
 
-Shengjiu Wang (1):
-      ARM: clk-imx6q: refine esai_ipg's parent
+Am thinking they might have rebranded the Ducati as something else.  
+Maybe they got sued ;-)  The dm814x TRM lists DUCATI in the names for 
+these registers, so it's fine with me to keep using them here.
 
-Stefan Agner (2):
-      ARM vf610: add compatibilty strings of supported Vybrid SoC's
-      ARM: imx: pllv3: add shift for frequency multiplier
+...
 
- Documentation/devicetree/bindings/arm/fsl.txt |  12 +++
- arch/arm/mach-imx/Makefile                    |   3 +-
- arch/arm/mach-imx/clk-gate2.c                 |  23 +++++-
- arch/arm/mach-imx/clk-imx6q.c                 |   2 +-
- arch/arm/mach-imx/clk-pllv3.c                 |  10 ++-
- arch/arm/mach-imx/clk-vf610.c                 |   8 +-
- arch/arm/mach-imx/clk.h                       |   1 +
- arch/arm/mach-imx/common.h                    |   4 +
- arch/arm/mach-imx/cpuidle-imx6sx.c            | 105 ++++++++++++++++++++++++++
- arch/arm/mach-imx/cpuidle.h                   |   5 ++
- arch/arm/mach-imx/gpc.c                       |  25 +++++-
- arch/arm/mach-imx/mach-imx6q.c                |   2 +-
- arch/arm/mach-imx/mach-imx6sx.c               |   2 +-
- arch/arm/mach-imx/mach-vf610.c                |   5 +-
- arch/arm/mach-imx/pm-imx6.c                   |   7 +-
- include/dt-bindings/clock/vf610-clock.h       |   3 +-
- 16 files changed, 195 insertions(+), 22 deletions(-)
- create mode 100644 arch/arm/mach-imx/cpuidle-imx6sx.c
+I tried applying a version of this patch, but looks like it has a 
+dependency on some mach-omap2/io.c changes that I don't have a stable 
+commit for.  How about this: if you can change the CLKDM_CAN_HWSUP_SWSUP 
+to CLKDM_CAN_SWSUP in most cases, then feel free to add my Reviewed-by: 
+and to merge it.  Otherwise if you'd prefer me to take it upstream, let me 
+know what stable commit I should base the pull request on.
+
+
+I appreciate the discussion,
+
+- Paul
