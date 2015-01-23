@@ -1,124 +1,51 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Fri, 23 Jan 2015 12:31:40 +0000
-Subject: [PATCH 2/3] arm64: Consolidate hotplug notifier for instruction
- emulation
-In-Reply-To: <1421844191-9263-3-git-send-email-suzuki.poulose@arm.com> (Suzuki
- K. Poulose's message of "Wed, 21 Jan 2015 12:43:10 +0000")
-References: <1421844191-9263-1-git-send-email-suzuki.poulose@arm.com>
- <1421844191-9263-2-git-send-email-suzuki.poulose@arm.com>
- <1421844191-9263-3-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <9hhoappn0er.fsf@e105922-lin.cambridge.arm.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 23 Jan 2015 18:23:03 +0530
+Subject: [RFC V2] OPP: Redefine bindings to overcome shortcomings
+In-Reply-To: <1422013154.29475.11.camel@pengutronix.de>
+References: <cbe949d7a69c3b16a3e9d6e5429eb81d3ae9d8b9.1422009157.git.viresh.kumar@linaro.org>
+ <1422013154.29475.11.camel@pengutronix.de>
+Message-ID: <CAKohpokdKby1_aUDTUDkNkYj3C9F83Hn--w7TS=Y-UE1ZdnW6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki,
-
-A possible simplification below.
-
-"Suzuki K. Poulose" <suzuki.poulose@arm.com> writes:
-
-> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+On 23 January 2015 at 17:09, Lucas Stach <l.stach@pengutronix.de> wrote:
+> Am Freitag, den 23.01.2015, 16:14 +0530 schrieb Viresh Kumar:
+>> I haven't incorporated the comments given by Mark Brown as I had some doubts.
+>> @broonie: Is this what you wanted to mention earlier ? : http://pastebin.com/1RZTccmm
+>>
 >
-> As of now each insn_emulation has a cpu hotplug notifier that
-> enables/disables the CPU feature bit for the functionality. This
-> patch re-arranges the code, such that there is only one notifier
-> that runs through the list of registered emulation hooks and runs
-> their corresponding set_hw_mode.
+> I think we should work this out for the new bindings, as
+> voltage-tolerance is a completely bogus value.
+
+Yeah, that's what I was saying. I just wanted to confirm that I understood
+it clearly. And so didn't made the changes here.
+
+>> +  - opp-microvolt: voltage in micro Volts
 >
-> We do nothing when a CPU is dying as we will set the appropriate bits
-> as it comes back online based on the state of the hooks.
+> Each OPP voltage should be defined by the triplet of minimum,
+> nominal/typical, maximum. This lets you specify exact tolerances in each
+> direction and should cover most use-cases.
 >
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Punit Agrawal <punit.agrawal@arm.com>
-> ---
->  arch/arm64/include/asm/cputype.h     |    2 +
->  arch/arm64/kernel/armv8_deprecated.c |  125 +++++++++++++++++++++-------------
->  2 files changed, 79 insertions(+), 48 deletions(-)
+> IMHO it would make sense to just define opp-microvolt as an array of
+> those 3 values, so the DT doesn't get bloated with a lot more
+> properties.
 >
+> A typical value for a CPU could then look like this:
+> opp-microvolt = <800000 850000 1100000>
+>
+> For devices without any tolerance you can just specify the same value
+> three times and be done with it:
+> opp-microvolt = <900000 900000 900000>
 
-[...]
+Ok.
 
-> diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
-> index c363671..2c991f1 100644
-> --- a/arch/arm64/kernel/armv8_deprecated.c
-> +++ b/arch/arm64/kernel/armv8_deprecated.c
-> @@ -19,6 +19,7 @@
->  #include <asm/system_misc.h>
->  #include <asm/traps.h>
->  #include <asm/uaccess.h>
-> +#include <asm/cpufeature.h>
->  
->  #define CREATE_TRACE_POINTS
->  #include "trace-events-emulation.h"
-> @@ -85,6 +86,57 @@ static void remove_emulation_hooks(struct insn_emulation_ops *ops)
->  	pr_notice("Removed %s emulation handler\n", ops->name);
->  }
->  
-> +static void enable_insn_hw_mode(void *data)
-> +{
-> +	struct insn_emulation *insn = (struct insn_emulation *)data;
-> +	if (insn && insn->ops->set_hw_mode)
+>> +  Optional properties:
+>> +  - turbo-mode: Marks the volt-freq pair as turbo pair.
+>> +  - status: Marks the node enabled/disabled.
+>> +  - voltage-tolerance: Specify the CPU voltage tolerance in percentage.
+>
+> Please let's drop this.
 
-You can simplify (drop?) this...
+Yes, I did dropped it in the pastebin link I gave above.
 
-> +		insn->ops->set_hw_mode(true);
-> +}
-> +
-> +static void disable_insn_hw_mode(void *data)
-> +{
-> +	struct insn_emulation *insn = (struct insn_emulation *)data;
-> +	if (insn && insn->ops->set_hw_mode)
-
-and this check since...
-
-> +		insn->ops->set_hw_mode(false);
-> +}
-> +
-> +/* Run set_hw_mode(mode) on all active CPUs */
-> +static int run_all_cpu_set_hw_mode(struct insn_emulation *insn, bool enable)
-> +{
-> +	if (!insn->ops->set_hw_mode)
-> +		return -EINVAL;
-
-insn->ops->set_hw_mode is already checked here.
-
-> +	if (enable)
-> +		on_each_cpu(enable_insn_hw_mode, (void *)insn, true);
-> +	else
-> +		on_each_cpu(disable_insn_hw_mode, (void *)insn, true);
-> +	return 0;
-> +}
-> +
-> +/*
-> + * Run set_hw_mode for all insns on a starting CPU.
-> + * Returns:
-> + *  0 		- If all the hooks ran successfully.
-> + * -EINVAL	- At least one hook is not supported by the CPU.
-> + */
-> +static int run_all_insn_set_hw_mode(unsigned long cpu)
-> +{
-> +	int rc = 0;
-> +	unsigned long flags;
-> +	struct insn_emulation *insn;
-> +
-> +	raw_spin_lock_irqsave(&insn_emulation_lock, flags);
-> +	list_for_each_entry(insn, &insn_emulation, node) {
-> +		bool enable = (insn->current_mode == INSN_HW);
-> +		if (insn->ops->set_hw_mode && insn->ops->set_hw_mode(enable)) {
-> +			pr_warn(enable, "CPU[%ld] cannot support the emulation of %s",
-> +							cpu, insn->ops->name);
-> +			rc = -EINVAL;
-> +		}
-> +	}
-> +	raw_spin_unlock_irqrestore(&insn_emulation_lock, flags);
-> +	return rc;
-> +}
-> +
->  static int update_insn_emulation_mode(struct insn_emulation *insn,
->  				       enum insn_emulation_mode prev)
->  {
-
-[...]
+Thanks again for your feedback.
