@@ -1,107 +1,54 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 23 Jan 2015 13:40:58 +0100
-Subject: [PATCH v4 18/18] iommu: exynos: add callback for initializing
- devices from device tree
-In-Reply-To: <CABxcv=nkcY0biXuDH1BHDdOZhrzYWr-YNP13QWzdLfZfQrxouA@mail.gmail.com>
-References: <1421399592-7482-1-git-send-email-m.szyprowski@samsung.com>
- <1421399592-7482-19-git-send-email-m.szyprowski@samsung.com>
- <CABxcv=nkcY0biXuDH1BHDdOZhrzYWr-YNP13QWzdLfZfQrxouA@mail.gmail.com>
-Message-ID: <54C2415A.3020508@samsung.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 23 Jan 2015 13:41:36 +0100
+Subject: [PATCH 0/9] ARM: shmobile: r8a73a4/ape6evm multiplatform
+In-Reply-To: <15458901.vhItGblgjS@avalon>
+References: <1421758306-24838-1-git-send-email-geert+renesas@glider.be>
+ <20150122033907.GO31170@verge.net.au>
+ <20150123042304.GE17548@verge.net.au> <15458901.vhItGblgjS@avalon>
+Message-ID: <CAMuHMdUb=nbo=OBWXZ1jaoVwJV6LeLTEiU=ic4rEjprobn6+HA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Laurent,
 
-On 2015-01-19 16:27, Javier Martinez Canillas wrote:
-> I wanted to test your IOMMU series on an Exynos5420 Peach Pit but the
-> kernel hangs with your series + dependencies on top of 3.19-rc5.
+On Fri, Jan 23, 2015 at 1:26 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> On Friday 23 January 2015 13:23:04 Simon Horman wrote:
+>> On Thu, Jan 22, 2015 at 12:39:07PM +0900, Simon Horman wrote:
+>> > On Wed, Jan 21, 2015 at 10:59:27AM +0900, Simon Horman wrote:
+>> >> On Tue, Jan 20, 2015 at 01:51:37PM +0100, Geert Uytterhoeven wrote:
+>> >>> This series is based on renesas-drivers-2015-01-19-v3.19-rc5.
+>> >>> It depends on renesas-devel-20150119-v3.19-rc5 (code-wise) and
+>> >>> clk-shmobile-for-3.20 (functionality-wise), for which I've sent a pull
+>> >>> request to Mike Turquette yesterday.
+
+> I've noticed you have dropped the following patches from your devel branch:
 >
-> Bisecting I found that $subject is the offending commit. I've pushed
-> my test branch [0] in case I missed something.
+> clk: shmobile: div6: Avoid changing divisor in .disable()
+> clk: shmobile: Add r8a7793 support
+> clk: shmobile: r8a7793: document CPG clock support
+> clk: shmobile: r8a73a4 common clock framework implementation
+> clk: shmobile: Add r8a73a4 SoC to MSTP bindings
+> clk: shmobile: Add R-Car Gen2 RCAN clock support
+> clk: shmobile: Add R-Car Gen2 ADSP clock support
 >
-> On Fri, Jan 16, 2015 at 10:13 AM, Marek Szyprowski
-> <m.szyprowski@samsung.com> wrote:
->> This patch adds implementation of of_xlate callback, which prepares
->> masters device for attaching to IOMMU. This callback is called during
->> creating devices from device tree.
->>
->> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> ---
->>   drivers/iommu/exynos-iommu.c | 28 ++++++++++++++++++++++++++++
->>   1 file changed, 28 insertions(+)
->>
->> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
->> index ea2659159e63..5432b443abfc 100644
->> --- a/drivers/iommu/exynos-iommu.c
->> +++ b/drivers/iommu/exynos-iommu.c
->> @@ -1077,6 +1077,33 @@ static phys_addr_t exynos_iommu_iova_to_phys(struct iommu_domain *iommu_domain,
->>          return phys;
->>   }
->>
->> +static int exynos_iommu_of_xlate(struct device *dev,
->> +                                struct of_phandle_args *spec)
->> +{
->> +       struct exynos_iommu_owner *owner = dev->archdata.iommu;
->> +       struct platform_device *sysmmu = of_find_device_by_node(spec->np);
->> +       struct sysmmu_drvdata *data;
->> +
->> +       if (!sysmmu)
->> +               return -ENODEV;
->> +
->> +       data = platform_get_drvdata(sysmmu);
->> +       if (!data)
->> +               return -ENODEV;
->> +
->> +       if (!owner) {
->> +               owner = kzalloc(sizeof(*owner), GFP_KERNEL);
->> +               if (!owner)
->> +                       return -ENOMEM;
->> +
->> +               INIT_LIST_HEAD(&owner->clients);
->> +               dev->archdata.iommu = owner;
->> +       }
->> +
->> +       list_add_tail(&data->owner_node, &owner->clients);
-> This is the line that causes the kernel to hang, if I comment the
-> list_add_tail() call then the kernel boots.
+> I don't see those patches queued in Mike Turquette's CCF tree.
 >
-> I checked that neither data nor owner are NULL and that the
-> owner->clients list_head is initialized. Do you have any ideas what
-> could be happening?
+> How should they be handled, and do they need to be delayed to v3.21 ?
 
-This is really strange. However the hang is definitely not caused by
-adding the controller to the list, but rather the fact that it is later
-being initialized, probably in exynos_iommu_attach_device().
+I sent a pull request for these 4 days ago, cfr.
+https://lkml.org/lkml/2015/1/19/391, but so far Mike hasn't pulled yet, or
+hasn't published his updated tree yet.
 
-Just a quick question - does bootloader on Exynos5420 Peach Pit sets
-any image on the display?
+I still hope this will happen soon...
 
-If so then we will get IOMMU page fault on init (DMA engine of FIMD is
-left enabled from bootloader) and such case is not yet handled.
-Besides that I have no idea for any other reason for such failure.
+Gr{oetje,eeting}s,
 
-To check if this is caused by io page fault, please temporarily add the
-following hack:
---->8---
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 7864797609b3..5e70cf7eb31b 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -2011,6 +2011,9 @@ static bool arm_setup_iommu_dma_ops(struct device 
-*dev, u64 dma_base, u64 size,
-          return false;
-      }
+                        Geert
 
-+    iommu_map(mapping->domain, 0x40000000, 0x40000000, 0x80000000,
-+          IOMMU_READ | IOMMU_WRITE);
-+
-      if (arm_iommu_attach_device(dev, mapping)) {
-          pr_warn("Failed to attached device %s to IOMMU_mapping\n",
-                  dev_name(dev));
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
---->8---
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
