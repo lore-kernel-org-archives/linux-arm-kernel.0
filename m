@@ -1,68 +1,31 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 23 Jan 2015 16:51:17 +0100
-Subject: [PATCH v5 07/18] iommu: exynos: remove unused functions
-In-Reply-To: <1422028288-891-1-git-send-email-m.szyprowski@samsung.com>
-References: <1422028288-891-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1422028288-891-8-git-send-email-m.szyprowski@samsung.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 23 Jan 2015 17:09:26 +0100
+Subject: [PATCH] i2c: designware: use {readl|writel}_relaxed instead of
+ readl/writel
+In-Reply-To: <1418279201-3886-1-git-send-email-jszhang@marvell.com>
+References: <1418279201-3886-1-git-send-email-jszhang@marvell.com>
+Message-ID: <20150123160926.GE9592@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes two unneeded functions, which are not a part of
-generic IOMMU API and were never used by any other driver.
+On Thu, Dec 11, 2014 at 02:26:41PM +0800, Jisheng Zhang wrote:
+> readl/writel is too expensive especially on Cortex A9 w/ outer L2 cache.
+> This introduces i2c read/write errors on Marvell BG2/BG2Q SoCs when there
+> are heavy L2 cache maintenance operations at the same time.
+> 
+> The driver does not perform DMA, so it's safe to use the relaxed version.
+> From another side, the relaxed io accessor macros are available on all
+> architectures now, so we can use the relaxed versions instead.
+> 
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- drivers/iommu/exynos-iommu.c | 31 -------------------------------
- 1 file changed, 31 deletions(-)
+Applied to for-next, thanks! Just replaced "errors" with "delays" in the
+description.
 
-diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index b6c8612..3c82411 100644
---- a/drivers/iommu/exynos-iommu.c
-+++ b/drivers/iommu/exynos-iommu.c
-@@ -490,13 +490,6 @@ static int __exynos_sysmmu_enable(struct device *dev, phys_addr_t pgtable,
- 	return ret;
- }
- 
--int exynos_sysmmu_enable(struct device *dev, phys_addr_t pgtable)
--{
--	BUG_ON(!memblock_is_memory(pgtable));
--
--	return __exynos_sysmmu_enable(dev, pgtable, NULL);
--}
--
- static bool exynos_sysmmu_disable(struct device *dev)
- {
- 	unsigned long flags;
-@@ -588,30 +581,6 @@ static void sysmmu_tlb_invalidate_entry(struct device *dev, sysmmu_iova_t iova,
- 	spin_unlock_irqrestore(&data->lock, flags);
- }
- 
--void exynos_sysmmu_tlb_invalidate(struct device *dev)
--{
--	struct exynos_iommu_owner *owner = dev->archdata.iommu;
--	unsigned long flags;
--	struct sysmmu_drvdata *data;
--
--	data = dev_get_drvdata(owner->sysmmu);
--
--	spin_lock_irqsave(&data->lock, flags);
--	if (is_sysmmu_active(data)) {
--		if (!IS_ERR(data->clk_master))
--			clk_enable(data->clk_master);
--		if (sysmmu_block(data->sfrbase)) {
--			__sysmmu_tlb_invalidate(data->sfrbase);
--			sysmmu_unblock(data->sfrbase);
--		}
--		if (!IS_ERR(data->clk_master))
--			clk_disable(data->clk_master);
--	} else {
--		dev_dbg(dev, "disabled. Skipping TLB invalidation\n");
--	}
--	spin_unlock_irqrestore(&data->lock, flags);
--}
--
- static int __init exynos_sysmmu_probe(struct platform_device *pdev)
- {
- 	int irq, ret;
--- 
-1.9.2
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150123/54ca148c/attachment.sig>
