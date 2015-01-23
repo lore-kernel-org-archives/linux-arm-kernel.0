@@ -1,224 +1,293 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 23 Jan 2015 11:30:06 +0100
-Subject: [PATCH 07/12] pm: at91: the standby mode uses the same sram
- function as the suspend to memory mode
-In-Reply-To: <1421741825-18226-8-git-send-email-wenyou.yang@atmel.com>
-References: <1421741825-18226-1-git-send-email-wenyou.yang@atmel.com>
- <1421741825-18226-8-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20150123103006.GH19922@piout.net>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 23 Jan 2015 10:36:36 +0000
+Subject: [PATCH v6 1/2] arm64: dts: Add support for Spreadtrum SC9836 SoC
+ in dts and Makefile
+In-Reply-To: <1422008491-16452-2-git-send-email-chunyan.zhang@spreadtrum.com>
+References: <sprd-dt-v6>
+ <1422008491-16452-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1422008491-16452-2-git-send-email-chunyan.zhang@spreadtrum.com>
+Message-ID: <20150123103636.GA23493@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/01/2015 at 16:17:00 +0800, Wenyou Yang wrote :
-> To simply the PM code, the suspend to standby mode uses the same sram function
-> as the suspend to memory mode, running in the internal SRAM,
-> instead of the respective code for each mode.
+On Fri, Jan 23, 2015 at 10:21:30AM +0000, Chunyan Zhang wrote:
+> From: Zhizhou Zhang <zhizhou.zhang@spreadtrum.com>
 > 
-> But for the suspend to standby mode, the master clock doesn't
-> switch to the slow clock,  and the main oscillator doesn't
-> turn off as well.
+> Adds the device tree support for Spreadtrum SC9836 SoC which is based on
+> Sharkl64 platform.
 > 
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-
-That looks quite better, thanks.
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-
+> Sharkl64 platform contains the common nodes of Spreadtrum's arm64-based SoCs.
+> 
+> Signed-off-by: Zhizhou Zhang <zhizhou.zhang@spreadtrum.com>
+> Signed-off-by: Orson Zhai <orson.zhai@spreadtrum.com>
+> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
 > ---
->  arch/arm/mach-at91/pm.c           |   81 ++++++++++++++++---------------------
->  arch/arm/mach-at91/pm.h           |    6 +++
->  arch/arm/mach-at91/pm_slowclock.S |   18 +++++++++
->  3 files changed, 59 insertions(+), 46 deletions(-)
+>  arch/arm64/boot/dts/Makefile                  |    1 +
+>  arch/arm64/boot/dts/sprd/Makefile             |    5 ++
+>  arch/arm64/boot/dts/sprd/sc9836-openphone.dts |   49 ++++++++++++++++
+>  arch/arm64/boot/dts/sprd/sc9836.dtsi          |   74 +++++++++++++++++++++++++
+>  arch/arm64/boot/dts/sprd/sharkl64.dtsi        |   65 ++++++++++++++++++++++
+>  5 files changed, 194 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/sprd/Makefile
+>  create mode 100644 arch/arm64/boot/dts/sprd/sc9836-openphone.dts
+>  create mode 100644 arch/arm64/boot/dts/sprd/sc9836.dtsi
+>  create mode 100644 arch/arm64/boot/dts/sprd/sharkl64.dtsi
 > 
-> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-> index 691e6db..a1010f0 100644
-> --- a/arch/arm/mach-at91/pm.c
-> +++ b/arch/arm/mach-at91/pm.c
-> @@ -145,62 +145,51 @@ extern void at91_slow_clock(void __iomem *pmc, void __iomem *ramc0,
->  			    void __iomem *ramc1, int memctrl);
->  extern u32 at91_slow_clock_sz;
+> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+> index 3b8d427..806a717 100644
+> --- a/arch/arm64/boot/dts/Makefile
+> +++ b/arch/arm64/boot/dts/Makefile
+> @@ -2,6 +2,7 @@ dts-dirs += amd
+>  dts-dirs += apm
+>  dts-dirs += arm
+>  dts-dirs += cavium
+> +dts-dirs += sprd
 >  
-> +static void at91_pm_suspend(suspend_state_t state)
-> +{
-> +	unsigned int pm_data = at91_pm_data.memctrl;
+>  always		:= $(dtb-y)
+>  subdir-y	:= $(dts-dirs)
+> diff --git a/arch/arm64/boot/dts/sprd/Makefile b/arch/arm64/boot/dts/sprd/Makefile
+> new file mode 100644
+> index 0000000..b658c5e
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/sprd/Makefile
+> @@ -0,0 +1,5 @@
+> +dtb-$(CONFIG_ARCH_SPRD) += sc9836-openphone.dtb
 > +
-> +	pm_data |= (state == PM_SUSPEND_MEM) ?
-> +			(AT91_PM_SLOW_CLOCK << AT91_PM_MODE_OFFSET) : 0;
+> +always		:= $(dtb-y)
+> +subdir-y	:= $(dts-dirs)
+> +clean-files	:= *.dtb
+> diff --git a/arch/arm64/boot/dts/sprd/sc9836-openphone.dts b/arch/arm64/boot/dts/sprd/sc9836-openphone.dts
+> new file mode 100644
+> index 0000000..b8a69b2
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/sprd/sc9836-openphone.dts
+> @@ -0,0 +1,49 @@
+> +/*
+> + * Spreadtrum SC9836 openphone board DTS file
+> + *
+> + * Copyright (C) 2014, Spreadtrum Communications Inc.
+> + *
+> + * This file is licensed under a dual GPLv2 or X11 license.
+> + */
 > +
-> +	slow_clock(at91_pmc_base, at91_ramc_base[0],
-> +			at91_ramc_base[1], pm_data);
-> +}
+> +/dts-v1/;
 > +
->  static int at91_pm_enter(suspend_state_t state)
->  {
->  	at91_pinctrl_gpio_suspend();
->  
->  	switch (state) {
-> +	/*
-> +	 * Suspend-to-RAM is like STANDBY plus slow clock mode, so
-> +	 * drivers must suspend more deeply, the master clock switches
-> +	 * to the clk32k and turns off the main oscillator
-> +	 *
-> +	 * STANDBY mode has *all* drivers suspended; ignores irqs not
-> +	 * marked as 'wakeup' event sources; and reduces DRAM power.
-> +	 * But otherwise it's identical to PM_SUSPEND_ON:  cpu idle, and
-> +	 * nothing fancy done with main or cpu clocks.
-> +	 */
-> +	case PM_SUSPEND_MEM:
-> +	case PM_SUSPEND_STANDBY:
->  		/*
-> -		 * Suspend-to-RAM is like STANDBY plus slow clock mode, so
-> -		 * drivers must suspend more deeply:  only the master clock
-> -		 * controller may be using the main oscillator.
-> +		 * Ensure that clocks are in a valid state.
->  		 */
-> -		case PM_SUSPEND_MEM:
-> -			/*
-> -			 * Ensure that clocks are in a valid state.
-> -			 */
-> -			if (!at91_pm_verify_clocks())
-> -				goto error;
-> -
-> -			/*
-> -			 * Enter slow clock mode by switching over to clk32k and
-> -			 * turning off the main oscillator; reverse on wakeup.
-> -			 */
-> -			if (slow_clock) {
-> -				slow_clock(at91_pmc_base, at91_ramc_base[0],
-> -					   at91_ramc_base[1],
-> -					   at91_pm_data.memctrl);
-> -				break;
-> -			} else {
-> -				pr_info("AT91: PM - no slow clock mode enabled ...\n");
-> -				/* FALLTHROUGH leaving master clock alone */
-> -			}
-> +		if (!at91_pm_verify_clocks())
-> +			goto error;
->  
-> -		/*
-> -		 * STANDBY mode has *all* drivers suspended; ignores irqs not
-> -		 * marked as 'wakeup' event sources; and reduces DRAM power.
-> -		 * But otherwise it's identical to PM_SUSPEND_ON:  cpu idle, and
-> -		 * nothing fancy done with main or cpu clocks.
-> -		 */
-> -		case PM_SUSPEND_STANDBY:
-> -			/*
-> -			 * NOTE: the Wait-for-Interrupt instruction needs to be
-> -			 * in icache so no SDRAM accesses are needed until the
-> -			 * wakeup IRQ occurs and self-refresh is terminated.
-> -			 * For ARM 926 based chips, this requirement is weaker
-> -			 * as at91sam9 can access a RAM in self-refresh mode.
-> -			 */
-> -			if (at91_pm_standby)
-> -				at91_pm_standby();
-> -			break;
-> +		at91_pm_suspend(state);
->  
-> -		case PM_SUSPEND_ON:
-> -			cpu_do_idle();
-> -			break;
-> +		break;
->  
-> -		default:
-> -			pr_debug("AT91: PM - bogus suspend state %d\n", state);
-> -			goto error;
-> +	case PM_SUSPEND_ON:
-> +		cpu_do_idle();
-> +		break;
+> +#include "sc9836.dtsi"
 > +
-> +	default:
-> +		pr_debug("AT91: PM - bogus suspend state %d\n", state);
-> +		goto error;
->  	}
->  
->  error:
-> diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
-> index 7664d39..fbfea42 100644
-> --- a/arch/arm/mach-at91/pm.h
-> +++ b/arch/arm/mach-at91/pm.h
-> @@ -15,6 +15,12 @@
->  
->  #include <mach/at91_ramc.h>
->  
-> +#define AT91_PM_MEMCTRL_MASK	0x0f
-> +#define AT91_PM_MODE_OFFSET	4
-> +#define AT91_PM_MODE_MASK	0x0f
+> +/ {
+> +	model = "Spreadtrum SC9836 Openphone Board";
 > +
-> +#define	AT91_PM_SLOW_CLOCK	0x01
+> +	compatible = "sprd,sc9836-openphone", "sprd,sc9836";
 > +
->  /*
->   * On all at91 except rm9200 and x40 have the System Controller starts
->   * at address 0xffffc000 and has a size of 16KiB.
-> diff --git a/arch/arm/mach-at91/pm_slowclock.S b/arch/arm/mach-at91/pm_slowclock.S
-> index 634d819..92d7e63 100644
-> --- a/arch/arm/mach-at91/pm_slowclock.S
-> +++ b/arch/arm/mach-at91/pm_slowclock.S
-> @@ -15,12 +15,15 @@
->  #include <linux/clk/at91_pmc.h>
->  #include <mach/at91_ramc.h>
->  
-> +#include "pm.h"
+> +	aliases {
+> +		serial0 = &uart0;
+> +		serial1 = &uart1;
+> +		serial2 = &uart2;
+> +		serial3 = &uart3;
+> +	};
 > +
->  pmc	.req	r0
->  sdramc	.req	r1
->  ramc1	.req	r2
->  memctrl	.req	r3
->  tmp1	.req	r4
->  tmp2	.req	r5
-> +mode	.req	r6
->  
->  /*
->   * Wait until master clock is ready (after switching master clock source)
-> @@ -72,6 +75,13 @@ ENTRY(at91_slow_clock)
->  	mov	tmp1, #0
->  	mcr	p15, 0, tmp1, c7, c10, 4
->  
-> +	mov	tmp1, memctrl
-> +	mov	tmp2, tmp1, lsr#AT91_PM_MODE_OFFSET
-> +	and	mode, tmp2, #AT91_PM_MODE_MASK
+> +	memory at 80000000 {
+> +		device_type = "memory";
+> +		reg = <0 0x80000000 0 0x20000000>;
+> +	};
 > +
-> +	mov	tmp1, memctrl
-> +	and	memctrl, tmp1, #AT91_PM_MEMCTRL_MASK
-> +
->  	cmp	memctrl, #AT91_MEMCTRL_MC
->  	bne	ddr_sr_enable
->  
-> @@ -144,6 +154,9 @@ sdr_sr_enable:
->  	str	tmp1, [sdramc, #AT91_SDRAMC_LPR]
->  
->  sdr_sr_done:
-> +	tst	mode, #AT91_PM_SLOW_CLOCK
-> +	beq	skip_disable_clock
-> +
->  	/* Save Master clock setting */
->  	ldr	tmp1, [pmc, #AT91_PMC_MCKR]
->  	str	tmp1, .saved_mckr
-> @@ -169,9 +182,13 @@ sdr_sr_done:
->  	bic	tmp1, tmp1, #AT91_PMC_MOSCEN
->  	str	tmp1, [pmc, #AT91_CKGR_MOR]
->  
-> +skip_disable_clock:
->  	/* Wait for interrupt */
->  	mcr	p15, 0, tmp1, c7, c0, 4
->  
-> +	tst	mode, #AT91_PM_SLOW_CLOCK
-> +	beq	skip_enable_clock
-> +
->  	/* Turn on the main oscillator */
->  	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
->  	orr	tmp1, tmp1, #AT91_PMC_MOSCEN
-> @@ -199,6 +216,7 @@ sdr_sr_done:
->  
->  	wait_mckrdy
->  
-> +skip_enable_clock:
->  	/*
->  	 * at91rm9200 Memory controller
->  	 * Do nothing - self-refresh is automatically disabled.
-> -- 
-> 1.7.9.5
-> 
+> +	chosen {
+> +		stdout-path = &uart0;
+> +	};
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+It would be good to use an explicit configuration here. e.g. have:
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+Where '115200n8' is replaced by whatever the bootloader leaves the UART
+configured as on this board.
+
+That means you won't need a 'console=' to get nice consistent serial
+output at boot, and won't be relying on implicit defaults all over the
+place.
+
+> +};
+> +
+> +&uart0 {
+> +	status = "okay";
+> +};
+> +
+> +&uart1 {
+> +	status = "okay";
+> +};
+> +
+> +&uart2 {
+> +	status = "okay";
+> +};
+> +
+> +&uart3 {
+> +	status = "okay";
+> +};
+> diff --git a/arch/arm64/boot/dts/sprd/sc9836.dtsi b/arch/arm64/boot/dts/sprd/sc9836.dtsi
+> new file mode 100644
+> index 0000000..c646123
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/sprd/sc9836.dtsi
+> @@ -0,0 +1,74 @@
+> +/*
+> + * Spreadtrum SC9836 SoC DTS file
+> + *
+> + * Copyright (C) 2014, Spreadtrum Communications Inc.
+> + *
+> + * This file is licensed under a dual GPLv2 or X11 license.
+> + */
+> +
+> +#include "sharkl64.dtsi"
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +
+> +/ {
+> +	compatible = "sprd,sc9836";
+> +
+> +	cpus {
+> +		#address-cells = <2>;
+> +		#size-cells = <0>;
+> +
+> +		cpu at 0 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53", "arm,armv8";
+> +			reg = <0x0 0x0>;
+> +			enable-method = "psci";
+> +		};
+> +
+> +		cpu at 1 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53", "arm,armv8";
+> +			reg = <0x0 0x1>;
+> +			enable-method = "psci";
+> +		};
+> +
+> +		cpu at 2 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53", "arm,armv8";
+> +			reg = <0x0 0x2>;
+> +			enable-method = "psci";
+> +		};
+> +
+> +		cpu at 3 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53", "arm,armv8";
+> +			reg = <0x0 0x3>;
+> +			enable-method = "psci";
+> +		};
+> +	};
+> +
+> +	gic: interrupt-controller at 12001000 {
+> +		compatible = "arm,gic-400";
+> +		reg = <0 0x12001000 0 0x1000>,
+> +		      <0 0x12002000 0 0x2000>,
+> +		      <0 0x12004000 0 0x2000>,
+> +		      <0 0x12006000 0 0x2000>;
+> +		#interrupt-cells = <3>;
+> +		interrupt-controller;
+> +		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+> +	};
+> +
+> +	psci {
+> +		compatible	= "arm,psci";
+> +		method		= "smc";
+> +		cpu_on		= <0xc4000003>;
+> +		cpu_off		= <0x84000002>;
+> +		cpu_suspend	= <0xc4000001>;
+> +	};
+
+Given that there are no suspend states in this dts, the cpu_suspend
+property here could be omitted for now (though I guess it doesn't matter
+either way).
+
+> +
+> +	timer {
+> +		compatible = "arm,armv8-timer";
+> +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+> +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+> +			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+> +			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
+> +	};
+> +};
+> diff --git a/arch/arm64/boot/dts/sprd/sharkl64.dtsi b/arch/arm64/boot/dts/sprd/sharkl64.dtsi
+> new file mode 100644
+> index 0000000..6b4bdc5
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/sprd/sharkl64.dtsi
+> @@ -0,0 +1,65 @@
+> +/*
+> + * Spreadtrum Sharkl64 platform DTS file
+> + *
+> + * Copyright (C) 2014, Spreadtrum Communications Inc.
+> + *
+> + * This file is licensed under a dual GPLv2 or X11 license.
+> + */
+> +
+> +/ {
+> +	interrupt-parent = <&gic>;
+> +	#address-cells = <2>;
+> +	#size-cells = <2>;
+> +
+> +	soc {
+> +		compatible = "simple-bus";
+> +		#address-cells = <2>;
+> +		#size-cells = <2>;
+> +		ranges;
+> +
+> +		ap-apb {
+> +			compatible = "simple-bus";
+> +			#address-cells = <2>;
+> +			#size-cells = <2>;
+> +			ranges;
+> +
+> +			uart0: serial at 70000000 {
+> +				compatible = "sprd,sc9836-uart";
+> +				reg = <0 0x70000000 0 0x100>;
+> +				interrupts = <0 2 0xf04>;
+> +				clocks = <&clk26mhz>;
+> +				status = "disabled";
+> +			};
+> +
+> +			uart1: serial at 70100000 {
+> +				compatible = "sprd,sc9836-uart";
+> +				reg = <0 0x70100000 0 0x100>;
+> +				interrupts = <0 3 0xf04>;
+> +				clocks = <&clk26mhz>;
+> +				status = "disabled";
+> +			};
+> +
+> +			uart2: serial at 70200000 {
+> +				compatible = "sprd,sc9836-uart";
+> +				reg = <0 0x70200000 0 0x100>;
+> +				interrupts = <0 2 0xf04>;
+> +				clocks = <&clk26mhz>;
+> +				status = "disabled";
+> +			};
+> +
+> +			uart3: serial at 70300000 {
+> +				compatible = "sprd,sc9836-uart";
+> +				reg = <0 0x70300000 0 0x100>;
+> +				interrupts = <0 3 0xf04>;
+> +				clocks = <&clk26mhz>;
+> +				status = "disabled";
+> +			};
+> +		};
+> +	};
+> +
+> +	clk26mhz: clk26mhz {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <26000000>;
+> +	};
+> +};
+
+Other than my comments above, this looks fine to me. I assume the UART
+binding and driver are already queued somewhere else?
+
+If so:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
