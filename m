@@ -1,57 +1,28 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 23 Jan 2015 17:04:55 +0000
-Subject: [PATCH URGENT] arm: dma-mapping: Set DMA IOMMU ops in
- arm_iommu_attach_device()
-In-Reply-To: <2036088.T8IpDXjCxc@wuerfel>
-References: <1422022909-31044-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <10179212.ryUUVC9zEx@wuerfel> <2416515.WUUq1g4kPD@avalon>
- <2036088.T8IpDXjCxc@wuerfel>
-Message-ID: <20150123170455.GB13772@arm.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Fri, 23 Jan 2015 18:09:12 +0100
+Subject: [PATCH V4 4/4] mmc: pwrseq_simple: Add support for a reset GPIO
+ pin
+In-Reply-To: <CAPDyKFqnU3OcyiDYPQ4pLRhOGkiEJ1nuwYSP_+qain63N9CEfg@mail.gmail.com>
+References: <1421658784-11980-1-git-send-email-ulf.hansson@linaro.org>
+ <1421658784-11980-5-git-send-email-ulf.hansson@linaro.org>
+ <CABxcv=nGWPnkNz1tXJpaTUkroucDgVYzeCrEmZvA8xfzHzROvg@mail.gmail.com>
+ <CAPDyKFqnU3OcyiDYPQ4pLRhOGkiEJ1nuwYSP_+qain63N9CEfg@mail.gmail.com>
+Message-ID: <CABxcv=mGPm4GnFtKOY--Ev0fJEezM86-vfDrERMtaNJkjnTNmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 23, 2015 at 05:00:45PM +0000, Arnd Bergmann wrote:
-> On Friday 23 January 2015 17:55:25 Laurent Pinchart wrote:
-> > 
-> > On Friday 23 January 2015 16:27:24 Arnd Bergmann wrote:
-> > > On Friday 23 January 2015 16:21:49 Laurent Pinchart wrote:
-> > > > +/**
-> > > > + * arm_iommu_detach_device
-> > > > + * @dev: valid struct device pointer
-> > > > + *
-> > > > + * Detaches the provided device from a previously attached map.
-> > > > + * This voids the dma operations (dma_map_ops pointer)
-> > > > + */
-> > > > +void arm_iommu_detach_device(struct device *dev)
-> > > > +{
-> > > > +       __arm_iommu_detach_device(dev);
-> > > > +       set_dma_ops(dev, NULL);
-> > > > +}
-> > > > 
-> > > >  EXPORT_SYMBOL_GPL(arm_iommu_detach_device);
-> > > 
-> > > Would this introduce a regression in the case where the device is
-> > > cache coherent and needs arm_coherent_dma_ops set?
-> > 
-> > I think we need to handle that case (as well as the coherent IOMMU case in 
-> > arm_iommu_attach_device), but this patch only tries to restore the previous 
-> > behaviour to fix the bug detailed in the commit message. Would you prefer 
-> > fixing both issues in one go ?
-> > 
-> 
-> No, I was specifically trying to find out whether the new behavior would
-> be worse than what we had in 3.18. If it's a preexisting bug that nobody
-> has run into, there is no hurry.
+Hello Ulf,
 
-Agreed, I think Laurent's proposal here is the smallest thing that fixes
-the issue without breaking the new of_xlate-based configuration.
+On Fri, Jan 23, 2015 at 6:01 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>
+>> Any reason to not use the devm_gpiod_get_index() managed version instead?
+>
+> This struct device don't have a bound driver to it. Thus this device
+> won't be freed automagically from the ->remove() or failed ->probe()
+> path.
+>
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+Right, I missed that. Thanks a lot for the clarification.
 
-> It's quite likely that to date, all IOMMU users on ARM32 are not
-> cache coherent.
-
-Highbank has an ARM SMMU, but I don't see the iommu_coherent_ops getting
-used, so your assertion is probably right.
-
-Will
+Best regards,
+Javier
