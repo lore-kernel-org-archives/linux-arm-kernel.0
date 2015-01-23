@@ -1,100 +1,75 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 23 Jan 2015 17:34:50 +0000
-Subject: [PATCH] arm64: dts: Add initial device tree support for Tegra132
-In-Reply-To: <54C27D6F.9000006@wwwdotorg.org>
-References: <alpine.DEB.2.02.1501161139180.9776@utopia.booyaka.com>
- <20150121161313.GI5044@leverpostej>
- <alpine.DEB.2.02.1501231038130.5450@utopia.booyaka.com>
- <54C27D6F.9000006@wwwdotorg.org>
-Message-ID: <20150123173449.GB10424@leverpostej>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Fri, 23 Jan 2015 09:39:46 -0800
+Subject: [next-20150119]regression (mm)?
+In-Reply-To: <20150123172736.GA15392@kahuna>
+References: <54BD33DC.40200@ti.com> <20150119174317.GK20386@saruman>
+ <20150120001643.7D15AA8@black.fi.intel.com>
+ <20150120114555.GA11502@n2100.arm.linux.org.uk>
+ <20150120140546.DDCB8D4@black.fi.intel.com>
+ <20150123172736.GA15392@kahuna>
+Message-ID: <CANMBJr7w2jZBwRDEsVNvL3XrDZ2ttwFz7qBf4zySAMMmcgAxiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 23, 2015 at 04:57:19PM +0000, Stephen Warren wrote:
-> On 01/23/2015 04:31 AM, Paul Walmsley wrote:
-> > + Arto, Terje for comments on the host1x section
-> > + Stephen Warren for comments on the serial DT data
-> 
-> > On Wed, 21 Jan 2015, Mark Rutland wrote:
-> >
-> >> As mentioned in my reply to the DT list patch [1], there are a couple of
-> >> bits I'd like to see cleaned up first, but in the meantime I have some
-> >> comments from my first pass of the dtsi below. Some of these may equally
-> >> apply to existing dts(i) files.
-> >>
-> >> I see a few undocumented compatible strings (at least when comparing
-> >> against mainline). If there are other series or trees I should be
-> >> looking at, any pointers would be appreciated. If not, documentation
-> >> updates would be nice (checkpatch should complain otherwise).
-> 
-> >> On Fri, Jan 16, 2015 at 11:45:29AM +0000, Paul Walmsley wrote:
-> >>>
-> >>> Add an initial device tree file for the Tegra132 SoC.  The DT file is
-> >>> based on arch/arm/boot/dts/tegra124.dtsi and
-> >>> arch/arm/boot/dts/tegra114.dtsi, with the following significant
-> >>> changes:
-> >>>
-> >>> - Tegra132 uses a Denver CPU cluster rather than an ARMv7 CPU cluster
-> >>> - Devices are arranged by bus, rather than in a flat topology
-> >>> - No polling delays have been defined for the thermal zones.  I don't
-> >>>    believe that this is a property of the SoC hardware, but rather of a
-> >>>    given use-case.
-> 
-> >>> diff --git a/arch/arm64/boot/dts/tegra/tegra132.dtsi b/arch/arm64/boot/dts/tegra/tegra132.dtsi
-> >>> +               /*
-> >>> +                * There are two serial drivers: an 8250 based simple
-> >>> +                * serial driver and an APB DMA based serial driver
-> >>> +                * for higher baudrate and performance. To enable the
-> >>> +                * 8250 based driver, the compatible string is
-> >>> +                * "nvidia,tegra132-uart", "nvidia,tegra124-uart",
-> >>> +                * "nvidia,tegra20-uart" and to enable the APB DMA
-> >>> +                * based serial driver, the compatible string is
-> >>> +                * "nvidia,tegra132-hsuart", "nvidia,tegra124-hsuart",
-> >>> +                * "nvidia,tegra30-hsuart".
-> >>> +                */
-> >>
-> >> Is there any reason to continue with this split?
-> >>
-> >> Surely if the only difference is DMA, the presence of dmas and dma-names
-> >> should be sufficient to get the driver to do the right thing, and if you
-> >> need to disable DMA for debugging that could be a command-line option.
-> 
-> I vaguely recall asking for the DMA support to be integrated into the 
-> regular 8250 driver instead when the separate DMA-capable driver was 
-> first added. I /think/ there was resistance to this because adding lots 
-> of different SoC-specific ways to do DMA into the existing 8250 driver 
-> would complicate it even more, and hence be unmaintainable.
-> 
-> I assume that reasoning is still valid.
-> 
-> Perhaps what we need is more fine-grained driver selection, not just 
-> based on compatible value. Something like:
-> 
-> if compatible == nvidia,tegra20-uart:
->    if node.has_prop("enable-dma"):
->      driver = Tegra-specfic DMA capable UART driver
->    else:
->      driver = Common 8250 driver
+Hi,
 
-Surely we should assume that if the DMAs are listed (and not disabled)
-they are usable? I'm not sure I see the point in an additional property
-to force Linux-internal driver selection in this way.
+On 23 January 2015 at 09:27, Nishanth Menon <nm@ti.com> wrote:
+> On 16:05-20150120, Kirill A. Shutemov wrote:
+> [..]
+>> Signed-off-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
+>> Reported-by: Nishanth Menon <nm@ti.com>
+> Just to close on this thread:
+> https://github.com/nmenon/kernel-test-logs/tree/next-20150123 looks good
+> and back to old status. Thank you folks for all the help.
 
-What happens if we have a driver for a particular string, but fail to
-probe? Can we fall back to a more generic driver?
+I just reviewed the boot logs for next-20150123 and there still seems
+to be a related issue. I've been boot testing
+multi_v7_defconfig+CONFIG_ARM_LPAE=y kernel configurations which still
+seem broken.
 
-> Is that something that of_serial.c could/should be enhanced to do? That 
-> said, the whole reasoning behind separate compatible properties before 
-> was that compatible is supposed to "drive" driver selection. At least, 
-> that's what I was told then.
+For example here are two boots with exynos5250-arndale, one with
+multi_v7_defconfig+CONFIG_ARM_LPAE=y [1] and the other with
+multi_v7_defconfig[2]. You can see the kernel configurations with
+CONFIG_ARM_LPAE=y show the splat:
 
-The compatible string is meant to describe the programming interface the
-device is compatible with. The kernel should then choose the most
-appropriate driver it knows can handle that HW programming interface.
+[   14.605950] ------------[ cut here ]------------
+[   14.609163] WARNING: CPU: 1 PID: 63 at ../mm/mmap.c:2858
+exit_mmap+0x1b8/0x224()
+[   14.616548] Modules linked in:
+[   14.619553] CPU: 1 PID: 63 Comm: init Not tainted 3.19.0-rc5-next-20150123 #1
+[   14.626713] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+[   14.632830] [] (unwind_backtrace) from [] (show_stack+0x10/0x14)
+[   14.640473] [] (show_stack) from [] (dump_stack+0x78/0x94)
+[   14.647678] [] (dump_stack) from [] (warn_slowpath_common+0x74/0xb0)
+[   14.655744] [] (warn_slowpath_common) from [] (warn_slowpath_null+0x1c/0x24)
+[   14.664510] [] (warn_slowpath_null) from [] (exit_mmap+0x1b8/0x224)
+[   14.672497] [] (exit_mmap) from [] (mmput+0x40/0xf8)
+[   14.679180] [] (mmput) from [] (flush_old_exec+0x328/0x604)
+[   14.686471] [] (flush_old_exec) from [] (load_elf_binary+0x26c/0x11f4)
+[   14.694715] [] (load_elf_binary) from [] (search_binary_handler+0x98/0x244)
+[   14.703395] [] (search_binary_handler) from []
+(do_execveat_common+0x4dc/0x5bc)
+[   14.712421] [] (do_execveat_common) from [] (do_execve+0x28/0x30)
+[   14.720235] [] (do_execve) from [] (ret_fast_syscall+0x0/0x34)
+[   14.727782] ---[ end trace 5e3ca48b454c7e0a ]---
+[   14.733758] ------------[ cut here ]------------
 
-Considering it as a way to choose the driver is backwards. I'd expect
-the device node to have both strings (with the DMA capable string first)
-unless it really doesn't have any DMAs.
+Has anyone else tested with CONFIG_ARM_LPAE=y that can confirm my findings?
 
-Thanks,
-Mark.
+
+> --
+> Regards,
+> Nishanth Menon
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+[1] http://storage.kernelci.org/next/next-20150123/arm-multi_v7_defconfig+CONFIG_ARM_LPAE=y/lab-tbaker/boot-exynos5250-arndale.html
+
+[2] http://storage.kernelci.org/next/next-20150123/arm-multi_v7_defconfig/lab-tbaker/boot-exynos5250-arndale.html
+
+Cheers,
+
+Tyler
