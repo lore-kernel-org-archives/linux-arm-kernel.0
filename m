@@ -1,22 +1,33 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Fri, 23 Jan 2015 17:32:38 -0500
-Subject: [PATCH v4 5/6] PCI: update dma configuration from DT
-In-Reply-To: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
-References: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1422052359-12384-6-git-send-email-m-karicheri2@ti.com>
+Date: Fri, 23 Jan 2015 17:32:33 -0500
+Subject: [PATCH v4 0/6] PCI: get DMA configuration from parent device
+Message-ID: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If there is a DT node available for the root bridge's parent device,
-use the dma configuration from that device node. For example, keystone
-PCI devices would require dma_pfn_offset to be set correctly in the
-device structure of the pci device in order to have the correct dma mask.
-The DT node will have dma-ranges defined for this. Also support using
-the DT property dma-coherent to allow coherent DMA operation by the
-PCI device.
+PCI devices on Keystone doesn't have correct dma_pfn_offset set. This patch
+add capability to set the dma configuration such as dma-mask, dma_pfn_offset,
+and dma ops etc using the information from DT. The prior RFCs and discussions
+are available at [1] and [2] below.
 
-This patch use the new helper function of_pci_dma_configure() to update
-the device dma configuration.
+[2] : https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg790244.html
+[1] : http://www.gossamer-threads.com/lists/linux/kernel/2024591
+
+Change history:
+	v4 - moved size adjustments in of_iommu_configure() to a separate patch
+	   - consistent node name comment from Rob
+	   - patch 6 added for dma_mask adjustment and iommu mapping size
+	     limiting.
+	v3 - addressed comments to re-use of_dma_configure() for PCI
+	   - To help re-use, change of_iommu_configure() function argument
+		- Move of_dma_configure to of/device.c
+		- Limit the of_iommu_configure to non pci devices
+	v2 - update size to coherent_dma_mask + 1 if dma-range info is missing
+	   - also check the np for null.
+	v1 - updates based on the comments against initial RFC.
+	   - Added a helper function to get the OF node of the parent
+	   - Added an API in of_pci.c to update DMA configuration of the pci
+	     device.
 
 Cc: Joerg Roedel <joro@8bytes.org>
 Cc: Grant Likely <grant.likely@linaro.org>
@@ -27,30 +38,24 @@ Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
----
- drivers/pci/probe.c |    2 ++
- 1 file changed, 2 insertions(+)
+Murali Karicheri (6): 
+  of: iommu: add ptr to OF node arg to of_iommu_configure()
+  of: move of_dma_configure() to device.c to help re-use
+  of: fix size when dma-range is not used
+  of/pci: add of_pci_dma_configure() update dma configuration
+  PCI: update dma configuration from DT
+  arm: dma-mapping: updates to limit dma_mask and iommu mapping size
 
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 23212f8..d7dcd6c 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -6,6 +6,7 @@
- #include <linux/delay.h>
- #include <linux/init.h>
- #include <linux/pci.h>
-+#include <linux/of_pci.h>
- #include <linux/pci_hotplug.h>
- #include <linux/slab.h>
- #include <linux/module.h>
-@@ -1520,6 +1521,7 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
- 	dev->dev.dma_mask = &dev->dma_mask;
- 	dev->dev.dma_parms = &dev->dma_parms;
- 	dev->dev.coherent_dma_mask = 0xffffffffull;
-+	of_pci_dma_configure(dev);
- 
- 	pci_set_dma_max_seg_size(dev, 65536);
- 	pci_set_dma_seg_boundary(dev, 0xffffffff);
+ arch/arm/mm/dma-mapping.c |   10 +++++++
+ drivers/iommu/of_iommu.c  |   10 +++++--
+ drivers/of/device.c       |   71 +++++++++++++++++++++++++++++++++++++++++++++
+ drivers/of/of_pci.c       |   39 +++++++++++++++++++++++++
+ drivers/of/platform.c     |   58 ++----------------------------------
+ drivers/pci/probe.c       |    2 ++
+ include/linux/of_device.h |    2 ++
+ include/linux/of_iommu.h  |    6 ++--
+ include/linux/of_pci.h    |   12 ++++++++
+ 9 files changed, 150 insertions(+), 60 deletions(-)
+
 -- 
 1.7.9.5
