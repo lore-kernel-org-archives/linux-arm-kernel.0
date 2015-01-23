@@ -1,63 +1,103 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Fri, 23 Jan 2015 15:51:53 +0900
-Subject: [PATCH 1/2] clk: exynos5420: Add IDs for clocks used in DISP1
- power domain
-In-Reply-To: <54BF81C2.3020000@collabora.co.uk>
-References: <1421750127-22536-1-git-send-email-javier.martinez@collabora.co.uk>
- <1421750127-22536-2-git-send-email-javier.martinez@collabora.co.uk>
- <54BE6050.1090205@samsung.com> <20150120175402.22722.84342@quantum>
- <54BF81C2.3020000@collabora.co.uk>
-Message-ID: <0c2601d036d9$1276e7d0$3764b770$@kernel.org>
+From: ideal.song@samsung.com (Inha Song)
+Date: Fri, 23 Jan 2015 15:56:49 +0900
+Subject: [alsa-devel] [PATCH v4 3/3] ARM: dts: Add sound nodes for
+ exynos4412-trats2
+In-Reply-To: <1421989410-12490-4-git-send-email-ideal.song@samsung.com>
+References: <1421989410-12490-1-git-send-email-ideal.song@samsung.com>
+ <1421989410-12490-4-git-send-email-ideal.song@samsung.com>
+Message-ID: <20150123155649.14fe36a7@songinha-Samsung-DeskTop-System>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Javier Martinez Canillas wrote:
-> 
-> Hello,
-> 
-Hi,
+Hi Kukjin,
 
-> On 01/20/2015 06:54 PM, Mike Turquette wrote:
-> > Quoting Sylwester Nawrocki (2015-01-20 06:04:00)
-> >> Hi,
-> >>
-> >> On 20/01/15 11:35, Javier Martinez Canillas wrote:
-> >> > When a power domain is powered off on Exynos5420 SoC, the input clocks of
-> >> > the devices attached to this power domain are re-parented to oscclk and
-> >> > restored to the original parent after powering on the power domain.
-> >> >
-> >> > So a reference to the input and parent clocks for the devices attached to
-> >> > a power domain are needed to be able to do the re-parenting. The DISP1 pd
-> >> > includes modules which uses the following clocks:
-> >> >
-> >> > ACLK_200_DISP1 (MIXER and HDMILINK)
-> >> > ACLK_300_DISP1 (FIMD1)
-> >> > ACLK_400_DISP1 (Internal Buses)
-> >> >
-> >> > Each of these clocks are generated as the output of a clock mux so add an
-> >> > ID for all of these clock muxes and their parents to be referenced in the
-> >> > DISP1 power domain device node.
-> >> >
-> >> > Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> >>
-> >> The patch looks OK to me, I'm fine with it being merged via Kukjin's tree
-> >> due to the dts dependencies (including other pending dts patches touching
-> >> the arch/arm/boot/dts/exynos5420.dtsi file).
-> >> I think we need also Mike ACK for that, I could also queue the patch for
-> >> the clk tree and create a topic branch, but merging both patches via
-> >> arm-soc seems a more sane option in this case.
-> >>
-> >> Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> >
-> > Acked-by: Michael Turquette <mturquette@linaro.org>
-> >
-> 
-> Thanks a lot Sylwester and Mike for your acks.
-> 
-> Kukjin, could you please pick $subject and "Patch 2/2 ARM: dts: Add DISP1
-> power domain for exynos5420" through your tree?
-> 
-Sure, I will after applying Marek's generic power domain patch.
+Sorry, I missed to adding in Cc.
 
-Thanks,
-Kukjin
+Best Regards,
+Inha Song.
+
+On Fri, 23 Jan 2015 14:03:30 +0900
+Inha Song <ideal.song@samsung.com> wrote:
+
+> This patch add WM1811 audio codec, I2S interface and the sound
+> machine nodes to enable audio on exynos4412-trats2 board.
+> 
+> Signed-off-by: Inha Song <ideal.song@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos4412-trats2.dts | 42 +++++++++++++++++++++++++++++++++
+>  1 file changed, 42 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+> index 29231b4..6205b98 100644
+> --- a/arch/arm/boot/dts/exynos4412-trats2.dts
+> +++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+> @@ -203,6 +203,25 @@
+>  		};
+>  	};
+>  
+> +	i2c at 138A0000 {
+> +		samsung,i2c-sda-delay = <100>;
+> +		samsung,i2c-slave-addr = <0x10>;
+> +		samsung,i2c-max-bus-freq = <100000>;
+> +		pinctrl-0 = <&i2c4_bus>;
+> +		pinctrl-names = "default";
+> +		status = "okay";
+> +
+> +		wm1811: wm1811 at 1a {
+> +			compatible = "wlf,wm1811";
+> +			reg = <0x1a>;
+> +			clocks = <&pmu_system_controller 0>;
+> +			clock-names = "MCLK1";
+> +			DCVDD-supply = <&ldo3_reg>;
+> +			DBVDD1-supply = <&ldo3_reg>;
+> +			wlf,ldo1ena = <&gpj0 4 0>;
+> +		};
+> +	};
+> +
+>  	i2c at 138D0000 {
+>  		samsung,i2c-sda-delay = <100>;
+>  		samsung,i2c-slave-addr = <0x10>;
+> @@ -838,6 +857,24 @@
+>  		};
+>  	};
+>  
+> +	i2s0: i2s at 03830000 {
+> +		pinctrl-0 = <&i2s0_bus>;
+> +		pinctrl-names = "default";
+> +		status = "okay";
+> +	};
+> +
+> +	sound {
+> +		compatible = "samsung,trats2-audio";
+> +		samsung,i2s-controller = <&i2s0>;
+> +		samsung,model = "Trats2";
+> +		samsung,audio-codec = <&wm1811>;
+> +		samsung,audio-routing =
+> +			"SPK", "SPKOUTLN",
+> +			"SPK", "SPKOUTLP",
+> +			"SPK", "SPKOUTRN",
+> +			"SPK", "SPKOUTRP";
+> +	};
+> +
+>  	exynos-usbphy at 125B0000 {
+>  		status = "okay";
+>  	};
+> @@ -865,6 +902,11 @@
+>  	};
+>  };
+>  
+> +&pmu_system_controller {
+> +	assigned-clocks = <&pmu_system_controller 0>;
+> +	assigned-clock-parents =  <&clock CLK_XUSBXTI>;
+> +};
+> +
+>  &pinctrl_0 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&sleep0>;
+> -- 
+> 2.0.0.390.gcb682f8
+> 
+> _______________________________________________
+> Alsa-devel mailing list
+> Alsa-devel at alsa-project.org
+> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
