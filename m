@@ -1,222 +1,76 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 23 Jan 2015 22:22:03 +0100
-Subject: [PATCH] ARM: dts: sun4i: Add initial dts for Gemei G9 tablet
-In-Reply-To: <1422045409-1251-1-git-send-email-plaes@plaes.org>
-References: <1422045409-1251-1-git-send-email-plaes@plaes.org>
-Message-ID: <20150123212203.GB8470@lukather>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Fri, 23 Jan 2015 15:34:12 -0600
+Subject: [PATCH] PCI: keystone: fix incorrect annotations on probe and
+ remove
+In-Reply-To: <20150108221736.GA39839@dtor-ws>
+References: <20150108221736.GA39839@dtor-ws>
+Message-ID: <20150123213412.GK29776@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 23, 2015 at 10:36:49PM +0200, Priit Laes wrote:
-> Gemei G9 is an A10 based tablet, with 1G RAM, 16G NAND, 1024x768
-> IPS LCD display, stereo speakers, 1.3MP front camera and 5 MP
-> rear camera, 8000mAh battery, GT901 2+1 touchscreen, Bosch BMA250
-> accelerometer and RTL8188CUS USB wifi. It also has MicroSD slot,
-> miniHDMI, 1 x MicroUSB OTG port and 1 x MicroUSB host port and
-> 3.5mm headphone jack.
-> More details are available at: http://linux-sunxi.org/Gemei_G9
-> 
-> Signed-off-by: Priit Laes <plaes@plaes.org>
+[+cc Fabio]
+
+On Thu, Jan 08, 2015 at 02:17:36PM -0800, Dmitry Torokhov wrote:
+> Even though platform bus is not hot-pluggable, devices on it can be unbound
+> from the driver and bound back to it via sysfs, so we should not be using
+> __init annotations on probe() and __exit annotations on remove() methods.
+
+I don't completely understand this problem.  Does this mean there should be
+no __init/__exit annotations in these drivers at all?  If other PCI host
+bridge drivers have the same problem, I'd like to fix them all at once.
+
+For example, after applying this patch, ks_pcie_probe() is non-__init, but
+it calls ks_add_pcie_port(), which is still __init.  I thought that was
+illegal.
+
+I'm not sure about module_platform_driver_probe() either; it generates
+__init and __exit functions.  Should those annotations be removed, too?
+
+> Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 > ---
->  arch/arm/boot/dts/Makefile               |   6 +-
->  arch/arm/boot/dts/sun4i-a10-gemei-g9.dts | 138 +++++++++++++++++++++++++++++++
->  2 files changed, 142 insertions(+), 2 deletions(-)
->  create mode 100644 arch/arm/boot/dts/sun4i-a10-gemei-g9.dts
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 7df26a2..a2e05fc 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -447,12 +447,14 @@ dtb-$(CONFIG_MACH_SUN4I) += \
->  	sun4i-a10-ba10-tvbox.dtb \
->  	sun4i-a10-chuwi-v7-cw0825.dtb \
->  	sun4i-a10-cubieboard.dtb \
-> +	sun4i-a10-gemei-g9.dtb \
-> +	sun4i-a10-hackberry.dtb \
-> +	sun4i-a10-inet97fv2.dtb \
->  	sun4i-a10-marsboard.dtb \
->  	sun4i-a10-mini-xplus.dtb \
->  	sun4i-a10-mk802.dtb \
->  	sun4i-a10-mk802ii.dtb \
-> -	sun4i-a10-hackberry.dtb \
-> -	sun4i-a10-inet97fv2.dtb \
-> +	sun4i-a10-mini-xplus.dtb \
->  	sun4i-a10-olinuxino-lime.dtb \
->  	sun4i-a10-pcduino.dtb
->  dtb-$(CONFIG_MACH_SUN5I) += \
-> diff --git a/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts b/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts
-> new file mode 100644
-> index 0000000..46700b8
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts
-> @@ -0,0 +1,138 @@
-> +/*
-> + * Copyright 2015 Priit Laes
-> + *
-> + * Priit Laes <plaes@plaes.org>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + *     You should have received a copy of the GNU General Public
-> + *     License along with this file; if not, write to the Free
-> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-> + *     MA 02110-1301 USA
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +#include "sun4i-a10.dtsi"
-> +#include "sunxi-common-regulators.dtsi"
-> +#include <dt-bindings/gpio/gpio.h>
-> +
-> +/ {
-> +    model = "Gemei G9 Tablet";
-> +    compatible = "gemei,g9", "allwinner,sun4i-a10";
-> +};
-> +
-> +/*
-> + * http://linux-sunxi.org/Gemei_G9
-
-Please don't put URL in the DT. This is very likely to change in the
-future, and won't be valid anymore.
-
-> + *
-> + * TODO:
-> + *   2x cameras via CSI
-> + *   AXP battery management
-> + *   AXP power enable key
-> + *   Keys (LRADC)
-> + *   NAND
-> + *   OTG
-> + *   Touchscreen - gt801_2plus1 @ i2c adapter 2 @ 0x48
-> + */
-> +
-> +
-> +&ehci0 {
-> +    status = "okay";
-> +};
-
-Indentation with one tabulation please.
-
-
-> +&ehci1 {
-> +    status = "okay";
-> +};
-> +
-> +&i2c0 {
-> +    pinctrl-names = "default";
-> +    pinctrl-0 = <&i2c0_pins_a>;
-> +    status = "okay";
-> +
-> +    axp209: pmic at 34 {
-> +        compatible = "x-powers,axp209";
-> +        reg = <0x34>;
-> +        interrupts = <0>;
-> +
-> +        interrupt-controller;
-> +        #interrupt-cells = <1>;
-> +    };
-> +};
-> +
-> +&i2c1 {
-> +    pinctrl-names = "default";
-> +    pinctrl-0 = <&i2c1_pins_a>;
-> +    status = "okay";
-> +
-> +    /* Accelerometer */
-> +    bma250 at 18 {
-> +        compatible = "bosch,bma250";
-> +        reg = <0x18>;
-
-Is there a driver for this? It looks weird that it doesn't need more
-properties than that.
-
-> +    };
-> +};
-> +
-> +&reg_usb1_vbus {
-> +    status = "okay";
-> +};
-> +
-> +&reg_usb2_vbus {
-> +    status = "okay";
-> +};
-> +
-> +&mmc0 {
-> +    pinctrl-names = "default";
-> +    pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
-> +    vmmc-supply = <&reg_vcc3v3>;
-> +    bus-width = <4>;
-> +    cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH01 */
-> +    cd-inverted;
-> +    status = "okay";
-> +};
-> +
-> +
-
-Remove that extra new line.
-
-> +&uart0  {
-> +    pinctrl-names = "default";
-> +    pinctrl-0 = <&uart0_pins_a>;
-> +    status = "okay";
-> +};
-> +
-> +&usbphy {
-> +    usb1_vbus-supply = <&reg_usb1_vbus>;
-> +    usb2_vbus-supply = <&reg_usb2_vbus>;
-> +    status = "okay";
-> +};
+> Not tested, found by casual code inspection.
+> 
+>  drivers/pci/host/pci-keystone.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
+> index 1b893bc..7b84e1d 100644
+> --- a/drivers/pci/host/pci-keystone.c
+> +++ b/drivers/pci/host/pci-keystone.c
+> @@ -332,7 +332,7 @@ static const struct of_device_id ks_pcie_of_match[] = {
+>  };
+>  MODULE_DEVICE_TABLE(of, ks_pcie_of_match);
+>  
+> -static int __exit ks_pcie_remove(struct platform_device *pdev)
+> +static int ks_pcie_remove(struct platform_device *pdev)
+>  {
+>  	struct keystone_pcie *ks_pcie = platform_get_drvdata(pdev);
+>  
+> @@ -341,7 +341,7 @@ static int __exit ks_pcie_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> -static int __init ks_pcie_probe(struct platform_device *pdev)
+> +static int ks_pcie_probe(struct platform_device *pdev)
+>  {
+>  	struct device *dev = &pdev->dev;
+>  	struct keystone_pcie *ks_pcie;
+> @@ -398,9 +398,9 @@ fail_clk:
+>  	return ret;
+>  }
+>  
+> -static struct platform_driver ks_pcie_driver __refdata = {
+> +static struct platform_driver ks_pcie_driver = {
+>  	.probe  = ks_pcie_probe,
+> -	.remove = __exit_p(ks_pcie_remove),
+> +	.remove = ks_pcie_remove,
+>  	.driver = {
+>  		.name	= "keystone-pcie",
+>  		.owner	= THIS_MODULE,
 > -- 
-> 2.2.2
+> 2.2.0.rc0.207.ga3a616c
 > 
-
-Looks good otherwise, thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150123/444dc7c1/attachment-0001.sig>
+> 
+> -- 
+> Dmitry
