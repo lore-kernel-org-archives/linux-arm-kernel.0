@@ -1,141 +1,49 @@
-From: plaes@plaes.org (Priit Laes)
-Date: Fri, 23 Jan 2015 23:59:35 +0200
-Subject: [PATCH] ARM: dts: sun4i: Add initial dts for Gemei G9 tablet
-In-Reply-To: <20150123212203.GB8470@lukather>
-References: <1422045409-1251-1-git-send-email-plaes@plaes.org>
- <20150123212203.GB8470@lukather>
-Message-ID: <1422050375.1799.9.camel@plaes.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 23 Jan 2015 14:01:11 -0800
+Subject: [GIT PULL] ARM: BCM5301X: DT changes for v3.20
+In-Reply-To: <54BED7D7.80207@hauke-m.de>
+References: <54BED7D7.80207@hauke-m.de>
+Message-ID: <20150123220111.GE20896@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jan 20, 2015 at 11:33:59PM +0100, Hauke Mehrtens wrote:
+> Hi Olof, Hi Arnd,
+> 
+> This is a pull request with some dt updates for BCM5301X for 3.20.
+> 
+> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+> 
+>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+> 
+> are available in the git repository at:
+> 
+>   https://github.com/hauke/linux.git tags/bcm5301x-dt-2015-01-20
+> 
+> for you to fetch changes up to 5b1864b899d2b591402704dd0f6528c8661f1817:
+> 
+>   ARM: BCM5301X: Add DT for Buffalo WZR-900DHP (2015-01-20 23:23:25 +0100)
 
-On Fri, 2015-01-23 at 22:22 +0100, Maxime Ripard wrote:
-> On Fri, Jan 23, 2015 at 10:36:49PM +0200, Priit Laes wrote:
-> > Gemei G9 is an A10 based tablet, with 1G RAM, 16G NAND, 1024x768 
-> > IPS LCD display, stereo speakers, 1.3MP front camera and 5 MP
-> > rear camera, 8000mAh battery, GT901 2+1 touchscreen, Bosch BMA250 
-> > accelerometer and RTL8188CUS USB wifi. It also has MicroSD slot, 
-> > miniHDMI, 1 x MicroUSB OTG port and 1 x MicroUSB host port and 
-> > 3.5mm headphone jack.
-> > More details are available at: http://linux-sunxi.org/Gemei_G9
-> > 
-[..]
-> > 
-> > +/ {
-> > +    model = "Gemei G9 Tablet";
-> > +    compatible = "gemei,g9", "allwinner,sun4i-a10";
-> > +};
-> > +
-> > +/*
-> > + * http://linux-sunxi.org/Gemei_G9
-> 
-> Please don't put URL in the DT. This is very likely to change in the 
-> future, and won't be valid anymore.
+Hi Hauke,
 
-OK! The URL in commit message is ok to stay?
-> 
-> > + *
-> > + * TODO:
-> > + *   2x cameras via CSI
-> > + *   AXP battery management
-> > + *   AXP power enable key
-> > + *   Keys (LRADC)
-> > + *   NAND
-> > + *   OTG
-> > + *   Touchscreen - gt801_2plus1 @ i2c adapter 2 @ 0x48
-> > + */
-> > +
-> > +
-> > +&ehci0 {
-> > +    status = "okay";
-> > +};
-> 
-> Indentation with one tabulation please.
+I've merged this into next/dt now, comments below.
 
-Oops.. will do.
 > 
+> ----------------------------------------------------------------
+> bcm5301x-dt-2015-01-20: ARM: BCM5301X: dts updates for 3.20
 > 
-> > +&ehci1 {
-> > +    status = "okay";
-> > +};
-> > +
-> > +&i2c0 {
-> > +    pinctrl-names = "default";
-> > +    pinctrl-0 = <&i2c0_pins_a>;
-> > +    status = "okay";
-> > +
-> > +    axp209: pmic at 34 {
-> > +        compatible = "x-powers,axp209";
-> > +        reg = <0x34>;
-> > +        interrupts = <0>;
-> > +
-> > +        interrupt-controller;
-> > +        #interrupt-cells = <1>;
-> > +    };
-> > +};
-> > +
-> > +&i2c1 {
-> > +    pinctrl-names = "default";
-> > +    pinctrl-0 = <&i2c1_pins_a>;
-> > +    status = "okay";
-> > +
-> > +    /* Accelerometer */
-> > +    bma250 at 18 {
-> > +        compatible = "bosch,bma250";
-> > +        reg = <0x18>;
-> 
-> Is there a driver for this? It looks weird that it doesn't need more 
-> properties than that.
+> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
 
-Yes, it's supported by drivers/iio/accel/bma180.c though I have to 
-admit that this name is a bit misleading. (bosch-bma.c would 
-better, I guess).
+No signed-off-by needed in the tag -- the fact that you have signed it is
+enough. We do ask for a few words about what's in the branch though more than
+"dts updates". Something to think about going forward.
 
-And I was a bit surprised that it worked out of the box too, but the 
-device was present under /sys and I was able to read x, y, z and 
-temperature values.
+Also:
 
-> > +    };
-> > +};
-> > +
-> > +&reg_usb1_vbus {
-> > +    status = "okay";
-> > +};
-> > +
-> > +&reg_usb2_vbus {
-> > +    status = "okay";
-> > +};
-> > +
-> > +&mmc0 {
-> > +    pinctrl-names = "default";
-> > +    pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
-> > +    vmmc-supply = <&reg_vcc3v3>;
-> > +    bus-width = <4>;
-> > +    cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH01 */
-> > +    cd-inverted;
-> > +    status = "okay";
-> > +};
-> > +
-> > +
-> 
-> Remove that extra new line.
+We had asked that broadcom platforms go in together through Florian from
+here on out, so we don't have to deal with merge requests from each and
+every one of you since there are several subplatforms. Would that be ok
+with you?
 
-Will do.
-> 
-> > +&uart0  {
-> > +    pinctrl-names = "default";
-> > +    pinctrl-0 = <&uart0_pins_a>;
-> > +    status = "okay";
-> > +};
-> > +
-> > +&usbphy {
-> > +    usb1_vbus-supply = <&reg_usb1_vbus>;
-> > +    usb2_vbus-supply = <&reg_usb2_vbus>;
-> > +    status = "okay";
-> > +};
-> > --
-> > 2.2.2
-> > 
-> 
-> Looks good otherwise, thanks! Maxime
-> 
+
+-Olof
