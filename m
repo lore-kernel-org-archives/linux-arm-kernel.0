@@ -1,83 +1,101 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Fri, 23 Jan 2015 13:36:42 +0800
-Subject: [Resend Patch v4 03/16] smp,
- ARM64: Kill SMP single function call interrupt
-In-Reply-To: <1421991416-20297-1-git-send-email-jiang.liu@linux.intel.com>
-References: <1421991416-20297-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <1421991416-20297-4-git-send-email-jiang.liu@linux.intel.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Fri, 23 Jan 2015 15:37:50 +0900
+Subject: [PATCH v3] ARM: dts: exynos5422-odroidxu3: add on-board INA231
+ sensors
+In-Reply-To: <1421963668-28359-1-git-send-email-khilman@kernel.org>
+References: <1421963668-28359-1-git-send-email-khilman@kernel.org>
+Message-ID: <0b5701d036d7$1bdcad20$53960760$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 9a46ad6d6df3b54 "smp: make smp_call_function_many() use logic
-similar to smp_call_function_single()" has unified the way to handle
-single and multiple cross-CPU function calls. Now only one interrupt
-is needed for architecture specific code to support generic SMP function
-call interfaces, so kill the redundant single function call interrupt.
+Kevin Hilman wrote:
+> 
+> From: Kevin Hilman <khilman@linaro.org>
+> 
+> The odroid-xu3 has 4 INA231 current sensors on board which can be
+> accessed from the Linux via the hwmon interface.
+> 
+> There is one sensor for each of these power rails:
+> 
+> - A15 cluster: VDD_ARM
+> - A7 cluster: VDD_KFC
+> - GPU: VDD_G3D
+> - memory: VDD_MEM
+> 
+> In addition to adding the sensors, LDO26 from the PMIC needs to be
+> enabled because it's powering these sensor.
+> 
+> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Cc: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+> Reviewed-By: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+> ---
+> v3: extend existing i2c_0 node
+> v2: use "ti,ina231" as compatible string.
+> 
+> Applies on top of "ARM: dts: Add dts file for odroid XU3 board" from Sjoerd Simons.
+> 
+>  arch/arm/boot/dts/exynos5422-odroidxu3.dts | 39 ++++++++++++++++++++++++++++++
+>  1 file changed, 39 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+> index c29123c0734d..38694a4a5417 100644
+> --- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+> @@ -174,6 +174,13 @@
+>  					regulator-always-on;
+>  				};
+> 
+> +				ldo26_reg: LDO26 {
+> +					regulator-name = "vdd_ldo26";
+> +					regulator-min-microvolt = <3000000>;
+> +					regulator-max-microvolt = <3000000>;
+> +					regulator-always-on;
+> +				};
+> +
+>  				buck1_reg: BUCK1 {
+>  					regulator-name = "vdd_mif";
+>  					regulator-min-microvolt = <800000>;
+> @@ -330,3 +337,35 @@
+>  &usbdrd_dwc3_1 {
+>  	dr_mode = "otg";
+>  };
+> +
+> +&i2c_0 {
+> +	status = "okay";
+> +
+> +	/* A15 cluster: VDD_ARM */
+> +	ina231 at 40 {
+> +		compatible = "ti,ina231";
+> +		reg = <0x40>;
+> +		shunt-resistor = <10000>;
+> +	};
+> +
+> +	/* memory: VDD_MEM */
+> +	ina231 at 41 {
+> +		compatible = "ti,ina231";
+> +		reg = <0x41>;
+> +		shunt-resistor = <10000>;
+> +	};
+> +
+> +	/* GPU: VDD_G3D */
+> +	ina231 at 44 {
+> +		compatible = "ti,ina231";
+> +		reg = <0x44>;
+> +		shunt-resistor = <10000>;
+> +	};
+> +
+> +	/* A7 cluster: VDD_KFC */
+> +	ina231 at 45 {
+> +		compatible = "ti,ina231";
+> +		reg = <0x45>;
+> +		shunt-resistor = <10000>;
+> +	};
+> +};
+> --
+> 2.1.3
 
-Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm64/include/asm/hardirq.h |    2 +-
- arch/arm64/kernel/smp.c          |   10 +---------
- 2 files changed, 2 insertions(+), 10 deletions(-)
+OK, let me replace the applied patch with this in my tree.
 
-diff --git a/arch/arm64/include/asm/hardirq.h b/arch/arm64/include/asm/hardirq.h
-index e8a3268a891c..6aae421f4d73 100644
---- a/arch/arm64/include/asm/hardirq.h
-+++ b/arch/arm64/include/asm/hardirq.h
-@@ -20,7 +20,7 @@
- #include <linux/threads.h>
- #include <asm/irq.h>
- 
--#define NR_IPI	6
-+#define NR_IPI	5
- 
- typedef struct {
- 	unsigned int __softirq_pending;
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index 7ae6ee085261..328b8ce4b007 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -65,7 +65,6 @@ struct secondary_data secondary_data;
- enum ipi_msg_type {
- 	IPI_RESCHEDULE,
- 	IPI_CALL_FUNC,
--	IPI_CALL_FUNC_SINGLE,
- 	IPI_CPU_STOP,
- 	IPI_TIMER,
- 	IPI_IRQ_WORK,
-@@ -483,7 +482,6 @@ static const char *ipi_types[NR_IPI] __tracepoint_string = {
- #define S(x,s)	[x] = s
- 	S(IPI_RESCHEDULE, "Rescheduling interrupts"),
- 	S(IPI_CALL_FUNC, "Function call interrupts"),
--	S(IPI_CALL_FUNC_SINGLE, "Single function call interrupts"),
- 	S(IPI_CPU_STOP, "CPU stop interrupts"),
- 	S(IPI_TIMER, "Timer broadcast interrupts"),
- 	S(IPI_IRQ_WORK, "IRQ work interrupts"),
-@@ -527,7 +525,7 @@ void arch_send_call_function_ipi_mask(const struct cpumask *mask)
- 
- void arch_send_call_function_single_ipi(int cpu)
- {
--	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
-+	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC);
- }
- 
- #ifdef CONFIG_IRQ_WORK
-@@ -585,12 +583,6 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
- 		irq_exit();
- 		break;
- 
--	case IPI_CALL_FUNC_SINGLE:
--		irq_enter();
--		generic_smp_call_function_single_interrupt();
--		irq_exit();
--		break;
--
- 	case IPI_CPU_STOP:
- 		irq_enter();
- 		ipi_cpu_stop(cpu);
--- 
-1.7.10.4
+Thanks,
+Kukjin
