@@ -1,39 +1,107 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 23 Jan 2015 13:46:37 -0800
-Subject: [GIT PULL 1/3] drop legacy booting for omap3517
-In-Reply-To: <54be9e8b.6a58460a.68af.6889SMTPIN_ADDED_BROKEN@mx.google.com>
-References: <54be9e8b.6a58460a.68af.6889SMTPIN_ADDED_BROKEN@mx.google.com>
-Message-ID: <20150123214637.GA20896@quad.lixom.net>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Fri, 23 Jan 2015 13:47:26 -0800
+Subject: [PATCH] PCI: keystone: fix incorrect annotations on probe and
+ remove
+In-Reply-To: <20150123213412.GK29776@google.com>
+References: <20150108221736.GA39839@dtor-ws>
+ <20150123213412.GK29776@google.com>
+Message-ID: <20150123214726.GA4688@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 20, 2015 at 10:25:38AM -0800, Tony Lindgren wrote:
-> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
-> 
->   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.20/drop-legacy-3517-v2
-> 
-> for you to fetch changes up to 549f95ed20168daa06901054a028e185ebb905ab:
-> 
->   ARM: OMAP3: Add back Kconfig option MACH_OMAP3517EVM for ASoC (2015-01-20 08:49:08 -0800)
-> 
-> ----------------------------------------------------------------
-> We have had omap3517 booting in device tree mode for quite some
-> time now and we have at least a minimal dts file for the 3517
-> based boards. Also almost all the drivers are usable in device
-> tree mode. And if there are any drivers not yet supported in device
-> tree mode, those can be enabled using pdata quirks.
-> 
-> This leaves omap3430 to omap3730 as the only remaining mach-omap2
-> platforms still booting in legacy mode also. For those were are
-> printing a warning during the boot to get people to update their
-> systems to boot in device tree mode and slowly converting them
-> over to device tree based booting.
+Hi Bjorn,
 
-Merged into next/cleanup. Thanks!
+On Fri, Jan 23, 2015 at 03:34:12PM -0600, Bjorn Helgaas wrote:
+> [+cc Fabio]
+> 
+> On Thu, Jan 08, 2015 at 02:17:36PM -0800, Dmitry Torokhov wrote:
+> > Even though platform bus is not hot-pluggable, devices on it can be unbound
+> > from the driver and bound back to it via sysfs, so we should not be using
+> > __init annotations on probe() and __exit annotations on remove() methods.
+> 
+> I don't completely understand this problem.  Does this mean there should be
+> no __init/__exit annotations in these drivers at all?  If other PCI host
+> bridge drivers have the same problem, I'd like to fix them all at once.
 
+Basically they should not use __init/__exit, unless you take explicit
+steps to make sure that devices can't be unbound and bound again later
+via sysfs by setting driver->suppress_bind_attrs and/or using
+platform_driver_probe(). Note that if you use platform_driver_probe()
+then your driver can't cope with -EPROBE_DEFER reported by any of the
+subsystems it might be using.
 
--Olof
+> 
+> For example, after applying this patch, ks_pcie_probe() is non-__init, but
+> it calls ks_add_pcie_port(), which is still __init.  I thought that was
+> illegal.
+
+My bad, I missed that. The __init marking on ks_add_pcie_port() shoudl
+be removed as well.
+
+> 
+> I'm not sure about module_platform_driver_probe() either; it generates
+> __init and __exit functions.  Should those annotations be removed, too?
+
+module_platform_driver_probe() does internally platform_driver_probe()
+so it is OK for that probe function be __init (because we'd suppress
+sysfs bind/unbind and deferred probing so discaring init section is
+safe).
+
+Note that above applied to driver's ->probe() and ->remove() code paths
+only.  Marking module init/exit code as __init and __exit is still right
+thing to do.
+
+Thanks.
+
+> 
+> > Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> > ---
+> > 
+> > Not tested, found by casual code inspection.
+> > 
+> >  drivers/pci/host/pci-keystone.c | 8 ++++----
+> >  1 file changed, 4 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
+> > index 1b893bc..7b84e1d 100644
+> > --- a/drivers/pci/host/pci-keystone.c
+> > +++ b/drivers/pci/host/pci-keystone.c
+> > @@ -332,7 +332,7 @@ static const struct of_device_id ks_pcie_of_match[] = {
+> >  };
+> >  MODULE_DEVICE_TABLE(of, ks_pcie_of_match);
+> >  
+> > -static int __exit ks_pcie_remove(struct platform_device *pdev)
+> > +static int ks_pcie_remove(struct platform_device *pdev)
+> >  {
+> >  	struct keystone_pcie *ks_pcie = platform_get_drvdata(pdev);
+> >  
+> > @@ -341,7 +341,7 @@ static int __exit ks_pcie_remove(struct platform_device *pdev)
+> >  	return 0;
+> >  }
+> >  
+> > -static int __init ks_pcie_probe(struct platform_device *pdev)
+> > +static int ks_pcie_probe(struct platform_device *pdev)
+> >  {
+> >  	struct device *dev = &pdev->dev;
+> >  	struct keystone_pcie *ks_pcie;
+> > @@ -398,9 +398,9 @@ fail_clk:
+> >  	return ret;
+> >  }
+> >  
+> > -static struct platform_driver ks_pcie_driver __refdata = {
+> > +static struct platform_driver ks_pcie_driver = {
+> >  	.probe  = ks_pcie_probe,
+> > -	.remove = __exit_p(ks_pcie_remove),
+> > +	.remove = ks_pcie_remove,
+> >  	.driver = {
+> >  		.name	= "keystone-pcie",
+> >  		.owner	= THIS_MODULE,
+> > -- 
+> > 2.2.0.rc0.207.ga3a616c
+> > 
+> > 
+> > -- 
+> > Dmitry
+
+-- 
+Dmitry
