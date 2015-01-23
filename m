@@ -1,43 +1,90 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 23 Jan 2015 17:16:29 +0000
-Subject: [PATCHv3 0/3] Handle SETEND for AArch32 tasks
-In-Reply-To: <1421844191-9263-1-git-send-email-suzuki.poulose@arm.com>
-References: <1421844191-9263-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20150123171628.GG9557@e104818-lin.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 23 Jan 2015 09:14:05 -0800
+Subject: [PATCH v12 00/15] arm: Fix DEBUG_LL for multi-platform kernels
+ (without PL01X)
+In-Reply-To: <1940932.WxFESz5SgZ@wuerfel>
+References: <1414148076-12685-1-git-send-email-daniel.thompson@linaro.org>
+ <CAMuHMdUpNtL+K28DdC8xJ3vUPZGmviWcYGOVUNuhKQoobdL00Q@mail.gmail.com>
+ <20150123130837.GE26493@n2100.arm.linux.org.uk>
+ <1940932.WxFESz5SgZ@wuerfel>
+Message-ID: <20150123171404.GQ7696@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 21, 2015 at 12:43:08PM +0000, Suzuki K. Poulose wrote:
-> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+* Arnd Bergmann <arnd@arndb.de> [150123 05:32]:
+> On Friday 23 January 2015 13:08:37 Russell King - ARM Linux wrote:
+> > > Hi Arnd,
+> > > 
+> > > On Fri, Oct 24, 2014 at 5:46 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > > > There is still a related bug that we should also fix, but I'd say let's
+> > > > take your current patches first and then add whatever is missing
+> > > > on top. Specifically, a snippet like this
+> > > >
+> > > >         default 0xd4017000 if DEBUG_MMP_UART2
+> > > >         default 0xd4018000 if DEBUG_MMP_UART3
+> > > >         default 0xe0000000 if ARCH_SPEAR13XX
+> > > >         default 0xe4007000 if DEBUG_HIP04_UART
+> > > >         default 0xf0000be0 if ARCH_EBSA110
+> > > >
+> > > > still means you get the wrong default when you build a multiplatform
+> > > > kernel that you want to boot on HIP04 and you set DEBUG_HIP04_UART
+> > > > but you happen to also have ARCH_SPEAR13XX enabled.
+> > > >
+> > > > I have a patch that I use locally for randconfig builds that tries
+> > > > to fix this. It has some overlaps with your work but most parts are
+> > > > distinct. See below.
+> > > 
+> > > This is still desperately needed for anyone who wants to enable DEBUG_LL
+> > > on other platforms using multi_v7_defconfig.
+> > 
+> > I'd actually prefer to kill all these defaults and let people enter the
+> > value they want - for exactly this reason.
 > 
-> This series add support for controlling the 'setend' instruction,
-> which is deprecated in ARMv8, using the legacy instruction emulation
-> framework, introduced by Punit Agrawal.
+> I think it almost works right and seems fixable, but I agree with your
+> long-term direction.
 > 
-> Changes since V2:
->  - Move ID_AA64MMFR0_EL1 bit definitions to asm/cputype.h
->  - Use mask/value pair for the features in ID_AA64MMFR0_EL1
->  - Better documentation about the hardware support limitaion under
->    Documentation and the Kconfig help
->  - Restore the original 'set_hw_mode' API, with wrappers to invoke
->    the set_hw_mode for on_each_cpu() variants.
->  - Print a warning when we detect an incompatibility for a registered
->    insn_emulation hook on a hotplugged CPU.
+> > However, I realise that would not be popular, because removing them
+> > means that people have to refer to some kind of documentation to find
+> > the correct value, and that's hassle.
+> > 
+> > So, the existing defaulting behaviour is my compromise, but as I say,
+> > I'd much prefer the unpopular move of killing the entire set of defaults.
 > 
-> Changes since V1:
->  - Added a patch to keep track of the mixed endian support and register
->    the setend emulation only if all the active CPUs supports mixed endian.
->  - Fail hotplug operation if the CPU doesn't support a feature
->    required by insn_emulation.
->  - Signal handler runs in native endian
+> We can probably remove the defaults after we have had working earlycon
+> support for at least one kernel release. My feeling is that a lot of
+> people just enable debug_ll for normal kernels (and pass earlyprintk
+> in the DTB-provided command line!) because the normal console support
+> is just too late to spot when things go wrong, and debug_ll is
+> convenient enough despite the downsides.
+> 
+> earlycon avoids the need for hard configuration and mostly solves the
+> problem of the normal console being initialized too late, so I think
+> we should migrate platforms to use that over time. It's not a
+> problem for backwards compatibility because old dtbs will still work,
+> just without working earlycon when there is no "stdout-path" property.
+> 
+> With that in place, we can put debug_ll back into its destined place,
+> which is to debug the extremely early boot stages before earlycon,
+> and anyone who needs to do that can pick the correct physical addresses
+> themselves. Picking the right virtual address seems to be harder
+> for a lot of people, and everyone gets stuck on this when they first
+> try it. Maybe we can avoid this problem by finding a page into which
+> to put the mapping by default. The fixmap support we need for earlycon
+> should make this easier too.
 
-I queued these patches for 3.20 (and included Punit's suggestion as
-well). They should appear in linux-next later today.
+Totally agree, let's make debug_ll use super limited.
 
-Cc'ing Greg H @ Google since they are the main users of the emulation
-code. If you see any problem, please let us know.
+The reasons for why people need debug_ll are currently because of all
+the custom initcall levels. So far for all the cases I've seen, there
+should not be any need for custom initcall levels any longer with the
+deferred probe. The existing cases are all for legacy reasons and
+should not be needed at all on anything done over past five years
+or so.
 
-Thanks.
+The solution to removing the dependency to debug_ll is SoC specific
+earlyprintk support. And to initialize everything else later, not
+earlier.
 
--- 
-Catalin
+Cheers,
+
+Tony
