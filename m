@@ -1,61 +1,76 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 22 Jan 2015 12:03 +0100
-Subject: [PATCH] ARM: use default ioremap alignment for SMP or LPAE
-In-Reply-To: <20150122100441.GA19811@e104818-lin.cambridge.arm.com>
-References: <1421911075-8814-1-git-send-email-s.dyasly@samsung.com>
- <20150122100441.GA19811@e104818-lin.cambridge.arm.com>
-Message-ID: <3060178.HEZJjJCl1e@wuerfel>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Fri, 23 Jan 2015 14:48:56 +0100
+Subject: [PATCH v4 18/18] iommu: exynos: add callback for initializing
+ devices from device tree
+In-Reply-To: <54C2415A.3020508@samsung.com>
+References: <1421399592-7482-1-git-send-email-m.szyprowski@samsung.com>
+ <1421399592-7482-19-git-send-email-m.szyprowski@samsung.com>
+ <CABxcv=nkcY0biXuDH1BHDdOZhrzYWr-YNP13QWzdLfZfQrxouA@mail.gmail.com>
+ <54C2415A.3020508@samsung.com>
+Message-ID: <CABxcv=nX22+1VcA038yyLJz7dUN-tk9-kWTpSB-FeyLxVeRmZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 22 January 2015 10:04:41 Catalin Marinas wrote:
-> On Thu, Jan 22, 2015 at 07:17:55AM +0000, Sergey Dyasly wrote:
-> > 16MB alignment for ioremap mappings was added by commit a069c896d0d6 ("[ARM]
-> > 3705/1: add supersection support to ioremap()") in order to support supersection
-> > mappings. But __arm_ioremap_pfn_caller uses section and supersection mappings
-> > only in !SMP && !LPAE case. There is no need for such big alignment if either
-> > SMP or LPAE is enabled.
-> [...]
-> > diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> > index 184def0..c3ef139 100644
-> > --- a/arch/arm/include/asm/memory.h
-> > +++ b/arch/arm/include/asm/memory.h
-> > @@ -78,10 +78,12 @@
-> >   */
-> >  #define XIP_VIRT_ADDR(physaddr)  (MODULES_VADDR + ((physaddr) & 0x000fffff))
-> >  
-> > +#if !defined(CONFIG_SMP) && !defined(CONFIG_ARM_LPAE)
-> >  /*
-> >   * Allow 16MB-aligned ioremap pages
-> >   */
-> >  #define IOREMAP_MAX_ORDER    24
-> > +#endif
-> 
-> Actually, I think we could make this depend only on CONFIG_IO_36. That's
-> the only scenario where we get the supersections matter, and maybe make
-> CONFIG_IO_36 dependent on !SMP or !ARM_LPAE.
+Hello Marek,
 
-Good point, I assumed this was just a performance optimization,
-but it is in fact required for dynamic high mappings on XSC3.
+On Fri, Jan 23, 2015 at 1:40 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+>>> +
+>>> +       list_add_tail(&data->owner_node, &owner->clients);
+>>
+>> This is the line that causes the kernel to hang, if I comment the
+>> list_add_tail() call then the kernel boots.
+>>
+>> I checked that neither data nor owner are NULL and that the
+>> owner->clients list_head is initialized. Do you have any ideas what
+>> could be happening?
+>
+>
+> This is really strange. However the hang is definitely not caused by
+> adding the controller to the list, but rather the fact that it is later
+> being initialized, probably in exynos_iommu_attach_device().
+>
 
-> My assumption is that we
-> don't support single zImage with CPU_XSC3 enabled (but I haven't
-> followed the latest developments here).
+Yes, I knew adding to the list was not the issue but a side effect of
+being in the list. I'm not familiar with Exynos sysmmu/iommu to figure
+out though.
 
-I have said in the past that I do not expect any of the xscale or
-strongarm based platforms to be used with a single zImage kernel.
-This has changed slightly given the work that Robert Jarzmik and
-others are doing on mach-pxa with DT conversion. I still don't
-think it's likely that they will move on to multiplatform, but I
-no longer think it's impossible.
+> Just a quick question - does bootloader on Exynos5420 Peach Pit sets
+> any image on the display?
+>
 
-Fortunately, PXA also does not have any high physical address mappings
-that I can see. The only platform we have that has these (see
-'git grep ioremap_pfn') is mach-iop13xx, and I am still seeing
-this in the 'never going to be multiplatform' category.
+Yes u-boot does initialize the display, I see the boot messages and
+have an u-boot prompt.
 
-Unrelated to this question however is whether we want to keep
-supersection mappings as a performance optimization to save TLBs.
-It seems useful to me, but not critical.
+> If so then we will get IOMMU page fault on init (DMA engine of FIMD is
+> left enabled from bootloader) and such case is not yet handled.
+> Besides that I have no idea for any other reason for such failure.
+>
 
-	Arnd
+I see, that's a reasonable explanation and in fact your patch makes at
+least the kernel to start booting.
+
+> To check if this is caused by io page fault, please temporarily add the
+> following hack:
+> --->8---
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 7864797609b3..5e70cf7eb31b 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -2011,6 +2011,9 @@ static bool arm_setup_iommu_dma_ops(struct device
+> *dev, u64 dma_base, u64 size,
+>          return false;
+>      }
+>
+> +    iommu_map(mapping->domain, 0x40000000, 0x40000000, 0x80000000,
+> +          IOMMU_READ | IOMMU_WRITE);
+> +
+>      if (arm_iommu_attach_device(dev, mapping)) {
+
+The kernel still hangs but the boot does indeed go further. Here is my
+boot log [0] although I couldn't find an evident cause.
+
+Best regards,
+Javier
+
+[0]: http://paste.debian.net/plain/141968
