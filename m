@@ -1,57 +1,139 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sat, 24 Jan 2015 00:13:15 +0100
-Subject: [PATCH 07/12] pm: at91: the standby mode uses the same sram
- function as the suspend to memory mode
-In-Reply-To: <20150123165020.GA24210@gradator.net>
+Date: Sat, 24 Jan 2015 00:17:38 +0100
+Subject: [PATCH 08/12] pm: at91: rename file name: pm_slowclock.S
+ -->pm_suspend.S
+In-Reply-To: <20150123191719.GA29601@gradator.net>
 References: <1421741825-18226-1-git-send-email-wenyou.yang@atmel.com>
- <1421741825-18226-8-git-send-email-wenyou.yang@atmel.com>
- <20150123165020.GA24210@gradator.net>
-Message-ID: <20150123231315.GA32318@piout.net>
+ <1421741825-18226-9-git-send-email-wenyou.yang@atmel.com>
+ <20150123191719.GA29601@gradator.net>
+Message-ID: <20150123231738.GB32318@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/01/2015 at 17:50:20 +0100, Sylvain Rochet wrote :
+Hi,
+
+On 23/01/2015 at 20:17:19 +0100, Sylvain Rochet wrote :
 > Hello Wenyou,
 > 
-> 
-> On Tue, Jan 20, 2015 at 04:17:00PM +0800, Wenyou Yang wrote:
+> On Tue, Jan 20, 2015 at 04:17:01PM +0800, Wenyou Yang wrote:
 > > 
-> > diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-> > index 691e6db..a1010f0 100644
-> > --- a/arch/arm/mach-at91/pm.c
-> > +++ b/arch/arm/mach-at91/pm.c
+> > diff --git a/arch/arm/mach-at91/pm_suspend.S b/arch/arm/mach-at91/pm_suspend.S
+> > new file mode 100644
+> > index 0000000..420e730
+> > --- /dev/null
 > 
 > 
-> > @@ -145,62 +145,51 @@ extern void at91_slow_clock(void __iomem *pmc, void __iomem *ramc0,
-> >  			    void __iomem *ramc1, int memctrl);
-> >  extern u32 at91_slow_clock_sz;
-> >  
-> > +static void at91_pm_suspend(suspend_state_t state)
-> > +{
->       (...)
-> > +	slow_clock(at91_pmc_base, at91_ramc_base[0],
-> > +			at91_ramc_base[1], pm_data);
-> > +}
+> > +	/* Turn off the main oscillator */
+> > +	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
+> > +	bic	tmp1, tmp1, #AT91_PMC_MOSCEN
+> 
+> at91sam9x5 and probably others need a key here:
+> 	orr     tmp1, tmp1, #AT91_PMC_KEY
+> 
+> > +	str	tmp1, [pmc, #AT91_CKGR_MOR]
 > 
 > 
-> > -			if (slow_clock) {
-> > -				slow_clock(at91_pmc_base, at91_ramc_base[0],
-> > -					   at91_ramc_base[1],
-> > -					   at91_pm_data.memctrl);
->       (...)
-> > +               at91_pm_suspend(state);
+> 
+> > +	/* Wait for interrupt */
+> > +	mcr	p15, 0, tmp1, c7, c0, 4
+> 
+> The linux-3.10-at91 branch uses a different approach which seem 
+> necessary for newer board, you probably forget to merge the following:
+> 
+> /*
+>  * Put the processor to enter into Standby mode, wait for interrupt to wakeup
+>  */
+> 	.macro _do_wfi
+> 
+> #if defined(CONFIG_CPU_V7)
+> 	dsb
+> 
+> 	/* Disable the processor clock */
+> 	mov	tmp1, #AT91_PMC_PCK
+> 	str	tmp1, [pmc, #AT91_PMC_SCDR]
+> 
+> 	wfi		@ Wait For Interrupt
+> #else
+> 	mcr	p15, 0, tmp1, c7, c0, 4
+> #endif
+> 
+> 	.endm
+> 
+> 	.text
+> 
+> ENTRY(at91_slow_clock)
+> (...)
+> 	/* Wait for interrupt */
+> 	_do_wfi
+> (...)
 > 
 > 
-> By doing that you removed the condition "if (slow_clock)".
 > 
-> But slow_clock can still be NULL, see commit d2e4679, there are multiple 
-> reasons which ends up with a NULL slow_clock.
+> 
+> > +	/* Turn on the main oscillator */
+> > +	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
+> > +	orr	tmp1, tmp1, #AT91_PMC_MOSCEN
+> 
+> at91sam9x5 and probably others need a key here:
+>         orr     tmp1, tmp1, #AT91_PMC_KEY
+> 
+> > +	str	tmp1, [pmc, #AT91_CKGR_MOR]
+> 
+> 
+> 
+> What about the following parts which are also in linux-3.10-at91 branch 
+> but not in this rework, are they necessary ?
+> 
+> sdr_sr_done:
+> 	/* Disable MPDDRC Clock*/
+> 	cmp	ddrcid, #0
+> 	beq	2f
+> 	bic	tmp2, ddrcid, #0xe0 /* fetch lowest 5 bits */
+> 	mov	tmp1, #0x01
+> 	mov	tmp1, tmp1, lsl tmp2
+> 
+> 	tst	ddrcid, #0x20	/* > 32 ? */
+> 	beq	1f
+> 	str	tmp1, [pmc, #AT91_PMC_PCDR1]
+> 	b	2f
+> 1:
+> 	str	tmp1, [pmc, #AT91_PMC_PCDR]
+> 2:
+> 
+> 	/* Disable DDR Clock */
+> 	mov 	tmp1, #AT91_PMC_SYS_DDR
+> 	str	tmp1, [pmc, #AT91_PMC_SCDR]
+> 
+> 
+> 
+> 
+> 	/* Enable MPDDRC Clock*/
+> 	cmp	ddrcid, #0
+> 	beq	4f
+> 	bic	tmp2, ddrcid, #0xe0 /* fetch lowest 5 bits */
+> 	mov	tmp1, #0x01
+> 	mov	tmp1, tmp1, lsl tmp2
+> 
+> 	tst	ddrcid, #0x20	/* > 32 ? */
+> 	beq	3f
+> 	str	tmp1, [pmc, #AT91_PMC_PCER1]
+> 	b	4f
+> 3:
+> 	str	tmp1, [pmc, #AT91_PMC_PCER]
+> 4:
+> 
+> 	/* Enable DDR clock */
+> 	mov 	tmp1, #AT91_PMC_SYS_DDR
+> 	str	tmp1, [pmc, #AT91_PMC_SCER]
+> 
 > 
 
-I would fix that by not calling suspend_set_ops(&at91_pm_ops) when
-slow_clock is NULL in patch 6 (quick and easy) or copying the whole
-at91_pm_sram_init() in at91_pm_init() and handle failures from there.
-
+This is a rework, what is part of linux-3.10-at91 and not yet present in
+mainline should be part of a following series. I would prefer not mixing
+reworks and "new" functionalities (they have been present in the atmel
+tree for a while but never mainlined). I would say that PM on 9x5, n12
+and sama5 in mainline is clearly not well tested and is lagging behind
+the atmel tree.
 
 -- 
 Alexandre Belloni, Free Electrons
