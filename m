@@ -1,47 +1,88 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 23 Jan 2015 16:51:12 +0100
-Subject: [PATCH v5 02/18] arm: exynos: pm_domains: add support for devices
- registered before arch_initcall
+Date: Fri, 23 Jan 2015 16:51:25 +0100
+Subject: [PATCH v5 15/18] iommu: exynos: document internal structures
 In-Reply-To: <1422028288-891-1-git-send-email-m.szyprowski@samsung.com>
 References: <1422028288-891-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1422028288-891-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1422028288-891-16-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SYSMMU devices will be registered early before any other devices and
-before calling arch_initcall. To add them to respective power domains,
-additional scan of all platform devices is needed.
+Add a few words of comment to all internal structures used by the driver.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- arch/arm/mach-exynos/pm_domains.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ drivers/iommu/exynos-iommu.c | 49 +++++++++++++++++++++++++++++---------------
+ 1 file changed, 33 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
-index 37266a8..0e2bc36 100644
---- a/arch/arm/mach-exynos/pm_domains.c
-+++ b/arch/arm/mach-exynos/pm_domains.c
-@@ -105,6 +105,12 @@ static int exynos_pd_power_off(struct generic_pm_domain *domain)
- 	return exynos_pd_power(domain, false);
- }
+diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+index 78a12ea..ef71725 100644
+--- a/drivers/iommu/exynos-iommu.c
++++ b/drivers/iommu/exynos-iommu.c
+@@ -184,32 +184,49 @@ static char *sysmmu_fault_name[SYSMMU_FAULTS_NUM] = {
+ 	"UNKNOWN FAULT"
+ };
  
-+static __init int exynos_pd_init_platform_dev(struct device *dev, void *data)
-+{
-+	dev_pm_domain_attach(dev, true);
-+	return 0;
-+}
-+
- static __init int exynos4_pm_init_power_domain(void)
- {
- 	struct platform_device *pdev;
-@@ -189,6 +195,7 @@ no_clk:
- 		of_node_put(np);
- 	}
+-/* attached to dev.archdata.iommu of the master device */
++/*
++ * This structure is attached to dev.archdata.iommu of the master device
++ * on device add, contains a list of SYSMMU controllers defined by device tree,
++ * which are bound to given master device. It is usually referenced by 'owner'
++ * pointer.
++ */
+ struct exynos_iommu_owner {
+-	struct list_head clients;
++	struct list_head clients; /* list of sysmmu_drvdata.owner_node */
+ };
  
--	return 0;
-+	return bus_for_each_dev(&platform_bus_type, NULL, NULL,
-+				exynos_pd_init_platform_dev);
- }
- arch_initcall(exynos4_pm_init_power_domain);
++/*
++ * This structure is stored in ->priv field of generic struct iommu_domain,
++ * contains list of SYSMMU controllers from all master devices, which has been
++ * attached to this domain and page tables of IO address space defined by this
++ * domain. It is usually referenced by 'domain' pointer.
++ */
+ struct exynos_iommu_domain {
+-	struct list_head clients; /* list of sysmmu_drvdata.node */
++	struct list_head clients; /* list of sysmmu_drvdata.domain_node */
+ 	sysmmu_pte_t *pgtable; /* lv1 page table, 16KB */
+ 	short *lv2entcnt; /* free lv2 entry counter for each section */
+-	spinlock_t lock; /* lock for this structure */
++	spinlock_t lock; /* lock for modyfying list of clients */
+ 	spinlock_t pgtablelock; /* lock for modifying page table @ pgtable */
+ };
+ 
++/*
++ * This structure hold all data of a single SYSMMU controller, this includes
++ * hw resources like registers and clocks, pointers and list nodes to connect
++ * it to all other structures, internal state and parameters read from device
++ * tree. It is usually referenced by 'data' pointer.
++ */
+ struct sysmmu_drvdata {
+-	struct device *sysmmu;	/* System MMU's device descriptor */
+-	struct device *master;	/* Owner of system MMU */
+-	void __iomem *sfrbase;
+-	struct clk *clk;
+-	struct clk *clk_master;
+-	int activations;
+-	spinlock_t lock;
+-	struct iommu_domain *domain;
+-	struct list_head domain_node;
+-	struct list_head owner_node;
+-	phys_addr_t pgtable;
+-	int version;
++	struct device *sysmmu; /* SYSMMU controller device */
++	struct device *master; /* master device (owner of given SYSMMU) */
++	void __iomem *sfrbase; /* our registers */
++	struct clk *clk; /* SYSMMU's clock */
++	struct clk *clk_master; /* master's device clock */
++	int activations; /* number of calls to sysmmu_enable */
++	spinlock_t lock; /* lock for modyfying enable/disable state */
++	struct iommu_domain *domain; /* domain we belong to */
++	struct list_head domain_node; /* node for domain clients list */
++	struct list_head owner_node; /* node for owner clients list */
++	phys_addr_t pgtable; /* assigned page table structure */
++	int version; /* our version */
+ };
+ 
+ static bool set_sysmmu_active(struct sysmmu_drvdata *data)
 -- 
 1.9.2
