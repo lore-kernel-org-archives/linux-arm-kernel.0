@@ -1,50 +1,70 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 23 Jan 2015 16:44:32 +0000
-Subject: [GIT PULL] arm64: fixes for -rc6
-Message-ID: <20150123164432.GA13772@arm.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Fri, 23 Jan 2015 17:44:48 +0100
+Subject: [PATCH v4 18/18] iommu: exynos: add callback for initializing
+ devices from device tree
+In-Reply-To: <54C273AF.1010404@samsung.com>
+References: <1421399592-7482-1-git-send-email-m.szyprowski@samsung.com>
+ <1421399592-7482-19-git-send-email-m.szyprowski@samsung.com>
+ <CABxcv=nkcY0biXuDH1BHDdOZhrzYWr-YNP13QWzdLfZfQrxouA@mail.gmail.com>
+ <54C2415A.3020508@samsung.com>
+ <CABxcv=nX22+1VcA038yyLJz7dUN-tk9-kWTpSB-FeyLxVeRmZA@mail.gmail.com>
+ <54C273AF.1010404@samsung.com>
+Message-ID: <CABxcv==S97O84zRwFi6SZy75cvZEVRrFHHY-CvmYfQ+SEX0mTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Linus,
+Hello Marek,
 
-arm64 fixes seem to come in pairs recently, so please pull these two for
--rc6. We've got a fix for removing device-tree blobs when doing a make
-clean and another one addressing a missing include, which fixes build
-failures in -next for allmodconfig (spotted by Mark's buildbot).
+On Fri, Jan 23, 2015 at 5:15 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+>>
+>>> To check if this is caused by io page fault, please temporarily add the
+>>> following hack:
+>>> --->8---
+>>> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+>>> index 7864797609b3..5e70cf7eb31b 100644
+>>> --- a/arch/arm/mm/dma-mapping.c
+>>> +++ b/arch/arm/mm/dma-mapping.c
+>>> @@ -2011,6 +2011,9 @@ static bool arm_setup_iommu_dma_ops(struct device
+>>> *dev, u64 dma_base, u64 size,
+>>>           return false;
+>>>       }
+>>>
+>>> +    iommu_map(mapping->domain, 0x40000000, 0x40000000, 0x80000000,
+>>> +          IOMMU_READ | IOMMU_WRITE);
+>>> +
+>>>       if (arm_iommu_attach_device(dev, mapping)) {
+>>
+>> The kernel still hangs but the boot does indeed go further. Here is my
+>> boot log [0] although I couldn't find an evident cause.
+>
+>
+> Frankly, this freeze looks really strange, because there is no error message
+> or any other failure indicator.
+>
+> Thanks for testing the above hack. It confirmed that the previous boot
 
-Hopefully, that's us done for 3.19.
+You are welcome
 
-Cheers,
+> failure
+> was caused by display left enabled in bootloader. Such configuration is not
+> yet
+> supported, although I will do my best so find how to add support for it. For
+> the
 
-Will
+Great, thanks a lot.
 
---->8
+> time being - please don't enable IOMMU support on Exynos5420 Peach Pit. It
+> shouldn't be a big issue, because IOMMU support was already non-functional
+> all the time on Exynos platform.
+>
 
-The following changes since commit ec6f34e5b552fb0a52e6aae1a5afbbb1605cc6cc:
+Agreed but keep in mind that CONFIG_EXYNOS_IOMMU is currently enabled
+in arch/arm/configs/exynos_defconfig so you should include in your
+series a patch to disable that config option to prevent the boot hang.
+Or at least add a of_machine_is_compatible("google,peach") check
+although I don't know if there are other Exynos machines that have the
+same issue.
 
-  Linux 3.19-rc5 (2015-01-18 18:02:20 +1200)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
-
-for you to fetch changes up to 284be28565efe262a81972d12e9264d4824a4ced:
-
-  arm64: dump: Fix implicit inclusion of definition for PCI_IOBASE (2015-01-23 10:47:42 +0000)
-
-----------------------------------------------------------------
-arm64 fixes:
-- Fix cleaning of .dtbs following directory restructuring
-- Fix allmodconfig build breakage in -next due to missing include
-
-----------------------------------------------------------------
-Jungseok Lee (1):
-      arm64: Add dtb files to archclean rule
-
-Mark Brown (1):
-      arm64: dump: Fix implicit inclusion of definition for PCI_IOBASE
-
- arch/arm64/Makefile          | 1 +
- arch/arm64/boot/dts/Makefile | 2 --
- arch/arm64/mm/dump.c         | 1 +
- 3 files changed, 2 insertions(+), 2 deletions(-)
+Best regards,
+Javier
