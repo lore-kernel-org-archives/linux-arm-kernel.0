@@ -1,69 +1,77 @@
-From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Fri, 23 Jan 2015 21:01:05 +0800
-Subject: [PATCH v7 1/2] Documentation: DT: Add bindings for Spreadtrum SoC
- Platform
-In-Reply-To: <1422018066-24997-1-git-send-email-chunyan.zhang@spreadtrum.com>
-References: <sprd-serial-v7>
- <1422018066-24997-1-git-send-email-chunyan.zhang@spreadtrum.com>
-Message-ID: <1422018066-24997-2-git-send-email-chunyan.zhang@spreadtrum.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 23 Jan 2015 14:15:31 +0100
+Subject: [PATCH 1/3] ARM: Marvell: Remove init cpus function
+In-Reply-To: <1421686381-12397-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1421686381-12397-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <54C24973.5080801@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds Spreadtrum's prefix "sprd" to vendor-prefixes file.
-Adds the devicetree binding documentations for Spreadtrum's sc9836-uart
-and SC9836 SoC based on the Sharkl64 Platform which is a 64-bit SoC
-Platform of Spreadtrum.
+On 01/19/2015 05:52 PM, Daniel Lezcano wrote:
+> With the next patches, the init cpus function will be changed to be factored
+> out.
+>
+> The function 'armada_xp_smp_init_cpus' does nothing more than a sanity check
+> after the DT has been parsed. Even if this code is valid, it does not give a
+> real benefit as the DT should be correctly filled.
+>
+> Remove this callback.
+>
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
----
- Documentation/devicetree/bindings/arm/sprd.txt     |   11 +++++++++++
- .../devicetree/bindings/serial/sprd-uart.txt       |    7 +++++++
- .../devicetree/bindings/vendor-prefixes.txt        |    1 +
- 3 files changed, 19 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/sprd.txt
- create mode 100644 Documentation/devicetree/bindings/serial/sprd-uart.txt
+Hi Arnd, Olof,
 
-diff --git a/Documentation/devicetree/bindings/arm/sprd.txt b/Documentation/devicetree/bindings/arm/sprd.txt
-new file mode 100644
-index 0000000..31a629d
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/sprd.txt
-@@ -0,0 +1,11 @@
-+Spreadtrum SoC Platforms Device Tree Bindings
-+----------------------------------------------------
-+
-+Sharkl64 is a Spreadtrum's SoC Platform which is based
-+on ARM 64-bit processor.
-+
-+SC9836 openphone board with SC9836 SoC based on the
-+Sharkl64 Platform shall have the following properties.
-+
-+Required root node properties:
-+        - compatible = "sprd,sc9836-openphone", "sprd,sc9836";
-diff --git a/Documentation/devicetree/bindings/serial/sprd-uart.txt b/Documentation/devicetree/bindings/serial/sprd-uart.txt
-new file mode 100644
-index 0000000..2aff0f2
---- /dev/null
-+++ b/Documentation/devicetree/bindings/serial/sprd-uart.txt
-@@ -0,0 +1,7 @@
-+* Spreadtrum serial UART
-+
-+Required properties:
-+- compatible: must be "sprd,sc9836-uart"
-+- reg: offset and length of the register set for the device
-+- interrupts: exactly one interrupt specifier
-+- clocks: phandles to input clocks.
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index b1df0ad..0a8384f 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -153,6 +153,7 @@ snps	Synopsys, Inc.
- solidrun	SolidRun
- sony	Sony Corporation
- spansion	Spansion Inc.
-+sprd	Spreadtrum Communications Inc.
- st	STMicroelectronics
- ste	ST-Ericsson
- stericsson	ST-Ericsson
+any comments on this patchset ?
+
+Thanks
+   -- Daniel
+
+> ---
+>   arch/arm/mach-mvebu/platsmp.c | 11 -----------
+>   1 file changed, 11 deletions(-)
+>
+> diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
+> index 58cc8c1..3e93422 100644
+> --- a/arch/arm/mach-mvebu/platsmp.c
+> +++ b/arch/arm/mach-mvebu/platsmp.c
+> @@ -30,8 +30,6 @@
+>   #include "pmsu.h"
+>   #include "coherency.h"
+>
+> -#define ARMADA_XP_MAX_CPUS 4
+> -
+>   #define AXP_BOOTROM_BASE 0xfff00000
+>   #define AXP_BOOTROM_SIZE 0x100000
+>
+> @@ -114,14 +112,6 @@ static void armada_xp_secondary_init(unsigned int cpu)
+>   	mvebu_v7_pmsu_idle_exit();
+>   }
+>
+> -static void __init armada_xp_smp_init_cpus(void)
+> -{
+> -	unsigned int ncores = num_possible_cpus();
+> -
+> -	if (ncores == 0 || ncores > ARMADA_XP_MAX_CPUS)
+> -		panic("Invalid number of CPUs in DT\n");
+> -}
+> -
+>   static void __init armada_xp_smp_prepare_cpus(unsigned int max_cpus)
+>   {
+>   	struct device_node *node;
+> @@ -171,7 +161,6 @@ static int armada_xp_cpu_kill(unsigned int cpu)
+>   #endif
+>
+>   struct smp_operations armada_xp_smp_ops __initdata = {
+> -	.smp_init_cpus		= armada_xp_smp_init_cpus,
+>   	.smp_prepare_cpus	= armada_xp_smp_prepare_cpus,
+>   	.smp_boot_secondary	= armada_xp_boot_secondary,
+>   	.smp_secondary_init     = armada_xp_secondary_init,
+>
+
+
 -- 
-1.7.9.5
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
