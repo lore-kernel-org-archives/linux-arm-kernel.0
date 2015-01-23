@@ -1,45 +1,23 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 23 Jan 2015 18:01:32 +0100
-Subject: [PATCH V4 4/4] mmc: pwrseq_simple: Add support for a reset GPIO
- pin
-In-Reply-To: <CABxcv=nGWPnkNz1tXJpaTUkroucDgVYzeCrEmZvA8xfzHzROvg@mail.gmail.com>
-References: <1421658784-11980-1-git-send-email-ulf.hansson@linaro.org>
- <1421658784-11980-5-git-send-email-ulf.hansson@linaro.org>
- <CABxcv=nGWPnkNz1tXJpaTUkroucDgVYzeCrEmZvA8xfzHzROvg@mail.gmail.com>
-Message-ID: <CAPDyKFqnU3OcyiDYPQ4pLRhOGkiEJ1nuwYSP_+qain63N9CEfg@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 23 Jan 2015 09:01:01 -0800
+Subject: [PATCH v5 0/2] ARM: mediatek: Add watchdog driver
+In-Reply-To: <CABuKBeKWU=wGuyT2u1Ndori1e8B7vAzFAmCafwLDPfAyLHkYBQ@mail.gmail.com>
+References: <1421152136-5007-1-git-send-email-matthias.bgg@gmail.com>
+ <CABuKBeKWU=wGuyT2u1Ndori1e8B7vAzFAmCafwLDPfAyLHkYBQ@mail.gmail.com>
+Message-ID: <54C27E4D.1010108@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 January 2015 at 16:56, Javier Martinez Canillas
-<javier@dowhile0.org> wrote:
-> Hello Ulf,
+On 01/23/2015 06:20 AM, Matthias Brugger wrote:
+> Hi all,
 >
-> On Mon, Jan 19, 2015 at 10:13 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>
->>  int mmc_pwrseq_simple_alloc(struct mmc_host *host, struct device *dev)
->>  {
->>         struct mmc_pwrseq_simple *pwrseq;
->> +       int ret = 0;
->>
->>         pwrseq = kzalloc(sizeof(struct mmc_pwrseq_simple), GFP_KERNEL);
->>         if (!pwrseq)
->>                 return -ENOMEM;
->>
->> +       pwrseq->reset_gpio = gpiod_get_index(dev, "reset", 0, GPIOD_OUT_HIGH);
+> 2015-01-13 13:28 GMT+01:00 Matthias Brugger <matthias.bgg@gmail.com>:
+>> Mediatek SoCs have a watchdog driver. This patch set adds driver and DTS
+>> binding. The driver also implements a restart handler to reboot the SoC.
 >
-> Any reason to not use the devm_gpiod_get_index() managed version instead?
+> Any comments on this patch set?
+>
+I have it included in the set of patches that I am going to send to Wim,
+hopefully this weekend.
 
-This struct device don't have a bound driver to it. Thus this device
-won't be freed automagically from the ->remove() or failed ->probe()
-path.
-
->
-> AFAICT mmc_free_host() will free the device so in that case you won't
-> need to call gpiod_put() in mmc_pwrseq_simple_free().
->
-> This will also make easier to extend pwrseq_simple to support multiple
-> GPIOs like the DT binding implies.
->
-
-Kind regards
-Uffe
+Guenter
