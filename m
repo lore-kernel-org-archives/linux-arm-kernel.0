@@ -1,33 +1,47 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Fri, 23 Jan 2015 10:27:48 -0600
-Subject: [PATCH] MAINTAINERS: update Qualcomm support entry
-In-Reply-To: <20150122214644.GB8057@qualcomm.com>
-References: <1421901564-8854-1-git-send-email-agross@codeaurora.org>
- <1421902005.18480.3.camel@perches.com> <20150122214644.GB8057@qualcomm.com>
-Message-ID: <8D1CBBAD-4C1D-474A-81F6-FDD882154BE0@codeaurora.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 23 Jan 2015 16:32:31 +0000
+Subject: [PATCH v2 RESEND 2/8] irqchip: Supply new driver for STi based
+ devices
+In-Reply-To: <alpine.DEB.2.11.1501231702280.5526@nanos>
+References: <1421920133-7914-1-git-send-email-lee.jones@linaro.org>
+ <1421920133-7914-3-git-send-email-lee.jones@linaro.org>
+ <alpine.DEB.2.11.1501231702280.5526@nanos>
+Message-ID: <20150123163231.GB11745@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Jan 22, 2015, at 3:46 PM, Andy Gross <agross@codeaurora.org> wrote:
-
-> On Wed, Jan 21, 2015 at 08:46:45PM -0800, Joe Perches wrote:
->>> +L:	linux-soc at vger.kernel.org
->>> S:	Maintained
->>> F:	arch/arm/mach-qcom/
->>> +F:	drivers/soc/qcom
->> 
->> Please add a terminating /
->> 
->> F:	drivers/soc/qcom/
+On Fri, 23 Jan 2015, Thomas Gleixner wrote:
+> On Thu, 22 Jan 2015, Lee Jones wrote:
 > 
-> Noted, will fix.
+> > This driver is used to enable System Configuration Register controlled
+> > External, CTI (Core Sight), PMU (Performance Management), and PL310 L2
+> > Cache IRQs prior to use.
+> 
+> I'm wondering how this is related to irq_chip, 
 
-I?ll fix this up when I apply the patch.
+It doesn't really.  At least, it doesn't make use of the framework.  
+It was the most relevant subsystem.
 
-- k
+> but well, I don't mind it being parked here.
+
+Thanks Thomas.  I was hoping for that response.
+
+> Though I really cannot say anything about this DT translation
+> machinery for a single sysconfig register, other than it looks
+> completely overengineered to me.
+
+I understnad where you're coming from, but don't all drivers just
+'twiddle some register bits'?
+
+> The only technical comment I have is: shouldn't all the stuff except
+> the resume function be marked __init or is any of this required post
+> init?
+
+It's not common to mark functions invoked at and affter *_probe() as
+__init.  At least, not as far as I'm aware.
 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
