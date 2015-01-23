@@ -1,116 +1,127 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 23 Jan 2015 10:43:26 -0800
-Subject: [GIT PULL] qcom SoC changes for v3.20
-In-Reply-To: <DBE63F76-D4CB-49D5-90C6-642CFCA7687F@codeaurora.org>
-References: <alpine.DEB.2.02.1501191226010.2973@galak-ubuntu.qualcomm.com>
- <20150122011521.GA31815@quad.lixom.net>
- <D177DF12-0F31-49CF-B98B-9FAC23AAB24C@codeaurora.org>
- <CAOesGMipp=Odc-cWvrba0e1pd1X7O+PKNH+WoM3fG4xX2GRFuA@mail.gmail.com>
- <DBE63F76-D4CB-49D5-90C6-642CFCA7687F@codeaurora.org>
-Message-ID: <CAOesGMht4VaNgwr5rOyher081Vk7w_HKTMeOm677rEAkOcCPAg@mail.gmail.com>
+From: sylvain.rochet@finsecur.com (Sylvain Rochet)
+Date: Fri, 23 Jan 2015 20:17:19 +0100
+Subject: [PATCH 08/12] pm: at91: rename file name: pm_slowclock.S
+ -->pm_suspend.S
+In-Reply-To: <1421741825-18226-9-git-send-email-wenyou.yang@atmel.com>
+References: <1421741825-18226-1-git-send-email-wenyou.yang@atmel.com>
+ <1421741825-18226-9-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20150123191719.GA29601@gradator.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 23, 2015 at 8:22 AM, Kumar Gala <galak@codeaurora.org> wrote:
->
-> On Jan 22, 2015, at 9:00 PM, Olof Johansson <olof@lixom.net> wrote:
->
->> On Thu, Jan 22, 2015 at 9:02 AM, Kumar Gala <galak@codeaurora.org> wrote:
->>>
->>> On Jan 21, 2015, at 7:15 PM, Olof Johansson <olof@lixom.net> wrote:
->>>
->>>> Hi,
->>>>
->>>>
->>>> On Mon, Jan 19, 2015 at 12:27:15PM -0600, Kumar Gala wrote:
->>>>> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
->>>>>
->>>>> Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
->>>>>
->>>>> are available in the git repository at:
->>>>>
->>>>> git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-soc-for-3.20
->>>>>
->>>>> for you to fetch changes up to ae0a6075c046f9c8dbac18f53a779592f97b402e:
->>>>>
->>>>> soc: qcom: scm: Clarify boot interface (2015-01-19 11:55:12 -0600)
->>>>>
->>>>> ----------------------------------------------------------------
->>>>> Qualcomm ARM Based SoC Updates for v3.20
->>>>>
->>>>> * Moved scm support into drivers/soc/qcom (allows for use by drivers)
->>>>> * Various bug fixes and minor feature additions to scm code
->>>>> * Added big-endian support to debug MSM uart
->>>>> * Added big-endian support to ARCH_QCOM
->>>>>
->>>>> ----------------------------------------------------------------
->>>>> Lina Iyer (2):
->>>>>     ARM: qcom: Add SCM warmboot flags for quad core targets.
->>>>>     soc: qcom: scm: Move scm-boot files to drivers/soc and include/soc
->>>>>
->>>>> Olav Haugan (1):
->>>>>     ARM: qcom: scm: Add logging of actual return code from scm call
->>>>>
->>>>> Saravana Kannan (1):
->>>>>     ARM: qcom: scm: Add API to query for service/command availability.
->>>>>
->>>>> Stephen Boyd (9):
->>>>>     ARM: debug: Update MSM and QCOM DEBUG_LL help
->>>>>     ARM: debug: msm: Support big-endian CPUs
->>>>>     ARM: qcom: Select ARCH_SUPPORTS_BIG_ENDIAN
->>>>>     ARM: qcom: scm: Fix incorrect cache invalidation
->>>>>     ARM: qcom: scm: Get cacheline size from CTR
->>>>>     ARM: qcom: scm: Add a feat version query API
->>>>>     soc: qcom: scm: Move the scm driver to drivers/soc/qcom
->>>>
->>>> I replied on the patch here just now. This isn't the right thing to do,
->>>> as far as I can tell.
->>>>
->>>> Seems like sending a fresh request with the material besides the move
->>>> to drivers/soc should be mergeable though, so feel free to do that while
->>>> the rest is hashed out.
->>>
->>> Would the following be ok (dropped the move to drivers/soc and some additional unused scm APIs as of right now):
->>>
->>> ARM: qcom: Drop unnecessary selects from ARCH_QCOM
->>> ARM: qcom: scm: Clarify boot interface
->>> ARM: qcom: Add SCM warmboot flags for quad core targets.
->>> ARM: qcom: scm: Add logging of actual return code from scm call
->>> ARM: qcom: scm: Flush the command buffer only instead of the entire cache
->>> ARM: qcom: scm: Get cacheline size from CTR
->>> ARM: qcom: scm: Fix incorrect cache invalidation
->>> ARM: qcom: Select ARCH_SUPPORTS_BIG_ENDIAN
->>> ARM: debug: msm: Support big-endian CPUs
->>> ARM: debug: Update MSM and QCOM DEBUG_LL help
->>>
->>> Kconfig.debug        |    5 ++--
->>> include/debug/msm.S  |    6 +++++
->>> mach-qcom/Kconfig    |    3 --
->>> mach-qcom/scm-boot.c |    2 -
->>> mach-qcom/scm-boot.h |    4 ++-
->>> mach-qcom/scm.c      |   55 +++++++++++++++++++++++++++++++++++++--------------
->>> 6 files changed, 54 insertions(+), 21 deletions(-)
->>
->> I'd be OK with merging this, send a request and tag. Would that let
->> the DRM folks make progress too?
->
-> Will do, I don?t think it will address the DRM folks needs as they need access to make firmware calls from the DRM driver.
->
->> If you need a common place for this, drivers/firmware seems like a
->> better home than drivers/soc.
->
-> Agreed, what?s you take than on moving to use firmware_ops as defined in arch/arm and extended it or just leaving this as a qcom specific firmware interface?
+Hello Wenyou,
 
-Are there any other SoCs out there with similar requirements on
-firmware interfaces? I think most of them so far have been fairly
-simple compared to the complexity of the qualcomm firmware.
-
-Would it make sense to use firmware_ops for the common pieces and have
-direct smc calls for the rest? I'm not sure that would buy us all that
-much. Hm.
-
-Well, at least it's an internal implementation detail. If we move it
-now and find a better way to do it down the road it can be refactored.
+On Tue, Jan 20, 2015 at 04:17:01PM +0800, Wenyou Yang wrote:
+> 
+> diff --git a/arch/arm/mach-at91/pm_suspend.S b/arch/arm/mach-at91/pm_suspend.S
+> new file mode 100644
+> index 0000000..420e730
+> --- /dev/null
 
 
--Olof
+> +	/* Turn off the main oscillator */
+> +	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
+> +	bic	tmp1, tmp1, #AT91_PMC_MOSCEN
+
+at91sam9x5 and probably others need a key here:
+	orr     tmp1, tmp1, #AT91_PMC_KEY
+
+> +	str	tmp1, [pmc, #AT91_CKGR_MOR]
+
+
+
+> +	/* Wait for interrupt */
+> +	mcr	p15, 0, tmp1, c7, c0, 4
+
+The linux-3.10-at91 branch uses a different approach which seem 
+necessary for newer board, you probably forget to merge the following:
+
+/*
+ * Put the processor to enter into Standby mode, wait for interrupt to wakeup
+ */
+	.macro _do_wfi
+
+#if defined(CONFIG_CPU_V7)
+	dsb
+
+	/* Disable the processor clock */
+	mov	tmp1, #AT91_PMC_PCK
+	str	tmp1, [pmc, #AT91_PMC_SCDR]
+
+	wfi		@ Wait For Interrupt
+#else
+	mcr	p15, 0, tmp1, c7, c0, 4
+#endif
+
+	.endm
+
+	.text
+
+ENTRY(at91_slow_clock)
+(...)
+	/* Wait for interrupt */
+	_do_wfi
+(...)
+
+
+
+
+> +	/* Turn on the main oscillator */
+> +	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
+> +	orr	tmp1, tmp1, #AT91_PMC_MOSCEN
+
+at91sam9x5 and probably others need a key here:
+        orr     tmp1, tmp1, #AT91_PMC_KEY
+
+> +	str	tmp1, [pmc, #AT91_CKGR_MOR]
+
+
+
+What about the following parts which are also in linux-3.10-at91 branch 
+but not in this rework, are they necessary ?
+
+sdr_sr_done:
+	/* Disable MPDDRC Clock*/
+	cmp	ddrcid, #0
+	beq	2f
+	bic	tmp2, ddrcid, #0xe0 /* fetch lowest 5 bits */
+	mov	tmp1, #0x01
+	mov	tmp1, tmp1, lsl tmp2
+
+	tst	ddrcid, #0x20	/* > 32 ? */
+	beq	1f
+	str	tmp1, [pmc, #AT91_PMC_PCDR1]
+	b	2f
+1:
+	str	tmp1, [pmc, #AT91_PMC_PCDR]
+2:
+
+	/* Disable DDR Clock */
+	mov 	tmp1, #AT91_PMC_SYS_DDR
+	str	tmp1, [pmc, #AT91_PMC_SCDR]
+
+
+
+
+	/* Enable MPDDRC Clock*/
+	cmp	ddrcid, #0
+	beq	4f
+	bic	tmp2, ddrcid, #0xe0 /* fetch lowest 5 bits */
+	mov	tmp1, #0x01
+	mov	tmp1, tmp1, lsl tmp2
+
+	tst	ddrcid, #0x20	/* > 32 ? */
+	beq	3f
+	str	tmp1, [pmc, #AT91_PMC_PCER1]
+	b	4f
+3:
+	str	tmp1, [pmc, #AT91_PMC_PCER]
+4:
+
+	/* Enable DDR clock */
+	mov 	tmp1, #AT91_PMC_SYS_DDR
+	str	tmp1, [pmc, #AT91_PMC_SCER]
+
+
+
+Sylvain
