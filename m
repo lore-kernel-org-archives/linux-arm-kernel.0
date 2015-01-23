@@ -1,103 +1,121 @@
 From: ricardo.ribalda@gmail.com (Ricardo Ribalda Delgado)
-Date: Fri, 23 Jan 2015 17:08:36 +0100
-Subject: [PATCH 04/18] spi-xilinx: Simplify spi_fill_tx_fifo
+Date: Fri, 23 Jan 2015 17:08:42 +0100
+Subject: [PATCH 10/18] spi/xilinx: Support for spi mode CS_HIGH
 In-Reply-To: <1422029330-10971-1-git-send-email-ricardo.ribalda@gmail.com>
 References: <1422029330-10971-1-git-send-email-ricardo.ribalda@gmail.com>
-Message-ID: <1422029330-10971-5-git-send-email-ricardo.ribalda@gmail.com>
+Message-ID: <1422029330-10971-11-git-send-email-ricardo.ribalda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of checking the TX_FULL flag for every transaction, find out the
-size of the buffer at probe time and use it.
+The core controls the chip select lines individually.
+
+By default, all the lines are consider active_low. After
+spi_setup_transfer, it has its real value.
 
 Signed-off-by: Ricardo Ribalda Delgado <ricardo.ribalda@gmail.com>
 ---
- drivers/spi/spi-xilinx.c | 39 ++++++++++++++++++++++++++-------------
- 1 file changed, 26 insertions(+), 13 deletions(-)
+ drivers/spi/spi-xilinx.c | 62 +++++++++++++++++++++++++++++-------------------
+ 1 file changed, 38 insertions(+), 24 deletions(-)
 
 diff --git a/drivers/spi/spi-xilinx.c b/drivers/spi/spi-xilinx.c
-index 416b227..17480a2 100644
+index a70cb91..29edf1b 100644
 --- a/drivers/spi/spi-xilinx.c
 +++ b/drivers/spi/spi-xilinx.c
-@@ -88,6 +88,7 @@ struct xilinx_spi {
- 	const u8 *tx_ptr;	/* pointer in the Rx buffer */
+@@ -89,6 +89,7 @@ struct xilinx_spi {
  	int remaining_bytes;	/* the number of bytes left to transfer */
  	u8 bits_per_word;
-+	int buffer_size;	/* buffer size in words */
+ 	int buffer_size;	/* buffer size in words */
++	u32 cs_inactive;	/* Level of the CS pins when inactive*/
  	unsigned int (*read_fn)(void __iomem *);
  	void (*write_fn)(u32, void __iomem *);
  	void (*tx_fn)(struct xilinx_spi *);
-@@ -221,24 +222,16 @@ static int xilinx_spi_setup_transfer(struct spi_device *spi,
+@@ -194,33 +195,37 @@ static void xspi_init_hw(struct xilinx_spi *xspi)
+ static void xilinx_spi_chipselect(struct spi_device *spi, int is_on)
+ {
+ 	struct xilinx_spi *xspi = spi_master_get_devdata(spi->master);
++	u16 cr;
++	u32 cs;
+ 
+ 	if (is_on == BITBANG_CS_INACTIVE) {
+ 		/* Deselect the slave on the SPI bus */
+-		xspi->write_fn(0xffff, xspi->regs + XSPI_SSR_OFFSET);
+-	} else if (is_on == BITBANG_CS_ACTIVE) {
+-		/* Set the SPI clock phase and polarity */
+-		u16 cr = xspi->read_fn(xspi->regs + XSPI_CR_OFFSET)
+-			 & ~XSPI_CR_MODE_MASK;
+-		if (spi->mode & SPI_CPHA)
+-			cr |= XSPI_CR_CPHA;
+-		if (spi->mode & SPI_CPOL)
+-			cr |= XSPI_CR_CPOL;
+-		if (spi->mode & SPI_LSB_FIRST)
+-			cr |= XSPI_CR_LSB_FIRST;
+-		if (spi->mode & SPI_LOOP)
+-			cr |= XSPI_CR_LOOP;
+-		xspi->write_fn(cr, xspi->regs + XSPI_CR_OFFSET);
+-
+-		/* We do not check spi->max_speed_hz here as the SPI clock
+-		 * frequency is not software programmable (the IP block design
+-		 * parameter)
+-		 */
+-
+-		/* Activate the chip select */
+-		xspi->write_fn(~(0x0001 << spi->chip_select),
+-			xspi->regs + XSPI_SSR_OFFSET);
++		xspi->write_fn(xspi->cs_inactive, xspi->regs + XSPI_SSR_OFFSET);
++		return;
+ 	}
++
++	/* Set the SPI clock phase and polarity */
++	cr = xspi->read_fn(xspi->regs + XSPI_CR_OFFSET)	& ~XSPI_CR_MODE_MASK;
++	if (spi->mode & SPI_CPHA)
++		cr |= XSPI_CR_CPHA;
++	if (spi->mode & SPI_CPOL)
++		cr |= XSPI_CR_CPOL;
++	if (spi->mode & SPI_LSB_FIRST)
++		cr |= XSPI_CR_LSB_FIRST;
++	if (spi->mode & SPI_LOOP)
++		cr |= XSPI_CR_LOOP;
++	xspi->write_fn(cr, xspi->regs + XSPI_CR_OFFSET);
++
++	/* We do not check spi->max_speed_hz here as the SPI clock
++	 * frequency is not software programmable (the IP block design
++	 * parameter)
++	 */
++
++	cs = xspi->cs_inactive;
++	cs ^= BIT(spi->chip_select);
++
++	/* Activate the chip select */
++	xspi->write_fn(cs, xspi->regs + XSPI_SSR_OFFSET);
+ }
+ 
+ /* spi_bitbang requires custom setup_transfer() to be defined if there is a
+@@ -229,6 +234,13 @@ static void xilinx_spi_chipselect(struct spi_device *spi, int is_on)
+ static int xilinx_spi_setup_transfer(struct spi_device *spi,
+ 		struct spi_transfer *t)
+ {
++	struct xilinx_spi *xspi = spi_master_get_devdata(spi->master);
++
++	if (spi->mode & SPI_CS_HIGH)
++		xspi->cs_inactive &= ~BIT(spi->chip_select);
++	else
++		xspi->cs_inactive |= BIT(spi->chip_select);
++
  	return 0;
  }
  
--static int xilinx_spi_fill_tx_fifo(struct xilinx_spi *xspi)
-+static void xilinx_spi_fill_tx_fifo(struct xilinx_spi *xspi, int n_words)
- {
--	u8 sr;
--	int n_words = 0;
-+	xspi->remaining_bytes -= n_words * xspi->bits_per_word / 8;
+@@ -369,9 +381,11 @@ static int xilinx_spi_probe(struct platform_device *pdev)
+ 		return -ENODEV;
  
--	/* Fill the Tx FIFO with as many bytes as possible */
--	sr = xspi->read_fn(xspi->regs + XSPI_SR_OFFSET);
--	while ((sr & XSPI_SR_TX_FULL_MASK) == 0 && xspi->remaining_bytes > 0) {
-+	while (n_words--)
- 		if (xspi->tx_ptr)
- 			xspi->tx_fn(xspi);
- 		else
- 			xspi->write_fn(0, xspi->regs + XSPI_TXD_OFFSET);
--		xspi->remaining_bytes -= xspi->bits_per_word / 8;
--		sr = xspi->read_fn(xspi->regs + XSPI_SR_OFFSET);
--		n_words++;
--	}
--
--	return n_words;
-+	return;
- }
+ 	/* the spi->mode bits understood by this driver: */
+-	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_LSB_FIRST | SPI_LOOP;
++	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_LSB_FIRST | SPI_LOOP |
++			    SPI_CS_HIGH;
  
- static int xilinx_spi_txrx_bufs(struct spi_device *spi, struct spi_transfer *t)
-@@ -265,7 +258,10 @@ static int xilinx_spi_txrx_bufs(struct spi_device *spi, struct spi_transfer *t)
- 		u16 cr;
- 		int n_words;
- 
--		n_words = xilinx_spi_fill_tx_fifo(xspi);
-+		n_words = (xspi->remaining_bytes * 8) / xspi->bits_per_word;
-+		n_words = min(n_words, xspi->buffer_size);
-+
-+		xilinx_spi_fill_tx_fifo(xspi, n_words);
- 
- 		/* Start the transfer by not inhibiting the transmitter any
- 		 * longer
-@@ -322,6 +318,21 @@ static irqreturn_t xilinx_spi_irq(int irq, void *dev_id)
- 	return IRQ_HANDLED;
- }
- 
-+static int xilinx_spi_find_buffer_size(struct xilinx_spi *xspi)
-+{
-+	u8 sr;
-+	int n_words = 0;
-+
-+	/* Fill the Tx FIFO with as many words as possible */
-+	do {
-+		xspi->write_fn(0, xspi->regs + XSPI_TXD_OFFSET);
-+		sr = xspi->read_fn(xspi->regs + XSPI_SR_OFFSET);
-+		n_words++;
-+	} while (!(sr & XSPI_SR_TX_FULL_MASK));
-+
-+	return n_words;
-+}
-+
- static const struct of_device_id xilinx_spi_of_match[] = {
- 	{ .compatible = "xlnx,xps-spi-2.00.a", },
- 	{ .compatible = "xlnx,xps-spi-2.00.b", },
-@@ -413,6 +424,8 @@ static int xilinx_spi_probe(struct platform_device *pdev)
- 		goto put_master;
- 	}
- 
-+	xspi->buffer_size = xilinx_spi_find_buffer_size(xspi);
-+
- 	/* SPI controller initializations */
- 	xspi_init_hw(xspi);
- 
+ 	xspi = spi_master_get_devdata(master);
++	xspi->cs_inactive = 0xffffffff;
+ 	xspi->bitbang.master = master;
+ 	xspi->bitbang.chipselect = xilinx_spi_chipselect;
+ 	xspi->bitbang.setup_transfer = xilinx_spi_setup_transfer;
 -- 
 2.1.4
