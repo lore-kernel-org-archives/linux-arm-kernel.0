@@ -1,121 +1,89 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 23 Jan 2015 14:03:20 -0800
-Subject: [PATCH] PCI: keystone: fix incorrect annotations on probe and
- remove
-In-Reply-To: <20150123214726.GA4688@dtor-ws>
-References: <20150108221736.GA39839@dtor-ws>
- <20150123213412.GK29776@google.com> <20150123214726.GA4688@dtor-ws>
-Message-ID: <20150123220320.GB4688@dtor-ws>
+From: nm@TI.COM (Nishanth Menon)
+Date: Fri, 23 Jan 2015 16:05:05 -0600
+Subject: [next-20150119]regression (mm)?
+In-Reply-To: <20150123202229.GA9038@node.dhcp.inet.fi>
+References: <54BD33DC.40200@ti.com> <20150119174317.GK20386@saruman>
+ <20150120001643.7D15AA8@black.fi.intel.com>
+ <20150120114555.GA11502@n2100.arm.linux.org.uk>
+ <20150120140546.DDCB8D4@black.fi.intel.com>
+ <20150123172736.GA15392@kahuna>
+ <CANMBJr7w2jZBwRDEsVNvL3XrDZ2ttwFz7qBf4zySAMMmcgAxiw@mail.gmail.com>
+ <20150123183706.GA15791@kahuna>
+ <20150123202229.GA9038@node.dhcp.inet.fi>
+Message-ID: <20150123220505.GA17421@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 23, 2015 at 01:47:26PM -0800, Dmitry Torokhov wrote:
-> Hi Bjorn,
+On 22:22-20150123, Kirill A. Shutemov wrote:
+> On Fri, Jan 23, 2015 at 12:37:06PM -0600, Nishanth Menon wrote:
+> > On 09:39-20150123, Tyler Baker wrote:
+> > > Hi,
+> > > 
+> > > On 23 January 2015 at 09:27, Nishanth Menon <nm@ti.com> wrote:
+> > > > On 16:05-20150120, Kirill A. Shutemov wrote:
+> > > > [..]
+> > > >> Signed-off-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
+> > > >> Reported-by: Nishanth Menon <nm@ti.com>
+> > > > Just to close on this thread:
+> > > > https://github.com/nmenon/kernel-test-logs/tree/next-20150123 looks good
+> > > > and back to old status. Thank you folks for all the help.
+> > > 
+> > > I just reviewed the boot logs for next-20150123 and there still seems
+> > > to be a related issue. I've been boot testing
+> > > multi_v7_defconfig+CONFIG_ARM_LPAE=y kernel configurations which still
+> > > seem broken.
+> > > 
+> > > For example here are two boots with exynos5250-arndale, one with
+> > > multi_v7_defconfig+CONFIG_ARM_LPAE=y [1] and the other with
+> > > multi_v7_defconfig[2]. You can see the kernel configurations with
+> > > CONFIG_ARM_LPAE=y show the splat:
+> > > 
+> > > [   14.605950] ------------[ cut here ]------------
+> > > [   14.609163] WARNING: CPU: 1 PID: 63 at ../mm/mmap.c:2858
+> > > exit_mmap+0x1b8/0x224()
+> > > [   14.616548] Modules linked in:
+> > > [   14.619553] CPU: 1 PID: 63 Comm: init Not tainted 3.19.0-rc5-next-20150123 #1
+> > > [   14.626713] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+> > > [   14.632830] [] (unwind_backtrace) from [] (show_stack+0x10/0x14)
+> > > [   14.640473] [] (show_stack) from [] (dump_stack+0x78/0x94)
+> > > [   14.647678] [] (dump_stack) from [] (warn_slowpath_common+0x74/0xb0)
+> > > [   14.655744] [] (warn_slowpath_common) from [] (warn_slowpath_null+0x1c/0x24)
+> > > [   14.664510] [] (warn_slowpath_null) from [] (exit_mmap+0x1b8/0x224)
+> > > [   14.672497] [] (exit_mmap) from [] (mmput+0x40/0xf8)
+> > > [   14.679180] [] (mmput) from [] (flush_old_exec+0x328/0x604)
+> > > [   14.686471] [] (flush_old_exec) from [] (load_elf_binary+0x26c/0x11f4)
+> > > [   14.694715] [] (load_elf_binary) from [] (search_binary_handler+0x98/0x244)
+> > > [   14.703395] [] (search_binary_handler) from []
+> > > (do_execveat_common+0x4dc/0x5bc)
+> > > [   14.712421] [] (do_execveat_common) from [] (do_execve+0x28/0x30)
+> > > [   14.720235] [] (do_execve) from [] (ret_fast_syscall+0x0/0x34)
+> > > [   14.727782] ---[ end trace 5e3ca48b454c7e0a ]---
+> > > [   14.733758] ------------[ cut here ]------------
+> > > 
+> > > Has anyone else tested with CONFIG_ARM_LPAE=y that can confirm my findings?
+> > Uggh... I missed since i was looking at non LPAE omap2plus_defconfig.
+> > 
+> > Dual A15 OMAP5432 with multi_v7_defconfig + CONFIG_ARM_LPAE=y
+> > https://github.com/nmenon/kernel-test-logs/blob/next-20150123/multi_lpae_defconfig/omap5-evm.txt
+> > 
+> > Dual A15 DRA7/AM572x with same configuration as above.
+> > https://raw.githubusercontent.com/nmenon/kernel-test-logs/next-20150123/multi_lpae_defconfig/dra7xx-evm.txt
+> > https://github.com/nmenon/kernel-test-logs/blob/next-20150123/multi_lpae_defconfig/am57xx-evm.txt
+> > 
+> > Single A15 DRA72 with same configuration as above:
+> > https://raw.githubusercontent.com/nmenon/kernel-test-logs/next-20150123/multi_lpae_defconfig/dra72x-evm.txt
+> > 
+> > You are right. the issue re-appears with LPAE on :(
+> > Apologies on missing that.
 > 
-> On Fri, Jan 23, 2015 at 03:34:12PM -0600, Bjorn Helgaas wrote:
-> > [+cc Fabio]
-> > 
-> > On Thu, Jan 08, 2015 at 02:17:36PM -0800, Dmitry Torokhov wrote:
-> > > Even though platform bus is not hot-pluggable, devices on it can be unbound
-> > > from the driver and bound back to it via sysfs, so we should not be using
-> > > __init annotations on probe() and __exit annotations on remove() methods.
-> > 
-> > I don't completely understand this problem.  Does this mean there should be
-> > no __init/__exit annotations in these drivers at all?  If other PCI host
-> > bridge drivers have the same problem, I'd like to fix them all at once.
+> Guys, could you instrument mm_{inc,dec}_nr_pmds() with dump_stack() +
+> printk() of the counter and add printk() on mmap_exit() then run a simple
+> program which triggers the issue?
 
-By the way I think only keystone in drivers/pci has this issue. My
-script to find potential issues is:
-
-#!/bin/bash
-for i in `grep -rl '__exit\(_p\| \).*remove' $*`; do grep -L platform_driver_probe $i; done
-
-it is not 100% correct and generates both false positives and false
-negatives but still fains a few offenders in the tree.
-
-> 
-> Basically they should not use __init/__exit, unless you take explicit
-> steps to make sure that devices can't be unbound and bound again later
-> via sysfs by setting driver->suppress_bind_attrs and/or using
-> platform_driver_probe(). Note that if you use platform_driver_probe()
-> then your driver can't cope with -EPROBE_DEFER reported by any of the
-> subsystems it might be using.
-> 
-> > 
-> > For example, after applying this patch, ks_pcie_probe() is non-__init, but
-> > it calls ks_add_pcie_port(), which is still __init.  I thought that was
-> > illegal.
-> 
-> My bad, I missed that. The __init marking on ks_add_pcie_port() shoudl
-> be removed as well.
-> 
-> > 
-> > I'm not sure about module_platform_driver_probe() either; it generates
-> > __init and __exit functions.  Should those annotations be removed, too?
-> 
-> module_platform_driver_probe() does internally platform_driver_probe()
-> so it is OK for that probe function be __init (because we'd suppress
-> sysfs bind/unbind and deferred probing so discaring init section is
-> safe).
-> 
-> Note that above applied to driver's ->probe() and ->remove() code paths
-> only.  Marking module init/exit code as __init and __exit is still right
-> thing to do.
-> 
-> Thanks.
-> 
-> > 
-> > > Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> > > ---
-> > > 
-> > > Not tested, found by casual code inspection.
-> > > 
-> > >  drivers/pci/host/pci-keystone.c | 8 ++++----
-> > >  1 file changed, 4 insertions(+), 4 deletions(-)
-> > > 
-> > > diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
-> > > index 1b893bc..7b84e1d 100644
-> > > --- a/drivers/pci/host/pci-keystone.c
-> > > +++ b/drivers/pci/host/pci-keystone.c
-> > > @@ -332,7 +332,7 @@ static const struct of_device_id ks_pcie_of_match[] = {
-> > >  };
-> > >  MODULE_DEVICE_TABLE(of, ks_pcie_of_match);
-> > >  
-> > > -static int __exit ks_pcie_remove(struct platform_device *pdev)
-> > > +static int ks_pcie_remove(struct platform_device *pdev)
-> > >  {
-> > >  	struct keystone_pcie *ks_pcie = platform_get_drvdata(pdev);
-> > >  
-> > > @@ -341,7 +341,7 @@ static int __exit ks_pcie_remove(struct platform_device *pdev)
-> > >  	return 0;
-> > >  }
-> > >  
-> > > -static int __init ks_pcie_probe(struct platform_device *pdev)
-> > > +static int ks_pcie_probe(struct platform_device *pdev)
-> > >  {
-> > >  	struct device *dev = &pdev->dev;
-> > >  	struct keystone_pcie *ks_pcie;
-> > > @@ -398,9 +398,9 @@ fail_clk:
-> > >  	return ret;
-> > >  }
-> > >  
-> > > -static struct platform_driver ks_pcie_driver __refdata = {
-> > > +static struct platform_driver ks_pcie_driver = {
-> > >  	.probe  = ks_pcie_probe,
-> > > -	.remove = __exit_p(ks_pcie_remove),
-> > > +	.remove = ks_pcie_remove,
-> > >  	.driver = {
-> > >  		.name	= "keystone-pcie",
-> > >  		.owner	= THIS_MODULE,
-> > > -- 
-> > > 2.2.0.rc0.207.ga3a616c
-> > > 
-> > > 
-> > > -- 
-> > > Dmitry
-> 
-> -- 
-> Dmitry
+The simplest program I think we are all running is "boot to shell" - I
+mean, have'nt spend more time digging at it as I am not in a familiar
+territory here. :( is there any instrumentation patch you want us to try?
 
 -- 
-Dmitry
+Regards,
+Nishanth Menon
