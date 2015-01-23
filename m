@@ -1,14 +1,45 @@
 From: ming.lei@canonical.com (Ming Lei)
-Date: Fri, 23 Jan 2015 15:48:23 +0800
-Subject: [PATCH 0/2] ARM EXYNOS5 & net: add fixed phy support
-Message-ID: <1421999305-19267-1-git-send-email-ming.lei@canonical.com>
+Date: Fri, 23 Jan 2015 15:48:25 +0800
+Subject: [PATCH 2/2] net: stmmac: add fixed_phy support via fixed-link DT
+ binding
+In-Reply-To: <1421999305-19267-1-git-send-email-ming.lei@canonical.com>
+References: <1421999305-19267-1-git-send-email-ming.lei@canonical.com>
+Message-ID: <1421999305-19267-3-git-send-email-ming.lei@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Signed-off-by: Ming Lei <ming.lei@canonical.com>
+---
+ .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-These two patches adds fixed phy support using the fixed-link DT binding
-for stmmac.
-
-Thanks,
-Ming Lei
+diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+index 3039de2..73a3ced 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+@@ -27,6 +27,7 @@
+ #include <linux/of.h>
+ #include <linux/of_net.h>
+ #include <linux/of_device.h>
++#include <linux/of_mdio.h>
+ 
+ #include "stmmac.h"
+ #include "stmmac_platform.h"
+@@ -216,6 +217,15 @@ static int stmmac_probe_config_dt(struct platform_device *pdev,
+ 		plat->pmt = 1;
+ 	}
+ 
++	if (of_phy_is_fixed_link(np)) {
++		int ret = of_phy_register_fixed_link(np);
++		if (ret) {
++			dev_err(&pdev->dev, "failed to register fixed PHY\n");
++			return ret;
++		}
++		plat->phy_bus_name = "fixed";
++	}
++
+ 	if (of_device_is_compatible(np, "snps,dwmac-3.610") ||
+ 		of_device_is_compatible(np, "snps,dwmac-3.710")) {
+ 		plat->enh_desc = 1;
+-- 
+1.7.9.5
