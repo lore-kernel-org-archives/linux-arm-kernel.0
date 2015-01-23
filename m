@@ -1,72 +1,87 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Fri, 23 Jan 2015 12:57:24 +0800
-Subject: [PATCH 2/2] net: stmmac: add fixed_phy and phy_addr support using
- DT file
-In-Reply-To: <54C1CADD.4060103@gmail.com>
-References: <1421980893-14475-1-git-send-email-ming.lei@canonical.com>
- <1421980893-14475-3-git-send-email-ming.lei@canonical.com>
- <54C1CADD.4060103@gmail.com>
-Message-ID: <CACVXFVPDjArXCoghEsp9g9UjDLqUaB06kT_skN7Vwy43JfXaaA@mail.gmail.com>
+From: ideal.song@samsung.com (Inha Song)
+Date: Fri, 23 Jan 2015 14:03:30 +0900
+Subject: [alsa-devel] [PATCH v4 3/3] ARM: dts: Add sound nodes for
+ exynos4412-trats2
+In-Reply-To: <1421989410-12490-1-git-send-email-ideal.song@samsung.com>
+References: <1421989410-12490-1-git-send-email-ideal.song@samsung.com>
+Message-ID: <1421989410-12490-4-git-send-email-ideal.song@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 23, 2015 at 12:15 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> Le 22/01/2015 18:41, Ming Lei a ?crit :
->> From: Byungho An <bh74.an@samsung.com>
->>
->> This patch adds codes for DT file support, fixed_phy and phy_addr
->> can be set in DT file.
->>
->> Signed-off-by: Byungho An <bh74.an@samsung.com> (bypass check for
->> fixed phy) Signed-off-by: Ming Lei<ming.lei@canonical.com> ---
->> drivers/net/ethernet/stmicro/stmmac/stmmac_main.c  |    5 ++++-
->> .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |    7 +++++++ 2
->> files changed, 11 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
->> b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c index
->> 8c6b7c16..ddb4351 100644 ---
->> a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c +++
->> b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c @@ -847,8
->> +847,11 @@ static int stmmac_init_phy(struct net_device *dev) * 0
->> rather than 0xffff. Catch this here and treat 0 as a non-existent *
->> device as well. * Note: phydev->phy_id is the result of reading the
->> UID PHY registers. +   * But phy_id returned from fixed phy is
->> always zero, so bypass the +   * check for fixed phy. */ -    if
->> (phydev->phy_id == 0) { +     if (phydev->phy_id == 0 &&
->> (!priv->plat->phy_bus_name || +
->> strcmp(priv->plat->phy_bus_name,"fixed"))) {
->> phy_disconnect(phydev); return -ENODEV; } diff --git
->> a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
->> b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c index
->> 879e29f..4f11491 100644 ---
->> a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c +++
->> b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c @@ -128,6
->> +128,7 @@ static int stmmac_probe_config_dt(struct platform_device
->> *pdev, struct device_node *np = pdev->dev.of_node; struct
->> stmmac_dma_cfg *dma_cfg; const struct of_device_id *device; + u32
->> phy_addr;
->>
->> if (!np) return -ENODEV; @@ -217,6 +218,12 @@ static int
->> stmmac_probe_config_dt(struct platform_device *pdev, plat->pmt =
->> 1; }
->>
->> +     if (of_find_property(np, "fixed_phy", NULL)) { +
->> plat->phy_bus_name = "fixed"; +               of_property_read_u32(np,
->> "phy_addr", &phy_addr); +             plat->phy_addr = phy_addr; +    }
->
-> Humm, same here, it would look like you could use the existing Device
-> Tree helpers for parsing and registering a fixed PHY here, provided
-> that you use the proper binding though.
+This patch add WM1811 audio codec, I2S interface and the sound
+machine nodes to enable audio on exynos4412-trats2 board.
 
-OK, I will try to use the existing DT helpers in v1.
+Signed-off-by: Inha Song <ideal.song@samsung.com>
+---
+ arch/arm/boot/dts/exynos4412-trats2.dts | 42 +++++++++++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
 
->
-> BTW, Ming Lei's email is bouncing, do we have an updated email he
-> could be contacted with?
-
-Sorry, my signed-off-by email in the 1st patch is wrong(typo), and
-the address in this email and patch is correct.
-
-Thanks,
-Ming Lei
+diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+index 29231b4..6205b98 100644
+--- a/arch/arm/boot/dts/exynos4412-trats2.dts
++++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+@@ -203,6 +203,25 @@
+ 		};
+ 	};
+ 
++	i2c at 138A0000 {
++		samsung,i2c-sda-delay = <100>;
++		samsung,i2c-slave-addr = <0x10>;
++		samsung,i2c-max-bus-freq = <100000>;
++		pinctrl-0 = <&i2c4_bus>;
++		pinctrl-names = "default";
++		status = "okay";
++
++		wm1811: wm1811 at 1a {
++			compatible = "wlf,wm1811";
++			reg = <0x1a>;
++			clocks = <&pmu_system_controller 0>;
++			clock-names = "MCLK1";
++			DCVDD-supply = <&ldo3_reg>;
++			DBVDD1-supply = <&ldo3_reg>;
++			wlf,ldo1ena = <&gpj0 4 0>;
++		};
++	};
++
+ 	i2c at 138D0000 {
+ 		samsung,i2c-sda-delay = <100>;
+ 		samsung,i2c-slave-addr = <0x10>;
+@@ -838,6 +857,24 @@
+ 		};
+ 	};
+ 
++	i2s0: i2s at 03830000 {
++		pinctrl-0 = <&i2s0_bus>;
++		pinctrl-names = "default";
++		status = "okay";
++	};
++
++	sound {
++		compatible = "samsung,trats2-audio";
++		samsung,i2s-controller = <&i2s0>;
++		samsung,model = "Trats2";
++		samsung,audio-codec = <&wm1811>;
++		samsung,audio-routing =
++			"SPK", "SPKOUTLN",
++			"SPK", "SPKOUTLP",
++			"SPK", "SPKOUTRN",
++			"SPK", "SPKOUTRP";
++	};
++
+ 	exynos-usbphy at 125B0000 {
+ 		status = "okay";
+ 	};
+@@ -865,6 +902,11 @@
+ 	};
+ };
+ 
++&pmu_system_controller {
++	assigned-clocks = <&pmu_system_controller 0>;
++	assigned-clock-parents =  <&clock CLK_XUSBXTI>;
++};
++
+ &pinctrl_0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&sleep0>;
+-- 
+2.0.0.390.gcb682f8
