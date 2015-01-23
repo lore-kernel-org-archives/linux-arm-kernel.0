@@ -1,16 +1,16 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Fri, 23 Jan 2015 17:32:37 -0500
-Subject: [PATCH v4 4/6] of/pci: add of_pci_dma_configure() update dma
- configuration
+Date: Fri, 23 Jan 2015 17:32:35 -0500
+Subject: [PATCH v4 2/6] of: move of_dma_configure() to device.c to help re-use
 In-Reply-To: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
 References: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1422052359-12384-5-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1422052359-12384-3-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add of_pci_dma_configure() to allow updating the dma configuration
-of the pci device using the configuration from DT of the parent of
-the root bridge device.
+Move of_dma_configure() to device.c so that same function can be re-used
+for PCI devices to obtain DMA configuration from DT. Also add a second
+argument so that for PCI, DT node of root bus host bridge can be used to
+obtain the DMA configuration for the slave PCI device.
 
 Cc: Joerg Roedel <joro@8bytes.org>
 Cc: Grant Likely <grant.likely@linaro.org>
@@ -23,96 +23,197 @@ Cc: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 
 Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 ---
- drivers/of/of_pci.c    |   39 +++++++++++++++++++++++++++++++++++++++
- include/linux/of_pci.h |   12 ++++++++++++
- 2 files changed, 51 insertions(+)
+ drivers/of/device.c       |   59 +++++++++++++++++++++++++++++++++++++++++++++
+ drivers/of/platform.c     |   58 ++------------------------------------------
+ include/linux/of_device.h |    2 ++
+ 3 files changed, 63 insertions(+), 56 deletions(-)
 
-diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-index 88471d3..34878c9 100644
---- a/drivers/of/of_pci.c
-+++ b/drivers/of/of_pci.c
-@@ -2,6 +2,7 @@
- #include <linux/export.h>
+diff --git a/drivers/of/device.c b/drivers/of/device.c
+index 46d6c75c..2de320d 100644
+--- a/drivers/of/device.c
++++ b/drivers/of/device.c
+@@ -2,6 +2,9 @@
+ #include <linux/kernel.h>
  #include <linux/of.h>
- #include <linux/of_address.h>
-+#include <linux/of_device.h>
- #include <linux/of_pci.h>
+ #include <linux/of_device.h>
++#include <linux/of_address.h>
++#include <linux/of_iommu.h>
++#include <linux/dma-mapping.h>
+ #include <linux/init.h>
+ #include <linux/module.h>
+ #include <linux/mod_devicetable.h>
+@@ -66,6 +69,62 @@ int of_device_add(struct platform_device *ofdev)
+ 	return device_add(&ofdev->dev);
+ }
+ 
++/**
++ * of_dma_configure - Setup DMA configuration
++ * @dev:	Device to apply DMA configuration
++ * @np:		ptr to of node having dma configuration
++ *
++ * Try to get devices's DMA configuration from DT and update it
++ * accordingly.
++ *
++ * In case if platform code need to use own special DMA configuration,it
++ * can use Platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE event
++ * to fix up DMA configuration.
++ */
++void of_dma_configure(struct device *dev, struct device_node *np)
++{
++	u64 dma_addr, paddr, size;
++	int ret;
++	bool coherent;
++	unsigned long offset;
++	struct iommu_ops *iommu;
++
++	/*
++	 * Set default dma-mask to 32 bit. Drivers are expected to setup
++	 * the correct supported dma_mask.
++	 */
++	dev->coherent_dma_mask = DMA_BIT_MASK(32);
++
++	/*
++	 * Set it to coherent_dma_mask by default if the architecture
++	 * code has not set it.
++	 */
++	if (!dev->dma_mask)
++		dev->dma_mask = &dev->coherent_dma_mask;
++
++	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
++	if (ret < 0) {
++		dma_addr = offset = 0;
++		size = dev->coherent_dma_mask;
++	} else {
++		offset = PFN_DOWN(paddr - dma_addr);
++		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
++	}
++
++	dev->dma_pfn_offset = offset;
++
++	coherent = of_dma_is_coherent(np);
++	dev_dbg(dev, "device is%sdma coherent\n",
++		coherent ? " " : " not ");
++
++	iommu = of_iommu_configure(dev, np);
++	dev_dbg(dev, "device is%sbehind an iommu\n",
++		iommu ? " " : " not ");
++
++	arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
++}
++EXPORT_SYMBOL_GPL(of_dma_configure);
++
+ int of_device_register(struct platform_device *pdev)
+ {
+ 	device_initialize(&pdev->dev);
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index 7675b79..6403501 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -19,7 +19,6 @@
  #include <linux/slab.h>
- 
-@@ -229,6 +230,44 @@ parse_failed:
- 	return err;
+ #include <linux/of_address.h>
+ #include <linux/of_device.h>
+-#include <linux/of_iommu.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ #include <linux/platform_device.h>
+@@ -150,59 +149,6 @@ struct platform_device *of_device_alloc(struct device_node *np,
  }
- EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
-+
-+/**
-+ * of_get_pci_root_bridge_parent - get the OF node of the root bridge's parent
-+ * @dev: ptr to pci_dev struct of the pci device
-+ *
-+ * This function will traverse the bus up to the root bus starting with
-+ * the child and return the OF node ptr to root bridge device's parent device.
-+ */
-+struct device_node *of_get_pci_root_bridge_parent(struct pci_dev *dev)
-+{
-+	struct pci_bus *bus = dev->bus;
-+	struct device *bridge;
-+
-+	while (!pci_is_root_bus(bus))
-+		bus = bus->parent;
-+	bridge = bus->bridge;
-+
-+	return bridge->parent->of_node;
-+}
-+EXPORT_SYMBOL_GPL(of_get_pci_root_bridge_parent);
-+
-+/**
-+ * of_pci_dma_configure - Setup DMA configuration
-+ * @dev: ptr to pci_dev struct of the pci device
-+ *
-+ * Function to update PCI devices's DMA configuration using the same
-+ * info from the OF node of root host bridge's parent.
-+ */
-+void of_pci_dma_configure(struct pci_dev *pci_dev)
-+{
-+	struct device *dev = &pci_dev->dev;
-+	struct device_node *parent_np;
-+
-+	parent_np = of_get_pci_root_bridge_parent(pci_dev);
-+	of_dma_configure(dev, parent_np);
-+}
-+EXPORT_SYMBOL_GPL(of_pci_dma_configure);
-+
- #endif /* CONFIG_OF_ADDRESS */
+ EXPORT_SYMBOL(of_device_alloc);
  
- #ifdef CONFIG_PCI_MSI
-diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-index ce0e5ab..0465a2a 100644
---- a/include/linux/of_pci.h
-+++ b/include/linux/of_pci.h
-@@ -16,6 +16,8 @@ int of_pci_get_devfn(struct device_node *np);
- int of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin);
- int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
- int of_get_pci_domain_nr(struct device_node *node);
-+struct device_node *of_get_pci_root_bridge_parent(struct pci_dev *dev);
-+void of_pci_dma_configure(struct pci_dev *pci_dev);
- #else
- static inline int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq)
+-/**
+- * of_dma_configure - Setup DMA configuration
+- * @dev:	Device to apply DMA configuration
+- *
+- * Try to get devices's DMA configuration from DT and update it
+- * accordingly.
+- *
+- * In case if platform code need to use own special DMA configuration,it
+- * can use Platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE event
+- * to fix up DMA configuration.
+- */
+-static void of_dma_configure(struct device *dev)
+-{
+-	u64 dma_addr, paddr, size;
+-	int ret;
+-	bool coherent;
+-	unsigned long offset;
+-	struct iommu_ops *iommu;
+-
+-	/*
+-	 * Set default dma-mask to 32 bit. Drivers are expected to setup
+-	 * the correct supported dma_mask.
+-	 */
+-	dev->coherent_dma_mask = DMA_BIT_MASK(32);
+-
+-	/*
+-	 * Set it to coherent_dma_mask by default if the architecture
+-	 * code has not set it.
+-	 */
+-	if (!dev->dma_mask)
+-		dev->dma_mask = &dev->coherent_dma_mask;
+-
+-	ret = of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size);
+-	if (ret < 0) {
+-		dma_addr = offset = 0;
+-		size = dev->coherent_dma_mask;
+-	} else {
+-		offset = PFN_DOWN(paddr - dma_addr);
+-		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
+-	}
+-	dev->dma_pfn_offset = offset;
+-
+-	coherent = of_dma_is_coherent(dev->of_node);
+-	dev_dbg(dev, "device is%sdma coherent\n",
+-		coherent ? " " : " not ");
+-
+-	iommu = of_iommu_configure(dev, dev->of_node);
+-	dev_dbg(dev, "device is%sbehind an iommu\n",
+-		iommu ? " " : " not ");
+-
+-	arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
+-}
+-
+ static void of_dma_deconfigure(struct device *dev)
  {
-@@ -50,6 +52,16 @@ of_get_pci_domain_nr(struct device_node *node)
- {
- 	return -1;
+ 	arch_teardown_dma_ops(dev);
+@@ -236,7 +182,7 @@ static struct platform_device *of_platform_device_create_pdata(
+ 
+ 	dev->dev.bus = &platform_bus_type;
+ 	dev->dev.platform_data = platform_data;
+-	of_dma_configure(&dev->dev);
++	of_dma_configure(&dev->dev, dev->dev.of_node);
+ 
+ 	if (of_device_add(dev) != 0) {
+ 		of_dma_deconfigure(&dev->dev);
+@@ -299,7 +245,7 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
+ 		dev_set_name(&dev->dev, "%s", bus_id);
+ 	else
+ 		of_device_make_bus_id(&dev->dev);
+-	of_dma_configure(&dev->dev);
++	of_dma_configure(&dev->dev, dev->dev.of_node);
+ 
+ 	/* Allow the HW Peripheral ID to be overridden */
+ 	prop = of_get_property(node, "arm,primecell-periphid", NULL);
+diff --git a/include/linux/of_device.h b/include/linux/of_device.h
+index ef37021..c661496 100644
+--- a/include/linux/of_device.h
++++ b/include/linux/of_device.h
+@@ -53,6 +53,7 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
+ 	return of_node_get(cpu_dev->of_node);
  }
-+
-+static inline struct device_node
-+*of_get_pci_root_bridge_parent(struct pci_dev *dev)
-+{
-+	return NULL;
-+}
-+
-+static inline void of_pci_dma_configure(struct pci_dev *pci_dev)
-+{
-+}
- #endif
  
- #if defined(CONFIG_OF_ADDRESS)
++void of_dma_configure(struct device *dev, struct device_node *np);
+ #else /* CONFIG_OF */
+ 
+ static inline int of_driver_match_device(struct device *dev,
+@@ -90,6 +91,7 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
+ {
+ 	return NULL;
+ }
++void of_dma_configure(struct device *dev, struct device_node *np) { }
+ #endif /* CONFIG_OF */
+ 
+ #endif /* _LINUX_OF_DEVICE_H */
 -- 
 1.7.9.5
