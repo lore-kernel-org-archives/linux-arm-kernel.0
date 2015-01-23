@@ -1,50 +1,39 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 23 Jan 2015 15:42:40 -0600
-Subject: [PATCH] PCI: xilinx: fix harmless format string warning
-In-Reply-To: <1759235.dcJCuiggea@wuerfel>
-References: <1759235.dcJCuiggea@wuerfel>
-Message-ID: <20150123214240.GL29776@google.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 23 Jan 2015 13:46:37 -0800
+Subject: [GIT PULL 1/3] drop legacy booting for omap3517
+In-Reply-To: <54be9e8b.6a58460a.68af.6889SMTPIN_ADDED_BROKEN@mx.google.com>
+References: <54be9e8b.6a58460a.68af.6889SMTPIN_ADDED_BROKEN@mx.google.com>
+Message-ID: <20150123214637.GA20896@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 13, 2015 at 03:20:05PM +0100, Arnd Bergmann wrote:
-> The xilinx pcie driver prints a register value whose type is
-> propagated to the type returned by the GENMASK() macro.
-> Unfortunately, that type has recently changed as the result
-> of a bug fix, so now we get a warning about the type:
+On Tue, Jan 20, 2015 at 10:25:38AM -0800, Tony Lindgren wrote:
+> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
 > 
-> drivers/pci/host/pcie-xilinx.c: In function 'xilinx_pcie_clear_err_interrupts':
-> drivers/pci/host/pcie-xilinx.c:154:3: warning: format '%d' expects argument of type 'int', but argument 4 has type 'long unsigned int' [-Wformat=]
+>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
 > 
-> This changes the code so we always print the number as an
-> 'unsigned long' type to avoid the warning. The original code
-> was fine on 32-bit architectures but not on 64-bit. Now it
-> works as expected on both.
+> are available in the git repository at:
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 00b4d9a1412 ("bitops: Fix shift overflow in GENMASK macros")
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.20/drop-legacy-3517-v2
+> 
+> for you to fetch changes up to 549f95ed20168daa06901054a028e185ebb905ab:
+> 
+>   ARM: OMAP3: Add back Kconfig option MACH_OMAP3517EVM for ASoC (2015-01-20 08:49:08 -0800)
+> 
+> ----------------------------------------------------------------
+> We have had omap3517 booting in device tree mode for quite some
+> time now and we have at least a minimal dts file for the 3517
+> based boards. Also almost all the drivers are usable in device
+> tree mode. And if there are any drivers not yet supported in device
+> tree mode, those can be enabled using pdata quirks.
+> 
+> This leaves omap3430 to omap3730 as the only remaining mach-omap2
+> platforms still booting in legacy mode also. For those were are
+> printing a warning during the boot to get people to update their
+> systems to boot in device tree mode and slowly converting them
+> over to device tree based booting.
 
-Applied with Maxime's ack to pci/host-xilinx for v3.20, thanks!
+Merged into next/cleanup. Thanks!
 
-> diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
-> index ef3ebaf9a738..ce1c61d85b2c 100644
-> --- a/drivers/pci/host/pcie-xilinx.c
-> +++ b/drivers/pci/host/pcie-xilinx.c
-> @@ -148,10 +148,10 @@ static inline bool xilinx_pcie_link_is_up(struct xilinx_pcie_port *port)
->   */
->  static void xilinx_pcie_clear_err_interrupts(struct xilinx_pcie_port *port)
->  {
-> -	u32 val = pcie_read(port, XILINX_PCIE_REG_RPEFR);
-> +	unsigned long val = pcie_read(port, XILINX_PCIE_REG_RPEFR);
->  
->  	if (val & XILINX_PCIE_RPEFR_ERR_VALID) {
-> -		dev_dbg(port->dev, "Requester ID %d\n",
-> +		dev_dbg(port->dev, "Requester ID %lu\n",
->  			val & XILINX_PCIE_RPEFR_REQ_ID);
->  		pcie_write(port, XILINX_PCIE_RPEFR_ALL_MASK,
->  			   XILINX_PCIE_REG_RPEFR);
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+-Olof
