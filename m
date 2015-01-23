@@ -1,75 +1,30 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Fri, 23 Jan 2015 16:56:32 +0900
-Subject: [PATCH v9 0/7] devfreq: Add devfreq-event class to provide raw
- data for devfreq device
-In-Reply-To: <1421737809-4010-1-git-send-email-cw00.choi@samsung.com>
-References: <1421737809-4010-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <0dd401d036e2$1a4431d0$4ecc9570$@kernel.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 23 Jan 2015 16:02:45 +0800
+Subject: [GIT PULL] ARM: imx: fixes for 3.19, 2nd round
+Message-ID: <20150123080244.GA27337@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chanwoo Choi wrote:
-> 
-Hi,
+The following changes since commit 7a9f0604bd56936b2b18f49824e0e392dc7878c3:
 
-> This patchset add new devfreq_event class to provide raw data to determine
-> current utilization of device  which is used for devfreq governor.
-> 
-Yes, would be nice to use common framework something like the devfreq_event you created :)
+  ARM: dts: imx51-babbage: Fix ULPI PHY reset modelling (2015-01-06 20:25:58 +0800)
 
-> The following description explains the feature of two kind of devfreq class:
-> - devfreq class (existing)
->  : devfreq consumer device use raw data from devfreq_event device for
->    determining proper current system state and change voltage/frequency
->    dynamically using various governors.
-> - devfreq_event class (new)
->  : Provide measured raw data to devfreq device for governor
+are available in the git repository at:
 
-[...]
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-3.19-2
 
-> Chanwoo Choi (7):
->   devfreq: event: Add new devfreq_event class to provide basic data for devfreq governor
->   devfreq: event: Add exynos-ppmu devfreq-event driver
->   devfreq: event: Add documentation for exynos-ppmu devfreq-event driver
->   ARM: dts: Add PPMU dt node for Exynos3250 SoC
->   ARM: dts: Add PPMU dt node for Exynos4 SoCs
->   ARM: dts: exynos: Add PPMU node for Exynos3250-based Rinato/Monk board
->   ARM: dts: exynos: Add PPMU node for Exynos4412-based TRATS2 board
-> 
->  .../bindings/devfreq/event/exynos-ppmu.txt         | 110 +++++
->  arch/arm/boot/dts/exynos3250-monk.dts              |  40 ++
->  arch/arm/boot/dts/exynos3250-rinato.dts            |  40 ++
->  arch/arm/boot/dts/exynos3250.dtsi                  |  74 +++
->  arch/arm/boot/dts/exynos4.dtsi                     | 108 +++++
->  arch/arm/boot/dts/exynos4210.dtsi                  |   8 +
->  arch/arm/boot/dts/exynos4412-trats2.dts            |  40 ++
->  drivers/devfreq/Kconfig                            |   2 +
->  drivers/devfreq/Makefile                           |   6 +-
->  drivers/devfreq/devfreq-event.c                    | 498 +++++++++++++++++++++
->  drivers/devfreq/event/Kconfig                      |  25 ++
->  drivers/devfreq/event/Makefile                     |   2 +
->  drivers/devfreq/event/exynos-ppmu.c                | 374 ++++++++++++++++
->  drivers/devfreq/event/exynos-ppmu.h                |  93 ++++
->  include/linux/devfreq-event.h                      | 196 ++++++++
->  15 files changed, 1615 insertions(+), 1 deletion(-)
->  create mode 100644 Documentation/devicetree/bindings/devfreq/event/exynos-ppmu.txt
->  create mode 100644 drivers/devfreq/devfreq-event.c
->  create mode 100644 drivers/devfreq/event/Kconfig
->  create mode 100644 drivers/devfreq/event/Makefile
->  create mode 100644 drivers/devfreq/event/exynos-ppmu.c
->  create mode 100644 drivers/devfreq/event/exynos-ppmu.h
->  create mode 100644 include/linux/devfreq-event.h
-> 
-> --
+for you to fetch changes up to 7ecd0bde5bfea524a843ad8fa8cb66ccbce68779:
 
-Looks good to me.
+  ARM: dts: imx25: Fix PWM "per" clocks (2015-01-20 15:37:10 +0800)
 
-Myungjoo, shall I take DT changes in this series into Samsung tree?
+----------------------------------------------------------------
+The i.MX fixes for 3.19, 2nd round:
+ - Correct pwm clock assignment in i.MX25 device tree to fix the broken
+   pwm support on i.MX25
 
-4/7 ARM: dts: Add PPMU dt node for Exynos3250 SoC
-5/7 ARM: dts: Add PPMU dt node for Exynos4 SoCs
-6/7 ARM: dts: exynos: Add PPMU node for Exynos3250-based Rinato/Monk board
-7/7 ARM: dts: exynos: Add PPMU node for Exynos4412-based TRATS2 board
+----------------------------------------------------------------
+Fabio Estevam (1):
+      ARM: dts: imx25: Fix PWM "per" clocks
 
-Thanks,
-Kukjin
+ arch/arm/boot/dts/imx25.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
