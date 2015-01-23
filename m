@@ -1,93 +1,55 @@
-From: samuel.thibault@ens-lyon.org (Samuel Thibault)
-Date: Fri, 23 Jan 2015 13:31:22 +0100
-Subject: [PATCHv5 0/2] INPUT: Route keyboard LEDs through the generic
- LEDs layer
-In-Reply-To: <20150121152112.GA24789@type.bordeaux.inria.fr>
-References: <20141226232116.GA5069@type> <20150102195350.GB27538@amd>
- <20150121152112.GA24789@type.bordeaux.inria.fr>
-Message-ID: <20150123123122.GC3188@type.bordeaux.inria.fr>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Fri, 23 Jan 2015 18:07:15 +0530
+Subject: [RFC PATCH v4 3/4] arm64:thunder: Add initial dts for Cavium's
+ Thunder SoC in 2 Node topology.
+In-Reply-To: <1885509.Z0Gm3e3FlX@wuerfel>
+References: <1421924755-26029-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <1421924755-26029-4-git-send-email-gkulkarni@caviumnetworks.com>
+ <2882934.brFyhkGPyE@wuerfel> <1885509.Z0Gm3e3FlX@wuerfel>
+Message-ID: <CAFpQJXUvux+b9hYx_ZY-1hor0HRFFgh=e4vCYyJiDHrDC9Y=tQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Arnd,
 
-Samuel Thibault, le Wed 21 Jan 2015 16:21:12 +0100, a ?crit :
-> I have just tried what you described on a thinkpad lenovo T500, without
-> any problem, except that the thinkpad BIOS does a couple of funky
-> things:
-
-Actually it's even worse than that: depending on whether it is in
-synchronized mode or independent mode, *and* depending on the current
-*state* of the internal numlock LED, and probably also whether an
-external keyboard is connected, the internal numlock key will produce
-*or not* key events!  The actual transition table for this seems quite
-clumsy, basically the BIOS seems to be assuming that the the numlock
-key toggles the numlock LED, and setting up anything different leads
-to all kinds of confusing effects, the "simplest" of which being that
-you definitely not want to set e.g. a heartbeat trigger on the numlock
-LED, or else the right part of the keyboard will randomly behave as a
-keypad...
-
-I guess that may happen with other laptops, so I'm afraid I can only
-reject any kind of bug report involving the internal numlock LED or key
-of a laptop.
-
-So we're left with these:
-
-Pavel Machek, le Fri 02 Jan 2015 20:53:51 +0100, a ?crit :
-> > Here is v5 coming, with separate patches for the kbd and the input
-> > parts.
-> 
-> After booting with this, capslock led does not seem to work on text
-> console.
-
-Did you check that it was working before?  If you are using
-console-setup, it is a known bug that the capslock LED doesn't reflect
-the layout capslock state, because console-setup uses another modifier
-than the capslock modifier, because that one has unwanted legacy
-hardcoded effects.  That's precisely the point of the keyboard part
-of my two led patches to provide console-setup with an interface to
-properly route the layout capslock state (expressed as another modifier
-than capslock) to the capslock LED.
-
-> input4::capsl/trigger was none by default, that can't be right, right?
-
-That is still not right, and I still don't see how that can happen: my
-patch registers the input4::capsl LED with its default trigger name
-just before the input4-capsl trigger, and doesn't do anything about
-trigger assignment after that, so I don't see how it can be coming from
-my patch.
-
-> I tried putting kbd-capslock and input4-capsl there, but that did not
-> seem to help.
-
-Was it at least changing the content of the trigger file?  Again, if you
-are using console-setup, it is normal that the capslock modifier does
-not change, console-setup uses another modifier, that can be seen in
-dumpkeys | grep 58, depending on your precise configuration it will use
-various modifiers.  So in that case the kbd-capslock and input*-capsl
-are not good tests.
-
-Basically you're left with the kbd-scrollock and input*-scrolll triggers
-and scrollock key for easy testing, if you happen to have that key on
-your keyboard... (apparently the thinkpad I'm testing doesn't do funky
-things with it).
-
-> It works with heartbeat trigger, but not with input4-numl
-> trigger. (But numlock led works ok with that trigger, weird).
-
-That is probably due to the weird numlock behavior of the thinkpad.
-
-> vt::capsl/brightness controls capslock led, even when
-> input4-capsl/trigger is set to input4-numl.
-
-That is also not right, I can't reproduce it, and I don't see how it can
-happen with my patch.  Could you copy/paste the commands you are using?
-
-I have also posted reworked patches according to Dmitry's comments,
-probably better try those now.
-
-I'm sorry I forgot to make the second threaded with the first, but they
-are independent anyway.
-
-Samuel
+On Thu, Jan 22, 2015 at 11:56 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 22 January 2015 17:47:13 Arnd Bergmann wrote:
+>>
+>> This seems wrong still: The clusters and cores do not have unique
+>> numbers. I believe the code will not work correctly, and it won't
+>> be compliant with the binding from patch 2.
+>>
+>> I think the right way here would be to use
+>>
+>>         arm,associativity = <0 2 47>;
+>>
+>> for cpu at 20f, and
+>>
+>>         arm,associativity = <1 3 48>;
+>>
+>> for cpu at 10000. Your previous version used the numbers from
+>> the reg property, which should be fine as well if that helps:
+>>
+>>
+>>         arm,associativity = <0x0 0x200 0x20f>;
+>>
+>>         arm,associativity = <0x10000 0x10000 0x10000>;
+>>
+>> which should have the same effect as above, as long as the code
+>> can handle the numbers not being consecutive.
+>>
+>>
+>
+> Upon further consideration, I think your patch is correct after
+> all, but let me check again on PowerPC machines.
+i have removed, board id which was in previous patch, to keep the
+associativity aligned to mpidr, ie. socket,cluster id and core id.
+both previous and current mappings holds good for our design.
+our topology is 2 sockets(aff2=0and 1) , each having 3
+clusters(aff1=0to2)and each cluster having 16 cores(aff0:0to15)
+in associativity property, for our case, only first id(socket id) is
+mapped to numa, others are mentioned only to describe the topology.
+>
+>         Arnd
+thanks
+Ganapat
