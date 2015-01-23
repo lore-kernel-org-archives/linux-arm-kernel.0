@@ -1,15 +1,16 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 23 Jan 2015 14:55:47 -0800
-Subject: [GIT PULL 3/4] ARM: tegra: Core code changes for v3.20
-In-Reply-To: <1422028800-759-3-git-send-email-thierry.reding@gmail.com>
-References: <1422028800-759-1-git-send-email-thierry.reding@gmail.com>
- <1422028800-759-3-git-send-email-thierry.reding@gmail.com>
-Message-ID: <20150123225547.GT20896@quad.lixom.net>
+Date: Fri, 23 Jan 2015 14:58:51 -0800
+Subject: [GIT PULL] qcom SoC changes for v3.20-2
+In-Reply-To: <alpine.DEB.2.02.1501231035340.27036@galak-ubuntu.qualcomm.com>
+References: <alpine.DEB.2.02.1501231035340.27036@galak-ubuntu.qualcomm.com>
+Message-ID: <20150123225851.GU20896@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 23, 2015 at 04:59:59PM +0100, Thierry Reding wrote:
-> Hi ARM SoC maintainers,
+On Fri, Jan 23, 2015 at 10:37:37AM -0600, Kumar Gala wrote:
+> Updated from the tags/qcom-soc-for-3.20, dropped the movement of scm
+> code into drivers/soc/qcom, added a few other minor scm bug fixes,
+> and Andy Gross as co-maintainer.
 > 
 > The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
 > 
@@ -17,23 +18,13 @@ On Fri, Jan 23, 2015 at 04:59:59PM +0100, Thierry Reding wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-3.20-soc
+>   git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-soc-for-3.20-2
 > 
-> for you to fetch changes up to 3568df3d31d62b4368830cc6aac868cecdefd187:
+> for you to fetch changes up to f5d3af9d21f9790ac078276e6c103871c12a3daa:
 > 
->   soc: tegra: Add thermal reset (thermtrip) support to PMC (2015-01-23 16:20:49 +0100)
-> 
-> Thanks,
-> Thierry
-> 
-> ----------------------------------------------------------------
-> ARM: tegra: Core code changes for v3.20
-> 
-> This contains a couple of preparatory patches for 64-bit support. A new
-> feature is implemented in the power-management controller which allows
-> it to switch off the SoC if it overheats.
+>   MAINTAINERS: Add co-maintainer for ARM/Qualcomm Support (2015-01-23 10:29:21 -0600)
 
-Merged.
+Merged, thanks.
 
 
 -Olof
