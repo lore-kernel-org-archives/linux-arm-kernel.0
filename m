@@ -1,2286 +1,1180 @@
 From: al.stone@linaro.org (al.stone at linaro.org)
-Date: Thu, 22 Jan 2015 17:44:38 -0700
-Subject: [PATCH 1/7] ia64: ACPI: move kernel acpi files to a directory
+Date: Thu, 22 Jan 2015 17:44:43 -0700
+Subject: [PATCH 6/7] x86: ia64: arm64: ACPI: move _OSI support functions to
+ arch-dependent locations
 In-Reply-To: <1421973884-13029-1-git-send-email-al.stone@linaro.org>
 References: <1421973884-13029-1-git-send-email-al.stone@linaro.org>
-Message-ID: <1421973884-13029-2-git-send-email-al.stone@linaro.org>
+Message-ID: <1421973884-13029-7-git-send-email-al.stone@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Al Stone <ahs3@redhat.com>
 
-In preparation for adding some additional arch-dependent ACPI files,
-move the existing ones to a directory to try to keep clutter down in
-the arch/ia64/kernel directory.
+Having moved the _OSI callback function needed by ACPICA from
+drivers/acpi to arch-dependent locations, we now move all the
+remaining _OSI support functions to arch-dependent files.
 
-There is no functional change.  This patch only moves source files.
+This patch is much larger than I had wanted it to be; several of the
+functions that implemented acpi_osi* command line options, or did the
+set up of the interfaces to be provided by _OSI, shared a static struct.
+Hence, I ended up moving a bunch of code at once rather than perhaps a
+function at a time.
+
+Further, ACPI blacklisting for x86 (the only architecture using it) used
+some of the same _OSI functions.  So, it got moved to x86-specific
+locations as well.
+
+For x86, there should be no functional change; only the code locations
+have really changed.
+
+Even though this patch primarily changes x86-specific files, doing so
+has the effect of changing functionality for other architectures that
+can use ACPI.
+
+For ia64, there is no more checking of the blacklist; it wasn't used in
+the past, however, so its just removing a useless function call.  All
+other functionality should be unchanged.
+
+For arm64, any use of _OSI will issue a warning that it is deprecated.
+All use of _OSI will return false -- i.e., it will return no useful
+information to any firmware using it.  The ability to temporarily turn
+on _OSI, or turn off _OSI, or affect it in other ways from the command
+line is no longer available for arm64, either.
 
 Signed-off-by: Al Stone <al.stone@linaro.org>
 ---
- arch/ia64/kernel/Makefile        |    2 +-
- arch/ia64/kernel/acpi-ext.c      |  104 ----
- arch/ia64/kernel/acpi.c          | 1000 --------------------------------------
- arch/ia64/kernel/acpi/Makefile   |    1 +
- arch/ia64/kernel/acpi/acpi-ext.c |  104 ++++
- arch/ia64/kernel/acpi/acpi.c     | 1000 ++++++++++++++++++++++++++++++++++++++
- 6 files changed, 1106 insertions(+), 1105 deletions(-)
- delete mode 100644 arch/ia64/kernel/acpi-ext.c
- delete mode 100644 arch/ia64/kernel/acpi.c
- create mode 100644 arch/ia64/kernel/acpi/Makefile
- create mode 100644 arch/ia64/kernel/acpi/acpi-ext.c
- create mode 100644 arch/ia64/kernel/acpi/acpi.c
+ arch/x86/kernel/acpi/Makefile    |   2 +-
+ arch/x86/kernel/acpi/blacklist.c | 327 +++++++++++++++++++++++++++++++++++++++
+ arch/x86/kernel/acpi/boot.c      |   5 +-
+ arch/x86/kernel/acpi/osi.c       | 157 ++++++++++++++++++-
+ drivers/acpi/Makefile            |   1 -
+ drivers/acpi/blacklist.c         | 323 --------------------------------------
+ drivers/acpi/osl.c               | 193 -----------------------
+ include/linux/acpi.h             |   3 -
+ 8 files changed, 488 insertions(+), 523 deletions(-)
+ create mode 100644 arch/x86/kernel/acpi/blacklist.c
+ delete mode 100644 drivers/acpi/blacklist.c
 
-diff --git a/arch/ia64/kernel/Makefile b/arch/ia64/kernel/Makefile
-index 20678a9..2218842 100644
---- a/arch/ia64/kernel/Makefile
-+++ b/arch/ia64/kernel/Makefile
-@@ -13,7 +13,7 @@ obj-y := entry.o efi.o efi_stub.o gate-data.o fsys.o ia64_ksyms.o irq.o irq_ia64
- 	 salinfo.o setup.o signal.o sys_ia64.o time.o traps.o unaligned.o \
- 	 unwind.o mca.o mca_asm.o topology.o dma-mapping.o
+diff --git a/arch/x86/kernel/acpi/Makefile b/arch/x86/kernel/acpi/Makefile
+index e1359c9..11000b7 100644
+--- a/arch/x86/kernel/acpi/Makefile
++++ b/arch/x86/kernel/acpi/Makefile
+@@ -1,4 +1,4 @@
+-obj-$(CONFIG_ACPI)		+= boot.o osi.o
++obj-$(CONFIG_ACPI)		+= boot.o osi.o blacklist.o
+ obj-$(CONFIG_ACPI_SLEEP)	+= sleep.o wakeup_$(BITS).o
+ obj-$(CONFIG_ACPI_APEI)		+= apei.o
  
--obj-$(CONFIG_ACPI)		+= acpi.o acpi-ext.o
-+obj-y				+= acpi/
- obj-$(CONFIG_IA64_BRL_EMU)	+= brl_emu.o
- 
- obj-$(CONFIG_IA64_PALINFO)	+= palinfo.o
-diff --git a/arch/ia64/kernel/acpi-ext.c b/arch/ia64/kernel/acpi-ext.c
-deleted file mode 100644
-index 8b9318d..0000000
---- a/arch/ia64/kernel/acpi-ext.c
-+++ /dev/null
-@@ -1,104 +0,0 @@
--/*
-- * (c) Copyright 2003, 2006 Hewlett-Packard Development Company, L.P.
-- *	Alex Williamson <alex.williamson@hp.com>
-- *	Bjorn Helgaas <bjorn.helgaas@hp.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#include <linux/module.h>
--#include <linux/types.h>
--#include <linux/slab.h>
--#include <linux/acpi.h>
--
--#include <asm/acpi-ext.h>
--
--/*
-- * Device CSRs that do not appear in PCI config space should be described
-- * via ACPI.  This would normally be done with Address Space Descriptors
-- * marked as "consumer-only," but old versions of Windows and Linux ignore
-- * the producer/consumer flag, so HP invented a vendor-defined resource to
-- * describe the location and size of CSR space.
-- */
--
--struct acpi_vendor_uuid hp_ccsr_uuid = {
--	.subtype = 2,
--	.data = { 0xf9, 0xad, 0xe9, 0x69, 0x4f, 0x92, 0x5f, 0xab, 0xf6, 0x4a,
--	    0x24, 0xd2, 0x01, 0x37, 0x0e, 0xad },
--};
--
--static acpi_status hp_ccsr_locate(acpi_handle obj, u64 *base, u64 *length)
--{
--	acpi_status status;
--	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
--	struct acpi_resource *resource;
--	struct acpi_resource_vendor_typed *vendor;
--
--	status = acpi_get_vendor_resource(obj, METHOD_NAME__CRS, &hp_ccsr_uuid,
--		&buffer);
--
--	resource = buffer.pointer;
--	vendor = &resource->data.vendor_typed;
--
--	if (ACPI_FAILURE(status) || vendor->byte_length < 16) {
--		status = AE_NOT_FOUND;
--		goto exit;
--	}
--
--	memcpy(base, vendor->byte_data, sizeof(*base));
--	memcpy(length, vendor->byte_data + 8, sizeof(*length));
--
--  exit:
--	kfree(buffer.pointer);
--	return status;
--}
--
--struct csr_space {
--	u64	base;
--	u64	length;
--};
--
--static acpi_status find_csr_space(struct acpi_resource *resource, void *data)
--{
--	struct csr_space *space = data;
--	struct acpi_resource_address64 addr;
--	acpi_status status;
--
--	status = acpi_resource_to_address64(resource, &addr);
--	if (ACPI_SUCCESS(status) &&
--	    addr.resource_type == ACPI_MEMORY_RANGE &&
--	    addr.address_length &&
--	    addr.producer_consumer == ACPI_CONSUMER) {
--		space->base = addr.minimum;
--		space->length = addr.address_length;
--		return AE_CTRL_TERMINATE;
--	}
--	return AE_OK;		/* keep looking */
--}
--
--static acpi_status hp_crs_locate(acpi_handle obj, u64 *base, u64 *length)
--{
--	struct csr_space space = { 0, 0 };
--
--	acpi_walk_resources(obj, METHOD_NAME__CRS, find_csr_space, &space);
--	if (!space.length)
--		return AE_NOT_FOUND;
--
--	*base = space.base;
--	*length = space.length;
--	return AE_OK;
--}
--
--acpi_status hp_acpi_csr_space(acpi_handle obj, u64 *csr_base, u64 *csr_length)
--{
--	acpi_status status;
--
--	status = hp_ccsr_locate(obj, csr_base, csr_length);
--	if (ACPI_SUCCESS(status))
--		return status;
--
--	return hp_crs_locate(obj, csr_base, csr_length);
--}
--EXPORT_SYMBOL(hp_acpi_csr_space);
-diff --git a/arch/ia64/kernel/acpi.c b/arch/ia64/kernel/acpi.c
-deleted file mode 100644
-index e795cb8..0000000
---- a/arch/ia64/kernel/acpi.c
-+++ /dev/null
-@@ -1,1000 +0,0 @@
--/*
-- *  acpi.c - Architecture-Specific Low-Level ACPI Support
-- *
-- *  Copyright (C) 1999 VA Linux Systems
-- *  Copyright (C) 1999,2000 Walt Drummond <drummond@valinux.com>
-- *  Copyright (C) 2000, 2002-2003 Hewlett-Packard Co.
-- *	David Mosberger-Tang <davidm@hpl.hp.com>
-- *  Copyright (C) 2000 Intel Corp.
-- *  Copyright (C) 2000,2001 J.I. Lee <jung-ik.lee@intel.com>
-- *  Copyright (C) 2001 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
-- *  Copyright (C) 2001 Jenna Hall <jenna.s.hall@intel.com>
-- *  Copyright (C) 2001 Takayoshi Kochi <t-kochi@bq.jp.nec.com>
-- *  Copyright (C) 2002 Erich Focht <efocht@ess.nec.de>
-- *  Copyright (C) 2004 Ashok Raj <ashok.raj@intel.com>
-- *
-- * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-- *
-- *  This program is free software; you can redistribute it and/or modify
-- *  it under the terms of the GNU General Public License as published by
-- *  the Free Software Foundation; either version 2 of the License, or
-- *  (at your option) any later version.
-- *
-- *  This program is distributed in the hope that it will be useful,
-- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
-- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- *  GNU General Public License for more details.
-- *
-- *  You should have received a copy of the GNU General Public License
-- *  along with this program; if not, write to the Free Software
-- *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-- *
-- * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-- */
--
--#include <linux/module.h>
--#include <linux/init.h>
--#include <linux/kernel.h>
--#include <linux/sched.h>
--#include <linux/smp.h>
--#include <linux/string.h>
--#include <linux/types.h>
--#include <linux/irq.h>
--#include <linux/acpi.h>
--#include <linux/efi.h>
--#include <linux/mmzone.h>
--#include <linux/nodemask.h>
--#include <linux/slab.h>
--#include <acpi/processor.h>
--#include <asm/io.h>
--#include <asm/iosapic.h>
--#include <asm/machvec.h>
--#include <asm/page.h>
--#include <asm/numa.h>
--#include <asm/sal.h>
--#include <asm/cyclone.h>
--
--#define PREFIX			"ACPI: "
--
--int acpi_lapic;
--unsigned int acpi_cpei_override;
--unsigned int acpi_cpei_phys_cpuid;
--
--unsigned long acpi_wakeup_address = 0;
--
--#ifdef CONFIG_IA64_GENERIC
--static unsigned long __init acpi_find_rsdp(void)
--{
--	unsigned long rsdp_phys = 0;
--
--	if (efi.acpi20 != EFI_INVALID_TABLE_ADDR)
--		rsdp_phys = efi.acpi20;
--	else if (efi.acpi != EFI_INVALID_TABLE_ADDR)
--		printk(KERN_WARNING PREFIX
--		       "v1.0/r0.71 tables no longer supported\n");
--	return rsdp_phys;
--}
--
--const char __init *
--acpi_get_sysname(void)
--{
--	unsigned long rsdp_phys;
--	struct acpi_table_rsdp *rsdp;
--	struct acpi_table_xsdt *xsdt;
--	struct acpi_table_header *hdr;
--#ifdef CONFIG_INTEL_IOMMU
--	u64 i, nentries;
--#endif
--
--	rsdp_phys = acpi_find_rsdp();
--	if (!rsdp_phys) {
--		printk(KERN_ERR
--		       "ACPI 2.0 RSDP not found, default to \"dig\"\n");
--		return "dig";
--	}
--
--	rsdp = (struct acpi_table_rsdp *)__va(rsdp_phys);
--	if (strncmp(rsdp->signature, ACPI_SIG_RSDP, sizeof(ACPI_SIG_RSDP) - 1)) {
--		printk(KERN_ERR
--		       "ACPI 2.0 RSDP signature incorrect, default to \"dig\"\n");
--		return "dig";
--	}
--
--	xsdt = (struct acpi_table_xsdt *)__va(rsdp->xsdt_physical_address);
--	hdr = &xsdt->header;
--	if (strncmp(hdr->signature, ACPI_SIG_XSDT, sizeof(ACPI_SIG_XSDT) - 1)) {
--		printk(KERN_ERR
--		       "ACPI 2.0 XSDT signature incorrect, default to \"dig\"\n");
--		return "dig";
--	}
--
--	if (!strcmp(hdr->oem_id, "HP")) {
--		return "hpzx1";
--	} else if (!strcmp(hdr->oem_id, "SGI")) {
--		if (!strcmp(hdr->oem_table_id + 4, "UV"))
--			return "uv";
--		else
--			return "sn2";
--	}
--
--#ifdef CONFIG_INTEL_IOMMU
--	/* Look for Intel IOMMU */
--	nentries = (hdr->length - sizeof(*hdr)) /
--			 sizeof(xsdt->table_offset_entry[0]);
--	for (i = 0; i < nentries; i++) {
--		hdr = __va(xsdt->table_offset_entry[i]);
--		if (strncmp(hdr->signature, ACPI_SIG_DMAR,
--			sizeof(ACPI_SIG_DMAR) - 1) == 0)
--			return "dig_vtd";
--	}
--#endif
--
--	return "dig";
--}
--#endif /* CONFIG_IA64_GENERIC */
--
--#define ACPI_MAX_PLATFORM_INTERRUPTS	256
--
--/* Array to record platform interrupt vectors for generic interrupt routing. */
--int platform_intr_list[ACPI_MAX_PLATFORM_INTERRUPTS] = {
--	[0 ... ACPI_MAX_PLATFORM_INTERRUPTS - 1] = -1
--};
--
--enum acpi_irq_model_id acpi_irq_model = ACPI_IRQ_MODEL_IOSAPIC;
--
--/*
-- * Interrupt routing API for device drivers.  Provides interrupt vector for
-- * a generic platform event.  Currently only CPEI is implemented.
-- */
--int acpi_request_vector(u32 int_type)
--{
--	int vector = -1;
--
--	if (int_type < ACPI_MAX_PLATFORM_INTERRUPTS) {
--		/* corrected platform error interrupt */
--		vector = platform_intr_list[int_type];
--	} else
--		printk(KERN_ERR
--		       "acpi_request_vector(): invalid interrupt type\n");
--	return vector;
--}
--
--char *__init __acpi_map_table(unsigned long phys_addr, unsigned long size)
--{
--	return __va(phys_addr);
--}
--
--void __init __acpi_unmap_table(char *map, unsigned long size)
--{
--}
--
--/* --------------------------------------------------------------------------
--                            Boot-time Table Parsing
--   -------------------------------------------------------------------------- */
--
--static int available_cpus __initdata;
--struct acpi_table_madt *acpi_madt __initdata;
--static u8 has_8259;
--
--static int __init
--acpi_parse_lapic_addr_ovr(struct acpi_subtable_header * header,
--			  const unsigned long end)
--{
--	struct acpi_madt_local_apic_override *lapic;
--
--	lapic = (struct acpi_madt_local_apic_override *)header;
--
--	if (BAD_MADT_ENTRY(lapic, end))
--		return -EINVAL;
--
--	if (lapic->address) {
--		iounmap(ipi_base_addr);
--		ipi_base_addr = ioremap(lapic->address, 0);
--	}
--	return 0;
--}
--
--static int __init
--acpi_parse_lsapic(struct acpi_subtable_header * header, const unsigned long end)
--{
--	struct acpi_madt_local_sapic *lsapic;
--
--	lsapic = (struct acpi_madt_local_sapic *)header;
--
--	/*Skip BAD_MADT_ENTRY check, as lsapic size could vary */
--
--	if (lsapic->lapic_flags & ACPI_MADT_ENABLED) {
--#ifdef CONFIG_SMP
--		smp_boot_data.cpu_phys_id[available_cpus] =
--		    (lsapic->id << 8) | lsapic->eid;
--#endif
--		++available_cpus;
--	}
--
--	total_cpus++;
--	return 0;
--}
--
--static int __init
--acpi_parse_lapic_nmi(struct acpi_subtable_header * header, const unsigned long end)
--{
--	struct acpi_madt_local_apic_nmi *lacpi_nmi;
--
--	lacpi_nmi = (struct acpi_madt_local_apic_nmi *)header;
--
--	if (BAD_MADT_ENTRY(lacpi_nmi, end))
--		return -EINVAL;
--
--	/* TBD: Support lapic_nmi entries */
--	return 0;
--}
--
--static int __init
--acpi_parse_iosapic(struct acpi_subtable_header * header, const unsigned long end)
--{
--	struct acpi_madt_io_sapic *iosapic;
--
--	iosapic = (struct acpi_madt_io_sapic *)header;
--
--	if (BAD_MADT_ENTRY(iosapic, end))
--		return -EINVAL;
--
--	return iosapic_init(iosapic->address, iosapic->global_irq_base);
--}
--
--static unsigned int __initdata acpi_madt_rev;
--
--static int __init
--acpi_parse_plat_int_src(struct acpi_subtable_header * header,
--			const unsigned long end)
--{
--	struct acpi_madt_interrupt_source *plintsrc;
--	int vector;
--
--	plintsrc = (struct acpi_madt_interrupt_source *)header;
--
--	if (BAD_MADT_ENTRY(plintsrc, end))
--		return -EINVAL;
--
--	/*
--	 * Get vector assignment for this interrupt, set attributes,
--	 * and program the IOSAPIC routing table.
--	 */
--	vector = iosapic_register_platform_intr(plintsrc->type,
--						plintsrc->global_irq,
--						plintsrc->io_sapic_vector,
--						plintsrc->eid,
--						plintsrc->id,
--						((plintsrc->inti_flags & ACPI_MADT_POLARITY_MASK) ==
--						 ACPI_MADT_POLARITY_ACTIVE_HIGH) ?
--						IOSAPIC_POL_HIGH : IOSAPIC_POL_LOW,
--						((plintsrc->inti_flags & ACPI_MADT_TRIGGER_MASK) ==
--						 ACPI_MADT_TRIGGER_EDGE) ?
--						IOSAPIC_EDGE : IOSAPIC_LEVEL);
--
--	platform_intr_list[plintsrc->type] = vector;
--	if (acpi_madt_rev > 1) {
--		acpi_cpei_override = plintsrc->flags & ACPI_MADT_CPEI_OVERRIDE;
--	}
--
--	/*
--	 * Save the physical id, so we can check when its being removed
--	 */
--	acpi_cpei_phys_cpuid = ((plintsrc->id << 8) | (plintsrc->eid)) & 0xffff;
--
--	return 0;
--}
--
--#ifdef CONFIG_HOTPLUG_CPU
--unsigned int can_cpei_retarget(void)
--{
--	extern int cpe_vector;
--	extern unsigned int force_cpei_retarget;
--
--	/*
--	 * Only if CPEI is supported and the override flag
--	 * is present, otherwise return that its re-targettable
--	 * if we are in polling mode.
--	 */
--	if (cpe_vector > 0) {
--		if (acpi_cpei_override || force_cpei_retarget)
--			return 1;
--		else
--			return 0;
--	}
--	return 1;
--}
--
--unsigned int is_cpu_cpei_target(unsigned int cpu)
--{
--	unsigned int logical_id;
--
--	logical_id = cpu_logical_id(acpi_cpei_phys_cpuid);
--
--	if (logical_id == cpu)
--		return 1;
--	else
--		return 0;
--}
--
--void set_cpei_target_cpu(unsigned int cpu)
--{
--	acpi_cpei_phys_cpuid = cpu_physical_id(cpu);
--}
--#endif
--
--unsigned int get_cpei_target_cpu(void)
--{
--	return acpi_cpei_phys_cpuid;
--}
--
--static int __init
--acpi_parse_int_src_ovr(struct acpi_subtable_header * header,
--		       const unsigned long end)
--{
--	struct acpi_madt_interrupt_override *p;
--
--	p = (struct acpi_madt_interrupt_override *)header;
--
--	if (BAD_MADT_ENTRY(p, end))
--		return -EINVAL;
--
--	iosapic_override_isa_irq(p->source_irq, p->global_irq,
--				 ((p->inti_flags & ACPI_MADT_POLARITY_MASK) ==
--				  ACPI_MADT_POLARITY_ACTIVE_LOW) ?
--				 IOSAPIC_POL_LOW : IOSAPIC_POL_HIGH,
--				 ((p->inti_flags & ACPI_MADT_TRIGGER_MASK) ==
--				 ACPI_MADT_TRIGGER_LEVEL) ?
--				 IOSAPIC_LEVEL : IOSAPIC_EDGE);
--	return 0;
--}
--
--static int __init
--acpi_parse_nmi_src(struct acpi_subtable_header * header, const unsigned long end)
--{
--	struct acpi_madt_nmi_source *nmi_src;
--
--	nmi_src = (struct acpi_madt_nmi_source *)header;
--
--	if (BAD_MADT_ENTRY(nmi_src, end))
--		return -EINVAL;
--
--	/* TBD: Support nimsrc entries */
--	return 0;
--}
--
--static void __init acpi_madt_oem_check(char *oem_id, char *oem_table_id)
--{
--	if (!strncmp(oem_id, "IBM", 3) && (!strncmp(oem_table_id, "SERMOW", 6))) {
--
--		/*
--		 * Unfortunately ITC_DRIFT is not yet part of the
--		 * official SAL spec, so the ITC_DRIFT bit is not
--		 * set by the BIOS on this hardware.
--		 */
--		sal_platform_features |= IA64_SAL_PLATFORM_FEATURE_ITC_DRIFT;
--
--		cyclone_setup();
--	}
--}
--
--static int __init acpi_parse_madt(struct acpi_table_header *table)
--{
--	if (!table)
--		return -EINVAL;
--
--	acpi_madt = (struct acpi_table_madt *)table;
--
--	acpi_madt_rev = acpi_madt->header.revision;
--
--	/* remember the value for reference after free_initmem() */
--#ifdef CONFIG_ITANIUM
--	has_8259 = 1;		/* Firmware on old Itanium systems is broken */
--#else
--	has_8259 = acpi_madt->flags & ACPI_MADT_PCAT_COMPAT;
--#endif
--	iosapic_system_init(has_8259);
--
--	/* Get base address of IPI Message Block */
--
--	if (acpi_madt->address)
--		ipi_base_addr = ioremap(acpi_madt->address, 0);
--
--	printk(KERN_INFO PREFIX "Local APIC address %p\n", ipi_base_addr);
--
--	acpi_madt_oem_check(acpi_madt->header.oem_id,
--			    acpi_madt->header.oem_table_id);
--
--	return 0;
--}
--
--#ifdef CONFIG_ACPI_NUMA
--
--#undef SLIT_DEBUG
--
--#define PXM_FLAG_LEN ((MAX_PXM_DOMAINS + 1)/32)
--
--static int __initdata srat_num_cpus;	/* number of cpus */
--static u32 pxm_flag[PXM_FLAG_LEN];
--#define pxm_bit_set(bit)	(set_bit(bit,(void *)pxm_flag))
--#define pxm_bit_test(bit)	(test_bit(bit,(void *)pxm_flag))
--static struct acpi_table_slit __initdata *slit_table;
--cpumask_t early_cpu_possible_map = CPU_MASK_NONE;
--
--static int __init
--get_processor_proximity_domain(struct acpi_srat_cpu_affinity *pa)
--{
--	int pxm;
--
--	pxm = pa->proximity_domain_lo;
--	if (ia64_platform_is("sn2") || acpi_srat_revision >= 2)
--		pxm += pa->proximity_domain_hi[0] << 8;
--	return pxm;
--}
--
--static int __init
--get_memory_proximity_domain(struct acpi_srat_mem_affinity *ma)
--{
--	int pxm;
--
--	pxm = ma->proximity_domain;
--	if (!ia64_platform_is("sn2") && acpi_srat_revision <= 1)
--		pxm &= 0xff;
--
--	return pxm;
--}
--
--/*
-- * ACPI 2.0 SLIT (System Locality Information Table)
-- * http://devresource.hp.com/devresource/Docs/TechPapers/IA64/slit.pdf
-- */
--void __init acpi_numa_slit_init(struct acpi_table_slit *slit)
--{
--	u32 len;
--
--	len = sizeof(struct acpi_table_header) + 8
--	    + slit->locality_count * slit->locality_count;
--	if (slit->header.length != len) {
--		printk(KERN_ERR
--		       "ACPI 2.0 SLIT: size mismatch: %d expected, %d actual\n",
--		       len, slit->header.length);
--		return;
--	}
--	slit_table = slit;
--}
--
--void __init
--acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa)
--{
--	int pxm;
--
--	if (!(pa->flags & ACPI_SRAT_CPU_ENABLED))
--		return;
--
--	if (srat_num_cpus >= ARRAY_SIZE(node_cpuid)) {
--		printk_once(KERN_WARNING
--			    "node_cpuid[%ld] is too small, may not be able to use all cpus\n",
--			    ARRAY_SIZE(node_cpuid));
--		return;
--	}
--	pxm = get_processor_proximity_domain(pa);
--
--	/* record this node in proximity bitmap */
--	pxm_bit_set(pxm);
--
--	node_cpuid[srat_num_cpus].phys_id =
--	    (pa->apic_id << 8) | (pa->local_sapic_eid);
--	/* nid should be overridden as logical node id later */
--	node_cpuid[srat_num_cpus].nid = pxm;
--	cpu_set(srat_num_cpus, early_cpu_possible_map);
--	srat_num_cpus++;
--}
--
--int __init
--acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
--{
--	unsigned long paddr, size;
--	int pxm;
--	struct node_memblk_s *p, *q, *pend;
--
--	pxm = get_memory_proximity_domain(ma);
--
--	/* fill node memory chunk structure */
--	paddr = ma->base_address;
--	size = ma->length;
--
--	/* Ignore disabled entries */
--	if (!(ma->flags & ACPI_SRAT_MEM_ENABLED))
--		return -1;
--
--	/* record this node in proximity bitmap */
--	pxm_bit_set(pxm);
--
--	/* Insertion sort based on base address */
--	pend = &node_memblk[num_node_memblks];
--	for (p = &node_memblk[0]; p < pend; p++) {
--		if (paddr < p->start_paddr)
--			break;
--	}
--	if (p < pend) {
--		for (q = pend - 1; q >= p; q--)
--			*(q + 1) = *q;
--	}
--	p->start_paddr = paddr;
--	p->size = size;
--	p->nid = pxm;
--	num_node_memblks++;
--	return 0;
--}
--
--void __init acpi_numa_arch_fixup(void)
--{
--	int i, j, node_from, node_to;
--
--	/* If there's no SRAT, fix the phys_id and mark node 0 online */
--	if (srat_num_cpus == 0) {
--		node_set_online(0);
--		node_cpuid[0].phys_id = hard_smp_processor_id();
--		return;
--	}
--
--	/*
--	 * MCD - This can probably be dropped now.  No need for pxm ID to node ID
--	 * mapping with sparse node numbering iff MAX_PXM_DOMAINS <= MAX_NUMNODES.
--	 */
--	nodes_clear(node_online_map);
--	for (i = 0; i < MAX_PXM_DOMAINS; i++) {
--		if (pxm_bit_test(i)) {
--			int nid = acpi_map_pxm_to_node(i);
--			node_set_online(nid);
--		}
--	}
--
--	/* set logical node id in memory chunk structure */
--	for (i = 0; i < num_node_memblks; i++)
--		node_memblk[i].nid = pxm_to_node(node_memblk[i].nid);
--
--	/* assign memory bank numbers for each chunk on each node */
--	for_each_online_node(i) {
--		int bank;
--
--		bank = 0;
--		for (j = 0; j < num_node_memblks; j++)
--			if (node_memblk[j].nid == i)
--				node_memblk[j].bank = bank++;
--	}
--
--	/* set logical node id in cpu structure */
--	for_each_possible_early_cpu(i)
--		node_cpuid[i].nid = pxm_to_node(node_cpuid[i].nid);
--
--	printk(KERN_INFO "Number of logical nodes in system = %d\n",
--	       num_online_nodes());
--	printk(KERN_INFO "Number of memory chunks in system = %d\n",
--	       num_node_memblks);
--
--	if (!slit_table) {
--		for (i = 0; i < MAX_NUMNODES; i++)
--			for (j = 0; j < MAX_NUMNODES; j++)
--				node_distance(i, j) = i == j ? LOCAL_DISTANCE :
--							REMOTE_DISTANCE;
--		return;
--	}
--
--	memset(numa_slit, -1, sizeof(numa_slit));
--	for (i = 0; i < slit_table->locality_count; i++) {
--		if (!pxm_bit_test(i))
--			continue;
--		node_from = pxm_to_node(i);
--		for (j = 0; j < slit_table->locality_count; j++) {
--			if (!pxm_bit_test(j))
--				continue;
--			node_to = pxm_to_node(j);
--			node_distance(node_from, node_to) =
--			    slit_table->entry[i * slit_table->locality_count + j];
--		}
--	}
--
--#ifdef SLIT_DEBUG
--	printk("ACPI 2.0 SLIT locality table:\n");
--	for_each_online_node(i) {
--		for_each_online_node(j)
--		    printk("%03d ", node_distance(i, j));
--		printk("\n");
--	}
--#endif
--}
--#endif				/* CONFIG_ACPI_NUMA */
--
--/*
-- * success: return IRQ number (>=0)
-- * failure: return < 0
-- */
--int acpi_register_gsi(struct device *dev, u32 gsi, int triggering, int polarity)
--{
--	if (acpi_irq_model == ACPI_IRQ_MODEL_PLATFORM)
--		return gsi;
--
--	if (has_8259 && gsi < 16)
--		return isa_irq_to_vector(gsi);
--
--	return iosapic_register_intr(gsi,
--				     (polarity ==
--				      ACPI_ACTIVE_HIGH) ? IOSAPIC_POL_HIGH :
--				     IOSAPIC_POL_LOW,
--				     (triggering ==
--				      ACPI_EDGE_SENSITIVE) ? IOSAPIC_EDGE :
--				     IOSAPIC_LEVEL);
--}
--EXPORT_SYMBOL_GPL(acpi_register_gsi);
--
--void acpi_unregister_gsi(u32 gsi)
--{
--	if (acpi_irq_model == ACPI_IRQ_MODEL_PLATFORM)
--		return;
--
--	if (has_8259 && gsi < 16)
--		return;
--
--	iosapic_unregister_intr(gsi);
--}
--EXPORT_SYMBOL_GPL(acpi_unregister_gsi);
--
--static int __init acpi_parse_fadt(struct acpi_table_header *table)
--{
--	struct acpi_table_header *fadt_header;
--	struct acpi_table_fadt *fadt;
--
--	if (!table)
--		return -EINVAL;
--
--	fadt_header = (struct acpi_table_header *)table;
--	if (fadt_header->revision != 3)
--		return -ENODEV;	/* Only deal with ACPI 2.0 FADT */
--
--	fadt = (struct acpi_table_fadt *)fadt_header;
--
--	acpi_register_gsi(NULL, fadt->sci_interrupt, ACPI_LEVEL_SENSITIVE,
--				 ACPI_ACTIVE_LOW);
--	return 0;
--}
--
--int __init early_acpi_boot_init(void)
--{
--	int ret;
--
--	/*
--	 * do a partial walk of MADT to determine how many CPUs
--	 * we have including offline CPUs
--	 */
--	if (acpi_table_parse(ACPI_SIG_MADT, acpi_parse_madt)) {
--		printk(KERN_ERR PREFIX "Can't find MADT\n");
--		return 0;
--	}
--
--	ret = acpi_table_parse_madt(ACPI_MADT_TYPE_LOCAL_SAPIC,
--		acpi_parse_lsapic, NR_CPUS);
--	if (ret < 1)
--		printk(KERN_ERR PREFIX
--		       "Error parsing MADT - no LAPIC entries\n");
--	else
--		acpi_lapic = 1;
--
--#ifdef CONFIG_SMP
--	if (available_cpus == 0) {
--		printk(KERN_INFO "ACPI: Found 0 CPUS; assuming 1\n");
--		printk(KERN_INFO "CPU 0 (0x%04x)", hard_smp_processor_id());
--		smp_boot_data.cpu_phys_id[available_cpus] =
--		    hard_smp_processor_id();
--		available_cpus = 1;	/* We've got@least one of these, no? */
--	}
--	smp_boot_data.cpu_count = available_cpus;
--#endif
--	/* Make boot-up look pretty */
--	printk(KERN_INFO "%d CPUs available, %d CPUs total\n", available_cpus,
--	       total_cpus);
--
--	return 0;
--}
--
--int __init acpi_boot_init(void)
--{
--
--	/*
--	 * MADT
--	 * ----
--	 * Parse the Multiple APIC Description Table (MADT), if exists.
--	 * Note that this table provides platform SMP configuration
--	 * information -- the successor to MPS tables.
--	 */
--
--	if (acpi_table_parse(ACPI_SIG_MADT, acpi_parse_madt)) {
--		printk(KERN_ERR PREFIX "Can't find MADT\n");
--		goto skip_madt;
--	}
--
--	/* Local APIC */
--
--	if (acpi_table_parse_madt
--	    (ACPI_MADT_TYPE_LOCAL_APIC_OVERRIDE, acpi_parse_lapic_addr_ovr, 0) < 0)
--		printk(KERN_ERR PREFIX
--		       "Error parsing LAPIC address override entry\n");
--
--	if (acpi_table_parse_madt(ACPI_MADT_TYPE_LOCAL_APIC_NMI, acpi_parse_lapic_nmi, 0)
--	    < 0)
--		printk(KERN_ERR PREFIX "Error parsing LAPIC NMI entry\n");
--
--	/* I/O APIC */
--
--	if (acpi_table_parse_madt
--	    (ACPI_MADT_TYPE_IO_SAPIC, acpi_parse_iosapic, NR_IOSAPICS) < 1) {
--		if (!ia64_platform_is("sn2"))
--			printk(KERN_ERR PREFIX
--			       "Error parsing MADT - no IOSAPIC entries\n");
--	}
--
--	/* System-Level Interrupt Routing */
--
--	if (acpi_table_parse_madt
--	    (ACPI_MADT_TYPE_INTERRUPT_SOURCE, acpi_parse_plat_int_src,
--	     ACPI_MAX_PLATFORM_INTERRUPTS) < 0)
--		printk(KERN_ERR PREFIX
--		       "Error parsing platform interrupt source entry\n");
--
--	if (acpi_table_parse_madt
--	    (ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, acpi_parse_int_src_ovr, 0) < 0)
--		printk(KERN_ERR PREFIX
--		       "Error parsing interrupt source overrides entry\n");
--
--	if (acpi_table_parse_madt(ACPI_MADT_TYPE_NMI_SOURCE, acpi_parse_nmi_src, 0) < 0)
--		printk(KERN_ERR PREFIX "Error parsing NMI SRC entry\n");
--      skip_madt:
--
--	/*
--	 * FADT says whether a legacy keyboard controller is present.
--	 * The FADT also contains an SCI_INT line, by which the system
--	 * gets interrupts such as power and sleep buttons.  If it's not
--	 * on a Legacy interrupt, it needs to be setup.
--	 */
--	if (acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt))
--		printk(KERN_ERR PREFIX "Can't find FADT\n");
--
--#ifdef CONFIG_ACPI_NUMA
--#ifdef CONFIG_SMP
--	if (srat_num_cpus == 0) {
--		int cpu, i = 1;
--		for (cpu = 0; cpu < smp_boot_data.cpu_count; cpu++)
--			if (smp_boot_data.cpu_phys_id[cpu] !=
--			    hard_smp_processor_id())
--				node_cpuid[i++].phys_id =
--				    smp_boot_data.cpu_phys_id[cpu];
--	}
--#endif
--	build_cpu_to_node_map();
--#endif
--	return 0;
--}
--
--int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
--{
--	int tmp;
--
--	if (has_8259 && gsi < 16)
--		*irq = isa_irq_to_vector(gsi);
--	else {
--		tmp = gsi_to_irq(gsi);
--		if (tmp == -1)
--			return -1;
--		*irq = tmp;
--	}
--	return 0;
--}
--
--int acpi_isa_irq_to_gsi(unsigned isa_irq, u32 *gsi)
--{
--	if (isa_irq >= 16)
--		return -1;
--	*gsi = isa_irq;
--	return 0;
--}
--
--/*
-- *  ACPI based hotplug CPU support
-- */
--#ifdef CONFIG_ACPI_HOTPLUG_CPU
--static int acpi_map_cpu2node(acpi_handle handle, int cpu, int physid)
--{
--#ifdef CONFIG_ACPI_NUMA
--	/*
--	 * We don't have cpu-only-node hotadd. But if the system equips
--	 * SRAT table, pxm is already found and node is ready.
--  	 * So, just pxm_to_nid(pxm) is OK.
--	 * This code here is for the system which doesn't have full SRAT
--  	 * table for possible cpus.
--	 */
--	node_cpuid[cpu].phys_id = physid;
--	node_cpuid[cpu].nid = acpi_get_node(handle);
--#endif
--	return 0;
--}
--
--int additional_cpus __initdata = -1;
--
--static __init int setup_additional_cpus(char *s)
--{
--	if (s)
--		additional_cpus = simple_strtol(s, NULL, 0);
--
--	return 0;
--}
--
--early_param("additional_cpus", setup_additional_cpus);
--
--/*
-- * cpu_possible_mask should be static, it cannot change as CPUs
-- * are onlined, or offlined. The reason is per-cpu data-structures
-- * are allocated by some modules at init time, and dont expect to
-- * do this dynamically on cpu arrival/departure.
-- * cpu_present_mask on the other hand can change dynamically.
-- * In case when cpu_hotplug is not compiled, then we resort to current
-- * behaviour, which is cpu_possible == cpu_present.
-- * - Ashok Raj
-- *
-- * Three ways to find out the number of additional hotplug CPUs:
-- * - If the BIOS specified disabled CPUs in ACPI/mptables use that.
-- * - The user can overwrite it with additional_cpus=NUM
-- * - Otherwise don't reserve additional CPUs.
-- */
--__init void prefill_possible_map(void)
--{
--	int i;
--	int possible, disabled_cpus;
--
--	disabled_cpus = total_cpus - available_cpus;
--
-- 	if (additional_cpus == -1) {
-- 		if (disabled_cpus > 0)
--			additional_cpus = disabled_cpus;
-- 		else
--			additional_cpus = 0;
-- 	}
--
--	possible = available_cpus + additional_cpus;
--
--	if (possible > nr_cpu_ids)
--		possible = nr_cpu_ids;
--
--	printk(KERN_INFO "SMP: Allowing %d CPUs, %d hotplug CPUs\n",
--		possible, max((possible - available_cpus), 0));
--
--	for (i = 0; i < possible; i++)
--		set_cpu_possible(i, true);
--}
--
--static int _acpi_map_lsapic(acpi_handle handle, int physid, int *pcpu)
--{
--	cpumask_t tmp_map;
--	int cpu;
--
--	cpumask_complement(&tmp_map, cpu_present_mask);
--	cpu = cpumask_first(&tmp_map);
--	if (cpu >= nr_cpu_ids)
--		return -EINVAL;
--
--	acpi_map_cpu2node(handle, cpu, physid);
--
--	set_cpu_present(cpu, true);
--	ia64_cpu_to_sapicid[cpu] = physid;
--
--	acpi_processor_set_pdc(handle);
--
--	*pcpu = cpu;
--	return (0);
--}
--
--/* wrapper to silence section mismatch warning */
--int __ref acpi_map_cpu(acpi_handle handle, int physid, int *pcpu)
--{
--	return _acpi_map_lsapic(handle, physid, pcpu);
--}
--EXPORT_SYMBOL(acpi_map_cpu);
--
--int acpi_unmap_cpu(int cpu)
--{
--	ia64_cpu_to_sapicid[cpu] = -1;
--	set_cpu_present(cpu, false);
--
--#ifdef CONFIG_ACPI_NUMA
--	/* NUMA specific cleanup's */
--#endif
--
--	return (0);
--}
--EXPORT_SYMBOL(acpi_unmap_cpu);
--#endif				/* CONFIG_ACPI_HOTPLUG_CPU */
--
--#ifdef CONFIG_ACPI_NUMA
--static acpi_status acpi_map_iosapic(acpi_handle handle, u32 depth,
--				    void *context, void **ret)
--{
--	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
--	union acpi_object *obj;
--	struct acpi_madt_io_sapic *iosapic;
--	unsigned int gsi_base;
--	int node;
--
--	/* Only care about objects w/ a method that returns the MADT */
--	if (ACPI_FAILURE(acpi_evaluate_object(handle, "_MAT", NULL, &buffer)))
--		return AE_OK;
--
--	if (!buffer.length || !buffer.pointer)
--		return AE_OK;
--
--	obj = buffer.pointer;
--	if (obj->type != ACPI_TYPE_BUFFER ||
--	    obj->buffer.length < sizeof(*iosapic)) {
--		kfree(buffer.pointer);
--		return AE_OK;
--	}
--
--	iosapic = (struct acpi_madt_io_sapic *)obj->buffer.pointer;
--
--	if (iosapic->header.type != ACPI_MADT_TYPE_IO_SAPIC) {
--		kfree(buffer.pointer);
--		return AE_OK;
--	}
--
--	gsi_base = iosapic->global_irq_base;
--
--	kfree(buffer.pointer);
--
--	/* OK, it's an IOSAPIC MADT entry; associate it with a node */
--	node = acpi_get_node(handle);
--	if (node == NUMA_NO_NODE || !node_online(node) ||
--	    cpumask_empty(cpumask_of_node(node)))
--		return AE_OK;
--
--	/* We know a gsi to node mapping! */
--	map_iosapic_to_node(gsi_base, node);
--	return AE_OK;
--}
--
--static int __init
--acpi_map_iosapics (void)
--{
--	acpi_get_devices(NULL, acpi_map_iosapic, NULL, NULL);
--	return 0;
--}
--
--fs_initcall(acpi_map_iosapics);
--#endif				/* CONFIG_ACPI_NUMA */
--
--int __ref acpi_register_ioapic(acpi_handle handle, u64 phys_addr, u32 gsi_base)
--{
--	int err;
--
--	if ((err = iosapic_init(phys_addr, gsi_base)))
--		return err;
--
--#ifdef CONFIG_ACPI_NUMA
--	acpi_map_iosapic(handle, 0, NULL, NULL);
--#endif				/* CONFIG_ACPI_NUMA */
--
--	return 0;
--}
--
--EXPORT_SYMBOL(acpi_register_ioapic);
--
--int acpi_unregister_ioapic(acpi_handle handle, u32 gsi_base)
--{
--	return iosapic_remove(gsi_base);
--}
--
--EXPORT_SYMBOL(acpi_unregister_ioapic);
--
--/*
-- * acpi_suspend_lowlevel() - save kernel state and suspend.
-- *
-- * TBD when when IA64 starts to support suspend...
-- */
--int acpi_suspend_lowlevel(void) { return 0; }
-diff --git a/arch/ia64/kernel/acpi/Makefile b/arch/ia64/kernel/acpi/Makefile
+diff --git a/arch/x86/kernel/acpi/blacklist.c b/arch/x86/kernel/acpi/blacklist.c
 new file mode 100644
-index 0000000..8c12745
+index 0000000..ecc04b3
 --- /dev/null
-+++ b/arch/ia64/kernel/acpi/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_ACPI)		+= acpi.o acpi-ext.o
-diff --git a/arch/ia64/kernel/acpi/acpi-ext.c b/arch/ia64/kernel/acpi/acpi-ext.c
-new file mode 100644
-index 0000000..8b9318d
---- /dev/null
-+++ b/arch/ia64/kernel/acpi/acpi-ext.c
-@@ -0,0 +1,104 @@
++++ b/arch/x86/kernel/acpi/blacklist.c
+@@ -0,0 +1,327 @@
 +/*
-+ * (c) Copyright 2003, 2006 Hewlett-Packard Development Company, L.P.
-+ *	Alex Williamson <alex.williamson@hp.com>
-+ *	Bjorn Helgaas <bjorn.helgaas@hp.com>
++ *  blacklist.c
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/types.h>
-+#include <linux/slab.h>
-+#include <linux/acpi.h>
-+
-+#include <asm/acpi-ext.h>
-+
-+/*
-+ * Device CSRs that do not appear in PCI config space should be described
-+ * via ACPI.  This would normally be done with Address Space Descriptors
-+ * marked as "consumer-only," but old versions of Windows and Linux ignore
-+ * the producer/consumer flag, so HP invented a vendor-defined resource to
-+ * describe the location and size of CSR space.
-+ */
-+
-+struct acpi_vendor_uuid hp_ccsr_uuid = {
-+	.subtype = 2,
-+	.data = { 0xf9, 0xad, 0xe9, 0x69, 0x4f, 0x92, 0x5f, 0xab, 0xf6, 0x4a,
-+	    0x24, 0xd2, 0x01, 0x37, 0x0e, 0xad },
-+};
-+
-+static acpi_status hp_ccsr_locate(acpi_handle obj, u64 *base, u64 *length)
-+{
-+	acpi_status status;
-+	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
-+	struct acpi_resource *resource;
-+	struct acpi_resource_vendor_typed *vendor;
-+
-+	status = acpi_get_vendor_resource(obj, METHOD_NAME__CRS, &hp_ccsr_uuid,
-+		&buffer);
-+
-+	resource = buffer.pointer;
-+	vendor = &resource->data.vendor_typed;
-+
-+	if (ACPI_FAILURE(status) || vendor->byte_length < 16) {
-+		status = AE_NOT_FOUND;
-+		goto exit;
-+	}
-+
-+	memcpy(base, vendor->byte_data, sizeof(*base));
-+	memcpy(length, vendor->byte_data + 8, sizeof(*length));
-+
-+  exit:
-+	kfree(buffer.pointer);
-+	return status;
-+}
-+
-+struct csr_space {
-+	u64	base;
-+	u64	length;
-+};
-+
-+static acpi_status find_csr_space(struct acpi_resource *resource, void *data)
-+{
-+	struct csr_space *space = data;
-+	struct acpi_resource_address64 addr;
-+	acpi_status status;
-+
-+	status = acpi_resource_to_address64(resource, &addr);
-+	if (ACPI_SUCCESS(status) &&
-+	    addr.resource_type == ACPI_MEMORY_RANGE &&
-+	    addr.address_length &&
-+	    addr.producer_consumer == ACPI_CONSUMER) {
-+		space->base = addr.minimum;
-+		space->length = addr.address_length;
-+		return AE_CTRL_TERMINATE;
-+	}
-+	return AE_OK;		/* keep looking */
-+}
-+
-+static acpi_status hp_crs_locate(acpi_handle obj, u64 *base, u64 *length)
-+{
-+	struct csr_space space = { 0, 0 };
-+
-+	acpi_walk_resources(obj, METHOD_NAME__CRS, find_csr_space, &space);
-+	if (!space.length)
-+		return AE_NOT_FOUND;
-+
-+	*base = space.base;
-+	*length = space.length;
-+	return AE_OK;
-+}
-+
-+acpi_status hp_acpi_csr_space(acpi_handle obj, u64 *csr_base, u64 *csr_length)
-+{
-+	acpi_status status;
-+
-+	status = hp_ccsr_locate(obj, csr_base, csr_length);
-+	if (ACPI_SUCCESS(status))
-+		return status;
-+
-+	return hp_crs_locate(obj, csr_base, csr_length);
-+}
-+EXPORT_SYMBOL(hp_acpi_csr_space);
-diff --git a/arch/ia64/kernel/acpi/acpi.c b/arch/ia64/kernel/acpi/acpi.c
-new file mode 100644
-index 0000000..e795cb8
---- /dev/null
-+++ b/arch/ia64/kernel/acpi/acpi.c
-@@ -0,0 +1,1000 @@
-+/*
-+ *  acpi.c - Architecture-Specific Low-Level ACPI Support
++ *  Check to see if the given machine has a known bad ACPI BIOS
++ *  or if the BIOS is too old.
++ *  Check given machine against acpi_osi_dmi_table[].
 + *
-+ *  Copyright (C) 1999 VA Linux Systems
-+ *  Copyright (C) 1999,2000 Walt Drummond <drummond@valinux.com>
-+ *  Copyright (C) 2000, 2002-2003 Hewlett-Packard Co.
-+ *	David Mosberger-Tang <davidm@hpl.hp.com>
-+ *  Copyright (C) 2000 Intel Corp.
-+ *  Copyright (C) 2000,2001 J.I. Lee <jung-ik.lee@intel.com>
-+ *  Copyright (C) 2001 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
-+ *  Copyright (C) 2001 Jenna Hall <jenna.s.hall@intel.com>
-+ *  Copyright (C) 2001 Takayoshi Kochi <t-kochi@bq.jp.nec.com>
-+ *  Copyright (C) 2002 Erich Focht <efocht@ess.nec.de>
-+ *  Copyright (C) 2004 Ashok Raj <ashok.raj@intel.com>
++ *  Copyright (C) 2004 Len Brown <len.brown@intel.com>
++ *  Copyright (C) 2002 Andy Grover <andrew.grover@intel.com>
 + *
 + * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 + *
 + *  This program is free software; you can redistribute it and/or modify
 + *  it under the terms of the GNU General Public License as published by
-+ *  the Free Software Foundation; either version 2 of the License, or
-+ *  (at your option) any later version.
++ *  the Free Software Foundation; either version 2 of the License, or (at
++ *  your option) any later version.
 + *
-+ *  This program is distributed in the hope that it will be useful,
-+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *  GNU General Public License for more details.
++ *  This program is distributed in the hope that it will be useful, but
++ *  WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ *  General Public License for more details.
 + *
-+ *  You should have received a copy of the GNU General Public License
-+ *  along with this program; if not, write to the Free Software
-+ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
++ *  You should have received a copy of the GNU General Public License along
++ *  with this program; if not, write to the Free Software Foundation, Inc.,
++ *  59 Temple Place, Suite 330, Boston, MA 02111-1307 USA.
 + *
 + * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 + */
 +
-+#include <linux/module.h>
-+#include <linux/init.h>
 +#include <linux/kernel.h>
-+#include <linux/sched.h>
-+#include <linux/smp.h>
-+#include <linux/string.h>
-+#include <linux/types.h>
-+#include <linux/irq.h>
++#include <linux/init.h>
 +#include <linux/acpi.h>
-+#include <linux/efi.h>
-+#include <linux/mmzone.h>
-+#include <linux/nodemask.h>
-+#include <linux/slab.h>
-+#include <acpi/processor.h>
-+#include <asm/io.h>
-+#include <asm/iosapic.h>
-+#include <asm/machvec.h>
-+#include <asm/page.h>
-+#include <asm/numa.h>
-+#include <asm/sal.h>
-+#include <asm/cyclone.h>
++#include <linux/dmi.h>
 +
-+#define PREFIX			"ACPI: "
++extern void __init acpi_dmi_osi_linux(int enable,
++				      const struct dmi_system_id *d);
++extern void __init acpi_osi_setup(char *str);
 +
-+int acpi_lapic;
-+unsigned int acpi_cpei_override;
-+unsigned int acpi_cpei_phys_cpuid;
++#define PREFIX		"ACPI: "
 +
-+unsigned long acpi_wakeup_address = 0;
-+
-+#ifdef CONFIG_IA64_GENERIC
-+static unsigned long __init acpi_find_rsdp(void)
-+{
-+	unsigned long rsdp_phys = 0;
-+
-+	if (efi.acpi20 != EFI_INVALID_TABLE_ADDR)
-+		rsdp_phys = efi.acpi20;
-+	else if (efi.acpi != EFI_INVALID_TABLE_ADDR)
-+		printk(KERN_WARNING PREFIX
-+		       "v1.0/r0.71 tables no longer supported\n");
-+	return rsdp_phys;
-+}
-+
-+const char __init *
-+acpi_get_sysname(void)
-+{
-+	unsigned long rsdp_phys;
-+	struct acpi_table_rsdp *rsdp;
-+	struct acpi_table_xsdt *xsdt;
-+	struct acpi_table_header *hdr;
-+#ifdef CONFIG_INTEL_IOMMU
-+	u64 i, nentries;
-+#endif
-+
-+	rsdp_phys = acpi_find_rsdp();
-+	if (!rsdp_phys) {
-+		printk(KERN_ERR
-+		       "ACPI 2.0 RSDP not found, default to \"dig\"\n");
-+		return "dig";
-+	}
-+
-+	rsdp = (struct acpi_table_rsdp *)__va(rsdp_phys);
-+	if (strncmp(rsdp->signature, ACPI_SIG_RSDP, sizeof(ACPI_SIG_RSDP) - 1)) {
-+		printk(KERN_ERR
-+		       "ACPI 2.0 RSDP signature incorrect, default to \"dig\"\n");
-+		return "dig";
-+	}
-+
-+	xsdt = (struct acpi_table_xsdt *)__va(rsdp->xsdt_physical_address);
-+	hdr = &xsdt->header;
-+	if (strncmp(hdr->signature, ACPI_SIG_XSDT, sizeof(ACPI_SIG_XSDT) - 1)) {
-+		printk(KERN_ERR
-+		       "ACPI 2.0 XSDT signature incorrect, default to \"dig\"\n");
-+		return "dig";
-+	}
-+
-+	if (!strcmp(hdr->oem_id, "HP")) {
-+		return "hpzx1";
-+	} else if (!strcmp(hdr->oem_id, "SGI")) {
-+		if (!strcmp(hdr->oem_table_id + 4, "UV"))
-+			return "uv";
-+		else
-+			return "sn2";
-+	}
-+
-+#ifdef CONFIG_INTEL_IOMMU
-+	/* Look for Intel IOMMU */
-+	nentries = (hdr->length - sizeof(*hdr)) /
-+			 sizeof(xsdt->table_offset_entry[0]);
-+	for (i = 0; i < nentries; i++) {
-+		hdr = __va(xsdt->table_offset_entry[i]);
-+		if (strncmp(hdr->signature, ACPI_SIG_DMAR,
-+			sizeof(ACPI_SIG_DMAR) - 1) == 0)
-+			return "dig_vtd";
-+	}
-+#endif
-+
-+	return "dig";
-+}
-+#endif /* CONFIG_IA64_GENERIC */
-+
-+#define ACPI_MAX_PLATFORM_INTERRUPTS	256
-+
-+/* Array to record platform interrupt vectors for generic interrupt routing. */
-+int platform_intr_list[ACPI_MAX_PLATFORM_INTERRUPTS] = {
-+	[0 ... ACPI_MAX_PLATFORM_INTERRUPTS - 1] = -1
++enum acpi_blacklist_predicates {
++	all_versions,
++	less_than_or_equal,
++	equal,
++	greater_than_or_equal,
 +};
 +
-+enum acpi_irq_model_id acpi_irq_model = ACPI_IRQ_MODEL_IOSAPIC;
++struct acpi_blacklist_item {
++	char oem_id[7];
++	char oem_table_id[9];
++	u32 oem_revision;
++	char *table;
++	enum acpi_blacklist_predicates oem_revision_predicate;
++	char *reason;
++	u32 is_critical_error;
++};
++
++static struct dmi_system_id acpi_osi_dmi_table[] __initdata;
 +
 +/*
-+ * Interrupt routing API for device drivers.  Provides interrupt vector for
-+ * a generic platform event.  Currently only CPEI is implemented.
++ * POLICY: If *anything* doesn't work, put it on the blacklist.
++ *	   If they are critical errors, mark it critical, and abort driver load.
 + */
-+int acpi_request_vector(u32 int_type)
++static struct acpi_blacklist_item acpi_blacklist[] __initdata = {
++	/* Compaq Presario 1700 */
++	{"PTLTD ", "  DSDT  ", 0x06040000, ACPI_SIG_DSDT, less_than_or_equal,
++	 "Multiple problems", 1},
++	/* Sony FX120, FX140, FX150? */
++	{"SONY  ", "U0      ", 0x20010313, ACPI_SIG_DSDT, less_than_or_equal,
++	 "ACPI driver problem", 1},
++	/* Compaq Presario 800, Insyde BIOS */
++	{"INT440", "SYSFexxx", 0x00001001, ACPI_SIG_DSDT, less_than_or_equal,
++	 "Does not use _REG to protect EC OpRegions", 1},
++	/* IBM 600E - _ADR should return 7, but it returns 1 */
++	{"IBM   ", "TP600E  ", 0x00000105, ACPI_SIG_DSDT, less_than_or_equal,
++	 "Incorrect _ADR", 1},
++
++	{""}
++};
++
++int __init acpi_blacklisted(void)
 +{
-+	int vector = -1;
++	int i = 0;
++	int blacklisted = 0;
++	struct acpi_table_header table_header;
 +
-+	if (int_type < ACPI_MAX_PLATFORM_INTERRUPTS) {
-+		/* corrected platform error interrupt */
-+		vector = platform_intr_list[int_type];
-+	} else
-+		printk(KERN_ERR
-+		       "acpi_request_vector(): invalid interrupt type\n");
-+	return vector;
-+}
++	while (acpi_blacklist[i].oem_id[0] != '\0') {
++		if (acpi_get_table_header(acpi_blacklist[i].table, 0, &table_header)) {
++			i++;
++			continue;
++		}
 +
-+char *__init __acpi_map_table(unsigned long phys_addr, unsigned long size)
-+{
-+	return __va(phys_addr);
-+}
++		if (strncmp(acpi_blacklist[i].oem_id, table_header.oem_id, 6)) {
++			i++;
++			continue;
++		}
 +
-+void __init __acpi_unmap_table(char *map, unsigned long size)
-+{
-+}
++		if (strncmp
++		    (acpi_blacklist[i].oem_table_id, table_header.oem_table_id,
++		     8)) {
++			i++;
++			continue;
++		}
 +
-+/* --------------------------------------------------------------------------
-+                            Boot-time Table Parsing
-+   -------------------------------------------------------------------------- */
++		if ((acpi_blacklist[i].oem_revision_predicate == all_versions)
++		    || (acpi_blacklist[i].oem_revision_predicate ==
++			less_than_or_equal
++			&& table_header.oem_revision <=
++			acpi_blacklist[i].oem_revision)
++		    || (acpi_blacklist[i].oem_revision_predicate ==
++			greater_than_or_equal
++			&& table_header.oem_revision >=
++			acpi_blacklist[i].oem_revision)
++		    || (acpi_blacklist[i].oem_revision_predicate == equal
++			&& table_header.oem_revision ==
++			acpi_blacklist[i].oem_revision)) {
 +
-+static int available_cpus __initdata;
-+struct acpi_table_madt *acpi_madt __initdata;
-+static u8 has_8259;
++			printk(KERN_ERR PREFIX
++			       "Vendor \"%6.6s\" System \"%8.8s\" "
++			       "Revision 0x%x has a known ACPI BIOS problem.\n",
++			       acpi_blacklist[i].oem_id,
++			       acpi_blacklist[i].oem_table_id,
++			       acpi_blacklist[i].oem_revision);
 +
-+static int __init
-+acpi_parse_lapic_addr_ovr(struct acpi_subtable_header * header,
-+			  const unsigned long end)
-+{
-+	struct acpi_madt_local_apic_override *lapic;
++			printk(KERN_ERR PREFIX
++			       "Reason: %s. This is a %s error\n",
++			       acpi_blacklist[i].reason,
++			       (acpi_blacklist[i].
++				is_critical_error ? "non-recoverable" :
++				"recoverable"));
 +
-+	lapic = (struct acpi_madt_local_apic_override *)header;
-+
-+	if (BAD_MADT_ENTRY(lapic, end))
-+		return -EINVAL;
-+
-+	if (lapic->address) {
-+		iounmap(ipi_base_addr);
-+		ipi_base_addr = ioremap(lapic->address, 0);
++			blacklisted = acpi_blacklist[i].is_critical_error;
++			break;
++		} else {
++			i++;
++		}
 +	}
++
++	dmi_check_system(acpi_osi_dmi_table);
++
++	return blacklisted;
++}
++#ifdef CONFIG_DMI
++static int __init dmi_enable_osi_linux(const struct dmi_system_id *d)
++{
++	acpi_dmi_osi_linux(1, d);	/* enable */
++	return 0;
++}
++static int __init dmi_disable_osi_vista(const struct dmi_system_id *d)
++{
++	printk(KERN_NOTICE PREFIX "DMI detected: %s\n", d->ident);
++	acpi_osi_setup("!Windows 2006");
++	acpi_osi_setup("!Windows 2006 SP1");
++	acpi_osi_setup("!Windows 2006 SP2");
++	return 0;
++}
++static int __init dmi_disable_osi_win7(const struct dmi_system_id *d)
++{
++	printk(KERN_NOTICE PREFIX "DMI detected: %s\n", d->ident);
++	acpi_osi_setup("!Windows 2009");
++	return 0;
++}
++static int __init dmi_disable_osi_win8(const struct dmi_system_id *d)
++{
++	printk(KERN_NOTICE PREFIX "DMI detected: %s\n", d->ident);
++	acpi_osi_setup("!Windows 2012");
 +	return 0;
 +}
 +
-+static int __init
-+acpi_parse_lsapic(struct acpi_subtable_header * header, const unsigned long end)
-+{
-+	struct acpi_madt_local_sapic *lsapic;
-+
-+	lsapic = (struct acpi_madt_local_sapic *)header;
-+
-+	/*Skip BAD_MADT_ENTRY check, as lsapic size could vary */
-+
-+	if (lsapic->lapic_flags & ACPI_MADT_ENABLED) {
-+#ifdef CONFIG_SMP
-+		smp_boot_data.cpu_phys_id[available_cpus] =
-+		    (lsapic->id << 8) | lsapic->eid;
-+#endif
-+		++available_cpus;
-+	}
-+
-+	total_cpus++;
-+	return 0;
-+}
-+
-+static int __init
-+acpi_parse_lapic_nmi(struct acpi_subtable_header * header, const unsigned long end)
-+{
-+	struct acpi_madt_local_apic_nmi *lacpi_nmi;
-+
-+	lacpi_nmi = (struct acpi_madt_local_apic_nmi *)header;
-+
-+	if (BAD_MADT_ENTRY(lacpi_nmi, end))
-+		return -EINVAL;
-+
-+	/* TBD: Support lapic_nmi entries */
-+	return 0;
-+}
-+
-+static int __init
-+acpi_parse_iosapic(struct acpi_subtable_header * header, const unsigned long end)
-+{
-+	struct acpi_madt_io_sapic *iosapic;
-+
-+	iosapic = (struct acpi_madt_io_sapic *)header;
-+
-+	if (BAD_MADT_ENTRY(iosapic, end))
-+		return -EINVAL;
-+
-+	return iosapic_init(iosapic->address, iosapic->global_irq_base);
-+}
-+
-+static unsigned int __initdata acpi_madt_rev;
-+
-+static int __init
-+acpi_parse_plat_int_src(struct acpi_subtable_header * header,
-+			const unsigned long end)
-+{
-+	struct acpi_madt_interrupt_source *plintsrc;
-+	int vector;
-+
-+	plintsrc = (struct acpi_madt_interrupt_source *)header;
-+
-+	if (BAD_MADT_ENTRY(plintsrc, end))
-+		return -EINVAL;
++static struct dmi_system_id acpi_osi_dmi_table[] __initdata = {
++	{
++	.callback = dmi_disable_osi_vista,
++	.ident = "Fujitsu Siemens",
++	.matches = {
++		     DMI_MATCH(DMI_SYS_VENDOR, "FUJITSU SIEMENS"),
++		     DMI_MATCH(DMI_PRODUCT_NAME, "ESPRIMO Mobile V5505"),
++		},
++	},
++	{
++	/*
++	 * There have a NVIF method in MSI GX723 DSDT need call by Nvidia
++	 * driver (e.g. nouveau) when user press brightness hotkey.
++	 * Currently, nouveau driver didn't do the job and it causes there
++	 * have a infinite while loop in DSDT when user press hotkey.
++	 * We add MSI GX723's dmi information to this table for workaround
++	 * this issue.
++	 * Will remove MSI GX723 from the table after nouveau grows support.
++	 */
++	.callback = dmi_disable_osi_vista,
++	.ident = "MSI GX723",
++	.matches = {
++		     DMI_MATCH(DMI_SYS_VENDOR, "Micro-Star International"),
++		     DMI_MATCH(DMI_PRODUCT_NAME, "GX723"),
++		},
++	},
++	{
++	.callback = dmi_disable_osi_vista,
++	.ident = "Sony VGN-NS10J_S",
++	.matches = {
++		     DMI_MATCH(DMI_SYS_VENDOR, "Sony Corporation"),
++		     DMI_MATCH(DMI_PRODUCT_NAME, "VGN-NS10J_S"),
++		},
++	},
++	{
++	.callback = dmi_disable_osi_vista,
++	.ident = "Sony VGN-SR290J",
++	.matches = {
++		     DMI_MATCH(DMI_SYS_VENDOR, "Sony Corporation"),
++		     DMI_MATCH(DMI_PRODUCT_NAME, "VGN-SR290J"),
++		},
++	},
++	{
++	.callback = dmi_disable_osi_vista,
++	.ident = "VGN-NS50B_L",
++	.matches = {
++		     DMI_MATCH(DMI_SYS_VENDOR, "Sony Corporation"),
++		     DMI_MATCH(DMI_PRODUCT_NAME, "VGN-NS50B_L"),
++		},
++	},
++	{
++	.callback = dmi_disable_osi_vista,
++	.ident = "Toshiba Satellite L355",
++	.matches = {
++		     DMI_MATCH(DMI_SYS_VENDOR, "TOSHIBA"),
++		     DMI_MATCH(DMI_PRODUCT_VERSION, "Satellite L355"),
++		},
++	},
++	{
++	.callback = dmi_disable_osi_win7,
++	.ident = "ASUS K50IJ",
++	.matches = {
++		     DMI_MATCH(DMI_SYS_VENDOR, "ASUSTeK Computer Inc."),
++		     DMI_MATCH(DMI_PRODUCT_NAME, "K50IJ"),
++		},
++	},
++	{
++	.callback = dmi_disable_osi_vista,
++	.ident = "Toshiba P305D",
++	.matches = {
++		     DMI_MATCH(DMI_SYS_VENDOR, "TOSHIBA"),
++		     DMI_MATCH(DMI_PRODUCT_NAME, "Satellite P305D"),
++		},
++	},
++	{
++	.callback = dmi_disable_osi_vista,
++	.ident = "Toshiba NB100",
++	.matches = {
++		     DMI_MATCH(DMI_SYS_VENDOR, "TOSHIBA"),
++		     DMI_MATCH(DMI_PRODUCT_NAME, "NB100"),
++		},
++	},
 +
 +	/*
-+	 * Get vector assignment for this interrupt, set attributes,
-+	 * and program the IOSAPIC routing table.
++	 * The wireless hotkey does not work on those machines when
++	 * returning true for _OSI("Windows 2012")
 +	 */
-+	vector = iosapic_register_platform_intr(plintsrc->type,
-+						plintsrc->global_irq,
-+						plintsrc->io_sapic_vector,
-+						plintsrc->eid,
-+						plintsrc->id,
-+						((plintsrc->inti_flags & ACPI_MADT_POLARITY_MASK) ==
-+						 ACPI_MADT_POLARITY_ACTIVE_HIGH) ?
-+						IOSAPIC_POL_HIGH : IOSAPIC_POL_LOW,
-+						((plintsrc->inti_flags & ACPI_MADT_TRIGGER_MASK) ==
-+						 ACPI_MADT_TRIGGER_EDGE) ?
-+						IOSAPIC_EDGE : IOSAPIC_LEVEL);
-+
-+	platform_intr_list[plintsrc->type] = vector;
-+	if (acpi_madt_rev > 1) {
-+		acpi_cpei_override = plintsrc->flags & ACPI_MADT_CPEI_OVERRIDE;
-+	}
++	{
++	.callback = dmi_disable_osi_win8,
++	.ident = "Dell Inspiron 7737",
++	.matches = {
++		    DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
++		    DMI_MATCH(DMI_PRODUCT_NAME, "Inspiron 7737"),
++		},
++	},
++	{
++	.callback = dmi_disable_osi_win8,
++	.ident = "Dell Inspiron 7537",
++	.matches = {
++		    DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
++		    DMI_MATCH(DMI_PRODUCT_NAME, "Inspiron 7537"),
++		},
++	},
++	{
++	.callback = dmi_disable_osi_win8,
++	.ident = "Dell Inspiron 5437",
++	.matches = {
++		    DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
++		    DMI_MATCH(DMI_PRODUCT_NAME, "Inspiron 5437"),
++		},
++	},
++	{
++	.callback = dmi_disable_osi_win8,
++	.ident = "Dell Inspiron 3437",
++	.matches = {
++		    DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
++		    DMI_MATCH(DMI_PRODUCT_NAME, "Inspiron 3437"),
++		},
++	},
++	{
++	.callback = dmi_disable_osi_win8,
++	.ident = "Dell Vostro 3446",
++	.matches = {
++		    DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
++		    DMI_MATCH(DMI_PRODUCT_NAME, "Vostro 3446"),
++		},
++	},
++	{
++	.callback = dmi_disable_osi_win8,
++	.ident = "Dell Vostro 3546",
++	.matches = {
++		    DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
++		    DMI_MATCH(DMI_PRODUCT_NAME, "Vostro 3546"),
++		},
++	},
 +
 +	/*
-+	 * Save the physical id, so we can check when its being removed
++	 * BIOS invocation of _OSI(Linux) is almost always a BIOS bug.
++	 * Linux ignores it, except for the machines enumerated below.
 +	 */
-+	acpi_cpei_phys_cpuid = ((plintsrc->id << 8) | (plintsrc->eid)) & 0xffff;
 +
-+	return 0;
++	/*
++	 * Without this this EEEpc exports a non working WMI interface, with
++	 * this it exports a working "good old" eeepc_laptop interface, fixing
++	 * both brightness control, and rfkill not working.
++	 */
++	{
++	.callback = dmi_enable_osi_linux,
++	.ident = "Asus EEE PC 1015PX",
++	.matches = {
++		     DMI_MATCH(DMI_SYS_VENDOR, "ASUSTeK Computer INC."),
++		     DMI_MATCH(DMI_PRODUCT_NAME, "1015PX"),
++		},
++	},
++	{}
++};
++
++#endif /* CONFIG_DMI */
+diff --git a/arch/x86/kernel/acpi/boot.c b/arch/x86/kernel/acpi/boot.c
+index d162636..4773f55 100644
+--- a/arch/x86/kernel/acpi/boot.c
++++ b/arch/x86/kernel/acpi/boot.c
+@@ -47,6 +47,9 @@
+ #include <asm/i8259.h>
+ 
+ #include "sleep.h" /* To include x86_acpi_suspend_lowlevel */
++
++extern int __init acpi_blacklisted(void);
++
+ static int __initdata acpi_force = 0;
+ int acpi_disabled;
+ EXPORT_SYMBOL(acpi_disabled);
+@@ -1502,7 +1505,7 @@ void __init acpi_boot_table_init(void)
+ 	 * If acpi_disabled, bail out
+ 	 */
+ 	if (acpi_disabled)
+-		return; 
++		return;
+ 
+ 	/*
+ 	 * Initialize the ACPI boot-time table parser.
+diff --git a/arch/x86/kernel/acpi/osi.c b/arch/x86/kernel/acpi/osi.c
+index fff2b0c..761c29e 100644
+--- a/arch/x86/kernel/acpi/osi.c
++++ b/arch/x86/kernel/acpi/osi.c
+@@ -34,6 +34,8 @@ ACPI_MODULE_NAME("osl");
+ 
+ #define PREFIX			"ACPI: "
+ 
++static void __init acpi_osi_setup_late(void);
++
+ /*
+  * The story of _OSI(Linux)
+  *
+@@ -72,10 +74,14 @@ static struct osi_linux {
+ 	unsigned int	dmi:1;
+ 	unsigned int	cmdline:1;
+ 	unsigned int	default_disabling:1;
+-} osi_linux = {0, 0, 0, 0};
++	unsigned int	interfaces_added:1;
++} osi_linux = {0, 0, 0, 0, 0};
+ 
+ u32 acpi_osi_handler(acpi_string interface, u32 supported)
+ {
++	if (!osi_linux.interfaces_added)
++		acpi_osi_setup_late();
++
+ 	if (!strcmp("Linux", interface)) {
+ 
+ 		printk_once(KERN_NOTICE FW_BUG PREFIX
+@@ -98,3 +104,152 @@ u32 acpi_osi_handler(acpi_string interface, u32 supported)
+ 	return supported;
+ }
+ 
++#define	OSI_STRING_LENGTH_MAX 64	/* arbitrary */
++#define	OSI_STRING_ENTRIES_MAX 16	/* arbitrary */
++
++struct osi_setup_entry {
++	char string[OSI_STRING_LENGTH_MAX];
++	bool enable;
++};
++
++static struct osi_setup_entry
++		osi_setup_entries[OSI_STRING_ENTRIES_MAX] = {
++	{"Module Device", true},
++	{"Processor Device", true},
++	{"3.0 _SCP Extensions", true},
++	{"Processor Aggregator Device", true},
++};
++
++void __init acpi_osi_setup(char *str)
++{
++	struct osi_setup_entry *osi;
++	bool enable = true;
++	int i;
++
++	if (!acpi_gbl_create_osi_method)
++		return;
++
++	if (str == NULL || *str == '\0') {
++		printk(KERN_INFO PREFIX "_OSI method disabled\n");
++		acpi_gbl_create_osi_method = FALSE;
++		return;
++	}
++
++	if (*str == '!') {
++		str++;
++		if (*str == '\0') {
++			osi_linux.default_disabling = 1;
++			return;
++		} else if (*str == '*') {
++			acpi_update_interfaces(ACPI_DISABLE_ALL_STRINGS);
++			for (i = 0; i < OSI_STRING_ENTRIES_MAX; i++) {
++				osi = &osi_setup_entries[i];
++				osi->enable = false;
++			}
++			return;
++		}
++		enable = false;
++	}
++
++	for (i = 0; i < OSI_STRING_ENTRIES_MAX; i++) {
++		osi = &osi_setup_entries[i];
++		if (!strcmp(osi->string, str)) {
++			osi->enable = enable;
++			break;
++		} else if (osi->string[0] == '\0') {
++			osi->enable = enable;
++			strncpy(osi->string, str, OSI_STRING_LENGTH_MAX);
++			break;
++		}
++	}
 +}
 +
-+#ifdef CONFIG_HOTPLUG_CPU
-+unsigned int can_cpei_retarget(void)
++static void __init set_osi_linux(unsigned int enable)
 +{
-+	extern int cpe_vector;
-+	extern unsigned int force_cpei_retarget;
++	if (osi_linux.enable != enable)
++		osi_linux.enable = enable;
 +
-+	/*
-+	 * Only if CPEI is supported and the override flag
-+	 * is present, otherwise return that its re-targettable
-+	 * if we are in polling mode.
-+	 */
-+	if (cpe_vector > 0) {
-+		if (acpi_cpei_override || force_cpei_retarget)
-+			return 1;
-+		else
-+			return 0;
++	if (osi_linux.enable)
++		acpi_osi_setup("Linux");
++	else
++		acpi_osi_setup("!Linux");
++
++	return;
++}
++
++static void __init acpi_cmdline_osi_linux(unsigned int enable)
++{
++	osi_linux.cmdline = 1;	/* cmdline set the default and override DMI */
++	osi_linux.dmi = 0;
++	set_osi_linux(enable);
++
++	return;
++}
++
++void __init acpi_dmi_osi_linux(int enable, const struct dmi_system_id *d)
++{
++	printk(KERN_NOTICE PREFIX "DMI detected: %s\n", d->ident);
++
++	if (enable == -1)
++		return;
++
++	osi_linux.dmi = 1;	/* DMI knows that this box asks OSI(Linux) */
++	set_osi_linux(enable);
++
++	return;
++}
++
++/*
++ * Modify the list of "OS Interfaces" reported to BIOS via _OSI
++ *
++ * empty string disables _OSI
++ * string starting with '!' disables that string
++ * otherwise string is added to list, augmenting built-in strings
++ */
++static void __init acpi_osi_setup_late(void)
++{
++	struct osi_setup_entry *osi;
++	char *str;
++	int i;
++	acpi_status status;
++
++	if (osi_linux.default_disabling) {
++		status = acpi_update_interfaces(ACPI_DISABLE_ALL_VENDOR_STRINGS);
++
++		if (ACPI_SUCCESS(status))
++			printk(KERN_INFO PREFIX "Disabled all _OSI OS vendors\n");
 +	}
++
++	for (i = 0; i < OSI_STRING_ENTRIES_MAX; i++) {
++		osi = &osi_setup_entries[i];
++		str = osi->string;
++
++		if (*str == '\0')
++			break;
++		if (osi->enable) {
++			status = acpi_install_interface(str);
++
++			if (ACPI_SUCCESS(status))
++				printk(KERN_INFO PREFIX "Added _OSI(%s)\n", str);
++		} else {
++			status = acpi_remove_interface(str);
++
++			if (ACPI_SUCCESS(status))
++				printk(KERN_INFO PREFIX "Deleted _OSI(%s)\n", str);
++		}
++	}
++}
++
++static int __init osi_setup(char *str)
++{
++	if (str && !strcmp("Linux", str))
++		acpi_cmdline_osi_linux(1);
++	else if (str && !strcmp("!Linux", str))
++		acpi_cmdline_osi_linux(0);
++	else
++		acpi_osi_setup(str);
++
 +	return 1;
 +}
 +
-+unsigned int is_cpu_cpei_target(unsigned int cpu)
-+{
-+	unsigned int logical_id;
-+
-+	logical_id = cpu_logical_id(acpi_cpei_phys_cpuid);
-+
-+	if (logical_id == cpu)
-+		return 1;
-+	else
-+		return 0;
-+}
-+
-+void set_cpei_target_cpu(unsigned int cpu)
-+{
-+	acpi_cpei_phys_cpuid = cpu_physical_id(cpu);
-+}
-+#endif
-+
-+unsigned int get_cpei_target_cpu(void)
-+{
-+	return acpi_cpei_phys_cpuid;
-+}
-+
-+static int __init
-+acpi_parse_int_src_ovr(struct acpi_subtable_header * header,
-+		       const unsigned long end)
-+{
-+	struct acpi_madt_interrupt_override *p;
-+
-+	p = (struct acpi_madt_interrupt_override *)header;
-+
-+	if (BAD_MADT_ENTRY(p, end))
-+		return -EINVAL;
-+
-+	iosapic_override_isa_irq(p->source_irq, p->global_irq,
-+				 ((p->inti_flags & ACPI_MADT_POLARITY_MASK) ==
-+				  ACPI_MADT_POLARITY_ACTIVE_LOW) ?
-+				 IOSAPIC_POL_LOW : IOSAPIC_POL_HIGH,
-+				 ((p->inti_flags & ACPI_MADT_TRIGGER_MASK) ==
-+				 ACPI_MADT_TRIGGER_LEVEL) ?
-+				 IOSAPIC_LEVEL : IOSAPIC_EDGE);
-+	return 0;
-+}
-+
-+static int __init
-+acpi_parse_nmi_src(struct acpi_subtable_header * header, const unsigned long end)
-+{
-+	struct acpi_madt_nmi_source *nmi_src;
-+
-+	nmi_src = (struct acpi_madt_nmi_source *)header;
-+
-+	if (BAD_MADT_ENTRY(nmi_src, end))
-+		return -EINVAL;
-+
-+	/* TBD: Support nimsrc entries */
-+	return 0;
-+}
-+
-+static void __init acpi_madt_oem_check(char *oem_id, char *oem_table_id)
-+{
-+	if (!strncmp(oem_id, "IBM", 3) && (!strncmp(oem_table_id, "SERMOW", 6))) {
-+
-+		/*
-+		 * Unfortunately ITC_DRIFT is not yet part of the
-+		 * official SAL spec, so the ITC_DRIFT bit is not
-+		 * set by the BIOS on this hardware.
-+		 */
-+		sal_platform_features |= IA64_SAL_PLATFORM_FEATURE_ITC_DRIFT;
-+
-+		cyclone_setup();
-+	}
-+}
-+
-+static int __init acpi_parse_madt(struct acpi_table_header *table)
-+{
-+	if (!table)
-+		return -EINVAL;
-+
-+	acpi_madt = (struct acpi_table_madt *)table;
-+
-+	acpi_madt_rev = acpi_madt->header.revision;
-+
-+	/* remember the value for reference after free_initmem() */
-+#ifdef CONFIG_ITANIUM
-+	has_8259 = 1;		/* Firmware on old Itanium systems is broken */
-+#else
-+	has_8259 = acpi_madt->flags & ACPI_MADT_PCAT_COMPAT;
-+#endif
-+	iosapic_system_init(has_8259);
-+
-+	/* Get base address of IPI Message Block */
-+
-+	if (acpi_madt->address)
-+		ipi_base_addr = ioremap(acpi_madt->address, 0);
-+
-+	printk(KERN_INFO PREFIX "Local APIC address %p\n", ipi_base_addr);
-+
-+	acpi_madt_oem_check(acpi_madt->header.oem_id,
-+			    acpi_madt->header.oem_table_id);
-+
-+	return 0;
-+}
-+
-+#ifdef CONFIG_ACPI_NUMA
-+
-+#undef SLIT_DEBUG
-+
-+#define PXM_FLAG_LEN ((MAX_PXM_DOMAINS + 1)/32)
-+
-+static int __initdata srat_num_cpus;	/* number of cpus */
-+static u32 pxm_flag[PXM_FLAG_LEN];
-+#define pxm_bit_set(bit)	(set_bit(bit,(void *)pxm_flag))
-+#define pxm_bit_test(bit)	(test_bit(bit,(void *)pxm_flag))
-+static struct acpi_table_slit __initdata *slit_table;
-+cpumask_t early_cpu_possible_map = CPU_MASK_NONE;
-+
-+static int __init
-+get_processor_proximity_domain(struct acpi_srat_cpu_affinity *pa)
-+{
-+	int pxm;
-+
-+	pxm = pa->proximity_domain_lo;
-+	if (ia64_platform_is("sn2") || acpi_srat_revision >= 2)
-+		pxm += pa->proximity_domain_hi[0] << 8;
-+	return pxm;
-+}
-+
-+static int __init
-+get_memory_proximity_domain(struct acpi_srat_mem_affinity *ma)
-+{
-+	int pxm;
-+
-+	pxm = ma->proximity_domain;
-+	if (!ia64_platform_is("sn2") && acpi_srat_revision <= 1)
-+		pxm &= 0xff;
-+
-+	return pxm;
-+}
-+
-+/*
-+ * ACPI 2.0 SLIT (System Locality Information Table)
-+ * http://devresource.hp.com/devresource/Docs/TechPapers/IA64/slit.pdf
-+ */
-+void __init acpi_numa_slit_init(struct acpi_table_slit *slit)
-+{
-+	u32 len;
-+
-+	len = sizeof(struct acpi_table_header) + 8
-+	    + slit->locality_count * slit->locality_count;
-+	if (slit->header.length != len) {
-+		printk(KERN_ERR
-+		       "ACPI 2.0 SLIT: size mismatch: %d expected, %d actual\n",
-+		       len, slit->header.length);
-+		return;
-+	}
-+	slit_table = slit;
-+}
-+
-+void __init
-+acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa)
-+{
-+	int pxm;
-+
-+	if (!(pa->flags & ACPI_SRAT_CPU_ENABLED))
-+		return;
-+
-+	if (srat_num_cpus >= ARRAY_SIZE(node_cpuid)) {
-+		printk_once(KERN_WARNING
-+			    "node_cpuid[%ld] is too small, may not be able to use all cpus\n",
-+			    ARRAY_SIZE(node_cpuid));
-+		return;
-+	}
-+	pxm = get_processor_proximity_domain(pa);
-+
-+	/* record this node in proximity bitmap */
-+	pxm_bit_set(pxm);
-+
-+	node_cpuid[srat_num_cpus].phys_id =
-+	    (pa->apic_id << 8) | (pa->local_sapic_eid);
-+	/* nid should be overridden as logical node id later */
-+	node_cpuid[srat_num_cpus].nid = pxm;
-+	cpu_set(srat_num_cpus, early_cpu_possible_map);
-+	srat_num_cpus++;
-+}
-+
-+int __init
-+acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
-+{
-+	unsigned long paddr, size;
-+	int pxm;
-+	struct node_memblk_s *p, *q, *pend;
-+
-+	pxm = get_memory_proximity_domain(ma);
-+
-+	/* fill node memory chunk structure */
-+	paddr = ma->base_address;
-+	size = ma->length;
-+
-+	/* Ignore disabled entries */
-+	if (!(ma->flags & ACPI_SRAT_MEM_ENABLED))
-+		return -1;
-+
-+	/* record this node in proximity bitmap */
-+	pxm_bit_set(pxm);
-+
-+	/* Insertion sort based on base address */
-+	pend = &node_memblk[num_node_memblks];
-+	for (p = &node_memblk[0]; p < pend; p++) {
-+		if (paddr < p->start_paddr)
-+			break;
-+	}
-+	if (p < pend) {
-+		for (q = pend - 1; q >= p; q--)
-+			*(q + 1) = *q;
-+	}
-+	p->start_paddr = paddr;
-+	p->size = size;
-+	p->nid = pxm;
-+	num_node_memblks++;
-+	return 0;
-+}
-+
-+void __init acpi_numa_arch_fixup(void)
-+{
-+	int i, j, node_from, node_to;
-+
-+	/* If there's no SRAT, fix the phys_id and mark node 0 online */
-+	if (srat_num_cpus == 0) {
-+		node_set_online(0);
-+		node_cpuid[0].phys_id = hard_smp_processor_id();
-+		return;
-+	}
-+
-+	/*
-+	 * MCD - This can probably be dropped now.  No need for pxm ID to node ID
-+	 * mapping with sparse node numbering iff MAX_PXM_DOMAINS <= MAX_NUMNODES.
-+	 */
-+	nodes_clear(node_online_map);
-+	for (i = 0; i < MAX_PXM_DOMAINS; i++) {
-+		if (pxm_bit_test(i)) {
-+			int nid = acpi_map_pxm_to_node(i);
-+			node_set_online(nid);
-+		}
-+	}
-+
-+	/* set logical node id in memory chunk structure */
-+	for (i = 0; i < num_node_memblks; i++)
-+		node_memblk[i].nid = pxm_to_node(node_memblk[i].nid);
-+
-+	/* assign memory bank numbers for each chunk on each node */
-+	for_each_online_node(i) {
-+		int bank;
-+
-+		bank = 0;
-+		for (j = 0; j < num_node_memblks; j++)
-+			if (node_memblk[j].nid == i)
-+				node_memblk[j].bank = bank++;
-+	}
-+
-+	/* set logical node id in cpu structure */
-+	for_each_possible_early_cpu(i)
-+		node_cpuid[i].nid = pxm_to_node(node_cpuid[i].nid);
-+
-+	printk(KERN_INFO "Number of logical nodes in system = %d\n",
-+	       num_online_nodes());
-+	printk(KERN_INFO "Number of memory chunks in system = %d\n",
-+	       num_node_memblks);
-+
-+	if (!slit_table) {
-+		for (i = 0; i < MAX_NUMNODES; i++)
-+			for (j = 0; j < MAX_NUMNODES; j++)
-+				node_distance(i, j) = i == j ? LOCAL_DISTANCE :
-+							REMOTE_DISTANCE;
-+		return;
-+	}
-+
-+	memset(numa_slit, -1, sizeof(numa_slit));
-+	for (i = 0; i < slit_table->locality_count; i++) {
-+		if (!pxm_bit_test(i))
-+			continue;
-+		node_from = pxm_to_node(i);
-+		for (j = 0; j < slit_table->locality_count; j++) {
-+			if (!pxm_bit_test(j))
-+				continue;
-+			node_to = pxm_to_node(j);
-+			node_distance(node_from, node_to) =
-+			    slit_table->entry[i * slit_table->locality_count + j];
-+		}
-+	}
-+
-+#ifdef SLIT_DEBUG
-+	printk("ACPI 2.0 SLIT locality table:\n");
-+	for_each_online_node(i) {
-+		for_each_online_node(j)
-+		    printk("%03d ", node_distance(i, j));
-+		printk("\n");
-+	}
-+#endif
-+}
-+#endif				/* CONFIG_ACPI_NUMA */
-+
-+/*
-+ * success: return IRQ number (>=0)
-+ * failure: return < 0
-+ */
-+int acpi_register_gsi(struct device *dev, u32 gsi, int triggering, int polarity)
-+{
-+	if (acpi_irq_model == ACPI_IRQ_MODEL_PLATFORM)
-+		return gsi;
-+
-+	if (has_8259 && gsi < 16)
-+		return isa_irq_to_vector(gsi);
-+
-+	return iosapic_register_intr(gsi,
-+				     (polarity ==
-+				      ACPI_ACTIVE_HIGH) ? IOSAPIC_POL_HIGH :
-+				     IOSAPIC_POL_LOW,
-+				     (triggering ==
-+				      ACPI_EDGE_SENSITIVE) ? IOSAPIC_EDGE :
-+				     IOSAPIC_LEVEL);
-+}
-+EXPORT_SYMBOL_GPL(acpi_register_gsi);
-+
-+void acpi_unregister_gsi(u32 gsi)
-+{
-+	if (acpi_irq_model == ACPI_IRQ_MODEL_PLATFORM)
-+		return;
-+
-+	if (has_8259 && gsi < 16)
-+		return;
-+
-+	iosapic_unregister_intr(gsi);
-+}
-+EXPORT_SYMBOL_GPL(acpi_unregister_gsi);
-+
-+static int __init acpi_parse_fadt(struct acpi_table_header *table)
-+{
-+	struct acpi_table_header *fadt_header;
-+	struct acpi_table_fadt *fadt;
-+
-+	if (!table)
-+		return -EINVAL;
-+
-+	fadt_header = (struct acpi_table_header *)table;
-+	if (fadt_header->revision != 3)
-+		return -ENODEV;	/* Only deal with ACPI 2.0 FADT */
-+
-+	fadt = (struct acpi_table_fadt *)fadt_header;
-+
-+	acpi_register_gsi(NULL, fadt->sci_interrupt, ACPI_LEVEL_SENSITIVE,
-+				 ACPI_ACTIVE_LOW);
-+	return 0;
-+}
-+
-+int __init early_acpi_boot_init(void)
-+{
-+	int ret;
-+
-+	/*
-+	 * do a partial walk of MADT to determine how many CPUs
-+	 * we have including offline CPUs
-+	 */
-+	if (acpi_table_parse(ACPI_SIG_MADT, acpi_parse_madt)) {
-+		printk(KERN_ERR PREFIX "Can't find MADT\n");
-+		return 0;
-+	}
-+
-+	ret = acpi_table_parse_madt(ACPI_MADT_TYPE_LOCAL_SAPIC,
-+		acpi_parse_lsapic, NR_CPUS);
-+	if (ret < 1)
-+		printk(KERN_ERR PREFIX
-+		       "Error parsing MADT - no LAPIC entries\n");
-+	else
-+		acpi_lapic = 1;
-+
-+#ifdef CONFIG_SMP
-+	if (available_cpus == 0) {
-+		printk(KERN_INFO "ACPI: Found 0 CPUS; assuming 1\n");
-+		printk(KERN_INFO "CPU 0 (0x%04x)", hard_smp_processor_id());
-+		smp_boot_data.cpu_phys_id[available_cpus] =
-+		    hard_smp_processor_id();
-+		available_cpus = 1;	/* We've got@least one of these, no? */
-+	}
-+	smp_boot_data.cpu_count = available_cpus;
-+#endif
-+	/* Make boot-up look pretty */
-+	printk(KERN_INFO "%d CPUs available, %d CPUs total\n", available_cpus,
-+	       total_cpus);
-+
-+	return 0;
-+}
-+
-+int __init acpi_boot_init(void)
-+{
-+
-+	/*
-+	 * MADT
-+	 * ----
-+	 * Parse the Multiple APIC Description Table (MADT), if exists.
-+	 * Note that this table provides platform SMP configuration
-+	 * information -- the successor to MPS tables.
-+	 */
-+
-+	if (acpi_table_parse(ACPI_SIG_MADT, acpi_parse_madt)) {
-+		printk(KERN_ERR PREFIX "Can't find MADT\n");
-+		goto skip_madt;
-+	}
-+
-+	/* Local APIC */
-+
-+	if (acpi_table_parse_madt
-+	    (ACPI_MADT_TYPE_LOCAL_APIC_OVERRIDE, acpi_parse_lapic_addr_ovr, 0) < 0)
-+		printk(KERN_ERR PREFIX
-+		       "Error parsing LAPIC address override entry\n");
-+
-+	if (acpi_table_parse_madt(ACPI_MADT_TYPE_LOCAL_APIC_NMI, acpi_parse_lapic_nmi, 0)
-+	    < 0)
-+		printk(KERN_ERR PREFIX "Error parsing LAPIC NMI entry\n");
-+
-+	/* I/O APIC */
-+
-+	if (acpi_table_parse_madt
-+	    (ACPI_MADT_TYPE_IO_SAPIC, acpi_parse_iosapic, NR_IOSAPICS) < 1) {
-+		if (!ia64_platform_is("sn2"))
-+			printk(KERN_ERR PREFIX
-+			       "Error parsing MADT - no IOSAPIC entries\n");
-+	}
-+
-+	/* System-Level Interrupt Routing */
-+
-+	if (acpi_table_parse_madt
-+	    (ACPI_MADT_TYPE_INTERRUPT_SOURCE, acpi_parse_plat_int_src,
-+	     ACPI_MAX_PLATFORM_INTERRUPTS) < 0)
-+		printk(KERN_ERR PREFIX
-+		       "Error parsing platform interrupt source entry\n");
-+
-+	if (acpi_table_parse_madt
-+	    (ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, acpi_parse_int_src_ovr, 0) < 0)
-+		printk(KERN_ERR PREFIX
-+		       "Error parsing interrupt source overrides entry\n");
-+
-+	if (acpi_table_parse_madt(ACPI_MADT_TYPE_NMI_SOURCE, acpi_parse_nmi_src, 0) < 0)
-+		printk(KERN_ERR PREFIX "Error parsing NMI SRC entry\n");
-+      skip_madt:
-+
-+	/*
-+	 * FADT says whether a legacy keyboard controller is present.
-+	 * The FADT also contains an SCI_INT line, by which the system
-+	 * gets interrupts such as power and sleep buttons.  If it's not
-+	 * on a Legacy interrupt, it needs to be setup.
-+	 */
-+	if (acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt))
-+		printk(KERN_ERR PREFIX "Can't find FADT\n");
-+
-+#ifdef CONFIG_ACPI_NUMA
-+#ifdef CONFIG_SMP
-+	if (srat_num_cpus == 0) {
-+		int cpu, i = 1;
-+		for (cpu = 0; cpu < smp_boot_data.cpu_count; cpu++)
-+			if (smp_boot_data.cpu_phys_id[cpu] !=
-+			    hard_smp_processor_id())
-+				node_cpuid[i++].phys_id =
-+				    smp_boot_data.cpu_phys_id[cpu];
-+	}
-+#endif
-+	build_cpu_to_node_map();
-+#endif
-+	return 0;
-+}
-+
-+int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
-+{
-+	int tmp;
-+
-+	if (has_8259 && gsi < 16)
-+		*irq = isa_irq_to_vector(gsi);
-+	else {
-+		tmp = gsi_to_irq(gsi);
-+		if (tmp == -1)
-+			return -1;
-+		*irq = tmp;
-+	}
-+	return 0;
-+}
-+
-+int acpi_isa_irq_to_gsi(unsigned isa_irq, u32 *gsi)
-+{
-+	if (isa_irq >= 16)
-+		return -1;
-+	*gsi = isa_irq;
-+	return 0;
-+}
-+
-+/*
-+ *  ACPI based hotplug CPU support
-+ */
-+#ifdef CONFIG_ACPI_HOTPLUG_CPU
-+static int acpi_map_cpu2node(acpi_handle handle, int cpu, int physid)
-+{
-+#ifdef CONFIG_ACPI_NUMA
-+	/*
-+	 * We don't have cpu-only-node hotadd. But if the system equips
-+	 * SRAT table, pxm is already found and node is ready.
-+  	 * So, just pxm_to_nid(pxm) is OK.
-+	 * This code here is for the system which doesn't have full SRAT
-+  	 * table for possible cpus.
-+	 */
-+	node_cpuid[cpu].phys_id = physid;
-+	node_cpuid[cpu].nid = acpi_get_node(handle);
-+#endif
-+	return 0;
-+}
-+
-+int additional_cpus __initdata = -1;
-+
-+static __init int setup_additional_cpus(char *s)
-+{
-+	if (s)
-+		additional_cpus = simple_strtol(s, NULL, 0);
-+
-+	return 0;
-+}
-+
-+early_param("additional_cpus", setup_additional_cpus);
-+
-+/*
-+ * cpu_possible_mask should be static, it cannot change as CPUs
-+ * are onlined, or offlined. The reason is per-cpu data-structures
-+ * are allocated by some modules at init time, and dont expect to
-+ * do this dynamically on cpu arrival/departure.
-+ * cpu_present_mask on the other hand can change dynamically.
-+ * In case when cpu_hotplug is not compiled, then we resort to current
-+ * behaviour, which is cpu_possible == cpu_present.
-+ * - Ashok Raj
-+ *
-+ * Three ways to find out the number of additional hotplug CPUs:
-+ * - If the BIOS specified disabled CPUs in ACPI/mptables use that.
-+ * - The user can overwrite it with additional_cpus=NUM
-+ * - Otherwise don't reserve additional CPUs.
-+ */
-+__init void prefill_possible_map(void)
-+{
-+	int i;
-+	int possible, disabled_cpus;
-+
-+	disabled_cpus = total_cpus - available_cpus;
-+
-+ 	if (additional_cpus == -1) {
-+ 		if (disabled_cpus > 0)
-+			additional_cpus = disabled_cpus;
-+ 		else
-+			additional_cpus = 0;
-+ 	}
-+
-+	possible = available_cpus + additional_cpus;
-+
-+	if (possible > nr_cpu_ids)
-+		possible = nr_cpu_ids;
-+
-+	printk(KERN_INFO "SMP: Allowing %d CPUs, %d hotplug CPUs\n",
-+		possible, max((possible - available_cpus), 0));
-+
-+	for (i = 0; i < possible; i++)
-+		set_cpu_possible(i, true);
-+}
-+
-+static int _acpi_map_lsapic(acpi_handle handle, int physid, int *pcpu)
-+{
-+	cpumask_t tmp_map;
-+	int cpu;
-+
-+	cpumask_complement(&tmp_map, cpu_present_mask);
-+	cpu = cpumask_first(&tmp_map);
-+	if (cpu >= nr_cpu_ids)
-+		return -EINVAL;
-+
-+	acpi_map_cpu2node(handle, cpu, physid);
-+
-+	set_cpu_present(cpu, true);
-+	ia64_cpu_to_sapicid[cpu] = physid;
-+
-+	acpi_processor_set_pdc(handle);
-+
-+	*pcpu = cpu;
-+	return (0);
-+}
-+
-+/* wrapper to silence section mismatch warning */
-+int __ref acpi_map_cpu(acpi_handle handle, int physid, int *pcpu)
-+{
-+	return _acpi_map_lsapic(handle, physid, pcpu);
-+}
-+EXPORT_SYMBOL(acpi_map_cpu);
-+
-+int acpi_unmap_cpu(int cpu)
-+{
-+	ia64_cpu_to_sapicid[cpu] = -1;
-+	set_cpu_present(cpu, false);
-+
-+#ifdef CONFIG_ACPI_NUMA
-+	/* NUMA specific cleanup's */
-+#endif
-+
-+	return (0);
-+}
-+EXPORT_SYMBOL(acpi_unmap_cpu);
-+#endif				/* CONFIG_ACPI_HOTPLUG_CPU */
-+
-+#ifdef CONFIG_ACPI_NUMA
-+static acpi_status acpi_map_iosapic(acpi_handle handle, u32 depth,
-+				    void *context, void **ret)
-+{
-+	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
-+	union acpi_object *obj;
-+	struct acpi_madt_io_sapic *iosapic;
-+	unsigned int gsi_base;
-+	int node;
-+
-+	/* Only care about objects w/ a method that returns the MADT */
-+	if (ACPI_FAILURE(acpi_evaluate_object(handle, "_MAT", NULL, &buffer)))
-+		return AE_OK;
-+
-+	if (!buffer.length || !buffer.pointer)
-+		return AE_OK;
-+
-+	obj = buffer.pointer;
-+	if (obj->type != ACPI_TYPE_BUFFER ||
-+	    obj->buffer.length < sizeof(*iosapic)) {
-+		kfree(buffer.pointer);
-+		return AE_OK;
-+	}
-+
-+	iosapic = (struct acpi_madt_io_sapic *)obj->buffer.pointer;
-+
-+	if (iosapic->header.type != ACPI_MADT_TYPE_IO_SAPIC) {
-+		kfree(buffer.pointer);
-+		return AE_OK;
-+	}
-+
-+	gsi_base = iosapic->global_irq_base;
-+
-+	kfree(buffer.pointer);
-+
-+	/* OK, it's an IOSAPIC MADT entry; associate it with a node */
-+	node = acpi_get_node(handle);
-+	if (node == NUMA_NO_NODE || !node_online(node) ||
-+	    cpumask_empty(cpumask_of_node(node)))
-+		return AE_OK;
-+
-+	/* We know a gsi to node mapping! */
-+	map_iosapic_to_node(gsi_base, node);
-+	return AE_OK;
-+}
-+
-+static int __init
-+acpi_map_iosapics (void)
-+{
-+	acpi_get_devices(NULL, acpi_map_iosapic, NULL, NULL);
-+	return 0;
-+}
-+
-+fs_initcall(acpi_map_iosapics);
-+#endif				/* CONFIG_ACPI_NUMA */
-+
-+int __ref acpi_register_ioapic(acpi_handle handle, u64 phys_addr, u32 gsi_base)
-+{
-+	int err;
-+
-+	if ((err = iosapic_init(phys_addr, gsi_base)))
-+		return err;
-+
-+#ifdef CONFIG_ACPI_NUMA
-+	acpi_map_iosapic(handle, 0, NULL, NULL);
-+#endif				/* CONFIG_ACPI_NUMA */
-+
-+	return 0;
-+}
-+
-+EXPORT_SYMBOL(acpi_register_ioapic);
-+
-+int acpi_unregister_ioapic(acpi_handle handle, u32 gsi_base)
-+{
-+	return iosapic_remove(gsi_base);
-+}
-+
-+EXPORT_SYMBOL(acpi_unregister_ioapic);
-+
-+/*
-+ * acpi_suspend_lowlevel() - save kernel state and suspend.
-+ *
-+ * TBD when when IA64 starts to support suspend...
-+ */
-+int acpi_suspend_lowlevel(void) { return 0; }
++__setup("acpi_osi=", osi_setup);
+diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+index c346011..3fc0ad3 100644
+--- a/drivers/acpi/Makefile
++++ b/drivers/acpi/Makefile
+@@ -9,7 +9,6 @@ ccflags-$(CONFIG_ACPI_DEBUG)	+= -DACPI_DEBUG_OUTPUT
+ # ACPI Boot-Time Table Parsing
+ #
+ obj-y				+= tables.o
+-obj-$(CONFIG_X86)		+= blacklist.o
+ 
+ #
+ # ACPI Core Subsystem (Interpreter)
+diff --git a/drivers/acpi/blacklist.c b/drivers/acpi/blacklist.c
+deleted file mode 100644
+index 9b693d5..0000000
+--- a/drivers/acpi/blacklist.c
++++ /dev/null
+@@ -1,323 +0,0 @@
+-/*
+- *  blacklist.c
+- *
+- *  Check to see if the given machine has a known bad ACPI BIOS
+- *  or if the BIOS is too old.
+- *  Check given machine against acpi_osi_dmi_table[].
+- *
+- *  Copyright (C) 2004 Len Brown <len.brown@intel.com>
+- *  Copyright (C) 2002 Andy Grover <andrew.grover@intel.com>
+- *
+- * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- *
+- *  This program is free software; you can redistribute it and/or modify
+- *  it under the terms of the GNU General Public License as published by
+- *  the Free Software Foundation; either version 2 of the License, or (at
+- *  your option) any later version.
+- *
+- *  This program is distributed in the hope that it will be useful, but
+- *  WITHOUT ANY WARRANTY; without even the implied warranty of
+- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+- *  General Public License for more details.
+- *
+- *  You should have received a copy of the GNU General Public License along
+- *  with this program; if not, write to the Free Software Foundation, Inc.,
+- *  59 Temple Place, Suite 330, Boston, MA 02111-1307 USA.
+- *
+- * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- */
+-
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/acpi.h>
+-#include <linux/dmi.h>
+-
+-#include "internal.h"
+-
+-enum acpi_blacklist_predicates {
+-	all_versions,
+-	less_than_or_equal,
+-	equal,
+-	greater_than_or_equal,
+-};
+-
+-struct acpi_blacklist_item {
+-	char oem_id[7];
+-	char oem_table_id[9];
+-	u32 oem_revision;
+-	char *table;
+-	enum acpi_blacklist_predicates oem_revision_predicate;
+-	char *reason;
+-	u32 is_critical_error;
+-};
+-
+-static struct dmi_system_id acpi_osi_dmi_table[] __initdata;
+-
+-/*
+- * POLICY: If *anything* doesn't work, put it on the blacklist.
+- *	   If they are critical errors, mark it critical, and abort driver load.
+- */
+-static struct acpi_blacklist_item acpi_blacklist[] __initdata = {
+-	/* Compaq Presario 1700 */
+-	{"PTLTD ", "  DSDT  ", 0x06040000, ACPI_SIG_DSDT, less_than_or_equal,
+-	 "Multiple problems", 1},
+-	/* Sony FX120, FX140, FX150? */
+-	{"SONY  ", "U0      ", 0x20010313, ACPI_SIG_DSDT, less_than_or_equal,
+-	 "ACPI driver problem", 1},
+-	/* Compaq Presario 800, Insyde BIOS */
+-	{"INT440", "SYSFexxx", 0x00001001, ACPI_SIG_DSDT, less_than_or_equal,
+-	 "Does not use _REG to protect EC OpRegions", 1},
+-	/* IBM 600E - _ADR should return 7, but it returns 1 */
+-	{"IBM   ", "TP600E  ", 0x00000105, ACPI_SIG_DSDT, less_than_or_equal,
+-	 "Incorrect _ADR", 1},
+-
+-	{""}
+-};
+-
+-int __init acpi_blacklisted(void)
+-{
+-	int i = 0;
+-	int blacklisted = 0;
+-	struct acpi_table_header table_header;
+-
+-	while (acpi_blacklist[i].oem_id[0] != '\0') {
+-		if (acpi_get_table_header(acpi_blacklist[i].table, 0, &table_header)) {
+-			i++;
+-			continue;
+-		}
+-
+-		if (strncmp(acpi_blacklist[i].oem_id, table_header.oem_id, 6)) {
+-			i++;
+-			continue;
+-		}
+-
+-		if (strncmp
+-		    (acpi_blacklist[i].oem_table_id, table_header.oem_table_id,
+-		     8)) {
+-			i++;
+-			continue;
+-		}
+-
+-		if ((acpi_blacklist[i].oem_revision_predicate == all_versions)
+-		    || (acpi_blacklist[i].oem_revision_predicate ==
+-			less_than_or_equal
+-			&& table_header.oem_revision <=
+-			acpi_blacklist[i].oem_revision)
+-		    || (acpi_blacklist[i].oem_revision_predicate ==
+-			greater_than_or_equal
+-			&& table_header.oem_revision >=
+-			acpi_blacklist[i].oem_revision)
+-		    || (acpi_blacklist[i].oem_revision_predicate == equal
+-			&& table_header.oem_revision ==
+-			acpi_blacklist[i].oem_revision)) {
+-
+-			printk(KERN_ERR PREFIX
+-			       "Vendor \"%6.6s\" System \"%8.8s\" "
+-			       "Revision 0x%x has a known ACPI BIOS problem.\n",
+-			       acpi_blacklist[i].oem_id,
+-			       acpi_blacklist[i].oem_table_id,
+-			       acpi_blacklist[i].oem_revision);
+-
+-			printk(KERN_ERR PREFIX
+-			       "Reason: %s. This is a %s error\n",
+-			       acpi_blacklist[i].reason,
+-			       (acpi_blacklist[i].
+-				is_critical_error ? "non-recoverable" :
+-				"recoverable"));
+-
+-			blacklisted = acpi_blacklist[i].is_critical_error;
+-			break;
+-		} else {
+-			i++;
+-		}
+-	}
+-
+-	dmi_check_system(acpi_osi_dmi_table);
+-
+-	return blacklisted;
+-}
+-#ifdef CONFIG_DMI
+-static int __init dmi_enable_osi_linux(const struct dmi_system_id *d)
+-{
+-	acpi_dmi_osi_linux(1, d);	/* enable */
+-	return 0;
+-}
+-static int __init dmi_disable_osi_vista(const struct dmi_system_id *d)
+-{
+-	printk(KERN_NOTICE PREFIX "DMI detected: %s\n", d->ident);
+-	acpi_osi_setup("!Windows 2006");
+-	acpi_osi_setup("!Windows 2006 SP1");
+-	acpi_osi_setup("!Windows 2006 SP2");
+-	return 0;
+-}
+-static int __init dmi_disable_osi_win7(const struct dmi_system_id *d)
+-{
+-	printk(KERN_NOTICE PREFIX "DMI detected: %s\n", d->ident);
+-	acpi_osi_setup("!Windows 2009");
+-	return 0;
+-}
+-static int __init dmi_disable_osi_win8(const struct dmi_system_id *d)
+-{
+-	printk(KERN_NOTICE PREFIX "DMI detected: %s\n", d->ident);
+-	acpi_osi_setup("!Windows 2012");
+-	return 0;
+-}
+-
+-static struct dmi_system_id acpi_osi_dmi_table[] __initdata = {
+-	{
+-	.callback = dmi_disable_osi_vista,
+-	.ident = "Fujitsu Siemens",
+-	.matches = {
+-		     DMI_MATCH(DMI_SYS_VENDOR, "FUJITSU SIEMENS"),
+-		     DMI_MATCH(DMI_PRODUCT_NAME, "ESPRIMO Mobile V5505"),
+-		},
+-	},
+-	{
+-	/*
+-	 * There have a NVIF method in MSI GX723 DSDT need call by Nvidia
+-	 * driver (e.g. nouveau) when user press brightness hotkey.
+-	 * Currently, nouveau driver didn't do the job and it causes there
+-	 * have a infinite while loop in DSDT when user press hotkey.
+-	 * We add MSI GX723's dmi information to this table for workaround
+-	 * this issue.
+-	 * Will remove MSI GX723 from the table after nouveau grows support.
+-	 */
+-	.callback = dmi_disable_osi_vista,
+-	.ident = "MSI GX723",
+-	.matches = {
+-		     DMI_MATCH(DMI_SYS_VENDOR, "Micro-Star International"),
+-		     DMI_MATCH(DMI_PRODUCT_NAME, "GX723"),
+-		},
+-	},
+-	{
+-	.callback = dmi_disable_osi_vista,
+-	.ident = "Sony VGN-NS10J_S",
+-	.matches = {
+-		     DMI_MATCH(DMI_SYS_VENDOR, "Sony Corporation"),
+-		     DMI_MATCH(DMI_PRODUCT_NAME, "VGN-NS10J_S"),
+-		},
+-	},
+-	{
+-	.callback = dmi_disable_osi_vista,
+-	.ident = "Sony VGN-SR290J",
+-	.matches = {
+-		     DMI_MATCH(DMI_SYS_VENDOR, "Sony Corporation"),
+-		     DMI_MATCH(DMI_PRODUCT_NAME, "VGN-SR290J"),
+-		},
+-	},
+-	{
+-	.callback = dmi_disable_osi_vista,
+-	.ident = "VGN-NS50B_L",
+-	.matches = {
+-		     DMI_MATCH(DMI_SYS_VENDOR, "Sony Corporation"),
+-		     DMI_MATCH(DMI_PRODUCT_NAME, "VGN-NS50B_L"),
+-		},
+-	},
+-	{
+-	.callback = dmi_disable_osi_vista,
+-	.ident = "Toshiba Satellite L355",
+-	.matches = {
+-		     DMI_MATCH(DMI_SYS_VENDOR, "TOSHIBA"),
+-		     DMI_MATCH(DMI_PRODUCT_VERSION, "Satellite L355"),
+-		},
+-	},
+-	{
+-	.callback = dmi_disable_osi_win7,
+-	.ident = "ASUS K50IJ",
+-	.matches = {
+-		     DMI_MATCH(DMI_SYS_VENDOR, "ASUSTeK Computer Inc."),
+-		     DMI_MATCH(DMI_PRODUCT_NAME, "K50IJ"),
+-		},
+-	},
+-	{
+-	.callback = dmi_disable_osi_vista,
+-	.ident = "Toshiba P305D",
+-	.matches = {
+-		     DMI_MATCH(DMI_SYS_VENDOR, "TOSHIBA"),
+-		     DMI_MATCH(DMI_PRODUCT_NAME, "Satellite P305D"),
+-		},
+-	},
+-	{
+-	.callback = dmi_disable_osi_vista,
+-	.ident = "Toshiba NB100",
+-	.matches = {
+-		     DMI_MATCH(DMI_SYS_VENDOR, "TOSHIBA"),
+-		     DMI_MATCH(DMI_PRODUCT_NAME, "NB100"),
+-		},
+-	},
+-
+-	/*
+-	 * The wireless hotkey does not work on those machines when
+-	 * returning true for _OSI("Windows 2012")
+-	 */
+-	{
+-	.callback = dmi_disable_osi_win8,
+-	.ident = "Dell Inspiron 7737",
+-	.matches = {
+-		    DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+-		    DMI_MATCH(DMI_PRODUCT_NAME, "Inspiron 7737"),
+-		},
+-	},
+-	{
+-	.callback = dmi_disable_osi_win8,
+-	.ident = "Dell Inspiron 7537",
+-	.matches = {
+-		    DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+-		    DMI_MATCH(DMI_PRODUCT_NAME, "Inspiron 7537"),
+-		},
+-	},
+-	{
+-	.callback = dmi_disable_osi_win8,
+-	.ident = "Dell Inspiron 5437",
+-	.matches = {
+-		    DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+-		    DMI_MATCH(DMI_PRODUCT_NAME, "Inspiron 5437"),
+-		},
+-	},
+-	{
+-	.callback = dmi_disable_osi_win8,
+-	.ident = "Dell Inspiron 3437",
+-	.matches = {
+-		    DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+-		    DMI_MATCH(DMI_PRODUCT_NAME, "Inspiron 3437"),
+-		},
+-	},
+-	{
+-	.callback = dmi_disable_osi_win8,
+-	.ident = "Dell Vostro 3446",
+-	.matches = {
+-		    DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+-		    DMI_MATCH(DMI_PRODUCT_NAME, "Vostro 3446"),
+-		},
+-	},
+-	{
+-	.callback = dmi_disable_osi_win8,
+-	.ident = "Dell Vostro 3546",
+-	.matches = {
+-		    DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+-		    DMI_MATCH(DMI_PRODUCT_NAME, "Vostro 3546"),
+-		},
+-	},
+-
+-	/*
+-	 * BIOS invocation of _OSI(Linux) is almost always a BIOS bug.
+-	 * Linux ignores it, except for the machines enumerated below.
+-	 */
+-
+-	/*
+-	 * Without this this EEEpc exports a non working WMI interface, with
+-	 * this it exports a working "good old" eeepc_laptop interface, fixing
+-	 * both brightness control, and rfkill not working.
+-	 */
+-	{
+-	.callback = dmi_enable_osi_linux,
+-	.ident = "Asus EEE PC 1015PX",
+-	.matches = {
+-		     DMI_MATCH(DMI_SYS_VENDOR, "ASUSTeK Computer INC."),
+-		     DMI_MATCH(DMI_PRODUCT_NAME, "1015PX"),
+-		},
+-	},
+-	{}
+-};
+-
+-#endif /* CONFIG_DMI */
+diff --git a/drivers/acpi/osl.c b/drivers/acpi/osl.c
+index c7f1cd6..a0c9940 100644
+--- a/drivers/acpi/osl.c
++++ b/drivers/acpi/osl.c
+@@ -99,48 +99,6 @@ struct acpi_ioremap {
+ static LIST_HEAD(acpi_ioremaps);
+ static DEFINE_MUTEX(acpi_ioremap_lock);
+ 
+-static void __init acpi_osi_setup_late(void);
+-
+-/*
+- * The story of _OSI(Linux)
+- *
+- * From pre-history through Linux-2.6.22,
+- * Linux responded TRUE upon a BIOS OSI(Linux) query.
+- *
+- * Unfortunately, reference BIOS writers got wind of this
+- * and put OSI(Linux) in their example code, quickly exposing
+- * this string as ill-conceived and opening the door to
+- * an un-bounded number of BIOS incompatibilities.
+- *
+- * For example, OSI(Linux) was used on resume to re-POST a
+- * video card on one system, because Linux at that time
+- * could not do a speedy restore in its native driver.
+- * But then upon gaining quick native restore capability,
+- * Linux has no way to tell the BIOS to skip the time-consuming
+- * POST -- putting Linux at a permanent performance disadvantage.
+- * On another system, the BIOS writer used OSI(Linux)
+- * to infer native OS support for IPMI!  On other systems,
+- * OSI(Linux) simply got in the way of Linux claiming to
+- * be compatible with other operating systems, exposing
+- * BIOS issues such as skipped device initialization.
+- *
+- * So "Linux" turned out to be a really poor chose of
+- * OSI string, and from Linux-2.6.23 onward we respond FALSE.
+- *
+- * BIOS writers should NOT query _OSI(Linux) on future systems.
+- * Linux will complain on the console when it sees it, and return FALSE.
+- * To get Linux to return TRUE for your system  will require
+- * a kernel source update to add a DMI entry,
+- * or boot with "acpi_osi=Linux"
+- */
+-
+-static struct osi_linux {
+-	unsigned int	enable:1;
+-	unsigned int	dmi:1;
+-	unsigned int	cmdline:1;
+-	unsigned int	default_disabling:1;
+-} osi_linux = {0, 0, 0, 0};
+-
+ static void __init acpi_request_region (struct acpi_generic_address *gas,
+ 	unsigned int length, char *desc)
+ {
+@@ -1394,156 +1352,6 @@ static int __init acpi_os_name_setup(char *str)
+ 
+ __setup("acpi_os_name=", acpi_os_name_setup);
+ 
+-#define	OSI_STRING_LENGTH_MAX 64	/* arbitrary */
+-#define	OSI_STRING_ENTRIES_MAX 16	/* arbitrary */
+-
+-struct osi_setup_entry {
+-	char string[OSI_STRING_LENGTH_MAX];
+-	bool enable;
+-};
+-
+-static struct osi_setup_entry
+-		osi_setup_entries[OSI_STRING_ENTRIES_MAX] __initdata = {
+-	{"Module Device", true},
+-	{"Processor Device", true},
+-	{"3.0 _SCP Extensions", true},
+-	{"Processor Aggregator Device", true},
+-};
+-
+-void __init acpi_osi_setup(char *str)
+-{
+-	struct osi_setup_entry *osi;
+-	bool enable = true;
+-	int i;
+-
+-	if (!acpi_gbl_create_osi_method)
+-		return;
+-
+-	if (str == NULL || *str == '\0') {
+-		printk(KERN_INFO PREFIX "_OSI method disabled\n");
+-		acpi_gbl_create_osi_method = FALSE;
+-		return;
+-	}
+-
+-	if (*str == '!') {
+-		str++;
+-		if (*str == '\0') {
+-			osi_linux.default_disabling = 1;
+-			return;
+-		} else if (*str == '*') {
+-			acpi_update_interfaces(ACPI_DISABLE_ALL_STRINGS);
+-			for (i = 0; i < OSI_STRING_ENTRIES_MAX; i++) {
+-				osi = &osi_setup_entries[i];
+-				osi->enable = false;
+-			}
+-			return;
+-		}
+-		enable = false;
+-	}
+-
+-	for (i = 0; i < OSI_STRING_ENTRIES_MAX; i++) {
+-		osi = &osi_setup_entries[i];
+-		if (!strcmp(osi->string, str)) {
+-			osi->enable = enable;
+-			break;
+-		} else if (osi->string[0] == '\0') {
+-			osi->enable = enable;
+-			strncpy(osi->string, str, OSI_STRING_LENGTH_MAX);
+-			break;
+-		}
+-	}
+-}
+-
+-static void __init set_osi_linux(unsigned int enable)
+-{
+-	if (osi_linux.enable != enable)
+-		osi_linux.enable = enable;
+-
+-	if (osi_linux.enable)
+-		acpi_osi_setup("Linux");
+-	else
+-		acpi_osi_setup("!Linux");
+-
+-	return;
+-}
+-
+-static void __init acpi_cmdline_osi_linux(unsigned int enable)
+-{
+-	osi_linux.cmdline = 1;	/* cmdline set the default and override DMI */
+-	osi_linux.dmi = 0;
+-	set_osi_linux(enable);
+-
+-	return;
+-}
+-
+-void __init acpi_dmi_osi_linux(int enable, const struct dmi_system_id *d)
+-{
+-	printk(KERN_NOTICE PREFIX "DMI detected: %s\n", d->ident);
+-
+-	if (enable == -1)
+-		return;
+-
+-	osi_linux.dmi = 1;	/* DMI knows that this box asks OSI(Linux) */
+-	set_osi_linux(enable);
+-
+-	return;
+-}
+-
+-/*
+- * Modify the list of "OS Interfaces" reported to BIOS via _OSI
+- *
+- * empty string disables _OSI
+- * string starting with '!' disables that string
+- * otherwise string is added to list, augmenting built-in strings
+- */
+-static void __init acpi_osi_setup_late(void)
+-{
+-	struct osi_setup_entry *osi;
+-	char *str;
+-	int i;
+-	acpi_status status;
+-
+-	if (osi_linux.default_disabling) {
+-		status = acpi_update_interfaces(ACPI_DISABLE_ALL_VENDOR_STRINGS);
+-
+-		if (ACPI_SUCCESS(status))
+-			printk(KERN_INFO PREFIX "Disabled all _OSI OS vendors\n");
+-	}
+-
+-	for (i = 0; i < OSI_STRING_ENTRIES_MAX; i++) {
+-		osi = &osi_setup_entries[i];
+-		str = osi->string;
+-
+-		if (*str == '\0')
+-			break;
+-		if (osi->enable) {
+-			status = acpi_install_interface(str);
+-
+-			if (ACPI_SUCCESS(status))
+-				printk(KERN_INFO PREFIX "Added _OSI(%s)\n", str);
+-		} else {
+-			status = acpi_remove_interface(str);
+-
+-			if (ACPI_SUCCESS(status))
+-				printk(KERN_INFO PREFIX "Deleted _OSI(%s)\n", str);
+-		}
+-	}
+-}
+-
+-static int __init osi_setup(char *str)
+-{
+-	if (str && !strcmp("Linux", str))
+-		acpi_cmdline_osi_linux(1);
+-	else if (str && !strcmp("!Linux", str))
+-		acpi_cmdline_osi_linux(0);
+-	else
+-		acpi_osi_setup(str);
+-
+-	return 1;
+-}
+-
+-__setup("acpi_osi=", osi_setup);
+-
+ /*
+  * Disable the auto-serialization of named objects creation methods.
+  *
+@@ -1828,7 +1636,6 @@ acpi_status __init acpi_os_initialize1(void)
+ 	BUG_ON(!kacpi_notify_wq);
+ 	BUG_ON(!kacpi_hotplug_wq);
+ 	acpi_install_interface_handler(acpi_osi_handler);
+-	acpi_osi_setup_late();
+ 	return AE_OK;
+ }
+ 
+diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+index ec18ab0..b345015 100644
+--- a/include/linux/acpi.h
++++ b/include/linux/acpi.h
+@@ -268,9 +268,6 @@ static inline int acpi_video_display_switch_support(void)
+ 
+ #endif /* defined(CONFIG_ACPI_VIDEO) || defined(CONFIG_ACPI_VIDEO_MODULE) */
+ 
+-extern int acpi_blacklisted(void);
+-extern void acpi_dmi_osi_linux(int enable, const struct dmi_system_id *d);
+-extern void acpi_osi_setup(char *str);
+ extern u32 acpi_osi_handler(acpi_string interface, u32 supported);
+ 
+ #ifdef CONFIG_ACPI_NUMA
 -- 
 2.1.0
