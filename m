@@ -1,72 +1,49 @@
 From: ricardo.ribalda@gmail.com (Ricardo Ribalda Delgado)
-Date: Fri, 23 Jan 2015 17:08:32 +0100
-Subject: [PATCH 00/18] spi/xilinx: Speed-up
-Message-ID: <1422029330-10971-1-git-send-email-ricardo.ribalda@gmail.com>
+Date: Fri, 23 Jan 2015 17:08:34 +0100
+Subject: [PATCH 02/18] spi/xilinx: Support for spi mode LOOP
+In-Reply-To: <1422029330-10971-1-git-send-email-ricardo.ribalda@gmail.com>
+References: <1422029330-10971-1-git-send-email-ricardo.ribalda@gmail.com>
+Message-ID: <1422029330-10971-3-git-send-email-ricardo.ribalda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This set of patches has been developed after using the core to access a spi
-nor flash. The initial performance was not as desired. The following changes
-have been done.
+Hardware supports LOOP mode. Support it also in the driver.
 
--This series of patches add driver support for hardware implemented modes:
-LSB_FIRS, LOOP and CS_HIGH.
+Signed-off-by: Ricardo Ribalda Delgado <ricardo.ribalda@gmail.com>
+---
+ drivers/spi/spi-xilinx.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
--There is support for irq less operations.
-
--The buffer size of the core is detected at probe time, speeding up the
-operations.
-
--Code has been simplify and cleaned
-
-This are the results, before and after the patchet
-
-Original
-root at qt5022:~# dd if=/dev/mtd0 of=/dev/null
-16384+0 records in
-16384+0 records out
-8388608 bytes (8.4 MB) copied, 117.985 s, 71.1 kB/s
-
-?37: ? ? ? ?107 ? ? ?82853 ?Xilinx INTC Level ? 1 ?b0010000.spi-flash
-
-After patchset (irq):
-root at qt5022:~# dd if=/dev/mtd0 of=/dev/null
-16384+0 records in
-16384+0 records out
-8388608 bytes (8.4 MB) copied, 49.009 s, 171 kB/s
-
-After patchset (irq):
-root at qt5022:~# dd if=/dev/mtd0 of=/dev/null
-16384+0 records in
-16384+0 records out
-8388608 bytes (8.4 MB) copied, 41.2526 s, 203 kB/s
-
-IRQS:?ZERO
-
-This set of patches supersedes the previous patchet with only LSB_FIRST and LOOP
-
-Ricardo Ribalda Delgado (18):
-  spi/xilinx: Support for spi mode LSB_FIRST
-  spi/xilinx: Support for spi mode LOOP
-  spi/xilinx: Simplify data read from the Rx FIFO
-  spi-xilinx: Simplify spi_fill_tx_fifo
-  spi/xilinx: Leave the IRQ always enabled.
-  spi/xilinx: Code cleanup
-  spi/xilinx: Use cached value of register
-  spi/xilinx: Support cores with no interrupt
-  spi/xilinx: Do not inhibit transmission in polling mode
-  spi/xilinx: Support for spi mode CS_HIGH
-  spi/xilinx: Remove rx_fn and tx_fn pointer
-  spi/xilinx: Make spi_tx and spi_rx simmetric
-  spi/xilinx: Convert remainding_bytes in remaining words
-  spi/xilinx: Convert bits_per_word in bytes_per_word
-  spi/xilinx: Remove iowrite/ioread wrappers
-  spi/xilinx: Reset core before buffer_size detection
-  spi/xilinx: Remove remaining_words driver data variable
-  spi/xilinx: Check number of slaves range
-
- drivers/spi/spi-xilinx.c | 306 ++++++++++++++++++++++-------------------------
- 1 file changed, 146 insertions(+), 160 deletions(-)
-
+diff --git a/drivers/spi/spi-xilinx.c b/drivers/spi/spi-xilinx.c
+index d4edeee..e1d9a20 100644
+--- a/drivers/spi/spi-xilinx.c
++++ b/drivers/spi/spi-xilinx.c
+@@ -35,7 +35,7 @@
+ #define XSPI_CR_CPOL		0x08
+ #define XSPI_CR_CPHA		0x10
+ #define XSPI_CR_MODE_MASK	(XSPI_CR_CPHA | XSPI_CR_CPOL | \
+-				 XSPI_CR_LSB_FIRST)
++				 XSPI_CR_LSB_FIRST | XSPI_CR_LOOP)
+ #define XSPI_CR_TXFIFO_RESET	0x20
+ #define XSPI_CR_RXFIFO_RESET	0x40
+ #define XSPI_CR_MANUAL_SSELECT	0x80
+@@ -197,6 +197,8 @@ static void xilinx_spi_chipselect(struct spi_device *spi, int is_on)
+ 			cr |= XSPI_CR_CPOL;
+ 		if (spi->mode & SPI_LSB_FIRST)
+ 			cr |= XSPI_CR_LSB_FIRST;
++		if (spi->mode & SPI_LOOP)
++			cr |= XSPI_CR_LOOP;
+ 		xspi->write_fn(cr, xspi->regs + XSPI_CR_OFFSET);
+ 
+ 		/* We do not check spi->max_speed_hz here as the SPI clock
+@@ -356,7 +358,7 @@ static int xilinx_spi_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 
+ 	/* the spi->mode bits understood by this driver: */
+-	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_LSB_FIRST;
++	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_LSB_FIRST | SPI_LOOP;
+ 
+ 	xspi = spi_master_get_devdata(master);
+ 	xspi->bitbang.master = master;
 -- 
 2.1.4
