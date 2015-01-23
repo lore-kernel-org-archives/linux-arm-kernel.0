@@ -1,131 +1,65 @@
-From: r.peniaev@gmail.com (Roman Peniaev)
-Date: Fri, 23 Jan 2015 13:17:58 +0900
-Subject: [PATCH 1/2] ARM: entry-common: fix forgotten set of
- thread_info->syscall
-In-Reply-To: <CAGXu5j+CQxZo7ku6nj31UMHySVFo8My0Jd-GthF=tibe_Y2x0w@mail.gmail.com>
-References: <CAGXu5j+O6znN=7-gc3PqwqFA5MFRPLGBUzabOmQjWn_9WTjvpg@mail.gmail.com>
- <CACZ9PQUEprgKrpHazDULA5mf-OaoX=MAjEeWdspZTXT_+iUKWw@mail.gmail.com>
- <20150116155923.GK12302@n2100.arm.linux.org.uk>
- <CACZ9PQUVFtCQg6XjDbokEPy_R2fZcHiq6+EEUZnx4FVfpfZxJg@mail.gmail.com>
- <20150116161752.GL12302@n2100.arm.linux.org.uk>
- <CAGXu5j+XHFNyhaBndQr1Q2uthsFP9ZQGbaw5hofDmXyKXZ-H5g@mail.gmail.com>
- <CAGXu5j+9p1T29NoHnCNywd0T=H2mzWhCou5nSRfXZktEOC7_=A@mail.gmail.com>
- <20150119092002.GA32131@arm.com>
- <CAGXu5jJ8vphdjbqy7OojE=V70vLPs2impJ6i561JafrLYXxvbw@mail.gmail.com>
- <20150120224518.GL26493@n2100.arm.linux.org.uk>
- <20150120230458.GM26493@n2100.arm.linux.org.uk>
- <CAGXu5jKzif=vp6gn5ZtrTx-JTN367qFphobnt9s=awbaafwoUw@mail.gmail.com>
- <CACZ9PQXd_UpnDjgdvG884OpVb_oH_VtZB4Ka9K2Ex6JM4zecyQ@mail.gmail.com>
- <CAGXu5j+CQxZo7ku6nj31UMHySVFo8My0Jd-GthF=tibe_Y2x0w@mail.gmail.com>
-Message-ID: <CACZ9PQU7T1cbqWsym1oDd0zYw9jCVc985==uMsMVLYw8hQHJzQ@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 23 Jan 2015 13:22:52 +0900
+Subject: [PATCH v2 0/2] ARM: shmobile: kzm9g: Declare the full 512 MiB of
+ RAM
+In-Reply-To: <20150122025141.GG31170@verge.net.au>
+References: <1420571859-11655-1-git-send-email-geert+renesas@glider.be>
+ <20150108001412.GD18943@verge.net.au>
+ <20150122025141.GG31170@verge.net.au>
+Message-ID: <20150123042252.GB17548@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 23, 2015 at 3:07 AM, Kees Cook <keescook@chromium.org> wrote:
-> On Wed, Jan 21, 2015 at 5:24 PM, Roman Peniaev <r.peniaev@gmail.com> wrote:
->> On Thu, Jan 22, 2015 at 8:32 AM, Kees Cook <keescook@chromium.org> wrote:
->>> On Tue, Jan 20, 2015 at 3:04 PM, Russell King - ARM Linux
->>> <linux@arm.linux.org.uk> wrote:
-[snip]
->>>
->>> Native ARM64 hides the restart from both seccomp and ptrace, and this
->>> seems like the right idea, except that restart_syscall is still
->>> callable from userspace. I don't think there's a way to make that
->>> vanish, which means we'll always have an exposed syscall. If anything
->>> goes wrong with it (which we've been quite close to recently[1]),
->>> there would be no way to have seccomp filter it.
->>>
->>> So, at the least, I'd like arm64 to NOT hide restart_syscall from
->>> seccomp, and at best I'd like both arm and arm64 to (somehow) entirely
->>> remove restart_syscall from the userspace ABI so it wouldn't need to
->>> be filtered, and wouldn't become a weird ABI hiccup as you've
->>> described.
->>>
->>> I fail to imagine a way to remove restart_syscall from userspace, so
->>> I'm left with wanting parity of behavior between ARM and ARM64 (and
->>> x86). What's the right way forward?
->>
->> My sufferings are an opposite of what seccompt expects: currently I do
->> not see any possible way (from userspace) to get syscall number which was
->> restarted, because at some given time userspace checks the procfs
->> syscall file and sees NR_restart there, without any chance to understand
->> what exactly was restarted (I am talking about some kind of debugging
->> tool which does dead-lock analysis of stuck tasks).
->>
->> I totally agree with Russell not to provide kernel guts to userspace,
->> but it is already done.  Too late.
->>
->> So probably there is a need to split syscall on two numbers:
->> real and effective.  Real number we have right now on x86.
->>
->> And this should be done for both ptrace and procfs syscall file.
->> (am I right that only for ARM we already have PTRACE_SET_SYSCALL?
->>  seems we can add also real/effective getter)
->
-> ARM's syscall "get" is via PTRACE_GETREGSET with NT_PRSTATUS, reading ARM_r7:
->
-> int syscall_get(pid_t tracee) {
->         struct iovec iov;
->         struct pt_regs;
->
->         iov.iov_base = &regs;
->         iov.iov_len = sizeof(regs);
->         if (ptrace(PTRACE_GETREGSET, tracee, NT_PRSTATUS, &iov) < 0) {
->                perror("PTRACE_GETREGSET, NT_PRSTATUS");
->                return -1;
->         }
->         return regs.ARM_r7;
-> }
->
-> ARM's syscall "set" is via PTRACE_SET_SYSCALL:
->
-> int syscall_set(int syscall, pid_t tracee) {
->         return ptrace(PTRACE_SET_SYSCALL, tracee, NULL, syscall);
-> }
->
-> Landing in 3.19, ARM64 has get/set via PTRACE_[GS]ETREGSET with
-> NT_ARM_SYSTEM_CALL:
->
-> int syscall_get(pid_t tracee) {
->         struct iovec iov;
->         int syscall;
->
->         iov.iov_base = &syscall;
->         iov.iov_len = sizeof(syscall);
->         if (ptrace(PTRACE_GETREGSET, tracee,
->                   NT_ARM_SYSTEM_CALL, &iov) < 0) {
->                 perror("PTRACE_GETREGSET, NT_ARM_SYSTEM_CALL");
->                 return -1;
->         }
->         return syscall;
-> }
->
-> int syscall_set(int syscall, pid_t tracee) {
->         iov.iov_base = &syscall;
->         iov.iov_len = sizeof(syscall);
->         return ptrace(PTRACE_SETREGSET, tracee,
->                   NT_ARM_SYSTEM_CALL, &iov);
-> }
->
-> Prior to 3.19, ARM64 could use PTRACE_[GS]ETREGSET, NT_STATUS on
-> struct user_pt_regs and regs[8].
->
+On Thu, Jan 22, 2015 at 11:51:42AM +0900, Simon Horman wrote:
+> On Thu, Jan 08, 2015 at 09:14:12AM +0900, Simon Horman wrote:
+> > On Tue, Jan 06, 2015 at 08:17:37PM +0100, Geert Uytterhoeven wrote:
+> > > 	Hi Simon, Magnus,
+> > > 
+> > > This patch series prepares kzm9g and kzm9g-reference dts for booting a
+> > > multi-platform kernel.
+> > > 
+> > > Traditionally, the first 16 MiB of RAM was reserved for the RT
+> > > processor.  However, this is incompatible with CONFIG_AUTO_ZRELADDR=y,
+> > > which requires that the start address of physical memory is a multiple
+> > > of 128 MiB.
+> > > 
+> > > As CONFIG_AUTO_ZRELADDR=y is enabled for multi-platform kernels, declare
+> > > RAM to start at 0x40000000.
+> > > 
+> > > While at it, reclaim the last 8 MiB of RAM, too, so the full 512 MiB is
+> > > available. We don't know the exact reason why the last 8 MiB of RAM
+> > > was reserved, but thanks to Simon we know it is not used for a U-Boot
+> > > splash screen.  Note that kzm9g_defconfig still has
+> > > CONFIG_MEMORY_START=0x41000000 and CONFIG_MEMORY_SIZE=0x1f000000, so
+> > > before the advent of DT we scribbled over the last 8 MiB, too.
+> > > 
+> > > This is an alternative solution for "[PATCH v2 01/05] ARM: shmobile:
+> > > kzm9g-reference: 0x48008000 load address"
+> > > (http://www.spinics.net/lists/linux-sh/msg38385.html), which
+> > > (a) doesn't loose 112 MiB of RAM, and
+> > > (b) doesn't force to switch from zImage to uImage.
+> > > 
+> > > Thanks for applying!
+> > 
+> > Thanks, done.
+> 
+> For the record: Olof has asked for review comments for the BSC driver and
+> binding patches. Accordingly I have dropped them, and these patches which
+> depend on them, from next.
+> 
+> This dependency may be due to the way the branches are arranged, rather
+> than actual dependencies of the code. But regardless I am dropping all
+> effected branches for now.
 
-Thanks.  I also came up with this possible way to retrieve effective
-syscall.  But, as you showed, I still can get NR_restart (it is 32bit
-userspace on ARM64, right?)
+I have now had a chance to re-examine these patches and it seems to me that
+they do not depend on the BSC driver (or anything elsei other than possibly
+for context).  With that in mind I have queued them up in the dt-for-v3.21
+branch and pushed this as part of renesas-devel-20150123-v3.19-rc5.
 
-Also, this approach is definitely arch dependent (at least I have to
-know the register for scnr, also [probably] I have to distinguish EABI
-and OABI on ARM).
+Please take a moment to see if what I have done makes sense to you.
 
-And also all this ptrace machinery is not as fast as reading from
-procfs syscall file (no deal with signals, syscall restarts, etc).
+For reference this covers the following patches which comprised this series:
 
-But procfs syscall is not implemented on ARM and, even if it is,
-NR_restart spoils me everything.
-
-But still thanks.
-
---
-Roman
+Geert Uytterhoeven (2):
+  ARM: shmobile: kzm9g dts: Declare the full 512 MiB of RAM
+  ARM: shmobile: kzm9g-reference dts: Declare the full 512 MiB of RAM
