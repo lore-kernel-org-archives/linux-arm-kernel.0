@@ -1,33 +1,34 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 23 Jan 2015 23:51:06 +0100
-Subject: [Request pull] mvebu/fixes #3
-In-Reply-To: <CAOesGMiHAOOuCohfD2cV6eywGFjJK580STNAiDo9nahF-twuBQ@mail.gmail.com>
-References: <20150122004003.GA9533@lunn.ch>
- <20150123221040.GH20896@quad.lixom.net>
- <20150123224415.GI21727@lunn.ch>
- <CAOesGMiHAOOuCohfD2cV6eywGFjJK580STNAiDo9nahF-twuBQ@mail.gmail.com>
-Message-ID: <20150123225106.GK21727@lunn.ch>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 23 Jan 2015 14:53:36 -0800
+Subject: [GIT PULL 2/4] ARM: tegra: Default configuration changes for v3.20
+In-Reply-To: <1422028800-759-2-git-send-email-thierry.reding@gmail.com>
+References: <1422028800-759-1-git-send-email-thierry.reding@gmail.com>
+ <1422028800-759-2-git-send-email-thierry.reding@gmail.com>
+Message-ID: <20150123225336.GS20896@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 23, 2015 at 02:50:39PM -0800, Olof Johansson wrote:
-> On Fri, Jan 23, 2015 at 2:44 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> >> > mvebu fixes for 3.19. (Part 4)
-> >>
-> >> Subject says #3, tag says part 4. Hmm?
-> >
-> > Subject is wrong. This is #4.
-> >
-> > You seemed to of missed #3. At least i've not seen an email said you
-> > have pulled it. Could you please look back in your archive to Jan 17th
-> > for the real #3.
+On Fri, Jan 23, 2015 at 04:59:58PM +0100, Thierry Reding wrote:
+> Hi ARM SoC maintainers,
 > 
-> The one with 8f1e8ee28660018a935c7576b9af8ffe1feab54c in it? It's
-> merged, I merged it on the 18th.
+> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+> 
+>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-3.20-defconfig
+> 
+> for you to fetch changes up to fe07e48964c6f21020eeeb7f83e35a5bf1977a65:
+> 
+>   ARM: tegra: Regenerate defconfig based on v3.19-rc1 (2015-01-06 14:10:57 +0100)
 
-Hi Olof
+We usually don't do this for all configs on all releases -- just drop
+them when you revisit the file for other reasons some other time. That
+being said, no harm as long as only a few people do it every release
+(i.e. we don't want this to creep up on diffstats).
 
-Yes, Great. I must of missed the email.
+Merged into next/defconfig.
 
-Thanks
-	Andrew
+
+-Olof
