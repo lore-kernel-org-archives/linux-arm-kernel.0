@@ -1,147 +1,121 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 23 Jan 2015 11:02:43 +0100
-Subject: [GIT PULL 14/36] KVM: arm/arm64: Enable Dirty Page logging for ARMv8
+Date: Fri, 23 Jan 2015 11:02:45 +0100
+Subject: [GIT PULL 16/36] arm/arm64: KVM: pass down user space provided GIC
+ type into vGIC code
 In-Reply-To: <1422007385-14730-1-git-send-email-christoffer.dall@linaro.org>
 References: <1422007385-14730-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1422007385-14730-15-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1422007385-14730-17-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mario Smarduch <m.smarduch@samsung.com>
+From: Andre Przywara <andre.przywara@arm.com>
 
-This patch enables ARMv8 ditry page logging support. Plugs ARMv8 into generic
-layer through Kconfig symbol, and drops earlier ARM64 constraints to enable
-logging at architecture layer.
+With the introduction of a second emulated GIC model we need to let
+userspace specify the GIC model to use for each VM. Pass the
+userspace provided value down into the vGIC code and store it there
+to differentiate later.
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/include/asm/kvm_host.h | 12 ------------
- arch/arm/kvm/arm.c              |  4 ----
- arch/arm/kvm/mmu.c              | 19 +++++++++++--------
- arch/arm64/kvm/Kconfig          |  2 ++
- 4 files changed, 13 insertions(+), 24 deletions(-)
+ arch/arm/kvm/arm.c     |  2 +-
+ include/kvm/arm_vgic.h |  7 +++++--
+ virt/kvm/arm/vgic.c    | 15 +++++++++++++--
+ 3 files changed, 19 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 38931d4..7d07eb8 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -221,18 +221,6 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
- 	kvm_call_hyp((void*)hyp_stack_ptr, vector_ptr, pgd_ptr);
- }
- 
--/**
-- * kvm_flush_remote_tlbs() - flush all VM TLB entries
-- * @kvm:	pointer to kvm structure.
-- *
-- * Interface to HYP function to flush all VM TLB entries without address
-- * parameter.
-- */
--static inline void kvm_flush_remote_tlbs(struct kvm *kvm)
--{
--	kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
--}
--
- static inline int kvm_arch_dev_ioctl_check_extension(long ext)
- {
- 	return 0;
 diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 1434410..74603a0 100644
+index a7b94ec..3a51ffca 100644
 --- a/arch/arm/kvm/arm.c
 +++ b/arch/arm/kvm/arm.c
-@@ -808,7 +808,6 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
-  */
- int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
- {
--#ifdef CONFIG_ARM
- 	bool is_dirty = false;
- 	int r;
+@@ -851,7 +851,7 @@ long kvm_arch_vm_ioctl(struct file *filp,
+ 	switch (ioctl) {
+ 	case KVM_CREATE_IRQCHIP: {
+ 		if (vgic_present)
+-			return kvm_vgic_create(kvm);
++			return kvm_vgic_create(kvm, KVM_DEV_TYPE_ARM_VGIC_V2);
+ 		else
+ 			return -ENXIO;
+ 	}
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index ac4888d..525ce42 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -140,6 +140,9 @@ struct vgic_dist {
+ 	bool			in_kernel;
+ 	bool			ready;
  
-@@ -821,9 +820,6 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
- 
- 	mutex_unlock(&kvm->slots_lock);
- 	return r;
--#else /* arm64 */
--	return -EINVAL;
--#endif
- }
- 
- static int kvm_vm_ioctl_set_device_addr(struct kvm *kvm,
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 6685c68..eb94597 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -52,11 +52,18 @@ static phys_addr_t hyp_idmap_vector;
- 
- static bool memslot_is_logging(struct kvm_memory_slot *memslot)
- {
--#ifdef CONFIG_ARM
- 	return memslot->dirty_bitmap && !(memslot->flags & KVM_MEM_READONLY);
--#else
--	return false;
--#endif
-+}
++	/* vGIC model the kernel emulates for the guest (GICv2 or GICv3) */
++	u32			vgic_model;
 +
-+/**
-+ * kvm_flush_remote_tlbs() - flush all VM TLB entries for v7/8
-+ * @kvm:	pointer to kvm structure.
-+ *
-+ * Interface to HYP function to flush all VM TLB entries
-+ */
-+void kvm_flush_remote_tlbs(struct kvm *kvm)
-+{
-+	kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
+ 	int			nr_cpus;
+ 	int			nr_irqs;
+ 
+@@ -275,7 +278,7 @@ struct kvm_exit_mmio;
+ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
+ int kvm_vgic_hyp_init(void);
+ int kvm_vgic_map_resources(struct kvm *kvm);
+-int kvm_vgic_create(struct kvm *kvm);
++int kvm_vgic_create(struct kvm *kvm, u32 type);
+ void kvm_vgic_destroy(struct kvm *kvm);
+ void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu);
+ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
+@@ -327,7 +330,7 @@ static inline int kvm_vgic_map_resources(struct kvm *kvm)
+ 	return 0;
  }
  
- static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
-@@ -950,7 +957,6 @@ static bool kvm_is_device_pfn(unsigned long pfn)
- 	return !pfn_valid(pfn);
- }
- 
--#ifdef CONFIG_ARM
- /**
-  * stage2_wp_ptes - write protect PMD range
-  * @pmd:	pointer to pmd entry
-@@ -1095,7 +1101,6 @@ void kvm_arch_mmu_write_protect_pt_masked(struct kvm *kvm,
- 
- 	stage2_wp_range(kvm, start, end);
- }
--#endif
- 
- static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 			  struct kvm_memory_slot *memslot, unsigned long hva,
-@@ -1511,7 +1516,6 @@ void kvm_arch_commit_memory_region(struct kvm *kvm,
- 				   const struct kvm_memory_slot *old,
- 				   enum kvm_mr_change change)
+-static inline int kvm_vgic_create(struct kvm *kvm)
++static inline int kvm_vgic_create(struct kvm *kvm, u32 type)
  {
--#ifdef CONFIG_ARM
- 	/*
- 	 * At this point memslot has been committed and there is an
- 	 * allocated dirty_bitmap[], dirty pages will be be tracked while the
-@@ -1519,7 +1523,6 @@ void kvm_arch_commit_memory_region(struct kvm *kvm,
- 	 */
- 	if (change != KVM_MR_DELETE && mem->flags & KVM_MEM_LOG_DIRTY_PAGES)
- 		kvm_mmu_wp_memory_region(kvm, mem->slot);
--#endif
+ 	return 0;
+ }
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index c84f53df..283038e 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1698,6 +1698,16 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
+ 	int vcpu_id;
+ 
+ 	if (unlikely(!vgic_initialized(kvm))) {
++		/*
++		 * We only provide the automatic initialization of the VGIC
++		 * for the legacy case of a GICv2. Any other type must
++		 * be explicitly initialized once setup with the respective
++		 * KVM device call.
++		 */
++		if (kvm->arch.vgic.vgic_model != KVM_DEV_TYPE_ARM_VGIC_V2) {
++			ret = -EBUSY;
++			goto out;
++		}
+ 		mutex_lock(&kvm->lock);
+ 		ret = vgic_init(kvm);
+ 		mutex_unlock(&kvm->lock);
+@@ -1935,7 +1945,7 @@ out:
+ 	return ret;
  }
  
- int kvm_arch_prepare_memory_region(struct kvm *kvm,
-diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-index 8ba85e9..3ce389b 100644
---- a/arch/arm64/kvm/Kconfig
-+++ b/arch/arm64/kvm/Kconfig
-@@ -22,10 +22,12 @@ config KVM
- 	select PREEMPT_NOTIFIERS
- 	select ANON_INODES
- 	select HAVE_KVM_CPU_RELAX_INTERCEPT
-+	select HAVE_KVM_ARCH_TLB_FLUSH_ALL
- 	select KVM_MMIO
- 	select KVM_ARM_HOST
- 	select KVM_ARM_VGIC
- 	select KVM_ARM_TIMER
-+	select KVM_GENERIC_DIRTYLOG_READ_PROTECT
- 	---help---
- 	  Support hosting virtualized guest machines.
+-int kvm_vgic_create(struct kvm *kvm)
++int kvm_vgic_create(struct kvm *kvm, u32 type)
+ {
+ 	int i, vcpu_lock_idx = -1, ret;
+ 	struct kvm_vcpu *vcpu;
+@@ -1967,6 +1977,7 @@ int kvm_vgic_create(struct kvm *kvm)
  
+ 	spin_lock_init(&kvm->arch.vgic.lock);
+ 	kvm->arch.vgic.in_kernel = true;
++	kvm->arch.vgic.vgic_model = type;
+ 	kvm->arch.vgic.vctrl_base = vgic->vctrl_base;
+ 	kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
+ 	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
+@@ -2404,7 +2415,7 @@ static void vgic_destroy(struct kvm_device *dev)
+ 
+ static int vgic_create(struct kvm_device *dev, u32 type)
+ {
+-	return kvm_vgic_create(dev->kvm);
++	return kvm_vgic_create(dev->kvm, type);
+ }
+ 
+ static struct kvm_device_ops kvm_arm_vgic_v2_ops = {
 -- 
 2.1.2.330.g565301e.dirty
