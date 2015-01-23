@@ -1,41 +1,103 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri, 23 Jan 2015 09:56:53 +0100
-Subject: [PATCH] ARM: exynos_defconfig: Enable CONFIG_FHANDLE
-In-Reply-To: <54BC9995.4020300@samsung.com>
-References: <1417176414-21558-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <54786C1D.3050306@collabora.co.uk> <54BC9995.4020300@samsung.com>
-Message-ID: <54C20CD5.7060001@collabora.co.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 23 Jan 2015 09:59:58 +0100
+Subject: [PATCHv6 2/5] USB: gadget: atmel_usba_udc: Request an auto
+ disabled
+ Vbus signal IRQ instead of an auto enabled IRQ request followed by IRQ disable
+In-Reply-To: <0F74BBB2-B515-4A36-8C71-25F58A4D1AB6@jcrosoft.com>
+References: <1421945805-31129-1-git-send-email-sylvain.rochet@finsecur.com>
+ <1421945805-31129-3-git-send-email-sylvain.rochet@finsecur.com>
+ <0F74BBB2-B515-4A36-8C71-25F58A4D1AB6@jcrosoft.com>
+Message-ID: <54C20D8E.4040505@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Kukjin,
-
-On 01/19/2015 06:43 AM, Joonyoung Shim wrote:
->> 
+Le 23/01/2015 08:43, Jean-Christophe PLAGNIOL-VILLARD a ?crit :
 > 
-> I also hope merge this, already multi_v7_defconfig supports this.
-> 
-
-I would also hope this to be merged since it's required to boot
-using systemd.
-
-> Thanks.
-> 
->> This is certainly required for newer systemd and has to be enabled.
->> 
->> But it would also be great to have enabled all the config symbols
->> that are listed as requirements in the systemd README file:
->> 
->> http://cgit.freedesktop.org/systemd/systemd/tree/README.
->> 
->> Tony added that support to OMAP2+ defconfig in commit 673ce00c
->> ("ARM: omap2plus_defconfig: Add support for distros with systemd")
->> so the same should be done in exynos_defconfig.
->> 
->> That can of course be a follow-up patch though, so for $subject:
->> 
->> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>> On Jan 23, 2015, at 12:56 AM, Sylvain Rochet <sylvain.rochet@finsecur.com> wrote:
 >>
+>> Vbus IRQ handler needs a started UDC driver to work because it uses
+>> udc->driver, which is set by the UDC start handler. The previous way
+>> chosen was to return from interrupt if udc->driver is NULL using a
+>> spinlock around the check.
+>>
+>> We now request an auto disabled (IRQ_NOAUTOEN) Vbus signal IRQ instead
+>> of an auto enabled IRQ followed by disable_irq(). This way we remove the
+>> very small timeslot of enabled IRQ which existed previously between
+>> request() and disable(). We don't need anymore to check if udc->driver
+>> is NULL in IRQ handler.
+>>
+>> Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+>> Suggested-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+>> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+>> ---
+>> drivers/usb/gadget/udc/atmel_usba_udc.c | 9 ++-------
+>> 1 file changed, 2 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+>> index 40e5fc7..f9f305f 100644
+>> --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
+>> +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+>> @@ -1745,10 +1745,6 @@ static irqreturn_t usba_vbus_irq(int irq, void *devid)
+>>
+>> 	spin_lock(&udc->lock);
+>>
+>> -	/* May happen if Vbus pin toggles during probe() */
+>> -	if (!udc->driver)
+>> -		goto out;
+>> -
+>> 	vbus = vbus_is_present(udc);
+>> 	if (vbus != udc->vbus_prev) {
+>> 		if (vbus) {
+>> @@ -1769,7 +1765,6 @@ static irqreturn_t usba_vbus_irq(int irq, void *devid)
+>> 		udc->vbus_prev = vbus;
+>> 	}
+>>
+>> -out:
+>> 	spin_unlock(&udc->lock);
+>>
+>> 	return IRQ_HANDLED;
+>> @@ -2109,6 +2104,8 @@ static int usba_udc_probe(struct platform_device *pdev)
+>>
+>> 	if (gpio_is_valid(udc->vbus_pin)) {
+>> 		if (!devm_gpio_request(&pdev->dev, udc->vbus_pin, "atmel_usba_udc")) {
+>> +			irq_set_status_flags(gpio_to_irq(udc->vbus_pin),
+>> +					IRQ_NOAUTOEN);
+> 
+> not happy about still using the broken gpio_to_irq API
+> 
+> Linus can pass the IRQ via board file?
+> 
+> and via DT we can use IRQ directly
+
+Absolutely not the topic of this patch series.
+Maybe the subject of another patch later?
 
 Best regards,
-Javier
+
+
+>> 			ret = devm_request_irq(&pdev->dev,
+>> 					gpio_to_irq(udc->vbus_pin),
+>> 					usba_vbus_irq, 0,
+>> @@ -2118,8 +2115,6 @@ static int usba_udc_probe(struct platform_device *pdev)
+>> 				dev_warn(&udc->pdev->dev,
+>> 					 "failed to request vbus irq; "
+>> 					 "assuming always on\n");
+>> -			} else {
+>> -				disable_irq(gpio_to_irq(udc->vbus_pin));
+>> 			}
+>> 		} else {
+>> 			/* gpio_request fail so use -EINVAL for gpio_is_valid */
+>> -- 
+>> 2.1.4
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> 
+
+
+-- 
+Nicolas Ferre
