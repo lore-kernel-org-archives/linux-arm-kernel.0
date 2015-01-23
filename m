@@ -1,141 +1,41 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sat, 24 Jan 2015 00:17:38 +0100
-Subject: [PATCH 08/12] pm: at91: rename file name: pm_slowclock.S
- -->pm_suspend.S
-In-Reply-To: <20150123191719.GA29601@gradator.net>
-References: <1421741825-18226-1-git-send-email-wenyou.yang@atmel.com>
- <1421741825-18226-9-git-send-email-wenyou.yang@atmel.com>
- <20150123191719.GA29601@gradator.net>
-Message-ID: <20150123231738.GB32318@piout.net>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Fri, 23 Jan 2015 17:22:23 -0600
+Subject: [PATCH] PCI: xgene: Include clk.h instead of clk-private.h
+In-Reply-To: <1421954754-3217-1-git-send-email-sboyd@codeaurora.org>
+References: <1421954754-3217-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20150123232223.GU29776@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jan 22, 2015 at 11:25:54AM -0800, Stephen Boyd wrote:
+> This driver should be including clk.h as it's a clock consumer,
+> not a clock provider that needs to register clocks early.
+> 
+> Cc: Tanmay Inamdar <tinamdar@apm.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-On 23/01/2015 at 20:17:19 +0100, Sylvain Rochet wrote :
-> Hello Wenyou,
-> 
-> On Tue, Jan 20, 2015 at 04:17:01PM +0800, Wenyou Yang wrote:
-> > 
-> > diff --git a/arch/arm/mach-at91/pm_suspend.S b/arch/arm/mach-at91/pm_suspend.S
-> > new file mode 100644
-> > index 0000000..420e730
-> > --- /dev/null
-> 
-> 
-> > +	/* Turn off the main oscillator */
-> > +	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
-> > +	bic	tmp1, tmp1, #AT91_PMC_MOSCEN
-> 
-> at91sam9x5 and probably others need a key here:
-> 	orr     tmp1, tmp1, #AT91_PMC_KEY
-> 
-> > +	str	tmp1, [pmc, #AT91_CKGR_MOR]
-> 
-> 
-> 
-> > +	/* Wait for interrupt */
-> > +	mcr	p15, 0, tmp1, c7, c0, 4
-> 
-> The linux-3.10-at91 branch uses a different approach which seem 
-> necessary for newer board, you probably forget to merge the following:
-> 
-> /*
->  * Put the processor to enter into Standby mode, wait for interrupt to wakeup
->  */
-> 	.macro _do_wfi
-> 
-> #if defined(CONFIG_CPU_V7)
-> 	dsb
-> 
-> 	/* Disable the processor clock */
-> 	mov	tmp1, #AT91_PMC_PCK
-> 	str	tmp1, [pmc, #AT91_PMC_SCDR]
-> 
-> 	wfi		@ Wait For Interrupt
-> #else
-> 	mcr	p15, 0, tmp1, c7, c0, 4
-> #endif
-> 
-> 	.endm
-> 
-> 	.text
-> 
-> ENTRY(at91_slow_clock)
-> (...)
-> 	/* Wait for interrupt */
-> 	_do_wfi
-> (...)
-> 
-> 
-> 
-> 
-> > +	/* Turn on the main oscillator */
-> > +	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
-> > +	orr	tmp1, tmp1, #AT91_PMC_MOSCEN
-> 
-> at91sam9x5 and probably others need a key here:
->         orr     tmp1, tmp1, #AT91_PMC_KEY
-> 
-> > +	str	tmp1, [pmc, #AT91_CKGR_MOR]
-> 
-> 
-> 
-> What about the following parts which are also in linux-3.10-at91 branch 
-> but not in this rework, are they necessary ?
-> 
-> sdr_sr_done:
-> 	/* Disable MPDDRC Clock*/
-> 	cmp	ddrcid, #0
-> 	beq	2f
-> 	bic	tmp2, ddrcid, #0xe0 /* fetch lowest 5 bits */
-> 	mov	tmp1, #0x01
-> 	mov	tmp1, tmp1, lsl tmp2
-> 
-> 	tst	ddrcid, #0x20	/* > 32 ? */
-> 	beq	1f
-> 	str	tmp1, [pmc, #AT91_PMC_PCDR1]
-> 	b	2f
-> 1:
-> 	str	tmp1, [pmc, #AT91_PMC_PCDR]
-> 2:
-> 
-> 	/* Disable DDR Clock */
-> 	mov 	tmp1, #AT91_PMC_SYS_DDR
-> 	str	tmp1, [pmc, #AT91_PMC_SCDR]
-> 
-> 
-> 
-> 
-> 	/* Enable MPDDRC Clock*/
-> 	cmp	ddrcid, #0
-> 	beq	4f
-> 	bic	tmp2, ddrcid, #0xe0 /* fetch lowest 5 bits */
-> 	mov	tmp1, #0x01
-> 	mov	tmp1, tmp1, lsl tmp2
-> 
-> 	tst	ddrcid, #0x20	/* > 32 ? */
-> 	beq	3f
-> 	str	tmp1, [pmc, #AT91_PMC_PCER1]
-> 	b	4f
-> 3:
-> 	str	tmp1, [pmc, #AT91_PMC_PCER]
-> 4:
-> 
-> 	/* Enable DDR clock */
-> 	mov 	tmp1, #AT91_PMC_SYS_DDR
-> 	str	tmp1, [pmc, #AT91_PMC_SCER]
-> 
-> 
+Applied provisionally to pci/host-xgene for v3.20, thanks!
 
-This is a rework, what is part of linux-3.10-at91 and not yet present in
-mainline should be part of a following series. I would prefer not mixing
-reworks and "new" functionalities (they have been present in the atmel
-tree for a while but never mainlined). I would say that PM on 9x5, n12
-and sama5 in mainline is clearly not well tested and is lagging behind
-the atmel tree.
+I'm hoping for an ack from Tanmay.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> ---
+>  drivers/pci/host/pci-xgene.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+> index b1d0596457c5..fdb348d3ccd3 100644
+> --- a/drivers/pci/host/pci-xgene.c
+> +++ b/drivers/pci/host/pci-xgene.c
+> @@ -16,7 +16,7 @@
+>   * GNU General Public License for more details.
+>   *
+>   */
+> -#include <linux/clk-private.h>
+> +#include <linux/clk.h>
+>  #include <linux/delay.h>
+>  #include <linux/io.h>
+>  #include <linux/jiffies.h>
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+> 
