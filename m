@@ -1,88 +1,49 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Fri, 23 Jan 2015 16:01:41 +0900
-Subject: [PATCH V9 13/14] ARM: dts: snow: represent the connection between
- bridge and panel using videoport and endpoints
-In-Reply-To: <1421771935-31618-14-git-send-email-ajaykumar.rs@samsung.com>
-References: <1421771935-31618-1-git-send-email-ajaykumar.rs@samsung.com>
- <1421771935-31618-14-git-send-email-ajaykumar.rs@samsung.com>
-Message-ID: <0c9401d036da$71046bf0$530d43d0$@kernel.org>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 23 Jan 2015 08:26:52 +0100
+Subject: CMA region and highmem
+In-Reply-To: <CAD8Lp46rqXwQR5L=-Tt_iL0CPDsKt+hVYU7-viS0uHvmVXLqng@mail.gmail.com>
+References: <20140813191811.GP30401@n2100.arm.linux.org.uk>
+ <53F44858.2070906@samsung.com>
+ <CAD8Lp47W9UcA7CHSK9xia_b9opLv-5wi_9Omj2DThRo4wYkcNw@mail.gmail.com>
+ <53F5BCC3.2060609@samsung.com>
+ <CAD8Lp46rqXwQR5L=-Tt_iL0CPDsKt+hVYU7-viS0uHvmVXLqng@mail.gmail.com>
+Message-ID: <54C1F7BC.20604@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ajay Kumar wrote:
-> 
-> Define videoports and use endpoints to describe the connection between
-> the encoder, bridge and the panel, instead of using phandles.
-> 
-> Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
-> Acked-by: Inki Dae <inki.dae@samsung.com>
-> Tested-by: Rahul Sharma <rahul.sharma@samsung.com>
-> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Tested-by: Gustavo Padovan <gustavo.padovan@collabora.co.uk>
-> Tested-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-> ---
->  arch/arm/boot/dts/exynos5250-snow.dts |   30 ++++++++++++++++++++++++++++--
->  1 file changed, 28 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-> index b9aeec4..1bd5d3a 100644
-> --- a/arch/arm/boot/dts/exynos5250-snow.dts
-> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
-> @@ -183,7 +183,20 @@
->  			powerdown-gpios = <&gpy2 5 GPIO_ACTIVE_HIGH>;
->  			reset-gpios = <&gpx1 5 GPIO_ACTIVE_HIGH>;
->  			edid-emulation = <5>;
-> -			panel = <&panel>;
-> +
-> +			ports {
-> +				port at 0 {
-> +					bridge_out: endpoint {
-> +						remote-endpoint = <&panel_in>;
-> +					};
-> +				};
-> +
-> +				port at 1 {
-> +					bridge_in: endpoint {
-> +						remote-endpoint = <&dp_out>;
-> +					};
-> +				};
-> +			};
->  		};
->  	};
-> 
-> @@ -228,6 +241,12 @@
->  		compatible = "auo,b116xw03";
->  		power-supply = <&fet6>;
->  		backlight = <&backlight>;
-> +
-> +		port {
-> +			panel_in: endpoint {
-> +				remote-endpoint = <&bridge_out>;
-> +			};
-> +		};
->  	};
->  };
-> 
-> @@ -242,7 +261,14 @@
->  	samsung,link-rate = <0x0a>;
->  	samsung,lane-count = <2>;
->  	samsung,hpd-gpio = <&gpx0 7 GPIO_ACTIVE_HIGH>;
-> -	bridge = <&ptn3460>;
-> +
-> +	ports {
-> +		port at 0 {
-> +			dp_out: endpoint {
-> +				remote-endpoint = <&bridge_in>;
-> +			};
-> +		};
-> +	};
->  };
-> 
->  &ehci {
-> --
-> 1.7.9.5
+Hello,
 
-I'm fine on the DT changes in this series, shall I take 13/14 and 14/14 in
-Samsung tree?
+On 2015-01-22 21:55, Daniel Drake wrote:
+> On Thu, Aug 21, 2014 at 3:32 AM, Marek Szyprowski
+> <m.szyprowski@samsung.com> wrote:
+>> You are right, but frankly drivers doing large DMA allocations should take
+>> advantage of DMA_ATTR_NO_KERNEL_MAPPING DMA attribute, because all they
+>> usually do is just mapping those buffers to userspace. For a bit complex
+>> example, see drivers/gpu/drm/exynos/exynos_drm_buf.c or
+>> drivers/gpu/drm/msm/msm_drv.c.
+> Thanks again for the insight here. Revisiting this topic now:
+>
+> Looking at DMA_ATTR_NO_KERNEL_MAPPING in latest linus git, this only
+> seems to be implemented for IOMMU setups.
+> On other setups this flag seems to be ignored, so on such setups, your
+> change that tends to place the CMA region in high memory now puts
+> pressure on the vmalloc area even when the driver asked for
+> NO_KERNEL_MAPPING.
+>
+> Is there a good reason why the non-IOMMU codepath doesn't obey
+> DMA_ATTR_NO_KERNEL_MAPPING?
 
-- Kukjin
+No, it simply has not been implemented yet. Mainly because initially CMA
+regions were allocated in low memory and all my development boards that time
+didn't have enough memory to experiment with high mem...
+
+> We ran a quick experiment here
+> implementing this (i.e. just bailing out of __alloc_from_contiguous
+> before mapping the memory into kernel space) and it seems to work.
+
+Right. This should be enough. Feel free to submit a patch.
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
