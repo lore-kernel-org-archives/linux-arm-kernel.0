@@ -1,188 +1,121 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 23 Jan 2015 11:35:15 +0000
-Subject: [GIT PULL 03/36] arm/arm64: KVM: add tracing support for arm64
- exit handler
-In-Reply-To: <1422007385-14730-4-git-send-email-christoffer.dall@linaro.org>
-References: <1422007385-14730-1-git-send-email-christoffer.dall@linaro.org>
- <1422007385-14730-4-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <20150123113515.GF23493@leverpostej>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 23 Jan 2015 12:39:14 +0100
+Subject: [RFC V2] OPP: Redefine bindings to overcome shortcomings
+In-Reply-To: <cbe949d7a69c3b16a3e9d6e5429eb81d3ae9d8b9.1422009157.git.viresh.kumar@linaro.org>
+References: <cbe949d7a69c3b16a3e9d6e5429eb81d3ae9d8b9.1422009157.git.viresh.kumar@linaro.org>
+Message-ID: <1422013154.29475.11.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
-
-On Fri, Jan 23, 2015 at 10:02:32AM +0000, Christoffer Dall wrote:
-> From: Wei Huang <wei@redhat.com>
+Am Freitag, den 23.01.2015, 16:14 +0530 schrieb Viresh Kumar:
+> Rob et al,
 > 
-> arm64 uses its own copy of exit handler (arm64/kvm/handle_exit.c).
-> Currently this file doesn't hook up with any trace points. As a result
-> users might not see certain events (e.g. HVC & WFI) while using ftrace
-> with arm64 KVM. This patch fixes this issue by adding a new trace file
-> and defining two trace events (one of which is shared by wfi and wfe)
-> for arm64. The new trace points are then linked with related functions
-> in handle_exit.c.
-
-Stephen Rothwell reported a couple of conflicts between this patch and
-my ESR rework in -next:
-
-https://lkml.org/lkml/2015/1/22/7
-https://lkml.org/lkml/2015/1/22/8
-
-I'd hoped we'd be able to fix that before this went further upstream.
-
-The easiest way I could see to do that was to merge my esr branch (which
-is stable and Catalin has pulled) branch into the kvm-arm tree, and fix
-the conflicts there.
-
-Is there any chance we can fix that now?
-
-Thanks,
-Mark.
-
+> This is another attempt to redefine OPP bindings which we concluded to after
+> first round of reviews.
 > 
-> Signed-off-by: Wei Huang <wei@redhat.com>
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Current OPP (Operating performance point) DT bindings are proven to be
+> insufficient at multiple instances.
+> 
+> There had been multiple band-aid approaches to get them fixed (The latest one
+> being: http://www.mail-archive.com/devicetree at vger.kernel.org/msg53398.html).
+> For obvious reasons Rob rejected them and shown the right path forward.
+> 
+> The shortcomings we are trying to solve here:
+> 
+> - How to select which driver to probe for a platform, when multiple drivers are
+>   available. For example: how to choose between cpufreq-dt and arm_big_little
+>   drivers.
+> 
+> - Getting clock sharing information between CPUs. Single shared clock vs
+>   independent clock per core vs shared clock per cluster.
+> 
+> - Support for turbo modes
+> 
+> - Support for intermediate frequencies
+> 
+> - Other per OPP settings: transition latencies, disabled status, etc.?
+> 
+> Please see the below bindings for further details.
+> 
+> I haven't incorporated the comments given by Mark Brown as I had some doubts.
+> @broonie: Is this what you wanted to mention earlier ? : http://pastebin.com/1RZTccmm
+> 
+
+I think we should work this out for the new bindings, as
+voltage-tolerance is a completely bogus value.
+
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 > ---
->  arch/arm64/include/asm/kvm_arm.h     |  2 ++
->  arch/arm64/include/asm/kvm_emulate.h |  5 ++++
->  arch/arm64/kvm/handle_exit.c         | 13 +++++++--
->  arch/arm64/kvm/trace.h               | 55 ++++++++++++++++++++++++++++++++++++
->  4 files changed, 73 insertions(+), 2 deletions(-)
->  create mode 100644 arch/arm64/kvm/trace.h
 > 
-> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-> index 8afb863..3da2d3a 100644
-> --- a/arch/arm64/include/asm/kvm_arm.h
-> +++ b/arch/arm64/include/asm/kvm_arm.h
-> @@ -257,4 +257,6 @@
->  
->  #define ESR_EL2_EC_WFI_ISS_WFE	(1 << 0)
->  
-> +#define ESR_EL2_HVC_IMM_MASK	((1UL << 16) - 1)
-> +
->  #endif /* __ARM64_KVM_ARM_H__ */
-> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-> index 8127e45..a6fa2d2 100644
-> --- a/arch/arm64/include/asm/kvm_emulate.h
-> +++ b/arch/arm64/include/asm/kvm_emulate.h
-> @@ -126,6 +126,11 @@ static inline phys_addr_t kvm_vcpu_get_fault_ipa(const struct kvm_vcpu *vcpu)
->  	return ((phys_addr_t)vcpu->arch.fault.hpfar_el2 & HPFAR_MASK) << 8;
->  }
->  
-> +static inline u32 kvm_vcpu_hvc_get_imm(const struct kvm_vcpu *vcpu)
-> +{
-> +	return kvm_vcpu_get_hsr(vcpu) & ESR_EL2_HVC_IMM_MASK;
-> +}
-> +
->  static inline bool kvm_vcpu_dabt_isvalid(const struct kvm_vcpu *vcpu)
->  {
->  	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_EL2_ISV);
-> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-> index 34b8bd0..6a7eb3c 100644
-> --- a/arch/arm64/kvm/handle_exit.c
-> +++ b/arch/arm64/kvm/handle_exit.c
-> @@ -26,12 +26,18 @@
->  #include <asm/kvm_mmu.h>
->  #include <asm/kvm_psci.h>
->  
-> +#define CREATE_TRACE_POINTS
-> +#include "trace.h"
-> +
->  typedef int (*exit_handle_fn)(struct kvm_vcpu *, struct kvm_run *);
->  
->  static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  {
->  	int ret;
->  
-> +	trace_kvm_hvc_arm64(*vcpu_pc(vcpu), *vcpu_reg(vcpu, 0),
-> +			    kvm_vcpu_hvc_get_imm(vcpu));
-> +
->  	ret = kvm_psci_call(vcpu);
->  	if (ret < 0) {
->  		kvm_inject_undefined(vcpu);
-> @@ -61,10 +67,13 @@ static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
->   */
->  static int kvm_handle_wfx(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  {
-> -	if (kvm_vcpu_get_hsr(vcpu) & ESR_EL2_EC_WFI_ISS_WFE)
-> +	if (kvm_vcpu_get_hsr(vcpu) & ESR_EL2_EC_WFI_ISS_WFE) {
-> +		trace_kvm_wfx_arm64(*vcpu_pc(vcpu), true);
->  		kvm_vcpu_on_spin(vcpu);
-> -	else
-> +	} else {
-> +		trace_kvm_wfx_arm64(*vcpu_pc(vcpu), false);
->  		kvm_vcpu_block(vcpu);
-> +	}
->  
->  	kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
->  
-> diff --git a/arch/arm64/kvm/trace.h b/arch/arm64/kvm/trace.h
-> new file mode 100644
-> index 0000000..157416e9
-> --- /dev/null
-> +++ b/arch/arm64/kvm/trace.h
-> @@ -0,0 +1,55 @@
-> +#if !defined(_TRACE_ARM64_KVM_H) || defined(TRACE_HEADER_MULTI_READ)
-> +#define _TRACE_ARM64_KVM_H
-> +
-> +#include <linux/tracepoint.h>
-> +
-> +#undef TRACE_SYSTEM
-> +#define TRACE_SYSTEM kvm
-> +
-> +TRACE_EVENT(kvm_wfx_arm64,
-> +	TP_PROTO(unsigned long vcpu_pc, bool is_wfe),
-> +	TP_ARGS(vcpu_pc, is_wfe),
-> +
-> +	TP_STRUCT__entry(
-> +		__field(unsigned long,	vcpu_pc)
-> +		__field(bool,		is_wfe)
-> +	),
-> +
-> +	TP_fast_assign(
-> +		__entry->vcpu_pc = vcpu_pc;
-> +		__entry->is_wfe  = is_wfe;
-> +	),
-> +
-> +	TP_printk("guest executed wf%c at: 0x%08lx",
-> +		  __entry->is_wfe ? 'e' : 'i', __entry->vcpu_pc)
-> +);
-> +
-> +TRACE_EVENT(kvm_hvc_arm64,
-> +	TP_PROTO(unsigned long vcpu_pc, unsigned long r0, unsigned long imm),
-> +	TP_ARGS(vcpu_pc, r0, imm),
-> +
-> +	TP_STRUCT__entry(
-> +		__field(unsigned long, vcpu_pc)
-> +		__field(unsigned long, r0)
-> +		__field(unsigned long, imm)
-> +	),
-> +
-> +	TP_fast_assign(
-> +		__entry->vcpu_pc = vcpu_pc;
-> +		__entry->r0 = r0;
-> +		__entry->imm = imm;
-> +	),
-> +
-> +	TP_printk("HVC at 0x%08lx (r0: 0x%08lx, imm: 0x%lx)",
-> +		  __entry->vcpu_pc, __entry->r0, __entry->imm)
-> +);
-> +
-> +#endif /* _TRACE_ARM64_KVM_H */
-> +
-> +#undef TRACE_INCLUDE_PATH
-> +#define TRACE_INCLUDE_PATH .
-> +#undef TRACE_INCLUDE_FILE
-> +#define TRACE_INCLUDE_FILE trace
-> +
-> +/* This part must be outside protection */
-> +#include <trace/define_trace.h>
-> -- 
-> 2.1.2.330.g565301e.dirty
+>  Documentation/devicetree/bindings/power/opp.txt | 309 +++++++++++++++++++++++-
+>  1 file changed, 308 insertions(+), 1 deletion(-)
 > 
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
-> 
+> diff --git a/Documentation/devicetree/bindings/power/opp.txt b/Documentation/devicetree/bindings/power/opp.txt
+> index 74499e5033fc..9cdc0c9b09af 100644
+> --- a/Documentation/devicetree/bindings/power/opp.txt
+> +++ b/Documentation/devicetree/bindings/power/opp.txt
+> @@ -1,9 +1,316 @@
+> -* Generic OPP Interface
+> +Generic OPP (Operating Performance Points) Interface
+> +----------------------------------------------------
+>  
+>  SoCs have a standard set of tuples consisting of frequency and
+>  voltage pairs that the device will support per voltage domain. These
+>  are called Operating Performance Points or OPPs.
+>  
+> +This documents defines OPP bindings with its required/optional properties. OPPs
+> +can be defined for any device, this file uses CPU as an example to illustrate
+> +how to define OPPs.
+> +
+> +opp nodes and opp-lists
+> +
+> +- opp-listN:
+> +  List of nodes defining performance points. Following belong to the nodes
+> +  within the opp-lists.
+> +
+> +  Required properties:
+> +  - opp-khz: Frequency in kHz
+> +  - opp-microvolt: voltage in micro Volts
+
+Each OPP voltage should be defined by the triplet of minimum,
+nominal/typical, maximum. This lets you specify exact tolerances in each
+direction and should cover most use-cases.
+
+IMHO it would make sense to just define opp-microvolt as an array of
+those 3 values, so the DT doesn't get bloated with a lot more
+properties.
+
+A typical value for a CPU could then look like this:
+opp-microvolt = <800000 850000 1100000>
+
+For devices without any tolerance you can just specify the same value
+three times and be done with it:
+opp-microvolt = <900000 900000 900000>
+
+> +
+> +  Optional properties:
+> +  - turbo-mode: Marks the volt-freq pair as turbo pair.
+> +  - status: Marks the node enabled/disabled.
+> +  - voltage-tolerance: Specify the CPU voltage tolerance in percentage.
+
+Please let's drop this.
+
+> +  - clock-latency-ns: Specify the possible maximum transition latency (in
+> +    nanoseconds) for switching to this opp from any other opp.
+> +
+> +- oppN:
+> +  Operating performance point node per device. Devices using it should have its
+> +  phandle in their "operating-points-v2" property.
+> +
+> +  Required properties:
+> +  - compatible: allow OPPs to express their compatibility.
+> +  - opp-list: phandle to opp-list defined above.
+> +
+> +  Optional properties:
+> +  - opp-intermediate: Stable opp we *must* switch to, before switching to the
+> +    target opp. Contains phandle of one of the opp-node present in opp-list.
+> +
+[...]
+
+Regards,
+Lucas
