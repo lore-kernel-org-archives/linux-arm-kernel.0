@@ -1,49 +1,75 @@
 From: ricardo.ribalda@gmail.com (Ricardo Ribalda Delgado)
-Date: Fri, 23 Jan 2015 17:08:34 +0100
-Subject: [PATCH 02/18] spi/xilinx: Support for spi mode LOOP
+Date: Fri, 23 Jan 2015 17:08:35 +0100
+Subject: [PATCH 03/18] spi/xilinx: Simplify data read from the Rx FIFO
 In-Reply-To: <1422029330-10971-1-git-send-email-ricardo.ribalda@gmail.com>
 References: <1422029330-10971-1-git-send-email-ricardo.ribalda@gmail.com>
-Message-ID: <1422029330-10971-3-git-send-email-ricardo.ribalda@gmail.com>
+Message-ID: <1422029330-10971-4-git-send-email-ricardo.ribalda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hardware supports LOOP mode. Support it also in the driver.
+The number of words in the read buffer will be exactly the same as the
+number of words written on write buffer, once the transaction has
+finished.
+
+Instead of cheking the rx_empty flags for every word simply save the
+number of words written by fill_tx_fifo.
 
 Signed-off-by: Ricardo Ribalda Delgado <ricardo.ribalda@gmail.com>
 ---
- drivers/spi/spi-xilinx.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ drivers/spi/spi-xilinx.c | 15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/spi/spi-xilinx.c b/drivers/spi/spi-xilinx.c
-index d4edeee..e1d9a20 100644
+index e1d9a20..416b227 100644
 --- a/drivers/spi/spi-xilinx.c
 +++ b/drivers/spi/spi-xilinx.c
-@@ -35,7 +35,7 @@
- #define XSPI_CR_CPOL		0x08
- #define XSPI_CR_CPHA		0x10
- #define XSPI_CR_MODE_MASK	(XSPI_CR_CPHA | XSPI_CR_CPOL | \
--				 XSPI_CR_LSB_FIRST)
-+				 XSPI_CR_LSB_FIRST | XSPI_CR_LOOP)
- #define XSPI_CR_TXFIFO_RESET	0x20
- #define XSPI_CR_RXFIFO_RESET	0x40
- #define XSPI_CR_MANUAL_SSELECT	0x80
-@@ -197,6 +197,8 @@ static void xilinx_spi_chipselect(struct spi_device *spi, int is_on)
- 			cr |= XSPI_CR_CPOL;
- 		if (spi->mode & SPI_LSB_FIRST)
- 			cr |= XSPI_CR_LSB_FIRST;
-+		if (spi->mode & SPI_LOOP)
-+			cr |= XSPI_CR_LOOP;
- 		xspi->write_fn(cr, xspi->regs + XSPI_CR_OFFSET);
+@@ -221,9 +221,10 @@ static int xilinx_spi_setup_transfer(struct spi_device *spi,
+ 	return 0;
+ }
  
- 		/* We do not check spi->max_speed_hz here as the SPI clock
-@@ -356,7 +358,7 @@ static int xilinx_spi_probe(struct platform_device *pdev)
- 		return -ENODEV;
+-static void xilinx_spi_fill_tx_fifo(struct xilinx_spi *xspi)
++static int xilinx_spi_fill_tx_fifo(struct xilinx_spi *xspi)
+ {
+ 	u8 sr;
++	int n_words = 0;
  
- 	/* the spi->mode bits understood by this driver: */
--	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_LSB_FIRST;
-+	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_LSB_FIRST | SPI_LOOP;
+ 	/* Fill the Tx FIFO with as many bytes as possible */
+ 	sr = xspi->read_fn(xspi->regs + XSPI_SR_OFFSET);
+@@ -234,7 +235,10 @@ static void xilinx_spi_fill_tx_fifo(struct xilinx_spi *xspi)
+ 			xspi->write_fn(0, xspi->regs + XSPI_TXD_OFFSET);
+ 		xspi->remaining_bytes -= xspi->bits_per_word / 8;
+ 		sr = xspi->read_fn(xspi->regs + XSPI_SR_OFFSET);
++		n_words++;
+ 	}
++
++	return n_words;
+ }
  
- 	xspi = spi_master_get_devdata(master);
- 	xspi->bitbang.master = master;
+ static int xilinx_spi_txrx_bufs(struct spi_device *spi, struct spi_transfer *t)
+@@ -259,9 +263,9 @@ static int xilinx_spi_txrx_bufs(struct spi_device *spi, struct spi_transfer *t)
+ 
+ 	for (;;) {
+ 		u16 cr;
+-		u8 sr;
++		int n_words;
+ 
+-		xilinx_spi_fill_tx_fifo(xspi);
++		n_words = xilinx_spi_fill_tx_fifo(xspi);
+ 
+ 		/* Start the transfer by not inhibiting the transmitter any
+ 		 * longer
+@@ -282,11 +286,8 @@ static int xilinx_spi_txrx_bufs(struct spi_device *spi, struct spi_transfer *t)
+ 			       xspi->regs + XSPI_CR_OFFSET);
+ 
+ 		/* Read out all the data from the Rx FIFO */
+-		sr = xspi->read_fn(xspi->regs + XSPI_SR_OFFSET);
+-		while ((sr & XSPI_SR_RX_EMPTY_MASK) == 0) {
++		while (n_words--)
+ 			xspi->rx_fn(xspi);
+-			sr = xspi->read_fn(xspi->regs + XSPI_SR_OFFSET);
+-		}
+ 
+ 		/* See if there is more data to send */
+ 		if (xspi->remaining_bytes <= 0)
 -- 
 2.1.4
