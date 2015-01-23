@@ -1,111 +1,780 @@
 From: al.stone@linaro.org (al.stone at linaro.org)
-Date: Thu, 22 Jan 2015 17:44:37 -0700
-Subject: [PATCH 0/7] Start deprecating _OSI on new architectures
-Message-ID: <1421973884-13029-1-git-send-email-al.stone@linaro.org>
+Date: Thu, 22 Jan 2015 17:44:39 -0700
+Subject: [PATCH 2/7] arm64: ACPI: move kernel acpi files to a directory
+In-Reply-To: <1421973884-13029-1-git-send-email-al.stone@linaro.org>
+References: <1421973884-13029-1-git-send-email-al.stone@linaro.org>
+Message-ID: <1421973884-13029-3-git-send-email-al.stone@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Al Stone <al.stone@linaro.org>
+From: Al Stone <ahs3@redhat.com>
 
-The use of the ACPI _OSI method in Linux has a long and sordid history.
-Instead of perpetuating past complications on new architectures, the 
-consensus amongst those writing the ACPI specification and those using
-it seems to be to ultimately deprecate the use of _OSI.  I plan to
-propose such a change to the ACPI specification in the near future.
+In preparation for adding some additional arch-dependent ACPI files,
+move the existing ones to a directory to try to keep clutter down in
+the arch/arm64/kernel directory.
 
-In the meantime, these patches rearrange the implementation of _OSI so
-that it can be deprecated, or ultimately removed completely, on at least
-arm64 platforms.  This is done by simply moving the functions implementing 
-_OSI to arch-dependent locations.  For x86, there should be no change
-in functionality.  For ia64, while it does duplicate some code from x86,
-there is no longer any connection to the ACPI blacklist code that is only
-used by x86.  For arm64, any use of the _OSI method generates a warning
-that it has been deprecated, and then always returns false; i.e., that
-the capability being queried for, whether OS name or functionality, is
-not supported.  This is the first six of the patches.
+There is no functional change.  This patch only moves source files.
 
-The final patch changes the default value for the _OS_ method for arm64
-only.  Since there is no need to pretend to be older versions of Windows,
-or any other OS at all, the _OS_ method will return "Linux" on arm64.
-One can still use the acpi_os_name kernel parameter if there is a need
-to use some other value.
-
-Since we are breaking apart code previously shared, I have tried to make
-it so that applying the x86 patches alone will continue to compile, at
-the expense of breaking the build on non-x86 platforms.  However, once
-all of the patches are applied, we should be able to compile on all three
-architectures.  It is best to treat these as one whole.
-
-I have only done simple testing with these patches on arm64 and x86 (AMD
-Seattle and a Lenovo t440s ThinkPad, respectively).  Things seem to work
-as they should once booted, but this is a very, very small sample of
-possible machines.  The ia64 patches cross-compile, but I personally have
-no way to test them.
-
-The arm64 patches also rely on having applied Hanjun's patches for ACPI 5.1
-on arm64 [0].  The x86 and ia64 parts are not dependent on that patch set,
-though, and should be usable independently (i.e., patches 1, 3, 4 and 6).
-
-NB: some of the patches do not pass checkpatch.pl; the failures I saw were
-all part of the original code but are only showing up because that code is
-changing location, so I have left them as is.  If necessary, they could be
-fixed but I was more concerned about the number of changes needed on ia64
-and not having any way to test them.
-
-
-[0] https://lkml.org/lkml/2015/1/14/586
-
-
-Al Stone (6):
-  ia64: ACPI: move kernel acpi files to a directory
-  arm64: ACPI: move kernel acpi files to a directory
-  x86: ACPI: create arch-dependent version of acpi_osi_handler()
-  ia64: ACPI: create arch-dependent version of acpi_osi_handler()
-  arm64: ACPI: create arch-dependent version of acpi_osi_handler()
-  x86: ia64: arm64: ACPI: move _OSI support functions to arch-dependent
-    locations
-
-Hanjun Guo (1):
-  ACPI: use Linux as ACPI_OS_NAME for _OS on ARM64
-
- arch/arm64/Kconfig               |    1 +
- arch/arm64/kernel/Makefile       |    2 +-
- arch/arm64/kernel/acpi.c         |  359 --------------
- arch/arm64/kernel/acpi/Makefile  |    1 +
- arch/arm64/kernel/acpi/acpi.c    |  359 ++++++++++++++
- arch/arm64/kernel/acpi/osi.c     |   26 +
- arch/ia64/kernel/Makefile        |    2 +-
- arch/ia64/kernel/acpi-ext.c      |  104 ----
- arch/ia64/kernel/acpi.c          | 1000 --------------------------------------
- arch/ia64/kernel/acpi/Makefile   |    1 +
- arch/ia64/kernel/acpi/acpi-ext.c |  104 ++++
- arch/ia64/kernel/acpi/acpi.c     | 1000 ++++++++++++++++++++++++++++++++++++++
- arch/ia64/kernel/acpi/osi.c      |  119 +++++
- arch/x86/kernel/acpi/Makefile    |    2 +-
- arch/x86/kernel/acpi/blacklist.c |  327 +++++++++++++
- arch/x86/kernel/acpi/boot.c      |    5 +-
- arch/x86/kernel/acpi/osi.c       |  255 ++++++++++
- drivers/acpi/Kconfig             |    8 +
- drivers/acpi/Makefile            |    1 -
- drivers/acpi/blacklist.c         |  323 ------------
- drivers/acpi/osl.c               |  217 ---------
- include/acpi/acconfig.h          |    2 +
- include/acpi/platform/aclinux.h  |    4 +
- include/linux/acpi.h             |    4 +-
- 24 files changed, 2215 insertions(+), 2011 deletions(-)
+Signed-off-by: Al Stone <al.stone@linaro.org>
+---
+ arch/arm64/kernel/Makefile      |   2 +-
+ arch/arm64/kernel/acpi.c        | 359 ----------------------------------------
+ arch/arm64/kernel/acpi/Makefile |   1 +
+ arch/arm64/kernel/acpi/acpi.c   | 359 ++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 361 insertions(+), 360 deletions(-)
  delete mode 100644 arch/arm64/kernel/acpi.c
  create mode 100644 arch/arm64/kernel/acpi/Makefile
  create mode 100644 arch/arm64/kernel/acpi/acpi.c
- create mode 100644 arch/arm64/kernel/acpi/osi.c
- delete mode 100644 arch/ia64/kernel/acpi-ext.c
- delete mode 100644 arch/ia64/kernel/acpi.c
- create mode 100644 arch/ia64/kernel/acpi/Makefile
- create mode 100644 arch/ia64/kernel/acpi/acpi-ext.c
- create mode 100644 arch/ia64/kernel/acpi/acpi.c
- create mode 100644 arch/ia64/kernel/acpi/osi.c
- create mode 100644 arch/x86/kernel/acpi/blacklist.c
- create mode 100644 arch/x86/kernel/acpi/osi.c
- delete mode 100644 drivers/acpi/blacklist.c
 
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 8bdc6bd..d7d622f 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -34,7 +34,7 @@ arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
+ arm64-obj-$(CONFIG_EFI)			+= efi.o efi-stub.o efi-entry.o
+ arm64-obj-$(CONFIG_PCI)			+= pci.o
+ arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
+-arm64-obj-$(CONFIG_ACPI)		+= acpi.o
++arm64-obj-$(CONFIG_ACPI)		+= acpi/
+ 
+ obj-y					+= $(arm64-obj-y) vdso/
+ obj-m					+= $(arm64-obj-m)
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+deleted file mode 100644
+index ea3c9fc..0000000
+--- a/arch/arm64/kernel/acpi.c
++++ /dev/null
+@@ -1,359 +0,0 @@
+-/*
+- *  ARM64 Specific Low-Level ACPI Boot Support
+- *
+- *  Copyright (C) 2013-2014, Linaro Ltd.
+- *	Author: Al Stone <al.stone@linaro.org>
+- *	Author: Graeme Gregory <graeme.gregory@linaro.org>
+- *	Author: Hanjun Guo <hanjun.guo@linaro.org>
+- *	Author: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+- *	Author: Naresh Bhat <naresh.bhat@linaro.org>
+- *
+- *  This program is free software; you can redistribute it and/or modify
+- *  it under the terms of the GNU General Public License version 2 as
+- *  published by the Free Software Foundation.
+- */
+-
+-#define pr_fmt(fmt) "ACPI: " fmt
+-
+-#include <linux/init.h>
+-#include <linux/acpi.h>
+-#include <linux/cpumask.h>
+-#include <linux/memblock.h>
+-#include <linux/irq.h>
+-#include <linux/irqdomain.h>
+-#include <linux/bootmem.h>
+-#include <linux/smp.h>
+-#include <linux/irqchip/arm-gic-acpi.h>
+-
+-#include <asm/cputype.h>
+-#include <asm/cpu_ops.h>
+-
+-int acpi_noirq;			/* skip ACPI IRQ initialization */
+-int acpi_disabled;
+-EXPORT_SYMBOL(acpi_disabled);
+-
+-int acpi_pci_disabled;		/* skip ACPI PCI scan and IRQ initialization */
+-EXPORT_SYMBOL(acpi_pci_disabled);
+-
+-static int enabled_cpus;	/* Processors (GICC) with enabled flag in MADT */
+-
+-/*
+- * Since we're on ARM, the default interrupt routing model
+- * clearly has to be GIC.
+- */
+-enum acpi_irq_model_id acpi_irq_model = ACPI_IRQ_MODEL_GIC;
+-
+-/*
+- * __acpi_map_table() will be called before page_init(), so early_ioremap()
+- * or early_memremap() should be called here to for ACPI table mapping.
+- */
+-char *__init __acpi_map_table(unsigned long phys, unsigned long size)
+-{
+-	if (!phys || !size)
+-		return NULL;
+-
+-	return early_memremap(phys, size);
+-}
+-
+-void __init __acpi_unmap_table(char *map, unsigned long size)
+-{
+-	if (!map || !size)
+-		return;
+-
+-	early_memunmap(map, size);
+-}
+-
+-/**
+- * acpi_map_gic_cpu_interface - generates a logical cpu number
+- * and map to MPIDR represented by GICC structure
+- * @mpidr: CPU's hardware id to register, MPIDR represented in MADT
+- * @enabled: this cpu is enabled or not
+- *
+- * Returns the logical cpu number which maps to MPIDR
+- */
+-static int acpi_map_gic_cpu_interface(u64 mpidr, u8 enabled)
+-{
+-	int cpu;
+-
+-	if (mpidr == INVALID_HWID) {
+-		pr_info("Skip MADT cpu entry with invalid MPIDR\n");
+-		return -EINVAL;
+-	}
+-
+-	total_cpus++;
+-	if (!enabled)
+-		return -EINVAL;
+-
+-	if (enabled_cpus >=  NR_CPUS) {
+-		pr_warn("NR_CPUS limit of %d reached, Processor %d/0x%llx ignored.\n",
+-			NR_CPUS, total_cpus, mpidr);
+-		return -EINVAL;
+-	}
+-
+-	/* No need to check duplicate MPIDRs for the first CPU */
+-	if (enabled_cpus) {
+-		/*
+-		 * Duplicate MPIDRs are a recipe for disaster. Scan
+-		 * all initialized entries and check for
+-		 * duplicates. If any is found just ignore the CPU.
+-		 */
+-		for_each_possible_cpu(cpu) {
+-			if (cpu_logical_map(cpu) == mpidr) {
+-				pr_err("Firmware bug, duplicate CPU MPIDR: 0x%llx in MADT\n",
+-				       mpidr);
+-				return -EINVAL;
+-			}
+-		}
+-
+-		/* allocate a logical cpu id for the new comer */
+-		cpu = cpumask_next_zero(-1, cpu_possible_mask);
+-	} else {
+-		/*
+-		 * First GICC entry must be BSP as ACPI spec said
+-		 * in section 5.2.12.15
+-		 */
+-		if  (cpu_logical_map(0) != mpidr) {
+-			pr_err("First GICC entry with MPIDR 0x%llx is not BSP\n",
+-			       mpidr);
+-			return -EINVAL;
+-		}
+-
+-		/*
+-		 * boot_cpu_init() already hold bit 0 in cpu_present_mask
+-		 * for BSP, no need to allocate again.
+-		 */
+-		cpu = 0;
+-	}
+-
+-	/* CPU 0 was already initialized */
+-	if (cpu) {
+-		cpu_ops[cpu] = cpu_get_ops(acpi_psci_present() ? "psci" : NULL);
+-		if (!cpu_ops[cpu])
+-			return -EINVAL;
+-
+-		if (cpu_ops[cpu]->cpu_init(NULL, cpu))
+-			return -EOPNOTSUPP;
+-
+-		/* map the logical cpu id to cpu MPIDR */
+-		cpu_logical_map(cpu) = mpidr;
+-
+-		set_cpu_possible(cpu, true);
+-	} else {
+-		/* get cpu0's ops, no need to return if ops is null */
+-		cpu_ops[0] = cpu_get_ops(acpi_psci_present() ? "psci" : NULL);
+-	}
+-
+-	enabled_cpus++;
+-	return cpu;
+-}
+-
+-static int __init
+-acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
+-				const unsigned long end)
+-{
+-	struct acpi_madt_generic_interrupt *processor;
+-
+-	processor = (struct acpi_madt_generic_interrupt *)header;
+-
+-	if (BAD_MADT_ENTRY(processor, end))
+-		return -EINVAL;
+-
+-	acpi_table_print_madt_entry(header);
+-
+-	acpi_map_gic_cpu_interface(processor->arm_mpidr & MPIDR_HWID_BITMASK,
+-		processor->flags & ACPI_MADT_ENABLED);
+-
+-	return 0;
+-}
+-
+-/* Parse GIC cpu interface entries in MADT for SMP init */
+-void __init acpi_smp_init_cpus(void)
+-{
+-	int count;
+-
+-	/*
+-	 * do a partial walk of MADT to determine how many CPUs
+-	 * we have including disabled CPUs, and get information
+-	 * we need for SMP init
+-	 */
+-	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
+-			acpi_parse_gic_cpu_interface, 0);
+-
+-	if (!count) {
+-		pr_err("No GIC CPU interface entries present\n");
+-		return;
+-	} else if (count < 0) {
+-		pr_err("Error parsing GIC CPU interface entry\n");
+-		return;
+-	}
+-
+-	/* Make boot-up look pretty */
+-	pr_info("%d CPUs enabled, %d CPUs total\n", enabled_cpus, total_cpus);
+-}
+-
+-int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
+-{
+-	*irq = irq_find_mapping(NULL, gsi);
+-
+-	return 0;
+-}
+-EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
+-
+-/*
+- * success: return IRQ number (>0)
+- * failure: return =< 0
+- */
+-int acpi_register_gsi(struct device *dev, u32 gsi, int trigger, int polarity)
+-{
+-	unsigned int irq;
+-	unsigned int irq_type;
+-
+-	/*
+-	 * ACPI have no bindings to indicate SPI or PPI, so we
+-	 * use different mappings from DT in ACPI.
+-	 *
+-	 * For FDT
+-	 * PPI interrupt: in the range [0, 15];
+-	 * SPI interrupt: in the range [0, 987];
+-	 *
+-	 * For ACPI, GSI should be unique so using
+-	 * the hwirq directly for the mapping:
+-	 * PPI interrupt: in the range [16, 31];
+-	 * SPI interrupt: in the range [32, 1019];
+-	 */
+-
+-	if (trigger == ACPI_EDGE_SENSITIVE &&
+-				polarity == ACPI_ACTIVE_LOW)
+-		irq_type = IRQ_TYPE_EDGE_FALLING;
+-	else if (trigger == ACPI_EDGE_SENSITIVE &&
+-				polarity == ACPI_ACTIVE_HIGH)
+-		irq_type = IRQ_TYPE_EDGE_RISING;
+-	else if (trigger == ACPI_LEVEL_SENSITIVE &&
+-				polarity == ACPI_ACTIVE_LOW)
+-		irq_type = IRQ_TYPE_LEVEL_LOW;
+-	else if (trigger == ACPI_LEVEL_SENSITIVE &&
+-				polarity == ACPI_ACTIVE_HIGH)
+-		irq_type = IRQ_TYPE_LEVEL_HIGH;
+-	else
+-		irq_type = IRQ_TYPE_NONE;
+-
+-	/*
+-	 * Since only one GIC is supported in ACPI 5.0, we can
+-	 * create mapping refer to the default domain
+-	 */
+-	irq = irq_create_mapping(NULL, gsi);
+-	if (!irq)
+-		return irq;
+-
+-	/* Set irq type if specified and different than the current one */
+-	if (irq_type != IRQ_TYPE_NONE &&
+-		irq_type != irq_get_trigger_type(irq))
+-		irq_set_irq_type(irq, irq_type);
+-	return irq;
+-}
+-EXPORT_SYMBOL_GPL(acpi_register_gsi);
+-
+-void acpi_unregister_gsi(u32 gsi)
+-{
+-}
+-EXPORT_SYMBOL_GPL(acpi_unregister_gsi);
+-
+-static int __init acpi_parse_fadt(struct acpi_table_header *table)
+-{
+-	struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
+-
+-	/*
+-	 * Revision in table header is the FADT Major revision,
+-	 * and there is a minor revision of FADT which was introduced
+-	 * by ACPI 5.1, we only deal with ACPI 5.1 or newer revision
+-	 * to get arm boot flags, or we will disable ACPI.
+-	 */
+-	if (table->revision > 5 ||
+-	    (table->revision == 5 && fadt->minor_revision >= 1)) {
+-		/*
+-		 * ACPI 5.1 only has two explicit methods to boot up SMP,
+-		 * PSCI and Parking protocol, but the Parking protocol is
+-		 * only specified for ARMv7 now, so make PSCI as the only
+-		 * way for the SMP boot protocol before some updates for
+-		 * the ACPI spec or the Parking protocol spec.
+-		 */
+-		if (acpi_psci_present())
+-			return 0;
+-
+-		pr_warn("No PSCI support, will not bring up secondary CPUs\n");
+-		return -EOPNOTSUPP;
+-	}
+-
+-	pr_warn("Unsupported FADT revision %d.%d, should be 5.1+, will disable ACPI\n",
+-		table->revision, fadt->minor_revision);
+-	disable_acpi();
+-
+-	return -EINVAL;
+-}
+-
+-/*
+- * acpi_boot_table_init() called from setup_arch(), always.
+- *	1. find RSDP and get its address, and then find XSDT
+- *	2. extract all tables and checksums them all
+- *	3. check ACPI FADT revision
+- *
+- * We can parse ACPI boot-time tables such as MADT after
+- * this function is called.
+- */
+-void __init acpi_boot_table_init(void)
+-{
+-	/* If acpi_disabled, bail out */
+-	if (acpi_disabled)
+-		return;
+-
+-	/* Initialize the ACPI boot-time table parser. */
+-	if (acpi_table_init()) {
+-		disable_acpi();
+-		return;
+-	}
+-
+-	if (acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt))
+-		pr_err("Can't find FADT or error happened during parsing FADT\n");
+-}
+-
+-void __init acpi_gic_init(void)
+-{
+-	struct acpi_table_header *table;
+-	acpi_status status;
+-	acpi_size tbl_size;
+-	int err;
+-
+-	if (acpi_disabled)
+-		return;
+-
+-	status = acpi_get_table_with_size(ACPI_SIG_MADT, 0, &table, &tbl_size);
+-	if (ACPI_FAILURE(status)) {
+-		const char *msg = acpi_format_exception(status);
+-
+-		pr_err("Failed to get MADT table, %s\n", msg);
+-		return;
+-	}
+-
+-	err = gic_v2_acpi_init(table);
+-	if (err)
+-		pr_err("Failed to initialize GIC IRQ controller");
+-
+-	early_acpi_os_unmap_memory((char *)table, tbl_size);
+-}
+-
+-static int __init parse_acpi(char *arg)
+-{
+-	if (!arg)
+-		return -EINVAL;
+-
+-	/* "acpi=off" disables both ACPI table parsing and interpreter */
+-	if (strcmp(arg, "off") == 0)
+-		disable_acpi();
+-	else if (strcmp(arg, "force") == 0) /* force ACPI to be enabled */
+-		enable_acpi();
+-	else
+-		return -EINVAL;	/* Core will print when we return error */
+-
+-	return 0;
+-}
+-early_param("acpi", parse_acpi);
+diff --git a/arch/arm64/kernel/acpi/Makefile b/arch/arm64/kernel/acpi/Makefile
+new file mode 100644
+index 0000000..e049f94
+--- /dev/null
++++ b/arch/arm64/kernel/acpi/Makefile
+@@ -0,0 +1 @@
++obj-$(CONFIG_ACPI)		+= acpi.o
+diff --git a/arch/arm64/kernel/acpi/acpi.c b/arch/arm64/kernel/acpi/acpi.c
+new file mode 100644
+index 0000000..ea3c9fc
+--- /dev/null
++++ b/arch/arm64/kernel/acpi/acpi.c
+@@ -0,0 +1,359 @@
++/*
++ *  ARM64 Specific Low-Level ACPI Boot Support
++ *
++ *  Copyright (C) 2013-2014, Linaro Ltd.
++ *	Author: Al Stone <al.stone@linaro.org>
++ *	Author: Graeme Gregory <graeme.gregory@linaro.org>
++ *	Author: Hanjun Guo <hanjun.guo@linaro.org>
++ *	Author: Tomasz Nowicki <tomasz.nowicki@linaro.org>
++ *	Author: Naresh Bhat <naresh.bhat@linaro.org>
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License version 2 as
++ *  published by the Free Software Foundation.
++ */
++
++#define pr_fmt(fmt) "ACPI: " fmt
++
++#include <linux/init.h>
++#include <linux/acpi.h>
++#include <linux/cpumask.h>
++#include <linux/memblock.h>
++#include <linux/irq.h>
++#include <linux/irqdomain.h>
++#include <linux/bootmem.h>
++#include <linux/smp.h>
++#include <linux/irqchip/arm-gic-acpi.h>
++
++#include <asm/cputype.h>
++#include <asm/cpu_ops.h>
++
++int acpi_noirq;			/* skip ACPI IRQ initialization */
++int acpi_disabled;
++EXPORT_SYMBOL(acpi_disabled);
++
++int acpi_pci_disabled;		/* skip ACPI PCI scan and IRQ initialization */
++EXPORT_SYMBOL(acpi_pci_disabled);
++
++static int enabled_cpus;	/* Processors (GICC) with enabled flag in MADT */
++
++/*
++ * Since we're on ARM, the default interrupt routing model
++ * clearly has to be GIC.
++ */
++enum acpi_irq_model_id acpi_irq_model = ACPI_IRQ_MODEL_GIC;
++
++/*
++ * __acpi_map_table() will be called before page_init(), so early_ioremap()
++ * or early_memremap() should be called here to for ACPI table mapping.
++ */
++char *__init __acpi_map_table(unsigned long phys, unsigned long size)
++{
++	if (!phys || !size)
++		return NULL;
++
++	return early_memremap(phys, size);
++}
++
++void __init __acpi_unmap_table(char *map, unsigned long size)
++{
++	if (!map || !size)
++		return;
++
++	early_memunmap(map, size);
++}
++
++/**
++ * acpi_map_gic_cpu_interface - generates a logical cpu number
++ * and map to MPIDR represented by GICC structure
++ * @mpidr: CPU's hardware id to register, MPIDR represented in MADT
++ * @enabled: this cpu is enabled or not
++ *
++ * Returns the logical cpu number which maps to MPIDR
++ */
++static int acpi_map_gic_cpu_interface(u64 mpidr, u8 enabled)
++{
++	int cpu;
++
++	if (mpidr == INVALID_HWID) {
++		pr_info("Skip MADT cpu entry with invalid MPIDR\n");
++		return -EINVAL;
++	}
++
++	total_cpus++;
++	if (!enabled)
++		return -EINVAL;
++
++	if (enabled_cpus >=  NR_CPUS) {
++		pr_warn("NR_CPUS limit of %d reached, Processor %d/0x%llx ignored.\n",
++			NR_CPUS, total_cpus, mpidr);
++		return -EINVAL;
++	}
++
++	/* No need to check duplicate MPIDRs for the first CPU */
++	if (enabled_cpus) {
++		/*
++		 * Duplicate MPIDRs are a recipe for disaster. Scan
++		 * all initialized entries and check for
++		 * duplicates. If any is found just ignore the CPU.
++		 */
++		for_each_possible_cpu(cpu) {
++			if (cpu_logical_map(cpu) == mpidr) {
++				pr_err("Firmware bug, duplicate CPU MPIDR: 0x%llx in MADT\n",
++				       mpidr);
++				return -EINVAL;
++			}
++		}
++
++		/* allocate a logical cpu id for the new comer */
++		cpu = cpumask_next_zero(-1, cpu_possible_mask);
++	} else {
++		/*
++		 * First GICC entry must be BSP as ACPI spec said
++		 * in section 5.2.12.15
++		 */
++		if  (cpu_logical_map(0) != mpidr) {
++			pr_err("First GICC entry with MPIDR 0x%llx is not BSP\n",
++			       mpidr);
++			return -EINVAL;
++		}
++
++		/*
++		 * boot_cpu_init() already hold bit 0 in cpu_present_mask
++		 * for BSP, no need to allocate again.
++		 */
++		cpu = 0;
++	}
++
++	/* CPU 0 was already initialized */
++	if (cpu) {
++		cpu_ops[cpu] = cpu_get_ops(acpi_psci_present() ? "psci" : NULL);
++		if (!cpu_ops[cpu])
++			return -EINVAL;
++
++		if (cpu_ops[cpu]->cpu_init(NULL, cpu))
++			return -EOPNOTSUPP;
++
++		/* map the logical cpu id to cpu MPIDR */
++		cpu_logical_map(cpu) = mpidr;
++
++		set_cpu_possible(cpu, true);
++	} else {
++		/* get cpu0's ops, no need to return if ops is null */
++		cpu_ops[0] = cpu_get_ops(acpi_psci_present() ? "psci" : NULL);
++	}
++
++	enabled_cpus++;
++	return cpu;
++}
++
++static int __init
++acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
++				const unsigned long end)
++{
++	struct acpi_madt_generic_interrupt *processor;
++
++	processor = (struct acpi_madt_generic_interrupt *)header;
++
++	if (BAD_MADT_ENTRY(processor, end))
++		return -EINVAL;
++
++	acpi_table_print_madt_entry(header);
++
++	acpi_map_gic_cpu_interface(processor->arm_mpidr & MPIDR_HWID_BITMASK,
++		processor->flags & ACPI_MADT_ENABLED);
++
++	return 0;
++}
++
++/* Parse GIC cpu interface entries in MADT for SMP init */
++void __init acpi_smp_init_cpus(void)
++{
++	int count;
++
++	/*
++	 * do a partial walk of MADT to determine how many CPUs
++	 * we have including disabled CPUs, and get information
++	 * we need for SMP init
++	 */
++	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
++			acpi_parse_gic_cpu_interface, 0);
++
++	if (!count) {
++		pr_err("No GIC CPU interface entries present\n");
++		return;
++	} else if (count < 0) {
++		pr_err("Error parsing GIC CPU interface entry\n");
++		return;
++	}
++
++	/* Make boot-up look pretty */
++	pr_info("%d CPUs enabled, %d CPUs total\n", enabled_cpus, total_cpus);
++}
++
++int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
++{
++	*irq = irq_find_mapping(NULL, gsi);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
++
++/*
++ * success: return IRQ number (>0)
++ * failure: return =< 0
++ */
++int acpi_register_gsi(struct device *dev, u32 gsi, int trigger, int polarity)
++{
++	unsigned int irq;
++	unsigned int irq_type;
++
++	/*
++	 * ACPI have no bindings to indicate SPI or PPI, so we
++	 * use different mappings from DT in ACPI.
++	 *
++	 * For FDT
++	 * PPI interrupt: in the range [0, 15];
++	 * SPI interrupt: in the range [0, 987];
++	 *
++	 * For ACPI, GSI should be unique so using
++	 * the hwirq directly for the mapping:
++	 * PPI interrupt: in the range [16, 31];
++	 * SPI interrupt: in the range [32, 1019];
++	 */
++
++	if (trigger == ACPI_EDGE_SENSITIVE &&
++				polarity == ACPI_ACTIVE_LOW)
++		irq_type = IRQ_TYPE_EDGE_FALLING;
++	else if (trigger == ACPI_EDGE_SENSITIVE &&
++				polarity == ACPI_ACTIVE_HIGH)
++		irq_type = IRQ_TYPE_EDGE_RISING;
++	else if (trigger == ACPI_LEVEL_SENSITIVE &&
++				polarity == ACPI_ACTIVE_LOW)
++		irq_type = IRQ_TYPE_LEVEL_LOW;
++	else if (trigger == ACPI_LEVEL_SENSITIVE &&
++				polarity == ACPI_ACTIVE_HIGH)
++		irq_type = IRQ_TYPE_LEVEL_HIGH;
++	else
++		irq_type = IRQ_TYPE_NONE;
++
++	/*
++	 * Since only one GIC is supported in ACPI 5.0, we can
++	 * create mapping refer to the default domain
++	 */
++	irq = irq_create_mapping(NULL, gsi);
++	if (!irq)
++		return irq;
++
++	/* Set irq type if specified and different than the current one */
++	if (irq_type != IRQ_TYPE_NONE &&
++		irq_type != irq_get_trigger_type(irq))
++		irq_set_irq_type(irq, irq_type);
++	return irq;
++}
++EXPORT_SYMBOL_GPL(acpi_register_gsi);
++
++void acpi_unregister_gsi(u32 gsi)
++{
++}
++EXPORT_SYMBOL_GPL(acpi_unregister_gsi);
++
++static int __init acpi_parse_fadt(struct acpi_table_header *table)
++{
++	struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
++
++	/*
++	 * Revision in table header is the FADT Major revision,
++	 * and there is a minor revision of FADT which was introduced
++	 * by ACPI 5.1, we only deal with ACPI 5.1 or newer revision
++	 * to get arm boot flags, or we will disable ACPI.
++	 */
++	if (table->revision > 5 ||
++	    (table->revision == 5 && fadt->minor_revision >= 1)) {
++		/*
++		 * ACPI 5.1 only has two explicit methods to boot up SMP,
++		 * PSCI and Parking protocol, but the Parking protocol is
++		 * only specified for ARMv7 now, so make PSCI as the only
++		 * way for the SMP boot protocol before some updates for
++		 * the ACPI spec or the Parking protocol spec.
++		 */
++		if (acpi_psci_present())
++			return 0;
++
++		pr_warn("No PSCI support, will not bring up secondary CPUs\n");
++		return -EOPNOTSUPP;
++	}
++
++	pr_warn("Unsupported FADT revision %d.%d, should be 5.1+, will disable ACPI\n",
++		table->revision, fadt->minor_revision);
++	disable_acpi();
++
++	return -EINVAL;
++}
++
++/*
++ * acpi_boot_table_init() called from setup_arch(), always.
++ *	1. find RSDP and get its address, and then find XSDT
++ *	2. extract all tables and checksums them all
++ *	3. check ACPI FADT revision
++ *
++ * We can parse ACPI boot-time tables such as MADT after
++ * this function is called.
++ */
++void __init acpi_boot_table_init(void)
++{
++	/* If acpi_disabled, bail out */
++	if (acpi_disabled)
++		return;
++
++	/* Initialize the ACPI boot-time table parser. */
++	if (acpi_table_init()) {
++		disable_acpi();
++		return;
++	}
++
++	if (acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt))
++		pr_err("Can't find FADT or error happened during parsing FADT\n");
++}
++
++void __init acpi_gic_init(void)
++{
++	struct acpi_table_header *table;
++	acpi_status status;
++	acpi_size tbl_size;
++	int err;
++
++	if (acpi_disabled)
++		return;
++
++	status = acpi_get_table_with_size(ACPI_SIG_MADT, 0, &table, &tbl_size);
++	if (ACPI_FAILURE(status)) {
++		const char *msg = acpi_format_exception(status);
++
++		pr_err("Failed to get MADT table, %s\n", msg);
++		return;
++	}
++
++	err = gic_v2_acpi_init(table);
++	if (err)
++		pr_err("Failed to initialize GIC IRQ controller");
++
++	early_acpi_os_unmap_memory((char *)table, tbl_size);
++}
++
++static int __init parse_acpi(char *arg)
++{
++	if (!arg)
++		return -EINVAL;
++
++	/* "acpi=off" disables both ACPI table parsing and interpreter */
++	if (strcmp(arg, "off") == 0)
++		disable_acpi();
++	else if (strcmp(arg, "force") == 0) /* force ACPI to be enabled */
++		enable_acpi();
++	else
++		return -EINVAL;	/* Core will print when we return error */
++
++	return 0;
++}
++early_param("acpi", parse_acpi);
 -- 
 2.1.0
