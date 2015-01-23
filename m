@@ -1,79 +1,44 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 23 Jan 2015 09:43:54 +0000
-Subject: [PATCH v2 4/9] ARM: STi: DT: STiH407: Add Device Tree node for
- the LPC
-In-Reply-To: <54C208D9.6050006@st.com>
-References: <1421927767-28889-1-git-send-email-lee.jones@linaro.org>
- <1421927767-28889-5-git-send-email-lee.jones@linaro.org>
- <54C208D9.6050006@st.com>
-Message-ID: <20150123094354.GG9129@x1>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 23 Jan 2015 10:44:31 +0100
+Subject: KVM: CONFIG_LOCK_DEP and CONFIG_LOCK_DETECTOR?
+In-Reply-To: <54C14D01.2010506@arm.com>
+References: <1421919245.13638.50.camel@x220> <54C14BCF.1050902@samsung.com>
+ <54C14D01.2010506@arm.com>
+Message-ID: <20150123094431.GI15076@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 23 Jan 2015, David Paris wrote:
-
-> Hi Lee,
+On Thu, Jan 22, 2015 at 07:18:25PM +0000, Marc Zyngier wrote:
+> On 22/01/15 19:13, Mario Smarduch wrote:
+> > On 01/22/2015 01:34 AM, Paul Bolle wrote:
+> >> Mario,
+> >>
+> >> Your commit c64735554c0a ("KVM: arm: Add initial dirty page locking
+> >> support") is included in today's linux-next (ie, next-20150122). I
+> >> noticed because a script I use to check linux-next spotted a minor
+> >> problem with it.
+> >>
+> >> This commit added a comment that mentions CONFIG_LOCK_DEP and
+> >> CONFIG_LOCK_DETECTOR. It seems CONFIG_LOCKDEP and CONFIG_LOCKUP_DETECTOR
+> >> should be used instead. Is a trivial patch to fix these typos queued
+> >> somewhere?
+> >>
+> >> Thanks,
+> >>
+> >>
+> >> Paul Bolle
+> >>
+> > 
+> > Hi Paul,
+> >   thanks for spotting that. No there is no trivial patch
+> > queued, didn't notice it until now. Can I submit a follow
+> > up trivial patch later?
 > 
->     Just a minor remark/question,
+> Yeah, that can definitely wait. I think we have slightly bigger fish to
+> fry for now... ;-)
 > 
->     David
+> If someone sends us a patch once -rc1 is out, we'll queue it.
 > 
-> On 01/22/2015 12:56 PM, Lee Jones wrote:
-> >On current ST platforms the LPC controls a number of functions.  This
-> >patch enables support for the LPC Watchdog and LPC RTC devices on LPC1
-> >and LPC2 respectively.
-> >
-> >Signed-off-by: David Paris <david.paris@st.com>
-> >Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >---
-> >  arch/arm/boot/dts/stih407-family.dtsi | 20 ++++++++++++++++++++
-> >  1 file changed, 20 insertions(+)
-> >
-> >diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-> >index 3e31d32..04448a7 100644
-> >--- a/arch/arm/boot/dts/stih407-family.dtsi
-> >+++ b/arch/arm/boot/dts/stih407-family.dtsi
-> >@@ -7,6 +7,7 @@
-> >   * publishhed by the Free Software Foundation.
-> >   */
-> >  #include "stih407-pinctrl.dtsi"
-> >+#include <dt-bindings/mfd/st-lpc.h>
-> >  #include <dt-bindings/reset-controller/stih407-resets.h>
-> >  / {
-> >  	#address-cells = <1>;
-> >@@ -274,5 +275,24 @@
-> >  			status = "disabled";
-> >  		};
-> >+
-> >+		/* Watchdog and Real-Time Clock */
-> >+		lpc at 8787000 {
-> >+			compatible = "st,stih407-lpc";
-> >+			reg = <0x8787000 0x1000>;
-> >+			interrupts = <GIC_SPI 129 IRQ_TYPE_EDGE_RISING>;
-> In case of Watchdog, "interrupt" property is not used. So I think we
-> can remove it ?
+I'll just fix it up before sending the pull request today.
 
-Sure thing.
-
-> >+			clocks = <&clk_s_d3_flexgen CLK_LPC_0>;
-> >+			timeout-sec = <120>;
-> >+			st,syscfg = <&syscfg_core>;
-> >+			st,lpc-mode = <ST_LPC_MODE_WDT>;
-> >+		};
-> >+
-> >+		lpc at 8788000 {
-> >+			compatible = "st,stih407-lpc";
-> >+			reg = <0x8788000 0x1000>;
-> >+			interrupts = <GIC_SPI 130 IRQ_TYPE_EDGE_RISING>;
-> >+			clocks = <&clk_s_d3_flexgen CLK_LPC_1>;
-> >+			st,lpc-mode = <ST_LPC_MODE_RTC>;
-> >+		};
-> >  	};
-> >  };
-> 
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+-Christoffer
