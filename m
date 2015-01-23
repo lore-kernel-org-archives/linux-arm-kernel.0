@@ -1,51 +1,61 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Fri, 23 Jan 2015 17:32:39 -0500
-Subject: [PATCH v4 6/6] arm: dma-mapping: updates to limit dma_mask and iommu
- mapping size
+Date: Fri, 23 Jan 2015 17:32:36 -0500
+Subject: [PATCH v4 3/6] of: fix size when dma-range is not used
 In-Reply-To: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
 References: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1422052359-12384-7-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1422052359-12384-4-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Limit the dma_mask to minimum of dma_mask and dma_base + size - 1.
+Fix the dma-range size when the DT attribute is missing. i.e  set size to
+dev->coherent_dma_mask + 1 instead of dev->coherent_dma_mask. To detect
+overflow when mask is set to max of u64, add a check, log error and return.
+Some platform use mask format for size in DTS. So add a work around to
+catch this and fix.
 
-Also arm_iommu_create_mapping() has size parameter of size_t and
-arm_setup_iommu_dma_ops() can take a value higher than that. So
-limit the size to SIZE_MAX.
+Cc: Joerg Roedel <joro@8bytes.org>
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 
 Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 ---
- arch/arm/mm/dma-mapping.c |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/of/device.c |   14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 7864797..a1f9030 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -2004,6 +2004,13 @@ static bool arm_setup_iommu_dma_ops(struct device *dev, u64 dma_base, u64 size,
- 	if (!iommu)
- 		return false;
+diff --git a/drivers/of/device.c b/drivers/of/device.c
+index 2de320d..0a5ff54 100644
+--- a/drivers/of/device.c
++++ b/drivers/of/device.c
+@@ -105,12 +105,24 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+ 	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
+ 	if (ret < 0) {
+ 		dma_addr = offset = 0;
+-		size = dev->coherent_dma_mask;
++		size = dev->coherent_dma_mask + 1;
+ 	} else {
+ 		offset = PFN_DOWN(paddr - dma_addr);
++		/*
++		 * Add a work around to treat the size as mask + 1 in case
++		 * it is defined in DT as a mask.
++		 */
++		if (size & 1)
++			size = size + 1;
+ 		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
+ 	}
  
-+	/*
-+	 * currently arm_iommu_create_mapping() takes a max of size_t
-+	 * for size param. So check this limit for now.
-+	 */
-+	if (size > SIZE_MAX)
-+		return false;
++	/* if size is 0, we have an overflow of u64 */
++	if (!size) {
++		dev_err(dev, "invalid size\n");
++		return;
++	}
 +
- 	mapping = arm_iommu_create_mapping(dev->bus, dma_base, size);
- 	if (IS_ERR(mapping)) {
- 		pr_warn("Failed to create %llu-byte IOMMU mapping for device %s\n",
-@@ -2053,6 +2060,9 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
- {
- 	struct dma_map_ops *dma_ops;
+ 	dev->dma_pfn_offset = offset;
  
-+	/* limit dma_mask to the lower of the two values */
-+	*dev->dma_mask = min((*dev->dma_mask), (dma_base + size - 1));
-+
- 	dev->archdata.dma_coherent = coherent;
- 	if (arm_setup_iommu_dma_ops(dev, dma_base, size, iommu))
- 		dma_ops = arm_get_iommu_dma_map_ops(coherent);
+ 	coherent = of_dma_is_coherent(np);
 -- 
 1.7.9.5
