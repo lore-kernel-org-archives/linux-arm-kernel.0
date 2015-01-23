@@ -1,68 +1,182 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 23 Jan 2015 14:31:12 +0100
-Subject: [PATCH v12 00/15] arm: Fix DEBUG_LL for multi-platform kernels
- (without PL01X)
-In-Reply-To: <20150123130837.GE26493@n2100.arm.linux.org.uk>
-References: <1414148076-12685-1-git-send-email-daniel.thompson@linaro.org>
- <1822066.pI6QN22RDx@wuerfel>
- <CAMuHMdUpNtL+K28DdC8xJ3vUPZGmviWcYGOVUNuhKQoobdL00Q@mail.gmail.com>
- <20150123130837.GE26493@n2100.arm.linux.org.uk>
-Message-ID: <CAMuHMdV4eHJC6UEwUma=vEmEf3xBmW2L5006k+Ebe_qVFwtb2Q@mail.gmail.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Fri, 23 Jan 2015 08:31:37 -0500
+Subject: [PATCH v7 2/2] tty/serial: Add Spreadtrum sc9836-uart driver
+ support
+In-Reply-To: <1422018066-24997-3-git-send-email-chunyan.zhang@spreadtrum.com>
+References: <sprd-serial-v7>
+ <1422018066-24997-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1422018066-24997-3-git-send-email-chunyan.zhang@spreadtrum.com>
+Message-ID: <54C24D39.1080607@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi Chunyan,
 
-On Fri, Jan 23, 2015 at 2:08 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Jan 23, 2015 at 02:05:22PM +0100, Geert Uytterhoeven wrote:
->> On Fri, Oct 24, 2014 at 5:46 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > There is still a related bug that we should also fix, but I'd say let's
->> > take your current patches first and then add whatever is missing
->> > on top. Specifically, a snippet like this
->> >
->> >         default 0xd4017000 if DEBUG_MMP_UART2
->> >         default 0xd4018000 if DEBUG_MMP_UART3
->> >         default 0xe0000000 if ARCH_SPEAR13XX
->> >         default 0xe4007000 if DEBUG_HIP04_UART
->> >         default 0xf0000be0 if ARCH_EBSA110
->> >
->> > still means you get the wrong default when you build a multiplatform
->> > kernel that you want to boot on HIP04 and you set DEBUG_HIP04_UART
->> > but you happen to also have ARCH_SPEAR13XX enabled.
->> >
->> > I have a patch that I use locally for randconfig builds that tries
->> > to fix this. It has some overlaps with your work but most parts are
->> > distinct. See below.
->>
->> This is still desperately needed for anyone who wants to enable DEBUG_LL
->> on other platforms using multi_v7_defconfig.
->
-> I'd actually prefer to kill all these defaults and let people enter the
-> value they want - for exactly this reason.
->
-> However, I realise that would not be popular, because removing them
-> means that people have to refer to some kind of documentation to find
-> the correct value, and that's hassle.
->
-> So, the existing defaulting behaviour is my compromise, but as I say,
-> I'd much prefer the unpopular move of killing the entire set of defaults.
+Just the minor fix to zeroing the stack local in sprd_set_termios()
+and using dev_get_drvdata() in sprd_suspend()/sprd_resume().
 
-I have no problems with the default addresses.
+Regards,
+Peter Hurley
 
-I do have a problem with default addresses that depend on a non-debug
-symbol that is set is multi_v7_defconfig (e.g. CONFIG_ARCH_SPEAR13XX),
-as there's no way to disable that without editing arch/arm/Kconfig.debug.
-I do want to find out why multi_v7_defconfig doesn't work on a board
-without disabling e.g. CONFIG_ARCH_SPEAR13XX.
+On 01/23/2015 08:01 AM, Chunyan Zhang wrote:
+> Add a full sc9836-uart driver for SC9836 SoC which is based on the
+> spreadtrum sharkl64 platform.
+> This driver also support earlycon.
 
-Gr{oetje,eeting}s,
+[...]
 
-                        Geert
+> +static void sprd_set_termios(struct uart_port *port,
+> +				    struct ktermios *termios,
+> +				    struct ktermios *old)
+> +{
+> +	unsigned int baud, quot;
+> +	unsigned int lcr, fc;
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+	unsigned int lcr = 0, fc;
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> +	unsigned long flags;
+> +
+> +	/* ask the core to calculate the divisor for us */
+> +	baud = uart_get_baud_rate(port, termios, old, 0, SPRD_BAUD_IO_LIMIT);
+> +
+> +	quot = (unsigned int)((port->uartclk + baud / 2) / baud);
+> +
+> +	/* set data length */
+> +	switch (termios->c_cflag & CSIZE) {
+> +	case CS5:
+> +		lcr |= SPRD_LCR_DATA_LEN5;
+> +		break;
+> +	case CS6:
+> +		lcr |= SPRD_LCR_DATA_LEN6;
+> +		break;
+> +	case CS7:
+> +		lcr |= SPRD_LCR_DATA_LEN7;
+> +		break;
+> +	case CS8:
+> +	default:
+> +		lcr |= SPRD_LCR_DATA_LEN8;
+> +		break;
+> +	}
+> +
+> +	/* calculate stop bits */
+> +	lcr &= ~(SPRD_LCR_STOP_1BIT | SPRD_LCR_STOP_2BIT);
+> +	if (termios->c_cflag & CSTOPB)
+> +		lcr |= SPRD_LCR_STOP_2BIT;
+> +	else
+> +		lcr |= SPRD_LCR_STOP_1BIT;
+> +
+> +	/* calculate parity */
+> +	lcr &= ~SPRD_LCR_PARITY;
+> +	termios->c_cflag &= ~CMSPAR;	/* no support mark/space */
+> +	if (termios->c_cflag & PARENB) {
+> +		lcr |= SPRD_LCR_PARITY_EN;
+> +		if (termios->c_cflag & PARODD)
+> +			lcr |= SPRD_LCR_ODD_PAR;
+> +		else
+> +			lcr |= SPRD_LCR_EVEN_PAR;
+> +	}
+
+[...]
+
+> +static int sprd_probe(struct platform_device *pdev)
+> +{
+> +	struct resource *res;
+> +	struct uart_port *up;
+> +	struct clk *clk;
+> +	int irq;
+> +	int index;
+> +	int ret;
+> +
+> +	for (index = 0; index < ARRAY_SIZE(sprd_port); index++)
+> +		if (sprd_port[index] == NULL)
+> +			break;
+> +
+> +	if (index == ARRAY_SIZE(sprd_port))
+> +		return -EBUSY;
+> +
+> +	index = sprd_probe_dt_alias(index, &pdev->dev);
+> +
+> +	sprd_port[index] = devm_kzalloc(&pdev->dev,
+> +		sizeof(*sprd_port[index]), GFP_KERNEL);
+> +	if (!sprd_port[index])
+> +		return -ENOMEM;
+> +
+> +	pdev->id = index;
+
+see my recent reply regarding this and sprd_suspend/sprd_resume.
+
+> +
+> +	up = &sprd_port[index]->port;
+> +	up->dev = &pdev->dev;
+> +	up->line = index;
+> +	up->type = PORT_SPRD;
+> +	up->iotype = SERIAL_IO_PORT;
+> +	up->uartclk = SPRD_DEF_RATE;
+> +	up->fifosize = SPRD_FIFO_SIZE;
+> +	up->ops = &serial_sprd_ops;
+> +	up->flags = UPF_BOOT_AUTOCONF;
+> +
+> +	clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (!IS_ERR(clk))
+> +		up->uartclk = clk_get_rate(clk);
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!res) {
+> +		dev_err(&pdev->dev, "not provide mem resource\n");
+> +		return -ENODEV;
+> +	}
+> +	up->mapbase = res->start;
+> +	up->membase = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(up->membase))
+> +		return PTR_ERR(up->membase);
+> +
+> +	irq = platform_get_irq(pdev, 0);
+> +	if (irq < 0) {
+> +		dev_err(&pdev->dev, "not provide irq resource\n");
+> +		return -ENODEV;
+> +	}
+> +	up->irq = irq;
+> +
+> +	if (!sprd_ports_num) {
+> +		ret = uart_register_driver(&sprd_uart_driver);
+> +		if (ret < 0) {
+> +			pr_err("Failed to register SPRD-UART driver\n");
+> +			return ret;
+> +		}
+> +	}
+> +	sprd_ports_num++;
+> +
+> +	ret = uart_add_one_port(&sprd_uart_driver, up);
+> +	if (ret) {
+> +		sprd_port[index] = NULL;
+> +		sprd_remove(pdev);
+> +	}
+> +
+> +	platform_set_drvdata(pdev, up);
+> +
+> +	return ret;
+> +}
+> +
+> +static int sprd_suspend(struct device *dev)
+> +{
+> +	int id = to_platform_device(dev)->id;
+> +	struct uart_port *port = &sprd_port[id]->port;
+> +
+> +	uart_suspend_port(&sprd_uart_driver, port);
+
+same comment: see my recent reply using dev_get_drvdata().
+
+> +
+> +	return 0;
+> +}
+> +
+> +static int sprd_resume(struct device *dev)
+> +{
+> +	int id = to_platform_device(dev)->id;
+> +	struct uart_port *port = &sprd_port[id]->port;
+> +
+> +	uart_resume_port(&sprd_uart_driver, port);
+> +
+> +	return 0;
+> +}
+> +
