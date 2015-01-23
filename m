@@ -1,105 +1,32 @@
 From: galak@codeaurora.org (Kumar Gala)
-Date: Fri, 23 Jan 2015 10:22:09 -0600
-Subject: [GIT PULL] qcom SoC changes for v3.20
-In-Reply-To: <CAOesGMipp=Odc-cWvrba0e1pd1X7O+PKNH+WoM3fG4xX2GRFuA@mail.gmail.com>
-References: <alpine.DEB.2.02.1501191226010.2973@galak-ubuntu.qualcomm.com>
- <20150122011521.GA31815@quad.lixom.net>
- <D177DF12-0F31-49CF-B98B-9FAC23AAB24C@codeaurora.org>
- <CAOesGMipp=Odc-cWvrba0e1pd1X7O+PKNH+WoM3fG4xX2GRFuA@mail.gmail.com>
-Message-ID: <DBE63F76-D4CB-49D5-90C6-642CFCA7687F@codeaurora.org>
+Date: Fri, 23 Jan 2015 10:27:48 -0600
+Subject: [PATCH] MAINTAINERS: update Qualcomm support entry
+In-Reply-To: <20150122214644.GB8057@qualcomm.com>
+References: <1421901564-8854-1-git-send-email-agross@codeaurora.org>
+ <1421902005.18480.3.camel@perches.com> <20150122214644.GB8057@qualcomm.com>
+Message-ID: <8D1CBBAD-4C1D-474A-81F6-FDD882154BE0@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On Jan 22, 2015, at 9:00 PM, Olof Johansson <olof@lixom.net> wrote:
+On Jan 22, 2015, at 3:46 PM, Andy Gross <agross@codeaurora.org> wrote:
 
-> On Thu, Jan 22, 2015 at 9:02 AM, Kumar Gala <galak@codeaurora.org> wrote:
+> On Wed, Jan 21, 2015 at 08:46:45PM -0800, Joe Perches wrote:
+>>> +L:	linux-soc at vger.kernel.org
+>>> S:	Maintained
+>>> F:	arch/arm/mach-qcom/
+>>> +F:	drivers/soc/qcom
 >> 
->> On Jan 21, 2015, at 7:15 PM, Olof Johansson <olof@lixom.net> wrote:
+>> Please add a terminating /
 >> 
->>> Hi,
->>> 
->>> 
->>> On Mon, Jan 19, 2015 at 12:27:15PM -0600, Kumar Gala wrote:
->>>> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
->>>> 
->>>> Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
->>>> 
->>>> are available in the git repository at:
->>>> 
->>>> git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-soc-for-3.20
->>>> 
->>>> for you to fetch changes up to ae0a6075c046f9c8dbac18f53a779592f97b402e:
->>>> 
->>>> soc: qcom: scm: Clarify boot interface (2015-01-19 11:55:12 -0600)
->>>> 
->>>> ----------------------------------------------------------------
->>>> Qualcomm ARM Based SoC Updates for v3.20
->>>> 
->>>> * Moved scm support into drivers/soc/qcom (allows for use by drivers)
->>>> * Various bug fixes and minor feature additions to scm code
->>>> * Added big-endian support to debug MSM uart
->>>> * Added big-endian support to ARCH_QCOM
->>>> 
->>>> ----------------------------------------------------------------
->>>> Lina Iyer (2):
->>>>     ARM: qcom: Add SCM warmboot flags for quad core targets.
->>>>     soc: qcom: scm: Move scm-boot files to drivers/soc and include/soc
->>>> 
->>>> Olav Haugan (1):
->>>>     ARM: qcom: scm: Add logging of actual return code from scm call
->>>> 
->>>> Saravana Kannan (1):
->>>>     ARM: qcom: scm: Add API to query for service/command availability.
->>>> 
->>>> Stephen Boyd (9):
->>>>     ARM: debug: Update MSM and QCOM DEBUG_LL help
->>>>     ARM: debug: msm: Support big-endian CPUs
->>>>     ARM: qcom: Select ARCH_SUPPORTS_BIG_ENDIAN
->>>>     ARM: qcom: scm: Fix incorrect cache invalidation
->>>>     ARM: qcom: scm: Get cacheline size from CTR
->>>>     ARM: qcom: scm: Add a feat version query API
->>>>     soc: qcom: scm: Move the scm driver to drivers/soc/qcom
->>> 
->>> I replied on the patch here just now. This isn't the right thing to do,
->>> as far as I can tell.
->>> 
->>> Seems like sending a fresh request with the material besides the move
->>> to drivers/soc should be mergeable though, so feel free to do that while
->>> the rest is hashed out.
->> 
->> Would the following be ok (dropped the move to drivers/soc and some additional unused scm APIs as of right now):
->> 
->> ARM: qcom: Drop unnecessary selects from ARCH_QCOM
->> ARM: qcom: scm: Clarify boot interface
->> ARM: qcom: Add SCM warmboot flags for quad core targets.
->> ARM: qcom: scm: Add logging of actual return code from scm call
->> ARM: qcom: scm: Flush the command buffer only instead of the entire cache
->> ARM: qcom: scm: Get cacheline size from CTR
->> ARM: qcom: scm: Fix incorrect cache invalidation
->> ARM: qcom: Select ARCH_SUPPORTS_BIG_ENDIAN
->> ARM: debug: msm: Support big-endian CPUs
->> ARM: debug: Update MSM and QCOM DEBUG_LL help
->> 
->> Kconfig.debug        |    5 ++--
->> include/debug/msm.S  |    6 +++++
->> mach-qcom/Kconfig    |    3 --
->> mach-qcom/scm-boot.c |    2 -
->> mach-qcom/scm-boot.h |    4 ++-
->> mach-qcom/scm.c      |   55 +++++++++++++++++++++++++++++++++++++--------------
->> 6 files changed, 54 insertions(+), 21 deletions(-)
+>> F:	drivers/soc/qcom/
 > 
-> I'd be OK with merging this, send a request and tag. Would that let
-> the DRM folks make progress too?
+> Noted, will fix.
 
-Will do, I don?t think it will address the DRM folks needs as they need access to make firmware calls from the DRM driver.
-
-> If you need a common place for this, drivers/firmware seems like a
-> better home than drivers/soc.
-
-Agreed, what?s you take than on moving to use firmware_ops as defined in arch/arm and extended it or just leaving this as a qcom specific firmware interface?
+I?ll fix this up when I apply the patch.
 
 - k
+
 -- 
 Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
