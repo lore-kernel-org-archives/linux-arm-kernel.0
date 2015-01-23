@@ -1,37 +1,63 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Fri, 23 Jan 2015 15:44:13 -0800
-Subject: [PATCH] clk: zynq: Force CPU_2X clock to be ungated
-Message-ID: <1422056653-11271-1-git-send-email-soren.brinkmann@xilinx.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sat, 24 Jan 2015 00:48:55 +0100
+Subject: N900 v3.19-rc5 arm atags_to_fdt.c is broken
+In-Reply-To: <201501232336.36187@pali>
+References: <201501232239.55801@pali>
+ <201501232336.36187@pali>
+Message-ID: <20150123234855.GB27111@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CPU_2X clock does not have a classical in kernel user, but is,
-amongst other things, required for OCM and debug access. Make sure this
-clock does not mistakenly disabled during boot up by enabling it in the
-platforms clock driver.
+On Fri 2015-01-23 23:36:36, Pali Roh?r wrote:
+> On Friday 23 January 2015 22:39:55 Pali Roh?r wrote:
+> > Hello,
+> > 
+> > when I boot zImage with appended DT n900 in qemu
+> > fdt_open_into() function called from file
+> > arch/arm/boot/compressed/atags_to_fdt.c (in function
+> > atags_to_fdt) always returns -FDT_ERR_NOSPACE.
+> > 
+> > It means that all ATAGS (including cmdline arguments) passed
+> > by bootloader are ignored.
+> > 
+> > On real n900 device I see that booted DT version also ignore
+> > cmdline arguments from bootloader. I cannot debug decompress
+> > code on real device, but I think it is same problem as in
+> > qemu.
+> 
+> Looks like this quick patch is fixing above problem:
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
-I just noticed this on Linus' latest tip. I can't remember having had issues
-connecting the debugger before, but it might be a candidate for stable in case
-people report something like that.
+So... something overruns stack, and bigger stack fixes it...?
 
-	S?ren
+							Pavel
 
- drivers/clk/zynq/clkc.c | 1 +
- 1 file changed, 1 insertion(+)
+> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> index 68be901..4a7d75b 100644
+> --- a/arch/arm/boot/compressed/head.S
+> +++ b/arch/arm/boot/compressed/head.S
+> @@ -268,7 +268,7 @@ restart:	adr	r0, LC0
+>  		 * area.  No GOT fixup has occurred yet, but none of the
+>  		 * code we're about to call uses any global variable.
+>  		*/
+> -		add	sp, sp, #0x10000
+> +		add	sp, sp, #0x20000
+>  		stmfd	sp!, {r0-r3, ip, lr}
+>  		mov	r0, r8
+>  		mov	r1, r6
+> @@ -289,7 +289,7 @@ restart:	adr	r0, LC0
+>  		bleq	atags_to_fdt
+>  
+>  		ldmfd	sp!, {r0-r3, ip, lr}
+> -		sub	sp, sp, #0x10000
+> +		sub	sp, sp, #0x20000
+>  #endif
+>  
+>  		mov	r8, r6			@ use the appended device tree
+> 
+> 
 
-diff --git a/drivers/clk/zynq/clkc.c b/drivers/clk/zynq/clkc.c
-index c363106ed726..f8469315161d 100644
---- a/drivers/clk/zynq/clkc.c
-+++ b/drivers/clk/zynq/clkc.c
-@@ -346,6 +346,7 @@ static void __init zynq_clk_setup(struct device_node *np)
- 	clks[cpu_2x] = clk_register_gate(NULL, clk_output_name[cpu_2x],
- 			"cpu_2x_div", CLK_IGNORE_UNUSED, SLCR_ARM_CLK_CTRL,
- 			26, 0, &armclk_lock);
-+	clk_prepare_enable(clks[cpu_2x]);
- 
- 	clk = clk_register_fixed_factor(NULL, "cpu_1x_div", "cpu_div", 0, 1,
- 			4 + 2 * tmp);
+
+
 -- 
-2.2.2.1.g63c5777
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
