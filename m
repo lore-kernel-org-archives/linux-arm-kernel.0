@@ -1,40 +1,20 @@
-From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Thu, 22 Jan 2015 15:48:02 -0800
-Subject: [PATCH] iommu/arm-smmu: use a threaded handler for context interrupts
-Message-ID: <1421970482-11722-1-git-send-email-mitchelh@codeaurora.org>
+From: samuel.thibault@ens-lyon.org (Samuel Thibault)
+Date: Fri, 23 Jan 2015 01:10:38 +0100
+Subject: [PATCHv5 2/2] INPUT: Introduce generic trigger/LED pairs to
+ input LEDs
+In-Reply-To: <20150104232838.GA14912@dtor-glaptop>
+References: <20141226232116.GA5069@type> <20141226232310.GD5069@type>
+ <20150104232838.GA14912@dtor-glaptop>
+Message-ID: <20150123001038.GA2940@type.youpi.perso.aquilenet.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Context interrupts can call domain-specific handlers which might sleep.
-Currently we register our handler with request_irq, so our handler is
-called in atomic context, so domain handlers that sleep result in an
-invalid context BUG.  Fix this by using request_threaded_irq.
+Dmitry Torokhov, le Sun 04 Jan 2015 15:28:38 -0800, a ?crit :
+> > +	dev = cdev->dev->platform_data;
+> 
+> Umm, platform data is not the best place for storing this. Why not drvdata?
 
-This also prepares the way for doing things like enabling clocks within
-our interrupt handler.
+Ah, actually led_classdev already makes use of it, see the
+device_create_with_groups call in led_classdev_register.
 
-Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
----
- drivers/iommu/arm-smmu.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 6cd47b75286f..81f6b54d94b1 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -973,8 +973,9 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
- 	spin_unlock_irqrestore(&smmu_domain->lock, flags);
- 
- 	irq = smmu->irqs[smmu->num_global_irqs + cfg->irptndx];
--	ret = request_irq(irq, arm_smmu_context_fault, IRQF_SHARED,
--			  "arm-smmu-context-fault", domain);
-+	ret = request_threaded_irq(irq, NULL, arm_smmu_context_fault,
-+				IRQF_ONESHOT | IRQF_SHARED,
-+				"arm-smmu-context-fault", domain);
- 	if (IS_ERR_VALUE(ret)) {
- 		dev_err(smmu->dev, "failed to request context IRQ %d (%u)\n",
- 			cfg->irptndx, irq);
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Samuel
