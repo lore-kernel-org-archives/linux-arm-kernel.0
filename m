@@ -1,110 +1,30 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 23 Jan 2015 17:40:40 +0000
-Subject: [PATCHv2] arm64:mm: free the useless initial page table
-In-Reply-To: <20150123162126.GD9557@e104818-lin.cambridge.arm.com>
-References: <1418110007-13270-1-git-send-email-zhichang.yuan@linaro.org>
- <20150123162126.GD9557@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu8OQB+eziL6X85-v-+9KKPsK6Z=h2+1oDrM9imnSU8drg@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 23 Jan 2015 17:41:31 +0000
+Subject: [RFC PATCH 0/5] arm64: IOMMU-backed DMA mapping
+In-Reply-To: <20150123164759.GF9557@e104818-lin.cambridge.arm.com>
+References: <cover.1421086706.git.robin.murphy@arm.com>
+ <20150123164759.GF9557@e104818-lin.cambridge.arm.com>
+Message-ID: <54C287CB.9080000@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 January 2015 at 16:21, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Tue, Dec 09, 2014 at 07:26:47AM +0000, zhichang.yuan at linaro.org wrote:
->> From: "zhichang.yuan" <zhichang.yuan@linaro.org>
+On 23/01/15 16:47, Catalin Marinas wrote:
+> On Mon, Jan 12, 2015 at 08:48:52PM +0000, Robin Murphy wrote:
+>> Catalin Marinas (1):
+>>    arm64: Combine coherent and non-coherent swiotlb dma_ops
 >>
->> For 64K page system, after mapping a PMD section, the corresponding initial
->> page table is not needed any more. That page can be freed.
->>
->> Changes since v1:
->>
->> * make consistent code between alloc_init_pmd and alloc_init_pud;
->> * flush the TLB before the unused page table is freed;
->>
->> Signed-off-by: Zhichang Yuan <zhichang.yuan@linaro.org>
+>> Robin Murphy (4):
+>>    arm64: implement generic IOMMU configuration
+>>    iommu: implement common IOMMU ops for DMA mapping
+>>    arm64: add IOMMU dma_ops
+>>    arm64: hook up IOMMU dma_ops
 >
-> I thought about queuing this patch but I realised that
-> alloc_init_pmd/pud may be called in a late context where memblock_free()
-> would no longer make sense. Cc'ing Laura and Ard for any ideas here but
-> I think we may just end up with a few old page table pages sitting
-> around (not many though). In general we don't go from smaller to larger
-> mappings (that's what this patch targets) but given the API, I'm not
-> sure we have any guarantee.
+> I queued the first two patches in this series for 3.20. The rest need to
+> go through some review rounds.
 >
-> One solution would be to check for alloc == early_alloc or something
-> similar. Cc'ing Laura and Ard as they added the create_mapping_late()
-> code.
+> Thanks.
 >
 
-The UEFI page tables are only built up once, based on a series of
-disjoint memory regions, so that will never hit either of the
-memblock_free() branches.
-And AFAICT, the DEBUG_RODATA code does the splitting early, which
-causes the create_mapping_late() code to only change permissions, not
-change the granularity of any regions.
+Thanks Catalin, the less to rebase the better ;)
 
-Perhaps it's sufficient to add a comment and a BUG_ON(alloc !=
-early_alloc) to the memblock_free() branches?
-
--- 
-Ard.
-
-
->> ---
->>  arch/arm64/include/asm/pgtable.h |    3 +++
->>  arch/arm64/mm/mmu.c              |   15 ++++++++++++---
->>  2 files changed, 15 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
->> index 41a43bf..8a135b6 100644
->> --- a/arch/arm64/include/asm/pgtable.h
->> +++ b/arch/arm64/include/asm/pgtable.h
->> @@ -337,9 +337,12 @@ extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
->>
->>  #ifdef CONFIG_ARM64_64K_PAGES
->>  #define pud_sect(pud)                (0)
->> +#define pud_table(pud)               (1)
->>  #else
->>  #define pud_sect(pud)                ((pud_val(pud) & PUD_TYPE_MASK) == \
->>                                PUD_TYPE_SECT)
->> +#define pud_table(pud)               ((pud_val(pud) & PUD_TYPE_MASK) == \
->> +                                     PUD_TYPE_TABLE)
->>  #endif
->>
->>  static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
->> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
->> index f4f8b50..515f75b 100644
->> --- a/arch/arm64/mm/mmu.c
->> +++ b/arch/arm64/mm/mmu.c
->> @@ -191,8 +191,14 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
->>                        * Check for previous table entries created during
->>                        * boot (__create_page_tables) and flush them.
->>                        */
->> -                     if (!pmd_none(old_pmd))
->> +                     if (!pmd_none(old_pmd)) {
->>                               flush_tlb_all();
->> +                             if (pmd_table(old_pmd)) {
->> +                                     phys_addr_t table = __pa(pte_offset_map(&old_pmd, 0));
->> +
->> +                                     memblock_free(table, PAGE_SIZE);
->> +                             }
->> +                     }
->>               } else {
->>                       alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
->>                                      prot_pte);
->> @@ -234,9 +240,12 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
->>                        * Look up the old pmd table and free it.
->>                        */
->>                       if (!pud_none(old_pud)) {
->> -                             phys_addr_t table = __pa(pmd_offset(&old_pud, 0));
->> -                             memblock_free(table, PAGE_SIZE);
->>                               flush_tlb_all();
->> +                             if (pud_table(old_pud)) {
->> +                                     phys_addr_t table = __pa(pmd_offset(&old_pud, 0));
->> +
->> +                                     memblock_free(table, PAGE_SIZE);
->> +                             }
->>                       }
->>               } else {
->>                       alloc_init_pmd(pud, addr, next, phys, map_io);
->> --
->> 1.7.9.5
+Robin.
