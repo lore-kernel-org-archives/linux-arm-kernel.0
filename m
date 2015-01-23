@@ -1,44 +1,75 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 23 Jan 2015 13:41:57 +0000
-Subject: [GIT PULL 03/36] arm/arm64: KVM: add tracing support for arm64
- exit handler
-In-Reply-To: <54C24365.1000503@redhat.com>
-References: <1422007385-14730-1-git-send-email-christoffer.dall@linaro.org>
- <1422007385-14730-4-git-send-email-christoffer.dall@linaro.org>
- <20150123113515.GF23493@leverpostej> <54C2382E.6040800@redhat.com>
- <54C24365.1000503@redhat.com>
-Message-ID: <20150123134157.GL23493@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 23 Jan 2015 14:46:35 +0100
+Subject: [PATCH v3/resend 3/4] drivers: bus: Add Simple Power-Managed Bus
+ DT Bindings
+In-Reply-To: <CAMuHMdUMcyXdgv+xdd8Zo67rYnfh6JaSWfr1H3c6NrQs=JsNLg@mail.gmail.com>
+References: <1421919253-4784-1-git-send-email-geert+renesas@glider.be>
+ <7hvbjy30an.fsf@deeprootsystems.com>
+ <CAMuHMdUMcyXdgv+xdd8Zo67rYnfh6JaSWfr1H3c6NrQs=JsNLg@mail.gmail.com>
+Message-ID: <2160255.41m7rrCYxI@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 23, 2015 at 12:49:41PM +0000, Paolo Bonzini wrote:
+On Friday 23 January 2015 09:56:51 Geert Uytterhoeven wrote:
+> >> diff --git a/Documentation/devicetree/bindings/bus/simple-pm-bus.txt b/Documentation/devicetree/bindings/bus/simple-pm-bus.txt
+> >> new file mode 100644
+> >> index 0000000000000000..d03abf7fd8e3997a
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/bus/simple-pm-bus.txt
+> >> @@ -0,0 +1,52 @@
+> >> +Simple Power-Managed Bus
+> >> +========================
+> >> +
+> >> +A Simple Power-Managed Bus is a transparent bus that doesn't need a real
+> >> +driver, as it's typically initialized by the boot loader.
+> >> +
+> >> +However, its bus controller is part of a PM domain, or under the control of a
+> >> +functional clock.  Hence, the bus controller's PM domain and/or clock must be
+> >> +enabled for child devices connected to the bus (either on-SoC or externally)
+> >> +to function.
+> >> +
+> >> +
+> >> +Generic compatible values and properties
+> >> +----------------------------------------
+> >> +
+> >> +Required properties:
+> >> +  - compatible: Must be at least one of the vendor-specific compatible values
+> >> +             from a vendor-specific section below, and "simple-bus" as a
+> >> +             fallback.
+> >
+> > What happened to the idea of using something like "simple-pm-bus"?
 > 
+> I think that's a decision to make by the (successor of the) ePAPR committee.
+> At least it would be nice to get some feedback from the DT review team
+> about this.
 > 
-> On 23/01/2015 13:01, Paolo Bonzini wrote:
-> > 
-> > 
-> > On 23/01/2015 12:35, Mark Rutland wrote:
-> >>
-> >> https://lkml.org/lkml/2015/1/22/7
-> >> https://lkml.org/lkml/2015/1/22/8
-> >>
-> >> I'd hoped we'd be able to fix that before this went further upstream.
-> >>
-> >> The easiest way I could see to do that was to merge my esr branch (which
-> >> is stable and Catalin has pulled) branch into the kvm-arm tree, and fix
-> >> the conflicts there.
-> >>
-> >> Is there any chance we can fix that now?
-> > 
-> > I'll fix the conflicts in the kvm tree.  Please wait for further
-> > instructions...
+> If we go that road, the vendor-specific compatible value should still be
+> documented, else checkpatch will complain when encountering it in a DTS.
+> Then, should it become
 > 
-> Ok folks, please check that the resolution in the queue branch of
-> git://git.kernel.org/pub/scm/virt/kvm/kvm.git is okay.
+>     compatible = "renesas,bsc-sh73a0", "renesas,bsc", "simple-pm-bus",
+> "simple-bus";
+> 
+> or should "simple-bus" just be added to of_default_bus_match_table[], so we
+> can drop "simple-bus" from the list in the DTS:
+> 
+>     compatible = "renesas,bsc-sh73a0", "renesas,bsc", "simple-pm-bus";
 
-That looks fine to me. Git was happy to merge the arm64 for-next/core
-branch, and the result boots fine on my Juno.
+I was thinking of the reverse: drop "simple-bus" bus from the list here,
+but not add "simple-pm-bus" to of_default_bus_match_table. This will
+cause child devices to no longer be probed automatically, and you will
+have to call of_platform_populate() from simple_pm_bus_probe(), after
+pm_runtime_enable(). This seems like a cleaner model to me, for two
+reasons:
 
-Thanks for handling the fixup!
+- In the binding, claiming compatibility with "simple-bus" feels
+  wrong to me, because you have a bus that is not as simple as others
 
-Mark.
+- The ordering between pm_runtime_enable() and the probing of the
+  child devices is guaranteed, which I think it is not with your
+  current code.
+
+Does this make sense, or am I missing an important reason why there
+has to be a "simple-bus" compatible string here?
+
+	Arnd
