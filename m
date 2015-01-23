@@ -1,23 +1,57 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 23 Jan 2015 09:01:01 -0800
-Subject: [PATCH v5 0/2] ARM: mediatek: Add watchdog driver
-In-Reply-To: <CABuKBeKWU=wGuyT2u1Ndori1e8B7vAzFAmCafwLDPfAyLHkYBQ@mail.gmail.com>
-References: <1421152136-5007-1-git-send-email-matthias.bgg@gmail.com>
- <CABuKBeKWU=wGuyT2u1Ndori1e8B7vAzFAmCafwLDPfAyLHkYBQ@mail.gmail.com>
-Message-ID: <54C27E4D.1010108@roeck-us.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 23 Jan 2015 17:04:55 +0000
+Subject: [PATCH URGENT] arm: dma-mapping: Set DMA IOMMU ops in
+ arm_iommu_attach_device()
+In-Reply-To: <2036088.T8IpDXjCxc@wuerfel>
+References: <1422022909-31044-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <10179212.ryUUVC9zEx@wuerfel> <2416515.WUUq1g4kPD@avalon>
+ <2036088.T8IpDXjCxc@wuerfel>
+Message-ID: <20150123170455.GB13772@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/23/2015 06:20 AM, Matthias Brugger wrote:
-> Hi all,
->
-> 2015-01-13 13:28 GMT+01:00 Matthias Brugger <matthias.bgg@gmail.com>:
->> Mediatek SoCs have a watchdog driver. This patch set adds driver and DTS
->> binding. The driver also implements a restart handler to reboot the SoC.
->
-> Any comments on this patch set?
->
-I have it included in the set of patches that I am going to send to Wim,
-hopefully this weekend.
+On Fri, Jan 23, 2015 at 05:00:45PM +0000, Arnd Bergmann wrote:
+> On Friday 23 January 2015 17:55:25 Laurent Pinchart wrote:
+> > 
+> > On Friday 23 January 2015 16:27:24 Arnd Bergmann wrote:
+> > > On Friday 23 January 2015 16:21:49 Laurent Pinchart wrote:
+> > > > +/**
+> > > > + * arm_iommu_detach_device
+> > > > + * @dev: valid struct device pointer
+> > > > + *
+> > > > + * Detaches the provided device from a previously attached map.
+> > > > + * This voids the dma operations (dma_map_ops pointer)
+> > > > + */
+> > > > +void arm_iommu_detach_device(struct device *dev)
+> > > > +{
+> > > > +       __arm_iommu_detach_device(dev);
+> > > > +       set_dma_ops(dev, NULL);
+> > > > +}
+> > > > 
+> > > >  EXPORT_SYMBOL_GPL(arm_iommu_detach_device);
+> > > 
+> > > Would this introduce a regression in the case where the device is
+> > > cache coherent and needs arm_coherent_dma_ops set?
+> > 
+> > I think we need to handle that case (as well as the coherent IOMMU case in 
+> > arm_iommu_attach_device), but this patch only tries to restore the previous 
+> > behaviour to fix the bug detailed in the commit message. Would you prefer 
+> > fixing both issues in one go ?
+> > 
+> 
+> No, I was specifically trying to find out whether the new behavior would
+> be worse than what we had in 3.18. If it's a preexisting bug that nobody
+> has run into, there is no hurry.
 
-Guenter
+Agreed, I think Laurent's proposal here is the smallest thing that fixes
+the issue without breaking the new of_xlate-based configuration.
+
+  Acked-by: Will Deacon <will.deacon@arm.com>
+
+> It's quite likely that to date, all IOMMU users on ARM32 are not
+> cache coherent.
+
+Highbank has an ARM SMMU, but I don't see the iommu_coherent_ops getting
+used, so your assertion is probably right.
+
+Will
