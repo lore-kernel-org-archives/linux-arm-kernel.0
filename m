@@ -1,107 +1,35 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 23 Jan 2015 13:47:26 -0800
-Subject: [PATCH] PCI: keystone: fix incorrect annotations on probe and
- remove
-In-Reply-To: <20150123213412.GK29776@google.com>
-References: <20150108221736.GA39839@dtor-ws>
- <20150123213412.GK29776@google.com>
-Message-ID: <20150123214726.GA4688@dtor-ws>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 23 Jan 2015 13:47:53 -0800
+Subject: [GIT PULL 2/3] omap defconfig changes for v3.20
+In-Reply-To: <54be9e8c.6a58460a.68af.68a6SMTPIN_ADDED_BROKEN@mx.google.com>
+References: <pull-1421777718-852183>
+ <54be9e8c.6a58460a.68af.68a6SMTPIN_ADDED_BROKEN@mx.google.com>
+Message-ID: <20150123214753.GB20896@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
-
-On Fri, Jan 23, 2015 at 03:34:12PM -0600, Bjorn Helgaas wrote:
-> [+cc Fabio]
+On Tue, Jan 20, 2015 at 10:25:39AM -0800, Tony Lindgren wrote:
+> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
 > 
-> On Thu, Jan 08, 2015 at 02:17:36PM -0800, Dmitry Torokhov wrote:
-> > Even though platform bus is not hot-pluggable, devices on it can be unbound
-> > from the driver and bound back to it via sysfs, so we should not be using
-> > __init annotations on probe() and __exit annotations on remove() methods.
+>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
 > 
-> I don't completely understand this problem.  Does this mean there should be
-> no __init/__exit annotations in these drivers at all?  If other PCI host
-> bridge drivers have the same problem, I'd like to fix them all at once.
-
-Basically they should not use __init/__exit, unless you take explicit
-steps to make sure that devices can't be unbound and bound again later
-via sysfs by setting driver->suppress_bind_attrs and/or using
-platform_driver_probe(). Note that if you use platform_driver_probe()
-then your driver can't cope with -EPROBE_DEFER reported by any of the
-subsystems it might be using.
-
+> are available in the git repository at:
 > 
-> For example, after applying this patch, ks_pcie_probe() is non-__init, but
-> it calls ks_add_pcie_port(), which is still __init.  I thought that was
-> illegal.
-
-My bad, I missed that. The __init marking on ks_add_pcie_port() shoudl
-be removed as well.
-
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.20/defconfig-modular
 > 
-> I'm not sure about module_platform_driver_probe() either; it generates
-> __init and __exit functions.  Should those annotations be removed, too?
-
-module_platform_driver_probe() does internally platform_driver_probe()
-so it is OK for that probe function be __init (because we'd suppress
-sysfs bind/unbind and deferred probing so discaring init section is
-safe).
-
-Note that above applied to driver's ->probe() and ->remove() code paths
-only.  Marking module init/exit code as __init and __exit is still right
-thing to do.
-
-Thanks.
-
+> for you to fetch changes up to 697549cdd637841e7c88d0014fe25dfbb72565de:
 > 
-> > Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> > ---
-> > 
-> > Not tested, found by casual code inspection.
-> > 
-> >  drivers/pci/host/pci-keystone.c | 8 ++++----
-> >  1 file changed, 4 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
-> > index 1b893bc..7b84e1d 100644
-> > --- a/drivers/pci/host/pci-keystone.c
-> > +++ b/drivers/pci/host/pci-keystone.c
-> > @@ -332,7 +332,7 @@ static const struct of_device_id ks_pcie_of_match[] = {
-> >  };
-> >  MODULE_DEVICE_TABLE(of, ks_pcie_of_match);
-> >  
-> > -static int __exit ks_pcie_remove(struct platform_device *pdev)
-> > +static int ks_pcie_remove(struct platform_device *pdev)
-> >  {
-> >  	struct keystone_pcie *ks_pcie = platform_get_drvdata(pdev);
-> >  
-> > @@ -341,7 +341,7 @@ static int __exit ks_pcie_remove(struct platform_device *pdev)
-> >  	return 0;
-> >  }
-> >  
-> > -static int __init ks_pcie_probe(struct platform_device *pdev)
-> > +static int ks_pcie_probe(struct platform_device *pdev)
-> >  {
-> >  	struct device *dev = &pdev->dev;
-> >  	struct keystone_pcie *ks_pcie;
-> > @@ -398,9 +398,9 @@ fail_clk:
-> >  	return ret;
-> >  }
-> >  
-> > -static struct platform_driver ks_pcie_driver __refdata = {
-> > +static struct platform_driver ks_pcie_driver = {
-> >  	.probe  = ks_pcie_probe,
-> > -	.remove = __exit_p(ks_pcie_remove),
-> > +	.remove = ks_pcie_remove,
-> >  	.driver = {
-> >  		.name	= "keystone-pcie",
-> >  		.owner	= THIS_MODULE,
-> > -- 
-> > 2.2.0.rc0.207.ga3a616c
-> > 
-> > 
-> > -- 
-> > Dmitry
+>   ARM: omap2plus_defconfig: Enable OHCI & EHCI HCD support (2015-01-20 09:46:31 -0800)
+> 
+> ----------------------------------------------------------------
+> Defconfig changes for omap2plus_defconfig to make it more modular,
+> and to add few more drivers found on various boards.
 
--- 
-Dmitry
+Merged, thanks.
+
+BTW, please remember to enable drivers in the multi_v7 defconfigs too
+where it makes sense. Not sure if any of these fall in that category,
+I didn't check closely.
+
+
+-Olof
