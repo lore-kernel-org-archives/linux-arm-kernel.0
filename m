@@ -1,98 +1,68 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 23 Jan 2015 16:51:27 +0100
-Subject: [PATCH v5 17/18] iommu: exynos: init from dt-specific callback instead
- of initcall
+Date: Fri, 23 Jan 2015 16:51:17 +0100
+Subject: [PATCH v5 07/18] iommu: exynos: remove unused functions
 In-Reply-To: <1422028288-891-1-git-send-email-m.szyprowski@samsung.com>
 References: <1422028288-891-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1422028288-891-18-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1422028288-891-8-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces IOMMU_OF_DECLARE-based initialization to the
-driver, which replaces subsys_initcall-based procedure.
-exynos_iommu_of_setup ensures that each sysmmu controller is probed
-before its master device.
+This patch removes two unneeded functions, which are not a part of
+generic IOMMU API and were never used by any other driver.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c | 30 ++++++++++++++++++++++++++++--
- 1 file changed, 28 insertions(+), 2 deletions(-)
+ drivers/iommu/exynos-iommu.c | 31 -------------------------------
+ 1 file changed, 31 deletions(-)
 
 diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index c53cc8f..ff169ce 100644
+index b6c8612..3c82411 100644
 --- a/drivers/iommu/exynos-iommu.c
 +++ b/drivers/iommu/exynos-iommu.c
-@@ -13,16 +13,21 @@
- #endif
- 
- #include <linux/clk.h>
-+#include <linux/dma-mapping.h>
- #include <linux/err.h>
- #include <linux/io.h>
- #include <linux/iommu.h>
- #include <linux/interrupt.h>
- #include <linux/list.h>
-+#include <linux/of.h>
-+#include <linux/of_iommu.h>
-+#include <linux/of_platform.h>
- #include <linux/platform_device.h>
- #include <linux/pm_runtime.h>
- #include <linux/slab.h>
- 
- #include <asm/cacheflush.h>
-+#include <asm/dma-iommu.h>
- #include <asm/pgtable.h>
- 
- typedef u32 sysmmu_iova_t;
-@@ -1072,7 +1077,7 @@ static phys_addr_t exynos_iommu_iova_to_phys(struct iommu_domain *iommu_domain,
- 	return phys;
- }
- 
--static const struct iommu_ops exynos_iommu_ops = {
-+static struct iommu_ops exynos_iommu_ops = {
- 	.domain_init = exynos_iommu_domain_init,
- 	.domain_destroy = exynos_iommu_domain_destroy,
- 	.attach_dev = exynos_iommu_attach_device,
-@@ -1084,6 +1089,8 @@ static const struct iommu_ops exynos_iommu_ops = {
- 	.pgsize_bitmap = SECT_SIZE | LPAGE_SIZE | SPAGE_SIZE,
- };
- 
-+static int init_done;
-+
- static int __init exynos_iommu_init(void)
- {
- 	int ret;
-@@ -1116,6 +1123,8 @@ static int __init exynos_iommu_init(void)
- 		goto err_set_iommu;
- 	}
- 
-+	init_done = true;
-+
- 	return 0;
- err_set_iommu:
- 	kmem_cache_free(lv2table_kmem_cache, zero_lv2_table);
-@@ -1125,4 +1134,21 @@ err_reg_driver:
- 	kmem_cache_destroy(lv2table_kmem_cache);
+@@ -490,13 +490,6 @@ static int __exynos_sysmmu_enable(struct device *dev, phys_addr_t pgtable,
  	return ret;
  }
--subsys_initcall(exynos_iommu_init);
-+
-+static int __init exynos_iommu_of_setup(struct device_node *np)
-+{
-+	struct platform_device *pdev;
-+
-+	if (!init_done)
-+		exynos_iommu_init();
-+
-+	pdev = of_platform_device_create(np, NULL, platform_bus_type.dev_root);
-+	if (IS_ERR(pdev))
-+		return PTR_ERR(pdev);
-+
-+	of_iommu_set_ops(np, &exynos_iommu_ops);
-+	return 0;
-+}
-+
-+IOMMU_OF_DECLARE(exynos_iommu_of, "samsung,exynos-sysmmu",
-+		 exynos_iommu_of_setup);
+ 
+-int exynos_sysmmu_enable(struct device *dev, phys_addr_t pgtable)
+-{
+-	BUG_ON(!memblock_is_memory(pgtable));
+-
+-	return __exynos_sysmmu_enable(dev, pgtable, NULL);
+-}
+-
+ static bool exynos_sysmmu_disable(struct device *dev)
+ {
+ 	unsigned long flags;
+@@ -588,30 +581,6 @@ static void sysmmu_tlb_invalidate_entry(struct device *dev, sysmmu_iova_t iova,
+ 	spin_unlock_irqrestore(&data->lock, flags);
+ }
+ 
+-void exynos_sysmmu_tlb_invalidate(struct device *dev)
+-{
+-	struct exynos_iommu_owner *owner = dev->archdata.iommu;
+-	unsigned long flags;
+-	struct sysmmu_drvdata *data;
+-
+-	data = dev_get_drvdata(owner->sysmmu);
+-
+-	spin_lock_irqsave(&data->lock, flags);
+-	if (is_sysmmu_active(data)) {
+-		if (!IS_ERR(data->clk_master))
+-			clk_enable(data->clk_master);
+-		if (sysmmu_block(data->sfrbase)) {
+-			__sysmmu_tlb_invalidate(data->sfrbase);
+-			sysmmu_unblock(data->sfrbase);
+-		}
+-		if (!IS_ERR(data->clk_master))
+-			clk_disable(data->clk_master);
+-	} else {
+-		dev_dbg(dev, "disabled. Skipping TLB invalidation\n");
+-	}
+-	spin_unlock_irqrestore(&data->lock, flags);
+-}
+-
+ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
+ {
+ 	int irq, ret;
 -- 
 1.9.2
