@@ -1,103 +1,88 @@
-From: ideal.song@samsung.com (Inha Song)
-Date: Fri, 23 Jan 2015 15:56:49 +0900
-Subject: [alsa-devel] [PATCH v4 3/3] ARM: dts: Add sound nodes for
- exynos4412-trats2
-In-Reply-To: <1421989410-12490-4-git-send-email-ideal.song@samsung.com>
-References: <1421989410-12490-1-git-send-email-ideal.song@samsung.com>
- <1421989410-12490-4-git-send-email-ideal.song@samsung.com>
-Message-ID: <20150123155649.14fe36a7@songinha-Samsung-DeskTop-System>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Fri, 23 Jan 2015 16:01:41 +0900
+Subject: [PATCH V9 13/14] ARM: dts: snow: represent the connection between
+ bridge and panel using videoport and endpoints
+In-Reply-To: <1421771935-31618-14-git-send-email-ajaykumar.rs@samsung.com>
+References: <1421771935-31618-1-git-send-email-ajaykumar.rs@samsung.com>
+ <1421771935-31618-14-git-send-email-ajaykumar.rs@samsung.com>
+Message-ID: <0c9401d036da$71046bf0$530d43d0$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
-
-Sorry, I missed to adding in Cc.
-
-Best Regards,
-Inha Song.
-
-On Fri, 23 Jan 2015 14:03:30 +0900
-Inha Song <ideal.song@samsung.com> wrote:
-
-> This patch add WM1811 audio codec, I2S interface and the sound
-> machine nodes to enable audio on exynos4412-trats2 board.
+Ajay Kumar wrote:
 > 
-> Signed-off-by: Inha Song <ideal.song@samsung.com>
+> Define videoports and use endpoints to describe the connection between
+> the encoder, bridge and the panel, instead of using phandles.
+> 
+> Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
+> Acked-by: Inki Dae <inki.dae@samsung.com>
+> Tested-by: Rahul Sharma <rahul.sharma@samsung.com>
+> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Tested-by: Gustavo Padovan <gustavo.padovan@collabora.co.uk>
+> Tested-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
 > ---
->  arch/arm/boot/dts/exynos4412-trats2.dts | 42 +++++++++++++++++++++++++++++++++
->  1 file changed, 42 insertions(+)
+>  arch/arm/boot/dts/exynos5250-snow.dts |   30 ++++++++++++++++++++++++++++--
+>  1 file changed, 28 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
-> index 29231b4..6205b98 100644
-> --- a/arch/arm/boot/dts/exynos4412-trats2.dts
-> +++ b/arch/arm/boot/dts/exynos4412-trats2.dts
-> @@ -203,6 +203,25 @@
+> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+> index b9aeec4..1bd5d3a 100644
+> --- a/arch/arm/boot/dts/exynos5250-snow.dts
+> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
+> @@ -183,7 +183,20 @@
+>  			powerdown-gpios = <&gpy2 5 GPIO_ACTIVE_HIGH>;
+>  			reset-gpios = <&gpx1 5 GPIO_ACTIVE_HIGH>;
+>  			edid-emulation = <5>;
+> -			panel = <&panel>;
+> +
+> +			ports {
+> +				port at 0 {
+> +					bridge_out: endpoint {
+> +						remote-endpoint = <&panel_in>;
+> +					};
+> +				};
+> +
+> +				port at 1 {
+> +					bridge_in: endpoint {
+> +						remote-endpoint = <&dp_out>;
+> +					};
+> +				};
+> +			};
 >  		};
 >  	};
->  
-> +	i2c at 138A0000 {
-> +		samsung,i2c-sda-delay = <100>;
-> +		samsung,i2c-slave-addr = <0x10>;
-> +		samsung,i2c-max-bus-freq = <100000>;
-> +		pinctrl-0 = <&i2c4_bus>;
-> +		pinctrl-names = "default";
-> +		status = "okay";
+> 
+> @@ -228,6 +241,12 @@
+>  		compatible = "auo,b116xw03";
+>  		power-supply = <&fet6>;
+>  		backlight = <&backlight>;
 > +
-> +		wm1811: wm1811 at 1a {
-> +			compatible = "wlf,wm1811";
-> +			reg = <0x1a>;
-> +			clocks = <&pmu_system_controller 0>;
-> +			clock-names = "MCLK1";
-> +			DCVDD-supply = <&ldo3_reg>;
-> +			DBVDD1-supply = <&ldo3_reg>;
-> +			wlf,ldo1ena = <&gpj0 4 0>;
+> +		port {
+> +			panel_in: endpoint {
+> +				remote-endpoint = <&bridge_out>;
+> +			};
 > +		};
-> +	};
-> +
->  	i2c at 138D0000 {
->  		samsung,i2c-sda-delay = <100>;
->  		samsung,i2c-slave-addr = <0x10>;
-> @@ -838,6 +857,24 @@
->  		};
->  	};
->  
-> +	i2s0: i2s at 03830000 {
-> +		pinctrl-0 = <&i2s0_bus>;
-> +		pinctrl-names = "default";
-> +		status = "okay";
-> +	};
-> +
-> +	sound {
-> +		compatible = "samsung,trats2-audio";
-> +		samsung,i2s-controller = <&i2s0>;
-> +		samsung,model = "Trats2";
-> +		samsung,audio-codec = <&wm1811>;
-> +		samsung,audio-routing =
-> +			"SPK", "SPKOUTLN",
-> +			"SPK", "SPKOUTLP",
-> +			"SPK", "SPKOUTRN",
-> +			"SPK", "SPKOUTRP";
-> +	};
-> +
->  	exynos-usbphy at 125B0000 {
->  		status = "okay";
->  	};
-> @@ -865,6 +902,11 @@
 >  	};
 >  };
->  
-> +&pmu_system_controller {
-> +	assigned-clocks = <&pmu_system_controller 0>;
-> +	assigned-clock-parents =  <&clock CLK_XUSBXTI>;
-> +};
-> +
->  &pinctrl_0 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&sleep0>;
-> -- 
-> 2.0.0.390.gcb682f8
 > 
-> _______________________________________________
-> Alsa-devel mailing list
-> Alsa-devel at alsa-project.org
-> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
+> @@ -242,7 +261,14 @@
+>  	samsung,link-rate = <0x0a>;
+>  	samsung,lane-count = <2>;
+>  	samsung,hpd-gpio = <&gpx0 7 GPIO_ACTIVE_HIGH>;
+> -	bridge = <&ptn3460>;
+> +
+> +	ports {
+> +		port at 0 {
+> +			dp_out: endpoint {
+> +				remote-endpoint = <&bridge_in>;
+> +			};
+> +		};
+> +	};
+>  };
+> 
+>  &ehci {
+> --
+> 1.7.9.5
+
+I'm fine on the DT changes in this series, shall I take 13/14 and 14/14 in
+Samsung tree?
+
+- Kukjin
