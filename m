@@ -1,33 +1,39 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sat, 24 Jan 2015 18:15:23 +0100 (CET)
-Subject: [PATCH v4] irqchip: gic: Allow interrupt level to be set for PPIs.
-In-Reply-To: <87mw5bf256.fsf@approximate.cambridge.arm.com>
-References: <1421772779-25764-1-git-send-email-Liviu.Dudau@arm.com>
- <87mw5bf256.fsf@approximate.cambridge.arm.com>
-Message-ID: <alpine.DEB.2.11.1501241814430.5526@nanos>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Sat, 24 Jan 2015 18:20:00 +0100
+Subject: [PATCH v3 0/5] ARM: at91: fix irq_pm_install_action WARNING
+In-Reply-To: <alpine.DEB.2.11.1501241735530.5526@nanos>
+References: <1422032971-14139-1-git-send-email-boris.brezillon@free-electrons.com>
+ <alpine.DEB.2.11.1501241735530.5526@nanos>
+Message-ID: <20150124182000.59a4a96b@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 22 Jan 2015, Marc Zyngier wrote:
+Hi Thomas,
 
-> On Tue, Jan 20 2015 at  4:52:59 pm GMT, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> > During a recent cleanup of the arm64 DTs it has become clear that
-> > the handling of PPIs in xxxx_set_type() is incorrect. The ARM TRMs
-> > for GICv2 and later allow for "implementation defined" support for
-> > setting the edge or level type of the PPI interrupts and don't restrict
-> > the activation level of the signal. Current ARM implementations
-> > do restrict the PPI level type to IRQ_TYPE_LEVEL_LOW, but licensees
-> > of the IP can decide to shoot themselves in the foot at any time.
-> >
-> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+On Sat, 24 Jan 2015 17:37:48 +0100 (CET)
+Thomas Gleixner <tglx@linutronix.de> wrote:
+
+> On Fri, 23 Jan 2015, Boris Brezillon wrote:
+> >  - change the compatible string to clearly show that this chip is purely
+> >    virtual
 > 
-> For the GIC and GICv3 parts:
-> 
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> So we probably want to do : s/dumb/virt/ for both DT and code to make
+> it clear from the names as well.
 
-So I queue that if there are no further objections from Russell or the
-DT folks.
+I thought the dumb word was denoting the simplicity (stupidity ?) of
+the irq demultiplexer, but indeed, I don't see how a virtual irq demuxer
+could have enough information to do a better job (if there's an
+interrupt cause register, then it's not a virtual/software demuxer
+anymore).
+So replacing dumb by virt or virtual makes sense here.
 
-Thanks,
 
-	tglx
+Best Regards,
+
+Boris
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
