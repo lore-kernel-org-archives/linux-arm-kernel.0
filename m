@@ -1,80 +1,94 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 23 Jan 2015 19:01:27 -0600
-Subject: [PATCH 4/9] pci: add DT based ARM Versatile PCI host driver
-In-Reply-To: <2308474.mrIrUSfiTv@wuerfel>
-References: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
- <1419967718-26909-5-git-send-email-robherring2@gmail.com>
- <2308474.mrIrUSfiTv@wuerfel>
-Message-ID: <20150124010127.GA29776@google.com>
+From: n.nikolaev@virtualopensystems.com (Nikolay Nikolaev)
+Date: Sat, 24 Jan 2015 03:02:33 +0200
+Subject: [PATCH v2 2/5] KVM: ARM: on IO mem abort - route the call to KVM
+ MMIO bus
+In-Reply-To: <54B3FFB9.3050406@linaro.org>
+References: <20141207093641.17563.84226.stgit@i3820>
+ <20141207093749.17563.12497.stgit@i3820>
+ <54B3FFB9.3050406@linaro.org>
+Message-ID: <CADDJ2=Os6Uws6HN=iKg=uhx1artwBFXeyFKq9Co2Sgoo=63bOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 30, 2014 at 10:58:00PM +0100, Arnd Bergmann wrote:
-> On Tuesday 30 December 2014 13:28:33 Rob Herring wrote:
-> > +	list_for_each_entry(win, res, list) {
-> > +		struct resource *parent, *res = win->res;
-> > +
-> > +		switch (resource_type(res)) {
-> > +		case IORESOURCE_IO:
-> > +			parent = &ioport_resource;
-> > +			err = pci_remap_iospace(res, iobase);
-> > +			if (err) {
-> > +				dev_warn(dev, "error %d: failed to map resource %pR\n",
-> > +					 err, res);
-> > +				continue;
-> > +			}
-> > +			break;
-> > +		case IORESOURCE_MEM:
-> > +			parent = &iomem_resource;
-> > +			res_valid |= !(res->flags & IORESOURCE_PREFETCH);
-> > +
-> > +			writel(res->start >> 28, PCI_IMAP(mem));
-> > +			writel(PHYS_OFFSET >> 28, PCI_SMAP(mem));
-> > +			mem++;
-> > +
-> > +			break;
-> > +		case IORESOURCE_BUS:
-> > +		default:
-> > +			continue;
-> > +		}
-> > +
-> > +		err = devm_request_resource(dev, parent, res);
-> > +		if (err)
-> > +			goto out_release_res;
-> > +	}
-> 
-> I wonder if we should also request the physical resource for the I/O space
-> window to have it show up in /proc/iomem. We are rather inconsistent in this
-> regard between drivers.
+On Mon, Jan 12, 2015 at 7:09 PM, Eric Auger <eric.auger@linaro.org> wrote:
+> Hi Nikolay,
+> On 12/07/2014 10:37 AM, Nikolay Nikolaev wrote:
+>> On IO memory abort, try to handle the MMIO access thorugh the KVM
+>> registered read/write callbacks. This is done by invoking the relevant
+>> kvm_io_bus_* API.
+>>
+>> Signed-off-by: Nikolay Nikolaev <n.nikolaev@virtualopensystems.com>
+>> ---
+>>  arch/arm/kvm/mmio.c |   33 +++++++++++++++++++++++++++++++++
+>>  1 file changed, 33 insertions(+)
+>>
+>> diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
+>> index 4cb5a93..e42469f 100644
+>> --- a/arch/arm/kvm/mmio.c
+>> +++ b/arch/arm/kvm/mmio.c
+>> @@ -162,6 +162,36 @@ static int decode_hsr(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>       return 0;
+>>  }
+>>
+>> +/**
+>> + * handle_kernel_mmio - handle an in-kernel MMIO access
+>> + * @vcpu:    pointer to the vcpu performing the access
+>> + * @run:     pointer to the kvm_run structure
+>> + * @mmio:    pointer to the data describing the access
+>> + *
+>> + * returns true if the MMIO access has been performed in kernel space,
+>> + * and false if it needs to be emulated in user space.
+>> + */
+>> +static bool handle_kernel_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>> +             struct kvm_exit_mmio *mmio)
+>> +{
+>> +     int ret;
+>> +
+>> +     if (mmio->is_write) {
+>> +             ret = kvm_io_bus_write(vcpu, KVM_MMIO_BUS, mmio->phys_addr,
+>> +                             mmio->len, &mmio->data);
+>> +
+>> +     } else {
+>> +             ret = kvm_io_bus_read(vcpu, KVM_MMIO_BUS, mmio->phys_addr,
+>> +                             mmio->len, &mmio->data);
+>> +     }
+>> +     if (!ret) {
+>> +             kvm_prepare_mmio(run, mmio);
+>> +             kvm_handle_mmio_return(vcpu, run);
+>> +     }
+>> +
+>> +     return !ret;
+> in case ret < 0 (-EOPNOTSUPP = -95) aren't we returning true too? return
+> (ret==0)?
+>
+>> +}
+>> +
+>>  int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>>                phys_addr_t fault_ipa)
+>>  {
+>> @@ -200,6 +230,9 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>>       if (vgic_handle_mmio(vcpu, run, &mmio))
+>>               return 1;
+>>
+>> +     if (handle_kernel_mmio(vcpu, run, &mmio))
+>> +             return 1;
+>> +
+>>       kvm_prepare_mmio(run, &mmio);
+>>       return 0;
+> currently the io_mem_abort returned value is not used by mmu.c code. I
+> think this should be handed in kvm_handle_guest_abort. What do you think?
 
-I'd like that.  We are inconsistent, but I think it's useful to have this
-information in /proc/iomem.  After all, it is physical address space that
-we can't use for anything else, so I guess you could argue that it's
-actually a bug to omit it.
+You're right that the returned value is not handled further after we
+exit io_mem_abort, it's just passed up the call stack.
+However I'm not sure how to handle it better. If you have ideas, please share.
 
-> > +	pci_add_flags(PCI_ENABLE_PROC_DOMAINS);
-> > +	pci_add_flags(PCI_REASSIGN_ALL_BUS | PCI_REASSIGN_ALL_RSRC);
-> > +
-> > +	bus = pci_scan_root_bus(&pdev->dev, 0, &pci_versatile_ops, &sys, &pci_res);
-> > +	if (!bus)
-> > +		return -ENOMEM;
-> > +
-> > +	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
-> > +	pci_assign_unassigned_bus_resources(bus);
-> > +
-> > +	return 0;
-> 
-> One general question, mainly for Bjorn: pci_scan_root_bus adds all the devices
-> at the Linux driver level by calling pci_bus_add_devices(), but then we call
-> pci_fixup_irqs and pci_assign_unassigned_bus_resources after that, which will
-> change the devices again. Is this how it's meant to work? How do we ensure
-> that we have the correct irq number and resources by the time we enter the
-> probe() function of the PCI device driver that gets bound to a device here?
+regards,
+Nikolay Nikolaev
 
-Nope, that isn't how it's meant to work.  After pci_bus_add_devices()
-completes, drivers can be already bound to the device, and the PCI core
-should keep its mitts off things the driver could be using.  But I think
-we've had this problem for a long time, and I haven't looked at it recently
-to see how hard it would be to fix.
-
-Bjorn
+>
+> Best Regards
+>
+> Eric
+>>  }
+>>
+>
