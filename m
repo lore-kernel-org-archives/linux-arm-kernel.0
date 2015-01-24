@@ -1,100 +1,98 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Sat, 24 Jan 2015 12:59:20 +0900
-Subject: [GIT PULL] Samsung DT updates for v3.20
-Message-ID: <54C31898.1060906@kernel.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 23 Jan 2015 22:37:46 -0600
+Subject: [next-20150119]regression (mm)?
+In-Reply-To: <20150124011311.GB9038@node.dhcp.inet.fi>
+References: <20150119174317.GK20386@saruman>
+ <20150120001643.7D15AA8@black.fi.intel.com>
+ <20150120114555.GA11502@n2100.arm.linux.org.uk>
+ <20150120140546.DDCB8D4@black.fi.intel.com>
+ <20150123172736.GA15392@kahuna>
+ <CANMBJr7w2jZBwRDEsVNvL3XrDZ2ttwFz7qBf4zySAMMmcgAxiw@mail.gmail.com>
+ <20150123183706.GA15791@kahuna>
+ <20150123202229.GA9038@node.dhcp.inet.fi>
+ <CANMBJr4YOcHj2G7w-gwfoZjQQd=h0Mj59QNBo3ei_=ejYRcdnw@mail.gmail.com>
+ <20150124011311.GB9038@node.dhcp.inet.fi>
+Message-ID: <20150124043746.GA22262@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 03:13-20150124, Kirill A. Shutemov wrote:
+> > >> On 09:39-20150123, Tyler Baker wrote:
+[...]
+> > >> > I just reviewed the boot logs for next-20150123 and there still seems
+> > >> > to be a related issue. I've been boot testing
+> > >> > multi_v7_defconfig+CONFIG_ARM_LPAE=y kernel configurations which still
+> > >> > seem broken.
+[...]
+> Okay, proof of concept patch is below. It's going to break every other
+> architecture with FIRST_USER_ADDRESS != 0, but I think it's cleaner way to
+> go.
 
-Please pull Samsung DT updates for v3.20.
-I checked to use signed tag in this time ;)
+Testing on my end:
 
-Thanks and if any problems, please let me know.
+just ran through this set (+ logs similar to Tyler's from my side):
 
-- Kukjin
+next-20150123 (multi_v7_defconfig == !LPAE)
+ 1:    BeagleBoard-X15(am57xx-evm): BOOT: PASS: http://paste.ubuntu.org.cn/2219449
+ 2:                     dra72x-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2219450
+ 3:                     dra7xx-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2219451
+ 4:                      omap5-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2219452
+TOTAL = 4 boards, Booted Boards = 4, No Boot boards = 0
 
-The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+next-20150123-LPAE-Logging enabled[1] (multi_v7_defconfig +LPAE)
+ 1:    BeagleBoard-X15(am57xx-evm): BOOT: FAIL: http://paste.ubuntu.org.cn/2220938
+ 2:                     dra72x-evm: BOOT: FAIL: http://paste.ubuntu.org.cn/2220943
+ 3:                     dra7xx-evm: BOOT: FAIL: http://paste.ubuntu.org.cn/2220947
+ 4:                      omap5-evm: BOOT: FAIL: http://paste.ubuntu.org.cn/2220955
+TOTAL = 4 boards, Booted Boards = 0, No Boot boards = 4
 
-  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+next-20150123-LPAE-new-patch [2] (multi_v7_defconfig + LPAE)
+ 1:    BeagleBoard-X15(am57xx-evm): BOOT: PASS: http://paste.ubuntu.org.cn/2221047
+ 2:                     dra72x-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2221065
+ 3:                     dra7xx-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2221069
+ 4:                      omap5-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2221070
+TOTAL = 4 boards, Booted Boards = 4, No Boot boards = 0
 
-are available in the git repository at:
+next-20150123-new-patch[2] (multi_v7_defconfig == !LPAE)
+ 1:                     am335x-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2221277
+ 2:                      am335x-sk: BOOT: PASS: http://paste.ubuntu.org.cn/2221278
+ 3:                      am437x-sk: BOOT: FAIL: http://paste.ubuntu.org.cn/2221279 (unrelated)
+ 4:                    am43xx-epos: BOOT: PASS: http://paste.ubuntu.org.cn/2221280
+ 5:                   am43xx-gpevm: BOOT: PASS: http://paste.ubuntu.org.cn/2221281
+ 6:    BeagleBoard-X15(am57xx-evm): BOOT: PASS: http://paste.ubuntu.org.cn/2221282
+ 7:                 BeagleBoard-XM: BOOT: FAIL: http://paste.ubuntu.org.cn/2221283 (unrelated)
+ 8:            beagleboard-vanilla: BOOT: PASS: http://paste.ubuntu.org.cn/2221284
+ 9:               beaglebone-black: BOOT: PASS: http://paste.ubuntu.org.cn/2221285
+10:                     beaglebone: BOOT: FAIL: http://paste.ubuntu.org.cn/2221286 (unrelated)
+11:                     dra72x-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2221287
+12:                     dra7xx-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2221288
+13:                      omap5-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2221289
+14:                  pandaboard-es: BOOT: PASS: http://paste.ubuntu.org.cn/2221290
+15:             pandaboard-vanilla: BOOT: PASS: http://paste.ubuntu.org.cn/2221291
+16:                        sdp4430: BOOT: PASS: http://paste.ubuntu.org.cn/2221292
+TOTAL = 16 boards, Booted Boards = 13, No Boot boards = 3
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-tags/samsung-dt
+next-20150123-new-patch[2] (omap2plus_defconfig)
+ 1:                     am335x-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2221653
+ 2:                      am335x-sk: BOOT: PASS: http://paste.ubuntu.org.cn/2221654
+ 3:                      am437x-sk: BOOT: PASS: http://paste.ubuntu.org.cn/2221656
+ 4:                    am43xx-epos: BOOT: PASS: http://paste.ubuntu.org.cn/2221659
+ 5:                   am43xx-gpevm: BOOT: PASS: http://paste.ubuntu.org.cn/2221660
+ 6:    BeagleBoard-X15(am57xx-evm): BOOT: PASS: http://paste.ubuntu.org.cn/2221661
+ 7:                 BeagleBoard-XM: BOOT: PASS: http://paste.ubuntu.org.cn/2221670
+ 8:            beagleboard-vanilla: BOOT: PASS: http://paste.ubuntu.org.cn/2221676
+ 9:               beaglebone-black: BOOT: PASS: http://paste.ubuntu.org.cn/2221683
+10:                     beaglebone: BOOT: PASS: http://paste.ubuntu.org.cn/2221690
+11:                     dra72x-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2221692
+12:                     dra7xx-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2221695
+13:                      omap5-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2221700
+14:                  pandaboard-es: BOOT: PASS: http://paste.ubuntu.org.cn/2221704
+15:             pandaboard-vanilla: BOOT: PASS: http://paste.ubuntu.org.cn/2221707
+16:                        sdp4430: BOOT: PASS: http://paste.ubuntu.org.cn/2221713
+TOTAL = 16 boards, Booted Boards = 16, No Boot boards = 0
 
-for you to fetch changes up to 23c76dc666471dce5ce71b620839d2465723a7c9:
-
-  ARM: dts: Configure regulators for suspend on exynos Peach boards
-(2015-01-15 00:30:49 +0900)
-
-----------------------------------------------------------------
-Samsung DT updates for v3.20
-
-- exynos3250
-  : add exynos_usbphy node and hsotg nodes
-
-- exynos3250-rinato
-  : enable usb
-  : cleanup and use macro for gpio-keys
-  : add fimd and Panel devices support
-
-- exynos3250-monk
-  : enable usb
-  : cleanup and use macro for gpio-keys
-
-- exynos5250-snow
-  : add power and lid gpio-keys pinctrl
-
-- exynos5420-peach-pit and exynos5800-peach-pi
-  : configure regulators for suspend
-  : set always on for USB webCam regulators
-  : add lid GPIO key device
-
-- exynos5422
-  : add support new board Odroid XU3
-
-- dt-bindings
-  : add exynos-chipid
-
-----------------------------------------------------------------
-Beomho Seo (2):
-      ARM: dts: remove unnecessary gpio-key nodes for exynos3250 boards
-      ARM: dts: use macro in gpio keys for exynos3250 boards
-
-Inki Dae (2):
-      ARM: dts: add fimd device support for exynos3250-rinato
-      ARM: dts: add Panel device support for exynos3250-rinato
-
-Jaewon Kim (4):
-      ARM: dts: Add exynos_usbphy node for exynos3250
-      ARM: dts: Add hsotg node for exynos3250
-      ARM: dts: Enable USB node for exynos3250-rinato
-      ARM: dts: Enable USB node for exynos3250-monk
-
-Javier Martinez Canillas (4):
-      ARM: dts: Add power and lid GPIO keys pinctrl for exynos5250-snow
-      ARM: dts: Add lid GPIO key device node for Peach boards
-      ARM: dts: Set Peach boards USB WebCam regulators to always on
-      ARM: dts: Configure regulators for suspend on exynos Peach boards
-
-Pankaj Dubey (1):
-      Documentation: dt-bindings: add exynos-chipid binding information
-
-Sjoerd Simons (1):
-      ARM: dts: Add dts file for Odroid XU3 board
-
- .../bindings/arm/samsung/exynos-chipid.txt         |  12 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/exynos3250-monk.dts              |  15 +-
- arch/arm/boot/dts/exynos3250-rinato.dts            |  85 +++++-
- arch/arm/boot/dts/exynos3250.dtsi                  |  21 ++
- arch/arm/boot/dts/exynos5250-snow.dts              |  16 +
- arch/arm/boot/dts/exynos5420-peach-pit.dts         | 100 ++++++-
- arch/arm/boot/dts/exynos5422-odroidxu3.dts         | 332
-+++++++++++++++++++++
- arch/arm/boot/dts/exynos5800-peach-pi.dts          | 101 ++++++-
- 9 files changed, 675 insertions(+), 8 deletions(-)
- create mode 100644
-Documentation/devicetree/bindings/arm/samsung/exynos-chipid.txt
- create mode 100644 arch/arm/boot/dts/exynos5422-odroidxu3.dts
+[1] http://paste.ubuntu.org.cn/2220994 (based on diff from Tyler B)
+[2] https://patchwork.kernel.org/patch/5698491/
+-- 
+Regards,
+Nishanth Menon
