@@ -1,70 +1,45 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Sat, 24 Jan 2015 13:53:51 +0900
-Subject: [PATCH] ARM: exynos_defconfig: Enable PMIC and MUIC drivers for
- Gears and Trats2
-In-Reply-To: <1422022966-15897-1-git-send-email-k.kozlowski@samsung.com>
-References: <1422022966-15897-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <54C3255F.6000504@kernel.org>
+Date: Sat, 24 Jan 2015 13:54:28 +0900
+Subject: [PATCH] ARM: exynos_defconfig: Enable CONFIG_FHANDLE
+In-Reply-To: <54C20CD5.7060001@collabora.co.uk>
+References: <1417176414-21558-1-git-send-email-sjoerd.simons@collabora.co.uk>
+ <54786C1D.3050306@collabora.co.uk> <54BC9995.4020300@samsung.com>
+ <54C20CD5.7060001@collabora.co.uk>
+Message-ID: <54C32584.4040601@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/23/15 23:22, Krzysztof Kozlowski wrote:
-> Enable drivers for PMICs and MUICs present on Exynos-based devices:
->  - max14577: charger, extcon, fuel gauge (max17040), regulator,
->    used on: Gear 1, Gear 2,
->  - max77693: charger, extcon, fuel gauge (max17042),
->    used on: Trats2,
+On 01/23/15 17:56, Javier Martinez Canillas wrote:
+> Hello Kukjin,
 > 
-> This allows full usage of charging stack on these devices along with
-> extcon connector.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  arch/arm/configs/exynos_defconfig | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index 3d0c5d65c741..01758378a1b1 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -83,6 +83,10 @@ CONFIG_I2C_S3C2410=y
->  CONFIG_DEBUG_GPIO=y
->  CONFIG_POWER_SUPPLY=y
->  CONFIG_BATTERY_SBS=y
-> +CONFIG_BATTERY_MAX17040=y
-> +CONFIG_BATTERY_MAX17042=y
-> +CONFIG_CHARGER_MAX14577=y
-> +CONFIG_CHARGER_MAX77693=y
->  CONFIG_CHARGER_TPS65090=y
->  CONFIG_HWMON=y
->  CONFIG_SENSORS_LM90=y
-> @@ -94,6 +98,7 @@ CONFIG_S3C2410_WATCHDOG=y
->  CONFIG_MFD_CROS_EC=y
->  CONFIG_MFD_CROS_EC_I2C=y
->  CONFIG_MFD_CROS_EC_SPI=y
-> +CONFIG_MFD_MAX14577=y
->  CONFIG_MFD_MAX77686=y
->  CONFIG_MFD_MAX77693=y
->  CONFIG_MFD_MAX8997=y
-> @@ -102,6 +107,7 @@ CONFIG_MFD_TPS65090=y
->  CONFIG_REGULATOR=y
->  CONFIG_REGULATOR_FIXED_VOLTAGE=y
->  CONFIG_REGULATOR_GPIO=y
-> +CONFIG_REGULATOR_MAX14577=y
->  CONFIG_REGULATOR_MAX8997=y
->  CONFIG_REGULATOR_MAX77686=y
->  CONFIG_REGULATOR_MAX77802=y
-> @@ -168,6 +174,9 @@ CONFIG_COMMON_CLK_MAX77686=y
->  CONFIG_COMMON_CLK_MAX77802=y
->  CONFIG_COMMON_CLK_S2MPS11=y
->  CONFIG_EXYNOS_IOMMU=y
-> +CONFIG_EXTCON=y
-> +CONFIG_EXTCON_MAX14577=y
-> +CONFIG_EXTCON_MAX77693=y
->  CONFIG_IIO=y
->  CONFIG_EXYNOS_ADC=y
->  CONFIG_PWM=y
+Hi,
 
-I've applied, thanks.
+> On 01/19/2015 06:43 AM, Joonyoung Shim wrote:
+>>>
+>>
+>> I also hope merge this, already multi_v7_defconfig supports this.
+>>
+> 
+> I would also hope this to be merged since it's required to boot
+> using systemd.
+> 
+>> Thanks.
+>>
+>>> This is certainly required for newer systemd and has to be enabled.
+>>>
+>>> But it would also be great to have enabled all the config symbols
+>>> that are listed as requirements in the systemd README file:
+>>>
+>>> http://cgit.freedesktop.org/systemd/systemd/tree/README.
+>>>
+>>> Tony added that support to OMAP2+ defconfig in commit 673ce00c
+>>> ("ARM: omap2plus_defconfig: Add support for distros with systemd")
+>>> so the same should be done in exynos_defconfig.
+>>>
+>>> That can of course be a follow-up patch though, so for $subject:
+>>>
+>>> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>>>
+Thanks, applied.
 
 - Kukjin
