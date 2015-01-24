@@ -1,30 +1,25 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sat, 24 Jan 2015 11:17:20 +0100
-Subject: [PATCH v2 1/4] net: stmmac: dwmac-rk: Don't set the regulator
- voltage for phy from the driver
-In-Reply-To: <1421737780-1533-2-git-send-email-romain.perier@gmail.com>
-References: <1421737780-1533-1-git-send-email-romain.perier@gmail.com>
- <1421737780-1533-2-git-send-email-romain.perier@gmail.com>
-Message-ID: <6351287.4ner65dylF@phil>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Sat, 24 Jan 2015 12:46:19 +0100 (CET)
+Subject: [PATCH v2 RESEND 1/8] dt: bindings: Supply shared ST IRQ defines
+In-Reply-To: <20150123163938.GC11745@x1>
+References: <1421920133-7914-1-git-send-email-lee.jones@linaro.org>
+ <1421920133-7914-2-git-send-email-lee.jones@linaro.org>
+ <alpine.DEB.2.11.1501231656310.5526@nanos> <20150123163938.GC11745@x1>
+Message-ID: <alpine.DEB.2.11.1501241244430.5526@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 20. Januar 2015, 07:09:37 schrieb Romain Perier:
-> As these settings can be directly expressed from devicetree for both fixed
-> regulators and pmic-integrated regulators, it is more standard to set them
-> from dts and let the regulator framework use the right voltage informations
-> when it is used in the driver.
+On Fri, 23 Jan 2015, Lee Jones wrote:
+> On Fri, 23 Jan 2015, Thomas Gleixner wrote:
+> > Can we please stop adding these pointless filenames all over the
+> > place? They are useless and wrong in a lot of cases.
 > 
-> Signed-off-by: Romain Perier <romain.perier@gmail.com>
+> Less of a copy and paste and more and a `mv` without fixing up the
+> file names.  I guess they are silly, but they are rife, so someone must
+> think they're a good idea. :)
 
-Romain suggested to resend my tags against a real patch of the series, so it 
-turns up in patchwork, so
+I'd rather say they are ripe for being banned :)
 
-This series
-Tested-by: Heiko Stuebner <heiko@sntech.de>
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+Thanks,
 
-@Dave: as said in the v1 mail, this would be nice to have for 3.20
-
-
-Heiko
+	tglx
