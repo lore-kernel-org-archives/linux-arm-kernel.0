@@ -1,87 +1,51 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sat, 24 Jan 2015 11:01:54 -0300
-Subject: [PATCH 1/2] mtd: nand: pxa3xx: Fix PIO FIFO draining
-In-Reply-To: <54C26FCA.5050600@free-electrons.com>
-References: <1422027703-3763-1-git-send-email-maxime.ripard@free-electrons.com>
- <1422027703-3763-2-git-send-email-maxime.ripard@free-electrons.com>
- <54C26FCA.5050600@free-electrons.com>
-Message-ID: <54C3A5D2.4010402@free-electrons.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Sat, 24 Jan 2015 09:03:18 -0500
+Subject: [PATCH 12/32] arm: use %*pb[l] to print bitmaps including cpumasks
+ and nodemasks
+In-Reply-To: <1422108218-25398-1-git-send-email-tj@kernel.org>
+References: <1422108218-25398-1-git-send-email-tj@kernel.org>
+Message-ID: <1422108218-25398-13-git-send-email-tj@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/23/2015 12:59 PM, Gregory CLEMENT wrote:
-> On 23/01/2015 16:41, Maxime Ripard wrote:
->> The NDDB register holds the data that are needed by the read and write
->> commands.
->>
->> However, during a read PIO access, the datasheet specifies that after each 32
->> bits read in that register, when BCH is enabled, we have to make sure that the
->> RDDREQ bit is set in the NDSR register.
->>
->> This fixes an issue that was seen on the Armada 385, and presumably other mvebu
->> SoCs, when a read on a newly erased page would end up in the driver reporting a
->> timeout from the NAND.
->>
->> Cc: <stable@vger.kernel.org>
-> 
-> It would help the stable maintainer if you could indicate since which commit or
-> kernel release this fix should be applied.
-> 
+printk and friends can now formap bitmaps using '%*pb[l]'.  cpumask
+and nodemask also provide cpumask_pr_args() and nodemask_pr_args()
+respectively which can be used to generate the two printf arguments
+necessary to format the specified cpu/nodemask.
 
-This is a fix for the BCH support, namely commit 43bcfd2bb24a
-"mtd: nand: pxa3xx: Add driver-specific ECC BCH support". The commit was merged
-in v3.14.
+* Line termination only requires one extra space at the end of the
+  buffer.  Use PAGE_SIZE - 1 instead of PAGE_SIZE - 2 when formatting.
 
-However, this patch won't apply directly there. It will apply on commit
-fa543bef72d6 "mtd: nand: pxa3xx: Add a read/write buffers markers"; which
-was also merged in v3.14.
+This patch is dependent on the following two patches.
 
-Therefore, I guess it's OK to say
+ lib/vsprintf: implement bitmap printing through '%*pb[l]'
+ cpumask, nodemask: implement cpumask/nodemask_pr_args()
 
-Cc: <stable@vger.kernel.org> # v3.14.x
+Please wait till the forementioned patches are merged to mainline
+before applying to subsystem trees.
 
->> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> ---
->>  drivers/mtd/nand/pxa3xx_nand.c | 36 ++++++++++++++++++++++++++++++------
->>  1 file changed, 30 insertions(+), 6 deletions(-)
->>
->> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
->> index 96b0b1d27df1..320c2ab14d4e 100644
->> --- a/drivers/mtd/nand/pxa3xx_nand.c
->> +++ b/drivers/mtd/nand/pxa3xx_nand.c
->> @@ -480,6 +480,30 @@ static void disable_int(struct pxa3xx_nand_info *info, uint32_t int_mask)
->>  	nand_writel(info, NDCR, ndcr | int_mask);
->>  }
->>  
->> +static void drain_fifo(struct pxa3xx_nand_info *info,
->> +		       void *data,
->> +		       int len)
+Signed-off-by: Tejun Heo <tj@kernel.org>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+---
+ drivers/bus/arm-cci.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-^^
-You don't need to split that line, it seems to fit 80 characters as is.
-
->> +{
->> +	u32 *dst = (u32 *)data;
->> +
->> +	if (info->ecc_bch) {
->> +		while (len--) {
->> +			*dst++ = nand_readl(info, NDDB);
->> +
->> +			/*
->> +			 * According to the datasheet, when reading
->> +			 * from NDDB with BCH enabled, after each 32
->> +			 * bits reads, we have to make sure that the
->> +			 * NDSR.RDDREQ bit is set
->> +			 */
->> +			while (!(nand_readl(info, NDSR) & NDSR_RDDREQ))
->> +				cpu_relax();
-> 
-> Are we sure that we won't be blocked here?
-> If not, what about adding a timeout?
-> 
-
-Definitely. I think we shouldn't have an infinite loop, no matter what the hw specs say.
+diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+index 0ce5e2d..84fd660 100644
+--- a/drivers/bus/arm-cci.c
++++ b/drivers/bus/arm-cci.c
+@@ -806,8 +806,8 @@ static int cci_pmu_event_init(struct perf_event *event)
+ static ssize_t pmu_attr_cpumask_show(struct device *dev,
+ 				     struct device_attribute *attr, char *buf)
+ {
+-	int n = cpulist_scnprintf(buf, PAGE_SIZE - 2, &pmu->cpus);
+-
++	int n = scnprintf(buf, PAGE_SIZE - 1, "%*pbl",
++			  cpumask_pr_args(&pmu->cpus));
+ 	buf[n++] = '\n';
+ 	buf[n] = '\0';
+ 	return n;
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+2.1.0
