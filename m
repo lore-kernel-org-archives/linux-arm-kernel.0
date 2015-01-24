@@ -1,45 +1,32 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Sat, 24 Jan 2015 13:54:28 +0900
-Subject: [PATCH] ARM: exynos_defconfig: Enable CONFIG_FHANDLE
-In-Reply-To: <54C20CD5.7060001@collabora.co.uk>
-References: <1417176414-21558-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <54786C1D.3050306@collabora.co.uk> <54BC9995.4020300@samsung.com>
- <54C20CD5.7060001@collabora.co.uk>
-Message-ID: <54C32584.4040601@kernel.org>
+Date: Sat, 24 Jan 2015 13:55:23 +0900
+Subject: [PATCH v3] ARM: exynos_defconfig Enable CONFIG_LOCKUP_DETECTOR.
+In-Reply-To: <1421137088.8355.1.camel@AMDC1943>
+References: <1421088614-4662-1-git-send-email-moon.linux@yahoo.com>
+ <1421137088.8355.1.camel@AMDC1943>
+Message-ID: <54C325BB.1010904@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/23/15 17:56, Javier Martinez Canillas wrote:
-> Hello Kukjin,
-> 
-Hi,
-
-> On 01/19/2015 06:43 AM, Joonyoung Shim wrote:
->>>
+On 01/13/15 17:18, Krzysztof Kozlowski wrote:
+> On wto, 2015-01-13 at 00:20 +0530, Anand Moon wrote:
+>> On enabling CONFIG_LOCKUP_DETECTOR the kernel to act as a watchdog
+>> to detect hard and soft lockups. Enabling CONFIG_LOCKUP_DETECTOR
+>> don't introduce much overhead on exyons SOC.
 >>
->> I also hope merge this, already multi_v7_defconfig supports this.
+>> CONFIG_LOCKUP_DETECTOR is enabled on multi_v7_defconfig.
 >>
-> 
-> I would also hope this to be merged since it's required to boot
-> using systemd.
-> 
->> Thanks.
+>> Changes since v3:
+>>  * Made commit message more clear
+>>  * Corrected difference between CONFIG_LOCKUP_DETECTOR and CONFIG_LOCKDEP.
 >>
->>> This is certainly required for newer systemd and has to be enabled.
->>>
->>> But it would also be great to have enabled all the config symbols
->>> that are listed as requirements in the systemd README file:
->>>
->>> http://cgit.freedesktop.org/systemd/systemd/tree/README.
->>>
->>> Tony added that support to OMAP2+ defconfig in commit 673ce00c
->>> ("ARM: omap2plus_defconfig: Add support for distros with systemd")
->>> so the same should be done in exynos_defconfig.
->>>
->>> That can of course be a follow-up patch though, so for $subject:
->>>
->>> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->>>
-Thanks, applied.
+>> Tested on Exynos5422 ODROID XU3 board.
+>>
+>> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> Signed-off-by: Anand Moon <moon.linux@yahoo.com>
+> 
+> Now it looks okay. My reviewed-by may stay on.
+> 
+Thanks, applied
 
 - Kukjin
