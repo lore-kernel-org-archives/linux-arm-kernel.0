@@ -1,48 +1,39 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 24 Jan 2015 15:18:11 +0100
-Subject: [GIT PULL RESEND] pxa for v3.20
-In-Reply-To: <20150123215423.GD20896@quad.lixom.net> (Olof Johansson's message
- of "Fri, 23 Jan 2015 13:54:23 -0800")
-References: <87egqpff9m.fsf@free.fr> <20150123215423.GD20896@quad.lixom.net>
-Message-ID: <874mrgdzz0.fsf@free.fr>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 24 Jan 2015 22:33:46 +0800
+Subject: [PATCH 0/2] Input: sun4i-ts: Support touchpanel controller on A31
+Message-ID: <1422110028-30270-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson <olof@lixom.net> writes:
+Hi everyone,
 
-> Hi Robert,
->
-> Branch looks good, I'll merge this into next/fixes-non-critical. One nit below
-> though:
->
->> ----------------------------------------------------------------
->> Dmitry Eremin-Solenikov (3):
->>       ARM: pxa: add regulator_has_full_constraints to corgi board file
->>       ARM: pxa: add regulator_has_full_constraints to poodle board file
->>       ARM: pxa: add regulator_has_full_constraints to spitz board file
->> 
->> Martin Vajnar (1):
->>       hx4700: regulator: declare full constraints
->
-> Please use consistent patch subjects in the future. We've ended up using ARM:
-> <platform>: <foo> across all platforms these days.
->
-> I'm not going to ask you to respin just for this, but please remember to fix
-> future patches when you apply them if they're not already correct.
-You're right, I missed that one.
+As part of my work to get cpufreq working, this series adds support for the
+resistive touch panel controller on A31. It is the same hardware as on older
+SoCs, with a few register bits shifted, and a different temperature curve.
+I've matched the rest of the registers, and they all seem to fit.
 
-In case you've not already pulled, I created :
-   https://github.com/rjarzmik/linux.git tags/pxa-for-3.20-bis
+As I do not have a resistive touch screen, I am asking anyone with an A31
+board and a touch screen to help test this.
 
-I can resend a proper pull request if you wish, or we can leave it as is if you
-already pulled. In any case I'll be more carefull next time, maybe I can
-convince my bot to check that for me too.
+The temperature curve formula was confirmed by Allwinner as correct and
+working.
 
-Or even better checkpatch could check that any patch with a diffstat fully in
-arch/arm/{mach,plat}-<XYZ> has a subject beginning with "ARM: XYZ: ", that would
-be cool, and put the burden on others as well :)
+I've yet to fully test the remaining cpufreq bits, so I'm sending out this
+first. At least people will have a usable temperature sensor.
 
-Cheers.
+
+Regards,
+ChenYu
+
+
+Chen-Yu Tsai (2):
+  Input: sun4i-ts: Add support for touchpanel controller on A31
+  ARM: dts: sun6i: Add resistive touchscreen controller node to dtsi
+
+ .../bindings/input/touchscreen/sun4i.txt           |  2 +-
+ arch/arm/boot/dts/sun6i-a31.dtsi                   |  7 ++++
+ drivers/input/touchscreen/sun4i-ts.c               | 46 ++++++++++++++++------
+ 3 files changed, 41 insertions(+), 14 deletions(-)
 
 -- 
-Robert
+2.1.4
