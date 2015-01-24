@@ -1,31 +1,36 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Sat, 24 Jan 2015 12:12:04 -0300
-Subject: perf not capturing stack traces
-In-Reply-To: <20150123223745.GJ26557@saruman.tx.rr.com>
-References: <20150123195128.GE26557@saruman.tx.rr.com>
- <20150123205959.GD3073@kernel.org>
- <20150123223745.GJ26557@saruman.tx.rr.com>
-Message-ID: <20150124151204.GF3073@kernel.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 24 Jan 2015 16:29:44 +0100
+Subject: [PATCH v2] clk: sunxi: fix sun6i PLL1 .recalc_rate() result
+In-Reply-To: <1422088959-23365-1-git-send-email-wens@csie.org>
+References: <1422088959-23365-1-git-send-email-wens@csie.org>
+Message-ID: <20150124152944.GE8470@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Fri, Jan 23, 2015 at 04:37:45PM -0600, Felipe Balbi escreveu:
-> On Fri, Jan 23, 2015 at 05:59:59PM -0300, Arnaldo Carvalho de Melo wrote:
-> > Em Fri, Jan 23, 2015 at 01:51:28PM -0600, Felipe Balbi escreveu:
-> > > I'm using v3.19-rc5 on an ARM Cortex A9 board. Unfortunately, perf is
-> > > not able to capture any stack traces even though I CONFIG_STACKTRACE,
-> > > CONFIG_FRAME_POINTER and CONFIG_ARM_UNWIND all enabled.
-> > > 
-> > > I wonder if anybody else is facing similar issues.
-> > 
-> > Did it work with a previous kernel?
+Hi Mike,
+
+On Sat, Jan 24, 2015 at 04:42:39PM +0800, Chen-Yu Tsai wrote:
+> PLL1 on sun6i has its N factor start from 1 (N = register value + 1).
+> Make the factors clk driver aware of this so clk_factors_recalc_rate()
+> gives the correct result.
 > 
-> haven't checked with this board. First time I tried to use perf for
-> anything.
+> Cc: <stable@vger.kernel.org> # 3.12 9a5e6c7eb5cc clk: sunxi: Support factor
+> Cc: <stable@vger.kernel.org> # 3.12
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-And it is the first time I've heard about such a problem, not dealing
-with ARM myself, so I guess this is a case for looking if there was some
-previous kernel where this worked, then trying to bisect where the
-problem was introduced :-\
+Could you queue this for 3.19?
 
-- Arnaldo
+Thanks,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150124/30267c02/attachment.sig>
