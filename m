@@ -1,19 +1,53 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sat, 24 Jan 2015 17:37:48 +0100 (CET)
-Subject: [PATCH v3 0/5] ARM: at91: fix irq_pm_install_action WARNING
-In-Reply-To: <1422032971-14139-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1422032971-14139-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <alpine.DEB.2.11.1501241735530.5526@nanos>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Sat, 24 Jan 2015 17:49:16 +0100
+Subject: [PATCH 0/4] defconfigs: cleanup obsolete MTD configs
+In-Reply-To: <1422117213-3130-1-git-send-email-semen.protsenko@globallogic.com>
+References: <1422117213-3130-1-git-send-email-semen.protsenko@globallogic.com>
+Message-ID: <1422118156.27947.7.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 23 Jan 2015, Boris Brezillon wrote:
->  - change the compatible string to clearly show that this chip is purely
->    virtual
+On Sat, 2015-01-24 at 18:33 +0200, Semen Protsenko wrote:
+> This patch series removes next obsolete MTD configs from all defconfig files:
+>   - CONFIG_MTD_CHAR
+>   - CONFIG_MTD_CONCAT
+>   - CONFIG_MTD_DEBUG
+>   - CONFIG_MTD_DEBUG_VERBOSE
+>   - CONFIG_MTD_PARTITIONS
+> 
+> All those configs were removed from drivers/mtd/Kconfig earlier, but their usage
+> in defconfig files was remain unnoticed. There are at least two obvious reasons
+> to get rid of those configs:
+>   1. Their usage may cause to build warnings
 
-So we probably want to do : s/dumb/virt/ for both DT and code to make
-it clear from the names as well.
+That's news for me. I thought they are silently ignored. Do you have an
+example of such a warning?
 
-Thanks,
+>   2. Their usage may confuse someone who is grepping defconfig files to get
+>      the clue what MTD configuration may look like.
+> 
+> This series is harmless for all those defconfigs and will not break anything.
+> 
+> 
+> Semen Protsenko (4):
+>   defconfigs: remove CONFIG_MTD_CONCAT
+>   defconfigs: remove CONFIG_MTD_PARTITIONS
+>   defconfigs: remove CONFIG_MTD_CHAR
+>   defconfigs: remove CONFIG_MTD_DEBUG*
+> 
+>  arch/arm/configs/acs5k_defconfig                   |    3 ---
+> [...]
+>  arch/unicore32/configs/unicore32_defconfig         |    2 --
+>  226 files changed, 364 deletions(-)
 
-	tglx
+Seems like the kind of change that can only be reviewed by a script.
+
+Is there any policy on keeping defconfig files up to date? Because, only
+slightly exaggerated, all the defconfig files are outdated, in minor or
+major ways, at any given moment.
+
+I seem to remember Greg stating that defconfig files are on their way
+out. Did I remember that correctly?  
+
+
+Paul Bolle
