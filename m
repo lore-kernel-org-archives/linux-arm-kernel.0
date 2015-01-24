@@ -1,94 +1,78 @@
-From: n.nikolaev@virtualopensystems.com (Nikolay Nikolaev)
-Date: Sat, 24 Jan 2015 03:02:33 +0200
-Subject: [PATCH v2 2/5] KVM: ARM: on IO mem abort - route the call to KVM
- MMIO bus
-In-Reply-To: <54B3FFB9.3050406@linaro.org>
-References: <20141207093641.17563.84226.stgit@i3820>
- <20141207093749.17563.12497.stgit@i3820>
- <54B3FFB9.3050406@linaro.org>
-Message-ID: <CADDJ2=Os6Uws6HN=iKg=uhx1artwBFXeyFKq9Co2Sgoo=63bOQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 23 Jan 2015 17:03:41 -0800
+Subject: [PATCH 12/13] ARM: dts: omap3-gta04: uart4 is not connected, so
+ mark it "disabled"
+In-Reply-To: <20150124092842.2441d3c6@notabene.brown>
+References: <1421959099-28319-1-git-send-email-marek@goldelico.com>
+ <1421959099-28319-13-git-send-email-marek@goldelico.com>
+ <20150122214052.GY7718@atomide.com>
+ <20150124092842.2441d3c6@notabene.brown>
+Message-ID: <20150124010340.GB28663@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 12, 2015 at 7:09 PM, Eric Auger <eric.auger@linaro.org> wrote:
-> Hi Nikolay,
-> On 12/07/2014 10:37 AM, Nikolay Nikolaev wrote:
->> On IO memory abort, try to handle the MMIO access thorugh the KVM
->> registered read/write callbacks. This is done by invoking the relevant
->> kvm_io_bus_* API.
->>
->> Signed-off-by: Nikolay Nikolaev <n.nikolaev@virtualopensystems.com>
->> ---
->>  arch/arm/kvm/mmio.c |   33 +++++++++++++++++++++++++++++++++
->>  1 file changed, 33 insertions(+)
->>
->> diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
->> index 4cb5a93..e42469f 100644
->> --- a/arch/arm/kvm/mmio.c
->> +++ b/arch/arm/kvm/mmio.c
->> @@ -162,6 +162,36 @@ static int decode_hsr(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->>       return 0;
->>  }
->>
->> +/**
->> + * handle_kernel_mmio - handle an in-kernel MMIO access
->> + * @vcpu:    pointer to the vcpu performing the access
->> + * @run:     pointer to the kvm_run structure
->> + * @mmio:    pointer to the data describing the access
->> + *
->> + * returns true if the MMIO access has been performed in kernel space,
->> + * and false if it needs to be emulated in user space.
->> + */
->> +static bool handle_kernel_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
->> +             struct kvm_exit_mmio *mmio)
->> +{
->> +     int ret;
->> +
->> +     if (mmio->is_write) {
->> +             ret = kvm_io_bus_write(vcpu, KVM_MMIO_BUS, mmio->phys_addr,
->> +                             mmio->len, &mmio->data);
->> +
->> +     } else {
->> +             ret = kvm_io_bus_read(vcpu, KVM_MMIO_BUS, mmio->phys_addr,
->> +                             mmio->len, &mmio->data);
->> +     }
->> +     if (!ret) {
->> +             kvm_prepare_mmio(run, mmio);
->> +             kvm_handle_mmio_return(vcpu, run);
->> +     }
->> +
->> +     return !ret;
-> in case ret < 0 (-EOPNOTSUPP = -95) aren't we returning true too? return
-> (ret==0)?
->
->> +}
->> +
->>  int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
->>                phys_addr_t fault_ipa)
->>  {
->> @@ -200,6 +230,9 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
->>       if (vgic_handle_mmio(vcpu, run, &mmio))
->>               return 1;
->>
->> +     if (handle_kernel_mmio(vcpu, run, &mmio))
->> +             return 1;
->> +
->>       kvm_prepare_mmio(run, &mmio);
->>       return 0;
-> currently the io_mem_abort returned value is not used by mmu.c code. I
-> think this should be handed in kvm_handle_guest_abort. What do you think?
+* NeilBrown <neilb@suse.de> [150123 14:31]:
+> On Thu, 22 Jan 2015 13:40:53 -0800 Tony Lindgren <tony@atomide.com> wrote:
+> > >  
+> > > +&uart4 {
+> > > +	status = "disabled";
+> > > +};
+> > > +
+> > 
+> > This you probably want to avoid from PM point of view. Depending on
+> > bootloader state of uart4, Linux may or may not be able to hit any
+> > deeper power states.
+> > 
+> > Marking something with status = "disabled" in dts causes the device
+> > entry not even to be created. That means hwmod won't be able to reset
+> > and idle this device during boot.
+> > 
+> > The uart4 device is there for sure even if not muxed and in incomplete
+> > state. You may want to also check other places where you're using
+> > status = "disabled" for the same reasons.
+> 
+> That's ... unfortunate.  Would that apply to the MCBSPs too?  They are
+> disabled by default so you would need to explicitly enable them all for
+> sensible behaviour....
 
-You're right that the returned value is not handled further after we
-exit io_mem_abort, it's just passed up the call stack.
-However I'm not sure how to handle it better. If you have ideas, please share.
+Yeah that applies to all the SoC integrated devices that the bus code
+(hwmod) is supposed to reset and idle if unused. Basically anything
+that depends on the dev entry being created.
+ 
+> Hopefully there is some way to mark as device as "this is not used, make sure
+> it is turned off and stays off" ???
 
-regards,
-Nikolay Nikolaev
+Not currently that I know of :) To do that, we should add something
+like status = "incomplete" where the dev entry gets created but the
+driver is never probed. And incomplete here meaning that the device
+is missing some parts like pins that would make it work properly.
+ 
+> Thanks for the heads-up.  I'll have a look and see exactly what is happening.
 
->
-> Best Regards
->
-> Eric
->>  }
->>
->
+OK
+ 
+> BTW, on the topic of OMAP UARTs and power saving...
+>  I note that there are now two drivers for the OMAP3 UART - omap-serial and
+>  8250_omap.
+>  I also note that your commit:
+> 
+> commit a2fc36613ac1af2e92cbed7af80bc72d8114dd50
+>     ARM: OMAP3: Use manual idle for UARTs because of DMA errata
+> 
+>  is incompatible with omap-serial.  In particular, if I enable runtime
+>  suspend of the serial port by setting the autosuspend_timeout, then incoming
+>  characters will no longer wake the port (if I revert your patch incoming
+>  chars do wake the port).
+>  This could (I think) be fixed by enabling the RX/CTS interrupt.  However if
+>  omap-serial is being deprecated, then there probably isn't any point.
+> 
+>  So: what is the longer term expectation for these drivers?  Should we be
+>  switching over to 8250?
+
+Yeah you should alredy be able to do it. Hopefully we'll have some
+translation layer and the old omap-serial.c can be mostly removed
+now that we have 8250 support with runtime PM :)
+
+Regards,
+
+Tony
