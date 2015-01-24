@@ -1,109 +1,68 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 24 Jan 2015 12:56:31 +0100
-Subject: [PATCH 1/2] clk: sunxi: rewrite sun9i_a80_get_pll4_factors()
-Message-ID: <1422100592-19981-1-git-send-email-hdegoede@redhat.com>
+From: n.nikolaev@virtualopensystems.com (Nikolay Nikolaev)
+Date: Sat, 24 Jan 2015 13:59:24 +0200
+Subject: [PATCH v3 0/5] ARM: KVM: Enable the ioeventfd capability of KVM on ARM
+Message-ID: <20150124115815.11052.20755.stgit@i3820>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The old implementation of sun9i_a80_get_pll4_factors() has several issues,
-it checks against 256 / 512 in various places where it should use 255 / 511,
-it does the wrong thing for low frequencies which are an even multiple of
-6 MHz, e.g. if you ask it for 72 MHz it will result in 144 Mhz, and it does
-not take into account that n must be at least 12. Moreover it is quite hard
-to read / follow it.
+The IOEVENTFD KVM capability is a prerequisite for vhost support.
 
-This commit rewrites it to be correct in all cases, and makes it much easier
-to follow the code / to read.
+This series enables the ioeventfd KVM capability on ARM.
 
-Cc: Chen-Yu Tsai <wens@csie.org>
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+The implementation routes MMIO access in the IO abort handler to the KVM IO bus.
+If there is already a registered ioeventfd handler for this address, the file
+descriptor will be triggered.
+
+We extended the KVM IO bus API to expose the VCPU struct pointer. Now the VGIC
+MMIO access is done through this API. For this to operate the VGIC registers a
+kvm_io_device which represents the whole dist MMIO region.
+
+The code was tested on Dual Cortex-A15 Exynos5250 (ARM Chromebook).
+ARM64 build was verified, but not run on actual HW.
+
+Changes since v2:
+ - rebased on top of kvmarm/next
+ - moved vgic_register_kvm_io_dev to kvm_vgic_map_resources
+
+Changes since v1:
+ - fixed x86 compilation
+ - GICv2/GICv3 dist base selection
+ - added vgic_unregister_kvm_io_dev to free the iodev resources
+ - enable eventfd on ARM64
+
 ---
- drivers/clk/sunxi/clk-sun9i-core.c | 57 +++++++++++++++++++-------------------
- 1 file changed, 29 insertions(+), 28 deletions(-)
 
-diff --git a/drivers/clk/sunxi/clk-sun9i-core.c b/drivers/clk/sunxi/clk-sun9i-core.c
-index 9b5e7a1..d8da77d 100644
---- a/drivers/clk/sunxi/clk-sun9i-core.c
-+++ b/drivers/clk/sunxi/clk-sun9i-core.c
-@@ -24,50 +24,51 @@
- 
- 
- /**
-- * sun9i_a80_get_pll4_factors() - calculates n, p, m factors for PLL1
-+ * sun9i_a80_get_pll4_factors() - calculates n, p, m factors for PLL4
-  * PLL4 rate is calculated as follows
-  * rate = (parent_rate * n >> p) / (m + 1);
-- * parent_rate is always 24Mhz
-+ * parent_rate is always 24MHz
-  *
-  * p and m are named div1 and div2 in Allwinner's SDK
-  */
- 
- static void sun9i_a80_get_pll4_factors(u32 *freq, u32 parent_rate,
--				       u8 *n, u8 *k, u8 *m, u8 *p)
-+				       u8 *n_ret, u8 *k, u8 *m_ret, u8 *p_ret)
- {
--	int div;
-+	int n;
-+	int m = 1;
-+	int p = 1;
- 
--	/* Normalize value to a 6M multiple */
--	div = DIV_ROUND_UP(*freq, 6000000);
-+	/* Normalize value to a 6 MHz multiple (24 MHz / 4) */
-+	n = DIV_ROUND_UP(*freq, 6000000);
- 
--	/* divs above 256 cannot be odd */
--	if (div > 256)
--		div = round_up(div, 2);
-+	/* If n is too large switch to steps of 12 MHz */
-+	if (n > 255) {
-+		m = 0;
-+		n = (n + 1) / 2;
-+	}
-+
-+	/* If n is still too large switch to steps of 24 MHz */
-+	if (n > 255) {
-+		p = 0;
-+		n = (n + 1) / 2;
-+	}
- 
--	/* divs above 512 must be a multiple of 4 */
--	if (div > 512)
--		div = round_up(div, 4);
-+	/* n must be between 12 and 255 */
-+	if (n > 255)
-+		n = 255;
-+	else if (n < 12)
-+		n = 12;
- 
--	*freq = 6000000 * div;
-+	*freq = ((24000000 * n) >> p) / (m + 1);
- 
- 	/* we were called to round the frequency, we can now return */
--	if (n == NULL)
-+	if (n_ret == NULL)
- 		return;
- 
--	/* p will be 1 for divs under 512 */
--	if (div < 512)
--		*p = 1;
--	else
--		*p = 0;
--
--	/* m will be 1 if div is odd */
--	if (div & 1)
--		*m = 1;
--	else
--		*m = 0;
--
--	/* calculate a suitable n based on m and p */
--	*n = div / (*p + 1) / (*m + 1);
-+	*n_ret = n;
-+	*m_ret = m;
-+	*p_ret = p;
- }
- 
- static struct clk_factors_config sun9i_a80_pll4_config = {
--- 
-2.1.0
+Nikolay Nikolaev (5):
+      KVM: Redesign kvm_io_bus_ API to pass VCPU structure to the callbacks.
+      KVM: ARM: on IO mem abort - route the call to KVM MMIO bus
+      KVM: ARM VGIC add kvm_io_bus_ frontend
+      ARM/ARM64: enable linking against eventfd
+      ARM: enable KVM_CAP_IOEVENTFD
+
+
+ arch/arm/kvm/Kconfig       |    1 
+ arch/arm/kvm/Makefile      |    2 -
+ arch/arm/kvm/arm.c         |    3 +
+ arch/arm/kvm/mmio.c        |   32 +++++++++++
+ arch/arm64/kvm/Kconfig     |    1 
+ arch/arm64/kvm/Makefile    |    2 -
+ arch/powerpc/kvm/mpic.c    |   10 ++--
+ arch/powerpc/kvm/powerpc.c |    4 +
+ arch/s390/kvm/diag.c       |    2 -
+ arch/x86/kvm/i8254.c       |   14 +++--
+ arch/x86/kvm/i8259.c       |   12 ++--
+ arch/x86/kvm/ioapic.c      |    8 +--
+ arch/x86/kvm/lapic.c       |    4 +
+ arch/x86/kvm/vmx.c         |    2 -
+ arch/x86/kvm/x86.c         |   13 +++--
+ include/kvm/arm_vgic.h     |    3 -
+ include/linux/kvm_host.h   |   10 ++--
+ virt/kvm/arm/vgic.c        |  123 ++++++++++++++++++++++++++++++++++++++++----
+ virt/kvm/coalesced_mmio.c  |    5 +-
+ virt/kvm/eventfd.c         |    4 +
+ virt/kvm/iodev.h           |   23 +++++---
+ virt/kvm/kvm_main.c        |   32 ++++++-----
+ 22 files changed, 231 insertions(+), 79 deletions(-)
+
+--
+Signature
