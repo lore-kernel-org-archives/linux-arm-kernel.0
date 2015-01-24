@@ -1,32 +1,24 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Sat, 24 Jan 2015 21:50:53 +0400
-Subject: [PATCH 3/5] ARM: sa1100: use ioremapped memory to access SC
- registers
-In-Reply-To: <alpine.DEB.2.11.1501241846540.5526@nanos>
-References: <1421316574-10022-1-git-send-email-dbaryshkov@gmail.com>
- <1421316574-10022-3-git-send-email-dbaryshkov@gmail.com>
- <alpine.DEB.2.11.1501241846540.5526@nanos>
-Message-ID: <CALT56yP+PGCnbUN0BB4QTQ6phxmqL43vRoS_rtoMrgfjAtr3Rw@mail.gmail.com>
+From: rickard_strandqvist@spectrumdigital.se (Rickard Strandqvist)
+Date: Sat, 24 Jan 2015 18:33:00 +0100
+Subject: [PATCH 1/2] ARM: ux500: Move struct
+In-Reply-To: <20150122074458.GL22024@x1>
+References: <1421881782-23716-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+ <20150122074458.GL22024@x1>
+Message-ID: <CAKXHbyOhD5_cHRp02AuhcYFR5m8nBvWzdsygUdw689LrS9R67g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-01-24 20:48 GMT+03:00 Thomas Gleixner <tglx@linutronix.de>:
-> On Thu, 15 Jan 2015, Dmitry Eremin-Solenikov wrote:
->>  static void sa1100_mask_irq(struct irq_data *d)
->>  {
->> -     ICMR &= ~BIT(d->hwirq);
->> +     u32 reg;
->> +     unsigned long flags;
->> +
->> +     raw_spin_lock_irqsave(&lock, flags);
+2015-01-22 8:44 GMT+01:00 Lee Jones <lee.jones@linaro.org>:
 >
-> What's the exact point of that lock? And how is it related to the
-> $subject of the patch?
+> Are you sure a struct is required at all now?  It only contains a
+> single bool after all.
 
-It is needed to protect ICMR register during RMW cycle, isn't it?
-I might have missed locks around ack/mask/unmask calls from irq
-core. If so, I can happily drop this spinlock.
 
--- 
-With best wishes
-Dmitry
+Hi Lee
+
+Okay, I will gladly remove ab8500_ext_regulator_cfg completely.
+And I will try to update the comments, but since I'm not so familiar
+with what this code was meant to do it is a little more difficult.
+
+Kind regards
+Rickard Strandqvist
