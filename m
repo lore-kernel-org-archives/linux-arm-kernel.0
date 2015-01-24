@@ -1,51 +1,48 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Sat, 24 Jan 2015 09:03:18 -0500
-Subject: [PATCH 12/32] arm: use %*pb[l] to print bitmaps including cpumasks
- and nodemasks
-In-Reply-To: <1422108218-25398-1-git-send-email-tj@kernel.org>
-References: <1422108218-25398-1-git-send-email-tj@kernel.org>
-Message-ID: <1422108218-25398-13-git-send-email-tj@kernel.org>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 24 Jan 2015 15:18:11 +0100
+Subject: [GIT PULL RESEND] pxa for v3.20
+In-Reply-To: <20150123215423.GD20896@quad.lixom.net> (Olof Johansson's message
+ of "Fri, 23 Jan 2015 13:54:23 -0800")
+References: <87egqpff9m.fsf@free.fr> <20150123215423.GD20896@quad.lixom.net>
+Message-ID: <874mrgdzz0.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-printk and friends can now formap bitmaps using '%*pb[l]'.  cpumask
-and nodemask also provide cpumask_pr_args() and nodemask_pr_args()
-respectively which can be used to generate the two printf arguments
-necessary to format the specified cpu/nodemask.
+Olof Johansson <olof@lixom.net> writes:
 
-* Line termination only requires one extra space at the end of the
-  buffer.  Use PAGE_SIZE - 1 instead of PAGE_SIZE - 2 when formatting.
+> Hi Robert,
+>
+> Branch looks good, I'll merge this into next/fixes-non-critical. One nit below
+> though:
+>
+>> ----------------------------------------------------------------
+>> Dmitry Eremin-Solenikov (3):
+>>       ARM: pxa: add regulator_has_full_constraints to corgi board file
+>>       ARM: pxa: add regulator_has_full_constraints to poodle board file
+>>       ARM: pxa: add regulator_has_full_constraints to spitz board file
+>> 
+>> Martin Vajnar (1):
+>>       hx4700: regulator: declare full constraints
+>
+> Please use consistent patch subjects in the future. We've ended up using ARM:
+> <platform>: <foo> across all platforms these days.
+>
+> I'm not going to ask you to respin just for this, but please remember to fix
+> future patches when you apply them if they're not already correct.
+You're right, I missed that one.
 
-This patch is dependent on the following two patches.
+In case you've not already pulled, I created :
+   https://github.com/rjarzmik/linux.git tags/pxa-for-3.20-bis
 
- lib/vsprintf: implement bitmap printing through '%*pb[l]'
- cpumask, nodemask: implement cpumask/nodemask_pr_args()
+I can resend a proper pull request if you wish, or we can leave it as is if you
+already pulled. In any case I'll be more carefull next time, maybe I can
+convince my bot to check that for me too.
 
-Please wait till the forementioned patches are merged to mainline
-before applying to subsystem trees.
+Or even better checkpatch could check that any patch with a diffstat fully in
+arch/arm/{mach,plat}-<XYZ> has a subject beginning with "ARM: XYZ: ", that would
+be cool, and put the burden on others as well :)
 
-Signed-off-by: Tejun Heo <tj@kernel.org>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
----
- drivers/bus/arm-cci.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Cheers.
 
-diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-index 0ce5e2d..84fd660 100644
---- a/drivers/bus/arm-cci.c
-+++ b/drivers/bus/arm-cci.c
-@@ -806,8 +806,8 @@ static int cci_pmu_event_init(struct perf_event *event)
- static ssize_t pmu_attr_cpumask_show(struct device *dev,
- 				     struct device_attribute *attr, char *buf)
- {
--	int n = cpulist_scnprintf(buf, PAGE_SIZE - 2, &pmu->cpus);
--
-+	int n = scnprintf(buf, PAGE_SIZE - 1, "%*pbl",
-+			  cpumask_pr_args(&pmu->cpus));
- 	buf[n++] = '\n';
- 	buf[n] = '\0';
- 	return n;
 -- 
-2.1.0
+Robert
