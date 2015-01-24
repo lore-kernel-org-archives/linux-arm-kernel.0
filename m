@@ -1,29 +1,33 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sat, 24 Jan 2015 12:48:51 +0100 (CET)
-Subject: [PATCH v2 RESEND 2/8] irqchip: Supply new driver for STi based
- devices
-In-Reply-To: <20150123163231.GB11745@x1>
-References: <1421920133-7914-1-git-send-email-lee.jones@linaro.org>
- <1421920133-7914-3-git-send-email-lee.jones@linaro.org>
- <alpine.DEB.2.11.1501231702280.5526@nanos> <20150123163231.GB11745@x1>
-Message-ID: <alpine.DEB.2.11.1501241246240.5526@nanos>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat, 24 Jan 2015 12:56:32 +0100
+Subject: [PATCH 2/2] sunxi: clk: Set sun6i-pll1 n_start = 1
+In-Reply-To: <1422100592-19981-1-git-send-email-hdegoede@redhat.com>
+References: <1422100592-19981-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1422100592-19981-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 23 Jan 2015, Lee Jones wrote:
-> On Fri, 23 Jan 2015, Thomas Gleixner wrote:
-> > The only technical comment I have is: shouldn't all the stuff except
-> > the resume function be marked __init or is any of this required post
-> > init?
-> 
-> It's not common to mark functions invoked at and affter *_probe() as
-> __init.  At least, not as far as I'm aware.
+For all pll-s on sun6i n == 0 means use a multiplier of 1, rather then 0 as
+it means on sun4i / sun5i / sun7i. n_start = 1 is already correctly set
+for sun6i pll6, but was missing for pll1, this commit fixes this.
 
-Right, if the probe stuff is supposed to be functional post init, then
-we of course need to keep it around. But I guess we have no mechanism
-to distinguish the 'boot only' and 'keep post init' case. Might be
-worthwhile to investigate.
+Cc: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ drivers/clk/sunxi/clk-sunxi.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks,
-
-	tglx
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index 24c7cc1..699458e 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -584,6 +584,7 @@ static struct clk_factors_config sun6i_a31_pll1_config = {
+ 	.kwidth = 2,
+ 	.mshift = 0,
+ 	.mwidth = 2,
++	.n_start = 1,
+ };
+ 
+ static struct clk_factors_config sun8i_a23_pll1_config = {
+-- 
+2.1.0
