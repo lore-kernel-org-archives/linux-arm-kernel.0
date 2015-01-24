@@ -1,44 +1,51 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Sat, 24 Jan 2015 23:25:46 +0400
-Subject: [PATCH 3/5] ARM: sa1100: use ioremapped memory to access SC
- registers
-In-Reply-To: <alpine.DEB.2.11.1501242021210.5526@nanos>
-References: <1421316574-10022-1-git-send-email-dbaryshkov@gmail.com>
- <1421316574-10022-3-git-send-email-dbaryshkov@gmail.com>
- <alpine.DEB.2.11.1501241846540.5526@nanos>
- <CALT56yP+PGCnbUN0BB4QTQ6phxmqL43vRoS_rtoMrgfjAtr3Rw@mail.gmail.com>
- <alpine.DEB.2.11.1501242021210.5526@nanos>
-Message-ID: <CALT56yMLPWK6p3H+1=QAnb19GgZN3hbieXS8P3EANGfS2Ti1RQ@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sat, 24 Jan 2015 19:39:20 +0000 (UTC)
+Subject: [PATCH 13/23] ARM: OMAP2+: CM: determine CM base address from
+ device tree
+In-Reply-To: <1417103514-17027-14-git-send-email-t-kristo@ti.com>
+References: <1417103514-17027-1-git-send-email-t-kristo@ti.com>
+ <1417103514-17027-14-git-send-email-t-kristo@ti.com>
+Message-ID: <alpine.DEB.2.02.1501241937570.5450@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-01-24 22:24 GMT+03:00 Thomas Gleixner <tglx@linutronix.de>:
-> On Sat, 24 Jan 2015, Dmitry Eremin-Solenikov wrote:
->
->> 2015-01-24 20:48 GMT+03:00 Thomas Gleixner <tglx@linutronix.de>:
->> > On Thu, 15 Jan 2015, Dmitry Eremin-Solenikov wrote:
->> >>  static void sa1100_mask_irq(struct irq_data *d)
->> >>  {
->> >> -     ICMR &= ~BIT(d->hwirq);
->> >> +     u32 reg;
->> >> +     unsigned long flags;
->> >> +
->> >> +     raw_spin_lock_irqsave(&lock, flags);
->> >
->> > What's the exact point of that lock? And how is it related to the
->> > $subject of the patch?
->>
->> It is needed to protect ICMR register during RMW cycle, isn't it?
->
-> The original code has no protection for the RMW either.
->
-> And there is a simple reason for this. These functions are guaranteed
-> to be called with interrupts disabled and this is a uniprocessor
-> machine and it will never grow SMP support. So interrupts disabled is
-> serialization enough.
+Hi Tero
 
-OK, thanks for pointing. I'll update the patchset in a few days.
+On Thu, 27 Nov 2014, Tero Kristo wrote:
 
+> There is no need to provide the CM base address through a low-level API
+> from the low-level IO init, as this information is available through DT.
+> Re-routed the parsing function to be called from the CM drivers also to
+> simplify the implementation under io.c.
+> 
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+
+This one breaks boot on OMAP2430 (and presumably all other OMAP2xxx).  
+Adding something like this seems to get it working.
+
+
+- Paul
+
+---
+ arch/arm/mach-omap2/cm_common.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm/mach-omap2/cm_common.c b/arch/arm/mach-omap2/cm_common.c
+index c2d7c7b3002c..1770364f0499 100644
+--- a/arch/arm/mach-omap2/cm_common.c
++++ b/arch/arm/mach-omap2/cm_common.c
+@@ -234,7 +234,12 @@ static struct omap_prcm_init_data omap3_cm_data = {
+ 	.offset = -OMAP3430_IVA2_MOD,
+ };
+ 
++static struct omap_prcm_init_data omap2_prcm_data = {
++	.index = CLK_MEMMAP_INDEX_CM1,
++};
++
+ static struct of_device_id omap_cm_dt_match_table[] = {
++	{ .compatible = "ti,omap2-prcm", .data = &omap2_prcm_data },
+ 	{ .compatible = "ti,omap3-cm", .data = &omap3_cm_data },
+ 	{ .compatible = "ti,omap4-cm1", .data = &cm_data },
+ 	{ .compatible = "ti,omap4-cm2", .data = &cm2_data },
 -- 
-With best wishes
-Dmitry
+2.1.4
