@@ -1,138 +1,264 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sat, 24 Jan 2015 22:44:05 +0100 (CET)
-Subject: [PATCH 3.19-rc2 v15 5/8] printk: Simple implementation for NMI
- backtracing
-In-Reply-To: <1422022952-31552-6-git-send-email-daniel.thompson@linaro.org>
-References: <1422022952-31552-1-git-send-email-daniel.thompson@linaro.org>
- <1422022952-31552-6-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <alpine.DEB.2.11.1501242105230.5526@nanos>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sat, 24 Jan 2015 21:51:03 +0000 (UTC)
+Subject: [PATCH 01/23] ARM: OMAP2+: clock: move clock provider
+ infrastructure to clock driver
+In-Reply-To: <1417103514-17027-2-git-send-email-t-kristo@ti.com>
+References: <1417103514-17027-1-git-send-email-t-kristo@ti.com>
+ <1417103514-17027-2-git-send-email-t-kristo@ti.com>
+Message-ID: <alpine.DEB.2.02.1501242142181.5450@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 23 Jan 2015, Daniel Thompson wrote:
-> +#ifdef CONFIG_ARCH_WANT_NMI_PRINTK
-> +extern __printf(1, 0) int nmi_vprintk(const char *fmt, va_list args);
-> +
-> +struct cpumask;
-> +extern int prepare_nmi_printk(struct cpumask *cpus);
-> +extern void complete_nmi_printk(struct cpumask *cpus);
-> +
-> +/*
-> + * Replace printk to write into the NMI seq.
-> + *
-> + * To avoid include hell this is a macro rather than an inline function
-> + * (printk_func is not declared in this header file).
-> + */
-> +#define this_cpu_begin_nmi_printk() ({ \
-> +	printk_func_t __orig = this_cpu_read(printk_func); \
-> +	this_cpu_write(printk_func, nmi_vprintk); \
-> +	__orig; \
-> +})
-> +#define this_cpu_end_nmi_printk(fn) this_cpu_write(printk_func, fn)
++ Tomi 
 
-Why can't we just make it a proper function in printk.c and make
-DEFINE_PER_CPU(printk_func_t, printk_func) static once x86 is
-converted over, thereby getting rid of the misplaced declaration in
-percpu.h?
+On Thu, 27 Nov 2014, Tero Kristo wrote:
 
-It's really not performance critical at all. If you do system wide
-backtraces a function call is the least of your worries.
+> Splits the clock provider init out of the PRM driver and moves it to
+> clock driver. This is needed so that once the PRCM drivers are separated,
+> they can logically just access the clock driver not needing to go through
+> common PRM code. This would be wrong in the case of control module for
+> example.
+> 
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
 
-> +#ifdef CONFIG_ARCH_WANT_NMI_PRINTK
+This patch moves things in the wrong direction (ie, rather than keeping 
+the PRM register accesses in the PRM code, it moves PRM register accesses 
+into the clock code).  But I see that a subsequent patch in this series 
+moves them back.  So this change is temporary and that seems reasonable to 
+me.
 
-Why can't this simply be CONFIG_PRINTK_NMI and live at the same place
-as the other printk related options?
+However, as long as the clock code wants to do low-level register accesses 
+to PRM/CM/SCM registers, there needs to be some way to keep register 
+updates originating from the clock code from racing with register updates 
+coming from other code (e.g. non-clock-related PRM/CM/SCM accesses). So 
+I've changed this patch to use regmap (as below), and the followup patch 
+later in the series will be changed too.  Seems to work so far but let's 
+see how things go with the rest of the series.
 
-> +int nmi_vprintk(const char *fmt, va_list args)
-> +{
-> +	struct nmi_seq_buf *s = this_cpu_ptr(&nmi_print_seq);
-> +	unsigned int len = seq_buf_used(&s->seq);
-> +
-> +	seq_buf_vprintf(&s->seq, fmt, args);
-> +	return seq_buf_used(&s->seq) - len;
-> +}
-> +EXPORT_SYMBOL_GPL(nmi_vprintk);
 
-What's the point of these exports? This stuff is really not supposed
-to be used inside random modules.
+- Paul
 
-> +/*
-> + * Check for concurrent usage and set up per_cpu seq_buf buffers that the NMIs
-> + * running on the other CPUs will write to. Provides the mask of CPUs it is
-> + * safe to write from (i.e. a copy of the online mask).
-> + */
-> +int prepare_nmi_printk(struct cpumask *cpus)
+---
+ arch/arm/mach-omap2/clock.c       | 103 ++++++++++++++++++++++++++++++++++----
+ arch/arm/mach-omap2/clock.h       |   4 +-
+ arch/arm/mach-omap2/prcm-common.h |   2 +
+ arch/arm/mach-omap2/prm_common.c  |  34 +------------
+ 4 files changed, 97 insertions(+), 46 deletions(-)
 
-Can we please make all this proper prefixed? , i.e. printk_nmi_*
-
-> +{
-> +	struct nmi_seq_buf *s;
-> +	int cpu;
-> +
-> +	if (test_and_set_bit(0, &nmi_print_flag)) {
-> +		/*
-> +		 * If something is already using the NMI print facility we
-> +		 * can't allow a second one...
-> +		 */
-> +		return -EBUSY;
-
-So what's the point of saving and restoring the printk_func pointer at
-the call site?
-
-void printk_nmi_begin()
-{
-	if (__this_cpu_inc_return(nmi_printk_nest_level) == 1)
-	      this_cpu_write(printk_func, nmi_vprintk);
-}
-
-void printk_nmi_end()
-{
-	if (__this_cpu_dec_return(nmi_printk_nest_level) > 0)
-	        return;
-        this_cpu_write(printk_func, default_vprintk);
-	if (in_nmi())
-		irq_work_schedule();
-        else
-		printk_nmi_complete();
-}
-
-> +	}
-> +
-> +	cpumask_copy(cpus, cpu_online_mask);
-
-Why do you need external storage for this if nesting is not allowed?
-What's wrong with having a printk_nmi_mask? It's protected by the
-nmi_print_flag, so the call sites do not have to take care about
-protecting it until printk_nmi_complete() has been invoked.
-
-> +	for_each_cpu(cpu, cpus) {
-> +		s = &per_cpu(nmi_print_seq, cpu);
-> +		seq_buf_init(&s->seq, s->buffer, NMI_BUF_SIZE);
-
-Why do you want to do this here? The buffers should be initialized
-before the first NMI can hit and the complete code should reinit them
-before the next printk_nmi_prepare() sees the nmi_print_flag cleared.
-
-> +static void print_seq_line(struct nmi_seq_buf *s, int start, int end)
-> +{
-> +	const char *buf = s->buffer + start;
-> +
-> +	printk("%.*s", (end - start) + 1, buf);
-> +}
-> +
-> +void complete_nmi_printk(struct cpumask *cpus)
-> +{
-> +	struct nmi_seq_buf *s;
-> +	int len;
-> +	int cpu;
-> +	int i;
-
-Please condense all ints to a single line, but what's worse is the
-completely inconsistency versus scopes.
-
-len and i are only used in the for_each loop. Either we put all of
-them at the top of the function or we do it right.
-
-Thanks,
-
-	tglx
+diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
+index 6ad5b4dbd33e..5fd03e17560f 100644
+--- a/arch/arm/mach-omap2/clock.c
++++ b/arch/arm/mach-omap2/clock.c
+@@ -24,6 +24,8 @@
+ #include <linux/io.h>
+ #include <linux/bitops.h>
+ #include <linux/clk-private.h>
++#include <linux/of_address.h>
++#include <linux/regmap.h>
+ #include <asm/cpu.h>
+ 
+ #include <trace/events/power.h>
+@@ -73,32 +75,111 @@ struct ti_clk_features ti_clk_features;
+ static bool clkdm_control = true;
+ 
+ static LIST_HEAD(clk_hw_omap_clocks);
+-void __iomem *clk_memmaps[CLK_MAX_MEMMAPS];
++static struct regmap *clk_memmaps[CLK_MAX_MEMMAPS];
++
++static struct regmap_config prcm_regmap_config = {
++	.reg_bits	= 32,
++	.val_bits	= 32,
++	.reg_stride	= 4,
++	.fast_io	= 1,
++};
++
++static void clk_memmap_writel(u32 val, void __iomem *reg)
++{
++	struct clk_omap_reg *r = (struct clk_omap_reg *)&reg;
++
++	/*
++	 * XXX Can't really continue if an error occurred here, since
++	 * this function assumes that the write will always succeed
++	 */
++	if (regmap_write(clk_memmaps[r->index], r->offset, val)) {
++		WARN(1, "omap clock regmap write to %d %d failed\n",
++		     r->index, r->offset);
++		BUG();
++	}
++}
++
++static u32 clk_memmap_readl(void __iomem *reg)
++{
++	struct clk_omap_reg *r = (struct clk_omap_reg *)&reg;
++	unsigned int val = 0;
++
++	/*
++	 * XXX Can't really continue if an error occurred here, since
++	 * this function assumes that the read will always succeed
++	 */
++	if (regmap_read(clk_memmaps[r->index], r->offset, &val)) {
++		WARN(1, "omap clock regmap read from %d %d failed\n",
++		     r->index, r->offset);
++		BUG();
++	}
++
++	return val;
++}
+ 
+ void omap2_clk_writel(u32 val, struct clk_hw_omap *clk, void __iomem *reg)
+ {
+-	if (clk->flags & MEMMAP_ADDRESSING) {
+-		struct clk_omap_reg *r = (struct clk_omap_reg *)&reg;
+-		writel_relaxed(val, clk_memmaps[r->index] + r->offset);
+-	} else {
++	if (clk->flags & MEMMAP_ADDRESSING)
++		clk_memmap_writel(val, reg);
++	else
+ 		writel_relaxed(val, reg);
+-	}
+ }
+ 
+ u32 omap2_clk_readl(struct clk_hw_omap *clk, void __iomem *reg)
+ {
+ 	u32 val;
+ 
+-	if (clk->flags & MEMMAP_ADDRESSING) {
+-		struct clk_omap_reg *r = (struct clk_omap_reg *)&reg;
+-		val = readl_relaxed(clk_memmaps[r->index] + r->offset);
+-	} else {
++	if (clk->flags & MEMMAP_ADDRESSING)
++		val = clk_memmap_readl(reg);
++	else
+ 		val = readl_relaxed(reg);
+-	}
+ 
+ 	return val;
+ }
+ 
++static struct ti_clk_ll_ops omap_clk_ll_ops = {
++	.clk_readl = clk_memmap_readl,
++	.clk_writel = clk_memmap_writel,
++};
++
++/**
++ * omap2_clk_provider_init - initialize a clock provider
++ * @match_table: DT device table to match for devices to init
++ *
++ * Initializes a clock provider module (CM/PRM etc.), allocating the
++ * memory mapping, allocating the mapping index and initializing the
++ * low level driver infrastructure. Returns 0 in success, -ENOMEM in
++ * failure.
++ */
++int __init omap2_clk_provider_init(const struct of_device_id *match_table)
++{
++	struct device_node *np;
++	void __iomem *mem;
++	static int memmap_index;
++	struct regmap *regmap;
++
++	ti_clk_ll_ops = &omap_clk_ll_ops;
++
++	for_each_matching_node(np, match_table) {
++		mem = of_iomap(np, 0);
++		if (!mem)
++			return -ENOMEM;
++
++		regmap = regmap_init_mmio(NULL, mem, &prcm_regmap_config);
++		if (IS_ERR(regmap)) {
++			pr_err("omap2 clock: could not create regmap for %s\n",
++			       of_node_full_name(np));
++			continue;
++		}
++
++		clk_memmaps[memmap_index] = regmap;
++		ti_dt_clk_init_provider(np, memmap_index);
++		memmap_index++;
++	}
++
++	return 0;
++}
++
+ /*
+  * OMAP2+ specific clock functions
+  */
+diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
+index 1cf9dd85248a..a3b634978a0f 100644
+--- a/arch/arm/mach-omap2/clock.h
++++ b/arch/arm/mach-omap2/clock.h
+@@ -267,12 +267,12 @@ extern const struct clksel_rate div_1_3_rates[];
+ extern const struct clksel_rate div_1_4_rates[];
+ extern const struct clksel_rate div31_1to31_rates[];
+ 
+-extern void __iomem *clk_memmaps[];
+-
+ extern int omap2_clkops_enable_clkdm(struct clk_hw *hw);
+ extern void omap2_clkops_disable_clkdm(struct clk_hw *hw);
+ 
+ extern void omap_clocks_register(struct omap_clk *oclks, int cnt);
+ 
++int __init omap2_clk_provider_init(const struct of_device_id *match_table);
++
+ void __init ti_clk_init_features(void);
+ #endif
+diff --git a/arch/arm/mach-omap2/prcm-common.h b/arch/arm/mach-omap2/prcm-common.h
+index a8e4b582c527..22afef0a4794 100644
+--- a/arch/arm/mach-omap2/prcm-common.h
++++ b/arch/arm/mach-omap2/prcm-common.h
+@@ -517,6 +517,8 @@ struct omap_prcm_irq_setup {
+ 	.priority = _priority				\
+ 	}
+ 
++struct of_device_id;
++
+ extern void omap_prcm_irq_cleanup(void);
+ extern int omap_prcm_register_chain_handler(
+ 	struct omap_prcm_irq_setup *irq_setup);
+diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
+index 779940cb6e56..9f736d282303 100644
+--- a/arch/arm/mach-omap2/prm_common.c
++++ b/arch/arm/mach-omap2/prm_common.c
+@@ -590,41 +590,9 @@ static const struct of_device_id omap_prcm_dt_match_table[] = {
+ 	{ }
+ };
+ 
+-static struct clk_hw_omap memmap_dummy_ck = {
+-	.flags = MEMMAP_ADDRESSING,
+-};
+-
+-static u32 prm_clk_readl(void __iomem *reg)
+-{
+-	return omap2_clk_readl(&memmap_dummy_ck, reg);
+-}
+-
+-static void prm_clk_writel(u32 val, void __iomem *reg)
+-{
+-	omap2_clk_writel(val, &memmap_dummy_ck, reg);
+-}
+-
+-static struct ti_clk_ll_ops omap_clk_ll_ops = {
+-	.clk_readl = prm_clk_readl,
+-	.clk_writel = prm_clk_writel,
+-};
+-
+ int __init of_prcm_init(void)
+ {
+-	struct device_node *np;
+-	void __iomem *mem;
+-	int memmap_index = 0;
+-
+-	ti_clk_ll_ops = &omap_clk_ll_ops;
+-
+-	for_each_matching_node(np, omap_prcm_dt_match_table) {
+-		mem = of_iomap(np, 0);
+-		clk_memmaps[memmap_index] = mem;
+-		ti_dt_clk_init_provider(np, memmap_index);
+-		memmap_index++;
+-	}
+-
+-	return 0;
++	return omap2_clk_provider_init(omap_prcm_dt_match_table);
+ }
+ 
+ static int __init prm_late_init(void)
+-- 
+2.1.4
