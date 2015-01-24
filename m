@@ -1,36 +1,95 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 24 Jan 2015 16:29:44 +0100
-Subject: [PATCH v2] clk: sunxi: fix sun6i PLL1 .recalc_rate() result
-In-Reply-To: <1422088959-23365-1-git-send-email-wens@csie.org>
-References: <1422088959-23365-1-git-send-email-wens@csie.org>
-Message-ID: <20150124152944.GE8470@lukather>
+From: plaes@plaes.org (Priit Laes)
+Date: Sat, 24 Jan 2015 17:53:41 +0200
+Subject: [PATCH] ARM: dts: sun4i: Add initial dts for Gemei G9 tablet
+In-Reply-To: <20150124143945.GD8470@lukather>
+References: <1422045409-1251-1-git-send-email-plaes@plaes.org>
+ <20150123212203.GB8470@lukather> <1422050375.1799.9.camel@plaes.org>
+ <20150124143945.GD8470@lukather>
+Message-ID: <1422114821.3851.25.camel@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
 
-On Sat, Jan 24, 2015 at 04:42:39PM +0800, Chen-Yu Tsai wrote:
-> PLL1 on sun6i has its N factor start from 1 (N = register value + 1).
-> Make the factors clk driver aware of this so clk_factors_recalc_rate()
-> gives the correct result.
+On Sat, 2015-01-24 at 15:39 +0100, Maxime Ripard wrote:
+> Hi,
 > 
-> Cc: <stable@vger.kernel.org> # 3.12 9a5e6c7eb5cc clk: sunxi: Support factor
-> Cc: <stable@vger.kernel.org> # 3.12
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> On Fri, Jan 23, 2015 at 11:59:35PM +0200, Priit Laes wrote:
+> > 
+> > On Fri, 2015-01-23 at 22:22 +0100, Maxime Ripard wrote:
+> > > On Fri, Jan 23, 2015 at 10:36:49PM +0200, Priit Laes wrote:
+> > > > Gemei G9 is an A10 based tablet, with 1G RAM, 16G NAND, 
+> > > > 1024x768 IPS LCD display, stereo speakers, 1.3MP front camera 
+> > > > and 5 MP
+> > > > rear camera, 8000mAh battery, GT901 2+1 touchscreen, Bosch 
+> > > > BMA250 accelerometer and RTL8188CUS USB wifi. It also has 
+> > > > MicroSD slot, miniHDMI, 1 x MicroUSB OTG port and 1 x MicroUSB 
+> > > > host port and 3.5mm headphone jack.
+> > > > More details are available at: http://linux-sunxi.org/Gemei_G9
+> > > > 
+> > [..]
+> > > > 
+> > > > +/ {
+> > > > +    model = "Gemei G9 Tablet";
+> > > > +    compatible = "gemei,g9", "allwinner,sun4i-a10";
+> > > > +};
+> > > > +
+> > > > +/*
+> > > > + * http://linux-sunxi.org/Gemei_G9
+> > > 
+> > > Please don't put URL in the DT. This is very likely to change in 
+> > > the future, and won't be valid anymore.
+> > 
+> > OK! The URL in commit message is ok to stay?
+> 
+> Yeah, I'm not that fond of it, but it's not that important either.
+> 
+> > > > +&i2c1 {
+> > > > +    pinctrl-names = "default";
+> > > > +    pinctrl-0 = <&i2c1_pins_a>;
+> > > > +    status = "okay";
+> > > > +
+> > > > +    /* Accelerometer */
+> > > > +    bma250 at 18 {
+> > > > +        compatible = "bosch,bma250";
+> > > > +        reg = <0x18>;
+> > > 
+> > > Is there a driver for this? It looks weird that it doesn't need 
+> > > more properties than that.
+> > 
+> > Yes, it's supported by drivers/iio/accel/bma180.c though I have to 
+> > admit that this name is a bit misleading. (bosch-bma.c would
+> > better, I guess).
+> > 
+> > And I was a bit surprised that it worked out of the box too, but 
+> > the device was present under /sys and I was able to read x, y, z 
+> > and temperature values.
+> 
+> Cool :)
+> 
+> There's no interrupt wired to it then?
 
-Could you queue this for 3.19?
+Well, FEX file contained this:
 
-Thanks,
-Maxime
+[gsensor_para]
+gsensor_used = 1
+gsensor_name = "bma250"
+gsensor_twi_addr = 0x18
+gsensor_twi_id = 1
+gsensor_int1 = port:PH00<6><1><default><default>
+gsensor_int2 = port:PI10<6><1><default><default>
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150124/30267c02/attachment.sig>
+And according to the datasheet, this chip (bma250) has two interrupt 
+pins.
+
+Now, the bma180/250 driver works without IRQ-s, but it currently only 
+supports single interrupt pin. Therefore I should at least add a 
+comment about these pins and revisit this issue later.
+
+/* TODO: check whether following interrupt pins are connected:
+ *   - int1 - PH00
+ *   - int2 - PI10
+ */
+
+
+P?ikest,
+Priit Laes :)
