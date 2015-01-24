@@ -1,32 +1,68 @@
-From: semen.protsenko@globallogic.com (Sam Protsenko)
-Date: Sat, 24 Jan 2015 22:54:28 +0200
-Subject: [PATCH 0/4] defconfigs: cleanup obsolete MTD configs
-In-Reply-To: <1422118156.27947.7.camel@x220>
-References: <1422117213-3130-1-git-send-email-semen.protsenko@globallogic.com>
- <1422118156.27947.7.camel@x220>
-Message-ID: <CAJOTznWHpRh8ysVxwSWyvZL1UAe-G9A64j=M6z0+zPeoycgkDg@mail.gmail.com>
+From: bhupesh.sharma@freescale.com (Bhupesh Sharma)
+Date: Sun, 25 Jan 2015 02:42:48 +0530
+Subject: [RESEND PATCH v7 0/5] ARM64: Add support for FSL's LS2085A SoC
+Message-ID: <1422133973-16460-1-git-send-email-bhupesh.sharma@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> That's news for me. I thought they are silently ignored. Do you have an
-> example of such a warning?
+Reposting this series as last time it was sent during the merge window
 
-Not really. It was just assumption. It seems you are right, they are just
-ignored silently. But item 2 is still relevant and it was actually confused
-me when I tried to figure out MTD configuration for my platform.
-Anyway, garbage should be taken out from time to time.
+This patchset adds the support for FSL's LS2085A SoC which is based on
+ARMv8 architecture.
 
-> Seems like the kind of change that can only be reviewed by a script.
+This patchset also has patches which address DT compatible strings for
+nodes which appear un-documented.
 
-Good point. Because these patches were done by script to start with.
-Anyway, I reviewed result patches manually to be completely sure.
-You can write verifying script though, if you need to, it wouldn't take
-more than 2 minutes (it takes one-liner, actually).
+The enable-method for the CPU nodes is left for the bootloader (u-boot or UEFI)
+to patch-up which is expected to be PSCI v0.2
 
-> I seem to remember Greg stating that defconfig files are on their way
-> out. Did I remember that correctly?
+This patchset has been tested with the following patches which add PSCI
+v0.2 support in ARMv8 u-boot:
+http://patchwork.ozlabs.org/patch/383556/
+http://patchwork.ozlabs.org/patch/383555/
+http://patchwork.ozlabs.org/patch/383557/
+http://patchwork.ozlabs.org/patch/383558/
+http://patchwork.ozlabs.org/patch/383559/
+http://patchwork.ozlabs.org/patch/383560/
+http://patchwork.ozlabs.org/patch/383561/
+http://patchwork.ozlabs.org/patch/383562/
 
-Maybe they are. But they still in place, and why it's so, we should
-maintain them up-to-date. Ideally, this kind of work should be done by
-someone who introduces changes into Kconfig files. So I just fixed
-that oversight.
+Rebased against cleanup/dts-subdirs branch of the arm-soc tree
+
+Changes from v6:
+----------------
+* Rebased against cleanup/dts-subdirs branch of the arm-soc tree.
+* As a result, [PATCH 4/6] and [PATCH 5/6] of the v6 series are squashed
+  into one patch ([PATCH 4/5] of this series).
+
+Note:
+-----
+Optional GIC-500 regs like GICC, GICH and GICV are currently
+not tested and hence are not part of the DTS patch.
+
+Please review and consider for merge.
+
+Bhupesh Sharma (5):
+  Documentation: DT: Add bindings for FSL NS16550A UART
+  Documentation: DT: Add entry for FSL LS2085A SoC and Simulator model
+  Documentation: DT: Add entry for FSL Management Complex
+  arm64: Add DTS support for FSL's LS2085A SoC
+  arm64: Add support for FSL's LS2085A SoC in Kconfig and defconfig
+
+ Documentation/devicetree/bindings/arm/fsl.txt      |    8 +
+ .../devicetree/bindings/misc/fsl,qoriq-mc.txt      |   40 +++++
+ .../devicetree/bindings/serial/of-serial.txt       |   12 ++
+ arch/arm64/Kconfig                                 |    5 +
+ arch/arm64/boot/dts/Makefile                       |    1 +
+ arch/arm64/boot/dts/{ => freescale}/Makefile       |    4 +-
+ arch/arm64/boot/dts/freescale/fsl-ls2085a-simu.dts |   65 ++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi     |  163 ++++++++++++++++++++
+ arch/arm64/configs/defconfig                       |    1 +
+ 9 files changed, 296 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
+ copy arch/arm64/boot/dts/{ => freescale}/Makefile (54%)
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls2085a-simu.dts
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi
+
+-- 
+1.7.9.5
