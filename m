@@ -1,26 +1,32 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sat, 24 Jan 2015 18:48:26 +0100 (CET)
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Sat, 24 Jan 2015 21:50:53 +0400
 Subject: [PATCH 3/5] ARM: sa1100: use ioremapped memory to access SC
  registers
-In-Reply-To: <1421316574-10022-3-git-send-email-dbaryshkov@gmail.com>
+In-Reply-To: <alpine.DEB.2.11.1501241846540.5526@nanos>
 References: <1421316574-10022-1-git-send-email-dbaryshkov@gmail.com>
  <1421316574-10022-3-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <alpine.DEB.2.11.1501241846540.5526@nanos>
+ <alpine.DEB.2.11.1501241846540.5526@nanos>
+Message-ID: <CALT56yP+PGCnbUN0BB4QTQ6phxmqL43vRoS_rtoMrgfjAtr3Rw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Jan 2015, Dmitry Eremin-Solenikov wrote:
->  static void sa1100_mask_irq(struct irq_data *d)
->  {
-> -	ICMR &= ~BIT(d->hwirq);
-> +	u32 reg;
-> +	unsigned long flags;
-> +
-> +	raw_spin_lock_irqsave(&lock, flags);
+2015-01-24 20:48 GMT+03:00 Thomas Gleixner <tglx@linutronix.de>:
+> On Thu, 15 Jan 2015, Dmitry Eremin-Solenikov wrote:
+>>  static void sa1100_mask_irq(struct irq_data *d)
+>>  {
+>> -     ICMR &= ~BIT(d->hwirq);
+>> +     u32 reg;
+>> +     unsigned long flags;
+>> +
+>> +     raw_spin_lock_irqsave(&lock, flags);
+>
+> What's the exact point of that lock? And how is it related to the
+> $subject of the patch?
 
-What's the exact point of that lock? And how is it related to the
-$subject of the patch?
+It is needed to protect ICMR register during RMW cycle, isn't it?
+I might have missed locks around ack/mask/unmask calls from irq
+core. If so, I can happily drop this spinlock.
 
-Thanks,
-
-	tglx
+-- 
+With best wishes
+Dmitry
