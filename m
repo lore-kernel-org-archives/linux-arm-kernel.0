@@ -1,121 +1,80 @@
-From: dgilbert@interlog.com (Douglas Gilbert)
-Date: Sat, 24 Jan 2015 23:42:24 +0100
-Subject: [PATCH] at91: i2c-at91: improve time-out handling
-In-Reply-To: <20150113152752.GK7660@katana>
-References: <54A58BA5.3080003@interlog.com>
- <20150107103113.GA30897@ldesroches-Latitude-E6320>
- <20150113152752.GK7660@katana>
-Message-ID: <54C41FD0.2010607@interlog.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 24 Jan 2015 15:19:30 -0800
+Subject: [GIT PULL] ARM: SoC fixes
+Message-ID: <20150124231930.GA19897@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15-01-13 04:27 PM, Wolfram Sang wrote:
-> On Wed, Jan 07, 2015 at 11:31:14AM +0100, Ludovic Desroches wrote:
->> Hi Douglas,
->>
->> On Thu, Jan 01, 2015 at 01:02:13PM -0500, Douglas Gilbert wrote:
->>> With lk 3.19.0-rc2 and a at91sam9g25 (9x5) based system I
->>> connected a NXP SC16IS750 I2C to serial bridge. After
->>> routing the 750's IRQ back to the sc16is7xx driver and some
->>> simple successful test, it was time for some intense testing:
->>> Tx looped back to Rx on the 750, open picocom on /dev/ttySC0
->>> at 38400, and use hexdump to blast a binary file (in hex) at
->>> ttySC0. The I2C SCL speed was 200,000 Hz.
->>>
->>> It worked as expected for a few seconds then it wedged the
->>> I2C bus. That was repeatable. In the cases that I checked SCL
->>> was high, SDA was low (driven by _both_ the G25's macrocell
->>> and the 750!!) and IRQ was active (low). This patch stopped
->>> the G25 macrocell from driving SDA low in the above wedge
->>> (and stopped copious error reports going to the log). I was
->>> surprised that a NXP I2C chip got into this situation, IMO
->>> SDA on a slave should have a driven low timeout. IMO all
->>> I2C master drivers should have provision to drive a gpio
->>> connected to a (or all the) slave's RESET line(s).
->>>
->>>
->>> ChangeLog:
->>>     when handling an I2C bus time-out, first clean-up the
->>>     DMA transfer, then do an I2C macrocell software reset
->>>     and restore some registers, including the interrupt
->>>     mask
->>>
->>
->> I am wondering why you need to call at91_twi_irq_save() and
->> at91_twi_irq_restore(). The interrupts enabled in the driver are
->> AT91_TWI_TXCOMP, AT91_TWI_RXRDY and AT91_TWI_TXRDY and they are managed
->> in at91_do_twi_transfer() so they would be set correctly for the next
->> transfer.
->
-> Douglas, any more info you could provide?
+Hi Linus,
 
-I reran the torture tests without the at91_twi_irq_save() and
-at91_twi_irq_restore() calls and got the same results. So it
-seems that those calls are not needed; revised patch attached.
+The following changes since commit 966903a98fd80ae5f5c4a7ca121d36ea0ba23143:
 
-Other observations: after the torture test wedges (after
-several seconds at 38400 baud) grounding the RESET pin on the
-SC16IS750 clears the I2C bus jam; thereafter I2C
-transmissions can continue. That implies to me that Atmel's
-I2C macrocell is not wedged.
+  Merge tag 'samsung-fixes-3.19' of git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung into fixes (2015-01-16 19:11:37 -0800)
 
-When the sc16is7xx driver is built as a module, then rmmod
-runs into a slow path dump in the logs. That comes from the
-clk_disable() call in:
-   sc16is7xx_i2c_remove+0x88/0xa4 [sc16is7xx]
+are available in the git repository at:
 
-Tests done with lk 3.19.0-rc4 using a AT91SAM9G25 system
-(Acme Arietta).
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-for-linus
 
-For the attached patch:
-   Signed-off-by: Douglas Gilbert <dgilbert@interlog.com>
+for you to fetch changes up to 4b3415c9363f828e7f1e45edecb57930849d5d5b:
 
+  Merge tag 'imx-fixes-3.19-2' of git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux into fixes (2015-01-23 14:23:40 -0800)
 
->> Regards
->>
->> Ludovic
->>
->>> Signed-off-by: Douglas Gilbert <dgilbert@interlog.com>
->>
->>> diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
->>> index 636fd2e..4d78708 100644
->>> --- a/drivers/i2c/busses/i2c-at91.c
->>> +++ b/drivers/i2c/busses/i2c-at91.c
->>> @@ -382,6 +382,7 @@ static int at91_do_twi_transfer(struct at91_twi_dev *dev)
->>>   {
->>>   	int ret;
->>>   	bool has_unre_flag = dev->pdata->has_unre_flag;
->>> +	bool timed_out = false;
->>>
->>>   	dev_dbg(dev->dev, "transfer: %s %d bytes.\n",
->>>   		(dev->msg->flags & I2C_M_RD) ? "read" : "write", dev->buf_len);
->>> @@ -440,7 +441,7 @@ static int at91_do_twi_transfer(struct at91_twi_dev *dev)
->>>   					     dev->adapter.timeout);
->>>   	if (ret == 0) {
->>>   		dev_err(dev->dev, "controller timed out\n");
->>> -		at91_init_twi_bus(dev);
->>> +		timed_out = true;
->>>   		ret = -ETIMEDOUT;
->>>   		goto error;
->>>   	}
->>> @@ -471,6 +472,11 @@ static int at91_do_twi_transfer(struct at91_twi_dev *dev)
->>>
->>>   error:
->>>   	at91_twi_dma_cleanup(dev);
->>> +	if (timed_out) {
->>> +		at91_twi_irq_save(dev);
->>> +		at91_init_twi_bus(dev);
->>> +		at91_twi_irq_restore(dev);
->>> +	}
->>>   	return ret;
->>>   }
->>>
->>
+----------------------------------------------------------------
+ARM: SoC fixes
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: i2c-at91_tmout2.patch
-Type: text/x-patch
-Size: 1570 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150124/c0035c2f/attachment.bin>
+A week's worth of fixes for various ARM platforms. Diff wise, the
+largest fix is for OMAP to deal with how GIC now registers interrupts
+(irq_domain_add_legacy() -> irq_domain_add_linear() changes).
+
+Besides this, a few more renesas platforms needed the GIC instatiation
+done for legacy boards. There's also a fix that disables coherency of
+mvebu due to issues, and a few other smaller fixes.
+
+----------------------------------------------------------------
+Andrew Lunn (1):
+      bus: mvebu-mbus: fix support of MBus window 13
+
+Fabio Estevam (1):
+      ARM: dts: imx25: Fix PWM "per" clocks
+
+Felipe Balbi (1):
+      arm: boot: dts: dra7: enable dwc3 suspend PHY quirk
+
+Magnus Damm (2):
+      ARM: shmobile: r8a7778: Instantiate GIC from C board code in legacy builds
+      ARM: shmobile: r8a7779: Instantiate GIC from C board code in legacy builds
+
+Marc Zyngier (1):
+      ARM: OMAP: Work around hardcoded interrupts
+
+Olof Johansson (5):
+      Merge tag 'mvebu-fixes-3.19-3' of git://git.infradead.org/linux-mvebu into fixes
+      Merge tag 'omap-for-v3.19/gic-regression-v2' of git://git.kernel.org/.../tmlind/linux-omap into fixes
+      Merge tag 'renesas-soc-fixes2-for-v3.19' of git://git.kernel.org/.../horms/renesas into fixes
+      Merge tag 'mvebu-fixes-3.19-4' of git://git.infradead.org/linux-mvebu into fixes
+      Merge tag 'imx-fixes-3.19-2' of git://git.kernel.org/.../shawnguo/linux into fixes
+
+Robin Murphy (1):
+      arm64: dts: add baud rate to Juno stdout-path
+
+Thomas Petazzoni (1):
+      ARM: mvebu: completely disable hardware I/O coherency
+
+ arch/arm/boot/dts/dra7.dtsi                |  6 ++++++
+ arch/arm/boot/dts/imx25.dtsi               |  8 ++++----
+ arch/arm/mach-mvebu/coherency.c            |  7 ++++++-
+ arch/arm/mach-omap2/common.h               |  1 +
+ arch/arm/mach-omap2/omap4-common.c         | 32 ++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod.c           | 10 ++++++++--
+ arch/arm/mach-omap2/omap_hwmod.h           |  1 +
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  5 +++++
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c |  1 +
+ arch/arm/mach-omap2/prcm-common.h          |  1 +
+ arch/arm/mach-omap2/prm44xx.c              |  5 ++++-
+ arch/arm/mach-omap2/prm_common.c           | 14 +++++++++++--
+ arch/arm/mach-omap2/twl-common.c           |  7 ++++++-
+ arch/arm/mach-shmobile/setup-r8a7778.c     |  9 ++++++++-
+ arch/arm/mach-shmobile/setup-r8a7779.c     |  9 ++++++++-
+ arch/arm64/boot/dts/arm/juno.dts           |  2 +-
+ drivers/bus/mvebu-mbus.c                   | 13 ++++++++++++
+ 17 files changed, 117 insertions(+), 14 deletions(-)
