@@ -1,93 +1,57 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sun, 25 Jan 2015 16:03:03 +0100
-Subject: [PATCH v3 2/2] clocksource: driver for Conexant Digicolor SoC
- timer
-In-Reply-To: <20150125144656.GO2555@sapphire.tkos.co.il>
-References: <cover.1421821466.git.baruch@tkos.co.il>
- <762d81b2cf12922ba28fb58b3ea4d5b7072abefb.1421821466.git.baruch@tkos.co.il>
- <54C0F30F.9060607@linaro.org> <20150125144656.GO2555@sapphire.tkos.co.il>
-Message-ID: <54C505A7.6000506@linaro.org>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Sun, 25 Jan 2015 16:03:41 +0100 (CET)
+Subject: [PATCH 1/2] clockevents: introduce ->set_dev_mode() which can
+ return error
+In-Reply-To: <CAKohpomZJAymPHVNR9LkHM8V2tkmM=H+btYEiAJ9hq0mAoOzYw@mail.gmail.com>
+References: <1418162614-19182-1-git-send-email-khilman@kernel.org>
+ <1418162614-19182-2-git-send-email-khilman@kernel.org>
+ <alpine.DEB.2.11.1501231223470.5526@nanos>
+ <CAKohpomZJAymPHVNR9LkHM8V2tkmM=H+btYEiAJ9hq0mAoOzYw@mail.gmail.com>
+Message-ID: <alpine.DEB.2.11.1501251537380.5526@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/25/2015 03:46 PM, Baruch Siach wrote:
-> Hi Daniel,
->
-> On Thu, Jan 22, 2015 at 01:54:39PM +0100, Daniel Lezcano wrote:
->> On 01/21/2015 07:36 AM, Baruch Siach wrote:
->>> + * Based on:
->>> + *	Allwinner SoCs hstimer driver
->>
->> If this is based on the Allwinnner driver, may be you can have a look at the
->> patchset sent by Maxim to make sure your implementation is complete ?
->>
->> https://lkml.org/lkml/2015/1/11/52
->
-> Thanks for the tip. I'll take the applicable parts from that series.
->
-> [...]
->
->>> +static void __iomem *timer_base;
->>> +static u32 ticks_per_jiffy;
->>
->> Mind to encapsulate those global variables in a structure and use
->> container_of to access those fields like:
->>
->> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/clocksource/mtk_timer.c#n56
->>
->> ?
->
-> The trouble is that the sched_clock callback (digicolor_timer_sched_read)
-> needs a static timer_base to find the timer counter. Do you think adding a
-> structure is worth it only for ticks_per_jiffy?
+> >         case CLOCK_EVT_MODE_RESUME:
+> >              return dev->setup_resume(dev);
+> 
+> Because setting to all these existing modes isn't allowed
+> to fail currently, shouldn't we make return type of all the new
+> callbacks as 'void' and return 0 from this routine ? That way, these
+> callbacks would stay consistent with the set_mode() callback..
 
-Well you will have to define the global variable for this structure. So 
-you should be able to access the timer base directly. I agree it is not 
-perfect but at least that will encapsulate the code for the clockevents 
-side.
+If we go to individual callbacks then we analyze of a case by case
+basis which ones need a return value and which ones to not.
+ 
+> > That gives us a clear distinction of required and optional callbacks,
+> > which will make error handling and recovery simpler as well.
+> 
+> Now that we are looking forward to providing individual callbacks
+> per feature, I wanted to propose few more solutions to it, though I am
+> quite sure you would have already considered and rejected them.
+> 
+> I remember from your earlier mail that you didn't wanted to add
+> ONESHOT_STOPPED as a feature (as it isn't a feature really)
+> and that restricts us from doing this:
+> 
+> static int __clockevents_set_mode(dev, mode)
+> {
+>         if ((mode == CLOCK_EVT_MODE_ONESHOT_STOPPED) &&
+>             !(dev->features & CLOCK_EVT_FEAT_ONESHOT_STOPPED))
+>                 return -ENOSYS;
+> 
+>         dev->set_mode(mode, dev);
+>         return 0;
+> }
+> 
+> But what about providing a separate callback only for ONESHOT_STOPPED
+> mode and use set_mode() for everything else ?
 
->>> +static void digicolor_clkevt_mode(enum clock_event_mode mode,
->>> +				  struct clock_event_device *clk)
->>> +{
->>> +	switch (mode) {
->>> +	case CLOCK_EVT_MODE_PERIODIC:
->>> +		writeb(0, timer_base + CONTROL(TIMER_C));
->>
->> Even if that sounds overkill, please replace '0', '1' with whatever macro
->> name (eg. TIMER_DISABLE/ENABLE).
->
-> Will do for the entire file.
->
-> [...]
->
->>> +static struct irqaction digicolor_timer_irq = {
->>> +	.name = "digicolor_timerC",
->>> +	.flags = IRQF_TIMER | IRQF_IRQPOLL,
->>> +	.handler = digicolor_timer_interrupt,
->>> +	.dev_id = &digicolor_clockevent,
->>> +};
->>
->> The current trend is to use 'request_irq', so no such structure
->> declaration/initialization is needed.
->
-> Thanks. Will do.
->
->>> +	writel(~0, timer_base + COUNT(TIMER_B));
->>
->> s/~0/UINT_MAX/ ?
->
-> Ack.
->
-> Thanks for reviewing. I'll post an updated series shortly.
+And then fixup all drivers which do not have a default clause in their
+switch case and add MODE_ONESHOT_STOPPED? And half a year later we do
+the same for the next mode. No way.
 
-Ok, thanks.
+The current interface is suboptimal and we fix it proper. Period.
 
-   -- Daniel
+Thanks,
 
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+	tglx
