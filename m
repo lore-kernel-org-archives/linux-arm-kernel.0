@@ -1,33 +1,48 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 25 Jan 2015 18:06:56 +0100
-Subject: [PATCH v2] ARM: sunxi: dt: Fix aliases
-In-Reply-To: <1421961054-30341-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1421961054-30341-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20150125170656.GN8470@lukather>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 25 Jan 2015 18:09:25 +0100
+Subject: [PATCHv2] mvebu: add Linksys WRT1900AC (Mamba) support
+In-Reply-To: <54C51FAA.4080300@gmail.com>
+References: <1421687701-5667-1-git-send-email-kaloz@openwrt.org>
+ <20150119182113.GH32663@lunn.ch> <op.xsrcplz12s3iss@ecaz>
+ <54C51FAA.4080300@gmail.com>
+Message-ID: <20150125170925.GB23862@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 22, 2015 at 10:10:54PM +0100, Maxime Ripard wrote:
-> Commit f77d55a3b56a ("serial: 8250_dw: get index of serial line from DT
-> aliases") made the serial driver now use the serial aliases to get the tty
-> number, pointing out that our aliases have been wrong all along.
+> >>>+
+> >>>+        power {
+> >>>+            label = "mamba:white:power";
+> >>
+> >>Please replace this mamba with wrt1900ac. It is a property of the
+> >>device, not the board. Another device using the mamba board may use it
+> >>differently.
+> >>
+> >
+> >See above.
 > 
-> Remove them from the DTSI and add custom ones in the relevant boards.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> The LED should be named by the device, not the platform. If OpenWRT
+> userspace already expects "mamba" in here, I guess we are stuck with
+> it. If not, call it "wrt1900ac:white:power".
 
-Applied.
+Hi Sebastian
 
-Maxime
+We have some flexibility here. There is the mantra, don't break
+userspace, but that only applies once code has reached mainline.  We
+don't have to be compatible with OpenWRT, if we feel it would be wrong
+to do so. OpenWRT should be well aware of the risk of not "Upstream
+first". However, if it does not cost us anything, we can be
+compatible.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150125/438296c0/attachment.sig>
+I think Android is another good example. Some code has been accepted
+into mainline as is, other parts have been re-written with different
+APIs.
+
+If it is decided that mamba is used everywhere, then it should be used
+here. If wrt1900ac is used, then i would like to see this LED named
+wrt1900ac. What you don't see in this dts file is the other 8 or so
+LEDs, which are connected to an I2c LED driver. A first version of the
+kernel driver has now been merged, the DT binding is stable, so we
+should add these LEDs to this dts file. But we should be consistent
+with the naming.
+
+     Andrew
