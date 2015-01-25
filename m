@@ -1,73 +1,41 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 25 Jan 2015 14:18:22 -0500
-Subject: [PATCHv2] mvebu: add Linksys WRT1900AC (Mamba) support
-In-Reply-To: <20150125170925.GB23862@lunn.ch>
-References: <1421687701-5667-1-git-send-email-kaloz@openwrt.org>
- <20150119182113.GH32663@lunn.ch> <op.xsrcplz12s3iss@ecaz>
- <54C51FAA.4080300@gmail.com> <20150125170925.GB23862@lunn.ch>
-Message-ID: <20150125191822.GI24989@titan.lakedaemon.net>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Sun, 25 Jan 2015 20:30:33 +0100
+Subject: [PATCH] ARM: shmobile: henninger: rename board to Porter
+In-Reply-To: <2481726.lh33apx2TG@wasted.cogentembedded.com>
+References: <2481726.lh33apx2TG@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdW3NmzGxGa9DOHpk4Evjg=+bduUPiMoRZT9Ko7+jNp-Nw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 25, 2015 at 06:09:25PM +0100, Andrew Lunn wrote:
-> > >>>+
-> > >>>+        power {
-> > >>>+            label = "mamba:white:power";
-> > >>
-> > >>Please replace this mamba with wrt1900ac. It is a property of the
-> > >>device, not the board. Another device using the mamba board may use it
-> > >>differently.
-> > >>
-> > >
-> > >See above.
-> > 
-> > The LED should be named by the device, not the platform. If OpenWRT
-> > userspace already expects "mamba" in here, I guess we are stuck with
-> > it. If not, call it "wrt1900ac:white:power".
-> 
-> Hi Sebastian
-> 
-> We have some flexibility here. There is the mantra, don't break
-> userspace, but that only applies once code has reached mainline.
+Hi Sergei,
 
-Full agree.
+On Fri, Jan 23, 2015 at 9:37 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Renesas has made some changes to the Henninger low cost board hardware and at
+> the same time decided to  rename the board  to Porter.
 
-> If it is decided that mamba is used everywhere, then it should be used
-> here. If wrt1900ac is used, then i would like to see this LED named
-> wrt1900ac.
+Which changes? They're not reflected in the new DTS?
 
-I think the main problem here is that we are trying to predict the
-future decisions of an opaque entity (Linksys).  We can't.  All we can
-do is be specific about what we have before us today.  Then we can
-create a new compatible string in the future that reflects the
-differences post-opaque-entity-decisions.
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>
+> ---
+> This patch is against 'renesas-devel-20150123-v3.19-rc5' tag of Simon Horman's
+> 'renesas.git' repo.
+>
+>  arch/arm/boot/dts/Makefile                                     |  2 +-
+>  .../arm/boot/dts/{r8a7791-henninger.dts => r8a7791-porter.dts} | 10 +++++-----
+>  2 files changed, 6 insertions(+), 6 deletions(-)
+>  rename arch/arm/boot/dts/{r8a7791-henninger.dts => r8a7791-porter.dts} (96%)
 
-To that end, engineering is considerably more reliable than marketing.
-So I would be inclined to use 'mamba' for this board.  If Linksys
-creates a variant of this board and keeps the board name, then we can
-call it 'mamba-v2'.  Or, 'mamba-revB' if that's on the silk layer.
+You forgot to update Documentation/devicetree/bindings/arm/shmobile.txt
 
-At any rate, unless the DT maintainers disagree, compatible strings
-should reflect engineering attributes, and 'model' should reflect
-marketing names users would be familiar with.
+Gr{oetje,eeting}s,
 
-So...
+                        Geert
 
-	model = "Linksys WRT1900AC";
-	compatible = "linksys,mamba", "...";
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-...
-
-	power {
-		label = "mamba:white:power";
-
-The most deceptive part of this is that 'wrt1900ac' sounds *so* specific
-that we are inclined to trust it and use it.  But beware, marketing folks
-have never heard of version control, compatibility, or consistency.
-They are more likely to pull a Crazy Ivan [1] on us than Ivan himself. :-)
-
-thx,
-
-Jason.
-
-[1] https://en.wikipedia.org/wiki/Crazy_Ivan
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
