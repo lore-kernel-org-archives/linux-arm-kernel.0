@@ -1,142 +1,140 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sun, 25 Jan 2015 12:30:42 -0800
-Subject: [PATCH v2 3/6] power/reset: Remove sun6i reboot driver
-In-Reply-To: <1422217845-18901-1-git-send-email-linux@roeck-us.net>
-References: <1422217845-18901-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1422217845-18901-4-git-send-email-linux@roeck-us.net>
+From: prabhakar.csengg@gmail.com (Lad, Prabhakar)
+Date: Sun, 25 Jan 2015 20:31:55 +0000
+Subject: [PATCH v2] ARM: AM43xx: hwmod: add VPFE hwmod entries
+Message-ID: <1422217915-24231-1-git-send-email-prabhakar.csengg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sun6i restart is now handled by its watchdog driver directly,
-so this driver is no longer needed.
+From: Benoit Parrot <bparrot@ti.com>
 
-Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+this patch adds VPFE HWMOD data for AM43xx.
+
+Signed-off-by: Benoit Parrot <bparrot@ti.com>
+Signed-off-by: Darren Etheridge <detheridge@ti.com>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
 ---
- drivers/power/reset/Kconfig        |  6 ---
- drivers/power/reset/Makefile       |  1 -
- drivers/power/reset/sun6i-reboot.c | 85 --------------------------------------
- 3 files changed, 92 deletions(-)
- delete mode 100644 drivers/power/reset/sun6i-reboot.c
-
-diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
-index bf5acb3..4cb5744 100644
---- a/drivers/power/reset/Kconfig
-+++ b/drivers/power/reset/Kconfig
-@@ -109,12 +109,6 @@ config POWER_RESET_RESTART
- 	  Instead they restart, and u-boot holds the SoC until the
- 	  user presses a key. u-boot then boots into Linux.
+ Hi Paul,
  
--config POWER_RESET_SUN6I
--	bool "Allwinner A31 SoC reset driver"
--	depends on ARCH_SUNXI
--	help
--	  Reboot support for the Allwinner A31 SoCs.
+ You were right, the hardware team has confirmed that, the VPFE master port is
+ connected to L3 and the VPFE slave port is connected to L4. The L3 port cannot
+ serve as a register target because it is initiator only.
+ 
+ I have created links referring to dss l3/l4 hwmod and tested it, lemme know
+ if I have missed something.
+ 
+ arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 72 ++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/prcm43xx.h             |  3 +-
+ 2 files changed, 74 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+index 5c6c841..3787824 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+@@ -514,6 +514,44 @@ static struct omap_hwmod am43xx_dss_rfbi_hwmod = {
+ 	},
+ };
+ 
++static struct omap_hwmod_class_sysconfig am43xx_vpfe_sysc = {
++	.rev_offs       = 0x0,
++	.sysc_offs      = 0x104,
++	.sysc_flags     = SYSC_HAS_MIDLEMODE | SYSC_HAS_SIDLEMODE,
++	.idlemodes      = (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
++				MSTANDBY_FORCE | MSTANDBY_SMART | MSTANDBY_NO),
++	.sysc_fields    = &omap_hwmod_sysc_type2,
++};
++
++static struct omap_hwmod_class am43xx_vpfe_hwmod_class = {
++	.name           = "vpfe",
++	.sysc           = &am43xx_vpfe_sysc,
++};
++
++static struct omap_hwmod am43xx_vpfe0_hwmod = {
++	.name           = "vpfe0",
++	.class          = &am43xx_vpfe_hwmod_class,
++	.clkdm_name     = "l3s_clkdm",
++	.prcm           = {
++		.omap4  = {
++			.modulemode     = MODULEMODE_SWCTRL,
++			.clkctrl_offs   = AM43XX_CM_PER_VPFE0_CLKCTRL_OFFSET,
++		},
++	},
++};
++
++static struct omap_hwmod am43xx_vpfe1_hwmod = {
++	.name           = "vpfe1",
++	.class          = &am43xx_vpfe_hwmod_class,
++	.clkdm_name     = "l3s_clkdm",
++	.prcm           = {
++		.omap4  = {
++			.modulemode     = MODULEMODE_SWCTRL,
++			.clkctrl_offs   = AM43XX_CM_PER_VPFE1_CLKCTRL_OFFSET,
++		},
++	},
++};
++
+ /* Interfaces */
+ static struct omap_hwmod_ocp_if am43xx_l3_main__l4_hs = {
+ 	.master		= &am33xx_l3_main_hwmod,
+@@ -788,6 +826,36 @@ static struct omap_hwmod_ocp_if am43xx_l4_ls__dss_rfbi = {
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
+ 
++static struct omap_hwmod_ocp_if am43xx_l3__vpfe0 = {
++	.master         = &am43xx_vpfe0_hwmod,
++	.slave          = &am33xx_l3_main_hwmod,
++	.clk            = "l3_gclk",
++	.flags          = OCPIF_SWSUP_IDLE,
++	.user           = OCP_USER_MPU | OCP_USER_SDMA,
++};
++
++static struct omap_hwmod_ocp_if am43xx_l3__vpfe1 = {
++	.master         = &am43xx_vpfe1_hwmod,
++	.slave          = &am33xx_l3_main_hwmod,
++	.clk            = "l3_gclk",
++	.flags          = OCPIF_SWSUP_IDLE,
++	.user           = OCP_USER_MPU | OCP_USER_SDMA,
++};
++
++static struct omap_hwmod_ocp_if am43xx_l4_ls__vpfe0 = {
++	.master         = &am33xx_l4_ls_hwmod,
++	.slave          = &am43xx_vpfe0_hwmod,
++	.clk            = "l4ls_gclk",
++	.user           = OCP_USER_MPU | OCP_USER_SDMA,
++};
++
++static struct omap_hwmod_ocp_if am43xx_l4_ls__vpfe1 = {
++	.master         = &am33xx_l4_ls_hwmod,
++	.slave          = &am43xx_vpfe1_hwmod,
++	.clk            = "l4ls_gclk",
++	.user           = OCP_USER_MPU | OCP_USER_SDMA,
++};
++
+ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
+ 	&am33xx_l4_wkup__synctimer,
+ 	&am43xx_l4_ls__timer8,
+@@ -887,6 +955,10 @@ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
+ 	&am43xx_l4_ls__dss,
+ 	&am43xx_l4_ls__dss_dispc,
+ 	&am43xx_l4_ls__dss_rfbi,
++	&am43xx_l3__vpfe0,
++	&am43xx_l3__vpfe1,
++	&am43xx_l4_ls__vpfe0,
++	&am43xx_l4_ls__vpfe1,
+ 	NULL,
+ };
+ 
+diff --git a/arch/arm/mach-omap2/prcm43xx.h b/arch/arm/mach-omap2/prcm43xx.h
+index ad7b3e9..8aa4c2c 100644
+--- a/arch/arm/mach-omap2/prcm43xx.h
++++ b/arch/arm/mach-omap2/prcm43xx.h
+@@ -143,5 +143,6 @@
+ #define AM43XX_CM_PER_USB_OTG_SS1_CLKCTRL_OFFSET        0x0268
+ #define AM43XX_CM_PER_USBPHYOCP2SCP1_CLKCTRL_OFFSET	0x05C0
+ #define AM43XX_CM_PER_DSS_CLKCTRL_OFFSET		0x0a20
 -
- config POWER_RESET_ST
- 	bool "ST restart power-off driver"
- 	depends on ARCH_STI
-diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
-index 1631652..11de15b 100644
---- a/drivers/power/reset/Makefile
-+++ b/drivers/power/reset/Makefile
-@@ -11,7 +11,6 @@ obj-$(CONFIG_POWER_RESET_MSM) += msm-poweroff.o
- obj-$(CONFIG_POWER_RESET_LTC2952) += ltc2952-poweroff.o
- obj-$(CONFIG_POWER_RESET_QNAP) += qnap-poweroff.o
- obj-$(CONFIG_POWER_RESET_RESTART) += restart-poweroff.o
--obj-$(CONFIG_POWER_RESET_SUN6I) += sun6i-reboot.o
- obj-$(CONFIG_POWER_RESET_ST) += st-poweroff.o
- obj-$(CONFIG_POWER_RESET_VERSATILE) += arm-versatile-reboot.o
- obj-$(CONFIG_POWER_RESET_VEXPRESS) += vexpress-poweroff.o
-diff --git a/drivers/power/reset/sun6i-reboot.c b/drivers/power/reset/sun6i-reboot.c
-deleted file mode 100644
-index af2cd7f..0000000
---- a/drivers/power/reset/sun6i-reboot.c
-+++ /dev/null
-@@ -1,85 +0,0 @@
--/*
-- * Allwinner A31 SoCs reset code
-- *
-- * Copyright (C) 2012-2014 Maxime Ripard
-- *
-- * Maxime Ripard <maxime.ripard@free-electrons.com>
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#include <linux/delay.h>
--#include <linux/io.h>
--#include <linux/module.h>
--#include <linux/of_address.h>
--#include <linux/platform_device.h>
--#include <linux/reboot.h>
--
--#include <asm/system_misc.h>
--
--#define SUN6I_WATCHDOG1_IRQ_REG		0x00
--#define SUN6I_WATCHDOG1_CTRL_REG	0x10
--#define SUN6I_WATCHDOG1_CTRL_RESTART		BIT(0)
--#define SUN6I_WATCHDOG1_CONFIG_REG	0x14
--#define SUN6I_WATCHDOG1_CONFIG_RESTART		BIT(0)
--#define SUN6I_WATCHDOG1_CONFIG_IRQ		BIT(1)
--#define SUN6I_WATCHDOG1_MODE_REG	0x18
--#define SUN6I_WATCHDOG1_MODE_ENABLE		BIT(0)
--
--static void __iomem *wdt_base;
--
--static void sun6i_wdt_restart(enum reboot_mode mode, const char *cmd)
--{
--	if (!wdt_base)
--		return;
--
--	/* Disable interrupts */
--	writel(0, wdt_base + SUN6I_WATCHDOG1_IRQ_REG);
--
--	/* We want to disable the IRQ and just reset the whole system */
--	writel(SUN6I_WATCHDOG1_CONFIG_RESTART,
--		wdt_base + SUN6I_WATCHDOG1_CONFIG_REG);
--
--	/* Enable timer. The default and lowest interval value is 0.5s */
--	writel(SUN6I_WATCHDOG1_MODE_ENABLE,
--		wdt_base + SUN6I_WATCHDOG1_MODE_REG);
--
--	/* Restart the watchdog. */
--	writel(SUN6I_WATCHDOG1_CTRL_RESTART,
--		wdt_base + SUN6I_WATCHDOG1_CTRL_REG);
--
--	while (1) {
--		mdelay(5);
--		writel(SUN6I_WATCHDOG1_MODE_ENABLE,
--			wdt_base + SUN6I_WATCHDOG1_MODE_REG);
--	}
--}
--
--static int sun6i_reboot_probe(struct platform_device *pdev)
--{
--	wdt_base = of_iomap(pdev->dev.of_node, 0);
--	if (!wdt_base) {
--		WARN(1, "failed to map watchdog base address");
--		return -ENODEV;
--	}
--
--	arm_pm_restart = sun6i_wdt_restart;
--
--	return 0;
--}
--
--static struct of_device_id sun6i_reboot_of_match[] = {
--	{ .compatible = "allwinner,sun6i-a31-wdt" },
--	{}
--};
--
--static struct platform_driver sun6i_reboot_driver = {
--	.probe = sun6i_reboot_probe,
--	.driver = {
--		.name = "sun6i-reboot",
--		.of_match_table = sun6i_reboot_of_match,
--	},
--};
--module_platform_driver(sun6i_reboot_driver);
++#define AM43XX_CM_PER_VPFE0_CLKCTRL_OFFSET		0x0068
++#define AM43XX_CM_PER_VPFE1_CLKCTRL_OFFSET		0x0070
+ #endif
 -- 
 2.1.0
