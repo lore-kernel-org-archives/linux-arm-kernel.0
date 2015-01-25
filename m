@@ -1,96 +1,87 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 25 Jan 2015 18:46:00 +0100
-Subject: [GIT PULL] Allwinner clocks changes for 3.20
-Message-ID: <20150125174600.GA28225@lukather>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Sun, 25 Jan 2015 20:08:55 +0200
+Subject: [PATCH v3 0/4] ARM: Conexant Digicolor CX92755 SoC support
+In-Reply-To: <cover.1421219953.git.baruch@tkos.co.il>
+References: <cover.1421219953.git.baruch@tkos.co.il>
+Message-ID: <20150125180855.GA3148@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Hi ARM SoC maintainers,
 
-Here are the clock changes for the Allwinner platform for the 3.20
-merge window.
+On Wed, Jan 14, 2015 at 10:40:29AM +0200, Baruch Siach wrote:
+> This series adds initial support for the Conexant CX92755 SoC. The CX92755 is
+> one of the Digicolor series of SoCs, all sharing many of the same peripherals.
+> The code was tested on the CX92755 evaluation kit, AKA Equinox.
+> 
+> Uses attempting to try this code will most likely also want the UART/console
+> driver available from https://patchwork.kernel.org/patch/5515861/.
+
+Any chance of having this series merged for 3.20? Arnd has acked this already.
 
 Thanks,
-Maxime
+baruch
 
-The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
-
-  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-clocks-for-3.20
-
-for you to fetch changes up to 76820fcf7aa5a418b69cb7bed31b62d1feb1d6ad:
-
-  sunxi: clk: Set sun6i-pll1 n_start = 1 (2015-01-25 16:55:25 +0100)
-
-----------------------------------------------------------------
-Allwinner clock changes for 3.20
-
-The set of clock changes for the 3.20 merge window, with mostly:
-  - Some PLL fixes for the A80 and A31
-  - The MMC custom phase functions are removed, and moved over to the generic
-    phase API.
-  - Add the A80 MMC clocks
-
-Some DT changes slipped here as well, to preserve bisectability.
-
-----------------------------------------------------------------
-Chen-Yu Tsai (10):
-      clk: sunxi: Remove ahb1_sdram from sun6i/sun8i protected clocks list
-      clk: sunxi: unify sun6i AHB1 clock with proper PLL6 pre-divider
-      ARM: dts: sun6i: Unify ahb1 clock nodes
-      ARM: dts: sun8i: Unify ahb1 clock nodes
-      ARM: dts: sun8i: Add PLL6 and MBUS clock nodes
-      clk: sunxi: Fix factor clocks usage for sun9i core clocks
-      clk: sunxi: Propagate rate changes to parent for mux clocks
-      clk: sunxi: Add a common setup function for mmc module clocks
-      clk: sunxi: Add mod0 and mmc module clock support for A80
-      clk: sunxi: Add driver for A80 MMC config clocks/resets
-
-Hans de Goede (4):
-      clk: sunxi: Give sunxi_factors_register a registers parameter
-      clk: sunxi: Make the mod0 clk driver also a platform driver
-      clk: sunxi: rewrite sun9i_a80_get_pll4_factors()
-      sunxi: clk: Set sun6i-pll1 n_start = 1
-
-Maxime Ripard (4):
-      clk: sunxi: Rework MMC phase clocks
-      ARM: sunxi: dt: Add sample and output mmc clocks
-      mmc: sunxi: Convert MMC driver to the standard clock phase API
-      clk: sunxi: Remove custom phase function
-
- Documentation/devicetree/bindings/clock/sunxi.txt  |  43 +++-
- .../devicetree/bindings/mmc/sunxi-mmc.txt          |   8 +-
- arch/arm/boot/dts/sun4i-a10.dtsi                   |  72 ++++--
- arch/arm/boot/dts/sun5i-a10s.dtsi                  |  54 +++--
- arch/arm/boot/dts/sun5i-a13.dtsi                   |  44 ++--
- arch/arm/boot/dts/sun6i-a31.dtsi                   |  86 ++++---
- arch/arm/boot/dts/sun7i-a20.dtsi                   |  72 ++++--
- arch/arm/boot/dts/sun8i-a23.dtsi                   |  96 +++++---
- drivers/clk/sunxi/Makefile                         |   1 +
- drivers/clk/sunxi/clk-factors.c                    |  10 +-
- drivers/clk/sunxi/clk-factors.h                    |   7 +-
- drivers/clk/sunxi/clk-mod0.c                       | 224 +++++++++++++-----
- drivers/clk/sunxi/clk-sun8i-mbus.c                 |  13 +-
- drivers/clk/sunxi/clk-sun9i-core.c                 | 119 +++++++---
- drivers/clk/sunxi/clk-sun9i-mmc.c                  | 219 +++++++++++++++++
- drivers/clk/sunxi/clk-sunxi.c                      | 260 +++++++++++++++++----
- drivers/mmc/host/sunxi-mmc.c                       |  73 ++++--
- include/linux/clk/sunxi.h                          |  22 --
- 18 files changed, 1092 insertions(+), 331 deletions(-)
- create mode 100644 drivers/clk/sunxi/clk-sun9i-mmc.c
- delete mode 100644 include/linux/clk/sunxi.h
+> v3:
+>    * Remove earlyprintk from dts bootargs (Arnd Bergmann)
+> 
+>    * Move aliases from chip .dtsi to board .dts (Arnd Bergmann)
+> 
+>    * Add 'cpus' node (Mark Rutland)
+> 
+>    * Add commit log messages to all patches (Arnd Bergmann)
+> 
+>    * Add Arnd's ack
+> 
+>    * Split arch/arm stuff from the irq and timer drivers
+> 
+> v2:
+>    http://marc.info/?t=142074613900007&r=1&w=2
+> 
+>    * Remove .map_io assignment, debug_ll is enabled by default (Arnd Bergmann)
+> 
+>    * Migrate the irq driver to generic irq chip, simplifying the code somewhat
+>      (Arnd Bergmann)
+> 
+>    * Change the timer dt binding, so that the 'reg' property points to the
+>      first "Agent Communication" register. This should improve the chance of
+>      reusing this binding for other SoCs in this series.
+> 
+>    * Add the CONTROL() and COUNT() macros to the timer driver to make the code
+>      clearer.
+> 
+>    * Move arch/arm Kconfig changes from the clocksource driver patch to the
+>      base arch support patch to reduce dependency between them
+> 
+> v1:
+>    http://thread.gmane.org/gmane.linux.kernel/1855027
+> 
+> Baruch Siach (4):
+>   ARM: initial support for Conexant Digicolor CX92755 SoC
+>   ARM: digicolor: add low level debug support
+>   ARM: digicolor: add minimal device tree description
+>   ARM: devicetree: document supported Conexant Digicolor SoC
+> 
+>  .../devicetree/bindings/arm/digicolor.txt          |   6 ++
+>  arch/arm/Kconfig                                   |   2 +
+>  arch/arm/Kconfig.debug                             |  12 ++-
+>  arch/arm/boot/dts/Makefile                         |   1 +
+>  arch/arm/boot/dts/conexant_equinox.dts             |  74 ++++++++++++++
+>  arch/arm/boot/dts/cx92755.dtsi                     | 107 +++++++++++++++++++++
+>  arch/arm/include/debug/digicolor.S                 |  35 +++++++
+>  arch/arm/mach-digicolor/Kconfig                    |   5 +
+>  arch/arm/mach-digicolor/Makefile                   |   1 +
+>  arch/arm/mach-digicolor/digicolor.c                |  18 ++++
+>  10 files changed, 259 insertions(+), 2 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/digicolor.txt
+>  create mode 100644 arch/arm/boot/dts/conexant_equinox.dts
+>  create mode 100644 arch/arm/boot/dts/cx92755.dtsi
+>  create mode 100644 arch/arm/include/debug/digicolor.S
+>  create mode 100644 arch/arm/mach-digicolor/Kconfig
+>  create mode 100644 arch/arm/mach-digicolor/Makefile
+>  create mode 100644 arch/arm/mach-digicolor/digicolor.c
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150125/75f0a09a/attachment.sig>
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
