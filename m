@@ -1,62 +1,73 @@
-From: matthijsvanduin@gmail.com (Matthijs van Duin)
-Date: Sun, 25 Jan 2015 09:34:01 +0100
-Subject: [PATCH 4/4] ARM: dts: Add minimal support for dm8168-evm
-In-Reply-To: <20150123164756.GB7718@atomide.com>
-References: <1421192272-20754-1-git-send-email-tony@atomide.com>
- <1421192272-20754-5-git-send-email-tony@atomide.com>
- <20150117164709.GS18552@atomide.com>
- <CAALWOA-v=-KZ5W+Giwq9Z7rdA8JM2Q+zgqZPz-5sDrHD_b-_7A@mail.gmail.com>
- <20150117181404.GW18552@atomide.com>
- <CAALWOA-cdqPbLo4JvykGFODy2xUOozWg6OjzoGPLasJA022kJg@mail.gmail.com>
- <20150119172914.GY18552@atomide.com>
- <CAALWOA_54qoQgyCkGy10v+7-eQ87ddeCTG-dbP-P6x493HAswA@mail.gmail.com>
- <20150123164756.GB7718@atomide.com>
-Message-ID: <CAALWOA9F7UH5ORXdjyHAyekohZdSiE-+enNg5vsxOV5RgfqEdw@mail.gmail.com>
+From: wangzhou1@hisilicon.com (Zhou Wang)
+Date: Sun, 25 Jan 2015 18:53:14 +0800
+Subject: [PATCH v8 2/2] mtd: hisilicon: add device tree binding documentation
+In-Reply-To: <1422183194-10148-1-git-send-email-wangzhou1@hisilicon.com>
+References: <1422183194-10148-1-git-send-email-wangzhou1@hisilicon.com>
+Message-ID: <1422183194-10148-3-git-send-email-wangzhou1@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 January 2015 at 17:47, Tony Lindgren <tony@atomide.com> wrote:
-> That's interesting info thanks :) Yeah it seems dm814x was done after
-> dm816x and that clears at least some of the clockdomain confusion
-> that I though was TRM copy-paste issue.
+This patch adds the related dts binding document for Hisilicon 504 NAND
+controller.
 
-Well it is in some sense still a copy-paste issue when e.g.
-CM_SYSCLK18_CLKSEL refers to the "Audio PLL generated 32 Khz Clock"
-when there is none (it means the "Audio PLL A divider" output, which
-itself is in fact fed by the rtcdivider).
+Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
+---
+ .../devicetree/bindings/mtd/hisi504-nand.txt       | 47 ++++++++++++++++++++++
+ 1 file changed, 47 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mtd/hisi504-nand.txt
 
-Probably the sillyest copy-paste error is section 1.3.2.2.1 on the DSP
-interrupt controller, whose list of interrupts is from Freon/Primus
-(omap-L13x) which is not even remotely similar to the actual list in
-section 1.7.3.  Which reminds me, I also have a centaurus irqs
-spreadsheet which may be more convenient than the lists in the PDF and
-includes some that were censored from public docs:
-https://docs.google.com/spreadsheets/d/1O3IFMdAfLMWVBQ8rzLPexMbi4LDD5ECfpVYGF6HMv_0/view
-(note however that I consistently use 0-based indexing, regardless of
-the TRM which tends to vary on that)
-
-
-> > And there are gaps in the memory map suggesting maybe there were more
-> > submodules in earlier versions.  I know it differs from Netra's
-> > security subsystem since one module offset is different... hmm, now
-> > I'm curious. I'll see if I can find a moment to brush the dust off the
-> > evm816x here and make a quick inventory.
->
-> Should be usable for NFSroot with all the patches I've sent using the
-> ti u-boot and and appended DTB uImage. Sorry not all of it is yet in
-> Linux next though
-
-With "make a quick inventory" I meant peeking and poking around in the
-subsystem using JTAG, which is generally better done without any OS
-running on the target :-)  I don't actually have any real motivation
-to run linux on the evm816x; we selected the DM814x for our target
-(before it became clear support for it had basically dropped like a
-brick), though it may still take a bit before I have time to see how
-far I can get with booting Linux on it.
-
-The inventory of SecSS on Netra yielded exactly the same list of
-accelerators and other peripherals as on Centaurus btw. The only
-changes seem to be in subsystem control stuff. I was not succesful in
-attaching to the secM3 via JTAG though, but this may have been an
-issue with the target config since Code Composer was being more
-annoying than usual about it.
+diff --git a/Documentation/devicetree/bindings/mtd/hisi504-nand.txt b/Documentation/devicetree/bindings/mtd/hisi504-nand.txt
+new file mode 100644
+index 0000000..2e35f06
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mtd/hisi504-nand.txt
+@@ -0,0 +1,47 @@
++Hisilicon Hip04 Soc NAND controller DT binding
++
++Required properties:
++
++- compatible:          Should be "hisilicon,504-nfc".
++- reg:                 The first contains base physical address and size of
++                       NAND controller's registers. The second contains base
++                       physical address and size of NAND controller's buffer.
++- interrupts:          Interrupt number for nfc.
++- nand-bus-width:      See nand.txt.
++- nand-ecc-mode:       Support none and hw ecc mode.
++- #address-cells:      Partition address, should be set 1.
++- #size-cells:         Partition size, should be set 1.
++
++Optional properties:
++
++- nand-ecc-strength:   Number of bits to correct per ECC step.
++- nand-ecc-step-size:  Number of data bytes covered by a single ECC step.
++
++The following ECC strength and step size are currently supported:
++
++ - nand-ecc-strength = <16>, nand-ecc-step-size = <1024>
++
++Flash chip may optionally contain additional sub-nodes describing partitions of
++the address space. See partition.txt for more detail.
++
++Example:
++
++	nand: nand at 4020000 {
++		compatible = "hisilicon,504-nfc";
++		reg = <0x4020000 0x10000>, <0x5000000 0x1000>;
++		interrupts = <0 379 4>;
++		nand-bus-width = <8>;
++		nand-ecc-mode = "hw";
++		nand-ecc-strength = <16>;
++		nand-ecc-step-size = <1024>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		partition at 0 {
++			label = "nand_text";
++			reg = <0x00000000 0x00400000>;
++		};
++
++		...
++
++	};
+-- 
+1.9.1
