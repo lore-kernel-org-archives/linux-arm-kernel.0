@@ -1,101 +1,67 @@
 From: peter@hurleysoftware.com (Peter Hurley)
-Date: Sun, 25 Jan 2015 14:44:54 -0500
-Subject: [PATCH 4/4] tty: Remove external interface for tty_set_termios()
+Date: Sun, 25 Jan 2015 14:44:52 -0500
+Subject: [PATCH 2/4] serial: 8250_omap: Use UPSTAT_AUTORTS for RTS handling
 In-Reply-To: <1422215094-3216-1-git-send-email-peter@hurleysoftware.com>
 References: <1422215094-3216-1-git-send-email-peter@hurleysoftware.com>
-Message-ID: <1422215094-3216-5-git-send-email-peter@hurleysoftware.com>
+Message-ID: <1422215094-3216-3-git-send-email-peter@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tty_set_termios() is an internal helper intended for file scope use.
+Commit 88838d3112702 ("serial: omap_8250: Fix RTS handling") fixed
+RTS pin control when in autoRTS mode.
 
-UART drivers which are capable of driving the RTS pin must
-properly handle the tiocmset() method, regardless of termios settings.
-A failure to do so is a UART driver bug and should be fixed there.
-Do not use this interface to workaround UART driver bugs.
+New support added in "serial: core: Rework hw-assisted flow control support"
+enables a much simpler approach; rather than masking out autoRTS
+whenever writing the EFR register, use the UPSTAT_* mode to determine if
+autoRTS should be enabled when raising RTS (in omap8250_set_mctrl()).
 
-Cc: Marcel Holtmann <marcel@holtmann.org>
-Cc: Johan Hedberg <johan.hedberg@gmail.com>
-Cc: <linux-bluetooth@vger.kernel.org>
 Signed-off-by: Peter Hurley <peter@hurleysoftware.com>
 ---
- drivers/bluetooth/hci_ath.c | 15 ++-------------
- drivers/tty/tty_ioctl.c     |  3 +--
- include/linux/tty.h         |  1 -
- 3 files changed, 3 insertions(+), 16 deletions(-)
+ drivers/tty/serial/8250/8250_omap.c | 16 +++++++---------
+ 1 file changed, 7 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/bluetooth/hci_ath.c b/drivers/bluetooth/hci_ath.c
-index 2ff6dfd..9c4dcf4 100644
---- a/drivers/bluetooth/hci_ath.c
-+++ b/drivers/bluetooth/hci_ath.c
-@@ -51,33 +51,22 @@ struct ath_struct {
- 
- static int ath_wakeup_ar3k(struct tty_struct *tty)
- {
--	struct ktermios ktermios;
- 	int status = tty->driver->ops->tiocmget(tty);
- 
- 	if (status & TIOCM_CTS)
- 		return status;
- 
--	/* Disable Automatic RTSCTS */
--	ktermios = tty->termios;
--	ktermios.c_cflag &= ~CRTSCTS;
--	tty_set_termios(tty, &ktermios);
--
- 	/* Clear RTS first */
--	status = tty->driver->ops->tiocmget(tty);
-+	tty->driver->ops->tiocmget(tty);
- 	tty->driver->ops->tiocmset(tty, 0x00, TIOCM_RTS);
- 	mdelay(20);
- 
- 	/* Set RTS, wake up board */
--	status = tty->driver->ops->tiocmget(tty);
-+	tty->driver->ops->tiocmget(tty);
- 	tty->driver->ops->tiocmset(tty, TIOCM_RTS, 0x00);
- 	mdelay(20);
- 
- 	status = tty->driver->ops->tiocmget(tty);
--
--	/* Enable Automatic RTSCTS */
--	ktermios.c_cflag |= CRTSCTS;
--	status = tty_set_termios(tty, &ktermios);
--
- 	return status;
+diff --git a/drivers/tty/serial/8250/8250_omap.c b/drivers/tty/serial/8250/8250_omap.c
+index 4473881..59d6e90 100644
+--- a/drivers/tty/serial/8250/8250_omap.c
++++ b/drivers/tty/serial/8250/8250_omap.c
+@@ -120,10 +120,11 @@ static void omap8250_set_mctrl(struct uart_port *port, unsigned int mctrl)
+ 	 */
+ 	lcr = serial_in(up, UART_LCR);
+ 	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
+-	if (mctrl & TIOCM_RTS)
+-		serial_out(up, UART_EFR, priv->efr);
++	if ((mctrl & TIOCM_RTS) && (port->status & UPSTAT_AUTORTS))
++		priv->efr |= UART_EFR_RTS;
+ 	else
+-		serial_out(up, UART_EFR, priv->efr & ~UART_EFR_RTS);
++		priv->efr &= ~UART_EFR_RTS;
++	serial_out(up, UART_EFR, priv->efr);
+ 	serial_out(up, UART_LCR, lcr);
  }
  
-diff --git a/drivers/tty/tty_ioctl.c b/drivers/tty/tty_ioctl.c
-index d73f695..69fc0b8 100644
---- a/drivers/tty/tty_ioctl.c
-+++ b/drivers/tty/tty_ioctl.c
-@@ -533,7 +533,7 @@ EXPORT_SYMBOL(tty_termios_hw_change);
-  *	Locking: termios_rwsem
-  */
+@@ -272,10 +273,7 @@ static void omap8250_restore_regs(struct uart_8250_port *up)
+ 	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
+ 	serial_dl_write(up, priv->quot);
  
--int tty_set_termios(struct tty_struct *tty, struct ktermios *new_termios)
-+static int tty_set_termios(struct tty_struct *tty, struct ktermios *new_termios)
- {
- 	struct ktermios old_termios;
- 	struct tty_ldisc *ld;
-@@ -566,7 +566,6 @@ int tty_set_termios(struct tty_struct *tty, struct ktermios *new_termios)
- 	up_write(&tty->termios_rwsem);
- 	return 0;
- }
--EXPORT_SYMBOL_GPL(tty_set_termios);
+-	if (up->port.mctrl & TIOCM_RTS)
+-		serial_out(up, UART_EFR, priv->efr);
+-	else
+-		serial_out(up, UART_EFR, priv->efr & ~UART_EFR_RTS);
++	serial_out(up, UART_EFR, priv->efr);
  
- /**
-  *	set_termios		-	set termios values for a tty
-diff --git a/include/linux/tty.h b/include/linux/tty.h
-index 0992238..8c316b6 100644
---- a/include/linux/tty.h
-+++ b/include/linux/tty.h
-@@ -491,7 +491,6 @@ static inline speed_t tty_get_baud_rate(struct tty_struct *tty)
+ 	/* Configure flow control */
+ 	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
+@@ -424,9 +422,9 @@ static void omap_8250_set_termios(struct uart_port *port,
+ 	up->port.status &= ~(UPSTAT_AUTOCTS | UPSTAT_AUTORTS | UPSTAT_AUTOXOFF);
  
- extern void tty_termios_copy_hw(struct ktermios *new, struct ktermios *old);
- extern int tty_termios_hw_change(struct ktermios *a, struct ktermios *b);
--extern int tty_set_termios(struct tty_struct *tty, struct ktermios *kt);
- 
- extern struct tty_ldisc *tty_ldisc_ref(struct tty_struct *);
- extern void tty_ldisc_deref(struct tty_ldisc *);
+ 	if (termios->c_cflag & CRTSCTS && up->port.flags & UPF_HARD_FLOW) {
+-		/* Enable AUTORTS and AUTOCTS */
++		/* Enable AUTOCTS (autoRTS is enabled when RTS is raised) */
+ 		up->port.status |= UPSTAT_AUTOCTS | UPSTAT_AUTORTS;
+-		priv->efr |= UART_EFR_CTS | UART_EFR_RTS;
++		priv->efr |= UART_EFR_CTS;
+ 	} else	if (up->port.flags & UPF_SOFT_FLOW) {
+ 		/*
+ 		 * IXON Flag:
 -- 
 2.2.2
