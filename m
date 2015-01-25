@@ -1,17 +1,16 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 25 Jan 2015 22:23:15 +0100
+From: sre@kernel.org (Sebastian Reichel)
+Date: Sun, 25 Jan 2015 22:49:48 +0100
 Subject: [PATCH 0/4] Drop legacy support for omap3517
-In-Reply-To: <2871852.qm0MoZvdlF@wuerfel>
+In-Reply-To: <20150125212015.GA14307@amd>
 References: <1421171865-5209-1-git-send-email-tony@atomide.com>
+ <20150113204219.GJ2419@atomide.com>
  <20150115142536.GC512@earth.universe> <201501241300.00723@pali>
- <2871852.qm0MoZvdlF@wuerfel>
-Message-ID: <20150125212315.GB14307@amd>
+ <20150125212015.GA14307@amd>
+Message-ID: <20150125214947.GB20695@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat 2015-01-24 23:08:00, Arnd Bergmann wrote:
-> On Saturday 24 January 2015 13:00:00 Pali Roh?r wrote:
-> > 
+On Sun, Jan 25, 2015 at 10:22:58PM +0100, Pavel Machek wrote:
 > > Another regression for DT setup (which does not occur for board code):
 > > 
 > > omap_hsmmc driver does not export slot_name sysfs entry because
@@ -21,19 +20,19 @@ On Sat 2015-01-24 23:08:00, Arnd Bergmann wrote:
 > > DT is needed.
 > > 
 > > Here is simple patch which fix this problem:
-> > 
 > 
-> The sysfs file only exists for the two OMAP drivers, and the naming
-> is used only by board-n8x0, board-rx51 and board-omap3logic.
+> Thanks!
 > 
-> It may be better to add a board-specific hack for these to keep the
-> existing user space working but not spread the use of this file anywhere
-> else.
+> Does it need line into Documentation/devicetree/ somewhere?
 
-I'd guess this is going to be useful on more than just n900, and thus
-is worth supporting generically...
+Documentation/devicetree/bindings/mmc/mmc.txt (generic)
+Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt (omap specific)
 
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150125/2ee8f6e0/attachment-0001.sig>
