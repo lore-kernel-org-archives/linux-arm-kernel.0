@@ -1,217 +1,27 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sun, 25 Jan 2015 00:37:44 +0100 (CET)
-Subject: [RFC PATCH v2 2/5] irq: Allow interrupts to routed to NMI (or
- similar)
-In-Reply-To: <1421859822-3621-3-git-send-email-daniel.thompson@linaro.org>
-References: <1421166931-14134-1-git-send-email-daniel.thompson@linaro.org>
- <1421859822-3621-1-git-send-email-daniel.thompson@linaro.org>
- <1421859822-3621-3-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <alpine.DEB.2.11.1501242342370.5526@nanos>
+From: davem@davemloft.net (David Miller)
+Date: Sat, 24 Jan 2015 17:17:39 -0800 (PST)
+Subject: [PATCH v2 0/4] net: stmmac: dwmac-rk: Fix phy regulator issues
+In-Reply-To: <1421737780-1533-1-git-send-email-romain.perier@gmail.com>
+References: <1421737780-1533-1-git-send-email-romain.perier@gmail.com>
+Message-ID: <20150124.171739.2001690287677703044.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 21 Jan 2015, Daniel Thompson wrote:
-> @@ -307,6 +307,7 @@ static inline irq_hw_number_t irqd_to_hwirq(struct irq_data *d)
->   * @irq_eoi:		end of interrupt
->   * @irq_set_affinity:	set the CPU affinity on SMP machines
->   * @irq_retrigger:	resend an IRQ to the CPU
-> + * @irq_set_nmi_routing:set whether interrupt can act like NMI
+From: Romain Perier <romain.perier@gmail.com>
+Date: Tue, 20 Jan 2015 07:09:36 +0000
 
--ENOPARSE
+> This series fixes few issues in dwmac-rk:
+> 
+> 1. Voltage settings was hardcoded into the driver for the phy regulator.
+>    The driver now uses the default voltage settings found in the devicetree,
+>    which are applied throught the regulator framework.
+> 2. The regulator name used to power on or power off the phy was put in the devicetree
+>    variable "phy_regulator", which is not standard and added a lot of code for nothing.
+>    The driver now uses the devicetree property "phy-supply" and the corresponding functions
+>    to manipulate this regulator.
+> 
+> The corresponding devicetree files are also updated. As this new binding for
+> rk3288 has not been released with any official kernel yet (not until 3.20),
+> I don't need to care about keeping compatibility with the old non standard property.
 
-> +int handle_nmi_irq_desc(unsigned int irq, struct irq_desc *desc);
-
-And that's global for what?
-
-> +int handle_nmi_irq(unsigned int irq);
-> +
->  #endif
-> diff --git a/kernel/irq/irqdesc.c b/kernel/irq/irqdesc.c
-> index 99793b9b6d23..876d01a6ad74 100644
-> --- a/kernel/irq/irqdesc.c
-> +++ b/kernel/irq/irqdesc.c
-> @@ -646,3 +646,51 @@ unsigned int kstat_irqs_usr(unsigned int irq)
->  	irq_unlock_sparse();
->  	return sum;
->  }
-> +
-> +/**
-> + * handle_nmi_irq_desc - Call an NMI handler
-> + * @irq:	the interrupt number
-> + * @desc:	the interrupt description structure for this irq
-> + *
-> + * To the caller this function is similar in scope to generic_handle_irq_desc()
-> + * but without any attempt to manage the handler flow. We assume that if the
-
-We assume nothing. We set clear rules and if possible we enforce them.
-
-> + * flow is complex then NMI routing is a bad idea; the caller is expected to
-> + * handle the ack, clear, mask and unmask issues if necessary.
-
-And the caller is supposed to do that in which way?
-
-> + * Note that this function does not take any of the usual locks. Instead
-> + * is relies on NMIs being prohibited from sharing interrupts (i.e.
-> + * there will be exactly one irqaction) and that no call to free_irq()
-> + * will be made whilst the handler is running.
-
-And how do you guarantee that? Not at all AFAICT.
-
-> + */
-> +int handle_nmi_irq_desc(unsigned int irq, struct irq_desc *desc)
-> +{
-> +	struct irqaction *action = desc->action;
-> +
-> +	BUG_ON(action->next);
-> +
-> +	return action->handler(irq, action->dev_id);
-> +}
-> +EXPORT_SYMBOL_GPL(handle_nmi_irq_desc);
-
-You seem to have a strong determination to add EXPORT_SYMBOL_GPL to
-everything and some more. How is a module supposed to call this?
-
-> +/**
-> + * handle_nmi - Call an NMI handler
-> + * @irq:	the interrupt number
-> + * @desc:	the interrupt description structure for this irq
-> + *
-> + * To the caller this function is similar in scope to generic_handle_irq(),
-> + * see handle_nmi_irq_desc for more detail.
-
-I don't see a detail here which connects that in any way to
-generic_handle_irq().
-
-> + */
-> +int handle_nmi_irq(unsigned int irq)
-> +{
-> +	/*
-> +	 * irq_to_desc is either simple arithmetic (no locking) or a radix
-> +	 * tree lookup (RCU). Both are safe from NMI.
-> +	 */
-> +	struct irq_desc *desc = irq_to_desc(irq);
-> +
-> +	if (!desc)
-> +		return -EINVAL;
-> +	handle_nmi_irq_desc(irq, desc);
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(handle_nmi_irq);
-
-Sigh. Why would any low level entry handler live in a module?
-
-> diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
-> index 80692373abd6..96212a0493c0 100644
-> --- a/kernel/irq/manage.c
-> +++ b/kernel/irq/manage.c
-> @@ -571,6 +571,17 @@ int can_request_irq(unsigned int irq, unsigned long irqflags)
->  	return canrequest;
->  }
-
-Of course, because the function you copied has no documentation, you are
-supposed to omit it as well, right?
-  
-> +int __irq_set_nmi_routing(struct irq_desc *desc, unsigned int irq,
-
-And irq is used for what? Just because the function you copied does
-not use it either?
-
-And why is it global? Just because the function you copied is global
-as well?
-
-> +			   unsigned int nmi)
-> +{
-> +	struct irq_chip *chip = desc->irq_data.chip;
-> +
-> +	if (!chip || !chip->irq_set_nmi_routing)
-> +		return -EINVAL;
-> +
-> +	return chip->irq_set_nmi_routing(&desc->irq_data, nmi);
-> +}
-> +
->  int __irq_set_trigger(struct irq_desc *desc, unsigned int irq,
->  		      unsigned long flags)
->  {
-> @@ -966,6 +977,16 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
->  
->  	if (desc->irq_data.chip == &no_irq_chip)
->  		return -ENOSYS;
-> +
-> +	if (new->flags & __IRQF_NMI) {
-> +		if (new->flags & IRQF_SHARED)
-> +			return -EINVAL;
-> +
-> +		ret = arch_filter_nmi_handler(new->handler);
-
-See rant below.
-
-> +		if (ret < 0)
-> +			return ret;
-> +	}
-> +
->  	if (!try_module_get(desc->owner))
->  		return -ENODEV;
->  
-> @@ -1153,6 +1174,19 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
->  
->  		init_waitqueue_head(&desc->wait_for_threads);
->  
-> +		if (new->flags & __IRQF_NMI) {
-> +			ret = __irq_set_nmi_routing(desc, irq, true);
-> +			if (ret != 1)
-> +				goto out_mask;
-
-Another set of magic return values which are completely undocumented
-and follow the windows programming style. What's wrong with 0 on success?
-
-> +		} else {
-> +			ret = __irq_set_nmi_routing(desc, irq, false);
-> +			if (ret == 1) {
-> +				pr_err("Failed to disable NMI routing for irq %d\n",
-> +				       irq);
-
-Can we add a bit more unreadable conditions here?
-
-What's wrong with
-
-      	ret = irq_setup_nmi(desc, new->flags & __IRQF_NMI);
-      	if (ret) {
-	        pr_err("some useful info for both cases");
-		goto out;
-	}
-
-????
-
-> +
-> +/*
-> + * Allows architectures to deny requests to set __IRQF_NMI.
-> + *
-> + * Typically this is used to restrict the use of NMI handlers that do not
-> + * originate from arch code. However the default implementation is
-> + * extremely permissive.
-> + */
-> +int __weak arch_filter_nmi_handler(irq_handler_t handler)
-
-Your explanation above is completely useless and the default is wrong
-as well.
-
-What is this function going to solve? Nothing, AFAICT.
-
-Why is handler a proper decision criteria? How are the decisions going
-to look like?
-
-Looking at your proposed ARM implementation just make me ROTFL. You
-whitelist the perf handler. So any request for a random irq number
-with the perf handler as a target will succeed as long as that irq
-line can be switched to NMI mode.
-
-Before you send another iteration of this, can you please sit down and
-do a proper write up of the goals and the design to reach those
-goals?
-
-I'm certainly not going to waste my time and look at another cobbled
-together 'works for me' hackery.
-
-Thanks,
-
-	tglx
+Series applied to net-next, thanks.
