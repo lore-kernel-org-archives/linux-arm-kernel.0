@@ -1,56 +1,120 @@
-From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Sun, 25 Jan 2015 14:30:24 +0100
-Subject: [PATCH 08/12] pm: at91: rename file name: pm_slowclock.S
- -->pm_suspend.S
-In-Reply-To: <20150123231738.GB32318@piout.net>
-References: <1421741825-18226-1-git-send-email-wenyou.yang@atmel.com>
- <1421741825-18226-9-git-send-email-wenyou.yang@atmel.com>
- <20150123191719.GA29601@gradator.net>
- <20150123231738.GB32318@piout.net>
-Message-ID: <20150125133024.GA27125@gradator.net>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sun, 25 Jan 2015 15:32:42 +0200
+Subject: [PATCH v4 1/6] of: iommu: add ptr to OF node arg to
+ of_iommu_configure()
+In-Reply-To: <1422052359-12384-2-git-send-email-m-karicheri2@ti.com>
+References: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
+ <1422052359-12384-2-git-send-email-m-karicheri2@ti.com>
+Message-ID: <4711364.TTK5TCBdiy@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Alexandre,
+Hi Murali,
 
+Thank you for the patch.
 
-On Sat, Jan 24, 2015 at 12:17:38AM +0100, Alexandre Belloni wrote:
+On Friday 23 January 2015 17:32:34 Murali Karicheri wrote:
+> Function of_iommu_configure() is called from of_dma_configure() to
+> setup iommu ops using DT property. This API is currently used for
+> platform devices for which DMA configuration (including iommu ops)
+> may come from device's parent. To extend this functionality for PCI
+> devices, this API need to take a parent node ptr as an argument
+> instead of assuming device's parent. This is needed since for PCI, the
+> dma configuration may be defined in the DT node of the root bus bridge's
+> parent device. Currently only dma-range is used for PCI and iommu is not
+> supported. So return error if the device is PCI.
 > 
-> This is a rework, what is part of linux-3.10-at91 and not yet present in
-> mainline should be part of a following series. I would prefer not mixing
-> reworks and "new" functionalities (they have been present in the atmel
-> tree for a while but never mainlined).
+> Cc: Joerg Roedel <joro@8bytes.org>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> 
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> ---
+>  drivers/iommu/of_iommu.c |   10 ++++++++--
+>  drivers/of/platform.c    |    2 +-
+>  include/linux/of_iommu.h |    6 ++++--
+>  3 files changed, 13 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+> index af1dc6a..439235b 100644
+> --- a/drivers/iommu/of_iommu.c
+> +++ b/drivers/iommu/of_iommu.c
+> @@ -133,19 +133,25 @@ struct iommu_ops *of_iommu_get_ops(struct device_node
+> *np) return ops;
+>  }
+> 
+> -struct iommu_ops *of_iommu_configure(struct device *dev)
+> +struct iommu_ops *of_iommu_configure(struct device *dev,
+> +				     struct device_node *iommu_np)
+>  {
+>  	struct of_phandle_args iommu_spec;
+>  	struct device_node *np;
+>  	struct iommu_ops *ops = NULL;
+>  	int idx = 0;
+> 
+> +	if (dev_is_pci(dev)) {
+> +		dev_err(dev, "iommu is currently not supported for PCI\n");
+> +		return NULL;
+> +	}
+> +
+>  	/*
+>  	 * We don't currently walk up the tree looking for a parent IOMMU.
+>  	 * See the `Notes:' section of
+>  	 * Documentation/devicetree/bindings/iommu/iommu.txt
+>  	 */
 
-I agree, I just didn't know a new series will follow, maybe I missed 
-this point.
+Wouldn't it be better to fix this rather than passing the device node pointer 
+to the function ? The solution would be more generic.
 
-Maybe I am a bit too picky (or boring: if I am, please told me), but 
-this series by itself adds regression to all users of >= 9x5 boards 
-(sama5, ?) because it merges MEM target and MEM+SLOW_CLOCK target, which 
-used to be too different target states, not selectable at runtime indeed 
-but this is still in practice two different target states. Note that I 
-am not saying that MEM target and MEM+SLOW_CLOCK target should not be 
-merged, they should, absolutely ;-). For >= 9x5 boards (sama5, ?), MEM 
-target works and MEM+SLOW_CLOCK target does not work, MEM and 
-MEM+SLOW_CLOCK merge breaks MEM target for those boards.
+> -	while (!of_parse_phandle_with_args(dev->of_node, "iommus",
+> +	while (!of_parse_phandle_with_args(iommu_np, "iommus",
+>  					   "#iommu-cells", idx,
+>  					   &iommu_spec)) {
+>  		np = iommu_spec.np;
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> index a54ec10..7675b79 100644
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -196,7 +196,7 @@ static void of_dma_configure(struct device *dev)
+>  	dev_dbg(dev, "device is%sdma coherent\n",
+>  		coherent ? " " : " not ");
+> 
+> -	iommu = of_iommu_configure(dev);
+> +	iommu = of_iommu_configure(dev, dev->of_node);
+>  	dev_dbg(dev, "device is%sbehind an iommu\n",
+>  		iommu ? " " : " not ");
+> 
+> diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
+> index 16c7554..a97e5bd 100644
+> --- a/include/linux/of_iommu.h
+> +++ b/include/linux/of_iommu.h
+> @@ -12,7 +12,8 @@ extern int of_get_dma_window(struct device_node *dn, const
+> char *prefix, size_t *size);
+> 
+>  extern void of_iommu_init(void);
+> -extern struct iommu_ops *of_iommu_configure(struct device *dev);
+> +extern struct iommu_ops *of_iommu_configure(struct device *dev,
+> +					struct device_node *iommu_np);
+> 
+>  #else
+> 
+> @@ -24,7 +25,8 @@ static inline int of_get_dma_window(struct device_node
+> *dn, const char *prefix, }
+> 
+>  static inline void of_iommu_init(void) { }
+> -static inline struct iommu_ops *of_iommu_configure(struct device *dev)
+> +static inline struct iommu_ops *of_iommu_configure(struct device *dev,
+> +					 struct device_node *iommu_np)
+>  {
+>  	return NULL;
+>  }
 
-There is however a good news !, at91_pm_verify_clocks() used to be 
-called for MEM target without considering if it was MEM (~STANDBY) or 
-MEM+SLOW_CLOCK. It means that all MEM target users can with very good 
-chance go to a deeper sleep state without issue because 
-at91_pm_verify_clocks() successfully checked on those boards and is why 
-we can merge MEM and MEM+SLOW_CLOCK without adding a regression.
+-- 
+Regards,
 
-Care should be taken to pull-request at the same time both the rework 
-and the above cited following series about slow clock support for all 
-known boards so we don't break MEM target for a release cycle.
-
-
-> I would say that PM on 9x5, n12 and sama5 in mainline is clearly not 
-> well tested and is lagging behind the atmel tree.
-
-Well, at the current mainline state, everything works fine for me except 
-slow clock mode, I thoroughly checked everything else.
-
-
-Sylvain
+Laurent Pinchart
