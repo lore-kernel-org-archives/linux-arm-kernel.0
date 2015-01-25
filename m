@@ -1,32 +1,66 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 25 Jan 2015 19:23:12 +0100
-Subject: [PATCH 3/6] power/reset: Remove sun6i reboot driver
-In-Reply-To: <1422209622-31994-3-git-send-email-linux@roeck-us.net>
-References: <1422209622-31994-1-git-send-email-linux@roeck-us.net>
- <1422209622-31994-3-git-send-email-linux@roeck-us.net>
-Message-ID: <20150125182312.GO8470@lukather>
+From: tsahee@annapurnalabs.com (Tsahee Zidenberg)
+Date: Sun, 25 Jan 2015 20:27:36 +0200
+Subject: [PATCH 0/4] Introducing the Alpine platform.
+Message-ID: <54c53598.oxirKWtRGTrf8i3s%tsahee@annapurnalabs.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 25, 2015 at 10:13:39AM -0800, Guenter Roeck wrote:
-> sun6i restart is now handled by its watchdog driver directly,
-> so this driver is no longer needed.
-> 
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+Annapurna Labs(TM) is a technology company providing innovative solutions
+including chips, software, and systems for the datacenter and enterprise
+infrastructure.
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Alpine(TM) is one of Annapurna Labs? chip products targeting storage and
+networking applications. It is a complete Platform-On-Chip,
+integrating 2-4 cortex-A15 cores and multiple innovations to provide
+a seamless networking and storage fabric for enterprise and datacenter
+equipment.
 
-Thanks!
-Maxime
+This patchset provides initial support for the Alpine platform.
+
+Patch #1 contains minimal, single-cpu architecture support.
+
+Patch #2 adds early-debug capabilities via Alpine UART 0.
+
+Patch #3 adds smp-support and a secondary cpu enable-method for the platform.
+
+Patch #4 provides a device-tree for quad-core Alpine, along with documentation
+for the available device-tree nodes.
+
+The patchset was built on Linux 3.19-rc3,
+tested with multi_v7_defconfig, adding CONFIG_ARCH_ALPINE
+
+Tsahee Zidenberg (4):
+  ARM: Alpine: Initial support for Alpine platform
+  ARM: Alpine: early-debug print support
+  ARM: Alpine: smp support
+  ARM: dts: Add initial support for Alpine platform
+
+ .../bindings/arm/annapurna-labs,alpine.txt         |  96 +++++++++++
+ .../cpu-enable-method/annapurna-labs,alpine-smp    |  64 ++++++++
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/Kconfig                                   |   2 +
+ arch/arm/Kconfig.debug                             |  12 +-
+ arch/arm/Makefile                                  |   1 +
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/alpine.dts                       | 181 +++++++++++++++++++++
+ arch/arm/mach-alpine/Kconfig                       |   9 +
+ arch/arm/mach-alpine/Makefile                      |   6 +
+ arch/arm/mach-alpine/alpine_cpu_pm.c               |  68 ++++++++
+ arch/arm/mach-alpine/alpine_cpu_pm.h               |  26 +++
+ arch/arm/mach-alpine/alpine_cpu_resume.h           |  38 +++++
+ arch/arm/mach-alpine/alpine_machine.c              |  28 ++++
+ arch/arm/mach-alpine/platsmp.c                     |  48 ++++++
+ 15 files changed, 581 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/annapurna-labs,alpine.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/cpu-enable-method/annapurna-labs,alpine-smp
+ create mode 100644 arch/arm/boot/dts/alpine.dts
+ create mode 100644 arch/arm/mach-alpine/Kconfig
+ create mode 100644 arch/arm/mach-alpine/Makefile
+ create mode 100644 arch/arm/mach-alpine/alpine_cpu_pm.c
+ create mode 100644 arch/arm/mach-alpine/alpine_cpu_pm.h
+ create mode 100644 arch/arm/mach-alpine/alpine_cpu_resume.h
+ create mode 100644 arch/arm/mach-alpine/alpine_machine.c
+ create mode 100644 arch/arm/mach-alpine/platsmp.c
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150125/128b8f3e/attachment.sig>
+1.9.1
