@@ -1,56 +1,61 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 25 Jan 2015 17:06:25 +0100
-Subject: [PATCH v2 6/9] ARM: dts: sunxi: Add usb3_vbus regulator to
- common regulators dtsi
-In-Reply-To: <1422188530-1794-7-git-send-email-wens@csie.org>
-References: <1422188530-1794-1-git-send-email-wens@csie.org>
- <1422188530-1794-7-git-send-email-wens@csie.org>
-Message-ID: <20150125160625.GH8470@lukather>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Sun, 25 Jan 2015 11:11:28 -0500
+Subject: [GIT PULL] qcom SoC changes for v3.20
+In-Reply-To: <CAF6AEGuLu+KYwBX59T4-SThPDJCYwKDU6_qWf7d80Dae6FAmbQ@mail.gmail.com>
+References: <alpine.DEB.2.02.1501191226010.2973@galak-ubuntu.qualcomm.com>
+ <20150122011521.GA31815@quad.lixom.net>
+ <D177DF12-0F31-49CF-B98B-9FAC23AAB24C@codeaurora.org>
+ <CAOesGMipp=Odc-cWvrba0e1pd1X7O+PKNH+WoM3fG4xX2GRFuA@mail.gmail.com>
+ <DBE63F76-D4CB-49D5-90C6-642CFCA7687F@codeaurora.org>
+ <CAOesGMht4VaNgwr5rOyher081Vk7w_HKTMeOm677rEAkOcCPAg@mail.gmail.com>
+ <CAF6AEGuLu+KYwBX59T4-SThPDJCYwKDU6_qWf7d80Dae6FAmbQ@mail.gmail.com>
+Message-ID: <CAOw6vbJpfp-ViGXcS7vwm-1SWQmq=LhGkN=PmhKO9ky1qUJ2mA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 25, 2015 at 08:22:07PM +0800, Chen-Yu Tsai wrote:
-> Some SoCs have a total of 4 possible USB controllers. One such example
-> is the A80, which has one USB3 dual role device and 3 EHCI/OHCI pairs.
-> 
-> Add a common VBUS regulator for the last host controller.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  arch/arm/boot/dts/sunxi-common-regulators.dtsi | 10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sunxi-common-regulators.dtsi b/arch/arm/boot/dts/sunxi-common-regulators.dtsi
-> index e02baa66b33c..97fe8d73c4f7 100644
-> --- a/arch/arm/boot/dts/sunxi-common-regulators.dtsi
-> +++ b/arch/arm/boot/dts/sunxi-common-regulators.dtsi
-> @@ -130,6 +130,16 @@
->  		status = "disabled";
->  	};
->  
-> +	reg_usb3_vbus: usb3-vbus {
-> +		compatible = "regulator-fixed";
-> +		pinctrl-names = "default";
-> +		regulator-name = "usb3-vbus";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		enable-active-high;
-> +		status = "disabled";
-> +	};
-> +
+On Sun, Jan 25, 2015 at 11:03 AM, Rob Clark <robdclark@gmail.com> wrote:
+> On Fri, Jan 23, 2015 at 1:43 PM, Olof Johansson <olof@lixom.net> wrote:
+>>>> I'd be OK with merging this, send a request and tag. Would that let
+>>>> the DRM folks make progress too?
+>>>
+>>> Will do, I don?t think it will address the DRM folks needs as they need access to make firmware calls from the DRM driver.
+>>>
+>>>> If you need a common place for this, drivers/firmware seems like a
+>>>> better home than drivers/soc.
+>>>
+>>> Agreed, what?s you take than on moving to use firmware_ops as defined in arch/arm and extended it or just leaving this as a qcom specific firmware interface?
+>>
+>> Are there any other SoCs out there with similar requirements on
+>> firmware interfaces? I think most of them so far have been fairly
+>> simple compared to the complexity of the qualcomm firmware.
+>
+> I think the question is probably "how do downstream HDCP
+> implementations work on these other SoCs"..   so far, I think qcom is
+> the first to try to upstream HDCP support, but I know there have to be
+> at least a few downstream implementations lurking out there.
+>
 
-If the A80 is the only user so far, maybe that would make more sense
-to have it in the A80 dtsi? Especially since this regulator doesn't
-really do anything else than reg_vcc5v0.
+This isn't a concern on exynos, fwiw.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150125/fde1910d/attachment.sig>
+> And I'm sure as some others come out of the woodwork there will be
+> some things to refactor.. like possibly shared helpers for
+> implementing the state machine, etc.
+>
+
+Shared helpers would be useful to have once there's another hdcp
+implementation upstream. I haven't looked at our downstream hdcp
+implementation in a while, so it's difficult to say how much could be
+factored out. It's on my TODO stack... somewhere.
+
+Sean
+
+
+> BR,
+> -R
+>
+>> Would it make sense to use firmware_ops for the common pieces and have
+>> direct smc calls for the rest? I'm not sure that would buy us all that
+>> much. Hm.
+>>
+>> Well, at least it's an internal implementation detail. If we move it
+>> now and find a better way to do it down the road it can be refactored.
