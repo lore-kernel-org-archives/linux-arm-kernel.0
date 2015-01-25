@@ -1,90 +1,46 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sun, 25 Jan 2015 17:38:22 +0200
-Subject: [PATCH v5 11/18] iommu: exynos: remove useless device_add/remove
- callbacks
-In-Reply-To: <1422028288-891-12-git-send-email-m.szyprowski@samsung.com>
-References: <1422028288-891-1-git-send-email-m.szyprowski@samsung.com>
- <1422028288-891-12-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <2829552.kzfCU5HyxQ@avalon>
+From: jenskuske@gmail.com (Jens Kuske)
+Date: Sun, 25 Jan 2015 16:49:16 +0100
+Subject: [PATCH 0/3] net: allwinner: sun4i-emac: add missing SRAM mapping
+Message-ID: <1422200959-1717-1-git-send-email-jenskuske@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+Hi all,
 
-Thank you for the patch.
+The current sun4i-emac kernel driver does not set the needed SRAM mapping.
 
-On Friday 23 January 2015 16:51:21 Marek Szyprowski wrote:
-> The driver doesn't need to do anything important in device add/remove
-> callbacks, because initialization will be done from device-tree specific
-> callbacks added later. IOMMU groups created by current code were never
-> used.
+This hasn't been noticed because normally the bootloader already did this.
+But in case the bootloader skips initializing the EMAC, like in U-Boot's
+Falcon Mode for example, the kernel driver has to take care of it.
 
-IOMMU groups still seem a bit unclear to me. Will Deacon has nicely explained 
-what they represent in http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/310816.html. The IOMMU core doesn't make groups 
-mandatory, but requires them in some code paths.
+Patch 1-2 add a mfd/syscon for the shared registers responsible for SRAM
+mapping. These patches are taken from Chen-Yu Tsai's sunxi-musb tree [1] and
+I added a copy of the device-tree nodes to sun4i and sun5i.
 
-For example the coldplug device add function add_iommu_group() called for all 
-devices already registered when bus_set_iommu() is called will try to warn of 
-devices added multiple times with a WARN_ON(dev->iommu_group). Another example 
-is the iommu_bus_notifier() function which will call the remove_device() 
-operation only when dev->iommu_group isn't NULL.
+Patch 3 adds the code to map SRAM to EMAC using the syscon.
 
-I'm thus unsure whether groups should be made mandatory, or whether the IOMMU 
-core should be fixed to make them really optional (or, third option, whether 
-there's something I haven't understood properly).
+Regards,
+Jens
 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  drivers/iommu/exynos-iommu.c | 28 ----------------------------
->  1 file changed, 28 deletions(-)
-> 
-> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> index e62cb96..e40e699 100644
-> --- a/drivers/iommu/exynos-iommu.c
-> +++ b/drivers/iommu/exynos-iommu.c
-> @@ -1055,32 +1055,6 @@ static phys_addr_t exynos_iommu_iova_to_phys(struct
-> iommu_domain *domain, return phys;
->  }
-> 
-> -static int exynos_iommu_add_device(struct device *dev)
-> -{
-> -	struct iommu_group *group;
-> -	int ret;
-> -
-> -	group = iommu_group_get(dev);
-> -
-> -	if (!group) {
-> -		group = iommu_group_alloc();
-> -		if (IS_ERR(group)) {
-> -			dev_err(dev, "Failed to allocate IOMMU group\n");
-> -			return PTR_ERR(group);
-> -		}
-> -	}
-> -
-> -	ret = iommu_group_add_device(group, dev);
-> -	iommu_group_put(group);
-> -
-> -	return ret;
-> -}
-> -
-> -static void exynos_iommu_remove_device(struct device *dev)
-> -{
-> -	iommu_group_remove_device(dev);
-> -}
-> -
->  static const struct iommu_ops exynos_iommu_ops = {
->  	.domain_init = exynos_iommu_domain_init,
->  	.domain_destroy = exynos_iommu_domain_destroy,
-> @@ -1090,8 +1064,6 @@ static const struct iommu_ops exynos_iommu_ops = {
->  	.unmap = exynos_iommu_unmap,
->  	.map_sg = default_iommu_map_sg,
->  	.iova_to_phys = exynos_iommu_iova_to_phys,
-> -	.add_device = exynos_iommu_add_device,
-> -	.remove_device = exynos_iommu_remove_device,
->  	.pgsize_bitmap = SECT_SIZE | LPAGE_SIZE | SPAGE_SIZE,
->  };
+[1] https://github.com/wens/linux/commits/wip/sunxi-musb
+
+
+Chen-Yu Tsai (2):
+  ARM: dts: sunxi: Add syscon node for controlling SRAM mapping
+  ARM: sunxi: Add register bit definitions for SRAM mapping syscon
+
+Jens Kuske (1):
+  net: allwinner: sun4i-emac: fix emac SRAM mapping
+
+ arch/arm/boot/dts/sun4i-a10.dtsi            |  5 ++++
+ arch/arm/boot/dts/sun5i-a10s.dtsi           |  5 ++++
+ arch/arm/boot/dts/sun5i-a13.dtsi            |  5 ++++
+ arch/arm/boot/dts/sun7i-a20.dtsi            |  5 ++++
+ drivers/net/ethernet/allwinner/Kconfig      |  1 +
+ drivers/net/ethernet/allwinner/sun4i-emac.c | 18 +++++++++++++
+ include/linux/mfd/syscon/sun4i-sc.h         | 42 +++++++++++++++++++++++++++++
+ 7 files changed, 81 insertions(+)
+ create mode 100644 include/linux/mfd/syscon/sun4i-sc.h
 
 -- 
-Regards,
-
-Laurent Pinchart
+2.2.2
