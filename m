@@ -1,38 +1,78 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Sun, 25 Jan 2015 22:49:48 +0100
-Subject: [PATCH 0/4] Drop legacy support for omap3517
-In-Reply-To: <20150125212015.GA14307@amd>
-References: <1421171865-5209-1-git-send-email-tony@atomide.com>
- <20150113204219.GJ2419@atomide.com>
- <20150115142536.GC512@earth.universe> <201501241300.00723@pali>
- <20150125212015.GA14307@amd>
-Message-ID: <20150125214947.GB20695@earth.universe>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Sun, 25 Jan 2015 22:52:02 +0100
+Subject: [PATCH] clocksource: arm_arch_timer: Rename arch_timer_probed
+ to reflect behaviour
+In-Reply-To: <1421488012-5098-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1421488012-5098-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <54C56582.6080809@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 25, 2015 at 10:22:58PM +0100, Pavel Machek wrote:
-> > Another regression for DT setup (which does not occur for board code):
-> > 
-> > omap_hsmmc driver does not export slot_name sysfs entry because
-> > it not supported by DT yet. Entry slot_name is used by userspace
-> > application to determinate if mmc block device is internal eMMC
-> > memory or external uSD card. So support for this property also in
-> > DT is needed.
-> > 
-> > Here is simple patch which fix this problem:
-> 
-> Thanks!
-> 
-> Does it need line into Documentation/devicetree/ somewhere?
+On 01/17/2015 10:46 AM, Laurent Pinchart wrote:
+> The arch_timer_probed function returns whether the given time doesn't
+> need to be probed. This can be the case when the timer has been probed
+> already, but also when it has no corresponding enabled node in DT.
+>
+> Rename the function to arch_timer_need_probe and invert its return value
+> to better reflect the function's purpose and behaviour.
+>
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Documentation/devicetree/bindings/mmc/mmc.txt (generic)
-Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt (omap specific)
+I would like to have an ack from Sudeep or Mark (Cc'ed) before taking 
+this patch.
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150125/2ee8f6e0/attachment-0001.sig>
+Thanks
+   -- Daniel
+
+> ---
+>   drivers/clocksource/arm_arch_timer.c | 13 +++++++------
+>   1 file changed, 7 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index 095c1774592c..3cbdd563a967 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -660,17 +660,17 @@ static const struct of_device_id arch_timer_mem_of_match[] __initconst = {
+>   };
+>
+>   static bool __init
+> -arch_timer_probed(int type, const struct of_device_id *matches)
+> +arch_timer_need_probe(int type, const struct of_device_id *matches)
+>   {
+>   	struct device_node *dn;
+> -	bool probed = true;
+> +	bool need_probe = false;
+>
+>   	dn = of_find_matching_node(NULL, matches);
+>   	if (dn && of_device_is_available(dn) && !(arch_timers_present & type))
+> -		probed = false;
+> +		need_probe = true;
+>   	of_node_put(dn);
+>
+> -	return probed;
+> +	return need_probe;
+>   }
+>
+>   static void __init arch_timer_common_init(void)
+> @@ -679,9 +679,10 @@ static void __init arch_timer_common_init(void)
+>
+>   	/* Wait until both nodes are probed if we have two timers */
+>   	if ((arch_timers_present & mask) != mask) {
+> -		if (!arch_timer_probed(ARCH_MEM_TIMER, arch_timer_mem_of_match))
+> +		if (arch_timer_need_probe(ARCH_MEM_TIMER,
+> +					  arch_timer_mem_of_match))
+>   			return;
+> -		if (!arch_timer_probed(ARCH_CP15_TIMER, arch_timer_of_match))
+> +		if (arch_timer_need_probe(ARCH_CP15_TIMER, arch_timer_of_match))
+>   			return;
+>   	}
+>
+>
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
