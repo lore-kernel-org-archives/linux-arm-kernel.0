@@ -1,91 +1,69 @@
 From: jenskuske@gmail.com (Jens Kuske)
-Date: Sun, 25 Jan 2015 16:49:17 +0100
-Subject: [PATCH 1/3] ARM: dts: sunxi: Add syscon node for controlling SRAM
- mapping
+Date: Sun, 25 Jan 2015 16:49:18 +0100
+Subject: [PATCH 2/3] ARM: sunxi: Add register bit definitions for SRAM mapping
+ syscon
 In-Reply-To: <1422200959-1717-1-git-send-email-jenskuske@gmail.com>
 References: <1422200959-1717-1-git-send-email-jenskuske@gmail.com>
-Message-ID: <1422200959-1717-2-git-send-email-jenskuske@gmail.com>
+Message-ID: <1422200959-1717-3-git-send-email-jenskuske@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Chen-Yu Tsai <wens@csie.org>
 
-Allwinner SoCs have a system controller module that controls whether
-SRAM blocks are mapped to the CPU memory or specific peripherals.
-
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-[jenskuske at gmail.com: duplicate syscon node to sun4i and sun5i]
 Signed-off-by: Jens Kuske <jenskuske@gmail.com>
 ---
- arch/arm/boot/dts/sun4i-a10.dtsi  | 5 +++++
- arch/arm/boot/dts/sun5i-a10s.dtsi | 5 +++++
- arch/arm/boot/dts/sun5i-a13.dtsi  | 5 +++++
- arch/arm/boot/dts/sun7i-a20.dtsi  | 5 +++++
- 4 files changed, 20 insertions(+)
+ include/linux/mfd/syscon/sun4i-sc.h | 42 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
+ create mode 100644 include/linux/mfd/syscon/sun4i-sc.h
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 380f914..8a90e48 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -339,6 +339,11 @@
- 		#size-cells = <1>;
- 		ranges;
- 
-+		syscon: syscon at 01c00000 {
-+			compatible = "allwinner,sun4i-a10-syscon", "syscon";
-+			reg = <0x01c00000 0x8>;
-+		};
+diff --git a/include/linux/mfd/syscon/sun4i-sc.h b/include/linux/mfd/syscon/sun4i-sc.h
+new file mode 100644
+index 0000000..fb970d9
+--- /dev/null
++++ b/include/linux/mfd/syscon/sun4i-sc.h
+@@ -0,0 +1,42 @@
++/**
++ * sun4i-sc.h - Allwinner sun4i system control register bit definitions
++ *
++ * Copyright (C) 2014 Chen-Yu Tsai
++ *
++ * Chen-Yu Tsai  <wens@csie.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
- 		dma: dma-controller at 01c02000 {
- 			compatible = "allwinner,sun4i-a10-dma";
- 			reg = <0x01c02000 0x1000>;
-diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
-index 531272c..21df7b4 100644
---- a/arch/arm/boot/dts/sun5i-a10s.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
-@@ -300,6 +300,11 @@
- 		#size-cells = <1>;
- 		ranges;
- 
-+		syscon: syscon at 01c00000 {
-+			compatible = "allwinner,sun4i-a10-syscon", "syscon";
-+			reg = <0x01c00000 0x8>;
-+		};
++#ifndef __LINUX_SUN4I_SC_H
++#define __LINUX_SUN4I_SC_H
 +
- 		dma: dma-controller at 01c02000 {
- 			compatible = "allwinner,sun4i-a10-dma";
- 			reg = <0x01c02000 0x1000>;
-diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-index b131068..b69b7b1 100644
---- a/arch/arm/boot/dts/sun5i-a13.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-@@ -298,6 +298,11 @@
- 		#size-cells = <1>;
- 		ranges;
- 
-+		syscon: syscon at 01c00000 {
-+			compatible = "allwinner,sun4i-a10-syscon", "syscon";
-+			reg = <0x01c00000 0x8>;
-+		};
++#include <linux/bitops.h>
 +
- 		dma: dma-controller at 01c02000 {
- 			compatible = "allwinner,sun4i-a10-dma";
- 			reg = <0x01c02000 0x1000>;
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 82097c9..af9c7e6 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -451,6 +451,11 @@
- 		#size-cells = <1>;
- 		ranges;
- 
-+		syscon: syscon at 01c00000 {
-+			compatible = "allwinner,sun4i-a10-syscon", "syscon";
-+			reg = <0x01c00000 0x8>;
-+		};
++/* Registers */
++#define SUN4I_SC0	0x00
++#define SUN4I_SC1	0x04
 +
- 		nmi_intc: interrupt-controller at 01c00030 {
- 			compatible = "allwinner,sun7i-a20-sc-nmi";
- 			interrupt-controller;
++/* SRAM control register 0 bits */
++#define SUN4I_SC0_SRAM_C1_MAP_VE	0x7fffffff
++
++/* SRAM control register 1 bits */
++#define SUN4I_SC1_BIST_NDMA_CTRL_SEL	BIT(31)
++#define SUN4I_SC1_SRAM_C3_MAP_ISP	BIT(12)
++#define SUN4I_SC1_SRAM_C2_MAP_MASK	0x0300
++#define SUN4I_SC1_SRAM_C2_MAP_AE	0x0100
++#define SUN4I_SC1_SRAM_C2_MAP_CE	0x0200
++#define SUN4I_SC1_SRAM_C2_MAP_ACE	0x0300
++#define SUN4I_SC1_SRAM_A3_A4_MAP_MASK	0x0030
++#define SUN4I_SC1_SRAM_A3_A4_MAP_EMAC	0x0010
++#define SUN4I_SC1_SRAM_D_MAP_USB0	BIT(0)
++
++#endif /* __LINUX_SUN4I_SC_H */
 -- 
 2.2.2
