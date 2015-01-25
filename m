@@ -1,61 +1,106 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Sun, 25 Jan 2015 11:11:28 -0500
-Subject: [GIT PULL] qcom SoC changes for v3.20
-In-Reply-To: <CAF6AEGuLu+KYwBX59T4-SThPDJCYwKDU6_qWf7d80Dae6FAmbQ@mail.gmail.com>
-References: <alpine.DEB.2.02.1501191226010.2973@galak-ubuntu.qualcomm.com>
- <20150122011521.GA31815@quad.lixom.net>
- <D177DF12-0F31-49CF-B98B-9FAC23AAB24C@codeaurora.org>
- <CAOesGMipp=Odc-cWvrba0e1pd1X7O+PKNH+WoM3fG4xX2GRFuA@mail.gmail.com>
- <DBE63F76-D4CB-49D5-90C6-642CFCA7687F@codeaurora.org>
- <CAOesGMht4VaNgwr5rOyher081Vk7w_HKTMeOm677rEAkOcCPAg@mail.gmail.com>
- <CAF6AEGuLu+KYwBX59T4-SThPDJCYwKDU6_qWf7d80Dae6FAmbQ@mail.gmail.com>
-Message-ID: <CAOw6vbJpfp-ViGXcS7vwm-1SWQmq=LhGkN=PmhKO9ky1qUJ2mA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 25 Jan 2015 17:25:11 +0100
+Subject: [PATCH 3/3] net: allwinner: sun4i-emac: fix emac SRAM mapping
+In-Reply-To: <1422200959-1717-4-git-send-email-jenskuske@gmail.com>
+References: <1422200959-1717-1-git-send-email-jenskuske@gmail.com>
+ <1422200959-1717-4-git-send-email-jenskuske@gmail.com>
+Message-ID: <20150125162510.GK8470@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 25, 2015 at 11:03 AM, Rob Clark <robdclark@gmail.com> wrote:
-> On Fri, Jan 23, 2015 at 1:43 PM, Olof Johansson <olof@lixom.net> wrote:
->>>> I'd be OK with merging this, send a request and tag. Would that let
->>>> the DRM folks make progress too?
->>>
->>> Will do, I don?t think it will address the DRM folks needs as they need access to make firmware calls from the DRM driver.
->>>
->>>> If you need a common place for this, drivers/firmware seems like a
->>>> better home than drivers/soc.
->>>
->>> Agreed, what?s you take than on moving to use firmware_ops as defined in arch/arm and extended it or just leaving this as a qcom specific firmware interface?
->>
->> Are there any other SoCs out there with similar requirements on
->> firmware interfaces? I think most of them so far have been fairly
->> simple compared to the complexity of the qualcomm firmware.
->
-> I think the question is probably "how do downstream HDCP
-> implementations work on these other SoCs"..   so far, I think qcom is
-> the first to try to upstream HDCP support, but I know there have to be
-> at least a few downstream implementations lurking out there.
->
+Hi Jens,
 
-This isn't a concern on exynos, fwiw.
+On Sun, Jan 25, 2015 at 04:49:19PM +0100, Jens Kuske wrote:
+> The EMAC needs SRAM block A3_A4 being mapped to EMAC peripheral to
+> work. This is done by the bootloader most of the time, but U-Boot
+> Falcon Mode, for example, skips emac initialization and SRAM would
+> stay mapped to the CPU.
 
-> And I'm sure as some others come out of the woodwork there will be
-> some things to refactor.. like possibly shared helpers for
-> implementing the state machine, etc.
->
+Thanks for reviving this.
 
-Shared helpers would be useful to have once there's another hdcp
-implementation upstream. I haven't looked at our downstream hdcp
-implementation in a while, so it's difficult to say how much could be
-factored out. It's on my TODO stack... somewhere.
+> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
+> ---
+>  drivers/net/ethernet/allwinner/Kconfig      |  1 +
+>  drivers/net/ethernet/allwinner/sun4i-emac.c | 18 ++++++++++++++++++
+>  2 files changed, 19 insertions(+)
+> 
+> diff --git a/drivers/net/ethernet/allwinner/Kconfig b/drivers/net/ethernet/allwinner/Kconfig
+> index d8d95d4..508a288 100644
+> --- a/drivers/net/ethernet/allwinner/Kconfig
+> +++ b/drivers/net/ethernet/allwinner/Kconfig
+> @@ -28,6 +28,7 @@ config SUN4I_EMAC
+>  	select MII
+>  	select PHYLIB
+>  	select MDIO_SUN4I
+> +	select MFD_SYSCON
+>          ---help---
+>            Support for Allwinner A10 EMAC ethernet driver.
+>  
+> diff --git a/drivers/net/ethernet/allwinner/sun4i-emac.c b/drivers/net/ethernet/allwinner/sun4i-emac.c
+> index 1fcd556..86c891d 100644
+> --- a/drivers/net/ethernet/allwinner/sun4i-emac.c
+> +++ b/drivers/net/ethernet/allwinner/sun4i-emac.c
+> @@ -18,6 +18,8 @@
+>  #include <linux/gpio.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/irq.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/mfd/syscon/sun4i-sc.h>
+>  #include <linux/mii.h>
+>  #include <linux/module.h>
+>  #include <linux/netdevice.h>
+> @@ -28,6 +30,7 @@
+>  #include <linux/of_platform.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/phy.h>
+> +#include <linux/regmap.h>
+>  
+>  #include "sun4i-emac.h"
+>  
+> @@ -78,6 +81,7 @@ struct emac_board_info {
+>  
+>  	struct phy_device	*phy_dev;
+>  	struct device_node	*phy_node;
+> +	struct regmap		*sc;
+>  	unsigned int		link;
+>  	unsigned int		speed;
+>  	unsigned int		duplex;
+> @@ -862,6 +866,18 @@ static int emac_probe(struct platform_device *pdev)
+>  		goto out;
+>  	}
+>  
+> +	/* Map SRAM_A3_A4 to EMAC */
+> +	db->sc = syscon_regmap_lookup_by_compatible(
+> +						"allwinner,sun4i-a10-syscon");
+> +	if (IS_ERR(db->sc)) {
+> +		dev_err(&pdev->dev, "failed to find syscon regmap\n");
+> +		ret = PTR_ERR(db->sc);
+> +		goto out;
+> +	}
+> +
+> +	regmap_update_bits(db->sc, SUN4I_SC1, SUN4I_SC1_SRAM_A3_A4_MAP_MASK,
+> +						SUN4I_SC1_SRAM_A3_A4_MAP_EMAC);
+> +
 
-Sean
+I don't think that using a syscon is the right solution here.
 
+All this SRAM mapping thing is mutually exclusive, and will possibly
+impact other drivers as well.
 
-> BR,
-> -R
->
->> Would it make sense to use firmware_ops for the common pieces and have
->> direct smc calls for the rest? I'm not sure that would buy us all that
->> much. Hm.
->>
->> Well, at least it's an internal implementation detail. If we move it
->> now and find a better way to do it down the road it can be refactored.
+I think this is a more a case for a small driver in drivers/soc that
+would take care of this, and make sure that client drivers don't step
+on each other's toe.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150125/c2a153bc/attachment.sig>
