@@ -1,247 +1,90 @@
-From: ats@offog.org (Adam Sampson)
-Date: Sun, 25 Jan 2015 15:32:01 +0000
-Subject: [PATCH] ARM: dts: sun7i: Add dts file for pcDuino 3 Nano board
-Message-ID: <1422199921-325-1-git-send-email-ats@offog.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sun, 25 Jan 2015 17:38:22 +0200
+Subject: [PATCH v5 11/18] iommu: exynos: remove useless device_add/remove
+ callbacks
+In-Reply-To: <1422028288-891-12-git-send-email-m.szyprowski@samsung.com>
+References: <1422028288-891-1-git-send-email-m.szyprowski@samsung.com>
+ <1422028288-891-12-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <2829552.kzfCU5HyxQ@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the LinkSprite pcDuino 3 Nano board. This is a low-cost
-Allwinner A20 board with Arduino-style GPIO headers; it features 1G RAM,
-4G NAND flash, 1 micro-SD, 2 USB sockets, 1 micro USB socket for OTG and
-another for power in, HDMI, SATA, 5V power for SATA devices, gigabit
-Ethernet, an IR receiver, 3.5mm audio out and a MIPI camera connector.
+Hi Marek,
 
-For more details, see: http://linux-sunxi.org/LinkSprite_pcDuino3_Nano
+Thank you for the patch.
 
-Signed-off-by: Adam Sampson <ats@offog.org>
----
- arch/arm/boot/dts/Makefile                    |    3 +-
- arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts |  203 +++++++++++++++++++++++++
- 2 files changed, 205 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts
+On Friday 23 January 2015 16:51:21 Marek Szyprowski wrote:
+> The driver doesn't need to do anything important in device add/remove
+> callbacks, because initialization will be done from device-tree specific
+> callbacks added later. IOMMU groups created by current code were never
+> used.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 7df26a2..c025724 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -479,7 +479,8 @@ dtb-$(CONFIG_MACH_SUN7I) += \
- 	sun7i-a20-olinuxino-lime.dtb \
- 	sun7i-a20-olinuxino-lime2.dtb \
- 	sun7i-a20-olinuxino-micro.dtb \
--	sun7i-a20-pcduino3.dtb
-+	sun7i-a20-pcduino3.dtb \
-+	sun7i-a20-pcduino3-nano.dtb
- dtb-$(CONFIG_MACH_SUN8I) += \
- 	sun8i-a23-ippo-q8h-v5.dtb \
- 	sun8i-a23-ippo-q8h-v1.2.dtb
-diff --git a/arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts b/arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts
-new file mode 100644
-index 0000000..a2b18de
---- /dev/null
-+++ b/arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts
-@@ -0,0 +1,203 @@
-+/*
-+ * Copyright 2015 Adam Sampson <ats@offog.org>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ *     You should have received a copy of the GNU General Public
-+ *     License along with this file; if not, write to the Free
-+ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-+ *     MA 02110-1301 USA
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun7i-a20.dtsi"
-+#include "sunxi-common-regulators.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	model = "LinkSprite pcDuino3 Nano";
-+	compatible = "linksprite,pcduino3-nano", "allwinner,sun7i-a20";
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pins_pcduino3_nano>;
-+
-+		led3 {
-+			label = "pcduino3-nano:green:led3";
-+			gpios = <&pio 7 16 GPIO_ACTIVE_LOW>; /* PH16 */
-+		};
-+
-+		led4 {
-+			label = "pcduino3-nano:green:led4";
-+			gpios = <&pio 7 15 GPIO_ACTIVE_LOW>; /* PH15 */
-+		};
-+	};
-+};
-+
-+&ahci {
-+	target-supply = <&reg_ahci_5v>;
-+	status = "okay";
-+};
-+
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+&ehci1 {
-+	status = "okay";
-+};
-+
-+&gmac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&gmac_pins_rgmii_a>;
-+	phy = <&phy1>;
-+	phy-mode = "rgmii";
-+	status = "okay";
-+
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+	};
-+};
-+
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "okay";
-+
-+	axp209: pmic at 34 {
-+		compatible = "x-powers,axp209";
-+		reg = <0x34>;
-+		interrupt-parent = <&nmi_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
-+	};
-+};
-+
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_pins_a>;
-+	status = "okay";
-+};
-+
-+&ir0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ir0_pins_a>;
-+	status = "okay";
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&ohci0 {
-+	status = "okay";
-+};
-+
-+&ohci1 {
-+	status = "okay";
-+};
-+
-+&pio {
-+	ahci_pwr_pin_a: ahci_pwr_pin at 0 {
-+		allwinner,pins = "PH2";
-+	};
-+
-+	led_pins_pcduino3_nano: led_pins at 0 {
-+		allwinner,pins = "PH16", "PH15";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
-+	usb1_vbus_pin_pcduino3_nano: usb1_vbus_pin at 0 {
-+		allwinner,pins = "PH11";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
-+&reg_ahci_5v {
-+	gpio = <&pio 7 2 GPIO_ACTIVE_HIGH>; /* PH2 */
-+	status = "okay";
-+};
-+
-+&reg_usb1_vbus {
-+	pinctrl-0 = <&usb1_vbus_pin_pcduino3_nano>;
-+	gpio = <&pio 7 11 GPIO_ACTIVE_HIGH>; /* PH11 */
-+	status = "okay";
-+};
-+
-+&reg_usb2_vbus {
-+	status = "okay";
-+};
-+
-+&spi0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&spi0_pins_a>;
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart2_pins_a>;
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	usb1_vbus-supply = <&reg_usb1_vbus>;
-+	usb2_vbus-supply = <&reg_usb2_vbus>;
-+	status = "okay";
-+};
+IOMMU groups still seem a bit unclear to me. Will Deacon has nicely explained 
+what they represent in http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/310816.html. The IOMMU core doesn't make groups 
+mandatory, but requires them in some code paths.
+
+For example the coldplug device add function add_iommu_group() called for all 
+devices already registered when bus_set_iommu() is called will try to warn of 
+devices added multiple times with a WARN_ON(dev->iommu_group). Another example 
+is the iommu_bus_notifier() function which will call the remove_device() 
+operation only when dev->iommu_group isn't NULL.
+
+I'm thus unsure whether groups should be made mandatory, or whether the IOMMU 
+core should be fixed to make them really optional (or, third option, whether 
+there's something I haven't understood properly).
+
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  drivers/iommu/exynos-iommu.c | 28 ----------------------------
+>  1 file changed, 28 deletions(-)
+> 
+> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+> index e62cb96..e40e699 100644
+> --- a/drivers/iommu/exynos-iommu.c
+> +++ b/drivers/iommu/exynos-iommu.c
+> @@ -1055,32 +1055,6 @@ static phys_addr_t exynos_iommu_iova_to_phys(struct
+> iommu_domain *domain, return phys;
+>  }
+> 
+> -static int exynos_iommu_add_device(struct device *dev)
+> -{
+> -	struct iommu_group *group;
+> -	int ret;
+> -
+> -	group = iommu_group_get(dev);
+> -
+> -	if (!group) {
+> -		group = iommu_group_alloc();
+> -		if (IS_ERR(group)) {
+> -			dev_err(dev, "Failed to allocate IOMMU group\n");
+> -			return PTR_ERR(group);
+> -		}
+> -	}
+> -
+> -	ret = iommu_group_add_device(group, dev);
+> -	iommu_group_put(group);
+> -
+> -	return ret;
+> -}
+> -
+> -static void exynos_iommu_remove_device(struct device *dev)
+> -{
+> -	iommu_group_remove_device(dev);
+> -}
+> -
+>  static const struct iommu_ops exynos_iommu_ops = {
+>  	.domain_init = exynos_iommu_domain_init,
+>  	.domain_destroy = exynos_iommu_domain_destroy,
+> @@ -1090,8 +1064,6 @@ static const struct iommu_ops exynos_iommu_ops = {
+>  	.unmap = exynos_iommu_unmap,
+>  	.map_sg = default_iommu_map_sg,
+>  	.iova_to_phys = exynos_iommu_iova_to_phys,
+> -	.add_device = exynos_iommu_add_device,
+> -	.remove_device = exynos_iommu_remove_device,
+>  	.pgsize_bitmap = SECT_SIZE | LPAGE_SIZE | SPAGE_SIZE,
+>  };
+
 -- 
-1.7.10.4
+Regards,
+
+Laurent Pinchart
