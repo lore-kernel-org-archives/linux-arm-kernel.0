@@ -1,67 +1,142 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Sun, 25 Jan 2015 14:44:52 -0500
-Subject: [PATCH 2/4] serial: 8250_omap: Use UPSTAT_AUTORTS for RTS handling
-In-Reply-To: <1422215094-3216-1-git-send-email-peter@hurleysoftware.com>
-References: <1422215094-3216-1-git-send-email-peter@hurleysoftware.com>
-Message-ID: <1422215094-3216-3-git-send-email-peter@hurleysoftware.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sun, 25 Jan 2015 12:30:42 -0800
+Subject: [PATCH v2 3/6] power/reset: Remove sun6i reboot driver
+In-Reply-To: <1422217845-18901-1-git-send-email-linux@roeck-us.net>
+References: <1422217845-18901-1-git-send-email-linux@roeck-us.net>
+Message-ID: <1422217845-18901-4-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 88838d3112702 ("serial: omap_8250: Fix RTS handling") fixed
-RTS pin control when in autoRTS mode.
+sun6i restart is now handled by its watchdog driver directly,
+so this driver is no longer needed.
 
-New support added in "serial: core: Rework hw-assisted flow control support"
-enables a much simpler approach; rather than masking out autoRTS
-whenever writing the EFR register, use the UPSTAT_* mode to determine if
-autoRTS should be enabled when raising RTS (in omap8250_set_mctrl()).
-
-Signed-off-by: Peter Hurley <peter@hurleysoftware.com>
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 ---
- drivers/tty/serial/8250/8250_omap.c | 16 +++++++---------
- 1 file changed, 7 insertions(+), 9 deletions(-)
+ drivers/power/reset/Kconfig        |  6 ---
+ drivers/power/reset/Makefile       |  1 -
+ drivers/power/reset/sun6i-reboot.c | 85 --------------------------------------
+ 3 files changed, 92 deletions(-)
+ delete mode 100644 drivers/power/reset/sun6i-reboot.c
 
-diff --git a/drivers/tty/serial/8250/8250_omap.c b/drivers/tty/serial/8250/8250_omap.c
-index 4473881..59d6e90 100644
---- a/drivers/tty/serial/8250/8250_omap.c
-+++ b/drivers/tty/serial/8250/8250_omap.c
-@@ -120,10 +120,11 @@ static void omap8250_set_mctrl(struct uart_port *port, unsigned int mctrl)
- 	 */
- 	lcr = serial_in(up, UART_LCR);
- 	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
--	if (mctrl & TIOCM_RTS)
--		serial_out(up, UART_EFR, priv->efr);
-+	if ((mctrl & TIOCM_RTS) && (port->status & UPSTAT_AUTORTS))
-+		priv->efr |= UART_EFR_RTS;
- 	else
--		serial_out(up, UART_EFR, priv->efr & ~UART_EFR_RTS);
-+		priv->efr &= ~UART_EFR_RTS;
-+	serial_out(up, UART_EFR, priv->efr);
- 	serial_out(up, UART_LCR, lcr);
- }
+diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+index bf5acb3..4cb5744 100644
+--- a/drivers/power/reset/Kconfig
++++ b/drivers/power/reset/Kconfig
+@@ -109,12 +109,6 @@ config POWER_RESET_RESTART
+ 	  Instead they restart, and u-boot holds the SoC until the
+ 	  user presses a key. u-boot then boots into Linux.
  
-@@ -272,10 +273,7 @@ static void omap8250_restore_regs(struct uart_8250_port *up)
- 	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
- 	serial_dl_write(up, priv->quot);
- 
--	if (up->port.mctrl & TIOCM_RTS)
--		serial_out(up, UART_EFR, priv->efr);
--	else
--		serial_out(up, UART_EFR, priv->efr & ~UART_EFR_RTS);
-+	serial_out(up, UART_EFR, priv->efr);
- 
- 	/* Configure flow control */
- 	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
-@@ -424,9 +422,9 @@ static void omap_8250_set_termios(struct uart_port *port,
- 	up->port.status &= ~(UPSTAT_AUTOCTS | UPSTAT_AUTORTS | UPSTAT_AUTOXOFF);
- 
- 	if (termios->c_cflag & CRTSCTS && up->port.flags & UPF_HARD_FLOW) {
--		/* Enable AUTORTS and AUTOCTS */
-+		/* Enable AUTOCTS (autoRTS is enabled when RTS is raised) */
- 		up->port.status |= UPSTAT_AUTOCTS | UPSTAT_AUTORTS;
--		priv->efr |= UART_EFR_CTS | UART_EFR_RTS;
-+		priv->efr |= UART_EFR_CTS;
- 	} else	if (up->port.flags & UPF_SOFT_FLOW) {
- 		/*
- 		 * IXON Flag:
+-config POWER_RESET_SUN6I
+-	bool "Allwinner A31 SoC reset driver"
+-	depends on ARCH_SUNXI
+-	help
+-	  Reboot support for the Allwinner A31 SoCs.
+-
+ config POWER_RESET_ST
+ 	bool "ST restart power-off driver"
+ 	depends on ARCH_STI
+diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
+index 1631652..11de15b 100644
+--- a/drivers/power/reset/Makefile
++++ b/drivers/power/reset/Makefile
+@@ -11,7 +11,6 @@ obj-$(CONFIG_POWER_RESET_MSM) += msm-poweroff.o
+ obj-$(CONFIG_POWER_RESET_LTC2952) += ltc2952-poweroff.o
+ obj-$(CONFIG_POWER_RESET_QNAP) += qnap-poweroff.o
+ obj-$(CONFIG_POWER_RESET_RESTART) += restart-poweroff.o
+-obj-$(CONFIG_POWER_RESET_SUN6I) += sun6i-reboot.o
+ obj-$(CONFIG_POWER_RESET_ST) += st-poweroff.o
+ obj-$(CONFIG_POWER_RESET_VERSATILE) += arm-versatile-reboot.o
+ obj-$(CONFIG_POWER_RESET_VEXPRESS) += vexpress-poweroff.o
+diff --git a/drivers/power/reset/sun6i-reboot.c b/drivers/power/reset/sun6i-reboot.c
+deleted file mode 100644
+index af2cd7f..0000000
+--- a/drivers/power/reset/sun6i-reboot.c
++++ /dev/null
+@@ -1,85 +0,0 @@
+-/*
+- * Allwinner A31 SoCs reset code
+- *
+- * Copyright (C) 2012-2014 Maxime Ripard
+- *
+- * Maxime Ripard <maxime.ripard@free-electrons.com>
+- *
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
+- */
+-
+-#include <linux/delay.h>
+-#include <linux/io.h>
+-#include <linux/module.h>
+-#include <linux/of_address.h>
+-#include <linux/platform_device.h>
+-#include <linux/reboot.h>
+-
+-#include <asm/system_misc.h>
+-
+-#define SUN6I_WATCHDOG1_IRQ_REG		0x00
+-#define SUN6I_WATCHDOG1_CTRL_REG	0x10
+-#define SUN6I_WATCHDOG1_CTRL_RESTART		BIT(0)
+-#define SUN6I_WATCHDOG1_CONFIG_REG	0x14
+-#define SUN6I_WATCHDOG1_CONFIG_RESTART		BIT(0)
+-#define SUN6I_WATCHDOG1_CONFIG_IRQ		BIT(1)
+-#define SUN6I_WATCHDOG1_MODE_REG	0x18
+-#define SUN6I_WATCHDOG1_MODE_ENABLE		BIT(0)
+-
+-static void __iomem *wdt_base;
+-
+-static void sun6i_wdt_restart(enum reboot_mode mode, const char *cmd)
+-{
+-	if (!wdt_base)
+-		return;
+-
+-	/* Disable interrupts */
+-	writel(0, wdt_base + SUN6I_WATCHDOG1_IRQ_REG);
+-
+-	/* We want to disable the IRQ and just reset the whole system */
+-	writel(SUN6I_WATCHDOG1_CONFIG_RESTART,
+-		wdt_base + SUN6I_WATCHDOG1_CONFIG_REG);
+-
+-	/* Enable timer. The default and lowest interval value is 0.5s */
+-	writel(SUN6I_WATCHDOG1_MODE_ENABLE,
+-		wdt_base + SUN6I_WATCHDOG1_MODE_REG);
+-
+-	/* Restart the watchdog. */
+-	writel(SUN6I_WATCHDOG1_CTRL_RESTART,
+-		wdt_base + SUN6I_WATCHDOG1_CTRL_REG);
+-
+-	while (1) {
+-		mdelay(5);
+-		writel(SUN6I_WATCHDOG1_MODE_ENABLE,
+-			wdt_base + SUN6I_WATCHDOG1_MODE_REG);
+-	}
+-}
+-
+-static int sun6i_reboot_probe(struct platform_device *pdev)
+-{
+-	wdt_base = of_iomap(pdev->dev.of_node, 0);
+-	if (!wdt_base) {
+-		WARN(1, "failed to map watchdog base address");
+-		return -ENODEV;
+-	}
+-
+-	arm_pm_restart = sun6i_wdt_restart;
+-
+-	return 0;
+-}
+-
+-static struct of_device_id sun6i_reboot_of_match[] = {
+-	{ .compatible = "allwinner,sun6i-a31-wdt" },
+-	{}
+-};
+-
+-static struct platform_driver sun6i_reboot_driver = {
+-	.probe = sun6i_reboot_probe,
+-	.driver = {
+-		.name = "sun6i-reboot",
+-		.of_match_table = sun6i_reboot_of_match,
+-	},
+-};
+-module_platform_driver(sun6i_reboot_driver);
 -- 
-2.2.2
+2.1.0
