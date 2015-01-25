@@ -1,114 +1,113 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sun, 25 Jan 2015 20:22:06 +0800
-Subject: [PATCH v2 5/9] ARM: dts: sun9i: Add USB host controller nodes to a80
- dtsi
+Date: Sun, 25 Jan 2015 20:22:08 +0800
+Subject: [PATCH v2 7/9] ARM: dts: sun9i: Enable USB support on A80 Optimus
+ board
 In-Reply-To: <1422188530-1794-1-git-send-email-wens@csie.org>
 References: <1422188530-1794-1-git-send-email-wens@csie.org>
-Message-ID: <1422188530-1794-6-git-send-email-wens@csie.org>
+Message-ID: <1422188530-1794-8-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A80 has 3 EHCI/OHCI USB controllers.
-
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun9i-a80.dtsi | 70 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 70 insertions(+)
+ arch/arm/boot/dts/sun9i-a80-optimus.dts | 60 +++++++++++++++++++++++++++++++++
+ 1 file changed, 60 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
-index d7ebd9390b01..9483b15bfda7 100644
---- a/arch/arm/boot/dts/sun9i-a80.dtsi
-+++ b/arch/arm/boot/dts/sun9i-a80.dtsi
-@@ -355,6 +355,28 @@
- 		 */
- 		ranges = <0 0 0 0x20000000>;
+diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+index c4de9cb9a5f6..16d30bb3a872 100644
+--- a/arch/arm/boot/dts/sun9i-a80-optimus.dts
++++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+@@ -83,6 +83,18 @@
+ 	};
+ };
  
-+		ehci0: usb at 00a00000 {
-+			compatible = "allwinner,sun9i-a80-ehci", "generic-ehci";
-+			reg = <0x00a00000 0x100>;
-+			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&usb_mod_clk 1>;
-+			resets = <&usb_mod_clk 17>;
-+			phys = <&usbphy1>;
-+			phy-names = "usb";
-+			status = "disabled";
-+		};
++&ehci0 {
++	status = "okay";
++};
 +
-+		ohci0: usb at 00a00400 {
-+			compatible = "allwinner,sun9i-a80-ohci", "generic-ohci";
-+			reg = <0x00a00400 0x100>;
-+			interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&usb_mod_clk 1>, <&usb_mod_clk 2>;
-+			resets = <&usb_mod_clk 17>;
-+			phys = <&usbphy1>;
-+			phy-names = "usb";
-+			status = "disabled";
-+		};
++&ehci1 {
++	status = "okay";
++};
 +
- 		usbphy1: phy at 00a00800 {
- 			compatible = "allwinner,sun9i-a80-usb-phy";
- 			reg = <0x00a00800 0x4>;
-@@ -366,6 +388,32 @@
- 			#phy-cells = <0>;
- 		};
++&ehci2 {
++	status = "okay";
++};
++
+ &i2c3 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c3_pins_a>;
+@@ -94,6 +106,14 @@
+ 	allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+ };
  
-+		ehci1: usb at 00a01000 {
-+			compatible = "allwinner,sun9i-a80-ehci", "generic-ehci";
-+			reg = <0x00a01000 0x100>;
-+			interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&usb_mod_clk 3>;
-+			resets = <&usb_mod_clk 18>;
-+			phys = <&usbphy2>;
-+			phy-names = "usb";
-+			status = "disabled";
-+		};
++&ohci0 {
++	status = "okay";
++};
 +
-+		/*
-+		 * Even though ohci1 exists, it is never used as
-+		 * usb1 only has HSIC pins routed externally
-+		 */
-+		ohci1: usb at 00a01400 {
-+			compatible = "allwinner,sun9i-a80-ohci", "generic-ohci";
-+			reg = <0x00a01400 0x100>;
-+			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&usb_mod_clk 3>, <&usb_mod_clk 4>;
-+			resets = <&usb_mod_clk 18>;
-+			phys = <&usbphy2>;
-+			phy-names = "usb";
-+			status = "disabled";
-+		};
++&ohci2 {
++	status = "okay";
++};
 +
- 		usbphy2: phy at 00a01800 {
- 			compatible = "allwinner,sun9i-a80-usb-phy";
- 			reg = <0x00a01800 0x4>;
-@@ -380,6 +428,28 @@
- 			phy_type = "hsic";
- 		};
+ &pio {
+ 	led_pins_optimus: led-pins at 0 {
+ 		allwinner,pins = "PH0", "PH1";
+@@ -108,6 +128,20 @@
+ 		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+ 		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+ 	};
++
++	usb1_vbus_pin_optimus: usb1_vbus_pin at 1 {
++		allwinner,pins = "PH4";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
++	usb3_vbus_pin_optimus: usb3_vbus_pin at 1 {
++		allwinner,pins = "PH5";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
+ };
  
-+		ehci2: usb at 00a02000 {
-+			compatible = "allwinner,sun9i-a80-ehci", "generic-ehci";
-+			reg = <0x00a02000 0x100>;
-+			interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&usb_mod_clk 5>;
-+			resets = <&usb_mod_clk 19>;
-+			phys = <&usbphy3>;
-+			phy-names = "usb";
-+			status = "disabled";
-+		};
+ &mmc0 {
+@@ -129,6 +163,18 @@
+ 	status = "okay";
+ };
+ 
++&reg_usb1_vbus {
++	pinctrl-0 = <&usb1_vbus_pin_optimus>;
++	gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
++	status = "okay";
++};
 +
-+		ohci2: usb at 00a02400 {
-+			compatible = "allwinner,sun9i-a80-ohci", "generic-ohci";
-+			reg = <0x00a02400 0x100>;
-+			interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&usb_mod_clk 5>, <&usb_mod_clk 6>;
-+			resets = <&usb_mod_clk 19>;
-+			phys = <&usbphy3>;
-+			phy-names = "usb";
-+			status = "disabled";
-+		};
++&reg_usb3_vbus {
++	pinctrl-0 = <&usb3_vbus_pin_optimus>;
++	gpio = <&pio 7 5 GPIO_ACTIVE_HIGH>; /* PH5 */
++	status = "okay";
++};
 +
- 		usbphy3: phy at 00a02800 {
- 			compatible = "allwinner,sun9i-a80-usb-phy";
- 			reg = <0x00a02800 0x4>;
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
+@@ -145,3 +191,17 @@
+ 	/* Enable internal pull-up */
+ 	allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+ };
++
++&usbphy1 {
++	vbus-supply = <&reg_usb1_vbus>;
++	status = "okay";
++};
++
++&usbphy2 {
++	status = "okay";
++};
++
++&usbphy3 {
++	vbus-supply = <&reg_usb3_vbus>;
++	status = "okay";
++};
 -- 
 2.1.4
