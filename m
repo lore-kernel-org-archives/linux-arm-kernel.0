@@ -1,38 +1,26 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Sun, 25 Jan 2015 10:13:22 +0800
-Subject: [PATCH 0/2] ARM: dts: rockchip: add basic display nodes
-In-Reply-To: <3715086.HVfme6flvD@phil>
-References: <3715086.HVfme6flvD@phil>
-Message-ID: <CAGS+omAWJWOGpdFdqV57NkzVZGdnXmuZua3RG5XBZKzX8OBW9A@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Sat, 24 Jan 2015 21:55:12 -0800 (PST)
+Subject: [PATCH net-next v2 1/1] ARM: dts: imx6sx: correct i.MX6sx sdb
+ board enet phy address
+In-Reply-To: <1421743697-26918-1-git-send-email-b38611@freescale.com>
+References: <1421743697-26918-1-git-send-email-b38611@freescale.com>
+Message-ID: <20150124.215512.524443557800262525.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 22, 2015 at 5:31 AM, Heiko St?bner <heiko@sntech.de> wrote:
-> The core drm support will be part of 3.19 and the hdmi support will enter
-> the 3.20 kernel - so add at least the basic devicetree nodes.
->
-> I've pulled these patches out of the Chromium tree, adapted them to the
-> current mainline dts and have been using them with a bunch of code on top
-> with the vga connector of a firefly board for a week or so.
->
-> @Daniel et all: I hope I've kept all the tags and attributions intact.
-> If anything is wrong please holler.
+From: Fugang Duan <b38611@freescale.com>
+Date: Tue, 20 Jan 2015 16:48:17 +0800
 
-The series looks good to me.
-Thanks!
+> The commit (3d125f9c91c5) cause i.MX6SX sdb enet cannot work. The cause is
+> the commit add mdio node with un-correct phy address.
+> 
+> The patch just correct i.MX6sx sdb board enet phy address.
+> 
+> V2:
+> * As Shawn's suggestion that unit-address should match 'reg' property, so
+>   update ethernet-phy unit-address.
+> 
+> Acked-by: Stefan Agner <stefan@agner.ch>
+> Signed-off-by: Fugang Duan <B38611@freescale.com>
 
->
->
-> Andy Yan (1):
->   ARM: dts: rockchip: add rk3288 hdmi nodes
->
-> Daniel Kurtz (1):
->   ARM: dts: rockchip: Add rk3288 vop and display-subsystem
->
->  arch/arm/boot/dts/rk3288.dtsi | 76 +++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 76 insertions(+)
->
-> --
-> 2.1.1
->
->
+Applied.
