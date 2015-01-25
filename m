@@ -1,30 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 25 Jan 2015 15:56:52 +0000
-Subject: perf not capturing stack traces
-In-Reply-To: <20150124222342.GA26941@saruman.tx.rr.com>
-References: <20150123195128.GE26557@saruman.tx.rr.com>
- <20150123205959.GD3073@kernel.org>
- <20150123223745.GJ26557@saruman.tx.rr.com>
- <20150124151204.GF3073@kernel.org>
- <20150124222342.GA26941@saruman.tx.rr.com>
-Message-ID: <20150125155651.GB11502@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 25 Jan 2015 16:55:42 +0100
+Subject: [PATCH 2/2] sunxi: clk: Set sun6i-pll1 n_start = 1
+In-Reply-To: <1422100592-19981-2-git-send-email-hdegoede@redhat.com>
+References: <1422100592-19981-1-git-send-email-hdegoede@redhat.com>
+ <1422100592-19981-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150125155542.GF8470@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 24, 2015 at 04:23:42PM -0600, Felipe Balbi wrote:
-> yeah, I'll try a few older kernels, also see if I can reproduce on other
-> boards.
+On Sat, Jan 24, 2015 at 12:56:32PM +0100, Hans de Goede wrote:
+> For all pll-s on sun6i n == 0 means use a multiplier of 1, rather then 0 as
+> it means on sun4i / sun5i / sun7i. n_start = 1 is already correctly set
+> for sun6i pll6, but was missing for pll1, this commit fixes this.
+> 
+> Cc: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Perf works for me with CONFIG_FRAME_POINTER=y, but that's only for kernel
-space, and for userspace where the programs have been built for ARM mode
-with frame pointers.
+Applied the two, thanks!
 
-The kernel may work without CONFIG_FRAME_POINTER set, but I've never
-tested that, and I'd suggest that (given my experience looking at oops
-dumps) it's not all that reliable.
-
-Lastly, userspace without frame pointers is pretty much hopeless.
+Maxime
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150125/12cdecbe/attachment.sig>
