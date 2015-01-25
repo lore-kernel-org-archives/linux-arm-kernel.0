@@ -1,113 +1,53 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sun, 25 Jan 2015 20:22:08 +0800
-Subject: [PATCH v2 7/9] ARM: dts: sun9i: Enable USB support on A80 Optimus
- board
-In-Reply-To: <1422188530-1794-1-git-send-email-wens@csie.org>
-References: <1422188530-1794-1-git-send-email-wens@csie.org>
-Message-ID: <1422188530-1794-8-git-send-email-wens@csie.org>
+From: naobsd@gmail.com (FUKAUMI Naoki)
+Date: Sun, 25 Jan 2015 21:39:33 +0900
+Subject: [PATCH v4 0/3] add support for Firefly-RK3288 and Rayeager PX2 boards
+Message-ID: <1422189576-19478-1-git-send-email-naobsd@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun9i-a80-optimus.dts | 60 +++++++++++++++++++++++++++++++++
- 1 file changed, 60 insertions(+)
+This series adds support for following Rockchip SoC based boards.
 
-diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
-index c4de9cb9a5f6..16d30bb3a872 100644
---- a/arch/arm/boot/dts/sun9i-a80-optimus.dts
-+++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
-@@ -83,6 +83,18 @@
- 	};
- };
- 
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+&ehci1 {
-+	status = "okay";
-+};
-+
-+&ehci2 {
-+	status = "okay";
-+};
-+
- &i2c3 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c3_pins_a>;
-@@ -94,6 +106,14 @@
- 	allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- };
- 
-+&ohci0 {
-+	status = "okay";
-+};
-+
-+&ohci2 {
-+	status = "okay";
-+};
-+
- &pio {
- 	led_pins_optimus: led-pins at 0 {
- 		allwinner,pins = "PH0", "PH1";
-@@ -108,6 +128,20 @@
- 		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
- 		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- 	};
-+
-+	usb1_vbus_pin_optimus: usb1_vbus_pin at 1 {
-+		allwinner,pins = "PH4";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
-+	usb3_vbus_pin_optimus: usb3_vbus_pin at 1 {
-+		allwinner,pins = "PH5";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
- };
- 
- &mmc0 {
-@@ -129,6 +163,18 @@
- 	status = "okay";
- };
- 
-+&reg_usb1_vbus {
-+	pinctrl-0 = <&usb1_vbus_pin_optimus>;
-+	gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
-+	status = "okay";
-+};
-+
-+&reg_usb3_vbus {
-+	pinctrl-0 = <&usb3_vbus_pin_optimus>;
-+	gpio = <&pio 7 5 GPIO_ACTIVE_HIGH>; /* PH5 */
-+	status = "okay";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
-@@ -145,3 +191,17 @@
- 	/* Enable internal pull-up */
- 	allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- };
-+
-+&usbphy1 {
-+	vbus-supply = <&reg_usb1_vbus>;
-+	status = "okay";
-+};
-+
-+&usbphy2 {
-+	status = "okay";
-+};
-+
-+&usbphy3 {
-+	vbus-supply = <&reg_usb3_vbus>;
-+	status = "okay";
-+};
+ - Firefly, Firefly-RK3288 (both beta and mass production version)
+ - ChipSPARK, Rayeager PX2
+
+Changes in v4:
+- revert wrong clock-* fixes in v3
+- remove non-working tsadc
+- remove spi2 which uses only clk and cs0 pins
+- remove vqmmc-supply from sdmmc and keep vccio_sd 3.3V to make SD card works
+- update gmac regulator properties to match with recent Romain Perier's change
+
+Changes in v3:
+- fix ordering more
+- fix clock-* properties
+- enable tsadc with clock-* properties
+
+Changes in v2:
+- use own compatible property for Firefly-RK3288 beta version
+- remove disabled tsadc node
+- add missing vin-supply
+- use two chars for i2c address
+- fix ordering for the nodes without address element
+- add commit messages
+
+FUKAUMI Naoki (3):
+  dt-bindings: add vendor prefix and root compatible property for
+    Rockchip boards
+  ARM: dts: rockchip: add dts for Firefly Firefly-RK3288 boards
+  ARM: dts: rockchip: add dts for ChipSPARK Rayeager PX2 board
+
+ Documentation/devicetree/bindings/arm/rockchip.txt |  10 +
+ .../devicetree/bindings/vendor-prefixes.txt        |   2 +
+ arch/arm/boot/dts/Makefile                         |   5 +-
+ arch/arm/boot/dts/rk3066a-rayeager.dts             | 468 ++++++++++++++++++++
+ arch/arm/boot/dts/rk3288-firefly-beta.dts          |  71 +++
+ arch/arm/boot/dts/rk3288-firefly.dts               |  71 +++
+ arch/arm/boot/dts/rk3288-firefly.dtsi              | 483 +++++++++++++++++++++
+ 7 files changed, 1109 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/rk3066a-rayeager.dts
+ create mode 100644 arch/arm/boot/dts/rk3288-firefly-beta.dts
+ create mode 100644 arch/arm/boot/dts/rk3288-firefly.dts
+ create mode 100644 arch/arm/boot/dts/rk3288-firefly.dtsi
+
 -- 
-2.1.4
+2.2.2
