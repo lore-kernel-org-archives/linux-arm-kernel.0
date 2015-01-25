@@ -1,48 +1,78 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 25 Jan 2015 18:09:25 +0100
-Subject: [PATCHv2] mvebu: add Linksys WRT1900AC (Mamba) support
-In-Reply-To: <54C51FAA.4080300@gmail.com>
-References: <1421687701-5667-1-git-send-email-kaloz@openwrt.org>
- <20150119182113.GH32663@lunn.ch> <op.xsrcplz12s3iss@ecaz>
- <54C51FAA.4080300@gmail.com>
-Message-ID: <20150125170925.GB23862@lunn.ch>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 25 Jan 2015 18:39:14 +0100
+Subject: [GIT PULL] Allwinner fixes for 3.19
+Message-ID: <20150125173914.GA26866@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >>>+
-> >>>+        power {
-> >>>+            label = "mamba:white:power";
-> >>
-> >>Please replace this mamba with wrt1900ac. It is a property of the
-> >>device, not the board. Another device using the mamba board may use it
-> >>differently.
-> >>
-> >
-> >See above.
-> 
-> The LED should be named by the device, not the platform. If OpenWRT
-> userspace already expects "mamba" in here, I guess we are stuck with
-> it. If not, call it "wrt1900ac:white:power".
+Hi Arnd, Kevin, Olof,
 
-Hi Sebastian
+Please pull the following commits for the 3.19 kernel.
 
-We have some flexibility here. There is the mantra, don't break
-userspace, but that only applies once code has reached mainline.  We
-don't have to be compatible with OpenWRT, if we feel it would be wrong
-to do so. OpenWRT should be well aware of the risk of not "Upstream
-first". However, if it does not cost us anything, we can be
-compatible.
+Thanks!
+Maxime
 
-I think Android is another good example. Some code has been accepted
-into mainline as is, other parts have been re-written with different
-APIs.
+The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
 
-If it is decided that mamba is used everywhere, then it should be used
-here. If wrt1900ac is used, then i would like to see this LED named
-wrt1900ac. What you don't see in this dts file is the other 8 or so
-LEDs, which are connected to an I2c LED driver. A first version of the
-kernel driver has now been merged, the DT binding is stable, so we
-should add these LEDs to this dts file. But we should be consistent
-with the naming.
+  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
 
-     Andrew
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-fixes-for-3.19
+
+for you to fetch changes up to 117a2cc38ffe0b46bcc6f991a3534b345477439c:
+
+  ARM: sunxi: dt: Fix aliases (2015-01-25 18:06:34 +0100)
+
+----------------------------------------------------------------
+Allwinner fixes for 3.19
+
+A few minor fixes for the 3.19 kernel:
+  - The 8250 uart driver now respects the aliases, which pointed out that we
+    were using them wrong. Fixed them.
+  - The simplefb pipeline that was used on the A10 caused flickering and
+    tearing, and rendered it pretty much useless. Added a new simplefb node
+    with another pipeline that removes this issue. Note that we need to keep
+    the old node because u-boot 2015.01 uses it.
+  - Added a fix for the USB phy node on sun4i/sun5i
+
+----------------------------------------------------------------
+Chen-Yu Tsai (1):
+      ARM: dts: sunxi: Fix usb-phy support for sun4i/sun5i
+
+Hans de Goede (2):
+      ARM: dts: sun6i: ippo-q8h-v5: Fix serial0 alias
+      ARM: dts: sun4i: Add simplefb node with de_fe0-de_be0-lcd0-hdmi pipeline
+
+Maxime Ripard (1):
+      ARM: sunxi: dt: Fix aliases
+
+ arch/arm/boot/dts/sun4i-a10.dtsi                 | 20 ++++++++++----------
+ arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts |  6 ++++++
+ arch/arm/boot/dts/sun5i-a10s.dtsi                |  8 ++------
+ arch/arm/boot/dts/sun5i-a13-hsg-h702.dts         |  4 ++++
+ arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts  |  4 ++++
+ arch/arm/boot/dts/sun5i-a13-olinuxino.dts        |  4 ++++
+ arch/arm/boot/dts/sun5i-a13.dtsi                 |  9 ++-------
+ arch/arm/boot/dts/sun6i-a31.dtsi                 |  6 ------
+ arch/arm/boot/dts/sun7i-a20-bananapi.dts         |  6 ++++++
+ arch/arm/boot/dts/sun7i-a20-hummingbird.dts      |  8 ++++++++
+ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts  |  3 +++
+ arch/arm/boot/dts/sun7i-a20.dtsi                 |  8 --------
+ arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts      |  4 ++++
+ arch/arm/boot/dts/sun8i-a23.dtsi                 |  9 ---------
+ arch/arm/boot/dts/sun9i-a80-optimus.dts          |  5 +++++
+ arch/arm/boot/dts/sun9i-a80.dtsi                 | 10 ----------
+ 16 files changed, 58 insertions(+), 56 deletions(-)
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150125/e8c5d748/attachment.sig>
