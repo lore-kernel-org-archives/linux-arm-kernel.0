@@ -1,141 +1,188 @@
-From: addy.ke@rock-chips.com (Addy Ke)
-Date: Mon, 26 Jan 2015 19:19:35 +0800
-Subject: [PATCH 2/2] mmc: dw_mmc: wait until card ready if tuning fails
-In-Reply-To: <1422271175-19445-1-git-send-email-addy.ke@rock-chips.com>
-References: <1422271175-19445-1-git-send-email-addy.ke@rock-chips.com>
-Message-ID: <1422271175-19445-3-git-send-email-addy.ke@rock-chips.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 26 Jan 2015 12:22:16 +0100
+Subject: [PATCH v2 5/5] clocksource: sun5i: Add clock notifiers
+In-Reply-To: <1422265856-27631-6-git-send-email-maxime.ripard@free-electrons.com>
+References: <1422265856-27631-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1422265856-27631-6-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <54C62368.7050600@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch based on Alex's patch:
-https://patchwork.kernel.org/patch/5516411/
+On 01/26/2015 10:50 AM, Maxime Ripard wrote:
+> The parent clock of the sun5i timer is the AHB clock, which rate might change
+> because of other devices requirements.
+>
+> This is for example the case on the Allwinner A31, where the DMA controller
+> needs a minimum rate higher than the default, that is enforced after the timer
+> driver has probed.
+>
+> Add clock notifiers to make sure we reflect the clock rate changes in the timer
+> rates.
 
-Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
----
- drivers/mmc/core/mmc_ops.h |  1 -
- drivers/mmc/host/dw_mmc.c  | 48 ++++++++++++++++++++++++++++++++++++++++------
- include/linux/mmc/card.h   |  2 ++
- 3 files changed, 44 insertions(+), 7 deletions(-)
+Mmh, I am wondering if that shouldn't go to the time framework ...
 
-diff --git a/drivers/mmc/core/mmc_ops.h b/drivers/mmc/core/mmc_ops.h
-index 6f4b00e..c5be9ce 100644
---- a/drivers/mmc/core/mmc_ops.h
-+++ b/drivers/mmc/core/mmc_ops.h
-@@ -20,7 +20,6 @@ int mmc_send_op_cond(struct mmc_host *host, u32 ocr, u32 *rocr);
- int mmc_all_send_cid(struct mmc_host *host, u32 *cid);
- int mmc_set_relative_addr(struct mmc_card *card);
- int mmc_send_csd(struct mmc_card *card, u32 *csd);
--int mmc_send_status(struct mmc_card *card, u32 *status);
- int mmc_send_cid(struct mmc_host *host, u32 *cid);
- int mmc_spi_read_ocr(struct mmc_host *host, int highcap, u32 *ocrp);
- int mmc_spi_set_crc(struct mmc_host *host, int use_crc);
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index e54e656..4a31a5e 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -1317,10 +1317,38 @@ static void dw_mci_enable_sdio_irq(struct mmc_host *mmc, int enb)
- 	spin_unlock_irqrestore(&host->irq_lock, irqflags);
- }
- 
--static int dw_mci_tuning_test(struct dw_mci_slot *slot, u32 opcode,
--			       struct dw_mci_tuning_data *tuning_data,
--			       u8 *blk_test)
-+static int dw_mci_card_busy(u32 status)
- {
-+	return !(status & R1_READY_FOR_DATA) ||
-+		(R1_CURRENT_STATE(status) == R1_STATE_PRG);
-+}
-+
-+static int dw_mci_wait_for_card_ready(struct mmc_card *card)
-+{
-+	struct mmc_host *mmc = card->host;
-+	struct dw_mci_slot *slot = mmc_priv(mmc);
-+	struct dw_mci *host = slot->host;
-+	int err = 0;
-+	u32 status;
-+
-+	do {
-+		err = mmc_send_status(card, &status);
-+		if (err) {
-+			dev_err(host->dev,
-+				"Get card status fail in tuning state\n");
-+			break;
-+		}
-+	} while (dw_mci_card_busy(status));
-+
-+	return err;
-+}
-+
-+static int dw_mci_tuning_test(struct mmc_card *card, u32 opcode,
-+			      struct dw_mci_tuning_data *tuning_data,
-+			      u8 *blk_test)
-+{
-+	struct mmc_host *mmc = card->host;
-+	struct dw_mci_slot *slot = mmc_priv(mmc);
- 	struct dw_mci *host = slot->host;
- 	struct mmc_host *mmc = slot->mmc;
- 	const u8 *blk_pattern = tuning_data->blk_pattern;
-@@ -1330,6 +1358,7 @@ static int dw_mci_tuning_test(struct dw_mci_slot *slot, u32 opcode,
- 	struct mmc_command stop = {0};
- 	struct mmc_data data = {0};
- 	struct scatterlist sg;
-+	int err;
- 
- 	memset(blk_test, 0, blksz);
- 
-@@ -1365,6 +1394,11 @@ static int dw_mci_tuning_test(struct dw_mci_slot *slot, u32 opcode,
- 		dev_dbg(host->dev,
- 			"Tuning error: cmd.error:%d, data.error:%d\n",
- 			cmd.error, data.error);
-+
-+		err = dw_mci_wait_for_card_ready(card);
-+		if (err)
-+			return err;
-+
- 		if (cmd.error)
- 			return cmd.error;
- 		else
-@@ -1372,9 +1406,11 @@ static int dw_mci_tuning_test(struct dw_mci_slot *slot, u32 opcode,
- 	}
- }
- 
--static int dw_mci_execute_generic_tuning(struct dw_mci_slot *slot, u32 opcode,
-+static int dw_mci_execute_generic_tuning(struct mmc_card *card, u32 opcode,
- 					 struct dw_mci_tuning_data *tuning_data)
- {
-+	struct mmc_host *mmc = card->host;
-+	struct dw_mci_slot *slot = mmc_priv(mmc);
- 	struct dw_mci *host = slot->host;
- 	unsigned int blksz = tuning_data->blksz;
- 	u8 *blk_test;
-@@ -1412,7 +1448,7 @@ static int dw_mci_execute_generic_tuning(struct dw_mci_slot *slot, u32 opcode,
- 	for (i = 0; i < NUM_PHASES; i++) {
- 		clk_set_phase(host->sample_clk, i * PHASE_INCREMENT);
- 
--		v = !dw_mci_tuning_test(slot, opcode, tuning_data, blk_test);
-+		v = !dw_mci_tuning_test(card, opcode, tuning_data, blk_test);
- 
- 		if ((!prev_v) && v) {
- 			range_count++;
-@@ -1496,7 +1532,7 @@ static int dw_mci_execute_tuning(struct mmc_card *card, u32 opcode)
- 	if (drv_data && drv_data->execute_tuning)
- 		err = drv_data->execute_tuning(slot, opcode, &tuning_data);
- 	else
--		err = dw_mci_execute_generic_tuning(slot, opcode, &tuning_data);
-+		err = dw_mci_execute_generic_tuning(card, opcode, &tuning_data);
- 	return err;
- }
- 
-diff --git a/include/linux/mmc/card.h b/include/linux/mmc/card.h
-index 4d69c00..40d90ae 100644
---- a/include/linux/mmc/card.h
-+++ b/include/linux/mmc/card.h
-@@ -518,4 +518,6 @@ extern void mmc_unregister_driver(struct device_driver *);
- extern void mmc_fixup_device(struct mmc_card *card,
- 			     const struct mmc_fixup *table);
- 
-+int mmc_send_status(struct mmc_card *card, u32 *status);
-+
- #endif /* LINUX_MMC_CARD_H */
+Looking at the notifier callbacks that call generic time framework 
+functions.
+
+Can you have a look at commit b3e90722 ? and double check your changes ?
+
+A couple of comments below.
+
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>   drivers/clocksource/timer-sun5i.c | 72 +++++++++++++++++++++++++++++++++++++--
+>   1 file changed, 70 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/clocksource/timer-sun5i.c b/drivers/clocksource/timer-sun5i.c
+> index 377e50450781..5841a956f5f0 100644
+> --- a/drivers/clocksource/timer-sun5i.c
+> +++ b/drivers/clocksource/timer-sun5i.c
+> @@ -41,9 +41,13 @@
+>   struct sun5i_timer {
+>   	void __iomem		*base;
+>   	struct clk		*clk;
+> +	struct notifier_block	clk_rate_cb;
+>   	u32			ticks_per_jiffy;
+>   };
+>
+> +#define to_sun5i_timer(x) \
+> +	container_of(x, struct sun5i_timer, clk_rate_cb)
+> +
+>   struct sun5i_timer_clksrc {
+>   	struct sun5i_timer	timer;
+>   	struct clocksource	clksrc;
+> @@ -152,6 +156,30 @@ static cycle_t sun5i_clksrc_read(struct clocksource *clksrc)
+>   	return ~readl(cs->timer.base + TIMER_CNTVAL_LO_REG(1));
+>   }
+>
+> +static int sun5i_rate_cb_clksrc(struct notifier_block *nb,
+> +				unsigned long event, void *data)
+> +{
+> +	struct clk_notifier_data *ndata = data;
+> +	struct sun5i_timer *timer = to_sun5i_timer(nb);
+> +	struct sun5i_timer_clksrc *cs = container_of(timer,
+> +						     struct sun5i_timer_clksrc, timer);
+> +
+> +	switch (event) {
+> +	case PRE_RATE_CHANGE:
+> +		clocksource_unregister(&cs->clksrc);
+> +		break;
+> +
+> +	case POST_RATE_CHANGE:
+> +		clocksource_register_hz(&cs->clksrc, ndata->new_rate);
+> +		break;
+
+Why clocksource_unregister couldn't be in the POST_RATE_CHANGE ?
+
+> +	default:
+> +		break;
+> +	}
+> +
+> +	return NOTIFY_DONE;
+> +}
+> +
+>   static int __init sun5i_setup_clocksource(struct device_node *node,
+>   					  void __iomem *base,
+>   					  struct clk *clk, int irq)
+> @@ -174,6 +202,14 @@ static int __init sun5i_setup_clocksource(struct device_node *node,
+>
+>   	cs->timer.base = base;
+>   	cs->timer.clk = clk;
+> +	cs->timer.clk_rate_cb.notifier_call = sun5i_rate_cb_clksrc;
+> +	cs->timer.clk_rate_cb.next = NULL;
+> +
+> +	ret = clk_notifier_register(clk, &cs->timer.clk_rate_cb);
+> +	if (ret) {
+> +		pr_err("Unable to register clock notifier.\n");
+> +		goto err_disable_clk;
+> +	}
+>
+>   	writel(~0, base + TIMER_INTVAL_LO_REG(1));
+>   	writel(TIMER_CTL_ENABLE | TIMER_CTL_RELOAD,
+> @@ -188,11 +224,13 @@ static int __init sun5i_setup_clocksource(struct device_node *node,
+>   	ret = clocksource_register_hz(&cs->clksrc, rate);
+>   	if (ret) {
+>   		pr_err("Couldn't register clock source.\n");
+> -		goto err_disable_clk;
+> +		goto err_remove_notifier;
+>   	}
+>
+>   	return 0;
+>
+> +err_remove_notifier:
+> +	clk_notifier_unregister(clk, &cs->timer.clk_rate_cb);
+>   err_disable_clk:
+>   	clk_disable_unprepare(clk);
+>   err_free:
+> @@ -200,6 +238,26 @@ err_free:
+>   	return ret;
+>   }
+>
+> +static int sun5i_rate_cb_clkevt(struct notifier_block *nb,
+> +				unsigned long event, void *data)
+> +{
+> +	struct clk_notifier_data *ndata = data;
+> +	struct sun5i_timer *timer = to_sun5i_timer(nb);
+> +	struct sun5i_timer_clkevt *ce = container_of(timer,
+> +						     struct sun5i_timer_clkevt, timer);
+> +	unsigned long flags;
+> +
+> +	if (event == POST_RATE_CHANGE) {
+> +		local_irq_save(flags);
+> +		clockevents_update_freq(&ce->clkevt, ndata->new_rate);
+> +		local_irq_restore(flags);
+
+local_irq_save and local_irq_restore are already in the 
+clockevents_update_freq function.
+
+> +		ce->timer.ticks_per_jiffy = DIV_ROUND_UP(ndata->new_rate, HZ);
+> +	}
+> +
+> +	return NOTIFY_DONE;
+> +}
+> +
+>   static int __init sun5i_setup_clockevent(struct device_node *node, void __iomem *base,
+>   					 struct clk *clk, int irq)
+>   {
+> @@ -223,6 +281,14 @@ static int __init sun5i_setup_clockevent(struct device_node *node, void __iomem
+>   	ce->timer.base = base;
+>   	ce->timer.ticks_per_jiffy = DIV_ROUND_UP(rate, HZ);
+>   	ce->timer.clk = clk;
+> +	ce->timer.clk_rate_cb.notifier_call = sun5i_rate_cb_clkevt;
+> +	ce->timer.clk_rate_cb.next = NULL;
+> +
+> +	ret = clk_notifier_register(clk, &ce->timer.clk_rate_cb);
+> +	if (ret) {
+> +		pr_err("Unable to register clock notifier.\n");
+> +		goto err_disable_clk;
+> +	}
+>
+>   	ce->clkevt.name = node->name;
+>   	ce->clkevt.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
+> @@ -240,7 +306,7 @@ static int __init sun5i_setup_clockevent(struct device_node *node, void __iomem
+>   			  "sun5i_timer0", ce);
+>   	if (ret) {
+>   		pr_err("Unable to register interrupt\n");
+> -		goto err_disable_clk;
+> +		goto err_remove_notifier;
+>   	}
+>
+>   	clockevents_config_and_register(&ce->clkevt, rate,
+> @@ -248,6 +314,8 @@ static int __init sun5i_setup_clockevent(struct device_node *node, void __iomem
+>
+>   	return 0;
+>
+> +err_remove_notifier:
+> +	clk_notifier_unregister(clk, &ce->timer.clk_rate_cb);
+>   err_disable_clk:
+>   	clk_disable_unprepare(clk);
+>   err_free:
+>
+
+
 -- 
-1.8.3.2
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
