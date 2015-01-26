@@ -1,55 +1,74 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 26 Jan 2015 12:55:07 +0100
-Subject: [PATCH RESEND v3 0/3] irqchip: vf610-mscm: add support for MSCM
- interrupt router
-In-Reply-To: <alpine.DEB.2.11.1501261115300.5526@nanos>
-References: <1421309046-22452-1-git-send-email-stefan@agner.ch>
- <alpine.DEB.2.11.1501261115300.5526@nanos>
-Message-ID: <36990c90fa3d2ee0849227f31cbafb54@agner.ch>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon, 26 Jan 2015 13:57:14 +0200
+Subject: [PATCH v5 0/2] clocksource: Conexant CX92755 timers support
+Message-ID: <cover.1422272518.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-01-26 11:16, Thomas Gleixner wrote:
-> On Thu, 15 Jan 2015, Stefan Agner wrote:
-> 
->> Splitted out version of the MSCM driver. My first driver based on the
->> routeable domain support and was part of the Vybrid Cortex-M4 support
->> patchset.
->>
->> So far the MSCM interrupt router was initialized by the boot loader
->> and configured all interrupts for the Cortex-A5 CPU. There are two
->> use cases where a proper driver is necessary:
->> - To run Linux on the Cortex-M4. When the kernel is running on the
->>   non-preconfigured CPU, the interrupt router need to be configured
->>   properly.
->> - To support deeper sleep modes: LPSTOP clears the interrupt router
->>   configuration, hence a driver needs to restore the configuration
->>   on resume.
->> I created a seperate patchset for that driver which hopefully makes
->> it easier to get it into mergeable state.
->>
->> Since I identified some registers likely to be used by other drivers
->> (e.g. CPU ID or the CPU Generate Interrupt Register) I also added
->> the "syscon" compatible string to make the registers available for
->> other drivers in case needed.
->>
->> This resend version of this patchset is rebased on v3.19-rc4.
-> 
-> Has the discussion with Marc on the original V3 set been resolved?
+This short series adds support for the Conexant CX92755 SoC timers. This SoC is
+part of the Conexant Digicolor series of SoCs.
 
-There was no answer to the original v3 patch. The comments of Marc was
-back in the v2 set, and has been resolved in v3. However, no Ack from
-Marc so far.
+v5:
+   * Switch back to use of_iomap (not of_io_request_and_map), as the watchdog 
+	 driver also needs access to the same registers; add a comment clarifying 
+	 this
 
- 
-> What about the DT bindings? I'm relucant to pick that up w/o acks from
-> the DT folks.
+   Address more review comments by Daniel Lezcano:
 
-The bindings are straight forward interrupt-controller bindings, since
-it uses the hierarchic irq domain stuff. The only uncommon thing is that
-I also added "syscon" as compatible, since the module has functionality
-which might be required by other drivers (e.g. register to generate
-CPU2CPU interrupt or processor personality information).
+   * Properly encapsulate the static objects for the clock_event code
 
---
-Stefan
+   * Use dc_timer_{disable,enable,set_count} accessors to make the code clearer
+
+v4:
+   http://thread.gmane.org/gmane.linux.kernel/1874017
+
+   Address review comments by Daniel Lezcano:
+
+   * Use macros for register configuration values
+
+   * Encapsulate static objects in a struct
+
+   * Use of_io_request_and_map to exclusively map registers
+
+   * Use UINT_MAX instead of ~0
+
+   * Use request_irq instead of setup_irq, obviating the need for a separate 
+     irqaction struct
+
+v3:
+   http://article.gmane.org/gmane.linux.kernel/1870628
+   http://article.gmane.org/gmane.linux.kernel/1870627
+
+   * Split into a separate clocksource series
+
+v2:
+   http://article.gmane.org/gmane.linux.kernel/1861850
+   http://article.gmane.org/gmane.linux.kernel/1861853
+
+   * Change the timer dt binding, so that the 'reg' property points to the
+     first "Agent Communication" register. This should improve the chance of
+     reusing this binding for other SoCs in this series.
+
+   * Add the CONTROL() and COUNT() macros to the timer driver to make the code
+     clearer.
+
+   * Move arch/arm Kconfig changes from the clocksource driver patch to the
+     base arch support patch to reduce dependency between them
+
+v1:
+   http://article.gmane.org/gmane.linux.kernel/1855028
+   http://article.gmane.org/gmane.linux.kernel/1855025
+
+Baruch Siach (2):
+  clocksource: devicetree: document Conexant Digicolor timer binding
+  clocksource: driver for Conexant Digicolor SoC timer
+
+ .../devicetree/bindings/timer/digicolor-timer.txt  |  18 ++
+ drivers/clocksource/Makefile                       |   1 +
+ drivers/clocksource/timer-digicolor.c              | 199 +++++++++++++++++++++
+ 3 files changed, 218 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/timer/digicolor-timer.txt
+ create mode 100644 drivers/clocksource/timer-digicolor.c
+
+-- 
+2.1.4
