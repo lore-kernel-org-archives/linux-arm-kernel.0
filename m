@@ -1,168 +1,42 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 26 Jan 2015 02:15:45 +0000 (UTC)
-Subject: [PATCH v2] ARM: AM43xx: hwmod: add VPFE hwmod entries
-In-Reply-To: <1422217915-24231-1-git-send-email-prabhakar.csengg@gmail.com>
-References: <1422217915-24231-1-git-send-email-prabhakar.csengg@gmail.com>
-Message-ID: <alpine.DEB.2.02.1501260205090.5450@utopia.booyaka.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 26 Jan 2015 11:26:16 +0900
+Subject: [PATCH] ARM: shmobile: Select CONFIG_REGULATOR in defconfig once again
+Message-ID: <1422239176-978-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-On Sun, 25 Jan 2015, Lad, Prabhakar wrote:
+eb4513482d1c4882e3633528ccc48d77581b7bb1
+(ARM: shmobile: Enable kzm9g board in multiplatform defconfig)
+dropped CONFIG_REGULATOR from shmobile_defconfig as it was
+generated using a tree where CONFIG_REGULATOR is indirectly
+selected by ARCH_SH73A0.
 
-> From: Benoit Parrot <bparrot@ti.com>
-> 
-> this patch adds VPFE HWMOD data for AM43xx.
-> 
-> Signed-off-by: Benoit Parrot <bparrot@ti.com>
-> Signed-off-by: Darren Etheridge <detheridge@ti.com>
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
-> ---
->  Hi Paul,
->  
->  You were right, the hardware team has confirmed that, the VPFE master port is
->  connected to L3 and the VPFE slave port is connected to L4. The L3 port cannot
->  serve as a register target because it is initiator only.
+ARCH_SH73A0 is not queued up for v3.20 and thus, baring unforeseen
+changes, CONFIG_REGULATOR will not be selected by shmobile_defconfig
+in that release. This causes at least SDHI to stop working on
+R-Car Gen2 SoCs.
 
-OK makes sense to me.,
+Reported-by: Magnus Damm <damm+renesas@opensource.se>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+[horms: minimal patch targeted as a fix]
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/configs/shmobile_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
->  
->  I have created links referring to dss l3/l4 hwmod and tested it, lemme know
->  if I have missed something.
-
-A few minor comments below
-
->  
->  arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 72 ++++++++++++++++++++++++++++++
->  arch/arm/mach-omap2/prcm43xx.h             |  3 +-
->  2 files changed, 74 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-> index 5c6c841..3787824 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-> @@ -514,6 +514,44 @@ static struct omap_hwmod am43xx_dss_rfbi_hwmod = {
->  	},
->  };
->  
-> +static struct omap_hwmod_class_sysconfig am43xx_vpfe_sysc = {
-> +	.rev_offs       = 0x0,
-> +	.sysc_offs      = 0x104,
-> +	.sysc_flags     = SYSC_HAS_MIDLEMODE | SYSC_HAS_SIDLEMODE,
-> +	.idlemodes      = (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
-> +				MSTANDBY_FORCE | MSTANDBY_SMART | MSTANDBY_NO),
-> +	.sysc_fields    = &omap_hwmod_sysc_type2,
-> +};
-> +
-> +static struct omap_hwmod_class am43xx_vpfe_hwmod_class = {
-> +	.name           = "vpfe",
-> +	.sysc           = &am43xx_vpfe_sysc,
-> +};
-> +
-> +static struct omap_hwmod am43xx_vpfe0_hwmod = {
-> +	.name           = "vpfe0",
-> +	.class          = &am43xx_vpfe_hwmod_class,
-> +	.clkdm_name     = "l3s_clkdm",
-> +	.prcm           = {
-> +		.omap4  = {
-> +			.modulemode     = MODULEMODE_SWCTRL,
-> +			.clkctrl_offs   = AM43XX_CM_PER_VPFE0_CLKCTRL_OFFSET,
-> +		},
-> +	},
-> +};
-> +
-> +static struct omap_hwmod am43xx_vpfe1_hwmod = {
-> +	.name           = "vpfe1",
-> +	.class          = &am43xx_vpfe_hwmod_class,
-> +	.clkdm_name     = "l3s_clkdm",
-> +	.prcm           = {
-> +		.omap4  = {
-> +			.modulemode     = MODULEMODE_SWCTRL,
-> +			.clkctrl_offs   = AM43XX_CM_PER_VPFE1_CLKCTRL_OFFSET,
-> +		},
-> +	},
-> +};
-> +
->  /* Interfaces */
->  static struct omap_hwmod_ocp_if am43xx_l3_main__l4_hs = {
->  	.master		= &am33xx_l3_main_hwmod,
-> @@ -788,6 +826,36 @@ static struct omap_hwmod_ocp_if am43xx_l4_ls__dss_rfbi = {
->  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
->  };
->  
-> +static struct omap_hwmod_ocp_if am43xx_l3__vpfe0 = {
-> +	.master         = &am43xx_vpfe0_hwmod,
-> +	.slave          = &am33xx_l3_main_hwmod,
-> +	.clk            = "l3_gclk",
-> +	.flags          = OCPIF_SWSUP_IDLE,
-
-OCPIF_SWSUP_IDLE probably isn't needed here.  Could you please try without 
-it?
-
-> +	.user           = OCP_USER_MPU | OCP_USER_SDMA,
-> +};
-> +
-> +static struct omap_hwmod_ocp_if am43xx_l3__vpfe1 = {
-> +	.master         = &am43xx_vpfe1_hwmod,
-> +	.slave          = &am33xx_l3_main_hwmod,
-> +	.clk            = "l3_gclk",
-> +	.flags          = OCPIF_SWSUP_IDLE,
-
-Same point as the above.
-
-> +	.user           = OCP_USER_MPU | OCP_USER_SDMA,
-> +};
-> +
-> +static struct omap_hwmod_ocp_if am43xx_l4_ls__vpfe0 = {
-> +	.master         = &am33xx_l4_ls_hwmod,
-> +	.slave          = &am43xx_vpfe0_hwmod,
-> +	.clk            = "l4ls_gclk",
-> +	.user           = OCP_USER_MPU | OCP_USER_SDMA,
-> +};
-> +
-> +static struct omap_hwmod_ocp_if am43xx_l4_ls__vpfe1 = {
-> +	.master         = &am33xx_l4_ls_hwmod,
-> +	.slave          = &am43xx_vpfe1_hwmod,
-> +	.clk            = "l4ls_gclk",
-> +	.user           = OCP_USER_MPU | OCP_USER_SDMA,
-> +};
-> +
->  static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
->  	&am33xx_l4_wkup__synctimer,
->  	&am43xx_l4_ls__timer8,
-> @@ -887,6 +955,10 @@ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
->  	&am43xx_l4_ls__dss,
->  	&am43xx_l4_ls__dss_dispc,
->  	&am43xx_l4_ls__dss_rfbi,
-> +	&am43xx_l3__vpfe0,
-> +	&am43xx_l3__vpfe1,
-> +	&am43xx_l4_ls__vpfe0,
-> +	&am43xx_l4_ls__vpfe1,
->  	NULL,
->  };
->  
-> diff --git a/arch/arm/mach-omap2/prcm43xx.h b/arch/arm/mach-omap2/prcm43xx.h
-> index ad7b3e9..8aa4c2c 100644
-> --- a/arch/arm/mach-omap2/prcm43xx.h
-> +++ b/arch/arm/mach-omap2/prcm43xx.h
-> @@ -143,5 +143,6 @@
->  #define AM43XX_CM_PER_USB_OTG_SS1_CLKCTRL_OFFSET        0x0268
->  #define AM43XX_CM_PER_USBPHYOCP2SCP1_CLKCTRL_OFFSET	0x05C0
->  #define AM43XX_CM_PER_DSS_CLKCTRL_OFFSET		0x0a20
-> -
-> +#define AM43XX_CM_PER_VPFE0_CLKCTRL_OFFSET		0x0068
-> +#define AM43XX_CM_PER_VPFE1_CLKCTRL_OFFSET		0x0070
->  #endif
-> -- 
-> 2.1.0
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-
-
-- Paul
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+index 4f9868d..b553e2c 100644
+--- a/arch/arm/configs/shmobile_defconfig
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -118,6 +118,7 @@ CONFIG_WATCHDOG=y
+ CONFIG_DA9063_WATCHDOG=y
+ CONFIG_MFD_AS3711=y
+ CONFIG_MFD_DA9063=y
++CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_AS3711=y
+ CONFIG_REGULATOR_DA9210=y
+ CONFIG_REGULATOR_GPIO=y
+-- 
+2.1.4
