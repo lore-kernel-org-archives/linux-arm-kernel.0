@@ -1,22 +1,36 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Mon, 26 Jan 2015 13:32:42 -0800
-Subject: [PATCH] drivers: net: xgene: fix: Out of order descriptor bytes
- read
-In-Reply-To: <1422307652.29618.30.camel@edumazet-glaptop2.roam.corp.google.com>
-References: <1421957007-720-1-git-send-email-isubramanian@apm.com>
- <1421967050.3471.14.camel@edumazet-glaptop2.roam.corp.google.com>
- <CAKh23FmxvV82mVrHq5jv-FE+e6u6CkW+xL_a2_ULAQgP_mM2VA@mail.gmail.com>
- <1422307652.29618.30.camel@edumazet-glaptop2.roam.corp.google.com>
-Message-ID: <1422307962.29618.31.camel@edumazet-glaptop2.roam.corp.google.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Mon, 26 Jan 2015 13:48:03 -0800
+Subject: [PATCH 1/5] compat: Declare compat_sys_sigpending and
+ compat_sys_sigprocmask prototypes
+In-Reply-To: <1420819048-3515-2-git-send-email-catalin.marinas@arm.com>
+References: <1420819048-3515-1-git-send-email-catalin.marinas@arm.com>
+ <1420819048-3515-2-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20150126134803.99158a48850283da3d67d6cf@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-01-26 at 13:27 -0800, Eric Dumazet wrote:
+On Fri,  9 Jan 2015 15:57:24 +0000 Catalin Marinas <catalin.marinas@arm.com> wrote:
 
-> What happens if you compile a kernel with CONFIG_SMP=n ?
+> __ARCH_WANT_SYS_SIGPENDING or __ARCH_WANT_SYS_SIGPROGMASK may be defined
+> for compat support but the corresponding prototypes are missing from
+> linux/compat.h.
 > 
-> 
-> Most drivers in drivers/net use rmb() in this case, not smp_rmb() or
-> barrier()
+> ...
+>
+> --- a/include/linux/compat.h
+> +++ b/include/linux/compat.h
+> @@ -689,6 +689,15 @@ asmlinkage long compat_sys_sendfile64(int out_fd, int in_fd,
+>  asmlinkage long compat_sys_sigaltstack(const compat_stack_t __user *uss_ptr,
+>  				       compat_stack_t __user *uoss_ptr);
+>  
+> +#ifdef __ARCH_WANT_SYS_SIGPENDING
+> +asmlinkage long compat_sys_sigpending(compat_old_sigset_t __user *set);
+> +#endif
+> +
+> +#ifdef __ARCH_WANT_SYS_SIGPROCMASK
+> +asmlinkage long compat_sys_sigprocmask(int how, compat_old_sigset_t __user *nset,
+> +				       compat_old_sigset_t __user *oset);
+> +#endif
+> +
 
-Note that dma_rmb() was recently added as well.
+ack, please merge and submit.
