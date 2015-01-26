@@ -1,59 +1,65 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 26 Jan 2015 08:14:55 -0800
-Subject: N900 v3.19-rc5 arm atags_to_fdt.c is broken
-In-Reply-To: <201501232336.36187@pali>
-References: <201501232239.55801@pali>
- <201501232336.36187@pali>
-Message-ID: <20150126161454.GE28663@atomide.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 26 Jan 2015 17:19:50 +0100
+Subject: [GIT PULL] at91: dt for 3.20 #2
+Message-ID: <1422289190-29638-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pali Roh?r <pali.rohar@gmail.com> [150123 14:39]:
-> On Friday 23 January 2015 22:39:55 Pali Roh?r wrote:
-> > Hello,
-> > 
-> > when I boot zImage with appended DT n900 in qemu
-> > fdt_open_into() function called from file
-> > arch/arm/boot/compressed/atags_to_fdt.c (in function
-> > atags_to_fdt) always returns -FDT_ERR_NOSPACE.
-> > 
-> > It means that all ATAGS (including cmdline arguments) passed
-> > by bootloader are ignored.
-> > 
-> > On real n900 device I see that booted DT version also ignore
-> > cmdline arguments from bootloader. I cannot debug decompress
-> > code on real device, but I think it is same problem as in
-> > qemu.
-> 
-> Looks like this quick patch is fixing above problem:
-> 
-> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> index 68be901..4a7d75b 100644
-> --- a/arch/arm/boot/compressed/head.S
-> +++ b/arch/arm/boot/compressed/head.S
-> @@ -268,7 +268,7 @@ restart:	adr	r0, LC0
->  		 * area.  No GOT fixup has occurred yet, but none of the
->  		 * code we're about to call uses any global variable.
->  		*/
-> -		add	sp, sp, #0x10000
-> +		add	sp, sp, #0x20000
->  		stmfd	sp!, {r0-r3, ip, lr}
->  		mov	r0, r8
->  		mov	r1, r6
-> @@ -289,7 +289,7 @@ restart:	adr	r0, LC0
->  		bleq	atags_to_fdt
->  
->  		ldmfd	sp!, {r0-r3, ip, lr}
-> -		sub	sp, sp, #0x10000
-> +		sub	sp, sp, #0x20000
->  #endif
->  
->  		mov	r8, r6			@ use the appended device tree
+Arnd, Olof, Kevin,
 
-Nico, got any ideas about this one? This seems like a regression
-somewhere..
+Some more little modifications for the DT on several products. The
+corresponding code in drivers is already queued in the relevant maintainers'
+git trees and there are no dependencies.
 
-Regards,
+Thanks, best regards,
 
-Tony
- 
+The following changes since commit 4dd32e6d24932b0b0327d3a8ce526a56446e9b98:
+
+  ARM: at91: dts: sama5d3: add ov2640 camera sensor support (2015-01-15 16:14:27 +0100)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-dt2
+
+for you to fetch changes up to c7f85be1fdd130490b8b525b8f3a821a59e75feb:
+
+  ARM: at91/dt: sam9263: Add ac97 device node (2015-01-26 17:00:04 +0100)
+
+----------------------------------------------------------------
+Second DT batch for 3.20:
+- correct some pin configuration for at91sam9x5ek
+- add pioD on sama5d4 following a modification of pinctrl driver
+- add more precise nand compatibility string for sama5d4
+- audio modifications for wm8904 or ac97
+
+----------------------------------------------------------------
+Alexander Morozov (1):
+      ARM: at91: sama5d3xek/dt: use dt ids for wm8904
+
+Alexander Stein (2):
+      dt: atmel_ac97c: Add device tree documentation
+      ARM: at91/dt: sam9263: Add ac97 device node
+
+Bo Shen (1):
+      ARM: at91: at91sam9n12ek/dt: use dt ids for wm8904
+
+Josh Wu (1):
+      ARM: at91: sama5d4: dts: change the nand compatible string
+
+Ludovic Desroches (1):
+      ARM: at91/dt: sama5d4: add pioD controller
+
+Sylvain Rochet (1):
+      ARM: at91/dt: disable pull-up on vbus-gpio (PB16) to reduce power consumption
+
+ .../devicetree/bindings/sound/atmel_ac97c.txt       | 20 ++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9263.dtsi                  | 21 +++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9n12ek.dts                 |  2 +-
+ arch/arm/boot/dts/at91sam9x5ek.dtsi                 |  9 +++++++++
+ arch/arm/boot/dts/sama5d3xmb.dtsi                   |  2 +-
+ arch/arm/boot/dts/sama5d4.dtsi                      | 15 ++++++++++++++-
+ 6 files changed, 66 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/sound/atmel_ac97c.txt
+
+-- 
+Nicolas Ferre
