@@ -1,55 +1,86 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 26 Jan 2015 13:37:55 +0100
-Subject: [GIT PULL] ARM: mediatek: arm64 changes for v3.20
-Message-ID: <CABuKBeLPAHkKZ-1wYDgnWK6FxCq=EQerw_PLbThJkf6JmhgH8Q@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 26 Jan 2015 12:45:31 +0000
+Subject: [PATCH 4/7] ARM: at91: enable the L2 Cache controller
+In-Reply-To: <1422266836-24592-1-git-send-email-wenyou.yang@atmel.com>
+References: <1422266617-24381-1-git-send-email-wenyou.yang@atmel.com>
+ <1422266836-24592-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20150126124531.GH26493@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Olof,
+On Mon, Jan 26, 2015 at 06:07:16PM +0800, Wenyou Yang wrote:
+> +#ifdef CONFIG_CACHE_L2X0
+> +static void __init at91_init_l2cache(void)
+> +{
+> +	struct device_node *np;
+> +	u32 reg;
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "arm,pl310-cache");
+> +	if (!np)
+> +		return;
+> +
+> +	at91_l2cc_base = of_iomap(np, 0);
+> +	if (!at91_l2cc_base)
+> +		panic("unable to map l2cc cpu registers\n");
+> +
+> +	of_node_put(np);
+> +
+> +	/* Disable cache if it hasn't been done yet */
+> +	if (readl_relaxed(at91_l2cc_base + L2X0_CTRL) & L2X0_CTRL_EN)
+> +		writel_relaxed(~L2X0_CTRL_EN, at91_l2cc_base + L2X0_CTRL);
+> +
+> +	/* Prefetch Control */
+> +	reg = readl_relaxed(at91_l2cc_base + L310_PREFETCH_CTRL);
+> +	reg &= ~L310_PREFETCH_CTRL_OFFSET_MASK;
+> +	reg |= 0x01;
+> +	reg |= L310_PREFETCH_CTRL_DBL_LINEFILL_INCR;
+> +	reg |= L310_PREFETCH_CTRL_PREFETCH_DROP;
+> +	reg |= L310_PREFETCH_CTRL_DATA_PREFETCH;
+> +	reg |= L310_PREFETCH_CTRL_INSTR_PREFETCH;
+> +	reg |= L310_PREFETCH_CTRL_DBL_LINEFILL;
+> +	writel_relaxed(reg, at91_l2cc_base + L310_PREFETCH_CTRL);
+> +
+> +	/* Power Control */
+> +	reg = readl_relaxed(at91_l2cc_base + L310_POWER_CTRL);
+> +	reg |= L310_STNDBY_MODE_EN;
+> +	reg |= L310_DYNAMIC_CLK_GATING_EN;
+> +	writel_relaxed(reg, at91_l2cc_base + L310_POWER_CTRL);
+> +
+> +	/* Disable interrupts */
+> +	writel_relaxed(0x00, at91_l2cc_base + L2X0_INTR_MASK);
+> +	writel_relaxed(0x01ff, at91_l2cc_base + L2X0_INTR_CLEAR);
 
-Please take the following arm64 patches for v3.20.
+Stop hacking around the core L2x0 code.  None of the above should be
+necessary, and is in fact potentially dangerous if the cache was already
+previously enabled.  Disabling an already enabled cache is a potential
+data corrupting event.
 
-Cheers,
-Matthias
+Any of the above configuration should be performed by your boot loader
+or board firmware, and if not, then we need DT properties for it.
 
----
+The last thing we need is platforms buggering around in this way, so
+consider this a firm NAK against this approach.
 
-The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+> +	l2x0_of_init(0, ~0UL);
+> +}
+> +#else
+> +static inline void at91_init_l2cache(void) {}
+> +#endif
+> +
+>  static void __init sama5_dt_device_init(void)
+>  {
+> +	at91_init_l2cache();
+> +
+>  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>  	at91_sam9x5_pm_init();
+>  }
+> -- 
+> 1.7.9.5
 
-  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+In fact, none of this code is necessary.  If you set l2c_aux_mask and
+l2c_aux_val (preferably to ~0 and 0 respectively) then the generic ARM
+code will initialise the L2 cache in the appropriate way for you.
 
-are available in the git repository at:
-
-  https://github.com/mbgg/linux-mediatek.git tags/v3.20-next-arm64
-
-for you to fetch changes up to 4727a6f631bf3ab2a0373acd27d40483446fcb8a:
-
-  arm64: mediatek: Add MT8173 SoC Kconfig and defconfig (2015-01-26
-13:26:48 +0100)
-
-----------------------------------------------------------------
-Add support for mt8173 SoC from Mediatek.
-
-- add DT bindings documentation
-- add dts files for SoC and evaluation board
-- add to Kconfig and defconfig
-
-----------------------------------------------------------------
-Eddie Huang (3):
-      Document: DT: Add bindings for mediatek MT8173 SoC Platform
-      arm64: dts: Add mediatek MT8173 SoC and evaluation board dts and Makefile
-      arm64: mediatek: Add MT8173 SoC Kconfig and defconfig
-
- Documentation/devicetree/bindings/arm/mediatek.txt |   4 +
- .../bindings/arm/mediatek/mediatek,sysirq.txt      |   1 +
- .../devicetree/bindings/serial/mtk-uart.txt        |   4 +-
- arch/arm64/Kconfig                                 |   6 +
- arch/arm64/boot/dts/Makefile                       |   1 +
- arch/arm64/boot/dts/mediatek/Makefile              |   5 +
- arch/arm64/boot/dts/mediatek/mt8173-evb.dts        |  38 +++++
- arch/arm64/boot/dts/mediatek/mt8173.dtsi           | 168 +++++++++++++++++++++
- arch/arm64/configs/defconfig                       |   2 +
- 9 files changed, 228 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/boot/dts/mediatek/Makefile
- create mode 100644 arch/arm64/boot/dts/mediatek/mt8173-evb.dts
- create mode 100644 arch/arm64/boot/dts/mediatek/mt8173.dtsi
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
