@@ -1,80 +1,114 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 26 Jan 2015 15:16:00 +0100
-Subject: [PATCH v2 16/27] ARM: mvebu: armada-xp-axpwifiap: Relicense the
- device tree under GPLv2+/X11
-In-Reply-To: <1422281771-31443-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1422281771-31443-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1422281771-31443-17-git-send-email-gregory.clement@free-electrons.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 26 Jan 2015 15:18:53 +0100
+Subject: [PATCH RESEND v3 2/3] irqchip: vf610-mscm: dt-bindings: add
+ MSCM bindings
+In-Reply-To: <20150126133602.GG23313@leverpostej>
+References: <1421309046-22452-1-git-send-email-stefan@agner.ch>
+ <1421309046-22452-3-git-send-email-stefan@agner.ch>
+ <20150126133602.GG23313@leverpostej>
+Message-ID: <e8f5ff60a8da4c7539d9a33d162bb773@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current GPL only licensing on the device tree makes it very
-impractical for other software components licensed under another
-license.
+On 2015-01-26 14:36, Mark Rutland wrote:
+> On Thu, Jan 15, 2015 at 08:04:05AM +0000, Stefan Agner wrote:
+>> Add binding documentation for Miscellaneous System Control Module
+>> found in Freescale Vybrid SoC's.
+>>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> ---
+>>  .../bindings/arm/freescale/fsl,vf610-mscm.txt         | 19 +++++++++++++++++++
+>>  1 file changed, 19 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm.txt
+>> new file mode 100644
+>> index 0000000..e051b88
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm.txt
+>> @@ -0,0 +1,19 @@
+>> +Freescale Vybrid Miscellaneous System Control Module
+>> +
+>> +The MSCM IP contains Access Control and TrustZone Security hardware,
+>> +CPU Configuration registers and Interrupt Router control.
+>> +
+>> +Required properties:
+>> +- compatible : "fsl,vf610-mscm", "syscon"
+> 
+> I'm a little concerned by this also being a syscon. What other devices
+> need to refer to this block as a syscon?
+> 
 
-In order to make it easier for them to reuse our device trees,
-relicense our device trees under a GPL/X11 dual-license.
+The block offers several functionality. I'm happy we can discuss this
+here a bit more in depth, since I'm really not sure if the current
+solution is the best solution...
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Acked-by: Jason Cooper <jason@lakedaemon.net>
-Acked-by: Arnaud Ebalard <arno@natisbad.org>
-Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/boot/dts/armada-xp-axpwifiap.dts | 40 ++++++++++++++++++++++++++++---
- 1 file changed, 37 insertions(+), 3 deletions(-)
+Due to the general rule to not split hardware modules, I hesitated to
+make different nodes out of it. However, this module has some quite
+distinct sub-modules, hence I guess it would be also feasible to do so:
 
-diff --git a/arch/arm/boot/dts/armada-xp-axpwifiap.dts b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
-index 28174ab019f9..c1fbab243609 100644
---- a/arch/arm/boot/dts/armada-xp-axpwifiap.dts
-+++ b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
-@@ -10,9 +10,43 @@
-  *
-  * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-  *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
- /dts-v1/;
--- 
-2.1.0
+0x40001000-0x4000105C - Processor information e.g. which processor ID is
+the accessing processor (processor identity), cache size etc...
+0x40001800-0x40001820 - CPU2CPU directed interrupt generation/clear
+registers...
+0x40001880-0x4000195E - the actual interrupt router
+0x40001C00-0x40001DDC - ACTZS TrustZone registers...
+
+This driver accesses the first and the third block. The first block is
+necessary since the driver needs to know which CPU ID it is running on
+to actually program the interrupt router (Note: this is a heterogeneous
+multiprocessing system. This are actually treated as two independent UP
+systems, considering that Linux can also run on the Cortex-M4).
+
+Hence, the syscon definition which would allow to access other areas as
+needed, especially the processor information might be needed by any
+other peripheral (driver) which needs to know what CPU it is running on.
+What do you think?
+
+OTH, we could as well split it up in three or even four nodes. The MSCM
+interrupt router part just needs to access the the MSCM processor
+information part somehow (syscon?)...
+
+Fwiw, in our downstream kernel, the CPU2CPU interrupts are used for
+Freescales messaging system (MCC). I hacked a special interface in that
+early version of this driver, to export this functionality. But then I
+guess such a functionality should not affect the device tree
+bindings...?
+http://git.toradex.com/cgit/linux-toradex.git/commit/?h=toradex_vf_3.18-next&id=6f0bbad6b805cf2014eec54531dbe4ddb4867a91
+
+For detailed information, the module is documented in the public
+reference manual, chapter 64.
+http://www.freescale.com/webapp/sps/site/prod_summary.jsp?code=VF6xx&fpsp=1&tab=Documentation_Tab
+
+>> +- interrupt-controller : Identifies the node as an interrupt controller
+>> +- #interrupt-cells : Two cells, interrupt number and flags (IRQ type)
+> 
+> What numbers and flags are valid?
+> 
+
+The first cell is the hardware interrupt ID according to the MSCM
+interrupt router. The flags gets passed to the GIC interrupt controller
+only, hence those are the one which are supported by the GIC controller.
+
+
+Will add that information, thx.
+
+--
+Stefan
+
+> Mark.
+> 
+>> +- reg : the register range of the MSCM module
+>> +
+>> +Example:
+>> +	mscm: mscm at 40001000 {
+>> +		compatible = "fsl,vf610-mscm", "syscon";
+>> +		interrupt-controller;
+>> +		#interrupt-cells = <2>;
+>> +		interrupt-parent = <&intc>;
+>> +		reg = <0x40001000 0x1000>;
+>> +	}
+>> --
+>> 2.2.1
+>>
+>>
