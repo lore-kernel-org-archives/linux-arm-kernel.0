@@ -1,10 +1,10 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 26 Jan 2015 15:15:56 +0100
-Subject: [PATCH v2 12/27] ARM: mvebu: armada-388-db: Relicense the device tree
+Date: Mon, 26 Jan 2015 15:15:54 +0100
+Subject: [PATCH v2 10/27] ARM: mvebu: armada-375: Relicense the device tree
  under GPLv2+/X11
 In-Reply-To: <1422281771-31443-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1422281771-31443-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1422281771-31443-13-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1422281771-31443-11-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -21,15 +21,15 @@ Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 Acked-by: Marcin Wojtas <mw@semihalf.com>
 Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-388-db.dts | 40 ++++++++++++++++++++++++++++++++++---
+ arch/arm/boot/dts/armada-375.dtsi | 40 ++++++++++++++++++++++++++++++++++++---
  1 file changed, 37 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-388-db.dts b/arch/arm/boot/dts/armada-388-db.dts
-index e200836c30be..16512efcd32c 100644
---- a/arch/arm/boot/dts/armada-388-db.dts
-+++ b/arch/arm/boot/dts/armada-388-db.dts
+diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
+index 126bf7e9e6b4..ba3c57e0af72 100644
+--- a/arch/arm/boot/dts/armada-375.dtsi
++++ b/arch/arm/boot/dts/armada-375.dtsi
 @@ -6,9 +6,43 @@
-  *
+  * Gregory CLEMENT <gregory.clement@free-electrons.com>
   * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
   *
 - * This file is licensed under the terms of the GNU General Public
@@ -74,6 +74,6 @@ index e200836c30be..16512efcd32c 100644
 + *     OTHER DEALINGS IN THE SOFTWARE.
   */
  
- /dts-v1/;
+ #include "skeleton.dtsi"
 -- 
 2.1.0
