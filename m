@@ -1,158 +1,172 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Mon, 26 Jan 2015 18:08:58 +0800
-Subject: [PATCH 7/7] pm: at91: add disable/enable the mpddrc's clock and DDR
- clock support
+Date: Mon, 26 Jan 2015 18:07:57 +0800
+Subject: [PATCH 5/7] pm: at91: add disable/enable the L1/L2 cache while
+ suspend/resume
 In-Reply-To: <1422266617-24381-1-git-send-email-wenyou.yang@atmel.com>
 References: <1422266617-24381-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1422266938-24700-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1422266877-24628-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to decrease the power consumption, when go to suspend,
-disable the mpddr controller peripheral clock and the DDR clock
-after the DDR enters the self-refresh mode.
-
-Due the mpddr controller's issue, postpone the disable clocks operation,
-instead of the DDR enters self-fresh mode immediately.
-
-Enable the clocks after resume and before the DDR exits the self-refresh mode.
+For the sama5, disable L1 D-cache and L2 cache before the cpu go to wfi,
+after wakeing up, enable L1 D-cache and L2 cache.
 
 Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 ---
- arch/arm/mach-at91/pm.c         |    4 +++
- arch/arm/mach-at91/pm.h         |    8 +++++
- arch/arm/mach-at91/pm_suspend.S |   64 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 76 insertions(+)
+ arch/arm/mach-at91/pm.c         |    9 ++++
+ arch/arm/mach-at91/pm_suspend.S |  107 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 116 insertions(+)
 
 diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index 50cde92..6bd2a6b 100644
+index f75dc32..50cde92 100644
 --- a/arch/arm/mach-at91/pm.c
 +++ b/arch/arm/mach-at91/pm.c
-@@ -145,6 +145,10 @@ static void at91_pm_suspend(suspend_state_t state)
+@@ -35,6 +35,9 @@
+ #include "generic.h"
+ #include "pm.h"
+ 
++void __weak at91_disable_l1_l2_cache(void) {}
++void __weak at91_enable_l1_l2_cache(void) {}
++
+ struct at91_pm_struct at91_pm_data;
+ 
+ static int at91_pm_valid_state(suspend_state_t state)
+@@ -142,8 +145,14 @@ static void at91_pm_suspend(suspend_state_t state)
  	pm_data |= (state == PM_SUSPEND_MEM) ?
  				AT91_PM_MODE(AT91_PM_SLOW_CLOCK) : 0;
  
-+	pm_data |= AT91_PM_DDRCK(at91_pm_data.ddrck_id);
++	/* Disable L1 D-cache and L2 cache */
++	at91_disable_l1_l2_cache();
 +
-+	pm_data |= AT91_PM_DDRC_ID(at91_pm_data.mpddrc_id[0]);
+ 	at91_suspend_sram_fn(at91_pmc_base, at91_ramc_base[0],
+ 				at91_ramc_base[1], pm_data);
 +
- 	/* Disable L1 D-cache and L2 cache */
- 	at91_disable_l1_l2_cache();
++	/* Enable L1 D-cache and L2 cache */
++	at91_enable_l1_l2_cache();
+ }
  
-diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
-index 158575e..fd4c5fc 100644
---- a/arch/arm/mach-at91/pm.h
-+++ b/arch/arm/mach-at91/pm.h
-@@ -19,6 +19,14 @@
- #define	AT91_PM_MODE_MASK	0x0f
- #define	AT91_PM_MODE(x)		(((x) & AT91_PM_MODE_MASK) << AT91_PM_MODE_OFFSET)
- 
-+#define	AT91_PM_DDRCK_OFFSET	8
-+#define	AT91_PM_DDRCK_MASK	0xff
-+#define	AT91_PM_DDRCK(x)	(((x) & AT91_PM_DDRCK_MASK) << AT91_PM_DDRCK_OFFSET)
-+
-+#define	AT91_PM_DDRC_ID_OFFSET	16
-+#define	AT91_PM_DDRC_ID_MASK	0xff
-+#define	AT91_PM_DDRC_ID(x)	(((x) & AT91_PM_DDRC_ID_MASK) << AT91_PM_DDRC_ID_OFFSET)
-+
- #define	AT91_PM_SLOW_CLOCK	0x01
- 
- #endif
+ static int at91_pm_enter(suspend_state_t state)
 diff --git a/arch/arm/mach-at91/pm_suspend.S b/arch/arm/mach-at91/pm_suspend.S
-index e6e7f7a..8fb276c 100644
+index 88cf228..e6e7f7a 100644
 --- a/arch/arm/mach-at91/pm_suspend.S
 +++ b/arch/arm/mach-at91/pm_suspend.S
-@@ -26,6 +26,8 @@ memctrl	.req	r3
- tmp1	.req	r4
- tmp2	.req	r5
- mode	.req	r6
-+ddrc_id	.req	r7
-+ddrck	.req	r8
+@@ -15,6 +15,7 @@
+ #include <linux/clk/at91_pmc.h>
+ #include <mach/hardware.h>
+ #include <mach/at91_ramc.h>
++#include <asm/hardware/cache-l2x0.h>
  
- /*
-  * Wait until master clock is ready (after switching master clock source)
-@@ -130,6 +132,16 @@ ENTRY(at91_pm_suspend_in_sram)
- 	and	mode, tmp2, #AT91_PM_MODE_MASK
+ #include "pm.h"
  
- 	mov	tmp1, memctrl
-+	mov	tmp2, tmp1, lsr#AT91_PM_DDRCK_OFFSET
-+	mov	tmp1, #0x01
-+	and	tmp2, tmp2, #AT91_PM_DDRCK_MASK
-+	mov	ddrck, tmp1, lsl tmp2
+@@ -329,3 +330,109 @@ ram_restored:
+ 
+ ENTRY(at91_pm_suspend_in_sram_sz)
+ 	.word .-at91_pm_suspend_in_sram
 +
-+	mov	tmp1, memctrl
-+	mov	tmp2, tmp1, lsr#AT91_PM_DDRC_ID_OFFSET
-+	and	ddrc_id, tmp2, #AT91_PM_DDRC_ID_MASK
++/*---------------------------------------*/
 +
-+	mov	tmp1, memctrl
- 	and	memctrl, tmp1, #AT91_PM_MEMCTRL_MASK
- 
- 	cmp	memctrl, #AT91_MEMCTRL_MC
-@@ -234,6 +246,32 @@ sdr_sr_done:
- 	str	tmp1, [pmc, #AT91_CKGR_MOR]
- 
- skip_disable_main_clock:
++#if defined(CONFIG_CPU_V7)
++
++/*
++ * void at91_disable_l1_l2_cache(void)
++ *
++ * This function code disables, cleans & invalidates the L1 D-cache
++ * and cleans, invalidates & disable the L2 cache.
++ */
++ENTRY(at91_disable_l1_l2_cache)
++	stmfd	sp!, {r4 - r12, lr}
 +
 +	/*
-+	 * Disable the SDRAM controller clock
++	 * Flush all data from the L1 D-cache before disabling
++	 * SCTLR.C bit.
 +	 */
-+	cmp	ddrc_id, #0
-+	beq	skip_disable_ddrc_clock
-+	bic	tmp2, ddrc_id, #0xe0 /* fetch least 5 bits */
-+	mov	tmp1, #0x01
-+	mov	tmp1, tmp1, lsl tmp2
-+
-+	tst	ddrc_id, #0xe0	/* > 32 ? */
-+	beq	set_pmc_pcdr
-+	str	tmp1, [pmc, #AT91_PMC_PCDR1]
-+	b	skip_disable_ddrc_clock
-+set_pmc_pcdr:
-+	str	tmp1, [pmc, #AT91_PMC_PCDR]
-+skip_disable_ddrc_clock:
++	bl	v7_flush_dcache_all
 +
 +	/*
-+	 * Disable SDRAM system clock
++	 * Clear the SCTLR.C bit to prevent further data cache
++	 * allocation. Clearing SCTLR.C would make all the data accesses
++	 * strongly ordered and would not hit the cache.
 +	 */
-+	cmp	ddrck, #0
-+	beq	skip_disable_ddrck
-+	str	ddrck, [pmc, #AT91_PMC_SCDR]
-+skip_disable_ddrck:
-+
- 	/* Wait for interrupt */
- 	_do_wfi
- 
-@@ -269,6 +307,32 @@ skip_disable_main_clock:
- 	wait_mckrdy
- 
- skip_enable_main_clock:
++	mrc	p15, 0, r0, c1, c0, 0
++	bic	r0, r0, #(1 << 2)	@ Disable the C bit
++	mcr	p15, 0, r0, c1, c0, 0
++	isb
 +
 +	/*
-+	 * Enable the SDRAM controller clock
++	 * Invalidate L1 D-cache. Even though only invalidate is
++	 * necessary exported flush API is used here. Doing clean
++	 * on already clean cache would be almost NOP.
 +	 */
-+	cmp	ddrc_id, #0
-+	beq	skip_enable_ddrc_clock
-+	bic	tmp2, ddrc_id, #0xe0 /* fetch lowest 5 bits */
-+	mov	tmp1, #0x01
-+	mov	tmp1, tmp1, lsl tmp2
-+
-+	tst	ddrc_id, #0xe0	/* > 32 ? */
-+	beq	set_pmc_pcer
-+	str	tmp1, [pmc, #AT91_PMC_PCER1]
-+	b	skip_enable_ddrc_clock
-+set_pmc_pcer:
-+	str	tmp1, [pmc, #AT91_PMC_PCER]
-+skip_enable_ddrc_clock:
++	bl	v7_flush_dcache_all
 +
 +	/*
-+	 * Enable SDRAM system clock
++	 * Clean and invalidate the L2 cache.
++	 * Common cache-l2x0.c functions can't be used here since it
++	 * uses spinlocks. We are out of coherency here with data cache
++	 * disabled. The spinlock implementation uses exclusive load/store
++	 * instruction which can fail without data cache being enabled.
++	 * Because of this, CPU can lead to deadlock.
 +	 */
-+	cmp	ddrck, #0
-+	beq	skip_enable_ddrck
-+	str	ddrck, [pmc, #AT91_PMC_SCER]
-+skip_enable_ddrck:
++	ldr	r1, at91_l2cc_base_addr
++	ldr	r2, [r1]
++	cmp	r2, #0
++	beq	skip_l2disable
++	mov	r0, #0xff
++	str	r0, [r2, #L2X0_CLEAN_INV_WAY]
++wait:
++	ldr	r0, [r2, #L2X0_CLEAN_INV_WAY]
++	mov	r1, #0xff
++	ands	r0, r0, r1
++	bne	wait
 +
- 	/*
- 	 * at91rm9200 Memory controller
- 	 * Do nothing - self-refresh is automatically disabled.
++	mov	r0, #0
++	str	r0, [r2, #L2X0_CTRL]
++
++l2x_sync:
++	ldr	r0, [r2, #L2X0_CACHE_SYNC]
++	bic	r0, r0, #0x1
++	str	r0, [r2, #L2X0_CACHE_SYNC]
++sync:
++	ldr	r0, [r2, #L2X0_CACHE_SYNC]
++	ands	r0, r0, #0x1
++	bne	sync
++
++skip_l2disable:
++	ldmfd	sp!, {r4 - r12, pc}
++ENDPROC(at91_disable_l1_l2_cache)
++
++/*
++ * void at91_enable_l1_l2_cache(void)
++ *
++ * This function code enables the L1 D-cache and the L2 cache.
++ */
++ENTRY(at91_enable_l1_l2_cache)
++	stmfd	sp!, {r4 - r12, lr}
++
++	/* Enable the L2 cache */
++	ldr	r1, at91_l2cc_base_addr
++	ldr	r2, [r1]
++	cmp	r2, #0
++	beq	skip_l2en
++	ldr	r0, [r2, #L2X0_CTRL]
++	ands	r0, r0, #L2X0_CTRL_EN
++	bne	skip_l2en	@ Skip if already enabled
++	mov	r0, #L2X0_CTRL_EN
++	str	r0, [r2, #L2X0_CTRL]
++skip_l2en:
++
++	/* Enable the L1 D-cache */
++	mrc	p15, 0, r0, c1, c0, 0
++	tst	r0, #(1 << 2)		@ Check C bit enabled?
++	orreq	r0, r0, #(1 << 2)	@ Enable the C bit
++	mcreq	p15, 0, r0, c1, c0, 0
++	isb
++
++	ldmfd	sp!, {r4 - r12, pc}
++ENDPROC(at91_enable_l1_l2_cache)
++
++at91_l2cc_base_addr:
++	.word	at91_l2cc_base
++#endif
 -- 
 1.7.9.5
