@@ -1,73 +1,46 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 26 Jan 2015 14:00:30 +0100
-Subject: [GIT PULL] at91: cleanup/soc for 3.20 #3 (bis)
-In-Reply-To: <20150123230609.GV20896@quad.lixom.net>
-References: <20150123230609.GV20896@quad.lixom.net>
-Message-ID: <1422277230-25211-1-git-send-email-nicolas.ferre@atmel.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 26 Jan 2015 15:03:57 +0200
+Subject: [PATCH v5 11/18] iommu: exynos: remove useless device_add/remove
+ callbacks
+In-Reply-To: <20150126110059.GC30345@8bytes.org>
+References: <1422028288-891-1-git-send-email-m.szyprowski@samsung.com>
+ <2829552.kzfCU5HyxQ@avalon> <20150126110059.GC30345@8bytes.org>
+Message-ID: <1589480.9kxdoXKkuz@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Joerg,
 
-Arnd, Olof, Kevin,
+On Monday 26 January 2015 12:00:59 Joerg Roedel wrote:
+> Hi Laurent,
+> 
+> On Sun, Jan 25, 2015 at 05:38:22PM +0200, Laurent Pinchart wrote:
+> > IOMMU groups still seem a bit unclear to me. Will Deacon has nicely
+> > explained what they represent in
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/310816
+> > .html. The IOMMU core doesn't make groups
+> > mandatory, but requires them in some code paths.
+> > 
+> > For example the coldplug device add function add_iommu_group() called for
+> > all devices already registered when bus_set_iommu() is called will try to
+> > warn of devices added multiple times with a WARN_ON(dev->iommu_group).
+> > Another example is the iommu_bus_notifier() function which will call the
+> > remove_device() operation only when dev->iommu_group isn't NULL.
+> > 
+> > I'm thus unsure whether groups should be made mandatory, or whether the
+> > IOMMU core should be fixed to make them really optional (or, third
+> > option, whether there's something I haven't understood properly).
+> 
+> My plan is to make IOMMU groups mandatory. I am currently preparing and
+> RFC patch-set to introduce default-domains (which will be per group). So
+> when all IOMMU drivers are converted to make use of default domains the
+> iommu groups will be mandatory.
 
-This is the rework of my previous pull-request with modifications advised by
-Olof.
-This is a batch of cleanup/soc modifications that you may also stack on top of
-your "soc" branch as the previous one. It stabilizes a little bit our cleanup
-action before going further.
-Another one may be proposed before the merge-window opens.
-
-Thanks, best regards,
-
-The following changes since commit 29ee506d0d56f6d39cc237de2512f9cb5629cbf7:
-
-  ARM: at91: move at91rm9200_idle() to clk/at91/pmc.c (2015-01-16 18:08:42 +0100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-cleanup3
-
-for you to fetch changes up to 9726b6892beeaa736610370429a23a481d1b133e:
-
-  ARM: at91: pm: remove warning to remove SOC_AT91SAM9263 usage (2015-01-26 13:44:19 +0100)
-
-----------------------------------------------------------------
-Third batch of cleanup/soc for 3.20:
-- several fixes and adjustments following the last cleanup batch
-- removal of some unused Kconfig options
-- slight PM and pm_idle rework to ease future rework
-- removal of unneeded mach/system_rev.h
-
-----------------------------------------------------------------
-Alexandre Belloni (6):
-      ARM: at91: mark const init data with __initconst instead of __initdata
-      ARM: at91: fix sam9n12 and sam9x5 arm_pm_idle
-      ARM: at91: sam9: set arm_pm_idle from sam9_dt_device_init
-      ARM: at91: stop using HAVE_AT91_DBGUx
-      ARM: at91: remove unused mach/system_rev.h
-      ARM: at91: pm: remove warning to remove SOC_AT91SAM9263 usage
-
-Nicolas Ferre (3):
-      ARM: at91: fix Kconfig.debug by adding DEBUG_AT91_UART option
-      ARM: at91: fix PM initialization for newer SoCs
-      ARM: at91: fix ordering of SRAM and PM initialization
-
- arch/arm/Kconfig.debug                       | 16 +++++++++-----
- arch/arm/mach-at91/Kconfig                   | 19 ----------------
- arch/arm/mach-at91/at91sam9260.c             |  6 -----
- arch/arm/mach-at91/at91sam9261.c             |  6 -----
- arch/arm/mach-at91/at91sam9263.c             |  6 -----
- arch/arm/mach-at91/at91sam9g45.c             |  5 -----
- arch/arm/mach-at91/at91sam9rl.c              |  6 -----
- arch/arm/mach-at91/board-dt-rm9200.c         |  6 ++---
- arch/arm/mach-at91/board-dt-sam9.c           | 33 +++++++++++++++++++++++++---
- arch/arm/mach-at91/board-dt-sama5.c          |  2 +-
- arch/arm/mach-at91/generic.h                 |  2 ++
- arch/arm/mach-at91/include/mach/system_rev.h | 27 -----------------------
- arch/arm/mach-at91/pm.c                      |  7 ++++++
- arch/arm/mach-at91/pm_slowclock.S            |  9 --------
- 14 files changed, 54 insertions(+), 96 deletions(-)
- delete mode 100644 arch/arm/mach-at91/include/mach/system_rev.h
+Could the default domain policy be configured by the IOMMU driver ? The ipmmu-
+vmsa driver supports four domains only, and serves up to 32 masters, with one 
+group per master. A default of one domain per group wouldn't be usable.
 
 -- 
-Nicolas Ferre
+Regards,
+
+Laurent Pinchart
