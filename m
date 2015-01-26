@@ -1,63 +1,35 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 26 Jan 2015 15:27:29 +0100
-Subject: [PATCH v4 0/4] Add basic support for Mediatek MT8173 SoC
-In-Reply-To: <1421054073-43468-1-git-send-email-eddie.huang@mediatek.com>
-References: <1421054073-43468-1-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <CABuKBeKjGL6puqhqCb6b4=5Qb9+hcm-sGQ7vLxyb2jAFaLYGUQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 26 Jan 2015 15:32:36 +0100
+Subject: [PATCH 4/4] ARM: dts: Add initial support for Alpine platform
+In-Reply-To: <CABM=7kn8CMGZDPECfEru11O9gkbYFOTSkzHJF+Ku-oMJoFg6sQ@mail.gmail.com>
+References: <54c53663.0OSd3sO9f1oYd3El%tsahee@annapurnalabs.com>
+ <36490364.POE8pPlYQh@wuerfel>
+ <CABM=7kn8CMGZDPECfEru11O9gkbYFOTSkzHJF+Ku-oMJoFg6sQ@mail.gmail.com>
+Message-ID: <3392216.FHWJaKVrAq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-01-12 10:14 GMT+01:00 Eddie Huang <eddie.huang@mediatek.com>:
-> MT8173 is a SoC based on 64bit ARMv8 architecture. It contains 2 CA53 + 2 CA57 cores.
-> MT8173 share many HW IP with MT8135 and other MT65xx series. This patchset was tested
-> on MT8173 engineer sample, and boot to shell ok.
->
-> This series contains document bindings, device tree, defconfig, and one sysirq
-> modification for MT8173.
->
-> Changes in v4:
-> 1. Add sysirq, uart binding documents.
-> 2. Disable UART in mt8173.dtsi, enable needed UART in mt8173-evb.dtsi
->
-> This patch base on 3.19-rc1, Joe's sysirq patch [1] and test boot to shell with
-> Catalin Marinas's arch_timer virtual counter patch [2]
->
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/310335.html
-> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/309856.html
+On Monday 26 January 2015 16:14:11 Tsahee Zidenberg wrote:
+> On 26 January 2015 at 13:15, Arnd Bergmann <arnd@arndb.de> wrote:> +* CPU
+> node:
+> 
+> > > +
+> > > +The Alpine platform includes cortex-a15 cores.
+> > > +enable-method: must be "annapurna-labs,alpine-smp" to allow smp  [1]
+> >
+> > Any reason for not using PSCI on this platform?
+> >
+> >
+> PSCI is in the roadmap, but not supported by current firmware.
 
-Applied to v3.20-next/arm64.
-Thanks.
+As your initial submission is very minimal regarding driver support,
+would it be sensible to wait for the firmware to catch up then?
 
->
-> Eddie Huang (3):
->   Document: DT: Add bindings for mediatek MT8173 SoC Platform
->   arm64: dts: Add mediatek MT8173 SoC and evaluation board dts and
->     Makefile
->   arm64: mediatek: Add MT8173 SoC Kconfig and defconfig
->
-> Yingjoe Chen (1):
->   irqchip: mtk-sysirq: Get irq number from register resource size
->
->  Documentation/devicetree/bindings/arm/mediatek.txt |   4 +
->  .../bindings/arm/mediatek/mediatek,sysirq.txt      |   1 +
->  .../devicetree/bindings/serial/mtk-uart.txt        |   4 +-
->  arch/arm64/Kconfig                                 |   6 +
->  arch/arm64/boot/dts/Makefile                       |   1 +
->  arch/arm64/boot/dts/mediatek/Makefile              |   5 +
->  arch/arm64/boot/dts/mediatek/mt8173-evb.dts        |  38 +++++
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi           | 168 +++++++++++++++++++++
->  arch/arm64/configs/defconfig                       |   2 +
->  drivers/irqchip/irq-mtk-sysirq.c                   |  18 ++-
->  10 files changed, 239 insertions(+), 8 deletions(-)
->  create mode 100644 arch/arm64/boot/dts/mediatek/Makefile
->  create mode 100644 arch/arm64/boot/dts/mediatek/mt8173-evb.dts
->  create mode 100644 arch/arm64/boot/dts/mediatek/mt8173.dtsi
->
-> --
-> 1.8.1.1.dirty
->
+That way you lose SMP support for the moment but could still work
+on adding the device drivers while testing in uniprocessor mode and
+then we will see if your firmware is ready once there are more
+drivers upstream. Once the firmware has PSCI working, it will all
+just work without the need for extra devices in DT or the custom
+SMP operations.
 
-
-
--- 
-motzblog.wordpress.com
+	Ard
