@@ -1,60 +1,46 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 26 Jan 2015 01:10:16 +0100
-Subject: [PATCH] tty: serial: fsl_lpuart: terminate DMA on buffer flush
-Message-ID: <1422231016-27793-1-git-send-email-stefan@agner.ch>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 26 Jan 2015 09:22:16 +0900
+Subject: [PATCH 00/13] ARM: shmobile: Remove sh7372/Mackerel and ZBOOT
+ MMC/SDHI support
+In-Reply-To: <20150121045256.7648.7451.sendpatchset@little-apple>
+References: <20150121045256.7648.7451.sendpatchset@little-apple>
+Message-ID: <20150126002215.GB4477@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On uart buffer flush, serial core resets the circular buffer.
-If a DMA transfer is in progress at that time, the callback
-lpuart_dma_tx_complete will move buffer's tail unconditionally,
-hence tail moves beyond head. Use the flush_buffer hook to
-terminate the DMA imeaditely and avoid lpuart_dma_tx_complete
-being called in this situation.
+On Wed, Jan 21, 2015 at 01:52:56PM +0900, Magnus Damm wrote:
+> ARM: shmobile: Remove sh7372/Mackerel and ZBOOT MMC/SDHI support
+> 
+> [PATCH 01/13] ARM: shmobile: mackerel: Remove ZBOOT code
+> [PATCH 02/13] ARM: shmobile: mackerel: Remove Legacy C board code
+> [PATCH 03/13] ARM: shmobile: mackerel dts: Remove Legacy DTS file
+> [PATCH 04/13] ARM: shmobile: mackerel: Remove DT binding documentation
+> [PATCH 05/13] ARM: shmobile: mackerel: Remove mach-type entry
+> [PATCH 06/13] ARM: shmobile: mackerel: Remove defconfig
+> [PATCH 07/13] ARM: shmobile: sh7372: Remove ZBOOT MMC/SDHI support
+> [PATCH 08/13] ARM: shmobile: sh7372: Remove Legacy C SoC code
+> [PATCH 09/13] ARM: shmobile: sh7372: Remove DT binding documentation
+> [PATCH 10/13] ARM: shmobile: sh7372 dtsi: Remove Legacy DTSI file
+> [PATCH 11/13] Documentation: Remove ZBOOT MMC/SDHI utility and docs
+> [PATCH 12/13] pinctrl: sh-pfc: sh7372: Remove PFC support
+> [PATCH 13/13] pinctrl: sh-pfc: sh7372: Remove DT binding documentation
+> 
+> Remove legacy board and SoC support for Mackerel and sh7372. Both the
+> ARM mach-shmobile code base and the PINCTRL subsystem is affected.
+> 
+> Also get rid of the remaining ZBOOT MMC/SDHI code, documentation and
+> utility that has no user once sh7372 is gone.
+> 
+> The Cortex-A8 based sh7372 SoC is rather old and never went into mass
+> production anyway, so these patches that remove SoC and board support
+> will only affect a few selected developers.
+> 
+> I wish we had some way to make use of the ZBOOT MMC/SDHI code, but
+> without any board or SoC code it makes little sense to keep it.
+> 
+> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 
-This bug often showed up while shutdown and lead to duplicate
-serial console output.
+Hi Magnus,
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- drivers/tty/serial/fsl_lpuart.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
-
-diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
-index e95c497..7615b5d 100644
---- a/drivers/tty/serial/fsl_lpuart.c
-+++ b/drivers/tty/serial/fsl_lpuart.c
-@@ -454,6 +454,15 @@ static int lpuart_dma_rx(struct lpuart_port *sport)
- 	return 0;
- }
- 
-+static void lpuart_flush_buffer(struct uart_port *port)
-+{
-+	struct lpuart_port *sport = container_of(port, struct lpuart_port, port);
-+	if (sport->lpuart_dma_tx_use) {
-+		dmaengine_terminate_all(sport->dma_tx_chan);
-+		sport->dma_tx_in_progress = 0;
-+	}
-+}
-+
- static void lpuart_dma_rx_complete(void *arg)
- {
- 	struct lpuart_port *sport = arg;
-@@ -1519,6 +1528,7 @@ static struct uart_ops lpuart_pops = {
- 	.release_port	= lpuart_release_port,
- 	.config_port	= lpuart_config_port,
- 	.verify_port	= lpuart_verify_port,
-+	.flush_buffer	= lpuart_flush_buffer,
- };
- 
- static struct uart_ops lpuart32_pops = {
-@@ -1537,6 +1547,7 @@ static struct uart_ops lpuart32_pops = {
- 	.release_port	= lpuart_release_port,
- 	.config_port	= lpuart_config_port,
- 	.verify_port	= lpuart_verify_port,
-+	.flush_buffer	= lpuart_flush_buffer,
- };
- 
- static struct lpuart_port *lpuart_ports[UART_NR];
--- 
-2.2.2
+thanks for putting this together. There seem to have been few comments
+made on it. Could you consider respinning accordingly?
