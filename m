@@ -1,9 +1,10 @@
 From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 27 Jan 2015 00:51:44 +0100
-Subject: [PATCH 14/15] iommu/fsl: Make use of domain_alloc and domain_free
+Date: Tue, 27 Jan 2015 00:51:42 +0100
+Subject: [PATCH 12/15] iommu/ipmmu-vmsa: Make use of domain_alloc and
+ domain_free
 In-Reply-To: <1422316305-19216-1-git-send-email-joro@8bytes.org>
 References: <1422316305-19216-1-git-send-email-joro@8bytes.org>
-Message-ID: <1422316305-19216-15-git-send-email-joro@8bytes.org>
+Message-ID: <1422316305-19216-13-git-send-email-joro@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,221 +15,148 @@ replacement for domain_init/domain_destroy.
 
 Signed-off-by: Joerg Roedel <jroedel@suse.de>
 ---
- drivers/iommu/fsl_pamu_domain.c | 60 ++++++++++++++++++++++-------------------
- drivers/iommu/fsl_pamu_domain.h |  2 +-
- 2 files changed, 33 insertions(+), 29 deletions(-)
+ drivers/iommu/ipmmu-vmsa.c | 43 ++++++++++++++++++++++++-------------------
+ 1 file changed, 24 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/iommu/fsl_pamu_domain.c b/drivers/iommu/fsl_pamu_domain.c
-index c828f80..7c16c80 100644
---- a/drivers/iommu/fsl_pamu_domain.c
-+++ b/drivers/iommu/fsl_pamu_domain.c
-@@ -49,6 +49,11 @@ static struct kmem_cache *fsl_pamu_domain_cache;
- static struct kmem_cache *iommu_devinfo_cache;
- static DEFINE_SPINLOCK(device_domain_lock);
+diff --git a/drivers/iommu/ipmmu-vmsa.c b/drivers/iommu/ipmmu-vmsa.c
+index 7486931..12270e1 100644
+--- a/drivers/iommu/ipmmu-vmsa.c
++++ b/drivers/iommu/ipmmu-vmsa.c
+@@ -37,7 +37,7 @@ struct ipmmu_vmsa_device {
  
-+static struct fsl_dma_domain *to_fsl_dma_domain(struct iommu_domain *dom)
+ struct ipmmu_vmsa_domain {
+ 	struct ipmmu_vmsa_device *mmu;
+-	struct iommu_domain *io_domain;
++	struct iommu_domain io_domain;
+ 
+ 	unsigned int context_id;
+ 	spinlock_t lock;			/* Protects mappings */
+@@ -52,6 +52,11 @@ struct ipmmu_vmsa_archdata {
+ static DEFINE_SPINLOCK(ipmmu_devices_lock);
+ static LIST_HEAD(ipmmu_devices);
+ 
++static struct ipmmu_vmsa_domain *to_vmsa_domain(struct iommu_domain *dom)
 +{
-+	return container_of(dom, struct fsl_dma_domain, iommu_domain);
++	return container_of(dom, struct ipmmu_vmsa_domain, io_domain);
 +}
 +
- static int __init iommu_init_mempool(void)
- {
+ #define TLB_LOOP_TIMEOUT		100	/* 100us */
  
-@@ -84,7 +89,7 @@ static phys_addr_t get_phys_addr(struct fsl_dma_domain *dma_domain, dma_addr_t i
- 				&dma_domain->win_arr[0];
- 	struct iommu_domain_geometry *geom;
+ /* -----------------------------------------------------------------------------
+@@ -435,7 +440,7 @@ static irqreturn_t ipmmu_domain_irq(struct ipmmu_vmsa_domain *domain)
+ 	 * TODO: We need to look up the faulty device based on the I/O VA. Use
+ 	 * the IOMMU device for now.
+ 	 */
+-	if (!report_iommu_fault(domain->io_domain, mmu->dev, iova, 0))
++	if (!report_iommu_fault(&domain->io_domain, mmu->dev, iova, 0))
+ 		return IRQ_HANDLED;
  
--	geom = &dma_domain->iommu_domain->geometry;
-+	geom = &dma_domain->iommu_domain.geometry;
+ 	dev_err_ratelimited(mmu->dev,
+@@ -455,7 +460,7 @@ static irqreturn_t ipmmu_irq(int irq, void *dev)
+ 		return IRQ_NONE;
  
- 	if (!win_cnt || !dma_domain->geom_size) {
- 		pr_debug("Number of windows/geometry not configured for the domain\n");
-@@ -144,7 +149,7 @@ static int map_win(int liodn, struct fsl_dma_domain *dma_domain)
- {
- 	int ret;
- 	struct dma_window *wnd = &dma_domain->win_arr[0];
--	phys_addr_t wnd_addr = dma_domain->iommu_domain->geometry.aperture_start;
-+	phys_addr_t wnd_addr = dma_domain->iommu_domain.geometry.aperture_start;
- 	unsigned long flags;
+ 	io_domain = mmu->mapping->domain;
+-	domain = io_domain->priv;
++	domain = to_vmsa_domain(io_domain);
  
- 	spin_lock_irqsave(&iommu_lock, flags);
-@@ -194,7 +199,7 @@ static int update_liodn(int liodn, struct fsl_dma_domain *dma_domain, u32 wnd_nr
- 	} else {
- 		phys_addr_t wnd_addr;
- 
--		wnd_addr = dma_domain->iommu_domain->geometry.aperture_start;
-+		wnd_addr = dma_domain->iommu_domain.geometry.aperture_start;
- 
- 		ret = pamu_config_ppaace(liodn, wnd_addr,
- 					 wnd->size,
-@@ -402,7 +407,7 @@ static void attach_device(struct fsl_dma_domain *dma_domain, int liodn, struct d
- static phys_addr_t fsl_pamu_iova_to_phys(struct iommu_domain *domain,
- 					    dma_addr_t iova)
- {
--	struct fsl_dma_domain *dma_domain = domain->priv;
-+	struct fsl_dma_domain *dma_domain = to_fsl_dma_domain(domain);
- 
- 	if ((iova < domain->geometry.aperture_start) ||
- 		iova > (domain->geometry.aperture_end))
-@@ -416,11 +421,9 @@ static bool fsl_pamu_capable(enum iommu_cap cap)
- 	return cap == IOMMU_CAP_CACHE_COHERENCY;
+ 	return ipmmu_domain_irq(domain);
  }
+@@ -854,31 +859,31 @@ done:
+  * IOMMU Operations
+  */
  
--static void fsl_pamu_domain_destroy(struct iommu_domain *domain)
-+static void fsl_pamu_domain_free(struct iommu_domain *domain)
+-static int ipmmu_domain_init(struct iommu_domain *io_domain)
++static struct iommu_domain *ipmmu_domain_alloc(enum iommu_domain_type type)
  {
--	struct fsl_dma_domain *dma_domain = domain->priv;
--
--	domain->priv = NULL;
-+	struct fsl_dma_domain *dma_domain = to_fsl_dma_domain(domain);
- 
- 	/* remove all the devices from the device list */
- 	detach_device(NULL, dma_domain);
-@@ -431,23 +434,24 @@ static void fsl_pamu_domain_destroy(struct iommu_domain *domain)
- 	kmem_cache_free(fsl_pamu_domain_cache, dma_domain);
- }
- 
--static int fsl_pamu_domain_init(struct iommu_domain *domain)
-+static struct iommu_domain *fsl_pamu_domain_alloc(enum iommu_domain_type type)
- {
- 	struct fsl_dma_domain *dma_domain;
+ 	struct ipmmu_vmsa_domain *domain;
  
 +	if (type != IOMMU_DOMAIN_UNMANAGED)
 +		return NULL;
 +
- 	dma_domain = iommu_alloc_dma_domain();
- 	if (!dma_domain) {
- 		pr_debug("dma_domain allocation failed\n");
+ 	domain = kzalloc(sizeof(*domain), GFP_KERNEL);
+ 	if (!domain)
+-		return -ENOMEM;
++		return NULL;
+ 
+ 	spin_lock_init(&domain->lock);
+ 
+ 	domain->pgd = kzalloc(IPMMU_PTRS_PER_PGD * sizeof(pgd_t), GFP_KERNEL);
+ 	if (!domain->pgd) {
+ 		kfree(domain);
 -		return -ENOMEM;
 +		return NULL;
  	}
--	domain->priv = dma_domain;
--	dma_domain->iommu_domain = domain;
- 	/* defaul geometry 64 GB i.e. maximum system address */
--	domain->geometry.aperture_start = 0;
--	domain->geometry.aperture_end = (1ULL << 36) - 1;
--	domain->geometry.force_aperture = true;
-+	dma_domain->iommu_domain. geometry.aperture_start = 0;
-+	dma_domain->iommu_domain.geometry.aperture_end = (1ULL << 36) - 1;
-+	dma_domain->iommu_domain.geometry.force_aperture = true;
  
+-	io_domain->priv = domain;
+-	domain->io_domain = io_domain;
+-
 -	return 0;
-+	return &dma_domain->iommu_domain;
++	return &domain->io_domain;
  }
  
- /* Configure geometry settings for all LIODNs associated with domain */
-@@ -517,7 +521,7 @@ static int disable_domain_win(struct fsl_dma_domain *dma_domain, u32 wnd_nr)
- 
- static void fsl_pamu_window_disable(struct iommu_domain *domain, u32 wnd_nr)
+-static void ipmmu_domain_destroy(struct iommu_domain *io_domain)
++static void ipmmu_domain_free(struct iommu_domain *io_domain)
  {
--	struct fsl_dma_domain *dma_domain = domain->priv;
-+	struct fsl_dma_domain *dma_domain = to_fsl_dma_domain(domain);
+-	struct ipmmu_vmsa_domain *domain = io_domain->priv;
++	struct ipmmu_vmsa_domain *domain = to_vmsa_domain(io_domain);
+ 
+ 	/*
+ 	 * Free the domain resources. We assume that all devices have already
+@@ -894,7 +899,7 @@ static int ipmmu_attach_device(struct iommu_domain *io_domain,
+ {
+ 	struct ipmmu_vmsa_archdata *archdata = dev->archdata.iommu;
+ 	struct ipmmu_vmsa_device *mmu = archdata->mmu;
+-	struct ipmmu_vmsa_domain *domain = io_domain->priv;
++	struct ipmmu_vmsa_domain *domain = to_vmsa_domain(io_domain);
  	unsigned long flags;
- 	int ret;
- 
-@@ -549,7 +553,7 @@ static void fsl_pamu_window_disable(struct iommu_domain *domain, u32 wnd_nr)
- static int fsl_pamu_window_enable(struct iommu_domain *domain, u32 wnd_nr,
- 				  phys_addr_t paddr, u64 size, int prot)
- {
--	struct fsl_dma_domain *dma_domain = domain->priv;
-+	struct fsl_dma_domain *dma_domain = to_fsl_dma_domain(domain);
- 	struct dma_window *wnd;
- 	int pamu_prot = 0;
- 	int ret;
-@@ -626,7 +630,7 @@ static int handle_attach_device(struct fsl_dma_domain *dma_domain,
- 				 int num)
- {
- 	unsigned long flags;
--	struct iommu_domain *domain = dma_domain->iommu_domain;
-+	struct iommu_domain *domain = &dma_domain->iommu_domain;
- 	int ret = 0;
- 	int i;
- 
-@@ -673,7 +677,7 @@ static int handle_attach_device(struct fsl_dma_domain *dma_domain,
- static int fsl_pamu_attach_device(struct iommu_domain *domain,
- 				  struct device *dev)
- {
--	struct fsl_dma_domain *dma_domain = domain->priv;
-+	struct fsl_dma_domain *dma_domain = to_fsl_dma_domain(domain);
- 	const u32 *liodn;
- 	u32 liodn_cnt;
- 	int len, ret = 0;
-@@ -712,7 +716,7 @@ static int fsl_pamu_attach_device(struct iommu_domain *domain,
- static void fsl_pamu_detach_device(struct iommu_domain *domain,
- 				      struct device *dev)
- {
--	struct fsl_dma_domain *dma_domain = domain->priv;
-+	struct fsl_dma_domain *dma_domain = to_fsl_dma_domain(domain);
- 	const u32 *prop;
- 	int len;
- 	struct pci_dev *pdev = NULL;
-@@ -744,7 +748,7 @@ static void fsl_pamu_detach_device(struct iommu_domain *domain,
- static  int configure_domain_geometry(struct iommu_domain *domain, void *data)
- {
- 	struct iommu_domain_geometry *geom_attr = data;
--	struct fsl_dma_domain *dma_domain = domain->priv;
-+	struct fsl_dma_domain *dma_domain = to_fsl_dma_domain(domain);
- 	dma_addr_t geom_size;
- 	unsigned long flags;
- 
-@@ -835,7 +839,7 @@ static int configure_domain_dma_state(struct fsl_dma_domain *dma_domain, bool en
- static int fsl_pamu_set_domain_attr(struct iommu_domain *domain,
- 				 enum iommu_attr attr_type, void *data)
- {
--	struct fsl_dma_domain *dma_domain = domain->priv;
-+	struct fsl_dma_domain *dma_domain = to_fsl_dma_domain(domain);
  	int ret = 0;
  
- 
-@@ -861,7 +865,7 @@ static int fsl_pamu_set_domain_attr(struct iommu_domain *domain,
- static int fsl_pamu_get_domain_attr(struct iommu_domain *domain,
- 				 enum iommu_attr attr_type, void *data)
+@@ -933,7 +938,7 @@ static void ipmmu_detach_device(struct iommu_domain *io_domain,
+ 				struct device *dev)
  {
--	struct fsl_dma_domain *dma_domain = domain->priv;
-+	struct fsl_dma_domain *dma_domain = to_fsl_dma_domain(domain);
- 	int ret = 0;
+ 	struct ipmmu_vmsa_archdata *archdata = dev->archdata.iommu;
+-	struct ipmmu_vmsa_domain *domain = io_domain->priv;
++	struct ipmmu_vmsa_domain *domain = to_vmsa_domain(io_domain);
  
+ 	ipmmu_utlb_disable(domain, archdata->utlb);
  
-@@ -1025,7 +1029,7 @@ static void fsl_pamu_remove_device(struct device *dev)
- 
- static int fsl_pamu_set_windows(struct iommu_domain *domain, u32 w_count)
+@@ -945,7 +950,7 @@ static void ipmmu_detach_device(struct iommu_domain *io_domain,
+ static int ipmmu_map(struct iommu_domain *io_domain, unsigned long iova,
+ 		     phys_addr_t paddr, size_t size, int prot)
  {
--	struct fsl_dma_domain *dma_domain = domain->priv;
-+	struct fsl_dma_domain *dma_domain = to_fsl_dma_domain(domain);
- 	unsigned long flags;
+-	struct ipmmu_vmsa_domain *domain = io_domain->priv;
++	struct ipmmu_vmsa_domain *domain = to_vmsa_domain(io_domain);
+ 
+ 	if (!domain)
+ 		return -ENODEV;
+@@ -956,7 +961,7 @@ static int ipmmu_map(struct iommu_domain *io_domain, unsigned long iova,
+ static size_t ipmmu_unmap(struct iommu_domain *io_domain, unsigned long iova,
+ 			  size_t size)
+ {
+-	struct ipmmu_vmsa_domain *domain = io_domain->priv;
++	struct ipmmu_vmsa_domain *domain = to_vmsa_domain(io_domain);
  	int ret;
  
-@@ -1073,15 +1077,15 @@ static int fsl_pamu_set_windows(struct iommu_domain *domain, u32 w_count)
- 
- static u32 fsl_pamu_get_windows(struct iommu_domain *domain)
+ 	ret = ipmmu_clear_mapping(domain, iova, size);
+@@ -966,7 +971,7 @@ static size_t ipmmu_unmap(struct iommu_domain *io_domain, unsigned long iova,
+ static phys_addr_t ipmmu_iova_to_phys(struct iommu_domain *io_domain,
+ 				      dma_addr_t iova)
  {
--	struct fsl_dma_domain *dma_domain = domain->priv;
-+	struct fsl_dma_domain *dma_domain = to_fsl_dma_domain(domain);
- 
- 	return dma_domain->win_cnt;
+-	struct ipmmu_vmsa_domain *domain = io_domain->priv;
++	struct ipmmu_vmsa_domain *domain = to_vmsa_domain(io_domain);
+ 	pgd_t pgd;
+ 	pud_t pud;
+ 	pmd_t pmd;
+@@ -1121,8 +1126,8 @@ static void ipmmu_remove_device(struct device *dev)
  }
  
- static const struct iommu_ops fsl_pamu_ops = {
- 	.capable	= fsl_pamu_capable,
--	.domain_init	= fsl_pamu_domain_init,
--	.domain_destroy = fsl_pamu_domain_destroy,
-+	.domain_alloc	= fsl_pamu_domain_alloc,
-+	.domain_free    = fsl_pamu_domain_free,
- 	.attach_dev	= fsl_pamu_attach_device,
- 	.detach_dev	= fsl_pamu_detach_device,
- 	.domain_window_enable = fsl_pamu_window_enable,
-diff --git a/drivers/iommu/fsl_pamu_domain.h b/drivers/iommu/fsl_pamu_domain.h
-index c90293f..f2b0f74 100644
---- a/drivers/iommu/fsl_pamu_domain.h
-+++ b/drivers/iommu/fsl_pamu_domain.h
-@@ -71,7 +71,7 @@ struct fsl_dma_domain {
- 	u32				stash_id;
- 	struct pamu_stash_attribute	dma_stash;
- 	u32				snoop_id;
--	struct iommu_domain		*iommu_domain;
-+	struct iommu_domain		iommu_domain;
- 	spinlock_t			domain_lock;
- };
- 
+ static const struct iommu_ops ipmmu_ops = {
+-	.domain_init = ipmmu_domain_init,
+-	.domain_destroy = ipmmu_domain_destroy,
++	.domain_alloc = ipmmu_domain_alloc,
++	.domain_free = ipmmu_domain_free,
+ 	.attach_dev = ipmmu_attach_device,
+ 	.detach_dev = ipmmu_detach_device,
+ 	.map = ipmmu_map,
 -- 
 1.8.4.5
