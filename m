@@ -1,116 +1,76 @@
-From: jenskuske@gmail.com (Jens Kuske)
-Date: Mon, 26 Jan 2015 15:34:49 +0100
-Subject: [PATCH 3/3] net: allwinner: sun4i-emac: fix emac SRAM mapping
-In-Reply-To: <20150125162510.GK8470@lukather>
-References: <1422200959-1717-1-git-send-email-jenskuske@gmail.com>
- <1422200959-1717-4-git-send-email-jenskuske@gmail.com>
- <20150125162510.GK8470@lukather>
-Message-ID: <54C65089.70305@gmail.com>
+From: acme@kernel.org (Arnaldo Carvalho de Melo)
+Date: Mon, 26 Jan 2015 11:37:59 -0300
+Subject: perf not capturing stack traces
+In-Reply-To: <20150126135123.GC11502@n2100.arm.linux.org.uk>
+References: <20150123195128.GE26557@saruman.tx.rr.com>
+ <20150123205959.GD3073@kernel.org>
+ <20150123223745.GJ26557@saruman.tx.rr.com>
+ <20150124151204.GF3073@kernel.org>
+ <20150124222342.GA26941@saruman.tx.rr.com>
+ <20150125155651.GB11502@n2100.arm.linux.org.uk>
+ <20150126102711.GC15598@arm.com>
+ <20150126135123.GC11502@n2100.arm.linux.org.uk>
+Message-ID: <20150126143759.GB5906@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Em Mon, Jan 26, 2015 at 01:51:23PM +0000, Russell King - ARM Linux escreveu:
+> On Mon, Jan 26, 2015 at 10:27:11AM +0000, Will Deacon wrote:
+> > On Sun, Jan 25, 2015 at 03:56:52PM +0000, Russell King - ARM Linux wrote:
+> > > On Sat, Jan 24, 2015 at 04:23:42PM -0600, Felipe Balbi wrote:
+> > > > yeah, I'll try a few older kernels, also see if I can reproduce on other
+> > > > boards.
 
-On 25/01/15 17:25, Maxime Ripard wrote:
-> Hi Jens,
->
-> On Sun, Jan 25, 2015 at 04:49:19PM +0100, Jens Kuske wrote:
->> The EMAC needs SRAM block A3_A4 being mapped to EMAC peripheral to
->> work. This is done by the bootloader most of the time, but U-Boot
->> Falcon Mode, for example, skips emac initialization and SRAM would
->> stay mapped to the CPU.
->
-> Thanks for reviving this.
->
->> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
->> ---
->>   drivers/net/ethernet/allwinner/Kconfig      |  1 +
->>   drivers/net/ethernet/allwinner/sun4i-emac.c | 18 ++++++++++++++++++
->>   2 files changed, 19 insertions(+)
->>
->> diff --git a/drivers/net/ethernet/allwinner/Kconfig b/drivers/net/ethernet/allwinner/Kconfig
->> index d8d95d4..508a288 100644
->> --- a/drivers/net/ethernet/allwinner/Kconfig
->> +++ b/drivers/net/ethernet/allwinner/Kconfig
->> @@ -28,6 +28,7 @@ config SUN4I_EMAC
->>   	select MII
->>   	select PHYLIB
->>   	select MDIO_SUN4I
->> +	select MFD_SYSCON
->>           ---help---
->>             Support for Allwinner A10 EMAC ethernet driver.
->>
->> diff --git a/drivers/net/ethernet/allwinner/sun4i-emac.c b/drivers/net/ethernet/allwinner/sun4i-emac.c
->> index 1fcd556..86c891d 100644
->> --- a/drivers/net/ethernet/allwinner/sun4i-emac.c
->> +++ b/drivers/net/ethernet/allwinner/sun4i-emac.c
->> @@ -18,6 +18,8 @@
->>   #include <linux/gpio.h>
->>   #include <linux/interrupt.h>
->>   #include <linux/irq.h>
->> +#include <linux/mfd/syscon.h>
->> +#include <linux/mfd/syscon/sun4i-sc.h>
->>   #include <linux/mii.h>
->>   #include <linux/module.h>
->>   #include <linux/netdevice.h>
->> @@ -28,6 +30,7 @@
->>   #include <linux/of_platform.h>
->>   #include <linux/platform_device.h>
->>   #include <linux/phy.h>
->> +#include <linux/regmap.h>
->>
->>   #include "sun4i-emac.h"
->>
->> @@ -78,6 +81,7 @@ struct emac_board_info {
->>
->>   	struct phy_device	*phy_dev;
->>   	struct device_node	*phy_node;
->> +	struct regmap		*sc;
->>   	unsigned int		link;
->>   	unsigned int		speed;
->>   	unsigned int		duplex;
->> @@ -862,6 +866,18 @@ static int emac_probe(struct platform_device *pdev)
->>   		goto out;
->>   	}
->>
->> +	/* Map SRAM_A3_A4 to EMAC */
->> +	db->sc = syscon_regmap_lookup_by_compatible(
->> +						"allwinner,sun4i-a10-syscon");
->> +	if (IS_ERR(db->sc)) {
->> +		dev_err(&pdev->dev, "failed to find syscon regmap\n");
->> +		ret = PTR_ERR(db->sc);
->> +		goto out;
->> +	}
->> +
->> +	regmap_update_bits(db->sc, SUN4I_SC1, SUN4I_SC1_SRAM_A3_A4_MAP_MASK,
->> +						SUN4I_SC1_SRAM_A3_A4_MAP_EMAC);
->> +
->
-> I don't think that using a syscon is the right solution here.
->
-> All this SRAM mapping thing is mutually exclusive, and will possibly
-> impact other drivers as well.
+> > > Perf works for me with CONFIG_FRAME_POINTER=y, but that's only for kernel
+> > > space, and for userspace where the programs have been built for ARM mode
+> > > with frame pointers.
 
-Each single SRAM area can only be mapped to a single peripheral, so as 
-long as the driver only changes bits related to his own area nothing can 
-go wrong I believe.
+> > > The kernel may work without CONFIG_FRAME_POINTER set, but I've never
+> > > tested that, and I'd suggest that (given my experience looking at oops
+> > > dumps) it's not all that reliable.
 
-SRAM_C2 looks like it can be mapped do different devices (AE, CE, ACE), 
-but as far as I understand this, they are all related to the ACE device, 
-sharing a common register space, and would have to be handled by a 
-single driver anyway (if that will ever happen without docs) 
-https://linux-sunxi.org/ACE_Register_guide
+> > > Lastly, userspace without frame pointers is pretty much hopeless.
 
-> I think this is a more a case for a small driver in drivers/soc that
-> would take care of this, and make sure that client drivers don't step
-> on each other's toe.
+> > FWIW, perf can now use libunwind for unwinding the userspace side of
+> > things, so it's not quite as bad as it used to be. For the kernel side,
+> > if the unwinder isn't working properly it would be nice to know *why*,
+> > but I agree that it tends to be far flakier than the frame-pointer method.
 
-I'm not convinced this is necessary, but what would this driver do 
-different than a basic regmap? Check if the area is already mapped by 
-any driver and deny mapping it again by a different driver? Which 
-different driver, each area is only interesting for a single 
-device/driver? Except maybe mapping it to CPU as general purpose sram, 
-but that would need some direct agreement with the driver to steal its 
-memory anyway.
+> I don't see how userspace could be unwound without capturing the entire
+> userspace stack on every perf event - and that could be a considerable
+> size.  We have no way to know within the kernel which words on the
 
-Jens
+That is what you can do using 'perf record --call-graph dwarf':
+
+    -g               enables call-graph recording
+        --call-graph <mode[,dump_size]>
+                     setup and enables call-graph (stack chain/backtrace)
+                     recording: fp dwarf
+
+That will use:
+
+        PERF_SAMPLE_REGS_USER                   = 1U << 12,
+        PERF_SAMPLE_STACK_USER                  = 1U << 13,
+
+struct perf_event_attr {
+<SNIP>
+        /*
+         * Defines set of user regs to dump on samples.
+         * See asm/perf_regs.h for details.
+         */
+        __u64   sample_regs_user;
+
+        /*
+         * Defines size of the user stack to dump on samples.
+         */
+        __u32   sample_stack_user;
+<SNIP>
+}
+
+> userspace stack are part of the callchain and which aren't - the only
+> way we'd know is by loading the userspace's unwind tables, having the
+> kernel parsing them and generate a list of functions.
+
+Or deferring it to userspace to do that later.
+
+- Arnaldo
