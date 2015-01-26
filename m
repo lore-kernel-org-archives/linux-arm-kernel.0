@@ -1,104 +1,71 @@
-From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Mon, 26 Jan 2015 15:54:39 +0100
-Subject: [PATCH v2 1/2] pm: at91: pm_slowclock: fix suspend/resume hang up in
- timeouts
-In-Reply-To: <1422284080-32446-1-git-send-email-sylvain.rochet@finsecur.com>
-References: <1422265068-22974-1-git-send-email-wenyou.yang@atmel.com>
- <1422284080-32446-1-git-send-email-sylvain.rochet@finsecur.com>
-Message-ID: <1422284080-32446-2-git-send-email-sylvain.rochet@finsecur.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 26 Jan 2015 15:55:01 +0100
+Subject: [GIT PULL] ARM: mediatek: arm64 changes for v3.20
+In-Reply-To: <CABuKBeLPAHkKZ-1wYDgnWK6FxCq=EQerw_PLbThJkf6JmhgH8Q@mail.gmail.com>
+References: <CABuKBeLPAHkKZ-1wYDgnWK6FxCq=EQerw_PLbThJkf6JmhgH8Q@mail.gmail.com>
+Message-ID: <CABuKBeJgHmBYbnJpBGVmXth9wy+JowxuTDci58F7YqXpUq_sew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Removed timeout on XTAL, PLL lock and Master Clock Ready, hang if
-something went wrong instead of continuing in unknown condition. There
-is not much we can do if a PLL lock never ends, we are running in SRAM
-and we will not be able to connect back the sdram or ddram in order to
-be able to fire up a message or just panic.
+Hi Olof, hi Arnd,
 
-As a bonus, not decounting the timeout register in slow clock mode
-reduce cumulated suspend time and resume time from ~17ms to ~15ms.
+2015-01-26 13:37 GMT+01:00 Matthias Brugger <matthias.bgg@gmail.com>:
+> Hi Arnd and Olof,
+>
+> Please take the following arm64 patches for v3.20.
 
-Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
----
- arch/arm/mach-at91/pm_slowclock.S | 33 ++++-----------------------------
- 1 file changed, 4 insertions(+), 29 deletions(-)
+I somehow screwed up this pull request. Please ignore it.
 
-diff --git a/arch/arm/mach-at91/pm_slowclock.S b/arch/arm/mach-at91/pm_slowclock.S
-index 2001877..79dfdbe 100644
---- a/arch/arm/mach-at91/pm_slowclock.S
-+++ b/arch/arm/mach-at91/pm_slowclock.S
-@@ -34,11 +34,6 @@
-  */
- #undef SLOWDOWN_MASTER_CLOCK
- 
--#define MCKRDY_TIMEOUT		1000
--#define MOSCRDY_TIMEOUT 	1000
--#define PLLALOCK_TIMEOUT	1000
--#define PLLBLOCK_TIMEOUT	1000
--
- pmc	.req	r0
- sdramc	.req	r1
- ramc1	.req	r2
-@@ -50,56 +45,36 @@ tmp2	.req	r5
-  * Wait until master clock is ready (after switching master clock source)
-  */
- 	.macro wait_mckrdy
--	mov	tmp2, #MCKRDY_TIMEOUT
--1:	sub	tmp2, tmp2, #1
--	cmp	tmp2, #0
--	beq	2f
--	ldr	tmp1, [pmc, #AT91_PMC_SR]
-+1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
- 	tst	tmp1, #AT91_PMC_MCKRDY
- 	beq	1b
--2:
- 	.endm
- 
- /*
-  * Wait until master oscillator has stabilized.
-  */
- 	.macro wait_moscrdy
--	mov	tmp2, #MOSCRDY_TIMEOUT
--1:	sub	tmp2, tmp2, #1
--	cmp	tmp2, #0
--	beq	2f
--	ldr	tmp1, [pmc, #AT91_PMC_SR]
-+1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
- 	tst	tmp1, #AT91_PMC_MOSCS
- 	beq	1b
--2:
- 	.endm
- 
- /*
-  * Wait until PLLA has locked.
-  */
- 	.macro wait_pllalock
--	mov	tmp2, #PLLALOCK_TIMEOUT
--1:	sub	tmp2, tmp2, #1
--	cmp	tmp2, #0
--	beq	2f
--	ldr	tmp1, [pmc, #AT91_PMC_SR]
-+1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
- 	tst	tmp1, #AT91_PMC_LOCKA
- 	beq	1b
--2:
- 	.endm
- 
- /*
-  * Wait until PLLB has locked.
-  */
- 	.macro wait_pllblock
--	mov	tmp2, #PLLBLOCK_TIMEOUT
--1:	sub	tmp2, tmp2, #1
--	cmp	tmp2, #0
--	beq	2f
--	ldr	tmp1, [pmc, #AT91_PMC_SR]
-+1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
- 	tst	tmp1, #AT91_PMC_LOCKB
- 	beq	1b
--2:
- 	.endm
- 
- 	.text
+Cheers,
+Matthias
+
+>
+> Cheers,
+> Matthias
+>
+> ---
+>
+> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+>
+>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+>
+> are available in the git repository at:
+>
+>   https://github.com/mbgg/linux-mediatek.git tags/v3.20-next-arm64
+>
+> for you to fetch changes up to 4727a6f631bf3ab2a0373acd27d40483446fcb8a:
+>
+>   arm64: mediatek: Add MT8173 SoC Kconfig and defconfig (2015-01-26
+> 13:26:48 +0100)
+>
+> ----------------------------------------------------------------
+> Add support for mt8173 SoC from Mediatek.
+>
+> - add DT bindings documentation
+> - add dts files for SoC and evaluation board
+> - add to Kconfig and defconfig
+>
+> ----------------------------------------------------------------
+> Eddie Huang (3):
+>       Document: DT: Add bindings for mediatek MT8173 SoC Platform
+>       arm64: dts: Add mediatek MT8173 SoC and evaluation board dts and Makefile
+>       arm64: mediatek: Add MT8173 SoC Kconfig and defconfig
+>
+>  Documentation/devicetree/bindings/arm/mediatek.txt |   4 +
+>  .../bindings/arm/mediatek/mediatek,sysirq.txt      |   1 +
+>  .../devicetree/bindings/serial/mtk-uart.txt        |   4 +-
+>  arch/arm64/Kconfig                                 |   6 +
+>  arch/arm64/boot/dts/Makefile                       |   1 +
+>  arch/arm64/boot/dts/mediatek/Makefile              |   5 +
+>  arch/arm64/boot/dts/mediatek/mt8173-evb.dts        |  38 +++++
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi           | 168 +++++++++++++++++++++
+>  arch/arm64/configs/defconfig                       |   2 +
+>  9 files changed, 228 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm64/boot/dts/mediatek/Makefile
+>  create mode 100644 arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+>  create mode 100644 arch/arm64/boot/dts/mediatek/mt8173.dtsi
+
+
+
 -- 
-2.1.4
+motzblog.wordpress.com
