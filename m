@@ -1,55 +1,59 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 26 Jan 2015 14:58:18 +0100
-Subject: [PATCH v5 2/2] clocksource: driver for Conexant Digicolor SoC
- timer
-In-Reply-To: <20150126134751.GE3148@tarshish>
-References: <cover.1422272518.git.baruch@tkos.co.il>
- <ad84f7155286c45401ff7f6bc6506407cc3beb61.1422272518.git.baruch@tkos.co.il>
- <54C644AF.9030208@linaro.org> <20150126134751.GE3148@tarshish>
-Message-ID: <54C647FA.7010300@linaro.org>
+From: ats@offog.org (Adam Sampson)
+Date: Mon, 26 Jan 2015 13:59:31 +0000
+Subject: [PATCH] ARM: dts: sun7i: Add dts file for pcDuino 3 Nano board
+In-Reply-To: <20150126100921.GQ8470@lukather>
+References: <1422199921-325-1-git-send-email-ats@offog.org>
+ <20150125164846.GL8470@lukather>
+ <20150126003520.GA871@cartman.at.offog.org>
+ <20150126100921.GQ8470@lukather>
+Message-ID: <20150126135931.GB871@cartman.at.offog.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/26/2015 02:47 PM, Baruch Siach wrote:
-> Hi Daniel,
->
-> On Mon, Jan 26, 2015 at 02:44:15PM +0100, Daniel Lezcano wrote:
->>> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
->>> index 94d90b24b56b..a993c108be67 100644
->>> --- a/drivers/clocksource/Makefile
->>> +++ b/drivers/clocksource/Makefile
->>> @@ -10,6 +10,7 @@ obj-$(CONFIG_SH_TIMER_TMU)	+= sh_tmu.o
->>>   obj-$(CONFIG_EM_TIMER_STI)	+= em_sti.o
->>>   obj-$(CONFIG_CLKBLD_I8253)	+= i8253.o
->>>   obj-$(CONFIG_CLKSRC_MMIO)	+= mmio.o
->>> +obj-$(CONFIG_ARCH_DIGICOLOR)	+= timer-digicolor.o
->>
->> Ah, one minor change I forgot to mention in the last review (sorry about
->> that).
->>
->> Don't depend on the ARCH, add and select a TIMER_DIGICOLOR (or whatever the
->> name you prefer) in the mach-digicolor/Kconfig and use it here.
->
-> OK. I'll make the change. I'm just curious: what is the advantage of having a
-> separate config symbol for the timer?
+Hi Maxime,
 
-It is because some timers could be used in different platforms, so the 
-policy of the house is to let the platform Kconfig to select the timer.
+On Mon, Jan 26, 2015 at 11:09:21AM +0100, Maxime Ripard wrote:
+> If you read Documentation/leds/leds-class.txt, the pattern to follow is:
+> "devicename:colour:function"
+> so it should rather be pcduino3-nano:green:usr1 and usr2, or some
+> other thing.
 
-Also, that let one platform to not select the timer if it is not needed. 
-For example one SoC uses the architected timers and there is not power 
-management on the board, hence no cpu is powered down and no backup 
-timer is needed.
+How about pcduino3-nano:green:usr-led3/4? Or ...:usr1/2, and a comment
+in the .dts explaining how they're labelled on the board?
 
-Even if the timer is expected to be used on only one platform, we try to 
-keep the rule consistent across the different drivers (even if I admit 
-some cleanups should be done in the Kconfig file).
+There are a couple of other sunxi boards that have the same problem
+(multiple user-controllable LEDs of the same colour):
 
+sun4i-a10-marsboard.dts: label = "marsboard:red1:usr";
+sun4i-a10-marsboard.dts: label = "marsboard:red2:usr";
+sun4i-a10-marsboard.dts: label = "marsboard:red3:usr";
+sun4i-a10-marsboard.dts: label = "marsboard:red4:usr";
+sun9i-a80-optimus.dts: label = "optimus:led2:usr";
+sun9i-a80-optimus.dts: label = "optimus:led4:usr";
 
+I can send a patch for those if you'd like as well?
+
+> > Should there be aliases for I2C as well, since the same situation
+> > applies (i2c0 and i2c2)?
+> Yep.
+
+Added.
+
+> > More generally, is it correct to add nodes like these (uart2, spi0,
+> > i2c2) for features that appear on the Arduino GPIO headers?
+> If those pins are specifically dedicated to this feature, then yes.
+
+They're multipurpose pins on Arduino-compatible headers:
+http://learn.linksprite.com/wp-content/uploads/2014/10/pcDuino3-Nano_header-Model.jpg
+
+How you want them to be configured will depend on what you have plugged
+in; for example, some Arduino add-on boards will expect J11 P1/2 to be
+serial RX/TX and some will expect them to be GPIOs. So should we
+configure i2c2 etc. by default (and let the user turn them into GPIOs
+if required), or just provide the GPIOs (and require the user to adjust
+the .dts)?
+
+Cheers,
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Adam Sampson <ats@offog.org>                         <http://offog.org/>
