@@ -1,31 +1,33 @@
-From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Mon, 26 Jan 2015 14:44:53 +0100
-Subject: [PATCH v2 02/12] pm: at91: Workaround DDRSDRC self-refresh bug
- with LPDDR1 memories.
-In-Reply-To: <54C6426E.9090808@atmel.com>
-References: <1422265005-22937-1-git-send-email-wenyou.yang@atmel.com>
- <1422265139-23011-1-git-send-email-wenyou.yang@atmel.com>
- <20150126103605.GA20837@gradator.net> <54C6426E.9090808@atmel.com>
-Message-ID: <20150126134453.GA27559@gradator.net>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Mon, 26 Jan 2015 14:47:01 +0100
+Subject: [PATCH v5 11/18] iommu: exynos: remove useless device_add/remove
+ callbacks
+In-Reply-To: <1589480.9kxdoXKkuz@avalon>
+References: <1422028288-891-1-git-send-email-m.szyprowski@samsung.com>
+ <2829552.kzfCU5HyxQ@avalon> <20150126110059.GC30345@8bytes.org>
+ <1589480.9kxdoXKkuz@avalon>
+Message-ID: <20150126134701.GH30345@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Nicolas,
+Hi Laurent,
 
-On Mon, Jan 26, 2015 at 02:34:38PM +0100, Nicolas Ferre wrote:
-> Le 26/01/2015 11:36, Sylvain Rochet a ?crit :
-> > 
-> > I think we should explain we are dealing with an errata here, this is 
-> > not obvious at first sight, the patch summary may find its place here :-)
+On Mon, Jan 26, 2015 at 03:03:57PM +0200, Laurent Pinchart wrote:
+> On Monday 26 January 2015 12:00:59 Joerg Roedel wrote:
+> > My plan is to make IOMMU groups mandatory. I am currently preparing and
+> > RFC patch-set to introduce default-domains (which will be per group). So
+> > when all IOMMU drivers are converted to make use of default domains the
+> > iommu groups will be mandatory.
 > 
-> True but the problem is that this errata is not public yet, it will be
-> in a couple of weeks.
-> 
-> I have the feeling though that the commit message is pretty clear. We'll
-> maybe add that it"s an actual errata.
+> Could the default domain policy be configured by the IOMMU driver ? The ipmmu-
+> vmsa driver supports four domains only, and serves up to 32 masters, with one 
+> group per master. A default of one domain per group wouldn't be usable.
 
-Humm, this is not what I meant actually. I only proposed a code source 
-comment explaining why this is done this way, the current patch summary 
-looked like it will be perfect between /* */ ;-)
+I guess this limitation is a property of the iommu hardware. I currently
+have no support for this in the patch-set, but I think it is easy (and
+the best way) to support a model where we have only one default domain
+for all groups. This is not in the patch set right now, but will be
+added at some point.
 
-Sylvain
+
+	Joerg
