@@ -1,62 +1,114 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 26 Jan 2015 16:07:36 +0100
-Subject: [PATCH v2] ARM: at91: sama5d4: dts: change the nand compatible
- string
-In-Reply-To: <54C0D872.6010005@atmel.com>
-References: <1421656387-12538-2-git-send-email-josh.wu@atmel.com>
- <1421923305-10088-1-git-send-email-josh.wu@atmel.com>
- <54C0D872.6010005@atmel.com>
-Message-ID: <54C65838.4020707@atmel.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 26 Jan 2015 16:15:44 +0100
+Subject: [PATCH 1/2] mmc: core: use card pointer as the first parameter of
+ execute_tuning()
+In-Reply-To: <1422271175-19445-2-git-send-email-addy.ke@rock-chips.com>
+References: <1422271175-19445-1-git-send-email-addy.ke@rock-chips.com>
+ <1422271175-19445-2-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <CAPDyKFp=5epMggHu0+u_LU7ETujcoeP2xOpB7iD6JF2bs8BnEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 22/01/2015 12:01, Nicolas Ferre a ?crit :
-> Le 22/01/2015 11:41, Josh Wu a ?crit :
->> As we introduce a new "atmel,sama5d4-nand" compatible string for sama5d4,
->> so we need to apply it for sama5d4 chip.
->>
->> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> 
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> 
-> Brian,
-> I suppose that it makes sense to keep this patch with the previous one.
-> So, can you take it in your tree?
-> 
-> Otherwise, it can take the at91 -> arm-soc route.
+On 26 January 2015 at 12:19, Addy Ke <addy.ke@rock-chips.com> wrote:
+> We need to take the card pointer in execute_tuning() for mmc_send_status(),
 
-Bryan,
+mmc_send_status() is an mmc core function, not intended for host's to call.
 
-I take it with me right now and try to send it to arm-soc for 3.20.
+> but mmc->card is NULL in tuning state. So we need change the first parameter
+> of execute_tuning() to card pointer(struct mmc_card * card).
 
-Best regards,
+So, why do we need this?
 
+Kind regards
+Uffe
 
->> ---
->>
->> Changes in v2:
->> - still keep the old rm9200 nand compatible string for compatible old driver.
->>
->>  arch/arm/boot/dts/sama5d4.dtsi | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
->> index 1b0f30c..e40b1da 100644
->> --- a/arch/arm/boot/dts/sama5d4.dtsi
->> +++ b/arch/arm/boot/dts/sama5d4.dtsi
->> @@ -267,7 +267,7 @@
->>  		};
->>  
->>  		nand0: nand at 80000000 {
->> -			compatible = "atmel,at91rm9200-nand";
->> +			compatible = "atmel,sama5d4-nand", "atmel,at91rm9200-nand";
->>  			#address-cells = <1>;
->>  			#size-cells = <1>;
->>  			ranges;
->>
-> 
-> 
-
-
--- 
-Nicolas Ferre
+>
+> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+> ---
+>  drivers/mmc/core/core.c           | 2 +-
+>  drivers/mmc/host/dw_mmc.c         | 3 ++-
+>  drivers/mmc/host/rtsx_pci_sdmmc.c | 3 ++-
+>  drivers/mmc/host/rtsx_usb_sdmmc.c | 3 ++-
+>  include/linux/mmc/host.h          | 2 +-
+>  5 files changed, 8 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+> index 1be7055..271f024 100644
+> --- a/drivers/mmc/core/core.c
+> +++ b/drivers/mmc/core/core.c
+> @@ -1101,7 +1101,7 @@ int mmc_execute_tuning(struct mmc_card *card)
+>                 opcode = MMC_SEND_TUNING_BLOCK;
+>
+>         mmc_host_clk_hold(host);
+> -       err = host->ops->execute_tuning(host, opcode);
+> +       err = host->ops->execute_tuning(card, opcode);
+>         mmc_host_clk_release(host);
+>
+>         if (err)
+> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> index 4bd22af..e54e656 100644
+> --- a/drivers/mmc/host/dw_mmc.c
+> +++ b/drivers/mmc/host/dw_mmc.c
+> @@ -1485,8 +1485,9 @@ free_blk_test:
+>         return ret;
+>  }
+>
+> -static int dw_mci_execute_tuning(struct mmc_host *mmc, u32 opcode)
+> +static int dw_mci_execute_tuning(struct mmc_card *card, u32 opcode)
+>  {
+> +       struct mmc_host *mmc = card->host;
+>         struct dw_mci_slot *slot = mmc_priv(mmc);
+>         struct dw_mci *host = slot->host;
+>         const struct dw_mci_drv_data *drv_data = host->drv_data;
+> diff --git a/drivers/mmc/host/rtsx_pci_sdmmc.c b/drivers/mmc/host/rtsx_pci_sdmmc.c
+> index 1d3d6c4..230bd2f 100644
+> --- a/drivers/mmc/host/rtsx_pci_sdmmc.c
+> +++ b/drivers/mmc/host/rtsx_pci_sdmmc.c
+> @@ -1270,8 +1270,9 @@ out:
+>         return err;
+>  }
+>
+> -static int sdmmc_execute_tuning(struct mmc_host *mmc, u32 opcode)
+> +static int sdmmc_execute_tuning(struct mmc_card *card, u32 opcode)
+>  {
+> +       struct mmc_host *mmc = card->host;
+>         struct realtek_pci_sdmmc *host = mmc_priv(mmc);
+>         struct rtsx_pcr *pcr = host->pcr;
+>         int err = 0;
+> diff --git a/drivers/mmc/host/rtsx_usb_sdmmc.c b/drivers/mmc/host/rtsx_usb_sdmmc.c
+> index 88af827..c494c06 100644
+> --- a/drivers/mmc/host/rtsx_usb_sdmmc.c
+> +++ b/drivers/mmc/host/rtsx_usb_sdmmc.c
+> @@ -1265,8 +1265,9 @@ out:
+>                 return 0;
+>  }
+>
+> -static int sdmmc_execute_tuning(struct mmc_host *mmc, u32 opcode)
+> +static int sdmmc_execute_tuning(struct mmc_card *card, u32 opcode)
+>  {
+> +       struct mmc_host *mmc = card->host;
+>         struct rtsx_usb_sdmmc *host = mmc_priv(mmc);
+>         struct rtsx_ucr *ucr = host->ucr;
+>         int err = 0;
+> diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
+> index 0c8cbe5..ec4128e 100644
+> --- a/include/linux/mmc/host.h
+> +++ b/include/linux/mmc/host.h
+> @@ -133,7 +133,7 @@ struct mmc_host_ops {
+>         int     (*card_busy)(struct mmc_host *host);
+>
+>         /* The tuning command opcode value is different for SD and eMMC cards */
+> -       int     (*execute_tuning)(struct mmc_host *host, u32 opcode);
+> +       int     (*execute_tuning)(struct mmc_card *card, u32 opcode);
+>
+>         /* Prepare HS400 target operating frequency depending host driver */
+>         int     (*prepare_hs400_tuning)(struct mmc_host *host, struct mmc_ios *ios);
+> --
+> 1.8.3.2
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
