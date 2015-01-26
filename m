@@ -1,78 +1,31 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 26 Jan 2015 17:35:44 +0100
-Subject: [PATCHv2] mvebu: add Linksys WRT1900AC (Mamba) support
-In-Reply-To: <op.xs086cnu2s3iss@ecaz>
-References: <1421687701-5667-1-git-send-email-kaloz@openwrt.org>
- <20150119182113.GH32663@lunn.ch> <op.xsrcplz12s3iss@ecaz>
- <54C51FAA.4080300@gmail.com> <op.xs086cnu2s3iss@ecaz>
-Message-ID: <54C66CE0.8070407@free-electrons.com>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Mon, 26 Jan 2015 17:48:14 +0100
+Subject: [PATCH] pinctrl: zynq: Fix usb0 pins
+Message-ID: <1422290895-4046-1-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/01/2015 20:16, Imre Kaloz wrote:
-> Hi Sebastian,
-> 
-> On Sun, 25 Jan 2015 17:54:02 +0100, Sebastian Hesselbarth  
-> <sebastian.hesselbarth@gmail.com> wrote:
-> 
->>> - OpenWrt is the only firmware/stack other than the official one and
->>> people already know this device as "mamba".
->>>
->>> - Let's say the same device gets released under the same name or just
->>> the radios change - so no redesign takes place at all. In my opinion
->>> that hardly justifies adding multiple .dts files just to change the name
->>> of the LEDs to reflect that. I think people who want to run mainline on
->>> their device wouldn't be concerned about seeing a codename, but on the
->>> other hand we could receive patches to "correct" the marketing name in
->>> the LEDs.
->>
->> As soon as you'll discover another "mamba"-based device, you can
->> split-off the common stuff into a linksys-mamba.dtsi and include it
->> into each of the two device dts files.
->>
->> Right now, I'd suggest to have just a single linksys-wrt1900ac.dts.
-> 
-> Right now the only device using the board is the "mamba" with "WRT1900AC"  
-> as the marketing name.
-> 
-> Let me try to change the question: if we'll have a device made by  
-> "Company" called "foobar" marketed as "ABC100", mainline really prefers it  
-> to be called "company,abc100" (and hence the leds "abc100:color:label")  
-> instead of "company,foobar"?
+Fix usb0 pin 19 -> 29 (matching ethernet1 pins and manual).
+Pin 19 is used for ethernet0 on the Parallella board.
 
-I don't know if there is a guideline about it but as I wrote in the other
-email. Using the marketing name as model and board name as compatible string
-would make sens.
+Fixes: add958cee967 ("pinctrl: Add driver for Zynq")
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ drivers/pinctrl/pinctrl-zynq.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> 
-> As I've said, the "viper" has been sold as the EA4200v2 and the EA4500.  
-> Other than the sticker, it's the same device. So for me calling a single  
-> device as "linksys,viper" makes way more sense than creating a  
-> linksys-viper.dtsi and have a linksys-ea4200v2.dts and a  
-> linksys-ea4500.dts - (so multiple kernels) just to make the model / led  
-> name follow the sticker.
-> 
-
->From my point of view the compatible name and dts[i|] files are two separate things.
-This kind of information can (would?) be updated by the bootlader either natively
-or by using impedance-matcher. It would even be possible to use  dt overlays. We
-don't have to provide one dts for any variation of the same board.
-
-Gregory
-
-> Also, please mind we are talking about consumer stuff here, so it's likely  
-> there will be multiple versions (maybe with different socs/whatever). Do  
-> we really want to have devices named after random marketing name + version  
-> number combos? ABC100 can be the same as FOO1000v3 and BAR9999v5 or  
-> WTH555v2.
-> 
-> 
-> Imre
-> 
-
-
+diff --git a/drivers/pinctrl/pinctrl-zynq.c b/drivers/pinctrl/pinctrl-zynq.c
+index 8aa05e2eb705..6480ed533a87 100644
+--- a/drivers/pinctrl/pinctrl-zynq.c
++++ b/drivers/pinctrl/pinctrl-zynq.c
+@@ -357,7 +357,7 @@ static const unsigned int gpio0_50_pins[] = {50};
+ static const unsigned int gpio0_51_pins[] = {51};
+ static const unsigned int gpio0_52_pins[] = {52};
+ static const unsigned int gpio0_53_pins[] = {53};
+-static const unsigned int usb0_0_pins[] = {28, 19, 30, 31, 32, 33, 34, 35, 36,
++static const unsigned int usb0_0_pins[] = {28, 29, 30, 31, 32, 33, 34, 35, 36,
+ 					   37, 38, 39};
+ static const unsigned int usb1_0_pins[] = {40, 41, 42, 43, 44, 45, 46, 47, 48,
+ 					   49, 50, 51};
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.2.2
