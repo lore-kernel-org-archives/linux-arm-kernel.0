@@ -1,71 +1,43 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 26 Jan 2015 15:55:01 +0100
-Subject: [GIT PULL] ARM: mediatek: arm64 changes for v3.20
-In-Reply-To: <CABuKBeLPAHkKZ-1wYDgnWK6FxCq=EQerw_PLbThJkf6JmhgH8Q@mail.gmail.com>
-References: <CABuKBeLPAHkKZ-1wYDgnWK6FxCq=EQerw_PLbThJkf6JmhgH8Q@mail.gmail.com>
-Message-ID: <CABuKBeJgHmBYbnJpBGVmXth9wy+JowxuTDci58F7YqXpUq_sew@mail.gmail.com>
+From: saeed@annapurnalabs.com (Saeed Bishara)
+Date: Mon, 26 Jan 2015 16:59:03 +0200
+Subject: [PATCH 4/4] ARM: dts: Add initial support for Alpine platform
+In-Reply-To: <3392216.FHWJaKVrAq@wuerfel>
+References: <54c53663.0OSd3sO9f1oYd3El%tsahee@annapurnalabs.com>
+ <36490364.POE8pPlYQh@wuerfel>
+ <CABM=7kn8CMGZDPECfEru11O9gkbYFOTSkzHJF+Ku-oMJoFg6sQ@mail.gmail.com>
+ <3392216.FHWJaKVrAq@wuerfel>
+Message-ID: <CA+W-XThYsfOctZSriBU+oOcJevpi7tpjDEFUn2zfsiS13rzTqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, hi Arnd,
+On 26 January 2015 at 16:32, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 26 January 2015 16:14:11 Tsahee Zidenberg wrote:
+>> On 26 January 2015 at 13:15, Arnd Bergmann <arnd@arndb.de> wrote:> +* CPU
+>> node:
+>>
+>> > > +
+>> > > +The Alpine platform includes cortex-a15 cores.
+>> > > +enable-method: must be "annapurna-labs,alpine-smp" to allow smp  [1]
+>> >
+>> > Any reason for not using PSCI on this platform?
+>> >
+>> >
+>> PSCI is in the roadmap, but not supported by current firmware.
+>
+> As your initial submission is very minimal regarding driver support,
+> would it be sensible to wait for the firmware to catch up then?
+Arnd,
+there are already systems with this soc that shipped without  PSCI firmware.
+and we still would like to support mainline kernel on those systems
+without forcing firmware upgrade.
+saeed
 
-2015-01-26 13:37 GMT+01:00 Matthias Brugger <matthias.bgg@gmail.com>:
-> Hi Arnd and Olof,
 >
-> Please take the following arm64 patches for v3.20.
-
-I somehow screwed up this pull request. Please ignore it.
-
-Cheers,
-Matthias
-
+> That way you lose SMP support for the moment but could still work
+> on adding the device drivers while testing in uniprocessor mode and
+> then we will see if your firmware is ready once there are more
+> drivers upstream. Once the firmware has PSCI working, it will all
+> just work without the need for extra devices in DT or the custom
+> SMP operations.
 >
-> Cheers,
-> Matthias
->
-> ---
->
-> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
->
->   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
->
-> are available in the git repository at:
->
->   https://github.com/mbgg/linux-mediatek.git tags/v3.20-next-arm64
->
-> for you to fetch changes up to 4727a6f631bf3ab2a0373acd27d40483446fcb8a:
->
->   arm64: mediatek: Add MT8173 SoC Kconfig and defconfig (2015-01-26
-> 13:26:48 +0100)
->
-> ----------------------------------------------------------------
-> Add support for mt8173 SoC from Mediatek.
->
-> - add DT bindings documentation
-> - add dts files for SoC and evaluation board
-> - add to Kconfig and defconfig
->
-> ----------------------------------------------------------------
-> Eddie Huang (3):
->       Document: DT: Add bindings for mediatek MT8173 SoC Platform
->       arm64: dts: Add mediatek MT8173 SoC and evaluation board dts and Makefile
->       arm64: mediatek: Add MT8173 SoC Kconfig and defconfig
->
->  Documentation/devicetree/bindings/arm/mediatek.txt |   4 +
->  .../bindings/arm/mediatek/mediatek,sysirq.txt      |   1 +
->  .../devicetree/bindings/serial/mtk-uart.txt        |   4 +-
->  arch/arm64/Kconfig                                 |   6 +
->  arch/arm64/boot/dts/Makefile                       |   1 +
->  arch/arm64/boot/dts/mediatek/Makefile              |   5 +
->  arch/arm64/boot/dts/mediatek/mt8173-evb.dts        |  38 +++++
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi           | 168 +++++++++++++++++++++
->  arch/arm64/configs/defconfig                       |   2 +
->  9 files changed, 228 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm64/boot/dts/mediatek/Makefile
->  create mode 100644 arch/arm64/boot/dts/mediatek/mt8173-evb.dts
->  create mode 100644 arch/arm64/boot/dts/mediatek/mt8173.dtsi
-
-
-
--- 
-motzblog.wordpress.com
+>         Ard
