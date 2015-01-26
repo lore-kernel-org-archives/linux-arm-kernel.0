@@ -1,72 +1,45 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 26 Jan 2015 13:49:12 +0100
-Subject: [PATCH v2] ARM: at91: fix Kconfig.debug by adding DEBUG_AT91_UART
- option
-Message-ID: <1422276552-24456-1-git-send-email-nicolas.ferre@atmel.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 26 Jan 2015 14:50:16 +0200
+Subject: [PATCH] video: treat signal like timeout as failure
+In-Reply-To: <1421731430-13207-1-git-send-email-der.herr@hofr.at>
+References: <1421731430-13207-1-git-send-email-der.herr@hofr.at>
+Message-ID: <54C63808.5070505@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DEBUG_AT91_UART Kconfig option was forgotten when moving the
-AT91 debug-macro.S file. Add it and use it for the at91.S compilation.
+Hi,
 
-Reported-by: Paul Bolle <pebolle@tiscali.nl>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-Hi Olof,
+On 20/01/15 07:23, Nicholas Mc Guire wrote:
+> if(!wait_for_completion_interruptible_timeout(...))
+> only handles the timeout case - this patch adds handling the
+> signal case the same as timeout and cleans up.
+> 
+> Signed-off-by: Nicholas Mc Guire <der.herr@hofr.at>
+> ---
+> 
+> Only the timeout case was being handled, return of 0 in 
+> wait_for_completion_interruptible_timeout, the signal case (-ERESTARTSYS)
+> was treated just like the case of successful completion, which is most 
+> likely not reasonable.
+> 
+> Note that exynos_mipi_dsi_wr_data/exynos_mipi_dsi_rd_data return values
+> are not checked at the call sites in s6e8ax0.c (cmd_read/cmd_write)!
+> 
+> This patch simply treats the signal case the same way as the timeout case,
+> by releasing locks and returning 0 - which might not be the right thing to
+> do - this needs a review by someone knowing the details of this driver.
 
-This is the second revision of my patch and it must implement your advices
-described in your previous email. I'm building a pull-request with it as well
-so if you agree, you can take it easily.
+The code changes look ok to me, but again you have detailed descriptions
+above which are not in the patch description. All the above looks like
+something that should be in the patch description.
 
-Thanks for your help, bye.
+ Tomi
 
- arch/arm/Kconfig.debug | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index e34d24949c6a..3092052bb285 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -117,16 +117,19 @@ choice
- 	config AT91_DEBUG_LL_DBGU0
- 		bool "Kernel low-level debugging on rm9200, 9260/9g20, 9261/9g10, 9rl, 9x5, 9n12"
- 		select DEBUG_AT91_UART
-+		depends on ARCH_AT91
- 		depends on HAVE_AT91_DBGU0
- 
- 	config AT91_DEBUG_LL_DBGU1
- 		bool "Kernel low-level debugging on 9263, 9g45 and sama5d3"
- 		select DEBUG_AT91_UART
-+		depends on ARCH_AT91
- 		depends on HAVE_AT91_DBGU1
- 
- 	config AT91_DEBUG_LL_DBGU2
- 		bool "Kernel low-level debugging on sama5d4"
- 		select DEBUG_AT91_UART
-+		depends on ARCH_AT91
- 		depends on HAVE_AT91_DBGU2
- 
- 	config DEBUG_BCM2835
-@@ -1112,6 +1115,10 @@ choice
- 
- endchoice
- 
-+config DEBUG_AT91_UART
-+	bool
-+	depends on ARCH_AT91
-+
- config DEBUG_EXYNOS_UART
- 	bool
- 
-@@ -1168,8 +1175,7 @@ config DEBUG_LL_INCLUDE
- 	string
- 	default "debug/sa1100.S" if DEBUG_SA1100
- 	default "debug/8250.S" if DEBUG_LL_UART_8250 || DEBUG_UART_8250
--	default "debug/at91.S" if AT91_DEBUG_LL_DBGU0 || AT91_DEBUG_LL_DBGU1 || \
--				AT91_DEBUG_LL_DBGU2
-+	default "debug/at91.S" if DEBUG_AT91_UART
- 	default "debug/asm9260.S" if DEBUG_ASM9260_UART
- 	default "debug/clps711x.S" if DEBUG_CLPS711X_UART1 || DEBUG_CLPS711X_UART2
- 	default "debug/meson.S" if DEBUG_MESON_UARTAO
--- 
-2.1.3
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150126/f242a1a6/attachment.sig>
