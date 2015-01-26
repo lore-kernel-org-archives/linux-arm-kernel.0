@@ -1,156 +1,51 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 26 Jan 2015 12:15:11 +0200
-Subject: [PATCH v4 2/2] clocksource: driver for Conexant Digicolor SoC
- timer
-In-Reply-To: <54C60C4F.50507@linaro.org>
-References: <cover.1422256855.git.baruch@tkos.co.il>
- <d2d06d04f8ee8acb62e7748b42c3177229de478a.1422256855.git.baruch@tkos.co.il>
- <54C60C4F.50507@linaro.org>
-Message-ID: <20150126101511.GC3148@tarshish>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 26 Jan 2015 11:16:58 +0100
+Subject: [PATCH 0/4] Drop legacy support for omap3517
+In-Reply-To: <201501242314.58201@pali>
+References: <1421171865-5209-1-git-send-email-tony@atomide.com>
+ <2871852.qm0MoZvdlF@wuerfel> <201501242314.58201@pali>
+Message-ID: <3668717.H6LOeCvYZ4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Saturday 24 January 2015 23:14:58 Pali Roh?r wrote:
+> On Saturday 24 January 2015 23:08:00 Arnd Bergmann wrote:
+> > On Saturday 24 January 2015 13:00:00 Pali Roh?r wrote:
+> > > Another regression for DT setup (which does not occur for
+> > > board code):
+> > > 
+> > > omap_hsmmc driver does not export slot_name sysfs entry
+> > > because it not supported by DT yet. Entry slot_name is used
+> > > by userspace application to determinate if mmc block device
+> > > is internal eMMC memory or external uSD card. So support
+> > > for this property also in DT is needed.
+> > 
+> > > Here is simple patch which fix this problem:
+> > The sysfs file only exists for the two OMAP drivers, and the
+> > naming is used only by board-n8x0, board-rx51 and
+> > board-omap3logic.
+> > 
+> > It may be better to add a board-specific hack for these to
+> > keep the existing user space working but not spread the use
+> > of this file anywhere else.
+> 
+> Why? omap_hsmmc.c has already support for slot_name sysfs entry, 
+> just it is not filled from DT data (only from platform_data)...
 
-On Mon, Jan 26, 2015 at 10:43:43AM +0100, Daniel Lezcano wrote:
-[...]
-> >+static struct dc_dev_t {
-> >+	void __iomem *timer_base;
-> >+	u32 ticks_per_jiffy;
-> >+} dc_dev;
-> 
-> Hi Baruch,
-> 
-> your code is valid but I think there is a misunderstanding when we talked
-> about the encapsulation.
-> 
-> I was expecting something like:
-> 
-> static struct digicolor_timer {
-> 	void __iomem *base;
-> 	u32 ticks_per_jiffy;
-> 	int channel;
-> 	struct clock_event_device ce;
-> };
-> 
-> struct digicolor_timer *dg_timer(struct clock_event_device *ce)
-> {
-> 	return container_of(ce, struct digicolor_timer, ce);
-> }
-> 
-> So the timer could be accessed directly from the clock_event_device
-> structure. The exception is the 'sched_read' and the init function where you
-> will have to address directly the global variable.
-> 
-> Perhaps, that would be nice if you take the opportunity to encapsulate the
-> enable/disable functions.
-> 
-> static inline void dg_timer_disable(struct clock_event_device *ce)
-> {
-> 	struct digital_timer *dt = dg_timer(ce);
-> 	writeb(CONTROL_DISABLE, dt->base + CONTROL(dt->channel));	
-> }
-> 
-> static inline void dg_timer_enable(struct clock_event_device *ce, int mode)
-> {
-> 	struct digital_timer *dt = dg_timer(ce);
-> 	writeb(CONTROL_ENABLE | mode, dt->base, CONTROL(dt->channel));
-> }
-> 
-> >+
-> >+static void digicolor_clkevt_mode(enum clock_event_mode mode,
-> >+				  struct clock_event_device *clk)
-> 
-> IMO, 'clk' argument name is confusing. I would suggest to use 'ce' or
-> whatever.
-> 
-> >+{
-> >+	switch (mode) {
-> >+	case CLOCK_EVT_MODE_PERIODIC:
-> >+		writeb(CONTROL_DISABLE, dc_dev.timer_base + CONTROL(TIMER_C));
-> >+		writel(dc_dev.ticks_per_jiffy,
-> >+		       dc_dev.timer_base + COUNT(TIMER_C));
-> >+		writeb(CONTROL_ENABLE | CONTROL_MODE_PERIODIC,
-> >+		       dc_dev.timer_base + CONTROL(TIMER_C));
-> 
-> Becomes:
-> 
-> 		dg_timer_disable(ce);
-> 		dg_timer_enable(ce, CONTROL_MODE_PERIODIC);
-> 
-> ...
-> 
-> >+		break;
-> >+	case CLOCK_EVT_MODE_ONESHOT:
-> >+		writeb(CONTROL_DISABLE, dc_dev.timer_base + CONTROL(TIMER_C));
-> >+		writeb(CONTROL_ENABLE | CONTROL_MODE_ONESHOT,
-> >+		       dc_dev.timer_base + CONTROL(TIMER_C));
-> 
-> 
-> Becomes:
-> 		dg_timer_disable(ce);
-> 		dg_timer_enable(ce, CONTROL_MODE_ONESHOT);
-> 	
-> 
-> >+		break;
-> >+	case CLOCK_EVT_MODE_UNUSED:
-> >+	case CLOCK_EVT_MODE_SHUTDOWN:
-> >+	default:
-> >+		writeb(CONTROL_DISABLE, dc_dev.timer_base + CONTROL(TIMER_C));
-> 
-> Becomes:
-> 		dg_timer_disable(ce);
-> 
-> >+		break;
-> >+	}
-> >+}
-> >+
-> >+static int digicolor_clkevt_next_event(unsigned long evt,
-> >+				       struct clock_event_device *unused)
-> >+{
-> >+	writeb(CONTROL_DISABLE, dc_dev.timer_base + CONTROL(TIMER_C));
-> >+	writel(evt, dc_dev.timer_base + COUNT(TIMER_C));
-> >+	writeb(CONTROL_ENABLE | CONTROL_MODE_ONESHOT,
-> >+	       dc_dev.timer_base + CONTROL(TIMER_C));
-> 
-> Becomes:
-> 	dg_timer_disable(ce);
-> 	writel(evt, dg_timer(ce)->base + COUNT(dg_timer(ce)->base));
-> 	dg_timer_enable(ce, CONTROL_MODE_ONESHOT);
-> >+	return 0;
-> >+}
-> >+
-> >+static struct clock_event_device digicolor_clockevent = {
-> >+	.name = "digicolor_tick",
-> >+	.rating = 340,
-> >+	.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-> >+	.set_mode = digicolor_clkevt_mode,
-> >+	.set_next_event = digicolor_clkevt_next_event,
-> >+};
-> 
-> 
-> struct digicolor_timer dg_timer = {
-> 	
-> 	.ce = {
-> 		.name = "digicolor_tick",
-> 		.rating = 340,
-> 		.features = CLOCK_EVT_FEAT_PERIODIC |
-> 				CLOCK_EVT_FEAT_ONESHOT,
-> 		.set_mode = digicolor_clkevt_mode,
-> 		.set_next_event = digicolor_clkevt_next_event,
-> 	},
-> 	.channel = TIMER_C,
-> };
-> 
-> What do you think ?
+It's a highly nonstandard interface, none of the other controllers
+support it, and even changing the the other omap machines to use
+the same strings might break existing user space that might rely
+on whatever gets printed in those properties today.
 
-OK. I'll give it a try.
+We should limit the use of those strings to the boards that
+are known to run software that requires them to avoid regressions.
+We could also define a standard way of finding out whether an
+mmc device is removable. We already have the MMC_CAP_NONREMOVABLE
+flag in the kernel and could have a read-only boolean attribute
+in sysfs for it.
 
-Thanks for your prompt response and thorough review.
+Putting a "name" property into DT because some random user space
+requires a particular name to show up in sysfs however does not
+seem a legitimate hardware description.
 
-baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+	Arnd
