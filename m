@@ -1,67 +1,245 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 27 Jan 2015 00:22:14 +0100
-Subject: [PATCH 07/16] ARM: integrator: convert PCI to use generic config
- accesses
-In-Reply-To: <20150126182233.GB4063@google.com>
-References: <1420857290-8373-1-git-send-email-robh@kernel.org>
- <1420857290-8373-8-git-send-email-robh@kernel.org>
- <CACRpkdbwKN9LenqrWeu4WykhdZOGAdxpC_BYr2cYpc2_cn5GfA@mail.gmail.com>
- <4938579.0KIk3QtTCP@wuerfel>
- <CACRpkdZSXWrVudiadVjbhQDS_zQrYttaytW-TUoeFUrc=beD1A@mail.gmail.com>
- <20150122203336.GD13072@google.com>
- <20150126182233.GB4063@google.com>
-Message-ID: <CACRpkdaYL99yhJ08U13zJqviCFHzjMo9KtwfYhD+dHkuvQRhYg@mail.gmail.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Mon, 26 Jan 2015 18:25:39 -0500
+Subject: [PATCH v4 4/6] of/pci: add of_pci_dma_configure() update dma
+ configuration
+In-Reply-To: <20150123234124.GW29776@google.com>
+References: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
+ <1422052359-12384-5-git-send-email-m-karicheri2@ti.com>
+ <20150123234124.GW29776@google.com>
+Message-ID: <54C6CCF3.7080308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 26, 2015 at 7:22 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
-> On Thu, Jan 22, 2015 at 02:33:36PM -0600, Bjorn Helgaas wrote:
->> On Mon, Jan 12, 2015 at 01:05:12AM +0100, Linus Walleij wrote:
->> > On Sat, Jan 10, 2015 at 10:53 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > > On Saturday 10 January 2015 22:40:22 Linus Walleij wrote:
->> > >> >  static int v3_read_config(struct pci_bus *bus, unsigned int devfn, int where,
->> > >> >                           int size, u32 *val)
->> > >> >  {
->> > >> > -       addr = v3_open_config_window(bus, devfn, where);
->> > >> > +       int ret = pci_generic_config_read(bus, devfn, where, size, val);
->> > >> >         v3_close_config_window();
->> > >> > +       return ret;
->> > >> >  }
->> > >> >
->> > >> >  static int v3_write_config(struct pci_bus *bus, unsigned int devfn, int where,
->> > >> >                            int size, u32 val)
->> > >> >  {
->> > >> > +       int ret = pci_generic_config_write(bus, devfn, where, size, val);
->> > >> >         v3_close_config_window();
->> > >> > -       raw_spin_unlock_irqrestore(&v3_lock, flags);
->> > >> > +       return ret;
->> > >> >  }
->> > >> >
->> > >> >  static struct pci_ops pci_v3_ops = {
->> > >> > +       .map_bus = v3_open_config_window,
->> > >> >         .read   = v3_read_config,
->> > >> >         .write  = v3_write_config,
->> > >>
->> > >> So .map_bus is called before every .read/.write operation I take it.
->> > >>
->> > >> Wouldn't it be proper to call the v3_close_config_window() from a
->> > >> matching .unmap_bus() callback for symmetry?
->> > >
->> > > It would be nicer for integrator but useless for anything else, so
->> > > I'd vote for leaving it the way Rob posted.
->> >
->> > OK I buy that, throw in a comment about it in the code if there
->> > is some time for iterating the patch.
+On 01/23/2015 06:41 PM, Bjorn Helgaas wrote:
+> On Fri, Jan 23, 2015 at 05:32:37PM -0500, Murali Karicheri wrote:
+>> Add of_pci_dma_configure() to allow updating the dma configuration
+>> of the pci device using the configuration from DT of the parent of
+>> the root bridge device.
 >>
->> Would you prefer something like the following instead?  It keeps the
->> v3_open/close symmetry, but it does break apart and duplicate some of the
->> logic from v3_open_config_window().
+>> Cc: Joerg Roedel<joro@8bytes.org>
+>> Cc: Grant Likely<grant.likely@linaro.org>
+>> Cc: Rob Herring<robh+dt@kernel.org>
+>> Cc: Bjorn Helgaas<bhelgaas@google.com>
+>> Cc: Will Deacon<will.deacon@arm.com>
+>> Cc: Russell King<linux@arm.linux.org.uk>
+>> Cc: Arnd Bergmann<arnd@arndb.de>
+>> Cc: Suravee Suthikulpanit<Suravee.Suthikulpanit@amd.com>
+>>
+>> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
+>> ---
+>>   drivers/of/of_pci.c    |   39 +++++++++++++++++++++++++++++++++++++++
+>>   include/linux/of_pci.h |   12 ++++++++++++
+>>   2 files changed, 51 insertions(+)
+>>
+>> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+>> index 88471d3..34878c9 100644
+>> --- a/drivers/of/of_pci.c
+>> +++ b/drivers/of/of_pci.c
+>> @@ -2,6 +2,7 @@
+>>   #include<linux/export.h>
+>>   #include<linux/of.h>
+>>   #include<linux/of_address.h>
+>> +#include<linux/of_device.h>
+>>   #include<linux/of_pci.h>
+>>   #include<linux/slab.h>
+>>
+>> @@ -229,6 +230,44 @@ parse_failed:
+>>   	return err;
+>>   }
+>>   EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
+>> +
+>> +/**
+>> + * of_get_pci_root_bridge_parent - get the OF node of the root bridge's parent
+>> + * @dev: ptr to pci_dev struct of the pci device
+>> + *
+>> + * This function will traverse the bus up to the root bus starting with
+>> + * the child and return the OF node ptr to root bridge device's parent device.
+>> + */
+>> +struct device_node *of_get_pci_root_bridge_parent(struct pci_dev *dev)
 >
-> Hearing nothing, I kept Rob's initial version.  It can be tweaked later if
-> anybody wants to.  I just want to get all this into v3.20.
+> I'm not an OF person, but this interface seems like it might be too
+> special-purpose.  Maybe it would be enough to add
+> "of_get_pci_root_bridge()", and the caller could do this:
+>
+>      struct device *bridge = of_get_pci_root_bridge(dev);
+>      struct device_node *parent_np = bridge->parent->of_node;
+>
+> Also, the name "of_get_..." suggests that it increments a refcount, as
+> of_get_parent() does.  But you aren't doing anything with the refcount.
+>
+> But I guess an "of_get_pci_root_bridge()" isn't doing anything OF-related,
+> so maybe we should just add a "pci_get_host_bridge(struct pci_dev *)"
+> to PCI instead.
 
-Sorry, I'm OK with either version, this latest iteration looks very nice.
-Acked-by.
+Bjorn,
 
-Yours,
-Linus Walleij
+Thanks for the comment.
+
+I think adding pci_get_host_bridge() is a good idea. There is already 
+similar function in host-bridge.c. I have added this function re-using 
+existing function find_pci_root_bus(). See the incremental diff below 
+after this change. Does this look good?
+
+diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+index 34878c9..77b15b5 100644
+--- a/drivers/of/of_pci.c
++++ b/drivers/of/of_pci.c
+@@ -232,26 +232,6 @@ parse_failed:
+  EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
+
+  /**
+- * of_get_pci_root_bridge_parent - get the OF node of the root bridge's 
+parent
+- * @dev: ptr to pci_dev struct of the pci device
+- *
+- * This function will traverse the bus up to the root bus starting with
+- * the child and return the OF node ptr to root bridge device's parent 
+device.
+- */
+-struct device_node *of_get_pci_root_bridge_parent(struct pci_dev *dev)
+-{
+-       struct pci_bus *bus = dev->bus;
+-       struct device *bridge;
+-
+-       while (!pci_is_root_bus(bus))
+-               bus = bus->parent;
+-       bridge = bus->bridge;
+-
+-       return bridge->parent->of_node;
+-}
+-EXPORT_SYMBOL_GPL(of_get_pci_root_bridge_parent);
+-
+-/**
+   * of_pci_dma_configure - Setup DMA configuration
+   * @dev: ptr to pci_dev struct of the pci device
+   *
+@@ -261,10 +241,9 @@ EXPORT_SYMBOL_GPL(of_get_pci_root_bridge_parent);
+  void of_pci_dma_configure(struct pci_dev *pci_dev)
+  {
+         struct device *dev = &pci_dev->dev;
+-       struct device_node *parent_np;
++       struct device *bridge = pci_get_host_bridge(pci_dev);
+
+-       parent_np = of_get_pci_root_bridge_parent(pci_dev);
+-       of_dma_configure(dev, parent_np);
++       of_dma_configure(dev, bridge->parent->of_node);
+  }
+  EXPORT_SYMBOL_GPL(of_pci_dma_configure);
+
+diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
+index 0e5f3c9..9803aa6 100644
+--- a/drivers/pci/host-bridge.c
++++ b/drivers/pci/host-bridge.c
+@@ -23,6 +23,13 @@ static struct pci_host_bridge 
+*find_pci_host_bridge(struct pci_bus *bus)
+         return to_pci_host_bridge(root_bus->bridge);
+  }
+
++struct device *pci_get_host_bridge(struct pci_dev *dev)
++{
++       struct pci_bus *root_bus = find_pci_root_bus(dev->bus);
++
++       return root_bus->bridge;
++}
++
+  void pci_set_host_bridge_release(struct pci_host_bridge *bridge,
+                                  void (*release_fn)(struct 
+pci_host_bridge *),
+                                  void *release_data)
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 9603094..5bcdfa6 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -513,6 +513,8 @@ static inline struct pci_dev 
+*pci_upstream_bridge(struct pci_dev *dev)
+         return dev->bus->self;
+  }
+
++struct device *pci_get_host_bridge(struct pci_dev *dev);
++
+  #ifdef CONFIG_PCI_MSI
+  static inline bool pci_dev_msi_enabled(struct pci_dev *pci_dev)
+  {
+@@ -1823,6 +1825,7 @@ int pci_vpd_find_tag(const u8 *buf, unsigned int 
+off, unsigned int len, u8 rdt);
+  int pci_vpd_find_info_keyword(const u8 *buf, unsigned int off,
+                               unsigned int len, const char *kw);
+
+  /* PCI <-> OF binding helpers */
+  #ifdef CONFIG_OF
+  struct device_node;
+
+
+>
+> Bjorn
+>
+>> +{
+>> +	struct pci_bus *bus = dev->bus;
+>> +	struct device *bridge;
+>> +
+>> +	while (!pci_is_root_bus(bus))
+>> +		bus = bus->parent;
+>> +	bridge = bus->bridge;
+>> +
+>> +	return bridge->parent->of_node;
+>> +}
+>> +EXPORT_SYMBOL_GPL(of_get_pci_root_bridge_parent);
+>> +
+>> +/**
+>> + * of_pci_dma_configure - Setup DMA configuration
+>> + * @dev: ptr to pci_dev struct of the pci device
+>> + *
+>> + * Function to update PCI devices's DMA configuration using the same
+>> + * info from the OF node of root host bridge's parent.
+>> + */
+>> +void of_pci_dma_configure(struct pci_dev *pci_dev)
+>> +{
+>> +	struct device *dev =&pci_dev->dev;
+>> +	struct device_node *parent_np;
+>> +
+>> +	parent_np = of_get_pci_root_bridge_parent(pci_dev);
+>> +	of_dma_configure(dev, parent_np);
+>> +}
+>> +EXPORT_SYMBOL_GPL(of_pci_dma_configure);
+>> +
+>>   #endif /* CONFIG_OF_ADDRESS */
+>>
+>>   #ifdef CONFIG_PCI_MSI
+>> diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
+>> index ce0e5ab..0465a2a 100644
+>> --- a/include/linux/of_pci.h
+>> +++ b/include/linux/of_pci.h
+>> @@ -16,6 +16,8 @@ int of_pci_get_devfn(struct device_node *np);
+>>   int of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin);
+>>   int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
+>>   int of_get_pci_domain_nr(struct device_node *node);
+>> +struct device_node *of_get_pci_root_bridge_parent(struct pci_dev *dev);
+>> +void of_pci_dma_configure(struct pci_dev *pci_dev);
+>>   #else
+>>   static inline int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq)
+>>   {
+>> @@ -50,6 +52,16 @@ of_get_pci_domain_nr(struct device_node *node)
+>>   {
+>>   	return -1;
+>>   }
+>> +
+>> +static inline struct device_node
+>> +*of_get_pci_root_bridge_parent(struct pci_dev *dev)
+>> +{
+>> +	return NULL;
+>> +}
+>> +
+>> +static inline void of_pci_dma_configure(struct pci_dev *pci_dev)
+>> +{
+>> +}
+>>   #endif
+>>
+>>   #if defined(CONFIG_OF_ADDRESS)
+>> --
+>> 1.7.9.5
+>>
+
+
+-- 
+Murali Karicheri
+Linux Kernel, Texas Instruments
