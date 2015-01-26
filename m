@@ -1,10 +1,10 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 26 Jan 2015 15:16:06 +0100
-Subject: [PATCH v2 22/27] ARM: mvebu: armada-xp-mv78230: Relicense the device
- tree under GPLv2+/X11
+Date: Mon, 26 Jan 2015 15:16:03 +0100
+Subject: [PATCH v2 19/27] ARM: mvebu: armada-xp-gp: Relicense the device tree
+ under GPLv2+/X11
 In-Reply-To: <1422281771-31443-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1422281771-31443-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1422281771-31443-23-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1422281771-31443-20-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,22 +16,19 @@ In order to make it easier for them to reuse our device trees,
 relicense our device trees under a GPL/X11 dual-license.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Acked-by: Andrew Lunn <andrew@lunn.ch>
-Acked-by: Arnaud Ebalard <arno@natisbad.org>
-Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 Acked-by: Jason Cooper <jason@lakedaemon.net>
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-xp-mv78230.dtsi | 40 +++++++++++++++++++++++++++++---
+ arch/arm/boot/dts/armada-xp-gp.dts | 40 +++++++++++++++++++++++++++++++++++---
  1 file changed, 37 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-index 281ccd24295c..6e6d0f04bf2b 100644
---- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-@@ -5,9 +5,43 @@
-  *
+diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
+index ea8673647494..206aebba01be 100644
+--- a/arch/arm/boot/dts/armada-xp-gp.dts
++++ b/arch/arm/boot/dts/armada-xp-gp.dts
+@@ -8,9 +8,43 @@
+  * Gregory CLEMENT <gregory.clement@free-electrons.com>
   * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
   *
 - * This file is licensed under the terms of the GNU General Public
@@ -75,7 +72,7 @@ index 281ccd24295c..6e6d0f04bf2b 100644
 + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 + *     OTHER DEALINGS IN THE SOFTWARE.
   *
-  * Contains definitions specific to the Armada XP MV78230 SoC that are not
-  * common to all Armada XP SoCs.
+  * Note: this Device Tree assumes that the bootloader has remapped the
+  * internal registers to 0xf1000000 (instead of the default
 -- 
 2.1.0
