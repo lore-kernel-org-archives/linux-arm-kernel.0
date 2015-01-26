@@ -1,80 +1,47 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 26 Jan 2015 13:06:42 +0000
-Subject: [RFC PATCH 1/3] drivers: of: fix resources freeing in
- of_pci_get_host_bridge_resources()
-In-Reply-To: <20150126112111.GA547@red-moon>
-References: <1420644571-18928-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1420644571-18928-2-git-send-email-lorenzo.pieralisi@arm.com>
- <20150119183228.GE10762@e106497-lin.cambridge.arm.com>
- <20150120104922.GF5398@red-moon>
- <20150120112031.GA342@bart.dudau.co.uk>
- <20150126112111.GA547@red-moon>
-Message-ID: <20150126130642.GB956@e106497-lin.cambridge.arm.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 26 Jan 2015 15:20:28 +0200
+Subject: 3.19 on Nokia n900: audio quality awful
+In-Reply-To: <20150118120139.GA1509@amd>
+References: <20150106170433.GA5408@amd> <20150118120139.GA1509@amd>
+Message-ID: <54C63F1C.6010703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 26, 2015 at 11:21:11AM +0000, Lorenzo Pieralisi wrote:
-> On Tue, Jan 20, 2015 at 11:20:32AM +0000, Liviu Dudau wrote:
-> > On Tue, Jan 20, 2015 at 10:49:22AM +0000, Lorenzo Pieralisi wrote:
-> > > On Mon, Jan 19, 2015 at 06:32:29PM +0000, Liviu Dudau wrote:
-> > > 
-> > > [...]
-> > > 
-> > > > > @@ -146,6 +146,7 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
-> > > > >  	struct of_pci_range_parser parser;
-> > > > >  	char range_type[4];
-> > > > >  	int err;
-> > > > > +	struct pci_host_bridge_window *window;
-> > > > >  
-> > > > >  	if (io_base)
-> > > > >  		*io_base = (resource_size_t)OF_BAD_ADDR;
-> > > > > @@ -225,7 +226,10 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
-> > > > >  conversion_failed:
-> > > > >  	kfree(res);
-> > > > >  parse_failed:
-> > > > > +	list_for_each_entry(window, resources, list)
-> > > > > +		kfree(window->res);
-> > > > >  	pci_free_resource_list(resources);
-> > > > > +	kfree(bus_range);
-> > > > >  	return err;
-> > > > >  }
-> > > > >  EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
-> > > > 
-> > > > Hi Lorenzo et all,
-> > > > 
-> > > > Here is my personal view and I am happy to hear from others on the desired
-> > > > behaviour:
-> > > > 
-> > > > When I wrote this function what I had in mind was that it will parse as
-> > > > much as possible from the device tree and return a list of resources that
-> > > > could be successfully converted. If the entire list of ranges could not
-> > > > be converted then an error code will be returned, but the caller still
-> > > > had the list as constructed up to the error. It was the job of the caller
-> > > > to free the list in either cases, as stated in the comment.
-> > > 
-> > > That's what I am questioning. If the function takes an error path, the
-> > > windows list is freed, so the resource pointers are gone. There is no
-> > > way the caller can grab those resource pointers and free them.
-> > 
-> > I stand corrected. Your patch is needed.
+On 01/18/2015 02:01 PM, Pavel Machek wrote:
+> Hi!
 > 
-> Mind acking it ? I will ask Bjorn to take it then.
-
-Sure. 
-
-Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
-
+> If you have any idea about playback problems, help would be still
+> welcome. I'll have to do bisect, otherwise, and it will not be easy.
 > 
-> Thanks,
-> Lorenzo
+>> In 3.18, sound is nice and clear.
+>>
+>> In 3.19, sound is unusable. It produces nasty tone when it should be
+>> quiet, and there's at least as much noise as is sound.
+>>
+>> Unfortunately, list of mixers also changed (and there's cca 120
+>> settings), but a) it does not work with the old list and b) nothing I
+>> could figure out did make the sound usable. Some setting resulted in
+>> even more noise.
+>>
+>> Any idea what could have caused it?
 > 
+> I tried audio recording this time.
+> 
+> In 2.6.28-nokia, it is neccessary to set "Input select" na "digital
+> mic", then it works. Input select being in "playback" option makes it
+> easy to miss.
+> 
+> In 3.18 and 3.19-rc3, all I can record are zeros.
+> 
+> Does playback/recording work for you on OMAP 3430-based machines?
+
+Same codec (tlv320aic3106) works fine on my am335x and omap-l138 boards.
+BeagleBoard-xM also fine with twl4030 codec.
+
+I don't have my n900 in hacking mode (it is still in use time-to-time) but
+looking at the dts file: you might want to add ai3x-micbias-vg property to the
+aic3x nodes to select the correct mic bias voltage. I can't recall what is
+appropriate for n900, but 2.6.28-nokia sources might give you the answer.
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+P?ter
