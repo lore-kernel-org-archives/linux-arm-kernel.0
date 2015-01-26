@@ -1,52 +1,48 @@
-From: addy.ke@rock-chips.com (Addy Ke)
-Date: Mon, 26 Jan 2015 20:04:09 +0800
-Subject: [PATCH] mmc: dw_mmc: fix bug that cause mmc_test failture
-Message-ID: <1422273849-29773-1-git-send-email-addy.ke@rock-chips.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 26 Jan 2015 13:06:07 +0100
+Subject: [PATCH v5 11/18] iommu: exynos: remove useless device_add/remove
+ callbacks
+In-Reply-To: <20150126110059.GC30345@8bytes.org>
+References: <1422028288-891-1-git-send-email-m.szyprowski@samsung.com>
+ <1422028288-891-12-git-send-email-m.szyprowski@samsung.com>
+ <2829552.kzfCU5HyxQ@avalon> <20150126110059.GC30345@8bytes.org>
+Message-ID: <54C62DAF.6020809@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The STOP command can terminate a data transfer between a memory card and
-mmc controller.
+Hello,
 
-As show in Synopsys DesignWare Cores Mobile Stroage Host Databook:
-Data timeout and Data end-bit error will terminate further data transfer
-by mmc controller. So we should not send abort command to terminate a
-data transfer again if we got DRTO and EBE interrupt.
+On 2015-01-26 12:00, Joerg Roedel wrote:
+> Hi Laurent,
+>
+> On Sun, Jan 25, 2015 at 05:38:22PM +0200, Laurent Pinchart wrote:
+>> IOMMU groups still seem a bit unclear to me. Will Deacon has nicely explained
+>> what they represent in
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/310816.html.
+>> The IOMMU core doesn't make groups
+>> mandatory, but requires them in some code paths.
+>>
+>> For example the coldplug device add function add_iommu_group() called for all
+>> devices already registered when bus_set_iommu() is called will try to warn of
+>> devices added multiple times with a WARN_ON(dev->iommu_group). Another example
+>> is the iommu_bus_notifier() function which will call the remove_device()
+>> operation only when dev->iommu_group isn't NULL.
+>>
+>> I'm thus unsure whether groups should be made mandatory, or whether the IOMMU
+>> core should be fixed to make them really optional (or, third option, whether
+>> there's something I haven't understood properly).
+> My plan is to make IOMMU groups mandatory. I am currently preparing and
+> RFC patch-set to introduce default-domains (which will be per group). So
+> when all IOMMU drivers are converted to make use of default domains the
+> iommu groups will be mandatory.
 
-After this patch, all mmc_test cases can pass on RK3288-Pink2 board.
+Thanks for the comment, I will implement all that will be needed for it 
+to exynos
+iommu driver, but I would like to ask if you plan to merge my existing 
+patches for
+exynos iommu driver to your tree?
 
-Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
----
- drivers/mmc/host/dw_mmc.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index 4d2e3c2..4bd7df1 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -1520,7 +1520,10 @@ static void dw_mci_tasklet_func(unsigned long priv)
- 			if (test_and_clear_bit(EVENT_DATA_ERROR,
- 					       &host->pending_events)) {
- 				dw_mci_stop_dma(host);
--				send_stop_abort(host, data);
-+				if (data->stop ||
-+				    !(host->data_status & SDMMC_INT_DRTO) ||
-+				    !(host->data_status & SDMMC_INT_EBE))
-+					send_stop_abort(host, data);
- 				state = STATE_DATA_ERROR;
- 				break;
- 			}
-@@ -1547,7 +1550,10 @@ static void dw_mci_tasklet_func(unsigned long priv)
- 			if (test_and_clear_bit(EVENT_DATA_ERROR,
- 					       &host->pending_events)) {
- 				dw_mci_stop_dma(host);
--				send_stop_abort(host, data);
-+				if (data->stop ||
-+				    !(host->data_status & SDMMC_INT_DRTO) ||
-+				    !(host->data_status & SDMMC_INT_EBE))
-+					send_stop_abort(host, data);
- 				state = STATE_DATA_ERROR;
- 				break;
- 			}
+Best regards
 -- 
-1.8.3.2
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
