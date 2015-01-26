@@ -1,52 +1,81 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 26 Jan 2015 07:49:36 -0800
-Subject: [PATCH 01/23] ARM: OMAP2+: clock: move clock provider
- infrastructure to clock driver
-In-Reply-To: <54C61938.8000303@ti.com>
-References: <1417103514-17027-1-git-send-email-t-kristo@ti.com>
- <1417103514-17027-2-git-send-email-t-kristo@ti.com>
- <alpine.DEB.2.02.1501242142181.5450@utopia.booyaka.com>
- <54C61938.8000303@ti.com>
-Message-ID: <20150126154936.GC28663@atomide.com>
+From: mgorman@suse.de (Mel Gorman)
+Date: Mon, 26 Jan 2015 15:56:17 +0000
+Subject: [PATCHv2] mm: Don't offset memmap for flatmem
+In-Reply-To: <54C20EEC.1060809@suse.cz>
+References: <1421804273-29947-1-git-send-email-lauraa@codeaurora.org>
+ <1421888500-24364-1-git-send-email-lauraa@codeaurora.org>
+ <20150122162021.aa861aeb53c22206a19ebbcb@linux-foundation.org>
+ <54C196D0.6040900@codeaurora.org> <54C20EEC.1060809@suse.cz>
+Message-ID: <20150126155617.GA2395@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [150126 02:42]:
-> On 24/01/15 23:51, Paul Walmsley wrote:
-> > + Tomi 
-> > 
-> > On Thu, 27 Nov 2014, Tero Kristo wrote:
-> > 
-> >> Splits the clock provider init out of the PRM driver and moves it to
-> >> clock driver. This is needed so that once the PRCM drivers are separated,
-> >> they can logically just access the clock driver not needing to go through
-> >> common PRM code. This would be wrong in the case of control module for
-> >> example.
+On Fri, Jan 23, 2015 at 10:05:48AM +0100, Vlastimil Babka wrote:
+> On 01/23/2015 01:33 AM, Laura Abbott wrote:
+> >On 1/22/2015 4:20 PM, Andrew Morton wrote:
+> >>On Wed, 21 Jan 2015 17:01:40 -0800 Laura Abbott <lauraa@codeaurora.org> wrote:
 > >>
-> >> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> > 
-> > This patch moves things in the wrong direction (ie, rather than keeping 
-> > the PRM register accesses in the PRM code, it moves PRM register accesses 
-> > into the clock code).  But I see that a subsequent patch in this series 
-> > moves them back.  So this change is temporary and that seems reasonable to 
-> > me.
-> > 
-> > However, as long as the clock code wants to do low-level register accesses 
-> > to PRM/CM/SCM registers, there needs to be some way to keep register 
-> > updates originating from the clock code from racing with register updates 
-> > coming from other code (e.g. non-clock-related PRM/CM/SCM accesses). So 
-> > I've changed this patch to use regmap (as below), and the followup patch 
-> > later in the series will be changed too.  Seems to work so far but let's 
-> > see how things go with the rest of the series.
+> >>>Srinivas Kandagatla reported bad page messages when trying to
+> >>>remove the bottom 2MB on an ARM based IFC6410 board
+> >>>
+> >>>BUG: Bad page state in process swapper  pfn:fffa8
+> >>>page:ef7fb500 count:0 mapcount:0 mapping:  (null) index:0x0
+> >>>flags: 0x96640253(locked|error|dirty|active|arch_1|reclaim|mlocked)
+> >>>page dumped because: PAGE_FLAGS_CHECK_AT_FREE flag(s) set
+> >>>bad because of flags:
+> >>>flags: 0x200041(locked|active|mlocked)
+> >>>Modules linked in:
+> >>>CPU: 0 PID: 0 Comm: swapper Not tainted 3.19.0-rc3-00007-g412f9ba-dirty #816
+> >>>Hardware name: Qualcomm (Flattened Device Tree)
+> >>>[<c0218280>] (unwind_backtrace) from [<c0212be8>] (show_stack+0x20/0x24)
+> >>>[<c0212be8>] (show_stack) from [<c0af7124>] (dump_stack+0x80/0x9c)
+> >>>[<c0af7124>] (dump_stack) from [<c0301570>] (bad_page+0xc8/0x128)
+> >>>[<c0301570>] (bad_page) from [<c03018a8>] (free_pages_prepare+0x168/0x1e0)
+> >>>[<c03018a8>] (free_pages_prepare) from [<c030369c>] (free_hot_cold_page+0x3c/0x174)
+> >>>[<c030369c>] (free_hot_cold_page) from [<c0303828>] (__free_pages+0x54/0x58)
+> >>>[<c0303828>] (__free_pages) from [<c030395c>] (free_highmem_page+0x38/0x88)
+> >>>[<c030395c>] (free_highmem_page) from [<c0f62d5c>] (mem_init+0x240/0x430)
+> >>>[<c0f62d5c>] (mem_init) from [<c0f5db3c>] (start_kernel+0x1e4/0x3c8)
+> >>>[<c0f5db3c>] (start_kernel) from [<80208074>] (0x80208074)
+> >>>Disabling lock debugging due to kernel taint
+> >>>
+> >>>Removing the lower 2MB made the start of the lowmem zone to no longer
+> >>>be page block aligned. IFC6410 uses CONFIG_FLATMEM where
+> >>>alloc_node_mem_map allocates memory for the mem_map. alloc_node_mem_map
+> >>>will offset for unaligned nodes with the assumption the pfn/page
+> >>>translation functions will account for the offset. The functions for
+> >>>CONFIG_FLATMEM do not offset however, resulting in overrunning
+> >>>the memmap array. Just use the allocated memmap without any offset
+> >>>when running with CONFIG_FLATMEM to avoid the overrun.
+> >>>
+> >>
+> >>I don't think v2 addressed Vlastimil's review comment?
+> >>
+> >
+> >We're still adding the offset to node_mem_map and then subtracting it from
+> >just mem_map. Did I miss another comment somewhere?
 > 
-> I'm not sure if I miss something, but regmap_write does not protect from
-> problems if there are multiple users for the same registers. You need to
-> use regmap_update_bits() to get a protected read/write sequence, in
-> which you can change only the bits that you want to change.
+> Yes that was addressed, thanks. But I don't feel comfortable acking
+> it yet, as I have no idea if we are doing the right thing for
+> CONFIG_HAVE_MEMBLOCK_NODE_MAP && CONFIG_FLATMEM case here.
+> 
+> Also putting the CONFIG_FLATMEM && !CONFIG_HAVE_MEMBLOCK_NODE_MAP
+> under the "if (page_to_pfn(mem_map) != pgdat->node_start_pfn)" will
+> probably do the right thing, but looks like a weird test for this
+> case here.
+> 
+> I have no good suggestion though, so let's CC Mel who apparently
+> wrote the ARCH_PFN_OFFSET correction?
+> 
 
-To me it seems that issue can be fixed by making all the code use regmap.
-AFAIK that should work for the legacy code too.
+I don't recall introducing ARCH_PFN_OFFSET, are you sure it was me?  I'm just
+back today after been offline a week so didn't review the patch but IIRC,
+ARCH_PFN_OFFSET deals with the case where physical memory does not start
+at 0. Without the offset, virtual _PAGE_OFFSET would not physical page 0.
+I don't recall it being related to the alignment of node 0 so if there
+are crashes due to misalignment of node 0 and the fix is ARCH_PFN_OFFSET
+related then I'm surprised.
 
-Regards,
-
-Tony
+-- 
+Mel Gorman
+SUSE Labs
