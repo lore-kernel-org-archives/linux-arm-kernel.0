@@ -1,82 +1,50 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Mon, 26 Jan 2015 20:16:52 +0100
-Subject: [PATCH] ARM: /proc/atags: Export also for DT
-In-Reply-To: <CAL_JsqJ9i0jwaL1cyeomQG=bhhcnEgdGWYOqkcwidyk5xOUukg@mail.gmail.com>
-References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
- <201412041857.49341@pali>
- <CAL_JsqJ9i0jwaL1cyeomQG=bhhcnEgdGWYOqkcwidyk5xOUukg@mail.gmail.com>
-Message-ID: <201501262016.52079@pali>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 26 Jan 2015 19:19:42 +0000
+Subject: [PATCH 7/8] arm64/kexec: Add checks for KVM
+In-Reply-To: <a3353cf2ac47f49c20bbbb88405301cbaa359805.1421449714.git.geoff@infradead.org>
+References: <cover.1421449714.git.geoff@infradead.org>
+ <a3353cf2ac47f49c20bbbb88405301cbaa359805.1421449714.git.geoff@infradead.org>
+Message-ID: <20150126191942.GQ23313@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch will cause that decompressor store full ATAG structure into DT tree ("/atags"):
+On Sat, Jan 17, 2015 at 12:23:34AM +0000, Geoff Levand wrote:
+> Add runtime checks that fail the arm64 kexec syscall for situations that would
+> result in system instability do to problems in the KVM kernel support.
+> These checks should be removed when the KVM problems are resolved fixed.
+> 
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
+> ---
+>  arch/arm64/kernel/machine_kexec.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+> index 3d84759..a36459d 100644
+> --- a/arch/arm64/kernel/machine_kexec.c
+> +++ b/arch/arm64/kernel/machine_kexec.c
+> @@ -16,6 +16,9 @@
+>  #include <asm/cacheflush.h>
+>  #include <asm/system_misc.h>
+>  
+> +/* TODO: Remove this include when KVM can support a kexec reboot. */
+> +#include <asm/virt.h>
+> +
+>  /* Global variables for the relocate_kernel routine. */
+>  extern const unsigned char relocate_new_kernel[];
+>  extern const unsigned long relocate_new_kernel_size;
+> @@ -100,6 +103,13 @@ int machine_kexec_prepare(struct kimage *image)
+>  
+>  	kexec_image_info(image);
+>  
+> +	/* TODO: Remove this message when KVM can support a kexec reboot. */
+> +	if (IS_ENABLED(CONFIG_KVM) && is_hyp_mode_available()) {
+> +		pr_err("%s: Your kernel is configured with KVM support (CONFIG_KVM=y) which currently does not allow for kexec re-boot.\n",
+> +			__func__);
+> +		return -ENOSYS;
+> +	}
 
-diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
-index e7e1cc9..1975d7c 100644
---- a/arch/arm/boot/compressed/atags_to_fdt.c
-+++ b/arch/arm/boot/compressed/atags_to_fdt.c
-@@ -112,7 +112,7 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
- 	 * address and size for each bank */
- 	uint32_t mem_reg_property[2 * 2 * NR_BANKS];
- 	int memcount = 0;
--	int ret, memsize;
-+	int ret, memsize, atag_size;
- 
- 	/* make sure we've got an aligned pointer */
- 	if ((u32)atag_list & 0x3)
-@@ -184,6 +184,10 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
- 		}
- 	}
- 
-+	/* include the terminating ATAG_NONE */
-+	atag_size = (char *)atag - (char *)atag_list + sizeof(struct tag_header);
-+	setprop(fdt, "/", "atags", atag_list, atag_size);
-+
- 	if (memcount) {
- 		setprop(fdt, "/memory", "reg", mem_reg_property,
- 			4 * memcount * memsize);
+If you really don't want to implement KVM teardown, surely this should
+be at the start of the series, so we don't have a point in the middle
+where things may explode in this case?
 
-
-
-And this patch will export ATAG structure from DT tree ("/atags") into /proc/atags file:
-
-diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-index 9946c1b..0f249a3 100644
---- a/arch/arm/kernel/devtree.c
-+++ b/arch/arm/kernel/devtree.c
-@@ -29,6 +29,7 @@
- #include <asm/mach-types.h>
- #include <asm/system_info.h>
- 
-+#include "atags.h"
- 
- #ifdef CONFIG_SMP
- extern struct of_cpu_method __cpu_method_of_table[];
-@@ -254,5 +255,10 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
- 	if (prop)
- 		system_rev = fdt32_to_cpu(*prop);
- 
-+	/* Save atags */
-+	prop = of_get_flat_dt_prop(dt_root, "atags", NULL);
-+	if (prop)
-+		save_atags((void *)prop);
-+
- 	return mdesc;
- }
-
-
-Some userspace applications needs access to ATAG structure where can be stored some information passed 
-from bootloader to kernel. Example is Nokia N900 device and NOLO bootloader which provides information 
-about bootreason (device was started by power button or by alarm or restarted...) and bootmode (normal 
-mode or device update mode).
-
--- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150126/f941725a/attachment.sig>
+Mark.
