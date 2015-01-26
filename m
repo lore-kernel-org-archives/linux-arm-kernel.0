@@ -1,77 +1,95 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 26 Jan 2015 20:46:45 +0100 (CET)
-Subject: [PATCH RFC 2/3] power: mxs_power: add driver for mxs power
- subsystem
-In-Reply-To: <20150125150431.GE2719@earth.universe>
-References: <1416514477-19190-1-git-send-email-stefan.wahren@i2se.com>
- <1416514477-19190-3-git-send-email-stefan.wahren@i2se.com>
- <20150121230148.GJ13715@earth.universe> <54C0AFE4.3020701@i2se.com>
- <20150125150431.GE2719@earth.universe>
-Message-ID: <1719204322.245040.1422301605670.JavaMail.open-xchange@oxbaltgw03.schlund.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 26 Jan 2015 13:49:33 -0600
+Subject: [PATCH 1/4] arm: omap: hwmod: 43xx: add DebugSS hwmod data
+In-Reply-To: <20150126165640.GA10679@saruman.tx.rr.com>
+References: <1422054704-14915-1-git-send-email-balbi@ti.com>
+ <1422054704-14915-2-git-send-email-balbi@ti.com>
+ <alpine.DEB.2.02.1501260142590.5450@utopia.booyaka.com>
+ <20150126165640.GA10679@saruman.tx.rr.com>
+Message-ID: <20150126194933.GG6660@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-> Sebastian Reichel <sre@kernel.org> hat am 25. Januar 2015 um 16:04
-> geschrieben:
->
->
-> Hi,
->
-> [add maintainers from regulator framework]
->
-> On Thu, Jan 22, 2015 at 09:08:04AM +0100, Stefan Wahren wrote:
-> > Am 22.01.2015 um 00:01 schrieb Sebastian Reichel:
-> > > On Thu, Nov 20, 2014 at 08:14:36PM +0000, Stefan Wahren wrote:
-> > >> This patch adds a minimal driver for the Freescale i.MX23, i.MX28
-> > >> power subsystem. It's required to trigger the probing of the underlying
-> > >> drivers like on-chip regulators. Additionally the drivers supports
-> > >> the configuration of the DC-DC clock frequency to avoid possible
-> > >> interferences.
-> > > I would expect PLL to be board specific and part of DT. Why is it
-> > > specified as parameter?
-> >
-> > I think the switching frequency of the DC-DC belongs to the
-> > configuration and don't describe how the hardware is connected. But i
-> > don't have a problem to change it into a DT property.
-> >
-> > Does a common property name exists for the switching frequency or would
-> > it be vendor specific?
->
-> As far as I know most regulators have fixed switching frequencies,
-> so there is no common property name so far. I added regulator
-> framework people, since this property should be regulator specific.
->
-> Apart from introducing a custom/common switching-frequency property
-> the dts could also expose the PLL like this and use the common
-> clock-frequency property:
->
-> power: power at 80044000 {
-> compatible = "fsl,imx28-power";
-> #address-cells = <1>;
-> #size-cells = <1>;
-> reg = <0x80044000 0x2000>;
-> interrupts = <6>;
-> ranges;
->
-> powerpll {
-> compatible = "fsl,imx28-power-pll"
-> #clock-cells = <0>;
-> clock-frequency = <12345>;
-> }
-> }
+On Mon, Jan 26, 2015 at 10:56:40AM -0600, Felipe Balbi wrote:
+> > the references below are from SPRUHL7
+> > 
+> > On Fri, 23 Jan 2015, Felipe Balbi wrote:
+> > 
+> > > Without hwmod data for DebugSS, performance monitors
+> > > have no chance of running on AM43xx devices.
+> > > 
+> > > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > > ---
+> > >  arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 40 ++++++++++++++++++++++++++++++
+> > >  arch/arm/mach-omap2/prcm43xx.h             |  1 +
+> > >  2 files changed, 41 insertions(+)
+> > > 
+> > > diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+> > > index 5c6c8410160e..6709704dd5b5 100644
+> > > --- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+> > > +++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+> > > @@ -19,6 +19,7 @@
+> > >  #include "omap_hwmod.h"
+> > >  #include "omap_hwmod_33xx_43xx_common_data.h"
+> > >  #include "prcm43xx.h"
+> > > +#include "prm44xx.h"
+> > >  #include "omap_hwmod_common_data.h"
+> > >  
+> > >  
+> > > @@ -60,6 +61,44 @@ static struct omap_hwmod am43xx_wkup_m3_hwmod = {
+> > >  	.rst_lines_cnt	= ARRAY_SIZE(am33xx_wkup_m3_resets),
+> > >  };
+> > >  
+> > > +/*
+> > > + * 'debugss' class
+> > > + * debug and emulation sub system
+> > > + */
+> > > +static struct omap_hwmod_opt_clk am43xx_debugss_opt_clks[] = {
+> > > +	{ .role = "dbg_sysclk", .clk = "dbg_sysclk_ck" },
+> > > +	{ .role = "dbg_clka", .clk = "dbg_clka_ck", },
+> > > +	{ .role = "dbg_clkb", .clk = "dbg_clkb_ck", },
+> > > +	{ .role = "dbg_clkc", .clk = "dbg_clkc_ck", },
+> > > +};
+> > > +
+> > > +static struct omap_hwmod_class am43xx_debugss_hwmod_class = {
+> > > +	.name	= "debugss",
+> > > +};
+> > > +
+> > > +/* debugss */
+> > > +static struct omap_hwmod am43xx_debugss_hwmod = {
+> > > +	.name		= "debugss",
+> > > +	.class		= &am43xx_debugss_hwmod_class,
+> > > +	.clkdm_name	= "l3_aon_clkdm",
+> > > +	.main_clk	= "trace_clk_div_ck",
+> > > +	.prcm = {
+> > > +		.omap4 = {
+> > > +			.clkctrl_offs = AM43XX_CM_WKUP_DBGSS_CLKCTRL_OFFSET,
+> > 
+> > According to Table 6-275 "PRCM_CM_WKUP_DBGSS_CLKCTRL Register Field 
+> > Descriptions" this should have a 
+> > 
+> > 			.modulemode   = MODULEMODE_SWCTRL,
+> 
+> hm... modulemode SWCTRL causes wait_target_ready to fail. Any hints ?
 
-okay i understand. But doesn't it need a extra driver to set the switching
-frequency because of the new compatible string?
+gets stuck in transition state. PRCM_CM_WKUP_DBGSS_CLKCTRL is always
+read as 0x 12510f00 which would translate into:
 
-At this point i think about moving this feature into the bootloader.
+- module disabled
+- all opt clocks are on
+- module is transitioning
+- module in standby
+- clkA as TPIU and STM trace clock
+- all dividers set to 2
 
-@Fabio, @Marek:
-
-What's your opinion about that?
-
->
-> -- Sebastian
-
-Stefan
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150126/6857ea67/attachment.sig>
