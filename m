@@ -1,255 +1,121 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 26 Jan 2015 20:35:18 +0200
-Subject: [PATCH v6 2/2] clocksource: driver for Conexant Digicolor SoC timer
-In-Reply-To: <cover.1422296650.git.baruch@tkos.co.il>
-References: <cover.1422296650.git.baruch@tkos.co.il>
-Message-ID: <5ef8147956a428bba4db4fd5074021046c81ee7f.1422296650.git.baruch@tkos.co.il>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Mon, 26 Jan 2015 10:44:03 -0800
+Subject: [PATCH v3] ARM: zynq: DT: Add USB to device tree
+In-Reply-To: <8f367d9b85924f8e9cc9cb6fdff9a054@BN1BFFO11FD040.protection.gbl>
+References: <1417536431-27759-1-git-send-email-soren.brinkmann@xilinx.com>
+ <d78fedd84f354d80985187f851cb3cd1@BN1AFFO11FD055.protection.gbl>
+ <54C5F89A.3090901@suse.de> <54C5F965.90100@monstr.eu>
+ <54C5FBC3.7030903@suse.de> <54C60A56.7010403@suse.de>
+ <c65880cef67945ebaf61306febc1349b@BN1BFFO11FD010.protection.gbl>
+ <54C6698F.5020301@suse.de>
+ <8f367d9b85924f8e9cc9cb6fdff9a054@BN1BFFO11FD040.protection.gbl>
+Message-ID: <bb50396a16ab4042bdb554f72bde0bf7@BL2FFO11FD023.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clocksource driver to the Conexant CX92755 SoC, part of the Digicolor SoCs
-series. Hardware provides 8 timers, A to H. Timer A is dedicated to a future
-watchdog driver so we don't use it here. Use timer B for sched_clock, and timer
-C for clock_event.
+On Mon, 2015-01-26 at 08:23AM -0800, S?ren Brinkmann wrote:
+> On Mon, 2015-01-26 at 05:21PM +0100, Andreas F?rber wrote:
+> > Am 26.01.2015 um 16:50 schrieb S?ren Brinkmann:
+> > > On Mon, 2015-01-26 at 10:35AM +0100, Andreas F?rber wrote:
+> > >> Am 26.01.2015 um 09:33 schrieb Andreas F?rber:
+> > >>> Am 26.01.2015 um 09:23 schrieb Michal Simek:
+> > >>>> On 01/26/2015 09:19 AM, Andreas F?rber wrote:
+> > >>>>> And if I apply it to my -next based tree, adding corresponding nodes to
+> > >>>>> zynq-parallella.dts, I get repeatedly:
+> > >>>>>
+> > >>>>> [  +0,012242] ci_hdrc ci_hdrc.0: no of_node; not parsing pinctrl DT
+> > >>>>> [  +0,000157] ci_hdrc ci_hdrc.0: ChipIdea HDRC found, lpm: 0; cap:
+> > >>>>> f090e100 op: f090e140
+> > >>>>> [  +0,000081] platform ci_hdrc.0: Driver ci_hdrc requests probe deferral
+> > >>>>> [  +0,005360] ci_hdrc ci_hdrc.1: no of_node; not parsing pinctrl DT
+> > >>>>> [  +0,000120] ci_hdrc ci_hdrc.1: ChipIdea HDRC found, lpm: 0; cap:
+> > >>>>> f0910100 op: f0910140
+> > >>>>> [  +0,001810] platform ci_hdrc.1: Driver ci_hdrc requests probe deferral
+> > >>>>>
+> > >>>>> Am I missing any other patches or config options?
+> > >>>>> (I do notice that the pinctrl v3 patch that got merged has a trivial bug
+> > >>>>> for usb0, for which I'll send a patch later on.)
+> > >>>>
+> > >>>> Why is it deferred? Is it because of pinmuxing stuff?
+> > >>>
+> > >>> No, happened without as well.
+> > >>>
+> > >>> Looking at a different place in dmesg, I spot this:
+> > >>>
+> > >>> [  +0,003988] usb_phy_generic phy0: GPIO lookup for consumer reset-gpios
+> > >>> [  +0,000012] usb_phy_generic phy0: using device tree for GPIO lookup
+> > >>> [  +0,000015] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpios'
+> > >>> property
+> > >>>  of node '/phy0[0]'
+> > >>> [  +0,000013] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpio'
+> > >>> property
+> > >>> of node '/phy0[0]'
+> > >>> [  +0,000010] usb_phy_generic phy0: using lookup tables for GPIO lookup
+> > >>> [  +0,000153] usb_phy_generic phy0: lookup for GPIO reset-gpios failed
+> > >>> [  +0,000012] usb_phy_generic phy0: Error requesting RESET GPIO
+> > >>> [  +0,004360] usb_phy_generic: probe of phy0 failed with error -2
+> > >>> [  +0,004991] usb_phy_generic phy1: GPIO lookup for consumer reset-gpios
+> > >>> [  +0,000012] usb_phy_generic phy1: using device tree for GPIO lookup
+> > >>> [  +0,000013] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpios'
+> > >>> property
+> > >>>  of node '/phy1[0]'
+> > >>> [  +0,000013] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpio'
+> > >>> property of node '/phy1[0]'
+> > >>> [  +0,000010] usb_phy_generic phy1: using lookup tables for GPIO lookup
+> > >>> [  +0,000012] usb_phy_generic phy1: lookup for GPIO reset-gpios failed
+> > >>> [  +0,000011] usb_phy_generic phy1: Error requesting RESET GPIO
+> > >>> [  +0,004337] usb_phy_generic: probe of phy1 failed with error -2
+> > >>>
+> > >>> So, I guess the chipidea driver is deferring because the phys want a
+> > >>> property that neither me nor you are specifying? Would that be the two
+> > >>> MDIO pins 52 and 53 that would need to be specified?
+> > >>
+> > >> Erm, scratch that last question - wrong PHY. Trying it resolved the
+> > >> above phy errors but not the original problem. And so does an empty one:
+> > >>
+> > >> @@ -99,11 +100,13 @@
+> > >>
+> > >>         usb_phy0: phy0 {
+> > >>                 compatible = "usb-nop-xceiv";
+> > >> +               reset-gpios = <>;
+> > >>                 #phy-cells = <0>;
+> > >>         };
+> > >>
+> > >>         usb_phy1: phy1 {
+> > >>                 compatible = "usb-nop-xceiv";
+> > >> +               reset-gpios = <>;
+> > >>                 #phy-cells = <0>;
+> > >>         };
+> > >>  };
+> > >>
+> > >> In my manuals and notes I can't find any GPIO being used as reset for
+> > >> the USB PHYs. Any thoughts appreciated.
+> > > 
+> > > Such a connection is optional. The platform might rely on its reset
+> > > circuit, though it might not work for warm reboots.
+> > > I haven't looked at parallela docs, but if there is a schematic
+> > > available, that should tell you if/what is connected to the PHY reset
+> > > pin.
+> > 
+> > I do have the schematic, and the way I read it, only the on-board reset
+> > button resets the PHYs.
+> > 
+> > Yet it looks as if usb-nop-xceiv insists on a reset-gpios above, no?
+> > Does it work on your boards with linux-next?
+> 
+> I haven't re-tested it since I submitted the patches, but at that time
+> it worked. But I also didn't test USB with the pinctrl patches together.
+> I'll do some testing later today.
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- drivers/clocksource/Kconfig           |   3 +
- drivers/clocksource/Makefile          |   1 +
- drivers/clocksource/timer-digicolor.c | 199 ++++++++++++++++++++++++++++++++++
- 3 files changed, 203 insertions(+)
- create mode 100644 drivers/clocksource/timer-digicolor.c
+So, just did a test. I took all the pinctrl stuff and this patch and ran
+it on a zc702. I plugged in a thumb drive and that worked just fine. So,
+basically this patch could go in, despite missing pinctrl properties.
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index fc01ec27d3c8..7e116ce190dc 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -18,6 +18,9 @@ config CLKBLD_I8253
- config CLKSRC_MMIO
- 	bool
- 
-+config DIGICOLOR_TIMER
-+	bool
-+
- config DW_APB_TIMER
- 	bool
- 
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 94d90b24b56b..6b20951fc1e3 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -10,6 +10,7 @@ obj-$(CONFIG_SH_TIMER_TMU)	+= sh_tmu.o
- obj-$(CONFIG_EM_TIMER_STI)	+= em_sti.o
- obj-$(CONFIG_CLKBLD_I8253)	+= i8253.o
- obj-$(CONFIG_CLKSRC_MMIO)	+= mmio.o
-+obj-$(CONFIG_DIGICOLOR_TIMER)	+= timer-digicolor.o
- obj-$(CONFIG_DW_APB_TIMER)	+= dw_apb_timer.o
- obj-$(CONFIG_DW_APB_TIMER_OF)	+= dw_apb_timer_of.o
- obj-$(CONFIG_CLKSRC_NOMADIK_MTU)	+= nomadik-mtu.o
-diff --git a/drivers/clocksource/timer-digicolor.c b/drivers/clocksource/timer-digicolor.c
-new file mode 100644
-index 000000000000..7f8388cfa810
---- /dev/null
-+++ b/drivers/clocksource/timer-digicolor.c
-@@ -0,0 +1,199 @@
-+/*
-+ * Conexant Digicolor timer driver
-+ *
-+ * Author: Baruch Siach <baruch@tkos.co.il>
-+ *
-+ * Copyright (C) 2014 Paradox Innovation Ltd.
-+ *
-+ * Based on:
-+ *	Allwinner SoCs hstimer driver
-+ *
-+ * Copyright (C) 2013 Maxime Ripard
-+ *
-+ * Maxime Ripard <maxime.ripard@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+/*
-+ * Conexant Digicolor SoCs have 8 configurable timers, named from "Timer A" to
-+ * "Timer H". Timer A is the only one with watchdog support, so it is dedicated
-+ * to the watchdog driver. This driver uses Timer B for sched_clock(), and
-+ * Timer C for clockevents.
-+ */
-+
-+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-+
-+#include <linux/clk.h>
-+#include <linux/clockchips.h>
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/irqreturn.h>
-+#include <linux/sched_clock.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+
-+enum {
-+	TIMER_A,
-+	TIMER_B,
-+	TIMER_C,
-+	TIMER_D,
-+	TIMER_E,
-+	TIMER_F,
-+	TIMER_G,
-+	TIMER_H,
-+};
-+
-+#define CONTROL(t)	((t)*8)
-+#define COUNT(t)	((t)*8 + 4)
-+
-+#define CONTROL_DISABLE		0
-+#define CONTROL_ENABLE		BIT(0)
-+#define CONTROL_MODE(m)		((m) << 4)
-+#define CONTROL_MODE_ONESHOT	CONTROL_MODE(1)
-+#define CONTROL_MODE_PERIODIC	CONTROL_MODE(2)
-+
-+struct digicolor_timer {
-+	struct clock_event_device ce;
-+	void __iomem *base;
-+	u32 ticks_per_jiffy;
-+	int timer_id; /* one of TIMER_* */
-+};
-+
-+struct digicolor_timer *dc_timer(struct clock_event_device *ce)
-+{
-+	return container_of(ce, struct digicolor_timer, ce);
-+}
-+
-+static inline void dc_timer_disable(struct clock_event_device *ce)
-+{
-+	struct digicolor_timer *dt = dc_timer(ce);
-+	writeb(CONTROL_DISABLE, dt->base + CONTROL(dt->timer_id));
-+}
-+
-+static inline void dc_timer_enable(struct clock_event_device *ce, u32 mode)
-+{
-+	struct digicolor_timer *dt = dc_timer(ce);
-+	writeb(CONTROL_ENABLE | mode, dt->base + CONTROL(dt->timer_id));
-+}
-+
-+static inline void dc_timer_set_count(struct clock_event_device *ce,
-+				      unsigned long count)
-+{
-+	struct digicolor_timer *dt = dc_timer(ce);
-+	writel(count, dt->base + COUNT(dt->timer_id));
-+}
-+
-+static void digicolor_clkevt_mode(enum clock_event_mode mode,
-+				  struct clock_event_device *ce)
-+{
-+	struct digicolor_timer *dt = dc_timer(ce);
-+
-+	switch (mode) {
-+	case CLOCK_EVT_MODE_PERIODIC:
-+		dc_timer_disable(ce);
-+		dc_timer_set_count(ce, dt->ticks_per_jiffy);
-+		dc_timer_enable(ce, CONTROL_MODE_PERIODIC);
-+		break;
-+	case CLOCK_EVT_MODE_ONESHOT:
-+		dc_timer_disable(ce);
-+		dc_timer_enable(ce, CONTROL_MODE_ONESHOT);
-+		break;
-+	case CLOCK_EVT_MODE_UNUSED:
-+	case CLOCK_EVT_MODE_SHUTDOWN:
-+	default:
-+		dc_timer_disable(ce);
-+		break;
-+	}
-+}
-+
-+static int digicolor_clkevt_next_event(unsigned long evt,
-+				       struct clock_event_device *ce)
-+{
-+	dc_timer_disable(ce);
-+	dc_timer_set_count(ce, evt);
-+	dc_timer_enable(ce, CONTROL_MODE_ONESHOT);
-+
-+	return 0;
-+}
-+
-+static struct digicolor_timer dc_timer_dev = {
-+	.ce = {
-+		.name = "digicolor_tick",
-+		.rating = 340,
-+		.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-+		.set_mode = digicolor_clkevt_mode,
-+		.set_next_event = digicolor_clkevt_next_event,
-+	},
-+	.timer_id = TIMER_C,
-+};
-+
-+static irqreturn_t digicolor_timer_interrupt(int irq, void *dev_id)
-+{
-+	struct clock_event_device *evt = dev_id;
-+
-+	evt->event_handler(evt);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static u64 digicolor_timer_sched_read(void)
-+{
-+	return ~readl(dc_timer_dev.base + COUNT(TIMER_B));
-+}
-+
-+static void __init digicolor_timer_init(struct device_node *node)
-+{
-+	unsigned long rate;
-+	struct clk *clk;
-+	int ret, irq;
-+
-+	/*
-+	 * timer registers are shared with the watchdog timer;
-+	 * don't map exclusively
-+	 */
-+	dc_timer_dev.base = of_iomap(node, 0);
-+	if (!dc_timer_dev.base) {
-+		pr_err("Can't map registers");
-+		return;
-+	}
-+
-+	irq = irq_of_parse_and_map(node, dc_timer_dev.timer_id);
-+	if (irq <= 0) {
-+		pr_err("Can't parse IRQ");
-+		return;
-+	}
-+
-+	clk = of_clk_get(node, 0);
-+	if (IS_ERR(clk)) {
-+		pr_err("Can't get timer clock");
-+		return;
-+	}
-+	clk_prepare_enable(clk);
-+	rate = clk_get_rate(clk);
-+	dc_timer_dev.ticks_per_jiffy = DIV_ROUND_UP(rate, HZ);
-+
-+	writeb(CONTROL_DISABLE, dc_timer_dev.base + CONTROL(TIMER_B));
-+	writel(UINT_MAX, dc_timer_dev.base + COUNT(TIMER_B));
-+	writeb(CONTROL_ENABLE, dc_timer_dev.base + CONTROL(TIMER_B));
-+
-+	sched_clock_register(digicolor_timer_sched_read, 32, rate);
-+	clocksource_mmio_init(dc_timer_dev.base + COUNT(TIMER_B), node->name,
-+			      rate, 340, 32, clocksource_mmio_readl_down);
-+
-+	ret = request_irq(irq, digicolor_timer_interrupt,
-+			  IRQF_TIMER | IRQF_IRQPOLL, "digicolor_timerC",
-+			  &dc_timer_dev.ce);
-+	if (ret)
-+		pr_warn("request of timer irq %d failed (%d)\n", irq, ret);
-+
-+	dc_timer_dev.ce.cpumask = cpu_possible_mask;
-+	dc_timer_dev.ce.irq = irq;
-+
-+	clockevents_config_and_register(&dc_timer_dev.ce, rate, 0, 0xffffffff);
-+}
-+CLOCKSOURCE_OF_DECLARE(conexant_digicolor, "cnxt,cx92755-timer",
-+		       digicolor_timer_init);
--- 
-2.1.4
+Michal: How do you wanna handle this? Could you create a branch that has
+all the DT updates I can base stuff on, please? We could either take the
+pinctrl patches and this patch and add another one adding the pinctrl
+properties to the USB nodes. Or leave this patch out for now and revise
+it on top of the pinctrl patches.
+
+	Thanks,
+	S?ren
