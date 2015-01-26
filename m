@@ -1,83 +1,79 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 26 Jan 2015 11:09:21 +0100
-Subject: [PATCH] ARM: dts: sun7i: Add dts file for pcDuino 3 Nano board
-In-Reply-To: <20150126003520.GA871@cartman.at.offog.org>
-References: <1422199921-325-1-git-send-email-ats@offog.org>
- <20150125164846.GL8470@lukather>
- <20150126003520.GA871@cartman.at.offog.org>
-Message-ID: <20150126100921.GQ8470@lukather>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Mon, 26 Jan 2015 18:08:16 +0800
+Subject: [PATCH 6/7] pm: at91: add achieve the mpddrc peripheral ID and the
+ DDR clock ID support
+In-Reply-To: <1422266617-24381-1-git-send-email-wenyou.yang@atmel.com>
+References: <1422266617-24381-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1422266896-24666-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 26, 2015 at 12:35:20AM +0000, Adam Sampson wrote:
-> Hi Maxime,
-> 
-> On Sun, Jan 25, 2015 at 05:48:46PM +0100, Maxime Ripard wrote:
-> > > +			label = "pcduino3-nano:green:led3";
-> ...
-> > > +			label = "pcduino3-nano:green:led4";
-> > Where are the three other leds?
-> 
-> LED1 is the power LED, and as far as I can see there isn't an LED2 on
-> the board. LED5 is next to LED3/4, but it's not exposed by the 3.4
-> kernel that LinkSprite ship, and this forum post says it's not
-> software-controllable (which seems weird):
-> http://forum.linksprite.com/index.php?/topic/3145-pcduino3-nano-led-control/
-> 
-> > Also, usually, the last part of the label is what the led function
-> > usually is.
-> 
-> "LED3" and "LED4" are how those LEDs are actually labelled on the board
-> (unlike the pcDuino v3, which labels them "TX" and "RX", and calls them
-> pcduino3:green:rx/tx in the DTS). I've changed them to
-> pcduino3-nano:led3:usr and pcduino3-nano:led4:usr, but if you've got any
-> better suggestions then please let me know!
+The patch achieves the mpddr controller peripheral ID
+and the DDR clock ID from the dts file.
 
-It depends on what the leds are used for, but this is not what the
-label should be either.
+They will be used in the future to disable the mpddr controller'c clock
+the and DDR clock to decrease the power consumption during suspending.
 
-If you read Documentation/leds/leds-class.txt, the pattern to follow is:
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+---
+ arch/arm/mach-at91/generic.h |    2 ++
+ arch/arm/mach-at91/setup.c   |   24 ++++++++++++++++++++++++
+ 2 files changed, 26 insertions(+)
 
-"devicename:colour:function"
-
-so it should rather be pcduino3-nano:green:usr1 and usr2, or some
-other thing.
-
-> > > +&uart0 {
-> > > +	pinctrl-names = "default";
-> > > +	pinctrl-0 = <&uart0_pins_a>;
-> > > +	status = "okay";
-> > > +};
-> > > +
-> > > +&uart2 {
-> > > +	pinctrl-names = "default";
-> > > +	pinctrl-0 = <&uart2_pins_a>;
-> > > +	status = "okay";
-> > > +};
-> > 
-> > You probably want aliases for these two UARTs.
-> 
-> Done: I've aliased serial0 = &uart0 and serial1 = &uart2. Should there
-> be aliases for I2C as well, since the same situation applies (i2c0 and
-> i2c2)?
-
-Yep.
-
-> More generally, is it correct to add nodes like these (uart2, spi0,
-> i2c2) for features that appear on the Arduino GPIO headers?
-
-If those pins are specifically dedicated to this feature, then yes.
-
-Maxime
-
+diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
+index 41796bf..3c72a3e 100644
+--- a/arch/arm/mach-at91/generic.h
++++ b/arch/arm/mach-at91/generic.h
+@@ -47,6 +47,8 @@ void __init at91_sam9x5_pm_init(void) { }
+ struct at91_pm_struct {
+ 	unsigned long uhp_udp_mask;
+ 	int memctrl;
++	u32 mpddrc_id[2];
++	u32 ddrck_id;
+ };
+ 
+ #endif /* _AT91_GENERIC_H */
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index 7924663..a306f95 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -363,6 +363,27 @@ void __init at91_ioremap_matrix(u32 base_addr)
+ 		panic(pr_fmt("Impossible to ioremap at91_matrix_base\n"));
+ }
+ 
++static u32 at91_of_get_ddr_id(struct device_node *np, char *name)
++{
++	struct of_phandle_args clkspec;
++	u32 id;
++	int index;
++	int rc;
++
++	index = of_property_match_string(np, "clock-names", name);
++	rc = of_parse_phandle_with_args(np, "clocks", "#clock-cells", index, &clkspec);
++	if (rc)
++		return 0;
++
++	rc = of_property_read_u32(clkspec.np, "reg", &id);
++	if (rc)
++		return 0;
++
++	of_node_put(clkspec.np);
++
++	return id;
++}
++
+ struct at91_ramc_of_data {
+ 	u8 ramc_type;
+ };
+@@ -400,6 +421,9 @@ static void at91_dt_ramc(void)
+ 		of_data = of_id->data;
+ 		at91_pm_data.memctrl = of_data->ramc_type;
+ 
++		at91_pm_data.mpddrc_id[idx] = at91_of_get_ddr_id(np, "mpddr");
++		at91_pm_data.ddrck_id = at91_of_get_ddr_id(np, "ddrck");
++
+ 		idx++;
+ 	}
+ 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150126/f9329746/attachment.sig>
+1.7.9.5
