@@ -1,46 +1,35 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 26 Jan 2015 09:22:16 +0900
-Subject: [PATCH 00/13] ARM: shmobile: Remove sh7372/Mackerel and ZBOOT
- MMC/SDHI support
-In-Reply-To: <20150121045256.7648.7451.sendpatchset@little-apple>
-References: <20150121045256.7648.7451.sendpatchset@little-apple>
-Message-ID: <20150126002215.GB4477@verge.net.au>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 26 Jan 2015 01:34:11 +0100
+Subject: [PATCH URGENT] arm: dma-mapping: Set DMA IOMMU ops in
+ arm_iommu_attach_device()
+In-Reply-To: <1422022909-31044-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1422022909-31044-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1629706.j7HqG1L0bB@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 21, 2015 at 01:52:56PM +0900, Magnus Damm wrote:
-> ARM: shmobile: Remove sh7372/Mackerel and ZBOOT MMC/SDHI support
+Am Freitag, 23. Januar 2015, 16:21:49 schrieb Laurent Pinchart:
+> Commit 4bb25789ed28228a ("arm: dma-mapping: plumb our iommu mapping ops
+> into arch_setup_dma_ops") moved the setting of the DMA operations from
+> arm_iommu_attach_device() to arch_setup_dma_ops() where the DMA
+> operations to be used are selected based on whether the device is
+> connected to an IOMMU. However, the IOMMU detection scheme requires the
+> IOMMU driver to be ported to the new IOMMU of_xlate API. As no driver
+> has been ported yet, this effectively breaks all IOMMU ARM users that
+> depend on the IOMMU being handled transparently by the DMA mapping API.
 > 
-> [PATCH 01/13] ARM: shmobile: mackerel: Remove ZBOOT code
-> [PATCH 02/13] ARM: shmobile: mackerel: Remove Legacy C board code
-> [PATCH 03/13] ARM: shmobile: mackerel dts: Remove Legacy DTS file
-> [PATCH 04/13] ARM: shmobile: mackerel: Remove DT binding documentation
-> [PATCH 05/13] ARM: shmobile: mackerel: Remove mach-type entry
-> [PATCH 06/13] ARM: shmobile: mackerel: Remove defconfig
-> [PATCH 07/13] ARM: shmobile: sh7372: Remove ZBOOT MMC/SDHI support
-> [PATCH 08/13] ARM: shmobile: sh7372: Remove Legacy C SoC code
-> [PATCH 09/13] ARM: shmobile: sh7372: Remove DT binding documentation
-> [PATCH 10/13] ARM: shmobile: sh7372 dtsi: Remove Legacy DTSI file
-> [PATCH 11/13] Documentation: Remove ZBOOT MMC/SDHI utility and docs
-> [PATCH 12/13] pinctrl: sh-pfc: sh7372: Remove PFC support
-> [PATCH 13/13] pinctrl: sh-pfc: sh7372: Remove DT binding documentation
+> Fix this by restoring the setting of DMA IOMMU ops in
+> arm_iommu_attach_device() and splitting the rest of the function into a
+> new internal __arm_iommu_attach_device() function, called by
+> arch_setup_dma_ops().
 > 
-> Remove legacy board and SoC support for Mackerel and sh7372. Both the
-> ARM mach-shmobile code base and the PINCTRL subsystem is affected.
-> 
-> Also get rid of the remaining ZBOOT MMC/SDHI code, documentation and
-> utility that has no user once sh7372 is gone.
-> 
-> The Cortex-A8 based sh7372 SoC is rather old and never went into mass
-> production anyway, so these patches that remove SoC and board support
-> will only affect a few selected developers.
-> 
-> I wish we had some way to make use of the ZBOOT MMC/SDHI code, but
-> without any board or SoC code it makes little sense to keep it.
-> 
-> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Hi Magnus,
+on a rk3288 board with the currently failing drm driver this patch brought it 
+back to display something :-) , so
 
-thanks for putting this together. There seem to have been few comments
-made on it. Could you consider respinning accordingly?
+Tested-by: Heiko Stuebner <heiko@sntech.de>
+
+
+Thanks
+Heiko
