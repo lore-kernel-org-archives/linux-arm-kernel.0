@@ -1,150 +1,110 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Mon, 26 Jan 2015 01:25:13 +0000
-Subject: [PATCH 08/12] pm: at91: rename file name: pm_slowclock.S
- -->pm_suspend.S
-In-Reply-To: <20150123191719.GA29601@gradator.net>
-References: <1421741825-18226-1-git-send-email-wenyou.yang@atmel.com>
- <1421741825-18226-9-git-send-email-wenyou.yang@atmel.com>
- <20150123191719.GA29601@gradator.net>
-Message-ID: <B256D81BAE5131468A838E5D7A243641BFD32766@penmbx01>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 26 Jan 2015 02:04:35 +0000 (UTC)
+Subject: [PATCH 1/4] arm: omap: hwmod: 43xx: add DebugSS hwmod data
+In-Reply-To: <1422054704-14915-2-git-send-email-balbi@ti.com>
+References: <1422054704-14915-1-git-send-email-balbi@ti.com>
+ <1422054704-14915-2-git-send-email-balbi@ti.com>
+Message-ID: <alpine.DEB.2.02.1501260142590.5450@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylvain,
+Hi
 
-Thank you for your review.
+the references below are from SPRUHL7
 
-> -----Original Message-----
-> From: Sylvain Rochet [mailto:sylvain.rochet at finsecur.com]
-> Sent: Saturday, January 24, 2015 3:17 AM
-> To: Yang, Wenyou
-> Cc: Ferre, Nicolas; linux at arm.linux.org.uk; linux-kernel at vger.kernel.org;
-> alexandre.belloni at free-electrons.com; peda at axentia.se; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH 08/12] pm: at91: rename file name: pm_slowclock.S --
-> >pm_suspend.S
-> 
-> Hello Wenyou,
-> 
-> On Tue, Jan 20, 2015 at 04:17:01PM +0800, Wenyou Yang wrote:
-> >
-> > diff --git a/arch/arm/mach-at91/pm_suspend.S
-> > b/arch/arm/mach-at91/pm_suspend.S new file mode 100644 index
-> > 0000000..420e730
-> > --- /dev/null
-> 
-> 
-> > +	/* Turn off the main oscillator */
-> > +	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
-> > +	bic	tmp1, tmp1, #AT91_PMC_MOSCEN
-> 
-> at91sam9x5 and probably others need a key here:
-> 	orr     tmp1, tmp1, #AT91_PMC_KEY
-> 
-Yes, I am preparing the patches to support other SoCs.
+On Fri, 23 Jan 2015, Felipe Balbi wrote:
 
-> > +	str	tmp1, [pmc, #AT91_CKGR_MOR]
+> Without hwmod data for DebugSS, performance monitors
+> have no chance of running on AM43xx devices.
 > 
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+>  arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 40 ++++++++++++++++++++++++++++++
+>  arch/arm/mach-omap2/prcm43xx.h             |  1 +
+>  2 files changed, 41 insertions(+)
 > 
-> 
-> > +	/* Wait for interrupt */
-> > +	mcr	p15, 0, tmp1, c7, c0, 4
-> 
-> The linux-3.10-at91 branch uses a different approach which seem necessary for
-> newer board, you probably forget to merge the following:
-> 
-> /*
->  * Put the processor to enter into Standby mode, wait for interrupt to wakeup  */
-> 	.macro _do_wfi
-> 
-> #if defined(CONFIG_CPU_V7)
-> 	dsb
-> 
-> 	/* Disable the processor clock */
-> 	mov	tmp1, #AT91_PMC_PCK
-> 	str	tmp1, [pmc, #AT91_PMC_SCDR]
-> 
-> 	wfi		@ Wait For Interrupt
-> #else
-> 	mcr	p15, 0, tmp1, c7, c0, 4
-> #endif
-> 
-> 	.endm
-> 
-> 	.text
-> 
-I will send the new patch serials to support it in this week. Thanks.
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+> index 5c6c8410160e..6709704dd5b5 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+> @@ -19,6 +19,7 @@
+>  #include "omap_hwmod.h"
+>  #include "omap_hwmod_33xx_43xx_common_data.h"
+>  #include "prcm43xx.h"
+> +#include "prm44xx.h"
+>  #include "omap_hwmod_common_data.h"
+>  
+>  
+> @@ -60,6 +61,44 @@ static struct omap_hwmod am43xx_wkup_m3_hwmod = {
+>  	.rst_lines_cnt	= ARRAY_SIZE(am33xx_wkup_m3_resets),
+>  };
+>  
+> +/*
+> + * 'debugss' class
+> + * debug and emulation sub system
+> + */
+> +static struct omap_hwmod_opt_clk am43xx_debugss_opt_clks[] = {
+> +	{ .role = "dbg_sysclk", .clk = "dbg_sysclk_ck" },
+> +	{ .role = "dbg_clka", .clk = "dbg_clka_ck", },
+> +	{ .role = "dbg_clkb", .clk = "dbg_clkb_ck", },
+> +	{ .role = "dbg_clkc", .clk = "dbg_clkc_ck", },
+> +};
+> +
+> +static struct omap_hwmod_class am43xx_debugss_hwmod_class = {
+> +	.name	= "debugss",
+> +};
+> +
+> +/* debugss */
+> +static struct omap_hwmod am43xx_debugss_hwmod = {
+> +	.name		= "debugss",
+> +	.class		= &am43xx_debugss_hwmod_class,
+> +	.clkdm_name	= "l3_aon_clkdm",
+> +	.main_clk	= "trace_clk_div_ck",
+> +	.prcm = {
+> +		.omap4 = {
+> +			.clkctrl_offs = AM43XX_CM_WKUP_DBGSS_CLKCTRL_OFFSET,
 
-> ENTRY(at91_slow_clock)
-> (...)
-> 	/* Wait for interrupt */
-> 	_do_wfi
-> (...)
-> 
-> 
-> 
-> 
-> > +	/* Turn on the main oscillator */
-> > +	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
-> > +	orr	tmp1, tmp1, #AT91_PMC_MOSCEN
-> 
-> at91sam9x5 and probably others need a key here:
->         orr     tmp1, tmp1, #AT91_PMC_KEY
-> 
-> > +	str	tmp1, [pmc, #AT91_CKGR_MOR]
-> 
-> 
-> 
-> What about the following parts which are also in linux-3.10-at91 branch but not in
-> this rework, are they necessary ?
-Yes, they are necessary, I will send the next patch serial in this week.
+According to Table 6-275 "PRCM_CM_WKUP_DBGSS_CLKCTRL Register Field 
+Descriptions" this should have a 
 
-> 
-> sdr_sr_done:
-> 	/* Disable MPDDRC Clock*/
-> 	cmp	ddrcid, #0
-> 	beq	2f
-> 	bic	tmp2, ddrcid, #0xe0 /* fetch lowest 5 bits */
-> 	mov	tmp1, #0x01
-> 	mov	tmp1, tmp1, lsl tmp2
-> 
-> 	tst	ddrcid, #0x20	/* > 32 ? */
-> 	beq	1f
-> 	str	tmp1, [pmc, #AT91_PMC_PCDR1]
-> 	b	2f
-> 1:
-> 	str	tmp1, [pmc, #AT91_PMC_PCDR]
-> 2:
-> 
-> 	/* Disable DDR Clock */
-> 	mov 	tmp1, #AT91_PMC_SYS_DDR
-> 	str	tmp1, [pmc, #AT91_PMC_SCDR]
-> 
-> 
-> 
-> 
-> 	/* Enable MPDDRC Clock*/
-> 	cmp	ddrcid, #0
-> 	beq	4f
-> 	bic	tmp2, ddrcid, #0xe0 /* fetch lowest 5 bits */
-> 	mov	tmp1, #0x01
-> 	mov	tmp1, tmp1, lsl tmp2
-> 
-> 	tst	ddrcid, #0x20	/* > 32 ? */
-> 	beq	3f
-> 	str	tmp1, [pmc, #AT91_PMC_PCER1]
-> 	b	4f
-> 3:
-> 	str	tmp1, [pmc, #AT91_PMC_PCER]
-> 4:
-> 
-> 	/* Enable DDR clock */
-> 	mov 	tmp1, #AT91_PMC_SYS_DDR
-> 	str	tmp1, [pmc, #AT91_PMC_SCER]
-> 
-> 
-> 
-> Sylvain
+			.modulemode   = MODULEMODE_SWCTRL,
 
-Best Regards,
-Wenyou Yang
+> +		},
+> +	},
+> +	.opt_clks	= am43xx_debugss_opt_clks,
+> +	.opt_clks_cnt	= ARRAY_SIZE(am43xx_debugss_opt_clks),
+> +};
+> +
+> +/* debugss -> l3_main_2 */
+> +static struct omap_hwmod_ocp_if am43xx_debugss__l3_main = {
+> +	.master		= &am43xx_debugss_hwmod,
+> +	.slave		= &am33xx_l3_main_hwmod,
+> +	.clk		= "sys_clkin_ck",
+> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+
+According to Table 31-25 "Debug Modules Memory Mapping" there are a few 
+initiator ports on the DEBUGSS that are connected to various slave ports 
+on various chip-wide interconnects: L3_EMU, L4_PER, L4_WAKEUP, L4_CFG. I 
+would suggest starting by adding at least one of them as a struct 
+omap_hwmod_ocp_if record.  The one attached to L3_EMU would seem like a 
+good one to start with.
+
+> diff --git a/arch/arm/mach-omap2/prcm43xx.h b/arch/arm/mach-omap2/prcm43xx.h
+> index ad7b3e9977f8..bb42cd80526d 100644
+> --- a/arch/arm/mach-omap2/prcm43xx.h
+> +++ b/arch/arm/mach-omap2/prcm43xx.h
+> @@ -93,6 +93,7 @@
+>  #define AM43XX_CM_PER_TIMER5_CLKCTRL_OFFSET		0x0548
+>  #define AM43XX_CM_PER_TIMER6_CLKCTRL_OFFSET		0x0550
+>  #define AM43XX_CM_PER_TIMER7_CLKCTRL_OFFSET		0x0558
+> +#define AM43XX_CM_WKUP_DBGSS_CLKCTRL_OFFSET		0x0020
+>  #define AM43XX_CM_WKUP_WKUP_M3_CLKCTRL_OFFSET		0x0228
+>  #define AM43XX_CM_WKUP_CONTROL_CLKCTRL_OFFSET		0x0360
+>  #define AM43XX_CM_WKUP_SMARTREFLEX0_CLKCTRL_OFFSET	0x0350
+> -- 
+> 2.3.0-rc1
+
+
+- Paul
