@@ -1,52 +1,54 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 26 Jan 2015 12:51:34 +0000
-Subject: [PATCH RESEND v3 0/3] irqchip: vf610-mscm: add support for MSCM
- interrupt router
-In-Reply-To: <36990c90fa3d2ee0849227f31cbafb54@agner.ch>
-References: <1421309046-22452-1-git-send-email-stefan@agner.ch>
- <alpine.DEB.2.11.1501261115300.5526@nanos>
- <36990c90fa3d2ee0849227f31cbafb54@agner.ch>
-Message-ID: <54C63856.7010704@arm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 26 Jan 2015 15:57:25 +0300
+Subject: [PATCH v2 04/12] pm: at91: move the copying the sram function
+ to the sram initializationi phase
+In-Reply-To: <1422265201-23110-1-git-send-email-wenyou.yang@atmel.com>
+References: <1422265005-22937-1-git-send-email-wenyou.yang@atmel.com>
+ <1422265201-23110-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <54C639B5.7050106@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/01/15 11:55, Stefan Agner wrote:
-> On 2015-01-26 11:16, Thomas Gleixner wrote:
->> On Thu, 15 Jan 2015, Stefan Agner wrote:
->>
->>> Splitted out version of the MSCM driver. My first driver based on the
->>> routeable domain support and was part of the Vybrid Cortex-M4 support
->>> patchset.
->>>
->>> So far the MSCM interrupt router was initialized by the boot loader
->>> and configured all interrupts for the Cortex-A5 CPU. There are two
->>> use cases where a proper driver is necessary:
->>> - To run Linux on the Cortex-M4. When the kernel is running on the
->>>   non-preconfigured CPU, the interrupt router need to be configured
->>>   properly.
->>> - To support deeper sleep modes: LPSTOP clears the interrupt router
->>>   configuration, hence a driver needs to restore the configuration
->>>   on resume.
->>> I created a seperate patchset for that driver which hopefully makes
->>> it easier to get it into mergeable state.
->>>
->>> Since I identified some registers likely to be used by other drivers
->>> (e.g. CPU ID or the CPU Generate Interrupt Register) I also added
->>> the "syscon" compatible string to make the registers available for
->>> other drivers in case needed.
->>>
->>> This resend version of this patchset is rebased on v3.19-rc4.
->>
->> Has the discussion with Marc on the original V3 set been resolved?
-> 
-> There was no answer to the original v3 patch. The comments of Marc was
-> back in the v2 set, and has been resolved in v3. However, no Ack from
-> Marc so far.
+Hello.
 
-That's just me being lazy ;-). For the series:
+On 1/26/2015 12:40 PM, Wenyou Yang wrote:
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> To decrease the suspend time, move the copying the sram function
+> to the sram initialization phase, instead of every time go to suspend.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>   arch/arm/mach-at91/pm.c |    7 +++----
+>   1 file changed, 3 insertions(+), 4 deletions(-)
+
+> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+> index 5dd4e41..409185e 100644
+> --- a/arch/arm/mach-at91/pm.c
+> +++ b/arch/arm/mach-at91/pm.c
+> @@ -161,10 +161,6 @@ static int at91_pm_enter(suspend_state_t state)
+>   			 * turning off the main oscillator; reverse on wakeup.
+>   			 */
+>   			if (slow_clock) {
+> -#ifdef CONFIG_AT91_SLOW_CLOCK
+> -				/* copy slow_clock handler to SRAM, and call it */
+> -				memcpy(slow_clock, at91_slow_clock, at91_slow_clock_sz);
+> -#endif
+>   				slow_clock(at91_pmc_base, at91_ramc_base[0],
+>   					   at91_ramc_base[1],
+>   					   at91_pm_data.memctrl);
+> @@ -272,6 +268,9 @@ static void __init at91_pm_sram_init(void)
+>   	sram_pbase = gen_pool_virt_to_phys(sram_pool, sram_base);
+>   	slow_clock = __arm_ioremap_exec(sram_pbase, at91_slow_clock_sz, false);
+>
+> +	/* Copy slow_clock handler to SRAM, and call it */
+
+    You're not calling it here.
+
+> +	memcpy(slow_clock, at91_slow_clock, at91_slow_clock_sz);
+> +
+>   put_node:
+>   	of_node_put(node);
+>   }
+
+WBR, Sergei
