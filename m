@@ -1,82 +1,73 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 26 Jan 2015 12:59:05 +0000
-Subject: [PATCH] video: treat signal like timeout as failure
-In-Reply-To: <1421731430-13207-1-git-send-email-der.herr@hofr.at>
-References: <1421731430-13207-1-git-send-email-der.herr@hofr.at>
-Message-ID: <20150126125905.GI26493@n2100.arm.linux.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 26 Jan 2015 14:00:30 +0100
+Subject: [GIT PULL] at91: cleanup/soc for 3.20 #3 (bis)
+In-Reply-To: <20150123230609.GV20896@quad.lixom.net>
+References: <20150123230609.GV20896@quad.lixom.net>
+Message-ID: <1422277230-25211-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 20, 2015 at 06:23:50AM +0100, Nicholas Mc Guire wrote:
-> if(!wait_for_completion_interruptible_timeout(...))
-> only handles the timeout case - this patch adds handling the
-> signal case the same as timeout and cleans up.
-> 
-> Signed-off-by: Nicholas Mc Guire <der.herr@hofr.at>
-> ---
-> 
-> Only the timeout case was being handled, return of 0 in 
-> wait_for_completion_interruptible_timeout, the signal case (-ERESTARTSYS)
-> was treated just like the case of successful completion, which is most 
-> likely not reasonable.
-> 
-> Note that exynos_mipi_dsi_wr_data/exynos_mipi_dsi_rd_data return values
-> are not checked at the call sites in s6e8ax0.c (cmd_read/cmd_write)!
-> 
-> This patch simply treats the signal case the same way as the timeout case,
-> by releasing locks and returning 0 - which might not be the right thing to
-> do - this needs a review by someone knowing the details of this driver.
-> 
-> Patch is against 3.19.0-rc5 -next-20150119
-> 
-> Patch was only compile-tested with exynos_defconfig
-> 
->  drivers/video/fbdev/exynos/exynos_mipi_dsi_common.c |   17 +++++++++++------
->  1 file changed, 11 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/video/fbdev/exynos/exynos_mipi_dsi_common.c b/drivers/video/fbdev/exynos/exynos_mipi_dsi_common.c
-> index 2358a2f..55a7a45 100644
-> --- a/drivers/video/fbdev/exynos/exynos_mipi_dsi_common.c
-> +++ b/drivers/video/fbdev/exynos/exynos_mipi_dsi_common.c
-> @@ -157,6 +157,7 @@ int exynos_mipi_dsi_wr_data(struct mipi_dsim_device *dsim, unsigned int data_id,
->  	const unsigned char *data0, unsigned int data_size)
->  {
->  	unsigned int check_rx_ack = 0;
-> +	long timeout;
->  
->  	if (dsim->state == DSIM_STATE_ULPS) {
->  		dev_err(dsim->dev, "state is ULPS.\n");
-> @@ -244,9 +245,11 @@ int exynos_mipi_dsi_wr_data(struct mipi_dsim_device *dsim, unsigned int data_id,
->  		exynos_mipi_dsi_wr_tx_header(dsim, data_id, data_size & 0xff,
->  			(data_size & 0xff00) >> 8);
->  
-> -		if (!wait_for_completion_interruptible_timeout(&dsim_wr_comp,
-> -							MIPI_FIFO_TIMEOUT)) {
-> -			dev_warn(dsim->dev, "command write timeout.\n");
-> +		timeout = wait_for_completion_interruptible_timeout(
-> +					&dsim_wr_comp, MIPI_FIFO_TIMEOUT);
-> +		if (timeout <= 0) {
-> +			dev_warn(dsim->dev,
-> +				"command write timed-out/interrupted.\n");
 
-This is really silly.  Let's say that the program which results in
-this function called is using signals (eg, alarm() with SIGALRM, or
-asynchronous IO with SIGIO, etc).
+Arnd, Olof, Kevin,
 
-Why should having a SIGALRM raised print a kernel message?  If this
-happens a lot, it will result in the kernel log being flooded with
-these messages.
+This is the rework of my previous pull-request with modifications advised by
+Olof.
+This is a batch of cleanup/soc modifications that you may also stack on top of
+your "soc" branch as the previous one. It stabilizes a little bit our cleanup
+action before going further.
+Another one may be proposed before the merge-window opens.
 
-Signals should not be seen as exceptional conditions.  For some programs,
-they are merely asynchronous events which are a normal part of the
-programs operation (eg, SIGIO, SIGALRM, etc.)
+Thanks, best regards,
 
-Please, if you are going to handle signals, then handle them properly.
-If you're not going to handle them properly, don't use a wait that
-caters for them - use wait_for_completion_killable_timeout() which
-doesn't finish waiting on a signal unless the signal is going to result
-in the death of the program.
+The following changes since commit 29ee506d0d56f6d39cc237de2512f9cb5629cbf7:
+
+  ARM: at91: move at91rm9200_idle() to clk/at91/pmc.c (2015-01-16 18:08:42 +0100)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-cleanup3
+
+for you to fetch changes up to 9726b6892beeaa736610370429a23a481d1b133e:
+
+  ARM: at91: pm: remove warning to remove SOC_AT91SAM9263 usage (2015-01-26 13:44:19 +0100)
+
+----------------------------------------------------------------
+Third batch of cleanup/soc for 3.20:
+- several fixes and adjustments following the last cleanup batch
+- removal of some unused Kconfig options
+- slight PM and pm_idle rework to ease future rework
+- removal of unneeded mach/system_rev.h
+
+----------------------------------------------------------------
+Alexandre Belloni (6):
+      ARM: at91: mark const init data with __initconst instead of __initdata
+      ARM: at91: fix sam9n12 and sam9x5 arm_pm_idle
+      ARM: at91: sam9: set arm_pm_idle from sam9_dt_device_init
+      ARM: at91: stop using HAVE_AT91_DBGUx
+      ARM: at91: remove unused mach/system_rev.h
+      ARM: at91: pm: remove warning to remove SOC_AT91SAM9263 usage
+
+Nicolas Ferre (3):
+      ARM: at91: fix Kconfig.debug by adding DEBUG_AT91_UART option
+      ARM: at91: fix PM initialization for newer SoCs
+      ARM: at91: fix ordering of SRAM and PM initialization
+
+ arch/arm/Kconfig.debug                       | 16 +++++++++-----
+ arch/arm/mach-at91/Kconfig                   | 19 ----------------
+ arch/arm/mach-at91/at91sam9260.c             |  6 -----
+ arch/arm/mach-at91/at91sam9261.c             |  6 -----
+ arch/arm/mach-at91/at91sam9263.c             |  6 -----
+ arch/arm/mach-at91/at91sam9g45.c             |  5 -----
+ arch/arm/mach-at91/at91sam9rl.c              |  6 -----
+ arch/arm/mach-at91/board-dt-rm9200.c         |  6 ++---
+ arch/arm/mach-at91/board-dt-sam9.c           | 33 +++++++++++++++++++++++++---
+ arch/arm/mach-at91/board-dt-sama5.c          |  2 +-
+ arch/arm/mach-at91/generic.h                 |  2 ++
+ arch/arm/mach-at91/include/mach/system_rev.h | 27 -----------------------
+ arch/arm/mach-at91/pm.c                      |  7 ++++++
+ arch/arm/mach-at91/pm_slowclock.S            |  9 --------
+ 14 files changed, 54 insertions(+), 96 deletions(-)
+ delete mode 100644 arch/arm/mach-at91/include/mach/system_rev.h
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Nicolas Ferre
