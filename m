@@ -1,155 +1,60 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 26 Jan 2015 11:10:48 +0000
-Subject: [PATCH 2/5] ARM: sun5i: Relicense the A10s/A13 DTSI under
- GPLv2/X11
-In-Reply-To: <1409682069-7164-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1409682069-7164-1-git-send-email-maxime.ripard@free-electrons.com>
- <1409682069-7164-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20150126111048.GB24085@e102568-lin.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 26 Jan 2015 11:11:19 +0000
+Subject: [PATCH 7/7] mfd: Add support for the MediaTek MT6397 PMIC
+In-Reply-To: <20150126105222.GM12209@pengutronix.de>
+References: <1422022202-7526-1-git-send-email-s.hauer@pengutronix.de>
+ <1422022202-7526-8-git-send-email-s.hauer@pengutronix.de>
+ <20150123161440.GA11745@x1> <20150126105222.GM12209@pengutronix.de>
+Message-ID: <20150126111119.GE11745@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 02, 2014 at 07:21:06PM +0100, Maxime Ripard wrote:
-> The current GPL only licensing on the DTSI makes it very impractical for other
-> software components licensed under another license.
-> 
-> In order to make it easier for them to reuse our device trees, relicense our
-> DTSI first under a GPL/X11 dual-license. Hopefully, the DTS will follow soon.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Chen-Yu Tsai <wens@csie.org>
-> Cc: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
-> Cc: Emilio L?pez <emilio@elopez.com.ar>
-> Cc: Hans de Goede <hdegoede@redhat.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Oliver Schinagl <oliver@schinagl.nl>
-> Cc: Roman Byshko <rbyshko@gmail.com>
+On Mon, 26 Jan 2015, Sascha Hauer wrote:
+> On Fri, Jan 23, 2015 at 04:14:40PM +0000, Lee Jones wrote:
+> > On Fri, 23 Jan 2015, Sascha Hauer wrote:
+> > 
+> > > From: Flora Fu <flora.fu@mediatek.com>
+> > > 
+> > > This adds support for the MediaTek MT6397 PMIC. This is a
+> > > multifunction device with the following sub modules:
+> > > 
+> > > - Regulator
+> > > - RTC
+> > > - Audio codec
+> > > - GPIO
+> > > - Clock
+> > > 
+> > > It is interfaced to the host controller using SPI interface by a proprietary
+> > > hardware called PMIC wrapper or pwrap. MT6397 MFD is a child device of the
+> > > pwrap.
+> > > 
+> > > Signed-off-by: Flora Fu, MediaTek
+> > > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > > Cc: Samuel Ortiz <sameo@linux.intel.com>
+> > > Cc: Lee Jones <lee.jones@linaro.org>
+> > > ---
+> > >  Documentation/devicetree/bindings/mfd/mt6397.txt |  70 +++++
 
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+[...]
 
-> ---
->  arch/arm/boot/dts/sun5i-a10s.dtsi | 46 ++++++++++++++++++++++++++++++++++-----
->  arch/arm/boot/dts/sun5i-a13.dtsi  | 46 ++++++++++++++++++++++++++++++++++-----
->  2 files changed, 82 insertions(+), 10 deletions(-)
+> > > +	struct mt6397_chip *mt6397 = irq_get_chip_data(data->irq);
+> > > +	int shift = mt6397_irq_shift(data->hwirq);
+> > > +	int reg = mt6397_irq_reg(data->hwirq);
+> > > +	int reg_ofs = MT6397_INT_CON0 + reg * 2;
+> > > +
+> > > +	mt6397->irq_masks_cur[reg] &= ~(1 << shift);
+> > 
+> > s/(1 << shift)/BIT(shift)/
 > 
-> diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
-> index d73a2287b37a..22c9f0935e1d 100644
-> --- a/arch/arm/boot/dts/sun5i-a10s.dtsi
-> +++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
-> @@ -3,12 +3,48 @@
->   *
->   * Maxime Ripard <maxime.ripard@free-electrons.com>
->   *
-> - * The code contained herein is licensed under the GNU General Public
-> - * License. You may obtain a copy of the GNU General Public License
-> - * Version 2 or later at the following locations:
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
->   *
-> - * http://www.opensource.org/licenses/gpl-license.html
-> - * http://www.gnu.org/copyleft/gpl.html
-> + *  a) This library is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This library is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + *     You should have received a copy of the GNU General Public
-> + *     License along with this library; if not, write to the Free
-> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-> + *     MA 02110-1301 USA
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
->   */
->  
->  /include/ "skeleton.dtsi"
-> diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-> index c4b5d7825b9f..30cea25407b2 100644
-> --- a/arch/arm/boot/dts/sun5i-a13.dtsi
-> +++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-> @@ -3,12 +3,48 @@
->   *
->   * Maxime Ripard <maxime.ripard@free-electrons.com>
->   *
-> - * The code contained herein is licensed under the GNU General Public
-> - * License. You may obtain a copy of the GNU General Public License
-> - * Version 2 or later at the following locations:
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
->   *
-> - * http://www.opensource.org/licenses/gpl-license.html
-> - * http://www.gnu.org/copyleft/gpl.html
-> + *  a) This library is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This library is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + *     You should have received a copy of the GNU General Public
-> + *     License along with this library; if not, write to the Free
-> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-> + *     MA 02110-1301 USA
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
->   */
->  
->  /include/ "skeleton.dtsi"
-> -- 
-> 2.0.2
-> 
-> 
+> Is it mentioned somewhere that these BIT macros shall be used? There are
+> quadrillions of examples for both styles in the kernel and personally I
+> think 1 << x is more readable.
+
+I haven't seen a hard and fast 'rule' per say.  I think it's left up
+to the Maintainer of any given subsystem. ;)
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
