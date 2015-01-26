@@ -1,176 +1,87 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 26 Jan 2015 15:35:41 +0100
-Subject: [PATCH v2 5/5] clocksource: sun5i: Add clock notifiers
-In-Reply-To: <54C62368.7050600@linaro.org>
-References: <1422265856-27631-1-git-send-email-maxime.ripard@free-electrons.com>
- <1422265856-27631-6-git-send-email-maxime.ripard@free-electrons.com>
- <54C62368.7050600@linaro.org>
-Message-ID: <20150126143541.GG31568@lukather>
+From: Robby.Cai@freescale.com (Robby.Cai at freescale.com)
+Date: Mon, 26 Jan 2015 14:44:57 +0000
+Subject: [PATCH] ARM: dts: imx6qdl: Adjust the brightness setting for LVDS
+ panel
+In-Reply-To: <1421941084.3084.45.camel@pengutronix.de>
+References: <1421749355-23050-1-git-send-email-r63905@freescale.com>
+ <20150120113837.GC2766@dragon> <1421941084.3084.45.camel@pengutronix.de>
+Message-ID: <BLUPR03MB4059C6493E55DB26E8308E9F8350@BLUPR03MB405.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
 
-On Mon, Jan 26, 2015 at 12:22:16PM +0100, Daniel Lezcano wrote:
-> On 01/26/2015 10:50 AM, Maxime Ripard wrote:
-> >The parent clock of the sun5i timer is the AHB clock, which rate might change
-> >because of other devices requirements.
-> >
-> >This is for example the case on the Allwinner A31, where the DMA controller
-> >needs a minimum rate higher than the default, that is enforced after the timer
-> >driver has probed.
-> >
-> >Add clock notifiers to make sure we reflect the clock rate changes in the timer
-> >rates.
+
+> -----Original Message-----
+> From: Philipp Zabel [mailto:p.zabel at pengutronix.de]
+> Sent: Thursday, January 22, 2015 11:38 PM
+> To: Shawn Guo
+> Cc: Cai Robby-R63905; linux-pwm at vger.kernel.org; Eric Nelson; Tim Harvey;
+> jg1.han at samsung.com; Troy Kisky; thierry.reding at gmail.com;
+> kernel at pengutronix.de; lee.jones at linaro.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH] ARM: dts: imx6qdl: Adjust the brightness setting for
+> LVDS panel
 > 
-> Mmh, I am wondering if that shouldn't go to the time framework ...
+> Am Dienstag, den 20.01.2015, 19:38 +0800 schrieb Shawn Guo:
+> > Add LAKML and a few interested people.
+> >
+> > Shawn
+> >
+> > On Tue, Jan 20, 2015 at 06:22:35PM +0800, Robby Cai wrote:
+> > > Hannstar XGA panel is used by default on i.MX6QDL Sabre Auto/Lite/SD
+> > > or derived board.
+> > >
+> > > According to its data sheet [1],
+> > > a) the dimming duty cycle is 20% - 100%.
+> > > This patch changes the brightness-level from 20 to 100 with step 10
+> > > to make it straight-forward.
+> > > b) the typical dimming frequency is 20KHz.
+> > > The previous setting is 200Hz. This patch corrects it.
+> > >
+> > > [1]
+> > > http://boundarydevices.com/wp-content/uploads/2013/06/HSD100PXN1-A00
+> > > -C11-1.0.pdf
+> > >
+> > > Signed-off-by: Robby Cai <r63905@freescale.com>
+> > > ---
+> > >  arch/arm/boot/dts/imx6qdl-gw52xx.dtsi     | 6 +++---
+> > >  arch/arm/boot/dts/imx6qdl-gw53xx.dtsi     | 6 +++---
+> > >  arch/arm/boot/dts/imx6qdl-gw54xx.dtsi     | 6 +++---
+> > >  arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 6 +++---
+> > > arch/arm/boot/dts/imx6qdl-sabreauto.dtsi  | 6 +++---
+> > > arch/arm/boot/dts/imx6qdl-sabrelite.dtsi  | 6 +++---
+> > >  arch/arm/boot/dts/imx6qdl-sabresd.dtsi    | 6 +++---
+> > >  7 files changed, 21 insertions(+), 21 deletions(-)
+> > >
+> > > diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
+> > > b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
+> > > index b5756c2..33484d8 100644
+> > > --- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
+> > > +++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
+> > > @@ -29,9 +29,9 @@
+> > >
+> > >  	backlight {
+> > >  		compatible = "pwm-backlight";
+> > > -		pwms = <&pwm4 0 5000000>;
+> > > -		brightness-levels = <0 4 8 16 32 64 128 255>;
+> > > -		default-brightness-level = <7>;
+> > > +		pwms = <&pwm4 0 50000>;
+> > > +		brightness-levels = <0 20 30 40 50 60 70 80 90 100>;
+> > > +		default-brightness-level = <9>;
 > 
-> Looking at the notifier callbacks that call generic time framework
-> functions.
-
-I don't think the framework currently has a clock handle so far?
-
-> Can you have a look at commit b3e90722 ? and double check your
-> changes ?
-
-I'm exactly in the opposite situation.
-
-The parent clock of this timer is *not* the CPU clock, and it might
-even be in a completely different clock tree.
-
-However, our DMA controller has the same parent clock than the timer,
-and it needs some frequency adjustement. Otherwise, DMA would just not
-work.
-
-So I'm completely fine with any rate change as far as the timer is
-concerned, the driver just need to be notified to be able to reflect
-this rate change.
-
-> A couple of comments below.
+> I notice that the intervals are changed from exponential to linear.
+> Is this really wanted here?
+> I expect that the new settings result in huge steps in perceived
+> brightness at low levels and a nearly imperceptible change at the last
+> step.
 > 
-> >Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> >---
-> >  drivers/clocksource/timer-sun5i.c | 72 +++++++++++++++++++++++++++++++++++++--
-> >  1 file changed, 70 insertions(+), 2 deletions(-)
-> >
-> >diff --git a/drivers/clocksource/timer-sun5i.c b/drivers/clocksource/timer-sun5i.c
-> >index 377e50450781..5841a956f5f0 100644
-> >--- a/drivers/clocksource/timer-sun5i.c
-> >+++ b/drivers/clocksource/timer-sun5i.c
-> >@@ -41,9 +41,13 @@
-> >  struct sun5i_timer {
-> >  	void __iomem		*base;
-> >  	struct clk		*clk;
-> >+	struct notifier_block	clk_rate_cb;
-> >  	u32			ticks_per_jiffy;
-> >  };
-> >
-> >+#define to_sun5i_timer(x) \
-> >+	container_of(x, struct sun5i_timer, clk_rate_cb)
-> >+
-> >  struct sun5i_timer_clksrc {
-> >  	struct sun5i_timer	timer;
-> >  	struct clocksource	clksrc;
-> >@@ -152,6 +156,30 @@ static cycle_t sun5i_clksrc_read(struct clocksource *clksrc)
-> >  	return ~readl(cs->timer.base + TIMER_CNTVAL_LO_REG(1));
-> >  }
-> >
-> >+static int sun5i_rate_cb_clksrc(struct notifier_block *nb,
-> >+				unsigned long event, void *data)
-> >+{
-> >+	struct clk_notifier_data *ndata = data;
-> >+	struct sun5i_timer *timer = to_sun5i_timer(nb);
-> >+	struct sun5i_timer_clksrc *cs = container_of(timer,
-> >+						     struct sun5i_timer_clksrc, timer);
-> >+
-> >+	switch (event) {
-> >+	case PRE_RATE_CHANGE:
-> >+		clocksource_unregister(&cs->clksrc);
-> >+		break;
-> >+
-> >+	case POST_RATE_CHANGE:
-> >+		clocksource_register_hz(&cs->clksrc, ndata->new_rate);
-> >+		break;
-> 
-> Why clocksource_unregister couldn't be in the POST_RATE_CHANGE ?
+> regards
+> Philipp
 
-Wouldn't that leave a (small, I agree) window where the timer would
-run at a rate different to the one it has been registered with?
 
-> >+	default:
-> >+		break;
-> >+	}
-> >+
-> >+	return NOTIFY_DONE;
-> >+}
-> >+
-> >  static int __init sun5i_setup_clocksource(struct device_node *node,
-> >  					  void __iomem *base,
-> >  					  struct clk *clk, int irq)
-> >@@ -174,6 +202,14 @@ static int __init sun5i_setup_clocksource(struct device_node *node,
-> >
-> >  	cs->timer.base = base;
-> >  	cs->timer.clk = clk;
-> >+	cs->timer.clk_rate_cb.notifier_call = sun5i_rate_cb_clksrc;
-> >+	cs->timer.clk_rate_cb.next = NULL;
-> >+
-> >+	ret = clk_notifier_register(clk, &cs->timer.clk_rate_cb);
-> >+	if (ret) {
-> >+		pr_err("Unable to register clock notifier.\n");
-> >+		goto err_disable_clk;
-> >+	}
-> >
-> >  	writel(~0, base + TIMER_INTVAL_LO_REG(1));
-> >  	writel(TIMER_CTL_ENABLE | TIMER_CTL_RELOAD,
-> >@@ -188,11 +224,13 @@ static int __init sun5i_setup_clocksource(struct device_node *node,
-> >  	ret = clocksource_register_hz(&cs->clksrc, rate);
-> >  	if (ret) {
-> >  		pr_err("Couldn't register clock source.\n");
-> >-		goto err_disable_clk;
-> >+		goto err_remove_notifier;
-> >  	}
-> >
-> >  	return 0;
-> >
-> >+err_remove_notifier:
-> >+	clk_notifier_unregister(clk, &cs->timer.clk_rate_cb);
-> >  err_disable_clk:
-> >  	clk_disable_unprepare(clk);
-> >  err_free:
-> >@@ -200,6 +238,26 @@ err_free:
-> >  	return ret;
-> >  }
-> >
-> >+static int sun5i_rate_cb_clkevt(struct notifier_block *nb,
-> >+				unsigned long event, void *data)
-> >+{
-> >+	struct clk_notifier_data *ndata = data;
-> >+	struct sun5i_timer *timer = to_sun5i_timer(nb);
-> >+	struct sun5i_timer_clkevt *ce = container_of(timer,
-> >+						     struct sun5i_timer_clkevt, timer);
-> >+	unsigned long flags;
-> >+
-> >+	if (event == POST_RATE_CHANGE) {
-> >+		local_irq_save(flags);
-> >+		clockevents_update_freq(&ce->clkevt, ndata->new_rate);
-> >+		local_irq_restore(flags);
-> 
-> local_irq_save and local_irq_restore are already in the
-> clockevents_update_freq function.
+No particular reason here. I understand your concern but seems there's no obvious rule.
+How about add some interpolation, such as <0 52 64 96 128 160 192 224 255>
+or even more, <0 52 64 80 96 112 128 144 160 176 192 208 224 240 255>
 
-Ok.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150126/f9c789d8/attachment-0001.sig>
+Regards,
+Robby
