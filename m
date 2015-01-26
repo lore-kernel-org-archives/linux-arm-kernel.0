@@ -1,29 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 26 Jan 2015 20:37:51 +0000
-Subject: [PATCH] ARM: /proc/atags: Export also for DT
-In-Reply-To: <201501262016.52079@pali>
-References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
- <201412041857.49341@pali>
- <CAL_JsqJ9i0jwaL1cyeomQG=bhhcnEgdGWYOqkcwidyk5xOUukg@mail.gmail.com>
- <201501262016.52079@pali>
-Message-ID: <20150126203751.GK26493@n2100.arm.linux.org.uk>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 26 Jan 2015 21:39:26 +0100
+Subject: [PATCH 7/8] arm64/kexec: Add checks for KVM
+In-Reply-To: <20150126191942.GQ23313@leverpostej>
+References: <cover.1421449714.git.geoff@infradead.org>
+ <a3353cf2ac47f49c20bbbb88405301cbaa359805.1421449714.git.geoff@infradead.org>
+ <20150126191942.GQ23313@leverpostej>
+Message-ID: <CAMJs5B9DdKfdUw0_7+Q4okiZ0rWfgwi3vo1W=54+Ug0rcy8hHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 26, 2015 at 08:16:52PM +0100, Pali Roh?r wrote:
-> This patch will cause that decompressor store full ATAG structure into
-> DT tree ("/atags"):
+On Mon, Jan 26, 2015 at 8:19 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Sat, Jan 17, 2015 at 12:23:34AM +0000, Geoff Levand wrote:
+>> Add runtime checks that fail the arm64 kexec syscall for situations that would
+>> result in system instability do to problems in the KVM kernel support.
+>> These checks should be removed when the KVM problems are resolved fixed.
+>>
+>> Signed-off-by: Geoff Levand <geoff@infradead.org>
+>> ---
+>>  arch/arm64/kernel/machine_kexec.c | 10 ++++++++++
+>>  1 file changed, 10 insertions(+)
+>>
+>> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+>> index 3d84759..a36459d 100644
+>> --- a/arch/arm64/kernel/machine_kexec.c
+>> +++ b/arch/arm64/kernel/machine_kexec.c
+>> @@ -16,6 +16,9 @@
+>>  #include <asm/cacheflush.h>
+>>  #include <asm/system_misc.h>
+>>
+>> +/* TODO: Remove this include when KVM can support a kexec reboot. */
+>> +#include <asm/virt.h>
+>> +
+>>  /* Global variables for the relocate_kernel routine. */
+>>  extern const unsigned char relocate_new_kernel[];
+>>  extern const unsigned long relocate_new_kernel_size;
+>> @@ -100,6 +103,13 @@ int machine_kexec_prepare(struct kimage *image)
+>>
+>>       kexec_image_info(image);
+>>
+>> +     /* TODO: Remove this message when KVM can support a kexec reboot. */
+>> +     if (IS_ENABLED(CONFIG_KVM) && is_hyp_mode_available()) {
+>> +             pr_err("%s: Your kernel is configured with KVM support (CONFIG_KVM=y) which currently does not allow for kexec re-boot.\n",
+>> +                     __func__);
+>> +             return -ENOSYS;
+>> +     }
+>
+> If you really don't want to implement KVM teardown, surely this should
+> be at the start of the series, so we don't have a point in the middle
+> where things may explode in this case?
+>
+So this caters to support systems that don't support KVM (don't boot
+in EL2) but is configured with both KVM and KEXEC?
 
-How about something a little more radical.
+Why not just make the kexec config dependent on !KVM ?
 
-Rather than trying to squeeze various ATAGs into DT, why don't we add a
-standard ATAG to contain the DT and pass that through into the kernel.
-This is IMHO how we _should_ have done the ATAG compatibility from the
-start.
-
-That means we could get rid of most of the libfdt in the decompressor,
-and instead resolve the differences in the kernel.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+-Christoffer
