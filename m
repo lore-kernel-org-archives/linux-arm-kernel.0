@@ -1,87 +1,69 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 26 Jan 2015 11:46:59 +0000
-Subject: [PATCH 4/7] ARM: at91: enable the L2 Cache controller
-In-Reply-To: <1422266836-24592-1-git-send-email-wenyou.yang@atmel.com>
-References: <1422266617-24381-1-git-send-email-wenyou.yang@atmel.com>
- <1422266836-24592-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20150126114659.GD23313@leverpostej>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 26 Jan 2015 12:47:35 +0100
+Subject: [PATCH v2] MediaTek PMIC support
+In-Reply-To: <1422022202-7526-1-git-send-email-s.hauer@pengutronix.de>
+References: <1422022202-7526-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20150126114735.GA3178@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 26, 2015 at 10:07:16AM +0000, Wenyou Yang wrote:
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> ---
->  arch/arm/mach-at91/board-dt-sama5.c |   53 +++++++++++++++++++++++++++++++++++
->  1 file changed, 53 insertions(+)
+Olof, Arnd,
+
+OK to put the driver into drivers/soc/mediatek? Can you take these
+patches?
+
+Sascha
+
+On Fri, Jan 23, 2015 at 03:09:55PM +0100, Sascha Hauer wrote:
+> This series adds initial support for the MediaTek MT6397 PMIC and the
+> necessary infrastructure to attach it on the MT8135 / MT8173 SoCs.
 > 
-> diff --git a/arch/arm/mach-at91/board-dt-sama5.c b/arch/arm/mach-at91/board-dt-sama5.c
-> index 86cffcd..ed6db28 100644
-> --- a/arch/arm/mach-at91/board-dt-sama5.c
-> +++ b/arch/arm/mach-at91/board-dt-sama5.c
-> @@ -17,17 +17,70 @@
->  #include <linux/of_platform.h>
->  #include <linux/phy.h>
->  #include <linux/clk-provider.h>
-> +#include <linux/of_address.h>
->  
->  #include <asm/setup.h>
->  #include <asm/irq.h>
->  #include <asm/mach/arch.h>
->  #include <asm/mach/map.h>
->  #include <asm/mach/irq.h>
-> +#include <asm/hardware/cache-l2x0.h>
->  
->  #include "generic.h"
->  
-> +void __iomem *at91_l2cc_base;
-> +EXPORT_SYMBOL_GPL(at91_l2cc_base);
-> +
-> +#ifdef CONFIG_CACHE_L2X0
-> +static void __init at91_init_l2cache(void)
-> +{
-> +	struct device_node *np;
-> +	u32 reg;
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "arm,pl310-cache");
-> +	if (!np)
-> +		return;
-> +
-> +	at91_l2cc_base = of_iomap(np, 0);
-> +	if (!at91_l2cc_base)
-> +		panic("unable to map l2cc cpu registers\n");
-> +
-> +	of_node_put(np);
-> +
-> +	/* Disable cache if it hasn't been done yet */
-> +	if (readl_relaxed(at91_l2cc_base + L2X0_CTRL) & L2X0_CTRL_EN)
-> +		writel_relaxed(~L2X0_CTRL_EN, at91_l2cc_base + L2X0_CTRL);
-> +
-> +	/* Prefetch Control */
-> +	reg = readl_relaxed(at91_l2cc_base + L310_PREFETCH_CTRL);
-> +	reg &= ~L310_PREFETCH_CTRL_OFFSET_MASK;
-> +	reg |= 0x01;
-> +	reg |= L310_PREFETCH_CTRL_DBL_LINEFILL_INCR;
-> +	reg |= L310_PREFETCH_CTRL_PREFETCH_DROP;
-> +	reg |= L310_PREFETCH_CTRL_DATA_PREFETCH;
-> +	reg |= L310_PREFETCH_CTRL_INSTR_PREFETCH;
-> +	reg |= L310_PREFETCH_CTRL_DBL_LINEFILL;
-> +	writel_relaxed(reg, at91_l2cc_base + L310_PREFETCH_CTRL);
-> +
-> +	/* Power Control */
-> +	reg = readl_relaxed(at91_l2cc_base + L310_POWER_CTRL);
-> +	reg |= L310_STNDBY_MODE_EN;
-> +	reg |= L310_DYNAMIC_CLK_GATING_EN;
-> +	writel_relaxed(reg, at91_l2cc_base + L310_POWER_CTRL);
-> +
-> +	/* Disable interrupts */
-> +	writel_relaxed(0x00, at91_l2cc_base + L2X0_INTR_MASK);
-> +	writel_relaxed(0x01ff, at91_l2cc_base + L2X0_INTR_CLEAR);
-> +	l2x0_of_init(0, ~0UL);
-> +}
-> +#else
-> +static inline void at91_init_l2cache(void) {}
-> +#endif
+> The infrastructure includes:
+> 
+> - pericfg / infracfg controller support
+>   The pericfg / infracfg controllers contain miscellaneous registers for
+>   reset controllers and clocks.
+> 
+> - PMIC wrapper support
+>   On MediaTek MT8135, MT8173 and other SoCs the PMIC is connected via
+>   SPI. The SPI master interface is not directly visible to the CPU, but
+>   only through the PMIC wrapper inside the SoC. The communication between
+>   the SoC and the PMIC can optionally be encrypted. Also a non standard
+>   Dual IO SPI mode can be used to increase speed. The MT8135 also supports
+>   a special feature named "IP Pairing". With IP Pairing the pins of some
+>   SoC internal peripherals can be on the PMIC. The signals of these pins
+>   are routed over the SPI bus using the pwrap bridge. Because of these
+>   optional non SPI conform features the PMIC driver is not implemented as
+>   a SPI bus master driver.
+> 
+> The MT6397 PMIC itself is implemented as a regular mfd device driver which
+> uses regmap to access the PMIC registers.
+> 
+> This series also adds regulator support for the MT6397 PMIC.
+> 
+> The first 6 patches can be merged through the ARM SoC tree. The mfd
+> patch is independent of the first 6 patches and can be merged through the
+> mfd maintainer trees.
+> 
+> Changes since v1:
+> 
+> - document reset bindings for infracfg/pericfg
+> - fix base addresses in infracfg binding example
+> - Remove more Email addresses from Flora Fu (She is not working at
+>   MediaTek anymore, her address is no longer valid)
+> - drop Regulator support patch, it's already in next
+> 
+> Sascha
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
-This poking of the PL310 should live in the cache_l2x0 driver.
-
-Mark.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
