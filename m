@@ -1,240 +1,227 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 26 Jan 2015 13:57:16 +0200
-Subject: [PATCH v5 2/2] clocksource: driver for Conexant Digicolor SoC timer
-In-Reply-To: <cover.1422272518.git.baruch@tkos.co.il>
-References: <cover.1422272518.git.baruch@tkos.co.il>
-Message-ID: <ad84f7155286c45401ff7f6bc6506407cc3beb61.1422272518.git.baruch@tkos.co.il>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Mon, 26 Jan 2015 14:00:43 +0200
+Subject: [next-20150119]regression (mm)?
+In-Reply-To: <20150124043746.GA22262@kahuna>
+References: <20150120001643.7D15AA8@black.fi.intel.com>
+ <20150120114555.GA11502@n2100.arm.linux.org.uk>
+ <20150120140546.DDCB8D4@black.fi.intel.com>
+ <20150123172736.GA15392@kahuna>
+ <CANMBJr7w2jZBwRDEsVNvL3XrDZ2ttwFz7qBf4zySAMMmcgAxiw@mail.gmail.com>
+ <20150123183706.GA15791@kahuna>
+ <20150123202229.GA9038@node.dhcp.inet.fi>
+ <CANMBJr4YOcHj2G7w-gwfoZjQQd=h0Mj59QNBo3ei_=ejYRcdnw@mail.gmail.com>
+ <20150124011311.GB9038@node.dhcp.inet.fi>
+ <20150124043746.GA22262@kahuna>
+Message-ID: <20150126120043.GB25833@node.dhcp.inet.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clocksource driver to the Conexant CX92755 SoC, part of the Digicolor SoCs
-series. Hardware provides 8 timers, A to H. Timer A is dedicated to a future
-watchdog driver so we don't use it here. Use timer B for sched_clock, and timer
-C for clock_event.
+On Fri, Jan 23, 2015 at 10:37:46PM -0600, Nishanth Menon wrote:
+> On 03:13-20150124, Kirill A. Shutemov wrote:
+> > > >> On 09:39-20150123, Tyler Baker wrote:
+> [...]
+> > > >> > I just reviewed the boot logs for next-20150123 and there still seems
+> > > >> > to be a related issue. I've been boot testing
+> > > >> > multi_v7_defconfig+CONFIG_ARM_LPAE=y kernel configurations which still
+> > > >> > seem broken.
+> [...]
+> > Okay, proof of concept patch is below. It's going to break every other
+> > architecture with FIRST_USER_ADDRESS != 0, but I think it's cleaner way to
+> > go.
+> 
+> Testing on my end:
+> 
+> just ran through this set (+ logs similar to Tyler's from my side):
+> 
+> next-20150123 (multi_v7_defconfig == !LPAE)
+>  1:    BeagleBoard-X15(am57xx-evm): BOOT: PASS: http://paste.ubuntu.org.cn/2219449
+>  2:                     dra72x-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2219450
+>  3:                     dra7xx-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2219451
+>  4:                      omap5-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2219452
+> TOTAL = 4 boards, Booted Boards = 4, No Boot boards = 0
+> 
+> next-20150123-LPAE-Logging enabled[1] (multi_v7_defconfig +LPAE)
+>  1:    BeagleBoard-X15(am57xx-evm): BOOT: FAIL: http://paste.ubuntu.org.cn/2220938
+>  2:                     dra72x-evm: BOOT: FAIL: http://paste.ubuntu.org.cn/2220943
+>  3:                     dra7xx-evm: BOOT: FAIL: http://paste.ubuntu.org.cn/2220947
+>  4:                      omap5-evm: BOOT: FAIL: http://paste.ubuntu.org.cn/2220955
+> TOTAL = 4 boards, Booted Boards = 0, No Boot boards = 4
+> 
+> next-20150123-LPAE-new-patch [2] (multi_v7_defconfig + LPAE)
+>  1:    BeagleBoard-X15(am57xx-evm): BOOT: PASS: http://paste.ubuntu.org.cn/2221047
+>  2:                     dra72x-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2221065
+>  3:                     dra7xx-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2221069
+>  4:                      omap5-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2221070
+> TOTAL = 4 boards, Booted Boards = 4, No Boot boards = 0
+> 
+> next-20150123-new-patch[2] (multi_v7_defconfig == !LPAE)
+>  1:                     am335x-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2221277
+>  2:                      am335x-sk: BOOT: PASS: http://paste.ubuntu.org.cn/2221278
+>  3:                      am437x-sk: BOOT: FAIL: http://paste.ubuntu.org.cn/2221279 (unrelated)
+>  4:                    am43xx-epos: BOOT: PASS: http://paste.ubuntu.org.cn/2221280
+>  5:                   am43xx-gpevm: BOOT: PASS: http://paste.ubuntu.org.cn/2221281
+>  6:    BeagleBoard-X15(am57xx-evm): BOOT: PASS: http://paste.ubuntu.org.cn/2221282
+>  7:                 BeagleBoard-XM: BOOT: FAIL: http://paste.ubuntu.org.cn/2221283 (unrelated)
+>  8:            beagleboard-vanilla: BOOT: PASS: http://paste.ubuntu.org.cn/2221284
+>  9:               beaglebone-black: BOOT: PASS: http://paste.ubuntu.org.cn/2221285
+> 10:                     beaglebone: BOOT: FAIL: http://paste.ubuntu.org.cn/2221286 (unrelated)
+> 11:                     dra72x-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2221287
+> 12:                     dra7xx-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2221288
+> 13:                      omap5-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2221289
+> 14:                  pandaboard-es: BOOT: PASS: http://paste.ubuntu.org.cn/2221290
+> 15:             pandaboard-vanilla: BOOT: PASS: http://paste.ubuntu.org.cn/2221291
+> 16:                        sdp4430: BOOT: PASS: http://paste.ubuntu.org.cn/2221292
+> TOTAL = 16 boards, Booted Boards = 13, No Boot boards = 3
+> 
+> next-20150123-new-patch[2] (omap2plus_defconfig)
+>  1:                     am335x-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2221653
+>  2:                      am335x-sk: BOOT: PASS: http://paste.ubuntu.org.cn/2221654
+>  3:                      am437x-sk: BOOT: PASS: http://paste.ubuntu.org.cn/2221656
+>  4:                    am43xx-epos: BOOT: PASS: http://paste.ubuntu.org.cn/2221659
+>  5:                   am43xx-gpevm: BOOT: PASS: http://paste.ubuntu.org.cn/2221660
+>  6:    BeagleBoard-X15(am57xx-evm): BOOT: PASS: http://paste.ubuntu.org.cn/2221661
+>  7:                 BeagleBoard-XM: BOOT: PASS: http://paste.ubuntu.org.cn/2221670
+>  8:            beagleboard-vanilla: BOOT: PASS: http://paste.ubuntu.org.cn/2221676
+>  9:               beaglebone-black: BOOT: PASS: http://paste.ubuntu.org.cn/2221683
+> 10:                     beaglebone: BOOT: PASS: http://paste.ubuntu.org.cn/2221690
+> 11:                     dra72x-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2221692
+> 12:                     dra7xx-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2221695
+> 13:                      omap5-evm: BOOT: PASS: http://paste.ubuntu.org.cn/2221700
+> 14:                  pandaboard-es: BOOT: PASS: http://paste.ubuntu.org.cn/2221704
+> 15:             pandaboard-vanilla: BOOT: PASS: http://paste.ubuntu.org.cn/2221707
+> 16:                        sdp4430: BOOT: PASS: http://paste.ubuntu.org.cn/2221713
+> TOTAL = 16 boards, Booted Boards = 16, No Boot boards = 0
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+Okay thanks. Here's proper patch.
+
+>From 8f9845ab8d972164b700ff3e3ce53484cceb942b Mon Sep 17 00:00:00 2001
+From: "Kirill A. Shutemov" <kirill.shutemov@linux.intel.com>
+Date: Mon, 26 Jan 2015 12:07:54 +0200
+Subject: [PATCH 1/2] mm: fix false-positive warning on exit due mm_nr_pmds(mm)
+
+The problem is that we check nr_ptes/nr_pmds in exit_mmap() which happens
+*before* pgd_free(). And if an arch does pte/pmd allocation in pgd_alloc()
+and frees them in pgd_free() we see offset in counters by the time of the
+checks.
+
+We tried to workaround this by offsetting expected counter value
+according to FIRST_USER_ADDRESS for both nr_pte and nr_pmd in
+exit_mmap(). But it doesn't work in some cases:
+
+1. ARM with LPAE enabled also has non-zero USER_PGTABLES_CEILING, but
+   upper addresses occupied with huge pmd entries, so the trick with
+   offsetting expected counter value will get really ugly: we will have
+   to apply it nr_pmds, but not nr_ptes.
+
+2. Metag has non-zero FIRST_USER_ADDRESS, but doesn't do allocation
+   pte/pmd page tables allocation in pgd_alloc(), just setup a pgd entry
+   which is allocated at boot and shared accross all processes.
+
+The proposal is to move the check to check_mm() which happens *after*
+pgd_free() and do proper accounting during pgd_alloc() and pgd_free()
+which would bring counters to zero if nothing leaked.
+
+Signed-off-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
+Reported-by: Tyler Baker <tyler.baker@linaro.org>
+Tested-by: Nishanth Menon <nm@ti.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: James Hogan <james.hogan@imgtec.com>
+Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
 ---
- drivers/clocksource/Makefile          |   1 +
- drivers/clocksource/timer-digicolor.c | 199 ++++++++++++++++++++++++++++++++++
- 2 files changed, 200 insertions(+)
- create mode 100644 drivers/clocksource/timer-digicolor.c
+ arch/arm/mm/pgd.c       | 4 ++++
+ arch/unicore32/mm/pgd.c | 3 +++
+ kernel/fork.c           | 8 ++++++++
+ mm/mmap.c               | 5 -----
+ 4 files changed, 15 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 94d90b24b56b..a993c108be67 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -10,6 +10,7 @@ obj-$(CONFIG_SH_TIMER_TMU)	+= sh_tmu.o
- obj-$(CONFIG_EM_TIMER_STI)	+= em_sti.o
- obj-$(CONFIG_CLKBLD_I8253)	+= i8253.o
- obj-$(CONFIG_CLKSRC_MMIO)	+= mmio.o
-+obj-$(CONFIG_ARCH_DIGICOLOR)	+= timer-digicolor.o
- obj-$(CONFIG_DW_APB_TIMER)	+= dw_apb_timer.o
- obj-$(CONFIG_DW_APB_TIMER_OF)	+= dw_apb_timer_of.o
- obj-$(CONFIG_CLKSRC_NOMADIK_MTU)	+= nomadik-mtu.o
-diff --git a/drivers/clocksource/timer-digicolor.c b/drivers/clocksource/timer-digicolor.c
-new file mode 100644
-index 000000000000..7f8388cfa810
---- /dev/null
-+++ b/drivers/clocksource/timer-digicolor.c
-@@ -0,0 +1,199 @@
-+/*
-+ * Conexant Digicolor timer driver
-+ *
-+ * Author: Baruch Siach <baruch@tkos.co.il>
-+ *
-+ * Copyright (C) 2014 Paradox Innovation Ltd.
-+ *
-+ * Based on:
-+ *	Allwinner SoCs hstimer driver
-+ *
-+ * Copyright (C) 2013 Maxime Ripard
-+ *
-+ * Maxime Ripard <maxime.ripard@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
+diff --git a/arch/arm/mm/pgd.c b/arch/arm/mm/pgd.c
+index 249379535be2..a3681f11dd9f 100644
+--- a/arch/arm/mm/pgd.c
++++ b/arch/arm/mm/pgd.c
+@@ -97,6 +97,7 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
+ 
+ no_pte:
+ 	pmd_free(mm, new_pmd);
++	mm_dec_nr_pmds(mm);
+ no_pmd:
+ 	pud_free(mm, new_pud);
+ no_pud:
+@@ -130,9 +131,11 @@ void pgd_free(struct mm_struct *mm, pgd_t *pgd_base)
+ 	pte = pmd_pgtable(*pmd);
+ 	pmd_clear(pmd);
+ 	pte_free(mm, pte);
++	atomic_long_dec(&mm->nr_ptes);
+ no_pmd:
+ 	pud_clear(pud);
+ 	pmd_free(mm, pmd);
++	mm_dec_nr_pmds(mm);
+ no_pud:
+ 	pgd_clear(pgd);
+ 	pud_free(mm, pud);
+@@ -152,6 +155,7 @@ no_pgd:
+ 		pmd = pmd_offset(pud, 0);
+ 		pud_clear(pud);
+ 		pmd_free(mm, pmd);
++		mm_dec_nr_pmds(mm);
+ 		pgd_clear(pgd);
+ 		pud_free(mm, pud);
+ 	}
+diff --git a/arch/unicore32/mm/pgd.c b/arch/unicore32/mm/pgd.c
+index 08b8d4295e70..1bc00d0305d4 100644
+--- a/arch/unicore32/mm/pgd.c
++++ b/arch/unicore32/mm/pgd.c
+@@ -69,6 +69,7 @@ pgd_t *get_pgd_slow(struct mm_struct *mm)
+ 
+ no_pte:
+ 	pmd_free(mm, new_pmd);
++	mm_dec_nr_pmds(mm);
+ no_pmd:
+ 	free_pages((unsigned long)new_pgd, 0);
+ no_pgd:
+@@ -96,7 +97,9 @@ void free_pgd_slow(struct mm_struct *mm, pgd_t *pgd)
+ 	pte = pmd_pgtable(*pmd);
+ 	pmd_clear(pmd);
+ 	pte_free(mm, pte);
++	atomic_long_dec(&mm->nr_ptes);
+ 	pmd_free(mm, pmd);
++	mm_dec_nr_pmds(mm)
+ free:
+ 	free_pages((unsigned long) pgd, 0);
+ }
+diff --git a/kernel/fork.c b/kernel/fork.c
+index c99098c52641..76d6f292274c 100644
+--- a/kernel/fork.c
++++ b/kernel/fork.c
+@@ -606,6 +606,14 @@ static void check_mm(struct mm_struct *mm)
+ 			printk(KERN_ALERT "BUG: Bad rss-counter state "
+ 					  "mm:%p idx:%d val:%ld\n", mm, i, x);
+ 	}
 +
-+/*
-+ * Conexant Digicolor SoCs have 8 configurable timers, named from "Timer A" to
-+ * "Timer H". Timer A is the only one with watchdog support, so it is dedicated
-+ * to the watchdog driver. This driver uses Timer B for sched_clock(), and
-+ * Timer C for clockevents.
-+ */
++	if (atomic_long_read(&mm->nr_ptes))
++		pr_alert("BUG: non-zero nr_ptes on freeing mm: %ld",
++				atomic_long_read(&mm->nr_ptes));
++	if (mm_nr_pmds(mm))
++		pr_alert("BUG: non-zero nr_pmds on freeing mm: %ld",
++				mm_nr_pmds(mm));
 +
-+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-+
-+#include <linux/clk.h>
-+#include <linux/clockchips.h>
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/irqreturn.h>
-+#include <linux/sched_clock.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+
-+enum {
-+	TIMER_A,
-+	TIMER_B,
-+	TIMER_C,
-+	TIMER_D,
-+	TIMER_E,
-+	TIMER_F,
-+	TIMER_G,
-+	TIMER_H,
-+};
-+
-+#define CONTROL(t)	((t)*8)
-+#define COUNT(t)	((t)*8 + 4)
-+
-+#define CONTROL_DISABLE		0
-+#define CONTROL_ENABLE		BIT(0)
-+#define CONTROL_MODE(m)		((m) << 4)
-+#define CONTROL_MODE_ONESHOT	CONTROL_MODE(1)
-+#define CONTROL_MODE_PERIODIC	CONTROL_MODE(2)
-+
-+struct digicolor_timer {
-+	struct clock_event_device ce;
-+	void __iomem *base;
-+	u32 ticks_per_jiffy;
-+	int timer_id; /* one of TIMER_* */
-+};
-+
-+struct digicolor_timer *dc_timer(struct clock_event_device *ce)
-+{
-+	return container_of(ce, struct digicolor_timer, ce);
-+}
-+
-+static inline void dc_timer_disable(struct clock_event_device *ce)
-+{
-+	struct digicolor_timer *dt = dc_timer(ce);
-+	writeb(CONTROL_DISABLE, dt->base + CONTROL(dt->timer_id));
-+}
-+
-+static inline void dc_timer_enable(struct clock_event_device *ce, u32 mode)
-+{
-+	struct digicolor_timer *dt = dc_timer(ce);
-+	writeb(CONTROL_ENABLE | mode, dt->base + CONTROL(dt->timer_id));
-+}
-+
-+static inline void dc_timer_set_count(struct clock_event_device *ce,
-+				      unsigned long count)
-+{
-+	struct digicolor_timer *dt = dc_timer(ce);
-+	writel(count, dt->base + COUNT(dt->timer_id));
-+}
-+
-+static void digicolor_clkevt_mode(enum clock_event_mode mode,
-+				  struct clock_event_device *ce)
-+{
-+	struct digicolor_timer *dt = dc_timer(ce);
-+
-+	switch (mode) {
-+	case CLOCK_EVT_MODE_PERIODIC:
-+		dc_timer_disable(ce);
-+		dc_timer_set_count(ce, dt->ticks_per_jiffy);
-+		dc_timer_enable(ce, CONTROL_MODE_PERIODIC);
-+		break;
-+	case CLOCK_EVT_MODE_ONESHOT:
-+		dc_timer_disable(ce);
-+		dc_timer_enable(ce, CONTROL_MODE_ONESHOT);
-+		break;
-+	case CLOCK_EVT_MODE_UNUSED:
-+	case CLOCK_EVT_MODE_SHUTDOWN:
-+	default:
-+		dc_timer_disable(ce);
-+		break;
-+	}
-+}
-+
-+static int digicolor_clkevt_next_event(unsigned long evt,
-+				       struct clock_event_device *ce)
-+{
-+	dc_timer_disable(ce);
-+	dc_timer_set_count(ce, evt);
-+	dc_timer_enable(ce, CONTROL_MODE_ONESHOT);
-+
-+	return 0;
-+}
-+
-+static struct digicolor_timer dc_timer_dev = {
-+	.ce = {
-+		.name = "digicolor_tick",
-+		.rating = 340,
-+		.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-+		.set_mode = digicolor_clkevt_mode,
-+		.set_next_event = digicolor_clkevt_next_event,
-+	},
-+	.timer_id = TIMER_C,
-+};
-+
-+static irqreturn_t digicolor_timer_interrupt(int irq, void *dev_id)
-+{
-+	struct clock_event_device *evt = dev_id;
-+
-+	evt->event_handler(evt);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static u64 digicolor_timer_sched_read(void)
-+{
-+	return ~readl(dc_timer_dev.base + COUNT(TIMER_B));
-+}
-+
-+static void __init digicolor_timer_init(struct device_node *node)
-+{
-+	unsigned long rate;
-+	struct clk *clk;
-+	int ret, irq;
-+
-+	/*
-+	 * timer registers are shared with the watchdog timer;
-+	 * don't map exclusively
-+	 */
-+	dc_timer_dev.base = of_iomap(node, 0);
-+	if (!dc_timer_dev.base) {
-+		pr_err("Can't map registers");
-+		return;
-+	}
-+
-+	irq = irq_of_parse_and_map(node, dc_timer_dev.timer_id);
-+	if (irq <= 0) {
-+		pr_err("Can't parse IRQ");
-+		return;
-+	}
-+
-+	clk = of_clk_get(node, 0);
-+	if (IS_ERR(clk)) {
-+		pr_err("Can't get timer clock");
-+		return;
-+	}
-+	clk_prepare_enable(clk);
-+	rate = clk_get_rate(clk);
-+	dc_timer_dev.ticks_per_jiffy = DIV_ROUND_UP(rate, HZ);
-+
-+	writeb(CONTROL_DISABLE, dc_timer_dev.base + CONTROL(TIMER_B));
-+	writel(UINT_MAX, dc_timer_dev.base + COUNT(TIMER_B));
-+	writeb(CONTROL_ENABLE, dc_timer_dev.base + CONTROL(TIMER_B));
-+
-+	sched_clock_register(digicolor_timer_sched_read, 32, rate);
-+	clocksource_mmio_init(dc_timer_dev.base + COUNT(TIMER_B), node->name,
-+			      rate, 340, 32, clocksource_mmio_readl_down);
-+
-+	ret = request_irq(irq, digicolor_timer_interrupt,
-+			  IRQF_TIMER | IRQF_IRQPOLL, "digicolor_timerC",
-+			  &dc_timer_dev.ce);
-+	if (ret)
-+		pr_warn("request of timer irq %d failed (%d)\n", irq, ret);
-+
-+	dc_timer_dev.ce.cpumask = cpu_possible_mask;
-+	dc_timer_dev.ce.irq = irq;
-+
-+	clockevents_config_and_register(&dc_timer_dev.ce, rate, 0, 0xffffffff);
-+}
-+CLOCKSOURCE_OF_DECLARE(conexant_digicolor, "cnxt,cx92755-timer",
-+		       digicolor_timer_init);
+ #if defined(CONFIG_TRANSPARENT_HUGEPAGE) && !USE_SPLIT_PMD_PTLOCKS
+ 	VM_BUG_ON_MM(mm->pmd_huge_pte, mm);
+ #endif
+diff --git a/mm/mmap.c b/mm/mmap.c
+index 6a7d36d133fb..c5f44682c0d1 100644
+--- a/mm/mmap.c
++++ b/mm/mmap.c
+@@ -2851,11 +2851,6 @@ void exit_mmap(struct mm_struct *mm)
+ 		vma = remove_vma(vma);
+ 	}
+ 	vm_unacct_memory(nr_accounted);
+-
+-	WARN_ON(atomic_long_read(&mm->nr_ptes) >
+-			round_up(FIRST_USER_ADDRESS, PMD_SIZE) >> PMD_SHIFT);
+-	WARN_ON(mm_nr_pmds(mm) >
+-			round_up(FIRST_USER_ADDRESS, PUD_SIZE) >> PUD_SHIFT);
+ }
+ 
+ /* Insert vm structure into process list sorted by address
 -- 
-2.1.4
+ Kirill A. Shutemov
