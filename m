@@ -1,40 +1,49 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 26 Jan 2015 09:45:07 -0800
-Subject: [PATCH 1/2] mmc: core: use card pointer as the first parameter of
- execute_tuning()
-In-Reply-To: <CAPDyKFp=5epMggHu0+u_LU7ETujcoeP2xOpB7iD6JF2bs8BnEA@mail.gmail.com>
-References: <1422271175-19445-1-git-send-email-addy.ke@rock-chips.com>
- <1422271175-19445-2-git-send-email-addy.ke@rock-chips.com>
- <CAPDyKFp=5epMggHu0+u_LU7ETujcoeP2xOpB7iD6JF2bs8BnEA@mail.gmail.com>
-Message-ID: <CAD=FV=X9x0gW5TyLi4ERm8nxixQB__Y=5bRAtOax-_w+T33rCg@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 26 Jan 2015 18:45:24 +0100
+Subject: [PATCH] ARM: shmobile: R-Car Gen2: CONFIG_COMMON_CLK is always set
+In-Reply-To: <54C66EF9.10103@cogentembedded.com>
+References: <1422289274-20605-1-git-send-email-geert+renesas@glider.be>
+ <54C66EF9.10103@cogentembedded.com>
+Message-ID: <CAMuHMdVkCSWNXTfozS9oSKLB8OtHY4NUjMf3nMtDDJ-s4Co3Qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ulf,
-
-On Mon, Jan 26, 2015 at 7:15 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 26 January 2015 at 12:19, Addy Ke <addy.ke@rock-chips.com> wrote:
->> We need to take the card pointer in execute_tuning() for mmc_send_status(),
+On Mon, Jan 26, 2015 at 5:44 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+>> diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c
+>> b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+>> index e2b9bb46393d898d..aa3339258d9c0232 100644
+>> --- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
+>> +++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+>> @@ -51,9 +51,7 @@ u32 rcar_gen2_read_mode_pins(void)
+>>
+>>   void __init rcar_gen2_timer_init(void)
+>>   {
+>> -#if defined(CONFIG_ARM_ARCH_TIMER) || defined(CONFIG_COMMON_CLK)
 >
-> mmc_send_status() is an mmc core function, not intended for host's to call.
 >
->> but mmc->card is NULL in tuning state. So we need change the first parameter
->> of execute_tuning() to card pointer(struct mmc_card * card).
+>    Is CONFIG_ARM_ARCH_TIMER always defined too? I guess not...
+
+Nope...
+
+("x || true" == "true")
+
+>>         u32 mode = rcar_gen2_read_mode_pins();
+>> -#endif
+>>   #ifdef CONFIG_ARM_ARCH_TIMER
 >
-> So, why do we need this?
+>
+>    ... or you would have removed this as well?
 
-I asked Addy to post upstream against mmc_send_tuning(), but I guess
-he didn't (he posted against Alex's NAKed patch instead).
+... and if it would, that could have been a separate change ;-)
 
-...when I talked to him about it, Addy was asserting that when tuning
-fails it is important (at least on dw_mmc on rk3288) that we wait for
-the card to stop being busy and that the way to detect was using
-mmc_send_status().
+Gr{oetje,eeting}s,
 
-That would mean that against upstream you'd need to change
-mmc_send_tuning() to take in the card as well (or move the "host->card
-= card" assignment to before UHS init, which seems less desirable?)
+                        Geert
 
-What do you think about that?  Is there a better solution?
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
--Doug
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
