@@ -1,59 +1,44 @@
 From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
-Date: Mon, 26 Jan 2015 09:22:23 -0700
-Subject: [PATCH 7/9] coresight: fixing CPU hwid lookup in device tree
+Date: Mon, 26 Jan 2015 09:22:21 -0700
+Subject: [PATCH 5/9] coresight: fix the debug AMBA bus name
 In-Reply-To: <1422289345-2084-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1422289345-2084-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1422289345-2084-8-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1422289345-2084-6-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mathieu Poirier <mathieu.poirier@linaro.org>
+From: Kaixu Xia <xiakaixu@huawei.com>
 
-Some DT specification will represent CPU nodes with address
-cells greater than one, making the current code fail.  Using
-the proper retrieval helper function ensure the correct hwid
-for CPUs is read properly with different address cell size.
+The right debug AMBA bus name should be APB(Advanced Peripheral Bus),
+so just fix it.
 
+Signed-off-by: Kaixu Xia <xiakaixu@huawei.com>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/coresight/of_coresight.c | 16 +++++++++-------
- 1 file changed, 9 insertions(+), 7 deletions(-)
+ Documentation/trace/coresight.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/coresight/of_coresight.c b/drivers/coresight/of_coresight.c
-index 9a5ff56f34d9..c3efa418a86d 100644
---- a/drivers/coresight/of_coresight.c
-+++ b/drivers/coresight/of_coresight.c
-@@ -117,7 +117,7 @@ struct coresight_platform_data *of_get_coresight_platform_data(
- 	struct coresight_platform_data *pdata;
- 	struct of_endpoint endpoint, rendpoint;
- 	struct device *rdev;
--	struct device_node *cpu;
-+	struct device_node *dn;
- 	struct device_node *ep = NULL;
- 	struct device_node *rparent = NULL;
- 	struct device_node *rport = NULL;
-@@ -186,14 +186,16 @@ struct coresight_platform_data *of_get_coresight_platform_data(
+diff --git a/Documentation/trace/coresight.txt b/Documentation/trace/coresight.txt
+index bba7dbfc49ed..02361552a3ea 100644
+--- a/Documentation/trace/coresight.txt
++++ b/Documentation/trace/coresight.txt
+@@ -46,7 +46,7 @@ At typical coresight system would look like this:
+   | |   .        | !   | |   .        | !      | !        .   |      | SWD/
+   | |   .        | !   | |   .        | !      | !        .   |      | JTAG
+   *****************************************************************<-|
+- *************************** AMBA Debug ABP ************************
++ *************************** AMBA Debug APB ************************
+   *****************************************************************
+    |    .          !         .          !        !        .    |
+    |    .          *         .          *        *        .    |
+@@ -79,7 +79,7 @@ At typical coresight system would look like this:
+           To trace port                       TPIU= Trace Port Interface Unit
+                                               SWD = Serial Wire Debug
  
- 	/* Affinity defaults to CPU0 */
- 	pdata->cpu = 0;
--	cpu = of_parse_phandle(node, "cpu", 0);
--	if (cpu) {
--		const u32 *mpidr;
-+	dn = of_parse_phandle(node, "cpu", 0);
-+	if (dn) {
-+		const u32 *cell;
- 		int len, index;
-+		u64 hwid;
+-While on target configuration of the components is done via the ABP bus,
++While on target configuration of the components is done via the APB bus,
+ all trace data are carried out-of-band on the ATB bus.  The CTM provides
+ a way to aggregate and distribute signals between CoreSight components.
  
--		mpidr = of_get_property(cpu, "reg", &len);
--		if (mpidr && len == 4) {
--			index = get_logical_index(be32_to_cpup(mpidr));
-+		cell = of_get_property(dn, "reg", &len);
-+		if (cell) {
-+			hwid = of_read_number(cell, of_n_addr_cells(dn));
-+			index = get_logical_index(hwid);
- 			if (index != -EINVAL)
- 				pdata->cpu = index;
- 		}
 -- 
 1.9.1
