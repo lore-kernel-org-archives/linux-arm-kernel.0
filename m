@@ -1,47 +1,57 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 26 Jan 2015 11:13:58 +0000
-Subject: [PATCH 2/4] ARM: sti: stih407-family: Provide Clock Domain information
+Date: Mon, 26 Jan 2015 11:14:00 +0000
+Subject: [PATCH 4/4] clk: dt: st: Introduce clock domain documentation
 In-Reply-To: <1422270840-3039-1-git-send-email-lee.jones@linaro.org>
 References: <1422270840-3039-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1422270840-3039-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <1422270840-3039-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Certain clocks should not be turned of by clk_disable_unused.  Until
-now we have been using the kernel command-line of the same name to
-prevent common clk from turning off all clocks without a reference,
-as this would ensure hardware lockup.  This patch lists each clock
-which need to stay on to prevent the aforementioned issue from
-arising.
-
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/stih407-family.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ .../devicetree/bindings/clock/st/st,clk-domain.txt | 34 ++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/st/st,clk-domain.txt
 
-diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-index 3e31d32..0478b41 100644
---- a/arch/arm/boot/dts/stih407-family.dtsi
-+++ b/arch/arm/boot/dts/stih407-family.dtsi
-@@ -34,6 +34,19 @@
- 		reg = <0x08761000 0x1000>, <0x08760100 0x100>;
- 	};
- 
-+	clk-domain {
-+		compatible = "st,clk-domain";
-+		clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>,
-+			 <&clk_s_c0_flexgen CLK_COMPO_DVP>,
-+			 <&clk_s_c0_flexgen CLK_MMC_1>,
-+			 <&clk_s_c0_flexgen CLK_ICN_SBC>,
-+			 <&clk_s_c0_flexgen CLK_ICN_LMI>,
-+			 <&clk_s_c0_flexgen CLK_ICN_CPU>,
-+			 <&clk_s_c0_flexgen CLK_TX_ICN_DMU>,
-+			 <&clk_s_a0_flexgen CLK_IC_LMI0>,
-+			 <&clk_m_a9>;
-+	};
+diff --git a/Documentation/devicetree/bindings/clock/st/st,clk-domain.txt b/Documentation/devicetree/bindings/clock/st/st,clk-domain.txt
+new file mode 100644
+index 0000000..7309937
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/st/st,clk-domain.txt
+@@ -0,0 +1,34 @@
++STMicroelectronics Clock Domain
 +
- 	scu at 08760000 {
- 		compatible = "arm,cortex-a9-scu";
- 		reg = <0x08760000 0x1000>;
++ST hardware have a bunch of clocks which must not be turned off.
++If drivers a) fail to obtain a reference to any of these or b) give
++up a previously obtained reference during suspend, the common clk
++framework will attempt to turn them off and the hardware will
++subsequently die.  The only way to recover from this failure is to
++restart.
++
++To avoid either of these two scenarios from catastrophically
++disabling the running system we have implemented a clock domain
++where clocks are consumed and references are taken, thus preventing
++them from being shut down by the framework.
++
++We use the generic clock bindings found in:
++  Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++Required properties:
++- compatible : Must be "st,clk-domain"
++
++Example:
++
++clk-domain {
++	compatible = "st,clk-domain";
++	clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>,
++		 <&clk_s_c0_flexgen CLK_COMPO_DVP>,
++		 <&clk_s_c0_flexgen CLK_MMC_1>,
++		 <&clk_s_c0_flexgen CLK_ICN_SBC>,
++		 <&clk_s_c0_flexgen CLK_ICN_LMI>,
++		 <&clk_s_c0_flexgen CLK_ICN_CPU>,
++		 <&clk_s_c0_flexgen CLK_TX_ICN_DMU>,
++		 <&clk_s_a0_flexgen CLK_IC_LMI0>,
++		 <&clk_m_a9>;
++};
 -- 
 1.9.1
