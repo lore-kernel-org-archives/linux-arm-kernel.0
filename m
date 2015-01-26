@@ -1,100 +1,109 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 26 Jan 2015 11:13:59 +0000
-Subject: [PATCH 3/4] clk: st: Provide a clock domain
-In-Reply-To: <1422270840-3039-1-git-send-email-lee.jones@linaro.org>
-References: <1422270840-3039-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1422270840-3039-4-git-send-email-lee.jones@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 26 Jan 2015 12:15:55 +0100
+Subject: [PATCH 4/4] ARM: dts: Add initial support for Alpine platform
+In-Reply-To: <54c53663.0OSd3sO9f1oYd3El%tsahee@annapurnalabs.com>
+References: <54c53663.0OSd3sO9f1oYd3El%tsahee@annapurnalabs.com>
+Message-ID: <36490364.POE8pPlYQh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ST's h/w contains clocks which if turned off would prove fatal.  The
-only way to recover is to restart the board(s).  This driver takes
-references to clocks which are required to be always-on in order to
-prevent the common clk framework from trying to turn them off during
-the clk_disabled_unused() procedure.
+On Sunday 25 January 2015 20:30:59 Tsahee Zidenberg wrote:
+> This patch introduces an initial device-tree for the Alpine platform.
+> 
+> Signed-off-by: Barak Wasserstrom <barak@annapurnalabs.com>
+> Signed-off-by: Tsahee Zidenberg <tsahee@annapurnalabs.com>
+> ---
+>  .../bindings/arm/annapurna-labs,alpine.txt         |  96 +++++++++++
+>  .../cpu-enable-method/annapurna-labs,alpine-smp    |  64 ++++++++
+>  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+>  arch/arm/boot/dts/Makefile                         |   2 +
+>  arch/arm/boot/dts/alpine.dts                       | 181 +++++++++++++++++++++
+>  5 files changed, 344 insertions(+)
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/clk/st/Makefile     |  2 +-
- drivers/clk/st/clk-domain.c | 63 +++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 64 insertions(+), 1 deletion(-)
- create mode 100644 drivers/clk/st/clk-domain.c
+I'd suggest splitting this into two patches.
 
-diff --git a/drivers/clk/st/Makefile b/drivers/clk/st/Makefile
-index ede7b2f..ac09be6 100644
---- a/drivers/clk/st/Makefile
-+++ b/drivers/clk/st/Makefile
-@@ -1 +1 @@
--obj-y += clkgen-mux.o clkgen-pll.o clkgen-fsyn.o clk-flexgen.o
-+obj-y += clkgen-mux.o clkgen-pll.o clkgen-fsyn.o clk-flexgen.o clk-domain.o
-diff --git a/drivers/clk/st/clk-domain.c b/drivers/clk/st/clk-domain.c
-new file mode 100644
-index 0000000..e34049b
---- /dev/null
-+++ b/drivers/clk/st/clk-domain.c
-@@ -0,0 +1,63 @@
-+/*
-+ * ST Clock Domain
-+ *
-+ * Copyright (C) 2015 STMicroelectronics ? All Rights Reserved
-+ *
-+ * Author: Lee Jones <lee.jones@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#include <linux/clk-private.h>
-+#include <linux/clk-provider.h>
-+#include <linux/of_address.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+
-+static void st_clk_domain_hog_clock(struct platform_device *pdev, int index)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct clk *clk;
-+	int ret;
-+
-+	clk = of_clk_get(np, index);
-+	if (IS_ERR(clk)) {
-+		dev_warn(&pdev->dev, "Failed get clock %s[%d]: %li\n",
-+			 np->full_name, index, PTR_ERR(clk));
-+		return;
-+	}
-+
-+	ret = clk_prepare_enable(clk);
-+	if (ret)
-+		dev_warn(&pdev->dev, "Failed to enable clock: %s\n", clk->name);
-+}
-+
-+static int st_clk_domain_probe(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	int nclks, i;
-+
-+	nclks = of_count_phandle_with_args(np, "clocks", "#clock-cells");
-+
-+	for (i = 0; i < nclks; i++)
-+		st_clk_domain_hog_clock(pdev, i);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id st_clk_domain_match[] = {
-+	{ .compatible = "st,clk-domain" },
-+	{ },
-+};
-+
-+static struct platform_driver st_clk_domain_driver = {
-+	.probe = st_clk_domain_probe,
-+	.driver = {
-+		.name = "st-clk-domain",
-+		.of_match_table = st_clk_domain_match,
-+	},
-+};
-+module_platform_driver(st_clk_domain_driver);
--- 
-1.9.1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/annapurna-labs,alpine.txt
+> @@ -0,0 +1,96 @@
+> +Annapurna Labs Alpine Platform Device Tree Bindings
+> +---------------------------------------------------------------
+> +
+> +Boards in the Alpine family shall have the following properties:
+> +
+> +* Required root node properties:
+> +compatible: must contain "annapurna-labs,alpine"
+> +
+> +* Example:
+> +
+> +/ {
+> +	model = "Annapurna Labs Alpine Dev Board";
+> +	compatible = "annapurna-labs,alpine";
+> +
+> +	...
+> +}
+> +
+> +* CPU node:
+> +
+> +The Alpine platform includes cortex-a15 cores.
+> +enable-method: must be "annapurna-labs,alpine-smp" to allow smp  [1]
+
+Any reason for not using PSCI on this platform?
+
+> diff --git a/arch/arm/boot/dts/alpine.dts b/arch/arm/boot/dts/alpine.dts
+> new file mode 100644
+> index 0000000..fa0da66
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/alpine.dts
+
+Most people split this into one .dtsi file for the SoC and one .dts file
+for a specific machine, to reduce the amount of duplication when there
+are multiple machines that use the same chip.
+
+> @@ -0,0 +1,181 @@
+> +/*
+> + * Copyright 2015 Annapurna Labs Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along with
+> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+
+If you don't mind, please use a dual license for the dts file, to allow
+distributing the file with other OSs that might to run on the same
+hardware.
+
+> +/dts-v1/;
+> +
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +#include "skeleton64.dtsi"
+> +
+> +/ {
+> +	version = "2.4";
+
+This is not documented anywhere.
+
+> +	compatible = "annapurna-labs,alpine";
+> +	#address-cells = <2>;
+> +	#size-cells = <2>;
+> +	clock-ranges;
+
+No "model" property?
+
+> +		/* North Bridge Service Registers */
+> +		nb_service {
+> +			compatible = "annapurna-labs,al-sysfabric-service";
+> +			reg = <0x0 0xfb070000 0x0 0x10000>;
+> +		};
+
+What kinds of other registers are there in this device? Should it
+be marked as "syscon" so you can use it through a regmap?
+
+	Arnd
