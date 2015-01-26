@@ -1,138 +1,108 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 26 Jan 2015 08:24:03 -0800
-Subject: [PATCH] pinctrl: rockchip: Only mask interrupts; never disable
-Message-ID: <1422289444-15142-1-git-send-email-dianders@chromium.org>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Mon, 26 Jan 2015 08:23:55 -0800
+Subject: [PATCH v3] ARM: zynq: DT: Add USB to device tree
+In-Reply-To: <54C6698F.5020301@suse.de>
+References: <1417536431-27759-1-git-send-email-soren.brinkmann@xilinx.com>
+ <d78fedd84f354d80985187f851cb3cd1@BN1AFFO11FD055.protection.gbl>
+ <54C5F89A.3090901@suse.de> <54C5F965.90100@monstr.eu>
+ <54C5FBC3.7030903@suse.de> <54C60A56.7010403@suse.de>
+ <c65880cef67945ebaf61306febc1349b@BN1BFFO11FD010.protection.gbl>
+ <54C6698F.5020301@suse.de>
+Message-ID: <8f367d9b85924f8e9cc9cb6fdff9a054@BN1BFFO11FD040.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Rockchip GPIO interrupt controller totally throws away all status
-about an interrupt when you "disable" the interrupt.  That has
-unfortunate consequences in the following situation:
+On Mon, 2015-01-26 at 05:21PM +0100, Andreas F?rber wrote:
+> Am 26.01.2015 um 16:50 schrieb S?ren Brinkmann:
+> > On Mon, 2015-01-26 at 10:35AM +0100, Andreas F?rber wrote:
+> >> Am 26.01.2015 um 09:33 schrieb Andreas F?rber:
+> >>> Am 26.01.2015 um 09:23 schrieb Michal Simek:
+> >>>> On 01/26/2015 09:19 AM, Andreas F?rber wrote:
+> >>>>> And if I apply it to my -next based tree, adding corresponding nodes to
+> >>>>> zynq-parallella.dts, I get repeatedly:
+> >>>>>
+> >>>>> [  +0,012242] ci_hdrc ci_hdrc.0: no of_node; not parsing pinctrl DT
+> >>>>> [  +0,000157] ci_hdrc ci_hdrc.0: ChipIdea HDRC found, lpm: 0; cap:
+> >>>>> f090e100 op: f090e140
+> >>>>> [  +0,000081] platform ci_hdrc.0: Driver ci_hdrc requests probe deferral
+> >>>>> [  +0,005360] ci_hdrc ci_hdrc.1: no of_node; not parsing pinctrl DT
+> >>>>> [  +0,000120] ci_hdrc ci_hdrc.1: ChipIdea HDRC found, lpm: 0; cap:
+> >>>>> f0910100 op: f0910140
+> >>>>> [  +0,001810] platform ci_hdrc.1: Driver ci_hdrc requests probe deferral
+> >>>>>
+> >>>>> Am I missing any other patches or config options?
+> >>>>> (I do notice that the pinctrl v3 patch that got merged has a trivial bug
+> >>>>> for usb0, for which I'll send a patch later on.)
+> >>>>
+> >>>> Why is it deferred? Is it because of pinmuxing stuff?
+> >>>
+> >>> No, happened without as well.
+> >>>
+> >>> Looking at a different place in dmesg, I spot this:
+> >>>
+> >>> [  +0,003988] usb_phy_generic phy0: GPIO lookup for consumer reset-gpios
+> >>> [  +0,000012] usb_phy_generic phy0: using device tree for GPIO lookup
+> >>> [  +0,000015] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpios'
+> >>> property
+> >>>  of node '/phy0[0]'
+> >>> [  +0,000013] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpio'
+> >>> property
+> >>> of node '/phy0[0]'
+> >>> [  +0,000010] usb_phy_generic phy0: using lookup tables for GPIO lookup
+> >>> [  +0,000153] usb_phy_generic phy0: lookup for GPIO reset-gpios failed
+> >>> [  +0,000012] usb_phy_generic phy0: Error requesting RESET GPIO
+> >>> [  +0,004360] usb_phy_generic: probe of phy0 failed with error -2
+> >>> [  +0,004991] usb_phy_generic phy1: GPIO lookup for consumer reset-gpios
+> >>> [  +0,000012] usb_phy_generic phy1: using device tree for GPIO lookup
+> >>> [  +0,000013] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpios'
+> >>> property
+> >>>  of node '/phy1[0]'
+> >>> [  +0,000013] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpio'
+> >>> property of node '/phy1[0]'
+> >>> [  +0,000010] usb_phy_generic phy1: using lookup tables for GPIO lookup
+> >>> [  +0,000012] usb_phy_generic phy1: lookup for GPIO reset-gpios failed
+> >>> [  +0,000011] usb_phy_generic phy1: Error requesting RESET GPIO
+> >>> [  +0,004337] usb_phy_generic: probe of phy1 failed with error -2
+> >>>
+> >>> So, I guess the chipidea driver is deferring because the phys want a
+> >>> property that neither me nor you are specifying? Would that be the two
+> >>> MDIO pins 52 and 53 that would need to be specified?
+> >>
+> >> Erm, scratch that last question - wrong PHY. Trying it resolved the
+> >> above phy errors but not the original problem. And so does an empty one:
+> >>
+> >> @@ -99,11 +100,13 @@
+> >>
+> >>         usb_phy0: phy0 {
+> >>                 compatible = "usb-nop-xceiv";
+> >> +               reset-gpios = <>;
+> >>                 #phy-cells = <0>;
+> >>         };
+> >>
+> >>         usb_phy1: phy1 {
+> >>                 compatible = "usb-nop-xceiv";
+> >> +               reset-gpios = <>;
+> >>                 #phy-cells = <0>;
+> >>         };
+> >>  };
+> >>
+> >> In my manuals and notes I can't find any GPIO being used as reset for
+> >> the USB PHYs. Any thoughts appreciated.
+> > 
+> > Such a connection is optional. The platform might rely on its reset
+> > circuit, though it might not work for warm reboots.
+> > I haven't looked at parallela docs, but if there is a schematic
+> > available, that should tell you if/what is connected to the PHY reset
+> > pin.
+> 
+> I do have the schematic, and the way I read it, only the on-board reset
+> button resets the PHYs.
+> 
+> Yet it looks as if usb-nop-xceiv insists on a reset-gpios above, no?
+> Does it work on your boards with linux-next?
 
-1. An edge-triggered interrupt is enabled and should wake the system.
-2. System suspend happens: interrupt is disabled and marked for wake.
-3. rockchip_irq_suspend() reenables the interrupt so we can wake.
-4. Interrupt happens when asleep.
-5. rockchip_irq_resume() redisables the interrupt.
-6. Disabling the interrupt throws away all status about it.
-7. Normal system resume happens and we enable the interrupt again,
-   since we threw away status about the interrupt we don't know it
-   fired while suspended.  Even worse: if we need both edges of the
-   interrupt the logic to swap edges never runs.
+I haven't re-tested it since I submitted the patches, but at that time
+it worked. But I also didn't test USB with the pinctrl patches together.
+I'll do some testing later today.
 
-Note: even if we somehow can post the status about wakeup interrupts
-in rockchip_irq_resume() we would still have a window of losing any
-edges that came in while interrupts were disabled.
-
-If we use mask only then we don't need to worry.  The GPIO Interrupt
-controller keeps track of pending interrupts that are enabled and just
-masked.
-
-There was no real strong reason to support the enable/disable
-functionality (other than that it seemed right), so let's go back to
-just supporting mask/unmask but actually map it to the real
-mask/unmask.  This ends up with slightly different (and more correct)
-behavior than before (f2dd028 pinctrl: rockchip: Fix
-enable/disable/mask/unmask).
-
-Signed-off-by: Doug Anderson <dianders@chromium.org>
----
- drivers/pinctrl/pinctrl-rockchip.c | 48 +++++++++++---------------------------
- 1 file changed, 13 insertions(+), 35 deletions(-)
-
-diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
-index d144330..dee7d5f 100644
---- a/drivers/pinctrl/pinctrl-rockchip.c
-+++ b/drivers/pinctrl/pinctrl-rockchip.c
-@@ -89,7 +89,7 @@ struct rockchip_iomux {
-  * @reg_pull: optional separate register for additional pull settings
-  * @clk: clock of the gpio bank
-  * @irq: interrupt of the gpio bank
-- * @saved_enables: Saved content of GPIO_INTEN at suspend time.
-+ * @saved_masks: Saved content of GPIO_INTEN at suspend time.
-  * @pin_base: first pin number
-  * @nr_pins: number of pins in this bank
-  * @name: name of the bank
-@@ -108,7 +108,7 @@ struct rockchip_pin_bank {
- 	struct regmap			*regmap_pull;
- 	struct clk			*clk;
- 	int				irq;
--	u32				saved_enables;
-+	u32				saved_masks;
- 	u32				pin_base;
- 	u8				nr_pins;
- 	char				*name;
-@@ -1545,8 +1545,8 @@ static void rockchip_irq_suspend(struct irq_data *d)
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
- 	struct rockchip_pin_bank *bank = gc->private;
- 
--	bank->saved_enables = irq_reg_readl(gc, GPIO_INTEN);
--	irq_reg_writel(gc, gc->wake_active, GPIO_INTEN);
-+	bank->saved_masks = irq_reg_readl(gc, GPIO_INTMASK);
-+	irq_reg_writel(gc, ~gc->wake_active, GPIO_INTMASK);
- }
- 
- static void rockchip_irq_resume(struct irq_data *d)
-@@ -1554,35 +1554,7 @@ static void rockchip_irq_resume(struct irq_data *d)
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
- 	struct rockchip_pin_bank *bank = gc->private;
- 
--	irq_reg_writel(gc, bank->saved_enables, GPIO_INTEN);
--}
--
--static void rockchip_irq_disable(struct irq_data *d)
--{
--	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
--	u32 val;
--
--	irq_gc_lock(gc);
--
--	val = irq_reg_readl(gc, GPIO_INTEN);
--	val &= ~d->mask;
--	irq_reg_writel(gc, val, GPIO_INTEN);
--
--	irq_gc_unlock(gc);
--}
--
--static void rockchip_irq_enable(struct irq_data *d)
--{
--	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
--	u32 val;
--
--	irq_gc_lock(gc);
--
--	val = irq_reg_readl(gc, GPIO_INTEN);
--	val |= d->mask;
--	irq_reg_writel(gc, val, GPIO_INTEN);
--
--	irq_gc_unlock(gc);
-+	irq_reg_writel(gc, bank->saved_masks, GPIO_INTMASK);
- }
- 
- static int rockchip_interrupts_register(struct platform_device *pdev,
-@@ -1620,6 +1592,14 @@ static int rockchip_interrupts_register(struct platform_device *pdev,
- 			continue;
- 		}
- 
-+		/*
-+		 * Linux assumes that all interrupts start out disabled/masked.
-+		 * Our driver only uses the concept of masked and always keeps
-+		 * things enabled, so for us that's all masked and all enabled.
-+		 */
-+		writel_relaxed(0xffffffff, bank->reg_base + GPIO_INTMASK);
-+		writel_relaxed(0xffffffff, bank->reg_base + GPIO_INTEN);
-+
- 		gc = irq_get_domain_generic_chip(bank->domain, 0);
- 		gc->reg_base = bank->reg_base;
- 		gc->private = bank;
-@@ -1628,8 +1608,6 @@ static int rockchip_interrupts_register(struct platform_device *pdev,
- 		gc->chip_types[0].chip.irq_ack = irq_gc_ack_set_bit;
- 		gc->chip_types[0].chip.irq_mask = irq_gc_mask_set_bit;
- 		gc->chip_types[0].chip.irq_unmask = irq_gc_mask_clr_bit;
--		gc->chip_types[0].chip.irq_enable = rockchip_irq_enable;
--		gc->chip_types[0].chip.irq_disable = rockchip_irq_disable;
- 		gc->chip_types[0].chip.irq_set_wake = irq_gc_set_wake;
- 		gc->chip_types[0].chip.irq_suspend = rockchip_irq_suspend;
- 		gc->chip_types[0].chip.irq_resume = rockchip_irq_resume;
--- 
-2.2.0.rc0.207.ga3a616c
+	Soren
