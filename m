@@ -1,88 +1,55 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 26 Jan 2015 11:49:56 +0000
-Subject: [PATCH 6/7] pm: at91: add achieve the mpddrc peripheral ID and
- the DDR clock ID support
-In-Reply-To: <1422266896-24666-1-git-send-email-wenyou.yang@atmel.com>
-References: <1422266617-24381-1-git-send-email-wenyou.yang@atmel.com>
- <1422266896-24666-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20150126114956.GE23313@leverpostej>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 26 Jan 2015 12:55:07 +0100
+Subject: [PATCH RESEND v3 0/3] irqchip: vf610-mscm: add support for MSCM
+ interrupt router
+In-Reply-To: <alpine.DEB.2.11.1501261115300.5526@nanos>
+References: <1421309046-22452-1-git-send-email-stefan@agner.ch>
+ <alpine.DEB.2.11.1501261115300.5526@nanos>
+Message-ID: <36990c90fa3d2ee0849227f31cbafb54@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 26, 2015 at 10:08:16AM +0000, Wenyou Yang wrote:
-> The patch achieves the mpddr controller peripheral ID
-> and the DDR clock ID from the dts file.
+On 2015-01-26 11:16, Thomas Gleixner wrote:
+> On Thu, 15 Jan 2015, Stefan Agner wrote:
 > 
-> They will be used in the future to disable the mpddr controller'c clock
-> the and DDR clock to decrease the power consumption during suspending.
+>> Splitted out version of the MSCM driver. My first driver based on the
+>> routeable domain support and was part of the Vybrid Cortex-M4 support
+>> patchset.
+>>
+>> So far the MSCM interrupt router was initialized by the boot loader
+>> and configured all interrupts for the Cortex-A5 CPU. There are two
+>> use cases where a proper driver is necessary:
+>> - To run Linux on the Cortex-M4. When the kernel is running on the
+>>   non-preconfigured CPU, the interrupt router need to be configured
+>>   properly.
+>> - To support deeper sleep modes: LPSTOP clears the interrupt router
+>>   configuration, hence a driver needs to restore the configuration
+>>   on resume.
+>> I created a seperate patchset for that driver which hopefully makes
+>> it easier to get it into mergeable state.
+>>
+>> Since I identified some registers likely to be used by other drivers
+>> (e.g. CPU ID or the CPU Generate Interrupt Register) I also added
+>> the "syscon" compatible string to make the registers available for
+>> other drivers in case needed.
+>>
+>> This resend version of this patchset is rebased on v3.19-rc4.
 > 
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> ---
->  arch/arm/mach-at91/generic.h |    2 ++
->  arch/arm/mach-at91/setup.c   |   24 ++++++++++++++++++++++++
->  2 files changed, 26 insertions(+)
-> 
-> diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-> index 41796bf..3c72a3e 100644
-> --- a/arch/arm/mach-at91/generic.h
-> +++ b/arch/arm/mach-at91/generic.h
-> @@ -47,6 +47,8 @@ void __init at91_sam9x5_pm_init(void) { }
->  struct at91_pm_struct {
->  	unsigned long uhp_udp_mask;
->  	int memctrl;
-> +	u32 mpddrc_id[2];
-> +	u32 ddrck_id;
->  };
->  
->  #endif /* _AT91_GENERIC_H */
-> diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-> index 7924663..a306f95 100644
-> --- a/arch/arm/mach-at91/setup.c
-> +++ b/arch/arm/mach-at91/setup.c
-> @@ -363,6 +363,27 @@ void __init at91_ioremap_matrix(u32 base_addr)
->  		panic(pr_fmt("Impossible to ioremap at91_matrix_base\n"));
->  }
->  
-> +static u32 at91_of_get_ddr_id(struct device_node *np, char *name)
-> +{
-> +	struct of_phandle_args clkspec;
-> +	u32 id;
-> +	int index;
-> +	int rc;
-> +
-> +	index = of_property_match_string(np, "clock-names", name);
-> +	rc = of_parse_phandle_with_args(np, "clocks", "#clock-cells", index, &clkspec);
-> +	if (rc)
-> +		return 0;
-> +
-> +	rc = of_property_read_u32(clkspec.np, "reg", &id);
-> +	if (rc)
-> +		return 0;
-> +
-> +	of_node_put(clkspec.np);
-> +
-> +	return id;
-> +}
+> Has the discussion with Marc on the original V3 set been resolved?
 
-This doesn't look right to me. This assumes the format of the clock
-provider node, which invalidates the point of having the abstraction in
-the first place.
+There was no answer to the original v3 patch. The comments of Marc was
+back in the v2 set, and has been resolved in v3. However, no Ack from
+Marc so far.
 
-> +
->  struct at91_ramc_of_data {
->  	u8 ramc_type;
->  };
-> @@ -400,6 +421,9 @@ static void at91_dt_ramc(void)
->  		of_data = of_id->data;
->  		at91_pm_data.memctrl = of_data->ramc_type;
->  
-> +		at91_pm_data.mpddrc_id[idx] = at91_of_get_ddr_id(np, "mpddr");
-> +		at91_pm_data.ddrck_id = at91_of_get_ddr_id(np, "ddrck");
-> +
+ 
+> What about the DT bindings? I'm relucant to pick that up w/o acks from
+> the DT folks.
 
-Why do you need these here?
+The bindings are straight forward interrupt-controller bindings, since
+it uses the hierarchic irq domain stuff. The only uncommon thing is that
+I also added "syscon" as compatible, since the module has functionality
+which might be required by other drivers (e.g. register to generate
+CPU2CPU interrupt or processor personality information).
 
-Surely the logic for poking any clocks should live in the relevant
-clock controller drivers?
-
-Mark.
+--
+Stefan
