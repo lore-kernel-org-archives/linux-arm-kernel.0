@@ -1,69 +1,40 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 26 Jan 2015 08:29:24 -0800
-Subject: [PATCH] clk: zynq: Force CPU_2X clock to be ungated
-In-Reply-To: <3b7e448a3a9c4d8a8f566ef01160ba89@BY2FFO11FD041.protection.gbl>
-References: <1422056653-11271-1-git-send-email-soren.brinkmann@xilinx.com>
- <3b7e448a3a9c4d8a8f566ef01160ba89@BY2FFO11FD041.protection.gbl>
-Message-ID: <816b89f36a7d41ffb722a07b86f2bb7f@BN1BFFO11FD001.protection.gbl>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 26 Jan 2015 16:42:29 +0000
+Subject: [PATCH v2 1/3] ASoC: codecs: wm8904: add dt ids table
+In-Reply-To: <54C65C36.9050106@atmel.com>
+References: <1418614273-2303-1-git-send-email-voice.shen@atmel.com>
+ <20150115115425.GX3043@sirena.org.uk> <54B866B9.8000900@atmel.com>
+ <54C65C36.9050106@atmel.com>
+Message-ID: <20150126164229.GB21293@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2015-01-25 at 07:22PM -0800, S?ren Brinkmann wrote:
-> On Fri, 2015-01-23 at 03:44PM -0800, Soren Brinkmann wrote:
-> > The CPU_2X clock does not have a classical in kernel user, but is,
-> > amongst other things, required for OCM and debug access. Make sure this
-> > clock does not mistakenly disabled during boot up by enabling it in the
-> > platforms clock driver.
-> > 
-> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> > ---
-> > I just noticed this on Linus' latest tip. I can't remember having had issues
-> > connecting the debugger before, but it might be a candidate for stable in case
-> > people report something like that.
-> 
-> I bisected this down to commit:
-> 
-> ae43b3289186480f81c78bb63d788a85a3631f47 is the first bad commit
-> commit ae43b3289186480f81c78bb63d788a85a3631f47
-> Author: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Date:   Fri Nov 14 09:48:57 2014 +0100
-> 
->     ARM: 8202/1: dmaengine: pl330: Add runtime Power Management support v12
->     
->     This patch adds runtime PM support to pl330 DMA engine driver.
->     
->     The runtime power management for pl330 DMA driver allows gating of AMBA
->     clock (PDMA) in FSYS clock domain, when the device is not processing any
->     requests. This is necessary to enter low power modes on Exynos SoCs
->     (e.g. LPA on Exynos4x12 or W-AFTR on Exynos3250).
->     
->     Runtime PM resuming of the device may happen in atomic context (during
->     call device_issue_pending()) so pm_runtime_irq_safe() is used. This will
->     lead only to disabling/enabling of the clock but this is sufficient for
->     gating the clock and for reducing energy usage.
->     
->     Driver uses runtime PM callbacks from amba/bus.c driver only.
->     
->     Suggested-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
->     Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->     Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
->     Acked-by: Vinod Koul <vinod.koul@intel.com>
->     Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
-> :040000 040000 16e0cb02587254ea396e9d913d7997ac63bd3d49 97c1ee366f0790e65df00e85d06b2bcd07aa9f58 M      drivers
-> 
-> which makes sense, since the PL330 clock in Zynq is the mentioned
-> CPU_2X_CLK. I guess the additional runtime_pm in the driver causes the
-> clock to be gated which causes the issues for the mentioned other users
-> of this clock.
-> Looks like this patch got introduced in the 3.19 merge window. Hence,
-> stable should be off the table.
+On Mon, Jan 26, 2015 at 04:24:38PM +0100, Nicolas Ferre wrote:
+> Le 16/01/2015 02:17, Bo Shen a ?crit :
 
-That statement may have been a little premature. Turns out, it actually
-is the PL330 driver that is responsible for activating the CPU2X clock
-on Zynq. Things work as expected when that driver is in the kernel, but
-break as seen on 3.19 when that driver is not part of the kernel. Hence,
-this should probably go into stable, all the way back to when we merged
-Zynq's CCF code, which seems to have happened in 3.11.
+> >> Does this end up in the i2c_driver_id driver data or do we need some
+> >> extra code when devtype is assigned to check for an of_node and look at
+> >> the DT data instead?  That certainly used to be the case...
 
-	Soren
+> > At the beginning I think as the same as you, and also add the code to 
+> > get the data as I do in <drivers/misc/atmel-ssc.c>. However, as I 
+> > remember, I2C seems only use the compatible string after the comma, that 
+> > means only for "wlf,wm8904", it uses "wm8904" to match. So, I remove all 
+> > the code I added, and just keep these, and it can get the device type 
+> > correctly.
+
+> > So, when I submit the patch and keep the code as simple as possible.
+
+> I don't understand what's keeping this patch from being applied. Voice,
+> do you mind re-sending?
+
+I need to convince myself that the above actually works and is doing the
+right thing; the above explanation sounds like if it works it might be
+relying on a bug.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150126/512d059c/attachment.sig>
