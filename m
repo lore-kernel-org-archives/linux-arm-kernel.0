@@ -1,28 +1,150 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 26 Jan 2015 02:22:55 +0100
-Subject: [PATCH v4 0/3] add support for Firefly-RK3288 and Rayeager PX2
- boards
-In-Reply-To: <1422189576-19478-1-git-send-email-naobsd@gmail.com>
-References: <1422189576-19478-1-git-send-email-naobsd@gmail.com>
-Message-ID: <2137926.nqOiED5bzz@diego>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Mon, 26 Jan 2015 01:25:13 +0000
+Subject: [PATCH 08/12] pm: at91: rename file name: pm_slowclock.S
+ -->pm_suspend.S
+In-Reply-To: <20150123191719.GA29601@gradator.net>
+References: <1421741825-18226-1-git-send-email-wenyou.yang@atmel.com>
+ <1421741825-18226-9-git-send-email-wenyou.yang@atmel.com>
+ <20150123191719.GA29601@gradator.net>
+Message-ID: <B256D81BAE5131468A838E5D7A243641BFD32766@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Sonntag, 25. Januar 2015, 21:39:33 schrieb FUKAUMI Naoki:
-> This series adds support for following Rockchip SoC based boards.
+Hi Sylvain,
+
+Thank you for your review.
+
+> -----Original Message-----
+> From: Sylvain Rochet [mailto:sylvain.rochet at finsecur.com]
+> Sent: Saturday, January 24, 2015 3:17 AM
+> To: Yang, Wenyou
+> Cc: Ferre, Nicolas; linux at arm.linux.org.uk; linux-kernel at vger.kernel.org;
+> alexandre.belloni at free-electrons.com; peda at axentia.se; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH 08/12] pm: at91: rename file name: pm_slowclock.S --
+> >pm_suspend.S
 > 
->  - Firefly, Firefly-RK3288 (both beta and mass production version)
->  - ChipSPARK, Rayeager PX2
+> Hello Wenyou,
+> 
+> On Tue, Jan 20, 2015 at 04:17:01PM +0800, Wenyou Yang wrote:
+> >
+> > diff --git a/arch/arm/mach-at91/pm_suspend.S
+> > b/arch/arm/mach-at91/pm_suspend.S new file mode 100644 index
+> > 0000000..420e730
+> > --- /dev/null
+> 
+> 
+> > +	/* Turn off the main oscillator */
+> > +	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
+> > +	bic	tmp1, tmp1, #AT91_PMC_MOSCEN
+> 
+> at91sam9x5 and probably others need a key here:
+> 	orr     tmp1, tmp1, #AT91_PMC_KEY
+> 
+Yes, I am preparing the patches to support other SoCs.
 
-I've applied this series with Andy's Tested-by for the Rayeager board and my 
-Tested-by for the Firefly.
+> > +	str	tmp1, [pmc, #AT91_CKGR_MOR]
+> 
+> 
+> 
+> > +	/* Wait for interrupt */
+> > +	mcr	p15, 0, tmp1, c7, c0, 4
+> 
+> The linux-3.10-at91 branch uses a different approach which seem necessary for
+> newer board, you probably forget to merge the following:
+> 
+> /*
+>  * Put the processor to enter into Standby mode, wait for interrupt to wakeup  */
+> 	.macro _do_wfi
+> 
+> #if defined(CONFIG_CPU_V7)
+> 	dsb
+> 
+> 	/* Disable the processor clock */
+> 	mov	tmp1, #AT91_PMC_PCK
+> 	str	tmp1, [pmc, #AT91_PMC_SCDR]
+> 
+> 	wfi		@ Wait For Interrupt
+> #else
+> 	mcr	p15, 0, tmp1, c7, c0, 4
+> #endif
+> 
+> 	.endm
+> 
+> 	.text
+> 
+I will send the new patch serials to support it in this week. Thanks.
 
-One caveat, I had to remove the gmac node from the firefly dtsi, as the whole 
-gmac series goes through the network tree, so the dtb won't compile either in 
-my tree or arm-soc due to the missing core node.
+> ENTRY(at91_slow_clock)
+> (...)
+> 	/* Wait for interrupt */
+> 	_do_wfi
+> (...)
+> 
+> 
+> 
+> 
+> > +	/* Turn on the main oscillator */
+> > +	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
+> > +	orr	tmp1, tmp1, #AT91_PMC_MOSCEN
+> 
+> at91sam9x5 and probably others need a key here:
+>         orr     tmp1, tmp1, #AT91_PMC_KEY
+> 
+> > +	str	tmp1, [pmc, #AT91_CKGR_MOR]
+> 
+> 
+> 
+> What about the following parts which are also in linux-3.10-at91 branch but not in
+> this rework, are they necessary ?
+Yes, they are necessary, I will send the next patch serial in this week.
 
-I'll try to see if I can get the separate gmac node in when everything is 
-combined in 3.20-rc1.
+> 
+> sdr_sr_done:
+> 	/* Disable MPDDRC Clock*/
+> 	cmp	ddrcid, #0
+> 	beq	2f
+> 	bic	tmp2, ddrcid, #0xe0 /* fetch lowest 5 bits */
+> 	mov	tmp1, #0x01
+> 	mov	tmp1, tmp1, lsl tmp2
+> 
+> 	tst	ddrcid, #0x20	/* > 32 ? */
+> 	beq	1f
+> 	str	tmp1, [pmc, #AT91_PMC_PCDR1]
+> 	b	2f
+> 1:
+> 	str	tmp1, [pmc, #AT91_PMC_PCDR]
+> 2:
+> 
+> 	/* Disable DDR Clock */
+> 	mov 	tmp1, #AT91_PMC_SYS_DDR
+> 	str	tmp1, [pmc, #AT91_PMC_SCDR]
+> 
+> 
+> 
+> 
+> 	/* Enable MPDDRC Clock*/
+> 	cmp	ddrcid, #0
+> 	beq	4f
+> 	bic	tmp2, ddrcid, #0xe0 /* fetch lowest 5 bits */
+> 	mov	tmp1, #0x01
+> 	mov	tmp1, tmp1, lsl tmp2
+> 
+> 	tst	ddrcid, #0x20	/* > 32 ? */
+> 	beq	3f
+> 	str	tmp1, [pmc, #AT91_PMC_PCER1]
+> 	b	4f
+> 3:
+> 	str	tmp1, [pmc, #AT91_PMC_PCER]
+> 4:
+> 
+> 	/* Enable DDR clock */
+> 	mov 	tmp1, #AT91_PMC_SYS_DDR
+> 	str	tmp1, [pmc, #AT91_PMC_SCER]
+> 
+> 
+> 
+> Sylvain
 
-
-Heiko
+Best Regards,
+Wenyou Yang
