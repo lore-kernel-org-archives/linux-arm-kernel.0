@@ -1,46 +1,73 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 26 Jan 2015 15:03:57 +0200
-Subject: [PATCH v5 11/18] iommu: exynos: remove useless device_add/remove
- callbacks
-In-Reply-To: <20150126110059.GC30345@8bytes.org>
-References: <1422028288-891-1-git-send-email-m.szyprowski@samsung.com>
- <2829552.kzfCU5HyxQ@avalon> <20150126110059.GC30345@8bytes.org>
-Message-ID: <1589480.9kxdoXKkuz@avalon>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 26 Jan 2015 16:05:14 +0300
+Subject: [PATCH 2/7] pm: at91: pm_suspend: add the WFI support for ARMv7
+In-Reply-To: <1422266761-24487-1-git-send-email-wenyou.yang@atmel.com>
+References: <1422266617-24381-1-git-send-email-wenyou.yang@atmel.com>
+ <1422266761-24487-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <54C63B8A.9000702@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+Hello.
 
-On Monday 26 January 2015 12:00:59 Joerg Roedel wrote:
-> Hi Laurent,
-> 
-> On Sun, Jan 25, 2015 at 05:38:22PM +0200, Laurent Pinchart wrote:
-> > IOMMU groups still seem a bit unclear to me. Will Deacon has nicely
-> > explained what they represent in
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/310816
-> > .html. The IOMMU core doesn't make groups
-> > mandatory, but requires them in some code paths.
-> > 
-> > For example the coldplug device add function add_iommu_group() called for
-> > all devices already registered when bus_set_iommu() is called will try to
-> > warn of devices added multiple times with a WARN_ON(dev->iommu_group).
-> > Another example is the iommu_bus_notifier() function which will call the
-> > remove_device() operation only when dev->iommu_group isn't NULL.
-> > 
-> > I'm thus unsure whether groups should be made mandatory, or whether the
-> > IOMMU core should be fixed to make them really optional (or, third
-> > option, whether there's something I haven't understood properly).
-> 
-> My plan is to make IOMMU groups mandatory. I am currently preparing and
-> RFC patch-set to introduce default-domains (which will be per group). So
-> when all IOMMU drivers are converted to make use of default domains the
-> iommu groups will be mandatory.
+On 1/26/2015 1:06 PM, Wenyou Yang wrote:
 
-Could the default domain policy be configured by the IOMMU driver ? The ipmmu-
-vmsa driver supports four domains only, and serves up to 32 masters, with one 
-group per master. A default of one domain per group wouldn't be usable.
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> ---
+>   arch/arm/mach-at91/pm_suspend.S |   54 ++++++++++++++++++++++++++++++++++++++-
+>   1 file changed, 53 insertions(+), 1 deletion(-)
 
--- 
-Regards,
+> diff --git a/arch/arm/mach-at91/pm_suspend.S b/arch/arm/mach-at91/pm_suspend.S
+> index 122a3f1..e796722 100644
+> --- a/arch/arm/mach-at91/pm_suspend.S
+> +++ b/arch/arm/mach-at91/pm_suspend.S
+> @@ -53,6 +53,58 @@ mode	.req	r6
+>   	beq	1b
+>   	.endm
+>
+> +/*
+> + * Put the processor to enter the WFI state
+> + */
+> +	.macro _do_wfi
+> +
+> +#if defined(CONFIG_CPU_V7)
+> +	/*
+> +	 * Execute an ISB instruction to flush the pipeline to ensure
+> +	 * that all of operations have beem completed.
 
-Laurent Pinchart
+    Been.
+
+> +	 */
+> +	isb
+> +
+> +	/*
+> +	 * Execute an ISB instruction to ensure that all of the
+
+    ISB again, while you're executing DSB/DMB?
+
+> +	 * CP15 register changes have been committed.
+> +	 */
+> +	dsb
+> +	dmb
+> +
+> +	/* Disable the processor's clock */
+> +	mov	tmp1, #AT91_PMC_PCK
+
+    What's 'tmp1'? Is that a register name?
+
+> +	str	tmp1, [pmc, #AT91_PMC_SCDR]
+> +
+> +	/* Execute a WFI instruction */
+
+    Self-obvious comment, I'd say...
+
+> +	wfi	@ Wait For Interrupt
+> +
+> +	/*
+> +	 * CPU can specualatively prefetch the instructions
+
+    Speculatively.
+
+[...]
+
+WBR, Sergei
