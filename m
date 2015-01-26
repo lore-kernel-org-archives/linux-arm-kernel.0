@@ -1,51 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 26 Jan 2015 11:16:58 +0100
-Subject: [PATCH 0/4] Drop legacy support for omap3517
-In-Reply-To: <201501242314.58201@pali>
-References: <1421171865-5209-1-git-send-email-tony@atomide.com>
- <2871852.qm0MoZvdlF@wuerfel> <201501242314.58201@pali>
-Message-ID: <3668717.H6LOeCvYZ4@wuerfel>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 26 Jan 2015 11:16:45 +0100 (CET)
+Subject: [PATCH RESEND v3 0/3] irqchip: vf610-mscm: add support for MSCM
+ interrupt router
+In-Reply-To: <1421309046-22452-1-git-send-email-stefan@agner.ch>
+References: <1421309046-22452-1-git-send-email-stefan@agner.ch>
+Message-ID: <alpine.DEB.2.11.1501261115300.5526@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 24 January 2015 23:14:58 Pali Roh?r wrote:
-> On Saturday 24 January 2015 23:08:00 Arnd Bergmann wrote:
-> > On Saturday 24 January 2015 13:00:00 Pali Roh?r wrote:
-> > > Another regression for DT setup (which does not occur for
-> > > board code):
-> > > 
-> > > omap_hsmmc driver does not export slot_name sysfs entry
-> > > because it not supported by DT yet. Entry slot_name is used
-> > > by userspace application to determinate if mmc block device
-> > > is internal eMMC memory or external uSD card. So support
-> > > for this property also in DT is needed.
-> > 
-> > > Here is simple patch which fix this problem:
-> > The sysfs file only exists for the two OMAP drivers, and the
-> > naming is used only by board-n8x0, board-rx51 and
-> > board-omap3logic.
-> > 
-> > It may be better to add a board-specific hack for these to
-> > keep the existing user space working but not spread the use
-> > of this file anywhere else.
+On Thu, 15 Jan 2015, Stefan Agner wrote:
+
+> Splitted out version of the MSCM driver. My first driver based on the
+> routeable domain support and was part of the Vybrid Cortex-M4 support
+> patchset.
 > 
-> Why? omap_hsmmc.c has already support for slot_name sysfs entry, 
-> just it is not filled from DT data (only from platform_data)...
+> So far the MSCM interrupt router was initialized by the boot loader
+> and configured all interrupts for the Cortex-A5 CPU. There are two
+> use cases where a proper driver is necessary:
+> - To run Linux on the Cortex-M4. When the kernel is running on the
+>   non-preconfigured CPU, the interrupt router need to be configured
+>   properly.
+> - To support deeper sleep modes: LPSTOP clears the interrupt router
+>   configuration, hence a driver needs to restore the configuration
+>   on resume.
+> I created a seperate patchset for that driver which hopefully makes
+> it easier to get it into mergeable state.
+> 
+> Since I identified some registers likely to be used by other drivers
+> (e.g. CPU ID or the CPU Generate Interrupt Register) I also added
+> the "syscon" compatible string to make the registers available for
+> other drivers in case needed.
+> 
+> This resend version of this patchset is rebased on v3.19-rc4.
 
-It's a highly nonstandard interface, none of the other controllers
-support it, and even changing the the other omap machines to use
-the same strings might break existing user space that might rely
-on whatever gets printed in those properties today.
+Has the discussion with Marc on the original V3 set been resolved?
 
-We should limit the use of those strings to the boards that
-are known to run software that requires them to avoid regressions.
-We could also define a standard way of finding out whether an
-mmc device is removable. We already have the MMC_CAP_NONREMOVABLE
-flag in the kernel and could have a read-only boolean attribute
-in sysfs for it.
+What about the DT bindings? I'm relucant to pick that up w/o acks from
+the DT folks.
 
-Putting a "name" property into DT because some random user space
-requires a particular name to show up in sysfs however does not
-seem a legitimate hardware description.
+Thanks,
 
-	Arnd
+	tglx
