@@ -1,10 +1,10 @@
 From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 27 Jan 2015 00:51:42 +0100
-Subject: [PATCH 12/15] iommu/ipmmu-vmsa: Make use of domain_alloc and
+Date: Tue, 27 Jan 2015 00:51:38 +0100
+Subject: [PATCH 08/15] iommu/tegra-smmu: Make use of domain_alloc and
  domain_free
 In-Reply-To: <1422316305-19216-1-git-send-email-joro@8bytes.org>
 References: <1422316305-19216-1-git-send-email-joro@8bytes.org>
-Message-ID: <1422316305-19216-13-git-send-email-joro@8bytes.org>
+Message-ID: <1422316305-19216-9-git-send-email-joro@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,148 +15,145 @@ replacement for domain_init/domain_destroy.
 
 Signed-off-by: Joerg Roedel <jroedel@suse.de>
 ---
- drivers/iommu/ipmmu-vmsa.c | 43 ++++++++++++++++++++++++-------------------
- 1 file changed, 24 insertions(+), 19 deletions(-)
+ drivers/iommu/tegra-smmu.c | 41 +++++++++++++++++++++++------------------
+ 1 file changed, 23 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/iommu/ipmmu-vmsa.c b/drivers/iommu/ipmmu-vmsa.c
-index 7486931..12270e1 100644
---- a/drivers/iommu/ipmmu-vmsa.c
-+++ b/drivers/iommu/ipmmu-vmsa.c
-@@ -37,7 +37,7 @@ struct ipmmu_vmsa_device {
+diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
+index 6e134c7..f1bf84a 100644
+--- a/drivers/iommu/tegra-smmu.c
++++ b/drivers/iommu/tegra-smmu.c
+@@ -31,7 +31,7 @@ struct tegra_smmu {
+ };
  
- struct ipmmu_vmsa_domain {
- 	struct ipmmu_vmsa_device *mmu;
--	struct iommu_domain *io_domain;
-+	struct iommu_domain io_domain;
+ struct tegra_smmu_as {
+-	struct iommu_domain *domain;
++	struct iommu_domain domain;
+ 	struct tegra_smmu *smmu;
+ 	unsigned int use_count;
+ 	struct page *count;
+@@ -40,6 +40,11 @@ struct tegra_smmu_as {
+ 	u32 attr;
+ };
  
- 	unsigned int context_id;
- 	spinlock_t lock;			/* Protects mappings */
-@@ -52,6 +52,11 @@ struct ipmmu_vmsa_archdata {
- static DEFINE_SPINLOCK(ipmmu_devices_lock);
- static LIST_HEAD(ipmmu_devices);
- 
-+static struct ipmmu_vmsa_domain *to_vmsa_domain(struct iommu_domain *dom)
++static struct tegra_smmu_as *to_smmu_as(struct iommu_domain *dom)
 +{
-+	return container_of(dom, struct ipmmu_vmsa_domain, io_domain);
++	return container_of(dom, struct tegra_smmu_as, domain);
 +}
 +
- #define TLB_LOOP_TIMEOUT		100	/* 100us */
- 
- /* -----------------------------------------------------------------------------
-@@ -435,7 +440,7 @@ static irqreturn_t ipmmu_domain_irq(struct ipmmu_vmsa_domain *domain)
- 	 * TODO: We need to look up the faulty device based on the I/O VA. Use
- 	 * the IOMMU device for now.
- 	 */
--	if (!report_iommu_fault(domain->io_domain, mmu->dev, iova, 0))
-+	if (!report_iommu_fault(&domain->io_domain, mmu->dev, iova, 0))
- 		return IRQ_HANDLED;
- 
- 	dev_err_ratelimited(mmu->dev,
-@@ -455,7 +460,7 @@ static irqreturn_t ipmmu_irq(int irq, void *dev)
- 		return IRQ_NONE;
- 
- 	io_domain = mmu->mapping->domain;
--	domain = io_domain->priv;
-+	domain = to_vmsa_domain(io_domain);
- 
- 	return ipmmu_domain_irq(domain);
- }
-@@ -854,31 +859,31 @@ done:
-  * IOMMU Operations
-  */
- 
--static int ipmmu_domain_init(struct iommu_domain *io_domain)
-+static struct iommu_domain *ipmmu_domain_alloc(enum iommu_domain_type type)
+ static inline void smmu_writel(struct tegra_smmu *smmu, u32 value,
+ 			       unsigned long offset)
  {
- 	struct ipmmu_vmsa_domain *domain;
+@@ -224,30 +229,32 @@ static bool tegra_smmu_capable(enum iommu_cap cap)
+ 	return false;
+ }
+ 
+-static int tegra_smmu_domain_init(struct iommu_domain *domain)
++static struct iommu_domain *tegra_smmu_domain_alloc(enum iommu_domain_type type)
+ {
+ 	struct tegra_smmu_as *as;
+ 	unsigned int i;
+ 	uint32_t *pd;
  
 +	if (type != IOMMU_DOMAIN_UNMANAGED)
 +		return NULL;
 +
- 	domain = kzalloc(sizeof(*domain), GFP_KERNEL);
- 	if (!domain)
+ 	as = kzalloc(sizeof(*as), GFP_KERNEL);
+ 	if (!as)
 -		return -ENOMEM;
 +		return NULL;
  
- 	spin_lock_init(&domain->lock);
+ 	as->attr = SMMU_PD_READABLE | SMMU_PD_WRITABLE | SMMU_PD_NONSECURE;
+-	as->domain = domain;
  
- 	domain->pgd = kzalloc(IPMMU_PTRS_PER_PGD * sizeof(pgd_t), GFP_KERNEL);
- 	if (!domain->pgd) {
- 		kfree(domain);
+ 	as->pd = alloc_page(GFP_KERNEL | __GFP_DMA);
+ 	if (!as->pd) {
+ 		kfree(as);
 -		return -ENOMEM;
 +		return NULL;
  	}
  
--	io_domain->priv = domain;
--	domain->io_domain = io_domain;
+ 	as->count = alloc_page(GFP_KERNEL);
+ 	if (!as->count) {
+ 		__free_page(as->pd);
+ 		kfree(as);
+-		return -ENOMEM;
++		return NULL;
+ 	}
+ 
+ 	/* clear PDEs */
+@@ -264,14 +271,12 @@ static int tegra_smmu_domain_init(struct iommu_domain *domain)
+ 	for (i = 0; i < SMMU_NUM_PDE; i++)
+ 		pd[i] = 0;
+ 
+-	domain->priv = as;
 -
 -	return 0;
-+	return &domain->io_domain;
++	return &as->domain;
  }
  
--static void ipmmu_domain_destroy(struct iommu_domain *io_domain)
-+static void ipmmu_domain_free(struct iommu_domain *io_domain)
+-static void tegra_smmu_domain_destroy(struct iommu_domain *domain)
++static void tegra_smmu_domain_free(struct iommu_domain *domain)
  {
--	struct ipmmu_vmsa_domain *domain = io_domain->priv;
-+	struct ipmmu_vmsa_domain *domain = to_vmsa_domain(io_domain);
+-	struct tegra_smmu_as *as = domain->priv;
++	struct tegra_smmu_as *as = to_smmu_as(domain);
  
- 	/*
- 	 * Free the domain resources. We assume that all devices have already
-@@ -894,7 +899,7 @@ static int ipmmu_attach_device(struct iommu_domain *io_domain,
+ 	/* TODO: free page directory and page tables */
+ 	ClearPageReserved(as->pd);
+@@ -395,7 +400,7 @@ static int tegra_smmu_attach_dev(struct iommu_domain *domain,
+ 				 struct device *dev)
  {
- 	struct ipmmu_vmsa_archdata *archdata = dev->archdata.iommu;
- 	struct ipmmu_vmsa_device *mmu = archdata->mmu;
--	struct ipmmu_vmsa_domain *domain = io_domain->priv;
-+	struct ipmmu_vmsa_domain *domain = to_vmsa_domain(io_domain);
- 	unsigned long flags;
- 	int ret = 0;
+ 	struct tegra_smmu *smmu = dev->archdata.iommu;
+-	struct tegra_smmu_as *as = domain->priv;
++	struct tegra_smmu_as *as = to_smmu_as(domain);
+ 	struct device_node *np = dev->of_node;
+ 	struct of_phandle_args args;
+ 	unsigned int index = 0;
+@@ -428,7 +433,7 @@ static int tegra_smmu_attach_dev(struct iommu_domain *domain,
  
-@@ -933,7 +938,7 @@ static void ipmmu_detach_device(struct iommu_domain *io_domain,
- 				struct device *dev)
+ static void tegra_smmu_detach_dev(struct iommu_domain *domain, struct device *dev)
  {
- 	struct ipmmu_vmsa_archdata *archdata = dev->archdata.iommu;
--	struct ipmmu_vmsa_domain *domain = io_domain->priv;
-+	struct ipmmu_vmsa_domain *domain = to_vmsa_domain(io_domain);
- 
- 	ipmmu_utlb_disable(domain, archdata->utlb);
- 
-@@ -945,7 +950,7 @@ static void ipmmu_detach_device(struct iommu_domain *io_domain,
- static int ipmmu_map(struct iommu_domain *io_domain, unsigned long iova,
- 		     phys_addr_t paddr, size_t size, int prot)
+-	struct tegra_smmu_as *as = domain->priv;
++	struct tegra_smmu_as *as = to_smmu_as(domain);
+ 	struct device_node *np = dev->of_node;
+ 	struct tegra_smmu *smmu = as->smmu;
+ 	struct of_phandle_args args;
+@@ -524,7 +529,7 @@ static void as_put_pte(struct tegra_smmu_as *as, dma_addr_t iova)
+ static int tegra_smmu_map(struct iommu_domain *domain, unsigned long iova,
+ 			  phys_addr_t paddr, size_t size, int prot)
  {
--	struct ipmmu_vmsa_domain *domain = io_domain->priv;
-+	struct ipmmu_vmsa_domain *domain = to_vmsa_domain(io_domain);
- 
- 	if (!domain)
- 		return -ENODEV;
-@@ -956,7 +961,7 @@ static int ipmmu_map(struct iommu_domain *io_domain, unsigned long iova,
- static size_t ipmmu_unmap(struct iommu_domain *io_domain, unsigned long iova,
- 			  size_t size)
+-	struct tegra_smmu_as *as = domain->priv;
++	struct tegra_smmu_as *as = to_smmu_as(domain);
+ 	struct tegra_smmu *smmu = as->smmu;
+ 	unsigned long offset;
+ 	struct page *page;
+@@ -548,7 +553,7 @@ static int tegra_smmu_map(struct iommu_domain *domain, unsigned long iova,
+ static size_t tegra_smmu_unmap(struct iommu_domain *domain, unsigned long iova,
+ 			       size_t size)
  {
--	struct ipmmu_vmsa_domain *domain = io_domain->priv;
-+	struct ipmmu_vmsa_domain *domain = to_vmsa_domain(io_domain);
- 	int ret;
- 
- 	ret = ipmmu_clear_mapping(domain, iova, size);
-@@ -966,7 +971,7 @@ static size_t ipmmu_unmap(struct iommu_domain *io_domain, unsigned long iova,
- static phys_addr_t ipmmu_iova_to_phys(struct iommu_domain *io_domain,
- 				      dma_addr_t iova)
+-	struct tegra_smmu_as *as = domain->priv;
++	struct tegra_smmu_as *as = to_smmu_as(domain);
+ 	struct tegra_smmu *smmu = as->smmu;
+ 	unsigned long offset;
+ 	struct page *page;
+@@ -572,7 +577,7 @@ static size_t tegra_smmu_unmap(struct iommu_domain *domain, unsigned long iova,
+ static phys_addr_t tegra_smmu_iova_to_phys(struct iommu_domain *domain,
+ 					   dma_addr_t iova)
  {
--	struct ipmmu_vmsa_domain *domain = io_domain->priv;
-+	struct ipmmu_vmsa_domain *domain = to_vmsa_domain(io_domain);
- 	pgd_t pgd;
- 	pud_t pud;
- 	pmd_t pmd;
-@@ -1121,8 +1126,8 @@ static void ipmmu_remove_device(struct device *dev)
- }
+-	struct tegra_smmu_as *as = domain->priv;
++	struct tegra_smmu_as *as = to_smmu_as(domain);
+ 	struct page *page;
+ 	unsigned long pfn;
+ 	u32 *pte;
+@@ -633,8 +638,8 @@ static void tegra_smmu_remove_device(struct device *dev)
  
- static const struct iommu_ops ipmmu_ops = {
--	.domain_init = ipmmu_domain_init,
--	.domain_destroy = ipmmu_domain_destroy,
-+	.domain_alloc = ipmmu_domain_alloc,
-+	.domain_free = ipmmu_domain_free,
- 	.attach_dev = ipmmu_attach_device,
- 	.detach_dev = ipmmu_detach_device,
- 	.map = ipmmu_map,
+ static const struct iommu_ops tegra_smmu_ops = {
+ 	.capable = tegra_smmu_capable,
+-	.domain_init = tegra_smmu_domain_init,
+-	.domain_destroy = tegra_smmu_domain_destroy,
++	.domain_alloc = tegra_smmu_domain_alloc,
++	.domain_free = tegra_smmu_domain_free,
+ 	.attach_dev = tegra_smmu_attach_dev,
+ 	.detach_dev = tegra_smmu_detach_dev,
+ 	.add_device = tegra_smmu_add_device,
 -- 
 1.8.4.5
