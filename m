@@ -1,57 +1,87 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 26 Jan 2015 13:46:33 +0200
-Subject: [PATCHv5 2/2] leds: tlc591xx: Driver for the TI 8/16 Channel
- i2c LED driver
-In-Reply-To: <1421879364-8573-3-git-send-email-andrew@lunn.ch>
-References: <1421879364-8573-1-git-send-email-andrew@lunn.ch>
- <1421879364-8573-3-git-send-email-andrew@lunn.ch>
-Message-ID: <54C62919.8000205@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 26 Jan 2015 11:46:59 +0000
+Subject: [PATCH 4/7] ARM: at91: enable the L2 Cache controller
+In-Reply-To: <1422266836-24592-1-git-send-email-wenyou.yang@atmel.com>
+References: <1422266617-24381-1-git-send-email-wenyou.yang@atmel.com>
+ <1422266836-24592-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20150126114659.GD23313@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jan 26, 2015 at 10:07:16AM +0000, Wenyou Yang wrote:
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> ---
+>  arch/arm/mach-at91/board-dt-sama5.c |   53 +++++++++++++++++++++++++++++++++++
+>  1 file changed, 53 insertions(+)
+> 
+> diff --git a/arch/arm/mach-at91/board-dt-sama5.c b/arch/arm/mach-at91/board-dt-sama5.c
+> index 86cffcd..ed6db28 100644
+> --- a/arch/arm/mach-at91/board-dt-sama5.c
+> +++ b/arch/arm/mach-at91/board-dt-sama5.c
+> @@ -17,17 +17,70 @@
+>  #include <linux/of_platform.h>
+>  #include <linux/phy.h>
+>  #include <linux/clk-provider.h>
+> +#include <linux/of_address.h>
+>  
+>  #include <asm/setup.h>
+>  #include <asm/irq.h>
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/map.h>
+>  #include <asm/mach/irq.h>
+> +#include <asm/hardware/cache-l2x0.h>
+>  
+>  #include "generic.h"
+>  
+> +void __iomem *at91_l2cc_base;
+> +EXPORT_SYMBOL_GPL(at91_l2cc_base);
+> +
+> +#ifdef CONFIG_CACHE_L2X0
+> +static void __init at91_init_l2cache(void)
+> +{
+> +	struct device_node *np;
+> +	u32 reg;
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "arm,pl310-cache");
+> +	if (!np)
+> +		return;
+> +
+> +	at91_l2cc_base = of_iomap(np, 0);
+> +	if (!at91_l2cc_base)
+> +		panic("unable to map l2cc cpu registers\n");
+> +
+> +	of_node_put(np);
+> +
+> +	/* Disable cache if it hasn't been done yet */
+> +	if (readl_relaxed(at91_l2cc_base + L2X0_CTRL) & L2X0_CTRL_EN)
+> +		writel_relaxed(~L2X0_CTRL_EN, at91_l2cc_base + L2X0_CTRL);
+> +
+> +	/* Prefetch Control */
+> +	reg = readl_relaxed(at91_l2cc_base + L310_PREFETCH_CTRL);
+> +	reg &= ~L310_PREFETCH_CTRL_OFFSET_MASK;
+> +	reg |= 0x01;
+> +	reg |= L310_PREFETCH_CTRL_DBL_LINEFILL_INCR;
+> +	reg |= L310_PREFETCH_CTRL_PREFETCH_DROP;
+> +	reg |= L310_PREFETCH_CTRL_DATA_PREFETCH;
+> +	reg |= L310_PREFETCH_CTRL_INSTR_PREFETCH;
+> +	reg |= L310_PREFETCH_CTRL_DBL_LINEFILL;
+> +	writel_relaxed(reg, at91_l2cc_base + L310_PREFETCH_CTRL);
+> +
+> +	/* Power Control */
+> +	reg = readl_relaxed(at91_l2cc_base + L310_POWER_CTRL);
+> +	reg |= L310_STNDBY_MODE_EN;
+> +	reg |= L310_DYNAMIC_CLK_GATING_EN;
+> +	writel_relaxed(reg, at91_l2cc_base + L310_POWER_CTRL);
+> +
+> +	/* Disable interrupts */
+> +	writel_relaxed(0x00, at91_l2cc_base + L2X0_INTR_MASK);
+> +	writel_relaxed(0x01ff, at91_l2cc_base + L2X0_INTR_CLEAR);
+> +	l2x0_of_init(0, ~0UL);
+> +}
+> +#else
+> +static inline void at91_init_l2cache(void) {}
+> +#endif
 
-On 22/01/15 00:29, Andrew Lunn wrote:
-> The TLC59116 is an I2C bus controlled 16-channel LED driver.  The
-> TLC59108 is an I2C bus controlled 8-channel LED driver, which is very
-> similar to the TLC59116. Each LED output has its own 8-bit
-> fixed-frequency PWM controller to control the brightness of the LED.
-> The LEDs can also be fixed off and on, making them suitable for use as
-> GPOs.
+This poking of the PL310 should live in the cache_l2x0 driver.
 
-So as I've mentioned, our HW uses TLC59108 not only for LED (backlight)
-but also as a GPO. And as we shortly discussed (in private mails, I
-think), technically it's possible to write gpio and backligth drivers
-that utilize a LED driver to do the actual work.
-
-Some years ago there was a patch from Peter to implement GPO on top of PWM:
-
-https://lkml.org/lkml/2012/11/22/108
-
-That wasn't merged, but there was also no outright NAK, although it
-seemed different people preferred different approach. That patch is
-quite similar to what we'd need for GPO on top of LED.
-
-However, I'm still not convinced that is the correct solution. A GPO
-support for a PWM output makes sense, as it's just a PWM with full
-on/off output. But a LED means a, well, LED, something that emits light.
-GPO on LED sounds a bit silly.
-
-So... To me it's still slightly unclear when should one write a PWM
-driver and when a LED driver. But I would say that as the TLC591xx
-outputs a PWM signal, it should be a PWM driver. Then the different
-users of this PWM signal could be made on top of that (LED, backlight, GPO).
-
-What would be the technical drawbacks with having the TLC591xx driver as
-a PWM, instead of LED?
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150126/dde4e6d9/attachment.sig>
+Mark.
