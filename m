@@ -1,18 +1,47 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 26 Jan 2015 08:51:08 -0800
-Subject: [PATCH] pinctrl: zynq: Fix usb0 pins
-In-Reply-To: <1422290895-4046-1-git-send-email-afaerber@suse.de>
-References: <1422290895-4046-1-git-send-email-afaerber@suse.de>
-Message-ID: <1b0d387535914b48b3a720ecbe143e08@BN1AFFO11FD032.protection.gbl>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 26 Jan 2015 17:56:19 +0100
+Subject: [PATCH] pinctrl: rockchip: Only mask interrupts; never disable
+In-Reply-To: <1422289444-15142-1-git-send-email-dianders@chromium.org>
+References: <1422289444-15142-1-git-send-email-dianders@chromium.org>
+Message-ID: <1844800.Wx1PProku3@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-01-26 at 05:48PM +0100, Andreas F?rber wrote:
-> Fix usb0 pin 19 -> 29 (matching ethernet1 pins and manual).
-> Pin 19 is used for ethernet0 on the Parallella board.
+Am Montag, 26. Januar 2015, 08:24:03 schrieb Doug Anderson:
+> The Rockchip GPIO interrupt controller totally throws away all status
+> about an interrupt when you "disable" the interrupt.  That has
+> unfortunate consequences in the following situation:
 > 
-> Fixes: add958cee967 ("pinctrl: Add driver for Zynq")
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-Reviewed-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> 1. An edge-triggered interrupt is enabled and should wake the system.
+> 2. System suspend happens: interrupt is disabled and marked for wake.
+> 3. rockchip_irq_suspend() reenables the interrupt so we can wake.
+> 4. Interrupt happens when asleep.
+> 5. rockchip_irq_resume() redisables the interrupt.
+> 6. Disabling the interrupt throws away all status about it.
+> 7. Normal system resume happens and we enable the interrupt again,
+>    since we threw away status about the interrupt we don't know it
+>    fired while suspended.  Even worse: if we need both edges of the
+>    interrupt the logic to swap edges never runs.
+> 
+> Note: even if we somehow can post the status about wakeup interrupts
+> in rockchip_irq_resume() we would still have a window of losing any
+> edges that came in while interrupts were disabled.
+> 
+> If we use mask only then we don't need to worry.  The GPIO Interrupt
+> controller keeps track of pending interrupts that are enabled and just
+> masked.
+> 
+> There was no real strong reason to support the enable/disable
+> functionality (other than that it seemed right), so let's go back to
+> just supporting mask/unmask but actually map it to the real
+> mask/unmask.  This ends up with slightly different (and more correct)
+> behavior than before (f2dd028 pinctrl: rockchip: Fix
+> enable/disable/mask/unmask).
+> 
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
 
-	Soren
+I talked with Doug about it and this looks sane, so
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+
+
+Heiko
