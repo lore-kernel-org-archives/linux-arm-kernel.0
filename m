@@ -1,54 +1,59 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 26 Jan 2015 17:16:14 +0100
-Subject: [PATCH v4 2/5] drivers: bus: Sort Makefile entries alphabetically
-In-Reply-To: <1422288977-20353-1-git-send-email-geert+renesas@glider.be>
-References: <1422288977-20353-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1422288977-20353-3-git-send-email-geert+renesas@glider.be>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 26 Jan 2015 08:14:55 -0800
+Subject: N900 v3.19-rc5 arm atags_to_fdt.c is broken
+In-Reply-To: <201501232336.36187@pali>
+References: <201501232239.55801@pali>
+ <201501232336.36187@pali>
+Message-ID: <20150126161454.GE28663@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Tested-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
----
-v4:
-  - No changes,
+* Pali Roh?r <pali.rohar@gmail.com> [150123 14:39]:
+> On Friday 23 January 2015 22:39:55 Pali Roh?r wrote:
+> > Hello,
+> > 
+> > when I boot zImage with appended DT n900 in qemu
+> > fdt_open_into() function called from file
+> > arch/arm/boot/compressed/atags_to_fdt.c (in function
+> > atags_to_fdt) always returns -FDT_ERR_NOSPACE.
+> > 
+> > It means that all ATAGS (including cmdline arguments) passed
+> > by bootloader are ignored.
+> > 
+> > On real n900 device I see that booted DT version also ignore
+> > cmdline arguments from bootloader. I cannot debug decompress
+> > code on real device, but I think it is same problem as in
+> > qemu.
+> 
+> Looks like this quick patch is fixing above problem:
+> 
+> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> index 68be901..4a7d75b 100644
+> --- a/arch/arm/boot/compressed/head.S
+> +++ b/arch/arm/boot/compressed/head.S
+> @@ -268,7 +268,7 @@ restart:	adr	r0, LC0
+>  		 * area.  No GOT fixup has occurred yet, but none of the
+>  		 * code we're about to call uses any global variable.
+>  		*/
+> -		add	sp, sp, #0x10000
+> +		add	sp, sp, #0x20000
+>  		stmfd	sp!, {r0-r3, ip, lr}
+>  		mov	r0, r8
+>  		mov	r1, r6
+> @@ -289,7 +289,7 @@ restart:	adr	r0, LC0
+>  		bleq	atags_to_fdt
+>  
+>  		ldmfd	sp!, {r0-r3, ip, lr}
+> -		sub	sp, sp, #0x10000
+> +		sub	sp, sp, #0x20000
+>  #endif
+>  
+>  		mov	r8, r6			@ use the appended device tree
 
-v3:
-  - Add Tested-by,
+Nico, got any ideas about this one? This seems like a regression
+somewhere..
 
-v2:
-  - New.
----
- drivers/bus/Makefile | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+Regards,
 
-diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
-index 2973c18cbcc27816..3cfaf2c7f25ac4f0 100644
---- a/drivers/bus/Makefile
-+++ b/drivers/bus/Makefile
-@@ -2,16 +2,16 @@
- # Makefile for the bus drivers.
- #
+Tony
  
-+# Interconnect bus drivers for ARM platforms
-+obj-$(CONFIG_ARM_CCI)		+= arm-cci.o
-+obj-$(CONFIG_ARM_CCN)		+= arm-ccn.o
-+
- obj-$(CONFIG_BRCMSTB_GISB_ARB)	+= brcmstb_gisb.o
--obj-$(CONFIG_IMX_WEIM)	+= imx-weim.o
--obj-$(CONFIG_MVEBU_MBUS) += mvebu-mbus.o
--obj-$(CONFIG_OMAP_OCP2SCP)	+= omap-ocp2scp.o
-+obj-$(CONFIG_IMX_WEIM)		+= imx-weim.o
-+obj-$(CONFIG_MVEBU_MBUS) 	+= mvebu-mbus.o
- 
- # Interconnect bus driver for OMAP SoCs.
- obj-$(CONFIG_OMAP_INTERCONNECT)	+= omap_l3_smx.o omap_l3_noc.o
- 
--# Interconnect bus drivers for ARM platforms
--obj-$(CONFIG_ARM_CCI)		+= arm-cci.o
--obj-$(CONFIG_ARM_CCN)		+= arm-ccn.o
--
-+obj-$(CONFIG_OMAP_OCP2SCP)	+= omap-ocp2scp.o
- obj-$(CONFIG_VEXPRESS_CONFIG)	+= vexpress-config.o
--- 
-1.9.1
