@@ -1,55 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 26 Jan 2015 13:54:06 +0000
-Subject: perf not capturing stack traces
-In-Reply-To: <20150126121243.GA16629@kernel.org>
-References: <20150123195128.GE26557@saruman.tx.rr.com>
- <20150123205959.GD3073@kernel.org>
- <20150123223745.GJ26557@saruman.tx.rr.com>
- <20150124151204.GF3073@kernel.org>
- <20150124222342.GA26941@saruman.tx.rr.com>
- <20150125155651.GB11502@n2100.arm.linux.org.uk>
- <20150126102711.GC15598@arm.com>
- <20150126121243.GA16629@kernel.org>
-Message-ID: <20150126135406.GD11502@n2100.arm.linux.org.uk>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 26 Jan 2015 14:58:18 +0100
+Subject: [PATCH v5 2/2] clocksource: driver for Conexant Digicolor SoC
+ timer
+In-Reply-To: <20150126134751.GE3148@tarshish>
+References: <cover.1422272518.git.baruch@tkos.co.il>
+ <ad84f7155286c45401ff7f6bc6506407cc3beb61.1422272518.git.baruch@tkos.co.il>
+ <54C644AF.9030208@linaro.org> <20150126134751.GE3148@tarshish>
+Message-ID: <54C647FA.7010300@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 26, 2015 at 09:12:43AM -0300, Arnaldo Carvalho de Melo wrote:
-> Em Mon, Jan 26, 2015 at 10:27:11AM +0000, Will Deacon escreveu:
-> > On Sun, Jan 25, 2015 at 03:56:52PM +0000, Russell King - ARM Linux wrote:
-> > > On Sat, Jan 24, 2015 at 04:23:42PM -0600, Felipe Balbi wrote:
-> > > > yeah, I'll try a few older kernels, also see if I can reproduce on other
-> > > > boards.
-> > > 
-> > > Perf works for me with CONFIG_FRAME_POINTER=y, but that's only for kernel
-> > > space, and for userspace where the programs have been built for ARM mode
-> > > with frame pointers.
-> > > 
-> > > The kernel may work without CONFIG_FRAME_POINTER set, but I've never
-> > > tested that, and I'd suggest that (given my experience looking at oops
-> > > dumps) it's not all that reliable.
-> > > 
-> > > Lastly, userspace without frame pointers is pretty much hopeless.
-> > 
-> > FWIW, perf can now use libunwind for unwinding the userspace side of
-> > things, so it's not quite as bad as it used to be. For the kernel side,
-> > if the unwinder isn't working properly it would be nice to know *why*,
-> > but I agree that it tends to be far flakier than the frame-pointer method.
-> 
-> Any idea why, with userspace using frame pointers, perf doesn't go all
-> the way from kernel to userspace main() (or whatever is the endpoint),
-> as Russel stated?
-           ^ *growl*
+On 01/26/2015 02:47 PM, Baruch Siach wrote:
+> Hi Daniel,
+>
+> On Mon, Jan 26, 2015 at 02:44:15PM +0100, Daniel Lezcano wrote:
+>>> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+>>> index 94d90b24b56b..a993c108be67 100644
+>>> --- a/drivers/clocksource/Makefile
+>>> +++ b/drivers/clocksource/Makefile
+>>> @@ -10,6 +10,7 @@ obj-$(CONFIG_SH_TIMER_TMU)	+= sh_tmu.o
+>>>   obj-$(CONFIG_EM_TIMER_STI)	+= em_sti.o
+>>>   obj-$(CONFIG_CLKBLD_I8253)	+= i8253.o
+>>>   obj-$(CONFIG_CLKSRC_MMIO)	+= mmio.o
+>>> +obj-$(CONFIG_ARCH_DIGICOLOR)	+= timer-digicolor.o
+>>
+>> Ah, one minor change I forgot to mention in the last review (sorry about
+>> that).
+>>
+>> Don't depend on the ARCH, add and select a TIMER_DIGICOLOR (or whatever the
+>> name you prefer) in the mach-digicolor/Kconfig and use it here.
+>
+> OK. I'll make the change. I'm just curious: what is the advantage of having a
+> separate config symbol for the timer?
 
-I've rebuilt userspace code which I've been working on in with a bunch of
-flags which makes it use frame pointers in ARM mode, and perf does seem
-to be capable of that; in that case, perf_callchain_user() can walk the
-linked set of frames.
+It is because some timers could be used in different platforms, so the 
+policy of the house is to let the platform Kconfig to select the timer.
 
-However, if glibc is built for thumb2 or doesn't contain frame pointers,
-userspace tracing pretty much stops after you hit the first function in
-userspace.
+Also, that let one platform to not select the timer if it is not needed. 
+For example one SoC uses the architected timers and there is not power 
+management on the board, hence no cpu is powered down and no backup 
+timer is needed.
+
+Even if the timer is expected to be used on only one platform, we try to 
+keep the rule consistent across the different drivers (even if I admit 
+some cleanups should be done in the Kconfig file).
+
+
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
