@@ -1,527 +1,166 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 26 Jan 2015 18:49:31 +0100
-Subject: [PATCH v2] ARM: at91: merge SOC_AT91SAM9xxx
-In-Reply-To: <1421359100-8930-11-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1421359100-8930-11-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1422294571-25356-1-git-send-email-nicolas.ferre@atmel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 26 Jan 2015 17:54:17 +0000
+Subject: [PATCH 3/4] ARM: pmu: add support for interrupt-affinity property
+In-Reply-To: <1422294858-28100-1-git-send-email-will.deacon@arm.com>
+References: <1422294858-28100-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1422294858-28100-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Historically, the PMU devicetree bindings have expected SPIs to be
+listed in order of *logical* CPU number. This is problematic for
+bootloaders, especially when the boot CPU (logical ID 0) isn't listed
+first in the devicetree.
 
-Only use SOC_AT91SAM9 for all the at91sam9 SoCs.
+This patch adds a new optional property, interrupt-affinity, to the
+PMU node which allows the interrupt affinity to be described using
+a list of phandled to CPU nodes, with each entry in the list
+corresponding to the SPI at the same index in the interrupts property.
 
-It enables HAVE_AT91_SMD and HAVE_AT91_UTMI for all the sam9 SoCs but this only
-represents 96 bytes of uncompressed kernel code.
-
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-[nicolas.ferre at atmel.com: remove all use of particular SAM9 config options]
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/configs/at91_dt_defconfig    | 10 +---
- arch/arm/mach-at91/Kconfig            | 92 ++++++++++-------------------------
- arch/arm/mach-at91/Makefile           |  7 ---
- arch/arm/mach-at91/at91sam9260.c      | 26 ----------
- arch/arm/mach-at91/at91sam9261.c      | 25 ----------
- arch/arm/mach-at91/at91sam9263.c      | 24 ---------
- arch/arm/mach-at91/at91sam9g45.c      | 24 ---------
- arch/arm/mach-at91/at91sam9n12.c      | 20 --------
- arch/arm/mach-at91/at91sam9rl.c       | 25 ----------
- arch/arm/mach-at91/at91sam9x5.c       | 20 --------
- arch/arm/mach-at91/include/mach/cpu.h | 52 ++++++--------------
- arch/arm/mach-at91/soc.h              | 20 +-------
- 12 files changed, 42 insertions(+), 303 deletions(-)
- delete mode 100644 arch/arm/mach-at91/at91sam9260.c
- delete mode 100644 arch/arm/mach-at91/at91sam9261.c
- delete mode 100644 arch/arm/mach-at91/at91sam9263.c
- delete mode 100644 arch/arm/mach-at91/at91sam9g45.c
- delete mode 100644 arch/arm/mach-at91/at91sam9n12.c
- delete mode 100644 arch/arm/mach-at91/at91sam9rl.c
- delete mode 100644 arch/arm/mach-at91/at91sam9x5.c
+ arch/arm/include/asm/pmu.h       |  1 +
+ arch/arm/kernel/perf_event_cpu.c | 69 ++++++++++++++++++++++++++++++++++++----
+ 2 files changed, 63 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
-index a67375f24b21..f2670f638e97 100644
---- a/arch/arm/configs/at91_dt_defconfig
-+++ b/arch/arm/configs/at91_dt_defconfig
-@@ -15,15 +15,7 @@ CONFIG_MODULE_UNLOAD=y
- # CONFIG_IOSCHED_CFQ is not set
- CONFIG_ARCH_AT91=y
- CONFIG_SOC_AT91RM9200=y
--CONFIG_SOC_AT91SAM9260=y
--CONFIG_SOC_AT91SAM9261=y
--CONFIG_SOC_AT91SAM9263=y
--CONFIG_SOC_AT91SAM9RL=y
--CONFIG_SOC_AT91SAM9G45=y
--CONFIG_SOC_AT91SAM9X5=y
--CONFIG_SOC_AT91SAM9N12=y
--CONFIG_MACH_AT91RM9200_DT=y
--CONFIG_MACH_AT91SAM9_DT=y
-+CONFIG_SOC_AT91SAM9=y
- CONFIG_AT91_TIMER_HZ=128
- CONFIG_AEABI=y
- CONFIG_UACCESS_WITH_MEMCPY=y
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index c6956b863b9d..c6740e359a44 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -16,15 +16,6 @@ config HAVE_AT91_SMD
- config HAVE_AT91_H32MX
- 	bool
+diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
+index b1596bd59129..675e4ab79f68 100644
+--- a/arch/arm/include/asm/pmu.h
++++ b/arch/arm/include/asm/pmu.h
+@@ -92,6 +92,7 @@ struct pmu_hw_events {
+ struct arm_pmu {
+ 	struct pmu	pmu;
+ 	cpumask_t	active_irqs;
++	int		*irq_affinity;
+ 	char		*name;
+ 	irqreturn_t	(*handle_irq)(int irq_num, void *dev);
+ 	void		(*enable)(struct perf_event *event);
+diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
+index dd9acc95ebc0..488bda0646ec 100644
+--- a/arch/arm/kernel/perf_event_cpu.c
++++ b/arch/arm/kernel/perf_event_cpu.c
+@@ -92,11 +92,16 @@ static void cpu_pmu_free_irq(struct arm_pmu *cpu_pmu)
+ 		free_percpu_irq(irq, &hw_events->percpu_pmu);
+ 	} else {
+ 		for (i = 0; i < irqs; ++i) {
+-			if (!cpumask_test_and_clear_cpu(i, &cpu_pmu->active_irqs))
++			int cpu = i;
++
++			if (cpu_pmu->irq_affinity)
++				cpu = cpu_pmu->irq_affinity[i];
++
++			if (!cpumask_test_and_clear_cpu(cpu, &cpu_pmu->active_irqs))
+ 				continue;
+ 			irq = platform_get_irq(pmu_device, i);
+ 			if (irq >= 0)
+-				free_irq(irq, per_cpu_ptr(&hw_events->percpu_pmu, i));
++				free_irq(irq, per_cpu_ptr(&hw_events->percpu_pmu, cpu));
+ 		}
+ 	}
+ }
+@@ -128,32 +133,37 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
+ 		on_each_cpu(cpu_pmu_enable_percpu_irq, &irq, 1);
+ 	} else {
+ 		for (i = 0; i < irqs; ++i) {
++			int cpu = i;
++
+ 			err = 0;
+ 			irq = platform_get_irq(pmu_device, i);
+ 			if (irq < 0)
+ 				continue;
  
--config SOC_AT91SAM9
--	bool
--	select ATMEL_AIC_IRQ
--	select COMMON_CLK_AT91
--	select CPU_ARM926T
--	select GENERIC_CLOCKEVENTS
--	select MEMORY
--	select ATMEL_SDRAMC
--
- config SOC_SAMA5
- 	bool
- 	select ATMEL_AIC5_IRQ
-@@ -92,67 +83,36 @@ config SOC_AT91RM9200
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_AT91_USB_CLK
++			if (cpu_pmu->irq_affinity)
++				cpu = cpu_pmu->irq_affinity[i];
++
+ 			/*
+ 			 * If we have a single PMU interrupt that we can't shift,
+ 			 * assume that we're running on a uniprocessor machine and
+ 			 * continue. Otherwise, continue without this interrupt.
+ 			 */
+-			if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
++			if (irq_set_affinity(irq, cpumask_of(cpu)) && irqs > 1) {
+ 				pr_warn("unable to set irq affinity (irq=%d, cpu=%u)\n",
+-					irq, i);
++					irq, cpu);
+ 				continue;
+ 			}
  
--config SOC_AT91SAM9260
--	bool "AT91SAM9260, AT91SAM9XE or AT91SAM9G20"
--	select SOC_AT91SAM9
--	select HAVE_AT91_USB_CLK
--	help
--	  Select this if you are using one of Atmel's AT91SAM9260, AT91SAM9XE
--	  or AT91SAM9G20 SoC.
--
--config SOC_AT91SAM9261
--	bool "AT91SAM9261 or AT91SAM9G10"
--	select HAVE_FB_ATMEL
--	select SOC_AT91SAM9
--	select HAVE_AT91_USB_CLK
--	help
--	  Select this if you are using one of Atmel's AT91SAM9261 or AT91SAM9G10 SoC.
--
--config SOC_AT91SAM9263
--	bool "AT91SAM9263"
--	select HAVE_FB_ATMEL
--	select SOC_AT91SAM9
--	select HAVE_AT91_USB_CLK
--
--config SOC_AT91SAM9RL
--	bool "AT91SAM9RL"
--	select HAVE_FB_ATMEL
--	select SOC_AT91SAM9
--	select HAVE_AT91_UTMI
--
--config SOC_AT91SAM9G45
--	bool "AT91SAM9G45 or AT91SAM9M10 families"
--	select HAVE_FB_ATMEL
--	select SOC_AT91SAM9
--	select HAVE_AT91_UTMI
--	select HAVE_AT91_USB_CLK
--	help
--	  Select this if you are using one of Atmel's AT91SAM9G45 family SoC.
--	  This support covers AT91SAM9G45, AT91SAM9G46, AT91SAM9M10 and AT91SAM9M11.
--
--config SOC_AT91SAM9X5
--	bool "AT91SAM9x5 family"
--	select HAVE_FB_ATMEL
--	select SOC_AT91SAM9
--	select HAVE_AT91_UTMI
-+config SOC_AT91SAM9
-+	bool "AT91SAM9"
-+	select ATMEL_AIC_IRQ
-+	select ATMEL_SDRAMC
-+	select COMMON_CLK_AT91
-+	select CPU_ARM926T
-+	select GENERIC_CLOCKEVENTS
- 	select HAVE_AT91_SMD
- 	select HAVE_AT91_USB_CLK
--	help
--	  Select this if you are using one of Atmel's AT91SAM9x5 family SoC.
--	  This means that your SAM9 name finishes with a '5' (except if it is
--	  AT91SAM9G45!).
--	  This support covers AT91SAM9G15, AT91SAM9G25, AT91SAM9X25, AT91SAM9G35
--	  and AT91SAM9X35.
--
--config SOC_AT91SAM9N12
--	bool "AT91SAM9N12 family"
-+	select HAVE_AT91_UTMI
- 	select HAVE_FB_ATMEL
--	select SOC_AT91SAM9
--	select HAVE_AT91_USB_CLK
-+	select MEMORY
- 	help
--	  Select this if you are using Atmel's AT91SAM9N12 SoC.
--
--# ----------------------------------------------------------
-+	  Select this if you are using one of those Atmel SoC:
-+	    AT91SAM9260
-+	    AT91SAM9261
-+	    AT91SAM9263
-+	    AT91SAM9G15
-+	    AT91SAM9G20
-+	    AT91SAM9G25
-+	    AT91SAM9G35
-+	    AT91SAM9G45
-+	    AT91SAM9G46
-+	    AT91SAM9M10
-+	    AT91SAM9M11
-+	    AT91SAM9N12
-+	    AT91SAM9RL
-+	    AT91SAM9X25
-+	    AT91SAM9X35
-+	    AT91SAM9XE
- endif # SOC_SAM_V4_V5
+ 			err = request_irq(irq, handler,
+ 					  IRQF_NOBALANCING | IRQF_NO_THREAD, "arm-pmu",
+-					  per_cpu_ptr(&hw_events->percpu_pmu, i));
++					  per_cpu_ptr(&hw_events->percpu_pmu, cpu));
+ 			if (err) {
+ 				pr_err("unable to request IRQ%d for ARM PMU counters\n",
+ 					irq);
+ 				return err;
+ 			}
  
- comment "AT91 Feature Selections"
-diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-index 8ef7d9a2e855..ad7fc5834188 100644
---- a/arch/arm/mach-at91/Makefile
-+++ b/arch/arm/mach-at91/Makefile
-@@ -8,13 +8,6 @@ obj-$(CONFIG_SOC_AT91SAM9)	+= sam9_smc.o
+-			cpumask_set_cpu(i, &cpu_pmu->active_irqs);
++			cpumask_set_cpu(cpu, &cpu_pmu->active_irqs);
+ 		}
+ 	}
  
- # CPU-specific support
- obj-$(CONFIG_SOC_AT91RM9200)	+= at91rm9200.o at91rm9200_time.o
--obj-$(CONFIG_SOC_AT91SAM9260)	+= at91sam9260.o
--obj-$(CONFIG_SOC_AT91SAM9261)	+= at91sam9261.o
--obj-$(CONFIG_SOC_AT91SAM9263)	+= at91sam9263.o
--obj-$(CONFIG_SOC_AT91SAM9G45)	+= at91sam9g45.o
--obj-$(CONFIG_SOC_AT91SAM9N12)	+= at91sam9n12.o
--obj-$(CONFIG_SOC_AT91SAM9X5)	+= at91sam9x5.o
--obj-$(CONFIG_SOC_AT91SAM9RL)	+= at91sam9rl.o
- obj-$(CONFIG_SOC_SAMA5D3)	+= sama5d3.o
- obj-$(CONFIG_SOC_SAMA5D4)	+= sama5d4.o
+@@ -289,6 +299,48 @@ static int probe_current_pmu(struct arm_pmu *pmu)
+ 	return ret;
+ }
  
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-deleted file mode 100644
-index 37b7ce4c6a3b..000000000000
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ /dev/null
-@@ -1,26 +0,0 @@
--/*
-- * arch/arm/mach-at91/at91sam9260.c
-- *
-- *  Copyright (C) 2006 SAN People
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- */
--
--#include <asm/system_misc.h>
--#include <mach/cpu.h>
--#include <mach/at91_dbgu.h>
--#include <mach/hardware.h>
--
--#include "soc.h"
--#include "generic.h"
--
--/* --------------------------------------------------------------------
-- *  AT91SAM9260 processor initialization
-- * -------------------------------------------------------------------- */
--
--AT91_SOC_START(at91sam9260)
--AT91_SOC_END
-diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-deleted file mode 100644
-index aebbf76b6038..000000000000
---- a/arch/arm/mach-at91/at91sam9261.c
-+++ /dev/null
-@@ -1,25 +0,0 @@
--/*
-- * arch/arm/mach-at91/at91sam9261.c
-- *
-- *  Copyright (C) 2005 SAN People
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- */
--
--#include <asm/system_misc.h>
--#include <mach/cpu.h>
--#include <mach/hardware.h>
--
--#include "soc.h"
--#include "generic.h"
--
--/* --------------------------------------------------------------------
-- *  AT91SAM9261 processor initialization
-- * -------------------------------------------------------------------- */
--
--AT91_SOC_START(at91sam9261)
--AT91_SOC_END
-diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-deleted file mode 100644
-index dca29457d9cc..000000000000
---- a/arch/arm/mach-at91/at91sam9263.c
-+++ /dev/null
-@@ -1,24 +0,0 @@
--/*
-- * arch/arm/mach-at91/at91sam9263.c
-- *
-- *  Copyright (C) 2007 Atmel Corporation.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- */
--
--#include <asm/system_misc.h>
--#include <mach/hardware.h>
--
--#include "soc.h"
--#include "generic.h"
--
--/* --------------------------------------------------------------------
-- *  AT91SAM9263 processor initialization
-- * -------------------------------------------------------------------- */
--
--AT91_SOC_START(at91sam9263)
--AT91_SOC_END
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-deleted file mode 100644
-index 4957a9ef748a..000000000000
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ /dev/null
-@@ -1,24 +0,0 @@
--/*
-- *  Chip-specific setup code for the AT91SAM9G45 family
-- *
-- *  Copyright (C) 2009 Atmel Corporation.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- */
--
--#include <asm/system_misc.h>
--#include <mach/hardware.h>
--
--#include "soc.h"
--#include "generic.h"
--
--/* --------------------------------------------------------------------
-- *  AT91SAM9G45 processor initialization
-- * -------------------------------------------------------------------- */
--
--AT91_SOC_START(at91sam9g45)
--AT91_SOC_END
-diff --git a/arch/arm/mach-at91/at91sam9n12.c b/arch/arm/mach-at91/at91sam9n12.c
-deleted file mode 100644
-index b5ea69a3eaf6..000000000000
---- a/arch/arm/mach-at91/at91sam9n12.c
-+++ /dev/null
-@@ -1,20 +0,0 @@
--/*
-- * SoC specific setup code for the AT91SAM9N12
-- *
-- * Copyright (C) 2012 Atmel Corporation.
-- *
-- * Licensed under GPLv2 or later.
-- */
--
--#include <asm/system_misc.h>
--#include <mach/hardware.h>
--
--#include "soc.h"
--#include "generic.h"
--
--/* --------------------------------------------------------------------
-- *  AT91SAM9N12 processor initialization
-- * -------------------------------------------------------------------- */
--
--AT91_SOC_START(at91sam9n12)
--AT91_SOC_END
-diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-deleted file mode 100644
-index 6cb40e4ec20f..000000000000
---- a/arch/arm/mach-at91/at91sam9rl.c
-+++ /dev/null
-@@ -1,25 +0,0 @@
--/*
-- * arch/arm/mach-at91/at91sam9rl.c
-- *
-- *  Copyright (C) 2005 SAN People
-- *  Copyright (C) 2007 Atmel Corporation
-- *
-- * This file is subject to the terms and conditions of the GNU General Public
-- * License.  See the file COPYING in the main directory of this archive for
-- * more details.
-- */
--
--#include <asm/system_misc.h>
--#include <mach/cpu.h>
--#include <mach/at91_dbgu.h>
--#include <mach/hardware.h>
--
--#include "soc.h"
--#include "generic.h"
--
--/* --------------------------------------------------------------------
-- *  AT91SAM9RL processor initialization
-- * -------------------------------------------------------------------- */
--
--AT91_SOC_START(at91sam9rl)
--AT91_SOC_END
-diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
-deleted file mode 100644
-index 7b60a529db01..000000000000
---- a/arch/arm/mach-at91/at91sam9x5.c
-+++ /dev/null
-@@ -1,20 +0,0 @@
--/*
-- *  Chip-specific setup code for the AT91SAM9x5 family
-- *
-- *  Copyright (C) 2010-2012 Atmel Corporation.
-- *
-- * Licensed under GPLv2 or later.
-- */
--
--#include <asm/system_misc.h>
--#include <mach/hardware.h>
--
--#include "soc.h"
--#include "generic.h"
--
--/* --------------------------------------------------------------------
-- *  AT91SAM9x5 processor initialization
-- * -------------------------------------------------------------------- */
--
--AT91_SOC_START(at91sam9x5)
--AT91_SOC_END
-diff --git a/arch/arm/mach-at91/include/mach/cpu.h b/arch/arm/mach-at91/include/mach/cpu.h
-index 61914fb35f5d..ce7c80a44983 100644
---- a/arch/arm/mach-at91/include/mach/cpu.h
-+++ b/arch/arm/mach-at91/include/mach/cpu.h
-@@ -152,69 +152,45 @@ static inline int at91_soc_is_detected(void)
- #define cpu_is_at91rm9200_pqfp() (0)
- #endif
++static int of_pmu_irq_cfg(struct platform_device *pdev)
++{
++	int i;
++	int *irqs = kcalloc(pdev->num_resources, sizeof(*irqs), GFP_KERNEL);
++
++	if (!irqs)
++		return -ENOMEM;
++
++	for (i = 0; i < pdev->num_resources; ++i) {
++		struct device_node *dn;
++		int cpu = -1;
++
++		dn = of_parse_phandle(pdev->dev.of_node, "interrupt-affinity",
++				      i);
++		if (!dn) {
++			pr_warn("Failed to parse interrupt-affinity for idx %d\n",
++				i);
++			break;
++		}
++
++		for_each_possible_cpu(cpu)
++			if (arch_find_n_match_cpu_physical_id(dn, cpu, NULL))
++				break;
++
++		if (cpu == -1) {
++			pr_warn("Failed to find logical CPU for %s\n",
++				dn->name);
++			break;
++		}
++
++		irqs[i] = cpu;
++		of_node_put(dn);
++	}
++
++	if (i == pdev->num_resources)
++		cpu_pmu->irq_affinity = irqs;
++	else
++		kfree(irqs);
++
++	return 0;
++}
++
+ static int cpu_pmu_device_probe(struct platform_device *pdev)
+ {
+ 	const struct of_device_id *of_id;
+@@ -313,7 +365,10 @@ static int cpu_pmu_device_probe(struct platform_device *pdev)
  
--#ifdef CONFIG_SOC_AT91SAM9260
-+#ifdef CONFIG_SOC_AT91SAM9
- #define cpu_is_at91sam9xe()	(at91_soc_initdata.subtype == AT91_SOC_SAM9XE)
- #define cpu_is_at91sam9260()	(at91_soc_initdata.type == AT91_SOC_SAM9260)
- #define cpu_is_at91sam9g20()	(at91_soc_initdata.type == AT91_SOC_SAM9G20)
--#else
--#define cpu_is_at91sam9xe()	(0)
--#define cpu_is_at91sam9260()	(0)
--#define cpu_is_at91sam9g20()	(0)
--#endif
--
--#ifdef CONFIG_SOC_AT91SAM9261
- #define cpu_is_at91sam9261()	(at91_soc_initdata.type == AT91_SOC_SAM9261)
- #define cpu_is_at91sam9g10()	(at91_soc_initdata.type == AT91_SOC_SAM9G10)
--#else
--#define cpu_is_at91sam9261()	(0)
--#define cpu_is_at91sam9g10()	(0)
--#endif
--
--#ifdef CONFIG_SOC_AT91SAM9263
- #define cpu_is_at91sam9263()	(at91_soc_initdata.type == AT91_SOC_SAM9263)
--#else
--#define cpu_is_at91sam9263()	(0)
--#endif
--
--#ifdef CONFIG_SOC_AT91SAM9RL
- #define cpu_is_at91sam9rl()	(at91_soc_initdata.type == AT91_SOC_SAM9RL)
--#else
--#define cpu_is_at91sam9rl()	(0)
--#endif
--
--#ifdef CONFIG_SOC_AT91SAM9G45
- #define cpu_is_at91sam9g45()	(at91_soc_initdata.type == AT91_SOC_SAM9G45)
- #define cpu_is_at91sam9g45es()	(at91_soc_initdata.subtype == AT91_SOC_SAM9G45ES)
- #define cpu_is_at91sam9m10()	(at91_soc_initdata.subtype == AT91_SOC_SAM9M10)
- #define cpu_is_at91sam9g46()	(at91_soc_initdata.subtype == AT91_SOC_SAM9G46)
- #define cpu_is_at91sam9m11()	(at91_soc_initdata.subtype == AT91_SOC_SAM9M11)
--#else
--#define cpu_is_at91sam9g45()	(0)
--#define cpu_is_at91sam9g45es()	(0)
--#define cpu_is_at91sam9m10()	(0)
--#define cpu_is_at91sam9g46()	(0)
--#define cpu_is_at91sam9m11()	(0)
--#endif
--
--#ifdef CONFIG_SOC_AT91SAM9X5
- #define cpu_is_at91sam9x5()	(at91_soc_initdata.type == AT91_SOC_SAM9X5)
- #define cpu_is_at91sam9g15()	(at91_soc_initdata.subtype == AT91_SOC_SAM9G15)
- #define cpu_is_at91sam9g35()	(at91_soc_initdata.subtype == AT91_SOC_SAM9G35)
- #define cpu_is_at91sam9x35()	(at91_soc_initdata.subtype == AT91_SOC_SAM9X35)
- #define cpu_is_at91sam9g25()	(at91_soc_initdata.subtype == AT91_SOC_SAM9G25)
- #define cpu_is_at91sam9x25()	(at91_soc_initdata.subtype == AT91_SOC_SAM9X25)
-+#define cpu_is_at91sam9n12()	(at91_soc_initdata.type == AT91_SOC_SAM9N12)
- #else
-+#define cpu_is_at91sam9xe()	(0)
-+#define cpu_is_at91sam9260()	(0)
-+#define cpu_is_at91sam9g20()	(0)
-+#define cpu_is_at91sam9261()	(0)
-+#define cpu_is_at91sam9g10()	(0)
-+#define cpu_is_at91sam9263()	(0)
-+#define cpu_is_at91sam9rl()	(0)
-+#define cpu_is_at91sam9g45()	(0)
-+#define cpu_is_at91sam9g45es()	(0)
-+#define cpu_is_at91sam9m10()	(0)
-+#define cpu_is_at91sam9g46()	(0)
-+#define cpu_is_at91sam9m11()	(0)
- #define cpu_is_at91sam9x5()	(0)
- #define cpu_is_at91sam9g15()	(0)
- #define cpu_is_at91sam9g35()	(0)
- #define cpu_is_at91sam9x35()	(0)
- #define cpu_is_at91sam9g25()	(0)
- #define cpu_is_at91sam9x25()	(0)
--#endif
--
--#ifdef CONFIG_SOC_AT91SAM9N12
--#define cpu_is_at91sam9n12()	(at91_soc_initdata.type == AT91_SOC_SAM9N12)
--#else
- #define cpu_is_at91sam9n12()	(0)
- #endif
- 
-diff --git a/arch/arm/mach-at91/soc.h b/arch/arm/mach-at91/soc.h
-index ae6c0b2f1146..f803e1016f74 100644
---- a/arch/arm/mach-at91/soc.h
-+++ b/arch/arm/mach-at91/soc.h
-@@ -40,31 +40,13 @@ static inline int at91_soc_is_enabled(void)
- #define at91rm9200_soc	at91_boot_soc
- #endif
- 
--#if !defined(CONFIG_SOC_AT91SAM9260)
-+#if !defined(CONFIG_SOC_AT91SAM9)
- #define at91sam9260_soc	at91_boot_soc
--#endif
--
--#if !defined(CONFIG_SOC_AT91SAM9261)
- #define at91sam9261_soc	at91_boot_soc
--#endif
--
--#if !defined(CONFIG_SOC_AT91SAM9263)
- #define at91sam9263_soc	at91_boot_soc
--#endif
--
--#if !defined(CONFIG_SOC_AT91SAM9G45)
- #define at91sam9g45_soc	at91_boot_soc
--#endif
--
--#if !defined(CONFIG_SOC_AT91SAM9RL)
- #define at91sam9rl_soc	at91_boot_soc
--#endif
--
--#if !defined(CONFIG_SOC_AT91SAM9X5)
- #define at91sam9x5_soc	at91_boot_soc
--#endif
--
--#if !defined(CONFIG_SOC_AT91SAM9N12)
- #define at91sam9n12_soc	at91_boot_soc
- #endif
- 
+ 	if (node && (of_id = of_match_node(cpu_pmu_of_device_ids, pdev->dev.of_node))) {
+ 		init_fn = of_id->data;
+-		ret = init_fn(pmu);
++
++		ret = of_pmu_irq_cfg(pdev);
++		if (!ret)
++			ret = init_fn(pmu);
+ 	} else {
+ 		ret = probe_current_pmu(pmu);
+ 	}
 -- 
-2.1.3
+2.1.4
