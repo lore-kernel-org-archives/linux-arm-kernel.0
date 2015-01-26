@@ -1,172 +1,94 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Mon, 26 Jan 2015 18:07:57 +0800
-Subject: [PATCH 5/7] pm: at91: add disable/enable the L1/L2 cache while
- suspend/resume
-In-Reply-To: <1422266617-24381-1-git-send-email-wenyou.yang@atmel.com>
-References: <1422266617-24381-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1422266877-24628-1-git-send-email-wenyou.yang@atmel.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 26 Jan 2015 10:11:36 +0000
+Subject: [PATCH 08/27] ARM: mvebu: armada-370-xp: Relicense the device
+ tree under GPLv2+/X11
+In-Reply-To: <1418657915-22775-9-git-send-email-gregory.clement@free-electrons.com>
+References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
+ <1418657915-22775-9-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20150126101136.GA6835@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the sama5, disable L1 D-cache and L2 cache before the cpu go to wfi,
-after wakeing up, enable L1 D-cache and L2 cache.
+On Mon, Dec 15, 2014 at 03:38:16PM +0000, Gregory CLEMENT wrote:
+> The current GPL only licensing on the device tree makes it very
+> impractical for other software components licensed under another
+> license.
+> 
+> In order to make it easier for them to reuse our device trees,
+> relicense our device trees under a GPL/X11 dual-license.
+> 
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Arnaud Ebalard <arno@natisbad.org>
+> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Cc: Greg Ungerer <gerg@uclinux.org>
+> Cc: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+> Cc: Simon Baatz <gmbnomis@gmail.com>
+> Cc: Simon Guinot <simon.guinot@sequanux.org>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Willy Tarreau <w@1wt.eu>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
- arch/arm/mach-at91/pm.c         |    9 ++++
- arch/arm/mach-at91/pm_suspend.S |  107 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 116 insertions(+)
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index f75dc32..50cde92 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -35,6 +35,9 @@
- #include "generic.h"
- #include "pm.h"
- 
-+void __weak at91_disable_l1_l2_cache(void) {}
-+void __weak at91_enable_l1_l2_cache(void) {}
-+
- struct at91_pm_struct at91_pm_data;
- 
- static int at91_pm_valid_state(suspend_state_t state)
-@@ -142,8 +145,14 @@ static void at91_pm_suspend(suspend_state_t state)
- 	pm_data |= (state == PM_SUSPEND_MEM) ?
- 				AT91_PM_MODE(AT91_PM_SLOW_CLOCK) : 0;
- 
-+	/* Disable L1 D-cache and L2 cache */
-+	at91_disable_l1_l2_cache();
-+
- 	at91_suspend_sram_fn(at91_pmc_base, at91_ramc_base[0],
- 				at91_ramc_base[1], pm_data);
-+
-+	/* Enable L1 D-cache and L2 cache */
-+	at91_enable_l1_l2_cache();
- }
- 
- static int at91_pm_enter(suspend_state_t state)
-diff --git a/arch/arm/mach-at91/pm_suspend.S b/arch/arm/mach-at91/pm_suspend.S
-index 88cf228..e6e7f7a 100644
---- a/arch/arm/mach-at91/pm_suspend.S
-+++ b/arch/arm/mach-at91/pm_suspend.S
-@@ -15,6 +15,7 @@
- #include <linux/clk/at91_pmc.h>
- #include <mach/hardware.h>
- #include <mach/at91_ramc.h>
-+#include <asm/hardware/cache-l2x0.h>
- 
- #include "pm.h"
- 
-@@ -329,3 +330,109 @@ ram_restored:
- 
- ENTRY(at91_pm_suspend_in_sram_sz)
- 	.word .-at91_pm_suspend_in_sram
-+
-+/*---------------------------------------*/
-+
-+#if defined(CONFIG_CPU_V7)
-+
-+/*
-+ * void at91_disable_l1_l2_cache(void)
-+ *
-+ * This function code disables, cleans & invalidates the L1 D-cache
-+ * and cleans, invalidates & disable the L2 cache.
-+ */
-+ENTRY(at91_disable_l1_l2_cache)
-+	stmfd	sp!, {r4 - r12, lr}
-+
-+	/*
-+	 * Flush all data from the L1 D-cache before disabling
-+	 * SCTLR.C bit.
-+	 */
-+	bl	v7_flush_dcache_all
-+
-+	/*
-+	 * Clear the SCTLR.C bit to prevent further data cache
-+	 * allocation. Clearing SCTLR.C would make all the data accesses
-+	 * strongly ordered and would not hit the cache.
-+	 */
-+	mrc	p15, 0, r0, c1, c0, 0
-+	bic	r0, r0, #(1 << 2)	@ Disable the C bit
-+	mcr	p15, 0, r0, c1, c0, 0
-+	isb
-+
-+	/*
-+	 * Invalidate L1 D-cache. Even though only invalidate is
-+	 * necessary exported flush API is used here. Doing clean
-+	 * on already clean cache would be almost NOP.
-+	 */
-+	bl	v7_flush_dcache_all
-+
-+	/*
-+	 * Clean and invalidate the L2 cache.
-+	 * Common cache-l2x0.c functions can't be used here since it
-+	 * uses spinlocks. We are out of coherency here with data cache
-+	 * disabled. The spinlock implementation uses exclusive load/store
-+	 * instruction which can fail without data cache being enabled.
-+	 * Because of this, CPU can lead to deadlock.
-+	 */
-+	ldr	r1, at91_l2cc_base_addr
-+	ldr	r2, [r1]
-+	cmp	r2, #0
-+	beq	skip_l2disable
-+	mov	r0, #0xff
-+	str	r0, [r2, #L2X0_CLEAN_INV_WAY]
-+wait:
-+	ldr	r0, [r2, #L2X0_CLEAN_INV_WAY]
-+	mov	r1, #0xff
-+	ands	r0, r0, r1
-+	bne	wait
-+
-+	mov	r0, #0
-+	str	r0, [r2, #L2X0_CTRL]
-+
-+l2x_sync:
-+	ldr	r0, [r2, #L2X0_CACHE_SYNC]
-+	bic	r0, r0, #0x1
-+	str	r0, [r2, #L2X0_CACHE_SYNC]
-+sync:
-+	ldr	r0, [r2, #L2X0_CACHE_SYNC]
-+	ands	r0, r0, #0x1
-+	bne	sync
-+
-+skip_l2disable:
-+	ldmfd	sp!, {r4 - r12, pc}
-+ENDPROC(at91_disable_l1_l2_cache)
-+
-+/*
-+ * void at91_enable_l1_l2_cache(void)
-+ *
-+ * This function code enables the L1 D-cache and the L2 cache.
-+ */
-+ENTRY(at91_enable_l1_l2_cache)
-+	stmfd	sp!, {r4 - r12, lr}
-+
-+	/* Enable the L2 cache */
-+	ldr	r1, at91_l2cc_base_addr
-+	ldr	r2, [r1]
-+	cmp	r2, #0
-+	beq	skip_l2en
-+	ldr	r0, [r2, #L2X0_CTRL]
-+	ands	r0, r0, #L2X0_CTRL_EN
-+	bne	skip_l2en	@ Skip if already enabled
-+	mov	r0, #L2X0_CTRL_EN
-+	str	r0, [r2, #L2X0_CTRL]
-+skip_l2en:
-+
-+	/* Enable the L1 D-cache */
-+	mrc	p15, 0, r0, c1, c0, 0
-+	tst	r0, #(1 << 2)		@ Check C bit enabled?
-+	orreq	r0, r0, #(1 << 2)	@ Enable the C bit
-+	mcreq	p15, 0, r0, c1, c0, 0
-+	isb
-+
-+	ldmfd	sp!, {r4 - r12, pc}
-+ENDPROC(at91_enable_l1_l2_cache)
-+
-+at91_l2cc_base_addr:
-+	.word	at91_l2cc_base
-+#endif
--- 
-1.7.9.5
+> ---
+>  arch/arm/boot/dts/armada-370-xp.dtsi | 40 +++++++++++++++++++++++++++++++++---
+>  1 file changed, 37 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+> index 1af428602748..8a322ad57e5f 100644
+> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
+> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+> @@ -8,9 +8,43 @@
+>   * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>   * Ben Dooks <ben.dooks@codethink.co.uk>
+>   *
+> - * This file is licensed under the terms of the GNU General Public
+> - * License version 2.  This program is licensed "as is" without any
+> - * warranty of any kind, whether express or implied.
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+>   *
+>   * This file contains the definitions that are common to the Armada
+>   * 370 and Armada XP SoC.
+> -- 
+> 1.9.1
+> 
+> 
