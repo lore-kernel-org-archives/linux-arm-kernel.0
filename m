@@ -1,38 +1,55 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Mon, 26 Jan 2015 12:00:59 +0100
-Subject: [PATCH v5 11/18] iommu: exynos: remove useless device_add/remove
- callbacks
-In-Reply-To: <2829552.kzfCU5HyxQ@avalon>
-References: <1422028288-891-1-git-send-email-m.szyprowski@samsung.com>
- <1422028288-891-12-git-send-email-m.szyprowski@samsung.com>
- <2829552.kzfCU5HyxQ@avalon>
-Message-ID: <20150126110059.GC30345@8bytes.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 26 Jan 2015 12:01:06 +0100
+Subject: [PATCH 2/4] ARM: Alpine: early-debug print support
+In-Reply-To: <54c5365c.v0Ob21sdO6QYSZZM%tsahee@annapurnalabs.com>
+References: <54c5365c.v0Ob21sdO6QYSZZM%tsahee@annapurnalabs.com>
+Message-ID: <1504954.Jxbc2j5qJq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
-
-On Sun, Jan 25, 2015 at 05:38:22PM +0200, Laurent Pinchart wrote:
-> IOMMU groups still seem a bit unclear to me. Will Deacon has nicely explained 
-> what they represent in
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/310816.html.
-> The IOMMU core doesn't make groups 
-> mandatory, but requires them in some code paths.
+On Sunday 25 January 2015 20:30:52 Tsahee Zidenberg wrote:
+> Alpine platform includes UART8250 that can be used for early prints.
 > 
-> For example the coldplug device add function add_iommu_group() called for all 
-> devices already registered when bus_set_iommu() is called will try to warn of 
-> devices added multiple times with a WARN_ON(dev->iommu_group). Another example 
-> is the iommu_bus_notifier() function which will call the remove_device() 
-> operation only when dev->iommu_group isn't NULL.
+> Signed-off-by: Saeed Bishara <saeed@annapurnalabs.com>
+> Signed-off-by: Tsahee Zidenberg <tsahee@annapurnalabs.com>
+
+The entries look ok, but please keep them all sorted in the
+respective lists.
+
+> ---
+>  arch/arm/Kconfig.debug | 12 +++++++++++-
+>  1 file changed, 11 insertions(+), 1 deletion(-)
 > 
-> I'm thus unsure whether groups should be made mandatory, or whether the IOMMU 
-> core should be fixed to make them really optional (or, third option, whether 
-> there's something I haven't understood properly).
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index 5ddd490..db6c389 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -1031,6 +1031,14 @@ choice
+>  		  This option selects UART0 on VIA/Wondermedia System-on-a-chip
+>  		  devices, including VT8500, WM8505, WM8650 and WM8850.
+>  
+> +	config DEBUG_ALPINE_UART0
+> +		bool "Kernel low-level debugging messages via Alpine UART0"
+> +		depends on ARCH_ALPINE
+> +		select DEBUG_UART_8250
+> +		help
+> +		  Say Y here if you want kernel low-level debugging support
+> +		  on Alpine based platforms.
+> +
 
-My plan is to make IOMMU groups mandatory. I am currently preparing and
-RFC patch-set to introduce default-domains (which will be per group). So
-when all IOMMU drivers are converted to make use of default domains the
-iommu groups will be mandatory.
+This one is sorted alphabetically
 
+>  	config DEBUG_LL_UART_NONE
+>  		bool "No low-level debugging UART"
+>  		depends on !ARCH_MULTIPLATFORM
+> @@ -1312,6 +1320,7 @@ config DEBUG_UART_PHYS
+>  	default 0xfff36000 if DEBUG_HIGHBANK_UART
+>  	default 0xfffe8600 if DEBUG_UART_BCM63XX
+>  	default 0xfffff700 if ARCH_IOP33X
+> +	default 0xfd883000 if DEBUG_ALPINE_UART0
+>  	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
+>  		DEBUG_LL_UART_EFM32 || \
 
-	Joerg
+And the other two are sorted by address.
+
+	Arnd
