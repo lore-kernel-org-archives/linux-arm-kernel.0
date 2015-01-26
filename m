@@ -1,49 +1,98 @@
-From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
-Date: Mon, 26 Jan 2015 04:01:59 +0100
-Subject: [PATCH v1 2/2] net: stmmac: add fixed_phy support via fixed-link
- DT binding
-In-Reply-To: <1422239858-3452-3-git-send-email-ming.lei@canonical.com>
-References: <1422239858-3452-1-git-send-email-ming.lei@canonical.com>
- <1422239858-3452-3-git-send-email-ming.lei@canonical.com>
-Message-ID: <54C5AE27.4080206@suse.de>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Mon, 26 Jan 2015 03:06:31 +0000
+Subject: [PATCH 07/12] pm: at91: the standby mode uses the same sram
+ function as the suspend to memory mode
+In-Reply-To: <20150123173234.GA26382@gradator.net>
+References: <1421741825-18226-1-git-send-email-wenyou.yang@atmel.com>
+ <1421741825-18226-8-git-send-email-wenyou.yang@atmel.com>
+ <20150123173234.GA26382@gradator.net>
+Message-ID: <B256D81BAE5131468A838E5D7A243641BFD3483D@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 26.01.2015 um 03:37 schrieb Ming Lei:
-> diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
-> index 8c6b7c16..ddb4351 100644
-> --- a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
-> +++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
-> @@ -847,8 +847,11 @@ static int stmmac_init_phy(struct net_device *dev)
->  	 * 0 rather than 0xffff. Catch this here and treat 0 as a non-existent
->  	 * device as well.
->  	 * Note: phydev->phy_id is the result of reading the UID PHY registers.
-> +	 * But phy_id returned from fixed phy is always zero, so bypass the
-> +	 * check for fixed phy.
->  	 */
-> -	if (phydev->phy_id == 0) {
-> +	if (phydev->phy_id == 0 && (!priv->plat->phy_bus_name ||
-> +			strcmp(priv->plat->phy_bus_name,"fixed"))) {
+Hi Sylvain,
 
-Small nit here: There's a space missing between the arguments.
+Thank you for review.
 
-Cheers,
-Andreas
+> -----Original Message-----
+> From: Sylvain Rochet [mailto:sylvain.rochet at finsecur.com]
+> Sent: Saturday, January 24, 2015 1:33 AM
+> To: Yang, Wenyou
+> Cc: Ferre, Nicolas; linux at arm.linux.org.uk; linux-kernel at vger.kernel.org;
+> alexandre.belloni at free-electrons.com; peda at axentia.se; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH 07/12] pm: at91: the standby mode uses the same sram
+> function as the suspend to memory mode
+> 
+> Hello Wenyou,
+> 
+> On Tue, Jan 20, 2015 at 04:17:00PM +0800, Wenyou Yang wrote:
+> >
+> > diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c index
+> > 691e6db..a1010f0 100644
+> > --- a/arch/arm/mach-at91/pm.c
+> > +++ b/arch/arm/mach-at91/pm.c
+>   (...)
+> >  static int at91_pm_enter(suspend_state_t state)  {
+> >  	at91_pinctrl_gpio_suspend();
+> >
+> >  	switch (state) {
+> > +	/*
+> > +	 * Suspend-to-RAM is like STANDBY plus slow clock mode, so
+> > +	 * drivers must suspend more deeply, the master clock switches
+> > +	 * to the clk32k and turns off the main oscillator
+> > +	 *
+> > +	 * STANDBY mode has *all* drivers suspended; ignores irqs not
+> > +	 * marked as 'wakeup' event sources; and reduces DRAM power.
+> > +	 * But otherwise it's identical to PM_SUSPEND_ON:  cpu idle, and
+> > +	 * nothing fancy done with main or cpu clocks.
+> > +	 */
+> > +	case PM_SUSPEND_MEM:
+> > +	case PM_SUSPEND_STANDBY:
+>    (...)
+> > -		case PM_SUSPEND_MEM:
+> > -			/*
+> > -			 * Ensure that clocks are in a valid state.
+> > -			 */
+> > -			if (!at91_pm_verify_clocks())
+> > -				goto error;
+>    (...)
+> > +		if (!at91_pm_verify_clocks())
+> > +			goto error;
+> >
+>    (...)
+> > -		case PM_SUSPEND_STANDBY:
+> > -			/*
+> > -			 * NOTE: the Wait-for-Interrupt instruction needs to be
+> 
+> By doing that at91_pm_verify_clocks() is now called for both MEM and STANDBY
+> targets.
+> 
+> In my opinion this function is misnamed and should be called
+> at91_pm_verify_clocks_for_slow_clock_mode(). This function actually checks if
+> we can safely switch to slow clock mode, if some peripherals are still using the
+> master clock, we abort the suspend because we can't suspend in good condition.
+> Hard unclocking peripherals which ask for a soft stop, like USB controllers, is
+> something we should avoid doing.
+> 
+> This function checks if USB PLL and PLL B are stopped, if PCK0..PCK3 are
+> stopped too (or just using the 32k clock). If all drivers suspended correctly this is
+> the state we expect and we can suspend in a deep state.
+> 
+> Not this is currently not the case in linux-next, suspend/resume support to all Atmel
+> USB drivers (ehci-atmel,ohci-at91,atmel_usba,at91_udc) are in my series:
+>  [PATCHv7 0/6] USB: host: Atmel OHCI and EHCI drivers improvements
+>    <1421761144-11767-1-git-send-email-sylvain.rochet@finsecur.com>
+>  [PATCHv6 0/5] USB: gadget: atmel_usba_udc: Driver improvements
+>    <1421945805-31129-1-git-send-email-sylvain.rochet@finsecur.com>
+> 
+> We are not going to change any clock for STANDBY target, there is no clock to
+> check, so we don't need to call at91_pm_verify_clocks() for this target.
+I will change in the next version.
+Thanks.
 
->  		phy_disconnect(phydev);
->  		return -ENODEV;
->  	}
-[snip]
+> 
+> Sylvain
 
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Jennifer Guild, Dilip Upmanyu,
-Graham Norton; HRB 21284 (AG N?rnberg)
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150126/4315fdde/attachment.sig>
+Best Regards,
+Wenyou Yang
