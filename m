@@ -1,56 +1,94 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 26 Jan 2015 16:45:02 +0100
-Subject: [PATCH] ARM: dts: re-fromat AT91 part to match other entries
-In-Reply-To: <2263559.r5MiMeqJt6@wuerfel>
-References: <20150112224203.GL22090@quad.lixom.net>
- <20150113230956.GA15087@quad.lixom.net> <20150113234759.GH3843@piout.net>
- <2263559.r5MiMeqJt6@wuerfel>
-Message-ID: <54C660FE.3000401@atmel.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Mon, 26 Jan 2015 07:50:22 -0800
+Subject: [PATCH v3] ARM: zynq: DT: Add USB to device tree
+In-Reply-To: <54C60A56.7010403@suse.de>
+References: <1417536431-27759-1-git-send-email-soren.brinkmann@xilinx.com>
+ <d78fedd84f354d80985187f851cb3cd1@BN1AFFO11FD055.protection.gbl>
+ <54C5F89A.3090901@suse.de> <54C5F965.90100@monstr.eu>
+ <54C5FBC3.7030903@suse.de> <54C60A56.7010403@suse.de>
+Message-ID: <c65880cef67945ebaf61306febc1349b@BN1BFFO11FD010.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 14/01/2015 10:05, Arnd Bergmann a ?crit :
-> On Wednesday 14 January 2015 00:47:59 Alexandre Belloni wrote:
->>
->> On 13/01/2015 at 15:09:56 -0800, Olof Johansson wrote :
->>> On Tue, Jan 13, 2015 at 03:43:00PM +0100, Nicolas Ferre wrote:
->>>> The entries are separated as ARM V4/V5 and ARM V7 as some other per-SoC config
->>>> options may be removed in the near future.
->>>>
->>>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->>>> ---
->>>> Hi Olof,
->>>>
->>>> This is an attempt to match other ARM SoC families format.
->>>> If you feel that the patch can be good, do not hesitate to take it yourself. I
->>>> don't plan to integrate it in any of my pull-request so it can appear quickly in
->>>> arm-soc and can be used by everyone.
->>>
->>> Hi,
->>>
->>> If you see what Peter did, he split up the rules per-SoC based on how
->>> things were selectable in Kconfig. Since you seem to have the Kconfig
->>> entries already, how about doing the same? That way the same information
->>> w.r.t. SoC family that you have as comments isn't lost either.
->>>
->>
->> You didn't see the patch set yet because it depends on a lot of other
->> series still being discussed but after the switch to multiplatform, the
->> only config option left will be SOC_AT91RM9200, SOC_AT91SAM9 (both
->> under SOC_SAM_V4_V5) and SOC_SAMA5, under SOC_SAM_V7.
->>
->> That's our plan, unless you feel that we should keep one config option
->> per SoC.
+On Mon, 2015-01-26 at 10:35AM +0100, Andreas F?rber wrote:
+> Am 26.01.2015 um 09:33 schrieb Andreas F?rber:
+> > Am 26.01.2015 um 09:23 schrieb Michal Simek:
+> >> On 01/26/2015 09:19 AM, Andreas F?rber wrote:
+> >>> And if I apply it to my -next based tree, adding corresponding nodes to
+> >>> zynq-parallella.dts, I get repeatedly:
+> >>>
+> >>> [  +0,012242] ci_hdrc ci_hdrc.0: no of_node; not parsing pinctrl DT
+> >>> [  +0,000157] ci_hdrc ci_hdrc.0: ChipIdea HDRC found, lpm: 0; cap:
+> >>> f090e100 op: f090e140
+> >>> [  +0,000081] platform ci_hdrc.0: Driver ci_hdrc requests probe deferral
+> >>> [  +0,005360] ci_hdrc ci_hdrc.1: no of_node; not parsing pinctrl DT
+> >>> [  +0,000120] ci_hdrc ci_hdrc.1: ChipIdea HDRC found, lpm: 0; cap:
+> >>> f0910100 op: f0910140
+> >>> [  +0,001810] platform ci_hdrc.1: Driver ci_hdrc requests probe deferral
+> >>>
+> >>> Am I missing any other patches or config options?
+> >>> (I do notice that the pinctrl v3 patch that got merged has a trivial bug
+> >>> for usb0, for which I'll send a patch later on.)
+> >>
+> >> Why is it deferred? Is it because of pinmuxing stuff?
+> > 
+> > No, happened without as well.
+> > 
+> > Looking at a different place in dmesg, I spot this:
+> > 
+> > [  +0,003988] usb_phy_generic phy0: GPIO lookup for consumer reset-gpios
+> > [  +0,000012] usb_phy_generic phy0: using device tree for GPIO lookup
+> > [  +0,000015] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpios'
+> > property
+> >  of node '/phy0[0]'
+> > [  +0,000013] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpio'
+> > property
+> > of node '/phy0[0]'
+> > [  +0,000010] usb_phy_generic phy0: using lookup tables for GPIO lookup
+> > [  +0,000153] usb_phy_generic phy0: lookup for GPIO reset-gpios failed
+> > [  +0,000012] usb_phy_generic phy0: Error requesting RESET GPIO
+> > [  +0,004360] usb_phy_generic: probe of phy0 failed with error -2
+> > [  +0,004991] usb_phy_generic phy1: GPIO lookup for consumer reset-gpios
+> > [  +0,000012] usb_phy_generic phy1: using device tree for GPIO lookup
+> > [  +0,000013] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpios'
+> > property
+> >  of node '/phy1[0]'
+> > [  +0,000013] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpio'
+> > property of node '/phy1[0]'
+> > [  +0,000010] usb_phy_generic phy1: using lookup tables for GPIO lookup
+> > [  +0,000012] usb_phy_generic phy1: lookup for GPIO reset-gpios failed
+> > [  +0,000011] usb_phy_generic phy1: Error requesting RESET GPIO
+> > [  +0,004337] usb_phy_generic: probe of phy1 failed with error -2
+> > 
+> > So, I guess the chipidea driver is deferring because the phys want a
+> > property that neither me nor you are specifying? Would that be the two
+> > MDIO pins 52 and 53 that would need to be specified?
 > 
-> With the patches that I prepared last year, all of AT91SAM9 becomes
-> one small file, so there really isn't any need to have separate Kconfig
-> options.
+> Erm, scratch that last question - wrong PHY. Trying it resolved the
+> above phy errors but not the original problem. And so does an empty one:
+> 
+> @@ -99,11 +100,13 @@
+> 
+>         usb_phy0: phy0 {
+>                 compatible = "usb-nop-xceiv";
+> +               reset-gpios = <>;
+>                 #phy-cells = <0>;
+>         };
+> 
+>         usb_phy1: phy1 {
+>                 compatible = "usb-nop-xceiv";
+> +               reset-gpios = <>;
+>                 #phy-cells = <0>;
+>         };
+>  };
+> 
+> In my manuals and notes I can't find any GPIO being used as reset for
+> the USB PHYs. Any thoughts appreciated.
 
-Hi Olof,
+Such a connection is optional. The platform might rely on its reset
+circuit, though it might not work for warm reboots.
+I haven't looked at parallela docs, but if there is a schematic
+available, that should tell you if/what is connected to the PHY reset
+pin.
 
-After what noted Alexandre and Arnd, don't you think my initial attempt
-was okay? Aka: ping ;-)
-
-Bye,
--- 
-Nicolas Ferre
+	Soren
