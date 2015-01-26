@@ -1,49 +1,81 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 26 Jan 2015 14:56:56 +0100
-Subject: [PATCH 2/5] ARM: sun5i: Relicense the A10s/A13 DTSI under
- GPLv2/X11
-In-Reply-To: <20150126111048.GB24085@e102568-lin.cambridge.arm.com>
-References: <1409682069-7164-1-git-send-email-maxime.ripard@free-electrons.com>
- <1409682069-7164-2-git-send-email-maxime.ripard@free-electrons.com>
- <20150126111048.GB24085@e102568-lin.cambridge.arm.com>
-Message-ID: <20150126135656.GF31568@lukather>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 26 Jan 2015 15:15:47 +0100
+Subject: [PATCH v2 03/27] ARM: mvebu: armada-370-mirabox: Relicense the device
+ tree under GPLv2+/X11
+In-Reply-To: <1422281771-31443-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1422281771-31443-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1422281771-31443-4-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 26, 2015 at 11:10:48AM +0000, Lorenzo Pieralisi wrote:
-> On Tue, Sep 02, 2014 at 07:21:06PM +0100, Maxime Ripard wrote:
-> > The current GPL only licensing on the DTSI makes it very impractical for other
-> > software components licensed under another license.
-> > 
-> > In order to make it easier for them to reuse our device trees, relicense our
-> > DTSI first under a GPL/X11 dual-license. Hopefully, the DTS will follow soon.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Chen-Yu Tsai <wens@csie.org>
-> > Cc: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
-> > Cc: Emilio L?pez <emilio@elopez.com.ar>
-> > Cc: Hans de Goede <hdegoede@redhat.com>
-> > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Cc: Oliver Schinagl <oliver@schinagl.nl>
-> > Cc: Roman Byshko <rbyshko@gmail.com>
-> 
-> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+The current GPL only licensing on the device tree makes it very
+impractical for other software components licensed under another
+license.
 
-Thanks Lorenzo!
+In order to make it easier for them to reuse our device trees,
+relicense our device trees under a GPL/X11 dual-license.
 
-Applied the two patches with all the Acked-by.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Acked-by: Arnaud Ebalard <arno@natisbad.org>
+Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Acked-by: Jason Cooper <jason@lakedaemon.net>
+Acked-by: Ryan Press <ryan@presslab.us>
+Acked-by: Simon Baatz <gmbnomis@gmail.com>
+Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-370-mirabox.dts | 40 +++++++++++++++++++++++++++++---
+ 1 file changed, 37 insertions(+), 3 deletions(-)
 
-Maxime
-
+diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
+index e1b0eb6b091f..b10ceb488efe 100644
+--- a/arch/arm/boot/dts/armada-370-mirabox.dts
++++ b/arch/arm/boot/dts/armada-370-mirabox.dts
+@@ -3,9 +3,43 @@
+  *
+  * Gregory CLEMENT <gregory.clement@free-electrons.com>
+  *
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
+  */
+ 
+ /dts-v1/;
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150126/0585fc27/attachment.sig>
+2.1.0
