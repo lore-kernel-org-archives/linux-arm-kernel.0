@@ -1,56 +1,59 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 26 Jan 2015 14:34:38 +0100
-Subject: [PATCH v2 02/12] pm: at91: Workaround DDRSDRC self-refresh bug
- with LPDDR1 memories.
-In-Reply-To: <20150126103605.GA20837@gradator.net>
-References: <1422265005-22937-1-git-send-email-wenyou.yang@atmel.com>
- <1422265139-23011-1-git-send-email-wenyou.yang@atmel.com>
- <20150126103605.GA20837@gradator.net>
-Message-ID: <54C6426E.9090808@atmel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 26 Jan 2015 13:36:02 +0000
+Subject: [PATCH RESEND v3 2/3] irqchip: vf610-mscm: dt-bindings: add MSCM
+ bindings
+In-Reply-To: <1421309046-22452-3-git-send-email-stefan@agner.ch>
+References: <1421309046-22452-1-git-send-email-stefan@agner.ch>
+ <1421309046-22452-3-git-send-email-stefan@agner.ch>
+Message-ID: <20150126133602.GG23313@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 26/01/2015 11:36, Sylvain Rochet a ?crit :
-> Hello Wenyou,
+On Thu, Jan 15, 2015 at 08:04:05AM +0000, Stefan Agner wrote:
+> Add binding documentation for Miscellaneous System Control Module
+> found in Freescale Vybrid SoC's.
 > 
-> On Mon, Jan 26, 2015 at 05:38:59PM +0800, Wenyou Yang wrote:
->> From: Peter Rosin <peda@axentia.se>
->>
->> The DDRSDR controller fails miserably to put LPDDR1 memories in
->> self-refresh. Force the controller to think it has DDR2 memories
->> during the self-refresh period, as the DDR2 self-refresh spec is
->> equivalent to LPDDR1, and is correctly implemented in the
->> controller.
->>
->> Assume that the second controller has the same fault, but that is
->> untested.
->>
->> Signed-off-by: Peter Rosin <peda@axentia.se>
->> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> ---
->>  arch/arm/mach-at91/pm_slowclock.S  |   43 +++++++++++++++++++++++++++++++-----
->>  include/soc/at91/at91sam9_ddrsdr.h |    2 +-
->>  2 files changed, 39 insertions(+), 6 deletions(-)
->>
->> diff --git a/arch/arm/mach-at91/pm_slowclock.S b/arch/arm/mach-at91/pm_slowclock.S
->> index e2bfaf5..1155217 100644
->> --- a/arch/arm/mach-at91/pm_slowclock.S
->> +++ b/arch/arm/mach-at91/pm_slowclock.S
->> @@ -100,6 +100,16 @@ ddr_sr_enable:
->>  	cmp	memctrl, #AT91_MEMCTRL_DDRSDR
->>  	bne	sdr_sr_enable
->>  
->> +	/* LPDDR1 --> force DDR2 mode during self-refresh */
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>  .../bindings/arm/freescale/fsl,vf610-mscm.txt         | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm.txt
 > 
-> I think we should explain we are dealing with an errata here, this is 
-> not obvious at first sight, the patch summary may find its place here :-)
+> diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm.txt
+> new file mode 100644
+> index 0000000..e051b88
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm.txt
+> @@ -0,0 +1,19 @@
+> +Freescale Vybrid Miscellaneous System Control Module
+> +
+> +The MSCM IP contains Access Control and TrustZone Security hardware,
+> +CPU Configuration registers and Interrupt Router control.
+> +
+> +Required properties:
+> +- compatible : "fsl,vf610-mscm", "syscon"
 
-True but the problem is that this errata is not public yet, it will be
-in a couple of weeks.
+I'm a little concerned by this also being a syscon. What other devices
+need to refer to this block as a syscon?
 
-I have the feeling though that the commit message is pretty clear. We'll
-maybe add that it"s an actual errata.
+> +- interrupt-controller : Identifies the node as an interrupt controller
+> +- #interrupt-cells : Two cells, interrupt number and flags (IRQ type)
 
-Bye,
--- 
-Nicolas Ferre
+What numbers and flags are valid?
+
+Mark.
+
+> +- reg : the register range of the MSCM module
+> +
+> +Example:
+> +	mscm: mscm at 40001000 {
+> +		compatible = "fsl,vf610-mscm", "syscon";
+> +		interrupt-controller;
+> +		#interrupt-cells = <2>;
+> +		interrupt-parent = <&intc>;
+> +		reg = <0x40001000 0x1000>;
+> +	}
+> -- 
+> 2.2.1
+> 
+> 
