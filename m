@@ -1,86 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 26 Jan 2015 09:03:23 -0800
-Subject: N900 v3.19-rc5 arm atags_to_fdt.c is broken
-In-Reply-To: <201501261723.10505@pali>
-References: <201501232239.55801@pali> <201501232336.36187@pali>
- <20150126161454.GE28663@atomide.com> <201501261723.10505@pali>
-Message-ID: <20150126170323.GF28663@atomide.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 26 Jan 2015 09:12:10 -0800
+Subject: [PATCH v2] ARM: at91: sama5d4: dts: change the nand compatible
+ string
+In-Reply-To: <54C65838.4020707@atmel.com>
+References: <1421656387-12538-2-git-send-email-josh.wu@atmel.com>
+ <1421923305-10088-1-git-send-email-josh.wu@atmel.com>
+ <54C0D872.6010005@atmel.com> <54C65838.4020707@atmel.com>
+Message-ID: <20150126171210.GC5273@norris-Latitude-E6410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pali Roh?r <pali.rohar@gmail.com> [150126 08:26]:
-> On Monday 26 January 2015 17:14:55 Tony Lindgren wrote:
-> > * Pali Roh?r <pali.rohar@gmail.com> [150123 14:39]:
-> > > On Friday 23 January 2015 22:39:55 Pali Roh?r wrote:
-> > > > Hello,
-> > > > 
-> > > > when I boot zImage with appended DT n900 in qemu
-> > > > fdt_open_into() function called from file
-> > > > arch/arm/boot/compressed/atags_to_fdt.c (in function
-> > > > atags_to_fdt) always returns -FDT_ERR_NOSPACE.
-> > > > 
-> > > > It means that all ATAGS (including cmdline arguments)
-> > > > passed by bootloader are ignored.
-> > > > 
-> > > > On real n900 device I see that booted DT version also
-> > > > ignore cmdline arguments from bootloader. I cannot debug
-> > > > decompress code on real device, but I think it is same
-> > > > problem as in qemu.
-> > > 
-> > > Looks like this quick patch is fixing above problem:
-> > > 
-> > > diff --git a/arch/arm/boot/compressed/head.S
-> > > b/arch/arm/boot/compressed/head.S index 68be901..4a7d75b
-> > > 100644
-> > > --- a/arch/arm/boot/compressed/head.S
-> > > +++ b/arch/arm/boot/compressed/head.S
-> > > @@ -268,7 +268,7 @@ restart:	adr	r0, LC0
-> > > 
-> > >  		 * area.  No GOT fixup has occurred yet, but none of 
-> the
-> > >  		 * code we're about to call uses any global variable.
-> > >  		
-> > >  		*/
-> > > 
-> > > -		add	sp, sp, #0x10000
-> > > +		add	sp, sp, #0x20000
-> > > 
-> > >  		stmfd	sp!, {r0-r3, ip, lr}
-> > >  		mov	r0, r8
-> > >  		mov	r1, r6
-> > > 
-> > > @@ -289,7 +289,7 @@ restart:	adr	r0, LC0
-> > > 
-> > >  		bleq	atags_to_fdt
-> > >  		
-> > >  		ldmfd	sp!, {r0-r3, ip, lr}
-> > > 
-> > > -		sub	sp, sp, #0x10000
-> > > +		sub	sp, sp, #0x20000
-> > > 
-> > >  #endif
-> > >  
-> > >  		mov	r8, r6			@ use the appended device tree
+On Mon, Jan 26, 2015 at 04:07:36PM +0100, Nicolas Ferre wrote:
+> Le 22/01/2015 12:01, Nicolas Ferre a ?crit :
+> > Le 22/01/2015 11:41, Josh Wu a ?crit :
+> >> As we introduce a new "atmel,sama5d4-nand" compatible string for sama5d4,
+> >> so we need to apply it for sama5d4 chip.
+> >>
+> >> Signed-off-by: Josh Wu <josh.wu@atmel.com>
 > > 
-> > Nico, got any ideas about this one? This seems like a
-> > regression somewhere..
+> > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 > > 
-> > Regards,
+> > Brian,
+> > I suppose that it makes sense to keep this patch with the previous one.
+> > So, can you take it in your tree?
 > > 
-> > Tony
-> 
-> $ du -b arch/arm/boot/dts/omap3-n900.dtb 
-> 70212   arch/arm/boot/dts/omap3-n900.dtb
-> 
-> $ echo $((0x10000))
-> 65536
-> 
-> I would say, problem is because omap3-n900 binary DT is too large
+> > Otherwise, it can take the at91 -> arm-soc route.
 
-OK if that's the case, then your patch makes sense to me. It also
-seems we can have the temporary stack be larger than the initial
-stack just for atags_to_fdt.
+I actually would prefer that. The changes are sane enough by themselves,
+and I don't often touch the arch/arm DTS files.
 
-Regards,
+> I take it with me right now and try to send it to arm-soc for 3.20.
 
-Tony
+That's fine. Thanks.
+
+Brian
