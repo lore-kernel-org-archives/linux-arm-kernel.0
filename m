@@ -1,73 +1,80 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 26 Jan 2015 16:05:14 +0300
-Subject: [PATCH 2/7] pm: at91: pm_suspend: add the WFI support for ARMv7
-In-Reply-To: <1422266761-24487-1-git-send-email-wenyou.yang@atmel.com>
-References: <1422266617-24381-1-git-send-email-wenyou.yang@atmel.com>
- <1422266761-24487-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <54C63B8A.9000702@cogentembedded.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Mon, 26 Jan 2015 13:06:42 +0000
+Subject: [RFC PATCH 1/3] drivers: of: fix resources freeing in
+ of_pci_get_host_bridge_resources()
+In-Reply-To: <20150126112111.GA547@red-moon>
+References: <1420644571-18928-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1420644571-18928-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <20150119183228.GE10762@e106497-lin.cambridge.arm.com>
+ <20150120104922.GF5398@red-moon>
+ <20150120112031.GA342@bart.dudau.co.uk>
+ <20150126112111.GA547@red-moon>
+Message-ID: <20150126130642.GB956@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Mon, Jan 26, 2015 at 11:21:11AM +0000, Lorenzo Pieralisi wrote:
+> On Tue, Jan 20, 2015 at 11:20:32AM +0000, Liviu Dudau wrote:
+> > On Tue, Jan 20, 2015 at 10:49:22AM +0000, Lorenzo Pieralisi wrote:
+> > > On Mon, Jan 19, 2015 at 06:32:29PM +0000, Liviu Dudau wrote:
+> > > 
+> > > [...]
+> > > 
+> > > > > @@ -146,6 +146,7 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
+> > > > >  	struct of_pci_range_parser parser;
+> > > > >  	char range_type[4];
+> > > > >  	int err;
+> > > > > +	struct pci_host_bridge_window *window;
+> > > > >  
+> > > > >  	if (io_base)
+> > > > >  		*io_base = (resource_size_t)OF_BAD_ADDR;
+> > > > > @@ -225,7 +226,10 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
+> > > > >  conversion_failed:
+> > > > >  	kfree(res);
+> > > > >  parse_failed:
+> > > > > +	list_for_each_entry(window, resources, list)
+> > > > > +		kfree(window->res);
+> > > > >  	pci_free_resource_list(resources);
+> > > > > +	kfree(bus_range);
+> > > > >  	return err;
+> > > > >  }
+> > > > >  EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
+> > > > 
+> > > > Hi Lorenzo et all,
+> > > > 
+> > > > Here is my personal view and I am happy to hear from others on the desired
+> > > > behaviour:
+> > > > 
+> > > > When I wrote this function what I had in mind was that it will parse as
+> > > > much as possible from the device tree and return a list of resources that
+> > > > could be successfully converted. If the entire list of ranges could not
+> > > > be converted then an error code will be returned, but the caller still
+> > > > had the list as constructed up to the error. It was the job of the caller
+> > > > to free the list in either cases, as stated in the comment.
+> > > 
+> > > That's what I am questioning. If the function takes an error path, the
+> > > windows list is freed, so the resource pointers are gone. There is no
+> > > way the caller can grab those resource pointers and free them.
+> > 
+> > I stand corrected. Your patch is needed.
+> 
+> Mind acking it ? I will ask Bjorn to take it then.
 
-On 1/26/2015 1:06 PM, Wenyou Yang wrote:
+Sure. 
 
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> ---
->   arch/arm/mach-at91/pm_suspend.S |   54 ++++++++++++++++++++++++++++++++++++++-
->   1 file changed, 53 insertions(+), 1 deletion(-)
+Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
 
-> diff --git a/arch/arm/mach-at91/pm_suspend.S b/arch/arm/mach-at91/pm_suspend.S
-> index 122a3f1..e796722 100644
-> --- a/arch/arm/mach-at91/pm_suspend.S
-> +++ b/arch/arm/mach-at91/pm_suspend.S
-> @@ -53,6 +53,58 @@ mode	.req	r6
->   	beq	1b
->   	.endm
->
-> +/*
-> + * Put the processor to enter the WFI state
-> + */
-> +	.macro _do_wfi
-> +
-> +#if defined(CONFIG_CPU_V7)
-> +	/*
-> +	 * Execute an ISB instruction to flush the pipeline to ensure
-> +	 * that all of operations have beem completed.
+> 
+> Thanks,
+> Lorenzo
+> 
 
-    Been.
-
-> +	 */
-> +	isb
-> +
-> +	/*
-> +	 * Execute an ISB instruction to ensure that all of the
-
-    ISB again, while you're executing DSB/DMB?
-
-> +	 * CP15 register changes have been committed.
-> +	 */
-> +	dsb
-> +	dmb
-> +
-> +	/* Disable the processor's clock */
-> +	mov	tmp1, #AT91_PMC_PCK
-
-    What's 'tmp1'? Is that a register name?
-
-> +	str	tmp1, [pmc, #AT91_PMC_SCDR]
-> +
-> +	/* Execute a WFI instruction */
-
-    Self-obvious comment, I'd say...
-
-> +	wfi	@ Wait For Interrupt
-> +
-> +	/*
-> +	 * CPU can specualatively prefetch the instructions
-
-    Speculatively.
-
-[...]
-
-WBR, Sergei
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
