@@ -1,31 +1,60 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sun, 25 Jan 2015 23:23:37 +0100
-Subject: [PATCH 0/2] ARM: dts: rockchip: add basic display nodes
-In-Reply-To: <CAGS+omAWJWOGpdFdqV57NkzVZGdnXmuZua3RG5XBZKzX8OBW9A@mail.gmail.com>
-References: <3715086.HVfme6flvD@phil>
- <CAGS+omAWJWOGpdFdqV57NkzVZGdnXmuZua3RG5XBZKzX8OBW9A@mail.gmail.com>
-Message-ID: <4325309.iUKh4KUx77@diego>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 26 Jan 2015 01:10:16 +0100
+Subject: [PATCH] tty: serial: fsl_lpuart: terminate DMA on buffer flush
+Message-ID: <1422231016-27793-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Sonntag, 25. Januar 2015, 10:13:22 schrieb Daniel Kurtz:
-> On Thu, Jan 22, 2015 at 5:31 AM, Heiko St?bner <heiko@sntech.de> wrote:
-> > The core drm support will be part of 3.19 and the hdmi support will enter
-> > the 3.20 kernel - so add at least the basic devicetree nodes.
-> > 
-> > I've pulled these patches out of the Chromium tree, adapted them to the
-> > current mainline dts and have been using them with a bunch of code on top
-> > with the vga connector of a firefly board for a week or so.
-> > 
-> > @Daniel et all: I hope I've kept all the tags and attributions intact.
-> > If anything is wrong please holler.
-> 
-> The series looks good to me.
-> Thanks!
+On uart buffer flush, serial core resets the circular buffer.
+If a DMA transfer is in progress at that time, the callback
+lpuart_dma_tx_complete will move buffer's tail unconditionally,
+hence tail moves beyond head. Use the flush_buffer hook to
+terminate the DMA imeaditely and avoid lpuart_dma_tx_complete
+being called in this situation.
 
-great :-)
+This bug often showed up while shutdown and lead to duplicate
+serial console output.
 
-I've added both patches to my dts branch.
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ drivers/tty/serial/fsl_lpuart.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-
-Heiko
+diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
+index e95c497..7615b5d 100644
+--- a/drivers/tty/serial/fsl_lpuart.c
++++ b/drivers/tty/serial/fsl_lpuart.c
+@@ -454,6 +454,15 @@ static int lpuart_dma_rx(struct lpuart_port *sport)
+ 	return 0;
+ }
+ 
++static void lpuart_flush_buffer(struct uart_port *port)
++{
++	struct lpuart_port *sport = container_of(port, struct lpuart_port, port);
++	if (sport->lpuart_dma_tx_use) {
++		dmaengine_terminate_all(sport->dma_tx_chan);
++		sport->dma_tx_in_progress = 0;
++	}
++}
++
+ static void lpuart_dma_rx_complete(void *arg)
+ {
+ 	struct lpuart_port *sport = arg;
+@@ -1519,6 +1528,7 @@ static struct uart_ops lpuart_pops = {
+ 	.release_port	= lpuart_release_port,
+ 	.config_port	= lpuart_config_port,
+ 	.verify_port	= lpuart_verify_port,
++	.flush_buffer	= lpuart_flush_buffer,
+ };
+ 
+ static struct uart_ops lpuart32_pops = {
+@@ -1537,6 +1547,7 @@ static struct uart_ops lpuart32_pops = {
+ 	.release_port	= lpuart_release_port,
+ 	.config_port	= lpuart_config_port,
+ 	.verify_port	= lpuart_verify_port,
++	.flush_buffer	= lpuart_flush_buffer,
+ };
+ 
+ static struct lpuart_port *lpuart_ports[UART_NR];
+-- 
+2.2.2
