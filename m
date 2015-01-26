@@ -1,43 +1,40 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 26 Jan 2015 09:57:57 +0000
-Subject: [RFC PATCH v3 2/2] arm: kernel: fix pci_mmap_page_range() offset
- calculation
-In-Reply-To: <20150123235911.GG13072@google.com>
-References: <1415877558-8906-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1415877558-8906-3-git-send-email-lorenzo.pieralisi@arm.com>
- <20150123235911.GG13072@google.com>
-Message-ID: <20150126095757.GB23384@e102568-lin.cambridge.arm.com>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Mon, 26 Jan 2015 18:03:37 +0800
+Subject: [PATCH 0/7] AT91 pm improvements for 3.20
+Message-ID: <1422266617-24381-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 23, 2015 at 11:59:11PM +0000, Bjorn Helgaas wrote:
-> On Thu, Nov 13, 2014 at 11:19:16AM +0000, Lorenzo Pieralisi wrote:
-> > The pci_mmap_page_range() API should be written to expect offset
-> > values representing PCI memory resource addresses as seen by user
-> > space, through the pci_resource_to_user() API.
-> > 
-> > ARM relies on the standard implementation of pci_resource_to_user()
-> > which actually is an identity map and exports to user space
-> > PCI memory resources as they are stored in PCI devices resources
-> > structures, which represent CPU physical addresses (fixed-up using
-> > BUS to CPU address conversions) not PCI bus addresses.
-> > 
-> > Therefore, on ARM platforms where the mapping between CPU and BUS
-> > address is not a 1:1 the current pci_mmap_page_range() implementation is
-> > erroneous, in that an additional shift is applied to an already fixed-up
-> > offset passed from userspace.
-> > 
-> > Hence, this patch removes the mem_offset from the pgoff calculation
-> > since the offset as passed from user space already represents the CPU
-> > physical address corresponding to the resource to be mapped, ie no
-> > additional offset should be applied.
-> > 
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Russell King <linux@arm.linux.org.uk>
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> 
-> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+Hi Nicolas,
 
-Thank you, I will ask Russell to merge it.
+This patch set is add pm support for ARMv7 SoCs.
+ - Add WFI support for ARMv7.
+ - Disable the L1 D-cache and L2 cache before suspending.
+ - Get the memory type from the dts file config.
+ - Disable the mpddr controller's clock and DDR clock during the suspending.
 
-Lorenzo
+It is based on the following patch set,
+	[PATCH v2 00/12] AT91 pm cleanup for 3.20
+
+Patrice Vilchez (1):
+  pm: at91: pm_suspend: MOR register KEY was missing
+
+Wenyou Yang (6):
+  pm: at91: achieve the memory controller's type from the dts file.
+  pm: at91: pm_suspend: add the WFI support for ARMv7
+  ARM: at91: enable the L2 Cache controller
+  pm: at91: add disable/enable the L1/L2 cache while suspend/resume
+  pm: at91: add achieve the mpddrc peripheral ID and the DDR clock ID
+    support
+  pm: at91: add disable/enable the mpddrc's clock and DDR clock support
+
+ arch/arm/mach-at91/board-dt-sama5.c |   53 ++++++++
+ arch/arm/mach-at91/generic.h        |    7 ++
+ arch/arm/mach-at91/pm.c             |   22 ++--
+ arch/arm/mach-at91/pm.h             |    8 ++
+ arch/arm/mach-at91/pm_suspend.S     |  227 ++++++++++++++++++++++++++++++++++-
+ arch/arm/mach-at91/setup.c          |   52 +++++++-
+ 6 files changed, 356 insertions(+), 13 deletions(-)
+
+-- 
+1.7.9.5
