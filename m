@@ -1,92 +1,192 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 26 Jan 2015 15:17:47 +0900
-Subject: [PATCH 00/14 v2] ARM: shmobile: Remove sh7372/Mackerel and ZBOOT
- MMC/SDHI support V2
-Message-ID: <20150126061747.6848.9708.sendpatchset@little-apple>
+Date: Mon, 26 Jan 2015 15:17:58 +0900
+Subject: [PATCH 01/14 v2] ARM: shmobile: mackerel: Remove ZBOOT code
+In-Reply-To: <20150126061747.6848.9708.sendpatchset@little-apple>
+References: <20150126061747.6848.9708.sendpatchset@little-apple>
+Message-ID: <20150126061758.6848.22708.sendpatchset@little-apple>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM: shmobile: Remove sh7372/Mackerel and ZBOOT MMC/SDHI support V2
+From: Magnus Damm <damm+renesas@opensource.se>
 
-[PATCH 01/14 v2] ARM: shmobile: mackerel: Remove ZBOOT code
-[PATCH 02/14 v2] ARM: shmobile: mackerel: Remove Legacy C board code
-[PATCH 03/14 v2] ARM: shmobile: mackerel dts: Remove Legacy DTS file
-[PATCH 04/14 v2] ARM: shmobile: mackerel: Remove DT binding documentation
-[PATCH 05/14 v2] ARM: shmobile: mackerel: Remove mach-type entry
-[PATCH 06/14 v2] ARM: shmobile: mackerel: Remove defconfig
-[PATCH 07/14 v2] ARM: shmobile: mackerel: Remove from MAINTAINERS
-[PATCH 08/14 v2] ARM: shmobile: sh7372: Remove ZBOOT MMC/SDHI support
-[PATCH 09/14 v2] ARM: shmobile: sh7372: Remove Legacy C SoC code
-[PATCH 10/14 v2] ARM: shmobile: sh7372: Remove DT binding documentation
-[PATCH 11/14 v2] ARM: shmobile: sh7372 dtsi: Remove Legacy DTSI file
-[PATCH 12/14 v2] Documentation: Remove ZBOOT MMC/SDHI utility and docs
-[PATCH 13/14 v2] pinctrl: sh-pfc: sh7372: Remove PFC support
-[PATCH 14/14 v2] pinctrl: sh-pfc: sh7372: Remove DT binding documentation
-
-Here is my latest attempt (V2) of legacy board and SoC support removal
-for Mackerel and sh7372. Both the ARM mach-shmobile code base and the
-PINCTRL subsystem is affected.
-
-Also get rid of the remaining ZBOOT MMC/SDHI code, documentation and
-utility that has no user once sh7372 is gone.
-
-The Cortex-A8 based sh7372 SoC is rather old and never went into mass
-production anyway, so these patches that remove SoC and board support
-will only affect a few selected developers.
-
-I wish we had some way to make use of the ZBOOT MMC/SDHI code, but
-without any board or SoC code it makes little sense to keep it.
-
-Thanks to Laurent and Geert for review!
+Remove ZBOOT support code for Mackerel. With this patch in place
+it is no longer possible to boot a self-contained kernel directly
+from the reset vector. ZBOOT is still supported on kzm9g.
 
 Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
 
- Built on top of renesas-devel-20150123-v3.19-rc5
+ Changes since V1:
+ - Rebased and resolved conflicts
 
- Documentation/Makefile                                            |    2 
- Documentation/arm/Makefile                                        |    1 
- Documentation/arm/SH-Mobile/Makefile                              |    7 
- Documentation/arm/SH-Mobile/vrl4.c                                |  170 
- Documentation/arm/SH-Mobile/zboot-rom-mmcif.txt                   |   29 
- Documentation/arm/SH-Mobile/zboot-rom-sdhi.txt                    |   42 
- Documentation/devicetree/bindings/arm/shmobile.txt                |    4 
- Documentation/devicetree/bindings/pinctrl/renesas,pfc-pinctrl.txt |    8 
- MAINTAINERS                                                       |    1 
- arch/arm/Kconfig                                                  |   29 
- arch/arm/Kconfig.debug                                            |    7 
- arch/arm/boot/compressed/Makefile                                 |   15 
- arch/arm/boot/compressed/head-shmobile.S                          |   30 
- arch/arm/boot/compressed/mmcif-sh7372.c                           |   88 
- arch/arm/boot/compressed/sdhi-sh7372.c                            |   95 
- arch/arm/boot/compressed/sdhi-shmobile.c                          |  449 -
- arch/arm/boot/compressed/sdhi-shmobile.h                          |   11 
- arch/arm/boot/dts/Makefile                                        |    1 
- arch/arm/boot/dts/sh7372-mackerel.dts                             |   26 
- arch/arm/boot/dts/sh7372.dtsi                                     |   35 
- arch/arm/configs/mackerel_defconfig                               |  157 
- arch/arm/mach-shmobile/Kconfig                                    |   16 
- arch/arm/mach-shmobile/Makefile                                   |    6 
- arch/arm/mach-shmobile/Makefile.boot                              |    1 
- arch/arm/mach-shmobile/board-mackerel.c                           | 1522 -----
- arch/arm/mach-shmobile/clock-sh7372.c                             |  620 --
- arch/arm/mach-shmobile/common.h                                   |    1 
- arch/arm/mach-shmobile/entry-intc.S                               |   54 
- arch/arm/mach-shmobile/include/mach/head-mackerel.txt             |   93 
- arch/arm/mach-shmobile/include/mach/mmc-mackerel.h                |   38 
- arch/arm/mach-shmobile/include/mach/mmc.h                         |   16 
- arch/arm/mach-shmobile/include/mach/sdhi-sh7372.h                 |   21 
- arch/arm/mach-shmobile/include/mach/sdhi.h                        |   16 
- arch/arm/mach-shmobile/include/mach/zboot.h                       |    5 
- arch/arm/mach-shmobile/intc-sh7372.c                              |  672 --
- arch/arm/mach-shmobile/pm-sh7372.c                                |  549 --
- arch/arm/mach-shmobile/setup-sh7372.c                             | 1016 ---
- arch/arm/mach-shmobile/sh7372.h                                   |   84 
- arch/arm/mach-shmobile/sleep-sh7372.S                             |   98 
- arch/arm/tools/mach-types                                         |    1 
- drivers/pinctrl/sh-pfc/Kconfig                                    |    5 
- drivers/pinctrl/sh-pfc/Makefile                                   |    1 
- drivers/pinctrl/sh-pfc/core.c                                     |    9 
- drivers/pinctrl/sh-pfc/core.h                                     |    1 
- drivers/pinctrl/sh-pfc/pfc-sh7372.c                               | 2645 ----------
- 45 files changed, 8 insertions(+), 8689 deletions(-)
+ arch/arm/mach-shmobile/include/mach/head-mackerel.txt |   93 -----------------
+ arch/arm/mach-shmobile/include/mach/mmc-mackerel.h    |   38 ------
+ arch/arm/mach-shmobile/include/mach/mmc.h             |    5 
+ arch/arm/mach-shmobile/include/mach/zboot.h           |    5 
+ 4 files changed, 1 insertion(+), 140 deletions(-)
+
+--- 0001/arch/arm/mach-shmobile/include/mach/head-mackerel.txt
++++ /dev/null	2015-01-13 15:44:39.280208949 +0900
+@@ -1,93 +0,0 @@
+-LIST "partner-jet-setup.txt"
+-LIST "(C) Copyright 2010 Renesas Solutions Corp"
+-LIST "Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>"
+-
+-LIST "RWT Setting"
+-EW 0xE6020004, 0xA500
+-EW 0xE6030004, 0xA500
+-
+-LIST "GPIO Setting"
+-EB 0xE6051013, 0xA2
+-
+-LIST "CPG"
+-ED 0xE61500C0, 0x00000002
+-
+-WAIT 1, 0xFE40009C
+-
+-LIST "FRQCR"
+-ED 0xE6150000, 0x2D1305C3
+-ED 0xE61500E0, 0x9E40358E
+-ED 0xE6150004, 0x80331050
+-
+-WAIT 1, 0xFE40009C
+-
+-ED 0xE61500E4, 0x00002000
+-
+-WAIT 1, 0xFE40009C
+-
+-LIST "PLL"
+-ED 0xE6150028, 0x00004000
+-
+-WAIT 1, 0xFE40009C
+-
+-ED 0xE615002C, 0x93000040
+-
+-WAIT 1, 0xFE40009C
+-
+-LIST "SUB/USBClk"
+-ED 0xE6150080, 0x00000180
+-
+-LIST "BSC"
+-ED 0xFEC10000, 0x00E0001B
+-
+-LIST "SBSC1"
+-ED 0xFE400354, 0x01AD8000
+-ED 0xFE400354, 0x01AD8001
+-
+-WAIT 5, 0xFE40009C
+-
+-ED 0xFE400008, 0xBCC90151
+-ED 0xFE400040, 0x41774113
+-ED 0xFE400044, 0x2712E229
+-ED 0xFE400048, 0x20C18505
+-ED 0xFE40004C, 0x00110209
+-ED 0xFE400010, 0x00000087
+-
+-WAIT 30, 0xFE40009C
+-
+-ED 0xFE400084, 0x0000003F
+-EB 0xFE500000, 0x00
+-
+-WAIT 5, 0xFE40009C
+-
+-ED 0xFE400084, 0x0000FF0A
+-EB 0xFE500000, 0x00
+-
+-WAIT 1, 0xFE40009C
+-
+-ED 0xFE400084, 0x00002201
+-EB 0xFE500000, 0x00
+-ED 0xFE400084, 0x00000302
+-EB 0xFE500000, 0x00
+-EB 0xFE5C0000, 0x00
+-ED 0xFE400008, 0xBCC90159
+-ED 0xFE40008C, 0x88800004
+-ED 0xFE400094, 0x00000004
+-ED 0xFE400028, 0xA55A0032
+-ED 0xFE40002C, 0xA55A000C
+-ED 0xFE400020, 0xA55A2048
+-ED 0xFE400008, 0xBCC90959
+-
+-LIST "Change CPGA setting"
+-ED 0xE61500E0, 0x9E40352E
+-ED 0xE6150004, 0x80331050
+-
+-WAIT 1, 0xFE40009C
+-
+-ED 0xFE400354, 0x01AD8002
+-
+-LIST "SCIF0 - Serial port for earlyprintk"
+-EB 0xE6053098, 0xe1
+-EW 0xE6C40000, 0x0000
+-EB 0xE6C40004, 0x19
+-EW 0xE6C40008, 0x0030
+--- 0001/arch/arm/mach-shmobile/include/mach/mmc-mackerel.h
++++ /dev/null	2015-01-13 15:44:39.280208949 +0900
+@@ -1,38 +0,0 @@
+-#ifndef MMC_MACKEREL_H
+-#define MMC_MACKEREL_H
+-
+-#define PORT0CR      (void __iomem *)0xe6051000
+-#define PORT1CR      (void __iomem *)0xe6051001
+-#define PORT2CR      (void __iomem *)0xe6051002
+-#define PORT159CR    (void __iomem *)0xe605009f
+-
+-#define PORTR031_000DR (void __iomem *)0xe6055000
+-#define PORTL159_128DR (void __iomem *)0xe6054010
+-
+-static inline void mmc_init_progress(void)
+-{
+-       /* Initialise LEDS0-3
+-        * registers: PORT0CR-PORT2CR,PORT159CR (LED0-LED3 Control)
+-        * value:     0x10 - enable output
+-        */
+-       __raw_writeb(0x10, PORT0CR);
+-       __raw_writeb(0x10, PORT1CR);
+-       __raw_writeb(0x10, PORT2CR);
+-       __raw_writeb(0x10, PORT159CR);
+-}
+-
+-static inline void mmc_update_progress(int n)
+-{
+-	unsigned a = 0, b = 0;
+-
+-	if (n < 3)
+-		a = 1 << n;
+-	else
+-		b = 1 << 31;
+-
+-	__raw_writel((__raw_readl(PORTR031_000DR) & ~0x7) | a,
+-		     PORTR031_000DR);
+-	__raw_writel((__raw_readl(PORTL159_128DR) & ~(1 << 31)) | b,
+-		     PORTL159_128DR);
+-}
+-#endif /* MMC_MACKEREL_H */
+--- 0001/arch/arm/mach-shmobile/include/mach/mmc.h
++++ work/arch/arm/mach-shmobile/include/mach/mmc.h	2015-01-26 13:25:56.975993591 +0900
+@@ -7,10 +7,5 @@
+  *
+  **************************************************/
+ 
+-#ifdef CONFIG_MACH_MACKEREL
+-#include "mach/mmc-mackerel.h"
+-#else
+ #error "unsupported board."
+-#endif
+-
+ #endif /* MMC_H */
+--- 0001/arch/arm/mach-shmobile/include/mach/zboot.h
++++ work/arch/arm/mach-shmobile/include/mach/zboot.h	2015-01-26 13:26:47.145993411 +0900
+@@ -9,10 +9,7 @@
+  *
+  **************************************************/
+ 
+-#ifdef CONFIG_MACH_MACKEREL
+-#define MEMORY_START	0x40000000
+-#include "mach/head-mackerel.txt"
+-#elif defined(CONFIG_MACH_KZM9G) || defined(CONFIG_MACH_KZM9G_REFERENCE)
++#if defined(CONFIG_MACH_KZM9G) || defined(CONFIG_MACH_KZM9G_REFERENCE)
+ #define MEMORY_START	0x43000000
+ #include "mach/head-kzm9g.txt"
+ #else
