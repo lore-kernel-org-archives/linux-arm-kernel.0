@@ -1,9 +1,9 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 26 Jan 2015 17:16:15 +0100
-Subject: [PATCH v4 3/5] drivers: bus: Add Simple Power-Managed Bus DT Bindings
+Date: Mon, 26 Jan 2015 17:16:13 +0100
+Subject: [PATCH v4 1/5] drivers: bus: Sort Kconfig entries alphabetically
 In-Reply-To: <1422288977-20353-1-git-send-email-geert+renesas@glider.be>
 References: <1422288977-20353-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1422288977-20353-4-git-send-email-geert+renesas@glider.be>
+Message-ID: <1422288977-20353-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,69 +11,86 @@ Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Tested-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 ---
 v4:
-  - Replace "simple-bus" by "simple-pm-bus",
-  - Remove the "renesas,bsc" bindings. They will be specified in a
-    separate document.
+  - No changes,
 
 v3:
   - Add Tested-by,
-  - Document required properties inherited from "simple-bus",
-  - Document required "reg" property for "renesas,bsc",
-  - Move "ranges" before "reg" in the example,
 
 v2:
   - New.
 ---
- .../devicetree/bindings/bus/simple-pm-bus.txt      | 41 ++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/bus/simple-pm-bus.txt
+ drivers/bus/Kconfig | 44 ++++++++++++++++++++++----------------------
+ 1 file changed, 22 insertions(+), 22 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/bus/simple-pm-bus.txt b/Documentation/devicetree/bindings/bus/simple-pm-bus.txt
-new file mode 100644
-index 0000000000000000..0415e93a816c5ac0
---- /dev/null
-+++ b/Documentation/devicetree/bindings/bus/simple-pm-bus.txt
-@@ -0,0 +1,41 @@
-+Simple Power-Managed Bus
-+========================
+diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+index b99729e368608bda..626960819e6df16c 100644
+--- a/drivers/bus/Kconfig
++++ b/drivers/bus/Kconfig
+@@ -4,6 +4,21 @@
+ 
+ menu "Bus devices"
+ 
++config ARM_CCI
++	bool "ARM CCI driver support"
++	depends on ARM && OF && CPU_V7
++	help
++	  Driver supporting the CCI cache coherent interconnect for ARM
++	  platforms.
 +
-+A Simple Power-Managed Bus is a transparent bus that doesn't need a real
-+driver, as it's typically initialized by the boot loader.
++config ARM_CCN
++	bool "ARM CCN driver support"
++	depends on ARM || ARM64
++	depends on PERF_EVENTS
++	help
++	  PMU (perf) driver supporting the ARM CCN (Cache Coherent Network)
++	  interconnect.
 +
-+However, its bus controller is part of a PM domain, or under the control of a
-+functional clock.  Hence, the bus controller's PM domain and/or clock must be
-+enabled for child devices connected to the bus (either on-SoC or externally)
-+to function.
-+
-+The bindings for the Simple Power-Managed Bus extend the bindings for
-+"simple-bus", as specified in ePAPR.
-+
-+
-+Required properties:
-+  - compatible: Must contain at least "simple-pm-bus".
-+		It's recommended to let this be preceded by one or more
-+		vendor-specific compatible values.
-+  - #address-cells, #size-cells, ranges: Must describe the mapping between
-+		parent address and child address spaces.
-+
-+Optional platform-specific properties for clock or PM domain control (at least
-+one of them is required):
-+  - clocks: Must contain a reference to the functional clock(s),
-+  - power-domains: Must contain a reference to the PM domain.
-+
-+
-+Example:
-+
-+	bsc: bus at fec10000 {
-+		compatible = "renesas,bsc-sh73a0", "renesas,bsc",
-+			     "simple-pm-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0 0x20000000>;
-+		reg = <0xfec10000 0x400>;
-+		interrupts = <0 39 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&zb_clk>;
-+		power-domains = <&pd_a4s>;
-+	};
+ config BRCMSTB_GISB_ARB
+ 	bool "Broadcom STB GISB bus arbiter"
+ 	depends on ARM || MIPS
+@@ -27,15 +42,6 @@ config MVEBU_MBUS
+ 	  Driver needed for the MBus configuration on Marvell EBU SoCs
+ 	  (Kirkwood, Dove, Orion5x, MV78XX0 and Armada 370/XP).
+ 
+-config OMAP_OCP2SCP
+-	tristate "OMAP OCP2SCP DRIVER"
+-	depends on ARCH_OMAP2PLUS
+-	help
+-	  Driver to enable ocp2scp module which transforms ocp interface
+-	  protocol to scp protocol. In OMAP4, USB PHY is connected via
+-	  OCP2SCP and in OMAP5, both USB PHY and SATA PHY is connected via
+-	  OCP2SCP.
+-
+ config OMAP_INTERCONNECT
+ 	tristate "OMAP INTERCONNECT DRIVER"
+ 	depends on ARCH_OMAP2PLUS
+@@ -43,20 +49,14 @@ config OMAP_INTERCONNECT
+ 	help
+ 	  Driver to enable OMAP interconnect error handling driver.
+ 
+-config ARM_CCI
+-	bool "ARM CCI driver support"
+-	depends on ARM && OF && CPU_V7
+-	help
+-	  Driver supporting the CCI cache coherent interconnect for ARM
+-	  platforms.
+-
+-config ARM_CCN
+-	bool "ARM CCN driver support"
+-	depends on ARM || ARM64
+-	depends on PERF_EVENTS
++config OMAP_OCP2SCP
++	tristate "OMAP OCP2SCP DRIVER"
++	depends on ARCH_OMAP2PLUS
+ 	help
+-	  PMU (perf) driver supporting the ARM CCN (Cache Coherent Network)
+-	  interconnect.
++	  Driver to enable ocp2scp module which transforms ocp interface
++	  protocol to scp protocol. In OMAP4, USB PHY is connected via
++	  OCP2SCP and in OMAP5, both USB PHY and SATA PHY is connected via
++	  OCP2SCP.
+ 
+ config VEXPRESS_CONFIG
+ 	bool "Versatile Express configuration bus"
 -- 
 1.9.1
