@@ -1,54 +1,34 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 26 Jan 2015 12:38:48 +0200
-Subject: [PATCH 01/23] ARM: OMAP2+: clock: move clock provider
- infrastructure to clock driver
-In-Reply-To: <alpine.DEB.2.02.1501242142181.5450@utopia.booyaka.com>
-References: <1417103514-17027-1-git-send-email-t-kristo@ti.com>
- <1417103514-17027-2-git-send-email-t-kristo@ti.com>
- <alpine.DEB.2.02.1501242142181.5450@utopia.booyaka.com>
-Message-ID: <54C61938.8000303@ti.com>
+From: jroedel@suse.de (Joerg Roedel)
+Date: Mon, 26 Jan 2015 11:42:29 +0100
+Subject: [PATCH URGENT] arm: dma-mapping: Set DMA IOMMU ops in
+ arm_iommu_attach_device()
+In-Reply-To: <1422022909-31044-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1422022909-31044-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <20150126104229.GB2312@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/01/15 23:51, Paul Walmsley wrote:
-> + Tomi 
+On Fri, Jan 23, 2015 at 04:21:49PM +0200, Laurent Pinchart wrote:
+> Commit 4bb25789ed28228a ("arm: dma-mapping: plumb our iommu mapping ops
+> into arch_setup_dma_ops") moved the setting of the DMA operations from
+> arm_iommu_attach_device() to arch_setup_dma_ops() where the DMA
+> operations to be used are selected based on whether the device is
+> connected to an IOMMU. However, the IOMMU detection scheme requires the
+> IOMMU driver to be ported to the new IOMMU of_xlate API. As no driver
+> has been ported yet, this effectively breaks all IOMMU ARM users that
+> depend on the IOMMU being handled transparently by the DMA mapping API.
 > 
-> On Thu, 27 Nov 2014, Tero Kristo wrote:
+> Fix this by restoring the setting of DMA IOMMU ops in
+> arm_iommu_attach_device() and splitting the rest of the function into a
+> new internal __arm_iommu_attach_device() function, called by
+> arch_setup_dma_ops().
 > 
->> Splits the clock provider init out of the PRM driver and moves it to
->> clock driver. This is needed so that once the PRCM drivers are separated,
->> they can logically just access the clock driver not needing to go through
->> common PRM code. This would be wrong in the case of control module for
->> example.
->>
->> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> 
-> This patch moves things in the wrong direction (ie, rather than keeping 
-> the PRM register accesses in the PRM code, it moves PRM register accesses 
-> into the clock code).  But I see that a subsequent patch in this series 
-> moves them back.  So this change is temporary and that seems reasonable to 
-> me.
-> 
-> However, as long as the clock code wants to do low-level register accesses 
-> to PRM/CM/SCM registers, there needs to be some way to keep register 
-> updates originating from the clock code from racing with register updates 
-> coming from other code (e.g. non-clock-related PRM/CM/SCM accesses). So 
-> I've changed this patch to use regmap (as below), and the followup patch 
-> later in the series will be changed too.  Seems to work so far but let's 
-> see how things go with the rest of the series.
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> ---
+>  arch/arm/mm/dma-mapping.c | 53 +++++++++++++++++++++++++++++++++--------------
+>  1 file changed, 38 insertions(+), 15 deletions(-)
 
-I'm not sure if I miss something, but regmap_write does not protect from
-problems if there are multiple users for the same registers. You need to
-use regmap_update_bits() to get a protected read/write sequence, in
-which you can change only the bits that you want to change.
-
- Tomi
+I guess this patch will be merged by one of the ARM trees?
 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150126/59dadd47/attachment.sig>
+	Joerg
