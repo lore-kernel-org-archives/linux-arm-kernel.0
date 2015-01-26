@@ -1,44 +1,48 @@
 From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
-Date: Mon, 26 Jan 2015 09:22:24 -0700
-Subject: [PATCH 8/9] coresight-etm: remove check for unknown Kconfig macro
+Date: Mon, 26 Jan 2015 09:22:20 -0700
+Subject: [PATCH 4/9] coresight: remove the extra spaces
 In-Reply-To: <1422289345-2084-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1422289345-2084-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1422289345-2084-9-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1422289345-2084-5-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Paul Bolle <pebolle@tiscali.nl>
+From: Kaixu Xia <xiakaixu@huawei.com>
 
-The CoreSight ETM/PTM driver contains a check for a
-CONFIG_CORESIGHT_SOURCE_ETM_DEFAULT_ENABLE macro. But there's no related
-Kconfig symbol CORESIGHT_SOURCE_ETM_DEFAULT_ENABLE. Remove that check
-and the single line of code it hides.
+There are some extra spaces, so just remove them from these lines.
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+Signed-off-by: Kaixu Xia <xiakaixu@huawei.com>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/coresight/coresight-etm3x.c | 8 +-------
- 1 file changed, 1 insertion(+), 7 deletions(-)
+ drivers/coresight/coresight-etb10.c | 2 +-
+ drivers/coresight/coresight.c       | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/coresight/coresight-etm3x.c b/drivers/coresight/coresight-etm3x.c
-index 73c36696f1b6..c965f5724abd 100644
---- a/drivers/coresight/coresight-etm3x.c
-+++ b/drivers/coresight/coresight-etm3x.c
-@@ -34,14 +34,8 @@
+diff --git a/drivers/coresight/coresight-etb10.c b/drivers/coresight/coresight-etb10.c
+index a1da7020201b..c9acd406f0d0 100644
+--- a/drivers/coresight/coresight-etb10.c
++++ b/drivers/coresight/coresight-etb10.c
+@@ -454,7 +454,7 @@ static int etb_probe(struct amba_device *adev, const struct amba_id *id)
+ 	if (ret)
+ 		return ret;
  
- #include "coresight-etm.h"
+-	drvdata->buffer_depth =  etb_get_buffer_depth(drvdata);
++	drvdata->buffer_depth = etb_get_buffer_depth(drvdata);
+ 	clk_disable_unprepare(drvdata->clk);
  
--#ifdef CONFIG_CORESIGHT_SOURCE_ETM_DEFAULT_ENABLE
--static int boot_enable = 1;
--#else
- static int boot_enable;
--#endif
--module_param_named(
--	boot_enable, boot_enable, int, S_IRUGO
--);
-+module_param_named(boot_enable, boot_enable, int, S_IRUGO);
+ 	if (drvdata->buffer_depth < 0)
+diff --git a/drivers/coresight/coresight.c b/drivers/coresight/coresight.c
+index d6052e2cd6a7..c5def9382357 100644
+--- a/drivers/coresight/coresight.c
++++ b/drivers/coresight/coresight.c
+@@ -498,7 +498,7 @@ static int coresight_orphan_match(struct device *dev, void *data)
+ 	 * Circle throuch all the connection of that component.  If we find
+ 	 * an orphan connection whose name matches @csdev, link it.
+ 	 */
+-	for (i = 0; i < i_csdev->nr_outport; i++)	{
++	for (i = 0; i < i_csdev->nr_outport; i++) {
+ 		conn = &i_csdev->conns[i];
  
- /* The number of ETM/PTM currently registered */
- static int etm_count;
+ 		/* We have found at least one orphan connection */
 -- 
 1.9.1
