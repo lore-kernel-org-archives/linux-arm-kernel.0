@@ -1,73 +1,108 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 26 Jan 2015 19:02:23 +0000
-Subject: [PATCH 4/8] arm64: Add EL2 switch to soft_restart
-In-Reply-To: <bb44d4eee4fab15278e4a8829a0981878bc9acd7.1421449714.git.geoff@infradead.org>
-References: <cover.1421449714.git.geoff@infradead.org>
- <bb44d4eee4fab15278e4a8829a0981878bc9acd7.1421449714.git.geoff@infradead.org>
-Message-ID: <20150126190223.GO23313@leverpostej>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Mon, 26 Jan 2015 20:09:45 +0100
+Subject: [PATCH] ARM: /proc/cpuinfo: DT: Add support for Revision
+In-Reply-To: <CAL_JsqJ9i0jwaL1cyeomQG=bhhcnEgdGWYOqkcwidyk5xOUukg@mail.gmail.com>
+References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
+ <201412041857.49341@pali>
+ <CAL_JsqJ9i0jwaL1cyeomQG=bhhcnEgdGWYOqkcwidyk5xOUukg@mail.gmail.com>
+Message-ID: <201501262009.45854@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 17, 2015 at 12:23:34AM +0000, Geoff Levand wrote:
-> When a CPU is reset it needs to be put into the exception level it had when it
-> entered the kernel.  Update cpu_reset() to accept an argument el2_switch which
-> signals cpu_reset() to enter the soft reset address at EL2.  If el2_switch is
-> not set the soft reset address will be entered at EL1.
-> 
-> Update cpu_soft_restart() and soft_restart() to pass the return of
-> is_hyp_mode_available() as the el2_switch value to cpu_reset().  Also update the
-> comments of cpu_reset(), cpu_soft_restart() and soft_restart() to reflect this
-> change.
-> 
-> Signed-off-by: Geoff Levand <geoff@infradead.org>
-> ---
->  arch/arm64/include/asm/proc-fns.h |  4 ++--
->  arch/arm64/kernel/process.c       | 10 ++++++++-
->  arch/arm64/mm/proc.S              | 47 +++++++++++++++++++++++++++++----------
->  3 files changed, 46 insertions(+), 15 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/proc-fns.h b/arch/arm64/include/asm/proc-fns.h
-> index 9a8fd84..339394d 100644
-> --- a/arch/arm64/include/asm/proc-fns.h
-> +++ b/arch/arm64/include/asm/proc-fns.h
-> @@ -32,8 +32,8 @@ extern void cpu_cache_off(void);
->  extern void cpu_do_idle(void);
->  extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
->  extern void cpu_reset(unsigned long addr) __attribute__((noreturn));
-> -void cpu_soft_restart(phys_addr_t cpu_reset,
-> -		unsigned long addr) __attribute__((noreturn));
-> +void cpu_soft_restart(phys_addr_t cpu_reset, unsigned long el2_switch,
-> +		      unsigned long addr) __attribute__((noreturn));
->  extern void cpu_do_suspend(struct cpu_suspend_ctx *ptr);
->  extern u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
->  
-> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> index fde9923..371bbf1 100644
-> --- a/arch/arm64/kernel/process.c
-> +++ b/arch/arm64/kernel/process.c
-> @@ -50,6 +50,7 @@
->  #include <asm/mmu_context.h>
->  #include <asm/processor.h>
->  #include <asm/stacktrace.h>
-> +#include <asm/virt.h>
->  
->  #ifdef CONFIG_CC_STACKPROTECTOR
->  #include <linux/stackprotector.h>
-> @@ -60,7 +61,14 @@ EXPORT_SYMBOL(__stack_chk_guard);
->  void soft_restart(unsigned long addr)
->  {
->  	setup_mm_for_reboot();
-> -	cpu_soft_restart(virt_to_phys(cpu_reset), addr);
-> +
-> +	/* TODO: Remove this conditional when KVM can support CPU restart. */
-> +	if (IS_ENABLED(CONFIG_KVM))
-> +		cpu_soft_restart(virt_to_phys(cpu_reset), 0, addr);
+Ok, here is patch which set Revision field (global variable system_rev) in /proc/cpuinfo from DT 
+revision property:
 
-If we haven't torn down KVM, doesn't that mean that KVM is active at EL2
-(with MMU and caches on) at this point?
+diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+index 11c54de..9946c1b 100644
+--- a/arch/arm/kernel/devtree.c
++++ b/arch/arm/kernel/devtree.c
+@@ -19,6 +19,7 @@
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ #include <linux/smp.h>
++#include <linux/libfdt_env.h>
+ 
+ #include <asm/cputype.h>
+ #include <asm/setup.h>
+@@ -26,6 +27,7 @@
+ #include <asm/smp_plat.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
++#include <asm/system_info.h>
+ 
+ 
+ #ifdef CONFIG_SMP
+@@ -204,6 +206,8 @@ static const void * __init arch_get_next_mach(const char *const **match)
+ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
+ {
+ 	const struct machine_desc *mdesc, *mdesc_best = NULL;
++	unsigned long dt_root;
++	const u32 *prop;
+ 
+ #ifdef CONFIG_ARCH_MULTIPLATFORM
+ 	DT_MACHINE_START(GENERIC_DT, "Generic DT based system")
+@@ -215,17 +219,16 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
+ 	if (!dt_phys || !early_init_dt_verify(phys_to_virt(dt_phys)))
+ 		return NULL;
+ 
++	dt_root = of_get_flat_dt_root();
+ 	mdesc = of_flat_dt_match_machine(mdesc_best, arch_get_next_mach);
+ 
+ 	if (!mdesc) {
+ 		const char *prop;
+ 		int size;
+-		unsigned long dt_root;
+ 
+ 		early_print("\nError: unrecognized/unsupported "
+ 			    "device tree compatible list:\n[ ");
+ 
+-		dt_root = of_get_flat_dt_root();
+ 		prop = of_get_flat_dt_prop(dt_root, "compatible", &size);
+ 		while (size > 0) {
+ 			early_print("'%s' ", prop);
+@@ -246,5 +249,10 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
+ 	/* Change machine number to match the mdesc we're using */
+ 	__machine_arch_type = mdesc->nr;
+ 
++	/* Set system revision from DT */
++	prop = of_get_flat_dt_prop(dt_root, "revision", NULL);
++	if (prop)
++		system_rev = fdt32_to_cpu(*prop);
++
+ 	return mdesc;
+ }
 
-If that's the case then we cannot possibly try to call kexec(), because
-we cannot touch the memory used by the page tables for those EL2
-mappings. Things will explode if we do.
 
-Mark.
+And here is patch which convert ATAG revision into DT revision property and append it into DT in 
+decompress code:
+
+diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
+index 9448aa0..e7e1cc9 100644
+--- a/arch/arm/boot/compressed/atags_to_fdt.c
++++ b/arch/arm/boot/compressed/atags_to_fdt.c
+@@ -171,6 +171,8 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
+ 					cpu_to_fdt32(atag->u.mem.size);
+ 			}
+ 
++		} else if (atag->hdr.tag == ATAG_REVISION) {
++			setprop_cell(fdt, "/", "revision", atag->u.revision.rev);
+ 		} else if (atag->hdr.tag == ATAG_INITRD2) {
+ 			uint32_t initrd_start, initrd_size;
+ 			initrd_start = atag->u.initrd.start;
+
+
+I tested it on DT booted Nokia N900 and it is working, in /proc/cpuinfo is revision from ATAG.
+
+I do not know which DT property to use for storing HW Revision, so if "/revision" is not correct one, 
+let me know what to use instead. Also you can add my Signed-off-by for both patches.
+
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150126/e883d073/attachment.sig>
