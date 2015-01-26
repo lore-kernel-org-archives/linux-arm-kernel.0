@@ -1,108 +1,69 @@
 From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 26 Jan 2015 08:23:55 -0800
-Subject: [PATCH v3] ARM: zynq: DT: Add USB to device tree
-In-Reply-To: <54C6698F.5020301@suse.de>
-References: <1417536431-27759-1-git-send-email-soren.brinkmann@xilinx.com>
- <d78fedd84f354d80985187f851cb3cd1@BN1AFFO11FD055.protection.gbl>
- <54C5F89A.3090901@suse.de> <54C5F965.90100@monstr.eu>
- <54C5FBC3.7030903@suse.de> <54C60A56.7010403@suse.de>
- <c65880cef67945ebaf61306febc1349b@BN1BFFO11FD010.protection.gbl>
- <54C6698F.5020301@suse.de>
-Message-ID: <8f367d9b85924f8e9cc9cb6fdff9a054@BN1BFFO11FD040.protection.gbl>
+Date: Mon, 26 Jan 2015 08:29:24 -0800
+Subject: [PATCH] clk: zynq: Force CPU_2X clock to be ungated
+In-Reply-To: <3b7e448a3a9c4d8a8f566ef01160ba89@BY2FFO11FD041.protection.gbl>
+References: <1422056653-11271-1-git-send-email-soren.brinkmann@xilinx.com>
+ <3b7e448a3a9c4d8a8f566ef01160ba89@BY2FFO11FD041.protection.gbl>
+Message-ID: <816b89f36a7d41ffb722a07b86f2bb7f@BN1BFFO11FD001.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-01-26 at 05:21PM +0100, Andreas F?rber wrote:
-> Am 26.01.2015 um 16:50 schrieb S?ren Brinkmann:
-> > On Mon, 2015-01-26 at 10:35AM +0100, Andreas F?rber wrote:
-> >> Am 26.01.2015 um 09:33 schrieb Andreas F?rber:
-> >>> Am 26.01.2015 um 09:23 schrieb Michal Simek:
-> >>>> On 01/26/2015 09:19 AM, Andreas F?rber wrote:
-> >>>>> And if I apply it to my -next based tree, adding corresponding nodes to
-> >>>>> zynq-parallella.dts, I get repeatedly:
-> >>>>>
-> >>>>> [  +0,012242] ci_hdrc ci_hdrc.0: no of_node; not parsing pinctrl DT
-> >>>>> [  +0,000157] ci_hdrc ci_hdrc.0: ChipIdea HDRC found, lpm: 0; cap:
-> >>>>> f090e100 op: f090e140
-> >>>>> [  +0,000081] platform ci_hdrc.0: Driver ci_hdrc requests probe deferral
-> >>>>> [  +0,005360] ci_hdrc ci_hdrc.1: no of_node; not parsing pinctrl DT
-> >>>>> [  +0,000120] ci_hdrc ci_hdrc.1: ChipIdea HDRC found, lpm: 0; cap:
-> >>>>> f0910100 op: f0910140
-> >>>>> [  +0,001810] platform ci_hdrc.1: Driver ci_hdrc requests probe deferral
-> >>>>>
-> >>>>> Am I missing any other patches or config options?
-> >>>>> (I do notice that the pinctrl v3 patch that got merged has a trivial bug
-> >>>>> for usb0, for which I'll send a patch later on.)
-> >>>>
-> >>>> Why is it deferred? Is it because of pinmuxing stuff?
-> >>>
-> >>> No, happened without as well.
-> >>>
-> >>> Looking at a different place in dmesg, I spot this:
-> >>>
-> >>> [  +0,003988] usb_phy_generic phy0: GPIO lookup for consumer reset-gpios
-> >>> [  +0,000012] usb_phy_generic phy0: using device tree for GPIO lookup
-> >>> [  +0,000015] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpios'
-> >>> property
-> >>>  of node '/phy0[0]'
-> >>> [  +0,000013] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpio'
-> >>> property
-> >>> of node '/phy0[0]'
-> >>> [  +0,000010] usb_phy_generic phy0: using lookup tables for GPIO lookup
-> >>> [  +0,000153] usb_phy_generic phy0: lookup for GPIO reset-gpios failed
-> >>> [  +0,000012] usb_phy_generic phy0: Error requesting RESET GPIO
-> >>> [  +0,004360] usb_phy_generic: probe of phy0 failed with error -2
-> >>> [  +0,004991] usb_phy_generic phy1: GPIO lookup for consumer reset-gpios
-> >>> [  +0,000012] usb_phy_generic phy1: using device tree for GPIO lookup
-> >>> [  +0,000013] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpios'
-> >>> property
-> >>>  of node '/phy1[0]'
-> >>> [  +0,000013] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpio'
-> >>> property of node '/phy1[0]'
-> >>> [  +0,000010] usb_phy_generic phy1: using lookup tables for GPIO lookup
-> >>> [  +0,000012] usb_phy_generic phy1: lookup for GPIO reset-gpios failed
-> >>> [  +0,000011] usb_phy_generic phy1: Error requesting RESET GPIO
-> >>> [  +0,004337] usb_phy_generic: probe of phy1 failed with error -2
-> >>>
-> >>> So, I guess the chipidea driver is deferring because the phys want a
-> >>> property that neither me nor you are specifying? Would that be the two
-> >>> MDIO pins 52 and 53 that would need to be specified?
-> >>
-> >> Erm, scratch that last question - wrong PHY. Trying it resolved the
-> >> above phy errors but not the original problem. And so does an empty one:
-> >>
-> >> @@ -99,11 +100,13 @@
-> >>
-> >>         usb_phy0: phy0 {
-> >>                 compatible = "usb-nop-xceiv";
-> >> +               reset-gpios = <>;
-> >>                 #phy-cells = <0>;
-> >>         };
-> >>
-> >>         usb_phy1: phy1 {
-> >>                 compatible = "usb-nop-xceiv";
-> >> +               reset-gpios = <>;
-> >>                 #phy-cells = <0>;
-> >>         };
-> >>  };
-> >>
-> >> In my manuals and notes I can't find any GPIO being used as reset for
-> >> the USB PHYs. Any thoughts appreciated.
+On Sun, 2015-01-25 at 07:22PM -0800, S?ren Brinkmann wrote:
+> On Fri, 2015-01-23 at 03:44PM -0800, Soren Brinkmann wrote:
+> > The CPU_2X clock does not have a classical in kernel user, but is,
+> > amongst other things, required for OCM and debug access. Make sure this
+> > clock does not mistakenly disabled during boot up by enabling it in the
+> > platforms clock driver.
 > > 
-> > Such a connection is optional. The platform might rely on its reset
-> > circuit, though it might not work for warm reboots.
-> > I haven't looked at parallela docs, but if there is a schematic
-> > available, that should tell you if/what is connected to the PHY reset
-> > pin.
+> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> > ---
+> > I just noticed this on Linus' latest tip. I can't remember having had issues
+> > connecting the debugger before, but it might be a candidate for stable in case
+> > people report something like that.
 > 
-> I do have the schematic, and the way I read it, only the on-board reset
-> button resets the PHYs.
+> I bisected this down to commit:
 > 
-> Yet it looks as if usb-nop-xceiv insists on a reset-gpios above, no?
-> Does it work on your boards with linux-next?
+> ae43b3289186480f81c78bb63d788a85a3631f47 is the first bad commit
+> commit ae43b3289186480f81c78bb63d788a85a3631f47
+> Author: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Date:   Fri Nov 14 09:48:57 2014 +0100
+> 
+>     ARM: 8202/1: dmaengine: pl330: Add runtime Power Management support v12
+>     
+>     This patch adds runtime PM support to pl330 DMA engine driver.
+>     
+>     The runtime power management for pl330 DMA driver allows gating of AMBA
+>     clock (PDMA) in FSYS clock domain, when the device is not processing any
+>     requests. This is necessary to enter low power modes on Exynos SoCs
+>     (e.g. LPA on Exynos4x12 or W-AFTR on Exynos3250).
+>     
+>     Runtime PM resuming of the device may happen in atomic context (during
+>     call device_issue_pending()) so pm_runtime_irq_safe() is used. This will
+>     lead only to disabling/enabling of the clock but this is sufficient for
+>     gating the clock and for reducing energy usage.
+>     
+>     Driver uses runtime PM callbacks from amba/bus.c driver only.
+>     
+>     Suggested-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+>     Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>     Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+>     Acked-by: Vinod Koul <vinod.koul@intel.com>
+>     Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> 
+> :040000 040000 16e0cb02587254ea396e9d913d7997ac63bd3d49 97c1ee366f0790e65df00e85d06b2bcd07aa9f58 M      drivers
+> 
+> which makes sense, since the PL330 clock in Zynq is the mentioned
+> CPU_2X_CLK. I guess the additional runtime_pm in the driver causes the
+> clock to be gated which causes the issues for the mentioned other users
+> of this clock.
+> Looks like this patch got introduced in the 3.19 merge window. Hence,
+> stable should be off the table.
 
-I haven't re-tested it since I submitted the patches, but at that time
-it worked. But I also didn't test USB with the pinctrl patches together.
-I'll do some testing later today.
+That statement may have been a little premature. Turns out, it actually
+is the PL330 driver that is responsible for activating the CPU2X clock
+on Zynq. Things work as expected when that driver is in the kernel, but
+break as seen on 3.19 when that driver is not part of the kernel. Hence,
+this should probably go into stable, all the way back to when we merged
+Zynq's CCF code, which seems to have happened in 3.11.
 
 	Soren
