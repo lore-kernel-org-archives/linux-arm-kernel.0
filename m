@@ -1,23 +1,18 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 26 Jan 2015 15:49:51 +0900
+Date: Mon, 26 Jan 2015 15:51:06 +0900
 Subject: [PATCH 00/13] ARM: shmobile: Remove sh7372/Mackerel and ZBOOT
  MMC/SDHI support
-In-Reply-To: <3040234.j4M7Dsju9X@avalon>
+In-Reply-To: <20150126002215.GB4477@verge.net.au>
 References: <20150121045256.7648.7451.sendpatchset@little-apple>
- <3040234.j4M7Dsju9X@avalon>
-Message-ID: <CANqRtoQOB7NHf8PSUxidX+Q0KAHidJOAq1bp-h3ftAWf4LJF_w@mail.gmail.com>
+ <20150126002215.GB4477@verge.net.au>
+Message-ID: <CANqRtoR+=xkMQFC61ak36=OTBi-TEjvHOhESdKo7w=bo7aVUvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+Hi Simon,
 
-On Wed, Jan 21, 2015 at 9:42 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> Hi Magnus,
->
-> Thank you for the patches.
->
-> On Wednesday 21 January 2015 13:52:56 Magnus Damm wrote:
+On Mon, Jan 26, 2015 at 9:22 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Wed, Jan 21, 2015 at 01:52:56PM +0900, Magnus Damm wrote:
 >> ARM: shmobile: Remove sh7372/Mackerel and ZBOOT MMC/SDHI support
 >>
 >> [PATCH 01/13] ARM: shmobile: mackerel: Remove ZBOOT code
@@ -49,19 +44,15 @@ On Wed, Jan 21, 2015 at 9:42 PM, Laurent Pinchart
 >>
 >> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 >
-> For patches 01 to 05, 07 to 10, and 13,
+> Hi Magnus,
 >
-> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> thanks for putting this together. There seem to have been few comments
+> made on it. Could you consider respinning accordingly?
 
-Great, thanks, I have included your ack in V2 for the patches above.
+Done! V2 is now out.
 
-> 'git grep -i sh7372' reports 25 mentions of the SoC in the kernel sources.
-> Please let me know if you would like to me submit patches to remove them, or
-> if you want to do so yourself.
+Please let me know if you need to to rework something.
 
-Thanks. I prefer not to touch those myself, so if you or someone else
-could do it step-by-step then that would be excellent.
-
-Best,
+Cheers,
 
 / magnus
