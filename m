@@ -1,82 +1,83 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 26 Jan 2015 22:48:21 +0100
-Subject: N900 v3.19-rc5 arm atags_to_fdt.c is broken
-In-Reply-To: <alpine.LFD.2.11.1501261318590.1322@knanqh.ubzr>
-References: <201501232239.55801@pali> <201501232336.36187@pali>
- <20150126161454.GE28663@atomide.com> <201501261723.10505@pali>
- <20150126170323.GF28663@atomide.com>
- <alpine.LFD.2.11.1501261318590.1322@knanqh.ubzr>
-Message-ID: <20150126214821.GA8884@amd>
+From: geoff@infradead.org (Geoff Levand)
+Date: Mon, 26 Jan 2015 13:48:48 -0800
+Subject: [PATCH 4/8] arm64: Add EL2 switch to soft_restart
+In-Reply-To: <20150126190223.GO23313@leverpostej>
+References: <cover.1421449714.git.geoff@infradead.org>
+ <bb44d4eee4fab15278e4a8829a0981878bc9acd7.1421449714.git.geoff@infradead.org>
+ <20150126190223.GO23313@leverpostej>
+Message-ID: <1422308928.21823.16.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Mark,
 
-> > > $ du -b arch/arm/boot/dts/omap3-n900.dtb 
-> > > 70212   arch/arm/boot/dts/omap3-n900.dtb
-> > > 
-> > > $ echo $((0x10000))
-> > > 65536
-> > > 
-> > > I would say, problem is because omap3-n900 binary DT is too large
+On Mon, 2015-01-26 at 19:02 +0000, Mark Rutland wrote:
+> On Sat, Jan 17, 2015 at 12:23:34AM +0000, Geoff Levand wrote:
+> > When a CPU is reset it needs to be put into the exception level it had when it
+> > entered the kernel.  Update cpu_reset() to accept an argument el2_switch which
+> > signals cpu_reset() to enter the soft reset address at EL2.  If el2_switch is
+> > not set the soft reset address will be entered at EL1.
+> > 
+> > Update cpu_soft_restart() and soft_restart() to pass the return of
+> > is_hyp_mode_available() as the el2_switch value to cpu_reset().  Also update the
+> > comments of cpu_reset(), cpu_soft_restart() and soft_restart() to reflect this
+> > change.
+> > 
+> > Signed-off-by: Geoff Levand <geoff@infradead.org>
+> > ---
+> >  arch/arm64/include/asm/proc-fns.h |  4 ++--
+> >  arch/arm64/kernel/process.c       | 10 ++++++++-
+> >  arch/arm64/mm/proc.S              | 47 +++++++++++++++++++++++++++++----------
+> >  3 files changed, 46 insertions(+), 15 deletions(-)
+> > 
+> > diff --git a/arch/arm64/include/asm/proc-fns.h b/arch/arm64/include/asm/proc-fns.h
+> > index 9a8fd84..339394d 100644
+> > --- a/arch/arm64/include/asm/proc-fns.h
+> > +++ b/arch/arm64/include/asm/proc-fns.h
+> > @@ -32,8 +32,8 @@ extern void cpu_cache_off(void);
+> >  extern void cpu_do_idle(void);
+> >  extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
+> >  extern void cpu_reset(unsigned long addr) __attribute__((noreturn));
+> > -void cpu_soft_restart(phys_addr_t cpu_reset,
+> > -		unsigned long addr) __attribute__((noreturn));
+> > +void cpu_soft_restart(phys_addr_t cpu_reset, unsigned long el2_switch,
+> > +		      unsigned long addr) __attribute__((noreturn));
+> >  extern void cpu_do_suspend(struct cpu_suspend_ctx *ptr);
+> >  extern u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
+> >  
+> > diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> > index fde9923..371bbf1 100644
+> > --- a/arch/arm64/kernel/process.c
+> > +++ b/arch/arm64/kernel/process.c
+> > @@ -50,6 +50,7 @@
+> >  #include <asm/mmu_context.h>
+> >  #include <asm/processor.h>
+> >  #include <asm/stacktrace.h>
+> > +#include <asm/virt.h>
+> >  
+> >  #ifdef CONFIG_CC_STACKPROTECTOR
+> >  #include <linux/stackprotector.h>
+> > @@ -60,7 +61,14 @@ EXPORT_SYMBOL(__stack_chk_guard);
+> >  void soft_restart(unsigned long addr)
+> >  {
+> >  	setup_mm_for_reboot();
+> > -	cpu_soft_restart(virt_to_phys(cpu_reset), addr);
+> > +
+> > +	/* TODO: Remove this conditional when KVM can support CPU restart. */
+> > +	if (IS_ENABLED(CONFIG_KVM))
+> > +		cpu_soft_restart(virt_to_phys(cpu_reset), 0, addr);
 > 
-> I agree.
+> If we haven't torn down KVM, doesn't that mean that KVM is active at EL2
+> (with MMU and caches on) at this point?
 > 
-> > OK if that's the case, then your patch makes sense to me. It also
-> > seems we can have the temporary stack be larger than the initial
-> > stack just for atags_to_fdt.
-> 
-> The stack size isn't the issue, but rather its location.  We need to 
-> position it away from the DT data.  The DT size is known and we could 
-> use that, plus some room for the insertion of new data coming from the
-> ATAG conversion.
-> 
-> Something like the following would be a more robust solution:
-> 
-> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> index 68be901759..89718de9dd 100644
-> --- a/arch/arm/boot/compressed/head.S
-> +++ b/arch/arm/boot/compressed/head.S
-> @@ -263,16 +263,37 @@ restart:	adr	r0, LC0
->  		 * OK... Let's do some funky business here.
->  		 * If we do have a DTB appended to zImage, and we do have
->  		 * an ATAG list around, we want the later to be translated
-> -		 * and folded into the former here.  To be on the safe side,
-> -		 * let's temporarily move  the stack away into the malloc
-> -		 * area.  No GOT fixup has occurred yet, but none of the
-> -		 * code we're about to call uses any global variable.
-> +		 * and folded into the former here. No GOT fixup has occurred
-> +		 * yet, but none of the code we're about to call uses any
-> +		 * global variable.
->  		*/
-> -		add	sp, sp, #0x10000
-> +
-> +		/* Get the initial DTB size */
-> +		ldr	r5, [r6, #4]
-> +#ifndef __ARMEB__
-> +		/* convert to little endian */
-> +		eor	r1, r5, r5, ror #16
-> +		bic	r1, r1, #0x00ff0000
-> +		mov	r5, r5, ror #8
-> +		eor	r5, r5, r1, lsr #8
-> +#endif
-> +		/* 50% DTB growth should be good enough */
-> +		add	r5, r5, r5, lsr #1
-> +		/* preserve 64-bit alignment */
-> +		add	r5, r5, #7
-> +		bic	r5, r5, #7
-> +		/* clamp to 32KB min and 1MB max */
-> +		movs	r1, r5, lsr #15
-> +		moveq	r5, #(1 << 15)
-> +		movs	r1, r5, lsr #20
-> +		movne	r5, #(1 << 20)
+> If that's the case then we cannot possibly try to call kexec(), because
+> we cannot touch the memory used by the page tables for those EL2
+> mappings. Things will explode if we do.
 
-Dunno. Would it be easier/simpler to just use 1MB, always? Do we
-support machines with <16MB RAM?
+This conditional is just if KVM, do things the old way (don't try to
+switch exception levels).  It is to handle the system shutdown case.
 
-Best regards,
-								
+Another patch in this series '[PATCH 7/8] arm64/kexec: Add checks for
+KVM' assures kexec cannot happen when KVM is configured.
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-Geoff
