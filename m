@@ -1,57 +1,55 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Mon, 26 Jan 2015 13:00:27 -0800
-Subject: [PATCH 7/8] arm64/kexec: Add checks for KVM
-In-Reply-To: <20150126191942.GQ23313@leverpostej>
-References: <cover.1421449714.git.geoff@infradead.org>
- <a3353cf2ac47f49c20bbbb88405301cbaa359805.1421449714.git.geoff@infradead.org>
- <20150126191942.GQ23313@leverpostej>
-Message-ID: <1422306027.21823.14.camel@infradead.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 26 Jan 2015 13:08:18 -0800
+Subject: [GIT PULL 1/2] omap non-urgent fixes for v3.20, part 2
+Message-ID: <pull-1422306429-777451>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+The following changes since commit 13efcb188984f69e1f97b4d9e7d3663fb782946f:
 
-On Mon, 2015-01-26 at 19:19 +0000, Mark Rutland wrote:
-> On Sat, Jan 17, 2015 at 12:23:34AM +0000, Geoff Levand wrote:
-> > Add runtime checks that fail the arm64 kexec syscall for situations that would
-> > result in system instability do to problems in the KVM kernel support.
-> > These checks should be removed when the KVM problems are resolved fixed.
-> > 
-> > Signed-off-by: Geoff Levand <geoff@infradead.org>
-> > ---
-> >  arch/arm64/kernel/machine_kexec.c | 10 ++++++++++
-> >  1 file changed, 10 insertions(+)
-> > 
-> > diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-> > index 3d84759..a36459d 100644
-> > --- a/arch/arm64/kernel/machine_kexec.c
-> > +++ b/arch/arm64/kernel/machine_kexec.c
-> > @@ -16,6 +16,9 @@
-> >  #include <asm/cacheflush.h>
-> >  #include <asm/system_misc.h>
-> >  
-> > +/* TODO: Remove this include when KVM can support a kexec reboot. */
-> > +#include <asm/virt.h>
-> > +
-> >  /* Global variables for the relocate_kernel routine. */
-> >  extern const unsigned char relocate_new_kernel[];
-> >  extern const unsigned long relocate_new_kernel_size;
-> > @@ -100,6 +103,13 @@ int machine_kexec_prepare(struct kimage *image)
-> >  
-> >  	kexec_image_info(image);
-> >  
-> > +	/* TODO: Remove this message when KVM can support a kexec reboot. */
-> > +	if (IS_ENABLED(CONFIG_KVM) && is_hyp_mode_available()) {
-> > +		pr_err("%s: Your kernel is configured with KVM support (CONFIG_KVM=y) which currently does not allow for kexec re-boot.\n",
-> > +			__func__);
-> > +		return -ENOSYS;
-> > +	}
-> 
-> If you really don't want to implement KVM teardown, surely this should
-> be at the start of the series, so we don't have a point in the middle
-> where things may explode in this case?
+  ARM: OMAP2+: Disable omap3 PM init for ti81xx (2015-01-14 17:37:16 -0800)
 
-Yes, you're right.  I'm hoping we can get the KVM fix done soon so this
-is not needed.
+are available in the git repository at:
 
--Geoff
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.20/fixes-not-urgent-pt2
+
+for you to fetch changes up to 20d9448a59770420ead8078fb76948de32765fe6:
+
+  Merge tag 'for-v3.20/omap-hwmod-a' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into omap-for-v3.20/fixes-not-urgent (2015-01-21 16:52:17 -0800)
+
+----------------------------------------------------------------
+Non-critical fixes for omap hwmod code via Paul Walmsley <paul@pwsan.com>:
+
+First set of OMAP2+ hwmod patches for Linux v3.20.  These are mostly
+fixes for warnings, although there's one DRA7xx patch that fixes
+CONFIG_DEBUG_LL for AM572x/DRA7xx SoCs that use UART3 for console,
+such as the BeagleBoard-X15.
+
+These patches entered Linux-next starting with the next-20150121 tag.
+
+Basic build, boot, and PM test results can be found here:
+
+http://www.pwsan.com/omap/testlogs/omap-hwmod-a-for-v3.20/20150121142621/
+
+----------------------------------------------------------------
+Keerthy (1):
+      ARM: OMAP: DRA7: hwmod: Make gpmc software supervised as the smart idle is broken
+
+Lokesh Vutla (2):
+      ARM: OMAP2+: hwmod: print error if wait_target_ready() failed
+      ARM: DRA7: hwmod: Fix boot crash with DEBUG_LL enabled on UART3
+
+Paul Walmsley (1):
+      MAINTAINERS: add maintainer for OMAP hwmod data
+
+Tomi Valkeinen (1):
+      ARM: AM43xx: hwmod: set DSS submodule parent hwmods
+
+Tony Lindgren (1):
+      Merge tag 'for-v3.20/omap-hwmod-a' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v3.20/fixes-not-urgent
+
+ MAINTAINERS                                | 6 ++++++
+ arch/arm/mach-omap2/omap_hwmod.c           | 4 ++--
+ arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 2 ++
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c  | 5 +++--
+ 4 files changed, 13 insertions(+), 4 deletions(-)
