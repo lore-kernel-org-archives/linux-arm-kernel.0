@@ -1,36 +1,132 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 26 Jan 2015 09:20:56 +0100
-Subject: [PATCH 00/13] ARM: shmobile: Remove sh7372/Mackerel and ZBOOT
- MMC/SDHI support
-In-Reply-To: <CANqRtoRj0Ssyc6ONkw05pUadzA8G5agqi3uWi7o_-hhYEs64Eg@mail.gmail.com>
-References: <20150121045256.7648.7451.sendpatchset@little-apple>
- <87twzkn1rd.wl%kuninori.morimoto.gx@renesas.com>
- <CAMuHMdWoi1TDq-XQO6-EjVzQPyYyeG4e0U+chseQ9MXuO3Lhgg@mail.gmail.com>
- <CANqRtoRj0Ssyc6ONkw05pUadzA8G5agqi3uWi7o_-hhYEs64Eg@mail.gmail.com>
-Message-ID: <CAMuHMdWax_yWKVn-j2UF1ZUB-LvFEFmo-KJ+kQ0Qr2gTHro8gw@mail.gmail.com>
+From: prabhakar.csengg@gmail.com (Lad, Prabhakar)
+Date: Mon, 26 Jan 2015 08:21:28 +0000
+Subject: [PATCH v3] ARM: AM43xx: hwmod: add VPFE hwmod entries
+Message-ID: <1422260488-380-1-git-send-email-prabhakar.csengg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 26, 2015 at 7:47 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
->> It seems arch/sh still supports Linux running on the SH core in sh7372?
->
-> I don't think we have any support upstream for that, but I recall
-> cooking up some prototype running two linux instances in separate
-> memory spaces and using virtio as mailbox interface in between. I also
-> recall that SH4AL-DSP CPU core tend to be a PITA to handle
-> toolchain-wise, but SH4 with FPU is much easier with current (or
-> yesteryear) toolchain. Exactly which SH core that is included in
-> sh7372 I'm not so sure about. =)
+From: Benoit Parrot <bparrot@ti.com>
 
-JFTR, SH4AL-DSP.
+this patch adds VPFE HWMOD data for AM43xx.
 
-Gr{oetje,eeting}s,
+Signed-off-by: Benoit Parrot <bparrot@ti.com>
+Signed-off-by: Darren Etheridge <detheridge@ti.com>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+---
+ Changes for v3:
+ a: Dropped OCPIF_SWSUP_IDLE flag from l3 hwmods of vpfe.
+ 
+ arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 70 ++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/prcm43xx.h             |  3 +-
+ 2 files changed, 72 insertions(+), 1 deletion(-)
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+index 5c6c841..8543f9f 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+@@ -514,6 +514,44 @@ static struct omap_hwmod am43xx_dss_rfbi_hwmod = {
+ 	},
+ };
+ 
++static struct omap_hwmod_class_sysconfig am43xx_vpfe_sysc = {
++	.rev_offs       = 0x0,
++	.sysc_offs      = 0x104,
++	.sysc_flags     = SYSC_HAS_MIDLEMODE | SYSC_HAS_SIDLEMODE,
++	.idlemodes      = (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
++				MSTANDBY_FORCE | MSTANDBY_SMART | MSTANDBY_NO),
++	.sysc_fields    = &omap_hwmod_sysc_type2,
++};
++
++static struct omap_hwmod_class am43xx_vpfe_hwmod_class = {
++	.name           = "vpfe",
++	.sysc           = &am43xx_vpfe_sysc,
++};
++
++static struct omap_hwmod am43xx_vpfe0_hwmod = {
++	.name           = "vpfe0",
++	.class          = &am43xx_vpfe_hwmod_class,
++	.clkdm_name     = "l3s_clkdm",
++	.prcm           = {
++		.omap4  = {
++			.modulemode     = MODULEMODE_SWCTRL,
++			.clkctrl_offs   = AM43XX_CM_PER_VPFE0_CLKCTRL_OFFSET,
++		},
++	},
++};
++
++static struct omap_hwmod am43xx_vpfe1_hwmod = {
++	.name           = "vpfe1",
++	.class          = &am43xx_vpfe_hwmod_class,
++	.clkdm_name     = "l3s_clkdm",
++	.prcm           = {
++		.omap4  = {
++			.modulemode     = MODULEMODE_SWCTRL,
++			.clkctrl_offs   = AM43XX_CM_PER_VPFE1_CLKCTRL_OFFSET,
++		},
++	},
++};
++
+ /* Interfaces */
+ static struct omap_hwmod_ocp_if am43xx_l3_main__l4_hs = {
+ 	.master		= &am33xx_l3_main_hwmod,
+@@ -788,6 +826,34 @@ static struct omap_hwmod_ocp_if am43xx_l4_ls__dss_rfbi = {
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
+ 
++static struct omap_hwmod_ocp_if am43xx_l3__vpfe0 = {
++	.master         = &am43xx_vpfe0_hwmod,
++	.slave          = &am33xx_l3_main_hwmod,
++	.clk            = "l3_gclk",
++	.user           = OCP_USER_MPU | OCP_USER_SDMA,
++};
++
++static struct omap_hwmod_ocp_if am43xx_l3__vpfe1 = {
++	.master         = &am43xx_vpfe1_hwmod,
++	.slave          = &am33xx_l3_main_hwmod,
++	.clk            = "l3_gclk",
++	.user           = OCP_USER_MPU | OCP_USER_SDMA,
++};
++
++static struct omap_hwmod_ocp_if am43xx_l4_ls__vpfe0 = {
++	.master         = &am33xx_l4_ls_hwmod,
++	.slave          = &am43xx_vpfe0_hwmod,
++	.clk            = "l4ls_gclk",
++	.user           = OCP_USER_MPU | OCP_USER_SDMA,
++};
++
++static struct omap_hwmod_ocp_if am43xx_l4_ls__vpfe1 = {
++	.master         = &am33xx_l4_ls_hwmod,
++	.slave          = &am43xx_vpfe1_hwmod,
++	.clk            = "l4ls_gclk",
++	.user           = OCP_USER_MPU | OCP_USER_SDMA,
++};
++
+ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
+ 	&am33xx_l4_wkup__synctimer,
+ 	&am43xx_l4_ls__timer8,
+@@ -887,6 +953,10 @@ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
+ 	&am43xx_l4_ls__dss,
+ 	&am43xx_l4_ls__dss_dispc,
+ 	&am43xx_l4_ls__dss_rfbi,
++	&am43xx_l3__vpfe0,
++	&am43xx_l3__vpfe1,
++	&am43xx_l4_ls__vpfe0,
++	&am43xx_l4_ls__vpfe1,
+ 	NULL,
+ };
+ 
+diff --git a/arch/arm/mach-omap2/prcm43xx.h b/arch/arm/mach-omap2/prcm43xx.h
+index ad7b3e9..8aa4c2c 100644
+--- a/arch/arm/mach-omap2/prcm43xx.h
++++ b/arch/arm/mach-omap2/prcm43xx.h
+@@ -143,5 +143,6 @@
+ #define AM43XX_CM_PER_USB_OTG_SS1_CLKCTRL_OFFSET        0x0268
+ #define AM43XX_CM_PER_USBPHYOCP2SCP1_CLKCTRL_OFFSET	0x05C0
+ #define AM43XX_CM_PER_DSS_CLKCTRL_OFFSET		0x0a20
+-
++#define AM43XX_CM_PER_VPFE0_CLKCTRL_OFFSET		0x0068
++#define AM43XX_CM_PER_VPFE1_CLKCTRL_OFFSET		0x0070
+ #endif
+-- 
+2.1.0
