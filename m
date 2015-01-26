@@ -1,87 +1,102 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Mon, 26 Jan 2015 17:39:40 +0800
-Subject: [PATCH v2 03/12] pm: at91: pm_slowclock: remove the unused code
- related with SLOWDOWN_MASTER_CLOCK
+Date: Mon, 26 Jan 2015 17:41:30 +0800
+Subject: [PATCH v2 06/12] pm: at91: remove the config item
+ CONFIG_AT91_SLOW_CLOCK
 In-Reply-To: <1422265005-22937-1-git-send-email-wenyou.yang@atmel.com>
 References: <1422265005-22937-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1422265180-23077-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1422265290-23200-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SLOWDOWN_MASTER_CLOCK definition is not used, remove the redundant code.
+The slow clock always exists, for the suspend to memory mode,
+the master clock always switch to the slow clock.
+
+To simplify the PM config, remove this config item, remove
+the definition code as well.
 
 Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/mach-at91/pm_slowclock.S |   37 -------------------------------------
- 1 file changed, 37 deletions(-)
+ arch/arm/mach-at91/Kconfig  |   13 -------------
+ arch/arm/mach-at91/Makefile |    2 +-
+ arch/arm/mach-at91/pm.c     |    7 -------
+ 3 files changed, 1 insertion(+), 21 deletions(-)
 
-diff --git a/arch/arm/mach-at91/pm_slowclock.S b/arch/arm/mach-at91/pm_slowclock.S
-index 1155217..4e55665 100644
---- a/arch/arm/mach-at91/pm_slowclock.S
-+++ b/arch/arm/mach-at91/pm_slowclock.S
-@@ -11,20 +11,11 @@
-  * published by the Free Software Foundation.
-  *
-  */
--
- #include <linux/linkage.h>
- #include <linux/clk/at91_pmc.h>
- #include <mach/hardware.h>
- #include <mach/at91_ramc.h>
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index cbaf0c8..0af6744 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -160,19 +160,6 @@ endif # SOC_SAM_V4_V5
  
--/*
-- * When SLOWDOWN_MASTER_CLOCK is defined we will also slow down the Master
-- * clock during suspend by adjusting its prescalar and divisor.
-- * NOTE: This hasn't been shown to be stable on SAM9s; and on the RM9200 there
-- *       are errata regarding adjusting the prescalar and divisor.
-- */
--#undef SLOWDOWN_MASTER_CLOCK
--
- pmc	.req	r0
- sdramc	.req	r1
- ramc1	.req	r2
-@@ -166,18 +157,6 @@ sdr_sr_done:
+ comment "AT91 Feature Selections"
  
- 	wait_mckrdy
- 
--#ifdef SLOWDOWN_MASTER_CLOCK
--	/*
--	 * Set the Master Clock PRES and MDIV fields.
--	 *
--	 * See AT91RM9200 errata #27 and #28 for details.
--	 */
--	mov	tmp1, #0
--	str	tmp1, [pmc, #AT91_PMC_MCKR]
+-config AT91_SLOW_CLOCK
+-	bool "Suspend-to-RAM disables main oscillator"
+-	depends on SUSPEND
+-	help
+-	  Select this if you want Suspend-to-RAM to save the most power
+-	  possible (without powering off the CPU) by disabling the PLLs
+-	  and main oscillator so that only the 32 KiHz clock is available.
 -
--	wait_mckrdy
+-	  When only that slow-clock is available, some peripherals lose
+-	  functionality.  Many can't issue wakeup events unless faster
+-	  clocks are available.  Some lose their operating state and
+-	  need to be completely re-initialized.
+-
+ config AT91_TIMER_HZ
+        int "Kernel HZ (jiffies per second)"
+        range 32 1024
+diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+index 8ef7d9a..13dd3e6 100644
+--- a/arch/arm/mach-at91/Makefile
++++ b/arch/arm/mach-at91/Makefile
+@@ -27,7 +27,7 @@ obj-$(CONFIG_SOC_SAMA5)		+= board-dt-sama5.o
+ 
+ # Power Management
+ obj-$(CONFIG_PM)		+= pm.o
+-obj-$(CONFIG_AT91_SLOW_CLOCK)	+= pm_slowclock.o
++obj-$(CONFIG_PM)		+= pm_slowclock.o
+ 
+ ifeq ($(CONFIG_PM_DEBUG),y)
+ CFLAGS_pm.o += -DDEBUG
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index 409185e..dc2541b 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -133,11 +133,9 @@ EXPORT_SYMBOL(at91_suspend_entering_slow_clock);
+ static void (*slow_clock)(void __iomem *pmc, void __iomem *ramc0,
+ 			  void __iomem *ramc1, int memctrl);
+ 
+-#ifdef CONFIG_AT91_SLOW_CLOCK
+ extern void at91_slow_clock(void __iomem *pmc, void __iomem *ramc0,
+ 			    void __iomem *ramc1, int memctrl);
+ extern u32 at91_slow_clock_sz;
+-#endif
+ 
+ static int at91_pm_enter(suspend_state_t state)
+ {
+@@ -232,7 +230,6 @@ void at91_pm_set_standby(void (*at91_standby)(void))
+ 	}
+ }
+ 
+-#ifdef CONFIG_AT91_SLOW_CLOCK
+ static void __init at91_pm_sram_init(void)
+ {
+ 	struct gen_pool *sram_pool;
+@@ -274,14 +271,10 @@ static void __init at91_pm_sram_init(void)
+ put_node:
+ 	of_node_put(node);
+ }
 -#endif
 -
- 	/* Save PLLA setting and disable it */
- 	ldr	tmp1, [pmc, #AT91_CKGR_PLLAR]
- 	str	tmp1, .saved_pllar
-@@ -213,22 +192,6 @@ sdr_sr_done:
- 	wait_pllalock
- 4:
  
--#ifdef SLOWDOWN_MASTER_CLOCK
--	/*
--	 * First set PRES if it was not 0,
--	 * than set CSS and MDIV fields.
--	 *
--	 * See AT91RM9200 errata #27 and #28 for details.
--	 */
--	ldr	tmp1, .saved_mckr
--	tst	tmp1, #AT91_PMC_PRES
--	beq	2f
--	and	tmp1, tmp1, #AT91_PMC_PRES
--	str	tmp1, [pmc, #AT91_PMC_MCKR]
--
--	wait_mckrdy
+ static void __init at91_pm_init(void)
+ {
+-#ifdef CONFIG_AT91_SLOW_CLOCK
+ 	at91_pm_sram_init();
 -#endif
--
- 	/*
- 	 * Restore master clock setting
- 	 */
+ 
+ 	pr_info("AT91: Power Management%s\n", (slow_clock ? " (with slow clock mode)" : ""));
+ 
 -- 
 1.7.9.5
