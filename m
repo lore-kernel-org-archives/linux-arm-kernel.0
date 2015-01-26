@@ -1,96 +1,128 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 26 Jan 2015 18:47:11 +0000 (UTC)
-Subject: [PATCH v2] ARM: AM43xx: hwmod: add VPFE hwmod entries
-In-Reply-To: <CA+V-a8vuD-+cwaP_bKpB8GweT-xX4E3PHrbB+uefCW+Xre7cog@mail.gmail.com>
-References: <1422217915-24231-1-git-send-email-prabhakar.csengg@gmail.com>
- <alpine.DEB.2.02.1501260205090.5450@utopia.booyaka.com>
- <CA+V-a8urS2C20FDcfsGa+Gg+7wmbbQQw3U7BfXf6GBKoBGMc9w@mail.gmail.com>
- <20150126155032.GD2570@ti.com>
- <CA+V-a8vuD-+cwaP_bKpB8GweT-xX4E3PHrbB+uefCW+Xre7cog@mail.gmail.com>
-Message-ID: <alpine.DEB.2.02.1501261846460.5450@utopia.booyaka.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Mon, 26 Jan 2015 13:49:01 -0500
+Subject: [PATCH v4 1/6] of: iommu: add ptr to OF node arg to
+ of_iommu_configure()
+In-Reply-To: <4711364.TTK5TCBdiy@avalon>
+References: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
+ <1422052359-12384-2-git-send-email-m-karicheri2@ti.com>
+ <4711364.TTK5TCBdiy@avalon>
+Message-ID: <54C68C1D.5030605@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Prabhakar,
+On 01/25/2015 08:32 AM, Laurent Pinchart wrote:
+> Hi Murali,
+>
+> Thank you for the patch.
+>
+> On Friday 23 January 2015 17:32:34 Murali Karicheri wrote:
+>> Function of_iommu_configure() is called from of_dma_configure() to
+>> setup iommu ops using DT property. This API is currently used for
+>> platform devices for which DMA configuration (including iommu ops)
+>> may come from device's parent. To extend this functionality for PCI
+>> devices, this API need to take a parent node ptr as an argument
+>> instead of assuming device's parent. This is needed since for PCI, the
+>> dma configuration may be defined in the DT node of the root bus bridge's
+>> parent device. Currently only dma-range is used for PCI and iommu is not
+>> supported. So return error if the device is PCI.
+>>
+>> Cc: Joerg Roedel<joro@8bytes.org>
+>> Cc: Grant Likely<grant.likely@linaro.org>
+>> Cc: Rob Herring<robh+dt@kernel.org>
+>> Cc: Bjorn Helgaas<bhelgaas@google.com>
+>> Cc: Will Deacon<will.deacon@arm.com>
+>> Cc: Russell King<linux@arm.linux.org.uk>
+>> Cc: Arnd Bergmann<arnd@arndb.de>
+>> Cc: Suravee Suthikulpanit<Suravee.Suthikulpanit@amd.com>
+>>
+>> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
+>> ---
+>>   drivers/iommu/of_iommu.c |   10 ++++++++--
+>>   drivers/of/platform.c    |    2 +-
+>>   include/linux/of_iommu.h |    6 ++++--
+>>   3 files changed, 13 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+>> index af1dc6a..439235b 100644
+>> --- a/drivers/iommu/of_iommu.c
+>> +++ b/drivers/iommu/of_iommu.c
+>> @@ -133,19 +133,25 @@ struct iommu_ops *of_iommu_get_ops(struct device_node
+>> *np) return ops;
+>>   }
+>>
+>> -struct iommu_ops *of_iommu_configure(struct device *dev)
+>> +struct iommu_ops *of_iommu_configure(struct device *dev,
+>> +				     struct device_node *iommu_np)
+>>   {
+>>   	struct of_phandle_args iommu_spec;
+>>   	struct device_node *np;
+>>   	struct iommu_ops *ops = NULL;
+>>   	int idx = 0;
+>>
+>> +	if (dev_is_pci(dev)) {
+>> +		dev_err(dev, "iommu is currently not supported for PCI\n");
+>> +		return NULL;
+>> +	}
+>> +
+>>   	/*
+>>   	 * We don't currently walk up the tree looking for a parent IOMMU.
+>>   	 * See the `Notes:' section of
+>>   	 * Documentation/devicetree/bindings/iommu/iommu.txt
+>>   	 */
+> Wouldn't it be better to fix this rather than passing the device node pointer
+> to the function ? The solution would be more generic.
+Laurent,
 
-On Mon, 26 Jan 2015, Lad, Prabhakar wrote:
+Will Deacon (Copied here) is working on this as we alteady discussed in 
+this thread. So it will be
+addressed by him in another series.
 
-> Hi Benoit,
-> 
-> On Mon, Jan 26, 2015 at 3:50 PM, Benoit Parrot <bparrot@ti.com> wrote:
-> > Lad, Prabhakar <prabhakar.csengg@gmail.com> wrote on Mon [2015-Jan-26 08:13:01 +0000]:
-> >> Hi Paul,
-> >>
-> >> Thanks for the review.
-> >>
-> >> On Mon, Jan 26, 2015 at 2:15 AM, Paul Walmsley <paul@pwsan.com> wrote:
-> >> > Hi
-> >> >
-> >> > On Sun, 25 Jan 2015, Lad, Prabhakar wrote:
-> >> >
-> >> >> From: Benoit Parrot <bparrot@ti.com>
-> >> >>
-> >> >> this patch adds VPFE HWMOD data for AM43xx.
-> >> >>
-> >> >> Signed-off-by: Benoit Parrot <bparrot@ti.com>
-> >> >> Signed-off-by: Darren Etheridge <detheridge@ti.com>
-> >> >> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> >> >> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
-> >> >> ---
-> >> >>  Hi Paul,
-> >> >>
-> >> >>  You were right, the hardware team has confirmed that, the VPFE master port is
-> >> >>  connected to L3 and the VPFE slave port is connected to L4. The L3 port cannot
-> >> >>  serve as a register target because it is initiator only.
-> >> >
-> >> > OK makes sense to me.,
-> >> >
-> >> >>
-> >> >>  I have created links referring to dss l3/l4 hwmod and tested it, lemme know
-> >> >>  if I have missed something.
-> >> >
-> >> > A few minor comments below
-> >> >
-> >> >>
-> >> [Snip]
-> >> >>  /* Interfaces */
-> >> >>  static struct omap_hwmod_ocp_if am43xx_l3_main__l4_hs = {
-> >> >>       .master         = &am33xx_l3_main_hwmod,
-> >> >> @@ -788,6 +826,36 @@ static struct omap_hwmod_ocp_if am43xx_l4_ls__dss_rfbi = {
-> >> >>       .user           = OCP_USER_MPU | OCP_USER_SDMA,
-> >> >>  };
-> >> >>
-> >> >> +static struct omap_hwmod_ocp_if am43xx_l3__vpfe0 = {
-> >> >> +     .master         = &am43xx_vpfe0_hwmod,
-> >> >> +     .slave          = &am33xx_l3_main_hwmod,
-> >> >> +     .clk            = "l3_gclk",
-> >> >> +     .flags          = OCPIF_SWSUP_IDLE,
-> >> >
-> >> > OCPIF_SWSUP_IDLE probably isn't needed here.  Could you please try without
-> >> > it?
-> >> >
-> >> >> +     .user           = OCP_USER_MPU | OCP_USER_SDMA,
-> >> >> +};
-> >> >> +
-> >> >> +static struct omap_hwmod_ocp_if am43xx_l3__vpfe1 = {
-> >> >> +     .master         = &am43xx_vpfe1_hwmod,
-> >> >> +     .slave          = &am33xx_l3_main_hwmod,
-> >> >> +     .clk            = "l3_gclk",
-> >> >> +     .flags          = OCPIF_SWSUP_IDLE,
-> >> >
-> >> > Same point as the above.
-> >> >
-> >> Dropped and tested works! posting a v3.
-> >
-> > When you tested it without the OCPIF_SWSUP_IDLE, did you go trhough a complete suspend/resume cycle?
-> > This flag was added early on because otherwise the susbsytem would not go idle without it...
-> >
-> > Can you post the console output during a suspend/resume cycle?
-> >
-> Ah I didn?t test the suspend/resume will do and post the console log.
+Murali
+>
+>> -	while (!of_parse_phandle_with_args(dev->of_node, "iommus",
+>> +	while (!of_parse_phandle_with_args(iommu_np, "iommus",
+>>   					   "#iommu-cells", idx,
+>>   					&iommu_spec)) {
+>>   		np = iommu_spec.np;
+>> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+>> index a54ec10..7675b79 100644
+>> --- a/drivers/of/platform.c
+>> +++ b/drivers/of/platform.c
+>> @@ -196,7 +196,7 @@ static void of_dma_configure(struct device *dev)
+>>   	dev_dbg(dev, "device is%sdma coherent\n",
+>>   		coherent ? " " : " not ");
+>>
+>> -	iommu = of_iommu_configure(dev);
+>> +	iommu = of_iommu_configure(dev, dev->of_node);
+>>   	dev_dbg(dev, "device is%sbehind an iommu\n",
+>>   		iommu ? " " : " not ");
+>>
+>> diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
+>> index 16c7554..a97e5bd 100644
+>> --- a/include/linux/of_iommu.h
+>> +++ b/include/linux/of_iommu.h
+>> @@ -12,7 +12,8 @@ extern int of_get_dma_window(struct device_node *dn, const
+>> char *prefix, size_t *size);
+>>
+>>   extern void of_iommu_init(void);
+>> -extern struct iommu_ops *of_iommu_configure(struct device *dev);
+>> +extern struct iommu_ops *of_iommu_configure(struct device *dev,
+>> +					struct device_node *iommu_np);
+>>
+>>   #else
+>>
+>> @@ -24,7 +25,8 @@ static inline int of_get_dma_window(struct device_node
+>> *dn, const char *prefix, }
+>>
+>>   static inline void of_iommu_init(void) { }
+>> -static inline struct iommu_ops *of_iommu_configure(struct device *dev)
+>> +static inline struct iommu_ops *of_iommu_configure(struct device *dev,
+>> +					 struct device_node *iommu_np)
+>>   {
+>>   	return NULL;
+>>   }
 
-Could you also do a suspend/resume test on v2?
- 
-thanks
 
-- Paul
+-- 
+Murali Karicheri
+Linux Kernel, Texas Instruments
