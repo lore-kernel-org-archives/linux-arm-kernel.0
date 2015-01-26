@@ -1,79 +1,75 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Mon, 26 Jan 2015 18:28:54 -0500
-Subject: [PATCH v4 5/6] PCI: update dma configuration from DT
-In-Reply-To: <20150123232725.GV29776@google.com>
-References: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
- <1422052359-12384-6-git-send-email-m-karicheri2@ti.com>
- <20150123232725.GV29776@google.com>
-Message-ID: <54C6CDB6.2080207@ti.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Tue, 27 Jan 2015 00:51:32 +0100
+Subject: [PATCH 02/15] iommu: Introduce iommu domain types
+In-Reply-To: <1422316305-19216-1-git-send-email-joro@8bytes.org>
+References: <1422316305-19216-1-git-send-email-joro@8bytes.org>
+Message-ID: <1422316305-19216-3-git-send-email-joro@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/23/2015 06:27 PM, Bjorn Helgaas wrote:
-> On Fri, Jan 23, 2015 at 05:32:38PM -0500, Murali Karicheri wrote:
->> If there is a DT node available for the root bridge's parent device,
->> use the dma configuration from that device node. For example, keystone
->> PCI devices would require dma_pfn_offset to be set correctly in the
->> device structure of the pci device in order to have the correct dma mask.
->> The DT node will have dma-ranges defined for this. Also support using
->> the DT property dma-coherent to allow coherent DMA operation by the
->> PCI device.
->>
->> This patch use the new helper function of_pci_dma_configure() to update
->> the device dma configuration.
->>
->> Cc: Joerg Roedel<joro@8bytes.org>
->> Cc: Grant Likely<grant.likely@linaro.org>
->> Cc: Rob Herring<robh+dt@kernel.org>
->> Cc: Bjorn Helgaas<bhelgaas@google.com>
->> Cc: Will Deacon<will.deacon@arm.com>
->> Cc: Russell King<linux@arm.linux.org.uk>
->> Cc: Arnd Bergmann<arnd@arndb.de>
->> Cc: Suravee Suthikulpanit<Suravee.Suthikulpanit@amd.com>
->>
->> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
->
-> I assume this series will be merged via some non-PCI tree, so:
+From: Joerg Roedel <jroedel@suse.de>
 
-Not sure who will pick this. Since this is for PCI, will it be possible 
-to apply this to arm-pci/next?
+This allows to handle domains differently based on their
+type in the future. An IOMMU driver can implement certain
+optimizations for DMA-API domains for example.
 
->
-> Acked-by: Bjorn Helgaas<bhelgaas@google.com>
+Signed-off-by: Joerg Roedel <jroedel@suse.de>
+---
+ drivers/iommu/iommu.c |  5 +++--
+ include/linux/iommu.h | 11 ++++++++++-
+ 2 files changed, 13 insertions(+), 3 deletions(-)
 
-I will add your ack for v5.
-
-Murali
->
->> ---
->>   drivers/pci/probe.c |    2 ++
->>   1 file changed, 2 insertions(+)
->>
->> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
->> index 23212f8..d7dcd6c 100644
->> --- a/drivers/pci/probe.c
->> +++ b/drivers/pci/probe.c
->> @@ -6,6 +6,7 @@
->>   #include<linux/delay.h>
->>   #include<linux/init.h>
->>   #include<linux/pci.h>
->> +#include<linux/of_pci.h>
->>   #include<linux/pci_hotplug.h>
->>   #include<linux/slab.h>
->>   #include<linux/module.h>
->> @@ -1520,6 +1521,7 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
->>   	dev->dev.dma_mask =&dev->dma_mask;
->>   	dev->dev.dma_parms =&dev->dma_parms;
->>   	dev->dev.coherent_dma_mask = 0xffffffffull;
->> +	of_pci_dma_configure(dev);
->>
->>   	pci_set_dma_max_seg_size(dev, 65536);
->>   	pci_set_dma_seg_boundary(dev, 0xffffffff);
->> --
->> 1.7.9.5
->>
-
-
+diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+index 684efc0..ab24d77 100644
+--- a/drivers/iommu/iommu.c
++++ b/drivers/iommu/iommu.c
+@@ -909,14 +909,15 @@ struct iommu_domain *iommu_domain_alloc(struct bus_type *bus)
+ 	ops = bus->iommu_ops;
+ 
+ 	if (ops->domain_alloc)
+-		domain = ops->domain_alloc();
++		domain = ops->domain_alloc(IOMMU_DOMAIN_UNMANAGED);
+ 	else
+ 		domain = kzalloc(sizeof(*domain), GFP_KERNEL);
+ 
+ 	if (!domain)
+ 		return NULL;
+ 
+-	domain->ops = bus->iommu_ops;
++	domain->ops  = bus->iommu_ops;
++	domain->type = IOMMU_DOMAIN_UNMANAGED;
+ 
+ 	if (ops->domain_init && domain->ops->domain_init(domain))
+ 		goto out_free;
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index 69d1d12..0b67f65 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -51,7 +51,16 @@ struct iommu_domain_geometry {
+ 	bool force_aperture;       /* DMA only allowed in mappable range? */
+ };
+ 
++/* This are the possible domain-types */
++enum iommu_domain_type {
++	IOMMU_DOMAIN_DMA,	/* Domain used for DMA-API */
++	IOMMU_DOMAIN_IDENTITY,	/* Identity mapped domain  */
++	IOMMU_DOMAIN_UNMANAGED, /* Domain mappings are managed by a third party
++				   user (like KVM or VFIO) */
++};
++
+ struct iommu_domain {
++	enum iommu_domain_type type;
+ 	const struct iommu_ops *ops;
+ 	void *priv;
+ 	iommu_fault_handler_t handler;
+@@ -117,7 +126,7 @@ struct iommu_ops {
+ 	void (*domain_destroy)(struct iommu_domain *domain);
+ 
+ 	/* Domain allocation and freeing by the iommu driver */
+-	struct iommu_domain *(*domain_alloc)(void);
++	struct iommu_domain *(*domain_alloc)(enum iommu_domain_type);
+ 	void (*domain_free)(struct iommu_domain *);
+ 
+ 	int (*attach_dev)(struct iommu_domain *domain, struct device *dev);
 -- 
-Murali Karicheri
-Linux Kernel, Texas Instruments
+1.8.4.5
