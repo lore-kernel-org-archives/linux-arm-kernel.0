@@ -1,119 +1,46 @@
-From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
-Date: Mon, 26 Jan 2015 17:21:35 +0100
-Subject: [PATCH v3] ARM: zynq: DT: Add USB to device tree
-In-Reply-To: <c65880cef67945ebaf61306febc1349b@BN1BFFO11FD010.protection.gbl>
-References: <1417536431-27759-1-git-send-email-soren.brinkmann@xilinx.com>
- <d78fedd84f354d80985187f851cb3cd1@BN1AFFO11FD055.protection.gbl>
- <54C5F89A.3090901@suse.de> <54C5F965.90100@monstr.eu>
- <54C5FBC3.7030903@suse.de> <54C60A56.7010403@suse.de>
- <c65880cef67945ebaf61306febc1349b@BN1BFFO11FD010.protection.gbl>
-Message-ID: <54C6698F.5020301@suse.de>
+From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
+Date: Mon, 26 Jan 2015 09:22:16 -0700
+Subject: [PATCH 0/9] coresight: next
+Message-ID: <1422289345-2084-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 26.01.2015 um 16:50 schrieb S?ren Brinkmann:
-> On Mon, 2015-01-26 at 10:35AM +0100, Andreas F?rber wrote:
->> Am 26.01.2015 um 09:33 schrieb Andreas F?rber:
->>> Am 26.01.2015 um 09:23 schrieb Michal Simek:
->>>> On 01/26/2015 09:19 AM, Andreas F?rber wrote:
->>>>> And if I apply it to my -next based tree, adding corresponding nodes to
->>>>> zynq-parallella.dts, I get repeatedly:
->>>>>
->>>>> [  +0,012242] ci_hdrc ci_hdrc.0: no of_node; not parsing pinctrl DT
->>>>> [  +0,000157] ci_hdrc ci_hdrc.0: ChipIdea HDRC found, lpm: 0; cap:
->>>>> f090e100 op: f090e140
->>>>> [  +0,000081] platform ci_hdrc.0: Driver ci_hdrc requests probe deferral
->>>>> [  +0,005360] ci_hdrc ci_hdrc.1: no of_node; not parsing pinctrl DT
->>>>> [  +0,000120] ci_hdrc ci_hdrc.1: ChipIdea HDRC found, lpm: 0; cap:
->>>>> f0910100 op: f0910140
->>>>> [  +0,001810] platform ci_hdrc.1: Driver ci_hdrc requests probe deferral
->>>>>
->>>>> Am I missing any other patches or config options?
->>>>> (I do notice that the pinctrl v3 patch that got merged has a trivial bug
->>>>> for usb0, for which I'll send a patch later on.)
->>>>
->>>> Why is it deferred? Is it because of pinmuxing stuff?
->>>
->>> No, happened without as well.
->>>
->>> Looking at a different place in dmesg, I spot this:
->>>
->>> [  +0,003988] usb_phy_generic phy0: GPIO lookup for consumer reset-gpios
->>> [  +0,000012] usb_phy_generic phy0: using device tree for GPIO lookup
->>> [  +0,000015] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpios'
->>> property
->>>  of node '/phy0[0]'
->>> [  +0,000013] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpio'
->>> property
->>> of node '/phy0[0]'
->>> [  +0,000010] usb_phy_generic phy0: using lookup tables for GPIO lookup
->>> [  +0,000153] usb_phy_generic phy0: lookup for GPIO reset-gpios failed
->>> [  +0,000012] usb_phy_generic phy0: Error requesting RESET GPIO
->>> [  +0,004360] usb_phy_generic: probe of phy0 failed with error -2
->>> [  +0,004991] usb_phy_generic phy1: GPIO lookup for consumer reset-gpios
->>> [  +0,000012] usb_phy_generic phy1: using device tree for GPIO lookup
->>> [  +0,000013] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpios'
->>> property
->>>  of node '/phy1[0]'
->>> [  +0,000013] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpio'
->>> property of node '/phy1[0]'
->>> [  +0,000010] usb_phy_generic phy1: using lookup tables for GPIO lookup
->>> [  +0,000012] usb_phy_generic phy1: lookup for GPIO reset-gpios failed
->>> [  +0,000011] usb_phy_generic phy1: Error requesting RESET GPIO
->>> [  +0,004337] usb_phy_generic: probe of phy1 failed with error -2
->>>
->>> So, I guess the chipidea driver is deferring because the phys want a
->>> property that neither me nor you are specifying? Would that be the two
->>> MDIO pins 52 and 53 that would need to be specified?
->>
->> Erm, scratch that last question - wrong PHY. Trying it resolved the
->> above phy errors but not the original problem. And so does an empty one:
->>
->> @@ -99,11 +100,13 @@
->>
->>         usb_phy0: phy0 {
->>                 compatible = "usb-nop-xceiv";
->> +               reset-gpios = <>;
->>                 #phy-cells = <0>;
->>         };
->>
->>         usb_phy1: phy1 {
->>                 compatible = "usb-nop-xceiv";
->> +               reset-gpios = <>;
->>                 #phy-cells = <0>;
->>         };
->>  };
->>
->> In my manuals and notes I can't find any GPIO being used as reset for
->> the USB PHYs. Any thoughts appreciated.
-> 
-> Such a connection is optional. The platform might rely on its reset
-> circuit, though it might not work for warm reboots.
-> I haven't looked at parallela docs, but if there is a schematic
-> available, that should tell you if/what is connected to the PHY reset
-> pin.
+From: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-I do have the schematic, and the way I read it, only the on-board reset
-button resets the PHYs.
+Good day,
 
-Yet it looks as if usb-nop-xceiv insists on a reset-gpios above, no?
-Does it work on your boards with linux-next?
+These are the latest additions to the coresight sub-system.  Please
+consider for inclusion.
 
-And regarding my previous reporting, I was mistaken: I had to increase
-the log buffer size due to enabled pinctrl debugging, which made the phy
-errors sometimes appear, depending on timing. They're still there.
+Thanks,
+Mathieu
 
-Andreas
+Kaixu Xia (7):
+  coresight: fix the replicator subtype value
+  coresight: remove the unnecessary replicator property
+  coresight: fix the link between orphan connection and newly added
+    device
+  coresight: remove the extra spaces
+  coresight: fix the debug AMBA bus name
+  coresight: remove the unnecessary function coresight_is_bit_set()
+  coresight: fix function etm_writel_cp14() parameter order
+
+Mathieu Poirier (1):
+  coresight: fixing CPU hwid lookup in device tree
+
+Paul Bolle (1):
+  coresight-etm: remove check for unknown Kconfig macro
+
+ Documentation/devicetree/bindings/arm/coresight.txt |  4 ----
+ Documentation/trace/coresight.txt                   |  4 ++--
+ drivers/coresight/coresight-etb10.c                 |  2 +-
+ drivers/coresight/coresight-etm3x.c                 |  8 +-------
+ drivers/coresight/coresight-priv.h                  |  2 +-
+ drivers/coresight/coresight-replicator.c            |  2 +-
+ drivers/coresight/coresight.c                       | 11 ++++++-----
+ drivers/coresight/of_coresight.c                    | 16 +++++++++-------
+ include/linux/coresight.h                           |  3 ---
+ 9 files changed, 21 insertions(+), 31 deletions(-)
 
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Jennifer Guild, Dilip Upmanyu,
-Graham Norton; HRB 21284 (AG N?rnberg)
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150126/c8aeb779/attachment.sig>
+1.9.1
