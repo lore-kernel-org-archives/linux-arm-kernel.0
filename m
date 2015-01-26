@@ -1,91 +1,49 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Mon, 26 Jan 2015 18:07:16 +0800
-Subject: [PATCH 4/7] ARM: at91: enable the L2 Cache controller
-In-Reply-To: <1422266617-24381-1-git-send-email-wenyou.yang@atmel.com>
-References: <1422266617-24381-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1422266836-24592-1-git-send-email-wenyou.yang@atmel.com>
+From: sylvain.rochet@finsecur.com (Sylvain Rochet)
+Date: Mon, 26 Jan 2015 11:09:55 +0100
+Subject: [PATCH v2 07/12] pm: at91: the standby mode uses the same sram
+ function as the suspend to memory mode
+In-Reply-To: <1422265331-23236-1-git-send-email-wenyou.yang@atmel.com>
+References: <1422265005-22937-1-git-send-email-wenyou.yang@atmel.com>
+ <1422265331-23236-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20150126100955.GA18907@gradator.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
- arch/arm/mach-at91/board-dt-sama5.c |   53 +++++++++++++++++++++++++++++++++++
- 1 file changed, 53 insertions(+)
+Hello Wenyou,
 
-diff --git a/arch/arm/mach-at91/board-dt-sama5.c b/arch/arm/mach-at91/board-dt-sama5.c
-index 86cffcd..ed6db28 100644
---- a/arch/arm/mach-at91/board-dt-sama5.c
-+++ b/arch/arm/mach-at91/board-dt-sama5.c
-@@ -17,17 +17,70 @@
- #include <linux/of_platform.h>
- #include <linux/phy.h>
- #include <linux/clk-provider.h>
-+#include <linux/of_address.h>
- 
- #include <asm/setup.h>
- #include <asm/irq.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- #include <asm/mach/irq.h>
-+#include <asm/hardware/cache-l2x0.h>
- 
- #include "generic.h"
- 
-+void __iomem *at91_l2cc_base;
-+EXPORT_SYMBOL_GPL(at91_l2cc_base);
-+
-+#ifdef CONFIG_CACHE_L2X0
-+static void __init at91_init_l2cache(void)
-+{
-+	struct device_node *np;
-+	u32 reg;
-+
-+	np = of_find_compatible_node(NULL, NULL, "arm,pl310-cache");
-+	if (!np)
-+		return;
-+
-+	at91_l2cc_base = of_iomap(np, 0);
-+	if (!at91_l2cc_base)
-+		panic("unable to map l2cc cpu registers\n");
-+
-+	of_node_put(np);
-+
-+	/* Disable cache if it hasn't been done yet */
-+	if (readl_relaxed(at91_l2cc_base + L2X0_CTRL) & L2X0_CTRL_EN)
-+		writel_relaxed(~L2X0_CTRL_EN, at91_l2cc_base + L2X0_CTRL);
-+
-+	/* Prefetch Control */
-+	reg = readl_relaxed(at91_l2cc_base + L310_PREFETCH_CTRL);
-+	reg &= ~L310_PREFETCH_CTRL_OFFSET_MASK;
-+	reg |= 0x01;
-+	reg |= L310_PREFETCH_CTRL_DBL_LINEFILL_INCR;
-+	reg |= L310_PREFETCH_CTRL_PREFETCH_DROP;
-+	reg |= L310_PREFETCH_CTRL_DATA_PREFETCH;
-+	reg |= L310_PREFETCH_CTRL_INSTR_PREFETCH;
-+	reg |= L310_PREFETCH_CTRL_DBL_LINEFILL;
-+	writel_relaxed(reg, at91_l2cc_base + L310_PREFETCH_CTRL);
-+
-+	/* Power Control */
-+	reg = readl_relaxed(at91_l2cc_base + L310_POWER_CTRL);
-+	reg |= L310_STNDBY_MODE_EN;
-+	reg |= L310_DYNAMIC_CLK_GATING_EN;
-+	writel_relaxed(reg, at91_l2cc_base + L310_POWER_CTRL);
-+
-+	/* Disable interrupts */
-+	writel_relaxed(0x00, at91_l2cc_base + L2X0_INTR_MASK);
-+	writel_relaxed(0x01ff, at91_l2cc_base + L2X0_INTR_CLEAR);
-+	l2x0_of_init(0, ~0UL);
-+}
-+#else
-+static inline void at91_init_l2cache(void) {}
-+#endif
-+
- static void __init sama5_dt_device_init(void)
- {
-+	at91_init_l2cache();
-+
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- 	at91_sam9x5_pm_init();
- }
--- 
-1.7.9.5
+
+On Mon, Jan 26, 2015 at 05:42:11PM +0800, Wenyou Yang wrote:
+> +static int at91_pm_verify_clocks(suspend_state_t state)
+>  {
+>  	unsigned long scsr;
+>  	int i;
+>  
+> +	/* For PM_SUSPEND_STANDBY, skip verifying the clock */
+> +	if (state == PM_SUSPEND_STANDBY)
+> +		return 1;
+> +
+
+In my opinion we should use the select() already in place in 
+at91_pm_enter() to do that:
+
+>  static int at91_pm_enter(suspend_state_t state)
+>  {
+>  	at91_pinctrl_gpio_suspend();
+>  
+>  	switch (state) {
+     (...)
+> +	case PM_SUSPEND_MEM:
+
+	/*
+	 * Ensure that clocks are in a valid state.
+	 */
+	if (!at91_pm_verify_clocks())
+		goto error;
+	/* FALLTHROUGH */
+
+> +	case PM_SUSPEND_STANDBY:
+>  		/*
+> -		 * Suspend-to-RAM is like STANDBY plus slow clock mode, so
+
+
+Sylvain
