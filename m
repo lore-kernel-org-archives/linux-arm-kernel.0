@@ -1,45 +1,52 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 26 Jan 2015 14:50:16 +0200
-Subject: [PATCH] video: treat signal like timeout as failure
-In-Reply-To: <1421731430-13207-1-git-send-email-der.herr@hofr.at>
-References: <1421731430-13207-1-git-send-email-der.herr@hofr.at>
-Message-ID: <54C63808.5070505@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 26 Jan 2015 12:51:34 +0000
+Subject: [PATCH RESEND v3 0/3] irqchip: vf610-mscm: add support for MSCM
+ interrupt router
+In-Reply-To: <36990c90fa3d2ee0849227f31cbafb54@agner.ch>
+References: <1421309046-22452-1-git-send-email-stefan@agner.ch>
+ <alpine.DEB.2.11.1501261115300.5526@nanos>
+ <36990c90fa3d2ee0849227f31cbafb54@agner.ch>
+Message-ID: <54C63856.7010704@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 20/01/15 07:23, Nicholas Mc Guire wrote:
-> if(!wait_for_completion_interruptible_timeout(...))
-> only handles the timeout case - this patch adds handling the
-> signal case the same as timeout and cleans up.
+On 26/01/15 11:55, Stefan Agner wrote:
+> On 2015-01-26 11:16, Thomas Gleixner wrote:
+>> On Thu, 15 Jan 2015, Stefan Agner wrote:
+>>
+>>> Splitted out version of the MSCM driver. My first driver based on the
+>>> routeable domain support and was part of the Vybrid Cortex-M4 support
+>>> patchset.
+>>>
+>>> So far the MSCM interrupt router was initialized by the boot loader
+>>> and configured all interrupts for the Cortex-A5 CPU. There are two
+>>> use cases where a proper driver is necessary:
+>>> - To run Linux on the Cortex-M4. When the kernel is running on the
+>>>   non-preconfigured CPU, the interrupt router need to be configured
+>>>   properly.
+>>> - To support deeper sleep modes: LPSTOP clears the interrupt router
+>>>   configuration, hence a driver needs to restore the configuration
+>>>   on resume.
+>>> I created a seperate patchset for that driver which hopefully makes
+>>> it easier to get it into mergeable state.
+>>>
+>>> Since I identified some registers likely to be used by other drivers
+>>> (e.g. CPU ID or the CPU Generate Interrupt Register) I also added
+>>> the "syscon" compatible string to make the registers available for
+>>> other drivers in case needed.
+>>>
+>>> This resend version of this patchset is rebased on v3.19-rc4.
+>>
+>> Has the discussion with Marc on the original V3 set been resolved?
 > 
-> Signed-off-by: Nicholas Mc Guire <der.herr@hofr.at>
-> ---
-> 
-> Only the timeout case was being handled, return of 0 in 
-> wait_for_completion_interruptible_timeout, the signal case (-ERESTARTSYS)
-> was treated just like the case of successful completion, which is most 
-> likely not reasonable.
-> 
-> Note that exynos_mipi_dsi_wr_data/exynos_mipi_dsi_rd_data return values
-> are not checked at the call sites in s6e8ax0.c (cmd_read/cmd_write)!
-> 
-> This patch simply treats the signal case the same way as the timeout case,
-> by releasing locks and returning 0 - which might not be the right thing to
-> do - this needs a review by someone knowing the details of this driver.
+> There was no answer to the original v3 patch. The comments of Marc was
+> back in the v2 set, and has been resolved in v3. However, no Ack from
+> Marc so far.
 
-The code changes look ok to me, but again you have detailed descriptions
-above which are not in the patch description. All the above looks like
-something that should be in the patch description.
+That's just me being lazy ;-). For the series:
 
- Tomi
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150126/f242a1a6/attachment.sig>
+	M.
+-- 
+Jazz is not dead. It just smells funny...
