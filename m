@@ -1,122 +1,50 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 26 Jan 2015 09:29:56 +0200
-Subject: [PATCH 3/3] ARM: edma: Split up header file to platform_data
- and API file
-In-Reply-To: <CAOesGMgdLB9WkOwCt__iRMnTYZ-tMNS==FL+b6s3CzHK4b0MYQ@mail.gmail.com>
-References: <1417084891-17990-1-git-send-email-peter.ujfalusi@ti.com>	<1417084891-17990-4-git-send-email-peter.ujfalusi@ti.com>
- <CAOesGMgdLB9WkOwCt__iRMnTYZ-tMNS==FL+b6s3CzHK4b0MYQ@mail.gmail.com>
-Message-ID: <54C5ECF4.10709@ti.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon, 26 Jan 2015 09:56:10 +0200
+Subject: [PATCH v4 1/2] clocksource: devicetree: document Conexant Digicolor
+ timer binding
+In-Reply-To: <cover.1422256855.git.baruch@tkos.co.il>
+References: <cover.1422256855.git.baruch@tkos.co.il>
+Message-ID: <c7f10f49db45099a393dc62db556c8de9ff63923.1422256855.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The Conexant CX92755 SoC provides 8 32-bit timers as part of its so called
+"Agent Communication" block. Timers can be configures either as free running or
+one shot. Each timer has a dedicated interrupt source in the CX92755 interrupts
+controller. The first timer (Timer A) can also be configured as watchdog.
 
-On 01/22/2015 03:40 AM, Olof Johansson wrote:
-> Hi,
-> 
-> On Thu, Nov 27, 2014 at 2:41 AM, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
->> include/linux/platform_data/ is not a correct place to keep the API
->> definitions for edma, it is meant to be only for the pdata for the device.
->> Clean up this by moving the API to include/linux/edma.h
-> 
-> It's a nice net improvement, but it moves some things that should be
-> in _neither_ location to a new place where it doesn't belong either --
-> and the new location is even more global. See below.
-> 
-> ...
-> 
->> diff --git a/include/linux/edma.h b/include/linux/edma.h
->> new file mode 100644
->> index 000000000000..9df92198c117
->> --- /dev/null
->> +++ b/include/linux/edma.h
->> @@ -0,0 +1,153 @@
->> +/*
->> + * TI EDMA definitions
->> + *
->> + * Copyright (C) 2006-2013 Texas Instruments.
->> + *
->> + * This program is free software; you can redistribute it and/or
->> + * modify it under the terms of the GNU General Public License as
->> + * published by the Free Software Foundation version 2.
->> + *
->> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
->> + * kind, whether express or implied; without even the implied warranty
->> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +/*
->> + * This EDMA3 programming framework exposes two basic kinds of resource:
->> + *
->> + *  Channel    Triggers transfers, usually from a hardware event but
->> + *             also manually or by "chaining" from DMA completions.
->> + *             Each channel is coupled to a Parameter RAM (PaRAM) slot.
->> + *
->> + *  Slot       Each PaRAM slot holds a DMA transfer descriptor (PaRAM
->> + *             "set"), source and destination addresses, a link to a
->> + *             next PaRAM slot (if any), options for the transfer, and
->> + *             instructions for updating those addresses.  There are
->> + *             more than twice as many slots as event channels.
->> + *
->> + * Each PaRAM set describes a sequence of transfers, either for one large
->> + * buffer or for several discontiguous smaller buffers.  An EDMA transfer
->> + * is driven only from a channel, which performs the transfers specified
->> + * in its PaRAM slot until there are no more transfers.  When that last
->> + * transfer completes, the "link" field may be used to reload the channel's
->> + * PaRAM slot with a new transfer descriptor.
->> + *
->> + * The EDMA Channel Controller (CC) maps requests from channels into physical
->> + * Transfer Controller (TC) requests when the channel triggers (by hardware
->> + * or software events, or by chaining).  The two physical DMA channels provided
->> + * by the TCs are thus shared by many logical channels.
->> + *
->> + * DaVinci hardware also has a "QDMA" mechanism which is not currently
->> + * supported through this interface.  (DSP firmware uses it though.)
->> + */
->> +
->> +#ifndef __LINUX_EDMA_H_
->> +#define __LINUX_EDMA_H_
->> +
->> +#include <linux/platform_data/edma.h>
->> +
->> +/* PaRAM slots are laid out like this */
->> +struct edmacc_param {
->> +       u32 opt;
->> +       u32 src;
->> +       u32 a_b_cnt;
->> +       u32 dst;
->> +       u32 src_dst_bidx;
->> +       u32 link_bcntrld;
->> +       u32 src_dst_cidx;
->> +       u32 ccnt;
->> +} __packed;
->> +
->> +/* fields in edmacc_param.opt */
->> +#define SAM            BIT(0)
->> +#define DAM            BIT(1)
->> +#define SYNCDIM                BIT(2)
->> +#define STATIC         BIT(3)
->> +#define EDMA_FWID      (0x07 << 8)
->> +#define TCCMODE                BIT(11)
->> +#define EDMA_TCC(t)    ((t) << 12)
->> +#define TCINTEN                BIT(20)
->> +#define ITCINTEN       BIT(21)
->> +#define TCCHEN         BIT(22)
->> +#define ITCCHEN                BIT(23)
-> 
-> This seems like the kind of thing that should go with the edma driver
-> instead of being globally exported to the kernel through a
-> include/linux header file.
+This commit adds devicetree binding definition of this hardware module. The
+binding defined here should be reusable for other SoCs in the Digicolor series.
 
-Currently the edmacc_param struct is used by arch/arm/common/edma.c,
-drivers/dma/edma.c and the sound/soc/davinci/davinci-pcm.c
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+ .../devicetree/bindings/timer/digicolor-timer.txt      | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/timer/digicolor-timer.txt
 
-For now this has to be in a global header file. Even with my local VIP branch
-where I had removed the davinci-pcm already the two drivers for edma needs
-this in global header file.
-I can assure you, it will be gone (along with the arch/arm/common/edma.c) but
-not right away.
-
+diff --git a/Documentation/devicetree/bindings/timer/digicolor-timer.txt b/Documentation/devicetree/bindings/timer/digicolor-timer.txt
+new file mode 100644
+index 000000000000..d1b659bbc29f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/timer/digicolor-timer.txt
+@@ -0,0 +1,18 @@
++Conexant Digicolor SoCs Timer Controller
++
++Required properties:
++
++- compatible : should be "cnxt,cx92755-timer"
++- reg : Specifies base physical address and size of the "Agent Communication"
++  timer registers
++- interrupts : Contains 8 interrupts, one for each timer
++- clocks: phandle to the main clock
++
++Example:
++
++	timer at f0000fc0 {
++		compatible = "cnxt,cx92755-timer";
++		reg = <0xf0000fc0 0x40>;
++		interrupts = <19>, <31>, <34>, <35>, <52>, <53>, <54>, <55>;
++		clocks = <&main_clk>;
++	};
 -- 
-P?ter
+2.1.4
