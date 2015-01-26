@@ -1,308 +1,101 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 26 Jan 2015 17:25:49 +0800
-Subject: [PATCH v2 1/9] clk: sunxi: Add support for sun9i a80 usb clocks
- and resets
-In-Reply-To: <20150125160253.GG8470@lukather>
-References: <1422188530-1794-1-git-send-email-wens@csie.org>
- <1422188530-1794-2-git-send-email-wens@csie.org>
- <20150125160253.GG8470@lukather>
-Message-ID: <CAGb2v667DGBPXGdU1jO1x=pxmu3Oue9qxVZmZz5KxqzC_9xxGw@mail.gmail.com>
+From: afaerber@suse.de (=?windows-1252?Q?Andreas_F=E4rber?=)
+Date: Mon, 26 Jan 2015 10:35:18 +0100
+Subject: [PATCH v3] ARM: zynq: DT: Add USB to device tree
+In-Reply-To: <54C5FBC3.7030903@suse.de>
+References: <1417536431-27759-1-git-send-email-soren.brinkmann@xilinx.com>
+ <d78fedd84f354d80985187f851cb3cd1@BN1AFFO11FD055.protection.gbl>
+ <54C5F89A.3090901@suse.de> <54C5F965.90100@monstr.eu>
+ <54C5FBC3.7030903@suse.de>
+Message-ID: <54C60A56.7010403@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Am 26.01.2015 um 09:33 schrieb Andreas F?rber:
+> Am 26.01.2015 um 09:23 schrieb Michal Simek:
+>> On 01/26/2015 09:19 AM, Andreas F?rber wrote:
+>>> And if I apply it to my -next based tree, adding corresponding nodes to
+>>> zynq-parallella.dts, I get repeatedly:
+>>>
+>>> [  +0,012242] ci_hdrc ci_hdrc.0: no of_node; not parsing pinctrl DT
+>>> [  +0,000157] ci_hdrc ci_hdrc.0: ChipIdea HDRC found, lpm: 0; cap:
+>>> f090e100 op: f090e140
+>>> [  +0,000081] platform ci_hdrc.0: Driver ci_hdrc requests probe deferral
+>>> [  +0,005360] ci_hdrc ci_hdrc.1: no of_node; not parsing pinctrl DT
+>>> [  +0,000120] ci_hdrc ci_hdrc.1: ChipIdea HDRC found, lpm: 0; cap:
+>>> f0910100 op: f0910140
+>>> [  +0,001810] platform ci_hdrc.1: Driver ci_hdrc requests probe deferral
+>>>
+>>> Am I missing any other patches or config options?
+>>> (I do notice that the pinctrl v3 patch that got merged has a trivial bug
+>>> for usb0, for which I'll send a patch later on.)
+>>
+>> Why is it deferred? Is it because of pinmuxing stuff?
+> 
+> No, happened without as well.
+> 
+> Looking at a different place in dmesg, I spot this:
+> 
+> [  +0,003988] usb_phy_generic phy0: GPIO lookup for consumer reset-gpios
+> [  +0,000012] usb_phy_generic phy0: using device tree for GPIO lookup
+> [  +0,000015] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpios'
+> property
+>  of node '/phy0[0]'
+> [  +0,000013] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpio'
+> property
+> of node '/phy0[0]'
+> [  +0,000010] usb_phy_generic phy0: using lookup tables for GPIO lookup
+> [  +0,000153] usb_phy_generic phy0: lookup for GPIO reset-gpios failed
+> [  +0,000012] usb_phy_generic phy0: Error requesting RESET GPIO
+> [  +0,004360] usb_phy_generic: probe of phy0 failed with error -2
+> [  +0,004991] usb_phy_generic phy1: GPIO lookup for consumer reset-gpios
+> [  +0,000012] usb_phy_generic phy1: using device tree for GPIO lookup
+> [  +0,000013] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpios'
+> property
+>  of node '/phy1[0]'
+> [  +0,000013] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpio'
+> property of node '/phy1[0]'
+> [  +0,000010] usb_phy_generic phy1: using lookup tables for GPIO lookup
+> [  +0,000012] usb_phy_generic phy1: lookup for GPIO reset-gpios failed
+> [  +0,000011] usb_phy_generic phy1: Error requesting RESET GPIO
+> [  +0,004337] usb_phy_generic: probe of phy1 failed with error -2
+> 
+> So, I guess the chipidea driver is deferring because the phys want a
+> property that neither me nor you are specifying? Would that be the two
+> MDIO pins 52 and 53 that would need to be specified?
 
-2015?1?25? ??11:05 ? "Maxime Ripard" <maxime.ripard@free-electrons.com> ???
->
-> Hi,
->
-> On Sun, Jan 25, 2015 at 08:22:02PM +0800, Chen-Yu Tsai wrote:
-> > The USB controller/phy clocks and reset controls are in a separate
-> > address block, unlike previous SoCs where they were in the clock
-> > controller.
-> >
-> > This patch copies the original gates clk functions used for usb
-> > clocks into a separate file, and renames them to *_usb_*. Also
-> > add a per-gate parent index, so we can set different parents for
-> > each gate.
-> >
-> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> > ---
-> >  Documentation/devicetree/bindings/clock/sunxi.txt |   2 +
-> >  drivers/clk/sunxi/Makefile                        |   1 +
-> >  drivers/clk/sunxi/clk-usb.c                       | 193 ++++++++++++++++++++++
-> >  3 files changed, 196 insertions(+)
-> >  create mode 100644 drivers/clk/sunxi/clk-usb.c
-> >
-> > diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-> > index 60b44285250d..3f1dcd879af7 100644
-> > --- a/Documentation/devicetree/bindings/clock/sunxi.txt
-> > +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-> > @@ -66,6 +66,8 @@ Required properties:
-> >       "allwinner,sun4i-a10-usb-clk" - for usb gates + resets on A10 / A20
-> >       "allwinner,sun5i-a13-usb-clk" - for usb gates + resets on A13
-> >       "allwinner,sun6i-a31-usb-clk" - for usb gates + resets on A31
-> > +     "allwinner,sun9i-a80-usb-mod-clk" - for usb gates + resets on A80
-> > +     "allwinner,sun9i-a80-usb-phy-clk" - for usb phy gates + resets on A80
-> >
-> >  Required properties for all clocks:
-> >  - reg : shall be the control register address for the clock.
-> > diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-> > index 3a5292e3fcf8..058f273d6154 100644
-> > --- a/drivers/clk/sunxi/Makefile
-> > +++ b/drivers/clk/sunxi/Makefile
-> > @@ -9,6 +9,7 @@ obj-y += clk-mod0.o
-> >  obj-y += clk-sun8i-mbus.o
-> >  obj-y += clk-sun9i-core.o
-> >  obj-y += clk-sun9i-mmc.o
-> > +obj-y += clk-usb.o
->
-> Is that supposed to handle the other USB clocks in the future as well?
+Erm, scratch that last question - wrong PHY. Trying it resolved the
+above phy errors but not the original problem. And so does an empty one:
 
-I plan to do that. If you compare this and the original USB clk driver,
-you'll notice it's pretty much the same.
+@@ -99,11 +100,13 @@
 
-> >
-> >  obj-$(CONFIG_MFD_SUN6I_PRCM) += \
-> >       clk-sun6i-ar100.o clk-sun6i-apb0.o clk-sun6i-apb0-gates.o \
-> > diff --git a/drivers/clk/sunxi/clk-usb.c b/drivers/clk/sunxi/clk-usb.c
-> > new file mode 100644
-> > index 000000000000..1a93400353de
-> > --- /dev/null
-> > +++ b/drivers/clk/sunxi/clk-usb.c
-> > @@ -0,0 +1,193 @@
-> > +/*
-> > + * Copyright 2013 Emilio L?pez
-> > + *
-> > + * Emilio L?pez <emilio@elopez.com.ar>
->
-> Hmmmm, the copyright notice seems weird :)
+        usb_phy0: phy0 {
+                compatible = "usb-nop-xceiv";
++               reset-gpios = <>;
+                #phy-cells = <0>;
+        };
 
-The code was pulled from clk-sunxi.c, which only has Emilio's
-copyright. I suppose I could dig up who actually wrote the code.
-I think it was Hans.
+        usb_phy1: phy1 {
+                compatible = "usb-nop-xceiv";
++               reset-gpios = <>;
+                #phy-cells = <0>;
+        };
+ };
 
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License as published by
-> > + * the Free Software Foundation; either version 2 of the License, or
-> > + * (at your option) any later version.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +
-> > +#include <linux/clk-provider.h>
-> > +#include <linux/clkdev.h>
-> > +#include <linux/of.h>
-> > +#include <linux/of_address.h>
-> > +#include <linux/reset-controller.h>
-> > +#include <linux/spinlock.h>
-> > +
-> > +
-> > +/**
-> > + * sunxi_usb_reset... - reset bits in usb clk registers handling
-> > + */
-> > +
-> > +struct usb_reset_data {
-> > +     void __iomem                    *reg;
-> > +     spinlock_t                      *lock;
-> > +     struct clk                      *clk;
-> > +     struct reset_controller_dev     rcdev;
-> > +};
-> > +
-> > +static int sunxi_usb_reset_assert(struct reset_controller_dev *rcdev,
-> > +                           unsigned long id)
-> > +{
-> > +     struct usb_reset_data *data = container_of(rcdev,
-> > +                                                struct usb_reset_data,
-> > +                                                rcdev);
-> > +     unsigned long flags;
-> > +     u32 reg;
-> > +
-> > +     clk_prepare_enable(data->clk);
-> > +     spin_lock_irqsave(data->lock, flags);
-> > +
-> > +     reg = readl(data->reg);
-> > +     writel(reg & ~BIT(id), data->reg);
-> > +
-> > +     spin_unlock_irqrestore(data->lock, flags);
-> > +     clk_disable_unprepare(data->clk);
-> > +
-> > +     return 0;
-> > +}
-> > +
-> > +static int sunxi_usb_reset_deassert(struct reset_controller_dev *rcdev,
-> > +                             unsigned long id)
-> > +{
-> > +     struct usb_reset_data *data = container_of(rcdev,
-> > +                                                  struct usb_reset_data,
-> > +                                                  rcdev);
-> > +     unsigned long flags;
-> > +     u32 reg;
-> > +
-> > +     clk_prepare_enable(data->clk);
-> > +     spin_lock_irqsave(data->lock, flags);
-> > +
-> > +     reg = readl(data->reg);
-> > +     writel(reg | BIT(id), data->reg);
-> > +
-> > +     spin_unlock_irqrestore(data->lock, flags);
-> > +     clk_disable_unprepare(data->clk);
-> > +
-> > +     return 0;
-> > +}
-> > +
-> > +static struct reset_control_ops sunxi_usb_reset_ops = {
-> > +     .assert         = sunxi_usb_reset_assert,
-> > +     .deassert       = sunxi_usb_reset_deassert,
-> > +};
-> > +
-> > +/**
-> > + * sunxi_usb_clk_setup() - Setup function for usb gate clocks
-> > + */
-> > +
-> > +#define SUNXI_USB_MAX_SIZE 32
-> > +
-> > +struct usb_clk_data {
-> > +     u32 clk_mask;
-> > +     u32 reset_mask;
-> > +     bool reset_needs_clk;
-> > +};
-> > +
-> > +static void __init sunxi_usb_clk_setup(struct device_node *node,
-> > +                                    const struct usb_clk_data *data,
-> > +                                    spinlock_t *lock)
-> > +{
-> > +     struct clk_onecell_data *clk_data;
-> > +     struct usb_reset_data *reset_data;
-> > +     const char *clk_parent;
-> > +     const char *clk_name;
-> > +     void __iomem *reg;
-> > +     int qty;
-> > +     int i = 0;
-> > +     int j = 0;
-> > +
-> > +     reg = of_io_request_and_map(node, 0, of_node_full_name(node));
->
-> You should check the return code here.
+In my manuals and notes I can't find any GPIO being used as reset for
+the USB PHYs. Any thoughts appreciated.
 
-Right.
+Regards,
+Andreas
 
-> > +     clk_parent = of_clk_get_parent_name(node, 0);
-> > +     if (!clk_parent)
-> > +             return;
-> > +
-> > +     /* Worst-case size approximation and memory allocation */
-> > +     qty = find_last_bit((unsigned long *)&data->clk_mask,
-> > +                         SUNXI_USB_MAX_SIZE);
->
-> Newline
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Jennifer Guild, Dilip Upmanyu,
+Graham Norton; HRB 21284 (AG N?rnberg)
 
-OK.
-
-> > +     clk_data = kmalloc(sizeof(struct clk_onecell_data), GFP_KERNEL);
-> > +     if (!clk_data)
-> > +             return;
->
-> Newline.
-
-OK.
-
-> > +     clk_data->clks = kzalloc((qty+1) * sizeof(struct clk *), GFP_KERNEL);
-> > +     if (!clk_data->clks) {
-> > +             kfree(clk_data);
-> > +             return;
-> > +     }
-> > +
-> > +     for_each_set_bit(i, (unsigned long *)&data->clk_mask,
-> > +                      SUNXI_USB_MAX_SIZE) {
-> > +             of_property_read_string_index(node, "clock-output-names",
-> > +                                           j, &clk_name);
-> > +             clk_data->clks[i] = clk_register_gate(NULL, clk_name,
-> > +                                                   clk_parent, 0,
-> > +                                                   reg, i, 0, lock);
-> > +             WARN_ON(IS_ERR(clk_data->clks[i]));
-> > +             clk_register_clkdev(clk_data->clks[i], clk_name, NULL);
->
-> Do we really need to use clkdev for these clocks?
-
-Original code. I don't think we do.
-
-> > +             j++;
-> > +     }
-> > +
-> > +     /* Adjust to the real max */
-> > +     clk_data->clk_num = i;
-> > +
-> > +     of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
-> > +
-> > +     /* Register a reset controller for usb with reset bits */
-> > +     if (data->reset_mask == 0)
-> > +             return;
-> > +
-> > +     reset_data = kzalloc(sizeof(*reset_data), GFP_KERNEL);
-> > +     if (!reset_data)
-> > +             return;
-> > +
-> > +     if (data->reset_needs_clk)
-> > +             reset_data->clk = of_clk_get(node, 0);
->
-> Newline
-
-OK.
-
-> > +     if (IS_ERR(reset_data->clk)) {
-> > +             pr_err("Could not get clock for reset controls\n");
-> > +             kfree(reset_data);
-> > +             return;
-> > +     }
->
-> Newline, and that block should probably be part of the if block above.
-
-NULL is not considered an error, but maybe being in the same block
-makes it clear that they are related.
-
-> > +     reset_data->reg = reg;
-> > +     reset_data->lock = lock;
-> > +     reset_data->rcdev.nr_resets = __fls(data->reset_mask) + 1;
-> > +     reset_data->rcdev.ops = &sunxi_usb_reset_ops;
-> > +     reset_data->rcdev.of_node = node;
-> > +     reset_controller_register(&reset_data->rcdev);
-> > +}
-> > +
-> > +static const struct usb_clk_data sun9i_a80_usb_mod_data __initconst = {
-> > +     .clk_mask = BIT(6) | BIT(5) | BIT(4) | BIT(3) | BIT(2) | BIT(1),
-> > +     .reset_mask = BIT(19) | BIT(18) | BIT(17),
-> > +     .reset_needs_clk = 1,
-> > +};
-> > +
-> > +static DEFINE_SPINLOCK(a80_usb_mod_lock);
-> > +
-> > +static void __init sun9i_a80_usb_mod_setup(struct device_node *node)
-> > +{
-> > +     sunxi_usb_clk_setup(node, &sun9i_a80_usb_mod_data, &a80_usb_mod_lock);
-> > +}
-> > +CLK_OF_DECLARE(sun9i_a80_usb_mod, "allwinner,sun9i-a80-usb-mod-clk", sun9i_a80_usb_mod_setup);
-> > +
-> > +static const struct usb_clk_data sun9i_a80_usb_phy_data __initconst = {
-> > +     .clk_mask = BIT(10) | BIT(5) | BIT(4) | BIT(3) | BIT(2) | BIT(1),
-> > +     .reset_mask = BIT(21) | BIT(20) | BIT(19) | BIT(18) | BIT(17),
-> > +     .reset_needs_clk = 1,
-> > +};
-> > +
-> > +static DEFINE_SPINLOCK(a80_usb_phy_lock);
-> > +
-> > +static void __init sun9i_a80_usb_phy_setup(struct device_node *node)
-> > +{
-> > +     sunxi_usb_clk_setup(node, &sun9i_a80_usb_phy_data, &a80_usb_phy_lock);
-> > +}
-> > +CLK_OF_DECLARE(sun9i_a80_usb_phy, "allwinner,sun9i-a80-usb-phy-clk", sun9i_a80_usb_phy_setup);
->
-> Looks good otherwise, thanks!
-
-Thanks.
-
-ChenYu
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150126/fb9bb454/attachment.sig>
