@@ -1,10 +1,10 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 26 Jan 2015 15:15:57 +0100
-Subject: [PATCH v2 13/27] ARM: mvebu: armada-385: Relicense the device tree
+Date: Mon, 26 Jan 2015 15:15:59 +0100
+Subject: [PATCH v2 15/27] ARM: mvebu: armada-38x: Relicense the device tree
  under GPLv2+/X11
 In-Reply-To: <1422281771-31443-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1422281771-31443-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1422281771-31443-14-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1422281771-31443-16-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,15 +17,16 @@ relicense our device trees under a GPL/X11 dual-license.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Acked-by: Jason Cooper <jason@lakedaemon.net>
-Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Acked-by: Marcin Wojtas <mw@semihalf.com>
+Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-385.dtsi | 40 ++++++++++++++++++++++++++++++++++++---
+ arch/arm/boot/dts/armada-38x.dtsi | 40 ++++++++++++++++++++++++++++++++++++---
  1 file changed, 37 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-385.dtsi b/arch/arm/boot/dts/armada-385.dtsi
-index a54a252ddb4c..8e67d2c083dd 100644
---- a/arch/arm/boot/dts/armada-385.dtsi
-+++ b/arch/arm/boot/dts/armada-385.dtsi
+diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+index 33cad7f7a224..54ebce71f802 100644
+--- a/arch/arm/boot/dts/armada-38x.dtsi
++++ b/arch/arm/boot/dts/armada-38x.dtsi
 @@ -7,9 +7,43 @@
   * Gregory CLEMENT <gregory.clement@free-electrons.com>
   * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
@@ -72,6 +73,6 @@ index a54a252ddb4c..8e67d2c083dd 100644
 + *     OTHER DEALINGS IN THE SOFTWARE.
   */
  
- #include "armada-38x.dtsi"
+ #include "skeleton.dtsi"
 -- 
 2.1.0
