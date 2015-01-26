@@ -1,148 +1,86 @@
-From: plaes@plaes.org (Priit Laes)
-Date: Mon, 26 Jan 2015 18:58:32 +0200
-Subject: [PATCH] arm: sunxi: input: RFC: Add sysfs voltage for sun4i-lradc
- driver
-Message-ID: <1422291516-24895-1-git-send-email-plaes@plaes.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 26 Jan 2015 09:03:23 -0800
+Subject: N900 v3.19-rc5 arm atags_to_fdt.c is broken
+In-Reply-To: <201501261723.10505@pali>
+References: <201501232239.55801@pali> <201501232336.36187@pali>
+ <20150126161454.GE28663@atomide.com> <201501261723.10505@pali>
+Message-ID: <20150126170323.GF28663@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
----
- .../ABI/testing/sysfs-driver-input-sun4i-lradc     |  4 ++
- drivers/input/keyboard/sun4i-lradc-keys.c          | 49 +++++++++++++++++-----
- 2 files changed, 43 insertions(+), 10 deletions(-)
- create mode 100644 Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc
+* Pali Roh?r <pali.rohar@gmail.com> [150126 08:26]:
+> On Monday 26 January 2015 17:14:55 Tony Lindgren wrote:
+> > * Pali Roh?r <pali.rohar@gmail.com> [150123 14:39]:
+> > > On Friday 23 January 2015 22:39:55 Pali Roh?r wrote:
+> > > > Hello,
+> > > > 
+> > > > when I boot zImage with appended DT n900 in qemu
+> > > > fdt_open_into() function called from file
+> > > > arch/arm/boot/compressed/atags_to_fdt.c (in function
+> > > > atags_to_fdt) always returns -FDT_ERR_NOSPACE.
+> > > > 
+> > > > It means that all ATAGS (including cmdline arguments)
+> > > > passed by bootloader are ignored.
+> > > > 
+> > > > On real n900 device I see that booted DT version also
+> > > > ignore cmdline arguments from bootloader. I cannot debug
+> > > > decompress code on real device, but I think it is same
+> > > > problem as in qemu.
+> > > 
+> > > Looks like this quick patch is fixing above problem:
+> > > 
+> > > diff --git a/arch/arm/boot/compressed/head.S
+> > > b/arch/arm/boot/compressed/head.S index 68be901..4a7d75b
+> > > 100644
+> > > --- a/arch/arm/boot/compressed/head.S
+> > > +++ b/arch/arm/boot/compressed/head.S
+> > > @@ -268,7 +268,7 @@ restart:	adr	r0, LC0
+> > > 
+> > >  		 * area.  No GOT fixup has occurred yet, but none of 
+> the
+> > >  		 * code we're about to call uses any global variable.
+> > >  		
+> > >  		*/
+> > > 
+> > > -		add	sp, sp, #0x10000
+> > > +		add	sp, sp, #0x20000
+> > > 
+> > >  		stmfd	sp!, {r0-r3, ip, lr}
+> > >  		mov	r0, r8
+> > >  		mov	r1, r6
+> > > 
+> > > @@ -289,7 +289,7 @@ restart:	adr	r0, LC0
+> > > 
+> > >  		bleq	atags_to_fdt
+> > >  		
+> > >  		ldmfd	sp!, {r0-r3, ip, lr}
+> > > 
+> > > -		sub	sp, sp, #0x10000
+> > > +		sub	sp, sp, #0x20000
+> > > 
+> > >  #endif
+> > >  
+> > >  		mov	r8, r6			@ use the appended device tree
+> > 
+> > Nico, got any ideas about this one? This seems like a
+> > regression somewhere..
+> > 
+> > Regards,
+> > 
+> > Tony
+> 
+> $ du -b arch/arm/boot/dts/omap3-n900.dtb 
+> 70212   arch/arm/boot/dts/omap3-n900.dtb
+> 
+> $ echo $((0x10000))
+> 65536
+> 
+> I would say, problem is because omap3-n900 binary DT is too large
 
-diff --git a/Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc b/Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc
-new file mode 100644
-index 0000000..e4e6448
---- /dev/null
-+++ b/Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc
-@@ -0,0 +1,4 @@
-+What:		/sys/class/input/input(x)/device/voltage
-+Date:		February 2015
-+Contact:	Priit Laes <plaes@plaes.org>
-+Description:	ADC output voltage in microvolts or 0 if device is not opened.
-diff --git a/drivers/input/keyboard/sun4i-lradc-keys.c b/drivers/input/keyboard/sun4i-lradc-keys.c
-index cc8f7dd..c0ab8ec 100644
---- a/drivers/input/keyboard/sun4i-lradc-keys.c
-+++ b/drivers/input/keyboard/sun4i-lradc-keys.c
-@@ -79,10 +79,27 @@ struct sun4i_lradc_data {
- 	u32 vref;
- };
- 
-+static u32 sun4i_lradc_read_voltage(struct sun4i_lradc_data *lradc)
-+{
-+	u32 val = readl(lradc->base + LRADC_DATA0) & 0x3f;
-+	return val * lradc->vref / 63;
-+};
-+
-+static ssize_t
-+sun4i_lradc_dev_voltage_show(struct device *dev,
-+			struct device_attribute *attr, char *buf)
-+{
-+	struct sun4i_lradc_data *lradc = dev_get_drvdata(dev);
-+
-+	return sprintf(buf, "%u\n", sun4i_lradc_read_voltage(lradc));
-+}
-+
-+static const DEVICE_ATTR(voltage, S_IRUGO, sun4i_lradc_dev_voltage_show, NULL);
-+
- static irqreturn_t sun4i_lradc_irq(int irq, void *dev_id)
- {
- 	struct sun4i_lradc_data *lradc = dev_id;
--	u32 i, ints, val, voltage, diff, keycode = 0, closest = 0xffffffff;
-+	u32 i, ints, voltage, diff, keycode = 0, closest = 0xffffffff;
- 
- 	ints  = readl(lradc->base + LRADC_INTS);
- 
-@@ -97,8 +114,7 @@ static irqreturn_t sun4i_lradc_irq(int irq, void *dev_id)
- 	}
- 
- 	if ((ints & CHAN0_KEYDOWN_IRQ) && lradc->chan0_keycode == 0) {
--		val = readl(lradc->base + LRADC_DATA0) & 0x3f;
--		voltage = val * lradc->vref / 63;
-+		voltage = sun4i_lradc_read_voltage(lradc);
- 
- 		for (i = 0; i < lradc->chan0_map_count; i++) {
- 			diff = abs(lradc->chan0_map[i].voltage - voltage);
-@@ -156,7 +172,7 @@ static void sun4i_lradc_close(struct input_dev *dev)
- }
- 
- static int sun4i_lradc_load_dt_keymap(struct device *dev,
--				      struct sun4i_lradc_data *lradc)
-+				    struct sun4i_lradc_data *lradc)
- {
- 	struct device_node *np, *pp;
- 	int i;
-@@ -168,8 +184,8 @@ static int sun4i_lradc_load_dt_keymap(struct device *dev,
- 
- 	lradc->chan0_map_count = of_get_child_count(np);
- 	if (lradc->chan0_map_count == 0) {
--		dev_err(dev, "keymap is missing in device tree\n");
--		return -EINVAL;
-+		dev_info(dev, "keymap is missing in device tree\n");
-+		return 0;
- 	}
- 
- 	lradc->chan0_map = devm_kmalloc_array(dev, lradc->chan0_map_count,
-@@ -185,19 +201,19 @@ static int sun4i_lradc_load_dt_keymap(struct device *dev,
- 
- 		error = of_property_read_u32(pp, "channel", &channel);
- 		if (error || channel != 0) {
--			dev_err(dev, "%s: Inval channel prop\n", pp->name);
-+			dev_err(dev, "%s: Invalid 'channel' property\n", pp->name);
- 			return -EINVAL;
- 		}
- 
- 		error = of_property_read_u32(pp, "voltage", &map->voltage);
- 		if (error) {
--			dev_err(dev, "%s: Inval voltage prop\n", pp->name);
-+			dev_err(dev, "%s: Invalid 'voltage' property\n", pp->name);
- 			return -EINVAL;
- 		}
- 
- 		error = of_property_read_u32(pp, "linux,code", &map->keycode);
- 		if (error) {
--			dev_err(dev, "%s: Inval linux,code prop\n", pp->name);
-+			dev_err(dev, "%s: Invalid 'linux,code' property\n", pp->name);
- 			return -EINVAL;
- 		}
- 
-@@ -257,14 +273,26 @@ static int sun4i_lradc_probe(struct platform_device *pdev)
- 	if (error)
- 		return error;
- 
--	error = input_register_device(lradc->input);
-+	error = device_create_file(dev, &dev_attr_voltage);
- 	if (error)
- 		return error;
- 
-+	error = input_register_device(lradc->input);
-+	if (error) {
-+		device_remove_file(&pdev->dev, &dev_attr_voltage);
-+		return error;
-+	}
-+
- 	platform_set_drvdata(pdev, lradc);
- 	return 0;
- }
- 
-+static int sun4i_lradc_remove(struct platform_device *pdev)
-+{
-+	device_remove_file(&pdev->dev, &dev_attr_voltage);
-+	return 0;
-+}
-+
- static const struct of_device_id sun4i_lradc_of_match[] = {
- 	{ .compatible = "allwinner,sun4i-a10-lradc-keys", },
- 	{ /* sentinel */ }
-@@ -277,6 +305,7 @@ static struct platform_driver sun4i_lradc_driver = {
- 		.of_match_table = of_match_ptr(sun4i_lradc_of_match),
- 	},
- 	.probe	= sun4i_lradc_probe,
-+	.remove = sun4i_lradc_remove,
- };
- 
- module_platform_driver(sun4i_lradc_driver);
--- 
-2.2.2
+OK if that's the case, then your patch makes sense to me. It also
+seems we can have the temporary stack be larger than the initial
+stack just for atags_to_fdt.
+
+Regards,
+
+Tony
