@@ -1,100 +1,62 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 26 Jan 2015 15:56:03 +0100
-Subject: [PATCH v2 1/2] mtd: nand: pxa3xx: Fix PIO FIFO draining
-In-Reply-To: <1422284164-16867-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1422284164-16867-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1422284164-16867-2-git-send-email-maxime.ripard@free-electrons.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 26 Jan 2015 16:07:36 +0100
+Subject: [PATCH v2] ARM: at91: sama5d4: dts: change the nand compatible
+ string
+In-Reply-To: <54C0D872.6010005@atmel.com>
+References: <1421656387-12538-2-git-send-email-josh.wu@atmel.com>
+ <1421923305-10088-1-git-send-email-josh.wu@atmel.com>
+ <54C0D872.6010005@atmel.com>
+Message-ID: <54C65838.4020707@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The NDDB register holds the data that are needed by the read and write
-commands.
+Le 22/01/2015 12:01, Nicolas Ferre a ?crit :
+> Le 22/01/2015 11:41, Josh Wu a ?crit :
+>> As we introduce a new "atmel,sama5d4-nand" compatible string for sama5d4,
+>> so we need to apply it for sama5d4 chip.
+>>
+>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> 
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> 
+> Brian,
+> I suppose that it makes sense to keep this patch with the previous one.
+> So, can you take it in your tree?
+> 
+> Otherwise, it can take the at91 -> arm-soc route.
 
-However, during a read PIO access, the datasheet specifies that after each 32
-bits read in that register, when BCH is enabled, we have to make sure that the
-RDDREQ bit is set in the NDSR register.
+Bryan,
 
-This fixes an issue that was seen on the Armada 385, and presumably other mvebu
-SoCs, when a read on a newly erased page would end up in the driver reporting a
-timeout from the NAND.
+I take it with me right now and try to send it to arm-soc for 3.20.
 
-Cc: <stable@vger.kernel.org> # v3.14
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/mtd/nand/pxa3xx_nand.c | 45 ++++++++++++++++++++++++++++++++++++------
- 1 file changed, 39 insertions(+), 6 deletions(-)
+Best regards,
 
-diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 96b0b1d27df1..e6918befb951 100644
---- a/drivers/mtd/nand/pxa3xx_nand.c
-+++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -23,6 +23,7 @@
- #include <linux/mtd/partitions.h>
- #include <linux/io.h>
- #include <linux/irq.h>
-+#include <linux/jiffies.h>
- #include <linux/slab.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-@@ -480,6 +481,38 @@ static void disable_int(struct pxa3xx_nand_info *info, uint32_t int_mask)
- 	nand_writel(info, NDCR, ndcr | int_mask);
- }
- 
-+static void drain_fifo(struct pxa3xx_nand_info *info, void *data, int len)
-+{
-+	u32 *dst = (u32 *)data;
-+
-+	if (info->ecc_bch) {
-+		while (len--) {
-+			u32 timeout;
-+
-+			*dst++ = nand_readl(info, NDDB);
-+
-+			/*
-+			 * According to the datasheet, when reading
-+			 * from NDDB with BCH enabled, after each 32
-+			 * bits reads, we have to make sure that the
-+			 * NDSR.RDDREQ bit is set
-+			 */
-+			timeout = jiffies + msecs_to_jiffies(5);
-+			while (!(nand_readl(info, NDSR) & NDSR_RDDREQ)) {
-+				if (!time_before(jiffies, timeout)) {
-+					dev_err(&info->pdev->dev,
-+						"Timeout on RDDREQ while draining the FIFO\n");
-+					return;
-+				}
-+
-+				cpu_relax();
-+			}
-+		}
-+	} else {
-+		__raw_readsl(info->mmio_base + NDDB, data, len);
-+	}
-+}
-+
- static void handle_data_pio(struct pxa3xx_nand_info *info)
- {
- 	unsigned int do_bytes = min(info->data_size, info->chunk_size);
-@@ -496,14 +529,14 @@ static void handle_data_pio(struct pxa3xx_nand_info *info)
- 				      DIV_ROUND_UP(info->oob_size, 4));
- 		break;
- 	case STATE_PIO_READING:
--		__raw_readsl(info->mmio_base + NDDB,
--			     info->data_buff + info->data_buff_pos,
--			     DIV_ROUND_UP(do_bytes, 4));
-+		drain_fifo(info,
-+			   info->data_buff + info->data_buff_pos,
-+			   DIV_ROUND_UP(do_bytes, 4));
- 
- 		if (info->oob_size > 0)
--			__raw_readsl(info->mmio_base + NDDB,
--				     info->oob_buff + info->oob_buff_pos,
--				     DIV_ROUND_UP(info->oob_size, 4));
-+			drain_fifo(info,
-+				   info->oob_buff + info->oob_buff_pos,
-+				   DIV_ROUND_UP(info->oob_size, 4));
- 		break;
- 	default:
- 		dev_err(&info->pdev->dev, "%s: invalid state %d\n", __func__,
+
+>> ---
+>>
+>> Changes in v2:
+>> - still keep the old rm9200 nand compatible string for compatible old driver.
+>>
+>>  arch/arm/boot/dts/sama5d4.dtsi | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
+>> index 1b0f30c..e40b1da 100644
+>> --- a/arch/arm/boot/dts/sama5d4.dtsi
+>> +++ b/arch/arm/boot/dts/sama5d4.dtsi
+>> @@ -267,7 +267,7 @@
+>>  		};
+>>  
+>>  		nand0: nand at 80000000 {
+>> -			compatible = "atmel,at91rm9200-nand";
+>> +			compatible = "atmel,sama5d4-nand", "atmel,at91rm9200-nand";
+>>  			#address-cells = <1>;
+>>  			#size-cells = <1>;
+>>  			ranges;
+>>
+> 
+> 
+
+
 -- 
-2.2.2
+Nicolas Ferre
