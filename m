@@ -1,63 +1,49 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Mon, 26 Jan 2015 10:37:38 +0800
-Subject: [PATCH v1 2/2] net: stmmac: add fixed_phy support via fixed-link DT
- binding
-In-Reply-To: <1422239858-3452-1-git-send-email-ming.lei@canonical.com>
+From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
+Date: Mon, 26 Jan 2015 04:01:59 +0100
+Subject: [PATCH v1 2/2] net: stmmac: add fixed_phy support via fixed-link
+ DT binding
+In-Reply-To: <1422239858-3452-3-git-send-email-ming.lei@canonical.com>
 References: <1422239858-3452-1-git-send-email-ming.lei@canonical.com>
-Message-ID: <1422239858-3452-3-git-send-email-ming.lei@canonical.com>
+ <1422239858-3452-3-git-send-email-ming.lei@canonical.com>
+Message-ID: <54C5AE27.4080206@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Ming Lei <ming.lei@canonical.com>
----
- drivers/net/ethernet/stmicro/stmmac/stmmac_main.c  |    5 ++++-
- .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |   10 ++++++++++
- 2 files changed, 14 insertions(+), 1 deletion(-)
+Am 26.01.2015 um 03:37 schrieb Ming Lei:
+> diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
+> index 8c6b7c16..ddb4351 100644
+> --- a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
+> +++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
+> @@ -847,8 +847,11 @@ static int stmmac_init_phy(struct net_device *dev)
+>  	 * 0 rather than 0xffff. Catch this here and treat 0 as a non-existent
+>  	 * device as well.
+>  	 * Note: phydev->phy_id is the result of reading the UID PHY registers.
+> +	 * But phy_id returned from fixed phy is always zero, so bypass the
+> +	 * check for fixed phy.
+>  	 */
+> -	if (phydev->phy_id == 0) {
+> +	if (phydev->phy_id == 0 && (!priv->plat->phy_bus_name ||
+> +			strcmp(priv->plat->phy_bus_name,"fixed"))) {
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
-index 8c6b7c16..ddb4351 100644
---- a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
-@@ -847,8 +847,11 @@ static int stmmac_init_phy(struct net_device *dev)
- 	 * 0 rather than 0xffff. Catch this here and treat 0 as a non-existent
- 	 * device as well.
- 	 * Note: phydev->phy_id is the result of reading the UID PHY registers.
-+	 * But phy_id returned from fixed phy is always zero, so bypass the
-+	 * check for fixed phy.
- 	 */
--	if (phydev->phy_id == 0) {
-+	if (phydev->phy_id == 0 && (!priv->plat->phy_bus_name ||
-+			strcmp(priv->plat->phy_bus_name,"fixed"))) {
- 		phy_disconnect(phydev);
- 		return -ENODEV;
- 	}
-diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-index 3039de2..73a3ced 100644
---- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-@@ -27,6 +27,7 @@
- #include <linux/of.h>
- #include <linux/of_net.h>
- #include <linux/of_device.h>
-+#include <linux/of_mdio.h>
- 
- #include "stmmac.h"
- #include "stmmac_platform.h"
-@@ -216,6 +217,15 @@ static int stmmac_probe_config_dt(struct platform_device *pdev,
- 		plat->pmt = 1;
- 	}
- 
-+	if (of_phy_is_fixed_link(np)) {
-+		int ret = of_phy_register_fixed_link(np);
-+		if (ret) {
-+			dev_err(&pdev->dev, "failed to register fixed PHY\n");
-+			return ret;
-+		}
-+		plat->phy_bus_name = "fixed";
-+	}
-+
- 	if (of_device_is_compatible(np, "snps,dwmac-3.610") ||
- 		of_device_is_compatible(np, "snps,dwmac-3.710")) {
- 		plat->enh_desc = 1;
+Small nit here: There's a space missing between the arguments.
+
+Cheers,
+Andreas
+
+>  		phy_disconnect(phydev);
+>  		return -ENODEV;
+>  	}
+[snip]
+
 -- 
-1.7.9.5
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Jennifer Guild, Dilip Upmanyu,
+Graham Norton; HRB 21284 (AG N?rnberg)
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150126/4315fdde/attachment.sig>
