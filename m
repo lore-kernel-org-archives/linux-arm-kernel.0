@@ -1,10 +1,10 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 26 Jan 2015 15:15:46 +0100
-Subject: [PATCH v2 02/27] ARM: mvebu: armada-370: Relicense the device tree
+Date: Mon, 26 Jan 2015 15:15:56 +0100
+Subject: [PATCH v2 12/27] ARM: mvebu: armada-388-db: Relicense the device tree
  under GPLv2+/X11
 In-Reply-To: <1422281771-31443-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1422281771-31443-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1422281771-31443-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1422281771-31443-13-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,22 +16,20 @@ In order to make it easier for them to reuse our device trees,
 relicense our device trees under a GPL/X11 dual-license.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Acked-by: Arnaud Ebalard <arno@natisbad.org>
-Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 Acked-by: Jason Cooper <jason@lakedaemon.net>
-Acked-by: Ryan Press <ryan@presslab.us>
+Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Acked-by: Marcin Wojtas <mw@semihalf.com>
 Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/boot/dts/armada-370.dtsi | 40 ++++++++++++++++++++++++++++++++++++---
+ arch/arm/boot/dts/armada-388-db.dts | 40 ++++++++++++++++++++++++++++++++++---
  1 file changed, 37 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index fdb3c12a6139..27397f151def 100644
---- a/arch/arm/boot/dts/armada-370.dtsi
-+++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -7,9 +7,43 @@
-  * Gregory CLEMENT <gregory.clement@free-electrons.com>
+diff --git a/arch/arm/boot/dts/armada-388-db.dts b/arch/arm/boot/dts/armada-388-db.dts
+index e200836c30be..16512efcd32c 100644
+--- a/arch/arm/boot/dts/armada-388-db.dts
++++ b/arch/arm/boot/dts/armada-388-db.dts
+@@ -6,9 +6,43 @@
+  *
   * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
   *
 - * This file is licensed under the terms of the GNU General Public
@@ -74,8 +72,8 @@ index fdb3c12a6139..27397f151def 100644
 + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 + *     OTHER DEALINGS IN THE SOFTWARE.
-  *
-  * Contains definitions specific to the Armada 370 SoC that are not
-  * common to all Armada SoCs.
+  */
+ 
+ /dts-v1/;
 -- 
 2.1.0
