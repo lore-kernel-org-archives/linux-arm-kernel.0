@@ -1,32 +1,27 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 26 Jan 2015 18:13:30 +0900
-Subject: [PATCH 00/13] ARM: shmobile: Remove sh7372/Mackerel and ZBOOT
- MMC/SDHI support
-In-Reply-To: <CAMuHMdWax_yWKVn-j2UF1ZUB-LvFEFmo-KJ+kQ0Qr2gTHro8gw@mail.gmail.com>
-References: <20150121045256.7648.7451.sendpatchset@little-apple>
- <87twzkn1rd.wl%kuninori.morimoto.gx@renesas.com>
- <CAMuHMdWoi1TDq-XQO6-EjVzQPyYyeG4e0U+chseQ9MXuO3Lhgg@mail.gmail.com>
- <CANqRtoRj0Ssyc6ONkw05pUadzA8G5agqi3uWi7o_-hhYEs64Eg@mail.gmail.com>
- <CAMuHMdWax_yWKVn-j2UF1ZUB-LvFEFmo-KJ+kQ0Qr2gTHro8gw@mail.gmail.com>
-Message-ID: <CANqRtoRi05hNqjBj4Mu0tCJxqOrGBnKPg8V5LZ9tXQr4GzXnDA@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 26 Jan 2015 17:23:39 +0800
+Subject: [PATCH 2/2] sunxi: clk: Set sun6i-pll1 n_start = 1
+In-Reply-To: <20150125155542.GF8470@lukather>
+References: <1422100592-19981-1-git-send-email-hdegoede@redhat.com>
+ <1422100592-19981-2-git-send-email-hdegoede@redhat.com>
+ <20150125155542.GF8470@lukather>
+Message-ID: <CAGb2v65DwNE4Q_R1uQdn97VemPKuNxK8bsbc6-whZ0xeD4T7yw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 26, 2015 at 5:20 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> On Mon, Jan 26, 2015 at 7:47 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
->>> It seems arch/sh still supports Linux running on the SH core in sh7372?
+On Sun, Jan 25, 2015 at 11:55 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Sat, Jan 24, 2015 at 12:56:32PM +0100, Hans de Goede wrote:
+>> For all pll-s on sun6i n == 0 means use a multiplier of 1, rather then 0 as
+>> it means on sun4i / sun5i / sun7i. n_start = 1 is already correctly set
+>> for sun6i pll6, but was missing for pll1, this commit fixes this.
 >>
->> I don't think we have any support upstream for that, but I recall
->> cooking up some prototype running two linux instances in separate
->> memory spaces and using virtio as mailbox interface in between. I also
->> recall that SH4AL-DSP CPU core tend to be a PITA to handle
->> toolchain-wise, but SH4 with FPU is much easier with current (or
->> yesteryear) toolchain. Exactly which SH core that is included in
->> sh7372 I'm not so sure about. =)
+>> Cc: Chen-Yu Tsai <wens@csie.org>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 >
-> JFTR, SH4AL-DSP.
+> Applied the two, thanks!
 
-Good luck with that. =)
+This is the same as the one I sent, which you asked Mike to queue
+for 3.19.
 
-/ magnus
+ChenYu
