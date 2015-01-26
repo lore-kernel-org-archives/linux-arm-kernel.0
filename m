@@ -1,114 +1,51 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 26 Jan 2015 16:15:44 +0100
-Subject: [PATCH 1/2] mmc: core: use card pointer as the first parameter of
- execute_tuning()
-In-Reply-To: <1422271175-19445-2-git-send-email-addy.ke@rock-chips.com>
-References: <1422271175-19445-1-git-send-email-addy.ke@rock-chips.com>
- <1422271175-19445-2-git-send-email-addy.ke@rock-chips.com>
-Message-ID: <CAPDyKFp=5epMggHu0+u_LU7ETujcoeP2xOpB7iD6JF2bs8BnEA@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 26 Jan 2015 16:24:38 +0100
+Subject: [PATCH v2 1/3] ASoC: codecs: wm8904: add dt ids table
+In-Reply-To: <54B866B9.8000900@atmel.com>
+References: <1418614273-2303-1-git-send-email-voice.shen@atmel.com>
+ <20150115115425.GX3043@sirena.org.uk> <54B866B9.8000900@atmel.com>
+Message-ID: <54C65C36.9050106@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 January 2015 at 12:19, Addy Ke <addy.ke@rock-chips.com> wrote:
-> We need to take the card pointer in execute_tuning() for mmc_send_status(),
+Le 16/01/2015 02:17, Bo Shen a ?crit :
+> Hi Mark,
+> 
+> On 01/15/2015 07:54 PM, Mark Brown wrote:
+>> On Mon, Dec 15, 2014 at 11:31:11AM +0800, Bo Shen wrote:
+>>
+>>> +#ifdef CONFIG_OF
+>>> +static enum wm8904_type wm8904_data = WM8904;
+>>> +static enum wm8904_type wm8912_data = WM8912;
+>>> +
+>>> +static const struct of_device_id wm8904_of_match[] = {
+>>> +	{
+>>> +		.compatible = "wlf,wm8904",
+>>> +		.data = &wm8904_data,
+>>
+>> Does this end up in the i2c_driver_id driver data or do we need some
+>> extra code when devtype is assigned to check for an of_node and look at
+>> the DT data instead?  That certainly used to be the case...
+> 
+> At the beginning I think as the same as you, and also add the code to 
+> get the data as I do in <drivers/misc/atmel-ssc.c>. However, as I 
+> remember, I2C seems only use the compatible string after the comma, that 
+> means only for "wlf,wm8904", it uses "wm8904" to match. So, I remove all 
+> the code I added, and just keep these, and it can get the device type 
+> correctly.
+> 
+> So, when I submit the patch and keep the code as simple as possible.
+> 
+> Thanks.
+> 
+> Best Regards,
+> Bo Shen
 
-mmc_send_status() is an mmc core function, not intended for host's to call.
+I don't understand what's keeping this patch from being applied. Voice,
+do you mind re-sending?
 
-> but mmc->card is NULL in tuning state. So we need change the first parameter
-> of execute_tuning() to card pointer(struct mmc_card * card).
+On my side, I take the two patches that apply on AT91 DT (2/3 and 3/3).
 
-So, why do we need this?
-
-Kind regards
-Uffe
-
->
-> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
-> ---
->  drivers/mmc/core/core.c           | 2 +-
->  drivers/mmc/host/dw_mmc.c         | 3 ++-
->  drivers/mmc/host/rtsx_pci_sdmmc.c | 3 ++-
->  drivers/mmc/host/rtsx_usb_sdmmc.c | 3 ++-
->  include/linux/mmc/host.h          | 2 +-
->  5 files changed, 8 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-> index 1be7055..271f024 100644
-> --- a/drivers/mmc/core/core.c
-> +++ b/drivers/mmc/core/core.c
-> @@ -1101,7 +1101,7 @@ int mmc_execute_tuning(struct mmc_card *card)
->                 opcode = MMC_SEND_TUNING_BLOCK;
->
->         mmc_host_clk_hold(host);
-> -       err = host->ops->execute_tuning(host, opcode);
-> +       err = host->ops->execute_tuning(card, opcode);
->         mmc_host_clk_release(host);
->
->         if (err)
-> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> index 4bd22af..e54e656 100644
-> --- a/drivers/mmc/host/dw_mmc.c
-> +++ b/drivers/mmc/host/dw_mmc.c
-> @@ -1485,8 +1485,9 @@ free_blk_test:
->         return ret;
->  }
->
-> -static int dw_mci_execute_tuning(struct mmc_host *mmc, u32 opcode)
-> +static int dw_mci_execute_tuning(struct mmc_card *card, u32 opcode)
->  {
-> +       struct mmc_host *mmc = card->host;
->         struct dw_mci_slot *slot = mmc_priv(mmc);
->         struct dw_mci *host = slot->host;
->         const struct dw_mci_drv_data *drv_data = host->drv_data;
-> diff --git a/drivers/mmc/host/rtsx_pci_sdmmc.c b/drivers/mmc/host/rtsx_pci_sdmmc.c
-> index 1d3d6c4..230bd2f 100644
-> --- a/drivers/mmc/host/rtsx_pci_sdmmc.c
-> +++ b/drivers/mmc/host/rtsx_pci_sdmmc.c
-> @@ -1270,8 +1270,9 @@ out:
->         return err;
->  }
->
-> -static int sdmmc_execute_tuning(struct mmc_host *mmc, u32 opcode)
-> +static int sdmmc_execute_tuning(struct mmc_card *card, u32 opcode)
->  {
-> +       struct mmc_host *mmc = card->host;
->         struct realtek_pci_sdmmc *host = mmc_priv(mmc);
->         struct rtsx_pcr *pcr = host->pcr;
->         int err = 0;
-> diff --git a/drivers/mmc/host/rtsx_usb_sdmmc.c b/drivers/mmc/host/rtsx_usb_sdmmc.c
-> index 88af827..c494c06 100644
-> --- a/drivers/mmc/host/rtsx_usb_sdmmc.c
-> +++ b/drivers/mmc/host/rtsx_usb_sdmmc.c
-> @@ -1265,8 +1265,9 @@ out:
->                 return 0;
->  }
->
-> -static int sdmmc_execute_tuning(struct mmc_host *mmc, u32 opcode)
-> +static int sdmmc_execute_tuning(struct mmc_card *card, u32 opcode)
->  {
-> +       struct mmc_host *mmc = card->host;
->         struct rtsx_usb_sdmmc *host = mmc_priv(mmc);
->         struct rtsx_ucr *ucr = host->ucr;
->         int err = 0;
-> diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
-> index 0c8cbe5..ec4128e 100644
-> --- a/include/linux/mmc/host.h
-> +++ b/include/linux/mmc/host.h
-> @@ -133,7 +133,7 @@ struct mmc_host_ops {
->         int     (*card_busy)(struct mmc_host *host);
->
->         /* The tuning command opcode value is different for SD and eMMC cards */
-> -       int     (*execute_tuning)(struct mmc_host *host, u32 opcode);
-> +       int     (*execute_tuning)(struct mmc_card *card, u32 opcode);
->
->         /* Prepare HS400 target operating frequency depending host driver */
->         int     (*prepare_hs400_tuning)(struct mmc_host *host, struct mmc_ios *ios);
-> --
-> 1.8.3.2
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Bye,
+-- 
+Nicolas Ferre
