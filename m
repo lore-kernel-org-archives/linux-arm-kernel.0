@@ -1,107 +1,96 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 26 Jan 2015 19:44:36 +0100
-Subject: [PATCHv2] mvebu: add Linksys WRT1900AC (Mamba) support
-In-Reply-To: <1421687701-5667-1-git-send-email-kaloz@openwrt.org>
-References: <1421687701-5667-1-git-send-email-kaloz@openwrt.org>
-Message-ID: <20150126184436.GE5015@lunn.ch>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 26 Jan 2015 18:47:11 +0000 (UTC)
+Subject: [PATCH v2] ARM: AM43xx: hwmod: add VPFE hwmod entries
+In-Reply-To: <CA+V-a8vuD-+cwaP_bKpB8GweT-xX4E3PHrbB+uefCW+Xre7cog@mail.gmail.com>
+References: <1422217915-24231-1-git-send-email-prabhakar.csengg@gmail.com>
+ <alpine.DEB.2.02.1501260205090.5450@utopia.booyaka.com>
+ <CA+V-a8urS2C20FDcfsGa+Gg+7wmbbQQw3U7BfXf6GBKoBGMc9w@mail.gmail.com>
+ <20150126155032.GD2570@ti.com>
+ <CA+V-a8vuD-+cwaP_bKpB8GweT-xX4E3PHrbB+uefCW+Xre7cog@mail.gmail.com>
+Message-ID: <alpine.DEB.2.02.1501261846460.5450@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 19, 2015 at 06:15:01PM +0100, Imre Kaloz wrote:
-> The Linksys WRT1900AC (Mamba) is a router that has
+Hi Prabhakar,
+
+On Mon, 26 Jan 2015, Lad, Prabhakar wrote:
+
+> Hi Benoit,
 > 
-> - 2 mini-PCIe slots with Marvell 88W8864 radios
-> - 1 USB 3.0 port
-> - 1 USB 2.0/eSATAp port
-> - 2 Ethernet interfaces connected to a 88E6172 switch (1x WAN + 4x LAN)
-> - 128MB NAND flash
-> - 256MB RAM
-> 
-> Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
-> ---
-> Changes since v1:
->   * add dual license
->   * lower SPI speed to meet the chip's maximum
->   * pinctrl cleanups based on Andrew Lunn's suggestions
-> ---
->  arch/arm/boot/dts/armada-xp-mamba.dts | 273 ++++++++++++++++++++++++++++++++++
->  1 file changed, 273 insertions(+)
->  create mode 100644 arch/arm/boot/dts/armada-xp-mamba.dts
-> 
-> diff --git a/arch/arm/boot/dts/armada-xp-mamba.dts b/arch/arm/boot/dts/armada-xp-mamba.dts
-> new file mode 100644
-> index 0000000..e368d18
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/armada-xp-mamba.dts
-> @@ -0,0 +1,273 @@
-> +/*
-> + * Device Tree file for the Linksys WRT1900AC (Mamba).
-> + *
-> + * Note: this board is shipped with a new generation boot loader that
-> + * remaps internal registers at 0xf1000000. Therefore, if earlyprintk
-> + * is used, the CONFIG_DEBUG_MVEBU_UART_ALTERNATE option should be
-> + * used.
-> + *
-> + * Copyright (C) 2014 Imre Kaloz <kaloz@openwrt.org>
-> + *
-> + * Based on armada-xp-axpwifiap.dts:
-> + *
-> + *     Copyright (C) 2013 Marvell
-> + *
-> + *     Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is licensed under the terms of the GNU General Public
-> + *     License version 2.  This program is licensed "as is" without
-> + *     any warranty of any kind, whether express or implied.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/input/input.h>
-> +#include "armada-xp-mv78230.dtsi"
-> +
-> +/ {
-> +	model = "Linksys WRT1900AC (Mamba)";
-> +	compatible = "linksys,mamba", "marvell,armadaxp-mv78230",
-> +		     "marvell,armadaxp", "marvell,armada-370-xp";
+> On Mon, Jan 26, 2015 at 3:50 PM, Benoit Parrot <bparrot@ti.com> wrote:
+> > Lad, Prabhakar <prabhakar.csengg@gmail.com> wrote on Mon [2015-Jan-26 08:13:01 +0000]:
+> >> Hi Paul,
+> >>
+> >> Thanks for the review.
+> >>
+> >> On Mon, Jan 26, 2015 at 2:15 AM, Paul Walmsley <paul@pwsan.com> wrote:
+> >> > Hi
+> >> >
+> >> > On Sun, 25 Jan 2015, Lad, Prabhakar wrote:
+> >> >
+> >> >> From: Benoit Parrot <bparrot@ti.com>
+> >> >>
+> >> >> this patch adds VPFE HWMOD data for AM43xx.
+> >> >>
+> >> >> Signed-off-by: Benoit Parrot <bparrot@ti.com>
+> >> >> Signed-off-by: Darren Etheridge <detheridge@ti.com>
+> >> >> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> >> >> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+> >> >> ---
+> >> >>  Hi Paul,
+> >> >>
+> >> >>  You were right, the hardware team has confirmed that, the VPFE master port is
+> >> >>  connected to L3 and the VPFE slave port is connected to L4. The L3 port cannot
+> >> >>  serve as a register target because it is initiator only.
+> >> >
+> >> > OK makes sense to me.,
+> >> >
+> >> >>
+> >> >>  I have created links referring to dss l3/l4 hwmod and tested it, lemme know
+> >> >>  if I have missed something.
+> >> >
+> >> > A few minor comments below
+> >> >
+> >> >>
+> >> [Snip]
+> >> >>  /* Interfaces */
+> >> >>  static struct omap_hwmod_ocp_if am43xx_l3_main__l4_hs = {
+> >> >>       .master         = &am33xx_l3_main_hwmod,
+> >> >> @@ -788,6 +826,36 @@ static struct omap_hwmod_ocp_if am43xx_l4_ls__dss_rfbi = {
+> >> >>       .user           = OCP_USER_MPU | OCP_USER_SDMA,
+> >> >>  };
+> >> >>
+> >> >> +static struct omap_hwmod_ocp_if am43xx_l3__vpfe0 = {
+> >> >> +     .master         = &am43xx_vpfe0_hwmod,
+> >> >> +     .slave          = &am33xx_l3_main_hwmod,
+> >> >> +     .clk            = "l3_gclk",
+> >> >> +     .flags          = OCPIF_SWSUP_IDLE,
+> >> >
+> >> > OCPIF_SWSUP_IDLE probably isn't needed here.  Could you please try without
+> >> > it?
+> >> >
+> >> >> +     .user           = OCP_USER_MPU | OCP_USER_SDMA,
+> >> >> +};
+> >> >> +
+> >> >> +static struct omap_hwmod_ocp_if am43xx_l3__vpfe1 = {
+> >> >> +     .master         = &am43xx_vpfe1_hwmod,
+> >> >> +     .slave          = &am33xx_l3_main_hwmod,
+> >> >> +     .clk            = "l3_gclk",
+> >> >> +     .flags          = OCPIF_SWSUP_IDLE,
+> >> >
+> >> > Same point as the above.
+> >> >
+> >> Dropped and tested works! posting a v3.
+> >
+> > When you tested it without the OCPIF_SWSUP_IDLE, did you go trhough a complete suspend/resume cycle?
+> > This flag was added early on because otherwise the susbsytem would not go idle without it...
+> >
+> > Can you post the console output during a suspend/resume cycle?
+> >
+> Ah I didn?t test the suspend/resume will do and post the console log.
 
-Hi Imre
+Could you also do a suspend/resume test on v2?
+ 
+thanks
 
-So the consensus seems to be 
-
- model = "Linksys WRT1900AC";
- compatible = "linksys,mamba", "...";
-
-with leds using mamba.
-
-Please name the file armada-xp-linksys-mamba.dts.
-
-       Andrew
+- Paul
