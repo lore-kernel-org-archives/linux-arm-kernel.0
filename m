@@ -1,52 +1,32 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 26 Jan 2015 17:10:22 +0800
-Subject: [RFC PATCH 4/5] arm64: add IOMMU dma_ops
-In-Reply-To: <aa7de3b1dd189c31eb8b14d0c0eea699183f8a2c.1421086706.git.robin.murphy@arm.com>
-References: <cover.1421086706.git.robin.murphy@arm.com>
- <aa7de3b1dd189c31eb8b14d0c0eea699183f8a2c.1421086706.git.robin.murphy@arm.com>
-Message-ID: <54C6047E.6070005@nvidia.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Mon, 26 Jan 2015 18:13:30 +0900
+Subject: [PATCH 00/13] ARM: shmobile: Remove sh7372/Mackerel and ZBOOT
+ MMC/SDHI support
+In-Reply-To: <CAMuHMdWax_yWKVn-j2UF1ZUB-LvFEFmo-KJ+kQ0Qr2gTHro8gw@mail.gmail.com>
+References: <20150121045256.7648.7451.sendpatchset@little-apple>
+ <87twzkn1rd.wl%kuninori.morimoto.gx@renesas.com>
+ <CAMuHMdWoi1TDq-XQO6-EjVzQPyYyeG4e0U+chseQ9MXuO3Lhgg@mail.gmail.com>
+ <CANqRtoRj0Ssyc6ONkw05pUadzA8G5agqi3uWi7o_-hhYEs64Eg@mail.gmail.com>
+ <CAMuHMdWax_yWKVn-j2UF1ZUB-LvFEFmo-KJ+kQ0Qr2gTHro8gw@mail.gmail.com>
+Message-ID: <CANqRtoRi05hNqjBj4Mu0tCJxqOrGBnKPg8V5LZ9tXQr4GzXnDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/13/2015 04:48 AM, Robin Murphy wrote:
-> Taking some inspiration from the arch/arm code, implement the
-> arch-specific side of the DMA mapping ops using the new IOMMU-DMA layer.
+On Mon, Jan 26, 2015 at 5:20 PM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> On Mon, Jan 26, 2015 at 7:47 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
+>>> It seems arch/sh still supports Linux running on the SH core in sh7372?
+>>
+>> I don't think we have any support upstream for that, but I recall
+>> cooking up some prototype running two linux instances in separate
+>> memory spaces and using virtio as mailbox interface in between. I also
+>> recall that SH4AL-DSP CPU core tend to be a PITA to handle
+>> toolchain-wise, but SH4 with FPU is much easier with current (or
+>> yesteryear) toolchain. Exactly which SH core that is included in
+>> sh7372 I'm not so sure about. =)
 >
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
-[snip]
->   static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
->   {
-> +#ifdef CONFIG_IOMMU_DMA
-> +	if (dev->archdata.mapping)
+> JFTR, SH4AL-DSP.
 
-Hi Robin,
+Good luck with that. =)
 
-Report one more issue, it would be safer like this.
-if (dev && dev->archdata.mapping)
-
-I do some more tests with a generic buffer allocator (ION). Allocate 
-buffer from ION and then import by Tegra/DRM. I saw a crash in ION.
-
-Please reference and follow the call stack below. You could find out it 
-could pass NULL of the dev pointer (ion_page_pool_alloc_pages).
-
-[   83.836688] Call trace:
-[   83.836694] [<ffffffc000422fd0>] swiotlb_sync_single+0xc/0xa4
-[   83.836707] [<ffffffc0004230dc>] swiotlb_sync_sg_for_device+0x44/0x70
-[   83.836713] [<ffffffc000211030>] __swiotlb_sync_sg_for_device+0x28/0xac
-[   83.836720] [<ffffffc0005eb934>] ion_pages_sync_for_device+0xfc/0x10c
-[   83.836724] [<ffffffc0005ecb6c>] ion_page_pool_alloc+0xc8/0xe0
-[   83.836729] [<ffffffc0005ed3d0>] ion_system_heap_allocate+0xfc/0x324
-[   83.836732] [<ffffffc0005eae98>] ion_alloc+0xf0/0x480
-[   83.836736] [<ffffffc0005eb3bc>] ion_ioctl+0x194/0x608
-[   83.836741] [<ffffffc0005eeae0>] compat_ion_ioctl+0x300/0x6e0
-[   83.836747] [<ffffffc000340280>] compat_sys_ioctl+0x108/0x139c
-
-Thanks
--Joseph
-
-> +		return iova_to_phys(dev, dev_addr);
-> +#endif
->   	return (phys_addr_t)dev_addr;
->   }
+/ magnus
