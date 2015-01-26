@@ -1,40 +1,46 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 26 Jan 2015 15:47:51 +0200
-Subject: [PATCH v5 2/2] clocksource: driver for Conexant Digicolor SoC
- timer
-In-Reply-To: <54C644AF.9030208@linaro.org>
-References: <cover.1422272518.git.baruch@tkos.co.il>
- <ad84f7155286c45401ff7f6bc6506407cc3beb61.1422272518.git.baruch@tkos.co.il>
- <54C644AF.9030208@linaro.org>
-Message-ID: <20150126134751.GE3148@tarshish>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 26 Jan 2015 13:51:23 +0000
+Subject: perf not capturing stack traces
+In-Reply-To: <20150126102711.GC15598@arm.com>
+References: <20150123195128.GE26557@saruman.tx.rr.com>
+ <20150123205959.GD3073@kernel.org>
+ <20150123223745.GJ26557@saruman.tx.rr.com>
+ <20150124151204.GF3073@kernel.org>
+ <20150124222342.GA26941@saruman.tx.rr.com>
+ <20150125155651.GB11502@n2100.arm.linux.org.uk>
+ <20150126102711.GC15598@arm.com>
+Message-ID: <20150126135123.GC11502@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
-
-On Mon, Jan 26, 2015 at 02:44:15PM +0100, Daniel Lezcano wrote:
-> >diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-> >index 94d90b24b56b..a993c108be67 100644
-> >--- a/drivers/clocksource/Makefile
-> >+++ b/drivers/clocksource/Makefile
-> >@@ -10,6 +10,7 @@ obj-$(CONFIG_SH_TIMER_TMU)	+= sh_tmu.o
-> >  obj-$(CONFIG_EM_TIMER_STI)	+= em_sti.o
-> >  obj-$(CONFIG_CLKBLD_I8253)	+= i8253.o
-> >  obj-$(CONFIG_CLKSRC_MMIO)	+= mmio.o
-> >+obj-$(CONFIG_ARCH_DIGICOLOR)	+= timer-digicolor.o
+On Mon, Jan 26, 2015 at 10:27:11AM +0000, Will Deacon wrote:
+> On Sun, Jan 25, 2015 at 03:56:52PM +0000, Russell King - ARM Linux wrote:
+> > On Sat, Jan 24, 2015 at 04:23:42PM -0600, Felipe Balbi wrote:
+> > > yeah, I'll try a few older kernels, also see if I can reproduce on other
+> > > boards.
+> > 
+> > Perf works for me with CONFIG_FRAME_POINTER=y, but that's only for kernel
+> > space, and for userspace where the programs have been built for ARM mode
+> > with frame pointers.
+> > 
+> > The kernel may work without CONFIG_FRAME_POINTER set, but I've never
+> > tested that, and I'd suggest that (given my experience looking at oops
+> > dumps) it's not all that reliable.
+> > 
+> > Lastly, userspace without frame pointers is pretty much hopeless.
 > 
-> Ah, one minor change I forgot to mention in the last review (sorry about
-> that).
-> 
-> Don't depend on the ARCH, add and select a TIMER_DIGICOLOR (or whatever the
-> name you prefer) in the mach-digicolor/Kconfig and use it here.
+> FWIW, perf can now use libunwind for unwinding the userspace side of
+> things, so it's not quite as bad as it used to be. For the kernel side,
+> if the unwinder isn't working properly it would be nice to know *why*,
+> but I agree that it tends to be far flakier than the frame-pointer method.
 
-OK. I'll make the change. I'm just curious: what is the advantage of having a 
-separate config symbol for the timer?
-
-baruch
+I don't see how userspace could be unwound without capturing the entire
+userspace stack on every perf event - and that could be a considerable
+size.  We have no way to know within the kernel which words on the
+userspace stack are part of the callchain and which aren't - the only
+way we'd know is by loading the userspace's unwind tables, having the
+kernel parsing them and generate a list of functions.
 
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
