@@ -1,76 +1,176 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Mon, 26 Jan 2015 11:37:59 -0300
-Subject: perf not capturing stack traces
-In-Reply-To: <20150126135123.GC11502@n2100.arm.linux.org.uk>
-References: <20150123195128.GE26557@saruman.tx.rr.com>
- <20150123205959.GD3073@kernel.org>
- <20150123223745.GJ26557@saruman.tx.rr.com>
- <20150124151204.GF3073@kernel.org>
- <20150124222342.GA26941@saruman.tx.rr.com>
- <20150125155651.GB11502@n2100.arm.linux.org.uk>
- <20150126102711.GC15598@arm.com>
- <20150126135123.GC11502@n2100.arm.linux.org.uk>
-Message-ID: <20150126143759.GB5906@kernel.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 26 Jan 2015 15:35:41 +0100
+Subject: [PATCH v2 5/5] clocksource: sun5i: Add clock notifiers
+In-Reply-To: <54C62368.7050600@linaro.org>
+References: <1422265856-27631-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1422265856-27631-6-git-send-email-maxime.ripard@free-electrons.com>
+ <54C62368.7050600@linaro.org>
+Message-ID: <20150126143541.GG31568@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Mon, Jan 26, 2015 at 01:51:23PM +0000, Russell King - ARM Linux escreveu:
-> On Mon, Jan 26, 2015 at 10:27:11AM +0000, Will Deacon wrote:
-> > On Sun, Jan 25, 2015 at 03:56:52PM +0000, Russell King - ARM Linux wrote:
-> > > On Sat, Jan 24, 2015 at 04:23:42PM -0600, Felipe Balbi wrote:
-> > > > yeah, I'll try a few older kernels, also see if I can reproduce on other
-> > > > boards.
+Hi Daniel,
 
-> > > Perf works for me with CONFIG_FRAME_POINTER=y, but that's only for kernel
-> > > space, and for userspace where the programs have been built for ARM mode
-> > > with frame pointers.
+On Mon, Jan 26, 2015 at 12:22:16PM +0100, Daniel Lezcano wrote:
+> On 01/26/2015 10:50 AM, Maxime Ripard wrote:
+> >The parent clock of the sun5i timer is the AHB clock, which rate might change
+> >because of other devices requirements.
+> >
+> >This is for example the case on the Allwinner A31, where the DMA controller
+> >needs a minimum rate higher than the default, that is enforced after the timer
+> >driver has probed.
+> >
+> >Add clock notifiers to make sure we reflect the clock rate changes in the timer
+> >rates.
+> 
+> Mmh, I am wondering if that shouldn't go to the time framework ...
+> 
+> Looking at the notifier callbacks that call generic time framework
+> functions.
 
-> > > The kernel may work without CONFIG_FRAME_POINTER set, but I've never
-> > > tested that, and I'd suggest that (given my experience looking at oops
-> > > dumps) it's not all that reliable.
+I don't think the framework currently has a clock handle so far?
 
-> > > Lastly, userspace without frame pointers is pretty much hopeless.
+> Can you have a look at commit b3e90722 ? and double check your
+> changes ?
 
-> > FWIW, perf can now use libunwind for unwinding the userspace side of
-> > things, so it's not quite as bad as it used to be. For the kernel side,
-> > if the unwinder isn't working properly it would be nice to know *why*,
-> > but I agree that it tends to be far flakier than the frame-pointer method.
+I'm exactly in the opposite situation.
 
-> I don't see how userspace could be unwound without capturing the entire
-> userspace stack on every perf event - and that could be a considerable
-> size.  We have no way to know within the kernel which words on the
+The parent clock of this timer is *not* the CPU clock, and it might
+even be in a completely different clock tree.
 
-That is what you can do using 'perf record --call-graph dwarf':
+However, our DMA controller has the same parent clock than the timer,
+and it needs some frequency adjustement. Otherwise, DMA would just not
+work.
 
-    -g               enables call-graph recording
-        --call-graph <mode[,dump_size]>
-                     setup and enables call-graph (stack chain/backtrace)
-                     recording: fp dwarf
+So I'm completely fine with any rate change as far as the timer is
+concerned, the driver just need to be notified to be able to reflect
+this rate change.
 
-That will use:
+> A couple of comments below.
+> 
+> >Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> >---
+> >  drivers/clocksource/timer-sun5i.c | 72 +++++++++++++++++++++++++++++++++++++--
+> >  1 file changed, 70 insertions(+), 2 deletions(-)
+> >
+> >diff --git a/drivers/clocksource/timer-sun5i.c b/drivers/clocksource/timer-sun5i.c
+> >index 377e50450781..5841a956f5f0 100644
+> >--- a/drivers/clocksource/timer-sun5i.c
+> >+++ b/drivers/clocksource/timer-sun5i.c
+> >@@ -41,9 +41,13 @@
+> >  struct sun5i_timer {
+> >  	void __iomem		*base;
+> >  	struct clk		*clk;
+> >+	struct notifier_block	clk_rate_cb;
+> >  	u32			ticks_per_jiffy;
+> >  };
+> >
+> >+#define to_sun5i_timer(x) \
+> >+	container_of(x, struct sun5i_timer, clk_rate_cb)
+> >+
+> >  struct sun5i_timer_clksrc {
+> >  	struct sun5i_timer	timer;
+> >  	struct clocksource	clksrc;
+> >@@ -152,6 +156,30 @@ static cycle_t sun5i_clksrc_read(struct clocksource *clksrc)
+> >  	return ~readl(cs->timer.base + TIMER_CNTVAL_LO_REG(1));
+> >  }
+> >
+> >+static int sun5i_rate_cb_clksrc(struct notifier_block *nb,
+> >+				unsigned long event, void *data)
+> >+{
+> >+	struct clk_notifier_data *ndata = data;
+> >+	struct sun5i_timer *timer = to_sun5i_timer(nb);
+> >+	struct sun5i_timer_clksrc *cs = container_of(timer,
+> >+						     struct sun5i_timer_clksrc, timer);
+> >+
+> >+	switch (event) {
+> >+	case PRE_RATE_CHANGE:
+> >+		clocksource_unregister(&cs->clksrc);
+> >+		break;
+> >+
+> >+	case POST_RATE_CHANGE:
+> >+		clocksource_register_hz(&cs->clksrc, ndata->new_rate);
+> >+		break;
+> 
+> Why clocksource_unregister couldn't be in the POST_RATE_CHANGE ?
 
-        PERF_SAMPLE_REGS_USER                   = 1U << 12,
-        PERF_SAMPLE_STACK_USER                  = 1U << 13,
+Wouldn't that leave a (small, I agree) window where the timer would
+run at a rate different to the one it has been registered with?
 
-struct perf_event_attr {
-<SNIP>
-        /*
-         * Defines set of user regs to dump on samples.
-         * See asm/perf_regs.h for details.
-         */
-        __u64   sample_regs_user;
+> >+	default:
+> >+		break;
+> >+	}
+> >+
+> >+	return NOTIFY_DONE;
+> >+}
+> >+
+> >  static int __init sun5i_setup_clocksource(struct device_node *node,
+> >  					  void __iomem *base,
+> >  					  struct clk *clk, int irq)
+> >@@ -174,6 +202,14 @@ static int __init sun5i_setup_clocksource(struct device_node *node,
+> >
+> >  	cs->timer.base = base;
+> >  	cs->timer.clk = clk;
+> >+	cs->timer.clk_rate_cb.notifier_call = sun5i_rate_cb_clksrc;
+> >+	cs->timer.clk_rate_cb.next = NULL;
+> >+
+> >+	ret = clk_notifier_register(clk, &cs->timer.clk_rate_cb);
+> >+	if (ret) {
+> >+		pr_err("Unable to register clock notifier.\n");
+> >+		goto err_disable_clk;
+> >+	}
+> >
+> >  	writel(~0, base + TIMER_INTVAL_LO_REG(1));
+> >  	writel(TIMER_CTL_ENABLE | TIMER_CTL_RELOAD,
+> >@@ -188,11 +224,13 @@ static int __init sun5i_setup_clocksource(struct device_node *node,
+> >  	ret = clocksource_register_hz(&cs->clksrc, rate);
+> >  	if (ret) {
+> >  		pr_err("Couldn't register clock source.\n");
+> >-		goto err_disable_clk;
+> >+		goto err_remove_notifier;
+> >  	}
+> >
+> >  	return 0;
+> >
+> >+err_remove_notifier:
+> >+	clk_notifier_unregister(clk, &cs->timer.clk_rate_cb);
+> >  err_disable_clk:
+> >  	clk_disable_unprepare(clk);
+> >  err_free:
+> >@@ -200,6 +238,26 @@ err_free:
+> >  	return ret;
+> >  }
+> >
+> >+static int sun5i_rate_cb_clkevt(struct notifier_block *nb,
+> >+				unsigned long event, void *data)
+> >+{
+> >+	struct clk_notifier_data *ndata = data;
+> >+	struct sun5i_timer *timer = to_sun5i_timer(nb);
+> >+	struct sun5i_timer_clkevt *ce = container_of(timer,
+> >+						     struct sun5i_timer_clkevt, timer);
+> >+	unsigned long flags;
+> >+
+> >+	if (event == POST_RATE_CHANGE) {
+> >+		local_irq_save(flags);
+> >+		clockevents_update_freq(&ce->clkevt, ndata->new_rate);
+> >+		local_irq_restore(flags);
+> 
+> local_irq_save and local_irq_restore are already in the
+> clockevents_update_freq function.
 
-        /*
-         * Defines size of the user stack to dump on samples.
-         */
-        __u32   sample_stack_user;
-<SNIP>
-}
+Ok.
 
-> userspace stack are part of the callchain and which aren't - the only
-> way we'd know is by loading the userspace's unwind tables, having the
-> kernel parsing them and generate a list of functions.
+Thanks!
+Maxime
 
-Or deferring it to userspace to do that later.
-
-- Arnaldo
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150126/f9c789d8/attachment-0001.sig>
