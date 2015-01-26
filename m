@@ -1,10 +1,10 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 26 Jan 2015 15:16:05 +0100
-Subject: [PATCH v2 21/27] ARM: mvebu: armada-xp-matrix: Relicense the device
- tree under GPLv2+/X11
+Date: Mon, 26 Jan 2015 15:16:02 +0100
+Subject: [PATCH v2 18/27] ARM: mvebu: armada-xp: Relicense the device tree
+ under GPLv2+/X11
 In-Reply-To: <1422281771-31443-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1422281771-31443-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1422281771-31443-22-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1422281771-31443-19-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,19 +16,24 @@ In order to make it easier for them to reuse our device trees,
 relicense our device trees under a GPL/X11 dual-license.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Acked-by: Arnaud Ebalard <arno@natisbad.org>
+Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Acked-by: Heikki Krogerus <heikki.krogerus@linux.intel.com>
 Acked-by: Jason Cooper <jason@lakedaemon.net>
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Acked-by: Willy Tarreau <w@1wt.eu>
 ---
- arch/arm/boot/dts/armada-xp-matrix.dts | 40 +++++++++++++++++++++++++++++++---
+ arch/arm/boot/dts/armada-xp.dtsi | 40 +++++++++++++++++++++++++++++++++++++---
  1 file changed, 37 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-xp-matrix.dts b/arch/arm/boot/dts/armada-xp-matrix.dts
-index 7e291e2ef4b3..56f958eb1ede 100644
---- a/arch/arm/boot/dts/armada-xp-matrix.dts
-+++ b/arch/arm/boot/dts/armada-xp-matrix.dts
-@@ -5,9 +5,43 @@
-  *
-  * Lior Amsalem <alior@marvell.com>
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index 62c3ba958b39..82917236a2fb 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -8,9 +8,43 @@
+  * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+  * Ben Dooks <ben.dooks@codethink.co.uk>
   *
 - * This file is licensed under the terms of the GNU General Public
 - * License version 2.  This program is licensed "as is" without any
@@ -70,8 +75,8 @@ index 7e291e2ef4b3..56f958eb1ede 100644
 + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 + *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
- /dts-v1/;
+  *
+  * Contains definitions specific to the Armada XP SoC that are not
+  * common to all Armada SoCs.
 -- 
 2.1.0
