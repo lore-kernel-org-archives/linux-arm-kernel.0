@@ -1,10 +1,10 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 26 Jan 2015 15:16:04 +0100
-Subject: [PATCH v2 20/27] ARM: mvebu: armada-xp-lenovo-ix4-300d: Relicense the
- device tree under GPLv2+/X11
+Date: Mon, 26 Jan 2015 15:16:10 +0100
+Subject: [PATCH v2 26/27] ARM: mvebu: armada-xp-openblocks-ax3-4: Relicense
+ the device tree under GPLv2+/X11
 In-Reply-To: <1422281771-31443-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1422281771-31443-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1422281771-31443-21-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1422281771-31443-27-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,26 +16,27 @@ In order to make it easier for them to reuse our device trees,
 relicense our device trees under a GPL/X11 dual-license.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 Acked-by: Jason Cooper <jason@lakedaemon.net>
-Acked-by: Arnaud Ebalard <arno@natisbad.org>
-Acked-by: Benoit Masson <yahoo@perenite.com>
+Acked-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+Acked-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
 Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts | 41 ++++++++++++++++++++++---
- 1 file changed, 37 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 40 ++++++++++++++++++++++--
+ 1 file changed, 37 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
-index a2ef93c1eb10..5fb3c8b687cf 100644
---- a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
-+++ b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
-@@ -3,10 +3,43 @@
+diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+index 6f6b0916df48..0c76d9f05fd0 100644
+--- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
++++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+@@ -5,9 +5,43 @@
   *
-  * Copyright (C) 2014, Benoit Masson <yahoo@perenite.com>
+  * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
   *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * as published by the Free Software Foundation; either version
-- * 2 of the License, or (at your option) any later version.
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
 + * This file is dual-licensed: you can use it either under the terms
 + * of the GPL or the X11 license, at your option. Note that this dual
 + * licensing only applies to this file, and not this project as a
