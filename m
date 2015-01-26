@@ -1,110 +1,148 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 26 Jan 2015 10:56:40 -0600
-Subject: [PATCH 1/4] arm: omap: hwmod: 43xx: add DebugSS hwmod data
-In-Reply-To: <alpine.DEB.2.02.1501260142590.5450@utopia.booyaka.com>
-References: <1422054704-14915-1-git-send-email-balbi@ti.com>
- <1422054704-14915-2-git-send-email-balbi@ti.com>
- <alpine.DEB.2.02.1501260142590.5450@utopia.booyaka.com>
-Message-ID: <20150126165640.GA10679@saruman.tx.rr.com>
+From: plaes@plaes.org (Priit Laes)
+Date: Mon, 26 Jan 2015 18:58:32 +0200
+Subject: [PATCH] arm: sunxi: input: RFC: Add sysfs voltage for sun4i-lradc
+ driver
+Message-ID: <1422291516-24895-1-git-send-email-plaes@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+---
+ .../ABI/testing/sysfs-driver-input-sun4i-lradc     |  4 ++
+ drivers/input/keyboard/sun4i-lradc-keys.c          | 49 +++++++++++++++++-----
+ 2 files changed, 43 insertions(+), 10 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc
 
-On Mon, Jan 26, 2015 at 02:04:35AM +0000, Paul Walmsley wrote:
-> Hi
-> 
-> the references below are from SPRUHL7
-> 
-> On Fri, 23 Jan 2015, Felipe Balbi wrote:
-> 
-> > Without hwmod data for DebugSS, performance monitors
-> > have no chance of running on AM43xx devices.
-> > 
-> > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > ---
-> >  arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 40 ++++++++++++++++++++++++++++++
-> >  arch/arm/mach-omap2/prcm43xx.h             |  1 +
-> >  2 files changed, 41 insertions(+)
-> > 
-> > diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-> > index 5c6c8410160e..6709704dd5b5 100644
-> > --- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-> > +++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-> > @@ -19,6 +19,7 @@
-> >  #include "omap_hwmod.h"
-> >  #include "omap_hwmod_33xx_43xx_common_data.h"
-> >  #include "prcm43xx.h"
-> > +#include "prm44xx.h"
-> >  #include "omap_hwmod_common_data.h"
-> >  
-> >  
-> > @@ -60,6 +61,44 @@ static struct omap_hwmod am43xx_wkup_m3_hwmod = {
-> >  	.rst_lines_cnt	= ARRAY_SIZE(am33xx_wkup_m3_resets),
-> >  };
-> >  
-> > +/*
-> > + * 'debugss' class
-> > + * debug and emulation sub system
-> > + */
-> > +static struct omap_hwmod_opt_clk am43xx_debugss_opt_clks[] = {
-> > +	{ .role = "dbg_sysclk", .clk = "dbg_sysclk_ck" },
-> > +	{ .role = "dbg_clka", .clk = "dbg_clka_ck", },
-> > +	{ .role = "dbg_clkb", .clk = "dbg_clkb_ck", },
-> > +	{ .role = "dbg_clkc", .clk = "dbg_clkc_ck", },
-> > +};
-> > +
-> > +static struct omap_hwmod_class am43xx_debugss_hwmod_class = {
-> > +	.name	= "debugss",
-> > +};
-> > +
-> > +/* debugss */
-> > +static struct omap_hwmod am43xx_debugss_hwmod = {
-> > +	.name		= "debugss",
-> > +	.class		= &am43xx_debugss_hwmod_class,
-> > +	.clkdm_name	= "l3_aon_clkdm",
-> > +	.main_clk	= "trace_clk_div_ck",
-> > +	.prcm = {
-> > +		.omap4 = {
-> > +			.clkctrl_offs = AM43XX_CM_WKUP_DBGSS_CLKCTRL_OFFSET,
-> 
-> According to Table 6-275 "PRCM_CM_WKUP_DBGSS_CLKCTRL Register Field 
-> Descriptions" this should have a 
-> 
-> 			.modulemode   = MODULEMODE_SWCTRL,
-
-hm... modulemode SWCTRL causes wait_target_ready to fail. Any hints ?
-
-> > +		},
-> > +	},
-> > +	.opt_clks	= am43xx_debugss_opt_clks,
-> > +	.opt_clks_cnt	= ARRAY_SIZE(am43xx_debugss_opt_clks),
-> > +};
-> > +
-> > +/* debugss -> l3_main_2 */
-> > +static struct omap_hwmod_ocp_if am43xx_debugss__l3_main = {
-> > +	.master		= &am43xx_debugss_hwmod,
-> > +	.slave		= &am33xx_l3_main_hwmod,
-> > +	.clk		= "sys_clkin_ck",
-> > +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-> > +};
-> > +
-> 
-> According to Table 31-25 "Debug Modules Memory Mapping" there are a few 
-> initiator ports on the DEBUGSS that are connected to various slave ports 
-> on various chip-wide interconnects: L3_EMU, L4_PER, L4_WAKEUP, L4_CFG. I 
-> would suggest starting by adding at least one of them as a struct 
-> omap_hwmod_ocp_if record.  The one attached to L3_EMU would seem like a 
-> good one to start with.
-
-I'll have a look.
-
+diff --git a/Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc b/Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc
+new file mode 100644
+index 0000000..e4e6448
+--- /dev/null
++++ b/Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc
+@@ -0,0 +1,4 @@
++What:		/sys/class/input/input(x)/device/voltage
++Date:		February 2015
++Contact:	Priit Laes <plaes@plaes.org>
++Description:	ADC output voltage in microvolts or 0 if device is not opened.
+diff --git a/drivers/input/keyboard/sun4i-lradc-keys.c b/drivers/input/keyboard/sun4i-lradc-keys.c
+index cc8f7dd..c0ab8ec 100644
+--- a/drivers/input/keyboard/sun4i-lradc-keys.c
++++ b/drivers/input/keyboard/sun4i-lradc-keys.c
+@@ -79,10 +79,27 @@ struct sun4i_lradc_data {
+ 	u32 vref;
+ };
+ 
++static u32 sun4i_lradc_read_voltage(struct sun4i_lradc_data *lradc)
++{
++	u32 val = readl(lradc->base + LRADC_DATA0) & 0x3f;
++	return val * lradc->vref / 63;
++};
++
++static ssize_t
++sun4i_lradc_dev_voltage_show(struct device *dev,
++			struct device_attribute *attr, char *buf)
++{
++	struct sun4i_lradc_data *lradc = dev_get_drvdata(dev);
++
++	return sprintf(buf, "%u\n", sun4i_lradc_read_voltage(lradc));
++}
++
++static const DEVICE_ATTR(voltage, S_IRUGO, sun4i_lradc_dev_voltage_show, NULL);
++
+ static irqreturn_t sun4i_lradc_irq(int irq, void *dev_id)
+ {
+ 	struct sun4i_lradc_data *lradc = dev_id;
+-	u32 i, ints, val, voltage, diff, keycode = 0, closest = 0xffffffff;
++	u32 i, ints, voltage, diff, keycode = 0, closest = 0xffffffff;
+ 
+ 	ints  = readl(lradc->base + LRADC_INTS);
+ 
+@@ -97,8 +114,7 @@ static irqreturn_t sun4i_lradc_irq(int irq, void *dev_id)
+ 	}
+ 
+ 	if ((ints & CHAN0_KEYDOWN_IRQ) && lradc->chan0_keycode == 0) {
+-		val = readl(lradc->base + LRADC_DATA0) & 0x3f;
+-		voltage = val * lradc->vref / 63;
++		voltage = sun4i_lradc_read_voltage(lradc);
+ 
+ 		for (i = 0; i < lradc->chan0_map_count; i++) {
+ 			diff = abs(lradc->chan0_map[i].voltage - voltage);
+@@ -156,7 +172,7 @@ static void sun4i_lradc_close(struct input_dev *dev)
+ }
+ 
+ static int sun4i_lradc_load_dt_keymap(struct device *dev,
+-				      struct sun4i_lradc_data *lradc)
++				    struct sun4i_lradc_data *lradc)
+ {
+ 	struct device_node *np, *pp;
+ 	int i;
+@@ -168,8 +184,8 @@ static int sun4i_lradc_load_dt_keymap(struct device *dev,
+ 
+ 	lradc->chan0_map_count = of_get_child_count(np);
+ 	if (lradc->chan0_map_count == 0) {
+-		dev_err(dev, "keymap is missing in device tree\n");
+-		return -EINVAL;
++		dev_info(dev, "keymap is missing in device tree\n");
++		return 0;
+ 	}
+ 
+ 	lradc->chan0_map = devm_kmalloc_array(dev, lradc->chan0_map_count,
+@@ -185,19 +201,19 @@ static int sun4i_lradc_load_dt_keymap(struct device *dev,
+ 
+ 		error = of_property_read_u32(pp, "channel", &channel);
+ 		if (error || channel != 0) {
+-			dev_err(dev, "%s: Inval channel prop\n", pp->name);
++			dev_err(dev, "%s: Invalid 'channel' property\n", pp->name);
+ 			return -EINVAL;
+ 		}
+ 
+ 		error = of_property_read_u32(pp, "voltage", &map->voltage);
+ 		if (error) {
+-			dev_err(dev, "%s: Inval voltage prop\n", pp->name);
++			dev_err(dev, "%s: Invalid 'voltage' property\n", pp->name);
+ 			return -EINVAL;
+ 		}
+ 
+ 		error = of_property_read_u32(pp, "linux,code", &map->keycode);
+ 		if (error) {
+-			dev_err(dev, "%s: Inval linux,code prop\n", pp->name);
++			dev_err(dev, "%s: Invalid 'linux,code' property\n", pp->name);
+ 			return -EINVAL;
+ 		}
+ 
+@@ -257,14 +273,26 @@ static int sun4i_lradc_probe(struct platform_device *pdev)
+ 	if (error)
+ 		return error;
+ 
+-	error = input_register_device(lradc->input);
++	error = device_create_file(dev, &dev_attr_voltage);
+ 	if (error)
+ 		return error;
+ 
++	error = input_register_device(lradc->input);
++	if (error) {
++		device_remove_file(&pdev->dev, &dev_attr_voltage);
++		return error;
++	}
++
+ 	platform_set_drvdata(pdev, lradc);
+ 	return 0;
+ }
+ 
++static int sun4i_lradc_remove(struct platform_device *pdev)
++{
++	device_remove_file(&pdev->dev, &dev_attr_voltage);
++	return 0;
++}
++
+ static const struct of_device_id sun4i_lradc_of_match[] = {
+ 	{ .compatible = "allwinner,sun4i-a10-lradc-keys", },
+ 	{ /* sentinel */ }
+@@ -277,6 +305,7 @@ static struct platform_driver sun4i_lradc_driver = {
+ 		.of_match_table = of_match_ptr(sun4i_lradc_of_match),
+ 	},
+ 	.probe	= sun4i_lradc_probe,
++	.remove = sun4i_lradc_remove,
+ };
+ 
+ module_platform_driver(sun4i_lradc_driver);
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150126/77448018/attachment.sig>
+2.2.2
