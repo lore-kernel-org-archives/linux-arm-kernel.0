@@ -1,59 +1,49 @@
-From: ats@offog.org (Adam Sampson)
-Date: Mon, 26 Jan 2015 13:59:31 +0000
-Subject: [PATCH] ARM: dts: sun7i: Add dts file for pcDuino 3 Nano board
-In-Reply-To: <20150126100921.GQ8470@lukather>
-References: <1422199921-325-1-git-send-email-ats@offog.org>
- <20150125164846.GL8470@lukather>
- <20150126003520.GA871@cartman.at.offog.org>
- <20150126100921.GQ8470@lukather>
-Message-ID: <20150126135931.GB871@cartman.at.offog.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 26 Jan 2015 14:56:56 +0100
+Subject: [PATCH 2/5] ARM: sun5i: Relicense the A10s/A13 DTSI under
+ GPLv2/X11
+In-Reply-To: <20150126111048.GB24085@e102568-lin.cambridge.arm.com>
+References: <1409682069-7164-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1409682069-7164-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20150126111048.GB24085@e102568-lin.cambridge.arm.com>
+Message-ID: <20150126135656.GF31568@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On Mon, Jan 26, 2015 at 11:10:48AM +0000, Lorenzo Pieralisi wrote:
+> On Tue, Sep 02, 2014 at 07:21:06PM +0100, Maxime Ripard wrote:
+> > The current GPL only licensing on the DTSI makes it very impractical for other
+> > software components licensed under another license.
+> > 
+> > In order to make it easier for them to reuse our device trees, relicense our
+> > DTSI first under a GPL/X11 dual-license. Hopefully, the DTS will follow soon.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Chen-Yu Tsai <wens@csie.org>
+> > Cc: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
+> > Cc: Emilio L?pez <emilio@elopez.com.ar>
+> > Cc: Hans de Goede <hdegoede@redhat.com>
+> > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Cc: Oliver Schinagl <oliver@schinagl.nl>
+> > Cc: Roman Byshko <rbyshko@gmail.com>
+> 
+> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-On Mon, Jan 26, 2015 at 11:09:21AM +0100, Maxime Ripard wrote:
-> If you read Documentation/leds/leds-class.txt, the pattern to follow is:
-> "devicename:colour:function"
-> so it should rather be pcduino3-nano:green:usr1 and usr2, or some
-> other thing.
+Thanks Lorenzo!
 
-How about pcduino3-nano:green:usr-led3/4? Or ...:usr1/2, and a comment
-in the .dts explaining how they're labelled on the board?
+Applied the two patches with all the Acked-by.
 
-There are a couple of other sunxi boards that have the same problem
-(multiple user-controllable LEDs of the same colour):
-
-sun4i-a10-marsboard.dts: label = "marsboard:red1:usr";
-sun4i-a10-marsboard.dts: label = "marsboard:red2:usr";
-sun4i-a10-marsboard.dts: label = "marsboard:red3:usr";
-sun4i-a10-marsboard.dts: label = "marsboard:red4:usr";
-sun9i-a80-optimus.dts: label = "optimus:led2:usr";
-sun9i-a80-optimus.dts: label = "optimus:led4:usr";
-
-I can send a patch for those if you'd like as well?
-
-> > Should there be aliases for I2C as well, since the same situation
-> > applies (i2c0 and i2c2)?
-> Yep.
-
-Added.
-
-> > More generally, is it correct to add nodes like these (uart2, spi0,
-> > i2c2) for features that appear on the Arduino GPIO headers?
-> If those pins are specifically dedicated to this feature, then yes.
-
-They're multipurpose pins on Arduino-compatible headers:
-http://learn.linksprite.com/wp-content/uploads/2014/10/pcDuino3-Nano_header-Model.jpg
-
-How you want them to be configured will depend on what you have plugged
-in; for example, some Arduino add-on boards will expect J11 P1/2 to be
-serial RX/TX and some will expect them to be GPIOs. So should we
-configure i2c2 etc. by default (and let the user turn them into GPIOs
-if required), or just provide the GPIOs (and require the user to adjust
-the .dts)?
-
-Cheers,
+Maxime
 
 -- 
-Adam Sampson <ats@offog.org>                         <http://offog.org/>
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150126/0585fc27/attachment.sig>
