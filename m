@@ -1,48 +1,59 @@
 From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
-Date: Mon, 26 Jan 2015 09:22:20 -0700
-Subject: [PATCH 4/9] coresight: remove the extra spaces
+Date: Mon, 26 Jan 2015 09:22:23 -0700
+Subject: [PATCH 7/9] coresight: fixing CPU hwid lookup in device tree
 In-Reply-To: <1422289345-2084-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1422289345-2084-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1422289345-2084-5-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1422289345-2084-8-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kaixu Xia <xiakaixu@huawei.com>
+From: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-There are some extra spaces, so just remove them from these lines.
+Some DT specification will represent CPU nodes with address
+cells greater than one, making the current code fail.  Using
+the proper retrieval helper function ensure the correct hwid
+for CPUs is read properly with different address cell size.
 
-Signed-off-by: Kaixu Xia <xiakaixu@huawei.com>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/coresight/coresight-etb10.c | 2 +-
- drivers/coresight/coresight.c       | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/coresight/of_coresight.c | 16 +++++++++-------
+ 1 file changed, 9 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/coresight/coresight-etb10.c b/drivers/coresight/coresight-etb10.c
-index a1da7020201b..c9acd406f0d0 100644
---- a/drivers/coresight/coresight-etb10.c
-+++ b/drivers/coresight/coresight-etb10.c
-@@ -454,7 +454,7 @@ static int etb_probe(struct amba_device *adev, const struct amba_id *id)
- 	if (ret)
- 		return ret;
+diff --git a/drivers/coresight/of_coresight.c b/drivers/coresight/of_coresight.c
+index 9a5ff56f34d9..c3efa418a86d 100644
+--- a/drivers/coresight/of_coresight.c
++++ b/drivers/coresight/of_coresight.c
+@@ -117,7 +117,7 @@ struct coresight_platform_data *of_get_coresight_platform_data(
+ 	struct coresight_platform_data *pdata;
+ 	struct of_endpoint endpoint, rendpoint;
+ 	struct device *rdev;
+-	struct device_node *cpu;
++	struct device_node *dn;
+ 	struct device_node *ep = NULL;
+ 	struct device_node *rparent = NULL;
+ 	struct device_node *rport = NULL;
+@@ -186,14 +186,16 @@ struct coresight_platform_data *of_get_coresight_platform_data(
  
--	drvdata->buffer_depth =  etb_get_buffer_depth(drvdata);
-+	drvdata->buffer_depth = etb_get_buffer_depth(drvdata);
- 	clk_disable_unprepare(drvdata->clk);
+ 	/* Affinity defaults to CPU0 */
+ 	pdata->cpu = 0;
+-	cpu = of_parse_phandle(node, "cpu", 0);
+-	if (cpu) {
+-		const u32 *mpidr;
++	dn = of_parse_phandle(node, "cpu", 0);
++	if (dn) {
++		const u32 *cell;
+ 		int len, index;
++		u64 hwid;
  
- 	if (drvdata->buffer_depth < 0)
-diff --git a/drivers/coresight/coresight.c b/drivers/coresight/coresight.c
-index d6052e2cd6a7..c5def9382357 100644
---- a/drivers/coresight/coresight.c
-+++ b/drivers/coresight/coresight.c
-@@ -498,7 +498,7 @@ static int coresight_orphan_match(struct device *dev, void *data)
- 	 * Circle throuch all the connection of that component.  If we find
- 	 * an orphan connection whose name matches @csdev, link it.
- 	 */
--	for (i = 0; i < i_csdev->nr_outport; i++)	{
-+	for (i = 0; i < i_csdev->nr_outport; i++) {
- 		conn = &i_csdev->conns[i];
- 
- 		/* We have found at least one orphan connection */
+-		mpidr = of_get_property(cpu, "reg", &len);
+-		if (mpidr && len == 4) {
+-			index = get_logical_index(be32_to_cpup(mpidr));
++		cell = of_get_property(dn, "reg", &len);
++		if (cell) {
++			hwid = of_read_number(cell, of_n_addr_cells(dn));
++			index = get_logical_index(hwid);
+ 			if (index != -EINVAL)
+ 				pdata->cpu = index;
+ 		}
 -- 
 1.9.1
