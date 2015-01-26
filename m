@@ -1,171 +1,34 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 26 Jan 2015 14:06:22 -0800
-Subject: [PATCH] arm: sunxi: input: RFC: Add sysfs voltage for
- sun4i-lradc driver
-In-Reply-To: <54C6955D.403@redhat.com>
-References: <1422291516-24895-1-git-send-email-plaes@plaes.org>
- <54C6955D.403@redhat.com>
-Message-ID: <20150126220622.GA16941@dtor-ws>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 26 Jan 2015 14:34:02 -0800 (PST)
+Subject: [PATCH] drivers: net: xgene: fix: Out of order descriptor
+ bytes read
+In-Reply-To: <CAKh23FmxvV82mVrHq5jv-FE+e6u6CkW+xL_a2_ULAQgP_mM2VA@mail.gmail.com>
+References: <1421957007-720-1-git-send-email-isubramanian@apm.com>
+ <1421967050.3471.14.camel@edumazet-glaptop2.roam.corp.google.com>
+ <CAKh23FmxvV82mVrHq5jv-FE+e6u6CkW+xL_a2_ULAQgP_mM2VA@mail.gmail.com>
+Message-ID: <20150126.143402.1309886104452878553.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 26, 2015 at 08:28:29PM +0100, Hans de Goede wrote:
-> Hi,
-> 
-> On 26-01-15 17:58, Priit Laes wrote:
-> 
-> No commit message? Please write an informative commit msg, like why we want this patch,
-> I guess it is to help figuring out the voltage levels for various buttons when creating
-> a dts, but I would prefer to not guess, which is where a good commit message would
-> come in handy ...
-> 
-> >---
-> >  .../ABI/testing/sysfs-driver-input-sun4i-lradc     |  4 ++
-> >  drivers/input/keyboard/sun4i-lradc-keys.c          | 49 +++++++++++++++++-----
-> >  2 files changed, 43 insertions(+), 10 deletions(-)
-> >  create mode 100644 Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc
-> >
-> >diff --git a/Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc b/Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc
-> >new file mode 100644
-> >index 0000000..e4e6448
-> >--- /dev/null
-> >+++ b/Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc
-> >@@ -0,0 +1,4 @@
-> >+What:		/sys/class/input/input(x)/device/voltage
-> >+Date:		February 2015
-> >+Contact:	Priit Laes <plaes@plaes.org>
-> >+Description:	ADC output voltage in microvolts or 0 if device is not opened.
-> >diff --git a/drivers/input/keyboard/sun4i-lradc-keys.c b/drivers/input/keyboard/sun4i-lradc-keys.c
-> >index cc8f7dd..c0ab8ec 100644
-> >--- a/drivers/input/keyboard/sun4i-lradc-keys.c
-> >+++ b/drivers/input/keyboard/sun4i-lradc-keys.c
-> >@@ -79,10 +79,27 @@ struct sun4i_lradc_data {
-> >  	u32 vref;
-> >  };
-> >
-> >+static u32 sun4i_lradc_read_voltage(struct sun4i_lradc_data *lradc)
-> >+{
-> >+	u32 val = readl(lradc->base + LRADC_DATA0) & 0x3f;
-> >+	return val * lradc->vref / 63;
-> >+};
-> >+
-> >+static ssize_t
-> >+sun4i_lradc_dev_voltage_show(struct device *dev,
-> >+			struct device_attribute *attr, char *buf)
-> >+{
-> >+	struct sun4i_lradc_data *lradc = dev_get_drvdata(dev);
-> >+
-> >+	return sprintf(buf, "%u\n", sun4i_lradc_read_voltage(lradc));
-> >+}
-> >+
-> >+static const DEVICE_ATTR(voltage, S_IRUGO, sun4i_lradc_dev_voltage_show, NULL);
-> >+
-> >  static irqreturn_t sun4i_lradc_irq(int irq, void *dev_id)
-> >  {
-> >  	struct sun4i_lradc_data *lradc = dev_id;
-> >-	u32 i, ints, val, voltage, diff, keycode = 0, closest = 0xffffffff;
-> >+	u32 i, ints, voltage, diff, keycode = 0, closest = 0xffffffff;
-> >
-> >  	ints  = readl(lradc->base + LRADC_INTS);
-> >
-> >@@ -97,8 +114,7 @@ static irqreturn_t sun4i_lradc_irq(int irq, void *dev_id)
-> >  	}
-> >
-> >  	if ((ints & CHAN0_KEYDOWN_IRQ) && lradc->chan0_keycode == 0) {
-> >-		val = readl(lradc->base + LRADC_DATA0) & 0x3f;
-> >-		voltage = val * lradc->vref / 63;
-> >+		voltage = sun4i_lradc_read_voltage(lradc);
-> >
-> >  		for (i = 0; i < lradc->chan0_map_count; i++) {
-> >  			diff = abs(lradc->chan0_map[i].voltage - voltage);
-> >@@ -156,7 +172,7 @@ static void sun4i_lradc_close(struct input_dev *dev)
-> >  }
-> >
-> >  static int sun4i_lradc_load_dt_keymap(struct device *dev,
-> >-				      struct sun4i_lradc_data *lradc)
-> >+				    struct sun4i_lradc_data *lradc)
-> >  {
-> >  	struct device_node *np, *pp;
-> >  	int i;
-> 
-> Why this identation change ?
-> 
-> >@@ -168,8 +184,8 @@ static int sun4i_lradc_load_dt_keymap(struct device *dev,
-> >
-> >  	lradc->chan0_map_count = of_get_child_count(np);
-> >  	if (lradc->chan0_map_count == 0) {
-> >-		dev_err(dev, "keymap is missing in device tree\n");
-> >-		return -EINVAL;
-> >+		dev_info(dev, "keymap is missing in device tree\n");
-> >+		return 0;
-> >  	}
-> >
-> >  	lradc->chan0_map = devm_kmalloc_array(dev, lradc->chan0_map_count,
-> 
-> I assume this is so that people can still use the sysfs node, to create a dts, right
-> not sure I like this, might be better to document to simple create a dts with
-> a single button mapping for 200 mV (most board use 200 mV steps between the buttons).
-> 
-> >@@ -185,19 +201,19 @@ static int sun4i_lradc_load_dt_keymap(struct device *dev,
-> >
-> >  		error = of_property_read_u32(pp, "channel", &channel);
-> >  		if (error || channel != 0) {
-> >-			dev_err(dev, "%s: Inval channel prop\n", pp->name);
-> >+			dev_err(dev, "%s: Invalid 'channel' property\n", pp->name);
-> >  			return -EINVAL;
-> >  		}
-> >
-> >  		error = of_property_read_u32(pp, "voltage", &map->voltage);
-> >  		if (error) {
-> >-			dev_err(dev, "%s: Inval voltage prop\n", pp->name);
-> >+			dev_err(dev, "%s: Invalid 'voltage' property\n", pp->name);
-> >  			return -EINVAL;
-> >  		}
-> >
-> >  		error = of_property_read_u32(pp, "linux,code", &map->keycode);
-> >  		if (error) {
-> >-			dev_err(dev, "%s: Inval linux,code prop\n", pp->name);
-> >+			dev_err(dev, "%s: Invalid 'linux,code' property\n", pp->name);
-> >  			return -EINVAL;
-> >  		}
-> >
-> 
-> This hunk / 3 changes belong in a separate patch. Also please run checkpatch, I think
-> you're running over 80 chars here.
-> 
-> 
-> >@@ -257,14 +273,26 @@ static int sun4i_lradc_probe(struct platform_device *pdev)
-> >  	if (error)
-> >  		return error;
-> >
-> >-	error = input_register_device(lradc->input);
-> >+	error = device_create_file(dev, &dev_attr_voltage);
-> >  	if (error)
-> >  		return error;
-> >
-> >+	error = input_register_device(lradc->input);
-> >+	if (error) {
-> >+		device_remove_file(&pdev->dev, &dev_attr_voltage);
-> >+		return error;
-> >+	}
-> >+
-> >  	platform_set_drvdata(pdev, lradc);
-> >  	return 0;
-> >  }
-> >
-> >+static int sun4i_lradc_remove(struct platform_device *pdev)
-> >+{
-> >+	device_remove_file(&pdev->dev, &dev_attr_voltage);
-> >+	return 0;
-> >+}
-> >+
-> 
-> This looks wrong, I think (*) that we've a bug here because we're not
-> unregistering the input device, so maybe do 2 patches, 1 fixing the
-> not unregistering bug, and then just add the device_remove_file()
-> in the sysfs patch.
+From: Iyappan Subramanian <isubramanian@apm.com>
+Date: Mon, 26 Jan 2015 13:12:23 -0800
 
-The unregister was not necessary since the input device is managed.
+>>> @@ -369,6 +369,8 @@ static int xgene_enet_process_ring(struct xgene_enet_desc_ring *ring,
+>>>               if (unlikely(xgene_enet_is_desc_slot_empty(raw_desc)))
+>>>                       break;
+>>>
+>>> +             /* read fpqnum field after dataaddr field */
+>>> +             smp_rmb();
+>>>               if (is_rx_desc(raw_desc))
+>>>                       ret = xgene_enet_rx_frame(ring, raw_desc);
+>>>               else
+>>
+>> Reading your changelog, it looks like you need a plain rmb() here.
+> 
+> rmb() translates into dsb, which in arm64 serializes everything
+> including instructions and thus expensive compared to dmb.
+> 
+> Do you see any issue with smp_rmb() (which translates into dmb) ?
 
--- 
-Dmitry
+smp_rmb() is not appropriate.  You're not serializing accesses between
+two cpus, you're serializing the cpu with the device.
