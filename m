@@ -1,104 +1,59 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 26 Jan 2015 11:25:45 +0800
-Subject: [RFC PATCH 4/5] arm64: add IOMMU dma_ops
-In-Reply-To: <aa7de3b1dd189c31eb8b14d0c0eea699183f8a2c.1421086706.git.robin.murphy@arm.com>
-References: <cover.1421086706.git.robin.murphy@arm.com>
- <aa7de3b1dd189c31eb8b14d0c0eea699183f8a2c.1421086706.git.robin.murphy@arm.com>
-Message-ID: <54C5B3B9.1040300@nvidia.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 26 Jan 2015 12:59:44 +0900
+Subject: [PATCH] ARM: shmobile: Select CONFIG_REGULATOR in defconfig once
+ again
+In-Reply-To: <878ugqb7al.wl%kuninori.morimoto.gx@renesas.com>
+References: <1422239176-978-1-git-send-email-horms+renesas@verge.net.au>
+ <878ugqb7al.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20150126035942.GC1215@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/13/2015 04:48 AM, Robin Murphy wrote:
-> Taking some inspiration from the arch/arm code, implement the
-> arch-specific side of the DMA mapping ops using the new IOMMU-DMA layer.
->
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->   arch/arm64/include/asm/device.h      |   3 +
->   arch/arm64/include/asm/dma-mapping.h |  12 ++
->   arch/arm64/mm/dma-mapping.c          | 297 +++++++++++++++++++++++++++++++++++
->   3 files changed, 312 insertions(+)
->
-[snip]
-> +static struct dma_map_ops iommu_dma_ops = {
-> +	.alloc = __iommu_alloc_attrs,
-> +	.free = __iommu_free_attrs,
-> +	.mmap = __swiotlb_mmap,
+On Mon, Jan 26, 2015 at 02:31:55AM +0000, Kuninori Morimoto wrote:
+> 
+> Hi Simon
+> 
+> > From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> > 
+> > eb4513482d1c4882e3633528ccc48d77581b7bb1
+> > (ARM: shmobile: Enable kzm9g board in multiplatform defconfig)
+> > dropped CONFIG_REGULATOR from shmobile_defconfig as it was
+> > generated using a tree where CONFIG_REGULATOR is indirectly
+> > selected by ARCH_SH73A0.
+> > 
+> > ARCH_SH73A0 is not queued up for v3.20 and thus, baring unforeseen
+> > changes, CONFIG_REGULATOR will not be selected by shmobile_defconfig
+> > in that release. This causes at least SDHI to stop working on
+> > R-Car Gen2 SoCs.
+> > 
+> > Reported-by: Magnus Damm <damm+renesas@opensource.se>
+> > Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> > [horms: minimal patch targeted as a fix]
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > ---
+> >  arch/arm/configs/shmobile_defconfig | 1 +
+> >  1 file changed, 1 insertion(+)
 
-Hi Robin,
+For the record, this patch is based on
+renesas-next-20150122-v3.19-rc1.
 
-Thanks for posting this series. I spent some time to re-write Tegra-smmu 
-driver to work with the new DT-based iommu initialization procedure and 
-do some modification in Tegra/DRM driver to make it work with 
-IOMMU-backed DMA mapping API.
+> > diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+> > index 4f9868d..b553e2c 100644
+> > --- a/arch/arm/configs/shmobile_defconfig
+> > +++ b/arch/arm/configs/shmobile_defconfig
+> > @@ -118,6 +118,7 @@ CONFIG_WATCHDOG=y
+> >  CONFIG_DA9063_WATCHDOG=y
+> >  CONFIG_MFD_AS3711=y
+> >  CONFIG_MFD_DA9063=y
+> > +CONFIG_REGULATOR=y
+> >  CONFIG_REGULATOR_AS3711=y
+> >  CONFIG_REGULATOR_DA9210=y
+> >  CONFIG_REGULATOR_GPIO=y
+> 
+> Oh.. Thank you for your help
+> (I have sent other question mail)
+> It looks good :)
 
-Found two issues, one is the mmap function here.
-The mmap function is not reliable, the userspace application and kernel 
-easily leads to crash after calling this. Can we mmap the CPU VA to the 
-IOVA?
-This issue was gone after replacing it with the same function 
-(arm_iommu_mmap_attrs) in the ARM32 kernel. And everything just works fine.
-
-> +	.map_page = __iommu_map_page,
-> +	.unmap_page = __iommu_unmap_page,
-> +	.map_sg = __iommu_map_sg_attrs,
-> +	.unmap_sg = __iommu_unmap_sg_attrs,
-> +	.sync_single_for_cpu = __iommu_sync_single_for_cpu,
-> +	.sync_single_for_device = __iommu_sync_single_for_device,
-> +	.sync_sg_for_cpu = __iommu_sync_sg_for_cpu,
-> +	.sync_sg_for_device = __iommu_sync_sg_for_device,
-> +	.dma_supported = iommu_dma_supported,
-> +	.mapping_error = iommu_dma_mapping_error,
-> +};
-> +
-> +static void __iommu_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
-> +				  struct iommu_ops *ops)
-> +{
-> +	struct iommu_dma_mapping *mapping;
-> +
-> +	if (!ops)
-> +		return;
-> +
-> +	mapping = iommu_dma_create_mapping(ops, dma_base, size);
-
-The other issue is here. We create a DMA range here, but the 
-__iova_alloc not really working with that, if the end of the range was 
-under 4G limitation. The allocation address always starts from 
-0xfffxxxxx, because we set the .dma_mask to DMA_BIT_MASK(32) by default. 
-If we don't expect that, we need one more function call like 
-dma_coerce_mask_and_coherent(dev, 0x80000000) for the range of 0 to 2G 
-for example.
-
-Does this the expectation when we use this framework?
-
-(Except the issue of __alloc_iova, I am ok with this. We could set up a 
-default range from 0 to 4G for every device by default, and then isolate 
-the virtual range by reset the .dma_mask of the device later.)
-
-Thanks,
--Joseph
-
-> +	if (!mapping) {
-> +		pr_warn("Failed to create %llu-byte IOMMU mapping for device %s\n",
-> +				size, dev_name(dev));
-> +		return;
-> +	}
-> +
-> +	if (iommu_dma_attach_device(dev, mapping))
-> +		pr_warn("Failed to attach device %s to IOMMU mapping\n",
-> +				dev_name(dev));
-> +	else
-> +		dev->archdata.dma_ops = &iommu_dma_ops;
-> +
-> +	/* drop the initial mapping refcount */
-> +	iommu_dma_release_mapping(mapping);
-> +}
-> +
-> +#else
-> +
-> +static void __iommu_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
-> +				  struct iommu_ops *iommu)
-> +{ }
-> +
-> +#endif  /* CONFIG_IOMMU_DMA */
->
+Thanks. I have tried to address your questions in an answer to your
+other email. Can you confirm me know if the above patch is ok for you or not.
+I'd like to get this one right :)
