@@ -1,23 +1,46 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Mon, 26 Jan 2015 11:31:30 +0100
-Subject: [PATCH 00/27] ARM: mvebu: armada-*: Relicense the device tree
- under GPLv2+/X11
-In-Reply-To: <54AA7DA6.3030707@free-electrons.com>
-References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
- <54AA7DA6.3030707@free-electrons.com>
-Message-ID: <CAPv3WKeK0VjP8p6wZyxP4nba-_kzFFE_x=K8CHPKNQXvQH5b6A@mail.gmail.com>
+From: sylvain.rochet@finsecur.com (Sylvain Rochet)
+Date: Mon, 26 Jan 2015 11:36:05 +0100
+Subject: [PATCH v2 02/12] pm: at91: Workaround DDRSDRC self-refresh bug
+ with LPDDR1 memories.
+In-Reply-To: <1422265139-23011-1-git-send-email-wenyou.yang@atmel.com>
+References: <1422265005-22937-1-git-send-email-wenyou.yang@atmel.com>
+ <1422265139-23011-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20150126103605.GA20837@gradator.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+Hello Wenyou,
 
-I'm sorry for such long delay.
+On Mon, Jan 26, 2015 at 05:38:59PM +0800, Wenyou Yang wrote:
+> From: Peter Rosin <peda@axentia.se>
+> 
+> The DDRSDR controller fails miserably to put LPDDR1 memories in
+> self-refresh. Force the controller to think it has DDR2 memories
+> during the self-refresh period, as the DDR2 self-refresh spec is
+> equivalent to LPDDR1, and is correctly implemented in the
+> controller.
+> 
+> Assume that the second controller has the same fault, but that is
+> untested.
+> 
+> Signed-off-by: Peter Rosin <peda@axentia.se>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>  arch/arm/mach-at91/pm_slowclock.S  |   43 +++++++++++++++++++++++++++++++-----
+>  include/soc/at91/at91sam9_ddrsdr.h |    2 +-
+>  2 files changed, 39 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/pm_slowclock.S b/arch/arm/mach-at91/pm_slowclock.S
+> index e2bfaf5..1155217 100644
+> --- a/arch/arm/mach-at91/pm_slowclock.S
+> +++ b/arch/arm/mach-at91/pm_slowclock.S
+> @@ -100,6 +100,16 @@ ddr_sr_enable:
+>  	cmp	memctrl, #AT91_MEMCTRL_DDRSDR
+>  	bne	sdr_sr_enable
+>  
+> +	/* LPDDR1 --> force DDR2 mode during self-refresh */
 
+I think we should explain we are dealing with an errata here, this is 
+not obvious at first sight, the patch summary may find its place here :-)
 
-> For Marcin Wojtas:
-> ARM: mvebu: armada-38x: Relicense the device tree under GPLv2+/X11
-> ARM: mvebu: armada-385-db: Relicense the device tree under GPLv2+/X11
-> ARM: mvebu: armada-375: Relicense the device tree under GPLv2+/X11
->
-
-Acked-by: Marcin Wojtas <mw@semihalf.com>
+Sylvain
