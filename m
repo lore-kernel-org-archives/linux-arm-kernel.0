@@ -1,47 +1,56 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 26 Jan 2015 15:20:28 +0200
-Subject: 3.19 on Nokia n900: audio quality awful
-In-Reply-To: <20150118120139.GA1509@amd>
-References: <20150106170433.GA5408@amd> <20150118120139.GA1509@amd>
-Message-ID: <54C63F1C.6010703@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 26 Jan 2015 14:34:38 +0100
+Subject: [PATCH v2 02/12] pm: at91: Workaround DDRSDRC self-refresh bug
+ with LPDDR1 memories.
+In-Reply-To: <20150126103605.GA20837@gradator.net>
+References: <1422265005-22937-1-git-send-email-wenyou.yang@atmel.com>
+ <1422265139-23011-1-git-send-email-wenyou.yang@atmel.com>
+ <20150126103605.GA20837@gradator.net>
+Message-ID: <54C6426E.9090808@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/18/2015 02:01 PM, Pavel Machek wrote:
-> Hi!
+Le 26/01/2015 11:36, Sylvain Rochet a ?crit :
+> Hello Wenyou,
 > 
-> If you have any idea about playback problems, help would be still
-> welcome. I'll have to do bisect, otherwise, and it will not be easy.
-> 
->> In 3.18, sound is nice and clear.
+> On Mon, Jan 26, 2015 at 05:38:59PM +0800, Wenyou Yang wrote:
+>> From: Peter Rosin <peda@axentia.se>
 >>
->> In 3.19, sound is unusable. It produces nasty tone when it should be
->> quiet, and there's at least as much noise as is sound.
+>> The DDRSDR controller fails miserably to put LPDDR1 memories in
+>> self-refresh. Force the controller to think it has DDR2 memories
+>> during the self-refresh period, as the DDR2 self-refresh spec is
+>> equivalent to LPDDR1, and is correctly implemented in the
+>> controller.
 >>
->> Unfortunately, list of mixers also changed (and there's cca 120
->> settings), but a) it does not work with the old list and b) nothing I
->> could figure out did make the sound usable. Some setting resulted in
->> even more noise.
+>> Assume that the second controller has the same fault, but that is
+>> untested.
 >>
->> Any idea what could have caused it?
+>> Signed-off-by: Peter Rosin <peda@axentia.se>
+>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> ---
+>>  arch/arm/mach-at91/pm_slowclock.S  |   43 +++++++++++++++++++++++++++++++-----
+>>  include/soc/at91/at91sam9_ddrsdr.h |    2 +-
+>>  2 files changed, 39 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-at91/pm_slowclock.S b/arch/arm/mach-at91/pm_slowclock.S
+>> index e2bfaf5..1155217 100644
+>> --- a/arch/arm/mach-at91/pm_slowclock.S
+>> +++ b/arch/arm/mach-at91/pm_slowclock.S
+>> @@ -100,6 +100,16 @@ ddr_sr_enable:
+>>  	cmp	memctrl, #AT91_MEMCTRL_DDRSDR
+>>  	bne	sdr_sr_enable
+>>  
+>> +	/* LPDDR1 --> force DDR2 mode during self-refresh */
 > 
-> I tried audio recording this time.
-> 
-> In 2.6.28-nokia, it is neccessary to set "Input select" na "digital
-> mic", then it works. Input select being in "playback" option makes it
-> easy to miss.
-> 
-> In 3.18 and 3.19-rc3, all I can record are zeros.
-> 
-> Does playback/recording work for you on OMAP 3430-based machines?
+> I think we should explain we are dealing with an errata here, this is 
+> not obvious at first sight, the patch summary may find its place here :-)
 
-Same codec (tlv320aic3106) works fine on my am335x and omap-l138 boards.
-BeagleBoard-xM also fine with twl4030 codec.
+True but the problem is that this errata is not public yet, it will be
+in a couple of weeks.
 
-I don't have my n900 in hacking mode (it is still in use time-to-time) but
-looking at the dts file: you might want to add ai3x-micbias-vg property to the
-aic3x nodes to select the correct mic bias voltage. I can't recall what is
-appropriate for n900, but 2.6.28-nokia sources might give you the answer.
+I have the feeling though that the commit message is pretty clear. We'll
+maybe add that it"s an actual errata.
 
+Bye,
 -- 
-P?ter
+Nicolas Ferre
