@@ -1,67 +1,146 @@
-From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Mon, 26 Jan 2015 17:11:24 +0100
-Subject: [PATCH v2 02/12] pm: at91: Workaround DDRSDRC self-refresh bug
- with LPDDR1 memories.
-In-Reply-To: <54C66589.3040505@atmel.com>
-References: <1422265005-22937-1-git-send-email-wenyou.yang@atmel.com>
- <1422265139-23011-1-git-send-email-wenyou.yang@atmel.com>
- <20150126103605.GA20837@gradator.net> <54C6426E.9090808@atmel.com>
- <20150126134453.GA27559@gradator.net>
- <372b731350484f8ea1d29bd016421dfb@EMAIL.axentia.se>
- <54C66589.3040505@atmel.com>
-Message-ID: <20150126161124.GA24190@gradator.net>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Mon, 26 Jan 2015 17:16:17 +0100
+Subject: [PATCH v4 5/5] drivers: bus: Add Simple Power-Managed Bus Driver
+In-Reply-To: <1422288977-20353-1-git-send-email-geert+renesas@glider.be>
+References: <1422288977-20353-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1422288977-20353-6-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Nicolas and Peter,
+Add a driver for transparent busses that don't need a real driver, but
+where the bus controller is part of a PM domain, or under the control of
+a functional clock.  Typically, the bus controller's PM domain and/or
+clock must be enabled for child devices connected to the bus (either
+on-SoC or externally) to function.
 
-On Mon, Jan 26, 2015 at 05:04:25PM +0100, Nicolas Ferre wrote:
-> Le 26/01/2015 16:58, Peter Rosin a ?crit :
-> > Sylvain Rochet wrote:
-> >> Hello Nicolas,
-> >>
-> >> On Mon, Jan 26, 2015 at 02:34:38PM +0100, Nicolas Ferre wrote:
-> >>> Le 26/01/2015 11:36, Sylvain Rochet a ?crit :
-> >>>>
-> >>>> I think we should explain we are dealing with an errata here, this
-> >>>> is not obvious at first sight, the patch summary may find its place
-> >>>> here :-)
-> >>>
-> >>> True but the problem is that this errata is not public yet, it will be
-> >>> in a couple of weeks.
-> >>>
-> >>> I have the feeling though that the commit message is pretty clear.
-> >>> We'll maybe add that it"s an actual errata.
-> >>
-> >> Humm, this is not what I meant actually. I only proposed a code source
-> >> comment explaining why this is done this way, the current patch summary
-> >> looked like it will be perfect between /* */ ;-)
-> > 
-> > I did not want to fill up the source with wordy comments, and settled
-> > for a one-liner. I don't know much about the underlying reasons other
-> > than the fact that LPDDR1 mode of the controller isn't working properly
-> > in self-refresh and that the DDR2 spec is similar enough to work.
-> > 
-> > The one-liner comment says about the same thing, but not with so
-> > many words. The comment does make it clear that the switch to DDR2
-> > is intentional, and that is all that is needed as protection from some
-> > future cleanup. I mean, anyone seeing that comment and just erasing
-> > the whole thing without further investigation is not doing a very good
-> > job as there is no reason to intentionally switch from LPDDR1 mode to
-> > DDR2 mode, other that the fact that the LPDDR1 mode isn't working for
-> > some reason. That reason is not to be found in the commit message
-> > and I have no information to improve the situation. IMO, the only thing
-> > missing is a pointer to the as yet unreleased errata, which should explain
-> > the situation clearly for any and all interested parties. May I suggest that
-> > someone who cares sends a patch with the comment update when the
-> > errata is released?
-> 
-> That's the option that I'll take.
-> 
-> Let's go for it (and anyone remind me if I don't when the errata is
-> released).
+Hence the sole purpose of this driver is to enable its clock and PM
+domain (if exist(s)), which are specified in the DT and managed from
+platform and PM domain code, and to probe for child devices.
 
-I fully agree with that, a pointer to a datasheet errata is exactly the 
-same thing as explaining the issue.
+Due to the child-parent relationship with devices connected to the bus,
+PM domain and clock state transitions are handled in the correct order.
 
-Sylvain
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Tested-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+---
+v4:
+  - Bind against the generic "simple-pm-bus" instead of "renesas,bsc",
+  - Explicitly call of_platform_populate() after pm_runtime_enable() to
+    enforce ordering, instead of depending on claimed compatibility with
+    "simple-bus",
+
+v3:
+  - Add Tested-by,
+
+v2:
+  - Rename from "Renesas Bus State Controller Driver" (renesas-bsc) to
+    "Simple Power-Managed Bus Driver" (simple-pm-bus),
+  - Change module license to GPL v2,
+  - Change email address to geert+renesas at glider.be.
+---
+ drivers/bus/Kconfig         | 13 ++++++++++
+ drivers/bus/Makefile        |  1 +
+ drivers/bus/simple-pm-bus.c | 58 +++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 72 insertions(+)
+ create mode 100644 drivers/bus/simple-pm-bus.c
+
+diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+index 626960819e6df16c..7e9c2674af81d6e9 100644
+--- a/drivers/bus/Kconfig
++++ b/drivers/bus/Kconfig
+@@ -58,6 +58,19 @@ config OMAP_OCP2SCP
+ 	  OCP2SCP and in OMAP5, both USB PHY and SATA PHY is connected via
+ 	  OCP2SCP.
+ 
++config SIMPLE_PM_BUS
++	bool "Simple Power-Managed Bus Driver"
++	depends on OF && PM
++	depends on ARCH_SHMOBILE || COMPILE_TEST
++	help
++	  Driver for transparent busses that don't need a real driver, but
++	  where the bus controller is part of a PM domain, or under the control
++	  of a functional clock, and thus relies on runtime PM for managing
++	  this PM domain and/or clock.
++	  An example of such a bus controller is the Renesas Bus State
++	  Controller (BSC, sometimes called "LBSC within Bus Bridge", or
++	  "External Bus Interface") as found on several Renesas ARM SoCs.
++
+ config VEXPRESS_CONFIG
+ 	bool "Versatile Express configuration bus"
+ 	default y if ARCH_VEXPRESS
+diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
+index 3cfaf2c7f25ac4f0..e023a2bec664d900 100644
+--- a/drivers/bus/Makefile
++++ b/drivers/bus/Makefile
+@@ -14,4 +14,5 @@ obj-$(CONFIG_MVEBU_MBUS) 	+= mvebu-mbus.o
+ obj-$(CONFIG_OMAP_INTERCONNECT)	+= omap_l3_smx.o omap_l3_noc.o
+ 
+ obj-$(CONFIG_OMAP_OCP2SCP)	+= omap-ocp2scp.o
++obj-$(CONFIG_SIMPLE_PM_BUS)	+= simple-pm-bus.o
+ obj-$(CONFIG_VEXPRESS_CONFIG)	+= vexpress-config.o
+diff --git a/drivers/bus/simple-pm-bus.c b/drivers/bus/simple-pm-bus.c
+new file mode 100644
+index 0000000000000000..c5eb46cbf388b507
+--- /dev/null
++++ b/drivers/bus/simple-pm-bus.c
+@@ -0,0 +1,58 @@
++/*
++ * Simple Power-Managed Bus Driver
++ *
++ * Copyright (C) 2014-2015 Glider bvba
++ *
++ * This file is subject to the terms and conditions of the GNU General Public
++ * License.  See the file "COPYING" in the main directory of this archive
++ * for more details.
++ */
++
++#include <linux/module.h>
++#include <linux/of_platform.h>
++#include <linux/platform_device.h>
++#include <linux/pm_runtime.h>
++
++
++static int simple_pm_bus_probe(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++
++	dev_dbg(&pdev->dev, "%s\n", __func__);
++
++	pm_runtime_enable(&pdev->dev);
++
++	if (np)
++		of_platform_populate(np, NULL, NULL, &pdev->dev);
++
++	return 0;
++}
++
++static int simple_pm_bus_remove(struct platform_device *pdev)
++{
++	dev_dbg(&pdev->dev, "%s\n", __func__);
++
++	pm_runtime_disable(&pdev->dev);
++	return 0;
++}
++
++static const struct of_device_id simple_pm_bus_of_match[] = {
++	{ .compatible = "simple-pm-bus", },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, simple_pm_bus_of_match);
++
++static struct platform_driver simple_pm_bus_driver = {
++	.probe = simple_pm_bus_probe,
++	.remove = simple_pm_bus_remove,
++	.driver = {
++		.name = "simple-pm-bus",
++		.of_match_table = simple_pm_bus_of_match,
++	},
++};
++
++module_platform_driver(simple_pm_bus_driver);
++
++MODULE_DESCRIPTION("Simple Power-Managed Bus Driver");
++MODULE_AUTHOR("Geert Uytterhoeven <geert+renesas@glider.be>");
++MODULE_LICENSE("GPL v2");
+-- 
+1.9.1
