@@ -1,35 +1,23 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 26 Jan 2015 10:27:11 +0000
-Subject: perf not capturing stack traces
-In-Reply-To: <20150125155651.GB11502@n2100.arm.linux.org.uk>
-References: <20150123195128.GE26557@saruman.tx.rr.com>
- <20150123205959.GD3073@kernel.org>
- <20150123223745.GJ26557@saruman.tx.rr.com>
- <20150124151204.GF3073@kernel.org>
- <20150124222342.GA26941@saruman.tx.rr.com>
- <20150125155651.GB11502@n2100.arm.linux.org.uk>
-Message-ID: <20150126102711.GC15598@arm.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Mon, 26 Jan 2015 11:31:30 +0100
+Subject: [PATCH 00/27] ARM: mvebu: armada-*: Relicense the device tree
+ under GPLv2+/X11
+In-Reply-To: <54AA7DA6.3030707@free-electrons.com>
+References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
+ <54AA7DA6.3030707@free-electrons.com>
+Message-ID: <CAPv3WKeK0VjP8p6wZyxP4nba-_kzFFE_x=K8CHPKNQXvQH5b6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 25, 2015 at 03:56:52PM +0000, Russell King - ARM Linux wrote:
-> On Sat, Jan 24, 2015 at 04:23:42PM -0600, Felipe Balbi wrote:
-> > yeah, I'll try a few older kernels, also see if I can reproduce on other
-> > boards.
-> 
-> Perf works for me with CONFIG_FRAME_POINTER=y, but that's only for kernel
-> space, and for userspace where the programs have been built for ARM mode
-> with frame pointers.
-> 
-> The kernel may work without CONFIG_FRAME_POINTER set, but I've never
-> tested that, and I'd suggest that (given my experience looking at oops
-> dumps) it's not all that reliable.
-> 
-> Lastly, userspace without frame pointers is pretty much hopeless.
+Hi Gregory,
 
-FWIW, perf can now use libunwind for unwinding the userspace side of
-things, so it's not quite as bad as it used to be. For the kernel side,
-if the unwinder isn't working properly it would be nice to know *why*,
-but I agree that it tends to be far flakier than the frame-pointer method.
+I'm sorry for such long delay.
 
-Will
+
+> For Marcin Wojtas:
+> ARM: mvebu: armada-38x: Relicense the device tree under GPLv2+/X11
+> ARM: mvebu: armada-385-db: Relicense the device tree under GPLv2+/X11
+> ARM: mvebu: armada-375: Relicense the device tree under GPLv2+/X11
+>
+
+Acked-by: Marcin Wojtas <mw@semihalf.com>
