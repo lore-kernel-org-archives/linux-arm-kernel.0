@@ -1,9 +1,10 @@
 From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 27 Jan 2015 00:51:37 +0100
-Subject: [PATCH 07/15] iommu/exynos: Make use of domain_alloc and domain_free
+Date: Tue, 27 Jan 2015 00:51:39 +0100
+Subject: [PATCH 09/15] iommu/tegra-gart: Make use of domain_alloc and
+ domain_free
 In-Reply-To: <1422316305-19216-1-git-send-email-joro@8bytes.org>
 References: <1422316305-19216-1-git-send-email-joro@8bytes.org>
-Message-ID: <1422316305-19216-8-git-send-email-joro@8bytes.org>
+Message-ID: <1422316305-19216-10-git-send-email-joro@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,189 +15,152 @@ replacement for domain_init/domain_destroy.
 
 Signed-off-by: Joerg Roedel <jroedel@suse.de>
 ---
- drivers/iommu/exynos-iommu.c | 87 ++++++++++++++++++++++++--------------------
- 1 file changed, 47 insertions(+), 40 deletions(-)
+ drivers/iommu/tegra-gart.c | 67 +++++++++++++++++++++++++++++++---------------
+ 1 file changed, 46 insertions(+), 21 deletions(-)
 
-diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 7ce5273..d103cbf 100644
---- a/drivers/iommu/exynos-iommu.c
-+++ b/drivers/iommu/exynos-iommu.c
-@@ -200,6 +200,7 @@ struct exynos_iommu_domain {
- 	short *lv2entcnt; /* free lv2 entry counter for each section */
- 	spinlock_t lock; /* lock for this structure */
- 	spinlock_t pgtablelock; /* lock for modifying page table @ pgtable */
-+	struct iommu_domain domain; /* generic domain data structure */
+diff --git a/drivers/iommu/tegra-gart.c b/drivers/iommu/tegra-gart.c
+index f722a0c..34ca333 100644
+--- a/drivers/iommu/tegra-gart.c
++++ b/drivers/iommu/tegra-gart.c
+@@ -63,11 +63,21 @@ struct gart_device {
+ 	struct device		*dev;
  };
  
- struct sysmmu_drvdata {
-@@ -214,6 +215,11 @@ struct sysmmu_drvdata {
- 	phys_addr_t pgtable;
- };
++struct gart_domain {
++	struct iommu_domain domain;		/* generic domain handle */
++	struct gart_device *gart;		/* link to gart device   */
++};
++
+ static struct gart_device *gart_handle; /* unique for a system */
  
-+static struct exynos_iommu_domain *to_exynos_domain(struct iommu_domain *dom)
+ #define GART_PTE(_pfn)						\
+ 	(GART_ENTRY_PHYS_ADDR_VALID | ((_pfn) << PAGE_SHIFT))
+ 
++static struct gart_domain *to_gart_domain(struct iommu_domain *dom)
 +{
-+	return container_of(dom, struct exynos_iommu_domain, domain);
++	return container_of(dom, struct gart_domain, domain);
 +}
 +
- static bool set_sysmmu_active(struct sysmmu_drvdata *data)
+ /*
+  * Any interaction between any block on PPSB and a block on APB or AHB
+  * must have these read-back to ensure the APB/AHB bus transaction is
+@@ -156,6 +166,7 @@ static inline bool gart_iova_range_valid(struct gart_device *gart,
+ static int gart_iommu_attach_dev(struct iommu_domain *domain,
+ 				 struct device *dev)
  {
- 	/* return true if the System MMU was not active previously
-@@ -696,58 +702,60 @@ static inline void pgtable_flush(void *vastart, void *vaend)
- 				virt_to_phys(vaend));
++	struct gart_domain *gart_domain = to_gart_domain(domain);
+ 	struct gart_device *gart;
+ 	struct gart_client *client, *c;
+ 	int err = 0;
+@@ -163,7 +174,7 @@ static int gart_iommu_attach_dev(struct iommu_domain *domain,
+ 	gart = gart_handle;
+ 	if (!gart)
+ 		return -EINVAL;
+-	domain->priv = gart;
++	gart_domain->gart = gart;
+ 
+ 	domain->geometry.aperture_start = gart->iovmm_base;
+ 	domain->geometry.aperture_end   = gart->iovmm_base +
+@@ -198,7 +209,8 @@ fail:
+ static void gart_iommu_detach_dev(struct iommu_domain *domain,
+ 				  struct device *dev)
+ {
+-	struct gart_device *gart = domain->priv;
++	struct gart_domain *gart_domain = to_gart_domain(domain);
++	struct gart_device *gart = gart_domain->gart;
+ 	struct gart_client *c;
+ 
+ 	spin_lock(&gart->client_lock);
+@@ -216,33 +228,44 @@ out:
+ 	spin_unlock(&gart->client_lock);
  }
  
--static int exynos_iommu_domain_init(struct iommu_domain *domain)
-+static struct iommu_domain *exynos_iommu_domain_alloc(enum iommu_domain_type type)
+-static int gart_iommu_domain_init(struct iommu_domain *domain)
++static struct iommu_domain *gart_iommu_domain_alloc(enum iommu_domain_type type)
  {
--	struct exynos_iommu_domain *priv;
-+	struct exynos_iommu_domain *exynos_domain;
- 	int i;
- 
--	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
--	if (!priv)
--		return -ENOMEM;
+-	return 0;
++	struct gart_domain *gart_domain;
++
 +	if (type != IOMMU_DOMAIN_UNMANAGED)
 +		return NULL;
 +
-+	exynos_domain = kzalloc(sizeof(*exynos_domain), GFP_KERNEL);
-+	if (!exynos_domain)
++	gart_domain = kzalloc(sizeof(*gart_domain), GFP_KERNEL);
++	if (!gart_domain)
 +		return NULL;
++
++	return &gart_domain->domain;
+ }
  
--	priv->pgtable = (sysmmu_pte_t *)__get_free_pages(GFP_KERNEL, 2);
--	if (!priv->pgtable)
-+	exynos_domain->pgtable = (sysmmu_pte_t *)__get_free_pages(GFP_KERNEL, 2);
-+	if (!exynos_domain->pgtable)
- 		goto err_pgtable;
+-static void gart_iommu_domain_destroy(struct iommu_domain *domain)
++static void gart_iommu_domain_free(struct iommu_domain *domain)
+ {
+-	struct gart_device *gart = domain->priv;
+-
+-	if (!gart)
+-		return;
++	struct gart_domain *gart_domain = to_gart_domain(domain);
++	struct gart_device *gart = gart_domain->gart;
  
--	priv->lv2entcnt = (short *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, 1);
--	if (!priv->lv2entcnt)
-+	exynos_domain->lv2entcnt = (short *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, 1);
-+	if (!exynos_domain->lv2entcnt)
- 		goto err_counter;
+-	spin_lock(&gart->client_lock);
+-	if (!list_empty(&gart->client)) {
+-		struct gart_client *c;
++	if (gart) {
++		spin_lock(&gart->client_lock);
++		if (!list_empty(&gart->client)) {
++			struct gart_client *c;
  
- 	/* Workaround for System MMU v3.3 to prevent caching 1MiB mapping */
- 	for (i = 0; i < NUM_LV1ENTRIES; i += 8) {
--		priv->pgtable[i + 0] = ZERO_LV2LINK;
--		priv->pgtable[i + 1] = ZERO_LV2LINK;
--		priv->pgtable[i + 2] = ZERO_LV2LINK;
--		priv->pgtable[i + 3] = ZERO_LV2LINK;
--		priv->pgtable[i + 4] = ZERO_LV2LINK;
--		priv->pgtable[i + 5] = ZERO_LV2LINK;
--		priv->pgtable[i + 6] = ZERO_LV2LINK;
--		priv->pgtable[i + 7] = ZERO_LV2LINK;
-+		exynos_domain->pgtable[i + 0] = ZERO_LV2LINK;
-+		exynos_domain->pgtable[i + 1] = ZERO_LV2LINK;
-+		exynos_domain->pgtable[i + 2] = ZERO_LV2LINK;
-+		exynos_domain->pgtable[i + 3] = ZERO_LV2LINK;
-+		exynos_domain->pgtable[i + 4] = ZERO_LV2LINK;
-+		exynos_domain->pgtable[i + 5] = ZERO_LV2LINK;
-+		exynos_domain->pgtable[i + 6] = ZERO_LV2LINK;
-+		exynos_domain->pgtable[i + 7] = ZERO_LV2LINK;
+-		list_for_each_entry(c, &gart->client, list)
+-			gart_iommu_detach_dev(domain, c->dev);
++			list_for_each_entry(c, &gart->client, list)
++				gart_iommu_detach_dev(domain, c->dev);
++		}
++		spin_unlock(&gart->client_lock);
  	}
- 
--	pgtable_flush(priv->pgtable, priv->pgtable + NUM_LV1ENTRIES);
-+	pgtable_flush(exynos_domain->pgtable, exynos_domain->pgtable + NUM_LV1ENTRIES);
- 
--	spin_lock_init(&priv->lock);
--	spin_lock_init(&priv->pgtablelock);
--	INIT_LIST_HEAD(&priv->clients);
-+	spin_lock_init(&exynos_domain->lock);
-+	spin_lock_init(&exynos_domain->pgtablelock);
-+	INIT_LIST_HEAD(&exynos_domain->clients);
- 
--	domain->geometry.aperture_start = 0;
--	domain->geometry.aperture_end   = ~0UL;
--	domain->geometry.force_aperture = true;
-+	exynos_domain->domain.geometry.aperture_start = 0;
-+	exynos_domain->domain.geometry.aperture_end   = ~0UL;
-+	exynos_domain->domain.geometry.force_aperture = true;
- 
--	domain->priv = priv;
--	return 0;
-+	return &exynos_domain->domain;
- 
- err_counter:
--	free_pages((unsigned long)priv->pgtable, 2);
-+	free_pages((unsigned long)exynos_domain->pgtable, 2);
- err_pgtable:
--	kfree(priv);
--	return -ENOMEM;
-+	kfree(exynos_domain);
-+	return NULL;
- }
- 
--static void exynos_iommu_domain_destroy(struct iommu_domain *domain)
-+static void exynos_iommu_domain_free(struct iommu_domain *domain)
- {
--	struct exynos_iommu_domain *priv = domain->priv;
-+	struct exynos_iommu_domain *priv = to_exynos_domain(domain);
- 	struct exynos_iommu_owner *owner;
- 	unsigned long flags;
- 	int i;
-@@ -773,15 +781,14 @@ static void exynos_iommu_domain_destroy(struct iommu_domain *domain)
- 
- 	free_pages((unsigned long)priv->pgtable, 2);
- 	free_pages((unsigned long)priv->lv2entcnt, 1);
--	kfree(domain->priv);
+-	spin_unlock(&gart->client_lock);
 -	domain->priv = NULL;
-+	kfree(priv);
++
++	kfree(gart_domain);
  }
  
- static int exynos_iommu_attach_device(struct iommu_domain *domain,
- 				   struct device *dev)
+ static int gart_iommu_map(struct iommu_domain *domain, unsigned long iova,
+ 			  phys_addr_t pa, size_t bytes, int prot)
  {
- 	struct exynos_iommu_owner *owner = dev->archdata.iommu;
--	struct exynos_iommu_domain *priv = domain->priv;
-+	struct exynos_iommu_domain *priv = to_exynos_domain(domain);
- 	phys_addr_t pagetable = virt_to_phys(priv->pgtable);
+-	struct gart_device *gart = domain->priv;
++	struct gart_domain *gart_domain = to_gart_domain(domain);
++	struct gart_device *gart = gart_domain->gart;
  	unsigned long flags;
- 	int ret;
-@@ -812,7 +819,7 @@ static void exynos_iommu_detach_device(struct iommu_domain *domain,
- 				    struct device *dev)
+ 	unsigned long pfn;
+ 
+@@ -265,7 +288,8 @@ static int gart_iommu_map(struct iommu_domain *domain, unsigned long iova,
+ static size_t gart_iommu_unmap(struct iommu_domain *domain, unsigned long iova,
+ 			       size_t bytes)
  {
- 	struct exynos_iommu_owner *owner;
--	struct exynos_iommu_domain *priv = domain->priv;
-+	struct exynos_iommu_domain *priv = to_exynos_domain(domain);
- 	phys_addr_t pagetable = virt_to_phys(priv->pgtable);
+-	struct gart_device *gart = domain->priv;
++	struct gart_domain *gart_domain = to_gart_domain(domain);
++	struct gart_device *gart = gart_domain->gart;
  	unsigned long flags;
  
-@@ -988,7 +995,7 @@ static int lv2set_page(sysmmu_pte_t *pent, phys_addr_t paddr, size_t size,
- static int exynos_iommu_map(struct iommu_domain *domain, unsigned long l_iova,
- 			 phys_addr_t paddr, size_t size, int prot)
+ 	if (!gart_iova_range_valid(gart, iova, bytes))
+@@ -281,7 +305,8 @@ static size_t gart_iommu_unmap(struct iommu_domain *domain, unsigned long iova,
+ static phys_addr_t gart_iommu_iova_to_phys(struct iommu_domain *domain,
+ 					   dma_addr_t iova)
  {
--	struct exynos_iommu_domain *priv = domain->priv;
-+	struct exynos_iommu_domain *priv = to_exynos_domain(domain);
- 	sysmmu_pte_t *entry;
- 	sysmmu_iova_t iova = (sysmmu_iova_t)l_iova;
+-	struct gart_device *gart = domain->priv;
++	struct gart_domain *gart_domain = to_gart_domain(domain);
++	struct gart_device *gart = gart_domain->gart;
+ 	unsigned long pte;
+ 	phys_addr_t pa;
  	unsigned long flags;
-@@ -1042,7 +1049,7 @@ static void exynos_iommu_tlb_invalidate_entry(struct exynos_iommu_domain *priv,
- static size_t exynos_iommu_unmap(struct iommu_domain *domain,
- 					unsigned long l_iova, size_t size)
- {
--	struct exynos_iommu_domain *priv = domain->priv;
-+	struct exynos_iommu_domain *priv = to_exynos_domain(domain);
- 	sysmmu_iova_t iova = (sysmmu_iova_t)l_iova;
- 	sysmmu_pte_t *ent;
- 	size_t err_pgsize;
-@@ -1119,7 +1126,7 @@ err:
- static phys_addr_t exynos_iommu_iova_to_phys(struct iommu_domain *domain,
- 					  dma_addr_t iova)
- {
--	struct exynos_iommu_domain *priv = domain->priv;
-+	struct exynos_iommu_domain *priv = to_exynos_domain(domain);
- 	sysmmu_pte_t *entry;
- 	unsigned long flags;
- 	phys_addr_t phys = 0;
-@@ -1171,8 +1178,8 @@ static void exynos_iommu_remove_device(struct device *dev)
- }
+@@ -310,8 +335,8 @@ static bool gart_iommu_capable(enum iommu_cap cap)
  
- static const struct iommu_ops exynos_iommu_ops = {
--	.domain_init = exynos_iommu_domain_init,
--	.domain_destroy = exynos_iommu_domain_destroy,
-+	.domain_alloc = exynos_iommu_domain_alloc,
-+	.domain_free = exynos_iommu_domain_free,
- 	.attach_dev = exynos_iommu_attach_device,
- 	.detach_dev = exynos_iommu_detach_device,
- 	.map = exynos_iommu_map,
+ static const struct iommu_ops gart_iommu_ops = {
+ 	.capable	= gart_iommu_capable,
+-	.domain_init	= gart_iommu_domain_init,
+-	.domain_destroy	= gart_iommu_domain_destroy,
++	.domain_alloc	= gart_iommu_domain_alloc,
++	.domain_free	= gart_iommu_domain_free,
+ 	.attach_dev	= gart_iommu_attach_dev,
+ 	.detach_dev	= gart_iommu_detach_dev,
+ 	.map		= gart_iommu_map,
 -- 
 1.8.4.5
