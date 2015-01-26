@@ -1,57 +1,89 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Mon, 26 Jan 2015 15:58:44 +0000
-Subject: [PATCH v2 02/12] pm: at91: Workaround DDRSDRC self-refresh bug
- with LPDDR1 memories.
-In-Reply-To: <20150126134453.GA27559@gradator.net>
-References: <1422265005-22937-1-git-send-email-wenyou.yang@atmel.com>
- <1422265139-23011-1-git-send-email-wenyou.yang@atmel.com>
- <20150126103605.GA20837@gradator.net> <54C6426E.9090808@atmel.com>
- <20150126134453.GA27559@gradator.net>
-Message-ID: <372b731350484f8ea1d29bd016421dfb@EMAIL.axentia.se>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 26 Jan 2015 17:00:41 +0100
+Subject: [PATCH v3] ARM: at91/dt: sam9263: Add ac97 device node
+In-Reply-To: <20150108191603.GF2447@piout.net>
+References: <1419854922-29338-1-git-send-email-alexanders83@web.de>
+ <1419854922-29338-3-git-send-email-alexanders83@web.de>
+ <2066438.if5qXaBWRu@kongar> <20150108191603.GF2447@piout.net>
+Message-ID: <54C664A9.7090403@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sylvain Rochet wrote:
-> Hello Nicolas,
+Le 08/01/2015 20:16, Alexandre Belloni a ?crit :
+> Hi,
 > 
-> On Mon, Jan 26, 2015 at 02:34:38PM +0100, Nicolas Ferre wrote:
-> > Le 26/01/2015 11:36, Sylvain Rochet a ?crit :
-> > >
-> > > I think we should explain we are dealing with an errata here, this
-> > > is not obvious at first sight, the patch summary may find its place
-> > > here :-)
-> >
-> > True but the problem is that this errata is not public yet, it will be
-> > in a couple of weeks.
-> >
-> > I have the feeling though that the commit message is pretty clear.
-> > We'll maybe add that it"s an actual errata.
 > 
-> Humm, this is not what I meant actually. I only proposed a code source
-> comment explaining why this is done this way, the current patch summary
-> looked like it will be perfect between /* */ ;-)
+> On 08/01/2015 at 20:12:04 +0100, Alexander Stein wrote :
+>> Now that the implementation has been applied to sound/for-next (https://git.kernel.org/cgit/linux/kernel/git/tiwai/sound.git/log/?h=for-next
+>> ), who is going to pick the related patches (this one and the other two adding documentation and default config)?
+>>
+> 
+> Nicolas will do it but he has not yet started to create a branch for
+> 3.20.
 
-I did not want to fill up the source with wordy comments, and settled
-for a one-liner. I don't know much about the underlying reasons other
-than the fact that LPDDR1 mode of the controller isn't working properly
-in self-refresh and that the DDR2 spec is similar enough to work.
+Yes, both first patches added to at91-3.20-dt branch.
 
-The one-liner comment says about the same thing, but not with so
-many words. The comment does make it clear that the switch to DDR2
-is intentional, and that is all that is needed as protection from some
-future cleanup. I mean, anyone seeing that comment and just erasing
-the whole thing without further investigation is not doing a very good
-job as there is no reason to intentionally switch from LPDDR1 mode to
-DDR2 mode, other that the fact that the LPDDR1 mode isn't working for
-some reason. That reason is not to be found in the commit message
-and I have no information to improve the situation. IMO, the only thing
-missing is a pointer to the as yet unreleased errata, which should explain
-the situation clearly for any and all interested parties. May I suggest that
-someone who cares sends a patch with the comment update when the
-errata is released?
+Thanks, best regards,
 
-If others feel differently, by all means please reword and expand the
-comment.
+>> Best regards,
+>> Alexander
+>>
+>> On Monday 29 December 2014, 13:08:41 wrote Alexander Stein:
+>>> This adds the device node for the ac97 controller.
+>>>
+>>> Signed-off-by: Alexander Stein <alexanders83@web.de>
+>>> Acked-By Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>>> ---
+>>> Changes in v3:
+>>> * Renamed the compatible string to atmel,at91sam9263-ac97c
+>>> * Added 'Acked-By Alexandre Belloni <alexandre.belloni@free-electrons.com>'
+>>>
+>>>  arch/arm/boot/dts/at91sam9263.dtsi | 21 +++++++++++++++++++++
+>>>  1 file changed, 21 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+>>> index 6283785..2e67e38 100644
+>>> --- a/arch/arm/boot/dts/at91sam9263.dtsi
+>>> +++ b/arch/arm/boot/dts/at91sam9263.dtsi
+>>> @@ -700,6 +700,16 @@
+>>>  					};
+>>>  				};
+>>>  
+>>> +				ac97 {
+>>> +					pinctrl_ac97: ac97-0 {
+>>> +						atmel,pins =
+>>> +							<AT91_PIOB 0 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB12 periph A AC97FS pin */
+>>> +							 AT91_PIOB 1 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB13 periph A AC97CK pin */
+>>> +							 AT91_PIOB 2 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB14 periph A AC97TX pin */
+>>> +							 AT91_PIOB 3 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PB14 periph A AC97RX pin */
+>>> +					};
+>>> +				};
+>>> +
+>>>  				pioA: gpio at fffff200 {
+>>>  					compatible = "atmel,at91rm9200-gpio";
+>>>  					reg = <0xfffff200 0x200>;
+>>> @@ -828,6 +838,17 @@
+>>>  				status = "disabled";
+>>>  			};
+>>>  
+>>> +			ac97: sound at fffa0000 {
+>>> +				compatible = "atmel,at91sam9263-ac97c";
+>>> +				reg = <0xfffa0000 0x4000>;
+>>> +				interrupts = <18 IRQ_TYPE_LEVEL_HIGH 5>;
+>>> +				pinctrl-names = "default";
+>>> +				pinctrl-0 = <&pinctrl_ac97>;
+>>> +				clocks = <&ac97_clk>;
+>>> +				clock-names = "ac97_clk";
+>>> +				status = "disabled";
+>>> +			};
+>>> +
+>>>  			macb0: ethernet at fffbc000 {
+>>>  				compatible = "cdns,at32ap7000-macb", "cdns,macb";
+>>>  				reg = <0xfffbc000 0x100>;
+>>>
+>>
+> 
 
-Cheers,
-Peter
+
+-- 
+Nicolas Ferre
