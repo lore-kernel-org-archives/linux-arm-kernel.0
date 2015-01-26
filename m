@@ -1,94 +1,85 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 26 Jan 2015 07:50:22 -0800
-Subject: [PATCH v3] ARM: zynq: DT: Add USB to device tree
-In-Reply-To: <54C60A56.7010403@suse.de>
-References: <1417536431-27759-1-git-send-email-soren.brinkmann@xilinx.com>
- <d78fedd84f354d80985187f851cb3cd1@BN1AFFO11FD055.protection.gbl>
- <54C5F89A.3090901@suse.de> <54C5F965.90100@monstr.eu>
- <54C5FBC3.7030903@suse.de> <54C60A56.7010403@suse.de>
-Message-ID: <c65880cef67945ebaf61306febc1349b@BN1BFFO11FD010.protection.gbl>
+From: bparrot@ti.com (Benoit Parrot)
+Date: Mon, 26 Jan 2015 09:50:32 -0600
+Subject: [PATCH v2] ARM: AM43xx: hwmod: add VPFE hwmod entries
+In-Reply-To: <CA+V-a8urS2C20FDcfsGa+Gg+7wmbbQQw3U7BfXf6GBKoBGMc9w@mail.gmail.com>
+References: <1422217915-24231-1-git-send-email-prabhakar.csengg@gmail.com>
+ <alpine.DEB.2.02.1501260205090.5450@utopia.booyaka.com>
+ <CA+V-a8urS2C20FDcfsGa+Gg+7wmbbQQw3U7BfXf6GBKoBGMc9w@mail.gmail.com>
+Message-ID: <20150126155032.GD2570@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-01-26 at 10:35AM +0100, Andreas F?rber wrote:
-> Am 26.01.2015 um 09:33 schrieb Andreas F?rber:
-> > Am 26.01.2015 um 09:23 schrieb Michal Simek:
-> >> On 01/26/2015 09:19 AM, Andreas F?rber wrote:
-> >>> And if I apply it to my -next based tree, adding corresponding nodes to
-> >>> zynq-parallella.dts, I get repeatedly:
-> >>>
-> >>> [  +0,012242] ci_hdrc ci_hdrc.0: no of_node; not parsing pinctrl DT
-> >>> [  +0,000157] ci_hdrc ci_hdrc.0: ChipIdea HDRC found, lpm: 0; cap:
-> >>> f090e100 op: f090e140
-> >>> [  +0,000081] platform ci_hdrc.0: Driver ci_hdrc requests probe deferral
-> >>> [  +0,005360] ci_hdrc ci_hdrc.1: no of_node; not parsing pinctrl DT
-> >>> [  +0,000120] ci_hdrc ci_hdrc.1: ChipIdea HDRC found, lpm: 0; cap:
-> >>> f0910100 op: f0910140
-> >>> [  +0,001810] platform ci_hdrc.1: Driver ci_hdrc requests probe deferral
-> >>>
-> >>> Am I missing any other patches or config options?
-> >>> (I do notice that the pinctrl v3 patch that got merged has a trivial bug
-> >>> for usb0, for which I'll send a patch later on.)
+Lad, Prabhakar <prabhakar.csengg@gmail.com> wrote on Mon [2015-Jan-26 08:13:01 +0000]:
+> Hi Paul,
+> 
+> Thanks for the review.
+> 
+> On Mon, Jan 26, 2015 at 2:15 AM, Paul Walmsley <paul@pwsan.com> wrote:
+> > Hi
+> >
+> > On Sun, 25 Jan 2015, Lad, Prabhakar wrote:
+> >
+> >> From: Benoit Parrot <bparrot@ti.com>
 > >>
-> >> Why is it deferred? Is it because of pinmuxing stuff?
-> > 
-> > No, happened without as well.
-> > 
-> > Looking at a different place in dmesg, I spot this:
-> > 
-> > [  +0,003988] usb_phy_generic phy0: GPIO lookup for consumer reset-gpios
-> > [  +0,000012] usb_phy_generic phy0: using device tree for GPIO lookup
-> > [  +0,000015] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpios'
-> > property
-> >  of node '/phy0[0]'
-> > [  +0,000013] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpio'
-> > property
-> > of node '/phy0[0]'
-> > [  +0,000010] usb_phy_generic phy0: using lookup tables for GPIO lookup
-> > [  +0,000153] usb_phy_generic phy0: lookup for GPIO reset-gpios failed
-> > [  +0,000012] usb_phy_generic phy0: Error requesting RESET GPIO
-> > [  +0,004360] usb_phy_generic: probe of phy0 failed with error -2
-> > [  +0,004991] usb_phy_generic phy1: GPIO lookup for consumer reset-gpios
-> > [  +0,000012] usb_phy_generic phy1: using device tree for GPIO lookup
-> > [  +0,000013] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpios'
-> > property
-> >  of node '/phy1[0]'
-> > [  +0,000013] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpio'
-> > property of node '/phy1[0]'
-> > [  +0,000010] usb_phy_generic phy1: using lookup tables for GPIO lookup
-> > [  +0,000012] usb_phy_generic phy1: lookup for GPIO reset-gpios failed
-> > [  +0,000011] usb_phy_generic phy1: Error requesting RESET GPIO
-> > [  +0,004337] usb_phy_generic: probe of phy1 failed with error -2
-> > 
-> > So, I guess the chipidea driver is deferring because the phys want a
-> > property that neither me nor you are specifying? Would that be the two
-> > MDIO pins 52 and 53 that would need to be specified?
-> 
-> Erm, scratch that last question - wrong PHY. Trying it resolved the
-> above phy errors but not the original problem. And so does an empty one:
-> 
-> @@ -99,11 +100,13 @@
-> 
->         usb_phy0: phy0 {
->                 compatible = "usb-nop-xceiv";
-> +               reset-gpios = <>;
->                 #phy-cells = <0>;
->         };
-> 
->         usb_phy1: phy1 {
->                 compatible = "usb-nop-xceiv";
-> +               reset-gpios = <>;
->                 #phy-cells = <0>;
->         };
->  };
-> 
-> In my manuals and notes I can't find any GPIO being used as reset for
-> the USB PHYs. Any thoughts appreciated.
+> >> this patch adds VPFE HWMOD data for AM43xx.
+> >>
+> >> Signed-off-by: Benoit Parrot <bparrot@ti.com>
+> >> Signed-off-by: Darren Etheridge <detheridge@ti.com>
+> >> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> >> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+> >> ---
+> >>  Hi Paul,
+> >>
+> >>  You were right, the hardware team has confirmed that, the VPFE master port is
+> >>  connected to L3 and the VPFE slave port is connected to L4. The L3 port cannot
+> >>  serve as a register target because it is initiator only.
+> >
+> > OK makes sense to me.,
+> >
+> >>
+> >>  I have created links referring to dss l3/l4 hwmod and tested it, lemme know
+> >>  if I have missed something.
+> >
+> > A few minor comments below
+> >
+> >>
+> [Snip]
+> >>  /* Interfaces */
+> >>  static struct omap_hwmod_ocp_if am43xx_l3_main__l4_hs = {
+> >>       .master         = &am33xx_l3_main_hwmod,
+> >> @@ -788,6 +826,36 @@ static struct omap_hwmod_ocp_if am43xx_l4_ls__dss_rfbi = {
+> >>       .user           = OCP_USER_MPU | OCP_USER_SDMA,
+> >>  };
+> >>
+> >> +static struct omap_hwmod_ocp_if am43xx_l3__vpfe0 = {
+> >> +     .master         = &am43xx_vpfe0_hwmod,
+> >> +     .slave          = &am33xx_l3_main_hwmod,
+> >> +     .clk            = "l3_gclk",
+> >> +     .flags          = OCPIF_SWSUP_IDLE,
+> >
+> > OCPIF_SWSUP_IDLE probably isn't needed here.  Could you please try without
+> > it?
+> >
+> >> +     .user           = OCP_USER_MPU | OCP_USER_SDMA,
+> >> +};
+> >> +
+> >> +static struct omap_hwmod_ocp_if am43xx_l3__vpfe1 = {
+> >> +     .master         = &am43xx_vpfe1_hwmod,
+> >> +     .slave          = &am33xx_l3_main_hwmod,
+> >> +     .clk            = "l3_gclk",
+> >> +     .flags          = OCPIF_SWSUP_IDLE,
+> >
+> > Same point as the above.
+> >
+> Dropped and tested works! posting a v3.
 
-Such a connection is optional. The platform might rely on its reset
-circuit, though it might not work for warm reboots.
-I haven't looked at parallela docs, but if there is a schematic
-available, that should tell you if/what is connected to the PHY reset
-pin.
+When you tested it without the OCPIF_SWSUP_IDLE, did you go trhough a complete suspend/resume cycle?
+This flag was added early on because otherwise the susbsytem would not go idle without it...
 
-	Soren
+Can you post the console output during a suspend/resume cycle?
+
+Benoit
+
+> 
+> Cheers,
+> --Prabhakar Lad
