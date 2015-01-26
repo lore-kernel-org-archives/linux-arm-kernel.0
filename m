@@ -1,72 +1,88 @@
-From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
-Date: Mon, 26 Jan 2015 09:22:19 -0700
-Subject: [PATCH 3/9] coresight: fix the link between orphan connection and
- newly added device
-In-Reply-To: <1422289345-2084-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1422289345-2084-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1422289345-2084-4-git-send-email-mathieu.poirier@linaro.org>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Mon, 26 Jan 2015 17:23:10 +0100
+Subject: N900 v3.19-rc5 arm atags_to_fdt.c is broken
+In-Reply-To: <20150126161454.GE28663@atomide.com>
+References: <201501232239.55801@pali> <201501232336.36187@pali>
+ <20150126161454.GE28663@atomide.com>
+Message-ID: <201501261723.10505@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kaixu Xia <xiakaixu@huawei.com>
+On Monday 26 January 2015 17:14:55 Tony Lindgren wrote:
+> * Pali Roh?r <pali.rohar@gmail.com> [150123 14:39]:
+> > On Friday 23 January 2015 22:39:55 Pali Roh?r wrote:
+> > > Hello,
+> > > 
+> > > when I boot zImage with appended DT n900 in qemu
+> > > fdt_open_into() function called from file
+> > > arch/arm/boot/compressed/atags_to_fdt.c (in function
+> > > atags_to_fdt) always returns -FDT_ERR_NOSPACE.
+> > > 
+> > > It means that all ATAGS (including cmdline arguments)
+> > > passed by bootloader are ignored.
+> > > 
+> > > On real n900 device I see that booted DT version also
+> > > ignore cmdline arguments from bootloader. I cannot debug
+> > > decompress code on real device, but I think it is same
+> > > problem as in qemu.
+> > 
+> > Looks like this quick patch is fixing above problem:
+> > 
+> > diff --git a/arch/arm/boot/compressed/head.S
+> > b/arch/arm/boot/compressed/head.S index 68be901..4a7d75b
+> > 100644
+> > --- a/arch/arm/boot/compressed/head.S
+> > +++ b/arch/arm/boot/compressed/head.S
+> > @@ -268,7 +268,7 @@ restart:	adr	r0, LC0
+> > 
+> >  		 * area.  No GOT fixup has occurred yet, but none of 
+the
+> >  		 * code we're about to call uses any global variable.
+> >  		
+> >  		*/
+> > 
+> > -		add	sp, sp, #0x10000
+> > +		add	sp, sp, #0x20000
+> > 
+> >  		stmfd	sp!, {r0-r3, ip, lr}
+> >  		mov	r0, r8
+> >  		mov	r1, r6
+> > 
+> > @@ -289,7 +289,7 @@ restart:	adr	r0, LC0
+> > 
+> >  		bleq	atags_to_fdt
+> >  		
+> >  		ldmfd	sp!, {r0-r3, ip, lr}
+> > 
+> > -		sub	sp, sp, #0x10000
+> > +		sub	sp, sp, #0x20000
+> > 
+> >  #endif
+> >  
+> >  		mov	r8, r6			@ use the appended device tree
+> 
+> Nico, got any ideas about this one? This seems like a
+> regression somewhere..
+> 
+> Regards,
+> 
+> Tony
 
-When founding a component that has orphan connections, we should
-validate if it match the newly added device. If it does not match,
-only then should the @still_orphan flag should be set.
+$ du -b arch/arm/boot/dts/omap3-n900.dtb 
+70212   arch/arm/boot/dts/omap3-n900.dtb
 
-The tested result as follows.
-pre:
-/sys/bus/coresight/devices # echo 1 > e3c42000.etb/enable_sink
-/sys/bus/coresight/devices # echo 1 > e3c7c000.ptm/enable_source
-[   15.527692] Unable to handle kernel NULL pointer dereference at virtual address 00000124
-[   15.555142] pgd = c2294000
-[   15.564226] [00000124] *pgd=3d393831, *pte=00000000, *ppte=00000000
-[   15.585391] Internal error: Oops: 817 [#1] PREEMPT SMP ARM
-[   15.603807] CPU: 0 PID: 144 Comm: sh Not tainted 3.17.0-rc1-12634-g1222fe0-dirty #3
-[   15.629490] task: ed3803c0 ti: c213a000 task.ti: c213a000
-[   15.647627] PC is at coresight_build_paths+0x1c/0x314
-[   15.664579] LR is at coresight_build_paths+0x6c/0x314
-[   15.681526] pc : [<c02da20c>]    lr : [<c02da25c>]    psr: 20000013
-[   15.681526] sp : c213be88  ip : c02da800  fp : 00000000
-[   15.720023] r10: 00000002  r9 : ed13250c  r8 : 00000001
-[   15.737549] r7 : c213bee8  r6 : ffffffea  r5 : 00000000  r4 : 00000124
-[   15.759446] r3 : ed216f24  r2 : 00000001  r1 : c213bee8  r0 : 00000000
-[   15.781346] Flags: nzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
+$ echo $((0x10000))
+65536
 
-post:
-/sys/bus/coresight/devices # echo 1 > e3c42000.etb/enable_sink
-/sys/bus/coresight/devices # echo 1 > e3c7c000.ptm/enable_source
-[   59.934255] coresight-etb10 e3c42000.etb: ETB enabled
-[   59.951317] coresight-replicator replicator0: REPLICATOR enabled
-[   59.971581] coresight-funnel e3c41000.funnel: FUNNEL inport 0 enabled
-[   59.993334] coresight-etm3x e3c7c000.ptm: ETM tracing enabled
+I would say, problem is because omap3-n900 binary DT is too large
 
-Signed-off-by: Kaixu Xia <xiakaixu@huawei.com>
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- drivers/coresight/coresight.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/coresight/coresight.c b/drivers/coresight/coresight.c
-index 6e0181f84425..d6052e2cd6a7 100644
---- a/drivers/coresight/coresight.c
-+++ b/drivers/coresight/coresight.c
-@@ -504,11 +504,12 @@ static int coresight_orphan_match(struct device *dev, void *data)
- 		/* We have found at least one orphan connection */
- 		if (conn->child_dev == NULL) {
- 			/* Does it match this newly added device? */
--			if (!strcmp(dev_name(&csdev->dev), conn->child_name))
-+			if (!strcmp(dev_name(&csdev->dev), conn->child_name)) {
- 				conn->child_dev = csdev;
--		} else {
--			/* Too bad, this component still has an orphan */
--			still_orphan = true;
-+			} else {
-+				/* This component still has an orphan */
-+				still_orphan = true;
-+			}
- 		}
- 	}
- 
 -- 
-1.9.1
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150126/12452f90/attachment-0001.sig>
