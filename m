@@ -1,226 +1,92 @@
-From: plaes@plaes.org (Priit Laes)
-Date: Mon, 26 Jan 2015 20:00:06 +0200
-Subject: [PATCH v3] ARM: dts: sun4i: Add initial dts for Gemei G9 tablet
-Message-ID: <1422295208-11016-1-git-send-email-plaes@plaes.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 26 Jan 2015 19:08:33 +0100
+Subject: [PATCH v2] ARM: at91: at91rm9200: set idle and restart from
+ rm9200_dt_device_init()
+In-Reply-To: <1421359100-8930-12-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1421359100-8930-12-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1422295713-26549-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gemei G9 is an A10 based tablet, with 1G RAM, 16G NAND, 1024x768
-IPS LCD display, stereo speakers, 1.3MP front camera and 5 MP
-rear camera, 8000mAh battery, GT901 2+1 touchscreen, Bosch BMA250
-accelerometer and RTL8188CUS USB wifi. It also has MicroSD slot,
-miniHDMI, 1 x MicroUSB OTG port and 1 x MicroUSB host port and
-3.5mm headphone jack.
+From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Changes since v2:
- * Fix syntax error (brown paper bag release)
+Setup arm_pm_idle and arm_pm_restart function pointers from
+rm9200_dt_device_init() function to simplify the at91rm9200 initialization
+process.
+This same move is already done for the sam9s.
 
-Changes since v1:
- * Added sun4i-lradc keymap
- * Added TODO note about missing IRQ pins for bma250
- * Fixed formatting issues and removed external URLs
-
-Signed-off-by: Priit Laes <plaes@plaes.org>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+[nicolas.ferre at atmel.com: adapt patch to newer series]
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/boot/dts/Makefile               |   6 +-
- arch/arm/boot/dts/sun4i-a10-gemei-g9.dts | 168 +++++++++++++++++++++++++++++++
- 2 files changed, 172 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/boot/dts/sun4i-a10-gemei-g9.dts
+ arch/arm/mach-at91/at91rm9200.c      | 14 --------------
+ arch/arm/mach-at91/board-dt-rm9200.c | 14 ++++++++++++++
+ 2 files changed, 14 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 7df26a2..a2e05fc 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -447,12 +447,14 @@ dtb-$(CONFIG_MACH_SUN4I) += \
- 	sun4i-a10-ba10-tvbox.dtb \
- 	sun4i-a10-chuwi-v7-cw0825.dtb \
- 	sun4i-a10-cubieboard.dtb \
-+	sun4i-a10-gemei-g9.dtb \
-+	sun4i-a10-hackberry.dtb \
-+	sun4i-a10-inet97fv2.dtb \
- 	sun4i-a10-marsboard.dtb \
- 	sun4i-a10-mini-xplus.dtb \
- 	sun4i-a10-mk802.dtb \
- 	sun4i-a10-mk802ii.dtb \
--	sun4i-a10-hackberry.dtb \
--	sun4i-a10-inet97fv2.dtb \
-+	sun4i-a10-mini-xplus.dtb \
- 	sun4i-a10-olinuxino-lime.dtb \
- 	sun4i-a10-pcduino.dtb
- dtb-$(CONFIG_MACH_SUN5I) += \
-diff --git a/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts b/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts
-new file mode 100644
-index 0000000..0c73453
---- /dev/null
-+++ b/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts
-@@ -0,0 +1,168 @@
-+/*
-+ * Copyright 2015 Priit Laes
-+ *
-+ * Priit Laes <plaes@plaes.org>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ *     You should have received a copy of the GNU General Public
-+ *     License along with this file; if not, write to the Free
-+ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-+ *     MA 02110-1301 USA
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
+diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
+index 3be1963f5c56..ae0d5f0eb108 100644
+--- a/arch/arm/mach-at91/at91rm9200.c
++++ b/arch/arm/mach-at91/at91rm9200.c
+@@ -22,25 +22,11 @@
+ #include "generic.h"
+ 
+ 
+-static void at91rm9200_restart(enum reboot_mode reboot_mode, const char *cmd)
+-{
+-	/*
+-	 * Perform a hardware reset with the use of the Watchdog timer.
+-	 */
+-	at91_st_write(AT91_ST_WDMR, AT91_ST_RSTEN | AT91_ST_EXTEN | 1);
+-	at91_st_write(AT91_ST_CR, AT91_ST_WDRST);
+-}
+ 
+ /* --------------------------------------------------------------------
+  *  AT91RM9200 processor initialization
+  * -------------------------------------------------------------------- */
+ 
+-static void __init at91rm9200_initialize(void)
+-{
+-	arm_pm_idle = at91rm9200_idle;
+-	arm_pm_restart = at91rm9200_restart;
+-}
+ 
+ AT91_SOC_START(at91rm9200)
+-	.init = at91rm9200_initialize,
+ AT91_SOC_END
+diff --git a/arch/arm/mach-at91/board-dt-rm9200.c b/arch/arm/mach-at91/board-dt-rm9200.c
+index d47c4433444d..5fcd1c73ece0 100644
+--- a/arch/arm/mach-at91/board-dt-rm9200.c
++++ b/arch/arm/mach-at91/board-dt-rm9200.c
+@@ -22,9 +22,21 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/irq.h>
++#include <asm/system_misc.h>
 +
-+/dts-v1/;
-+#include "sun4i-a10.dtsi"
-+#include "sunxi-common-regulators.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
++#include <mach/at91_st.h>
+ 
+ #include "generic.h"
+ 
++static void at91rm9200_restart(enum reboot_mode reboot_mode, const char *cmd)
++{
++	/*
++	 * Perform a hardware reset with the use of the Watchdog timer.
++	 */
++	at91_st_write(AT91_ST_WDMR, AT91_ST_RSTEN | AT91_ST_EXTEN | 1);
++	at91_st_write(AT91_ST_CR, AT91_ST_WDRST);
++}
 +
-+/ {
-+	model = "Gemei G9 Tablet";
-+	compatible = "gemei,g9", "allwinner,sun4i-a10";
-+};
-+
-+/*
-+ * TODO:
-+ *   2x cameras via CSI
-+ *   bma250 IRQs
-+ *   AXP battery management
-+ *   NAND
-+ *   OTG
-+ *   Touchscreen - gt801_2plus1 @ i2c adapter 2 @ 0x48
-+ */
-+
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+&ehci1 {
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "okay";
-+
-+	axp209: pmic at 34 {
-+		compatible = "x-powers,axp209";
-+		reg = <0x34>;
-+		interrupts = <0>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
-+	};
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins_a>;
-+	status = "okay";
-+
-+	/* Accelerometer */
-+	bma250 at 18 {
-+		compatible = "bosch,bma250";
-+		reg = <0x18>;
-+
-+		/*
-+		 * TODO: interrupt pins:
-+		 * int1 - PH00
-+		 * int2 - PI10
-+		 */
-+	};
-+};
-+
-+&lradc {
-+	vref-supply = <&reg_vcc3v0>;
-+
-+	status = "okay";
-+
-+	button at 158 {
-+		label = "Volume Down";
-+		linux,code = <KEY_VOLUMEDOWN>;
-+		channel = <0>;
-+		voltage = <158730>;
-+	};
-+
-+	button at 349 {
-+		label = "Volume Up";
-+		linux,code = <KEY_VOLUMEUP>;
-+		channel = <0>;
-+		voltage = <349206>;
-+	};
-+
-+	button at 1142 {
-+		label = "Esc";
-+		linux,code = <KEY_ESC>;
-+		channel = <0>;
-+		voltage = <1142856>;
-+	};
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH01 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&reg_usb1_vbus {
-+	status = "okay";
-+};
-+
-+&reg_usb2_vbus {
-+	status = "okay";
-+};
-+
-+
-+&uart0  {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	usb1_vbus-supply = <&reg_usb1_vbus>;
-+	usb2_vbus-supply = <&reg_usb2_vbus>;
-+	status = "okay";
-+};
+ static void __init at91rm9200_dt_timer_init(void)
+ {
+ 	of_clk_init(NULL);
+@@ -35,6 +47,8 @@ static void __init rm9200_dt_device_init(void)
+ {
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ 
++	arm_pm_idle = at91rm9200_idle;
++	arm_pm_restart = at91rm9200_restart;
+ 	at91_rm9200_pm_init();
+ }
+ 
 -- 
-2.2.2
+2.1.3
