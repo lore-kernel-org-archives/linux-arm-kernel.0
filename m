@@ -1,69 +1,88 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 26 Jan 2015 12:47:35 +0100
-Subject: [PATCH v2] MediaTek PMIC support
-In-Reply-To: <1422022202-7526-1-git-send-email-s.hauer@pengutronix.de>
-References: <1422022202-7526-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20150126114735.GA3178@pengutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 26 Jan 2015 11:49:56 +0000
+Subject: [PATCH 6/7] pm: at91: add achieve the mpddrc peripheral ID and
+ the DDR clock ID support
+In-Reply-To: <1422266896-24666-1-git-send-email-wenyou.yang@atmel.com>
+References: <1422266617-24381-1-git-send-email-wenyou.yang@atmel.com>
+ <1422266896-24666-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20150126114956.GE23313@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof, Arnd,
+On Mon, Jan 26, 2015 at 10:08:16AM +0000, Wenyou Yang wrote:
+> The patch achieves the mpddr controller peripheral ID
+> and the DDR clock ID from the dts file.
+> 
+> They will be used in the future to disable the mpddr controller'c clock
+> the and DDR clock to decrease the power consumption during suspending.
+> 
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> ---
+>  arch/arm/mach-at91/generic.h |    2 ++
+>  arch/arm/mach-at91/setup.c   |   24 ++++++++++++++++++++++++
+>  2 files changed, 26 insertions(+)
+> 
+> diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
+> index 41796bf..3c72a3e 100644
+> --- a/arch/arm/mach-at91/generic.h
+> +++ b/arch/arm/mach-at91/generic.h
+> @@ -47,6 +47,8 @@ void __init at91_sam9x5_pm_init(void) { }
+>  struct at91_pm_struct {
+>  	unsigned long uhp_udp_mask;
+>  	int memctrl;
+> +	u32 mpddrc_id[2];
+> +	u32 ddrck_id;
+>  };
+>  
+>  #endif /* _AT91_GENERIC_H */
+> diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+> index 7924663..a306f95 100644
+> --- a/arch/arm/mach-at91/setup.c
+> +++ b/arch/arm/mach-at91/setup.c
+> @@ -363,6 +363,27 @@ void __init at91_ioremap_matrix(u32 base_addr)
+>  		panic(pr_fmt("Impossible to ioremap at91_matrix_base\n"));
+>  }
+>  
+> +static u32 at91_of_get_ddr_id(struct device_node *np, char *name)
+> +{
+> +	struct of_phandle_args clkspec;
+> +	u32 id;
+> +	int index;
+> +	int rc;
+> +
+> +	index = of_property_match_string(np, "clock-names", name);
+> +	rc = of_parse_phandle_with_args(np, "clocks", "#clock-cells", index, &clkspec);
+> +	if (rc)
+> +		return 0;
+> +
+> +	rc = of_property_read_u32(clkspec.np, "reg", &id);
+> +	if (rc)
+> +		return 0;
+> +
+> +	of_node_put(clkspec.np);
+> +
+> +	return id;
+> +}
 
-OK to put the driver into drivers/soc/mediatek? Can you take these
-patches?
+This doesn't look right to me. This assumes the format of the clock
+provider node, which invalidates the point of having the abstraction in
+the first place.
 
-Sascha
+> +
+>  struct at91_ramc_of_data {
+>  	u8 ramc_type;
+>  };
+> @@ -400,6 +421,9 @@ static void at91_dt_ramc(void)
+>  		of_data = of_id->data;
+>  		at91_pm_data.memctrl = of_data->ramc_type;
+>  
+> +		at91_pm_data.mpddrc_id[idx] = at91_of_get_ddr_id(np, "mpddr");
+> +		at91_pm_data.ddrck_id = at91_of_get_ddr_id(np, "ddrck");
+> +
 
-On Fri, Jan 23, 2015 at 03:09:55PM +0100, Sascha Hauer wrote:
-> This series adds initial support for the MediaTek MT6397 PMIC and the
-> necessary infrastructure to attach it on the MT8135 / MT8173 SoCs.
-> 
-> The infrastructure includes:
-> 
-> - pericfg / infracfg controller support
->   The pericfg / infracfg controllers contain miscellaneous registers for
->   reset controllers and clocks.
-> 
-> - PMIC wrapper support
->   On MediaTek MT8135, MT8173 and other SoCs the PMIC is connected via
->   SPI. The SPI master interface is not directly visible to the CPU, but
->   only through the PMIC wrapper inside the SoC. The communication between
->   the SoC and the PMIC can optionally be encrypted. Also a non standard
->   Dual IO SPI mode can be used to increase speed. The MT8135 also supports
->   a special feature named "IP Pairing". With IP Pairing the pins of some
->   SoC internal peripherals can be on the PMIC. The signals of these pins
->   are routed over the SPI bus using the pwrap bridge. Because of these
->   optional non SPI conform features the PMIC driver is not implemented as
->   a SPI bus master driver.
-> 
-> The MT6397 PMIC itself is implemented as a regular mfd device driver which
-> uses regmap to access the PMIC registers.
-> 
-> This series also adds regulator support for the MT6397 PMIC.
-> 
-> The first 6 patches can be merged through the ARM SoC tree. The mfd
-> patch is independent of the first 6 patches and can be merged through the
-> mfd maintainer trees.
-> 
-> Changes since v1:
-> 
-> - document reset bindings for infracfg/pericfg
-> - fix base addresses in infracfg binding example
-> - Remove more Email addresses from Flora Fu (She is not working at
->   MediaTek anymore, her address is no longer valid)
-> - drop Regulator support patch, it's already in next
-> 
-> Sascha
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Why do you need these here?
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Surely the logic for poking any clocks should live in the relevant
+clock controller drivers?
+
+Mark.
