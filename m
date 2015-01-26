@@ -1,33 +1,67 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 27 Jan 2015 00:06:45 +0100
-Subject: [PATCH 1/2] clk: pxa: add pxa3xx clock driver
-In-Reply-To: <1420577139-30556-1-git-send-email-robert.jarzmik@free.fr>
- (Robert Jarzmik's message of "Tue, 6 Jan 2015 21:45:38 +0100")
-References: <1420577139-30556-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <87wq49p2ey.fsf@free.fr>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 27 Jan 2015 00:22:14 +0100
+Subject: [PATCH 07/16] ARM: integrator: convert PCI to use generic config
+ accesses
+In-Reply-To: <20150126182233.GB4063@google.com>
+References: <1420857290-8373-1-git-send-email-robh@kernel.org>
+ <1420857290-8373-8-git-send-email-robh@kernel.org>
+ <CACRpkdbwKN9LenqrWeu4WykhdZOGAdxpC_BYr2cYpc2_cn5GfA@mail.gmail.com>
+ <4938579.0KIk3QtTCP@wuerfel>
+ <CACRpkdZSXWrVudiadVjbhQDS_zQrYttaytW-TUoeFUrc=beD1A@mail.gmail.com>
+ <20150122203336.GD13072@google.com>
+ <20150126182233.GB4063@google.com>
+Message-ID: <CACRpkdaYL99yhJ08U13zJqviCFHzjMo9KtwfYhD+dHkuvQRhYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Robert Jarzmik <robert.jarzmik@free.fr> writes:
-
-> Move pxa25x clock drivers from arch/arm/mach-pxa to driver/clk.
-> In the move :
->  - convert to new clock framework legacy clocks
->  - provide clocks as before for platform data based boards
->  - provide clocks through devicetree with clk-pxa-dt
+On Mon, Jan 26, 2015 at 7:22 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+> On Thu, Jan 22, 2015 at 02:33:36PM -0600, Bjorn Helgaas wrote:
+>> On Mon, Jan 12, 2015 at 01:05:12AM +0100, Linus Walleij wrote:
+>> > On Sat, Jan 10, 2015 at 10:53 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > > On Saturday 10 January 2015 22:40:22 Linus Walleij wrote:
+>> > >> >  static int v3_read_config(struct pci_bus *bus, unsigned int devfn, int where,
+>> > >> >                           int size, u32 *val)
+>> > >> >  {
+>> > >> > -       addr = v3_open_config_window(bus, devfn, where);
+>> > >> > +       int ret = pci_generic_config_read(bus, devfn, where, size, val);
+>> > >> >         v3_close_config_window();
+>> > >> > +       return ret;
+>> > >> >  }
+>> > >> >
+>> > >> >  static int v3_write_config(struct pci_bus *bus, unsigned int devfn, int where,
+>> > >> >                            int size, u32 val)
+>> > >> >  {
+>> > >> > +       int ret = pci_generic_config_write(bus, devfn, where, size, val);
+>> > >> >         v3_close_config_window();
+>> > >> > -       raw_spin_unlock_irqrestore(&v3_lock, flags);
+>> > >> > +       return ret;
+>> > >> >  }
+>> > >> >
+>> > >> >  static struct pci_ops pci_v3_ops = {
+>> > >> > +       .map_bus = v3_open_config_window,
+>> > >> >         .read   = v3_read_config,
+>> > >> >         .write  = v3_write_config,
+>> > >>
+>> > >> So .map_bus is called before every .read/.write operation I take it.
+>> > >>
+>> > >> Wouldn't it be proper to call the v3_close_config_window() from a
+>> > >> matching .unmap_bus() callback for symmetry?
+>> > >
+>> > > It would be nicer for integrator but useless for anything else, so
+>> > > I'd vote for leaving it the way Rob posted.
+>> >
+>> > OK I buy that, throw in a comment about it in the code if there
+>> > is some time for iterating the patch.
+>>
+>> Would you prefer something like the following instead?  It keeps the
+>> v3_open/close symmetry, but it does break apart and duplicate some of the
+>> logic from v3_open_config_window().
 >
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> Hearing nothing, I kept Rob's initial version.  It can be tweaked later if
+> anybody wants to.  I just want to get all this into v3.20.
 
-Hi Mike,
+Sorry, I'm OK with either version, this latest iteration looks very nice.
+Acked-by.
 
-Would there be a change for this to land in 3.20 (only patch 1/2) ?
-
-Of course it won't be activated, as my intention is to use 3.21 as my vehicle to
-swap pxa25x, pxa27x and pxa3xx to common clock framework though pxa tree.
-
-FWIW, this was tested on the zylonite board so far.
-
-Cheers.
-
---
-Robert
+Yours,
+Linus Walleij
