@@ -1,132 +1,74 @@
-From: prabhakar.csengg@gmail.com (Lad, Prabhakar)
-Date: Mon, 26 Jan 2015 08:21:28 +0000
-Subject: [PATCH v3] ARM: AM43xx: hwmod: add VPFE hwmod entries
-Message-ID: <1422260488-380-1-git-send-email-prabhakar.csengg@gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 26 Jan 2015 09:23:01 +0100
+Subject: [PATCH v3] ARM: zynq: DT: Add USB to device tree
+In-Reply-To: <54C5F89A.3090901@suse.de>
+References: <1417536431-27759-1-git-send-email-soren.brinkmann@xilinx.com>
+ <d78fedd84f354d80985187f851cb3cd1@BN1AFFO11FD055.protection.gbl>
+ <54C5F89A.3090901@suse.de>
+Message-ID: <54C5F965.90100@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Benoit Parrot <bparrot@ti.com>
+On 01/26/2015 09:19 AM, Andreas F?rber wrote:
+> Hi Michal,
+> 
+> Am 03.12.2014 um 09:39 schrieb Michal Simek:
+>> On 12/02/2014 05:07 PM, Soren Brinkmann wrote:
+>>> Add USB nodes to zc702, zc706 and zed device trees.
+>>>
+>>> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+>>> ---
+>>> v3:
+>>>  - rename phy nodes: usb_phy -> phy0
+>>>  - rebased onto zynq/dt
+>>> v2:
+>>>  - remove '@0' from phy node name
+>>>  - don't add bogus space
+>>> ---
+>>>  arch/arm/boot/dts/zynq-7000.dtsi | 20 ++++++++++++++++++++
+>>>  arch/arm/boot/dts/zynq-zc702.dts | 11 +++++++++++
+>>>  arch/arm/boot/dts/zynq-zc706.dts | 10 ++++++++++
+>>>  arch/arm/boot/dts/zynq-zed.dts   | 10 ++++++++++
+>>>  4 files changed, 51 insertions(+)
+> [...]
+>>
+>> Applied to zynq/dt.
+> 
+> Hm, I don't see this patch in linux-next next-20150123...
+> 
+> And if I apply it to my -next based tree, adding corresponding nodes to
+> zynq-parallella.dts, I get repeatedly:
+> 
+> [  +0,012242] ci_hdrc ci_hdrc.0: no of_node; not parsing pinctrl DT
+> [  +0,000157] ci_hdrc ci_hdrc.0: ChipIdea HDRC found, lpm: 0; cap:
+> f090e100 op: f090e140
+> [  +0,000081] platform ci_hdrc.0: Driver ci_hdrc requests probe deferral
+> [  +0,005360] ci_hdrc ci_hdrc.1: no of_node; not parsing pinctrl DT
+> [  +0,000120] ci_hdrc ci_hdrc.1: ChipIdea HDRC found, lpm: 0; cap:
+> f0910100 op: f0910140
+> [  +0,001810] platform ci_hdrc.1: Driver ci_hdrc requests probe deferral
+> 
+> Am I missing any other patches or config options?
+> (I do notice that the pinctrl v3 patch that got merged has a trivial bug
+> for usb0, for which I'll send a patch later on.)
 
-this patch adds VPFE HWMOD data for AM43xx.
+Why is it deferred? Is it because of pinmuxing stuff?
 
-Signed-off-by: Benoit Parrot <bparrot@ti.com>
-Signed-off-by: Darren Etheridge <detheridge@ti.com>
-Signed-off-by: Felipe Balbi <balbi@ti.com>
-Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
----
- Changes for v3:
- a: Dropped OCPIF_SWSUP_IDLE flag from l3 hwmods of vpfe.
- 
- arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 70 ++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/prcm43xx.h             |  3 +-
- 2 files changed, 72 insertions(+), 1 deletion(-)
+Thanks,
+Michal
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-index 5c6c841..8543f9f 100644
---- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-@@ -514,6 +514,44 @@ static struct omap_hwmod am43xx_dss_rfbi_hwmod = {
- 	},
- };
- 
-+static struct omap_hwmod_class_sysconfig am43xx_vpfe_sysc = {
-+	.rev_offs       = 0x0,
-+	.sysc_offs      = 0x104,
-+	.sysc_flags     = SYSC_HAS_MIDLEMODE | SYSC_HAS_SIDLEMODE,
-+	.idlemodes      = (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
-+				MSTANDBY_FORCE | MSTANDBY_SMART | MSTANDBY_NO),
-+	.sysc_fields    = &omap_hwmod_sysc_type2,
-+};
-+
-+static struct omap_hwmod_class am43xx_vpfe_hwmod_class = {
-+	.name           = "vpfe",
-+	.sysc           = &am43xx_vpfe_sysc,
-+};
-+
-+static struct omap_hwmod am43xx_vpfe0_hwmod = {
-+	.name           = "vpfe0",
-+	.class          = &am43xx_vpfe_hwmod_class,
-+	.clkdm_name     = "l3s_clkdm",
-+	.prcm           = {
-+		.omap4  = {
-+			.modulemode     = MODULEMODE_SWCTRL,
-+			.clkctrl_offs   = AM43XX_CM_PER_VPFE0_CLKCTRL_OFFSET,
-+		},
-+	},
-+};
-+
-+static struct omap_hwmod am43xx_vpfe1_hwmod = {
-+	.name           = "vpfe1",
-+	.class          = &am43xx_vpfe_hwmod_class,
-+	.clkdm_name     = "l3s_clkdm",
-+	.prcm           = {
-+		.omap4  = {
-+			.modulemode     = MODULEMODE_SWCTRL,
-+			.clkctrl_offs   = AM43XX_CM_PER_VPFE1_CLKCTRL_OFFSET,
-+		},
-+	},
-+};
-+
- /* Interfaces */
- static struct omap_hwmod_ocp_if am43xx_l3_main__l4_hs = {
- 	.master		= &am33xx_l3_main_hwmod,
-@@ -788,6 +826,34 @@ static struct omap_hwmod_ocp_if am43xx_l4_ls__dss_rfbi = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
-+static struct omap_hwmod_ocp_if am43xx_l3__vpfe0 = {
-+	.master         = &am43xx_vpfe0_hwmod,
-+	.slave          = &am33xx_l3_main_hwmod,
-+	.clk            = "l3_gclk",
-+	.user           = OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+static struct omap_hwmod_ocp_if am43xx_l3__vpfe1 = {
-+	.master         = &am43xx_vpfe1_hwmod,
-+	.slave          = &am33xx_l3_main_hwmod,
-+	.clk            = "l3_gclk",
-+	.user           = OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+static struct omap_hwmod_ocp_if am43xx_l4_ls__vpfe0 = {
-+	.master         = &am33xx_l4_ls_hwmod,
-+	.slave          = &am43xx_vpfe0_hwmod,
-+	.clk            = "l4ls_gclk",
-+	.user           = OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+static struct omap_hwmod_ocp_if am43xx_l4_ls__vpfe1 = {
-+	.master         = &am33xx_l4_ls_hwmod,
-+	.slave          = &am43xx_vpfe1_hwmod,
-+	.clk            = "l4ls_gclk",
-+	.user           = OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
- static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
- 	&am33xx_l4_wkup__synctimer,
- 	&am43xx_l4_ls__timer8,
-@@ -887,6 +953,10 @@ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
- 	&am43xx_l4_ls__dss,
- 	&am43xx_l4_ls__dss_dispc,
- 	&am43xx_l4_ls__dss_rfbi,
-+	&am43xx_l3__vpfe0,
-+	&am43xx_l3__vpfe1,
-+	&am43xx_l4_ls__vpfe0,
-+	&am43xx_l4_ls__vpfe1,
- 	NULL,
- };
- 
-diff --git a/arch/arm/mach-omap2/prcm43xx.h b/arch/arm/mach-omap2/prcm43xx.h
-index ad7b3e9..8aa4c2c 100644
---- a/arch/arm/mach-omap2/prcm43xx.h
-+++ b/arch/arm/mach-omap2/prcm43xx.h
-@@ -143,5 +143,6 @@
- #define AM43XX_CM_PER_USB_OTG_SS1_CLKCTRL_OFFSET        0x0268
- #define AM43XX_CM_PER_USBPHYOCP2SCP1_CLKCTRL_OFFSET	0x05C0
- #define AM43XX_CM_PER_DSS_CLKCTRL_OFFSET		0x0a20
--
-+#define AM43XX_CM_PER_VPFE0_CLKCTRL_OFFSET		0x0068
-+#define AM43XX_CM_PER_VPFE1_CLKCTRL_OFFSET		0x0070
- #endif
 -- 
-2.1.0
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150126/404bb118/attachment.sig>
