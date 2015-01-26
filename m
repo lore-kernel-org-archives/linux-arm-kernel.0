@@ -1,10 +1,10 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 26 Jan 2015 15:15:55 +0100
-Subject: [PATCH v2 11/27] ARM: mvebu: armada-380: Relicense the device tree
+Date: Mon, 26 Jan 2015 15:15:58 +0100
+Subject: [PATCH v2 14/27] ARM: mvebu: armada-388-rd: Relicense the device tree
  under GPLv2+/X11
 In-Reply-To: <1422281771-31443-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1422281771-31443-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1422281771-31443-12-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1422281771-31443-15-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,13 +19,13 @@ Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Acked-by: Jason Cooper <jason@lakedaemon.net>
 Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-380.dtsi | 40 ++++++++++++++++++++++++++++++++++++---
+ arch/arm/boot/dts/armada-388-rd.dts | 40 ++++++++++++++++++++++++++++++++++---
  1 file changed, 37 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-380.dtsi b/arch/arm/boot/dts/armada-380.dtsi
-index 7e509d2d74d0..5102d19cc8f4 100644
---- a/arch/arm/boot/dts/armada-380.dtsi
-+++ b/arch/arm/boot/dts/armada-380.dtsi
+diff --git a/arch/arm/boot/dts/armada-388-rd.dts b/arch/arm/boot/dts/armada-388-rd.dts
+index c98a8f8d01a9..d99baac72081 100644
+--- a/arch/arm/boot/dts/armada-388-rd.dts
++++ b/arch/arm/boot/dts/armada-388-rd.dts
 @@ -7,9 +7,43 @@
   * Gregory CLEMENT <gregory.clement@free-electrons.com>
   * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
@@ -72,6 +72,6 @@ index 7e509d2d74d0..5102d19cc8f4 100644
 + *     OTHER DEALINGS IN THE SOFTWARE.
   */
  
- #include "armada-38x.dtsi"
+ /dts-v1/;
 -- 
 2.1.0
