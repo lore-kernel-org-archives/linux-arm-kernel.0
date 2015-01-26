@@ -1,88 +1,44 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Mon, 26 Jan 2015 17:23:10 +0100
-Subject: N900 v3.19-rc5 arm atags_to_fdt.c is broken
-In-Reply-To: <20150126161454.GE28663@atomide.com>
-References: <201501232239.55801@pali> <201501232336.36187@pali>
- <20150126161454.GE28663@atomide.com>
-Message-ID: <201501261723.10505@pali>
+From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
+Date: Mon, 26 Jan 2015 09:22:24 -0700
+Subject: [PATCH 8/9] coresight-etm: remove check for unknown Kconfig macro
+In-Reply-To: <1422289345-2084-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1422289345-2084-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1422289345-2084-9-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 26 January 2015 17:14:55 Tony Lindgren wrote:
-> * Pali Roh?r <pali.rohar@gmail.com> [150123 14:39]:
-> > On Friday 23 January 2015 22:39:55 Pali Roh?r wrote:
-> > > Hello,
-> > > 
-> > > when I boot zImage with appended DT n900 in qemu
-> > > fdt_open_into() function called from file
-> > > arch/arm/boot/compressed/atags_to_fdt.c (in function
-> > > atags_to_fdt) always returns -FDT_ERR_NOSPACE.
-> > > 
-> > > It means that all ATAGS (including cmdline arguments)
-> > > passed by bootloader are ignored.
-> > > 
-> > > On real n900 device I see that booted DT version also
-> > > ignore cmdline arguments from bootloader. I cannot debug
-> > > decompress code on real device, but I think it is same
-> > > problem as in qemu.
-> > 
-> > Looks like this quick patch is fixing above problem:
-> > 
-> > diff --git a/arch/arm/boot/compressed/head.S
-> > b/arch/arm/boot/compressed/head.S index 68be901..4a7d75b
-> > 100644
-> > --- a/arch/arm/boot/compressed/head.S
-> > +++ b/arch/arm/boot/compressed/head.S
-> > @@ -268,7 +268,7 @@ restart:	adr	r0, LC0
-> > 
-> >  		 * area.  No GOT fixup has occurred yet, but none of 
-the
-> >  		 * code we're about to call uses any global variable.
-> >  		
-> >  		*/
-> > 
-> > -		add	sp, sp, #0x10000
-> > +		add	sp, sp, #0x20000
-> > 
-> >  		stmfd	sp!, {r0-r3, ip, lr}
-> >  		mov	r0, r8
-> >  		mov	r1, r6
-> > 
-> > @@ -289,7 +289,7 @@ restart:	adr	r0, LC0
-> > 
-> >  		bleq	atags_to_fdt
-> >  		
-> >  		ldmfd	sp!, {r0-r3, ip, lr}
-> > 
-> > -		sub	sp, sp, #0x10000
-> > +		sub	sp, sp, #0x20000
-> > 
-> >  #endif
-> >  
-> >  		mov	r8, r6			@ use the appended device tree
-> 
-> Nico, got any ideas about this one? This seems like a
-> regression somewhere..
-> 
-> Regards,
-> 
-> Tony
+From: Paul Bolle <pebolle@tiscali.nl>
 
-$ du -b arch/arm/boot/dts/omap3-n900.dtb 
-70212   arch/arm/boot/dts/omap3-n900.dtb
+The CoreSight ETM/PTM driver contains a check for a
+CONFIG_CORESIGHT_SOURCE_ETM_DEFAULT_ENABLE macro. But there's no related
+Kconfig symbol CORESIGHT_SOURCE_ETM_DEFAULT_ENABLE. Remove that check
+and the single line of code it hides.
 
-$ echo $((0x10000))
-65536
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ drivers/coresight/coresight-etm3x.c | 8 +-------
+ 1 file changed, 1 insertion(+), 7 deletions(-)
 
-I would say, problem is because omap3-n900 binary DT is too large
-
+diff --git a/drivers/coresight/coresight-etm3x.c b/drivers/coresight/coresight-etm3x.c
+index 73c36696f1b6..c965f5724abd 100644
+--- a/drivers/coresight/coresight-etm3x.c
++++ b/drivers/coresight/coresight-etm3x.c
+@@ -34,14 +34,8 @@
+ 
+ #include "coresight-etm.h"
+ 
+-#ifdef CONFIG_CORESIGHT_SOURCE_ETM_DEFAULT_ENABLE
+-static int boot_enable = 1;
+-#else
+ static int boot_enable;
+-#endif
+-module_param_named(
+-	boot_enable, boot_enable, int, S_IRUGO
+-);
++module_param_named(boot_enable, boot_enable, int, S_IRUGO);
+ 
+ /* The number of ETM/PTM currently registered */
+ static int etm_count;
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150126/12452f90/attachment-0001.sig>
+1.9.1
