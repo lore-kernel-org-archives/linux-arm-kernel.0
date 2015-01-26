@@ -1,40 +1,39 @@
-From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Mon, 26 Jan 2015 10:55:54 +0100
-Subject: [PATCH v2 00/12] AT91 pm cleanup for 3.20
-In-Reply-To: <1422265005-22937-1-git-send-email-wenyou.yang@atmel.com>
-References: <1422265005-22937-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20150126095554.GA18807@gradator.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 26 Jan 2015 10:50:51 +0100
+Subject: [PATCH v2 0/5] clocksource: sun5i: Support parent clock rate changes
+Message-ID: <1422265856-27631-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Wenyou,
+Hi,
 
-On Mon, Jan 26, 2015 at 05:36:45PM +0800, Wenyou Yang wrote:
-> Hi Nicolas,
-> 
-> This version is rebased on the branch: at91-3.20-cleanup of the repository
-> 	git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git
-> 
-> It is purpose to clean up the PM code, includes the patches from Peter Rosin and Sylvain Rochet.
-> 
-> Since verifying the USB clock and USB PLL disabling before suspending to memory,
-> it aslo depends on the following patch serials from Sylvain:
-> 	[PATCHv6 0/5] USB: gadget: atmel_usba_udc: Driver improvements
-> 	[PATCHv7 0/6] USB: host: Atmel OHCI and EHCI drivers improvements
-> 
-> Removes CONFIG_AT91_SLOW_CLOCK config item to simply the PM config,
-> The suspend to standby mode uses the same sram function as the suspend to memory mode.
-> Remove some unused code.
-> 
-> Alexandr & Sylvain, Thank you very much for so many feedbacks.
-> 
-> Changes in v2:
->  - Rebase on the at91-3.20-cleanup branch
->  - Recover the verify clock condition, only for suspend to memory.
->  - Collect ACK from Alexandre
->  - Add the macro for PM mode
+The Allwinner HS timers have the AHB clock as their parent
+clock. Since this clock is shared with other devices, we could very
+well have another driver requesting a rate change of that clock,
+making our timer change frequency at the same time.
 
-Did you fix the slow_clock == NULL condition with the change suggested 
-by Alexandre ?
+This is especially true on the A31, where the DMA controller needs to
+do such a rate change, making the HS timer unreliable at the time on
+the A31.
 
-Sylvain
+This serie makes some cleanups and implements clock notifiers to be
+able to reflect such rate changes and make sure that the timer is
+always working.
+
+Maxime
+
+Changes from v1:
+  - Changed the interrupt name to its previous value
+
+Maxime Ripard (5):
+  clocksource: sun5i: Switch to request_irq
+  clocksource: sun5i: Use of_io_request_and_map
+  clocksource: sun5i: Remove sched_clock
+  clocksource: sun5i: Refactor the current code
+  clocksource: sun5i: Add clock notifiers
+
+ drivers/clocksource/timer-sun5i.c | 306 +++++++++++++++++++++++++++++---------
+ 1 file changed, 232 insertions(+), 74 deletions(-)
+
+-- 
+2.2.2
