@@ -1,86 +1,25 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 26 Jan 2015 12:45:31 +0000
-Subject: [PATCH 4/7] ARM: at91: enable the L2 Cache controller
-In-Reply-To: <1422266836-24592-1-git-send-email-wenyou.yang@atmel.com>
-References: <1422266617-24381-1-git-send-email-wenyou.yang@atmel.com>
- <1422266836-24592-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20150126124531.GH26493@n2100.arm.linux.org.uk>
+From: joro@8bytes.org (joro at 8bytes.org)
+Date: Mon, 26 Jan 2015 13:46:03 +0100
+Subject: [PATCH v2] iommu/ipmmu-vmsa: Use the ARM LPAE page table allocator
+In-Reply-To: <2654819.qtgnKgjAAR@avalon>
+References: <20150119140106.GM6343@8bytes.org> <3530276.KVdcG9umfv@avalon>
+ <20150121152724.GB30345@8bytes.org> <2654819.qtgnKgjAAR@avalon>
+Message-ID: <20150126124603.GE4653@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 26, 2015 at 06:07:16PM +0800, Wenyou Yang wrote:
-> +#ifdef CONFIG_CACHE_L2X0
-> +static void __init at91_init_l2cache(void)
-> +{
-> +	struct device_node *np;
-> +	u32 reg;
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "arm,pl310-cache");
-> +	if (!np)
-> +		return;
-> +
-> +	at91_l2cc_base = of_iomap(np, 0);
-> +	if (!at91_l2cc_base)
-> +		panic("unable to map l2cc cpu registers\n");
-> +
-> +	of_node_put(np);
-> +
-> +	/* Disable cache if it hasn't been done yet */
-> +	if (readl_relaxed(at91_l2cc_base + L2X0_CTRL) & L2X0_CTRL_EN)
-> +		writel_relaxed(~L2X0_CTRL_EN, at91_l2cc_base + L2X0_CTRL);
-> +
-> +	/* Prefetch Control */
-> +	reg = readl_relaxed(at91_l2cc_base + L310_PREFETCH_CTRL);
-> +	reg &= ~L310_PREFETCH_CTRL_OFFSET_MASK;
-> +	reg |= 0x01;
-> +	reg |= L310_PREFETCH_CTRL_DBL_LINEFILL_INCR;
-> +	reg |= L310_PREFETCH_CTRL_PREFETCH_DROP;
-> +	reg |= L310_PREFETCH_CTRL_DATA_PREFETCH;
-> +	reg |= L310_PREFETCH_CTRL_INSTR_PREFETCH;
-> +	reg |= L310_PREFETCH_CTRL_DBL_LINEFILL;
-> +	writel_relaxed(reg, at91_l2cc_base + L310_PREFETCH_CTRL);
-> +
-> +	/* Power Control */
-> +	reg = readl_relaxed(at91_l2cc_base + L310_POWER_CTRL);
-> +	reg |= L310_STNDBY_MODE_EN;
-> +	reg |= L310_DYNAMIC_CLK_GATING_EN;
-> +	writel_relaxed(reg, at91_l2cc_base + L310_POWER_CTRL);
-> +
-> +	/* Disable interrupts */
-> +	writel_relaxed(0x00, at91_l2cc_base + L2X0_INTR_MASK);
-> +	writel_relaxed(0x01ff, at91_l2cc_base + L2X0_INTR_CLEAR);
+On Wed, Jan 21, 2015 at 05:31:05PM +0200, Laurent Pinchart wrote:
+> On Wednesday 21 January 2015 16:27:24 joro at 8bytes.org wrote:
+> > On Wed, Jan 21, 2015 at 05:07:03PM +0200, Laurent Pinchart wrote:
+> > > As you wish. I just thought you would prefer merging the series with at
+> > > least one user.
+> > 
+> > Yes, and with your patch there would be two users: ARM-SMMU and the VMSA
+> > IPMMU. So ideally I would apply/pull Will's patches on v3.19-rc5 with
+> > your patch on-top (and no other patches as dependency).
+> 
+> But that would conflict with the IPMMU patches that you have already queued 
+> for v3.20.
 
-Stop hacking around the core L2x0 code.  None of the above should be
-necessary, and is in fact potentially dangerous if the cache was already
-previously enabled.  Disabling an already enabled cache is a potential
-data corrupting event.
-
-Any of the above configuration should be performed by your boot loader
-or board firmware, and if not, then we need DT properties for it.
-
-The last thing we need is platforms buggering around in this way, so
-consider this a firm NAK against this approach.
-
-> +	l2x0_of_init(0, ~0UL);
-> +}
-> +#else
-> +static inline void at91_init_l2cache(void) {}
-> +#endif
-> +
->  static void __init sama5_dt_device_init(void)
->  {
-> +	at91_init_l2cache();
-> +
->  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
->  	at91_sam9x5_pm_init();
->  }
-> -- 
-> 1.7.9.5
-
-In fact, none of this code is necessary.  If you set l2c_aux_mask and
-l2c_aux_val (preferably to ~0 and 0 respectively) then the generic ARM
-code will initialise the L2 cache in the appropriate way for you.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Okay, I merged the arm/smmu branch into arm/renesas and applied your
+patch on-top.
