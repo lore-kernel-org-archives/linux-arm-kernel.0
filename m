@@ -1,43 +1,36 @@
-From: saeed@annapurnalabs.com (Saeed Bishara)
-Date: Mon, 26 Jan 2015 16:59:03 +0200
-Subject: [PATCH 4/4] ARM: dts: Add initial support for Alpine platform
-In-Reply-To: <3392216.FHWJaKVrAq@wuerfel>
-References: <54c53663.0OSd3sO9f1oYd3El%tsahee@annapurnalabs.com>
- <36490364.POE8pPlYQh@wuerfel>
- <CABM=7kn8CMGZDPECfEru11O9gkbYFOTSkzHJF+Ku-oMJoFg6sQ@mail.gmail.com>
- <3392216.FHWJaKVrAq@wuerfel>
-Message-ID: <CA+W-XThYsfOctZSriBU+oOcJevpi7tpjDEFUn2zfsiS13rzTqQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 26 Jan 2015 15:56:02 +0100
+Subject: [PATCH v2 0/2] ARM: mvebu: a385-db-ap: Enable the NAND controller
+Message-ID: <1422284164-16867-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 January 2015 at 16:32, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 26 January 2015 16:14:11 Tsahee Zidenberg wrote:
->> On 26 January 2015 at 13:15, Arnd Bergmann <arnd@arndb.de> wrote:> +* CPU
->> node:
->>
->> > > +
->> > > +The Alpine platform includes cortex-a15 cores.
->> > > +enable-method: must be "annapurna-labs,alpine-smp" to allow smp  [1]
->> >
->> > Any reason for not using PSCI on this platform?
->> >
->> >
->> PSCI is in the roadmap, but not supported by current firmware.
->
-> As your initial submission is very minimal regarding driver support,
-> would it be sensible to wait for the firmware to catch up then?
-Arnd,
-there are already systems with this soc that shipped without  PSCI firmware.
-and we still would like to support mainline kernel on those systems
-without forcing firmware upgrade.
-saeed
 
->
-> That way you lose SMP support for the moment but could still work
-> on adding the device drivers while testing in uniprocessor mode and
-> then we will see if your firmware is ready once there are more
-> drivers upstream. Once the firmware has PSCI working, it will all
-> just work without the need for extra devices in DT or the custom
-> SMP operations.
->
->         Ard
+Hi,
+
+This patch serie enable the NAND support on the Armada 385 Access
+Point DB.
+
+In the process, some timeouts were found when we were accessing a
+freshly erased NAND page, which turned out to be an issue when
+draining the read FIFO where we were not following the datasheet.
+
+This has been fixed with the first patch, with stable CC'd. The second
+patch just enables the NAND controller in the DT.
+
+Thanks,
+Maxime
+
+Changes from v1:
+  - Added a timeout to the busy waiting loop for RDDREQ
+
+Maxime Ripard (2):
+  mtd: nand: pxa3xx: Fix PIO FIFO draining
+  ARM: mvebu: a385-db-ap: Enable the NAND
+
+ arch/arm/boot/dts/armada-385-db-ap.dts | 13 ++++++++++
+ drivers/mtd/nand/pxa3xx_nand.c         | 45 +++++++++++++++++++++++++++++-----
+ 2 files changed, 52 insertions(+), 6 deletions(-)
+
+-- 
+2.2.2
