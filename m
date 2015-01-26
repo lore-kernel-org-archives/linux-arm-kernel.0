@@ -1,10 +1,10 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 26 Jan 2015 15:16:09 +0100
-Subject: [PATCH v2 25/27] ARM: mvebu: armada-xp-netgear-rn2120: Relicense the
- device tree under GPLv2+/X11
+Date: Mon, 26 Jan 2015 15:16:07 +0100
+Subject: [PATCH v2 23/27] ARM: mvebu: armada-xp-mv78260: Relicense the device
+ tree under GPLv2+/X11
 In-Reply-To: <1422281771-31443-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1422281771-31443-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1422281771-31443-26-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1422281771-31443-24-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,25 +18,25 @@ relicense our device trees under a GPL/X11 dual-license.
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Acked-by: Jason Cooper <jason@lakedaemon.net>
 Acked-by: Arnaud Ebalard <arno@natisbad.org>
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Acked-by: Willy Tarreau <w@1wt.eu>
 ---
- arch/arm/boot/dts/armada-xp-netgear-rn2120.dts | 41 +++++++++++++++++++++++---
- 1 file changed, 37 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi | 40 +++++++++++++++++++++++++++++---
+ 1 file changed, 37 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
-index d81430aa4ab3..a7ceafd5808d 100644
---- a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
-+++ b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
-@@ -3,10 +3,43 @@
+diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+index d7a8d0b0f385..4a7cbed79b07 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+@@ -5,9 +5,43 @@
   *
-  * Copyright (C) 2013, Arnaud EBALARD <arno@natisbad.org>
+  * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
   *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * as published by the Free Software Foundation; either version
-- * 2 of the License, or (at your option) any later version.
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
 + * This file is dual-licensed: you can use it either under the terms
 + * of the GPL or the X11 license, at your option. Note that this dual
 + * licensing only applies to this file, and not this project as a
@@ -74,8 +74,8 @@ index d81430aa4ab3..a7ceafd5808d 100644
 + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 + *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
- /dts-v1/;
+  *
+  * Contains definitions specific to the Armada XP MV78260 SoC that are not
+  * common to all Armada XP SoCs.
 -- 
 2.1.0
