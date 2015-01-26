@@ -1,45 +1,39 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Mon, 26 Jan 2015 11:51:04 -0700
-Subject: Tegra baseline test results for v3.19-rc6
-Message-ID: <54C68C98.2060205@nvidia.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 26 Jan 2015 18:55:25 +0000
+Subject: [PATCH 0/8] arm64 kexec kernel patches V7
+In-Reply-To: <20150126174414.GF14048@e104818-lin.cambridge.arm.com>
+References: <cover.1415926876.git.geoff@infradead.orgg>
+ <cover.1421449714.git.geoff@infradead.org>
+ <20150126174414.GF14048@e104818-lin.cambridge.arm.com>
+Message-ID: <20150126185524.GN23313@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v3.19-rc6.
-Logs and other details at:
+On Mon, Jan 26, 2015 at 05:44:14PM +0000, Catalin Marinas wrote:
+> Hi Geoff,
+> 
+> On Sat, Jan 17, 2015 at 12:23:34AM +0000, Geoff Levand wrote:
+> > This series adds the core support for kexec re-boots on arm64.  This v7 of the
+> > series is mainly just a rebase to the latest arm64 for-next/core branch
+> > (v3.19-rc4), and a few very minor changes requested for v6.
+> 
+> I haven't looked at the series in detail before, so some of my comments
+> may have already been discussed.
+> 
+> > Several things are known to have problems on kexec re-boot:
+> > 
+> > spin-table
+> 
+> I think that's not too bad, for complete kexec support (SMP->SMP) we can
+> require some CPU unplug mechanism and PSCI is one of them.
+> 
+> > FIX: Upgrade system firmware to provide PSCI enable method support or add
+> > missing spin-table support to the kernel.
+> 
+> What's the missing spin-table support?
 
-     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.19-rc6/20150125203104/
+As you mention above, a mechanism for returning the CPUs to FW. There is
+no spec for doing this with spin-table, which would have to be written
+and vetted.
 
-
-Test summary
-------------
-
-Build: zImage:
-     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Boot to userspace: multi_v7_defconfig:
-     Pass: ( 3/ 3): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-     Pass: ( 3/ 3): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v3.19-rc5 (ec6f34e5b552fb0a52e6aae1a5afbbb1605cc6cc)):
-    text     data      bss    total  kernel
-   +1489    +2440        0    +3929  multi_v7_defconfig
-   +1405      -16        0    +1389  tegra_defconfig
-
-
-
-Boot-time memory difference
-(delta in bytes from test_v3.19-rc5 (ec6f34e5b552fb0a52e6aae1a5afbbb1605cc6cc))
-     avail    rsrvd     high    freed                board              kconfig                  dtb
-         .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-         .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-         .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-         .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-         .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+Mark.
