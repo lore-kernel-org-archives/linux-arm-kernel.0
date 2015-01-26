@@ -1,52 +1,40 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 26 Jan 2015 17:44:14 +0000
-Subject: [PATCH 0/8] arm64 kexec kernel patches V7
-In-Reply-To: <cover.1421449714.git.geoff@infradead.org>
-References: <cover.1415926876.git.geoff@infradead.orgg>
- <cover.1421449714.git.geoff@infradead.org>
-Message-ID: <20150126174414.GF14048@e104818-lin.cambridge.arm.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 26 Jan 2015 09:45:07 -0800
+Subject: [PATCH 1/2] mmc: core: use card pointer as the first parameter of
+ execute_tuning()
+In-Reply-To: <CAPDyKFp=5epMggHu0+u_LU7ETujcoeP2xOpB7iD6JF2bs8BnEA@mail.gmail.com>
+References: <1422271175-19445-1-git-send-email-addy.ke@rock-chips.com>
+ <1422271175-19445-2-git-send-email-addy.ke@rock-chips.com>
+ <CAPDyKFp=5epMggHu0+u_LU7ETujcoeP2xOpB7iD6JF2bs8BnEA@mail.gmail.com>
+Message-ID: <CAD=FV=X9x0gW5TyLi4ERm8nxixQB__Y=5bRAtOax-_w+T33rCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geoff,
+Ulf,
 
-On Sat, Jan 17, 2015 at 12:23:34AM +0000, Geoff Levand wrote:
-> This series adds the core support for kexec re-boots on arm64.  This v7 of the
-> series is mainly just a rebase to the latest arm64 for-next/core branch
-> (v3.19-rc4), and a few very minor changes requested for v6.
+On Mon, Jan 26, 2015 at 7:15 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 26 January 2015 at 12:19, Addy Ke <addy.ke@rock-chips.com> wrote:
+>> We need to take the card pointer in execute_tuning() for mmc_send_status(),
+>
+> mmc_send_status() is an mmc core function, not intended for host's to call.
+>
+>> but mmc->card is NULL in tuning state. So we need change the first parameter
+>> of execute_tuning() to card pointer(struct mmc_card * card).
+>
+> So, why do we need this?
 
-I haven't looked at the series in detail before, so some of my comments
-may have already been discussed.
+I asked Addy to post upstream against mmc_send_tuning(), but I guess
+he didn't (he posted against Alex's NAKed patch instead).
 
-> Several things are known to have problems on kexec re-boot:
-> 
-> spin-table
+...when I talked to him about it, Addy was asserting that when tuning
+fails it is important (at least on dw_mmc on rk3288) that we wait for
+the card to stop being busy and that the way to detect was using
+mmc_send_status().
 
-I think that's not too bad, for complete kexec support (SMP->SMP) we can
-require some CPU unplug mechanism and PSCI is one of them.
+That would mean that against upstream you'd need to change
+mmc_send_tuning() to take in the card as well (or move the "host->card
+= card" assignment to before UHS init, which seems less desirable?)
 
-> FIX: Upgrade system firmware to provide PSCI enable method support or add
-> missing spin-table support to the kernel.
+What do you think about that?  Is there a better solution?
 
-What's the missing spin-table support?
-
-> ACPI
-> ----
-> 
-> PROBLEM: The kernel for ACPI based systems does not export a device tree to the
-> standard user space location of 'proc/device-tree'.  Current applications
-> expect to access device tree information from this standard location.
-> 
-> WORK-AROUND: Disable ACPI in firmware, OR pass 'acpi=off' on the first stage
-> kernel command line, OR pass a user specified DTB using the kexec --dtb option.
-> 
-> FIX: FIX: An interface to expose a binary device tree to user space has been
-> proposed.  User kexec utilities will need to be updated to add support for this
-> new interface.
-
-So the fix here is to boot the second stage kernel with dtb, which means
-that we mandate the existence of a DT file for any ACPI system. Are
-there plans to make the kexec'ed kernel reuse the ACPI tables?
-
--- 
-Catalin
+-Doug
