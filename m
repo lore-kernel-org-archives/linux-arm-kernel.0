@@ -1,36 +1,62 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 26 Jan 2015 11:13:56 +0000
-Subject: [PATCH 0/4] clk: st: New clock domain
-Message-ID: <1422270840-3039-1-git-send-email-lee.jones@linaro.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 26 Jan 2015 11:21:11 +0000
+Subject: [RFC PATCH 1/3] drivers: of: fix resources freeing in
+ of_pci_get_host_bridge_resources()
+In-Reply-To: <20150120112031.GA342@bart.dudau.co.uk>
+References: <1420644571-18928-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1420644571-18928-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <20150119183228.GE10762@e106497-lin.cambridge.arm.com>
+ <20150120104922.GF5398@red-moon>
+ <20150120112031.GA342@bart.dudau.co.uk>
+Message-ID: <20150126112111.GA547@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ST hardware have a bunch of clocks which must not be turned off.
-If drivers a) fail to obtain a reference to any of these or b) give
-up a previously obtained reference during suspend, the common clk
-framework will attempt to turn them off and the hardware will
-subsequently die.  The only way to recover from this failure is to
-restart.
+On Tue, Jan 20, 2015 at 11:20:32AM +0000, Liviu Dudau wrote:
+> On Tue, Jan 20, 2015 at 10:49:22AM +0000, Lorenzo Pieralisi wrote:
+> > On Mon, Jan 19, 2015 at 06:32:29PM +0000, Liviu Dudau wrote:
+> > 
+> > [...]
+> > 
+> > > > @@ -146,6 +146,7 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
+> > > >  	struct of_pci_range_parser parser;
+> > > >  	char range_type[4];
+> > > >  	int err;
+> > > > +	struct pci_host_bridge_window *window;
+> > > >  
+> > > >  	if (io_base)
+> > > >  		*io_base = (resource_size_t)OF_BAD_ADDR;
+> > > > @@ -225,7 +226,10 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
+> > > >  conversion_failed:
+> > > >  	kfree(res);
+> > > >  parse_failed:
+> > > > +	list_for_each_entry(window, resources, list)
+> > > > +		kfree(window->res);
+> > > >  	pci_free_resource_list(resources);
+> > > > +	kfree(bus_range);
+> > > >  	return err;
+> > > >  }
+> > > >  EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
+> > > 
+> > > Hi Lorenzo et all,
+> > > 
+> > > Here is my personal view and I am happy to hear from others on the desired
+> > > behaviour:
+> > > 
+> > > When I wrote this function what I had in mind was that it will parse as
+> > > much as possible from the device tree and return a list of resources that
+> > > could be successfully converted. If the entire list of ranges could not
+> > > be converted then an error code will be returned, but the caller still
+> > > had the list as constructed up to the error. It was the job of the caller
+> > > to free the list in either cases, as stated in the comment.
+> > 
+> > That's what I am questioning. If the function takes an error path, the
+> > windows list is freed, so the resource pointers are gone. There is no
+> > way the caller can grab those resource pointers and free them.
+> 
+> I stand corrected. Your patch is needed.
 
-To avoid either of these two scenarios from catastrophically
-disabling the running system we have implemented a clock domain
-where clocks are consumed and references are taken, thus preventing
-them from being shut down by the framework.
+Mind acking it ? I will ask Bjorn to take it then.
 
-Lee Jones (4):
-  ARM: sti: stih407-family: Supply defines for CLOCKGEN A0
-  ARM: sti: stih407-family: Provide Clock Domain information
-  clk: st: Provide a clock domain
-  clk: dt: st: Introduce clock domain documentation
-
- .../devicetree/bindings/clock/st/st,clk-domain.txt | 34 ++++++++++++
- arch/arm/boot/dts/stih407-family.dtsi              | 13 +++++
- drivers/clk/st/Makefile                            |  2 +-
- drivers/clk/st/clk-domain.c                        | 63 ++++++++++++++++++++++
- include/dt-bindings/clock/stih407-clks.h           |  4 ++
- 5 files changed, 115 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/clock/st/st,clk-domain.txt
- create mode 100644 drivers/clk/st/clk-domain.c
-
--- 
-1.9.1
+Thanks,
+Lorenzo
