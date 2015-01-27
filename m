@@ -1,87 +1,56 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Tue, 27 Jan 2015 13:54:41 +0800
-Subject: [PATCH v3 04/13] pm: at91: pm_slowclock: remove the unused code
- related with SLOWDOWN_MASTER_CLOCK
+Date: Tue, 27 Jan 2015 13:56:42 +0800
+Subject: [PATCH v3 06/13] ARM: at91: move select SRAM to ARCH_AT91
 In-Reply-To: <1422337810-3257-1-git-send-email-wenyou.yang@atmel.com>
 References: <1422337810-3257-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1422338081-5806-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1422338202-5906-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SLOWDOWN_MASTER_CLOCK definition is not used, remove the redundant code.
+Because the CONFIG_AT91_SLOW_CLOCK will be removed
+to simply the PM config, so move select SRAM.
 
 Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/mach-at91/pm_slowclock.S |   37 -------------------------------------
- 1 file changed, 37 deletions(-)
+ arch/arm/mach-at91/Kconfig |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-at91/pm_slowclock.S b/arch/arm/mach-at91/pm_slowclock.S
-index 1155217..4e55665 100644
---- a/arch/arm/mach-at91/pm_slowclock.S
-+++ b/arch/arm/mach-at91/pm_slowclock.S
-@@ -11,20 +11,11 @@
-  * published by the Free Software Foundation.
-  *
-  */
--
- #include <linux/linkage.h>
- #include <linux/clk/at91_pmc.h>
- #include <mach/hardware.h>
- #include <mach/at91_ramc.h>
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index c6956b8..cbaf0c8 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -24,6 +24,7 @@ config SOC_AT91SAM9
+ 	select GENERIC_CLOCKEVENTS
+ 	select MEMORY
+ 	select ATMEL_SDRAMC
++	select SRAM if PM
  
--/*
-- * When SLOWDOWN_MASTER_CLOCK is defined we will also slow down the Master
-- * clock during suspend by adjusting its prescalar and divisor.
-- * NOTE: This hasn't been shown to be stable on SAM9s; and on the RM9200 there
-- *       are errata regarding adjusting the prescalar and divisor.
-- */
--#undef SLOWDOWN_MASTER_CLOCK
--
- pmc	.req	r0
- sdramc	.req	r1
- ramc1	.req	r2
-@@ -166,18 +157,6 @@ sdr_sr_done:
+ config SOC_SAMA5
+ 	bool
+@@ -34,6 +35,7 @@ config SOC_SAMA5
+ 	select MEMORY
+ 	select ATMEL_SDRAMC
+ 	select PHYLIB if NETDEVICES
++	select SRAM if PM
  
- 	wait_mckrdy
+ menu "Atmel AT91 System-on-Chip"
  
--#ifdef SLOWDOWN_MASTER_CLOCK
--	/*
--	 * Set the Master Clock PRES and MDIV fields.
--	 *
--	 * See AT91RM9200 errata #27 and #28 for details.
--	 */
--	mov	tmp1, #0
--	str	tmp1, [pmc, #AT91_PMC_MCKR]
--
--	wait_mckrdy
--#endif
--
- 	/* Save PLLA setting and disable it */
- 	ldr	tmp1, [pmc, #AT91_CKGR_PLLAR]
- 	str	tmp1, .saved_pllar
-@@ -213,22 +192,6 @@ sdr_sr_done:
- 	wait_pllalock
- 4:
+@@ -91,6 +93,7 @@ config SOC_AT91RM9200
+ 	select CPU_ARM920T
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_AT91_USB_CLK
++	select SRAM if PM
  
--#ifdef SLOWDOWN_MASTER_CLOCK
--	/*
--	 * First set PRES if it was not 0,
--	 * than set CSS and MDIV fields.
--	 *
--	 * See AT91RM9200 errata #27 and #28 for details.
--	 */
--	ldr	tmp1, .saved_mckr
--	tst	tmp1, #AT91_PMC_PRES
--	beq	2f
--	and	tmp1, tmp1, #AT91_PMC_PRES
--	str	tmp1, [pmc, #AT91_PMC_MCKR]
--
--	wait_mckrdy
--#endif
--
- 	/*
- 	 * Restore master clock setting
- 	 */
+ config SOC_AT91SAM9260
+ 	bool "AT91SAM9260, AT91SAM9XE or AT91SAM9G20"
+@@ -159,7 +162,6 @@ comment "AT91 Feature Selections"
+ 
+ config AT91_SLOW_CLOCK
+ 	bool "Suspend-to-RAM disables main oscillator"
+-	select SRAM
+ 	depends on SUSPEND
+ 	help
+ 	  Select this if you want Suspend-to-RAM to save the most power
 -- 
 1.7.9.5
