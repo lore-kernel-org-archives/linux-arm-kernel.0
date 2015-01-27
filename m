@@ -1,39 +1,37 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 26 Jan 2015 18:42:06 -0800
-Subject: [GIT PULL] at91: cleanup/soc for 3.20 #3 (bis)
-In-Reply-To: <1422277230-25211-1-git-send-email-nicolas.ferre@atmel.com>
-References: <20150123230609.GV20896@quad.lixom.net>
- <1422277230-25211-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20150127024206.GC22154@quad.lixom.net>
+Date: Mon, 26 Jan 2015 18:44:26 -0800
+Subject: [GIT PULL] Samsung DT updates for v3.20
+In-Reply-To: <54C31898.1060906@kernel.org>
+References: <54C31898.1060906@kernel.org>
+Message-ID: <20150127024426.GD22154@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 26, 2015 at 02:00:30PM +0100, Nicolas Ferre wrote:
+On Sat, Jan 24, 2015 at 12:59:20PM +0900, Kukjin Kim wrote:
+> Hi,
 > 
-> Arnd, Olof, Kevin,
+> Please pull Samsung DT updates for v3.20.
+> I checked to use signed tag in this time ;)
 > 
-> This is the rework of my previous pull-request with modifications advised by
-> Olof.
-> This is a batch of cleanup/soc modifications that you may also stack on top of
-> your "soc" branch as the previous one. It stabilizes a little bit our cleanup
-> action before going further.
-> Another one may be proposed before the merge-window opens.
+> Thanks and if any problems, please let me know.
 > 
-> Thanks, best regards,
+> - Kukjin
 > 
-> The following changes since commit 29ee506d0d56f6d39cc237de2512f9cb5629cbf7:
+> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
 > 
->   ARM: at91: move at91rm9200_idle() to clk/at91/pmc.c (2015-01-16 18:08:42 +0100)
+>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-cleanup3
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> tags/samsung-dt
 > 
-> for you to fetch changes up to 9726b6892beeaa736610370429a23a481d1b133e:
+> for you to fetch changes up to 23c76dc666471dce5ce71b620839d2465723a7c9:
 > 
->   ARM: at91: pm: remove warning to remove SOC_AT91SAM9263 usage (2015-01-26 13:44:19 +0100)
+>   ARM: dts: Configure regulators for suspend on exynos Peach boards
+> (2015-01-15 00:30:49 +0900)
 
-Merged, thanks.
+Merged, thanks for the tag description!
 
 
 -Olof
