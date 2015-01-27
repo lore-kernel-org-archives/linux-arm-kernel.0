@@ -1,61 +1,187 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 27 Jan 2015 13:14:28 -0600
-Subject: [PATCH] usb: phy-generic: Don't fail on missing gpio reset
-In-Reply-To: <19e48726b36942cfb0430fc625b41e1b@BY2FFO11FD043.protection.gbl>
-References: <1422323129-20969-1-git-send-email-soren.brinkmann@xilinx.com>
- <20150127152047.GA13776@saruman.tx.rr.com>
- <19e48726b36942cfb0430fc625b41e1b@BY2FFO11FD043.protection.gbl>
-Message-ID: <20150127191427.GN14878@saruman.tx.rr.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 27 Jan 2015 11:31:26 -0800
+Subject: [PATCH] arm: sunxi: input: RFC: Add sysfs voltage for
+ sun4i-lradc driver
+In-Reply-To: <54C75467.7010909@redhat.com>
+References: <1422291516-24895-1-git-send-email-plaes@plaes.org>
+ <54C6955D.403@redhat.com> <20150126220622.GA16941@dtor-ws>
+ <54C75467.7010909@redhat.com>
+Message-ID: <20150127193126.GA29637@dtor-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 27, 2015 at 11:13:08AM -0800, S?ren Brinkmann wrote:
-> On Tue, 2015-01-27 at 09:20AM -0600, Felipe Balbi wrote:
-> > On Mon, Jan 26, 2015 at 05:45:29PM -0800, Soren Brinkmann wrote:
-> > > A reset through a GPIO is optional. Don't fail probing when it is
-> > > missing.
-> > > 
-> > > Reported-by: Andreas F?rber <afaerber@suse.de>
-> > > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> > > ---
-> > > Hi Andreas,
-> > > 
-> > > does this do the trick?
-> > > 
-> > > 	Thanks,
-> > > 	S?ren
-> > > 
-> > >  drivers/usb/phy/phy-generic.c | 6 ++----
-> > >  1 file changed, 2 insertions(+), 4 deletions(-)
-> > > 
-> > > diff --git a/drivers/usb/phy/phy-generic.c b/drivers/usb/phy/phy-generic.c
-> > > index dd05254241fb..a73d4c738f0b 100644
-> > > --- a/drivers/usb/phy/phy-generic.c
-> > > +++ b/drivers/usb/phy/phy-generic.c
-> > > @@ -241,10 +241,8 @@ int usb_phy_gen_create_phy(struct device *dev, struct usb_phy_generic *nop,
-> > >  
-> > >  	if (err == -EPROBE_DEFER)
-> > >  		return -EPROBE_DEFER;
-> > > -	if (err) {
-> > > -		dev_err(dev, "Error requesting RESET GPIO\n");
-> > > -		return err;
-> > > -	}
-> > > +	if (err)
-> > > +		nop->gpiod_reset = NULL;
-> > 
-> > there's a better patch to use gpiod_get_optional(), instead.
+On Tue, Jan 27, 2015 at 10:03:35AM +0100, Hans de Goede wrote:
+> Hi,
 > 
-> Great, apparently that wasn't in linux-next yesterday. I'll give it a
-> shot once it arrives there.
+> On 26-01-15 23:06, Dmitry Torokhov wrote:
+> >On Mon, Jan 26, 2015 at 08:28:29PM +0100, Hans de Goede wrote:
+> >>Hi,
+> >>
+> >>On 26-01-15 17:58, Priit Laes wrote:
+> >>
+> >>No commit message? Please write an informative commit msg, like why we want this patch,
+> >>I guess it is to help figuring out the voltage levels for various buttons when creating
+> >>a dts, but I would prefer to not guess, which is where a good commit message would
+> >>come in handy ...
+> >>
+> >>>---
+> >>>  .../ABI/testing/sysfs-driver-input-sun4i-lradc     |  4 ++
+> >>>  drivers/input/keyboard/sun4i-lradc-keys.c          | 49 +++++++++++++++++-----
+> >>>  2 files changed, 43 insertions(+), 10 deletions(-)
+> >>>  create mode 100644 Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc
+> >>>
+> >>>diff --git a/Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc b/Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc
+> >>>new file mode 100644
+> >>>index 0000000..e4e6448
+> >>>--- /dev/null
+> >>>+++ b/Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc
+> >>>@@ -0,0 +1,4 @@
+> >>>+What:		/sys/class/input/input(x)/device/voltage
+> >>>+Date:		February 2015
+> >>>+Contact:	Priit Laes <plaes@plaes.org>
+> >>>+Description:	ADC output voltage in microvolts or 0 if device is not opened.
+> >>>diff --git a/drivers/input/keyboard/sun4i-lradc-keys.c b/drivers/input/keyboard/sun4i-lradc-keys.c
+> >>>index cc8f7dd..c0ab8ec 100644
+> >>>--- a/drivers/input/keyboard/sun4i-lradc-keys.c
+> >>>+++ b/drivers/input/keyboard/sun4i-lradc-keys.c
+> >>>@@ -79,10 +79,27 @@ struct sun4i_lradc_data {
+> >>>  	u32 vref;
+> >>>  };
+> >>>
+> >>>+static u32 sun4i_lradc_read_voltage(struct sun4i_lradc_data *lradc)
+> >>>+{
+> >>>+	u32 val = readl(lradc->base + LRADC_DATA0) & 0x3f;
+> >>>+	return val * lradc->vref / 63;
+> >>>+};
+> >>>+
+> >>>+static ssize_t
+> >>>+sun4i_lradc_dev_voltage_show(struct device *dev,
+> >>>+			struct device_attribute *attr, char *buf)
+> >>>+{
+> >>>+	struct sun4i_lradc_data *lradc = dev_get_drvdata(dev);
+> >>>+
+> >>>+	return sprintf(buf, "%u\n", sun4i_lradc_read_voltage(lradc));
+> >>>+}
+> >>>+
+> >>>+static const DEVICE_ATTR(voltage, S_IRUGO, sun4i_lradc_dev_voltage_show, NULL);
+> >>>+
+> >>>  static irqreturn_t sun4i_lradc_irq(int irq, void *dev_id)
+> >>>  {
+> >>>  	struct sun4i_lradc_data *lradc = dev_id;
+> >>>-	u32 i, ints, val, voltage, diff, keycode = 0, closest = 0xffffffff;
+> >>>+	u32 i, ints, voltage, diff, keycode = 0, closest = 0xffffffff;
+> >>>
+> >>>  	ints  = readl(lradc->base + LRADC_INTS);
+> >>>
+> >>>@@ -97,8 +114,7 @@ static irqreturn_t sun4i_lradc_irq(int irq, void *dev_id)
+> >>>  	}
+> >>>
+> >>>  	if ((ints & CHAN0_KEYDOWN_IRQ) && lradc->chan0_keycode == 0) {
+> >>>-		val = readl(lradc->base + LRADC_DATA0) & 0x3f;
+> >>>-		voltage = val * lradc->vref / 63;
+> >>>+		voltage = sun4i_lradc_read_voltage(lradc);
+> >>>
+> >>>  		for (i = 0; i < lradc->chan0_map_count; i++) {
+> >>>  			diff = abs(lradc->chan0_map[i].voltage - voltage);
+> >>>@@ -156,7 +172,7 @@ static void sun4i_lradc_close(struct input_dev *dev)
+> >>>  }
+> >>>
+> >>>  static int sun4i_lradc_load_dt_keymap(struct device *dev,
+> >>>-				      struct sun4i_lradc_data *lradc)
+> >>>+				    struct sun4i_lradc_data *lradc)
+> >>>  {
+> >>>  	struct device_node *np, *pp;
+> >>>  	int i;
+> >>
+> >>Why this identation change ?
+> >>
+> >>>@@ -168,8 +184,8 @@ static int sun4i_lradc_load_dt_keymap(struct device *dev,
+> >>>
+> >>>  	lradc->chan0_map_count = of_get_child_count(np);
+> >>>  	if (lradc->chan0_map_count == 0) {
+> >>>-		dev_err(dev, "keymap is missing in device tree\n");
+> >>>-		return -EINVAL;
+> >>>+		dev_info(dev, "keymap is missing in device tree\n");
+> >>>+		return 0;
+> >>>  	}
+> >>>
+> >>>  	lradc->chan0_map = devm_kmalloc_array(dev, lradc->chan0_map_count,
+> >>
+> >>I assume this is so that people can still use the sysfs node, to create a dts, right
+> >>not sure I like this, might be better to document to simple create a dts with
+> >>a single button mapping for 200 mV (most board use 200 mV steps between the buttons).
+> >>
+> >>>@@ -185,19 +201,19 @@ static int sun4i_lradc_load_dt_keymap(struct device *dev,
+> >>>
+> >>>  		error = of_property_read_u32(pp, "channel", &channel);
+> >>>  		if (error || channel != 0) {
+> >>>-			dev_err(dev, "%s: Inval channel prop\n", pp->name);
+> >>>+			dev_err(dev, "%s: Invalid 'channel' property\n", pp->name);
+> >>>  			return -EINVAL;
+> >>>  		}
+> >>>
+> >>>  		error = of_property_read_u32(pp, "voltage", &map->voltage);
+> >>>  		if (error) {
+> >>>-			dev_err(dev, "%s: Inval voltage prop\n", pp->name);
+> >>>+			dev_err(dev, "%s: Invalid 'voltage' property\n", pp->name);
+> >>>  			return -EINVAL;
+> >>>  		}
+> >>>
+> >>>  		error = of_property_read_u32(pp, "linux,code", &map->keycode);
+> >>>  		if (error) {
+> >>>-			dev_err(dev, "%s: Inval linux,code prop\n", pp->name);
+> >>>+			dev_err(dev, "%s: Invalid 'linux,code' property\n", pp->name);
+> >>>  			return -EINVAL;
+> >>>  		}
+> >>>
+> >>
+> >>This hunk / 3 changes belong in a separate patch. Also please run checkpatch, I think
+> >>you're running over 80 chars here.
+> >>
+> >>
+> >>>@@ -257,14 +273,26 @@ static int sun4i_lradc_probe(struct platform_device *pdev)
+> >>>  	if (error)
+> >>>  		return error;
+> >>>
+> >>>-	error = input_register_device(lradc->input);
+> >>>+	error = device_create_file(dev, &dev_attr_voltage);
+> >>>  	if (error)
+> >>>  		return error;
+> >>>
+> >>>+	error = input_register_device(lradc->input);
+> >>>+	if (error) {
+> >>>+		device_remove_file(&pdev->dev, &dev_attr_voltage);
+> >>>+		return error;
+> >>>+	}
+> >>>+
+> >>>  	platform_set_drvdata(pdev, lradc);
+> >>>  	return 0;
+> >>>  }
+> >>>
+> >>>+static int sun4i_lradc_remove(struct platform_device *pdev)
+> >>>+{
+> >>>+	device_remove_file(&pdev->dev, &dev_attr_voltage);
+> >>>+	return 0;
+> >>>+}
+> >>>+
+> >>
+> >>This looks wrong, I think (*) that we've a bug here because we're not
+> >>unregistering the input device, so maybe do 2 patches, 1 fixing the
+> >>not unregistering bug, and then just add the device_remove_file()
+> >>in the sysfs patch.
+> >
+> >The unregister was not necessary since the input device is managed.
+> 
+> Ah right, looking at the code again I see we use devm_input_allocate_device()
+> is there no devm_create_file for creating sysfs entries ?
 
-It's still under discussion ;-)
+Greg was pushing the viewpoint that no drivers should create device attributes
+manually (since it is somewhat racy - attributes are created after devices show
+up) but I do not think he's gonna win that ever. So if someone were to add
+devm_create_attribute_group() API I think that would be great. In absence of
+this there is always devm_add_action().
+
+Thanks.
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150127/caea0929/attachment.sig>
+Dmitry
