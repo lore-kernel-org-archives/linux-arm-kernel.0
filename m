@@ -1,29 +1,65 @@
-From: ricardo.ribalda@gmail.com (Ricardo Ribalda Delgado)
-Date: Tue, 27 Jan 2015 20:56:23 +0100
-Subject: [PATCH 08/18] spi/xilinx: Support cores with no interrupt
-In-Reply-To: <20150127194912.GO21293@sirena.org.uk>
-References: <1422029330-10971-1-git-send-email-ricardo.ribalda@gmail.com>
- <1422029330-10971-9-git-send-email-ricardo.ribalda@gmail.com>
- <20150127000428.GK21293@sirena.org.uk>
- <CAPybu_1RW0F-ak-B_4H-riTUwF2yCrpKdT2RWviTdCMR_kQmww@mail.gmail.com>
- <20150127194912.GO21293@sirena.org.uk>
-Message-ID: <CAPybu_3YJd_=wxOaGjGqDrhAJp2wxioeBG69S129r5UUNTCo1w@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 27 Jan 2015 11:57:24 -0800
+Subject: [PATCH] clk: ux500: Drop use of clk-private.h
+In-Reply-To: <CAPDyKFrVseR_Mczn5q0pjcMk6SN1HCebWTis4wOfcH+vfEDnRA@mail.gmail.com>
+References: <1421955259-8875-1-git-send-email-sboyd@codeaurora.org>
+ <CAPDyKFrVseR_Mczn5q0pjcMk6SN1HCebWTis4wOfcH+vfEDnRA@mail.gmail.com>
+Message-ID: <20150127195724.22722.97889@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello
+Quoting Ulf Hansson (2015-01-22 23:36:28)
+> On 22 January 2015 at 20:34, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> > These drivers don't need to include clk-private.h. Remove the
+> > include.
+> >
+> > Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> 
+> Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+> 
+> I suppose you can queue this through your clk tree directly?
 
-On Tue, Jan 27, 2015 at 8:49 PM, Mark Brown <broonie@kernel.org> wrote:
->
->> https://patchwork.kernel.org/patch/5648351/
->
-> Please include plain text descriptions of things in your mails rather
-> than just links/numbers.
+Applied.
 
-spi: xilinx: Use standard num-cs binding
+Regards,
+Mike
 
-
-Regards!
-
--- 
-Ricardo Ribalda
+> 
+> Kind regards
+> Uffe
+> 
+> > ---
+> >  drivers/clk/ux500/clk-prcc.c  | 1 -
+> >  drivers/clk/ux500/clk-prcmu.c | 1 -
+> >  2 files changed, 2 deletions(-)
+> >
+> > diff --git a/drivers/clk/ux500/clk-prcc.c b/drivers/clk/ux500/clk-prcc.c
+> > index bd4769a84485..0e950769ed03 100644
+> > --- a/drivers/clk/ux500/clk-prcc.c
+> > +++ b/drivers/clk/ux500/clk-prcc.c
+> > @@ -8,7 +8,6 @@
+> >   */
+> >
+> >  #include <linux/clk-provider.h>
+> > -#include <linux/clk-private.h>
+> >  #include <linux/slab.h>
+> >  #include <linux/io.h>
+> >  #include <linux/err.h>
+> > diff --git a/drivers/clk/ux500/clk-prcmu.c b/drivers/clk/ux500/clk-prcmu.c
+> > index e2d63bc47436..bf63c96acb1a 100644
+> > --- a/drivers/clk/ux500/clk-prcmu.c
+> > +++ b/drivers/clk/ux500/clk-prcmu.c
+> > @@ -8,7 +8,6 @@
+> >   */
+> >
+> >  #include <linux/clk-provider.h>
+> > -#include <linux/clk-private.h>
+> >  #include <linux/mfd/dbx500-prcmu.h>
+> >  #include <linux/slab.h>
+> >  #include <linux/io.h>
+> > --
+> > The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> > a Linux Foundation Collaborative Project
+> >
