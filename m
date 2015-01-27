@@ -1,31 +1,27 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Tue, 27 Jan 2015 13:47:22 +0100
-Subject: [PATCH v5 1/5] ARM: mediatek: Add config options for mediatek
- SoCs.
-In-Reply-To: <CABuKBeLPN74fiLduvswHfPrgAoQCFXCtdLZhhoha8Q=0xBSjpA@mail.gmail.com>
-References: <1421818097-9281-1-git-send-email-hongzhou.yang@mediatek.com>
- <1421818097-9281-2-git-send-email-hongzhou.yang@mediatek.com>
- <CABuKBeJGigY5ym9cJy=PYK8jbdsOLLtkmovHq6xho4gYseCAWg@mail.gmail.com>
- <1422353800.14015.35.camel@x220> <1422354400.32212.25.camel@mtksdaap41>
- <1422354858.14015.39.camel@x220>
- <CABuKBeLPN74fiLduvswHfPrgAoQCFXCtdLZhhoha8Q=0xBSjpA@mail.gmail.com>
-Message-ID: <1422362842.14015.48.camel@x220>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Tue, 27 Jan 2015 13:57:33 +0100
+Subject: [PATCH v2 06/11] ARM: tegra: Move out nyan-generic parts out from
+ the nyan-big DT
+In-Reply-To: <54B7F8D2.4040400@wwwdotorg.org>
+References: <1421338359-27467-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1421338359-27467-7-git-send-email-tomeu.vizoso@collabora.com>
+ <54B7F8D2.4040400@wwwdotorg.org>
+Message-ID: <CAAObsKBfBREzQueA8NRJ0msi7g=5s9Sd2riSEF+0jp8JSbT-mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Matthias,
+On 15 January 2015 at 18:28, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 01/15/2015 09:12 AM, Tomeu Vizoso wrote:
+>>
+>> In preparation for adding the DT for the nyan-blaze board.
+>
+>
+> "git format-patch -C" might help here; hopefully it'd highlight that
+> arch/arm/boot/dts/tegra124-nyan.dtsi was a copy from
+> arch/arm/boot/dts/tegra124-nyan-big.dts, with just a few small diffs?
 
-On Tue, 2015-01-27 at 13:38 +0100, Matthias Brugger wrote:
-> Yes, this symbols are needed when we implement the pinctrl driver for
-> the other platforms.
-> I will implement mt6589 as soon as the pinctrl driver got merged.
-> I suppose Howard will go for the mt6592.
+It doesn't, because we keep the pinmux config in the leaf files.
 
-I see. Unless the users of MACH_MT6589, MACH_MT6592, MACH_MT8127, and
-MACH_MT8135 take very long to land in linux-next (or in mainline) I
-won't bother you again about this.
+Regards,
 
-Thanks!
-
-
-Paul Bolle
+Tomeu
