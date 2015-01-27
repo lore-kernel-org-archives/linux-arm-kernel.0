@@ -1,69 +1,149 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Tue, 27 Jan 2015 07:40:12 +0000
-Subject: [PATCH v2 1/3] ARM: shmobile: armadillo800eva: Properly specify
- HDMI audio link format
-In-Reply-To: <1421847492-8857-1-git-send-email-lars@metafoo.de>
-References: <1421847492-8857-1-git-send-email-lars@metafoo.de>
-Message-ID: <8761bsacx5.wl%kuninori.morimoto.gx@renesas.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 26 Jan 2015 23:59:21 -0800
+Subject: [PATCH 1/2] Input: sun4i-ts: Add support for touchpanel
+ controller on A31
+In-Reply-To: <1422110028-30270-2-git-send-email-wens@csie.org>
+References: <1422110028-30270-1-git-send-email-wens@csie.org>
+ <1422110028-30270-2-git-send-email-wens@csie.org>
+Message-ID: <20150127075921.GA11487@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Lars
-
-Thank you for your patch
-
-> The DAI link format should be specified for the whole link rather than just
-> one component on the link. So move the format specification for the HDMI
-> audio link from the CPU component to the link itself.
+On Sat, Jan 24, 2015 at 10:33:47PM +0800, Chen-Yu Tsai wrote:
+> The Allwinner A31 SoC (sun6i) has the same resistive touchpanel
+> controller as on other sunxi platforms. The only difference between
+> the variants is the control bits for enabling operations are
+> left-shifted by 1 on the A31.
 > 
-> Since the sh-mobile-hdmi DAI driver doesn't implement the set_fmt() callback
-> in this case there is no functional difference between only specifying the
-> the format for the CPU side or for the whole link, but the later it will
-> allow us to remove support for just specifying the format for one component.
+> This patch adds support for this variant.
 > 
-> Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
+> Also update the comment for the original temperature sensor with
+> information from Allwinner.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+
+Applied, thank you.
+
 > ---
-> No changes since v1.
-> ---
->  arch/arm/mach-shmobile/board-armadillo800eva.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  .../bindings/input/touchscreen/sun4i.txt           |  2 +-
+>  drivers/input/touchscreen/sun4i-ts.c               | 46 ++++++++++++++++------
+>  2 files changed, 34 insertions(+), 14 deletions(-)
 > 
-> diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
-> index 6d949f1..75de26c 100644
-> --- a/arch/arm/mach-shmobile/board-armadillo800eva.c
-> +++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
-> @@ -1040,9 +1040,9 @@ static struct asoc_simple_card_info fsi2_hdmi_info = {
->  	.card		= "FSI2B-HDMI",
->  	.codec		= "sh-mobile-hdmi",
->  	.platform	= "sh_fsi2",
-> +	.daifmt		= SND_SOC_DAIFMT_CBS_CFS,
->  	.cpu_dai = {
->  		.name	= "fsib-dai",
-> -		.fmt	= SND_SOC_DAIFMT_CBS_CFS,
->  	},
->  	.codec_dai = {
->  		.name = "sh_mobile_hdmi-hifi",
+> diff --git a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
+> index a8405bab6c00..433332d3b2ba 100644
+> --- a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
+> +++ b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
+> @@ -2,7 +2,7 @@ sun4i resistive touchscreen controller
+>  --------------------------------------
+>  
+>  Required properties:
+> - - compatible: "allwinner,sun4i-a10-ts"
+> + - compatible: "allwinner,sun4i-a10-ts" or "allwinner,sun6i-a31-ts"
+>   - reg: mmio address range of the chip
+>   - interrupts: interrupt to which the chip is connected
+>   - #thermal-sensor-cells: shall be 0
+> diff --git a/drivers/input/touchscreen/sun4i-ts.c b/drivers/input/touchscreen/sun4i-ts.c
+> index 9ae53d4289fb..b93a28b955fd 100644
+> --- a/drivers/input/touchscreen/sun4i-ts.c
+> +++ b/drivers/input/touchscreen/sun4i-ts.c
+> @@ -72,6 +72,9 @@
+>  #define TP_ADC_SELECT(x)	((x) << 3)
+>  #define ADC_CHAN_SELECT(x)	((x) << 0)  /* 3 bits */
+>  
+> +/* on sun6i, bits 3~6 are left shifted by 1 to 4~7 */
+> +#define SUN6I_TP_MODE_EN(x)	((x) << 5)
+> +
+>  /* TP_CTRL2 bits */
+>  #define TP_SENSITIVE_ADJUST(x)	((x) << 28) /* 4 bits */
+>  #define TP_MODE_SELECT(x)	((x) << 26) /* 2 bits */
+> @@ -113,6 +116,8 @@ struct sun4i_ts_data {
+>  	unsigned int irq;
+>  	bool ignore_fifo_data;
+>  	int temp_data;
+> +	int temp_offset;
+> +	int temp_step;
+>  };
+>  
+>  static void sun4i_ts_irq_handle_input(struct sun4i_ts_data *ts, u32 reg_val)
+> @@ -188,17 +193,7 @@ static int sun4i_get_temp(const struct sun4i_ts_data *ts, long *temp)
+>  	if (ts->temp_data == -1)
+>  		return -EAGAIN;
+>  
+> -	/*
+> -	 * The user manuals do not contain the formula for calculating
+> -	 * the temperature. The formula used here is from the AXP209,
+> -	 * which is designed by X-Powers, an affiliate of Allwinner:
+> -	 *
+> -	 *     temperature = -144.7 + (value * 0.1)
+> -	 *
+> -	 * This should be replaced with the correct one if such information
+> -	 * becomes available.
+> -	 */
+> -	*temp = (ts->temp_data - 1447) * 100;
+> +	*temp = (ts->temp_data - ts->temp_offset) * ts->temp_step;
+>  
+>  	return 0;
+>  }
+> @@ -249,6 +244,7 @@ static int sun4i_ts_probe(struct platform_device *pdev)
+>  	struct device_node *np = dev->of_node;
+>  	struct device *hwmon;
+>  	int error;
+> +	u32 reg;
+>  	bool ts_attached;
+>  
+>  	ts = devm_kzalloc(dev, sizeof(struct sun4i_ts_data), GFP_KERNEL);
+> @@ -258,6 +254,25 @@ static int sun4i_ts_probe(struct platform_device *pdev)
+>  	ts->dev = dev;
+>  	ts->ignore_fifo_data = true;
+>  	ts->temp_data = -1;
+> +	if (of_device_is_compatible(np, "allwinner,sun6i-a31-ts")) {
+> +		/* Allwinner SDK has temperature = -271 + (value / 6) (C) */
+> +		ts->temp_offset = 1626;
+> +		ts->temp_step = 167;
+> +	} else {
+> +		/*
+> +		 * The user manuals do not contain the formula for calculating
+> +		 * the temperature. The formula used here is from the AXP209,
+> +		 * which is designed by X-Powers, an affiliate of Allwinner:
+> +		 *
+> +		 *     temperature = -144.7 + (value * 0.1)
+> +		 *
+> +		 * Allwinner does not have any documentation whatsoever for
+> +		 * this hardware. Moreover, it is claimed that the sensor
+> +		 * is inaccurate and cannot work properly.
+> +		 */
+> +		ts->temp_offset = 1447;
+> +		ts->temp_step = 100;
+> +	}
+>  
+>  	ts_attached = of_property_read_bool(np, "allwinner,ts-attached");
+>  	if (ts_attached) {
+> @@ -314,8 +329,12 @@ static int sun4i_ts_probe(struct platform_device *pdev)
+>  	 * Set stylus up debounce to aprox 10 ms, enable debounce, and
+>  	 * finally enable tp mode.
+>  	 */
+> -	writel(STYLUS_UP_DEBOUN(5) | STYLUS_UP_DEBOUN_EN(1) | TP_MODE_EN(1),
+> -	       ts->base + TP_CTRL1);
+> +	reg = STYLUS_UP_DEBOUN(5) | STYLUS_UP_DEBOUN_EN(1);
+> +	if (of_device_is_compatible(np, "allwinner,sun4i-a10-ts"))
+> +		reg |= TP_MODE_EN(1);
+> +	else
+> +		reg |= SUN6I_TP_MODE_EN(1);
+> +	writel(reg, ts->base + TP_CTRL1);
+>  
+>  	/*
+>  	 * The thermal core does not register hwmon devices for DT-based
+> @@ -364,6 +383,7 @@ static int sun4i_ts_remove(struct platform_device *pdev)
+>  
+>  static const struct of_device_id sun4i_ts_of_match[] = {
+>  	{ .compatible = "allwinner,sun4i-a10-ts", },
+> +	{ .compatible = "allwinner,sun6i-a31-ts", },
+>  	{ /* sentinel */ }
+>  };
+>  MODULE_DEVICE_TABLE(of, sun4i_ts_of_match);
+> -- 
+> 2.1.4
+> 
 
-I guess if you want to use common .daifmt, it should be same as "codec" side.
-(cpu side "S" means, codec / daifmt side "M")
-So, this mean above should be
-
-@@ -1040,9 +1040,9 @@ static struct asoc_simple_card_info fsi2_hdmi_info = {
- 	.card		= "FSI2B-HDMI",
- 	.codec		= "sh-mobile-hdmi",
- 	.platform	= "sh_fsi2",
-+	.daifmt		= SND_SOC_DAIFMT_CBM_CFM,   <=
- 	.cpu_dai = {
-		.name	= "fsib-dai",
--		.fmt	= SND_SOC_DAIFMT_CBS_CFS,
- 	},
-
-c7a507eea1db1430476289f525f9c853d5d485e8
-(ASoC: fsi: fixup SND_SOC_DAIFMT_CBx_CFx flags)
-can be good example ?
-(I wonder what happen on armadillo800eva ?)
-
-Best regards
----
-Kuninori Morimoto
+-- 
+Dmitry
