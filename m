@@ -1,84 +1,163 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 27 Jan 2015 09:59:00 +0900
-Subject: [PATCH repost] ARM: shmobile: r8a7794: Correct SDHI base
- address, clock labels and output-names
-In-Reply-To: <20150122022559.GC31170@verge.net.au>
-References: <20150122022559.GC31170@verge.net.au>
-Message-ID: <20150127005859.GC29710@verge.net.au>
+From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
+Date: Tue, 27 Jan 2015 02:14:26 +0100
+Subject: [PATCH v3] ARM: zynq: DT: Add USB to device tree
+In-Reply-To: <bb50396a16ab4042bdb554f72bde0bf7@BL2FFO11FD023.protection.gbl>
+References: <1417536431-27759-1-git-send-email-soren.brinkmann@xilinx.com>
+ <d78fedd84f354d80985187f851cb3cd1@BN1AFFO11FD055.protection.gbl>
+ <54C5F89A.3090901@suse.de> <54C5F965.90100@monstr.eu>
+ <54C5FBC3.7030903@suse.de> <54C60A56.7010403@suse.de>
+ <c65880cef67945ebaf61306febc1349b@BN1BFFO11FD010.protection.gbl>
+ <54C6698F.5020301@suse.de>
+ <8f367d9b85924f8e9cc9cb6fdff9a054@BN1BFFO11FD040.protection.gbl>
+ <bb50396a16ab4042bdb554f72bde0bf7@BL2FFO11FD023.protection.gbl>
+Message-ID: <54C6E672.4030602@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 22, 2015 at 11:25:59AM +0900, Simon Horman wrote:
-> * Correct base address of SD3 div6 clk.
-> * Update div6 labels and MSTP output names
->   There appears to have been some inconsistency and confusion here as on
->   the r8a7790 these clocks are referred to as SD(HI)1 and SD(HI)2 while on
->   the r8a7791 and r8a7794 they are referred to as SD(HI)2 and SD(HI)3.
-> 
-> This has no run-time affect as the clock nodes are not currently used.
-> 
-> Fixes: 8e181633e6ca96049 ("ARM: shmobile: r8a7794: Add SDHI clocks to device tree")
-> Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
++ linux-gpio, linux-usb, Felipe Balbi
 
-Geert,
+Am 26.01.2015 um 19:44 schrieb S?ren Brinkmann:
+> On Mon, 2015-01-26 at 08:23AM -0800, S?ren Brinkmann wrote:
+>> On Mon, 2015-01-26 at 05:21PM +0100, Andreas F?rber wrote:
+>>> Am 26.01.2015 um 16:50 schrieb S?ren Brinkmann:
+>>>> On Mon, 2015-01-26 at 10:35AM +0100, Andreas F?rber wrote:
+>>>>> Am 26.01.2015 um 09:33 schrieb Andreas F?rber:
+>>>>>> Am 26.01.2015 um 09:23 schrieb Michal Simek:
+>>>>>>> On 01/26/2015 09:19 AM, Andreas F?rber wrote:
+>>>>>>>> And if I apply it to my -next based tree, adding corresponding nodes to
+>>>>>>>> zynq-parallella.dts, I get repeatedly:
+>>>>>>>>
+>>>>>>>> [  +0,012242] ci_hdrc ci_hdrc.0: no of_node; not parsing pinctrl DT
+>>>>>>>> [  +0,000157] ci_hdrc ci_hdrc.0: ChipIdea HDRC found, lpm: 0; cap:
+>>>>>>>> f090e100 op: f090e140
+>>>>>>>> [  +0,000081] platform ci_hdrc.0: Driver ci_hdrc requests probe deferral
+>>>>>>>> [  +0,005360] ci_hdrc ci_hdrc.1: no of_node; not parsing pinctrl DT
+>>>>>>>> [  +0,000120] ci_hdrc ci_hdrc.1: ChipIdea HDRC found, lpm: 0; cap:
+>>>>>>>> f0910100 op: f0910140
+>>>>>>>> [  +0,001810] platform ci_hdrc.1: Driver ci_hdrc requests probe deferral
+>>>>>>>>
+>>>>>>>> Am I missing any other patches or config options?
+[...]
+>>>>>>> Why is it deferred? Is it because of pinmuxing stuff?
+>>>>>>
+>>>>>> No, happened without as well.
+>>>>>>
+>>>>>> Looking at a different place in dmesg, I spot this:
+>>>>>>
+>>>>>> [  +0,003988] usb_phy_generic phy0: GPIO lookup for consumer reset-gpios
+>>>>>> [  +0,000012] usb_phy_generic phy0: using device tree for GPIO lookup
+>>>>>> [  +0,000015] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpios'
+>>>>>> property
+>>>>>>  of node '/phy0[0]'
+>>>>>> [  +0,000013] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpio'
+>>>>>> property
+>>>>>> of node '/phy0[0]'
+>>>>>> [  +0,000010] usb_phy_generic phy0: using lookup tables for GPIO lookup
+>>>>>> [  +0,000153] usb_phy_generic phy0: lookup for GPIO reset-gpios failed
+>>>>>> [  +0,000012] usb_phy_generic phy0: Error requesting RESET GPIO
+>>>>>> [  +0,004360] usb_phy_generic: probe of phy0 failed with error -2
+>>>>>> [  +0,004991] usb_phy_generic phy1: GPIO lookup for consumer reset-gpios
+>>>>>> [  +0,000012] usb_phy_generic phy1: using device tree for GPIO lookup
+>>>>>> [  +0,000013] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpios'
+>>>>>> property
+>>>>>>  of node '/phy1[0]'
+>>>>>> [  +0,000013] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpio'
+>>>>>> property of node '/phy1[0]'
+>>>>>> [  +0,000010] usb_phy_generic phy1: using lookup tables for GPIO lookup
+>>>>>> [  +0,000012] usb_phy_generic phy1: lookup for GPIO reset-gpios failed
+>>>>>> [  +0,000011] usb_phy_generic phy1: Error requesting RESET GPIO
+>>>>>> [  +0,004337] usb_phy_generic: probe of phy1 failed with error -2
+>>>>>>
+>>>>>> So, I guess the chipidea driver is deferring because the phys want a
+>>>>>> property that neither me nor you are specifying? [...]
+[...]
+>>>>> In my manuals and notes I can't find any GPIO being used as reset for
+>>>>> the USB PHYs. Any thoughts appreciated.
+>>>>
+>>>> Such a connection is optional. The platform might rely on its reset
+>>>> circuit, though it might not work for warm reboots.
+>>>> I haven't looked at parallela docs, but if there is a schematic
+>>>> available, that should tell you if/what is connected to the PHY reset
+>>>> pin.
+>>>
+>>> I do have the schematic, and the way I read it, only the on-board reset
+>>> button resets the PHYs.
+>>>
+>>> Yet it looks as if usb-nop-xceiv insists on a reset-gpios above, no?
+>>> Does it work on your boards with linux-next?
+>>
+>> I haven't re-tested it since I submitted the patches, but at that time
+>> it worked. But I also didn't test USB with the pinctrl patches together.
+>> I'll do some testing later today.
+> 
+> So, just did a test. I took all the pinctrl stuff and this patch and ran
+> it on a zc702. I plugged in a thumb drive and that worked just fine. So,
+> basically this patch could go in, despite missing pinctrl properties.
 
-could you find a moment to look over this.
-Its a follow-up to an earlier patch which you gave me some
-feedback on.
+For my board I needed the following workaround:
 
-> 
-> ---
-> * A similar change to update the div6 clock node names and labels,
->   and the MSTP clock output-names is required for the r8a7791.
->   The base addresses appear to be correct there.
-> ---
->  arch/arm/boot/dts/r8a7794.dtsi | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-> index 8f78da5..b98534e 100644
-> --- a/arch/arm/boot/dts/r8a7794.dtsi
-> +++ b/arch/arm/boot/dts/r8a7794.dtsi
-> @@ -294,16 +294,16 @@
->  					     "lb", "qspi", "sdh", "sd0", "z";
->  		};
->  		/* Variable factor clocks */
-> -		sd1_clk: sd2_clk at e6150078 {
-> +		sd2_clk: sd2_clk at e6150078 {
->  			compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
->  			reg = <0 0xe6150078 0 4>;
->  			clocks = <&pll1_div2_clk>;
->  			#clock-cells = <0>;
->  			clock-output-names = "sd1";
->  		};
-> -		sd2_clk: sd3_clk at e615007c {
-> +		sd3_clk: sd3_clk at e615026c {
->  			compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
-> -			reg = <0 0xe615007c 0 4>;
-> +			reg = <0 0xe615026c 0 4>;
->  			clocks = <&pll1_div2_clk>;
->  			#clock-cells = <0>;
->  			clock-output-names = "sd2";
-> @@ -518,7 +518,7 @@
->  		mstp3_clks: mstp3_clks at e615013c {
->  			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
->  			reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
-> -			clocks = <&sd2_clk>, <&sd1_clk>, <&cpg_clocks R8A7794_CLK_SD0>,
-> +			clocks = <&sd3_clk>, <&sd2_clk>, <&cpg_clocks R8A7794_CLK_SD0>,
->  			         <&mmc0_clk>, <&rclk_clk>, <&hp_clk>, <&hp_clk>;
->  			#clock-cells = <1>;
->  			clock-indices = <
-> @@ -527,7 +527,7 @@
->  				R8A7794_CLK_USBDMAC0 R8A7794_CLK_USBDMAC1
->  			>;
->  			clock-output-names =
-> -			        "sdhi2", "sdhi1", "sdhi0",
-> +			        "sdhi3", "sdhi2", "sdhi0",
->  				"mmcif0", "cmt1", "usbdmac0", "usbdmac1";
->  		};
->  		mstp7_clks: mstp7_clks at e615014c {
-> -- 
-> 2.1.4
-> 
+diff --git a/drivers/usb/phy/phy-generic.c b/drivers/usb/phy/phy-generic.c
+index dd05254241fb..96c7c36e22a6 100644
+--- a/drivers/usb/phy/phy-generic.c
++++ b/drivers/usb/phy/phy-generic.c
+@@ -218,13 +218,13 @@ int usb_phy_gen_create_phy(struct device *dev,
+struct usb_phy_generic *nop,
+                        clk_rate = 0;
+
+                needs_vcc = of_property_read_bool(node, "vcc-supply");
+-               nop->gpiod_reset = devm_gpiod_get(dev, "reset-gpios");
++               /*nop->gpiod_reset = devm_gpiod_get(dev, "reset-gpios");
+                err = PTR_ERR(nop->gpiod_reset);
+                if (!err) {
+                        nop->gpiod_vbus = devm_gpiod_get(dev,
+
+"vbus-detect-gpio");
+                        err = PTR_ERR(nop->gpiod_vbus);
+-               }
++               }*/
+        } else if (pdata) {
+                type = pdata->type;
+                clk_rate = pdata->clk_rate;
+
+[  +0,004738] usb_phy_generic phy0: Looking up vcc-supply from device tree
+[  +0,000018] usb_phy_generic phy0: Looking up vcc-supply property in
+node /phy0 failed
+[  +0,000011] phy0 supply vcc not found, using dummy regulator
+[  +0,004844] usb_phy_generic phy1: Looking up vcc-supply from device tree
+[  +0,000017] usb_phy_generic phy1: Looking up vcc-supply property in
+node /phy1 failed
+[  +0,000008] phy1 supply vcc not found, using dummy regulator
+
+Basically, usb-nop-xceiv fails to probe when reset-gpios property is
+absent (and probably also when vbus-detect-gpio property is absent).
+So I don't understand why it would work for your boards without such
+properties on today's linux-next... sounds like you tested a different tree?
+
+Take a look at __gpiod_get_index() called from devm_gpiod_get():
+http://lxr.free-electrons.com/source/drivers/gpio/gpiolib.c#L1648
+
+!desc || desc == ERR_PTR(-ENOENT) results in the above "using lookup
+tables for GPIO lookup", then IS_ERR(desc) in "lookup for GPIO %s failed".
+
+My interpretation is that this gpiolib code is probably okay but that
+the generic usb phy code fails to check for specific error codes such as
+absent property (as opposed to deferred resolution of a phandle, where
+we do want to return -EDEFER early).
+
+My work tree: https://github.com/afaerber/linux/commits/parallella-next
+
+Regards,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Jennifer Guild, Dilip Upmanyu,
+Graham Norton; HRB 21284 (AG N?rnberg)
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150127/cc356bd0/attachment.sig>
