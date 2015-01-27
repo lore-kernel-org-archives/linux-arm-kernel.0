@@ -1,52 +1,64 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 27 Jan 2015 00:16:29 +0000
-Subject: [PATCH RFC 2/3] power: mxs_power: add driver for mxs power
- subsystem
-In-Reply-To: <1719204322.245040.1422301605670.JavaMail.open-xchange@oxbaltgw03.schlund.de>
-References: <1416514477-19190-1-git-send-email-stefan.wahren@i2se.com>
- <1416514477-19190-3-git-send-email-stefan.wahren@i2se.com>
- <20150121230148.GJ13715@earth.universe> <54C0AFE4.3020701@i2se.com>
- <20150125150431.GE2719@earth.universe>
- <1719204322.245040.1422301605670.JavaMail.open-xchange@oxbaltgw03.schlund.de>
-Message-ID: <20150127001629.GP21293@sirena.org.uk>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Tue, 27 Jan 2015 01:21:16 +0100
+Subject: [RFC PATCH 3/5] iommu: implement common IOMMU ops for DMA mapping
+In-Reply-To: <09e5515a9afcb3235f4c425520cd18a6032d31b4.1421086706.git.robin.murphy@arm.com>
+References: <cover.1421086706.git.robin.murphy@arm.com>
+ <09e5515a9afcb3235f4c425520cd18a6032d31b4.1421086706.git.robin.murphy@arm.com>
+Message-ID: <20150127002116.GI30345@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 26, 2015 at 08:46:45PM +0100, Stefan Wahren wrote:
+Hi Robin,
 
-> > > Does a common property name exists for the switching frequency or would
-> > > it be vendor specific?
+thanks for the patch, I think it is good start to move forward. See my
+comments below.
 
-> > As far as I know most regulators have fixed switching frequencies,
-> > so there is no common property name so far. I added regulator
-> > framework people, since this property should be regulator specific.
+On Mon, Jan 12, 2015 at 08:48:55PM +0000, Robin Murphy wrote:
+> Taking inspiration from the existing arch/arm code, break out some
+> generic functions to interface the DMA-API to the IOMMU-API. This will
+> do the bulk of the heavy lifting for IOMMU-backed dma-mapping.
+> 
+> Whilst the target is arm64, rather than introduce yet another private
+> implementation, place this in common code as the first step towards
+> consolidating the numerous versions spread around between architecture
+> code and IOMMU drivers.
 
-No, it's pretty common for there to be a couple of options - there's
-normally a performance tradeoff (power for regulation accuracy and/or
-cost) which can be selected.  IIRC it's selected at design time as it
-affect the choice of passives on the board.
+Is there any reason you implemented that only for AArch64? I think it
+makes a lot of sense to have a common implementation of that across
+architectures (AArch64, ARM and X86).
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  include/linux/dma-iommu.h |  78 ++++++++
+>  lib/Kconfig               |   8 +
+>  lib/Makefile              |   1 +
+>  lib/dma-iommu.c           | 455 ++++++++++++++++++++++++++++++++++++++++++++++
 
-> okay i understand. But doesn't it need a extra driver to set the switching
-> frequency because of the new compatible string?
+I'd like this to live in drivers/iommu, as most other dma-api
+implementations for iommu-drivers also live there.
 
-I don't understand this bit at all, sorry.
+> +/*
+> + * This little guy is filling in until iommu_map_sg lands and we can hook that
+> + * up instead (which is going to be rather involved thanks to page alignment)
+> + */
 
-> 
-> At this point i think about moving this feature into the bootloader.
-> 
-> @Fabio, @Marek:
-> 
-> What's your opinion about that?
-> 
-> >
-> > -- Sebastian
-> 
-> Stefan
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150127/224c59a4/attachment.sig>
+iommu_map_sg should be there now. You can convert this function to it.
+
+> +static int __iommu_dma_map_sg_simple(struct device *dev, struct scatterlist *sg,
+> +		int nents, enum dma_data_direction dir, struct dma_attrs *attrs,
+> +		bool coherent)
+> +{
+> +	struct scatterlist *s;
+> +	int i;
+> +
+> +	for_each_sg(sg, s, nents, i) {
+> +		sg_dma_address(s) = __iommu_dma_map_page(dev, sg_page(s), s->offset,
+> +						s->length, dir, coherent);
+> +		sg_dma_len(s) = s->length;
+> +	}
+> +	return nents;
+> +}
+
+So long,
+
+        Joerg
