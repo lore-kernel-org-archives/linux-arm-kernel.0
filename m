@@ -1,26 +1,35 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Tue, 27 Jan 2015 13:19:50 -0500
-Subject: [PATCH] ahci_xgene: Fix the dma state machine lockup for the
- ATA_CMD_SMART PIO mode command.
-In-Reply-To: <1422381371-11361-2-git-send-email-stripathi@apm.com>
-References: <1422381371-11361-1-git-send-email-stripathi@apm.com>
- <1422381371-11361-2-git-send-email-stripathi@apm.com>
-Message-ID: <20150127181950.GE12314@htj.dyndns.org>
+From: ats@offog.org (Adam Sampson)
+Date: Tue, 27 Jan 2015 18:25:33 +0000
+Subject: [PATCH] ARM: dts: sun7i: Add dts file for pcDuino 3 Nano board
+In-Reply-To: <20150127170035.GJ7200@lukather>
+References: <1422199921-325-1-git-send-email-ats@offog.org>
+ <20150125164846.GL8470@lukather>
+ <20150126003520.GA871@cartman.at.offog.org>
+ <20150126100921.GQ8470@lukather>
+ <20150126135931.GB871@cartman.at.offog.org>
+ <20150127170035.GJ7200@lukather>
+Message-ID: <20150127182533.GE871@cartman.at.offog.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 27, 2015 at 11:26:11PM +0530, Suman Tripathi wrote:
-> This patch addresses the issue with ATA_CMD_SMART pio mode
-> command for enumeration and device detection with ATA devices.It is the
-> same issue as in patch
-> 
-> www.spinics.net/lists/linux-ide/msg49092.html
+On Tue, Jan 27, 2015 at 06:00:35PM +0100, Maxime Ripard wrote:
+> > How about pcduino3-nano:green:usr-led3/4? Or ...:usr1/2, and a comment
+> > in the .dts explaining how they're labelled on the board?
+> The latter looks better yes. tx and rx would do too, if you know what
+> tx and what rx we're talking about here.
 
-The link is broken.  Can you please include at least a brief
-explanation of the problem and preferably link to something more
-permanant (commit ID, http://lkml.kernel.org/g/MSG_ID)?
+I've changed it to usr1/2 with comments. (I don't know if they were
+intended to be TX/RX; the documentation doesn't suggest so.)
 
-Thanks.
+> > They're multipurpose pins on Arduino-compatible headers:
+...
+> > So should we [...]
+> None of the above, if there's no hardware default, we won't enforce
+> any default either. This is a case for the DT overlays.
+
+OK -- that simplifies it quite a bit, then. v3 of the patch incoming!
+
+Thanks very much,
 
 -- 
-tejun
+Adam Sampson <ats@offog.org>                         <http://offog.org/>
