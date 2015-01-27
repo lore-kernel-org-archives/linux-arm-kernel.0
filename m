@@ -1,103 +1,31 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Tue, 27 Jan 2015 12:14:11 +0000
-Subject: [PATCH v3 03/13] pm: at91: Workaround DDRSDRC self-refresh bug
- with LPDDR1 memories.
-In-Reply-To: <54C7675D.8000204@cogentembedded.com>
-References: <1422337810-3257-1-git-send-email-wenyou.yang@atmel.com>
- <1422338006-3371-1-git-send-email-wenyou.yang@atmel.com>
- <54C7675D.8000204@cogentembedded.com>
-Message-ID: <fd04e7c80f6841368ea1953d544f3386@EMAIL.axentia.se>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 27 Jan 2015 12:14:24 +0000
+Subject: [PATCH v9 3/5] regulators: axp20x: Use "clock-frequency"
+ property for dcdc work frequency
+In-Reply-To: <1421941147-9682-4-git-send-email-wens@csie.org>
+References: <1421941147-9682-1-git-send-email-wens@csie.org>
+ <1421941147-9682-4-git-send-email-wens@csie.org>
+Message-ID: <20150127121424.GS21293@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sergei Shtylyov wrote:
-> Hello.
-
-Hi!
-
-> On 1/27/2015 8:53 AM, Wenyou Yang wrote:
+On Thu, Jan 22, 2015 at 11:39:05PM +0800, Chen-Yu Tsai wrote:
+> Since the dcdc regulator work frequency is a property of the regulators
+> DT sub-tree, there is no issue of naming collisions, so we can use the
+> standard "clock-frequency" binding for this.
 > 
-> > From: Peter Rosin <peda@axentia.se>
-> 
-> > The DDRSDR controller fails miserably to put LPDDR1 memories in
-> > self-refresh. Force the controller to think it has DDR2 memories
-> > during the self-refresh period, as the DDR2 self-refresh spec is
-> > equivalent to LPDDR1, and is correctly implemented in the controller.
-> 
-> > Assume that the second controller has the same fault, but that is
-> > untested.
-> 
-> > Signed-off-by: Peter Rosin <peda@axentia.se>
-> > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > ---
-> >   arch/arm/mach-at91/pm_slowclock.S  |   43
-> +++++++++++++++++++++++++++++++-----
-> >   include/soc/at91/at91sam9_ddrsdr.h |    2 +-
-> >   2 files changed, 39 insertions(+), 6 deletions(-)
-> 
-> > diff --git a/arch/arm/mach-at91/pm_slowclock.S
-> > b/arch/arm/mach-at91/pm_slowclock.S
-> > index e2bfaf5..1155217 100644
-> > --- a/arch/arm/mach-at91/pm_slowclock.S
-> > +++ b/arch/arm/mach-at91/pm_slowclock.S
-> [...]
-> > @@ -108,14 +118,26 @@ ddr_sr_enable:
-> >
-> >   	/* figure out if we use the second ram controller */
-> >   	cmp	ramc1, #0
-> > -	ldrne	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
-> > -	strne	tmp2, .saved_sam9_lpr1
-> > -	bicne	tmp2, #AT91_DDRSDRC_LPCB
-> > -	orrne	tmp2, #AT91_DDRSDRC_LPCB_SELF_REFRESH
-> > +	beq	ddr_no_2nd_ctrl
-> > +
-> > +	ldr	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
-> > +	str	tmp2, .saved_sam9_mdr1
-> > +	bic	tmp2, tmp2, #~AT91_DDRSDRC_MD
-> > +	cmp	tmp2, #AT91_DDRSDRC_MD_LOW_POWER_DDR
-> > +	ldreq	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
-> > +	biceq	tmp2, tmp2, #AT91_DDRSDRC_MD
-> 
->     Didn't you forget ~? Either that, or ~ above is not needed, I think.
+> The driver sets a reasonable default value (same as the datasheet), and
+> only 1 dts has the old binding, with the default value.
 
-The code is correct, the first bic with ~ clears bits not in the relevant
-field in order to compare if LPDDR mode is active. The second bic(eq)
-w/o ~ clears the field, to make way for the bits in the below orreq
-when actually changing the register content into DDR2 mode.
-
-> > +	orreq	tmp2, tmp2, #AT91_DDRSDRC_MD_DDR2
-> > +	streq	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
-> > +
-> > +	ldr	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
-> > +	str	tmp2, .saved_sam9_lpr1
-> > +	bic	tmp2, #AT91_DDRSDRC_LPCB
-> 
->     Didn't you forget ~? And isn't it 3-operand instruction (as seen in the above
-> code)?
-
-The logic for the LPR register is from the old code, the "only" thing
-I did to it was changing the instruction sequence to not have the
-???ne form, i.e. ldrne, strne, bicne, orrne became ldr, str, bic, orr
-with a jump around it instead. So, the original code also had a two
-argument bic(ne), which indeed is strange, and I don't know why
-there is no warning from the assembler. Since there is no warning,
-my guess is that the assembler somehow mends it? Or does the
-patch actually break the second controller? It would be a surprise
-it the assembler handles 2-operand bicne differently from a
-2-operand bic, no?
-
-> > +	orr	tmp2, #AT91_DDRSDRC_LPCB_SELF_REFRESH
-> 
->     Only 2 operands?
-
-Same argument as above. I didn't touch it (sort of...)
-
-Should I update the patch and fix this collateral 2-operand problem as
-well? To me, it feels like a separate patch, no?
-
-> [...]
-> 
-> WBR, Sergei
-
-Cheers,
-Peter
+I don't see any benefit from this change - not only is this an
+incompatible change (which may affect out of tree users as well as in
+tree users) but it's not really doing anything with the clock API which
+I'd expect to be happening for a clock API property.  What's the goal
+here?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150127/4a10a876/attachment.sig>
