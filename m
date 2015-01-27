@@ -1,69 +1,58 @@
-From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Tue, 27 Jan 2015 15:56:46 +0800
-Subject: [PATCH v8 1/2] Documentation: DT: Add bindings for Spreadtrum SoC
- Platform
-In-Reply-To: <1422345407-10037-1-git-send-email-chunyan.zhang@spreadtrum.com>
-References: <sc9836-serial-v8>
- <1422345407-10037-1-git-send-email-chunyan.zhang@spreadtrum.com>
-Message-ID: <1422345407-10037-2-git-send-email-chunyan.zhang@spreadtrum.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 27 Jan 2015 09:43:37 +0100
+Subject: [GIT PULL] Allwinner fixes for 3.19
+In-Reply-To: <20150127042237.GE22154@quad.lixom.net>
+References: <20150125173914.GA26866@lukather>
+ <20150127042237.GE22154@quad.lixom.net>
+Message-ID: <20150127084337.GC7200@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds Spreadtrum's prefix "sprd" to vendor-prefixes file.
-Adds the devicetree binding documentations for Spreadtrum's sc9836-uart
-and SC9836 SoC based on the Sharkl64 Platform which is a 64-bit SoC
-Platform of Spreadtrum.
+On Mon, Jan 26, 2015 at 08:22:37PM -0800, Olof Johansson wrote:
+> On Sun, Jan 25, 2015 at 06:39:14PM +0100, Maxime Ripard wrote:
+> > Hi Arnd, Kevin, Olof,
+> > 
+> > Please pull the following commits for the 3.19 kernel.
+> > 
+> > Thanks!
+> > Maxime
+> > 
+> > The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+> > 
+> >   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+> > 
+> > are available in the git repository at:
+> > 
+> >   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-fixes-for-3.19
+> > 
+> > for you to fetch changes up to 117a2cc38ffe0b46bcc6f991a3534b345477439c:
+> > 
+> >   ARM: sunxi: dt: Fix aliases (2015-01-25 18:06:34 +0100)
+> > 
+> > ----------------------------------------------------------------
+> > Allwinner fixes for 3.19
+> > 
+> > A few minor fixes for the 3.19 kernel:
+> >   - The 8250 uart driver now respects the aliases, which pointed out that we
+> >     were using them wrong. Fixed them.
+> 
+> D'oh. We found this in time on Tegra, but I guess Allwinner snuck by without
+> anyone noticing before the code went in.
 
-Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
----
- Documentation/devicetree/bindings/arm/sprd.txt     |   11 +++++++++++
- .../devicetree/bindings/serial/sprd-uart.txt       |    7 +++++++
- .../devicetree/bindings/vendor-prefixes.txt        |    1 +
- 3 files changed, 19 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/sprd.txt
- create mode 100644 Documentation/devicetree/bindings/serial/sprd-uart.txt
+Yeah, almost all of the boards use uart0 as their "main" UART, and so
+only the secondary UART were affected by this, which made us catch it
+pretty late.
 
-diff --git a/Documentation/devicetree/bindings/arm/sprd.txt b/Documentation/devicetree/bindings/arm/sprd.txt
-new file mode 100644
-index 0000000..31a629d
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/sprd.txt
-@@ -0,0 +1,11 @@
-+Spreadtrum SoC Platforms Device Tree Bindings
-+----------------------------------------------------
-+
-+Sharkl64 is a Spreadtrum's SoC Platform which is based
-+on ARM 64-bit processor.
-+
-+SC9836 openphone board with SC9836 SoC based on the
-+Sharkl64 Platform shall have the following properties.
-+
-+Required root node properties:
-+        - compatible = "sprd,sc9836-openphone", "sprd,sc9836";
-diff --git a/Documentation/devicetree/bindings/serial/sprd-uart.txt b/Documentation/devicetree/bindings/serial/sprd-uart.txt
-new file mode 100644
-index 0000000..2aff0f2
---- /dev/null
-+++ b/Documentation/devicetree/bindings/serial/sprd-uart.txt
-@@ -0,0 +1,7 @@
-+* Spreadtrum serial UART
-+
-+Required properties:
-+- compatible: must be "sprd,sc9836-uart"
-+- reg: offset and length of the register set for the device
-+- interrupts: exactly one interrupt specifier
-+- clocks: phandles to input clocks.
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index b1df0ad..0a8384f 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -153,6 +153,7 @@ snps	Synopsys, Inc.
- solidrun	SolidRun
- sony	Sony Corporation
- spansion	Spansion Inc.
-+sprd	Spreadtrum Communications Inc.
- st	STMicroelectronics
- ste	ST-Ericsson
- stericsson	ST-Ericsson
+Maxime
+
 -- 
-1.7.9.5
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150127/ec7b1bf4/attachment.sig>
