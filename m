@@ -1,92 +1,107 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 27 Jan 2015 22:38:53 +0100
-Subject: [PATCH v2 2/5] KVM: ARM: on IO mem abort - route the call to KVM
- MMIO bus
-In-Reply-To: <CADDJ2=Os6Uws6HN=iKg=uhx1artwBFXeyFKq9Co2Sgoo=63bOQ@mail.gmail.com>
-References: <20141207093641.17563.84226.stgit@i3820>
- <20141207093749.17563.12497.stgit@i3820>
- <54B3FFB9.3050406@linaro.org>
- <CADDJ2=Os6Uws6HN=iKg=uhx1artwBFXeyFKq9Co2Sgoo=63bOQ@mail.gmail.com>
-Message-ID: <20150127213853.GE9055@cbox>
+From: peda@axentia.se (Peter Rosin)
+Date: Tue, 27 Jan 2015 21:55:52 +0000
+Subject: [PATCH v3 03/13] pm: at91: Workaround DDRSDRC self-refresh bug
+ with LPDDR1 memories.
+References: <1422337810-3257-1-git-send-email-wenyou.yang@atmel.com>
+ <1422338006-3371-1-git-send-email-wenyou.yang@atmel.com>
+ <54C7675D.8000204@cogentembedded.com>
+Message-ID: <6740d1ada0cb4c8bbf765728c7443918@EMAIL.axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 24, 2015 at 03:02:33AM +0200, Nikolay Nikolaev wrote:
-> On Mon, Jan 12, 2015 at 7:09 PM, Eric Auger <eric.auger@linaro.org> wrote:
-> > Hi Nikolay,
-> > On 12/07/2014 10:37 AM, Nikolay Nikolaev wrote:
-> >> On IO memory abort, try to handle the MMIO access thorugh the KVM
-> >> registered read/write callbacks. This is done by invoking the relevant
-> >> kvm_io_bus_* API.
-> >>
-> >> Signed-off-by: Nikolay Nikolaev <n.nikolaev@virtualopensystems.com>
-> >> ---
-> >>  arch/arm/kvm/mmio.c |   33 +++++++++++++++++++++++++++++++++
-> >>  1 file changed, 33 insertions(+)
-> >>
-> >> diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
-> >> index 4cb5a93..e42469f 100644
-> >> --- a/arch/arm/kvm/mmio.c
-> >> +++ b/arch/arm/kvm/mmio.c
-> >> @@ -162,6 +162,36 @@ static int decode_hsr(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
-> >>       return 0;
-> >>  }
-> >>
-> >> +/**
-> >> + * handle_kernel_mmio - handle an in-kernel MMIO access
-> >> + * @vcpu:    pointer to the vcpu performing the access
-> >> + * @run:     pointer to the kvm_run structure
-> >> + * @mmio:    pointer to the data describing the access
-> >> + *
-> >> + * returns true if the MMIO access has been performed in kernel space,
-> >> + * and false if it needs to be emulated in user space.
-> >> + */
-> >> +static bool handle_kernel_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
-> >> +             struct kvm_exit_mmio *mmio)
-> >> +{
-> >> +     int ret;
-> >> +
-> >> +     if (mmio->is_write) {
-> >> +             ret = kvm_io_bus_write(vcpu, KVM_MMIO_BUS, mmio->phys_addr,
-> >> +                             mmio->len, &mmio->data);
-> >> +
-> >> +     } else {
-> >> +             ret = kvm_io_bus_read(vcpu, KVM_MMIO_BUS, mmio->phys_addr,
-> >> +                             mmio->len, &mmio->data);
-> >> +     }
-> >> +     if (!ret) {
-> >> +             kvm_prepare_mmio(run, mmio);
-> >> +             kvm_handle_mmio_return(vcpu, run);
-> >> +     }
-> >> +
-> >> +     return !ret;
-> > in case ret < 0 (-EOPNOTSUPP = -95) aren't we returning true too? return
-> > (ret==0)?
+I wrote:
+> Sergei Shtylyov wrote:
+> > On 1/27/2015 8:53 AM, Wenyou Yang wrote:
 > >
-> >> +}
-> >> +
-> >>  int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
-> >>                phys_addr_t fault_ipa)
-> >>  {
-> >> @@ -200,6 +230,9 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
-> >>       if (vgic_handle_mmio(vcpu, run, &mmio))
-> >>               return 1;
-> >>
-> >> +     if (handle_kernel_mmio(vcpu, run, &mmio))
-> >> +             return 1;
-> >> +
-> >>       kvm_prepare_mmio(run, &mmio);
-> >>       return 0;
-> > currently the io_mem_abort returned value is not used by mmu.c code. I
-> > think this should be handed in kvm_handle_guest_abort. What do you think?
+> > > From: Peter Rosin <peda@axentia.se>
+> >
+> > > The DDRSDR controller fails miserably to put LPDDR1 memories in
+> > > self-refresh. Force the controller to think it has DDR2 memories
+> > > during the self-refresh period, as the DDR2 self-refresh spec is
+> > > equivalent to LPDDR1, and is correctly implemented in the controller.
+> >
+> > > Assume that the second controller has the same fault, but that is
+> > > untested.
+> >
+> > > Signed-off-by: Peter Rosin <peda@axentia.se>
+> > > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > > ---
+> > >   arch/arm/mach-at91/pm_slowclock.S  |   43
+> > +++++++++++++++++++++++++++++++-----
+> > >   include/soc/at91/at91sam9_ddrsdr.h |    2 +-
+> > >   2 files changed, 39 insertions(+), 6 deletions(-)
+> >
+> > > diff --git a/arch/arm/mach-at91/pm_slowclock.S
+> > > b/arch/arm/mach-at91/pm_slowclock.S
+> > > index e2bfaf5..1155217 100644
+> > > --- a/arch/arm/mach-at91/pm_slowclock.S
+> > > +++ b/arch/arm/mach-at91/pm_slowclock.S
+> > [...]
+> > > @@ -108,14 +118,26 @@ ddr_sr_enable:
+> > >
+> > >   	/* figure out if we use the second ram controller */
+> > >   	cmp	ramc1, #0
+> > > -	ldrne	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
+> > > -	strne	tmp2, .saved_sam9_lpr1
+> > > -	bicne	tmp2, #AT91_DDRSDRC_LPCB
+> > > -	orrne	tmp2, #AT91_DDRSDRC_LPCB_SELF_REFRESH
+> > > +	beq	ddr_no_2nd_ctrl
+> > > +
+> > > +	ldr	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
+> > > +	str	tmp2, .saved_sam9_mdr1
+> > > +	bic	tmp2, tmp2, #~AT91_DDRSDRC_MD
+> > > +	cmp	tmp2, #AT91_DDRSDRC_MD_LOW_POWER_DDR
+> > > +	ldreq	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
+> > > +	biceq	tmp2, tmp2, #AT91_DDRSDRC_MD
+> >
+> >     Didn't you forget ~? Either that, or ~ above is not needed, I think.
 > 
-> You're right that the returned value is not handled further after we
-> exit io_mem_abort, it's just passed up the call stack.
-> However I'm not sure how to handle it better. If you have ideas, please share.
+> The code is correct, the first bic with ~ clears bits not in the relevant
+> field in order to compare if LPDDR mode is active. The second bic(eq)
+> w/o ~ clears the field, to make way for the bits in the below orreq
+> when actually changing the register content into DDR2 mode.
 > 
-I'm confused: the return value from io_mem_abort is assigned to a
-variable 'ret' in kvm_handle_guest_abort and that determines if we
-should run the VM again or return to userspace (with some work for
-userspace to do or with an error).
+> > > +	orreq	tmp2, tmp2, #AT91_DDRSDRC_MD_DDR2
+> > > +	streq	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
+> > > +
+> > > +	ldr	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
+> > > +	str	tmp2, .saved_sam9_lpr1
+> > > +	bic	tmp2, #AT91_DDRSDRC_LPCB
+> >
+> >     Didn't you forget ~? And isn't it 3-operand instruction (as seen in the above
+> > code)?
+> 
+> The logic for the LPR register is from the old code, the "only" thing
+> I did to it was changing the instruction sequence to not have the
+> ???ne form, i.e. ldrne, strne, bicne, orrne became ldr, str, bic, orr
+> with a jump around it instead. So, the original code also had a two
+> argument bic(ne), which indeed is strange, and I don't know why
+> there is no warning from the assembler. Since there is no warning,
+> my guess is that the assembler somehow mends it? Or does the
+> patch actually break the second controller? It would be a surprise
+> it the assembler handles 2-operand bicne differently from a
 
--Christoffer
+s/it the/if the/
+
+> 2-operand bic, no?
+> 
+> > > +	orr	tmp2, #AT91_DDRSDRC_LPCB_SELF_REFRESH
+> >
+> >     Only 2 operands?
+> 
+> Same argument as above. I didn't touch it (sort of...)
+> 
+> Should I update the patch and fix this collateral 2-operand problem as
+> well? To me, it feels like a separate patch, no?
+
+I have now checked the assembler output, and apparently it mends the
+input, just as I thought. That might be a fluke, of course, or it might be a
+deliberate shorthand when the destination register is the same as the
+following operand? But I also note that there are more instances of this
+2 vs. 3 argument syntax, and I suggest that they are all fixed in one go,
+if it is determined that they need fixing. I am obviously not an authority
+when it comes to arm assembler syntax, so someone else will have to
+advise...
+
+Cheers,
+Peter
