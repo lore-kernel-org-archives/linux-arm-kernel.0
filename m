@@ -1,114 +1,67 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 27 Jan 2015 14:37:39 +0100
-Subject: N900 v3.19-rc5 arm atags_to_fdt.c is broken
-In-Reply-To: <alpine.LFD.2.11.1501261318590.1322@knanqh.ubzr>
-References: <201501232239.55801@pali> <201501232336.36187@pali>
- <20150126161454.GE28663@atomide.com> <201501261723.10505@pali>
- <20150126170323.GF28663@atomide.com>
- <alpine.LFD.2.11.1501261318590.1322@knanqh.ubzr>
-Message-ID: <20150127133739.GB25306@amd>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 27 Jan 2015 14:59:20 +0100
+Subject: [PATCHv6 1/2] leds: tlc591xx: Document binding for the TI 8/16
+ Channel i2c LED driver
+In-Reply-To: <1422367161-16487-1-git-send-email-andrew@lunn.ch>
+References: <1422367161-16487-1-git-send-email-andrew@lunn.ch>
+Message-ID: <1422367161-16487-2-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Document the binding for the TLC591xx LED driver.
 
-> > > I would say, problem is because omap3-n900 binary DT is too large
-> 
-> I agree.
-> 
-> > OK if that's the case, then your patch makes sense to me. It also
-> > seems we can have the temporary stack be larger than the initial
-> > stack just for atags_to_fdt.
-> 
-> The stack size isn't the issue, but rather its location.  We need to 
-> position it away from the DT data.  The DT size is known and we could 
-> use that, plus some room for the insertion of new data coming from the
-> ATAG conversion.
-> 
-> Something like the following would be a more robust solution:
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+Cc: Matthew.Fatheree at belkin.com
+---
+ .../devicetree/bindings/leds/leds-tlc591xx.txt     | 40 ++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/leds/leds-tlc591xx.txt
 
-Tested-by: Pavel Machek <pavel@ucw.cz>
-
-(Note, that in 3.19 dts for n900 got too big, so we are actually
-triggering old bugs. That means that this is a regression fix, and
-should go in ASAP).
-
-
-
-> 
-> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> index 68be901759..89718de9dd 100644
-> --- a/arch/arm/boot/compressed/head.S
-> +++ b/arch/arm/boot/compressed/head.S
-> @@ -263,16 +263,37 @@ restart:	adr	r0, LC0
->  		 * OK... Let's do some funky business here.
->  		 * If we do have a DTB appended to zImage, and we do have
->  		 * an ATAG list around, we want the later to be translated
-> -		 * and folded into the former here.  To be on the safe side,
-> -		 * let's temporarily move  the stack away into the malloc
-> -		 * area.  No GOT fixup has occurred yet, but none of the
-> -		 * code we're about to call uses any global variable.
-> +		 * and folded into the former here. No GOT fixup has occurred
-> +		 * yet, but none of the code we're about to call uses any
-> +		 * global variable.
->  		*/
-> -		add	sp, sp, #0x10000
-> +
-> +		/* Get the initial DTB size */
-> +		ldr	r5, [r6, #4]
-> +#ifndef __ARMEB__
-> +		/* convert to little endian */
-> +		eor	r1, r5, r5, ror #16
-> +		bic	r1, r1, #0x00ff0000
-> +		mov	r5, r5, ror #8
-> +		eor	r5, r5, r1, lsr #8
-> +#endif
-> +		/* 50% DTB growth should be good enough */
-> +		add	r5, r5, r5, lsr #1
-> +		/* preserve 64-bit alignment */
-> +		add	r5, r5, #7
-> +		bic	r5, r5, #7
-> +		/* clamp to 32KB min and 1MB max */
-> +		movs	r1, r5, lsr #15
-> +		moveq	r5, #(1 << 15)
-> +		movs	r1, r5, lsr #20
-> +		movne	r5, #(1 << 20)
-> +
-> +		/* Temporarily relocate the stack past the DTB work space */
-> +		add	sp, sp, r5
->  		stmfd	sp!, {r0-r3, ip, lr}
->  		mov	r0, r8
->  		mov	r1, r6
-> -		sub	r2, sp, r6
-> +		mov	r2, r5
->  		bl	atags_to_fdt
->  
->  		/*
-> @@ -285,11 +306,11 @@ restart:	adr	r0, LC0
->  		bic	r0, r0, #1
->  		add	r0, r0, #0x100
->  		mov	r1, r6
-> -		sub	r2, sp, r6
-> +		mov	r2, r5
->  		bleq	atags_to_fdt
->  
->  		ldmfd	sp!, {r0-r3, ip, lr}
-> -		sub	sp, sp, #0x10000
-> +		sub	sp, sp, r5
->  #endif
->  
->  		mov	r8, r6			@ use the appended device tree
-> @@ -306,7 +327,7 @@ restart:	adr	r0, LC0
->  		subs	r1, r5, r1
->  		addhi	r9, r9, r1
->  
-> -		/* Get the dtb's size */
-> +		/* Get the current DTB size */
->  		ldr	r5, [r6, #4]
->  #ifndef __ARMEB__
->  		/* convert r5 (dtb size) to little endian */
-
-
-
+diff --git a/Documentation/devicetree/bindings/leds/leds-tlc591xx.txt b/Documentation/devicetree/bindings/leds/leds-tlc591xx.txt
+new file mode 100644
+index 000000000000..3bbbf7024411
+--- /dev/null
++++ b/Documentation/devicetree/bindings/leds/leds-tlc591xx.txt
+@@ -0,0 +1,40 @@
++LEDs connected to tlc59116 or tlc59108
++
++Required properties
++- compatible: should be "ti,tlc59116" or "ti,tlc59108"
++- #address-cells: must be 1
++- #size-cells: must be 0
++- reg: typically 0x68
++
++Each led is represented as a sub-node of the ti,tlc59116.
++See Documentation/devicetree/bindings/leds/common.txt
++
++LED sub-node properties:
++- reg: number of LED line, 0 to 15 or 0 to 7
++- label: (optional) name of LED
++- linux,default-trigger : (optional)
++
++Examples:
++
++tlc59116 at 68 {
++	#address-cells = <1>;
++	#size-cells = <0>;
++	compatible = "ti,tlc59116";
++	reg = <0x68>;
++
++	wan at 0 {
++		label = "wrt1900ac:amber:wan";
++		reg = <0x0>;
++	};
++
++	2g at 2 {
++		label = "wrt1900ac:white:2g";
++		reg = <0x2>;
++	};
++
++	alive at 9 {
++		label = "wrt1900ac:green:alive";
++		reg = <0x9>;
++		linux,default_trigger = "heartbeat";
++	};
++};
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+2.1.4
