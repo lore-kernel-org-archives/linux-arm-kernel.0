@@ -1,42 +1,63 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Mon, 26 Jan 2015 17:45:29 -0800
-Subject: [PATCH] usb: phy-generic: Don't fail on missing gpio reset
-Message-ID: <1422323129-20969-1-git-send-email-soren.brinkmann@xilinx.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 27 Jan 2015 13:04:37 +1100
+Subject: linux-next: manual merge of the net-next tree with the arm-soc tree
+Message-ID: <20150127130437.3cd05af9@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A reset through a GPIO is optional. Don't fail probing when it is
-missing.
+Hi all,
 
-Reported-by: Andreas F?rber <afaerber@suse.de>
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
-Hi Andreas,
+Today's linux-next merge of the net-next tree got a conflict in
+arch/arm/boot/dts/rk3288.dtsi between commit eecfe981cecd ("ARM: dts:
+rockchip: add RK3288 suspend support") from the arm-soc tree and commit
+3d3fb74afc9b ("ARM: dts: rockchip: add gmac info for rk3288") from the
+net-next tree.
 
-does this do the trick?
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-	Thanks,
-	S?ren
-
- drivers/usb/phy/phy-generic.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/usb/phy/phy-generic.c b/drivers/usb/phy/phy-generic.c
-index dd05254241fb..a73d4c738f0b 100644
---- a/drivers/usb/phy/phy-generic.c
-+++ b/drivers/usb/phy/phy-generic.c
-@@ -241,10 +241,8 @@ int usb_phy_gen_create_phy(struct device *dev, struct usb_phy_generic *nop,
- 
- 	if (err == -EPROBE_DEFER)
- 		return -EPROBE_DEFER;
--	if (err) {
--		dev_err(dev, "Error requesting RESET GPIO\n");
--		return err;
--	}
-+	if (err)
-+		nop->gpiod_reset = NULL;
- 
- 	nop->phy.otg = devm_kzalloc(dev, sizeof(*nop->phy.otg),
- 			GFP_KERNEL);
 -- 
-2.2.2.1.g63c5777
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/boot/dts/rk3288.dtsi
+index 2a878a35facc,910dcad2088a..000000000000
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@@ -734,24 -741,11 +750,29 @@@
+  			bias-disable;
+  		};
+  
++ 		pcfg_pull_none_12ma: pcfg-pull-none-12ma {
++ 			bias-disable;
++ 			drive-strength = <12>;
++ 		};
++ 
+ +		sleep {
+ +			global_pwroff: global-pwroff {
+ +				rockchip,pins = <0 0 RK_FUNC_1 &pcfg_pull_none>;
+ +			};
+ +
+ +			ddrio_pwroff: ddrio-pwroff {
+ +				rockchip,pins = <0 1 RK_FUNC_1 &pcfg_pull_none>;
+ +			};
+ +
+ +			ddr0_retention: ddr0-retention {
+ +				rockchip,pins = <0 2 RK_FUNC_1 &pcfg_pull_up>;
+ +			};
+ +
+ +			ddr1_retention: ddr1-retention {
+ +				rockchip,pins = <0 3 RK_FUNC_1 &pcfg_pull_up>;
+ +			};
+ +		};
+ +
+  		i2c0 {
+  			i2c0_xfer: i2c0-xfer {
+  				rockchip,pins = <0 15 RK_FUNC_1 &pcfg_pull_none>,
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150127/039daea7/attachment.sig>
