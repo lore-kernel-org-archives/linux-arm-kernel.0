@@ -1,262 +1,114 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 27 Jan 2015 13:31:37 +0000
-Subject: [PATCH v3 3/5] KVM: ARM VGIC add kvm_io_bus_ frontend
-In-Reply-To: <20150124115947.11052.73994.stgit@i3820>
-References: <20150124115815.11052.20755.stgit@i3820>
- <20150124115947.11052.73994.stgit@i3820>
-Message-ID: <54C79339.3070800@arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 27 Jan 2015 14:37:39 +0100
+Subject: N900 v3.19-rc5 arm atags_to_fdt.c is broken
+In-Reply-To: <alpine.LFD.2.11.1501261318590.1322@knanqh.ubzr>
+References: <201501232239.55801@pali> <201501232336.36187@pali>
+ <20150126161454.GE28663@atomide.com> <201501261723.10505@pali>
+ <20150126170323.GF28663@atomide.com>
+ <alpine.LFD.2.11.1501261318590.1322@knanqh.ubzr>
+Message-ID: <20150127133739.GB25306@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nikolay,
 
-On 24/01/15 11:59, Nikolay Nikolaev wrote:
-> In io_mem_abort remove the call to vgic_handle_mmio. The target is to have
-> a single MMIO handling path - that is through the kvm_io_bus_ API.
+> > > I would say, problem is because omap3-n900 binary DT is too large
 > 
-> Register a kvm_io_device in kvm_vgic_init on the whole vGIC MMIO region.
-> Both read and write calls are redirected to vgic_io_dev_access where
-> kvm_exit_mmio is composed to pass it to vm_ops.handle_mmio.
+> I agree.
 > 
+> > OK if that's the case, then your patch makes sense to me. It also
+> > seems we can have the temporary stack be larger than the initial
+> > stack just for atags_to_fdt.
 > 
-> Signed-off-by: Nikolay Nikolaev <n.nikolaev@virtualopensystems.com>
-> ---
->  arch/arm/kvm/mmio.c    |    3 -
->  include/kvm/arm_vgic.h |    3 -
->  virt/kvm/arm/vgic.c    |  123 ++++++++++++++++++++++++++++++++++++++++++++----
->  3 files changed, 114 insertions(+), 15 deletions(-)
+> The stack size isn't the issue, but rather its location.  We need to 
+> position it away from the DT data.  The DT size is known and we could 
+> use that, plus some room for the insertion of new data coming from the
+> ATAG conversion.
 > 
-> diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
-> index d852137..8dc2fde 100644
-> --- a/arch/arm/kvm/mmio.c
-> +++ b/arch/arm/kvm/mmio.c
-> @@ -230,9 +230,6 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
->  			       fault_ipa, 0);
->  	}
->  
-> -	if (vgic_handle_mmio(vcpu, run, &mmio))
-> -		return 1;
-> -
+> Something like the following would be a more robust solution:
 
-Why is this (whole patch) actually needed? Is that just to make it nicer
-by pulling everything under one umbrella?
-For enabling ioeventfd you actually don't need this patch, right?
-(I am asking because this breaks GICv3 emulation, see below)
+Tested-by: Pavel Machek <pavel@ucw.cz>
 
->  	if (handle_kernel_mmio(vcpu, run, &mmio))
->  		return 1;
->  
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index 7c55dd5..60639b1 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -237,6 +237,7 @@ struct vgic_dist {
->  	unsigned long		*irq_pending_on_cpu;
->  
->  	struct vgic_vm_ops	vm_ops;
-> +	struct kvm_io_device	*io_dev;
->  #endif
->  };
->  
-> @@ -311,8 +312,6 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
->  			bool level);
->  void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
->  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
-> -bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
-> -		      struct kvm_exit_mmio *mmio);
->  
->  #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
->  #define vgic_initialized(k)	(!!((k)->arch.vgic.nr_cpus))
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 0cc6ab6..195d2ba 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -31,6 +31,9 @@
->  #include <asm/kvm_emulate.h>
->  #include <asm/kvm_arm.h>
->  #include <asm/kvm_mmu.h>
-> +#include <asm/kvm.h>
+(Note, that in 3.19 dts for n900 got too big, so we are actually
+triggering old bugs. That means that this is a regression fix, and
+should go in ASAP).
+
+
+
+> 
+> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> index 68be901759..89718de9dd 100644
+> --- a/arch/arm/boot/compressed/head.S
+> +++ b/arch/arm/boot/compressed/head.S
+> @@ -263,16 +263,37 @@ restart:	adr	r0, LC0
+>  		 * OK... Let's do some funky business here.
+>  		 * If we do have a DTB appended to zImage, and we do have
+>  		 * an ATAG list around, we want the later to be translated
+> -		 * and folded into the former here.  To be on the safe side,
+> -		 * let's temporarily move  the stack away into the malloc
+> -		 * area.  No GOT fixup has occurred yet, but none of the
+> -		 * code we're about to call uses any global variable.
+> +		 * and folded into the former here. No GOT fixup has occurred
+> +		 * yet, but none of the code we're about to call uses any
+> +		 * global variable.
+>  		*/
+> -		add	sp, sp, #0x10000
 > +
-> +#include "iodev.h"
->  
->  /*
->   * How the whole thing works (courtesy of Christoffer Dall):
-> @@ -77,6 +80,7 @@
->  
->  #include "vgic.h"
->  
-> +static int vgic_register_kvm_io_dev(struct kvm *kvm);
->  static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu);
->  static void vgic_retire_lr(int lr_nr, int irq, struct kvm_vcpu *vcpu);
->  static struct vgic_lr vgic_get_lr(const struct kvm_vcpu *vcpu, int lr);
-> @@ -97,6 +101,7 @@ static bool queue_sgi(struct kvm_vcpu *vcpu, int irq)
->  
->  int kvm_vgic_map_resources(struct kvm *kvm)
->  {
-> +	vgic_register_kvm_io_dev(kvm);
->  	return kvm->arch.vgic.vm_ops.map_resources(kvm, vgic);
->  }
->  
-> @@ -776,27 +781,123 @@ bool vgic_handle_mmio_range(struct kvm_vcpu *vcpu, struct kvm_run *run,
->  }
->  
->  /**
-> - * vgic_handle_mmio - handle an in-kernel MMIO access for the GIC emulation
-> + * vgic_io_dev_access - handle an in-kernel MMIO access for the GIC emulation
->   * @vcpu:      pointer to the vcpu performing the access
-> - * @run:       pointer to the kvm_run structure
-> - * @mmio:      pointer to the data describing the access
-> + * @this:      pointer to the kvm_io_device structure
-> + * @addr:      the MMIO address being accessed
-> + * @len:       the length of the accessed data
-> + * @val:       pointer to the value being written,
-> + *             or where the read operation will store its result
-> + * @is_write:  flag to show whether a write access is performed
->   *
-> - * returns true if the MMIO access has been performed in kernel space,
-> - * and false if it needs to be emulated in user space.
-> + * returns 0 if the MMIO access has been performed in kernel space,
-> + * and 1 if it needs to be emulated in user space.
->   * Calls the actual handling routine for the selected VGIC model.
->   */
-> -bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
-> -		      struct kvm_exit_mmio *mmio)
-> +static int vgic_io_dev_access(struct kvm_vcpu *vcpu, struct kvm_io_device *this,
-> +			    gpa_t addr, int len, void *val, bool is_write)
->  {
-> -	if (!irqchip_in_kernel(vcpu->kvm))
-> -		return false;
-> +	struct kvm_exit_mmio mmio;
-> +	bool ret;
-> +
-> +	mmio = (struct kvm_exit_mmio) {
-> +		.phys_addr = addr,
-> +		.len = len,
-> +		.is_write = is_write,
-> +	};
-> +
-> +	if (is_write)
-> +		memcpy(mmio.data, val, len);
->  
->  	/*
->  	 * This will currently call either vgic_v2_handle_mmio() or
->  	 * vgic_v3_handle_mmio(), which in turn will call
->  	 * vgic_handle_mmio_range() defined above.
->  	 */
-> -	return vcpu->kvm->arch.vgic.vm_ops.handle_mmio(vcpu, run, mmio);
-> +	ret = vcpu->kvm->arch.vgic.vm_ops.handle_mmio(vcpu, vcpu->run, &mmio);
-> +
-> +	if (!is_write)
-> +		memcpy(val, mmio.data, len);
-> +
-> +	return ret ? 0 : 1;
-> +}
-> +
-> +static int vgic_io_dev_read(struct kvm_vcpu *vcpu, struct kvm_io_device *this,
-> +			  gpa_t addr, int len, void *val)
-> +{
-> +	return vgic_io_dev_access(vcpu, this, addr, len, val, false);
-> +}
-> +
-> +static int vgic_io_dev_write(struct kvm_vcpu *vcpu, struct kvm_io_device *this,
-> +			   gpa_t addr, int len, const void *val)
-> +{
-> +	return vgic_io_dev_access(vcpu, this, addr, len, (void *)val, true);
-> +}
-> +
-> +static const struct kvm_io_device_ops vgic_io_dev_ops = {
-> +	.read       = vgic_io_dev_read,
-> +	.write      = vgic_io_dev_write,
-> +};
-> +
-> +static int vgic_register_kvm_io_dev(struct kvm *kvm)
-> +{
-> +	int len = 0;
-> +	int ret;
-> +
-> +	struct vgic_dist *dist = &kvm->arch.vgic;
-> +	unsigned long base = dist->vgic_dist_base;
-> +	u32 type = kvm->arch.vgic.vgic_model;
-> +	struct kvm_io_device *dev;
-> +
-> +	if (IS_VGIC_ADDR_UNDEF(base)) {
-> +		kvm_err("Need to set vgic distributor address first\n");
-> +		return -ENXIO;
-> +	}
-> +
-> +	dev = kzalloc(sizeof(struct kvm_io_device), GFP_KERNEL);
-> +	if (!dev)
-> +		return -ENOMEM;
-> +
-> +	switch (type) {
-> +	case KVM_DEV_TYPE_ARM_VGIC_V2:
-> +		len = KVM_VGIC_V2_DIST_SIZE;
-> +		break;
-> +#ifdef CONFIG_ARM_GIC_V3
-> +	case KVM_DEV_TYPE_ARM_VGIC_V3:
-> +		len = KVM_VGIC_V3_DIST_SIZE;
-> +		break;
+> +		/* Get the initial DTB size */
+> +		ldr	r5, [r6, #4]
+> +#ifndef __ARMEB__
+> +		/* convert to little endian */
+> +		eor	r1, r5, r5, ror #16
+> +		bic	r1, r1, #0x00ff0000
+> +		mov	r5, r5, ror #8
+> +		eor	r5, r5, r1, lsr #8
 > +#endif
-> +	}
-
-But this only registers the GIC distributor, leaving out the
-redistributor regions introduced by GICv3. To me it looks like this
-kvm_iodevice registration code should be moved into *-emul.c, where each
-emulated device registers what it needs.
-Especially in the wake of the upcoming v2M/ITS emulation I think we need
-a proper solution for this, so I am wondering if we could just leave
-that patch out (at least for now) and keep the two-line special
-treatment for the VGIC above in.
-That should enable ioeventfd without breaking the VGIC.
-
-Cheers,
-Andre.
-
+> +		/* 50% DTB growth should be good enough */
+> +		add	r5, r5, r5, lsr #1
+> +		/* preserve 64-bit alignment */
+> +		add	r5, r5, #7
+> +		bic	r5, r5, #7
+> +		/* clamp to 32KB min and 1MB max */
+> +		movs	r1, r5, lsr #15
+> +		moveq	r5, #(1 << 15)
+> +		movs	r1, r5, lsr #20
+> +		movne	r5, #(1 << 20)
 > +
-> +	kvm_iodevice_init(dev, &vgic_io_dev_ops);
-> +
-> +	mutex_lock(&kvm->slots_lock);
-> +
-> +	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS,
-> +			base, len, dev);
-> +	if (ret < 0)
-> +		goto out_unlock;
-> +	mutex_unlock(&kvm->slots_lock);
-> +
-> +	kvm->arch.vgic.io_dev = dev;
-> +
-> +	return 0;
-> +
-> +out_unlock:
-> +	mutex_unlock(&kvm->slots_lock);
-> +	kfree(dev);
-> +	return ret;
-> +}
-> +
-> +static void vgic_unregister_kvm_io_dev(struct kvm *kvm)
-> +{
-> +	struct vgic_dist *dist = &kvm->arch.vgic;
-> +
-> +	if (dist) {
-> +		kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS, dist->io_dev);
-> +		kfree(dist->io_dev);
-> +		dist->io_dev = NULL;
-> +	}
->  }
+> +		/* Temporarily relocate the stack past the DTB work space */
+> +		add	sp, sp, r5
+>  		stmfd	sp!, {r0-r3, ip, lr}
+>  		mov	r0, r8
+>  		mov	r1, r6
+> -		sub	r2, sp, r6
+> +		mov	r2, r5
+>  		bl	atags_to_fdt
 >  
->  static int vgic_nr_shared_irqs(struct vgic_dist *dist)
-> @@ -1428,6 +1529,8 @@ void kvm_vgic_destroy(struct kvm *kvm)
->  	struct kvm_vcpu *vcpu;
->  	int i;
+>  		/*
+> @@ -285,11 +306,11 @@ restart:	adr	r0, LC0
+>  		bic	r0, r0, #1
+>  		add	r0, r0, #0x100
+>  		mov	r1, r6
+> -		sub	r2, sp, r6
+> +		mov	r2, r5
+>  		bleq	atags_to_fdt
 >  
-> +	vgic_unregister_kvm_io_dev(kvm);
-> +
->  	kvm_for_each_vcpu(i, vcpu, kvm)
->  		kvm_vgic_vcpu_destroy(vcpu);
+>  		ldmfd	sp!, {r0-r3, ip, lr}
+> -		sub	sp, sp, #0x10000
+> +		sub	sp, sp, r5
+>  #endif
 >  
-> 
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
-> 
+>  		mov	r8, r6			@ use the appended device tree
+> @@ -306,7 +327,7 @@ restart:	adr	r0, LC0
+>  		subs	r1, r5, r1
+>  		addhi	r9, r9, r1
+>  
+> -		/* Get the dtb's size */
+> +		/* Get the current DTB size */
+>  		ldr	r5, [r6, #4]
+>  #ifndef __ARMEB__
+>  		/* convert r5 (dtb size) to little endian */
+
+
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
