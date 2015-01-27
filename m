@@ -1,37 +1,59 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 26 Jan 2015 18:44:26 -0800
-Subject: [GIT PULL] Samsung DT updates for v3.20
-In-Reply-To: <54C31898.1060906@kernel.org>
-References: <54C31898.1060906@kernel.org>
-Message-ID: <20150127024426.GD22154@quad.lixom.net>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Tue, 27 Jan 2015 02:58:41 +0000
+Subject: [PATCH v2 00/12] AT91 pm cleanup for 3.20
+In-Reply-To: <20150126095554.GA18807@gradator.net>
+References: <1422265005-22937-1-git-send-email-wenyou.yang@atmel.com>
+ <20150126095554.GA18807@gradator.net>
+Message-ID: <B256D81BAE5131468A838E5D7A243641BFD35BFC@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 24, 2015 at 12:59:20PM +0900, Kukjin Kim wrote:
-> Hi,
-> 
-> Please pull Samsung DT updates for v3.20.
-> I checked to use signed tag in this time ;)
-> 
-> Thanks and if any problems, please let me know.
-> 
-> - Kukjin
-> 
-> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
-> 
->   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> tags/samsung-dt
-> 
-> for you to fetch changes up to 23c76dc666471dce5ce71b620839d2465723a7c9:
-> 
->   ARM: dts: Configure regulators for suspend on exynos Peach boards
-> (2015-01-15 00:30:49 +0900)
-
-Merged, thanks for the tag description!
 
 
--Olof
+> -----Original Message-----
+> From: Sylvain Rochet [mailto:sylvain.rochet at finsecur.com]
+> Sent: Monday, January 26, 2015 5:56 PM
+> To: Yang, Wenyou
+> Cc: Ferre, Nicolas; linux at arm.linux.org.uk; linux-arm-kernel at lists.infradead.org;
+> linux-kernel at vger.kernel.org; alexandre.belloni at free-electrons.com;
+> peda at axentia.se
+> Subject: Re: [PATCH v2 00/12] AT91 pm cleanup for 3.20
+> 
+> Hello Wenyou,
+> 
+> On Mon, Jan 26, 2015 at 05:36:45PM +0800, Wenyou Yang wrote:
+> > Hi Nicolas,
+> >
+> > This version is rebased on the branch: at91-3.20-cleanup of the repository
+> > 	git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git
+> >
+> > It is purpose to clean up the PM code, includes the patches from Peter Rosin
+> and Sylvain Rochet.
+> >
+> > Since verifying the USB clock and USB PLL disabling before suspending
+> > to memory, it aslo depends on the following patch serials from Sylvain:
+> > 	[PATCHv6 0/5] USB: gadget: atmel_usba_udc: Driver improvements
+> > 	[PATCHv7 0/6] USB: host: Atmel OHCI and EHCI drivers improvements
+> >
+> > Removes CONFIG_AT91_SLOW_CLOCK config item to simply the PM config,
+> > The suspend to standby mode uses the same sram function as the suspend to
+> memory mode.
+> > Remove some unused code.
+> >
+> > Alexandr & Sylvain, Thank you very much for so many feedbacks.
+> >
+> > Changes in v2:
+> >  - Rebase on the at91-3.20-cleanup branch
+> >  - Recover the verify clock condition, only for suspend to memory.
+> >  - Collect ACK from Alexandre
+> >  - Add the macro for PM mode
+> 
+> Did you fix the slow_clock == NULL condition with the change suggested by
+> Alexandre ?
+Sorry, didn't. I will send v3 to fix it.
+
+> 
+> Sylvain
+
+Best Regards,
+Wenyou Yang
