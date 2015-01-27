@@ -1,163 +1,116 @@
-From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
-Date: Tue, 27 Jan 2015 02:14:26 +0100
-Subject: [PATCH v3] ARM: zynq: DT: Add USB to device tree
-In-Reply-To: <bb50396a16ab4042bdb554f72bde0bf7@BL2FFO11FD023.protection.gbl>
-References: <1417536431-27759-1-git-send-email-soren.brinkmann@xilinx.com>
- <d78fedd84f354d80985187f851cb3cd1@BN1AFFO11FD055.protection.gbl>
- <54C5F89A.3090901@suse.de> <54C5F965.90100@monstr.eu>
- <54C5FBC3.7030903@suse.de> <54C60A56.7010403@suse.de>
- <c65880cef67945ebaf61306febc1349b@BN1BFFO11FD010.protection.gbl>
- <54C6698F.5020301@suse.de>
- <8f367d9b85924f8e9cc9cb6fdff9a054@BN1BFFO11FD040.protection.gbl>
- <bb50396a16ab4042bdb554f72bde0bf7@BL2FFO11FD023.protection.gbl>
-Message-ID: <54C6E672.4030602@suse.de>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 27 Jan 2015 10:17:09 +0900
+Subject: [PATCH 00/14 v2] ARM: shmobile: Remove sh7372/Mackerel and ZBOOT
+ MMC/SDHI support V2
+In-Reply-To: <20150126061747.6848.9708.sendpatchset@little-apple>
+References: <20150126061747.6848.9708.sendpatchset@little-apple>
+Message-ID: <20150127011707.GD29710@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ linux-gpio, linux-usb, Felipe Balbi
-
-Am 26.01.2015 um 19:44 schrieb S?ren Brinkmann:
-> On Mon, 2015-01-26 at 08:23AM -0800, S?ren Brinkmann wrote:
->> On Mon, 2015-01-26 at 05:21PM +0100, Andreas F?rber wrote:
->>> Am 26.01.2015 um 16:50 schrieb S?ren Brinkmann:
->>>> On Mon, 2015-01-26 at 10:35AM +0100, Andreas F?rber wrote:
->>>>> Am 26.01.2015 um 09:33 schrieb Andreas F?rber:
->>>>>> Am 26.01.2015 um 09:23 schrieb Michal Simek:
->>>>>>> On 01/26/2015 09:19 AM, Andreas F?rber wrote:
->>>>>>>> And if I apply it to my -next based tree, adding corresponding nodes to
->>>>>>>> zynq-parallella.dts, I get repeatedly:
->>>>>>>>
->>>>>>>> [  +0,012242] ci_hdrc ci_hdrc.0: no of_node; not parsing pinctrl DT
->>>>>>>> [  +0,000157] ci_hdrc ci_hdrc.0: ChipIdea HDRC found, lpm: 0; cap:
->>>>>>>> f090e100 op: f090e140
->>>>>>>> [  +0,000081] platform ci_hdrc.0: Driver ci_hdrc requests probe deferral
->>>>>>>> [  +0,005360] ci_hdrc ci_hdrc.1: no of_node; not parsing pinctrl DT
->>>>>>>> [  +0,000120] ci_hdrc ci_hdrc.1: ChipIdea HDRC found, lpm: 0; cap:
->>>>>>>> f0910100 op: f0910140
->>>>>>>> [  +0,001810] platform ci_hdrc.1: Driver ci_hdrc requests probe deferral
->>>>>>>>
->>>>>>>> Am I missing any other patches or config options?
-[...]
->>>>>>> Why is it deferred? Is it because of pinmuxing stuff?
->>>>>>
->>>>>> No, happened without as well.
->>>>>>
->>>>>> Looking at a different place in dmesg, I spot this:
->>>>>>
->>>>>> [  +0,003988] usb_phy_generic phy0: GPIO lookup for consumer reset-gpios
->>>>>> [  +0,000012] usb_phy_generic phy0: using device tree for GPIO lookup
->>>>>> [  +0,000015] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpios'
->>>>>> property
->>>>>>  of node '/phy0[0]'
->>>>>> [  +0,000013] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpio'
->>>>>> property
->>>>>> of node '/phy0[0]'
->>>>>> [  +0,000010] usb_phy_generic phy0: using lookup tables for GPIO lookup
->>>>>> [  +0,000153] usb_phy_generic phy0: lookup for GPIO reset-gpios failed
->>>>>> [  +0,000012] usb_phy_generic phy0: Error requesting RESET GPIO
->>>>>> [  +0,004360] usb_phy_generic: probe of phy0 failed with error -2
->>>>>> [  +0,004991] usb_phy_generic phy1: GPIO lookup for consumer reset-gpios
->>>>>> [  +0,000012] usb_phy_generic phy1: using device tree for GPIO lookup
->>>>>> [  +0,000013] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpios'
->>>>>> property
->>>>>>  of node '/phy1[0]'
->>>>>> [  +0,000013] of_get_named_gpiod_flags: can't parse 'reset-gpios-gpio'
->>>>>> property of node '/phy1[0]'
->>>>>> [  +0,000010] usb_phy_generic phy1: using lookup tables for GPIO lookup
->>>>>> [  +0,000012] usb_phy_generic phy1: lookup for GPIO reset-gpios failed
->>>>>> [  +0,000011] usb_phy_generic phy1: Error requesting RESET GPIO
->>>>>> [  +0,004337] usb_phy_generic: probe of phy1 failed with error -2
->>>>>>
->>>>>> So, I guess the chipidea driver is deferring because the phys want a
->>>>>> property that neither me nor you are specifying? [...]
-[...]
->>>>> In my manuals and notes I can't find any GPIO being used as reset for
->>>>> the USB PHYs. Any thoughts appreciated.
->>>>
->>>> Such a connection is optional. The platform might rely on its reset
->>>> circuit, though it might not work for warm reboots.
->>>> I haven't looked at parallela docs, but if there is a schematic
->>>> available, that should tell you if/what is connected to the PHY reset
->>>> pin.
->>>
->>> I do have the schematic, and the way I read it, only the on-board reset
->>> button resets the PHYs.
->>>
->>> Yet it looks as if usb-nop-xceiv insists on a reset-gpios above, no?
->>> Does it work on your boards with linux-next?
->>
->> I haven't re-tested it since I submitted the patches, but at that time
->> it worked. But I also didn't test USB with the pinctrl patches together.
->> I'll do some testing later today.
+On Mon, Jan 26, 2015 at 03:17:47PM +0900, Magnus Damm wrote:
+> ARM: shmobile: Remove sh7372/Mackerel and ZBOOT MMC/SDHI support V2
 > 
-> So, just did a test. I took all the pinctrl stuff and this patch and ran
-> it on a zc702. I plugged in a thumb drive and that worked just fine. So,
-> basically this patch could go in, despite missing pinctrl properties.
+> [PATCH 01/14 v2] ARM: shmobile: mackerel: Remove ZBOOT code
+> [PATCH 02/14 v2] ARM: shmobile: mackerel: Remove Legacy C board code
+> [PATCH 03/14 v2] ARM: shmobile: mackerel dts: Remove Legacy DTS file
+> [PATCH 04/14 v2] ARM: shmobile: mackerel: Remove DT binding documentation
+> [PATCH 05/14 v2] ARM: shmobile: mackerel: Remove mach-type entry
+> [PATCH 06/14 v2] ARM: shmobile: mackerel: Remove defconfig
+> [PATCH 07/14 v2] ARM: shmobile: mackerel: Remove from MAINTAINERS
+> [PATCH 08/14 v2] ARM: shmobile: sh7372: Remove ZBOOT MMC/SDHI support
+> [PATCH 09/14 v2] ARM: shmobile: sh7372: Remove Legacy C SoC code
+> [PATCH 10/14 v2] ARM: shmobile: sh7372: Remove DT binding documentation
+> [PATCH 11/14 v2] ARM: shmobile: sh7372 dtsi: Remove Legacy DTSI file
+> [PATCH 12/14 v2] Documentation: Remove ZBOOT MMC/SDHI utility and docs
+> [PATCH 13/14 v2] pinctrl: sh-pfc: sh7372: Remove PFC support
+> [PATCH 14/14 v2] pinctrl: sh-pfc: sh7372: Remove DT binding documentation
+> 
+> Here is my latest attempt (V2) of legacy board and SoC support removal
+> for Mackerel and sh7372. Both the ARM mach-shmobile code base and the
+> PINCTRL subsystem is affected.
+> 
+> Also get rid of the remaining ZBOOT MMC/SDHI code, documentation and
+> utility that has no user once sh7372 is gone.
+> 
+> The Cortex-A8 based sh7372 SoC is rather old and never went into mass
+> production anyway, so these patches that remove SoC and board support
+> will only affect a few selected developers.
+> 
+> I wish we had some way to make use of the ZBOOT MMC/SDHI code, but
+> without any board or SoC code it makes little sense to keep it.
+> 
+> Thanks to Laurent and Geert for review!
 
-For my board I needed the following workaround:
+Sad to see all our hard work being deleted. But at the same
+time its nice to be able to reduce our footprint by 8681 lines!
 
-diff --git a/drivers/usb/phy/phy-generic.c b/drivers/usb/phy/phy-generic.c
-index dd05254241fb..96c7c36e22a6 100644
---- a/drivers/usb/phy/phy-generic.c
-+++ b/drivers/usb/phy/phy-generic.c
-@@ -218,13 +218,13 @@ int usb_phy_gen_create_phy(struct device *dev,
-struct usb_phy_generic *nop,
-                        clk_rate = 0;
+I have queued up the first 12 patches of this series, that is the
+non-pfc patches. They are queued up in a new sh7372-soc-removal-for-v3.21
+branch which I intend to push as part of renesas-devel-20150127-v3.19-rc6 a
+little later today.
 
-                needs_vcc = of_property_read_bool(node, "vcc-supply");
--               nop->gpiod_reset = devm_gpiod_get(dev, "reset-gpios");
-+               /*nop->gpiod_reset = devm_gpiod_get(dev, "reset-gpios");
-                err = PTR_ERR(nop->gpiod_reset);
-                if (!err) {
-                        nop->gpiod_vbus = devm_gpiod_get(dev,
+With regards to the PFC patches, the last two patches in the series, I have
+spoken with Laurent about this and my understanding is that his feeling
+is that they could be merged independently by the pinctl maintainer, Linus
+Walleij.
 
-"vbus-detect-gpio");
-                        err = PTR_ERR(nop->gpiod_vbus);
--               }
-+               }*/
-        } else if (pdata) {
-                type = pdata->type;
-                clk_rate = pdata->clk_rate;
+Laurent, if that is correct could see about working with Linus towards
+that goal? If not, please let me know and we can work out another plan.
 
-[  +0,004738] usb_phy_generic phy0: Looking up vcc-supply from device tree
-[  +0,000018] usb_phy_generic phy0: Looking up vcc-supply property in
-node /phy0 failed
-[  +0,000011] phy0 supply vcc not found, using dummy regulator
-[  +0,004844] usb_phy_generic phy1: Looking up vcc-supply from device tree
-[  +0,000017] usb_phy_generic phy1: Looking up vcc-supply property in
-node /phy1 failed
-[  +0,000008] phy1 supply vcc not found, using dummy regulator
-
-Basically, usb-nop-xceiv fails to probe when reset-gpios property is
-absent (and probably also when vbus-detect-gpio property is absent).
-So I don't understand why it would work for your boards without such
-properties on today's linux-next... sounds like you tested a different tree?
-
-Take a look at __gpiod_get_index() called from devm_gpiod_get():
-http://lxr.free-electrons.com/source/drivers/gpio/gpiolib.c#L1648
-
-!desc || desc == ERR_PTR(-ENOENT) results in the above "using lookup
-tables for GPIO lookup", then IS_ERR(desc) in "lookup for GPIO %s failed".
-
-My interpretation is that this gpiolib code is probably okay but that
-the generic usb phy code fails to check for specific error codes such as
-absent property (as opposed to deferred resolution of a phandle, where
-we do want to return -EDEFER early).
-
-My work tree: https://github.com/afaerber/linux/commits/parallella-next
-
-Regards,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Jennifer Guild, Dilip Upmanyu,
-Graham Norton; HRB 21284 (AG N?rnberg)
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150127/cc356bd0/attachment.sig>
+> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+> ---
+> 
+>  Built on top of renesas-devel-20150123-v3.19-rc5
+> 
+>  Documentation/Makefile                                            |    2 
+>  Documentation/arm/Makefile                                        |    1 
+>  Documentation/arm/SH-Mobile/Makefile                              |    7 
+>  Documentation/arm/SH-Mobile/vrl4.c                                |  170 
+>  Documentation/arm/SH-Mobile/zboot-rom-mmcif.txt                   |   29 
+>  Documentation/arm/SH-Mobile/zboot-rom-sdhi.txt                    |   42 
+>  Documentation/devicetree/bindings/arm/shmobile.txt                |    4 
+>  Documentation/devicetree/bindings/pinctrl/renesas,pfc-pinctrl.txt |    8 
+>  MAINTAINERS                                                       |    1 
+>  arch/arm/Kconfig                                                  |   29 
+>  arch/arm/Kconfig.debug                                            |    7 
+>  arch/arm/boot/compressed/Makefile                                 |   15 
+>  arch/arm/boot/compressed/head-shmobile.S                          |   30 
+>  arch/arm/boot/compressed/mmcif-sh7372.c                           |   88 
+>  arch/arm/boot/compressed/sdhi-sh7372.c                            |   95 
+>  arch/arm/boot/compressed/sdhi-shmobile.c                          |  449 -
+>  arch/arm/boot/compressed/sdhi-shmobile.h                          |   11 
+>  arch/arm/boot/dts/Makefile                                        |    1 
+>  arch/arm/boot/dts/sh7372-mackerel.dts                             |   26 
+>  arch/arm/boot/dts/sh7372.dtsi                                     |   35 
+>  arch/arm/configs/mackerel_defconfig                               |  157 
+>  arch/arm/mach-shmobile/Kconfig                                    |   16 
+>  arch/arm/mach-shmobile/Makefile                                   |    6 
+>  arch/arm/mach-shmobile/Makefile.boot                              |    1 
+>  arch/arm/mach-shmobile/board-mackerel.c                           | 1522 -----
+>  arch/arm/mach-shmobile/clock-sh7372.c                             |  620 --
+>  arch/arm/mach-shmobile/common.h                                   |    1 
+>  arch/arm/mach-shmobile/entry-intc.S                               |   54 
+>  arch/arm/mach-shmobile/include/mach/head-mackerel.txt             |   93 
+>  arch/arm/mach-shmobile/include/mach/mmc-mackerel.h                |   38 
+>  arch/arm/mach-shmobile/include/mach/mmc.h                         |   16 
+>  arch/arm/mach-shmobile/include/mach/sdhi-sh7372.h                 |   21 
+>  arch/arm/mach-shmobile/include/mach/sdhi.h                        |   16 
+>  arch/arm/mach-shmobile/include/mach/zboot.h                       |    5 
+>  arch/arm/mach-shmobile/intc-sh7372.c                              |  672 --
+>  arch/arm/mach-shmobile/pm-sh7372.c                                |  549 --
+>  arch/arm/mach-shmobile/setup-sh7372.c                             | 1016 ---
+>  arch/arm/mach-shmobile/sh7372.h                                   |   84 
+>  arch/arm/mach-shmobile/sleep-sh7372.S                             |   98 
+>  arch/arm/tools/mach-types                                         |    1 
+>  drivers/pinctrl/sh-pfc/Kconfig                                    |    5 
+>  drivers/pinctrl/sh-pfc/Makefile                                   |    1 
+>  drivers/pinctrl/sh-pfc/core.c                                     |    9 
+>  drivers/pinctrl/sh-pfc/core.h                                     |    1 
+>  drivers/pinctrl/sh-pfc/pfc-sh7372.c                               | 2645 ----------
+>  45 files changed, 8 insertions(+), 8689 deletions(-)
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
