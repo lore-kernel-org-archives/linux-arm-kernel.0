@@ -1,55 +1,106 @@
 From: bhuvanchandra.dv@toradex.com (Bhuvanchandra DV)
-Date: Tue, 27 Jan 2015 16:27:18 +0530
-Subject: [PATCH 1/7] ARM: vf610: add second DSPI instance
+Date: Tue, 27 Jan 2015 16:27:19 +0530
+Subject: [PATCH 2/7] ARM: vf-colibri: add SPI support and enable MCP2515 CAN
 In-Reply-To: <1422356244-15629-1-git-send-email-bhuvanchandra.dv@toradex.com>
 References: <1422356244-15629-1-git-send-email-bhuvanchandra.dv@toradex.com>
-Message-ID: <1422356244-15629-2-git-send-email-bhuvanchandra.dv@toradex.com>
+Message-ID: <1422356244-15629-3-git-send-email-bhuvanchandra.dv@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Stefan Agner <stefan@agner.ch>
+MCP2515 CAN controller is available on Colibri Evaluation board.
+Hence enable MCP2515 CAN.
+
 Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
 ---
- arch/arm/boot/dts/vf500.dtsi |  4 ++++
- arch/arm/boot/dts/vfxxx.dtsi | 11 +++++++++++
- 2 files changed, 15 insertions(+)
+ arch/arm/boot/dts/vf-colibri-eval-v3.dtsi | 31 +++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/vf-colibri.dtsi         | 15 +++++++++++++++
+ 2 files changed, 46 insertions(+)
 
-diff --git a/arch/arm/boot/dts/vf500.dtsi b/arch/arm/boot/dts/vf500.dtsi
-index 1dbf8d2..f5f807c 100644
---- a/arch/arm/boot/dts/vf500.dtsi
-+++ b/arch/arm/boot/dts/vf500.dtsi
-@@ -66,6 +66,10 @@
- 	interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
+diff --git a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
+index 36cafbf..69364b0 100644
+--- a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
++++ b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
+@@ -12,6 +12,12 @@
+ 		bootargs = "console=ttyLP0,115200";
+ 	};
+ 
++	clk16m: clk16m {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <16000000>;
++	};
++
+ 	regulators {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+@@ -47,6 +53,21 @@
+ 	status  = "okay";
  };
  
 +&dspi1 {
-+	interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;
++	status = "okay";
++
++	can2: mcp2515 at 0 {
++		compatible = "microchip,mcp2515";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_can_int>;
++		reg = <0>;
++		clocks = <&clk16m>;
++		spi-max-frequency = <10000000>;
++		interrupt-parent = <&gpio2>;
++		interrupts = <11 GPIO_ACTIVE_LOW>;
++	};
++};
++
+ &esdhc1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_esdhc1>;
+@@ -94,3 +115,13 @@
+ &usbh1 {
+ 	vbus-supply = <&usbh_vbus_reg>;
+ };
++
++&iomuxc {
++	vf610-colibri {
++		pinctrl_can_int: can_int {
++			fsl,pins = <
++				VF610_PAD_PTB21__GPIO_43	0x22ed
++			>;
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/vf-colibri.dtsi b/arch/arm/boot/dts/vf-colibri.dtsi
+index 5c2b732..fbef082 100644
+--- a/arch/arm/boot/dts/vf-colibri.dtsi
++++ b/arch/arm/boot/dts/vf-colibri.dtsi
+@@ -23,6 +23,12 @@
+ 	status = "okay";
+ };
+ 
++&dspi1 {
++	bus-num = <1>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_dspi1>;
 +};
 +
  &edma0 {
- 	interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>,
- 			<GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
-diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
-index a29c7ce..789744b 100644
---- a/arch/arm/boot/dts/vfxxx.dtsi
-+++ b/arch/arm/boot/dts/vfxxx.dtsi
-@@ -139,6 +139,17 @@
- 				status = "disabled";
- 			};
+ 	status = "okay";
+ };
+@@ -107,6 +113,15 @@
+ 			>;
+ 		};
  
-+			dspi1: dspi1 at 4002d000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "fsl,vf610-dspi";
-+				reg = <0x4002d000 0x1000>;
-+				clocks = <&clks VF610_CLK_DSPI1>;
-+				clock-names = "dspi";
-+				spi-num-chipselects = <5>;
-+				status = "disabled";
-+			};
++		pinctrl_dspi1: dspi1grp {
++			fsl,pins = <
++				VF610_PAD_PTD5__DSPI1_CS0		0x33e2
++				VF610_PAD_PTD6__DSPI1_SIN		0x33e1
++				VF610_PAD_PTD7__DSPI1_SOUT		0x33e2
++				VF610_PAD_PTD8__DSPI1_SCK		0x33e2
++			>;
++		};
 +
- 			sai2: sai at 40031000 {
- 				compatible = "fsl,vf610-sai";
- 				reg = <0x40031000 0x1000>;
+ 		pinctrl_esdhc1: esdhc1grp {
+ 			fsl,pins = <
+ 				VF610_PAD_PTA24__ESDHC1_CLK	0x31ef
 -- 
 2.2.2
