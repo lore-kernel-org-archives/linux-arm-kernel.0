@@ -1,92 +1,55 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 27 Jan 2015 16:46:20 +0000
-Subject: [PATCH 4/8] arm64: Add EL2 switch to soft_restart
-In-Reply-To: <1422308928.21823.16.camel@infradead.org>
-References: <cover.1421449714.git.geoff@infradead.org>
- <bb44d4eee4fab15278e4a8829a0981878bc9acd7.1421449714.git.geoff@infradead.org>
- <20150126190223.GO23313@leverpostej>
- <1422308928.21823.16.camel@infradead.org>
-Message-ID: <20150127164619.GL17721@leverpostej>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 27 Jan 2015 09:48:43 -0700
+Subject: [PATCH v2 04/11] ARM: tegra: Set spi-max-frequency property to
+ flash node
+In-Reply-To: <CAAObsKDx_W23OTL2RE4xxgXL-rtp3npkBtx6qMHV1j8ZXmo1rw@mail.gmail.com>
+References: <1421338359-27467-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1421338359-27467-5-git-send-email-tomeu.vizoso@collabora.com>
+ <54B7F84A.6020906@wwwdotorg.org>
+ <CAAObsKDx_W23OTL2RE4xxgXL-rtp3npkBtx6qMHV1j8ZXmo1rw@mail.gmail.com>
+Message-ID: <54C7C16B.2080003@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 26, 2015 at 09:48:48PM +0000, Geoff Levand wrote:
-> Hi Mark,
-> 
-> On Mon, 2015-01-26 at 19:02 +0000, Mark Rutland wrote:
-> > On Sat, Jan 17, 2015 at 12:23:34AM +0000, Geoff Levand wrote:
-> > > When a CPU is reset it needs to be put into the exception level it had when it
-> > > entered the kernel.  Update cpu_reset() to accept an argument el2_switch which
-> > > signals cpu_reset() to enter the soft reset address at EL2.  If el2_switch is
-> > > not set the soft reset address will be entered at EL1.
-> > > 
-> > > Update cpu_soft_restart() and soft_restart() to pass the return of
-> > > is_hyp_mode_available() as the el2_switch value to cpu_reset().  Also update the
-> > > comments of cpu_reset(), cpu_soft_restart() and soft_restart() to reflect this
-> > > change.
-> > > 
-> > > Signed-off-by: Geoff Levand <geoff@infradead.org>
-> > > ---
-> > >  arch/arm64/include/asm/proc-fns.h |  4 ++--
-> > >  arch/arm64/kernel/process.c       | 10 ++++++++-
-> > >  arch/arm64/mm/proc.S              | 47 +++++++++++++++++++++++++++++----------
-> > >  3 files changed, 46 insertions(+), 15 deletions(-)
-> > > 
-> > > diff --git a/arch/arm64/include/asm/proc-fns.h b/arch/arm64/include/asm/proc-fns.h
-> > > index 9a8fd84..339394d 100644
-> > > --- a/arch/arm64/include/asm/proc-fns.h
-> > > +++ b/arch/arm64/include/asm/proc-fns.h
-> > > @@ -32,8 +32,8 @@ extern void cpu_cache_off(void);
-> > >  extern void cpu_do_idle(void);
-> > >  extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
-> > >  extern void cpu_reset(unsigned long addr) __attribute__((noreturn));
-> > > -void cpu_soft_restart(phys_addr_t cpu_reset,
-> > > -		unsigned long addr) __attribute__((noreturn));
-> > > +void cpu_soft_restart(phys_addr_t cpu_reset, unsigned long el2_switch,
-> > > +		      unsigned long addr) __attribute__((noreturn));
-> > >  extern void cpu_do_suspend(struct cpu_suspend_ctx *ptr);
-> > >  extern u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
-> > >  
-> > > diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> > > index fde9923..371bbf1 100644
-> > > --- a/arch/arm64/kernel/process.c
-> > > +++ b/arch/arm64/kernel/process.c
-> > > @@ -50,6 +50,7 @@
-> > >  #include <asm/mmu_context.h>
-> > >  #include <asm/processor.h>
-> > >  #include <asm/stacktrace.h>
-> > > +#include <asm/virt.h>
-> > >  
-> > >  #ifdef CONFIG_CC_STACKPROTECTOR
-> > >  #include <linux/stackprotector.h>
-> > > @@ -60,7 +61,14 @@ EXPORT_SYMBOL(__stack_chk_guard);
-> > >  void soft_restart(unsigned long addr)
-> > >  {
-> > >  	setup_mm_for_reboot();
-> > > -	cpu_soft_restart(virt_to_phys(cpu_reset), addr);
-> > > +
-> > > +	/* TODO: Remove this conditional when KVM can support CPU restart. */
-> > > +	if (IS_ENABLED(CONFIG_KVM))
-> > > +		cpu_soft_restart(virt_to_phys(cpu_reset), 0, addr);
-> > 
-> > If we haven't torn down KVM, doesn't that mean that KVM is active at EL2
-> > (with MMU and caches on) at this point?
-> > 
-> > If that's the case then we cannot possibly try to call kexec(), because
-> > we cannot touch the memory used by the page tables for those EL2
-> > mappings. Things will explode if we do.
-> 
-> This conditional is just if KVM, do things the old way (don't try to
-> switch exception levels).  It is to handle the system shutdown case.
+On 01/27/2015 04:13 AM, Tomeu Vizoso wrote:
+> On 15 January 2015 at 18:26, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 01/15/2015 09:12 AM, Tomeu Vizoso wrote:
+>>>
+>>> To silence a warning on Nyan boards.
+>>>
+>>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>>> ---
+>>>    arch/arm/boot/dts/tegra124-nyan-big.dts | 1 +
+>>>    1 file changed, 1 insertion(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/tegra124-nyan-big.dts
+>>> b/arch/arm/boot/dts/tegra124-nyan-big.dts
+>>> index 9a9cffe..94c7ba9 100644
+>>> --- a/arch/arm/boot/dts/tegra124-nyan-big.dts
+>>> +++ b/arch/arm/boot/dts/tegra124-nyan-big.dts
+>>> @@ -1660,6 +1660,7 @@
+>>>
+>>>                  flash at 0 {
+>>>                          compatible = "winbond,w25q32dw";
+>>> +                       spi-max-frequency = <25000000>;
+>>
+>>
+>> This property already exists in the SPI controller. Isn't the max frequency
+>> supposed to inherit from there? If so, shouldn't the code not warn when such
+>> inheritance happens, i.e. it'd be better to fix the code?
+>
+> I don't think it's supposed to fall back to the controller's max freq,
+> as each device has its own maximum frequency that it can support and
+> it's not related to what the master supports.
 
-Having grepped treewide for soft_restart, other than kexec there are no
-users for arm64. So surely kexec is the only case to cater for at the
-moment?
+If the controller-specific frequency property isn't ever used, we should 
+remove it. No point carrying cruft that looks like it does something but 
+doesn't.
 
-> Another patch in this series '[PATCH 7/8] arm64/kexec: Add checks for
-> KVM' assures kexec cannot happen when KVM is configured.
-
-It would be better to just move this earlier (or event better, implement
-kvm teardown).
-
-Mark.
+Logically, each device's max frequency certainly should be influenced by 
+all of the controller, board, and device max frequency. Those should all 
+impose a cap on the speed used. I'd expect this to be expressed in DT as 
+a single property in each device where the user has calculated that max 
+for the device, with the option to have all the devices fall back to the 
+"default" provided at the controller/bus level if the device imposes a 
+cap that's no lower.
