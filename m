@@ -1,178 +1,53 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 27 Jan 2015 10:03:35 +0100
-Subject: [PATCH] arm: sunxi: input: RFC: Add sysfs voltage for sun4i-lradc
- driver
-In-Reply-To: <20150126220622.GA16941@dtor-ws>
-References: <1422291516-24895-1-git-send-email-plaes@plaes.org>
- <54C6955D.403@redhat.com> <20150126220622.GA16941@dtor-ws>
-Message-ID: <54C75467.7010909@redhat.com>
+From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
+Date: Tue, 27 Jan 2015 15:56:45 +0800
+Subject: [PATCH v8 0/2] Add Spreadtrum SoC bindings and serial driver support
+In-Reply-To: <sc9836-serial-v8>
+References: <sc9836-serial-v8>
+Message-ID: <1422345407-10037-1-git-send-email-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch-set split the last version, and addressed the review comments from
+last version on serial driver code.
 
-On 26-01-15 23:06, Dmitry Torokhov wrote:
-> On Mon, Jan 26, 2015 at 08:28:29PM +0100, Hans de Goede wrote:
->> Hi,
->>
->> On 26-01-15 17:58, Priit Laes wrote:
->>
->> No commit message? Please write an informative commit msg, like why we want this patch,
->> I guess it is to help figuring out the voltage levels for various buttons when creating
->> a dts, but I would prefer to not guess, which is where a good commit message would
->> come in handy ...
->>
->>> ---
->>>   .../ABI/testing/sysfs-driver-input-sun4i-lradc     |  4 ++
->>>   drivers/input/keyboard/sun4i-lradc-keys.c          | 49 +++++++++++++++++-----
->>>   2 files changed, 43 insertions(+), 10 deletions(-)
->>>   create mode 100644 Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc
->>>
->>> diff --git a/Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc b/Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc
->>> new file mode 100644
->>> index 0000000..e4e6448
->>> --- /dev/null
->>> +++ b/Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc
->>> @@ -0,0 +1,4 @@
->>> +What:		/sys/class/input/input(x)/device/voltage
->>> +Date:		February 2015
->>> +Contact:	Priit Laes <plaes@plaes.org>
->>> +Description:	ADC output voltage in microvolts or 0 if device is not opened.
->>> diff --git a/drivers/input/keyboard/sun4i-lradc-keys.c b/drivers/input/keyboard/sun4i-lradc-keys.c
->>> index cc8f7dd..c0ab8ec 100644
->>> --- a/drivers/input/keyboard/sun4i-lradc-keys.c
->>> +++ b/drivers/input/keyboard/sun4i-lradc-keys.c
->>> @@ -79,10 +79,27 @@ struct sun4i_lradc_data {
->>>   	u32 vref;
->>>   };
->>>
->>> +static u32 sun4i_lradc_read_voltage(struct sun4i_lradc_data *lradc)
->>> +{
->>> +	u32 val = readl(lradc->base + LRADC_DATA0) & 0x3f;
->>> +	return val * lradc->vref / 63;
->>> +};
->>> +
->>> +static ssize_t
->>> +sun4i_lradc_dev_voltage_show(struct device *dev,
->>> +			struct device_attribute *attr, char *buf)
->>> +{
->>> +	struct sun4i_lradc_data *lradc = dev_get_drvdata(dev);
->>> +
->>> +	return sprintf(buf, "%u\n", sun4i_lradc_read_voltage(lradc));
->>> +}
->>> +
->>> +static const DEVICE_ATTR(voltage, S_IRUGO, sun4i_lradc_dev_voltage_show, NULL);
->>> +
->>>   static irqreturn_t sun4i_lradc_irq(int irq, void *dev_id)
->>>   {
->>>   	struct sun4i_lradc_data *lradc = dev_id;
->>> -	u32 i, ints, val, voltage, diff, keycode = 0, closest = 0xffffffff;
->>> +	u32 i, ints, voltage, diff, keycode = 0, closest = 0xffffffff;
->>>
->>>   	ints  = readl(lradc->base + LRADC_INTS);
->>>
->>> @@ -97,8 +114,7 @@ static irqreturn_t sun4i_lradc_irq(int irq, void *dev_id)
->>>   	}
->>>
->>>   	if ((ints & CHAN0_KEYDOWN_IRQ) && lradc->chan0_keycode == 0) {
->>> -		val = readl(lradc->base + LRADC_DATA0) & 0x3f;
->>> -		voltage = val * lradc->vref / 63;
->>> +		voltage = sun4i_lradc_read_voltage(lradc);
->>>
->>>   		for (i = 0; i < lradc->chan0_map_count; i++) {
->>>   			diff = abs(lradc->chan0_map[i].voltage - voltage);
->>> @@ -156,7 +172,7 @@ static void sun4i_lradc_close(struct input_dev *dev)
->>>   }
->>>
->>>   static int sun4i_lradc_load_dt_keymap(struct device *dev,
->>> -				      struct sun4i_lradc_data *lradc)
->>> +				    struct sun4i_lradc_data *lradc)
->>>   {
->>>   	struct device_node *np, *pp;
->>>   	int i;
->>
->> Why this identation change ?
->>
->>> @@ -168,8 +184,8 @@ static int sun4i_lradc_load_dt_keymap(struct device *dev,
->>>
->>>   	lradc->chan0_map_count = of_get_child_count(np);
->>>   	if (lradc->chan0_map_count == 0) {
->>> -		dev_err(dev, "keymap is missing in device tree\n");
->>> -		return -EINVAL;
->>> +		dev_info(dev, "keymap is missing in device tree\n");
->>> +		return 0;
->>>   	}
->>>
->>>   	lradc->chan0_map = devm_kmalloc_array(dev, lradc->chan0_map_count,
->>
->> I assume this is so that people can still use the sysfs node, to create a dts, right
->> not sure I like this, might be better to document to simple create a dts with
->> a single button mapping for 200 mV (most board use 200 mV steps between the buttons).
->>
->>> @@ -185,19 +201,19 @@ static int sun4i_lradc_load_dt_keymap(struct device *dev,
->>>
->>>   		error = of_property_read_u32(pp, "channel", &channel);
->>>   		if (error || channel != 0) {
->>> -			dev_err(dev, "%s: Inval channel prop\n", pp->name);
->>> +			dev_err(dev, "%s: Invalid 'channel' property\n", pp->name);
->>>   			return -EINVAL;
->>>   		}
->>>
->>>   		error = of_property_read_u32(pp, "voltage", &map->voltage);
->>>   		if (error) {
->>> -			dev_err(dev, "%s: Inval voltage prop\n", pp->name);
->>> +			dev_err(dev, "%s: Invalid 'voltage' property\n", pp->name);
->>>   			return -EINVAL;
->>>   		}
->>>
->>>   		error = of_property_read_u32(pp, "linux,code", &map->keycode);
->>>   		if (error) {
->>> -			dev_err(dev, "%s: Inval linux,code prop\n", pp->name);
->>> +			dev_err(dev, "%s: Invalid 'linux,code' property\n", pp->name);
->>>   			return -EINVAL;
->>>   		}
->>>
->>
->> This hunk / 3 changes belong in a separate patch. Also please run checkpatch, I think
->> you're running over 80 chars here.
->>
->>
->>> @@ -257,14 +273,26 @@ static int sun4i_lradc_probe(struct platform_device *pdev)
->>>   	if (error)
->>>   		return error;
->>>
->>> -	error = input_register_device(lradc->input);
->>> +	error = device_create_file(dev, &dev_attr_voltage);
->>>   	if (error)
->>>   		return error;
->>>
->>> +	error = input_register_device(lradc->input);
->>> +	if (error) {
->>> +		device_remove_file(&pdev->dev, &dev_attr_voltage);
->>> +		return error;
->>> +	}
->>> +
->>>   	platform_set_drvdata(pdev, lradc);
->>>   	return 0;
->>>   }
->>>
->>> +static int sun4i_lradc_remove(struct platform_device *pdev)
->>> +{
->>> +	device_remove_file(&pdev->dev, &dev_attr_voltage);
->>> +	return 0;
->>> +}
->>> +
->>
->> This looks wrong, I think (*) that we've a bug here because we're not
->> unregistering the input device, so maybe do 2 patches, 1 fixing the
->> not unregistering bug, and then just add the device_remove_file()
->> in the sysfs patch.
->
-> The unregister was not necessary since the input device is managed.
+Changes from v7:
+* Addressed review comments from Peter:
+	- Initialized the stack local with zero in sprd_set_termios()
+	- Used dev_get_drvdata() to get sprd_uart_port
 
-Ah right, looking at the code again I see we use devm_input_allocate_device()
-is there no devm_create_file for creating sysfs entries ?
+Changes from v6:
+	- Setted SPRD_TIMEOUT with 256 rather than 2048
+	- Used u32 instead of uint32_t
+	- Removed inline of handle_lsr_errors which is a single call site function
+	- Removed unused parameter of sprd_tx & sprd_rx
+	- Used spin_lock_irqsave in sprd_startup() instead of spin_lock
+	- Added a check for port->sysrq in sprd_console_write()
+	- Used a global counter as a condition of calling uart_{un}register_driver
+	- Added pdev->id assignment in probe()
+	- Setted port->flags with UPF_BOOT_AUTOCONF instead of ASYNC_BOOT_AUTOCONF
 
-Regards,
+Changes from v5:
+	- Used Spreadtrum instead of SPRD in menus
+	- Changed TTY name to 'ttyS'
+	- Moved uart_register_driver() to probe()
+	- Added spinlock as needed
+	- Removed register states saving and restoring in suspend() and resume()
 
-Hans
+Chunyan Zhang (2):
+  Documentation: DT: Add bindings for Spreadtrum SoC Platform
+  tty/serial: Add Spreadtrum sc9836-uart driver support
+
+ Documentation/devicetree/bindings/arm/sprd.txt     |   11 +
+ .../devicetree/bindings/serial/sprd-uart.txt       |    7 +
+ .../devicetree/bindings/vendor-prefixes.txt        |    1 +
+ drivers/tty/serial/Kconfig                         |   18 +
+ drivers/tty/serial/Makefile                        |    1 +
+ drivers/tty/serial/sprd_serial.c                   |  797 ++++++++++++++++++++
+ include/uapi/linux/serial_core.h                   |    3 +
+ 7 files changed, 838 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/sprd.txt
+ create mode 100644 Documentation/devicetree/bindings/serial/sprd-uart.txt
+ create mode 100644 drivers/tty/serial/sprd_serial.c
+
+-- 
+1.7.9.5
