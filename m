@@ -1,81 +1,74 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 27 Jan 2015 08:05:25 -0600
-Subject: [PATCH 3/3] tty/serial: 8250_early: Add support for PXA UARTs
-In-Reply-To: <54C78E32.4050406@hurleysoftware.com>
-References: <1422334209-23125-1-git-send-email-robh@kernel.org>
- <1422334209-23125-3-git-send-email-robh@kernel.org>
- <54C78E32.4050406@hurleysoftware.com>
-Message-ID: <CAL_Jsq+Jm=0YRJ_uc+wk0YopVGBgcfJia_W+X8oRViq=ATsx6A@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 27 Jan 2015 15:07:26 +0100
+Subject: [PATCH v3 2/3] dt-bindings: Add pinctrl bindings for
+ mt65xx/mt81xx.
+In-Reply-To: <20150126155733.GQ12209@pengutronix.de>
+References: <20141127101830.GP30369@pengutronix.de>
+ <CACRpkdbMdJT6y-NL36RgQe0-CAFAVGqKiwY9+yFcwA7JDLmA+Q@mail.gmail.com>
+ <20141202135527.GM30369@pengutronix.de>
+ <CACRpkdZeRd+j7d_iRphruHRg8p3XjqWK8_HQzLH2PTZ_pqOrYA@mail.gmail.com>
+ <20150112122200.GC18908@pengutronix.de>
+ <CACRpkdYXrdiRWMV8YpxrSLe2rLEV-ZnX7=36w21zGquh==6WgA@mail.gmail.com>
+ <20150113161614.GF23940@pengutronix.de>
+ <CACRpkdYRrs2=gNM1XGSh1cSo5Pvx6iNLt4HjL6gdTqGPWYSRDw@mail.gmail.com>
+ <1421403805.11671.58.camel@mtksdaap41>
+ <CACRpkdYmjrEtds4wLr0cOmCPOLhS9xisfrY-cNZ3r0oh8n489Q@mail.gmail.com>
+ <20150126155733.GQ12209@pengutronix.de>
+Message-ID: <CACRpkdazPhi6ebrMs4uN9wC_fxyDzFUUTuy=4qObEsdtU_VBrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 27, 2015 at 7:10 AM, Peter Hurley <peter@hurleysoftware.com> wrote:
-> On 01/26/2015 11:50 PM, Rob Herring wrote:
->> The PXA variant of the 8250 UART adds a UART enable bit which must not
->> be cleared. Make the earlycon support maintain this bit if it is set.
->> This implies some initialization of the UART, but we cannot
->> unconditionally set the bit as some other variants require this bit to
->> be clear for other functions.
+On Mon, Jan 26, 2015 at 4:57 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Tue, Jan 20, 2015 at 10:45:09AM +0100, Linus Walleij wrote:
+
+>> As discussed with Sascha Hauer it is ambigous to use "pins" for
+>> a numerical value indicating both a mux setting and a pin. Sascha
+>> suggests using "pinmux" and adding this as a secondary generic
+>> binding for this type of pin controllers that use numbers and #defines
+>> to set up bindings.
+>>
+>> We should still move these parsing functions to the core.
 >
-> So if the bootloader doesn't enable the uart, then earlycon doesn't work?
-
-Correct. Some earlycon drivers rely on this fact and don't do any
-initialization. There is a patch posted also to skip init for the 8250
-earlycon. We could rely on that instead, but the 1st chunk is still
-needed.
-
-The UART already being initialized should be pretty common for PXA
-based systems. More so than x86 UARTs. I think it is better to work
-under some conditions than none.
-
-> Or is there some other piece that is enabling the uart after earlycon setup
-> (besides the driver, of course)?
+> I tried that for the last few days and failed.
 >
->> Signed-off-by: Rob Herring <robh@kernel.org>
->> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->> Cc: Jiri Slaby <jslaby@suse.cz>
->> Cc: linux-serial at vger.kernel.org
->> ---
->>  drivers/tty/serial/8250/8250_early.c | 8 +++++---
->>  1 file changed, 5 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/tty/serial/8250/8250_early.c b/drivers/tty/serial/8250/8250_early.c
->> index ce2a8ab..c31a22b 100644
->> --- a/drivers/tty/serial/8250/8250_early.c
->> +++ b/drivers/tty/serial/8250/8250_early.c
->> @@ -93,10 +93,10 @@ static void __init early_serial8250_write(struct console *console,
->>       struct uart_port *port = &early_device->port;
->>       unsigned int ier;
->>
->> -     /* Save the IER and disable interrupts */
->> +     /* Save the IER and disable interrupts preserving the UUE bit */
->>       ier = serial8250_early_in(port, UART_IER);
->>       if (ier)
->> -             serial8250_early_out(port, UART_IER, 0);
->> +             serial8250_early_out(port, UART_IER, ier & UART_IER_UUE);
->>
->>       uart_console_write(port, s, count, serial_putc);
->>
->> @@ -127,9 +127,11 @@ static void __init init_port(struct earlycon_device *device)
->>       struct uart_port *port = &device->port;
->>       unsigned int divisor;
->>       unsigned char c;
->> +     unsigned int ier;
->>
->>       serial8250_early_out(port, UART_LCR, 0x3);      /* 8n1 */
->> -     serial8250_early_out(port, UART_IER, 0);        /* no interrupt */
->> +     ier = serial8250_early_in(port, UART_IER);
->> +     serial8250_early_out(port, UART_IER, ier & UART_IER_UUE); /* no interrupt */
+> Part of the problem is that the core lacks the data structures to put
+> the information in. There is
 >
-> The trailing comment seems no longer relevant; how about below?
-
-It is because we are still disabling interrupts.
-
->         /* Mask interrupts (preserve XScale's uart enable bit) */
->         serial8250_early_out(port, UART_IER, ier & UART_IER_UUE);
+> struct pinctrl_map_mux {
+>         const char *group;
+>         const char *function;
+> };
 >
-> OTOH, if the uart is disabled, shouldn't earlycon be disabled?
+> but its meaning is SoC specific. Some SoCs combine the pins found in a
+> dt subnode to one group (i.MX, rockchip, at91) while others make an
+> individual group from each single pin (Tegra, others?). Also the
+> function string is SoC specific. Some SoCs just define functions like
+> "alt1".."altn" which are valid for all groups, others define different
+> function names for each group.
+>
+> Another thing is that the binding gives us numbers, but struct
+> pinctrl_map_mux expects strings, so the numbers would have to be
+> converted to strings. This is crude since the contents of struct
+> pinctrl_map_mux are converted from strings back to numbers later from
+> the pinctrl core with the help of the driver. So we would have to
+> translate the numbers from the bindings to strings just to convert them
+> back to numbers before passing them to the driver later.
 
-There's no way I can detect that.
+So can we use a union?
 
-Rob
+struct pinctrl_map_mux {
+        union group {
+              const char *groupstr;
+              u16 groupno;
+        };
+        union function {
+              const char *functionstr;
+              u16 funcno;
+        };
+};
+
+The augment the code to reference foo->group.groupstr or
+foo->group.groupno etc depending on runpath.
+
+Yours,
+Linus Walleij
