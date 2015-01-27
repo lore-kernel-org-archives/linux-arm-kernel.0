@@ -1,71 +1,52 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Tue, 27 Jan 2015 08:10:10 -0500
-Subject: [PATCH 3/3] tty/serial: 8250_early: Add support for PXA UARTs
-In-Reply-To: <1422334209-23125-3-git-send-email-robh@kernel.org>
-References: <1422334209-23125-1-git-send-email-robh@kernel.org>
- <1422334209-23125-3-git-send-email-robh@kernel.org>
-Message-ID: <54C78E32.4050406@hurleysoftware.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 27 Jan 2015 14:21:27 +0100
+Subject: [PATCH] ARM: /proc/atags: Export also for DT
+In-Reply-To: <CAL_JsqL_EEg7tC-q8wV5v8jAfPSiri4z19iJfz2r7zntRwPyOg@mail.gmail.com>
+References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
+ <201412041857.49341@pali>
+ <CAL_JsqJ9i0jwaL1cyeomQG=bhhcnEgdGWYOqkcwidyk5xOUukg@mail.gmail.com>
+ <201501262016.52079@pali>
+ <CAL_JsqL_EEg7tC-q8wV5v8jAfPSiri4z19iJfz2r7zntRwPyOg@mail.gmail.com>
+Message-ID: <20150127132127.GA869@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/26/2015 11:50 PM, Rob Herring wrote:
-> The PXA variant of the 8250 UART adds a UART enable bit which must not
-> be cleared. Make the earlycon support maintain this bit if it is set.
-> This implies some initialization of the UART, but we cannot
-> unconditionally set the bit as some other variants require this bit to
-> be clear for other functions.
+On Mon 2015-01-26 14:33:21, Rob Herring wrote:
+> On Mon, Jan 26, 2015 at 1:16 PM, Pali Roh?r <pali.rohar@gmail.com> wrote:
+> > This patch will cause that decompressor store full ATAG structure into DT tree ("/atags"):
+> >
 
-So if the bootloader doesn't enable the uart, then earlycon doesn't work?
-Or is there some other piece that is enabling the uart after earlycon setup
-(besides the driver, of course)?
-
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Jiri Slaby <jslaby@suse.cz>
-> Cc: linux-serial at vger.kernel.org
-> ---
->  drivers/tty/serial/8250/8250_early.c | 8 +++++---
->  1 file changed, 5 insertions(+), 3 deletions(-)
+> > +       /* include the terminating ATAG_NONE */
+> > +       atag_size = (char *)atag - (char *)atag_list + sizeof(struct tag_header);
+> > +       setprop(fdt, "/", "atags", atag_list, atag_size);
+> > +
+> >         if (memcount) {
+> >                 setprop(fdt, "/memory", "reg", mem_reg_property,
+> >                         4 * memcount * memsize);
+> >
+> >
+> >
+> > And this patch will export ATAG structure from DT tree ("/atags") into /proc/atags file:
 > 
-> diff --git a/drivers/tty/serial/8250/8250_early.c b/drivers/tty/serial/8250/8250_early.c
-> index ce2a8ab..c31a22b 100644
-> --- a/drivers/tty/serial/8250/8250_early.c
-> +++ b/drivers/tty/serial/8250/8250_early.c
-> @@ -93,10 +93,10 @@ static void __init early_serial8250_write(struct console *console,
->  	struct uart_port *port = &early_device->port;
->  	unsigned int ier;
->  
-> -	/* Save the IER and disable interrupts */
-> +	/* Save the IER and disable interrupts preserving the UUE bit */
->  	ier = serial8250_early_in(port, UART_IER);
->  	if (ier)
-> -		serial8250_early_out(port, UART_IER, 0);
-> +		serial8250_early_out(port, UART_IER, ier & UART_IER_UUE);
->  
->  	uart_console_write(port, s, count, serial_putc);
->  
-> @@ -127,9 +127,11 @@ static void __init init_port(struct earlycon_device *device)
->  	struct uart_port *port = &device->port;
->  	unsigned int divisor;
->  	unsigned char c;
-> +	unsigned int ier;
->  
->  	serial8250_early_out(port, UART_LCR, 0x3);	/* 8n1 */
-> -	serial8250_early_out(port, UART_IER, 0);	/* no interrupt */
-> +	ier = serial8250_early_in(port, UART_IER);
-> +	serial8250_early_out(port, UART_IER, ier & UART_IER_UUE); /* no interrupt */
+> Please properly send your patches.
 
-The trailing comment seems no longer relevant; how about below?
+Actually, when sending patches for discussion, this is format easier
+to read.
 
-	/* Mask interrupts (preserve XScale's uart enable bit) */
-	serial8250_early_out(port, UART_IER, ier & UART_IER_UUE);
-
-OTOH, if the uart is disabled, shouldn't earlycon be disabled?
-
-Regards,
-Peter Hurley
-
->  	serial8250_early_out(port, UART_FCR, 0);	/* no fifo */
->  	serial8250_early_out(port, UART_MCR, 0x3);	/* DTR + RTS */
->  
+> > Some userspace applications needs access to ATAG structure where can be stored some information passed
+> > from bootloader to kernel. Example is Nokia N900 device and NOLO bootloader which provides information
+> > about bootreason (device was started by power button or by alarm or restarted...) and bootmode (normal
+> > mode or device update mode).
 > 
+> This goes in the commit message.
+> 
+> These would be non-standard fields which are not upstream. I don't
+> know that we care in that case...
+
+Other devices are going to care about boot reason, too, and we might
+as well be compatible...
+									Pavel
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
