@@ -1,112 +1,44 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 27 Jan 2015 13:55:15 -0500
-Subject: [PATCH v4 3/6] of: fix size when dma-range is not used
-In-Reply-To: <54C77616.80301@arm.com>
-References: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
- <1422052359-12384-4-git-send-email-m-karicheri2@ti.com>
- <54C77616.80301@arm.com>
-Message-ID: <54C7DF13.20402@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 27 Jan 2015 18:59:42 +0000
+Subject: [alsa-devel] [PATCH v4 1/3] ASoC: samsung: Add machine driver
+ for Trats2
+In-Reply-To: <1421989410-12490-2-git-send-email-ideal.song@samsung.com>
+References: <1421989410-12490-1-git-send-email-ideal.song@samsung.com>
+ <1421989410-12490-2-git-send-email-ideal.song@samsung.com>
+Message-ID: <20150127185942.GM21293@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/27/2015 06:27 AM, Robin Murphy wrote:
-> Hi Murali,
->
-> On 23/01/15 22:32, Murali Karicheri wrote:
->> Fix the dma-range size when the DT attribute is missing. i.e set size to
->> dev->coherent_dma_mask + 1 instead of dev->coherent_dma_mask. To detect
->> overflow when mask is set to max of u64, add a check, log error and
->> return.
->> Some platform use mask format for size in DTS. So add a work around to
->> catch this and fix.
->>
->> Cc: Joerg Roedel <joro@8bytes.org>
->> Cc: Grant Likely <grant.likely@linaro.org>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: Bjorn Helgaas <bhelgaas@google.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Cc: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->>
->> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->> ---
->> drivers/of/device.c | 14 +++++++++++++-
->> 1 file changed, 13 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/of/device.c b/drivers/of/device.c
->> index 2de320d..0a5ff54 100644
->> --- a/drivers/of/device.c
->> +++ b/drivers/of/device.c
->> @@ -105,12 +105,24 @@ void of_dma_configure(struct device *dev, struct
->> device_node *np)
->> ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
->> if (ret < 0) {
->> dma_addr = offset = 0;
->> - size = dev->coherent_dma_mask;
->> + size = dev->coherent_dma_mask + 1;
->> } else {
->> offset = PFN_DOWN(paddr - dma_addr);
->> + /*
->> + * Add a work around to treat the size as mask + 1 in case
->> + * it is defined in DT as a mask.
->> + */
->> + if (size & 1)
->> + size = size + 1;
->> dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
->> }
->>
->> + /* if size is 0, we have an overflow of u64 */
->> + if (!size) {
->> + dev_err(dev, "invalid size\n");
->> + return;
->> + }
->> +
->
-> This seems potentially fragile to dodgy DTs given that we might also be
-> using size to make a mask later. Would it make sense to double-up a
-> sanity check as mask-format detection? Something like:
->
-> if is_power_of_2(size)
-> // use size
-> else if is_power_of_2(size + 1)
-> // use size + 1
-> else
-> // cry
-Robin,
+On Fri, Jan 23, 2015 at 02:03:28PM +0900, Inha Song wrote:
+> This patch add the sound machine driver for Trats2 board.
+> The codec operate in master mode.
 
-How about having the logic like this?
+This looks like (and mostly should be) a DTified copy of the littlemill
+driver.  The major differences are the fact that this lacks jack
+detection, the management of the clock and the fact that instead of
+picking a fixed clock frequency this tries to adjust based on
+hw_params().  Ideally we'd be able to merge these drivers so we're
+keeping up with best practice.
 
-	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
-	if (ret < 0) {
-		dma_addr = offset = 0;
-		size = dev->coherent_dma_mask + 1;
-	} else {
-		offset = PFN_DOWN(paddr - dma_addr);
-		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
-	}
+The reason we pick a fixed frequency for littlemill is that the device
+supports analogue bypass paths which would be broken otherwise which
+will apply here also I imagine.
 
-	if (is_power_of_2(size + 1))
-		size = size + 1;
-	else if (!is_power_of_2(size))
-	{
-		dev_err(dev, "invalid size\n");
-		return;
-	}
+> +config SND_SOC_SAMSUNG_TRATS2_WM1811
+> +	tristate "SoC I2S Audio support for WM1811 on Tizen Trats2 board"
+> +	depends on SND_SOC_SAMSUNG
+> +	select SND_SAMSUNG_I2S
+> +	select MFD_WM8994
 
-Murali
->
->
-> Robin.
->
->> dev->dma_pfn_offset = offset;
->>
->> coherent = of_dma_is_coherent(np);
->>
->
->
-
-
--- 
-Murali Karicheri
-Linux Kernel, Texas Instruments
+For things outside the audio subsystem it's more common to use a depends
+instead of a select - the selects are there because the drivers only
+work with a machine driver and if we go outside the subsystem then since
+selects aren't recursive we end up breaking elsewhere.  For example here
+we'll end up not selecting MFD_CORE.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150127/c4a54074/attachment.sig>
