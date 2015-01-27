@@ -1,48 +1,54 @@
-From: psawargaonkar@apm.com (Pranavkumar Sawargaonkar)
-Date: Tue, 27 Jan 2015 12:33:26 +0530
-Subject: [PATCH] arm64: dts: Fix GIC reg sizes for APM X-Gene
-Message-ID: <1422342206-4750-1-git-send-email-psawargaonkar@apm.com>
+From: sumit.semwal@linaro.org (Sumit Semwal)
+Date: Tue, 27 Jan 2015 12:34:13 +0530
+Subject: [RFCv2 2/2] dma-buf: add helpers for sharing attacher constraints
+ with dma-parms
+In-Reply-To: <20150121173128.GV26493@n2100.arm.linux.org.uk>
+References: <1421813807-9178-1-git-send-email-sumit.semwal@linaro.org>
+ <1421813807-9178-3-git-send-email-sumit.semwal@linaro.org>
+ <20150121173128.GV26493@n2100.arm.linux.org.uk>
+Message-ID: <CAO_48GE4XQm+Fd9JUGzyw9fsFDSo6+fRY79vwS=Yjcw5GLZAJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In APM X-Gene, GIC register space is 64K aligned while the sizes mentioned
-in the dt are 4K aligned. This breaks KVM when kernel is built with 64K page
-size due to size alignment checking in vgic driver for VCPU Control and
-VCPU register.
+Hi Russell!
 
-This patch corrects the sizes to be inline with the hardware spec.
+On 21 January 2015 at 23:01, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Jan 21, 2015 at 09:46:47AM +0530, Sumit Semwal wrote:
+>> +static int calc_constraints(struct device *dev,
+>> +                         struct dma_buf_constraints *calc_cons)
+>> +{
+>> +     struct dma_buf_constraints cons = *calc_cons;
+>> +
+>> +     cons.dma_mask &= dma_get_mask(dev);
+>
+> I don't think this makes much sense when you consider that the DMA
+> infrastructure supports buses with offsets.  The DMA mask is th
+> upper limit of the _bus_ specific address, it is not a mask per-se.
+>
+> What this means is that &= is not the right operation.  Moreover,
+> simply comparing masks which could be from devices on unrelated
+> buses doesn't make sense either.
+>
+> However, that said, I don't have an answer for what you want to
+> achieve here.
 
-CC: linux-arm-kernel at lists.infradead.org
-CC: kvmarm at lists.cs.columbia.edu
-CC: arnd at arndb.de
-CC: marc.zyngier at arm.com
-CC: christoffer.dall at linaro.org
-CC: jcm at redhat.com
-Signed-off-by: Pranavkumar Sawargaonkar <psawargaonkar@apm.com>
-Signed-off-by: Tushar Jagad <tjagad@apm.com>
-Signed-off-by: Feng Kan <fkan@apm.com>
----
- arch/arm64/boot/dts/apm/apm-storm.dtsi |    8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+Thanks for your comments! I suppose in that case, I will leave out the
+*dma_masks from this constraints information for now; we can re-visit
+it when a specific use case really needs information about the
+dma-masks of the attached devices.
 
-diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-index f1ad9c2..65f0e6d 100644
---- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-@@ -81,10 +81,10 @@
- 		compatible = "arm,cortex-a15-gic";
- 		#interrupt-cells = <3>;
- 		interrupt-controller;
--		reg = <0x0 0x78010000 0x0 0x1000>,	/* GIC Dist */
--		      <0x0 0x78020000 0x0 0x1000>,	/* GIC CPU */
--		      <0x0 0x78040000 0x0 0x2000>,	/* GIC VCPU Control */
--		      <0x0 0x78060000 0x0 0x2000>;	/* GIC VCPU */
-+		reg = <0x0 0x78010000 0x0 0x10000>,	/* GIC Dist */
-+		      <0x0 0x78020000 0x0 0x20000>,	/* GIC CPU */
-+		      <0x0 0x78040000 0x0 0x10000>,	/* GIC VCPU Control */
-+		      <0x0 0x78060000 0x0 0x20000>;	/* GIC VCPU */
- 		interrupts = <1 9 0xf04>;	/* GIC Maintenence IRQ */
- 	};
+I will post an updated patch-set soon.
+>
+> --
+> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+> according to speedtest.net.
 
---
-1.7.9.5
+
+
+-- 
+Thanks and regards,
+
+Sumit Semwal
+Kernel Team Lead - Linaro Mobile Group
+Linaro.org ? Open source software for ARM SoCs
