@@ -1,42 +1,41 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 27 Jan 2015 11:07:42 +0100
-Subject: [PATCH v3 07/13] pm: at91: remove the config item
- CONFIG_AT91_SLOW_CLOCK
-In-Reply-To: <20150127095515.GB32121@gradator.net>
+From: sylvain.rochet@finsecur.com (Sylvain Rochet)
+Date: Tue, 27 Jan 2015 11:08:24 +0100
+Subject: [PATCH v3 08/13] pm: at91: the standby mode uses the same sram
+ function as the suspend to memory mode
+In-Reply-To: <1422338300-5984-1-git-send-email-wenyou.yang@atmel.com>
 References: <1422337810-3257-1-git-send-email-wenyou.yang@atmel.com>
- <1422338247-5945-1-git-send-email-wenyou.yang@atmel.com>
- <20150127095515.GB32121@gradator.net>
-Message-ID: <20150127100742.GA15829@piout.net>
+ <1422338300-5984-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20150127100824.GC32121@gradator.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Wenyou,
 
-On 27/01/2015 at 10:55:15 +0100, Sylvain Rochet wrote :
-> Hello Wenyou,
+On Tue, Jan 27, 2015 at 01:58:20PM +0800, Wenyou Yang wrote:
 > 
-> On Tue, Jan 27, 2015 at 01:57:27PM +0800, Wenyou Yang wrote:
-> >  
-> >  static void __init at91_pm_init(void)
-> >  {
-> > -#ifdef CONFIG_AT91_SLOW_CLOCK
-> >  	at91_pm_sram_init();
-> > -#endif
-> >  
-> >  	pr_info("AT91: Power Management%s\n", (slow_clock ? " (with slow clock mode)" : ""));
-> 
-> Details, but the ternary operation can be removed here, slow_clock now 
-> defines whether we have PM support at all, not whether we have 
-> slow_clock mode available.
-> 
-> Maybe we should not even display this message on the console if we 
-> failed to allocate sram for slow_clock, we already fired a message 
-> saying that PM is not available at all in at91_pm_sram_init().
-> 
+> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+> index 0377c0d..d967c31 100644
+> --- a/arch/arm/mach-at91/pm.c
+> +++ b/arch/arm/mach-at91/pm.c
+> @@ -71,7 +71,7 @@ static int at91_pm_begin(suspend_state_t state)
+>   * Verify that all the clocks are correct before entering
+>   * slow-clock mode.
+>   */
+> -static int at91_pm_verify_clocks(void)
+> +static int at91_pm_verify_clocks(suspend_state_t state)
+>  {
+>  	unsigned long scsr;
+>  	int i;
+> @@ (...)
 
-That is done in patch 10/13.
+Unused state argument, it was added in v2, this is just a trace of a 
+reverted v2 change not fully cleaned.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+
+> +		if (!at91_pm_verify_clocks(state))
+> +			goto error;
+
+Ditto.
+
+
+Sylvain
