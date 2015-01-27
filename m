@@ -1,143 +1,67 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 27 Jan 2015 16:36:30 +0000
-Subject: [PATCH] arm64: mm: use *_sect to check for section maps
-Message-ID: <1422376590-14312-1-git-send-email-mark.rutland@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 27 Jan 2015 10:44:29 -0600
+Subject: [PATCH 2/3] tty/serial: of_serial: add support for PXA/MMP uarts
+In-Reply-To: <54C7AA2D.7080202@hurleysoftware.com>
+References: <1422334209-23125-1-git-send-email-robh@kernel.org>
+ <1422334209-23125-2-git-send-email-robh@kernel.org>
+ <54C78823.7050504@hurleysoftware.com>
+ <CAL_Jsq+8jDN+fYyed5RYd2e1K+H_R1NkjT38WXSpKfxTLgsDbQ@mail.gmail.com>
+ <54C7AA2D.7080202@hurleysoftware.com>
+Message-ID: <CAL_Jsq+wxY0=S1ff-Fk0xDBxHdhBvNopLpjfCETVoo_mou658w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Tue, Jan 27, 2015 at 9:09 AM, Peter Hurley <peter@hurleysoftware.com> wrote:
+> On 01/27/2015 09:30 AM, Rob Herring wrote:
+>> On Tue, Jan 27, 2015 at 6:44 AM, Peter Hurley <peter@hurleysoftware.com> wrote:
+>>> Hi Rob,
+>>>
+>>> On 01/26/2015 11:50 PM, Rob Herring wrote:
+>>>> Add mrvl,pxa-uart and mrvl,mmp-uart compatible strings for the of_serial
+>>>> driver. These are 8250 variants which have a port type of PORT_XSCALE.
+>>>>
+>>>> There is also the serial driver pxa.c with these compatible strings
+>>>> already. However, it can be replaced with the common 8250 driver. It has
+>>>> some issues like it cannot coexist with the 8250 driver due to tty name
+>>>> collision. That also means adding these compatible strings here should
+>>>> not case a problem.
+>>>
+>>> So what determines which driver is controlling the port if both
+>>> drivers are built-in?
+>>
+>> If both are built-in, whoever registers ttyS ports first wins. This
+>> will be the 8250 driver due to link order.
+>
+> Ok, but then I think the commit log should reflect that this patch
+> effectively replaces pxa2xx-uart driver with the 8250 driver for PXA/MMP uarts
+> if both drivers are built-in or both drivers are modules.
 
-The below patch is based on the arm64 for-next/core branch [1]. While
-currently it shouldn't result in a functional change given the
-definition of the *_bad macros, I believe it makes the code better
-describe the intended behaviour (hence making it easier to read).
+It doesn't always. It is only on DT enabled platforms. But I can be
+more explicit about that.
 
-I've given this a spin on Juno with and without DEBUG_RODATA.
+There is another patch to remove the PXA driver entirely which I'm
+inquiring about why it was never merged [1]. This is why I went down
+the path of getting the 8250 driver to work rather than trying to fix
+the PXA driver.
 
-Mark.
+>> So I guess PXA systems have avoided this by never building in 8250 driver.
+>
+> Platform devices are initialized first, so before this patch the pxa2xx-uart
+> driver would have claimed the platform ports before the 8250 driver, if
+> both were built-in (or both modules).
 
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
+That's not exactly what I observed. The console is killed when the
+real driver initializes. I have no other debug output capability after
+that, so I'm not completely sure what was happening. Part of the
+problem is you need to move uart_register_driver to probe from the
+initcall as this is what other serial drivers sharing ttyS have done.
+Using 8250 earlycon with the PXA driver seems to cause problems, so
+I'd have to duplicate the earlycon support in the PXA driver.
 
----->8----
-The {pgd,pud,pmd}_bad family of macros have slightly fuzzy
-cross-architecture semantics, and seem to imply a populated entry that
-is not a next-level table, rather than a particular type of entry (e.g.
-a section map).
+> Maybe Kconfig should warn if they're both built-in or both modules?
 
-In arm64 code, for those cases where we care about whether an entry is a
-section mapping, we can instead use the {pud,pmd}_sect macros to
-explicitly check for this case. This helps to document precisely what we
-care about, making the code easier to read, and allows for future
-relaxation of the *_bad macros to check for other "bad" entries.
+Is there a way to do that?
 
-To that end this patch updates the table dumping and initial table setup
-to check for section mappings with {pud,pmd}_sect, and adds/restores
-BUG_ON(*_bad((*p)) checks after we've handled the *_sect and *_none
-cases so as to catch remaining "bad" cases.
+Rob
 
-In the fault handling code, show_pte is left with *_bad checks as it
-only cares about whether it can walk the next level table, and this path
-is used for both kernel and userspace fault handling. The former case
-will be followed by a die() where we'll report the address that
-triggered the fault, which can be useful context for debugging.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Steve Capper <steve.capper@linaro.org>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Kees Cook <keescook@chromium.org>
-Cc: Laura Abbott <lauraa@codeaurora.org>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/mm/dump.c | 18 ++++++++++++------
- arch/arm64/mm/mmu.c  |  6 ++++--
- 2 files changed, 16 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
-index bbc5a29..61296537 100644
---- a/arch/arm64/mm/dump.c
-+++ b/arch/arm64/mm/dump.c
-@@ -249,10 +249,12 @@ static void walk_pmd(struct pg_state *st, pud_t *pud, unsigned long start)
- 
- 	for (i = 0; i < PTRS_PER_PMD; i++, pmd++) {
- 		addr = start + i * PMD_SIZE;
--		if (pmd_none(*pmd) || pmd_sect(*pmd) || pmd_bad(*pmd))
-+		if (pmd_none(*pmd) || pmd_sect(*pmd)) {
- 			note_page(st, addr, 3, pmd_val(*pmd));
--		else
-+		} else {
-+			BUG_ON(pmd_bad(*pmd));
- 			walk_pte(st, pmd, addr);
-+		}
- 	}
- }
- 
-@@ -264,10 +266,12 @@ static void walk_pud(struct pg_state *st, pgd_t *pgd, unsigned long start)
- 
- 	for (i = 0; i < PTRS_PER_PUD; i++, pud++) {
- 		addr = start + i * PUD_SIZE;
--		if (pud_none(*pud) || pud_sect(*pud) || pud_bad(*pud))
-+		if (pud_none(*pud) || pud_sect(*pud)) {
- 			note_page(st, addr, 2, pud_val(*pud));
--		else
-+		} else {
-+			BUG_ON(pud_bad(*pud));
- 			walk_pmd(st, pud, addr);
-+		}
- 	}
- }
- 
-@@ -279,10 +283,12 @@ static void walk_pgd(struct pg_state *st, struct mm_struct *mm, unsigned long st
- 
- 	for (i = 0; i < PTRS_PER_PGD; i++, pgd++) {
- 		addr = start + i * PGDIR_SIZE;
--		if (pgd_none(*pgd) || pgd_bad(*pgd))
-+		if (pgd_none(*pgd)) {
- 			note_page(st, addr, 1, pgd_val(*pgd));
--		else
-+		} else {
-+			BUG_ON(pgd_bad(*pgd));
- 			walk_pud(st, pgd, addr);
-+		}
- 	}
- }
- 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 155cbb0..29fe8aa 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -90,13 +90,14 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
- {
- 	pte_t *pte;
- 
--	if (pmd_none(*pmd) || pmd_bad(*pmd)) {
-+	if (pmd_none(*pmd) || pmd_sect(*pmd)) {
- 		pte = alloc(PTRS_PER_PTE * sizeof(pte_t));
- 		if (pmd_sect(*pmd))
- 			split_pmd(pmd, pte);
- 		__pmd_populate(pmd, __pa(pte), PMD_TYPE_TABLE);
- 		flush_tlb_all();
- 	}
-+	BUG_ON(pmd_bad(*pmd));
- 
- 	pte = pte_offset_kernel(pmd, addr);
- 	do {
-@@ -128,7 +129,7 @@ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
- 	/*
- 	 * Check for initial section mappings in the pgd/pud and remove them.
- 	 */
--	if (pud_none(*pud) || pud_bad(*pud)) {
-+	if (pud_none(*pud) || pud_sect(*pud)) {
- 		pmd = alloc(PTRS_PER_PMD * sizeof(pmd_t));
- 		if (pud_sect(*pud)) {
- 			/*
-@@ -140,6 +141,7 @@ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
- 		pud_populate(mm, pud, pmd);
- 		flush_tlb_all();
- 	}
-+	BUG_ON(pud_bad(*pud));
- 
- 	pmd = pmd_offset(pud, addr);
- 	do {
--- 
-1.9.1
+[1] https://lkml.org/lkml/2015/1/19/471
