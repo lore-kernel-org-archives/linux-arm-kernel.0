@@ -1,112 +1,30 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Tue, 27 Jan 2015 13:52:30 +0800
-Subject: [PATCH v3 02/13] pm: at91: pm_slowclock: remove clocks which are
- already stopped when entering slow clock mode
-In-Reply-To: <1422337810-3257-1-git-send-email-wenyou.yang@atmel.com>
-References: <1422337810-3257-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1422337950-3335-1-git-send-email-wenyou.yang@atmel.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 27 Jan 2015 06:55:10 +0100
+Subject: [PATCH] ARM: pxa: fix broken isa interrupts for zeus and viper
+Message-ID: <1422338110-12070-1-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sylvain Rochet <sylvain.rochet@finsecur.com>
+Commit "ARM: pxa: arbitrarily set first interrupt number" broke viper
+and zeus boards which still refer to PXA_ISA_IRQ() macro. Redefine
+the macro, which declares the legacy interrupts from 0 to 15.
 
-Assume USB PLL and PLL B are already stopped before entering sleep mode,
-print a warning if this isn't the case.
-
-Removed PLL B from slow clock code, all drivers are supposed to properly
-unprepare clocks.
-
-Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- arch/arm/mach-at91/pm.c           |   12 ++++++++++++
- arch/arm/mach-at91/pm_slowclock.S |   31 -------------------------------
- 2 files changed, 12 insertions(+), 31 deletions(-)
+ arch/arm/mach-pxa/include/mach/irqs.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index 87c1fd8..5dd4e41 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -98,6 +98,18 @@ static int at91_pm_verify_clocks(void)
- 		}
- 	}
+diff --git a/arch/arm/mach-pxa/include/mach/irqs.h b/arch/arm/mach-pxa/include/mach/irqs.h
+index 83e04d4..7e3ea35 100644
+--- a/arch/arm/mach-pxa/include/mach/irqs.h
++++ b/arch/arm/mach-pxa/include/mach/irqs.h
+@@ -14,6 +14,7 @@
  
-+	/* Drivers should have previously suspended USB PLL */
-+	if (at91_pmc_read(AT91_CKGR_UCKR) & AT91_PMC_UPLLEN) {
-+		pr_err("AT91: PM - Suspend-to-RAM with USB PLL running\n");
-+		return 0;
-+	}
-+
-+	/* Drivers should have previously suspended PLL B */
-+	if (at91_pmc_read(AT91_PMC_SR) & AT91_PMC_LOCKB) {
-+		pr_err("AT91: PM - Suspend-to-RAM with PLL B running\n");
-+		return 0;
-+	}
-+
- 	return 1;
- }
+ #include <asm/irq.h>
  
-diff --git a/arch/arm/mach-at91/pm_slowclock.S b/arch/arm/mach-at91/pm_slowclock.S
-index 50744e7..e2bfaf5 100644
---- a/arch/arm/mach-at91/pm_slowclock.S
-+++ b/arch/arm/mach-at91/pm_slowclock.S
-@@ -59,15 +59,6 @@ tmp2	.req	r5
- 	beq	1b
- 	.endm
++#define PXA_ISA_IRQ(x)	(x)
+ #define PXA_IRQ(x)	(NR_IRQS_LEGACY + (x))
  
--/*
-- * Wait until PLLB has locked.
-- */
--	.macro wait_pllblock
--1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
--	tst	tmp1, #AT91_PMC_LOCKB
--	beq	1b
--	.endm
--
- 	.text
- 
- /* void at91_slow_clock(void __iomem *pmc, void __iomem *sdramc,
-@@ -173,13 +164,6 @@ sdr_sr_done:
- 	orr	tmp1, tmp1, #(1 << 29)		/* bit 29 always set */
- 	str	tmp1, [pmc, #AT91_CKGR_PLLAR]
- 
--	/* Save PLLB setting and disable it */
--	ldr	tmp1, [pmc, #AT91_CKGR_PLLBR]
--	str	tmp1, .saved_pllbr
--
--	mov	tmp1, #AT91_PMC_PLLCOUNT
--	str	tmp1, [pmc, #AT91_CKGR_PLLBR]
--
- 	/* Turn off the main oscillator */
- 	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
- 	bic	tmp1, tmp1, #AT91_PMC_MOSCEN
-@@ -195,18 +179,6 @@ sdr_sr_done:
- 
- 	wait_moscrdy
- 
--	/* Restore PLLB setting */
--	ldr	tmp1, .saved_pllbr
--	str	tmp1, [pmc, #AT91_CKGR_PLLBR]
--
--	tst	tmp1, #(AT91_PMC_MUL &  0xff0000)
--	bne	1f
--	tst	tmp1, #(AT91_PMC_MUL & ~0xff0000)
--	beq	2f
--1:
--	wait_pllblock
--2:
--
- 	/* Restore PLLA setting */
- 	ldr	tmp1, .saved_pllar
- 	str	tmp1, [pmc, #AT91_CKGR_PLLAR]
-@@ -285,9 +257,6 @@ ram_restored:
- .saved_pllar:
- 	.word 0
- 
--.saved_pllbr:
--	.word 0
--
- .saved_sam9_lpr:
- 	.word 0
- 
+ #define IRQ_SSP3	PXA_IRQ(0)	/* SSP3 service request */
 -- 
-1.7.9.5
+2.1.0
