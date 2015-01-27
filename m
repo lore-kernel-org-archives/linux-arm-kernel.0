@@ -1,43 +1,34 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 27 Jan 2015 13:34:38 +0200
-Subject: [PATCH 01/23] ARM: OMAP2+: clock: move clock provider
- infrastructure to clock driver
-In-Reply-To: <20150126154936.GC28663@atomide.com>
-References: <1417103514-17027-1-git-send-email-t-kristo@ti.com>
- <1417103514-17027-2-git-send-email-t-kristo@ti.com>
- <alpine.DEB.2.02.1501242142181.5450@utopia.booyaka.com>
- <54C61938.8000303@ti.com> <20150126154936.GC28663@atomide.com>
-Message-ID: <54C777CE.1070900@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 27 Jan 2015 11:59:53 +0000
+Subject: [PATCH 00/18] spi/xilinx: Speed-up
+In-Reply-To: <CAPybu_1==6gvwbWQWxSj_C3siGFTjvqNh1=Xj6jvu_xQFOA-Kw@mail.gmail.com>
+References: <1422029330-10971-1-git-send-email-ricardo.ribalda@gmail.com>
+ <20150127001419.GO21293@sirena.org.uk>
+ <CAPybu_1==6gvwbWQWxSj_C3siGFTjvqNh1=Xj6jvu_xQFOA-Kw@mail.gmail.com>
+Message-ID: <20150127115953.GQ21293@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/01/15 17:49, Tony Lindgren wrote:
+On Tue, Jan 27, 2015 at 11:17:42AM +0100, Ricardo Ribalda Delgado wrote:
+> On Tue, Jan 27, 2015 at 1:14 AM, Mark Brown <broonie@kernel.org> wrote:
 
->> I'm not sure if I miss something, but regmap_write does not protect from
->> problems if there are multiple users for the same registers. You need to
->> use regmap_update_bits() to get a protected read/write sequence, in
->> which you can change only the bits that you want to change.
-> 
-> To me it seems that issue can be fixed by making all the code use regmap.
-> AFAIK that should work for the legacy code too.
+> >>   spi/xilinx: Support for spi mode LOOP
+> >>   spi/xilinx: Simplify data read from the Rx FIFO
+> >>   spi-xilinx: Simplify spi_fill_tx_fifo
 
-Even if everybody uses regmap, doing
+> > spi-xilinx?
 
-v = regmap_read()
-modify v
-regmap_write(v)
+> Thanks! Fixed on the next version.
 
-is racy. regmap_update_bits() has to be used to protect the read/write
-sequence. Which may be somewhat challenging at times with some strange
-registers, the like Roger Q encountered recently related to CAN.
+> BTW what is preferred spi/xilinx: or spi: xilinx: ?I have seen both naming.
 
- Tomi
-
-
+Traditionally SPI always used spi/xilinx but that's too far out from the
+normal kernel standards so it's hard to get people to follow it at all
+so I don't worry about that specific bit too much.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150127/9bd4d3be/attachment.sig>
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150127/de83855e/attachment-0001.sig>
