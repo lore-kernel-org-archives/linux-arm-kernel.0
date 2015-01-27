@@ -1,54 +1,31 @@
-From: sumit.semwal@linaro.org (Sumit Semwal)
-Date: Tue, 27 Jan 2015 12:34:13 +0530
-Subject: [RFCv2 2/2] dma-buf: add helpers for sharing attacher constraints
- with dma-parms
-In-Reply-To: <20150121173128.GV26493@n2100.arm.linux.org.uk>
-References: <1421813807-9178-1-git-send-email-sumit.semwal@linaro.org>
- <1421813807-9178-3-git-send-email-sumit.semwal@linaro.org>
- <20150121173128.GV26493@n2100.arm.linux.org.uk>
-Message-ID: <CAO_48GE4XQm+Fd9JUGzyw9fsFDSo6+fRY79vwS=Yjcw5GLZAJg@mail.gmail.com>
+From: hongzhou.yang@mediatek.com (Hongzhou Yang)
+Date: Tue, 27 Jan 2015 15:13:53 +0800
+Subject: Add Mediatek SoC Pinctrl/GPIO/EINT driver for MT8173. 
+Message-ID: <1422342836-27689-1-git-send-email-hongzhou.yang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell!
+This is the first version of add Mediatek SoC Pinctrl/GPIO/EINT driver for MT8173.
+It is base on MT8135 pinctrl driver, MT8173 has 135 pins.
 
-On 21 January 2015 at 23:01, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Jan 21, 2015 at 09:46:47AM +0530, Sumit Semwal wrote:
->> +static int calc_constraints(struct device *dev,
->> +                         struct dma_buf_constraints *calc_cons)
->> +{
->> +     struct dma_buf_constraints cons = *calc_cons;
->> +
->> +     cons.dma_mask &= dma_get_mask(dev);
->
-> I don't think this makes much sense when you consider that the DMA
-> infrastructure supports buses with offsets.  The DMA mask is th
-> upper limit of the _bus_ specific address, it is not a mask per-se.
->
-> What this means is that &= is not the right operation.  Moreover,
-> simply comparing masks which could be from devices on unrelated
-> buses doesn't make sense either.
->
-> However, that said, I don't have an answer for what you want to
-> achieve here.
+Hongzhou Yang (3):
+  arm64: mediatek: Add config option for mt8173.
+  arm64: mediatek: Add Pinctrl/GPIO/EINT driver for mt8173.
+  arm64: dts: mt8173: Add pinctrl/GPIO/EINT node for mt8173.
 
-Thanks for your comments! I suppose in that case, I will leave out the
-*dma_masks from this constraints information for now; we can re-visit
-it when a specific use case really needs information about the
-dma-masks of the attached devices.
-
-I will post an updated patch-set soon.
->
-> --
-> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-> according to speedtest.net.
-
-
+ arch/arm64/Kconfig                            |    6 +
+ arch/arm64/boot/dts/mediatek/mt8173-pinfunc.h |  682 ++++++++++++++
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi      |   19 +
+ drivers/pinctrl/mediatek/Kconfig              |    4 +
+ drivers/pinctrl/mediatek/Makefile             |    1 +
+ drivers/pinctrl/mediatek/pinctrl-mt8173.c     |  452 +++++++++
+ drivers/pinctrl/mediatek/pinctrl-mtk-common.c |   14 +
+ drivers/pinctrl/mediatek/pinctrl-mtk-common.h |    7 +
+ drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h | 1226 +++++++++++++++++++++++++
+ 9 files changed, 2411 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/mediatek/mt8173-pinfunc.h
+ create mode 100644 drivers/pinctrl/mediatek/pinctrl-mt8173.c
+ create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h
 
 -- 
-Thanks and regards,
-
-Sumit Semwal
-Kernel Team Lead - Linaro Mobile Group
-Linaro.org ? Open source software for ARM SoCs
+1.8.1.1.dirty
