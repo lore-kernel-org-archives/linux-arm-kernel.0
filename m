@@ -1,219 +1,198 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 27 Jan 2015 15:59:59 -0500
-Subject: [PATCH v5 2/8] of: move of_dma_configure() to device.c to help re-use
-In-Reply-To: <1422392405-32196-1-git-send-email-m-karicheri2@ti.com>
-References: <1422392405-32196-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1422392405-32196-3-git-send-email-m-karicheri2@ti.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Tue, 27 Jan 2015 21:02:48 +0000
+Subject: [PATCH 2/3] iio: adc: vf610: implement configurable conversion
+ modes
+In-Reply-To: <1421769723-28677-3-git-send-email-stefan@agner.ch>
+References: <1421769723-28677-1-git-send-email-stefan@agner.ch>
+ <1421769723-28677-3-git-send-email-stefan@agner.ch>
+Message-ID: <54C7FCF8.80703@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move of_dma_configure() to device.c so that same function can be re-used
-for PCI devices to obtain DMA configuration from DT. Also add a second
-argument so that for PCI, DT node of root bus host bridge can be used to
-obtain the DMA configuration for the slave PCI device.
-
-Cc: Joerg Roedel <joro@8bytes.org>
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
----
- drivers/of/device.c       |   59 +++++++++++++++++++++++++++++++++++++++++++++
- drivers/of/platform.c     |   58 ++------------------------------------------
- include/linux/of_device.h |    2 ++
- 3 files changed, 63 insertions(+), 56 deletions(-)
-
-diff --git a/drivers/of/device.c b/drivers/of/device.c
-index 46d6c75c..2de320d 100644
---- a/drivers/of/device.c
-+++ b/drivers/of/device.c
-@@ -2,6 +2,9 @@
- #include <linux/kernel.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-+#include <linux/of_address.h>
-+#include <linux/of_iommu.h>
-+#include <linux/dma-mapping.h>
- #include <linux/init.h>
- #include <linux/module.h>
- #include <linux/mod_devicetable.h>
-@@ -66,6 +69,62 @@ int of_device_add(struct platform_device *ofdev)
- 	return device_add(&ofdev->dev);
- }
- 
-+/**
-+ * of_dma_configure - Setup DMA configuration
-+ * @dev:	Device to apply DMA configuration
-+ * @np:		ptr to of node having dma configuration
-+ *
-+ * Try to get devices's DMA configuration from DT and update it
-+ * accordingly.
-+ *
-+ * In case if platform code need to use own special DMA configuration,it
-+ * can use Platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE event
-+ * to fix up DMA configuration.
-+ */
-+void of_dma_configure(struct device *dev, struct device_node *np)
-+{
-+	u64 dma_addr, paddr, size;
-+	int ret;
-+	bool coherent;
-+	unsigned long offset;
-+	struct iommu_ops *iommu;
-+
-+	/*
-+	 * Set default dma-mask to 32 bit. Drivers are expected to setup
-+	 * the correct supported dma_mask.
-+	 */
-+	dev->coherent_dma_mask = DMA_BIT_MASK(32);
-+
-+	/*
-+	 * Set it to coherent_dma_mask by default if the architecture
-+	 * code has not set it.
-+	 */
-+	if (!dev->dma_mask)
-+		dev->dma_mask = &dev->coherent_dma_mask;
-+
-+	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
-+	if (ret < 0) {
-+		dma_addr = offset = 0;
-+		size = dev->coherent_dma_mask;
-+	} else {
-+		offset = PFN_DOWN(paddr - dma_addr);
-+		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
-+	}
-+
-+	dev->dma_pfn_offset = offset;
-+
-+	coherent = of_dma_is_coherent(np);
-+	dev_dbg(dev, "device is%sdma coherent\n",
-+		coherent ? " " : " not ");
-+
-+	iommu = of_iommu_configure(dev, np);
-+	dev_dbg(dev, "device is%sbehind an iommu\n",
-+		iommu ? " " : " not ");
-+
-+	arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
-+}
-+EXPORT_SYMBOL_GPL(of_dma_configure);
-+
- int of_device_register(struct platform_device *pdev)
- {
- 	device_initialize(&pdev->dev);
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index d3f3988..cbee18d 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -19,7 +19,6 @@
- #include <linux/slab.h>
- #include <linux/of_address.h>
- #include <linux/of_device.h>
--#include <linux/of_iommu.h>
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/platform_device.h>
-@@ -150,59 +149,6 @@ struct platform_device *of_device_alloc(struct device_node *np,
- }
- EXPORT_SYMBOL(of_device_alloc);
- 
--/**
-- * of_dma_configure - Setup DMA configuration
-- * @dev:	Device to apply DMA configuration
-- *
-- * Try to get devices's DMA configuration from DT and update it
-- * accordingly.
-- *
-- * In case if platform code need to use own special DMA configuration,it
-- * can use Platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE event
-- * to fix up DMA configuration.
-- */
--static void of_dma_configure(struct device *dev)
--{
--	u64 dma_addr, paddr, size;
--	int ret;
--	bool coherent;
--	unsigned long offset;
--	struct iommu_ops *iommu;
--
--	/*
--	 * Set default dma-mask to 32 bit. Drivers are expected to setup
--	 * the correct supported dma_mask.
--	 */
--	dev->coherent_dma_mask = DMA_BIT_MASK(32);
--
--	/*
--	 * Set it to coherent_dma_mask by default if the architecture
--	 * code has not set it.
--	 */
--	if (!dev->dma_mask)
--		dev->dma_mask = &dev->coherent_dma_mask;
--
--	ret = of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size);
--	if (ret < 0) {
--		dma_addr = offset = 0;
--		size = dev->coherent_dma_mask;
--	} else {
--		offset = PFN_DOWN(paddr - dma_addr);
--		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
--	}
--	dev->dma_pfn_offset = offset;
--
--	coherent = of_dma_is_coherent(dev->of_node);
--	dev_dbg(dev, "device is%sdma coherent\n",
--		coherent ? " " : " not ");
--
--	iommu = of_iommu_configure(dev, dev->of_node);
--	dev_dbg(dev, "device is%sbehind an iommu\n",
--		iommu ? " " : " not ");
--
--	arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
--}
--
- static void of_dma_deconfigure(struct device *dev)
- {
- 	arch_teardown_dma_ops(dev);
-@@ -236,7 +182,7 @@ static struct platform_device *of_platform_device_create_pdata(
- 
- 	dev->dev.bus = &platform_bus_type;
- 	dev->dev.platform_data = platform_data;
--	of_dma_configure(&dev->dev);
-+	of_dma_configure(&dev->dev, dev->dev.of_node);
- 
- 	if (of_device_add(dev) != 0) {
- 		of_dma_deconfigure(&dev->dev);
-@@ -299,7 +245,7 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
- 		dev_set_name(&dev->dev, "%s", bus_id);
- 	else
- 		of_device_make_bus_id(&dev->dev);
--	of_dma_configure(&dev->dev);
-+	of_dma_configure(&dev->dev, dev->dev.of_node);
- 
- 	/* Allow the HW Peripheral ID to be overridden */
- 	prop = of_get_property(node, "arm,primecell-periphid", NULL);
-diff --git a/include/linux/of_device.h b/include/linux/of_device.h
-index ef37021..c661496 100644
---- a/include/linux/of_device.h
-+++ b/include/linux/of_device.h
-@@ -53,6 +53,7 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
- 	return of_node_get(cpu_dev->of_node);
- }
- 
-+void of_dma_configure(struct device *dev, struct device_node *np);
- #else /* CONFIG_OF */
- 
- static inline int of_driver_match_device(struct device *dev,
-@@ -90,6 +91,7 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
- {
- 	return NULL;
- }
-+void of_dma_configure(struct device *dev, struct device_node *np) { }
- #endif /* CONFIG_OF */
- 
- #endif /* _LINUX_OF_DEVICE_H */
--- 
-1.7.9.5
+On 20/01/15 16:02, Stefan Agner wrote:
+> Support configureable conversion mode through sysfs. So far, the
+> mode used was low-power, which is enabled by default now. Beside
+> that, the modes normal and high-speed are selectable as well.
+> 
+> Use the new device tree property which specifies the maximum ADC
+> conversion clock frequencies. Depending on the mode used, the
+> available resulting conversion frequency are calcaulated
+> dynamically.
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+We have the extinfo stuff to cut down on the boiler plate, particularly
+with enum type items like this.  See the various IIO_ENUM() etc in iio.h
+> ---
+>  drivers/iio/adc/vf610_adc.c | 92 ++++++++++++++++++++++++++++++++++++++++++---
+>  1 file changed, 86 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/iio/adc/vf610_adc.c b/drivers/iio/adc/vf610_adc.c
+> index e63b8e7..fd41d91c 100644
+> --- a/drivers/iio/adc/vf610_adc.c
+> +++ b/drivers/iio/adc/vf610_adc.c
+> @@ -118,15 +118,21 @@ enum average_sel {
+>  	VF610_ADC_SAMPLE_32,
+>  };
+>  
+> +enum conversion_mode_sel {
+> +	VF610_ADC_CONV_NORMAL,
+> +	VF610_ADC_CONV_HIGH_SPEED,
+> +	VF610_ADC_CONV_LOW_POWER,
+> +};
+> +
+>  struct vf610_adc_feature {
+>  	enum clk_sel	clk_sel;
+>  	enum vol_ref	vol_ref;
+> +	enum conversion_mode_sel conv_mode;
+>  
+>  	int	clk_div;
+>  	int     sample_rate;
+>  	int	res_mode;
+>  
+> -	bool	lpm;
+>  	bool	calibration;
+>  	bool	ovwren;
+>  };
+> @@ -139,6 +145,8 @@ struct vf610_adc {
+>  	u32 vref_uv;
+>  	u32 value;
+>  	struct regulator *vref;
+> +
+> +	u32 max_adck_rate[3];
+>  	struct vf610_adc_feature adc_feature;
+>  
+>  	u32 sample_freq_avail[5];
+> @@ -146,6 +154,8 @@ struct vf610_adc {
+>  	struct completion completion;
+>  };
+>  
+> +static const char * const vf610_conv_modes[] = { "normal", "high-speed",
+> +						 "low-power" };
+>  static const u32 vf610_hw_avgs[] = { 1, 4, 8, 16, 32 };
+>  
+>  #define VF610_ADC_CHAN(_idx, _chan_type) {			\
+> @@ -186,8 +196,20 @@ static const struct iio_chan_spec vf610_adc_iio_channels[] = {
+>  
+>  static inline void vf610_adc_calculate_rates(struct vf610_adc *info)
+>  {
+> +	struct vf610_adc_feature *adc_feature = &info->adc_feature;
+>  	unsigned long adck_rate, ipg_rate = clk_get_rate(info->clk);
+> -	int i;
+> +	int divisor, i;
+> +
+> +	adck_rate = info->max_adck_rate[adc_feature->conv_mode];
+> +
+> +	if (adck_rate) {
+> +		/* calculate clk divider which is within specification */
+> +		divisor = ipg_rate / adck_rate;
+> +		adc_feature->clk_div = 1 << fls(divisor + 1);
+> +	} else {
+> +		/* fall-back value using a safe divisor */
+> +		adc_feature->clk_div = 8;
+> +	}
+>  
+>  	/*
+>  	 * Calculate ADC sample frequencies
+> @@ -219,10 +241,8 @@ static inline void vf610_adc_cfg_init(struct vf610_adc *info)
+>  
+>  	adc_feature->res_mode = 12;
+>  	adc_feature->sample_rate = 1;
+> -	adc_feature->lpm = true;
+>  
+> -	/* Use a save ADCK which is below 20MHz on all devices */
+> -	adc_feature->clk_div = 8;
+> +	adc_feature->conv_mode = VF610_ADC_CONV_LOW_POWER;
+>  
+>  	vf610_adc_calculate_rates(info);
+>  }
+> @@ -307,10 +327,12 @@ static void vf610_adc_cfg_set(struct vf610_adc *info)
+>  	cfg_data = readl(info->regs + VF610_REG_ADC_CFG);
+>  
+>  	cfg_data &= ~VF610_ADC_ADLPC_EN;
+> -	if (adc_feature->lpm)
+> +	if (adc_feature->conv_mode == VF610_ADC_CONV_LOW_POWER)
+>  		cfg_data |= VF610_ADC_ADLPC_EN;
+>  
+>  	cfg_data &= ~VF610_ADC_ADHSC_EN;
+> +	if (adc_feature->conv_mode == VF610_ADC_CONV_HIGH_SPEED)
+> +		cfg_data |= VF610_ADC_ADHSC_EN;
+>  
+>  	writel(cfg_data, info->regs + VF610_REG_ADC_CFG);
+>  }
+> @@ -466,10 +488,65 @@ static ssize_t vf610_show_samp_freq_avail(struct device *dev,
+>  	return len;
+>  }
+>  
+> +static ssize_t vf610_read_mode(struct device *dev,
+> +		struct device_attribute *attr,
+> +		char *buf)
+> +{
+> +	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+> +	struct vf610_adc *info = iio_priv(indio_dev);
+> +
+> +	return sprintf(buf, "%s\n",
+> +			vf610_conv_modes[info->adc_feature.conv_mode]);
+> +}
+> +
+> +
+> +static ssize_t vf610_write_mode(struct device *dev,
+> +		struct device_attribute *attr,
+> +		const char *buf,
+> +		size_t len)
+> +{
+> +	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+> +	struct vf610_adc *info = iio_priv(indio_dev);
+> +	int i, mode = -EINVAL;
+> +
+> +	mutex_lock(&indio_dev->mlock);
+> +	if (iio_buffer_enabled(indio_dev)) {
+> +		mutex_unlock(&indio_dev->mlock);
+> +		return -EBUSY;
+> +	}
+> +	mutex_unlock(&indio_dev->mlock);
+> +
+> +	for (i = 0; i < ARRAY_SIZE(vf610_conv_modes); i++) {
+> +		if (!strcmp(vf610_conv_modes[i], buf)) {
+> +			mode = i;
+> +			break;
+> +		}
+> +	}
+> +
+> +	if (mode < 0)
+> +		return mode;
+> +
+> +	mutex_lock(&indio_dev->mlock);
+> +	info->adc_feature.conv_mode = mode;
+> +	vf610_adc_calculate_rates(info);
+> +	vf610_adc_hw_init(info);
+> +	mutex_unlock(&indio_dev->mlock);
+> +
+> +	return len;
+> +}
+> +
+>  static IIO_DEV_ATTR_SAMP_FREQ_AVAIL(vf610_show_samp_freq_avail);
+>  
+> +static IIO_CONST_ATTR_NAMED(conversion_mode_available,
+> +	conversion_mode_available, "normal high-speed low-power");
+> +
+> +IIO_DEVICE_ATTR(conversion_mode, S_IWUSR | S_IRUGO, vf610_read_mode,
+> +	vf610_write_mode, 0);
+> +
+>  static struct attribute *vf610_attributes[] = {
+>  	&iio_dev_attr_sampling_frequency_available.dev_attr.attr,
+> +	&iio_const_attr_conversion_mode_available.dev_attr.attr,
+> +	&iio_dev_attr_conversion_mode.dev_attr.attr,
+>  	NULL
+>  };
+>  
+> @@ -654,6 +731,9 @@ static int vf610_adc_probe(struct platform_device *pdev)
+>  
+>  	info->vref_uv = regulator_get_voltage(info->vref);
+>  
+> +	of_property_read_u32_array(pdev->dev.of_node, "fsl,adck-max-frequency",
+> +			info->max_adck_rate, 3);
+> +
+>  	platform_set_drvdata(pdev, indio_dev);
+>  
+>  	init_completion(&info->completion);
+> 
