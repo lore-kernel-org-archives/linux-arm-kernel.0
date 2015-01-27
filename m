@@ -1,34 +1,58 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Tue, 27 Jan 2015 23:52:47 +0000
-Subject: [PATCH v2 1/3] ARM: shmobile: armadillo800eva: Properly specify
- HDMI audio link format
-In-Reply-To: <54C74A2D.6000606@metafoo.de>
-References: <1421847492-8857-1-git-send-email-lars@metafoo.de>
- <8761bsacx5.wl%kuninori.morimoto.gx@renesas.com>
- <54C74A2D.6000606@metafoo.de>
-Message-ID: <87fvavlr0b.wl%kuninori.morimoto.gx@renesas.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 28 Jan 2015 00:55:35 +0100
+Subject: [GIT PULL] ARM: mediatek: arm64 changes for v3.20
+Message-ID: <CABuKBe+3DWcKkRt3yc0QZvDJUQPJs8xqC-v+wBqReyXrXeDP8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Arnd and Olof,
 
-Hi Lars
+Please take the following arm64 patches for v3.20.
+I send a pull request two days ago. As I said, it was screwed up, so
+here it comes again.
+Hopefully this time everything went fine.
 
-> > I guess if you want to use common .daifmt, it should be same as "codec" side.
-> > (cpu side "S" means, codec / daifmt side "M")
-> > So, this mean above should be
-> >
-> > @@ -1040,9 +1040,9 @@ static struct asoc_simple_card_info fsi2_hdmi_info = {
-> >   	.card		= "FSI2B-HDMI",
-> >   	.codec		= "sh-mobile-hdmi",
-> >   	.platform	= "sh_fsi2",
-> > +	.daifmt		= SND_SOC_DAIFMT_CBM_CFM,   <=
-> >   	.cpu_dai = {
-> > 		.name	= "fsib-dai",
-> > -		.fmt	= SND_SOC_DAIFMT_CBS_CFS,
-> >   	},
-> 
-> Right now the CPU is configured as master, with your proposed change it 
-> would be configured as slave. These flags are always from the CODEC's 
-> perspective.
+Cheers,
+Matthias
 
-I see, your patch was correct for CPU = Master
+-- 
+
+The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+
+  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+
+are available in the git repository at:
+
+  https://github.com/mbgg/linux-mediatek.git tags/v3.20-next-arm64
+
+for you to fetch changes up to 4727a6f631bf3ab2a0373acd27d40483446fcb8a:
+
+  arm64: mediatek: Add MT8173 SoC Kconfig and defconfig (2015-01-26
+13:26:48 +0100)
+
+----------------------------------------------------------------
+Add support for mt8173 SoC from Mediatek.
+
+- add DT bindings documentation
+- add dts files for SoC and evaluation board
+- add to Kconfig and defconfig
+
+----------------------------------------------------------------
+Eddie Huang (3):
+      Document: DT: Add bindings for mediatek MT8173 SoC Platform
+      arm64: dts: Add mediatek MT8173 SoC and evaluation board dts and Makefile
+      arm64: mediatek: Add MT8173 SoC Kconfig and defconfig
+
+ Documentation/devicetree/bindings/arm/mediatek.txt |   4 +
+ .../bindings/arm/mediatek/mediatek,sysirq.txt      |   1 +
+ .../devicetree/bindings/serial/mtk-uart.txt        |   4 +-
+ arch/arm64/Kconfig                                 |   6 +
+ arch/arm64/boot/dts/Makefile                       |   1 +
+ arch/arm64/boot/dts/mediatek/Makefile              |   5 +
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts        |  38 +++++
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           | 168 +++++++++++++++++++++
+ arch/arm64/configs/defconfig                       |   2 +
+ 9 files changed, 228 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/boot/dts/mediatek/Makefile
+ create mode 100644 arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+ create mode 100644 arch/arm64/boot/dts/mediatek/mt8173.dtsi
