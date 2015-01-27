@@ -1,67 +1,92 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 27 Jan 2015 10:44:29 -0600
-Subject: [PATCH 2/3] tty/serial: of_serial: add support for PXA/MMP uarts
-In-Reply-To: <54C7AA2D.7080202@hurleysoftware.com>
-References: <1422334209-23125-1-git-send-email-robh@kernel.org>
- <1422334209-23125-2-git-send-email-robh@kernel.org>
- <54C78823.7050504@hurleysoftware.com>
- <CAL_Jsq+8jDN+fYyed5RYd2e1K+H_R1NkjT38WXSpKfxTLgsDbQ@mail.gmail.com>
- <54C7AA2D.7080202@hurleysoftware.com>
-Message-ID: <CAL_Jsq+wxY0=S1ff-Fk0xDBxHdhBvNopLpjfCETVoo_mou658w@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 27 Jan 2015 16:46:20 +0000
+Subject: [PATCH 4/8] arm64: Add EL2 switch to soft_restart
+In-Reply-To: <1422308928.21823.16.camel@infradead.org>
+References: <cover.1421449714.git.geoff@infradead.org>
+ <bb44d4eee4fab15278e4a8829a0981878bc9acd7.1421449714.git.geoff@infradead.org>
+ <20150126190223.GO23313@leverpostej>
+ <1422308928.21823.16.camel@infradead.org>
+Message-ID: <20150127164619.GL17721@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 27, 2015 at 9:09 AM, Peter Hurley <peter@hurleysoftware.com> wrote:
-> On 01/27/2015 09:30 AM, Rob Herring wrote:
->> On Tue, Jan 27, 2015 at 6:44 AM, Peter Hurley <peter@hurleysoftware.com> wrote:
->>> Hi Rob,
->>>
->>> On 01/26/2015 11:50 PM, Rob Herring wrote:
->>>> Add mrvl,pxa-uart and mrvl,mmp-uart compatible strings for the of_serial
->>>> driver. These are 8250 variants which have a port type of PORT_XSCALE.
->>>>
->>>> There is also the serial driver pxa.c with these compatible strings
->>>> already. However, it can be replaced with the common 8250 driver. It has
->>>> some issues like it cannot coexist with the 8250 driver due to tty name
->>>> collision. That also means adding these compatible strings here should
->>>> not case a problem.
->>>
->>> So what determines which driver is controlling the port if both
->>> drivers are built-in?
->>
->> If both are built-in, whoever registers ttyS ports first wins. This
->> will be the 8250 driver due to link order.
->
-> Ok, but then I think the commit log should reflect that this patch
-> effectively replaces pxa2xx-uart driver with the 8250 driver for PXA/MMP uarts
-> if both drivers are built-in or both drivers are modules.
+On Mon, Jan 26, 2015 at 09:48:48PM +0000, Geoff Levand wrote:
+> Hi Mark,
+> 
+> On Mon, 2015-01-26 at 19:02 +0000, Mark Rutland wrote:
+> > On Sat, Jan 17, 2015 at 12:23:34AM +0000, Geoff Levand wrote:
+> > > When a CPU is reset it needs to be put into the exception level it had when it
+> > > entered the kernel.  Update cpu_reset() to accept an argument el2_switch which
+> > > signals cpu_reset() to enter the soft reset address at EL2.  If el2_switch is
+> > > not set the soft reset address will be entered at EL1.
+> > > 
+> > > Update cpu_soft_restart() and soft_restart() to pass the return of
+> > > is_hyp_mode_available() as the el2_switch value to cpu_reset().  Also update the
+> > > comments of cpu_reset(), cpu_soft_restart() and soft_restart() to reflect this
+> > > change.
+> > > 
+> > > Signed-off-by: Geoff Levand <geoff@infradead.org>
+> > > ---
+> > >  arch/arm64/include/asm/proc-fns.h |  4 ++--
+> > >  arch/arm64/kernel/process.c       | 10 ++++++++-
+> > >  arch/arm64/mm/proc.S              | 47 +++++++++++++++++++++++++++++----------
+> > >  3 files changed, 46 insertions(+), 15 deletions(-)
+> > > 
+> > > diff --git a/arch/arm64/include/asm/proc-fns.h b/arch/arm64/include/asm/proc-fns.h
+> > > index 9a8fd84..339394d 100644
+> > > --- a/arch/arm64/include/asm/proc-fns.h
+> > > +++ b/arch/arm64/include/asm/proc-fns.h
+> > > @@ -32,8 +32,8 @@ extern void cpu_cache_off(void);
+> > >  extern void cpu_do_idle(void);
+> > >  extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
+> > >  extern void cpu_reset(unsigned long addr) __attribute__((noreturn));
+> > > -void cpu_soft_restart(phys_addr_t cpu_reset,
+> > > -		unsigned long addr) __attribute__((noreturn));
+> > > +void cpu_soft_restart(phys_addr_t cpu_reset, unsigned long el2_switch,
+> > > +		      unsigned long addr) __attribute__((noreturn));
+> > >  extern void cpu_do_suspend(struct cpu_suspend_ctx *ptr);
+> > >  extern u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
+> > >  
+> > > diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> > > index fde9923..371bbf1 100644
+> > > --- a/arch/arm64/kernel/process.c
+> > > +++ b/arch/arm64/kernel/process.c
+> > > @@ -50,6 +50,7 @@
+> > >  #include <asm/mmu_context.h>
+> > >  #include <asm/processor.h>
+> > >  #include <asm/stacktrace.h>
+> > > +#include <asm/virt.h>
+> > >  
+> > >  #ifdef CONFIG_CC_STACKPROTECTOR
+> > >  #include <linux/stackprotector.h>
+> > > @@ -60,7 +61,14 @@ EXPORT_SYMBOL(__stack_chk_guard);
+> > >  void soft_restart(unsigned long addr)
+> > >  {
+> > >  	setup_mm_for_reboot();
+> > > -	cpu_soft_restart(virt_to_phys(cpu_reset), addr);
+> > > +
+> > > +	/* TODO: Remove this conditional when KVM can support CPU restart. */
+> > > +	if (IS_ENABLED(CONFIG_KVM))
+> > > +		cpu_soft_restart(virt_to_phys(cpu_reset), 0, addr);
+> > 
+> > If we haven't torn down KVM, doesn't that mean that KVM is active at EL2
+> > (with MMU and caches on) at this point?
+> > 
+> > If that's the case then we cannot possibly try to call kexec(), because
+> > we cannot touch the memory used by the page tables for those EL2
+> > mappings. Things will explode if we do.
+> 
+> This conditional is just if KVM, do things the old way (don't try to
+> switch exception levels).  It is to handle the system shutdown case.
 
-It doesn't always. It is only on DT enabled platforms. But I can be
-more explicit about that.
+Having grepped treewide for soft_restart, other than kexec there are no
+users for arm64. So surely kexec is the only case to cater for at the
+moment?
 
-There is another patch to remove the PXA driver entirely which I'm
-inquiring about why it was never merged [1]. This is why I went down
-the path of getting the 8250 driver to work rather than trying to fix
-the PXA driver.
+> Another patch in this series '[PATCH 7/8] arm64/kexec: Add checks for
+> KVM' assures kexec cannot happen when KVM is configured.
 
->> So I guess PXA systems have avoided this by never building in 8250 driver.
->
-> Platform devices are initialized first, so before this patch the pxa2xx-uart
-> driver would have claimed the platform ports before the 8250 driver, if
-> both were built-in (or both modules).
+It would be better to just move this earlier (or event better, implement
+kvm teardown).
 
-That's not exactly what I observed. The console is killed when the
-real driver initializes. I have no other debug output capability after
-that, so I'm not completely sure what was happening. Part of the
-problem is you need to move uart_register_driver to probe from the
-initcall as this is what other serial drivers sharing ttyS have done.
-Using 8250 earlycon with the PXA driver seems to cause problems, so
-I'd have to duplicate the earlycon support in the PXA driver.
-
-> Maybe Kconfig should warn if they're both built-in or both modules?
-
-Is there a way to do that?
-
-Rob
-
-[1] https://lkml.org/lkml/2015/1/19/471
+Mark.
