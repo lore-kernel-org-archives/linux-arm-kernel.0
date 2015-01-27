@@ -1,59 +1,97 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Tue, 27 Jan 2015 02:58:41 +0000
-Subject: [PATCH v2 00/12] AT91 pm cleanup for 3.20
-In-Reply-To: <20150126095554.GA18807@gradator.net>
-References: <1422265005-22937-1-git-send-email-wenyou.yang@atmel.com>
- <20150126095554.GA18807@gradator.net>
-Message-ID: <B256D81BAE5131468A838E5D7A243641BFD35BFC@penmbx01>
+From: baozich@gmail.com (Chen Baozi)
+Date: Tue, 27 Jan 2015 03:06:01 +0000
+Subject: [PATCH] irqchip: GICv3: ITS: Allocate enough memory for the full
+ range of DeviceID
+Message-ID: <1422327961-19733-1-git-send-email-baozich@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The ITS table allocator is only allocating a single page per table.
+This works fine for most things, but leads to silent lack of
+interrupt delivery if we end-up with a device that has an ID that is
+out of the range defined by a single page of memory. Even worse, depending
+on the page size, behaviour changes, which is not a very good experience.
 
+A solution is actually to allocate memory for the full range of ID that
+the ITS supports. A massive waste memory wise, but at least a safe bet.
 
-> -----Original Message-----
-> From: Sylvain Rochet [mailto:sylvain.rochet at finsecur.com]
-> Sent: Monday, January 26, 2015 5:56 PM
-> To: Yang, Wenyou
-> Cc: Ferre, Nicolas; linux at arm.linux.org.uk; linux-arm-kernel at lists.infradead.org;
-> linux-kernel at vger.kernel.org; alexandre.belloni at free-electrons.com;
-> peda at axentia.se
-> Subject: Re: [PATCH v2 00/12] AT91 pm cleanup for 3.20
-> 
-> Hello Wenyou,
-> 
-> On Mon, Jan 26, 2015 at 05:36:45PM +0800, Wenyou Yang wrote:
-> > Hi Nicolas,
-> >
-> > This version is rebased on the branch: at91-3.20-cleanup of the repository
-> > 	git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git
-> >
-> > It is purpose to clean up the PM code, includes the patches from Peter Rosin
-> and Sylvain Rochet.
-> >
-> > Since verifying the USB clock and USB PLL disabling before suspending
-> > to memory, it aslo depends on the following patch serials from Sylvain:
-> > 	[PATCHv6 0/5] USB: gadget: atmel_usba_udc: Driver improvements
-> > 	[PATCHv7 0/6] USB: host: Atmel OHCI and EHCI drivers improvements
-> >
-> > Removes CONFIG_AT91_SLOW_CLOCK config item to simply the PM config,
-> > The suspend to standby mode uses the same sram function as the suspend to
-> memory mode.
-> > Remove some unused code.
-> >
-> > Alexandr & Sylvain, Thank you very much for so many feedbacks.
-> >
-> > Changes in v2:
-> >  - Rebase on the at91-3.20-cleanup branch
-> >  - Recover the verify clock condition, only for suspend to memory.
-> >  - Collect ACK from Alexandre
-> >  - Add the macro for PM mode
-> 
-> Did you fix the slow_clock == NULL condition with the change suggested by
-> Alexandre ?
-Sorry, didn't. I will send v3 to fix it.
+This patch has been tested on the Phytium SoC.
 
-> 
-> Sylvain
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Chen Baozi <chenbaozi@kylinos.com.cn>
+---
+ drivers/irqchip/irq-gic-v3-its.c   | 25 +++++++++++++++++++++----
+ include/linux/irqchip/arm-gic-v3.h |  2 ++
+ 2 files changed, 23 insertions(+), 4 deletions(-)
 
-Best Regards,
-Wenyou Yang
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 86e4684..d7a3d36 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -806,14 +806,31 @@ static int its_alloc_tables(struct its_node *its)
+ 		u64 val = readq_relaxed(its->base + GITS_BASER + i * 8);
+ 		u64 type = GITS_BASER_TYPE(val);
+ 		u64 entry_size = GITS_BASER_ENTRY_SIZE(val);
++		int order = 0;
++		int alloc_size;
+ 		u64 tmp;
+ 		void *base;
+ 
+ 		if (type == GITS_BASER_TYPE_NONE)
+ 			continue;
+ 
+-		/* We're lazy and only allocate a single page for now */
+-		base = (void *)get_zeroed_page(GFP_KERNEL);
++		/*
++		 * Allocate as many entries as required to fit the
++		 * range of device IDs that the ITS can grok... The ID
++		 * space being incredibly sparse, this results in a
++		 * massive waste of memory.
++		 *
++		 * For other tables, only allocate a single page.
++		 */
++		if (type == GITS_BASER_TYPE_DEVICE) {
++			u64 typer = readq_relaxed(its->base + GITS_TYPER);
++			u32 ids = GITS_TYPER_DEVBITS(typer);
++
++			order = get_order((1UL << ids) * entry_size);
++		}
++
++		alloc_size = (1 << order) * PAGE_SIZE;
++		base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
+ 		if (!base) {
+ 			err = -ENOMEM;
+ 			goto out_free;
+@@ -841,7 +858,7 @@ retry_baser:
+ 			break;
+ 		}
+ 
+-		val |= (PAGE_SIZE / psz) - 1;
++		val |= (alloc_size / psz) - 1;
+ 
+ 		writeq_relaxed(val, its->base + GITS_BASER + i * 8);
+ 		tmp = readq_relaxed(its->base + GITS_BASER + i * 8);
+@@ -882,7 +899,7 @@ retry_baser:
+ 		}
+ 
+ 		pr_info("ITS: allocated %d %s @%lx (psz %dK, shr %d)\n",
+-			(int)(PAGE_SIZE / entry_size),
++			(int)(alloc_size / entry_size),
+ 			its_base_type_string[type],
+ 			(unsigned long)virt_to_phys(base),
+ 			psz / SZ_1K, (int)shr >> GITS_BASER_SHAREABILITY_SHIFT);
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index 1e8b0cf..7cf8d40 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -132,6 +132,8 @@
+ #define GITS_BASER			0x0100
+ #define GITS_PIDR2			GICR_PIDR2
+ 
++#define GITS_TYPER_DEVBITS_SHIFT	13
++#define GITS_TYPER_DEVBITS(r)		((((r) >> GITS_TYPER_DEVBITS_SHIFT) & 0x1f) + 1)
+ #define GITS_TRANSLATER			0x10040
+ 
+ #define GITS_TYPER_PTA			(1UL << 19)
+-- 
+2.1.4
