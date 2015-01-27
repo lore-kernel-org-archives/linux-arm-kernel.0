@@ -1,79 +1,179 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 27 Jan 2015 19:35:09 +0100 (CET)
-Subject: [PATCH RFC 2/3] power: mxs_power: add driver for mxs power
- subsystem
-In-Reply-To: <20150127001629.GP21293@sirena.org.uk>
-References: <1416514477-19190-1-git-send-email-stefan.wahren@i2se.com>
- <1416514477-19190-3-git-send-email-stefan.wahren@i2se.com>
- <20150121230148.GJ13715@earth.universe> <54C0AFE4.3020701@i2se.com>
- <20150125150431.GE2719@earth.universe>
- <1719204322.245040.1422301605670.JavaMail.open-xchange@oxbaltgw03.schlund.de>
- <20150127001629.GP21293@sirena.org.uk>
-Message-ID: <1954124242.301697.1422383709733.JavaMail.open-xchange@oxbaltgw09.schlund.de>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 27 Jan 2015 12:42:11 -0600
+Subject: [PATCH v4 4/6] of/pci: add of_pci_dma_configure() update dma
+ configuration
+In-Reply-To: <54C7D576.6030502@ti.com>
+References: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
+ <1422052359-12384-5-git-send-email-m-karicheri2@ti.com>
+ <20150123234124.GW29776@google.com> <54C6CCF3.7080308@ti.com>
+ <CAErSpo4w0zVCmXk2D2Qk5W3kceS9Wk+=jqHBDwk6HUXWwXdq_Q@mail.gmail.com>
+ <54C7D576.6030502@ti.com>
+Message-ID: <CAErSpo4Awgqu0ZtoMm0XSZzhnYtXh3xxH2OJMkyth5YDR9GUiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Tue, Jan 27, 2015 at 12:14 PM, Murali Karicheri <m-karicheri2@ti.com> wrote:
+> On 01/26/2015 06:59 PM, Bjorn Helgaas wrote:
+>>
+>> On Mon, Jan 26, 2015 at 5:25 PM, Murali Karicheri<m-karicheri2@ti.com>
+>> wrote:
+>>>
+>>> On 01/23/2015 06:41 PM, Bjorn Helgaas wrote:
+>>>>
+>>>>
+>>>> On Fri, Jan 23, 2015 at 05:32:37PM -0500, Murali Karicheri wrote:
+>>>>>
+>>>>>
+>>>>> Add of_pci_dma_configure() to allow updating the dma configuration
+>>>>> of the pci device using the configuration from DT of the parent of
+>>>>> the root bridge device.
+>>>>>
+>   -- Cut ---
+>
+>>>>>
+>>>>> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
+>>>>> ---
+>>>>>    drivers/of/of_pci.c    |   39
+>>>>> +++++++++++++++++++++++++++++++++++++++
+>>>>>    include/linux/of_pci.h |   12 ++++++++++++
+>>>>>    2 files changed, 51 insertions(+)
+>>>>>
+>>>>> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+>>>>> index 88471d3..34878c9 100644
+>>>>> --- a/drivers/of/of_pci.c
+>>>>> +++ b/drivers/of/of_pci.c
+>>>>> @@ -2,6 +2,7 @@
+>>>>>    #include<linux/export.h>
+>>>>>    #include<linux/of.h>
+>>>>>    #include<linux/of_address.h>
+>>>>> +#include<linux/of_device.h>
+>>>>>    #include<linux/of_pci.h>
+>>>>>    #include<linux/slab.h>
+>>>>>
+>>>>> @@ -229,6 +230,44 @@ parse_failed:
+>>>>>          return err;
+>>>>>    }
+>>>>>    EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
+>>>>> +
+>>>>> +/**
+>>>>> + * of_get_pci_root_bridge_parent - get the OF node of the root
+>>>>> bridge's
+>>>>> parent
+>>>>> + * @dev: ptr to pci_dev struct of the pci device
+>>>>> + *
+>>>>> + * This function will traverse the bus up to the root bus starting
+>>>>> with
+>>>>> + * the child and return the OF node ptr to root bridge device's parent
+>>>>> device.
+>>>>> + */
+>>>>> +struct device_node *of_get_pci_root_bridge_parent(struct pci_dev *dev)
+>>>>
+>>>>
+>>>>
+>>>> I'm not an OF person, but this interface seems like it might be too
+>>>> special-purpose.  Maybe it would be enough to add
+>>>> "of_get_pci_root_bridge()", and the caller could do this:
+>>>>
+>>>>       struct device *bridge = of_get_pci_root_bridge(dev);
+>>>>       struct device_node *parent_np = bridge->parent->of_node;
+>>>>
+>>>> Also, the name "of_get_..." suggests that it increments a refcount, as
+>>>> of_get_parent() does.  But you aren't doing anything with the refcount.
+>>>>
+>>>> But I guess an "of_get_pci_root_bridge()" isn't doing anything
+>>>> OF-related,
+>>>> so maybe we should just add a "pci_get_host_bridge(struct pci_dev *)"
+>>>> to PCI instead.
+>>>
+>>>
+>>>
+>>> Bjorn,
+>>>
+>>> Thanks for the comment.
+>>>
+>>> I think adding pci_get_host_bridge() is a good idea. There is already
+>>> similar function in host-bridge.c. I have added this function re-using
+>>> existing function find_pci_root_bus(). See the incremental diff below
+>>> after
+>>> this change. Does this look good?
+>>
+>>
+>> I like the implementation, but I think either we need to take a
+>> reference on the host bridge, or change the name to  something like
+>> "pci_find_host_bridge()", because using "_get_" is conventional for
+>> functions that acquire a reference.
+>>
+>> Since host bridges are hot-pluggable, at least in theory, I vote for
+>> taking a reference.  Then of course, you'd have to add code to drop
+>> the reference when you're finished with it.
+>>
+> Bjorn,
+>
+> Thanks. I agree with your suggestion even though the convention is not
+> followed fully :) of_pci_get_devfn(), of_get_pci_domain_nr(),
+> of_pci_get_host_bridge_resources() are some of those functions not following
+> the convention. I plan to change the function as below. Also want to name
+> functions as pci_get/put_host_bridge_device() as existing function
+> find_pci_host_bridge() is actually returning ptr to struct pci_host_bridge
+> vs the new function returning ptr to device. Here are the new functions and
+> how they will be used. Please review and respond so that I can avoid a
+> re-spin.
+>
+> in linux/include/pci.h add the prototypes of
+> pci_get/put_host_bridge_device().
+>
+> in drivers/pci/host-bridge.c add two new functions.
+>
+> struct device *pci_get_host_bridge_device(struct pci_dev *dev)
+> {
+>         struct pci_bus *root_bus = find_pci_root_bus(dev->bus);
+>         struct device *bridge = root_bus->bridge;
+>
+>         kobject_get(&bridge->kobj);
+>         return bridge;
+> }
 
-> Mark Brown <broonie@kernel.org> hat am 27. Januar 2015 um 01:16 geschrieben:
+Looks good to me.
+
+> void  pci_put_host_bridge_device(struct pci_dev *dev)
+> {
+>         struct pci_bus *root_bus = find_pci_root_bus(dev->bus);
+>         struct device *bridge = root_bus->bridge;
+>
+>         kobject_put(&bridge->kobj);
+> }
+
+I think I would pass in the "struct device *" here so we don't have to
+call find_pci_root_bus() again.
+
+> drivers/of/of_pci.c
+>
+> void of_pci_dma_configure(struct pci_dev *pci_dev)
+> {
+>         struct device *dev = &pci_dev->dev;
+>         struct device *bridge = pci_get_host_bridge_device(pci_dev);
+>
+>         of_dma_configure(dev, bridge->parent->of_node);
+>         pci_put_host_bridge_device(pci_dev);
+
+Then this would become "pci_put_host_bridge_device(bridge)"
+
+> }
+>
+> Murali
+>
+>> Bjorn
+>>
+>
+>>>>>
+>>>
+>>>
+>>> --
+>>> Murali Karicheri
+>>> Linux Kernel, Texas Instruments
 >
 >
-> On Mon, Jan 26, 2015 at 08:46:45PM +0100, Stefan Wahren wrote:
 >
-> > > > Does a common property name exists for the switching frequency or would
-> > > > it be vendor specific?
->
-> > > As far as I know most regulators have fixed switching frequencies,
-> > > so there is no common property name so far. I added regulator
-> > > framework people, since this property should be regulator specific.
->
-> No, it's pretty common for there to be a couple of options - there's
-> normally a performance tradeoff (power for regulation accuracy and/or
-> cost) which can be selected. IIRC it's selected at design time as it
-> affect the choice of passives on the board.
->
-> > okay i understand. But doesn't it need a extra driver to set the switching
-> > frequency because of the new compatible string?
->
-> I don't understand this bit at all, sorry.
-
-Sebastian suggested a new sub-node in the devicetree:
-
-    powerpll {
-        compatible = "fsl,imx28-power-pll"
-        #clock-cells = <0>;
-        clock-frequency = <12345>;
-    }
-
-and i think that the new compatible string needs a separate driver to take care
-of the switching frequency.
-
-Or is it okay to leave the handling of the switching frequency in the mxs-power
-driver?
-
-Btw if we add a new node to set switching frequency, i think it would be better
-to describe the dc-dc convertor and not the pll:
-
-    dcdc {
-       compatible = "fsl,imx28-dcdc"
-       frequency = <12345>;
-    }
-
-What do you think?
-
-Best regards
-Stefan
-
->
-> >
-> > At this point i think about moving this feature into the bootloader.
-> >
-> > @Fabio, @Marek:
-> >
-> > What's your opinion about that?
-> >
-> > >
-> > > -- Sebastian
-> >
-> > Stefan
-> >
+> --
+> Murali Karicheri
+> Linux Kernel, Texas Instruments
