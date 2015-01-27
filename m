@@ -1,187 +1,169 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 27 Jan 2015 11:31:26 -0800
-Subject: [PATCH] arm: sunxi: input: RFC: Add sysfs voltage for
- sun4i-lradc driver
-In-Reply-To: <54C75467.7010909@redhat.com>
-References: <1422291516-24895-1-git-send-email-plaes@plaes.org>
- <54C6955D.403@redhat.com> <20150126220622.GA16941@dtor-ws>
- <54C75467.7010909@redhat.com>
-Message-ID: <20150127193126.GA29637@dtor-glaptop>
+From: geoff@infradead.org (Geoff Levand)
+Date: Tue, 27 Jan 2015 11:33:18 -0800
+Subject: [PATCH V2 1/8] arm64: Fold proc-macros.S into assembler.h
+In-Reply-To: <e81815fb841db3ea40ce8e2fd18cf021ec9c6cf7.1421449714.git.geoff@infradead.org>
+References: <cover.1421449714.git.geoff@infradead.org>
+ <e81815fb841db3ea40ce8e2fd18cf021ec9c6cf7.1421449714.git.geoff@infradead.org>
+Message-ID: <1422387198.21823.23.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 27, 2015 at 10:03:35AM +0100, Hans de Goede wrote:
-> Hi,
-> 
-> On 26-01-15 23:06, Dmitry Torokhov wrote:
-> >On Mon, Jan 26, 2015 at 08:28:29PM +0100, Hans de Goede wrote:
-> >>Hi,
-> >>
-> >>On 26-01-15 17:58, Priit Laes wrote:
-> >>
-> >>No commit message? Please write an informative commit msg, like why we want this patch,
-> >>I guess it is to help figuring out the voltage levels for various buttons when creating
-> >>a dts, but I would prefer to not guess, which is where a good commit message would
-> >>come in handy ...
-> >>
-> >>>---
-> >>>  .../ABI/testing/sysfs-driver-input-sun4i-lradc     |  4 ++
-> >>>  drivers/input/keyboard/sun4i-lradc-keys.c          | 49 +++++++++++++++++-----
-> >>>  2 files changed, 43 insertions(+), 10 deletions(-)
-> >>>  create mode 100644 Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc
-> >>>
-> >>>diff --git a/Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc b/Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc
-> >>>new file mode 100644
-> >>>index 0000000..e4e6448
-> >>>--- /dev/null
-> >>>+++ b/Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc
-> >>>@@ -0,0 +1,4 @@
-> >>>+What:		/sys/class/input/input(x)/device/voltage
-> >>>+Date:		February 2015
-> >>>+Contact:	Priit Laes <plaes@plaes.org>
-> >>>+Description:	ADC output voltage in microvolts or 0 if device is not opened.
-> >>>diff --git a/drivers/input/keyboard/sun4i-lradc-keys.c b/drivers/input/keyboard/sun4i-lradc-keys.c
-> >>>index cc8f7dd..c0ab8ec 100644
-> >>>--- a/drivers/input/keyboard/sun4i-lradc-keys.c
-> >>>+++ b/drivers/input/keyboard/sun4i-lradc-keys.c
-> >>>@@ -79,10 +79,27 @@ struct sun4i_lradc_data {
-> >>>  	u32 vref;
-> >>>  };
-> >>>
-> >>>+static u32 sun4i_lradc_read_voltage(struct sun4i_lradc_data *lradc)
-> >>>+{
-> >>>+	u32 val = readl(lradc->base + LRADC_DATA0) & 0x3f;
-> >>>+	return val * lradc->vref / 63;
-> >>>+};
-> >>>+
-> >>>+static ssize_t
-> >>>+sun4i_lradc_dev_voltage_show(struct device *dev,
-> >>>+			struct device_attribute *attr, char *buf)
-> >>>+{
-> >>>+	struct sun4i_lradc_data *lradc = dev_get_drvdata(dev);
-> >>>+
-> >>>+	return sprintf(buf, "%u\n", sun4i_lradc_read_voltage(lradc));
-> >>>+}
-> >>>+
-> >>>+static const DEVICE_ATTR(voltage, S_IRUGO, sun4i_lradc_dev_voltage_show, NULL);
-> >>>+
-> >>>  static irqreturn_t sun4i_lradc_irq(int irq, void *dev_id)
-> >>>  {
-> >>>  	struct sun4i_lradc_data *lradc = dev_id;
-> >>>-	u32 i, ints, val, voltage, diff, keycode = 0, closest = 0xffffffff;
-> >>>+	u32 i, ints, voltage, diff, keycode = 0, closest = 0xffffffff;
-> >>>
-> >>>  	ints  = readl(lradc->base + LRADC_INTS);
-> >>>
-> >>>@@ -97,8 +114,7 @@ static irqreturn_t sun4i_lradc_irq(int irq, void *dev_id)
-> >>>  	}
-> >>>
-> >>>  	if ((ints & CHAN0_KEYDOWN_IRQ) && lradc->chan0_keycode == 0) {
-> >>>-		val = readl(lradc->base + LRADC_DATA0) & 0x3f;
-> >>>-		voltage = val * lradc->vref / 63;
-> >>>+		voltage = sun4i_lradc_read_voltage(lradc);
-> >>>
-> >>>  		for (i = 0; i < lradc->chan0_map_count; i++) {
-> >>>  			diff = abs(lradc->chan0_map[i].voltage - voltage);
-> >>>@@ -156,7 +172,7 @@ static void sun4i_lradc_close(struct input_dev *dev)
-> >>>  }
-> >>>
-> >>>  static int sun4i_lradc_load_dt_keymap(struct device *dev,
-> >>>-				      struct sun4i_lradc_data *lradc)
-> >>>+				    struct sun4i_lradc_data *lradc)
-> >>>  {
-> >>>  	struct device_node *np, *pp;
-> >>>  	int i;
-> >>
-> >>Why this identation change ?
-> >>
-> >>>@@ -168,8 +184,8 @@ static int sun4i_lradc_load_dt_keymap(struct device *dev,
-> >>>
-> >>>  	lradc->chan0_map_count = of_get_child_count(np);
-> >>>  	if (lradc->chan0_map_count == 0) {
-> >>>-		dev_err(dev, "keymap is missing in device tree\n");
-> >>>-		return -EINVAL;
-> >>>+		dev_info(dev, "keymap is missing in device tree\n");
-> >>>+		return 0;
-> >>>  	}
-> >>>
-> >>>  	lradc->chan0_map = devm_kmalloc_array(dev, lradc->chan0_map_count,
-> >>
-> >>I assume this is so that people can still use the sysfs node, to create a dts, right
-> >>not sure I like this, might be better to document to simple create a dts with
-> >>a single button mapping for 200 mV (most board use 200 mV steps between the buttons).
-> >>
-> >>>@@ -185,19 +201,19 @@ static int sun4i_lradc_load_dt_keymap(struct device *dev,
-> >>>
-> >>>  		error = of_property_read_u32(pp, "channel", &channel);
-> >>>  		if (error || channel != 0) {
-> >>>-			dev_err(dev, "%s: Inval channel prop\n", pp->name);
-> >>>+			dev_err(dev, "%s: Invalid 'channel' property\n", pp->name);
-> >>>  			return -EINVAL;
-> >>>  		}
-> >>>
-> >>>  		error = of_property_read_u32(pp, "voltage", &map->voltage);
-> >>>  		if (error) {
-> >>>-			dev_err(dev, "%s: Inval voltage prop\n", pp->name);
-> >>>+			dev_err(dev, "%s: Invalid 'voltage' property\n", pp->name);
-> >>>  			return -EINVAL;
-> >>>  		}
-> >>>
-> >>>  		error = of_property_read_u32(pp, "linux,code", &map->keycode);
-> >>>  		if (error) {
-> >>>-			dev_err(dev, "%s: Inval linux,code prop\n", pp->name);
-> >>>+			dev_err(dev, "%s: Invalid 'linux,code' property\n", pp->name);
-> >>>  			return -EINVAL;
-> >>>  		}
-> >>>
-> >>
-> >>This hunk / 3 changes belong in a separate patch. Also please run checkpatch, I think
-> >>you're running over 80 chars here.
-> >>
-> >>
-> >>>@@ -257,14 +273,26 @@ static int sun4i_lradc_probe(struct platform_device *pdev)
-> >>>  	if (error)
-> >>>  		return error;
-> >>>
-> >>>-	error = input_register_device(lradc->input);
-> >>>+	error = device_create_file(dev, &dev_attr_voltage);
-> >>>  	if (error)
-> >>>  		return error;
-> >>>
-> >>>+	error = input_register_device(lradc->input);
-> >>>+	if (error) {
-> >>>+		device_remove_file(&pdev->dev, &dev_attr_voltage);
-> >>>+		return error;
-> >>>+	}
-> >>>+
-> >>>  	platform_set_drvdata(pdev, lradc);
-> >>>  	return 0;
-> >>>  }
-> >>>
-> >>>+static int sun4i_lradc_remove(struct platform_device *pdev)
-> >>>+{
-> >>>+	device_remove_file(&pdev->dev, &dev_attr_voltage);
-> >>>+	return 0;
-> >>>+}
-> >>>+
-> >>
-> >>This looks wrong, I think (*) that we've a bug here because we're not
-> >>unregistering the input device, so maybe do 2 patches, 1 fixing the
-> >>not unregistering bug, and then just add the device_remove_file()
-> >>in the sysfs patch.
-> >
-> >The unregister was not necessary since the input device is managed.
-> 
-> Ah right, looking at the code again I see we use devm_input_allocate_device()
-> is there no devm_create_file for creating sysfs entries ?
+To allow the assembler macros defined in arch/arm64/mm/proc-macros.S to be used
+outside the mm code move the contents of proc-macros.S to
+arch/arm64/include/asm/assembler.h, delete proc-macros.S, and fix up all
+references to proc-macros.S.
 
-Greg was pushing the viewpoint that no drivers should create device attributes
-manually (since it is somewhat racy - attributes are created after devices show
-up) but I do not think he's gonna win that ever. So if someone were to add
-devm_create_attribute_group() API I think that would be great. In absence of
-this there is always devm_add_action().
+Signed-off-by: Geoff Levand <geoff@infradead.org>
+---
+ arch/arm64/include/asm/assembler.h | 37 +++++++++++++++++++++++++-
+ arch/arm64/mm/cache.S              |  2 --
+ arch/arm64/mm/proc-macros.S        | 54 --------------------------------------
+ arch/arm64/mm/proc.S               |  2 --
+ 4 files changed, 36 insertions(+), 59 deletions(-)
+ delete mode 100644 arch/arm64/mm/proc-macros.S
 
-Thanks.
-
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index 5901480..80436d3 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -1,5 +1,5 @@
+ /*
+- * Based on arch/arm/include/asm/assembler.h
++ * Based on arch/arm/include/asm/assembler.h, arch/arm/mm/proc-macros.S
+  *
+  * Copyright (C) 1996-2000 Russell King
+  * Copyright (C) 2012 ARM Ltd.
+@@ -20,6 +20,7 @@
+ #error "Only include this from assembly code"
+ #endif
+ 
++#include <asm/asm-offsets.h>
+ #include <asm/ptrace.h>
+ #include <asm/thread_info.h>
+ 
+@@ -155,3 +156,37 @@ lr	.req	x30		// link register
+ #endif
+ 	orr	\rd, \lbits, \hbits, lsl #32
+ 	.endm
++
++/*
++ * vma_vm_mm - get mm pointer from vma pointer (vma->vm_mm)
++ */
++	.macro	vma_vm_mm, rd, rn
++	ldr	\rd, [\rn, #VMA_VM_MM]
++	.endm
++
++/*
++ * mmid - get context id from mm pointer (mm->context.id)
++ */
++	.macro	mmid, rd, rn
++	ldr	\rd, [\rn, #MM_CONTEXT_ID]
++	.endm
++
++/*
++ * dcache_line_size - get the minimum D-cache line size from the CTR register.
++ */
++	.macro	dcache_line_size, reg, tmp
++	mrs	\tmp, ctr_el0			// read CTR
++	ubfm	\tmp, \tmp, #16, #19		// cache line size encoding
++	mov	\reg, #4			// bytes per word
++	lsl	\reg, \reg, \tmp		// actual cache line size
++	.endm
++
++/*
++ * icache_line_size - get the minimum I-cache line size from the CTR register.
++ */
++	.macro	icache_line_size, reg, tmp
++	mrs	\tmp, ctr_el0			// read CTR
++	and	\tmp, \tmp, #0xf		// cache line size encoding
++	mov	\reg, #4			// bytes per word
++	lsl	\reg, \reg, \tmp		// actual cache line size
++	.endm
+diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+index 2560e1e..2d7a67c 100644
+--- a/arch/arm64/mm/cache.S
++++ b/arch/arm64/mm/cache.S
+@@ -24,8 +24,6 @@
+ #include <asm/cpufeature.h>
+ #include <asm/alternative-asm.h>
+ 
+-#include "proc-macros.S"
+-
+ /*
+  *	__flush_dcache_all()
+  *
+diff --git a/arch/arm64/mm/proc-macros.S b/arch/arm64/mm/proc-macros.S
+deleted file mode 100644
+index 005d29e..0000000
+--- a/arch/arm64/mm/proc-macros.S
++++ /dev/null
+@@ -1,54 +0,0 @@
+-/*
+- * Based on arch/arm/mm/proc-macros.S
+- *
+- * Copyright (C) 2012 ARM Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+- */
+-
+-#include <asm/asm-offsets.h>
+-#include <asm/thread_info.h>
+-
+-/*
+- * vma_vm_mm - get mm pointer from vma pointer (vma->vm_mm)
+- */
+-	.macro	vma_vm_mm, rd, rn
+-	ldr	\rd, [\rn, #VMA_VM_MM]
+-	.endm
+-
+-/*
+- * mmid - get context id from mm pointer (mm->context.id)
+- */
+-	.macro	mmid, rd, rn
+-	ldr	\rd, [\rn, #MM_CONTEXT_ID]
+-	.endm
+-
+-/*
+- * dcache_line_size - get the minimum D-cache line size from the CTR register.
+- */
+-	.macro	dcache_line_size, reg, tmp
+-	mrs	\tmp, ctr_el0			// read CTR
+-	ubfm	\tmp, \tmp, #16, #19		// cache line size encoding
+-	mov	\reg, #4			// bytes per word
+-	lsl	\reg, \reg, \tmp		// actual cache line size
+-	.endm
+-
+-/*
+- * icache_line_size - get the minimum I-cache line size from the CTR register.
+- */
+-	.macro	icache_line_size, reg, tmp
+-	mrs	\tmp, ctr_el0			// read CTR
+-	and	\tmp, \tmp, #0xf		// cache line size encoding
+-	mov	\reg, #4			// bytes per word
+-	lsl	\reg, \reg, \tmp		// actual cache line size
+-	.endm
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 28eebfb..fe69f6e 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -26,8 +26,6 @@
+ #include <asm/pgtable-hwdef.h>
+ #include <asm/pgtable.h>
+ 
+-#include "proc-macros.S"
+-
+ #ifdef CONFIG_ARM64_64K_PAGES
+ #define TCR_TG_FLAGS	TCR_TG0_64K | TCR_TG1_64K
+ #else
 -- 
-Dmitry
+2.1.0
