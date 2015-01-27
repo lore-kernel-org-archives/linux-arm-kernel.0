@@ -1,32 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 27 Jan 2015 21:12:39 +0100
-Subject: [PATCH v1 1/2] mmc: host: arasan: Add addition of-arasan quirks
- and IOMMU support for arasan SDHCI driver.
-In-Reply-To: <1422379260-10139-2-git-send-email-stripathi@apm.com>
-References: <1422379260-10139-1-git-send-email-stripathi@apm.com>
- <1422379260-10139-2-git-send-email-stripathi@apm.com>
-Message-ID: <2889598.XIWjCcRL7e@wuerfel>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 27 Jan 2015 21:13:37 +0100
+Subject: [PATCH 0/8] PM / Domains: Re-structure code for adding/removing
+ devices to genpd
+Message-ID: <1422389625-11730-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 27 January 2015 22:50:59 Suman Tripathi wrote:
-> @@ -174,6 +176,13 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
->         pltfm_host->priv = sdhci_arasan;
->         pltfm_host->clk = clk_xin;
-> 
-> +       ret = xgene_ahbc_iommu_attach_device(&pdev->dev);
-> +       if (ret < 0 && IS_ENABLED(CONFIG_XGENE_AHBC_IOMMU)) {
-> +               dev_err(&pdev->dev,
-> +                       "unable to attach device to iommu %x\n", ret);
-> +               goto clk_disable_all;
-> +       }
-> +
->         ret = sdhci_add_host(host);
->         if (ret) {
->                 dev_err(&pdev->dev, "platform register failed (%u)\n", ret);
-> 
+While adding error handling of genpd's ->attach_dev() callback, I realized that
+we also had a need to re-structure some of the code which deals with
+adding/removing devices to genpd. Especially the APIs, __pm_genpd_add_device()
+and pm_genpd_remove_device() deserved some attention.
 
-This looks wrong: the iommu should be automatically configured for devices
-that need it, without any interaction from the driver.
+Patch 1 -> 4, can be considered as more simple cleanups and should not impact
+the behavior for current clients using the APIs. 
 
-	Arnd
+Patch 5, eliminates a mutex for generic_pm_domain_data by re-order the
+initialization/cleanup of dev_pm_qos notifiers.
+
+Patch 6, move some code around to fix a potenial memory leakage of a struct
+pm_subsys_data.
+
+Patch 7, code restructuring which impacts locking behavior while adding/removing
+devices. Should improve code readability and decrease critical regions of
+holding locks.
+
+Patch 8, Adds error handling of genpd's ->attach_dev() callback
+
+
+Ulf Hansson (8):
+  PM / Domains: Rename __pm_genpd_alloc|free_dev_data()
+  PM / Domains: Remove reference counting for the generic_pm_domain_data
+  PM / Domains: Don't allow an existing generic_pm_domain_data
+  PM / Domains: Don't check for an existing device when adding a new
+  PM / Domains: Eliminate the mutex for the generic_pm_domain_data
+  PM / Domains: Free pm_subsys_data in error path in
+    __pm_genpd_add_device()
+  PM / Domains: Re-order initialization of generic_pm_domain_data
+  PM / Domains: Handle errors from genpd's ->attach_dev() callback
+
+ drivers/base/power/domain.c | 137 +++++++++++++++++++++-----------------------
+ include/linux/pm_domain.h   |   2 -
+ 2 files changed, 65 insertions(+), 74 deletions(-)
+
+-- 
+1.9.1
