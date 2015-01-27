@@ -1,92 +1,67 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Tue, 27 Jan 2015 14:43:38 -0500
-Subject: [PATCH 2/3] tty/serial: of_serial: add support for PXA/MMP uarts
-In-Reply-To: <CAL_Jsq+wxY0=S1ff-Fk0xDBxHdhBvNopLpjfCETVoo_mou658w@mail.gmail.com>
-References: <1422334209-23125-1-git-send-email-robh@kernel.org>
- <1422334209-23125-2-git-send-email-robh@kernel.org>
- <54C78823.7050504@hurleysoftware.com>
- <CAL_Jsq+8jDN+fYyed5RYd2e1K+H_R1NkjT38WXSpKfxTLgsDbQ@mail.gmail.com>
- <54C7AA2D.7080202@hurleysoftware.com>
- <CAL_Jsq+wxY0=S1ff-Fk0xDBxHdhBvNopLpjfCETVoo_mou658w@mail.gmail.com>
-Message-ID: <54C7EA6A.4010805@hurleysoftware.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 27 Jan 2015 19:43:46 +0000
+Subject: [PATCH RFC 2/3] power: mxs_power: add driver for mxs power
+ subsystem
+In-Reply-To: <1954124242.301697.1422383709733.JavaMail.open-xchange@oxbaltgw09.schlund.de>
+References: <1416514477-19190-1-git-send-email-stefan.wahren@i2se.com>
+ <1416514477-19190-3-git-send-email-stefan.wahren@i2se.com>
+ <20150121230148.GJ13715@earth.universe> <54C0AFE4.3020701@i2se.com>
+ <20150125150431.GE2719@earth.universe>
+ <1719204322.245040.1422301605670.JavaMail.open-xchange@oxbaltgw03.schlund.de>
+ <20150127001629.GP21293@sirena.org.uk>
+ <1954124242.301697.1422383709733.JavaMail.open-xchange@oxbaltgw09.schlund.de>
+Message-ID: <20150127194346.GN21293@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/27/2015 11:44 AM, Rob Herring wrote:
-> On Tue, Jan 27, 2015 at 9:09 AM, Peter Hurley <peter@hurleysoftware.com> wrote:
->> On 01/27/2015 09:30 AM, Rob Herring wrote:
->>> On Tue, Jan 27, 2015 at 6:44 AM, Peter Hurley <peter@hurleysoftware.com> wrote:
->>>> Hi Rob,
->>>>
->>>> On 01/26/2015 11:50 PM, Rob Herring wrote:
->>>>> Add mrvl,pxa-uart and mrvl,mmp-uart compatible strings for the of_serial
->>>>> driver. These are 8250 variants which have a port type of PORT_XSCALE.
->>>>>
->>>>> There is also the serial driver pxa.c with these compatible strings
->>>>> already. However, it can be replaced with the common 8250 driver. It has
->>>>> some issues like it cannot coexist with the 8250 driver due to tty name
->>>>> collision. That also means adding these compatible strings here should
->>>>> not case a problem.
->>>>
->>>> So what determines which driver is controlling the port if both
->>>> drivers are built-in?
->>>
->>> If both are built-in, whoever registers ttyS ports first wins. This
->>> will be the 8250 driver due to link order.
->>
->> Ok, but then I think the commit log should reflect that this patch
->> effectively replaces pxa2xx-uart driver with the 8250 driver for PXA/MMP uarts
->> if both drivers are built-in or both drivers are modules.
-> 
-> It doesn't always. It is only on DT enabled platforms. But I can be
-> more explicit about that.
-> 
-> There is another patch to remove the PXA driver entirely which I'm
-> inquiring about why it was never merged [1]. This is why I went down
-> the path of getting the 8250 driver to work rather than trying to fix
-> the PXA driver.
+On Tue, Jan 27, 2015 at 07:35:09PM +0100, Stefan Wahren wrote:
+> > Mark Brown <broonie@kernel.org> hat am 27. Januar 2015 um 01:16 geschrieben:
 
-Ah. I had seen your inquiry but didn't grasp the significance.
-Greg acked that patch over 8 mos ago; it's still stuck somewhere?
+> > > okay i understand. But doesn't it need a extra driver to set the switching
+> > > frequency because of the new compatible string?
 
-OTOH, I didn't realize that patch removed the PXA driver. That driver has
-errata workarounds which didn't get integrated into the 8250 core; it seems
-a shame to toss that away.
+> > I don't understand this bit at all, sorry.
 
-[ Sidebar: I did a trial split of 8250_core into a separate 8250 base module
-  and an 8250 universal driver. I keep having to rework the split but it's
-  pretty close now; the 8250 base module might be just the thing for simplifying
-  the pxa driver and getting console/earlycon/dma for free.
+> Sebastian suggested a new sub-node in the devicetree:
 
-  Let me see what I can do about getting that done.
-]
+>     powerpll {
+>         compatible = "fsl,imx28-power-pll"
+>         #clock-cells = <0>;
+>         clock-frequency = <12345>;
+>     }
 
->>> So I guess PXA systems have avoided this by never building in 8250 driver.
->>
->> Platform devices are initialized first, so before this patch the pxa2xx-uart
->> driver would have claimed the platform ports before the 8250 driver, if
->> both were built-in (or both modules).
-> 
-> That's not exactly what I observed. The console is killed when the
-> real driver initializes. I have no other debug output capability after
-> that, so I'm not completely sure what was happening. Part of the
-> problem is you need to move uart_register_driver to probe from the
-> initcall as this is what other serial drivers sharing ttyS have done.
+> and i think that the new compatible string needs a separate driver to take care
+> of the switching frequency.
 
-Ah, yep. I missed that subtlety.
+I can see that this has been suggested, what I can't understand is why
+we would wish to do this but I am missing some context here which may
+make it all perfectly clear.
 
-> Using 8250 earlycon with the PXA driver seems to cause problems, so
-> I'd have to duplicate the earlycon support in the PXA driver.
-> 
->> Maybe Kconfig should warn if they're both built-in or both modules?
-> 
-> Is there a way to do that?
+> Or is it okay to leave the handling of the switching frequency in the mxs-power
+> driver?
 
-I think so; conf warns if one setting overrides another, so I think there's
-probably a way to make that happen in the Kconfig. I'll mess with that later
-tonight or tomorrow, and get back to you.
+Unless the clock is exposed externally to the regulator either as an
+input or an output I'm not sure I see any benefit but I'm possibly
+missing something here.  It does sound like there might be a separate
+clock IP or something?
 
-Regards,
-Peter Hurley
+> Btw if we add a new node to set switching frequency, i think it would be better
+> to describe the dc-dc convertor and not the pll:
 
- 
+>     dcdc {
+>        compatible = "fsl,imx28-dcdc"
+>        frequency = <12345>;
+>     }
+
+> What do you think?
+
+Yes, just adding a new property on the regulator node with all the other
+properties seems sensible (we've just gained some helpers which make it
+fairly straightforward to do this).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150127/3e3dfca8/attachment.sig>
