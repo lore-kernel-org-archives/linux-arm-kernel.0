@@ -1,26 +1,30 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 27 Jan 2015 15:19:01 +0100
-Subject: [PATCH v5 2/5] dt-bindings: Add pinctrl bindings for
- mt65xx/mt81xx.
-In-Reply-To: <1421818097-9281-3-git-send-email-hongzhou.yang@mediatek.com>
-References: <1421818097-9281-1-git-send-email-hongzhou.yang@mediatek.com>
- <1421818097-9281-3-git-send-email-hongzhou.yang@mediatek.com>
-Message-ID: <CACRpkdb5=SX0-xdpngBszcha=R4nPLTSv3b_n=NOtGUL6f2_Fg@mail.gmail.com>
+Date: Tue, 27 Jan 2015 15:21:10 +0100
+Subject: [PATCH 1/7] pinctrl: mediatek: emulate GPIO interrupt on
+ both-edges
+In-Reply-To: <1422339332-27498-2-git-send-email-chaotian.jing@mediatek.com>
+References: <1422339332-27498-1-git-send-email-chaotian.jing@mediatek.com>
+ <1422339332-27498-2-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <CACRpkdbncsDJ3pP0dETpho5+j+OVuaYr=YTsH8pAs7vuT_9OLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 21, 2015 at 6:28 AM, Hongzhou Yang
-<hongzhou.yang@mediatek.com> wrote:
+On Tue, Jan 27, 2015 at 7:15 AM, Chaotian Jing
+<chaotian.jing@mediatek.com> wrote:
 
-> From: Hongzhou Yang <hongzhou.yang@mediatek.com>
+> From: Yingjoe Chen <yingjoe.chen@mediatek.com>
 >
-> Add devicetree bindings for Mediatek SoC pinctrl driver.
+> MTK EINT does not support generating interrupt on both edges.
+> Emulate this by changing edge polarity while enable irq,
+> set types and interrupt handling. This follows an example of
+> drivers/gpio/gpio-mxc.c.
 >
-> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
 
-Sascha can you ACK this binding?
-If you confirm it will cover also your usecase I'm gonna be happy
-with this...
+Hongzhu, if you're fine with this patch can you ACK it as maintainer
+of the pinctrl driver so I can merge it immediately on top of your
+drivern whenever we consider it finished (and if it applies still...)
 
 Yours,
 Linus Walleij
