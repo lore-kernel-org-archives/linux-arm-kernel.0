@@ -1,35 +1,66 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 26 Jan 2015 20:45:10 -0800
-Subject: [GIT PULL RESEND] pxa for v3.20
-In-Reply-To: <87lhkoq1ff.fsf@free.fr>
-References: <87egqpff9m.fsf@free.fr> <20150123215423.GD20896@quad.lixom.net>
- <874mrgdzz0.fsf@free.fr> <20150127021733.GB22154@quad.lixom.net>
- <87lhkoq1ff.fsf@free.fr>
-Message-ID: <CAOesGMga4MB+q740uj1Li4Mnq6kXxQzKk_cf0YKjt5aj5_GFLA@mail.gmail.com>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Tue, 27 Jan 2015 04:44:59 +0000
+Subject: [PATCH v2 07/12] pm: at91: the standby mode uses the same sram
+ function as the suspend to memory mode
+In-Reply-To: <20150126100955.GA18907@gradator.net>
+References: <1422265005-22937-1-git-send-email-wenyou.yang@atmel.com>
+ <1422265331-23236-1-git-send-email-wenyou.yang@atmel.com>
+ <20150126100955.GA18907@gradator.net>
+Message-ID: <B256D81BAE5131468A838E5D7A243641BFD35CD3@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 26, 2015 at 8:42 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> Olof Johansson <olof@lixom.net> writes:
->
->> I had already merged, but it looks like you broke viper and zeus. Both of them
->> still refer to PXA_ISA_IRQ().
->>
->> Can you send an incremental patch for that? Or if you prefer that we drop this
->> branch for now while you sort it out that's OK too -- your preference.
-> I'll send an incremental patch.
-> I'm really frustrated my bot didn't catch that, I suppose yours caught it by
-> building viper_defconfig ...
+Hi Sylvain,
 
-Yeah, I build all defconfigs.
+> -----Original Message-----
+> From: Sylvain Rochet [mailto:sylvain.rochet at finsecur.com]
+> Sent: Monday, January 26, 2015 6:10 PM
+> To: Yang, Wenyou
+> Cc: Ferre, Nicolas; linux at arm.linux.org.uk; linux-arm-kernel at lists.infradead.org;
+> linux-kernel at vger.kernel.org; alexandre.belloni at free-electrons.com;
+> peda at axentia.se
+> Subject: Re: [PATCH v2 07/12] pm: at91: the standby mode uses the same sram
+> function as the suspend to memory mode
+> 
+> Hello Wenyou,
+> 
+> 
+> On Mon, Jan 26, 2015 at 05:42:11PM +0800, Wenyou Yang wrote:
+> > +static int at91_pm_verify_clocks(suspend_state_t state)
+> >  {
+> >  	unsigned long scsr;
+> >  	int i;
+> >
+> > +	/* For PM_SUSPEND_STANDBY, skip verifying the clock */
+> > +	if (state == PM_SUSPEND_STANDBY)
+> > +		return 1;
+> > +
+> 
+> In my opinion we should use the select() already in place in
+> at91_pm_enter() to do that:
+Accepted. Thanks
 
->> Yeah we normally scale this by educating downstream maintainers. checkpatch is
->> useful in many cases but making it do everything is hard.
-> Yeah, but humans do forget, even educated ... I'll be carefull as much as I can,
-> but I knew the rule and yet this slipped through.
+> 
+> >  static int at91_pm_enter(suspend_state_t state)  {
+> >  	at91_pinctrl_gpio_suspend();
+> >
+> >  	switch (state) {
+>      (...)
+> > +	case PM_SUSPEND_MEM:
+> 
+> 	/*
+> 	 * Ensure that clocks are in a valid state.
+> 	 */
+> 	if (!at91_pm_verify_clocks())
+> 		goto error;
+> 	/* FALLTHROUGH */
+> 
+> > +	case PM_SUSPEND_STANDBY:
+> >  		/*
+> > -		 * Suspend-to-RAM is like STANDBY plus slow clock mode, so
+> 
+> 
+> Sylvain
 
-Oh, no worries. We're all human, which is why I pointed it out when I
-noticed it. Next time I might miss it too. It happens.
-
-
--Olof
+Best Regards,
+Wenyou Yang
