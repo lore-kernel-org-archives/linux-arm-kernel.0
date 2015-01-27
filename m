@@ -1,28 +1,25 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 27 Jan 2015 15:03:12 -0800
-Subject: [PATCH v3 0/4] ARM: Conexant Digicolor CX92755 SoC support
-In-Reply-To: <20150125180855.GA3148@tarshish>
-References: <cover.1421219953.git.baruch@tkos.co.il>
- <20150125180855.GA3148@tarshish>
-Message-ID: <20150127230312.GB11789@quad.lixom.net>
+Date: Tue, 27 Jan 2015 15:05:24 -0800
+Subject: [RESEND PATCH v7 2/5] Documentation: DT: Add entry for FSL
+ LS2085A SoC and Simulator model
+In-Reply-To: <1422133973-16460-3-git-send-email-bhupesh.sharma@freescale.com>
+References: <1422133973-16460-1-git-send-email-bhupesh.sharma@freescale.com>
+ <1422133973-16460-3-git-send-email-bhupesh.sharma@freescale.com>
+Message-ID: <20150127230524.GC11789@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 25, 2015 at 08:08:55PM +0200, Baruch Siach wrote:
-> Hi ARM SoC maintainers,
+On Sun, Jan 25, 2015 at 02:42:50AM +0530, Bhupesh Sharma wrote:
+> This patch adds a devicetree binding documentation for FSL's
+> LS2085A SoC and Simulator model.
 > 
-> On Wed, Jan 14, 2015 at 10:40:29AM +0200, Baruch Siach wrote:
-> > This series adds initial support for the Conexant CX92755 SoC. The CX92755 is
-> > one of the Digicolor series of SoCs, all sharing many of the same peripherals.
-> > The code was tested on the CX92755 evaluation kit, AKA Equinox.
-> > 
-> > Uses attempting to try this code will most likely also want the UART/console
-> > driver available from https://patchwork.kernel.org/patch/5515861/.
-> 
-> Any chance of having this series merged for 3.20? Arnd has acked this already.
+> Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
+> ---
+>  Documentation/devicetree/bindings/arm/fsl.txt |    8 ++++++++
+>  1 file changed, 8 insertions(+)
 
-Yep, just had a small comment on naming for the third patch, the rest have been
-applied now.
+What was this patch based on? It was quite far out of date context wise.
+Anyway, easy fixup and applied now.
 
 
 -Olof
