@@ -1,84 +1,39 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 26 Jan 2015 19:06:11 -0500 (EST)
-Subject: N900 v3.19-rc5 arm atags_to_fdt.c is broken
-In-Reply-To: <20150126214821.GA8884@amd>
-References: <201501232239.55801@pali> <201501232336.36187@pali>
- <20150126161454.GE28663@atomide.com> <201501261723.10505@pali>
- <20150126170323.GF28663@atomide.com>
- <alpine.LFD.2.11.1501261318590.1322@knanqh.ubzr> <20150126214821.GA8884@amd>
-Message-ID: <alpine.LFD.2.11.1501261903130.1322@knanqh.ubzr>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 27 Jan 2015 00:09:03 +0000
+Subject: [PATCH 11/18] spi/xilinx: Remove rx_fn and tx_fn pointer
+In-Reply-To: <1422029330-10971-12-git-send-email-ricardo.ribalda@gmail.com>
+References: <1422029330-10971-1-git-send-email-ricardo.ribalda@gmail.com>
+ <1422029330-10971-12-git-send-email-ricardo.ribalda@gmail.com>
+Message-ID: <20150127000903.GM21293@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 26 Jan 2015, Pavel Machek wrote:
+On Fri, Jan 23, 2015 at 05:08:43PM +0100, Ricardo Ribalda Delgado wrote:
 
-> Hi!
-> 
-> > > > $ du -b arch/arm/boot/dts/omap3-n900.dtb 
-> > > > 70212   arch/arm/boot/dts/omap3-n900.dtb
-> > > > 
-> > > > $ echo $((0x10000))
-> > > > 65536
-> > > > 
-> > > > I would say, problem is because omap3-n900 binary DT is too large
-> > 
-> > I agree.
-> > 
-> > > OK if that's the case, then your patch makes sense to me. It also
-> > > seems we can have the temporary stack be larger than the initial
-> > > stack just for atags_to_fdt.
-> > 
-> > The stack size isn't the issue, but rather its location.  We need to 
-> > position it away from the DT data.  The DT size is known and we could 
-> > use that, plus some room for the insertion of new data coming from the
-> > ATAG conversion.
-> > 
-> > Something like the following would be a more robust solution:
-> > 
-> > diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> > index 68be901759..89718de9dd 100644
-> > --- a/arch/arm/boot/compressed/head.S
-> > +++ b/arch/arm/boot/compressed/head.S
-> > @@ -263,16 +263,37 @@ restart:	adr	r0, LC0
-> >  		 * OK... Let's do some funky business here.
-> >  		 * If we do have a DTB appended to zImage, and we do have
-> >  		 * an ATAG list around, we want the later to be translated
-> > -		 * and folded into the former here.  To be on the safe side,
-> > -		 * let's temporarily move  the stack away into the malloc
-> > -		 * area.  No GOT fixup has occurred yet, but none of the
-> > -		 * code we're about to call uses any global variable.
-> > +		 * and folded into the former here. No GOT fixup has occurred
-> > +		 * yet, but none of the code we're about to call uses any
-> > +		 * global variable.
-> >  		*/
-> > -		add	sp, sp, #0x10000
-> > +
-> > +		/* Get the initial DTB size */
-> > +		ldr	r5, [r6, #4]
-> > +#ifndef __ARMEB__
-> > +		/* convert to little endian */
-> > +		eor	r1, r5, r5, ror #16
-> > +		bic	r1, r1, #0x00ff0000
-> > +		mov	r5, r5, ror #8
-> > +		eor	r5, r5, r1, lsr #8
-> > +#endif
-> > +		/* 50% DTB growth should be good enough */
-> > +		add	r5, r5, r5, lsr #1
-> > +		/* preserve 64-bit alignment */
-> > +		add	r5, r5, #7
-> > +		bic	r5, r5, #7
-> > +		/* clamp to 32KB min and 1MB max */
-> > +		movs	r1, r5, lsr #15
-> > +		moveq	r5, #(1 << 15)
-> > +		movs	r1, r5, lsr #20
-> > +		movne	r5, #(1 << 20)
-> 
-> Dunno. Would it be easier/simpler to just use 1MB, always? Do we
-> support machines with <16MB RAM?
+> +	switch (xspi->bits_per_word) {
+> +	case 8:
+> +		*(u8 *)(xspi->rx_ptr) = data;
+> +		break;
+> +	case 16:
+> +		*(u16 *)(xspi->rx_ptr) = data;
+> +		break;
+> +	case 32:
+>  		*(u32 *)(xspi->rx_ptr) = data;
+> -		xspi->rx_ptr += 4;
+> +		break;
+>  	}
 
-If people are used to put other things relatively close to the kernel 
-image like, say, some initrd image, then I'd prefer to be more 
-conservative and avoid spreading out too much.
+Perhaps I'm missing something here but we only seem to be incrementing
+rx_ptr for the 32 bit case here...
 
+> +	xspi->rx_ptr += xspi->bits_per_word/8;
 
-Nicolas
+...which looks to duplicate this which handles all cases.  Also there's
+a coding style thing - spaces around the / please.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150127/22453ffc/attachment.sig>
