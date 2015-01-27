@@ -1,78 +1,62 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 27 Jan 2015 13:11:57 +0200
-Subject: [PATCHv5 2/2] leds: tlc591xx: Driver for the TI 8/16 Channel
- i2c LED driver
-In-Reply-To: <20150126171052.GC5015@lunn.ch>
-References: <1421879364-8573-1-git-send-email-andrew@lunn.ch>
- <1421879364-8573-3-git-send-email-andrew@lunn.ch> <54C62919.8000205@ti.com>
- <20150126171052.GC5015@lunn.ch>
-Message-ID: <54C7727D.70000@ti.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 27 Jan 2015 11:12:32 +0000
+Subject: [PATCH v4 6/6] arm: dma-mapping: updates to limit dma_mask and
+ iommu mapping size
+In-Reply-To: <1422052359-12384-7-git-send-email-m-karicheri2@ti.com>
+References: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
+ <1422052359-12384-7-git-send-email-m-karicheri2@ti.com>
+Message-ID: <54C772A0.2000203@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Murali,
 
-On 26/01/15 19:10, Andrew Lunn wrote:
->> So... To me it's still slightly unclear when should one write a PWM
->> driver and when a LED driver. But I would say that as the TLC591xx
->> outputs a PWM signal, it should be a PWM driver. Then the different
->> users of this PWM signal could be made on top of that (LED, backlight, GPO).
->>
->> What would be the technical drawbacks with having the TLC591xx driver as
->> a PWM, instead of LED?
->  
-> Hi Tomi
-> 
-> We have been through this once, but the big technical drawback is that
-> this hardware cannot do what the Linux Kernel defines as PWM.
-> 
-> It cannot correctly implement the PMW call:
-> 
-> int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns);
-> 
-> This hardware has a fixed period, since it is clocked at 97-kHz.  So
-> you cannot set the period. The duty is also somewhat restrictive, in
-> that it only allows 1/256 increments of the 97Khz.
+On 23/01/15 22:32, Murali Karicheri wrote:
+> Limit the dma_mask to minimum of dma_mask and dma_base + size - 1.
+>
+> Also arm_iommu_create_mapping() has size parameter of size_t and
+> arm_setup_iommu_dma_ops() can take a value higher than that. So
+> limit the size to SIZE_MAX.
+>
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> ---
+>   arch/arm/mm/dma-mapping.c |   10 ++++++++++
+>   1 file changed, 10 insertions(+)
+>
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 7864797..a1f9030 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -2004,6 +2004,13 @@ static bool arm_setup_iommu_dma_ops(struct device *dev, u64 dma_base, u64 size,
+>   	if (!iommu)
+>   		return false;
+>
+> +	/*
+> +	 * currently arm_iommu_create_mapping() takes a max of size_t
+> +	 * for size param. So check this limit for now.
+> +	 */
+> +	if (size > SIZE_MAX)
+> +		return false;
+> +
+>   	mapping = arm_iommu_create_mapping(dev->bus, dma_base, size);
+>   	if (IS_ERR(mapping)) {
+>   		pr_warn("Failed to create %llu-byte IOMMU mapping for device %s\n",
+> @@ -2053,6 +2060,9 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+>   {
+>   	struct dma_map_ops *dma_ops;
+>
+> +	/* limit dma_mask to the lower of the two values */
+> +	*dev->dma_mask = min((*dev->dma_mask), (dma_base + size - 1));
+> +
 
-Surely other PWM devices also have restrictions in the period or duty cycle?
+Is there any reason not to do this in of_dma_configure? It seems like 
+something everyone could benefit from - I'd cooked up a dodgy workaround 
+for the same issue in my arm64 IOMMU code, but handling it generically 
+in common code would be much nicer.
 
-> This hardware does however perfectly fit the LED API:
-> 
-> enum led_brightness {
->         LED_OFF         = 0,
->         LED_HALF        = 127,
->         LED_FULL        = 255,
-> };
-> 
->         void            (*brightness_set)(struct led_classdev *led_cdev,
->                                           enum led_brightness brightness);
-> 
-> So we can model it perfectly as an LED driver, or badly as a PWM
-> driver.
+Robin.
 
-Maybe so, but what does it mean in practice? If it's implemented as a
-PWM driver, and the existing leds-pwm driver is used for the led
-functionality, shall we miss some brightness values? Is the
-configuration more difficult? Or what?
-
-So my point here is that it outputs a PWM signal, so it makes sense to
-have it as a PWM driver. It has restricted configurability compared to
-more versatile PWM hardware, but I so far don't see why that would be an
-issue.
-
-If it is a PWM driver, we get backlight support for free via the
-existing pwm_bl driver, and LED support via leds-pwm. And there has been
-a clear acceptance on GPO functionality with PWM outputs (in the Peter's
-mail thread), whereas I would bet that a LED based GPO functionality
-would encounter resistance, because that doesn't quite make sense.
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150127/5a23a940/attachment.sig>
+>   	dev->archdata.dma_coherent = coherent;
+>   	if (arm_setup_iommu_dma_ops(dev, dma_base, size, iommu))
+>   		dma_ops = arm_get_iommu_dma_map_ops(coherent);
+>
