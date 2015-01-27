@@ -1,27 +1,71 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 27 Jan 2015 13:01:17 +0000
-Subject: [PATCH 4/7] spi: spi-fsl-dspi: avoid preparing the clock two times
-In-Reply-To: <1422356244-15629-5-git-send-email-bhuvanchandra.dv@toradex.com>
-References: <1422356244-15629-1-git-send-email-bhuvanchandra.dv@toradex.com>
- <1422356244-15629-5-git-send-email-bhuvanchandra.dv@toradex.com>
-Message-ID: <20150127130117.GU21293@sirena.org.uk>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Tue, 27 Jan 2015 08:10:10 -0500
+Subject: [PATCH 3/3] tty/serial: 8250_early: Add support for PXA UARTs
+In-Reply-To: <1422334209-23125-3-git-send-email-robh@kernel.org>
+References: <1422334209-23125-1-git-send-email-robh@kernel.org>
+ <1422334209-23125-3-git-send-email-robh@kernel.org>
+Message-ID: <54C78E32.4050406@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 27, 2015 at 04:27:21PM +0530, Bhuvanchandra DV wrote:
-> regmap_read/regmap_write will expect the peripheral clock
-> to be enabled before accessing the registers of the peripheral.
-> Since the peripheral clock is enabled separatly, avoid redundant clock
-> prepare (with devm_regmap_init_mmio_clk) and use devm_regmap_init_mmio instead.
+On 01/26/2015 11:50 PM, Rob Herring wrote:
+> The PXA variant of the 8250 UART adds a UART enable bit which must not
+> be cleared. Make the earlycon support maintain this bit if it is set.
+> This implies some initialization of the UART, but we cannot
+> unconditionally set the bit as some other variants require this bit to
+> be clear for other functions.
 
-What's the advantage of this?  The clock API is refcounted so there
-should be no issue with this and it seems like it's opening us up to
-bugs if there's a path where we interact with the registers without
-enabling the clocks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150127/ea749d88/attachment.sig>
+So if the bootloader doesn't enable the uart, then earlycon doesn't work?
+Or is there some other piece that is enabling the uart after earlycon setup
+(besides the driver, of course)?
+
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Jiri Slaby <jslaby@suse.cz>
+> Cc: linux-serial at vger.kernel.org
+> ---
+>  drivers/tty/serial/8250/8250_early.c | 8 +++++---
+>  1 file changed, 5 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/8250/8250_early.c b/drivers/tty/serial/8250/8250_early.c
+> index ce2a8ab..c31a22b 100644
+> --- a/drivers/tty/serial/8250/8250_early.c
+> +++ b/drivers/tty/serial/8250/8250_early.c
+> @@ -93,10 +93,10 @@ static void __init early_serial8250_write(struct console *console,
+>  	struct uart_port *port = &early_device->port;
+>  	unsigned int ier;
+>  
+> -	/* Save the IER and disable interrupts */
+> +	/* Save the IER and disable interrupts preserving the UUE bit */
+>  	ier = serial8250_early_in(port, UART_IER);
+>  	if (ier)
+> -		serial8250_early_out(port, UART_IER, 0);
+> +		serial8250_early_out(port, UART_IER, ier & UART_IER_UUE);
+>  
+>  	uart_console_write(port, s, count, serial_putc);
+>  
+> @@ -127,9 +127,11 @@ static void __init init_port(struct earlycon_device *device)
+>  	struct uart_port *port = &device->port;
+>  	unsigned int divisor;
+>  	unsigned char c;
+> +	unsigned int ier;
+>  
+>  	serial8250_early_out(port, UART_LCR, 0x3);	/* 8n1 */
+> -	serial8250_early_out(port, UART_IER, 0);	/* no interrupt */
+> +	ier = serial8250_early_in(port, UART_IER);
+> +	serial8250_early_out(port, UART_IER, ier & UART_IER_UUE); /* no interrupt */
+
+The trailing comment seems no longer relevant; how about below?
+
+	/* Mask interrupts (preserve XScale's uart enable bit) */
+	serial8250_early_out(port, UART_IER, ier & UART_IER_UUE);
+
+OTOH, if the uart is disabled, shouldn't earlycon be disabled?
+
+Regards,
+Peter Hurley
+
+>  	serial8250_early_out(port, UART_FCR, 0);	/* no fifo */
+>  	serial8250_early_out(port, UART_MCR, 0x3);	/* DTR + RTS */
+>  
+> 
