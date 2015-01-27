@@ -1,62 +1,45 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 27 Jan 2015 11:12:32 +0000
-Subject: [PATCH v4 6/6] arm: dma-mapping: updates to limit dma_mask and
- iommu mapping size
-In-Reply-To: <1422052359-12384-7-git-send-email-m-karicheri2@ti.com>
-References: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
- <1422052359-12384-7-git-send-email-m-karicheri2@ti.com>
-Message-ID: <54C772A0.2000203@arm.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Tue, 27 Jan 2015 12:13:18 +0100
+Subject: [PATCH v2 04/11] ARM: tegra: Set spi-max-frequency property to
+ flash node
+In-Reply-To: <54B7F84A.6020906@wwwdotorg.org>
+References: <1421338359-27467-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1421338359-27467-5-git-send-email-tomeu.vizoso@collabora.com>
+ <54B7F84A.6020906@wwwdotorg.org>
+Message-ID: <CAAObsKDx_W23OTL2RE4xxgXL-rtp3npkBtx6qMHV1j8ZXmo1rw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Murali,
+On 15 January 2015 at 18:26, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 01/15/2015 09:12 AM, Tomeu Vizoso wrote:
+>>
+>> To silence a warning on Nyan boards.
+>>
+>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>> ---
+>>   arch/arm/boot/dts/tegra124-nyan-big.dts | 1 +
+>>   1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/arm/boot/dts/tegra124-nyan-big.dts
+>> b/arch/arm/boot/dts/tegra124-nyan-big.dts
+>> index 9a9cffe..94c7ba9 100644
+>> --- a/arch/arm/boot/dts/tegra124-nyan-big.dts
+>> +++ b/arch/arm/boot/dts/tegra124-nyan-big.dts
+>> @@ -1660,6 +1660,7 @@
+>>
+>>                 flash at 0 {
+>>                         compatible = "winbond,w25q32dw";
+>> +                       spi-max-frequency = <25000000>;
+>
+>
+> This property already exists in the SPI controller. Isn't the max frequency
+> supposed to inherit from there? If so, shouldn't the code not warn when such
+> inheritance happens, i.e. it'd be better to fix the code?
 
-On 23/01/15 22:32, Murali Karicheri wrote:
-> Limit the dma_mask to minimum of dma_mask and dma_base + size - 1.
->
-> Also arm_iommu_create_mapping() has size parameter of size_t and
-> arm_setup_iommu_dma_ops() can take a value higher than that. So
-> limit the size to SIZE_MAX.
->
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> ---
->   arch/arm/mm/dma-mapping.c |   10 ++++++++++
->   1 file changed, 10 insertions(+)
->
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 7864797..a1f9030 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -2004,6 +2004,13 @@ static bool arm_setup_iommu_dma_ops(struct device *dev, u64 dma_base, u64 size,
->   	if (!iommu)
->   		return false;
->
-> +	/*
-> +	 * currently arm_iommu_create_mapping() takes a max of size_t
-> +	 * for size param. So check this limit for now.
-> +	 */
-> +	if (size > SIZE_MAX)
-> +		return false;
-> +
->   	mapping = arm_iommu_create_mapping(dev->bus, dma_base, size);
->   	if (IS_ERR(mapping)) {
->   		pr_warn("Failed to create %llu-byte IOMMU mapping for device %s\n",
-> @@ -2053,6 +2060,9 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
->   {
->   	struct dma_map_ops *dma_ops;
->
-> +	/* limit dma_mask to the lower of the two values */
-> +	*dev->dma_mask = min((*dev->dma_mask), (dma_base + size - 1));
-> +
+I don't think it's supposed to fall back to the controller's max freq,
+as each device has its own maximum frequency that it can support and
+it's not related to what the master supports.
 
-Is there any reason not to do this in of_dma_configure? It seems like 
-something everyone could benefit from - I'd cooked up a dodgy workaround 
-for the same issue in my arm64 IOMMU code, but handling it generically 
-in common code would be much nicer.
+Regards,
 
-Robin.
-
->   	dev->archdata.dma_coherent = coherent;
->   	if (arm_setup_iommu_dma_ops(dev, dma_base, size, iommu))
->   		dma_ops = arm_get_iommu_dma_map_ops(coherent);
->
+Tomeu
