@@ -1,44 +1,27 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 27 Jan 2015 15:08:22 -0800
-Subject: [RESEND PATCH v7 4/5] arm64: Add DTS support for FSL's LS2085A SoC
-In-Reply-To: <1422133973-16460-5-git-send-email-bhupesh.sharma@freescale.com>
-References: <1422133973-16460-1-git-send-email-bhupesh.sharma@freescale.com>
- <1422133973-16460-5-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <20150127230822.GF11789@quad.lixom.net>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Wed, 28 Jan 2015 01:09:39 +0200
+Subject: N900 v3.19-rc5 arm atags_to_fdt.c is broken
+In-Reply-To: <alpine.LFD.2.11.1501271309450.1322@knanqh.ubzr>
+References: <201501232239.55801@pali> <201501232336.36187@pali>
+ <20150126161454.GE28663@atomide.com> <201501261723.10505@pali>
+ <20150126170323.GF28663@atomide.com>
+ <alpine.LFD.2.11.1501261318590.1322@knanqh.ubzr>
+ <20150127133739.GB25306@amd>
+ <alpine.LFD.2.11.1501271014160.1322@knanqh.ubzr>
+ <20150127175359.GE11502@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1501271309450.1322@knanqh.ubzr>
+Message-ID: <20150127230938.GB591@fuloong-minipc.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 25, 2015 at 02:42:52AM +0530, Bhupesh Sharma wrote:
-> This patch adds the device tree support for FSL LS2085A SoC
-> based on ARMv8 architecture.
-> 
-> Following levels of DTSI/DTS files have been created for the
-> LS2085A SoC family:
-> 
-> - fsl-ls2085a.dtsi:
-> DTS-Include file for FSL LS2085A SoC.
-> 
-> - fsl-ls2085a-simu.dts:
-> DTS file for FSL LS2085a software simulator model.
-> 
-> In addition, this patch adds build support for FSL's LS2085A
-> simulator model in arm64 dts Makefile.
-> 
-> Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
-> Signed-off-by: Arnab Basu <arnab_basu@rocketmail.com>
-> Signed-off-by: Stuart Yoder <stuart.yoder@freescale.com>
-> ---
->  arch/arm64/boot/dts/Makefile                       |    1 +
->  arch/arm64/boot/dts/{ => freescale}/Makefile       |    4 +-
->  arch/arm64/boot/dts/freescale/fsl-ls2085a-simu.dts |   65 ++++++++
->  arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi     |  163 ++++++++++++++++++++
->  4 files changed, 230 insertions(+), 3 deletions(-)
->  copy arch/arm64/boot/dts/{ => freescale}/Makefile (54%)
->  create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls2085a-simu.dts
->  create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi
+On Tue, Jan 27, 2015 at 01:50:22PM -0500, Nicolas Pitre wrote:
+> Hence the ATAG-to-DT compat code in the decompressor.  This 
+> was meant to smooth things around the transition to DT, etc.  After all, 
+> those devices with non-replaceable bootloaders where shim layers are not 
+> possible should get out of commission eventually?
 
+Probably after 5 years there are still people using and hacking mainline
+Linux with N900 etc., and newer OMAPs (since there no "useful" devices)
+are long forgotten...
 
-Applied, thanks.
-
-
--Olof
+A.
