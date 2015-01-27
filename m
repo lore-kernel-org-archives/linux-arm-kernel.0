@@ -1,52 +1,33 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 27 Jan 2015 09:20:47 -0600
-Subject: [PATCH] usb: phy-generic: Don't fail on missing gpio reset
-In-Reply-To: <1422323129-20969-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1422323129-20969-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <20150127152047.GA13776@saruman.tx.rr.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 27 Jan 2015 16:21:57 +0100
+Subject: [PATCH] ARM: dts: imx6qdl: Adjust the brightness setting for
+ LVDS panel
+In-Reply-To: <BLUPR03MB4059C6493E55DB26E8308E9F8350@BLUPR03MB405.namprd03.prod.outlook.com>
+References: <1421749355-23050-1-git-send-email-r63905@freescale.com>
+ <20150120113837.GC2766@dragon> <1421941084.3084.45.camel@pengutronix.de>
+ <BLUPR03MB4059C6493E55DB26E8308E9F8350@BLUPR03MB405.namprd03.prod.outlook.com>
+Message-ID: <1422372117.3751.58.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 26, 2015 at 05:45:29PM -0800, Soren Brinkmann wrote:
-> A reset through a GPIO is optional. Don't fail probing when it is
-> missing.
+Am Montag, den 26.01.2015, 14:44 +0000 schrieb Robby.Cai at freescale.com:
+> > I notice that the intervals are changed from exponential to linear.
+> > Is this really wanted here?
+> > I expect that the new settings result in huge steps in perceived
+> > brightness at low levels and a nearly imperceptible change at the last
+> > step.
+> > 
+> > regards
+> > Philipp
 > 
-> Reported-by: Andreas F?rber <afaerber@suse.de>
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> ---
-> Hi Andreas,
 > 
-> does this do the trick?
-> 
-> 	Thanks,
-> 	S?ren
-> 
->  drivers/usb/phy/phy-generic.c | 6 ++----
->  1 file changed, 2 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/usb/phy/phy-generic.c b/drivers/usb/phy/phy-generic.c
-> index dd05254241fb..a73d4c738f0b 100644
-> --- a/drivers/usb/phy/phy-generic.c
-> +++ b/drivers/usb/phy/phy-generic.c
-> @@ -241,10 +241,8 @@ int usb_phy_gen_create_phy(struct device *dev, struct usb_phy_generic *nop,
->  
->  	if (err == -EPROBE_DEFER)
->  		return -EPROBE_DEFER;
-> -	if (err) {
-> -		dev_err(dev, "Error requesting RESET GPIO\n");
-> -		return err;
-> -	}
-> +	if (err)
-> +		nop->gpiod_reset = NULL;
+> No particular reason here. I understand your concern but seems there's no obvious rule.
+> How about add some interpolation, such as <0 52 64 96 128 160 192 224 255>
+> or even more, <0 52 64 80 96 112 128 144 160 176 192 208 224 240 255>
 
-there's a better patch to use gpiod_get_optional(), instead.
+I just wanted to point out the possible issue. Maybe somebody with the
+actual panel could sit down and experiment and come up with some
+visually pleasing steps.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150127/c603b8f5/attachment-0001.sig>
+regards
+Philipp
