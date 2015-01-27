@@ -1,67 +1,62 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 27 Jan 2015 14:59:20 +0100
-Subject: [PATCHv6 1/2] leds: tlc591xx: Document binding for the TI 8/16
- Channel i2c LED driver
-In-Reply-To: <1422367161-16487-1-git-send-email-andrew@lunn.ch>
-References: <1422367161-16487-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1422367161-16487-2-git-send-email-andrew@lunn.ch>
+Date: Tue, 27 Jan 2015 14:59:19 +0100
+Subject: [PATCHv6 0/2] Driver for TI tlc591xx 8/16 Channel i2c LED driver
+Message-ID: <1422367161-16487-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the binding for the TLC591xx LED driver.
+This patchset is a driver for the TI tlc59116 16 Channel i2c LED
+driver and tlc59108 8 Channel i2c LED driver. This driver is used on
+the Belkin WRT1900AC access point and the C code is derived from code
+Belkin contributed to OpenWRT.  However it has been extensively
+re-written, and a device tree binding added to replace platform data.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 Cc: Matthew.Fatheree at belkin.com
----
- .../devicetree/bindings/leds/leds-tlc591xx.txt     | 40 ++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/leds/leds-tlc591xx.txt
 
-diff --git a/Documentation/devicetree/bindings/leds/leds-tlc591xx.txt b/Documentation/devicetree/bindings/leds/leds-tlc591xx.txt
-new file mode 100644
-index 000000000000..3bbbf7024411
---- /dev/null
-+++ b/Documentation/devicetree/bindings/leds/leds-tlc591xx.txt
-@@ -0,0 +1,40 @@
-+LEDs connected to tlc59116 or tlc59108
-+
-+Required properties
-+- compatible: should be "ti,tlc59116" or "ti,tlc59108"
-+- #address-cells: must be 1
-+- #size-cells: must be 0
-+- reg: typically 0x68
-+
-+Each led is represented as a sub-node of the ti,tlc59116.
-+See Documentation/devicetree/bindings/leds/common.txt
-+
-+LED sub-node properties:
-+- reg: number of LED line, 0 to 15 or 0 to 7
-+- label: (optional) name of LED
-+- linux,default-trigger : (optional)
-+
-+Examples:
-+
-+tlc59116 at 68 {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	compatible = "ti,tlc59116";
-+	reg = <0x68>;
-+
-+	wan at 0 {
-+		label = "wrt1900ac:amber:wan";
-+		reg = <0x0>;
-+	};
-+
-+	2g at 2 {
-+		label = "wrt1900ac:white:2g";
-+		reg = <0x2>;
-+	};
-+
-+	alive at 9 {
-+		label = "wrt1900ac:green:alive";
-+		reg = <0x9>;
-+		linux,default_trigger = "heartbeat";
-+	};
-+};
+Since v5:
+      Hard code number of LEDs, rather than #define
+      Moved common fields from led into priv
+      Moved reg_ledout into priv, removed helper functions
+      Cache brightness to avoid race conditions
+      tlc591xx_led_set -> tlc591xx_set_brightness
+      Be paranoid with of_match_device() and client->dev.of_node
+
+Since v4:
+      Fix Oops on module unload reported by Vignesh R
+
+Since v3:
+      Generalized and added support for tlc59108
+      brightness == 0 and brightness == LED_FULL disable PWM and used
+        fixed OFF/ON mode
+
+Since v2:
+      Remove incorrect /* Mode register ? */ comment
+      Parenthesis around the macro arguments
+      Converted many signed variables into unsigned
+      Saved an initialization
+
+
+Since v1:
+      s/uint8_t/u8/g
+      Remove empty line
+      Removed #gpio-cells
+      Added select REGMAP_I2C
+      Sorted #includes into alphabetic order
+      Added missing MODULE_DEVICE_TABLE(of, ...)
+      Check return value of regmap_write()
+      Simplified tlc59116_set_mode()
+
+Andrew Lunn (2):
+  leds: tlc59116: Document binding for the TI 16 Channel i2c LED driver
+  leds: tlc59116: Driver for the TI 16 Channel i2c LED driver
+
+ .../devicetree/bindings/leds/leds-tlc59116.txt     |  41 ++++
+ drivers/leds/Kconfig                               |   7 +
+ drivers/leds/Makefile                              |   1 +
+ drivers/leds/leds-tlc59116.c                       | 253 +++++++++++++++++++++
+ 4 files changed, 302 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/leds/leds-tlc59116.txt
+ create mode 100644 drivers/leds/leds-tlc59116.c
+
 -- 
-2.1.4
+2.1.3
