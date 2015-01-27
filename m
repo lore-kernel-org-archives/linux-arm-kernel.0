@@ -1,31 +1,40 @@
 From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Tue, 27 Jan 2015 16:30:28 +0100
-Subject: [RESEND PATCH v2 0/4] dmaengine: at_xdmac: several improvements
-Message-ID: <1422372632-21659-1-git-send-email-ludovic.desroches@atmel.com>
+Date: Tue, 27 Jan 2015 16:30:29 +0100
+Subject: [RESEND PATCH v2 1/4] dmaengine: at_xdmac: wait for in-progress
+ transaction to complete after pausing a channel
+In-Reply-To: <1422372632-21659-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1422372632-21659-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1422372632-21659-2-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 
-This series is based on vkoul/slave-dma/topic/slave_caps_device_control_fix
-branch.
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+---
+ drivers/dma/at_xdmac.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-Changes from v1:
-- put save_cc field addition in a single patch
-- update commit log of patch 3/4
-- remove AT_XDMAC_CUR_CFG since it is no more used
-
-Cyrille Pitchen (1):
-  dmaengine: at_xdmac: wait for in-progress transaction to complete
-    after pausing a channel
-
-Ludovic Desroches (3):
-  dmaengine: at_xdmac: introduce save_cc field
-  dmaengine: at_xdmac: simplify channel configuration stuff
-  dmaengine: at_xdmac: allow muliple dwidths when doing slave transfers
-
- drivers/dma/at_xdmac.c | 60 ++++++++++++++++++++++++++------------------------
- 1 file changed, 31 insertions(+), 29 deletions(-)
-
+diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
+index 8c799f6..5e3f072 100644
+--- a/drivers/dma/at_xdmac.c
++++ b/drivers/dma/at_xdmac.c
+@@ -1136,9 +1136,14 @@ static int at_xdmac_device_pause(struct dma_chan *chan)
+ 
+ 	dev_dbg(chan2dev(chan), "%s\n", __func__);
+ 
++	if (test_and_set_bit(AT_XDMAC_CHAN_IS_PAUSED, &atchan->status))
++		return 0;
++
+ 	spin_lock_bh(&atchan->lock);
+ 	at_xdmac_write(atxdmac, AT_XDMAC_GRWS, atchan->mask);
+-	set_bit(AT_XDMAC_CHAN_IS_PAUSED, &atchan->status);
++	while (at_xdmac_chan_read(atchan, AT_XDMAC_CC)
++	       & (AT_XDMAC_CC_WRIP | AT_XDMAC_CC_RDIP))
++		cpu_relax();
+ 	spin_unlock_bh(&atchan->lock);
+ 
+ 	return 0;
 -- 
 2.2.0
