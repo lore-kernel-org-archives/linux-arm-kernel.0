@@ -1,49 +1,96 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 27 Jan 2015 15:24:31 +0100
-Subject: [PATCH] ARM: /proc/atags: Export also for DT
-In-Reply-To: <CAL_JsqKM+2PtX_EpWXyOQHVXwf=jqVj8SroUGPO1Y2=Zj8_kMg@mail.gmail.com>
-References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
- <201412041857.49341@pali>
- <CAL_JsqJ9i0jwaL1cyeomQG=bhhcnEgdGWYOqkcwidyk5xOUukg@mail.gmail.com>
- <201501262016.52079@pali>
- <CAL_JsqL_EEg7tC-q8wV5v8jAfPSiri4z19iJfz2r7zntRwPyOg@mail.gmail.com>
- <20150127132127.GA869@amd>
- <CAL_JsqKM+2PtX_EpWXyOQHVXwf=jqVj8SroUGPO1Y2=Zj8_kMg@mail.gmail.com>
-Message-ID: <20150127142430.GA15236@amd>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Tue, 27 Jan 2015 09:25:17 -0500
+Subject: [PATCH 3/3] tty/serial: 8250_early: Add support for PXA UARTs
+In-Reply-To: <CAL_Jsq+Jm=0YRJ_uc+wk0YopVGBgcfJia_W+X8oRViq=ATsx6A@mail.gmail.com>
+References: <1422334209-23125-1-git-send-email-robh@kernel.org>
+ <1422334209-23125-3-git-send-email-robh@kernel.org>
+ <54C78E32.4050406@hurleysoftware.com>
+ <CAL_Jsq+Jm=0YRJ_uc+wk0YopVGBgcfJia_W+X8oRViq=ATsx6A@mail.gmail.com>
+Message-ID: <54C79FCD.9040802@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2015-01-27 08:16:45, Rob Herring wrote:
-> On Tue, Jan 27, 2015 at 7:21 AM, Pavel Machek <pavel@ucw.cz> wrote:
-> > On Mon 2015-01-26 14:33:21, Rob Herring wrote:
-> >> On Mon, Jan 26, 2015 at 1:16 PM, Pali Roh?r <pali.rohar@gmail.com> wrote:
-
-> >> This goes in the commit message.
-> >>
-> >> These would be non-standard fields which are not upstream. I don't
-> >> know that we care in that case...
-> >
-> > Other devices are going to care about boot reason, too, and we might
-> > as well be compatible...
+On 01/27/2015 09:05 AM, Rob Herring wrote:
+> On Tue, Jan 27, 2015 at 7:10 AM, Peter Hurley <peter@hurleysoftware.com> wrote:
+>> On 01/26/2015 11:50 PM, Rob Herring wrote:
+>>> The PXA variant of the 8250 UART adds a UART enable bit which must not
+>>> be cleared. Make the earlycon support maintain this bit if it is set.
+>>> This implies some initialization of the UART, but we cannot
+>>> unconditionally set the bit as some other variants require this bit to
+>>> be clear for other functions.
+>>
+>> So if the bootloader doesn't enable the uart, then earlycon doesn't work?
 > 
-> What other devices? Where is bootreason in the list of ATAGS:
+> Correct. Some earlycon drivers rely on this fact and don't do any
+> initialization. There is a patch posted also to skip init for the 8250
+> earlycon. We could rely on that instead, but the 1st chunk is still
+> needed.
 > 
-> #define ATAG_MEM        0x54410002
-> #define ATAG_VIDEOTEXT  0x54410003
-> #define ATAG_RAMDISK    0x54410004
-> #define ATAG_INITRD     0x54410005
-> #define ATAG_INITRD2    0x54420005
-> #define ATAG_SERIAL     0x54410006
-> #define ATAG_REVISION   0x54410007
-> #define ATAG_VIDEOLFB   0x54410008
-> #define ATAG_CMDLINE    0x54410009
-> #define ATAG_ACORN      0x41000101
-> #define ATAG_MEMCLK     0x41000402
+> The UART already being initialized should be pretty common for PXA
+> based systems. More so than x86 UARTs. I think it is better to work
+> under some conditions than none.
 
-Anyone, whose charging involves userspace.
+Ok.
 
-But the fact that it is needed on n900 should be enough.
-								Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+>> Or is there some other piece that is enabling the uart after earlycon setup
+>> (besides the driver, of course)?
+>>
+>>> Signed-off-by: Rob Herring <robh@kernel.org>
+>>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>>> Cc: Jiri Slaby <jslaby@suse.cz>
+>>> Cc: linux-serial at vger.kernel.org
+>>> ---
+>>>  drivers/tty/serial/8250/8250_early.c | 8 +++++---
+>>>  1 file changed, 5 insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/drivers/tty/serial/8250/8250_early.c b/drivers/tty/serial/8250/8250_early.c
+>>> index ce2a8ab..c31a22b 100644
+>>> --- a/drivers/tty/serial/8250/8250_early.c
+>>> +++ b/drivers/tty/serial/8250/8250_early.c
+>>> @@ -93,10 +93,10 @@ static void __init early_serial8250_write(struct console *console,
+>>>       struct uart_port *port = &early_device->port;
+>>>       unsigned int ier;
+>>>
+>>> -     /* Save the IER and disable interrupts */
+>>> +     /* Save the IER and disable interrupts preserving the UUE bit */
+>>>       ier = serial8250_early_in(port, UART_IER);
+>>>       if (ier)
+>>> -             serial8250_early_out(port, UART_IER, 0);
+>>> +             serial8250_early_out(port, UART_IER, ier & UART_IER_UUE);
+>>>
+>>>       uart_console_write(port, s, count, serial_putc);
+>>>
+>>> @@ -127,9 +127,11 @@ static void __init init_port(struct earlycon_device *device)
+>>>       struct uart_port *port = &device->port;
+>>>       unsigned int divisor;
+>>>       unsigned char c;
+>>> +     unsigned int ier;
+>>>
+>>>       serial8250_early_out(port, UART_LCR, 0x3);      /* 8n1 */
+>>> -     serial8250_early_out(port, UART_IER, 0);        /* no interrupt */
+>>> +     ier = serial8250_early_in(port, UART_IER);
+>>> +     serial8250_early_out(port, UART_IER, ier & UART_IER_UUE); /* no interrupt */
+>>
+>> The trailing comment seems no longer relevant; how about below?
+> 
+> It is because we are still disabling interrupts.
+
+I realize that, which is why my suggested replacement comment includes
+that information. It's not obvious what effect UART_IER_UUE has from
+just looking at the code.
+
+>>         /* Mask interrupts (preserve XScale's uart enable bit) */
+>>         serial8250_early_out(port, UART_IER, ier & UART_IER_UUE);
+>>
+>> OTOH, if the uart is disabled, shouldn't earlycon be disabled?
+> 
+> There's no way I can detect that.
+
+Right, sorry.
+
+[ I was about to write, "If UART_IER_UEE is not set, ..." which of course is true
+  for every other non-PXA 8250-base uart :)
+]
+
+Regards,
+Peter Hurley
