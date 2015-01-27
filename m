@@ -1,198 +1,100 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Tue, 27 Jan 2015 21:02:48 +0000
-Subject: [PATCH 2/3] iio: adc: vf610: implement configurable conversion
- modes
-In-Reply-To: <1421769723-28677-3-git-send-email-stefan@agner.ch>
-References: <1421769723-28677-1-git-send-email-stefan@agner.ch>
- <1421769723-28677-3-git-send-email-stefan@agner.ch>
-Message-ID: <54C7FCF8.80703@kernel.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 27 Jan 2015 21:09:44 +0000
+Subject: [PATCH] ARM: /proc/atags: Export also for DT
+In-Reply-To: <alpine.LFD.2.11.1501271446330.1322@knanqh.ubzr>
+References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
+ <20150127132127.GA869@amd>
+ <CAL_JsqKM+2PtX_EpWXyOQHVXwf=jqVj8SroUGPO1Y2=Zj8_kMg@mail.gmail.com>
+ <201501271532.25540@pali>
+ <20150127174818.GM26493@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1501271446330.1322@knanqh.ubzr>
+Message-ID: <20150127210943.GN26493@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/01/15 16:02, Stefan Agner wrote:
-> Support configureable conversion mode through sysfs. So far, the
-> mode used was low-power, which is enabled by default now. Beside
-> that, the modes normal and high-speed are selectable as well.
+On Tue, Jan 27, 2015 at 03:03:23PM -0500, Nicolas Pitre wrote:
+> On Tue, 27 Jan 2015, Russell King - ARM Linux wrote:
 > 
-> Use the new device tree property which specifies the maximum ADC
-> conversion clock frequencies. Depending on the mode used, the
-> available resulting conversion frequency are calcaulated
-> dynamically.
+> > On Tue, Jan 27, 2015 at 03:32:25PM +0100, Pali Roh?r wrote:
+> > > On Tuesday 27 January 2015 15:16:45 Rob Herring wrote:
+> > > > What other devices? Where is bootreason in the list of ATAGS:
+> > > > 
+> > > > #define ATAG_MEM        0x54410002
+> > > > #define ATAG_VIDEOTEXT  0x54410003
+> > > > #define ATAG_RAMDISK    0x54410004
+> > > > #define ATAG_INITRD     0x54410005
+> > > > #define ATAG_INITRD2    0x54420005
+> > > > #define ATAG_SERIAL     0x54410006
+> > > > #define ATAG_REVISION   0x54410007
+> > > > #define ATAG_VIDEOLFB   0x54410008
+> > > > #define ATAG_CMDLINE    0x54410009
+> > > > #define ATAG_ACORN      0x41000101
+> > > > #define ATAG_MEMCLK     0x41000402
+> > > > 
+> > > > Rob
+> > > 
+> > > Each device is using own proprietary atag (or other information) 
+> > > to pass bootreason from bootloader to kernel. No standard way :-(
 > 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-We have the extinfo stuff to cut down on the boiler plate, particularly
-with enum type items like this.  See the various IIO_ENUM() etc in iio.h
-> ---
->  drivers/iio/adc/vf610_adc.c | 92 ++++++++++++++++++++++++++++++++++++++++++---
->  1 file changed, 86 insertions(+), 6 deletions(-)
+> So that's what Pavel was alluding to.
 > 
-> diff --git a/drivers/iio/adc/vf610_adc.c b/drivers/iio/adc/vf610_adc.c
-> index e63b8e7..fd41d91c 100644
-> --- a/drivers/iio/adc/vf610_adc.c
-> +++ b/drivers/iio/adc/vf610_adc.c
-> @@ -118,15 +118,21 @@ enum average_sel {
->  	VF610_ADC_SAMPLE_32,
->  };
->  
-> +enum conversion_mode_sel {
-> +	VF610_ADC_CONV_NORMAL,
-> +	VF610_ADC_CONV_HIGH_SPEED,
-> +	VF610_ADC_CONV_LOW_POWER,
-> +};
-> +
->  struct vf610_adc_feature {
->  	enum clk_sel	clk_sel;
->  	enum vol_ref	vol_ref;
-> +	enum conversion_mode_sel conv_mode;
->  
->  	int	clk_div;
->  	int     sample_rate;
->  	int	res_mode;
->  
-> -	bool	lpm;
->  	bool	calibration;
->  	bool	ovwren;
->  };
-> @@ -139,6 +145,8 @@ struct vf610_adc {
->  	u32 vref_uv;
->  	u32 value;
->  	struct regulator *vref;
-> +
-> +	u32 max_adck_rate[3];
->  	struct vf610_adc_feature adc_feature;
->  
->  	u32 sample_freq_avail[5];
-> @@ -146,6 +154,8 @@ struct vf610_adc {
->  	struct completion completion;
->  };
->  
-> +static const char * const vf610_conv_modes[] = { "normal", "high-speed",
-> +						 "low-power" };
->  static const u32 vf610_hw_avgs[] = { 1, 4, 8, 16, 32 };
->  
->  #define VF610_ADC_CHAN(_idx, _chan_type) {			\
-> @@ -186,8 +196,20 @@ static const struct iio_chan_spec vf610_adc_iio_channels[] = {
->  
->  static inline void vf610_adc_calculate_rates(struct vf610_adc *info)
->  {
-> +	struct vf610_adc_feature *adc_feature = &info->adc_feature;
->  	unsigned long adck_rate, ipg_rate = clk_get_rate(info->clk);
-> -	int i;
-> +	int divisor, i;
-> +
-> +	adck_rate = info->max_adck_rate[adc_feature->conv_mode];
-> +
-> +	if (adck_rate) {
-> +		/* calculate clk divider which is within specification */
-> +		divisor = ipg_rate / adck_rate;
-> +		adc_feature->clk_div = 1 << fls(divisor + 1);
-> +	} else {
-> +		/* fall-back value using a safe divisor */
-> +		adc_feature->clk_div = 8;
-> +	}
->  
->  	/*
->  	 * Calculate ADC sample frequencies
-> @@ -219,10 +241,8 @@ static inline void vf610_adc_cfg_init(struct vf610_adc *info)
->  
->  	adc_feature->res_mode = 12;
->  	adc_feature->sample_rate = 1;
-> -	adc_feature->lpm = true;
->  
-> -	/* Use a save ADCK which is below 20MHz on all devices */
-> -	adc_feature->clk_div = 8;
-> +	adc_feature->conv_mode = VF610_ADC_CONV_LOW_POWER;
->  
->  	vf610_adc_calculate_rates(info);
->  }
-> @@ -307,10 +327,12 @@ static void vf610_adc_cfg_set(struct vf610_adc *info)
->  	cfg_data = readl(info->regs + VF610_REG_ADC_CFG);
->  
->  	cfg_data &= ~VF610_ADC_ADLPC_EN;
-> -	if (adc_feature->lpm)
-> +	if (adc_feature->conv_mode == VF610_ADC_CONV_LOW_POWER)
->  		cfg_data |= VF610_ADC_ADLPC_EN;
->  
->  	cfg_data &= ~VF610_ADC_ADHSC_EN;
-> +	if (adc_feature->conv_mode == VF610_ADC_CONV_HIGH_SPEED)
-> +		cfg_data |= VF610_ADC_ADHSC_EN;
->  
->  	writel(cfg_data, info->regs + VF610_REG_ADC_CFG);
->  }
-> @@ -466,10 +488,65 @@ static ssize_t vf610_show_samp_freq_avail(struct device *dev,
->  	return len;
->  }
->  
-> +static ssize_t vf610_read_mode(struct device *dev,
-> +		struct device_attribute *attr,
-> +		char *buf)
-> +{
-> +	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
-> +	struct vf610_adc *info = iio_priv(indio_dev);
-> +
-> +	return sprintf(buf, "%s\n",
-> +			vf610_conv_modes[info->adc_feature.conv_mode]);
-> +}
-> +
-> +
-> +static ssize_t vf610_write_mode(struct device *dev,
-> +		struct device_attribute *attr,
-> +		const char *buf,
-> +		size_t len)
-> +{
-> +	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
-> +	struct vf610_adc *info = iio_priv(indio_dev);
-> +	int i, mode = -EINVAL;
-> +
-> +	mutex_lock(&indio_dev->mlock);
-> +	if (iio_buffer_enabled(indio_dev)) {
-> +		mutex_unlock(&indio_dev->mlock);
-> +		return -EBUSY;
-> +	}
-> +	mutex_unlock(&indio_dev->mlock);
-> +
-> +	for (i = 0; i < ARRAY_SIZE(vf610_conv_modes); i++) {
-> +		if (!strcmp(vf610_conv_modes[i], buf)) {
-> +			mode = i;
-> +			break;
-> +		}
-> +	}
-> +
-> +	if (mode < 0)
-> +		return mode;
-> +
-> +	mutex_lock(&indio_dev->mlock);
-> +	info->adc_feature.conv_mode = mode;
-> +	vf610_adc_calculate_rates(info);
-> +	vf610_adc_hw_init(info);
-> +	mutex_unlock(&indio_dev->mlock);
-> +
-> +	return len;
-> +}
-> +
->  static IIO_DEV_ATTR_SAMP_FREQ_AVAIL(vf610_show_samp_freq_avail);
->  
-> +static IIO_CONST_ATTR_NAMED(conversion_mode_available,
-> +	conversion_mode_available, "normal high-speed low-power");
-> +
-> +IIO_DEVICE_ATTR(conversion_mode, S_IWUSR | S_IRUGO, vf610_read_mode,
-> +	vf610_write_mode, 0);
-> +
->  static struct attribute *vf610_attributes[] = {
->  	&iio_dev_attr_sampling_frequency_available.dev_attr.attr,
-> +	&iio_const_attr_conversion_mode_available.dev_attr.attr,
-> +	&iio_dev_attr_conversion_mode.dev_attr.attr,
->  	NULL
->  };
->  
-> @@ -654,6 +731,9 @@ static int vf610_adc_probe(struct platform_device *pdev)
->  
->  	info->vref_uv = regulator_get_voltage(info->vref);
->  
-> +	of_property_read_u32_array(pdev->dev.of_node, "fsl,adck-max-frequency",
-> +			info->max_adck_rate, 3);
-> +
->  	platform_set_drvdata(pdev, indio_dev);
->  
->  	init_completion(&info->completion);
+> > The reason that happens is because people refuse to discuss their
+> > requirements here - just like people refuse to report userspace API
+> > regressions to kernel people.  This rather pisses me off, because
+> > it creates all sorts of horrid per-platform yuck.
+> > 
+> > We _could_ (and have in the past) turned round and refused to support
+> > these kinds of hacks - which IMHO is quite a reasonable stance to
+> > take: the message we should be sending is "if you wish to design
+> > new methods without discussing it with us, we reserve the right not
+> > to support them in mainline kernels; please discuss with us your
+> > requirements."
+> > 
+> > Each time that we accept one of these hacks, we're sending a message
+> > that says "it's okay to work in this crappy way".
+> > 
+> > Yes, I realise that the N900 has little in the way of support, and we
+> > can't exert that kind of back pressure (since there's no one to direct
+> > that onto to effect any change) so I guess we just have to live with it.
 > 
+> If the method is: "let's pass non-standard ATAGs around and have ad-hoc 
+> user space code interpret it in some arbitrary way" then it's a complete 
+> abomination.
+> 
+> > > I think this kind of information (how was board/computer started) 
+> > > can be useful also for other architectures. E.g. on laptop you 
+> > > would like to know if if was started by RTC, power button, 
+> > > WakeOnLan, another ACPI event, rebooted machine, watchdog, etc... 
+> > > And scripts can act depending on this event (when by RTC, you 
+> > > need to run some planned job, when by watchdog reset you should 
+> > > check what caused that reason...).
+> 
+> Useful when properly designed and generic enough to be shared.
+> 
+> I'd suggest a DT property be proposed for that purpose if it doesn't 
+> already exist.  That at least has a chance to be generically useful.
+
+What this means is that we have to further augment the atags-to-dt code
+in the decompressor with the platform specific ATAGs to parse this
+information and merge it into the appended DT before passing the
+resulting DT blob to the kernel.
+
+Or we pass both the ATAGs and wrapped DT to the kernel when both exist,
+and let the kernel deal with it in a much saner environment than the
+restricted decompressor environment.
+
+Or we /could/ say that mainline never supported it, and we aren't going
+to add support for "new" tags to the mainline kernel.  It wouldn't be
+a regression, because mainline hasn't ever supported them (that's been
+said before about such things on other platforms.)
+
+However, there's another consideration to be had here before we can say
+that: how many people out there want to run a mainline (or even an
+updated kernel derived from mainline) on this device?  If there's a
+sizable following for the device wanting updated support, then it's
+something we really need to consider supporting inspite of our
+disappointment with Nokia inventing these "proprietary" tags.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
