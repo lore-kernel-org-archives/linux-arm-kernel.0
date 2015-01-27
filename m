@@ -1,41 +1,54 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 27 Jan 2015 10:16:24 -0500 (EST)
-Subject: N900 v3.19-rc5 arm atags_to_fdt.c is broken
-In-Reply-To: <20150127133739.GB25306@amd>
-References: <201501232239.55801@pali> <201501232336.36187@pali>
- <20150126161454.GE28663@atomide.com> <201501261723.10505@pali>
- <20150126170323.GF28663@atomide.com>
- <alpine.LFD.2.11.1501261318590.1322@knanqh.ubzr> <20150127133739.GB25306@amd>
-Message-ID: <alpine.LFD.2.11.1501271014160.1322@knanqh.ubzr>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 27 Jan 2015 16:18:06 +0100
+Subject: [PATCH 1/2] mmc: core: use card pointer as the first parameter of
+ execute_tuning()
+In-Reply-To: <CAD=FV=X9x0gW5TyLi4ERm8nxixQB__Y=5bRAtOax-_w+T33rCg@mail.gmail.com>
+References: <1422271175-19445-1-git-send-email-addy.ke@rock-chips.com>
+ <1422271175-19445-2-git-send-email-addy.ke@rock-chips.com>
+ <CAPDyKFp=5epMggHu0+u_LU7ETujcoeP2xOpB7iD6JF2bs8BnEA@mail.gmail.com>
+ <CAD=FV=X9x0gW5TyLi4ERm8nxixQB__Y=5bRAtOax-_w+T33rCg@mail.gmail.com>
+Message-ID: <CAPDyKFqjG=yxDcwnk4jbXMZ05hMkWR2x37uVpRNd_11-eB4G7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 27 Jan 2015, Pavel Machek wrote:
+On 26 January 2015 at 18:45, Doug Anderson <dianders@chromium.org> wrote:
+> Ulf,
+>
+> On Mon, Jan 26, 2015 at 7:15 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> On 26 January 2015 at 12:19, Addy Ke <addy.ke@rock-chips.com> wrote:
+>>> We need to take the card pointer in execute_tuning() for mmc_send_status(),
+>>
+>> mmc_send_status() is an mmc core function, not intended for host's to call.
+>>
+>>> but mmc->card is NULL in tuning state. So we need change the first parameter
+>>> of execute_tuning() to card pointer(struct mmc_card * card).
+>>
+>> So, why do we need this?
+>
+> I asked Addy to post upstream against mmc_send_tuning(), but I guess
+> he didn't (he posted against Alex's NAKed patch instead).
+>
+> ...when I talked to him about it, Addy was asserting that when tuning
+> fails it is important (at least on dw_mmc on rk3288) that we wait for
+> the card to stop being busy and that the way to detect was using
+> mmc_send_status().
 
-> 
-> > > > I would say, problem is because omap3-n900 binary DT is too large
-> > 
-> > I agree.
-> > 
-> > > OK if that's the case, then your patch makes sense to me. It also
-> > > seems we can have the temporary stack be larger than the initial
-> > > stack just for atags_to_fdt.
-> > 
-> > The stack size isn't the issue, but rather its location.  We need to 
-> > position it away from the DT data.  The DT size is known and we could 
-> > use that, plus some room for the insertion of new data coming from the
-> > ATAG conversion.
-> > 
-> > Something like the following would be a more robust solution:
-> 
-> Tested-by: Pavel Machek <pavel@ucw.cz>
-> 
-> (Note, that in 3.19 dts for n900 got too big, so we are actually
-> triggering old bugs. That means that this is a regression fix, and
-> should go in ASAP).
+So, could that be due to the internal logic of the error handling in
+dw_mmc driver? Or you think this is a generic issue?
 
-It is queued here:
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8294/1
+According to the specifications (eMMC and SD) both states that the
+tuning command has an R1 response. So, there shouldn't be any busy
+signalling involved - at least according to spec.
 
+>
+> That would mean that against upstream you'd need to change
+> mmc_send_tuning() to take in the card as well (or move the "host->card
+> = card" assignment to before UHS init, which seems less desirable?)
+>
+> What do you think about that?  Is there a better solution?
 
-Nicolas
+Why do we need to change mmc_send_tuning()? I thought the issue was
+that mmc_send_status(), which currently takes "card" as a parameter.
+
+Kind regards
+Uffe
