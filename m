@@ -1,104 +1,138 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 28 Jan 2015 03:54:05 +0800
-Subject: [PATCH v3 00/10] ARM: sun9i: Add USB host controller support for A80
-Message-ID: <1422388455-25923-1-git-send-email-wens@csie.org>
+Date: Wed, 28 Jan 2015 03:54:07 +0800
+Subject: [PATCH v3 02/10] clk: sunxi: Add support for sun9i A80 USB clocks and
+ resets
+In-Reply-To: <1422388455-25923-1-git-send-email-wens@csie.org>
+References: <1422388455-25923-1-git-send-email-wens@csie.org>
+Message-ID: <1422388455-25923-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+The USB controller/phy clocks and reset controls are in a separate
+address block, unlike previous SoCs where they were in the clock
+controller. Also, access to the address block is controlled by a
+clock gate to AHB.
 
-This is v3 of the sun9i A80 USB host support series.
+Add support for resets requiring a clock to be enabled when
+asserting/deasserting the reset controls, and add the sun9i USB
+clocks.
 
-This series adds USB host controller (EHCI/OHCI) support for the Allwinner
-A80 SoC. The A80 has 3 pairs of host controllers and USB PHYs. The PHYs,
-unlike in previous SoCs, do not have low level control registers anymore.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ Documentation/devicetree/bindings/clock/sunxi.txt |  2 ++
+ drivers/clk/sunxi/clk-usb.c                       | 43 +++++++++++++++++++++++
+ 2 files changed, 45 insertions(+)
 
-As such, this series forgoes the original phy-sun4i-usb driver, and adds
-a new, simpler driver for the USB PHYs. It may be possible to merge the
-two, but given that work is being done on the OTG front for the earlier
-SoCs, it may be better to merge them after support is complete.
-
-EHCI/OHCI0 corresponds to USB1 DP/DM pins; EHCI1 only has HSIC support;
-EHCI2/OHCI/2 is USB2 DP/DM externally. External pins labeled USB0 are
-for the USB 3.0 OTG controller.
-
-Changes since v2:
-
-  - Split out current USB clock/reset code with a separate patch.
-
-Changes since v1:
-
-  - Rework usb clock/reset driver to only enable ahb gate when child
-    clock gates are enabled.
-
-  - Add AHB_INCR16_BURST flag and HSIC specific bits to phy driver.
-
-  - Renumber USB PHYs according to sunxi tradition, usbphy0 for OTG,
-    usbphy1 and later for xHCI.
-
-  - Add VBUS regulator for usb3 to sunxi common regulators.
-
-  - Use common regulators for usb vbus regulators.
-
-  - Adapt to label references in board dts file.
-
-  - Use gpio and pinctrl macros in dts.
-
-
-Patch 1 moves the usb gate clocks and resets driver to a separate file.
-
-Patch 2 adds a80 specific support for usb-related clocks and resets.
-
-Patch 3 adds the device tree nodes for the usb clocks.
-
-Patch 4 adds a new generic phy driver for a80 usb phys. This has some
-code that is the same as the original phy-sun4i-usb driver, but is simpler.
-
-Patch 5 adds the 3 USB PHY nodes to the a80 dtsi.
-
-Patch 6 adds the USB host controller nodes to the a80 dtsi.
-
-Patch 7 adds a VBUS regulator for usb3 to sunxi common regulators.
-
-Patch 8 enables USB on the A80 Optimus board.
-
-Patch 9 enables sun9i USB PHY in sunxi_defconfig.
-
-Patch 10 enables sun9i USB PHY in multi_v7_defconfig.
-
-Regards,
-ChenYu
-
-
-Chen-Yu Tsai (10):
-  clk: sunxi: Move USB clocks to separate file
-  clk: sunxi: Add support for sun9i A80 USB clocks and resets
-  ARM: dts: sun9i: Add usb clock nodes to a80 dtsi
-  phy: Add driver to support individual USB PHYs on sun9i
-  ARM: dts: sun9i: Add usb phy nodes to a80 dtsi
-  ARM: dts: sun9i: Add USB host controller nodes to a80 dtsi
-  ARM: dts: sunxi: Add usb3_vbus regulator to common regulators dtsi
-  ARM: dts: sun9i: Enable USB support on A80 Optimus board
-  ARM: sunxi_defconfig: Enable CONFIG_PHY_SUN9I_USB
-  ARM: multi_v7_defconfig: Enable CONFIG_PHY_SUN9I_USB
-
- Documentation/devicetree/bindings/clock/sunxi.txt  |   2 +
- .../devicetree/bindings/phy/sun9i-usb-phy.txt      |  34 +++
- arch/arm/boot/dts/sun9i-a80-optimus.dts            |  60 ++++++
- arch/arm/boot/dts/sun9i-a80.dtsi                   | 129 +++++++++++
- arch/arm/boot/dts/sunxi-common-regulators.dtsi     |  10 +
- arch/arm/configs/multi_v7_defconfig                |   1 +
- arch/arm/configs/sunxi_defconfig                   |   1 +
- drivers/clk/sunxi/Makefile                         |   1 +
- drivers/clk/sunxi/clk-sunxi.c                      |  88 --------
- drivers/clk/sunxi/clk-usb.c                        | 233 ++++++++++++++++++++
- drivers/phy/Kconfig                                |  12 ++
- drivers/phy/Makefile                               |   1 +
- drivers/phy/phy-sun9i-usb.c                        | 238 +++++++++++++++++++++
- 13 files changed, 722 insertions(+), 88 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/phy/sun9i-usb-phy.txt
- create mode 100644 drivers/clk/sunxi/clk-usb.c
- create mode 100644 drivers/phy/phy-sun9i-usb.c
-
+diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+index 60b44285250d..3f1dcd879af7 100644
+--- a/Documentation/devicetree/bindings/clock/sunxi.txt
++++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+@@ -66,6 +66,8 @@ Required properties:
+ 	"allwinner,sun4i-a10-usb-clk" - for usb gates + resets on A10 / A20
+ 	"allwinner,sun5i-a13-usb-clk" - for usb gates + resets on A13
+ 	"allwinner,sun6i-a31-usb-clk" - for usb gates + resets on A31
++	"allwinner,sun9i-a80-usb-mod-clk" - for usb gates + resets on A80
++	"allwinner,sun9i-a80-usb-phy-clk" - for usb phy gates + resets on A80
+ 
+ Required properties for all clocks:
+ - reg : shall be the control register address for the clock.
+diff --git a/drivers/clk/sunxi/clk-usb.c b/drivers/clk/sunxi/clk-usb.c
+index f1dcc8fb5a7d..a86ed2f8d7af 100644
+--- a/drivers/clk/sunxi/clk-usb.c
++++ b/drivers/clk/sunxi/clk-usb.c
+@@ -29,6 +29,7 @@
+ struct usb_reset_data {
+ 	void __iomem			*reg;
+ 	spinlock_t			*lock;
++	struct clk			*clk;
+ 	struct reset_controller_dev	rcdev;
+ };
+ 
+@@ -41,12 +42,14 @@ static int sunxi_usb_reset_assert(struct reset_controller_dev *rcdev,
+ 	unsigned long flags;
+ 	u32 reg;
+ 
++	clk_prepare_enable(data->clk);
+ 	spin_lock_irqsave(data->lock, flags);
+ 
+ 	reg = readl(data->reg);
+ 	writel(reg & ~BIT(id), data->reg);
+ 
+ 	spin_unlock_irqrestore(data->lock, flags);
++	clk_disable_unprepare(data->clk);
+ 
+ 	return 0;
+ }
+@@ -60,12 +63,14 @@ static int sunxi_usb_reset_deassert(struct reset_controller_dev *rcdev,
+ 	unsigned long flags;
+ 	u32 reg;
+ 
++	clk_prepare_enable(data->clk);
+ 	spin_lock_irqsave(data->lock, flags);
+ 
+ 	reg = readl(data->reg);
+ 	writel(reg | BIT(id), data->reg);
+ 
+ 	spin_unlock_irqrestore(data->lock, flags);
++	clk_disable_unprepare(data->clk);
+ 
+ 	return 0;
+ }
+@@ -84,6 +89,7 @@ static struct reset_control_ops sunxi_usb_reset_ops = {
+ struct usb_clk_data {
+ 	u32 clk_mask;
+ 	u32 reset_mask;
++	bool reset_needs_clk;
+ };
+ 
+ static void __init sunxi_usb_clk_setup(struct device_node *node,
+@@ -146,6 +152,15 @@ static void __init sunxi_usb_clk_setup(struct device_node *node,
+ 	if (!reset_data)
+ 		return;
+ 
++	if (data->reset_needs_clk) {
++		reset_data->clk = of_clk_get(node, 0);
++		if (IS_ERR(reset_data->clk)) {
++			pr_err("Could not get clock for reset controls\n");
++			kfree(reset_data);
++			return;
++		}
++	}
++
+ 	reset_data->reg = reg;
+ 	reset_data->lock = lock;
+ 	reset_data->rcdev.nr_resets = __fls(data->reset_mask) + 1;
+@@ -188,3 +203,31 @@ static void __init sun6i_a31_usb_setup(struct device_node *node)
+ 	sunxi_usb_clk_setup(node, &sun6i_a31_usb_clk_data, &sun4i_a10_usb_lock);
+ }
+ CLK_OF_DECLARE(sun6i_a31_usb, "allwinner,sun6i-a31-usb-clk", sun6i_a31_usb_setup);
++
++static const struct usb_clk_data sun9i_a80_usb_mod_data __initconst = {
++	.clk_mask = BIT(6) | BIT(5) | BIT(4) | BIT(3) | BIT(2) | BIT(1),
++	.reset_mask = BIT(19) | BIT(18) | BIT(17),
++	.reset_needs_clk = 1,
++};
++
++static DEFINE_SPINLOCK(a80_usb_mod_lock);
++
++static void __init sun9i_a80_usb_mod_setup(struct device_node *node)
++{
++	sunxi_usb_clk_setup(node, &sun9i_a80_usb_mod_data, &a80_usb_mod_lock);
++}
++CLK_OF_DECLARE(sun9i_a80_usb_mod, "allwinner,sun9i-a80-usb-mod-clk", sun9i_a80_usb_mod_setup);
++
++static const struct usb_clk_data sun9i_a80_usb_phy_data __initconst = {
++	.clk_mask = BIT(10) | BIT(5) | BIT(4) | BIT(3) | BIT(2) | BIT(1),
++	.reset_mask = BIT(21) | BIT(20) | BIT(19) | BIT(18) | BIT(17),
++	.reset_needs_clk = 1,
++};
++
++static DEFINE_SPINLOCK(a80_usb_phy_lock);
++
++static void __init sun9i_a80_usb_phy_setup(struct device_node *node)
++{
++	sunxi_usb_clk_setup(node, &sun9i_a80_usb_phy_data, &a80_usb_phy_lock);
++}
++CLK_OF_DECLARE(sun9i_a80_usb_phy, "allwinner,sun9i-a80-usb-phy-clk", sun9i_a80_usb_phy_setup);
 -- 
 2.1.4
