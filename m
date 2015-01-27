@@ -1,40 +1,94 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 26 Jan 2015 20:30:33 -0800
-Subject: [GIT PULL 2/2] omap changes to make dm816x usable
-In-Reply-To: <54c6ad94.8182440a.13ff.1604SMTPIN_ADDED_BROKEN@mx.google.com>
-References: <pull-1422306429-777451>
- <54c6ad94.8182440a.13ff.1604SMTPIN_ADDED_BROKEN@mx.google.com>
-Message-ID: <20150127043033.GK22154@quad.lixom.net>
+From: ajaynumb@gmail.com (Ajay kumar)
+Date: Tue, 27 Jan 2015 09:57:39 +0530
+Subject: [PATCH V9 13/14] ARM: dts: snow: represent the connection between
+ bridge and panel using videoport and endpoints
+In-Reply-To: <0c9401d036da$71046bf0$530d43d0$@kernel.org>
+References: <1421771935-31618-1-git-send-email-ajaykumar.rs@samsung.com>
+ <1421771935-31618-14-git-send-email-ajaykumar.rs@samsung.com>
+ <0c9401d036da$71046bf0$530d43d0$@kernel.org>
+Message-ID: <CAEC9eQP+BiiM=-rMu+kqA721L76whbHCkpc15ctfhV3Z1ETwLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 26, 2015 at 01:08:19PM -0800, Tony Lindgren wrote:
-> The following changes since commit 13efcb188984f69e1f97b4d9e7d3663fb782946f:
-> 
->   ARM: OMAP2+: Disable omap3 PM init for ti81xx (2015-01-14 17:37:16 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.20/dm816x-data
-> 
-> for you to fetch changes up to 4d38bd1237f5bb67c3d5d183fc41db4bf4dbfb6b:
-> 
->   ARM: OMAP2+: Add dm816x hwmod support (2015-01-26 09:26:32 -0800)
-> 
-> ----------------------------------------------------------------
-> Patches to add necessary SoC related clockdomain and interconnect
-> data  to make dm816x boot with basic devices. This finally gets
-> dm816x into a usable shape for further work to happen after a few
-> years of stalled effort of making this SoC to work with the mainline
-> kernel.
-> 
-> As most of the devices are similar to the other omap variants, we
-> get at least serial, MMC, Ethernet, I2C, EDMA, pinctrl, SPI and GPMC
-> working for these SoCs with the related device tree changes.
+Hi Kukjin,
 
-Merged into next/soc.
+On Fri, Jan 23, 2015 at 12:31 PM, Kukjin Kim <kgene@kernel.org> wrote:
+> Ajay Kumar wrote:
+>>
+>> Define videoports and use endpoints to describe the connection between
+>> the encoder, bridge and the panel, instead of using phandles.
+>>
+>> Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
+>> Acked-by: Inki Dae <inki.dae@samsung.com>
+>> Tested-by: Rahul Sharma <rahul.sharma@samsung.com>
+>> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>> Tested-by: Gustavo Padovan <gustavo.padovan@collabora.co.uk>
+>> Tested-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+>> ---
+>>  arch/arm/boot/dts/exynos5250-snow.dts |   30 ++++++++++++++++++++++++++++--
+>>  1 file changed, 28 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+>> index b9aeec4..1bd5d3a 100644
+>> --- a/arch/arm/boot/dts/exynos5250-snow.dts
+>> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
+>> @@ -183,7 +183,20 @@
+>>                       powerdown-gpios = <&gpy2 5 GPIO_ACTIVE_HIGH>;
+>>                       reset-gpios = <&gpx1 5 GPIO_ACTIVE_HIGH>;
+>>                       edid-emulation = <5>;
+>> -                     panel = <&panel>;
+>> +
+>> +                     ports {
+>> +                             port at 0 {
+>> +                                     bridge_out: endpoint {
+>> +                                             remote-endpoint = <&panel_in>;
+>> +                                     };
+>> +                             };
+>> +
+>> +                             port at 1 {
+>> +                                     bridge_in: endpoint {
+>> +                                             remote-endpoint = <&dp_out>;
+>> +                                     };
+>> +                             };
+>> +                     };
+>>               };
+>>       };
+>>
+>> @@ -228,6 +241,12 @@
+>>               compatible = "auo,b116xw03";
+>>               power-supply = <&fet6>;
+>>               backlight = <&backlight>;
+>> +
+>> +             port {
+>> +                     panel_in: endpoint {
+>> +                             remote-endpoint = <&bridge_out>;
+>> +                     };
+>> +             };
+>>       };
+>>  };
+>>
+>> @@ -242,7 +261,14 @@
+>>       samsung,link-rate = <0x0a>;
+>>       samsung,lane-count = <2>;
+>>       samsung,hpd-gpio = <&gpx0 7 GPIO_ACTIVE_HIGH>;
+>> -     bridge = <&ptn3460>;
+>> +
+>> +     ports {
+>> +             port at 0 {
+>> +                     dp_out: endpoint {
+>> +                             remote-endpoint = <&bridge_in>;
+>> +                     };
+>> +             };
+>> +     };
+>>  };
+>>
+>>  &ehci {
+>> --
+>> 1.7.9.5
+>
+> I'm fine on the DT changes in this series, shall I take 13/14 and 14/14 in
+> Samsung tree?
+Yes, please take these patches.
 
-Thanks,
-
-
--Olof
+Thanks and regards,
+Ajay Kumar
