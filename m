@@ -1,44 +1,74 @@
-From: ricardo.ribalda@gmail.com (Ricardo Ribalda Delgado)
-Date: Tue, 27 Jan 2015 11:17:42 +0100
-Subject: [PATCH 00/18] spi/xilinx: Speed-up
-In-Reply-To: <20150127001419.GO21293@sirena.org.uk>
-References: <1422029330-10971-1-git-send-email-ricardo.ribalda@gmail.com>
- <20150127001419.GO21293@sirena.org.uk>
-Message-ID: <CAPybu_1==6gvwbWQWxSj_C3siGFTjvqNh1=Xj6jvu_xQFOA-Kw@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 27 Jan 2015 13:24:29 +0300
+Subject: [PATCH v3 03/13] pm: at91: Workaround DDRSDRC self-refresh bug
+ with LPDDR1 memories.
+In-Reply-To: <1422338006-3371-1-git-send-email-wenyou.yang@atmel.com>
+References: <1422337810-3257-1-git-send-email-wenyou.yang@atmel.com>
+ <1422338006-3371-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <54C7675D.8000204@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mark
+Hello.
 
-On Tue, Jan 27, 2015 at 1:14 AM, Mark Brown <broonie@kernel.org> wrote:
+On 1/27/2015 8:53 AM, Wenyou Yang wrote:
 
+> From: Peter Rosin <peda@axentia.se>
+
+> The DDRSDR controller fails miserably to put LPDDR1 memories in
+> self-refresh. Force the controller to think it has DDR2 memories
+> during the self-refresh period, as the DDR2 self-refresh spec is
+> equivalent to LPDDR1, and is correctly implemented in the
+> controller.
+
+> Assume that the second controller has the same fault, but that is
+> untested.
+
+> Signed-off-by: Peter Rosin <peda@axentia.se>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>   arch/arm/mach-at91/pm_slowclock.S  |   43 +++++++++++++++++++++++++++++++-----
+>   include/soc/at91/at91sam9_ddrsdr.h |    2 +-
+>   2 files changed, 39 insertions(+), 6 deletions(-)
+
+> diff --git a/arch/arm/mach-at91/pm_slowclock.S b/arch/arm/mach-at91/pm_slowclock.S
+> index e2bfaf5..1155217 100644
+> --- a/arch/arm/mach-at91/pm_slowclock.S
+> +++ b/arch/arm/mach-at91/pm_slowclock.S
+[...]
+> @@ -108,14 +118,26 @@ ddr_sr_enable:
 >
-> In general the best way to present a series is to start off with any bug
-> fixes (so they can be sent to Linus and stable if needed), then move on
-> to mechanical and stylistic cleanups (since they tend to be easy to
-> review and apply) and finally move on to new functionality (since that
-> is most likely to run into review problems and the cleanups should help
-> review).
+>   	/* figure out if we use the second ram controller */
+>   	cmp	ramc1, #0
+> -	ldrne	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
+> -	strne	tmp2, .saved_sam9_lpr1
+> -	bicne	tmp2, #AT91_DDRSDRC_LPCB
+> -	orrne	tmp2, #AT91_DDRSDRC_LPCB_SELF_REFRESH
+> +	beq	ddr_no_2nd_ctrl
+> +
+> +	ldr	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
+> +	str	tmp2, .saved_sam9_mdr1
+> +	bic	tmp2, tmp2, #~AT91_DDRSDRC_MD
+> +	cmp	tmp2, #AT91_DDRSDRC_MD_LOW_POWER_DDR
+> +	ldreq	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
+> +	biceq	tmp2, tmp2, #AT91_DDRSDRC_MD
 
-Will try to follow that pattern the next time.
+    Didn't you forget ~? Either that, or ~ above is not needed, I think.
 
-The development of the patchset has been a bit chaotic. I opened up
-the code to support more modes and then I realize that I could improve
-the poor performance I was having with the driver....
+> +	orreq	tmp2, tmp2, #AT91_DDRSDRC_MD_DDR2
+> +	streq	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
+> +
+> +	ldr	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
+> +	str	tmp2, .saved_sam9_lpr1
+> +	bic	tmp2, #AT91_DDRSDRC_LPCB
 
->
->>   spi/xilinx: Support for spi mode LOOP
->>   spi/xilinx: Simplify data read from the Rx FIFO
->>   spi-xilinx: Simplify spi_fill_tx_fifo
->
-> spi-xilinx?
+    Didn't you forget ~? And isn't it 3-operand instruction (as seen in the 
+above code)?
 
-Thanks! Fixed on the next version.
+> +	orr	tmp2, #AT91_DDRSDRC_LPCB_SELF_REFRESH
 
-BTW what is preferred spi/xilinx: or spi: xilinx: ?I have seen both naming.
+    Only 2 operands?
 
-Thanks!
+[...]
 
-
--- 
-Ricardo Ribalda
+WBR, Sergei
