@@ -1,64 +1,43 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 27 Jan 2015 11:34:16 +0000
-Subject: [PATCH v4 6/6] arm: dma-mapping: updates to limit dma_mask and
- iommu mapping size
-In-Reply-To: <54C772A0.2000203@arm.com>
-References: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
- <1422052359-12384-7-git-send-email-m-karicheri2@ti.com>
- <54C772A0.2000203@arm.com>
-Message-ID: <20150127113416.GB3226@e104818-lin.cambridge.arm.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 27 Jan 2015 13:34:38 +0200
+Subject: [PATCH 01/23] ARM: OMAP2+: clock: move clock provider
+ infrastructure to clock driver
+In-Reply-To: <20150126154936.GC28663@atomide.com>
+References: <1417103514-17027-1-git-send-email-t-kristo@ti.com>
+ <1417103514-17027-2-git-send-email-t-kristo@ti.com>
+ <alpine.DEB.2.02.1501242142181.5450@utopia.booyaka.com>
+ <54C61938.8000303@ti.com> <20150126154936.GC28663@atomide.com>
+Message-ID: <54C777CE.1070900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 27, 2015 at 11:12:32AM +0000, Robin Murphy wrote:
-> On 23/01/15 22:32, Murali Karicheri wrote:
-> > Limit the dma_mask to minimum of dma_mask and dma_base + size - 1.
-> >
-> > Also arm_iommu_create_mapping() has size parameter of size_t and
-> > arm_setup_iommu_dma_ops() can take a value higher than that. So
-> > limit the size to SIZE_MAX.
-> >
-> > Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> > ---
-> >   arch/arm/mm/dma-mapping.c |   10 ++++++++++
-> >   1 file changed, 10 insertions(+)
-> >
-> > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> > index 7864797..a1f9030 100644
-> > --- a/arch/arm/mm/dma-mapping.c
-> > +++ b/arch/arm/mm/dma-mapping.c
-> > @@ -2004,6 +2004,13 @@ static bool arm_setup_iommu_dma_ops(struct device *dev, u64 dma_base, u64 size,
-> >   	if (!iommu)
-> >   		return false;
-> >
-> > +	/*
-> > +	 * currently arm_iommu_create_mapping() takes a max of size_t
-> > +	 * for size param. So check this limit for now.
-> > +	 */
-> > +	if (size > SIZE_MAX)
-> > +		return false;
-> > +
-> >   	mapping = arm_iommu_create_mapping(dev->bus, dma_base, size);
-> >   	if (IS_ERR(mapping)) {
-> >   		pr_warn("Failed to create %llu-byte IOMMU mapping for device %s\n",
-> > @@ -2053,6 +2060,9 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
-> >   {
-> >   	struct dma_map_ops *dma_ops;
-> >
-> > +	/* limit dma_mask to the lower of the two values */
-> > +	*dev->dma_mask = min((*dev->dma_mask), (dma_base + size - 1));
-> > +
+On 26/01/15 17:49, Tony Lindgren wrote:
+
+>> I'm not sure if I miss something, but regmap_write does not protect from
+>> problems if there are multiple users for the same registers. You need to
+>> use regmap_update_bits() to get a protected read/write sequence, in
+>> which you can change only the bits that you want to change.
 > 
-> Is there any reason not to do this in of_dma_configure? It seems like 
-> something everyone could benefit from - I'd cooked up a dodgy workaround 
-> for the same issue in my arm64 IOMMU code, but handling it generically 
-> in common code would be much nicer.
+> To me it seems that issue can be fixed by making all the code use regmap.
+> AFAIK that should work for the legacy code too.
 
-I agree. I started something here:
+Even if everybody uses regmap, doing
 
-http://article.gmane.org/gmane.linux.kernel/1835096
+v = regmap_read()
+modify v
+regmap_write(v)
 
-but I don't remember to have got to a clear conclusion.
+is racy. regmap_update_bits() has to be used to protect the read/write
+sequence. Which may be somewhat challenging at times with some strange
+registers, the like Roger Q encountered recently related to CAN.
 
--- 
-Catalin
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150127/9bd4d3be/attachment.sig>
