@@ -1,54 +1,74 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 27 Jan 2015 16:18:06 +0100
-Subject: [PATCH 1/2] mmc: core: use card pointer as the first parameter of
- execute_tuning()
-In-Reply-To: <CAD=FV=X9x0gW5TyLi4ERm8nxixQB__Y=5bRAtOax-_w+T33rCg@mail.gmail.com>
-References: <1422271175-19445-1-git-send-email-addy.ke@rock-chips.com>
- <1422271175-19445-2-git-send-email-addy.ke@rock-chips.com>
- <CAPDyKFp=5epMggHu0+u_LU7ETujcoeP2xOpB7iD6JF2bs8BnEA@mail.gmail.com>
- <CAD=FV=X9x0gW5TyLi4ERm8nxixQB__Y=5bRAtOax-_w+T33rCg@mail.gmail.com>
-Message-ID: <CAPDyKFqjG=yxDcwnk4jbXMZ05hMkWR2x37uVpRNd_11-eB4G7w@mail.gmail.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Tue, 27 Jan 2015 10:19:55 -0500
+Subject: [PATCH v4 6/6] arm: dma-mapping: updates to limit dma_mask and
+ iommu mapping size
+In-Reply-To: <20150127113416.GB3226@e104818-lin.cambridge.arm.com>
+References: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
+ <1422052359-12384-7-git-send-email-m-karicheri2@ti.com>
+ <54C772A0.2000203@arm.com>
+ <20150127113416.GB3226@e104818-lin.cambridge.arm.com>
+Message-ID: <54C7AC9B.1040308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 January 2015 at 18:45, Doug Anderson <dianders@chromium.org> wrote:
-> Ulf,
->
-> On Mon, Jan 26, 2015 at 7:15 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> On 26 January 2015 at 12:19, Addy Ke <addy.ke@rock-chips.com> wrote:
->>> We need to take the card pointer in execute_tuning() for mmc_send_status(),
+On 01/27/2015 06:34 AM, Catalin Marinas wrote:
+> On Tue, Jan 27, 2015 at 11:12:32AM +0000, Robin Murphy wrote:
+>> On 23/01/15 22:32, Murali Karicheri wrote:
+>>> Limit the dma_mask to minimum of dma_mask and dma_base + size - 1.
+>>>
+>>> Also arm_iommu_create_mapping() has size parameter of size_t and
+>>> arm_setup_iommu_dma_ops() can take a value higher than that. So
+>>> limit the size to SIZE_MAX.
+>>>
+>>> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
+>>> ---
+>>>    arch/arm/mm/dma-mapping.c |   10 ++++++++++
+>>>    1 file changed, 10 insertions(+)
+>>>
+>>> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+>>> index 7864797..a1f9030 100644
+>>> --- a/arch/arm/mm/dma-mapping.c
+>>> +++ b/arch/arm/mm/dma-mapping.c
+>>> @@ -2004,6 +2004,13 @@ static bool arm_setup_iommu_dma_ops(struct device *dev, u64 dma_base, u64 size,
+>>>    	if (!iommu)
+>>>    		return false;
+>>>
+>>> +	/*
+>>> +	 * currently arm_iommu_create_mapping() takes a max of size_t
+>>> +	 * for size param. So check this limit for now.
+>>> +	 */
+>>> +	if (size>  SIZE_MAX)
+>>> +		return false;
+>>> +
+>>>    	mapping = arm_iommu_create_mapping(dev->bus, dma_base, size);
+>>>    	if (IS_ERR(mapping)) {
+>>>    		pr_warn("Failed to create %llu-byte IOMMU mapping for device %s\n",
+>>> @@ -2053,6 +2060,9 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+>>>    {
+>>>    	struct dma_map_ops *dma_ops;
+>>>
+>>> +	/* limit dma_mask to the lower of the two values */
+>>> +	*dev->dma_mask = min((*dev->dma_mask), (dma_base + size - 1));
+>>> +
 >>
->> mmc_send_status() is an mmc core function, not intended for host's to call.
->>
->>> but mmc->card is NULL in tuning state. So we need change the first parameter
->>> of execute_tuning() to card pointer(struct mmc_card * card).
->>
->> So, why do we need this?
->
-> I asked Addy to post upstream against mmc_send_tuning(), but I guess
-> he didn't (he posted against Alex's NAKed patch instead).
->
-> ...when I talked to him about it, Addy was asserting that when tuning
-> fails it is important (at least on dw_mmc on rk3288) that we wait for
-> the card to stop being busy and that the way to detect was using
-> mmc_send_status().
+>> Is there any reason not to do this in of_dma_configure? It seems like
+>> something everyone could benefit from - I'd cooked up a dodgy workaround
+>> for the same issue in my arm64 IOMMU code, but handling it generically
+>> in common code would be much nicer.
 
-So, could that be due to the internal logic of the error handling in
-dw_mmc driver? Or you think this is a generic issue?
+Ok Will move this to of_dma_configure().
 
-According to the specifications (eMMC and SD) both states that the
-tuning command has an R1 response. So, there shouldn't be any busy
-signalling involved - at least according to spec.
+Murali
 
 >
-> That would mean that against upstream you'd need to change
-> mmc_send_tuning() to take in the card as well (or move the "host->card
-> = card" assignment to before UHS init, which seems less desirable?)
+> I agree. I started something here:
 >
-> What do you think about that?  Is there a better solution?
+> http://article.gmane.org/gmane.linux.kernel/1835096
+>
+> but I don't remember to have got to a clear conclusion.
+>
 
-Why do we need to change mmc_send_tuning()? I thought the issue was
-that mmc_send_status(), which currently takes "card" as a parameter.
 
-Kind regards
-Uffe
+-- 
+Murali Karicheri
+Linux Kernel, Texas Instruments
