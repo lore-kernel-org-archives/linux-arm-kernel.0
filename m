@@ -1,16 +1,16 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 26 Jan 2015 20:23:22 -0800
-Subject: [GIT PULL] Allwinner defconfig for 3.20
-In-Reply-To: <20150125174006.GA27061@lukather>
-References: <20150125174006.GA27061@lukather>
-Message-ID: <20150127042322.GF22154@quad.lixom.net>
+Date: Mon, 26 Jan 2015 20:24:08 -0800
+Subject: [GIT PULL] Allwinner core changes for 3.20
+In-Reply-To: <20150125174104.GA27274@lukather>
+References: <20150125174104.GA27274@lukather>
+Message-ID: <20150127042408.GG22154@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 25, 2015 at 06:40:06PM +0100, Maxime Ripard wrote:
+On Sun, Jan 25, 2015 at 06:41:04PM +0100, Maxime Ripard wrote:
 > Hi Arnd, Kevin, Olof,
 > 
-> Please pull the following defconfig changes for the 3.20 merge window.
+> Please pull the following changes to mach-sunxi for the 3.20 merge window.
 > 
 > Thanks!
 > Maxime
@@ -21,13 +21,13 @@ On Sun, Jan 25, 2015 at 06:40:06PM +0100, Maxime Ripard wrote:
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-defconfig-for-3.20
+>   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-core-for-3.20
 > 
-> for you to fetch changes up to fef3f0dde681a32f148b765ee8e1465fba9b3cd4:
+> for you to fetch changes up to f91b7c62e0cdb8a1a72b61b16fcd48858a7d9193:
 > 
->   ARM: sunxi: Add AXP20x support multi_v7_defconfig (2015-01-06 17:33:31 +0100)
+>   ARM: sunxi: Register cpufreq-dt for sun[45678]i (2015-01-07 11:23:05 +0100)
+
 
 Merged, thanks.
-
 
 -Olof
