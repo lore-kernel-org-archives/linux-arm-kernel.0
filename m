@@ -1,190 +1,120 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 28 Jan 2015 03:54:06 +0800
-Subject: [PATCH v3 01/10] clk: sunxi: Move USB clocks to separate file
+Date: Wed, 28 Jan 2015 03:54:09 +0800
+Subject: [PATCH v3 04/10] phy: Add driver to support individual USB PHYs on
+ sun9i
 In-Reply-To: <1422388455-25923-1-git-send-email-wens@csie.org>
 References: <1422388455-25923-1-git-send-email-wens@csie.org>
-Message-ID: <1422388455-25923-2-git-send-email-wens@csie.org>
+Message-ID: <1422388455-25923-5-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The USB clocks originally shared code with the gates clocks, but had
-additional reset controllers. Move these to a separate file. This will
-allow us to add new support for slightly different USB clocks, such as
-on the A80, without affecting gates clocks, and also facilitate the
-migration of gates clocks to a generic solution.
+Unlike previous Allwinner SoCs, there is no central PHY control block
+on the A80. Also, OTG support is completely split off into a different
+controller.
 
-This also cleans up the USB clocks code slightly, such as adding
-newlines, getting rid of the unused clkdev call, using a simple
-u32 instead of BITMAP for the clock masks, using BIT() macro to
-declare the clock bitmasks, and using of_io_request_and_map() to
-get the I/O address.
+This adds a new driver to support the regular USB PHYs.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
+ .../devicetree/bindings/phy/sun9i-usb-phy.txt      |  34 +++
+ drivers/phy/Kconfig                                |  12 ++
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-sun9i-usb.c                        | 238 +++++++++++++++++++++
+ 4 files changed, 285 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/sun9i-usb-phy.txt
+ create mode 100644 drivers/phy/phy-sun9i-usb.c
 
-This patch does quite a few cleanups in addition to the code movement.
-I'm not sure if it's acceptable.
-
----
- drivers/clk/sunxi/Makefile    |   1 +
- drivers/clk/sunxi/clk-sunxi.c |  88 -------------------
- drivers/clk/sunxi/clk-usb.c   | 190 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 191 insertions(+), 88 deletions(-)
- create mode 100644 drivers/clk/sunxi/clk-usb.c
-
-diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-index 3a5292e3fcf8..058f273d6154 100644
---- a/drivers/clk/sunxi/Makefile
-+++ b/drivers/clk/sunxi/Makefile
-@@ -9,6 +9,7 @@ obj-y += clk-mod0.o
- obj-y += clk-sun8i-mbus.o
- obj-y += clk-sun9i-core.o
- obj-y += clk-sun9i-mmc.o
-+obj-y += clk-usb.o
- 
- obj-$(CONFIG_MFD_SUN6I_PRCM) += \
- 	clk-sun6i-ar100.o clk-sun6i-apb0.o clk-sun6i-apb0-gates.o \
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index 24c7cc12e9e1..af23be24d736 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -835,59 +835,6 @@ static void __init sunxi_divider_clk_setup(struct device_node *node,
- 
- 
- /**
-- * sunxi_gates_reset... - reset bits in leaf gate clk registers handling
-- */
--
--struct gates_reset_data {
--	void __iomem			*reg;
--	spinlock_t			*lock;
--	struct reset_controller_dev	rcdev;
--};
--
--static int sunxi_gates_reset_assert(struct reset_controller_dev *rcdev,
--			      unsigned long id)
--{
--	struct gates_reset_data *data = container_of(rcdev,
--						     struct gates_reset_data,
--						     rcdev);
--	unsigned long flags;
--	u32 reg;
--
--	spin_lock_irqsave(data->lock, flags);
--
--	reg = readl(data->reg);
--	writel(reg & ~BIT(id), data->reg);
--
--	spin_unlock_irqrestore(data->lock, flags);
--
--	return 0;
--}
--
--static int sunxi_gates_reset_deassert(struct reset_controller_dev *rcdev,
--				unsigned long id)
--{
--	struct gates_reset_data *data = container_of(rcdev,
--						     struct gates_reset_data,
--						     rcdev);
--	unsigned long flags;
--	u32 reg;
--
--	spin_lock_irqsave(data->lock, flags);
--
--	reg = readl(data->reg);
--	writel(reg | BIT(id), data->reg);
--
--	spin_unlock_irqrestore(data->lock, flags);
--
--	return 0;
--}
--
--static struct reset_control_ops sunxi_gates_reset_ops = {
--	.assert		= sunxi_gates_reset_assert,
--	.deassert	= sunxi_gates_reset_deassert,
--};
--
--/**
-  * sunxi_gates_clk_setup() - Setup function for leaf gates on clocks
-  */
- 
-@@ -895,7 +842,6 @@ static struct reset_control_ops sunxi_gates_reset_ops = {
- 
- struct gates_data {
- 	DECLARE_BITMAP(mask, SUNXI_GATES_MAX_SIZE);
--	u32 reset_mask;
- };
- 
- static const struct gates_data sun4i_axi_gates_data __initconst = {
-@@ -994,26 +940,10 @@ static const struct gates_data sun8i_a23_apb2_gates_data __initconst = {
- 	.mask = {0x1F0007},
- };
- 
--static const struct gates_data sun4i_a10_usb_gates_data __initconst = {
--	.mask = {0x1C0},
--	.reset_mask = 0x07,
--};
--
--static const struct gates_data sun5i_a13_usb_gates_data __initconst = {
--	.mask = {0x140},
--	.reset_mask = 0x03,
--};
--
--static const struct gates_data sun6i_a31_usb_gates_data __initconst = {
--	.mask = { BIT(18) | BIT(17) | BIT(16) | BIT(10) | BIT(9) | BIT(8) },
--	.reset_mask = BIT(2) | BIT(1) | BIT(0),
--};
--
- static void __init sunxi_gates_clk_setup(struct device_node *node,
- 					 struct gates_data *data)
- {
- 	struct clk_onecell_data *clk_data;
--	struct gates_reset_data *reset_data;
- 	const char *clk_parent;
- 	const char *clk_name;
- 	void __iomem *reg;
-@@ -1054,21 +984,6 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
- 	clk_data->clk_num = i;
- 
- 	of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
--
--	/* Register a reset controler for gates with reset bits */
--	if (data->reset_mask == 0)
--		return;
--
--	reset_data = kzalloc(sizeof(*reset_data), GFP_KERNEL);
--	if (!reset_data)
--		return;
--
--	reset_data->reg = reg;
--	reset_data->lock = &clk_lock;
--	reset_data->rcdev.nr_resets = __fls(data->reset_mask) + 1;
--	reset_data->rcdev.ops = &sunxi_gates_reset_ops;
--	reset_data->rcdev.of_node = node;
--	reset_controller_register(&reset_data->rcdev);
- }
- 
- 
-@@ -1321,9 +1236,6 @@ static const struct of_device_id clk_gates_match[] __initconst = {
- 	{.compatible = "allwinner,sun9i-a80-apb1-gates-clk", .data = &sun9i_a80_apb1_gates_data,},
- 	{.compatible = "allwinner,sun6i-a31-apb2-gates-clk", .data = &sun6i_a31_apb2_gates_data,},
- 	{.compatible = "allwinner,sun8i-a23-apb2-gates-clk", .data = &sun8i_a23_apb2_gates_data,},
--	{.compatible = "allwinner,sun4i-a10-usb-clk", .data = &sun4i_a10_usb_gates_data,},
--	{.compatible = "allwinner,sun5i-a13-usb-clk", .data = &sun5i_a13_usb_gates_data,},
--	{.compatible = "allwinner,sun6i-a31-usb-clk", .data = &sun6i_a31_usb_gates_data,},
- 	{}
- };
- 
-diff --git a/drivers/clk/sunxi/clk-usb.c b/drivers/clk/sunxi/clk-usb.c
+diff --git a/Documentation/devicetree/bindings/phy/sun9i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun9i-usb-phy.txt
 new file mode 100644
-index 000000000000..f1dcc8fb5a7d
+index 000000000000..af40dd2fe0eb
 --- /dev/null
-+++ b/drivers/clk/sunxi/clk-usb.c
-@@ -0,0 +1,190 @@
++++ b/Documentation/devicetree/bindings/phy/sun9i-usb-phy.txt
+@@ -0,0 +1,34 @@
++Allwinner sun9i USB PHY
++-----------------------
++
++Required properties:
++- compatible : should be one of
++  * allwinner,sun9i-a80-usb-phy
++- reg : a list of offset + length pairs
++- #phy-cells : from the generic phy bindings, must be 0
++- phy_type : "hsic" for HSIC usage;
++	     other values or absence of this property indicates normal USB
++- clocks : phandle + clock specifier for the phy clocks
++- clock-names : depending on the "phy_type" property,
++  * "phy" for normal USB
++  * "hsic_480M", "hsic_12M" for HSIC
++- resets : a list of phandle + reset specifier pairs
++- reset-names : depending on the "phy_type" property,
++  * "phy" for normal USB
++  * "hsic" for HSIC
++
++It is recommended to list all clocks and resets available.
++The driver will only use those matching the phy_type.
++
++Example:
++	usbphy1: phy at 00a01800 {
++		compatible = "allwinner,sun9i-a80-usb-phy";
++		reg = <0x00a01800 0x4>;
++		clocks = <&usb_phy_clk 2>, <&usb_phy_clk 10>,
++		       <&usb_phy_clk 3>;
++		clock-names = "hsic_480M", "hsic_12M", "phy";
++		resets = <&usb_phy_clk 18>, <&usb_phy_clk 19>;
++		reset-names = "hsic", "phy";
++		status = "disabled";
++		#phy-cells = <0>;
++	};
+diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+index ccad8809ecb1..4c280b28a2ce 100644
+--- a/drivers/phy/Kconfig
++++ b/drivers/phy/Kconfig
+@@ -174,6 +174,18 @@ config PHY_SUN4I_USB
+ 	  This driver controls the entire USB PHY block, both the USB OTG
+ 	  parts, as well as the 2 regular USB 2 host PHYs.
+ 
++config PHY_SUN9I_USB
++	tristate "Allwinner sun9i SoC USB PHY driver"
++	depends on ARCH_SUNXI && HAS_IOMEM && OF
++	depends on RESET_CONTROLLER
++	select USB_PHY
++	select GENERIC_PHY
++	help
++	  Enable this to support the transceiver that is part of Allwinner
++	  sun9i SoCs.
++
++	  This driver controls each individual USB 2 host PHY.
++
+ config PHY_SAMSUNG_USB2
+ 	tristate "Samsung USB 2.0 PHY driver"
+ 	depends on HAS_IOMEM
+diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+index aa74f961e44e..11ead804d9a4 100644
+--- a/drivers/phy/Makefile
++++ b/drivers/phy/Makefile
+@@ -20,6 +20,7 @@ obj-$(CONFIG_TWL4030_USB)		+= phy-twl4030-usb.o
+ obj-$(CONFIG_PHY_EXYNOS5250_SATA)	+= phy-exynos5250-sata.o
+ obj-$(CONFIG_PHY_HIX5HD2_SATA)		+= phy-hix5hd2-sata.o
+ obj-$(CONFIG_PHY_SUN4I_USB)		+= phy-sun4i-usb.o
++obj-$(CONFIG_PHY_SUN9I_USB)		+= phy-sun9i-usb.o
+ obj-$(CONFIG_PHY_SAMSUNG_USB2)		+= phy-exynos-usb2.o
+ phy-exynos-usb2-y			+= phy-samsung-usb2.o
+ phy-exynos-usb2-$(CONFIG_PHY_EXYNOS4210_USB2)	+= phy-exynos4210-usb2.o
+diff --git a/drivers/phy/phy-sun9i-usb.c b/drivers/phy/phy-sun9i-usb.c
+new file mode 100644
+index 000000000000..0fddd56df38c
+--- /dev/null
++++ b/drivers/phy/phy-sun9i-usb.c
+@@ -0,0 +1,238 @@
 +/*
-+ * Copyright 2013-2015 Emilio L?pez
++ * Allwinner sun9i USB phy driver
 + *
-+ * Emilio L?pez <emilio@elopez.com.ar>
++ * Copyright (C) 2014 Chen-Yu Tsai <wens@csie.org>
++ *
++ * Based on phy-sun4i-usb.c from
++ * Hans de Goede <hdegoede@redhat.com>
++ *
++ * and code from
++ * Allwinner Technology Co., Ltd. <www.allwinnertech.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
@@ -197,179 +127,221 @@ index 000000000000..f1dcc8fb5a7d
 + * GNU General Public License for more details.
 + */
 +
-+#include <linux/clk-provider.h>
-+#include <linux/clkdev.h>
++#include <linux/clk.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/mutex.h>
 +#include <linux/of.h>
 +#include <linux/of_address.h>
-+#include <linux/reset-controller.h>
-+#include <linux/spinlock.h>
++#include <linux/phy/phy.h>
++#include <linux/usb/of.h>
++#include <linux/platform_device.h>
++#include <linux/reset.h>
 +
++#define SUNXI_AHB_INCR16_BURST_EN	BIT(11)
++#define SUNXI_AHB_INCR8_BURST_EN	BIT(10)
++#define SUNXI_AHB_INCR4_BURST_EN	BIT(9)
++#define SUNXI_AHB_INCRX_ALIGN_EN	BIT(8)
++#define SUNXI_ULPI_BYPASS_EN		BIT(0)
 +
-+/**
-+ * sunxi_usb_reset... - reset bits in usb clk registers handling
-+ */
++/* usb1 HSIC specific bits */
++#define SUNXI_EHCI_HS_FORCE		BIT(20)
++#define SUNXI_HSIC_CONNECT_DET		BIT(17)
++#define SUNXI_HSIC_CONNECT_INT		BIT(16)
++#define SUNXI_HSIC			BIT(1)
 +
-+struct usb_reset_data {
-+	void __iomem			*reg;
-+	spinlock_t			*lock;
-+	struct reset_controller_dev	rcdev;
++struct sun9i_usb_phy {
++	struct phy *phy;
++	void __iomem *pmu;
++	struct regulator *vbus;
++	struct reset_control *reset;
++	struct clk *clk;
++	struct clk *hsic_clk;
++	enum usb_phy_interface type;
 +};
 +
-+static int sunxi_usb_reset_assert(struct reset_controller_dev *rcdev,
-+			      unsigned long id)
++static void sun9i_usb_phy_passby(struct sun9i_usb_phy *phy, int enable)
 +{
-+	struct usb_reset_data *data = container_of(rcdev,
-+						   struct usb_reset_data,
-+						   rcdev);
-+	unsigned long flags;
-+	u32 reg;
++	u32 bits, reg_value;
 +
-+	spin_lock_irqsave(data->lock, flags);
++	bits = SUNXI_AHB_INCR16_BURST_EN | SUNXI_AHB_INCR8_BURST_EN |
++		SUNXI_AHB_INCR4_BURST_EN | SUNXI_AHB_INCRX_ALIGN_EN |
++		SUNXI_ULPI_BYPASS_EN;
 +
-+	reg = readl(data->reg);
-+	writel(reg & ~BIT(id), data->reg);
++	if (phy->type == USBPHY_INTERFACE_MODE_HSIC)
++		bits |= SUNXI_HSIC | SUNXI_EHCI_HS_FORCE |
++			SUNXI_HSIC_CONNECT_DET | SUNXI_HSIC_CONNECT_INT;
 +
-+	spin_unlock_irqrestore(data->lock, flags);
++	reg_value = readl(phy->pmu);
++
++	if (enable)
++		reg_value |= bits;
++	else
++		reg_value &= ~bits;
++
++	writel(reg_value, phy->pmu);
++}
++
++static int sun9i_usb_phy_init(struct phy *_phy)
++{
++	struct sun9i_usb_phy *phy = phy_get_drvdata(_phy);
++	int ret;
++
++	ret = clk_prepare_enable(phy->clk);
++	if (ret)
++		goto err_clk;
++
++	ret = clk_prepare_enable(phy->hsic_clk);
++	if (ret)
++		goto err_hsic_clk;
++
++	ret = reset_control_deassert(phy->reset);
++	if (ret)
++		goto err_reset;
++
++	sun9i_usb_phy_passby(phy, 1);
++	return 0;
++
++err_reset:
++	clk_disable_unprepare(phy->hsic_clk);
++
++err_hsic_clk:
++	clk_disable_unprepare(phy->clk);
++
++err_clk:
++	return ret;
++}
++
++static int sun9i_usb_phy_exit(struct phy *_phy)
++{
++	struct sun9i_usb_phy *phy = phy_get_drvdata(_phy);
++
++	sun9i_usb_phy_passby(phy, 0);
++	reset_control_assert(phy->reset);
++	clk_disable_unprepare(phy->hsic_clk);
++	clk_disable_unprepare(phy->clk);
 +
 +	return 0;
 +}
 +
-+static int sunxi_usb_reset_deassert(struct reset_controller_dev *rcdev,
-+				unsigned long id)
++static int sun9i_usb_phy_power_on(struct phy *_phy)
 +{
-+	struct usb_reset_data *data = container_of(rcdev,
-+						     struct usb_reset_data,
-+						     rcdev);
-+	unsigned long flags;
-+	u32 reg;
++	struct sun9i_usb_phy *phy = phy_get_drvdata(_phy);
++	int ret = 0;
 +
-+	spin_lock_irqsave(data->lock, flags);
++	if (phy->vbus)
++		ret = regulator_enable(phy->vbus);
 +
-+	reg = readl(data->reg);
-+	writel(reg | BIT(id), data->reg);
++	return ret;
++}
 +
-+	spin_unlock_irqrestore(data->lock, flags);
++static int sun9i_usb_phy_power_off(struct phy *_phy)
++{
++	struct sun9i_usb_phy *phy = phy_get_drvdata(_phy);
++
++	if (phy->vbus)
++		regulator_disable(phy->vbus);
 +
 +	return 0;
 +}
 +
-+static struct reset_control_ops sunxi_usb_reset_ops = {
-+	.assert		= sunxi_usb_reset_assert,
-+	.deassert	= sunxi_usb_reset_deassert,
++static struct phy_ops sun9i_usb_phy_ops = {
++	.init		= sun9i_usb_phy_init,
++	.exit		= sun9i_usb_phy_exit,
++	.power_on	= sun9i_usb_phy_power_on,
++	.power_off	= sun9i_usb_phy_power_off,
++	.owner		= THIS_MODULE,
 +};
 +
-+/**
-+ * sunxi_usb_clk_setup() - Setup function for usb gate clocks
-+ */
-+
-+#define SUNXI_USB_MAX_SIZE 32
-+
-+struct usb_clk_data {
-+	u32 clk_mask;
-+	u32 reset_mask;
-+};
-+
-+static void __init sunxi_usb_clk_setup(struct device_node *node,
-+				       const struct usb_clk_data *data,
-+				       spinlock_t *lock)
++static int sun9i_usb_phy_probe(struct platform_device *pdev)
 +{
-+	struct clk_onecell_data *clk_data;
-+	struct usb_reset_data *reset_data;
-+	const char *clk_parent;
-+	const char *clk_name;
-+	void __iomem *reg;
-+	int qty;
-+	int i = 0;
-+	int j = 0;
++	struct sun9i_usb_phy *phy;
++	struct device *dev = &pdev->dev;
++	struct device_node *np = dev->of_node;
++	struct phy_provider *phy_provider;
++	struct resource *res;
 +
-+	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-+	if (IS_ERR(reg))
-+		return;
++	phy = devm_kzalloc(dev, sizeof(*phy), GFP_KERNEL);
++	if (!phy)
++		return -ENOMEM;
 +
-+	clk_parent = of_clk_get_parent_name(node, 0);
-+	if (!clk_parent)
-+		return;
-+
-+	/* Worst-case size approximation and memory allocation */
-+	qty = find_last_bit((unsigned long *)&data->clk_mask,
-+			    SUNXI_USB_MAX_SIZE);
-+
-+	clk_data = kmalloc(sizeof(struct clk_onecell_data), GFP_KERNEL);
-+	if (!clk_data)
-+		return;
-+
-+	clk_data->clks = kzalloc((qty+1) * sizeof(struct clk *), GFP_KERNEL);
-+	if (!clk_data->clks) {
-+		kfree(clk_data);
-+		return;
++	phy->vbus = devm_regulator_get_optional(dev, "vbus");
++	if (IS_ERR(phy->vbus)) {
++		if (PTR_ERR(phy->vbus) == -EPROBE_DEFER)
++			return -EPROBE_DEFER;
++		phy->vbus = NULL;
 +	}
 +
-+	for_each_set_bit(i, (unsigned long *)&data->clk_mask,
-+			 SUNXI_USB_MAX_SIZE) {
-+		of_property_read_string_index(node, "clock-output-names",
-+					      j, &clk_name);
-+		clk_data->clks[i] = clk_register_gate(NULL, clk_name,
-+						      clk_parent, 0,
-+						      reg, i, 0, lock);
-+		WARN_ON(IS_ERR(clk_data->clks[i]));
++	phy->type = of_usb_get_phy_mode(np);
++	if (phy->type == USBPHY_INTERFACE_MODE_HSIC) {
++		phy->clk = devm_clk_get(dev, "hsic_480M");
++		if (IS_ERR(phy->clk)) {
++			dev_err(dev, "failed to get hsic_480M clock\n");
++			return PTR_ERR(phy->clk);
++		}
 +
-+		j++;
++		phy->hsic_clk = devm_clk_get(dev, "hsic_12M");
++		if (IS_ERR(phy->clk)) {
++			dev_err(dev, "failed to get hsic_12M clock\n");
++			return PTR_ERR(phy->clk);
++		}
++
++		phy->reset = devm_reset_control_get(dev, "hsic");
++		if (IS_ERR(phy->reset)) {
++			dev_err(dev, "failed to get reset control\n");
++			return PTR_ERR(phy->reset);
++		}
++	} else {
++		phy->clk = devm_clk_get(dev, "phy");
++		if (IS_ERR(phy->clk)) {
++			dev_err(dev, "failed to get phy clock\n");
++			return PTR_ERR(phy->clk);
++		}
++
++		phy->reset = devm_reset_control_get(dev, "phy");
++		if (IS_ERR(phy->reset)) {
++			dev_err(dev, "failed to get reset control\n");
++			return PTR_ERR(phy->reset);
++		}
 +	}
 +
-+	/* Adjust to the real max */
-+	clk_data->clk_num = i;
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	phy->pmu = devm_ioremap_resource(dev, res);
++	if (IS_ERR(phy->pmu))
++		return PTR_ERR(phy->pmu);
 +
-+	of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
++	phy->phy = devm_phy_create(dev, NULL, &sun9i_usb_phy_ops);
++	if (IS_ERR(phy->phy)) {
++		dev_err(dev, "failed to create PHY\n");
++		return PTR_ERR(phy->phy);
++	}
 +
-+	/* Register a reset controller for usb with reset bits */
-+	if (data->reset_mask == 0)
-+		return;
++	phy_set_drvdata(phy->phy, phy);
++	dev_set_drvdata(dev, phy);
++	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
 +
-+	reset_data = kzalloc(sizeof(*reset_data), GFP_KERNEL);
-+	if (!reset_data)
-+		return;
-+
-+	reset_data->reg = reg;
-+	reset_data->lock = lock;
-+	reset_data->rcdev.nr_resets = __fls(data->reset_mask) + 1;
-+	reset_data->rcdev.ops = &sunxi_usb_reset_ops;
-+	reset_data->rcdev.of_node = node;
-+	reset_controller_register(&reset_data->rcdev);
++	return PTR_ERR_OR_ZERO(phy_provider);
 +}
 +
-+static const struct usb_clk_data sun4i_a10_usb_clk_data __initconst = {
-+	.clk_mask = BIT(8) | BIT(7) | BIT(6),
-+	.reset_mask = BIT(2) | BIT(1) | BIT(0),
++static const struct of_device_id sun9i_usb_phy_of_match[] = {
++	{ .compatible = "allwinner,sun9i-a80-usb-phy" },
++	{ },
 +};
++MODULE_DEVICE_TABLE(of, sun9i_usb_phy_of_match);
 +
-+static DEFINE_SPINLOCK(sun4i_a10_usb_lock);
-+
-+static void __init sun4i_a10_usb_setup(struct device_node *node)
-+{
-+	sunxi_usb_clk_setup(node, &sun4i_a10_usb_clk_data, &sun4i_a10_usb_lock);
-+}
-+CLK_OF_DECLARE(sun4i_a10_usb, "allwinner,sun4i-a10-usb-clk", sun4i_a10_usb_setup);
-+
-+static const struct usb_clk_data sun5i_a13_usb_clk_data __initconst = {
-+	.clk_mask = BIT(8) | BIT(6),
-+	.reset_mask = BIT(1) | BIT(0),
++static struct platform_driver sun9i_usb_phy_driver = {
++	.probe	= sun9i_usb_phy_probe,
++	.driver = {
++		.of_match_table	= sun9i_usb_phy_of_match,
++		.name  = "sun9i-usb-phy",
++	}
 +};
++module_platform_driver(sun9i_usb_phy_driver);
 +
-+static void __init sun5i_a13_usb_setup(struct device_node *node)
-+{
-+	sunxi_usb_clk_setup(node, &sun5i_a13_usb_clk_data, &sun4i_a10_usb_lock);
-+}
-+CLK_OF_DECLARE(sun5i_a13_usb, "allwinner,sun5i-a13-usb-clk", sun5i_a13_usb_setup);
-+
-+static const struct usb_clk_data sun6i_a31_usb_clk_data __initconst = {
-+	.clk_mask = BIT(18) | BIT(17) | BIT(16) | BIT(10) | BIT(9) | BIT(8),
-+	.reset_mask = BIT(2) | BIT(1) | BIT(0),
-+};
-+
-+static void __init sun6i_a31_usb_setup(struct device_node *node)
-+{
-+	sunxi_usb_clk_setup(node, &sun6i_a31_usb_clk_data, &sun4i_a10_usb_lock);
-+}
-+CLK_OF_DECLARE(sun6i_a31_usb, "allwinner,sun6i-a31-usb-clk", sun6i_a31_usb_setup);
++MODULE_DESCRIPTION("Allwinner sun9i USB phy driver");
++MODULE_AUTHOR("Chen-Yu Tsai <wens@csie.org>");
++MODULE_LICENSE("GPL v2");
 -- 
 2.1.4
