@@ -1,97 +1,74 @@
-From: baozich@gmail.com (Chen Baozi)
-Date: Tue, 27 Jan 2015 03:06:01 +0000
-Subject: [PATCH] irqchip: GICv3: ITS: Allocate enough memory for the full
- range of DeviceID
-Message-ID: <1422327961-19733-1-git-send-email-baozich@gmail.com>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Tue, 27 Jan 2015 03:08:09 +0000
+Subject: [PATCH 07/12] pm: at91: the standby mode uses the same sram
+ function as the suspend to memory mode
+In-Reply-To: <20150123231315.GA32318@piout.net>
+References: <1421741825-18226-1-git-send-email-wenyou.yang@atmel.com>
+ <1421741825-18226-8-git-send-email-wenyou.yang@atmel.com>
+ <20150123165020.GA24210@gradator.net> <20150123231315.GA32318@piout.net>
+Message-ID: <B256D81BAE5131468A838E5D7A243641BFD35C16@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ITS table allocator is only allocating a single page per table.
-This works fine for most things, but leads to silent lack of
-interrupt delivery if we end-up with a device that has an ID that is
-out of the range defined by a single page of memory. Even worse, depending
-on the page size, behaviour changes, which is not a very good experience.
+Hi Alexandre,
 
-A solution is actually to allocate memory for the full range of ID that
-the ITS supports. A massive waste memory wise, but at least a safe bet.
+> -----Original Message-----
+> From: Alexandre Belloni [mailto:alexandre.belloni at free-electrons.com]
+> Sent: Saturday, January 24, 2015 7:13 AM
+> To: Sylvain Rochet
+> Cc: Yang, Wenyou; Ferre, Nicolas; linux at arm.linux.org.uk; linux-
+> kernel at vger.kernel.org; peda at axentia.se; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 07/12] pm: at91: the standby mode uses the same sram
+> function as the suspend to memory mode
+> 
+> On 23/01/2015 at 17:50:20 +0100, Sylvain Rochet wrote :
+> > Hello Wenyou,
+> >
+> >
+> > On Tue, Jan 20, 2015 at 04:17:00PM +0800, Wenyou Yang wrote:
+> > >
+> > > diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c index
+> > > 691e6db..a1010f0 100644
+> > > --- a/arch/arm/mach-at91/pm.c
+> > > +++ b/arch/arm/mach-at91/pm.c
+> >
+> >
+> > > @@ -145,62 +145,51 @@ extern void at91_slow_clock(void __iomem *pmc,
+> void __iomem *ramc0,
+> > >  			    void __iomem *ramc1, int memctrl);  extern u32
+> > > at91_slow_clock_sz;
+> > >
+> > > +static void at91_pm_suspend(suspend_state_t state) {
+> >       (...)
+> > > +	slow_clock(at91_pmc_base, at91_ramc_base[0],
+> > > +			at91_ramc_base[1], pm_data);
+> > > +}
+> >
+> >
+> > > -			if (slow_clock) {
+> > > -				slow_clock(at91_pmc_base, at91_ramc_base[0],
+> > > -					   at91_ramc_base[1],
+> > > -					   at91_pm_data.memctrl);
+> >       (...)
+> > > +               at91_pm_suspend(state);
+> >
+> >
+> > By doing that you removed the condition "if (slow_clock)".
+> >
+> > But slow_clock can still be NULL, see commit d2e4679, there are
+> > multiple reasons which ends up with a NULL slow_clock.
+> >
+> 
+> I would fix that by not calling suspend_set_ops(&at91_pm_ops) when slow_clock
+> is NULL in patch 6 (quick and easy) or copying the whole
+> at91_pm_sram_init() in at91_pm_init() and handle failures from there.
+Thank you for suggestion, I will fix it.
 
-This patch has been tested on the Phytium SoC.
+> 
+> 
+> --
+> Alexandre Belloni, Free Electrons
+> Embedded Linux, Kernel and Android engineering http://free-electrons.com
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Chen Baozi <chenbaozi@kylinos.com.cn>
----
- drivers/irqchip/irq-gic-v3-its.c   | 25 +++++++++++++++++++++----
- include/linux/irqchip/arm-gic-v3.h |  2 ++
- 2 files changed, 23 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 86e4684..d7a3d36 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -806,14 +806,31 @@ static int its_alloc_tables(struct its_node *its)
- 		u64 val = readq_relaxed(its->base + GITS_BASER + i * 8);
- 		u64 type = GITS_BASER_TYPE(val);
- 		u64 entry_size = GITS_BASER_ENTRY_SIZE(val);
-+		int order = 0;
-+		int alloc_size;
- 		u64 tmp;
- 		void *base;
- 
- 		if (type == GITS_BASER_TYPE_NONE)
- 			continue;
- 
--		/* We're lazy and only allocate a single page for now */
--		base = (void *)get_zeroed_page(GFP_KERNEL);
-+		/*
-+		 * Allocate as many entries as required to fit the
-+		 * range of device IDs that the ITS can grok... The ID
-+		 * space being incredibly sparse, this results in a
-+		 * massive waste of memory.
-+		 *
-+		 * For other tables, only allocate a single page.
-+		 */
-+		if (type == GITS_BASER_TYPE_DEVICE) {
-+			u64 typer = readq_relaxed(its->base + GITS_TYPER);
-+			u32 ids = GITS_TYPER_DEVBITS(typer);
-+
-+			order = get_order((1UL << ids) * entry_size);
-+		}
-+
-+		alloc_size = (1 << order) * PAGE_SIZE;
-+		base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
- 		if (!base) {
- 			err = -ENOMEM;
- 			goto out_free;
-@@ -841,7 +858,7 @@ retry_baser:
- 			break;
- 		}
- 
--		val |= (PAGE_SIZE / psz) - 1;
-+		val |= (alloc_size / psz) - 1;
- 
- 		writeq_relaxed(val, its->base + GITS_BASER + i * 8);
- 		tmp = readq_relaxed(its->base + GITS_BASER + i * 8);
-@@ -882,7 +899,7 @@ retry_baser:
- 		}
- 
- 		pr_info("ITS: allocated %d %s @%lx (psz %dK, shr %d)\n",
--			(int)(PAGE_SIZE / entry_size),
-+			(int)(alloc_size / entry_size),
- 			its_base_type_string[type],
- 			(unsigned long)virt_to_phys(base),
- 			psz / SZ_1K, (int)shr >> GITS_BASER_SHAREABILITY_SHIFT);
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 1e8b0cf..7cf8d40 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -132,6 +132,8 @@
- #define GITS_BASER			0x0100
- #define GITS_PIDR2			GICR_PIDR2
- 
-+#define GITS_TYPER_DEVBITS_SHIFT	13
-+#define GITS_TYPER_DEVBITS(r)		((((r) >> GITS_TYPER_DEVBITS_SHIFT) & 0x1f) + 1)
- #define GITS_TRANSLATER			0x10040
- 
- #define GITS_TYPER_PTA			(1UL << 19)
--- 
-2.1.4
+Best Regards,
+Wenyou Yang
