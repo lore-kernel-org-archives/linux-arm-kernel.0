@@ -1,59 +1,56 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 26 Jan 2015 18:13:44 -0800
-Subject: [PATCH] ARM: dts: re-fromat AT91 part to match other entries
-In-Reply-To: <54C660FE.3000401@atmel.com>
-References: <20150112224203.GL22090@quad.lixom.net>
- <20150113230956.GA15087@quad.lixom.net>
- <20150113234759.GH3843@piout.net> <2263559.r5MiMeqJt6@wuerfel>
- <54C660FE.3000401@atmel.com>
-Message-ID: <20150127021344.GA22154@quad.lixom.net>
+Date: Mon, 26 Jan 2015 18:17:33 -0800
+Subject: [GIT PULL RESEND] pxa for v3.20
+In-Reply-To: <874mrgdzz0.fsf@free.fr>
+References: <87egqpff9m.fsf@free.fr> <20150123215423.GD20896@quad.lixom.net>
+ <874mrgdzz0.fsf@free.fr>
+Message-ID: <20150127021733.GB22154@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 26, 2015 at 04:45:02PM +0100, Nicolas Ferre wrote:
-> Le 14/01/2015 10:05, Arnd Bergmann a ?crit :
-> > On Wednesday 14 January 2015 00:47:59 Alexandre Belloni wrote:
-> >>
-> >> On 13/01/2015 at 15:09:56 -0800, Olof Johansson wrote :
-> >>> On Tue, Jan 13, 2015 at 03:43:00PM +0100, Nicolas Ferre wrote:
-> >>>> The entries are separated as ARM V4/V5 and ARM V7 as some other per-SoC config
-> >>>> options may be removed in the near future.
-> >>>>
-> >>>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> >>>> ---
-> >>>> Hi Olof,
-> >>>>
-> >>>> This is an attempt to match other ARM SoC families format.
-> >>>> If you feel that the patch can be good, do not hesitate to take it yourself. I
-> >>>> don't plan to integrate it in any of my pull-request so it can appear quickly in
-> >>>> arm-soc and can be used by everyone.
-> >>>
-> >>> Hi,
-> >>>
-> >>> If you see what Peter did, he split up the rules per-SoC based on how
-> >>> things were selectable in Kconfig. Since you seem to have the Kconfig
-> >>> entries already, how about doing the same? That way the same information
-> >>> w.r.t. SoC family that you have as comments isn't lost either.
-> >>>
-> >>
-> >> You didn't see the patch set yet because it depends on a lot of other
-> >> series still being discussed but after the switch to multiplatform, the
-> >> only config option left will be SOC_AT91RM9200, SOC_AT91SAM9 (both
-> >> under SOC_SAM_V4_V5) and SOC_SAMA5, under SOC_SAM_V7.
-> >>
-> >> That's our plan, unless you feel that we should keep one config option
-> >> per SoC.
-> > 
-> > With the patches that I prepared last year, all of AT91SAM9 becomes
-> > one small file, so there really isn't any need to have separate Kconfig
-> > options.
+On Sat, Jan 24, 2015 at 03:18:11PM +0100, Robert Jarzmik wrote:
+> Olof Johansson <olof@lixom.net> writes:
 > 
-> Hi Olof,
+> > Hi Robert,
+> >
+> > Branch looks good, I'll merge this into next/fixes-non-critical. One nit below
+> > though:
+> >
+> >> ----------------------------------------------------------------
+> >> Dmitry Eremin-Solenikov (3):
+> >>       ARM: pxa: add regulator_has_full_constraints to corgi board file
+> >>       ARM: pxa: add regulator_has_full_constraints to poodle board file
+> >>       ARM: pxa: add regulator_has_full_constraints to spitz board file
+> >> 
+> >> Martin Vajnar (1):
+> >>       hx4700: regulator: declare full constraints
+> >
+> > Please use consistent patch subjects in the future. We've ended up using ARM:
+> > <platform>: <foo> across all platforms these days.
+> >
+> > I'm not going to ask you to respin just for this, but please remember to fix
+> > future patches when you apply them if they're not already correct.
+> You're right, I missed that one.
 > 
-> After what noted Alexandre and Arnd, don't you think my initial attempt
-> was okay? Aka: ping ;-)
+> In case you've not already pulled, I created :
+>    https://github.com/rjarzmik/linux.git tags/pxa-for-3.20-bis
+> 
+> I can resend a proper pull request if you wish, or we can leave it as is if you
+> already pulled. In any case I'll be more carefull next time, maybe I can
+> convince my bot to check that for me too.
 
-Ah, yes. Applied now.
+I had already merged, but it looks like you broke viper and zeus. Both of them
+still refer to PXA_ISA_IRQ().
+
+Can you send an incremental patch for that? Or if you prefer that we drop this
+branch for now while you sort it out that's OK too -- your preference.
+
+> Or even better checkpatch could check that any patch with a diffstat fully in
+> arch/arm/{mach,plat}-<XYZ> has a subject beginning with "ARM: XYZ: ", that would
+> be cool, and put the burden on others as well :)
+
+Yeah we normally scale this by educating downstream maintainers. checkpatch is
+useful in many cases but making it do everything is hard.
 
 
 -Olof
