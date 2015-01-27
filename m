@@ -1,20 +1,77 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 28 Jan 2015 00:15:41 +0100
-Subject: [PATCH] pinctrl: pinctrl-imx: don't use invalid value of conf_reg
-In-Reply-To: <1422399025-25636-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1422399025-25636-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20150127231541.GJ29856@pengutronix.de>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 28 Jan 2015 00:17:11 +0100
+Subject: N900 v3.19-rc5 arm atags_to_fdt.c is broken
+In-Reply-To: <alpine.LFD.2.11.1501271309450.1322@knanqh.ubzr>
+References: <201501232239.55801@pali> <201501232336.36187@pali>
+ <20150126161454.GE28663@atomide.com> <201501261723.10505@pali>
+ <20150126170323.GF28663@atomide.com>
+ <alpine.LFD.2.11.1501261318590.1322@knanqh.ubzr>
+ <20150127133739.GB25306@amd>
+ <alpine.LFD.2.11.1501271014160.1322@knanqh.ubzr>
+ <20150127175359.GE11502@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1501271309450.1322@knanqh.ubzr>
+Message-ID: <20150127231711.GB27641@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue 2015-01-27 13:50:22, Nicolas Pitre wrote:
+> On Tue, 27 Jan 2015, Russell King - ARM Linux wrote:
+> 
+> > On Tue, Jan 27, 2015 at 10:16:24AM -0500, Nicolas Pitre wrote:
+> > > On Tue, 27 Jan 2015, Pavel Machek wrote:
+> > > > (Note, that in 3.19 dts for n900 got too big, so we are actually
+> > > > triggering old bugs. That means that this is a regression fix, and
+> > > > should go in ASAP).
+> > > 
+> > > It is queued here:
+> > > http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8294/1
+> > 
+> > Irrespective of that patch, I commented on another thread (about adding
+> > the serial number to DT):
+> > 
+> > | How about something a little more radical.
+> > | 
+> > | Rather than trying to squeeze various ATAGs into DT, why don't we add a
+> > | standard ATAG to contain the DT and pass that through into the kernel.
+> > | This is IMHO how we _should_ have done the ATAG compatibility from the
+> > | start.
+> > | 
+> > | That means we could get rid of most of the libfdt in the decompressor,
+> > | and instead resolve the differences in the kernel.
+> > 
+> > That would allow us to get rid of all the FDT compatibility code in the
+> > decompressor, and when we encounter these special ATAGs, we can deal with
+> > them in the kernel instead of having to mess around with the DT.  I'd
+> > also assume (although I haven't checked) that it would be much easier to
+> > add additional DT properties in the kernel environment, rather than in
+> > the rather restrictive decompressor environment.
+> 
+> Well...
+> 
+> I was initially against any ATAG-to-DT compatibility at all.  IMHO the 
+> "right" solution is to update the bootloader.
+> 
+> However people complained that updating the bootloader wasn't possible. 
+> I therefore suggested they go with a shim layer I termed the "impedance 
+> matcher" acting like an intermediate boot stage converting their (often 
+> unofficial and out-of-tree) ATAGs into proper DT nodes.  Some people did 
+> exactly that and it works wonderfully for them. It also works 
+> wonderfully for kernel maintenance as the platform specific tweaks are 
+> kept out of the kernel tree.
+> 
+> Still, that wasn't good enough for some cases as the move to DT 
+> regressed some platforms that just used to work before.  Concatenating a 
+> DTB to zImage was tolerable but installing an additional shim layer was 
+> too much.  Hence the ATAG-to-DT compat code in the decompressor.  This 
+> was meant to smooth things around the transition to DT, etc.  After all, 
+> those devices with non-replaceable bootloaders where shim layers are not 
+> possible should get out of commission eventually?
 
-please disregard the patch here, the email address of Dong Aisheng I
-used isn't valid any more. I resend with the correct address.
+N900 is still phone that is best-supported by the mainline,
+AFAICT. Yes, it is rather sad, but it means that no, it is probably
+not going out of commission anytime soon.
 
-Best regards
-Uwe
-
+									Pavel
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
