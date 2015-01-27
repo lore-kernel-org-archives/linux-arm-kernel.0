@@ -1,130 +1,181 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 27 Jan 2015 11:42:08 -0300
-Subject: [PATCH 5/9] mtd: pxa3xx_nand: add support for the Marvell Berlin
- nand controller
-In-Reply-To: <1422367816-4257-6-git-send-email-antoine.tenart@free-electrons.com>
-References: <1422367816-4257-1-git-send-email-antoine.tenart@free-electrons.com>
- <1422367816-4257-6-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <54C7A3C0.6020507@free-electrons.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Tue, 27 Jan 2015 09:47:48 -0500
+Subject: [PATCH v8 2/2] tty/serial: Add Spreadtrum sc9836-uart driver
+ support
+In-Reply-To: <1422345407-10037-3-git-send-email-chunyan.zhang@spreadtrum.com>
+References: <sc9836-serial-v8>
+ <1422345407-10037-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1422345407-10037-3-git-send-email-chunyan.zhang@spreadtrum.com>
+Message-ID: <54C7A514.6090206@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/27/2015 11:10 AM, Antoine Tenart wrote:
-> The nand controller on Marvell Berlin SoC reuse the pxa3xx nand driver
-> as it quite close. The process of sending commands can be compared to
-> the one of the Marvell armada 370: read and write commands are done in
-> chunks.
-> 
-> But the Berlin nand controller has some other specificities which
-> require some modifications of the pxa3xx nand driver:
-> - there are no IRQ available so we need to poll the status register: we
->   have to use our own cmdfunc Berlin function, and early on the probing
->   function.
-> - PAGEPROG are very different from the one used in the pxa3xx driver,
->   so we're using a specific process for this one
-> - the SEQIN command is equivalent to a READ0 command
-> - the RNDOUT command must be used to perform a read operation, and the
->   command is not NAND_CMD_RNDOUT
-> - the ERASE1 command is specific (0xd060)
-> 
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> ---
->  drivers/mtd/nand/pxa3xx_nand.c | 287 +++++++++++++++++++++++++++++++++++++----
->  1 file changed, 261 insertions(+), 26 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-> index b2783b1f663c..62ea369dc524 100644
-> --- a/drivers/mtd/nand/pxa3xx_nand.c
-> +++ b/drivers/mtd/nand/pxa3xx_nand.c
-> @@ -109,6 +109,8 @@
->  #define NDCB0_EXT_CMD_TYPE(x)	(((x) << 29) & NDCB0_EXT_CMD_TYPE_MASK)
->  #define NDCB0_CMD_TYPE_MASK	(0x7 << 21)
->  #define NDCB0_CMD_TYPE(x)	(((x) << 21) & NDCB0_CMD_TYPE_MASK)
-> +#define NDCB0_CMD_XTYPE_MASK	(0x7 << 29)
-> +#define NDCB0_CMD_XTYPE(x)	(((x) << 29) & NDCB0_CMD_XTYPE_MASK)
->  #define NDCB0_NC		(0x1 << 20)
->  #define NDCB0_DBC		(0x1 << 19)
->  #define NDCB0_ADDR_CYC_MASK	(0x7 << 16)
-> @@ -117,13 +119,20 @@
->  #define NDCB0_CMD1_MASK		(0xff)
->  #define NDCB0_ADDR_CYC_SHIFT	(16)
->  
-> -#define EXT_CMD_TYPE_DISPATCH	6 /* Command dispatch */
-> -#define EXT_CMD_TYPE_NAKED_RW	5 /* Naked read or Naked write */
-> -#define EXT_CMD_TYPE_READ	4 /* Read */
-> -#define EXT_CMD_TYPE_DISP_WR	4 /* Command dispatch with write */
-> -#define EXT_CMD_TYPE_FINAL	3 /* Final command */
-> -#define EXT_CMD_TYPE_LAST_RW	1 /* Last naked read/write */
-> -#define EXT_CMD_TYPE_MONO	0 /* Monolithic read/write */
-> +#define EXT_CMD_TYPE_LAST_PAGEPROG	10
-> +#define EXT_CMD_TYPE_CHUNK_PAGEPROG	9
-> +#define EXT_CMD_TYPE_LAST_RNDOUT	8
-> +#define EXT_CMD_TYPE_CHUNK_RNDOUT	7
-> +#define EXT_CMD_TYPE_DISPATCH		6 /* Command dispatch */
-> +#define EXT_CMD_TYPE_NAKED_RW		5 /* Naked read or Naked write */
-> +#define EXT_CMD_TYPE_READ		4 /* Read */
-> +#define EXT_CMD_TYPE_DISP_WR		4 /* Command dispatch with write */
-> +#define EXT_CMD_TYPE_FINAL		3 /* Final command */
-> +#define EXT_CMD_TYPE_LAST_RW		1 /* Last naked read/write */
-> +#define EXT_CMD_TYPE_MONO		0 /* Monolithic read/write */
-> +
-> +#define BERLIN_NAND_CMD_RNDOUT		0x3000
-> +#define BERLIN_NAND_CMD_ERASE1		0xd060
->  
->  /* macros for registers read/write */
->  #define nand_writel(info, off, val)	\
-> @@ -158,6 +167,7 @@ enum {
->  enum pxa3xx_nand_variant {
->  	PXA3XX_NAND_VARIANT_PXA,
->  	PXA3XX_NAND_VARIANT_ARMADA370,
-> +	PXA3XX_NAND_VARIANT_BERLIN2,
->  };
->  
->  struct pxa3xx_nand_host {
-> @@ -244,10 +254,13 @@ module_param(use_dma, bool, 0444);
->  MODULE_PARM_DESC(use_dma, "enable DMA for data transferring to/from NAND HW");
->  
->  static struct pxa3xx_nand_timing timing[] = {
-> -	{ 40, 80, 60, 100, 80, 100, 90000, 400, 40, },
-> -	{ 10,  0, 20,  40, 30,  40, 11123, 110, 10, },
-> -	{ 10, 25, 15,  25, 15,  30, 25000,  60, 10, },
-> -	{ 10, 35, 15,  25, 15,  25, 25000,  60, 10, },
-> +	{ 40, 80, 60, 100, 80, 100,  90000, 400, 40, },
-> +	{ 10,  0, 20,  40, 30,  40,  11123, 110, 10, },
-> +	{ 10, 25, 15,  25, 15,  30,  25000,  60, 10, },
-> +	{ 10, 35, 15,  25, 15,  25,  25000,  60, 10, },
-> +	{  5, 20, 10,  12, 10,  12,  60000,  60, 10, },
-> +	{  5, 20, 10,  12, 10,  12, 200000, 120, 10, },
-> +	{  5, 15, 10,  15, 10,  15,  60000,  60, 10, },
->  };
->  
->  static struct pxa3xx_nand_flash builtin_flash_types[] = {
-> @@ -260,6 +273,20 @@ static struct pxa3xx_nand_flash builtin_flash_types[] = {
->  { "512MiB 8-bit",  0xdc2c,  64, 2048,  8,  8, 4096, &timing[2] },
->  { "512MiB 16-bit", 0xcc2c,  64, 2048, 16, 16, 4096, &timing[2] },
->  { "256MiB 16-bit", 0xba20,  64, 2048, 16, 16, 2048, &timing[3] },
-> +{ },
-> +};
-> +
-> +static struct pxa3xx_nand_flash berlin_builtin_flash_types[] = {
-> +{ "2GiB 8-bit",    0xd5ec, 128, 8192,  8,  8, 2048, &timing[4] },
-> +{ "2GiB 8-bit",    0xd598, 128, 8192,  8,  8, 2048, &timing[5] },
-> +{ "2GiB 8-bit",    0x482c, 256, 4096,  8,  8, 2048, &timing[6] },
-> +{ "4GiB 8-bit",    0xd7ec, 128, 8192,  8,  8, 4096, &timing[5] },
-> +{ "8GiB 8-bit",    0xdeec, 128, 8192,  8,  8, 4096, &timing[5] },
-> +{ "4GiB 8-bit",    0xd7ad, 256, 8192,  8,  8, 2048, &timing[5] },
-> +{ "4GiB 8-bit",    0x682c, 256, 4096,  8,  8, 4096, &timing[6] },
-> +{ "8GiB 8-bit",    0x882c, 256, 8192,  8,  8, 4096, &timing[6] },
-> +{ "8GiB 8-bit",    0xdead, 256, 8192,  8,  8, 4096, &timing[6] },
-> +{ },
->  };
->  
+Hi Chunyan,
 
-IMO, this sucks. I was hoping to see this old style probing go away,
-instead of be augmented.
+Minor but important fixes below.
 
-There are proper ways to set timings.
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+And for the v9 version, please only use "To:" for
+"Greg Kroah-Hartman <gregkh@linuxfoundation.org>"
+
+All other recipients should only be Cc:
+
+Regards,
+Peter Hurley
+
+
+On 01/27/2015 02:56 AM, Chunyan Zhang wrote:
+> Add a full sc9836-uart driver for SC9836 SoC which is based on the
+> spreadtrum sharkl64 platform.
+> This driver also support earlycon.
+
+[...]
+
+> +static int sprd_probe_dt_alias(int index, struct device *dev)
+> +{
+> +	struct device_node *np;
+> +	static bool seen_dev_with_alias;
+> +	static bool seen_dev_without_alias;
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+delete these two lines; these were used for the message deleted in a
+previous patch version.
+
+> +	int ret = index;
+> +
+> +	if (!IS_ENABLED(CONFIG_OF))
+> +		return ret;
+> +
+> +	np = dev->of_node;
+> +	if (!np)
+> +		return ret;
+> +
+> +	ret = of_alias_get_id(np, "serial");
+> +	if (IS_ERR_VALUE(ret)) {
+> +		seen_dev_without_alias = true;
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+delete this line.
+
+> +		ret = index;
+> +	} else {
+> +		seen_dev_with_alias = true;
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+delete this line.
+
+> +		if (ret >= ARRAY_SIZE(sprd_port) || sprd_port[ret] != NULL) {
+> +			dev_warn(dev, "requested serial port %d  not available.\n", ret);
+> +			ret = index;
+> +		}
+> +	}
+
+Simplify the entire "if (IS_ERR_VALUE(ret))" statement to:
+
+	if (IS_ERR_VALUE(ret))
+		ret = index;
+	else if (ret >= ..................) {
+		dev_warn(.....);
+		ret = index;
+	}
+
+
+> +
+> +	return ret;
+> +}
+> +
+> +static int sprd_remove(struct platform_device *dev)
+> +{
+> +	struct sprd_uart_port *sup = platform_get_drvdata(dev);
+> +
+> +	if (sup) {
+> +		uart_remove_one_port(&sprd_uart_driver, &sup->port);
+> +		sprd_port[sup->port.line] = NULL;
+> +		sprd_ports_num--;
+> +	}
+> +
+> +	if (!sprd_ports_num)
+> +		uart_unregister_driver(&sprd_uart_driver);
+> +
+> +	return 0;
+> +}
+> +
+> +static int sprd_probe(struct platform_device *pdev)
+> +{
+> +	struct resource *res;
+> +	struct uart_port *up;
+> +	struct clk *clk;
+> +	int irq;
+> +	int index;
+> +	int ret;
+> +
+> +	for (index = 0; index < ARRAY_SIZE(sprd_port); index++)
+> +		if (sprd_port[index] == NULL)
+> +			break;
+> +
+> +	if (index == ARRAY_SIZE(sprd_port))
+> +		return -EBUSY;
+> +
+> +	index = sprd_probe_dt_alias(index, &pdev->dev);
+> +
+> +	sprd_port[index] = devm_kzalloc(&pdev->dev,
+> +		sizeof(*sprd_port[index]), GFP_KERNEL);
+> +	if (!sprd_port[index])
+> +		return -ENOMEM;
+> +
+> +	pdev->id = index;
+        ^^^^^^^^^^^^^^^^
+delete this line.
+
+The platform device id cannot be assigned by the driver.
+(This was left over from trying to fix sprd_suspend/sprd_resume
+but that's fixed correctly now.)
+
+> +
+> +	up = &sprd_port[index]->port;
+> +	up->dev = &pdev->dev;
+> +	up->line = index;
+> +	up->type = PORT_SPRD;
+> +	up->iotype = SERIAL_IO_PORT;
+> +	up->uartclk = SPRD_DEF_RATE;
+> +	up->fifosize = SPRD_FIFO_SIZE;
+> +	up->ops = &serial_sprd_ops;
+> +	up->flags = UPF_BOOT_AUTOCONF;
+> +
+> +	clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (!IS_ERR(clk))
+> +		up->uartclk = clk_get_rate(clk);
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!res) {
+> +		dev_err(&pdev->dev, "not provide mem resource\n");
+> +		return -ENODEV;
+> +	}
+> +	up->mapbase = res->start;
+> +	up->membase = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(up->membase))
+> +		return PTR_ERR(up->membase);
+> +
+> +	irq = platform_get_irq(pdev, 0);
+> +	if (irq < 0) {
+> +		dev_err(&pdev->dev, "not provide irq resource\n");
+> +		return -ENODEV;
+> +	}
+> +	up->irq = irq;
+> +
+> +	if (!sprd_ports_num) {
+> +		ret = uart_register_driver(&sprd_uart_driver);
+> +		if (ret < 0) {
+> +			pr_err("Failed to register SPRD-UART driver\n");
+> +			return ret;
+> +		}
+> +	}
+> +	sprd_ports_num++;
+> +
+> +	ret = uart_add_one_port(&sprd_uart_driver, up);
+> +	if (ret) {
+> +		sprd_port[index] = NULL;
+> +		sprd_remove(pdev);
+> +	}
+> +
+> +	platform_set_drvdata(pdev, up);
+> +
+> +	return ret;
+> +}
