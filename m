@@ -1,64 +1,50 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 27 Jan 2015 18:00:51 +0000
-Subject: [PATCH 3/8] arm64: Add new hcall HVC_CALL_FUNC
-In-Reply-To: <20150127173947.GJ3226@e104818-lin.cambridge.arm.com>
-References: <cover.1421449714.git.geoff@infradead.org>
- <3f1795bc1dad1d0510a9d24a168ecd5d83666507.1421449714.git.geoff@infradead.org>
- <20150127173947.GJ3226@e104818-lin.cambridge.arm.com>
-Message-ID: <20150127180051.GN17721@leverpostej>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 27 Jan 2015 18:01:45 +0000
+Subject: [PATCH] drivers: of: fix resources freeing in
+ of_pci_get_host_bridge_resources()
+Message-ID: <1422381705-5380-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 27, 2015 at 05:39:47PM +0000, Catalin Marinas wrote:
-> On Sat, Jan 17, 2015 at 12:23:34AM +0000, Geoff Levand wrote:
-> > diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-> > index 99c319c..4f23a48 100644
-> > --- a/arch/arm64/include/asm/virt.h
-> > +++ b/arch/arm64/include/asm/virt.h
-> > @@ -41,6 +41,19 @@
-> >  
-> >  #define HVC_CALL_HYP 3
-> >  
-> > +/*
-> > + * HVC_CALL_FUNC - Execute a function at EL2.
-> > + *
-> > + * @x0: Physical address of the function to be executed.
-> > + * @x1: Passed as the first argument to the function.
-> > + * @x2: Passed as the second argument to the function.
-> > + * @x3: Passed as the third argument to the function.
-> > + *
-> > + * The called function must preserve the contents of register x18.
-> 
-> Can you pick a register that's normally callee saved?
+In the function of_pci_get_host_bridge_resources() if the parsing of
+ranges fails, previously allocated resources inclusive of bus_range
+are not freed and are not expected to be freed by the function caller
+on error return.
 
-We're in the hyp-stub, so we don't have a stack in EL2. Therefore we
-can't stack any of the existing callee-saved register values in order to
-be able to use them.
+This patch fixes the issues by adding code that properly frees resources
+and bus_range before exiting the function with an error return value.
 
-One way to avoid that would be to have asm block which issues the HVC at
-EL1 stack/unstack the LR around the HVC. Then we're free to corrupt the
-LR at EL2 in order to call the provided function.
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Acked-by: Liviu Dudau <liviu.dudau@arm.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+---
+ drivers/of/of_pci.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-[...]
-
-> > +1:	cmp     x18, #HVC_CALL_FUNC
-> > +	b.ne    2f
-> > +	mov     x18, lr
-> > +	mov     lr, x0
-> > +	mov     x0, x1
-> > +	mov     x1, x2
-> > +	mov     x2, x3
-> > +	blr     lr
-> > +	mov     lr, x18
-> >  
-> >  2:	eret
-> >  ENDPROC(el1_sync)
-> 
-> What is the calling convention for this HVC? You mentioned x18 above but
-> what about other registers that the called function may corrupt (x18 is
-> a temporary register, so it's not expected to be callee saved).
-
-Other than x18, the usual PCS rules apply here. We don't have a stack,
-so the function we call can't make a nested call to anything else.
-
-Mark.
+diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+index 88471d3..60dc36c 100644
+--- a/drivers/of/of_pci.c
++++ b/drivers/of/of_pci.c
+@@ -140,6 +140,7 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
+ 			unsigned char busno, unsigned char bus_max,
+ 			struct list_head *resources, resource_size_t *io_base)
+ {
++	struct pci_host_bridge_window *window;
+ 	struct resource *res;
+ 	struct resource *bus_range;
+ 	struct of_pci_range range;
+@@ -225,7 +226,10 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
+ conversion_failed:
+ 	kfree(res);
+ parse_failed:
++	list_for_each_entry(window, resources, list)
++		kfree(window->res);
+ 	pci_free_resource_list(resources);
++	kfree(bus_range);
+ 	return err;
+ }
+ EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
+-- 
+2.2.1
