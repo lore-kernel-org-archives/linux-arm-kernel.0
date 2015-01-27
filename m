@@ -1,52 +1,24 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Tue, 27 Jan 2015 04:32:59 -0500
-Subject: [PATCH] arm64: dts: Fix GIC reg sizes for APM X-Gene
-In-Reply-To: <1422342206-4750-1-git-send-email-psawargaonkar@apm.com>
-References: <1422342206-4750-1-git-send-email-psawargaonkar@apm.com>
-Message-ID: <54C75B4B.6050709@redhat.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Tue, 27 Jan 2015 10:43:53 +0100
+Subject: arm64: USB_ARCH_HAS_EHCI
+Message-ID: <1422351833.14015.20.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/27/2015 02:03 AM, Pranavkumar Sawargaonkar wrote:
-> In APM X-Gene, GIC register space is 64K aligned while the sizes mentioned
-> in the dt are 4K aligned. This breaks KVM when kernel is built with 64K page
-> size due to size alignment checking in vgic driver for VCPU Control and
-> VCPU register.
-> 
-> This patch corrects the sizes to be inline with the hardware spec.
-> 
-> CC: linux-arm-kernel at lists.infradead.org
-> CC: kvmarm at lists.cs.columbia.edu
-> CC: arnd at arndb.de
-> CC: marc.zyngier at arm.com
-> CC: christoffer.dall at linaro.org
-> CC: jcm at redhat.com
-> Signed-off-by: Pranavkumar Sawargaonkar <psawargaonkar@apm.com>
-> Signed-off-by: Tushar Jagad <tjagad@apm.com>
-> Signed-off-by: Feng Kan <fkan@apm.com>
-> ---
->  arch/arm64/boot/dts/apm/apm-storm.dtsi |    8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> index f1ad9c2..65f0e6d 100644
-> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> @@ -81,10 +81,10 @@
->  		compatible = "arm,cortex-a15-gic";
->  		#interrupt-cells = <3>;
->  		interrupt-controller;
-> -		reg = <0x0 0x78010000 0x0 0x1000>,	/* GIC Dist */
-> -		      <0x0 0x78020000 0x0 0x1000>,	/* GIC CPU */
-> -		      <0x0 0x78040000 0x0 0x2000>,	/* GIC VCPU Control */
-> -		      <0x0 0x78060000 0x0 0x2000>;	/* GIC VCPU */
-> +		reg = <0x0 0x78010000 0x0 0x10000>,	/* GIC Dist */
-> +		      <0x0 0x78020000 0x0 0x20000>,	/* GIC CPU */
-> +		      <0x0 0x78040000 0x0 0x10000>,	/* GIC VCPU Control */
-> +		      <0x0 0x78060000 0x0 0x20000>;	/* GIC VCPU */
->  		interrupts = <1 9 0xf04>;	/* GIC Maintenence IRQ */
->  	};
+Paul,
 
-Thanks. I confirm that we have tested this.
+Your commit d035fdfa27ac ("arm64: Add Tegra132 support") is included in
+today's linux-next (ie, next-20150127). I noticed because a script I use
+to check linux-next spotted a minor problem with it.
 
-Jon.
+It adds a select for the Kconfig symbol USB_ARCH_HAS_EHCI. That Kconfig
+was obsoleted in v3.11 and removed in v3.15. See commit b797b76fb464
+("usb: host: remove USB_ARCH_HAS_?HCI"). That select is now a nop.
+
+Should I submit the trivial patch to remove that line or do you prefer
+to do that yourself?
+
+Thanks,
+
+
+Paul Bolle
