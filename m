@@ -1,33 +1,29 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 27 Jan 2015 16:21:57 +0100
-Subject: [PATCH] ARM: dts: imx6qdl: Adjust the brightness setting for
- LVDS panel
-In-Reply-To: <BLUPR03MB4059C6493E55DB26E8308E9F8350@BLUPR03MB405.namprd03.prod.outlook.com>
-References: <1421749355-23050-1-git-send-email-r63905@freescale.com>
- <20150120113837.GC2766@dragon> <1421941084.3084.45.camel@pengutronix.de>
- <BLUPR03MB4059C6493E55DB26E8308E9F8350@BLUPR03MB405.namprd03.prod.outlook.com>
-Message-ID: <1422372117.3751.58.camel@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 27 Jan 2015 16:24:10 +0100
+Subject: [PATCH] usb: phy-generic: Don't fail on missing gpio reset
+In-Reply-To: <1422323129-20969-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1422323129-20969-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1488241.JRB4nxvr9q@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 26.01.2015, 14:44 +0000 schrieb Robby.Cai at freescale.com:
-> > I notice that the intervals are changed from exponential to linear.
-> > Is this really wanted here?
-> > I expect that the new settings result in huge steps in perceived
-> > brightness at low levels and a nearly imperceptible change at the last
-> > step.
-> > 
-> > regards
-> > Philipp
-> 
-> 
-> No particular reason here. I understand your concern but seems there's no obvious rule.
-> How about add some interpolation, such as <0 52 64 96 128 160 192 224 255>
-> or even more, <0 52 64 80 96 112 128 144 160 176 192 208 224 240 255>
+On Monday 26 January 2015 17:45:29 Soren Brinkmann wrote:
+> diff --git a/drivers/usb/phy/phy-generic.c b/drivers/usb/phy/phy-generic.c
+> index dd05254241fb..a73d4c738f0b 100644
+> --- a/drivers/usb/phy/phy-generic.c
+> +++ b/drivers/usb/phy/phy-generic.c
+> @@ -241,10 +241,8 @@ int usb_phy_gen_create_phy(struct device *dev, struct usb_phy_generic *nop,
+>  
+>         if (err == -EPROBE_DEFER)
+>                 return -EPROBE_DEFER;
+> -       if (err) {
+> -               dev_err(dev, "Error requesting RESET GPIO\n");
+> -               return err;
+> -       }
+> +       if (err)
+> +               nop->gpiod_reset = NULL;
 
-I just wanted to point out the possible issue. Maybe somebody with the
-actual panel could sit down and experiment and come up with some
-visually pleasing steps.
+You might want to distinguish between a missing property and a
+reset gpio that was specified but for some reason cannot be used.
 
-regards
-Philipp
+	Arnd
