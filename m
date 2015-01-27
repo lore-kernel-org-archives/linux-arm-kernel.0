@@ -1,42 +1,72 @@
-From: freddy77@gmail.com (Frediano Ziglio)
-Date: Tue, 27 Jan 2015 15:07:53 +0000
-Subject: Kexec and KVM not working gracefully together
-Message-ID: <CAHt6W4cuRi3bfj5mryFouhOLGAAWuNXKVvz4K-rAjQnwiegL-Q@mail.gmail.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Tue, 27 Jan 2015 10:09:33 -0500
+Subject: [PATCH 2/3] tty/serial: of_serial: add support for PXA/MMP uarts
+In-Reply-To: <CAL_Jsq+8jDN+fYyed5RYd2e1K+H_R1NkjT38WXSpKfxTLgsDbQ@mail.gmail.com>
+References: <1422334209-23125-1-git-send-email-robh@kernel.org>
+ <1422334209-23125-2-git-send-email-robh@kernel.org>
+ <54C78823.7050504@hurleysoftware.com>
+ <CAL_Jsq+8jDN+fYyed5RYd2e1K+H_R1NkjT38WXSpKfxTLgsDbQ@mail.gmail.com>
+Message-ID: <54C7AA2D.7080202@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-  I was trying to make kexec (software reset) work on an ARM platform
-and I realized that the kernel launched with kexec cannot use KVM.
-Looking for message I get from kernel and code the situation is this:
-1- kernel start in HYP mode but then kvm code switch to SVC mode and
-initialize HYP mode with its code;
-2- kexec call reboot with LINUX_REBOOT_CMD_KEXEC
-3- kernel call kernel_exec;
-4- kernel_exec calls machine_kexec;
-5- machine_kexec calls soft_restart passing physical entry point for
-next in memory kernel;
-6- soft_restart calls __soft_restart changing stack;
-7- __soft_restart calls cpu_reset (which in my case is defined as cpu_v7_reset);
-8- cpu_v7_reset just disable MMU (it's in an identity memory) and
-calls next kernel entry point.
+On 01/27/2015 09:30 AM, Rob Herring wrote:
+> On Tue, Jan 27, 2015 at 6:44 AM, Peter Hurley <peter@hurleysoftware.com> wrote:
+>> Hi Rob,
+>>
+>> On 01/26/2015 11:50 PM, Rob Herring wrote:
+>>> Add mrvl,pxa-uart and mrvl,mmp-uart compatible strings for the of_serial
+>>> driver. These are 8250 variants which have a port type of PORT_XSCALE.
+>>>
+>>> There is also the serial driver pxa.c with these compatible strings
+>>> already. However, it can be replaced with the common 8250 driver. It has
+>>> some issues like it cannot coexist with the 8250 driver due to tty name
+>>> collision. That also means adding these compatible strings here should
+>>> not case a problem.
+>>
+>> So what determines which driver is controlling the port if both
+>> drivers are built-in?
+> 
+> If both are built-in, whoever registers ttyS ports first wins. This
+> will be the 8250 driver due to link order.
 
->From point 3 to 8 kernel is always in SVC mode so next kernel is
-launched in SVC mode too but initial kernel was launched in HYP mode.
+Ok, but then I think the commit log should reflect that this patch
+effectively replaces pxa2xx-uart driver with the 8250 driver for PXA/MMP uarts
+if both drivers are built-in or both drivers are modules.
 
-I used kernel 3.14 but looking at 3.19 rc code there is the same issue
-(code didn't change).
+> So I guess PXA systems have avoided this by never building in 8250 driver.
 
-Using hvc instruction you can execute arbitrary functions however
-these function must be in a very restricted range as HYP code MMU has
-very limited paged configured and cpu_v7_reset is not one of these
-functions.
+Platform devices are initialized first, so before this patch the pxa2xx-uart
+driver would have claimed the platform ports before the 8250 driver, if
+both were built-in (or both modules).
 
-My idea to fix the issue is before calling cpu_reset call a new
-kvm_exit or similar that turn into HYP mode with MMU set as SVC mode.
-
-Is this a known issue? Should I try to fix the problem or somebody can
-easily fix it?
+Maybe Kconfig should warn if they're both built-in or both modules?
 
 Regards,
-  Frediano
+Peter Hurley
+
+>>> Signed-off-by: Rob Herring <robh@kernel.org>
+>>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>>> Cc: Jiri Slaby <jslaby@suse.cz>
+>>> Cc: linux-serial at vger.kernel.org
+>>> ---
+>>>  drivers/tty/serial/of_serial.c | 4 ++++
+>>>  1 file changed, 4 insertions(+)
+>>>
+>>> diff --git a/drivers/tty/serial/of_serial.c b/drivers/tty/serial/of_serial.c
+>>> index 3194b42..fbb719c 100644
+>>> --- a/drivers/tty/serial/of_serial.c
+>>> +++ b/drivers/tty/serial/of_serial.c
+>>> @@ -335,6 +335,10 @@ static struct of_device_id of_platform_serial_table[] = {
+>>>               .data = (void *)PORT_ALTR_16550_F64, },
+>>>       { .compatible = "altr,16550-FIFO128",
+>>>               .data = (void *)PORT_ALTR_16550_F128, },
+>>> +     { .compatible = "mrvl,mmp-uart",
+>>> +             .data = (void *)PORT_XSCALE, },
+>>> +     { .compatible = "mrvl,pxa-uart",
+>>> +             .data = (void *)PORT_XSCALE, },
+>>>  #ifdef CONFIG_SERIAL_OF_PLATFORM_NWPSERIAL
+>>>       { .compatible = "ibm,qpace-nwp-serial",
+>>>               .data = (void *)PORT_NWPSERIAL, },
+>>>
+>>
