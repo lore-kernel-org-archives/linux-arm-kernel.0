@@ -1,52 +1,31 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Tue, 27 Jan 2015 07:44:19 -0500
-Subject: [PATCH 2/3] tty/serial: of_serial: add support for PXA/MMP uarts
-In-Reply-To: <1422334209-23125-2-git-send-email-robh@kernel.org>
-References: <1422334209-23125-1-git-send-email-robh@kernel.org>
- <1422334209-23125-2-git-send-email-robh@kernel.org>
-Message-ID: <54C78823.7050504@hurleysoftware.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Tue, 27 Jan 2015 13:47:22 +0100
+Subject: [PATCH v5 1/5] ARM: mediatek: Add config options for mediatek
+ SoCs.
+In-Reply-To: <CABuKBeLPN74fiLduvswHfPrgAoQCFXCtdLZhhoha8Q=0xBSjpA@mail.gmail.com>
+References: <1421818097-9281-1-git-send-email-hongzhou.yang@mediatek.com>
+ <1421818097-9281-2-git-send-email-hongzhou.yang@mediatek.com>
+ <CABuKBeJGigY5ym9cJy=PYK8jbdsOLLtkmovHq6xho4gYseCAWg@mail.gmail.com>
+ <1422353800.14015.35.camel@x220> <1422354400.32212.25.camel@mtksdaap41>
+ <1422354858.14015.39.camel@x220>
+ <CABuKBeLPN74fiLduvswHfPrgAoQCFXCtdLZhhoha8Q=0xBSjpA@mail.gmail.com>
+Message-ID: <1422362842.14015.48.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Matthias,
 
-On 01/26/2015 11:50 PM, Rob Herring wrote:
-> Add mrvl,pxa-uart and mrvl,mmp-uart compatible strings for the of_serial
-> driver. These are 8250 variants which have a port type of PORT_XSCALE.
-> 
-> There is also the serial driver pxa.c with these compatible strings
-> already. However, it can be replaced with the common 8250 driver. It has
-> some issues like it cannot coexist with the 8250 driver due to tty name
-> collision. That also means adding these compatible strings here should
-> not case a problem.
+On Tue, 2015-01-27 at 13:38 +0100, Matthias Brugger wrote:
+> Yes, this symbols are needed when we implement the pinctrl driver for
+> the other platforms.
+> I will implement mt6589 as soon as the pinctrl driver got merged.
+> I suppose Howard will go for the mt6592.
 
-So what determines which driver is controlling the port if both
-drivers are built-in?
+I see. Unless the users of MACH_MT6589, MACH_MT6592, MACH_MT8127, and
+MACH_MT8135 take very long to land in linux-next (or in mainline) I
+won't bother you again about this.
 
-Regards,
-Peter Hurley
+Thanks!
 
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Jiri Slaby <jslaby@suse.cz>
-> Cc: linux-serial at vger.kernel.org
-> ---
->  drivers/tty/serial/of_serial.c | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/drivers/tty/serial/of_serial.c b/drivers/tty/serial/of_serial.c
-> index 3194b42..fbb719c 100644
-> --- a/drivers/tty/serial/of_serial.c
-> +++ b/drivers/tty/serial/of_serial.c
-> @@ -335,6 +335,10 @@ static struct of_device_id of_platform_serial_table[] = {
->  		.data = (void *)PORT_ALTR_16550_F64, },
->  	{ .compatible = "altr,16550-FIFO128",
->  		.data = (void *)PORT_ALTR_16550_F128, },
-> +	{ .compatible = "mrvl,mmp-uart",
-> +		.data = (void *)PORT_XSCALE, },
-> +	{ .compatible = "mrvl,pxa-uart",
-> +		.data = (void *)PORT_XSCALE, },
->  #ifdef CONFIG_SERIAL_OF_PLATFORM_NWPSERIAL
->  	{ .compatible = "ibm,qpace-nwp-serial",
->  		.data = (void *)PORT_NWPSERIAL, },
-> 
+
+Paul Bolle
