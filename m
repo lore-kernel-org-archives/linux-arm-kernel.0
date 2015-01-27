@@ -1,92 +1,48 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 27 Jan 2015 16:00:02 -0500
-Subject: [PATCH v5 5/8] of/pci: add of_pci_dma_configure() update dma
- configuration
+Date: Tue, 27 Jan 2015 16:00:04 -0500
+Subject: [PATCH v5 7/8] arm: dma-mapping: limit iommu mapping size
 In-Reply-To: <1422392405-32196-1-git-send-email-m-karicheri2@ti.com>
 References: <1422392405-32196-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1422392405-32196-6-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1422392405-32196-8-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add of_pci_dma_configure() to allow updating the dma configuration
-of the pci device using the configuration from DT of the parent of
-the root bridge device. Use the newly added APIs
-pci_get/put_host_bridge_device() for implementing this.
+arm_iommu_create_mapping() has size parameter of size_t and
+arm_setup_iommu_dma_ops() can take a value higher than that
+when this is called from the of code. So limit the size to
+SIZE_MAX.
 
 Cc: Joerg Roedel <joro@8bytes.org>
 Cc: Grant Likely <grant.likely@linaro.org>
 Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
 Cc: Will Deacon <will.deacon@arm.com>
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 ---
- drivers/of/of_pci.c    |   19 +++++++++++++++++++
- include/linux/of_pci.h |    5 +++++
- 2 files changed, 24 insertions(+)
+ arch/arm/mm/dma-mapping.c |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-index 88471d3..0f1dd0b 100644
---- a/drivers/of/of_pci.c
-+++ b/drivers/of/of_pci.c
-@@ -2,6 +2,7 @@
- #include <linux/export.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-+#include <linux/of_device.h>
- #include <linux/of_pci.h>
- #include <linux/slab.h>
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 7864797..496b2c3 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -2004,6 +2004,13 @@ static bool arm_setup_iommu_dma_ops(struct device *dev, u64 dma_base, u64 size,
+ 	if (!iommu)
+ 		return false;
  
-@@ -229,6 +230,24 @@ parse_failed:
- 	return err;
- }
- EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
++	/*
++	 * currently arm_iommu_create_mapping() takes a max of size_t
++	 * for size param. So check this limit for now.
++	 */
++	if (size > SIZE_MAX)
++		return false;
 +
-+/**
-+ * of_pci_dma_configure - Setup DMA configuration
-+ * @dev: ptr to pci_dev struct of the pci device
-+ *
-+ * Function to update PCI devices's DMA configuration using the same
-+ * info from the OF node of root host bridge's parent.
-+ */
-+void of_pci_dma_configure(struct pci_dev *pci_dev)
-+{
-+	struct device *dev = &pci_dev->dev;
-+	struct device *bridge = pci_get_host_bridge_device(pci_dev);
-+
-+	of_dma_configure(dev, bridge->parent->of_node);
-+	pci_put_host_bridge_device(bridge);
-+}
-+EXPORT_SYMBOL_GPL(of_pci_dma_configure);
-+
- #endif /* CONFIG_OF_ADDRESS */
- 
- #ifdef CONFIG_PCI_MSI
-diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-index ce0e5ab..8f1741f 100644
---- a/include/linux/of_pci.h
-+++ b/include/linux/of_pci.h
-@@ -16,6 +16,7 @@ int of_pci_get_devfn(struct device_node *np);
- int of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin);
- int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
- int of_get_pci_domain_nr(struct device_node *node);
-+void of_pci_dma_configure(struct pci_dev *pci_dev);
- #else
- static inline int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq)
- {
-@@ -50,6 +51,10 @@ of_get_pci_domain_nr(struct device_node *node)
- {
- 	return -1;
- }
-+
-+static inline void of_pci_dma_configure(struct pci_dev *pci_dev)
-+{
-+}
- #endif
- 
- #if defined(CONFIG_OF_ADDRESS)
+ 	mapping = arm_iommu_create_mapping(dev->bus, dma_base, size);
+ 	if (IS_ERR(mapping)) {
+ 		pr_warn("Failed to create %llu-byte IOMMU mapping for device %s\n",
 -- 
 1.7.9.5
