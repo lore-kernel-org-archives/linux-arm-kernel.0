@@ -1,34 +1,103 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 27 Jan 2015 11:59:53 +0000
-Subject: [PATCH 00/18] spi/xilinx: Speed-up
-In-Reply-To: <CAPybu_1==6gvwbWQWxSj_C3siGFTjvqNh1=Xj6jvu_xQFOA-Kw@mail.gmail.com>
-References: <1422029330-10971-1-git-send-email-ricardo.ribalda@gmail.com>
- <20150127001419.GO21293@sirena.org.uk>
- <CAPybu_1==6gvwbWQWxSj_C3siGFTjvqNh1=Xj6jvu_xQFOA-Kw@mail.gmail.com>
-Message-ID: <20150127115953.GQ21293@sirena.org.uk>
+From: peda@axentia.se (Peter Rosin)
+Date: Tue, 27 Jan 2015 12:14:11 +0000
+Subject: [PATCH v3 03/13] pm: at91: Workaround DDRSDRC self-refresh bug
+ with LPDDR1 memories.
+In-Reply-To: <54C7675D.8000204@cogentembedded.com>
+References: <1422337810-3257-1-git-send-email-wenyou.yang@atmel.com>
+ <1422338006-3371-1-git-send-email-wenyou.yang@atmel.com>
+ <54C7675D.8000204@cogentembedded.com>
+Message-ID: <fd04e7c80f6841368ea1953d544f3386@EMAIL.axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 27, 2015 at 11:17:42AM +0100, Ricardo Ribalda Delgado wrote:
-> On Tue, Jan 27, 2015 at 1:14 AM, Mark Brown <broonie@kernel.org> wrote:
+Sergei Shtylyov wrote:
+> Hello.
 
-> >>   spi/xilinx: Support for spi mode LOOP
-> >>   spi/xilinx: Simplify data read from the Rx FIFO
-> >>   spi-xilinx: Simplify spi_fill_tx_fifo
+Hi!
 
-> > spi-xilinx?
+> On 1/27/2015 8:53 AM, Wenyou Yang wrote:
+> 
+> > From: Peter Rosin <peda@axentia.se>
+> 
+> > The DDRSDR controller fails miserably to put LPDDR1 memories in
+> > self-refresh. Force the controller to think it has DDR2 memories
+> > during the self-refresh period, as the DDR2 self-refresh spec is
+> > equivalent to LPDDR1, and is correctly implemented in the controller.
+> 
+> > Assume that the second controller has the same fault, but that is
+> > untested.
+> 
+> > Signed-off-by: Peter Rosin <peda@axentia.se>
+> > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > ---
+> >   arch/arm/mach-at91/pm_slowclock.S  |   43
+> +++++++++++++++++++++++++++++++-----
+> >   include/soc/at91/at91sam9_ddrsdr.h |    2 +-
+> >   2 files changed, 39 insertions(+), 6 deletions(-)
+> 
+> > diff --git a/arch/arm/mach-at91/pm_slowclock.S
+> > b/arch/arm/mach-at91/pm_slowclock.S
+> > index e2bfaf5..1155217 100644
+> > --- a/arch/arm/mach-at91/pm_slowclock.S
+> > +++ b/arch/arm/mach-at91/pm_slowclock.S
+> [...]
+> > @@ -108,14 +118,26 @@ ddr_sr_enable:
+> >
+> >   	/* figure out if we use the second ram controller */
+> >   	cmp	ramc1, #0
+> > -	ldrne	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
+> > -	strne	tmp2, .saved_sam9_lpr1
+> > -	bicne	tmp2, #AT91_DDRSDRC_LPCB
+> > -	orrne	tmp2, #AT91_DDRSDRC_LPCB_SELF_REFRESH
+> > +	beq	ddr_no_2nd_ctrl
+> > +
+> > +	ldr	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
+> > +	str	tmp2, .saved_sam9_mdr1
+> > +	bic	tmp2, tmp2, #~AT91_DDRSDRC_MD
+> > +	cmp	tmp2, #AT91_DDRSDRC_MD_LOW_POWER_DDR
+> > +	ldreq	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
+> > +	biceq	tmp2, tmp2, #AT91_DDRSDRC_MD
+> 
+>     Didn't you forget ~? Either that, or ~ above is not needed, I think.
 
-> Thanks! Fixed on the next version.
+The code is correct, the first bic with ~ clears bits not in the relevant
+field in order to compare if LPDDR mode is active. The second bic(eq)
+w/o ~ clears the field, to make way for the bits in the below orreq
+when actually changing the register content into DDR2 mode.
 
-> BTW what is preferred spi/xilinx: or spi: xilinx: ?I have seen both naming.
+> > +	orreq	tmp2, tmp2, #AT91_DDRSDRC_MD_DDR2
+> > +	streq	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
+> > +
+> > +	ldr	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
+> > +	str	tmp2, .saved_sam9_lpr1
+> > +	bic	tmp2, #AT91_DDRSDRC_LPCB
+> 
+>     Didn't you forget ~? And isn't it 3-operand instruction (as seen in the above
+> code)?
 
-Traditionally SPI always used spi/xilinx but that's too far out from the
-normal kernel standards so it's hard to get people to follow it at all
-so I don't worry about that specific bit too much.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150127/de83855e/attachment-0001.sig>
+The logic for the LPR register is from the old code, the "only" thing
+I did to it was changing the instruction sequence to not have the
+???ne form, i.e. ldrne, strne, bicne, orrne became ldr, str, bic, orr
+with a jump around it instead. So, the original code also had a two
+argument bic(ne), which indeed is strange, and I don't know why
+there is no warning from the assembler. Since there is no warning,
+my guess is that the assembler somehow mends it? Or does the
+patch actually break the second controller? It would be a surprise
+it the assembler handles 2-operand bicne differently from a
+2-operand bic, no?
+
+> > +	orr	tmp2, #AT91_DDRSDRC_LPCB_SELF_REFRESH
+> 
+>     Only 2 operands?
+
+Same argument as above. I didn't touch it (sort of...)
+
+Should I update the patch and fix this collateral 2-operand problem as
+well? To me, it feels like a separate patch, no?
+
+> [...]
+> 
+> WBR, Sergei
+
+Cheers,
+Peter
