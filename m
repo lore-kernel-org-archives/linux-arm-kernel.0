@@ -1,74 +1,83 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Tue, 27 Jan 2015 03:27:46 +0000
-Subject: [PATCH v2 04/12] pm: at91: move the copying the sram function
- to the sram initializationi phase
-In-Reply-To: <54C639B5.7050106@cogentembedded.com>
-References: <1422265005-22937-1-git-send-email-wenyou.yang@atmel.com>
- <1422265201-23110-1-git-send-email-wenyou.yang@atmel.com>
- <54C639B5.7050106@cogentembedded.com>
-Message-ID: <B256D81BAE5131468A838E5D7A243641BFD35C38@penmbx01>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Tue, 27 Jan 2015 11:36:39 +0800
+Subject: [PATCH v3 1/2] ASoC: codecs: wm8904: add dt ids table
+Message-ID: <1422329800-28481-1-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+From: Alexander Morozov <linux@meltdown.ru>
 
-Thank you for your review.
+The WM8904 and WM8918 has the same data type, while the WM8912
+has different data type. So, use the data in dt ids table to
+distinguish them.
 
-> -----Original Message-----
-> From: Sergei Shtylyov [mailto:sergei.shtylyov at cogentembedded.com]
-> Sent: Monday, January 26, 2015 8:57 PM
-> To: Yang, Wenyou; Ferre, Nicolas; linux at arm.linux.org.uk
-> Cc: sylvain.rochet at finsecur.com; linux-kernel at vger.kernel.org;
-> alexandre.belloni at free-electrons.com; peda at axentia.se; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH v2 04/12] pm: at91: move the copying the sram function to
-> the sram initializationi phase
-> 
-> Hello.
-> 
-> On 1/26/2015 12:40 PM, Wenyou Yang wrote:
-> 
-> > To decrease the suspend time, move the copying the sram function to
-> > the sram initialization phase, instead of every time go to suspend.
-> 
-> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> > Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > ---
-> >   arch/arm/mach-at91/pm.c |    7 +++----
-> >   1 file changed, 3 insertions(+), 4 deletions(-)
-> 
-> > diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c index
-> > 5dd4e41..409185e 100644
-> > --- a/arch/arm/mach-at91/pm.c
-> > +++ b/arch/arm/mach-at91/pm.c
-> > @@ -161,10 +161,6 @@ static int at91_pm_enter(suspend_state_t state)
-> >   			 * turning off the main oscillator; reverse on wakeup.
-> >   			 */
-> >   			if (slow_clock) {
-> > -#ifdef CONFIG_AT91_SLOW_CLOCK
-> > -				/* copy slow_clock handler to SRAM, and call it */
-> > -				memcpy(slow_clock, at91_slow_clock,
-> at91_slow_clock_sz);
-> > -#endif
-> >   				slow_clock(at91_pmc_base, at91_ramc_base[0],
-> >   					   at91_ramc_base[1],
-> >   					   at91_pm_data.memctrl);
-> > @@ -272,6 +268,9 @@ static void __init at91_pm_sram_init(void)
-> >   	sram_pbase = gen_pool_virt_to_phys(sram_pool, sram_base);
-> >   	slow_clock = __arm_ioremap_exec(sram_pbase, at91_slow_clock_sz,
-> > false);
-> >
-> > +	/* Copy slow_clock handler to SRAM, and call it */
-> 
->     You're not calling it here.
-> 
-> > +	memcpy(slow_clock, at91_slow_clock, at91_slow_clock_sz);
-> > +
-> >   put_node:
-> >   	of_node_put(node);
-> >   }
-> 
-> WBR, Sergei
+Signed-off-by: Alexander Morozov <linux@meltdown.ru>
+[voice.shen at atmel.com: add code to distinguish device type]
+Signed-off-by: Bo Shen <voice.shen@atmel.com>
+---
+Changes in v3:
+  - Get the device type from match data in probe function.
+Changes in v2:
+  - Add driver data for distinguish the device capability.
 
-Best Regards,
-Wenyou Yang
+ sound/soc/codecs/wm8904.c | 31 ++++++++++++++++++++++++++++++-
+ 1 file changed, 30 insertions(+), 1 deletion(-)
+
+diff --git a/sound/soc/codecs/wm8904.c b/sound/soc/codecs/wm8904.c
+index 4d2d2b1..a80bc52 100644
+--- a/sound/soc/codecs/wm8904.c
++++ b/sound/soc/codecs/wm8904.c
+@@ -2098,6 +2098,24 @@ static const struct regmap_config wm8904_regmap = {
+ 	.num_reg_defaults = ARRAY_SIZE(wm8904_reg_defaults),
+ };
+ 
++#ifdef CONFIG_OF
++static enum wm8904_type wm8904_data = WM8904;
++static enum wm8904_type wm8912_data = WM8912;
++
++static const struct of_device_id wm8904_of_match[] = {
++	{
++		.compatible = "wlf,wm8904",
++		.data = &wm8904_data,
++	}, {
++		.compatible = "wlf,wm8912",
++		.data = &wm8912_data,
++	}, {
++		/* sentinel */
++	}
++};
++MODULE_DEVICE_TABLE(of, wm8904_of_match);
++#endif
++
+ static int wm8904_i2c_probe(struct i2c_client *i2c,
+ 			    const struct i2c_device_id *id)
+ {
+@@ -2125,7 +2143,17 @@ static int wm8904_i2c_probe(struct i2c_client *i2c,
+ 		return ret;
+ 	}
+ 
+-	wm8904->devtype = id->driver_data;
++	if (i2c->dev.of_node) {
++		const struct of_device_id *match;
++
++		match = of_match_node(wm8904_of_match, i2c->dev.of_node);
++		if (match == NULL)
++			return -EINVAL;
++		wm8904->devtype = *((enum wm8904_type *)match->data);
++	} else {
++		wm8904->devtype = id->driver_data;
++	}
++
+ 	i2c_set_clientdata(i2c, wm8904);
+ 	wm8904->pdata = i2c->dev.platform_data;
+ 
+@@ -2259,6 +2287,7 @@ static struct i2c_driver wm8904_i2c_driver = {
+ 	.driver = {
+ 		.name = "wm8904",
+ 		.owner = THIS_MODULE,
++		.of_match_table = of_match_ptr(wm8904_of_match),
+ 	},
+ 	.probe =    wm8904_i2c_probe,
+ 	.remove =   wm8904_i2c_remove,
+-- 
+2.3.0.rc0
