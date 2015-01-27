@@ -1,26 +1,52 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 27 Jan 2015 19:52:34 +0000
-Subject: [PATCH 3/7] spi: spi-fsl-dspi: Remove usage of devm_kzalloc
-In-Reply-To: <1422356244-15629-4-git-send-email-bhuvanchandra.dv@toradex.com>
-References: <1422356244-15629-1-git-send-email-bhuvanchandra.dv@toradex.com>
- <1422356244-15629-4-git-send-email-bhuvanchandra.dv@toradex.com>
-Message-ID: <20150127195234.GP21293@sirena.org.uk>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 28 Jan 2015 03:54:08 +0800
+Subject: [PATCH v3 03/10] ARM: dts: sun9i: Add usb clock nodes to a80 dtsi
+In-Reply-To: <1422388455-25923-1-git-send-email-wens@csie.org>
+References: <1422388455-25923-1-git-send-email-wens@csie.org>
+Message-ID: <1422388455-25923-4-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 27, 2015 at 04:27:20PM +0530, Bhuvanchandra DV wrote:
-> devm_* API was supposed to be used only in probe function call.
-> Memory is allocated at 'probe' and free automatically at 'remove'.
+The USB controller and phy clocks and resets have a separate address
+block and driver. Add the nodes to represent them.
 
-Applied, thanks.  Please don't dump entire backtraces into your commit
-logs - they're far too big and not very helpful, they can obscure real
-content in the message.  Explain in words what the problem is and if a
-backtrace helps illustrate that edit it down to only relevant portions
-rather than blindly including the entire thing.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150127/2fd40a42/attachment.sig>
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun9i-a80.dtsi | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
+index 9e28ffc6dd90..679cf2878800 100644
+--- a/arch/arm/boot/dts/sun9i-a80.dtsi
++++ b/arch/arm/boot/dts/sun9i-a80.dtsi
+@@ -147,6 +147,28 @@
+ 			clock-output-names = "osc32k";
+ 		};
+ 
++		usb_mod_clk: clk at 00a08000 {
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++			compatible = "allwinner,sun9i-a80-usb-mod-clk";
++			reg = <0x00a08000 0x4>;
++			clocks = <&ahb1_gates 1>;
++			clock-output-names = "usb0_ahb", "usb_ohci0",
++					     "usb1_ahb", "usb_ohci1",
++					     "usb2_ahb", "usb_ohci2";
++		};
++
++		usb_phy_clk: clk at 00a08004 {
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++			compatible = "allwinner,sun9i-a80-usb-phy-clk";
++			reg = <0x00a08004 0x4>;
++			clocks = <&ahb1_gates 1>;
++			clock-output-names = "usb_phy0", "usb_hsic1_480M",
++					     "usb_phy1", "usb_hsic2_480M",
++					     "usb_phy2", "usb_hsic_12M";
++		};
++
+ 		pll4: clk at 0600000c {
+ 			#clock-cells = <0>;
+ 			compatible = "allwinner,sun9i-a80-pll4-clk";
+-- 
+2.1.4
