@@ -1,74 +1,52 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 27 Jan 2015 10:19:55 -0500
-Subject: [PATCH v4 6/6] arm: dma-mapping: updates to limit dma_mask and
- iommu mapping size
-In-Reply-To: <20150127113416.GB3226@e104818-lin.cambridge.arm.com>
-References: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
- <1422052359-12384-7-git-send-email-m-karicheri2@ti.com>
- <54C772A0.2000203@arm.com>
- <20150127113416.GB3226@e104818-lin.cambridge.arm.com>
-Message-ID: <54C7AC9B.1040308@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 27 Jan 2015 09:20:47 -0600
+Subject: [PATCH] usb: phy-generic: Don't fail on missing gpio reset
+In-Reply-To: <1422323129-20969-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1422323129-20969-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <20150127152047.GA13776@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/27/2015 06:34 AM, Catalin Marinas wrote:
-> On Tue, Jan 27, 2015 at 11:12:32AM +0000, Robin Murphy wrote:
->> On 23/01/15 22:32, Murali Karicheri wrote:
->>> Limit the dma_mask to minimum of dma_mask and dma_base + size - 1.
->>>
->>> Also arm_iommu_create_mapping() has size parameter of size_t and
->>> arm_setup_iommu_dma_ops() can take a value higher than that. So
->>> limit the size to SIZE_MAX.
->>>
->>> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
->>> ---
->>>    arch/arm/mm/dma-mapping.c |   10 ++++++++++
->>>    1 file changed, 10 insertions(+)
->>>
->>> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
->>> index 7864797..a1f9030 100644
->>> --- a/arch/arm/mm/dma-mapping.c
->>> +++ b/arch/arm/mm/dma-mapping.c
->>> @@ -2004,6 +2004,13 @@ static bool arm_setup_iommu_dma_ops(struct device *dev, u64 dma_base, u64 size,
->>>    	if (!iommu)
->>>    		return false;
->>>
->>> +	/*
->>> +	 * currently arm_iommu_create_mapping() takes a max of size_t
->>> +	 * for size param. So check this limit for now.
->>> +	 */
->>> +	if (size>  SIZE_MAX)
->>> +		return false;
->>> +
->>>    	mapping = arm_iommu_create_mapping(dev->bus, dma_base, size);
->>>    	if (IS_ERR(mapping)) {
->>>    		pr_warn("Failed to create %llu-byte IOMMU mapping for device %s\n",
->>> @@ -2053,6 +2060,9 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
->>>    {
->>>    	struct dma_map_ops *dma_ops;
->>>
->>> +	/* limit dma_mask to the lower of the two values */
->>> +	*dev->dma_mask = min((*dev->dma_mask), (dma_base + size - 1));
->>> +
->>
->> Is there any reason not to do this in of_dma_configure? It seems like
->> something everyone could benefit from - I'd cooked up a dodgy workaround
->> for the same issue in my arm64 IOMMU code, but handling it generically
->> in common code would be much nicer.
+On Mon, Jan 26, 2015 at 05:45:29PM -0800, Soren Brinkmann wrote:
+> A reset through a GPIO is optional. Don't fail probing when it is
+> missing.
+> 
+> Reported-by: Andreas F?rber <afaerber@suse.de>
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> ---
+> Hi Andreas,
+> 
+> does this do the trick?
+> 
+> 	Thanks,
+> 	S?ren
+> 
+>  drivers/usb/phy/phy-generic.c | 6 ++----
+>  1 file changed, 2 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/usb/phy/phy-generic.c b/drivers/usb/phy/phy-generic.c
+> index dd05254241fb..a73d4c738f0b 100644
+> --- a/drivers/usb/phy/phy-generic.c
+> +++ b/drivers/usb/phy/phy-generic.c
+> @@ -241,10 +241,8 @@ int usb_phy_gen_create_phy(struct device *dev, struct usb_phy_generic *nop,
+>  
+>  	if (err == -EPROBE_DEFER)
+>  		return -EPROBE_DEFER;
+> -	if (err) {
+> -		dev_err(dev, "Error requesting RESET GPIO\n");
+> -		return err;
+> -	}
+> +	if (err)
+> +		nop->gpiod_reset = NULL;
 
-Ok Will move this to of_dma_configure().
-
-Murali
-
->
-> I agree. I started something here:
->
-> http://article.gmane.org/gmane.linux.kernel/1835096
->
-> but I don't remember to have got to a clear conclusion.
->
-
+there's a better patch to use gpiod_get_optional(), instead.
 
 -- 
-Murali Karicheri
-Linux Kernel, Texas Instruments
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150127/c603b8f5/attachment-0001.sig>
