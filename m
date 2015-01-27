@@ -1,96 +1,35 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Tue, 27 Jan 2015 04:44:02 +0000
-Subject: [PATCH 2/7] pm: at91: pm_suspend: add the WFI support for ARMv7
-In-Reply-To: <54C63B8A.9000702@cogentembedded.com>
-References: <1422266617-24381-1-git-send-email-wenyou.yang@atmel.com>
- <1422266761-24487-1-git-send-email-wenyou.yang@atmel.com>
- <54C63B8A.9000702@cogentembedded.com>
-Message-ID: <B256D81BAE5131468A838E5D7A243641BFD35CC6@penmbx01>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 26 Jan 2015 20:45:10 -0800
+Subject: [GIT PULL RESEND] pxa for v3.20
+In-Reply-To: <87lhkoq1ff.fsf@free.fr>
+References: <87egqpff9m.fsf@free.fr> <20150123215423.GD20896@quad.lixom.net>
+ <874mrgdzz0.fsf@free.fr> <20150127021733.GB22154@quad.lixom.net>
+ <87lhkoq1ff.fsf@free.fr>
+Message-ID: <CAOesGMga4MB+q740uj1Li4Mnq6kXxQzKk_cf0YKjt5aj5_GFLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
-
-Thank you for your review.
-
-> -----Original Message-----
-> From: Sergei Shtylyov [mailto:sergei.shtylyov at cogentembedded.com]
-> Sent: Monday, January 26, 2015 9:05 PM
-> To: Yang, Wenyou; Ferre, Nicolas; linux at arm.linux.org.uk
-> Cc: sylvain.rochet at finsecur.com; Vilchez, Patrice; linux-kernel at vger.kernel.org;
-> alexandre.belloni at free-electrons.com; peda at axentia.se; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH 2/7] pm: at91: pm_suspend: add the WFI support for ARMv7
-> 
-> Hello.
-> 
-> On 1/26/2015 1:06 PM, Wenyou Yang wrote:
-> 
-> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> > ---
-> >   arch/arm/mach-at91/pm_suspend.S |   54
-> ++++++++++++++++++++++++++++++++++++++-
-> >   1 file changed, 53 insertions(+), 1 deletion(-)
-> 
-> > diff --git a/arch/arm/mach-at91/pm_suspend.S
-> > b/arch/arm/mach-at91/pm_suspend.S index 122a3f1..e796722 100644
-> > --- a/arch/arm/mach-at91/pm_suspend.S
-> > +++ b/arch/arm/mach-at91/pm_suspend.S
-> > @@ -53,6 +53,58 @@ mode	.req	r6
-> >   	beq	1b
-> >   	.endm
-> >
-> > +/*
-> > + * Put the processor to enter the WFI state  */
-> > +	.macro _do_wfi
-> > +
-> > +#if defined(CONFIG_CPU_V7)
-> > +	/*
-> > +	 * Execute an ISB instruction to flush the pipeline to ensure
-> > +	 * that all of operations have beem completed.
-> 
->     Been.
-> 
-> > +	 */
-> > +	isb
-> > +
-> > +	/*
-> > +	 * Execute an ISB instruction to ensure that all of the
-> 
->     ISB again, while you're executing DSB/DMB?
+On Mon, Jan 26, 2015 at 8:42 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> Olof Johansson <olof@lixom.net> writes:
 >
-Thank you for your pointing.
- 
-> > +	 * CP15 register changes have been committed.
-> > +	 */
-> > +	dsb
-> > +	dmb
-> > +
-> > +	/* Disable the processor's clock */
-> > +	mov	tmp1, #AT91_PMC_PCK
-> 
->     What's 'tmp1'? Is that a register name?
-Yes, a register name defined at the head of file.
+>> I had already merged, but it looks like you broke viper and zeus. Both of them
+>> still refer to PXA_ISA_IRQ().
+>>
+>> Can you send an incremental patch for that? Or if you prefer that we drop this
+>> branch for now while you sort it out that's OK too -- your preference.
+> I'll send an incremental patch.
+> I'm really frustrated my bot didn't catch that, I suppose yours caught it by
+> building viper_defconfig ...
 
-> 
-> > +	str	tmp1, [pmc, #AT91_PMC_SCDR]
-> > +
-> > +	/* Execute a WFI instruction */
-> 
->     Self-obvious comment, I'd say...
-> 
-> > +	wfi	@ Wait For Interrupt
-> > +
-> > +	/*
-> > +	 * CPU can specualatively prefetch the instructions
-> 
->     Speculatively.
-Thanks.
-> 
-> [...]
-> 
-> WBR, Sergei
+Yeah, I build all defconfigs.
+
+>> Yeah we normally scale this by educating downstream maintainers. checkpatch is
+>> useful in many cases but making it do everything is hard.
+> Yeah, but humans do forget, even educated ... I'll be carefull as much as I can,
+> but I knew the rule and yet this slipped through.
+
+Oh, no worries. We're all human, which is why I pointed it out when I
+noticed it. Next time I might miss it too. It happens.
 
 
-Best Regards,
-Wenyou Yang
+-Olof
