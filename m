@@ -1,65 +1,57 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 27 Jan 2015 15:25:36 +0000
-Subject: Kexec and KVM not working gracefully together
-In-Reply-To: <CAHt6W4cuRi3bfj5mryFouhOLGAAWuNXKVvz4K-rAjQnwiegL-Q@mail.gmail.com>
-References: <CAHt6W4cuRi3bfj5mryFouhOLGAAWuNXKVvz4K-rAjQnwiegL-Q@mail.gmail.com>
-Message-ID: <54C7ADF0.8090102@arm.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Tue, 27 Jan 2015 16:26:12 +0100
+Subject: N900 v3.19-rc5 arm atags_to_fdt.c is broken
+In-Reply-To: <alpine.LFD.2.11.1501271014160.1322@knanqh.ubzr>
+References: <201501232239.55801@pali> <20150127133739.GB25306@amd>
+ <alpine.LFD.2.11.1501271014160.1322@knanqh.ubzr>
+Message-ID: <201501271626.12365@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Frediano,
-
-On 27/01/15 15:07, Frediano Ziglio wrote:
-> Hi,
->   I was trying to make kexec (software reset) work on an ARM platform
-> and I realized that the kernel launched with kexec cannot use KVM.
-> Looking for message I get from kernel and code the situation is this:
-> 1- kernel start in HYP mode but then kvm code switch to SVC mode and
-> initialize HYP mode with its code;
-> 2- kexec call reboot with LINUX_REBOOT_CMD_KEXEC
-> 3- kernel call kernel_exec;
-> 4- kernel_exec calls machine_kexec;
-> 5- machine_kexec calls soft_restart passing physical entry point for
-> next in memory kernel;
-> 6- soft_restart calls __soft_restart changing stack;
-> 7- __soft_restart calls cpu_reset (which in my case is defined as cpu_v7_reset);
-> 8- cpu_v7_reset just disable MMU (it's in an identity memory) and
-> calls next kernel entry point.
+On Tuesday 27 January 2015 16:16:24 Nicolas Pitre wrote:
+> On Tue, 27 Jan 2015, Pavel Machek wrote:
+> > > > > I would say, problem is because omap3-n900 binary DT
+> > > > > is too large
+> > > 
+> > > I agree.
+> > > 
+> > > > OK if that's the case, then your patch makes sense to
+> > > > me. It also seems we can have the temporary stack be
+> > > > larger than the initial stack just for atags_to_fdt.
+> > > 
+> > > The stack size isn't the issue, but rather its location. 
+> > > We need to position it away from the DT data.  The DT
+> > > size is known and we could use that, plus some room for
+> > > the insertion of new data coming from the ATAG
+> > > conversion.
+> > 
+> > > Something like the following would be a more robust 
+solution:
+> > Tested-by: Pavel Machek <pavel@ucw.cz>
+> > 
+> > (Note, that in 3.19 dts for n900 got too big, so we are
+> > actually triggering old bugs. That means that this is a
+> > regression fix, and should go in ASAP).
 > 
-> From point 3 to 8 kernel is always in SVC mode so next kernel is
-> launched in SVC mode too but initial kernel was launched in HYP mode.
+> It is queued here:
+> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id
+> =8294/1
 > 
-> I used kernel 3.14 but looking at 3.19 rc code there is the same issue
-> (code didn't change).
 > 
-> Using hvc instruction you can execute arbitrary functions however
-> these function must be in a very restricted range as HYP code MMU has
-> very limited paged configured and cpu_v7_reset is not one of these
-> functions.
-> 
-> My idea to fix the issue is before calling cpu_reset call a new
-> kvm_exit or similar that turn into HYP mode with MMU set as SVC mode.
-> 
-> Is this a known issue? Should I try to fix the problem or somebody can
-> easily fix it?
+> Nicolas
 
-This has been known for a while, and so far people dealing with Kexec
-have preferred sidestepping the issue. This is moderately easy to fix if
-you're happy dealing with page tables. What is missing is the code that
-switches back to an idmap, restore the HYP stubs, and let Kexec install
-its own stubs for jumping to the next kernel.
+I tested your patch and fdt_open_into() does not return error 
+FDT_ERR_NOSPACE anymore. It is working. So you can add my
 
-Most of the infrastructure is already there, it is "just" a matter of
-getting it right.
+Tested-by: Pali Roh?r <pali.rohar@gmail.com>
 
-If you feel like giving it a go, I suggest you have a look at how we
-actually install KVM (the transitions from no MMU to idmap to trampoline
-page to final layout is rather entertaining). Once you understand that,
-it should be rather straightforward to perform this in the reverse
-order, and we can assist you getting it right.
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150127/8da05adc/attachment.sig>
