@@ -1,51 +1,64 @@
 From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Mon, 26 Jan 2015 22:34:00 -0800
-Subject: [PATCH V3 0/2] perf symbols: debuglink and arm mapping symbols changes
-Message-ID: <1422340442-4673-1-git-send-email-victor.kamensky@linaro.org>
+Date: Mon, 26 Jan 2015 22:34:01 -0800
+Subject: [PATCH V3 1/2] perf symbols: Ignore mapping symbols on aarch64
+In-Reply-To: <1422340442-4673-1-git-send-email-victor.kamensky@linaro.org>
+References: <1422340442-4673-1-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <1422340442-4673-2-git-send-email-victor.kamensky@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Folks,
+Aarch64 ELF files use mapping symbols with special names $x, $d
+to identify regions of Aarch64 code (see Aarch64 ELF ABI - "ARM
+IHI 0056B", section "4.5.4 Mapping symbols").
 
-Here is third version of mini-series that addresses couple issues
-in perf symbols handling.
+The patch filters out these symbols at load time, similar to
+"696b97a perf symbols: Ignore mapping symbols on ARM" changes
+done for ARM before V8.
 
-Changes since V2:
+Also added handling of mapping symbols that has format
+"$d.<any>" and similar for both cases.
 
-o Since V2 caused some controversy wrt aarch64/arm fixes [3], replace
-'perf symbols: Ignore mapping symbols on aarch64' and 'perf symbols: 
-improve abi compliance in arm mapping symbols handling with another 
-version of almost equivalent single patch that was discussed on [1].
-In new patch superset of aarch64 and arm mapping symbols handled by
-single code snippet, that is more aligned with other places where
-aarch64 and arm mapping symbols are handled.
+Note we are not making difference between EM_ARM and
+EM_AARCH64 mapping symbols instead code handles superset
+of both.
 
-Changes since V1:
-
-o 'perf symbols: Ignore mapping symbols on aarch64': based on feedback
-from Will Deacon and Russell King [1] added code that handles ARM/Aarch64
-mapping symbols like "$d.<any>". Code uses similar snippet to handle
-ARM mapping symbols as in another places in kernel, but it has its
-own version of the code. Added proper Acked-by.
-
-o 'perf symbols: debuglink should take symfs option into account':
-based on feedback from David Ahern [2] picked more simple version that
-does not make malloced copy of 'filename', that makes patch simpler.
-Added proper 'Acked-and-tested-by'.
-
-[1] https://lkml.org/lkml/2015/1/13/507
-
-[2] https://lkml.org/lkml/2015/1/13/508
-
-[3] https://lkml.org/lkml/2015/1/22/382
-
-Victor Kamensky (2):
-  perf symbols: Ignore mapping symbols on aarch64
-  perf symbols: debuglink should take symfs option into account
-
- tools/perf/util/dso.c        | 6 +++---
+Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
+Cc: Paul Mackerras <paulus@samba.org>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
+Cc: Adrian Hunter <adrian.hunter@intel.com>
+Cc: Jiri Olsa <jolsa@redhat.com>
+Cc: Namhyung Kim <namhyung@kernel.org>
+Cc: Avi Kivity <avi@cloudius-systems.com>
+Cc: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+Cc: Anton Blanchard <anton@samba.org>
+Cc: David Ahern <dsahern@gmail.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Dave Martin <Dave.Martin@arm.com>
+---
  tools/perf/util/symbol-elf.c | 7 +++----
- 2 files changed, 6 insertions(+), 7 deletions(-)
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
+diff --git a/tools/perf/util/symbol-elf.c b/tools/perf/util/symbol-elf.c
+index 06fcd1b..8fc6e2f 100644
+--- a/tools/perf/util/symbol-elf.c
++++ b/tools/perf/util/symbol-elf.c
+@@ -856,10 +856,9 @@ int dso__load_sym(struct dso *dso, struct map *map,
+ 		/* Reject ARM ELF "mapping symbols": these aren't unique and
+ 		 * don't identify functions, so will confuse the profile
+ 		 * output: */
+-		if (ehdr.e_machine == EM_ARM) {
+-			if (!strcmp(elf_name, "$a") ||
+-			    !strcmp(elf_name, "$d") ||
+-			    !strcmp(elf_name, "$t"))
++		if (ehdr.e_machine == EM_ARM || ehdr.e_machine == EM_AARCH64) {
++			if (elf_name[0] == '$' && strchr("adtx", elf_name[1])
++			    && (elf_name[2] == '\0' || elf_name[2] == '.'))
+ 				continue;
+ 		}
+ 
 -- 
 1.9.3
