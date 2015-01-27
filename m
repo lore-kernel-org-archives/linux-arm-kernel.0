@@ -1,69 +1,101 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 26 Jan 2015 18:05:23 -0800
-Subject: [PATCH v4 6/7] ARM: zynq: DT: Add pinctrl information
-In-Reply-To: <54C6D44C.4060106@suse.de>
-References: <1420818231-13451-1-git-send-email-soren.brinkmann@xilinx.com>
- <1420818231-13451-7-git-send-email-soren.brinkmann@xilinx.com>
- <54C6D44C.4060106@suse.de>
-Message-ID: <95fcb833572949c9aa2f406c0b147d1f@BL2FFO11FD060.protection.gbl>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 26 Jan 2015 18:02:55 -0800
+Subject: [PATCH] ARM: dts: Fix dm816x pinctrl and syscon so they are children
+ of SCM
+Message-ID: <20150127020254.GI7696@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-01-27 at 12:57AM +0100, Andreas F?rber wrote:
-> Am 09.01.2015 um 16:43 schrieb Soren Brinkmann:
-> > Add pinctrl descriptions to the zc702 and zc706 device trees.
-> > 
-> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> > Tested-by: Andreas F?rber <afaerber@suse.de>
-> > ---
-> > Changes since v1:
-> >  - remove 'pinctrl-' prefix for pinctrl sub-nodes
-> >  - separate config and mux nodes
-> > 
-> > Changes since RFC v2:
-> >  - add pinconf properties to zc702 mdio node
-> >  - remove arguments from bias-related props
-> > 
-> > Changes since RFC v1:
-> >  - separate DT changes into their own patch
-> > ---
-> >  arch/arm/boot/dts/zynq-7000.dtsi |   8 +-
-> >  arch/arm/boot/dts/zynq-zc702.dts | 181 +++++++++++++++++++++++++++++++++++++++
-> >  arch/arm/boot/dts/zynq-zc706.dts | 152 ++++++++++++++++++++++++++++++++
-> >  3 files changed, 340 insertions(+), 1 deletion(-)
-> [...]
-> > diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
-> > index 280f02dd4ddc..4995412f116f 100644
-> > --- a/arch/arm/boot/dts/zynq-zc702.dts
-> > +++ b/arch/arm/boot/dts/zynq-zc702.dts
-> [...]
-> > @@ -50,15 +52,24 @@
-> >  	status = "okay";
-> >  	phy-mode = "rgmii-id";
-> >  	phy-handle = <&ethernet_phy>;
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&pinctrl_gem0_default>;
-> >  
-> >  	ethernet_phy: ethernet-phy at 7 {
-> >  		reg = <7>;
-> >  	};
-> >  };
-> >  
-> > +&gpio0 {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&pinctrl_gpio0_default>;
-> 
-> On linux-next the equivalent no longer works for the Parallella, with
-> gpio failing to probe.
-> 
-> If I move these two properties to the leds node (for which I am
-> configuring gpio 7) then I get a heartbeat as before.
+From: Tony Lindgren <tony@atomide.com>
+Date: Wed, 21 Jan 2015 16:21:52 -0800
+Subject: [PATCH] ARM: dts: Fix dm816x pinctrl and syscon so they are children of SCM
 
-I think for USB I have a fix (see other email with patch), but LEDs seem
-to be broken too. On my zc702 I get:
-   of_get_named_gpiod_flags: parsed 'gpios' property of node '/leds/ds23[0]' - status (-517)
+Looks like I only got half done with moving pinctrl and syscon to
+be children of the SCM. I've set up the FAPLL clocks that way already,
+but did not complete the job as I copied the syscon values from
+am33xx.dtsi.
 
-517 is probe deferral. Looks like the LED driver needs to learn to defer
-probing when the GPIO driver isn't available yet.
+To make sure the syscon mapping works, I've verfified that we can
+set up davinci_emac mac address the same way as cpsw already does
+with the syscon mapping. So let's add that too.
 
-	S?ren
+Cc: Brian Hutchinson <b.hutchman@gmail.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/arch/arm/boot/dts/dm816x.dtsi
++++ b/arch/arm/boot/dts/dm816x.dtsi
+@@ -50,15 +50,6 @@
+ 		};
+ 	};
+ 
+-	dm816x_pinmux: pinmux at 44e10800 {
+-		compatible = "pinctrl-single";
+-		reg = <0x48140800 0x50a>;
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-		pinctrl-single,register-width = <16>;
+-		pinctrl-single,function-mask = <0xf>;
+-	};
+-
+ 	/*
+ 	 * XXX: Use a flat representation of the dm816x interconnect.
+ 	 * The real dm816x interconnect network is quite complex. Since
+@@ -89,12 +80,29 @@
+ 		};
+ 
+ 		scrm: scrm at 48140000 {
+-			compatible = "ti,dm816-scrm";
++			compatible = "ti,dm816-scrm", "simple-bus";
+ 			reg = <0x48140000 0x21000>;
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+ 			ranges = <0 0x48140000 0x21000>;
+ 
++			dm816x_pinmux: pinmux at 800 {
++				compatible = "pinctrl-single";
++				reg = <0x800 0x50a>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				pinctrl-single,register-width = <16>;
++				pinctrl-single,function-mask = <0xf>;
++			};
++
++			/* Device Configuration Registers */
++			scm_conf: syscon at 600 {
++				compatible = "syscon";
++				reg = <0x600 0x110>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++			};
++
+ 			scrm_clocks: clocks {
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+@@ -104,11 +112,6 @@
+ 			};
+ 		};
+ 
+-		cm: syscon at 44e10000 {
+-			compatible = "ti,am33xx-controlmodule", "syscon";
+-			reg = <0x44e10000 0x800>;
+-		};
+-
+ 		edma: edma at 49000000 {
+ 			compatible = "ti,edma3";
+ 			ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2", "tptc3";
+@@ -213,6 +216,7 @@
+ 			reg = <0x4a100000 0x800
+ 			       0x4a100900 0x3700>;
+ 			clocks = <&sysclk24_ck>;
++			syscon = <&scm_conf>;
+ 			ti,davinci-ctrl-reg-offset = <0>;
+ 			ti,davinci-ctrl-mod-reg-offset = <0x900>;
+ 			ti,davinci-ctrl-ram-offset = <0x2000>;
+@@ -226,6 +230,7 @@
+ 			ti,hwmods = "emac1";
+ 			reg = <0x4a120000 0x4000>;
+ 			clocks = <&sysclk24_ck>;
++			syscon = <&scm_conf>;
+ 			ti,davinci-ctrl-reg-offset = <0>;
+ 			ti,davinci-ctrl-mod-reg-offset = <0x900>;
+ 			ti,davinci-ctrl-ram-offset = <0x2000>;
