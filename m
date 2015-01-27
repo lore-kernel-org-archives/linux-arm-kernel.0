@@ -1,56 +1,39 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 26 Jan 2015 18:17:33 -0800
-Subject: [GIT PULL RESEND] pxa for v3.20
-In-Reply-To: <874mrgdzz0.fsf@free.fr>
-References: <87egqpff9m.fsf@free.fr> <20150123215423.GD20896@quad.lixom.net>
- <874mrgdzz0.fsf@free.fr>
-Message-ID: <20150127021733.GB22154@quad.lixom.net>
+Date: Mon, 26 Jan 2015 18:42:06 -0800
+Subject: [GIT PULL] at91: cleanup/soc for 3.20 #3 (bis)
+In-Reply-To: <1422277230-25211-1-git-send-email-nicolas.ferre@atmel.com>
+References: <20150123230609.GV20896@quad.lixom.net>
+ <1422277230-25211-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20150127024206.GC22154@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 24, 2015 at 03:18:11PM +0100, Robert Jarzmik wrote:
-> Olof Johansson <olof@lixom.net> writes:
+On Mon, Jan 26, 2015 at 02:00:30PM +0100, Nicolas Ferre wrote:
 > 
-> > Hi Robert,
-> >
-> > Branch looks good, I'll merge this into next/fixes-non-critical. One nit below
-> > though:
-> >
-> >> ----------------------------------------------------------------
-> >> Dmitry Eremin-Solenikov (3):
-> >>       ARM: pxa: add regulator_has_full_constraints to corgi board file
-> >>       ARM: pxa: add regulator_has_full_constraints to poodle board file
-> >>       ARM: pxa: add regulator_has_full_constraints to spitz board file
-> >> 
-> >> Martin Vajnar (1):
-> >>       hx4700: regulator: declare full constraints
-> >
-> > Please use consistent patch subjects in the future. We've ended up using ARM:
-> > <platform>: <foo> across all platforms these days.
-> >
-> > I'm not going to ask you to respin just for this, but please remember to fix
-> > future patches when you apply them if they're not already correct.
-> You're right, I missed that one.
+> Arnd, Olof, Kevin,
 > 
-> In case you've not already pulled, I created :
->    https://github.com/rjarzmik/linux.git tags/pxa-for-3.20-bis
+> This is the rework of my previous pull-request with modifications advised by
+> Olof.
+> This is a batch of cleanup/soc modifications that you may also stack on top of
+> your "soc" branch as the previous one. It stabilizes a little bit our cleanup
+> action before going further.
+> Another one may be proposed before the merge-window opens.
 > 
-> I can resend a proper pull request if you wish, or we can leave it as is if you
-> already pulled. In any case I'll be more carefull next time, maybe I can
-> convince my bot to check that for me too.
+> Thanks, best regards,
+> 
+> The following changes since commit 29ee506d0d56f6d39cc237de2512f9cb5629cbf7:
+> 
+>   ARM: at91: move at91rm9200_idle() to clk/at91/pmc.c (2015-01-16 18:08:42 +0100)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-cleanup3
+> 
+> for you to fetch changes up to 9726b6892beeaa736610370429a23a481d1b133e:
+> 
+>   ARM: at91: pm: remove warning to remove SOC_AT91SAM9263 usage (2015-01-26 13:44:19 +0100)
 
-I had already merged, but it looks like you broke viper and zeus. Both of them
-still refer to PXA_ISA_IRQ().
-
-Can you send an incremental patch for that? Or if you prefer that we drop this
-branch for now while you sort it out that's OK too -- your preference.
-
-> Or even better checkpatch could check that any patch with a diffstat fully in
-> arch/arm/{mach,plat}-<XYZ> has a subject beginning with "ARM: XYZ: ", that would
-> be cool, and put the burden on others as well :)
-
-Yeah we normally scale this by educating downstream maintainers. checkpatch is
-useful in many cases but making it do everything is hard.
+Merged, thanks.
 
 
 -Olof
