@@ -1,97 +1,95 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 27 Jan 2015 20:44:47 +0100
-Subject: [linux-sunxi] Re: [PATCH] arm: sunxi: input: RFC: Add sysfs
- voltage for sun4i-lradc driver
-In-Reply-To: <54C76DF2.50707@redhat.com>
-References: <1422291516-24895-1-git-send-email-plaes@plaes.org>
- <20150127091829.GD7200@lukather>
- <1422352189.23189.12.camel@plaes.org> <54C76DF2.50707@redhat.com>
-Message-ID: <20150127194447.GO7200@lukather>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 27 Jan 2015 21:47:42 +0200
+Subject: [PATCH 00/14 v2] ARM: shmobile: Remove sh7372/Mackerel and ZBOOT
+ MMC/SDHI support V2
+In-Reply-To: <20150127011707.GD29710@verge.net.au>
+References: <20150126061747.6848.9708.sendpatchset@little-apple>
+ <20150127011707.GD29710@verge.net.au>
+Message-ID: <1521770.CESgZ9DKGZ@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 27, 2015 at 11:52:34AM +0100, Hans de Goede wrote:
-> Hi,
-> 
-> On 27-01-15 10:49, Priit Laes wrote:
-> >
-> >On Tue, 2015-01-27 at 10:18 +0100, Maxime Ripard wrote:
-> >>Hi,
-> >>
-> >>On Mon, Jan 26, 2015 at 06:58:32PM +0200, Priit Laes wrote:
-> >>>---
-> >>
-> >>Like Hans was pointing out, commit log and signed-off-by please
-> >>
-> >>>  .../ABI/testing/sysfs-driver-input-sun4i-lradc     |  4 ++
-> >>>  drivers/input/keyboard/sun4i-lradc-keys.c          | 49
-> >>>+++++++++++++++++-----
-> >>>  2 files changed, 43 insertions(+), 10 deletions(-)
-> >>>  create mode 100644 Documentation/ABI/testing/sysfs-driver-input-
-> >>>sun4i-lradc
-> >>>
-> >>>diff --git a/Documentation/ABI/testing/sysfs-driver-input-sun4i-
-> >>>lradc b/Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc
-> >>>new file mode 100644
-> >>>index 0000000..e4e6448
-> >>>--- /dev/null
-> >>>+++ b/Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc
-> >>>@@ -0,0 +1,4 @@
-> >>>+What:          /sys/class/input/input(x)/device/voltage
-> >>>+Date:          February 2015
-> >>>+Contact:       Priit Laes <plaes@plaes.org>
-> >>>+Description:   ADC output voltage in microvolts or 0 if device is
-> >>>not opened.
-> >>
-> >>Why is it returning 0 when "device is not opened" ? What does that
-> >>even mean? You can't read that file without opening it.
-> >
-> >It means that something has to open the /dev/input/inputX device which
-> >sets up the ADC before the voltage can be read from the sysfs file.
-> >
-> >[...]
-> >
-> >
-> >>
-> >>As I told you already, if you're going to expose this an ADC in the
-> >>end, the proper solution is to use the IIO framework, not adding a
-> >>custom sysfs file.
-> >
-> >My intention was to expose just a simple debug output, so one can
-> >press the buttons and read the voltages for devicetree keymap.
-> >
-> >If anyone can suggest a simpler approach than current sysfs based one,
-> >I would do it.
-> 
-> The android driver always uses 0.2V / 200mV steps, so what I do is
-> simply create a mapping with 200mV mapped to KEY_VOLUMEUP, 400mV mapped
-> to KEY_VOLUMEDOWN, etc. following the hardcoded android driver mapping:
-> 
-> https://github.com/linux-sunxi/linux-sunxi/blob/sunxi-3.4/drivers/input/keyboard/sun4i-keyboard.c#L136
-> 
-> Usually this will be correct in one go, after testing one can shuffle
-> key codes as needed (usually not needed) and/or remove unused entries.
-> 
-> With that said I do think that a sysfs file to see the actual voltages,
-> or a kernel parameter to printk them on keypress interrupt would be useful.
-> 
-> I guess the printk option would be better as it would show the actual
-> keypress value read, not some semi-random sample.
+Hi Linus,
 
-That wouldn't require that much code actually. Either using dev_dbg,
-or debugfs like Dmitry was suggesting would be two nice solutions I
-guess.
+On Tuesday 27 January 2015 10:17:09 Simon Horman wrote:
+> On Mon, Jan 26, 2015 at 03:17:47PM +0900, Magnus Damm wrote:
+> > ARM: shmobile: Remove sh7372/Mackerel and ZBOOT MMC/SDHI support V2
+> > 
+> > [PATCH 01/14 v2] ARM: shmobile: mackerel: Remove ZBOOT code
+> > [PATCH 02/14 v2] ARM: shmobile: mackerel: Remove Legacy C board code
+> > [PATCH 03/14 v2] ARM: shmobile: mackerel dts: Remove Legacy DTS file
+> > [PATCH 04/14 v2] ARM: shmobile: mackerel: Remove DT binding documentation
+> > [PATCH 05/14 v2] ARM: shmobile: mackerel: Remove mach-type entry
+> > [PATCH 06/14 v2] ARM: shmobile: mackerel: Remove defconfig
+> > [PATCH 07/14 v2] ARM: shmobile: mackerel: Remove from MAINTAINERS
+> > [PATCH 08/14 v2] ARM: shmobile: sh7372: Remove ZBOOT MMC/SDHI support
+> > [PATCH 09/14 v2] ARM: shmobile: sh7372: Remove Legacy C SoC code
+> > [PATCH 10/14 v2] ARM: shmobile: sh7372: Remove DT binding documentation
+> > [PATCH 11/14 v2] ARM: shmobile: sh7372 dtsi: Remove Legacy DTSI file
+> > [PATCH 12/14 v2] Documentation: Remove ZBOOT MMC/SDHI utility and docs
+> > [PATCH 13/14 v2] pinctrl: sh-pfc: sh7372: Remove PFC support
+> > [PATCH 14/14 v2] pinctrl: sh-pfc: sh7372: Remove DT binding documentation
+> > 
+> > Here is my latest attempt (V2) of legacy board and SoC support removal
+> > for Mackerel and sh7372. Both the ARM mach-shmobile code base and the
+> > PINCTRL subsystem is affected.
+> > 
+> > Also get rid of the remaining ZBOOT MMC/SDHI code, documentation and
+> > utility that has no user once sh7372 is gone.
+> > 
+> > The Cortex-A8 based sh7372 SoC is rather old and never went into mass
+> > production anyway, so these patches that remove SoC and board support
+> > will only affect a few selected developers.
+> > 
+> > I wish we had some way to make use of the ZBOOT MMC/SDHI code, but
+> > without any board or SoC code it makes little sense to keep it.
+> > 
+> > Thanks to Laurent and Geert for review!
+> 
+> Sad to see all our hard work being deleted. But at the same
+> time its nice to be able to reduce our footprint by 8681 lines!
+> 
+> I have queued up the first 12 patches of this series, that is the
+> non-pfc patches. They are queued up in a new sh7372-soc-removal-for-v3.21
+> branch which I intend to push as part of renesas-devel-20150127-v3.19-rc6 a
+> little later today.
+> 
+> With regards to the PFC patches, the last two patches in the series, I have
+> spoken with Laurent about this and my understanding is that his feeling
+> is that they could be merged independently by the pinctl maintainer, Linus
+> Walleij.
+> 
+> Laurent, if that is correct could see about working with Linus towards
+> that goal? If not, please let me know and we can work out another plan.
 
-Maxime
+The following changes since commit 4d1216ba80e8e6269e56dc043364b661ee0a7c23:
+
+  Merge branch 'devel' into for-next (2015-01-27 09:57:36 +0100)
+
+are available in the git repository at:
+
+  git://linuxtv.org/pinchartl/fbdev.git pinmux/next/pfc
+
+for you to fetch changes up to 1f35f33e117303ca450ce4be67a7fb6ec9cb90f8:
+
+  pinctrl: sh-pfc: sh7372: Remove DT binding documentation (2015-01-27 
+21:41:59 +0200)
+
+----------------------------------------------------------------
+Magnus Damm (2):
+      pinctrl: sh-pfc: sh7372: Remove PFC support
+      pinctrl: sh-pfc: sh7372: Remove DT binding documentation
+
+ .../devicetree/bindings/pinctrl/renesas,pfc-pinctrl.txt |    8 +-
+ drivers/pinctrl/sh-pfc/Kconfig                          |    5 -
+ drivers/pinctrl/sh-pfc/Makefile                         |    1 -
+ drivers/pinctrl/sh-pfc/core.c                           |    9 -
+ drivers/pinctrl/sh-pfc/core.h                           |    1 -
+ drivers/pinctrl/sh-pfc/pfc-sh7372.c                     | 2645 --------------
+ 6 files changed, 3 insertions(+), 2666 deletions(-)
+ delete mode 100644 drivers/pinctrl/sh-pfc/pfc-sh7372.c
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150127/c9b38f4d/attachment.sig>
+Regards,
+
+Laurent Pinchart
