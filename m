@@ -1,27 +1,27 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue, 27 Jan 2015 13:57:33 +0100
-Subject: [PATCH v2 06/11] ARM: tegra: Move out nyan-generic parts out from
- the nyan-big DT
-In-Reply-To: <54B7F8D2.4040400@wwwdotorg.org>
-References: <1421338359-27467-1-git-send-email-tomeu.vizoso@collabora.com>
- <1421338359-27467-7-git-send-email-tomeu.vizoso@collabora.com>
- <54B7F8D2.4040400@wwwdotorg.org>
-Message-ID: <CAAObsKBfBREzQueA8NRJ0msi7g=5s9Sd2riSEF+0jp8JSbT-mw@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 27 Jan 2015 13:01:17 +0000
+Subject: [PATCH 4/7] spi: spi-fsl-dspi: avoid preparing the clock two times
+In-Reply-To: <1422356244-15629-5-git-send-email-bhuvanchandra.dv@toradex.com>
+References: <1422356244-15629-1-git-send-email-bhuvanchandra.dv@toradex.com>
+ <1422356244-15629-5-git-send-email-bhuvanchandra.dv@toradex.com>
+Message-ID: <20150127130117.GU21293@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 January 2015 at 18:28, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 01/15/2015 09:12 AM, Tomeu Vizoso wrote:
->>
->> In preparation for adding the DT for the nyan-blaze board.
->
->
-> "git format-patch -C" might help here; hopefully it'd highlight that
-> arch/arm/boot/dts/tegra124-nyan.dtsi was a copy from
-> arch/arm/boot/dts/tegra124-nyan-big.dts, with just a few small diffs?
+On Tue, Jan 27, 2015 at 04:27:21PM +0530, Bhuvanchandra DV wrote:
+> regmap_read/regmap_write will expect the peripheral clock
+> to be enabled before accessing the registers of the peripheral.
+> Since the peripheral clock is enabled separatly, avoid redundant clock
+> prepare (with devm_regmap_init_mmio_clk) and use devm_regmap_init_mmio instead.
 
-It doesn't, because we keep the pinmux config in the leaf files.
-
-Regards,
-
-Tomeu
+What's the advantage of this?  The clock API is refcounted so there
+should be no issue with this and it seems like it's opening us up to
+bugs if there's a path where we interact with the registers without
+enabling the clocks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150127/ea749d88/attachment.sig>
