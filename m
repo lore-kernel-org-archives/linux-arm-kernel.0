@@ -1,169 +1,75 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Tue, 27 Jan 2015 11:33:18 -0800
-Subject: [PATCH V2 1/8] arm64: Fold proc-macros.S into assembler.h
-In-Reply-To: <e81815fb841db3ea40ce8e2fd18cf021ec9c6cf7.1421449714.git.geoff@infradead.org>
-References: <cover.1421449714.git.geoff@infradead.org>
- <e81815fb841db3ea40ce8e2fd18cf021ec9c6cf7.1421449714.git.geoff@infradead.org>
-Message-ID: <1422387198.21823.23.camel@infradead.org>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 27 Jan 2015 11:34:01 -0800
+Subject: [linux-sunxi] Re: [PATCH] arm: sunxi: input: RFC: Add sysfs
+ voltage for sun4i-lradc driver
+In-Reply-To: <1422352189.23189.12.camel@plaes.org>
+References: <1422291516-24895-1-git-send-email-plaes@plaes.org>
+ <20150127091829.GD7200@lukather>
+ <1422352189.23189.12.camel@plaes.org>
+Message-ID: <20150127193401.GB29637@dtor-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To allow the assembler macros defined in arch/arm64/mm/proc-macros.S to be used
-outside the mm code move the contents of proc-macros.S to
-arch/arm64/include/asm/assembler.h, delete proc-macros.S, and fix up all
-references to proc-macros.S.
+On Tue, Jan 27, 2015 at 11:49:49AM +0200, Priit Laes wrote:
+> 
+> On Tue, 2015-01-27 at 10:18 +0100, Maxime Ripard wrote:
+> > Hi,
+> > 
+> > On Mon, Jan 26, 2015 at 06:58:32PM +0200, Priit Laes wrote:
+> > > ---
+> > 
+> > Like Hans was pointing out, commit log and signed-off-by please
+> > 
+> > >  .../ABI/testing/sysfs-driver-input-sun4i-lradc     |  4 ++
+> > >  drivers/input/keyboard/sun4i-lradc-keys.c          | 49 
+> > > +++++++++++++++++-----
+> > >  2 files changed, 43 insertions(+), 10 deletions(-)
+> > >  create mode 100644 Documentation/ABI/testing/sysfs-driver-input-
+> > > sun4i-lradc
+> > > 
+> > > diff --git a/Documentation/ABI/testing/sysfs-driver-input-sun4i-
+> > > lradc b/Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc
+> > > new file mode 100644
+> > > index 0000000..e4e6448
+> > > --- /dev/null
+> > > +++ b/Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc
+> > > @@ -0,0 +1,4 @@
+> > > +What:          /sys/class/input/input(x)/device/voltage
+> > > +Date:          February 2015
+> > > +Contact:       Priit Laes <plaes@plaes.org>
+> > > +Description:   ADC output voltage in microvolts or 0 if device is 
+> > > not opened.
+> > 
+> > Why is it returning 0 when "device is not opened" ? What does that 
+> > even mean? You can't read that file without opening it.
+> 
+> It means that something has to open the /dev/input/inputX device which 
+> sets up the ADC before the voltage can be read from the sysfs file.
 
-Signed-off-by: Geoff Levand <geoff@infradead.org>
----
- arch/arm64/include/asm/assembler.h | 37 +++++++++++++++++++++++++-
- arch/arm64/mm/cache.S              |  2 --
- arch/arm64/mm/proc-macros.S        | 54 --------------------------------------
- arch/arm64/mm/proc.S               |  2 --
- 4 files changed, 36 insertions(+), 59 deletions(-)
- delete mode 100644 arch/arm64/mm/proc-macros.S
+I'd consider this a bug. Why someone has to use an unrelated interface for
+another interface to work correctly?
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 5901480..80436d3 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -1,5 +1,5 @@
- /*
-- * Based on arch/arm/include/asm/assembler.h
-+ * Based on arch/arm/include/asm/assembler.h, arch/arm/mm/proc-macros.S
-  *
-  * Copyright (C) 1996-2000 Russell King
-  * Copyright (C) 2012 ARM Ltd.
-@@ -20,6 +20,7 @@
- #error "Only include this from assembly code"
- #endif
- 
-+#include <asm/asm-offsets.h>
- #include <asm/ptrace.h>
- #include <asm/thread_info.h>
- 
-@@ -155,3 +156,37 @@ lr	.req	x30		// link register
- #endif
- 	orr	\rd, \lbits, \hbits, lsl #32
- 	.endm
-+
-+/*
-+ * vma_vm_mm - get mm pointer from vma pointer (vma->vm_mm)
-+ */
-+	.macro	vma_vm_mm, rd, rn
-+	ldr	\rd, [\rn, #VMA_VM_MM]
-+	.endm
-+
-+/*
-+ * mmid - get context id from mm pointer (mm->context.id)
-+ */
-+	.macro	mmid, rd, rn
-+	ldr	\rd, [\rn, #MM_CONTEXT_ID]
-+	.endm
-+
-+/*
-+ * dcache_line_size - get the minimum D-cache line size from the CTR register.
-+ */
-+	.macro	dcache_line_size, reg, tmp
-+	mrs	\tmp, ctr_el0			// read CTR
-+	ubfm	\tmp, \tmp, #16, #19		// cache line size encoding
-+	mov	\reg, #4			// bytes per word
-+	lsl	\reg, \reg, \tmp		// actual cache line size
-+	.endm
-+
-+/*
-+ * icache_line_size - get the minimum I-cache line size from the CTR register.
-+ */
-+	.macro	icache_line_size, reg, tmp
-+	mrs	\tmp, ctr_el0			// read CTR
-+	and	\tmp, \tmp, #0xf		// cache line size encoding
-+	mov	\reg, #4			// bytes per word
-+	lsl	\reg, \reg, \tmp		// actual cache line size
-+	.endm
-diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-index 2560e1e..2d7a67c 100644
---- a/arch/arm64/mm/cache.S
-+++ b/arch/arm64/mm/cache.S
-@@ -24,8 +24,6 @@
- #include <asm/cpufeature.h>
- #include <asm/alternative-asm.h>
- 
--#include "proc-macros.S"
--
- /*
-  *	__flush_dcache_all()
-  *
-diff --git a/arch/arm64/mm/proc-macros.S b/arch/arm64/mm/proc-macros.S
-deleted file mode 100644
-index 005d29e..0000000
---- a/arch/arm64/mm/proc-macros.S
-+++ /dev/null
-@@ -1,54 +0,0 @@
--/*
-- * Based on arch/arm/mm/proc-macros.S
-- *
-- * Copyright (C) 2012 ARM Ltd.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-- */
--
--#include <asm/asm-offsets.h>
--#include <asm/thread_info.h>
--
--/*
-- * vma_vm_mm - get mm pointer from vma pointer (vma->vm_mm)
-- */
--	.macro	vma_vm_mm, rd, rn
--	ldr	\rd, [\rn, #VMA_VM_MM]
--	.endm
--
--/*
-- * mmid - get context id from mm pointer (mm->context.id)
-- */
--	.macro	mmid, rd, rn
--	ldr	\rd, [\rn, #MM_CONTEXT_ID]
--	.endm
--
--/*
-- * dcache_line_size - get the minimum D-cache line size from the CTR register.
-- */
--	.macro	dcache_line_size, reg, tmp
--	mrs	\tmp, ctr_el0			// read CTR
--	ubfm	\tmp, \tmp, #16, #19		// cache line size encoding
--	mov	\reg, #4			// bytes per word
--	lsl	\reg, \reg, \tmp		// actual cache line size
--	.endm
--
--/*
-- * icache_line_size - get the minimum I-cache line size from the CTR register.
-- */
--	.macro	icache_line_size, reg, tmp
--	mrs	\tmp, ctr_el0			// read CTR
--	and	\tmp, \tmp, #0xf		// cache line size encoding
--	mov	\reg, #4			// bytes per word
--	lsl	\reg, \reg, \tmp		// actual cache line size
--	.endm
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 28eebfb..fe69f6e 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -26,8 +26,6 @@
- #include <asm/pgtable-hwdef.h>
- #include <asm/pgtable.h>
- 
--#include "proc-macros.S"
--
- #ifdef CONFIG_ARM64_64K_PAGES
- #define TCR_TG_FLAGS	TCR_TG0_64K | TCR_TG1_64K
- #else
+> 
+> [...]
+> 
+> 
+> > 
+> > As I told you already, if you're going to expose this an ADC in the 
+> > end, the proper solution is to use the IIO framework, not adding a 
+> > custom sysfs file.
+> 
+> My intention was to expose just a simple debug output, so one can 
+> press the buttons and read the voltages for devicetree keymap.
+> 
+> If anyone can suggest a simpler approach than current sysfs based one, 
+> I would do it. But full blown iio driver is currently out of scope. 
+> Also, Carlo's (ccaione) initially submitted (?) driver for lradc 
+> utilized iio subsystem.
+
+For stuff like this debugfs (AKA dumping ground) is better suited as it does
+not establish ABI.  i
+
+Thanks.
+
 -- 
-2.1.0
+Dmitry
