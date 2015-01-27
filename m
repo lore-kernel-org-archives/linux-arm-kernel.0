@@ -1,238 +1,154 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 27 Jan 2015 19:07:26 +0100
-Subject: [PATCH 7/7] ARM: at91/trivial: unify functions and machine names
-In-Reply-To: <cover.1422381280.git.nicolas.ferre@atmel.com>
-References: <cover.1422381280.git.nicolas.ferre@atmel.com>
-Message-ID: <fa9df37f603459bf08a4f8fc99337874c677e2bf.1422381280.git.nicolas.ferre@atmel.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Tue, 27 Jan 2015 13:14:14 -0500
+Subject: [PATCH v4 4/6] of/pci: add of_pci_dma_configure() update dma
+ configuration
+In-Reply-To: <CAErSpo4w0zVCmXk2D2Qk5W3kceS9Wk+=jqHBDwk6HUXWwXdq_Q@mail.gmail.com>
+References: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
+ <1422052359-12384-5-git-send-email-m-karicheri2@ti.com>
+ <20150123234124.GW29776@google.com> <54C6CCF3.7080308@ti.com>
+ <CAErSpo4w0zVCmXk2D2Qk5W3kceS9Wk+=jqHBDwk6HUXWwXdq_Q@mail.gmail.com>
+Message-ID: <54C7D576.6030502@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the string "(Device Tree)" after the machine name because all AT91
-machines use the DT nowadays.
-Also change some function names to unify following the convention:
-- at91sam9xxx aren't named sam9, 9xxx but with the full name
-- sama5 are the ones that don't have the at91 prefix anymore.
+On 01/26/2015 06:59 PM, Bjorn Helgaas wrote:
+> On Mon, Jan 26, 2015 at 5:25 PM, Murali Karicheri<m-karicheri2@ti.com>  wrote:
+>> On 01/23/2015 06:41 PM, Bjorn Helgaas wrote:
+>>>
+>>> On Fri, Jan 23, 2015 at 05:32:37PM -0500, Murali Karicheri wrote:
+>>>>
+>>>> Add of_pci_dma_configure() to allow updating the dma configuration
+>>>> of the pci device using the configuration from DT of the parent of
+>>>> the root bridge device.
+>>>>
+   -- Cut ---
+>>>>
+>>>> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
+>>>> ---
+>>>>    drivers/of/of_pci.c    |   39 +++++++++++++++++++++++++++++++++++++++
+>>>>    include/linux/of_pci.h |   12 ++++++++++++
+>>>>    2 files changed, 51 insertions(+)
+>>>>
+>>>> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+>>>> index 88471d3..34878c9 100644
+>>>> --- a/drivers/of/of_pci.c
+>>>> +++ b/drivers/of/of_pci.c
+>>>> @@ -2,6 +2,7 @@
+>>>>    #include<linux/export.h>
+>>>>    #include<linux/of.h>
+>>>>    #include<linux/of_address.h>
+>>>> +#include<linux/of_device.h>
+>>>>    #include<linux/of_pci.h>
+>>>>    #include<linux/slab.h>
+>>>>
+>>>> @@ -229,6 +230,44 @@ parse_failed:
+>>>>          return err;
+>>>>    }
+>>>>    EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
+>>>> +
+>>>> +/**
+>>>> + * of_get_pci_root_bridge_parent - get the OF node of the root bridge's
+>>>> parent
+>>>> + * @dev: ptr to pci_dev struct of the pci device
+>>>> + *
+>>>> + * This function will traverse the bus up to the root bus starting with
+>>>> + * the child and return the OF node ptr to root bridge device's parent
+>>>> device.
+>>>> + */
+>>>> +struct device_node *of_get_pci_root_bridge_parent(struct pci_dev *dev)
+>>>
+>>>
+>>> I'm not an OF person, but this interface seems like it might be too
+>>> special-purpose.  Maybe it would be enough to add
+>>> "of_get_pci_root_bridge()", and the caller could do this:
+>>>
+>>>       struct device *bridge = of_get_pci_root_bridge(dev);
+>>>       struct device_node *parent_np = bridge->parent->of_node;
+>>>
+>>> Also, the name "of_get_..." suggests that it increments a refcount, as
+>>> of_get_parent() does.  But you aren't doing anything with the refcount.
+>>>
+>>> But I guess an "of_get_pci_root_bridge()" isn't doing anything OF-related,
+>>> so maybe we should just add a "pci_get_host_bridge(struct pci_dev *)"
+>>> to PCI instead.
+>>
+>>
+>> Bjorn,
+>>
+>> Thanks for the comment.
+>>
+>> I think adding pci_get_host_bridge() is a good idea. There is already
+>> similar function in host-bridge.c. I have added this function re-using
+>> existing function find_pci_root_bus(). See the incremental diff below after
+>> this change. Does this look good?
+>
+> I like the implementation, but I think either we need to take a
+> reference on the host bridge, or change the name to  something like
+> "pci_find_host_bridge()", because using "_get_" is conventional for
+> functions that acquire a reference.
+>
+> Since host bridges are hot-pluggable, at least in theory, I vote for
+> taking a reference.  Then of course, you'd have to add code to drop
+> the reference when you're finished with it.
+>
+Bjorn,
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/mach-at91/at91rm9200.c |  8 ++++----
- arch/arm/mach-at91/at91sam9.c   | 28 ++++++++++++++--------------
- arch/arm/mach-at91/generic.h    | 16 ++++++++--------
- arch/arm/mach-at91/pm.c         |  8 ++++----
- arch/arm/mach-at91/sama5.c      |  6 +++---
- 5 files changed, 33 insertions(+), 33 deletions(-)
+Thanks. I agree with your suggestion even though the convention is not 
+followed fully :) of_pci_get_devfn(), of_get_pci_domain_nr(), 
+of_pci_get_host_bridge_resources() are some of those functions not 
+following the convention. I plan to change the function as below. Also 
+want to name functions as pci_get/put_host_bridge_device() as existing 
+function find_pci_host_bridge() is actually returning ptr to struct 
+pci_host_bridge  vs the new function returning ptr to device. Here are 
+the new functions and how they will be used. Please review and respond 
+so that I can avoid a re-spin.
 
-diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
-index 49ae3d455bd5..8fcfb70f7124 100644
---- a/arch/arm/mach-at91/at91rm9200.c
-+++ b/arch/arm/mach-at91/at91rm9200.c
-@@ -43,13 +43,13 @@ static void __init at91rm9200_dt_timer_init(void)
- 	at91rm9200_timer_init();
- }
- 
--static void __init rm9200_dt_device_init(void)
-+static void __init at91rm9200_dt_device_init(void)
- {
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- 
- 	arm_pm_idle = at91rm9200_idle;
- 	arm_pm_restart = at91rm9200_restart;
--	at91_rm9200_pm_init();
-+	at91rm9200_pm_init();
- }
- 
- 
-@@ -59,9 +59,9 @@ static const char *at91rm9200_dt_board_compat[] __initconst = {
- 	NULL
- };
- 
--DT_MACHINE_START(at91rm9200_dt, "Atmel AT91RM9200 (Device Tree)")
-+DT_MACHINE_START(at91rm9200_dt, "Atmel AT91RM9200")
- 	.init_time      = at91rm9200_dt_timer_init,
- 	.map_io		= at91_map_io,
--	.init_machine	= rm9200_dt_device_init,
-+	.init_machine	= at91rm9200_dt_device_init,
- 	.dt_compat	= at91rm9200_dt_board_compat,
- MACHINE_END
-diff --git a/arch/arm/mach-at91/at91sam9.c b/arch/arm/mach-at91/at91sam9.c
-index ecbe535c2ce0..56e3ba73ec40 100644
---- a/arch/arm/mach-at91/at91sam9.c
-+++ b/arch/arm/mach-at91/at91sam9.c
-@@ -25,12 +25,12 @@
- 
- #include "generic.h"
- 
--static void __init sam9_dt_device_init(void)
-+static void __init at91sam9_dt_device_init(void)
- {
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- 
- 	arm_pm_idle = at91sam9_idle;
--	at91_sam9260_pm_init();
-+	at91sam9260_pm_init();
- }
- 
- static const char *at91_dt_board_compat[] __initconst = {
-@@ -38,22 +38,22 @@ static const char *at91_dt_board_compat[] __initconst = {
- 	NULL
- };
- 
--DT_MACHINE_START(at91sam_dt, "Atmel AT91SAM (Device Tree)")
-+DT_MACHINE_START(at91sam_dt, "Atmel AT91SAM9")
- 	/* Maintainer: Atmel */
- 	.map_io		= at91_map_io,
--	.init_machine	= sam9_dt_device_init,
-+	.init_machine	= at91sam9_dt_device_init,
- 	.dt_compat	= at91_dt_board_compat,
- MACHINE_END
- 
--static void __init sam9g45_dt_device_init(void)
-+static void __init at91sam9g45_dt_device_init(void)
- {
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- 
- 	arm_pm_idle = at91sam9_idle;
--	at91_sam9g45_pm_init();
-+	at91sam9g45_pm_init();
- }
- 
--static const char *at91_9g45_board_compat[] __initconst = {
-+static const char *at91sam9g45_board_compat[] __initconst = {
- 	"atmel,at91sam9g45",
- 	NULL
- };
-@@ -61,19 +61,19 @@ static const char *at91_9g45_board_compat[] __initconst = {
- DT_MACHINE_START(at91sam9g45_dt, "Atmel AT91SAM9G45")
- 	/* Maintainer: Atmel */
- 	.map_io		= at91_map_io,
--	.init_machine	= sam9g45_dt_device_init,
--	.dt_compat	= at91_9g45_board_compat,
-+	.init_machine	= at91sam9g45_dt_device_init,
-+	.dt_compat	= at91sam9g45_board_compat,
- MACHINE_END
- 
--static void __init sam9x5_dt_device_init(void)
-+static void __init at91sam9x5_dt_device_init(void)
- {
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- 
- 	arm_pm_idle = at91sam9_idle;
--	at91_sam9x5_pm_init();
-+	at91sam9x5_pm_init();
- }
- 
--static const char *at91_9x5_board_compat[] __initconst = {
-+static const char *at91sam9x5_board_compat[] __initconst = {
- 	"atmel,at91sam9x5",
- 	"atmel,at91sam9n12",
- 	NULL
-@@ -82,6 +82,6 @@ static const char *at91_9x5_board_compat[] __initconst = {
- DT_MACHINE_START(at91sam9x5_dt, "Atmel AT91SAM9")
- 	/* Maintainer: Atmel */
- 	.map_io		= at91_map_io,
--	.init_machine	= sam9x5_dt_device_init,
--	.dt_compat	= at91_9x5_board_compat,
-+	.init_machine	= at91sam9x5_dt_device_init,
-+	.dt_compat	= at91sam9x5_board_compat,
- MACHINE_END
-diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-index 9c6e5b9f87ff..a6e726a6e0b5 100644
---- a/arch/arm/mach-at91/generic.h
-+++ b/arch/arm/mach-at91/generic.h
-@@ -30,15 +30,15 @@ extern void at91_ioremap_matrix(u32 base_addr);
- 
- 
- #ifdef CONFIG_PM
--extern void __init at91_rm9200_pm_init(void);
--extern void __init at91_sam9260_pm_init(void);
--extern void __init at91_sam9g45_pm_init(void);
--extern void __init at91_sam9x5_pm_init(void);
-+extern void __init at91rm9200_pm_init(void);
-+extern void __init at91sam9260_pm_init(void);
-+extern void __init at91sam9g45_pm_init(void);
-+extern void __init at91sam9x5_pm_init(void);
- #else
--void __init at91_rm9200_pm_init(void) { }
--void __init at91_sam9260_pm_init(void) { }
--void __init at91_sam9g45_pm_init(void) { }
--void __init at91_sam9x5_pm_init(void) { }
-+void __init at91rm9200_pm_init(void) { }
-+void __init at91sam9260_pm_init(void) { }
-+void __init at91sam9g45_pm_init(void) { }
-+void __init at91sam9x5_pm_init(void) { }
- #endif
- 
- #endif /* _AT91_GENERIC_H */
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index 25bb93db8208..af8d8afc2e12 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -319,7 +319,7 @@ static void __init at91_pm_init(void)
- 	suspend_set_ops(&at91_pm_ops);
- }
- 
--void __init at91_rm9200_pm_init(void)
-+void __init at91rm9200_pm_init(void)
- {
- 	at91_dt_ramc();
- 
-@@ -334,7 +334,7 @@ void __init at91_rm9200_pm_init(void)
- 	at91_pm_init();
- }
- 
--void __init at91_sam9260_pm_init(void)
-+void __init at91sam9260_pm_init(void)
- {
- 	at91_dt_ramc();
- 	at91_pm_data.memctrl = AT91_MEMCTRL_SDRAMC;
-@@ -342,7 +342,7 @@ void __init at91_sam9260_pm_init(void)
- 	return at91_pm_init();
- }
- 
--void __init at91_sam9g45_pm_init(void)
-+void __init at91sam9g45_pm_init(void)
- {
- 	at91_dt_ramc();
- 	at91_pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP;
-@@ -350,7 +350,7 @@ void __init at91_sam9g45_pm_init(void)
- 	return at91_pm_init();
- }
- 
--void __init at91_sam9x5_pm_init(void)
-+void __init at91sam9x5_pm_init(void)
- {
- 	at91_dt_ramc();
- 	at91_pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP | AT91SAM926x_PMC_UDP;
-diff --git a/arch/arm/mach-at91/sama5.c b/arch/arm/mach-at91/sama5.c
-index 0feccbfd0eb6..228814aa5ca1 100644
---- a/arch/arm/mach-at91/sama5.c
-+++ b/arch/arm/mach-at91/sama5.c
-@@ -31,7 +31,7 @@
- static void __init sama5_dt_device_init(void)
- {
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
--	at91_sam9x5_pm_init();
-+	at91sam9x5_pm_init();
- }
- 
- static const char *sama5_dt_board_compat[] __initconst = {
-@@ -39,7 +39,7 @@ static const char *sama5_dt_board_compat[] __initconst = {
- 	NULL
- };
- 
--DT_MACHINE_START(sama5_dt, "Atmel SAMA5 (Device Tree)")
-+DT_MACHINE_START(sama5_dt, "Atmel SAMA5")
- 	/* Maintainer: Atmel */
- 	.map_io		= at91_map_io,
- 	.init_machine	= sama5_dt_device_init,
-@@ -84,7 +84,7 @@ static const char *sama5_alt_dt_board_compat[] __initconst = {
- 	NULL
- };
- 
--DT_MACHINE_START(sama5_alt_dt, "Atmel SAMA5 (Device Tree)")
-+DT_MACHINE_START(sama5_alt_dt, "Atmel SAMA5")
- 	/* Maintainer: Atmel */
- 	.map_io		= sama5_alt_map_io,
- 	.init_machine	= sama5_dt_device_init,
+in linux/include/pci.h add the prototypes of 
+pci_get/put_host_bridge_device().
+
+in drivers/pci/host-bridge.c add two new functions.
+
+struct device *pci_get_host_bridge_device(struct pci_dev *dev)
+{
+	struct pci_bus *root_bus = find_pci_root_bus(dev->bus);
+	struct device *bridge = root_bus->bridge;
+
+	kobject_get(&bridge->kobj);
+	return bridge;
+}
+
+void  pci_put_host_bridge_device(struct pci_dev *dev)
+{
+	struct pci_bus *root_bus = find_pci_root_bus(dev->bus);
+	struct device *bridge = root_bus->bridge;
+
+	kobject_put(&bridge->kobj);
+}
+
+drivers/of/of_pci.c
+
+void of_pci_dma_configure(struct pci_dev *pci_dev)
+{
+	struct device *dev = &pci_dev->dev;
+	struct device *bridge = pci_get_host_bridge_device(pci_dev);
+
+	of_dma_configure(dev, bridge->parent->of_node);
+	pci_put_host_bridge_device(pci_dev);
+}
+
+Murali
+
+> Bjorn
+>
+
+>>>>
+>>
+>>
+>> --
+>> Murali Karicheri
+>> Linux Kernel, Texas Instruments
+
+
 -- 
-2.1.3
+Murali Karicheri
+Linux Kernel, Texas Instruments
