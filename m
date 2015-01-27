@@ -1,100 +1,215 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 27 Jan 2015 21:09:44 +0000
-Subject: [PATCH] ARM: /proc/atags: Export also for DT
-In-Reply-To: <alpine.LFD.2.11.1501271446330.1322@knanqh.ubzr>
-References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
- <20150127132127.GA869@amd>
- <CAL_JsqKM+2PtX_EpWXyOQHVXwf=jqVj8SroUGPO1Y2=Zj8_kMg@mail.gmail.com>
- <201501271532.25540@pali>
- <20150127174818.GM26493@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1501271446330.1322@knanqh.ubzr>
-Message-ID: <20150127210943.GN26493@n2100.arm.linux.org.uk>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue, 27 Jan 2015 22:20:24 +0100
+Subject: [PATCH 1/3] iio: adc: vf610: use ADC clock within specification
+In-Reply-To: <54C7FC31.2000306@kernel.org>
+References: <1421769723-28677-1-git-send-email-stefan@agner.ch>
+ <1421769723-28677-2-git-send-email-stefan@agner.ch>
+ <54C7FC31.2000306@kernel.org>
+Message-ID: <6f337694ae952a4574ad678d80231bd2@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 27, 2015 at 03:03:23PM -0500, Nicolas Pitre wrote:
-> On Tue, 27 Jan 2015, Russell King - ARM Linux wrote:
-> 
-> > On Tue, Jan 27, 2015 at 03:32:25PM +0100, Pali Roh?r wrote:
-> > > On Tuesday 27 January 2015 15:16:45 Rob Herring wrote:
-> > > > What other devices? Where is bootreason in the list of ATAGS:
-> > > > 
-> > > > #define ATAG_MEM        0x54410002
-> > > > #define ATAG_VIDEOTEXT  0x54410003
-> > > > #define ATAG_RAMDISK    0x54410004
-> > > > #define ATAG_INITRD     0x54410005
-> > > > #define ATAG_INITRD2    0x54420005
-> > > > #define ATAG_SERIAL     0x54410006
-> > > > #define ATAG_REVISION   0x54410007
-> > > > #define ATAG_VIDEOLFB   0x54410008
-> > > > #define ATAG_CMDLINE    0x54410009
-> > > > #define ATAG_ACORN      0x41000101
-> > > > #define ATAG_MEMCLK     0x41000402
-> > > > 
-> > > > Rob
-> > > 
-> > > Each device is using own proprietary atag (or other information) 
-> > > to pass bootreason from bootloader to kernel. No standard way :-(
-> 
-> So that's what Pavel was alluding to.
-> 
-> > The reason that happens is because people refuse to discuss their
-> > requirements here - just like people refuse to report userspace API
-> > regressions to kernel people.  This rather pisses me off, because
-> > it creates all sorts of horrid per-platform yuck.
-> > 
-> > We _could_ (and have in the past) turned round and refused to support
-> > these kinds of hacks - which IMHO is quite a reasonable stance to
-> > take: the message we should be sending is "if you wish to design
-> > new methods without discussing it with us, we reserve the right not
-> > to support them in mainline kernels; please discuss with us your
-> > requirements."
-> > 
-> > Each time that we accept one of these hacks, we're sending a message
-> > that says "it's okay to work in this crappy way".
-> > 
-> > Yes, I realise that the N900 has little in the way of support, and we
-> > can't exert that kind of back pressure (since there's no one to direct
-> > that onto to effect any change) so I guess we just have to live with it.
-> 
-> If the method is: "let's pass non-standard ATAGs around and have ad-hoc 
-> user space code interpret it in some arbitrary way" then it's a complete 
-> abomination.
-> 
-> > > I think this kind of information (how was board/computer started) 
-> > > can be useful also for other architectures. E.g. on laptop you 
-> > > would like to know if if was started by RTC, power button, 
-> > > WakeOnLan, another ACPI event, rebooted machine, watchdog, etc... 
-> > > And scripts can act depending on this event (when by RTC, you 
-> > > need to run some planned job, when by watchdog reset you should 
-> > > check what caused that reason...).
-> 
-> Useful when properly designed and generic enough to be shared.
-> 
-> I'd suggest a DT property be proposed for that purpose if it doesn't 
-> already exist.  That at least has a chance to be generically useful.
+On 2015-01-27 21:59, Jonathan Cameron wrote:
+> On 20/01/15 16:02, Stefan Agner wrote:
+>> Depending on conversion mode used, the ADC clock (ADCK) needs
+>> to be below a maximum frequency. According to Vybrid's data
+>> sheet this is 20MHz for the low power conversion mode.
+>>
+>> The ADC clock is depending on input clock, which is the bus
+>> clock by default. Vybrid SoC are typically clocked at at 400MHz
+>> or 500MHz, which leads to 66MHz or 83MHz bus clock respectively.
+>> Hence, a divider of 8 is required to stay below the specified
+>> maximum clock of 20MHz.
+> I hate to point out the obvious, by 83/8 > 20.  Missing something?
 
-What this means is that we have to further augment the atags-to-dt code
-in the decompressor with the platform specific ATAGs to parse this
-information and merge it into the appended DT before passing the
-resulting DT blob to the kernel.
+"stay below the specified maximum clock of 20MHz."
+                          ^
 
-Or we pass both the ATAGs and wrapped DT to the kernel when both exist,
-and let the kernel deal with it in a much saner environment than the
-restricted decompressor environment.
+The next smaller divider is 4, but then we would en up with more than
+20MHz... Unfortunate, but I really don't want to violate the spec :-)
 
-Or we /could/ say that mainline never supported it, and we aren't going
-to add support for "new" tags to the mainline kernel.  It wouldn't be
-a regression, because mainline hasn't ever supported them (that's been
-said before about such things on other platforms.)
+>>
+>> Due to the different bus clock speeds, the resulting sampling
+>> frequency is not static. Hence use the ADC clock and calculate
+>> the actual available sampling frequency dynamically.
+>>
+>> This fixes bogous values observed on some 500MHz clocked Vybrid
+>> SoC. The resulting value usually showed Bit 9 being stuck at 1,
+>> or 0, which lead to a value of +/-512.
+>>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> In principle this looks fine to me. I would however like an
+> Ack from Fugang as the original author of the driver).
 
-However, there's another consideration to be had here before we can say
-that: how many people out there want to run a mainline (or even an
-updated kernel derived from mainline) on this device?  If there's a
-sizable following for the device wanting updated support, then it's
-something we really need to consider supporting inspite of our
-disappointment with Nokia inventing these "proprietary" tags.
+Ok, Fugang is in CC too (B38611 at freescale.com).
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+
+> Given timing I probably wouldn't send this upstream until after
+> the merge window now (as it's stable material this won't really
+> matter).
+
+That's fine for me, thx.
+
+--
+Stefan
+
+> 
+> Jonathan
+>> ---
+>>  drivers/iio/adc/vf610_adc.c | 91 ++++++++++++++++++++++++++++++---------------
+>>  1 file changed, 61 insertions(+), 30 deletions(-)
+>>
+>> diff --git a/drivers/iio/adc/vf610_adc.c b/drivers/iio/adc/vf610_adc.c
+>> index 8ec353c..e63b8e7 100644
+>> --- a/drivers/iio/adc/vf610_adc.c
+>> +++ b/drivers/iio/adc/vf610_adc.c
+>> @@ -141,9 +141,13 @@ struct vf610_adc {
+>>  	struct regulator *vref;
+>>  	struct vf610_adc_feature adc_feature;
+>>
+>> +	u32 sample_freq_avail[5];
+>> +
+>>  	struct completion completion;
+>>  };
+>>
+>> +static const u32 vf610_hw_avgs[] = { 1, 4, 8, 16, 32 };
+>> +
+>>  #define VF610_ADC_CHAN(_idx, _chan_type) {			\
+>>  	.type = (_chan_type),					\
+>>  	.indexed = 1,						\
+>> @@ -180,35 +184,47 @@ static const struct iio_chan_spec vf610_adc_iio_channels[] = {
+>>  	/* sentinel */
+>>  };
+>>
+>> -/*
+>> - * ADC sample frequency, unit is ADCK cycles.
+>> - * ADC clk source is ipg clock, which is the same as bus clock.
+>> - *
+>> - * ADC conversion time = SFCAdder + AverageNum x (BCT + LSTAdder)
+>> - * SFCAdder: fixed to 6 ADCK cycles
+>> - * AverageNum: 1, 4, 8, 16, 32 samples for hardware average.
+>> - * BCT (Base Conversion Time): fixed to 25 ADCK cycles for 12 bit mode
+>> - * LSTAdder(Long Sample Time): fixed to 3 ADCK cycles
+>> - *
+>> - * By default, enable 12 bit resolution mode, clock source
+>> - * set to ipg clock, So get below frequency group:
+>> - */
+>> -static const u32 vf610_sample_freq_avail[5] =
+>> -{1941176, 559332, 286957, 145374, 73171};
+>> +static inline void vf610_adc_calculate_rates(struct vf610_adc *info)
+>> +{
+>> +	unsigned long adck_rate, ipg_rate = clk_get_rate(info->clk);
+>> +	int i;
+>> +
+>> +	/*
+>> +	 * Calculate ADC sample frequencies
+>> +	 * Sample time unit is ADCK cycles. ADCK clk source is ipg clock,
+>> +	 * which is the same as bus clock.
+>> +	 *
+>> +	 * ADC conversion time = SFCAdder + AverageNum x (BCT + LSTAdder)
+>> +	 * SFCAdder: fixed to 6 ADCK cycles
+>> +	 * AverageNum: 1, 4, 8, 16, 32 samples for hardware average.
+>> +	 * BCT (Base Conversion Time): fixed to 25 ADCK cycles for 12 bit mode
+>> +	 * LSTAdder(Long Sample Time): fixed to 3 ADCK cycles
+>> +	 */
+>> +	adck_rate = ipg_rate / info->adc_feature.clk_div;
+>> +	for (i = 0; i < ARRAY_SIZE(vf610_hw_avgs); i++)
+>> +		info->sample_freq_avail[i] =
+>> +			adck_rate / (6 + vf610_hw_avgs[i] * (25 + 3));
+>> +}
+>>
+>>  static inline void vf610_adc_cfg_init(struct vf610_adc *info)
+>>  {
+>> +	struct vf610_adc_feature *adc_feature = &info->adc_feature;
+>> +
+>>  	/* set default Configuration for ADC controller */
+>> -	info->adc_feature.clk_sel = VF610_ADCIOC_BUSCLK_SET;
+>> -	info->adc_feature.vol_ref = VF610_ADCIOC_VR_VREF_SET;
+>> +	adc_feature->clk_sel = VF610_ADCIOC_BUSCLK_SET;
+>> +	adc_feature->vol_ref = VF610_ADCIOC_VR_VREF_SET;
+>> +
+>> +	adc_feature->calibration = true;
+>> +	adc_feature->ovwren = true;
+>> +
+>> +	adc_feature->res_mode = 12;
+>> +	adc_feature->sample_rate = 1;
+>> +	adc_feature->lpm = true;
+>>
+>> -	info->adc_feature.calibration = true;
+>> -	info->adc_feature.ovwren = true;
+>> +	/* Use a save ADCK which is below 20MHz on all devices */
+>> +	adc_feature->clk_div = 8;
+>>
+>> -	info->adc_feature.clk_div = 1;
+>> -	info->adc_feature.res_mode = 12;
+>> -	info->adc_feature.sample_rate = 1;
+>> -	info->adc_feature.lpm = true;
+>> +	vf610_adc_calculate_rates(info);
+>>  }
+>>
+>>  static void vf610_adc_cfg_post_set(struct vf610_adc *info)
+>> @@ -290,12 +306,10 @@ static void vf610_adc_cfg_set(struct vf610_adc *info)
+>>
+>>  	cfg_data = readl(info->regs + VF610_REG_ADC_CFG);
+>>
+>> -	/* low power configuration */
+>>  	cfg_data &= ~VF610_ADC_ADLPC_EN;
+>>  	if (adc_feature->lpm)
+>>  		cfg_data |= VF610_ADC_ADLPC_EN;
+>>
+>> -	/* disable high speed */
+>>  	cfg_data &= ~VF610_ADC_ADHSC_EN;
+>>
+>>  	writel(cfg_data, info->regs + VF610_REG_ADC_CFG);
+>> @@ -435,10 +449,27 @@ static irqreturn_t vf610_adc_isr(int irq, void *dev_id)
+>>  	return IRQ_HANDLED;
+>>  }
+>>
+>> -static IIO_CONST_ATTR_SAMP_FREQ_AVAIL("1941176, 559332, 286957, 145374, 73171");
+>> +static ssize_t vf610_show_samp_freq_avail(struct device *dev,
+>> +				struct device_attribute *attr, char *buf)
+>> +{
+>> +	struct vf610_adc *info = iio_priv(dev_to_iio_dev(dev));
+>> +	size_t len = 0;
+>> +	int i;
+>> +
+>> +	for (i = 0; i < ARRAY_SIZE(info->sample_freq_avail); i++)
+>> +		len += scnprintf(buf + len, PAGE_SIZE - len,
+>> +			"%u ", info->sample_freq_avail[i]);
+>> +
+>> +	/* replace trailing space by newline */
+>> +	buf[len - 1] = '\n';
+>> +
+>> +	return len;
+>> +}
+>> +
+>> +static IIO_DEV_ATTR_SAMP_FREQ_AVAIL(vf610_show_samp_freq_avail);
+>>
+>>  static struct attribute *vf610_attributes[] = {
+>> -	&iio_const_attr_sampling_frequency_available.dev_attr.attr,
+>> +	&iio_dev_attr_sampling_frequency_available.dev_attr.attr,
+>>  	NULL
+>>  };
+>>
+>> @@ -502,7 +533,7 @@ static int vf610_read_raw(struct iio_dev *indio_dev,
+>>  		return IIO_VAL_FRACTIONAL_LOG2;
+>>
+>>  	case IIO_CHAN_INFO_SAMP_FREQ:
+>> -		*val = vf610_sample_freq_avail[info->adc_feature.sample_rate];
+>> +		*val = info->sample_freq_avail[info->adc_feature.sample_rate];
+>>  		*val2 = 0;
+>>  		return IIO_VAL_INT;
+>>
+>> @@ -525,9 +556,9 @@ static int vf610_write_raw(struct iio_dev *indio_dev,
+>>  	switch (mask) {
+>>  		case IIO_CHAN_INFO_SAMP_FREQ:
+>>  			for (i = 0;
+>> -				i < ARRAY_SIZE(vf610_sample_freq_avail);
+>> +				i < ARRAY_SIZE(info->sample_freq_avail);
+>>  				i++)
+>> -				if (val == vf610_sample_freq_avail[i]) {
+>> +				if (val == info->sample_freq_avail[i]) {
+>>  					info->adc_feature.sample_rate = i;
+>>  					vf610_adc_sample_set(info);
+>>  					return 0;
+>>
