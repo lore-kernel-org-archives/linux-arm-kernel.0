@@ -1,63 +1,69 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 27 Jan 2015 13:04:37 +1100
-Subject: linux-next: manual merge of the net-next tree with the arm-soc tree
-Message-ID: <20150127130437.3cd05af9@canb.auug.org.au>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Mon, 26 Jan 2015 18:05:23 -0800
+Subject: [PATCH v4 6/7] ARM: zynq: DT: Add pinctrl information
+In-Reply-To: <54C6D44C.4060106@suse.de>
+References: <1420818231-13451-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1420818231-13451-7-git-send-email-soren.brinkmann@xilinx.com>
+ <54C6D44C.4060106@suse.de>
+Message-ID: <95fcb833572949c9aa2f406c0b147d1f@BL2FFO11FD060.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Tue, 2015-01-27 at 12:57AM +0100, Andreas F?rber wrote:
+> Am 09.01.2015 um 16:43 schrieb Soren Brinkmann:
+> > Add pinctrl descriptions to the zc702 and zc706 device trees.
+> > 
+> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> > Tested-by: Andreas F?rber <afaerber@suse.de>
+> > ---
+> > Changes since v1:
+> >  - remove 'pinctrl-' prefix for pinctrl sub-nodes
+> >  - separate config and mux nodes
+> > 
+> > Changes since RFC v2:
+> >  - add pinconf properties to zc702 mdio node
+> >  - remove arguments from bias-related props
+> > 
+> > Changes since RFC v1:
+> >  - separate DT changes into their own patch
+> > ---
+> >  arch/arm/boot/dts/zynq-7000.dtsi |   8 +-
+> >  arch/arm/boot/dts/zynq-zc702.dts | 181 +++++++++++++++++++++++++++++++++++++++
+> >  arch/arm/boot/dts/zynq-zc706.dts | 152 ++++++++++++++++++++++++++++++++
+> >  3 files changed, 340 insertions(+), 1 deletion(-)
+> [...]
+> > diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
+> > index 280f02dd4ddc..4995412f116f 100644
+> > --- a/arch/arm/boot/dts/zynq-zc702.dts
+> > +++ b/arch/arm/boot/dts/zynq-zc702.dts
+> [...]
+> > @@ -50,15 +52,24 @@
+> >  	status = "okay";
+> >  	phy-mode = "rgmii-id";
+> >  	phy-handle = <&ethernet_phy>;
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&pinctrl_gem0_default>;
+> >  
+> >  	ethernet_phy: ethernet-phy at 7 {
+> >  		reg = <7>;
+> >  	};
+> >  };
+> >  
+> > +&gpio0 {
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&pinctrl_gpio0_default>;
+> 
+> On linux-next the equivalent no longer works for the Parallella, with
+> gpio failing to probe.
+> 
+> If I move these two properties to the leds node (for which I am
+> configuring gpio 7) then I get a heartbeat as before.
 
-Today's linux-next merge of the net-next tree got a conflict in
-arch/arm/boot/dts/rk3288.dtsi between commit eecfe981cecd ("ARM: dts:
-rockchip: add RK3288 suspend support") from the arm-soc tree and commit
-3d3fb74afc9b ("ARM: dts: rockchip: add gmac info for rk3288") from the
-net-next tree.
+I think for USB I have a fix (see other email with patch), but LEDs seem
+to be broken too. On my zc702 I get:
+   of_get_named_gpiod_flags: parsed 'gpios' property of node '/leds/ds23[0]' - status (-517)
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+517 is probe deferral. Looks like the LED driver needs to learn to defer
+probing when the GPIO driver isn't available yet.
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc arch/arm/boot/dts/rk3288.dtsi
-index 2a878a35facc,910dcad2088a..000000000000
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@@ -734,24 -741,11 +750,29 @@@
-  			bias-disable;
-  		};
-  
-+ 		pcfg_pull_none_12ma: pcfg-pull-none-12ma {
-+ 			bias-disable;
-+ 			drive-strength = <12>;
-+ 		};
-+ 
- +		sleep {
- +			global_pwroff: global-pwroff {
- +				rockchip,pins = <0 0 RK_FUNC_1 &pcfg_pull_none>;
- +			};
- +
- +			ddrio_pwroff: ddrio-pwroff {
- +				rockchip,pins = <0 1 RK_FUNC_1 &pcfg_pull_none>;
- +			};
- +
- +			ddr0_retention: ddr0-retention {
- +				rockchip,pins = <0 2 RK_FUNC_1 &pcfg_pull_up>;
- +			};
- +
- +			ddr1_retention: ddr1-retention {
- +				rockchip,pins = <0 3 RK_FUNC_1 &pcfg_pull_up>;
- +			};
- +		};
- +
-  		i2c0 {
-  			i2c0_xfer: i2c0-xfer {
-  				rockchip,pins = <0 15 RK_FUNC_1 &pcfg_pull_none>,
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150127/039daea7/attachment.sig>
+	S?ren
