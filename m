@@ -1,31 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 27 Jan 2015 22:43:25 +0000
-Subject: [PATCH v3 03/13] pm: at91: Workaround DDRSDRC self-refresh bug
- with LPDDR1 memories.
-In-Reply-To: <6740d1ada0cb4c8bbf765728c7443918@EMAIL.axentia.se>
-References: <1422337810-3257-1-git-send-email-wenyou.yang@atmel.com>
- <1422338006-3371-1-git-send-email-wenyou.yang@atmel.com>
- <54C7675D.8000204@cogentembedded.com>
- <6740d1ada0cb4c8bbf765728c7443918@EMAIL.axentia.se>
-Message-ID: <20150127224325.GR26493@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Tue, 27 Jan 2015 23:50:25 +0100
+Subject: [PATCH] pinctrl: pinctrl-imx: don't use invalid value of conf_reg
+Message-ID: <1422399025-25636-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 27, 2015 at 09:55:52PM +0000, Peter Rosin wrote:
-> I have now checked the assembler output, and apparently it mends the
-> input, just as I thought. That might be a fluke, of course, or it might be a
-> deliberate shorthand when the destination register is the same as the
-> following operand?
+The right check for conf_reg to be invalid it testing against -1 not 0
+as is done in the rest of the driver.
 
-I believe it is because we have the assembler in unified asm mode, where
-such things are legal (due to Thumb2.)  That means these two are
-legal:
+This fixes an oops that can be triggered by:
 
-	orr	r2, #const
-	orr	r2, r2, #const
+	cat /sys/kernel/debug/pinctrl/43fac000.iomuxc/*
 
-and equivalent in this context.
+Fixes: ae75ff814538 ("pinctrl: pinctrl-imx: add imx pinctrl core driver")
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ drivers/pinctrl/freescale/pinctrl-imx.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c b/drivers/pinctrl/freescale/pinctrl-imx.c
+index 52f2b9404fe0..448f10986c28 100644
+--- a/drivers/pinctrl/freescale/pinctrl-imx.c
++++ b/drivers/pinctrl/freescale/pinctrl-imx.c
+@@ -437,7 +437,7 @@ static void imx_pinconf_dbg_show(struct pinctrl_dev *pctldev,
+ 	const struct imx_pin_reg *pin_reg = &info->pin_regs[pin_id];
+ 	unsigned long config;
+ 
+-	if (!pin_reg || !pin_reg->conf_reg) {
++	if (!pin_reg || pin_reg->conf_reg == -1) {
+ 		seq_printf(s, "N/A");
+ 		return;
+ 	}
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+2.1.4
