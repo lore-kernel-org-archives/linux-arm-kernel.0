@@ -1,52 +1,104 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 28 Jan 2015 03:54:08 +0800
-Subject: [PATCH v3 03/10] ARM: dts: sun9i: Add usb clock nodes to a80 dtsi
-In-Reply-To: <1422388455-25923-1-git-send-email-wens@csie.org>
-References: <1422388455-25923-1-git-send-email-wens@csie.org>
-Message-ID: <1422388455-25923-4-git-send-email-wens@csie.org>
+Date: Wed, 28 Jan 2015 03:54:05 +0800
+Subject: [PATCH v3 00/10] ARM: sun9i: Add USB host controller support for A80
+Message-ID: <1422388455-25923-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The USB controller and phy clocks and resets have a separate address
-block and driver. Add the nodes to represent them.
+Hi everyone,
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun9i-a80.dtsi | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+This is v3 of the sun9i A80 USB host support series.
 
-diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
-index 9e28ffc6dd90..679cf2878800 100644
---- a/arch/arm/boot/dts/sun9i-a80.dtsi
-+++ b/arch/arm/boot/dts/sun9i-a80.dtsi
-@@ -147,6 +147,28 @@
- 			clock-output-names = "osc32k";
- 		};
- 
-+		usb_mod_clk: clk at 00a08000 {
-+			#clock-cells = <1>;
-+			#reset-cells = <1>;
-+			compatible = "allwinner,sun9i-a80-usb-mod-clk";
-+			reg = <0x00a08000 0x4>;
-+			clocks = <&ahb1_gates 1>;
-+			clock-output-names = "usb0_ahb", "usb_ohci0",
-+					     "usb1_ahb", "usb_ohci1",
-+					     "usb2_ahb", "usb_ohci2";
-+		};
-+
-+		usb_phy_clk: clk at 00a08004 {
-+			#clock-cells = <1>;
-+			#reset-cells = <1>;
-+			compatible = "allwinner,sun9i-a80-usb-phy-clk";
-+			reg = <0x00a08004 0x4>;
-+			clocks = <&ahb1_gates 1>;
-+			clock-output-names = "usb_phy0", "usb_hsic1_480M",
-+					     "usb_phy1", "usb_hsic2_480M",
-+					     "usb_phy2", "usb_hsic_12M";
-+		};
-+
- 		pll4: clk at 0600000c {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun9i-a80-pll4-clk";
+This series adds USB host controller (EHCI/OHCI) support for the Allwinner
+A80 SoC. The A80 has 3 pairs of host controllers and USB PHYs. The PHYs,
+unlike in previous SoCs, do not have low level control registers anymore.
+
+As such, this series forgoes the original phy-sun4i-usb driver, and adds
+a new, simpler driver for the USB PHYs. It may be possible to merge the
+two, but given that work is being done on the OTG front for the earlier
+SoCs, it may be better to merge them after support is complete.
+
+EHCI/OHCI0 corresponds to USB1 DP/DM pins; EHCI1 only has HSIC support;
+EHCI2/OHCI/2 is USB2 DP/DM externally. External pins labeled USB0 are
+for the USB 3.0 OTG controller.
+
+Changes since v2:
+
+  - Split out current USB clock/reset code with a separate patch.
+
+Changes since v1:
+
+  - Rework usb clock/reset driver to only enable ahb gate when child
+    clock gates are enabled.
+
+  - Add AHB_INCR16_BURST flag and HSIC specific bits to phy driver.
+
+  - Renumber USB PHYs according to sunxi tradition, usbphy0 for OTG,
+    usbphy1 and later for xHCI.
+
+  - Add VBUS regulator for usb3 to sunxi common regulators.
+
+  - Use common regulators for usb vbus regulators.
+
+  - Adapt to label references in board dts file.
+
+  - Use gpio and pinctrl macros in dts.
+
+
+Patch 1 moves the usb gate clocks and resets driver to a separate file.
+
+Patch 2 adds a80 specific support for usb-related clocks and resets.
+
+Patch 3 adds the device tree nodes for the usb clocks.
+
+Patch 4 adds a new generic phy driver for a80 usb phys. This has some
+code that is the same as the original phy-sun4i-usb driver, but is simpler.
+
+Patch 5 adds the 3 USB PHY nodes to the a80 dtsi.
+
+Patch 6 adds the USB host controller nodes to the a80 dtsi.
+
+Patch 7 adds a VBUS regulator for usb3 to sunxi common regulators.
+
+Patch 8 enables USB on the A80 Optimus board.
+
+Patch 9 enables sun9i USB PHY in sunxi_defconfig.
+
+Patch 10 enables sun9i USB PHY in multi_v7_defconfig.
+
+Regards,
+ChenYu
+
+
+Chen-Yu Tsai (10):
+  clk: sunxi: Move USB clocks to separate file
+  clk: sunxi: Add support for sun9i A80 USB clocks and resets
+  ARM: dts: sun9i: Add usb clock nodes to a80 dtsi
+  phy: Add driver to support individual USB PHYs on sun9i
+  ARM: dts: sun9i: Add usb phy nodes to a80 dtsi
+  ARM: dts: sun9i: Add USB host controller nodes to a80 dtsi
+  ARM: dts: sunxi: Add usb3_vbus regulator to common regulators dtsi
+  ARM: dts: sun9i: Enable USB support on A80 Optimus board
+  ARM: sunxi_defconfig: Enable CONFIG_PHY_SUN9I_USB
+  ARM: multi_v7_defconfig: Enable CONFIG_PHY_SUN9I_USB
+
+ Documentation/devicetree/bindings/clock/sunxi.txt  |   2 +
+ .../devicetree/bindings/phy/sun9i-usb-phy.txt      |  34 +++
+ arch/arm/boot/dts/sun9i-a80-optimus.dts            |  60 ++++++
+ arch/arm/boot/dts/sun9i-a80.dtsi                   | 129 +++++++++++
+ arch/arm/boot/dts/sunxi-common-regulators.dtsi     |  10 +
+ arch/arm/configs/multi_v7_defconfig                |   1 +
+ arch/arm/configs/sunxi_defconfig                   |   1 +
+ drivers/clk/sunxi/Makefile                         |   1 +
+ drivers/clk/sunxi/clk-sunxi.c                      |  88 --------
+ drivers/clk/sunxi/clk-usb.c                        | 233 ++++++++++++++++++++
+ drivers/phy/Kconfig                                |  12 ++
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-sun9i-usb.c                        | 238 +++++++++++++++++++++
+ 13 files changed, 722 insertions(+), 88 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/sun9i-usb-phy.txt
+ create mode 100644 drivers/clk/sunxi/clk-usb.c
+ create mode 100644 drivers/phy/phy-sun9i-usb.c
+
 -- 
 2.1.4
