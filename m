@@ -1,108 +1,130 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Tue, 27 Jan 2015 15:32:25 +0100
-Subject: [PATCH] ARM: /proc/atags: Export also for DT
-In-Reply-To: <CAL_JsqKM+2PtX_EpWXyOQHVXwf=jqVj8SroUGPO1Y2=Zj8_kMg@mail.gmail.com>
-References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
- <20150127132127.GA869@amd>
- <CAL_JsqKM+2PtX_EpWXyOQHVXwf=jqVj8SroUGPO1Y2=Zj8_kMg@mail.gmail.com>
-Message-ID: <201501271532.25540@pali>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 27 Jan 2015 11:42:08 -0300
+Subject: [PATCH 5/9] mtd: pxa3xx_nand: add support for the Marvell Berlin
+ nand controller
+In-Reply-To: <1422367816-4257-6-git-send-email-antoine.tenart@free-electrons.com>
+References: <1422367816-4257-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1422367816-4257-6-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <54C7A3C0.6020507@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 27 January 2015 15:16:45 Rob Herring wrote:
-> On Tue, Jan 27, 2015 at 7:21 AM, Pavel Machek <pavel@ucw.cz> 
-wrote:
-> > On Mon 2015-01-26 14:33:21, Rob Herring wrote:
-> >> On Mon, Jan 26, 2015 at 1:16 PM, Pali Roh?r 
-<pali.rohar@gmail.com> wrote:
-> >> > This patch will cause that decompressor store full ATAG
-> >> > structure into DT tree ("/atags"):
-> >> > 
-> >> > 
-> >> > +       /* include the terminating ATAG_NONE */
-> >> > +       atag_size = (char *)atag - (char *)atag_list +
-> >> > sizeof(struct tag_header); +       setprop(fdt, "/",
-> >> > "atags", atag_list, atag_size); +
-> >> > 
-> >> >         if (memcount) {
-> >> >         
-> >> >                 setprop(fdt, "/memory", "reg",
-> >> >                 mem_reg_property,
-> >> >                 
-> >> >                         4 * memcount * memsize);
-> >> > 
-> >> > And this patch will export ATAG structure from DT tree 
-("/atags") into /proc/atags file:
-> >> Please properly send your patches.
-> > 
-> > Actually, when sending patches for discussion, this is
-> > format easier to read.
+On 01/27/2015 11:10 AM, Antoine Tenart wrote:
+> The nand controller on Marvell Berlin SoC reuse the pxa3xx nand driver
+> as it quite close. The process of sending commands can be compared to
+> the one of the Marvell armada 370: read and write commands are done in
+> chunks.
 > 
-> Some people might prefer them as attachments too...
+> But the Berlin nand controller has some other specificities which
+> require some modifications of the pxa3xx nand driver:
+> - there are no IRQ available so we need to poll the status register: we
+>   have to use our own cmdfunc Berlin function, and early on the probing
+>   function.
+> - PAGEPROG are very different from the one used in the pxa3xx driver,
+>   so we're using a specific process for this one
+> - the SEQIN command is equivalent to a READ0 command
+> - the RNDOUT command must be used to perform a read operation, and the
+>   command is not NAND_CMD_RNDOUT
+> - the ERASE1 command is specific (0xd060)
 > 
-> >> > Some userspace applications needs access to ATAG
-> >> > structure where can be stored some information passed
-> >> > from bootloader to kernel. Example is Nokia N900 device
-> >> > and NOLO bootloader which provides information about
-> >> > bootreason (device was started by power button or by
-> >> > alarm or restarted...) and bootmode (normal mode or
-> >> > device update mode).
-> >> 
-> >> This goes in the commit message.
-> >> 
-> >> These would be non-standard fields which are not upstream.
-> >> I don't know that we care in that case...
-> > 
-> > Other devices are going to care about boot reason, too, and
-> > we might as well be compatible...
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> ---
+>  drivers/mtd/nand/pxa3xx_nand.c | 287 +++++++++++++++++++++++++++++++++++++----
+>  1 file changed, 261 insertions(+), 26 deletions(-)
 > 
-> What other devices? Where is bootreason in the list of ATAGS:
-> 
-> #define ATAG_MEM        0x54410002
-> #define ATAG_VIDEOTEXT  0x54410003
-> #define ATAG_RAMDISK    0x54410004
-> #define ATAG_INITRD     0x54410005
-> #define ATAG_INITRD2    0x54420005
-> #define ATAG_SERIAL     0x54410006
-> #define ATAG_REVISION   0x54410007
-> #define ATAG_VIDEOLFB   0x54410008
-> #define ATAG_CMDLINE    0x54410009
-> #define ATAG_ACORN      0x41000101
-> #define ATAG_MEMCLK     0x41000402
-> 
-> Rob
+> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+> index b2783b1f663c..62ea369dc524 100644
+> --- a/drivers/mtd/nand/pxa3xx_nand.c
+> +++ b/drivers/mtd/nand/pxa3xx_nand.c
+> @@ -109,6 +109,8 @@
+>  #define NDCB0_EXT_CMD_TYPE(x)	(((x) << 29) & NDCB0_EXT_CMD_TYPE_MASK)
+>  #define NDCB0_CMD_TYPE_MASK	(0x7 << 21)
+>  #define NDCB0_CMD_TYPE(x)	(((x) << 21) & NDCB0_CMD_TYPE_MASK)
+> +#define NDCB0_CMD_XTYPE_MASK	(0x7 << 29)
+> +#define NDCB0_CMD_XTYPE(x)	(((x) << 29) & NDCB0_CMD_XTYPE_MASK)
+>  #define NDCB0_NC		(0x1 << 20)
+>  #define NDCB0_DBC		(0x1 << 19)
+>  #define NDCB0_ADDR_CYC_MASK	(0x7 << 16)
+> @@ -117,13 +119,20 @@
+>  #define NDCB0_CMD1_MASK		(0xff)
+>  #define NDCB0_ADDR_CYC_SHIFT	(16)
+>  
+> -#define EXT_CMD_TYPE_DISPATCH	6 /* Command dispatch */
+> -#define EXT_CMD_TYPE_NAKED_RW	5 /* Naked read or Naked write */
+> -#define EXT_CMD_TYPE_READ	4 /* Read */
+> -#define EXT_CMD_TYPE_DISP_WR	4 /* Command dispatch with write */
+> -#define EXT_CMD_TYPE_FINAL	3 /* Final command */
+> -#define EXT_CMD_TYPE_LAST_RW	1 /* Last naked read/write */
+> -#define EXT_CMD_TYPE_MONO	0 /* Monolithic read/write */
+> +#define EXT_CMD_TYPE_LAST_PAGEPROG	10
+> +#define EXT_CMD_TYPE_CHUNK_PAGEPROG	9
+> +#define EXT_CMD_TYPE_LAST_RNDOUT	8
+> +#define EXT_CMD_TYPE_CHUNK_RNDOUT	7
+> +#define EXT_CMD_TYPE_DISPATCH		6 /* Command dispatch */
+> +#define EXT_CMD_TYPE_NAKED_RW		5 /* Naked read or Naked write */
+> +#define EXT_CMD_TYPE_READ		4 /* Read */
+> +#define EXT_CMD_TYPE_DISP_WR		4 /* Command dispatch with write */
+> +#define EXT_CMD_TYPE_FINAL		3 /* Final command */
+> +#define EXT_CMD_TYPE_LAST_RW		1 /* Last naked read/write */
+> +#define EXT_CMD_TYPE_MONO		0 /* Monolithic read/write */
+> +
+> +#define BERLIN_NAND_CMD_RNDOUT		0x3000
+> +#define BERLIN_NAND_CMD_ERASE1		0xd060
+>  
+>  /* macros for registers read/write */
+>  #define nand_writel(info, off, val)	\
+> @@ -158,6 +167,7 @@ enum {
+>  enum pxa3xx_nand_variant {
+>  	PXA3XX_NAND_VARIANT_PXA,
+>  	PXA3XX_NAND_VARIANT_ARMADA370,
+> +	PXA3XX_NAND_VARIANT_BERLIN2,
+>  };
+>  
+>  struct pxa3xx_nand_host {
+> @@ -244,10 +254,13 @@ module_param(use_dma, bool, 0444);
+>  MODULE_PARM_DESC(use_dma, "enable DMA for data transferring to/from NAND HW");
+>  
+>  static struct pxa3xx_nand_timing timing[] = {
+> -	{ 40, 80, 60, 100, 80, 100, 90000, 400, 40, },
+> -	{ 10,  0, 20,  40, 30,  40, 11123, 110, 10, },
+> -	{ 10, 25, 15,  25, 15,  30, 25000,  60, 10, },
+> -	{ 10, 35, 15,  25, 15,  25, 25000,  60, 10, },
+> +	{ 40, 80, 60, 100, 80, 100,  90000, 400, 40, },
+> +	{ 10,  0, 20,  40, 30,  40,  11123, 110, 10, },
+> +	{ 10, 25, 15,  25, 15,  30,  25000,  60, 10, },
+> +	{ 10, 35, 15,  25, 15,  25,  25000,  60, 10, },
+> +	{  5, 20, 10,  12, 10,  12,  60000,  60, 10, },
+> +	{  5, 20, 10,  12, 10,  12, 200000, 120, 10, },
+> +	{  5, 15, 10,  15, 10,  15,  60000,  60, 10, },
+>  };
+>  
+>  static struct pxa3xx_nand_flash builtin_flash_types[] = {
+> @@ -260,6 +273,20 @@ static struct pxa3xx_nand_flash builtin_flash_types[] = {
+>  { "512MiB 8-bit",  0xdc2c,  64, 2048,  8,  8, 4096, &timing[2] },
+>  { "512MiB 16-bit", 0xcc2c,  64, 2048, 16, 16, 4096, &timing[2] },
+>  { "256MiB 16-bit", 0xba20,  64, 2048, 16, 16, 2048, &timing[3] },
+> +{ },
+> +};
+> +
+> +static struct pxa3xx_nand_flash berlin_builtin_flash_types[] = {
+> +{ "2GiB 8-bit",    0xd5ec, 128, 8192,  8,  8, 2048, &timing[4] },
+> +{ "2GiB 8-bit",    0xd598, 128, 8192,  8,  8, 2048, &timing[5] },
+> +{ "2GiB 8-bit",    0x482c, 256, 4096,  8,  8, 2048, &timing[6] },
+> +{ "4GiB 8-bit",    0xd7ec, 128, 8192,  8,  8, 4096, &timing[5] },
+> +{ "8GiB 8-bit",    0xdeec, 128, 8192,  8,  8, 4096, &timing[5] },
+> +{ "4GiB 8-bit",    0xd7ad, 256, 8192,  8,  8, 2048, &timing[5] },
+> +{ "4GiB 8-bit",    0x682c, 256, 4096,  8,  8, 4096, &timing[6] },
+> +{ "8GiB 8-bit",    0x882c, 256, 8192,  8,  8, 4096, &timing[6] },
+> +{ "8GiB 8-bit",    0xdead, 256, 8192,  8,  8, 4096, &timing[6] },
+> +{ },
+>  };
+>  
 
-Each device is using own proprietary atag (or other information) 
-to pass bootreason from bootloader to kernel. No standard way :-(
+IMO, this sucks. I was hoping to see this old style probing go away,
+instead of be augmented.
 
-I think Pavel mean to introduce some standard way how *new* 
-version of bootloaders can pass boot reason to kernel and how 
-kernel tell it to userspace...
-
-E.g. NOLO -- bootloader for Nokia N900 -- pass this information 
-in ATAG_OMAP (0x414f4d50) and Nokia kernel exports it via procfs 
-file /proc/bootreason.
-
-Also NOLO pass some other information via ATAGs, but those are 
-static and now part of n900 DT file. But bootreason is not static 
-information so cannot be hardcoded into static DT file which is 
-part of kernel.
-
-I think this kind of information (how was board/computer started) 
-can be useful also for other architectures. E.g. on laptop you 
-would like to know if if was started by RTC, power button, 
-WakeOnLan, another ACPI event, rebooted machine, watchdog, etc... 
-And scripts can act depending on this event (when by RTC, you 
-need to run some planned job, when by watchdog reset you should 
-check what caused that reason...).
-
+There are proper ways to set timings.
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150127/f0b0c2da/attachment.sig>
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
