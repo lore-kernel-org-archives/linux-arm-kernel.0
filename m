@@ -1,55 +1,84 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 27 Jan 2015 09:58:09 +0900
-Subject: [PATCH v2 1/3] ARM: shmobile: armadillo800eva: Properly specify
- HDMI audio link format
-In-Reply-To: <1421847492-8857-1-git-send-email-lars@metafoo.de>
-References: <1421847492-8857-1-git-send-email-lars@metafoo.de>
-Message-ID: <20150127005808.GB29710@verge.net.au>
+Date: Tue, 27 Jan 2015 09:59:00 +0900
+Subject: [PATCH repost] ARM: shmobile: r8a7794: Correct SDHI base
+ address, clock labels and output-names
+In-Reply-To: <20150122022559.GC31170@verge.net.au>
+References: <20150122022559.GC31170@verge.net.au>
+Message-ID: <20150127005859.GC29710@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 21, 2015 at 02:38:10PM +0100, Lars-Peter Clausen wrote:
-> The DAI link format should be specified for the whole link rather than just
-> one component on the link. So move the format specification for the HDMI
-> audio link from the CPU component to the link itself.
+On Thu, Jan 22, 2015 at 11:25:59AM +0900, Simon Horman wrote:
+> * Correct base address of SD3 div6 clk.
+> * Update div6 labels and MSTP output names
+>   There appears to have been some inconsistency and confusion here as on
+>   the r8a7790 these clocks are referred to as SD(HI)1 and SD(HI)2 while on
+>   the r8a7791 and r8a7794 they are referred to as SD(HI)2 and SD(HI)3.
 > 
-> Since the sh-mobile-hdmi DAI driver doesn't implement the set_fmt() callback
-> in this case there is no functional difference between only specifying the
-> the format for the CPU side or for the whole link, but the later it will
-> allow us to remove support for just specifying the format for one component.
+> This has no run-time affect as the clock nodes are not currently used.
 > 
-> Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
+> Fixes: 8e181633e6ca96049 ("ARM: shmobile: r8a7794: Add SDHI clocks to device tree")
+> Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
+Geert,
+
+could you find a moment to look over this.
+Its a follow-up to an earlier patch which you gave me some
+feedback on.
+
+> 
 > ---
-> No changes since v1.
-
-Morimoto-san,
-
-could you provide a review of this patch?
-
+> * A similar change to update the div6 clock node names and labels,
+>   and the MSTP clock output-names is required for the r8a7791.
+>   The base addresses appear to be correct there.
 > ---
->  arch/arm/mach-shmobile/board-armadillo800eva.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm/boot/dts/r8a7794.dtsi | 10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
 > 
-> diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
-> index 6d949f1..75de26c 100644
-> --- a/arch/arm/mach-shmobile/board-armadillo800eva.c
-> +++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
-> @@ -1040,9 +1040,9 @@ static struct asoc_simple_card_info fsi2_hdmi_info = {
->  	.card		= "FSI2B-HDMI",
->  	.codec		= "sh-mobile-hdmi",
->  	.platform	= "sh_fsi2",
-> +	.daifmt		= SND_SOC_DAIFMT_CBS_CFS,
->  	.cpu_dai = {
->  		.name	= "fsib-dai",
-> -		.fmt	= SND_SOC_DAIFMT_CBS_CFS,
->  	},
->  	.codec_dai = {
->  		.name = "sh_mobile_hdmi-hifi",
+> diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+> index 8f78da5..b98534e 100644
+> --- a/arch/arm/boot/dts/r8a7794.dtsi
+> +++ b/arch/arm/boot/dts/r8a7794.dtsi
+> @@ -294,16 +294,16 @@
+>  					     "lb", "qspi", "sdh", "sd0", "z";
+>  		};
+>  		/* Variable factor clocks */
+> -		sd1_clk: sd2_clk at e6150078 {
+> +		sd2_clk: sd2_clk at e6150078 {
+>  			compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
+>  			reg = <0 0xe6150078 0 4>;
+>  			clocks = <&pll1_div2_clk>;
+>  			#clock-cells = <0>;
+>  			clock-output-names = "sd1";
+>  		};
+> -		sd2_clk: sd3_clk at e615007c {
+> +		sd3_clk: sd3_clk at e615026c {
+>  			compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
+> -			reg = <0 0xe615007c 0 4>;
+> +			reg = <0 0xe615026c 0 4>;
+>  			clocks = <&pll1_div2_clk>;
+>  			#clock-cells = <0>;
+>  			clock-output-names = "sd2";
+> @@ -518,7 +518,7 @@
+>  		mstp3_clks: mstp3_clks at e615013c {
+>  			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
+>  			reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
+> -			clocks = <&sd2_clk>, <&sd1_clk>, <&cpg_clocks R8A7794_CLK_SD0>,
+> +			clocks = <&sd3_clk>, <&sd2_clk>, <&cpg_clocks R8A7794_CLK_SD0>,
+>  			         <&mmc0_clk>, <&rclk_clk>, <&hp_clk>, <&hp_clk>;
+>  			#clock-cells = <1>;
+>  			clock-indices = <
+> @@ -527,7 +527,7 @@
+>  				R8A7794_CLK_USBDMAC0 R8A7794_CLK_USBDMAC1
+>  			>;
+>  			clock-output-names =
+> -			        "sdhi2", "sdhi1", "sdhi0",
+> +			        "sdhi3", "sdhi2", "sdhi0",
+>  				"mmcif0", "cmt1", "usbdmac0", "usbdmac1";
+>  		};
+>  		mstp7_clks: mstp7_clks at e615014c {
 > -- 
-> 1.8.0
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 2.1.4
 > 
