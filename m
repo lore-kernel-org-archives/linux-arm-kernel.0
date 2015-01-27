@@ -1,117 +1,178 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 27 Jan 2015 09:48:09 +0100
-Subject: [PATCH repost] ARM: shmobile: r8a7794: Correct SDHI base address,
- clock labels and output-names
-In-Reply-To: <20150127005859.GC29710@verge.net.au>
-References: <20150122022559.GC31170@verge.net.au>
- <20150127005859.GC29710@verge.net.au>
-Message-ID: <CAMuHMdXMuJzJ6C-Wv4fGj4mXaU8jkJpS6Vf22y6uNMXOJpss3g@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 27 Jan 2015 10:03:35 +0100
+Subject: [PATCH] arm: sunxi: input: RFC: Add sysfs voltage for sun4i-lradc
+ driver
+In-Reply-To: <20150126220622.GA16941@dtor-ws>
+References: <1422291516-24895-1-git-send-email-plaes@plaes.org>
+ <54C6955D.403@redhat.com> <20150126220622.GA16941@dtor-ws>
+Message-ID: <54C75467.7010909@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi,
 
-On Tue, Jan 27, 2015 at 1:59 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Thu, Jan 22, 2015 at 11:25:59AM +0900, Simon Horman wrote:
->> * Correct base address of SD3 div6 clk.
->> * Update div6 labels and MSTP output names
->>   There appears to have been some inconsistency and confusion here as on
->>   the r8a7790 these clocks are referred to as SD(HI)1 and SD(HI)2 while on
->>   the r8a7791 and r8a7794 they are referred to as SD(HI)2 and SD(HI)3.
+On 26-01-15 23:06, Dmitry Torokhov wrote:
+> On Mon, Jan 26, 2015 at 08:28:29PM +0100, Hans de Goede wrote:
+>> Hi,
 >>
->> This has no run-time affect as the clock nodes are not currently used.
+>> On 26-01-15 17:58, Priit Laes wrote:
 >>
->> Fixes: 8e181633e6ca96049 ("ARM: shmobile: r8a7794: Add SDHI clocks to device tree")
->> Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
->> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>> No commit message? Please write an informative commit msg, like why we want this patch,
+>> I guess it is to help figuring out the voltage levels for various buttons when creating
+>> a dts, but I would prefer to not guess, which is where a good commit message would
+>> come in handy ...
+>>
+>>> ---
+>>>   .../ABI/testing/sysfs-driver-input-sun4i-lradc     |  4 ++
+>>>   drivers/input/keyboard/sun4i-lradc-keys.c          | 49 +++++++++++++++++-----
+>>>   2 files changed, 43 insertions(+), 10 deletions(-)
+>>>   create mode 100644 Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc
+>>>
+>>> diff --git a/Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc b/Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc
+>>> new file mode 100644
+>>> index 0000000..e4e6448
+>>> --- /dev/null
+>>> +++ b/Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc
+>>> @@ -0,0 +1,4 @@
+>>> +What:		/sys/class/input/input(x)/device/voltage
+>>> +Date:		February 2015
+>>> +Contact:	Priit Laes <plaes@plaes.org>
+>>> +Description:	ADC output voltage in microvolts or 0 if device is not opened.
+>>> diff --git a/drivers/input/keyboard/sun4i-lradc-keys.c b/drivers/input/keyboard/sun4i-lradc-keys.c
+>>> index cc8f7dd..c0ab8ec 100644
+>>> --- a/drivers/input/keyboard/sun4i-lradc-keys.c
+>>> +++ b/drivers/input/keyboard/sun4i-lradc-keys.c
+>>> @@ -79,10 +79,27 @@ struct sun4i_lradc_data {
+>>>   	u32 vref;
+>>>   };
+>>>
+>>> +static u32 sun4i_lradc_read_voltage(struct sun4i_lradc_data *lradc)
+>>> +{
+>>> +	u32 val = readl(lradc->base + LRADC_DATA0) & 0x3f;
+>>> +	return val * lradc->vref / 63;
+>>> +};
+>>> +
+>>> +static ssize_t
+>>> +sun4i_lradc_dev_voltage_show(struct device *dev,
+>>> +			struct device_attribute *attr, char *buf)
+>>> +{
+>>> +	struct sun4i_lradc_data *lradc = dev_get_drvdata(dev);
+>>> +
+>>> +	return sprintf(buf, "%u\n", sun4i_lradc_read_voltage(lradc));
+>>> +}
+>>> +
+>>> +static const DEVICE_ATTR(voltage, S_IRUGO, sun4i_lradc_dev_voltage_show, NULL);
+>>> +
+>>>   static irqreturn_t sun4i_lradc_irq(int irq, void *dev_id)
+>>>   {
+>>>   	struct sun4i_lradc_data *lradc = dev_id;
+>>> -	u32 i, ints, val, voltage, diff, keycode = 0, closest = 0xffffffff;
+>>> +	u32 i, ints, voltage, diff, keycode = 0, closest = 0xffffffff;
+>>>
+>>>   	ints  = readl(lradc->base + LRADC_INTS);
+>>>
+>>> @@ -97,8 +114,7 @@ static irqreturn_t sun4i_lradc_irq(int irq, void *dev_id)
+>>>   	}
+>>>
+>>>   	if ((ints & CHAN0_KEYDOWN_IRQ) && lradc->chan0_keycode == 0) {
+>>> -		val = readl(lradc->base + LRADC_DATA0) & 0x3f;
+>>> -		voltage = val * lradc->vref / 63;
+>>> +		voltage = sun4i_lradc_read_voltage(lradc);
+>>>
+>>>   		for (i = 0; i < lradc->chan0_map_count; i++) {
+>>>   			diff = abs(lradc->chan0_map[i].voltage - voltage);
+>>> @@ -156,7 +172,7 @@ static void sun4i_lradc_close(struct input_dev *dev)
+>>>   }
+>>>
+>>>   static int sun4i_lradc_load_dt_keymap(struct device *dev,
+>>> -				      struct sun4i_lradc_data *lradc)
+>>> +				    struct sun4i_lradc_data *lradc)
+>>>   {
+>>>   	struct device_node *np, *pp;
+>>>   	int i;
+>>
+>> Why this identation change ?
+>>
+>>> @@ -168,8 +184,8 @@ static int sun4i_lradc_load_dt_keymap(struct device *dev,
+>>>
+>>>   	lradc->chan0_map_count = of_get_child_count(np);
+>>>   	if (lradc->chan0_map_count == 0) {
+>>> -		dev_err(dev, "keymap is missing in device tree\n");
+>>> -		return -EINVAL;
+>>> +		dev_info(dev, "keymap is missing in device tree\n");
+>>> +		return 0;
+>>>   	}
+>>>
+>>>   	lradc->chan0_map = devm_kmalloc_array(dev, lradc->chan0_map_count,
+>>
+>> I assume this is so that people can still use the sysfs node, to create a dts, right
+>> not sure I like this, might be better to document to simple create a dts with
+>> a single button mapping for 200 mV (most board use 200 mV steps between the buttons).
+>>
+>>> @@ -185,19 +201,19 @@ static int sun4i_lradc_load_dt_keymap(struct device *dev,
+>>>
+>>>   		error = of_property_read_u32(pp, "channel", &channel);
+>>>   		if (error || channel != 0) {
+>>> -			dev_err(dev, "%s: Inval channel prop\n", pp->name);
+>>> +			dev_err(dev, "%s: Invalid 'channel' property\n", pp->name);
+>>>   			return -EINVAL;
+>>>   		}
+>>>
+>>>   		error = of_property_read_u32(pp, "voltage", &map->voltage);
+>>>   		if (error) {
+>>> -			dev_err(dev, "%s: Inval voltage prop\n", pp->name);
+>>> +			dev_err(dev, "%s: Invalid 'voltage' property\n", pp->name);
+>>>   			return -EINVAL;
+>>>   		}
+>>>
+>>>   		error = of_property_read_u32(pp, "linux,code", &map->keycode);
+>>>   		if (error) {
+>>> -			dev_err(dev, "%s: Inval linux,code prop\n", pp->name);
+>>> +			dev_err(dev, "%s: Invalid 'linux,code' property\n", pp->name);
+>>>   			return -EINVAL;
+>>>   		}
+>>>
+>>
+>> This hunk / 3 changes belong in a separate patch. Also please run checkpatch, I think
+>> you're running over 80 chars here.
+>>
+>>
+>>> @@ -257,14 +273,26 @@ static int sun4i_lradc_probe(struct platform_device *pdev)
+>>>   	if (error)
+>>>   		return error;
+>>>
+>>> -	error = input_register_device(lradc->input);
+>>> +	error = device_create_file(dev, &dev_attr_voltage);
+>>>   	if (error)
+>>>   		return error;
+>>>
+>>> +	error = input_register_device(lradc->input);
+>>> +	if (error) {
+>>> +		device_remove_file(&pdev->dev, &dev_attr_voltage);
+>>> +		return error;
+>>> +	}
+>>> +
+>>>   	platform_set_drvdata(pdev, lradc);
+>>>   	return 0;
+>>>   }
+>>>
+>>> +static int sun4i_lradc_remove(struct platform_device *pdev)
+>>> +{
+>>> +	device_remove_file(&pdev->dev, &dev_attr_voltage);
+>>> +	return 0;
+>>> +}
+>>> +
+>>
+>> This looks wrong, I think (*) that we've a bug here because we're not
+>> unregistering the input device, so maybe do 2 patches, 1 fixing the
+>> not unregistering bug, and then just add the device_remove_file()
+>> in the sysfs patch.
 >
-> Geert,
->
-> could you find a moment to look over this.
-> Its a follow-up to an earlier patch which you gave me some
-> feedback on.
+> The unregister was not necessary since the input device is managed.
 
-Sorry, it fell through the cracks.
+Ah right, looking at the code again I see we use devm_input_allocate_device()
+is there no devm_create_file for creating sysfs entries ?
 
->> ---
->> * A similar change to update the div6 clock node names and labels,
->>   and the MSTP clock output-names is required for the r8a7791.
->>   The base addresses appear to be correct there.
->> ---
->>  arch/arm/boot/dts/r8a7794.dtsi | 10 +++++-----
->>  1 file changed, 5 insertions(+), 5 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
->> index 8f78da5..b98534e 100644
->> --- a/arch/arm/boot/dts/r8a7794.dtsi
->> +++ b/arch/arm/boot/dts/r8a7794.dtsi
->> @@ -294,16 +294,16 @@
->>                                            "lb", "qspi", "sdh", "sd0", "z";
->>               };
->>               /* Variable factor clocks */
->> -             sd1_clk: sd2_clk at e6150078 {
->> +             sd2_clk: sd2_clk at e6150078 {
->>                       compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
->>                       reg = <0 0xe6150078 0 4>;
->>                       clocks = <&pll1_div2_clk>;
->>                       #clock-cells = <0>;
->>                       clock-output-names = "sd1";
+Regards,
 
-I think these should be "sd2"...
-
->>               };
->> -             sd2_clk: sd3_clk at e615007c {
->> +             sd3_clk: sd3_clk at e615026c {
->>                       compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
->> -                     reg = <0 0xe615007c 0 4>;
->> +                     reg = <0 0xe615026c 0 4>;
->>                       clocks = <&pll1_div2_clk>;
->>                       #clock-cells = <0>;
->>                       clock-output-names = "sd2";
-
-... and "sd3", as they refer to the clock signals from the clock generator,
-and thus should match the register and label names.
-
-(Note: The (old) R-Car E2 v0.1 datasheet does call them SD1 and SD2 :-(
-
->> @@ -518,7 +518,7 @@
->>               mstp3_clks: mstp3_clks at e615013c {
->>                       compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
->>                       reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
->> -                     clocks = <&sd2_clk>, <&sd1_clk>, <&cpg_clocks R8A7794_CLK_SD0>,
->> +                     clocks = <&sd3_clk>, <&sd2_clk>, <&cpg_clocks R8A7794_CLK_SD0>,
->>                                <&mmc0_clk>, <&rclk_clk>, <&hp_clk>, <&hp_clk>;
->>                       #clock-cells = <1>;
->>                       clock-indices = <
->> @@ -527,7 +527,7 @@
->>                               R8A7794_CLK_USBDMAC0 R8A7794_CLK_USBDMAC1
->>                       >;
->>                       clock-output-names =
->> -                             "sdhi2", "sdhi1", "sdhi0",
->> +                             "sdhi3", "sdhi2", "sdhi0",
-
-These are disputable: the MSTP docs indeed call them SDHI3, SDHI2, and
-SDHI0 (in the latest R-Car Gen2 family datasheet revision).
-But for all(?) other MSTP clocks they match the actual module instances
-that are driven by the clocks.
-So I think these should stay "sdhi2", "sdhi1", and "sdhi0", as they refer to
-the SDHI instances, not the parent clocks.
-
-At least we should be consistent with the R8A7794_CLK_SDHIx indices,
-which are 2, 1, and 0, not 3, 2, 0.
-
->>                               "mmcif0", "cmt1", "usbdmac0", "usbdmac1";
->>               };
->>               mstp7_clks: mstp7_clks at e615014c {
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Hans
