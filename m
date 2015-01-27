@@ -1,37 +1,15 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 27 Jan 2015 15:59:57 -0500
-Subject: [PATCH v5 0/8] PCI: get DMA configuration from parent device
-Message-ID: <1422392405-32196-1-git-send-email-m-karicheri2@ti.com>
+Date: Tue, 27 Jan 2015 16:00:00 -0500
+Subject: [PATCH v5 3/8] of: fix size when dma-range is not used
+In-Reply-To: <1422392405-32196-1-git-send-email-m-karicheri2@ti.com>
+References: <1422392405-32196-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1422392405-32196-4-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PCI devices on Keystone doesn't have correct dma_pfn_offset set. This patch
-add capability to set the dma configuration such as dma-mask, dma_pfn_offset,
-and dma ops etc using the information from DT. The prior RFCs and discussions
-are available at [1] and [2] below.
-
-[2] : https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg790244.html
-[1] : http://www.gossamer-threads.com/lists/linux/kernel/2024591
-
-Change history:
-	v5 - moved the dma_mask update in device from ARM specific API to
-	     of_dma_configure to allow this across other architecture as well
-	   - improved sanity check for DT dma-range size in of_dma_configure()
-	   - moved API to get parent bridge device to PCI (host-bridge.c)
-	v4 - moved size adjustments in of_iommu_configure() to a separate patch
-	   - consistent node name comment from Rob
-	   - patch 6 added for dma_mask adjustment and iommu mapping size
-	     limiting.
-	v3 - addressed comments to re-use of_dma_configure() for PCI
-	   - To help re-use, change of_iommu_configure() function argument
-		- Move of_dma_configure to of/device.c
-		- Limit the of_iommu_configure to non pci devices
-	v2 - update size to coherent_dma_mask + 1 if dma-range info is missing
-	   - also check the np for null.
-	v1 - updates based on the comments against initial RFC.
-	   - Added a helper function to get the OF node of the parent
-	   - Added an API in of_pci.c to update DMA configuration of the pci
-	     device.
+Fix the dma-range size when the DT attribute is missing. i.e  set size to
+dev->coherent_dma_mask + 1 instead of dev->coherent_dma_mask. Also add
+code to check invalid values of size configured in DT and log error.
 
 Cc: Joerg Roedel <joro@8bytes.org>
 Cc: Grant Likely <grant.likely@linaro.org>
@@ -42,31 +20,35 @@ Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
-Acked-by: Murali Karicheri <m-karicheri2@ti.com>
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+---
+ drivers/of/device.c |    9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-Murali Karicheri (8):
-  of: iommu: add ptr to OF node arg to of_iommu_configure()
-  of: move of_dma_configure() to device.c to help re-use
-  of: fix size when dma-range is not used
-  PCI: add helper functions pci_get[put]_host_bridge_device()
-  of/pci: add of_pci_dma_configure() update dma configuration
-  PCI: update dma configuration from DT
-  arm: dma-mapping: limit iommu mapping size
-  of: limit dma_mask of the device based on dma-range size
-
- arch/arm/mm/dma-mapping.c |    7 +++++
- drivers/iommu/of_iommu.c  |   10 +++++--
- drivers/of/device.c       |   69 +++++++++++++++++++++++++++++++++++++++++++++
- drivers/of/of_pci.c       |   19 +++++++++++++
- drivers/of/platform.c     |   58 ++-----------------------------------
- drivers/pci/host-bridge.c |   14 +++++++++
- drivers/pci/probe.c       |    2 ++
- include/linux/of_device.h |    2 ++
- include/linux/of_iommu.h  |    6 ++--
- include/linux/of_pci.h    |    5 ++++
- include/linux/pci.h       |    3 ++
- 11 files changed, 135 insertions(+), 60 deletions(-)
-
+diff --git a/drivers/of/device.c b/drivers/of/device.c
+index 2de320d..17504f4 100644
+--- a/drivers/of/device.c
++++ b/drivers/of/device.c
+@@ -105,12 +105,19 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+ 	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
+ 	if (ret < 0) {
+ 		dma_addr = offset = 0;
+-		size = dev->coherent_dma_mask;
++		size = dev->coherent_dma_mask + 1;
+ 	} else {
+ 		offset = PFN_DOWN(paddr - dma_addr);
+ 		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
+ 	}
+ 
++	if (is_power_of_2(size + 1))
++		size = size + 1;
++	else if (!is_power_of_2(size)) {
++		dev_err(dev, "invalid size\n");
++		return;
++	}
++
+ 	dev->dma_pfn_offset = offset;
+ 
+ 	coherent = of_dma_is_coherent(np);
 -- 
 1.7.9.5
