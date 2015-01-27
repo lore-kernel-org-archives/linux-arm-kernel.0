@@ -1,31 +1,42 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 27 Jan 2015 06:55:18 -0800
-Subject: [PATCH v8 0/2] Add Spreadtrum SoC bindings and serial driver
- support
-In-Reply-To: <2196748.ag4UzqF1Px@wuerfel>
-References: <1422345407-10037-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <2196748.ag4UzqF1Px@wuerfel>
-Message-ID: <20150127145518.GA32531@kroah.com>
+From: freddy77@gmail.com (Frediano Ziglio)
+Date: Tue, 27 Jan 2015 15:07:53 +0000
+Subject: Kexec and KVM not working gracefully together
+Message-ID: <CAHt6W4cuRi3bfj5mryFouhOLGAAWuNXKVvz4K-rAjQnwiegL-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 27, 2015 at 02:24:02PM +0100, Arnd Bergmann wrote:
-> On Tuesday 27 January 2015 15:56:45 Chunyan Zhang wrote:
-> > This patch-set split the last version, and addressed the review comments from
-> > last version on serial driver code.
-> > 
-> > Changes from v7:
-> > * Addressed review comments from Peter:
-> >         - Initialized the stack local with zero in sprd_set_termios()
-> >         - Used dev_get_drvdata() to get sprd_uart_port
-> > 
-> 
-> Looks good to me, but you still have too many people on 'To', so Greg
-> might be missing that you expect him to merge it.
-> 
-> Greg, if there are no further comments, can you take both patches through
-> the tty git?
+Hi,
+  I was trying to make kexec (software reset) work on an ARM platform
+and I realized that the kernel launched with kexec cannot use KVM.
+Looking for message I get from kernel and code the situation is this:
+1- kernel start in HYP mode but then kvm code switch to SVC mode and
+initialize HYP mode with its code;
+2- kexec call reboot with LINUX_REBOOT_CMD_KEXEC
+3- kernel call kernel_exec;
+4- kernel_exec calls machine_kexec;
+5- machine_kexec calls soft_restart passing physical entry point for
+next in memory kernel;
+6- soft_restart calls __soft_restart changing stack;
+7- __soft_restart calls cpu_reset (which in my case is defined as cpu_v7_reset);
+8- cpu_v7_reset just disable MMU (it's in an identity memory) and
+calls next kernel entry point.
 
-Will do, thanks.
+>From point 3 to 8 kernel is always in SVC mode so next kernel is
+launched in SVC mode too but initial kernel was launched in HYP mode.
 
-greg k-h
+I used kernel 3.14 but looking at 3.19 rc code there is the same issue
+(code didn't change).
+
+Using hvc instruction you can execute arbitrary functions however
+these function must be in a very restricted range as HYP code MMU has
+very limited paged configured and cpu_v7_reset is not one of these
+functions.
+
+My idea to fix the issue is before calling cpu_reset call a new
+kvm_exit or similar that turn into HYP mode with MMU set as SVC mode.
+
+Is this a known issue? Should I try to fix the problem or somebody can
+easily fix it?
+
+Regards,
+  Frediano
