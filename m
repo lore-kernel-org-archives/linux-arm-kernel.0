@@ -1,61 +1,40 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 27 Jan 2015 16:52:50 +0000
-Subject: [PATCH] arm64: drop unnecessary cache+tlb maintenance
-Message-ID: <1422377570-16761-1-git-send-email-mark.rutland@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 27 Jan 2015 08:50:16 -0800
+Subject: [PATCH 01/23] ARM: OMAP2+: clock: move clock provider
+ infrastructure to clock driver
+In-Reply-To: <54C777CE.1070900@ti.com>
+References: <1417103514-17027-1-git-send-email-t-kristo@ti.com>
+ <1417103514-17027-2-git-send-email-t-kristo@ti.com>
+ <alpine.DEB.2.02.1501242142181.5450@utopia.booyaka.com>
+ <54C61938.8000303@ti.com> <20150126154936.GC28663@atomide.com>
+ <54C777CE.1070900@ti.com>
+Message-ID: <20150127165016.GJ28663@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In paging_init, we call flush_cache_all, but this is backed by Set/Way
-operations which may not achieve anything in the presence of cache line
-migration and/or system caches. If the caches are already in an
-inconsistent state at this point, there is nothing we can do (short of
-flushing the entire physical address space by VA) to empty architected
-and system caches. As such, flush_cache_all only serves to mask other
-potential bugs. Hence, this patch removes the boot-time call to
-flush_cache_all.
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [150127 03:37]:
+> On 26/01/15 17:49, Tony Lindgren wrote:
+> 
+> >> I'm not sure if I miss something, but regmap_write does not protect from
+> >> problems if there are multiple users for the same registers. You need to
+> >> use regmap_update_bits() to get a protected read/write sequence, in
+> >> which you can change only the bits that you want to change.
+> > 
+> > To me it seems that issue can be fixed by making all the code use regmap.
+> > AFAIK that should work for the legacy code too.
+> 
+> Even if everybody uses regmap, doing
+> 
+> v = regmap_read()
+> modify v
+> regmap_write(v)
+> 
+> is racy. regmap_update_bits() has to be used to protect the read/write
+> sequence. Which may be somewhat challenging at times with some strange
+> registers, the like Roger Q encountered recently related to CAN.
 
-Immediately after the cache maintenance we flush the TLBs, but this is
-also unnecessary. Before enabling the MMU, the TLBs are invalidated, and
-thus are initially clean. When changing the contents of active tables
-(e.g. in fixup_executable() for DEBUG_RODATA) we perform the required
-TLB maintenance following the update, and therefore no additional
-maintenance is required to ensure the new table entries are in effect.
-Since activating the MMU we will not have modified system register
-fields permitted to be cached in a TLB, and therefore do not need
-maintenance for any cached system register fields. Hence, the TLB flush
-is unnecessary.
+Yeah that's a good point.
 
-Shortly after the unnecessary TLB flush, we update TTBR0 to point to an
-empty zero page rather than the idmap, and flush the TLBs. This
-maintenance is necessary to remove the global idmap entries from the
-TLBs (as they would conflict with userspace mappings), and is retained.
+Regards,
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Steve Capper <steve.capper@linaro.org>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/mm/mmu.c | 7 -------
- 1 file changed, 7 deletions(-)
-
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 29fe8aa..88f7ac2 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -431,13 +431,6 @@ void __init paging_init(void)
- 	map_mem();
- 	fixup_executable();
- 
--	/*
--	 * Finally flush the caches and tlb to ensure that we're in a
--	 * consistent state.
--	 */
--	flush_cache_all();
--	flush_tlb_all();
--
- 	/* allocate the zero page. */
- 	zero_page = early_alloc(PAGE_SIZE);
- 
--- 
-1.9.1
+Tony
