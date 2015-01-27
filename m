@@ -1,55 +1,121 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 26 Jan 2015 22:50:09 -0600
-Subject: [PATCH 3/3] tty/serial: 8250_early: Add support for PXA UARTs
-In-Reply-To: <1422334209-23125-1-git-send-email-robh@kernel.org>
-References: <1422334209-23125-1-git-send-email-robh@kernel.org>
-Message-ID: <1422334209-23125-3-git-send-email-robh@kernel.org>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Tue, 27 Jan 2015 05:11:30 +0000
+Subject: [PATCH 4/7] ARM: at91: enable the L2 Cache controller
+In-Reply-To: <20150126223657.GB11867@piout.net>
+References: <1422266617-24381-1-git-send-email-wenyou.yang@atmel.com>
+ <1422266836-24592-1-git-send-email-wenyou.yang@atmel.com>
+ <20150126223657.GB11867@piout.net>
+Message-ID: <B256D81BAE5131468A838E5D7A243641BFD35D08@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PXA variant of the 8250 UART adds a UART enable bit which must not
-be cleared. Make the earlycon support maintain this bit if it is set.
-This implies some initialization of the UART, but we cannot
-unconditionally set the bit as some other variants require this bit to
-be clear for other functions.
+Hi Alexandre,
 
-Signed-off-by: Rob Herring <robh@kernel.org>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Jiri Slaby <jslaby@suse.cz>
-Cc: linux-serial at vger.kernel.org
----
- drivers/tty/serial/8250/8250_early.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+> -----Original Message-----
+> From: Alexandre Belloni [mailto:alexandre.belloni at free-electrons.com]
+> Sent: Tuesday, January 27, 2015 6:37 AM
+> To: Yang, Wenyou
+> Cc: Ferre, Nicolas; linux at arm.linux.org.uk; linux-arm-kernel at lists.infradead.org;
+> linux-kernel at vger.kernel.org; sylvain.rochet at finsecur.com; peda at axentia.se;
+> Vilchez, Patrice
+> Subject: Re: [PATCH 4/7] ARM: at91: enable the L2 Cache controller
+> 
+> Hi Wenyou,
+> 
+> This patch is not necessary, the only thing missing is the prefetch configuration
+> and I will submit the correct DT snippet for 3.21.
+I will drop this patch.
 
-diff --git a/drivers/tty/serial/8250/8250_early.c b/drivers/tty/serial/8250/8250_early.c
-index ce2a8ab..c31a22b 100644
---- a/drivers/tty/serial/8250/8250_early.c
-+++ b/drivers/tty/serial/8250/8250_early.c
-@@ -93,10 +93,10 @@ static void __init early_serial8250_write(struct console *console,
- 	struct uart_port *port = &early_device->port;
- 	unsigned int ier;
- 
--	/* Save the IER and disable interrupts */
-+	/* Save the IER and disable interrupts preserving the UUE bit */
- 	ier = serial8250_early_in(port, UART_IER);
- 	if (ier)
--		serial8250_early_out(port, UART_IER, 0);
-+		serial8250_early_out(port, UART_IER, ier & UART_IER_UUE);
- 
- 	uart_console_write(port, s, count, serial_putc);
- 
-@@ -127,9 +127,11 @@ static void __init init_port(struct earlycon_device *device)
- 	struct uart_port *port = &device->port;
- 	unsigned int divisor;
- 	unsigned char c;
-+	unsigned int ier;
- 
- 	serial8250_early_out(port, UART_LCR, 0x3);	/* 8n1 */
--	serial8250_early_out(port, UART_IER, 0);	/* no interrupt */
-+	ier = serial8250_early_in(port, UART_IER);
-+	serial8250_early_out(port, UART_IER, ier & UART_IER_UUE); /* no interrupt */
- 	serial8250_early_out(port, UART_FCR, 0);	/* no fifo */
- 	serial8250_early_out(port, UART_MCR, 0x3);	/* DTR + RTS */
- 
--- 
-2.1.0
+> 
+> On 26/01/2015 at 18:07:16 +0800, Wenyou Yang wrote :
+> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> > ---
+> >  arch/arm/mach-at91/board-dt-sama5.c |   53
+> +++++++++++++++++++++++++++++++++++
+> >  1 file changed, 53 insertions(+)
+> >
+> > diff --git a/arch/arm/mach-at91/board-dt-sama5.c
+> > b/arch/arm/mach-at91/board-dt-sama5.c
+> > index 86cffcd..ed6db28 100644
+> > --- a/arch/arm/mach-at91/board-dt-sama5.c
+> > +++ b/arch/arm/mach-at91/board-dt-sama5.c
+> > @@ -17,17 +17,70 @@
+> >  #include <linux/of_platform.h>
+> >  #include <linux/phy.h>
+> >  #include <linux/clk-provider.h>
+> > +#include <linux/of_address.h>
+> >
+> >  #include <asm/setup.h>
+> >  #include <asm/irq.h>
+> >  #include <asm/mach/arch.h>
+> >  #include <asm/mach/map.h>
+> >  #include <asm/mach/irq.h>
+> > +#include <asm/hardware/cache-l2x0.h>
+> >
+> >  #include "generic.h"
+> >
+> > +void __iomem *at91_l2cc_base;
+> > +EXPORT_SYMBOL_GPL(at91_l2cc_base);
+> > +
+> > +#ifdef CONFIG_CACHE_L2X0
+> > +static void __init at91_init_l2cache(void) {
+> > +	struct device_node *np;
+> > +	u32 reg;
+> > +
+> > +	np = of_find_compatible_node(NULL, NULL, "arm,pl310-cache");
+> > +	if (!np)
+> > +		return;
+> > +
+> > +	at91_l2cc_base = of_iomap(np, 0);
+> > +	if (!at91_l2cc_base)
+> > +		panic("unable to map l2cc cpu registers\n");
+> > +
+> > +	of_node_put(np);
+> > +
+> > +	/* Disable cache if it hasn't been done yet */
+> > +	if (readl_relaxed(at91_l2cc_base + L2X0_CTRL) & L2X0_CTRL_EN)
+> > +		writel_relaxed(~L2X0_CTRL_EN, at91_l2cc_base + L2X0_CTRL);
+> > +
+> > +	/* Prefetch Control */
+> > +	reg = readl_relaxed(at91_l2cc_base + L310_PREFETCH_CTRL);
+> > +	reg &= ~L310_PREFETCH_CTRL_OFFSET_MASK;
+> > +	reg |= 0x01;
+> > +	reg |= L310_PREFETCH_CTRL_DBL_LINEFILL_INCR;
+> > +	reg |= L310_PREFETCH_CTRL_PREFETCH_DROP;
+> > +	reg |= L310_PREFETCH_CTRL_DATA_PREFETCH;
+> > +	reg |= L310_PREFETCH_CTRL_INSTR_PREFETCH;
+> > +	reg |= L310_PREFETCH_CTRL_DBL_LINEFILL;
+> > +	writel_relaxed(reg, at91_l2cc_base + L310_PREFETCH_CTRL);
+> > +
+> > +	/* Power Control */
+> > +	reg = readl_relaxed(at91_l2cc_base + L310_POWER_CTRL);
+> > +	reg |= L310_STNDBY_MODE_EN;
+> > +	reg |= L310_DYNAMIC_CLK_GATING_EN;
+> > +	writel_relaxed(reg, at91_l2cc_base + L310_POWER_CTRL);
+> > +
+> > +	/* Disable interrupts */
+> > +	writel_relaxed(0x00, at91_l2cc_base + L2X0_INTR_MASK);
+> > +	writel_relaxed(0x01ff, at91_l2cc_base + L2X0_INTR_CLEAR);
+> > +	l2x0_of_init(0, ~0UL);
+> > +}
+> > +#else
+> > +static inline void at91_init_l2cache(void) {} #endif
+> > +
+> >  static void __init sama5_dt_device_init(void)  {
+> > +	at91_init_l2cache();
+> > +
+> >  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> >  	at91_sam9x5_pm_init();
+> >  }
+> > --
+> > 1.7.9.5
+> >
+> 
+> --
+> Alexandre Belloni, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
+
+
+Best Regards,
+Wenyou Yang
