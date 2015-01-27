@@ -1,107 +1,33 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Tue, 27 Jan 2015 21:55:52 +0000
-Subject: [PATCH v3 03/13] pm: at91: Workaround DDRSDRC self-refresh bug
- with LPDDR1 memories.
-References: <1422337810-3257-1-git-send-email-wenyou.yang@atmel.com>
- <1422338006-3371-1-git-send-email-wenyou.yang@atmel.com>
- <54C7675D.8000204@cogentembedded.com>
-Message-ID: <6740d1ada0cb4c8bbf765728c7443918@EMAIL.axentia.se>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 27 Jan 2015 16:58:17 -0500 (EST)
+Subject: [PATCH] ARM: /proc/atags: Export also for DT
+In-Reply-To: <alpine.LFD.2.11.1501271614280.1322@knanqh.ubzr>
+References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
+ <20150127132127.GA869@amd>
+ <CAL_JsqKM+2PtX_EpWXyOQHVXwf=jqVj8SroUGPO1Y2=Zj8_kMg@mail.gmail.com>
+ <201501271532.25540@pali> <20150127174818.GM26493@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1501271446330.1322@knanqh.ubzr>
+ <20150127210943.GN26493@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1501271614280.1322@knanqh.ubzr>
+Message-ID: <alpine.LFD.2.11.1501271644570.1322@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I wrote:
-> Sergei Shtylyov wrote:
-> > On 1/27/2015 8:53 AM, Wenyou Yang wrote:
-> >
-> > > From: Peter Rosin <peda@axentia.se>
-> >
-> > > The DDRSDR controller fails miserably to put LPDDR1 memories in
-> > > self-refresh. Force the controller to think it has DDR2 memories
-> > > during the self-refresh period, as the DDR2 self-refresh spec is
-> > > equivalent to LPDDR1, and is correctly implemented in the controller.
-> >
-> > > Assume that the second controller has the same fault, but that is
-> > > untested.
-> >
-> > > Signed-off-by: Peter Rosin <peda@axentia.se>
-> > > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > > ---
-> > >   arch/arm/mach-at91/pm_slowclock.S  |   43
-> > +++++++++++++++++++++++++++++++-----
-> > >   include/soc/at91/at91sam9_ddrsdr.h |    2 +-
-> > >   2 files changed, 39 insertions(+), 6 deletions(-)
-> >
-> > > diff --git a/arch/arm/mach-at91/pm_slowclock.S
-> > > b/arch/arm/mach-at91/pm_slowclock.S
-> > > index e2bfaf5..1155217 100644
-> > > --- a/arch/arm/mach-at91/pm_slowclock.S
-> > > +++ b/arch/arm/mach-at91/pm_slowclock.S
-> > [...]
-> > > @@ -108,14 +118,26 @@ ddr_sr_enable:
-> > >
-> > >   	/* figure out if we use the second ram controller */
-> > >   	cmp	ramc1, #0
-> > > -	ldrne	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
-> > > -	strne	tmp2, .saved_sam9_lpr1
-> > > -	bicne	tmp2, #AT91_DDRSDRC_LPCB
-> > > -	orrne	tmp2, #AT91_DDRSDRC_LPCB_SELF_REFRESH
-> > > +	beq	ddr_no_2nd_ctrl
-> > > +
-> > > +	ldr	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
-> > > +	str	tmp2, .saved_sam9_mdr1
-> > > +	bic	tmp2, tmp2, #~AT91_DDRSDRC_MD
-> > > +	cmp	tmp2, #AT91_DDRSDRC_MD_LOW_POWER_DDR
-> > > +	ldreq	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
-> > > +	biceq	tmp2, tmp2, #AT91_DDRSDRC_MD
-> >
-> >     Didn't you forget ~? Either that, or ~ above is not needed, I think.
-> 
-> The code is correct, the first bic with ~ clears bits not in the relevant
-> field in order to compare if LPDDR mode is active. The second bic(eq)
-> w/o ~ clears the field, to make way for the bits in the below orreq
-> when actually changing the register content into DDR2 mode.
-> 
-> > > +	orreq	tmp2, tmp2, #AT91_DDRSDRC_MD_DDR2
-> > > +	streq	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
-> > > +
-> > > +	ldr	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
-> > > +	str	tmp2, .saved_sam9_lpr1
-> > > +	bic	tmp2, #AT91_DDRSDRC_LPCB
-> >
-> >     Didn't you forget ~? And isn't it 3-operand instruction (as seen in the above
-> > code)?
-> 
-> The logic for the LPR register is from the old code, the "only" thing
-> I did to it was changing the instruction sequence to not have the
-> ???ne form, i.e. ldrne, strne, bicne, orrne became ldr, str, bic, orr
-> with a jump around it instead. So, the original code also had a two
-> argument bic(ne), which indeed is strange, and I don't know why
-> there is no warning from the assembler. Since there is no warning,
-> my guess is that the assembler somehow mends it? Or does the
-> patch actually break the second controller? It would be a surprise
-> it the assembler handles 2-operand bicne differently from a
+On Tue, 27 Jan 2015, Nicolas Pitre wrote:
 
-s/it the/if the/
+> If there is indeed a sizable following for the device then someone 
+> should figure out how to cope with upstream kernels, either through the 
+> installation of some intermediate bootloader that can talk FDT directly, 
+> or via a shim layer.  None of that has to be performed by nor linked 
+> with the kernel binary, nor maintained in the kernel tree. And it's not 
+> even that hard to do: we have precedents on other platforms with crappy 
+> bootloaders where this just works.
 
-> 2-operand bic, no?
-> 
-> > > +	orr	tmp2, #AT91_DDRSDRC_LPCB_SELF_REFRESH
-> >
-> >     Only 2 operands?
-> 
-> Same argument as above. I didn't touch it (sort of...)
-> 
-> Should I update the patch and fix this collateral 2-operand problem as
-> well? To me, it feels like a separate patch, no?
+For reference I recommend the following threads:
 
-I have now checked the assembler output, and apparently it mends the
-input, just as I thought. That might be a fluke, of course, or it might be a
-deliberate shorthand when the destination register is the same as the
-following operand? But I also note that there are more instances of this
-2 vs. 3 argument syntax, and I suggest that they are all fixed in one go,
-if it is determined that they need fixing. I am obviously not an authority
-when it comes to arm assembler syntax, so someone else will have to
-advise...
+http://comments.gmane.org/gmane.linux.kbuild.devel/10722
 
-Cheers,
-Peter
+http://www.spinics.net/lists/arm-kernel/msg249719.html
+
+
+Nicolas
