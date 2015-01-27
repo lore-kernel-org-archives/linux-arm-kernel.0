@@ -1,32 +1,37 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 27 Jan 2015 15:10:11 +0100
-Subject: [PATCH 4/9] mtd: pxa3xx_nand: add a default chunk size
+Date: Tue, 27 Jan 2015 15:10:16 +0100
+Subject: [PATCH 9/9] ARM: berlin: enable flash on the BG2Q DMP
 In-Reply-To: <1422367816-4257-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1422367816-4257-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1422367816-4257-5-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1422367816-4257-10-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a default chunk size of 512 in the pxa3xx nand driver.
+The BG2Q DMP has a nand controller. Enable it with the correct
+configuration.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- drivers/mtd/nand/pxa3xx_nand.c | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/berlin2q-marvell-dmp.dts | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 782ae24d6b7d..b2783b1f663c 100644
---- a/drivers/mtd/nand/pxa3xx_nand.c
-+++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -1430,6 +1430,9 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
- 	if (pdata->keep_config && !pxa3xx_nand_detect_config(info))
- 		goto KEEP_CONFIG;
- 
-+	/* Set a default chunk size */
-+	info->chunk_size = 512;
+diff --git a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
+index a98ac1bd8f65..0bfdff5ca86f 100644
+--- a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
++++ b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
+@@ -112,3 +112,13 @@
+ &sata_phy {
+ 	status = "okay";
+ };
 +
- 	ret = pxa3xx_nand_sensing(info);
- 	if (ret) {
- 		dev_info(&info->pdev->dev, "There is no chip on cs %d!\n",
++&nand0 {
++	marvell,nand-enable-arbiter;
++	nand-ecc-strength = <48>;
++	nand-ecc-step-size = <1024>;
++
++	num-cs = <1>;
++
++	status = "okay";
++};
 -- 
 2.2.2
