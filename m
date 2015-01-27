@@ -1,31 +1,33 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 27 Jan 2015 15:10:10 +0100
-Subject: [PATCH 3/9] mtd: pxa3xx_nand: set NDCR_PG_PER_BLK if page per block
- is 128
+Date: Tue, 27 Jan 2015 15:10:08 +0100
+Subject: [PATCH 1/9] mtd: pxa3xx_nand: initialiaze pxa3xx_flash_ids to 0
 In-Reply-To: <1422367816-4257-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1422367816-4257-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1422367816-4257-4-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1422367816-4257-2-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+pxa3xx_flash_ids wasn't initialized to 0, which in certain cases could
+end up containing corrupted values in its members. Fix this to avoid
+possible issues.
+
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- drivers/mtd/nand/pxa3xx_nand.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/mtd/nand/pxa3xx_nand.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 2681ec4abafa..782ae24d6b7d 100644
+index 96b0b1d27df1..d00ac392d1c4 100644
 --- a/drivers/mtd/nand/pxa3xx_nand.c
 +++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -1216,7 +1216,8 @@ static int pxa3xx_nand_config_flash(struct pxa3xx_nand_info *info,
+@@ -1472,6 +1472,8 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
+ 		return ret;
+ 	}
  
- 	ndcr |= (pdata->enable_arbiter) ? NDCR_ND_ARB_EN : 0;
- 	ndcr |= (host->col_addr_cycles == 2) ? NDCR_RA_START : 0;
--	ndcr |= (f->page_per_block == 64) ? NDCR_PG_PER_BLK : 0;
-+	ndcr |= (f->page_per_block == 64 || f->page_per_block == 128) ?
-+		NDCR_PG_PER_BLK : 0;
- 	ndcr |= (f->page_size == 2048) ? NDCR_PAGE_SZ : 0;
- 	ndcr |= (f->flash_width == 16) ? NDCR_DWIDTH_M : 0;
- 	ndcr |= (f->dfc_width == 16) ? NDCR_DWIDTH_C : 0;
++	memset(pxa3xx_flash_ids, 0, sizeof(pxa3xx_flash_ids));
++
+ 	pxa3xx_flash_ids[0].name = f->name;
+ 	pxa3xx_flash_ids[0].dev_id = (f->chip_id >> 8) & 0xffff;
+ 	pxa3xx_flash_ids[0].pagesize = f->page_size;
 -- 
 2.2.2
