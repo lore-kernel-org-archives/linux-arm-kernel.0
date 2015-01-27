@@ -1,110 +1,76 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Tue, 27 Jan 2015 05:24:51 +0000
-Subject: [PATCH 6/7] pm: at91: add achieve the mpddrc peripheral ID and
- the DDR clock ID support
-In-Reply-To: <20150126114956.GE23313@leverpostej>
-References: <1422266617-24381-1-git-send-email-wenyou.yang@atmel.com>
- <1422266896-24666-1-git-send-email-wenyou.yang@atmel.com>
- <20150126114956.GE23313@leverpostej>
-Message-ID: <B256D81BAE5131468A838E5D7A243641BFD35D20@penmbx01>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Tue, 27 Jan 2015 13:50:10 +0800
+Subject: [PATCH v3 00/13] AT91 pm cleanup for 3.20
+Message-ID: <1422337810-3257-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Nicolas,
 
-Thank you for your review.
+This version is rebased on the branch: at91-3.20-cleanup of the repository
+	git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git
 
-> -----Original Message-----
-> From: Mark Rutland [mailto:mark.rutland at arm.com]
-> Sent: Monday, January 26, 2015 7:50 PM
-> To: Yang, Wenyou
-> Cc: Ferre, Nicolas; linux at arm.linux.org.uk; sylvain.rochet at finsecur.com; Vilchez,
-> Patrice; linux-kernel at vger.kernel.org; alexandre.belloni at free-electrons.com;
-> peda at axentia.se; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 6/7] pm: at91: add achieve the mpddrc peripheral ID and the
-> DDR clock ID support
-> 
-> On Mon, Jan 26, 2015 at 10:08:16AM +0000, Wenyou Yang wrote:
-> > The patch achieves the mpddr controller peripheral ID and the DDR
-> > clock ID from the dts file.
-> >
-> > They will be used in the future to disable the mpddr controller'c
-> > clock the and DDR clock to decrease the power consumption during suspending.
-> >
-> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> > ---
-> >  arch/arm/mach-at91/generic.h |    2 ++
-> >  arch/arm/mach-at91/setup.c   |   24 ++++++++++++++++++++++++
-> >  2 files changed, 26 insertions(+)
-> >
-> > diff --git a/arch/arm/mach-at91/generic.h
-> > b/arch/arm/mach-at91/generic.h index 41796bf..3c72a3e 100644
-> > --- a/arch/arm/mach-at91/generic.h
-> > +++ b/arch/arm/mach-at91/generic.h
-> > @@ -47,6 +47,8 @@ void __init at91_sam9x5_pm_init(void) { }  struct
-> > at91_pm_struct {
-> >  	unsigned long uhp_udp_mask;
-> >  	int memctrl;
-> > +	u32 mpddrc_id[2];
-> > +	u32 ddrck_id;
-> >  };
-> >
-> >  #endif /* _AT91_GENERIC_H */
-> > diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-> > index 7924663..a306f95 100644
-> > --- a/arch/arm/mach-at91/setup.c
-> > +++ b/arch/arm/mach-at91/setup.c
-> > @@ -363,6 +363,27 @@ void __init at91_ioremap_matrix(u32 base_addr)
-> >  		panic(pr_fmt("Impossible to ioremap at91_matrix_base\n"));  }
-> >
-> > +static u32 at91_of_get_ddr_id(struct device_node *np, char *name) {
-> > +	struct of_phandle_args clkspec;
-> > +	u32 id;
-> > +	int index;
-> > +	int rc;
-> > +
-> > +	index = of_property_match_string(np, "clock-names", name);
-> > +	rc = of_parse_phandle_with_args(np, "clocks", "#clock-cells", index,
-> &clkspec);
-> > +	if (rc)
-> > +		return 0;
-> > +
-> > +	rc = of_property_read_u32(clkspec.np, "reg", &id);
-> > +	if (rc)
-> > +		return 0;
-> > +
-> > +	of_node_put(clkspec.np);
-> > +
-> > +	return id;
-> > +}
-> 
-> This doesn't look right to me. This assumes the format of the clock provider node,
-> which invalidates the point of having the abstraction in the first place.
-> 
-> > +
-> >  struct at91_ramc_of_data {
-> >  	u8 ramc_type;
-> >  };
-> > @@ -400,6 +421,9 @@ static void at91_dt_ramc(void)
-> >  		of_data = of_id->data;
-> >  		at91_pm_data.memctrl = of_data->ramc_type;
-> >
-> > +		at91_pm_data.mpddrc_id[idx] = at91_of_get_ddr_id(np, "mpddr");
-> > +		at91_pm_data.ddrck_id = at91_of_get_ddr_id(np, "ddrck");
-> > +
-> 
-> Why do you need these here?
-> 
-> Surely the logic for poking any clocks should live in the relevant clock controller
-> drivers?
-Thank for your suggestion.
+It is purpose to clean up the PM code, includes the patches from Peter Rosin and Sylvain Rochet.
 
-I thought that it is reasonable to get the DDR controller's peripheral id from the DDR device node.
+Since verifying the USB clock and USB PLL disabling before suspending to memory,
+it aslo depends on the following patch serials from Sylvain:
+	[PATCHv6 0/5] USB: gadget: atmel_usba_udc: Driver improvements
+	[PATCHv7 0/6] USB: host: Atmel OHCI and EHCI drivers improvements
 
-Anyway, let me think over how to do it.
+Removes CONFIG_AT91_SLOW_CLOCK config item to simply the PM config,
+The suspend to standby mode uses the same sram function as the suspend to memory mode.
+Remove some unused code.
 
-> 
-> Mark.
+Alexandr & Sylvain, Thank you very much for so many feedbacks.
 
-Best Regards,
-Wenyou Yang
+Changes in v2:
+ - Rebase on the at91-3.20-cleanup branch
+ - Recover the verify clock condition, only for suspend to memory.
+ - Collect ACK from Alexandre
+ - Add the macro for PM mode
+
+Changes in v3
+ - Sylvain splits the patch in two
+ - Add handling if no sram allocated for PM
+ - Retain the STANDBY and SUSPEND_MEM select in at91_pm_enter.
+
+Peter Rosin (1):
+  pm: at91: Workaround DDRSDRC self-refresh bug with LPDDR1 memories.
+
+Sylvain Rochet (2):
+  pm: at91: pm_slowclock: fix suspend/resume hang up in timeouts
+  pm: at91: pm_slowclock: remove clocks which are already stopped when
+    entering slow clock mode
+
+Wenyou Yang (10):
+  pm: at91: pm_slowclock: remove the unused code related with
+    SLOWDOWN_MASTER_CLOCK
+  pm: at91: move the copying the sram function to the sram
+    initializationi phase
+  ARM: at91: move select SRAM to ARCH_AT91
+  pm: at91: remove the config item CONFIG_AT91_SLOW_CLOCK
+  pm: at91: the standby mode uses the same sram function as the suspend
+    to memory mode
+  pm: at91: rename file name: pm_slowclock.S -->pm_suspend.S
+  pm: at91: rename function name:
+    at91_slow_clock()-->at91_pm_suspend_sram_fn
+  pm: at91: remove the at91_xxx_standby() function definitions in the
+    pm.h
+  pm: at91: setup: remove the struct ramc_ids .data at91_xxx_standby
+    members
+  pm: at91: amend the pm_suspend entry for at91_cpuidle_device
+
+ arch/arm/mach-at91/Kconfig         |   17 +-
+ arch/arm/mach-at91/Makefile        |    2 +-
+ arch/arm/mach-at91/pm.c            |  150 ++++++++---------
+ arch/arm/mach-at91/pm.h            |  100 +----------
+ arch/arm/mach-at91/pm_slowclock.S  |  323 ------------------------------------
+ arch/arm/mach-at91/pm_suspend.S    |  277 +++++++++++++++++++++++++++++++
+ arch/arm/mach-at91/setup.c         |   19 +--
+ include/soc/at91/at91sam9_ddrsdr.h |    2 +-
+ 8 files changed, 367 insertions(+), 523 deletions(-)
+ delete mode 100644 arch/arm/mach-at91/pm_slowclock.S
+ create mode 100644 arch/arm/mach-at91/pm_suspend.S
+
+-- 
+1.7.9.5
