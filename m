@@ -1,64 +1,52 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 27 Jan 2015 01:21:16 +0100
-Subject: [RFC PATCH 3/5] iommu: implement common IOMMU ops for DMA mapping
-In-Reply-To: <09e5515a9afcb3235f4c425520cd18a6032d31b4.1421086706.git.robin.murphy@arm.com>
-References: <cover.1421086706.git.robin.murphy@arm.com>
- <09e5515a9afcb3235f4c425520cd18a6032d31b4.1421086706.git.robin.murphy@arm.com>
-Message-ID: <20150127002116.GI30345@8bytes.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 27 Jan 2015 09:27:49 +0900
+Subject: [PATCH] ARM: shmobile: R-Car Gen2: CONFIG_COMMON_CLK is always set
+In-Reply-To: <1422289274-20605-1-git-send-email-geert+renesas@glider.be>
+References: <1422289274-20605-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20150127002748.GA29710@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
-
-thanks for the patch, I think it is good start to move forward. See my
-comments below.
-
-On Mon, Jan 12, 2015 at 08:48:55PM +0000, Robin Murphy wrote:
-> Taking inspiration from the existing arch/arm code, break out some
-> generic functions to interface the DMA-API to the IOMMU-API. This will
-> do the bulk of the heavy lifting for IOMMU-backed dma-mapping.
+On Mon, Jan 26, 2015 at 05:21:14PM +0100, Geert Uytterhoeven wrote:
+> Since commit e042681894b62d60 ("ARM: shmobile: r8a7790: Remove legacy
+> code"), all R-Car Gen2 SoCs are supported by multiplatform kernels only.
+> As CONFIG_COMMON_CLK is always set for multiplatform kernels, we can
+> remove related #ifdefs in code specific to R-Car Gen2 SoCs.
 > 
-> Whilst the target is arm64, rather than introduce yet another private
-> implementation, place this in common code as the first step towards
-> consolidating the numerous versions spread around between architecture
-> code and IOMMU drivers.
-
-Is there any reason you implemented that only for AArch64? I think it
-makes a lot of sense to have a common implementation of that across
-architectures (AArch64, ARM and X86).
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 > ---
->  include/linux/dma-iommu.h |  78 ++++++++
->  lib/Kconfig               |   8 +
->  lib/Makefile              |   1 +
->  lib/dma-iommu.c           | 455 ++++++++++++++++++++++++++++++++++++++++++++++
+> Depends on renesas-lager-board-removal-for-v3.20
 
-I'd like this to live in drivers/iommu, as most other dma-api
-implementations for iommu-drivers also live there.
+Thanks, I have queued this up in the soc-for-v3.21 branch.
 
-> +/*
-> + * This little guy is filling in until iommu_map_sg lands and we can hook that
-> + * up instead (which is going to be rather involved thanks to page alignment)
-> + */
-
-iommu_map_sg should be there now. You can convert this function to it.
-
-> +static int __iommu_dma_map_sg_simple(struct device *dev, struct scatterlist *sg,
-> +		int nents, enum dma_data_direction dir, struct dma_attrs *attrs,
-> +		bool coherent)
-> +{
-> +	struct scatterlist *s;
-> +	int i;
-> +
-> +	for_each_sg(sg, s, nents, i) {
-> +		sg_dma_address(s) = __iommu_dma_map_page(dev, sg_page(s), s->offset,
-> +						s->length, dir, coherent);
-> +		sg_dma_len(s) = s->length;
-> +	}
-> +	return nents;
-> +}
-
-So long,
-
-        Joerg
+> ---
+>  arch/arm/mach-shmobile/setup-rcar-gen2.c | 4 ----
+>  1 file changed, 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+> index e2b9bb46393d898d..aa3339258d9c0232 100644
+> --- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
+> +++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+> @@ -51,9 +51,7 @@ u32 rcar_gen2_read_mode_pins(void)
+>  
+>  void __init rcar_gen2_timer_init(void)
+>  {
+> -#if defined(CONFIG_ARM_ARCH_TIMER) || defined(CONFIG_COMMON_CLK)
+>  	u32 mode = rcar_gen2_read_mode_pins();
+> -#endif
+>  #ifdef CONFIG_ARM_ARCH_TIMER
+>  	void __iomem *base;
+>  	int extal_mhz = 0;
+> @@ -129,9 +127,7 @@ void __init rcar_gen2_timer_init(void)
+>  	iounmap(base);
+>  #endif /* CONFIG_ARM_ARCH_TIMER */
+>  
+> -#ifdef CONFIG_COMMON_CLK
+>  	rcar_gen2_clocks_init(mode);
+> -#endif
+>  	clocksource_of_init();
+>  }
+>  
+> -- 
+> 1.9.1
+> 
