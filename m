@@ -1,40 +1,79 @@
-From: chenbaozi@kylinos.com.cn (Chen Baozi)
-Date: Tue, 27 Jan 2015 19:15:16 +0800
-Subject: [PATCH] irqchip: GICv3: ITS: Allocate enough memory for the full
- range of DeviceID
-In-Reply-To: <1422327961-19733-1-git-send-email-baozich@gmail.com>
-References: <1422327961-19733-1-git-send-email-baozich@gmail.com>
-Message-ID: <15CDAC06-1E2B-4545-93E8-CBB4B47E2707@kylinos.com.cn>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 27 Jan 2015 11:27:18 +0000
+Subject: [PATCH v4 3/6] of: fix size when dma-range is not used
+In-Reply-To: <1422052359-12384-4-git-send-email-m-karicheri2@ti.com>
+References: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
+ <1422052359-12384-4-git-send-email-m-karicheri2@ti.com>
+Message-ID: <54C77616.80301@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Jan 27, 2015, at 11:06, Chen Baozi <baozich@gmail.com> wrote:
-> 
-> The ITS table allocator is only allocating a single page per table.
-> This works fine for most things, but leads to silent lack of
-> interrupt delivery if we end-up with a device that has an ID that is
-> out of the range defined by a single page of memory. Even worse, depending
-> on the page size, behaviour changes, which is not a very good experience.
-> 
-> A solution is actually to allocate memory for the full range of ID that
-> the ITS supports. A massive waste memory wise, but at least a safe bet.
-> 
-> This patch has been tested on the Phytium SoC.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Hi Murali,
 
-Failed to clarify that Marc is the author of this patch.
+On 23/01/15 22:32, Murali Karicheri wrote:
+> Fix the dma-range size when the DT attribute is missing. i.e  set size to
+> dev->coherent_dma_mask + 1 instead of dev->coherent_dma_mask. To detect
+> overflow when mask is set to max of u64, add a check, log error and return.
+> Some platform use mask format for size in DTS. So add a work around to
+> catch this and fix.
+>
+> Cc: Joerg Roedel <joro@8bytes.org>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> ---
+>   drivers/of/device.c |   14 +++++++++++++-
+>   1 file changed, 13 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/of/device.c b/drivers/of/device.c
+> index 2de320d..0a5ff54 100644
+> --- a/drivers/of/device.c
+> +++ b/drivers/of/device.c
+> @@ -105,12 +105,24 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+>   	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
+>   	if (ret < 0) {
+>   		dma_addr = offset = 0;
+> -		size = dev->coherent_dma_mask;
+> +		size = dev->coherent_dma_mask + 1;
+>   	} else {
+>   		offset = PFN_DOWN(paddr - dma_addr);
+> +		/*
+> +		 * Add a work around to treat the size as mask + 1 in case
+> +		 * it is defined in DT as a mask.
+> +		 */
+> +		if (size & 1)
+> +			size = size + 1;
+>   		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
+>   	}
+>
+> +	/* if size is 0, we have an overflow of u64 */
+> +	if (!size) {
+> +		dev_err(dev, "invalid size\n");
+> +		return;
+> +	}
+> +
 
-Sorry for the mistake.
+This seems potentially fragile to dodgy DTs given that we might also be 
+using size to make a mask later. Would it make sense to double-up a 
+sanity check as mask-format detection? Something like:
 
-Cheers,
+if is_power_of_2(size)
+	// use size
+else if is_power_of_2(size + 1)
+	// use size + 1
+else
+	// cry
 
-Baozi.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 842 bytes
-Desc: Message signed with OpenPGP using GPGMail
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150127/03bf04e0/attachment.sig>
+Robin.
+
+>   	dev->dma_pfn_offset = offset;
+>
+>   	coherent = of_dma_is_coherent(np);
+>
