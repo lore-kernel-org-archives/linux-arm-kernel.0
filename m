@@ -1,91 +1,46 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 27 Jan 2015 21:13:43 +0100
-Subject: [PATCH 6/8] PM / Domains: Free pm_subsys_data in error path in
- __pm_genpd_add_device()
+Date: Tue, 27 Jan 2015 21:13:45 +0100
+Subject: [PATCH 8/8] PM / Domains: Handle errors from genpd's ->attach_dev()
+ callback
 In-Reply-To: <1422389625-11730-1-git-send-email-ulf.hansson@linaro.org>
 References: <1422389625-11730-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1422389625-11730-7-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1422389625-11730-9-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The error path in __pm_genpd_add_device() didn't decrease the reference
-to the struct pm_subsys_data.
+The optional genpd's ->attach_dev() callback is invoked from
+__pm_genpd_add_device(). Let's add error handling from the response
+from this callback and propagate the error code.
 
-Let's move the calls to dev_pm_get|put_subsys_data() into
-genpd_alloc|free_dev_data() to fix this issue and thus prevent a
-potential memory leakage.
+When __pm_genpd_add_device() is invoked through the generic OF-based PM
+domain look-up path, the device is being probed. Returning an error
+will mean the device won't be attached to its PM domain. Errors of
+-EPROBE_DEFER get special treatment and is propagated to the driver
+core.
+
+Therefore this change also enables the ->attach_dev() callback to
+be able to request for a deferred probe sequence.
 
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/base/power/domain.c | 25 ++++++++++++++++---------
- 1 file changed, 16 insertions(+), 9 deletions(-)
+ drivers/base/power/domain.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index 1f026c1..3bd342f 100644
+index 0fd5ee1..ba4abbe 100644
 --- a/drivers/base/power/domain.c
 +++ b/drivers/base/power/domain.c
-@@ -1380,18 +1380,30 @@ EXPORT_SYMBOL_GPL(pm_genpd_syscore_poweron);
- static struct generic_pm_domain_data *genpd_alloc_dev_data(struct device *dev)
- {
- 	struct generic_pm_domain_data *gpd_data;
-+	int ret;
-+
-+	ret = dev_pm_get_subsys_data(dev);
-+	if (ret)
-+		return ERR_PTR(ret);
- 
- 	gpd_data = kzalloc(sizeof(*gpd_data), GFP_KERNEL);
--	if (!gpd_data)
--		return NULL;
-+	if (!gpd_data) {
-+		ret = -ENOMEM;
-+		goto err_put;
-+	}
- 
- 	return gpd_data;
-+
-+ err_put:
-+	dev_pm_put_subsys_data(dev);
-+	return ERR_PTR(ret);
- }
- 
- static void genpd_free_dev_data(struct device *dev,
- 				struct generic_pm_domain_data *gpd_data)
- {
- 	kfree(gpd_data);
-+	dev_pm_put_subsys_data(dev);
- }
- 
- /**
-@@ -1412,8 +1424,8 @@ int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
- 		return -EINVAL;
- 
- 	gpd_data = genpd_alloc_dev_data(dev);
--	if (!gpd_data)
--		return -ENOMEM;
-+	if (IS_ERR(gpd_data))
-+		return PTR_ERR(gpd_data);
- 
- 	genpd_acquire_lock(genpd);
- 
-@@ -1422,10 +1434,6 @@ int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
+@@ -1467,8 +1467,9 @@ int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
  		goto out;
  	}
  
--	ret = dev_pm_get_subsys_data(dev);
--	if (ret)
--		goto out;
--
- 	spin_lock_irq(&dev->power.lock);
+-	if (genpd->attach_dev)
+-		genpd->attach_dev(genpd, dev);
++	ret = genpd->attach_dev ? genpd->attach_dev(genpd, dev) : 0;
++	if (ret)
++		goto out;
  
- 	if (dev->power.subsys_data->domain_data) {
-@@ -1528,7 +1536,6 @@ int pm_genpd_remove_device(struct generic_pm_domain *genpd,
- 
- 	genpd_release_lock(genpd);
- 
--	dev_pm_put_subsys_data(dev);
- 	genpd_free_dev_data(dev, gpd_data);
- 
- 	return 0;
+ 	genpd->device_count++;
+ 	genpd->max_off_time_changed = true;
 -- 
 1.9.1
