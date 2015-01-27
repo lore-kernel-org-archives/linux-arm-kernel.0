@@ -1,72 +1,42 @@
-From: ricardo.ribalda@gmail.com (Ricardo Ribalda Delgado)
-Date: Tue, 27 Jan 2015 11:00:51 +0100
-Subject: [PATCH 11/18] spi/xilinx: Remove rx_fn and tx_fn pointer
-In-Reply-To: <20150127000903.GM21293@sirena.org.uk>
-References: <1422029330-10971-1-git-send-email-ricardo.ribalda@gmail.com>
- <1422029330-10971-12-git-send-email-ricardo.ribalda@gmail.com>
- <20150127000903.GM21293@sirena.org.uk>
-Message-ID: <CAPybu_3gF1BXhq4j5Z3DfM8_PxuK72Pshm6_5qVKH-ZyYTpgig@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 27 Jan 2015 11:07:42 +0100
+Subject: [PATCH v3 07/13] pm: at91: remove the config item
+ CONFIG_AT91_SLOW_CLOCK
+In-Reply-To: <20150127095515.GB32121@gradator.net>
+References: <1422337810-3257-1-git-send-email-wenyou.yang@atmel.com>
+ <1422338247-5945-1-git-send-email-wenyou.yang@atmel.com>
+ <20150127095515.GB32121@gradator.net>
+Message-ID: <20150127100742.GA15829@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mark
+Hi,
 
+On 27/01/2015 at 10:55:15 +0100, Sylvain Rochet wrote :
+> Hello Wenyou,
+> 
+> On Tue, Jan 27, 2015 at 01:57:27PM +0800, Wenyou Yang wrote:
+> >  
+> >  static void __init at91_pm_init(void)
+> >  {
+> > -#ifdef CONFIG_AT91_SLOW_CLOCK
+> >  	at91_pm_sram_init();
+> > -#endif
+> >  
+> >  	pr_info("AT91: Power Management%s\n", (slow_clock ? " (with slow clock mode)" : ""));
+> 
+> Details, but the ternary operation can be removed here, slow_clock now 
+> defines whether we have PM support at all, not whether we have 
+> slow_clock mode available.
+> 
+> Maybe we should not even display this message on the console if we 
+> failed to allocate sram for slow_clock, we already fired a message 
+> saying that PM is not available at all in at91_pm_sram_init().
+> 
 
-> Perhaps I'm missing something here but we only seem to be incrementing
-> rx_ptr for the 32 bit case here...
-
-The unified diff is a bit confusing this time.
-
-This is how the function looks after the patch.
-All the modes are handled in a generic way.
-
-Which I believe it is right:
-
-static void xilinx_spi_rx(struct xilinx_spi *xspi)
-{
-u32 data = xspi->read_fn(xspi->regs + XSPI_RXD_OFFSET);
-
-if (!xspi->rx_ptr)
-    return;
-
-switch (xspi->bits_per_word) {
-case 8:
-    *(u8 *)(xspi->rx_ptr) = data;
-break;
-case 16:
-    *(u16 *)(xspi->rx_ptr) = data;
-break;
-case 32:
-    *(u32 *)(xspi->rx_ptr) = data;
-break;
-}
-
-xspi->rx_ptr += xspi->bits_per_word/8;
-}
-
-
-
->
->> +     xspi->rx_ptr += xspi->bits_per_word/8;
->
-> ...which looks to duplicate this which handles all cases.  Also there's
-> a coding style thing - spaces around the / please.
-
-I am fixing this on the next version. (and  xspi->tx_ptr +=
-xspi->bits_per_word/8;)
-
-I am also cc: the maintainers of checkpatch, because for whatever
-reason, this was not found by the script
-
-ricardo at neopili:~/curro/qtec/linux-upstream$ scripts/checkpatch.pl
-xilinx-spi2/0011-spi-xilinx-Remove-rx_fn-and-tx_fn-pointer.patch
-total: 0 errors, 0 warnings, 109 lines checked
-
-xilinx-spi2/0011-spi-xilinx-Remove-rx_fn-and-tx_fn-pointer.patch has
-no obvious style problems and is ready for submission.
-
-Thanks!
-
+That is done in patch 10/13.
 
 -- 
-Ricardo Ribalda
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
