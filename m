@@ -1,84 +1,62 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 28 Jan 2015 11:33:00 +0000
-Subject: [PATCH v4 1/6] of: iommu: add ptr to OF node arg to
- of_iommu_configure()
-In-Reply-To: <54C68C1D.5030605@ti.com>
-References: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
- <1422052359-12384-2-git-send-email-m-karicheri2@ti.com>
- <4711364.TTK5TCBdiy@avalon> <54C68C1D.5030605@ti.com>
-Message-ID: <20150128113300.GF1569@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 28 Jan 2015 12:36:01 +0100
+Subject: [PATCH V4 1/4] mmc: core: Initial support for MMC power sequences
+In-Reply-To: <CABxcv==xBNsh+NrVb8PcBVtxQOKDL79YMkwK=wOL0gJZriEUjw@mail.gmail.com>
+References: <1421658784-11980-1-git-send-email-ulf.hansson@linaro.org>
+ <1421658784-11980-2-git-send-email-ulf.hansson@linaro.org>
+ <CABxcv==xBNsh+NrVb8PcBVtxQOKDL79YMkwK=wOL0gJZriEUjw@mail.gmail.com>
+Message-ID: <CAPDyKFoze-26fPm+C=D_o3tMSXWeTV4=2ZfOKaC3uLtxCrtjvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 26, 2015 at 06:49:01PM +0000, Murali Karicheri wrote:
-> On 01/25/2015 08:32 AM, Laurent Pinchart wrote:
-> > Hi Murali,
-> >
-> > Thank you for the patch.
-> >
-> > On Friday 23 January 2015 17:32:34 Murali Karicheri wrote:
-> >> Function of_iommu_configure() is called from of_dma_configure() to
-> >> setup iommu ops using DT property. This API is currently used for
-> >> platform devices for which DMA configuration (including iommu ops)
-> >> may come from device's parent. To extend this functionality for PCI
-> >> devices, this API need to take a parent node ptr as an argument
-> >> instead of assuming device's parent. This is needed since for PCI, the
-> >> dma configuration may be defined in the DT node of the root bus bridge's
-> >> parent device. Currently only dma-range is used for PCI and iommu is not
-> >> supported. So return error if the device is PCI.
-> >>
-> >> Cc: Joerg Roedel<joro@8bytes.org>
-> >> Cc: Grant Likely<grant.likely@linaro.org>
-> >> Cc: Rob Herring<robh+dt@kernel.org>
-> >> Cc: Bjorn Helgaas<bhelgaas@google.com>
-> >> Cc: Will Deacon<will.deacon@arm.com>
-> >> Cc: Russell King<linux@arm.linux.org.uk>
-> >> Cc: Arnd Bergmann<arnd@arndb.de>
-> >> Cc: Suravee Suthikulpanit<Suravee.Suthikulpanit@amd.com>
-> >>
-> >> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
-> >> ---
-> >>   drivers/iommu/of_iommu.c |   10 ++++++++--
-> >>   drivers/of/platform.c    |    2 +-
-> >>   include/linux/of_iommu.h |    6 ++++--
-> >>   3 files changed, 13 insertions(+), 5 deletions(-)
-> >>
-> >> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-> >> index af1dc6a..439235b 100644
-> >> --- a/drivers/iommu/of_iommu.c
-> >> +++ b/drivers/iommu/of_iommu.c
-> >> @@ -133,19 +133,25 @@ struct iommu_ops *of_iommu_get_ops(struct device_node
-> >> *np) return ops;
-> >>   }
-> >>
-> >> -struct iommu_ops *of_iommu_configure(struct device *dev)
-> >> +struct iommu_ops *of_iommu_configure(struct device *dev,
-> >> +				     struct device_node *iommu_np)
-> >>   {
-> >>   	struct of_phandle_args iommu_spec;
-> >>   	struct device_node *np;
-> >>   	struct iommu_ops *ops = NULL;
-> >>   	int idx = 0;
-> >>
-> >> +	if (dev_is_pci(dev)) {
-> >> +		dev_err(dev, "iommu is currently not supported for PCI\n");
-> >> +		return NULL;
-> >> +	}
-> >> +
-> >>   	/*
-> >>   	 * We don't currently walk up the tree looking for a parent IOMMU.
-> >>   	 * See the `Notes:' section of
-> >>   	 * Documentation/devicetree/bindings/iommu/iommu.txt
-> >>   	 */
-> > Wouldn't it be better to fix this rather than passing the device node pointer
-> > to the function ? The solution would be more generic.
-> Laurent,
-> 
-> Will Deacon (Copied here) is working on this as we alteady discussed in 
-> this thread. So it will be
-> addressed by him in another series.
+On 28 January 2015 at 11:17, Javier Martinez Canillas
+<javier@dowhile0.org> wrote:
+> Hello Ulf,
+>
+> On Mon, Jan 19, 2015 at 10:13 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> System on chip designs may specify a specific MMC power sequence. To
+>> successfully detect an (e)MMC/SD/SDIO card, that power sequence must
+>> be followed while initializing the card.
+>>
+>> To be able to handle these SOC specific power sequences, let's add a
+>> MMC power sequence interface. It provides the following functions to
+>> help the mmc core to deal with these power sequences.
+>>
+>> mmc_pwrseq_alloc() - Invoked from mmc_of_parse(), to initialize data.
+>> mmc_pwrseq_pre_power_on()- Invoked in the beginning of mmc_power_up().
+>> mmc_pwrseq_post_power_on()- Invoked at the end in mmc_power_up().
+>> mmc_pwrseq_power_off()- Invoked from mmc_power_off().
+>> mmc_pwrseq_free() - Invoked from mmc_free_host(), to free data.
+>>
+>> Each MMC power sequence provider will be responsible to implement a set
+>> of callbacks. These callbacks mirrors the functions above.
+>>
+>> This patch adds the skeleton, following patches will extend the core of
+>> the MMC power sequence and add support for a specific simple MMC power
+>> sequence.
+>>
+>> Do note, since the mmc_pwrseq_alloc() is invoked from mmc_of_parse(),
+>> host drivers needs to make use of this API to enable the support for
+>> MMC power sequences. Moreover the MMC power sequence support depends on
+>> CONFIG_OF.
+>>
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> ---
+>
+> Patch looks good to me and I could successfully get the SDIO wlan chip
+> in the Snow Chromebook after extending the pwrseq_simple driver so on
+> Exynos5250 Snow Chromebook:
 
-Well, "working on this" equates to "has it somewhere near the bottom of
-a very long list" :)
+By extending you mean?
 
-Will
+>
+> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>
+> Best regards,
+> Javier
+
+Thanks for testing and reviewing! I have applied your tags to the patches.
+
+Kind regards
+Uffe
