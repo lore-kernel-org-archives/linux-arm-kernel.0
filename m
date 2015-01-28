@@ -1,34 +1,38 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 28 Jan 2015 08:19:51 +0100
-Subject: [PATCH] ARM: /proc/atags: Export also for DT
-In-Reply-To: <1FECE32B-0D63-4696-BED7-74FE5845C260@jcrosoft.com>
-References: <20150127132127.GA869@amd>
- <CAL_JsqKM+2PtX_EpWXyOQHVXwf=jqVj8SroUGPO1Y2=Zj8_kMg@mail.gmail.com>
- <201501271532.25540@pali>
- <20150127174818.GM26493@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1501271446330.1322@knanqh.ubzr>
- <20150127210943.GN26493@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1501271614280.1322@knanqh.ubzr>
- <20150127223331.GP26493@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1501272027390.1322@knanqh.ubzr>
- <1FECE32B-0D63-4696-BED7-74FE5845C260@jcrosoft.com>
-Message-ID: <20150128071950.GB29927@amd>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 28 Jan 2015 08:49:07 +0100
+Subject: [PATCH v5 2/5] dt-bindings: Add pinctrl bindings for
+ mt65xx/mt81xx.
+In-Reply-To: <CACRpkdb5=SX0-xdpngBszcha=R4nPLTSv3b_n=NOtGUL6f2_Fg@mail.gmail.com>
+References: <1421818097-9281-1-git-send-email-hongzhou.yang@mediatek.com>
+ <1421818097-9281-3-git-send-email-hongzhou.yang@mediatek.com>
+ <CACRpkdb5=SX0-xdpngBszcha=R4nPLTSv3b_n=NOtGUL6f2_Fg@mail.gmail.com>
+Message-ID: <20150128074907.GY12209@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> > In other words, what prevents someone from creating, say, a custom 
-> > minimal Barebox version that sits on top of the existing N900 
-> > bootloader?  Wouldn't that provide a much better user experience?
+On Tue, Jan 27, 2015 at 03:19:01PM +0100, Linus Walleij wrote:
+> On Wed, Jan 21, 2015 at 6:28 AM, Hongzhou Yang
+> <hongzhou.yang@mediatek.com> wrote:
 > 
-> I do agree with Nicolas
+> > From: Hongzhou Yang <hongzhou.yang@mediatek.com>
+> >
+> > Add devicetree bindings for Mediatek SoC pinctrl driver.
+> >
+> > Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
 > 
-> If I can get my hand on a phone I?ll put barebox on it
+> Sascha can you ACK this binding?
 
-Grab it in the nearest "second hand cellphones" shop, and have fun! It
-should be less than $70.
-									Pavel
+Just did that.
+
+> If you confirm it will cover also your usecase I'm gonna be happy
+> with this...
+
+\o/
+
+Sascha
+
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
