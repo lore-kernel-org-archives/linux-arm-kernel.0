@@ -1,39 +1,53 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Jan 2015 22:17:40 +0100
-Subject: [PATCH 0/7] [media] ARM randconfig fixes
-Message-ID: <1422479867-3370921-1-git-send-email-arnd@arndb.de>
+Date: Wed, 28 Jan 2015 22:17:45 +0100
+Subject: [PATCH 5/7] [media] gspca: add INPUT dependency
+In-Reply-To: <1422479867-3370921-1-git-send-email-arnd@arndb.de>
+References: <1422479867-3370921-1-git-send-email-arnd@arndb.de>
+Message-ID: <1422479867-3370921-6-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mauro,
+The gspca  driver uses the input_event infrastructure and fails
+to link if that is not available:
 
-This is one set of randconfig fixes that I've been carrying in
-a local branch for a long time. I have made sure that they are
-all still required, but there are others that I have not been
-able to reproduce yet, so I will probably send them out once
-I get the errors again.
+drivers/built-in.o: In function `gspca_disconnect':
+media/usb/gspca/gspca.c:2171: undefined reference to `input_unregister_device'
+drivers/built-in.o: In function `gspca_dev_probe2':
+media/usb/gspca/gspca.c:2112: undefined reference to `input_allocate_device'
+media/usb/gspca/gspca.c:2112: undefined reference to `input_register_device'
+media/usb/gspca/gspca.c:2112: undefined reference to `input_unregister_device'
+media/usb/gspca/gspca.c:2112: undefined reference to `input_free_device'
+drivers/built-in.o: In function `sd_int_pkt_scan':
+media/usb/gspca/pac207.c:428: undefined reference to `input_event'
+drivers/built-in.o: In function `sd_int_pkt_scan':
+media/usb/gspca/pac7302.c:879: undefined reference to `input_event'
+drivers/built-in.o: In function `sd_int_pkt_scan':
+media/usb/gspca/se401.c:612: undefined reference to `input_event'
+drivers/built-in.o: In function `sd_stop0':
+media/usb/gspca/xirlink_cit.c:2742: undefined reference to `input_event'
+drivers/built-in.o: In function `cit_check_button':
+media/usb/gspca/xirlink_cit.c:2935: undefined reference to `input_event'
+drivers/built-in.o:/git/arm-soc/include/linux/input.h:414: more undefined references to `input_event' follow
 
-The ones here are all trivial, mostly adding missing dependencies.
+This adds an explicit dependency.
 
-Please apply.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Hans de Goede <hdegoede@redhat.com>
+---
+ drivers/media/usb/gspca/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Arnd Bergmann (7):
-  [media] timberdale: do not select TIMB_DMA
-  [media] radio/aimslab: use mdelay instead of udelay
-  [media] staging/davinci/vpfe/dm365: add missing dependencies
-  [media] siano: fix Kconfig dependencies
-  [media] gspca: add INPUT dependency
-  [media] marvell-ccic: MMP_CAMERA never worked
-  [media] marvell-ccic needs VIDEOBUF2_DMA_SG
-
- drivers/media/mmc/siano/Kconfig             | 2 ++
- drivers/media/platform/Kconfig              | 6 ++----
- drivers/media/platform/marvell-ccic/Kconfig | 3 ++-
- drivers/media/radio/radio-aimslab.c         | 4 ++--
- drivers/media/usb/gspca/Kconfig             | 1 +
- drivers/media/usb/siano/Kconfig             | 2 ++
- drivers/staging/media/davinci_vpfe/Kconfig  | 2 ++
- 7 files changed, 13 insertions(+), 7 deletions(-)
-
+diff --git a/drivers/media/usb/gspca/Kconfig b/drivers/media/usb/gspca/Kconfig
+index eed10d782535..2b23aad5a9f2 100644
+--- a/drivers/media/usb/gspca/Kconfig
++++ b/drivers/media/usb/gspca/Kconfig
+@@ -1,6 +1,7 @@
+ menuconfig USB_GSPCA
+ 	tristate "GSPCA based webcams"
+ 	depends on VIDEO_V4L2
++	depends on INPUT
+ 	default m
+ 	---help---
+ 	  Say Y here if you want to enable selecting webcams based
 -- 
 2.1.0.rc2
