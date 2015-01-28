@@ -1,41 +1,84 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 28 Jan 2015 16:19:13 +0000
-Subject: [PATCH] ARM: /proc/atags: Export also for DT
-In-Reply-To: <20150128161316.GS26493@n2100.arm.linux.org.uk>
-References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
- <20150127174818.GM26493@n2100.arm.linux.org.uk>
- <20150128005032.GK28663@atomide.com> <201501281458.22088@pali>
- <alpine.LFD.2.11.1501280925400.1322@knanqh.ubzr>
- <CAL_Jsq+rESm8q44ABRbh9hqMsfcMNx0kcXJ5ONbn1=ue-RvHFg@mail.gmail.com>
- <20150128161316.GS26493@n2100.arm.linux.org.uk>
-Message-ID: <20150128161913.GU1569@arm.com>
+From: kas@fi.muni.cz (Jan Kasprzak)
+Date: Wed, 28 Jan 2015 17:19:10 +0100
+Subject: [PATCH 2/4] net: wan: add missing virt_to_bus dependencies
+In-Reply-To: <1422454504-439085-3-git-send-email-arnd@arndb.de>
+References: <1422454504-439085-1-git-send-email-arnd@arndb.de>
+ <1422454504-439085-3-git-send-email-arnd@arndb.de>
+Message-ID: <20150128161910.GJ6378@fi.muni.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 28, 2015 at 04:13:17PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Jan 28, 2015 at 09:57:18AM -0600, Rob Herring wrote:
-> > I'm fine with that, but we just need to have a standard kernel
-> > userspace interface in addition to something like
-> > /proc/device-tree/bootreason. Perhaps this can be the default
-> > implementation for the watchdog dev. Someday when we decide DT is crap
-> > and have a new boot interface, we'll have people relying on
-> > /proc/device-tree. I hope to be retired when that happens...
-> 
-> Anyone who thinks that DT can be replaced in the same way that we made
-> the mistake with ATAGs would really need their head examined.
-> 
-> As you point out, removing DT removes the /proc/device-tree/ sub-tree.
-> Whether we like it or not, that is a userspace API, one which we have
-> users of already.  That pretty much means that we can't remove DT for
-> existing platforms or any platform we have now converted to DT.
+Arnd Bergmann wrote:
+: The cosa driver is rather outdated and does not get built on most
+: platforms because it requires the ISA_DMA_API symbol. However
+: there are some ARM platforms that have ISA_DMA_API but no virt_to_bus,
+: and they get this build error when enabling the ltpc driver.
+: 
+: drivers/net/wan/cosa.c: In function 'tx_interrupt':
+: drivers/net/wan/cosa.c:1768:3: error: implicit declaration of function 'virt_to_bus'
+:    unsigned long addr = virt_to_bus(cosa->txbuf);
+:    ^
+: 
+: The same problem exists for the Hostess SV-11 and Sealevel Systems 4021
+: drivers.
 
-<ok, I'll go there!>
+	Hello,
 
-... and for platforms that can also be booted via ACPI? If we have to
-convert the ACPI tables into a device-tree purely for /proc/device-tree,
-then we may as well boot with the thing too :)
+as for COSA, it is OK. Although I would like to know whether there still is
+at least one COSA card in use somewhere :-)
 
-Seriously though, I don't see how we can maintain this directory for
-ACPI, regardless of whether or not it's ABI.
+Acked-By: Jan "Yenya" Kasprzak <kas@fi.muni.cz>
 
-Will
+Thanks,
+
+-Yenya
+
+: 
+: This adds another dependency in Kconfig to avoid that configuration.
+: 
+: Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+: ---
+:  drivers/net/wan/Kconfig | 6 +++---
+:  1 file changed, 3 insertions(+), 3 deletions(-)
+: 
+: diff --git a/drivers/net/wan/Kconfig b/drivers/net/wan/Kconfig
+: index 94e234975c61..a2fdd15f285a 100644
+: --- a/drivers/net/wan/Kconfig
+: +++ b/drivers/net/wan/Kconfig
+: @@ -25,7 +25,7 @@ if WAN
+:  # There is no way to detect a comtrol sv11 - force it modular for now.
+:  config HOSTESS_SV11
+:  	tristate "Comtrol Hostess SV-11 support"
+: -	depends on ISA && m && ISA_DMA_API && INET && HDLC
+: +	depends on ISA && m && ISA_DMA_API && INET && HDLC && VIRT_TO_BUS
+:  	help
+:  	  Driver for Comtrol Hostess SV-11 network card which
+:  	  operates on low speed synchronous serial links at up to
+: @@ -37,7 +37,7 @@ config HOSTESS_SV11
+:  # The COSA/SRP driver has not been tested as non-modular yet.
+:  config COSA
+:  	tristate "COSA/SRP sync serial boards support"
+: -	depends on ISA && m && ISA_DMA_API && HDLC
+: +	depends on ISA && m && ISA_DMA_API && HDLC && VIRT_TO_BUS
+:  	---help---
+:  	  Driver for COSA and SRP synchronous serial boards.
+:  
+: @@ -87,7 +87,7 @@ config LANMEDIA
+:  # There is no way to detect a Sealevel board. Force it modular
+:  config SEALEVEL_4021
+:  	tristate "Sealevel Systems 4021 support"
+: -	depends on ISA && m && ISA_DMA_API && INET && HDLC
+: +	depends on ISA && m && ISA_DMA_API && INET && HDLC && VIRT_TO_BUS
+:  	help
+:  	  This is a driver for the Sealevel Systems ACB 56 serial I/O adapter.
+:  
+: -- 
+: 2.1.0.rc2
+
+-- 
+| Jan "Yenya" Kasprzak   <kas@{fi.muni.cz - work | yenya.net - private}> |
+| New GPG 4096R/A45477D5 -- see http://www.fi.muni.cz/~kas/pgp-rollover.txt |
+| http://www.fi.muni.cz/~kas/     Journal: http://www.fi.muni.cz/~kas/blog/ |
+||| "New and improved" is only really improved if it also takes backwards |||
+||| compatibility into account, rather than saying "now everybody must do |||
+||| things the new and improved - and different - way"   --Linus Torvalds |||
