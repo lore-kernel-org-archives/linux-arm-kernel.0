@@ -1,107 +1,98 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Tue, 27 Jan 2015 18:46:38 -0800
-Subject: [PATCH 8/9] regulator: Drop now unused get_optimum_mode
-In-Reply-To: <1422413199-17273-1-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1422413199-17273-1-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <1422413199-17273-9-git-send-email-bjorn.andersson@sonymobile.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 27 Jan 2015 20:49:25 -0600
+Subject: [PATCH v5 5/8] of/pci: add of_pci_dma_configure() update dma
+ configuration
+In-Reply-To: <1422392405-32196-6-git-send-email-m-karicheri2@ti.com>
+References: <1422392405-32196-1-git-send-email-m-karicheri2@ti.com>
+ <1422392405-32196-6-git-send-email-m-karicheri2@ti.com>
+Message-ID: <CAL_JsqL_SBezH92nJ_xHg5o1ZfH8uC_wne72CQr6yCP+ByuiXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
----
- drivers/regulator/core.c         | 40 ++++++++--------------------------------
- include/linux/regulator/driver.h |  5 -----
- 2 files changed, 8 insertions(+), 37 deletions(-)
+On Tue, Jan 27, 2015 at 3:00 PM, Murali Karicheri <m-karicheri2@ti.com> wrote:
+> Add of_pci_dma_configure() to allow updating the dma configuration
+> of the pci device using the configuration from DT of the parent of
+> the root bridge device. Use the newly added APIs
+> pci_get/put_host_bridge_device() for implementing this.
+>
+> Cc: Joerg Roedel <joro@8bytes.org>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
 
-diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-index 2a53515..cfab6fc 100644
---- a/drivers/regulator/core.c
-+++ b/drivers/regulator/core.c
-@@ -662,7 +662,6 @@ static int drms_uA_update(struct regulator_dev *rdev)
- {
- 	struct regulator *sibling;
- 	int current_uA = 0, output_uV, input_uV, err;
--	unsigned int mode;
- 
- 	/*
- 	 * first check to see if we can set modes at all, otherwise just
-@@ -672,14 +671,9 @@ static int drms_uA_update(struct regulator_dev *rdev)
- 	if (err < 0)
- 		return 0;
- 
--	if (!rdev->desc->ops->get_optimum_mode &&
--	    !rdev->desc->ops->set_optimum_mode)
-+	if (!rdev->desc->ops->set_optimum_mode)
- 		return 0;
- 
--	if (!rdev->desc->ops->set_mode &&
--	    !rdev->desc->ops->set_optimum_mode)
--		return -EINVAL;
--
- 	/* get output voltage */
- 	output_uV = _regulator_get_voltage(rdev);
- 	if (output_uV <= 0) {
-@@ -702,31 +696,13 @@ static int drms_uA_update(struct regulator_dev *rdev)
- 	list_for_each_entry(sibling, &rdev->consumer_list, list)
- 		current_uA += sibling->uA_load;
- 
--	if (rdev->desc->ops->set_optimum_mode) {
--		/* set the optimum mode for our new total regulator load */
--		err = rdev->desc->ops->set_optimum_mode(rdev,
--							input_uV, output_uV,
--							current_uA);
--		if (err < 0)
--			rdev_err(rdev, "failed to set optimum mode @ %d uA %d -> %d uV\n",
--				 current_uA, input_uV, output_uV);
--	} else {
--		/* now get the optimum mode for our new total regulator load */
--		mode = rdev->desc->ops->get_optimum_mode(rdev, input_uV,
--							 output_uV, current_uA);
--
--		/* check the new mode is allowed */
--		err = regulator_mode_constrain(rdev, &mode);
--		if (err < 0) {
--			rdev_err(rdev, "failed to get optimum mode @ %d uA %d -> %d uV\n",
--				 current_uA, input_uV, output_uV);
--			return err;
--		}
--
--		err = rdev->desc->ops->set_mode(rdev, mode);
--		if (err < 0)
--			rdev_err(rdev, "failed to set optimum mode %x\n", mode);
--	}
-+	/* set the optimum mode for our new total regulator load */
-+	err = rdev->desc->ops->set_optimum_mode(rdev,
-+						input_uV, output_uV,
-+						current_uA);
-+	if (err < 0)
-+		rdev_err(rdev, "failed to set optimum mode @ %d uA %d -> %d uV\n",
-+			 current_uA, input_uV, output_uV);
- 
- 	return err;
- }
-diff --git a/include/linux/regulator/driver.h b/include/linux/regulator/driver.h
-index 837addb..f472cb5 100644
---- a/include/linux/regulator/driver.h
-+++ b/include/linux/regulator/driver.h
-@@ -95,8 +95,6 @@ struct regulator_linear_range {
-  * @get_mode: Get the configured operating mode for the regulator.
-  * @get_status: Return actual (not as-configured) status of regulator, as a
-  *	REGULATOR_STATUS value (or negative errno)
-- * @get_optimum_mode: Get the most efficient operating mode for the regulator
-- *                    when running with the specified parameters.
-  * @set_optimum_mode: Set the most efficient operating mode for the regulator
-  *                    when running with the specified parameters.
-  *
-@@ -165,9 +163,6 @@ struct regulator_ops {
- 	 */
- 	int (*get_status)(struct regulator_dev *);
- 
--	/* get most efficient regulator operating mode for load */
--	unsigned int (*get_optimum_mode) (struct regulator_dev *, int input_uV,
--					  int output_uV, int load_uA);
- 	/* set most efficient regulator operating mode for load */
- 	int (*set_optimum_mode)(struct regulator_dev *, int input_uV,
- 				int output_uV, int load_uA);
--- 
-1.9.1
+Acked-by: Rob Herring <robh@kernel.org>
+
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>
+> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> ---
+>  drivers/of/of_pci.c    |   19 +++++++++++++++++++
+>  include/linux/of_pci.h |    5 +++++
+>  2 files changed, 24 insertions(+)
+>
+> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+> index 88471d3..0f1dd0b 100644
+> --- a/drivers/of/of_pci.c
+> +++ b/drivers/of/of_pci.c
+> @@ -2,6 +2,7 @@
+>  #include <linux/export.h>
+>  #include <linux/of.h>
+>  #include <linux/of_address.h>
+> +#include <linux/of_device.h>
+>  #include <linux/of_pci.h>
+>  #include <linux/slab.h>
+>
+> @@ -229,6 +230,24 @@ parse_failed:
+>         return err;
+>  }
+>  EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
+> +
+> +/**
+> + * of_pci_dma_configure - Setup DMA configuration
+> + * @dev: ptr to pci_dev struct of the pci device
+> + *
+> + * Function to update PCI devices's DMA configuration using the same
+> + * info from the OF node of root host bridge's parent.
+> + */
+> +void of_pci_dma_configure(struct pci_dev *pci_dev)
+> +{
+> +       struct device *dev = &pci_dev->dev;
+> +       struct device *bridge = pci_get_host_bridge_device(pci_dev);
+> +
+> +       of_dma_configure(dev, bridge->parent->of_node);
+> +       pci_put_host_bridge_device(bridge);
+> +}
+> +EXPORT_SYMBOL_GPL(of_pci_dma_configure);
+> +
+>  #endif /* CONFIG_OF_ADDRESS */
+>
+>  #ifdef CONFIG_PCI_MSI
+> diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
+> index ce0e5ab..8f1741f 100644
+> --- a/include/linux/of_pci.h
+> +++ b/include/linux/of_pci.h
+> @@ -16,6 +16,7 @@ int of_pci_get_devfn(struct device_node *np);
+>  int of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin);
+>  int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
+>  int of_get_pci_domain_nr(struct device_node *node);
+> +void of_pci_dma_configure(struct pci_dev *pci_dev);
+>  #else
+>  static inline int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq)
+>  {
+> @@ -50,6 +51,10 @@ of_get_pci_domain_nr(struct device_node *node)
+>  {
+>         return -1;
+>  }
+> +
+> +static inline void of_pci_dma_configure(struct pci_dev *pci_dev)
+> +{
+> +}
+>  #endif
+>
+>  #if defined(CONFIG_OF_ADDRESS)
+> --
+> 1.7.9.5
+>
