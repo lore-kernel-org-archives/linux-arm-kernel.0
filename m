@@ -1,66 +1,39 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 28 Jan 2015 12:55:45 +0100
-Subject: [PATCH] ARM: mvebu: don't set the PL310 in I/O coherency mode when
- I/O coherency is disabled
-Message-ID: <1422446145-24447-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 28 Jan 2015 19:54:12 +0800
+Subject: [PATCH] mmc: sdhci-pxav3: fix setting of pdata->clk_delay_cycles
+Message-ID: <1422446052-2323-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit f2c3c67f00 (merge commit that adds commit "ARM: mvebu:
-completely disable hardware I/O coherency"), we disable I/O coherency
-on Armada EBU platforms.
+Current code checks "clk_delay_cycles > 0" to know whether the optional
+"mrvl,clk_delay_cycles" is set or not. But of_property_read_u32() doesn't
+touch clk_delay_cycles if the property is not set. And type of
+clk_delay_cycles is u32, so we may always set pdata->clk_delay_cycles as a
+random value.
 
-However, we continue to initialize the coherency fabric, because this
-coherency fabric is needed on Armada XP for inter-CPU
-coherency. Unfortunately, due to this, we also continued to execute
-the coherency fabric initialization code for Armada 375/38x, which
-switched the PL310 into I/O coherent mode. This has the effect of
-disabling the outer cache sync operation: this is needed when I/O
-coherency is enabled to work around a PCIe/L2 deadlock. But obviously,
-when I/O coherency is disabled, having the outer cache sync operation
-is crucial.
+This patch fix this problem by check the return value of of_property_read_u32()
+to know whether the optional clk-delay-cycles is set or not.
 
-Therefore, this commit fixes the armada_375_380_coherency_init() so
-that the PL310 is switched to I/O coherent mode only if I/O coherency
-is enabled.
-
-Without this fix, all devices using DMA are broken on Armada 375/38x.
-
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: <stable@vger.kernel.org>
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Cc: <stable@vger.kernel.org> # v3.6+
 ---
-This fix is needed in 3.19-rc, and in all stable kernel releases in
-which f2c3c67f00 was added.
+ drivers/mmc/host/sdhci-pxav3.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-In mainline, it is not strictly needed, since we have since then
-re-enabled I/O coherency using automatic barriers.
-
-Commit applies on top of 3.19-rc6, and has been tested on Armada XP,
-Armada 375 and Armada 38x, by checking that the XOR engine self-tests
-are working properly, which is a good indication that DMA and I/O
-coherency is minimally working. Without the fix, the XOR engine
-self-tests were not even working on Armada 38x.
-
- arch/arm/mach-mvebu/coherency.c | 7 +++++++
- 1 file changed, 7 insertions(+)
-
-diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index caa21e9..ccef880 100644
---- a/arch/arm/mach-mvebu/coherency.c
-+++ b/arch/arm/mach-mvebu/coherency.c
-@@ -190,6 +190,13 @@ static void __init armada_375_380_coherency_init(struct device_node *np)
- 	arch_ioremap_caller = armada_pcie_wa_ioremap_caller;
+diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
+index c5db5d2..f1c6362 100644
+--- a/drivers/mmc/host/sdhci-pxav3.c
++++ b/drivers/mmc/host/sdhci-pxav3.c
+@@ -268,8 +268,8 @@ static struct sdhci_pxa_platdata *pxav3_get_mmc_pdata(struct device *dev)
+ 	if (!pdata)
+ 		return NULL;
  
- 	/*
-+	 * We should switch the PL310 to I/O coherency mode only if
-+	 * I/O coherency is actually enabled.
-+	 */
-+	if (!coherency_available())
-+		return;
-+
-+	/*
- 	 * Add the PL310 property "arm,io-coherent". This makes sure the
- 	 * outer sync operation is not used, which allows to
- 	 * workaround the system erratum that causes deadlocks when
+-	of_property_read_u32(np, "mrvl,clk-delay-cycles", &clk_delay_cycles);
+-	if (clk_delay_cycles > 0)
++	if (!of_property_read_u32(np, "mrvl,clk-delay-cycles",
++				  &clk_delay_cycles))
+ 		pdata->clk_delay_cycles = clk_delay_cycles;
+ 
+ 	return pdata;
 -- 
-2.1.0
+2.1.4
