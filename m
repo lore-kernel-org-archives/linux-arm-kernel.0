@@ -1,140 +1,98 @@
-From: bparrot@ti.com (Benoit Parrot)
-Date: Wed, 28 Jan 2015 13:32:47 -0600
-Subject: [PATCH v3] ARM: AM43xx: hwmod: add VPFE hwmod entries
-In-Reply-To: <1422260488-380-1-git-send-email-prabhakar.csengg@gmail.com>
-References: <1422260488-380-1-git-send-email-prabhakar.csengg@gmail.com>
-Message-ID: <20150128193247.GH2570@ti.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Wed, 28 Jan 2015 20:33:53 +0100
+Subject: [PATCH] ARM: /proc/atags: Export also for DT
+In-Reply-To: <0ED606B9-34EB-4FEC-BCC1-19BC60BCF768@jcrosoft.com>
+References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
+ <CAL_Jsq+rESm8q44ABRbh9hqMsfcMNx0kcXJ5ONbn1=ue-RvHFg@mail.gmail.com>
+ <0ED606B9-34EB-4FEC-BCC1-19BC60BCF768@jcrosoft.com>
+Message-ID: <201501282033.53144@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suspend/resume is functional with this patch.
+On Wednesday 28 January 2015 19:00:25 Jean-Christophe PLAGNIOL-
+VILLARD wrote:
+> > On Jan 28, 2015, at 11:57 PM, Rob Herring
+> > <robherring2@gmail.com> wrote:
+> > 
+> > On Wed, Jan 28, 2015 at 8:33 AM, Nicolas Pitre 
+<nico@fluxnic.net> wrote:
+> >> On Wed, 28 Jan 2015, Pali Roh?r wrote:
+> >>> On Wednesday 28 January 2015 01:50:33 Tony Lindgren wrote:
+> >>>> On omaps, the bootrom passes the bootreason in r1 to the
+> >>>> bootloader that can do whatever it wants with it. We
+> >>>> could maybe pass it in the kernel cmdline to the
+> >>>> watchdog driver for user space?
+> >>> 
+> >>> Not truth for N900. Bootreason depends on PRM_RSTST omap
+> >>> register, state of vbat charger pins, time how long was
+> >>> power key pressed, R&D data stored in CAL partition and
+> >>> other undocumented registers for omap HS devices. I
+> >>> already tried to implement at least some subset of it in
+> >>> userspace (or kernel), but it is impossible because NOLO
+> >>> bootloader clear status of PRM_RSTST register.
+> >>> 
+> >>> There is also copy of PRM_RSTST register stored at address
+> >>> 0x4020FFB8 (tracing data) but that address is rewritten
+> >>> (probably by kernel), so we really cannot implement
+> >>> reading bootreason in kernel.
+> >>> 
+> >>> But in early stage in uboot it is possible to read
+> >>> 0x4020FFB8 address and get some part of bootreason. But
+> >>> still PRM_RSTST is not enough!
+> >>> 
+> >>> I would be happy if DT kernel can export /proc/atags file
+> >>> with ATAGs passed by bootloader. It would be enough for
+> >>> me. In userspace I can parse content and do what is
+> >>> needed.
+> >> 
+> >> What about defining a DT boot reason property instead?
+> >> Maybe it already exists?  If not, it's something that could
+> >> certainly be generically used on other platforms too.
+> > 
+> > I'm fine with that, but we just need to have a standard
+> > kernel userspace interface in addition to something like
+> > /proc/device-tree/bootreason. Perhaps this can be the
+> > default implementation for the watchdog dev. Someday when
+> > we decide DT is crap and have a new boot interface, we'll
+> > have people relying on /proc/device-tree. I hope to be
+> > retired when that happens?
+> 
+> but if we try to do this generic, where will you store the
+> boot mode
+> 
+> I mean where the SoC boot from
+> 
+> useful to for the Userspace to known where is the bootloader
+> in case of multi boot mode
+> 
+> Best Regards,
+> J.
+> 
+> > Rob
+> > 
 
-Tested-by: Benoit Parrot <bparrot@ti.com>
+I think in this discussion we are mixing two parts which should 
+be designed & solved separately.
 
-Lad, Prabhakar <prabhakar.csengg@gmail.com> wrote on Mon [2015-Jan-26 08:21:28 +0000]:
-> From: Benoit Parrot <bparrot@ti.com>
-> 
-> this patch adds VPFE HWMOD data for AM43xx.
-> 
-> Signed-off-by: Benoit Parrot <bparrot@ti.com>
-> Signed-off-by: Darren Etheridge <detheridge@ti.com>
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
-> ---
->  Changes for v3:
->  a: Dropped OCPIF_SWSUP_IDLE flag from l3 hwmods of vpfe.
->  
->  arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 70 ++++++++++++++++++++++++++++++
->  arch/arm/mach-omap2/prcm43xx.h             |  3 +-
->  2 files changed, 72 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-> index 5c6c841..8543f9f 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-> @@ -514,6 +514,44 @@ static struct omap_hwmod am43xx_dss_rfbi_hwmod = {
->  	},
->  };
->  
-> +static struct omap_hwmod_class_sysconfig am43xx_vpfe_sysc = {
-> +	.rev_offs       = 0x0,
-> +	.sysc_offs      = 0x104,
-> +	.sysc_flags     = SYSC_HAS_MIDLEMODE | SYSC_HAS_SIDLEMODE,
-> +	.idlemodes      = (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
-> +				MSTANDBY_FORCE | MSTANDBY_SMART | MSTANDBY_NO),
-> +	.sysc_fields    = &omap_hwmod_sysc_type2,
-> +};
-> +
-> +static struct omap_hwmod_class am43xx_vpfe_hwmod_class = {
-> +	.name           = "vpfe",
-> +	.sysc           = &am43xx_vpfe_sysc,
-> +};
-> +
-> +static struct omap_hwmod am43xx_vpfe0_hwmod = {
-> +	.name           = "vpfe0",
-> +	.class          = &am43xx_vpfe_hwmod_class,
-> +	.clkdm_name     = "l3s_clkdm",
-> +	.prcm           = {
-> +		.omap4  = {
-> +			.modulemode     = MODULEMODE_SWCTRL,
-> +			.clkctrl_offs   = AM43XX_CM_PER_VPFE0_CLKCTRL_OFFSET,
-> +		},
-> +	},
-> +};
-> +
-> +static struct omap_hwmod am43xx_vpfe1_hwmod = {
-> +	.name           = "vpfe1",
-> +	.class          = &am43xx_vpfe_hwmod_class,
-> +	.clkdm_name     = "l3s_clkdm",
-> +	.prcm           = {
-> +		.omap4  = {
-> +			.modulemode     = MODULEMODE_SWCTRL,
-> +			.clkctrl_offs   = AM43XX_CM_PER_VPFE1_CLKCTRL_OFFSET,
-> +		},
-> +	},
-> +};
-> +
->  /* Interfaces */
->  static struct omap_hwmod_ocp_if am43xx_l3_main__l4_hs = {
->  	.master		= &am33xx_l3_main_hwmod,
-> @@ -788,6 +826,34 @@ static struct omap_hwmod_ocp_if am43xx_l4_ls__dss_rfbi = {
->  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
->  };
->  
-> +static struct omap_hwmod_ocp_if am43xx_l3__vpfe0 = {
-> +	.master         = &am43xx_vpfe0_hwmod,
-> +	.slave          = &am33xx_l3_main_hwmod,
-> +	.clk            = "l3_gclk",
-> +	.user           = OCP_USER_MPU | OCP_USER_SDMA,
-> +};
-> +
-> +static struct omap_hwmod_ocp_if am43xx_l3__vpfe1 = {
-> +	.master         = &am43xx_vpfe1_hwmod,
-> +	.slave          = &am33xx_l3_main_hwmod,
-> +	.clk            = "l3_gclk",
-> +	.user           = OCP_USER_MPU | OCP_USER_SDMA,
-> +};
-> +
-> +static struct omap_hwmod_ocp_if am43xx_l4_ls__vpfe0 = {
-> +	.master         = &am33xx_l4_ls_hwmod,
-> +	.slave          = &am43xx_vpfe0_hwmod,
-> +	.clk            = "l4ls_gclk",
-> +	.user           = OCP_USER_MPU | OCP_USER_SDMA,
-> +};
-> +
-> +static struct omap_hwmod_ocp_if am43xx_l4_ls__vpfe1 = {
-> +	.master         = &am33xx_l4_ls_hwmod,
-> +	.slave          = &am43xx_vpfe1_hwmod,
-> +	.clk            = "l4ls_gclk",
-> +	.user           = OCP_USER_MPU | OCP_USER_SDMA,
-> +};
-> +
->  static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
->  	&am33xx_l4_wkup__synctimer,
->  	&am43xx_l4_ls__timer8,
-> @@ -887,6 +953,10 @@ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
->  	&am43xx_l4_ls__dss,
->  	&am43xx_l4_ls__dss_dispc,
->  	&am43xx_l4_ls__dss_rfbi,
-> +	&am43xx_l3__vpfe0,
-> +	&am43xx_l3__vpfe1,
-> +	&am43xx_l4_ls__vpfe0,
-> +	&am43xx_l4_ls__vpfe1,
->  	NULL,
->  };
->  
-> diff --git a/arch/arm/mach-omap2/prcm43xx.h b/arch/arm/mach-omap2/prcm43xx.h
-> index ad7b3e9..8aa4c2c 100644
-> --- a/arch/arm/mach-omap2/prcm43xx.h
-> +++ b/arch/arm/mach-omap2/prcm43xx.h
-> @@ -143,5 +143,6 @@
->  #define AM43XX_CM_PER_USB_OTG_SS1_CLKCTRL_OFFSET        0x0268
->  #define AM43XX_CM_PER_USBPHYOCP2SCP1_CLKCTRL_OFFSET	0x05C0
->  #define AM43XX_CM_PER_DSS_CLKCTRL_OFFSET		0x0a20
-> -
-> +#define AM43XX_CM_PER_VPFE0_CLKCTRL_OFFSET		0x0068
-> +#define AM43XX_CM_PER_VPFE1_CLKCTRL_OFFSET		0x0070
->  #endif
-> -- 
-> 2.1.0
-> 
+1) How should bootloader tell to kernel what is bootreason
+
+2) How should kernel export bootreason to userspace
+
+In modern x86 laptop world bootreason can be requested from 
+BIOS/WMI/firmware by special proprietary vendor specific command.
+
+So we should not lock bootreason to DT or ATAG only. Or only 
+bootloader --> kernel transition. For other platforms, board or 
+even architectures (x86) there can runtime way (for kernel) how 
+to read bootreason...
+
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150128/cc59673e/attachment-0001.sig>
