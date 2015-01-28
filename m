@@ -1,31 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Jan 2015 21:05:50 +0100
-Subject: [PATCH] leds: ipaq needs LEDS_CLASS
-Message-ID: <7354226.f7e3npkAlC@wuerfel>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 28 Jan 2015 20:06:00 +0000
+Subject: [RFC V2] OPP: Redefine bindings to overcome shortcomings
+In-Reply-To: <cbe949d7a69c3b16a3e9d6e5429eb81d3ae9d8b9.1422009157.git.viresh.kumar@linaro.org>
+References: <cbe949d7a69c3b16a3e9d6e5429eb81d3ae9d8b9.1422009157.git.viresh.kumar@linaro.org>
+Message-ID: <20150128200600.GR21293@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All other drivers have a dependency on this already, but this one
-does not, which can lead to a link error when LEDS_CLASS is not set.
+On Fri, Jan 23, 2015 at 04:14:50PM +0530, Viresh Kumar wrote:
 
-drivers/built-in.o: In function `micro_leds_remove':
-:(.text+0x13d1bc): undefined reference to `led_classdev_unregister'
-drivers/built-in.o: In function `micro_leds_probe':
-:(.text+0x13d3d0): undefined reference to `led_classdev_register'
+> +- opp-listN:
+> +  List of nodes defining performance points. Following belong to the nodes
+> +  within the opp-lists.
 
-This patch adds the missing dependency.
+Why is there the N here?  It doesn't correspond to the examples...
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> +  Required properties:
+> +  - opp-khz: Frequency in kHz
+> +  - opp-microvolt: voltage in micro Volts
 
-diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
-index 95029dfd311a..927bb4491e1c 100644
---- a/drivers/leds/Kconfig
-+++ b/drivers/leds/Kconfig
-@@ -144,6 +144,7 @@ config LEDS_SUNFIRE
- 
- config LEDS_IPAQ_MICRO
- 	tristate "LED Support for the Compaq iPAQ h3xxx"
-+	depends on LEDS_CLASS
- 	depends on MFD_IPAQ_MICRO
- 	help
- 	  Choose this option if you want to use the notification LED on
+I thought the goal here was to specify ranges?
+
+> +- oppN:
+> +  Operating performance point node per device. Devices using it should have its
+> +  phandle in their "operating-points-v2" property.
+> +
+> +  Required properties:
+> +  - compatible: allow OPPs to express their compatibility.
+> +  - opp-list: phandle to opp-list defined above.
+
+I don't understand what that compatible property is intended to mean and
+I expect other readers might be similarly confused - is it a standard
+compatbile property meaning this noe corresponds to some sort of device?
+
+There also appears to be no code matching these bindings...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150128/e6dd0d9e/attachment.sig>
