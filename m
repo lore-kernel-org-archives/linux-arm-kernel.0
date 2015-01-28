@@ -1,55 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Jan 2015 22:31:30 +0100
-Subject: [RFC] ASoC: rt5677: fix SPI dependency
-Message-ID: <19778554.1IDiTWklUc@wuerfel>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 28 Jan 2015 15:31:49 -0600
+Subject: [PATCH v10 1/3] arm64: Add __NR_* definitions for compat syscalls
+In-Reply-To: <1404458911-8214-2-git-send-email-takahiro.akashi@linaro.org>
+References: <1404458911-8214-1-git-send-email-takahiro.akashi@linaro.org>
+ <1404458911-8214-2-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <CAOZdJXUhpmi0SM5izDYQnx8SHjWjqOFVduV0+boPw6+YCKP5+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rt5677 codec has gained code that requires SPI to work correctly,
-but there is no provision in Kconfig to prevent the driver from
-being used when SPI is disabled or a loadable module, resulting
-in this build error:
+On Fri, Jul 4, 2014 at 2:28 AM, AKASHI Takahiro
+<takahiro.akashi@linaro.org> wrote:
+> +#define __ARM_NR_COMPAT_BASE           0x0f0000
+> +#define __ARM_NR_compat_cacheflush     (__ARM_NR_COMPAT_BASE+2)
+> +#define __ARM_NR_compat_set_tls                (__ARM_NR_COMPAT_BASE+5)
 
-sound/built-in.o: In function `rt5677_spi_write':
-:(.text+0xa7ba0): undefined reference to `spi_sync'
-sound/built-in.o: In function `rt5677_spi_driver_init':
-:(.init.text+0x253c): undefined reference to `spi_register_driver'
+I know this patch is six months old, but I was wondering if anyone
+knows of any plans to make these syscalls available to 64-bit apps?
+We have a 32-bit app that uses __ARM_NR_compat_cacheflush, and we'd
+like to port that app to 64-bit.  I'm just not sure how to start doing
+that, since there don't appear to be any 64-bit ARM-specific syscalls.
 
-ERROR: "spi_sync" [sound/soc/codecs/snd-soc-rt5677-spi.ko] undefined!
-ERROR: "spi_register_driver" [sound/soc/codecs/snd-soc-rt5677-spi.ko] undefined!
-
-This makes the SPI portion of the driver depend on the SPI subsystem,
-and disables the function that uses SPI for firmware download if SPI
-is disabled. The latter may not be the correct solution, but I could
-not come up with a better one.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: af48f1d08a54741 ("ASoC: rt5677: Support DSP function for VAD application")
-
-diff --git a/sound/soc/codecs/Kconfig b/sound/soc/codecs/Kconfig
-index 8349f982a586..ef2c70e77d91 100644
---- a/sound/soc/codecs/Kconfig
-+++ b/sound/soc/codecs/Kconfig
-@@ -525,7 +525,7 @@ config SND_SOC_RT5677
- 
- config SND_SOC_RT5677_SPI
- 	tristate
--	default SND_SOC_RT5677
-+	default SND_SOC_RT5677 && SPI
- 
- #Freescale sgtl5000 codec
- config SND_SOC_SGTL5000
-diff --git a/sound/soc/codecs/rt5677.c b/sound/soc/codecs/rt5677.c
-index 26fc538f03b1..5d0bb8748dd1 100644
---- a/sound/soc/codecs/rt5677.c
-+++ b/sound/soc/codecs/rt5677.c
-@@ -702,6 +702,9 @@ static int rt5677_set_dsp_vad(struct snd_soc_codec *codec, bool on)
- 	static bool activity;
- 	int ret;
- 
-+	if (!IS_ENABLED(CONFIG_SND_SOC_RT5677_SPI))
-+		return -ENXIO;
-+
- 	if (on && !activity) {
- 		activity = true;
- 
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
