@@ -1,31 +1,37 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 28 Jan 2015 10:35:10 +0100
-Subject: [PATCH 8/8] PM / Domains: Handle errors from genpd's
- ->attach_dev() callback
-In-Reply-To: <1422389625-11730-9-git-send-email-ulf.hansson@linaro.org>
-References: <1422389625-11730-1-git-send-email-ulf.hansson@linaro.org>
- <1422389625-11730-9-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <CAMuHMdXQ7SUBunaZQs0_xBgnYR2mbwjCVuuy3xe6S1qbyBsUWA@mail.gmail.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Wed, 28 Jan 2015 10:46:45 +0100
+Subject: arm64: USB_ARCH_HAS_EHCI
+In-Reply-To: <alpine.DEB.2.02.1501272130470.19947@utopia.booyaka.com>
+References: <1422351833.14015.20.camel@x220>
+ <alpine.DEB.2.02.1501272130470.19947@utopia.booyaka.com>
+Message-ID: <1422438405.5666.16.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 27, 2015 at 9:13 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> When __pm_genpd_add_device() is invoked through the generic OF-based PM
-> domain look-up path, the device is being probed. Returning an error
-> will mean the device won't be attached to its PM domain. Errors of
-> -EPROBE_DEFER get special treatment and is propagated to the driver
+On Tue, 2015-01-27 at 21:31 +0000, Paul Walmsley wrote:
+> On Tue, 27 Jan 2015, Paul Bolle wrote:
+> 
+> > Your commit d035fdfa27ac ("arm64: Add Tegra132 support") is included in
+> > today's linux-next (ie, next-20150127). I noticed because a script I use
+> > to check linux-next spotted a minor problem with it.
+> > 
+> > It adds a select for the Kconfig symbol USB_ARCH_HAS_EHCI. That Kconfig
+> > was obsoleted in v3.11 and removed in v3.15. See commit b797b76fb464
+> > ("usb: host: remove USB_ARCH_HAS_?HCI"). That select is now a nop.
+> > 
+> > Should I submit the trivial patch to remove that line or do you prefer
+> > to do that yourself?
+> 
+> Thanks, I'll post a new version.
 
-are propagated
+I just noticed that your commit added another unneeded select. The entry
+for ARCH_TEGRA selects HAVE_SMP, but HAVE_SMP is only available on arm
+or xtensa. There's no point in selecting it in arm64.
 
-> core.
+(The patch I submitted in https://lkml.org/lkml/2014/9/30/578 would have
+warned about this. See https://lkml.org/lkml/2014/9/30/577 for an
+introduction. I'll see if I can get Michal Marek to put that patch in a
+tree that is part of linux-next.)
 
-Gr{oetje,eeting}s,
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Paul Bolle
