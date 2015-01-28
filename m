@@ -1,85 +1,49 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Wed, 28 Jan 2015 10:28:12 -0500
-Subject: [PATCH v5 3/8] of: fix size when dma-range is not used
-In-Reply-To: <54C8C652.8050507@arm.com>
-References: <1422392405-32196-1-git-send-email-m-karicheri2@ti.com>
- <1422392405-32196-4-git-send-email-m-karicheri2@ti.com>
- <54C8C652.8050507@arm.com>
-Message-ID: <54C9000C.3040907@ti.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 28 Jan 2015 09:34:10 -0600
+Subject: [PATCH] ARM: cns3xxx: fix typo in PCI config accessor
+In-Reply-To: <20150128151712.GA12050@google.com>
+References: <2000255.rnmr9HfSOg@wuerfel> <20150128151712.GA12050@google.com>
+Message-ID: <CAL_Jsq+-Tn=nCAVAE8sqPD1_aHBSv4jTdAZxWS4B3cOYaGgdow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/28/2015 06:21 AM, Robin Murphy wrote:
-> Hi Murali,
->
-> [sorry, missed replying to yesterday's version]
->
-> On 27/01/15 21:00, Murali Karicheri wrote:
->> Fix the dma-range size when the DT attribute is missing. i.e set size to
->> dev->coherent_dma_mask + 1 instead of dev->coherent_dma_mask. Also add
->> code to check invalid values of size configured in DT and log error.
+On Wed, Jan 28, 2015 at 9:17 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+> On Wed, Jan 28, 2015 at 02:53:07PM +0100, Arnd Bergmann wrote:
+>> The recent patch to convert the cns3xxx PCI code added an
+>> extraneous opening bracket, which makes the build fail,
+>> so remove this.
 >>
->> Cc: Joerg Roedel <joro@8bytes.org>
->> Cc: Grant Likely <grant.likely@linaro.org>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: Bjorn Helgaas <bhelgaas@google.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Cc: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->>
->> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> Fixes: 10e2c5540d48 ("ARM: cns3xxx: Convert PCI to use generic config accessors")
 >> ---
->> drivers/of/device.c | 9 ++++++++-
->> 1 file changed, 8 insertions(+), 1 deletion(-)
 >>
->> diff --git a/drivers/of/device.c b/drivers/of/device.c
->> index 2de320d..17504f4 100644
->> --- a/drivers/of/device.c
->> +++ b/drivers/of/device.c
->> @@ -105,12 +105,19 @@ void of_dma_configure(struct device *dev, struct
->> device_node *np)
->> ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
->> if (ret < 0) {
->> dma_addr = offset = 0;
->> - size = dev->coherent_dma_mask;
->> + size = dev->coherent_dma_mask + 1;
->> } else {
->> offset = PFN_DOWN(paddr - dma_addr);
->> dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
->> }
+>> Hi Bjorn,
 >>
->> + if (is_power_of_2(size + 1))
->> + size = size + 1;
->> + else if (!is_power_of_2(size)) {
->> + dev_err(dev, "invalid size\n");
->> + return;
->> + }
->> +
+>> The broken patch just showed up in linux-next. Please apply this one on top,
+>> or fold it into the original patch if you don't mind rebasing.
 >
-> Couldn't these checks go into the "else" path above? We don't need to
-> check the non-DT case, because we know we've just set it to something
-> sensible.
-Robin,
+> I folded it in, thanks!  I guess Fengguang's autobuilder must not build
+> this config, because I got a success report from it.
 
-Sure it can. I was doing flip/flop on the choice and thought it doesn' 
-matter either way. Please also repond to Catalin's comment if you have 
-any issues so that I can avoid additional spin on this patch.
+Sorry about this. I had fixed this in my tree, but forgot to send out
+the update. I've double checked and this was the only fix I had.
 
-Thanks
+How do you get success reports? I only ever get failures.
 
-Murali
+Rob
+
 >
-> Robin.
->
->> dev->dma_pfn_offset = offset;
+>> diff --git a/arch/arm/mach-cns3xxx/pcie.c b/arch/arm/mach-cns3xxx/pcie.c
+>> index e41fc339d100..c622c306c390 100644
+>> --- a/arch/arm/mach-cns3xxx/pcie.c
+>> +++ b/arch/arm/mach-cns3xxx/pcie.c
+>> @@ -101,7 +101,7 @@ static int cns3xxx_pci_read_config(struct pci_bus *bus, unsigned int devfn,
+>>                * for a PCIe bridge. So we must fixup the class code
+>>                * to 0x604 here.
+>>                */
+>> -             *val = (((((*val << shift) & 0xff) | (0x604 << 16)) >> shift) & mask;
+>> +             *val = ((((*val << shift) & 0xff) | (0x604 << 16)) >> shift) & mask;
 >>
->> coherent = of_dma_is_coherent(np);
+>>       return ret;
+>>  }
 >>
->
->
-
-
--- 
-Murali Karicheri
-Linux Kernel, Texas Instruments
