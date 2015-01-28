@@ -1,85 +1,97 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Wed, 28 Jan 2015 23:59:38 +0100
-Subject: [PATCH RFC 2/3] power: mxs_power: add driver for mxs power
- subsystem
-In-Reply-To: <443299280.47516.1422483725178.JavaMail.open-xchange@oxbaltgw03.schlund.de>
-References: <1416514477-19190-1-git-send-email-stefan.wahren@i2se.com>
- <1416514477-19190-3-git-send-email-stefan.wahren@i2se.com>
- <20150121230148.GJ13715@earth.universe> <54C0AFE4.3020701@i2se.com>
- <20150125150431.GE2719@earth.universe>
- <1719204322.245040.1422301605670.JavaMail.open-xchange@oxbaltgw03.schlund.de>
- <20150127001629.GP21293@sirena.org.uk>
- <1954124242.301697.1422383709733.JavaMail.open-xchange@oxbaltgw09.schlund.de>
- <20150127194346.GN21293@sirena.org.uk>
- <443299280.47516.1422483725178.JavaMail.open-xchange@oxbaltgw03.schlund.de>
-Message-ID: <20150128225937.GA12749@earth.universe>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Wed, 28 Jan 2015 18:00:21 -0500
+Subject: [PATCH] soc: ti: knav_qmss_queue: export API calls for use by user
+ driver
+Message-ID: <1422486021-23874-1-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Currently only few of the API calls are exported. This creates problem
+when the knav* modules are built as modules and another user module
+such as netcp_core try to use these API calls and they are also built
+as module. This patch export these APIs to address the issue.
 
-On Wed, Jan 28, 2015 at 11:22:05PM +0100, Stefan Wahren wrote:
-> > Mark Brown <broonie@kernel.org> hat am 27. Januar 2015 um 20:43 geschrieben:
-> > On Tue, Jan 27, 2015 at 07:35:09PM +0100, Stefan Wahren wrote:
-> > > > Mark Brown <broonie@kernel.org> hat am 27. Januar 2015 um 01:16
-> > > > geschrieben:
-> >
-> > > > > okay i understand. But doesn't it need a extra driver to set the
-> > > > > switching
-> > > > > frequency because of the new compatible string?
-> >
-> > > > I don't understand this bit at all, sorry.
-> >
-> > > Sebastian suggested a new sub-node in the devicetree:
-> >
-> > > powerpll {
-> > > compatible = "fsl,imx28-power-pll"
-> > > #clock-cells = <0>;
-> > > clock-frequency = <12345>;
-> > > }
-> >
-> > > and i think that the new compatible string needs a separate driver to take
-> > > care
-> > > of the switching frequency.
-> >
-> > I can see that this has been suggested, what I can't understand is why
-> > we would wish to do this but I am missing some context here which may
-> > make it all perfectly clear.
-> 
-> The relevant register DC-DC Miscellaneous Register (HW_POWER_MISC) is described
-> in chapter 11.12.10 of the reference manual [1].
->
-> [1] - http://cache.freescale.com/files/dsp/doc/ref_manual/MCIMX28RM.pdf
+This is needed to support allmodconfig for ARM
 
-Having a look at the datasheet my suggestion for the sub-node
-doesn't make sense. I missunderstood how the hardware architecture
-looks like, sorry for the noise :(
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+---
+ drivers/soc/ti/knav_qmss_queue.c |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-> changing the switching frequency is not a common feature for this IC. In most
-> cases the clock for the DC-DC switching frequency runs at 24 MHz (ref_xtal).
-> Unfortunatelly this could cause interferences for example in UHF band. So
-> switching to ref_pll and changing clock divider is a option to avoid such
-> interferences without changing hardware.
->
-> I decided to implement it as a module parameter, because i see it's a
-> configuration option.
-
-I think its best to use a DT property then. That way it can be set
-appropiatly for boards known to use a band, which could have
-interference problems.
-
-So just add a simple property (without a subnode). If I understand
-Mark correctly, there's a high chance more drivers will need to
-describe the switching frequency, so I suggest to use a vendor
-independent property name:
-
-switching-frequency = <12345>;
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150128/2606ebdb/attachment-0001.sig>
+diff --git a/drivers/soc/ti/knav_qmss_queue.c b/drivers/soc/ti/knav_qmss_queue.c
+index 8e6a95d..6d8646d 100644
+--- a/drivers/soc/ti/knav_qmss_queue.c
++++ b/drivers/soc/ti/knav_qmss_queue.c
+@@ -626,6 +626,7 @@ int knav_queue_push(void *qhandle, dma_addr_t dma,
+ 	atomic_inc(&qh->stats.pushes);
+ 	return 0;
+ }
++EXPORT_SYMBOL_GPL(knav_queue_push);
+ 
+ /**
+  * knav_queue_pop()	- pop data (or descriptor) from the head of a queue
+@@ -663,6 +664,7 @@ dma_addr_t knav_queue_pop(void *qhandle, unsigned *size)
+ 	atomic_inc(&qh->stats.pops);
+ 	return dma;
+ }
++EXPORT_SYMBOL_GPL(knav_queue_pop);
+ 
+ /* carve out descriptors and push into queue */
+ static void kdesc_fill_pool(struct knav_pool *pool)
+@@ -717,12 +719,14 @@ dma_addr_t knav_pool_desc_virt_to_dma(void *ph, void *virt)
+ 	struct knav_pool *pool = ph;
+ 	return pool->region->dma_start + (virt - pool->region->virt_start);
+ }
++EXPORT_SYMBOL_GPL(knav_pool_desc_virt_to_dma);
+ 
+ void *knav_pool_desc_dma_to_virt(void *ph, dma_addr_t dma)
+ {
+ 	struct knav_pool *pool = ph;
+ 	return pool->region->virt_start + (dma - pool->region->dma_start);
+ }
++EXPORT_SYMBOL_GPL(knav_pool_desc_dma_to_virt);
+ 
+ /**
+  * knav_pool_create()	- Create a pool of descriptors
+@@ -878,6 +882,7 @@ void *knav_pool_desc_get(void *ph)
+ 	data = knav_pool_desc_dma_to_virt(pool, dma);
+ 	return data;
+ }
++EXPORT_SYMBOL_GPL(knav_pool_desc_get);
+ 
+ /**
+  * knav_pool_desc_put()	- return a descriptor to the pool
+@@ -890,6 +895,7 @@ void knav_pool_desc_put(void *ph, void *desc)
+ 	dma = knav_pool_desc_virt_to_dma(pool, desc);
+ 	knav_queue_push(pool->queue, dma, pool->region->desc_size, 0);
+ }
++EXPORT_SYMBOL_GPL(knav_pool_desc_put);
+ 
+ /**
+  * knav_pool_desc_map()	- Map descriptor for DMA transfer
+@@ -916,6 +922,7 @@ int knav_pool_desc_map(void *ph, void *desc, unsigned size,
+ 
+ 	return 0;
+ }
++EXPORT_SYMBOL_GPL(knav_pool_desc_map);
+ 
+ /**
+  * knav_pool_desc_unmap()	- Unmap descriptor after DMA transfer
+@@ -938,6 +945,7 @@ void *knav_pool_desc_unmap(void *ph, dma_addr_t dma, unsigned dma_sz)
+ 	prefetch(desc);
+ 	return desc;
+ }
++EXPORT_SYMBOL_GPL(knav_pool_desc_unmap);
+ 
+ /**
+  * knav_pool_count()	- Get the number of descriptors in pool.
+@@ -949,6 +957,7 @@ int knav_pool_count(void *ph)
+ 	struct knav_pool *pool = ph;
+ 	return knav_queue_get_count(pool->queue);
+ }
++EXPORT_SYMBOL_GPL(knav_pool_count);
+ 
+ static void knav_queue_setup_region(struct knav_device *kdev,
+ 					struct knav_region *region)
+-- 
+1.7.9.5
