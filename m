@@ -1,37 +1,39 @@
-From: jarkko.nikula@bitmer.com (Jarkko Nikula)
-Date: Wed, 28 Jan 2015 20:15:46 +0200
-Subject: 3.19 on Nokia n900: audio quality awful
-In-Reply-To: <54C63F1C.6010703@ti.com>
-References: <20150106170433.GA5408@amd> <20150118120139.GA1509@amd>
- <54C63F1C.6010703@ti.com>
-Message-ID: <54C92752.9000004@bitmer.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 28 Jan 2015 19:15:50 +0100
+Subject: [PATCH v2 3/6] mmc: pwrseq: Document optional clock for the simple
+ power sequence
+In-Reply-To: <1422468953-7594-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1422468953-7594-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1422468953-7594-4-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/26/2015 03:20 PM, Peter Ujfalusi wrote:
-> On 01/18/2015 02:01 PM, Pavel Machek wrote:
->> In 2.6.28-nokia, it is neccessary to set "Input select" na "digital
->> mic", then it works. Input select being in "playback" option makes it
->> easy to miss.
->>
->> In 3.18 and 3.19-rc3, all I can record are zeros.
->>
->> Does playback/recording work for you on OMAP 3430-based machines?
-> 
-> Same codec (tlv320aic3106) works fine on my am335x and omap-l138 boards.
-> BeagleBoard-xM also fine with twl4030 codec.
-> 
-> I don't have my n900 in hacking mode (it is still in use time-to-time) but
-> looking at the dts file: you might want to add ai3x-micbias-vg property to the
-> aic3x nodes to select the correct mic bias voltage. I can't recall what is
-> appropriate for n900, but 2.6.28-nokia sources might give you the answer.
-> 
-No need to go that far. N900 has been supported in mainline since 2.6.39
-or so. Part A of AIC34 (which is basically dual AIC33 in a same package)
-drives 2 V for the digital microphone bias and part B 2.5 V for the headset.
+Some WLAN chips attached to a SDIO interface, need an external clock
+to be operational. Since this is very common, extend the simple MMC
+power sequence DT binding to support an optional clock.
 
-Unfortunately I haven't had time recently to try what might have caused
-that regression after 3.18.
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+---
 
+Changes since v1: None.
+---
+ Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
+index eaae652213ae..a462c50f19a8 100644
+--- a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
++++ b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
+@@ -12,6 +12,10 @@ Optional properties:
+ 	at initialization and prior we start the power up procedure of the card.
+ 	They will be de-asserted right after the power has been provided to the
+ 	card.
++- clocks : Must contain an entry for the entry in clock-names.
++  See ../clocks/clock-bindings.txt for details.
++- clock-names : Must include the following entry:
++  "ext_clock" (External clock provided to the card).
+ 
+ Example:
+ 
 -- 
-Jarkko
+2.1.3
