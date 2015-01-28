@@ -1,31 +1,88 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 28 Jan 2015 08:48:38 +0100
-Subject: [PATCH v5 2/5] dt-bindings: Add pinctrl bindings for
- mt65xx/mt81xx.
-In-Reply-To: <1421818097-9281-3-git-send-email-hongzhou.yang@mediatek.com>
-References: <1421818097-9281-1-git-send-email-hongzhou.yang@mediatek.com>
- <1421818097-9281-3-git-send-email-hongzhou.yang@mediatek.com>
-Message-ID: <20150128074838.GX12209@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 28 Jan 2015 07:58:35 +0000
+Subject: [PATCH 4/4] clk: dt: st: Introduce clock domain documentation
+In-Reply-To: <20150128011902.22722.85007@quantum>
+References: <1422270840-3039-1-git-send-email-lee.jones@linaro.org>
+ <1422270840-3039-5-git-send-email-lee.jones@linaro.org>
+ <20150128011902.22722.85007@quantum>
+Message-ID: <20150128075835.GF4567@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 21, 2015 at 01:28:14PM +0800, Hongzhou Yang wrote:
-> From: Hongzhou Yang <hongzhou.yang@mediatek.com>
+On Tue, 27 Jan 2015, Mike Turquette wrote:
+
+> Quoting Lee Jones (2015-01-26 03:14:00)
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  .../devicetree/bindings/clock/st/st,clk-domain.txt | 34 ++++++++++++++++++++++
+> >  1 file changed, 34 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/clock/st/st,clk-domain.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/clock/st/st,clk-domain.txt b/Documentation/devicetree/bindings/clock/st/st,clk-domain.txt
+> > new file mode 100644
+> > index 0000000..7309937
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/clock/st/st,clk-domain.txt
+> > @@ -0,0 +1,34 @@
+> > +STMicroelectronics Clock Domain
+> > +
+> > +ST hardware have a bunch of clocks which must not be turned off.
+> > +If drivers a) fail to obtain a reference to any of these or b) give
+> > +up a previously obtained reference during suspend, the common clk
+> > +framework will attempt to turn them off and the hardware will
+> > +subsequently die.  The only way to recover from this failure is to
+> > +restart.
+> > +
+> > +To avoid either of these two scenarios from catastrophically
+> > +disabling the running system we have implemented a clock domain
+> > +where clocks are consumed and references are taken, thus preventing
+> > +them from being shut down by the framework.
+> > +
+> > +We use the generic clock bindings found in:
+> > +  Documentation/devicetree/bindings/clock/clock-bindings.txt
+> > +
+> > +Required properties:
+> > +- compatible : Must be "st,clk-domain"
 > 
-> Add devicetree bindings for Mediatek SoC pinctrl driver.
+> Seems like a useful feature for any clock provider, not just ST's. Have
+> you thought about making this solution generic for DT-based clock
+> providers?
 > 
-> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+> We could amend the common clock binding to include a special "always on"
+> clock group that is automagically prepared and enabled when the clock
+> provider/driver is registered, using a common function.
 
-This basically follows the pinmux binding I suggested as generic pinmux
-binding for per-pin type controllers, so:
+OMG, I'm actually going to strangle you!
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+This is what I've been proposing to you (privately) for weeks.
 
-Sascha
+Does this ring any bells?
 
+  "Just FYI, I am not going to add any method to the kernel that
+  permanently enables a clock via some new api. At the worst case your
+  clock driver can simply call clk_prepare_enable in its probe
+  function (there are some examples of this)."
+
+I will be more than happy to make this a generic driver, if thats what
+you want (now). ;)
+
+> > +Example:
+> > +
+> > +clk-domain {
+> > +       compatible = "st,clk-domain";
+> > +       clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>,
+> > +                <&clk_s_c0_flexgen CLK_COMPO_DVP>,
+> > +                <&clk_s_c0_flexgen CLK_MMC_1>,
+> > +                <&clk_s_c0_flexgen CLK_ICN_SBC>,
+> > +                <&clk_s_c0_flexgen CLK_ICN_LMI>,
+> > +                <&clk_s_c0_flexgen CLK_ICN_CPU>,
+> > +                <&clk_s_c0_flexgen CLK_TX_ICN_DMU>,
+> > +                <&clk_s_a0_flexgen CLK_IC_LMI0>,
+> > +                <&clk_m_a9>;
+> > +};
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
