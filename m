@@ -1,79 +1,83 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Jan 2015 17:08:44 +0100
-Subject: [PATCH] pinctrl: hide PCONFDUMP in #ifdef
-Message-ID: <4217929.mzU2TuSLSj@wuerfel>
+From: lznuaa@gmail.com (Zhi Li)
+Date: Wed, 28 Jan 2015 10:10:17 -0600
+Subject: [PATCH V2] clk: mxs: Fix invalid 32-bit access to frac registers
+In-Reply-To: <54C905CA.80908@i2se.com>
+References: <1419762402-4548-1-git-send-email-stefan.wahren@i2se.com>
+ <CAHrpEqQ-eoqM3W1hYcS6EPTmur1FSfm8TeEjYrtZ+PquavL86w@mail.gmail.com>
+ <201501220039.02073.marex@denx.de>
+ <20150128015131.22722.22882@quantum>
+ <CAHrpEqSFfdWsCif_wZO2ToRpwOuC2yt45+HwOpGgv+B=EwKTCw@mail.gmail.com>
+ <54C905CA.80908@i2se.com>
+Message-ID: <CAHrpEqQ=7EZNzpt1tmjBUrH8oDzjQmCCOrZaH8MBdmvV1+uFZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The zynq and qcom-spmi pinctrl drivers both use pin_config_item arrays
-to provide extra interfaces in debugfs. This structure and the
-PCONFDUMP macro are not defined if CONFIG_DEBUG_FS is turned off,
-so we get build errors like:
+On Wed, Jan 28, 2015 at 9:52 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> Hi,
+>
+> Am 28.01.2015 um 04:36 schrieb Zhi Li:
+>> On Tue, Jan 27, 2015 at 7:51 PM, Mike Turquette <mturquette@linaro.org> wrote:
+>>> Quoting Marek Vasut (2015-01-21 15:39:01)
+>>>> On Wednesday, January 21, 2015 at 05:16:03 PM, Zhi Li wrote:
+>>>>> On Sun, Dec 28, 2014 at 4:26 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+>>>>>> According to i.MX23 and i.MX28 reference manual the fractional
+>>>>>> clock control registers must be addressed by byte instructions.
+>>>>> I don't think mx23 and mx28 have such limitation. I will double check
+>>>>> with IC team about this.
+>>>>> RTL is generated from a xml file. All registers implement is unified.
+>>>>> I don't think only clock control register have such limitation and
+>>>>> other registers not.
+>>>> Hi,
+>>>>
+>>>> Section 10.8.24 in the MX28 datasheet (Fractional Clock Control Register 0)
+>>>> states otherwise, but maybe the documentation is simply not matching the
+>>>> silicon.
+>>>>
+>>>> Here's a quote:
+>>>> "
+>>>> This register controls the 9-phase fractional clock dividers. The fractional
+>>>> clock frequencies are a product of the values in these registers. NOTE: This
+>>>> register can only be addressed by byte instructions. Addressing word or half-
+>>>> word are not allowed.
+>>>> "
+>>>>
+>>>> I also recall seeing weird behavior when these registers were accessed by word
+>>>> access in U-Boot, so I believe the datasheet is correct.
+>>> Hi Frank,
+>>>
+>>> Are you satisfied with this patch?
+>> I asked IC designer about this.
+>> They will check RTL code.
+>> I will check their status again.
+>> Our released BSP code used 32bit WORD access.
+>
+> i want to point out that the 32bit WORD is divided in 4 parts (IO0FRAC,
+> IO1FRAC, EMIFRAC, CPUFRAC). Yes, it's true that BSP code access the
+> register as 32bit, but it's never modify the complete 32bit at once just
+> only 1 part (8bit) at a time.
+>
+> So here is my theory about Fractional Clock Control Register:
+>
+> Reading as 32bit WORD => safe
+> Modify only 1 part (8bit) of the 32bit WORD => safe
+> Modify more than 1 part of the 32bit WORD => unsafe !!!
 
-pinctrl/qcom/pinctrl-spmi-gpio.c:139:37: error: array type has incomplete element type
- static const struct pin_config_item pmic_conf_items[ARRAY_SIZE(pmic_gpio_bindings)] = {
-                                     ^
-pinctrl/qcom/pinctrl-spmi-gpio.c:140:2: error: implicit declaration of function 'PCONFDUMP' [-Werror=implicit-function-declaration]
-  PCONFDUMP(PMIC_GPIO_CONF_PULL_UP,  "pull up strength", NULL, true),
-  ^
-pinctrl/qcom/pinctrl-spmi-gpio.c:139:37: warning: 'pmic_conf_items' defined but not used [-Wunused-variable]
- static const struct pin_config_item pmic_conf_items[ARRAY_SIZE(pmic_gpio_bindings)] = {
+Yes, it is align with what I get from IC designer.
 
-Lacking any better idea to solve this nicely, this patch uses #ifdef
-to hide the structures, just like the pinctrl core does.
+best regards
+Frank Li
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/drivers/pinctrl/pinctrl-zynq.c b/drivers/pinctrl/pinctrl-zynq.c
-index 8aa05e2eb705..36252df3c737 100644
---- a/drivers/pinctrl/pinctrl-zynq.c
-+++ b/drivers/pinctrl/pinctrl-zynq.c
-@@ -924,9 +924,11 @@ static const struct pinconf_generic_params zynq_dt_params[] = {
- 	{"io-standard", PIN_CONFIG_IOSTANDARD, zynq_iostd_lvcmos18},
- };
- 
-+#ifdef CONFIG_DEBUG_FS
- static const struct pin_config_item zynq_conf_items[ARRAY_SIZE(zynq_dt_params)] = {
- 	PCONFDUMP(PIN_CONFIG_IOSTANDARD, "IO-standard", NULL, true),
- };
-+#endif
- 
- static unsigned int zynq_pinconf_iostd_get(u32 reg)
- {
-@@ -1101,7 +1103,9 @@ static struct pinctrl_desc zynq_desc = {
- 	.confops = &zynq_pinconf_ops,
- 	.num_custom_params = ARRAY_SIZE(zynq_dt_params),
- 	.custom_params = zynq_dt_params,
-+#ifdef CONFIG_DEBUG_FS
- 	.custom_conf_items = zynq_conf_items,
-+#endif
- 	.owner = THIS_MODULE,
- };
- 
-diff --git a/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c b/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
-index bbf99a715b63..0f11a26d932b 100644
---- a/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
-+++ b/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
-@@ -136,10 +136,12 @@ static const struct pinconf_generic_params pmic_gpio_bindings[] = {
- 	{"qcom,drive-strength",		PMIC_GPIO_CONF_STRENGTH,	0},
- };
- 
-+#ifdef CONFIG_DEBUG_FS
- static const struct pin_config_item pmic_conf_items[ARRAY_SIZE(pmic_gpio_bindings)] = {
- 	PCONFDUMP(PMIC_GPIO_CONF_PULL_UP,  "pull up strength", NULL, true),
- 	PCONFDUMP(PMIC_GPIO_CONF_STRENGTH, "drive-strength", NULL, true),
- };
-+#endif
- 
- static const char *const pmic_gpio_groups[] = {
- 	"gpio1", "gpio2", "gpio3", "gpio4", "gpio5", "gpio6", "gpio7", "gpio8",
-@@ -744,7 +746,9 @@ static int pmic_gpio_probe(struct platform_device *pdev)
- 	pctrldesc->npins = npins;
- 	pctrldesc->num_custom_params = ARRAY_SIZE(pmic_gpio_bindings);
- 	pctrldesc->custom_params = pmic_gpio_bindings;
-+#ifdef CONFIG_DEBUG_FS
- 	pctrldesc->custom_conf_items = pmic_conf_items;
-+#endif
- 
- 	for (i = 0; i < npins; i++, pindesc++) {
- 		pad = &pads[i];
+>
+> Best regards
+> Stefan
+>
+>>
+>> best regards
+>> Frank Li
+>>> Regards,
+>>> Mike
+>>>
+>>>> Best regards,
+>>>> Marek Vasut
+>
+>
