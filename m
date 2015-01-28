@@ -1,14 +1,14 @@
-From: elder@linaro.org (Alex Elder)
-Date: Wed, 28 Jan 2015 13:27:57 -0600
+From: behanw@converseincode.com (Behan Webster)
+Date: Wed, 28 Jan 2015 11:30:12 -0800
 Subject: [PATCH] bcm: address clang inline asm incompatibility
 In-Reply-To: <CAKv+Gu9fc_F1iC5NAwaG_ed3RRhYnxEBLbuLgW0Oa_qJ96j-gA@mail.gmail.com>
 References: <1422422306-27473-1-git-send-email-behanw@converseincode.com>	<CAKv+Gu_NCgMmX_LQqi7vtjtP4ofrW+kx8FPgRd4-LWwK=73-xg@mail.gmail.com>	<54C8EE04.6060809@linaro.org>	<CAKv+Gu8CrMqwqBOF8rYa3RP1=gfCthwP=1k9kQ73v6+Sxwah4A@mail.gmail.com>	<54C91791.9030508@linaro.org>	<CAKv+Gu8P8eC+bmerCpbSX=USODqE=U7WnLeiCfhHJ8SSVAzPDw@mail.gmail.com>
  <CAKv+Gu9fc_F1iC5NAwaG_ed3RRhYnxEBLbuLgW0Oa_qJ96j-gA@mail.gmail.com>
-Message-ID: <54C9383D.10901@linaro.org>
+Message-ID: <54C938C4.40708@converseincode.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/28/2015 01:17 PM, Ard Biesheuvel wrote:
+On 01/28/15 11:17, Ard Biesheuvel wrote:
 > On 28 January 2015 at 17:20, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
 >> On 28 January 2015 at 17:08, Alex Elder <elder@linaro.org> wrote:
 >>> On 01/28/2015 10:17 AM, Ard Biesheuvel wrote:
@@ -42,25 +42,20 @@ On 01/28/2015 01:17 PM, Ard Biesheuvel wrote:
 >>>>>>> +#else  /* !__clang__ */
 >>>>>>> +#define R12    "ip"    /* gcc calls r12 "ip" */
 >>>>>>> +#endif /* !__clang__ */
->>>>>>
 >>>>>> Why not just use r12 for both?
->>>>>
 >>>>> Yes, that would have been an obvious fix.  But the
 >>>>> assembler (in the GCC environment) doesn't accept that.
 >>>>>
->>>>
 >>>> Mine has no problems with it at all
 >>>>
 >>>> $ echo 'mov r12, #0' | arm-linux-gnueabihf-gcc -c -x assembler-with-cpp -
 >>>>
 >>>> and grepping for r12 under arch/arm suggests the same
->>>
 >>> The use of "r12" is fine.  But it's not just the assembler,
 >>> I believe it also involves gcc.
 >>>
 >>> The problem is with the use of the __asmeq(x, y) macro.
 >>>
->>
 >> Ah right. Apologies for assuming that you had missed something obvious here.
 >> But __asmeq is not the toolchain, it is a local construct #define'd in
 >> compiler.h
@@ -85,7 +80,6 @@ On 01/28/2015 01:17 PM, Ard Biesheuvel wrote:
 >>> I suspect that clang might (rightfully) have a failure in
 >>> this __asmeq() call.
 >>>
->>
 >> In that case, I would strongly suggest fixing the __asmeq () macro
 >> instead, and teach it that ("r12","ip") and ("ip","r12") are fine too.
 >>
@@ -101,19 +95,8 @@ On 01/28/2015 01:17 PM, Ard Biesheuvel wrote:
 >> emitted by inline asm, the waters get even murkier and it becomes even
 >> harder to claim parity between the two.
 >>
-> 
 > Something like this perhaps?
-
-So __asmeq() yields true if the register names (strings) are
-equal, or if one is "ip" and the other is "r12" (in either order).
-
-I can't comment on whether it's right in all build environments but
-this looks OK to me, to handle this special case.
-
-I would much rather you generate that patch.  Is that OK?
-
-					-Alex
-
+>
 > -------->8----------
 > diff --git a/arch/arm/include/asm/compiler.h b/arch/arm/include/asm/compiler.h
 > index 8155db2f7fa1..f99c674b3751 100644
@@ -126,8 +109,16 @@ I would much rather you generate that patch.  Is that OK?
 > -#define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
 > +#define __asmeq(x, y)  ".ifnc " x "," y " ; .ifnc " x y ",ipr12 ; " \
 > +       ".ifnc " x y ",r12ip ; .err ; .endif ; .endif ; .endif\n\t"
-> 
-> 
+>
+>
 >  #endif /* __ASM_ARM_COMPILER_H */
 > -------->8----------
-> 
+If that is acceptable, that's fine by me.
+
+In principal none of us *want* to use #ifdefs.
+
+Behan
+
+-- 
+Behan Webster
+behanw at converseincode.com
