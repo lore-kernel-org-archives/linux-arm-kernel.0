@@ -1,43 +1,50 @@
-From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Wed, 28 Jan 2015 09:59:13 +0100
-Subject: [PATCH v4 00/13] AT91 pm cleanup for 3.20
-In-Reply-To: <1422409172-24178-1-git-send-email-wenyou.yang@atmel.com>
-References: <1422409172-24178-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20150128085913.GA7742@gradator.net>
+From: svarbanov@mm-sol.com (Stanimir Varbanov)
+Date: Wed, 28 Jan 2015 11:05:50 +0200
+Subject: [PATCH 1/6] soc: qcom: gsbi: Add support for ADM CRCI muxing
+In-Reply-To: <1422396644-21714-2-git-send-email-agross@codeaurora.org>
+References: <1422396644-21714-1-git-send-email-agross@codeaurora.org>
+ <1422396644-21714-2-git-send-email-agross@codeaurora.org>
+Message-ID: <54C8A66E.3070306@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Wenyou,
+Hi Andy,
 
-On Wed, Jan 28, 2015 at 09:39:32AM +0800, Wenyou Yang wrote:
-> Hi Nicolas,
+On 01/28/2015 12:10 AM, Andy Gross wrote:
+> This patch adds automatic configuration for the ADM CRCI muxing required to
+> support DMA operations for GSBI clients.  The GSBI mode and instance determine
+> the correct TCSR ADM CRCI MUX value that must be programmed so that the DMA
+> works properly.
 > 
-> This version is rebased on the branch: at91-3.20-cleanup of the repository
-> 	git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git
+> Signed-off-by: Andy Gross <agross@codeaurora.org>
+> ---
+>  .../devicetree/bindings/soc/qcom/qcom,gsbi.txt     |   17 ++-
+>  drivers/soc/qcom/Kconfig                           |    1 +
+>  drivers/soc/qcom/qcom_gsbi.c                       |  148 +++++++++++++++++++-
+>  3 files changed, 158 insertions(+), 8 deletions(-)
 > 
-> It is purpose to clean up the PM code, includes the patches from Peter Rosin and Sylvain Rochet.
-> 
-> Since verifying the USB clock and USB PLL disabling before suspending to memory,
-> it aslo depends on the following patch serials from Sylvain:
-> 	[PATCHv6 0/5] USB: gadget: atmel_usba_udc: Driver improvements
-> 	[PATCHv7 0/6] USB: host: Atmel OHCI and EHCI drivers improvements
-> 
-> Removes CONFIG_AT91_SLOW_CLOCK config item to simply the PM config,
-> The suspend to standby mode uses the same sram function as the suspend to memory mode.
-> Remove some unused code.
-> 
-> Alexandr & Sylvain, Thank you very much for so many feedbacks.
-> 
-> Changes in v2:
->  - Rebase on the at91-3.20-cleanup branch
->  - Recover the verify clock condition, only for suspend to memory.
->  - Collect ACK from Alexandre
->  - Add the macro for PM mode
-> 
-> Changes in v3:
->  - Clear unused state argument in at91_pm_verify_clocks()
->  - Remove pr_info("AT91:... slow_clock ? ..") in patch 07/13.
 
-Changes in v4: ? :-)
+<snip>
 
-Sylvain
+> diff --git a/drivers/soc/qcom/Kconfig b/drivers/soc/qcom/Kconfig
+> index 7bd2c94..32f20be 100644
+> --- a/drivers/soc/qcom/Kconfig
+> +++ b/drivers/soc/qcom/Kconfig
+> @@ -4,6 +4,7 @@
+>  config QCOM_GSBI
+>          tristate "QCOM General Serial Bus Interface"
+>          depends on ARCH_QCOM
+> +	select MFD_SYSCON
+
+Wrong indentation? In fact the original Kconfig entry has spaces instead
+of tabs, could you prepare a cleanup patch for this.
+
+>          help
+>            Say y here to enable GSBI support.  The GSBI provides control
+>            functions for connecting the underlying serial UART, SPI, and I2C
+
+<snip>
+
+-- 
+regards,
+Stan
