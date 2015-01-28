@@ -1,29 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Jan 2015 16:19:31 +0100
-Subject: [PATCH] mtd: export new mtd_mmap_capabilities
-Message-ID: <1900951.4yX9yJNQM5@wuerfel>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Wed, 28 Jan 2015 23:21:05 +0800
+Subject: [PATCH] PCI: Fix pcibios_update_irq misuse of irq number
+In-Reply-To: <1422456683-797-1-git-send-email-marc.zyngier@arm.com>
+References: <1422456683-797-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <54C8FE61.1030304@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The recently added mtd_mmap_capabilities can be used from loadable
-modules, in particular romfs, but is not exported, so we get
 
-ERROR: "mtd_mmap_capabilities" [fs/romfs/romfs.ko] undefined!
 
-This adds the missing export.
+On 2015/1/28 22:51, Marc Zyngier wrote:
+> pcibios_update_irq writes an irq number into the config space
+> of a given PCI device, but ignores the fact that this number
+> is a virtual interrupt number, which might be a very different
+> value from what the underlying hardware is using.
+> 
+> The obvious fix is to fetch the HW interrupt number from the
+> corresponding irq_data structure. This is slightly complicated
+> by the fact that this interrupt might be services by a stacked
+> domain.
+> 
+> This has been tested on KVM with kvmtool.
+> 
+> Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Tested-by: Andre Przywara <andre.przywara@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  drivers/pci/setup-irq.c | 12 ++++++++++--
+>  1 file changed, 10 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/pci/setup-irq.c b/drivers/pci/setup-irq.c
+> index 4e2d595..828cbc9 100644
+> --- a/drivers/pci/setup-irq.c
+> +++ b/drivers/pci/setup-irq.c
+> @@ -15,11 +15,19 @@
+>  #include <linux/errno.h>
+>  #include <linux/ioport.h>
+>  #include <linux/cache.h>
+> +#include <linux/irq.h>
+>  
+>  void __weak pcibios_update_irq(struct pci_dev *dev, int irq)
+>  {
+> -	dev_dbg(&dev->dev, "assigning IRQ %02d\n", irq);
+> -	pci_write_config_byte(dev, PCI_INTERRUPT_LINE, irq);
+> +	struct irq_data *d;
+> +
+> +	d = irq_get_irq_data(irq);
+> +#ifdef CONFIG_IRQ_DOMAIN_HIERARCHY
+> +	while (d->parent_data)
+> +		d = d->parent_data;
+> +#endif
+> +	dev_dbg(&dev->dev, "assigning IRQ %02ld\n", d->hwirq);
+> +	pci_write_config_byte(dev, PCI_INTERRUPT_LINE, d->hwirq);
+>  }
+Hi Mark,
+	Instead of modifying the common version, how about
+implementing an arch specific version? Arch may have different
+way to determine the irq number. Above implementation doesn't
+work with x86, for example.
+Regards!
+Gerry
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: b4caecd48005f ("fs: introduce f_op->mmap_capabilities for nommu mmap support")
-
-diff --git a/drivers/mtd/mtdcore.c b/drivers/mtd/mtdcore.c
-index 1eef3b032f08..de7957681680 100644
---- a/drivers/mtd/mtdcore.c
-+++ b/drivers/mtd/mtdcore.c
-@@ -365,6 +365,7 @@ unsigned mtd_mmap_capabilities(struct mtd_info *mtd)
- 		return NOMMU_MAP_COPY;
- 	}
- }
-+EXPORT_SYMBOL_GPL(mtd_mmap_capabilities);
- #endif
- 
- /**
+>  
+>  static void pdev_fixup_irq(struct pci_dev *dev,
+> 
