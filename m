@@ -1,32 +1,87 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 28 Jan 2015 15:24:12 +0000
-Subject: Hangs in libhugetlbfs tests in -next
-Message-ID: <20150128152412.GX21293@sirena.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 28 Jan 2015 15:27:28 +0000
+Subject: [PATCH] PCI: Fix pcibios_update_irq misuse of irq number
+In-Reply-To: <54C8FE61.1030304@linux.intel.com>
+References: <1422456683-797-1-git-send-email-marc.zyngier@arm.com>
+ <54C8FE61.1030304@linux.intel.com>
+Message-ID: <54C8FFE0.3030007@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For at least the past couple of days tests of libhugetlbfs have been
-hanging on mustang in the mlock test running ARMv8 defconfig with both
-32 bit and 64 bit userspace - after the mprotect test (the one before
-it) we get no console output for several hours so it appears that the
-test has deadlocked.  The tail of the log is:
+Hi Gerry,
 
-| find_path (2M: 64):	PASS
-| unlinked_fd (2M: 64):	PASS
-| readback (2M: 64):	PASS
-| truncate (2M: 64):	PASS
-| shared (2M: 64):	PASS
-| mprotect (2M: 64):	PASS
+On 28/01/15 15:21, Jiang Liu wrote:
+> 
+> 
+> On 2015/1/28 22:51, Marc Zyngier wrote:
+>> pcibios_update_irq writes an irq number into the config space
+>> of a given PCI device, but ignores the fact that this number
+>> is a virtual interrupt number, which might be a very different
+>> value from what the underlying hardware is using.
+>>
+>> The obvious fix is to fetch the HW interrupt number from the
+>> corresponding irq_data structure. This is slightly complicated
+>> by the fact that this interrupt might be services by a stacked
+>> domain.
+>>
+>> This has been tested on KVM with kvmtool.
+>>
+>> Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Tested-by: Andre Przywara <andre.przywara@arm.com>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  drivers/pci/setup-irq.c | 12 ++++++++++--
+>>  1 file changed, 10 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/pci/setup-irq.c b/drivers/pci/setup-irq.c
+>> index 4e2d595..828cbc9 100644
+>> --- a/drivers/pci/setup-irq.c
+>> +++ b/drivers/pci/setup-irq.c
+>> @@ -15,11 +15,19 @@
+>>  #include <linux/errno.h>
+>>  #include <linux/ioport.h>
+>>  #include <linux/cache.h>
+>> +#include <linux/irq.h>
+>>  
+>>  void __weak pcibios_update_irq(struct pci_dev *dev, int irq)
+>>  {
+>> -	dev_dbg(&dev->dev, "assigning IRQ %02d\n", irq);
+>> -	pci_write_config_byte(dev, PCI_INTERRUPT_LINE, irq);
+>> +	struct irq_data *d;
+>> +
+>> +	d = irq_get_irq_data(irq);
+>> +#ifdef CONFIG_IRQ_DOMAIN_HIERARCHY
+>> +	while (d->parent_data)
+>> +		d = d->parent_data;
+>> +#endif
+>> +	dev_dbg(&dev->dev, "assigning IRQ %02ld\n", d->hwirq);
+>> +	pci_write_config_byte(dev, PCI_INTERRUPT_LINE, d->hwirq);
+>>  }
+> Hi Mark,
+> 	Instead of modifying the common version, how about
+> implementing an arch specific version? Arch may have different
+> way to determine the irq number. Above implementation doesn't
+> work with x86, for example.
 
-and then a timeout.
+If you look at the Makefile, this file is used on:
 
-This may be a generic bug but my ability to run these tests on other
-platforms with huge page support using the infrastructure I'm using is
-limited so I've not been able to test elsewhere and confirm.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150128/df17921d/attachment.sig>
+obj-$(CONFIG_ALPHA) += setup-irq.o
+obj-$(CONFIG_ARM) += setup-irq.o
+obj-$(CONFIG_UNICORE32) += setup-irq.o
+obj-$(CONFIG_SUPERH) += setup-irq.o
+obj-$(CONFIG_MIPS) += setup-irq.o
+obj-$(CONFIG_TILE) += setup-irq.o
+obj-$(CONFIG_SPARC_LEON) += setup-irq.o
+obj-$(CONFIG_M68K) += setup-irq.o
+
+x86 doesn't use that at all.
+
+That aside, do you know any case where this transformation would lead to
+an invalid result? Worse case, irq should be equal to hwirq, shouldn't
+it? Or are you thinking of something else?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
