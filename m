@@ -1,76 +1,83 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 28 Jan 2015 14:19:34 +0000
-Subject: [PATCH 02/15] iommu: Introduce iommu domain types
-In-Reply-To: <1422316305-19216-3-git-send-email-joro@8bytes.org>
-References: <1422316305-19216-1-git-send-email-joro@8bytes.org>
- <1422316305-19216-3-git-send-email-joro@8bytes.org>
-Message-ID: <20150128141934.GP1569@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 28 Jan 2015 08:21:09 -0600
+Subject: [PATCH 2/3] tty/serial: of_serial: add support for PXA/MMP uarts
+In-Reply-To: <54C7EA6A.4010805@hurleysoftware.com>
+References: <1422334209-23125-1-git-send-email-robh@kernel.org>
+ <1422334209-23125-2-git-send-email-robh@kernel.org>
+ <54C78823.7050504@hurleysoftware.com>
+ <CAL_Jsq+8jDN+fYyed5RYd2e1K+H_R1NkjT38WXSpKfxTLgsDbQ@mail.gmail.com>
+ <54C7AA2D.7080202@hurleysoftware.com>
+ <CAL_Jsq+wxY0=S1ff-Fk0xDBxHdhBvNopLpjfCETVoo_mou658w@mail.gmail.com>
+ <54C7EA6A.4010805@hurleysoftware.com>
+Message-ID: <CAL_JsqLvg9CA32oWVzxA5TxtPJxAJFf9K4N+RHJeefemr_88ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+On Tue, Jan 27, 2015 at 1:43 PM, Peter Hurley <peter@hurleysoftware.com> wrote:
+> On 01/27/2015 11:44 AM, Rob Herring wrote:
+>> On Tue, Jan 27, 2015 at 9:09 AM, Peter Hurley <peter@hurleysoftware.com> wrote:
+>>> On 01/27/2015 09:30 AM, Rob Herring wrote:
+>>>> On Tue, Jan 27, 2015 at 6:44 AM, Peter Hurley <peter@hurleysoftware.com> wrote:
+>>>>> Hi Rob,
+>>>>>
+>>>>> On 01/26/2015 11:50 PM, Rob Herring wrote:
+>>>>>> Add mrvl,pxa-uart and mrvl,mmp-uart compatible strings for the of_serial
+>>>>>> driver. These are 8250 variants which have a port type of PORT_XSCALE.
+>>>>>>
+>>>>>> There is also the serial driver pxa.c with these compatible strings
+>>>>>> already. However, it can be replaced with the common 8250 driver. It has
+>>>>>> some issues like it cannot coexist with the 8250 driver due to tty name
+>>>>>> collision. That also means adding these compatible strings here should
+>>>>>> not case a problem.
+>>>>>
+>>>>> So what determines which driver is controlling the port if both
+>>>>> drivers are built-in?
+>>>>
+>>>> If both are built-in, whoever registers ttyS ports first wins. This
+>>>> will be the 8250 driver due to link order.
+>>>
+>>> Ok, but then I think the commit log should reflect that this patch
+>>> effectively replaces pxa2xx-uart driver with the 8250 driver for PXA/MMP uarts
+>>> if both drivers are built-in or both drivers are modules.
+>>
+>> It doesn't always. It is only on DT enabled platforms. But I can be
+>> more explicit about that.
+>>
+>> There is another patch to remove the PXA driver entirely which I'm
+>> inquiring about why it was never merged [1]. This is why I went down
+>> the path of getting the 8250 driver to work rather than trying to fix
+>> the PXA driver.
+>
+> Ah. I had seen your inquiry but didn't grasp the significance.
+> Greg acked that patch over 8 mos ago; it's still stuck somewhere?
 
-Thanks for posting this!
+It appears to me that this patch got added as a dependency to the rest
+of the series which never got merged. Guess they lost interest.
 
-On Mon, Jan 26, 2015 at 11:51:32PM +0000, Joerg Roedel wrote:
-> From: Joerg Roedel <jroedel@suse.de>
-> 
-> This allows to handle domains differently based on their
-> type in the future. An IOMMU driver can implement certain
-> optimizations for DMA-API domains for example.
-> 
-> Signed-off-by: Joerg Roedel <jroedel@suse.de>
-> ---
->  drivers/iommu/iommu.c |  5 +++--
->  include/linux/iommu.h | 11 ++++++++++-
->  2 files changed, 13 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-> index 684efc0..ab24d77 100644
-> --- a/drivers/iommu/iommu.c
-> +++ b/drivers/iommu/iommu.c
-> @@ -909,14 +909,15 @@ struct iommu_domain *iommu_domain_alloc(struct bus_type *bus)
->  	ops = bus->iommu_ops;
->  
->  	if (ops->domain_alloc)
-> -		domain = ops->domain_alloc();
-> +		domain = ops->domain_alloc(IOMMU_DOMAIN_UNMANAGED);
->  	else
->  		domain = kzalloc(sizeof(*domain), GFP_KERNEL);
->  
->  	if (!domain)
->  		return NULL;
->  
-> -	domain->ops = bus->iommu_ops;
-> +	domain->ops  = bus->iommu_ops;
-> +	domain->type = IOMMU_DOMAIN_UNMANAGED;
->  
->  	if (ops->domain_init && domain->ops->domain_init(domain))
->  		goto out_free;
-> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-> index 69d1d12..0b67f65 100644
-> --- a/include/linux/iommu.h
-> +++ b/include/linux/iommu.h
-> @@ -51,7 +51,16 @@ struct iommu_domain_geometry {
->  	bool force_aperture;       /* DMA only allowed in mappable range? */
->  };
->  
-> +/* This are the possible domain-types */
-> +enum iommu_domain_type {
-> +	IOMMU_DOMAIN_DMA,	/* Domain used for DMA-API */
-> +	IOMMU_DOMAIN_IDENTITY,	/* Identity mapped domain  */
+> OTOH, I didn't realize that patch removed the PXA driver. That driver has
+> errata workarounds which didn't get integrated into the 8250 core; it seems
+> a shame to toss that away.
 
-What happens if somebody calls map or unmap on an identity-mapping domain?
-Can we catch that in the IOMMU core before calling the IOMMU driver? That
-also implies we need something extra to parameterise the attributes for
-the mapping (e.g. cacheable, read-only) and also potentially the address
-range.
+There was some discussion on errata in the prior versions. One of them
+was deemed not needed. Another one is needed, but that's on certain
+PXA2xx. So we'll need to pickup that work-around at some point, but it
+is not yet needed here because PXA2xx is not enabled for DT.
 
-> +	IOMMU_DOMAIN_UNMANAGED, /* Domain mappings are managed by a third party
-> +				   user (like KVM or VFIO) */
+> [ Sidebar: I did a trial split of 8250_core into a separate 8250 base module
+>   and an 8250 universal driver. I keep having to rework the split but it's
+>   pretty close now; the 8250 base module might be just the thing for simplifying
+>   the pxa driver and getting console/earlycon/dma for free.
+>
+>   Let me see what I can do about getting that done.
+> ]
 
-We already have the domain attributes (iommu_attr) to describe features
-of a domain. Is there really a need for this extra type, or can we extend
-the attribute set and allow for domain allocation with attributes?
+Yes, it would be nice to split the legacy ISA parts from the proper
+platform driver. There's way too many kconfig options for the 8250 as
+well IMO.
 
-Will
+BTW, It appears that the main motivator for a separate driver was to
+add DMA support and that's what the out of tree driver adds. But now,
+we would never add the PXA DMA API support and the 8250 driver has
+learned DMA support.
+
+Rob
