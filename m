@@ -1,52 +1,112 @@
 From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Tue, 27 Jan 2015 18:46:30 -0800
-Subject: [PATCH 0/9] Simplify regulator_set_optimum_mode
-Message-ID: <1422413199-17273-1-git-send-email-bjorn.andersson@sonymobile.com>
+Date: Tue, 27 Jan 2015 18:46:32 -0800
+Subject: [PATCH 2/9] regulator: core: Introduce set_optimum_mode op
+In-Reply-To: <1422413199-17273-1-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1422413199-17273-1-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <1422413199-17273-3-git-send-email-bjorn.andersson@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series pushes the get_optimum_mode/set_mode pair from
-regulator_set_optimum_mode into the individual drivers.
+Expose the requested load directly to the regulator implementation for
+hardware that does not support the normal enum based set_mode().
 
-The first patch consolidates the two drms updating paths, to reduce code
-duplication.
+Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+---
 
-The second patch introduces the set_optimum_mode call, the following patches
-moves drivers over to the new api and get_optimum_mode is finally dropped.
+Note that the majority of the change to drms_uA_update is cancelled out in
+patch 8, but I added this to keep it bisectable.
 
-With this in place we can implement set_optimum_mode in the Qualcomm RPM
-driver.
+ drivers/regulator/core.c         | 42 ++++++++++++++++++++++++++--------------
+ include/linux/regulator/driver.h |  5 +++++
+ 2 files changed, 32 insertions(+), 15 deletions(-)
 
-
-When we talked about this you (Mark) said that you wished that we simplified
-this api, but how far would you like to take that?
-
-* Drop input_uV/output_uV from set_optimum_mode? (there are no users today)
-* Rename the op to set_current() (without in/out uV, this is basically what we have)
-* s/regulator_set_optimum_mode/regulator_set_current/ ?
-* Remove regulator_set_mode (consumers should know their expected load, not the
-  expected operating mode of whatever regulator they are supplied by)
-
-Bjorn Andersson (9):
-  regulator: core: Consolidate drms update handling
-  regulator: core: Introduce set_optimum_mode op
-  regulator: ab8500: move to set_optimum_mode
-  regulator: wm831x-ldo: move to set_optimum_mode
-  regulator: wm8350: move to set_optimum_mode
-  regulator: hi6421: move to set_optimum_mode
-  regulator: wm8400: move to set_optimum_mode
-  regulator: Drop now unused get_optimum_mode
-  regulator: qcom-rpm: Implement set_optimum_mode
-
- drivers/regulator/ab8500.c             |  48 +++++++-------
- drivers/regulator/core.c               | 112 +++++++++------------------------
- drivers/regulator/hi6421-regulator.c   |  15 +++--
- drivers/regulator/qcom_rpm-regulator.c |  28 +++++++++
- drivers/regulator/wm831x-ldo.c         |  21 ++++---
- drivers/regulator/wm8350-regulator.c   |  12 ++--
- drivers/regulator/wm8400-regulator.c   |  10 +--
- include/linux/regulator/driver.h       |   8 +--
- 8 files changed, 118 insertions(+), 136 deletions(-)
-
+diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
+index 0e0d829..2a53515 100644
+--- a/drivers/regulator/core.c
++++ b/drivers/regulator/core.c
+@@ -672,10 +672,12 @@ static int drms_uA_update(struct regulator_dev *rdev)
+ 	if (err < 0)
+ 		return 0;
+ 
+-	if (!rdev->desc->ops->get_optimum_mode)
++	if (!rdev->desc->ops->get_optimum_mode &&
++	    !rdev->desc->ops->set_optimum_mode)
+ 		return 0;
+ 
+-	if (!rdev->desc->ops->set_mode)
++	if (!rdev->desc->ops->set_mode &&
++	    !rdev->desc->ops->set_optimum_mode)
+ 		return -EINVAL;
+ 
+ 	/* get output voltage */
+@@ -700,22 +702,32 @@ static int drms_uA_update(struct regulator_dev *rdev)
+ 	list_for_each_entry(sibling, &rdev->consumer_list, list)
+ 		current_uA += sibling->uA_load;
+ 
+-	/* now get the optimum mode for our new total regulator load */
+-	mode = rdev->desc->ops->get_optimum_mode(rdev, input_uV,
+-						  output_uV, current_uA);
++	if (rdev->desc->ops->set_optimum_mode) {
++		/* set the optimum mode for our new total regulator load */
++		err = rdev->desc->ops->set_optimum_mode(rdev,
++							input_uV, output_uV,
++							current_uA);
++		if (err < 0)
++			rdev_err(rdev, "failed to set optimum mode @ %d uA %d -> %d uV\n",
++				 current_uA, input_uV, output_uV);
++	} else {
++		/* now get the optimum mode for our new total regulator load */
++		mode = rdev->desc->ops->get_optimum_mode(rdev, input_uV,
++							 output_uV, current_uA);
++
++		/* check the new mode is allowed */
++		err = regulator_mode_constrain(rdev, &mode);
++		if (err < 0) {
++			rdev_err(rdev, "failed to get optimum mode @ %d uA %d -> %d uV\n",
++				 current_uA, input_uV, output_uV);
++			return err;
++		}
+ 
+-	/* check the new mode is allowed */
+-	err = regulator_mode_constrain(rdev, &mode);
+-	if (err < 0) {
+-		rdev_err(rdev, "failed to get optimum mode @ %d uA %d -> %d uV\n",
+-			 current_uA, input_uV, output_uV);
+-		return err;
++		err = rdev->desc->ops->set_mode(rdev, mode);
++		if (err < 0)
++			rdev_err(rdev, "failed to set optimum mode %x\n", mode);
+ 	}
+ 
+-	err = rdev->desc->ops->set_mode(rdev, mode);
+-	if (err < 0)
+-		rdev_err(rdev, "failed to set optimum mode %x\n", mode);
+-
+ 	return err;
+ }
+ 
+diff --git a/include/linux/regulator/driver.h b/include/linux/regulator/driver.h
+index 5f1e9ca..837addb 100644
+--- a/include/linux/regulator/driver.h
++++ b/include/linux/regulator/driver.h
+@@ -97,6 +97,8 @@ struct regulator_linear_range {
+  *	REGULATOR_STATUS value (or negative errno)
+  * @get_optimum_mode: Get the most efficient operating mode for the regulator
+  *                    when running with the specified parameters.
++ * @set_optimum_mode: Set the most efficient operating mode for the regulator
++ *                    when running with the specified parameters.
+  *
+  * @set_bypass: Set the regulator in bypass mode.
+  * @get_bypass: Get the regulator bypass mode state.
+@@ -166,6 +168,9 @@ struct regulator_ops {
+ 	/* get most efficient regulator operating mode for load */
+ 	unsigned int (*get_optimum_mode) (struct regulator_dev *, int input_uV,
+ 					  int output_uV, int load_uA);
++	/* set most efficient regulator operating mode for load */
++	int (*set_optimum_mode)(struct regulator_dev *, int input_uV,
++				int output_uV, int load_uA);
+ 
+ 	/* control and report on bypass mode */
+ 	int (*set_bypass)(struct regulator_dev *dev, bool enable);
 -- 
 1.9.1
