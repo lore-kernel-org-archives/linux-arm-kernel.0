@@ -1,92 +1,72 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 27 Jan 2015 17:15:13 -0800
-Subject: [linux-sunxi] Re: [PATCH] arm: sunxi: input: RFC: Add sysfs
- voltage for sun4i-lradc driver
-In-Reply-To: <20150127194447.GO7200@lukather>
-References: <1422291516-24895-1-git-send-email-plaes@plaes.org>
- <20150127091829.GD7200@lukather>
- <1422352189.23189.12.camel@plaes.org> <54C76DF2.50707@redhat.com>
- <20150127194447.GO7200@lukather>
-Message-ID: <20150128011513.GA30169@dtor-ws>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 27 Jan 2015 17:19:02 -0800
+Subject: [PATCH 4/4] clk: dt: st: Introduce clock domain documentation
+In-Reply-To: <1422270840-3039-5-git-send-email-lee.jones@linaro.org>
+References: <1422270840-3039-1-git-send-email-lee.jones@linaro.org>
+ <1422270840-3039-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <20150128011902.22722.85007@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 27, 2015 at 08:44:47PM +0100, Maxime Ripard wrote:
-> On Tue, Jan 27, 2015 at 11:52:34AM +0100, Hans de Goede wrote:
-> > Hi,
-> > 
-> > On 27-01-15 10:49, Priit Laes wrote:
-> > >
-> > >On Tue, 2015-01-27 at 10:18 +0100, Maxime Ripard wrote:
-> > >>Hi,
-> > >>
-> > >>On Mon, Jan 26, 2015 at 06:58:32PM +0200, Priit Laes wrote:
-> > >>>---
-> > >>
-> > >>Like Hans was pointing out, commit log and signed-off-by please
-> > >>
-> > >>>  .../ABI/testing/sysfs-driver-input-sun4i-lradc     |  4 ++
-> > >>>  drivers/input/keyboard/sun4i-lradc-keys.c          | 49
-> > >>>+++++++++++++++++-----
-> > >>>  2 files changed, 43 insertions(+), 10 deletions(-)
-> > >>>  create mode 100644 Documentation/ABI/testing/sysfs-driver-input-
-> > >>>sun4i-lradc
-> > >>>
-> > >>>diff --git a/Documentation/ABI/testing/sysfs-driver-input-sun4i-
-> > >>>lradc b/Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc
-> > >>>new file mode 100644
-> > >>>index 0000000..e4e6448
-> > >>>--- /dev/null
-> > >>>+++ b/Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc
-> > >>>@@ -0,0 +1,4 @@
-> > >>>+What:          /sys/class/input/input(x)/device/voltage
-> > >>>+Date:          February 2015
-> > >>>+Contact:       Priit Laes <plaes@plaes.org>
-> > >>>+Description:   ADC output voltage in microvolts or 0 if device is
-> > >>>not opened.
-> > >>
-> > >>Why is it returning 0 when "device is not opened" ? What does that
-> > >>even mean? You can't read that file without opening it.
-> > >
-> > >It means that something has to open the /dev/input/inputX device which
-> > >sets up the ADC before the voltage can be read from the sysfs file.
-> > >
-> > >[...]
-> > >
-> > >
-> > >>
-> > >>As I told you already, if you're going to expose this an ADC in the
-> > >>end, the proper solution is to use the IIO framework, not adding a
-> > >>custom sysfs file.
-> > >
-> > >My intention was to expose just a simple debug output, so one can
-> > >press the buttons and read the voltages for devicetree keymap.
-> > >
-> > >If anyone can suggest a simpler approach than current sysfs based one,
-> > >I would do it.
-> > 
-> > The android driver always uses 0.2V / 200mV steps, so what I do is
-> > simply create a mapping with 200mV mapped to KEY_VOLUMEUP, 400mV mapped
-> > to KEY_VOLUMEDOWN, etc. following the hardcoded android driver mapping:
-> > 
-> > https://github.com/linux-sunxi/linux-sunxi/blob/sunxi-3.4/drivers/input/keyboard/sun4i-keyboard.c#L136
-> > 
-> > Usually this will be correct in one go, after testing one can shuffle
-> > key codes as needed (usually not needed) and/or remove unused entries.
-> > 
-> > With that said I do think that a sysfs file to see the actual voltages,
-> > or a kernel parameter to printk them on keypress interrupt would be useful.
-> > 
-> > I guess the printk option would be better as it would show the actual
-> > keypress value read, not some semi-random sample.
+Quoting Lee Jones (2015-01-26 03:14:00)
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  .../devicetree/bindings/clock/st/st,clk-domain.txt | 34 ++++++++++++++++++++++
+>  1 file changed, 34 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/st/st,clk-domain.txt
 > 
-> That wouldn't require that much code actually. Either using dev_dbg,
-> or debugfs like Dmitry was suggesting would be two nice solutions I
-> guess.
+> diff --git a/Documentation/devicetree/bindings/clock/st/st,clk-domain.txt b/Documentation/devicetree/bindings/clock/st/st,clk-domain.txt
+> new file mode 100644
+> index 0000000..7309937
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/st/st,clk-domain.txt
+> @@ -0,0 +1,34 @@
+> +STMicroelectronics Clock Domain
+> +
+> +ST hardware have a bunch of clocks which must not be turned off.
+> +If drivers a) fail to obtain a reference to any of these or b) give
+> +up a previously obtained reference during suspend, the common clk
+> +framework will attempt to turn them off and the hardware will
+> +subsequently die.  The only way to recover from this failure is to
+> +restart.
+> +
+> +To avoid either of these two scenarios from catastrophically
+> +disabling the running system we have implemented a clock domain
+> +where clocks are consumed and references are taken, thus preventing
+> +them from being shut down by the framework.
+> +
+> +We use the generic clock bindings found in:
+> +  Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +
+> +Required properties:
+> +- compatible : Must be "st,clk-domain"
 
-Given the stated purpose I'd say dev_dbg() and call it a day.
+Seems like a useful feature for any clock provider, not just ST's. Have
+you thought about making this solution generic for DT-based clock
+providers?
 
-Thanks.
+We could amend the common clock binding to include a special "always on"
+clock group that is automagically prepared and enabled when the clock
+provider/driver is registered, using a common function.
 
--- 
-Dmitry
+Regards,
+Mike
+
+> +
+> +Example:
+> +
+> +clk-domain {
+> +       compatible = "st,clk-domain";
+> +       clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>,
+> +                <&clk_s_c0_flexgen CLK_COMPO_DVP>,
+> +                <&clk_s_c0_flexgen CLK_MMC_1>,
+> +                <&clk_s_c0_flexgen CLK_ICN_SBC>,
+> +                <&clk_s_c0_flexgen CLK_ICN_LMI>,
+> +                <&clk_s_c0_flexgen CLK_ICN_CPU>,
+> +                <&clk_s_c0_flexgen CLK_TX_ICN_DMU>,
+> +                <&clk_s_a0_flexgen CLK_IC_LMI0>,
+> +                <&clk_m_a9>;
+> +};
+> -- 
+> 1.9.1
+> 
