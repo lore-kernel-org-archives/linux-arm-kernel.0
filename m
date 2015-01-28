@@ -1,31 +1,80 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 28 Jan 2015 09:04:48 -0800
-Subject: [PATCH 4/4] ARM: dts: Add minimal support for dm8168-evm
-In-Reply-To: <20150123164756.GB7718@atomide.com>
-References: <1421192272-20754-1-git-send-email-tony@atomide.com>
- <1421192272-20754-5-git-send-email-tony@atomide.com>
- <20150117164709.GS18552@atomide.com>
- <CAALWOA-v=-KZ5W+Giwq9Z7rdA8JM2Q+zgqZPz-5sDrHD_b-_7A@mail.gmail.com>
- <20150117181404.GW18552@atomide.com>
- <CAALWOA-cdqPbLo4JvykGFODy2xUOozWg6OjzoGPLasJA022kJg@mail.gmail.com>
- <20150119172914.GY18552@atomide.com>
- <CAALWOA_54qoQgyCkGy10v+7-eQ87ddeCTG-dbP-P6x493HAswA@mail.gmail.com>
- <20150123164756.GB7718@atomide.com>
-Message-ID: <20150128170448.GP28663@atomide.com>
+From: elder@linaro.org (Alex Elder)
+Date: Wed, 28 Jan 2015 11:08:33 -0600
+Subject: [PATCH] bcm: address clang inline asm incompatibility
+In-Reply-To: <CAKv+Gu8CrMqwqBOF8rYa3RP1=gfCthwP=1k9kQ73v6+Sxwah4A@mail.gmail.com>
+References: <1422422306-27473-1-git-send-email-behanw@converseincode.com>	<CAKv+Gu_NCgMmX_LQqi7vtjtP4ofrW+kx8FPgRd4-LWwK=73-xg@mail.gmail.com>	<54C8EE04.6060809@linaro.org>
+ <CAKv+Gu8CrMqwqBOF8rYa3RP1=gfCthwP=1k9kQ73v6+Sxwah4A@mail.gmail.com>
+Message-ID: <54C91791.9030508@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [150123 08:54]:
+On 01/28/2015 10:17 AM, Ard Biesheuvel wrote:
+> On 28 January 2015 at 14:11, Alex Elder <elder@linaro.org> wrote:
+>> On 01/28/2015 05:15 AM, Ard Biesheuvel wrote:
+>>> On 28 January 2015 at 05:18, Behan Webster <behanw@converseincode.com> wrote:
+>>>> From: Alex Elder <elder@linaro.org>
+>>>>
+>>>> My GCC-based build environment likes to call register r12 by the
+>>>> name "ip" in inline asm.  Behan Webster informed me that his Clang-
+>>>> based build environment likes "r12" instead.
+>>>>
+>>>> Try to make them both happy.
+>>>>
+>>>> Signed-off-by: Alex Elder <elder@linaro.org>
+>>>> Signed-off-by: Behan Webster <behanw@converseincode.com>
+>>>> ---
+>>>>  arch/arm/mach-bcm/bcm_kona_smc.c | 9 +++++++--
+>>>>  1 file changed, 7 insertions(+), 2 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/mach-bcm/bcm_kona_smc.c b/arch/arm/mach-bcm/bcm_kona_smc.c
+>>>> index a55a7ec..3937bd5 100644
+>>>> --- a/arch/arm/mach-bcm/bcm_kona_smc.c
+>>>> +++ b/arch/arm/mach-bcm/bcm_kona_smc.c
+>>>> @@ -106,9 +106,14 @@ int __init bcm_kona_smc_init(void)
+>>>>   * request result appropriately.  This result value is found in r0
+>>>>   * when the "smc" request completes.
+>>>>   */
+>>>> +#ifdef __clang__
+>>>> +#define R12    "r12"
+>>>> +#else  /* !__clang__ */
+>>>> +#define R12    "ip"    /* gcc calls r12 "ip" */
+>>>> +#endif /* !__clang__ */
+>>>
+>>> Why not just use r12 for both?
+>>
+>> Yes, that would have been an obvious fix.  But the
+>> assembler (in the GCC environment) doesn't accept that.
+>>
 > 
-> Should be usable for NFSroot with all the patches I've sent using the
-> ti u-boot and and appended DTB uImage. Sorry not all of it is yet in
-> Linux next though, I'll push a current testing branch at some point
-> today. The mainline u-boot was at least missing the davinci_emac
-> support the last time I tried.
+> Mine has no problems with it at all
+> 
+> $ echo 'mov r12, #0' | arm-linux-gnueabihf-gcc -c -x assembler-with-cpp -
+> 
+> and grepping for r12 under arch/arm suggests the same
 
-Seems to be all in today's Linux next and I just verified that
-3.19.0-rc6-next-20150128-06478-g30720bbe is booting on 8168-evm.
+The use of "r12" is fine.  But it's not just the assembler,
+I believe it also involves gcc.
 
-Regards,
+The problem is with the use of the __asmeq(x, y) macro.
 
-Tony
+If I assign the "ip" variable with "r12":
+        register u32 ip asm("r12");     /* Also called ip */
+
+Then that's fine.  However, this line then causes an error:
+                __asmeq("%0", "r12")
+
+Apparently gcc uses register "ip" when it sees asm("r12").  So
+attempting to verify the desired register got used with __asmeq()
+causes a string mismatch--"ip" is not equal to "r12".
+
+So I could use:
+
+        register u32 ip asm("r12");     /* Also called ip */
+		...
+                __asmeq("%0", "ip")
+
+And that will build.  But it's a little non-intuitive, and
+I suspect that clang might (rightfully) have a failure in
+this __asmeq() call.
+
+					-Alex
