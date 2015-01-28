@@ -1,34 +1,34 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 28 Jan 2015 13:46:39 +0000
-Subject: [Patch v2 18/22] PCI: Use common resource list management code
- instead of private implementation
-In-Reply-To: <1422442660-455-19-git-send-email-jiang.liu@linux.intel.com>
-References: <1422442660-455-1-git-send-email-jiang.liu@linux.intel.com>
- <1422442660-455-19-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <20150128134639.GN1569@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 28 Jan 2015 14:48:06 +0100
+Subject: [PATCH 2/5] drm: panel/simple: add backlight dependency
+In-Reply-To: <1422452889-415782-1-git-send-email-arnd@arndb.de>
+References: <1422452889-415782-1-git-send-email-arnd@arndb.de>
+Message-ID: <1422452889-415782-3-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 28, 2015 at 10:57:36AM +0000, Jiang Liu wrote:
-> Use common resource list management data structure and interfaces
-> instead of private implementation.
-> 
-> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
-> ---
->  arch/arm/kernel/bios32.c            |    5 ++---
->  arch/x86/pci/bus_numa.c             |    4 ++--
->  drivers/pci/bus.c                   |   18 ++++++------------
->  drivers/pci/host-bridge.c           |    8 ++++----
->  drivers/pci/host/pci-host-generic.c |    4 ++--
->  drivers/pci/host/pci-xgene.c        |    4 ++--
->  drivers/pci/host/pcie-xilinx.c      |    4 ++--
->  drivers/pci/probe.c                 |   10 +++++-----
->  include/linux/pci.h                 |    9 ++-------
->  9 files changed, 27 insertions(+), 39 deletions(-)
+The simple panel code uses the backlight interface to
+find a device, which fails when backlight is disabled:
 
-The arch/arm/ and drivers/pci/host/pci-host-generic.c bits look fine to
-me:
+drivers/built-in.o: In function `panel_simple_platform_probe':
+:(.text+0xd3c48): undefined reference to `of_find_backlight_by_node'
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/gpu/drm/panel/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Will
+diff --git a/drivers/gpu/drm/panel/Kconfig b/drivers/gpu/drm/panel/Kconfig
+index 84506053a7ca..d84583776d50 100644
+--- a/drivers/gpu/drm/panel/Kconfig
++++ b/drivers/gpu/drm/panel/Kconfig
+@@ -10,6 +10,7 @@ menu "Display Panels"
+ config DRM_PANEL_SIMPLE
+ 	tristate "support for simple panels"
+ 	depends on OF
++	depends on BACKLIGHT_CLASS_DEVICE
+ 	help
+ 	  DRM panel driver for dumb panels that need at most a regulator and
+ 	  a GPIO to be powered up. Optionally a backlight can be attached so
+-- 
+2.1.0.rc2
