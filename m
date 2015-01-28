@@ -1,50 +1,42 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Jan 2015 20:48:14 +0100
-Subject: [PATCH 07/15] ARM: disable some options on ARMv7-M
+Date: Wed, 28 Jan 2015 20:48:16 +0100
+Subject: [PATCH 09/15] ARM: disable CONFIG_PTDUMP on !MMU
 In-Reply-To: <1422474502-3097078-1-git-send-email-arnd@arndb.de>
 References: <1422474502-3097078-1-git-send-email-arnd@arndb.de>
-Message-ID: <1422474502-3097078-8-git-send-email-arnd@arndb.de>
+Message-ID: <1422474502-3097078-10-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kprobes, irqflags tracing and kexec don't currently build on
-kernels targetting ARMv7-M, so for now, we should just disallow
-those combinations.
+It's obviously pointless to dump page tables when the MMU is disabled,
+and even trying to build this code results in numerous build errors
+like these:
+
+../arch/arm/mm/dump.c:56:11: error: 'L_PTE_USER' undeclared here (not in a function)
+   .mask = L_PTE_USER,
+           ^
+../arch/arm/mm/dump.c:61:11: error: 'L_PTE_RDONLY' undeclared here (not in a function)
+   .mask = L_PTE_RDONLY,
+           ^
+../arch/arm/mm/dump.c:66:11: error: 'L_PTE_XN' undeclared here (not in a function)
+   .mask = L_PTE_XN,
+           ^
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/Kconfig | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/Kconfig.debug | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index b9b68b467584..11cc5fa40ff7 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -55,7 +55,7 @@ config ARM
- 	select HAVE_KERNEL_LZMA
- 	select HAVE_KERNEL_LZO
- 	select HAVE_KERNEL_XZ
--	select HAVE_KPROBES if !XIP_KERNEL && !CPU_ENDIAN_BE32 && !CPU_32v3
-+	select HAVE_KPROBES if !XIP_KERNEL && !CPU_ENDIAN_BE32 && !CPU_32v3 && !CPU_V7M
- 	select HAVE_KRETPROBES if (HAVE_KPROBES)
- 	select HAVE_MEMBLOCK
- 	select HAVE_MOD_ARCH_SPECIFIC if ARM_UNWIND
-@@ -169,7 +169,7 @@ config LOCKDEP_SUPPORT
- 
- config TRACE_IRQFLAGS_SUPPORT
- 	bool
--	default y
-+	default !CPU_V7M
- 
- config RWSEM_XCHGADD_ALGORITHM
- 	bool
-@@ -1990,6 +1990,7 @@ config XIP_PHYS_ADDR
- config KEXEC
- 	bool "Kexec system call (EXPERIMENTAL)"
- 	depends on (!SMP || PM_SLEEP_SMP)
-+	depends on !CPU_V7M
- 	help
- 	  kexec is a system call that implements the ability to shutdown your
- 	  current kernel, and to start another kernel.  It is like a reboot
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index aa5464044b07..24b649186014 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -5,6 +5,7 @@ source "lib/Kconfig.debug"
+ config ARM_PTDUMP
+ 	bool "Export kernel pagetable layout to userspace via debugfs"
+ 	depends on DEBUG_KERNEL
++	depends on MMU
+ 	select DEBUG_FS
+ 	---help---
+ 	  Say Y here if you want to show the kernel pagetable layout in a
 -- 
 2.1.0.rc2
