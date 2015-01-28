@@ -1,126 +1,281 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 29 Jan 2015 01:32 +0200
-Subject: [PATCH v4 1/6] of: iommu: add ptr to OF node arg to
- of_iommu_configure()
-In-Reply-To: <20150128133219.GM1569@arm.com>
-References: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
- <13812499.ICbNgSDOae@avalon> <20150128133219.GM1569@arm.com>
-Message-ID: <5349994.6VHXzPdIxs@avalon>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 28 Jan 2015 17:34:39 -0600
+Subject: [Patch v2 18/22] PCI: Use common resource list management code
+ instead of private implementation
+In-Reply-To: <1422442660-455-19-git-send-email-jiang.liu@linux.intel.com>
+References: <1422442660-455-1-git-send-email-jiang.liu@linux.intel.com>
+ <1422442660-455-19-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <20150128233439.GD17623@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-On Wednesday 28 January 2015 13:32:19 Will Deacon wrote:
-> On Wed, Jan 28, 2015 at 01:15:10PM +0000, Laurent Pinchart wrote:
-> > On Wednesday 28 January 2015 12:29:42 Will Deacon wrote:
-> >> On Wed, Jan 28, 2015 at 12:23:03PM +0000, Laurent Pinchart wrote:
-> >>> On Wednesday 28 January 2015 11:33:00 Will Deacon wrote:
-> >>>> On Mon, Jan 26, 2015 at 06:49:01PM +0000, Murali Karicheri wrote:
-> >>>>> On 01/25/2015 08:32 AM, Laurent Pinchart wrote:
-> >>>>>> On Friday 23 January 2015 17:32:34 Murali Karicheri wrote:
-> >>>>>>> Function of_iommu_configure() is called from of_dma_configure() to
-> >>>>>>> setup iommu ops using DT property. This API is currently used for
-> >>>>>>> platform devices for which DMA configuration (including iommu ops)
-> >>>>>>> may come from device's parent. To extend this functionality for
-> >>>>>>> PCI devices, this API need to take a parent node ptr as an argument
-> >>>>>>> instead of assuming device's parent. This is needed since for PCI,
-> >>>>>>> the dma configuration may be defined in the DT node of the root
-> >>>>>>> bus bridge's parent device. Currently only dma-range is used for PCI
-> >>>>>>> and iommu is not supported. So return error if the device is PCI.
-> >>>>>>> 
-> >>>>>>> Cc: Joerg Roedel<joro@8bytes.org>
-> >>>>>>> Cc: Grant Likely<grant.likely@linaro.org>
-> >>>>>>> Cc: Rob Herring<robh+dt@kernel.org>
-> >>>>>>> Cc: Bjorn Helgaas<bhelgaas@google.com>
-> >>>>>>> Cc: Will Deacon<will.deacon@arm.com>
-> >>>>>>> Cc: Russell King<linux@arm.linux.org.uk>
-> >>>>>>> Cc: Arnd Bergmann<arnd@arndb.de>
-> >>>>>>> Cc: Suravee Suthikulpanit<Suravee.Suthikulpanit@amd.com>
-> >>>>>>> 
-> >>>>>>> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
-> >>>>>>> ---
-> >>>>>>> 
-> >>>>>>>   drivers/iommu/of_iommu.c |   10 ++++++++--
-> >>>>>>>   drivers/of/platform.c    |    2 +-
-> >>>>>>>   include/linux/of_iommu.h |    6 ++++--
-> >>>>>>>   3 files changed, 13 insertions(+), 5 deletions(-)
-> >>>>>>> 
-> >>>>>>> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-> >>>>>>> index af1dc6a..439235b 100644
-> >>>>>>> --- a/drivers/iommu/of_iommu.c
-> >>>>>>> +++ b/drivers/iommu/of_iommu.c
-> >>>>>>> @@ -133,19 +133,25 @@ struct iommu_ops *of_iommu_get_ops(struct
-> >>>>>>> device_node *np)
-> >>>>>>>   	return ops;
-> >>>>>>>  }
-> >>>>>>> 
-> >>>>>>> -struct iommu_ops *of_iommu_configure(struct device *dev)
-> >>>>>>> +struct iommu_ops *of_iommu_configure(struct device *dev,
-> >>>>>>> +				     struct device_node *iommu_np)
-> >>>>>>>  {
-> >>>>>>>   	struct of_phandle_args iommu_spec;
-> >>>>>>>   	struct device_node *np;
-> >>>>>>>   	struct iommu_ops *ops = NULL;
-> >>>>>>>   	int idx = 0;
-> >>>>>>> 
-> >>>>>>> +	if (dev_is_pci(dev)) {
-> >>>>>>> +		dev_err(dev, "iommu is currently not supported for PCI\n");
-> >>>>>>> +		return NULL;
-> >>>>>>> +	}
-> >>>>>>> +
-> >>>>>>>   	/*
-> >>>>>>>   	 * We don't currently walk up the tree looking for a parent
-> >>>>>>>   	 IOMMU.
-> >>>>>>>   	 * See the `Notes:' section of
-> >>>>>>>   	 * Documentation/devicetree/bindings/iommu/iommu.txt
-> >>>>>>>   	 */
-> >>>>>> 
-> >>>>>> Wouldn't it be better to fix this rather than passing the device
-> >>>>>> node pointer to the function ? The solution would be more generic.
-> >>>>> 
-> >>>>> Will Deacon (Copied here) is working on this as we alteady discussed
-> >>>>> in this thread. So it will be addressed by him in another series.
-> >>>> 
-> >>>> Well, "working on this" equates to "has it somewhere near the bottom
-> >>>> of a very long list" :)
-> >>> 
-> >>> What's your opinion on this patch then, do you think adding the
-> >>> iommu_np argument makes sense as a temporary hack, or should we instead
-> >>> walk up the tree looking for an iommus attribute in parent nodes ? I
-> >>> don't expect that to be insanely difficult to code.
-> >> 
-> >> If walking up the tree is useful, then I think we should do that and
-> >> update the Documentation to reflect the new behaviour.
-> > 
-> > If I understand Murali's patch set right (please correct me if that's not
-> > the case) the PCI code walks up the DT nodes hierarchy to the parent node
-> > that contains the iommus attribute and passes a pointer to that node to
-> > this function. It's thus a PCI-specific solution. As a temporary hack
-> > that's OK I suppose, but if implementing it right straight away isn't
-> > difficult that would be better.
+On Wed, Jan 28, 2015 at 06:57:36PM +0800, Jiang Liu wrote:
+> Use common resource list management data structure and interfaces
+> instead of private implementation.
 > 
-> It looks to me like the code walks the PCI topology to get the DT node for
-> the host controller, and passes *that* to of_dma_configure. That sounds
-> like the right thing to do to me, especially since the PCI topology is
-> likely not encoded in the device-tree. So actually, it is passing the
-> first parent node afaict.
+> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
 
-Indeed, that's right. I forgot for a moment that we have non-DT devices ;-)
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-Murali, nitpicking a bit, shouldn't the iommu_np parameter be renamed ? It 
-points to the node containing the iommus parameter, not to the iommu node, so 
-the current name is slightly confusing. A brief kerneldoc above the function 
-would also help. This can be the subject of a separate patch.
-
-> The part I'm more interested in is the mapping of RequesterID (PCI dma
-> alias) to IOMMU ID when we transition from the PCI topology to the DT
-> topology. Currently, it seems to be 1:1 on the platforms I have, but I
-> doubt this will always be the case.
-
--- 
-Regards,
-
-Laurent Pinchart
+> ---
+>  arch/arm/kernel/bios32.c            |    5 ++---
+>  arch/x86/pci/bus_numa.c             |    4 ++--
+>  drivers/pci/bus.c                   |   18 ++++++------------
+>  drivers/pci/host-bridge.c           |    8 ++++----
+>  drivers/pci/host/pci-host-generic.c |    4 ++--
+>  drivers/pci/host/pci-xgene.c        |    4 ++--
+>  drivers/pci/host/pcie-xilinx.c      |    4 ++--
+>  drivers/pci/probe.c                 |   10 +++++-----
+>  include/linux/pci.h                 |    9 ++-------
+>  9 files changed, 27 insertions(+), 39 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+> index a4effd6d8f2f..968b03cb6376 100644
+> --- a/arch/arm/kernel/bios32.c
+> +++ b/arch/arm/kernel/bios32.c
+> @@ -422,17 +422,16 @@ static int pcibios_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+>  static int pcibios_init_resources(int busnr, struct pci_sys_data *sys)
+>  {
+>  	int ret;
+> -	struct pci_host_bridge_window *window;
+> +	struct resource_list_entry *window;
+>  
+>  	if (list_empty(&sys->resources)) {
+>  		pci_add_resource_offset(&sys->resources,
+>  			 &iomem_resource, sys->mem_offset);
+>  	}
+>  
+> -	list_for_each_entry(window, &sys->resources, list) {
+> +	resource_list_for_each_entry(window, &sys->resources)
+>  		if (resource_type(window->res) == IORESOURCE_IO)
+>  			return 0;
+> -	}
+>  
+>  	sys->io_res.start = (busnr * SZ_64K) ?  : pcibios_min_io;
+>  	sys->io_res.end = (busnr + 1) * SZ_64K - 1;
+> diff --git a/arch/x86/pci/bus_numa.c b/arch/x86/pci/bus_numa.c
+> index f3a2cfc14125..6785af30ed39 100644
+> --- a/arch/x86/pci/bus_numa.c
+> +++ b/arch/x86/pci/bus_numa.c
+> @@ -31,7 +31,7 @@ void x86_pci_root_bus_resources(int bus, struct list_head *resources)
+>  {
+>  	struct pci_root_info *info = x86_find_pci_root_info(bus);
+>  	struct pci_root_res *root_res;
+> -	struct pci_host_bridge_window *window;
+> +	struct resource_list_entry *window;
+>  	bool found = false;
+>  
+>  	if (!info)
+> @@ -41,7 +41,7 @@ void x86_pci_root_bus_resources(int bus, struct list_head *resources)
+>  	       bus);
+>  
+>  	/* already added by acpi ? */
+> -	list_for_each_entry(window, resources, list)
+> +	resource_list_for_each_entry(window, resources)
+>  		if (window->res->flags & IORESOURCE_BUS) {
+>  			found = true;
+>  			break;
+> diff --git a/drivers/pci/bus.c b/drivers/pci/bus.c
+> index 8fb16188cd82..c850c48d81d2 100644
+> --- a/drivers/pci/bus.c
+> +++ b/drivers/pci/bus.c
+> @@ -20,17 +20,16 @@
+>  void pci_add_resource_offset(struct list_head *resources, struct resource *res,
+>  			     resource_size_t offset)
+>  {
+> -	struct pci_host_bridge_window *window;
+> +	struct resource_list_entry *entry;
+>  
+> -	window = kzalloc(sizeof(struct pci_host_bridge_window), GFP_KERNEL);
+> -	if (!window) {
+> +	entry = resource_list_create_entry(res, 0);
+> +	if (!entry) {
+>  		printk(KERN_ERR "PCI: can't add host bridge window %pR\n", res);
+>  		return;
+>  	}
+>  
+> -	window->res = res;
+> -	window->offset = offset;
+> -	list_add_tail(&window->list, resources);
+> +	entry->offset = offset;
+> +	resource_list_add_tail(entry, resources);
+>  }
+>  EXPORT_SYMBOL(pci_add_resource_offset);
+>  
+> @@ -42,12 +41,7 @@ EXPORT_SYMBOL(pci_add_resource);
+>  
+>  void pci_free_resource_list(struct list_head *resources)
+>  {
+> -	struct pci_host_bridge_window *window, *tmp;
+> -
+> -	list_for_each_entry_safe(window, tmp, resources, list) {
+> -		list_del(&window->list);
+> -		kfree(window);
+> -	}
+> +	resource_list_free(resources);
+>  }
+>  EXPORT_SYMBOL(pci_free_resource_list);
+>  
+> diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
+> index 0e5f3c95af5b..3ea13883e6a5 100644
+> --- a/drivers/pci/host-bridge.c
+> +++ b/drivers/pci/host-bridge.c
+> @@ -35,10 +35,10 @@ void pcibios_resource_to_bus(struct pci_bus *bus, struct pci_bus_region *region,
+>  			     struct resource *res)
+>  {
+>  	struct pci_host_bridge *bridge = find_pci_host_bridge(bus);
+> -	struct pci_host_bridge_window *window;
+> +	struct resource_list_entry *window;
+>  	resource_size_t offset = 0;
+>  
+> -	list_for_each_entry(window, &bridge->windows, list) {
+> +	resource_list_for_each_entry(window, &bridge->windows) {
+>  		if (resource_contains(window->res, res)) {
+>  			offset = window->offset;
+>  			break;
+> @@ -60,10 +60,10 @@ void pcibios_bus_to_resource(struct pci_bus *bus, struct resource *res,
+>  			     struct pci_bus_region *region)
+>  {
+>  	struct pci_host_bridge *bridge = find_pci_host_bridge(bus);
+> -	struct pci_host_bridge_window *window;
+> +	struct resource_list_entry *window;
+>  	resource_size_t offset = 0;
+>  
+> -	list_for_each_entry(window, &bridge->windows, list) {
+> +	resource_list_for_each_entry(window, &bridge->windows) {
+>  		struct pci_bus_region bus_region;
+>  
+>  		if (resource_type(res) != resource_type(window->res))
+> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+> index 6eb1aa75bd37..16d5d6eeb35a 100644
+> --- a/drivers/pci/host/pci-host-generic.c
+> +++ b/drivers/pci/host/pci-host-generic.c
+> @@ -149,14 +149,14 @@ static int gen_pci_parse_request_of_pci_ranges(struct gen_pci *pci)
+>  	struct device *dev = pci->host.dev.parent;
+>  	struct device_node *np = dev->of_node;
+>  	resource_size_t iobase;
+> -	struct pci_host_bridge_window *win;
+> +	struct resource_list_entry *win;
+>  
+>  	err = of_pci_get_host_bridge_resources(np, 0, 0xff, &pci->resources,
+>  					       &iobase);
+>  	if (err)
+>  		return err;
+>  
+> -	list_for_each_entry(win, &pci->resources, list) {
+> +	resource_list_for_each_entry(win, &pci->resources) {
+>  		struct resource *parent, *res = win->res;
+>  
+>  		switch (resource_type(res)) {
+> diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+> index b1d0596457c5..e335b834f950 100644
+> --- a/drivers/pci/host/pci-xgene.c
+> +++ b/drivers/pci/host/pci-xgene.c
+> @@ -401,11 +401,11 @@ static int xgene_pcie_map_ranges(struct xgene_pcie_port *port,
+>  				 struct list_head *res,
+>  				 resource_size_t io_base)
+>  {
+> -	struct pci_host_bridge_window *window;
+> +	struct resource_list_entry *window;
+>  	struct device *dev = port->dev;
+>  	int ret;
+>  
+> -	list_for_each_entry(window, res, list) {
+> +	resource_list_for_each_entry(window, res) {
+>  		struct resource *res = window->res;
+>  		u64 restype = resource_type(res);
+>  
+> diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
+> index ef3ebaf9a738..253e993a111f 100644
+> --- a/drivers/pci/host/pcie-xilinx.c
+> +++ b/drivers/pci/host/pcie-xilinx.c
+> @@ -737,7 +737,7 @@ static int xilinx_pcie_parse_and_add_res(struct xilinx_pcie_port *port)
+>  	resource_size_t offset;
+>  	struct of_pci_range_parser parser;
+>  	struct of_pci_range range;
+> -	struct pci_host_bridge_window *win;
+> +	struct resource_list_entry *win;
+>  	int err = 0, mem_resno = 0;
+>  
+>  	/* Get the ranges */
+> @@ -807,7 +807,7 @@ static int xilinx_pcie_parse_and_add_res(struct xilinx_pcie_port *port)
+>  
+>  free_resources:
+>  	release_child_resources(&iomem_resource);
+> -	list_for_each_entry(win, &port->resources, list)
+> +	resource_list_for_each_entry(win, &port->resources)
+>  		devm_kfree(dev, win->res);
+>  	pci_free_resource_list(&port->resources);
+>  
+> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> index 23212f8ae09b..df6a40932aa0 100644
+> --- a/drivers/pci/probe.c
+> +++ b/drivers/pci/probe.c
+> @@ -1895,7 +1895,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+>  	int error;
+>  	struct pci_host_bridge *bridge;
+>  	struct pci_bus *b, *b2;
+> -	struct pci_host_bridge_window *window, *n;
+> +	struct resource_list_entry *window, *n;
+>  	struct resource *res;
+>  	resource_size_t offset;
+>  	char bus_addr[64];
+> @@ -1959,8 +1959,8 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+>  		printk(KERN_INFO "PCI host bridge to bus %s\n", dev_name(&b->dev));
+>  
+>  	/* Add initial resources to the bus */
+> -	list_for_each_entry_safe(window, n, resources, list) {
+> -		list_move_tail(&window->list, &bridge->windows);
+> +	resource_list_for_each_entry_safe(window, n, resources) {
+> +		list_move_tail(&window->node, &bridge->windows);
+>  		res = window->res;
+>  		offset = window->offset;
+>  		if (res->flags & IORESOURCE_BUS)
+> @@ -2060,12 +2060,12 @@ void pci_bus_release_busn_res(struct pci_bus *b)
+>  struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
+>  		struct pci_ops *ops, void *sysdata, struct list_head *resources)
+>  {
+> -	struct pci_host_bridge_window *window;
+> +	struct resource_list_entry *window;
+>  	bool found = false;
+>  	struct pci_bus *b;
+>  	int max;
+>  
+> -	list_for_each_entry(window, resources, list)
+> +	resource_list_for_each_entry(window, resources)
+>  		if (window->res->flags & IORESOURCE_BUS) {
+>  			found = true;
+>  			break;
+> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> index 9603094ed59b..6aa40d62cdab 100644
+> --- a/include/linux/pci.h
+> +++ b/include/linux/pci.h
+> @@ -29,6 +29,7 @@
+>  #include <linux/atomic.h>
+>  #include <linux/device.h>
+>  #include <linux/io.h>
+> +#include <linux/resource_ext.h>
+>  #include <uapi/linux/pci.h>
+>  
+>  #include <linux/pci_ids.h>
+> @@ -397,16 +398,10 @@ static inline int pci_channel_offline(struct pci_dev *pdev)
+>  	return (pdev->error_state != pci_channel_io_normal);
+>  }
+>  
+> -struct pci_host_bridge_window {
+> -	struct list_head list;
+> -	struct resource *res;		/* host bridge aperture (CPU address) */
+> -	resource_size_t offset;		/* bus address + offset = CPU address */
+> -};
+> -
+>  struct pci_host_bridge {
+>  	struct device dev;
+>  	struct pci_bus *bus;		/* root bus */
+> -	struct list_head windows;	/* pci_host_bridge_windows */
+> +	struct list_head windows;	/* resource_list_entry */
+>  	void (*release_fn)(struct pci_host_bridge *);
+>  	void *release_data;
+>  };
+> -- 
+> 1.7.10.4
+> 
