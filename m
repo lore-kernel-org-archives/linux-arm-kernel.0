@@ -1,40 +1,59 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Jan 2015 15:15:00 +0100
-Subject: [PATCH 0/4] net: driver fixes from arm randconfig builds
-Message-ID: <1422454504-439085-1-git-send-email-arnd@arndb.de>
+Date: Wed, 28 Jan 2015 15:15:03 +0100
+Subject: [PATCH 3/4] net: lance,ni64: don't build for ARM
+In-Reply-To: <1422454504-439085-1-git-send-email-arnd@arndb.de>
+References: <1422454504-439085-1-git-send-email-arnd@arndb.de>
+Message-ID: <1422454504-439085-4-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These four patches are fallout from test builds on ARM. I have a
-few more of them in my backlog but have not yet confirmed them
-to still be valid.
+The ni65 and lance ethernet drivers manually program the ISA DMA
+controller that is only available on x86 PCs and a few compatible
+systems. Trying to build it on ARM results in this error:
 
-The first three patches are about incomplete dependencies on
-old drivers. One could backport them to the beginning of time
-in theory, but there is little value since nobody would run into
-these problems.
+ni65.c: In function 'ni65_probe1':
+ni65.c:496:62: error: 'DMA1_STAT_REG' undeclared (first use in this function)
+     ((inb(DMA1_STAT_REG) >> 4) & 0x0f)
+                                                              ^
+ni65.c:496:62: note: each undeclared identifier is reported only once for each function it appears in
+ni65.c:497:63: error: 'DMA2_STAT_REG' undeclared (first use in this function)
+     | (inb(DMA2_STAT_REG) & 0xf0);
 
-The final patch is one I had submitted before together with the
-respective pcmcia patch but forgot to follow up on that. It's
-still a valid but relatively theoretical bug, because the previous
-behavior of the driver was just as broken as what we have in
-mainline.
+The DMA1_STAT_REG and DMA2_STAT_REG registers are only defined for
+alpha, mips, parisc, powerpc and x86, although it is not clear
+which subarchitectures actually have them at the correct location.
 
-Please apply,
+This patch for now just disables it for ARM, to avoid randconfig
+build errors. We could also decide to limit it to the set of
+architectures on which it does compile, but that might look more
+deliberate than guessing based on where the drivers build.
 
-	Arnd
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/net/ethernet/amd/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Arnd Bergmann (4):
-  net: cs89x0: always build platform code if !HAS_IOPORT_MAP
-  net: wan: add missing virt_to_bus dependencies
-  net: lance,ni64: don't build for ARM
-  net: am2150: fix nmclan_cs.c shared interrupt handling
-
- drivers/net/ethernet/amd/Kconfig     | 4 ++--
- drivers/net/ethernet/amd/nmclan_cs.c | 2 ++
- drivers/net/ethernet/cirrus/Kconfig  | 3 ++-
- drivers/net/wan/Kconfig              | 6 +++---
- 4 files changed, 9 insertions(+), 6 deletions(-)
-
+diff --git a/drivers/net/ethernet/amd/Kconfig b/drivers/net/ethernet/amd/Kconfig
+index 5d3b5202327c..c638c85f3954 100644
+--- a/drivers/net/ethernet/amd/Kconfig
++++ b/drivers/net/ethernet/amd/Kconfig
+@@ -45,7 +45,7 @@ config AMD8111_ETH
+ 
+ config LANCE
+ 	tristate "AMD LANCE and PCnet (AT1500 and NE2100) support"
+-	depends on ISA && ISA_DMA_API
++	depends on ISA && ISA_DMA_API && !ARM
+ 	---help---
+ 	  If you have a network (Ethernet) card of this type, say Y and read
+ 	  the Ethernet-HOWTO, available from
+@@ -142,7 +142,7 @@ config PCMCIA_NMCLAN
+ 
+ config NI65
+ 	tristate "NI6510 support"
+-	depends on ISA && ISA_DMA_API
++	depends on ISA && ISA_DMA_API && !ARM
+ 	---help---
+ 	  If you have a network (Ethernet) card of this type, say Y and read
+ 	  the Ethernet-HOWTO, available from
 -- 
 2.1.0.rc2
