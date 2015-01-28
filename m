@@ -1,50 +1,52 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 28 Jan 2015 09:33:48 -0500 (EST)
-Subject: [PATCH] ARM: /proc/atags: Export also for DT
-In-Reply-To: <201501281458.22088@pali>
-References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
- <20150127174818.GM26493@n2100.arm.linux.org.uk>
- <20150128005032.GK28663@atomide.com> <201501281458.22088@pali>
-Message-ID: <alpine.LFD.2.11.1501280925400.1322@knanqh.ubzr>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 28 Jan 2015 15:40:20 +0100
+Subject: [PATCH 1/1] ARM: multi_v7_defconfig: Enable Exynos5420 Multi-Cluster
+ PM support
+Message-ID: <1422456020-10975-1-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 28 Jan 2015, Pali Roh?r wrote:
+The Exynos5420 cluster power management support allowing Exynos
+5420/5422/5800 machines to power up and down the secondary CPUs.
 
-> On Wednesday 28 January 2015 01:50:33 Tony Lindgren wrote:
-> > On omaps, the bootrom passes the bootreason in r1 to the
-> > bootloader that can do whatever it wants with it. We could
-> > maybe pass it in the kernel cmdline to the watchdog driver
-> > for user space?
-> > 
-> 
-> Not truth for N900. Bootreason depends on PRM_RSTST omap 
-> register, state of vbat charger pins, time how long was power key 
-> pressed, R&D data stored in CAL partition and other undocumented 
-> registers for omap HS devices. I already tried to implement at 
-> least some subset of it in userspace (or kernel), but it is 
-> impossible because NOLO bootloader clear status of PRM_RSTST 
-> register.
-> 
-> There is also copy of PRM_RSTST register stored at address 
-> 0x4020FFB8 (tracing data) but that address is rewritten (probably 
-> by kernel), so we really cannot implement reading bootreason in 
-> kernel.
-> 
-> But in early stage in uboot it is possible to read 0x4020FFB8 
-> address and get some part of bootreason. But still PRM_RSTST is 
-> not enough!
-> 
-> I would be happy if DT kernel can export /proc/atags file with 
-> ATAGs passed by bootloader. It would be enough for me. In 
-> userspace I can parse content and do what is needed.
+Without this option enabled, the secondary CPUs are not brought
+up on boot and the following error is shown:
 
-What about defining a DT boot reason property instead?
-Maybe it already exists?  If not, it's something that could certainly be 
-generically used on other platforms too.
+CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+Setting up static identity map for 0x40938e90 - 0x40938f28
+ARM CCI driver probed
+CPU1: failed to boot: -38
+CPU2: failed to boot: -38
+CPU3: failed to boot: -38
+CPU4: failed to boot: -38
+CPU5: failed to boot: -38
+CPU6: failed to boot: -38
+CPU7: failed to boot: -38
+Brought up 1 CPUs
 
-Converting the special ATAG into its standard DT equivalent would then 
-be trivial and much cleaner overall.
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+---
 
+This patch was tested on an Exynos5420 Peach Pit and with MCPM support
+enabled, all the 8 CPUs are powered up:
 
-Nicolas
+Brought up 8 CPUs
+SMP: Total of 8 processors activated (384.00 BogoMIPS).
+
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 6e974b6bfa90..e8a4c955241b 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -61,6 +61,7 @@ CONFIG_MACH_SPEAR1310=y
+ CONFIG_MACH_SPEAR1340=y
+ CONFIG_ARCH_STI=y
+ CONFIG_ARCH_EXYNOS=y
++CONFIG_EXYNOS5420_MCPM=y
+ CONFIG_ARCH_SUNXI=y
+ CONFIG_ARCH_SIRF=y
+ CONFIG_ARCH_TEGRA=y
+-- 
+2.1.3
