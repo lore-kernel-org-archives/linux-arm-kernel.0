@@ -1,67 +1,62 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Jan 2015 22:50:04 +0100
-Subject: [PATCH] usb: musb: add generic usb phy dependencies
-Message-ID: <4595774.yLOm5IvvqR@wuerfel>
+Date: Wed, 28 Jan 2015 20:57:19 +0100
+Subject: randconfig bug: ARM/KVM link error in hyp_idmap section
+Message-ID: <3919069.MpPCrczKD2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Multiple musb glue drivers depend on the generic usb phy support,
-but fail to list it as a dependency in Kconfig. This results
-in build erros like:
+Since 0394e1f60520 ("ARM: KVM: enforce maximum size for identity
+mapped code"), some randconfigs started failing because the hyp_idmap
+section grows too large. I've tracked this down to the problem of
+veneers getting erroneously added to this section, but I'm not
+sure about the fix. The patch below is what I came up with.
 
-drivers/built-in.o: In function `am35x_remove':
-:(.text+0xadacc): undefined reference to `usb_phy_generic_unregister'
-drivers/built-in.o: In function `am35x_probe':
-:(.text+0xae1c8): undefined reference to `usb_phy_generic_register'
-:(.text+0xae244): undefined reference to `usb_phy_generic_unregister'
-drivers/built-in.o: In function `jz4740_remove':
-:(.text+0xaf648): undefined reference to `usb_phy_generic_unregister'
-drivers/built-in.o: In function `jz4740_musb_init':
-:(.text+0xaf694): undefined reference to `usb_phy_generic_register'
+Any other ideas?
 
-This adds the ones that are missing.
+	Arnd
+
+8<----
+Subject: [PATCH] ARM: KVM: avoid "HYP init code too big" error
+
+When building large kernels, the linker will emit lots of veneers
+into the .hyp.idmap.text section, which causes it to grow beyond
+one page, and that triggers the build error.
+
+This moves the section into .rodata instead, which avoids the
+veneers and is safe because the code is not executed directly
+but always copied into a separate page first.
+
+I am unsure if I wrote this the correct way though, so
+it needs to be reviewed carefully.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-diff --git a/drivers/usb/musb/Kconfig b/drivers/usb/musb/Kconfig
-index b005010240e5..26c835f1b726 100644
---- a/drivers/usb/musb/Kconfig
-+++ b/drivers/usb/musb/Kconfig
-@@ -63,11 +63,13 @@ comment "Platform Glue Layer"
- config USB_MUSB_DAVINCI
- 	tristate "DaVinci"
- 	depends on ARCH_DAVINCI_DMx
-+	depends on NOP_USB_XCEIV
- 	depends on BROKEN
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index ce01a2d3339f..f4de6e16d951 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -23,10 +23,14 @@
+ 	VMLINUX_SYMBOL(__idmap_text_start) = .;				\
+ 	*(.idmap.text)							\
+ 	VMLINUX_SYMBOL(__idmap_text_end) = .;				\
+-	. = ALIGN(32);							\
++	. = ALIGN(32);							
++
++#define IDMAP_RODATA							\
++	.rodata : {							\
+ 	VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;			\
+ 	*(.hyp.idmap.text)						\
+-	VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;
++	VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;			\
++	}
  
- config USB_MUSB_DA8XX
- 	tristate "DA8xx/OMAP-L1x"
- 	depends on ARCH_DAVINCI_DA8XX
-+	depends on NOP_USB_XCEIV
- 	depends on BROKEN
+ #ifdef CONFIG_HOTPLUG_CPU
+ #define ARM_CPU_DISCARD(x)
+@@ -123,6 +127,7 @@ SECTIONS
+ 	. = ALIGN(1<<SECTION_SHIFT);
+ #endif
+ 	RO_DATA(PAGE_SIZE)
++	IDMAP_RODATA
  
- config USB_MUSB_TUSB6010
-@@ -83,6 +85,7 @@ config USB_MUSB_OMAP2PLUS
- config USB_MUSB_AM35X
- 	tristate "AM35x"
- 	depends on ARCH_OMAP
-+	depends on NOP_USB_XCEIV
- 
- config USB_MUSB_DSPS
- 	tristate "TI DSPS platforms"
-@@ -93,6 +96,7 @@ config USB_MUSB_DSPS
- config USB_MUSB_BLACKFIN
- 	tristate "Blackfin"
- 	depends on (BF54x && !BF544) || (BF52x && ! BF522 && !BF523)
-+	depends on NOP_USB_XCEIV
- 
- config USB_MUSB_UX500
- 	tristate "Ux500 platforms"
-@@ -100,6 +104,7 @@ config USB_MUSB_UX500
- 
- config USB_MUSB_JZ4740
- 	tristate "JZ4740"
-+	depends on NOP_USB_XCEIV
- 	depends on MACH_JZ4740 || COMPILE_TEST
- 	depends on USB_MUSB_GADGET
- 	depends on USB_OTG_BLACKLIST_HUB
+ 	. = ALIGN(4);
+ 	__ex_table : AT(ADDR(__ex_table) - LOAD_OFFSET) {
