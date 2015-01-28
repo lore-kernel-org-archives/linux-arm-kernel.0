@@ -1,100 +1,64 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 28 Jan 2015 12:08:34 +0100
-Subject: [PATCH v2 2/5] KVM: ARM: on IO mem abort - route the call to
- KVM MMIO bus
-In-Reply-To: <20150127213853.GE9055@cbox>
-References: <20141207093641.17563.84226.stgit@i3820>
- <20141207093749.17563.12497.stgit@i3820> <54B3FFB9.3050406@linaro.org>
- <CADDJ2=Os6Uws6HN=iKg=uhx1artwBFXeyFKq9Co2Sgoo=63bOQ@mail.gmail.com>
- <20150127213853.GE9055@cbox>
-Message-ID: <54C8C332.60007@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 28 Jan 2015 11:15:53 +0000
+Subject: [PATCH] bcm: address clang inline asm incompatibility
+In-Reply-To: <1422422306-27473-1-git-send-email-behanw@converseincode.com>
+References: <1422422306-27473-1-git-send-email-behanw@converseincode.com>
+Message-ID: <CAKv+Gu_NCgMmX_LQqi7vtjtP4ofrW+kx8FPgRd4-LWwK=73-xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/27/2015 10:38 PM, Christoffer Dall wrote:
-> On Sat, Jan 24, 2015 at 03:02:33AM +0200, Nikolay Nikolaev wrote:
->> On Mon, Jan 12, 2015 at 7:09 PM, Eric Auger <eric.auger@linaro.org> wrote:
->>> Hi Nikolay,
->>> On 12/07/2014 10:37 AM, Nikolay Nikolaev wrote:
->>>> On IO memory abort, try to handle the MMIO access thorugh the KVM
->>>> registered read/write callbacks. This is done by invoking the relevant
->>>> kvm_io_bus_* API.
->>>>
->>>> Signed-off-by: Nikolay Nikolaev <n.nikolaev@virtualopensystems.com>
->>>> ---
->>>>  arch/arm/kvm/mmio.c |   33 +++++++++++++++++++++++++++++++++
->>>>  1 file changed, 33 insertions(+)
->>>>
->>>> diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
->>>> index 4cb5a93..e42469f 100644
->>>> --- a/arch/arm/kvm/mmio.c
->>>> +++ b/arch/arm/kvm/mmio.c
->>>> @@ -162,6 +162,36 @@ static int decode_hsr(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->>>>       return 0;
->>>>  }
->>>>
->>>> +/**
->>>> + * handle_kernel_mmio - handle an in-kernel MMIO access
->>>> + * @vcpu:    pointer to the vcpu performing the access
->>>> + * @run:     pointer to the kvm_run structure
->>>> + * @mmio:    pointer to the data describing the access
->>>> + *
->>>> + * returns true if the MMIO access has been performed in kernel space,
->>>> + * and false if it needs to be emulated in user space.
->>>> + */
->>>> +static bool handle_kernel_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
->>>> +             struct kvm_exit_mmio *mmio)
->>>> +{
->>>> +     int ret;
->>>> +
->>>> +     if (mmio->is_write) {
->>>> +             ret = kvm_io_bus_write(vcpu, KVM_MMIO_BUS, mmio->phys_addr,
->>>> +                             mmio->len, &mmio->data);
->>>> +
->>>> +     } else {
->>>> +             ret = kvm_io_bus_read(vcpu, KVM_MMIO_BUS, mmio->phys_addr,
->>>> +                             mmio->len, &mmio->data);
->>>> +     }
->>>> +     if (!ret) {
->>>> +             kvm_prepare_mmio(run, mmio);
->>>> +             kvm_handle_mmio_return(vcpu, run);
->>>> +     }
->>>> +
->>>> +     return !ret;
->>> in case ret < 0 (-EOPNOTSUPP = -95) aren't we returning true too? return
->>> (ret==0)?
->>>
->>>> +}
->>>> +
->>>>  int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
->>>>                phys_addr_t fault_ipa)
->>>>  {
->>>> @@ -200,6 +230,9 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
->>>>       if (vgic_handle_mmio(vcpu, run, &mmio))
->>>>               return 1;
->>>>
->>>> +     if (handle_kernel_mmio(vcpu, run, &mmio))
->>>> +             return 1;
->>>> +
->>>>       kvm_prepare_mmio(run, &mmio);
->>>>       return 0;
->>> currently the io_mem_abort returned value is not used by mmu.c code. I
->>> think this should be handed in kvm_handle_guest_abort. What do you think?
->>
->> You're right that the returned value is not handled further after we
->> exit io_mem_abort, it's just passed up the call stack.
->> However I'm not sure how to handle it better. If you have ideas, please share.
->>
-> I'm confused: the return value from io_mem_abort is assigned to a
-> variable 'ret' in kvm_handle_guest_abort and that determines if we
-> should run the VM again or return to userspace (with some work for
-> userspace to do or with an error).
+On 28 January 2015 at 05:18, Behan Webster <behanw@converseincode.com> wrote:
+> From: Alex Elder <elder@linaro.org>
+>
+> My GCC-based build environment likes to call register r12 by the
+> name "ip" in inline asm.  Behan Webster informed me that his Clang-
+> based build environment likes "r12" instead.
+>
+> Try to make them both happy.
+>
+> Signed-off-by: Alex Elder <elder@linaro.org>
+> Signed-off-by: Behan Webster <behanw@converseincode.com>
+> ---
+>  arch/arm/mach-bcm/bcm_kona_smc.c | 9 +++++++--
+>  1 file changed, 7 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-bcm/bcm_kona_smc.c b/arch/arm/mach-bcm/bcm_kona_smc.c
+> index a55a7ec..3937bd5 100644
+> --- a/arch/arm/mach-bcm/bcm_kona_smc.c
+> +++ b/arch/arm/mach-bcm/bcm_kona_smc.c
+> @@ -106,9 +106,14 @@ int __init bcm_kona_smc_init(void)
+>   * request result appropriately.  This result value is found in r0
+>   * when the "smc" request completes.
+>   */
+> +#ifdef __clang__
+> +#define R12    "r12"
+> +#else  /* !__clang__ */
+> +#define R12    "ip"    /* gcc calls r12 "ip" */
+> +#endif /* !__clang__ */
 
-hum well apologies for that. Guess I was tired when reading that piece
-of code :-(
+Why not just use r12 for both?
 
-Best Regards
-Eric
-> 
-> -Christoffer
-> 
+>  static int bcm_kona_do_smc(u32 service_id, u32 buffer_phys)
+>  {
+> -       register u32 ip asm("ip");      /* Also called r12 */
+> +       register u32 ip asm(R12);       /* Also called r12 */
+>         register u32 r0 asm("r0");
+>         register u32 r4 asm("r4");
+>         register u32 r5 asm("r5");
+> @@ -120,7 +125,7 @@ static int bcm_kona_do_smc(u32 service_id, u32 buffer_phys)
+>
+>         asm volatile (
+>                 /* Make sure we got the registers we want */
+> -               __asmeq("%0", "ip")
+> +               __asmeq("%0", R12)
+>                 __asmeq("%1", "r0")
+>                 __asmeq("%2", "r4")
+>                 __asmeq("%3", "r5")
+> --
+> 1.9.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
