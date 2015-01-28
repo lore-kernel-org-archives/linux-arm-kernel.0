@@ -1,60 +1,35 @@
 From: agross@codeaurora.org (Andy Gross)
-Date: Wed, 28 Jan 2015 11:26:21 -0600
+Date: Wed, 28 Jan 2015 11:27:27 -0600
 Subject: [PATCH 1/6] soc: qcom: gsbi: Add support for ADM CRCI muxing
-In-Reply-To: <20150128031149.GM11960@sonymobile.com>
+In-Reply-To: <54C8A66E.3070306@mm-sol.com>
 References: <1422396644-21714-1-git-send-email-agross@codeaurora.org>
  <1422396644-21714-2-git-send-email-agross@codeaurora.org>
- <20150128031149.GM11960@sonymobile.com>
-Message-ID: <20150128172621.GA17315@qualcomm.com>
+ <54C8A66E.3070306@mm-sol.com>
+Message-ID: <20150128172727.GB17315@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 27, 2015 at 07:11:50PM -0800, Bjorn Andersson wrote:
-> On Tue 27 Jan 14:10 PST 2015, Andy Gross wrote:
+On Wed, Jan 28, 2015 at 11:05:50AM +0200, Stanimir Varbanov wrote:
+> <snip>
 > 
-> This solution looks good, just some style things.
+> > diff --git a/drivers/soc/qcom/Kconfig b/drivers/soc/qcom/Kconfig
+> > index 7bd2c94..32f20be 100644
+> > --- a/drivers/soc/qcom/Kconfig
+> > +++ b/drivers/soc/qcom/Kconfig
+> > @@ -4,6 +4,7 @@
+> >  config QCOM_GSBI
+> >          tristate "QCOM General Serial Bus Interface"
+> >          depends on ARCH_QCOM
+> > +	select MFD_SYSCON
 > 
-> > diff --git a/drivers/soc/qcom/qcom_gsbi.c b/drivers/soc/qcom/qcom_gsbi.c
-> [..]
-> > +#define MAX_GSBI		12
-> > +
-> > +#define TCSR_ADM_CRCI_BASE	0x70
-> > +
-> > +struct crci_config {
-> > +	u32 num_rows;
-> > +	const u32 *array;
-> 
-> Making this:
->  const u32 (*array)[MAX_GSBI];
+> Wrong indentation? In fact the original Kconfig entry has spaces instead
+> of tabs, could you prepare a cleanup patch for this.
 
-ok, i'll switch to do this instead and change the usage down below.
+yeah I'll switch to spaces since the Kconfig is using spaces.
 
-<snip>
-
-> > +			else
-> > +				val = 0;
-> > +
-> > +			regmap_update_bits(gsbi->tcsr,
-> > +				TCSR_ADM_CRCI_BASE + 0x4*i,
-> > +				config->array[i*MAX_GSBI + gsbi_num - 1], val);
-> 
-> To me this would be cleaner:
-> 
-> mask = config->array[i][gsbi_num - 1];
-> if (gsbi->mode == GSBI_PRO_SPI)
-> 	regmap_update_bits(gsbi->tcsr, TCSR_ADM_CRCI_BASE + i * 4, mask, mask);
-> else
-> 	regmap_update_bits(gsbi->tcsr, TCSR_ADM_CRCI_BASE + i * 4, mask, 0);
-
-i had considered doing something similar.  It does make it cleaner, so I'll do
-this.
-
-> > +		}
-> > +
-> There should be an extra set of {} around the if statment body.
-
-done
-
+> >          help
+> >            Say y here to enable GSBI support.  The GSBI provides control
+> >            functions for connecting the underlying serial UART, SPI, and I2C
 
 -- 
 Qualcomm Innovation Center, Inc.
