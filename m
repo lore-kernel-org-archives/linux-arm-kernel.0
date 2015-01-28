@@ -1,26 +1,68 @@
-From: corbet@lwn.net (Jonathan Corbet)
-Date: Wed, 28 Jan 2015 14:58:43 -0700
-Subject: [PATCH 7/7] [media] marvell-ccic needs VIDEOBUF2_DMA_SG
-In-Reply-To: <1422479867-3370921-8-git-send-email-arnd@arndb.de>
-References: <1422479867-3370921-1-git-send-email-arnd@arndb.de>
- <1422479867-3370921-8-git-send-email-arnd@arndb.de>
-Message-ID: <20150128145843.16683733@lwn.net>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 28 Jan 2015 22:00:04 +0000
+Subject: [PATCH] ARM: teach __asmeq that r12 and ip are the same register
+In-Reply-To: <alpine.LFD.2.11.1501281636170.1322@knanqh.ubzr>
+References: <1422480618-25371-1-git-send-email-ard.biesheuvel@linaro.org>
+ <alpine.LFD.2.11.1501281636170.1322@knanqh.ubzr>
+Message-ID: <CAKv+Gu_zXwLdREs1NogW4GaoYiXQz-d4HqJ6KsEPV0q-gPrVTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 28 Jan 2015 22:17:47 +0100
-Arnd Bergmann <arnd@arndb.de> wrote:
+On 28 January 2015 at 21:46, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Wed, 28 Jan 2015, Ard Biesheuvel wrote:
+>
+>> The __asmeq macro is used inside inline asm statements to ensure that
+>> register asm variables that explicitly specify a register are mapped
+>> correctly onto those registers when used in inline asm input and output
+>> constraints. However, the string based matching fails to take into account
+>> that 'ip' may also be referred to as 'r12', (e.g., by clang), causing false
+>> negatives.
+>>
+>> Fix this by making __asmeq consider the ("ip","r12") and ("r12","ip")
+>> cases specifically.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>
+> gcc is likely to do the same substitution with r10 ("sl") and r11
+> ("fp").  Might as well add them right away for completeness.
+>
 
-> The vb2_dma_sg_memops pointer is only valid if VIDEOBUF2_DMA_SG is
-> set, so we should select that to avoid this build error:
-> 
-> drivers/built-in.o: In function `mcam_v4l_open':
-> :(.text+0x388d00): undefined reference to `vb2_dma_sg_memops'
+I just checked with my 4.8 gcc toolchain: r11 indeed gets emitted as
+fp when used in inline asm, but r10 is just r10.
+So I should update the patch to include fp as well.
 
-I acked this one the last time it came around (I forget from who).  I
-still don't know how to create a .config that exposes the problem, but
-others have clearly succeeded in doing it.
+> Then, does clang call sp, lr, pc as r13, r14 and r15? I guess not as
+> this is probably against the latest ARM assembly conventions.
+>
 
-Acked-by: Jonathan Corbet <corbet@lwn.net>
+@Behan, could you answer this one?
 
-jon
+>> ---
+>> Even though clang shouldn't be susceptible to the same bug, there is still
+>> value in retaining these assertions there, so instead of just turning
+>> __asmeq into a nop if __clang__ is defined, let's make it work correctly.
+>>
+>>  arch/arm/include/asm/compiler.h | 5 ++++-
+>>  1 file changed, 4 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/include/asm/compiler.h b/arch/arm/include/asm/compiler.h
+>> index 8155db2f7fa1..c3a316a59710 100644
+>> --- a/arch/arm/include/asm/compiler.h
+>> +++ b/arch/arm/include/asm/compiler.h
+>> @@ -8,8 +8,11 @@
+>>   * This string is meant to be concatenated with the inline asm string and
+>>   * will cause compilation to stop on mismatch.
+>>   * (for details, see gcc PR 15089)
+>> + * For compatibility with clang, we have to explicitly take the equivalence
+>> + * of 'r12' and 'ip into account as well.
+>>   */
+>> -#define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
+>> +#define __asmeq(x, y)  ".ifnc " x "," y " ; .ifnc " x y ",ipr12 ; " \
+>> +     ".ifnc " x y ",r12ip ; .err ; .endif ; .endif ; .endif\n\t"
+>>
+>>
+>>  #endif /* __ASM_ARM_COMPILER_H */
+>> --
+>> 1.8.3.2
+>>
+>>
