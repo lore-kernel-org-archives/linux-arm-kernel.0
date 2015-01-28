@@ -1,41 +1,32 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Wed, 28 Jan 2015 17:24:18 +0800
-Subject: [PATCH 1/7] pinctrl: mediatek: emulate GPIO interrupt on
- both-edges
-In-Reply-To: <CACRpkdbncsDJ3pP0dETpho5+j+OVuaYr=YTsH8pAs7vuT_9OLw@mail.gmail.com>
-References: <1422339332-27498-1-git-send-email-chaotian.jing@mediatek.com>
- <1422339332-27498-2-git-send-email-chaotian.jing@mediatek.com>
- <CACRpkdbncsDJ3pP0dETpho5+j+OVuaYr=YTsH8pAs7vuT_9OLw@mail.gmail.com>
-Message-ID: <1422437058.32212.38.camel@mtksdaap41>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Wed, 28 Jan 2015 17:27:54 +0800
+Subject: [PATCH 0/2] Add Mediatek RTC driver 
+Message-ID: <1422437276-41334-1-git-send-email-eddie.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-01-27 at 15:21 +0100, Linus Walleij wrote:
-> On Tue, Jan 27, 2015 at 7:15 AM, Chaotian Jing
-> <chaotian.jing@mediatek.com> wrote:
-> 
-> > From: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> >
-> > MTK EINT does not support generating interrupt on both edges.
-> > Emulate this by changing edge polarity while enable irq,
-> > set types and interrupt handling. This follows an example of
-> > drivers/gpio/gpio-mxc.c.
-> >
-> > Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> 
-> Hongzhu, if you're fine with this patch can you ACK it as maintainer
-> of the pinctrl driver so I can merge it immediately on top of your
-> drivern whenever we consider it finished (and if it applies still...)
+RTC is one submodule of Mediatek MT6397 PMIC chip[1]. This series 
+support RTC driver that work with Mediatek SoC like MT8135, MT8173.
+It implements second counter and also provide alarm function.
 
-Hi Linus,
+This series base on 3.19-rc1, and Sascha's PMIC mfd patch[1]. Test ok 
+on MT8135 platform.
 
-Thanks for reviewing.
-Please note this patch depends on mt8173 pinctrl driver patch[1], and
-modify files introduced in that patch. So this patch should be merged
-after that series.
+[1] https://lkml.org/lkml/2015/1/23/325
 
-Joe.C
+Eddie Huang (1):
+  dt: bindings: Add Mediatek RTC driver binding document
 
-[1]
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/320066.html
+Tianping Fang (1):
+  rtc: mediatek: Add MT63xx RTC driver
+
+ .../bindings/rtc/mediatek,mt63xx-rtc.txt           |  18 ++
+ drivers/rtc/Kconfig                                |  10 +
+ drivers/rtc/Makefile                               |   1 +
+ drivers/rtc/rtc-mt6397.c                           | 352 +++++++++++++++++++++
+ 4 files changed, 381 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/rtc/mediatek,mt63xx-rtc.txt
+ create mode 100644 drivers/rtc/rtc-mt6397.c
+
+-- 
+1.8.1.1.dirty
