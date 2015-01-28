@@ -1,71 +1,31 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Jan 2015 21:01:39 +0100
-Subject: [PATCH 3/3] cpufreq: exynos: allow modular build
-In-Reply-To: <20150128172209.GF29600@developer.hsd1.ca.comcast.net>
-References: <1422451015-390439-1-git-send-email-arnd@arndb.de>
- <1422451015-390439-4-git-send-email-arnd@arndb.de>
- <20150128172209.GF29600@developer.hsd1.ca.comcast.net>
-Message-ID: <1799972.nQ2Axu0CEJ@wuerfel>
+Date: Wed, 28 Jan 2015 21:05:50 +0100
+Subject: [PATCH] leds: ipaq needs LEDS_CLASS
+Message-ID: <7354226.f7e3npkAlC@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 28 January 2015 13:22:11 Eduardo Valentin wrote:
-> >  
-> >  config ARM_EXYNOS5440_CPUFREQ
-> > -	bool "SAMSUNG EXYNOS5440"
-> > +	tristate "SAMSUNG EXYNOS5440"
-> >  	depends on SOC_EXYNOS5440
-> >  	depends on HAVE_CLK && OF
-> > +	depends on THERMAL
-> >  	select PM_OPP
-> >  	default y
-> >  	help
-> 
-> Reading the code briefly, looks like the intention is to separate soc
-> specific code into different files, but they all compose one single
-> driver. Translating into module, I believe it makes sense to build them
-> into a single module, instead of having all of them as separate module.
-> 
-> Meaning, only ARM_EXYNOS_CPUFREQ becomes tristate, all the remaining
-> continues bool. And we add the following Makefile change to your patch
+All other drivers have a dependency on this already, but this one
+does not, which can lead to a link error when LEDS_CLASS is not set.
 
-That was my initial thought as well, but the devil is in the details:
+drivers/built-in.o: In function `micro_leds_remove':
+:(.text+0x13d1bc): undefined reference to `led_classdev_unregister'
+drivers/built-in.o: In function `micro_leds_probe':
+:(.text+0x13d3d0): undefined reference to `led_classdev_register'
 
-> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> index 0f9a2c3..c3c3cf5 100644
-> --- a/drivers/cpufreq/Kconfig.arm
-> +++ b/drivers/cpufreq/Kconfig.arm
-> @@ -26,13 +26,19 @@ config ARM_VEXPRESS_SPC_CPUFREQ
->  
->  
->  config ARM_EXYNOS_CPUFREQ
-> -	bool
-> +	tristate "SAMSUNG EXYNOS CPUfreq Driver"
-> +	depends on THERMAL
-> +	default y
-> +	help
-> +	  This adds the CPUFreq driver for Samsung EXYNOS platforms
-> +
-> +	  If in doubt, say N.
+This patch adds the missing dependency.
 
-Now the option shows up on all systems that include Kconfig.arm,
-in particular non-exynos machines that might not even be able
-to build this.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-It's also enabled by default, but if you change the default to 'n',
-the entire drivers will be disabled for users with an existing
-configuration file.
-
-We could work around these issues by adding extra (silent) Kconfig
-symbols that automatically do the right thing, but that would not
-be any less ugly than my first patch.
-
-Another possible might be to change the drivers to use the normal
-probe ordering and move the module_platform_driver() statement
-into the individual drivers, so that e.g. exynos4210_cpufreq_init()
-gets turned into exynos4210_cpufreq_probe() and calls the generic
-exynos_cpufreq_probe() function. This would let us express the
-dependencies more naturally and just export one symbol from the
-main module.
-
-	Arnd
+diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
+index 95029dfd311a..927bb4491e1c 100644
+--- a/drivers/leds/Kconfig
++++ b/drivers/leds/Kconfig
+@@ -144,6 +144,7 @@ config LEDS_SUNFIRE
+ 
+ config LEDS_IPAQ_MICRO
+ 	tristate "LED Support for the Compaq iPAQ h3xxx"
++	depends on LEDS_CLASS
+ 	depends on MFD_IPAQ_MICRO
+ 	help
+ 	  Choose this option if you want to use the notification LED on
