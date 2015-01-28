@@ -1,46 +1,54 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Jan 2015 20:48:13 +0100
-Subject: [PATCH 06/15] ARM: disable UACCESS_WITH_MEMCPY and Kprobes for ARMv3
-In-Reply-To: <1422474502-3097078-1-git-send-email-arnd@arndb.de>
-References: <1422474502-3097078-1-git-send-email-arnd@arndb.de>
-Message-ID: <1422474502-3097078-7-git-send-email-arnd@arndb.de>
+Date: Wed, 28 Jan 2015 20:48:07 +0100
+Subject: [PATCH 00/15] ARM: simple randconfig fixes
+Message-ID: <1422474502-3097078-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We cannot currently build a kernel with either of these
-options when gcc thinks it is building for ARMv3. Just
-disabling them helps us build more random configurations.
+Hi Russell,
 
-Note that we don't actually support ARMv3 at all any more,
-but when building a kernel for RiscPC with a StrongARM
-CPU, we have to pretend to run on ARMv3 anyway.
+I've sorted through my 300-patch series for randconfig and found
+a number of patches that look basically ok, please review if you
+find the time.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/Kconfig | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Most of them simply add Kconfig dependencies to prevent configurations
+that are know to be broken, but others are more subtle. I have more
+patches that are not included here and that I might get back to at
+a later point.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index b03c6d8dd80b..b9b68b467584 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -55,7 +55,7 @@ config ARM
- 	select HAVE_KERNEL_LZMA
- 	select HAVE_KERNEL_LZO
- 	select HAVE_KERNEL_XZ
--	select HAVE_KPROBES if !XIP_KERNEL && !CPU_ENDIAN_BE32
-+	select HAVE_KPROBES if !XIP_KERNEL && !CPU_ENDIAN_BE32 && !CPU_32v3
- 	select HAVE_KRETPROBES if (HAVE_KPROBES)
- 	select HAVE_MEMBLOCK
- 	select HAVE_MOD_ARCH_SPECIFIC if ARM_UNWIND
-@@ -1726,7 +1726,7 @@ config ALIGNMENT_TRAP
- 
- config UACCESS_WITH_MEMCPY
- 	bool "Use kernel mem{cpy,set}() for {copy_to,clear}_user()"
--	depends on MMU
-+	depends on MMU && !CPU_32v3
- 	default y if CPU_FEROCEON
- 	help
- 	  Implement faster copy_to_user and clear_user methods for CPU
+Those are either things you rejected already, or that I would do
+differently, or that fix problems I cannot currently reproduce.
+
+	Arnd
+
+Arnd Bergmann (15):
+  ARM: always select IRQ_WORK on SMP
+  ARM: KGDB does not build on BE32
+  ARM: disable branch profiling in uncompressor
+  ARM: fix LPAE build without ARM_PATCH_PHYS_VIRT
+  ARM: no longer expose CPU_ARM7TDMI/CPU_ARM9TDMI
+  ARM: disable UACCESS_WITH_MEMCPY and Kprobes for ARMv3
+  ARM: disable some options on ARMv7-M
+  ARM: add missing arch_irqs_disabled function
+  ARM: disable CONFIG_PTDUMP on !MMU
+  ARM: call printk conditonally on armv7-m
+  ARM: HAVE_VIRT_CPU_ACCOUNTING_GEN requires cmpxchg64
+  ARM: bpf: fix NOMMU build
+  ARM: code patching only works on MMU
+  ARM: do not use optimized do_div for ARMv3
+  ARM: don't discard exit sections for spinlock debugging
+
+ arch/arm/Kconfig                  | 16 +++++++++-------
+ arch/arm/Kconfig.debug            |  1 +
+ arch/arm/boot/compressed/Makefile |  2 ++
+ arch/arm/include/asm/cacheflush.h |  7 +++++++
+ arch/arm/include/asm/div64.h      |  2 +-
+ arch/arm/include/asm/irqflags.h   |  5 +++++
+ arch/arm/kernel/entry-v7m.S       |  2 ++
+ arch/arm/kernel/vmlinux.lds.S     |  3 +--
+ arch/arm/mm/Kconfig               |  4 ++--
+ arch/arm/mm/mmu.c                 |  2 ++
+ 10 files changed, 32 insertions(+), 12 deletions(-)
+
 -- 
 2.1.0.rc2
