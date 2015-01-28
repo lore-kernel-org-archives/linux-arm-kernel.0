@@ -1,46 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Jan 2015 22:30:01 +0100
-Subject: [PATCH] ASoC: davinci: fix DM365_EVM codec selection
-Message-ID: <12284641.mhX5PHEsR2@wuerfel>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 28 Jan 2015 21:30:18 +0000
+Subject: [PATCH] ARM: teach __asmeq that r12 and ip are the same register
+Message-ID: <1422480618-25371-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An earlier bug fix of mine made the SND_DM365_VOICE_CODEC symbol
-tristate to avoid creating an undefined reference from the
-davinci-vcif.c driver to the davinci_soc_platform_register
-function that may be in a module.
+The __asmeq macro is used inside inline asm statements to ensure that
+register asm variables that explicitly specify a register are mapped
+correctly onto those registers when used in inline asm input and output
+constraints. However, the string based matching fails to take into account
+that 'ip' may also be referred to as 'r12', (e.g., by clang), causing false
+negatives.
 
-However, this may now lead to a different error on randconfig
-kernels:
+Fix this by making __asmeq consider the ("ip","r12") and ("r12","ip")
+cases specifically.
 
-"warning: SND_DM365_VOICE_CODEC creates inconsistent choice state"
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+Even though clang shouldn't be susceptible to the same bug, there is still
+value in retaining these assertions there, so instead of just turning
+__asmeq into a nop if __clang__ is defined, let's make it work correctly.
 
-This happens because we now have a choice statement with
-one bool and one tristate option, and the latter might not
-support being set to 'y' because of dependencies.
+ arch/arm/include/asm/compiler.h | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-This new change turns the other option into 'tristate' as well,
-which avoids the problem.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 19926c6de0c3 ("ASoC: davinci: vcif must be a module if SND_DAVINCI_SOC is")
-
-diff --git a/sound/soc/davinci/Kconfig b/sound/soc/davinci/Kconfig
-index 8e948c63f3d9..2b81ca418d2a 100644
---- a/sound/soc/davinci/Kconfig
-+++ b/sound/soc/davinci/Kconfig
-@@ -58,13 +58,12 @@ choice
- 	depends on MACH_DAVINCI_DM365_EVM
+diff --git a/arch/arm/include/asm/compiler.h b/arch/arm/include/asm/compiler.h
+index 8155db2f7fa1..c3a316a59710 100644
+--- a/arch/arm/include/asm/compiler.h
++++ b/arch/arm/include/asm/compiler.h
+@@ -8,8 +8,11 @@
+  * This string is meant to be concatenated with the inline asm string and
+  * will cause compilation to stop on mismatch.
+  * (for details, see gcc PR 15089)
++ * For compatibility with clang, we have to explicitly take the equivalence
++ * of 'r12' and 'ip into account as well.
+  */
+-#define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
++#define __asmeq(x, y)  ".ifnc " x "," y " ; .ifnc " x y ",ipr12 ; " \
++	".ifnc " x y ",r12ip ; .err ; .endif ; .endif ; .endif\n\t"
  
- config SND_DM365_AIC3X_CODEC
--	bool "Audio Codec - AIC3101"
-+	tristate "Audio Codec - AIC3101"
- 	help
- 	  Say Y if you want to add support for AIC3101 audio codec
  
- config SND_DM365_VOICE_CODEC
- 	tristate "Voice Codec - CQ93VC"
--	depends on SND_DAVINCI_SOC
- 	select MFD_DAVINCI_VOICECODEC
- 	select SND_DAVINCI_SOC_VCIF
- 	select SND_SOC_CQ0093VC
+ #endif /* __ASM_ARM_COMPILER_H */
+-- 
+1.8.3.2
