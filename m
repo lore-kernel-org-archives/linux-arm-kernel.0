@@ -1,37 +1,54 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 28 Jan 2015 13:38:01 -0800
-Subject: [PATCH 1/2] arm: qcom_defconfig: Enable lpass clock driver
-Message-ID: <1422481082-4821-1-git-send-email-sboyd@codeaurora.org>
+Date: Wed, 28 Jan 2015 13:38:02 -0800
+Subject: [PATCH 2/2] ARM: qcom: Update defconfig
+In-Reply-To: <1422481082-4821-1-git-send-email-sboyd@codeaurora.org>
+References: <1422481082-4821-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1422481082-4821-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajendra Nayak <rnayak@codeaurora.org>
+After removing ARCH_REQUIRE_GPIOLIB we need to select
+CONFIG_GPIOLIB to keep building the pinctrl drivers. Make the
+defconfig smaller too by running savedefconfig.
 
-Enable the LPASS clock controller driver so that audio drivers
-can enable, disable, and set rates on their clocks.
-
-Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
-Signed-off-by: Kumar Gala <galak@codeaurora.org>
-[sboyd at codeaurora.org: Enable 8960 driver too]
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/configs/qcom_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/configs/qcom_defconfig | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
-index 8c7da3319d82..881d18b9b4de 100644
+index 881d18b9b4de..2de999338df0 100644
 --- a/arch/arm/configs/qcom_defconfig
 +++ b/arch/arm/configs/qcom_defconfig
-@@ -138,7 +138,9 @@ CONFIG_QCOM_GSBI=y
+@@ -97,9 +97,9 @@ CONFIG_PINCTRL_APQ8084=y
+ CONFIG_PINCTRL_IPQ8064=y
+ CONFIG_PINCTRL_MSM8960=y
+ CONFIG_PINCTRL_MSM8X74=y
++CONFIG_GPIOLIB=y
+ CONFIG_DEBUG_GPIO=y
+ CONFIG_GPIO_SYSFS=y
+-CONFIG_POWER_SUPPLY=y
+ CONFIG_POWER_RESET=y
+ CONFIG_POWER_RESET_MSM=y
+ CONFIG_THERMAL=y
+@@ -134,16 +134,15 @@ CONFIG_RTC_CLASS=y
+ CONFIG_DMADEVICES=y
+ CONFIG_QCOM_BAM_DMA=y
+ CONFIG_STAGING=y
+-CONFIG_QCOM_GSBI=y
  CONFIG_COMMON_CLK_QCOM=y
  CONFIG_APQ_MMCC_8084=y
- CONFIG_IPQ_GCC_806X=y
-+CONFIG_IPQ_LCC_806X=y
+-CONFIG_IPQ_GCC_806X=y
+ CONFIG_IPQ_LCC_806X=y
  CONFIG_MSM_GCC_8660=y
-+CONFIG_MSM_LCC_8960=y
+ CONFIG_MSM_LCC_8960=y
  CONFIG_MSM_MMCC_8960=y
  CONFIG_MSM_MMCC_8974=y
  CONFIG_MSM_IOMMU=y
++CONFIG_QCOM_GSBI=y
+ CONFIG_PHY_QCOM_APQ8064_SATA=y
+ CONFIG_PHY_QCOM_IPQ806X_SATA=y
+ CONFIG_EXT2_FS=y
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
