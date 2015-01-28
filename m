@@ -1,36 +1,48 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 28 Jan 2015 18:14:53 +0000
-Subject: [Linaro-acpi] [PATCH v7 04/17] ARM64 / ACPI: Introduce
- early_param for "acpi" and pass acpi=force to enable ACPI
-In-Reply-To: <CAOZdJXXe+29rux1L3QYBX0yHLy3kdi+ZJrXVd=XfgYN=R6DtKA@mail.gmail.com>
-References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
- <1421247905-3749-5-git-send-email-hanjun.guo@linaro.org>
- <CAOZdJXU2bFR1T4ZnGavvnrUXAp5e=vNt9g6WKX46H8qs1wz-TQ@mail.gmail.com>
- <CAOZdJXXe+29rux1L3QYBX0yHLy3kdi+ZJrXVd=XfgYN=R6DtKA@mail.gmail.com>
-Message-ID: <20150128181453.GG31752@e104818-lin.cambridge.arm.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 28 Jan 2015 19:15:47 +0100
+Subject: [PATCH v2 0/6] Add multiple GPIO and external clock to MMC
+ pwrseq_simple
+Message-ID: <1422468953-7594-1-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 28, 2015 at 06:08:24PM +0000, Timur Tabi wrote:
-> On Wed, Jan 28, 2015 at 11:58 AM, Timur Tabi <timur@codeaurora.org> wrote:
-> > What is the reason to assume that DT is preferred over ACPI?  I would
-> > have thought that if ACPI is present, then it means we're on an ARM64
-> > server platform, and therefore it should be used.  It seems silly to
-> > require acpi=force on every ARM64 server platform.
-> 
-> So it looks like there's a whole conversation about this already in
-> this thread that I didn't notice.  However, reading through all of it,
-> I still don't understand sure why the presence of ACPI tables is
-> insufficient to enable ACPI.  
+Hello Ulf,
 
-Because ACPI on arm64 is still experimental, no matter how many people
-claim that it is production ready in their private setups.
+Many WLAN chips attached to an SDIO interface needs more than one GPIO
+for their reset sequence and also an external clock to be operational.
 
-> In what situation would we want to ignore ACPI tables that are
-> present?
+Since this is very common, this series extend the simple MMC power sequence
+to support more than one reset GPIO and also an optional external clock.
 
-When DT tables are also present (and for the first platforms, that's
-highly recommended, though not easily enforceable at the kernel level).
+This is the second version of the series that addressed issues pointed out
+by Arend van Spriel and Srinivas Kandagatla.
 
--- 
-Catalin
+The series depend on v4 "mmc: core: Add support for MMC power sequences":
+
+http://comments.gmane.org/gmane.linux.kernel.mmc/30665
+
+Javier Martinez Canillas (6):
+  mmc: pwrseq: Document that simple sequence support more than one GPIO
+  mmc: pwrseq_simple: Extend to support more pins
+  mmc: pwrseq: Document optional clock for the simple power sequence
+  mmc: pwrseq_simple: Add optional reference clock support
+  ARM: dts: exynos5250-snow: Enable wifi power-on
+  ARM: dts: exynos5250-snow: Add cap-sdio-irq to wifi mmc node
+
+ .../devicetree/bindings/mmc/mmc-pwrseq-simple.txt  | 11 ++-
+ arch/arm/boot/dts/exynos5250-snow.dts              | 26 ++++++-
+ drivers/mmc/core/pwrseq_simple.c                   | 85 ++++++++++++++++++----
+ 3 files changed, 103 insertions(+), 19 deletions(-)
+
+Patch #1 extends the simple MMC power sequence DT binding to support more
+than one GPIO and patch #2 adds the actual implementation.
+
+In the same way, patch #3 and #4 extend the simple MMC power sequence DT
+binding and pwrseq_simple driver to support an optional external clock.
+
+Finally as an example, patch #5 and patch #6 adds support for the wifi
+chip in the Exynos5250 Snow that needs all these resources. These two
+patches were added to the series only for completeness.
+
+Best regards,
+Javier
