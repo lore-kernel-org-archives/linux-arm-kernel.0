@@ -1,49 +1,52 @@
-From: stripathi@apm.com (Suman Tripathi)
-Date: Wed, 28 Jan 2015 09:54:21 +0530
-Subject: [PATCH] ahci_xgene: Fix the dma state machine lockup for the
- ATA_CMD_SMART PIO mode command.
-In-Reply-To: <20150127181950.GE12314@htj.dyndns.org>
-References: <1422381371-11361-1-git-send-email-stripathi@apm.com>
- <1422381371-11361-2-git-send-email-stripathi@apm.com>
- <20150127181950.GE12314@htj.dyndns.org>
-Message-ID: <CAOHikRBBG2p7kBn=bwP9rw0RYecvjNqz-zAiHeKT4+TyP8sCoA@mail.gmail.com>
+From: behanw@converseincode.com (Behan Webster)
+Date: Tue, 27 Jan 2015 21:18:26 -0800
+Subject: [PATCH] bcm: address clang inline asm incompatibility
+Message-ID: <1422422306-27473-1-git-send-email-behanw@converseincode.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 27, 2015 at 11:26:11PM +0530, Suman Tripathi wrote:
-> This patch addresses the issue with ATA_CMD_SMART pio mode
-> command for enumeration and device detection with ATA devices.It is the
-> same issue as in patch
->
-> www.spinics.net/lists/linux-ide/msg49092.html
+From: Alex Elder <elder@linaro.org>
 
-The link is broken.  Can you please include at least a brief
-explanation of the problem and preferably link to something more
-permanant (commit ID, http://lkml.kernel.org/g/MSG_ID)?
-Ok some problem might be there, But the link is opening. Sure I will
-add the explanation rather than providing a link in the next version
+My GCC-based build environment likes to call register r12 by the
+name "ip" in inline asm.  Behan Webster informed me that his Clang-
+based build environment likes "r12" instead.
 
+Try to make them both happy.
 
-On Tue, Jan 27, 2015 at 11:49 PM, Tejun Heo <tj@kernel.org> wrote:
-> On Tue, Jan 27, 2015 at 11:26:11PM +0530, Suman Tripathi wrote:
->> This patch addresses the issue with ATA_CMD_SMART pio mode
->> command for enumeration and device detection with ATA devices.It is the
->> same issue as in patch
->>
->> www.spinics.net/lists/linux-ide/msg49092.html
->
-> The link is broken.  Can you please include at least a brief
-> explanation of the problem and preferably link to something more
-> permanant (commit ID, http://lkml.kernel.org/g/MSG_ID)?
->
-> Thanks.
->
-> --
-> tejun
+Signed-off-by: Alex Elder <elder@linaro.org>
+Signed-off-by: Behan Webster <behanw@converseincode.com>
+---
+ arch/arm/mach-bcm/bcm_kona_smc.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
-
-
+diff --git a/arch/arm/mach-bcm/bcm_kona_smc.c b/arch/arm/mach-bcm/bcm_kona_smc.c
+index a55a7ec..3937bd5 100644
+--- a/arch/arm/mach-bcm/bcm_kona_smc.c
++++ b/arch/arm/mach-bcm/bcm_kona_smc.c
+@@ -106,9 +106,14 @@ int __init bcm_kona_smc_init(void)
+  * request result appropriately.  This result value is found in r0
+  * when the "smc" request completes.
+  */
++#ifdef __clang__
++#define R12	"r12"
++#else  /* !__clang__ */
++#define R12	"ip"	/* gcc calls r12 "ip" */
++#endif /* !__clang__ */
+ static int bcm_kona_do_smc(u32 service_id, u32 buffer_phys)
+ {
+-	register u32 ip asm("ip");	/* Also called r12 */
++	register u32 ip asm(R12);	/* Also called r12 */
+ 	register u32 r0 asm("r0");
+ 	register u32 r4 asm("r4");
+ 	register u32 r5 asm("r5");
+@@ -120,7 +125,7 @@ static int bcm_kona_do_smc(u32 service_id, u32 buffer_phys)
+ 
+ 	asm volatile (
+ 		/* Make sure we got the registers we want */
+-		__asmeq("%0", "ip")
++		__asmeq("%0", R12)
+ 		__asmeq("%1", "r0")
+ 		__asmeq("%2", "r4")
+ 		__asmeq("%3", "r5")
 -- 
-Thanks,
-with regards,
-Suman Tripathi
+1.9.1
