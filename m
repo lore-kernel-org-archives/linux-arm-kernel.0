@@ -1,45 +1,60 @@
-From: zhang.lyra@gmail.com (Lyra Zhang)
-Date: Wed, 28 Jan 2015 18:46:53 +0800
-Subject: [PATCH v9 2/2] tty/serial: Add Spreadtrum sc9836-uart driver
- support
-In-Reply-To: <20150128095401.GC14175@tarshish>
-References: <1422413261-17184-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1422413261-17184-3-git-send-email-chunyan.zhang@spreadtrum.com>
- <20150128061250.GQ2555@sapphire.tkos.co.il>
- <CAAfSe-v4FGpHL3N3utiDwcoc7qus1XZZszuXBqB6LeE1frAfeA@mail.gmail.com>
- <20150128095401.GC14175@tarshish>
-Message-ID: <CAAfSe-t-to3=KrUH2cWQXy710H8Lr3Nd7Za1yoaxio4i70c51w@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 28 Jan 2015 12:48:52 +0200
+Subject: [PATCH v3 3/4] ARM: digicolor: add minimal device tree description
+In-Reply-To: <20150127230141.GA11263@quad.lixom.net>
+References: <cover.1421219953.git.baruch@tkos.co.il>
+ <474d0849bb30ab4ec323fa4c1bc67b30b31d3884.1421219953.git.baruch@tkos.co.il>
+ <20150127230141.GA11263@quad.lixom.net>
+Message-ID: <20150128104852.GE14175@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 28, 2015 at 5:54 PM, Baruch Siach <baruch@tkos.co.il> wrote:
-> Hi Lyra Zhang,
->
-> On Wed, Jan 28, 2015 at 04:46:33PM +0800, Lyra Zhang wrote:
->> On Wed, Jan 28, 2015 at 2:12 PM, Baruch Siach <baruch@tkos.co.il> wrote:
->> > On Wed, Jan 28, 2015 at 10:47:41AM +0800, Chunyan Zhang wrote:
->> >> +             if (uart_handle_sysrq_char(port, ch))
->> >> +                     continue;
->> >
->> > My comment[1] on a previous version of this patch still stands.
->> > uart_handle_sysrq_char is a NOP when SUPPORT_SYSRQ is not defined.
->>
->> yes, there are two definitions in serial_core.h, and it returns 0 when
->> SUPPORT_SYSRQ is not defined.
->> so, I think my code behavior does not hurt, right?
->
-> Right. I just wanted to point out that you can easily define SUPPORT_SYSRQ as
-> appropriate like many other serial drivers do to get sysrq support.
->
+Hi Olof,
 
-Ok, I got it. I'll add SUPPORT_SYSRQ definition, and send v10 to Greg.
+On Tue, Jan 27, 2015 at 03:01:41PM -0800, Olof Johansson wrote:
+> On Wed, Jan 14, 2015 at 10:40:32AM +0200, Baruch Siach wrote:
+> > cx92755.dtsi describes CX92755 on chip peripherals. conexant_equinox.dts
+> > describes the Equinox evaluation board for the CX92755 SoC.
+> > 
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> > ---
+> >  arch/arm/boot/dts/Makefile             |   1 +
+> >  arch/arm/boot/dts/conexant_equinox.dts |  74 +++++++++++++++++++++++
+> >  arch/arm/boot/dts/cx92755.dtsi         | 107 +++++++++++++++++++++++++++++++++
+> >  3 files changed, 182 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/conexant_equinox.dts
+> >  create mode 100644 arch/arm/boot/dts/cx92755.dtsi
+> > 
+> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> > index 91bd5bd62857..fbeb65eaddda 100644
+> > --- a/arch/arm/boot/dts/Makefile
+> > +++ b/arch/arm/boot/dts/Makefile
+> > @@ -75,6 +75,7 @@ dtb-$(CONFIG_ARCH_BRCMSTB) += \
+> >  	bcm7445-bcm97445svmb.dtb
+> >  dtb-$(CONFIG_ARCH_DAVINCI) += da850-enbw-cmc.dtb \
+> >  	da850-evm.dtb
+> > +dtb-$(CONFIG_ARCH_DIGICOLOR) += conexant_equinox.dtb
+> >  dtb-$(CONFIG_ARCH_EFM32) += efm32gg-dk3750.dtb
+> >  dtb-$(CONFIG_ARCH_EXYNOS) += exynos3250-monk.dtb \
+> >  	exynos3250-rinato.dtb \
+> > diff --git a/arch/arm/boot/dts/conexant_equinox.dts b/arch/arm/boot/dts/conexant_equinox.dts
+> > new file mode 100644
+> > index 000000000000..f33bf5635d47
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/conexant_equinox.dts
+> 
+> To segment the namespace a bit, we ask that you prefix your dts files with the
+> platform. What would be a suitable prefix here? conexant? digicolor?
 
-thanks,
-Chunyan
+I think we should use the actual SoC name, that is cx92755, just like the 
+.dtsi file is named. I'll resend this patch with the name change and a few 
+more incremental changes needed by the interrupt controller and timer drivers.
 
-> baruch
->
-> --
->      http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-> =}------------------------------------------------ooO--U--Ooo------------{=
->    - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Thanks,
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
