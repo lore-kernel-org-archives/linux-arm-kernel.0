@@ -1,45 +1,55 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 28 Jan 2015 21:30:18 +0000
-Subject: [PATCH] ARM: teach __asmeq that r12 and ip are the same register
-Message-ID: <1422480618-25371-1-git-send-email-ard.biesheuvel@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 28 Jan 2015 22:31:30 +0100
+Subject: [RFC] ASoC: rt5677: fix SPI dependency
+Message-ID: <19778554.1IDiTWklUc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The __asmeq macro is used inside inline asm statements to ensure that
-register asm variables that explicitly specify a register are mapped
-correctly onto those registers when used in inline asm input and output
-constraints. However, the string based matching fails to take into account
-that 'ip' may also be referred to as 'r12', (e.g., by clang), causing false
-negatives.
+The rt5677 codec has gained code that requires SPI to work correctly,
+but there is no provision in Kconfig to prevent the driver from
+being used when SPI is disabled or a loadable module, resulting
+in this build error:
 
-Fix this by making __asmeq consider the ("ip","r12") and ("r12","ip")
-cases specifically.
+sound/built-in.o: In function `rt5677_spi_write':
+:(.text+0xa7ba0): undefined reference to `spi_sync'
+sound/built-in.o: In function `rt5677_spi_driver_init':
+:(.init.text+0x253c): undefined reference to `spi_register_driver'
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-Even though clang shouldn't be susceptible to the same bug, there is still
-value in retaining these assertions there, so instead of just turning
-__asmeq into a nop if __clang__ is defined, let's make it work correctly.
+ERROR: "spi_sync" [sound/soc/codecs/snd-soc-rt5677-spi.ko] undefined!
+ERROR: "spi_register_driver" [sound/soc/codecs/snd-soc-rt5677-spi.ko] undefined!
 
- arch/arm/include/asm/compiler.h | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+This makes the SPI portion of the driver depend on the SPI subsystem,
+and disables the function that uses SPI for firmware download if SPI
+is disabled. The latter may not be the correct solution, but I could
+not come up with a better one.
 
-diff --git a/arch/arm/include/asm/compiler.h b/arch/arm/include/asm/compiler.h
-index 8155db2f7fa1..c3a316a59710 100644
---- a/arch/arm/include/asm/compiler.h
-+++ b/arch/arm/include/asm/compiler.h
-@@ -8,8 +8,11 @@
-  * This string is meant to be concatenated with the inline asm string and
-  * will cause compilation to stop on mismatch.
-  * (for details, see gcc PR 15089)
-+ * For compatibility with clang, we have to explicitly take the equivalence
-+ * of 'r12' and 'ip into account as well.
-  */
--#define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
-+#define __asmeq(x, y)  ".ifnc " x "," y " ; .ifnc " x y ",ipr12 ; " \
-+	".ifnc " x y ",r12ip ; .err ; .endif ; .endif ; .endif\n\t"
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: af48f1d08a54741 ("ASoC: rt5677: Support DSP function for VAD application")
+
+diff --git a/sound/soc/codecs/Kconfig b/sound/soc/codecs/Kconfig
+index 8349f982a586..ef2c70e77d91 100644
+--- a/sound/soc/codecs/Kconfig
++++ b/sound/soc/codecs/Kconfig
+@@ -525,7 +525,7 @@ config SND_SOC_RT5677
  
+ config SND_SOC_RT5677_SPI
+ 	tristate
+-	default SND_SOC_RT5677
++	default SND_SOC_RT5677 && SPI
  
- #endif /* __ASM_ARM_COMPILER_H */
--- 
-1.8.3.2
+ #Freescale sgtl5000 codec
+ config SND_SOC_SGTL5000
+diff --git a/sound/soc/codecs/rt5677.c b/sound/soc/codecs/rt5677.c
+index 26fc538f03b1..5d0bb8748dd1 100644
+--- a/sound/soc/codecs/rt5677.c
++++ b/sound/soc/codecs/rt5677.c
+@@ -702,6 +702,9 @@ static int rt5677_set_dsp_vad(struct snd_soc_codec *codec, bool on)
+ 	static bool activity;
+ 	int ret;
+ 
++	if (!IS_ENABLED(CONFIG_SND_SOC_RT5677_SPI))
++		return -ENXIO;
++
+ 	if (on && !activity) {
+ 		activity = true;
+ 
