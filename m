@@ -1,52 +1,46 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Jan 2015 20:48:20 +0100
-Subject: [PATCH 13/15] ARM: code patching only works on MMU
+Date: Wed, 28 Jan 2015 20:48:18 +0100
+Subject: [PATCH 11/15] ARM: HAVE_VIRT_CPU_ACCOUNTING_GEN requires cmpxchg64
 In-Reply-To: <1422474502-3097078-1-git-send-email-arnd@arndb.de>
 References: <1422474502-3097078-1-git-send-email-arnd@arndb.de>
-Message-ID: <1422474502-3097078-14-git-send-email-arnd@arndb.de>
+Message-ID: <1422474502-3097078-12-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no __set_fixmap implementation for NOMMU kernels, so
-we cannot link the kernel/patch.c file:
+The cpu time accounting code uses 64-bit nanosecond based
+cputime_t if HAVE_VIRT_CPU_ACCOUNTING_GEN is enabled, which
+in turn requires working cmpxchg64 support. Trying this
+on ARMv7M, ARMv5 and earlier, or OABI will result in a
+build error like
 
-arch/arm/kernel/built-in.o: In function `patch_map':
-:(.text+0x257e): undefined reference to `__set_fixmap'
-arch/arm/kernel/built-in.o: In function `__patch_text_real':
-:(.text+0x2618): undefined reference to `__set_fixmap'
-:(.text+0x262e): undefined reference to `__set_fixmap'
+  CC      kernel/sched/cputime.o
+/tmp/ccVoXzRS.s:127: Error: selected processor does not support Thumb mode `ldrexd r4,r5,[r3]'
+/tmp/ccVoXzRS.s:131: Error: selected processor does not support Thumb mode `strexd lr,r8,r9,[r3]'
+/tmp/ccVoXzRS.s:148: Error: selected processor does not support Thumb mode `ldrexd r6,r7,[r5]'
+/tmp/ccVoXzRS.s:152: Error: selected processor does not support Thumb mode `strexd r4,r0,r1,[r5]'
 
-To work around that, this adds dependencies for all features
-that rely on code patching.
+To work around this problem, make HAVE_VIRT_CPU_ACCOUNTING_GEN
+depend on the newer architectures and EABI support. There is
+very little use in this feature on older machines, so there
+should be no downsides.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/Kconfig | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 04af434c11b1..ed5beecbeb45 100644
+index 11cc5fa40ff7..04af434c11b1 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -29,8 +29,8 @@ config ARM
- 	select HARDIRQS_SW_RESEND
- 	select HAVE_ARCH_AUDITSYSCALL if (AEABI && !OABI_COMPAT)
- 	select HAVE_ARCH_BITREVERSE if (CPU_32v7M || CPU_32v7) && !CPU_32v6
--	select HAVE_ARCH_JUMP_LABEL if !XIP_KERNEL && !CPU_ENDIAN_BE32
--	select HAVE_ARCH_KGDB if !CPU_ENDIAN_BE32
-+	select HAVE_ARCH_JUMP_LABEL if !XIP_KERNEL && !CPU_ENDIAN_BE32 && MMU
-+	select HAVE_ARCH_KGDB if !CPU_ENDIAN_BE32 && MMU
- 	select HAVE_ARCH_SECCOMP_FILTER if (AEABI && !OABI_COMPAT)
- 	select HAVE_ARCH_TRACEHOOK
- 	select HAVE_BPF_JIT
-@@ -41,7 +41,7 @@ config ARM
- 	select HAVE_DMA_API_DEBUG
- 	select HAVE_DMA_ATTRS
- 	select HAVE_DMA_CONTIGUOUS if MMU
--	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL) && !CPU_ENDIAN_BE32
-+	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL) && !CPU_ENDIAN_BE32 && MMU
- 	select HAVE_EFFICIENT_UNALIGNED_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && MMU
- 	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
- 	select HAVE_FUNCTION_GRAPH_TRACER if (!THUMB2_KERNEL)
+@@ -68,7 +68,7 @@ config ARM
+ 	select HAVE_REGS_AND_STACK_ACCESS_API
+ 	select HAVE_SYSCALL_TRACEPOINTS
+ 	select HAVE_UID16
+-	select HAVE_VIRT_CPU_ACCOUNTING_GEN
++	select HAVE_VIRT_CPU_ACCOUNTING_GEN if AEABI && (CPU_V6K || CPU_V7)
+ 	select IRQ_FORCED_THREADING
+ 	select MODULES_USE_ELF_REL
+ 	select NO_BOOTMEM
 -- 
 2.1.0.rc2
