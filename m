@@ -1,46 +1,44 @@
 From: ricardo.ribalda@gmail.com (Ricardo Ribalda Delgado)
-Date: Wed, 28 Jan 2015 13:23:48 +0100
-Subject: [PATCH v2 09/15] spi/xilinx: Make spi_tx and spi_rx simmetric
+Date: Wed, 28 Jan 2015 13:23:53 +0100
+Subject: [PATCH v2 14/15] spi/xilinx: Check number of slaves range
 In-Reply-To: <1422447834-23116-1-git-send-email-ricardo.ribalda@gmail.com>
 References: <1422447834-23116-1-git-send-email-ricardo.ribalda@gmail.com>
-Message-ID: <1422447834-23116-10-git-send-email-ricardo.ribalda@gmail.com>
+Message-ID: <1422447834-23116-15-git-send-email-ricardo.ribalda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-spi_rx handles the case where the buffer is null. Nevertheless spi_tx
-did not handle it, and was handled by the caller function.
+The core only supports up to 32 slaves, and the chipselect function
+expects the same.
 
 Signed-off-by: Ricardo Ribalda Delgado <ricardo.ribalda@gmail.com>
 ---
- drivers/spi/spi-xilinx.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+ drivers/spi/spi-xilinx.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
 diff --git a/drivers/spi/spi-xilinx.c b/drivers/spi/spi-xilinx.c
-index ac94e54..6ce1066 100644
+index 026f4c5..134d8cd 100644
 --- a/drivers/spi/spi-xilinx.c
 +++ b/drivers/spi/spi-xilinx.c
-@@ -116,6 +116,10 @@ static unsigned int xspi_read32_be(void __iomem *addr)
+@@ -22,6 +22,8 @@
+ #include <linux/spi/xilinx_spi.h>
+ #include <linux/io.h>
  
- static void xilinx_spi_tx(struct xilinx_spi *xspi)
- {
-+	if (!xspi->tx_ptr) {
-+		xspi->write_fn(0, xspi->regs + XSPI_TXD_OFFSET);
-+		return;
++#define MAX_CS			32
++
+ #define XILINX_SPI_NAME "xilinx_spi"
+ 
+ /* Register definitions as per "OPB Serial Peripheral Interface (SPI) (v1.00e)
+@@ -340,6 +342,11 @@ static int xilinx_spi_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
+ 
++	if (num_cs > MAX_CS) {
++		dev_err(&pdev->dev, "Invalid number of spi slaves\n");
++		return -EINVAL;
 +	}
- 	xspi->write_fn(*(u32 *)(xspi->tx_ptr), xspi->regs + XSPI_TXD_OFFSET);
- 	xspi->tx_ptr += xspi->bits_per_word / 8;
- }
-@@ -230,10 +234,7 @@ static void xilinx_spi_fill_tx_fifo(struct xilinx_spi *xspi, int n_words)
- 	xspi->remaining_bytes -= n_words * xspi->bits_per_word / 8;
- 
- 	while (n_words--)
--		if (xspi->tx_ptr)
--			xilinx_spi_tx(xspi);
--		else
--			xspi->write_fn(0, xspi->regs + XSPI_TXD_OFFSET);
-+		xilinx_spi_tx(xspi);
- 	return;
- }
- 
++
+ 	master = spi_alloc_master(&pdev->dev, sizeof(struct xilinx_spi));
+ 	if (!master)
+ 		return -ENODEV;
 -- 
 2.1.4
