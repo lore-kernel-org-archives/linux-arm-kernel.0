@@ -1,29 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Jan 2015 16:10:28 +0100
-Subject: [PATCH] eventfs: avoid unused variable warning
-Message-ID: <88925492.FKoyo2trpD@wuerfel>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 28 Jan 2015 09:17:12 -0600
+Subject: [PATCH] ARM: cns3xxx: fix typo in PCI config accessor
+In-Reply-To: <2000255.rnmr9HfSOg@wuerfel>
+References: <2000255.rnmr9HfSOg@wuerfel>
+Message-ID: <20150128151712.GA12050@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An optimization patch from Chris Mason causes build warnings about
-an unused variable.
+On Wed, Jan 28, 2015 at 02:53:07PM +0100, Arnd Bergmann wrote:
+> The recent patch to convert the cns3xxx PCI code added an
+> extraneous opening bracket, which makes the build fail,
+> so remove this.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 10e2c5540d48 ("ARM: cns3xxx: Convert PCI to use generic config accessors")
+> ---
+> 
+> Hi Bjorn,
+> 
+> The broken patch just showed up in linux-next. Please apply this one on top,
+> or fold it into the original patch if you don't mind rebasing.
 
-The patch that broke this is currently in the akpm-current series,
-so this fixup can be folded into the original patch. I was expecting
-multiple people to send a patch for this, so I waited a bit at first.
+I folded it in, thanks!  I guess Fengguang's autobuilder must not build
+this config, because I got a success report from it.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 567162b87a5c5f  ("eventfd: don't take the spinlock in eventfd_poll")
-
-diff --git a/fs/eventfd.c b/fs/eventfd.c
-index 439e6f0177f3..303ddc43dbee 100644
---- a/fs/eventfd.c
-+++ b/fs/eventfd.c
-@@ -118,7 +118,6 @@ static unsigned int eventfd_poll(struct file *file, poll_table *wait)
- {
- 	struct eventfd_ctx *ctx = file->private_data;
- 	unsigned int events = 0;
--	unsigned long flags;
- 	unsigned int count;
- 
- 	poll_wait(file, &ctx->wqh, wait);
+> diff --git a/arch/arm/mach-cns3xxx/pcie.c b/arch/arm/mach-cns3xxx/pcie.c
+> index e41fc339d100..c622c306c390 100644
+> --- a/arch/arm/mach-cns3xxx/pcie.c
+> +++ b/arch/arm/mach-cns3xxx/pcie.c
+> @@ -101,7 +101,7 @@ static int cns3xxx_pci_read_config(struct pci_bus *bus, unsigned int devfn,
+>  		 * for a PCIe bridge. So we must fixup the class code
+>  		 * to 0x604 here.
+>  		 */
+> -		*val = (((((*val << shift) & 0xff) | (0x604 << 16)) >> shift) & mask;
+> +		*val = ((((*val << shift) & 0xff) | (0x604 << 16)) >> shift) & mask;
+>  
+>  	return ret;
+>  }
+> 
