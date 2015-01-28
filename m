@@ -1,27 +1,97 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 28 Jan 2015 17:35:35 +0100
-Subject: [PATCH 1/5] mmc: pwrseq: Document that simple sequence support
- more than one GPIO
-In-Reply-To: <54C90F89.1040500@linaro.org>
-References: <1422439819-29854-1-git-send-email-javier.martinez@collabora.co.uk>
- <1422439819-29854-2-git-send-email-javier.martinez@collabora.co.uk>
- <54C90F89.1040500@linaro.org>
-Message-ID: <54C90FD7.40601@collabora.co.uk>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 28 Jan 2015 17:40:31 +0100
+Subject: [PATCH V2] clk: mxs: Fix invalid 32-bit access to frac registers
+In-Reply-To: <CAHrpEqQ=7EZNzpt1tmjBUrH8oDzjQmCCOrZaH8MBdmvV1+uFZg@mail.gmail.com>
+References: <1419762402-4548-1-git-send-email-stefan.wahren@i2se.com>
+ <CAHrpEqQ-eoqM3W1hYcS6EPTmur1FSfm8TeEjYrtZ+PquavL86w@mail.gmail.com>
+ <201501220039.02073.marex@denx.de> <20150128015131.22722.22882@quantum>
+ <CAHrpEqSFfdWsCif_wZO2ToRpwOuC2yt45+HwOpGgv+B=EwKTCw@mail.gmail.com>
+ <54C905CA.80908@i2se.com>
+ <CAHrpEqQ=7EZNzpt1tmjBUrH8oDzjQmCCOrZaH8MBdmvV1+uFZg@mail.gmail.com>
+Message-ID: <54C910FF.7090308@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Srinivas,
+Hi,
 
-On 01/28/2015 05:34 PM, Srinivas Kandagatla wrote:
->> -- reset-gpios : contains a GPIO specifier. The reset GPIO is asserted at
->> -	initialization and prior we start the power up procedure of the card. It
->> -	will be de-asserted right after the power has been provided to the card.
->> +- reset-gpios : contains a list of GPIO specifiers. The reset GPIOs are asserted
->> +	at initialization and prior we start the power up procedure of the card.
->> +	Will be de-asserted right after the power has been provided to the card.
-> Makes sense if you add "They" before last sentence.
+Am 28.01.2015 um 17:10 schrieb Zhi Li:
+> On Wed, Jan 28, 2015 at 9:52 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+>> Hi,
+>>
+>> Am 28.01.2015 um 04:36 schrieb Zhi Li:
+>>> On Tue, Jan 27, 2015 at 7:51 PM, Mike Turquette <mturquette@linaro.org> wrote:
+>>>> Quoting Marek Vasut (2015-01-21 15:39:01)
+>>>>> On Wednesday, January 21, 2015 at 05:16:03 PM, Zhi Li wrote:
+>>>>>> On Sun, Dec 28, 2014 at 4:26 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+>>>>>>> According to i.MX23 and i.MX28 reference manual the fractional
+>>>>>>> clock control registers must be addressed by byte instructions.
+>>>>>> I don't think mx23 and mx28 have such limitation. I will double check
+>>>>>> with IC team about this.
+>>>>>> RTL is generated from a xml file. All registers implement is unified.
+>>>>>> I don't think only clock control register have such limitation and
+>>>>>> other registers not.
+>>>>> Hi,
+>>>>>
+>>>>> Section 10.8.24 in the MX28 datasheet (Fractional Clock Control Register 0)
+>>>>> states otherwise, but maybe the documentation is simply not matching the
+>>>>> silicon.
+>>>>>
+>>>>> Here's a quote:
+>>>>> "
+>>>>> This register controls the 9-phase fractional clock dividers. The fractional
+>>>>> clock frequencies are a product of the values in these registers. NOTE: This
+>>>>> register can only be addressed by byte instructions. Addressing word or half-
+>>>>> word are not allowed.
+>>>>> "
+>>>>>
+>>>>> I also recall seeing weird behavior when these registers were accessed by word
+>>>>> access in U-Boot, so I believe the datasheet is correct.
+>>>> Hi Frank,
+>>>>
+>>>> Are you satisfied with this patch?
+>>> I asked IC designer about this.
+>>> They will check RTL code.
+>>> I will check their status again.
+>>> Our released BSP code used 32bit WORD access.
+>> i want to point out that the 32bit WORD is divided in 4 parts (IO0FRAC,
+>> IO1FRAC, EMIFRAC, CPUFRAC). Yes, it's true that BSP code access the
+>> register as 32bit, but it's never modify the complete 32bit at once just
+>> only 1 part (8bit) at a time.
+>>
+>> So here is my theory about Fractional Clock Control Register:
+>>
+>> Reading as 32bit WORD => safe
+>> Modify only 1 part (8bit) of the 32bit WORD => safe
+>> Modify more than 1 part of the 32bit WORD => unsafe !!!
+> Yes, it is align with what I get from IC designer.
+>
+> best regards
+> Frank Li
 
-Thanks, I'll change it.
+okay, fine. The clk init for the i.MX28 in the kernel tries to the set
+IO0FRAC and IO1FRAC at once. So this patch fix this problem.
 
-Best regards,
-Javier
+And since i was on that, i changed all accesses on that register to 8bit
+to avoid this problem in the future.
+
+So what's your opinion about this patch?
+
+Best regards
+Stefan
+
+>
+>> Best regards
+>> Stefan
+>>
+>>> best regards
+>>> Frank Li
+>>>> Regards,
+>>>> Mike
+>>>>
+>>>>> Best regards,
+>>>>> Marek Vasut
+>>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
