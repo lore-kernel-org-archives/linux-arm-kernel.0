@@ -1,40 +1,18 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Jan 2015 21:13:50 +0100
-Subject: [PATCH] video/mmpfb: allow modular build
-Message-ID: <8150312.I9dm5QVFgr@wuerfel>
+From: elder@linaro.org (Alex Elder)
+Date: Wed, 28 Jan 2015 14:15:06 -0600
+Subject: [PATCH] bcm: address clang inline asm incompatibility
+In-Reply-To: <CAKv+Gu8B7G3tNahkguDBjCOQih4_ywRtwaJz2D2b+vY1249-DA@mail.gmail.com>
+References: <1422422306-27473-1-git-send-email-behanw@converseincode.com>	<CAKv+Gu_NCgMmX_LQqi7vtjtP4ofrW+kx8FPgRd4-LWwK=73-xg@mail.gmail.com>	<54C8EE04.6060809@linaro.org>	<CAKv+Gu8CrMqwqBOF8rYa3RP1=gfCthwP=1k9kQ73v6+Sxwah4A@mail.gmail.com>	<54C91791.9030508@linaro.org>	<CAKv+Gu8P8eC+bmerCpbSX=USODqE=U7WnLeiCfhHJ8SSVAzPDw@mail.gmail.com>	<CAKv+Gu9fc_F1iC5NAwaG_ed3RRhYnxEBLbuLgW0Oa_qJ96j-gA@mail.gmail.com>	<54C9383D.10901@linaro.org>	<CAKv+Gu88G2QqAupD9j4_-t2=0VJGNbWkUViLBM2nUuyuN-PHWA@mail.gmail.com>
+ <CAKv+Gu8B7G3tNahkguDBjCOQih4_ywRtwaJz2D2b+vY1249-DA@mail.gmail.com>
+Message-ID: <54C9434A.30000@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The frame buffer core can be a module, which means any fb drivers
-should be able to build as modules too. This turns mmpfb into
-a tristate option to allow that and fix a possible randconfig
-build error.
+On 01/28/2015 02:11 PM, Ard Biesheuvel wrote:
+> Actually, if clang is guaranteed to emit the correct register name
+> inside the inline asm for register asm variables used in input or
+> output constraints, I think it makes sense to #define __asmeq as a nop
+> if __clang__ is defined. (Note that __asmeq only exists to work around
+> a specific GCC bug)
 
-drivers/built-in.o: In function `modes_setup':
-:(.text+0x11b34): undefined reference to `fb_videomode_to_modelist'
-:(.text+0x11b5c): undefined reference to `fb_videomode_to_var'
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/drivers/video/fbdev/mmp/Makefile b/drivers/video/fbdev/mmp/Makefile
-index a014cb358bf8..924dd0930cc7 100644
---- a/drivers/video/fbdev/mmp/Makefile
-+++ b/drivers/video/fbdev/mmp/Makefile
-@@ -1 +1,3 @@
--obj-y += core.o hw/ panel/ fb/
-+obj-$(CONFIG_MMP_DISP) += mmp_disp.o hw/ panel/ fb/
-+
-+mmp_disp-y		+= core.o
-diff --git a/drivers/video/fbdev/mmp/fb/Kconfig b/drivers/video/fbdev/mmp/fb/Kconfig
-index 9b0141f105f5..985e1a7cd254 100644
---- a/drivers/video/fbdev/mmp/fb/Kconfig
-+++ b/drivers/video/fbdev/mmp/fb/Kconfig
-@@ -1,7 +1,7 @@
- if MMP_DISP
- 
- config MMP_FB
--	bool "fb driver for Marvell MMP Display Subsystem"
-+	tristate "fb driver for Marvell MMP Display Subsystem"
- 	depends on FB
- 	select FB_CFB_FILLRECT
- 	select FB_CFB_COPYAREA
+I agree completely.  Behan, what do you think?	-Alex
