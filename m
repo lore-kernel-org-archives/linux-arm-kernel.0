@@ -1,46 +1,134 @@
-From: lennart@poettering.net (Lennart Poettering)
-Date: Wed, 28 Jan 2015 02:38:52 +0100
-Subject: [systemd-devel] Making udev emit a signal when it is done
- loading modules
-In-Reply-To: <20150117160319.GO18247@in.waw.pl>
-References: <54BA20D0.7060402@redhat.com>
- <20150117160319.GO18247@in.waw.pl>
-Message-ID: <20150128013852.GA8177@gardel-login>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Wed, 28 Jan 2015 09:47:31 +0800
+Subject: [PATCH v4 11/13] pm: at91: remove the at91_xxx_standby() function
+ definitions in the pm.h
+In-Reply-To: <1422409172-24178-1-git-send-email-wenyou.yang@atmel.com>
+References: <1422409172-24178-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1422409651-24608-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 17.01.15 17:03, Zbigniew J?drzejewski-Szmek (zbyszek at in.waw.pl) wrote:
+Because the the suspend to standby mode uses the sram function,
+these functions will not used, remove the redundant code.
 
-> On Sat, Jan 17, 2015 at 09:44:00AM +0100, Hans de Goede wrote:
-> > We would like
-> > udev to emit a signal (ABI to be discussed) when it is done
-> > trying to load modules for everything which was already enumerated
-> > when it starts, iow when there are no new device events pending
-> > anymore when udev does its initial hotplug replay.
-> I think you can just create a unit like:
-> 
-> # disable-new-hardware.service
-> [Unit]
-> After=systemd-udev-settle.service systemd-modules-load.service
-> Wants=systemd-udev-settle.service
-> 
-> [Service]
-> Type=oneshot
-> RemainAfterExit=yes
-> ExecStart=/usr/local/bin/ping-the-kernel
-> 
-> > So the question to you is would you be willing to include such
-> > functionality in udev?
-> I don't think udevd has enough knowledge. But a systemd unit like
-> the one above should work.
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/mach-at91/pm.h |   97 -----------------------------------------------
+ 1 file changed, 97 deletions(-)
 
-To clarify this: if people do this, then this pulls in
-systemd-udev-settle.service, which slows down boot. Every service that
-does that is hence a majour source of slowness. 
-
-It's a hack to use this, not a solution. 
-
-Lennart
-
+diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
+index 5bc9c33..158575e 100644
+--- a/arch/arm/mach-at91/pm.h
++++ b/arch/arm/mach-at91/pm.h
+@@ -12,7 +12,6 @@
+ #define __ARCH_ARM_MACH_AT91_PM
+ 
+ #include <asm/proc-fns.h>
+-
+ #include <mach/at91_ramc.h>
+ 
+ #define	AT91_PM_MEMCTRL_MASK	0x0f
+@@ -22,100 +21,4 @@
+ 
+ #define	AT91_PM_SLOW_CLOCK	0x01
+ 
+-#ifdef CONFIG_PM
+-extern void at91_pm_set_standby(void (*at91_standby)(void));
+-#else
+-static inline void at91_pm_set_standby(void (*at91_standby)(void)) { }
+-#endif
+-
+-/*
+- * The AT91RM9200 goes into self-refresh mode with this command, and will
+- * terminate self-refresh automatically on the next SDRAM access.
+- *
+- * Self-refresh mode is exited as soon as a memory access is made, but we don't
+- * know for sure when that happens. However, we need to restore the low-power
+- * mode if it was enabled before going idle. Restoring low-power mode while
+- * still in self-refresh is "not recommended", but seems to work.
+- */
+-
+-static inline void at91rm9200_standby(void)
+-{
+-	u32 lpr = at91_ramc_read(0, AT91RM9200_SDRAMC_LPR);
+-
+-	asm volatile(
+-		"b    1f\n\t"
+-		".align    5\n\t"
+-		"1:  mcr    p15, 0, %0, c7, c10, 4\n\t"
+-		"    str    %0, [%1, %2]\n\t"
+-		"    str    %3, [%1, %4]\n\t"
+-		"    mcr    p15, 0, %0, c7, c0, 4\n\t"
+-		"    str    %5, [%1, %2]"
+-		:
+-		: "r" (0), "r" (AT91_BASE_SYS), "r" (AT91RM9200_SDRAMC_LPR),
+-		  "r" (1), "r" (AT91RM9200_SDRAMC_SRR),
+-		  "r" (lpr));
+-}
+-
+-/* We manage both DDRAM/SDRAM controllers, we need more than one value to
+- * remember.
+- */
+-static inline void at91_ddr_standby(void)
+-{
+-	/* Those two values allow us to delay self-refresh activation
+-	 * to the maximum. */
+-	u32 lpr0, lpr1 = 0;
+-	u32 saved_lpr0, saved_lpr1 = 0;
+-
+-	if (at91_ramc_base[1]) {
+-		saved_lpr1 = at91_ramc_read(1, AT91_DDRSDRC_LPR);
+-		lpr1 = saved_lpr1 & ~AT91_DDRSDRC_LPCB;
+-		lpr1 |= AT91_DDRSDRC_LPCB_SELF_REFRESH;
+-	}
+-
+-	saved_lpr0 = at91_ramc_read(0, AT91_DDRSDRC_LPR);
+-	lpr0 = saved_lpr0 & ~AT91_DDRSDRC_LPCB;
+-	lpr0 |= AT91_DDRSDRC_LPCB_SELF_REFRESH;
+-
+-	/* self-refresh mode now */
+-	at91_ramc_write(0, AT91_DDRSDRC_LPR, lpr0);
+-	if (at91_ramc_base[1])
+-		at91_ramc_write(1, AT91_DDRSDRC_LPR, lpr1);
+-
+-	cpu_do_idle();
+-
+-	at91_ramc_write(0, AT91_DDRSDRC_LPR, saved_lpr0);
+-	if (at91_ramc_base[1])
+-		at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1);
+-}
+-
+-/* We manage both DDRAM/SDRAM controllers, we need more than one value to
+- * remember.
+- */
+-static inline void at91sam9_sdram_standby(void)
+-{
+-	u32 lpr0, lpr1 = 0;
+-	u32 saved_lpr0, saved_lpr1 = 0;
+-
+-	if (at91_ramc_base[1]) {
+-		saved_lpr1 = at91_ramc_read(1, AT91_SDRAMC_LPR);
+-		lpr1 = saved_lpr1 & ~AT91_SDRAMC_LPCB;
+-		lpr1 |= AT91_SDRAMC_LPCB_SELF_REFRESH;
+-	}
+-
+-	saved_lpr0 = at91_ramc_read(0, AT91_SDRAMC_LPR);
+-	lpr0 = saved_lpr0 & ~AT91_SDRAMC_LPCB;
+-	lpr0 |= AT91_SDRAMC_LPCB_SELF_REFRESH;
+-
+-	/* self-refresh mode now */
+-	at91_ramc_write(0, AT91_SDRAMC_LPR, lpr0);
+-	if (at91_ramc_base[1])
+-		at91_ramc_write(1, AT91_SDRAMC_LPR, lpr1);
+-
+-	cpu_do_idle();
+-
+-	at91_ramc_write(0, AT91_SDRAMC_LPR, saved_lpr0);
+-	if (at91_ramc_base[1])
+-		at91_ramc_write(1, AT91_SDRAMC_LPR, saved_lpr1);
+-}
+-
+ #endif
 -- 
-Lennart Poettering, Red Hat
+1.7.9.5
