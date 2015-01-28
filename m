@@ -1,35 +1,42 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 27 Jan 2015 16:18:26 -0800
-Subject: [GIT PULL] ARM: mediatek: arm64 changes for v3.20
-In-Reply-To: <CABuKBe+3DWcKkRt3yc0QZvDJUQPJs8xqC-v+wBqReyXrXeDP8A@mail.gmail.com>
-References: <CABuKBe+3DWcKkRt3yc0QZvDJUQPJs8xqC-v+wBqReyXrXeDP8A@mail.gmail.com>
-Message-ID: <CAOesGMgd2X4V=-2f_UKXh1+knyF0imgNv7+_k1T2GHfh6cRrYQ@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 28 Jan 2015 01:25:35 +0100
+Subject: [PATCH URGENT] arm: dma-mapping: Set DMA IOMMU ops in
+ arm_iommu_attach_device()
+In-Reply-To: <1422022909-31044-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1422022909-31044-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <2085044.xTrZHjchoH@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 27, 2015 at 3:55 PM, Matthias Brugger
-<matthias.bgg@gmail.com> wrote:
-> Hi Arnd and Olof,
->
-> Please take the following arm64 patches for v3.20.
-> I send a pull request two days ago. As I said, it was screwed up, so
-> here it comes again.
-> Hopefully this time everything went fine.
->
-> Cheers,
-> Matthias
->
-> --
->
-> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
->
->   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
->
-> are available in the git repository at:
->
->   https://github.com/mbgg/linux-mediatek.git tags/v3.20-next-arm64
+Hi Arnd, Olof,
 
-Merged, thanks.
+Am Freitag, 23. Januar 2015, 16:21:49 schrieb Laurent Pinchart:
+> Commit 4bb25789ed28228a ("arm: dma-mapping: plumb our iommu mapping ops
+> into arch_setup_dma_ops") moved the setting of the DMA operations from
+> arm_iommu_attach_device() to arch_setup_dma_ops() where the DMA
+> operations to be used are selected based on whether the device is
+> connected to an IOMMU. However, the IOMMU detection scheme requires the
+> IOMMU driver to be ported to the new IOMMU of_xlate API. As no driver
+> has been ported yet, this effectively breaks all IOMMU ARM users that
+> depend on the IOMMU being handled transparently by the DMA mapping API.
+> 
+> Fix this by restoring the setting of DMA IOMMU ops in
+> arm_iommu_attach_device() and splitting the rest of the function into a
+> new internal __arm_iommu_attach_device() function, called by
+> arch_setup_dma_ops().
+> 
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+
+in the original submission arm at kernel.org was not included, but it looks like 
+the patch should go through arm-soc.
+
+We have two tags
+	Acked-by: Will Deacon <will.deacon@arm.com>
+	Tested-by: Heiko Stuebner <heiko@sntech.de>
+
+Can you find the original patch somehow or should it be resend to include 
+arm at kernel.org ?
 
 
--Olof
+Thanks
+Heiko
