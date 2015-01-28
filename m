@@ -1,25 +1,140 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 28 Jan 2015 19:31:10 +0000
-Subject: [PATCH v3 1/2] ASoC: codecs: wm8904: add dt ids table
-In-Reply-To: <1422329800-28481-1-git-send-email-voice.shen@atmel.com>
-References: <1422329800-28481-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <20150128193110.GI21293@sirena.org.uk>
+From: bparrot@ti.com (Benoit Parrot)
+Date: Wed, 28 Jan 2015 13:32:47 -0600
+Subject: [PATCH v3] ARM: AM43xx: hwmod: add VPFE hwmod entries
+In-Reply-To: <1422260488-380-1-git-send-email-prabhakar.csengg@gmail.com>
+References: <1422260488-380-1-git-send-email-prabhakar.csengg@gmail.com>
+Message-ID: <20150128193247.GH2570@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 27, 2015 at 11:36:39AM +0800, Bo Shen wrote:
-> From: Alexander Morozov <linux@meltdown.ru>
-> 
-> The WM8904 and WM8918 has the same data type, while the WM8912
-> has different data type. So, use the data in dt ids table to
-> distinguish them.
+Suspend/resume is functional with this patch.
 
-Applied both, thanks - please use subjct lines matching the style for
-the subsystem and CC maintainers (including driver maintainers).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150128/0ff467e4/attachment.sig>
+Tested-by: Benoit Parrot <bparrot@ti.com>
+
+Lad, Prabhakar <prabhakar.csengg@gmail.com> wrote on Mon [2015-Jan-26 08:21:28 +0000]:
+> From: Benoit Parrot <bparrot@ti.com>
+> 
+> this patch adds VPFE HWMOD data for AM43xx.
+> 
+> Signed-off-by: Benoit Parrot <bparrot@ti.com>
+> Signed-off-by: Darren Etheridge <detheridge@ti.com>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+> ---
+>  Changes for v3:
+>  a: Dropped OCPIF_SWSUP_IDLE flag from l3 hwmods of vpfe.
+>  
+>  arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 70 ++++++++++++++++++++++++++++++
+>  arch/arm/mach-omap2/prcm43xx.h             |  3 +-
+>  2 files changed, 72 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+> index 5c6c841..8543f9f 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+> @@ -514,6 +514,44 @@ static struct omap_hwmod am43xx_dss_rfbi_hwmod = {
+>  	},
+>  };
+>  
+> +static struct omap_hwmod_class_sysconfig am43xx_vpfe_sysc = {
+> +	.rev_offs       = 0x0,
+> +	.sysc_offs      = 0x104,
+> +	.sysc_flags     = SYSC_HAS_MIDLEMODE | SYSC_HAS_SIDLEMODE,
+> +	.idlemodes      = (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
+> +				MSTANDBY_FORCE | MSTANDBY_SMART | MSTANDBY_NO),
+> +	.sysc_fields    = &omap_hwmod_sysc_type2,
+> +};
+> +
+> +static struct omap_hwmod_class am43xx_vpfe_hwmod_class = {
+> +	.name           = "vpfe",
+> +	.sysc           = &am43xx_vpfe_sysc,
+> +};
+> +
+> +static struct omap_hwmod am43xx_vpfe0_hwmod = {
+> +	.name           = "vpfe0",
+> +	.class          = &am43xx_vpfe_hwmod_class,
+> +	.clkdm_name     = "l3s_clkdm",
+> +	.prcm           = {
+> +		.omap4  = {
+> +			.modulemode     = MODULEMODE_SWCTRL,
+> +			.clkctrl_offs   = AM43XX_CM_PER_VPFE0_CLKCTRL_OFFSET,
+> +		},
+> +	},
+> +};
+> +
+> +static struct omap_hwmod am43xx_vpfe1_hwmod = {
+> +	.name           = "vpfe1",
+> +	.class          = &am43xx_vpfe_hwmod_class,
+> +	.clkdm_name     = "l3s_clkdm",
+> +	.prcm           = {
+> +		.omap4  = {
+> +			.modulemode     = MODULEMODE_SWCTRL,
+> +			.clkctrl_offs   = AM43XX_CM_PER_VPFE1_CLKCTRL_OFFSET,
+> +		},
+> +	},
+> +};
+> +
+>  /* Interfaces */
+>  static struct omap_hwmod_ocp_if am43xx_l3_main__l4_hs = {
+>  	.master		= &am33xx_l3_main_hwmod,
+> @@ -788,6 +826,34 @@ static struct omap_hwmod_ocp_if am43xx_l4_ls__dss_rfbi = {
+>  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>  };
+>  
+> +static struct omap_hwmod_ocp_if am43xx_l3__vpfe0 = {
+> +	.master         = &am43xx_vpfe0_hwmod,
+> +	.slave          = &am33xx_l3_main_hwmod,
+> +	.clk            = "l3_gclk",
+> +	.user           = OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+> +static struct omap_hwmod_ocp_if am43xx_l3__vpfe1 = {
+> +	.master         = &am43xx_vpfe1_hwmod,
+> +	.slave          = &am33xx_l3_main_hwmod,
+> +	.clk            = "l3_gclk",
+> +	.user           = OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+> +static struct omap_hwmod_ocp_if am43xx_l4_ls__vpfe0 = {
+> +	.master         = &am33xx_l4_ls_hwmod,
+> +	.slave          = &am43xx_vpfe0_hwmod,
+> +	.clk            = "l4ls_gclk",
+> +	.user           = OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+> +static struct omap_hwmod_ocp_if am43xx_l4_ls__vpfe1 = {
+> +	.master         = &am33xx_l4_ls_hwmod,
+> +	.slave          = &am43xx_vpfe1_hwmod,
+> +	.clk            = "l4ls_gclk",
+> +	.user           = OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+>  static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
+>  	&am33xx_l4_wkup__synctimer,
+>  	&am43xx_l4_ls__timer8,
+> @@ -887,6 +953,10 @@ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
+>  	&am43xx_l4_ls__dss,
+>  	&am43xx_l4_ls__dss_dispc,
+>  	&am43xx_l4_ls__dss_rfbi,
+> +	&am43xx_l3__vpfe0,
+> +	&am43xx_l3__vpfe1,
+> +	&am43xx_l4_ls__vpfe0,
+> +	&am43xx_l4_ls__vpfe1,
+>  	NULL,
+>  };
+>  
+> diff --git a/arch/arm/mach-omap2/prcm43xx.h b/arch/arm/mach-omap2/prcm43xx.h
+> index ad7b3e9..8aa4c2c 100644
+> --- a/arch/arm/mach-omap2/prcm43xx.h
+> +++ b/arch/arm/mach-omap2/prcm43xx.h
+> @@ -143,5 +143,6 @@
+>  #define AM43XX_CM_PER_USB_OTG_SS1_CLKCTRL_OFFSET        0x0268
+>  #define AM43XX_CM_PER_USBPHYOCP2SCP1_CLKCTRL_OFFSET	0x05C0
+>  #define AM43XX_CM_PER_DSS_CLKCTRL_OFFSET		0x0a20
+> -
+> +#define AM43XX_CM_PER_VPFE0_CLKCTRL_OFFSET		0x0068
+> +#define AM43XX_CM_PER_VPFE1_CLKCTRL_OFFSET		0x0070
+>  #endif
+> -- 
+> 2.1.0
+> 
