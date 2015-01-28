@@ -1,57 +1,87 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 28 Jan 2015 07:39:13 -0800
-Subject: [PATCH] ARM: /proc/atags: Export also for DT
-In-Reply-To: <alpine.LFD.2.11.1501280925400.1322@knanqh.ubzr>
-References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
- <20150127174818.GM26493@n2100.arm.linux.org.uk>
- <20150128005032.GK28663@atomide.com> <201501281458.22088@pali>
- <alpine.LFD.2.11.1501280925400.1322@knanqh.ubzr>
-Message-ID: <20150128153912.GL28663@atomide.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 28 Jan 2015 09:43:32 -0600
+Subject: [PATCH] PCI: Fix pcibios_update_irq misuse of irq number
+In-Reply-To: <54C8FFE0.3030007@arm.com>
+References: <1422456683-797-1-git-send-email-marc.zyngier@arm.com>
+ <54C8FE61.1030304@linux.intel.com> <54C8FFE0.3030007@arm.com>
+Message-ID: <CAErSpo6jOs+MBpAjDxkeVp5AqU1Ln+_-k8Xgb2eqPm3Lv6Udzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nicolas Pitre <nico@fluxnic.net> [150128 06:37]:
-> On Wed, 28 Jan 2015, Pali Roh?r wrote:
-> 
-> > On Wednesday 28 January 2015 01:50:33 Tony Lindgren wrote:
-> > > On omaps, the bootrom passes the bootreason in r1 to the
-> > > bootloader that can do whatever it wants with it. We could
-> > > maybe pass it in the kernel cmdline to the watchdog driver
-> > > for user space?
-> > > 
-> > 
-> > Not truth for N900. Bootreason depends on PRM_RSTST omap 
-> > register, state of vbat charger pins, time how long was power key 
-> > pressed, R&D data stored in CAL partition and other undocumented 
-> > registers for omap HS devices. I already tried to implement at 
-> > least some subset of it in userspace (or kernel), but it is 
-> > impossible because NOLO bootloader clear status of PRM_RSTST 
-> > register.
-> > 
-> > There is also copy of PRM_RSTST register stored at address 
-> > 0x4020FFB8 (tracing data) but that address is rewritten (probably 
-> > by kernel), so we really cannot implement reading bootreason in 
-> > kernel.
-> > 
-> > But in early stage in uboot it is possible to read 0x4020FFB8 
-> > address and get some part of bootreason. But still PRM_RSTST is 
-> > not enough!
-> > 
-> > I would be happy if DT kernel can export /proc/atags file with 
-> > ATAGs passed by bootloader. It would be enough for me. In 
-> > userspace I can parse content and do what is needed.
-> 
-> What about defining a DT boot reason property instead?
-> Maybe it already exists?  If not, it's something that could certainly be 
-> generically used on other platforms too.
-> 
-> Converting the special ATAG into its standard DT equivalent would then 
-> be trivial and much cleaner overall.
+On Wed, Jan 28, 2015 at 9:27 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> Hi Gerry,
+>
+> On 28/01/15 15:21, Jiang Liu wrote:
+>>
+>>
+>> On 2015/1/28 22:51, Marc Zyngier wrote:
+>>> pcibios_update_irq writes an irq number into the config space
+>>> of a given PCI device, but ignores the fact that this number
+>>> is a virtual interrupt number, which might be a very different
+>>> value from what the underlying hardware is using.
+>>>
+>>> The obvious fix is to fetch the HW interrupt number from the
+>>> corresponding irq_data structure. This is slightly complicated
+>>> by the fact that this interrupt might be services by a stacked
+>>> domain.
+>>>
+>>> This has been tested on KVM with kvmtool.
+>>>
+>>> Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>> Tested-by: Andre Przywara <andre.przywara@arm.com>
+>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>> ---
+>>>  drivers/pci/setup-irq.c | 12 ++++++++++--
+>>>  1 file changed, 10 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/drivers/pci/setup-irq.c b/drivers/pci/setup-irq.c
+>>> index 4e2d595..828cbc9 100644
+>>> --- a/drivers/pci/setup-irq.c
+>>> +++ b/drivers/pci/setup-irq.c
+>>> @@ -15,11 +15,19 @@
+>>>  #include <linux/errno.h>
+>>>  #include <linux/ioport.h>
+>>>  #include <linux/cache.h>
+>>> +#include <linux/irq.h>
+>>>
+>>>  void __weak pcibios_update_irq(struct pci_dev *dev, int irq)
+>>>  {
+>>> -    dev_dbg(&dev->dev, "assigning IRQ %02d\n", irq);
+>>> -    pci_write_config_byte(dev, PCI_INTERRUPT_LINE, irq);
+>>> +    struct irq_data *d;
+>>> +
+>>> +    d = irq_get_irq_data(irq);
+>>> +#ifdef CONFIG_IRQ_DOMAIN_HIERARCHY
+>>> +    while (d->parent_data)
+>>> +            d = d->parent_data;
+>>> +#endif
+>>> +    dev_dbg(&dev->dev, "assigning IRQ %02ld\n", d->hwirq);
+>>> +    pci_write_config_byte(dev, PCI_INTERRUPT_LINE, d->hwirq);
+>>>  }
+>> Hi Mark,
+>>       Instead of modifying the common version, how about
+>> implementing an arch specific version? Arch may have different
+>> way to determine the irq number. Above implementation doesn't
+>> work with x86, for example.
+>
+> If you look at the Makefile, this file is used on:
+>
+> obj-$(CONFIG_ALPHA) += setup-irq.o
+> obj-$(CONFIG_ARM) += setup-irq.o
+> obj-$(CONFIG_UNICORE32) += setup-irq.o
+> obj-$(CONFIG_SUPERH) += setup-irq.o
+> obj-$(CONFIG_MIPS) += setup-irq.o
+> obj-$(CONFIG_TILE) += setup-irq.o
+> obj-$(CONFIG_SPARC_LEON) += setup-irq.o
+> obj-$(CONFIG_M68K) += setup-irq.o
+>
+> x86 doesn't use that at all.
 
-Sounds good to me as then we don't have to add any legacy custom
-Nokia specific atag. And it won't prevent us from adding a generic
-ATAG_BOOTREASON if really needed.
+Since you're looking at this, Marc, do you see a nice way to get rid
+of these arch dependencies in the Makefile and unify this a bit?  We
+still have this pci_fixup_irqs() ugliness -- it's not really
+arch-specific at all, but it's called from arch code, and it uses
+for_each_pci_dev(), which obviously only works for things present at
+boot and not for things hot-added later.
 
-Regards,
-
-Tony
+Bjorn
