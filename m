@@ -1,40 +1,92 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 27 Jan 2015 17:10:45 -0800
-Subject: [PATCH 1/2] clk: pxa: add pxa3xx clock driver
-In-Reply-To: <87wq49p2ey.fsf@free.fr>
-References: <1420577139-30556-1-git-send-email-robert.jarzmik@free.fr>
- <87wq49p2ey.fsf@free.fr>
-Message-ID: <20150128011045.22722.19778@quantum>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 27 Jan 2015 17:15:13 -0800
+Subject: [linux-sunxi] Re: [PATCH] arm: sunxi: input: RFC: Add sysfs
+ voltage for sun4i-lradc driver
+In-Reply-To: <20150127194447.GO7200@lukather>
+References: <1422291516-24895-1-git-send-email-plaes@plaes.org>
+ <20150127091829.GD7200@lukather>
+ <1422352189.23189.12.camel@plaes.org> <54C76DF2.50707@redhat.com>
+ <20150127194447.GO7200@lukather>
+Message-ID: <20150128011513.GA30169@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Robert Jarzmik (2015-01-26 15:06:45)
-> Robert Jarzmik <robert.jarzmik@free.fr> writes:
+On Tue, Jan 27, 2015 at 08:44:47PM +0100, Maxime Ripard wrote:
+> On Tue, Jan 27, 2015 at 11:52:34AM +0100, Hans de Goede wrote:
+> > Hi,
+> > 
+> > On 27-01-15 10:49, Priit Laes wrote:
+> > >
+> > >On Tue, 2015-01-27 at 10:18 +0100, Maxime Ripard wrote:
+> > >>Hi,
+> > >>
+> > >>On Mon, Jan 26, 2015 at 06:58:32PM +0200, Priit Laes wrote:
+> > >>>---
+> > >>
+> > >>Like Hans was pointing out, commit log and signed-off-by please
+> > >>
+> > >>>  .../ABI/testing/sysfs-driver-input-sun4i-lradc     |  4 ++
+> > >>>  drivers/input/keyboard/sun4i-lradc-keys.c          | 49
+> > >>>+++++++++++++++++-----
+> > >>>  2 files changed, 43 insertions(+), 10 deletions(-)
+> > >>>  create mode 100644 Documentation/ABI/testing/sysfs-driver-input-
+> > >>>sun4i-lradc
+> > >>>
+> > >>>diff --git a/Documentation/ABI/testing/sysfs-driver-input-sun4i-
+> > >>>lradc b/Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc
+> > >>>new file mode 100644
+> > >>>index 0000000..e4e6448
+> > >>>--- /dev/null
+> > >>>+++ b/Documentation/ABI/testing/sysfs-driver-input-sun4i-lradc
+> > >>>@@ -0,0 +1,4 @@
+> > >>>+What:          /sys/class/input/input(x)/device/voltage
+> > >>>+Date:          February 2015
+> > >>>+Contact:       Priit Laes <plaes@plaes.org>
+> > >>>+Description:   ADC output voltage in microvolts or 0 if device is
+> > >>>not opened.
+> > >>
+> > >>Why is it returning 0 when "device is not opened" ? What does that
+> > >>even mean? You can't read that file without opening it.
+> > >
+> > >It means that something has to open the /dev/input/inputX device which
+> > >sets up the ADC before the voltage can be read from the sysfs file.
+> > >
+> > >[...]
+> > >
+> > >
+> > >>
+> > >>As I told you already, if you're going to expose this an ADC in the
+> > >>end, the proper solution is to use the IIO framework, not adding a
+> > >>custom sysfs file.
+> > >
+> > >My intention was to expose just a simple debug output, so one can
+> > >press the buttons and read the voltages for devicetree keymap.
+> > >
+> > >If anyone can suggest a simpler approach than current sysfs based one,
+> > >I would do it.
+> > 
+> > The android driver always uses 0.2V / 200mV steps, so what I do is
+> > simply create a mapping with 200mV mapped to KEY_VOLUMEUP, 400mV mapped
+> > to KEY_VOLUMEDOWN, etc. following the hardcoded android driver mapping:
+> > 
+> > https://github.com/linux-sunxi/linux-sunxi/blob/sunxi-3.4/drivers/input/keyboard/sun4i-keyboard.c#L136
+> > 
+> > Usually this will be correct in one go, after testing one can shuffle
+> > key codes as needed (usually not needed) and/or remove unused entries.
+> > 
+> > With that said I do think that a sysfs file to see the actual voltages,
+> > or a kernel parameter to printk them on keypress interrupt would be useful.
+> > 
+> > I guess the printk option would be better as it would show the actual
+> > keypress value read, not some semi-random sample.
 > 
-> > Move pxa25x clock drivers from arch/arm/mach-pxa to driver/clk.
-> > In the move :
-> >  - convert to new clock framework legacy clocks
-> >  - provide clocks as before for platform data based boards
-> >  - provide clocks through devicetree with clk-pxa-dt
-> >
-> > Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> 
-> Hi Mike,
-> 
-> Would there be a change for this to land in 3.20 (only patch 1/2) ?
-> 
-> Of course it won't be activated, as my intention is to use 3.21 as my vehicle to
-> swap pxa25x, pxa27x and pxa3xx to common clock framework though pxa tree.
-> 
-> FWIW, this was tested on the zylonite board so far.
+> That wouldn't require that much code actually. Either using dev_dbg,
+> or debugfs like Dmitry was suggesting would be two nice solutions I
+> guess.
 
-Applied patch #1 to clk-next for 3.20.
+Given the stated purpose I'd say dev_dbg() and call it a day.
 
-Regards,
-Mike
+Thanks.
 
-> 
-> Cheers.
-> 
-> --
-> Robert
+-- 
+Dmitry
