@@ -1,34 +1,30 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Jan 2015 14:48:06 +0100
-Subject: [PATCH 2/5] drm: panel/simple: add backlight dependency
-In-Reply-To: <1422452889-415782-1-git-send-email-arnd@arndb.de>
-References: <1422452889-415782-1-git-send-email-arnd@arndb.de>
-Message-ID: <1422452889-415782-3-git-send-email-arnd@arndb.de>
+Date: Wed, 28 Jan 2015 14:48:04 +0100
+Subject: [PATCH 0/5] drm: add missing dependencies
+Message-ID: <1422452889-415782-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The simple panel code uses the backlight interface to
-find a device, which fails when backlight is disabled:
+I did lots of randconfig tests over time, which resulted in many patches,
+five of which are for drm. In each of these cases, the Kconfig dependencies
+are incomplete, which can lead to broken builds, and specifying the
+complete dependencies solves it.
 
-drivers/built-in.o: In function `panel_simple_platform_probe':
-:(.text+0xd3c48): undefined reference to `of_find_backlight_by_node'
+The patches are all independent from one another and solve separate
+issues. Please apply.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/gpu/drm/panel/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+Arnd Bergmann (5):
+  drm: panel/sharp: add backlight dependency
+  drm: panel/simple: add backlight dependency
+  drm: rockchip: add reset controller dependency
+  drm: sti: add panel dependency
+  drm: msm: add missing dependencies on OF and COMMON_CLK
 
-diff --git a/drivers/gpu/drm/panel/Kconfig b/drivers/gpu/drm/panel/Kconfig
-index 84506053a7ca..d84583776d50 100644
---- a/drivers/gpu/drm/panel/Kconfig
-+++ b/drivers/gpu/drm/panel/Kconfig
-@@ -10,6 +10,7 @@ menu "Display Panels"
- config DRM_PANEL_SIMPLE
- 	tristate "support for simple panels"
- 	depends on OF
-+	depends on BACKLIGHT_CLASS_DEVICE
- 	help
- 	  DRM panel driver for dumb panels that need at most a regulator and
- 	  a GPIO to be powered up. Optionally a backlight can be attached so
+ drivers/gpu/drm/msm/Kconfig      | 1 +
+ drivers/gpu/drm/panel/Kconfig    | 2 ++
+ drivers/gpu/drm/rockchip/Kconfig | 1 +
+ drivers/gpu/drm/sti/Kconfig      | 1 +
+ 4 files changed, 5 insertions(+)
+
 -- 
 2.1.0.rc2
