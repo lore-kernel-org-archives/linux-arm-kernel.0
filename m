@@ -1,32 +1,79 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Jan 2015 22:35:01 +0100
-Subject: [PATCH v10 1/3] arm64: Add __NR_* definitions for compat syscalls
-In-Reply-To: <CAOZdJXUhpmi0SM5izDYQnx8SHjWjqOFVduV0+boPw6+YCKP5+g@mail.gmail.com>
-References: <1404458911-8214-1-git-send-email-takahiro.akashi@linaro.org>
- <1404458911-8214-2-git-send-email-takahiro.akashi@linaro.org>
- <CAOZdJXUhpmi0SM5izDYQnx8SHjWjqOFVduV0+boPw6+YCKP5+g@mail.gmail.com>
-Message-ID: <12610204.3KbMJUth1j@wuerfel>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 28 Jan 2015 13:36:12 -0800
+Subject: [PATCH] arm: dts: qcom: Add LCC nodes
+Message-ID: <1422480972-4105-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 28 January 2015 15:31:49 Timur Tabi wrote:
-> On Fri, Jul 4, 2014 at 2:28 AM, AKASHI Takahiro
-> <takahiro.akashi@linaro.org> wrote:
-> > +#define __ARM_NR_COMPAT_BASE           0x0f0000
-> > +#define __ARM_NR_compat_cacheflush     (__ARM_NR_COMPAT_BASE+2)
-> > +#define __ARM_NR_compat_set_tls                (__ARM_NR_COMPAT_BASE+5)
-> 
-> I know this patch is six months old, but I was wondering if anyone
-> knows of any plans to make these syscalls available to 64-bit apps?
-> We have a 32-bit app that uses __ARM_NR_compat_cacheflush, and we'd
-> like to port that app to 64-bit.  I'm just not sure how to start doing
-> that, since there don't appear to be any 64-bit ARM-specific syscalls.
-> 
+From: Kumar Gala <galak@codeaurora.org>
 
-You can add architecture specific syscalls by using the 16 numbers following
-__NR_arch_specific_syscall. Whether it makes sense to have a cacheflush
-syscall on arm64, I have no idea.
+Add the node for the LPASS clock controller found on a few qcom
+SoCs so that the clock driver can probe.
 
-I believe that we should not need a set_tls syscall though.
+Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+Signed-off-by: Kumar Gala <galak@codeaurora.org>
+[sboyd at codeaurora.org: Added apq8064 and msm8960 nodes]
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/boot/dts/qcom-apq8064.dtsi | 7 +++++++
+ arch/arm/boot/dts/qcom-ipq8064.dtsi | 8 ++++++++
+ arch/arm/boot/dts/qcom-msm8960.dtsi | 7 +++++++
+ 3 files changed, 22 insertions(+)
 
-	Arnd
+diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+index b3154c071652..7705752c212c 100644
+--- a/arch/arm/boot/dts/qcom-apq8064.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+@@ -239,6 +239,13 @@
+ 			#reset-cells = <1>;
+ 		};
+ 
++		lcc: clock-controller at 28000000 {
++			compatible = "qcom,lcc-apq8064";
++			reg = <0x28000000 0x1000>;
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++		};
++
+ 		mmcc: clock-controller at 4000000 {
+ 			compatible = "qcom,mmcc-apq8064";
+ 			reg = <0x4000000 0x1000>;
+diff --git a/arch/arm/boot/dts/qcom-ipq8064.dtsi b/arch/arm/boot/dts/qcom-ipq8064.dtsi
+index cb225dafe97c..568260c387bb 100644
+--- a/arch/arm/boot/dts/qcom-ipq8064.dtsi
++++ b/arch/arm/boot/dts/qcom-ipq8064.dtsi
+@@ -279,5 +279,13 @@
+ 			#clock-cells = <1>;
+ 			#reset-cells = <1>;
+ 		};
++
++		lcc: clock-controller at 28000000 {
++			compatible = "qcom,lcc-ipq8064";
++			reg = <0x28000000 0x1000>;
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++		};
++
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/qcom-msm8960.dtsi b/arch/arm/boot/dts/qcom-msm8960.dtsi
+index e1b0d5cd9e3c..41ac308d4d68 100644
+--- a/arch/arm/boot/dts/qcom-msm8960.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8960.dtsi
+@@ -91,6 +91,13 @@
+ 			reg = <0x900000 0x4000>;
+ 		};
+ 
++		lcc: clock-controller at 28000000 {
++			compatible = "qcom,lcc-msm8960";
++			reg = <0x28000000 0x1000>;
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++		};
++
+ 		clock-controller at 4000000 {
+ 			compatible = "qcom,mmcc-msm8960";
+ 			reg = <0x4000000 0x1000>;
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
