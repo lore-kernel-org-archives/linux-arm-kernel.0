@@ -1,40 +1,40 @@
-From: fugang.duan@freescale.com (fugang.duan at freescale.com)
-Date: Wed, 28 Jan 2015 01:33:16 +0000
-Subject: [PATCH 0/3] iio: adc: vf610: respect ADC clocking limitations
-In-Reply-To: <1421769723-28677-1-git-send-email-stefan@agner.ch>
-References: <1421769723-28677-1-git-send-email-stefan@agner.ch>
-Message-ID: <BLUPR03MB37366EC9DAB3A4B0A16E72BF5330@BLUPR03MB373.namprd03.prod.outlook.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 27 Jan 2015 17:41:05 -0800
+Subject: [PATCH v2] clk: sunxi: fix sun6i PLL1 .recalc_rate() result
+In-Reply-To: <20150124152944.GE8470@lukather>
+References: <1422088959-23365-1-git-send-email-wens@csie.org>
+ <20150124152944.GE8470@lukather>
+Message-ID: <20150128014105.22722.46052@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stefan Agner <stefan@agner.ch> Sent: Wednesday, January 21, 2015 12:02 AM
-> To: jic23 at kernel.org
-> Cc: shawn.guo at linaro.org; Duan Fugang-B38611; maitysanchayan at gmail.com;
-> linux-iio at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org; stefan at agner.ch
-> Subject: [PATCH 0/3] iio: adc: vf610: respect ADC clocking limitations
+Quoting Maxime Ripard (2015-01-24 07:29:44)
+> Hi Mike,
 > 
-> Respect ADC clocking limitations which lead to bogous reading on 500MHz
-> clocked Vybrid SoC's. Additionally, also implement a sysfs-property to
-> configure the conversion mode available in this ADC peripherial.
+> On Sat, Jan 24, 2015 at 04:42:39PM +0800, Chen-Yu Tsai wrote:
+> > PLL1 on sun6i has its N factor start from 1 (N = register value + 1).
+> > Make the factors clk driver aware of this so clk_factors_recalc_rate()
+> > gives the correct result.
+> > 
+> > Cc: <stable@vger.kernel.org> # 3.12 9a5e6c7eb5cc clk: sunxi: Support factor
+> > Cc: <stable@vger.kernel.org> # 3.12
+> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > 
-> Stefan Agner (3):
->   iio: adc: vf610: use ADC clock within specification
->   iio: adc: vf610: implement configurable conversion modes
->   ARM: dts: add property for maximum ADC clock frequencies
-> 
->  .../devicetree/bindings/iio/adc/vf610-adc.txt      |   9 ++
->  arch/arm/boot/dts/vfxxx.dtsi                       |   4 +
->  drivers/iio/adc/vf610_adc.c                        | 175
-> +++++++++++++++++----
->  3 files changed, 156 insertions(+), 32 deletions(-)
-> 
-> --
-> 2.2.2
+> Could you queue this for 3.19?
 
-The patch set are fine for me.
+This is fixed in 76820fc in clk-next, destined for 3.20.
 
-Acked-by: Fugang Duan <B38611@freescale.com>
+Also I'm confused by the stable tags above. Looks like 9a5e6c7eb5cc was
+merged for 3.16, not 3.12.
 
-Thanks. 
-Fugang
+Regards,
+Mike
+
+> 
+> Thanks,
+> Maxime
+> 
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
