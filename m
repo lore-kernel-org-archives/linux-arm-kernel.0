@@ -1,122 +1,54 @@
-From: behanw@converseincode.com (Behan Webster)
-Date: Wed, 28 Jan 2015 13:07:40 -0800
-Subject: [PATCH] bcm: address clang inline asm incompatibility
-In-Reply-To: <CAKv+Gu88G2QqAupD9j4_-t2=0VJGNbWkUViLBM2nUuyuN-PHWA@mail.gmail.com>
-References: <1422422306-27473-1-git-send-email-behanw@converseincode.com>	<CAKv+Gu_NCgMmX_LQqi7vtjtP4ofrW+kx8FPgRd4-LWwK=73-xg@mail.gmail.com>	<54C8EE04.6060809@linaro.org>	<CAKv+Gu8CrMqwqBOF8rYa3RP1=gfCthwP=1k9kQ73v6+Sxwah4A@mail.gmail.com>	<54C91791.9030508@linaro.org>	<CAKv+Gu8P8eC+bmerCpbSX=USODqE=U7WnLeiCfhHJ8SSVAzPDw@mail.gmail.com>	<CAKv+Gu9fc_F1iC5NAwaG_ed3RRhYnxEBLbuLgW0Oa_qJ96j-gA@mail.gmail.com>	<54C9383D.10901@linaro.org>
- <CAKv+Gu88G2QqAupD9j4_-t2=0VJGNbWkUViLBM2nUuyuN-PHWA@mail.gmail.com>
-Message-ID: <54C94F9C.7030309@converseincode.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 28 Jan 2015 21:12:42 +0000 (UTC)
+Subject: arm64: USB_ARCH_HAS_EHCI
+In-Reply-To: <1422478839.3621.34.camel@x220>
+References: <1422351833.14015.20.camel@x220>
+ <alpine.DEB.2.02.1501272130470.19947@utopia.booyaka.com>
+ <1422438405.5666.16.camel@x220>
+ <alpine.DEB.2.02.1501281621330.19947@utopia.booyaka.com>
+ <1422478839.3621.34.camel@x220>
+Message-ID: <alpine.DEB.2.02.1501282106540.19947@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/28/15 11:38, Ard Biesheuvel wrote:
-> On 28 January 2015 at 19:27, Alex Elder <elder@linaro.org> wrote:
->> On 01/28/2015 01:17 PM, Ard Biesheuvel wrote:
->>> On 28 January 2015 at 17:20, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>>> On 28 January 2015 at 17:08, Alex Elder <elder@linaro.org> wrote:
->>>>> On 01/28/2015 10:17 AM, Ard Biesheuvel wrote:
->>>>>> On 28 January 2015 at 14:11, Alex Elder <elder@linaro.org> wrote:
->>>>>>> On 01/28/2015 05:15 AM, Ard Biesheuvel wrote:
->>>>>>>> On 28 January 2015 at 05:18, Behan Webster <behanw@converseincode.com> wrote:
->>>>>>>>> From: Alex Elder <elder@linaro.org>
->>>>>>>>>
->>>>>>>>> My GCC-based build environment likes to call register r12 by the
->>>>>>>>> name "ip" in inline asm.  Behan Webster informed me that his Clang-
->>>>>>>>> based build environment likes "r12" instead.
->>>>>>>>>
->>>>>>>>> Try to make them both happy.
->>>>>>>>>
->>>>>>>>> Signed-off-by: Alex Elder <elder@linaro.org>
->>>>>>>>> Signed-off-by: Behan Webster <behanw@converseincode.com>
->>>>>>>>> ---
->>>>>>>>>  arch/arm/mach-bcm/bcm_kona_smc.c | 9 +++++++--
->>>>>>>>>  1 file changed, 7 insertions(+), 2 deletions(-)
->>>>>>>>>
->>>>>>>>> diff --git a/arch/arm/mach-bcm/bcm_kona_smc.c b/arch/arm/mach-bcm/bcm_kona_smc.c
->>>>>>>>> index a55a7ec..3937bd5 100644
->>>>>>>>> --- a/arch/arm/mach-bcm/bcm_kona_smc.c
->>>>>>>>> +++ b/arch/arm/mach-bcm/bcm_kona_smc.c
->>>>>>>>> @@ -106,9 +106,14 @@ int __init bcm_kona_smc_init(void)
->>>>>>>>>   * request result appropriately.  This result value is found in r0
->>>>>>>>>   * when the "smc" request completes.
->>>>>>>>>   */
->>>>>>>>> +#ifdef __clang__
->>>>>>>>> +#define R12    "r12"
->>>>>>>>> +#else  /* !__clang__ */
->>>>>>>>> +#define R12    "ip"    /* gcc calls r12 "ip" */
->>>>>>>>> +#endif /* !__clang__ */
->>>>>>>> Why not just use r12 for both?
->>>>>>> Yes, that would have been an obvious fix.  But the
->>>>>>> assembler (in the GCC environment) doesn't accept that.
->>>>>>>
->>>>>> Mine has no problems with it at all
->>>>>>
->>>>>> $ echo 'mov r12, #0' | arm-linux-gnueabihf-gcc -c -x assembler-with-cpp -
->>>>>>
->>>>>> and grepping for r12 under arch/arm suggests the same
->>>>> The use of "r12" is fine.  But it's not just the assembler,
->>>>> I believe it also involves gcc.
->>>>>
->>>>> The problem is with the use of the __asmeq(x, y) macro.
->>>>>
->>>> Ah right. Apologies for assuming that you had missed something obvious here.
->>>> But __asmeq is not the toolchain, it is a local construct #define'd in
->>>> compiler.h
->>>>
->>>>> If I assign the "ip" variable with "r12":
->>>>>         register u32 ip asm("r12");     /* Also called ip */
->>>>>
->>>>> Then that's fine.  However, this line then causes an error:
->>>>>                 __asmeq("%0", "r12")
->>>>>
->>>>> Apparently gcc uses register "ip" when it sees asm("r12").  So
->>>>> attempting to verify the desired register got used with __asmeq()
->>>>> causes a string mismatch--"ip" is not equal to "r12".
->>>>>
->>>>> So I could use:
->>>>>
->>>>>         register u32 ip asm("r12");     /* Also called ip */
->>>>>                 ...
->>>>>                 __asmeq("%0", "ip")
->>>>>
->>>>> And that will build.  But it's a little non-intuitive, and
->>>>> I suspect that clang might (rightfully) have a failure in
->>>>> this __asmeq() call.
->>>>>
->>>> In that case, I would strongly suggest fixing the __asmeq () macro
->>>> instead, and teach it that ("r12","ip") and ("ip","r12") are fine too.
->>>>
->>>> The thing is, inline asm is a dodgy area to begin with in terms of
->>>> clang-to-gcc compatibility. On arm64, we have been seeing issues where
->>>> the width of the register -which is fixed on gcc- is selected based on
->>>> the size of that variable, i.e., an int32 gets a w# register and int64
->>>> gets a x# register. Imagine debugging that, e.g., a str %0, [xx] that
->>>> writes 8 bytes on GCC suddenly only writing 4 bytes when built with
->>>> clang.
->>>>
->>>> If we also start using the preprocessor to conditionalise what is
->>>> emitted by inline asm, the waters get even murkier and it becomes even
->>>> harder to claim parity between the two.
->>>>
->>> Something like this perhaps?
->> So __asmeq() yields true if the register names (strings) are
->> equal, or if one is "ip" and the other is "r12" (in either order).
->>
->> I can't comment on whether it's right in all build environments but
->> this looks OK to me, to handle this special case.
->>
->> I would much rather you generate that patch.  Is that OK?
->>
-> Sure, I can cook up a patch if you guys can confirm that it fixes your
-> use case. (I tested GCC myself but I don't have clang installed)
->
-That appears to work with clang as well.
+Hi Paul,
 
-All in all a much better solution.
+On Wed, 28 Jan 2015, Paul Bolle wrote:
 
-Thank you,
+> On Wed, 2015-01-28 at 16:25 +0000, Paul Walmsley wrote:
+> > Is the Kconfig checker script you mentioned on Tuesday available in the 
+> > mainline tree?  I don't see anything obvious under the "Static Analysers" 
+> > section of the Makefile, but perhaps I'm overlooking it.
+> 
+> No, it's not.
+> 
+> In tree you'll find scripts/checkkconfigsymbols.py. That catches over
+> 90% of the stuff my local script catches, in less than 10% of runtime.
+> It would certainly have caught your use of USB_ARCH_HAS_EHCI.
 
-Behan
+OK great, I'll add that to my static analysis scripts.
 
--- 
-Behan Webster
-behanw at converseincode.com
+> My local script is my third (or fourth) attempt at a script that checks
+> these kind of issues. I've used it on linux-next since for about 3/4 of
+> a year now. While doing that I ran into people that are planning into
+> adding similar, but far more advanced, functionality into one of the
+> bots that is checking linux. So I never bothered making my script
+> public. (I'm not sure what the status of those plan is now.)
+> 
+> In the mean time I'll keep on checking linux-next with my script. That
+> should also help to see what problems an actual bot could run into, for
+> the benefit of those people. 
+
+That sounds good; it's a very useful service you're providing.
+
+> Problems like:
+> - should it check each commit (I think it should only check releases);
+> - should it be a true bot (I think it needs a wetware frontend to
+>   filter out non-issues).
+> 
+> Hope this answers your question.
+
+It does.  Thanks for the detailed response.
+
+
+- Paul
