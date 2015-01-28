@@ -1,60 +1,128 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 28 Jan 2015 11:22:50 +0000
-Subject: arm32 binaries work with CONFIG_COMPAT as root but not as user?
-In-Reply-To: <CAAqcGHnS7P7=xzXoOPE61dcbbq_1kvmeB-V1GcDUxB1ND0-kZA@mail.gmail.com>
-References: <CAAqcGHnS7P7=xzXoOPE61dcbbq_1kvmeB-V1GcDUxB1ND0-kZA@mail.gmail.com>
-Message-ID: <20150128112249.GD6646@e104818-lin.cambridge.arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 28 Jan 2015 11:25:52 +0000
+Subject: [PATCH 2/7] pm: at91: pm_suspend: add the WFI support for ARMv7
+In-Reply-To: <1422266761-24487-1-git-send-email-wenyou.yang@atmel.com>
+References: <1422266617-24381-1-git-send-email-wenyou.yang@atmel.com>
+ <1422266761-24487-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20150128112551.GA13253@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 28, 2015 at 10:52:21AM +0000, Riku Voipio wrote:
-> Perhaps I'm missing here something, but seems I can only run 32bit arm
-> programs on arm64 system if I am root. So far even the simplest hello
-> world will be killed/segfaulted on startup. This is on mustang hw.
+On Mon, Jan 26, 2015 at 10:06:01AM +0000, Wenyou Yang wrote:
+
+Commit log please.
+
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> ---
+>  arch/arm/mach-at91/pm_suspend.S |   54 ++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 53 insertions(+), 1 deletion(-)
 > 
-> taking on 3.19-rc3 with arch=arm64 and make defconfig:
+> diff --git a/arch/arm/mach-at91/pm_suspend.S b/arch/arm/mach-at91/pm_suspend.S
+> index 122a3f1..e796722 100644
+> --- a/arch/arm/mach-at91/pm_suspend.S
+> +++ b/arch/arm/mach-at91/pm_suspend.S
+> @@ -53,6 +53,58 @@ mode	.req	r6
+>  	beq	1b
+>  	.endm
+>  
+> +/*
+> + * Put the processor to enter the WFI state
+> + */
+> +	.macro _do_wfi
 
-It works for me with the arm64 for-next/core branch, I haven't tried
-vanilla 3.19-rc3 yet. Do you have other patches applied?
+You will have to explain why you need this, really.
 
-> wget http://kos.to/hello-test/hello
-> # file hello
-> hello: ELF 32-bit LSB executable, ARM, EABI5 version 1 (SYSV),
-> statically linked, for GNU/Linux 2.6.32,
-> BuildID[sha1]=c37a3b366d645eee600963a535370fa0bad9b2c0, not stripped
-> # ./hello
-> hello world
-> # su - linaro
-> $ /root/hello
-> Segmentation fault
-> $ gdb /root/hello
-> (gdb) run
-> Starting program: /root/hello
-> During startup program terminated with signal SIGSEGV, Segmentation fault.
+> +
+> +#if defined(CONFIG_CPU_V7)
+> +	/*
+> +	 * Execute an ISB instruction to flush the pipeline to ensure
+> +	 * that all of operations have beem completed.
 
-Do you get some kernel message?
+s/beem/been
 
-This works for me with Debian armel.
+> +	 */
+> +	isb
+> +
+> +	/*
+> +	 * Execute an ISB instruction to ensure that all of the
+> +	 * CP15 register changes have been committed.
+> +	 */
+> +	dsb
 
-> If you have a debian/ubuntu system, you can also reproduce it with multiarch:
+This is a dsb not an isb.
+
+> +	dmb
+
+You have to explain why you need every single one of these barriers,
+otherwise I am NAKing this patch.
+
+> +
+> +	/* Disable the processor's clock */
+> +	mov	tmp1, #AT91_PMC_PCK
+> +	str	tmp1, [pmc, #AT91_PMC_SCDR]
+> +
+> +	/* Execute a WFI instruction */
+> +	wfi	@ Wait For Interrupt
+
+This one looks ok :)
+
+> +
+> +	/*
+> +	 * CPU can specualatively prefetch the instructions
+> +	 * so add NOPs after WFI. Sixteen NOPs as Cortex-A5 pipeline.
+
+So what ? I suspect your issue is related to wfi completion on pending
+IRQ. I would like to know the details that describe the issue you are
+trying to solve here please.
+
+> +	 */
+> +	nop
+> +	nop
+> +	nop
+> +	nop
+> +	nop
+> +	nop
+> +	nop
+> +	nop
+> +	nop
+> +	nop
+> +	nop
+> +	nop
+> +	nop
+> +	nop
+> +	nop
+> +	nop
+> +#else
+> +	mcr	p15, 0, tmp1, c7, c0, 4
+> +#endif
+
+Tell us what's the problem you have to solve, first, then we will see how
+to fix it.
+
+Thanks,
+Lorenzo
+
+> +
+> +	.endm
+> +
+>  	.text
+>  
+>  /*
+> @@ -181,7 +233,7 @@ sdr_sr_done:
+>  
+>  skip_disable_main_clock:
+>  	/* Wait for interrupt */
+> -	mcr	p15, 0, tmp1, c7, c0, 4
+> +	_do_wfi
+>  
+>  	tst	mode, #AT91_PM_SLOW_CLOCK
+>  	beq	skip_enable_main_clock
+> -- 
+> 1.7.9.5
 > 
-> dpkg --add-architecture armhf
-> apt-get update
-> apt-get install hello:armhf
-> # hello
-> Hello, world!
-> # su - ubuntu
-> $ hello
-> Segmentation fault
-> $
-
-This works as well.
-
-What does this say:
-
-# cat /proc/sys/vm/mmap_min_addr
-
-If it is 64K, it won't run 32-bit apps as non-root.
-
--- 
-Catalin
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
