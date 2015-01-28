@@ -1,69 +1,45 @@
 From: stripathi@apm.com (Suman Tripathi)
-Date: Wed, 28 Jan 2015 09:53:25 +0530
-Subject: [PATCH v1 2/2] arm64: dts: Add the arasan sdhc nodes in
- apm-storm.dtsi.
-In-Reply-To: <CAOHikRB4tSkJsMccqHRS8XYULaP+dS7KujeSLh+ZpTxDDOF5xQ@mail.gmail.com>
-References: <1422379260-10139-1-git-send-email-stripathi@apm.com>
- <1422379260-10139-3-git-send-email-stripathi@apm.com>
- <4747424.udeKOcy6tC@wuerfel>
- <CAOHikRB4tSkJsMccqHRS8XYULaP+dS7KujeSLh+ZpTxDDOF5xQ@mail.gmail.com>
-Message-ID: <CAOHikRAOVMQiOy_VrXmJU1e+8KBwOFSfX1uSKvfdbVG=Br2ocg@mail.gmail.com>
+Date: Wed, 28 Jan 2015 09:54:21 +0530
+Subject: [PATCH] ahci_xgene: Fix the dma state machine lockup for the
+ ATA_CMD_SMART PIO mode command.
+In-Reply-To: <20150127181950.GE12314@htj.dyndns.org>
+References: <1422381371-11361-1-git-send-email-stripathi@apm.com>
+ <1422381371-11361-2-git-send-email-stripathi@apm.com>
+ <20150127181950.GE12314@htj.dyndns.org>
+Message-ID: <CAOHikRBBG2p7kBn=bwP9rw0RYecvjNqz-zAiHeKT4+TyP8sCoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Tue, Jan 27, 2015 at 11:26:11PM +0530, Suman Tripathi wrote:
+> This patch addresses the issue with ATA_CMD_SMART pio mode
+> command for enumeration and device detection with ATA devices.It is the
+> same issue as in patch
+>
+> www.spinics.net/lists/linux-ide/msg49092.html
 
-I added the iommus in the IOMMU AHBC patch. Anything wrong in that ?
-In the next version Also I will remove the IOMMU hacks from arasan
-driver
+The link is broken.  Can you please include at least a brief
+explanation of the problem and preferably link to something more
+permanant (commit ID, http://lkml.kernel.org/g/MSG_ID)?
+Ok some problem might be there, But the link is opening. Sure I will
+add the explanation rather than providing a link in the next version
 
-On Wed, Jan 28, 2015 at 9:48 AM, Suman Tripathi <stripathi@apm.com> wrote:
-> Hi Arnd,
->
-> On Tuesday 27 January 2015 22:51:00 Suman Tripathi wrote:
+
+On Tue, Jan 27, 2015 at 11:49 PM, Tejun Heo <tj@kernel.org> wrote:
+> On Tue, Jan 27, 2015 at 11:26:11PM +0530, Suman Tripathi wrote:
+>> This patch addresses the issue with ATA_CMD_SMART pio mode
+>> command for enumeration and device detection with ATA devices.It is the
+>> same issue as in patch
 >>
->> +               sdhc0: sdhc at 1c000000 {
->> +                       device_type = "sdhc";
->> +                       compatible = "arasan,sdhci-8.9a";
->> +                       reg = <0x0 0x1c000000 0x0 0x100>;
->> +                       interrupts = <0x0 0x49 0x4>;
->> +                       clock-names = "clk_xin", "clk_ahb";
->> +                       clocks = <&sdioclk 0>, <&ahbclk 0>;
->> +               };
->> +
+>> www.spinics.net/lists/linux-ide/msg49092.html
 >
-> Here you don't provide an 'iommus' property, which means that the
-> device is unable to use the iommu.
-> I added the iommus in the IOMMU AHBC patch. Anything wrong in that ? In the
-> next version Also I will remove the IOMMU hacks from arasan driver
+> The link is broken.  Can you please include at least a brief
+> explanation of the problem and preferably link to something more
+> permanant (commit ID, http://lkml.kernel.org/g/MSG_ID)?
 >
->
-> On Wed, Jan 28, 2015 at 1:43 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->>
->> On Tuesday 27 January 2015 22:51:00 Suman Tripathi wrote:
->> >
->> > +               sdhc0: sdhc at 1c000000 {
->> > +                       device_type = "sdhc";
->> > +                       compatible = "arasan,sdhci-8.9a";
->> > +                       reg = <0x0 0x1c000000 0x0 0x100>;
->> > +                       interrupts = <0x0 0x49 0x4>;
->> > +                       clock-names = "clk_xin", "clk_ahb";
->> > +                       clocks = <&sdioclk 0>, <&ahbclk 0>;
->> > +               };
->> > +
->>
->> Here you don't provide an 'iommus' property, which means that the
->> device is unable to use the iommu.
->>
->>         Arnd
->
->
->
+> Thanks.
 >
 > --
-> Thanks,
-> with regards,
-> Suman Tripathi
+> tejun
 
 
 
