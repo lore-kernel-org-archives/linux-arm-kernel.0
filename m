@@ -1,72 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Jan 2015 15:45:53 +0100
-Subject: [PATCH] iommu: disable on !MMU builds
-Message-ID: <1685569.C1Ne1erBMA@wuerfel>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 28 Jan 2015 15:46:05 +0100
+Subject: [PATCH v5] can: Convert to runtime_pm
+In-Reply-To: <baf987c11c0242c2bf87b81f9396b09d@BN1BFFO11FD018.protection.gbl>
+References: <baf987c11c0242c2bf87b81f9396b09d@BN1BFFO11FD018.protection.gbl>
+Message-ID: <54C8F62D.6090909@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A lot of the IOMMU support code does not build if the CPU does
-not have an MMU itself, and it's not clear if there is any
-use case for it, so let's just disable it and wait for anybody
-to need it.
+On 01/12/2015 04:04 PM, Kedareswara rao Appana wrote:
+> Instead of enabling/disabling clocks at several locations in the driver,
+> Use the runtime_pm framework. This consolidates the actions for runtime PM
+> In the appropriate callbacks and makes the driver more readable and mantainable.
+> 
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> ---
+> Changes for v5:
+>  - Updated with the review comments.
+>    Updated the remove fuction to use runtime_pm.
+> Chnages for v4:
+>  - Updated with the review comments.
+> Changes for v3:
+>   - Converted the driver to use runtime_pm.
+> Changes for v2:
+>   - Removed the struct platform_device* from suspend/resume
+>     as suggest by Lothar.
 
-This avoids randconfig errors like
+Any plans to submit a v6?
 
-../arch/arm/mm/dma-mapping.c: In function '__iommu_alloc_remap':
-../arch/arm/mm/dma-mapping.c:1278:34: error: 'VM_ARM_DMA_CONSISTENT' undeclared (first use in this function)
-  area = get_vm_area_caller(size, VM_ARM_DMA_CONSISTENT | VM_USERMAP,
-                                  ^
-../arch/arm/mm/dma-mapping.c:1278:34: note: each undeclared identifier is reported only once for each function it appears in
-../arch/arm/mm/dma-mapping.c: In function '__atomic_get_pages':
-../arch/arm/mm/dma-mapping.c:1358:27: error: 'atomic_pool' undeclared (first use in this function)
-  struct dma_pool *pool = &atomic_pool;
+Marc
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-index c68c8db0e6f7..089da97d7c6b 100644
---- a/drivers/iommu/Kconfig
-+++ b/drivers/iommu/Kconfig
-@@ -4,6 +4,7 @@ config IOMMU_API
- 
- menuconfig IOMMU_SUPPORT
- 	bool "IOMMU Hardware Support"
-+	depends on MMU
- 	default y
- 	---help---
- 	  Say Y here if you want to compile device drivers for IO Memory
-@@ -170,7 +171,7 @@ config IRQ_REMAP
- # OMAP IOMMU support
- config OMAP_IOMMU
- 	bool "OMAP IOMMU Support"
--	depends on ARCH_OMAP2PLUS
-+	depends on ARCH_OMAP2PLUS && MMU
- 	select IOMMU_API
- 
- config OMAP_IOMMU_DEBUG
-@@ -217,7 +218,7 @@ config TEGRA_IOMMU_SMMU
- 
- config EXYNOS_IOMMU
- 	bool "Exynos IOMMU Support"
--	depends on ARCH_EXYNOS && ARM
-+	depends on ARCH_EXYNOS && ARM && MMU
- 	select IOMMU_API
- 	select ARM_DMA_USE_IOMMU
- 	help
-@@ -246,7 +247,7 @@ config SHMOBILE_IPMMU_TLB
- config SHMOBILE_IOMMU
- 	bool "IOMMU for Renesas IPMMU/IPMMUI"
- 	default n
--	depends on ARM
-+	depends on ARM && MMU
- 	depends on ARCH_SHMOBILE || COMPILE_TEST
- 	select IOMMU_API
- 	select ARM_DMA_USE_IOMMU
-@@ -336,6 +337,7 @@ config SPAPR_TCE_IOMMU
- config ARM_SMMU
- 	bool "ARM Ltd. System MMU (SMMU) Support"
- 	depends on ARM64 || ARM
-+	depends on MMU
- 	select IOMMU_API
- 	select IOMMU_IO_PGTABLE_LPAE
- 	select ARM_DMA_USE_IOMMU if ARM
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150128/93040070/attachment-0001.sig>
