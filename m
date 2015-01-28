@@ -1,66 +1,60 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 28 Jan 2015 11:21:54 +0000
-Subject: [PATCH v5 3/8] of: fix size when dma-range is not used
-In-Reply-To: <1422392405-32196-4-git-send-email-m-karicheri2@ti.com>
-References: <1422392405-32196-1-git-send-email-m-karicheri2@ti.com>
- <1422392405-32196-4-git-send-email-m-karicheri2@ti.com>
-Message-ID: <54C8C652.8050507@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 28 Jan 2015 11:22:50 +0000
+Subject: arm32 binaries work with CONFIG_COMPAT as root but not as user?
+In-Reply-To: <CAAqcGHnS7P7=xzXoOPE61dcbbq_1kvmeB-V1GcDUxB1ND0-kZA@mail.gmail.com>
+References: <CAAqcGHnS7P7=xzXoOPE61dcbbq_1kvmeB-V1GcDUxB1ND0-kZA@mail.gmail.com>
+Message-ID: <20150128112249.GD6646@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Murali,
+On Wed, Jan 28, 2015 at 10:52:21AM +0000, Riku Voipio wrote:
+> Perhaps I'm missing here something, but seems I can only run 32bit arm
+> programs on arm64 system if I am root. So far even the simplest hello
+> world will be killed/segfaulted on startup. This is on mustang hw.
+> 
+> taking on 3.19-rc3 with arch=arm64 and make defconfig:
 
-[sorry, missed replying to yesterday's version]
+It works for me with the arm64 for-next/core branch, I haven't tried
+vanilla 3.19-rc3 yet. Do you have other patches applied?
 
-On 27/01/15 21:00, Murali Karicheri wrote:
-> Fix the dma-range size when the DT attribute is missing. i.e  set size to
-> dev->coherent_dma_mask + 1 instead of dev->coherent_dma_mask. Also add
-> code to check invalid values of size configured in DT and log error.
->
-> Cc: Joerg Roedel <joro@8bytes.org>
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> ---
->   drivers/of/device.c |    9 ++++++++-
->   1 file changed, 8 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/of/device.c b/drivers/of/device.c
-> index 2de320d..17504f4 100644
-> --- a/drivers/of/device.c
-> +++ b/drivers/of/device.c
-> @@ -105,12 +105,19 @@ void of_dma_configure(struct device *dev, struct device_node *np)
->   	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
->   	if (ret < 0) {
->   		dma_addr = offset = 0;
-> -		size = dev->coherent_dma_mask;
-> +		size = dev->coherent_dma_mask + 1;
->   	} else {
->   		offset = PFN_DOWN(paddr - dma_addr);
->   		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
->   	}
->
-> +	if (is_power_of_2(size + 1))
-> +		size = size + 1;
-> +	else if (!is_power_of_2(size)) {
-> +		dev_err(dev, "invalid size\n");
-> +		return;
-> +	}
-> +
+> wget http://kos.to/hello-test/hello
+> # file hello
+> hello: ELF 32-bit LSB executable, ARM, EABI5 version 1 (SYSV),
+> statically linked, for GNU/Linux 2.6.32,
+> BuildID[sha1]=c37a3b366d645eee600963a535370fa0bad9b2c0, not stripped
+> # ./hello
+> hello world
+> # su - linaro
+> $ /root/hello
+> Segmentation fault
+> $ gdb /root/hello
+> (gdb) run
+> Starting program: /root/hello
+> During startup program terminated with signal SIGSEGV, Segmentation fault.
 
-Couldn't these checks go into the "else" path above? We don't need to 
-check the non-DT case, because we know we've just set it to something 
-sensible.
+Do you get some kernel message?
 
-Robin.
+This works for me with Debian armel.
 
->   	dev->dma_pfn_offset = offset;
->
->   	coherent = of_dma_is_coherent(np);
->
+> If you have a debian/ubuntu system, you can also reproduce it with multiarch:
+> 
+> dpkg --add-architecture armhf
+> apt-get update
+> apt-get install hello:armhf
+> # hello
+> Hello, world!
+> # su - ubuntu
+> $ hello
+> Segmentation fault
+> $
+
+This works as well.
+
+What does this say:
+
+# cat /proc/sys/vm/mmap_min_addr
+
+If it is 64K, it won't run 32-bit apps as non-root.
+
+-- 
+Catalin
