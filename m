@@ -1,62 +1,79 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Jan 2015 15:15:02 +0100
-Subject: [PATCH 2/4] net: wan: add missing virt_to_bus dependencies
-In-Reply-To: <1422454504-439085-1-git-send-email-arnd@arndb.de>
-References: <1422454504-439085-1-git-send-email-arnd@arndb.de>
-Message-ID: <1422454504-439085-3-git-send-email-arnd@arndb.de>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Wed, 28 Jan 2015 15:17:42 +0100
+Subject: [PATCH 2/9] mtd: pxa3xx_nand: add a non mandatory ECC clock
+In-Reply-To: <20150128113552.5dd3edc4@xhacker>
+References: <1422367816-4257-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1422367816-4257-3-git-send-email-antoine.tenart@free-electrons.com>
+ <20150128113552.5dd3edc4@xhacker>
+Message-ID: <20150128141742.GB11705@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cosa driver is rather outdated and does not get built on most
-platforms because it requires the ISA_DMA_API symbol. However
-there are some ARM platforms that have ISA_DMA_API but no virt_to_bus,
-and they get this build error when enabling the ltpc driver.
+Hi Jisheng!
 
-drivers/net/wan/cosa.c: In function 'tx_interrupt':
-drivers/net/wan/cosa.c:1768:3: error: implicit declaration of function 'virt_to_bus'
-   unsigned long addr = virt_to_bus(cosa->txbuf);
-   ^
+On Wed, Jan 28, 2015 at 11:35:52AM +0800, Jisheng Zhang wrote:
+> On Tue, 27 Jan 2015 06:10:09 -0800
+> Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
+> 
+> > diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+> > index d00ac392d1c4..2681ec4abafa 100644
+> > --- a/drivers/mtd/nand/pxa3xx_nand.c
+> > +++ b/drivers/mtd/nand/pxa3xx_nand.c
+> > @@ -180,7 +180,7 @@ struct pxa3xx_nand_info {
+> >  	struct nand_hw_control	controller;
+> >  	struct platform_device	 *pdev;
+> >  
+> > -	struct clk		*clk;
+> > +	struct clk		*clk, *ecc_clk;
+> >  	void __iomem		*mmio_base;
+> >  	unsigned long		mmio_phys;
+> >  	struct completion	cmd_complete, dev_ready;
+> > @@ -1608,7 +1608,7 @@ static int alloc_nand_resource(struct platform_device
+> > *pdev) 
+> >  	spin_lock_init(&chip->controller->lock);
+> >  	init_waitqueue_head(&chip->controller->wq);
+> > -	info->clk = devm_clk_get(&pdev->dev, NULL);
+> > +	info->clk = devm_clk_get(&pdev->dev, "nfc");
+> >  	if (IS_ERR(info->clk)) {
+> 
+> Do we need to fall back to unnamed clock here? Otherwise I guess it will break
+> other platforms.
 
-The same problem exists for the Hostess SV-11 and Sealevel Systems 4021
-drivers.
+Yes, as Andrew pointed out we need to keep the NULL here to avoid
+breaking other platforms.
 
-This adds another dependency in Kconfig to avoid that configuration.
+> >  
+> >  	/* initialize all interrupts to be disabled */
+> > @@ -1687,6 +1694,9 @@ static int alloc_nand_resource(struct platform_device
+> > *pdev) fail_free_buf:
+> >  	free_irq(irq, info);
+> >  	kfree(info->data_buff);
+> > +fail_disable_ecc_clk:
+> > +	if (!IS_ERR(info->ecc_clk))
+> > +		clk_disable_unprepare(info->ecc_clk);
+> 
+> we can remove the IS_ERR check to simplify this error path since commit
+> 63589e92c2d9("clk: Ignore error and NULL pointers passed to clk_{unprepare, disable}()")
+> 
+> >  fail_disable_clk:
+> >  	clk_disable_unprepare(info->clk);
+> >  	return ret;
+> > @@ -1709,6 +1719,8 @@ static int pxa3xx_nand_remove(struct platform_device
+> > *pdev) pxa3xx_nand_free_buff(info);
+> >  
+> >  	clk_disable_unprepare(info->clk);
+> > +	if (!IS_ERR(info->ecc_clk))
+> > +		clk_disable_unprepare(info->ecc_clk);
+> 
+> we can remove the IS_ERR check too.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/net/wan/Kconfig | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Yes! Thanks for the hint, I'll remove these useless checks in v2.
 
-diff --git a/drivers/net/wan/Kconfig b/drivers/net/wan/Kconfig
-index 94e234975c61..a2fdd15f285a 100644
---- a/drivers/net/wan/Kconfig
-+++ b/drivers/net/wan/Kconfig
-@@ -25,7 +25,7 @@ if WAN
- # There is no way to detect a comtrol sv11 - force it modular for now.
- config HOSTESS_SV11
- 	tristate "Comtrol Hostess SV-11 support"
--	depends on ISA && m && ISA_DMA_API && INET && HDLC
-+	depends on ISA && m && ISA_DMA_API && INET && HDLC && VIRT_TO_BUS
- 	help
- 	  Driver for Comtrol Hostess SV-11 network card which
- 	  operates on low speed synchronous serial links at up to
-@@ -37,7 +37,7 @@ config HOSTESS_SV11
- # The COSA/SRP driver has not been tested as non-modular yet.
- config COSA
- 	tristate "COSA/SRP sync serial boards support"
--	depends on ISA && m && ISA_DMA_API && HDLC
-+	depends on ISA && m && ISA_DMA_API && HDLC && VIRT_TO_BUS
- 	---help---
- 	  Driver for COSA and SRP synchronous serial boards.
- 
-@@ -87,7 +87,7 @@ config LANMEDIA
- # There is no way to detect a Sealevel board. Force it modular
- config SEALEVEL_4021
- 	tristate "Sealevel Systems 4021 support"
--	depends on ISA && m && ISA_DMA_API && INET && HDLC
-+	depends on ISA && m && ISA_DMA_API && INET && HDLC && VIRT_TO_BUS
- 	help
- 	  This is a driver for the Sealevel Systems ACB 56 serial I/O adapter.
- 
+Thanks!
+
+Antoine
+
 -- 
-2.1.0.rc2
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
