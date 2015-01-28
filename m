@@ -1,152 +1,100 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 28 Jan 2015 11:05:23 +0000
-Subject: [PATCH v4 3/6] of: fix size when dma-range is not used
-In-Reply-To: <54C7DF13.20402@ti.com>
-References: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
- <1422052359-12384-4-git-send-email-m-karicheri2@ti.com>
- <54C77616.80301@arm.com> <54C7DF13.20402@ti.com>
-Message-ID: <20150128110523.GC6646@e104818-lin.cambridge.arm.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Wed, 28 Jan 2015 12:08:34 +0100
+Subject: [PATCH v2 2/5] KVM: ARM: on IO mem abort - route the call to
+ KVM MMIO bus
+In-Reply-To: <20150127213853.GE9055@cbox>
+References: <20141207093641.17563.84226.stgit@i3820>
+ <20141207093749.17563.12497.stgit@i3820> <54B3FFB9.3050406@linaro.org>
+ <CADDJ2=Os6Uws6HN=iKg=uhx1artwBFXeyFKq9Co2Sgoo=63bOQ@mail.gmail.com>
+ <20150127213853.GE9055@cbox>
+Message-ID: <54C8C332.60007@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 27, 2015 at 06:55:15PM +0000, Murali Karicheri wrote:
-> On 01/27/2015 06:27 AM, Robin Murphy wrote:
-> > On 23/01/15 22:32, Murali Karicheri wrote:
-> >> Fix the dma-range size when the DT attribute is missing. i.e set size to
-> >> dev->coherent_dma_mask + 1 instead of dev->coherent_dma_mask. To detect
-> >> overflow when mask is set to max of u64, add a check, log error and
-> >> return.
-> >> Some platform use mask format for size in DTS. So add a work around to
-> >> catch this and fix.
-> >>
-> >> Cc: Joerg Roedel <joro@8bytes.org>
-> >> Cc: Grant Likely <grant.likely@linaro.org>
-> >> Cc: Rob Herring <robh+dt@kernel.org>
-> >> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> >> Cc: Will Deacon <will.deacon@arm.com>
-> >> Cc: Russell King <linux@arm.linux.org.uk>
-> >> Cc: Arnd Bergmann <arnd@arndb.de>
-> >> Cc: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> >>
-> >> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> >> ---
-> >> drivers/of/device.c | 14 +++++++++++++-
-> >> 1 file changed, 13 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/drivers/of/device.c b/drivers/of/device.c
-> >> index 2de320d..0a5ff54 100644
-> >> --- a/drivers/of/device.c
-> >> +++ b/drivers/of/device.c
-> >> @@ -105,12 +105,24 @@ void of_dma_configure(struct device *dev, struct
-> >> device_node *np)
-> >> ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
-> >> if (ret < 0) {
-> >> dma_addr = offset = 0;
-> >> - size = dev->coherent_dma_mask;
-> >> + size = dev->coherent_dma_mask + 1;
-> >> } else {
-> >> offset = PFN_DOWN(paddr - dma_addr);
-> >> + /*
-> >> + * Add a work around to treat the size as mask + 1 in case
-> >> + * it is defined in DT as a mask.
-> >> + */
-> >> + if (size & 1)
-> >> + size = size + 1;
-> >> dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
-> >> }
-> >>
-> >> + /* if size is 0, we have an overflow of u64 */
-> >> + if (!size) {
-> >> + dev_err(dev, "invalid size\n");
-> >> + return;
-> >> + }
-> >> +
-> >
-> > This seems potentially fragile to dodgy DTs given that we might also be
-> > using size to make a mask later. Would it make sense to double-up a
-> > sanity check as mask-format detection? Something like:
-> >
-> > if is_power_of_2(size)
-> > // use size
-> > else if is_power_of_2(size + 1)
-> > // use size + 1
-> > else
-> > // cry
+On 01/27/2015 10:38 PM, Christoffer Dall wrote:
+> On Sat, Jan 24, 2015 at 03:02:33AM +0200, Nikolay Nikolaev wrote:
+>> On Mon, Jan 12, 2015 at 7:09 PM, Eric Auger <eric.auger@linaro.org> wrote:
+>>> Hi Nikolay,
+>>> On 12/07/2014 10:37 AM, Nikolay Nikolaev wrote:
+>>>> On IO memory abort, try to handle the MMIO access thorugh the KVM
+>>>> registered read/write callbacks. This is done by invoking the relevant
+>>>> kvm_io_bus_* API.
+>>>>
+>>>> Signed-off-by: Nikolay Nikolaev <n.nikolaev@virtualopensystems.com>
+>>>> ---
+>>>>  arch/arm/kvm/mmio.c |   33 +++++++++++++++++++++++++++++++++
+>>>>  1 file changed, 33 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
+>>>> index 4cb5a93..e42469f 100644
+>>>> --- a/arch/arm/kvm/mmio.c
+>>>> +++ b/arch/arm/kvm/mmio.c
+>>>> @@ -162,6 +162,36 @@ static int decode_hsr(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>>>       return 0;
+>>>>  }
+>>>>
+>>>> +/**
+>>>> + * handle_kernel_mmio - handle an in-kernel MMIO access
+>>>> + * @vcpu:    pointer to the vcpu performing the access
+>>>> + * @run:     pointer to the kvm_run structure
+>>>> + * @mmio:    pointer to the data describing the access
+>>>> + *
+>>>> + * returns true if the MMIO access has been performed in kernel space,
+>>>> + * and false if it needs to be emulated in user space.
+>>>> + */
+>>>> +static bool handle_kernel_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>>>> +             struct kvm_exit_mmio *mmio)
+>>>> +{
+>>>> +     int ret;
+>>>> +
+>>>> +     if (mmio->is_write) {
+>>>> +             ret = kvm_io_bus_write(vcpu, KVM_MMIO_BUS, mmio->phys_addr,
+>>>> +                             mmio->len, &mmio->data);
+>>>> +
+>>>> +     } else {
+>>>> +             ret = kvm_io_bus_read(vcpu, KVM_MMIO_BUS, mmio->phys_addr,
+>>>> +                             mmio->len, &mmio->data);
+>>>> +     }
+>>>> +     if (!ret) {
+>>>> +             kvm_prepare_mmio(run, mmio);
+>>>> +             kvm_handle_mmio_return(vcpu, run);
+>>>> +     }
+>>>> +
+>>>> +     return !ret;
+>>> in case ret < 0 (-EOPNOTSUPP = -95) aren't we returning true too? return
+>>> (ret==0)?
+>>>
+>>>> +}
+>>>> +
+>>>>  int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>>>>                phys_addr_t fault_ipa)
+>>>>  {
+>>>> @@ -200,6 +230,9 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>>>>       if (vgic_handle_mmio(vcpu, run, &mmio))
+>>>>               return 1;
+>>>>
+>>>> +     if (handle_kernel_mmio(vcpu, run, &mmio))
+>>>> +             return 1;
+>>>> +
+>>>>       kvm_prepare_mmio(run, &mmio);
+>>>>       return 0;
+>>> currently the io_mem_abort returned value is not used by mmu.c code. I
+>>> think this should be handed in kvm_handle_guest_abort. What do you think?
+>>
+>> You're right that the returned value is not handled further after we
+>> exit io_mem_abort, it's just passed up the call stack.
+>> However I'm not sure how to handle it better. If you have ideas, please share.
+>>
+> I'm confused: the return value from io_mem_abort is assigned to a
+> variable 'ret' in kvm_handle_guest_abort and that determines if we
+> should run the VM again or return to userspace (with some work for
+> userspace to do or with an error).
+
+hum well apologies for that. Guess I was tired when reading that piece
+of code :-(
+
+Best Regards
+Eric
 > 
-> How about having the logic like this?
+> -Christoffer
 > 
-> 	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
-> 	if (ret < 0) {
-> 		dma_addr = offset = 0;
-> 		size = dev->coherent_dma_mask + 1;
-> 	} else {
-> 		offset = PFN_DOWN(paddr - dma_addr);
-> 		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
-> 	}
-> 
-> 	if (is_power_of_2(size + 1))
-> 		size = size + 1;
-> 	else if (!is_power_of_2(size))
-> 	{
-> 		dev_err(dev, "invalid size\n");
-> 		return;
-> 	}
-
-In of_dma_configure(), we currently assume that the default coherent
-mask is 32-bit. In this thread:
-
-http://article.gmane.org/gmane.linux.kernel/1835096
-
-we talked about setting the coherent mask based on size automatically.
-I'm not sure about the size but I think we can assume is 32-bit mask + 1
-if it is not specified in the DT. Instead of just assuming a default
-mask, let's assume a default size and create the mask based on this
-(untested):
-
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index 5b33c6a21807..9ff8d1286b44 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -170,10 +170,10 @@ static void of_dma_configure(struct device *dev)
- 	struct iommu_ops *iommu;
- 
- 	/*
--	 * Set default dma-mask to 32 bit. Drivers are expected to setup
--	 * the correct supported dma_mask.
-+	 * Set default size to cover the 32-bit. Drivers are expected to setup
-+	 * the correct size and dma_mask.
- 	 */
--	dev->coherent_dma_mask = DMA_BIT_MASK(32);
-+	size = 1ULL << 32;
- 
- 	/*
- 	 * Set it to coherent_dma_mask by default if the architecture
-@@ -185,13 +185,24 @@ static void of_dma_configure(struct device *dev)
- 	ret = of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size);
- 	if (ret < 0) {
- 		dma_addr = offset = 0;
--		size = dev->coherent_dma_mask;
- 	} else {
- 		offset = PFN_DOWN(paddr - dma_addr);
- 		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
- 	}
- 	dev->dma_pfn_offset = offset;
- 
-+	/*
-+	 * Workaround for DTs setting the size to a mask or 0.
-+	 */
-+	if (is_power_of_2(size + 1))
-+		size += 1;
-+
-+	/*
-+	 * Coherent DMA masks larger than 32-bit must be explicitly set by the
-+	 * driver.
-+	 */
-+	dev->coherent_dma_mask = min(DMA_BIT_MASK(32), DMA_BIT_MASK(ilog2(size)));
-+
- 	coherent = of_dma_is_coherent(dev->of_node);
- 	dev_dbg(dev, "device is%sdma coherent\n",
- 		coherent ? " " : " not ");
-
--- 
-Catalin
