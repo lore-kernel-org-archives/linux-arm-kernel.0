@@ -1,44 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Jan 2015 15:15:04 +0100
-Subject: [PATCH 4/4] net: am2150: fix nmclan_cs.c shared interrupt handling
-In-Reply-To: <1422454504-439085-1-git-send-email-arnd@arndb.de>
-References: <1422454504-439085-1-git-send-email-arnd@arndb.de>
-Message-ID: <1422454504-439085-5-git-send-email-arnd@arndb.de>
+From: riku.voipio@linaro.org (Riku Voipio)
+Date: Wed, 28 Jan 2015 16:16:13 +0200
+Subject: arm32 binaries work with CONFIG_COMPAT as root but not as user?
+In-Reply-To: <20150128114708.GA9000@e104818-lin.cambridge.arm.com>
+References: <CAAqcGHnS7P7=xzXoOPE61dcbbq_1kvmeB-V1GcDUxB1ND0-kZA@mail.gmail.com>
+ <20150128112249.GD6646@e104818-lin.cambridge.arm.com>
+ <CAAqcGHn5rVyWRznbgTxLjTp6kHRGWW26-zJ3t7eOki_czwx1AQ@mail.gmail.com>
+ <20150128114708.GA9000@e104818-lin.cambridge.arm.com>
+Message-ID: <CAAqcGH=8rBHZ8B66sEVE+8aa9+oqXkM5ex3gjcXO3WxCu+8aXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A recent patch tried to work around a valid warning for the use of a
-deprecated interface by blindly changing from the old
-pcmcia_request_exclusive_irq() interface to pcmcia_request_irq().
+On 28 January 2015 at 13:47, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Wed, Jan 28, 2015 at 11:42:55AM +0000, Riku Voipio wrote:
+>> On 28 January 2015 at 13:22, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> > On Wed, Jan 28, 2015 at 10:52:21AM +0000, Riku Voipio wrote:
+>> > What does this say:
+>> cat /proc/sys/vm/mmap_min_addr
+>> 65536
+>>
+>> > # cat /proc/sys/vm/mmap_min_addr
+>> >
+>> > If it is 64K, it won't run 32-bit apps as non-root.
+>>
+>> echo 32768 > /proc/sys/vm/mmap_min_addr
+>>
+>> and indeed binaries work as expected.
+>>
+>> The ubuntu LTS 3.13 kernel has:
+>>
+>> /boot/config-3.13.0-39-generic:CONFIG_DEFAULT_MMAP_MIN_ADDR=65536
+>>
+>> I need to check how the value ended up wrong on the 3.19-rc3 I tested.
+>
+> It may be set by some boot script on arm64 Ubuntu (so entirely in user
+> space).
 
-This driver has an interrupt handler that is not currently aware
-of shared interrupts, but can be easily converted to be.
-At the moment, the driver reads the interrupt status register
-repeatedly until it contains only zeroes in the interesting bits,
-and handles each bit individually.
+Correct, the invalid value is set in /etc/sysctl.d/10-zeropage.conf.
+I've also opened a bug for the ubuntu folk to fix.
 
-This patch adds the missing part of returning IRQ_NONE in case none
-of the bits are set to start with, so we can move on to the next
-interrupt source.
+https://bugs.launchpad.net/ubuntu/+source/procps/+bug/1415481
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 5f5316fcd08ef7 ("am2150: Update nmclan_cs.c to use update PCMCIA API")
----
- drivers/net/ethernet/amd/nmclan_cs.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/drivers/net/ethernet/amd/nmclan_cs.c b/drivers/net/ethernet/amd/nmclan_cs.c
-index 5b22764ba88d..27245efe9f50 100644
---- a/drivers/net/ethernet/amd/nmclan_cs.c
-+++ b/drivers/net/ethernet/amd/nmclan_cs.c
-@@ -952,6 +952,8 @@ static irqreturn_t mace_interrupt(int irq, void *dev_id)
-   do {
-     /* WARNING: MACE_IR is a READ/CLEAR port! */
-     status = inb(ioaddr + AM2150_MACE_BASE + MACE_IR);
-+    if (!(status & ~MACE_IMR_DEFAULT) && IntrCnt == MACE_MAX_IR_ITERATIONS)
-+      return IRQ_NONE;
- 
-     pr_debug("mace_interrupt: irq 0x%X status 0x%X.\n", irq, status);
- 
--- 
-2.1.0.rc2
+Riku
