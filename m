@@ -1,39 +1,49 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 28 Jan 2015 10:01:27 +0900
-Subject: [PATCH v10 0/7] devfreq: Add devfreq-event class to provide raw
- data for devfreq device
-In-Reply-To: <2091672023.141961422352757659.JavaMail.weblogic@epmlwas08c>
-References: <2091672023.141961422352757659.JavaMail.weblogic@epmlwas08c>
-Message-ID: <54C834E7.8060203@samsung.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 27 Jan 2015 17:01:30 -0800
+Subject: [PATCH v2] clk: zynq: Force CPU_2X clock to be ungated
+In-Reply-To: <1422385549-2550-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1422385549-2550-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <20150128010130.22722.42627@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Kukjin,
-
-Could you please pick remaining patches (patch4-patch7)?
-
-On 01/27/2015 06:59 PM, MyungJoo Ham wrote:
->>  This patchset add new devfreq_event class to provide raw data to determine
->> current utilization of device  which is used for devfreq governor.
->>
->> The following description explains the feature of two kind of devfreq class:
->> - devfreq class (existing)
->>  : devfreq consumer device use raw data from devfreq_event device for
->>    determining proper current system state and change voltage/frequency
->>    dynamically using various governors.
->> - devfreq_event class (new)
->>  : Provide measured raw data to devfreq device for governor
+Quoting Soren Brinkmann (2015-01-27 11:05:27)
+> The CPU_2X clock does not have a classical in-kernel user, but is,
+> amongst other things, required for OCM and debug access. Make sure this
+> clock is not mistakenly disabled during boot up by enabling it in the
+> platform's clock driver.
 > 
-> Merged in my local git repo (1/7 to 3/7 as those three are in /drivers/devfreq).
+> Cc: stable at vger.kernel.org # 3.11+
+> Fixes: 0ee52b157b8e 'clk: zynq: Add clock controller driver'
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+
+Applied to clk-next.
+
+Regards,
+Mike
+
+> ---
+> v2:
+>  - Fixed some typo's in the commit message
+>  - added Fixes and Cc tags to commit message
 > 
-> However, the admin requires me to setup the firewall again, so please wait
-> another day for the merged patches to show up in external network
-> (git.kernel.org) and to make a pull-request for Rafael.
-> (waiting firewall execption approvals from the admin)
-
-Dear Myungjoo,
-
-Thanks for your apply.
-
-Best Regards,
-Chanwoo Choi
+> As reference, the v1 submission: https://patchwork.kernel.org/patch/5698251/
+> ---
+>  drivers/clk/zynq/clkc.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/clk/zynq/clkc.c b/drivers/clk/zynq/clkc.c
+> index 9037bebd69f7..f870aad57711 100644
+> --- a/drivers/clk/zynq/clkc.c
+> +++ b/drivers/clk/zynq/clkc.c
+> @@ -303,6 +303,7 @@ static void __init zynq_clk_setup(struct device_node *np)
+>         clks[cpu_2x] = clk_register_gate(NULL, clk_output_name[cpu_2x],
+>                         "cpu_2x_div", CLK_IGNORE_UNUSED, SLCR_ARM_CLK_CTRL,
+>                         26, 0, &armclk_lock);
+> +       clk_prepare_enable(clks[cpu_2x]);
+>  
+>         clk = clk_register_fixed_factor(NULL, "cpu_1x_div", "cpu_div", 0, 1,
+>                         4 + 2 * tmp);
+> -- 
+> 2.2.2.1.g63c5777
+> 
