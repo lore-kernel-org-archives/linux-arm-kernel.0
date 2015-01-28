@@ -1,34 +1,35 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 28 Jan 2015 19:39:01 +0100
-Subject: [PATCH 3/5] ARM: at91/dt: fix matrix compatible in at91sam9261.dtsi
-In-Reply-To: <1422470343-25981-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1422470343-25981-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1422470343-25981-4-git-send-email-boris.brezillon@free-electrons.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 28 Jan 2015 19:03:42 +0000
+Subject: [PATCH 7/7] spi: spi-fsl-dspi: Add support for TCFQ transfer mode
+In-Reply-To: <1422356608-15961-2-git-send-email-bhuvanchandra.dv@toradex.com>
+References: <1422356608-15961-1-git-send-email-bhuvanchandra.dv@toradex.com>
+ <1422356608-15961-2-git-send-email-bhuvanchandra.dv@toradex.com>
+Message-ID: <20150128190342.GE21293@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The matrix IP is referenced by other peripherals which are expecting a
-syscon device. Moreover, the registers layout of the at91sam9260 and
-at91sam9261 SoCs are not the same.
-Update the compatible string accordingly.
+On Tue, Jan 27, 2015 at 04:33:28PM +0530, Bhuvanchandra DV wrote:
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- arch/arm/boot/dts/at91sam9261.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> TCFQ is interrupt of Transfer Complete Flag in DSPI module.
+> EOQ is interrupt of End of Queue Flag in DSPI module.
+> For adopting of different platform, either of them is a way of DSPI
+> transfer data. This patch add TCF support for DSPI module  in other platform.
 
-diff --git a/arch/arm/boot/dts/at91sam9261.dtsi b/arch/arm/boot/dts/at91sam9261.dtsi
-index 7b81a03..410d954 100644
---- a/arch/arm/boot/dts/at91sam9261.dtsi
-+++ b/arch/arm/boot/dts/at91sam9261.dtsi
-@@ -263,7 +263,7 @@
- 			};
- 
- 			matrix: matrix at ffffee00 {
--				compatible = "atmel,at91sam9260-bus-matrix";
-+				compatible = "atmel,at91sam9261-bus-matrix", "syscon";
- 				reg = <0xffffee00 0x200>;
- 			};
- 
--- 
-1.9.1
+I can't really understand what the purpose of this is, sorry.  What are
+these modes and why would one choose one over the other?  Your changelog
+suggests this is being done per board which implies that it's tuning for
+performance but that's usually something that should be done in device
+drivers, not the device tree - perhaps the tuning will change over time
+as the driver is optimized or perhaps it varies depending on the
+transfer.
+
+The code mentions a DMA option as well, generally where it's available
+DMA is something that's chosen at runtime based on the length of the
+transfer.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150128/cca55770/attachment.sig>
