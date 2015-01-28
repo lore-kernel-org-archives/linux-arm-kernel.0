@@ -1,41 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Jan 2015 17:24:36 +0100
-Subject: [PATCH] MPILIB: avoid assembler warning
-Message-ID: <16372019.BFlLRod3Eu@wuerfel>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 28 Jan 2015 16:25:04 +0000 (UTC)
+Subject: arm64: USB_ARCH_HAS_EHCI
+In-Reply-To: <1422438405.5666.16.camel@x220>
+References: <1422351833.14015.20.camel@x220>
+ <alpine.DEB.2.02.1501272130470.19947@utopia.booyaka.com>
+ <1422438405.5666.16.camel@x220>
+Message-ID: <alpine.DEB.2.02.1501281621330.19947@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A wrapper around the umull assembly instruction might reuse
-the input register as an output, which is undefined on
-some ARM machines, as pointed out by this assembler warning:
+On Wed, 28 Jan 2015, Paul Bolle wrote:
 
-  CC      lib/mpi/generic_mpih-mul1.o
-/tmp/ccxJuxIy.s: Assembler messages:
-/tmp/ccxJuxIy.s:53: rdhi, rdlo and rm must all be different
-  CC      lib/mpi/generic_mpih-mul2.o
-/tmp/ccI0scAD.s: Assembler messages:
-/tmp/ccI0scAD.s:53: rdhi, rdlo and rm must all be different
-  CC      lib/mpi/generic_mpih-mul3.o
-/tmp/ccMvVQcp.s: Assembler messages:
-/tmp/ccMvVQcp.s:53: rdhi, rdlo and rm must all be different
+> On Tue, 2015-01-27 at 21:31 +0000, Paul Walmsley wrote:
+> > On Tue, 27 Jan 2015, Paul Bolle wrote:
+> > 
+> > > Your commit d035fdfa27ac ("arm64: Add Tegra132 support") is included in
+> > > today's linux-next (ie, next-20150127). I noticed because a script I use
+> > > to check linux-next spotted a minor problem with it.
+> > > 
+> > > It adds a select for the Kconfig symbol USB_ARCH_HAS_EHCI. That Kconfig
+> > > was obsoleted in v3.11 and removed in v3.15. See commit b797b76fb464
+> > > ("usb: host: remove USB_ARCH_HAS_?HCI"). That select is now a nop.
+> > > 
+> > > Should I submit the trivial patch to remove that line or do you prefer
+> > > to do that yourself?
+> > 
+> > Thanks, I'll post a new version.
+> 
+> I just noticed that your commit added another unneeded select. The entry
+> for ARCH_TEGRA selects HAVE_SMP, but HAVE_SMP is only available on arm
+> or xtensa. There's no point in selecting it in arm64.
 
-This changes the constraints to force different registers to
-be used as output.
+OK thanks, will roll that in.  Looks like Thierry's already sent a pull 
+request for the original patch, so I'll probably just send a follow-up.
 
-Signed-off-by: Arnd Bergmann <arnd@arnd.de>
----
-Not sure who would be the best person to pick this patch up.
+Is the Kconfig checker script you mentioned on Tuesday available in the 
+mainline tree?  I don't see anything obvious under the "Static Analysers" 
+section of the Makefile, but perhaps I'm overlooking it.
 
-diff --git a/lib/mpi/longlong.h b/lib/mpi/longlong.h
-index aac511417ad1..c4dbdb506174 100644
---- a/lib/mpi/longlong.h
-+++ b/lib/mpi/longlong.h
-@@ -216,7 +216,7 @@ extern UDItype __udiv_qrnnd(UDItype *, UDItype, UDItype, UDItype);
- 	__asm__ ("%@ Inlined umul_ppmm\n" \
- 		"umull %r1, %r0, %r2, %r3" \
- 	: "=&r" ((USItype)(xh)), \
--			"=r" ((USItype)(xl)) \
-+			"=&r" ((USItype)(xl)) \
- 	: "r" ((USItype)(a)), \
- 			"r" ((USItype)(b)) \
- 	: "r0", "r1")
+
+- Paul
