@@ -1,59 +1,57 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 27 Jan 2015 20:37:14 -0600
-Subject: [PATCH v5 3/8] of: fix size when dma-range is not used
-In-Reply-To: <1422392405-32196-4-git-send-email-m-karicheri2@ti.com>
-References: <1422392405-32196-1-git-send-email-m-karicheri2@ti.com>
- <1422392405-32196-4-git-send-email-m-karicheri2@ti.com>
-Message-ID: <CAL_JsqJCE2c7PjwN_ynC5_hufe=Xo55E0j=EW5GbuX9saf82dQ@mail.gmail.com>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Tue, 27 Jan 2015 18:46:34 -0800
+Subject: [PATCH 4/9] regulator: wm831x-ldo: move to set_optimum_mode
+In-Reply-To: <1422413199-17273-1-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1422413199-17273-1-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <1422413199-17273-5-git-send-email-bjorn.andersson@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 27, 2015 at 3:00 PM, Murali Karicheri <m-karicheri2@ti.com> wrote:
-> Fix the dma-range size when the DT attribute is missing. i.e  set size to
-> dev->coherent_dma_mask + 1 instead of dev->coherent_dma_mask. Also add
-> code to check invalid values of size configured in DT and log error.
->
-> Cc: Joerg Roedel <joro@8bytes.org>
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> ---
->  drivers/of/device.c |    9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/of/device.c b/drivers/of/device.c
-> index 2de320d..17504f4 100644
-> --- a/drivers/of/device.c
-> +++ b/drivers/of/device.c
-> @@ -105,12 +105,19 @@ void of_dma_configure(struct device *dev, struct device_node *np)
->         ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
->         if (ret < 0) {
->                 dma_addr = offset = 0;
-> -               size = dev->coherent_dma_mask;
-> +               size = dev->coherent_dma_mask + 1;
+Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+---
+ drivers/regulator/wm831x-ldo.c | 21 +++++++++++++--------
+ 1 file changed, 13 insertions(+), 8 deletions(-)
 
-This is fine since coherent_dma_mask will always be 4G - 1 in this case.
-
->         } else {
->                 offset = PFN_DOWN(paddr - dma_addr);
->                 dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
->         }
->
-> +       if (is_power_of_2(size + 1))
-> +               size = size + 1;
-> +       else if (!is_power_of_2(size)) {
-> +               dev_err(dev, "invalid size\n");
-> +               return;
-
-I think this is too restrictive. I think checking bit 0 is 1 is enough
-to tell the size is a mask.
-
-I would like it to be a WARN if detected and just add 1.
-
-Rob
+diff --git a/drivers/regulator/wm831x-ldo.c b/drivers/regulator/wm831x-ldo.c
+index 7ae2dc8..40d391e 100644
+--- a/drivers/regulator/wm831x-ldo.c
++++ b/drivers/regulator/wm831x-ldo.c
+@@ -186,15 +186,20 @@ static int wm831x_gp_ldo_get_status(struct regulator_dev *rdev)
+ 		return regulator_mode_to_status(ret);
+ }
+ 
+-static unsigned int wm831x_gp_ldo_get_optimum_mode(struct regulator_dev *rdev,
+-						   int input_uV,
+-						   int output_uV, int load_uA)
++static int wm831x_gp_ldo_set_optimum_mode(struct regulator_dev *rdev,
++					  int input_uV,
++					  int output_uV, int load_uA)
+ {
++	unsigned int mode;
++
+ 	if (load_uA < 20000)
+-		return REGULATOR_MODE_STANDBY;
+-	if (load_uA < 50000)
+-		return REGULATOR_MODE_IDLE;
+-	return REGULATOR_MODE_NORMAL;
++		mode = REGULATOR_MODE_STANDBY;
++	else if (load_uA < 50000)
++		mode = REGULATOR_MODE_IDLE;
++	else
++		mode = REGULATOR_MODE_NORMAL;
++
++	return wm831x_gp_ldo_set_mode(rdev, mode);
+ }
+ 
+ 
+@@ -207,7 +212,7 @@ static struct regulator_ops wm831x_gp_ldo_ops = {
+ 	.get_mode = wm831x_gp_ldo_get_mode,
+ 	.set_mode = wm831x_gp_ldo_set_mode,
+ 	.get_status = wm831x_gp_ldo_get_status,
+-	.get_optimum_mode = wm831x_gp_ldo_get_optimum_mode,
++	.set_optimum_mode = wm831x_gp_ldo_set_optimum_mode,
+ 	.get_bypass = regulator_get_bypass_regmap,
+ 	.set_bypass = regulator_set_bypass_regmap,
+ 
+-- 
+1.9.1
