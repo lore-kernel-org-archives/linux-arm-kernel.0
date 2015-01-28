@@ -1,43 +1,78 @@
-From: riku.voipio@linaro.org (Riku Voipio)
-Date: Wed, 28 Jan 2015 16:16:13 +0200
-Subject: arm32 binaries work with CONFIG_COMPAT as root but not as user?
-In-Reply-To: <20150128114708.GA9000@e104818-lin.cambridge.arm.com>
-References: <CAAqcGHnS7P7=xzXoOPE61dcbbq_1kvmeB-V1GcDUxB1ND0-kZA@mail.gmail.com>
- <20150128112249.GD6646@e104818-lin.cambridge.arm.com>
- <CAAqcGHn5rVyWRznbgTxLjTp6kHRGWW26-zJ3t7eOki_czwx1AQ@mail.gmail.com>
- <20150128114708.GA9000@e104818-lin.cambridge.arm.com>
-Message-ID: <CAAqcGH=8rBHZ8B66sEVE+8aa9+oqXkM5ex3gjcXO3WxCu+8aXw@mail.gmail.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Wed, 28 Jan 2015 14:17:00 +0000
+Subject: [PATCH] arm64: drop unnecessary cache+tlb maintenance
+In-Reply-To: <1422377570-16761-1-git-send-email-mark.rutland@arm.com>
+References: <1422377570-16761-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20150128141659.GA16652@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 January 2015 at 13:47, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Wed, Jan 28, 2015 at 11:42:55AM +0000, Riku Voipio wrote:
->> On 28 January 2015 at 13:22, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> > On Wed, Jan 28, 2015 at 10:52:21AM +0000, Riku Voipio wrote:
->> > What does this say:
->> cat /proc/sys/vm/mmap_min_addr
->> 65536
->>
->> > # cat /proc/sys/vm/mmap_min_addr
->> >
->> > If it is 64K, it won't run 32-bit apps as non-root.
->>
->> echo 32768 > /proc/sys/vm/mmap_min_addr
->>
->> and indeed binaries work as expected.
->>
->> The ubuntu LTS 3.13 kernel has:
->>
->> /boot/config-3.13.0-39-generic:CONFIG_DEFAULT_MMAP_MIN_ADDR=65536
->>
->> I need to check how the value ended up wrong on the 3.19-rc3 I tested.
->
-> It may be set by some boot script on arm64 Ubuntu (so entirely in user
-> space).
+On Tue, Jan 27, 2015 at 04:52:50PM +0000, Mark Rutland wrote:
+> In paging_init, we call flush_cache_all, but this is backed by Set/Way
+> operations which may not achieve anything in the presence of cache line
+> migration and/or system caches. If the caches are already in an
+> inconsistent state at this point, there is nothing we can do (short of
+> flushing the entire physical address space by VA) to empty architected
+> and system caches. As such, flush_cache_all only serves to mask other
+> potential bugs. Hence, this patch removes the boot-time call to
+> flush_cache_all.
+> 
+> Immediately after the cache maintenance we flush the TLBs, but this is
+> also unnecessary. Before enabling the MMU, the TLBs are invalidated, and
+> thus are initially clean. When changing the contents of active tables
+> (e.g. in fixup_executable() for DEBUG_RODATA) we perform the required
+> TLB maintenance following the update, and therefore no additional
+> maintenance is required to ensure the new table entries are in effect.
+> Since activating the MMU we will not have modified system register
+> fields permitted to be cached in a TLB, and therefore do not need
+> maintenance for any cached system register fields. Hence, the TLB flush
+> is unnecessary.
+> 
+> Shortly after the unnecessary TLB flush, we update TTBR0 to point to an
+> empty zero page rather than the idmap, and flush the TLBs. This
+> maintenance is necessary to remove the global idmap entries from the
+> TLBs (as they would conflict with userspace mappings), and is retained.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Steve Capper <steve.capper@linaro.org>
+> Cc: Will Deacon <will.deacon@arm.com>
 
-Correct, the invalid value is set in /etc/sysctl.d/10-zeropage.conf.
-I've also opened a bug for the ubuntu folk to fix.
+Hi Mark,
 
-https://bugs.launchpad.net/ubuntu/+source/procps/+bug/1415481
+This looks reasonable to me.
 
-Riku
+Please feel free to add:
+
+Acked-by: Steve Capper <steve.capper@linaro.org>
+
+Cheers,
+-- 
+Steve
+
+> ---
+>  arch/arm64/mm/mmu.c | 7 -------
+>  1 file changed, 7 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 29fe8aa..88f7ac2 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -431,13 +431,6 @@ void __init paging_init(void)
+>  	map_mem();
+>  	fixup_executable();
+>  
+> -	/*
+> -	 * Finally flush the caches and tlb to ensure that we're in a
+> -	 * consistent state.
+> -	 */
+> -	flush_cache_all();
+> -	flush_tlb_all();
+> -
+>  	/* allocate the zero page. */
+>  	zero_page = early_alloc(PAGE_SIZE);
+>  
+> -- 
+> 1.9.1
+> 
