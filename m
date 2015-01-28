@@ -1,68 +1,58 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 28 Jan 2015 22:00:04 +0000
-Subject: [PATCH] ARM: teach __asmeq that r12 and ip are the same register
-In-Reply-To: <alpine.LFD.2.11.1501281636170.1322@knanqh.ubzr>
-References: <1422480618-25371-1-git-send-email-ard.biesheuvel@linaro.org>
- <alpine.LFD.2.11.1501281636170.1322@knanqh.ubzr>
-Message-ID: <CAKv+Gu_zXwLdREs1NogW4GaoYiXQz-d4HqJ6KsEPV0q-gPrVTQ@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 28 Jan 2015 23:02:53 +0100
+Subject: 3.19 on Nokia n900: audio quality awful
+In-Reply-To: <54C63F1C.6010703@ti.com>
+References: <20150106170433.GA5408@amd> <20150118120139.GA1509@amd>
+ <54C63F1C.6010703@ti.com>
+Message-ID: <20150128220253.GB28275@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 January 2015 at 21:46, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Wed, 28 Jan 2015, Ard Biesheuvel wrote:
->
->> The __asmeq macro is used inside inline asm statements to ensure that
->> register asm variables that explicitly specify a register are mapped
->> correctly onto those registers when used in inline asm input and output
->> constraints. However, the string based matching fails to take into account
->> that 'ip' may also be referred to as 'r12', (e.g., by clang), causing false
->> negatives.
->>
->> Fix this by making __asmeq consider the ("ip","r12") and ("r12","ip")
->> cases specifically.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->
-> gcc is likely to do the same substitution with r10 ("sl") and r11
-> ("fp").  Might as well add them right away for completeness.
->
+On Mon 2015-01-26 15:20:28, Peter Ujfalusi wrote:
+> On 01/18/2015 02:01 PM, Pavel Machek wrote:
+> > Hi!
+> > 
+> > If you have any idea about playback problems, help would be still
+> > welcome. I'll have to do bisect, otherwise, and it will not be easy.
+> > 
+> >> In 3.18, sound is nice and clear.
+> >>
+> >> In 3.19, sound is unusable. It produces nasty tone when it should be
+> >> quiet, and there's at least as much noise as is sound.
+> >>
+> >> Unfortunately, list of mixers also changed (and there's cca 120
+> >> settings), but a) it does not work with the old list and b) nothing I
+> >> could figure out did make the sound usable. Some setting resulted in
+> >> even more noise.
+> >>
+> >> Any idea what could have caused it?
+> > 
+> > I tried audio recording this time.
+> > 
+> > In 2.6.28-nokia, it is neccessary to set "Input select" na "digital
+> > mic", then it works. Input select being in "playback" option makes it
+> > easy to miss.
+> > 
+> > In 3.18 and 3.19-rc3, all I can record are zeros.
+> > 
+> > Does playback/recording work for you on OMAP 3430-based machines?
+> 
+> Same codec (tlv320aic3106) works fine on my am335x and omap-l138 boards.
+> BeagleBoard-xM also fine with twl4030 codec.
+> 
+> I don't have my n900 in hacking mode (it is still in use
+> time-to-time) but
 
-I just checked with my 4.8 gcc toolchain: r11 indeed gets emitted as
-fp when used in inline asm, but r10 is just r10.
-So I should update the patch to include fp as well.
+Actually, with nfsroot / loading kernel using NOLO, it is not
+neccessary to break your n900. It is possible to boot complete
+userspace without changing single bit of flash.
 
-> Then, does clang call sp, lr, pc as r13, r14 and r15? I guess not as
-> this is probably against the latest ARM assembly conventions.
->
+> looking at the dts file: you might want to add ai3x-micbias-vg property to the
+> aic3x nodes to select the correct mic bias voltage. I can't recall what is
+> appropriate for n900, but 2.6.28-nokia sources might give you the answer.
 
-@Behan, could you answer this one?
-
->> ---
->> Even though clang shouldn't be susceptible to the same bug, there is still
->> value in retaining these assertions there, so instead of just turning
->> __asmeq into a nop if __clang__ is defined, let's make it work correctly.
->>
->>  arch/arm/include/asm/compiler.h | 5 ++++-
->>  1 file changed, 4 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/include/asm/compiler.h b/arch/arm/include/asm/compiler.h
->> index 8155db2f7fa1..c3a316a59710 100644
->> --- a/arch/arm/include/asm/compiler.h
->> +++ b/arch/arm/include/asm/compiler.h
->> @@ -8,8 +8,11 @@
->>   * This string is meant to be concatenated with the inline asm string and
->>   * will cause compilation to stop on mismatch.
->>   * (for details, see gcc PR 15089)
->> + * For compatibility with clang, we have to explicitly take the equivalence
->> + * of 'r12' and 'ip into account as well.
->>   */
->> -#define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
->> +#define __asmeq(x, y)  ".ifnc " x "," y " ; .ifnc " x y ",ipr12 ; " \
->> +     ".ifnc " x y ",r12ip ; .err ; .endif ; .endif ; .endif\n\t"
->>
->>
->>  #endif /* __ASM_ARM_COMPILER_H */
->> --
->> 1.8.3.2
->>
->>
+Ok, thanks, let me try...
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
