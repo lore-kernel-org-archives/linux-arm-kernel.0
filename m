@@ -1,29 +1,36 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 28 Jan 2015 11:15:05 +0100
-Subject: [PATCH 0/3] ARM: rockchip: provide the watchdog with a clock
-In-Reply-To: <1736604.toH3biuFW2@phil>
-References: <1736604.toH3biuFW2@phil>
-Message-ID: <2144701.MzC17KKY9c@diego>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 28 Jan 2015 11:10:17 +0100
+Subject: [PATCH 3/5] mmc: pwrseq: Document optional clock for the simple power
+ sequence
+In-Reply-To: <1422439819-29854-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1422439819-29854-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1422439819-29854-4-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 21. Januar 2015, 20:54:50 schrieb Heiko St?bner:
-> The snps,dw-wdt needs to read the clock-rate of its supplying clock
-> for some operations. The clock itself is based on pclk_pd_alive
-> and is indeed gateable. The caveat is that the gate is living in the
-> so-called secure-GRF, which isn't even writeable in some boot-modes.
-> 
-> But to have an actual clock reference to the correct clock, implement
-> a fixed-factor clock, to be substituted when we can control the actual
-> gate safely.
-> 
-> Heiko Stuebner (3):
->   clk: rockchip: add id for watchdog pclk on rk3288
->   clk: rockchip: add a dummy clock for the watchdog pclk on rk3288
->   ARM: dts: rockchip: add rk3288 watchdog clock
+Some WLAN chips attached to a SDIO interface, need an external clock
+to be operational. Since this is very common, extend the simple MMC
+power sequence DT binding to support an optional clock.
 
-with the clock changes (patches 1+2) being accepted into the clock tree, I've 
-now also added the third patch to my dts branch.
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+---
+ Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-
-Heiko
+diff --git a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
+index 9a77deb164c7..6b5c10d1144c 100644
+--- a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
++++ b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
+@@ -11,6 +11,10 @@ Optional properties:
+ - reset-gpios : contains a list of GPIO specifiers. The reset GPIOs are asserted
+ 	at initialization and prior we start the power up procedure of the card.
+ 	Will be de-asserted right after the power has been provided to the card.
++- clocks : Must contain an entry for the entry in clock-names.
++  See ../clocks/clock-bindings.txt for details.
++- clock-names : Must include the following entry:
++  "ext_clock" (External clock provided to the card).
+ 
+ Example:
+ 
+-- 
+2.1.3
