@@ -1,138 +1,44 @@
-From: behanw@converseincode.com (Behan Webster)
-Date: Wed, 28 Jan 2015 13:18:00 -0800
-Subject: [PATCH] bcm: address clang inline asm incompatibility
-In-Reply-To: <CAKv+Gu8B7G3tNahkguDBjCOQih4_ywRtwaJz2D2b+vY1249-DA@mail.gmail.com>
-References: <1422422306-27473-1-git-send-email-behanw@converseincode.com>	<CAKv+Gu_NCgMmX_LQqi7vtjtP4ofrW+kx8FPgRd4-LWwK=73-xg@mail.gmail.com>	<54C8EE04.6060809@linaro.org>	<CAKv+Gu8CrMqwqBOF8rYa3RP1=gfCthwP=1k9kQ73v6+Sxwah4A@mail.gmail.com>	<54C91791.9030508@linaro.org>	<CAKv+Gu8P8eC+bmerCpbSX=USODqE=U7WnLeiCfhHJ8SSVAzPDw@mail.gmail.com>	<CAKv+Gu9fc_F1iC5NAwaG_ed3RRhYnxEBLbuLgW0Oa_qJ96j-gA@mail.gmail.com>	<54C9383D.10901@linaro.org>	<CAKv+Gu88G2QqAupD9j4_-t2=0VJGNbWkUViLBM2nUuyuN-PHWA@mail.gmail.com>
- <CAKv+Gu8B7G3tNahkguDBjCOQih4_ywRtwaJz2D2b+vY1249-DA@mail.gmail.com>
-Message-ID: <54C95208.2050705@converseincode.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 28 Jan 2015 22:17:41 +0100
+Subject: [PATCH 1/7] [media] timberdale: do not select TIMB_DMA
+In-Reply-To: <1422479867-3370921-1-git-send-email-arnd@arndb.de>
+References: <1422479867-3370921-1-git-send-email-arnd@arndb.de>
+Message-ID: <1422479867-3370921-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/28/15 12:11, Ard Biesheuvel wrote:
-> On 28 January 2015 at 19:38, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> On 28 January 2015 at 19:27, Alex Elder <elder@linaro.org> wrote:
->>> On 01/28/2015 01:17 PM, Ard Biesheuvel wrote:
->>>> On 28 January 2015 at 17:20, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>>>> On 28 January 2015 at 17:08, Alex Elder <elder@linaro.org> wrote:
->>>>>> On 01/28/2015 10:17 AM, Ard Biesheuvel wrote:
->>>>>>> On 28 January 2015 at 14:11, Alex Elder <elder@linaro.org> wrote:
->>>>>>>> On 01/28/2015 05:15 AM, Ard Biesheuvel wrote:
->>>>>>>>> On 28 January 2015 at 05:18, Behan Webster <behanw@converseincode.com> wrote:
->>>>>>>>>> From: Alex Elder <elder@linaro.org>
->>>>>>>>>>
->>>>>>>>>> My GCC-based build environment likes to call register r12 by the
->>>>>>>>>> name "ip" in inline asm.  Behan Webster informed me that his Clang-
->>>>>>>>>> based build environment likes "r12" instead.
->>>>>>>>>>
->>>>>>>>>> Try to make them both happy.
->>>>>>>>>>
->>>>>>>>>> Signed-off-by: Alex Elder <elder@linaro.org>
->>>>>>>>>> Signed-off-by: Behan Webster <behanw@converseincode.com>
->>>>>>>>>> ---
->>>>>>>>>>  arch/arm/mach-bcm/bcm_kona_smc.c | 9 +++++++--
->>>>>>>>>>  1 file changed, 7 insertions(+), 2 deletions(-)
->>>>>>>>>>
->>>>>>>>>> diff --git a/arch/arm/mach-bcm/bcm_kona_smc.c b/arch/arm/mach-bcm/bcm_kona_smc.c
->>>>>>>>>> index a55a7ec..3937bd5 100644
->>>>>>>>>> --- a/arch/arm/mach-bcm/bcm_kona_smc.c
->>>>>>>>>> +++ b/arch/arm/mach-bcm/bcm_kona_smc.c
->>>>>>>>>> @@ -106,9 +106,14 @@ int __init bcm_kona_smc_init(void)
->>>>>>>>>>   * request result appropriately.  This result value is found in r0
->>>>>>>>>>   * when the "smc" request completes.
->>>>>>>>>>   */
->>>>>>>>>> +#ifdef __clang__
->>>>>>>>>> +#define R12    "r12"
->>>>>>>>>> +#else  /* !__clang__ */
->>>>>>>>>> +#define R12    "ip"    /* gcc calls r12 "ip" */
->>>>>>>>>> +#endif /* !__clang__ */
->>>>>>>>> Why not just use r12 for both?
->>>>>>>> Yes, that would have been an obvious fix.  But the
->>>>>>>> assembler (in the GCC environment) doesn't accept that.
->>>>>>>>
->>>>>>> Mine has no problems with it at all
->>>>>>>
->>>>>>> $ echo 'mov r12, #0' | arm-linux-gnueabihf-gcc -c -x assembler-with-cpp -
->>>>>>>
->>>>>>> and grepping for r12 under arch/arm suggests the same
->>>>>> The use of "r12" is fine.  But it's not just the assembler,
->>>>>> I believe it also involves gcc.
->>>>>>
->>>>>> The problem is with the use of the __asmeq(x, y) macro.
->>>>>>
->>>>> Ah right. Apologies for assuming that you had missed something obvious here.
->>>>> But __asmeq is not the toolchain, it is a local construct #define'd in
->>>>> compiler.h
->>>>>
->>>>>> If I assign the "ip" variable with "r12":
->>>>>>         register u32 ip asm("r12");     /* Also called ip */
->>>>>>
->>>>>> Then that's fine.  However, this line then causes an error:
->>>>>>                 __asmeq("%0", "r12")
->>>>>>
->>>>>> Apparently gcc uses register "ip" when it sees asm("r12").  So
->>>>>> attempting to verify the desired register got used with __asmeq()
->>>>>> causes a string mismatch--"ip" is not equal to "r12".
->>>>>>
->>>>>> So I could use:
->>>>>>
->>>>>>         register u32 ip asm("r12");     /* Also called ip */
->>>>>>                 ...
->>>>>>                 __asmeq("%0", "ip")
->>>>>>
->>>>>> And that will build.  But it's a little non-intuitive, and
->>>>>> I suspect that clang might (rightfully) have a failure in
->>>>>> this __asmeq() call.
->>>>>>
->>>>> In that case, I would strongly suggest fixing the __asmeq () macro
->>>>> instead, and teach it that ("r12","ip") and ("ip","r12") are fine too.
->>>>>
->>>>> The thing is, inline asm is a dodgy area to begin with in terms of
->>>>> clang-to-gcc compatibility. On arm64, we have been seeing issues where
->>>>> the width of the register -which is fixed on gcc- is selected based on
->>>>> the size of that variable, i.e., an int32 gets a w# register and int64
->>>>> gets a x# register. Imagine debugging that, e.g., a str %0, [xx] that
->>>>> writes 8 bytes on GCC suddenly only writing 4 bytes when built with
->>>>> clang.
->>>>>
->>>>> If we also start using the preprocessor to conditionalise what is
->>>>> emitted by inline asm, the waters get even murkier and it becomes even
->>>>> harder to claim parity between the two.
->>>>>
->>>> Something like this perhaps?
->>> So __asmeq() yields true if the register names (strings) are
->>> equal, or if one is "ip" and the other is "r12" (in either order).
->>>
->>> I can't comment on whether it's right in all build environments but
->>> this looks OK to me, to handle this special case.
->>>
->>> I would much rather you generate that patch.  Is that OK?
->>>
->> Sure, I can cook up a patch if you guys can confirm that it fixes your
->> use case. (I tested GCC myself but I don't have clang installed)
->>
-> Actually, if clang is guaranteed to emit the correct register name
-> inside the inline asm for register asm variables used in input or
-> output constraints, I think it makes sense to #define __asmeq as a nop
-> if __clang__ is defined. (Note that __asmeq only exists to work around
-> a specific GCC bug)
-As far as I'm aware neither clang nor gcc will guarantee this completely
-in all places where asmeq has been used. Register assignments are
-handled differently, and at different levels of the architecture between
-the 2 compilers.
+The timberdale media driver requires the use of the respective
+dma engine driver, but that may not be enabled, causing a
+Kconfig warning:
 
-Certainly asmeq has caught these kinds of bad assumptions in a number of
-places in the kernel while we've ported to clang (like when naked
-functions are used, and the calling convention for -O2 is assumed).
+warning: (VIDEO_TIMBERDALE) selects TIMB_DMA which has unmet direct dependencies (DMADEVICES && MFD_TIMBERDALE)
 
-I personally would prefer code which doesn't rely on variables being in
-the correct registers. However I'm aware that in the case of the smc
-instruction there really isn't a choice, as that's the way it works (it
-assumes values in certain registers). :(
+This fixes the dependency by removing the inappropriate 'select'
+statement and replacing it with a direct dependency on the
+drivers that provide the services this needs.
 
-I think the code you've come up with is the best solution for now.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 7155043c2d027 ("[media] enable COMPILE_TEST for media drivers")
+---
+ drivers/media/platform/Kconfig | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-Behan
-
+diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
+index 765bffb49a72..6a1334be7544 100644
+--- a/drivers/media/platform/Kconfig
++++ b/drivers/media/platform/Kconfig
+@@ -56,10 +56,8 @@ config VIDEO_VIU
+ 
+ config VIDEO_TIMBERDALE
+ 	tristate "Support for timberdale Video In/LogiWIN"
+-	depends on VIDEO_V4L2 && I2C && DMADEVICES
+-	depends on MFD_TIMBERDALE || COMPILE_TEST
+-	select DMA_ENGINE
+-	select TIMB_DMA
++	depends on VIDEO_V4L2 && I2C
++	depends on (MFD_TIMBERDALE && TIMB_DMA) || COMPILE_TEST
+ 	select VIDEO_ADV7180
+ 	select VIDEOBUF_DMA_CONTIG
+ 	---help---
 -- 
-Behan Webster
-behanw at converseincode.com
+2.1.0.rc2
