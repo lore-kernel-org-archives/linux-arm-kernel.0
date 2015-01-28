@@ -1,67 +1,40 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 28 Jan 2015 15:14:51 +0100
-Subject: [PATCH 2/9] mtd: pxa3xx_nand: add a non mandatory ECC clock
-In-Reply-To: <20150127155047.GB16546@lunn.ch>
-References: <1422367816-4257-1-git-send-email-antoine.tenart@free-electrons.com>
- <1422367816-4257-3-git-send-email-antoine.tenart@free-electrons.com>
- <20150127155047.GB16546@lunn.ch>
-Message-ID: <20150128141451.GA11705@kwain>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 28 Jan 2015 15:15:00 +0100
+Subject: [PATCH 0/4] net: driver fixes from arm randconfig builds
+Message-ID: <1422454504-439085-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+These four patches are fallout from test builds on ARM. I have a
+few more of them in my backlog but have not yet confirmed them
+to still be valid.
 
-On Tue, Jan 27, 2015 at 04:50:47PM +0100, Andrew Lunn wrote:
-> On Tue, Jan 27, 2015 at 03:10:09PM +0100, Antoine Tenart wrote:
-> > Some controllers (as the coming Berlin nand controller) need to enable
-> > an ECC clock. Add support for this clock in the pxa3xx nand driver, and
-> > leave it as non mandatory.
-> 
-> It would be good to document this clock in the device tree binding.
+The first three patches are about incomplete dependencies on
+old drivers. One could backport them to the beginning of time
+in theory, but there is little value since nobody would run into
+these problems.
 
-Yes! I'll add the ECC clock into the documentation.
+The final patch is one I had submitted before together with the
+respective pcmcia patch but forgot to follow up on that. It's
+still a valid but relatively theoretical bug, because the previous
+behavior of the driver was just as broken as what we have in
+mainline.
 
-> 
-> > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> > ---
-> >  drivers/mtd/nand/pxa3xx_nand.c | 26 +++++++++++++++++++-------
-> >  1 file changed, 19 insertions(+), 7 deletions(-)
-> > 
-> > diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-> > index d00ac392d1c4..2681ec4abafa 100644
-> > --- a/drivers/mtd/nand/pxa3xx_nand.c
-> > +++ b/drivers/mtd/nand/pxa3xx_nand.c
-> > @@ -180,7 +180,7 @@ struct pxa3xx_nand_info {
-> >  	struct nand_hw_control	controller;
-> >  	struct platform_device	 *pdev;
-> >  
-> > -	struct clk		*clk;
-> > +	struct clk		*clk, *ecc_clk;
-> >  	void __iomem		*mmio_base;
-> >  	unsigned long		mmio_phys;
-> >  	struct completion	cmd_complete, dev_ready;
-> > @@ -1608,7 +1608,7 @@ static int alloc_nand_resource(struct platform_device *pdev)
-> >  
-> >  	spin_lock_init(&chip->controller->lock);
-> >  	init_waitqueue_head(&chip->controller->wq);
-> > -	info->clk = devm_clk_get(&pdev->dev, NULL);
-> > +	info->clk = devm_clk_get(&pdev->dev, "nfc");
-> 
-> Does this keep backwards compatibility? Not all the existing users
-> have there clocks named. What i think happens here is that
-> of_clk_get_by_name() calls of_property_match_string(np, "clock-names",
-> name); That returns -EINVAL, and then we ask of_clk_get() to get the
-> -EINVAL'th clock. I don't think that is going to end well.
-> 
-> I think you need to keep the NULL here, but should use "ecc" for the
-> second clock and require the use of the clock-names property when an
-> ecc clock is required.
+Please apply,
 
-I agree, I'll go back to NULL in v2.
+	Arnd
 
-Antoine
+Arnd Bergmann (4):
+  net: cs89x0: always build platform code if !HAS_IOPORT_MAP
+  net: wan: add missing virt_to_bus dependencies
+  net: lance,ni64: don't build for ARM
+  net: am2150: fix nmclan_cs.c shared interrupt handling
+
+ drivers/net/ethernet/amd/Kconfig     | 4 ++--
+ drivers/net/ethernet/amd/nmclan_cs.c | 2 ++
+ drivers/net/ethernet/cirrus/Kconfig  | 3 ++-
+ drivers/net/wan/Kconfig              | 6 +++---
+ 4 files changed, 9 insertions(+), 6 deletions(-)
 
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+2.1.0.rc2
