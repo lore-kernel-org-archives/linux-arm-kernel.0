@@ -1,145 +1,45 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 28 Jan 2015 11:31:23 +0100
-Subject: [PATCH RESEND v3 2/3] irqchip: vf610-mscm: dt-bindings: add
- MSCM bindings
-In-Reply-To: <e8f5ff60a8da4c7539d9a33d162bb773@agner.ch>
-References: <1421309046-22452-1-git-send-email-stefan@agner.ch>
- <1421309046-22452-3-git-send-email-stefan@agner.ch>
- <20150126133602.GG23313@leverpostej>
- <e8f5ff60a8da4c7539d9a33d162bb773@agner.ch>
-Message-ID: <96a334f3e775b6e5db51383e3ae94f7d@agner.ch>
+From: zhang.lyra@gmail.com (Lyra Zhang)
+Date: Wed, 28 Jan 2015 18:46:53 +0800
+Subject: [PATCH v9 2/2] tty/serial: Add Spreadtrum sc9836-uart driver
+ support
+In-Reply-To: <20150128095401.GC14175@tarshish>
+References: <1422413261-17184-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1422413261-17184-3-git-send-email-chunyan.zhang@spreadtrum.com>
+ <20150128061250.GQ2555@sapphire.tkos.co.il>
+ <CAAfSe-v4FGpHL3N3utiDwcoc7qus1XZZszuXBqB6LeE1frAfeA@mail.gmail.com>
+ <20150128095401.GC14175@tarshish>
+Message-ID: <CAAfSe-t-to3=KrUH2cWQXy710H8Lr3Nd7Za1yoaxio4i70c51w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-01-26 15:18, Stefan Agner wrote:
-> On 2015-01-26 14:36, Mark Rutland wrote:
->> On Thu, Jan 15, 2015 at 08:04:05AM +0000, Stefan Agner wrote:
->>> Add binding documentation for Miscellaneous System Control Module
->>> found in Freescale Vybrid SoC's.
->>>
->>> Signed-off-by: Stefan Agner <stefan@agner.ch>
->>> ---
->>>  .../bindings/arm/freescale/fsl,vf610-mscm.txt         | 19 +++++++++++++++++++
->>>  1 file changed, 19 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm.txt
->>> new file mode 100644
->>> index 0000000..e051b88
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm.txt
->>> @@ -0,0 +1,19 @@
->>> +Freescale Vybrid Miscellaneous System Control Module
->>> +
->>> +The MSCM IP contains Access Control and TrustZone Security hardware,
->>> +CPU Configuration registers and Interrupt Router control.
->>> +
->>> +Required properties:
->>> +- compatible : "fsl,vf610-mscm", "syscon"
+On Wed, Jan 28, 2015 at 5:54 PM, Baruch Siach <baruch@tkos.co.il> wrote:
+> Hi Lyra Zhang,
+>
+> On Wed, Jan 28, 2015 at 04:46:33PM +0800, Lyra Zhang wrote:
+>> On Wed, Jan 28, 2015 at 2:12 PM, Baruch Siach <baruch@tkos.co.il> wrote:
+>> > On Wed, Jan 28, 2015 at 10:47:41AM +0800, Chunyan Zhang wrote:
+>> >> +             if (uart_handle_sysrq_char(port, ch))
+>> >> +                     continue;
+>> >
+>> > My comment[1] on a previous version of this patch still stands.
+>> > uart_handle_sysrq_char is a NOP when SUPPORT_SYSRQ is not defined.
 >>
->> I'm a little concerned by this also being a syscon. What other devices
->> need to refer to this block as a syscon?
->>
-> 
-> The block offers several functionality. I'm happy we can discuss this
-> here a bit more in depth, since I'm really not sure if the current
-> solution is the best solution...
-> 
-> Due to the general rule to not split hardware modules, I hesitated to
-> make different nodes out of it. However, this module has some quite
-> distinct sub-modules, hence I guess it would be also feasible to do so:
-> 
-> 0x40001000-0x4000105C - Processor information e.g. which processor ID is
-> the accessing processor (processor identity), cache size etc...
-> 0x40001800-0x40001820 - CPU2CPU directed interrupt generation/clear
-> registers...
-> 0x40001880-0x4000195E - the actual interrupt router
-> 0x40001C00-0x40001DDC - ACTZS TrustZone registers...
-> 
-> This driver accesses the first and the third block. The first block is
-> necessary since the driver needs to know which CPU ID it is running on
-> to actually program the interrupt router (Note: this is a heterogeneous
-> multiprocessing system. This are actually treated as two independent UP
-> systems, considering that Linux can also run on the Cortex-M4).
-> 
-> Hence, the syscon definition which would allow to access other areas as
-> needed, especially the processor information might be needed by any
-> other peripheral (driver) which needs to know what CPU it is running on.
-> What do you think?
-> 
-> OTH, we could as well split it up in three or even four nodes. The MSCM
-> interrupt router part just needs to access the the MSCM processor
-> information part somehow (syscon?)...
-> 
-> Fwiw, in our downstream kernel, the CPU2CPU interrupts are used for
-> Freescales messaging system (MCC). I hacked a special interface in that
-> early version of this driver, to export this functionality. But then I
-> guess such a functionality should not affect the device tree
-> bindings...?
-> http://git.toradex.com/cgit/linux-toradex.git/commit/?h=toradex_vf_3.18-next&id=6f0bbad6b805cf2014eec54531dbe4ddb4867a91
-> 
-> For detailed information, the module is documented in the public
-> reference manual, chapter 64.
-> http://www.freescale.com/webapp/sps/site/prod_summary.jsp?code=VF6xx&fpsp=1&tab=Documentation_Tab
-> 
+>> yes, there are two definitions in serial_core.h, and it returns 0 when
+>> SUPPORT_SYSRQ is not defined.
+>> so, I think my code behavior does not hurt, right?
+>
+> Right. I just wanted to point out that you can easily define SUPPORT_SYSRQ as
+> appropriate like many other serial drivers do to get sysrq support.
+>
 
-The MSCM module described as individual sub-modules would look something
-like this:
+Ok, I got it. I'll add SUPPORT_SYSRQ definition, and send v10 to Greg.
 
+thanks,
+Chunyan
 
-	mscm_cpucfg: cpucfg at 40001000 {
-		compatible = "fsl,vf610-mscm-cpucfg", "syscon";
-		reg = <0x40001000 0x800>;
-	};
-
-	mscm_ir: interrupt-controller at 40001800 {
-		compatible = "fsl,vf610-mscm-ir";
-		reg = <0x40001800 0x400>;
-		fsl,cpucfg = <&mscm_cpucfg>;
-		interrupt-controller;
-		#interrupt-cells = <2>;
-		interrupt-parent = <&intc>;
-	};
-
-With this layout, only the CPU information part would be syscon, whereas
-the MSCM interrupt router driver would be its first user. The TrustZone
-registers are left out for now...
-
-What do you think? Advice appreciated.
-
---
-Stefan
-
-
->>> +- interrupt-controller : Identifies the node as an interrupt controller
->>> +- #interrupt-cells : Two cells, interrupt number and flags (IRQ type)
->>
->> What numbers and flags are valid?
->>
-> 
-> The first cell is the hardware interrupt ID according to the MSCM
-> interrupt router. The flags gets passed to the GIC interrupt controller
-> only, hence those are the one which are supported by the GIC controller.
-> 
-> 
-> Will add that information, thx.
-> 
+> baruch
+>
 > --
-> Stefan
-> 
->> Mark.
->>
->>> +- reg : the register range of the MSCM module
->>> +
->>> +Example:
->>> +	mscm: mscm at 40001000 {
->>> +		compatible = "fsl,vf610-mscm", "syscon";
->>> +		interrupt-controller;
->>> +		#interrupt-cells = <2>;
->>> +		interrupt-parent = <&intc>;
->>> +		reg = <0x40001000 0x1000>;
->>> +	}
->>> --
->>> 2.2.1
->>>
->>>
+>      http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+> =}------------------------------------------------ooO--U--Ooo------------{=
+>    - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
