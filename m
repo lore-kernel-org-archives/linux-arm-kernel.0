@@ -1,78 +1,62 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Wed, 28 Jan 2015 14:17:00 +0000
-Subject: [PATCH] arm64: drop unnecessary cache+tlb maintenance
-In-Reply-To: <1422377570-16761-1-git-send-email-mark.rutland@arm.com>
-References: <1422377570-16761-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20150128141659.GA16652@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 28 Jan 2015 15:15:02 +0100
+Subject: [PATCH 2/4] net: wan: add missing virt_to_bus dependencies
+In-Reply-To: <1422454504-439085-1-git-send-email-arnd@arndb.de>
+References: <1422454504-439085-1-git-send-email-arnd@arndb.de>
+Message-ID: <1422454504-439085-3-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 27, 2015 at 04:52:50PM +0000, Mark Rutland wrote:
-> In paging_init, we call flush_cache_all, but this is backed by Set/Way
-> operations which may not achieve anything in the presence of cache line
-> migration and/or system caches. If the caches are already in an
-> inconsistent state at this point, there is nothing we can do (short of
-> flushing the entire physical address space by VA) to empty architected
-> and system caches. As such, flush_cache_all only serves to mask other
-> potential bugs. Hence, this patch removes the boot-time call to
-> flush_cache_all.
-> 
-> Immediately after the cache maintenance we flush the TLBs, but this is
-> also unnecessary. Before enabling the MMU, the TLBs are invalidated, and
-> thus are initially clean. When changing the contents of active tables
-> (e.g. in fixup_executable() for DEBUG_RODATA) we perform the required
-> TLB maintenance following the update, and therefore no additional
-> maintenance is required to ensure the new table entries are in effect.
-> Since activating the MMU we will not have modified system register
-> fields permitted to be cached in a TLB, and therefore do not need
-> maintenance for any cached system register fields. Hence, the TLB flush
-> is unnecessary.
-> 
-> Shortly after the unnecessary TLB flush, we update TTBR0 to point to an
-> empty zero page rather than the idmap, and flush the TLBs. This
-> maintenance is necessary to remove the global idmap entries from the
-> TLBs (as they would conflict with userspace mappings), and is retained.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Steve Capper <steve.capper@linaro.org>
-> Cc: Will Deacon <will.deacon@arm.com>
+The cosa driver is rather outdated and does not get built on most
+platforms because it requires the ISA_DMA_API symbol. However
+there are some ARM platforms that have ISA_DMA_API but no virt_to_bus,
+and they get this build error when enabling the ltpc driver.
 
-Hi Mark,
+drivers/net/wan/cosa.c: In function 'tx_interrupt':
+drivers/net/wan/cosa.c:1768:3: error: implicit declaration of function 'virt_to_bus'
+   unsigned long addr = virt_to_bus(cosa->txbuf);
+   ^
 
-This looks reasonable to me.
+The same problem exists for the Hostess SV-11 and Sealevel Systems 4021
+drivers.
 
-Please feel free to add:
+This adds another dependency in Kconfig to avoid that configuration.
 
-Acked-by: Steve Capper <steve.capper@linaro.org>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/net/wan/Kconfig | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Cheers,
+diff --git a/drivers/net/wan/Kconfig b/drivers/net/wan/Kconfig
+index 94e234975c61..a2fdd15f285a 100644
+--- a/drivers/net/wan/Kconfig
++++ b/drivers/net/wan/Kconfig
+@@ -25,7 +25,7 @@ if WAN
+ # There is no way to detect a comtrol sv11 - force it modular for now.
+ config HOSTESS_SV11
+ 	tristate "Comtrol Hostess SV-11 support"
+-	depends on ISA && m && ISA_DMA_API && INET && HDLC
++	depends on ISA && m && ISA_DMA_API && INET && HDLC && VIRT_TO_BUS
+ 	help
+ 	  Driver for Comtrol Hostess SV-11 network card which
+ 	  operates on low speed synchronous serial links at up to
+@@ -37,7 +37,7 @@ config HOSTESS_SV11
+ # The COSA/SRP driver has not been tested as non-modular yet.
+ config COSA
+ 	tristate "COSA/SRP sync serial boards support"
+-	depends on ISA && m && ISA_DMA_API && HDLC
++	depends on ISA && m && ISA_DMA_API && HDLC && VIRT_TO_BUS
+ 	---help---
+ 	  Driver for COSA and SRP synchronous serial boards.
+ 
+@@ -87,7 +87,7 @@ config LANMEDIA
+ # There is no way to detect a Sealevel board. Force it modular
+ config SEALEVEL_4021
+ 	tristate "Sealevel Systems 4021 support"
+-	depends on ISA && m && ISA_DMA_API && INET && HDLC
++	depends on ISA && m && ISA_DMA_API && INET && HDLC && VIRT_TO_BUS
+ 	help
+ 	  This is a driver for the Sealevel Systems ACB 56 serial I/O adapter.
+ 
 -- 
-Steve
-
-> ---
->  arch/arm64/mm/mmu.c | 7 -------
->  1 file changed, 7 deletions(-)
-> 
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 29fe8aa..88f7ac2 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -431,13 +431,6 @@ void __init paging_init(void)
->  	map_mem();
->  	fixup_executable();
->  
-> -	/*
-> -	 * Finally flush the caches and tlb to ensure that we're in a
-> -	 * consistent state.
-> -	 */
-> -	flush_cache_all();
-> -	flush_tlb_all();
-> -
->  	/* allocate the zero page. */
->  	zero_page = early_alloc(PAGE_SIZE);
->  
-> -- 
-> 1.9.1
-> 
+2.1.0.rc2
