@@ -1,60 +1,134 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Tue, 27 Jan 2015 21:36:38 -0600
-Subject: [PATCH V2] clk: mxs: Fix invalid 32-bit access to frac registers
-In-Reply-To: <20150128015131.22722.22882@quantum>
-References: <1419762402-4548-1-git-send-email-stefan.wahren@i2se.com>
- <CAHrpEqQ-eoqM3W1hYcS6EPTmur1FSfm8TeEjYrtZ+PquavL86w@mail.gmail.com>
- <201501220039.02073.marex@denx.de>
- <20150128015131.22722.22882@quantum>
-Message-ID: <CAHrpEqSFfdWsCif_wZO2ToRpwOuC2yt45+HwOpGgv+B=EwKTCw@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 28 Jan 2015 11:35:52 +0800
+Subject: [PATCH 2/9] mtd: pxa3xx_nand: add a non mandatory ECC clock
+In-Reply-To: <1422367816-4257-3-git-send-email-antoine.tenart@free-electrons.com>
+References: <1422367816-4257-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1422367816-4257-3-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20150128113552.5dd3edc4@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 27, 2015 at 7:51 PM, Mike Turquette <mturquette@linaro.org> wrote:
-> Quoting Marek Vasut (2015-01-21 15:39:01)
->> On Wednesday, January 21, 2015 at 05:16:03 PM, Zhi Li wrote:
->> > On Sun, Dec 28, 2014 at 4:26 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
->> > > According to i.MX23 and i.MX28 reference manual the fractional
->> > > clock control registers must be addressed by byte instructions.
->> >
->> > I don't think mx23 and mx28 have such limitation. I will double check
->> > with IC team about this.
->> > RTL is generated from a xml file. All registers implement is unified.
->> > I don't think only clock control register have such limitation and
->> > other registers not.
->>
->> Hi,
->>
->> Section 10.8.24 in the MX28 datasheet (Fractional Clock Control Register 0)
->> states otherwise, but maybe the documentation is simply not matching the
->> silicon.
->>
->> Here's a quote:
->> "
->> This register controls the 9-phase fractional clock dividers. The fractional
->> clock frequencies are a product of the values in these registers. NOTE: This
->> register can only be addressed by byte instructions. Addressing word or half-
->> word are not allowed.
->> "
->>
->> I also recall seeing weird behavior when these registers were accessed by word
->> access in U-Boot, so I believe the datasheet is correct.
->
-> Hi Frank,
->
-> Are you satisfied with this patch?
+Dear Antoine,
 
-I asked IC designer about this.
-They will check RTL code.
-I will check their status again.
-Our released BSP code used 32bit WORD access.
+On Tue, 27 Jan 2015 06:10:09 -0800
+Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
 
-best regards
-Frank Li
->
-> Regards,
-> Mike
->
->>
->> Best regards,
->> Marek Vasut
+> Some controllers (as the coming Berlin nand controller) need to enable
+> an ECC clock. Add support for this clock in the pxa3xx nand driver, and
+> leave it as non mandatory.
+> 
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> ---
+>  drivers/mtd/nand/pxa3xx_nand.c | 26 +++++++++++++++++++-------
+>  1 file changed, 19 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+> index d00ac392d1c4..2681ec4abafa 100644
+> --- a/drivers/mtd/nand/pxa3xx_nand.c
+> +++ b/drivers/mtd/nand/pxa3xx_nand.c
+> @@ -180,7 +180,7 @@ struct pxa3xx_nand_info {
+>  	struct nand_hw_control	controller;
+>  	struct platform_device	 *pdev;
+>  
+> -	struct clk		*clk;
+> +	struct clk		*clk, *ecc_clk;
+>  	void __iomem		*mmio_base;
+>  	unsigned long		mmio_phys;
+>  	struct completion	cmd_complete, dev_ready;
+> @@ -1608,7 +1608,7 @@ static int alloc_nand_resource(struct platform_device
+> *pdev) 
+>  	spin_lock_init(&chip->controller->lock);
+>  	init_waitqueue_head(&chip->controller->wq);
+> -	info->clk = devm_clk_get(&pdev->dev, NULL);
+> +	info->clk = devm_clk_get(&pdev->dev, "nfc");
+>  	if (IS_ERR(info->clk)) {
+
+Do we need to fall back to unnamed clock here? Otherwise I guess it will break
+other platforms.
+
+>  		dev_err(&pdev->dev, "failed to get nand clock\n");
+>  		return PTR_ERR(info->clk);
+> @@ -1617,6 +1617,13 @@ static int alloc_nand_resource(struct
+> platform_device *pdev) if (ret < 0)
+>  		return ret;
+>  
+> +	info->ecc_clk = devm_clk_get(&pdev->dev, "ecc");
+> +	if (!IS_ERR(info->ecc_clk)) {
+> +		ret = clk_prepare_enable(info->ecc_clk);
+> +		if (ret < 0)
+> +			goto fail_disable_clk;
+> +	}
+> +
+>  	if (use_dma) {
+>  		/*
+>  		 * This is a dirty hack to make this driver work from
+> @@ -1633,7 +1640,7 @@ static int alloc_nand_resource(struct platform_device
+> *pdev) dev_err(&pdev->dev,
+>  					"no resource defined for data
+> DMA\n"); ret = -ENXIO;
+> -				goto fail_disable_clk;
+> +				goto fail_disable_ecc_clk;
+>  			}
+>  			info->drcmr_dat = r->start;
+>  
+> @@ -1642,7 +1649,7 @@ static int alloc_nand_resource(struct platform_device
+> *pdev) dev_err(&pdev->dev,
+>  					"no resource defined for cmd
+> DMA\n"); ret = -ENXIO;
+> -				goto fail_disable_clk;
+> +				goto fail_disable_ecc_clk;
+>  			}
+>  			info->drcmr_cmd = r->start;
+>  		}
+> @@ -1652,14 +1659,14 @@ static int alloc_nand_resource(struct
+> platform_device *pdev) if (irq < 0) {
+>  		dev_err(&pdev->dev, "no IRQ resource defined\n");
+>  		ret = -ENXIO;
+> -		goto fail_disable_clk;
+> +		goto fail_disable_ecc_clk;
+>  	}
+>  
+>  	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	info->mmio_base = devm_ioremap_resource(&pdev->dev, r);
+>  	if (IS_ERR(info->mmio_base)) {
+>  		ret = PTR_ERR(info->mmio_base);
+> -		goto fail_disable_clk;
+> +		goto fail_disable_ecc_clk;
+>  	}
+>  	info->mmio_phys = r->start;
+>  
+> @@ -1668,7 +1675,7 @@ static int alloc_nand_resource(struct platform_device
+> *pdev) info->data_buff = kmalloc(info->buf_size, GFP_KERNEL);
+>  	if (info->data_buff == NULL) {
+>  		ret = -ENOMEM;
+> -		goto fail_disable_clk;
+> +		goto fail_disable_ecc_clk;
+>  	}
+>  
+>  	/* initialize all interrupts to be disabled */
+> @@ -1687,6 +1694,9 @@ static int alloc_nand_resource(struct platform_device
+> *pdev) fail_free_buf:
+>  	free_irq(irq, info);
+>  	kfree(info->data_buff);
+> +fail_disable_ecc_clk:
+> +	if (!IS_ERR(info->ecc_clk))
+> +		clk_disable_unprepare(info->ecc_clk);
+
+we can remove the IS_ERR check to simplify this error path since commit
+63589e92c2d9("clk: Ignore error and NULL pointers passed to clk_{unprepare, disable}()")
+
+>  fail_disable_clk:
+>  	clk_disable_unprepare(info->clk);
+>  	return ret;
+> @@ -1709,6 +1719,8 @@ static int pxa3xx_nand_remove(struct platform_device
+> *pdev) pxa3xx_nand_free_buff(info);
+>  
+>  	clk_disable_unprepare(info->clk);
+> +	if (!IS_ERR(info->ecc_clk))
+> +		clk_disable_unprepare(info->ecc_clk);
+
+we can remove the IS_ERR check too.
+
+>  
+>  	for (cs = 0; cs < pdata->num_cs; cs++)
+>  		nand_release(info->host[cs]->mtd);
