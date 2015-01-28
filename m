@@ -1,237 +1,107 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Wed, 28 Jan 2015 13:22:11 -0400
-Subject: [PATCH 3/3] cpufreq: exynos: allow modular build
-In-Reply-To: <1422451015-390439-4-git-send-email-arnd@arndb.de>
-References: <1422451015-390439-1-git-send-email-arnd@arndb.de>
- <1422451015-390439-4-git-send-email-arnd@arndb.de>
-Message-ID: <20150128172209.GF29600@developer.hsd1.ca.comcast.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 28 Jan 2015 17:23:31 +0000
+Subject: [PATCH v4 3/6] of: fix size when dma-range is not used
+In-Reply-To: <CAL_JsqJiCKW0ny=_ueq=A7RH3octpEhN+KZuLZhbNEHusyjcig@mail.gmail.com>
+References: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
+ <1422052359-12384-4-git-send-email-m-karicheri2@ti.com>
+ <54C77616.80301@arm.com> <54C7DF13.20402@ti.com>
+ <20150128110523.GC6646@e104818-lin.cambridge.arm.com>
+ <CAL_JsqJiCKW0ny=_ueq=A7RH3octpEhN+KZuLZhbNEHusyjcig@mail.gmail.com>
+Message-ID: <20150128172330.GD31752@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 28, 2015 at 02:16:55PM +0100, Arnd Bergmann wrote:
-> The exynos cpufreq driver code recently gained a dependency on the
-> cooling code, which may be a loadable module. This breaks an ARM
-> allmodconfig build:
+On Wed, Jan 28, 2015 at 03:45:19PM +0000, Rob Herring wrote:
+> On Wed, Jan 28, 2015 at 5:05 AM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > On Tue, Jan 27, 2015 at 06:55:15PM +0000, Murali Karicheri wrote:
+> >> How about having the logic like this?
+> >>
+> >>       ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
+> >>       if (ret < 0) {
+> >>               dma_addr = offset = 0;
+> >>               size = dev->coherent_dma_mask + 1;
+> >>       } else {
+> >>               offset = PFN_DOWN(paddr - dma_addr);
+> >>               dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
+> >>       }
+> >>
+> >>       if (is_power_of_2(size + 1))
+> >>               size = size + 1;
+> >>       else if (!is_power_of_2(size))
+> >>       {
+> >>               dev_err(dev, "invalid size\n");
+> >>               return;
+> >>       }
+> >
+> > In of_dma_configure(), we currently assume that the default coherent
+> > mask is 32-bit. In this thread:
+> >
+> > http://article.gmane.org/gmane.linux.kernel/1835096
+> >
+> > we talked about setting the coherent mask based on size automatically.
+> > I'm not sure about the size but I think we can assume is 32-bit mask + 1
+> > if it is not specified in the DT. Instead of just assuming a default
+> > mask, let's assume a default size and create the mask based on this
+> > (untested):
+> >
+> > diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> > index 5b33c6a21807..9ff8d1286b44 100644
+> > --- a/drivers/of/platform.c
+> > +++ b/drivers/of/platform.c
+> > @@ -170,10 +170,10 @@ static void of_dma_configure(struct device *dev)
+> >         struct iommu_ops *iommu;
+> >
+> >         /*
+> > -        * Set default dma-mask to 32 bit. Drivers are expected to setup
+> > -        * the correct supported dma_mask.
+> > +        * Set default size to cover the 32-bit. Drivers are expected to setup
+> > +        * the correct size and dma_mask.
+> >          */
+> > -       dev->coherent_dma_mask = DMA_BIT_MASK(32);
+> > +       size = 1ULL << 32;
+> >
+> >         /*
+> >          * Set it to coherent_dma_mask by default if the architecture
+> > @@ -185,13 +185,24 @@ static void of_dma_configure(struct device *dev)
+> >         ret = of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size);
+> >         if (ret < 0) {
+> >                 dma_addr = offset = 0;
+> > -               size = dev->coherent_dma_mask;
 > 
-> drivers/built-in.o: In function `exynos_cpufreq_probe':
-> :(.text+0x1748e8): undefined reference to `of_cpufreq_cooling_register'
+> Are we assuming dma_addr, paddr and size are not touched on error? If
+> so, we can get rid of this clause entirely.
+
+We can if we initialise dma_addr and offset to 0 when declared in this
+function. The dma_addr and size variables are later passed to the
+arch_setup_dma_ops(), so they need to have some sane values independent
+of the presence of dma-ranges in the DT.
+
+> >         } else {
+> >                 offset = PFN_DOWN(paddr - dma_addr);
+> >                 dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
+> >         }
+> >         dev->dma_pfn_offset = offset;
+> >
+> > +       /*
+> > +        * Workaround for DTs setting the size to a mask or 0.
+> > +        */
+> > +       if (is_power_of_2(size + 1))
+> > +               size += 1;
 > 
-> To avoid this problem, change cpufreq Kconfig to allow the drivers
-> to be loadable modules as well and enforce a dependency on the
-> thermal module. Also, export the symbols that are used for communicating
-> between the three cpu-specific parts of the driver and the main module.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: e725d26c4857 ("cpufreq: exynos: Use device tree to determine if cpufreq cooling should be registered")
-> ---
->  drivers/cpufreq/Kconfig.arm          | 14 +++++++++-----
->  drivers/cpufreq/exynos-cpufreq.h     |  6 +++---
->  drivers/cpufreq/exynos4210-cpufreq.c |  1 +
->  drivers/cpufreq/exynos4x12-cpufreq.c |  1 +
->  drivers/cpufreq/exynos5250-cpufreq.c |  1 +
->  5 files changed, 15 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> index 0f9a2c3c0e0d..99ac56746ebd 100644
-> --- a/drivers/cpufreq/Kconfig.arm
-> +++ b/drivers/cpufreq/Kconfig.arm
-> @@ -26,11 +26,12 @@ config ARM_VEXPRESS_SPC_CPUFREQ
->  
->  
->  config ARM_EXYNOS_CPUFREQ
-> -	bool
-> +	tristate
->  
->  config ARM_EXYNOS4210_CPUFREQ
-> -	bool "SAMSUNG EXYNOS4210"
-> +	tristate "SAMSUNG EXYNOS4210"
->  	depends on CPU_EXYNOS4210
-> +	depends on THERMAL
->  	default y
->  	select ARM_EXYNOS_CPUFREQ
->  	help
-> @@ -40,8 +41,9 @@ config ARM_EXYNOS4210_CPUFREQ
->  	  If in doubt, say N.
->  
->  config ARM_EXYNOS4X12_CPUFREQ
-> -	bool "SAMSUNG EXYNOS4x12"
-> +	tristate "SAMSUNG EXYNOS4x12"
->  	depends on SOC_EXYNOS4212 || SOC_EXYNOS4412
-> +	depends on THERMAL
->  	default y
->  	select ARM_EXYNOS_CPUFREQ
->  	help
-> @@ -51,8 +53,9 @@ config ARM_EXYNOS4X12_CPUFREQ
->  	  If in doubt, say N.
->  
->  config ARM_EXYNOS5250_CPUFREQ
-> -	bool "SAMSUNG EXYNOS5250"
-> +	tristate "SAMSUNG EXYNOS5250"
->  	depends on SOC_EXYNOS5250
-> +	depends on THERMAL
->  	default y
->  	select ARM_EXYNOS_CPUFREQ
->  	help
-> @@ -62,9 +65,10 @@ config ARM_EXYNOS5250_CPUFREQ
->  	  If in doubt, say N.
->  
->  config ARM_EXYNOS5440_CPUFREQ
-> -	bool "SAMSUNG EXYNOS5440"
-> +	tristate "SAMSUNG EXYNOS5440"
->  	depends on SOC_EXYNOS5440
->  	depends on HAVE_CLK && OF
-> +	depends on THERMAL
->  	select PM_OPP
->  	default y
->  	help
+> As I mentioned, I think power of 2 is too restrictive (from a DT
+> perspective even though the kernel may require a power of 2 here for
+> the mask). Just checking bit0 set should be enough.
 
-Reading the code briefly, looks like the intention is to separate soc
-specific code into different files, but they all compose one single
-driver. Translating into module, I believe it makes sense to build them
-into a single module, instead of having all of them as separate module.
+The power of 2 was mainly to cover the case where the size is wrongly
+written as a mask in the DT. If the size is deliberately not a power of
+two and not a full mask, the above check won't change it. With my
+proposal, ilog2 gets rid of extra bits in size, only that if the size
+was a mask because of DT error, we lose a bit in the coherent_dma_mask.
 
-Meaning, only ARM_EXYNOS_CPUFREQ becomes tristate, all the remaining
-continues bool. And we add the following Makefile change to your patch
+> Also, we need a WARN here so DTs get fixed.
 
----
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index 0f9a2c3..c3c3cf5 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -26,13 +26,19 @@ config ARM_VEXPRESS_SPC_CPUFREQ
- 
- 
- config ARM_EXYNOS_CPUFREQ
--	bool
-+	tristate "SAMSUNG EXYNOS CPUfreq Driver"
-+	depends on THERMAL
-+	default y
-+	help
-+	  This adds the CPUFreq driver for Samsung EXYNOS platforms
-+
-+	  If in doubt, say N.
- 
- config ARM_EXYNOS4210_CPUFREQ
- 	bool "SAMSUNG EXYNOS4210"
- 	depends on CPU_EXYNOS4210
-+	depends on ARM_EXYNOS_CPUFREQ
- 	default y
--	select ARM_EXYNOS_CPUFREQ
- 	help
- 	  This adds the CPUFreq driver for Samsung EXYNOS4210
- 	  SoC (S5PV310 or S5PC210).
-@@ -42,8 +48,8 @@ config ARM_EXYNOS4210_CPUFREQ
- config ARM_EXYNOS4X12_CPUFREQ
- 	bool "SAMSUNG EXYNOS4x12"
- 	depends on SOC_EXYNOS4212 || SOC_EXYNOS4412
-+	depends on ARM_EXYNOS_CPUFREQ
- 	default y
--	select ARM_EXYNOS_CPUFREQ
- 	help
- 	  This adds the CPUFreq driver for Samsung EXYNOS4X12
- 	  SoC (EXYNOS4212 or EXYNOS4412).
-@@ -54,7 +60,7 @@ config ARM_EXYNOS5250_CPUFREQ
- 	bool "SAMSUNG EXYNOS5250"
- 	depends on SOC_EXYNOS5250
- 	default y
--	select ARM_EXYNOS_CPUFREQ
-+	depends on ARM_EXYNOS_CPUFREQ
- 	help
- 	  This adds the CPUFreq driver for Samsung EXYNOS5250
- 	  SoC.
-diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-index b3ca7b0..b26e2bf 100644
---- a/drivers/cpufreq/Makefile
-+++ b/drivers/cpufreq/Makefile
-@@ -51,10 +51,11 @@ obj-$(CONFIG_ARM_DT_BL_CPUFREQ)		+= arm_big_little_dt.o
- 
- obj-$(CONFIG_ARCH_DAVINCI)		+= davinci-cpufreq.o
- obj-$(CONFIG_UX500_SOC_DB8500)		+= dbx500-cpufreq.o
--obj-$(CONFIG_ARM_EXYNOS_CPUFREQ)	+= exynos-cpufreq.o
--obj-$(CONFIG_ARM_EXYNOS4210_CPUFREQ)	+= exynos4210-cpufreq.o
--obj-$(CONFIG_ARM_EXYNOS4X12_CPUFREQ)	+= exynos4x12-cpufreq.o
--obj-$(CONFIG_ARM_EXYNOS5250_CPUFREQ)	+= exynos5250-cpufreq.o
-+obj-$(CONFIG_ARM_EXYNOS_CPUFREQ)	+= arm-exynos-cpufreq.o
-+arm-exynos-cpufreq-y					:= exynos-cpufreq.o
-+arm-exynos-cpufreq-$(CONFIG_ARM_EXYNOS4210_CPUFREQ)	+= exynos4210-cpufreq.o
-+arm-exynos-cpufreq-$(CONFIG_ARM_EXYNOS4X12_CPUFREQ)	+= exynos4x12-cpufreq.o
-+arm-exynos-cpufreq-$(CONFIG_ARM_EXYNOS5250_CPUFREQ)	+= exynos5250-cpufreq.o
- obj-$(CONFIG_ARM_EXYNOS5440_CPUFREQ)	+= exynos5440-cpufreq.o
- obj-$(CONFIG_ARM_HIGHBANK_CPUFREQ)	+= highbank-cpufreq.o
- obj-$(CONFIG_ARM_IMX6Q_CPUFREQ)		+= imx6q-cpufreq.o
+I agree.
 
-> diff --git a/drivers/cpufreq/exynos-cpufreq.h b/drivers/cpufreq/exynos-cpufreq.h
-> index 9f2062a7cc02..32a895af4961 100644
-> --- a/drivers/cpufreq/exynos-cpufreq.h
-> +++ b/drivers/cpufreq/exynos-cpufreq.h
-> @@ -53,7 +53,7 @@ struct exynos_dvfs_info {
->  	void __iomem	*cmu_regs;
->  };
->  
-> -#ifdef CONFIG_ARM_EXYNOS4210_CPUFREQ
-> +#if IS_ENABLED(CONFIG_ARM_EXYNOS4210_CPUFREQ)
->  extern int exynos4210_cpufreq_init(struct exynos_dvfs_info *);
->  #else
->  static inline int exynos4210_cpufreq_init(struct exynos_dvfs_info *info)
-> @@ -61,7 +61,7 @@ static inline int exynos4210_cpufreq_init(struct exynos_dvfs_info *info)
->  	return -EOPNOTSUPP;
->  }
->  #endif
-> -#ifdef CONFIG_ARM_EXYNOS4X12_CPUFREQ
-> +#if IS_ENABLED(CONFIG_ARM_EXYNOS4X12_CPUFREQ)
->  extern int exynos4x12_cpufreq_init(struct exynos_dvfs_info *);
->  #else
->  static inline int exynos4x12_cpufreq_init(struct exynos_dvfs_info *info)
-> @@ -69,7 +69,7 @@ static inline int exynos4x12_cpufreq_init(struct exynos_dvfs_info *info)
->  	return -EOPNOTSUPP;
->  }
->  #endif
-> -#ifdef CONFIG_ARM_EXYNOS5250_CPUFREQ
-> +#if IS_ENABLED(CONFIG_ARM_EXYNOS5250_CPUFREQ)
->  extern int exynos5250_cpufreq_init(struct exynos_dvfs_info *);
->  #else
->  static inline int exynos5250_cpufreq_init(struct exynos_dvfs_info *info)
-> diff --git a/drivers/cpufreq/exynos4210-cpufreq.c b/drivers/cpufreq/exynos4210-cpufreq.c
-> index 843ec824fd91..4b5de19f0ea2 100644
-> --- a/drivers/cpufreq/exynos4210-cpufreq.c
-> +++ b/drivers/cpufreq/exynos4210-cpufreq.c
-> @@ -182,3 +182,4 @@ err_moutcore:
->  	pr_debug("%s: failed initialization\n", __func__);
->  	return -EINVAL;
->  }
-> +EXPORT_SYMBOL_GPL(exynos4210_cpufreq_init);
-> diff --git a/drivers/cpufreq/exynos4x12-cpufreq.c b/drivers/cpufreq/exynos4x12-cpufreq.c
-> index 9e78a850e29f..d2924e1bc909 100644
-> --- a/drivers/cpufreq/exynos4x12-cpufreq.c
-> +++ b/drivers/cpufreq/exynos4x12-cpufreq.c
-> @@ -234,3 +234,4 @@ err_moutcore:
->  	pr_debug("%s: failed initialization\n", __func__);
->  	return -EINVAL;
->  }
-> +EXPORT_SYMBOL_GPL(exynos4x12_cpufreq_init);
-> diff --git a/drivers/cpufreq/exynos5250-cpufreq.c b/drivers/cpufreq/exynos5250-cpufreq.c
-> index 3eafdc7ba787..b2810b839331 100644
-> --- a/drivers/cpufreq/exynos5250-cpufreq.c
-> +++ b/drivers/cpufreq/exynos5250-cpufreq.c
-> @@ -208,3 +208,4 @@ err_moutcore:
->  	pr_err("%s: failed initialization\n", __func__);
->  	return -EINVAL;
->  }
-> +EXPORT_SYMBOL_GPL(exynos5250_cpufreq_init);
-
-and certainly we would not need to export such functions anymore
-
-> -- 
-> 2.1.0.rc2
-> 
-
-BR,
-
-Eduardo
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150128/41b0cc10/attachment.sig>
+-- 
+Catalin
