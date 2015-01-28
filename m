@@ -1,54 +1,41 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Jan 2015 20:48:07 +0100
-Subject: [PATCH 00/15] ARM: simple randconfig fixes
-Message-ID: <1422474502-3097078-1-git-send-email-arnd@arndb.de>
+Date: Wed, 28 Jan 2015 20:48:17 +0100
+Subject: [PATCH 10/15] ARM: call printk conditonally on armv7-m
+In-Reply-To: <1422474502-3097078-1-git-send-email-arnd@arndb.de>
+References: <1422474502-3097078-1-git-send-email-arnd@arndb.de>
+Message-ID: <1422474502-3097078-11-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+The "__invalid_entry" handler in the armv7-m code tries to
+use printk to report an error condition. However, that cannot
+work if CONFIG_PRINTK is disabled and we don't provide this
+function.
 
-I've sorted through my 300-patch series for randconfig and found
-a number of patches that look basically ok, please review if you
-find the time.
+This adds an #ifdef to skip the call to prevent a link error
+in this case.
 
-Most of them simply add Kconfig dependencies to prevent configurations
-that are know to be broken, but others are more subtle. I have more
-patches that are not included here and that I might get back to at
-a later point.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/kernel/entry-v7m.S | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Those are either things you rejected already, or that I would do
-differently, or that fix problems I cannot currently reproduce.
-
-	Arnd
-
-Arnd Bergmann (15):
-  ARM: always select IRQ_WORK on SMP
-  ARM: KGDB does not build on BE32
-  ARM: disable branch profiling in uncompressor
-  ARM: fix LPAE build without ARM_PATCH_PHYS_VIRT
-  ARM: no longer expose CPU_ARM7TDMI/CPU_ARM9TDMI
-  ARM: disable UACCESS_WITH_MEMCPY and Kprobes for ARMv3
-  ARM: disable some options on ARMv7-M
-  ARM: add missing arch_irqs_disabled function
-  ARM: disable CONFIG_PTDUMP on !MMU
-  ARM: call printk conditonally on armv7-m
-  ARM: HAVE_VIRT_CPU_ACCOUNTING_GEN requires cmpxchg64
-  ARM: bpf: fix NOMMU build
-  ARM: code patching only works on MMU
-  ARM: do not use optimized do_div for ARMv3
-  ARM: don't discard exit sections for spinlock debugging
-
- arch/arm/Kconfig                  | 16 +++++++++-------
- arch/arm/Kconfig.debug            |  1 +
- arch/arm/boot/compressed/Makefile |  2 ++
- arch/arm/include/asm/cacheflush.h |  7 +++++++
- arch/arm/include/asm/div64.h      |  2 +-
- arch/arm/include/asm/irqflags.h   |  5 +++++
- arch/arm/kernel/entry-v7m.S       |  2 ++
- arch/arm/kernel/vmlinux.lds.S     |  3 +--
- arch/arm/mm/Kconfig               |  4 ++--
- arch/arm/mm/mmu.c                 |  2 ++
- 10 files changed, 32 insertions(+), 12 deletions(-)
-
+diff --git a/arch/arm/kernel/entry-v7m.S b/arch/arm/kernel/entry-v7m.S
+index 2260f1855820..8944f4991c3c 100644
+--- a/arch/arm/kernel/entry-v7m.S
++++ b/arch/arm/kernel/entry-v7m.S
+@@ -22,10 +22,12 @@
+ 
+ __invalid_entry:
+ 	v7m_exception_entry
++#ifdef CONFIG_PRINTK
+ 	adr	r0, strerr
+ 	mrs	r1, ipsr
+ 	mov	r2, lr
+ 	bl	printk
++#endif
+ 	mov	r0, sp
+ 	bl	show_regs
+ 1:	b	1b
 -- 
 2.1.0.rc2
