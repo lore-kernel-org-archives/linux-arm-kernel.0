@@ -1,66 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 28 Jan 2015 12:07:39 +0000
-Subject: [PATCH] iommu/arm-smmu: use a threaded handler for context
- interrupts
-In-Reply-To: <vnkw61bx2klr.fsf@mitchelh-linux.qualcomm.com>
-References: <1421970482-11722-1-git-send-email-mitchelh@codeaurora.org>
- <20150123112415.GD23058@arm.com>
- <vnkw61bx2klr.fsf@mitchelh-linux.qualcomm.com>
-Message-ID: <20150128120738.GJ1569@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 28 Jan 2015 12:10:17 +0000
+Subject: [PATCHv2] arm64:mm: free the useless initial page table
+In-Reply-To: <CAKv+Gu8OQB+eziL6X85-v-+9KKPsK6Z=h2+1oDrM9imnSU8drg@mail.gmail.com>
+References: <1418110007-13270-1-git-send-email-zhichang.yuan@linaro.org>
+ <20150123162126.GD9557@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu8OQB+eziL6X85-v-+9KKPsK6Z=h2+1oDrM9imnSU8drg@mail.gmail.com>
+Message-ID: <20150128121017.GB9000@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 23, 2015 at 10:33:20PM +0000, Mitchel Humpherys wrote:
-> On Fri, Jan 23 2015 at 03:24:15 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Thu, Jan 22, 2015 at 11:48:02PM +0000, Mitchel Humpherys wrote:
-> >> Context interrupts can call domain-specific handlers which might sleep.
-> >> Currently we register our handler with request_irq, so our handler is
-> >> called in atomic context, so domain handlers that sleep result in an
-> >> invalid context BUG.  Fix this by using request_threaded_irq.
-> >> 
-> >> This also prepares the way for doing things like enabling clocks within
-> >> our interrupt handler.
-> >> 
-> >> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
-> >> ---
-> >>  drivers/iommu/arm-smmu.c | 5 +++--
-> >>  1 file changed, 3 insertions(+), 2 deletions(-)
-> >> 
-> >> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> >> index 6cd47b75286f..81f6b54d94b1 100644
-> >> --- a/drivers/iommu/arm-smmu.c
-> >> +++ b/drivers/iommu/arm-smmu.c
-> >> @@ -973,8 +973,9 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
-> >>  	spin_unlock_irqrestore(&smmu_domain->lock, flags);
-> >>  
-> >>  	irq = smmu->irqs[smmu->num_global_irqs + cfg->irptndx];
-> >> -	ret = request_irq(irq, arm_smmu_context_fault, IRQF_SHARED,
-> >> -			  "arm-smmu-context-fault", domain);
-> >> +	ret = request_threaded_irq(irq, NULL, arm_smmu_context_fault,
-> >> +				IRQF_ONESHOT | IRQF_SHARED,
-> >> +				"arm-smmu-context-fault", domain);
-> >>  	if (IS_ERR_VALUE(ret)) {
-> >>  		dev_err(smmu->dev, "failed to request context IRQ %d (%u)\n",
-> >>  			cfg->irptndx, irq);
+On Fri, Jan 23, 2015 at 05:40:40PM +0000, Ard Biesheuvel wrote:
+> On 23 January 2015 at 16:21, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Tue, Dec 09, 2014 at 07:26:47AM +0000, zhichang.yuan at linaro.org wrote:
+> >> From: "zhichang.yuan" <zhichang.yuan@linaro.org>
+> >>
+> >> For 64K page system, after mapping a PMD section, the corresponding initial
+> >> page table is not needed any more. That page can be freed.
+> >>
+> >> Changes since v1:
+> >>
+> >> * make consistent code between alloc_init_pmd and alloc_init_pud;
+> >> * flush the TLB before the unused page table is freed;
+> >>
+> >> Signed-off-by: Zhichang Yuan <zhichang.yuan@linaro.org>
 > >
-> > I think I'd rather keep a simple atomic handler, then have a threaded
-> > handler for actually issuing the report_iommu_fault. i.e. we only wake
-> > the thread when it looks like there's some work to do. That also works
-> > much better for shared interrupts.
+> > I thought about queuing this patch but I realised that
+> > alloc_init_pmd/pud may be called in a late context where memblock_free()
+> > would no longer make sense. Cc'ing Laura and Ard for any ideas here but
+> > I think we may just end up with a few old page table pages sitting
+> > around (not many though). In general we don't go from smaller to larger
+> > mappings (that's what this patch targets) but given the API, I'm not
+> > sure we have any guarantee.
+> >
+> > One solution would be to check for alloc == early_alloc or something
+> > similar. Cc'ing Laura and Ard as they added the create_mapping_late()
+> > code.
+> >
 > 
-> Are you still against adding clock support to the driver?  If not, we'll
-> need to move to a threaded handler when clocks come in anyways...
+> The UEFI page tables are only built up once, based on a series of
+> disjoint memory regions, so that will never hit either of the
+> memblock_free() branches.
+> And AFAICT, the DEBUG_RODATA code does the splitting early, which
+> causes the create_mapping_late() code to only change permissions, not
+> change the granularity of any regions.
 > 
-> Can you elaborate what you mean regarding shared interrupts?  Even
-> without clocks it seems like the code clarity / performance tradeoff
-> would favor a threaded handler, given that performance isn't important
-> here.
+> Perhaps it's sufficient to add a comment and a BUG_ON(alloc !=
+> early_alloc) to the memblock_free() branches?
 
-With a shared handler (e.g. a bunch of context banks have the same IRQ)
-then I assume that we don't want to end up with multiple handler threads
-all tripping over each other. I'd rather have one thread that handles work
-queued up by multiple low-level handlers.
+Thanks for confirming, I merged this patch together with BUG_ON(), just
+in case.
 
-Do you have a preference either way?
-
-Will
+-- 
+Catalin
