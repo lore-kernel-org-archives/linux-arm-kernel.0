@@ -1,66 +1,67 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Jan 2015 22:49 +0100
-Subject: [PATCH] usb: dwc2: fix USB core dependencies
-Message-ID: <1554724.zbFzpEsGrd@wuerfel>
+Date: Wed, 28 Jan 2015 22:50:04 +0100
+Subject: [PATCH] usb: musb: add generic usb phy dependencies
+Message-ID: <4595774.yLOm5IvvqR@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is currently possible to configure the dwc2 driver as built-in
-when host mode or dual-role is enabled, but the USB core is
-a loadable module. This leads to a link failure:
+Multiple musb glue drivers depend on the generic usb phy support,
+but fail to list it as a dependency in Kconfig. This results
+in build erros like:
 
-drivers/built-in.o: In function `_dwc2_hcd_start':
-:(.text+0x84538): undefined reference to `usb_hcd_resume_root_hub'
-drivers/built-in.o: In function `_dwc2_hcd_urb_dequeue':
-:(.text+0x84aa0): undefined reference to `usb_hcd_check_unlink_urb'
-:(.text+0x84e4c): undefined reference to `usb_hcd_unlink_urb_from_ep'
-:(.text+0x84e74): undefined reference to `usb_hcd_giveback_urb'
-drivers/built-in.o: In function `dwc2_assign_and_init_hc':
-:(.text+0x86b98): undefined reference to `usb_hcd_unmap_urb_for_dma'
-drivers/built-in.o: In function `_dwc2_hcd_urb_enqueue':
-:(.text+0x8717c): undefined reference to `usb_hcd_link_urb_to_ep'
-:(.text+0x872f4): undefined reference to `usb_hcd_unlink_urb_from_ep'
-drivers/built-in.o: In function `dwc2_host_complete':
-:(.text+0x875d4): undefined reference to `usb_hcd_unlink_urb_from_ep'
-:(.text+0x87600): undefined reference to `usb_hcd_giveback_urb'
-drivers/built-in.o: In function `dwc2_hcd_init':
-:(.text+0x87ba8): undefined reference to `usb_disabled'
-:(.text+0x87d38): undefined reference to `usb_create_hcd'
-:(.text+0x88094): undefined reference to `usb_add_hcd'
-:(.text+0x880dc): undefined reference to `usb_put_hcd'
-drivers/built-in.o: In function `dwc2_hcd_remove':
-:(.text+0x8821c): undefined reference to `usb_remove_hcd'
-:(.text+0x8823c): undefined reference to `usb_put_hcd'
-drivers/built-in.o: In function `dwc2_hc_handle_tt_clear.isra.10':
-:(.text+0x88e2c): undefined reference to `usb_hub_clear_tt_buffer'
-drivers/built-in.o: In function `dwc2_hcd_qtd_add':
-:(.text+0x8b554): undefined reference to `usb_calc_bus_time'
+drivers/built-in.o: In function `am35x_remove':
+:(.text+0xadacc): undefined reference to `usb_phy_generic_unregister'
+drivers/built-in.o: In function `am35x_probe':
+:(.text+0xae1c8): undefined reference to `usb_phy_generic_register'
+:(.text+0xae244): undefined reference to `usb_phy_generic_unregister'
+drivers/built-in.o: In function `jz4740_remove':
+:(.text+0xaf648): undefined reference to `usb_phy_generic_unregister'
+drivers/built-in.o: In function `jz4740_musb_init':
+:(.text+0xaf694): undefined reference to `usb_phy_generic_register'
 
-To fix the problem, this patch changes the dependencies so that
-dwc2 host mode can only be enabled if either the USB core is
-built-in or both USB and dwc2 are modules.
+This adds the ones that are missing.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-diff --git a/drivers/usb/dwc2/Kconfig b/drivers/usb/dwc2/Kconfig
-index b323c4c11b0a..76b9ba4dc925 100644
---- a/drivers/usb/dwc2/Kconfig
-+++ b/drivers/usb/dwc2/Kconfig
-@@ -23,7 +23,7 @@ choice
+diff --git a/drivers/usb/musb/Kconfig b/drivers/usb/musb/Kconfig
+index b005010240e5..26c835f1b726 100644
+--- a/drivers/usb/musb/Kconfig
++++ b/drivers/usb/musb/Kconfig
+@@ -63,11 +63,13 @@ comment "Platform Glue Layer"
+ config USB_MUSB_DAVINCI
+ 	tristate "DaVinci"
+ 	depends on ARCH_DAVINCI_DMx
++	depends on NOP_USB_XCEIV
+ 	depends on BROKEN
  
- config USB_DWC2_HOST
- 	bool "Host only mode"
--	depends on USB
-+	depends on USB=y || (USB_DWC2=m && USB)
- 	help
- 	  The Designware USB2.0 high-speed host controller
- 	  integrated into many SoCs. Select this option if you want the
-@@ -42,7 +42,7 @@ config USB_DWC2_PERIPHERAL
+ config USB_MUSB_DA8XX
+ 	tristate "DA8xx/OMAP-L1x"
+ 	depends on ARCH_DAVINCI_DA8XX
++	depends on NOP_USB_XCEIV
+ 	depends on BROKEN
  
- config USB_DWC2_DUAL_ROLE
- 	bool "Dual Role mode"
--	depends on (USB=y || USB=USB_DWC2) && (USB_GADGET=y || USB_GADGET=USB_DWC2)
-+	depends on (USB=y && USB_GADGET=y) || (USB_DWC2=m && USB && USB_GADGET)
- 	help
- 	  Select this option if you want the driver to work in a dual-role
- 	  mode. In this mode both host and gadget features are enabled, and
+ config USB_MUSB_TUSB6010
+@@ -83,6 +85,7 @@ config USB_MUSB_OMAP2PLUS
+ config USB_MUSB_AM35X
+ 	tristate "AM35x"
+ 	depends on ARCH_OMAP
++	depends on NOP_USB_XCEIV
+ 
+ config USB_MUSB_DSPS
+ 	tristate "TI DSPS platforms"
+@@ -93,6 +96,7 @@ config USB_MUSB_DSPS
+ config USB_MUSB_BLACKFIN
+ 	tristate "Blackfin"
+ 	depends on (BF54x && !BF544) || (BF52x && ! BF522 && !BF523)
++	depends on NOP_USB_XCEIV
+ 
+ config USB_MUSB_UX500
+ 	tristate "Ux500 platforms"
+@@ -100,6 +104,7 @@ config USB_MUSB_UX500
+ 
+ config USB_MUSB_JZ4740
+ 	tristate "JZ4740"
++	depends on NOP_USB_XCEIV
+ 	depends on MACH_JZ4740 || COMPILE_TEST
+ 	depends on USB_MUSB_GADGET
+ 	depends on USB_OTG_BLACKLIST_HUB
