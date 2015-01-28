@@ -1,77 +1,73 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 27 Jan 2015 16:50:33 -0800
-Subject: [PATCH] ARM: /proc/atags: Export also for DT
-In-Reply-To: <20150127174818.GM26493@n2100.arm.linux.org.uk>
-References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
- <20150127132127.GA869@amd>
- <CAL_JsqKM+2PtX_EpWXyOQHVXwf=jqVj8SroUGPO1Y2=Zj8_kMg@mail.gmail.com>
- <201501271532.25540@pali>
- <20150127174818.GM26493@n2100.arm.linux.org.uk>
-Message-ID: <20150128005032.GK28663@atomide.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 28 Jan 2015 09:53:42 +0900
+Subject: [PATCH] ARM: shmobile: r8a7794: Correct SDHI clock base address,
+ labels and output-names
+Message-ID: <1422406422-671-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [150127 09:51]:
-> 
-> We _could_ (and have in the past) turned round and refused to support
-> these kinds of hacks - which IMHO is quite a reasonable stance to
-> take: the message we should be sending is "if you wish to design
-> new methods without discussing it with us, we reserve the right not
-> to support them in mainline kernels; please discuss with us your
-> requirements."
-> 
-> Each time that we accept one of these hacks, we're sending a message
-> that says "it's okay to work in this crappy way".
-> 
-> Yes, I realise that the N900 has little in the way of support, and we
-> can't exert that kind of back pressure (since there's no one to direct
-> that onto to effect any change) so I guess we just have to live with it.
+* Correct base address of SD3 div6 clk.
+* Update div6 clock node labels
+  There appears to have been some inconsistency and confusion here as on
+  the r8a7790 these clocks are referred to as SD(HI)1 and SD(HI)2 while on
+  the r8a7791 and r8a7794 they are referred to as SD(HI)2 and SD(HI)3.
 
-I believe after N900 Nokia dropped the custom ATAGs and used the
-kernel cmdline instead. And most of the n900 custom ATAGs are not
-even needed any longer.
+This has no run-time affect as the clock nodes are not currently used.
 
-The ATAG_REVISION is a standard feature that we should support
-naturally. I don't think we should add any custom ATAGs, except
-maybe for the bootreason.
- 
-> > I think this kind of information (how was board/computer started) 
-> > can be useful also for other architectures. E.g. on laptop you 
-> > would like to know if if was started by RTC, power button, 
-> > WakeOnLan, another ACPI event, rebooted machine, watchdog, etc... 
-> > And scripts can act depending on this event (when by RTC, you 
-> > need to run some planned job, when by watchdog reset you should 
-> > check what caused that reason...).
-> 
-> There is a standard way to get the boot information already: look at
-> the watchdog API:
-> 
-> #define WDIOC_GETBOOTSTATUS     _IOR(WATCHDOG_IOCTL_BASE, 2, int)
-> 
-> which uses the WDIOF_* flags to indicate the last boot reason.  It
-> probably isn't as flexible as some may desire, but it should provide
-> at least the "watchdog rebooted us" vs "over temperature" vs some
-> other boot reason.
-> 
-> The other thing to consider is whether we have a way to know what
-> the boot reason was, and what we should do if we do not have a way
-> of supporting some of the boot reasons.  For example, if we have
-> support for RTC alarm based booting, but no way to actually tell
-> if the boot was caused by the RTC alarm triggering.
+Fixes: 8e181633e6ca96049 ("ARM: shmobile: r8a7794: Add SDHI clocks to device tree")
+Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-On omaps, the bootrom passes the bootreason in r1 to the bootloader
-that can do whatever it wants with it. We could maybe pass it
-in the kernel cmdline to the watchdog driver for user space?
+---
 
-Of course the problem is that the signed bootloader on n900 cannot
-be modified so the pass through u-boot would have to translate
-the custom ATAG for bootreason into a kernel cmdline..
+* A similar change to update the div6 clock node names and labels
+  appears to be required for the r8a7791.  The base addresses appear to be
+  correct there.
 
-But it may actually make sense to add the bootreason ATAGs, it
-seems quite generic to me.
+* This patch is a revised version of " ARM: shmobile: r8a7794: Correct SDHI
+  base address, clock labels and output-names"
+---
+ arch/arm/boot/dts/r8a7794.dtsi | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-AFAIK, the other n900 ATAGs can be just ignored.
-
-Regards,
-
-Tony
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index 8f78da5..debf3e2d 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -294,19 +294,19 @@
+ 					     "lb", "qspi", "sdh", "sd0", "z";
+ 		};
+ 		/* Variable factor clocks */
+-		sd1_clk: sd2_clk at e6150078 {
++		sd2_clk: sd2_clk at e6150078 {
+ 			compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
+ 			reg = <0 0xe6150078 0 4>;
+ 			clocks = <&pll1_div2_clk>;
+ 			#clock-cells = <0>;
+-			clock-output-names = "sd1";
++			clock-output-names = "sd2";
+ 		};
+-		sd2_clk: sd3_clk at e615007c {
++		sd3_clk: sd3_clk at e615026c {
+ 			compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
+-			reg = <0 0xe615007c 0 4>;
++			reg = <0 0xe615026c 0 4>;
+ 			clocks = <&pll1_div2_clk>;
+ 			#clock-cells = <0>;
+-			clock-output-names = "sd2";
++			clock-output-names = "sd3";
+ 		};
+ 		mmc0_clk: mmc0_clk at e6150240 {
+ 			compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
+@@ -518,7 +518,7 @@
+ 		mstp3_clks: mstp3_clks at e615013c {
+ 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
+-			clocks = <&sd2_clk>, <&sd1_clk>, <&cpg_clocks R8A7794_CLK_SD0>,
++			clocks = <&sd3_clk>, <&sd2_clk>, <&cpg_clocks R8A7794_CLK_SD0>,
+ 			         <&mmc0_clk>, <&rclk_clk>, <&hp_clk>, <&hp_clk>;
+ 			#clock-cells = <1>;
+ 			clock-indices = <
+-- 
+2.1.4
