@@ -1,83 +1,44 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 28 Jan 2015 08:12:50 +0200
-Subject: [PATCH v9 2/2] tty/serial: Add Spreadtrum sc9836-uart driver
- support
-In-Reply-To: <1422413261-17184-3-git-send-email-chunyan.zhang@spreadtrum.com>
-References: <sc9836-serial-v9>
- <1422413261-17184-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1422413261-17184-3-git-send-email-chunyan.zhang@spreadtrum.com>
-Message-ID: <20150128061250.GQ2555@sapphire.tkos.co.il>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 28 Jan 2015 07:19:22 +0100
+Subject: [PATCH v2] clk: sunxi: fix sun6i PLL1 .recalc_rate() result
+In-Reply-To: <20150128014105.22722.46052@quantum>
+References: <1422088959-23365-1-git-send-email-wens@csie.org>
+ <20150124152944.GE8470@lukather> <20150128014105.22722.46052@quantum>
+Message-ID: <CAGb2v64GaYOXkMKcJa9EjxtCsjWJANOjmf2zbfP9Motn0+bMvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chunyan Zhang,
+On Wed, Jan 28, 2015 at 2:41 AM, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting Maxime Ripard (2015-01-24 07:29:44)
+>> Hi Mike,
+>>
+>> On Sat, Jan 24, 2015 at 04:42:39PM +0800, Chen-Yu Tsai wrote:
+>> > PLL1 on sun6i has its N factor start from 1 (N = register value + 1).
+>> > Make the factors clk driver aware of this so clk_factors_recalc_rate()
+>> > gives the correct result.
+>> >
+>> > Cc: <stable@vger.kernel.org> # 3.12 9a5e6c7eb5cc clk: sunxi: Support factor
+>> > Cc: <stable@vger.kernel.org> # 3.12
+>> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>>
+>> Could you queue this for 3.19?
+>
+> This is fixed in 76820fc in clk-next, destined for 3.20.
+>
+> Also I'm confused by the stable tags above. Looks like 9a5e6c7eb5cc was
+> merged for 3.16, not 3.12.
 
-On Wed, Jan 28, 2015 at 10:47:41AM +0800, Chunyan Zhang wrote:
-[...]
-> +static inline void sprd_rx(struct uart_port *port)
-> +{
-> +	struct tty_port *tty = &port->state->port;
-> +	unsigned int ch, flag, lsr, max_count = SPRD_TIMEOUT;
-> +
-> +	while ((serial_in(port, SPRD_STS1) & 0x00ff) && max_count--) {
-> +		lsr = serial_in(port, SPRD_LSR);
-> +		ch = serial_in(port, SPRD_RXD);
-> +		flag = TTY_NORMAL;
-> +		port->icount.rx++;
-> +
-> +		if (lsr & (SPRD_LSR_BI | SPRD_LSR_PE |
-> +			SPRD_LSR_FE | SPRD_LSR_OE))
-> +			if (handle_lsr_errors(port, &lsr, &flag))
-> +				continue;
-> +		if (uart_handle_sysrq_char(port, ch))
-> +			continue;
+I think so. I wasn't quite sure what the version number was
+supposed to be, the first version it is applicable? or the
+first version the specific patch was merged.
 
-My comment[1] on a previous version of this patch still stands. 
-uart_handle_sysrq_char is a NOP when SUPPORT_SYSRQ is not defined.
+ChenYu
 
-> +
-> +		uart_insert_char(port, lsr, SPRD_LSR_OE, ch, flag);
-> +	}
-> +
-> +	tty_flip_buffer_push(tty);
-> +}
-
-[...]
-
-> +static void sprd_console_write(struct console *co, const char *s,
-> +				      unsigned int count)
-> +{
-> +	struct uart_port *port = &sprd_port[co->index]->port;
-> +	int locked = 1;
-> +	unsigned long flags;
-> +
-> +	if (port->sysrq)
-> +		locked = 0;
-
-The sysrq field of struct uart_port is only defined when 
-CONFIG_SERIAL_CORE_CONSOLE or SUPPORT_SYSRQ are defined. You should #ifdef 
-this part accordingly to avoid build breakage.
-
-> +	else if (oops_in_progress)
-> +		locked = spin_trylock_irqsave(&port->lock, flags);
-> +	else
-> +		spin_lock_irqsave(&port->lock, flags);
-> +
-> +	uart_console_write(port, s, count, sprd_console_putchar);
-> +
-> +	/* wait for transmitter to become empty */
-> +	wait_for_xmitr(port);
-> +
-> +	if (locked)
-> +		spin_unlock_irqrestore(&port->lock, flags);
-> +}
-
-[1]
-	http://article.gmane.org/gmane.linux.drivers.devicetree/106483
-
-baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+>>
+>> Thanks,
+>> Maxime
+>>
+>> --
+>> Maxime Ripard, Free Electrons
+>> Embedded Linux, Kernel and Android engineering
+>> http://free-electrons.com
