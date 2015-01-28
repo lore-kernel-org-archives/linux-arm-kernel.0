@@ -1,57 +1,103 @@
 From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Tue, 27 Jan 2015 18:46:34 -0800
-Subject: [PATCH 4/9] regulator: wm831x-ldo: move to set_optimum_mode
+Date: Tue, 27 Jan 2015 18:46:33 -0800
+Subject: [PATCH 3/9] regulator: ab8500: move to set_optimum_mode
 In-Reply-To: <1422413199-17273-1-git-send-email-bjorn.andersson@sonymobile.com>
 References: <1422413199-17273-1-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <1422413199-17273-5-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <1422413199-17273-4-git-send-email-bjorn.andersson@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 ---
- drivers/regulator/wm831x-ldo.c | 21 +++++++++++++--------
- 1 file changed, 13 insertions(+), 8 deletions(-)
+ drivers/regulator/ab8500.c | 48 +++++++++++++++++++++++-----------------------
+ 1 file changed, 24 insertions(+), 24 deletions(-)
 
-diff --git a/drivers/regulator/wm831x-ldo.c b/drivers/regulator/wm831x-ldo.c
-index 7ae2dc8..40d391e 100644
---- a/drivers/regulator/wm831x-ldo.c
-+++ b/drivers/regulator/wm831x-ldo.c
-@@ -186,15 +186,20 @@ static int wm831x_gp_ldo_get_status(struct regulator_dev *rdev)
- 		return regulator_mode_to_status(ret);
+diff --git a/drivers/regulator/ab8500.c b/drivers/regulator/ab8500.c
+index 0f97514..c1588c1 100644
+--- a/drivers/regulator/ab8500.c
++++ b/drivers/regulator/ab8500.c
+@@ -320,27 +320,6 @@ static int ab8500_regulator_is_enabled(struct regulator_dev *rdev)
+ 		return 0;
  }
  
--static unsigned int wm831x_gp_ldo_get_optimum_mode(struct regulator_dev *rdev,
--						   int input_uV,
--						   int output_uV, int load_uA)
-+static int wm831x_gp_ldo_set_optimum_mode(struct regulator_dev *rdev,
-+					  int input_uV,
-+					  int output_uV, int load_uA)
+-static unsigned int ab8500_regulator_get_optimum_mode(
+-		struct regulator_dev *rdev, int input_uV,
+-		int output_uV, int load_uA)
+-{
+-	unsigned int mode;
+-
+-	struct ab8500_regulator_info *info = rdev_get_drvdata(rdev);
+-
+-	if (info == NULL) {
+-		dev_err(rdev_get_dev(rdev), "regulator info null pointer\n");
+-		return -EINVAL;
+-	}
+-
+-	if (load_uA <= info->load_lp_uA)
+-		mode = REGULATOR_MODE_IDLE;
+-	else
+-		mode = REGULATOR_MODE_NORMAL;
+-
+-	return mode;
+-}
+-
+ static int ab8500_regulator_set_mode(struct regulator_dev *rdev,
+ 				     unsigned int mode)
  {
+@@ -430,6 +409,27 @@ out_unlock:
+ 	return ret;
+ }
+ 
++static int ab8500_regulator_set_optimum_mode(
++		struct regulator_dev *rdev, int input_uV,
++		int output_uV, int load_uA)
++{
 +	unsigned int mode;
 +
- 	if (load_uA < 20000)
--		return REGULATOR_MODE_STANDBY;
--	if (load_uA < 50000)
--		return REGULATOR_MODE_IDLE;
--	return REGULATOR_MODE_NORMAL;
-+		mode = REGULATOR_MODE_STANDBY;
-+	else if (load_uA < 50000)
++	struct ab8500_regulator_info *info = rdev_get_drvdata(rdev);
++
++	if (info == NULL) {
++		dev_err(rdev_get_dev(rdev), "regulator info null pointer\n");
++		return -EINVAL;
++	}
++
++	if (load_uA <= info->load_lp_uA)
 +		mode = REGULATOR_MODE_IDLE;
 +	else
 +		mode = REGULATOR_MODE_NORMAL;
 +
-+	return wm831x_gp_ldo_set_mode(rdev, mode);
- }
- 
- 
-@@ -207,7 +212,7 @@ static struct regulator_ops wm831x_gp_ldo_ops = {
- 	.get_mode = wm831x_gp_ldo_get_mode,
- 	.set_mode = wm831x_gp_ldo_set_mode,
- 	.get_status = wm831x_gp_ldo_get_status,
--	.get_optimum_mode = wm831x_gp_ldo_get_optimum_mode,
-+	.set_optimum_mode = wm831x_gp_ldo_set_optimum_mode,
- 	.get_bypass = regulator_get_bypass_regmap,
- 	.set_bypass = regulator_set_bypass_regmap,
- 
++	return ab8500_regulator_set_mode(rdev, mode);
++}
++
+ static unsigned int ab8500_regulator_get_mode(struct regulator_dev *rdev)
+ {
+ 	struct ab8500_regulator_info *info = rdev_get_drvdata(rdev);
+@@ -645,7 +645,7 @@ static struct regulator_ops ab8500_regulator_volt_mode_ops = {
+ 	.enable			= ab8500_regulator_enable,
+ 	.disable		= ab8500_regulator_disable,
+ 	.is_enabled		= ab8500_regulator_is_enabled,
+-	.get_optimum_mode	= ab8500_regulator_get_optimum_mode,
++	.set_optimum_mode	= ab8500_regulator_set_optimum_mode,
+ 	.set_mode		= ab8500_regulator_set_mode,
+ 	.get_mode		= ab8500_regulator_get_mode,
+ 	.get_voltage_sel 	= ab8500_regulator_get_voltage_sel,
+@@ -656,7 +656,7 @@ static struct regulator_ops ab8500_regulator_volt_mode_ops = {
+ static struct regulator_ops ab8540_aux3_regulator_volt_mode_ops = {
+ 	.enable		= ab8500_regulator_enable,
+ 	.disable	= ab8500_regulator_disable,
+-	.get_optimum_mode	= ab8500_regulator_get_optimum_mode,
++	.set_optimum_mode	= ab8500_regulator_set_optimum_mode,
+ 	.set_mode	= ab8500_regulator_set_mode,
+ 	.get_mode	= ab8500_regulator_get_mode,
+ 	.is_enabled	= ab8500_regulator_is_enabled,
+@@ -678,7 +678,7 @@ static struct regulator_ops ab8500_regulator_mode_ops = {
+ 	.enable			= ab8500_regulator_enable,
+ 	.disable		= ab8500_regulator_disable,
+ 	.is_enabled		= ab8500_regulator_is_enabled,
+-	.get_optimum_mode	= ab8500_regulator_get_optimum_mode,
++	.set_optimum_mode	= ab8500_regulator_set_optimum_mode,
+ 	.set_mode		= ab8500_regulator_set_mode,
+ 	.get_mode		= ab8500_regulator_get_mode,
+ 	.list_voltage		= regulator_list_voltage_table,
 -- 
 1.9.1
