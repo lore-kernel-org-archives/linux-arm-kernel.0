@@ -1,34 +1,29 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Jan 2015 16:04:46 +0100
-Subject: [PATCH] sound: sscape: add missing include of linux/io.h
-In-Reply-To: <s5hlhknx8bc.wl-tiwai@suse.de>
-References: <7794866.XZSLAdxcrb@wuerfel> <s5hlhknx8bc.wl-tiwai@suse.de>
-Message-ID: <3560329.35JVsOOFlQ@wuerfel>
+Date: Wed, 28 Jan 2015 16:10:28 +0100
+Subject: [PATCH] eventfs: avoid unused variable warning
+Message-ID: <88925492.FKoyo2trpD@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The soundscape driver uses the ISA inb/outb functions declared
-in linux/io.h, so it needs to include this header to avoid
-a build error:
+An optimization patch from Chris Mason causes build warnings about
+an unused variable.
 
-sscape.c: In function 'sscape_write_unsafe':
-sscape.c:203:2: error: implicit declaration of function 'outb' [-Werror=implicit-function-declaration]
+The patch that broke this is currently in the akpm-current series,
+so this fixup can be folded into the original patch. I was expecting
+multiple people to send a patch for this, so I waited a bit at first.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-Sorry about messing up the patch description the first time. I'm cleaning
-out old patches from a randconfig build tree and I found this one was
-still needed but did not inspect the changelog closely enough.
+Fixes: 567162b87a5c5f  ("eventfd: don't take the spinlock in eventfd_poll")
 
-diff --git a/sound/isa/sscape.c b/sound/isa/sscape.c
-index 018ab140c2be..7b248cdf06e2 100644
---- a/sound/isa/sscape.c
-+++ b/sound/isa/sscape.c
-@@ -23,6 +23,7 @@
+diff --git a/fs/eventfd.c b/fs/eventfd.c
+index 439e6f0177f3..303ddc43dbee 100644
+--- a/fs/eventfd.c
++++ b/fs/eventfd.c
+@@ -118,7 +118,6 @@ static unsigned int eventfd_poll(struct file *file, poll_table *wait)
+ {
+ 	struct eventfd_ctx *ctx = file->private_data;
+ 	unsigned int events = 0;
+-	unsigned long flags;
+ 	unsigned int count;
  
- #include <linux/init.h>
- #include <linux/err.h>
-+#include <linux/io.h>
- #include <linux/isa.h>
- #include <linux/delay.h>
- #include <linux/firmware.h>
+ 	poll_wait(file, &ctx->wqh, wait);
