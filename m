@@ -1,109 +1,133 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 28 Jan 2015 15:15:10 +0200
-Subject: [PATCH v4 1/6] of: iommu: add ptr to OF node arg to
- of_iommu_configure()
-In-Reply-To: <20150128122941.GK1569@arm.com>
-References: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
- <3953539.m9NpxSWcJ5@avalon> <20150128122941.GK1569@arm.com>
-Message-ID: <13812499.ICbNgSDOae@avalon>
+From: mpeg.blue@free.fr (Mason)
+Date: Wed, 28 Jan 2015 14:16:21 +0100
+Subject: Delays, clocks, timers, hrtimers, etc
+Message-ID: <54C8E125.3070905@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 28 January 2015 12:29:42 Will Deacon wrote:
-> On Wed, Jan 28, 2015 at 12:23:03PM +0000, Laurent Pinchart wrote:
-> > On Wednesday 28 January 2015 11:33:00 Will Deacon wrote:
-> >> On Mon, Jan 26, 2015 at 06:49:01PM +0000, Murali Karicheri wrote:
-> >>> On 01/25/2015 08:32 AM, Laurent Pinchart wrote:
-> >>>> On Friday 23 January 2015 17:32:34 Murali Karicheri wrote:
-> >>>>> Function of_iommu_configure() is called from of_dma_configure() to
-> >>>>> setup iommu ops using DT property. This API is currently used for
-> >>>>> platform devices for which DMA configuration (including iommu ops)
-> >>>>> may come from device's parent. To extend this functionality for PCI
-> >>>>> devices, this API need to take a parent node ptr as an argument
-> >>>>> instead of assuming device's parent. This is needed since for PCI,
-> >>>>> the dma configuration may be defined in the DT node of the root bus
-> >>>>> bridge's parent device. Currently only dma-range is used for PCI and
-> >>>>> iommu is not supported. So return error if the device is PCI.
-> >>>>> 
-> >>>>> Cc: Joerg Roedel<joro@8bytes.org>
-> >>>>> Cc: Grant Likely<grant.likely@linaro.org>
-> >>>>> Cc: Rob Herring<robh+dt@kernel.org>
-> >>>>> Cc: Bjorn Helgaas<bhelgaas@google.com>
-> >>>>> Cc: Will Deacon<will.deacon@arm.com>
-> >>>>> Cc: Russell King<linux@arm.linux.org.uk>
-> >>>>> Cc: Arnd Bergmann<arnd@arndb.de>
-> >>>>> Cc: Suravee Suthikulpanit<Suravee.Suthikulpanit@amd.com>
-> >>>>> 
-> >>>>> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
-> >>>>> ---
-> >>>>> 
-> >>>>>   drivers/iommu/of_iommu.c |   10 ++++++++--
-> >>>>>   drivers/of/platform.c    |    2 +-
-> >>>>>   include/linux/of_iommu.h |    6 ++++--
-> >>>>>   3 files changed, 13 insertions(+), 5 deletions(-)
-> >>>>> 
-> >>>>> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-> >>>>> index af1dc6a..439235b 100644
-> >>>>> --- a/drivers/iommu/of_iommu.c
-> >>>>> +++ b/drivers/iommu/of_iommu.c
-> >>>>> @@ -133,19 +133,25 @@ struct iommu_ops *of_iommu_get_ops(struct
-> >>>>> device_node *np)
-> >>>>>   	return ops;
-> >>>>>  }
-> >>>>> 
-> >>>>> -struct iommu_ops *of_iommu_configure(struct device *dev)
-> >>>>> +struct iommu_ops *of_iommu_configure(struct device *dev,
-> >>>>> +				     struct device_node *iommu_np)
-> >>>>>  {
-> >>>>>   	struct of_phandle_args iommu_spec;
-> >>>>>   	struct device_node *np;
-> >>>>>   	struct iommu_ops *ops = NULL;
-> >>>>>   	int idx = 0;
-> >>>>> 
-> >>>>> +	if (dev_is_pci(dev)) {
-> >>>>> +		dev_err(dev, "iommu is currently not supported for PCI\n");
-> >>>>> +		return NULL;
-> >>>>> +	}
-> >>>>> +
-> >>>>>   	/*
-> >>>>>   	 * We don't currently walk up the tree looking for a parent
-> >>>>>   	 IOMMU.
-> >>>>>   	 * See the `Notes:' section of
-> >>>>>   	 * Documentation/devicetree/bindings/iommu/iommu.txt
-> >>>>>   	 */
-> >>>> 
-> >>>> Wouldn't it be better to fix this rather than passing the device node
-> >>>> pointer to the function ? The solution would be more generic.
-> >>> 
-> >>> Will Deacon (Copied here) is working on this as we alteady discussed
-> >>> in this thread. So it will be addressed by him in another series.
-> >> 
-> >> Well, "working on this" equates to "has it somewhere near the bottom of
-> >> a very long list" :)
-> > 
-> > What's your opinion on this patch then, do you think adding the iommu_np
-> > argument makes sense as a temporary hack, or should we instead walk up the
-> > tree looking for an iommus attribute in parent nodes ? I don't expect that
-> > to be insanely difficult to code.
-> 
-> If walking up the tree is useful, then I think we should do that and update
-> the Documentation to reflect the new behaviour.
+Hello,
 
-If I understand Murali's patch set right (please correct me if that's not the 
-case) the PCI code walks up the DT nodes hierarchy to the parent node that 
-contains the iommus attribute and passes a pointer to that node to this 
-function. It's thus a PCI-specific solution. As a temporary hack that's OK I 
-suppose, but if implementing it right straight away isn't difficult that would 
-be better.
+I am swimming in a sea of confusion, and am hoping someone would toss
+me a life-jacket (of enlightenment). Please forgive me if some of my
+questions are poorly asked or appear in seemingly random order.
 
-> The only reason that I didn't code that in of_iommu_configure originally is
-> because I didn't want to go against the binding spec for the initial
-> version, especially as we didn't have a reason to look at parent nodes.
-> 
-> The only thing to double-check is that we don't break any existing users
-> of the binding with this change, but I don't think that we do.
+Working on a Cortex A9 based SoC, I set out to "clean up" the platform
+specific timer code, by using as much generic framework as possible.
+(Right now, there's a lot of "redundant" code in the mach dir.)
 
--- 
-Regards,
 
-Laurent Pinchart
+Q1. the {n,u,m}delay function family
+
+arch/arm/include/asm/delay.h mentions
+"Delay routines, using a pre-computed "loops_per_second" value."
+*BUT* if the frequency changes dynamically (thanks to cpufreq)
+the "loops_per_second" value cannot be pre-computed, as it would
+change dynamically too, right?
+
+Looking at arch/arm/lib/delay.c it seems the default implementation
+is a busy loop (in delay-loop.S) which looks up "loops_per_jiffy"
+in the prolog to determine the number of times to loop, right?
+
+http://lxr.free-electrons.com/source/arch/arm/lib/delay-loop.S
+
+(Side issue, why is the loop unrolled in __loop_delay? What is the
+point of unrolling a busy loop? This is commented code however.)
+
+What happens if loops_per_jiffy changes while one core is in the
+busy loop? It seems we might exit the loop too early, which could
+break some drivers with some weird heisenbug, no?
+
+Also, is the update of loops_per_jiffy atomic? Is it possible that
+if one core reads it while another updates it, we get garbage?
+
+I suppose this is one reason why the default functions are overridden
+by register_current_timer_delay(&arch_delay_timer) right? I think the
+property of a timer is that its frequency doesn't change, even if the
+CPU's frequency changes? So we are still busy looping, but we are
+checking the actual time spent in the loop, whatever the cpufreq?
+
+Reference
+https://www.kernel.org/doc/Documentation/timers/timers-howto.txt
+
+
+Q2. Cortex A9 global and private timers
+
+http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0407f/CIHGECHJ.html
+
+(What are private timers used for?)
+
+In my platform-specific code, there is a config option to choose between
+
+1) the ARM global timer
+2) a platform-specific timer (timer0)
+
+I noticed that there is generic code to support the global timer in
+drivers/clocksource/arm_global_timer.c
+
+config ARM_GLOBAL_TIMER
+	bool
+	select CLKSRC_OF if OF
+	help
+	  This options enables support for the ARM global timer unit
+
+config CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
+	bool
+	depends on ARM_GLOBAL_TIMER
+	default y
+	help
+	 Use ARM global timer clock source as sched_clock
+
+I was thinking it would be better to use the "standard" option (ARM global timer)
+as it is "officially" supported in the vanilla kernel. So less code to write and
+to debug, and it has likely received more testing. Why would one rely on
+platform-specific timers then?
+
+Are high-resolution timers supported with the global timer?
+
+
+Q3. Using the generic global timer implementation
+
+So, how do I use that implementation?
+(Is someone other than STMicro using it?)
+
+I see:
+
+static void __init global_timer_of_register(struct device_node *np)
+CLOCKSOURCE_OF_DECLARE(arm_gt, "arm,cortex-a9-global-timer", global_timer_of_register);
+
+OF stands for open firmware, yes?
+So is this related to device tree?
+
+http://lxr.free-electrons.com/source/Documentation/devicetree/bindings/arm/global_timer.txt
+
+This file makes no sense to me.
+
+- interrupts : One interrupt to each core
+interrupts = <1 13 0xf01>;
+what are 1 13 0xf01 ??
+
+- clocks : Should be phandle to a clock.
+clocks = <&arm_periph_clk>;
+
+For my (old) 3.14 kernel, I found this:
+
+     /*
+      * ARM Peripheral clock for timers
+      */
+     arm_periph_clk: arm_periph_clk {
+       #clock-cells = <0>;
+       compatible = "fixed-clock";
+       clock-frequency = <600000000>;
+     };
+
+But it looks like the definitions have moved around since then?
+
+This device tree concept is too much to swallow in a single serving.
+Please tell me if I'm going down the correct rabbit hole, and I'll
+do some LWN readings to try to wrap my mind around the concept.
+
+
+Anyway, if anyone can help me out on some of these topics, I'd be
+eternally grateful.
+
+Regards.
