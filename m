@@ -1,56 +1,107 @@
 From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Tue, 27 Jan 2015 18:46:35 -0800
-Subject: [PATCH 5/9] regulator: wm8350: move to set_optimum_mode
+Date: Tue, 27 Jan 2015 18:46:38 -0800
+Subject: [PATCH 8/9] regulator: Drop now unused get_optimum_mode
 In-Reply-To: <1422413199-17273-1-git-send-email-bjorn.andersson@sonymobile.com>
 References: <1422413199-17273-1-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <1422413199-17273-6-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <1422413199-17273-9-git-send-email-bjorn.andersson@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 ---
- drivers/regulator/wm8350-regulator.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ drivers/regulator/core.c         | 40 ++++++++--------------------------------
+ include/linux/regulator/driver.h |  5 -----
+ 2 files changed, 8 insertions(+), 37 deletions(-)
 
-diff --git a/drivers/regulator/wm8350-regulator.c b/drivers/regulator/wm8350-regulator.c
-index 7ec7c39..f8bcaed 100644
---- a/drivers/regulator/wm8350-regulator.c
-+++ b/drivers/regulator/wm8350-regulator.c
-@@ -915,13 +915,13 @@ static unsigned int get_mode(int uA, const struct wm8350_dcdc_efficiency *eff)
- 	return REGULATOR_MODE_NORMAL;
- }
- 
--/* Query the regulator for it's most efficient mode @ uV,uA
-+/* Configure the regulator for it's most efficient mode @ uV,uA
-  * WM8350 regulator efficiency is pretty similar over
-  * different input and output uV.
-  */
--static unsigned int wm8350_dcdc_get_optimum_mode(struct regulator_dev *rdev,
--						 int input_uV, int output_uV,
--						 int output_uA)
-+static int wm8350_dcdc_set_optimum_mode(struct regulator_dev *rdev,
-+					int input_uV, int output_uV,
-+					int output_uA)
+diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
+index 2a53515..cfab6fc 100644
+--- a/drivers/regulator/core.c
++++ b/drivers/regulator/core.c
+@@ -662,7 +662,6 @@ static int drms_uA_update(struct regulator_dev *rdev)
  {
- 	int dcdc = rdev_get_id(rdev), mode;
+ 	struct regulator *sibling;
+ 	int current_uA = 0, output_uV, input_uV, err;
+-	unsigned int mode;
  
-@@ -938,7 +938,7 @@ static unsigned int wm8350_dcdc_get_optimum_mode(struct regulator_dev *rdev,
- 		mode = REGULATOR_MODE_NORMAL;
- 		break;
- 	}
--	return mode;
-+	return wm8350_dcdc_set_mode(rdev, mode);
+ 	/*
+ 	 * first check to see if we can set modes at all, otherwise just
+@@ -672,14 +671,9 @@ static int drms_uA_update(struct regulator_dev *rdev)
+ 	if (err < 0)
+ 		return 0;
+ 
+-	if (!rdev->desc->ops->get_optimum_mode &&
+-	    !rdev->desc->ops->set_optimum_mode)
++	if (!rdev->desc->ops->set_optimum_mode)
+ 		return 0;
+ 
+-	if (!rdev->desc->ops->set_mode &&
+-	    !rdev->desc->ops->set_optimum_mode)
+-		return -EINVAL;
+-
+ 	/* get output voltage */
+ 	output_uV = _regulator_get_voltage(rdev);
+ 	if (output_uV <= 0) {
+@@ -702,31 +696,13 @@ static int drms_uA_update(struct regulator_dev *rdev)
+ 	list_for_each_entry(sibling, &rdev->consumer_list, list)
+ 		current_uA += sibling->uA_load;
+ 
+-	if (rdev->desc->ops->set_optimum_mode) {
+-		/* set the optimum mode for our new total regulator load */
+-		err = rdev->desc->ops->set_optimum_mode(rdev,
+-							input_uV, output_uV,
+-							current_uA);
+-		if (err < 0)
+-			rdev_err(rdev, "failed to set optimum mode @ %d uA %d -> %d uV\n",
+-				 current_uA, input_uV, output_uV);
+-	} else {
+-		/* now get the optimum mode for our new total regulator load */
+-		mode = rdev->desc->ops->get_optimum_mode(rdev, input_uV,
+-							 output_uV, current_uA);
+-
+-		/* check the new mode is allowed */
+-		err = regulator_mode_constrain(rdev, &mode);
+-		if (err < 0) {
+-			rdev_err(rdev, "failed to get optimum mode @ %d uA %d -> %d uV\n",
+-				 current_uA, input_uV, output_uV);
+-			return err;
+-		}
+-
+-		err = rdev->desc->ops->set_mode(rdev, mode);
+-		if (err < 0)
+-			rdev_err(rdev, "failed to set optimum mode %x\n", mode);
+-	}
++	/* set the optimum mode for our new total regulator load */
++	err = rdev->desc->ops->set_optimum_mode(rdev,
++						input_uV, output_uV,
++						current_uA);
++	if (err < 0)
++		rdev_err(rdev, "failed to set optimum mode @ %d uA %d -> %d uV\n",
++			 current_uA, input_uV, output_uV);
+ 
+ 	return err;
  }
+diff --git a/include/linux/regulator/driver.h b/include/linux/regulator/driver.h
+index 837addb..f472cb5 100644
+--- a/include/linux/regulator/driver.h
++++ b/include/linux/regulator/driver.h
+@@ -95,8 +95,6 @@ struct regulator_linear_range {
+  * @get_mode: Get the configured operating mode for the regulator.
+  * @get_status: Return actual (not as-configured) status of regulator, as a
+  *	REGULATOR_STATUS value (or negative errno)
+- * @get_optimum_mode: Get the most efficient operating mode for the regulator
+- *                    when running with the specified parameters.
+  * @set_optimum_mode: Set the most efficient operating mode for the regulator
+  *                    when running with the specified parameters.
+  *
+@@ -165,9 +163,6 @@ struct regulator_ops {
+ 	 */
+ 	int (*get_status)(struct regulator_dev *);
  
- static struct regulator_ops wm8350_dcdc_ops = {
-@@ -951,7 +951,7 @@ static struct regulator_ops wm8350_dcdc_ops = {
- 	.is_enabled = regulator_is_enabled_regmap,
- 	.get_mode = wm8350_dcdc_get_mode,
- 	.set_mode = wm8350_dcdc_set_mode,
--	.get_optimum_mode = wm8350_dcdc_get_optimum_mode,
-+	.set_optimum_mode = wm8350_dcdc_set_optimum_mode,
- 	.set_suspend_voltage = wm8350_dcdc_set_suspend_voltage,
- 	.set_suspend_enable = wm8350_dcdc_set_suspend_enable,
- 	.set_suspend_disable = wm8350_dcdc_set_suspend_disable,
+-	/* get most efficient regulator operating mode for load */
+-	unsigned int (*get_optimum_mode) (struct regulator_dev *, int input_uV,
+-					  int output_uV, int load_uA);
+ 	/* set most efficient regulator operating mode for load */
+ 	int (*set_optimum_mode)(struct regulator_dev *, int input_uV,
+ 				int output_uV, int load_uA);
 -- 
 1.9.1
