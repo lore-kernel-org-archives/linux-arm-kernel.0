@@ -1,98 +1,127 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Wed, 28 Jan 2015 20:33:53 +0100
-Subject: [PATCH] ARM: /proc/atags: Export also for DT
-In-Reply-To: <0ED606B9-34EB-4FEC-BCC1-19BC60BCF768@jcrosoft.com>
-References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
- <CAL_Jsq+rESm8q44ABRbh9hqMsfcMNx0kcXJ5ONbn1=ue-RvHFg@mail.gmail.com>
- <0ED606B9-34EB-4FEC-BCC1-19BC60BCF768@jcrosoft.com>
-Message-ID: <201501282033.53144@pali>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 28 Jan 2015 19:38:17 +0000
+Subject: [PATCH] bcm: address clang inline asm incompatibility
+In-Reply-To: <54C9383D.10901@linaro.org>
+References: <1422422306-27473-1-git-send-email-behanw@converseincode.com>
+ <CAKv+Gu_NCgMmX_LQqi7vtjtP4ofrW+kx8FPgRd4-LWwK=73-xg@mail.gmail.com>
+ <54C8EE04.6060809@linaro.org>
+ <CAKv+Gu8CrMqwqBOF8rYa3RP1=gfCthwP=1k9kQ73v6+Sxwah4A@mail.gmail.com>
+ <54C91791.9030508@linaro.org>
+ <CAKv+Gu8P8eC+bmerCpbSX=USODqE=U7WnLeiCfhHJ8SSVAzPDw@mail.gmail.com>
+ <CAKv+Gu9fc_F1iC5NAwaG_ed3RRhYnxEBLbuLgW0Oa_qJ96j-gA@mail.gmail.com>
+ <54C9383D.10901@linaro.org>
+Message-ID: <CAKv+Gu88G2QqAupD9j4_-t2=0VJGNbWkUViLBM2nUuyuN-PHWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 28 January 2015 19:00:25 Jean-Christophe PLAGNIOL-
-VILLARD wrote:
-> > On Jan 28, 2015, at 11:57 PM, Rob Herring
-> > <robherring2@gmail.com> wrote:
-> > 
-> > On Wed, Jan 28, 2015 at 8:33 AM, Nicolas Pitre 
-<nico@fluxnic.net> wrote:
-> >> On Wed, 28 Jan 2015, Pali Roh?r wrote:
-> >>> On Wednesday 28 January 2015 01:50:33 Tony Lindgren wrote:
-> >>>> On omaps, the bootrom passes the bootreason in r1 to the
-> >>>> bootloader that can do whatever it wants with it. We
-> >>>> could maybe pass it in the kernel cmdline to the
-> >>>> watchdog driver for user space?
-> >>> 
-> >>> Not truth for N900. Bootreason depends on PRM_RSTST omap
-> >>> register, state of vbat charger pins, time how long was
-> >>> power key pressed, R&D data stored in CAL partition and
-> >>> other undocumented registers for omap HS devices. I
-> >>> already tried to implement at least some subset of it in
-> >>> userspace (or kernel), but it is impossible because NOLO
-> >>> bootloader clear status of PRM_RSTST register.
-> >>> 
-> >>> There is also copy of PRM_RSTST register stored at address
-> >>> 0x4020FFB8 (tracing data) but that address is rewritten
-> >>> (probably by kernel), so we really cannot implement
-> >>> reading bootreason in kernel.
-> >>> 
-> >>> But in early stage in uboot it is possible to read
-> >>> 0x4020FFB8 address and get some part of bootreason. But
-> >>> still PRM_RSTST is not enough!
-> >>> 
-> >>> I would be happy if DT kernel can export /proc/atags file
-> >>> with ATAGs passed by bootloader. It would be enough for
-> >>> me. In userspace I can parse content and do what is
-> >>> needed.
-> >> 
-> >> What about defining a DT boot reason property instead?
-> >> Maybe it already exists?  If not, it's something that could
-> >> certainly be generically used on other platforms too.
-> > 
-> > I'm fine with that, but we just need to have a standard
-> > kernel userspace interface in addition to something like
-> > /proc/device-tree/bootreason. Perhaps this can be the
-> > default implementation for the watchdog dev. Someday when
-> > we decide DT is crap and have a new boot interface, we'll
-> > have people relying on /proc/device-tree. I hope to be
-> > retired when that happens?
-> 
-> but if we try to do this generic, where will you store the
-> boot mode
-> 
-> I mean where the SoC boot from
-> 
-> useful to for the Userspace to known where is the bootloader
-> in case of multi boot mode
-> 
-> Best Regards,
-> J.
-> 
-> > Rob
-> > 
+On 28 January 2015 at 19:27, Alex Elder <elder@linaro.org> wrote:
+> On 01/28/2015 01:17 PM, Ard Biesheuvel wrote:
+>> On 28 January 2015 at 17:20, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>>> On 28 January 2015 at 17:08, Alex Elder <elder@linaro.org> wrote:
+>>>> On 01/28/2015 10:17 AM, Ard Biesheuvel wrote:
+>>>>> On 28 January 2015 at 14:11, Alex Elder <elder@linaro.org> wrote:
+>>>>>> On 01/28/2015 05:15 AM, Ard Biesheuvel wrote:
+>>>>>>> On 28 January 2015 at 05:18, Behan Webster <behanw@converseincode.com> wrote:
+>>>>>>>> From: Alex Elder <elder@linaro.org>
+>>>>>>>>
+>>>>>>>> My GCC-based build environment likes to call register r12 by the
+>>>>>>>> name "ip" in inline asm.  Behan Webster informed me that his Clang-
+>>>>>>>> based build environment likes "r12" instead.
+>>>>>>>>
+>>>>>>>> Try to make them both happy.
+>>>>>>>>
+>>>>>>>> Signed-off-by: Alex Elder <elder@linaro.org>
+>>>>>>>> Signed-off-by: Behan Webster <behanw@converseincode.com>
+>>>>>>>> ---
+>>>>>>>>  arch/arm/mach-bcm/bcm_kona_smc.c | 9 +++++++--
+>>>>>>>>  1 file changed, 7 insertions(+), 2 deletions(-)
+>>>>>>>>
+>>>>>>>> diff --git a/arch/arm/mach-bcm/bcm_kona_smc.c b/arch/arm/mach-bcm/bcm_kona_smc.c
+>>>>>>>> index a55a7ec..3937bd5 100644
+>>>>>>>> --- a/arch/arm/mach-bcm/bcm_kona_smc.c
+>>>>>>>> +++ b/arch/arm/mach-bcm/bcm_kona_smc.c
+>>>>>>>> @@ -106,9 +106,14 @@ int __init bcm_kona_smc_init(void)
+>>>>>>>>   * request result appropriately.  This result value is found in r0
+>>>>>>>>   * when the "smc" request completes.
+>>>>>>>>   */
+>>>>>>>> +#ifdef __clang__
+>>>>>>>> +#define R12    "r12"
+>>>>>>>> +#else  /* !__clang__ */
+>>>>>>>> +#define R12    "ip"    /* gcc calls r12 "ip" */
+>>>>>>>> +#endif /* !__clang__ */
+>>>>>>>
+>>>>>>> Why not just use r12 for both?
+>>>>>>
+>>>>>> Yes, that would have been an obvious fix.  But the
+>>>>>> assembler (in the GCC environment) doesn't accept that.
+>>>>>>
+>>>>>
+>>>>> Mine has no problems with it at all
+>>>>>
+>>>>> $ echo 'mov r12, #0' | arm-linux-gnueabihf-gcc -c -x assembler-with-cpp -
+>>>>>
+>>>>> and grepping for r12 under arch/arm suggests the same
+>>>>
+>>>> The use of "r12" is fine.  But it's not just the assembler,
+>>>> I believe it also involves gcc.
+>>>>
+>>>> The problem is with the use of the __asmeq(x, y) macro.
+>>>>
+>>>
+>>> Ah right. Apologies for assuming that you had missed something obvious here.
+>>> But __asmeq is not the toolchain, it is a local construct #define'd in
+>>> compiler.h
+>>>
+>>>> If I assign the "ip" variable with "r12":
+>>>>         register u32 ip asm("r12");     /* Also called ip */
+>>>>
+>>>> Then that's fine.  However, this line then causes an error:
+>>>>                 __asmeq("%0", "r12")
+>>>>
+>>>> Apparently gcc uses register "ip" when it sees asm("r12").  So
+>>>> attempting to verify the desired register got used with __asmeq()
+>>>> causes a string mismatch--"ip" is not equal to "r12".
+>>>>
+>>>> So I could use:
+>>>>
+>>>>         register u32 ip asm("r12");     /* Also called ip */
+>>>>                 ...
+>>>>                 __asmeq("%0", "ip")
+>>>>
+>>>> And that will build.  But it's a little non-intuitive, and
+>>>> I suspect that clang might (rightfully) have a failure in
+>>>> this __asmeq() call.
+>>>>
+>>>
+>>> In that case, I would strongly suggest fixing the __asmeq () macro
+>>> instead, and teach it that ("r12","ip") and ("ip","r12") are fine too.
+>>>
+>>> The thing is, inline asm is a dodgy area to begin with in terms of
+>>> clang-to-gcc compatibility. On arm64, we have been seeing issues where
+>>> the width of the register -which is fixed on gcc- is selected based on
+>>> the size of that variable, i.e., an int32 gets a w# register and int64
+>>> gets a x# register. Imagine debugging that, e.g., a str %0, [xx] that
+>>> writes 8 bytes on GCC suddenly only writing 4 bytes when built with
+>>> clang.
+>>>
+>>> If we also start using the preprocessor to conditionalise what is
+>>> emitted by inline asm, the waters get even murkier and it becomes even
+>>> harder to claim parity between the two.
+>>>
+>>
+>> Something like this perhaps?
+>
+> So __asmeq() yields true if the register names (strings) are
+> equal, or if one is "ip" and the other is "r12" (in either order).
+>
+> I can't comment on whether it's right in all build environments but
+> this looks OK to me, to handle this special case.
+>
+> I would much rather you generate that patch.  Is that OK?
+>
 
-I think in this discussion we are mixing two parts which should 
-be designed & solved separately.
-
-1) How should bootloader tell to kernel what is bootreason
-
-2) How should kernel export bootreason to userspace
-
-In modern x86 laptop world bootreason can be requested from 
-BIOS/WMI/firmware by special proprietary vendor specific command.
-
-So we should not lock bootreason to DT or ATAG only. Or only 
-bootloader --> kernel transition. For other platforms, board or 
-even architectures (x86) there can runtime way (for kernel) how 
-to read bootreason...
+Sure, I can cook up a patch if you guys can confirm that it fixes your
+use case. (I tested GCC myself but I don't have clang installed)
 
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150128/cc59673e/attachment-0001.sig>
+Ard.
