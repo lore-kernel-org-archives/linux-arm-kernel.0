@@ -1,38 +1,72 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Jan 2015 15:43:52 +0100
-Subject: [PATCH] mm: export "high_memory" symbol on !MMU
-Message-ID: <2715923.qFZi90ffep@wuerfel>
+Date: Wed, 28 Jan 2015 15:45:53 +0100
+Subject: [PATCH] iommu: disable on !MMU builds
+Message-ID: <1685569.C1Ne1erBMA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From f391eb37fafc8a22d7fd9574b8d220f0d90a91d0 Mon Sep 17 00:00:00 2001
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Mon, 25 Aug 2014 16:24:41 +0200
-Subject: [PATCH] mm: export "high_memory" symbol on !MMU
+A lot of the IOMMU support code does not build if the CPU does
+not have an MMU itself, and it's not clear if there is any
+use case for it, so let's just disable it and wait for anybody
+to need it.
 
-The symbol 'high_memory' is provided on both MMU- and NOMMU-kernels,
-but only one of them is exported, which leads to module build errors
-in drivers that work fine built-in:
+This avoids randconfig errors like
 
-ERROR: "high_memory" [drivers/net/virtio_net.ko] undefined!
-ERROR: "high_memory" [drivers/net/ppp/ppp_mppe.ko] undefined!
-ERROR: "high_memory" [drivers/mtd/nand/nand.ko] undefined!
-ERROR: "high_memory" [crypto/tcrypt.ko] undefined!
-ERROR: "high_memory" [crypto/cts.ko] undefined!
-
-This exports the symbol to get these to work on NOMMU as well.
+../arch/arm/mm/dma-mapping.c: In function '__iommu_alloc_remap':
+../arch/arm/mm/dma-mapping.c:1278:34: error: 'VM_ARM_DMA_CONSISTENT' undeclared (first use in this function)
+  area = get_vm_area_caller(size, VM_ARM_DMA_CONSISTENT | VM_USERMAP,
+                                  ^
+../arch/arm/mm/dma-mapping.c:1278:34: note: each undeclared identifier is reported only once for each function it appears in
+../arch/arm/mm/dma-mapping.c: In function '__atomic_get_pages':
+../arch/arm/mm/dma-mapping.c:1358:27: error: 'atomic_pool' undeclared (first use in this function)
+  struct dma_pool *pool = &atomic_pool;
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-diff --git a/mm/nommu.c b/mm/nommu.c
-index e9228cbe46de..7bdeb281ad0e 100644
---- a/mm/nommu.c
-+++ b/mm/nommu.c
-@@ -59,6 +59,7 @@
- #endif
+diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+index c68c8db0e6f7..089da97d7c6b 100644
+--- a/drivers/iommu/Kconfig
++++ b/drivers/iommu/Kconfig
+@@ -4,6 +4,7 @@ config IOMMU_API
  
- void *high_memory;
-+EXPORT_SYMBOL(high_memory);
- struct page *mem_map;
- unsigned long max_mapnr;
- unsigned long highest_memmap_pfn;
+ menuconfig IOMMU_SUPPORT
+ 	bool "IOMMU Hardware Support"
++	depends on MMU
+ 	default y
+ 	---help---
+ 	  Say Y here if you want to compile device drivers for IO Memory
+@@ -170,7 +171,7 @@ config IRQ_REMAP
+ # OMAP IOMMU support
+ config OMAP_IOMMU
+ 	bool "OMAP IOMMU Support"
+-	depends on ARCH_OMAP2PLUS
++	depends on ARCH_OMAP2PLUS && MMU
+ 	select IOMMU_API
+ 
+ config OMAP_IOMMU_DEBUG
+@@ -217,7 +218,7 @@ config TEGRA_IOMMU_SMMU
+ 
+ config EXYNOS_IOMMU
+ 	bool "Exynos IOMMU Support"
+-	depends on ARCH_EXYNOS && ARM
++	depends on ARCH_EXYNOS && ARM && MMU
+ 	select IOMMU_API
+ 	select ARM_DMA_USE_IOMMU
+ 	help
+@@ -246,7 +247,7 @@ config SHMOBILE_IPMMU_TLB
+ config SHMOBILE_IOMMU
+ 	bool "IOMMU for Renesas IPMMU/IPMMUI"
+ 	default n
+-	depends on ARM
++	depends on ARM && MMU
+ 	depends on ARCH_SHMOBILE || COMPILE_TEST
+ 	select IOMMU_API
+ 	select ARM_DMA_USE_IOMMU
+@@ -336,6 +337,7 @@ config SPAPR_TCE_IOMMU
+ config ARM_SMMU
+ 	bool "ARM Ltd. System MMU (SMMU) Support"
+ 	depends on ARM64 || ARM
++	depends on MMU
+ 	select IOMMU_API
+ 	select IOMMU_IO_PGTABLE_LPAE
+ 	select ARM_DMA_USE_IOMMU if ARM
