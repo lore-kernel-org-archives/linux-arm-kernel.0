@@ -1,69 +1,50 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Wed, 28 Jan 2015 09:48:15 +0800
-Subject: [PATCH v4 12/13] pm: at91: setup: remove the struct ramc_ids .data
- at91_xxx_standby members
-In-Reply-To: <1422409172-24178-1-git-send-email-wenyou.yang@atmel.com>
-References: <1422409172-24178-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1422409695-24645-1-git-send-email-wenyou.yang@atmel.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 27 Jan 2015 17:51:31 -0800
+Subject: [PATCH V2] clk: mxs: Fix invalid 32-bit access to frac registers
+In-Reply-To: <201501220039.02073.marex@denx.de>
+References: <1419762402-4548-1-git-send-email-stefan.wahren@i2se.com>
+ <CAHrpEqQ-eoqM3W1hYcS6EPTmur1FSfm8TeEjYrtZ+PquavL86w@mail.gmail.com>
+ <201501220039.02073.marex@denx.de>
+Message-ID: <20150128015131.22722.22882@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because the at91_xxx_standby function is removed,
-remove the struct ramc_ids .data members code.
+Quoting Marek Vasut (2015-01-21 15:39:01)
+> On Wednesday, January 21, 2015 at 05:16:03 PM, Zhi Li wrote:
+> > On Sun, Dec 28, 2014 at 4:26 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> > > According to i.MX23 and i.MX28 reference manual the fractional
+> > > clock control registers must be addressed by byte instructions.
+> > 
+> > I don't think mx23 and mx28 have such limitation. I will double check
+> > with IC team about this.
+> > RTL is generated from a xml file. All registers implement is unified.
+> > I don't think only clock control register have such limitation and
+> > other registers not.
+> 
+> Hi,
+> 
+> Section 10.8.24 in the MX28 datasheet (Fractional Clock Control Register 0) 
+> states otherwise, but maybe the documentation is simply not matching the
+> silicon.
+> 
+> Here's a quote:
+> "
+> This register controls the 9-phase fractional clock dividers. The fractional 
+> clock frequencies are a product of the values in these registers. NOTE: This 
+> register can only be addressed by byte instructions. Addressing word or half-
+> word are not allowed.
+> "
+> 
+> I also recall seeing weird behavior when these registers were accessed by word
+> access in U-Boot, so I believe the datasheet is correct.
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/mach-at91/setup.c |   19 ++++---------------
- 1 file changed, 4 insertions(+), 15 deletions(-)
+Hi Frank,
 
-diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-index 4c18428..b8dba9f 100644
---- a/arch/arm/mach-at91/setup.c
-+++ b/arch/arm/mach-at91/setup.c
-@@ -362,10 +362,10 @@ void __init at91_ioremap_matrix(u32 base_addr)
- }
- 
- static struct of_device_id ramc_ids[] = {
--	{ .compatible = "atmel,at91rm9200-sdramc", .data = at91rm9200_standby },
--	{ .compatible = "atmel,at91sam9260-sdramc", .data = at91sam9_sdram_standby },
--	{ .compatible = "atmel,at91sam9g45-ddramc", .data = at91_ddr_standby },
--	{ .compatible = "atmel,sama5d3-ddramc", .data = at91_ddr_standby },
-+	{ .compatible = "atmel,at91rm9200-sdramc" },
-+	{ .compatible = "atmel,at91sam9260-sdramc" },
-+	{ .compatible = "atmel,at91sam9g45-ddramc" },
-+	{ .compatible = "atmel,sama5d3-ddramc" },
- 	{ /*sentinel*/ }
- };
- 
-@@ -374,28 +374,17 @@ static void at91_dt_ramc(void)
- 	struct device_node *np;
- 	const struct of_device_id *of_id;
- 	int idx = 0;
--	const void *standby = NULL;
- 
- 	for_each_matching_node_and_match(np, ramc_ids, &of_id) {
- 		at91_ramc_base[idx] = of_iomap(np, 0);
- 		if (!at91_ramc_base[idx])
- 			panic(pr_fmt("unable to map ramc[%d] cpu registers\n"), idx);
- 
--		if (!standby)
--			standby = of_id->data;
--
- 		idx++;
- 	}
- 
- 	if (!idx)
- 		panic(pr_fmt("unable to find compatible ram controller node in dtb\n"));
--
--	if (!standby) {
--		pr_warn("ramc no standby function available\n");
--		return;
--	}
--
--	at91_pm_set_standby(standby);
- }
- 
- void __init at91_dt_initialize(void)
--- 
-1.7.9.5
+Are you satisfied with this patch?
+
+Regards,
+Mike
+
+> 
+> Best regards,
+> Marek Vasut
