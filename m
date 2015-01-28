@@ -1,71 +1,90 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Jan 2015 23:11:20 +0100
-Subject: [PATCH v2 6/7] [media] marvell-ccic: MMP_CAMERA no longer builds
-In-Reply-To: <1422479867-3370921-7-git-send-email-arnd@arndb.de>
-References: <1422479867-3370921-1-git-send-email-arnd@arndb.de>
- <1422479867-3370921-7-git-send-email-arnd@arndb.de>
-Message-ID: <1683657.95n8fCPCvc@wuerfel>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 28 Jan 2015 23:22:05 +0100 (CET)
+Subject: [PATCH RFC 2/3] power: mxs_power: add driver for mxs power
+ subsystem
+In-Reply-To: <20150127194346.GN21293@sirena.org.uk>
+References: <1416514477-19190-1-git-send-email-stefan.wahren@i2se.com>
+ <1416514477-19190-3-git-send-email-stefan.wahren@i2se.com>
+ <20150121230148.GJ13715@earth.universe> <54C0AFE4.3020701@i2se.com>
+ <20150125150431.GE2719@earth.universe>
+ <1719204322.245040.1422301605670.JavaMail.open-xchange@oxbaltgw03.schlund.de>
+ <20150127001629.GP21293@sirena.org.uk>
+ <1954124242.301697.1422383709733.JavaMail.open-xchange@oxbaltgw09.schlund.de>
+ <20150127194346.GN21293@sirena.org.uk>
+Message-ID: <443299280.47516.1422483725178.JavaMail.open-xchange@oxbaltgw03.schlund.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mmp ccic driver expects a platform_data structure that does not exist
-in the mainline kernel and presumably was changed in a kernel fork, which
-leads to build errors now:
+Hi Mark,
 
-media/platform/marvell-ccic/mmp-driver.c: In function 'mmpcam_calc_dphy':
-media/platform/marvell-ccic/mmp-driver.c:252:15: error: 'struct mmp_camera_platform_data' has no member named 'dphy3_algo'
-  switch (pdata->dphy3_algo) {
-               ^
-media/platform/marvell-ccic/mmp-driver.c:253:7: error: 'DPHY3_ALGO_PXA910' undeclared (first use in this function)
-  case DPHY3_ALGO_PXA910:
-       ^
-media/platform/marvell-ccic/mmp-driver.c:253:7: note: each undeclared identifier is reported only once for each function it appears in
-media/platform/marvell-ccic/mmp-driver.c:257:8: error: 'struct mmp_camera_platform_data' has no member named 'dphy'
-
-This marks the driver as 'BROKEN' but keeps the code around.
-Alternatively it could be removed entirely.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Jonathan Corbet <corbet@lwn.net>
-Cc: Libin Yang <lbyang@marvell.com>
-Fixes: 05fed81625bf75 ("[media] marvell-ccic: add MIPI support for marvell-ccic driver")
-----
-> This driver most assuredly did work on XO 1.75 machines, and the
-> platform_data structure does exist; it's the stuff added by Libin
-> afterward that apparently broke things.  Strange that it only came out now,
-> though, nearly two years later. Libin, any thoughts on this?
-
-I've carried this workaround in a private git tree that has hundreds of
-randconfig fixes, just started flushing out some of the patches again.
-The configuration in which the driver gets selected is relatively rare,
-and it is not enabled in any of the defconfigs obviously.
-
-When I originally wrote the patch description, I must have missed the
-fact that the driver was moved from a different directory and I only
-saw that it was broken at the point when it showed up in
-drivers/media/platform/marvell-ccic/.
-
-> Meanwhile, it is clearly broken, and I don't have an immediate fix, so,
+> Mark Brown <broonie@kernel.org> hat am 27. Januar 2015 um 20:43 geschrieben:
 >
-> Acked-by: Jonathan Corbet <corbet@lwn.net>
+>
+> On Tue, Jan 27, 2015 at 07:35:09PM +0100, Stefan Wahren wrote:
+> > > Mark Brown <broonie@kernel.org> hat am 27. Januar 2015 um 01:16
+> > > geschrieben:
+>
+> > > > okay i understand. But doesn't it need a extra driver to set the
+> > > > switching
+> > > > frequency because of the new compatible string?
+>
+> > > I don't understand this bit at all, sorry.
+>
+> > Sebastian suggested a new sub-node in the devicetree:
+>
+> > powerpll {
+> > compatible = "fsl,imx28-power-pll"
+> > #clock-cells = <0>;
+> > clock-frequency = <12345>;
+> > }
+>
+> > and i think that the new compatible string needs a separate driver to take
+> > care
+> > of the switching frequency.
+>
+> I can see that this has been suggested, what I can't understand is why
+> we would wish to do this but I am missing some context here which may
+> make it all perfectly clear.
 
-Thanks
+changing the switching frequency is not a common feature for this IC. In most
+cases the clock for the DC-DC switching frequency runs at 24 MHz (ref_xtal).
+Unfortunatelly this could cause interferences for example in UHF band. So
+switching to ref_pll and changing clock divider is a option to avoid such
+interferences without changing hardware.
 
-> (Though I would like a different patch subject, since the current one is
-> wrong).
+The relevant register DC-DC Miscellaneous Register (HW_POWER_MISC) is described
+in chapter 11.12.10 of the reference manual [1].
 
-Done.
+I decided to implement it as a module parameter, because i see it's a
+configuration option.
 
-diff --git a/drivers/media/platform/marvell-ccic/Kconfig b/drivers/media/platform/marvell-ccic/Kconfig
-index 6265d36adceb..7ac0f13c98be 100644
---- a/drivers/media/platform/marvell-ccic/Kconfig
-+++ b/drivers/media/platform/marvell-ccic/Kconfig
-@@ -13,7 +13,7 @@ config VIDEO_CAFE_CCIC
- config VIDEO_MMP_CAMERA
- 	tristate "Marvell Armada 610 integrated camera controller support"
- 	depends on ARCH_MMP && I2C && VIDEO_V4L2
--	depends on HAS_DMA
-+	depends on HAS_DMA && BROKEN
- 	select VIDEO_OV7670
- 	select I2C_GPIO
- 	select VIDEOBUF2_DMA_SG
+[1] - http://cache.freescale.com/files/dsp/doc/ref_manual/MCIMX28RM.pdf
+
+>
+> > Or is it okay to leave the handling of the switching frequency in the
+> > mxs-power
+> > driver?
+>
+> Unless the clock is exposed externally to the regulator either as an
+> input or an output I'm not sure I see any benefit but I'm possibly
+> missing something here. It does sound like there might be a separate
+> clock IP or something?
+>
+> > Btw if we add a new node to set switching frequency, i think it would be
+> > better
+> > to describe the dc-dc convertor and not the pll:
+>
+> > dcdc {
+> > compatible = "fsl,imx28-dcdc"
+> > frequency = <12345>;
+> > }
+>
+> > What do you think?
+>
+> Yes, just adding a new property on the regulator node with all the other
+> properties seems sensible (we've just gained some helpers which make it
+> fairly straightforward to do this).
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
