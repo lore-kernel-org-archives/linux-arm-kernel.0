@@ -1,103 +1,52 @@
 From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Tue, 27 Jan 2015 18:46:33 -0800
-Subject: [PATCH 3/9] regulator: ab8500: move to set_optimum_mode
-In-Reply-To: <1422413199-17273-1-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1422413199-17273-1-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <1422413199-17273-4-git-send-email-bjorn.andersson@sonymobile.com>
+Date: Tue, 27 Jan 2015 18:46:30 -0800
+Subject: [PATCH 0/9] Simplify regulator_set_optimum_mode
+Message-ID: <1422413199-17273-1-git-send-email-bjorn.andersson@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
----
- drivers/regulator/ab8500.c | 48 +++++++++++++++++++++++-----------------------
- 1 file changed, 24 insertions(+), 24 deletions(-)
+This patch series pushes the get_optimum_mode/set_mode pair from
+regulator_set_optimum_mode into the individual drivers.
 
-diff --git a/drivers/regulator/ab8500.c b/drivers/regulator/ab8500.c
-index 0f97514..c1588c1 100644
---- a/drivers/regulator/ab8500.c
-+++ b/drivers/regulator/ab8500.c
-@@ -320,27 +320,6 @@ static int ab8500_regulator_is_enabled(struct regulator_dev *rdev)
- 		return 0;
- }
- 
--static unsigned int ab8500_regulator_get_optimum_mode(
--		struct regulator_dev *rdev, int input_uV,
--		int output_uV, int load_uA)
--{
--	unsigned int mode;
--
--	struct ab8500_regulator_info *info = rdev_get_drvdata(rdev);
--
--	if (info == NULL) {
--		dev_err(rdev_get_dev(rdev), "regulator info null pointer\n");
--		return -EINVAL;
--	}
--
--	if (load_uA <= info->load_lp_uA)
--		mode = REGULATOR_MODE_IDLE;
--	else
--		mode = REGULATOR_MODE_NORMAL;
--
--	return mode;
--}
--
- static int ab8500_regulator_set_mode(struct regulator_dev *rdev,
- 				     unsigned int mode)
- {
-@@ -430,6 +409,27 @@ out_unlock:
- 	return ret;
- }
- 
-+static int ab8500_regulator_set_optimum_mode(
-+		struct regulator_dev *rdev, int input_uV,
-+		int output_uV, int load_uA)
-+{
-+	unsigned int mode;
-+
-+	struct ab8500_regulator_info *info = rdev_get_drvdata(rdev);
-+
-+	if (info == NULL) {
-+		dev_err(rdev_get_dev(rdev), "regulator info null pointer\n");
-+		return -EINVAL;
-+	}
-+
-+	if (load_uA <= info->load_lp_uA)
-+		mode = REGULATOR_MODE_IDLE;
-+	else
-+		mode = REGULATOR_MODE_NORMAL;
-+
-+	return ab8500_regulator_set_mode(rdev, mode);
-+}
-+
- static unsigned int ab8500_regulator_get_mode(struct regulator_dev *rdev)
- {
- 	struct ab8500_regulator_info *info = rdev_get_drvdata(rdev);
-@@ -645,7 +645,7 @@ static struct regulator_ops ab8500_regulator_volt_mode_ops = {
- 	.enable			= ab8500_regulator_enable,
- 	.disable		= ab8500_regulator_disable,
- 	.is_enabled		= ab8500_regulator_is_enabled,
--	.get_optimum_mode	= ab8500_regulator_get_optimum_mode,
-+	.set_optimum_mode	= ab8500_regulator_set_optimum_mode,
- 	.set_mode		= ab8500_regulator_set_mode,
- 	.get_mode		= ab8500_regulator_get_mode,
- 	.get_voltage_sel 	= ab8500_regulator_get_voltage_sel,
-@@ -656,7 +656,7 @@ static struct regulator_ops ab8500_regulator_volt_mode_ops = {
- static struct regulator_ops ab8540_aux3_regulator_volt_mode_ops = {
- 	.enable		= ab8500_regulator_enable,
- 	.disable	= ab8500_regulator_disable,
--	.get_optimum_mode	= ab8500_regulator_get_optimum_mode,
-+	.set_optimum_mode	= ab8500_regulator_set_optimum_mode,
- 	.set_mode	= ab8500_regulator_set_mode,
- 	.get_mode	= ab8500_regulator_get_mode,
- 	.is_enabled	= ab8500_regulator_is_enabled,
-@@ -678,7 +678,7 @@ static struct regulator_ops ab8500_regulator_mode_ops = {
- 	.enable			= ab8500_regulator_enable,
- 	.disable		= ab8500_regulator_disable,
- 	.is_enabled		= ab8500_regulator_is_enabled,
--	.get_optimum_mode	= ab8500_regulator_get_optimum_mode,
-+	.set_optimum_mode	= ab8500_regulator_set_optimum_mode,
- 	.set_mode		= ab8500_regulator_set_mode,
- 	.get_mode		= ab8500_regulator_get_mode,
- 	.list_voltage		= regulator_list_voltage_table,
+The first patch consolidates the two drms updating paths, to reduce code
+duplication.
+
+The second patch introduces the set_optimum_mode call, the following patches
+moves drivers over to the new api and get_optimum_mode is finally dropped.
+
+With this in place we can implement set_optimum_mode in the Qualcomm RPM
+driver.
+
+
+When we talked about this you (Mark) said that you wished that we simplified
+this api, but how far would you like to take that?
+
+* Drop input_uV/output_uV from set_optimum_mode? (there are no users today)
+* Rename the op to set_current() (without in/out uV, this is basically what we have)
+* s/regulator_set_optimum_mode/regulator_set_current/ ?
+* Remove regulator_set_mode (consumers should know their expected load, not the
+  expected operating mode of whatever regulator they are supplied by)
+
+Bjorn Andersson (9):
+  regulator: core: Consolidate drms update handling
+  regulator: core: Introduce set_optimum_mode op
+  regulator: ab8500: move to set_optimum_mode
+  regulator: wm831x-ldo: move to set_optimum_mode
+  regulator: wm8350: move to set_optimum_mode
+  regulator: hi6421: move to set_optimum_mode
+  regulator: wm8400: move to set_optimum_mode
+  regulator: Drop now unused get_optimum_mode
+  regulator: qcom-rpm: Implement set_optimum_mode
+
+ drivers/regulator/ab8500.c             |  48 +++++++-------
+ drivers/regulator/core.c               | 112 +++++++++------------------------
+ drivers/regulator/hi6421-regulator.c   |  15 +++--
+ drivers/regulator/qcom_rpm-regulator.c |  28 +++++++++
+ drivers/regulator/wm831x-ldo.c         |  21 ++++---
+ drivers/regulator/wm8350-regulator.c   |  12 ++--
+ drivers/regulator/wm8400-regulator.c   |  10 +--
+ include/linux/regulator/driver.h       |   8 +--
+ 8 files changed, 118 insertions(+), 136 deletions(-)
+
 -- 
 1.9.1
