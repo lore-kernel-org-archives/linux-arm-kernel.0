@@ -1,63 +1,31 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Wed, 28 Jan 2015 12:06:09 -0500
-Subject: [PATCH 2/3] tty/serial: of_serial: add support for PXA/MMP uarts
-In-Reply-To: <CAL_JsqLvg9CA32oWVzxA5TxtPJxAJFf9K4N+RHJeefemr_88ug@mail.gmail.com>
-References: <1422334209-23125-1-git-send-email-robh@kernel.org>
- <1422334209-23125-2-git-send-email-robh@kernel.org>
- <54C78823.7050504@hurleysoftware.com>
- <CAL_Jsq+8jDN+fYyed5RYd2e1K+H_R1NkjT38WXSpKfxTLgsDbQ@mail.gmail.com>
- <54C7AA2D.7080202@hurleysoftware.com>
- <CAL_Jsq+wxY0=S1ff-Fk0xDBxHdhBvNopLpjfCETVoo_mou658w@mail.gmail.com>
- <54C7EA6A.4010805@hurleysoftware.com>
- <CAL_JsqLvg9CA32oWVzxA5TxtPJxAJFf9K4N+RHJeefemr_88ug@mail.gmail.com>
-Message-ID: <54C91701.2090006@hurleysoftware.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 28 Jan 2015 09:04:48 -0800
+Subject: [PATCH 4/4] ARM: dts: Add minimal support for dm8168-evm
+In-Reply-To: <20150123164756.GB7718@atomide.com>
+References: <1421192272-20754-1-git-send-email-tony@atomide.com>
+ <1421192272-20754-5-git-send-email-tony@atomide.com>
+ <20150117164709.GS18552@atomide.com>
+ <CAALWOA-v=-KZ5W+Giwq9Z7rdA8JM2Q+zgqZPz-5sDrHD_b-_7A@mail.gmail.com>
+ <20150117181404.GW18552@atomide.com>
+ <CAALWOA-cdqPbLo4JvykGFODy2xUOozWg6OjzoGPLasJA022kJg@mail.gmail.com>
+ <20150119172914.GY18552@atomide.com>
+ <CAALWOA_54qoQgyCkGy10v+7-eQ87ddeCTG-dbP-P6x493HAswA@mail.gmail.com>
+ <20150123164756.GB7718@atomide.com>
+Message-ID: <20150128170448.GP28663@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/28/2015 09:21 AM, Rob Herring wrote:
-> On Tue, Jan 27, 2015 at 1:43 PM, Peter Hurley <peter@hurleysoftware.com> wrote:
->> On 01/27/2015 11:44 AM, Rob Herring wrote:
->>> On Tue, Jan 27, 2015 at 9:09 AM, Peter Hurley <peter@hurleysoftware.com> wrote:
->>>> On 01/27/2015 09:30 AM, Rob Herring wrote:
->>>>> On Tue, Jan 27, 2015 at 6:44 AM, Peter Hurley <peter@hurleysoftware.com> wrote:
->>>>>> On 01/26/2015 11:50 PM, Rob Herring wrote:
-
-[...]
-
->> OTOH, I didn't realize that patch removed the PXA driver. That driver has
->> errata workarounds which didn't get integrated into the 8250 core; it seems
->> a shame to toss that away.
+* Tony Lindgren <tony@atomide.com> [150123 08:54]:
 > 
-> There was some discussion on errata in the prior versions. One of them
-> was deemed not needed. Another one is needed, but that's on certain
-> PXA2xx. So we'll need to pickup that work-around at some point, but it
-> is not yet needed here because PXA2xx is not enabled for DT.
+> Should be usable for NFSroot with all the patches I've sent using the
+> ti u-boot and and appended DTB uImage. Sorry not all of it is yet in
+> Linux next though, I'll push a current testing branch at some point
+> today. The mainline u-boot was at least missing the davinci_emac
+> support the last time I tried.
 
-Do you know offhand which errata? If not, nbd; I can do a little digging.
-
-
->> [ Sidebar: I did a trial split of 8250_core into a separate 8250 base module
->>   and an 8250 universal driver. I keep having to rework the split but it's
->>   pretty close now; the 8250 base module might be just the thing for simplifying
->>   the pxa driver and getting console/earlycon/dma for free.
->>
->>   Let me see what I can do about getting that done.
->> ]
-> 
-> Yes, it would be nice to split the legacy ISA parts from the proper
-> platform driver. There's way too many kconfig options for the 8250 as
-> well IMO.
-
-After I finish the split, I can look at making most/all of those options
-dependent on the universal 8250 driver only.
-
-> BTW, It appears that the main motivator for a separate driver was to
-> add DMA support and that's what the out of tree driver adds. But now,
-> we would never add the PXA DMA API support and the 8250 driver has
-> learned DMA support.
-
-Yeah, PXA should not have been forked. But I say that with the benefit
-of hindsight.
+Seems to be all in today's Linux next and I just verified that
+3.19.0-rc6-next-20150128-06478-g30720bbe is booting on 8168-evm.
 
 Regards,
-Peter Hurley
+
+Tony
