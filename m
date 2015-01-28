@@ -1,33 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Jan 2015 14:53:07 +0100
-Subject: [PATCH] ARM: cns3xxx: fix typo in PCI config accessor
-Message-ID: <2000255.rnmr9HfSOg@wuerfel>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 28 Jan 2015 21:53:07 +0800
+Subject: [PATCH v7 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
+In-Reply-To: <54C7CF0D.4050607@codeaurora.org>
+References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
+ <54C7CF0D.4050607@codeaurora.org>
+Message-ID: <54C8E9C3.9010508@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The recent patch to convert the cns3xxx PCI code added an
-extraneous opening bracket, which makes the build fail,
-so remove this.
+On 2015?01?28? 01:46, Timur Tabi wrote:
+> On 01/14/2015 09:04 AM, Hanjun Guo wrote:
+>> This is the v7 of ACPI core patches for ARM64 based on ACPI 5.1
+>>
+>
+> Tested-by: Timur Tabi <timur@codeaurora.org>
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 10e2c5540d48 ("ARM: cns3xxx: Convert PCI to use generic config accessors")
----
+Thanks!
 
-Hi Bjorn,
+>
+> However, these 17 patches are insufficient to make ACPI work completely
+> on ARM64.  I need to add two patches:
+>
+> acpi: add arm to the platforms that use ioremap
+> http://lists.linaro.org/pipermail/linaro-acpi/2014-November/002943.html
+>
+> acpi: fix acpi_os_ioremap for arm64
+> http://lists.linaro.org/pipermail/linaro-acpi/2014-November/002859.html
+>
+> Without these two patches, my ACPI-based device drivers don't probe. Can
+> we add them to this 17-patch patchset?
 
-The broken patch just showed up in linux-next. Please apply this one on top,
-or fold it into the original patch if you don't mind rebasing.
+I will add them into next version :)
 
-diff --git a/arch/arm/mach-cns3xxx/pcie.c b/arch/arm/mach-cns3xxx/pcie.c
-index e41fc339d100..c622c306c390 100644
---- a/arch/arm/mach-cns3xxx/pcie.c
-+++ b/arch/arm/mach-cns3xxx/pcie.c
-@@ -101,7 +101,7 @@ static int cns3xxx_pci_read_config(struct pci_bus *bus, unsigned int devfn,
- 		 * for a PCIe bridge. So we must fixup the class code
- 		 * to 0x604 here.
- 		 */
--		*val = (((((*val << shift) & 0xff) | (0x604 << 16)) >> shift) & mask;
-+		*val = ((((*val << shift) & 0xff) | (0x604 << 16)) >> shift) & mask;
- 
- 	return ret;
- }
+Best Regards,
+Hanjun
