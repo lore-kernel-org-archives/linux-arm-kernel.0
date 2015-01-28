@@ -1,139 +1,81 @@
 From: ricardo.ribalda@gmail.com (Ricardo Ribalda Delgado)
-Date: Wed, 28 Jan 2015 13:23:47 +0100
-Subject: [PATCH v2 08/15] spi/xilinx: Remove rx_fn and tx_fn pointer
+Date: Wed, 28 Jan 2015 13:23:50 +0100
+Subject: [PATCH v2 11/15] spi/xilinx: Convert bits_per_word in bytes_per_word
 In-Reply-To: <1422447834-23116-1-git-send-email-ricardo.ribalda@gmail.com>
 References: <1422447834-23116-1-git-send-email-ricardo.ribalda@gmail.com>
-Message-ID: <1422447834-23116-9-git-send-email-ricardo.ribalda@gmail.com>
+Message-ID: <1422447834-23116-12-git-send-email-ricardo.ribalda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simplify the code by removing the tx and and rx function pointers and
-substitute them by a single function.
+Simplify the code by using the unit used on most of the code logic.
 
 Signed-off-by: Ricardo Ribalda Delgado <ricardo.ribalda@gmail.com>
 ---
-v2: Changes Requested by Mark Brown <broonie@kernel.org>
-
-Code style a / 8 instead of a/8
-
- drivers/spi/spi-xilinx.c | 69 +++++++++++++-----------------------------------
- 1 file changed, 18 insertions(+), 51 deletions(-)
+ drivers/spi/spi-xilinx.c | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/spi/spi-xilinx.c b/drivers/spi/spi-xilinx.c
-index 523da73..ac94e54 100644
+index 8ed306e..b16fccf 100644
 --- a/drivers/spi/spi-xilinx.c
 +++ b/drivers/spi/spi-xilinx.c
-@@ -92,8 +92,6 @@ struct xilinx_spi {
+@@ -87,7 +87,7 @@ struct xilinx_spi {
+ 	u8 *rx_ptr;		/* pointer in the Tx buffer */
+ 	const u8 *tx_ptr;	/* pointer in the Rx buffer */
+ 	int remaining_words;	/* the number of words left to transfer */
+-	u8 bits_per_word;
++	u8 bytes_per_word;
+ 	int buffer_size;	/* buffer size in words */
  	u32 cs_inactive;	/* Level of the CS pins when inactive*/
  	unsigned int (*read_fn)(void __iomem *);
- 	void (*write_fn)(u32, void __iomem *);
--	void (*tx_fn)(struct xilinx_spi *);
--	void (*rx_fn)(struct xilinx_spi *);
- };
- 
- static void xspi_write32(u32 val, void __iomem *addr)
-@@ -116,49 +114,32 @@ static unsigned int xspi_read32_be(void __iomem *addr)
- 	return ioread32be(addr);
- }
- 
--static void xspi_tx8(struct xilinx_spi *xspi)
--{
--	xspi->write_fn(*xspi->tx_ptr, xspi->regs + XSPI_TXD_OFFSET);
--	xspi->tx_ptr++;
--}
--
--static void xspi_tx16(struct xilinx_spi *xspi)
--{
--	xspi->write_fn(*(u16 *)(xspi->tx_ptr), xspi->regs + XSPI_TXD_OFFSET);
--	xspi->tx_ptr += 2;
--}
--
--static void xspi_tx32(struct xilinx_spi *xspi)
-+static void xilinx_spi_tx(struct xilinx_spi *xspi)
- {
- 	xspi->write_fn(*(u32 *)(xspi->tx_ptr), xspi->regs + XSPI_TXD_OFFSET);
--	xspi->tx_ptr += 4;
-+	xspi->tx_ptr += xspi->bits_per_word / 8;
- }
- 
--static void xspi_rx8(struct xilinx_spi *xspi)
-+static void xilinx_spi_rx(struct xilinx_spi *xspi)
- {
- 	u32 data = xspi->read_fn(xspi->regs + XSPI_RXD_OFFSET);
--	if (xspi->rx_ptr) {
--		*xspi->rx_ptr = data & 0xff;
--		xspi->rx_ptr++;
--	}
--}
- 
--static void xspi_rx16(struct xilinx_spi *xspi)
--{
--	u32 data = xspi->read_fn(xspi->regs + XSPI_RXD_OFFSET);
--	if (xspi->rx_ptr) {
--		*(u16 *)(xspi->rx_ptr) = data & 0xffff;
--		xspi->rx_ptr += 2;
--	}
--}
-+	if (!xspi->rx_ptr)
-+		return;
- 
--static void xspi_rx32(struct xilinx_spi *xspi)
--{
--	u32 data = xspi->read_fn(xspi->regs + XSPI_RXD_OFFSET);
--	if (xspi->rx_ptr) {
-+	switch (xspi->bits_per_word) {
-+	case 8:
-+		*(u8 *)(xspi->rx_ptr) = data;
-+		break;
-+	case 16:
-+		*(u16 *)(xspi->rx_ptr) = data;
-+		break;
-+	case 32:
- 		*(u32 *)(xspi->rx_ptr) = data;
--		xspi->rx_ptr += 4;
-+		break;
+@@ -121,7 +121,7 @@ static void xilinx_spi_tx(struct xilinx_spi *xspi)
+ 		return;
  	}
-+
-+	xspi->rx_ptr += xspi->bits_per_word / 8;
+ 	xspi->write_fn(*(u32 *)(xspi->tx_ptr), xspi->regs + XSPI_TXD_OFFSET);
+-	xspi->tx_ptr += xspi->bits_per_word / 8;
++	xspi->tx_ptr += xspi->bytes_per_word;
+ }
+ 
+ static void xilinx_spi_rx(struct xilinx_spi *xspi)
+@@ -131,19 +131,19 @@ static void xilinx_spi_rx(struct xilinx_spi *xspi)
+ 	if (!xspi->rx_ptr)
+ 		return;
+ 
+-	switch (xspi->bits_per_word) {
+-	case 8:
++	switch (xspi->bytes_per_word) {
++	case 1:
+ 		*(u8 *)(xspi->rx_ptr) = data;
+ 		break;
+-	case 16:
++	case 2:
+ 		*(u16 *)(xspi->rx_ptr) = data;
+ 		break;
+-	case 32:
++	case 4:
+ 		*(u32 *)(xspi->rx_ptr) = data;
+ 		break;
+ 	}
+ 
+-	xspi->rx_ptr += xspi->bits_per_word / 8;
++	xspi->rx_ptr += xspi->bytes_per_word;
  }
  
  static void xspi_init_hw(struct xilinx_spi *xspi)
-@@ -250,7 +231,7 @@ static void xilinx_spi_fill_tx_fifo(struct xilinx_spi *xspi, int n_words)
+@@ -246,7 +246,7 @@ static int xilinx_spi_txrx_bufs(struct spi_device *spi, struct spi_transfer *t)
  
- 	while (n_words--)
- 		if (xspi->tx_ptr)
--			xspi->tx_fn(xspi);
-+			xilinx_spi_tx(xspi);
- 		else
- 			xspi->write_fn(0, xspi->regs + XSPI_TXD_OFFSET);
- 	return;
-@@ -301,7 +282,7 @@ static int xilinx_spi_txrx_bufs(struct spi_device *spi, struct spi_transfer *t)
+ 	xspi->tx_ptr = t->tx_buf;
+ 	xspi->rx_ptr = t->rx_buf;
+-	xspi->remaining_words = (t->len * 8) / xspi->bits_per_word;
++	xspi->remaining_words = t->len / xspi->bytes_per_word;
+ 	reinit_completion(&xspi->done);
  
- 		/* Read out all the data from the Rx FIFO */
- 		while (n_words--)
--			xspi->rx_fn(xspi);
-+			xilinx_spi_rx(xspi);
+ 	while (xspi->remaining_words) {
+@@ -410,7 +410,7 @@ static int xilinx_spi_probe(struct platform_device *pdev)
  	}
  
- 	return t->len - xspi->remaining_bytes;
-@@ -430,20 +411,6 @@ static int xilinx_spi_probe(struct platform_device *pdev)
- 
  	master->bits_per_word_mask = SPI_BPW_MASK(bits_per_word);
- 	xspi->bits_per_word = bits_per_word;
--	if (xspi->bits_per_word == 8) {
--		xspi->tx_fn = xspi_tx8;
--		xspi->rx_fn = xspi_rx8;
--	} else if (xspi->bits_per_word == 16) {
--		xspi->tx_fn = xspi_tx16;
--		xspi->rx_fn = xspi_rx16;
--	} else if (xspi->bits_per_word == 32) {
--		xspi->tx_fn = xspi_tx32;
--		xspi->rx_fn = xspi_rx32;
--	} else {
--		ret = -EINVAL;
--		goto put_master;
--	}
--
+-	xspi->bits_per_word = bits_per_word;
++	xspi->bytes_per_word = bits_per_word / 8;
  	xspi->buffer_size = xilinx_spi_find_buffer_size(xspi);
  
  	xspi->irq = platform_get_irq(pdev, 0);
