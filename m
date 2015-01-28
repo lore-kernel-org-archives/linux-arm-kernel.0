@@ -1,40 +1,75 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 27 Jan 2015 17:41:05 -0800
-Subject: [PATCH v2] clk: sunxi: fix sun6i PLL1 .recalc_rate() result
-In-Reply-To: <20150124152944.GE8470@lukather>
-References: <1422088959-23365-1-git-send-email-wens@csie.org>
- <20150124152944.GE8470@lukather>
-Message-ID: <20150128014105.22722.46052@quantum>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Wed, 28 Jan 2015 09:39:32 +0800
+Subject: [PATCH v4 00/13] AT91 pm cleanup for 3.20
+Message-ID: <1422409172-24178-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Maxime Ripard (2015-01-24 07:29:44)
-> Hi Mike,
-> 
-> On Sat, Jan 24, 2015 at 04:42:39PM +0800, Chen-Yu Tsai wrote:
-> > PLL1 on sun6i has its N factor start from 1 (N = register value + 1).
-> > Make the factors clk driver aware of this so clk_factors_recalc_rate()
-> > gives the correct result.
-> > 
-> > Cc: <stable@vger.kernel.org> # 3.12 9a5e6c7eb5cc clk: sunxi: Support factor
-> > Cc: <stable@vger.kernel.org> # 3.12
-> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> 
-> Could you queue this for 3.19?
+Hi Nicolas,
 
-This is fixed in 76820fc in clk-next, destined for 3.20.
+This version is rebased on the branch: at91-3.20-cleanup of the repository
+	git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git
 
-Also I'm confused by the stable tags above. Looks like 9a5e6c7eb5cc was
-merged for 3.16, not 3.12.
+It is purpose to clean up the PM code, includes the patches from Peter Rosin and Sylvain Rochet.
 
-Regards,
-Mike
+Since verifying the USB clock and USB PLL disabling before suspending to memory,
+it aslo depends on the following patch serials from Sylvain:
+	[PATCHv6 0/5] USB: gadget: atmel_usba_udc: Driver improvements
+	[PATCHv7 0/6] USB: host: Atmel OHCI and EHCI drivers improvements
 
-> 
-> Thanks,
-> Maxime
-> 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+Removes CONFIG_AT91_SLOW_CLOCK config item to simply the PM config,
+The suspend to standby mode uses the same sram function as the suspend to memory mode.
+Remove some unused code.
+
+Alexandr & Sylvain, Thank you very much for so many feedbacks.
+
+Changes in v2:
+ - Rebase on the at91-3.20-cleanup branch
+ - Recover the verify clock condition, only for suspend to memory.
+ - Collect ACK from Alexandre
+ - Add the macro for PM mode
+
+Changes in v3:
+ - Clear unused state argument in at91_pm_verify_clocks()
+ - Remove pr_info("AT91:... slow_clock ? ..") in patch 07/13.
+
+Peter Rosin (1):
+  pm: at91: Workaround DDRSDRC self-refresh bug with LPDDR1 memories.
+
+Sylvain Rochet (2):
+  pm: at91: pm_slowclock: fix suspend/resume hang up in timeouts
+  pm: at91: pm_slowclock: remove clocks which are already stopped when
+    entering slow clock mode
+
+Wenyou Yang (10):
+  pm: at91: pm_slowclock: remove the unused code related with
+    SLOWDOWN_MASTER_CLOCK
+  pm: at91: move the copying the sram function to the sram
+    initializationi phase
+  ARM: at91: move select SRAM to ARCH_AT91
+  pm: at91: remove the config item CONFIG_AT91_SLOW_CLOCK
+  pm: at91: the standby mode uses the same sram function as the suspend
+    to memory mode
+  pm: at91: rename file name: pm_slowclock.S -->pm_suspend.S
+  pm: at91: rename function name:
+    at91_slow_clock()-->at91_pm_suspend_sram_fn
+  pm: at91: remove the at91_xxx_standby() function definitions in the
+    pm.h
+  pm: at91: setup: remove the struct ramc_ids .data at91_xxx_standby
+    members
+  pm: at91: amend the pm_suspend entry for at91_cpuidle_device
+
+ arch/arm/mach-at91/Kconfig         |   17 +-
+ arch/arm/mach-at91/Makefile        |    2 +-
+ arch/arm/mach-at91/pm.c            |  148 +++++++++--------
+ arch/arm/mach-at91/pm.h            |  100 +----------
+ arch/arm/mach-at91/pm_slowclock.S  |  323 ------------------------------------
+ arch/arm/mach-at91/pm_suspend.S    |  277 +++++++++++++++++++++++++++++++
+ arch/arm/mach-at91/setup.c         |   19 +--
+ include/soc/at91/at91sam9_ddrsdr.h |    2 +-
+ 8 files changed, 366 insertions(+), 522 deletions(-)
+ delete mode 100644 arch/arm/mach-at91/pm_slowclock.S
+ create mode 100644 arch/arm/mach-at91/pm_suspend.S
+
+-- 
+1.7.9.5
