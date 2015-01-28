@@ -1,41 +1,31 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 28 Jan 2015 11:56:32 -0600
-Subject: [PATCH 3/3] dts: versatile: add sysregs node
-In-Reply-To: <1422467792-2065-1-git-send-email-robh@kernel.org>
-References: <1422467792-2065-1-git-send-email-robh@kernel.org>
-Message-ID: <1422467792-2065-4-git-send-email-robh@kernel.org>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 28 Jan 2015 11:58:54 -0600
+Subject: [Linaro-acpi] [PATCH v7 04/17] ARM64 / ACPI: Introduce
+ early_param for "acpi" and pass acpi=force to enable ACPI
+In-Reply-To: <1421247905-3749-5-git-send-email-hanjun.guo@linaro.org>
+References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
+ <1421247905-3749-5-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <CAOZdJXU2bFR1T4ZnGavvnrUXAp5e=vNt9g6WKX46H8qs1wz-TQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Versatile boards have the same sysregs as other ARM Ltd boards. Add
-the nodes in order to enable support for 24MHz counter as sched_clock.
+On Wed, Jan 14, 2015 at 9:04 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> From: Al Stone <al.stone@linaro.org>
+>
+> Introduce one early parameters "off" and "force" for "acpi", acpi=off
+> will be the default behavior for ARM64, so introduce acpi=force to
+> enable ACPI on ARM64.
+>
+> Disable ACPI before early parameters parsed, and enable it to pass
+> "acpi=force" if people want use ACPI on ARM64. This ensures DT be
+> the prefer one if ACPI table and DT both are provided at this moment.
 
-This is a minimal node definition as the existing sub node definition
-used on VExpress has some issues raised by Linus W.
+What is the reason to assume that DT is preferred over ACPI?  I would
+have thought that if ACPI is present, then it means we're on an ARM64
+server platform, and therefore it should be used.  It seems silly to
+require acpi=force on every ARM64 server platform.
 
-Signed-off-by: Rob Herring <robh@kernel.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: devicetree at vger.kernel.org
----
- arch/arm/boot/dts/versatile-ab.dts | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/arch/arm/boot/dts/versatile-ab.dts b/arch/arm/boot/dts/versatile-ab.dts
-index 27d0d9c..01f4019 100644
---- a/arch/arm/boot/dts/versatile-ab.dts
-+++ b/arch/arm/boot/dts/versatile-ab.dts
-@@ -252,6 +252,11 @@
- 			#size-cells = <1>;
- 			ranges = <0 0x10000000 0x10000>;
- 
-+			sysreg at 0 {
-+				compatible = "arm,versatile-sysreg", "syscon";
-+				reg = <0x00000 0x1000>;
-+			};
-+
- 			aaci at 4000 {
- 				compatible = "arm,primecell";
- 				reg = <0x4000 0x1000>;
 -- 
-2.1.0
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
