@@ -1,72 +1,67 @@
-From: elder@linaro.org (Alex Elder)
-Date: Wed, 28 Jan 2015 08:11:16 -0600
-Subject: [PATCH] bcm: address clang inline asm incompatibility
-In-Reply-To: <CAKv+Gu_NCgMmX_LQqi7vtjtP4ofrW+kx8FPgRd4-LWwK=73-xg@mail.gmail.com>
-References: <1422422306-27473-1-git-send-email-behanw@converseincode.com>
- <CAKv+Gu_NCgMmX_LQqi7vtjtP4ofrW+kx8FPgRd4-LWwK=73-xg@mail.gmail.com>
-Message-ID: <54C8EE04.6060809@linaro.org>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Wed, 28 Jan 2015 15:14:51 +0100
+Subject: [PATCH 2/9] mtd: pxa3xx_nand: add a non mandatory ECC clock
+In-Reply-To: <20150127155047.GB16546@lunn.ch>
+References: <1422367816-4257-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1422367816-4257-3-git-send-email-antoine.tenart@free-electrons.com>
+ <20150127155047.GB16546@lunn.ch>
+Message-ID: <20150128141451.GA11705@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/28/2015 05:15 AM, Ard Biesheuvel wrote:
-> On 28 January 2015 at 05:18, Behan Webster <behanw@converseincode.com> wrote:
->> From: Alex Elder <elder@linaro.org>
->>
->> My GCC-based build environment likes to call register r12 by the
->> name "ip" in inline asm.  Behan Webster informed me that his Clang-
->> based build environment likes "r12" instead.
->>
->> Try to make them both happy.
->>
->> Signed-off-by: Alex Elder <elder@linaro.org>
->> Signed-off-by: Behan Webster <behanw@converseincode.com>
->> ---
->>  arch/arm/mach-bcm/bcm_kona_smc.c | 9 +++++++--
->>  1 file changed, 7 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/mach-bcm/bcm_kona_smc.c b/arch/arm/mach-bcm/bcm_kona_smc.c
->> index a55a7ec..3937bd5 100644
->> --- a/arch/arm/mach-bcm/bcm_kona_smc.c
->> +++ b/arch/arm/mach-bcm/bcm_kona_smc.c
->> @@ -106,9 +106,14 @@ int __init bcm_kona_smc_init(void)
->>   * request result appropriately.  This result value is found in r0
->>   * when the "smc" request completes.
->>   */
->> +#ifdef __clang__
->> +#define R12    "r12"
->> +#else  /* !__clang__ */
->> +#define R12    "ip"    /* gcc calls r12 "ip" */
->> +#endif /* !__clang__ */
+Hi Andrew,
+
+On Tue, Jan 27, 2015 at 04:50:47PM +0100, Andrew Lunn wrote:
+> On Tue, Jan 27, 2015 at 03:10:09PM +0100, Antoine Tenart wrote:
+> > Some controllers (as the coming Berlin nand controller) need to enable
+> > an ECC clock. Add support for this clock in the pxa3xx nand driver, and
+> > leave it as non mandatory.
 > 
-> Why not just use r12 for both?
+> It would be good to document this clock in the device tree binding.
 
-Yes, that would have been an obvious fix.  But the
-assembler (in the GCC environment) doesn't accept that.
-
-					-Alex
+Yes! I'll add the ECC clock into the documentation.
 
 > 
->>  static int bcm_kona_do_smc(u32 service_id, u32 buffer_phys)
->>  {
->> -       register u32 ip asm("ip");      /* Also called r12 */
->> +       register u32 ip asm(R12);       /* Also called r12 */
->>         register u32 r0 asm("r0");
->>         register u32 r4 asm("r4");
->>         register u32 r5 asm("r5");
->> @@ -120,7 +125,7 @@ static int bcm_kona_do_smc(u32 service_id, u32 buffer_phys)
->>
->>         asm volatile (
->>                 /* Make sure we got the registers we want */
->> -               __asmeq("%0", "ip")
->> +               __asmeq("%0", R12)
->>                 __asmeq("%1", "r0")
->>                 __asmeq("%2", "r4")
->>                 __asmeq("%3", "r5")
->> --
->> 1.9.1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> > ---
+> >  drivers/mtd/nand/pxa3xx_nand.c | 26 +++++++++++++++++++-------
+> >  1 file changed, 19 insertions(+), 7 deletions(-)
+> > 
+> > diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+> > index d00ac392d1c4..2681ec4abafa 100644
+> > --- a/drivers/mtd/nand/pxa3xx_nand.c
+> > +++ b/drivers/mtd/nand/pxa3xx_nand.c
+> > @@ -180,7 +180,7 @@ struct pxa3xx_nand_info {
+> >  	struct nand_hw_control	controller;
+> >  	struct platform_device	 *pdev;
+> >  
+> > -	struct clk		*clk;
+> > +	struct clk		*clk, *ecc_clk;
+> >  	void __iomem		*mmio_base;
+> >  	unsigned long		mmio_phys;
+> >  	struct completion	cmd_complete, dev_ready;
+> > @@ -1608,7 +1608,7 @@ static int alloc_nand_resource(struct platform_device *pdev)
+> >  
+> >  	spin_lock_init(&chip->controller->lock);
+> >  	init_waitqueue_head(&chip->controller->wq);
+> > -	info->clk = devm_clk_get(&pdev->dev, NULL);
+> > +	info->clk = devm_clk_get(&pdev->dev, "nfc");
+> 
+> Does this keep backwards compatibility? Not all the existing users
+> have there clocks named. What i think happens here is that
+> of_clk_get_by_name() calls of_property_match_string(np, "clock-names",
+> name); That returns -EINVAL, and then we ask of_clk_get() to get the
+> -EINVAL'th clock. I don't think that is going to end well.
+> 
+> I think you need to keep the NULL here, but should use "ecc" for the
+> second clock and require the use of the clock-names property when an
+> ecc clock is required.
+
+I agree, I'll go back to NULL in v2.
+
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
