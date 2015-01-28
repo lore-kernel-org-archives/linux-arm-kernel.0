@@ -1,38 +1,57 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 28 Jan 2015 15:01:13 -0800
-Subject: [REQUEST PULL] mvebu-fixes-6
-In-Reply-To: <20150128172902.GA29434@lunn.ch>
-References: <20150128160231.GA28862@lunn.ch> <20150128172902.GA29434@lunn.ch>
-Message-ID: <20150128230113.GB3177@quad.lixom.net>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 28 Jan 2015 17:13:02 -0600
+Subject: [PATCH] drivers: of: fix resources freeing in
+ of_pci_get_host_bridge_resources()
+In-Reply-To: <1422381705-5380-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1422381705-5380-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20150128231302.GB17623@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 28, 2015 at 06:29:02PM +0100, Andrew Lunn wrote:
-> Hi Olof
+On Tue, Jan 27, 2015 at 06:01:45PM +0000, Lorenzo Pieralisi wrote:
+> In the function of_pci_get_host_bridge_resources() if the parsing of
+> ranges fails, previously allocated resources inclusive of bus_range
+> are not freed and are not expected to be freed by the function caller
+> on error return.
 > 
-> I messed up the mvebu #5 fixes pull request. Please ignore it and use
-> this #6 instead.
+> This patch fixes the issues by adding code that properly frees resources
+> and bus_range before exiting the function with an error return value.
 > 
-> It contains a single patch, which we need to fix an issue introduced
-> by a previous fix.
-> 
-> Sorry for the mess up.
-> 
->       Andrew
-> 
-> The following changes since commit 38bdf45f4aa5cb6186d50a29e6cbbd9d486a1519:
-> 
->   bus: mvebu-mbus: fix support of MBus window 13 (2015-01-19 15:40:53 -0600)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-3.19-6
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Acked-by: Liviu Dudau <liviu.dudau@arm.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
 
-Hrm, would have been nice not to have to take a regression fix for a fix.
+Applied to pci/host-generic for v3.20, thanks!
 
-Also, please use [GIT PULL] and a subject line, since we tend to reuse them in
-the commit text. ARM: mvebu fixes for v3.20 #6 or something like that would do
-just fine.
-
-
--Olof
+> ---
+>  drivers/of/of_pci.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+> index 88471d3..60dc36c 100644
+> --- a/drivers/of/of_pci.c
+> +++ b/drivers/of/of_pci.c
+> @@ -140,6 +140,7 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
+>  			unsigned char busno, unsigned char bus_max,
+>  			struct list_head *resources, resource_size_t *io_base)
+>  {
+> +	struct pci_host_bridge_window *window;
+>  	struct resource *res;
+>  	struct resource *bus_range;
+>  	struct of_pci_range range;
+> @@ -225,7 +226,10 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
+>  conversion_failed:
+>  	kfree(res);
+>  parse_failed:
+> +	list_for_each_entry(window, resources, list)
+> +		kfree(window->res);
+>  	pci_free_resource_list(resources);
+> +	kfree(bus_range);
+>  	return err;
+>  }
+>  EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
+> -- 
+> 2.2.1
+> 
