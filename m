@@ -1,38 +1,41 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Wed, 28 Jan 2015 11:51:03 +0100
-Subject: [PATCH v3 05/10] ARM: tegra: Add node for trackpad in Nyan boards
-In-Reply-To: <1422442278-10405-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1422442278-10405-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1422442278-10405-6-git-send-email-tomeu.vizoso@collabora.com>
+From: riku.voipio@linaro.org (Riku Voipio)
+Date: Wed, 28 Jan 2015 12:52:21 +0200
+Subject: arm32 binaries work with CONFIG_COMPAT as root but not as user?
+Message-ID: <CAAqcGHnS7P7=xzXoOPE61dcbbq_1kvmeB-V1GcDUxB1ND0-kZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Nyan boards have a eKTH3000 from Elan as their trackpad, connected
-through I2C.
+Hi,
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
----
- arch/arm/boot/dts/tegra124-nyan.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+Perhaps I'm missing here something, but seems I can only run 32bit arm
+programs on arm64 system if I am root. So far even the simplest hello
+world will be killed/segfaulted on startup. This is on mustang hw.
 
-diff --git a/arch/arm/boot/dts/tegra124-nyan.dtsi b/arch/arm/boot/dts/tegra124-nyan.dtsi
-index 9f25ff1..26e7402 100644
---- a/arch/arm/boot/dts/tegra124-nyan.dtsi
-+++ b/arch/arm/boot/dts/tegra124-nyan.dtsi
-@@ -71,6 +71,14 @@
- 	i2c at 0,7000c400 {
- 		status = "okay";
- 		clock-frequency = <100000>;
-+
-+		trackpad at 15 {
-+			compatible = "elan,ekth3000";
-+			reg = <0x15>;
-+			interrupt-parent = <&gpio>;
-+			interrupts = <TEGRA_GPIO(W, 3) IRQ_TYPE_EDGE_FALLING>;
-+			wakeup-source;
-+		};
- 	};
- 
- 	i2c at 0,7000c500 {
--- 
-1.9.3
+taking on 3.19-rc3 with arch=arm64 and make defconfig:
+
+wget http://kos.to/hello-test/hello
+# file hello
+hello: ELF 32-bit LSB executable, ARM, EABI5 version 1 (SYSV),
+statically linked, for GNU/Linux 2.6.32,
+BuildID[sha1]=c37a3b366d645eee600963a535370fa0bad9b2c0, not stripped
+# ./hello
+hello world
+# su - linaro
+$ /root/hello
+Segmentation fault
+$ gdb /root/hello
+(gdb) run
+Starting program: /root/hello
+During startup program terminated with signal SIGSEGV, Segmentation fault.
+
+If you have a debian/ubuntu system, you can also reproduce it with multiarch:
+
+dpkg --add-architecture armhf
+apt-get update
+apt-get install hello:armhf
+# hello
+Hello, world!
+# su - ubuntu
+$ hello
+Segmentation fault
+$
