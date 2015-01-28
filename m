@@ -1,38 +1,49 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 28 Jan 2015 19:38:58 +0100
-Subject: [PATCH 0/5] ARM: at91/dt: add matrix and SMC nodes
-Message-ID: <1422470343-25981-1-git-send-email-boris.brezillon@free-electrons.com>
+Date: Wed, 28 Jan 2015 19:39:00 +0100
+Subject: [PATCH 2/5] ARM: at91/dt: add SMC0/1 nodes in at91sam9263 dtsi
+In-Reply-To: <1422470343-25981-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1422470343-25981-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1422470343-25981-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Alexander Stein <alexanders83@web.de>
 
-This series adds the matrix and SMC syscon nodes whose registers are needed
-by other peripherals (EBI, USB Device).
+Add the SMC0/1 (Static Memory Controller) nodes in at91sam9263sama5d3 dtsi.
 
-Best Regards,
+Signed-off-by: Alexander Stein <alexanders83@web.de>
+[boris.brezillon at free-electrons.com: shrink SMC reg ranges]
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/boot/dts/at91sam9263.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-Boris
-
-Alexander Stein (2):
-  ARM: at91/dt: add matrix node in at91sam9263 dtsi
-  ARM: at91/dt: add SMC0/1 nodes in at91sam9263 dtsi
-
-Boris Brezillon (3):
-  ARM: at91/dt: fix matrix compatible in at91sam9261.dtsi
-  ARM: at91/dt: add SMC and HSMC nodes
-  ARM: at91/dt: add matrix nodes
-
- arch/arm/boot/dts/at91sam9260.dtsi | 10 ++++++++++
- arch/arm/boot/dts/at91sam9261.dtsi |  7 ++++++-
- arch/arm/boot/dts/at91sam9263.dtsi | 15 +++++++++++++++
- arch/arm/boot/dts/at91sam9g45.dtsi | 10 ++++++++++
- arch/arm/boot/dts/at91sam9n12.dtsi | 10 ++++++++++
- arch/arm/boot/dts/at91sam9rl.dtsi  | 10 ++++++++++
- arch/arm/boot/dts/at91sam9x5.dtsi  | 10 ++++++++++
- arch/arm/boot/dts/sama5d3.dtsi     | 10 ++++++++++
- arch/arm/boot/dts/sama5d4.dtsi     |  5 +++++
- 9 files changed, 86 insertions(+), 1 deletion(-)
-
+diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+index ceb0254..79f9b81 100644
+--- a/arch/arm/boot/dts/at91sam9263.dtsi
++++ b/arch/arm/boot/dts/at91sam9263.dtsi
+@@ -361,11 +361,21 @@
+ 				reg = <0xffffe200 0x200>;
+ 			};
+ 
++			smc0: smc0 at ffffe400 {
++				compatible = "atmel,at91sam9260-smc", "syscon";
++				reg = <0xffffe400 0x100>;
++			};
++
+ 			ramc1: ramc at ffffe800 {
+ 				compatible = "atmel,at91sam9260-sdramc";
+ 				reg = <0xffffe800 0x200>;
+ 			};
+ 
++			smc1: smc1 at ffffea00 {
++				compatible = "atmel,at91sam9260-smc", "syscon";
++				reg = <0xffffea00 0x100>;
++			};
++
+ 			matrix: matrix at ffffec00 {
+ 				compatible = "atmel,at91sam9263-matrix", "syscon";
+ 				reg = <0xffffec00 0x200>;
 -- 
 1.9.1
