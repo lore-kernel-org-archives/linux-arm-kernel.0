@@ -1,140 +1,37 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 28 Jan 2015 19:15:49 +0100
-Subject: [PATCH v2 2/6] mmc: pwrseq_simple: Extend to support more pins
-In-Reply-To: <1422468953-7594-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1422468953-7594-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1422468953-7594-3-git-send-email-javier.martinez@collabora.co.uk>
+From: jarkko.nikula@bitmer.com (Jarkko Nikula)
+Date: Wed, 28 Jan 2015 20:15:46 +0200
+Subject: 3.19 on Nokia n900: audio quality awful
+In-Reply-To: <54C63F1C.6010703@ti.com>
+References: <20150106170433.GA5408@amd> <20150118120139.GA1509@amd>
+ <54C63F1C.6010703@ti.com>
+Message-ID: <54C92752.9000004@bitmer.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many WLAN attached to a SDIO/MMC interface, needs more than one pin for
-their reset sequence. For example, is very common for chips to have two
-pins: one for reset and one for power enable.
+On 01/26/2015 03:20 PM, Peter Ujfalusi wrote:
+> On 01/18/2015 02:01 PM, Pavel Machek wrote:
+>> In 2.6.28-nokia, it is neccessary to set "Input select" na "digital
+>> mic", then it works. Input select being in "playback" option makes it
+>> easy to miss.
+>>
+>> In 3.18 and 3.19-rc3, all I can record are zeros.
+>>
+>> Does playback/recording work for you on OMAP 3430-based machines?
+> 
+> Same codec (tlv320aic3106) works fine on my am335x and omap-l138 boards.
+> BeagleBoard-xM also fine with twl4030 codec.
+> 
+> I don't have my n900 in hacking mode (it is still in use time-to-time) but
+> looking at the dts file: you might want to add ai3x-micbias-vg property to the
+> aic3x nodes to select the correct mic bias voltage. I can't recall what is
+> appropriate for n900, but 2.6.28-nokia sources might give you the answer.
+> 
+No need to go that far. N900 has been supported in mainline since 2.6.39
+or so. Part A of AIC34 (which is basically dual AIC33 in a same package)
+drives 2 V for the digital microphone bias and part B 2.5 V for the headset.
 
-This patch adds support for more reset pins to the pwrseq_simple driver
-and instead hardcoding a fixed number, it uses the of_gpio_named_count()
-since the MMC power sequence is only built when CONFIG_OF is enabled.
+Unfortunately I haven't had time recently to try what might have caused
+that regression after 3.18.
 
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
-
-Changes since v1:
- - Many code cleanups suggested by Srinivas Kandagatla
-    * Rename reset_gpio array to reset_gpios.
-    * Use a zero length array for reset_gpios to avoid a kmalloc.
-    * Refactor GPIO assert and de-ssert logic into a common function.
-    * Simplify gpiod_put logic in case of gpiod_get error.
----
- drivers/mmc/core/pwrseq_simple.c | 55 +++++++++++++++++++++++++++++-----------
- 1 file changed, 40 insertions(+), 15 deletions(-)
-
-diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/mmc/core/pwrseq_simple.c
-index 0958c696137f..e53d3c7e059c 100644
---- a/drivers/mmc/core/pwrseq_simple.c
-+++ b/drivers/mmc/core/pwrseq_simple.c
-@@ -11,6 +11,7 @@
- #include <linux/slab.h>
- #include <linux/device.h>
- #include <linux/err.h>
-+#include <linux/of_gpio.h>
- #include <linux/gpio/consumer.h>
- 
- #include <linux/mmc/host.h>
-@@ -19,16 +20,26 @@
- 
- struct mmc_pwrseq_simple {
- 	struct mmc_pwrseq pwrseq;
--	struct gpio_desc *reset_gpio;
-+	int nr_gpios;
-+	struct gpio_desc *reset_gpios[0];
- };
- 
-+static void mmc_pwrseq_simple_set_gpios_value(struct mmc_pwrseq_simple *pwrseq,
-+					      int value)
-+{
-+	int i;
-+
-+	for (i = 0; i < pwrseq->nr_gpios; i++)
-+		if (!IS_ERR(pwrseq->reset_gpios[i]))
-+			gpiod_set_value_cansleep(pwrseq->reset_gpios[i], value);
-+}
-+
- static void mmc_pwrseq_simple_pre_power_on(struct mmc_host *host)
- {
- 	struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
- 					struct mmc_pwrseq_simple, pwrseq);
- 
--	if (!IS_ERR(pwrseq->reset_gpio))
--		gpiod_set_value_cansleep(pwrseq->reset_gpio, 1);
-+	mmc_pwrseq_simple_set_gpios_value(pwrseq, 1);
- }
- 
- static void mmc_pwrseq_simple_post_power_on(struct mmc_host *host)
-@@ -36,17 +47,18 @@ static void mmc_pwrseq_simple_post_power_on(struct mmc_host *host)
- 	struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
- 					struct mmc_pwrseq_simple, pwrseq);
- 
--	if (!IS_ERR(pwrseq->reset_gpio))
--		gpiod_set_value_cansleep(pwrseq->reset_gpio, 0);
-+	mmc_pwrseq_simple_set_gpios_value(pwrseq, 0);
- }
- 
- static void mmc_pwrseq_simple_free(struct mmc_host *host)
- {
- 	struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
- 					struct mmc_pwrseq_simple, pwrseq);
-+	int i;
- 
--	if (!IS_ERR(pwrseq->reset_gpio))
--		gpiod_put(pwrseq->reset_gpio);
-+	for (i = 0; i < pwrseq->nr_gpios; i++)
-+		if (!IS_ERR(pwrseq->reset_gpios[i]))
-+			gpiod_put(pwrseq->reset_gpios[i]);
- 
- 	kfree(pwrseq);
- 	host->pwrseq = NULL;
-@@ -62,20 +74,33 @@ static struct mmc_pwrseq_ops mmc_pwrseq_simple_ops = {
- int mmc_pwrseq_simple_alloc(struct mmc_host *host, struct device *dev)
- {
- 	struct mmc_pwrseq_simple *pwrseq;
--	int ret = 0;
-+	int i, nr_gpios, ret = 0;
- 
--	pwrseq = kzalloc(sizeof(struct mmc_pwrseq_simple), GFP_KERNEL);
-+	nr_gpios = of_gpio_named_count(dev->of_node, "reset-gpios");
-+	if (nr_gpios < 0)
-+		nr_gpios = 0;
-+
-+	pwrseq = kzalloc(sizeof(struct mmc_pwrseq_simple) + nr_gpios *
-+			 sizeof(struct gpio_desc *), GFP_KERNEL);
- 	if (!pwrseq)
- 		return -ENOMEM;
- 
--	pwrseq->reset_gpio = gpiod_get_index(dev, "reset", 0, GPIOD_OUT_HIGH);
--	if (IS_ERR(pwrseq->reset_gpio) &&
--		PTR_ERR(pwrseq->reset_gpio) != -ENOENT &&
--		PTR_ERR(pwrseq->reset_gpio) != -ENOSYS) {
--		ret = PTR_ERR(pwrseq->reset_gpio);
--		goto free;
-+	for (i = 0; i < nr_gpios; i++) {
-+		pwrseq->reset_gpios[i] = gpiod_get_index(dev, "reset", i,
-+							 GPIOD_OUT_HIGH);
-+		if (IS_ERR(pwrseq->reset_gpios[i]) &&
-+		    PTR_ERR(pwrseq->reset_gpios[i]) != -ENOENT &&
-+		    PTR_ERR(pwrseq->reset_gpios[i]) != -ENOSYS) {
-+			ret = PTR_ERR(pwrseq->reset_gpios[i]);
-+
-+			while (--i)
-+				gpiod_put(pwrseq->reset_gpios[i]);
-+
-+			goto free;
-+		}
- 	}
- 
-+	pwrseq->nr_gpios = nr_gpios;
- 	pwrseq->pwrseq.ops = &mmc_pwrseq_simple_ops;
- 	host->pwrseq = &pwrseq->pwrseq;
- 
 -- 
-2.1.3
+Jarkko
