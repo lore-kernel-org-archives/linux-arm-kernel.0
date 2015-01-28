@@ -1,175 +1,59 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Wed, 28 Jan 2015 10:24:04 +0800
-Subject: [PATCH v2 3/3] pm: at91: add disable/enable the L1/L2 cache while
- suspend/resume
-In-Reply-To: <1422411707-10945-1-git-send-email-wenyou.yang@atmel.com>
-References: <1422411707-10945-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1422411844-13241-1-git-send-email-wenyou.yang@atmel.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 27 Jan 2015 20:37:14 -0600
+Subject: [PATCH v5 3/8] of: fix size when dma-range is not used
+In-Reply-To: <1422392405-32196-4-git-send-email-m-karicheri2@ti.com>
+References: <1422392405-32196-1-git-send-email-m-karicheri2@ti.com>
+ <1422392405-32196-4-git-send-email-m-karicheri2@ti.com>
+Message-ID: <CAL_JsqJCE2c7PjwN_ynC5_hufe=Xo55E0j=EW5GbuX9saf82dQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the sama5, disable L1 D-cache and L2 cache before the cpu go to wfi,
-after wakeing up, enable L1 D-cache and L2 cache.
+On Tue, Jan 27, 2015 at 3:00 PM, Murali Karicheri <m-karicheri2@ti.com> wrote:
+> Fix the dma-range size when the DT attribute is missing. i.e  set size to
+> dev->coherent_dma_mask + 1 instead of dev->coherent_dma_mask. Also add
+> code to check invalid values of size configured in DT and log error.
+>
+> Cc: Joerg Roedel <joro@8bytes.org>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> ---
+>  drivers/of/device.c |    9 ++++++++-
+>  1 file changed, 8 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/of/device.c b/drivers/of/device.c
+> index 2de320d..17504f4 100644
+> --- a/drivers/of/device.c
+> +++ b/drivers/of/device.c
+> @@ -105,12 +105,19 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+>         ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
+>         if (ret < 0) {
+>                 dma_addr = offset = 0;
+> -               size = dev->coherent_dma_mask;
+> +               size = dev->coherent_dma_mask + 1;
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
- arch/arm/mach-at91/pm.c         |   12 +++++
- arch/arm/mach-at91/pm_suspend.S |  107 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 119 insertions(+)
+This is fine since coherent_dma_mask will always be 4G - 1 in this case.
 
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index c547038..3442f80e 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -40,6 +40,12 @@ static struct {
- 	int memctrl;
- } at91_pm_data;
- 
-+void __weak at91_disable_l1_l2_cache(void) {}
-+void __weak at91_enable_l1_l2_cache(void) {}
-+
-+void __iomem *at91_l2cc_base;
-+EXPORT_SYMBOL_GPL(at91_l2cc_base);
-+
- static int at91_pm_valid_state(suspend_state_t state)
- {
- 	switch (state) {
-@@ -141,8 +147,14 @@ static void at91_pm_suspend(suspend_state_t state)
- 	pm_data |= (state == PM_SUSPEND_MEM) ?
- 				AT91_PM_MODE(AT91_PM_SLOW_CLOCK) : 0;
- 
-+	/* Disable L1 D-cache and L2 cache */
-+	at91_disable_l1_l2_cache();
-+
- 	at91_suspend_sram_fn(at91_pmc_base, at91_ramc_base[0],
- 				at91_ramc_base[1], pm_data);
-+
-+	/* Enable L1 D-cache and L2 cache */
-+	at91_enable_l1_l2_cache();
- }
- 
- static int at91_pm_enter(suspend_state_t state)
-diff --git a/arch/arm/mach-at91/pm_suspend.S b/arch/arm/mach-at91/pm_suspend.S
-index 311cc23..02d4e56 100644
---- a/arch/arm/mach-at91/pm_suspend.S
-+++ b/arch/arm/mach-at91/pm_suspend.S
-@@ -15,6 +15,7 @@
- #include <linux/clk/at91_pmc.h>
- #include <mach/hardware.h>
- #include <mach/at91_ramc.h>
-+#include <asm/hardware/cache-l2x0.h>
- 
- #include "pm.h"
- 
-@@ -324,3 +325,109 @@ ram_restored:
- 
- ENTRY(at91_pm_suspend_in_sram_sz)
- 	.word .-at91_pm_suspend_in_sram
-+
-+/*---------------------------------------*/
-+
-+#if defined(CONFIG_CPU_V7)
-+
-+/*
-+ * void at91_disable_l1_l2_cache(void)
-+ *
-+ * This function code disables, cleans & invalidates the L1 D-cache
-+ * and cleans, invalidates & disable the L2 cache.
-+ */
-+ENTRY(at91_disable_l1_l2_cache)
-+	stmfd	sp!, {r4 - r12, lr}
-+
-+	/*
-+	 * Flush all data from the L1 D-cache before disabling
-+	 * SCTLR.C bit.
-+	 */
-+	bl	v7_flush_dcache_all
-+
-+	/*
-+	 * Clear the SCTLR.C bit to prevent further data cache
-+	 * allocation. Clearing SCTLR.C would make all the data accesses
-+	 * strongly ordered and would not hit the cache.
-+	 */
-+	mrc	p15, 0, r0, c1, c0, 0
-+	bic	r0, r0, #(1 << 2)	@ Disable the C bit
-+	mcr	p15, 0, r0, c1, c0, 0
-+	isb
-+
-+	/*
-+	 * Invalidate L1 D-cache. Even though only invalidate is
-+	 * necessary exported flush API is used here. Doing clean
-+	 * on already clean cache would be almost NOP.
-+	 */
-+	bl	v7_flush_dcache_all
-+
-+	/*
-+	 * Clean and invalidate the L2 cache.
-+	 * Common cache-l2x0.c functions can't be used here since it
-+	 * uses spinlocks. We are out of coherency here with data cache
-+	 * disabled. The spinlock implementation uses exclusive load/store
-+	 * instruction which can fail without data cache being enabled.
-+	 * Because of this, CPU can lead to deadlock.
-+	 */
-+	ldr	r1, at91_l2cc_base_addr
-+	ldr	r2, [r1]
-+	cmp	r2, #0
-+	beq	skip_l2disable
-+	mov	r0, #0xff
-+	str	r0, [r2, #L2X0_CLEAN_INV_WAY]
-+wait:
-+	ldr	r0, [r2, #L2X0_CLEAN_INV_WAY]
-+	mov	r1, #0xff
-+	ands	r0, r0, r1
-+	bne	wait
-+
-+	mov	r0, #0
-+	str	r0, [r2, #L2X0_CTRL]
-+
-+l2x_sync:
-+	ldr	r0, [r2, #L2X0_CACHE_SYNC]
-+	bic	r0, r0, #0x1
-+	str	r0, [r2, #L2X0_CACHE_SYNC]
-+sync:
-+	ldr	r0, [r2, #L2X0_CACHE_SYNC]
-+	ands	r0, r0, #0x1
-+	bne	sync
-+
-+skip_l2disable:
-+	ldmfd	sp!, {r4 - r12, pc}
-+ENDPROC(at91_disable_l1_l2_cache)
-+
-+/*
-+ * void at91_enable_l1_l2_cache(void)
-+ *
-+ * This function code enables the L1 D-cache and the L2 cache.
-+ */
-+ENTRY(at91_enable_l1_l2_cache)
-+	stmfd	sp!, {r4 - r12, lr}
-+
-+	/* Enable the L2 cache */
-+	ldr	r1, at91_l2cc_base_addr
-+	ldr	r2, [r1]
-+	cmp	r2, #0
-+	beq	skip_l2en
-+	ldr	r0, [r2, #L2X0_CTRL]
-+	ands	r0, r0, #L2X0_CTRL_EN
-+	bne	skip_l2en	@ Skip if already enabled
-+	mov	r0, #L2X0_CTRL_EN
-+	str	r0, [r2, #L2X0_CTRL]
-+skip_l2en:
-+
-+	/* Enable the L1 D-cache */
-+	mrc	p15, 0, r0, c1, c0, 0
-+	tst	r0, #(1 << 2)		@ Check C bit enabled?
-+	orreq	r0, r0, #(1 << 2)	@ Enable the C bit
-+	mcreq	p15, 0, r0, c1, c0, 0
-+	isb
-+
-+	ldmfd	sp!, {r4 - r12, pc}
-+ENDPROC(at91_enable_l1_l2_cache)
-+
-+at91_l2cc_base_addr:
-+	.word	at91_l2cc_base
-+#endif
--- 
-1.7.9.5
+>         } else {
+>                 offset = PFN_DOWN(paddr - dma_addr);
+>                 dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
+>         }
+>
+> +       if (is_power_of_2(size + 1))
+> +               size = size + 1;
+> +       else if (!is_power_of_2(size)) {
+> +               dev_err(dev, "invalid size\n");
+> +               return;
+
+I think this is too restrictive. I think checking bit 0 is 1 is enough
+to tell the size is a mask.
+
+I would like it to be a WARN if detected and just add 1.
+
+Rob
