@@ -1,37 +1,37 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Wed, 28 Jan 2015 10:46:45 +0100
-Subject: arm64: USB_ARCH_HAS_EHCI
-In-Reply-To: <alpine.DEB.2.02.1501272130470.19947@utopia.booyaka.com>
-References: <1422351833.14015.20.camel@x220>
- <alpine.DEB.2.02.1501272130470.19947@utopia.booyaka.com>
-Message-ID: <1422438405.5666.16.camel@x220>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 28 Jan 2015 11:54:01 +0200
+Subject: [PATCH v9 2/2] tty/serial: Add Spreadtrum sc9836-uart driver
+ support
+In-Reply-To: <CAAfSe-v4FGpHL3N3utiDwcoc7qus1XZZszuXBqB6LeE1frAfeA@mail.gmail.com>
+References: <1422413261-17184-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1422413261-17184-3-git-send-email-chunyan.zhang@spreadtrum.com>
+ <20150128061250.GQ2555@sapphire.tkos.co.il>
+ <CAAfSe-v4FGpHL3N3utiDwcoc7qus1XZZszuXBqB6LeE1frAfeA@mail.gmail.com>
+Message-ID: <20150128095401.GC14175@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-01-27 at 21:31 +0000, Paul Walmsley wrote:
-> On Tue, 27 Jan 2015, Paul Bolle wrote:
+Hi Lyra Zhang,
+
+On Wed, Jan 28, 2015 at 04:46:33PM +0800, Lyra Zhang wrote:
+> On Wed, Jan 28, 2015 at 2:12 PM, Baruch Siach <baruch@tkos.co.il> wrote:
+> > On Wed, Jan 28, 2015 at 10:47:41AM +0800, Chunyan Zhang wrote:
+> >> +             if (uart_handle_sysrq_char(port, ch))
+> >> +                     continue;
+> >
+> > My comment[1] on a previous version of this patch still stands.
+> > uart_handle_sysrq_char is a NOP when SUPPORT_SYSRQ is not defined.
 > 
-> > Your commit d035fdfa27ac ("arm64: Add Tegra132 support") is included in
-> > today's linux-next (ie, next-20150127). I noticed because a script I use
-> > to check linux-next spotted a minor problem with it.
-> > 
-> > It adds a select for the Kconfig symbol USB_ARCH_HAS_EHCI. That Kconfig
-> > was obsoleted in v3.11 and removed in v3.15. See commit b797b76fb464
-> > ("usb: host: remove USB_ARCH_HAS_?HCI"). That select is now a nop.
-> > 
-> > Should I submit the trivial patch to remove that line or do you prefer
-> > to do that yourself?
-> 
-> Thanks, I'll post a new version.
+> yes, there are two definitions in serial_core.h, and it returns 0 when
+> SUPPORT_SYSRQ is not defined.
+> so, I think my code behavior does not hurt, right?
 
-I just noticed that your commit added another unneeded select. The entry
-for ARCH_TEGRA selects HAVE_SMP, but HAVE_SMP is only available on arm
-or xtensa. There's no point in selecting it in arm64.
+Right. I just wanted to point out that you can easily define SUPPORT_SYSRQ as 
+appropriate like many other serial drivers do to get sysrq support.
 
-(The patch I submitted in https://lkml.org/lkml/2014/9/30/578 would have
-warned about this. See https://lkml.org/lkml/2014/9/30/577 for an
-introduction. I'll see if I can get Michal Marek to put that patch in a
-tree that is part of linux-next.)
+baruch
 
-
-Paul Bolle
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
