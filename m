@@ -1,95 +1,35 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 28 Jan 2015 16:38:55 +0100
-Subject: [PATCH v4 3/5] drivers: bus: Add Simple Power-Managed Bus DT
- Bindings
-In-Reply-To: <20150127181727.GO17721@leverpostej>
-References: <1422288977-20353-1-git-send-email-geert+renesas@glider.be>
- <1422288977-20353-4-git-send-email-geert+renesas@glider.be>
- <20150127181727.GO17721@leverpostej>
-Message-ID: <CAMuHMdXUQESzCggb6FsDQStVtCHgTCCKo7veXSdUTZcB9OAd_w@mail.gmail.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Wed, 28 Jan 2015 07:41:39 -0800
+Subject: [PATCH 1/2] ARM: zynq: Remove bogus value from 'bias-disable'
+ property
+In-Reply-To: <ce6e56872ab744a49612ef9bca07c73d@BN1AFFO11FD005.protection.gbl>
+References: <1422301796-22888-1-git-send-email-soren.brinkmann@xilinx.com>
+ <54C6DDE8.3000905@suse.de>
+ <ce6e56872ab744a49612ef9bca07c73d@BN1AFFO11FD005.protection.gbl>
+Message-ID: <421020c5dac8492ea949dc202441c184@BL2FFO11FD054.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Wed, 2015-01-28 at 03:21PM +0100, Michal Simek wrote:
+> On 01/27/2015 01:38 AM, Andreas F?rber wrote:
+> > Am 26.01.2015 um 20:49 schrieb Soren Brinkmann:
+> >> In one pinctrl node, a 'bias-disable' property is erroneously assigned a
+> >> value.
+> >>
+> >> Fixes: ARM: zynq: DT: Add pinctrl information
+> >> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> > 
+> > Reviewed-by: Andreas F?rber <afaerber@suse.de>
+> > 
+> > Andreas
+> > 
+> 
+> Applied both.
 
-On Tue, Jan 27, 2015 at 7:17 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/bus/simple-pm-bus.txt
->> @@ -0,0 +1,41 @@
->> +Simple Power-Managed Bus
->> +========================
->> +
->> +A Simple Power-Managed Bus is a transparent bus that doesn't need a real
->> +driver, as it's typically initialized by the boot loader.
->> +
->> +However, its bus controller is part of a PM domain, or under the control of a
->> +functional clock.  Hence, the bus controller's PM domain and/or clock must be
->> +enabled for child devices connected to the bus (either on-SoC or externally)
->> +to function.
->> +
->> +The bindings for the Simple Power-Managed Bus extend the bindings for
->> +"simple-bus", as specified in ePAPR.
->
-> I would note that "simple-pm-bus" follows the "simple-bus" set of
-> properties, but is not an extension of "simple-bus".
+Thanks. Given how the branch looks now, you could squash 'ARM: zynq: DT:
+Remove bogus value from 'bias-disable' property' and 'ARM: zynq: DT: Add
+pinctrl information to USB nodes' into 'ARM: zynq: DT: Add pinctrl
+information'. Then we have it all in one patch and spare everybody the
+intermittent, partly broken commits.
 
-OK.
-
-> For the reasons I mentioned previously, I don't think that any
-> "simple-pm-bus" should be "simple-bus" compatible (and I believe we
-> should document that requirement below).
-
->> +Required properties:
->> +  - compatible: Must contain at least "simple-pm-bus".
-
-So you think I should add 'and must not contain "simple-bus"'?
-
->> +             It's recommended to let this be preceded by one or more
->> +             vendor-specific compatible values.
->> +  - #address-cells, #size-cells, ranges: Must describe the mapping between
->> +             parent address and child address spaces.
->> +
->> +Optional platform-specific properties for clock or PM domain control (at least
->> +one of them is required):
->> +  - clocks: Must contain a reference to the functional clock(s),
->
-> I'm a little worried about the clocks. What are the expectations on
-> their configuration?
-
-The clocks are highly platform-dependent. Hence the exact expectations
-belong in the binding documentation for the clock provider (and possibly
-the PM domain provider, too).
-
-> I don't see how we can generally rely on the clock configuration being
-> correct unless the input clocks only have on/off controls, and the OS
-> doesn't see any of the parent clock tree it could potentially change the
-> configuration of (beyond on/off).
-
-This is indeed not about generic programmable clock generators, but about
-clocks that are used solely to start/stop a hardware module by (un)gating
-a functional clock.
-
-> Otherwise we're relying on implicit behaviour elsewhere in Linux (which
-> _will_ break over time), and this ends up not being usable by anything
-> else.
->
-> I'm coming to the opinion that while we might be able to have common
-> driver in Linux, we can't have a common "simple-pm-bus" binding because
-> it implicitly assumes too much about the OS behaviour.
-
-If the bus controller is clocked from a generic programmable clock generator,
-it would need its own driver to configure e.g. the clock frequency, which
-could need more information from DT. This is not covered by "simple-pm-bus".
-
-Thanks for your comments!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+	S?ren
