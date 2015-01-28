@@ -1,48 +1,31 @@
 From: ricardo.ribalda@gmail.com (Ricardo Ribalda Delgado)
-Date: Wed, 28 Jan 2015 13:23:42 +0100
-Subject: [PATCH v2 03/15] spi/xilinx: Code cleanup
+Date: Wed, 28 Jan 2015 13:23:43 +0100
+Subject: [PATCH v2 04/15] spi/xilinx: Use cached value of register
 In-Reply-To: <1422447834-23116-1-git-send-email-ricardo.ribalda@gmail.com>
 References: <1422447834-23116-1-git-send-email-ricardo.ribalda@gmail.com>
-Message-ID: <1422447834-23116-4-git-send-email-ricardo.ribalda@gmail.com>
+Message-ID: <1422447834-23116-5-git-send-email-ricardo.ribalda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the transmission loop, check for remaining bytes at the loop
-condition.
-
-This way we can handle transmissions of 0 bytes and clean the code.
+The control register has not changed since the previous access.
+Therefore we can use the cached value and safe one bus access.
 
 Signed-off-by: Ricardo Ribalda Delgado <ricardo.ribalda@gmail.com>
 ---
-v2: Changes Requested by Mark Brown <broonie@kernel.org>
-Improve description
-
- drivers/spi/spi-xilinx.c | 6 +-----
- 1 file changed, 1 insertion(+), 5 deletions(-)
+ drivers/spi/spi-xilinx.c | 1 -
+ 1 file changed, 1 deletion(-)
 
 diff --git a/drivers/spi/spi-xilinx.c b/drivers/spi/spi-xilinx.c
-index d933207..a0f7c9d 100644
+index a0f7c9d..12b311e 100644
 --- a/drivers/spi/spi-xilinx.c
 +++ b/drivers/spi/spi-xilinx.c
-@@ -248,7 +248,7 @@ static int xilinx_spi_txrx_bufs(struct spi_device *spi, struct spi_transfer *t)
- 	xspi->remaining_bytes = t->len;
- 	reinit_completion(&xspi->done);
+@@ -271,7 +271,6 @@ static int xilinx_spi_txrx_bufs(struct spi_device *spi, struct spi_transfer *t)
+ 		 * transmitter while the Isr refills the transmit register/FIFO,
+ 		 * or make sure it is stopped if we're done.
+ 		 */
+-		cr = xspi->read_fn(xspi->regs + XSPI_CR_OFFSET);
+ 		xspi->write_fn(cr | XSPI_CR_TRANS_INHIBIT,
+ 			       xspi->regs + XSPI_CR_OFFSET);
  
--	for (;;) {
-+	while (xspi->remaining_bytes) {
- 		u16 cr;
- 		int n_words;
- 
-@@ -278,10 +278,6 @@ static int xilinx_spi_txrx_bufs(struct spi_device *spi, struct spi_transfer *t)
- 		/* Read out all the data from the Rx FIFO */
- 		while (n_words--)
- 			xspi->rx_fn(xspi);
--
--		/* See if there is more data to send */
--		if (xspi->remaining_bytes <= 0)
--			break;
- 	}
- 
- 	return t->len - xspi->remaining_bytes;
 -- 
 2.1.4
