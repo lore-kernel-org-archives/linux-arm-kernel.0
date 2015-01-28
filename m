@@ -1,40 +1,38 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 28 Jan 2015 09:17:12 -0600
-Subject: [PATCH] ARM: cns3xxx: fix typo in PCI config accessor
-In-Reply-To: <2000255.rnmr9HfSOg@wuerfel>
-References: <2000255.rnmr9HfSOg@wuerfel>
-Message-ID: <20150128151712.GA12050@google.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 28 Jan 2015 16:17:10 +0100
+Subject: [PATCH] Input: sun4i-ts: add thermal driver dependency
+Message-ID: <2265502.1m7jYBaqyh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 28, 2015 at 02:53:07PM +0100, Arnd Bergmann wrote:
-> The recent patch to convert the cns3xxx PCI code added an
-> extraneous opening bracket, which makes the build fail,
-> so remove this.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 10e2c5540d48 ("ARM: cns3xxx: Convert PCI to use generic config accessors")
-> ---
-> 
-> Hi Bjorn,
-> 
-> The broken patch just showed up in linux-next. Please apply this one on top,
-> or fold it into the original patch if you don't mind rebasing.
+The sun4i-ts driver has had a dependency on the thermal code
+since it was first merged, but this is not currently enforced
+in Kconfig, so in some randconfig builds we get
 
-I folded it in, thanks!  I guess Fengguang's autobuilder must not build
-this config, because I got a success report from it.
+drivers/built-in.o: In function `sun4i_ts_remove':
+:(.text+0x2376f4): undefined reference to `thermal_zone_of_sensor_unregister'
+drivers/built-in.o: In function `sun4i_ts_probe':
+:(.text+0x237a94): undefined reference to `thermal_zone_of_sensor_register'
+:(.text+0x237c00): undefined reference to `thermal_zone_of_sensor_unregister'
 
-> diff --git a/arch/arm/mach-cns3xxx/pcie.c b/arch/arm/mach-cns3xxx/pcie.c
-> index e41fc339d100..c622c306c390 100644
-> --- a/arch/arm/mach-cns3xxx/pcie.c
-> +++ b/arch/arm/mach-cns3xxx/pcie.c
-> @@ -101,7 +101,7 @@ static int cns3xxx_pci_read_config(struct pci_bus *bus, unsigned int devfn,
->  		 * for a PCIe bridge. So we must fixup the class code
->  		 * to 0x604 here.
->  		 */
-> -		*val = (((((*val << shift) & 0xff) | (0x604 << 16)) >> shift) & mask;
-> +		*val = ((((*val << shift) & 0xff) | (0x604 << 16)) >> shift) & mask;
->  
->  	return ret;
->  }
-> 
+We need the dependency on THERMAL in order to ensure that this
+driver becomes a loadable module if the thermal support itself
+is modular, while the dependency on THERMAL_OF is a runtime dependency
+and the driver will still build but not work if it is missing.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 6decea7c5438e2 ("Input: add driver for Allwinner sunxi SoC's rtp controller")
+
+diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
+index 58917525126e..e2447f0063b7 100644
+--- a/drivers/input/touchscreen/Kconfig
++++ b/drivers/input/touchscreen/Kconfig
+@@ -943,6 +943,8 @@ config TOUCHSCREEN_SUN4I
+ 	tristate "Allwinner sun4i resistive touchscreen controller support"
+ 	depends on ARCH_SUNXI || COMPILE_TEST
+ 	depends on HWMON
++	depends on THERMAL
++	depends on THERMAL_OF || COMPILE_TEST
+ 	help
+ 	  This selects support for the resistive touchscreen controller
+ 	  found on Allwinner sunxi SoCs.
