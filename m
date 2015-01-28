@@ -1,23 +1,38 @@
-From: bhuvanchandra.dv@toradex.com (BhuvanChandra.DV)
-Date: Wed, 28 Jan 2015 07:05:55 +0000
-Subject: [PATCH 3/7] spi: spi-fsl-dspi: Remove usage of devm_kzalloc
-In-Reply-To: <20150127195234.GP21293@sirena.org.uk>
-References: <1422356244-15629-1-git-send-email-bhuvanchandra.dv@toradex.com>
- <1422356244-15629-4-git-send-email-bhuvanchandra.dv@toradex.com>
- <20150127195234.GP21293@sirena.org.uk>
-Message-ID: <1422429099979.36592@toradex.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 28 Jan 2015 08:18:40 +0100
+Subject: [PATCH] ARM: /proc/atags: Export also for DT
+In-Reply-To: <alpine.LFD.2.11.1501272027390.1322@knanqh.ubzr>
+References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
+ <20150127132127.GA869@amd>
+ <CAL_JsqKM+2PtX_EpWXyOQHVXwf=jqVj8SroUGPO1Y2=Zj8_kMg@mail.gmail.com>
+ <201501271532.25540@pali>
+ <20150127174818.GM26493@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1501271446330.1322@knanqh.ubzr>
+ <20150127210943.GN26493@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1501271614280.1322@knanqh.ubzr>
+ <20150127223331.GP26493@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1501272027390.1322@knanqh.ubzr>
+Message-ID: <20150128071840.GA29927@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi!
 
-On 01/28/2015 01:22 AM, Mark Brown wrote:
-> On Tue, Jan 27, 2015 at 04:27:20PM +0530, Bhuvanchandra DV wrote:
->> devm_* API was supposed to be used only in probe function call.
->> Memory is allocated at 'probe' and free automatically at 'remove'.
-> Applied, thanks.  Please don't dump entire backtraces into your commit
-> logs - they're far too big and not very helpful, they can obscure real
-> content in the message.  Explain in words what the problem is and if a
-> backtrace helps illustrate that edit it down to only relevant portions
-> rather than blindly including the entire thing.
+> In other words, what prevents someone from creating, say, a custom 
+> minimal Barebox version that sits on top of the existing N900 
+> bootloader?  Wouldn't that provide a much better user experience?
 
-OK
+Lot of useless work, that would make user experience worse?
+
+We have mostly working u-boot on N900. Its there, useful for boot
+menus, but makes debugging tricky, so we want to keep working with
+internal bootloader, too. And I have already explained this to you
+before.
+
+Now, would you stop assigning work to other people?
+
+Thanks,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
