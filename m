@@ -1,37 +1,66 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 28 Jan 2015 11:47:08 +0000
-Subject: arm32 binaries work with CONFIG_COMPAT as root but not as user?
-In-Reply-To: <CAAqcGHn5rVyWRznbgTxLjTp6kHRGWW26-zJ3t7eOki_czwx1AQ@mail.gmail.com>
-References: <CAAqcGHnS7P7=xzXoOPE61dcbbq_1kvmeB-V1GcDUxB1ND0-kZA@mail.gmail.com>
- <20150128112249.GD6646@e104818-lin.cambridge.arm.com>
- <CAAqcGHn5rVyWRznbgTxLjTp6kHRGWW26-zJ3t7eOki_czwx1AQ@mail.gmail.com>
-Message-ID: <20150128114708.GA9000@e104818-lin.cambridge.arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 28 Jan 2015 12:55:45 +0100
+Subject: [PATCH] ARM: mvebu: don't set the PL310 in I/O coherency mode when
+ I/O coherency is disabled
+Message-ID: <1422446145-24447-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 28, 2015 at 11:42:55AM +0000, Riku Voipio wrote:
-> On 28 January 2015 at 13:22, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Wed, Jan 28, 2015 at 10:52:21AM +0000, Riku Voipio wrote:
-> > What does this say:
-> cat /proc/sys/vm/mmap_min_addr
-> 65536
-> 
-> > # cat /proc/sys/vm/mmap_min_addr
-> >
-> > If it is 64K, it won't run 32-bit apps as non-root.
-> 
-> echo 32768 > /proc/sys/vm/mmap_min_addr
-> 
-> and indeed binaries work as expected.
-> 
-> The ubuntu LTS 3.13 kernel has:
-> 
-> /boot/config-3.13.0-39-generic:CONFIG_DEFAULT_MMAP_MIN_ADDR=65536
-> 
-> I need to check how the value ended up wrong on the 3.19-rc3 I tested.
+Since commit f2c3c67f00 (merge commit that adds commit "ARM: mvebu:
+completely disable hardware I/O coherency"), we disable I/O coherency
+on Armada EBU platforms.
 
-It may be set by some boot script on arm64 Ubuntu (so entirely in user
-space).
+However, we continue to initialize the coherency fabric, because this
+coherency fabric is needed on Armada XP for inter-CPU
+coherency. Unfortunately, due to this, we also continued to execute
+the coherency fabric initialization code for Armada 375/38x, which
+switched the PL310 into I/O coherent mode. This has the effect of
+disabling the outer cache sync operation: this is needed when I/O
+coherency is enabled to work around a PCIe/L2 deadlock. But obviously,
+when I/O coherency is disabled, having the outer cache sync operation
+is crucial.
 
+Therefore, this commit fixes the armada_375_380_coherency_init() so
+that the PL310 is switched to I/O coherent mode only if I/O coherency
+is enabled.
+
+Without this fix, all devices using DMA are broken on Armada 375/38x.
+
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: <stable@vger.kernel.org>
+---
+This fix is needed in 3.19-rc, and in all stable kernel releases in
+which f2c3c67f00 was added.
+
+In mainline, it is not strictly needed, since we have since then
+re-enabled I/O coherency using automatic barriers.
+
+Commit applies on top of 3.19-rc6, and has been tested on Armada XP,
+Armada 375 and Armada 38x, by checking that the XOR engine self-tests
+are working properly, which is a good indication that DMA and I/O
+coherency is minimally working. Without the fix, the XOR engine
+self-tests were not even working on Armada 38x.
+
+ arch/arm/mach-mvebu/coherency.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+index caa21e9..ccef880 100644
+--- a/arch/arm/mach-mvebu/coherency.c
++++ b/arch/arm/mach-mvebu/coherency.c
+@@ -190,6 +190,13 @@ static void __init armada_375_380_coherency_init(struct device_node *np)
+ 	arch_ioremap_caller = armada_pcie_wa_ioremap_caller;
+ 
+ 	/*
++	 * We should switch the PL310 to I/O coherency mode only if
++	 * I/O coherency is actually enabled.
++	 */
++	if (!coherency_available())
++		return;
++
++	/*
+ 	 * Add the PL310 property "arm,io-coherent". This makes sure the
+ 	 * outer sync operation is not used, which allows to
+ 	 * workaround the system erratum that causes deadlocks when
 -- 
-Catalin
+2.1.0
