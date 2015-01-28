@@ -1,37 +1,82 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 28 Jan 2015 10:14:53 +0100
-Subject: [PATCH] ARM: shmobile: r8a7794: Correct SDHI clock base address,
- labels and output-names
-In-Reply-To: <1422406422-671-1-git-send-email-horms+renesas@verge.net.au>
-References: <1422406422-671-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdWzvwmX8uN+Do-1vZiSeqknLdgmv060GCvbZd1=x4YnXA@mail.gmail.com>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Wed, 28 Jan 2015 17:14:47 +0800
+Subject: [PATCH v4 00/13 RESEND] AT91 pm cleanup for 3.20
+In-Reply-To: <1422409172-24178-1-git-send-email-wenyou.yang@atmel.com>
+References: <1422409172-24178-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1422436487-21890-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 28, 2015 at 1:53 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> * Correct base address of SD3 div6 clk.
-> * Update div6 clock node labels
->   There appears to have been some inconsistency and confusion here as on
->   the r8a7790 these clocks are referred to as SD(HI)1 and SD(HI)2 while on
->   the r8a7791 and r8a7794 they are referred to as SD(HI)2 and SD(HI)3.
->
-> This has no run-time affect as the clock nodes are not currently used.
->
-> Fixes: 8e181633e6ca96049 ("ARM: shmobile: r8a7794: Add SDHI clocks to device tree")
-> Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Hi Nicolas,
 
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+This version is rebased on the branch: at91-3.20-cleanup of the repository
+	git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git
 
-Gr{oetje,eeting}s,
+It is purpose to clean up the PM code, includes the patches from Peter Rosin and Sylvain Rochet.
 
-                        Geert
+Since verifying the USB clock and USB PLL disabling before suspending to memory,
+it aslo depends on the following patch serials from Sylvain:
+	[PATCHv6 0/5] USB: gadget: atmel_usba_udc: Driver improvements
+	[PATCHv7 0/6] USB: host: Atmel OHCI and EHCI drivers improvements
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Removes CONFIG_AT91_SLOW_CLOCK config item to simply the PM config,
+The suspend to standby mode uses the same sram function as the suspend to memory mode.
+Remove some unused code.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Alexandr & Sylvain, Thank you very much for so many feedbacks.
+
+Changes in v4:
+ - Clear unused state argument in at91_pm_verify_clocks()
+ - Remove pr_info("AT91:... slow_clock ? ..") in patch 07/13.
+
+Changes in v3
+ - Sylvain splits the patch in two
+ - Add handling if no sram allocated for PM
+ - Retain the STANDBY and SUSPEND_MEM select in at91_pm_enter.
+
+Changes in v2:
+ - Rebase on the at91-3.20-cleanup branch
+ - Recover the verify clock condition, only for suspend to memory.
+ - Collect ACK from Alexandre
+ - Add the macro for PM mode
+
+Peter Rosin (1):
+  pm: at91: Workaround DDRSDRC self-refresh bug with LPDDR1 memories.
+
+Sylvain Rochet (2):
+  pm: at91: pm_slowclock: fix suspend/resume hang up in timeouts
+  pm: at91: pm_slowclock: remove clocks which are already stopped when
+    entering slow clock mode
+
+Wenyou Yang (10):
+  pm: at91: pm_slowclock: remove the unused code related with
+    SLOWDOWN_MASTER_CLOCK
+  pm: at91: move the copying the sram function to the sram
+    initializationi phase
+  ARM: at91: move select SRAM to ARCH_AT91
+  pm: at91: remove the config item CONFIG_AT91_SLOW_CLOCK
+  pm: at91: the standby mode uses the same sram function as the suspend
+    to memory mode
+  pm: at91: rename file name: pm_slowclock.S -->pm_suspend.S
+  pm: at91: rename function name:
+    at91_slow_clock()-->at91_pm_suspend_sram_fn
+  pm: at91: remove the at91_xxx_standby() function definitions in the
+    pm.h
+  pm: at91: setup: remove the struct ramc_ids .data at91_xxx_standby
+    members
+  pm: at91: amend the pm_suspend entry for at91_cpuidle_device
+
+ arch/arm/mach-at91/Kconfig         |   17 +-
+ arch/arm/mach-at91/Makefile        |    2 +-
+ arch/arm/mach-at91/pm.c            |  148 +++++++++--------
+ arch/arm/mach-at91/pm.h            |  100 +----------
+ arch/arm/mach-at91/pm_slowclock.S  |  323 ------------------------------------
+ arch/arm/mach-at91/pm_suspend.S    |  277 +++++++++++++++++++++++++++++++
+ arch/arm/mach-at91/setup.c         |   19 +--
+ include/soc/at91/at91sam9_ddrsdr.h |    2 +-
+ 8 files changed, 366 insertions(+), 522 deletions(-)
+ delete mode 100644 arch/arm/mach-at91/pm_slowclock.S
+ create mode 100644 arch/arm/mach-at91/pm_suspend.S
+
+-- 
+1.7.9.5
