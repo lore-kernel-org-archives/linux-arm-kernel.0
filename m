@@ -1,51 +1,50 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 28 Jan 2015 15:22:55 +0100
-Subject: [PATCH v4 6/7] ARM: zynq: DT: Add pinctrl information
-In-Reply-To: <54C6D510.6090105@suse.de>
-References: <1420818231-13451-1-git-send-email-soren.brinkmann@xilinx.com>
- <1420818231-13451-7-git-send-email-soren.brinkmann@xilinx.com>
- <CACRpkdZ1jfTUqfLKonJxar2Jn25+4wTF-D4XUXOszSsoJrA07w@mail.gmail.com>
- <1a749692196d406a8229d4891f3563f4@BN1BFFO11FD016.protection.gbl>
- <54C6D510.6090105@suse.de>
-Message-ID: <41babf16a78d4d48855d80d61262e39a@BL2FFO11FD033.protection.gbl>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 28 Jan 2015 09:33:48 -0500 (EST)
+Subject: [PATCH] ARM: /proc/atags: Export also for DT
+In-Reply-To: <201501281458.22088@pali>
+References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
+ <20150127174818.GM26493@n2100.arm.linux.org.uk>
+ <20150128005032.GK28663@atomide.com> <201501281458.22088@pali>
+Message-ID: <alpine.LFD.2.11.1501280925400.1322@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/27/2015 01:00 AM, Andreas F?rber wrote:
-> Am 12.01.2015 um 08:27 schrieb Michal Simek:
->> On 01/11/2015 10:38 PM, Linus Walleij wrote:
->>> On Fri, Jan 9, 2015 at 4:43 PM, Soren Brinkmann
->>> <soren.brinkmann@xilinx.com> wrote:
->>>
->>>> Add pinctrl descriptions to the zc702 and zc706 device trees.
->>>>
->>>> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
->>>> Tested-by: Andreas F?rber <afaerber@suse.de>
->>>
->>> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
->>>
->>> Beautiful and in line with how I want things to look.
->>>
->>> Yours,
->>> Linus Walleij
->>>
->>
->> Applied to zynq/dt.
+On Wed, 28 Jan 2015, Pali Roh?r wrote:
+
+> On Wednesday 28 January 2015 01:50:33 Tony Lindgren wrote:
+> > On omaps, the bootrom passes the bootreason in r1 to the
+> > bootloader that can do whatever it wants with it. We could
+> > maybe pass it in the kernel cmdline to the watchdog driver
+> > for user space?
+> > 
 > 
-> Did you maybe forget to push?
+> Not truth for N900. Bootreason depends on PRM_RSTST omap 
+> register, state of vbat charger pins, time how long was power key 
+> pressed, R&D data stored in CAL partition and other undocumented 
+> registers for omap HS devices. I already tried to implement at 
+> least some subset of it in userspace (or kernel), but it is 
+> impossible because NOLO bootloader clear status of PRM_RSTST 
+> register.
 > 
-> https://github.com/Xilinx/linux-xlnx/commits/zynq/dt doesn't have it.
+> There is also copy of PRM_RSTST register stored at address 
+> 0x4020FFB8 (tracing data) but that address is rewritten (probably 
+> by kernel), so we really cannot implement reading bootreason in 
+> kernel.
+> 
+> But in early stage in uboot it is possible to read 0x4020FFB8 
+> address and get some part of bootreason. But still PRM_RSTST is 
+> not enough!
+> 
+> I would be happy if DT kernel can export /proc/atags file with 
+> ATAGs passed by bootloader. It would be enough for me. In 
+> userspace I can parse content and do what is needed.
 
-Ah sorry - I have pushed it now.
+What about defining a DT boot reason property instead?
+Maybe it already exists?  If not, it's something that could certainly be 
+generically used on other platforms too.
 
-Thanks,
-Michal
+Converting the special ATAG into its standard DT equivalent would then 
+be trivial and much cleaner overall.
 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150128/55f98779/attachment.sig>
+Nicolas
