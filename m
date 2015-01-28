@@ -1,58 +1,68 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 28 Jan 2015 00:55:35 +0100
-Subject: [GIT PULL] ARM: mediatek: arm64 changes for v3.20
-Message-ID: <CABuKBe+3DWcKkRt3yc0QZvDJUQPJs8xqC-v+wBqReyXrXeDP8A@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 28 Jan 2015 01:15:07 +0100
+Subject: [GIT PULL] ARM: rockchip: second batch of dts updates for 3.20
+Message-ID: <2511110.jH7fOBdjlK@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Olof,
+Hi Arnd, Olof,
 
-Please take the following arm64 patches for v3.20.
-I send a pull request two days ago. As I said, it was screwed up, so
-here it comes again.
-Hopefully this time everything went fine.
+here are some more devicetree changes for Rockchip boards.
+The tag messages explains the contents hopefully enough.
 
-Cheers,
-Matthias
+And even the subject is correct this time ;-)
 
--- 
+So please pull
 
-The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
 
-  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+Thanks
+Heiko
+
+
+The following changes since commit 5963e106df7b601a8f23cbbaac1420e4c740ada6:
+
+  ARM: dts: rockchip: add suspend settings for rk3288-evb-rk808 (2014-12-31 16:19:18 +0100)
 
 are available in the git repository at:
 
-  https://github.com/mbgg/linux-mediatek.git tags/v3.20-next-arm64
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.20-rockchip-dts2
 
-for you to fetch changes up to 4727a6f631bf3ab2a0373acd27d40483446fcb8a:
+for you to fetch changes up to 11ff8c86d74002cb493407742fd1c128055e1abe:
 
-  arm64: mediatek: Add MT8173 SoC Kconfig and defconfig (2015-01-26
-13:26:48 +0100)
-
-----------------------------------------------------------------
-Add support for mt8173 SoC from Mediatek.
-
-- add DT bindings documentation
-- add dts files for SoC and evaluation board
-- add to Kconfig and defconfig
+  ARM: dts: rockchip: add dts for ChipSPARK Rayeager PX2 board (2015-01-26 02:15:36 +0100)
 
 ----------------------------------------------------------------
-Eddie Huang (3):
-      Document: DT: Add bindings for mediatek MT8173 SoC Platform
-      arm64: dts: Add mediatek MT8173 SoC and evaluation board dts and Makefile
-      arm64: mediatek: Add MT8173 SoC Kconfig and defconfig
+Basic display nodes for lcdcs and hdmi encoder, timer node
+for the broadcast timer going through the clocksource tree
+and two new boards, the rk3288-based Firefly and the
+PX2-based Rayeager board (the PX2 is identical to the rk3066
+but made for industrial users).
 
- Documentation/devicetree/bindings/arm/mediatek.txt |   4 +
- .../bindings/arm/mediatek/mediatek,sysirq.txt      |   1 +
- .../devicetree/bindings/serial/mtk-uart.txt        |   4 +-
- arch/arm64/Kconfig                                 |   6 +
- arch/arm64/boot/dts/Makefile                       |   1 +
- arch/arm64/boot/dts/mediatek/Makefile              |   5 +
- arch/arm64/boot/dts/mediatek/mt8173-evb.dts        |  38 +++++
- arch/arm64/boot/dts/mediatek/mt8173.dtsi           | 168 +++++++++++++++++++++
- arch/arm64/configs/defconfig                       |   2 +
- 9 files changed, 228 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/boot/dts/mediatek/Makefile
- create mode 100644 arch/arm64/boot/dts/mediatek/mt8173-evb.dts
- create mode 100644 arch/arm64/boot/dts/mediatek/mt8173.dtsi
+----------------------------------------------------------------
+Andy Yan (1):
+      ARM: dts: rockchip: add rk3288 hdmi nodes
+
+Daniel Kurtz (1):
+      ARM: dts: rockchip: Add rk3288 vop and display-subsystem
+
+Daniel Lezcano (1):
+      ARM: dts: rockchip: Add rockchip timer node for rk3288
+
+FUKAUMI Naoki (3):
+      dt-bindings: add vendor prefix and root compatible property for Rockchip boards
+      ARM: dts: rockchip: add dts for Firefly Firefly-RK3288 boards
+      ARM: dts: rockchip: add dts for ChipSPARK Rayeager PX2 board
+
+ Documentation/devicetree/bindings/arm/rockchip.txt |  10 +
+ .../devicetree/bindings/vendor-prefixes.txt        |   2 +
+ arch/arm/boot/dts/Makefile                         |   5 +-
+ arch/arm/boot/dts/rk3066a-rayeager.dts             | 468 +++++++++++++++++++++
+ arch/arm/boot/dts/rk3288-firefly-beta.dts          |  71 ++++
+ arch/arm/boot/dts/rk3288-firefly.dts               |  71 ++++
+ arch/arm/boot/dts/rk3288-firefly.dtsi              | 467 ++++++++++++++++++++
+ arch/arm/boot/dts/rk3288.dtsi                      |  84 ++++
+ 8 files changed, 1177 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/rk3066a-rayeager.dts
+ create mode 100644 arch/arm/boot/dts/rk3288-firefly-beta.dts
+ create mode 100644 arch/arm/boot/dts/rk3288-firefly.dts
+ create mode 100644 arch/arm/boot/dts/rk3288-firefly.dtsi
