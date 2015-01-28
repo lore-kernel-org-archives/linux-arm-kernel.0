@@ -1,34 +1,35 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Wed, 28 Jan 2015 23:52:00 +0100
-Subject: [PATCH v2 0/8] ARM: Conexant Digicolor CX92755 SoC support
-In-Reply-To: <20150128224145.GK3148@tarshish>
-References: <cover.1420744368.git.baruch@tkos.co.il>
- <5966468.GiJYdzCvnt@wuerfel> <1422484395.3621.73.camel@x220>
- <20150128224145.GK3148@tarshish>
-Message-ID: <1422485520.3621.81.camel@x220>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 28 Jan 2015 14:59:03 -0800
+Subject: [PATCH 1/1] ARM: multi_v7_defconfig: Enable Exynos5420
+ Multi-Cluster PM support
+In-Reply-To: <1422456020-10975-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1422456020-10975-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <20150128225903.GA3177@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch,
-
-On Thu, 2015-01-29 at 00:41 +0200, Baruch Siach wrote:
-> On Wed, Jan 28, 2015 at 11:33:15PM +0100, Paul Bolle wrote:
-> > On Thu, 2015-01-08 at 23:46 +0100, Arnd Bergmann wrote:
-> > > Once there are no more review comments, please submit the first three
-> > > patches to arm at kernel.org, and send the other patches as separate
-> > > series to the respective maintainers for irqchip and clocksource.
-> > 
-> > I found this message while looking into CONFIG_ARCH_DIGICOLOR. That
-> > Kconfig macro entered linux-next in next-20150128. But there's no
-> > Kconfig symbol ARCH_DIGICOLOR yet in linux-next.
+On Wed, Jan 28, 2015 at 03:40:20PM +0100, Javier Martinez Canillas wrote:
+> The Exynos5420 cluster power management support allowing Exynos
+> 5420/5422/5800 machines to power up and down the secondary CPUs.
 > 
-> Just for the record: base digicolor platform support is in the for-next branch 
-> of arm-soc.git since today. I guess it should appear in linux-next tomorrow.
+> Without this option enabled, the secondary CPUs are not brought
+> up on boot and the following error is shown:
+> 
+> CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+> Setting up static identity map for 0x40938e90 - 0x40938f28
+> ARM CCI driver probed
+> CPU1: failed to boot: -38
+> CPU2: failed to boot: -38
+> CPU3: failed to boot: -38
+> CPU4: failed to boot: -38
+> CPU5: failed to boot: -38
+> CPU6: failed to boot: -38
+> CPU7: failed to boot: -38
+> Brought up 1 CPUs
+> 
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-So I choose a less convincing patch series to discuss this. But that
-doesn't alter the general issue I raised. At least, I hope it doesn't.
-
-Thanks!
+Applied, thanks.
 
 
-Paul Bolle
+-Olof
