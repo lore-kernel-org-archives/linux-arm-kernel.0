@@ -1,97 +1,89 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 28 Jan 2015 12:29:42 +0000
-Subject: [PATCH v4 1/6] of: iommu: add ptr to OF node arg to
- of_iommu_configure()
-In-Reply-To: <3953539.m9NpxSWcJ5@avalon>
-References: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
- <54C68C1D.5030605@ti.com> <20150128113300.GF1569@arm.com>
- <3953539.m9NpxSWcJ5@avalon>
-Message-ID: <20150128122941.GK1569@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 28 Jan 2015 13:29:56 +0100
+Subject: [PATCH] ARM: mvebu: don't set the PL310 in I/O coherency mode
+ when I/O coherency is disabled
+In-Reply-To: <1422446145-24447-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1422446145-24447-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <54C8D644.6050709@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 28, 2015 at 12:23:03PM +0000, Laurent Pinchart wrote:
-> On Wednesday 28 January 2015 11:33:00 Will Deacon wrote:
-> > On Mon, Jan 26, 2015 at 06:49:01PM +0000, Murali Karicheri wrote:
-> > > On 01/25/2015 08:32 AM, Laurent Pinchart wrote:
-> > >> On Friday 23 January 2015 17:32:34 Murali Karicheri wrote:
-> > >>> Function of_iommu_configure() is called from of_dma_configure() to
-> > >>> setup iommu ops using DT property. This API is currently used for
-> > >>> platform devices for which DMA configuration (including iommu ops)
-> > >>> may come from device's parent. To extend this functionality for PCI
-> > >>> devices, this API need to take a parent node ptr as an argument
-> > >>> instead of assuming device's parent. This is needed since for PCI, the
-> > >>> dma configuration may be defined in the DT node of the root bus
-> > >>> bridge's parent device. Currently only dma-range is used for PCI and
-> > >>> iommu is not supported. So return error if the device is PCI.
-> > >>> 
-> > >>> Cc: Joerg Roedel<joro@8bytes.org>
-> > >>> Cc: Grant Likely<grant.likely@linaro.org>
-> > >>> Cc: Rob Herring<robh+dt@kernel.org>
-> > >>> Cc: Bjorn Helgaas<bhelgaas@google.com>
-> > >>> Cc: Will Deacon<will.deacon@arm.com>
-> > >>> Cc: Russell King<linux@arm.linux.org.uk>
-> > >>> Cc: Arnd Bergmann<arnd@arndb.de>
-> > >>> Cc: Suravee Suthikulpanit<Suravee.Suthikulpanit@amd.com>
-> > >>> 
-> > >>> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
-> > >>> ---
-> > >>> 
-> > >>>   drivers/iommu/of_iommu.c |   10 ++++++++--
-> > >>>   drivers/of/platform.c    |    2 +-
-> > >>>   include/linux/of_iommu.h |    6 ++++--
-> > >>>   3 files changed, 13 insertions(+), 5 deletions(-)
-> > >>> 
-> > >>> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-> > >>> index af1dc6a..439235b 100644
-> > >>> --- a/drivers/iommu/of_iommu.c
-> > >>> +++ b/drivers/iommu/of_iommu.c
-> > >>> @@ -133,19 +133,25 @@ struct iommu_ops *of_iommu_get_ops(struct
-> > >>> device_node *np)
-> > >>>   	return ops;
-> > >>>  }
-> > >>> 
-> > >>> -struct iommu_ops *of_iommu_configure(struct device *dev)
-> > >>> +struct iommu_ops *of_iommu_configure(struct device *dev,
-> > >>> +				     struct device_node *iommu_np)
-> > >>>  {
-> > >>>   	struct of_phandle_args iommu_spec;
-> > >>>   	struct device_node *np;
-> > >>>   	struct iommu_ops *ops = NULL;
-> > >>>   	int idx = 0;
-> > >>> 
-> > >>> +	if (dev_is_pci(dev)) {
-> > >>> +		dev_err(dev, "iommu is currently not supported for PCI\n");
-> > >>> +		return NULL;
-> > >>> +	}
-> > >>> +
-> > >>>   	/*
-> > >>>   	 * We don't currently walk up the tree looking for a parent IOMMU.
-> > >>>   	 * See the `Notes:' section of
-> > >>>   	 * Documentation/devicetree/bindings/iommu/iommu.txt
-> > >>>   	 */
-> > >> 
-> > >> Wouldn't it be better to fix this rather than passing the device node
-> > >> pointer to the function ? The solution would be more generic.
-> > > 
-> > > Will Deacon (Copied here) is working on this as we alteady discussed in
-> > > this thread. So it will be addressed by him in another series.
-> > 
-> > Well, "working on this" equates to "has it somewhere near the bottom of
-> > a very long list" :)
+Hi Thomas, Andrew,
+
+On 28/01/2015 12:55, Thomas Petazzoni wrote:
+> Since commit f2c3c67f00 (merge commit that adds commit "ARM: mvebu:
+> completely disable hardware I/O coherency"), we disable I/O coherency
+> on Armada EBU platforms.
 > 
-> What's your opinion on this patch then, do you think adding the iommu_np 
-> argument makes sense as a temporary hack, or should we instead walk up the 
-> tree looking for an iommus attribute in parent nodes ? I don't expect that to 
-> be insanely difficult to code.
+> However, we continue to initialize the coherency fabric, because this
+> coherency fabric is needed on Armada XP for inter-CPU
+> coherency. Unfortunately, due to this, we also continued to execute
+> the coherency fabric initialization code for Armada 375/38x, which
+> switched the PL310 into I/O coherent mode. This has the effect of
+> disabling the outer cache sync operation: this is needed when I/O
+> coherency is enabled to work around a PCIe/L2 deadlock. But obviously,
+> when I/O coherency is disabled, having the outer cache sync operation
+> is crucial.
+> 
+> Therefore, this commit fixes the armada_375_380_coherency_init() so
+> that the PL310 is switched to I/O coherent mode only if I/O coherency
+> is enabled.
+> 
+> Without this fix, all devices using DMA are broken on Armada 375/38x.
 
-If walking up the tree is useful, then I think we should do that and update
-the Documentation to reflect the new behaviour. The only reason that I
-didn't code that in of_iommu_configure originally is because I didn't want
-to go against the binding spec for the initial version, especially as we
-didn't have a reason to look at parent nodes.
+Without this fix on my Armada 375 DB board, the kernel hang during the XOR
+engine self-test. This fix is really something we should have in 3.19-rc.
 
-The only thing to double-check is that we don't break any existing users
-of the binding with this change, but I don't think that we do.
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+and also
+Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Will
+Thanks,
+
+Gregory
+
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: <stable@vger.kernel.org>
+> ---
+> This fix is needed in 3.19-rc, and in all stable kernel releases in
+> which f2c3c67f00 was added.
+> 
+> In mainline, it is not strictly needed, since we have since then
+> re-enabled I/O coherency using automatic barriers.
+> 
+> Commit applies on top of 3.19-rc6, and has been tested on Armada XP,
+> Armada 375 and Armada 38x, by checking that the XOR engine self-tests
+> are working properly, which is a good indication that DMA and I/O
+> coherency is minimally working. Without the fix, the XOR engine
+> self-tests were not even working on Armada 38x.
+> 
+>  arch/arm/mach-mvebu/coherency.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+> index caa21e9..ccef880 100644
+> --- a/arch/arm/mach-mvebu/coherency.c
+> +++ b/arch/arm/mach-mvebu/coherency.c
+> @@ -190,6 +190,13 @@ static void __init armada_375_380_coherency_init(struct device_node *np)
+>  	arch_ioremap_caller = armada_pcie_wa_ioremap_caller;
+>  
+>  	/*
+> +	 * We should switch the PL310 to I/O coherency mode only if
+> +	 * I/O coherency is actually enabled.
+> +	 */
+> +	if (!coherency_available())
+> +		return;
+> +
+> +	/*
+>  	 * Add the PL310 property "arm,io-coherent". This makes sure the
+>  	 * outer sync operation is not used, which allows to
+>  	 * workaround the system erratum that causes deadlocks when
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
