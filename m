@@ -1,43 +1,35 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 28 Jan 2015 20:06:00 +0000
-Subject: [RFC V2] OPP: Redefine bindings to overcome shortcomings
-In-Reply-To: <cbe949d7a69c3b16a3e9d6e5429eb81d3ae9d8b9.1422009157.git.viresh.kumar@linaro.org>
-References: <cbe949d7a69c3b16a3e9d6e5429eb81d3ae9d8b9.1422009157.git.viresh.kumar@linaro.org>
-Message-ID: <20150128200600.GR21293@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 28 Jan 2015 21:09:16 +0100
+Subject: [PATCH] crypto: atmel: remove bogus select
+Message-ID: <1780191.gdgDmCPaN0@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 23, 2015 at 04:14:50PM +0530, Viresh Kumar wrote:
+The Atmel at91 crypto driver unconditionally selects AT_HDMAC,
+which results in a Kconfig warning if that driver is not enabled:
 
-> +- opp-listN:
-> +  List of nodes defining performance points. Following belong to the nodes
-> +  within the opp-lists.
+warning: (CRYPTO_DEV_ATMEL_AES) selects AT_HDMAC which has unmet direct dependencies (DMADEVICES && ARCH_AT91)
 
-Why is there the N here?  It doesn't correspond to the examples...
+The crypty driver itself does not actually have a dependency
+on a particular dma engine, other than this being the one that
+is used in at91.
 
-> +  Required properties:
-> +  - opp-khz: Frequency in kHz
-> +  - opp-microvolt: voltage in micro Volts
+Removing the 'select' gets rid of the warning, with no apparent
+downsides.
+We should probably enable AT_HDMAC in sama5_defconfig, because
+it no longers gets enabled implicitly.
 
-I thought the goal here was to specify ranges?
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-> +- oppN:
-> +  Operating performance point node per device. Devices using it should have its
-> +  phandle in their "operating-points-v2" property.
-> +
-> +  Required properties:
-> +  - compatible: allow OPPs to express their compatibility.
-> +  - opp-list: phandle to opp-list defined above.
-
-I don't understand what that compatible property is intended to mean and
-I expect other readers might be similarly confused - is it a standard
-compatbile property meaning this noe corresponds to some sort of device?
-
-There also appears to be no code matching these bindings...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150128/e6dd0d9e/attachment.sig>
+diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
+index 2fb0fdfc87df..0c411c0aae99 100644
+--- a/drivers/crypto/Kconfig
++++ b/drivers/crypto/Kconfig
+@@ -348,7 +348,6 @@ config CRYPTO_DEV_ATMEL_AES
+ 	select CRYPTO_AES
+ 	select CRYPTO_ALGAPI
+ 	select CRYPTO_BLKCIPHER
+-	select AT_HDMAC
+ 	help
+ 	  Some Atmel processors have AES hw accelerator.
+ 	  Select this if you want to use the Atmel module for
