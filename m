@@ -1,27 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Jan 2015 20:23:27 +0100
-Subject: [PATCH] Smack: fix netfilter Makefile entry
-In-Reply-To: <54C927E3.6000006@cogentembedded.com>
-References: <2504358.ZeqdfUXKpJ@wuerfel> <54C927E3.6000006@cogentembedded.com>
-Message-ID: <30287261.Lan5Co1lCn@wuerfel>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 28 Jan 2015 19:25:45 +0000
+Subject: [PATCH 5/7] spi: spi-fsl-dspi: Remove spi-bitbang
+In-Reply-To: <1422356244-15629-6-git-send-email-bhuvanchandra.dv@toradex.com>
+References: <1422356244-15629-1-git-send-email-bhuvanchandra.dv@toradex.com>
+ <1422356244-15629-6-git-send-email-bhuvanchandra.dv@toradex.com>
+Message-ID: <20150128192545.GA12296@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 28 January 2015 21:18:11 Sergei Shtylyov wrote:
-> > diff --git a/security/smack/Makefile b/security/smack/Makefile
-> > index 616cf93b368e..d4a376c84050 100644
-> > --- a/security/smack/Makefile
-> > +++ b/security/smack/Makefile
-> > @@ -5,4 +5,4 @@
-> >   obj-$(CONFIG_SECURITY_SMACK) := smack.o
-> >
-> >   smack-y := smack_lsm.o smack_access.o smackfs.o
-> > -smack-$(CONFIG_NETFILTER) += smack_netfilter.o
-> > +smack-$(SECURITY_SMACK_NETFILTER) += smack_netfilter.o
+On Tue, Jan 27, 2015 at 04:27:22PM +0530, Bhuvanchandra DV wrote:
+> From: Chao Fu <B44548@freescale.com>
 > 
->     CONFIG_ missing?
+> DSPI module need cs change information in
+> a spi transfer. According to cs change, DSPI
 
-Yes, you are right. Anyway, as another fix is already queued,
-it doesn't matter any more.
-
-	Arnd
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150128/322dbf34/attachment.sig>
