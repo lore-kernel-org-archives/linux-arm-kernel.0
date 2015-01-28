@@ -1,41 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Jan 2015 22:51:04 +0100
-Subject: [PATCH] usb: musb: add omap-control dependency
-In-Reply-To: <4595774.yLOm5IvvqR@wuerfel>
-References: <4595774.yLOm5IvvqR@wuerfel>
-Message-ID: <3080978.V631px3tUy@wuerfel>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 28 Jan 2015 22:57:14 +0100
+Subject: [PATCH v2] clk: sunxi: fix sun6i PLL1 .recalc_rate() result
+In-Reply-To: <20150128180141.22722.98983@quantum>
+References: <1422088959-23365-1-git-send-email-wens@csie.org>
+ <20150124152944.GE8470@lukather> <20150128014105.22722.46052@quantum>
+ <CAGb2v64GaYOXkMKcJa9EjxtCsjWJANOjmf2zbfP9Motn0+bMvw@mail.gmail.com>
+ <20150128180141.22722.98983@quantum>
+Message-ID: <CAGb2v66JHK9adf5gUKdiByke4OdtGN2KFKC1srx7q_4tARJU_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The omap musb front-end calls into the phy driver directly
-instead of using a generic phy interface, which causes a link
-error when the specific driver is not built-in:
+On Wed, Jan 28, 2015 at 7:01 PM, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting Chen-Yu Tsai (2015-01-27 22:19:22)
+>> On Wed, Jan 28, 2015 at 2:41 AM, Mike Turquette <mturquette@linaro.org> wrote:
+>> > Quoting Maxime Ripard (2015-01-24 07:29:44)
+>> >> Hi Mike,
+>> >>
+>> >> On Sat, Jan 24, 2015 at 04:42:39PM +0800, Chen-Yu Tsai wrote:
+>> >> > PLL1 on sun6i has its N factor start from 1 (N = register value + 1).
+>> >> > Make the factors clk driver aware of this so clk_factors_recalc_rate()
+>> >> > gives the correct result.
+>> >> >
+>> >> > Cc: <stable@vger.kernel.org> # 3.12 9a5e6c7eb5cc clk: sunxi: Support factor
+>> >> > Cc: <stable@vger.kernel.org> # 3.12
+>> >> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> >>
+>> >> Could you queue this for 3.19?
+>> >
+>> > This is fixed in 76820fc in clk-next, destined for 3.20.
+>> >
+>> > Also I'm confused by the stable tags above. Looks like 9a5e6c7eb5cc was
+>> > merged for 3.16, not 3.12.
+>>
+>> I think so. I wasn't quite sure what the version number was
+>> supposed to be, the first version it is applicable? or the
+>> first version the specific patch was merged.
+>
+> Chen-Yu,
+>
+> I think that struct clk_factors_config did not have the n_start member
+> before 9a5e6c7eb5cc, so this patch could not apply without 9a5e6c7eb5cc.
+> That's from memory though, and I might be mis-remembering.
 
-drivers/built-in.o: In function `omap2430_musb_disable':
-usb/musb/omap2430.c:480: undefined reference to `omap_control_usb_set_mode'
-drivers/built-in.o: In function `omap2430_musb_enable':
-usb/musb/omap2430.c:466: undefined reference to `omap_control_usb_set_mode'
-usb/musb/omap2430.c:447: undefined reference to `omap_control_usb_set_mode'
-drivers/built-in.o: In function `omap_musb_set_mailbox':
-usb/musb/omap2430.c:273: undefined reference to `omap_control_usb_set_mode'
-usb/musb/omap2430.c:304: undefined reference to `omap_control_usb_set_mode'
-drivers/built-in.o:(.debug_addr+0xbd9e0): more undefined references to `omap_control_usb_set_mode' follow
+AFAIK the stable-commit doc explains the format above as cherry-picking
+9a5e6c7eb5cc first, then applying this patch.
 
-This adds an explicit dependency.
+> The fix is not for a new regression, thus it is going into 3.20 and I am
+> remiss to rebase my tree to add a stable tag. Can you submit this to
+> stable yourself after 3.20-rc1? I think the proper thing to do is to
+> reference this patch and the commitlog to show that it was fixed
+> upstream.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: ca784be36cc725 ("usb: start using the control module driver")
+Sure. Also CC-ing Hans, as his name is on the patch for 3.20. :)
 
-diff --git a/drivers/usb/musb/Kconfig b/drivers/usb/musb/Kconfig
-index 26c835f1b726..14e1628483d9 100644
---- a/drivers/usb/musb/Kconfig
-+++ b/drivers/usb/musb/Kconfig
-@@ -79,7 +79,7 @@ config USB_MUSB_TUSB6010
- 
- config USB_MUSB_OMAP2PLUS
- 	tristate "OMAP2430 and onwards"
--	depends on ARCH_OMAP2PLUS && USB
-+	depends on ARCH_OMAP2PLUS && USB && OMAP_CONTROL_PHY
- 	select GENERIC_PHY
- 
- config USB_MUSB_AM35X
+ChenYu
+
+> Regards,
+> Mike
+>
+>>
+>> ChenYu
+>>
+>> >>
+>> >> Thanks,
+>> >> Maxime
+>> >>
+>> >> --
+>> >> Maxime Ripard, Free Electrons
+>> >> Embedded Linux, Kernel and Android engineering
+>> >> http://free-electrons.com
