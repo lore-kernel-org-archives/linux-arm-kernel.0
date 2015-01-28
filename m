@@ -1,72 +1,40 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 27 Jan 2015 17:19:02 -0800
-Subject: [PATCH 4/4] clk: dt: st: Introduce clock domain documentation
-In-Reply-To: <1422270840-3039-5-git-send-email-lee.jones@linaro.org>
-References: <1422270840-3039-1-git-send-email-lee.jones@linaro.org>
- <1422270840-3039-5-git-send-email-lee.jones@linaro.org>
-Message-ID: <20150128011902.22722.85007@quantum>
+From: fugang.duan@freescale.com (fugang.duan at freescale.com)
+Date: Wed, 28 Jan 2015 01:33:16 +0000
+Subject: [PATCH 0/3] iio: adc: vf610: respect ADC clocking limitations
+In-Reply-To: <1421769723-28677-1-git-send-email-stefan@agner.ch>
+References: <1421769723-28677-1-git-send-email-stefan@agner.ch>
+Message-ID: <BLUPR03MB37366EC9DAB3A4B0A16E72BF5330@BLUPR03MB373.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Lee Jones (2015-01-26 03:14:00)
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  .../devicetree/bindings/clock/st/st,clk-domain.txt | 34 ++++++++++++++++++++++
->  1 file changed, 34 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/st/st,clk-domain.txt
+From: Stefan Agner <stefan@agner.ch> Sent: Wednesday, January 21, 2015 12:02 AM
+> To: jic23 at kernel.org
+> Cc: shawn.guo at linaro.org; Duan Fugang-B38611; maitysanchayan at gmail.com;
+> linux-iio at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org; stefan at agner.ch
+> Subject: [PATCH 0/3] iio: adc: vf610: respect ADC clocking limitations
 > 
-> diff --git a/Documentation/devicetree/bindings/clock/st/st,clk-domain.txt b/Documentation/devicetree/bindings/clock/st/st,clk-domain.txt
-> new file mode 100644
-> index 0000000..7309937
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/st/st,clk-domain.txt
-> @@ -0,0 +1,34 @@
-> +STMicroelectronics Clock Domain
-> +
-> +ST hardware have a bunch of clocks which must not be turned off.
-> +If drivers a) fail to obtain a reference to any of these or b) give
-> +up a previously obtained reference during suspend, the common clk
-> +framework will attempt to turn them off and the hardware will
-> +subsequently die.  The only way to recover from this failure is to
-> +restart.
-> +
-> +To avoid either of these two scenarios from catastrophically
-> +disabling the running system we have implemented a clock domain
-> +where clocks are consumed and references are taken, thus preventing
-> +them from being shut down by the framework.
-> +
-> +We use the generic clock bindings found in:
-> +  Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +
-> +Required properties:
-> +- compatible : Must be "st,clk-domain"
-
-Seems like a useful feature for any clock provider, not just ST's. Have
-you thought about making this solution generic for DT-based clock
-providers?
-
-We could amend the common clock binding to include a special "always on"
-clock group that is automagically prepared and enabled when the clock
-provider/driver is registered, using a common function.
-
-Regards,
-Mike
-
-> +
-> +Example:
-> +
-> +clk-domain {
-> +       compatible = "st,clk-domain";
-> +       clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>,
-> +                <&clk_s_c0_flexgen CLK_COMPO_DVP>,
-> +                <&clk_s_c0_flexgen CLK_MMC_1>,
-> +                <&clk_s_c0_flexgen CLK_ICN_SBC>,
-> +                <&clk_s_c0_flexgen CLK_ICN_LMI>,
-> +                <&clk_s_c0_flexgen CLK_ICN_CPU>,
-> +                <&clk_s_c0_flexgen CLK_TX_ICN_DMU>,
-> +                <&clk_s_a0_flexgen CLK_IC_LMI0>,
-> +                <&clk_m_a9>;
-> +};
-> -- 
-> 1.9.1
+> Respect ADC clocking limitations which lead to bogous reading on 500MHz
+> clocked Vybrid SoC's. Additionally, also implement a sysfs-property to
+> configure the conversion mode available in this ADC peripherial.
 > 
+> Stefan Agner (3):
+>   iio: adc: vf610: use ADC clock within specification
+>   iio: adc: vf610: implement configurable conversion modes
+>   ARM: dts: add property for maximum ADC clock frequencies
+> 
+>  .../devicetree/bindings/iio/adc/vf610-adc.txt      |   9 ++
+>  arch/arm/boot/dts/vfxxx.dtsi                       |   4 +
+>  drivers/iio/adc/vf610_adc.c                        | 175
+> +++++++++++++++++----
+>  3 files changed, 156 insertions(+), 32 deletions(-)
+> 
+> --
+> 2.2.2
+
+The patch set are fine for me.
+
+Acked-by: Fugang Duan <B38611@freescale.com>
+
+Thanks. 
+Fugang
