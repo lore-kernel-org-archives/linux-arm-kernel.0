@@ -1,44 +1,49 @@
-From: tsahee@annapurnalabs.com (Tsahee Zidenberg)
-Date: Wed, 28 Jan 2015 20:16:42 +0200
-Subject: [PATCH 0/4] Introducing the Alpine platform.
-In-Reply-To: <2167083.J5A154DcBG@wuerfel>
-References: <54c53598.oxirKWtRGTrf8i3s%tsahee@annapurnalabs.com>
- <2167083.J5A154DcBG@wuerfel>
-Message-ID: <CABM=7kkvDenWmDOJRsO23QfErV1YZgb-bSr6yR9OaNfNhbKmjQ@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 28 Jan 2015 21:18:11 +0300
+Subject: [PATCH] Smack: fix netfilter Makefile entry
+In-Reply-To: <2504358.ZeqdfUXKpJ@wuerfel>
+References: <2504358.ZeqdfUXKpJ@wuerfel>
+Message-ID: <54C927E3.6000006@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 January 2015 at 13:17, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Sunday 25 January 2015 20:27:36 Tsahee Zidenberg wrote:
->> Annapurna Labs(TM) is a technology company providing innovative solutions
->> including chips, software, and systems for the datacenter and enterprise
->> infrastructure.
->>
->> Alpine(TM) is one of Annapurna Labs? chip products targeting storage and
->> networking applications. It is a complete Platform-On-Chip,
->> integrating 2-4 cortex-A15 cores and multiple innovations to provide
->> a seamless networking and storage fabric for enterprise and datacenter
->> equipment.
->
-> Looks very nice overall!
->
-> I've replied with some specific comments, but if you address them
-> quickly, this might still make it into 3.20.
->
-Thank you! We are very excited about sending these patches. An update
-patchset will be sent soon.
+Hello.
 
-> Do you have a public git tree with the other device drivers and
-> bindings you will need on top of this?
+On 01/28/2015 07:12 PM, Arnd Bergmann wrote:
+
+> The newly added Smack support for netfilter secmark has its own
+> Kconfig symbol, but the actual implementation is conditionally
+> built on another symbol.
+
+> It is possible for CONFIG_NETFILTER and SECURITY_SMACK to both
+> be enabled, but NETWORK_SECMARK to be disabled, in which case
+> we get a build error:
+
+> ../security/smack/smack_netfilter.c: In function 'smack_ipv6_output':
+> ../security/smack/smack_netfilter.c:36:6: error: 'struct sk_buff' has no member named 'secmark'
+>     skb->secmark = skp->smk_secid;
+>        ^
+> ../security/smack/smack_netfilter.c: In function 'smack_ipv4_output':
+> ../security/smack/smack_netfilter.c:55:6: error: 'struct sk_buff' has no member named 'secmark'
+>     skb->secmark = skp->smk_secid;
+>        ^
 >
->         Arnd
+> This changes the Makefile to use the correct Kconfig symbol.
 
-No public git tree yet.
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 69f287ae6fc83 ("Smack: secmark support for netfilter")
 
-A complete kernel supporting alpine platform is available in
-accordance with GPL for a few products.
-E.g. this from synology:
-http://sourceforge.net/projects/dsgpl/files/Synology%20NAS%20GPL%20Source/5004branch/synogpl-5004-alpine.tbz/download
+> diff --git a/security/smack/Makefile b/security/smack/Makefile
+> index 616cf93b368e..d4a376c84050 100644
+> --- a/security/smack/Makefile
+> +++ b/security/smack/Makefile
+> @@ -5,4 +5,4 @@
+>   obj-$(CONFIG_SECURITY_SMACK) := smack.o
+>
+>   smack-y := smack_lsm.o smack_access.o smackfs.o
+> -smack-$(CONFIG_NETFILTER) += smack_netfilter.o
+> +smack-$(SECURITY_SMACK_NETFILTER) += smack_netfilter.o
 
-Thank you!
-Tsahee.
+    CONFIG_ missing?
+
+WBR, Sergei
