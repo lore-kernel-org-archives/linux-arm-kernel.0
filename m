@@ -1,42 +1,52 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 28 Jan 2015 16:25:04 +0000 (UTC)
-Subject: arm64: USB_ARCH_HAS_EHCI
-In-Reply-To: <1422438405.5666.16.camel@x220>
-References: <1422351833.14015.20.camel@x220>
- <alpine.DEB.2.02.1501272130470.19947@utopia.booyaka.com>
- <1422438405.5666.16.camel@x220>
-Message-ID: <alpine.DEB.2.02.1501281621330.19947@utopia.booyaka.com>
+From: casey@schaufler-ca.com (Casey Schaufler)
+Date: Wed, 28 Jan 2015 08:27:20 -0800
+Subject: [PATCH] Smack: fix netfilter Makefile entry
+In-Reply-To: <2504358.ZeqdfUXKpJ@wuerfel>
+References: <2504358.ZeqdfUXKpJ@wuerfel>
+Message-ID: <54C90DE8.1030600@schaufler-ca.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 28 Jan 2015, Paul Bolle wrote:
+On 1/28/2015 8:12 AM, Arnd Bergmann wrote:
+> The newly added Smack support for netfilter secmark has its own
+> Kconfig symbol, but the actual implementation is conditionally
+> built on another symbol.
 
-> On Tue, 2015-01-27 at 21:31 +0000, Paul Walmsley wrote:
-> > On Tue, 27 Jan 2015, Paul Bolle wrote:
-> > 
-> > > Your commit d035fdfa27ac ("arm64: Add Tegra132 support") is included in
-> > > today's linux-next (ie, next-20150127). I noticed because a script I use
-> > > to check linux-next spotted a minor problem with it.
-> > > 
-> > > It adds a select for the Kconfig symbol USB_ARCH_HAS_EHCI. That Kconfig
-> > > was obsoleted in v3.11 and removed in v3.15. See commit b797b76fb464
-> > > ("usb: host: remove USB_ARCH_HAS_?HCI"). That select is now a nop.
-> > > 
-> > > Should I submit the trivial patch to remove that line or do you prefer
-> > > to do that yourself?
-> > 
-> > Thanks, I'll post a new version.
-> 
-> I just noticed that your commit added another unneeded select. The entry
-> for ARCH_TEGRA selects HAVE_SMP, but HAVE_SMP is only available on arm
-> or xtensa. There's no point in selecting it in arm64.
+A patch for this problem, 82b0b2c2b1e64ad6c5309a9eeba806af9812666b
+is already available in:
 
-OK thanks, will roll that in.  Looks like Thierry's already sent a pull 
-request for the original patch, so I'll probably just send a follow-up.
+	git://git.gitorious.org/smack-next/kernel.git smack-for-3.20-rebased
 
-Is the Kconfig checker script you mentioned on Tuesday available in the 
-mainline tree?  I don't see anything obvious under the "Static Analysers" 
-section of the Makefile, but perhaps I'm overlooking it.
+A pull request has sent to James Morris for inclusion in the security tree.
 
-
-- Paul
+>
+> It is possible for CONFIG_NETFILTER and SECURITY_SMACK to both
+> be enabled, but NETWORK_SECMARK to be disabled, in which case
+> we get a build error:
+>
+> ../security/smack/smack_netfilter.c: In function 'smack_ipv6_output':
+> ../security/smack/smack_netfilter.c:36:6: error: 'struct sk_buff' has no member named 'secmark'
+>    skb->secmark = skp->smk_secid;
+>       ^
+> ../security/smack/smack_netfilter.c: In function 'smack_ipv4_output':
+> ../security/smack/smack_netfilter.c:55:6: error: 'struct sk_buff' has no member named 'secmark'
+>    skb->secmark = skp->smk_secid;
+>       ^
+>
+> This changes the Makefile to use the correct Kconfig symbol.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 69f287ae6fc83 ("Smack: secmark support for netfilter")
+>
+> diff --git a/security/smack/Makefile b/security/smack/Makefile
+> index 616cf93b368e..d4a376c84050 100644
+> --- a/security/smack/Makefile
+> +++ b/security/smack/Makefile
+> @@ -5,4 +5,4 @@
+>  obj-$(CONFIG_SECURITY_SMACK) := smack.o
+>  
+>  smack-y := smack_lsm.o smack_access.o smackfs.o
+> -smack-$(CONFIG_NETFILTER) += smack_netfilter.o
+> +smack-$(SECURITY_SMACK_NETFILTER) += smack_netfilter.o
+>
+>
