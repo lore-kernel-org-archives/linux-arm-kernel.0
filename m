@@ -1,40 +1,50 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Jan 2015 20:48:15 +0100
-Subject: [PATCH 08/15] ARM: add missing arch_irqs_disabled function
+Date: Wed, 28 Jan 2015 20:48:14 +0100
+Subject: [PATCH 07/15] ARM: disable some options on ARMv7-M
 In-Reply-To: <1422474502-3097078-1-git-send-email-arnd@arndb.de>
 References: <1422474502-3097078-1-git-send-email-arnd@arndb.de>
-Message-ID: <1422474502-3097078-9-git-send-email-arnd@arndb.de>
+Message-ID: <1422474502-3097078-8-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When building with CONFIG_DEBUG_LOCK_ALLOC and CONFIG_PREEMPT_COUNT,
-the generic rcu_read_lock_sched_held function requires a definition
-of arch_irqs_disabled. All other architectures provide this, so
-this patch adds the trivial wrapper around arch_irqs_disabled_flags()
-that a lot of the others use as well.
-
-include/linux/rcupdate.h: In function 'rcu_read_lock_sched_held':
-include/linux/rcupdate.h:516:2: error: implicit declaration of function 'arch_irqs_disabled'
+Kprobes, irqflags tracing and kexec don't currently build on
+kernels targetting ARMv7-M, so for now, we should just disallow
+those combinations.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/include/asm/irqflags.h | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/Kconfig | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/include/asm/irqflags.h b/arch/arm/include/asm/irqflags.h
-index 3b763d6652a0..202dfeecd07a 100644
---- a/arch/arm/include/asm/irqflags.h
-+++ b/arch/arm/include/asm/irqflags.h
-@@ -161,5 +161,10 @@ static inline int arch_irqs_disabled_flags(unsigned long flags)
- 	return flags & IRQMASK_I_BIT;
- }
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index b9b68b467584..11cc5fa40ff7 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -55,7 +55,7 @@ config ARM
+ 	select HAVE_KERNEL_LZMA
+ 	select HAVE_KERNEL_LZO
+ 	select HAVE_KERNEL_XZ
+-	select HAVE_KPROBES if !XIP_KERNEL && !CPU_ENDIAN_BE32 && !CPU_32v3
++	select HAVE_KPROBES if !XIP_KERNEL && !CPU_ENDIAN_BE32 && !CPU_32v3 && !CPU_V7M
+ 	select HAVE_KRETPROBES if (HAVE_KPROBES)
+ 	select HAVE_MEMBLOCK
+ 	select HAVE_MOD_ARCH_SPECIFIC if ARM_UNWIND
+@@ -169,7 +169,7 @@ config LOCKDEP_SUPPORT
  
-+static inline int arch_irqs_disabled(void)
-+{
-+	return arch_irqs_disabled_flags(arch_local_save_flags());
-+}
-+
- #endif /* ifdef __KERNEL__ */
- #endif /* ifndef __ASM_ARM_IRQFLAGS_H */
+ config TRACE_IRQFLAGS_SUPPORT
+ 	bool
+-	default y
++	default !CPU_V7M
+ 
+ config RWSEM_XCHGADD_ALGORITHM
+ 	bool
+@@ -1990,6 +1990,7 @@ config XIP_PHYS_ADDR
+ config KEXEC
+ 	bool "Kexec system call (EXPERIMENTAL)"
+ 	depends on (!SMP || PM_SLEEP_SMP)
++	depends on !CPU_V7M
+ 	help
+ 	  kexec is a system call that implements the ability to shutdown your
+ 	  current kernel, and to start another kernel.  It is like a reboot
 -- 
 2.1.0.rc2
