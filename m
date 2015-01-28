@@ -1,58 +1,95 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 28 Jan 2015 09:38:32 -0600
-Subject: [PATCH] ARM: cns3xxx: fix typo in PCI config accessor
-In-Reply-To: <CAL_Jsq+-Tn=nCAVAE8sqPD1_aHBSv4jTdAZxWS4B3cOYaGgdow@mail.gmail.com>
-References: <2000255.rnmr9HfSOg@wuerfel> <20150128151712.GA12050@google.com>
- <CAL_Jsq+-Tn=nCAVAE8sqPD1_aHBSv4jTdAZxWS4B3cOYaGgdow@mail.gmail.com>
-Message-ID: <CAErSpo6ATgUqwjvWjyodV33_6Zi8S6S4Mbgxxv_BMGiOA=Ta8w@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 28 Jan 2015 16:38:55 +0100
+Subject: [PATCH v4 3/5] drivers: bus: Add Simple Power-Managed Bus DT
+ Bindings
+In-Reply-To: <20150127181727.GO17721@leverpostej>
+References: <1422288977-20353-1-git-send-email-geert+renesas@glider.be>
+ <1422288977-20353-4-git-send-email-geert+renesas@glider.be>
+ <20150127181727.GO17721@leverpostej>
+Message-ID: <CAMuHMdXUQESzCggb6FsDQStVtCHgTCCKo7veXSdUTZcB9OAd_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Fengguang]
+Hi Mark,
 
-On Wed, Jan 28, 2015 at 9:34 AM, Rob Herring <robh@kernel.org> wrote:
-> On Wed, Jan 28, 2015 at 9:17 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
->> On Wed, Jan 28, 2015 at 02:53:07PM +0100, Arnd Bergmann wrote:
->>> The recent patch to convert the cns3xxx PCI code added an
->>> extraneous opening bracket, which makes the build fail,
->>> so remove this.
->>>
->>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->>> Fixes: 10e2c5540d48 ("ARM: cns3xxx: Convert PCI to use generic config accessors")
->>> ---
->>>
->>> Hi Bjorn,
->>>
->>> The broken patch just showed up in linux-next. Please apply this one on top,
->>> or fold it into the original patch if you don't mind rebasing.
->>
->> I folded it in, thanks!  I guess Fengguang's autobuilder must not build
->> this config, because I got a success report from it.
+On Tue, Jan 27, 2015 at 7:17 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/bus/simple-pm-bus.txt
+>> @@ -0,0 +1,41 @@
+>> +Simple Power-Managed Bus
+>> +========================
+>> +
+>> +A Simple Power-Managed Bus is a transparent bus that doesn't need a real
+>> +driver, as it's typically initialized by the boot loader.
+>> +
+>> +However, its bus controller is part of a PM domain, or under the control of a
+>> +functional clock.  Hence, the bus controller's PM domain and/or clock must be
+>> +enabled for child devices connected to the bus (either on-SoC or externally)
+>> +to function.
+>> +
+>> +The bindings for the Simple Power-Managed Bus extend the bindings for
+>> +"simple-bus", as specified in ePAPR.
 >
-> Sorry about this. I had fixed this in my tree, but forgot to send out
-> the update. I've double checked and this was the only fix I had.
+> I would note that "simple-pm-bus" follows the "simple-bus" set of
+> properties, but is not an extension of "simple-bus".
+
+OK.
+
+> For the reasons I mentioned previously, I don't think that any
+> "simple-pm-bus" should be "simple-bus" compatible (and I believe we
+> should document that requirement below).
+
+>> +Required properties:
+>> +  - compatible: Must contain at least "simple-pm-bus".
+
+So you think I should add 'and must not contain "simple-bus"'?
+
+>> +             It's recommended to let this be preceded by one or more
+>> +             vendor-specific compatible values.
+>> +  - #address-cells, #size-cells, ranges: Must describe the mapping between
+>> +             parent address and child address spaces.
+>> +
+>> +Optional platform-specific properties for clock or PM domain control (at least
+>> +one of them is required):
+>> +  - clocks: Must contain a reference to the functional clock(s),
 >
-> How do you get success reports? I only ever get failures.
+> I'm a little worried about the clocks. What are the expectations on
+> their configuration?
 
-I think Fengguang has it set up so success reports only go to the
-owner of the tree, while failure reports go to the owner + people
-related to the patch, e.g., maybe people in the signed-off-by list?  I
-don't know whether that's configurable, or whether you'd even want to
-see all the success reports from my tree :)
+The clocks are highly platform-dependent. Hence the exact expectations
+belong in the binding documentation for the clock provider (and possibly
+the PM domain provider, too).
 
-Bjorn
+> I don't see how we can generally rely on the clock configuration being
+> correct unless the input clocks only have on/off controls, and the OS
+> doesn't see any of the parent clock tree it could potentially change the
+> configuration of (beyond on/off).
 
->>> diff --git a/arch/arm/mach-cns3xxx/pcie.c b/arch/arm/mach-cns3xxx/pcie.c
->>> index e41fc339d100..c622c306c390 100644
->>> --- a/arch/arm/mach-cns3xxx/pcie.c
->>> +++ b/arch/arm/mach-cns3xxx/pcie.c
->>> @@ -101,7 +101,7 @@ static int cns3xxx_pci_read_config(struct pci_bus *bus, unsigned int devfn,
->>>                * for a PCIe bridge. So we must fixup the class code
->>>                * to 0x604 here.
->>>                */
->>> -             *val = (((((*val << shift) & 0xff) | (0x604 << 16)) >> shift) & mask;
->>> +             *val = ((((*val << shift) & 0xff) | (0x604 << 16)) >> shift) & mask;
->>>
->>>       return ret;
->>>  }
->>>
+This is indeed not about generic programmable clock generators, but about
+clocks that are used solely to start/stop a hardware module by (un)gating
+a functional clock.
+
+> Otherwise we're relying on implicit behaviour elsewhere in Linux (which
+> _will_ break over time), and this ends up not being usable by anything
+> else.
+>
+> I'm coming to the opinion that while we might be able to have common
+> driver in Linux, we can't have a common "simple-pm-bus" binding because
+> it implicitly assumes too much about the OS behaviour.
+
+If the bus controller is clocked from a generic programmable clock generator,
+it would need its own driver to configure e.g. the clock frequency, which
+could need more information from DT. This is not covered by "simple-pm-bus".
+
+Thanks for your comments!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
