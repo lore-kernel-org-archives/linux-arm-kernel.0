@@ -1,48 +1,63 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 28 Jan 2015 09:00:49 -0800
-Subject: [PATCH] clk: ti: Fix FAPLL parent enable bit handling
-Message-ID: <20150128170048.GO28663@atomide.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Wed, 28 Jan 2015 12:06:09 -0500
+Subject: [PATCH 2/3] tty/serial: of_serial: add support for PXA/MMP uarts
+In-Reply-To: <CAL_JsqLvg9CA32oWVzxA5TxtPJxAJFf9K4N+RHJeefemr_88ug@mail.gmail.com>
+References: <1422334209-23125-1-git-send-email-robh@kernel.org>
+ <1422334209-23125-2-git-send-email-robh@kernel.org>
+ <54C78823.7050504@hurleysoftware.com>
+ <CAL_Jsq+8jDN+fYyed5RYd2e1K+H_R1NkjT38WXSpKfxTLgsDbQ@mail.gmail.com>
+ <54C7AA2D.7080202@hurleysoftware.com>
+ <CAL_Jsq+wxY0=S1ff-Fk0xDBxHdhBvNopLpjfCETVoo_mou658w@mail.gmail.com>
+ <54C7EA6A.4010805@hurleysoftware.com>
+ <CAL_JsqLvg9CA32oWVzxA5TxtPJxAJFf9K4N+RHJeefemr_88ug@mail.gmail.com>
+Message-ID: <54C91701.2090006@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 163152cbbe32 ("clk: ti: Add support for FAPLL on dm816x")
-added basic support for the FAPLL on dm818x, but has a bug for the
-parent PLL enable bit. The FAPLL_MAIN_PLLEN is defined as BIT(3)
-but the code is doing a shift on it.
+On 01/28/2015 09:21 AM, Rob Herring wrote:
+> On Tue, Jan 27, 2015 at 1:43 PM, Peter Hurley <peter@hurleysoftware.com> wrote:
+>> On 01/27/2015 11:44 AM, Rob Herring wrote:
+>>> On Tue, Jan 27, 2015 at 9:09 AM, Peter Hurley <peter@hurleysoftware.com> wrote:
+>>>> On 01/27/2015 09:30 AM, Rob Herring wrote:
+>>>>> On Tue, Jan 27, 2015 at 6:44 AM, Peter Hurley <peter@hurleysoftware.com> wrote:
+>>>>>> On 01/26/2015 11:50 PM, Rob Herring wrote:
 
-This means the parent PLL won't get disabled even if all it's child
-synthesizers are disabled.
+[...]
 
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-Cc: Brian Hutchinson <b.hutchman@gmail.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+>> OTOH, I didn't realize that patch removed the PXA driver. That driver has
+>> errata workarounds which didn't get integrated into the 8250 core; it seems
+>> a shame to toss that away.
+> 
+> There was some discussion on errata in the prior versions. One of them
+> was deemed not needed. Another one is needed, but that's on certain
+> PXA2xx. So we'll need to pickup that work-around at some point, but it
+> is not yet needed here because PXA2xx is not enabled for DT.
 
---- a/drivers/clk/ti/fapll.c
-+++ b/drivers/clk/ti/fapll.c
-@@ -84,7 +84,7 @@ static int ti_fapll_enable(struct clk_hw *hw)
- 	struct fapll_data *fd = to_fapll(hw);
- 	u32 v = readl_relaxed(fd->base);
- 
--	v |= (1 << FAPLL_MAIN_PLLEN);
-+	v |= FAPLL_MAIN_PLLEN;
- 	writel_relaxed(v, fd->base);
- 
- 	return 0;
-@@ -95,7 +95,7 @@ static void ti_fapll_disable(struct clk_hw *hw)
- 	struct fapll_data *fd = to_fapll(hw);
- 	u32 v = readl_relaxed(fd->base);
- 
--	v &= ~(1 << FAPLL_MAIN_PLLEN);
-+	v &= ~FAPLL_MAIN_PLLEN;
- 	writel_relaxed(v, fd->base);
- }
- 
-@@ -104,7 +104,7 @@ static int ti_fapll_is_enabled(struct clk_hw *hw)
- 	struct fapll_data *fd = to_fapll(hw);
- 	u32 v = readl_relaxed(fd->base);
- 
--	return v & (1 << FAPLL_MAIN_PLLEN);
-+	return v & FAPLL_MAIN_PLLEN;
- }
- 
- static unsigned long ti_fapll_recalc_rate(struct clk_hw *hw,
+Do you know offhand which errata? If not, nbd; I can do a little digging.
+
+
+>> [ Sidebar: I did a trial split of 8250_core into a separate 8250 base module
+>>   and an 8250 universal driver. I keep having to rework the split but it's
+>>   pretty close now; the 8250 base module might be just the thing for simplifying
+>>   the pxa driver and getting console/earlycon/dma for free.
+>>
+>>   Let me see what I can do about getting that done.
+>> ]
+> 
+> Yes, it would be nice to split the legacy ISA parts from the proper
+> platform driver. There's way too many kconfig options for the 8250 as
+> well IMO.
+
+After I finish the split, I can look at making most/all of those options
+dependent on the universal 8250 driver only.
+
+> BTW, It appears that the main motivator for a separate driver was to
+> add DMA support and that's what the out of tree driver adds. But now,
+> we would never add the PXA DMA API support and the 8250 driver has
+> learned DMA support.
+
+Yeah, PXA should not have been forked. But I say that with the benefit
+of hindsight.
+
+Regards,
+Peter Hurley
