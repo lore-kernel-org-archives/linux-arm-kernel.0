@@ -1,41 +1,57 @@
-From: riku.voipio@linaro.org (Riku Voipio)
-Date: Wed, 28 Jan 2015 12:52:21 +0200
-Subject: arm32 binaries work with CONFIG_COMPAT as root but not as user?
-Message-ID: <CAAqcGHnS7P7=xzXoOPE61dcbbq_1kvmeB-V1GcDUxB1ND0-kZA@mail.gmail.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Wed, 28 Jan 2015 11:51:06 +0100
+Subject: [PATCH v3 08/10] ARM: tegra: Use pwrseq-simple for the wifi in Nyan
+In-Reply-To: <1422442278-10405-1-git-send-email-tomeu.vizoso@collabora.com>
+References: <1422442278-10405-1-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1422442278-10405-9-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The Nyan boards have a Marvell 88w8897 wifi card connected through SDIO
+that needs the reset line to be asserted before mmc power up and deasserted
+afterwards.
 
-Perhaps I'm missing here something, but seems I can only run 32bit arm
-programs on arm64 system if I am root. So far even the simplest hello
-world will be killed/segfaulted on startup. This is on mustang hw.
+This patch also adds references to the power supplies of the card so that
+the regulators are enabled when it's probed.
 
-taking on 3.19-rc3 with arch=arm64 and make defconfig:
+Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+---
+ arch/arm/boot/dts/tegra124-nyan.dtsi | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
-wget http://kos.to/hello-test/hello
-# file hello
-hello: ELF 32-bit LSB executable, ARM, EABI5 version 1 (SYSV),
-statically linked, for GNU/Linux 2.6.32,
-BuildID[sha1]=c37a3b366d645eee600963a535370fa0bad9b2c0, not stripped
-# ./hello
-hello world
-# su - linaro
-$ /root/hello
-Segmentation fault
-$ gdb /root/hello
-(gdb) run
-Starting program: /root/hello
-During startup program terminated with signal SIGSEGV, Segmentation fault.
-
-If you have a debian/ubuntu system, you can also reproduce it with multiarch:
-
-dpkg --add-architecture armhf
-apt-get update
-apt-get install hello:armhf
-# hello
-Hello, world!
-# su - ubuntu
-$ hello
-Segmentation fault
-$
+diff --git a/arch/arm/boot/dts/tegra124-nyan.dtsi b/arch/arm/boot/dts/tegra124-nyan.dtsi
+index 26e7402..632d181 100644
+--- a/arch/arm/boot/dts/tegra124-nyan.dtsi
++++ b/arch/arm/boot/dts/tegra124-nyan.dtsi
+@@ -207,7 +207,6 @@
+ 					regulator-name = "+1.8V_VDDIO";
+ 					regulator-min-microvolt = <1800000>;
+ 					regulator-max-microvolt = <1800000>;
+-					regulator-boot-on;
+ 					regulator-always-on;
+ 				};
+ 
+@@ -364,12 +363,20 @@
+ 		status = "okay";
+ 	};
+ 
++	sdhci0_pwrseq: sdhci0_pwrseq {
++		compatible = "mmc-pwrseq-simple";
++
++		reset-gpios = <&gpio TEGRA_GPIO(X, 7) GPIO_ACTIVE_LOW>;
++	};
++
+ 	sdhci at 0,700b0000 { /* WiFi/BT on this bus */
+ 		status = "okay";
+-		power-gpios = <&gpio TEGRA_GPIO(X, 7) GPIO_ACTIVE_HIGH>;
+ 		bus-width = <4>;
+ 		no-1-8-v;
+ 		non-removable;
++		mmc-pwrseq = <&sdhci0_pwrseq>;
++		vmmc-supply = <&vdd_3v3_lp0>;
++		vqmmc-supply = <&vddio_1v8>;
+ 	};
+ 
+ 	sdhci at 0,700b0400 { /* SD Card on this bus */
+-- 
+1.9.3
