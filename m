@@ -1,37 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Jan 2015 20:48:22 +0100
-Subject: [PATCH 15/15] ARM: don't discard exit sections for spinlock debugging
-In-Reply-To: <1422474502-3097078-1-git-send-email-arnd@arndb.de>
-References: <1422474502-3097078-1-git-send-email-arnd@arndb.de>
-Message-ID: <1422474502-3097078-16-git-send-email-arnd@arndb.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 28 Jan 2015 19:52:04 +0000
+Subject: [PATCH 2/9] regulator: core: Introduce set_optimum_mode op
+In-Reply-To: <1422413199-17273-3-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1422413199-17273-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1422413199-17273-3-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <20150128195204.GN21293@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This avoids lots of warnings like this one:
+On Tue, Jan 27, 2015 at 06:46:32PM -0800, Bjorn Andersson wrote:
 
-`.exit.text' referenced in section `.alt.smp.init' of drivers/built-in.o: defined in discarded section `.exit.text' of drivers/built-in.o
+> +	/* set most efficient regulator operating mode for load */
+> +	int (*set_optimum_mode)(struct regulator_dev *, int input_uV,
+> +				int output_uV, int load_uA);
 
-for each spinlock that is used in an __exit function, because
-the smp alternatives try to patch out the spinlock locations.
+This is basically fine but can you please rename this to be something
+that more directly reflects the fact that we're just informing the
+driver about the operating parameters - there are other things a driver
+could usefully do with this, for example set current limits so that if
+something starts to consume excessive current the device will flag this
+as an error.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/kernel/vmlinux.lds.S | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index fb98c79179e9..f4de6e16d951 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -40,8 +40,7 @@
- #define ARM_CPU_KEEP(x)
- #endif
- 
--#if (defined(CONFIG_SMP_ON_UP) && !defined(CONFIG_DEBUG_SPINLOCK)) || \
--	defined(CONFIG_GENERIC_BUG)
-+#if defined(CONFIG_SMP_ON_UP) || defined(CONFIG_GENERIC_BUG)
- #define ARM_EXIT_KEEP(x)	x
- #define ARM_EXIT_DISCARD(x)
- #else
--- 
-2.1.0.rc2
+It'd also be better to split the voltage specs out into a separate
+function, especially for the output voltage where obviously we have a
+separate range based interface for setting that.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150128/534b8c8f/attachment.sig>
