@@ -1,87 +1,41 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Wed, 28 Jan 2015 10:22:37 +0800
-Subject: [PATCH v2 1/3] pm: at91: pm_suspend: add the WFI support for ARMv7
+Date: Wed, 28 Jan 2015 10:23:22 +0800
+Subject: [PATCH v2 2/3] pm: at91: pm_suspend: MOR register KEY was missing
 In-Reply-To: <1422411707-10945-1-git-send-email-wenyou.yang@atmel.com>
 References: <1422411707-10945-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1422411757-13066-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1422411802-13207-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the WFI support to put the cpu to the sleep state.
+From: Patrice Vilchez <patrice.vilchez@atmel.com>
 
-In the meanwhile, disable the processor's clock.
+Because writing the MOR register requires the PASSWD(0x37),
+if missed, the write operation will be aborted.
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+Signed-off-by: Patrice Vilchez <patrice.vilchez@atmel.com>
 ---
- arch/arm/mach-at91/pm_suspend.S |   49 ++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 48 insertions(+), 1 deletion(-)
+ arch/arm/mach-at91/pm_suspend.S |    2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/arch/arm/mach-at91/pm_suspend.S b/arch/arm/mach-at91/pm_suspend.S
-index 122a3f1..aed6903 100644
+index aed6903..311cc23 100644
 --- a/arch/arm/mach-at91/pm_suspend.S
 +++ b/arch/arm/mach-at91/pm_suspend.S
-@@ -53,6 +53,53 @@ mode	.req	r6
- 	beq	1b
- 	.endm
- 
-+/*
-+ * Put the processor to enter the WFI state
-+ */
-+	.macro _do_wfi
-+
-+#if defined(CONFIG_CPU_V7)
-+	/*
-+	 * Execute an ISB instruction to flush the pipeline to ensure
-+	 * that all of operations have beem completed.
-+	 */
-+	isb
-+
-+	dsb
-+	dmb
-+
-+	/* Disable the processor's clock */
-+	mov	tmp1, #AT91_PMC_PCK
-+	str	tmp1, [pmc, #AT91_PMC_SCDR]
-+
-+	wfi
-+
-+	/*
-+	 * CPU can speculatively prefetch the instructions
-+	 * so add NOPs after WFI. Sixteen NOPs as Cortex-A5 pipeline.
-+	 */
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+#else
-+	mcr	p15, 0, tmp1, c7, c0, 4
-+#endif
-+
-+	.endm
-+
- 	.text
- 
- /*
-@@ -181,7 +228,7 @@ sdr_sr_done:
+@@ -224,6 +224,7 @@ sdr_sr_done:
+ 	/* Turn off the main oscillator */
+ 	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
+ 	bic	tmp1, tmp1, #AT91_PMC_MOSCEN
++	orr	tmp1, tmp1, #AT91_PMC_KEY
+ 	str	tmp1, [pmc, #AT91_CKGR_MOR]
  
  skip_disable_main_clock:
- 	/* Wait for interrupt */
--	mcr	p15, 0, tmp1, c7, c0, 4
-+	_do_wfi
+@@ -236,6 +237,7 @@ skip_disable_main_clock:
+ 	/* Turn on the main oscillator */
+ 	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
+ 	orr	tmp1, tmp1, #AT91_PMC_MOSCEN
++	orr	tmp1, tmp1, #AT91_PMC_KEY
+ 	str	tmp1, [pmc, #AT91_CKGR_MOR]
  
- 	tst	mode, #AT91_PM_SLOW_CLOCK
- 	beq	skip_enable_main_clock
+ 	wait_moscrdy
 -- 
 1.7.9.5
