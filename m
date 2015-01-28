@@ -1,50 +1,64 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 27 Jan 2015 17:51:31 -0800
-Subject: [PATCH V2] clk: mxs: Fix invalid 32-bit access to frac registers
-In-Reply-To: <201501220039.02073.marex@denx.de>
-References: <1419762402-4548-1-git-send-email-stefan.wahren@i2se.com>
- <CAHrpEqQ-eoqM3W1hYcS6EPTmur1FSfm8TeEjYrtZ+PquavL86w@mail.gmail.com>
- <201501220039.02073.marex@denx.de>
-Message-ID: <20150128015131.22722.22882@quantum>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Wed, 28 Jan 2015 09:48:59 +0800
+Subject: [PATCH v4 13/13] pm: at91: amend the pm_suspend entry for
+ at91_cpuidle_device
+In-Reply-To: <1422409172-24178-1-git-send-email-wenyou.yang@atmel.com>
+References: <1422409172-24178-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1422409739-24707-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Marek Vasut (2015-01-21 15:39:01)
-> On Wednesday, January 21, 2015 at 05:16:03 PM, Zhi Li wrote:
-> > On Sun, Dec 28, 2014 at 4:26 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> > > According to i.MX23 and i.MX28 reference manual the fractional
-> > > clock control registers must be addressed by byte instructions.
-> > 
-> > I don't think mx23 and mx28 have such limitation. I will double check
-> > with IC team about this.
-> > RTL is generated from a xml file. All registers implement is unified.
-> > I don't think only clock control register have such limitation and
-> > other registers not.
-> 
-> Hi,
-> 
-> Section 10.8.24 in the MX28 datasheet (Fractional Clock Control Register 0) 
-> states otherwise, but maybe the documentation is simply not matching the
-> silicon.
-> 
-> Here's a quote:
-> "
-> This register controls the 9-phase fractional clock dividers. The fractional 
-> clock frequencies are a product of the values in these registers. NOTE: This 
-> register can only be addressed by byte instructions. Addressing word or half-
-> word are not allowed.
-> "
-> 
-> I also recall seeing weird behavior when these registers were accessed by word
-> access in U-Boot, so I believe the datasheet is correct.
+Because the at91_xxx_standby() function is substitued by the at91_pm_suspend(),
+the pm_suspend entry for at91_cpuidle_device changes as well.
 
-Hi Frank,
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/mach-at91/pm.c |   17 ++++++++++-------
+ 1 file changed, 10 insertions(+), 7 deletions(-)
 
-Are you satisfied with this patch?
-
-Regards,
-Mike
-
-> 
-> Best regards,
-> Marek Vasut
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index 144521d..c547038 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -40,8 +40,6 @@ static struct {
+ 	int memctrl;
+ } at91_pm_data;
+ 
+-static void (*at91_pm_standby)(void);
+-
+ static int at91_pm_valid_state(suspend_state_t state)
+ {
+ 	switch (state) {
+@@ -214,12 +212,15 @@ static struct platform_device at91_cpuidle_device = {
+ 	.name = "cpuidle-at91",
+ };
+ 
+-void at91_pm_set_standby(void (*at91_standby)(void))
++static void at91_cpuidle_suspend(void)
+ {
+-	if (at91_standby) {
+-		at91_cpuidle_device.dev.platform_data = at91_standby;
+-		at91_pm_standby = at91_standby;
+-	}
++	at91_pm_suspend(PM_SUSPEND_STANDBY);
++}
++
++static void at91_cpuidle_set_suspend(void (*at91_suspend)(void))
++{
++	if (at91_suspend)
++		at91_cpuidle_device.dev.platform_data = at91_suspend;
+ }
+ 
+ static void __init at91_pm_sram_init(void)
+@@ -270,6 +271,8 @@ static void __init at91_pm_init(void)
+ {
+ 	at91_pm_sram_init();
+ 
++	at91_cpuidle_set_suspend(at91_cpuidle_suspend);
++
+ 	if (at91_cpuidle_device.dev.platform_data)
+ 		platform_device_register(&at91_cpuidle_device);
+ 
+-- 
+1.7.9.5
