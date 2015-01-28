@@ -1,39 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Jan 2015 17:12 +0100
-Subject: [PATCH] Smack: fix netfilter Makefile entry
-Message-ID: <2504358.ZeqdfUXKpJ@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 28 Jan 2015 16:13:17 +0000
+Subject: [PATCH] ARM: /proc/atags: Export also for DT
+In-Reply-To: <CAL_Jsq+rESm8q44ABRbh9hqMsfcMNx0kcXJ5ONbn1=ue-RvHFg@mail.gmail.com>
+References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
+ <20150127174818.GM26493@n2100.arm.linux.org.uk>
+ <20150128005032.GK28663@atomide.com> <201501281458.22088@pali>
+ <alpine.LFD.2.11.1501280925400.1322@knanqh.ubzr>
+ <CAL_Jsq+rESm8q44ABRbh9hqMsfcMNx0kcXJ5ONbn1=ue-RvHFg@mail.gmail.com>
+Message-ID: <20150128161316.GS26493@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly added Smack support for netfilter secmark has its own
-Kconfig symbol, but the actual implementation is conditionally
-built on another symbol.
+On Wed, Jan 28, 2015 at 09:57:18AM -0600, Rob Herring wrote:
+> I'm fine with that, but we just need to have a standard kernel
+> userspace interface in addition to something like
+> /proc/device-tree/bootreason. Perhaps this can be the default
+> implementation for the watchdog dev. Someday when we decide DT is crap
+> and have a new boot interface, we'll have people relying on
+> /proc/device-tree. I hope to be retired when that happens...
 
-It is possible for CONFIG_NETFILTER and SECURITY_SMACK to both
-be enabled, but NETWORK_SECMARK to be disabled, in which case
-we get a build error:
+Anyone who thinks that DT can be replaced in the same way that we made
+the mistake with ATAGs would really need their head examined.
 
-../security/smack/smack_netfilter.c: In function 'smack_ipv6_output':
-../security/smack/smack_netfilter.c:36:6: error: 'struct sk_buff' has no member named 'secmark'
-   skb->secmark = skp->smk_secid;
-      ^
-../security/smack/smack_netfilter.c: In function 'smack_ipv4_output':
-../security/smack/smack_netfilter.c:55:6: error: 'struct sk_buff' has no member named 'secmark'
-   skb->secmark = skp->smk_secid;
-      ^
+As you point out, removing DT removes the /proc/device-tree/ sub-tree.
+Whether we like it or not, that is a userspace API, one which we have
+users of already.  That pretty much means that we can't remove DT for
+existing platforms or any platform we have now converted to DT.
 
-This changes the Makefile to use the correct Kconfig symbol.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 69f287ae6fc83 ("Smack: secmark support for netfilter")
-
-diff --git a/security/smack/Makefile b/security/smack/Makefile
-index 616cf93b368e..d4a376c84050 100644
---- a/security/smack/Makefile
-+++ b/security/smack/Makefile
-@@ -5,4 +5,4 @@
- obj-$(CONFIG_SECURITY_SMACK) := smack.o
- 
- smack-y := smack_lsm.o smack_access.o smackfs.o
--smack-$(CONFIG_NETFILTER) += smack_netfilter.o
-+smack-$(SECURITY_SMACK_NETFILTER) += smack_netfilter.o
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
