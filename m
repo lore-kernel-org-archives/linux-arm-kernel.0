@@ -1,18 +1,32 @@
-From: elder@linaro.org (Alex Elder)
-Date: Wed, 28 Jan 2015 14:15:06 -0600
-Subject: [PATCH] bcm: address clang inline asm incompatibility
-In-Reply-To: <CAKv+Gu8B7G3tNahkguDBjCOQih4_ywRtwaJz2D2b+vY1249-DA@mail.gmail.com>
-References: <1422422306-27473-1-git-send-email-behanw@converseincode.com>	<CAKv+Gu_NCgMmX_LQqi7vtjtP4ofrW+kx8FPgRd4-LWwK=73-xg@mail.gmail.com>	<54C8EE04.6060809@linaro.org>	<CAKv+Gu8CrMqwqBOF8rYa3RP1=gfCthwP=1k9kQ73v6+Sxwah4A@mail.gmail.com>	<54C91791.9030508@linaro.org>	<CAKv+Gu8P8eC+bmerCpbSX=USODqE=U7WnLeiCfhHJ8SSVAzPDw@mail.gmail.com>	<CAKv+Gu9fc_F1iC5NAwaG_ed3RRhYnxEBLbuLgW0Oa_qJ96j-gA@mail.gmail.com>	<54C9383D.10901@linaro.org>	<CAKv+Gu88G2QqAupD9j4_-t2=0VJGNbWkUViLBM2nUuyuN-PHWA@mail.gmail.com>
- <CAKv+Gu8B7G3tNahkguDBjCOQih4_ywRtwaJz2D2b+vY1249-DA@mail.gmail.com>
-Message-ID: <54C9434A.30000@linaro.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 28 Jan 2015 12:22:41 -0800
+Subject: [PATCH 0/2] Fix secondary CPU boot for thumb2 kernels
+In-Reply-To: <1421869698-27341-1-git-send-email-sboyd@codeaurora.org>
+References: <1421869698-27341-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <54C94511.30508@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/28/2015 02:11 PM, Ard Biesheuvel wrote:
-> Actually, if clang is guaranteed to emit the correct register name
-> inside the inline asm for register asm variables used in input or
-> output constraints, I think it makes sense to #define __asmeq as a nop
-> if __clang__ is defined. (Note that __asmeq only exists to work around
-> a specific GCC bug)
+On 01/21/15 11:48, Stephen Boyd wrote:
+> Currently I can't boot up secondary CPUs on qcom platforms when I
+> compile the kernel for THUMB2 mode. This is because we always enter
+> the kernel in ARM mode regardless of what mode the kernel is compiled
+> for. This patchset adds a small wrapper to secondary_startup() called
+> secondary_startup_arm() that allows us to switch into THUMB2 mode if
+> we need to. If the kernel is compiled for ARM mode it shouldn't have
+> any effect.
+>
+> Stephen Boyd (2):
+>   ARM: Add a secondary_startup that assumes ARM mode
+>   ARM: qcom: Use secondary_startup_arm()
+>
+>  arch/arm/kernel/head.S       | 7 +++++++
+>  arch/arm/mach-qcom/platsmp.c | 4 ++--
+>  2 files changed, 9 insertions(+), 2 deletions(-)
+>
 
-I agree completely.  Behan, what do you think?	-Alex
+Any comments here? Perhaps I can send this through the patch tracker?
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
