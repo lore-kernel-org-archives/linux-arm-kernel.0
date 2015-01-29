@@ -1,40 +1,48 @@
-From: hongzhou.yang@mediatek.com (Hongzhou Yang)
-Date: Wed, 28 Jan 2015 23:29:39 -0800
-Subject: [PATCH 1/7] pinctrl: mediatek: emulate GPIO interrupt on
- both-edges
-In-Reply-To: <CACRpkdbncsDJ3pP0dETpho5+j+OVuaYr=YTsH8pAs7vuT_9OLw@mail.gmail.com>
-References: <1422339332-27498-1-git-send-email-chaotian.jing@mediatek.com>
- <1422339332-27498-2-git-send-email-chaotian.jing@mediatek.com>
- <CACRpkdbncsDJ3pP0dETpho5+j+OVuaYr=YTsH8pAs7vuT_9OLw@mail.gmail.com>
-Message-ID: <1422516579.23729.7.camel@mussux00.eus.mediatek.inc>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Thu, 29 Jan 2015 08:33:28 +0100
+Subject: [PATCH] crypto: atmel: remove bogus select
+In-Reply-To: <1780191.gdgDmCPaN0@wuerfel>
+References: <1780191.gdgDmCPaN0@wuerfel>
+Message-ID: <20150129073328.GC1097@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-01-27 at 15:21 +0100, Linus Walleij wrote:
-> On Tue, Jan 27, 2015 at 7:15 AM, Chaotian Jing
-> <chaotian.jing@mediatek.com> wrote:
+On Wed, Jan 28, 2015 at 09:09:16PM +0100, Arnd Bergmann wrote:
+> The Atmel at91 crypto driver unconditionally selects AT_HDMAC,
+> which results in a Kconfig warning if that driver is not enabled:
 > 
-> > From: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> >
-> > MTK EINT does not support generating interrupt on both edges.
-> > Emulate this by changing edge polarity while enable irq,
-> > set types and interrupt handling. This follows an example of
-> > drivers/gpio/gpio-mxc.c.
-> >
-> > Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> warning: (CRYPTO_DEV_ATMEL_AES) selects AT_HDMAC which has unmet direct dependencies (DMADEVICES && ARCH_AT91)
 > 
-> Hongzhu, if you're fine with this patch can you ACK it as maintainer
-> of the pinctrl driver so I can merge it immediately on top of your
-> drivern whenever we consider it finished (and if it applies still...)
+> The crypty driver itself does not actually have a dependency
+> on a particular dma engine, other than this being the one that
+> is used in at91.
 > 
-> Yours,
-> Linus Walleij
+> Removing the 'select' gets rid of the warning, with no apparent
+> downsides.
 
-Hi Linus,
+This driver doesn't work without DMA. I think it is the reason why the
+select AT_HDMAC was used.
 
-I think it's good, thank you.
-Acked-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
-
-Yours,
-Hongzhou
+> We should probably enable AT_HDMAC in sama5_defconfig, because
+> it no longers gets enabled implicitly.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
+> index 2fb0fdfc87df..0c411c0aae99 100644
+> --- a/drivers/crypto/Kconfig
+> +++ b/drivers/crypto/Kconfig
+> @@ -348,7 +348,6 @@ config CRYPTO_DEV_ATMEL_AES
+>  	select CRYPTO_AES
+>  	select CRYPTO_ALGAPI
+>  	select CRYPTO_BLKCIPHER
+> -	select AT_HDMAC
+>  	help
+>  	  Some Atmel processors have AES hw accelerator.
+>  	  Select this if you want to use the Atmel module for
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
