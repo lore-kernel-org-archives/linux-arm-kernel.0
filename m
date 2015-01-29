@@ -1,49 +1,28 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 29 Jan 2015 15:06:12 -0800
-Subject: [GIT PULL] at91: cleanup/soc for 3.20 #4
-In-Reply-To: <20150129230157.GD4164@piout.net>
-References: <1422532272-32055-1-git-send-email-nicolas.ferre@atmel.com>
- <20150129220256.GG20785@quad.lixom.net>
- <CAOesGMjf6mPhq3s9jf+kTvKFkYM+yLdZ7akLQM_q_TCj3qHF3g@mail.gmail.com>
- <20150129230157.GD4164@piout.net>
-Message-ID: <CAOesGMhycUD4ZfQccjD=zzRB901u0YT1NqCuA7chNTnvgt7Fsg@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 29 Jan 2015 15:08:59 -0800 (PST)
+Subject: [PATCH 0/4] net: driver fixes from arm randconfig builds
+In-Reply-To: <1422454504-439085-1-git-send-email-arnd@arndb.de>
+References: <1422454504-439085-1-git-send-email-arnd@arndb.de>
+Message-ID: <20150129.150859.1312045066060618087.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 29, 2015 at 3:01 PM, Alexandre Belloni
-<alexandre.belloni@free-electrons.com> wrote:
-> Hi,
->
-> On 29/01/2015 at 14:08:25 -0800, Olof Johansson wrote :
->> On Thu, Jan 29, 2015 at 2:02 PM, Olof Johansson <olof@lixom.net> wrote:
->> > On Thu, Jan 29, 2015 at 12:51:12PM +0100, Nicolas Ferre wrote:
->> >> Arnd, Olof, Kevin,
->> >>
->> >> This is a batch of cleanup/soc modifications that you may also stack on top of
->> >> your "soc" branch as the previous one.
->> >> It collects some more cleanup material and simplifies the AT91 boot code. Only
->> >> some little details remain before having a classical DT boot (without additional
->> >> mapping of registers for instance). This part will be addressed in 3.21.
->> >>
->> >> The switch to multi-platform is not included as it needs some patches in ASoC,
->> >> ata and arm-soc/next/drivers to be able to compile. I may send patches or a
->> >> pull-request that can be send to Linus late during the merge-window. Tell me
->> >> how you feel it can be done (or delayed to 3.21).
->> >>
->> >> The conflict related to the rename of board-dt-sama5.c => sama5.c is solved in
->> >> this branch:
->> >> https://git.kernel.org/cgit/linux/kernel/git/nferre/linux-at91.git/log/?h=arm-soc-for-next%2bat91-3.20-cleanup
->> >>
->
-> The conflict is fixed there ;)
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Wed, 28 Jan 2015 15:15:00 +0100
 
-This conflict will bubble all the way up to Linus. I wonder if it's
-better to just include the fix as a base of this branch. Not merged on
-top, but as a base. That'll be easiest of all.
+> These four patches are fallout from test builds on ARM. I have a
+> few more of them in my backlog but have not yet confirmed them
+> to still be valid.
+> 
+> The first three patches are about incomplete dependencies on
+> old drivers. One could backport them to the beginning of time
+> in theory, but there is little value since nobody would run into
+> these problems.
+> 
+> The final patch is one I had submitted before together with the
+> respective pcmcia patch but forgot to follow up on that. It's
+> still a valid but relatively theoretical bug, because the previous
+> behavior of the driver was just as broken as what we have in
+> mainline.
 
-Nicolas, can you respin with that as base? Since that fixes branch
-from you is based on -rc1, it should work out quite well.
-
-
-
--Olof
+Series applied, thanks Arnd.
