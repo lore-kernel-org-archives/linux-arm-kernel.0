@@ -1,46 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 29 Jan 2015 23:24:32 +0100
-Subject: [PATCH] crypto: atmel: remove bogus select
-In-Reply-To: <20150129073328.GC1097@odux.rfo.atmel.com>
-References: <1780191.gdgDmCPaN0@wuerfel>
- <20150129073328.GC1097@odux.rfo.atmel.com>
-Message-ID: <2762861.1qAcXXChEF@wuerfel>
+Date: Thu, 29 Jan 2015 23:28:15 +0100
+Subject: [PATCH] spi/xilinx: Cast ioread32/iowrite32 function pointers
+In-Reply-To: <CAPybu_0OWLZeEFMByrrDg7HOfjAYbOnAoazLac-E8KV-mKSJSg@mail.gmail.com>
+References: <1422543073-21895-1-git-send-email-ricardo.ribalda@gmail.com>
+ <2800334.5ezTSQFkNQ@wuerfel>
+ <CAPybu_0OWLZeEFMByrrDg7HOfjAYbOnAoazLac-E8KV-mKSJSg@mail.gmail.com>
+Message-ID: <2357790.QEsOKkOOBx@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 29 January 2015 08:33:28 Ludovic Desroches wrote:
-> On Wed, Jan 28, 2015 at 09:09:16PM +0100, Arnd Bergmann wrote:
-> > The Atmel at91 crypto driver unconditionally selects AT_HDMAC,
-> > which results in a Kconfig warning if that driver is not enabled:
-> > 
-> > warning: (CRYPTO_DEV_ATMEL_AES) selects AT_HDMAC which has unmet direct dependencies (DMADEVICES && ARCH_AT91)
-> > 
-> > The crypty driver itself does not actually have a dependency
-> > on a particular dma engine, other than this being the one that
-> > is used in at91.
-> > 
-> > Removing the 'select' gets rid of the warning, with no apparent
-> > downsides.
-> 
-> This driver doesn't work without DMA. I think it is the reason why the
-> select AT_HDMAC was used.
-> 
+On Thursday 29 January 2015 23:14:46 Ricardo Ribalda Delgado wrote:
+> What about the different return type? u8 vs int
 
-I understand the intention, but this what was written in Kconfig is
-not the correct way to express it.
-
-A lot of drivers require DMA_ENGINE support, but the linux/dmaengine.h
-header file provides static inline helpers to make sure that things
-still compile if that is disabled, and in the example I mentioned
-above, it does build, but clearly cannot work as the real dmaengine
-interfaces are not provided by the kernel.
-
-What we could do to express the runtime dependency correctly is to add
-
-	depends on (ARCH_AT91 && AT_HDMAC) || COMPILE_TEST
-
-which would let the driver only be enabled in cases that have a
-reasonable chance of working, but still allow it to be built
-everywhere else.
+Too many drivers use all sorts of different types, I've given up
+hope of changing drivers to agree on the same type here. Basically
+you can think of 'void __iomem *' as the magic keyword for something
+that gets returned from ioremap, can take an integer offset and gets
+passed into readb/readw/readl/write..., but any other assumption beyond
+that is dangerous.
 
 	Arnd
