@@ -1,107 +1,95 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Thu, 29 Jan 2015 11:16:15 -0500
-Subject: [PATCH v10 2/2] tty/serial: Add Spreadtrum sc9836-uart driver
- support
-In-Reply-To: <54CA59F1.3060008@gmail.com>
-References: <sc9836-serial-v10>
- <1422443324-25082-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1422443324-25082-3-git-send-email-chunyan.zhang@spreadtrum.com>
- <54CA5128.8050500@gmail.com> <54CA568E.6080306@hurleysoftware.com>
- <54CA59F1.3060008@gmail.com>
-Message-ID: <54CA5CCF.6040208@hurleysoftware.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 29 Jan 2015 16:24:43 +0000
+Subject: [PATCH] arm64: Avoid breakage caused by .altmacro in fpsimd
+ save/restore macros
+Message-ID: <1422548683-25544-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/29/2015 11:04 AM, Varka Bhadram wrote:
-> Hi Peter,
-> 
-> On Thursday 29 January 2015 09:19 PM, Peter Hurley wrote:
->> Hi Varka,
->>
->> On 01/29/2015 10:26 AM, Varka Bhadram wrote:
->>> Hi,
->>>
->>> On Wednesday 28 January 2015 04:38 PM, Chunyan Zhang wrote:
->>>> Add a full sc9836-uart driver for SC9836 SoC which is based on the
->>>> spreadtrum sharkl64 platform.
->>>> This driver also support earlycon.
->>>>
->>>> Originally-by: Lanqing Liu <lanqing.liu@spreadtrum.com>
->>>> Signed-off-by: Orson Zhai <orson.zhai@spreadtrum.com>
->>>> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
->>>> Acked-by: Arnd Bergmann <arnd@arndb.de>
->>>> Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
->>>> ---
->>>>   drivers/tty/serial/Kconfig       |   18 +
->>>>   drivers/tty/serial/Makefile      |    1 +
->>>>   drivers/tty/serial/sprd_serial.c |  793 ++++++++++++++++++++++++++++++++++++++
->>>>   include/uapi/linux/serial_core.h |    3 +
->>>>   4 files changed, 815 insertions(+)
->>>>   create mode 100644 drivers/tty/serial/sprd_serial.c
->>>>
->>> (...)
->>>
->>>> +static int sprd_probe(struct platform_device *pdev)
->>>> +{
->>>> +    struct resource *res;
->>>> +    struct uart_port *up;
->>>> +    struct clk *clk;
->>>> +    int irq;
->>>> +    int index;
->>>> +    int ret;
->>>> +
->>>> +    for (index = 0; index < ARRAY_SIZE(sprd_port); index++)
->>>> +        if (sprd_port[index] == NULL)
->>>> +            break;
->>>> +
->>>> +    if (index == ARRAY_SIZE(sprd_port))
->>>> +        return -EBUSY;
->>>> +
->>>> +    index = sprd_probe_dt_alias(index, &pdev->dev);
->>>> +
->>>> +    sprd_port[index] = devm_kzalloc(&pdev->dev,
->>>> +        sizeof(*sprd_port[index]), GFP_KERNEL);
->>>> +    if (!sprd_port[index])
->>>> +        return -ENOMEM;
->>>> +
->>>> +    up = &sprd_port[index]->port;
->>>> +    up->dev = &pdev->dev;
->>>> +    up->line = index;
->>>> +    up->type = PORT_SPRD;
->>>> +    up->iotype = SERIAL_IO_PORT;
->>>> +    up->uartclk = SPRD_DEF_RATE;
->>>> +    up->fifosize = SPRD_FIFO_SIZE;
->>>> +    up->ops = &serial_sprd_ops;
->>>> +    up->flags = UPF_BOOT_AUTOCONF;
->>>> +
->>>> +    clk = devm_clk_get(&pdev->dev, NULL);
->>>> +    if (!IS_ERR(clk))
->>>> +        up->uartclk = clk_get_rate(clk);
->>>> +
->>>> +    res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>>> +    if (!res) {
->>>> +        dev_err(&pdev->dev, "not provide mem resource\n");
->>>> +        return -ENODEV;
->>>> +    }
->>> This check is not required. It will be done by devm_ioremap_resource()
->> I disagree. devm_ioremap_resource() interprets the NULL resource as
->> a bad parameter and returns -EINVAL which is then forwarded as the
->> return value from the probe.
->>
->> -ENODEV is the correct return value from the probe if the expected
->> resource is not available (either because it doesn't exist or was already
->> claimed by another driver).
-> 
-> Check on the resource happening with evm_ioremap_resource.
-> 
-> Not necessary to check multiple times.
-> 
-> I did series for all the drivers. see [1]
-> 
-> [1]: https://lkml.org/lkml/2014/11/3/986 <https://lkml.org/lkml/2014/11/3/986>
+Alternate macro mode is not a property of a macro definition, but a
+gas runtime state that alters the way macros are expanded for ever
+after (until .noaltmacro is seen).
 
-That's a usb series. Did you do a serial driver series I missed?
-I don't see anything related in Greg's tty-next tree...
+This means that subsequent assembly code that calls other macros can
+break if fpsimdmacros.h is included.
 
-Regards,
-Peter Hurley
+Since these instruction sequences are simple (if dull -- but in a
+good way), this patch solves the problem by simply expanding the
+.irp loops.  The pre-existing fpsimd_{save,restore} macros weren't
+rolled with .irp anyway and the sequences affected are short, so
+this change restores consistency at little cost.
+
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+---
+ arch/arm64/include/asm/fpsimdmacros.h |   43 ++++++++++++++++++++++++---------
+ 1 file changed, 32 insertions(+), 11 deletions(-)
+
+diff --git a/arch/arm64/include/asm/fpsimdmacros.h b/arch/arm64/include/asm/fpsimdmacros.h
+index 007618b..a2daf12 100644
+--- a/arch/arm64/include/asm/fpsimdmacros.h
++++ b/arch/arm64/include/asm/fpsimdmacros.h
+@@ -76,7 +76,6 @@
+ 	fpsimd_restore_fpcr x\tmpnr, \state
+ .endm
+ 
+-.altmacro
+ .macro fpsimd_save_partial state, numnr, tmpnr1, tmpnr2
+ 	mrs	x\tmpnr1, fpsr
+ 	str	w\numnr, [\state, #8]
+@@ -86,11 +85,22 @@
+ 	add	\state, \state, x\numnr, lsl #4
+ 	sub	x\tmpnr1, x\tmpnr1, x\numnr, lsl #1
+ 	br	x\tmpnr1
+-	.irp	qa, 30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2, 0
+-	.irp	qb, %(qa + 1)
+-	stp	q\qa, q\qb, [\state, # -16 * \qa - 16]
+-	.endr
+-	.endr
++	stp	q30, q31, [\state, #-16 * 30 - 16]
++	stp	q28, q29, [\state, #-16 * 28 - 16]
++	stp	q26, q27, [\state, #-16 * 26 - 16]
++	stp	q24, q25, [\state, #-16 * 24 - 16]
++	stp	q22, q23, [\state, #-16 * 22 - 16]
++	stp	q20, q21, [\state, #-16 * 20 - 16]
++	stp	q18, q19, [\state, #-16 * 18 - 16]
++	stp	q16, q17, [\state, #-16 * 16 - 16]
++	stp	q14, q15, [\state, #-16 * 14 - 16]
++	stp	q12, q13, [\state, #-16 * 12 - 16]
++	stp	q10, q11, [\state, #-16 * 10 - 16]
++	stp	q8, q9, [\state, #-16 * 8 - 16]
++	stp	q6, q7, [\state, #-16 * 6 - 16]
++	stp	q4, q5, [\state, #-16 * 4 - 16]
++	stp	q2, q3, [\state, #-16 * 2 - 16]
++	stp	q0, q1, [\state, #-16 * 0 - 16]
+ 0:
+ .endm
+ 
+@@ -103,10 +113,21 @@
+ 	add	\state, \state, x\tmpnr2, lsl #4
+ 	sub	x\tmpnr1, x\tmpnr1, x\tmpnr2, lsl #1
+ 	br	x\tmpnr1
+-	.irp	qa, 30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2, 0
+-	.irp	qb, %(qa + 1)
+-	ldp	q\qa, q\qb, [\state, # -16 * \qa - 16]
+-	.endr
+-	.endr
++	ldp	q30, q31, [\state, #-16 * 30 - 16]
++	ldp	q28, q29, [\state, #-16 * 28 - 16]
++	ldp	q26, q27, [\state, #-16 * 26 - 16]
++	ldp	q24, q25, [\state, #-16 * 24 - 16]
++	ldp	q22, q23, [\state, #-16 * 22 - 16]
++	ldp	q20, q21, [\state, #-16 * 20 - 16]
++	ldp	q18, q19, [\state, #-16 * 18 - 16]
++	ldp	q16, q17, [\state, #-16 * 16 - 16]
++	ldp	q14, q15, [\state, #-16 * 14 - 16]
++	ldp	q12, q13, [\state, #-16 * 12 - 16]
++	ldp	q10, q11, [\state, #-16 * 10 - 16]
++	ldp	q8, q9, [\state, #-16 * 8 - 16]
++	ldp	q6, q7, [\state, #-16 * 6 - 16]
++	ldp	q4, q5, [\state, #-16 * 4 - 16]
++	ldp	q2, q3, [\state, #-16 * 2 - 16]
++	ldp	q0, q1, [\state, #-16 * 0 - 16]
+ 0:
+ .endm
+-- 
+1.7.10.4
