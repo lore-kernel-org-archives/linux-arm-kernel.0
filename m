@@ -1,18 +1,18 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Thu, 29 Jan 2015 09:33:39 +0900
-Subject: [GIT PULL 1/4] Samsung Cleanup for v3.20
-Message-ID: <54C97FE3.3030600@kernel.org>
+Date: Thu, 29 Jan 2015 09:33:52 +0900
+Subject: [GIT PULL 2/4] Samsung mach updates for v3.20
+Message-ID: <54C97FF0.6090808@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof, Kevin
+Hi,
 
-Please pull Samsung cleanup for v3.20.
+This is for updating of mach-exynos and plat-samsung.
+Please pull and if any problems, please let me know.
 
-This cleanup is very nice, Samsung SoCs no more use specific DMA and
-remove i2c sys from mach-exynos. Thanks to Arnd and all involved guys.
+Thanks,
+Kukjin
 
-- Kukjin
 
 
 The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
@@ -22,71 +22,33 @@ The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
 are available in the git repository at:
 
   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-tags/samsung-cleanup
+tags/samsung-update
 
-for you to fetch changes up to d50b9e2e788dce9b120b5ac1140f0cdd1bf905eb:
+for you to fetch changes up to a4f582f5c5fe3e8eaef7ce637c894619bdee650e:
 
-  ARM: SAMSUNG: remove unused DMA infrastructure (2015-01-24 13:09:54 +0900)
-
-----------------------------------------------------------------
-Samsung cleanup for v3.20
-
-- remove i2c sys configuration from mach-exynos/
-  : all related codes moved into i2c driver
-- remove Samsung specific DMA
-  : every Samsung stuff uses dmaengine APIs
+  ARM: EXYNOS: Add exynos3250 suspend-to-ram support (2015-01-15
+00:24:26 +0900)
 
 ----------------------------------------------------------------
-Arnd Bergmann (1):
-      ARM: SAMSUNG: remove unused DMA infrastructure
+Samsung mach updates for v3.20
 
-Pankaj Dubey (1):
-      ARM: EXYNOS: Remove i2c sys configuration related code
+- add exynos3250 Supsend to RAM support
+- recognize MFC v8 devices for exynos5422/5800
+- print CPU id/rev during kernel boot
 
- Documentation/arm/Samsung-S3C24XX/DMA.txt        |   46 -
- arch/arm/mach-exynos/exynos.c                    |   39 +-
- arch/arm/mach-exynos/include/mach/dma.h          |   26 -
- arch/arm/mach-exynos/include/mach/map.h          |    3 -
- arch/arm/mach-exynos/pm.c                        |    3 +-
- arch/arm/mach-exynos/regs-sys.h                  |   22 -
- arch/arm/mach-exynos/suspend.c                   |    7 -
- arch/arm/mach-s3c24xx/Kconfig                    |   42 -
- arch/arm/mach-s3c24xx/Makefile                   |    7 -
- arch/arm/mach-s3c24xx/dma-s3c2410.c              |  182 ---
- arch/arm/mach-s3c24xx/dma-s3c2412.c              |  150 ---
- arch/arm/mach-s3c24xx/dma-s3c2440.c              |  193 ---
- arch/arm/mach-s3c24xx/dma-s3c2443.c              |  179 ---
- arch/arm/mach-s3c24xx/dma.c                      | 1465
-----------------------
- arch/arm/mach-s3c24xx/include/mach/dma.h         |  159 ---
- arch/arm/mach-s3c64xx/include/mach/dma.h         |   15 -
- arch/arm/plat-samsung/Kconfig                    |   15 -
- arch/arm/plat-samsung/Makefile                   |    6 -
- arch/arm/plat-samsung/dma-ops.c                  |  146 ---
- arch/arm/plat-samsung/dma.c                      |   84 --
- arch/arm/plat-samsung/include/plat/dma-core.h    |   22 -
- arch/arm/plat-samsung/include/plat/dma-ops.h     |   69 -
- arch/arm/plat-samsung/include/plat/dma-pl330.h   |  121 --
- arch/arm/plat-samsung/include/plat/dma-s3c24xx.h |   73 --
- arch/arm/plat-samsung/include/plat/dma.h         |  130 --
- arch/arm/plat-samsung/include/plat/regs-dma.h    |  151 ---
- arch/arm/plat-samsung/s3c-dma-ops.c              |  146 ---
- drivers/dma/Kconfig                              |    2 +-
- 28 files changed, 5 insertions(+), 3498 deletions(-)
- delete mode 100644 Documentation/arm/Samsung-S3C24XX/DMA.txt
- delete mode 100644 arch/arm/mach-exynos/include/mach/dma.h
- delete mode 100644 arch/arm/mach-exynos/regs-sys.h
- delete mode 100644 arch/arm/mach-s3c24xx/dma-s3c2410.c
- delete mode 100644 arch/arm/mach-s3c24xx/dma-s3c2412.c
- delete mode 100644 arch/arm/mach-s3c24xx/dma-s3c2440.c
- delete mode 100644 arch/arm/mach-s3c24xx/dma-s3c2443.c
- delete mode 100644 arch/arm/mach-s3c24xx/dma.c
- delete mode 100644 arch/arm/plat-samsung/dma-ops.c
- delete mode 100644 arch/arm/plat-samsung/dma.c
- delete mode 100644 arch/arm/plat-samsung/include/plat/dma-core.h
- delete mode 100644 arch/arm/plat-samsung/include/plat/dma-ops.h
- delete mode 100644 arch/arm/plat-samsung/include/plat/dma-pl330.h
- delete mode 100644 arch/arm/plat-samsung/include/plat/dma-s3c24xx.h
- delete mode 100644 arch/arm/plat-samsung/include/plat/dma.h
- delete mode 100644 arch/arm/plat-samsung/include/plat/regs-dma.h
- delete mode 100644 arch/arm/plat-samsung/s3c-dma-ops.c
+----------------------------------------------------------------
+Chanwoo Choi (1):
+      ARM: EXYNOS: Add exynos3250 suspend-to-ram support
+
+Olof Johansson (1):
+      ARM: SAMSUNG: print CPU id on probe
+
+Sjoerd Simons (1):
+      ARM: EXYNOS: Recognize Samsung MFC v8 devices
+
+ arch/arm/mach-exynos/exynos.c   |  1 +
+ arch/arm/mach-exynos/regs-pmu.h |  3 ++
+ arch/arm/mach-exynos/suspend.c  | 77
++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/plat-samsung/cpu.c     |  4 +++
+ 4 files changed, 85 insertions(+)
