@@ -1,78 +1,63 @@
-From: namhyung@kernel.org (Namhyung Kim)
-Date: Thu, 29 Jan 2015 10:39:14 +0900
-Subject: [PATCH V3 1/2] perf symbols: Ignore mapping symbols on aarch64
-In-Reply-To: <1422340442-4673-2-git-send-email-victor.kamensky@linaro.org>
-References: <1422340442-4673-1-git-send-email-victor.kamensky@linaro.org>
- <1422340442-4673-2-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <20150129013914.GC24182@sejong>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 29 Jan 2015 10:47:18 +0900
+Subject: [PATCH] ARM: shmobile: r8a7791: Correct SDHI clock labels and
+ output-names
+Message-ID: <1422496038-3915-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 26, 2015 at 10:34:01PM -0800, Victor Kamensky wrote:
-> Aarch64 ELF files use mapping symbols with special names $x, $d
-> to identify regions of Aarch64 code (see Aarch64 ELF ABI - "ARM
-> IHI 0056B", section "4.5.4 Mapping symbols").
-> 
-> The patch filters out these symbols at load time, similar to
-> "696b97a perf symbols: Ignore mapping symbols on ARM" changes
-> done for ARM before V8.
-> 
-> Also added handling of mapping symbols that has format
-> "$d.<any>" and similar for both cases.
-> 
-> Note we are not making difference between EM_ARM and
-> EM_AARCH64 mapping symbols instead code handles superset
-> of both.
-> 
-> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
-> Cc: Paul Mackerras <paulus@samba.org>
-> Cc: Ingo Molnar <mingo@redhat.com>
-> Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
-> Cc: Adrian Hunter <adrian.hunter@intel.com>
-> Cc: Jiri Olsa <jolsa@redhat.com>
-> Cc: Avi Kivity <avi@cloudius-systems.com>
-> Cc: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
-> Cc: Anton Blanchard <anton@samba.org>
-> Cc: David Ahern <dsahern@gmail.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Dave Martin <Dave.Martin@arm.com>
+There appears to have been some inconsistency and confusion here as on
+the r8a7790 these clocks are referred to as SD(HI)1 and SD(HI)2 while on
+the r8a7791 and r8a7794 they are referred to as SD(HI)2 and SD(HI)3.
 
-Acked-by: Namhyung Kim <namhyung@kernel.org>
+Fixes: 59e79895b95892863 ("ARM: shmobile: r8a7791: Add clocks")
+Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Thanks,
-Namhyung
+---
 
+This follows the naming pattern of "ARM: shmobile: r8a7794: Correct SDHI
+clock base address, labels and output-names".
+---
+ arch/arm/boot/dts/r8a7791.dtsi | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-> ---
->  tools/perf/util/symbol-elf.c | 7 +++----
->  1 file changed, 3 insertions(+), 4 deletions(-)
-> 
-> diff --git a/tools/perf/util/symbol-elf.c b/tools/perf/util/symbol-elf.c
-> index 06fcd1b..8fc6e2f 100644
-> --- a/tools/perf/util/symbol-elf.c
-> +++ b/tools/perf/util/symbol-elf.c
-> @@ -856,10 +856,9 @@ int dso__load_sym(struct dso *dso, struct map *map,
->  		/* Reject ARM ELF "mapping symbols": these aren't unique and
->  		 * don't identify functions, so will confuse the profile
->  		 * output: */
-> -		if (ehdr.e_machine == EM_ARM) {
-> -			if (!strcmp(elf_name, "$a") ||
-> -			    !strcmp(elf_name, "$d") ||
-> -			    !strcmp(elf_name, "$t"))
-> +		if (ehdr.e_machine == EM_ARM || ehdr.e_machine == EM_AARCH64) {
-> +			if (elf_name[0] == '$' && strchr("adtx", elf_name[1])
-> +			    && (elf_name[2] == '\0' || elf_name[2] == '.'))
->  				continue;
->  		}
->  
-> -- 
-> 1.9.3
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index 6b0cd1b..86862a5 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -880,19 +880,19 @@
+ 		};
+ 
+ 		/* Variable factor clocks */
+-		sd1_clk: sd2_clk at e6150078 {
++		sd2_clk: sd2_clk at e6150078 {
+ 			compatible = "renesas,r8a7791-div6-clock", "renesas,cpg-div6-clock";
+ 			reg = <0 0xe6150078 0 4>;
+ 			clocks = <&pll1_div2_clk>;
+ 			#clock-cells = <0>;
+-			clock-output-names = "sd1";
++			clock-output-names = "sd2";
+ 		};
+-		sd2_clk: sd3_clk at e615026c {
++		sd3_clk: sd3_clk at e615026c {
+ 			compatible = "renesas,r8a7791-div6-clock", "renesas,cpg-div6-clock";
+ 			reg = <0 0xe615026c 0 4>;
+ 			clocks = <&pll1_div2_clk>;
+ 			#clock-cells = <0>;
+-			clock-output-names = "sd2";
++			clock-output-names = "sd3";
+ 		};
+ 		mmc0_clk: mmc0_clk at e6150240 {
+ 			compatible = "renesas,r8a7791-div6-clock", "renesas,cpg-div6-clock";
+@@ -1113,7 +1113,7 @@
+ 		mstp3_clks: mstp3_clks at e615013c {
+ 			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
+-			clocks = <&cp_clk>, <&sd2_clk>, <&sd1_clk>, <&cpg_clocks R8A7791_CLK_SD0>,
++			clocks = <&cp_clk>, <&sd3_clk>, <&sd2_clk>, <&cpg_clocks R8A7791_CLK_SD0>,
+ 				 <&mmc0_clk>, <&hp_clk>, <&mp_clk>, <&hp_clk>, <&mp_clk>, <&rclk_clk>,
+ 				 <&hp_clk>, <&hp_clk>;
+ 			#clock-cells = <1>;
+-- 
+2.1.4
