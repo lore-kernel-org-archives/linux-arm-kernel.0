@@ -1,53 +1,65 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 28 Jan 2015 16:49:39 -0700
-Subject: [PATCH 24/24] Documentation: DT bindings: add nvidia,
- denver compatible string
-In-Reply-To: <20150128234935.20644.89300.stgit@dusk.lan>
-References: <20150128234935.20644.89300.stgit@dusk.lan>
-Message-ID: <20150128234938.20644.69989.stgit@dusk.lan>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 29 Jan 2015 09:28:31 +0900
+Subject: [PATCH 00/14 v2] ARM: shmobile: Remove sh7372/Mackerel and ZBOOT
+ MMC/SDHI support V2
+In-Reply-To: <CANqRtoRzvWMo9y_y80uz=kx=M5p-FzkgWPyZZ914sKHvQcM4Fg@mail.gmail.com>
+References: <20150126061747.6848.9708.sendpatchset@little-apple>
+ <20150127011707.GD29710@verge.net.au>
+ <20150127035835.GA1145@verge.net.au>
+ <CANqRtoRzvWMo9y_y80uz=kx=M5p-FzkgWPyZZ914sKHvQcM4Fg@mail.gmail.com>
+Message-ID: <20150129002827.GA18731@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Jan 28, 2015 at 02:53:29PM +0900, Magnus Damm wrote:
+> Hi Simon,
+> 
+> On Tue, Jan 27, 2015 at 12:58 PM, Simon Horman <horms@verge.net.au> wrote:
+> > On ?,  1? 27, 2015 at 10:17:09?? +0900, Simon Horman wrote:
+> >> On Mon, Jan 26, 2015 at 03:17:47PM +0900, Magnus Damm wrote:
+> >> > ARM: shmobile: Remove sh7372/Mackerel and ZBOOT MMC/SDHI support V2
+> >> >
+> >> > [PATCH 01/14 v2] ARM: shmobile: mackerel: Remove ZBOOT code
+> >> > [PATCH 02/14 v2] ARM: shmobile: mackerel: Remove Legacy C board code
+> >> > [PATCH 03/14 v2] ARM: shmobile: mackerel dts: Remove Legacy DTS file
+> >> > [PATCH 04/14 v2] ARM: shmobile: mackerel: Remove DT binding documentation
+> >> > [PATCH 05/14 v2] ARM: shmobile: mackerel: Remove mach-type entry
+> >> > [PATCH 06/14 v2] ARM: shmobile: mackerel: Remove defconfig
+> >> > [PATCH 07/14 v2] ARM: shmobile: mackerel: Remove from MAINTAINERS
+> >> > [PATCH 08/14 v2] ARM: shmobile: sh7372: Remove ZBOOT MMC/SDHI support
+> >> > [PATCH 09/14 v2] ARM: shmobile: sh7372: Remove Legacy C SoC code
+> >> > [PATCH 10/14 v2] ARM: shmobile: sh7372: Remove DT binding documentation
+> >> > [PATCH 11/14 v2] ARM: shmobile: sh7372 dtsi: Remove Legacy DTSI file
+> >> > [PATCH 12/14 v2] Documentation: Remove ZBOOT MMC/SDHI utility and docs
+> >> > [PATCH 13/14 v2] pinctrl: sh-pfc: sh7372: Remove PFC support
+> >> > [PATCH 14/14 v2] pinctrl: sh-pfc: sh7372: Remove DT binding documentation
+> >> >
+> >> > Here is my latest attempt (V2) of legacy board and SoC support removal
+> >> > for Mackerel and sh7372. Both the ARM mach-shmobile code base and the
+> >> > PINCTRL subsystem is affected.
+> >> >
+> >> > Also get rid of the remaining ZBOOT MMC/SDHI code, documentation and
+> >> > utility that has no user once sh7372 is gone.
+> >> >
+> >> > The Cortex-A8 based sh7372 SoC is rather old and never went into mass
+> >> > production anyway, so these patches that remove SoC and board support
+> >> > will only affect a few selected developers.
+> >> >
+> >> > I wish we had some way to make use of the ZBOOT MMC/SDHI code, but
+> >> > without any board or SoC code it makes little sense to keep it.
+> >> >
+> >> > Thanks to Laurent and Geert for review!
+> >>
+> >> Sad to see all our hard work being deleted. But at the same
+> >> time its nice to be able to reduce our footprint by 8681 lines!
+> >>
+> >> I have queued up the first 12 patches of this series, that is the
+> >> non-pfc patches. They are queued up in a new sh7372-soc-removal-for-v3.21
+> >> branch which I intend to push as part of renesas-devel-20150127-v3.19-rc6 a
+> >> little later today.
+> >
+> > BTW, could you check that I queued up things correctly?
+> 
+> It looks fine to me. Thanks for your help!
 
-Add a compatible string for the NVIDIA Denver CPU to the ARM CPU DT
-binding documentation file.  The primary objective here is to keep
-checkpatch.pl from warning when the compatible string is used in an
-SoC DT file, per:
-
-http://marc.info/?l=linux-tegra&m=142201349727836&w=2
-
-
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Kumar Gala <galak@codeaurora.org>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Olof Johansson <olof@lixom.net>
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: Rohit Vaswani <rvaswani@codeaurora.org>
-Cc: Paul Walmsley <pwalmsley@nvidia.com>
-Cc: Marc Carino <marc.ceeeee@gmail.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: devicetree at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
----
- Documentation/devicetree/bindings/arm/cpus.txt |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-index b2aacbe16ed9..4ea31f0b7764 100644
---- a/Documentation/devicetree/bindings/arm/cpus.txt
-+++ b/Documentation/devicetree/bindings/arm/cpus.txt
-@@ -175,6 +175,7 @@ nodes to be present and contain the properties described below.
- 			    "marvell,pj4a"
- 			    "marvell,pj4b"
- 			    "marvell,sheeva-v5"
-+			    "nvidia,denver" (not yet matched in the code)
- 			    "qcom,krait"
- 			    "qcom,scorpion"
- 	- enable-method
+Thanks, for checking.
