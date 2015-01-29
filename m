@@ -1,51 +1,49 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 29 Jan 2015 17:51:32 +0000
-Subject: randconfig bug: ARM/KVM link error in hyp_idmap section
-In-Reply-To: <CAEDV+gKzkER4n=oNiM1wNmNnbMEosYKo=Awu8j8R5Fr7kzE_Ew@mail.gmail.com>
-References: <3919069.MpPCrczKD2@wuerfel>	<CAEDV+gJ3YO8oeka_yaJGg+LXA0Od0TGkZb8vD_q74xNRx9g0Rg@mail.gmail.com>	<1611315.VFEsrxkfBf@wuerfel>	<54CA5954.8060506@arm.com>
- <CAEDV+gKzkER4n=oNiM1wNmNnbMEosYKo=Awu8j8R5Fr7kzE_Ew@mail.gmail.com>
-Message-ID: <54CA7324.7000000@arm.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu, 29 Jan 2015 19:10:31 +0100
+Subject: [PATCH 7/7] spi: spi-fsl-dspi: Add support for TCFQ transfer mode
+In-Reply-To: <1422536382672.21760@toradex.com>
+References: <1422356608-15961-1-git-send-email-bhuvanchandra.dv@toradex.com>
+ <1422356608-15961-2-git-send-email-bhuvanchandra.dv@toradex.com>
+ <20150128190342.GE21293@sirena.org.uk> <1422533049999.91114@toradex.com>
+ <20150129121320.GI21293@sirena.org.uk> <1422536382672.21760@toradex.com>
+Message-ID: <1a28f3439386e1132ae0f3ab80666305@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/01/15 17:40, Christoffer Dall wrote:
+On 2015-01-29 13:53, BhuvanChandra.DV wrote:
+> On 01/29/2015 05:43 PM, Mark Brown wrote:
+>> On Thu, Jan 29, 2015 at 11:58:25AM +0000, BhuvanChandra.DV wrote:
+>>
+>>> As far as i understood the major difference between the two modes are when
+>>> the interrupt to trigger, as EOQ mode will trigger the interrupt at end of
+>>> queue and TCF will trigger the interrupt at every frame transfer. Probably
+>>> mode selection shouldn't be a device tree property, but i don't see any
+>>> automatic way to choose between the modes.
+>>> Maybe a config would be more appropriate?
+>> Or if there's either no particular reason to choose one over the other
+>> or one is always better then just pick one in the driver and don't worry
+>> about implementing both.
 > 
-> 
-> On Thu, Jan 29, 2015 at 5:01 PM, Marc Zyngier <marc.zyngier@arm.com
-> <mailto:marc.zyngier@arm.com>> wrote:
-> 
->     Hi Arnd,
-> 
->     On 29/01/15 15:53, Arnd Bergmann wrote:
->     > On Thursday 29 January 2015 16:23:42 Christoffer Dall wrote:
->     >> the changes look ok, but I don't understand why putting stuff in
->     rodata is
->     >> a good solution, is it simply by chance that the linker then
->     generates
->     >> fewer veneers there?  I think we're only branching internally in
->     the hyp
->     >> idmap text page anyhow, so wondering why this appears in the
->     first place...
->     >> hmmm.
->     >
->     > The linker will not generate any veneers for .rodata because it
->     does not
->     > expect executable code in there. As I said, above, this is also
->     correct
->     > because it matches how we access that section (read-only, never
->     execute).
-> 
->     Not sure about the later point. We only copy the code if it is not page
->     aligned, and use it in place otherwise. I guess we could change that,
->     but we'd need the same change for arm64.
-> 
-> 
-> I'd be ok with changing that... 
+> Among the two, EOQ would be better since with TCF, interrupts are generated at
+> every frame transfer, which could be a problem at higher frequencies.
+> I think we can omit this patch then.
 
-In which case I have no further objection.
+It would be interesting to know what the authors original motivation
+implementing this feature was. Reading the email of the original
+patchset indicates that there are platforms where only TCF is supported:
 
-Thanks,
+<quote>
+For adopting of different platform, either of them is a way of DSPI
+transfer data.
+</quote>
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+However, I don't know which platform that would be. Also, it seems that
+Chao Fu's email is not valid anymore. 
+
+@Xiubo Li, maybe you can shed some light on this?
+
+>From the platform I am concerned about, Vybrid, it seems not very
+useful, so I'm fine with omitting that patch.
+
+--
+Stefan 
