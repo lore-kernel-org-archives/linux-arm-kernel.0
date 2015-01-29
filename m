@@ -1,29 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 29 Jan 2015 11:48:49 +0000
-Subject: [PATCH v2] ARM: teach __asmeq that r11 == fp and r12 == ip
-In-Reply-To: <1422524686-30462-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1422524686-30462-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150129114849.GZ26493@n2100.arm.linux.org.uk>
+From: petr.cvek@tul.cz (Petr Cvek)
+Date: Thu, 29 Jan 2015 12:51:38 +0100
+Subject: [PATCH v2] RTC: PXA: Fix regression of interrupt before ioremap
+Message-ID: <54CA1ECA.8050000@tul.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 29, 2015 at 09:44:46AM +0000, Ard Biesheuvel wrote:
-> The __asmeq macro is used inside inline asm statements to ensure that
-> register asm variables that explicitly specify a register are mapped
-> correctly onto those registers when used in inline asm input and output
-> constraints. However, the string based matching fails to take into account
-> that 'fp' is often referred to as 'r11' and 'ip' is often referred to as
-> 'r12', (e.g., by clang), causing false negatives.
-> 
-> Fix this by making __asmeq consider the ("fp","r11"), ("r11","fp"),
-> ("ip","r12") and ("r12","ip") cases specifically.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Interrupts appear before register set of the PXA2xx RTC controller is ioremaped.
 
-The method adopted is rather horrid in itself, but I guess there's no
-other way to deal with this... so I'm okay with the patch.  (I won't
-say I'm happy with it!)
+This fixes regression from:
+  'commit a44802f8fb7e593adabc6ef53c8df45a1717fa9b ("drivers/rtc/rtc-pxa.c: fix alarm can't wake up system issue")'
+  'commit 2f6e5f9458646263d3d9ffadd5e11e3d8d15a7d0 ("drivers/rtc: remove IRQF_DISABLED")'
 
+Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
+---
+ drivers/rtc/rtc-pxa.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/rtc/rtc-pxa.c b/drivers/rtc/rtc-pxa.c
+index 4561f37..d7d83e5 100644
+--- a/drivers/rtc/rtc-pxa.c
++++ b/drivers/rtc/rtc-pxa.c
+@@ -346,7 +346,7 @@ static int __init pxa_rtc_probe(struct platform_device *pdev)
+ 		dev_err(dev, "No alarm IRQ resource defined\n");
+ 		return -ENXIO;
+ 	}
+-	pxa_rtc_open(dev);
++
+ 	pxa_rtc->base = devm_ioremap(dev, pxa_rtc->ress->start,
+ 				resource_size(pxa_rtc->ress));
+ 	if (!pxa_rtc->base) {
+@@ -375,6 +375,10 @@ static int __init pxa_rtc_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
++	ret = pxa_rtc_open(dev);
++	if (ret)
++		return ret;
++
+ 	device_init_wakeup(dev, 1);
+ 
+ 	return 0;
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+1.7.12.1
