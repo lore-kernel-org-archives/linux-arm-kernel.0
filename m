@@ -1,75 +1,58 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 29 Jan 2015 11:13:38 -0800
-Subject: [PATCH v13 4/6] clk: Add rate constraints to clocks
-In-Reply-To: <CAMuHMdUGgA70o2SgdJR3X6AkCcMssHU0POLfzppADT-O=BrYDw@mail.gmail.com>
-References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>	<1422011024-32283-5-git-send-email-tomeu.vizoso@collabora.com>
- <CAMuHMdUGgA70o2SgdJR3X6AkCcMssHU0POLfzppADT-O=BrYDw@mail.gmail.com>
-Message-ID: <54CA8662.7040008@codeaurora.org>
+From: rjui@broadcom.com (Ray Jui)
+Date: Thu, 29 Jan 2015 11:24:34 -0800
+Subject: [PATCH 2/4] MAINTAINERS: update Broadcom Cygnus SoC git tree
+In-Reply-To: <CAKdAkRSXYDdUxMVms4B53aV3fm=hkO3hnyHPhyzKGGW5Bxs4-Q@mail.gmail.com>
+References: <1420843541-5166-1-git-send-email-f.fainelli@gmail.com>	<1420843541-5166-3-git-send-email-f.fainelli@gmail.com>	<54B05AFD.2030105@broadcom.com>
+ <CAKdAkRSXYDdUxMVms4B53aV3fm=hkO3hnyHPhyzKGGW5Bxs4-Q@mail.gmail.com>
+Message-ID: <54CA88F2.5080700@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/29/15 05:31, Geert Uytterhoeven wrote:
-> Hi Tomeu, Mike,
->
-> On Fri, Jan 23, 2015 at 12:03 PM, Tomeu Vizoso
-> <tomeu.vizoso@collabora.com> wrote:
->> --- a/drivers/clk/clk.c
->> +++ b/drivers/clk/clk.c
->> @@ -2391,25 +2543,24 @@ int __clk_get(struct clk *clk)
->>         return 1;
->>  }
+
+
+On 1/29/2015 11:01 AM, Dmitry Torokhov wrote:
+> On Fri, Jan 9, 2015 at 2:49 PM, Ray Jui <rjui@broadcom.com> wrote:
 >>
->> -static void clk_core_put(struct clk_core *core)
->> +void __clk_put(struct clk *clk)
->>  {
->>         struct module *owner;
 >>
->> -       owner = core->owner;
->> +       if (!clk || WARN_ON_ONCE(IS_ERR(clk)))
->> +               return;
+>> On 1/9/2015 2:45 PM, Florian Fainelli wrote:
+>>> The Cygnus SoC git tree is moved from github.com/brcm/linux.git to its
+>>> own git tree at github.com/Broadcom/cygnus-linux.git.
+>>>
+>>> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+>>> ---
+>>>  MAINTAINERS | 2 +-
+>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/MAINTAINERS b/MAINTAINERS
+>>> index ff73215cd165..4a8f3459f9c2 100644
+>>> --- a/MAINTAINERS
+>>> +++ b/MAINTAINERS
+>>> @@ -2192,7 +2192,7 @@ M:      Ray Jui <rjui@broadcom.com>
+>>>  M:   Scott Branden <sbranden@broadcom.com>
+>>>  L:   linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>>>  L:   bcm-kernel-feedback-list at broadcom.com
+>>> -T:   git git://git.github.com/brcm/linux.git
+>>> +T:   git git://git.github.com/Broadcom/cygnus-linux.git
 >>
->>         clk_prepare_lock();
->> -       kref_put(&core->ref, __clk_release);
->> +
->> +       hlist_del(&clk->child_node);
->> +       clk_core_set_rate_nolock(clk->core, clk->core->req_rate);
-> At this point, clk->core->req_rate is still zero, causing
-> cpg_div6_clock_round_rate() to be called with a zero "rate" parameter,
-> e.g. on r8a7791:
+>> Looks fine to me!
+> 
+> Hmm, the address does not work for me unless I drop 'git.' from the front:
+> 
+> git://github.com/Broadcom/cygnus-linux.git
+> 
+> Thanks.
+> 
+Thanks, Dmitry.
 
-Hmm.. I wonder if we should assign core->req_rate to be the same as
-core->rate during __clk_init()? That would make this call to
-clk_core_set_rate_nolock() a nop in this case.
+I just tried it myself and also got a connection timeout with
+git://git.github.com/Broadcom/cygnus-linux.git
 
->
-> cpg_div6_clock_round_rate: clock sd2 rate 0 parent_rate 780000000 div 1
-> cpg_div6_clock_round_rate: clock sd1 rate 0 parent_rate 780000000 div 1
-> cpg_div6_clock_round_rate: clock mmc0 rate 0 parent_rate 780000000 div 1
-> cpg_div6_clock_round_rate: clock sd1 rate 0 parent_rate 780000000 div 1
-> cpg_div6_clock_round_rate: clock sd1 rate 0 parent_rate 780000000 div 1
-> cpg_div6_clock_round_rate: clock sd2 rate 0 parent_rate 780000000 div 1
-> cpg_div6_clock_round_rate: clock sd2 rate 0 parent_rate 780000000 div 1
->
-> and cpg_div6_clock_calc_div() is called to calculate
->
->         div = DIV_ROUND_CLOSEST(parent_rate, rate);
->
-> Why was this call to clk_core_set_rate_nolock() in __clk_put() added?
-> Before, there was no rate setting done at this point, and
-> cpg_div6_clock_round_rate() was not called.
+fatal: unable to connect to git.github.com:
+git.github.com[0: 23.235.47.133]: errno=Connection timed out
 
-We need to call clk_core_set_rate_nolock() here to drop any min/max rate
-request that this consumer has.
+Same issue for git://git.github.com/broadcom/stblinux.git and
+git://git.github.com/broadcom/arm-bcm63xx.git
 
->
-> Have the semantics changed? Should .round_rate() be ready to
-> accept a "zero" rate, and use e.g. the current rate instead?
+git://github.com/Broadcom/cygnus-linux.git works fine as you mentioned.
 
-It seems like we've also exposed a bug in cpg_div6_clock_calc_div().
-Technically any driver could have called clk_round_rate() with a zero
-rate before this change and that would have caused the same division by
-zero.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Florian, I think we need to fix this. Thanks.
