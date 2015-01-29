@@ -1,24 +1,64 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 29 Jan 2015 10:44:24 +0100
-Subject: [PATCH 14/14 v2] pinctrl: sh-pfc: sh7372: Remove DT binding
- documentation
-In-Reply-To: <20150126062012.6848.20501.sendpatchset@little-apple>
-References: <20150126061747.6848.9708.sendpatchset@little-apple>
- <20150126062012.6848.20501.sendpatchset@little-apple>
-Message-ID: <CACRpkdYMRttcAqSPkK7fHk7r48cYqyi1DyMCn3K9vOLeAz79XQ@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 29 Jan 2015 09:44:46 +0000
+Subject: [PATCH v2] ARM: teach __asmeq that r11 == fp and r12 == ip
+Message-ID: <1422524686-30462-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 26, 2015 at 7:20 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
+The __asmeq macro is used inside inline asm statements to ensure that
+register asm variables that explicitly specify a register are mapped
+correctly onto those registers when used in inline asm input and output
+constraints. However, the string based matching fails to take into account
+that 'fp' is often referred to as 'r11' and 'ip' is often referred to as
+'r12', (e.g., by clang), causing false negatives.
 
-> From: Magnus Damm <damm+renesas@opensource.se>
->
-> Remove the DT compatible string entry for the now unsupported sh7372 SoC.
->
-> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
-> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Fix this by making __asmeq consider the ("fp","r11"), ("r11","fp"),
+("ip","r12") and ("r12","ip") cases specifically.
 
-Patch applied.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+v2:
+Added r11 but not r10, as the latter is only referred to as 'sl' in
+objdump output, but GCC emitted inline asm substitutes the references
+with 'r10' instead. sp/lr/pc are unambiguous between GCC and clang.
 
-Yours,
-Linus Walleij
+Primary purpose of this patch is to fix the incompatibility between clang
+and GCC, but the side effect is that it relaxes the requirement imposed on
+the programmer to refer to a register by the same name as the compiler does.
+If that is seen as a substantial upside by some, we could indeed still decide
+to add r10, r13, r14 and r15 (for which no such incompatibility exists) as well.
+However, those are not currently used in __asmeq invocations anywhere under
+arch/arm
+
+ arch/arm/include/asm/compiler.h | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/include/asm/compiler.h b/arch/arm/include/asm/compiler.h
+index 8155db2f7fa1..29fe85e59439 100644
+--- a/arch/arm/include/asm/compiler.h
++++ b/arch/arm/include/asm/compiler.h
+@@ -8,8 +8,21 @@
+  * This string is meant to be concatenated with the inline asm string and
+  * will cause compilation to stop on mismatch.
+  * (for details, see gcc PR 15089)
++ * For compatibility with clang, we have to specifically take the equivalence
++ * of 'r11' <-> 'fp' and 'r12' <-> 'ip' into account as well.
+  */
+-#define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
++#define __asmeq(x, y)				\
++	".ifnc " x "," y "; "			\
++	  ".ifnc " x y ",fpr11; " 		\
++	    ".ifnc " x y ",r11fp; "		\
++	      ".ifnc " x y ",ipr12; " 		\
++	        ".ifnc " x y ",r12ip; "		\
++	          ".err; "			\
++	        ".endif; "			\
++	      ".endif; "			\
++	    ".endif; "				\
++	  ".endif; "				\
++	".endif\n\t"
+ 
+ 
+ #endif /* __ASM_ARM_COMPILER_H */
+-- 
+1.8.3.2
