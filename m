@@ -1,41 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 29 Jan 2015 17:18:59 +0100
-Subject: [PATCH] [TEMPORARY] net: netfilter: IPV6 XT sockets need
- CONFIG_NF_DEFRAG_IPV6
-Message-ID: <1513018.IdvuSAziQY@wuerfel>
+Date: Thu, 29 Jan 2015 17:22:16 +0100
+Subject: [PATCH] ARM: fix ARMv4+Feroceon multiplatform build
+Message-ID: <1811247.REIIfdW143@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If IP6_NF_IPTABLES=m, NF_DEFRAG_IPV6 gets selected as a module as well
-from NETFILTER_XT_MATCH_SOCKET, so the latter cannot be built-in, or
-we get:
+The feroceon copypage implementation cannot be built when targetting an
+ARMv4 CPU, so we need to pass the march=armv5te flag manually to gcc
+when building this file. This is obviously safe since that code will
+not be executed on ARMv4.
 
-net/built-in.o: In function `socket_mt_init':
-:(.init.text+0x32a0): undefined reference to `nf_defrag_ipv6_enable'
-net/built-in.o: In function `tproxy_tg_init':
-xt_TPROXY.c:582: undefined reference to `nf_defrag_ipv6_enable'
-
-This adds one more dependency like the others to avoid the problem.
+/tmp/ccEtc0pF.s: Assembler messages:
+/tmp/ccEtc0pF.s:59: Error: selected processor does not support ARM mode `pld [lr,#32]'
+/tmp/ccEtc0pF.s:60: Error: selected processor does not support ARM mode `pld [lr,#64]'
+/tmp/ccEtc0pF.s:61: Error: selected processor does not support ARM mode `pld [lr,#96]'
+/tmp/ccEtc0pF.s:62: Error: selected processor does not support ARM mode `pld [lr,#128]'
+/tmp/ccEtc0pF.s:63: Error: selected processor does not support ARM mode `pld [lr,#160]'
+/tmp/ccEtc0pF.s:64: Error: selected processor does not support ARM mode `pld [lr,#192]'
+/tmp/ccEtc0pF.s:65: Error: selected processor does not support ARM mode `pld [lr,#224]'
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-diff --git a/net/netfilter/Kconfig b/net/netfilter/Kconfig
-index b02660fa9eb0..2bd57d62a385 100644
---- a/net/netfilter/Kconfig
-+++ b/net/netfilter/Kconfig
-@@ -875,6 +875,7 @@ config NETFILTER_XT_TARGET_TPROXY
- 	depends on NETFILTER_ADVANCED
- 	depends on (IPV6 || IPV6=n)
- 	depends on IP_NF_MANGLE
-+	depends on (IP6_NF_IPTABLES || !IP6_NF_IPTABLES)
- 	select NF_DEFRAG_IPV4
- 	select NF_DEFRAG_IPV6 if IP6_NF_IPTABLES
- 	help
-@@ -1367,6 +1368,7 @@ config NETFILTER_XT_MATCH_SOCKET
- 	depends on NETFILTER_ADVANCED
- 	depends on !NF_CONNTRACK || NF_CONNTRACK
- 	depends on (IPV6 || IPV6=n)
-+	depends on (IP6_NF_IPTABLES || !IP6_NF_IPTABLES)
- 	select NF_DEFRAG_IPV4
- 	select NF_DEFRAG_IPV6 if IP6_NF_IPTABLES
- 	help
+diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
+index d3afdf9eb65a..39a44bb84edf 100644
+--- a/arch/arm/mm/Makefile
++++ b/arch/arm/mm/Makefile
+@@ -55,6 +55,8 @@ obj-$(CONFIG_CPU_XSCALE)	+= copypage-xscale.o
+ obj-$(CONFIG_CPU_XSC3)		+= copypage-xsc3.o
+ obj-$(CONFIG_CPU_COPY_FA)	+= copypage-fa.o
+ 
++CFLAGS_copypage-feroceon.o := -march=armv5te
++
+ obj-$(CONFIG_CPU_TLB_V4WT)	+= tlb-v4.o
+ obj-$(CONFIG_CPU_TLB_V4WB)	+= tlb-v4wb.o
+ obj-$(CONFIG_CPU_TLB_V4WBI)	+= tlb-v4wbi.o
