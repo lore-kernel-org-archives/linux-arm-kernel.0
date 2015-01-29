@@ -1,33 +1,42 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 29 Jan 2015 14:04:56 -0800
-Subject: [GIT PULL] Zynq SoC changes for 3.20
-In-Reply-To: <1f0d53f4aa6f40659cd299540eaed31c@BN1AFFO11FD019.protection.gbl>
-References: <1f0d53f4aa6f40659cd299540eaed31c@BN1AFFO11FD019.protection.gbl>
-Message-ID: <20150129220456.GH20785@quad.lixom.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 29 Jan 2015 23:04:46 +0100
+Subject: [PATCH] mmc: moxart: fix probe logic
+In-Reply-To: <20150129170104.GD26493@n2100.arm.linux.org.uk>
+References: <8340872.32GezMfzR1@wuerfel>
+ <20150129170104.GD26493@n2100.arm.linux.org.uk>
+Message-ID: <4063267.WLHfiFCJT7@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 29, 2015 at 03:43:53PM +0100, Michal Simek wrote:
-> Hi,
+On Thursday 29 January 2015 17:01:04 Russell King - ARM Linux wrote:
+> On Thu, Jan 29, 2015 at 05:15:31PM +0100, Arnd Bergmann wrote:
+> > @@ -586,10 +586,10 @@ static int moxart_probe(struct platform_device *pdev)
+> >               goto out;
+> >       }
+> >  
+> > -     clk = of_clk_get(node, 0);
+> > -     if (IS_ERR(clk)) {
+> > +     host->clk = of_clk_get(node, 0);
+> > +     if (IS_ERR(host->clk)) {
+> >               dev_err(dev, "of_clk_get failed\n");
+> > -             ret = PTR_ERR(clk);
+> > +             ret = PTR_ERR(host->clk);
+> >               goto out;
+> >       }
+> >  
+> ...
+> > @@ -677,6 +679,8 @@ static int moxart_probe(struct platform_device *pdev)
+> >       return 0;
+> >  
+> >  out:
+> > +     if (host->clk)
+> > +             clk_put(host->clk);
 > 
-> please pull these 4 patches to your tree.
+> Are you sure?
 > 
-> Thanks,
-> Michal
-> 
-> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
-> 
->   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
-> 
-> are available in the git repository at:
-> 
->   https://github.com/Xilinx/linux-xlnx.git tags/zynq-soc-for-3.20
-> 
-> for you to fetch changes up to 3329659df0300d1d0aa22f5e7063f83a88ef92aa:
-> 
->   ARM: zynq: Simplify SLCR initialization (2015-01-29 15:38:17 +0100)
 
-Merged, thanks!
+Oops, sorry about that.
 
+Thanks for the review! Fixed patch follows.
 
--Olof
+	Arnd
