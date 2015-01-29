@@ -1,52 +1,144 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 29 Jan 2015 13:59:00 -0800
-Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Fixes for v3.20
-In-Reply-To: <cover.1422492899.git.horms+renesas@verge.net.au>
-References: <cover.1422492899.git.horms+renesas@verge.net.au>
-Message-ID: <20150129215900.GF20785@quad.lixom.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 29 Jan 2015 23:06 +0100
+Subject: [PATCH v2] mmc: moxart: fix probe logic
+In-Reply-To: <20150129170104.GD26493@n2100.arm.linux.org.uk>
+References: <8340872.32GezMfzR1@wuerfel>
+ <20150129170104.GD26493@n2100.arm.linux.org.uk>
+Message-ID: <1862200.Pj3heKAtuk@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 29, 2015 at 10:31:22AM +0900, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
-> 
-> Please consider these Renesas ARM based SoC defconfig fixes for v3.20.
-> 
-> This pull request is based on "Second Round of Renesas ARM Based SoC
-> Defconfig Updates for v3.20", tagged as renesas-defconfig2-for-v3.20, which
-> you have previously pulled.
-> 
-> 
-> That pull-request was comprised of a single patch "ARM: shmobile: Enable
-> kzm9g board in multiplatform defconfig" which updated the mach_shmobile
-> based on the output of make savedefconfig run on a tree with sh73a0/kzm9g
-> multiplatform support present. And due to REGULATOR being indirectly
-> selected by Kconfig with that support prsent it was not present in the
-> resulting shmobile_defconfig.
-> 
-> However, sh73a0/kzm9g multiplatform supportsupport is no longer queued up
-> for v3.20 and thus is not enabled by make shmobile_defconfig resulting at
-> least in SDHI not working on boards based on R-Car Gen2 SoCs.
-> 
-> It may have been better if I had held off on the patch in question
-> until sh73a0/kzm9g multiplatform support was merged, something I expected
-> to occur for v3.20. But things being as they are this pull-request
-> provides a simple fix for the fallout.
-> 
-> 
-> The following changes since commit eb4513482d1c4882e3633528ccc48d77581b7bb1:
-> 
->   ARM: shmobile: Enable kzm9g board in multiplatform defconfig (2015-01-14 09:51:08 +0900)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig-fixes-for-v3.20
-> 
-> for you to fetch changes up to 30aca3c84bd79b48154908b6c1592347f4df3d53:
-> 
->   ARM: shmobile: Select CONFIG_REGULATOR in defconfig once again (2015-01-26 16:14:04 +0900)
+Jonas Jensen wanted to submit a patch for these, but apparently
+forgot about it. I stumbled over this symptom first:
 
-Merged, thanks.
+drivers/built-in.o: In function `moxart_probe':
+:(.text+0x2af128): undefined reference to `of_dma_request_slave_channel'
 
+This is because of_dma_request_slave_channel is an internal helper
+and not exported to loadable module. I'm changing the driver to
+use dma_request_slave_channel_reason() instead.
 
--Olof
+Further problems from inspection:
+
+* The remove function must not call kfree on the host pointer,
+  because it is allocated together with the mmc_host.
+
+* The clock is never released
+
+* The dma_cap_mask_t is completely unused and can be removed
+
+* deferred probing does not work if the dma driver is loaded
+  after the mmc driver.
+
+This patch should fix all of the above.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+v2:  do not call clk_put() on an error pointer
+ 
+diff --git a/drivers/mmc/host/moxart-mmc.c b/drivers/mmc/host/moxart-mmc.c
+index d2a1ef61ec97..66af7ae1f926 100644
+--- a/drivers/mmc/host/moxart-mmc.c
++++ b/drivers/mmc/host/moxart-mmc.c
+@@ -17,6 +17,7 @@
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <linux/delay.h>
++#include <linux/errno.h>
+ #include <linux/interrupt.h>
+ #include <linux/blkdev.h>
+ #include <linux/dma-mapping.h>
+@@ -131,6 +132,7 @@ struct moxart_host {
+ 	struct mmc_host			*mmc;
+ 	struct mmc_request		*mrq;
+ 	struct scatterlist		*cur_sg;
++	struct clk			*clk;
+ 	struct completion		dma_complete;
+ 	struct completion		pio_complete;
+ 
+@@ -560,9 +562,7 @@ static int moxart_probe(struct platform_device *pdev)
+ 	struct mmc_host *mmc;
+ 	struct moxart_host *host = NULL;
+ 	struct dma_slave_config cfg;
+-	struct clk *clk;
+ 	void __iomem *reg_mmc;
+-	dma_cap_mask_t mask;
+ 	int irq, ret;
+ 	u32 i;
+ 
+@@ -586,10 +586,11 @@ static int moxart_probe(struct platform_device *pdev)
+ 		goto out;
+ 	}
+ 
+-	clk = of_clk_get(node, 0);
+-	if (IS_ERR(clk)) {
++	host->clk = of_clk_get(node, 0);
++	if (IS_ERR(host->clk)) {
+ 		dev_err(dev, "of_clk_get failed\n");
+-		ret = PTR_ERR(clk);
++		ret = PTR_ERR(host->clk);
++		host->clk = NULL;
+ 		goto out;
+ 	}
+ 
+@@ -603,18 +604,15 @@ static int moxart_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		goto out;
+ 
+-	dma_cap_zero(mask);
+-	dma_cap_set(DMA_SLAVE, mask);
+-
+ 	host = mmc_priv(mmc);
+ 	host->mmc = mmc;
+ 	host->base = reg_mmc;
+ 	host->reg_phys = res_mmc.start;
+ 	host->timeout = msecs_to_jiffies(1000);
+-	host->sysclk = clk_get_rate(clk);
++	host->sysclk = clk_get_rate(host->clk);
+ 	host->fifo_width = readl(host->base + REG_FEATURE) << 2;
+-	host->dma_chan_tx = of_dma_request_slave_channel(node, "tx");
+-	host->dma_chan_rx = of_dma_request_slave_channel(node, "rx");
++	host->dma_chan_tx = dma_request_slave_channel_reason(dev, "tx");
++	host->dma_chan_rx = dma_request_slave_channel_reason(dev, "rx");
+ 
+ 	spin_lock_init(&host->lock);
+ 
+@@ -624,6 +622,11 @@ static int moxart_probe(struct platform_device *pdev)
+ 	mmc->ocr_avail = 0xffff00;	/* Support 2.0v - 3.6v power. */
+ 
+ 	if (IS_ERR(host->dma_chan_tx) || IS_ERR(host->dma_chan_rx)) {
++		if (PTR_ERR(host->dma_chan_tx) == -EPROBE_DEFER ||
++		    PTR_ERR(host->dma_chan_rx) == -EPROBE_DEFER) {
++			ret = -EPROBE_DEFER;
++			goto out;
++		}
+ 		dev_dbg(dev, "PIO mode transfer enabled\n");
+ 		host->have_dma = false;
+ 	} else {
+@@ -677,6 +680,8 @@ static int moxart_probe(struct platform_device *pdev)
+ 	return 0;
+ 
+ out:
++	if (host->clk)
++		clk_put(host->clk);
+ 	if (mmc)
+ 		mmc_free_host(mmc);
+ 	return ret;
+@@ -694,6 +699,7 @@ static int moxart_remove(struct platform_device *pdev)
+ 			dma_release_channel(host->dma_chan_tx);
+ 		if (!IS_ERR(host->dma_chan_rx))
+ 			dma_release_channel(host->dma_chan_rx);
++		clk_put(host->clk);
+ 		mmc_remove_host(mmc);
+ 		mmc_free_host(mmc);
+ 
+@@ -702,9 +708,6 @@ static int moxart_remove(struct platform_device *pdev)
+ 		writel(readl(host->base + REG_CLOCK_CONTROL) | CLK_OFF,
+ 		       host->base + REG_CLOCK_CONTROL);
+ 	}
+-
+-	kfree(host);
+-
+ 	return 0;
+ }
+ 
