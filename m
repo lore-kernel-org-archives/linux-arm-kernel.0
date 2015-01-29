@@ -1,25 +1,105 @@
-From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Thu, 29 Jan 2015 07:37:48 +0100
-Subject: [PATCH] ARM: cns3xxx: fix typo in PCI config accessor
-In-Reply-To: <2000255.rnmr9HfSOg@wuerfel> (Arnd Bergmann's message of "Wed, 28
- Jan 2015 14:53:07 +0100")
-References: <2000255.rnmr9HfSOg@wuerfel>
-Message-ID: <m3y4omw0qr.fsf@t19.piap.pl>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Thu, 29 Jan 2015 14:36:02 +0800
+Subject: [PATCH v5 01/13] pm: at91: pm_slowclock: fix suspend/resume hang up
+ in timeouts
+In-Reply-To: <1422513316-21509-1-git-send-email-wenyou.yang@atmel.com>
+References: <1422513316-21509-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1422513362-22096-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+From: Sylvain Rochet <sylvain.rochet@finsecur.com>
 
-> The recent patch to convert the cns3xxx PCI code added an
-> extraneous opening bracket, which makes the build fail,
-> so remove this.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 10e2c5540d48 ("ARM: cns3xxx: Convert PCI to use generic config accessors")
-Acked-by: Krzysztof Ha?asa <khalasa@piap.pl>
+Removed timeout on XTAL, PLL lock and Master Clock Ready, hang if
+something went wrong instead of continuing in unknown condition. There
+is not much we can do if a PLL lock never ends, we are running in SRAM
+and we will not be able to connect back the sdram or ddram in order to
+be able to fire up a message or just panic.
 
+As a bonus, not decounting the timeout register in slow clock mode
+reduce cumulated suspend time and resume time from ~17ms to ~15ms.
+
+Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+---
+ arch/arm/mach-at91/pm_slowclock.S |   33 ++++-----------------------------
+ 1 file changed, 4 insertions(+), 29 deletions(-)
+
+diff --git a/arch/arm/mach-at91/pm_slowclock.S b/arch/arm/mach-at91/pm_slowclock.S
+index 556151e..50744e7 100644
+--- a/arch/arm/mach-at91/pm_slowclock.S
++++ b/arch/arm/mach-at91/pm_slowclock.S
+@@ -25,11 +25,6 @@
+  */
+ #undef SLOWDOWN_MASTER_CLOCK
+ 
+-#define MCKRDY_TIMEOUT		1000
+-#define MOSCRDY_TIMEOUT 	1000
+-#define PLLALOCK_TIMEOUT	1000
+-#define PLLBLOCK_TIMEOUT	1000
+-
+ pmc	.req	r0
+ sdramc	.req	r1
+ ramc1	.req	r2
+@@ -41,56 +36,36 @@ tmp2	.req	r5
+  * Wait until master clock is ready (after switching master clock source)
+  */
+ 	.macro wait_mckrdy
+-	mov	tmp2, #MCKRDY_TIMEOUT
+-1:	sub	tmp2, tmp2, #1
+-	cmp	tmp2, #0
+-	beq	2f
+-	ldr	tmp1, [pmc, #AT91_PMC_SR]
++1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
+ 	tst	tmp1, #AT91_PMC_MCKRDY
+ 	beq	1b
+-2:
+ 	.endm
+ 
+ /*
+  * Wait until master oscillator has stabilized.
+  */
+ 	.macro wait_moscrdy
+-	mov	tmp2, #MOSCRDY_TIMEOUT
+-1:	sub	tmp2, tmp2, #1
+-	cmp	tmp2, #0
+-	beq	2f
+-	ldr	tmp1, [pmc, #AT91_PMC_SR]
++1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
+ 	tst	tmp1, #AT91_PMC_MOSCS
+ 	beq	1b
+-2:
+ 	.endm
+ 
+ /*
+  * Wait until PLLA has locked.
+  */
+ 	.macro wait_pllalock
+-	mov	tmp2, #PLLALOCK_TIMEOUT
+-1:	sub	tmp2, tmp2, #1
+-	cmp	tmp2, #0
+-	beq	2f
+-	ldr	tmp1, [pmc, #AT91_PMC_SR]
++1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
+ 	tst	tmp1, #AT91_PMC_LOCKA
+ 	beq	1b
+-2:
+ 	.endm
+ 
+ /*
+  * Wait until PLLB has locked.
+  */
+ 	.macro wait_pllblock
+-	mov	tmp2, #PLLBLOCK_TIMEOUT
+-1:	sub	tmp2, tmp2, #1
+-	cmp	tmp2, #0
+-	beq	2f
+-	ldr	tmp1, [pmc, #AT91_PMC_SR]
++1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
+ 	tst	tmp1, #AT91_PMC_LOCKB
+ 	beq	1b
+-2:
+ 	.endm
+ 
+ 	.text
 -- 
-Krzysztof Halasa
-
-Research Institute for Automation and Measurements PIAP
-Al. Jerozolimskie 202, 02-486 Warsaw, Poland
+1.7.9.5
