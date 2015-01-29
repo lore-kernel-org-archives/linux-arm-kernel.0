@@ -1,64 +1,38 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 29 Jan 2015 09:44:46 +0000
-Subject: [PATCH v2] ARM: teach __asmeq that r11 == fp and r12 == ip
-Message-ID: <1422524686-30462-1-git-send-email-ard.biesheuvel@linaro.org>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 29 Jan 2015 17:42:12 +0800
+Subject: [PATCH] mmc: sdhci: switch voltage before sdhci_set_ios in runtime
+ resume
+Message-ID: <1422524532-4275-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The __asmeq macro is used inside inline asm statements to ensure that
-register asm variables that explicitly specify a register are mapped
-correctly onto those registers when used in inline asm input and output
-constraints. However, the string based matching fails to take into account
-that 'fp' is often referred to as 'r11' and 'ip' is often referred to as
-'r12', (e.g., by clang), causing false negatives.
+I observed the Host Control2 register isn't correctly restored
+after runtime resuming on BG2Q. For example, the register reads
+as 0x800c before runtime suspend, but it's set as 0x8004 after runtime
+resuming. This could results in a non working host.
 
-Fix this by making __asmeq consider the ("fp","r11"), ("r11","fp"),
-("ip","r12") and ("r12","ip") cases specifically.
+The reason is the Host Control2 is incorrectly reset when switching
+voltage. We fix this by following the same sequence during initialization.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
-v2:
-Added r11 but not r10, as the latter is only referred to as 'sl' in
-objdump output, but GCC emitted inline asm substitutes the references
-with 'r10' instead. sp/lr/pc are unambiguous between GCC and clang.
+ drivers/mmc/host/sdhci.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Primary purpose of this patch is to fix the incompatibility between clang
-and GCC, but the side effect is that it relaxes the requirement imposed on
-the programmer to refer to a register by the same name as the compiler does.
-If that is seen as a substantial upside by some, we could indeed still decide
-to add r10, r13, r14 and r15 (for which no such incompatibility exists) as well.
-However, those are not currently used in __asmeq invocations anywhere under
-arch/arm
-
- arch/arm/include/asm/compiler.h | 15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/include/asm/compiler.h b/arch/arm/include/asm/compiler.h
-index 8155db2f7fa1..29fe85e59439 100644
---- a/arch/arm/include/asm/compiler.h
-+++ b/arch/arm/include/asm/compiler.h
-@@ -8,8 +8,21 @@
-  * This string is meant to be concatenated with the inline asm string and
-  * will cause compilation to stop on mismatch.
-  * (for details, see gcc PR 15089)
-+ * For compatibility with clang, we have to specifically take the equivalence
-+ * of 'r11' <-> 'fp' and 'r12' <-> 'ip' into account as well.
-  */
--#define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
-+#define __asmeq(x, y)				\
-+	".ifnc " x "," y "; "			\
-+	  ".ifnc " x y ",fpr11; " 		\
-+	    ".ifnc " x y ",r11fp; "		\
-+	      ".ifnc " x y ",ipr12; " 		\
-+	        ".ifnc " x y ",r12ip; "		\
-+	          ".err; "			\
-+	        ".endif; "			\
-+	      ".endif; "			\
-+	    ".endif; "				\
-+	  ".endif; "				\
-+	".endif\n\t"
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index c9881ca..0ad412a 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -2871,9 +2871,9 @@ int sdhci_runtime_resume_host(struct sdhci_host *host)
+ 	/* Force clock and power re-program */
+ 	host->pwr = 0;
+ 	host->clock = 0;
++	sdhci_do_start_signal_voltage_switch(host, &host->mmc->ios);
+ 	sdhci_do_set_ios(host, &host->mmc->ios);
  
- 
- #endif /* __ASM_ARM_COMPILER_H */
+-	sdhci_do_start_signal_voltage_switch(host, &host->mmc->ios);
+ 	if ((host_flags & SDHCI_PV_ENABLED) &&
+ 		!(host->quirks2 & SDHCI_QUIRK2_PRESET_VALUE_BROKEN)) {
+ 		spin_lock_irqsave(&host->lock, flags);
 -- 
-1.8.3.2
+2.1.4
