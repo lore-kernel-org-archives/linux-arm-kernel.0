@@ -1,37 +1,25 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 29 Jan 2015 09:51:07 +0100
-Subject: [PATCH v3 4/7] mmc: sdhci-pxav3: Modify clock settings for the
- SDR50 and DDR50 modes
-In-Reply-To: <CAPDyKFpTnGrdKLYjH=GaG2bQ-44F68fSxRvRQBi8bHP5A83Ahw@mail.gmail.com>
-References: <1422031587-18212-1-git-send-email-gregory.clement@free-electrons.com>	<1422031587-18212-5-git-send-email-gregory.clement@free-electrons.com>
- <CAPDyKFpTnGrdKLYjH=GaG2bQ-44F68fSxRvRQBi8bHP5A83Ahw@mail.gmail.com>
-Message-ID: <54C9F47B.1020200@free-electrons.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 29 Jan 2015 17:53:30 +0900
+Subject: [PATCH] ARM: shmobile: r8a7791: Correct SDHI clock labels and
+ output-names
+In-Reply-To: <CAMuHMdXktWqe_+HhORN0iWEMLm=y2fS52PFtPK4RzAHQMHLYXw@mail.gmail.com>
+References: <1422496038-3915-1-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdXktWqe_+HhORN0iWEMLm=y2fS52PFtPK4RzAHQMHLYXw@mail.gmail.com>
+Message-ID: <20150129085330.GB21851@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
-
-[...]
-
->> +               dev_warn(&pdev->dev, "conf-sdio3 register not found\n");
->> +               dev_warn(&pdev->dev, "disabling SDR50 and DDR50 modes\n");
->> +               dev_warn(&pdev->dev, "consider updating your dtb\n");
+On Thu, Jan 29, 2015 at 09:05:15AM +0100, Geert Uytterhoeven wrote:
+> On Thu, Jan 29, 2015 at 2:47 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > There appears to have been some inconsistency and confusion here as on
+> > the r8a7790 these clocks are referred to as SD(HI)1 and SD(HI)2 while on
+> > the r8a7791 and r8a7794 they are referred to as SD(HI)2 and SD(HI)3.
+> >
+> > Fixes: 59e79895b95892863 ("ARM: shmobile: r8a7791: Add clocks")
+> > Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > 
-> One dev_warn() should be enough. Also I don't think checkpatch
-> complains about long lines for dev_warn().
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Right. Once you will have told if you sill want a change or not in patch 1,
-I will send a new version with this change.
-
-
-Thanks,
-
-Gregory
-
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Thanks, I have queued this up.
