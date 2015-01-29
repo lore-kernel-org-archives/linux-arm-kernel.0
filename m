@@ -1,62 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 29 Jan 2015 19:26:11 +0000
-Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher
- constraints with dma-parms
-In-Reply-To: <CAF6AEGtTmFg66TK_AFkQ-xp7Nd9Evk3nqe6xCBp7K=77OmXTxA@mail.gmail.com>
-References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
- <1422347154-15258-2-git-send-email-sumit.semwal@linaro.org>
- <20150129143908.GA26493@n2100.arm.linux.org.uk>
- <CAO_48GEOQ1pBwirgEWeVVXW-iOmaC=Xerr2VyYYz9t1QDXgVsw@mail.gmail.com>
- <20150129154718.GB26493@n2100.arm.linux.org.uk>
- <CAF6AEGtTmFg66TK_AFkQ-xp7Nd9Evk3nqe6xCBp7K=77OmXTxA@mail.gmail.com>
-Message-ID: <20150129192610.GE26493@n2100.arm.linux.org.uk>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 29 Jan 2015 20:42:12 +0100
+Subject: [PATCH v2] RTC: PXA: Fix regression of interrupt before ioremap
+In-Reply-To: <54CA1ECA.8050000@tul.cz> (Petr Cvek's message of "Thu, 29 Jan
+ 2015 12:51:38 +0100")
+References: <54CA1ECA.8050000@tul.cz>
+Message-ID: <87fvatnzl7.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 29, 2015 at 01:52:09PM -0500, Rob Clark wrote:
-> Quite possibly for some of these edge some of cases, some of the
-> dma-buf exporters are going to need to get more clever (ie. hand off
-> different scatterlists to different clients).  Although I think by far
-> the two common cases will be "I can support anything via an iommu/mmu"
-> and "I need phys contig".
-> 
-> But that isn't an issue w/ dma-buf itself, so much as it is an issue
-> w/ drivers.  I guess there would be more interest in fixing up drivers
-> when actual hw comes along that needs it..
+Petr Cvek <petr.cvek@tul.cz> writes:
 
-However, validating the attachments is the business of dma-buf.  This
-is actual infrastructure, which should ensure some kind of sanity such
-as the issues I've raised.
+> Interrupts appear before register set of the PXA2xx RTC controller is ioremaped.
+>
+> This fixes regression from:
+>   'commit a44802f8fb7e593adabc6ef53c8df45a1717fa9b ("drivers/rtc/rtc-pxa.c: fix alarm can't wake up system issue")'
+>   'commit 2f6e5f9458646263d3d9ffadd5e11e3d8d15a7d0 ("drivers/rtc: remove IRQF_DISABLED")'
+>
+> Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
 
-The whole "we can push it onto our users" is really on - what that
-results in is the users ignoring most of the requirements and just doing
-their own thing, which ultimately ends up with the whole thing turning
-into a disgusting mess - one which becomes very difficult to fix later.
+No sorry, I don't like this.
+It's not your patch I don't like, it fixes a real problem, but what happens then
+if :
+ - kernel boots
+ - a process opens /dev/rtc0
 
-Now, if we're going to do the "more clever" thing you mention above,
-that rather negates the point of this two-part patch set, which is to
-provide the union of the DMA capabilities of all users.  A union in
-that case is no longer sane as we'd be tailoring the SG lists to each
-user.
+The real issue is with patch a44802f "drivers/rtc/rtc-pxa.c: fix alarm can't
+wake up system issue". I'd rather have you revert a44802f, which makes no sense
+to me ...
 
-If we aren't going to do the "more clever" thing, then yes, we need this
-code to calculate that union, but we _also_ need it to do sanity checking
-right from the start, and refuse conditions which ultimately break the
-ability to make use of that union - in other words, when the union of
-the DMA capabilities means that the dmabuf can't be represented.
+Leo if you want to comment on it, feel free, and tell me if you tried your patch
+with the code in Documentation/rtc.txt ?
 
-Unless we do that, we'll just end up with random drivers interpreting
-what they want from the DMA capabilities, and we'll have some drivers
-exporting (eg) scatterlists which satisfy the maximum byte size of an
-element, but ignoring the maximum number of entries or vice versa, and
-that'll most probably hide the case of "too small a union".
+Cheers.
 
-It really doesn't make sense to do both either: that route is even more
-madness, because we'll end up with two classes of drivers - those which
-use the union approach, and those which don't.
-
-The KISS principle applies here.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+--
+Robert
