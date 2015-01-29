@@ -1,155 +1,111 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 29 Jan 2015 08:16:26 +0000 (UTC)
-Subject: OMAP baseline test results for v3.19-rc6
-Message-ID: <alpine.DEB.2.02.1501290808440.19947@utopia.booyaka.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 29 Jan 2015 09:31:05 +0100
+Subject: [PATCH v2 1/7] mmc: sdhci-pxav3: Fix SDR50 and DDR50 capabilities
+ for the Armada 38x flavor
+In-Reply-To: <CAPDyKFp=TxkL4BPMxVU+pMPoCQ1xPq0XZ+ZPpBFFaDnNtFjynw@mail.gmail.com>
+References: <1422010594-1735-1-git-send-email-gregory.clement@free-electrons.com>	<1422010594-1735-2-git-send-email-gregory.clement@free-electrons.com>
+ <CAPDyKFp=TxkL4BPMxVU+pMPoCQ1xPq0XZ+ZPpBFFaDnNtFjynw@mail.gmail.com>
+Message-ID: <54C9EFC9.7090809@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Ulf,
 
-Here are some basic OMAP test results for Linux v3.19-rc6.
-Logs and other details at:
+On 28/01/2015 21:36, Ulf Hansson wrote:
+> On 23 January 2015 at 11:56, Gregory CLEMENT
+> <gregory.clement@free-electrons.com> wrote:
+>> According to erratum 'FE-2946959' both SDR50 and DDR50 modes require
+>> specific clock adjustments in SDIO3 Configuration register. However,
+>> this register was not part of the device tree binding. Even if the
+>> binding can (and will) be extended we still need handling the case
+>> where this register was not available. In this case we use the
+>> SDHCI_QUIRK_MISSING_CAPS quirk remove them from the capabilities.
+>>
+>> This commit is based on the work done by Marcin Wojtas<mw@semihalf.com>
+>>
+>> Fixes: 5491ce3f79ee ("mmc: sdhci-pxav3: add support for the Armada 38x SDHCI controller")
+>> Cc: <stable@vger.kernel.org> # v3.15+
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+>> ---
+>>  drivers/mmc/host/sdhci-pxav3.c | 18 ++++++++++++++++++
+>>  1 file changed, 18 insertions(+)
+>>
+>> diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
+>> index ca3424e7ef71..7b07325b4fba 100644
+>> --- a/drivers/mmc/host/sdhci-pxav3.c
+>> +++ b/drivers/mmc/host/sdhci-pxav3.c
+>> @@ -118,6 +118,20 @@ static int mv_conf_mbus_windows(struct platform_device *pdev,
+>>         return 0;
+>>  }
+>>
+>> +static int armada_38x_quirks(struct sdhci_host *host)
+> 
+> Seems like this function can be void instead of always returning 0.
 
-    http://www.pwsan.com/omap/testlogs/test_v3.19-rc6/20150128221837/
+In patch 4 "mmc: sdhci-pxav3: Modify clock settings for the SDR50 and
+DDR50 modes", this function can return other values than 0.
 
+I could change the prototype in patch 4, but it would also imply
+removing the test of the return value in this patch and adding in back
+patch 4. By returning a value in this patch, it reduced the amount of
+change over the patches.
 
-Test summary
-------------
-
-Build: uImage:
-    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only
-
-Build: uImage+dtb:
-    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es,
-		  omap2plus_defconfig/omap4-var-som,
-		  omap2plus_defconfig/omap3-evm-37xx,
-		  omap2plus_defconfig_n800_only_a/omap2420-n800,
-		  omap2plus_defconfig/omap2430-sdp,
-		  omap2plus_defconfig/am3517-evm,
-		  omap2plus_defconfig/omap3-beagle,
-		  omap2plus_defconfig/omap3-beagle-xm,
-		  omap2plus_defconfig/omap3-sbc-t3517,
-		  omap2plus_defconfig/omap5-uevm,
-		  omap2plus_defconfig/omap5-sbc-t54
-
-Build: zImage:
-    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  omap2plus_defconfig_omap5_only,
-		  omap2plus_defconfig_dra7xx_only,
-		  omap2plus_defconfig_am43xx_only,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap4430_sdp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
-
-Build warnings from toolchain: uImage:
-    FAIL ( 1/ 3): omap1_defconfig_1510innovator_only
-
-Build warnings from toolchain: uImage+dtb:
-    (none)
-
-Build warnings from toolchain: zImage:
-    FAIL ( 2/17): omap2plus_defconfig_no_pm, multi_v7_defconfig
-
-Boot to userspace:
-    FAIL ( 1/17): 2430sdp
-    skip ( 2/17): 5912osk, 3517evm
-    Pass (14/17): am335xbonelt, am335xbone, 4430es2panda, 4460pandaes,
-		  4460varsomom, 37xxevm, 3530es3beagle, 3530es31beagle,
-		  3730beaglexm, 3730es12beaglexm, cmt3517, 5430es2uevm,
-		  5430es2sbct54, 2420n800
-
-Kernel warnings during boot to userspace:
-    FAIL ( 3/17): 4430es2panda, 4460varsomom, cmt3517
-
-PM: chip retention via suspend:
-    FAIL ( 6/12): am335xbonelt, 4430es2panda, 4460varsomom, 2430sdp,
-		  5430es2uevm, 5430es2sbct54
-    Pass ( 6/12): 4460pandaes, 37xxevm, 3530es3beagle, 3530es31beagle,
-		  3730beaglexm, 3730es12beaglexm
-
-PM: chip retention via dynamic idle:
-    FAIL ( 7/12): am335xbonelt, 4430es2panda, 4460pandaes,
-		  4460varsomom, 2430sdp, 5430es2uevm, 5430es2sbct54
-    Pass ( 5/12): 37xxevm, 3530es3beagle, 3530es31beagle, 3730beaglexm,
-		  3730es12beaglexm
-
-PM: chip off (except CORE, due to errata) via suspend:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off (except CORE, due to errata) via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
-		  3730es12beaglexm
-
-PM: chip off via dynamic idle:
-    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
-		  3730es12beaglexm
-
-Kernel warnings during PM test:
-    FAIL ( 2/17): 4430es2panda, 4460varsomom
+But if you still prefer than I this function return void in this
+patch, I can do it.
 
 
-vmlinux object size
-(delta in bytes from test_v3.19-rc5 (ec6f34e5b552fb0a52e6aae1a5afbbb1605cc6cc)):
-   text     data      bss    total  kernel
-   +252      +32        0     +284  omap1_defconfig
-   +252      +40        0     +292  omap1_defconfig_1510innovator_only
-   +252      +32        0     +284  omap1_defconfig_5912osk_only
-  +1445    +2440        0    +3885  multi_v7_defconfig
-  +3345    +2952        0    +6297  omap2plus_defconfig
- +10263     +384       +8   +10655  omap2plus_defconfig_2430sdp_only
- +10791     +768        0   +11559  omap2plus_defconfig_am33xx_only
- +10919    +1416        0   +12335  omap2plus_defconfig_am43xx_only
-  +3281    +2944        0    +6225  omap2plus_defconfig_cpupm
-  +6887    +1344        0    +8231  omap2plus_defconfig_dra7xx_only
- +10187     +608        0   +10795  omap2plus_defconfig_n800_multi_omap2xxx
- +10066     +544        0   +10610  omap2plus_defconfig_n800_only_a
-  +3277    +3008        0    +6285  omap2plus_defconfig_no_pm
-  +7377    +1600        0    +8977  omap2plus_defconfig_omap2_4_only
-  +3277    +1600        0    +4877  omap2plus_defconfig_omap3_4_only
- +10919    +1336        0   +12255  omap2plus_defconfig_omap5_only
-   +172     +324      -24     +472  rmk_omap3430_ldp_allnoconfig
-   +508     +392        0     +900  rmk_omap3430_ldp_oldconfig
-   +580    +1028      -96    +1512  rmk_omap4430_sdp_allnoconfig
-   +972    +1048        0    +2020  rmk_omap4430_sdp_oldconfig
+Thanks,
 
-Boot-time memory difference
-(delta in bytes from test_v3.19-rc5 (ec6f34e5b552fb0a52e6aae1a5afbbb1605cc6cc))
-  avail  rsrvd   high  freed  board          kconfig
-   -12k    12k      .      .  2420n800       omap2plus_defconfig_n800_only_a
-    -4k     4k      .    -4k  3530es31beagle omap2plus_defconfig
-    -4k     4k      .    -4k  3530es3beagle  omap2plus_defconfig
-      .      .      .    -4k  3730beaglexm   omap2plus_defconfig
-      .      .      .    -4k  3730es12beaglexmomap2plus_defconfig
-    -4k     4k      .    -4k  37xxevm        omap2plus_defconfig
-    -4k     4k      .    -4k  4430es2panda   omap2plus_defconfig
-    -4k     4k      .    -4k  4460pandaes    omap2plus_defconfig
-    -4k     4k      .    -4k  4460varsomom   omap2plus_defconfig
-    -4k     4k      .    -4k  5430es2sbct54  omap2plus_defconfig
-      .      .      .    -4k  5430es2uevm    omap2plus_defconfig
-    -8k     8k      .      .  am335xbone     omap2plus_defconfig_am33xx_only
-      .      .      .    -4k  am335xbonelt   omap2plus_defconfig
+Gregory
 
 
-Something is not right with either our kernel, or the OMAP4460 VAR-SOM-OM 
-board in the testbed.  It hit an alignment fault during the boot test:
+> 
+>> +{
+>> +       host->quirks |= SDHCI_QUIRK_MISSING_CAPS;
+>> +       /*
+>> +        * According to erratum 'FE-2946959' both SDR50 and DDR50
+>> +        * modes require specific clock adjustments in SDIO3
+>> +        * Configuration register, if the adjustment is not done,
+>> +        * remove them from the capabilities.
+>> +        */
+>> +       host->caps1 = sdhci_readl(host, SDHCI_CAPABILITIES_1);
+>> +       host->caps1 &= ~(SDHCI_SUPPORT_SDR50 | SDHCI_SUPPORT_DDR50);
+>> +       return 0;
+>> +}
+>> +
+>>  static void pxav3_reset(struct sdhci_host *host, u8 mask)
+>>  {
+>>         struct platform_device *pdev = to_platform_device(mmc_dev(host->mmc));
+>> @@ -319,6 +333,9 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
+>>                 clk_prepare_enable(pxa->clk_core);
+>>
+>>         if (of_device_is_compatible(np, "marvell,armada-380-sdhci")) {
+>> +               ret = armada_38x_quirks(host);
+>> +               if (ret < 0)
+>> +                       goto err_quirks;
+>>                 ret = mv_conf_mbus_windows(pdev, mv_mbus_dram_info());
+>>                 if (ret < 0)
+>>                         goto err_mbus_win;
+>> @@ -400,6 +417,7 @@ err_mbus_win:
+>>         if (!IS_ERR(pxa->clk_core))
+>>                 clk_disable_unprepare(pxa->clk_core);
+>>  err_clk_get:
+>> +err_quirks:
+>>         sdhci_pltfm_free(pdev);
+>>         return ret;
+>>  }
+>> --
+>> 2.1.0
+>>
+> 
+> Kind regards
+> Uffe
+> 
 
-http://www.pwsan.com/omap/testlogs/test_v3.19-rc6/20150128221837/boot/4460varsomom/4460varsomom_log.txt
 
-but not the PM test:
-
-http://www.pwsan.com/omap/testlogs/test_v3.19-rc6/20150128221837/pm/4460varsomom/4460varsomom_log.txt
-
-The kernel command line options are different between the two boots.  
-Something to keep an eye on.
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
