@@ -1,61 +1,21 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 29 Jan 2015 10:49:38 -0600
-Subject: [PATCH v4 1/6] of: iommu: add ptr to OF node arg to
- of_iommu_configure()
-In-Reply-To: <5349994.6VHXzPdIxs@avalon>
-References: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
- <13812499.ICbNgSDOae@avalon> <20150128133219.GM1569@arm.com>
- <5349994.6VHXzPdIxs@avalon>
-Message-ID: <CAL_Jsq+rzwk0Rw5RRKf9oLqXNFFgnJb4UQ_AzpJLxN1Z0rJWMQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 29 Jan 2015 17:50:30 +0100
+Subject: [PATCH] [TEMPORARY] net: netfilter: IPV6 XT sockets need
+ CONFIG_NF_DEFRAG_IPV6
+In-Reply-To: <1513018.IdvuSAziQY@wuerfel>
+References: <1513018.IdvuSAziQY@wuerfel>
+Message-ID: <1699413.oLnudLOjvJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 28, 2015 at 5:32 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> Hi Will,
->
-> On Wednesday 28 January 2015 13:32:19 Will Deacon wrote:
->> On Wed, Jan 28, 2015 at 01:15:10PM +0000, Laurent Pinchart wrote:
->> > On Wednesday 28 January 2015 12:29:42 Will Deacon wrote:
->> >> On Wed, Jan 28, 2015 at 12:23:03PM +0000, Laurent Pinchart wrote:
->> >>> On Wednesday 28 January 2015 11:33:00 Will Deacon wrote:
->> >>>> On Mon, Jan 26, 2015 at 06:49:01PM +0000, Murali Karicheri wrote:
->> >>>>> On 01/25/2015 08:32 AM, Laurent Pinchart wrote:
->> >>>>>> On Friday 23 January 2015 17:32:34 Murali Karicheri wrote:
->> >>>>>>> Function of_iommu_configure() is called from of_dma_configure() to
->> >>>>>>> setup iommu ops using DT property. This API is currently used for
->> >>>>>>> platform devices for which DMA configuration (including iommu ops)
->> >>>>>>> may come from device's parent. To extend this functionality for
->> >>>>>>> PCI devices, this API need to take a parent node ptr as an argument
->> >>>>>>> instead of assuming device's parent. This is needed since for PCI,
->> >>>>>>> the dma configuration may be defined in the DT node of the root
->> >>>>>>> bus bridge's parent device. Currently only dma-range is used for PCI
->> >>>>>>> and iommu is not supported. So return error if the device is PCI.
+On Thursday 29 January 2015 17:18:59 Arnd Bergmann wrote:
+> If IP6_NF_IPTABLES=m, NF_DEFRAG_IPV6 gets selected as a module as well
+> from NETFILTER_XT_MATCH_SOCKET, so the latter cannot be built-in, or
+> we get:
 
-[...]
+I messed up the subject line, the [TEMPORARY] was not meant to be
+in there, and I also saw that the subject was mixed up too.
 
->> > If I understand Murali's patch set right (please correct me if that's not
->> > the case) the PCI code walks up the DT nodes hierarchy to the parent node
->> > that contains the iommus attribute and passes a pointer to that node to
->> > this function. It's thus a PCI-specific solution. As a temporary hack
->> > that's OK I suppose, but if implementing it right straight away isn't
->> > difficult that would be better.
->>
->> It looks to me like the code walks the PCI topology to get the DT node for
->> the host controller, and passes *that* to of_dma_configure. That sounds
->> like the right thing to do to me, especially since the PCI topology is
->> likely not encoded in the device-tree. So actually, it is passing the
->> first parent node afaict.
->
-> Indeed, that's right. I forgot for a moment that we have non-DT devices ;-)
->
-> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
->
-> Murali, nitpicking a bit, shouldn't the iommu_np parameter be renamed ? It
-> points to the node containing the iommus parameter, not to the iommu node, so
-> the current name is slightly confusing. A brief kerneldoc above the function
-> would also help. This can be the subject of a separate patch.
+I will send it again with the proper subject.
 
-It was more confusing having np and node within the function.
-
-Rob
+	Arnd
