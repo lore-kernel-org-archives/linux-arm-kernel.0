@@ -1,55 +1,56 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Thu, 29 Jan 2015 10:28:59 +0000
-Subject: [PATCH 2/3] clocksource: versatile: adapt for Versatile AB and
- PB boards
-In-Reply-To: <1422467792-2065-3-git-send-email-robh@kernel.org>
-References: <1422467792-2065-1-git-send-email-robh@kernel.org>
- <1422467792-2065-3-git-send-email-robh@kernel.org>
-Message-ID: <20150129102859.GR956@e106497-lin.cambridge.arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 29 Jan 2015 11:32:49 +0100
+Subject: [PATCH 0/8] PM / Domains: Re-structure code for adding/removing
+ devices to genpd
+In-Reply-To: <1422389625-11730-1-git-send-email-ulf.hansson@linaro.org>
+References: <1422389625-11730-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <CAMuHMdWOEYX8S_j80ay4KepESHSJVFFW5UD=cKo_cMQ=Ak0U8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 28, 2015 at 05:56:31PM +0000, Rob Herring wrote:
-> The same 24MHz counter is also present on Versatile AB and PB boards, so
-> add the compatible string for them.
-> 
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Liviu Dudau <liviu.dudau@arm.com>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> ---
->  drivers/clocksource/versatile.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clocksource/versatile.c b/drivers/clocksource/versatile.c
-> index 2798e74..0a26d3d 100644
-> --- a/drivers/clocksource/versatile.c
-> +++ b/drivers/clocksource/versatile.c
-> @@ -36,5 +36,7 @@ static void __init versatile_sched_clock_init(struct device_node *node)
->  
->  	sched_clock_register(versatile_sys_24mhz_read, 32, 24000000);
->  }
-> -CLOCKSOURCE_OF_DECLARE(versatile, "arm,vexpress-sysreg",
-> +CLOCKSOURCE_OF_DECLARE(vexpress, "arm,vexpress-sysreg",
-> +		       versatile_sched_clock_init);
-> +CLOCKSOURCE_OF_DECLARE(versatile, "arm,versatile-sysreg",
->  		       versatile_sched_clock_init);
+On Tue, Jan 27, 2015 at 9:13 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> While adding error handling of genpd's ->attach_dev() callback, I realized that
+> we also had a need to re-structure some of the code which deals with
+> adding/removing devices to genpd. Especially the APIs, __pm_genpd_add_device()
+> and pm_genpd_remove_device() deserved some attention.
+>
+> Patch 1 -> 4, can be considered as more simple cleanups and should not impact
+> the behavior for current clients using the APIs.
+>
+> Patch 5, eliminates a mutex for generic_pm_domain_data by re-order the
+> initialization/cleanup of dev_pm_qos notifiers.
+>
+> Patch 6, move some code around to fix a potenial memory leakage of a struct
+> pm_subsys_data.
+>
+> Patch 7, code restructuring which impacts locking behavior while adding/removing
+> devices. Should improve code readability and decrease critical regions of
+> holding locks.
+>
+> Patch 8, Adds error handling of genpd's ->attach_dev() callback
+>
+>
+> Ulf Hansson (8):
+>   PM / Domains: Rename __pm_genpd_alloc|free_dev_data()
+>   PM / Domains: Remove reference counting for the generic_pm_domain_data
+>   PM / Domains: Don't allow an existing generic_pm_domain_data
+>   PM / Domains: Don't check for an existing device when adding a new
+>   PM / Domains: Eliminate the mutex for the generic_pm_domain_data
+>   PM / Domains: Free pm_subsys_data in error path in
+>     __pm_genpd_add_device()
+>   PM / Domains: Re-order initialization of generic_pm_domain_data
+>   PM / Domains: Handle errors from genpd's ->attach_dev() callback
 
-Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
+Looks OK, and tested on sh73a0/kzm9g-multiplatform with PM domains
+Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-> -- 
-> 2.1.0
-> 
-> 
+Gr{oetje,eeting}s,
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
