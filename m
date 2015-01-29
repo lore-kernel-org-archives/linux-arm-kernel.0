@@ -1,63 +1,51 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Thu, 29 Jan 2015 14:44:42 +0800
-Subject: [PATCH v5 13/13] pm: at91: amend the pm_suspend entry for
- at91_cpuidle_device
-In-Reply-To: <1422513316-21509-1-git-send-email-wenyou.yang@atmel.com>
-References: <1422513316-21509-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1422513882-27602-1-git-send-email-wenyou.yang@atmel.com>
+From: namhyung@kernel.org (Namhyung Kim)
+Date: Thu, 29 Jan 2015 15:54:50 +0900
+Subject: [PATCH V3 2/2] perf symbols: debuglink should take symfs option
+ into account
+In-Reply-To: <CAA3XUr1twCC6s=1Y3Fk7W3ER9t6hFKJBC57vyzx9zjTD9fMW1Q@mail.gmail.com>
+References: <1422340442-4673-1-git-send-email-victor.kamensky@linaro.org>
+ <1422340442-4673-3-git-send-email-victor.kamensky@linaro.org>
+ <20150129013809.GB24182@sejong>
+ <CAA3XUr1twCC6s=1Y3Fk7W3ER9t6hFKJBC57vyzx9zjTD9fMW1Q@mail.gmail.com>
+Message-ID: <20150129065450.GD24182@sejong>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because the at91_xxx_standby() function is substitued by the at91_pm_suspend(),
-the pm_suspend entry for at91_cpuidle_device changes as well.
+On Wed, Jan 28, 2015 at 08:08:30PM -0800, Victor Kamensky wrote:
+> Hi  Namhyung,
+> 
+> On 28 January 2015 at 17:38, Namhyung Kim <namhyung@kernel.org> wrote:
+> > Hi Victor,
+> >
+> > On Mon, Jan 26, 2015 at 10:34:02PM -0800, Victor Kamensky wrote:
+> >> Currently code that tries to read corresponding debug symbol
+> >> file from .gnu_debuglink section (DSO_BINARY_TYPE__DEBUGLINK)
+> >> does not take in account symfs option, so filename__read_debuglink
+> >> function cannot open ELF file, if symfs option is used.
+> >>
+> >> Fix is to add proper handling of symfs as it is done in other
+> >> places: use __symbol__join_symfs function to get real file name
+> >> of target ELF file.
+> >>
+> >> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+> >> Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
+> >> Cc: Paul Mackerras <paulus@samba.org>
+> >> Cc: Ingo Molnar <mingo@redhat.com>
+> >> Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
+> >> Cc: Jiri Olsa <jolsa@kernel.org>
+> >> Cc: Adrian Hunter <adrian.hunter@intel.com>
+> >> Cc: Waiman Long <Waiman.Long@hp.com>
+> >> Cc: David Ahern <dsahern@gmail.com>
+> >> Acked-and-tested-by: David Ahern <dsahern@gmail.com>
+> >
+> > Acked-by: Namhyung Kim <namhyung@kernel.org>
+> 
+> Thank you for the Acks! Is there any action items on my side?
+> Should I repost patches with your Acks? Or you or Arnaldo
+> will add them once they got merged in proper tree for
+> upstreaming?
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/mach-at91/pm.c |   16 ++++++++++------
- 1 file changed, 10 insertions(+), 6 deletions(-)
+I think Arnaldo will merge them with Acks. ;-)
 
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index f915f4b..657b9ba 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -41,7 +41,6 @@ static struct {
- 	int memctrl;
- } at91_pm_data;
- 
--static void (*at91_pm_standby)(void);
- void __iomem *at91_ramc_base[2];
- 
- static int at91_pm_valid_state(suspend_state_t state)
-@@ -216,12 +215,15 @@ static struct platform_device at91_cpuidle_device = {
- 	.name = "cpuidle-at91",
- };
- 
--void at91_pm_set_standby(void (*at91_standby)(void))
-+static void at91_cpuidle_set_suspend(void (*at91_suspend)(void))
- {
--	if (at91_standby) {
--		at91_cpuidle_device.dev.platform_data = at91_standby;
--		at91_pm_standby = at91_standby;
--	}
-+	if (at91_suspend)
-+		at91_cpuidle_device.dev.platform_data = at91_suspend;
-+}
-+
-+static void at91_cpuidle_suspend(void)
-+{
-+	at91_pm_suspend(PM_SUSPEND_STANDBY);
- }
- 
- static struct of_device_id ramc_ids[] = {
-@@ -298,6 +300,8 @@ static void __init at91_pm_init(void)
- {
- 	at91_pm_sram_init();
- 
-+	at91_cpuidle_set_suspend(at91_cpuidle_suspend);
-+
- 	if (at91_cpuidle_device.dev.platform_data)
- 		platform_device_register(&at91_cpuidle_device);
- 
--- 
-1.7.9.5
+Thanks,
+Namhyung
