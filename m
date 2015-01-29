@@ -1,50 +1,55 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 29 Jan 2015 15:43:53 +0100
-Subject: [GIT PULL] Zynq SoC changes for 3.20
-Message-ID: <1f0d53f4aa6f40659cd299540eaed31c@BN1AFFO11FD019.protection.gbl>
+From: ricardo.ribalda@gmail.com (Ricardo Ribalda Delgado)
+Date: Thu, 29 Jan 2015 15:51:13 +0100
+Subject: [PATCH] spi/xilinx: Cast ioread32/iowrite32 function pointers
+Message-ID: <1422543073-21895-1-git-send-email-ricardo.ribalda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+IO functions prototypes may have different argument qualifiers
+on different architectures.
 
-please pull these 4 patches to your tree.
+This patch cast the assignment of the function, to match the one defined
+at iomap.h.
 
-Thanks,
-Michal
+Fixes: 99082eab63449f9d spi/xilinx: Remove iowrite/ioread wrappers
+Reported-by: kbuild test robot <fengguang.wu@intel.com>
+Signed-off-by: Ricardo Ribalda Delgado <ricardo.ribalda@gmail.com>
+---
+ drivers/spi/spi-xilinx.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
-
-  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
-
-are available in the git repository at:
-
-  https://github.com/Xilinx/linux-xlnx.git tags/zynq-soc-for-3.20
-
-for you to fetch changes up to 3329659df0300d1d0aa22f5e7063f83a88ef92aa:
-
-  ARM: zynq: Simplify SLCR initialization (2015-01-29 15:38:17 +0100)
-
-----------------------------------------------------------------
-arm: Xilinx Zynq SoC patches for v3.20
-
-- Enable pincontrol
-- Simplified SLCR initialization
-- Setup default ARCH_NR_GPIO
-
-----------------------------------------------------------------
-Michal Simek (2):
-      ARM: zynq: Setup default gpio number for Xilinx Zynq
-      ARM: zynq: Simplify SLCR initialization
-
-Moritz Fischer (1):
-      ARM: zynq: PM: Fixed simple typo.
-
-Soren Brinkmann (1):
-      ARM: zynq: Enable pinctrl
-
- arch/arm/Kconfig            |  2 +-
- arch/arm/mach-zynq/Kconfig  |  2 ++
- arch/arm/mach-zynq/common.c |  2 --
- arch/arm/mach-zynq/pm.c     |  2 +-
- arch/arm/mach-zynq/slcr.c   | 35 +++++++----------------------------
- 5 files changed, 11 insertions(+), 32 deletions(-)
+diff --git a/drivers/spi/spi-xilinx.c b/drivers/spi/spi-xilinx.c
+index 0e8962c..418e730 100644
+--- a/drivers/spi/spi-xilinx.c
++++ b/drivers/spi/spi-xilinx.c
+@@ -91,7 +91,7 @@ struct xilinx_spi {
+ 	u8 bytes_per_word;
+ 	int buffer_size;	/* buffer size in words */
+ 	u32 cs_inactive;	/* Level of the CS pins when inactive*/
+-	unsigned int (*read_fn)(void __iomem *);
++	u32 (*read_fn)(void __iomem *);
+ 	void (*write_fn)(u32, void __iomem *);
+ };
+ 
+@@ -378,15 +378,15 @@ static int xilinx_spi_probe(struct platform_device *pdev)
+ 	 * Setup little endian helper functions first and try to use them
+ 	 * and check if bit was correctly setup or not.
+ 	 */
+-	xspi->read_fn = ioread32;
+-	xspi->write_fn = iowrite32;
++	xspi->read_fn = (u32 (*)(void __iomem *)) ioread32;
++	xspi->write_fn = (void (*)(u32, void __iomem *)) iowrite32;
+ 
+ 	xspi->write_fn(XSPI_CR_LOOP, xspi->regs + XSPI_CR_OFFSET);
+ 	tmp = xspi->read_fn(xspi->regs + XSPI_CR_OFFSET);
+ 	tmp &= XSPI_CR_LOOP;
+ 	if (tmp != XSPI_CR_LOOP) {
+-		xspi->read_fn = ioread32be;
+-		xspi->write_fn = iowrite32be;
++		xspi->read_fn = (u32 (*)(void __iomem *)) ioread32be;
++		xspi->write_fn = (void (*)(u32, void __iomem *)) iowrite32be;
+ 	}
+ 
+ 	master->bits_per_word_mask = SPI_BPW_MASK(bits_per_word);
+-- 
+2.1.4
