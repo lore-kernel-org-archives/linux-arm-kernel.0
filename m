@@ -1,47 +1,33 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 29 Jan 2015 23:08:25 +0100
-Subject: [PATCH 2/2] ARM: dts: rockchip: housekeeping off i2c0 on rk3288-evb
- boards
-In-Reply-To: <5715597.a6Lom1OGfJ@diego>
-References: <5715597.a6Lom1OGfJ@diego>
-Message-ID: <1550421.auhbiXq1Bp@diego>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 29 Jan 2015 14:04:56 -0800
+Subject: [GIT PULL] Zynq SoC changes for 3.20
+In-Reply-To: <1f0d53f4aa6f40659cd299540eaed31c@BN1AFFO11FD019.protection.gbl>
+References: <1f0d53f4aa6f40659cd299540eaed31c@BN1AFFO11FD019.protection.gbl>
+Message-ID: <20150129220456.GH20785@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the same transfer speed on both the rk808 and act8846 variants and
-remove the status=okay from the rk808 one which is already set in the
-shared rk3288-evb.dtsi .
+On Thu, Jan 29, 2015 at 03:43:53PM +0100, Michal Simek wrote:
+> Hi,
+> 
+> please pull these 4 patches to your tree.
+> 
+> Thanks,
+> Michal
+> 
+> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+> 
+>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+> 
+> are available in the git repository at:
+> 
+>   https://github.com/Xilinx/linux-xlnx.git tags/zynq-soc-for-3.20
+> 
+> for you to fetch changes up to 3329659df0300d1d0aa22f5e7063f83a88ef92aa:
+> 
+>   ARM: zynq: Simplify SLCR initialization (2015-01-29 15:38:17 +0100)
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm/boot/dts/rk3288-evb-act8846.dts | 2 ++
- arch/arm/boot/dts/rk3288-evb-rk808.dts   | 1 -
- 2 files changed, 2 insertions(+), 1 deletion(-)
+Merged, thanks!
 
-diff --git a/arch/arm/boot/dts/rk3288-evb-act8846.dts b/arch/arm/boot/dts/rk3288-evb-act8846.dts
-index 9db02bbe..d7b8bbc 100644
---- a/arch/arm/boot/dts/rk3288-evb-act8846.dts
-+++ b/arch/arm/boot/dts/rk3288-evb-act8846.dts
-@@ -22,6 +22,8 @@
- };
- 
- &i2c0 {
-+	clock-frequency = <400000>;
-+
- 	vdd_cpu: syr827 at 40 {
- 		compatible = "silergy,syr827";
- 		fcs,suspend-voltage-selector = <1>;
-diff --git a/arch/arm/boot/dts/rk3288-evb-rk808.dts b/arch/arm/boot/dts/rk3288-evb-rk808.dts
-index d453ddd..3f7aa9e 100644
---- a/arch/arm/boot/dts/rk3288-evb-rk808.dts
-+++ b/arch/arm/boot/dts/rk3288-evb-rk808.dts
-@@ -23,7 +23,6 @@
- 
- &i2c0 {
- 	clock-frequency = <400000>;
--	status = "okay";
- 
- 	rk808: pmic at 1b {
- 		compatible = "rockchip,rk808";
--- 
-2.1.1
+
+-Olof
