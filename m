@@ -1,140 +1,35 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 29 Jan 2015 17:15:31 +0100
-Subject: [PATCH] mmc: moxart: fix probe logic
-Message-ID: <8340872.32GezMfzR1@wuerfel>
+Date: Thu, 29 Jan 2015 17:16:38 +0100
+Subject: [PATCH] drm: shmobile: fix Kconfig dependencies
+Message-ID: <101632463.PMlAvjKhba@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jonas Jensen wanted to submit a patch for these, but apparently
-forgot about it. I stumbled over this symptom first:
+The shmobile drm driver selects BACKLIGHT_CLASS_DEVICE
+as of 0a5a5499ad88 "drm: shmobile: Add dependency on
+BACKLIGHT_CLASS_DEVICE", but that option in turn depends
+on BACKLIGHT_LCD_SUPPORT, so we actually have to select
+both, or alternatively use 'depends on BACKLIGHT_CLASS_DEVICE'.
 
-drivers/built-in.o: In function `moxart_probe':
-:(.text+0x2af128): undefined reference to `of_dma_request_slave_channel'
-
-This is because of_dma_request_slave_channel is an internal helper
-and not exported to loadable module. I'm changing the driver to
-use dma_request_slave_channel_reason() instead.
-
-Further problems from inspection:
-
-* The remove function must not call kfree on the host pointer,
-  because it is allocated together with the mmc_host.
-
-* The clock is never released
-
-* The dma_cap_mask_t is completely unused and can be removed
-
-* deferred probing does not work if the dma driver is loaded
-  after the mmc driver.
-
-This patch should fix all of the above.
+Further, the driver uses FB_SH_MOBILE_MERAM if that is
+enabled, but this breaks if MERAM is a module while
+the DRM driver is built-in. To solve this, add a dependency
+on "FB_SH_MOBILE_MERAM || !FB_SH_MOBILE_MERAM", which forces
+DRM_SHMOBILE to be a module if FB_SH_MOBILE_MERAM set to 'm'.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-Jonas, can you check this patch and provide an Ack if it's ok?
 
-diff --git a/drivers/mmc/host/moxart-mmc.c b/drivers/mmc/host/moxart-mmc.c
-index d2a1ef61ec97..d9401a1cc589 100644
---- a/drivers/mmc/host/moxart-mmc.c
-+++ b/drivers/mmc/host/moxart-mmc.c
-@@ -17,6 +17,7 @@
- #include <linux/init.h>
- #include <linux/platform_device.h>
- #include <linux/delay.h>
-+#include <linux/errno.h>
- #include <linux/interrupt.h>
- #include <linux/blkdev.h>
- #include <linux/dma-mapping.h>
-@@ -131,6 +132,7 @@ struct moxart_host {
- 	struct mmc_host			*mmc;
- 	struct mmc_request		*mrq;
- 	struct scatterlist		*cur_sg;
-+	struct clk			*clk;
- 	struct completion		dma_complete;
- 	struct completion		pio_complete;
- 
-@@ -560,9 +562,7 @@ static int moxart_probe(struct platform_device *pdev)
- 	struct mmc_host *mmc;
- 	struct moxart_host *host = NULL;
- 	struct dma_slave_config cfg;
--	struct clk *clk;
- 	void __iomem *reg_mmc;
--	dma_cap_mask_t mask;
- 	int irq, ret;
- 	u32 i;
- 
-@@ -586,10 +586,10 @@ static int moxart_probe(struct platform_device *pdev)
- 		goto out;
- 	}
- 
--	clk = of_clk_get(node, 0);
--	if (IS_ERR(clk)) {
-+	host->clk = of_clk_get(node, 0);
-+	if (IS_ERR(host->clk)) {
- 		dev_err(dev, "of_clk_get failed\n");
--		ret = PTR_ERR(clk);
-+		ret = PTR_ERR(host->clk);
- 		goto out;
- 	}
- 
-@@ -603,18 +603,15 @@ static int moxart_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto out;
- 
--	dma_cap_zero(mask);
--	dma_cap_set(DMA_SLAVE, mask);
--
- 	host = mmc_priv(mmc);
- 	host->mmc = mmc;
- 	host->base = reg_mmc;
- 	host->reg_phys = res_mmc.start;
- 	host->timeout = msecs_to_jiffies(1000);
--	host->sysclk = clk_get_rate(clk);
-+	host->sysclk = clk_get_rate(host->clk);
- 	host->fifo_width = readl(host->base + REG_FEATURE) << 2;
--	host->dma_chan_tx = of_dma_request_slave_channel(node, "tx");
--	host->dma_chan_rx = of_dma_request_slave_channel(node, "rx");
-+	host->dma_chan_tx = dma_request_slave_channel_reason(dev, "tx");
-+	host->dma_chan_rx = dma_request_slave_channel_reason(dev, "rx");
- 
- 	spin_lock_init(&host->lock);
- 
-@@ -624,6 +621,11 @@ static int moxart_probe(struct platform_device *pdev)
- 	mmc->ocr_avail = 0xffff00;	/* Support 2.0v - 3.6v power. */
- 
- 	if (IS_ERR(host->dma_chan_tx) || IS_ERR(host->dma_chan_rx)) {
-+		if (PTR_ERR(host->dma_chan_tx) == -EPROBE_DEFER ||
-+		    PTR_ERR(host->dma_chan_rx) == -EPROBE_DEFER) {
-+			ret = -EPROBE_DEFER;
-+			goto out;
-+		}
- 		dev_dbg(dev, "PIO mode transfer enabled\n");
- 		host->have_dma = false;
- 	} else {
-@@ -677,6 +679,8 @@ static int moxart_probe(struct platform_device *pdev)
- 	return 0;
- 
- out:
-+	if (host->clk)
-+		clk_put(host->clk);
- 	if (mmc)
- 		mmc_free_host(mmc);
- 	return ret;
-@@ -694,6 +698,7 @@ static int moxart_remove(struct platform_device *pdev)
- 			dma_release_channel(host->dma_chan_tx);
- 		if (!IS_ERR(host->dma_chan_rx))
- 			dma_release_channel(host->dma_chan_rx);
-+		clk_put(host->clk);
- 		mmc_remove_host(mmc);
- 		mmc_free_host(mmc);
- 
-@@ -702,9 +707,6 @@ static int moxart_remove(struct platform_device *pdev)
- 		writel(readl(host->base + REG_CLOCK_CONTROL) | CLK_OFF,
- 		       host->base + REG_CLOCK_CONTROL);
- 	}
--
--	kfree(host);
--
- 	return 0;
- }
- 
+diff --git a/drivers/gpu/drm/shmobile/Kconfig b/drivers/gpu/drm/shmobile/Kconfig
+index a50fe0eeaa0d..8d17d00ddb4b 100644
+--- a/drivers/gpu/drm/shmobile/Kconfig
++++ b/drivers/gpu/drm/shmobile/Kconfig
+@@ -2,7 +2,9 @@ config DRM_SHMOBILE
+ 	tristate "DRM Support for SH Mobile"
+ 	depends on DRM && ARM
+ 	depends on ARCH_SHMOBILE || COMPILE_TEST
++	depends on FB_SH_MOBILE_MERAM || !FB_SH_MOBILE_MERAM
+ 	select BACKLIGHT_CLASS_DEVICE
++	select BACKLIGHT_LCD_SUPPORT
+ 	select DRM_KMS_HELPER
+ 	select DRM_KMS_FB_HELPER
+ 	select DRM_KMS_CMA_HELPER
