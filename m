@@ -1,43 +1,89 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 29 Jan 2015 12:40:23 -0800
-Subject: [GIT PULL]  Broadcom MAINTAINERS file updates for 3.20 (v3)
-Message-ID: <1422564023-28977-1-git-send-email-f.fainelli@gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 29 Jan 2015 21:42:18 +0100
+Subject: 3.19 on Nokia n900: audio quality awful
+In-Reply-To: <54CA173F.1070301@ti.com>
+References: <20150106170433.GA5408@amd> <20150118120139.GA1509@amd>
+ <54C63F1C.6010703@ti.com> <54C92752.9000004@bitmer.com>
+ <20150128224144.GA28956@amd> <20150129073529.GA19122@bitmer.com>
+ <54CA173F.1070301@ti.com>
+Message-ID: <20150129204218.GC3962@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+Hi!
 
-  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+> >> I did this:
+> >>
+> >> I'm not sure which one is "main" microphone and which is headset, but
+> >> I guess 2V should be "close enough" to 2.5V to produce something
+> >> different from zeros..?
+> >>
+> > Main or integrated is digital microphone which does AD conversion itself
+> > and headset is analogue. If DMIC is without bias codec will sample plain
+> > zeros from DMIC input but analogue input should always produce some random
+> > LSB bits from codec's AD converter.
+> > 
+> > If codec produces zeros also from analogue input then I suppose codec
+> > ADC is not powered up or similar. One way to hunt regression if
+> > bisecting is not possible due reason or another is to dump and diff codec
+> > registers from /sys/kernel/debug/regmap/ using both working commit
+> >and head.
 
-are available in the git repository at:
+I tried 2.6.28... where recording was, but it does not support
+regmap. Then I tried 3.14, but could not get recording to work there.
 
-  http://github.com/broadcom/stblinux tags/arm-soc/for-3.20/maintainer
+> >>  	tlv320aic3x_aux: tlv320aic3x at 19 {
+> >> @@ -502,6 +504,8 @@
+> >>  		DRVDD-supply = <&vmmc2>;
+> >>  		IOVDD-supply = <&vio>;
+> >>  		DVDD-supply = <&vio>;
+> >> +
+> >> +		ai3x-micbias-vg = <1>;
+> >>  	};
+> > This should be 2, i.e. 2.5 V according to
+> > Documentation/devicetree/bindings/sound/tlv320aic3x.txt. I think 2 V is
+> > too low for some headset mics and that was the reason for 2.5 V.
 
-for you to fetch changes up to 5e2aed2746a02f677cc07679407360ab80b4106a:
+Ok, tried that, but no change.
 
-  MAINTAINERS: add a git entry for BMIPS-based BCM7xxx SoCs (2015-01-29 12:31:30 -0800)
+> Can you also try this patch to correct the DAPM route for the rx51:
 
-Arnd, Olof, please drop the previous pull request and use this one instead, thanks!
+Yes, with the patch below (and dts updates I did) recording works.
 
-Changes in v3:
-- provide working git repositories links
+Another interesting note is that audio quality is not that horrible
+when playing 8 kHz, mono signal... it is mostly what I'd
+expect. Playing 44.1kHz, stereo mp3 .. is not good.
 
-Changes in v2:
-- consistently use github.com/broadcom (lower case) everywhere
+Tested-by: Pavel Machek <pavel@ucw.cz>
 
-----------------------------------------------------------------
-This pull request contains updates to our MAINTAINERS files for all relevant
-Broadcom SoCs: BCM63xx, Cygnus/iProc, ARM & MIPS-based BCM7xxx (brcmstb).
+Thanks,
+									Pavel
 
-Our new code location for all Broadcom-related kernel activities is now on
-http://github.com/broadcom/.
+> diff --git a/sound/soc/omap/rx51.c b/sound/soc/omap/rx51.c
+> index 04896d6252a2..7f299357c2d2 100644
+> --- a/sound/soc/omap/rx51.c
+> +++ b/sound/soc/omap/rx51.c
+> @@ -250,14 +250,14 @@ static const struct snd_soc_dapm_route audio_map[] = {
+>  	{"FM Transmitter", NULL, "LLOUT"},
+>  	{"FM Transmitter", NULL, "RLOUT"},
+> 
+> -	{"DMic Rate 64", NULL, "Mic Bias"},
+> -	{"Mic Bias", NULL, "DMic"},
+> +	{"DMic Rate 64", NULL, "DMic"},
+> +	{"DMic", NULL, "Mic Bias"},
+> 
+>  	{"b LINE2R", NULL, "MONO_LOUT"},
+>  	{"Earphone", NULL, "b HPLOUT"},
+> 
+> -	{"LINE1L", NULL, "b Mic Bias"},
+> -	{"b Mic Bias", NULL, "HS Mic"}
+> +	{"LINE1L", NULL, "HS Mic"},
+> +	{"HS Mic", NULL, "b Mic Bias"},
+>  };
+> 
+>  static const char * const spk_function[] = {"Off", "On"};
+> 
 
-----------------------------------------------------------------
-Florian Fainelli (4):
-      MAINTAINERS: move BCM63xx ARM-based SoCs git tree
-      MAINTAINERS: update Broadcom Cygnus SoC git tree
-      MAINTAINERS: add a git entry for BCM7xxx ARM-based SoCs
-      MAINTAINERS: add a git entry for BMIPS-based BCM7xxx SoCs
-
- MAINTAINERS | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
