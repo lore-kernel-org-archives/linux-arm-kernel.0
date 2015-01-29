@@ -1,33 +1,24 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 29 Jan 2015 16:31:38 +0000
-Subject: [PATCH v2] arm64: Kconfig: clean up two no-op Kconfig options
- from CONFIG_ARCH_TEGRA*
-In-Reply-To: <alpine.DEB.2.02.1501291541390.16475@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1501291541390.16475@utopia.booyaka.com>
-Message-ID: <20150129163137.GJ8951@e104818-lin.cambridge.arm.com>
+From: santosh.shilimkar@oracle.com (santosh shilimkar)
+Date: Thu, 29 Jan 2015 08:33:23 -0800
+Subject: [PATCH] soc: ti: knav_qmss_queue: export API calls for use by
+ user driver
+In-Reply-To: <1422486021-23874-1-git-send-email-m-karicheri2@ti.com>
+References: <1422486021-23874-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <54CA60D3.6090008@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 29, 2015 at 03:42:45PM +0000, Paul Walmsley wrote:
-> 
-> Paul Bolle pointed out that commit
-> d035fdfa27ac124bc8f94c3d7dc82ad069802170 ("arm64: Add Tegra132
-> support") included two Kconfig symbols that are now no-ops:
-> USB_ARCH_HAS_EHCI and HAVE_SMP.  So, drop the two symbols.
-> 
-> This second version corrects a thinko in Paul Bolle's E-mail address.
-> 
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Paul Walmsley <pwalmsley@nvidia.com>
-> Cc: Allen Martin <amartin@nvidia.com>
-> Cc: Thierry Reding <treding@nvidia.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Paul Bolle <pebolle@tiscali.nl>
+On 1/28/2015 3:00 PM, Murali Karicheri wrote:
+> Currently only few of the API calls are exported. This creates problem
+> when the knav* modules are built as modules and another user module
+> such as netcp_core try to use these API calls and they are also built
+> as module. This patch export these APIs to address the issue.
+>
+> This is needed to support allmodconfig for ARM
+>
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> ---
+Looks fine. I will pick this up for next merge window.
 
-The patch looks fine. Cc'ing the arm-soc guys as they have merged the
-original commit.
-
--- 
-Catalin
+Regards,
+Santosh
