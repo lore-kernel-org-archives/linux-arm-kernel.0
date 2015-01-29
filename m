@@ -1,57 +1,73 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 29 Jan 2015 07:09:23 +0530
-Subject: [RFC V2] OPP: Redefine bindings to overcome shortcomings
-In-Reply-To: <20150128200600.GR21293@sirena.org.uk>
-References: <cbe949d7a69c3b16a3e9d6e5429eb81d3ae9d8b9.1422009157.git.viresh.kumar@linaro.org>
- <20150128200600.GR21293@sirena.org.uk>
-Message-ID: <CAKohpokxdpF2nTeOnDpofNM1vW3aZRyDBE3WKmvZ8wJedf-TGw@mail.gmail.com>
+From: namhyung@kernel.org (Namhyung Kim)
+Date: Thu, 29 Jan 2015 10:38:09 +0900
+Subject: [PATCH V3 2/2] perf symbols: debuglink should take symfs option
+ into account
+In-Reply-To: <1422340442-4673-3-git-send-email-victor.kamensky@linaro.org>
+References: <1422340442-4673-1-git-send-email-victor.kamensky@linaro.org>
+ <1422340442-4673-3-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <20150129013809.GB24182@sejong>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 January 2015 at 01:36, Mark Brown <broonie@kernel.org> wrote:
-> On Fri, Jan 23, 2015 at 04:14:50PM +0530, Viresh Kumar wrote:
->
->> +- opp-listN:
->> +  List of nodes defining performance points. Following belong to the nodes
->> +  within the opp-lists.
->
-> Why is there the N here?  It doesn't correspond to the examples...
+Hi Victor,
 
-I meant [0..N], probably its better to remove it ..
+On Mon, Jan 26, 2015 at 10:34:02PM -0800, Victor Kamensky wrote:
+> Currently code that tries to read corresponding debug symbol
+> file from .gnu_debuglink section (DSO_BINARY_TYPE__DEBUGLINK)
+> does not take in account symfs option, so filename__read_debuglink
+> function cannot open ELF file, if symfs option is used.
+> 
+> Fix is to add proper handling of symfs as it is done in other
+> places: use __symbol__join_symfs function to get real file name
+> of target ELF file.
+> 
+> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+> Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
+> Cc: Paul Mackerras <paulus@samba.org>
+> Cc: Ingo Molnar <mingo@redhat.com>
+> Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
+> Cc: Jiri Olsa <jolsa@kernel.org>
+> Cc: Adrian Hunter <adrian.hunter@intel.com>
+> Cc: Waiman Long <Waiman.Long@hp.com>
+> Cc: David Ahern <dsahern@gmail.com>
+> Acked-and-tested-by: David Ahern <dsahern@gmail.com>
 
->> +  Required properties:
->> +  - opp-khz: Frequency in kHz
->> +  - opp-microvolt: voltage in micro Volts
->
-> I thought the goal here was to specify ranges?
+Acked-by: Namhyung Kim <namhyung@kernel.org>
 
-Yeah, I wasn't 100% sure of what you suggested and so asked a question in
-the mail earlier. I will change it to what you suggested.
+Thanks,
+Namhyung
 
->> +- oppN:
->> +  Operating performance point node per device. Devices using it should have its
->> +  phandle in their "operating-points-v2" property.
->> +
->> +  Required properties:
->> +  - compatible: allow OPPs to express their compatibility.
->> +  - opp-list: phandle to opp-list defined above.
->
-> I don't understand what that compatible property is intended to mean and
-> I expect other readers might be similarly confused - is it a standard
-> compatbile property meaning this noe corresponds to some sort of device?
 
-The goal is to choose the driver which we want to probe for a platform. There
-can be multiple DT enabled cpufreq drivers present in a build and the platform
-needs some way to choose one of them.
-
-For example, if both cpufreq-dt, exynos-cpufreq and arm-big-little drivers are
-present in a kernel build, the how do we specify which one a platform wants to
-use.
-
-The generic drivers (cpufreq-dt and big LITTLE) should match with some generic
-strings, as these aren't specific to any platform. But exynos one can be matched
-with the machine or Soc-family's existing compatible names.
-
-> There also appears to be no code matching these bindings...
-
-I still have to post it, was trying to finalize the bindings first.
+> ---
+>  tools/perf/util/dso.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/tools/perf/util/dso.c b/tools/perf/util/dso.c
+> index 45be944..ca8d8d5 100644
+> --- a/tools/perf/util/dso.c
+> +++ b/tools/perf/util/dso.c
+> @@ -45,13 +45,13 @@ int dso__read_binary_type_filename(const struct dso *dso,
+>  	case DSO_BINARY_TYPE__DEBUGLINK: {
+>  		char *debuglink;
+>  
+> -		strncpy(filename, dso->long_name, size);
+> -		debuglink = filename + dso->long_name_len;
+> +		len = __symbol__join_symfs(filename, size, dso->long_name);
+> +		debuglink = filename + len;
+>  		while (debuglink != filename && *debuglink != '/')
+>  			debuglink--;
+>  		if (*debuglink == '/')
+>  			debuglink++;
+> -		ret = filename__read_debuglink(dso->long_name, debuglink,
+> +		ret = filename__read_debuglink(filename, debuglink,
+>  					       size - (debuglink - filename));
+>  		}
+>  		break;
+> -- 
+> 1.9.3
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
