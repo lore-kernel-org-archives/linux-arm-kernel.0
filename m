@@ -1,60 +1,56 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Thu, 29 Jan 2015 14:38:55 +0800
-Subject: [PATCH v5 05/13] pm: at91: move the copying the sram function to the
- sram initializationi phase
+Date: Thu, 29 Jan 2015 14:39:39 +0800
+Subject: [PATCH v5 06/13] ARM: at91: move select SRAM to ARCH_AT91
 In-Reply-To: <1422513316-21509-1-git-send-email-wenyou.yang@atmel.com>
 References: <1422513316-21509-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1422513535-23885-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1422513579-24378-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To decrease the suspend time, move the copying the sram function
-to the sram initialization phase, instead of every time go to suspend.
-
-In the meanwhile, if there is no sram allocated for PM, the PM is not supported.
+Because the CONFIG_AT91_SLOW_CLOCK will be removed
+to simply the PM config, so move select SRAM.
 
 Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/mach-at91/pm.c |   12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
+ arch/arm/mach-at91/Kconfig |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index daa998d..6df0152 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -163,10 +163,6 @@ static int at91_pm_enter(suspend_state_t state)
- 			 * turning off the main oscillator; reverse on wakeup.
- 			 */
- 			if (slow_clock) {
--#ifdef CONFIG_AT91_SLOW_CLOCK
--				/* copy slow_clock handler to SRAM, and call it */
--				memcpy(slow_clock, at91_slow_clock, at91_slow_clock_sz);
--#endif
- 				slow_clock(at91_pmc_base, at91_ramc_base[0],
- 					   at91_ramc_base[1],
- 					   at91_pm_data.memctrl);
-@@ -311,6 +307,9 @@ static void __init at91_pm_sram_init(void)
- 	sram_pbase = gen_pool_virt_to_phys(sram_pool, sram_base);
- 	slow_clock = __arm_ioremap_exec(sram_pbase, at91_slow_clock_sz, false);
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index c6740e3..6b9e685 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -25,6 +25,7 @@ config SOC_SAMA5
+ 	select MEMORY
+ 	select ATMEL_SDRAMC
+ 	select PHYLIB if NETDEVICES
++	select SRAM if PM
  
-+	/* Copy the slow_clock handler to SRAM */
-+	memcpy(slow_clock, at91_slow_clock, at91_slow_clock_sz);
-+
- put_node:
- 	of_node_put(node);
- }
-@@ -328,7 +327,10 @@ static void __init at91_pm_init(void)
- 	if (at91_cpuidle_device.dev.platform_data)
- 		platform_device_register(&at91_cpuidle_device);
+ menu "Atmel AT91 System-on-Chip"
  
--	suspend_set_ops(&at91_pm_ops);
-+	if (slow_clock)
-+		suspend_set_ops(&at91_pm_ops);
-+	else
-+		pr_info("AT91: PM : Not supported, due to no sram allocated\n");
- }
+@@ -82,6 +83,7 @@ config SOC_AT91RM9200
+ 	select CPU_ARM920T
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_AT91_USB_CLK
++	select SRAM if PM
  
- void __init at91rm9200_pm_init(void)
+ config SOC_AT91SAM9
+ 	bool "AT91SAM9"
+@@ -95,6 +97,7 @@ config SOC_AT91SAM9
+ 	select HAVE_AT91_UTMI
+ 	select HAVE_FB_ATMEL
+ 	select MEMORY
++	select SRAM if PM
+ 	help
+ 	  Select this if you are using one of those Atmel SoC:
+ 	    AT91SAM9260
+@@ -119,7 +122,6 @@ comment "AT91 Feature Selections"
+ 
+ config AT91_SLOW_CLOCK
+ 	bool "Suspend-to-RAM disables main oscillator"
+-	select SRAM
+ 	depends on SUSPEND
+ 	help
+ 	  Select this if you want Suspend-to-RAM to save the most power
 -- 
 1.7.9.5
