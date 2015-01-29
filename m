@@ -1,78 +1,41 @@
-From: elder@linaro.org (Alex Elder)
-Date: Thu, 29 Jan 2015 06:44:30 -0600
-Subject: [PATCH v2] ARM: teach __asmeq that r11 == fp and r12 == ip
-In-Reply-To: <1422524686-30462-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1422524686-30462-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <54CA2B2E.30409@linaro.org>
+From: petr.cvek@tul.cz (Petr Cvek)
+Date: Thu, 29 Jan 2015 13:45:50 +0100
+Subject: [RESEND PATCH v4] Sound: PXA: Fix settings of PXAxxx DMA
+In-Reply-To: <54CA125D.7010908@tul.cz>
+References: <54CA125D.7010908@tul.cz>
+Message-ID: <54CA2B7E.5010003@tul.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/29/2015 03:44 AM, Ard Biesheuvel wrote:
-> The __asmeq macro is used inside inline asm statements to ensure that
-> register asm variables that explicitly specify a register are mapped
-> correctly onto those registers when used in inline asm input and output
-> constraints. However, the string based matching fails to take into account
-> that 'fp' is often referred to as 'r11' and 'ip' is often referred to as
-> 'r12', (e.g., by clang), causing false negatives.
-> 
-> Fix this by making __asmeq consider the ("fp","r11"), ("r11","fp"),
-> ("ip","r12") and ("r12","ip") cases specifically.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Fix PXA DMA autoincrementation, so capture will not use playback settings
+(incrementation in register space instead in target buffer).
 
-I'm satisfied.  Kind of awkward, but it does what's needed,
-and solves the general problem rather than a specific instance
-of it in "bcm_kona_smc.c".
+Regression from:
+  'commit d65a14587a9be853a887a1407db133df1fb68e29 ("ASoC: pxa: use snd_dmaengine_dai_dma_data")'
 
-I tested it in my environment with "r12" and "ip" used in
-all combinations and can confirm they all work as desired.
+Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
+Acked-by: Daniel Mack <daniel@zonque.org>
+---
+ sound/arm/pxa2xx-pcm-lib.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-Thanks for doing this Ard.
-
-Reviewed-by: Alex Elder <elder@linaro.org>
-
-> ---
-> v2:
-> Added r11 but not r10, as the latter is only referred to as 'sl' in
-> objdump output, but GCC emitted inline asm substitutes the references
-> with 'r10' instead. sp/lr/pc are unambiguous between GCC and clang.
-> 
-> Primary purpose of this patch is to fix the incompatibility between clang
-> and GCC, but the side effect is that it relaxes the requirement imposed on
-> the programmer to refer to a register by the same name as the compiler does.
-> If that is seen as a substantial upside by some, we could indeed still decide
-> to add r10, r13, r14 and r15 (for which no such incompatibility exists) as well.
-> However, those are not currently used in __asmeq invocations anywhere under
-> arch/arm
-> 
->  arch/arm/include/asm/compiler.h | 15 ++++++++++++++-
->  1 file changed, 14 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/include/asm/compiler.h b/arch/arm/include/asm/compiler.h
-> index 8155db2f7fa1..29fe85e59439 100644
-> --- a/arch/arm/include/asm/compiler.h
-> +++ b/arch/arm/include/asm/compiler.h
-> @@ -8,8 +8,21 @@
->   * This string is meant to be concatenated with the inline asm string and
->   * will cause compilation to stop on mismatch.
->   * (for details, see gcc PR 15089)
-> + * For compatibility with clang, we have to specifically take the equivalence
-> + * of 'r11' <-> 'fp' and 'r12' <-> 'ip' into account as well.
->   */
-> -#define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
-> +#define __asmeq(x, y)				\
-> +	".ifnc " x "," y "; "			\
-> +	  ".ifnc " x y ",fpr11; " 		\
-> +	    ".ifnc " x y ",r11fp; "		\
-> +	      ".ifnc " x y ",ipr12; " 		\
-> +	        ".ifnc " x y ",r12ip; "		\
-> +	          ".err; "			\
-> +	        ".endif; "			\
-> +	      ".endif; "			\
-> +	    ".endif; "				\
-> +	  ".endif; "				\
-> +	".endif\n\t"
->  
->  
->  #endif /* __ASM_ARM_COMPILER_H */
-> 
+diff --git a/sound/arm/pxa2xx-pcm-lib.c b/sound/arm/pxa2xx-pcm-lib.c
+index 01f8fdc..f8ca3ca 100644
+--- a/sound/arm/pxa2xx-pcm-lib.c
++++ b/sound/arm/pxa2xx-pcm-lib.c
+@@ -45,7 +45,12 @@ int __pxa2xx_pcm_hw_params(struct snd_pcm_substream *substream,
+ 	size_t period = params_period_bytes(params);
+ 	pxa_dma_desc *dma_desc;
+ 	dma_addr_t dma_buff_phys, next_desc_phys;
+-	u32 dcmd = DCMD_INCSRCADDR | DCMD_FLOWTRG;
++	u32 dcmd = 0;
++
++	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
++		dcmd = DCMD_INCSRCADDR | DCMD_FLOWTRG;
++	else
++		dcmd = DCMD_INCTRGADDR | DCMD_FLOWSRC;
+ 
+ 	/* temporary transition hack */
+ 	switch (rtd->params->addr_width) {
+-- 
+1.7.12.1
