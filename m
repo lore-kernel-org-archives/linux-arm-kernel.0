@@ -1,155 +1,106 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 29 Jan 2015 14:05:41 +0100
-Subject: [PATCH v2 4/6] mmc: pwrseq_simple: Add optional reference clock
- support
-In-Reply-To: <1422468953-7594-5-git-send-email-javier.martinez@collabora.co.uk>
-References: <1422468953-7594-1-git-send-email-javier.martinez@collabora.co.uk>
- <1422468953-7594-5-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <CAPDyKFommNu7oscgmhwMpT-5KYN9b6d1xvt513_0qWE=HEGbow@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 29 Jan 2015 14:06:12 +0100
+Subject: [GIT PULL]: clockevents: new material for 3.20
+Message-ID: <54CA3044.6070501@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 January 2015 at 19:15, Javier Martinez Canillas
-<javier.martinez@collabora.co.uk> wrote:
-> Some WLAN chips attached to a SDIO interface, need a reference clock.
->
-> Since this is very common, extend the prseq_simple driver to support
-> an optional clock that is enabled prior the card power up procedure.
->
-> Note: the external clock is optional. Thus an error is not returned
-> if the clock is not found.
->
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> ---
->
-> Changes since v1:
->  - Rebase on top of latest changes.
->  - Use IS_ERR() instead of checking for NULL to see if the clock exists.
-> ---
->  drivers/mmc/core/pwrseq_simple.c | 34 ++++++++++++++++++++++++++++++++--
->  1 file changed, 32 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/mmc/core/pwrseq_simple.c
-> index e53d3c7e059c..5e34c77efa5e 100644
-> --- a/drivers/mmc/core/pwrseq_simple.c
-> +++ b/drivers/mmc/core/pwrseq_simple.c
-> @@ -7,6 +7,7 @@
->   *
->   *  Simple MMC power sequence management
->   */
-> +#include <linux/clk.h>
->  #include <linux/kernel.h>
->  #include <linux/slab.h>
->  #include <linux/device.h>
-> @@ -20,6 +21,7 @@
->
->  struct mmc_pwrseq_simple {
->         struct mmc_pwrseq pwrseq;
-> +       struct clk *ext_clk;
 
-You need to add a bool, maybe call it clk_enabled;  See why below.
+Hi Thomas,
 
->         int nr_gpios;
->         struct gpio_desc *reset_gpios[0];
->  };
-> @@ -39,6 +41,9 @@ static void mmc_pwrseq_simple_pre_power_on(struct mmc_host *host)
->         struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
->                                         struct mmc_pwrseq_simple, pwrseq);
->
-> +       if (!IS_ERR(pwrseq->ext_clk))
-> +               clk_prepare_enable(pwrseq->ext_clk);
-> +
+this pull request contains the following changes:
 
-There are no guarantee that the ->mmc_pwrseq_simple_pre_power_on()
-will be invoked prior ->mmc_pwrseq_simple_power_off().
+  * Barry Song renamed the marco timer to atlas7
 
-That means you need to keep track of if you have gated/ungated the
-clock. In other words check pwrseq->clk_enabled. That will prevent
-potential clk unbalance issues.
+  * Baruch Siach provided a new driver for the Conexant Digicolor SoCs
 
->         mmc_pwrseq_simple_set_gpios_value(pwrseq, 1);
->  }
->
-> @@ -50,6 +55,17 @@ static void mmc_pwrseq_simple_post_power_on(struct mmc_host *host)
->         mmc_pwrseq_simple_set_gpios_value(pwrseq, 0);
->  }
->
-> +static void mmc_pwrseq_simple_power_off(struct mmc_host *host)
-> +{
-> +       struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
-> +                                       struct mmc_pwrseq_simple, pwrseq);
-> +
-> +       mmc_pwrseq_simple_set_gpios_value(pwrseq, 1);
-> +
-> +       if (!IS_ERR(pwrseq->ext_clk))
-> +               clk_disable_unprepare(pwrseq->ext_clk);
+  * Daniel Lezcano added a new driver for the rockchip rk3288 board
 
-Same comment as above.
+  * Oleksij Rempel added a new driver asm9260 for mips
 
-> +}
-> +
->  static void mmc_pwrseq_simple_free(struct mmc_host *host)
->  {
->         struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
-> @@ -60,6 +76,9 @@ static void mmc_pwrseq_simple_free(struct mmc_host *host)
->                 if (!IS_ERR(pwrseq->reset_gpios[i]))
->                         gpiod_put(pwrseq->reset_gpios[i]);
->
-> +       if (!IS_ERR(pwrseq->ext_clk))
-> +               clk_put(pwrseq->ext_clk);
-> +
->         kfree(pwrseq);
->         host->pwrseq = NULL;
->  }
-> @@ -67,7 +86,7 @@ static void mmc_pwrseq_simple_free(struct mmc_host *host)
->  static struct mmc_pwrseq_ops mmc_pwrseq_simple_ops = {
->         .pre_power_on = mmc_pwrseq_simple_pre_power_on,
->         .post_power_on = mmc_pwrseq_simple_post_power_on,
-> -       .power_off = mmc_pwrseq_simple_pre_power_on,
-> +       .power_off = mmc_pwrseq_simple_power_off,
->         .free = mmc_pwrseq_simple_free,
->  };
->
-> @@ -85,6 +104,14 @@ int mmc_pwrseq_simple_alloc(struct mmc_host *host, struct device *dev)
->         if (!pwrseq)
->                 return -ENOMEM;
->
-> +       pwrseq->ext_clk = clk_get(dev, "ext_clock");
-> +       if (IS_ERR(pwrseq->ext_clk) &&
-> +           PTR_ERR(pwrseq->ext_clk) != -ENOENT &&
-> +           PTR_ERR(pwrseq->ext_clk) != -ENOSYS) {
+  * Rob Herring added the DT definition for the versatile AB/PB boards 
+as these ones are compatible with the Versatile clocksource
 
-I don't think you can get -ENOSYS.
+  * Thierry Reding removed an used variable for the sirf driver
 
-> +               ret = PTR_ERR(pwrseq->ext_clk);
-> +               goto free;
-> +       }
-> +
->         for (i = 0; i < nr_gpios; i++) {
->                 pwrseq->reset_gpios[i] = gpiod_get_index(dev, "reset", i,
->                                                          GPIOD_OUT_HIGH);
-> @@ -96,7 +123,7 @@ int mmc_pwrseq_simple_alloc(struct mmc_host *host, struct device *dev)
->                         while (--i)
->                                 gpiod_put(pwrseq->reset_gpios[i]);
->
-> -                       goto free;
-> +                       goto clk_put;
->                 }
->         }
->
-> @@ -105,6 +132,9 @@ int mmc_pwrseq_simple_alloc(struct mmc_host *host, struct device *dev)
->         host->pwrseq = &pwrseq->pwrseq;
->
->         return 0;
-> +clk_put:
-> +       if (!IS_ERR(pwrseq->ext_clk))
-> +               clk_put(pwrseq->ext_clk);
->  free:
->         kfree(pwrseq);
->         return ret;
-> --
-> 2.1.3
->
+The following changes since commit 9bc7491906b4113b4c5ae442157c7dfc4e10cd14:
 
-Kind regards
-Uffe
+   hrtimer: Prevent stale expiry time in hrtimer_interrupt() (2015-01-23 
+12:13:20 +0100)
+
+are available in the git repository at:
+
+   http://git.linaro.org/people/daniel.lezcano/linux.git clockevents/3.20
+
+for you to fetch changes up to 35a8578e8b83eb13f8d57ab40b98bcfd5199d3d4:
+
+   dts: versatile: Add sysregs node (2015-01-29 14:02:16 +0100)
+
+----------------------------------------------------------------
+Barry Song (1):
+       clocksource: marco: Rename marco to atlas7
+
+Baruch Siach (2):
+       clocksource: devicetree: Document Conexant Digicolor timer binding
+       clocksource: Driver for Conexant Digicolor SoC timer
+
+Daniel Lezcano (1):
+       clockevents: rockchip: Add rockchip timer for rk3288
+
+Oleksij Rempel (1):
+       ARM: clocksource: Add asm9260_timer driver
+
+Rob Herring (3):
+       dt/bindings: Add binding for Versatile system registers
+       clocksource: versatile: Adapt for Versatile AB and PB boards
+       dts: versatile: Add sysregs node
+
+Thierry Reding (1):
+       clocksource: sirf: Remove unused variable
+
+  Documentation/devicetree/bindings/arm/versatile-sysreg.txt        | 
+10 ++++++++++
+  Documentation/devicetree/bindings/timer/digicolor-timer.txt       | 
+18 +++++++++++++++++
+  Documentation/devicetree/bindings/timer/rockchip,rk3288-timer.txt | 
+18 +++++++++++++++++
+  MAINTAINERS                                                       |   2 +-
+  arch/arm/boot/dts/versatile-ab.dts                                | 
+5 +++++
+  arch/arm/mach-rockchip/Kconfig                                    |   1 +
+  drivers/clocksource/Kconfig                                       | 
+17 ++++++++++++++++
+  drivers/clocksource/Makefile                                      | 
+5 ++++-
+  drivers/clocksource/asm9260_timer.c                               | 
+220 
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  drivers/clocksource/rockchip_timer.c                              | 
+180 
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  drivers/clocksource/{timer-marco.c => timer-atlas7.c}             | 
+15 +++++++-------
+  drivers/clocksource/timer-digicolor.c                             | 
+199 
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  drivers/clocksource/versatile.c                                   | 
+4 +++-
+  13 files changed, 683 insertions(+), 11 deletions(-)
+  create mode 100644 
+Documentation/devicetree/bindings/arm/versatile-sysreg.txt
+  create mode 100644 
+Documentation/devicetree/bindings/timer/digicolor-timer.txt
+  create mode 100644 
+Documentation/devicetree/bindings/timer/rockchip,rk3288-timer.txt
+  create mode 100644 drivers/clocksource/asm9260_timer.c
+  create mode 100644 drivers/clocksource/rockchip_timer.c
+  rename drivers/clocksource/{timer-marco.c => timer-atlas7.c} (95%)
+  create mode 100644 drivers/clocksource/timer-digicolor.c--
+
+
+
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
