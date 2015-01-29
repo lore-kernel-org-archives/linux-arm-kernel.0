@@ -1,63 +1,172 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 29 Jan 2015 10:47:18 +0900
-Subject: [PATCH] ARM: shmobile: r8a7791: Correct SDHI clock labels and
- output-names
-Message-ID: <1422496038-3915-1-git-send-email-horms+renesas@verge.net.au>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 28 Jan 2015 18:11:50 -0800
+Subject: [PATCH 1/6] soc: qcom: gsbi: Add support for ADM CRCI muxing
+In-Reply-To: <1422396644-21714-2-git-send-email-agross@codeaurora.org>
+References: <1422396644-21714-1-git-send-email-agross@codeaurora.org>
+ <1422396644-21714-2-git-send-email-agross@codeaurora.org>
+Message-ID: <20150129021150.GC23506@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There appears to have been some inconsistency and confusion here as on
-the r8a7790 these clocks are referred to as SD(HI)1 and SD(HI)2 while on
-the r8a7791 and r8a7794 they are referred to as SD(HI)2 and SD(HI)3.
+On 01/27, Andy Gross wrote:
+> This patch adds automatic configuration for the ADM CRCI muxing required to
+> support DMA operations for GSBI clients.  The GSBI mode and instance determine
+> the correct TCSR ADM CRCI MUX value that must be programmed so that the DMA
+> works properly.
+> 
+> Signed-off-by: Andy Gross <agross@codeaurora.org>
+> ---
+>  .../devicetree/bindings/soc/qcom/qcom,gsbi.txt     |   17 ++-
+>  drivers/soc/qcom/Kconfig                           |    1 +
+>  drivers/soc/qcom/qcom_gsbi.c                       |  148 +++++++++++++++++++-
+>  3 files changed, 158 insertions(+), 8 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,gsbi.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,gsbi.txt
+> index 4ce24d4..39eea8a 100644
+> --- a/Documentation/devicetree/bindings/soc/qcom/qcom,gsbi.txt
+> +++ b/Documentation/devicetree/bindings/soc/qcom/qcom,gsbi.txt
+> @@ -6,12 +6,18 @@ configuration settings.  The mode setting will govern the input/output mode of
+>  the 4 GSBI IOs.
+>  
+>  Required properties:
+> -- compatible: must contain "qcom,gsbi-v1.0.0" for APQ8064/IPQ8064
+> +- compatible:	Should contain:
+> +		"qcom,gsbi-ipq8064" for IPQ8064
+> +		"qcom,gsbi-apq8064" for APQ8064
+> +		"qcom,gsbi-msm8960" for MSM8960
+> +		"qcom,gsbi-msm8660" for MSM8660
 
-Fixes: 59e79895b95892863 ("ARM: shmobile: r8a7791: Add clocks")
-Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Hopefully this is not necessary, but if it is we should leave the
+old compatible here and say it's deprecated or something.
 
----
+>  - reg: Address range for GSBI registers
+>  - clocks: required clock
+>  - clock-names: must contain "iface" entry
+>  - qcom,mode : indicates MUX value for configuration of the serial interface.
+>    Please reference dt-bindings/soc/qcom,gsbi.h for valid mux values.
+> +- qcom,gsbi-num: indicates GSBI instance number
 
-This follows the naming pattern of "ARM: shmobile: r8a7794: Correct SDHI
-clock base address, labels and output-names".
----
- arch/arm/boot/dts/r8a7791.dtsi | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+Why not use DT aliases for this? Then other drivers or more
+generic code can search for a gsbiN alias for the particular gsbi
+node. No qcom specific property.
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 6b0cd1b..86862a5 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -880,19 +880,19 @@
- 		};
- 
- 		/* Variable factor clocks */
--		sd1_clk: sd2_clk at e6150078 {
-+		sd2_clk: sd2_clk at e6150078 {
- 			compatible = "renesas,r8a7791-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0 0xe6150078 0 4>;
- 			clocks = <&pll1_div2_clk>;
- 			#clock-cells = <0>;
--			clock-output-names = "sd1";
-+			clock-output-names = "sd2";
- 		};
--		sd2_clk: sd3_clk at e615026c {
-+		sd3_clk: sd3_clk at e615026c {
- 			compatible = "renesas,r8a7791-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0 0xe615026c 0 4>;
- 			clocks = <&pll1_div2_clk>;
- 			#clock-cells = <0>;
--			clock-output-names = "sd2";
-+			clock-output-names = "sd3";
- 		};
- 		mmc0_clk: mmc0_clk at e6150240 {
- 			compatible = "renesas,r8a7791-div6-clock", "renesas,cpg-div6-clock";
-@@ -1113,7 +1113,7 @@
- 		mstp3_clks: mstp3_clks at e615013c {
- 			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
--			clocks = <&cp_clk>, <&sd2_clk>, <&sd1_clk>, <&cpg_clocks R8A7791_CLK_SD0>,
-+			clocks = <&cp_clk>, <&sd3_clk>, <&sd2_clk>, <&cpg_clocks R8A7791_CLK_SD0>,
- 				 <&mmc0_clk>, <&hp_clk>, <&mp_clk>, <&hp_clk>, <&mp_clk>, <&rclk_clk>,
- 				 <&hp_clk>, <&hp_clk>;
- 			#clock-cells = <1>;
+> +- syscon-tcsr: indicates phandle of TCSR syscon node
+
+Make this optional but required if any child nodes use dma?
+
+>  
+>  Optional properties:
+>  - qcom,crci : indicates CRCI MUX value for QUP CRCI ports.  Please reference
+
+> diff --git a/drivers/soc/qcom/qcom_gsbi.c b/drivers/soc/qcom/qcom_gsbi.c
+> index 729425d..c7a22b5 100644
+> --- a/drivers/soc/qcom/qcom_gsbi.c
+> +++ b/drivers/soc/qcom/qcom_gsbi.c
+>  
+>  struct gsbi_info {
+>  	struct clk *hclk;
+>  	u32 mode;
+>  	u32 crci;
+> +	struct regmap *tcsr;
+> +};
+> +
+> +static const struct of_device_id gsbi_dt_match[] = {
+> +	{ .compatible = "qcom,gsbi-v1.0.0", .data = NULL},
+> +	{ .compatible = "qcom,gsbi-ipq8064", .data = &config_ipq8064},
+> +	{ .compatible = "qcom,gsbi-apq8064", .data = &config_apq8064},
+> +	{ .compatible = "qcom,gsbi-msm8960", .data = &config_msm8960},
+> +	{ .compatible = "qcom,gsbi-msm8660", .data = &config_msm8660},
+> +	{ },
+>  };
+> +MODULE_DEVICE_TABLE(of, gsbi_dt_match);
+>  
+>  static int gsbi_probe(struct platform_device *pdev)
+>  {
+>  	struct device_node *node = pdev->dev.of_node;
+> +	const struct of_device_id *match;
+>  	struct resource *res;
+>  	void __iomem *base;
+>  	struct gsbi_info *gsbi;
+> +	u32 gsbi_num, i, val;
+
+i should be int
+
+> +	struct crci_config *config;
+
+const?
+
+>  
+>  	gsbi = devm_kzalloc(&pdev->dev, sizeof(*gsbi), GFP_KERNEL);
+>  
+> @@ -45,6 +152,20 @@ static int gsbi_probe(struct platform_device *pdev)
+>  	if (IS_ERR(base))
+>  		return PTR_ERR(base);
+>  
+> +	gsbi->tcsr = syscon_regmap_lookup_by_phandle(node, "syscon-tcsr");
+> +	if (IS_ERR(gsbi->tcsr))
+> +		return -EINVAL;
+> +
+> +	if (of_property_read_u32(node, "qcom,gsbi-num", &gsbi_num)) {
+> +		dev_err(&pdev->dev, "missing gsbi instance number\n");
+> +		return -EINVAL;
+> +	}
+
+As said before, aliases would do the job the same and not require
+some qcom specific property.
+
+> +
+> +	if (!gsbi_num || gsbi_num > MAX_GSBI) {
+> +		dev_err(&pdev->dev, "invalid gsbi number\n");
+> +		return -EINVAL;
+> +	}
+> +
+>  	if (of_property_read_u32(node, "qcom,mode", &gsbi->mode)) {
+>  		dev_err(&pdev->dev, "missing mode configuration\n");
+>  		return -EINVAL;
+> @@ -64,6 +185,26 @@ static int gsbi_probe(struct platform_device *pdev)
+>  	writel_relaxed((gsbi->mode << GSBI_PROTOCOL_SHIFT) | gsbi->crci,
+>  				base + GSBI_CTRL_REG);
+>  
+> +	/*
+> +	 * modify tcsr to reflect mode and ADM CRCI mux
+> +	 * Each gsbi contains a pair of bits, one for RX and one for TX
+> +	 * SPI mode requires both bits cleared, otherwise they are set
+> +	 */
+> +	match = of_match_node(gsbi_dt_match, node);
+
+Why not match the config to the TCSR compatible string? Wouldn't
+that more accurately reflect that we need to set different bits
+depending on which type of TCSR we're using? The version of GSBI
+hardware is not actually changing in every different SoC so I
+don't see why we want to change the compatible there just because
+the TCSR register layout changed.
+
+> +	config = (struct crci_config *)match->data;
+
+Cast shouldn't be necessary if config is const?
+
+> +
+> +	if (config)
+> +		for (i = 0; i < config->num_rows; i++) {
+> +			if (gsbi->mode == GSBI_PROT_SPI)
+
+Doesn't I2C need the same treatment (anything in QUP really)?
+Maybe the logic could be changed to check for gsbi->crci ==
+GSBI_CRCI_QUP?
+
+> +				val = config->array[i*MAX_GSBI + gsbi_num - 1];
+> +			else
+> +				val = 0;
+> +
+> +			regmap_update_bits(gsbi->tcsr,
+> +				TCSR_ADM_CRCI_BASE + 0x4*i,
+> +				config->array[i*MAX_GSBI + gsbi_num - 1], val);
+> +		}
+> +
+>  	/* make sure the gsbi control write is not reordered */
+>  	wmb();
+>  
+
 -- 
-2.1.4
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
