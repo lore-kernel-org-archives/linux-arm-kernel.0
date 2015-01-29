@@ -1,22 +1,45 @@
-From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
-Date: Thu, 29 Jan 2015 13:25:26 -0800
-Subject: [PATCH 1/2] soc: ti: knav_qmss_queue: makefile tweak to build
- as dynamic module
-In-Reply-To: <1422563870-19252-1-git-send-email-m-karicheri2@ti.com>
-References: <1422563870-19252-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <54CAA546.6060501@oracle.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 29 Jan 2015 13:29:53 -0800
+Subject: [PATCH 0/2] Fix secondary CPU boot for thumb2 kernels
+In-Reply-To: <20150129154624.GH8951@e104818-lin.cambridge.arm.com>
+References: <1421869698-27341-1-git-send-email-sboyd@codeaurora.org>
+ <54C94511.30508@codeaurora.org>
+ <20150129154624.GH8951@e104818-lin.cambridge.arm.com>
+Message-ID: <54CAA651.2010205@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/29/15 12:37 PM, Murali Karicheri wrote:
-> Currently configuring qmss and dma as dynamic module creates three .ko
-> files. knav_qmss_acc.ko and knav_qmss_queue.ko both can't be insmod
-> because of circular dependency. So combine these two into one module
-> by changing the makefile.
+On 01/29/15 07:46, Catalin Marinas wrote:
+> On Wed, Jan 28, 2015 at 08:22:41PM +0000, Stephen Boyd wrote:
+>> On 01/21/15 11:48, Stephen Boyd wrote:
+>>> Currently I can't boot up secondary CPUs on qcom platforms when I
+>>> compile the kernel for THUMB2 mode. This is because we always enter
+>>> the kernel in ARM mode regardless of what mode the kernel is compiled
+>>> for. This patchset adds a small wrapper to secondary_startup() called
+>>> secondary_startup_arm() that allows us to switch into THUMB2 mode if
+>>> we need to. If the kernel is compiled for ARM mode it shouldn't have
+>>> any effect.
+>>>
+>>> Stephen Boyd (2):
+>>>   ARM: Add a secondary_startup that assumes ARM mode
+>>>   ARM: qcom: Use secondary_startup_arm()
+>>>
+>>>  arch/arm/kernel/head.S       | 7 +++++++
+>>>  arch/arm/mach-qcom/platsmp.c | 4 ++--
+>>>  2 files changed, 9 insertions(+), 2 deletions(-)
+>> Any comments here? Perhaps I can send this through the patch tracker?
+> FWIW, they look fine to me.
 >
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>
+> I guess the reason it works fine on other platforms is because the
+> secondary start address we pass to firmware has bit 0 set and this
+> causes the jump to the kernel in Thumb-2 mode.
+>
 
-Applied both $subject and 2/2. Thanks
+Thanks. I tried forcing that and it still didn't work so I guess the
+firmware isn't using interworking branches.
 
-Regards,
-Santosh
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
