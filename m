@@ -1,66 +1,51 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 28 Jan 2015 16:55:28 -0800
-Subject: [PATCH 1/2] mmc: core: use card pointer as the first parameter of
- execute_tuning()
-In-Reply-To: <CAPDyKFqjG=yxDcwnk4jbXMZ05hMkWR2x37uVpRNd_11-eB4G7w@mail.gmail.com>
-References: <1422271175-19445-1-git-send-email-addy.ke@rock-chips.com>
- <1422271175-19445-2-git-send-email-addy.ke@rock-chips.com>
- <CAPDyKFp=5epMggHu0+u_LU7ETujcoeP2xOpB7iD6JF2bs8BnEA@mail.gmail.com>
- <CAD=FV=X9x0gW5TyLi4ERm8nxixQB__Y=5bRAtOax-_w+T33rCg@mail.gmail.com>
- <CAPDyKFqjG=yxDcwnk4jbXMZ05hMkWR2x37uVpRNd_11-eB4G7w@mail.gmail.com>
-Message-ID: <CAD=FV=VQg+sQUpgbKw7Zz=-f+jPM=6O-+3gUpohWhj8JeSPu6Q@mail.gmail.com>
+From: gerg@uclinux.org (Greg Ungerer)
+Date: Thu, 29 Jan 2015 11:15:34 +1000
+Subject: [PATCH] mm: export "high_memory" symbol on !MMU
+In-Reply-To: <2715923.qFZi90ffep@wuerfel>
+References: <2715923.qFZi90ffep@wuerfel>
+Message-ID: <54C989B6.4080006@uclinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ulf,
+On 29/01/15 00:43, Arnd Bergmann wrote:
+>>From f391eb37fafc8a22d7fd9574b8d220f0d90a91d0 Mon Sep 17 00:00:00 2001
+> From: Arnd Bergmann <arnd@arndb.de>
+> Date: Mon, 25 Aug 2014 16:24:41 +0200
+> Subject: [PATCH] mm: export "high_memory" symbol on !MMU
+> 
+> The symbol 'high_memory' is provided on both MMU- and NOMMU-kernels,
+> but only one of them is exported, which leads to module build errors
+> in drivers that work fine built-in:
+> 
+> ERROR: "high_memory" [drivers/net/virtio_net.ko] undefined!
+> ERROR: "high_memory" [drivers/net/ppp/ppp_mppe.ko] undefined!
+> ERROR: "high_memory" [drivers/mtd/nand/nand.ko] undefined!
+> ERROR: "high_memory" [crypto/tcrypt.ko] undefined!
+> ERROR: "high_memory" [crypto/cts.ko] undefined!
+> 
+> This exports the symbol to get these to work on NOMMU as well.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-On Tue, Jan 27, 2015 at 7:18 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> I asked Addy to post upstream against mmc_send_tuning(), but I guess
->> he didn't (he posted against Alex's NAKed patch instead).
->>
->> ...when I talked to him about it, Addy was asserting that when tuning
->> fails it is important (at least on dw_mmc on rk3288) that we wait for
->> the card to stop being busy and that the way to detect was using
->> mmc_send_status().
->
-> So, could that be due to the internal logic of the error handling in
-> dw_mmc driver? Or you think this is a generic issue?
->
-> According to the specifications (eMMC and SD) both states that the
-> tuning command has an R1 response. So, there shouldn't be any busy
-> signalling involved - at least according to spec.
+Here is an ack if you want one:
 
-I did a bit of digging into this issue myself.  What I found was that
-a "response CRC" and "end of transfer".  This was why I posted up
-<https://patchwork.kernel.org/patch/5623071/>.  From that patch:
+Acked-by: Greg Ungerer <gerg@uclinux.org>
 
-> Specifically it looks like in certain error conditions (I saw this
-> with Response CRC errors) that data keeps showing up in the FIFO even
-> after the error is reported and the CD (command done) bit is set.  If
-> we don't wait for this data to finish transferring then it confuses
-> the next transaction.  In the specific failure case I ran into I found
-> that I could monitor the data_state_mc_busy bit and wait for it to
-> clear, but in other failure cases this bit was stuck at busy when we
-> saw an error.  Hence a generic big delay seems like the only option.
-
-...Addy instead fixed the problem using mmc_send_status() to try to
-detect when the transfer was all done and it apparently worked, but it
-seemed odd to me.  My MMC "expertise" pretty much ends with looking
-for simple logic errors in the MMC driver, so my hope was that one of
-you guys would know this better...
+Regards
+Greg
 
 
->> That would mean that against upstream you'd need to change
->> mmc_send_tuning() to take in the card as well (or move the "host->card
->> = card" assignment to before UHS init, which seems less desirable?)
->>
->> What do you think about that?  Is there a better solution?
->
-> Why do we need to change mmc_send_tuning()? I thought the issue was
-> that mmc_send_status(), which currently takes "card" as a parameter.
-
-Well, if mmc_send_tuning() needed to call mmc_send_status() then
-mmc_send_tuning() would need the card parameter, right?
-
-
-Doug
+> diff --git a/mm/nommu.c b/mm/nommu.c
+> index e9228cbe46de..7bdeb281ad0e 100644
+> --- a/mm/nommu.c
+> +++ b/mm/nommu.c
+> @@ -59,6 +59,7 @@
+>  #endif
+>  
+>  void *high_memory;
+> +EXPORT_SYMBOL(high_memory);
+>  struct page *mem_map;
+>  unsigned long max_mapnr;
+>  unsigned long highest_memmap_pfn;
+> 
+> 
