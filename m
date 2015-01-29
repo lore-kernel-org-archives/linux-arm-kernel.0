@@ -1,55 +1,67 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 29 Jan 2015 14:52:56 +0100
-Subject: [PATCH 6/9] clocksource: Driver for Conexant Digicolor SoC timer
-In-Reply-To: <1422538656.32520.4.camel@x220>
-References: <54CA3044.6070501@linaro.org>	
- <1422536899-16609-1-git-send-email-daniel.lezcano@linaro.org>	
- <1422536899-16609-6-git-send-email-daniel.lezcano@linaro.org>
- <1422538656.32520.4.camel@x220>
-Message-ID: <54CA3B38.507@linaro.org>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Thu, 29 Jan 2015 14:53:10 +0100
+Subject: [PATCH v2 4/6] mmc: pwrseq_simple: Add optional reference clock
+ support
+In-Reply-To: <CAPDyKFommNu7oscgmhwMpT-5KYN9b6d1xvt513_0qWE=HEGbow@mail.gmail.com>
+References: <1422468953-7594-1-git-send-email-javier.martinez@collabora.co.uk>	<1422468953-7594-5-git-send-email-javier.martinez@collabora.co.uk>
+ <CAPDyKFommNu7oscgmhwMpT-5KYN9b6d1xvt513_0qWE=HEGbow@mail.gmail.com>
+Message-ID: <54CA3B46.20204@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/29/2015 02:37 PM, Paul Bolle wrote:
-> On Thu, 2015-01-29 at 14:08 +0100, Daniel Lezcano wrote:
->> From: Baruch Siach <baruch@tkos.co.il>
+Hello Ulf,
+
+Thanks a lot for your feedback.
+
+On 01/29/2015 02:05 PM, Ulf Hansson wrote:
 >>
->> Add clocksource driver to the Conexant CX92755 SoC, part of the Digicolor SoCs
->> series. Hardware provides 8 timers, A to H. Timer A is dedicated to a future
->> watchdog driver so we don't use it here. Use timer B for sched_clock, and timer
->> C for clock_event.
->>
->> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
->> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->> ---
->>   drivers/clocksource/Kconfig           |   3 +
->>   drivers/clocksource/Makefile          |   1 +
->>   drivers/clocksource/timer-digicolor.c | 199 ++++++++++++++++++++++++++++++++++
->>   3 files changed, 203 insertions(+)
->>   create mode 100644 drivers/clocksource/timer-digicolor.c
->>
->> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
->> index a89120b..72a3827 100644
->> --- a/drivers/clocksource/Kconfig
->> +++ b/drivers/clocksource/Kconfig
->> @@ -18,6 +18,9 @@ config CLKBLD_I8253
->>   config CLKSRC_MMIO
->>   	bool
->>
->> +config DIGICOLOR_TIMER
->> +	bool
->> +
+>>  struct mmc_pwrseq_simple {
+>>         struct mmc_pwrseq pwrseq;
+>> +       struct clk *ext_clk;
+> 
+> You need to add a bool, maybe call it clk_enabled;  See why below.
 >
-> And the select for this symbol (see https://lkml.org/lkml/2015/1/26/360)
-> will be provided in a separate patch? Because this patch, by itself,
-> won't allow DIGICOLOR_TIMER to be set, will it?
 
-You are right, that should be done in a separate patch. I believe Baruch 
-should have done that.
+Ok
+ 
+>>         int nr_gpios;
+>>         struct gpio_desc *reset_gpios[0];
+>>  };
+>> @@ -39,6 +41,9 @@ static void mmc_pwrseq_simple_pre_power_on(struct mmc_host *host)
+>>         struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
+>>                                         struct mmc_pwrseq_simple, pwrseq);
+>>
+>> +       if (!IS_ERR(pwrseq->ext_clk))
+>> +               clk_prepare_enable(pwrseq->ext_clk);
+>> +
+> 
+> There are no guarantee that the ->mmc_pwrseq_simple_pre_power_on()
+> will be invoked prior ->mmc_pwrseq_simple_power_off().
+>
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+Got it, I didn't know that mmc_pwrseq_simple_power_off() could be invoked.
+without mmc_pwrseq_simple_pre_power_on() not being called before.
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> That means you need to keep track of if you have gated/ungated the
+> clock. In other words check pwrseq->clk_enabled. That will prevent
+> potential clk unbalance issues.
+
+Yes, I'll change to check for the boolean in _simple_power_off() and
+_post_power_on() then.
+
+>> @@ -85,6 +104,14 @@ int mmc_pwrseq_simple_alloc(struct mmc_host *host, struct device *dev)
+>>         if (!pwrseq)
+>>                 return -ENOMEM;
+>>
+>> +       pwrseq->ext_clk = clk_get(dev, "ext_clock");
+>> +       if (IS_ERR(pwrseq->ext_clk) &&
+>> +           PTR_ERR(pwrseq->ext_clk) != -ENOENT &&
+>> +           PTR_ERR(pwrseq->ext_clk) != -ENOSYS) {
+> 
+> I don't think you can get -ENOSYS.
+> 
+
+You are right, I'll remove that.
+
+Best regards,
+Javier
