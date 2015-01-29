@@ -1,63 +1,75 @@
-From: nathan.sullivan@ni.com (Nathan Sullivan)
-Date: Thu, 29 Jan 2015 12:56:18 -0600
-Subject: __HAVE_ARCH_CMPXCHG on ARM?
-Message-ID: <20150129185618.GA31459@nathan3500-linux-VM>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 29 Jan 2015 11:13:38 -0800
+Subject: [PATCH v13 4/6] clk: Add rate constraints to clocks
+In-Reply-To: <CAMuHMdUGgA70o2SgdJR3X6AkCcMssHU0POLfzppADT-O=BrYDw@mail.gmail.com>
+References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>	<1422011024-32283-5-git-send-email-tomeu.vizoso@collabora.com>
+ <CAMuHMdUGgA70o2SgdJR3X6AkCcMssHU0POLfzppADT-O=BrYDw@mail.gmail.com>
+Message-ID: <54CA8662.7040008@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 01/29/15 05:31, Geert Uytterhoeven wrote:
+> Hi Tomeu, Mike,
+>
+> On Fri, Jan 23, 2015 at 12:03 PM, Tomeu Vizoso
+> <tomeu.vizoso@collabora.com> wrote:
+>> --- a/drivers/clk/clk.c
+>> +++ b/drivers/clk/clk.c
+>> @@ -2391,25 +2543,24 @@ int __clk_get(struct clk *clk)
+>>         return 1;
+>>  }
+>>
+>> -static void clk_core_put(struct clk_core *core)
+>> +void __clk_put(struct clk *clk)
+>>  {
+>>         struct module *owner;
+>>
+>> -       owner = core->owner;
+>> +       if (!clk || WARN_ON_ONCE(IS_ERR(clk)))
+>> +               return;
+>>
+>>         clk_prepare_lock();
+>> -       kref_put(&core->ref, __clk_release);
+>> +
+>> +       hlist_del(&clk->child_node);
+>> +       clk_core_set_rate_nolock(clk->core, clk->core->req_rate);
+> At this point, clk->core->req_rate is still zero, causing
+> cpg_div6_clock_round_rate() to be called with a zero "rate" parameter,
+> e.g. on r8a7791:
 
-While investigating a performance issue on RT 3.14, I noticed that
-__HAVE_ARCH_CMPXCHG is not defined for ARM.  This causes -rt locks to
-always use the slow path and impacts performance.  ARMv6 and above
-have a cmpxchg implementation already that will work just fine.
+Hmm.. I wonder if we should assign core->req_rate to be the same as
+core->rate during __clk_init()? That would make this call to
+clk_core_set_rate_nolock() a nop in this case.
 
-In 2012, Yong Zhang submitted a patch to fix this[1], but it mysteriously
-disappeared afterwards.  I did notice that the s-o-b line has a different
-email address than the windriver one.  Yong, do you mind re-submitting the
-patch with a fixed s-o-b?
+>
+> cpg_div6_clock_round_rate: clock sd2 rate 0 parent_rate 780000000 div 1
+> cpg_div6_clock_round_rate: clock sd1 rate 0 parent_rate 780000000 div 1
+> cpg_div6_clock_round_rate: clock mmc0 rate 0 parent_rate 780000000 div 1
+> cpg_div6_clock_round_rate: clock sd1 rate 0 parent_rate 780000000 div 1
+> cpg_div6_clock_round_rate: clock sd1 rate 0 parent_rate 780000000 div 1
+> cpg_div6_clock_round_rate: clock sd2 rate 0 parent_rate 780000000 div 1
+> cpg_div6_clock_round_rate: clock sd2 rate 0 parent_rate 780000000 div 1
+>
+> and cpg_div6_clock_calc_div() is called to calculate
+>
+>         div = DIV_ROUND_CLOSEST(parent_rate, rate);
+>
+> Why was this call to clk_core_set_rate_nolock() in __clk_put() added?
+> Before, there was no rate setting done at this point, and
+> cpg_div6_clock_round_rate() was not called.
 
-Thanks!
-   Nathan Sullivan
+We need to call clk_core_set_rate_nolock() here to drop any min/max rate
+request that this consumer has.
 
-[1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2012-May/102122.html (duplicated below)
+>
+> Have the semantics changed? Should .round_rate() be ready to
+> accept a "zero" rate, and use e.g. the current rate instead?
 
--- 8< --
-From: Yong Zhang <yong.zhang@windriver.com>
+It seems like we've also exposed a bug in cpg_div6_clock_calc_div().
+Technically any driver could have called clk_round_rate() with a zero
+rate before this change and that would have caused the same division by
+zero.
 
-Both pi_stress and sigwaittest in rt-test show performance gain with
-__HAVE_ARCH_CMPXCHG. Testing result on coretile_express_a9x4:
-
-pi_stress -p 99 --duration=300 (on linux-3.4-rc5; bigger is better)
-  vanilla:     Total inversion performed: 5493381
-  patched:     Total inversion performed: 5621746
-
-sigwaittest -p 99 -l 100000 (on linux-3.4-rc5-rt6; less is better)
-  3.4-rc5-rt6: Min   24, Cur   27, Avg   30, Max   98
-  patched:     Min   19, Cur   21, Avg   23, Max   96
-
-Signed-off-by: Yong Zhang <yong.zhang0@gmail.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Nicolas Pitre <nico@linaro.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: linux-arm-kernel at lists.infradead.org
----
- arch/arm/include/asm/cmpxchg.h |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/include/asm/cmpxchg.h b/arch/arm/include/asm/cmpxchg.h
-index 7eb18c1..a91b44e 100644
---- a/arch/arm/include/asm/cmpxchg.h
-+++ b/arch/arm/include/asm/cmpxchg.h
-@@ -127,6 +127,8 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
- 
- #else	/* min ARCH >= ARMv6 */
- 
-+#define __HAVE_ARCH_CMPXCHG 1
-+
- extern void __bad_cmpxchg(volatile void *ptr, int size);
- 
- /*
 -- 
-1.7.5.4
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
