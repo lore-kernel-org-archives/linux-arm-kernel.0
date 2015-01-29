@@ -1,21 +1,119 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 29 Jan 2015 17:50:30 +0100
-Subject: [PATCH] [TEMPORARY] net: netfilter: IPV6 XT sockets need
- CONFIG_NF_DEFRAG_IPV6
-In-Reply-To: <1513018.IdvuSAziQY@wuerfel>
-References: <1513018.IdvuSAziQY@wuerfel>
-Message-ID: <1699413.oLnudLOjvJ@wuerfel>
+From: Dave.Martin@arm.com (Dave P Martin)
+Date: Thu, 29 Jan 2015 16:51:00 +0000
+Subject: [PATCH] arm64: Avoid breakage caused by .altmacro in fpsimd
+ save/restore macros
+In-Reply-To: <CAKv+Gu-JAegP+F6gVbfBSzOitzHB3=oPqd1UmsM5YN=L2ywLoA@mail.gmail.com>
+References: <1422548683-25544-1-git-send-email-Dave.Martin@arm.com>
+ <CAKv+Gu-JAegP+F6gVbfBSzOitzHB3=oPqd1UmsM5YN=L2ywLoA@mail.gmail.com>
+Message-ID: <20150129165100.GC11665@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 29 January 2015 17:18:59 Arnd Bergmann wrote:
-> If IP6_NF_IPTABLES=m, NF_DEFRAG_IPV6 gets selected as a module as well
-> from NETFILTER_XT_MATCH_SOCKET, so the latter cannot be built-in, or
-> we get:
+On Thu, Jan 29, 2015 at 04:34:05PM +0000, Ard Biesheuvel wrote:
+> On 29 January 2015 at 16:24, Dave Martin <Dave.Martin@arm.com> wrote:
+> > Alternate macro mode is not a property of a macro definition, but a
+> > gas runtime state that alters the way macros are expanded for ever
+> > after (until .noaltmacro is seen).
+> >
+> > This means that subsequent assembly code that calls other macros can
+> > break if fpsimdmacros.h is included.
+> >
+> > Since these instruction sequences are simple (if dull -- but in a
+> > good way), this patch solves the problem by simply expanding the
+> > .irp loops.  The pre-existing fpsimd_{save,restore} macros weren't
+> > rolled with .irp anyway and the sequences affected are short, so
+> > this change restores consistency at little cost.
+> >
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> 
+> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-I messed up the subject line, the [TEMPORARY] was not meant to be
-in there, and I also saw that the subject was mixed up too.
+Thanks
 
-I will send it again with the proper subject.
+(Also, apologies for accidentally missing you from cc)
 
-	Arnd
+Cheers
+---Dave
+
+> 
+> > ---
+> >  arch/arm64/include/asm/fpsimdmacros.h |   43 ++++++++++++++++++++++++---------
+> >  1 file changed, 32 insertions(+), 11 deletions(-)
+> >
+> > diff --git a/arch/arm64/include/asm/fpsimdmacros.h b/arch/arm64/include/asm/fpsimdmacros.h
+> > index 007618b..a2daf12 100644
+> > --- a/arch/arm64/include/asm/fpsimdmacros.h
+> > +++ b/arch/arm64/include/asm/fpsimdmacros.h
+> > @@ -76,7 +76,6 @@
+> >         fpsimd_restore_fpcr x\tmpnr, \state
+> >  .endm
+> >
+> > -.altmacro
+> >  .macro fpsimd_save_partial state, numnr, tmpnr1, tmpnr2
+> >         mrs     x\tmpnr1, fpsr
+> >         str     w\numnr, [\state, #8]
+> > @@ -86,11 +85,22 @@
+> >         add     \state, \state, x\numnr, lsl #4
+> >         sub     x\tmpnr1, x\tmpnr1, x\numnr, lsl #1
+> >         br      x\tmpnr1
+> > -       .irp    qa, 30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2, 0
+> > -       .irp    qb, %(qa + 1)
+> > -       stp     q\qa, q\qb, [\state, # -16 * \qa - 16]
+> > -       .endr
+> > -       .endr
+> > +       stp     q30, q31, [\state, #-16 * 30 - 16]
+> > +       stp     q28, q29, [\state, #-16 * 28 - 16]
+> > +       stp     q26, q27, [\state, #-16 * 26 - 16]
+> > +       stp     q24, q25, [\state, #-16 * 24 - 16]
+> > +       stp     q22, q23, [\state, #-16 * 22 - 16]
+> > +       stp     q20, q21, [\state, #-16 * 20 - 16]
+> > +       stp     q18, q19, [\state, #-16 * 18 - 16]
+> > +       stp     q16, q17, [\state, #-16 * 16 - 16]
+> > +       stp     q14, q15, [\state, #-16 * 14 - 16]
+> > +       stp     q12, q13, [\state, #-16 * 12 - 16]
+> > +       stp     q10, q11, [\state, #-16 * 10 - 16]
+> > +       stp     q8, q9, [\state, #-16 * 8 - 16]
+> > +       stp     q6, q7, [\state, #-16 * 6 - 16]
+> > +       stp     q4, q5, [\state, #-16 * 4 - 16]
+> > +       stp     q2, q3, [\state, #-16 * 2 - 16]
+> > +       stp     q0, q1, [\state, #-16 * 0 - 16]
+> >  0:
+> >  .endm
+> >
+> > @@ -103,10 +113,21 @@
+> >         add     \state, \state, x\tmpnr2, lsl #4
+> >         sub     x\tmpnr1, x\tmpnr1, x\tmpnr2, lsl #1
+> >         br      x\tmpnr1
+> > -       .irp    qa, 30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2, 0
+> > -       .irp    qb, %(qa + 1)
+> > -       ldp     q\qa, q\qb, [\state, # -16 * \qa - 16]
+> > -       .endr
+> > -       .endr
+> > +       ldp     q30, q31, [\state, #-16 * 30 - 16]
+> > +       ldp     q28, q29, [\state, #-16 * 28 - 16]
+> > +       ldp     q26, q27, [\state, #-16 * 26 - 16]
+> > +       ldp     q24, q25, [\state, #-16 * 24 - 16]
+> > +       ldp     q22, q23, [\state, #-16 * 22 - 16]
+> > +       ldp     q20, q21, [\state, #-16 * 20 - 16]
+> > +       ldp     q18, q19, [\state, #-16 * 18 - 16]
+> > +       ldp     q16, q17, [\state, #-16 * 16 - 16]
+> > +       ldp     q14, q15, [\state, #-16 * 14 - 16]
+> > +       ldp     q12, q13, [\state, #-16 * 12 - 16]
+> > +       ldp     q10, q11, [\state, #-16 * 10 - 16]
+> > +       ldp     q8, q9, [\state, #-16 * 8 - 16]
+> > +       ldp     q6, q7, [\state, #-16 * 6 - 16]
+> > +       ldp     q4, q5, [\state, #-16 * 4 - 16]
+> > +       ldp     q2, q3, [\state, #-16 * 2 - 16]
+> > +       ldp     q0, q1, [\state, #-16 * 0 - 16]
+> >  0:
+> >  .endm
+> > --
+> > 1.7.10.4
+> >
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
