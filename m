@@ -1,48 +1,79 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 29 Jan 2015 08:33:28 +0100
-Subject: [PATCH] crypto: atmel: remove bogus select
-In-Reply-To: <1780191.gdgDmCPaN0@wuerfel>
-References: <1780191.gdgDmCPaN0@wuerfel>
-Message-ID: <20150129073328.GC1097@odux.rfo.atmel.com>
+From: jarkko.nikula@bitmer.com (Jarkko Nikula)
+Date: Thu, 29 Jan 2015 09:35:29 +0200
+Subject: 3.19 on Nokia n900: audio quality awful
+In-Reply-To: <20150128224144.GA28956@amd>
+References: <20150106170433.GA5408@amd> <20150118120139.GA1509@amd>
+ <54C63F1C.6010703@ti.com> <54C92752.9000004@bitmer.com>
+ <20150128224144.GA28956@amd>
+Message-ID: <20150129073529.GA19122@bitmer.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 28, 2015 at 09:09:16PM +0100, Arnd Bergmann wrote:
-> The Atmel at91 crypto driver unconditionally selects AT_HDMAC,
-> which results in a Kconfig warning if that driver is not enabled:
+On Wed, Jan 28, 2015 at 11:41:44PM +0100, Pavel Machek wrote:
+> On Wed 2015-01-28 20:15:46, Jarkko Nikula wrote:
+> > On 01/26/2015 03:20 PM, Peter Ujfalusi wrote:
+> > > On 01/18/2015 02:01 PM, Pavel Machek wrote:
+> > No need to go that far. N900 has been supported in mainline since 2.6.39
+> > or so. Part A of AIC34 (which is basically dual AIC33 in a same package)
+> > drives 2 V for the digital microphone bias and part B 2.5 V for the headset.
 > 
-> warning: (CRYPTO_DEV_ATMEL_AES) selects AT_HDMAC which has unmet direct dependencies (DMADEVICES && ARCH_AT91)
+> Let me try... Umm, no change here :-(
 > 
-> The crypty driver itself does not actually have a dependency
-> on a particular dma engine, other than this being the one that
-> is used in at91.
+> root at n900:/tmp# arecord delme
+> Recording WAVE 'delme' : Unsigned 8 bit, Rate 8000 Hz, Mono
+> ^CAborted by signal Interrupt...
+> root at n900:/tmp# hexdump delme
+> 0000000 4952 4646 987c 0000 4157 4556 6d66 2074
+> 0000010 0010 0000 0001 0001 1f40 0000 1f40 0000
+> 0000020 0001 0008 6164 6174 9858 0000 8080 8080
+> 0000030 8080 8080 8080 8080 8080 8080 8080 8080
+> *
+> 0009880
+> root at n900:/tmp# aplay delme
+> Playing WAVE 'delme' : Unsigned 8 bit, Rate 8000 Hz, Mono
+> root at n900:/tmp#
 > 
-> Removing the 'select' gets rid of the warning, with no apparent
-> downsides.
+> I did this:
+> 
+> I'm not sure which one is "main" microphone and which is headset, but
+> I guess 2V should be "close enough" to 2.5V to produce something
+> different from zeros..?
+> 
+Main or integrated is digital microphone which does AD conversion itself
+and headset is analogue. If DMIC is without bias codec will sample plain
+zeros from DMIC input but analogue input should always produce some random
+LSB bits from codec's AD converter.
 
-This driver doesn't work without DMA. I think it is the reason why the
-select AT_HDMAC was used.
+If codec produces zeros also from analogue input then I suppose codec
+ADC is not powered up or similar. One way to hunt regression if
+bisecting is not possible due reason or another is to dump and diff codec
+registers from /sys/kernel/debug/regmap/ using both working commit and head.
 
-> We should probably enable AT_HDMAC in sama5_defconfig, because
-> it no longers gets enabled implicitly.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
-> index 2fb0fdfc87df..0c411c0aae99 100644
-> --- a/drivers/crypto/Kconfig
-> +++ b/drivers/crypto/Kconfig
-> @@ -348,7 +348,6 @@ config CRYPTO_DEV_ATMEL_AES
->  	select CRYPTO_AES
->  	select CRYPTO_ALGAPI
->  	select CRYPTO_BLKCIPHER
-> -	select AT_HDMAC
->  	help
->  	  Some Atmel processors have AES hw accelerator.
->  	  Select this if you want to use the Atmel module for
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
+> index 48b0987..f18a5b0 100644
+> --- a/arch/arm/boot/dts/omap3-n900.dts
+> +++ b/arch/arm/boot/dts/omap3-n900.dts
+> @@ -491,6 +491,8 @@
+>  		DRVDD-supply = <&vmmc2>;
+>  		IOVDD-supply = <&vio>;
+>  		DVDD-supply = <&vio>;
+> +
+> +		ai3x-micbias-vg = <1>;
+>  	};
+Looks ok for digital mic.
+
+>  
+>  	tlv320aic3x_aux: tlv320aic3x at 19 {
+> @@ -502,6 +504,8 @@
+>  		DRVDD-supply = <&vmmc2>;
+>  		IOVDD-supply = <&vio>;
+>  		DVDD-supply = <&vio>;
+> +
+> +		ai3x-micbias-vg = <1>;
+>  	};
+This should be 2, i.e. 2.5 V according to
+Documentation/devicetree/bindings/sound/tlv320aic3x.txt. I think 2 V is
+too low for some headset mics and that was the reason for 2.5 V.
+
+-- 
+Jarkko
