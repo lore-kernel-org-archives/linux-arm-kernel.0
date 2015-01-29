@@ -1,131 +1,37 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Thu, 29 Jan 2015 11:24:41 +0000
-Subject: [PATCH v4] dma: Add Xilinx AXI Direct Memory Access Engine
- driver support
-References: <1413374436-14410-1-git-send-email-sthokal@xilinx.com>
- <3236720.MHeqOodrCV@wuerfel>
- <7dc11ef7ccec49bcb052c30b9aa916c3@BL2FFO11FD044.protection.gbl>
- <1967130.oYyZRWCcEF@wuerfel>
-Message-ID: <add9a23928b44aa48965e993bb17f53b@BL2FFO11FD027.protection.gbl>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 29 Jan 2015 11:28:00 +0000
+Subject: [PATCH v4 05/13] pm: at91: move the copying the sram function to
+ the sram initializationi phase
+In-Reply-To: <1422409396-24394-1-git-send-email-wenyou.yang@atmel.com>
+References: <1422409172-24178-1-git-send-email-wenyou.yang@atmel.com>
+ <1422409396-24394-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20150129112800.GV26493@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+On Wed, Jan 28, 2015 at 09:43:16AM +0800, Wenyou Yang wrote:
+> -#ifdef CONFIG_AT91_SLOW_CLOCK
+> -				/* copy slow_clock handler to SRAM, and call it */
+> -				memcpy(slow_clock, at91_slow_clock, at91_slow_clock_sz);
+> -#endif
+>  				slow_clock(at91_pmc_base, at91_ramc_base[0],
+>  					   at91_ramc_base[1],
+>  					   at91_pm_data.memctrl);
+> @@ -272,6 +268,9 @@ static void __init at91_pm_sram_init(void)
+>  	sram_pbase = gen_pool_virt_to_phys(sram_pool, sram_base);
+>  	slow_clock = __arm_ioremap_exec(sram_pbase, at91_slow_clock_sz, false);
+>  
+> +	/* Copy the slow_clock handler to SRAM */
+> +	memcpy(slow_clock, at91_slow_clock, at91_slow_clock_sz);
+> +
 
+Why is this code not using the fncpy() support for copying functions.
+Why is it not checking the return code from __arm_ioremap_exec() or
+gen_pool_virt_to_phys() for failure?
 
-> -----Original Message-----
-> From: Appana Durga Kedareswara Rao
-> Sent: Monday, January 19, 2015 7:39 PM
-> To: 'Arnd Bergmann'; vinod.koul at intel.com
-> Cc: linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org;
-> vinod.koul at intel.com; Srikanth Vemula; linux-kernel at vger.kernel.org;
-> Srikanth Thokala; dmaengine at vger.kernel.org; robh+dt at kernel.org; Michal
-> Simek; Anirudha Sarangi; grant.likely at linaro.org; dan.j.williams at intel.com
-> Subject: RE: [PATCH v4] dma: Add Xilinx AXI Direct Memory Access Engine
-> driver support
->
-> Hi Arnd,
->
-> > -----Original Message-----
-> > From: Arnd Bergmann [mailto:arnd at arndb.de]
-> > Sent: Friday, October 24, 2014 7:29 PM
-> > To: Appana Durga Kedareswara Rao
-> > Cc: linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org;
-> > vinod.koul at intel.com; Srikanth Vemula; linux-kernel at vger.kernel.org;
-> > Srikanth Thokala; dmaengine at vger.kernel.org; robh+dt at kernel.org;
-> > Michal Simek; Anirudha Sarangi; grant.likely at linaro.org;
-> > dan.j.williams at intel.com
-> > Subject: Re: [PATCH v4] dma: Add Xilinx AXI Direct Memory Access
-> > Engine driver support
-> >
-> > On Friday 24 October 2014 12:08:26 Appana Durga Kedareswara Rao wrote:
-> > > From: Arnd Bergmann [mailto:arnd at arndb.de]
-> > > > On Tuesday 21 October 2014 09:06:13 Appana Durga Kedareswara Rao
-> > wrote:
-> > > > > The above mentioned API's  and structures will be used by the
-> > > > > dma test client driver's to set hardware configuration information.
-> > > > > The dma client drivers are not mainlined  yet and it is
-> > > > > Internally used by our git-tree  to test the DMA functionality in
-> loopback .
-> > > >
-> > > > I would suggest you add the test driver into the main dmaengine
-> > > > driver file directly then, so you don't need to export the symbols.
-> > > > If there are important reasons to keep that as separate files,
-> > > > just move the header to the drivers/dma/ directory and add the
-> > > > test driver
-> > there.
-> > >
-> > > Sorry I forgot to mention the below things in the mail .The Config
-> > > API's and structures not only used by the dmaengine driver's but
-> > > also used by the  various IP's  (Ex: Ethernet driver and SRIO driver
-> > > these drivers are under development).For example the Ethernet driver
-> > > is resides under drivers/net/ethernet but it needs to set some
-> > > specific configuration parameters of the dma that's why created a
-> > > separate header file for the h/w configurable parameters.
-> >
-> > That is a bug in the ethernet driver, and we should not merge such code.
-> >
-> > Please fix those drivers before submitting them, so they don't rely on
-> > additional interfaces beyond what the DMA engine API provides.
-> >
-> > If you need something that the common interface is missing, you can
-> > send a patch to extend the dmaengine core driver, but more likely it
-> > already does what you need and you are just not using it right.
-> >
->
-> Sorry for the delay in the reply.
-> We need that header file in the include/linux/ directory for various
-> reasons.
->
->  As you know the Xilinx DMA's have a set of configurable parameters which
-> we expect the DMA users to take advantage of.
->
->  For example:
->  For Axi DMA we have the following parameters that we expect to be
-> commonly used.
->  Coalesce count --> Used to configure the coalesce value.
->  Delay timer ---> Used to set the delay value.
->
->  We expect the Xilinx AXI Ethernet driver to use the Axi DMA driver in  near
-> furture. If so, using ethtool, we expect the driver users to play with the
-> above parameters to do performance tuning.
->
->  Hence AxiDMA driver must expose means to change coalese count or delay
-> timer.
->
->  Similarly For Axi VDMA we have the following parameters that will be used
-> by the users of this driver.
->  hsize  --> Used to configure number of bytes per line.
->  vsize  -->Number of lines per frame.
->  stride  --> Number of bytes per line.
->
->
->  Earlier in the driver we are embedding dma_slave_config into custom
-> structs But Lars suggested to modify it. please refer to the below thread for
-> more details.
->  http://www.spinics.net/lists/dmaengine/msg00010.html
->
->  And later we thought of creating a separate private member in
-> dma_slave_config for sharing additional configuration between slave
-> device and dma engine Or a new dma_ctrl_cmd like
->  FSLDMA_EXTERNAL_START(http://www.kernelhub.org/?msg=405535&p=2 )
->
->  Finally Vinod was ok with the existing suggestion so we dropped the above
-> thought.
->
->  @Vinod : Could you please comment on this.
+This looks like quite a massive review failure when this code was
+originally merged.  It needs fixing.
 
-Ping ?
-
-Regards,
-Kedar.
-
->
-> Regards,
-> Kedar.
->
-> >     Arnd
-
-
-
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
