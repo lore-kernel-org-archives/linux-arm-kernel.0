@@ -1,37 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 29 Jan 2015 11:28:00 +0000
-Subject: [PATCH v4 05/13] pm: at91: move the copying the sram function to
- the sram initializationi phase
-In-Reply-To: <1422409396-24394-1-git-send-email-wenyou.yang@atmel.com>
-References: <1422409172-24178-1-git-send-email-wenyou.yang@atmel.com>
- <1422409396-24394-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20150129112800.GV26493@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 29 Jan 2015 11:31:03 +0000
+Subject: [PATCH] arm64: mm: mark alloc_init_p{m,u}d as __ref
+Message-ID: <1422531063-29554-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 28, 2015 at 09:43:16AM +0800, Wenyou Yang wrote:
-> -#ifdef CONFIG_AT91_SLOW_CLOCK
-> -				/* copy slow_clock handler to SRAM, and call it */
-> -				memcpy(slow_clock, at91_slow_clock, at91_slow_clock_sz);
-> -#endif
->  				slow_clock(at91_pmc_base, at91_ramc_base[0],
->  					   at91_ramc_base[1],
->  					   at91_pm_data.memctrl);
-> @@ -272,6 +268,9 @@ static void __init at91_pm_sram_init(void)
->  	sram_pbase = gen_pool_virt_to_phys(sram_pool, sram_base);
->  	slow_clock = __arm_ioremap_exec(sram_pbase, at91_slow_clock_sz, false);
->  
-> +	/* Copy the slow_clock handler to SRAM */
-> +	memcpy(slow_clock, at91_slow_clock, at91_slow_clock_sz);
-> +
+Both alloc_init_pmd and alloc_init_pud refer to the __init function
+early_alloc as part of a BUG_ON(alloc != early_alloc) statement.
 
-Why is this code not using the fncpy() support for copying functions.
-Why is it not checking the return code from __arm_ioremap_exec() or
-gen_pool_virt_to_phys() for failure?
+This patch marks the functions as __ref to avoid the spurious section
+mismatch.
 
-This looks like quite a massive review failure when this code was
-originally merged.  It needs fixing.
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/mm/mmu.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 2eeac10aa0cf..611750b771c4 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -118,10 +118,10 @@ void split_pud(pud_t *old_pud, pmd_t *pmd)
+ 	} while (pmd++, i++, i < PTRS_PER_PMD);
+ }
+ 
+-static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
+-				  unsigned long addr, unsigned long end,
+-				  phys_addr_t phys, pgprot_t prot,
+-				  void *(*alloc)(unsigned long size))
++static void __ref alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
++				 unsigned long addr, unsigned long end,
++				 phys_addr_t phys, pgprot_t prot,
++				 void *(*alloc)(unsigned long size))
+ {
+ 	pmd_t *pmd;
+ 	unsigned long next;
+@@ -183,10 +183,10 @@ static inline bool use_1G_block(unsigned long addr, unsigned long next,
+ 	return true;
+ }
+ 
+-static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
+-				  unsigned long addr, unsigned long end,
+-				  phys_addr_t phys, pgprot_t prot,
+-				  void *(*alloc)(unsigned long size))
++static void __ref alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
++				 unsigned long addr, unsigned long end,
++				 phys_addr_t phys, pgprot_t prot,
++				 void *(*alloc)(unsigned long size))
+ {
+ 	pud_t *pud;
+ 	unsigned long next;
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+2.1.4
