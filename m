@@ -1,83 +1,89 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 29 Jan 2015 16:53:01 +0100
-Subject: randconfig bug: ARM/KVM link error in hyp_idmap section
-In-Reply-To: <CAEDV+gJ3YO8oeka_yaJGg+LXA0Od0TGkZb8vD_q74xNRx9g0Rg@mail.gmail.com>
-References: <3919069.MpPCrczKD2@wuerfel>
- <CAEDV+gJ3YO8oeka_yaJGg+LXA0Od0TGkZb8vD_q74xNRx9g0Rg@mail.gmail.com>
-Message-ID: <1611315.VFEsrxkfBf@wuerfel>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 29 Jan 2015 16:56:16 +0100
+Subject: [PATCH] spi/xilinx: Cast ioread32/iowrite32 function pointers
+In-Reply-To: <1422543073-21895-1-git-send-email-ricardo.ribalda@gmail.com>
+References: <1422543073-21895-1-git-send-email-ricardo.ribalda@gmail.com>
+Message-ID: <CAMuHMdX5CMH0Q5S_BBjb-F-kJfzkTS+sP9H-FDe_K_gFRxK7pw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 29 January 2015 16:23:42 Christoffer Dall wrote:
-> On Wed, Jan 28, 2015 at 8:57 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Thu, Jan 29, 2015 at 3:51 PM, Ricardo Ribalda Delgado
+<ricardo.ribalda@gmail.com> wrote:
+> IO functions prototypes may have different argument qualifiers
+> on different architectures.
 >
-> > 8<----
-> > Subject: [PATCH] ARM: KVM: avoid "HYP init code too big" error
-> >
-> > When building large kernels, the linker will emit lots of veneers
-> > into the .hyp.idmap.text section, which causes it to grow beyond
-> > one page, and that triggers the build error.
-> >
-> 
-> do you have a config handy that generates this error?
+> This patch cast the assignment of the function, to match the one defined
+> at iomap.h.
 
-Attached to this mail. Use on linux-next
+Adding casts is (usually) not the solution to the problem.
 
-> > This moves the section into .rodata instead, which avoids the
-> > veneers and is safe because the code is not executed directly
-> > but always copied into a separate page first.
-> >
-> > I am unsure if I wrote this the correct way though, so
-> > it needs to be reviewed carefully.
-> >
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> >
-> > diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-> > index ce01a2d3339f..f4de6e16d951 100644
-> > --- a/arch/arm/kernel/vmlinux.lds.S
-> > +++ b/arch/arm/kernel/vmlinux.lds.S
-> > @@ -23,10 +23,14 @@
-> >         VMLINUX_SYMBOL(__idmap_text_start) = .;                         \
-> >         *(.idmap.text)                                                  \
-> >         VMLINUX_SYMBOL(__idmap_text_end) = .;                           \
-> > -       . = ALIGN(32);                                                  \
-> > +       . = ALIGN(32);
-> > +
-> > +#define IDMAP_RODATA                                                   \
-> > +       .rodata : {                                                     \
-> >         VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;                     \
-> >         *(.hyp.idmap.text)                                              \
-> > -       VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;
-> > +       VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;                       \
-> > +       }
-> >
-> >  #ifdef CONFIG_HOTPLUG_CPU
-> >  #define ARM_CPU_DISCARD(x)
-> > @@ -123,6 +127,7 @@ SECTIONS
-> >         . = ALIGN(1<<SECTION_SHIFT);
-> >  #endif
-> >         RO_DATA(PAGE_SIZE)
-> > +       IDMAP_RODATA
-> >
-> >         . = ALIGN(4);
-> >         __ex_table : AT(ADDR(__ex_table) - LOAD_OFFSET) {
-> >
-> >
-> the changes look ok, but I don't understand why putting stuff in rodata is
-> a good solution, is it simply by chance that the linker then generates
-> fewer veneers there?  I think we're only branching internally in the hyp
-> idmap text page anyhow, so wondering why this appears in the first place...
-> hmmm.
+I think the definitions in include/asm-generic/iomap.h are actually wrong,
+as they lack a const:
 
-The linker will not generate any veneers for .rodata because it does not
-expect executable code in there. As I said, above, this is also correct
-because it matches how we access that section (read-only, never execute).
+    extern unsigned int ioread8(void __iomem *);
+    extern unsigned int ioread16(void __iomem *);
+    extern unsigned int ioread16be(void __iomem *);
+    extern unsigned int ioread32(void __iomem *);
+    extern unsigned int ioread32be(void __iomem *);
 
-	Arnd
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0x203B430A-config.gz
-Type: application/gzip
-Size: 26652 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150129/e2aa6fcd/attachment-0001.gz>
+Note that the definitions in include/asm-generic/io.h do have the const:
+
+    static inline u8 ioread8(const volatile void __iomem *addr)
+    static inline u16 ioread16(const volatile void __iomem *addr)
+    static inline u32 ioread32(const volatile void __iomem *addr)
+    static inline u16 ioread16be(const volatile void __iomem *addr)
+    static inline u32 ioread32be(const volatile void __iomem *addr)
+
+> Fixes: 99082eab63449f9d spi/xilinx: Remove iowrite/ioread wrappers
+> Reported-by: kbuild test robot <fengguang.wu@intel.com>
+> Signed-off-by: Ricardo Ribalda Delgado <ricardo.ribalda@gmail.com>
+> ---
+>  drivers/spi/spi-xilinx.c | 10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/spi/spi-xilinx.c b/drivers/spi/spi-xilinx.c
+> index 0e8962c..418e730 100644
+> --- a/drivers/spi/spi-xilinx.c
+> +++ b/drivers/spi/spi-xilinx.c
+> @@ -91,7 +91,7 @@ struct xilinx_spi {
+>         u8 bytes_per_word;
+>         int buffer_size;        /* buffer size in words */
+>         u32 cs_inactive;        /* Level of the CS pins when inactive*/
+> -       unsigned int (*read_fn)(void __iomem *);
+> +       u32 (*read_fn)(void __iomem *);
+>         void (*write_fn)(u32, void __iomem *);
+>  };
+>
+> @@ -378,15 +378,15 @@ static int xilinx_spi_probe(struct platform_device *pdev)
+>          * Setup little endian helper functions first and try to use them
+>          * and check if bit was correctly setup or not.
+>          */
+> -       xspi->read_fn = ioread32;
+> -       xspi->write_fn = iowrite32;
+> +       xspi->read_fn = (u32 (*)(void __iomem *)) ioread32;
+> +       xspi->write_fn = (void (*)(u32, void __iomem *)) iowrite32;
+>
+>         xspi->write_fn(XSPI_CR_LOOP, xspi->regs + XSPI_CR_OFFSET);
+>         tmp = xspi->read_fn(xspi->regs + XSPI_CR_OFFSET);
+>         tmp &= XSPI_CR_LOOP;
+>         if (tmp != XSPI_CR_LOOP) {
+> -               xspi->read_fn = ioread32be;
+> -               xspi->write_fn = iowrite32be;
+> +               xspi->read_fn = (u32 (*)(void __iomem *)) ioread32be;
+> +               xspi->write_fn = (void (*)(u32, void __iomem *)) iowrite32be;
+>         }
+>
+>         master->bits_per_word_mask = SPI_BPW_MASK(bits_per_word);
+> --
+> 2.1.4
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
