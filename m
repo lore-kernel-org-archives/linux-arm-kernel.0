@@ -1,45 +1,45 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 29 Jan 2015 14:08:17 +0100
-Subject: [PATCH 7/9] dt/bindings: Add binding for Versatile system registers
+Date: Thu, 29 Jan 2015 14:08:19 +0100
+Subject: [PATCH 9/9] dts: versatile: Add sysregs node
 In-Reply-To: <1422536899-16609-1-git-send-email-daniel.lezcano@linaro.org>
 References: <54CA3044.6070501@linaro.org>
  <1422536899-16609-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1422536899-16609-7-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1422536899-16609-9-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <robh@kernel.org>
 
-Add binding for Versatile board system registers found in the FPGA of the
-Versatile/AB and Versatile/PB boards.
+The Versatile boards have the same sysregs as other ARM Ltd boards. Add
+the nodes in order to enable support for 24MHz counter as sched_clock.
+
+This is a minimal node definition as the existing sub node definition
+used on VExpress has some issues raised by Linus W.
 
 Signed-off-by: Rob Herring <robh@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Kumar Gala <galak@codeaurora.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Linus Walleij <linus.walleij@linaro.org>
 Cc: devicetree at vger.kernel.org
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- Documentation/devicetree/bindings/arm/versatile-sysreg.txt | 10 ++++++++++
- 1 file changed, 10 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/versatile-sysreg.txt
+ arch/arm/boot/dts/versatile-ab.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/versatile-sysreg.txt b/Documentation/devicetree/bindings/arm/versatile-sysreg.txt
-new file mode 100644
-index 0000000..a4f1526
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/versatile-sysreg.txt
-@@ -0,0 +1,10 @@
-+ARM Versatile system registers
-+--------------------------------------
+diff --git a/arch/arm/boot/dts/versatile-ab.dts b/arch/arm/boot/dts/versatile-ab.dts
+index 27d0d9c..01f4019 100644
+--- a/arch/arm/boot/dts/versatile-ab.dts
++++ b/arch/arm/boot/dts/versatile-ab.dts
+@@ -252,6 +252,11 @@
+ 			#size-cells = <1>;
+ 			ranges = <0 0x10000000 0x10000>;
+ 
++			sysreg at 0 {
++				compatible = "arm,versatile-sysreg", "syscon";
++				reg = <0x00000 0x1000>;
++			};
 +
-+This is a system control registers block, providing multiple low level
-+platform functions like board detection and identification, software
-+interrupt generation, MMC and NOR Flash control etc.
-+
-+Required node properties:
-+- compatible value : = "arm,versatile-sysreg", "syscon"
-+- reg : physical base address and the size of the registers window
+ 			aaci at 4000 {
+ 				compatible = "arm,primecell";
+ 				reg = <0x4000 0x1000>;
 -- 
 1.9.1
