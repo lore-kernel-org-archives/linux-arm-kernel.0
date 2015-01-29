@@ -1,35 +1,34 @@
-From: petr.cvek@tul.cz (Petr Cvek)
-Date: Thu, 29 Jan 2015 11:58:37 +0100
-Subject: [PATCH v4] Sound: PXA: Fix settings of PXAxxx DMA
-Message-ID: <54CA125D.7010908@tul.cz>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 29 Jan 2015 11:07:44 +0000
+Subject: [RFC V2] OPP: Redefine bindings to overcome shortcomings
+In-Reply-To: <CAKohpokxdpF2nTeOnDpofNM1vW3aZRyDBE3WKmvZ8wJedf-TGw@mail.gmail.com>
+References: <CAKohpokxdpF2nTeOnDpofNM1vW3aZRyDBE3WKmvZ8wJedf-TGw@mail.gmail.com>
+Message-ID: <20150129110744.GU21293@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix PXA DMA autoincrementation, so capture will not use playback settings
-(incrementation in register space instead in target buffer).
+On Thu, Jan 29, 2015 at 07:09:23AM +0530, Viresh Kumar wrote:
+> On 29 January 2015 at 01:36, Mark Brown <broonie@kernel.org> wrote:
 
-Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
----
- sound/arm/pxa2xx-pcm-lib.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+> >> +  Required properties:
+> >> +  - compatible: allow OPPs to express their compatibility.
+> >> +  - opp-list: phandle to opp-list defined above.
 
-diff --git a/sound/arm/pxa2xx-pcm-lib.c b/sound/arm/pxa2xx-pcm-lib.c
-index 01f8fdc..f8ca3ca 100644
---- a/sound/arm/pxa2xx-pcm-lib.c
-+++ b/sound/arm/pxa2xx-pcm-lib.c
-@@ -45,7 +45,12 @@ int __pxa2xx_pcm_hw_params(struct snd_pcm_substream *substream,
- 	size_t period = params_period_bytes(params);
- 	pxa_dma_desc *dma_desc;
- 	dma_addr_t dma_buff_phys, next_desc_phys;
--	u32 dcmd = DCMD_INCSRCADDR | DCMD_FLOWTRG;
-+	u32 dcmd = 0;
-+
-+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-+		dcmd = DCMD_INCSRCADDR | DCMD_FLOWTRG;
-+	else
-+		dcmd = DCMD_INCTRGADDR | DCMD_FLOWSRC;
- 
- 	/* temporary transition hack */
- 	switch (rtd->params->addr_width) {
--- 
-1.7.12.1
+> > I don't understand what that compatible property is intended to mean and
+> > I expect other readers might be similarly confused - is it a standard
+> > compatbile property meaning this noe corresponds to some sort of device?
+
+> The goal is to choose the driver which we want to probe for a platform. There
+> can be multiple DT enabled cpufreq drivers present in a build and the platform
+> needs some way to choose one of them.
+
+So you need to document this as a platform device then if that's what
+you're doing here; there's more than just specifying a compatible string
+involved.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150129/9de5263e/attachment.sig>
