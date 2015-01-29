@@ -1,84 +1,42 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 29 Jan 2015 11:01:44 +0100
-Subject: [PATCH v2 1/7] mmc: sdhci-pxav3: Fix SDR50 and DDR50 capabilities
- for the Armada 38x flavor
-In-Reply-To: <54CA006F.8060108@free-electrons.com>
-References: <1422010594-1735-1-git-send-email-gregory.clement@free-electrons.com>
- <1422010594-1735-2-git-send-email-gregory.clement@free-electrons.com>
- <CAPDyKFp=TxkL4BPMxVU+pMPoCQ1xPq0XZ+ZPpBFFaDnNtFjynw@mail.gmail.com>
- <54C9EFC9.7090809@free-electrons.com>
- <CAPDyKFqXLb+BOrotBv9UKDeSCriK2k9qmxKoUrWTKK7uM2oLTw@mail.gmail.com>
- <54CA006F.8060108@free-electrons.com>
-Message-ID: <CAPDyKFoq+Z_n0GHkA4tWJp6vV_T+Fo3zm=CBfmNS+KN70qqwZA@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 29 Jan 2015 15:40:15 +0530
+Subject: [PATCH 3/3] cpufreq: exynos: allow modular build
+In-Reply-To: <2157802.ranbh8xTdL@wuerfel>
+References: <1422451015-390439-1-git-send-email-arnd@arndb.de>
+ <1799972.nQ2Axu0CEJ@wuerfel>
+ <CAKohpom9L4jiMRGn3OaWyYM7iR3Ame4-LKG144yuHmRxCJud3g@mail.gmail.com>
+ <2157802.ranbh8xTdL@wuerfel>
+Message-ID: <CAKohpo=An5Jm4qfhWaE96hPKyKVQfsZPdvrgxKH2ymvyvgQ_pQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 January 2015 at 10:42, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> Hi Ulf,
->
-> On 29/01/2015 10:31, Ulf Hansson wrote:
->> [...]
->>
->>>> Seems like this function can be void instead of always returning 0.
->>>
->>> In patch 4 "mmc: sdhci-pxav3: Modify clock settings for the SDR50 and
->>> DDR50 modes", this function can return other values than 0.
->>>
->>> I could change the prototype in patch 4, but it would also imply
->>> removing the test of the return value in this patch and adding in back
->>> patch 4. By returning a value in this patch, it reduced the amount of
->>> change over the patches.
->>>
->>> But if you still prefer than I this function return void in this
->>> patch, I can do it.
->>
->> No worries, let's keep it as an int. But then I have a few other
->> comments, see below.
->
-> OK
->
->>
->>>
->>>
->>> Thanks,
->>>
->>> Gregory
->>>
->>>
->>>>
->>>>> +{
->>>>> +       host->quirks |= SDHCI_QUIRK_MISSING_CAPS;
->>>>> +       /*
->>>>> +        * According to erratum 'FE-2946959' both SDR50 and DDR50
->>>>> +        * modes require specific clock adjustments in SDIO3
->>>>> +        * Configuration register, if the adjustment is not done,
->>>>> +        * remove them from the capabilities.
->>>>> +        */
->>>>> +       host->caps1 = sdhci_readl(host, SDHCI_CAPABILITIES_1);
->>>>> +       host->caps1 &= ~(SDHCI_SUPPORT_SDR50 | SDHCI_SUPPORT_DDR50);
->>>>> +       return 0;
->>>>> +}
->>>>> +
->>>>>  static void pxav3_reset(struct sdhci_host *host, u8 mask)
->>>>>  {
->>>>>         struct platform_device *pdev = to_platform_device(mmc_dev(host->mmc));
->>>>> @@ -319,6 +333,9 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
->>>>>                 clk_prepare_enable(pxa->clk_core);
->>>>>
->>>>>         if (of_device_is_compatible(np, "marvell,armada-380-sdhci")) {
->>>>> +               ret = armada_38x_quirks(host);
->>>>> +               if (ret < 0)
->>
->> Since in patch 4 you return a proper error code, let's also adopt to
->> that here by changing to:
->>
->> "if (IS_ERR(ret))
->
-> The function returns an int and IS_ERR expects a pointer. I am not sure
-> this macro would be appropriate here.
+On 29 January 2015 at 15:31, Arnd Bergmann <arnd@arndb.de> wrote:
+> That might be close enough to what we want. It would by default enable
+> ARM_EXYNOS_CPUFREQ for exynos based machines that do not use this driver
+> (e.g. 5440, which has a separate driver, or exynos3/exynos7), but that
+> can probably just be dealt with by disabling it in the user's defconfig.
+> If i'm reading exynos_cpufreq_probe right, it would actually compile
+> into an almost-empty file in this case and only kzalloc a few bytes
+> of memory and then print a warning message.
 
-You are right. Don't know what I was thinking. :-)
+I may be wrong this time around, but I will still try hard :
 
-Kind regards
-Uffe
+diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+index b3ca7b0b2c33..91747c411d86 100644
+--- a/drivers/cpufreq/Makefile
++++ b/drivers/cpufreq/Makefile
+@@ -51,10 +51,9 @@ obj-$(CONFIG_ARM_DT_BL_CPUFREQ)              +=
+arm_big_little_dt.o
+
+ obj-$(CONFIG_ARCH_DAVINCI)             += davinci-cpufreq.o
+ obj-$(CONFIG_UX500_SOC_DB8500)         += dbx500-cpufreq.o
+-obj-$(CONFIG_ARM_EXYNOS_CPUFREQ)       += exynos-cpufreq.o
+-obj-$(CONFIG_ARM_EXYNOS4210_CPUFREQ)   += exynos4210-cpufreq.o
+-obj-$(CONFIG_ARM_EXYNOS4X12_CPUFREQ)   += exynos4x12-cpufreq.o
+-obj-$(CONFIG_ARM_EXYNOS5250_CPUFREQ)   += exynos5250-cpufreq.o
++obj-$(CONFIG_ARM_EXYNOS4210_CPUFREQ)   += exynos-cpufreq.o exynos4210-cpufreq.o
++obj-$(CONFIG_ARM_EXYNOS4X12_CPUFREQ)   += exynos-cpufreq.o exynos4x12-cpufreq.o
++obj-$(CONFIG_ARM_EXYNOS5250_CPUFREQ)   += exynos-cpufreq.o exynos5250-cpufreq.o
+ obj-$(CONFIG_ARM_EXYNOS5440_CPUFREQ)   += exynos5440-cpufreq.o
+ obj-$(CONFIG_ARM_HIGHBANK_CPUFREQ)     += highbank-cpufreq.o
+ obj-$(CONFIG_ARM_IMX6Q_CPUFREQ)                += imx6q-cpufreq.o
