@@ -1,121 +1,31 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 29 Jan 2015 13:09:37 +0100
-Subject: [PATCH v4 0/7] Fixes and improvements for SDHCI on Armada 38x
-In-Reply-To: <1422531390-31038-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1422531390-31038-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <CAPDyKFo0cQYE=oWr1+x+gZzE4refOhD3FJBQscJ4dwdzT3p=ww@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 29 Jan 2015 12:13:20 +0000
+Subject: [PATCH 7/7] spi: spi-fsl-dspi: Add support for TCFQ transfer mode
+In-Reply-To: <1422533049999.91114@toradex.com>
+References: <1422356608-15961-1-git-send-email-bhuvanchandra.dv@toradex.com>
+ <1422356608-15961-2-git-send-email-bhuvanchandra.dv@toradex.com>
+ <20150128190342.GE21293@sirena.org.uk>
+ <1422533049999.91114@toradex.com>
+Message-ID: <20150129121320.GI21293@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 January 2015 at 12:36, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> Hi,
->
-> this series brings fixes and improvements for the SDHCI controller of
-> the Armada 38x SoCs.
->
-> The changes for this forth version was done on the 1st and 4th
-> patches, see the changelog for the details.
->
-> The first two patches are fixes and should be also applied on the
-> stable branch (I added stable in copy for this).
->
-> The first one removes the SDR50 and DDR50 mode timing from the
-> capabilities of the controller because the current implementation
-> doesn't support it.
->
-> The second one fix controller's caps according to the limitation of
-> the hardware.
->
-> The third one extends the Device Tree binding of the Armada 38x. It
-> allows using the SDIO3 configuration register.
->
-> The forth patch adds the support of this new register in the
-> driver. Thanks to this one, specific clock adjustments can be done in
-> order to support the SDR50 and DDR50 modes timing.
->
-> The fifth patch is device tree clean-up.
->
-> The sixth patch update the SDHCI node on Armada 38x in order to use
-> the new register and then to be able to support the SDR50 and DDR50
-> modes timing.
->
-> Finally, the seventh patch add the description of SDHCI for the Armada
-> 388 RD board which was missing.
->
-> Patches 1 to 4 should be merged through the mmc tree and patches 5 to
-> 7 should be merged through mvebu and then arm-soc.
->
-> Patch 4 depend on patch 2.
-> Patch 2 depend on patch 1.
-> And patch 1 depend on commit aa8165f91442 "mmc: sdhci-pxav3: do the
-> mbus window configuration after enabling clocks" which have been
-> merged.
->
-> But as all this patch should be merged through the same tree it would
-> not be a problem
->
-> The patches 5 to 7 depend on the patches already merged in mvebu.
->
-> As they are fixes, patches 1 and 2 should be merged in 3.18-rc or at
-> least in 3.19 and then they will be part of 3.18.1. For the other
-> patches it would be nice if they could be part of 3.19.
->
-> Thanks,
->
-> Gregory
->
-> Changelog:
->
-> v3 -> v4:
-> - Merge the 3 dev_wanr message in a single one
-> - Remove err_quirks label
->
-> v2 -> v3:
-> - Use of_property_read_bool() instead of of_get_property
-> - Brace the else case according to the Documentation/CodingStyle
-> - Move the setting of MMC_CAP_1_8V_DDR before the armada_38x_quirks
->   calls
->
-> v1 -> v2:
-> - Put back Marcin as author of patch 2 and 3
-> - Removed MMC_CAP_1_8V_DDR in the probe function
->
-> Gregory CLEMENT (5):
->   mmc: sdhci-pxav3: Fix SDR50 and DDR50 capabilities for the Armada 38x
->     flavor
->   mmc: sdhci-pxav3: Extend binding with SDIO3 conf reg for the Armada
->     38x
->   ARM: mvebu: Use macros for interrupt flags on Armada 38x sdhci node
->   ARM: mvebu: Update the SDHCI node on Armada 38x
->   ARM: mvebu: Add Device Tree description of SDHCI for Armada 388 RD
->
->
-> Gregory CLEMENT (5):
->   mmc: sdhci-pxav3: Fix SDR50 and DDR50 capabilities for the Armada 38x
->     flavor
->   mmc: sdhci-pxav3: Extend binding with SDIO3 conf reg for the Armada
->     38x
->   ARM: mvebu: Use macros for interrupt flags on Armada 38x sdhci node
->   ARM: mvebu: Update the SDHCI node on Armada 38x
->   ARM: mvebu: Add Device Tree description of SDHCI for Armada 388 RD
->
-> Marcin Wojtas (2):
->   mmc: sdhci-pxav3: Fix Armada 38x controller's caps according to
->     erratum ERR-7878951
->   mmc: sdhci-pxav3: Modify clock settings for the SDR50 and DDR50 modes
->
->  .../devicetree/bindings/mmc/sdhci-pxa.txt          | 15 ++--
->  arch/arm/boot/dts/armada-388-rd.dts                | 10 +++
->  arch/arm/boot/dts/armada-38x.dtsi                  |  7 +-
->  drivers/mmc/host/sdhci-pxav3.c                     | 83 +++++++++++++++++++++-
->  4 files changed, 106 insertions(+), 9 deletions(-)
->
-> --
-> 2.1.0
->
+On Thu, Jan 29, 2015 at 11:58:25AM +0000, BhuvanChandra.DV wrote:
 
-Thanks! Applied patch 1 -> 4 for next.
+> As far as i understood the major difference between the two modes are when
+> the interrupt to trigger, as EOQ mode will trigger the interrupt at end of
+> queue and TCF will trigger the interrupt at every frame transfer. Probably
+> mode selection shouldn't be a device tree property, but i don't see any
+> automatic way to choose between the modes.
+> Maybe a config would be more appropriate?
 
-Kind regards
-Uffe
+Or if there's either no particular reason to choose one over the other
+or one is always better then just pick one in the driver and don't worry
+about implementing both.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150129/48763654/attachment.sig>
