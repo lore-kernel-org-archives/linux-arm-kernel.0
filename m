@@ -1,22 +1,64 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 29 Jan 2015 17:04:09 +0530
-Subject: [RFC V2] OPP: Redefine bindings to overcome shortcomings
-In-Reply-To: <20150129110744.GU21293@sirena.org.uk>
-References: <CAKohpokxdpF2nTeOnDpofNM1vW3aZRyDBE3WKmvZ8wJedf-TGw@mail.gmail.com>
- <20150129110744.GU21293@sirena.org.uk>
-Message-ID: <CAKohpomqR77p0PKXCC+VbxtwWG+BGGaMJ7r5NVXKt4XUP9=OAQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 29 Jan 2015 11:34:50 +0000
+Subject: [PATCH v2 3/3] pm: at91: add disable/enable the L1/L2 cache
+ while suspend/resume
+In-Reply-To: <1422411844-13241-1-git-send-email-wenyou.yang@atmel.com>
+References: <1422411707-10945-1-git-send-email-wenyou.yang@atmel.com>
+ <1422411844-13241-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20150129113450.GW26493@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 January 2015 at 16:37, Mark Brown <broonie@kernel.org> wrote:
-> On Thu, Jan 29, 2015 at 07:09:23AM +0530, Viresh Kumar wrote:
+On Wed, Jan 28, 2015 at 10:24:04AM +0800, Wenyou Yang wrote:
+> +	/*
+> +	 * Clean and invalidate the L2 cache.
+> +	 * Common cache-l2x0.c functions can't be used here since it
+> +	 * uses spinlocks. We are out of coherency here with data cache
+> +	 * disabled. The spinlock implementation uses exclusive load/store
+> +	 * instruction which can fail without data cache being enabled.
+> +	 * Because of this, CPU can lead to deadlock.
 
->> The goal is to choose the driver which we want to probe for a platform. There
->> can be multiple DT enabled cpufreq drivers present in a build and the platform
->> needs some way to choose one of them.
->
-> So you need to document this as a platform device then if that's what
-> you're doing here; there's more than just specifying a compatible string
-> involved.
+We really need to stop needing platforms to create their own L2 handling
+code.  Please move this to a helper function in arch/arm/mm/l2c-l...-clean.S,
+replacing ... with the appropriate part for the code fragment.
 
-Will elaborate more on this to make it crystal clear..
+> +	 */
+> +	ldr	r1, at91_l2cc_base_addr
+> +	ldr	r2, [r1]
+> +	cmp	r2, #0
+> +	beq	skip_l2disable
+> +	mov	r0, #0xff
+> +	str	r0, [r2, #L2X0_CLEAN_INV_WAY]
+> +wait:
+> +	ldr	r0, [r2, #L2X0_CLEAN_INV_WAY]
+> +	mov	r1, #0xff
+> +	ands	r0, r0, r1
+> +	bne	wait
+> +
+> +	mov	r0, #0
+> +	str	r0, [r2, #L2X0_CTRL]
+> +
+> +l2x_sync:
+> +	ldr	r0, [r2, #L2X0_CACHE_SYNC]
+> +	bic	r0, r0, #0x1
+> +	str	r0, [r2, #L2X0_CACHE_SYNC]
+
+I wonder whether you've actually read the documentation for this.  You
+don't need to read-modify-write this register.  The C code doesn't even
+do this.  A write to this register is sufficient - a write issues the
+sync, a read returns the completion status.
+
+> +sync:
+> +	ldr	r0, [r2, #L2X0_CACHE_SYNC]
+> +	ands	r0, r0, #0x1
+> +	bne	sync
+
+Moreover, do you actually need this - it depends on the L2C model.  Only
+L2C220 needs to spin waiting for the sync operation to complete.
+
+Also, are you sure the "clean+invalidate, disable, sync" sequence is
+correct?  Should it not be "clean+invalidate, sync, disable" ?
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
