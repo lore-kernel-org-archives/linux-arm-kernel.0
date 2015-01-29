@@ -1,66 +1,54 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 29 Jan 2015 13:11:05 +0300
-Subject: [PATCH v5 05/13] pm: at91: move the copying the sram function
- to the sram initializationi phase
-In-Reply-To: <1422513535-23885-1-git-send-email-wenyou.yang@atmel.com>
-References: <1422513316-21509-1-git-send-email-wenyou.yang@atmel.com>
- <1422513535-23885-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <54CA0739.2030101@cogentembedded.com>
+From: prabhakar.csengg@gmail.com (Lad, Prabhakar)
+Date: Thu, 29 Jan 2015 10:26:08 +0000
+Subject: [PATCH 3/7] [media] staging/davinci/vpfe/dm365: add missing
+ dependencies
+In-Reply-To: <1422479867-3370921-4-git-send-email-arnd@arndb.de>
+References: <1422479867-3370921-1-git-send-email-arnd@arndb.de>
+ <1422479867-3370921-4-git-send-email-arnd@arndb.de>
+Message-ID: <CA+V-a8tqqvvMb2V=FJ49zC=tdtG4PNhVC-WRX3WnYO_dnrY05w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Wed, Jan 28, 2015 at 9:17 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> This driver can only be built when VIDEO_V4L2_SUBDEV_API
+> and VIDEO_DAVINCI_VPBE_DISPLAY are also provided by the
+> kernel.
+>
+> drivers/staging/media/davinci_vpfe/dm365_isif.c: In function '__isif_get_format':
+> drivers/staging/media/davinci_vpfe/dm365_isif.c:1410:3: error: implicit declaration of function 'v4l2_subdev_get_try_format' [-Werror=implicit-function-declaration]
+>    return v4l2_subdev_get_try_format(fh, pad);
+>    ^
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
-On 1/29/2015 9:38 AM, Wenyou Yang wrote:
+Acked-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
 
-> To decrease the suspend time, move the copying the sram function
-> to the sram initialization phase, instead of every time go to suspend.
+Regards,
+--Prabhakar Lad
 
-> In the meanwhile, if there is no sram allocated for PM, the PM is not supported.
-
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 > ---
->   arch/arm/mach-at91/pm.c |   12 +++++++-----
->   1 file changed, 7 insertions(+), 5 deletions(-)
-
-> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-> index daa998d..6df0152 100644
-> --- a/arch/arm/mach-at91/pm.c
-> +++ b/arch/arm/mach-at91/pm.c
-> @@ -163,10 +163,6 @@ static int at91_pm_enter(suspend_state_t state)
->   			 * turning off the main oscillator; reverse on wakeup.
->   			 */
->   			if (slow_clock) {
-> -#ifdef CONFIG_AT91_SLOW_CLOCK
-> -				/* copy slow_clock handler to SRAM, and call it */
-> -				memcpy(slow_clock, at91_slow_clock, at91_slow_clock_sz);
-> -#endif
->   				slow_clock(at91_pmc_base, at91_ramc_base[0],
->   					   at91_ramc_base[1],
->   					   at91_pm_data.memctrl);
-> @@ -311,6 +307,9 @@ static void __init at91_pm_sram_init(void)
->   	sram_pbase = gen_pool_virt_to_phys(sram_pool, sram_base);
->   	slow_clock = __arm_ioremap_exec(sram_pbase, at91_slow_clock_sz, false);
+>  drivers/staging/media/davinci_vpfe/Kconfig | 2 ++
+>  1 file changed, 2 insertions(+)
 >
-> +	/* Copy the slow_clock handler to SRAM */
-> +	memcpy(slow_clock, at91_slow_clock, at91_slow_clock_sz);
-
-    AFAIU (looking at the code above and below), __arm_ioremap_exec() can 
-return NULL and in this case memcpy() will cause kernel oops.
-
-> @@ -328,7 +327,10 @@ static void __init at91_pm_init(void)
->   	if (at91_cpuidle_device.dev.platform_data)
->   		platform_device_register(&at91_cpuidle_device);
+> diff --git a/drivers/staging/media/davinci_vpfe/Kconfig b/drivers/staging/media/davinci_vpfe/Kconfig
+> index 4de2f082491d..f40a06954a92 100644
+> --- a/drivers/staging/media/davinci_vpfe/Kconfig
+> +++ b/drivers/staging/media/davinci_vpfe/Kconfig
+> @@ -2,6 +2,8 @@ config VIDEO_DM365_VPFE
+>         tristate "DM365 VPFE Media Controller Capture Driver"
+>         depends on VIDEO_V4L2 && ARCH_DAVINCI_DM365 && !VIDEO_DM365_ISIF
+>         depends on HAS_DMA
+> +       depends on VIDEO_V4L2_SUBDEV_API
+> +       depends on VIDEO_DAVINCI_VPBE_DISPLAY
+>         select VIDEOBUF2_DMA_CONTIG
+>         help
+>           Support for DM365 VPFE based Media Controller Capture driver.
+> --
+> 2.1.0.rc2
 >
-> -	suspend_set_ops(&at91_pm_ops);
-> +	if (slow_clock)
-> +		suspend_set_ops(&at91_pm_ops);
-> +	else
-> +		pr_info("AT91: PM : Not supported, due to no sram allocated\n");
-
-    I'd suggest upper-casing "sram". And removing of colon after "PM".
-
-[...]
-
-WBR, Sergei
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
