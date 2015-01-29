@@ -1,35 +1,71 @@
-From: mpeg.blue@free.fr (Mason)
-Date: Thu, 29 Jan 2015 17:43:19 +0100
-Subject: RFC on cpufreq implementation
-In-Reply-To: <54B7F7CD.7030903@free.fr>
-References: <54B7F7CD.7030903@free.fr>
-Message-ID: <54CA6327.5070707@free.fr>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 29 Jan 2015 11:49:48 -0500 (EST)
+Subject: [PATCH v2] ARM: teach __asmeq that r11 == fp and r12 == ip
+In-Reply-To: <1422524686-30462-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1422524686-30462-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <alpine.LFD.2.11.1501291147480.1322@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/01/2015 18:24, Mason wrote:
+On Thu, 29 Jan 2015, Ard Biesheuvel wrote:
 
-> This is a follow-up to my previous thread.
-> "How many frequencies would cpufreq optimally like to manage?"
-> http://thread.gmane.org/gmane.linux.ports.arm.kernel/373669
+> The __asmeq macro is used inside inline asm statements to ensure that
+> register asm variables that explicitly specify a register are mapped
+> correctly onto those registers when used in inline asm input and output
+> constraints. However, the string based matching fails to take into account
+> that 'fp' is often referred to as 'r11' and 'ip' is often referred to as
+> 'r12', (e.g., by clang), causing false negatives.
+> 
+> Fix this by making __asmeq consider the ("fp","r11"), ("r11","fp"),
+> ("ip","r12") and ("r12","ip") cases specifically.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+> v2:
+> Added r11 but not r10, as the latter is only referred to as 'sl' in
+> objdump output, but GCC emitted inline asm substitutes the references
+> with 'r10' instead. sp/lr/pc are unambiguous between GCC and clang.
+> 
+> Primary purpose of this patch is to fix the incompatibility between clang
+> and GCC, but the side effect is that it relaxes the requirement imposed on
+> the programmer to refer to a register by the same name as the compiler does.
+> If that is seen as a substantial upside by some, we could indeed still decide
+> to add r10, r13, r14 and r15 (for which no such incompatibility exists) as well.
+> However, those are not currently used in __asmeq invocations anywhere under
+> arch/arm
+> 
+>  arch/arm/include/asm/compiler.h | 15 ++++++++++++++-
+>  1 file changed, 14 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/include/asm/compiler.h b/arch/arm/include/asm/compiler.h
+> index 8155db2f7fa1..29fe85e59439 100644
+> --- a/arch/arm/include/asm/compiler.h
+> +++ b/arch/arm/include/asm/compiler.h
+> @@ -8,8 +8,21 @@
+>   * This string is meant to be concatenated with the inline asm string and
+>   * will cause compilation to stop on mismatch.
+>   * (for details, see gcc PR 15089)
+> + * For compatibility with clang, we have to specifically take the equivalence
+> + * of 'r11' <-> 'fp' and 'r12' <-> 'ip' into account as well.
+>   */
+> -#define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
+> +#define __asmeq(x, y)				\
+> +	".ifnc " x "," y "; "			\
+> +	  ".ifnc " x y ",fpr11; " 		\
+> +	    ".ifnc " x y ",r11fp; "		\
+> +	      ".ifnc " x y ",ipr12; " 		\
+> +	        ".ifnc " x y ",r12ip; "		\
+> +	          ".err; "			\
+> +	        ".endif; "			\
+> +	      ".endif; "			\
+> +	    ".endif; "				\
+> +	  ".endif; "				\
+> +	".endif\n\t"
 
-OK, so this is my TAKE 2 on the cpufreq driver, trying to remove
-some dependencies on machine-specific definitions by getting the
-virtual address at init via ioremap. (Is -EFAULT the right error
-to return if ioremap fails?)
+I share RMK's yuck reaction, but for lack of a better idea:
 
-I'm not sure where machine-specific information is supposed to
-be stored though? Such as register definitions, or the physical
-addresses/offsets. What if they need to be shared among several
-source files? I can't just duplicate them... (I've tentatively
-called it temp.h for the time being.)
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-Regards.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: cpufreq.c
-Type: text/x-csrc
-Size: 2567 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150129/ee612bdc/attachment.bin>
+
+Nicolas
