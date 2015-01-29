@@ -1,90 +1,47 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Thu, 29 Jan 2015 13:52:09 -0500
-Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher constraints
- with dma-parms
-In-Reply-To: <20150129154718.GB26493@n2100.arm.linux.org.uk>
-References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
- <1422347154-15258-2-git-send-email-sumit.semwal@linaro.org>
- <20150129143908.GA26493@n2100.arm.linux.org.uk>
- <CAO_48GEOQ1pBwirgEWeVVXW-iOmaC=Xerr2VyYYz9t1QDXgVsw@mail.gmail.com>
- <20150129154718.GB26493@n2100.arm.linux.org.uk>
-Message-ID: <CAF6AEGtTmFg66TK_AFkQ-xp7Nd9Evk3nqe6xCBp7K=77OmXTxA@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 29 Jan 2015 10:57:25 -0800
+Subject: [PATCH URGENT] arm: dma-mapping: Set DMA IOMMU ops in
+ arm_iommu_attach_device()
+In-Reply-To: <2085044.xTrZHjchoH@diego>
+References: <1422022909-31044-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <2085044.xTrZHjchoH@diego>
+Message-ID: <20150129185725.GA18628@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 29, 2015 at 10:47 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Jan 29, 2015 at 09:00:11PM +0530, Sumit Semwal wrote:
->> So, short answer is, it is left to the exporter to decide. The dma-buf
->> framework should not even attempt to decide or enforce any of the
->> above.
->>
->> At each dma_buf_attach(), there's a callback to the exporter, where
->> the exporter can decide, if it intends to handle these kind of cases,
->> on the best way forward.
->>
->> The exporter might, for example, decide to migrate backing storage,
->
-> That's a decision which the exporter can not take.  Think about it...
->
-> If subsystem Y has mapped the buffer, it could be accessing the buffer's
-> backing storage at the same time that subsystem Z tries to attach to the
-> buffer.
+On Wed, Jan 28, 2015 at 01:25:35AM +0100, Heiko St?bner wrote:
+> Hi Arnd, Olof,
+> 
+> Am Freitag, 23. Januar 2015, 16:21:49 schrieb Laurent Pinchart:
+> > Commit 4bb25789ed28228a ("arm: dma-mapping: plumb our iommu mapping ops
+> > into arch_setup_dma_ops") moved the setting of the DMA operations from
+> > arm_iommu_attach_device() to arch_setup_dma_ops() where the DMA
+> > operations to be used are selected based on whether the device is
+> > connected to an IOMMU. However, the IOMMU detection scheme requires the
+> > IOMMU driver to be ported to the new IOMMU of_xlate API. As no driver
+> > has been ported yet, this effectively breaks all IOMMU ARM users that
+> > depend on the IOMMU being handled transparently by the DMA mapping API.
+> > 
+> > Fix this by restoring the setting of DMA IOMMU ops in
+> > arm_iommu_attach_device() and splitting the rest of the function into a
+> > new internal __arm_iommu_attach_device() function, called by
+> > arch_setup_dma_ops().
+> > 
+> > Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> 
+> in the original submission arm at kernel.org was not included, but it looks like 
+> the patch should go through arm-soc.
+> 
+> We have two tags
+> 	Acked-by: Will Deacon <will.deacon@arm.com>
+> 	Tested-by: Heiko Stuebner <heiko@sntech.de>
+> 
+> Can you find the original patch somehow or should it be resend to include 
+> arm at kernel.org ?
 
-The *theory* is that Y is map/unmap'ing the buffer around each use, so
-there will be some point where things could be migrated and remapped..
-in practice, I am not sure that anyone is doing this yet.
+The patch was posted on a list that I am subscribed to, so it popped up in
+the same thread this time. I've applied it to fixes for 3.19.
 
-Probably it would be reasonable if a more restrictive subsystem tried
-to attach after the buffer was already allocated and mapped in a way
-that don't meet the new constraints, then -EBUSY.
+Thanks,
 
-But from a quick look it seems like there needs to be a slight fixup
-to not return 0 if calc_constraints() fails..
-
-> Once the buffer has been exported to another user, the exporter has
-> effectively lost control over mediating accesses to that buffer.
->
-> All that it can do with the way the dma-buf API is today is to allocate
-> a _different_ scatter list pointing at the same backing storage which
-> satisfies the segment size and number of segments, etc.
->
-> There's also another issue which you haven't addressed.  What if several
-> attachments result in lowering max_segment_size and max_segment_count
-> such that:
->
->         max_segment_size * max_segment_count < dmabuf->size
->
-> but individually, the attachments allow dmabuf->size to be represented
-> as a scatterlist?
-
-Quite possibly for some of these edge some of cases, some of the
-dma-buf exporters are going to need to get more clever (ie. hand off
-different scatterlists to different clients).  Although I think by far
-the two common cases will be "I can support anything via an iommu/mmu"
-and "I need phys contig".
-
-But that isn't an issue w/ dma-buf itself, so much as it is an issue
-w/ drivers.  I guess there would be more interest in fixing up drivers
-when actual hw comes along that needs it..
-
-BR,
--R
-
-> If an exporter were to take notice of the max_segment_size and
-> max_segment_count, the resulting buffer is basically unrepresentable
-> as a scatterlist.
->
->> > Please consider the possible sequences of use (such as the scenario
->> > above) when creating or augmenting an API.
->> >
->>
->> I tried to think of the scenarios I could think of, but If you still
->> feel this approach doesn't help with your concerns, I'll graciously
->> accept advice to improve it.
->
-> See the new one above :)
->
-> --
-> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-> according to speedtest.net.
+-Olof
