@@ -1,56 +1,44 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 29 Jan 2015 08:53:31 +0530
-Subject: [PATCH 2/3] cpufreq: s3c: remove last use of resume_clocks
- callback
-In-Reply-To: <1422451015-390439-3-git-send-email-arnd@arndb.de>
+Date: Thu, 29 Jan 2015 09:09:03 +0530
+Subject: [PATCH 3/3] cpufreq: exynos: allow modular build
+In-Reply-To: <1799972.nQ2Axu0CEJ@wuerfel>
 References: <1422451015-390439-1-git-send-email-arnd@arndb.de>
- <1422451015-390439-3-git-send-email-arnd@arndb.de>
-Message-ID: <CAKohpo=v7SLii7ykqWfpf0ZAzCF6Oi9_ARVNmTu9u4j9poXafA@mail.gmail.com>
+ <1422451015-390439-4-git-send-email-arnd@arndb.de>
+ <20150128172209.GF29600@developer.hsd1.ca.comcast.net>
+ <1799972.nQ2Axu0CEJ@wuerfel>
+Message-ID: <CAKohpom9L4jiMRGn3OaWyYM7iR3Ame4-LKG144yuHmRxCJud3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 January 2015 at 18:46, Arnd Bergmann <arnd@arndb.de> wrote:
-> Commit 32726d2d550 ("ARM: SAMSUNG: Remove legacy clock code")
-> already removed the callback pointer, but there was one remaining
-> user:
->
-> drivers/cpufreq/s3c24xx-cpufreq.c: In function 's3c_cpufreq_resume_clocks':
-> drivers/cpufreq/s3c24xx-cpufreq.c:149:14: error: 'struct s3c_cpufreq_info' has no member named 'resume_clocks'
->   cpu_cur.info->resume_clocks();
->               ^
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 32726d2d550 ("ARM: SAMSUNG: Remove legacy clock code")
-> Cc: stable at vger.kernel.org # v3.17+
-> ---
->  drivers/cpufreq/s3c24xx-cpufreq.c | 8 --------
->  1 file changed, 8 deletions(-)
->
-> diff --git a/drivers/cpufreq/s3c24xx-cpufreq.c b/drivers/cpufreq/s3c24xx-cpufreq.c
-> index bd340a1ca87d..733aa5153e74 100644
-> --- a/drivers/cpufreq/s3c24xx-cpufreq.c
-> +++ b/drivers/cpufreq/s3c24xx-cpufreq.c
-> @@ -144,11 +144,6 @@ static void s3c_cpufreq_setfvco(struct s3c_cpufreq_config *cfg)
->         (cfg->info->set_fvco)(cfg);
->  }
->
-> -static inline void s3c_cpufreq_resume_clocks(void)
-> -{
-> -       cpu_cur.info->resume_clocks();
-> -}
-> -
->  static inline void s3c_cpufreq_updateclk(struct clk *clk,
->                                          unsigned int freq)
->  {
-> @@ -417,9 +412,6 @@ static int s3c_cpufreq_resume(struct cpufreq_policy *policy)
->
->         last_target = ~0;       /* invalidate last_target setting */
->
-> -       /* first, find out what speed we resumed at. */
-> -       s3c_cpufreq_resume_clocks();
-> -
->         /* whilst we will be called later on, we try and re-set the
->          * cpu frequencies as soon as possible so that we do not end
->          * up resuming devices and then immediately having to re-set
+On 29 January 2015 at 01:31, Arnd Bergmann <arnd@arndb.de> wrote:
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+>>  config ARM_EXYNOS_CPUFREQ
+>> -     bool
+>> +     tristate "SAMSUNG EXYNOS CPUfreq Driver"
+>> +     depends on THERMAL
+>> +     default y
+>> +     help
+>> +       This adds the CPUFreq driver for Samsung EXYNOS platforms
+>> +
+>> +       If in doubt, say N.
+>
+> Now the option shows up on all systems that include Kconfig.arm,
+> in particular non-exynos machines that might not even be able
+> to build this.
+
+I am sure I am wrong here, but want to know what I am missing.
+What about:
+
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index c3c3cf52d2d9..f3ee05067a69 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -27,7 +27,7 @@ config ARM_VEXPRESS_SPC_CPUFREQ
+
+ config ARM_EXYNOS_CPUFREQ
+        tristate "SAMSUNG EXYNOS CPUfreq Driver"
+-       depends on THERMAL
++       depends on THERMAL && ARCH_EXYNOS
+        default y
+        help
+          This adds the CPUFreq driver for Samsung EXYNOS platforms
