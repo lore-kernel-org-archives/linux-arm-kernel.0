@@ -1,32 +1,35 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 29 Jan 2015 09:05:15 +0100
-Subject: [PATCH] ARM: shmobile: r8a7791: Correct SDHI clock labels and
- output-names
-In-Reply-To: <1422496038-3915-1-git-send-email-horms+renesas@verge.net.au>
-References: <1422496038-3915-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdXktWqe_+HhORN0iWEMLm=y2fS52PFtPK4RzAHQMHLYXw@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 29 Jan 2015 09:10:42 +0100
+Subject: [REQUEST PULL] mvebu-fixes-6
+In-Reply-To: <20150128230113.GB3177@quad.lixom.net>
+References: <20150128160231.GA28862@lunn.ch> <20150128172902.GA29434@lunn.ch>
+ <20150128230113.GB3177@quad.lixom.net>
+Message-ID: <20150129091042.15716170@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 29, 2015 at 2:47 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> There appears to have been some inconsistency and confusion here as on
-> the r8a7790 these clocks are referred to as SD(HI)1 and SD(HI)2 while on
-> the r8a7791 and r8a7794 they are referred to as SD(HI)2 and SD(HI)3.
->
-> Fixes: 59e79895b95892863 ("ARM: shmobile: r8a7791: Add clocks")
-> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Dear Olof Johansson,
 
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+On Wed, 28 Jan 2015 15:01:13 -0800, Olof Johansson wrote:
 
-Gr{oetje,eeting}s,
+> > The following changes since commit 38bdf45f4aa5cb6186d50a29e6cbbd9d486a1519:
+> > 
+> >   bus: mvebu-mbus: fix support of MBus window 13 (2015-01-19 15:40:53 -0600)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-3.19-6
+> 
+> Hrm, would have been nice not to have to take a regression fix for a fix.
 
-                        Geert
+Indeed, and it is entirely my fault, not Andrew's. The I/O coherency
+disabling fix was working fine on Armada 370/XP, but not on Armada
+375/38x. My fault of not checking on a sufficient number of platforms.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Best regards,
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
