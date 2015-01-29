@@ -1,49 +1,21 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 29 Jan 2015 19:10:31 +0100
-Subject: [PATCH 7/7] spi: spi-fsl-dspi: Add support for TCFQ transfer mode
-In-Reply-To: <1422536382672.21760@toradex.com>
-References: <1422356608-15961-1-git-send-email-bhuvanchandra.dv@toradex.com>
- <1422356608-15961-2-git-send-email-bhuvanchandra.dv@toradex.com>
- <20150128190342.GE21293@sirena.org.uk> <1422533049999.91114@toradex.com>
- <20150129121320.GI21293@sirena.org.uk> <1422536382672.21760@toradex.com>
-Message-ID: <1a28f3439386e1132ae0f3ab80666305@agner.ch>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Thu, 29 Jan 2015 12:21:54 -0600
+Subject: [Linaro-acpi] [PATCH v7 04/17] ARM64 / ACPI: Introduce early_param
+ for "acpi" and pass acpi=force to enable ACPI
+In-Reply-To: <CAKv+Gu_=si=L5+vvg+8hRgwmTahqdePw5bZxUMFSZ8obk-VXFQ@mail.gmail.com>
+References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>	<1421247905-3749-5-git-send-email-hanjun.guo@linaro.org>	<CAOZdJXU2bFR1T4ZnGavvnrUXAp5e=vNt9g6WKX46H8qs1wz-TQ@mail.gmail.com>	<CAOZdJXXe+29rux1L3QYBX0yHLy3kdi+ZJrXVd=XfgYN=R6DtKA@mail.gmail.com>	<20150128181453.GG31752@e104818-lin.cambridge.arm.com>	<54C92804.5090806@codeaurora.org>	<20150129151956.GF8951@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu_=si=L5+vvg+8hRgwmTahqdePw5bZxUMFSZ8obk-VXFQ@mail.gmail.com>
+Message-ID: <54CA7A42.5080800@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-01-29 13:53, BhuvanChandra.DV wrote:
-> On 01/29/2015 05:43 PM, Mark Brown wrote:
->> On Thu, Jan 29, 2015 at 11:58:25AM +0000, BhuvanChandra.DV wrote:
->>
->>> As far as i understood the major difference between the two modes are when
->>> the interrupt to trigger, as EOQ mode will trigger the interrupt at end of
->>> queue and TCF will trigger the interrupt at every frame transfer. Probably
->>> mode selection shouldn't be a device tree property, but i don't see any
->>> automatic way to choose between the modes.
->>> Maybe a config would be more appropriate?
->> Or if there's either no particular reason to choose one over the other
->> or one is always better then just pick one in the driver and don't worry
->> about implementing both.
-> 
-> Among the two, EOQ would be better since with TCF, interrupts are generated at
-> every frame transfer, which could be a problem at higher frequencies.
-> I think we can omit this patch then.
+On 01/29/2015 12:20 PM, Ard Biesheuvel wrote:
+> If we are going with this solution, we should also mandate that an
+> ACPI enabled firmware should not supply a non-DT DTB
 
-It would be interesting to know what the authors original motivation
-implementing this feature was. Reading the email of the original
-patchset indicates that there are platforms where only TCF is supported:
+What is a non-DT DTB?  I thought the "DT" in "DTB" stood for device tree.
 
-<quote>
-For adopting of different platform, either of them is a way of DSPI
-transfer data.
-</quote>
-
-However, I don't know which platform that would be. Also, it seems that
-Chao Fu's email is not valid anymore. 
-
-@Xiubo Li, maybe you can shed some light on this?
-
->From the platform I am concerned about, Vybrid, it seems not very
-useful, so I'm fine with omitting that patch.
-
---
-Stefan 
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
