@@ -1,37 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 29 Jan 2015 15:23:33 +0100
-Subject: [PATCH] ASoC: Samsung: add missing I2C/SPI dependencies
-In-Reply-To: <20150129114134.GC21293@sirena.org.uk>
-References: <1815674.ObkQWLfgIW@wuerfel> <20150129114134.GC21293@sirena.org.uk>
-Message-ID: <3641576.5ROmxlmVfH@wuerfel>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 29 Jan 2015 16:26:39 +0200
+Subject: [PATCH 6/9] clocksource: Driver for Conexant Digicolor SoC timer
+In-Reply-To: <1422538656.32520.4.camel@x220>
+References: <54CA3044.6070501@linaro.org>
+ <1422536899-16609-1-git-send-email-daniel.lezcano@linaro.org>
+ <1422536899-16609-6-git-send-email-daniel.lezcano@linaro.org>
+ <1422538656.32520.4.camel@x220>
+Message-ID: <20150129142639.GI19448@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 29 January 2015 11:41:34 Mark Brown wrote:
-> On Wed, Jan 28, 2015 at 10:28:55PM +0100, Arnd Bergmann wrote:
-> > The SND_SOC_ARNDALE_RT5631_ALC5631 selects the rt5631 codec
-> > that requires I2C to work, so we get a build error if I2C
-> > is disabled:
-> 
-> You rather buried the lead about there being other drivers in this
-> changelog, makes the code a bit surprising when you find it.
-> 
-> >  config SND_SOC_SPEYSIDE
-> >  	tristate "Audio support for Wolfson Speyside"
-> > -	depends on SND_SOC_SAMSUNG && MACH_WLF_CRAGG_6410
-> > +	depends on SND_SOC_SAMSUNG && MACH_WLF_CRAGG_6410 && SPI_MASTER
-> >  	select SND_SAMSUNG_I2S
-> >  	select SND_SOC_WM8996
-> >  	select SND_SOC_WM9081
-> 
-> Why only add a dependency on SPI here?
+Hi Paul,
 
-I don't know, definitely my mistake. I had squashed three older patches
-together here, which resulted in the slightly strange changelog (I
-picked the one that explained it best and then tried to modify it
-to cover all changes) as well as the missing I2C dependency.
+On Thu, Jan 29, 2015 at 02:37:36PM +0100, Paul Bolle wrote:
+> On Thu, 2015-01-29 at 14:08 +0100, Daniel Lezcano wrote:
+> > From: Baruch Siach <baruch@tkos.co.il>
+> > +config DIGICOLOR_TIMER
+> > +	bool
+> 
+> And the select for this symbol (see https://lkml.org/lkml/2015/1/26/360)
+> will be provided in a separate patch? Because this patch, by itself,
+> won't allow DIGICOLOR_TIMER to be set, will it?
 
-I'll re-check all other drivers in this directory too and then send
-a new patch.
+Yes. Posted yesterday. See 
+http://article.gmane.org/gmane.linux.ports.arm.kernel/390166.
 
-	Arnd
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
