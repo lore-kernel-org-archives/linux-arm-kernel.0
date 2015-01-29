@@ -1,24 +1,136 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 29 Jan 2015 20:43:50 +0100
-Subject: [RESEND PATCH v4] Sound: PXA: Fix settings of PXAxxx DMA
-In-Reply-To: <54CA2B7E.5010003@tul.cz> (Petr Cvek's message of "Thu, 29 Jan
- 2015 13:45:50 +0100")
-References: <54CA125D.7010908@tul.cz> <54CA2B7E.5010003@tul.cz>
-Message-ID: <87bnlhnzih.fsf@free.fr>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 29 Jan 2015 22:19:29 +0200
+Subject: [PATCH 00/11] ARM: OMAP3: legacy clock data move under clk driver
+In-Reply-To: <20150107230006.GE13010@atomide.com>
+References: <1418746856-17173-1-git-send-email-t-kristo@ti.com>
+ <20150107230006.GE13010@atomide.com>
+Message-ID: <54CA95D1.6080700@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Petr Cvek <petr.cvek@tul.cz> writes:
-
-> Fix PXA DMA autoincrementation, so capture will not use playback settings
-> (incrementation in register space instead in target buffer).
+On 01/08/2015 01:00 AM, Tony Lindgren wrote:
+> * Tero Kristo <t-kristo@ti.com> [141216 08:22]:
+>> Hi,
+>>
+>> These patches move the legacy clock data for omap3 under drivers/clk/ti.
+>> After these patches are applied, it should be possible to get rid of
+>> clk-private.h (long pending project for Mike.)
+>>
+>> Testing done (on top of 3.18-rc1):
+>>
+>> omap3-beagle: boot / suspend-resume (ret/off) / cpuidle (ret/off)
+>> omap3-beagle-xm: boot upto fs mount (see note below)
+>> sdp3430: boot
+>> n900: boot
+>>
+>> Note: beagle-xm failed with FS mount on the board I have access to, but
+>>        this happens with clean 3.18-rc1 and linux-next also at the moment.
+>>        The board has probably corrupted filesystem image but I am unable
+>>        to fix this atm (remote board.)
+>>
+>> Test branch:
+>> tree: https://github.com/t-kristo/linux-pm.git
+>> branch: 3.18-rc1-omap3-clk-rework
 >
-> Regression from:
->   'commit d65a14587a9be853a887a1407db133df1fb68e29 ("ASoC: pxa: use snd_dmaengine_dai_dma_data")'
+> Great, hopefully this will finally allow Mike to make the
+> generic struct clk private to drivers/clk :)
 >
-> Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
-> Acked-by: Daniel Mack <daniel@zonque.org>
-Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> Seems to boot just fine based on a quick legacy booting test
+> on n900.
+>
+> Mike, assuming no other issues, can you please apply these into a
+> immutable branch against v3.19-rc1 that Paul and I can also merge
+> in as needed?
+>
+> Please also feel free to add:
+>
+> Acked-by: Tony Lindgren <tony@atomide.com>
+>
 
---
-Robert
+I just rebased these patches on top of 3.19-rc1, and noticed a problem 
+with dpll5 on beagle-xm (basically a divide-by-zero error + locking 
+issue during boot.) The extra diff at the end of this email fixes the 
+problems, I will also send the updated two patches as v2. Updated branch 
+available in my tree under name 3.19-rc1-omap3-clk-rework.
+
+- Tero
+
+---------------------
+
+diff --git a/drivers/clk/ti/clk-3xxx-legacy.c 
+b/drivers/clk/ti/clk-3xxx-legacy.c
+index 81ad510..e0732a4 100644
+--- a/drivers/clk/ti/clk-3xxx-legacy.c
++++ b/drivers/clk/ti/clk-3xxx-legacy.c
+@@ -136,6 +136,7 @@ static struct ti_clk_dpll dpll3_ck_data = {
+  	.idlest_mask = 0x1,
+  	.auto_recal_bit = 0x3,
+  	.max_divider = 0x80,
++	.min_divider = 0x1,
+  	.recal_en_bit = 0x5,
+  	.max_multiplier = 0x7ff,
+  	.enable_mask = 0x7,
+@@ -307,6 +308,7 @@ static struct ti_clk_dpll dpll4_ck_data = {
+  	.idlest_mask = 0x2,
+  	.auto_recal_bit = 0x13,
+  	.max_divider = 0x80,
++	.min_divider = 0x1,
+  	.recal_en_bit = 0x6,
+  	.max_multiplier = 0x7ff,
+  	.enable_mask = 0x70000,
+@@ -507,6 +509,7 @@ static struct ti_clk_dpll dpll5_ck_data = {
+  	.idlest_mask = 0x1,
+  	.auto_recal_bit = 0x3,
+  	.max_divider = 0x80,
++	.min_divider = 0x1,
+  	.recal_en_bit = 0x19,
+  	.max_multiplier = 0x7ff,
+  	.enable_mask = 0x7,
+@@ -1271,6 +1274,7 @@ static struct ti_clk_dpll dpll1_ck_data = {
+  	.idlest_mask = 0x1,
+  	.auto_recal_bit = 0x3,
+  	.max_divider = 0x80,
++	.min_divider = 0x1,
+  	.recal_en_bit = 0x7,
+  	.max_multiplier = 0x7ff,
+  	.enable_mask = 0x7,
+@@ -2154,6 +2158,7 @@ static struct ti_clk_dpll dpll2_ck_data = {
+  	.idlest_mask = 0x1,
+  	.auto_recal_bit = 0x3,
+  	.max_divider = 0x80,
++	.min_divider = 0x1,
+  	.recal_en_bit = 0x8,
+  	.max_multiplier = 0x7ff,
+  	.enable_mask = 0x7,
+@@ -2513,6 +2518,7 @@ static struct ti_clk_dpll dpll4_ck_omap36xx_data = {
+  	.idlest_mask = 0x2,
+  	.auto_recal_bit = 0x13,
+  	.max_divider = 0x80,
++	.min_divider = 0x1,
+  	.recal_en_bit = 0x6,
+  	.max_multiplier = 0xfff,
+  	.enable_mask = 0x70000,
+diff --git a/drivers/clk/ti/clock.h b/drivers/clk/ti/clock.h
+index 8d9c603..404158d 100644
+--- a/drivers/clk/ti/clock.h
++++ b/drivers/clk/ti/clock.h
+@@ -148,6 +148,7 @@ struct ti_clk_dpll {
+  	u32 sddiv_mask;
+  	u16 max_multiplier;
+  	u16 max_divider;
++	u8 min_divider;
+  	u8 auto_recal_bit;
+  	u8 recal_en_bit;
+  	u8 recal_st_bit;
+diff --git a/drivers/clk/ti/dpll.c b/drivers/clk/ti/dpll.c
+index 7d67639..47ebff7 100644
+--- a/drivers/clk/ti/dpll.c
++++ b/drivers/clk/ti/dpll.c
+@@ -243,6 +243,7 @@ struct clk *ti_clk_register_dpll(struct ti_clk *setup)
+  	dd->sddiv_mask = dpll->sddiv_mask;
+  	dd->dco_mask = dpll->dco_mask;
+  	dd->max_divider = dpll->max_divider;
++	dd->min_divider = dpll->min_divider;
+  	dd->max_multiplier = dpll->max_multiplier;
+  	dd->auto_recal_bit = dpll->auto_recal_bit;
+  	dd->recal_en_bit = dpll->recal_en_bit;
