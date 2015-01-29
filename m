@@ -1,41 +1,35 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 29 Jan 2015 12:36:30 +0100
-Subject: [PATCH v4 7/7] ARM: mvebu: Add Device Tree description of SDHCI for
- Armada 388 RD
+Date: Thu, 29 Jan 2015 12:36:28 +0100
+Subject: [PATCH v4 5/7] ARM: mvebu: Use macros for interrupt flags on Armada
+ 38x sdhci node
 In-Reply-To: <1422531390-31038-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1422531390-31038-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1422531390-31038-8-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1422531390-31038-6-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Device Tree description of SDHCI on Armada 388 RD board was
-missing. This commit adds the node for it.
+Instead of hardcoding the values of the interrupt flags, use the
+macros provided by <include/dt-bindings/interrupt-controller/irq.h>
+and <include/dt-bindings/interrupt-controller/arm-gic.h> for the
+Armada 38x SDHCI node.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-388-rd.dts | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/boot/dts/armada-38x.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/armada-388-rd.dts b/arch/arm/boot/dts/armada-388-rd.dts
-index c98a8f8d01a9..7dfede145ea3 100644
---- a/arch/arm/boot/dts/armada-388-rd.dts
-+++ b/arch/arm/boot/dts/armada-388-rd.dts
-@@ -51,6 +51,16 @@
- 				clock-frequency = <100000>;
- 			};
- 
-+			sdhci at d8000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&sdhci_pins>;
-+				broken-cd;
-+				no-1-8-v;
-+				wp-inverted;
-+				bus-width = <8>;
-+				status = "okay";
-+			};
-+
- 			serial at 12000 {
- 				status = "okay";
- 			};
+diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+index 79c4acf186e2..71d4eca5b497 100644
+--- a/arch/arm/boot/dts/armada-38x.dtsi
++++ b/arch/arm/boot/dts/armada-38x.dtsi
+@@ -516,7 +516,7 @@
+ 			sdhci at d8000 {
+ 				compatible = "marvell,armada-380-sdhci";
+ 				reg = <0xd8000 0x1000>, <0xdc000 0x100>;
+-				interrupts = <0 25 0x4>;
++				interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&gateclk 17>;
+ 				mrvl,clk-delay-cycles = <0x1F>;
+ 				status = "disabled";
 -- 
 2.1.0
