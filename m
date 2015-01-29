@@ -1,41 +1,29 @@
-From: petr.cvek@tul.cz (Petr Cvek)
-Date: Thu, 29 Jan 2015 13:45:50 +0100
-Subject: [RESEND PATCH v4] Sound: PXA: Fix settings of PXAxxx DMA
-In-Reply-To: <54CA125D.7010908@tul.cz>
-References: <54CA125D.7010908@tul.cz>
-Message-ID: <54CA2B7E.5010003@tul.cz>
+From: bhuvanchandra.dv@toradex.com (BhuvanChandra.DV)
+Date: Thu, 29 Jan 2015 12:53:57 +0000
+Subject: [PATCH 7/7] spi: spi-fsl-dspi: Add support for TCFQ transfer mode
+In-Reply-To: <20150129121320.GI21293@sirena.org.uk>
+References: <1422356608-15961-1-git-send-email-bhuvanchandra.dv@toradex.com>
+ <1422356608-15961-2-git-send-email-bhuvanchandra.dv@toradex.com>
+ <20150128190342.GE21293@sirena.org.uk> <1422533049999.91114@toradex.com>
+ <20150129121320.GI21293@sirena.org.uk>
+Message-ID: <1422536382672.21760@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix PXA DMA autoincrementation, so capture will not use playback settings
-(incrementation in register space instead in target buffer).
 
-Regression from:
-  'commit d65a14587a9be853a887a1407db133df1fb68e29 ("ASoC: pxa: use snd_dmaengine_dai_dma_data")'
+On 01/29/2015 05:43 PM, Mark Brown wrote:
+> On Thu, Jan 29, 2015 at 11:58:25AM +0000, BhuvanChandra.DV wrote:
+>
+>> As far as i understood the major difference between the two modes are when
+>> the interrupt to trigger, as EOQ mode will trigger the interrupt at end of
+>> queue and TCF will trigger the interrupt at every frame transfer. Probably
+>> mode selection shouldn't be a device tree property, but i don't see any
+>> automatic way to choose between the modes.
+>> Maybe a config would be more appropriate?
+> Or if there's either no particular reason to choose one over the other
+> or one is always better then just pick one in the driver and don't worry
+> about implementing both.
 
-Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
-Acked-by: Daniel Mack <daniel@zonque.org>
----
- sound/arm/pxa2xx-pcm-lib.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
-
-diff --git a/sound/arm/pxa2xx-pcm-lib.c b/sound/arm/pxa2xx-pcm-lib.c
-index 01f8fdc..f8ca3ca 100644
---- a/sound/arm/pxa2xx-pcm-lib.c
-+++ b/sound/arm/pxa2xx-pcm-lib.c
-@@ -45,7 +45,12 @@ int __pxa2xx_pcm_hw_params(struct snd_pcm_substream *substream,
- 	size_t period = params_period_bytes(params);
- 	pxa_dma_desc *dma_desc;
- 	dma_addr_t dma_buff_phys, next_desc_phys;
--	u32 dcmd = DCMD_INCSRCADDR | DCMD_FLOWTRG;
-+	u32 dcmd = 0;
-+
-+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-+		dcmd = DCMD_INCSRCADDR | DCMD_FLOWTRG;
-+	else
-+		dcmd = DCMD_INCTRGADDR | DCMD_FLOWSRC;
- 
- 	/* temporary transition hack */
- 	switch (rtd->params->addr_width) {
--- 
-1.7.12.1
+Among the two, EOQ would be better since with TCF, interrupts are generated at
+every frame transfer, which could be a problem at higher frequencies.
+I think we can omit this patch then.
