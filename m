@@ -1,45 +1,102 @@
-From: ricardo.ribalda@gmail.com (Ricardo Ribalda Delgado)
-Date: Thu, 29 Jan 2015 23:14:46 +0100
-Subject: [PATCH] spi/xilinx: Cast ioread32/iowrite32 function pointers
-In-Reply-To: <2800334.5ezTSQFkNQ@wuerfel>
-References: <1422543073-21895-1-git-send-email-ricardo.ribalda@gmail.com>
- <CAMuHMdX5CMH0Q5S_BBjb-F-kJfzkTS+sP9H-FDe_K_gFRxK7pw@mail.gmail.com>
- <CAPybu_3O3Rcq1Rvxvbpc-GOSs+VbO74_u+vfH+UtXjLAQjWLQA@mail.gmail.com>
- <2800334.5ezTSQFkNQ@wuerfel>
-Message-ID: <CAPybu_0OWLZeEFMByrrDg7HOfjAYbOnAoazLac-E8KV-mKSJSg@mail.gmail.com>
+From: robdclark@gmail.com (Rob Clark)
+Date: Thu, 29 Jan 2015 17:18:33 -0500
+Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher constraints
+ with dma-parms
+In-Reply-To: <20150129192610.GE26493@n2100.arm.linux.org.uk>
+References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
+ <1422347154-15258-2-git-send-email-sumit.semwal@linaro.org>
+ <20150129143908.GA26493@n2100.arm.linux.org.uk>
+ <CAO_48GEOQ1pBwirgEWeVVXW-iOmaC=Xerr2VyYYz9t1QDXgVsw@mail.gmail.com>
+ <20150129154718.GB26493@n2100.arm.linux.org.uk>
+ <CAF6AEGtTmFg66TK_AFkQ-xp7Nd9Evk3nqe6xCBp7K=77OmXTxA@mail.gmail.com>
+ <20150129192610.GE26493@n2100.arm.linux.org.uk>
+Message-ID: <CAF6AEGujk8UC4X6T=yhTrz1s+SyZUQ=m05h_WcxLDGZU6bydbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd
-
-On Thu, Jan 29, 2015 at 11:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > I think the definitions in include/asm-generic/iomap.h are actually wrong,
->> > as they lack a const:
->> >
->> >     extern unsigned int ioread8(void __iomem *);
->> >     extern unsigned int ioread16(void __iomem *);
->> >     extern unsigned int ioread16be(void __iomem *);
->> >     extern unsigned int ioread32(void __iomem *);
->> >     extern unsigned int ioread32be(void __iomem *);
->> >
->> > Note that the definitions in include/asm-generic/io.h do have the const:
->> >
->> >     static inline u8 ioread8(const volatile void __iomem *addr)
->> >     static inline u16 ioread16(const volatile void __iomem *addr)
->> >     static inline u32 ioread32(const volatile void __iomem *addr)
->> >     static inline u16 ioread16be(const volatile void __iomem *addr)
->> >     static inline u32 ioread32be(const volatile void __iomem *addr)
+On Thu, Jan 29, 2015 at 2:26 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Jan 29, 2015 at 01:52:09PM -0500, Rob Clark wrote:
+>> Quite possibly for some of these edge some of cases, some of the
+>> dma-buf exporters are going to need to get more clever (ie. hand off
+>> different scatterlists to different clients).  Although I think by far
+>> the two common cases will be "I can support anything via an iommu/mmu"
+>> and "I need phys contig".
 >>
-> I think we don't need the 'volatile' keyword here. The main reason
-> we have it on readl() is to shut up the compiler when dealing with
-> ancient driver code that annotates iomem pointers as volatile.
+>> But that isn't an issue w/ dma-buf itself, so much as it is an issue
+>> w/ drivers.  I guess there would be more interest in fixing up drivers
+>> when actual hw comes along that needs it..
 >
-> This is generally considered a (minor) driver mistake though, and
-> modern drivers that for some reason use ioread*() typically don't
-> do that (or they get a warning).
+> However, validating the attachments is the business of dma-buf.  This
+> is actual infrastructure, which should ensure some kind of sanity such
+> as the issues I've raised.
+>
 
-What about the different return type? u8 vs int
-Thanks
+My initial thought is for dma-buf to not try to prevent something than
+an exporter can actually do.. I think the scenario you describe could
+be handled by two sg-lists, if the exporter was clever enough.
 
--- 
-Ricardo Ribalda
+That all said, I think probably all the existing exporters cache the
+sg-list.  And I can't think of any actual hw which would hit this
+problem that can be solved by multiple sg-lists for the same physical
+memory.  (And the constraint calculation kind of assumes the end
+result will be a single sg-list.)  So it seems reasonable to me to
+check that max_segment_count * max_segment_size is not smaller than
+the buffer.
+
+If it was a less theoretical problem, I think I'd more inclined for a
+way that the exporter could override the checks, or something along
+those lines.
+
+otoh, if the attachment is just not possible because the buffer has
+been already allocated and mapped by someone with more relaxed
+constraints.. then I think the driver should be the one returning the
+error since dma-buf doesn't know this.
+
+> The whole "we can push it onto our users" is really on - what that
+> results in is the users ignoring most of the requirements and just doing
+> their own thing, which ultimately ends up with the whole thing turning
+> into a disgusting mess - one which becomes very difficult to fix later.
+
+Ideally at some point, dma-mapping or some helpers would support
+allocations matching constraints..  I think only actual gpu drivers
+want to do crazy enough things that they'd want to bypass dma-mapping.
+If everyone else can use dma-mapping and/or helpers then we make it
+harder for drivers to do the wrong thing than to do the right thing.
+
+> Now, if we're going to do the "more clever" thing you mention above,
+> that rather negates the point of this two-part patch set, which is to
+> provide the union of the DMA capabilities of all users.  A union in
+> that case is no longer sane as we'd be tailoring the SG lists to each
+> user.
+
+It doesn't really negate.. a different sg list representing the same
+physical memory cannot suddenly make the buffer physically contiguous
+(from the perspective of memory)..
+
+(unless we are not on the same page here, so to speak)
+
+BR,
+-R
+
+> If we aren't going to do the "more clever" thing, then yes, we need this
+> code to calculate that union, but we _also_ need it to do sanity checking
+> right from the start, and refuse conditions which ultimately break the
+> ability to make use of that union - in other words, when the union of
+> the DMA capabilities means that the dmabuf can't be represented.
+>
+> Unless we do that, we'll just end up with random drivers interpreting
+> what they want from the DMA capabilities, and we'll have some drivers
+> exporting (eg) scatterlists which satisfy the maximum byte size of an
+> element, but ignoring the maximum number of entries or vice versa, and
+> that'll most probably hide the case of "too small a union".
+>
+> It really doesn't make sense to do both either: that route is even more
+> madness, because we'll end up with two classes of drivers - those which
+> use the union approach, and those which don't.
+>
+> The KISS principle applies here.
+>
+> --
+> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+> according to speedtest.net.
