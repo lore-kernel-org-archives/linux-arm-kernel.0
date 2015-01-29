@@ -1,56 +1,68 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 29 Jan 2015 23:07:47 +0100
-Subject: [PATCH 1/2] ARM: dts: rockchip: add cpu and gpu regulators to
- rk3288-evb-act8846
-Message-ID: <5715597.a6Lom1OGfJ@diego>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 29 Jan 2015 14:02:56 -0800
+Subject: [GIT PULL] at91: cleanup/soc for 3.20 #4
+In-Reply-To: <1422532272-32055-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1422532272-32055-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20150129220256.GG20785@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The evaluation board using the act8846 as main pmic uses two additional
-regulators to provide the cpu and gpu voltage. Add these and also add
-the link to cpu supply from vdd_cpu.
+On Thu, Jan 29, 2015 at 12:51:12PM +0100, Nicolas Ferre wrote:
+> Arnd, Olof, Kevin,
+> 
+> This is a batch of cleanup/soc modifications that you may also stack on top of
+> your "soc" branch as the previous one.
+> It collects some more cleanup material and simplifies the AT91 boot code. Only
+> some little details remain before having a classical DT boot (without additional
+> mapping of registers for instance). This part will be addressed in 3.21.
+> 
+> The switch to multi-platform is not included as it needs some patches in ASoC,
+> ata and arm-soc/next/drivers to be able to compile. I may send patches or a
+> pull-request that can be send to Linus late during the merge-window. Tell me
+> how you feel it can be done (or delayed to 3.21).
+> 
+> The conflict related to the rename of board-dt-sama5.c => sama5.c is solved in
+> this branch:
+> https://git.kernel.org/cgit/linux/kernel/git/nferre/linux-at91.git/log/?h=arm-soc-for-next%2bat91-3.20-cleanup
+> 
+> Thanks, best regards,
+> 
+> The following changes since commit 9726b6892beeaa736610370429a23a481d1b133e:
+> 
+>   ARM: at91: pm: remove warning to remove SOC_AT91SAM9263 usage (2015-01-26 13:44:19 +0100)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-cleanup4
+> 
+> for you to fetch changes up to fa9df37f603459bf08a4f8fc99337874c677e2bf:
+> 
+>   ARM: at91/trivial: unify functions and machine names (2015-01-27 18:46:31 +0100)
+> 
+> ----------------------------------------------------------------
+> Fourth cleanup/soc batch for 3.20:
+> - merge all the at91sam9 code and remove the empty SoC-specific files
+> - remove the at91_boot_soc that is now useless in a DT context
+> - move the sram code in PM code as it's now only used there
+> - some file + function name changes after this big cleanup
+> 
+> ----------------------------------------------------------------
+> Alexandre Belloni (4):
+>       ARM: at91: at91rm9200: set idle and restart from rm9200_dt_device_init()
+>       ARM: at91: merge all SOC_AT91SAM9xxx
+>       ARM: at91: remove at91_boot_soc
+>       ARM: at91: remove at91_dt_initialize and machine init_early()
+> 
+> Nicolas Ferre (3):
+>       ARM: at91: move alternative initial mapping to board-dt-sama5.c
+>       ARM: at91: change board files into SoC files
+>       ARM: at91/trivial: unify functions and machine names
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm/boot/dts/rk3288-evb-act8846.dts | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+Very nice cleanups, and they just keep coming! Just watch out for regressions.
+:)
 
-diff --git a/arch/arm/boot/dts/rk3288-evb-act8846.dts b/arch/arm/boot/dts/rk3288-evb-act8846.dts
-index a76dd44..9db02bbe 100644
---- a/arch/arm/boot/dts/rk3288-evb-act8846.dts
-+++ b/arch/arm/boot/dts/rk3288-evb-act8846.dts
-@@ -17,7 +17,32 @@
- 	compatible = "rockchip,rk3288-evb-act8846", "rockchip,rk3288";
- };
- 
-+&cpu0 {
-+	cpu0-supply = <&vdd_cpu>;
-+};
-+
- &i2c0 {
-+	vdd_cpu: syr827 at 40 {
-+		compatible = "silergy,syr827";
-+		fcs,suspend-voltage-selector = <1>;
-+		reg = <0x40>;
-+		regulator-name = "vdd_cpu";
-+		regulator-min-microvolt = <850000>;
-+		regulator-max-microvolt = <1350000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+	};
-+
-+	vdd_gpu: syr828 at 41 {
-+		compatible = "silergy,syr828";
-+		fcs,suspend-voltage-selector = <1>;
-+		reg = <0x41>;
-+		regulator-name = "vdd_gpu";
-+		regulator-min-microvolt = <850000>;
-+		regulator-max-microvolt = <1350000>;
-+		regulator-always-on;
-+	};
-+
- 	hym8563 at 51 {
- 		compatible = "haoyu,hym8563";
- 		reg = <0x51>;
--- 
-2.1.1
+
+Merged.
+
+
+-Olof
