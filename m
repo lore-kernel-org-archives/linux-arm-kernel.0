@@ -1,68 +1,47 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 29 Jan 2015 14:02:56 -0800
-Subject: [GIT PULL] at91: cleanup/soc for 3.20 #4
-In-Reply-To: <1422532272-32055-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1422532272-32055-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20150129220256.GG20785@quad.lixom.net>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 29 Jan 2015 23:08:25 +0100
+Subject: [PATCH 2/2] ARM: dts: rockchip: housekeeping off i2c0 on rk3288-evb
+ boards
+In-Reply-To: <5715597.a6Lom1OGfJ@diego>
+References: <5715597.a6Lom1OGfJ@diego>
+Message-ID: <1550421.auhbiXq1Bp@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 29, 2015 at 12:51:12PM +0100, Nicolas Ferre wrote:
-> Arnd, Olof, Kevin,
-> 
-> This is a batch of cleanup/soc modifications that you may also stack on top of
-> your "soc" branch as the previous one.
-> It collects some more cleanup material and simplifies the AT91 boot code. Only
-> some little details remain before having a classical DT boot (without additional
-> mapping of registers for instance). This part will be addressed in 3.21.
-> 
-> The switch to multi-platform is not included as it needs some patches in ASoC,
-> ata and arm-soc/next/drivers to be able to compile. I may send patches or a
-> pull-request that can be send to Linus late during the merge-window. Tell me
-> how you feel it can be done (or delayed to 3.21).
-> 
-> The conflict related to the rename of board-dt-sama5.c => sama5.c is solved in
-> this branch:
-> https://git.kernel.org/cgit/linux/kernel/git/nferre/linux-at91.git/log/?h=arm-soc-for-next%2bat91-3.20-cleanup
-> 
-> Thanks, best regards,
-> 
-> The following changes since commit 9726b6892beeaa736610370429a23a481d1b133e:
-> 
->   ARM: at91: pm: remove warning to remove SOC_AT91SAM9263 usage (2015-01-26 13:44:19 +0100)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-cleanup4
-> 
-> for you to fetch changes up to fa9df37f603459bf08a4f8fc99337874c677e2bf:
-> 
->   ARM: at91/trivial: unify functions and machine names (2015-01-27 18:46:31 +0100)
-> 
-> ----------------------------------------------------------------
-> Fourth cleanup/soc batch for 3.20:
-> - merge all the at91sam9 code and remove the empty SoC-specific files
-> - remove the at91_boot_soc that is now useless in a DT context
-> - move the sram code in PM code as it's now only used there
-> - some file + function name changes after this big cleanup
-> 
-> ----------------------------------------------------------------
-> Alexandre Belloni (4):
->       ARM: at91: at91rm9200: set idle and restart from rm9200_dt_device_init()
->       ARM: at91: merge all SOC_AT91SAM9xxx
->       ARM: at91: remove at91_boot_soc
->       ARM: at91: remove at91_dt_initialize and machine init_early()
-> 
-> Nicolas Ferre (3):
->       ARM: at91: move alternative initial mapping to board-dt-sama5.c
->       ARM: at91: change board files into SoC files
->       ARM: at91/trivial: unify functions and machine names
+Use the same transfer speed on both the rk808 and act8846 variants and
+remove the status=okay from the rk808 one which is already set in the
+shared rk3288-evb.dtsi .
 
-Very nice cleanups, and they just keep coming! Just watch out for regressions.
-:)
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/boot/dts/rk3288-evb-act8846.dts | 2 ++
+ arch/arm/boot/dts/rk3288-evb-rk808.dts   | 1 -
+ 2 files changed, 2 insertions(+), 1 deletion(-)
 
-
-Merged.
-
-
--Olof
+diff --git a/arch/arm/boot/dts/rk3288-evb-act8846.dts b/arch/arm/boot/dts/rk3288-evb-act8846.dts
+index 9db02bbe..d7b8bbc 100644
+--- a/arch/arm/boot/dts/rk3288-evb-act8846.dts
++++ b/arch/arm/boot/dts/rk3288-evb-act8846.dts
+@@ -22,6 +22,8 @@
+ };
+ 
+ &i2c0 {
++	clock-frequency = <400000>;
++
+ 	vdd_cpu: syr827 at 40 {
+ 		compatible = "silergy,syr827";
+ 		fcs,suspend-voltage-selector = <1>;
+diff --git a/arch/arm/boot/dts/rk3288-evb-rk808.dts b/arch/arm/boot/dts/rk3288-evb-rk808.dts
+index d453ddd..3f7aa9e 100644
+--- a/arch/arm/boot/dts/rk3288-evb-rk808.dts
++++ b/arch/arm/boot/dts/rk3288-evb-rk808.dts
+@@ -23,7 +23,6 @@
+ 
+ &i2c0 {
+ 	clock-frequency = <400000>;
+-	status = "okay";
+ 
+ 	rk808: pmic at 1b {
+ 		compatible = "rockchip,rk808";
+-- 
+2.1.1
