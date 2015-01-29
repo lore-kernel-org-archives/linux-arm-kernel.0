@@ -1,87 +1,49 @@
-From: myungjoo.ham@gmail.com (MyungJoo Ham)
-Date: Thu, 29 Jan 2015 23:08:08 +0900
-Subject: Pull Request of PM / Devfreq (for next)
-Message-ID: <CAJ0PZbTSbjSKFH8Q=F1umscTMijO2W4_DioiQCUFFjEtnc08Ww@mail.gmail.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Thu, 29 Jan 2015 15:09:16 +0100
+Subject: [PATCH v6 8/8] ARM: imx_v4_v5_defconfig: Add I.MX25 Touchscreen
+ controller and ADC support.
+In-Reply-To: <1422540556-14828-1-git-send-email-mpa@pengutronix.de>
+References: <1422540556-14828-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1422540556-14828-9-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Rafael,
+From: Denis Carikli <denis@eukrea.com>
 
+Signed-off-by: Denis Carikli <denis@eukrea.com>
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ arch/arm/configs/imx_v4_v5_defconfig | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Here goes a pull request from PM / devfreq to Linux-PM, for-next.
-(linux-3.20 rc-X)
-
-
-
-Cheers,
-MyungJoo
-
-
-
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
-
-The following changes since commit 26bc420b59a38e4e6685a73345a0def461136dce:
-
-  Linux 3.19-rc6 (2015-01-25 20:04:41 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/mzx/devfreq.git
-tags/pull_req_20150129
-
-for you to fetch changes up to 846d4ee701e883f3e4647662e1f4069d0cd2694b:
-
-  PM / devfreq: event: Add documentation for exynos-ppmu devfreq-event
-driver (2015-01-29 21:52:53 +0900)
-
-- ----------------------------------------------------------------
-Pull Request of Devfreq, 2015-01-29.
-
-- ----------------------------------------------------------------
-Chanwoo Choi (3):
-      PM / devfreq: event: Add devfreq_event class
-      PM / devfreq: event: Add Exynos-ppmu devfreq-event driver
-      PM / devfreq: event: Add documentation for exynos-ppmu
-devfreq-event driver
-
-Tomeu Vizoso (1):
-      PM / devfreq: tegra: add devfreq driver for Tegra Activity Monitor
-
- .../bindings/devfreq/event/exynos-ppmu.txt         | 110 ++++
- drivers/devfreq/Kconfig                            |  12 +
- drivers/devfreq/Makefile                           |   4 +
- drivers/devfreq/devfreq-event.c                    | 494 ++++++++++++++
- drivers/devfreq/event/Kconfig                      |  25 +
- drivers/devfreq/event/Makefile                     |   2 +
- drivers/devfreq/event/exynos-ppmu.c                | 374 +++++++++++
- drivers/devfreq/event/exynos-ppmu.h                |  93 +++
- drivers/devfreq/tegra-devfreq.c                    | 718 +++++++++++++++++++++
- include/linux/devfreq-event.h                      | 196 ++++++
- 10 files changed, 2028 insertions(+)
- create mode 100644
-Documentation/devicetree/bindings/devfreq/event/exynos-ppmu.txt
- create mode 100644 drivers/devfreq/devfreq-event.c
- create mode 100644 drivers/devfreq/event/Kconfig
- create mode 100644 drivers/devfreq/event/Makefile
- create mode 100644 drivers/devfreq/event/exynos-ppmu.c
- create mode 100644 drivers/devfreq/event/exynos-ppmu.h
- create mode 100644 drivers/devfreq/tegra-devfreq.c
- create mode 100644 include/linux/devfreq-event.h
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1
-
-iQIcBAEBAgAGBQJUyj0BAAoJEBOhurvWBoCKHrAP/jCkj81SQEDB4PPF3w3JFfVj
-6GA2zVpunAeHAYq3klh41f9YyyyFxW1zp9nCfobcI9JO5IDsyCmNDOv5rla+yx/G
-XNlS4w+/tT5tXZjPR6b4irto6YsZN1Ro8AMH37UOqiOqB3t5nXjpZT64kWKNB9CF
-w7xPhTF6VhYlyT/wajqXDMzpMvSGt5YAIUJlpYLg7rD00rAatEbhfl5j7/bGkc/c
-X8X91j9I7Mc1mJ6hFkrtMJzYZAVPRbpVJuKNvMUru+DWCHMXOtv2fBfYEQFaQFTS
-V3/dVTvhhkW5ftgflDtWnUJIJVm8tavrtURLsOkw/6d0TuD0GMtcf0KNRnwdiR6D
-mznu3/l+3mg3XCUc5ydVYRProkj9CCpM5I5NVWsrJ1I5bj7E7kcF1jYKgNSr13j5
-9DFUheYJGY3953W1kAowRjqM+/ZMHxpsboRDTfxdl2Gfi3XLrhhjhKWNxNb2nsg4
-JdIFDbRnY4NHD8LXSlb8oJP/RfTgKc/wWYfqlETSeOZV4J7L6/DoHDM/jHzsVMU9
-j8zbE4f1LqAU0p5jP2RIt2ZTTXoNnIgObmXp/orhcoKRj9gm1qFb862U3IPrF+Jf
-W1lS/Casqc4gXYwqrYZ2Jjm87OujA3XqN4sxZAZbKbv8HI04mmzZRO6tXlnF62C+
-FVXiTktWShTIkMNyiXOu
-=BFS1
------END PGP SIGNATURE-----
+diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
+index e6b0007355f8..e1bda0136f6c 100644
+--- a/arch/arm/configs/imx_v4_v5_defconfig
++++ b/arch/arm/configs/imx_v4_v5_defconfig
+@@ -89,6 +89,7 @@ CONFIG_KEYBOARD_IMX=y
+ # CONFIG_INPUT_MOUSE is not set
+ CONFIG_INPUT_TOUCHSCREEN=y
+ CONFIG_TOUCHSCREEN_ADS7846=m
++CONFIG_TOUCHSCREEN_MX25=y
+ CONFIG_TOUCHSCREEN_MC13783=y
+ # CONFIG_LEGACY_PTYS is not set
+ CONFIG_SERIAL_8250=m
+@@ -108,6 +109,7 @@ CONFIG_HWMON=m
+ CONFIG_SENSORS_MC13783_ADC=m
+ CONFIG_WATCHDOG=y
+ CONFIG_IMX2_WDT=y
++CONFIG_MFD_MX25_TSADC=y
+ CONFIG_MFD_MC13XXX_SPI=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+@@ -173,6 +175,8 @@ CONFIG_DMADEVICES=y
+ CONFIG_IMX_SDMA=y
+ CONFIG_IMX_DMA=y
+ # CONFIG_IOMMU_SUPPORT is not set
++CONFIG_IIO=y
++CONFIG_FSL_MX25_ADC=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
+ CONFIG_EXT4_FS=y
+-- 
+2.1.4
