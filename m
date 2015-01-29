@@ -1,63 +1,48 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 29 Jan 2015 16:01:14 +0100
-Subject: [PATCH] ARM: efm32: switch to properly namespaced location property
-Message-ID: <1422543674-4890-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 29 Jan 2015 16:09:16 +0100
+Subject: [PATCH v4 05/13] pm: at91: move the copying the sram function to
+ the sram initializationi phase
+In-Reply-To: <20150129112800.GV26493@n2100.arm.linux.org.uk>
+References: <1422409172-24178-1-git-send-email-wenyou.yang@atmel.com>
+ <1422409396-24394-1-git-send-email-wenyou.yang@atmel.com>
+ <20150129112800.GV26493@n2100.arm.linux.org.uk>
+Message-ID: <20150129150916.GC4164@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commits:
+Hi,
 
-281ec367bff4 (i2c: efm32: correct namespacing of location property)
-d36f47fa8419 (serial: efm32: correct namespacing of location property)
-10ed7e9847b6 (spi: efm32: correct namespacing of location property)
+On 29/01/2015 at 11:28:00 +0000, Russell King - ARM Linux wrote :
+> On Wed, Jan 28, 2015 at 09:43:16AM +0800, Wenyou Yang wrote:
+> > -#ifdef CONFIG_AT91_SLOW_CLOCK
+> > -				/* copy slow_clock handler to SRAM, and call it */
+> > -				memcpy(slow_clock, at91_slow_clock, at91_slow_clock_sz);
+> > -#endif
+> >  				slow_clock(at91_pmc_base, at91_ramc_base[0],
+> >  					   at91_ramc_base[1],
+> >  					   at91_pm_data.memctrl);
+> > @@ -272,6 +268,9 @@ static void __init at91_pm_sram_init(void)
+> >  	sram_pbase = gen_pool_virt_to_phys(sram_pool, sram_base);
+> >  	slow_clock = __arm_ioremap_exec(sram_pbase, at91_slow_clock_sz, false);
+> >  
+> > +	/* Copy the slow_clock handler to SRAM */
+> > +	memcpy(slow_clock, at91_slow_clock, at91_slow_clock_sz);
+> > +
+> 
+> Why is this code not using the fncpy() support for copying functions.
 
-(contained in 3.17-rc1) all drivers support the correctly
-namespaced location property. So use the better names now.
+Indeed, this was done in the original version of the patch that I acked.
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/boot/dts/efm32gg-dk3750.dts | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+> Why is it not checking the return code from __arm_ioremap_exec() or
+> gen_pool_virt_to_phys() for failure?
 
-diff --git a/arch/arm/boot/dts/efm32gg-dk3750.dts b/arch/arm/boot/dts/efm32gg-dk3750.dts
-index b4031fa..504cf45 100644
---- a/arch/arm/boot/dts/efm32gg-dk3750.dts
-+++ b/arch/arm/boot/dts/efm32gg-dk3750.dts
-@@ -26,7 +26,7 @@
- 		};
- 
- 		i2c at 4000a000 {
--			efm32,location = <3>;
-+			energymicro,location = <3>;
- 			status = "ok";
- 
- 			temp at 48 {
-@@ -43,7 +43,7 @@
- 
- 		spi0: spi at 4000c000 { /* USART0 */
- 			cs-gpios = <&gpio 68 1>; // E4
--			location = <1>;
-+			energymicro,location = <1>;
- 			status = "ok";
- 
- 			microsd at 0 {
-@@ -57,7 +57,7 @@
- 
- 		spi1: spi at 4000c400 { /* USART1 */
- 			cs-gpios = <&gpio 51 1>; // D3
--			location = <1>;
-+			energymicro,location = <1>;
- 			status = "ok";
- 
- 			ks8851 at 0 {
-@@ -70,7 +70,7 @@
- 		};
- 
- 		uart4: uart at 4000e400 { /* UART1 */
--			location = <2>;
-+			energymicro,location = <2>;
- 			status = "ok";
- 		};
- 
+gen_pool_virt_to_phys() will not fail as the chunk is allocated just
+before so it will necessarily be found in the list.
+
+We need to reintroduce a check for slow_clock != NULL before fncpy()
+since it is moved out of its original if block.
+
 -- 
-2.1.4
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
