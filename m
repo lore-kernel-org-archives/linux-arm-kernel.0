@@ -1,86 +1,132 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 28 Jan 2015 22:45:37 -0800
-Subject: [PATCH 1/6] soc: qcom: gsbi: Add support for ADM CRCI muxing
-In-Reply-To: <20150129054143.GD13842@qualcomm.com>
-References: <1422396644-21714-1-git-send-email-agross@codeaurora.org>
- <1422396644-21714-2-git-send-email-agross@codeaurora.org>
- <20150129021150.GC23506@codeaurora.org>
- <20150129054143.GD13842@qualcomm.com>
-Message-ID: <20150129064537.GD23506@codeaurora.org>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Thu, 29 Jan 2015 14:42:31 +0800
+Subject: [PATCH v5 10/13] pm: at91: rename function name:
+ at91_slow_clock()-->at91_pm_suspend_sram_fn
+In-Reply-To: <1422513316-21509-1-git-send-email-wenyou.yang@atmel.com>
+References: <1422513316-21509-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1422513751-25977-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/28, Andy Gross wrote:
-> On Wed, Jan 28, 2015 at 06:11:50PM -0800, Stephen Boyd wrote:
-> 
-> > 
-> > > +- syscon-tcsr: indicates phandle of TCSR syscon node
-> > 
-> > Make this optional but required if any child nodes use dma?
-> 
-> To enforce that I'd have to determine that a child has a dmas.  I guess that
-> isn't so bad.
+As the file name's renaming, rename the file name at91_slow_clock()-->
+at91_pm_suspend_sram_fn, rename the function handler's name at the same time.
 
-I don't think we need to write any code in the driver to enforce
-this right now. As long as nobody gets it wrong bad things won't
-happen and we can just assume that the DT is correct. Once we get
-some bad DT we can go ahead and implement some DT parsing stuff.
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/mach-at91/pm.c         |   25 +++++++++++++------------
+ arch/arm/mach-at91/pm_suspend.S |   24 ++++++++++--------------
+ 2 files changed, 23 insertions(+), 26 deletions(-)
 
-> 
-> 
-> > > +
-> > > +	if (!gsbi_num || gsbi_num > MAX_GSBI) {
-> > > +		dev_err(&pdev->dev, "invalid gsbi number\n");
-> > > +		return -EINVAL;
-> > > +	}
-> > > +
-> > >  	if (of_property_read_u32(node, "qcom,mode", &gsbi->mode)) {
-> > >  		dev_err(&pdev->dev, "missing mode configuration\n");
-> > >  		return -EINVAL;
-> > > @@ -64,6 +185,26 @@ static int gsbi_probe(struct platform_device *pdev)
-> > >  	writel_relaxed((gsbi->mode << GSBI_PROTOCOL_SHIFT) | gsbi->crci,
-> > >  				base + GSBI_CTRL_REG);
-> > >  
-> > > +	/*
-> > > +	 * modify tcsr to reflect mode and ADM CRCI mux
-> > > +	 * Each gsbi contains a pair of bits, one for RX and one for TX
-> > > +	 * SPI mode requires both bits cleared, otherwise they are set
-> > > +	 */
-> > > +	match = of_match_node(gsbi_dt_match, node);
-> > 
-> > Why not match the config to the TCSR compatible string? Wouldn't
-> > that more accurately reflect that we need to set different bits
-> > depending on which type of TCSR we're using? The version of GSBI
-> > hardware is not actually changing in every different SoC so I
-> > don't see why we want to change the compatible there just because
-> > the TCSR register layout changed.
-> 
-> That is true.  However, with the gsbi compat, I avoid doing a match multiple
-> times and get the table I need immediately.  The alternative is N checks or
-> pulling the compat strings and comparing them to get the right table.
-
-Sorry I'm not following. We always have to call of_match_node()
-here and I'm just suggesting we replace gsbi_dt_match with
-tcsr_dt_match and leave gsbi_dt_match like it was before. I don't
-see how anything is avoided.
-
-> 
-> 
-> > > +
-> > > +	if (config)
-> > > +		for (i = 0; i < config->num_rows; i++) {
-> > > +			if (gsbi->mode == GSBI_PROT_SPI)
-> > 
-> > Doesn't I2C need the same treatment (anything in QUP really)?
-> > Maybe the logic could be changed to check for gsbi->crci ==
-> > GSBI_CRCI_QUP?
-> 
-> Nope.  I2C doesn't support DMA when ADM is the controller.  It's only SPI or
-> UART.
-
-Ok, I don't get it but I guess it doesn't matter if I2C doesn't
-use it.
-
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index c3a697f..ce15013 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -131,13 +131,12 @@ int at91_suspend_entering_slow_clock(void)
+ }
+ EXPORT_SYMBOL(at91_suspend_entering_slow_clock);
+ 
+-
+-static void (*slow_clock)(void __iomem *pmc, void __iomem *ramc0,
++static void (*at91_suspend_sram_fn)(void __iomem *pmc, void __iomem *ramc0,
+ 			  void __iomem *ramc1, int memctrl);
+ 
+-extern void at91_slow_clock(void __iomem *pmc, void __iomem *ramc0,
++extern void at91_pm_suspend_in_sram(void __iomem *pmc, void __iomem *ramc0,
+ 			    void __iomem *ramc1, int memctrl);
+-extern u32 at91_slow_clock_sz;
++extern u32 at91_pm_suspend_in_sram_sz;
+ 
+ static void at91_pm_suspend(suspend_state_t state)
+ {
+@@ -146,8 +145,8 @@ static void at91_pm_suspend(suspend_state_t state)
+ 	pm_data |= (state == PM_SUSPEND_MEM) ?
+ 				AT91_PM_MODE(AT91_PM_SLOW_CLOCK) : 0;
+ 
+-	slow_clock(at91_pmc_base, at91_ramc_base[0],
+-			at91_ramc_base[1], pm_data);
++	at91_suspend_sram_fn(at91_pmc_base, at91_ramc_base[0],
++				at91_ramc_base[1], pm_data);
+ }
+ 
+ static int at91_pm_enter(suspend_state_t state)
+@@ -288,17 +287,19 @@ static void __init at91_pm_sram_init(void)
+ 		goto put_node;
+ 	}
+ 
+-	sram_base = gen_pool_alloc(sram_pool, at91_slow_clock_sz);
++	sram_base = gen_pool_alloc(sram_pool, at91_pm_suspend_in_sram_sz);
+ 	if (!sram_base) {
+-		pr_warn("%s: unable to alloc ocram!\n", __func__);
++		pr_warn("%s: unable to alloc sram!\n", __func__);
+ 		goto put_node;
+ 	}
+ 
+ 	sram_pbase = gen_pool_virt_to_phys(sram_pool, sram_base);
+-	slow_clock = __arm_ioremap_exec(sram_pbase, at91_slow_clock_sz, false);
++	at91_suspend_sram_fn = __arm_ioremap_exec(sram_pbase,
++					at91_pm_suspend_in_sram_sz, false);
+ 
+-	/* Copy the slow_clock handler to SRAM */
+-	memcpy(slow_clock, at91_slow_clock, at91_slow_clock_sz);
++	/* Copy the pm suspend handler to SRAM */
++	memcpy(at91_suspend_sram_fn,
++		at91_pm_suspend_in_sram, at91_pm_suspend_in_sram_sz);
+ 
+ put_node:
+ 	of_node_put(node);
+@@ -311,7 +312,7 @@ static void __init at91_pm_init(void)
+ 	if (at91_cpuidle_device.dev.platform_data)
+ 		platform_device_register(&at91_cpuidle_device);
+ 
+-	if (slow_clock)
++	if (at91_suspend_sram_fn)
+ 		suspend_set_ops(&at91_pm_ops);
+ 	else
+ 		pr_info("AT91: PM : Not supported, due to no sram allocated\n");
+diff --git a/arch/arm/mach-at91/pm_suspend.S b/arch/arm/mach-at91/pm_suspend.S
+index 8edbad0..122a3f1 100644
+--- a/arch/arm/mach-at91/pm_suspend.S
++++ b/arch/arm/mach-at91/pm_suspend.S
+@@ -55,23 +55,19 @@ mode	.req	r6
+ 
+ 	.text
+ 
+-/* void at91_slow_clock(void __iomem *pmc, void __iomem *sdramc,
++/*
++ * void at91_pm_suspend_in_sram(void __iomem *pmc, void __iomem *sdramc,
+  *			void __iomem *ramc1, int memctrl)
++ * @input param:
++ * 	@r0: the base address of AT91_PMC
++ *  	@r1: the base address of SDRAM Controller (SDRAM, DDRSDR, or AT91_SYS)
++ *	@r2: the base address of second SDRAM Controller or 0 if not present
++ *	@r3: the pm information
+  */
+-ENTRY(at91_slow_clock)
++ENTRY(at91_pm_suspend_in_sram)
+ 	/* Save registers on stack */
+ 	stmfd	sp!, {r4 - r12, lr}
+ 
+-	/*
+-	 * Register usage:
+-	 *  R0 = Base address of AT91_PMC
+-	 *  R1 = Base address of RAM Controller (SDRAM, DDRSDR, or AT91_SYS)
+-	 *  R2 = Base address of second RAM Controller or 0 if not present
+-	 *  R3 = Memory controller
+-	 *  R4 = temporary register
+-	 *  R5 = temporary register
+-	 */
+-
+ 	/* Drain write buffer */
+ 	mov	tmp1, #0
+ 	mcr	p15, 0, tmp1, c7, c10, 4
+@@ -277,5 +273,5 @@ ram_restored:
+ .saved_sam9_mdr1:
+ 	.word 0
+ 
+-ENTRY(at91_slow_clock_sz)
+-	.word .-at91_slow_clock
++ENTRY(at91_pm_suspend_in_sram_sz)
++	.word .-at91_pm_suspend_in_sram
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.7.9.5
