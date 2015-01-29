@@ -1,96 +1,54 @@
-From: varkabhadram@gmail.com (Varka Bhadram)
-Date: Thu, 29 Jan 2015 21:02:41 +0530
-Subject: [PATCH v10 2/2] tty/serial: Add Spreadtrum sc9836-uart driver
- support
-In-Reply-To: <54CA5128.8050500@gmail.com>
-References: <sc9836-serial-v10>
- <1422443324-25082-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1422443324-25082-3-git-send-email-chunyan.zhang@spreadtrum.com>
- <54CA5128.8050500@gmail.com>
-Message-ID: <54CA5299.6050304@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 29 Jan 2015 15:42:45 +0000 (UTC)
+Subject: [PATCH v2] arm64: Kconfig: clean up two no-op Kconfig options from
+ CONFIG_ARCH_TEGRA*
+Message-ID: <alpine.DEB.2.02.1501291541390.16475@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 29 January 2015 08:56 PM, Varka Bhadram wrote:
-> Hi,
->
-> On Wednesday 28 January 2015 04:38 PM, Chunyan Zhang wrote:
->> Add a full sc9836-uart driver for SC9836 SoC which is based on the
->> spreadtrum sharkl64 platform.
->> This driver also support earlycon.
->>
->> Originally-by: Lanqing Liu <lanqing.liu@spreadtrum.com>
->> Signed-off-by: Orson Zhai <orson.zhai@spreadtrum.com>
->> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
->> Acked-by: Arnd Bergmann <arnd@arndb.de>
->> Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
->> ---
->>   drivers/tty/serial/Kconfig       |   18 +
->>   drivers/tty/serial/Makefile      |    1 +
->>   drivers/tty/serial/sprd_serial.c |  793 
->> ++++++++++++++++++++++++++++++++++++++
->>   include/uapi/linux/serial_core.h |    3 +
->>   4 files changed, 815 insertions(+)
->>   create mode 100644 drivers/tty/serial/sprd_serial.c
->>
-> (...)
->
->> +static int sprd_probe(struct platform_device *pdev)
->> +{
->> +    struct resource *res;
->> +    struct uart_port *up;
->> +    struct clk *clk;
->> +    int irq;
->> +    int index;
->> +    int ret;
->> +
->> +    for (index = 0; index < ARRAY_SIZE(sprd_port); index++)
->> +        if (sprd_port[index] == NULL)
->> +            break;
->> +
->> +    if (index == ARRAY_SIZE(sprd_port))
->> +        return -EBUSY;
->> +
->> +    index = sprd_probe_dt_alias(index, &pdev->dev);
->> +
->> +    sprd_port[index] = devm_kzalloc(&pdev->dev,
->> +        sizeof(*sprd_port[index]), GFP_KERNEL);
->> +    if (!sprd_port[index])
->> +        return -ENOMEM;
->> +
->> +    up = &sprd_port[index]->port;
->> +    up->dev = &pdev->dev;
->> +    up->line = index;
->> +    up->type = PORT_SPRD;
->> +    up->iotype = SERIAL_IO_PORT;
->> +    up->uartclk = SPRD_DEF_RATE;
->> +    up->fifosize = SPRD_FIFO_SIZE;
->> +    up->ops = &serial_sprd_ops;
->> +    up->flags = UPF_BOOT_AUTOCONF;
->> +
->> +    clk = devm_clk_get(&pdev->dev, NULL);
->> +    if (!IS_ERR(clk))
->> +        up->uartclk = clk_get_rate(clk);
->> +
->> +    res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +    if (!res) {
->> +        dev_err(&pdev->dev, "not provide mem resource\n");
->> +        return -ENODEV;
->> +    }
->
-> This check is not required. It will be done by devm_ioremap_resource()
->
->> +    up->mapbase = res->start;
 
-Accessing of 'res' has to be done after devm_ioremap_resource()
+Paul Bolle pointed out that commit
+d035fdfa27ac124bc8f94c3d7dc82ad069802170 ("arm64: Add Tegra132
+support") included two Kconfig symbols that are now no-ops:
+USB_ARCH_HAS_EHCI and HAVE_SMP.  So, drop the two symbols.
 
->> +    up->membase = devm_ioremap_resource(&pdev->dev, res);
->> +    if (IS_ERR(up->membase))
->> +        return PTR_ERR(up->membase);
->> +
->>
->
+This second version corrects a thinko in Paul Bolle's E-mail address.
 
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Paul Walmsley <pwalmsley@nvidia.com>
+Cc: Allen Martin <amartin@nvidia.com>
+Cc: Thierry Reding <treding@nvidia.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Paul Bolle <pebolle@tiscali.nl>
+---
+
+Boot-tested on NVIDIA Tegra132 Norrin64 FFD with a extra DTS page for the 
+board data (not yet posted upstream).
+
+ arch/arm64/Kconfig | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 3b97e725ebfc..ae18c3d2bb3b 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -180,7 +180,6 @@ config ARCH_TEGRA
+ 	select CLKSRC_OF
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_CLK
+-	select HAVE_SMP
+ 	select PINCTRL
+ 	select RESET_CONTROLLER
+ 	help
+@@ -190,7 +189,6 @@ config ARCH_TEGRA_132_SOC
+ 	bool "NVIDIA Tegra132 SoC"
+ 	depends on ARCH_TEGRA
+ 	select PINCTRL_TEGRA124
+-	select USB_ARCH_HAS_EHCI if USB_SUPPORT
+ 	select USB_ULPI if USB_PHY
+ 	select USB_ULPI_VIEWPORT if USB_PHY
+ 	help
 -- 
-Thanks,
-Varka Bhadram.
+2.1.4
