@@ -1,85 +1,143 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Wed, 28 Jan 2015 20:08:30 -0800
-Subject: [PATCH V3 2/2] perf symbols: debuglink should take symfs option
- into account
-In-Reply-To: <20150129013809.GB24182@sejong>
-References: <1422340442-4673-1-git-send-email-victor.kamensky@linaro.org>
- <1422340442-4673-3-git-send-email-victor.kamensky@linaro.org>
- <20150129013809.GB24182@sejong>
-Message-ID: <CAA3XUr1twCC6s=1Y3Fk7W3ER9t6hFKJBC57vyzx9zjTD9fMW1Q@mail.gmail.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Wed, 28 Jan 2015 23:41:43 -0600
+Subject: [PATCH 1/6] soc: qcom: gsbi: Add support for ADM CRCI muxing
+In-Reply-To: <20150129021150.GC23506@codeaurora.org>
+References: <1422396644-21714-1-git-send-email-agross@codeaurora.org>
+ <1422396644-21714-2-git-send-email-agross@codeaurora.org>
+ <20150129021150.GC23506@codeaurora.org>
+Message-ID: <20150129054143.GD13842@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi  Namhyung,
+On Wed, Jan 28, 2015 at 06:11:50PM -0800, Stephen Boyd wrote:
 
-On 28 January 2015 at 17:38, Namhyung Kim <namhyung@kernel.org> wrote:
-> Hi Victor,
->
-> On Mon, Jan 26, 2015 at 10:34:02PM -0800, Victor Kamensky wrote:
->> Currently code that tries to read corresponding debug symbol
->> file from .gnu_debuglink section (DSO_BINARY_TYPE__DEBUGLINK)
->> does not take in account symfs option, so filename__read_debuglink
->> function cannot open ELF file, if symfs option is used.
->>
->> Fix is to add proper handling of symfs as it is done in other
->> places: use __symbol__join_symfs function to get real file name
->> of target ELF file.
->>
->> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
->> Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
->> Cc: Paul Mackerras <paulus@samba.org>
->> Cc: Ingo Molnar <mingo@redhat.com>
->> Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
->> Cc: Jiri Olsa <jolsa@kernel.org>
->> Cc: Adrian Hunter <adrian.hunter@intel.com>
->> Cc: Waiman Long <Waiman.Long@hp.com>
->> Cc: David Ahern <dsahern@gmail.com>
->> Acked-and-tested-by: David Ahern <dsahern@gmail.com>
->
-> Acked-by: Namhyung Kim <namhyung@kernel.org>
+<snip>
 
-Thank you for the Acks! Is there any action items on my side?
-Should I repost patches with your Acks? Or you or Arnaldo
-will add them once they got merged in proper tree for
-upstreaming?
+> >  Required properties:
+> > -- compatible: must contain "qcom,gsbi-v1.0.0" for APQ8064/IPQ8064
+> > +- compatible:	Should contain:
+> > +		"qcom,gsbi-ipq8064" for IPQ8064
+> > +		"qcom,gsbi-apq8064" for APQ8064
+> > +		"qcom,gsbi-msm8960" for MSM8960
+> > +		"qcom,gsbi-msm8660" for MSM8660
+> 
+> Hopefully this is not necessary, but if it is we should leave the
+> old compatible here and say it's deprecated or something.
 
-Thanks,
-Victor
+Right.  I went back and forth with the tcsr vs gsbi.  If change the compats I'll
+put in a deprecated.
 
-> Thanks,
-> Namhyung
->
->
->> ---
->>  tools/perf/util/dso.c | 6 +++---
->>  1 file changed, 3 insertions(+), 3 deletions(-)
->>
->> diff --git a/tools/perf/util/dso.c b/tools/perf/util/dso.c
->> index 45be944..ca8d8d5 100644
->> --- a/tools/perf/util/dso.c
->> +++ b/tools/perf/util/dso.c
->> @@ -45,13 +45,13 @@ int dso__read_binary_type_filename(const struct dso *dso,
->>       case DSO_BINARY_TYPE__DEBUGLINK: {
->>               char *debuglink;
->>
->> -             strncpy(filename, dso->long_name, size);
->> -             debuglink = filename + dso->long_name_len;
->> +             len = __symbol__join_symfs(filename, size, dso->long_name);
->> +             debuglink = filename + len;
->>               while (debuglink != filename && *debuglink != '/')
->>                       debuglink--;
->>               if (*debuglink == '/')
->>                       debuglink++;
->> -             ret = filename__read_debuglink(dso->long_name, debuglink,
->> +             ret = filename__read_debuglink(filename, debuglink,
->>                                              size - (debuglink - filename));
->>               }
->>               break;
->> --
->> 1.9.3
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> Please read the FAQ at  http://www.tux.org/lkml/
+> >  - reg: Address range for GSBI registers
+> >  - clocks: required clock
+> >  - clock-names: must contain "iface" entry
+> >  - qcom,mode : indicates MUX value for configuration of the serial interface.
+> >    Please reference dt-bindings/soc/qcom,gsbi.h for valid mux values.
+> > +- qcom,gsbi-num: indicates GSBI instance number
+> 
+> Why not use DT aliases for this? Then other drivers or more
+> generic code can search for a gsbiN alias for the particular gsbi
+> node. No qcom specific property.
+
+Yeah thats cleaner.  I'll do that.
+
+> 
+> > +- syscon-tcsr: indicates phandle of TCSR syscon node
+> 
+> Make this optional but required if any child nodes use dma?
+
+To enforce that I'd have to determine that a child has a dmas.  I guess that
+isn't so bad.
+
+<snip>
+
+> >  static int gsbi_probe(struct platform_device *pdev)
+> >  {
+> >  	struct device_node *node = pdev->dev.of_node;
+> > +	const struct of_device_id *match;
+> >  	struct resource *res;
+> >  	void __iomem *base;
+> >  	struct gsbi_info *gsbi;
+> > +	u32 gsbi_num, i, val;
+> 
+> i should be int
+> 
+> > +	struct crci_config *config;
+> 
+> const?
+
+will fix both.
+
+> >  
+> >  	gsbi = devm_kzalloc(&pdev->dev, sizeof(*gsbi), GFP_KERNEL);
+> >  
+> > @@ -45,6 +152,20 @@ static int gsbi_probe(struct platform_device *pdev)
+> >  	if (IS_ERR(base))
+> >  		return PTR_ERR(base);
+> >  
+> > +	gsbi->tcsr = syscon_regmap_lookup_by_phandle(node, "syscon-tcsr");
+> > +	if (IS_ERR(gsbi->tcsr))
+> > +		return -EINVAL;
+> > +
+> > +	if (of_property_read_u32(node, "qcom,gsbi-num", &gsbi_num)) {
+> > +		dev_err(&pdev->dev, "missing gsbi instance number\n");
+> > +		return -EINVAL;
+> > +	}
+> 
+> As said before, aliases would do the job the same and not require
+> some qcom specific property.
+
+Yup. will fix.
+
+> > +
+> > +	if (!gsbi_num || gsbi_num > MAX_GSBI) {
+> > +		dev_err(&pdev->dev, "invalid gsbi number\n");
+> > +		return -EINVAL;
+> > +	}
+> > +
+> >  	if (of_property_read_u32(node, "qcom,mode", &gsbi->mode)) {
+> >  		dev_err(&pdev->dev, "missing mode configuration\n");
+> >  		return -EINVAL;
+> > @@ -64,6 +185,26 @@ static int gsbi_probe(struct platform_device *pdev)
+> >  	writel_relaxed((gsbi->mode << GSBI_PROTOCOL_SHIFT) | gsbi->crci,
+> >  				base + GSBI_CTRL_REG);
+> >  
+> > +	/*
+> > +	 * modify tcsr to reflect mode and ADM CRCI mux
+> > +	 * Each gsbi contains a pair of bits, one for RX and one for TX
+> > +	 * SPI mode requires both bits cleared, otherwise they are set
+> > +	 */
+> > +	match = of_match_node(gsbi_dt_match, node);
+> 
+> Why not match the config to the TCSR compatible string? Wouldn't
+> that more accurately reflect that we need to set different bits
+> depending on which type of TCSR we're using? The version of GSBI
+> hardware is not actually changing in every different SoC so I
+> don't see why we want to change the compatible there just because
+> the TCSR register layout changed.
+
+That is true.  However, with the gsbi compat, I avoid doing a match multiple
+times and get the table I need immediately.  The alternative is N checks or
+pulling the compat strings and comparing them to get the right table.
+
+> > +	config = (struct crci_config *)match->data;
+> 
+> Cast shouldn't be necessary if config is const?
+
+will check if that works
+
+> > +
+> > +	if (config)
+> > +		for (i = 0; i < config->num_rows; i++) {
+> > +			if (gsbi->mode == GSBI_PROT_SPI)
+> 
+> Doesn't I2C need the same treatment (anything in QUP really)?
+> Maybe the logic could be changed to check for gsbi->crci ==
+> GSBI_CRCI_QUP?
+
+Nope.  I2C doesn't support DMA when ADM is the controller.  It's only SPI or
+UART.
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
