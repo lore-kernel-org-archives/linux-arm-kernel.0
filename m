@@ -1,111 +1,161 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 29 Jan 2015 09:31:05 +0100
-Subject: [PATCH v2 1/7] mmc: sdhci-pxav3: Fix SDR50 and DDR50 capabilities
- for the Armada 38x flavor
-In-Reply-To: <CAPDyKFp=TxkL4BPMxVU+pMPoCQ1xPq0XZ+ZPpBFFaDnNtFjynw@mail.gmail.com>
-References: <1422010594-1735-1-git-send-email-gregory.clement@free-electrons.com>	<1422010594-1735-2-git-send-email-gregory.clement@free-electrons.com>
- <CAPDyKFp=TxkL4BPMxVU+pMPoCQ1xPq0XZ+ZPpBFFaDnNtFjynw@mail.gmail.com>
-Message-ID: <54C9EFC9.7090809@free-electrons.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 29 Jan 2015 09:45:15 +0100
+Subject: [PATCH 2/2] mmc: dw_mmc: wait until card ready if tuning fails
+In-Reply-To: <1422271175-19445-3-git-send-email-addy.ke@rock-chips.com>
+References: <1422271175-19445-1-git-send-email-addy.ke@rock-chips.com>
+ <1422271175-19445-3-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <CAPDyKFo+zLXnFjJTWpufCRvtJ_y2YEWT42sMHFTMD9psL-vd+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+On 26 January 2015 at 12:19, Addy Ke <addy.ke@rock-chips.com> wrote:
+> This patch based on Alex's patch:
+> https://patchwork.kernel.org/patch/5516411/
 
-On 28/01/2015 21:36, Ulf Hansson wrote:
-> On 23 January 2015 at 11:56, Gregory CLEMENT
-> <gregory.clement@free-electrons.com> wrote:
->> According to erratum 'FE-2946959' both SDR50 and DDR50 modes require
->> specific clock adjustments in SDIO3 Configuration register. However,
->> this register was not part of the device tree binding. Even if the
->> binding can (and will) be extended we still need handling the case
->> where this register was not available. In this case we use the
->> SDHCI_QUIRK_MISSING_CAPS quirk remove them from the capabilities.
->>
->> This commit is based on the work done by Marcin Wojtas<mw@semihalf.com>
->>
->> Fixes: 5491ce3f79ee ("mmc: sdhci-pxav3: add support for the Armada 38x SDHCI controller")
->> Cc: <stable@vger.kernel.org> # v3.15+
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
->> ---
->>  drivers/mmc/host/sdhci-pxav3.c | 18 ++++++++++++++++++
->>  1 file changed, 18 insertions(+)
->>
->> diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
->> index ca3424e7ef71..7b07325b4fba 100644
->> --- a/drivers/mmc/host/sdhci-pxav3.c
->> +++ b/drivers/mmc/host/sdhci-pxav3.c
->> @@ -118,6 +118,20 @@ static int mv_conf_mbus_windows(struct platform_device *pdev,
->>         return 0;
->>  }
->>
->> +static int armada_38x_quirks(struct sdhci_host *host)
-> 
-> Seems like this function can be void instead of always returning 0.
+This above patch was rejected, since it doesn't use mmc_send_tuning().
+Please base you work on my latest next branch.
 
-In patch 4 "mmc: sdhci-pxav3: Modify clock settings for the SDR50 and
-DDR50 modes", this function can return other values than 0.
+If you need other patches which has been posted recently, which hasn?t
+been reviewed nor merged you can just included them in your patchset
+as well.
 
-I could change the prototype in patch 4, but it would also imply
-removing the test of the return value in this patch and adding in back
-patch 4. By returning a value in this patch, it reduced the amount of
-change over the patches.
+Kind regards
+Uffe
 
-But if you still prefer than I this function return void in this
-patch, I can do it.
-
-
-Thanks,
-
-Gregory
-
-
-> 
->> +{
->> +       host->quirks |= SDHCI_QUIRK_MISSING_CAPS;
->> +       /*
->> +        * According to erratum 'FE-2946959' both SDR50 and DDR50
->> +        * modes require specific clock adjustments in SDIO3
->> +        * Configuration register, if the adjustment is not done,
->> +        * remove them from the capabilities.
->> +        */
->> +       host->caps1 = sdhci_readl(host, SDHCI_CAPABILITIES_1);
->> +       host->caps1 &= ~(SDHCI_SUPPORT_SDR50 | SDHCI_SUPPORT_DDR50);
->> +       return 0;
->> +}
->> +
->>  static void pxav3_reset(struct sdhci_host *host, u8 mask)
->>  {
->>         struct platform_device *pdev = to_platform_device(mmc_dev(host->mmc));
->> @@ -319,6 +333,9 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
->>                 clk_prepare_enable(pxa->clk_core);
->>
->>         if (of_device_is_compatible(np, "marvell,armada-380-sdhci")) {
->> +               ret = armada_38x_quirks(host);
->> +               if (ret < 0)
->> +                       goto err_quirks;
->>                 ret = mv_conf_mbus_windows(pdev, mv_mbus_dram_info());
->>                 if (ret < 0)
->>                         goto err_mbus_win;
->> @@ -400,6 +417,7 @@ err_mbus_win:
->>         if (!IS_ERR(pxa->clk_core))
->>                 clk_disable_unprepare(pxa->clk_core);
->>  err_clk_get:
->> +err_quirks:
->>         sdhci_pltfm_free(pdev);
->>         return ret;
->>  }
->> --
->> 2.1.0
->>
-> 
-> Kind regards
-> Uffe
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+>
+> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+> ---
+>  drivers/mmc/core/mmc_ops.h |  1 -
+>  drivers/mmc/host/dw_mmc.c  | 48 ++++++++++++++++++++++++++++++++++++++++------
+>  include/linux/mmc/card.h   |  2 ++
+>  3 files changed, 44 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/mmc/core/mmc_ops.h b/drivers/mmc/core/mmc_ops.h
+> index 6f4b00e..c5be9ce 100644
+> --- a/drivers/mmc/core/mmc_ops.h
+> +++ b/drivers/mmc/core/mmc_ops.h
+> @@ -20,7 +20,6 @@ int mmc_send_op_cond(struct mmc_host *host, u32 ocr, u32 *rocr);
+>  int mmc_all_send_cid(struct mmc_host *host, u32 *cid);
+>  int mmc_set_relative_addr(struct mmc_card *card);
+>  int mmc_send_csd(struct mmc_card *card, u32 *csd);
+> -int mmc_send_status(struct mmc_card *card, u32 *status);
+>  int mmc_send_cid(struct mmc_host *host, u32 *cid);
+>  int mmc_spi_read_ocr(struct mmc_host *host, int highcap, u32 *ocrp);
+>  int mmc_spi_set_crc(struct mmc_host *host, int use_crc);
+> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> index e54e656..4a31a5e 100644
+> --- a/drivers/mmc/host/dw_mmc.c
+> +++ b/drivers/mmc/host/dw_mmc.c
+> @@ -1317,10 +1317,38 @@ static void dw_mci_enable_sdio_irq(struct mmc_host *mmc, int enb)
+>         spin_unlock_irqrestore(&host->irq_lock, irqflags);
+>  }
+>
+> -static int dw_mci_tuning_test(struct dw_mci_slot *slot, u32 opcode,
+> -                              struct dw_mci_tuning_data *tuning_data,
+> -                              u8 *blk_test)
+> +static int dw_mci_card_busy(u32 status)
+>  {
+> +       return !(status & R1_READY_FOR_DATA) ||
+> +               (R1_CURRENT_STATE(status) == R1_STATE_PRG);
+> +}
+> +
+> +static int dw_mci_wait_for_card_ready(struct mmc_card *card)
+> +{
+> +       struct mmc_host *mmc = card->host;
+> +       struct dw_mci_slot *slot = mmc_priv(mmc);
+> +       struct dw_mci *host = slot->host;
+> +       int err = 0;
+> +       u32 status;
+> +
+> +       do {
+> +               err = mmc_send_status(card, &status);
+> +               if (err) {
+> +                       dev_err(host->dev,
+> +                               "Get card status fail in tuning state\n");
+> +                       break;
+> +               }
+> +       } while (dw_mci_card_busy(status));
+> +
+> +       return err;
+> +}
+> +
+> +static int dw_mci_tuning_test(struct mmc_card *card, u32 opcode,
+> +                             struct dw_mci_tuning_data *tuning_data,
+> +                             u8 *blk_test)
+> +{
+> +       struct mmc_host *mmc = card->host;
+> +       struct dw_mci_slot *slot = mmc_priv(mmc);
+>         struct dw_mci *host = slot->host;
+>         struct mmc_host *mmc = slot->mmc;
+>         const u8 *blk_pattern = tuning_data->blk_pattern;
+> @@ -1330,6 +1358,7 @@ static int dw_mci_tuning_test(struct dw_mci_slot *slot, u32 opcode,
+>         struct mmc_command stop = {0};
+>         struct mmc_data data = {0};
+>         struct scatterlist sg;
+> +       int err;
+>
+>         memset(blk_test, 0, blksz);
+>
+> @@ -1365,6 +1394,11 @@ static int dw_mci_tuning_test(struct dw_mci_slot *slot, u32 opcode,
+>                 dev_dbg(host->dev,
+>                         "Tuning error: cmd.error:%d, data.error:%d\n",
+>                         cmd.error, data.error);
+> +
+> +               err = dw_mci_wait_for_card_ready(card);
+> +               if (err)
+> +                       return err;
+> +
+>                 if (cmd.error)
+>                         return cmd.error;
+>                 else
+> @@ -1372,9 +1406,11 @@ static int dw_mci_tuning_test(struct dw_mci_slot *slot, u32 opcode,
+>         }
+>  }
+>
+> -static int dw_mci_execute_generic_tuning(struct dw_mci_slot *slot, u32 opcode,
+> +static int dw_mci_execute_generic_tuning(struct mmc_card *card, u32 opcode,
+>                                          struct dw_mci_tuning_data *tuning_data)
+>  {
+> +       struct mmc_host *mmc = card->host;
+> +       struct dw_mci_slot *slot = mmc_priv(mmc);
+>         struct dw_mci *host = slot->host;
+>         unsigned int blksz = tuning_data->blksz;
+>         u8 *blk_test;
+> @@ -1412,7 +1448,7 @@ static int dw_mci_execute_generic_tuning(struct dw_mci_slot *slot, u32 opcode,
+>         for (i = 0; i < NUM_PHASES; i++) {
+>                 clk_set_phase(host->sample_clk, i * PHASE_INCREMENT);
+>
+> -               v = !dw_mci_tuning_test(slot, opcode, tuning_data, blk_test);
+> +               v = !dw_mci_tuning_test(card, opcode, tuning_data, blk_test);
+>
+>                 if ((!prev_v) && v) {
+>                         range_count++;
+> @@ -1496,7 +1532,7 @@ static int dw_mci_execute_tuning(struct mmc_card *card, u32 opcode)
+>         if (drv_data && drv_data->execute_tuning)
+>                 err = drv_data->execute_tuning(slot, opcode, &tuning_data);
+>         else
+> -               err = dw_mci_execute_generic_tuning(slot, opcode, &tuning_data);
+> +               err = dw_mci_execute_generic_tuning(card, opcode, &tuning_data);
+>         return err;
+>  }
+>
+> diff --git a/include/linux/mmc/card.h b/include/linux/mmc/card.h
+> index 4d69c00..40d90ae 100644
+> --- a/include/linux/mmc/card.h
+> +++ b/include/linux/mmc/card.h
+> @@ -518,4 +518,6 @@ extern void mmc_unregister_driver(struct device_driver *);
+>  extern void mmc_fixup_device(struct mmc_card *card,
+>                              const struct mmc_fixup *table);
+>
+> +int mmc_send_status(struct mmc_card *card, u32 *status);
+> +
+>  #endif /* LINUX_MMC_CARD_H */
+> --
+> 1.8.3.2
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
