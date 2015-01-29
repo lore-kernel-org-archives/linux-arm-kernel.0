@@ -1,97 +1,141 @@
-From: gustavo@padovan.org (Gustavo Padovan)
-Date: Thu, 29 Jan 2015 12:29:19 -0200
-Subject: [PATCH V9 04/14] drm/bridge: ptn3460: Convert to i2c driver model
-In-Reply-To: <1421771935-31618-5-git-send-email-ajaykumar.rs@samsung.com>
-References: <1421771935-31618-1-git-send-email-ajaykumar.rs@samsung.com>
- <1421771935-31618-5-git-send-email-ajaykumar.rs@samsung.com>
-Message-ID: <20150129142919.GN2001@joana>
+From: varkabhadram@gmail.com (Varka Bhadram)
+Date: Thu, 29 Jan 2015 20:00:49 +0530
+Subject: [PATCH v6 5/8] iio: adc: fsl,imx25-gcq driver
+In-Reply-To: <1422540556-14828-6-git-send-email-mpa@pengutronix.de>
+References: <1422540556-14828-1-git-send-email-mpa@pengutronix.de>
+ <1422540556-14828-6-git-send-email-mpa@pengutronix.de>
+Message-ID: <54CA4419.1060207@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ajay,
+Hi,
 
-2015-01-20 Ajay Kumar <ajaykumar.rs@samsung.com>:
-
-> Use drm_bridge helpers to modify the driver to support
-> i2c driver model.
-> 
-> Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
-> Acked-by: Inki Dae <inki.dae@samsung.com>
-> Tested-by: Rahul Sharma <rahul.sharma@samsung.com>
-> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Tested-by: Gustavo Padovan <gustavo.padovan@collabora.co.uk>
-> Tested-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+On Thursday 29 January 2015 07:39 PM, Markus Pargmann wrote:
+> This is a conversion queue driver for the mx25 SoC. It uses the central
+> ADC which is used by two seperate independent queues. This driver
+> prepares different conversion configurations for each possible input.
+> For a conversion it creates a conversionqueue of one item with the
+> correct configuration for the chosen channel. It then executes the queue
+> once and disables the conversion queue afterwards.
+>
+> The reference voltages are configurable through devicetree subnodes,
+> depending on the connections of the ADC inputs.
+>
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 > ---
->  drivers/gpu/drm/bridge/Kconfig          |    2 +
->  drivers/gpu/drm/bridge/ptn3460.c        |  124 +++++++++++++++++++++----------
->  drivers/gpu/drm/exynos/exynos_dp_core.c |   22 ------
->  3 files changed, 86 insertions(+), 62 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
-> index 884923f..4254c2b 100644
-> --- a/drivers/gpu/drm/bridge/Kconfig
-> +++ b/drivers/gpu/drm/bridge/Kconfig
-> @@ -1,5 +1,7 @@
->  config DRM_PTN3460
->  	tristate "PTN3460 DP/LVDS bridge"
->  	depends on DRM
-> +	depends on OF && I2C
+>   drivers/iio/adc/Kconfig                     |   7 +
+>   drivers/iio/adc/Makefile                    |   1 +
+>   drivers/iio/adc/fsl-imx25-gcq.c             | 361 ++++++++++++++++++++++++++++
+>   include/dt-bindings/iio/adc/fsl-imx25-gcq.h |  18 ++
+>   4 files changed, 387 insertions(+)
+>   create mode 100644 drivers/iio/adc/fsl-imx25-gcq.c
+>   create mode 100644 include/dt-bindings/iio/adc/fsl-imx25-gcq.h
+>
+(...)
 
-Adding I2C here is causing this circular dependency:
+> +static int mx25_gcq_probe(struct platform_device *pdev)
+> +{
+> +	struct iio_dev *indio_dev;
+> +	struct mx25_gcq_priv *priv;
+> +	struct mx25_tsadc *tsadc = dev_get_drvdata(pdev->dev.parent);
+> +	struct device *dev = &pdev->dev;
+> +	struct resource *res;
+> +	void __iomem *mem;
+> +	int ret;
+> +
+> +	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*priv));
+> +	if (!indio_dev)
+> +		return -ENOMEM;
+> +
+> +	priv = iio_priv(indio_dev);
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	mem = devm_ioremap_resource(dev, res);
+> +	if (!mem)
+> +		return -ENOMEM;
+> +
+> +	priv->regs = devm_regmap_init_mmio(dev, mem, &mx25_gcq_regconfig);
+> +	if (IS_ERR(priv->regs)) {
+> +		dev_err(dev, "Failed to initialize regmap\n");
+> +		return PTR_ERR(priv->regs);
+> +	}
+> +
+> +	init_completion(&priv->completed);
+> +
+> +	/* Optional external regulator */
+> +	priv->ext_vref = devm_regulator_get(&pdev->dev, "vref");
+> +	if (!IS_ERR_OR_NULL(priv->ext_vref)) {
+> +		ret = regulator_enable(priv->ext_vref);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +
+> +	ret = mx25_gcq_setup_cfgs(pdev, priv);
+> +	if (ret)
+> +		return ret;
+> +
+> +	priv->clk = tsadc->clk;
+> +	ret = clk_prepare_enable(priv->clk);
+> +	if (ret) {
+> +		dev_err(dev, "Failed to enable clock\n");
+> +		return ret;
+> +	}
+> +
+> +	priv->irq = platform_get_irq(pdev, 0);
+> +	if (priv->irq <= 0) {
+> +		dev_err(dev, "Failed to get IRQ\n");
+> +		ret = priv->irq;
+> +		goto err_clk_unprepare;
+> +	}
+> +
+> +	ret = request_irq(priv->irq, mx25_gcq_irq, 0, pdev->name, priv);
 
-scripts/kconfig/conf --silentoldconfig Kconfig
-drivers/video/fbdev/Kconfig:5:error: recursive dependency detected!
-drivers/video/fbdev/Kconfig:5:  symbol FB is selected by DRM_KMS_FB_HELPER
-drivers/gpu/drm/Kconfig:34:     symbol DRM_KMS_FB_HELPER depends on
-DRM_KMS_HELPER
-drivers/gpu/drm/Kconfig:28:     symbol DRM_KMS_HELPER is selected by
-DRM_PTN3460
-drivers/gpu/drm/bridge/Kconfig:1:       symbol DRM_PTN3460 depends on I2C
-drivers/i2c/Kconfig:7:  symbol I2C is selected by FB_DDC
-drivers/video/fbdev/Kconfig:59: symbol FB_DDC is selected by FB_CYBER2000_DDC
-drivers/video/fbdev/Kconfig:374:        symbol FB_CYBER2000_DDC depends on
-FB_CYBER2000
-drivers/video/fbdev/Kconfig:362:        symbol FB_CYBER2000 depends on FB
+Use of devm_* API
 
-To solve this we just need to remove I2C from depends as DRM already selects
-I2C. This was already fixed by:
+> +	if (ret) {
+> +		dev_err(dev, "Failed requesting IRQ\n");
+> +		goto err_clk_unprepare;
+> +	}
+> +
+> +	indio_dev->dev.parent = &pdev->dev;
+> +	indio_dev->channels = mx25_gcq_channels;
+> +	indio_dev->num_channels = ARRAY_SIZE(mx25_gcq_channels);
+> +	indio_dev->info = &mx25_gcq_iio_info;
+> +
+> +	ret = iio_device_register(indio_dev);
+> +	if (ret) {
+> +		dev_err(dev, "Failed to register iio device\n");
+> +		goto err_irq_free;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, priv);
+> +
+> +	return 0;
+> +
+> +err_irq_free:
+> +	free_irq(priv->irq, (void *)priv);
 
+This is not required if use devm_*
 
-commit 90bde571ad194adb039cb92a11a5b346f15eb610
-Author: Arnd Bergmann <arnd@arndb.de>
-Date:   Tue Mar 25 12:06:46 2014 +0100
+> +err_clk_unprepare:
+> +	clk_disable_unprepare(priv->clk);
+> +	return ret;
+> +}
+> +
+> +static int mx25_gcq_remove(struct platform_device *pdev)
+> +{
+> +	struct mx25_gcq_priv *priv = platform_get_drvdata(pdev);
+> +	struct iio_dev *indio_dev = iio_priv_to_dev(pdev);
+> +
+> +	iio_device_unregister(indio_dev);
+> +	free_irq(priv->irq, priv);
 
-    drm/bridge: PTN3460 needs DRM_KMS_HELPER
+Dto...
 
-    The recently added PTN3460 device driver uses interfaces that
-    are provided by the KMS helper infrastructure, so we should
-    explicitly select that to avoid this linker error:
+>
 
-    ERROR: "drm_helper_probe_single_connector_modes" [drivers/gpu/drm/bridge/ptn3460.ko] undefined!
-    ERROR: "drm_helper_connector_dpms" [drivers/gpu/drm/bridge/ptn3460.ko] undefined!
-
-    We have to drop the I2C dependency to avoid a circular dependency
-    chain, but that's ok because DRM already selects I2C.
-
-    Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-    Signed-off-by: Dave Airlie <airlied@redhat.com>
-
-
-But you may have introduced it again on a rebase. The following patch fixes it:
-
-diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
-index 990b4b2..946d1ef 100644
---- a/drivers/gpu/drm/bridge/Kconfig
-+++ b/drivers/gpu/drm/bridge/Kconfig
-@@ -1,7 +1,6 @@
- config DRM_PTN3460
-        tristate "PTN3460 DP/LVDS bridge"
--       depends on DRM
--       depends on OF && I2C
-+       depends on DRM && OF
-        select DRM_KMS_HELPER
-        select DRM_PANEL
-        ---help---
-
-
-	Gustavo
+-- 
+Thanks,
+Varka Bhadram.
