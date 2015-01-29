@@ -1,99 +1,110 @@
-From: vbabka@suse.cz (Vlastimil Babka)
-Date: Thu, 29 Jan 2015 14:13:38 +0100
-Subject: [PATCHv2] mm: Don't offset memmap for flatmem
-In-Reply-To: <20150126155617.GA2395@suse.de>
-References: <1421804273-29947-1-git-send-email-lauraa@codeaurora.org>
- <1421888500-24364-1-git-send-email-lauraa@codeaurora.org>
- <20150122162021.aa861aeb53c22206a19ebbcb@linux-foundation.org>
- <54C196D0.6040900@codeaurora.org> <54C20EEC.1060809@suse.cz>
- <20150126155617.GA2395@suse.de>
-Message-ID: <54CA3202.8020609@suse.cz>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 29 Jan 2015 14:22:38 +0100
+Subject: [PATCH v2] MediaTek PMIC support
+In-Reply-To: <CABuKBe+x9o5OiysnMq-gvOBx3nKoaheL2efZGA6YQ7ZT5aqijw@mail.gmail.com>
+References: <1422022202-7526-1-git-send-email-s.hauer@pengutronix.de>
+ <20150126114735.GA3178@pengutronix.de>
+ <CABuKBe+x9o5OiysnMq-gvOBx3nKoaheL2efZGA6YQ7ZT5aqijw@mail.gmail.com>
+Message-ID: <CABuKBeLWeKkO4oHj1o8ts+nmhSApvy=xLcrFEQ8nEwUrrtcH1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/26/2015 04:56 PM, Mel Gorman wrote:
-> On Fri, Jan 23, 2015 at 10:05:48AM +0100, Vlastimil Babka wrote:
->> On 01/23/2015 01:33 AM, Laura Abbott wrote:
->>> On 1/22/2015 4:20 PM, Andrew Morton wrote:
->>>>
->>>> I don't think v2 addressed Vlastimil's review comment?
->>>>
->>>
->>> We're still adding the offset to node_mem_map and then subtracting it from
->>> just mem_map. Did I miss another comment somewhere?
->>
->> Yes that was addressed, thanks. But I don't feel comfortable acking
->> it yet, as I have no idea if we are doing the right thing for
->> CONFIG_HAVE_MEMBLOCK_NODE_MAP && CONFIG_FLATMEM case here.
->>
->> Also putting the CONFIG_FLATMEM && !CONFIG_HAVE_MEMBLOCK_NODE_MAP
->> under the "if (page_to_pfn(mem_map) != pgdat->node_start_pfn)" will
->> probably do the right thing, but looks like a weird test for this
->> case here.
->>
->> I have no good suggestion though, so let's CC Mel who apparently
->> wrote the ARCH_PFN_OFFSET correction?
->>
+2015-01-29 13:39 GMT+01:00 Matthias Brugger <matthias.bgg@gmail.com>:
+> Hi Sascha,
 >
-> I don't recall introducing ARCH_PFN_OFFSET, are you sure it was me?  I'm just
-> back today after been offline a week so didn't review the patch but IIRC,
-> ARCH_PFN_OFFSET deals with the case where physical memory does not start
-> at 0. Without the offset, virtual _PAGE_OFFSET would not physical page 0.
-> I don't recall it being related to the alignment of node 0 so if there
-> are crashes due to misalignment of node 0 and the fix is ARCH_PFN_OFFSET
-> related then I'm surprised.
+> 2015-01-26 12:47 GMT+01:00 Sascha Hauer <s.hauer@pengutronix.de>:
+>> Olof, Arnd,
+>>
+>> OK to put the driver into drivers/soc/mediatek? Can you take these
+>> patches?
+>
+> How does this patches fit together with the one James clock framework patches?
 
-You're right that ARCH_PFN_OFFSET wasn't added by you, but by commit 
-467bc461d2 which was a bugfix to your commit c713216dee, which did 
-introduce the mem_map correction code, and after which the code looked like:
+I forgot to send the link to the patches. Sorry for that. Here you are:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/313793.html
 
-mem_map = NODE_DATA(0)->node_mem_map;
-#ifdef CONFIG_ARCH_POPULATES_NODE_MAP
-                if (page_to_pfn(mem_map) != pgdat->node_start_pfn)
-                        mem_map -= pgdat->node_start_pfn;
-#endif /* CONFIG_ARCH_POPULATES_NODE_MAP */
+> Both use the same compatible "mediatek,mt8135-infracfg" and
+> "mediatek,mt8135-pericfg".
+>
+> I had a look on other implementations and they attach the reset
+> controller to the clk driver, if they share the same hw block.
+> Might we run into problems if we implement the clocks in the mfd, as
+> we need the clocks early in boot (e.g. for the timer)?
+>
+> In mt6589 pericfg apart from the clocks and reset controller provides
+> registers for AXI bus control and USB wakeup and USB clock selection.
+> The infracfg block provides top AXI bus fabric control signals and
+> remap registers for the modem.
+> Mike, Stephen, what do you think. Can we implement the clk in a mfd
+> driver? Or do you prefer to implement the whole block in the clk
+> driver?
+>
+> Cheers,
+> Matthias
+>
+>>
+>> Sascha
+>>
+>> On Fri, Jan 23, 2015 at 03:09:55PM +0100, Sascha Hauer wrote:
+>>> This series adds initial support for the MediaTek MT6397 PMIC and the
+>>> necessary infrastructure to attach it on the MT8135 / MT8173 SoCs.
+>>>
+>>> The infrastructure includes:
+>>>
+>>> - pericfg / infracfg controller support
+>>>   The pericfg / infracfg controllers contain miscellaneous registers for
+>>>   reset controllers and clocks.
+>>>
+>>> - PMIC wrapper support
+>>>   On MediaTek MT8135, MT8173 and other SoCs the PMIC is connected via
+>>>   SPI. The SPI master interface is not directly visible to the CPU, but
+>>>   only through the PMIC wrapper inside the SoC. The communication between
+>>>   the SoC and the PMIC can optionally be encrypted. Also a non standard
+>>>   Dual IO SPI mode can be used to increase speed. The MT8135 also supports
+>>>   a special feature named "IP Pairing". With IP Pairing the pins of some
+>>>   SoC internal peripherals can be on the PMIC. The signals of these pins
+>>>   are routed over the SPI bus using the pwrap bridge. Because of these
+>>>   optional non SPI conform features the PMIC driver is not implemented as
+>>>   a SPI bus master driver.
+>>>
+>>> The MT6397 PMIC itself is implemented as a regular mfd device driver which
+>>> uses regmap to access the PMIC registers.
+>>>
+>>> This series also adds regulator support for the MT6397 PMIC.
+>>>
+>>> The first 6 patches can be merged through the ARM SoC tree. The mfd
+>>> patch is independent of the first 6 patches and can be merged through the
+>>> mfd maintainer trees.
+>>>
+>>> Changes since v1:
+>>>
+>>> - document reset bindings for infracfg/pericfg
+>>> - fix base addresses in infracfg binding example
+>>> - Remove more Email addresses from Flora Fu (She is not working at
+>>>   MediaTek anymore, her address is no longer valid)
+>>> - drop Regulator support patch, it's already in next
+>>>
+>>> Sascha
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>>
+>>
+>> --
+>> Pengutronix e.K.                           |                             |
+>> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+>> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+>> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+>
+>
+>
+> --
+> motzblog.wordpress.com
 
 
-It's from 2006 so I can't expect you remember the details, but I had 
-some trouble finding out what this does. I assume it makes sure that 
-mem_map points to struct page corresponding to pfn 0, because that's 
-what translations using mem_map expect.
-But pgdat->node_mem_map points to struct page corresponding to 
-pgdat->node_start_pfn, which might not be 0. So it subtracts 
-node_start_pfn to fix that. This is OK, as the node_mem_map is allocated 
-(in this very function) with padding so that it covers a 
-MAX_ORDER_NR_PAGES aligned area where node_mem_map may point to the 
-middle of it.
 
-Commit 467bc461d2 fixed this in case the first pfn is not 0, but 
-ARCH_PFN_OFFSET. So mem_map points to struct page corresponding to 
-pfn=ARCH_PFN_OFFSET, which is OK. But I still have few doubts:
-
-1) The "if (page_to_pfn(mem_map) != pgdat->node_start_pfn)" sort of 
-silently assumes that mem_map is allocated at the beginning of the node, 
-i.e. at pgdat->node_start_pfn. And the only reason for this if-condition 
-to be true, is that we haven't corrected the page_to_pfn translation, 
-which uses mem_map. Is this assumption always OK to do? Shouldn't the 
-if-condition be instead about pgdat->node_start_pfn not being aligned?
-
-2) The #ifdef guard is about CONFIG_ARCH_POPULATES_NODE_MAP, which is 
-nowadays called CONFIG_HAVE_MEMBLOCK_NODE_MAP. But shouldn't it be 
-#ifdef FLATMEM instead? After all, we are correcting value of mem_map 
-based on page_to_pfn code variant used on FLATMEM. arm doesn't define
-CONFIG_ARCH_POPULATES_NODE_MAP but apparently needs this correction.
-
-3) The node_mem_map allocation code aligns the allocation to 
-MAX_ORDER_NR_PAGES, so the offset between the start of the allocated map 
-and where node_mem_map points to will be up to MAX_ORDER_NR_PAGES.
-However, here we subtract (in current kernel) (pgdat->node_start_pfn - 
-ARCH_PFN_OFFSET). That looks like another silent assumption, that 
-pgdat->node_start_pfn is always between ARCH_PFN_OFFSET and 
-ARCH_PFN_OFFSET + MAX_ORDER_NR_PAGES. If it were larger, the mem_map 
-correction would subtract too much and end up below what was allocated 
-for node_mem_map, no? The bug report behind this patch said that first 
-2MB of memory was reserved using "no-map flag using DT". Unless this 
-somehow translates to ARCH_PFN_OFFSET at build time, we would underflow 
-mem_map, right? Maybe I'm just overly paranoid here and of course 
-ARCH_PFN_OFFSET is determined properly on arm...
-
-If anyone can confirm my doubts or point me to what I'm missing, thanks.
+-- 
+motzblog.wordpress.com
