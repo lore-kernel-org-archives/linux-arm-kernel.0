@@ -1,123 +1,61 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 30 Jan 2015 00:42:30 +0100
-Subject: [PATCH 1/2] ARM: dts: rockchip: enable vops and hdmi output on
- rk3288-firefly and -evb
-Message-ID: <3746086.qLJlieorB7@diego>
+Date: Fri, 30 Jan 2015 00:43:11 +0100
+Subject: [PATCH 2/2] ARM: dts: rockchip: move the hdmi ddc-i2c-bus property to
+ the actual boards
+In-Reply-To: <3746086.qLJlieorB7@diego>
+References: <3746086.qLJlieorB7@diego>
+Message-ID: <7335328.BluQKWqSL0@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables the recently added display nodes on the firefly and evb,
-letting the boards output graphic data over the hdmi port.
+Currently the hdmi driver is using one of the soc i2c busses for ddc probing
+and while documentation always specifies i2c5 as hdmi-i2c it could very well
+be any other bus as well.
 
-This includes enabling of i2c5 on the evb that is used for ddc probing and
-setting the lcd-regulators to always on until the hdmi driver learns
-about using them.
+Therefore this is a property of the board and should be specified there.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/boot/dts/rk3288-evb.dtsi     | 24 ++++++++++++++++++++++++
- arch/arm/boot/dts/rk3288-firefly.dtsi | 22 ++++++++++++++++++++++
- 2 files changed, 46 insertions(+)
+ arch/arm/boot/dts/rk3288-evb.dtsi     | 1 +
+ arch/arm/boot/dts/rk3288-firefly.dtsi | 1 +
+ arch/arm/boot/dts/rk3288.dtsi         | 1 -
+ 3 files changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
-index 3e067dd..6857730 100644
+index 6857730..86ede58 100644
 --- a/arch/arm/boot/dts/rk3288-evb.dtsi
 +++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-@@ -104,6 +104,10 @@
+@@ -105,6 +105,7 @@
+ };
+ 
+ &hdmi {
++	ddc-i2c-bus = <&i2c5>;
  	status = "okay";
  };
  
-+&hdmi {
-+	status = "okay";
-+};
-+
- &sdmmc {
- 	bus-width = <4>;
- 	cap-mmc-highspeed;
-@@ -120,6 +124,10 @@
- 	status = "okay";
- };
- 
-+&i2c5 {
-+	status = "okay";
-+};
-+
- &wdt {
- 	status = "okay";
- };
-@@ -187,3 +195,19 @@
- &usb_host1 {
- 	status = "okay";
- };
-+
-+&vopb {
-+	status = "okay";
-+};
-+
-+&vopb_mmu {
-+	status = "okay";
-+};
-+
-+&vopl {
-+	status = "okay";
-+};
-+
-+&vopl_mmu {
-+	status = "okay";
-+};
 diff --git a/arch/arm/boot/dts/rk3288-firefly.dtsi b/arch/arm/boot/dts/rk3288-firefly.dtsi
-index 7f0ba9b..6dcc5e9 100644
+index 6dcc5e9..e6f873a 100644
 --- a/arch/arm/boot/dts/rk3288-firefly.dtsi
 +++ b/arch/arm/boot/dts/rk3288-firefly.dtsi
-@@ -179,6 +179,10 @@
+@@ -180,6 +180,7 @@
+ };
+ 
+ &hdmi {
++	ddc-i2c-bus = <&i2c5>;
  	status = "okay";
  };
  
-+&hdmi {
-+	status = "okay";
-+};
-+
- &i2c0 {
- 	clock-frequency = <400000>;
- 	status = "okay";
-@@ -265,6 +269,7 @@
- 				regulator-name = "vdd10_lcd";
- 				regulator-min-microvolt = <1000000>;
- 				regulator-max-microvolt = <1000000>;
-+				regulator-always-on;
- 			};
- 
- 			vcca_18: REG7 {
-@@ -303,6 +308,7 @@
- 				regulator-name = "vcc18_lcd";
- 				regulator-min-microvolt = <1800000>;
- 				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
- 			};
- 		};
- 	};
-@@ -462,6 +468,22 @@
- 	status = "okay";
- };
- 
-+&vopb {
-+	status = "okay";
-+};
-+
-+&vopb_mmu {
-+	status = "okay";
-+};
-+
-+&vopl {
-+	status = "okay";
-+};
-+
-+&vopl_mmu {
-+	status = "okay";
-+};
-+
- &wdt {
- 	status = "okay";
- };
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 1e75a0f..1141850 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -646,7 +646,6 @@
+ 		compatible = "rockchip,rk3288-dw-hdmi";
+ 		reg = <0xff980000 0x20000>;
+ 		reg-io-width = <4>;
+-		ddc-i2c-bus = <&i2c5>;
+ 		rockchip,grf = <&grf>;
+ 		interrupts = <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&cru  PCLK_HDMI_CTRL>, <&cru SCLK_HDMI_HDCP>;
 -- 
 2.1.1
