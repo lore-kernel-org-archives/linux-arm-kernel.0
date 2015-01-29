@@ -1,54 +1,97 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 29 Jan 2015 15:27:40 +0100
-Subject: [PATCH v2] MediaTek PMIC support
-In-Reply-To: <CABuKBe+x9o5OiysnMq-gvOBx3nKoaheL2efZGA6YQ7ZT5aqijw@mail.gmail.com>
-References: <1422022202-7526-1-git-send-email-s.hauer@pengutronix.de>
- <20150126114735.GA3178@pengutronix.de>
- <CABuKBe+x9o5OiysnMq-gvOBx3nKoaheL2efZGA6YQ7ZT5aqijw@mail.gmail.com>
-Message-ID: <20150129142740.GH12209@pengutronix.de>
+From: gustavo@padovan.org (Gustavo Padovan)
+Date: Thu, 29 Jan 2015 12:29:19 -0200
+Subject: [PATCH V9 04/14] drm/bridge: ptn3460: Convert to i2c driver model
+In-Reply-To: <1421771935-31618-5-git-send-email-ajaykumar.rs@samsung.com>
+References: <1421771935-31618-1-git-send-email-ajaykumar.rs@samsung.com>
+ <1421771935-31618-5-git-send-email-ajaykumar.rs@samsung.com>
+Message-ID: <20150129142919.GN2001@joana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 29, 2015 at 01:39:42PM +0100, Matthias Brugger wrote:
-> Hi Sascha,
+Hi Ajay,
+
+2015-01-20 Ajay Kumar <ajaykumar.rs@samsung.com>:
+
+> Use drm_bridge helpers to modify the driver to support
+> i2c driver model.
 > 
-> 2015-01-26 12:47 GMT+01:00 Sascha Hauer <s.hauer@pengutronix.de>:
-> > Olof, Arnd,
-> >
-> > OK to put the driver into drivers/soc/mediatek? Can you take these
-> > patches?
+> Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
+> Acked-by: Inki Dae <inki.dae@samsung.com>
+> Tested-by: Rahul Sharma <rahul.sharma@samsung.com>
+> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Tested-by: Gustavo Padovan <gustavo.padovan@collabora.co.uk>
+> Tested-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+> ---
+>  drivers/gpu/drm/bridge/Kconfig          |    2 +
+>  drivers/gpu/drm/bridge/ptn3460.c        |  124 +++++++++++++++++++++----------
+>  drivers/gpu/drm/exynos/exynos_dp_core.c |   22 ------
+>  3 files changed, 86 insertions(+), 62 deletions(-)
 > 
-> How does this patches fit together with the one James clock framework patches?
-> Both use the same compatible "mediatek,mt8135-infracfg" and
-> "mediatek,mt8135-pericfg".
-> 
-> I had a look on other implementations and they attach the reset
-> controller to the clk driver, if they share the same hw block.
-> Might we run into problems if we implement the clocks in the mfd, as
-> we need the clocks early in boot (e.g. for the timer)?
+> diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
+> index 884923f..4254c2b 100644
+> --- a/drivers/gpu/drm/bridge/Kconfig
+> +++ b/drivers/gpu/drm/bridge/Kconfig
+> @@ -1,5 +1,7 @@
+>  config DRM_PTN3460
+>  	tristate "PTN3460 DP/LVDS bridge"
+>  	depends on DRM
+> +	depends on OF && I2C
 
->From my experience the clocks are needed by the timer before any driver
-initializes.
+Adding I2C here is causing this circular dependency:
 
-> 
-> In mt6589 pericfg apart from the clocks and reset controller provides
-> registers for AXI bus control and USB wakeup and USB clock selection.
-> The infracfg block provides top AXI bus fabric control signals and
-> remap registers for the modem.
-> Mike, Stephen, what do you think. Can we implement the clk in a mfd
-> driver? Or do you prefer to implement the whole block in the clk
-> driver?
+scripts/kconfig/conf --silentoldconfig Kconfig
+drivers/video/fbdev/Kconfig:5:error: recursive dependency detected!
+drivers/video/fbdev/Kconfig:5:  symbol FB is selected by DRM_KMS_FB_HELPER
+drivers/gpu/drm/Kconfig:34:     symbol DRM_KMS_FB_HELPER depends on
+DRM_KMS_HELPER
+drivers/gpu/drm/Kconfig:28:     symbol DRM_KMS_HELPER is selected by
+DRM_PTN3460
+drivers/gpu/drm/bridge/Kconfig:1:       symbol DRM_PTN3460 depends on I2C
+drivers/i2c/Kconfig:7:  symbol I2C is selected by FB_DDC
+drivers/video/fbdev/Kconfig:59: symbol FB_DDC is selected by FB_CYBER2000_DDC
+drivers/video/fbdev/Kconfig:374:        symbol FB_CYBER2000_DDC depends on
+FB_CYBER2000
+drivers/video/fbdev/Kconfig:362:        symbol FB_CYBER2000 depends on FB
 
-Currently the clk support uses regular CLK_OF_DECLARE which handles the
-clock part of pericfg/infracfg and then later a regular driver for
-pericfg/infracfg comes and handles the rest of the functionality. Since
-both use separate registers in the device register space it should work
-fine.
+To solve this we just need to remove I2C from depends as DRM already selects
+I2C. This was already fixed by:
 
-Sascha
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+commit 90bde571ad194adb039cb92a11a5b346f15eb610
+Author: Arnd Bergmann <arnd@arndb.de>
+Date:   Tue Mar 25 12:06:46 2014 +0100
+
+    drm/bridge: PTN3460 needs DRM_KMS_HELPER
+
+    The recently added PTN3460 device driver uses interfaces that
+    are provided by the KMS helper infrastructure, so we should
+    explicitly select that to avoid this linker error:
+
+    ERROR: "drm_helper_probe_single_connector_modes" [drivers/gpu/drm/bridge/ptn3460.ko] undefined!
+    ERROR: "drm_helper_connector_dpms" [drivers/gpu/drm/bridge/ptn3460.ko] undefined!
+
+    We have to drop the I2C dependency to avoid a circular dependency
+    chain, but that's ok because DRM already selects I2C.
+
+    Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+    Signed-off-by: Dave Airlie <airlied@redhat.com>
+
+
+But you may have introduced it again on a rebase. The following patch fixes it:
+
+diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
+index 990b4b2..946d1ef 100644
+--- a/drivers/gpu/drm/bridge/Kconfig
++++ b/drivers/gpu/drm/bridge/Kconfig
+@@ -1,7 +1,6 @@
+ config DRM_PTN3460
+        tristate "PTN3460 DP/LVDS bridge"
+-       depends on DRM
+-       depends on OF && I2C
++       depends on DRM && OF
+        select DRM_KMS_HELPER
+        select DRM_PANEL
+        ---help---
+
+
+	Gustavo
