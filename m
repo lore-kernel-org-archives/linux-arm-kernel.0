@@ -1,67 +1,151 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Thu, 29 Jan 2015 14:53:10 +0100
-Subject: [PATCH v2 4/6] mmc: pwrseq_simple: Add optional reference clock
- support
-In-Reply-To: <CAPDyKFommNu7oscgmhwMpT-5KYN9b6d1xvt513_0qWE=HEGbow@mail.gmail.com>
-References: <1422468953-7594-1-git-send-email-javier.martinez@collabora.co.uk>	<1422468953-7594-5-git-send-email-javier.martinez@collabora.co.uk>
- <CAPDyKFommNu7oscgmhwMpT-5KYN9b6d1xvt513_0qWE=HEGbow@mail.gmail.com>
-Message-ID: <54CA3B46.20204@collabora.co.uk>
+From: mpeg.blue@free.fr (Mason)
+Date: Thu, 29 Jan 2015 14:57:37 +0100
+Subject: Delays, clocks, timers, hrtimers, etc
+In-Reply-To: <54C8E125.3070905@free.fr>
+References: <54C8E125.3070905@free.fr>
+Message-ID: <54CA3C51.2030802@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Ulf,
+[ I am aware that my message is way too long, and that few people would have
+the time to answer all these questions. So maybe, if someone feels inclined
+to answer just one or two, that might kickstart some discussion, and I might
+learn something along the way. Regards. ]
 
-Thanks a lot for your feedback.
+FTR, I've been reading about DeviceTree:
 
-On 01/29/2015 02:05 PM, Ulf Hansson wrote:
->>
->>  struct mmc_pwrseq_simple {
->>         struct mmc_pwrseq pwrseq;
->> +       struct clk *ext_clk;
-> 
-> You need to add a bool, maybe call it clk_enabled;  See why below.
+http://lwn.net/Articles/573409/
+http://www.carbondesignsystems.com/virtual-prototype-blog/bid/195122/Running-the-Latest-Linux-Kernel-on-a-Minimal-ARM-Cortex-A15-System
+http://devicetree.org/Device_Tree_Usage
+
+And I am resisting the urge to pile on a few more questions ;-/
+
+Regards.
+
+On 28/01/2015 14:16, Mason wrote:
+> Hello,
 >
-
-Ok
- 
->>         int nr_gpios;
->>         struct gpio_desc *reset_gpios[0];
->>  };
->> @@ -39,6 +41,9 @@ static void mmc_pwrseq_simple_pre_power_on(struct mmc_host *host)
->>         struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
->>                                         struct mmc_pwrseq_simple, pwrseq);
->>
->> +       if (!IS_ERR(pwrseq->ext_clk))
->> +               clk_prepare_enable(pwrseq->ext_clk);
->> +
-> 
-> There are no guarantee that the ->mmc_pwrseq_simple_pre_power_on()
-> will be invoked prior ->mmc_pwrseq_simple_power_off().
+> I am swimming in a sea of confusion, and am hoping someone would toss
+> me a life-jacket (of enlightenment). Please forgive me if some of my
+> questions are poorly asked or appear in seemingly random order.
 >
-
-Got it, I didn't know that mmc_pwrseq_simple_power_off() could be invoked.
-without mmc_pwrseq_simple_pre_power_on() not being called before.
-
-> That means you need to keep track of if you have gated/ungated the
-> clock. In other words check pwrseq->clk_enabled. That will prevent
-> potential clk unbalance issues.
-
-Yes, I'll change to check for the boolean in _simple_power_off() and
-_post_power_on() then.
-
->> @@ -85,6 +104,14 @@ int mmc_pwrseq_simple_alloc(struct mmc_host *host, struct device *dev)
->>         if (!pwrseq)
->>                 return -ENOMEM;
->>
->> +       pwrseq->ext_clk = clk_get(dev, "ext_clock");
->> +       if (IS_ERR(pwrseq->ext_clk) &&
->> +           PTR_ERR(pwrseq->ext_clk) != -ENOENT &&
->> +           PTR_ERR(pwrseq->ext_clk) != -ENOSYS) {
-> 
-> I don't think you can get -ENOSYS.
-> 
-
-You are right, I'll remove that.
-
-Best regards,
-Javier
+> Working on a Cortex A9 based SoC, I set out to "clean up" the platform
+> specific timer code, by using as much generic framework as possible.
+> (Right now, there's a lot of "redundant" code in the mach dir.)
+>
+>
+> Q1. the {n,u,m}delay function family
+>
+> arch/arm/include/asm/delay.h mentions
+> "Delay routines, using a pre-computed "loops_per_second" value."
+> *BUT* if the frequency changes dynamically (thanks to cpufreq)
+> the "loops_per_second" value cannot be pre-computed, as it would
+> change dynamically too, right?
+>
+> Looking at arch/arm/lib/delay.c it seems the default implementation
+> is a busy loop (in delay-loop.S) which looks up "loops_per_jiffy"
+> in the prolog to determine the number of times to loop, right?
+>
+> http://lxr.free-electrons.com/source/arch/arm/lib/delay-loop.S
+>
+> (Side issue, why is the loop unrolled in __loop_delay? What is the
+> point of unrolling a busy loop? This is commented code however.)
+>
+> What happens if loops_per_jiffy changes while one core is in the
+> busy loop? It seems we might exit the loop too early, which could
+> break some drivers with some weird heisenbug, no?
+>
+> Also, is the update of loops_per_jiffy atomic? Is it possible that
+> if one core reads it while another updates it, we get garbage?
+>
+> I suppose this is one reason why the default functions are overridden
+> by register_current_timer_delay(&arch_delay_timer) right? I think the
+> property of a timer is that its frequency doesn't change, even if the
+> CPU's frequency changes? So we are still busy looping, but we are
+> checking the actual time spent in the loop, whatever the cpufreq?
+>
+> Reference
+> https://www.kernel.org/doc/Documentation/timers/timers-howto.txt
+>
+>
+> Q2. Cortex A9 global and private timers
+>
+> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0407f/CIHGECHJ.html
+>
+> (What are private timers used for?)
+>
+> In my platform-specific code, there is a config option to choose between
+>
+> 1) the ARM global timer
+> 2) a platform-specific timer (timer0)
+>
+> I noticed that there is generic code to support the global timer in
+> drivers/clocksource/arm_global_timer.c
+>
+> config ARM_GLOBAL_TIMER
+>      bool
+>      select CLKSRC_OF if OF
+>      help
+>        This options enables support for the ARM global timer unit
+>
+> config CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
+>      bool
+>      depends on ARM_GLOBAL_TIMER
+>      default y
+>      help
+>       Use ARM global timer clock source as sched_clock
+>
+> I was thinking it would be better to use the "standard" option (ARM global timer)
+> as it is "officially" supported in the vanilla kernel. So less code to write and
+> to debug, and it has likely received more testing. Why would one rely on
+> platform-specific timers then?
+>
+> Are high-resolution timers supported with the global timer?
+>
+>
+> Q3. Using the generic global timer implementation
+>
+> So, how do I use that implementation?
+> (Is someone other than STMicro using it?)
+>
+> I see:
+>
+> static void __init global_timer_of_register(struct device_node *np)
+> CLOCKSOURCE_OF_DECLARE(arm_gt, "arm,cortex-a9-global-timer", global_timer_of_register);
+>
+> OF stands for open firmware, yes?
+> So is this related to device tree?
+>
+> http://lxr.free-electrons.com/source/Documentation/devicetree/bindings/arm/global_timer.txt
+>
+> This file makes no sense to me.
+>
+> - interrupts : One interrupt to each core
+> interrupts = <1 13 0xf01>;
+> what are 1 13 0xf01 ??
+>
+> - clocks : Should be phandle to a clock.
+> clocks = <&arm_periph_clk>;
+>
+> For my (old) 3.14 kernel, I found this:
+>
+>      /*
+>       * ARM Peripheral clock for timers
+>       */
+>      arm_periph_clk: arm_periph_clk {
+>        #clock-cells = <0>;
+>        compatible = "fixed-clock";
+>        clock-frequency = <600000000>;
+>      };
+>
+> But it looks like the definitions have moved around since then?
+>
+> This device tree concept is too much to swallow in a single serving.
+> Please tell me if I'm going down the correct rabbit hole, and I'll
+> do some LWN readings to try to wrap my mind around the concept.
+>
+>
+> Anyway, if anyone can help me out on some of these topics, I'd be
+> eternally grateful.
+>
+> Regards.
