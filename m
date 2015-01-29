@@ -1,54 +1,22 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 29 Jan 2015 11:31:03 +0000
-Subject: [PATCH] arm64: mm: mark alloc_init_p{m,u}d as __ref
-Message-ID: <1422531063-29554-1-git-send-email-will.deacon@arm.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 29 Jan 2015 17:04:09 +0530
+Subject: [RFC V2] OPP: Redefine bindings to overcome shortcomings
+In-Reply-To: <20150129110744.GU21293@sirena.org.uk>
+References: <CAKohpokxdpF2nTeOnDpofNM1vW3aZRyDBE3WKmvZ8wJedf-TGw@mail.gmail.com>
+ <20150129110744.GU21293@sirena.org.uk>
+Message-ID: <CAKohpomqR77p0PKXCC+VbxtwWG+BGGaMJ7r5NVXKt4XUP9=OAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both alloc_init_pmd and alloc_init_pud refer to the __init function
-early_alloc as part of a BUG_ON(alloc != early_alloc) statement.
+On 29 January 2015 at 16:37, Mark Brown <broonie@kernel.org> wrote:
+> On Thu, Jan 29, 2015 at 07:09:23AM +0530, Viresh Kumar wrote:
 
-This patch marks the functions as __ref to avoid the spurious section
-mismatch.
+>> The goal is to choose the driver which we want to probe for a platform. There
+>> can be multiple DT enabled cpufreq drivers present in a build and the platform
+>> needs some way to choose one of them.
+>
+> So you need to document this as a platform device then if that's what
+> you're doing here; there's more than just specifying a compatible string
+> involved.
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/mm/mmu.c | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 2eeac10aa0cf..611750b771c4 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -118,10 +118,10 @@ void split_pud(pud_t *old_pud, pmd_t *pmd)
- 	} while (pmd++, i++, i < PTRS_PER_PMD);
- }
- 
--static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
--				  unsigned long addr, unsigned long end,
--				  phys_addr_t phys, pgprot_t prot,
--				  void *(*alloc)(unsigned long size))
-+static void __ref alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
-+				 unsigned long addr, unsigned long end,
-+				 phys_addr_t phys, pgprot_t prot,
-+				 void *(*alloc)(unsigned long size))
- {
- 	pmd_t *pmd;
- 	unsigned long next;
-@@ -183,10 +183,10 @@ static inline bool use_1G_block(unsigned long addr, unsigned long next,
- 	return true;
- }
- 
--static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
--				  unsigned long addr, unsigned long end,
--				  phys_addr_t phys, pgprot_t prot,
--				  void *(*alloc)(unsigned long size))
-+static void __ref alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
-+				 unsigned long addr, unsigned long end,
-+				 phys_addr_t phys, pgprot_t prot,
-+				 void *(*alloc)(unsigned long size))
- {
- 	pud_t *pud;
- 	unsigned long next;
--- 
-2.1.4
+Will elaborate more on this to make it crystal clear..
