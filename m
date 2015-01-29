@@ -1,44 +1,30 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 29 Jan 2015 10:31:26 +0900
-Subject: [PATCH] ARM: shmobile: Select CONFIG_REGULATOR in defconfig once again
-In-Reply-To: <cover.1422492899.git.horms+renesas@verge.net.au>
-References: <cover.1422492899.git.horms+renesas@verge.net.au>
-Message-ID: <30aca3c84bd79b48154908b6c1592347f4df3d53.1422492899.git.horms+renesas@verge.net.au>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 29 Jan 2015 10:32:28 +0900
+Subject: [PATCH] ARM: shmobile: r8a7794: Correct SDHI clock base address,
+ labels and output-names
+In-Reply-To: <CAMuHMdWzvwmX8uN+Do-1vZiSeqknLdgmv060GCvbZd1=x4YnXA@mail.gmail.com>
+References: <1422406422-671-1-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdWzvwmX8uN+Do-1vZiSeqknLdgmv060GCvbZd1=x4YnXA@mail.gmail.com>
+Message-ID: <20150129013228.GA15358@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+On Wed, Jan 28, 2015 at 10:14:53AM +0100, Geert Uytterhoeven wrote:
+> On Wed, Jan 28, 2015 at 1:53 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > * Correct base address of SD3 div6 clk.
+> > * Update div6 clock node labels
+> >   There appears to have been some inconsistency and confusion here as on
+> >   the r8a7790 these clocks are referred to as SD(HI)1 and SD(HI)2 while on
+> >   the r8a7791 and r8a7794 they are referred to as SD(HI)2 and SD(HI)3.
+> >
+> > This has no run-time affect as the clock nodes are not currently used.
+> >
+> > Fixes: 8e181633e6ca96049 ("ARM: shmobile: r8a7794: Add SDHI clocks to device tree")
+> > Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> > Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-eb4513482d1c4882e3633528ccc48d77581b7bb1
-(ARM: shmobile: Enable kzm9g board in multiplatform defconfig)
-dropped CONFIG_REGULATOR from shmobile_defconfig as it was
-generated using a tree where CONFIG_REGULATOR is indirectly
-selected by ARCH_SH73A0.
-
-ARCH_SH73A0 is not queued up for v3.20 and thus, baring unforeseen
-changes, CONFIG_REGULATOR will not be selected by shmobile_defconfig
-in that release. This causes at least SDHI to stop working on
-R-Car Gen2 SoCs.
-
-Reported-by: Magnus Damm <damm+renesas@opensource.se>
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-[horms: minimal patch targeted as a fix]
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/shmobile_defconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index 4f9868d..b553e2c 100644
---- a/arch/arm/configs/shmobile_defconfig
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -118,6 +118,7 @@ CONFIG_WATCHDOG=y
- CONFIG_DA9063_WATCHDOG=y
- CONFIG_MFD_AS3711=y
- CONFIG_MFD_DA9063=y
-+CONFIG_REGULATOR=y
- CONFIG_REGULATOR_AS3711=y
- CONFIG_REGULATOR_DA9210=y
- CONFIG_REGULATOR_GPIO=y
--- 
-2.1.4
+Thanks, I will queue this up.
