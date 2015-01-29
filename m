@@ -1,64 +1,90 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Thu, 29 Jan 2015 10:51:51 -0800
-Subject: [PATCH] Input: sun4i-ts: add thermal driver dependency
-In-Reply-To: <54C9E63A.6020806@redhat.com>
-References: <2265502.1m7jYBaqyh@wuerfel>
- <54C9E63A.6020806@redhat.com>
-Message-ID: <20150129185151.GA33547@dtor-ws>
+From: robdclark@gmail.com (Rob Clark)
+Date: Thu, 29 Jan 2015 13:52:09 -0500
+Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher constraints
+ with dma-parms
+In-Reply-To: <20150129154718.GB26493@n2100.arm.linux.org.uk>
+References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
+ <1422347154-15258-2-git-send-email-sumit.semwal@linaro.org>
+ <20150129143908.GA26493@n2100.arm.linux.org.uk>
+ <CAO_48GEOQ1pBwirgEWeVVXW-iOmaC=Xerr2VyYYz9t1QDXgVsw@mail.gmail.com>
+ <20150129154718.GB26493@n2100.arm.linux.org.uk>
+Message-ID: <CAF6AEGtTmFg66TK_AFkQ-xp7Nd9Evk3nqe6xCBp7K=77OmXTxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 29, 2015 at 08:50:18AM +0100, Hans de Goede wrote:
-> Hi,
-> 
-> On 28-01-15 16:17, Arnd Bergmann wrote:
-> >The sun4i-ts driver has had a dependency on the thermal code
-> >since it was first merged,
-> 
-> The "since it was first merged bit" is not true, this is caused
-> by recent changes by ChenYu.
-> 
-> Other then that no objections from me against the proposed fix.
-> 
-> Regards,
-> 
-> Hans
-> 
-> 
->  but this is not currently enforced
-> >in Kconfig, so in some randconfig builds we get
-> >
-> >drivers/built-in.o: In function `sun4i_ts_remove':
-> >:(.text+0x2376f4): undefined reference to `thermal_zone_of_sensor_unregister'
-> >drivers/built-in.o: In function `sun4i_ts_probe':
-> >:(.text+0x237a94): undefined reference to `thermal_zone_of_sensor_register'
-> >:(.text+0x237c00): undefined reference to `thermal_zone_of_sensor_unregister'
-> >
-> >We need the dependency on THERMAL in order to ensure that this
-> >driver becomes a loadable module if the thermal support itself
-> >is modular, while the dependency on THERMAL_OF is a runtime dependency
-> >and the driver will still build but not work if it is missing.
-> >
-> >Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> >Fixes: 6decea7c5438e2 ("Input: add driver for Allwinner sunxi SoC's rtp controller")
-> >
-> >diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
-> >index 58917525126e..e2447f0063b7 100644
-> >--- a/drivers/input/touchscreen/Kconfig
-> >+++ b/drivers/input/touchscreen/Kconfig
-> >@@ -943,6 +943,8 @@ config TOUCHSCREEN_SUN4I
-> >  	tristate "Allwinner sun4i resistive touchscreen controller support"
-> >  	depends on ARCH_SUNXI || COMPILE_TEST
-> >  	depends on HWMON
-> >+	depends on THERMAL
-> >+	depends on THERMAL_OF || COMPILE_TEST
+On Thu, Jan 29, 2015 at 10:47 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Jan 29, 2015 at 09:00:11PM +0530, Sumit Semwal wrote:
+>> So, short answer is, it is left to the exporter to decide. The dma-buf
+>> framework should not even attempt to decide or enforce any of the
+>> above.
+>>
+>> At each dma_buf_attach(), there's a callback to the exporter, where
+>> the exporter can decide, if it intends to handle these kind of cases,
+>> on the best way forward.
+>>
+>> The exporter might, for example, decide to migrate backing storage,
+>
+> That's a decision which the exporter can not take.  Think about it...
+>
+> If subsystem Y has mapped the buffer, it could be accessing the buffer's
+> backing storage at the same time that subsystem Z tries to attach to the
+> buffer.
 
-THERMAL_OF does have proper stubs and I do not see why we need to force
-having TERMAL even if we don't do compile test. Should the dependency be:
+The *theory* is that Y is map/unmap'ing the buffer around each use, so
+there will be some point where things could be migrated and remapped..
+in practice, I am not sure that anyone is doing this yet.
 
-	depends on !THERMAL_OF || TERMAL
+Probably it would be reasonable if a more restrictive subsystem tried
+to attach after the buffer was already allocated and mapped in a way
+that don't meet the new constraints, then -EBUSY.
 
-Thanks.
+But from a quick look it seems like there needs to be a slight fixup
+to not return 0 if calc_constraints() fails..
 
--- 
-Dmitry
+> Once the buffer has been exported to another user, the exporter has
+> effectively lost control over mediating accesses to that buffer.
+>
+> All that it can do with the way the dma-buf API is today is to allocate
+> a _different_ scatter list pointing at the same backing storage which
+> satisfies the segment size and number of segments, etc.
+>
+> There's also another issue which you haven't addressed.  What if several
+> attachments result in lowering max_segment_size and max_segment_count
+> such that:
+>
+>         max_segment_size * max_segment_count < dmabuf->size
+>
+> but individually, the attachments allow dmabuf->size to be represented
+> as a scatterlist?
+
+Quite possibly for some of these edge some of cases, some of the
+dma-buf exporters are going to need to get more clever (ie. hand off
+different scatterlists to different clients).  Although I think by far
+the two common cases will be "I can support anything via an iommu/mmu"
+and "I need phys contig".
+
+But that isn't an issue w/ dma-buf itself, so much as it is an issue
+w/ drivers.  I guess there would be more interest in fixing up drivers
+when actual hw comes along that needs it..
+
+BR,
+-R
+
+> If an exporter were to take notice of the max_segment_size and
+> max_segment_count, the resulting buffer is basically unrepresentable
+> as a scatterlist.
+>
+>> > Please consider the possible sequences of use (such as the scenario
+>> > above) when creating or augmenting an API.
+>> >
+>>
+>> I tried to think of the scenarios I could think of, but If you still
+>> feel this approach doesn't help with your concerns, I'll graciously
+>> accept advice to improve it.
+>
+> See the new one above :)
+>
+> --
+> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+> according to speedtest.net.
