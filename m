@@ -1,71 +1,61 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 29 Jan 2015 11:49:48 -0500 (EST)
-Subject: [PATCH v2] ARM: teach __asmeq that r11 == fp and r12 == ip
-In-Reply-To: <1422524686-30462-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1422524686-30462-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <alpine.LFD.2.11.1501291147480.1322@knanqh.ubzr>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 29 Jan 2015 10:49:38 -0600
+Subject: [PATCH v4 1/6] of: iommu: add ptr to OF node arg to
+ of_iommu_configure()
+In-Reply-To: <5349994.6VHXzPdIxs@avalon>
+References: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
+ <13812499.ICbNgSDOae@avalon> <20150128133219.GM1569@arm.com>
+ <5349994.6VHXzPdIxs@avalon>
+Message-ID: <CAL_Jsq+rzwk0Rw5RRKf9oLqXNFFgnJb4UQ_AzpJLxN1Z0rJWMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 29 Jan 2015, Ard Biesheuvel wrote:
+On Wed, Jan 28, 2015 at 5:32 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> Hi Will,
+>
+> On Wednesday 28 January 2015 13:32:19 Will Deacon wrote:
+>> On Wed, Jan 28, 2015 at 01:15:10PM +0000, Laurent Pinchart wrote:
+>> > On Wednesday 28 January 2015 12:29:42 Will Deacon wrote:
+>> >> On Wed, Jan 28, 2015 at 12:23:03PM +0000, Laurent Pinchart wrote:
+>> >>> On Wednesday 28 January 2015 11:33:00 Will Deacon wrote:
+>> >>>> On Mon, Jan 26, 2015 at 06:49:01PM +0000, Murali Karicheri wrote:
+>> >>>>> On 01/25/2015 08:32 AM, Laurent Pinchart wrote:
+>> >>>>>> On Friday 23 January 2015 17:32:34 Murali Karicheri wrote:
+>> >>>>>>> Function of_iommu_configure() is called from of_dma_configure() to
+>> >>>>>>> setup iommu ops using DT property. This API is currently used for
+>> >>>>>>> platform devices for which DMA configuration (including iommu ops)
+>> >>>>>>> may come from device's parent. To extend this functionality for
+>> >>>>>>> PCI devices, this API need to take a parent node ptr as an argument
+>> >>>>>>> instead of assuming device's parent. This is needed since for PCI,
+>> >>>>>>> the dma configuration may be defined in the DT node of the root
+>> >>>>>>> bus bridge's parent device. Currently only dma-range is used for PCI
+>> >>>>>>> and iommu is not supported. So return error if the device is PCI.
 
-> The __asmeq macro is used inside inline asm statements to ensure that
-> register asm variables that explicitly specify a register are mapped
-> correctly onto those registers when used in inline asm input and output
-> constraints. However, the string based matching fails to take into account
-> that 'fp' is often referred to as 'r11' and 'ip' is often referred to as
-> 'r12', (e.g., by clang), causing false negatives.
-> 
-> Fix this by making __asmeq consider the ("fp","r11"), ("r11","fp"),
-> ("ip","r12") and ("r12","ip") cases specifically.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> v2:
-> Added r11 but not r10, as the latter is only referred to as 'sl' in
-> objdump output, but GCC emitted inline asm substitutes the references
-> with 'r10' instead. sp/lr/pc are unambiguous between GCC and clang.
-> 
-> Primary purpose of this patch is to fix the incompatibility between clang
-> and GCC, but the side effect is that it relaxes the requirement imposed on
-> the programmer to refer to a register by the same name as the compiler does.
-> If that is seen as a substantial upside by some, we could indeed still decide
-> to add r10, r13, r14 and r15 (for which no such incompatibility exists) as well.
-> However, those are not currently used in __asmeq invocations anywhere under
-> arch/arm
-> 
->  arch/arm/include/asm/compiler.h | 15 ++++++++++++++-
->  1 file changed, 14 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/include/asm/compiler.h b/arch/arm/include/asm/compiler.h
-> index 8155db2f7fa1..29fe85e59439 100644
-> --- a/arch/arm/include/asm/compiler.h
-> +++ b/arch/arm/include/asm/compiler.h
-> @@ -8,8 +8,21 @@
->   * This string is meant to be concatenated with the inline asm string and
->   * will cause compilation to stop on mismatch.
->   * (for details, see gcc PR 15089)
-> + * For compatibility with clang, we have to specifically take the equivalence
-> + * of 'r11' <-> 'fp' and 'r12' <-> 'ip' into account as well.
->   */
-> -#define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
-> +#define __asmeq(x, y)				\
-> +	".ifnc " x "," y "; "			\
-> +	  ".ifnc " x y ",fpr11; " 		\
-> +	    ".ifnc " x y ",r11fp; "		\
-> +	      ".ifnc " x y ",ipr12; " 		\
-> +	        ".ifnc " x y ",r12ip; "		\
-> +	          ".err; "			\
-> +	        ".endif; "			\
-> +	      ".endif; "			\
-> +	    ".endif; "				\
-> +	  ".endif; "				\
-> +	".endif\n\t"
+[...]
 
-I share RMK's yuck reaction, but for lack of a better idea:
+>> > If I understand Murali's patch set right (please correct me if that's not
+>> > the case) the PCI code walks up the DT nodes hierarchy to the parent node
+>> > that contains the iommus attribute and passes a pointer to that node to
+>> > this function. It's thus a PCI-specific solution. As a temporary hack
+>> > that's OK I suppose, but if implementing it right straight away isn't
+>> > difficult that would be better.
+>>
+>> It looks to me like the code walks the PCI topology to get the DT node for
+>> the host controller, and passes *that* to of_dma_configure. That sounds
+>> like the right thing to do to me, especially since the PCI topology is
+>> likely not encoded in the device-tree. So actually, it is passing the
+>> first parent node afaict.
+>
+> Indeed, that's right. I forgot for a moment that we have non-DT devices ;-)
+>
+> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+>
+> Murali, nitpicking a bit, shouldn't the iommu_np parameter be renamed ? It
+> points to the node containing the iommus parameter, not to the iommu node, so
+> the current name is slightly confusing. A brief kerneldoc above the function
+> would also help. This can be the subject of a separate patch.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+It was more confusing having np and node within the function.
 
-
-
-Nicolas
+Rob
