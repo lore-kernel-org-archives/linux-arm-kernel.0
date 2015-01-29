@@ -1,260 +1,166 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 29 Jan 2015 23:37:56 +0100
-Subject: [GIT PULL 2/3] arm/arm64: KVM: Invalidate data cache on unmap
+Date: Thu, 29 Jan 2015 23:37:57 +0100
+Subject: [GIT PULL 3/3] arm/arm64: KVM: Use kernel mapping to perform
+ invalidation on page fault
 In-Reply-To: <1422571077-14576-1-git-send-email-christoffer.dall@linaro.org>
 References: <1422571077-14576-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1422571077-14576-3-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1422571077-14576-4-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-Let's assume a guest has created an uncached mapping, and written
-to that page. Let's also assume that the host uses a cache-coherent
-IO subsystem. Let's finally assume that the host is under memory
-pressure and starts to swap things out.
+When handling a fault in stage-2, we need to resync I$ and D$, just
+to be sure we don't leave any old cache line behind.
 
-Before this "uncached" page is evicted, we need to make sure
-we invalidate potential speculated, clean cache lines that are
-sitting there, or the IO subsystem is going to swap out the
-cached view, loosing the data that has been written directly
-into memory.
+That's very good, except that we do so using the *user* address.
+Under heavy load (swapping like crazy), we may end up in a situation
+where the page gets mapped in stage-2 while being unmapped from
+userspace by another CPU.
+
+At that point, the DC/IC instructions can generate a fault, which
+we handle with kvm->mmu_lock held. The box quickly deadlocks, user
+is unhappy.
+
+Instead, perform this invalidation through the kernel mapping,
+which is guaranteed to be present. The box is much happier, and so
+am I.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/include/asm/kvm_mmu.h   | 31 +++++++++++++++
- arch/arm/kvm/mmu.c               | 82 ++++++++++++++++++++++++++++++++--------
- arch/arm64/include/asm/kvm_mmu.h | 18 +++++++++
- 3 files changed, 116 insertions(+), 15 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h   | 43 +++++++++++++++++++++++++++++++---------
+ arch/arm/kvm/mmu.c               | 12 +++++++----
+ arch/arm64/include/asm/kvm_mmu.h | 13 +++++++-----
+ 3 files changed, 50 insertions(+), 18 deletions(-)
 
 diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 286644c..552c31f 100644
+index 552c31f..1bca8f8 100644
 --- a/arch/arm/include/asm/kvm_mmu.h
 +++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -44,6 +44,7 @@
- 
- #ifndef __ASSEMBLY__
- 
-+#include <linux/highmem.h>
- #include <asm/cacheflush.h>
- #include <asm/pgalloc.h>
- 
-@@ -188,6 +189,36 @@ static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
- 	}
+@@ -162,13 +162,10 @@ static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
+ 	return (vcpu->arch.cp15[c1_SCTLR] & 0b101) == 0b101;
  }
  
-+static inline void __kvm_flush_dcache_pte(pte_t pte)
-+{
-+	void *va = kmap_atomic(pte_page(pte));
+-static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
+-					     unsigned long size,
+-					     bool ipa_uncached)
++static inline void __coherent_cache_guest_page(struct kvm_vcpu *vcpu, pfn_t pfn,
++					       unsigned long size,
++					       bool ipa_uncached)
+ {
+-	if (!vcpu_has_cache_enabled(vcpu) || ipa_uncached)
+-		kvm_flush_dcache_to_poc((void *)hva, size);
+-	
+ 	/*
+ 	 * If we are going to insert an instruction page and the icache is
+ 	 * either VIPT or PIPT, there is a potential problem where the host
+@@ -180,10 +177,38 @@ static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
+ 	 *
+ 	 * VIVT caches are tagged using both the ASID and the VMID and doesn't
+ 	 * need any kind of flushing (DDI 0406C.b - Page B3-1392).
++	 *
++	 * We need to do this through a kernel mapping (using the
++	 * user-space mapping has proved to be the wrong
++	 * solution). For that, we need to kmap one page at a time,
++	 * and iterate over the range.
+ 	 */
+-	if (icache_is_pipt()) {
+-		__cpuc_coherent_user_range(hva, hva + size);
+-	} else if (!icache_is_vivt_asid_tagged()) {
 +
-+	kvm_flush_dcache_to_poc(va, PAGE_SIZE);
++	bool need_flush = !vcpu_has_cache_enabled(vcpu) || ipa_uncached;
 +
-+	kunmap_atomic(va);
-+}
++	VM_BUG_ON(size & PAGE_MASK);
 +
-+static inline void __kvm_flush_dcache_pmd(pmd_t pmd)
-+{
-+	unsigned long size = PMD_SIZE;
-+	pfn_t pfn = pmd_pfn(pmd);
++	if (!need_flush && !icache_is_pipt())
++		goto vipt_cache;
 +
 +	while (size) {
 +		void *va = kmap_atomic_pfn(pfn);
 +
-+		kvm_flush_dcache_to_poc(va, PAGE_SIZE);
++		if (need_flush)
++			kvm_flush_dcache_to_poc(va, PAGE_SIZE);
 +
-+		pfn++;
++		if (icache_is_pipt())
++			__cpuc_coherent_user_range((unsigned long)va,
++						   (unsigned long)va + PAGE_SIZE);
++
 +		size -= PAGE_SIZE;
++		pfn++;
 +
 +		kunmap_atomic(va);
 +	}
-+}
 +
-+static inline void __kvm_flush_dcache_pud(pud_t pud)
-+{
-+}
-+
- #define kvm_virt_to_phys(x)		virt_to_idmap((unsigned long)(x))
- 
- void kvm_set_way_flush(struct kvm_vcpu *vcpu);
++vipt_cache:
++	if (!icache_is_pipt() && !icache_is_vivt_asid_tagged()) {
+ 		/* any kind of VIPT cache */
+ 		__flush_icache_all();
+ 	}
 diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 106737e..78e68ab 100644
+index 78e68ab..1366625 100644
 --- a/arch/arm/kvm/mmu.c
 +++ b/arch/arm/kvm/mmu.c
-@@ -58,6 +58,26 @@ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
- 		kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, kvm, ipa);
+@@ -957,6 +957,12 @@ static bool kvm_is_device_pfn(unsigned long pfn)
+ 	return !pfn_valid(pfn);
  }
  
-+/*
-+ * D-Cache management functions. They take the page table entries by
-+ * value, as they are flushing the cache using the kernel mapping (or
-+ * kmap on 32bit).
-+ */
-+static void kvm_flush_dcache_pte(pte_t pte)
++static void coherent_cache_guest_page(struct kvm_vcpu *vcpu, pfn_t pfn,
++				      unsigned long size, bool uncached)
 +{
-+	__kvm_flush_dcache_pte(pte);
++	__coherent_cache_guest_page(vcpu, pfn, size, uncached);
 +}
 +
-+static void kvm_flush_dcache_pmd(pmd_t pmd)
-+{
-+	__kvm_flush_dcache_pmd(pmd);
-+}
-+
-+static void kvm_flush_dcache_pud(pud_t pud)
-+{
-+	__kvm_flush_dcache_pud(pud);
-+}
-+
- static int mmu_topup_memory_cache(struct kvm_mmu_memory_cache *cache,
- 				  int min, int max)
- {
-@@ -119,6 +139,26 @@ static void clear_pmd_entry(struct kvm *kvm, pmd_t *pmd, phys_addr_t addr)
- 	put_page(virt_to_page(pmd));
- }
- 
-+/*
-+ * Unmapping vs dcache management:
-+ *
-+ * If a guest maps certain memory pages as uncached, all writes will
-+ * bypass the data cache and go directly to RAM.  However, the CPUs
-+ * can still speculate reads (not writes) and fill cache lines with
-+ * data.
-+ *
-+ * Those cache lines will be *clean* cache lines though, so a
-+ * clean+invalidate operation is equivalent to an invalidate
-+ * operation, because no cache lines are marked dirty.
-+ *
-+ * Those clean cache lines could be filled prior to an uncached write
-+ * by the guest, and the cache coherent IO subsystem would therefore
-+ * end up writing old data to disk.
-+ *
-+ * This is why right after unmapping a page/section and invalidating
-+ * the corresponding TLBs, we call kvm_flush_dcache_p*() to make sure
-+ * the IO subsystem will never hit in the cache.
-+ */
- static void unmap_ptes(struct kvm *kvm, pmd_t *pmd,
- 		       phys_addr_t addr, phys_addr_t end)
- {
-@@ -128,9 +168,16 @@ static void unmap_ptes(struct kvm *kvm, pmd_t *pmd,
- 	start_pte = pte = pte_offset_kernel(pmd, addr);
- 	do {
- 		if (!pte_none(*pte)) {
-+			pte_t old_pte = *pte;
-+
- 			kvm_set_pte(pte, __pte(0));
--			put_page(virt_to_page(pte));
- 			kvm_tlb_flush_vmid_ipa(kvm, addr);
-+
-+			/* No need to invalidate the cache for device mappings */
-+			if ((pte_val(old_pte) & PAGE_S2_DEVICE) != PAGE_S2_DEVICE)
-+				kvm_flush_dcache_pte(old_pte);
-+
-+			put_page(virt_to_page(pte));
+ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 			  struct kvm_memory_slot *memslot, unsigned long hva,
+ 			  unsigned long fault_status)
+@@ -1046,8 +1052,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 			kvm_set_s2pmd_writable(&new_pmd);
+ 			kvm_set_pfn_dirty(pfn);
  		}
- 	} while (pte++, addr += PAGE_SIZE, addr != end);
- 
-@@ -149,8 +196,13 @@ static void unmap_pmds(struct kvm *kvm, pud_t *pud,
- 		next = kvm_pmd_addr_end(addr, end);
- 		if (!pmd_none(*pmd)) {
- 			if (kvm_pmd_huge(*pmd)) {
-+				pmd_t old_pmd = *pmd;
-+
- 				pmd_clear(pmd);
- 				kvm_tlb_flush_vmid_ipa(kvm, addr);
-+
-+				kvm_flush_dcache_pmd(old_pmd);
-+
- 				put_page(virt_to_page(pmd));
- 			} else {
- 				unmap_ptes(kvm, pmd, addr, next);
-@@ -173,8 +225,13 @@ static void unmap_puds(struct kvm *kvm, pgd_t *pgd,
- 		next = kvm_pud_addr_end(addr, end);
- 		if (!pud_none(*pud)) {
- 			if (pud_huge(*pud)) {
-+				pud_t old_pud = *pud;
-+
- 				pud_clear(pud);
- 				kvm_tlb_flush_vmid_ipa(kvm, addr);
-+
-+				kvm_flush_dcache_pud(old_pud);
-+
- 				put_page(virt_to_page(pud));
- 			} else {
- 				unmap_pmds(kvm, pud, addr, next);
-@@ -209,10 +266,9 @@ static void stage2_flush_ptes(struct kvm *kvm, pmd_t *pmd,
- 
- 	pte = pte_offset_kernel(pmd, addr);
- 	do {
--		if (!pte_none(*pte)) {
--			hva_t hva = gfn_to_hva(kvm, addr >> PAGE_SHIFT);
--			kvm_flush_dcache_to_poc((void*)hva, PAGE_SIZE);
--		}
-+		if (!pte_none(*pte) &&
-+		    (pte_val(*pte) & PAGE_S2_DEVICE) != PAGE_S2_DEVICE)
-+			kvm_flush_dcache_pte(*pte);
- 	} while (pte++, addr += PAGE_SIZE, addr != end);
- }
- 
-@@ -226,12 +282,10 @@ static void stage2_flush_pmds(struct kvm *kvm, pud_t *pud,
- 	do {
- 		next = kvm_pmd_addr_end(addr, end);
- 		if (!pmd_none(*pmd)) {
--			if (kvm_pmd_huge(*pmd)) {
--				hva_t hva = gfn_to_hva(kvm, addr >> PAGE_SHIFT);
--				kvm_flush_dcache_to_poc((void*)hva, PMD_SIZE);
--			} else {
-+			if (kvm_pmd_huge(*pmd))
-+				kvm_flush_dcache_pmd(*pmd);
-+			else
- 				stage2_flush_ptes(kvm, pmd, addr, next);
--			}
+-		coherent_cache_guest_page(vcpu, hva & PMD_MASK, PMD_SIZE,
+-					  fault_ipa_uncached);
++		coherent_cache_guest_page(vcpu, pfn, PMD_SIZE, fault_ipa_uncached);
+ 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
+ 	} else {
+ 		pte_t new_pte = pfn_pte(pfn, mem_type);
+@@ -1055,8 +1060,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 			kvm_set_s2pte_writable(&new_pte);
+ 			kvm_set_pfn_dirty(pfn);
  		}
- 	} while (pmd++, addr = next, addr != end);
- }
-@@ -246,12 +300,10 @@ static void stage2_flush_puds(struct kvm *kvm, pgd_t *pgd,
- 	do {
- 		next = kvm_pud_addr_end(addr, end);
- 		if (!pud_none(*pud)) {
--			if (pud_huge(*pud)) {
--				hva_t hva = gfn_to_hva(kvm, addr >> PAGE_SHIFT);
--				kvm_flush_dcache_to_poc((void*)hva, PUD_SIZE);
--			} else {
-+			if (pud_huge(*pud))
-+				kvm_flush_dcache_pud(*pud);
-+			else
- 				stage2_flush_pmds(kvm, pud, addr, next);
--			}
- 		}
- 	} while (pud++, addr = next, addr != end);
- }
+-		coherent_cache_guest_page(vcpu, hva, PAGE_SIZE,
+-					  fault_ipa_uncached);
++		coherent_cache_guest_page(vcpu, pfn, PAGE_SIZE, fault_ipa_uncached);
+ 		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte,
+ 			pgprot_val(mem_type) == pgprot_val(PAGE_S2_DEVICE));
+ 	}
 diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 92d22e9..cbdc236 100644
+index cbdc236..adcf495 100644
 --- a/arch/arm64/include/asm/kvm_mmu.h
 +++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -258,6 +258,24 @@ static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
- 	}
+@@ -243,15 +243,18 @@ static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
+ 	return (vcpu_sys_reg(vcpu, SCTLR_EL1) & 0b101) == 0b101;
  }
  
-+static inline void __kvm_flush_dcache_pte(pte_t pte)
-+{
-+	struct page *page = pte_page(pte);
-+	kvm_flush_dcache_to_poc(page_address(page), PAGE_SIZE);
-+}
+-static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
+-					     unsigned long size,
+-					     bool ipa_uncached)
++static inline void __coherent_cache_guest_page(struct kvm_vcpu *vcpu, pfn_t pfn,
++					       unsigned long size,
++					       bool ipa_uncached)
+ {
++	void *va = page_address(pfn_to_page(pfn));
 +
-+static inline void __kvm_flush_dcache_pmd(pmd_t pmd)
-+{
-+	struct page *page = pmd_page(pmd);
-+	kvm_flush_dcache_to_poc(page_address(page), PMD_SIZE);
-+}
-+
-+static inline void __kvm_flush_dcache_pud(pud_t pud)
-+{
-+	struct page *page = pud_page(pud);
-+	kvm_flush_dcache_to_poc(page_address(page), PUD_SIZE);
-+}
-+
- #define kvm_virt_to_phys(x)		__virt_to_phys((unsigned long)(x))
+ 	if (!vcpu_has_cache_enabled(vcpu) || ipa_uncached)
+-		kvm_flush_dcache_to_poc((void *)hva, size);
++		kvm_flush_dcache_to_poc(va, size);
  
- void kvm_set_way_flush(struct kvm_vcpu *vcpu);
+ 	if (!icache_is_aliasing()) {		/* PIPT */
+-		flush_icache_range(hva, hva + size);
++		flush_icache_range((unsigned long)va,
++				   (unsigned long)va + size);
+ 	} else if (!icache_is_aivivt()) {	/* non ASID-tagged VIVT */
+ 		/* any kind of VIPT cache */
+ 		__flush_icache_all();
 -- 
 2.1.2.330.g565301e.dirty
