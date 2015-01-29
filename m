@@ -1,48 +1,75 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 29 Jan 2015 22:31:58 +0000
-Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher
- constraints with dma-parms
-In-Reply-To: <CAF6AEGujk8UC4X6T=yhTrz1s+SyZUQ=m05h_WcxLDGZU6bydbw@mail.gmail.com>
-References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
- <1422347154-15258-2-git-send-email-sumit.semwal@linaro.org>
- <20150129143908.GA26493@n2100.arm.linux.org.uk>
- <CAO_48GEOQ1pBwirgEWeVVXW-iOmaC=Xerr2VyYYz9t1QDXgVsw@mail.gmail.com>
- <20150129154718.GB26493@n2100.arm.linux.org.uk>
- <CAF6AEGtTmFg66TK_AFkQ-xp7Nd9Evk3nqe6xCBp7K=77OmXTxA@mail.gmail.com>
- <20150129192610.GE26493@n2100.arm.linux.org.uk>
- <CAF6AEGujk8UC4X6T=yhTrz1s+SyZUQ=m05h_WcxLDGZU6bydbw@mail.gmail.com>
-Message-ID: <20150129223158.GF26493@n2100.arm.linux.org.uk>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Thu, 29 Jan 2015 14:38:23 -0800
+Subject: [PATCH v2] drivers: net: xgene: fix: Out of order descriptor bytes
+ read
+Message-ID: <1422571103-17497-1-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 29, 2015 at 05:18:33PM -0500, Rob Clark wrote:
-> On Thu, Jan 29, 2015 at 2:26 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > Now, if we're going to do the "more clever" thing you mention above,
-> > that rather negates the point of this two-part patch set, which is to
-> > provide the union of the DMA capabilities of all users.  A union in
-> > that case is no longer sane as we'd be tailoring the SG lists to each
-> > user.
-> 
-> It doesn't really negate.. a different sg list representing the same
-> physical memory cannot suddenly make the buffer physically contiguous
-> (from the perspective of memory)..
-> 
-> (unless we are not on the same page here, so to speak)
+This patch fixes the following kernel crash,
 
-If we are really only interested in the "physically contiguous" vs
-"scattered" differentiation, why can't this be just a simple flag?
+	WARNING: CPU: 2 PID: 0 at net/ipv4/tcp_input.c:3079 tcp_clean_rtx_queue+0x658/0x80c()
+	Call trace:
+	[<fffffe0000096b7c>] dump_backtrace+0x0/0x184
+	[<fffffe0000096d10>] show_stack+0x10/0x1c
+	[<fffffe0000685ea0>] dump_stack+0x74/0x98
+	[<fffffe00000b44e0>] warn_slowpath_common+0x88/0xb0
+	[<fffffe00000b461c>] warn_slowpath_null+0x14/0x20
+	[<fffffe00005b5c1c>] tcp_clean_rtx_queue+0x654/0x80c
+	[<fffffe00005b6228>] tcp_ack+0x454/0x688
+	[<fffffe00005b6ca8>] tcp_rcv_established+0x4a4/0x62c
+	[<fffffe00005bf4b4>] tcp_v4_do_rcv+0x16c/0x350
+	[<fffffe00005c225c>] tcp_v4_rcv+0x8e8/0x904
+	[<fffffe000059d470>] ip_local_deliver_finish+0x100/0x26c
+	[<fffffe000059dad8>] ip_local_deliver+0xac/0xc4
+	[<fffffe000059d6c4>] ip_rcv_finish+0xe8/0x328
+	[<fffffe000059dd3c>] ip_rcv+0x24c/0x38c
+	[<fffffe0000563950>] __netif_receive_skb_core+0x29c/0x7c8
+	[<fffffe0000563ea4>] __netif_receive_skb+0x28/0x7c
+	[<fffffe0000563f54>] netif_receive_skb_internal+0x5c/0xe0
+	[<fffffe0000564810>] napi_gro_receive+0xb4/0x110
+	[<fffffe0000482a2c>] xgene_enet_process_ring+0x144/0x338
+	[<fffffe0000482d18>] xgene_enet_napi+0x1c/0x50
+	[<fffffe0000565454>] net_rx_action+0x154/0x228
+	[<fffffe00000b804c>] __do_softirq+0x110/0x28c
+	[<fffffe00000b8424>] irq_exit+0x8c/0xc0
+	[<fffffe0000093898>] handle_IRQ+0x44/0xa8
+	[<fffffe000009032c>] gic_handle_irq+0x38/0x7c
+	[...]
 
-I think I know where you're coming from on that distinction - most
-GPUs can cope with their buffers being discontiguous in memory, but
-scanout and capture hardware tends to need contiguous buffers.
+Software writes poison data into the descriptor bytes[15:8] and upon
+receiving the interrupt, if those bytes are overwritten by the hardware with
+the valid data, software also reads bytes[7:0] and executes receive/tx
+completion logic.
 
-My guess is that you're looking for some way that a GPU driver could
-allocate a buffer, which can then be imported into the scanout
-hardware - and when it is, the underlying backing store is converted
-to a contiguous buffer.  Is that the usage scenario you're thinking
-of?
+If the CPU executes the above two reads in out of order fashion, then the
+bytes[7:0] will have older data and causing the kernel panic.  We have to
+force the order of the reads and thus this patch introduces read memory
+barrier between these reads.
 
+Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
+---
+
+v2: Address comments from v1
+* replaced smp_rmb() with dma_rmb()
+
+---
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+index 83a5028..793f3b7 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+@@ -369,6 +369,8 @@ static int xgene_enet_process_ring(struct xgene_enet_desc_ring *ring,
+ 		if (unlikely(xgene_enet_is_desc_slot_empty(raw_desc)))
+ 			break;
+ 
++		/* read fpqnum field after dataaddr field */
++		dma_rmb();
+ 		if (is_rx_desc(raw_desc))
+ 			ret = xgene_enet_rx_frame(ring, raw_desc);
+ 		else
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
