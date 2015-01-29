@@ -1,65 +1,53 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 29 Jan 2015 09:28:31 +0900
-Subject: [PATCH 00/14 v2] ARM: shmobile: Remove sh7372/Mackerel and ZBOOT
- MMC/SDHI support V2
-In-Reply-To: <CANqRtoRzvWMo9y_y80uz=kx=M5p-FzkgWPyZZ914sKHvQcM4Fg@mail.gmail.com>
-References: <20150126061747.6848.9708.sendpatchset@little-apple>
- <20150127011707.GD29710@verge.net.au>
- <20150127035835.GA1145@verge.net.au>
- <CANqRtoRzvWMo9y_y80uz=kx=M5p-FzkgWPyZZ914sKHvQcM4Fg@mail.gmail.com>
-Message-ID: <20150129002827.GA18731@verge.net.au>
+Date: Thu, 29 Jan 2015 09:30:57 +0900
+Subject: [PATCH] ARM: shmobile: henninger: rename board to Porter
+In-Reply-To: <54C8E718.7060504@cogentembedded.com>
+References: <2481726.lh33apx2TG@wasted.cogentembedded.com>
+ <CAMuHMdW3NmzGxGa9DOHpk4Evjg=+bduUPiMoRZT9Ko7+jNp-Nw@mail.gmail.com>
+ <54C8E718.7060504@cogentembedded.com>
+Message-ID: <20150129003057.GB18731@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 28, 2015 at 02:53:29PM +0900, Magnus Damm wrote:
-> Hi Simon,
+On Wed, Jan 28, 2015 at 04:41:44PM +0300, Sergei Shtylyov wrote:
+> Hello.
 > 
-> On Tue, Jan 27, 2015 at 12:58 PM, Simon Horman <horms@verge.net.au> wrote:
-> > On ?,  1? 27, 2015 at 10:17:09?? +0900, Simon Horman wrote:
-> >> On Mon, Jan 26, 2015 at 03:17:47PM +0900, Magnus Damm wrote:
-> >> > ARM: shmobile: Remove sh7372/Mackerel and ZBOOT MMC/SDHI support V2
-> >> >
-> >> > [PATCH 01/14 v2] ARM: shmobile: mackerel: Remove ZBOOT code
-> >> > [PATCH 02/14 v2] ARM: shmobile: mackerel: Remove Legacy C board code
-> >> > [PATCH 03/14 v2] ARM: shmobile: mackerel dts: Remove Legacy DTS file
-> >> > [PATCH 04/14 v2] ARM: shmobile: mackerel: Remove DT binding documentation
-> >> > [PATCH 05/14 v2] ARM: shmobile: mackerel: Remove mach-type entry
-> >> > [PATCH 06/14 v2] ARM: shmobile: mackerel: Remove defconfig
-> >> > [PATCH 07/14 v2] ARM: shmobile: mackerel: Remove from MAINTAINERS
-> >> > [PATCH 08/14 v2] ARM: shmobile: sh7372: Remove ZBOOT MMC/SDHI support
-> >> > [PATCH 09/14 v2] ARM: shmobile: sh7372: Remove Legacy C SoC code
-> >> > [PATCH 10/14 v2] ARM: shmobile: sh7372: Remove DT binding documentation
-> >> > [PATCH 11/14 v2] ARM: shmobile: sh7372 dtsi: Remove Legacy DTSI file
-> >> > [PATCH 12/14 v2] Documentation: Remove ZBOOT MMC/SDHI utility and docs
-> >> > [PATCH 13/14 v2] pinctrl: sh-pfc: sh7372: Remove PFC support
-> >> > [PATCH 14/14 v2] pinctrl: sh-pfc: sh7372: Remove DT binding documentation
-> >> >
-> >> > Here is my latest attempt (V2) of legacy board and SoC support removal
-> >> > for Mackerel and sh7372. Both the ARM mach-shmobile code base and the
-> >> > PINCTRL subsystem is affected.
-> >> >
-> >> > Also get rid of the remaining ZBOOT MMC/SDHI code, documentation and
-> >> > utility that has no user once sh7372 is gone.
-> >> >
-> >> > The Cortex-A8 based sh7372 SoC is rather old and never went into mass
-> >> > production anyway, so these patches that remove SoC and board support
-> >> > will only affect a few selected developers.
-> >> >
-> >> > I wish we had some way to make use of the ZBOOT MMC/SDHI code, but
-> >> > without any board or SoC code it makes little sense to keep it.
-> >> >
-> >> > Thanks to Laurent and Geert for review!
-> >>
-> >> Sad to see all our hard work being deleted. But at the same
-> >> time its nice to be able to reduce our footprint by 8681 lines!
-> >>
-> >> I have queued up the first 12 patches of this series, that is the
-> >> non-pfc patches. They are queued up in a new sh7372-soc-removal-for-v3.21
-> >> branch which I intend to push as part of renesas-devel-20150127-v3.19-rc6 a
-> >> little later today.
-> >
-> > BTW, could you check that I queued up things correctly?
+> On 1/25/2015 10:30 PM, Geert Uytterhoeven wrote:
 > 
-> It looks fine to me. Thanks for your help!
+> >>Renesas has made some changes to the Henninger low cost board hardware and at
+> >>the same time decided to  rename the board  to Porter.
+> 
+> >Which changes?
+> 
+>   I don't have a list ready, sorry. One thing I know is that HDMI chip is
+> different (the same as on Koelsch now); we don't support it yet...
 
-Thanks, for checking.
+This sounds more like a new board than an update. I don't have any strong
+opinions about this at this time but perhaps it would make more sense to
+handle this as two steps: adding a new board and removing an old one.
+
+> >They're not reflected in the new DTS?
+> 
+>    Not yet.
+> 
+> >>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
+> >>---
+> >>This patch is against 'renesas-devel-20150123-v3.19-rc5' tag of Simon Horman's
+> >>'renesas.git' repo.
+> >>
+> >>  arch/arm/boot/dts/Makefile                                     |  2 +-
+> >>  .../arm/boot/dts/{r8a7791-henninger.dts => r8a7791-porter.dts} | 10 +++++-----
+> >>  2 files changed, 6 insertions(+), 6 deletions(-)
+> >>  rename arch/arm/boot/dts/{r8a7791-henninger.dts => r8a7791-porter.dts} (96%)
+> 
+> >You forgot to update Documentation/devicetree/bindings/arm/shmobile.txt
+> 
+>    No wonder -- I had no idea it is listed there...
+> 
+> >Gr{oetje,eeting}s,
+> 
+> >                         Geert
+> 
+> WBR, Sergei
+> 
