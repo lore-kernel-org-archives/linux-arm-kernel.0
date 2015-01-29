@@ -1,40 +1,73 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 29 Jan 2015 13:57:46 -0800
-Subject: [GIT PULL 4/4] Samsung 3rd DT updates for v3.20
-In-Reply-To: <54C98013.1080200@kernel.org>
-References: <54C98013.1080200@kernel.org>
-Message-ID: <20150129215746.GE20785@quad.lixom.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 29 Jan 2015 22:57:39 +0100
+Subject: [PATCH] [TEMPORARY] net: netfilter: IPV6 XT sockets need
+ CONFIG_NF_DEFRAG_IPV6
+In-Reply-To: <1699413.oLnudLOjvJ@wuerfel>
+References: <1513018.IdvuSAziQY@wuerfel> <1699413.oLnudLOjvJ@wuerfel>
+Message-ID: <2517612.ARZYBYQ2lu@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 29, 2015 at 09:34:27AM +0900, Kukjin Kim wrote:
-> Hi,
+On Thursday 29 January 2015 17:50:30 Arnd Bergmann wrote:
+> On Thursday 29 January 2015 17:18:59 Arnd Bergmann wrote:
+> > If IP6_NF_IPTABLES=m, NF_DEFRAG_IPV6 gets selected as a module as well
+> > from NETFILTER_XT_MATCH_SOCKET, so the latter cannot be built-in, or
+> > we get:
 > 
-> This is another Samsung DT updates for v3.20. Since including a clock
-> patch with Mike and Sylwester's acks so sending separate pull-request.
+> I messed up the subject line, the [TEMPORARY] was not meant to be
+> in there, and I also saw that the subject was mixed up too.
 > 
-> Please pull and if any problems please let me know.
-> 
-> Thanks,
-> Kukjin
-> 
-> 
-> The following changes since commit 6591a02e17e6d6587c3cf7588d523fa6f26b584a:
-> 
->   ARM: dts: reduce total RAM by 22 MiB for exynos5422-odroidxu3
-> (2015-01-24 13:24:10 +0900)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> tags/samsung-dt-3
-> 
-> for you to fetch changes up to ea08de16eb1ba2052ce2db4b58b62a2ec33357a3:
-> 
->   ARM: dts: Add DISP1 power domain for exynos5420 (2015-01-29 08:52:23
-> +0900)
+> I will send it again with the proper subject.
 
-Merged, thanks.
+After trying to fix up the commit message, I'm no longer sure the
+patch was right either. The patch below is what I have now, and it
+fixes the broken randconfig, but I'd give it a few hundred more
+builds and some thought before I'm actually convinced that it's complete.
 
+Sorry about the messup.
 
--Olof
+	Arnd
+
+8<-----
+>From 6da20879baa5b562c023f1a1b81a0a48da5ab0e4 Mon Sep 17 00:00:00 2001
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Fri, 6 Jun 2014 10:07:46 +0200
+Subject: [PATCH] [SUBMITTED] net: netfilter: fix IPV6 XT sockets dependency
+
+If IP6_NF_IPTABLES=m, and one of NETFILTER_XT_MATCH_SOCKET or
+NETFILTER_XT_TARGET_TPROXY is built-in, we get a link error:
+
+net/built-in.o: In function `socket_mt_init':
+:(.init.text+0x32a0): undefined reference to `nf_defrag_ipv6_enable'
+net/built-in.o: In function `tproxy_tg_init':
+xt_TPROXY.c:582: undefined reference to `nf_defrag_ipv6_enable'
+
+The reason for this is that NF_DEFRAG_IPV6 also gets selected
+by NF_CONNTRACK_IPV6, and that forces it to be a module.
+
+To solve this, we add another set of dependencies that enforce that
+either IP6_NF_IPTABLES is disabled, or the two netfilter drivers
+are also loadable modules.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/net/netfilter/Kconfig b/net/netfilter/Kconfig
+index b02660fa9eb0..fc4f4a207785 100644
+--- a/net/netfilter/Kconfig
++++ b/net/netfilter/Kconfig
+@@ -875,6 +875,7 @@ config NETFILTER_XT_TARGET_TPROXY
+ 	depends on NETFILTER_ADVANCED
+ 	depends on (IPV6 || IPV6=n)
+ 	depends on IP_NF_MANGLE
++	depends on !NF_CONNTRACK_IPV6 || NF_CONNTRACK_IPV6
+ 	select NF_DEFRAG_IPV4
+ 	select NF_DEFRAG_IPV6 if IP6_NF_IPTABLES
+ 	help
+@@ -1366,6 +1367,7 @@ config NETFILTER_XT_MATCH_SOCKET
+ 	depends on NETFILTER_XTABLES
+ 	depends on NETFILTER_ADVANCED
+ 	depends on !NF_CONNTRACK || NF_CONNTRACK
++	depends on !NF_CONNTRACK_IPV6 || NF_CONNTRACK_IPV6
+ 	depends on (IPV6 || IPV6=n)
+ 	select NF_DEFRAG_IPV4
+ 	select NF_DEFRAG_IPV6 if IP6_NF_IPTABLES
