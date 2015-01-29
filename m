@@ -1,95 +1,89 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 29 Jan 2015 16:24:43 +0000
-Subject: [PATCH] arm64: Avoid breakage caused by .altmacro in fpsimd
- save/restore macros
-Message-ID: <1422548683-25544-1-git-send-email-Dave.Martin@arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 29 Jan 2015 10:24:44 -0600
+Subject: [PATCH] usb: dwc2: fix USB core dependencies
+In-Reply-To: <1554724.zbFzpEsGrd@wuerfel>
+References: <1554724.zbFzpEsGrd@wuerfel>
+Message-ID: <20150129162444.GI21217@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alternate macro mode is not a property of a macro definition, but a
-gas runtime state that alters the way macros are expanded for ever
-after (until .noaltmacro is seen).
+Hi,
 
-This means that subsequent assembly code that calls other macros can
-break if fpsimdmacros.h is included.
+Adding John
 
-Since these instruction sequences are simple (if dull -- but in a
-good way), this patch solves the problem by simply expanding the
-.irp loops.  The pre-existing fpsimd_{save,restore} macros weren't
-rolled with .irp anyway and the sequences affected are short, so
-this change restores consistency at little cost.
+On Wed, Jan 28, 2015 at 10:49:00PM +0100, Arnd Bergmann wrote:
+> It is currently possible to configure the dwc2 driver as built-in
+> when host mode or dual-role is enabled, but the USB core is
+> a loadable module. This leads to a link failure:
+> 
+> drivers/built-in.o: In function `_dwc2_hcd_start':
+> :(.text+0x84538): undefined reference to `usb_hcd_resume_root_hub'
+> drivers/built-in.o: In function `_dwc2_hcd_urb_dequeue':
+> :(.text+0x84aa0): undefined reference to `usb_hcd_check_unlink_urb'
+> :(.text+0x84e4c): undefined reference to `usb_hcd_unlink_urb_from_ep'
+> :(.text+0x84e74): undefined reference to `usb_hcd_giveback_urb'
+> drivers/built-in.o: In function `dwc2_assign_and_init_hc':
+> :(.text+0x86b98): undefined reference to `usb_hcd_unmap_urb_for_dma'
+> drivers/built-in.o: In function `_dwc2_hcd_urb_enqueue':
+> :(.text+0x8717c): undefined reference to `usb_hcd_link_urb_to_ep'
+> :(.text+0x872f4): undefined reference to `usb_hcd_unlink_urb_from_ep'
+> drivers/built-in.o: In function `dwc2_host_complete':
+> :(.text+0x875d4): undefined reference to `usb_hcd_unlink_urb_from_ep'
+> :(.text+0x87600): undefined reference to `usb_hcd_giveback_urb'
+> drivers/built-in.o: In function `dwc2_hcd_init':
+> :(.text+0x87ba8): undefined reference to `usb_disabled'
+> :(.text+0x87d38): undefined reference to `usb_create_hcd'
+> :(.text+0x88094): undefined reference to `usb_add_hcd'
+> :(.text+0x880dc): undefined reference to `usb_put_hcd'
+> drivers/built-in.o: In function `dwc2_hcd_remove':
+> :(.text+0x8821c): undefined reference to `usb_remove_hcd'
+> :(.text+0x8823c): undefined reference to `usb_put_hcd'
+> drivers/built-in.o: In function `dwc2_hc_handle_tt_clear.isra.10':
+> :(.text+0x88e2c): undefined reference to `usb_hub_clear_tt_buffer'
+> drivers/built-in.o: In function `dwc2_hcd_qtd_add':
+> :(.text+0x8b554): undefined reference to `usb_calc_bus_time'
+> 
+> To fix the problem, this patch changes the dependencies so that
+> dwc2 host mode can only be enabled if either the USB core is
+> built-in or both USB and dwc2 are modules.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> diff --git a/drivers/usb/dwc2/Kconfig b/drivers/usb/dwc2/Kconfig
+> index b323c4c11b0a..76b9ba4dc925 100644
+> --- a/drivers/usb/dwc2/Kconfig
+> +++ b/drivers/usb/dwc2/Kconfig
+> @@ -23,7 +23,7 @@ choice
+>  
+>  config USB_DWC2_HOST
+>  	bool "Host only mode"
+> -	depends on USB
+> +	depends on USB=y || (USB_DWC2=m && USB)
+>  	help
+>  	  The Designware USB2.0 high-speed host controller
+>  	  integrated into many SoCs. Select this option if you want the
+> @@ -42,7 +42,7 @@ config USB_DWC2_PERIPHERAL
+>  
+>  config USB_DWC2_DUAL_ROLE
+>  	bool "Dual Role mode"
+> -	depends on (USB=y || USB=USB_DWC2) && (USB_GADGET=y || USB_GADGET=USB_DWC2)
+> +	depends on (USB=y && USB_GADGET=y) || (USB_DWC2=m && USB && USB_GADGET)
+>  	help
+>  	  Select this option if you want the driver to work in a dual-role
+>  	  mode. In this mode both host and gadget features are enabled, and
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
- arch/arm64/include/asm/fpsimdmacros.h |   43 ++++++++++++++++++++++++---------
- 1 file changed, 32 insertions(+), 11 deletions(-)
-
-diff --git a/arch/arm64/include/asm/fpsimdmacros.h b/arch/arm64/include/asm/fpsimdmacros.h
-index 007618b..a2daf12 100644
---- a/arch/arm64/include/asm/fpsimdmacros.h
-+++ b/arch/arm64/include/asm/fpsimdmacros.h
-@@ -76,7 +76,6 @@
- 	fpsimd_restore_fpcr x\tmpnr, \state
- .endm
- 
--.altmacro
- .macro fpsimd_save_partial state, numnr, tmpnr1, tmpnr2
- 	mrs	x\tmpnr1, fpsr
- 	str	w\numnr, [\state, #8]
-@@ -86,11 +85,22 @@
- 	add	\state, \state, x\numnr, lsl #4
- 	sub	x\tmpnr1, x\tmpnr1, x\numnr, lsl #1
- 	br	x\tmpnr1
--	.irp	qa, 30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2, 0
--	.irp	qb, %(qa + 1)
--	stp	q\qa, q\qb, [\state, # -16 * \qa - 16]
--	.endr
--	.endr
-+	stp	q30, q31, [\state, #-16 * 30 - 16]
-+	stp	q28, q29, [\state, #-16 * 28 - 16]
-+	stp	q26, q27, [\state, #-16 * 26 - 16]
-+	stp	q24, q25, [\state, #-16 * 24 - 16]
-+	stp	q22, q23, [\state, #-16 * 22 - 16]
-+	stp	q20, q21, [\state, #-16 * 20 - 16]
-+	stp	q18, q19, [\state, #-16 * 18 - 16]
-+	stp	q16, q17, [\state, #-16 * 16 - 16]
-+	stp	q14, q15, [\state, #-16 * 14 - 16]
-+	stp	q12, q13, [\state, #-16 * 12 - 16]
-+	stp	q10, q11, [\state, #-16 * 10 - 16]
-+	stp	q8, q9, [\state, #-16 * 8 - 16]
-+	stp	q6, q7, [\state, #-16 * 6 - 16]
-+	stp	q4, q5, [\state, #-16 * 4 - 16]
-+	stp	q2, q3, [\state, #-16 * 2 - 16]
-+	stp	q0, q1, [\state, #-16 * 0 - 16]
- 0:
- .endm
- 
-@@ -103,10 +113,21 @@
- 	add	\state, \state, x\tmpnr2, lsl #4
- 	sub	x\tmpnr1, x\tmpnr1, x\tmpnr2, lsl #1
- 	br	x\tmpnr1
--	.irp	qa, 30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2, 0
--	.irp	qb, %(qa + 1)
--	ldp	q\qa, q\qb, [\state, # -16 * \qa - 16]
--	.endr
--	.endr
-+	ldp	q30, q31, [\state, #-16 * 30 - 16]
-+	ldp	q28, q29, [\state, #-16 * 28 - 16]
-+	ldp	q26, q27, [\state, #-16 * 26 - 16]
-+	ldp	q24, q25, [\state, #-16 * 24 - 16]
-+	ldp	q22, q23, [\state, #-16 * 22 - 16]
-+	ldp	q20, q21, [\state, #-16 * 20 - 16]
-+	ldp	q18, q19, [\state, #-16 * 18 - 16]
-+	ldp	q16, q17, [\state, #-16 * 16 - 16]
-+	ldp	q14, q15, [\state, #-16 * 14 - 16]
-+	ldp	q12, q13, [\state, #-16 * 12 - 16]
-+	ldp	q10, q11, [\state, #-16 * 10 - 16]
-+	ldp	q8, q9, [\state, #-16 * 8 - 16]
-+	ldp	q6, q7, [\state, #-16 * 6 - 16]
-+	ldp	q4, q5, [\state, #-16 * 4 - 16]
-+	ldp	q2, q3, [\state, #-16 * 2 - 16]
-+	ldp	q0, q1, [\state, #-16 * 0 - 16]
- 0:
- .endm
 -- 
-1.7.10.4
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150129/7e1024a9/attachment.sig>
