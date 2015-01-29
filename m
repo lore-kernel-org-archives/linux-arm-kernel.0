@@ -1,78 +1,54 @@
-From: varkabhadram@gmail.com (Varka Bhadram)
-Date: Thu, 29 Jan 2015 19:56:40 +0530
-Subject: [PATCH v6 6/8] input: touchscreen: imx25 tcq driver
-In-Reply-To: <1422540556-14828-7-git-send-email-mpa@pengutronix.de>
-References: <1422540556-14828-1-git-send-email-mpa@pengutronix.de>
- <1422540556-14828-7-git-send-email-mpa@pengutronix.de>
-Message-ID: <54CA4320.4030607@gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 29 Jan 2015 15:27:40 +0100
+Subject: [PATCH v2] MediaTek PMIC support
+In-Reply-To: <CABuKBe+x9o5OiysnMq-gvOBx3nKoaheL2efZGA6YQ7ZT5aqijw@mail.gmail.com>
+References: <1422022202-7526-1-git-send-email-s.hauer@pengutronix.de>
+ <20150126114735.GA3178@pengutronix.de>
+ <CABuKBe+x9o5OiysnMq-gvOBx3nKoaheL2efZGA6YQ7ZT5aqijw@mail.gmail.com>
+Message-ID: <20150129142740.GH12209@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jan 29, 2015 at 01:39:42PM +0100, Matthias Brugger wrote:
+> Hi Sascha,
+> 
+> 2015-01-26 12:47 GMT+01:00 Sascha Hauer <s.hauer@pengutronix.de>:
+> > Olof, Arnd,
+> >
+> > OK to put the driver into drivers/soc/mediatek? Can you take these
+> > patches?
+> 
+> How does this patches fit together with the one James clock framework patches?
+> Both use the same compatible "mediatek,mt8135-infracfg" and
+> "mediatek,mt8135-pericfg".
+> 
+> I had a look on other implementations and they attach the reset
+> controller to the clk driver, if they share the same hw block.
+> Might we run into problems if we implement the clocks in the mfd, as
+> we need the clocks early in boot (e.g. for the timer)?
 
-On Thursday 29 January 2015 07:39 PM, Markus Pargmann wrote:
-> This is a driver for the imx25 ADC/TSC module. It controls the
-> touchscreen conversion queue and creates a touchscreen input device.
-> The driver currently only supports 4 wire touchscreens. The driver uses
-> a simple conversion queue of precharge, touch detection, X measurement,
-> Y measurement, precharge and another touch detection.
->
-> This driver uses the regmap from the parent to setup some touch specific
-> settings in the core driver and setup a idle configuration with touch
-> detection.
->
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> Acked-by: Dmitry Torokhov <dtor@vmware.com>
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> ---
->   drivers/input/touchscreen/Kconfig         |   6 +
->   drivers/input/touchscreen/Makefile        |   1 +
->   drivers/input/touchscreen/fsl-imx25-tcq.c | 587 ++++++++++++++++++++++++++++++
->   3 files changed, 594 insertions(+)
->   create mode 100644 drivers/input/touchscreen/fsl-imx25-tcq.c
->
-(...)
+>From my experience the clocks are needed by the timer before any driver
+initializes.
 
-> +	ret = request_threaded_irq(priv->irq, mx25_tcq_irq, mx25_tcq_irq_thread,
-> +				   IRQF_ONESHOT, pdev->name, priv);
+> 
+> In mt6589 pericfg apart from the clocks and reset controller provides
+> registers for AXI bus control and USB wakeup and USB clock selection.
+> The infracfg block provides top AXI bus fabric control signals and
+> remap registers for the modem.
+> Mike, Stephen, what do you think. Can we implement the clk in a mfd
+> driver? Or do you prefer to implement the whole block in the clk
+> driver?
 
-We can use devres API for request_thread_irq()...
+Currently the clk support uses regular CLK_OF_DECLARE which handles the
+clock part of pericfg/infracfg and then later a regular driver for
+pericfg/infracfg comes and handles the rest of the functionality. Since
+both use separate registers in the device register space it should work
+fine.
 
-> +	if (ret) {
-> +		dev_err(dev, "Failed requesting IRQ\n");
-> +		goto err_clk_unprepare;
-> +	}
-> +
-> +	ret = mx25_tcq_init(priv);
-> +	if (ret) {
-> +		dev_err(dev, "Failed to init tcq\n");
-> +		goto error_free_irq;
-> +	}
-> +
-> +	platform_set_drvdata(pdev, priv);
-> +
-> +	return 0;
-> +
-> +error_free_irq:
-> +	free_irq(priv->irq, priv);
-
-This is not required if we use devres API
-
-> +err_clk_unprepare:
-> +	clk_disable_unprepare(priv->clk);
-> +	return ret;
-> +}
-> +
-> +static int mx25_tcq_remove(struct platform_device *pdev)
-> +{
-> +	struct mx25_tcq_priv *priv = platform_get_drvdata(pdev);
-> +
-> +	free_irq(priv->irq, priv);
-
-This also..
-
+Sascha
 
 -- 
-Regards,
-Varka Bhadram.
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
