@@ -1,200 +1,37 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 29 Jan 2015 12:22:23 +0000
-Subject: [PATCH 2/7] pm: at91: pm_suspend: add the WFI support for ARMv7
-In-Reply-To: <B256D81BAE5131468A838E5D7A243641BFD38E3C@penmbx01>
-References: <1422266617-24381-1-git-send-email-wenyou.yang@atmel.com>
- <1422266761-24487-1-git-send-email-wenyou.yang@atmel.com>
- <20150128112551.GA13253@e102568-lin.cambridge.arm.com>
- <B256D81BAE5131468A838E5D7A243641BFD38E3C@penmbx01>
-Message-ID: <20150129122223.GA3937@red-moon>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Thu, 29 Jan 2015 12:29:00 +0000
+Subject: Hangs in libhugetlbfs tests in -next
+In-Reply-To: <20150128152412.GX21293@sirena.org.uk>
+References: <20150128152412.GX21293@sirena.org.uk>
+Message-ID: <CAPvkgC1LjQ0A2OkNjOAU3HAWVBiu3E=9pjJynPF4QFzyoRQRnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 29, 2015 at 02:36:01AM +0000, Yang, Wenyou wrote:
-> Hi Lorenzo,
-> 
-> Thank you for your review.
-> 
-> > -----Original Message-----
-> > From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
-> > Sent: Wednesday, January 28, 2015 7:26 PM
-> > To: Yang, Wenyou
-> > Cc: Ferre, Nicolas; linux at arm.linux.org.uk; linux-arm-kernel at lists.infradead.org;
-> > linux-kernel at vger.kernel.org; alexandre.belloni at free-electrons.com;
-> > sylvain.rochet at finsecur.com; peda at axentia.se; Vilchez, Patrice
-> > Subject: Re: [PATCH 2/7] pm: at91: pm_suspend: add the WFI support for ARMv7
-> > 
-> > On Mon, Jan 26, 2015 at 10:06:01AM +0000, Wenyou Yang wrote:
-> > 
-> > Commit log please.
-> Added in the v2.0
-> 
-> > 
-> > > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> > > ---
-> > >  arch/arm/mach-at91/pm_suspend.S |   54
-> > ++++++++++++++++++++++++++++++++++++++-
-> > >  1 file changed, 53 insertions(+), 1 deletion(-)
-> > >
-> > > diff --git a/arch/arm/mach-at91/pm_suspend.S
-> > > b/arch/arm/mach-at91/pm_suspend.S index 122a3f1..e796722 100644
-> > > --- a/arch/arm/mach-at91/pm_suspend.S
-> > > +++ b/arch/arm/mach-at91/pm_suspend.S
-> > > @@ -53,6 +53,58 @@ mode	.req	r6
-> > >  	beq	1b
-> > >  	.endm
-> > >
-> > > +/*
-> > > + * Put the processor to enter the WFI state  */
-> > > +	.macro _do_wfi
-> > 
-> > You will have to explain why you need this, really.
-> I don't understand your meaning.
+On 28 January 2015 at 15:24, Mark Brown <broonie@kernel.org> wrote:
+> For at least the past couple of days tests of libhugetlbfs have been
+> hanging on mustang in the mlock test running ARMv8 defconfig with both
+> 32 bit and 64 bit userspace - after the mprotect test (the one before
+> it) we get no console output for several hours so it appears that the
+> test has deadlocked.  The tail of the log is:
+>
+> | find_path (2M: 64):   PASS
+> | unlinked_fd (2M: 64): PASS
+> | readback (2M: 64):    PASS
+> | truncate (2M: 64):    PASS
+> | shared (2M: 64):      PASS
+> | mprotect (2M: 64):    PASS
+>
+> and then a timeout.
+>
+> This may be a generic bug but my ability to run these tests on other
+> platforms with huge page support using the infrastructure I'm using is
+> limited so I've not been able to test elsewhere and confirm.
 
-I want to understand why this assembly snippet (that can be rewritten
-in C BTW):
+I've reproduced this on Juno, it looks like hugtlb_fault is being
+called repeatedly in the mlock test.
 
-/* Disable the processor's clock */
-mov	tmp1, #AT91_PMC_PCK
-str	tmp1, [pmc, #AT91_PMC_SCDR]
+I'll investigate further.
 
-+
-
-cpu_do_idle()
-
-is not sufficient for you, or put it differently, why do you need
-this macro.
-
-> 
-> > 
-> > > +
-> > > +#if defined(CONFIG_CPU_V7)
-> > > +	/*
-> > > +	 * Execute an ISB instruction to flush the pipeline to ensure
-> > > +	 * that all of operations have beem completed.
-> > 
-> > s/beem/been
-> Thanks.
-> 
-> > 
-> > > +	 */
-> > > +	isb
-
-This isb should not be there, unless you know a reason why it should
-and you explain it to me.
-
-> > > +
-> > > +	/*
-> > > +	 * Execute an ISB instruction to ensure that all of the
-> > > +	 * CP15 register changes have been committed.
-> > > +	 */
-> > > +	dsb
-> > 
-> > This is a dsb not an isb.
-> Changed in the v2.0
-
-Yes, but I still do not understand why you want to execute it before
-disabling the clocks (I really hope that by "disabling the clocks" you
-mean "set the power controller to a state when, on wfi execution, the
-clocks are gated").
-
-> 
-> > 
-> > > +	dmb
-> > 
-> > You have to explain why you need every single one of these barriers, otherwise I
-> > am NAKing this patch.
-> No need this one?
-
-No, remove it.
-
-> 
-> > 
-> > > +
-> > > +	/* Disable the processor's clock */
-> > > +	mov	tmp1, #AT91_PMC_PCK
-> > > +	str	tmp1, [pmc, #AT91_PMC_SCDR]
-> > > +
-> > > +	/* Execute a WFI instruction */
-> > > +	wfi	@ Wait For Interrupt
-> > 
-> > This one looks ok :)
-> > 
-> > > +
-> > > +	/*
-> > > +	 * CPU can specualatively prefetch the instructions
-> > > +	 * so add NOPs after WFI. Sixteen NOPs as Cortex-A5 pipeline.
-> > 
-> > So what ? I suspect your issue is related to wfi completion on pending IRQ. I
-> > would like to know the details that describe the issue you are trying to solve here
-> > please.
-> Honestly, I referred to others, I will dig more, and test it.
-
-You should not copy and paste code, because:
-
-1) it might be broken
-2) and/or unoptimized
-3) and/or does not apply to your platform
-
-See my suggestion above, if it does not work for you, you will report the
-issue and we will take it from there.
-
-Thanks,
-Lorenzo
-
-> 
-> > 
-> > > +	 */
-> > > +	nop
-> > > +	nop
-> > > +	nop
-> > > +	nop
-> > > +	nop
-> > > +	nop
-> > > +	nop
-> > > +	nop
-> > > +	nop
-> > > +	nop
-> > > +	nop
-> > > +	nop
-> > > +	nop
-> > > +	nop
-> > > +	nop
-> > > +	nop
-> > > +#else
-> > > +	mcr	p15, 0, tmp1, c7, c0, 4
-> > > +#endif
-> > 
-> > Tell us what's the problem you have to solve, first, then we will see how to fix it.
-> > 
-> > Thanks,
-> > Lorenzo
-> > 
-> > > +
-> > > +	.endm
-> > > +
-> > >  	.text
-> > >
-> > >  /*
-> > > @@ -181,7 +233,7 @@ sdr_sr_done:
-> > >
-> > >  skip_disable_main_clock:
-> > >  	/* Wait for interrupt */
-> > > -	mcr	p15, 0, tmp1, c7, c0, 4
-> > > +	_do_wfi
-> > >
-> > >  	tst	mode, #AT91_PM_SLOW_CLOCK
-> > >  	beq	skip_enable_main_clock
-> > > --
-> > > 1.7.9.5
-> > >
-> > > --
-> > > To unsubscribe from this list: send the line "unsubscribe
-> > > linux-kernel" in the body of a message to majordomo at vger.kernel.org
-> > > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > > Please read the FAQ at  http://www.tux.org/lkml/
-> > >
-> 
-> Best Regards,
-> Wenyou Yang
-> 
+Cheers,
+-- 
+Steve
