@@ -1,37 +1,37 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Thu, 29 Jan 2015 12:29:00 +0000
-Subject: Hangs in libhugetlbfs tests in -next
-In-Reply-To: <20150128152412.GX21293@sirena.org.uk>
-References: <20150128152412.GX21293@sirena.org.uk>
-Message-ID: <CAPvkgC1LjQ0A2OkNjOAU3HAWVBiu3E=9pjJynPF4QFzyoRQRnw@mail.gmail.com>
+From: jose.ferreiro@horus.es (jose)
+Date: Thu, 29 Jan 2015 13:38:05 +0100
+Subject: MX6Q Linux 3.10.17 Trying to read registers at boot time
+Message-ID: <54CA29AD.2070703@horus.es>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 January 2015 at 15:24, Mark Brown <broonie@kernel.org> wrote:
-> For at least the past couple of days tests of libhugetlbfs have been
-> hanging on mustang in the mlock test running ARMv8 defconfig with both
-> 32 bit and 64 bit userspace - after the mprotect test (the one before
-> it) we get no console output for several hours so it appears that the
-> test has deadlocked.  The tail of the log is:
->
-> | find_path (2M: 64):   PASS
-> | unlinked_fd (2M: 64): PASS
-> | readback (2M: 64):    PASS
-> | truncate (2M: 64):    PASS
-> | shared (2M: 64):      PASS
-> | mprotect (2M: 64):    PASS
->
-> and then a timeout.
->
-> This may be a generic bug but my ability to run these tests on other
-> platforms with huge page support using the infrastructure I'm using is
-> limited so I've not been able to test elsewhere and confirm.
+Hello
 
-I've reproduced this on Juno, it looks like hugtlb_fault is being
-called repeatedly in the mlock test.
+As you can see below, I came here redirected from:
 
-I'll investigate further.
+https://community.freescale.com/message/473511#473511
+and
+meta-freescale at yoctoproject.org mail list
 
-Cheers,
--- 
-Steve
+I am trying to read/write registers on a 3.10.17 linux compiled for 
+Freescale iMX6Q. And I am trying to do it at mach-imx6q.c
+
+Kernel hangs at Starting kernel point when I try the read.
+
+Next step is try to access like IPU driver with 
+platform_get_resource(pdev, IORESOURCE_MEM, 0) but if someone has any 
+better suggestion I gladly will follow it.
+
+Thanks and best regards,
+Jose
+
+----------------
+I am not able to redirect the other list post so this is what I tried:
+1) direct access
+u32 reg = (ANADIG_ANA_MISC1_LVDSCLK1_IBEN | 
+ANADIG_ANA_MISC1_LVDS1_CLK_SEL_MASK);
+
+   writel(reg, (volatile void __iomem *) 0x20C8168);
+2) map a region:
+I used the request_mem_region, ioremap and ioread32 process 
+(http://www.makelinux.net/ldd3/chp-9-sect-4)
