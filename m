@@ -1,75 +1,85 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Wed, 28 Jan 2015 21:58:42 -0600
-Subject: [PATCH v7 1/4] Documentation: dt: add common bindings for
- hwspinlock
-In-Reply-To: <20150122185622.GE12911@leverpostej>
-References: <1421269101-51105-2-git-send-email-s-anna@ti.com>
- <20150115135201.GG16217@leverpostej> <20150115135556.GH16217@leverpostej>
- <CAL_JsqL2LZAooMk-V8+xeF2g6acZE21M+-OBRw8aEVa-5wVHuQ@mail.gmail.com>
- <CAK=WgbYQ=BbinqJ5fsw2Y+FKdy=nasLsw9mX8pw6S_o3owy9-g@mail.gmail.com>
- <20150116101746.GA21809@leverpostej>
- <CAK=WgbYBqPoUm9byx0du_g5ZmHdYaUVLpSPZYHoCVzNoatNKpw@mail.gmail.com>
- <20150120180548.GK7718@atomide.com>
- <CAK=WgbZGGtwmQwzWumjpYOsYHTt8vPQpTraABwJBsv5VXOmJ_Q@mail.gmail.com>
- <54BFE855.3090200@ti.com> <20150122185622.GE12911@leverpostej>
-Message-ID: <54C9AFF2.6000108@ti.com>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Wed, 28 Jan 2015 20:08:30 -0800
+Subject: [PATCH V3 2/2] perf symbols: debuglink should take symfs option
+ into account
+In-Reply-To: <20150129013809.GB24182@sejong>
+References: <1422340442-4673-1-git-send-email-victor.kamensky@linaro.org>
+ <1422340442-4673-3-git-send-email-victor.kamensky@linaro.org>
+ <20150129013809.GB24182@sejong>
+Message-ID: <CAA3XUr1twCC6s=1Y3Fk7W3ER9t6hFKJBC57vyzx9zjTD9fMW1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/22/2015 12:56 PM, Mark Rutland wrote:
-> On Wed, Jan 21, 2015 at 05:56:37PM +0000, Suman Anna wrote:
->> On 01/21/2015 06:41 AM, Ohad Ben-Cohen wrote:
->>> On Tue, Jan 20, 2015 at 8:05 PM, Tony Lindgren <tony@atomide.com> wrote:
->>>> How about default to Linux id space and allow overriding that with
->>>> a module param option if needed?
->>>
->>> I'm not sure I'm following.
->>>
->>> If the main point of contention is the base_id field, I'm also fine
->>> with removing it entirely, as I'm not aware of any actual user for it
->>> (Suman please confirm?).
->>
->> Yeah, well the current implementations that I am aware of only have a
->> single bank, so all of them would be using a value of 0. I am yet to see
->> a platform with multiple instances where the property really makes a
->> difference. v7 has the property mandatory, so all the implementations
->> would need to define this value even if it is 0.
->>
->> regards
->> Suman
->>
->>>
->>> Mark? Rob? Will you accept Suman's patches if the base_id field is removed?
-> 
-> My concern is that the mapping of hwspinlock IDs doesn't seem to be
-> explicit in the DT on a per-context basis, which is what I'd expect.
-> 
-> e.g.
-> 
-> lck: hwspinlock-device at f00 {
-> 	...
-> 	#hwlock-cells = <1>;
-> };
-> 
-> some-other-os-interface {
-> 	...
-> 	hwlocks = <&lck 0>, <&lck 1>, <&lck 2>, <&lck 3>;
-> 	hwlock-names = "glbl", "pool0", "pool1", "pool2";
-> };
-> 
-> a-different-os-interface {
-> 	...
-> 	hwlocks = <&lck 18>, <&lck 21>, <&lck 4>, <&lck 5>;
-> 	hwlock-names = "init", "teardown", "pool0", "pool1";
-> };
-> 
-> That's the only way I would expect this to possibly remain a stable
-> over time, and it's the entire reason for #hwlock-cells, no?
-> 
-> How do you expect the other components sharing the hwspinlocks to be
-> described?
+Hi  Namhyung,
 
-Yes indeed, this is what any of the clients will use on Linux. But this is not necessarily the semantics for exchanging hwlocks with the other processor(s) which is where the global id space comes into picture.
+On 28 January 2015 at 17:38, Namhyung Kim <namhyung@kernel.org> wrote:
+> Hi Victor,
+>
+> On Mon, Jan 26, 2015 at 10:34:02PM -0800, Victor Kamensky wrote:
+>> Currently code that tries to read corresponding debug symbol
+>> file from .gnu_debuglink section (DSO_BINARY_TYPE__DEBUGLINK)
+>> does not take in account symfs option, so filename__read_debuglink
+>> function cannot open ELF file, if symfs option is used.
+>>
+>> Fix is to add proper handling of symfs as it is done in other
+>> places: use __symbol__join_symfs function to get real file name
+>> of target ELF file.
+>>
+>> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+>> Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
+>> Cc: Paul Mackerras <paulus@samba.org>
+>> Cc: Ingo Molnar <mingo@redhat.com>
+>> Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
+>> Cc: Jiri Olsa <jolsa@kernel.org>
+>> Cc: Adrian Hunter <adrian.hunter@intel.com>
+>> Cc: Waiman Long <Waiman.Long@hp.com>
+>> Cc: David Ahern <dsahern@gmail.com>
+>> Acked-and-tested-by: David Ahern <dsahern@gmail.com>
+>
+> Acked-by: Namhyung Kim <namhyung@kernel.org>
 
-regards
-Suman
+Thank you for the Acks! Is there any action items on my side?
+Should I repost patches with your Acks? Or you or Arnaldo
+will add them once they got merged in proper tree for
+upstreaming?
+
+Thanks,
+Victor
+
+> Thanks,
+> Namhyung
+>
+>
+>> ---
+>>  tools/perf/util/dso.c | 6 +++---
+>>  1 file changed, 3 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/tools/perf/util/dso.c b/tools/perf/util/dso.c
+>> index 45be944..ca8d8d5 100644
+>> --- a/tools/perf/util/dso.c
+>> +++ b/tools/perf/util/dso.c
+>> @@ -45,13 +45,13 @@ int dso__read_binary_type_filename(const struct dso *dso,
+>>       case DSO_BINARY_TYPE__DEBUGLINK: {
+>>               char *debuglink;
+>>
+>> -             strncpy(filename, dso->long_name, size);
+>> -             debuglink = filename + dso->long_name_len;
+>> +             len = __symbol__join_symfs(filename, size, dso->long_name);
+>> +             debuglink = filename + len;
+>>               while (debuglink != filename && *debuglink != '/')
+>>                       debuglink--;
+>>               if (*debuglink == '/')
+>>                       debuglink++;
+>> -             ret = filename__read_debuglink(dso->long_name, debuglink,
+>> +             ret = filename__read_debuglink(filename, debuglink,
+>>                                              size - (debuglink - filename));
+>>               }
+>>               break;
+>> --
+>> 1.9.3
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> Please read the FAQ at  http://www.tux.org/lkml/
