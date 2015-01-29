@@ -1,66 +1,89 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 29 Jan 2015 12:51:46 -0800
-Subject: [PATCH 2/4] MAINTAINERS: update Broadcom Cygnus SoC git tree
-In-Reply-To: <54CA88F2.5080700@broadcom.com>
-References: <1420843541-5166-1-git-send-email-f.fainelli@gmail.com>	<1420843541-5166-3-git-send-email-f.fainelli@gmail.com>	<54B05AFD.2030105@broadcom.com>
- <CAKdAkRSXYDdUxMVms4B53aV3fm=hkO3hnyHPhyzKGGW5Bxs4-Q@mail.gmail.com>
- <54CA88F2.5080700@broadcom.com>
-Message-ID: <54CA9D62.2050908@gmail.com>
+From: tthayer@opensource.altera.com (Thor Thayer)
+Date: Thu, 29 Jan 2015 14:53:06 -0600
+Subject: [PATCHv6 0/5] Add Altera peripheral memories to EDAC framework
+In-Reply-To: <1420772036-3112-1-git-send-email-tthayer@opensource.altera.com>
+References: <1420772036-3112-1-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <54CA9DB2.4070109@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/01/15 11:24, Ray Jui wrote:
-> 
-> 
-> On 1/29/2015 11:01 AM, Dmitry Torokhov wrote:
->> On Fri, Jan 9, 2015 at 2:49 PM, Ray Jui <rjui@broadcom.com> wrote:
->>>
->>>
->>> On 1/9/2015 2:45 PM, Florian Fainelli wrote:
->>>> The Cygnus SoC git tree is moved from github.com/brcm/linux.git to its
->>>> own git tree at github.com/Broadcom/cygnus-linux.git.
->>>>
->>>> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
->>>> ---
->>>>  MAINTAINERS | 2 +-
->>>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>>
->>>> diff --git a/MAINTAINERS b/MAINTAINERS
->>>> index ff73215cd165..4a8f3459f9c2 100644
->>>> --- a/MAINTAINERS
->>>> +++ b/MAINTAINERS
->>>> @@ -2192,7 +2192,7 @@ M:      Ray Jui <rjui@broadcom.com>
->>>>  M:   Scott Branden <sbranden@broadcom.com>
->>>>  L:   linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->>>>  L:   bcm-kernel-feedback-list at broadcom.com
->>>> -T:   git git://git.github.com/brcm/linux.git
->>>> +T:   git git://git.github.com/Broadcom/cygnus-linux.git
->>>
->>> Looks fine to me!
->>
->> Hmm, the address does not work for me unless I drop 'git.' from the front:
->>
->> git://github.com/Broadcom/cygnus-linux.git
->>
->> Thanks.
->>
-> Thanks, Dmitry.
-> 
-> I just tried it myself and also got a connection timeout with
-> git://git.github.com/Broadcom/cygnus-linux.git
-> 
-> fatal: unable to connect to git.github.com:
-> git.github.com[0: 23.235.47.133]: errno=Connection timed out
-> 
-> Same issue for git://git.github.com/broadcom/stblinux.git and
-> git://git.github.com/broadcom/arm-bcm63xx.git
-> 
-> git://github.com/Broadcom/cygnus-linux.git works fine as you mentioned.
-> 
-> Florian, I think we need to fix this. Thanks.
+Hi Device Tree Maintainers,
 
-Thanks for noticing, somehow I copy/pasted the original entry for cygnus
-which was not working either. A new pull request has been submitted,
-let's see if we can it merged or if incremental fixes are needed.
--- 
-Florian
+On 01/08/2015 08:53 PM, tthayer at opensource.altera.com wrote:
+> From: Thor Thayer <tthayer@opensource.altera.com>
+>
+> This patch adds the L2 cache and OCRAM peripherals to the EDAC framework
+> using the EDAC device framework. The ECC is enabled early in the boot
+> process in the platform specific code.
+>
+
+The changes in this patch series revision were mainly to address device 
+tree concerns. There were changes in other areas of the code to address 
+these changes but I believe the other maintainers are waiting to see if 
+these changes are accepted before they will review (they had approved 
+the previous patch changes).
+
+How does the this patch series appear from a device tree perspective?
+
+Thank you for your time,
+
+Thor
+
+
+> v2 changes:
+> - Split On-Chip RAM ECC platform initialization into separate patch from
+>    L2 ECC platform initialization.
+> - Fix L2 cache dependency comments.
+> - Remove OCRAM node from dts and reference prior patch.
+>
+> v3 changes:
+> - Move L2 cache & On-Chip RAM EDAC code into altera_edac.c
+> - Remove SDRAM module compile.
+>
+> v4 changes:
+> - Change mask defines to use BIT().
+> - Fix comment style to agree with kernel coding style.
+> - Better printk description for read != write in trigger.
+> - Remove SysFS debugging message.
+> - Better dci->mod_name
+> - Move gen_pool pointer assignment to end of function.
+> - Invert logic to reduce indent in ocram depenency check.
+> - Change from dev_err() to edac_printk()
+> - Replace magic numbers with defines & comments.
+> - Improve error injection test.
+> - Change Makefile intermediary name to altr (from alt)
+>
+> v5 changes:
+> - Remove l2cache.h by using if (IS_ENABLED(CONFIG_EDAC_ALTERA_L2C))
+> - Remove ocram.h by using if (IS_ENABLED(CONFIG_EDAC_ALTERA_OCRAM))
+> - Check prop variable before using. Include io.h.
+> - Add defines for better readability. Remove MAINTAINERS changes.
+>
+> v6 changes:
+> - Simplify OCRAM initialization. Remove be32_to_cpup() calls.
+> - Remove syscon from L2 Cache. Force L2 Cache on if ECC enabled.
+> - Convert to nested ECC in device tree.
+> - Additional comments to clarify debug error injection.
+>
+> Thor Thayer (5):
+>    arm: socfpga: Enable L2 Cache ECC on startup.
+>    arm: socfpga: Enable OCRAM ECC on startup.
+>    edac: altera: Remove SDRAM module compile
+>    edac: altera: Add Altera L2 Cache and OCRAM EDAC Support
+>    arm: dts: Add Altera L2 Cache and OCRAM EDAC entries
+>
+>   .../bindings/arm/altera/socfpga-edac.txt           |   46 ++
+>   arch/arm/boot/dts/socfpga.dtsi                     |   20 +
+>   arch/arm/mach-socfpga/Makefile                     |    2 +
+>   arch/arm/mach-socfpga/core.h                       |    2 +
+>   arch/arm/mach-socfpga/l2_cache.c                   |   39 ++
+>   arch/arm/mach-socfpga/ocram.c                      |   97 ++++
+>   arch/arm/mach-socfpga/socfpga.c                    |    4 +-
+>   drivers/edac/Kconfig                               |   20 +-
+>   drivers/edac/Makefile                              |    5 +-
+>   drivers/edac/altera_edac.c                         |  506 +++++++++++++++++++-
+>   10 files changed, 735 insertions(+), 6 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-edac.txt
+>   create mode 100644 arch/arm/mach-socfpga/l2_cache.c
+>   create mode 100644 arch/arm/mach-socfpga/ocram.c
+>
