@@ -1,29 +1,155 @@
-From: bhuvanchandra.dv@toradex.com (BhuvanChandra.DV)
-Date: Thu, 29 Jan 2015 12:53:57 +0000
-Subject: [PATCH 7/7] spi: spi-fsl-dspi: Add support for TCFQ transfer mode
-In-Reply-To: <20150129121320.GI21293@sirena.org.uk>
-References: <1422356608-15961-1-git-send-email-bhuvanchandra.dv@toradex.com>
- <1422356608-15961-2-git-send-email-bhuvanchandra.dv@toradex.com>
- <20150128190342.GE21293@sirena.org.uk> <1422533049999.91114@toradex.com>
- <20150129121320.GI21293@sirena.org.uk>
-Message-ID: <1422536382672.21760@toradex.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 29 Jan 2015 14:05:41 +0100
+Subject: [PATCH v2 4/6] mmc: pwrseq_simple: Add optional reference clock
+ support
+In-Reply-To: <1422468953-7594-5-git-send-email-javier.martinez@collabora.co.uk>
+References: <1422468953-7594-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1422468953-7594-5-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <CAPDyKFommNu7oscgmhwMpT-5KYN9b6d1xvt513_0qWE=HEGbow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 01/29/2015 05:43 PM, Mark Brown wrote:
-> On Thu, Jan 29, 2015 at 11:58:25AM +0000, BhuvanChandra.DV wrote:
+On 28 January 2015 at 19:15, Javier Martinez Canillas
+<javier.martinez@collabora.co.uk> wrote:
+> Some WLAN chips attached to a SDIO interface, need a reference clock.
 >
->> As far as i understood the major difference between the two modes are when
->> the interrupt to trigger, as EOQ mode will trigger the interrupt at end of
->> queue and TCF will trigger the interrupt at every frame transfer. Probably
->> mode selection shouldn't be a device tree property, but i don't see any
->> automatic way to choose between the modes.
->> Maybe a config would be more appropriate?
-> Or if there's either no particular reason to choose one over the other
-> or one is always better then just pick one in the driver and don't worry
-> about implementing both.
+> Since this is very common, extend the prseq_simple driver to support
+> an optional clock that is enabled prior the card power up procedure.
+>
+> Note: the external clock is optional. Thus an error is not returned
+> if the clock is not found.
+>
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> ---
+>
+> Changes since v1:
+>  - Rebase on top of latest changes.
+>  - Use IS_ERR() instead of checking for NULL to see if the clock exists.
+> ---
+>  drivers/mmc/core/pwrseq_simple.c | 34 ++++++++++++++++++++++++++++++++--
+>  1 file changed, 32 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/mmc/core/pwrseq_simple.c
+> index e53d3c7e059c..5e34c77efa5e 100644
+> --- a/drivers/mmc/core/pwrseq_simple.c
+> +++ b/drivers/mmc/core/pwrseq_simple.c
+> @@ -7,6 +7,7 @@
+>   *
+>   *  Simple MMC power sequence management
+>   */
+> +#include <linux/clk.h>
+>  #include <linux/kernel.h>
+>  #include <linux/slab.h>
+>  #include <linux/device.h>
+> @@ -20,6 +21,7 @@
+>
+>  struct mmc_pwrseq_simple {
+>         struct mmc_pwrseq pwrseq;
+> +       struct clk *ext_clk;
 
-Among the two, EOQ would be better since with TCF, interrupts are generated at
-every frame transfer, which could be a problem at higher frequencies.
-I think we can omit this patch then.
+You need to add a bool, maybe call it clk_enabled;  See why below.
+
+>         int nr_gpios;
+>         struct gpio_desc *reset_gpios[0];
+>  };
+> @@ -39,6 +41,9 @@ static void mmc_pwrseq_simple_pre_power_on(struct mmc_host *host)
+>         struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
+>                                         struct mmc_pwrseq_simple, pwrseq);
+>
+> +       if (!IS_ERR(pwrseq->ext_clk))
+> +               clk_prepare_enable(pwrseq->ext_clk);
+> +
+
+There are no guarantee that the ->mmc_pwrseq_simple_pre_power_on()
+will be invoked prior ->mmc_pwrseq_simple_power_off().
+
+That means you need to keep track of if you have gated/ungated the
+clock. In other words check pwrseq->clk_enabled. That will prevent
+potential clk unbalance issues.
+
+>         mmc_pwrseq_simple_set_gpios_value(pwrseq, 1);
+>  }
+>
+> @@ -50,6 +55,17 @@ static void mmc_pwrseq_simple_post_power_on(struct mmc_host *host)
+>         mmc_pwrseq_simple_set_gpios_value(pwrseq, 0);
+>  }
+>
+> +static void mmc_pwrseq_simple_power_off(struct mmc_host *host)
+> +{
+> +       struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
+> +                                       struct mmc_pwrseq_simple, pwrseq);
+> +
+> +       mmc_pwrseq_simple_set_gpios_value(pwrseq, 1);
+> +
+> +       if (!IS_ERR(pwrseq->ext_clk))
+> +               clk_disable_unprepare(pwrseq->ext_clk);
+
+Same comment as above.
+
+> +}
+> +
+>  static void mmc_pwrseq_simple_free(struct mmc_host *host)
+>  {
+>         struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
+> @@ -60,6 +76,9 @@ static void mmc_pwrseq_simple_free(struct mmc_host *host)
+>                 if (!IS_ERR(pwrseq->reset_gpios[i]))
+>                         gpiod_put(pwrseq->reset_gpios[i]);
+>
+> +       if (!IS_ERR(pwrseq->ext_clk))
+> +               clk_put(pwrseq->ext_clk);
+> +
+>         kfree(pwrseq);
+>         host->pwrseq = NULL;
+>  }
+> @@ -67,7 +86,7 @@ static void mmc_pwrseq_simple_free(struct mmc_host *host)
+>  static struct mmc_pwrseq_ops mmc_pwrseq_simple_ops = {
+>         .pre_power_on = mmc_pwrseq_simple_pre_power_on,
+>         .post_power_on = mmc_pwrseq_simple_post_power_on,
+> -       .power_off = mmc_pwrseq_simple_pre_power_on,
+> +       .power_off = mmc_pwrseq_simple_power_off,
+>         .free = mmc_pwrseq_simple_free,
+>  };
+>
+> @@ -85,6 +104,14 @@ int mmc_pwrseq_simple_alloc(struct mmc_host *host, struct device *dev)
+>         if (!pwrseq)
+>                 return -ENOMEM;
+>
+> +       pwrseq->ext_clk = clk_get(dev, "ext_clock");
+> +       if (IS_ERR(pwrseq->ext_clk) &&
+> +           PTR_ERR(pwrseq->ext_clk) != -ENOENT &&
+> +           PTR_ERR(pwrseq->ext_clk) != -ENOSYS) {
+
+I don't think you can get -ENOSYS.
+
+> +               ret = PTR_ERR(pwrseq->ext_clk);
+> +               goto free;
+> +       }
+> +
+>         for (i = 0; i < nr_gpios; i++) {
+>                 pwrseq->reset_gpios[i] = gpiod_get_index(dev, "reset", i,
+>                                                          GPIOD_OUT_HIGH);
+> @@ -96,7 +123,7 @@ int mmc_pwrseq_simple_alloc(struct mmc_host *host, struct device *dev)
+>                         while (--i)
+>                                 gpiod_put(pwrseq->reset_gpios[i]);
+>
+> -                       goto free;
+> +                       goto clk_put;
+>                 }
+>         }
+>
+> @@ -105,6 +132,9 @@ int mmc_pwrseq_simple_alloc(struct mmc_host *host, struct device *dev)
+>         host->pwrseq = &pwrseq->pwrseq;
+>
+>         return 0;
+> +clk_put:
+> +       if (!IS_ERR(pwrseq->ext_clk))
+> +               clk_put(pwrseq->ext_clk);
+>  free:
+>         kfree(pwrseq);
+>         return ret;
+> --
+> 2.1.3
+>
+
+Kind regards
+Uffe
