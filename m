@@ -1,73 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 29 Jan 2015 22:57:39 +0100
-Subject: [PATCH] [TEMPORARY] net: netfilter: IPV6 XT sockets need
- CONFIG_NF_DEFRAG_IPV6
-In-Reply-To: <1699413.oLnudLOjvJ@wuerfel>
-References: <1513018.IdvuSAziQY@wuerfel> <1699413.oLnudLOjvJ@wuerfel>
-Message-ID: <2517612.ARZYBYQ2lu@wuerfel>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 29 Jan 2015 23:07:47 +0100
+Subject: [PATCH 1/2] ARM: dts: rockchip: add cpu and gpu regulators to
+ rk3288-evb-act8846
+Message-ID: <5715597.a6Lom1OGfJ@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 29 January 2015 17:50:30 Arnd Bergmann wrote:
-> On Thursday 29 January 2015 17:18:59 Arnd Bergmann wrote:
-> > If IP6_NF_IPTABLES=m, NF_DEFRAG_IPV6 gets selected as a module as well
-> > from NETFILTER_XT_MATCH_SOCKET, so the latter cannot be built-in, or
-> > we get:
-> 
-> I messed up the subject line, the [TEMPORARY] was not meant to be
-> in there, and I also saw that the subject was mixed up too.
-> 
-> I will send it again with the proper subject.
+The evaluation board using the act8846 as main pmic uses two additional
+regulators to provide the cpu and gpu voltage. Add these and also add
+the link to cpu supply from vdd_cpu.
 
-After trying to fix up the commit message, I'm no longer sure the
-patch was right either. The patch below is what I have now, and it
-fixes the broken randconfig, but I'd give it a few hundred more
-builds and some thought before I'm actually convinced that it's complete.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/boot/dts/rk3288-evb-act8846.dts | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-Sorry about the messup.
-
-	Arnd
-
-8<-----
->From 6da20879baa5b562c023f1a1b81a0a48da5ab0e4 Mon Sep 17 00:00:00 2001
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Fri, 6 Jun 2014 10:07:46 +0200
-Subject: [PATCH] [SUBMITTED] net: netfilter: fix IPV6 XT sockets dependency
-
-If IP6_NF_IPTABLES=m, and one of NETFILTER_XT_MATCH_SOCKET or
-NETFILTER_XT_TARGET_TPROXY is built-in, we get a link error:
-
-net/built-in.o: In function `socket_mt_init':
-:(.init.text+0x32a0): undefined reference to `nf_defrag_ipv6_enable'
-net/built-in.o: In function `tproxy_tg_init':
-xt_TPROXY.c:582: undefined reference to `nf_defrag_ipv6_enable'
-
-The reason for this is that NF_DEFRAG_IPV6 also gets selected
-by NF_CONNTRACK_IPV6, and that forces it to be a module.
-
-To solve this, we add another set of dependencies that enforce that
-either IP6_NF_IPTABLES is disabled, or the two netfilter drivers
-are also loadable modules.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/net/netfilter/Kconfig b/net/netfilter/Kconfig
-index b02660fa9eb0..fc4f4a207785 100644
---- a/net/netfilter/Kconfig
-+++ b/net/netfilter/Kconfig
-@@ -875,6 +875,7 @@ config NETFILTER_XT_TARGET_TPROXY
- 	depends on NETFILTER_ADVANCED
- 	depends on (IPV6 || IPV6=n)
- 	depends on IP_NF_MANGLE
-+	depends on !NF_CONNTRACK_IPV6 || NF_CONNTRACK_IPV6
- 	select NF_DEFRAG_IPV4
- 	select NF_DEFRAG_IPV6 if IP6_NF_IPTABLES
- 	help
-@@ -1366,6 +1367,7 @@ config NETFILTER_XT_MATCH_SOCKET
- 	depends on NETFILTER_XTABLES
- 	depends on NETFILTER_ADVANCED
- 	depends on !NF_CONNTRACK || NF_CONNTRACK
-+	depends on !NF_CONNTRACK_IPV6 || NF_CONNTRACK_IPV6
- 	depends on (IPV6 || IPV6=n)
- 	select NF_DEFRAG_IPV4
- 	select NF_DEFRAG_IPV6 if IP6_NF_IPTABLES
+diff --git a/arch/arm/boot/dts/rk3288-evb-act8846.dts b/arch/arm/boot/dts/rk3288-evb-act8846.dts
+index a76dd44..9db02bbe 100644
+--- a/arch/arm/boot/dts/rk3288-evb-act8846.dts
++++ b/arch/arm/boot/dts/rk3288-evb-act8846.dts
+@@ -17,7 +17,32 @@
+ 	compatible = "rockchip,rk3288-evb-act8846", "rockchip,rk3288";
+ };
+ 
++&cpu0 {
++	cpu0-supply = <&vdd_cpu>;
++};
++
+ &i2c0 {
++	vdd_cpu: syr827 at 40 {
++		compatible = "silergy,syr827";
++		fcs,suspend-voltage-selector = <1>;
++		reg = <0x40>;
++		regulator-name = "vdd_cpu";
++		regulator-min-microvolt = <850000>;
++		regulator-max-microvolt = <1350000>;
++		regulator-always-on;
++		regulator-boot-on;
++	};
++
++	vdd_gpu: syr828 at 41 {
++		compatible = "silergy,syr828";
++		fcs,suspend-voltage-selector = <1>;
++		reg = <0x41>;
++		regulator-name = "vdd_gpu";
++		regulator-min-microvolt = <850000>;
++		regulator-max-microvolt = <1350000>;
++		regulator-always-on;
++	};
++
+ 	hym8563 at 51 {
+ 		compatible = "haoyu,hym8563";
+ 		reg = <0x51>;
+-- 
+2.1.1
