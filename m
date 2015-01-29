@@ -1,64 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 29 Jan 2015 11:34:50 +0000
-Subject: [PATCH v2 3/3] pm: at91: add disable/enable the L1/L2 cache
- while suspend/resume
-In-Reply-To: <1422411844-13241-1-git-send-email-wenyou.yang@atmel.com>
-References: <1422411707-10945-1-git-send-email-wenyou.yang@atmel.com>
- <1422411844-13241-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20150129113450.GW26493@n2100.arm.linux.org.uk>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 29 Jan 2015 12:36:26 +0100
+Subject: [PATCH v4 3/7] mmc: sdhci-pxav3: Extend binding with SDIO3 conf reg
+ for the Armada 38x
+In-Reply-To: <1422531390-31038-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1422531390-31038-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1422531390-31038-4-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 28, 2015 at 10:24:04AM +0800, Wenyou Yang wrote:
-> +	/*
-> +	 * Clean and invalidate the L2 cache.
-> +	 * Common cache-l2x0.c functions can't be used here since it
-> +	 * uses spinlocks. We are out of coherency here with data cache
-> +	 * disabled. The spinlock implementation uses exclusive load/store
-> +	 * instruction which can fail without data cache being enabled.
-> +	 * Because of this, CPU can lead to deadlock.
+The SDHCI unit used on the Armada 38x needs using an extra register to
+do specific clock adjustments in order to support the SDR50 and DDR50
+modes. This patch extends the binding to allow using this register.
 
-We really need to stop needing platforms to create their own L2 handling
-code.  Please move this to a helper function in arch/arm/mm/l2c-l...-clean.S,
-replacing ... with the appropriate part for the code fragment.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ Documentation/devicetree/bindings/mmc/sdhci-pxa.txt | 15 +++++++++++----
+ 1 file changed, 11 insertions(+), 4 deletions(-)
 
-> +	 */
-> +	ldr	r1, at91_l2cc_base_addr
-> +	ldr	r2, [r1]
-> +	cmp	r2, #0
-> +	beq	skip_l2disable
-> +	mov	r0, #0xff
-> +	str	r0, [r2, #L2X0_CLEAN_INV_WAY]
-> +wait:
-> +	ldr	r0, [r2, #L2X0_CLEAN_INV_WAY]
-> +	mov	r1, #0xff
-> +	ands	r0, r0, r1
-> +	bne	wait
-> +
-> +	mov	r0, #0
-> +	str	r0, [r2, #L2X0_CTRL]
-> +
-> +l2x_sync:
-> +	ldr	r0, [r2, #L2X0_CACHE_SYNC]
-> +	bic	r0, r0, #0x1
-> +	str	r0, [r2, #L2X0_CACHE_SYNC]
-
-I wonder whether you've actually read the documentation for this.  You
-don't need to read-modify-write this register.  The C code doesn't even
-do this.  A write to this register is sufficient - a write issues the
-sync, a read returns the completion status.
-
-> +sync:
-> +	ldr	r0, [r2, #L2X0_CACHE_SYNC]
-> +	ands	r0, r0, #0x1
-> +	bne	sync
-
-Moreover, do you actually need this - it depends on the L2C model.  Only
-L2C220 needs to spin waiting for the sync operation to complete.
-
-Also, are you sure the "clean+invalidate, disable, sync" sequence is
-correct?  Should it not be "clean+invalidate, sync, disable" ?
-
+diff --git a/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt b/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt
+index 4dd6deb90719..3d1b449d6097 100644
+--- a/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt
++++ b/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt
+@@ -9,9 +9,13 @@ Required properties:
+ - reg:
+   * for "mrvl,pxav2-mmc" and "mrvl,pxav3-mmc", one register area for
+     the SDHCI registers.
+-  * for "marvell,armada-380-sdhci", two register areas. The first one
+-    for the SDHCI registers themselves, and the second one for the
+-    AXI/Mbus bridge registers of the SDHCI unit.
++
++  * for "marvell,armada-380-sdhci", three register areas. The first
++    one for the SDHCI registers themselves, the second one for the
++    AXI/Mbus bridge registers of the SDHCI unit, the third one for the
++    SDIO3 Configuration register
++- reg names: should be "sdhci", "mbus", "conf-sdio3". only mandatory
++  for "marvell,armada-380-sdhci"
+ - clocks: Array of clocks required for SDHCI; requires at least one for
+     I/O clock.
+ - clock-names: Array of names corresponding to clocks property; shall be
+@@ -35,7 +39,10 @@ sdhci at d4280800 {
+ 
+ sdhci at d8000 {
+ 	compatible = "marvell,armada-380-sdhci";
+-	reg = <0xd8000 0x1000>, <0xdc000 0x100>;
++	reg-names = "sdhci", "mbus", "conf-sdio3";
++	reg = <0xd8000 0x1000>,
++		<0xdc000 0x100>;
++		<0x18454 0x4>;
+ 	interrupts = <0 25 0x4>;
+ 	clocks = <&gateclk 17>;
+ 	clock-names = "io";
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+2.1.0
