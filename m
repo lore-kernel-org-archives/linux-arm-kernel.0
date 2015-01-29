@@ -1,34 +1,68 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Thu, 29 Jan 2015 18:16:22 -0500
-Subject: [Linaro-acpi] [PATCH v7 04/17] ARM64 / ACPI: Introduce early_param
- for "acpi" and pass acpi=force to enable ACPI
-In-Reply-To: <20150129231120.GA23786@e104818-lin.cambridge.arm.com>
-References: <CAOZdJXU2bFR1T4ZnGavvnrUXAp5e=vNt9g6WKX46H8qs1wz-TQ@mail.gmail.com>
- <CAOZdJXXe+29rux1L3QYBX0yHLy3kdi+ZJrXVd=XfgYN=R6DtKA@mail.gmail.com>
- <20150128181453.GG31752@e104818-lin.cambridge.arm.com>
- <54C92804.5090806@codeaurora.org>
- <20150129151956.GF8951@e104818-lin.cambridge.arm.com>
- <CAKv+Gu_=si=L5+vvg+8hRgwmTahqdePw5bZxUMFSZ8obk-VXFQ@mail.gmail.com>
- <54CA7A42.5080800@codeaurora.org>
- <CAKv+Gu_a6_zjt=MsRuQH2rr05XxDayy0gACtbPXZaDAyhWrigg@mail.gmail.com>
- <54CA7D4A.5090709@codeaurora.org> <54CA7F94.6000305@redhat.com>
- <20150129231120.GA23786@e104818-lin.cambridge.arm.com>
-Message-ID: <54CABF46.3050701@redhat.com>
+From: robdclark@gmail.com (Rob Clark)
+Date: Thu, 29 Jan 2015 18:19:51 -0500
+Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher constraints
+ with dma-parms
+In-Reply-To: <20150129223158.GF26493@n2100.arm.linux.org.uk>
+References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
+ <1422347154-15258-2-git-send-email-sumit.semwal@linaro.org>
+ <20150129143908.GA26493@n2100.arm.linux.org.uk>
+ <CAO_48GEOQ1pBwirgEWeVVXW-iOmaC=Xerr2VyYYz9t1QDXgVsw@mail.gmail.com>
+ <20150129154718.GB26493@n2100.arm.linux.org.uk>
+ <CAF6AEGtTmFg66TK_AFkQ-xp7Nd9Evk3nqe6xCBp7K=77OmXTxA@mail.gmail.com>
+ <20150129192610.GE26493@n2100.arm.linux.org.uk>
+ <CAF6AEGujk8UC4X6T=yhTrz1s+SyZUQ=m05h_WcxLDGZU6bydbw@mail.gmail.com>
+ <20150129223158.GF26493@n2100.arm.linux.org.uk>
+Message-ID: <CAF6AEGuF8j7CpPmKpPhqmc_Rc8qDDSMPSpPfvACsGShnaCRAxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/29/2015 06:11 PM, Catalin Marinas wrote:
+On Thu, Jan 29, 2015 at 5:31 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Jan 29, 2015 at 05:18:33PM -0500, Rob Clark wrote:
+>> On Thu, Jan 29, 2015 at 2:26 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > Now, if we're going to do the "more clever" thing you mention above,
+>> > that rather negates the point of this two-part patch set, which is to
+>> > provide the union of the DMA capabilities of all users.  A union in
+>> > that case is no longer sane as we'd be tailoring the SG lists to each
+>> > user.
+>>
+>> It doesn't really negate.. a different sg list representing the same
+>> physical memory cannot suddenly make the buffer physically contiguous
+>> (from the perspective of memory)..
+>>
+>> (unless we are not on the same page here, so to speak)
+>
+> If we are really only interested in the "physically contiguous" vs
+> "scattered" differentiation, why can't this be just a simple flag?
 
-> Sorry Jon but statements like this make me wonder whether we should
-> simply let the whole ARM ACPI be an out of tree distro business. We
-> spend a long time discussing OS-agnostic firmware implementation,
-> planning mini-summits, just to get certain Linux distro representative
-> stating that the kernel-firmware interface we discuss here only matters
-> for those planning to follow upstream. Certain Linux distros will play
-> by other rules.
+I'd be fine with that..  I was trying to make it a bit less of a point
+solution, but maybe trying to be too generic is not worth it..
 
-Oh, don't take it that way - I just mean that if someone needs a
-different ACPI always on, they can do that separately. I support your
-position on upstream at this time! :)
+There is apparently some hw which has iommu's but small # of tlb
+entries, and would prefer partially contiguous buffers.  But that
+isn't a hard constraint, and maybe shouldn't be solved w/
+max_segment_count.  And I'm not sure how common that is.
 
-Jon.
+> I think I know where you're coming from on that distinction - most
+> GPUs can cope with their buffers being discontiguous in memory, but
+> scanout and capture hardware tends to need contiguous buffers.
+>
+> My guess is that you're looking for some way that a GPU driver could
+> allocate a buffer, which can then be imported into the scanout
+> hardware - and when it is, the underlying backing store is converted
+> to a contiguous buffer.  Is that the usage scenario you're thinking
+> of?
+
+Pretty much..  and maybe a few slight permutations on that involving
+cameras / video codecs / etc.  But the really-really common case is
+gpu (with mmu/iommu) + display (without).  Just solving this problem
+would be a really good first step.
+
+BR,
+-R
+
+>
+> --
+> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+> according to speedtest.net.
