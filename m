@@ -1,53 +1,64 @@
-From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Thu, 29 Jan 2015 11:17:19 +0800
-Subject: [PATCH v6 0/2] ARM: hip04: add GPIO support
-In-Reply-To: <1421046312-22170-1-git-send-email-wangzhou1@hisilicon.com>
-References: <1421046312-22170-1-git-send-email-wangzhou1@hisilicon.com>
-Message-ID: <54C9A63F.4040508@hisilicon.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 29 Jan 2015 08:53:19 +0530
+Subject: [PATCH 1/3] cpufreq: s3c: remove incorrect __init annotations
+In-Reply-To: <1422451015-390439-2-git-send-email-arnd@arndb.de>
+References: <1422451015-390439-1-git-send-email-arnd@arndb.de>
+ <1422451015-390439-2-git-send-email-arnd@arndb.de>
+Message-ID: <CAKohpok5XsZ3o-Q_Ber8n5GaThe1x7BiHqFyHPSDLUDpyCXxog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus, Hi Haojian,
+On 28 January 2015 at 18:46, Arnd Bergmann <arnd@arndb.de> wrote:
+> The two functions s3c2416_cpufreq_driver_init and s3c_cpufreq_register
+> are marked init but are called from a context that might be run after
+> the __init sections are discarded, as the compiler points out:
+>
+> WARNING: vmlinux.o(.data+0x1ad9dc): Section mismatch in reference from the variable s3c2416_cpufreq_driver to the function .init.text:s3c2416_cpufreq_driver_init()
+> WARNING: drivers/built-in.o(.text+0x35b5dc): Section mismatch in reference from the function s3c2410a_cpufreq_add() to the function .init.text:s3c_cpufreq_register()
+>
+> This removes the __init markings.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: stable at vger.kernel.org
+> ---
+>  drivers/cpufreq/s3c2416-cpufreq.c | 4 ++--
+>  drivers/cpufreq/s3c24xx-cpufreq.c | 2 +-
+>  2 files changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/cpufreq/s3c2416-cpufreq.c b/drivers/cpufreq/s3c2416-cpufreq.c
+> index 2fd53eaaec20..d6d425773fa4 100644
+> --- a/drivers/cpufreq/s3c2416-cpufreq.c
+> +++ b/drivers/cpufreq/s3c2416-cpufreq.c
+> @@ -263,7 +263,7 @@ out:
+>  }
+>
+>  #ifdef CONFIG_ARM_S3C2416_CPUFREQ_VCORESCALE
+> -static void __init s3c2416_cpufreq_cfg_regulator(struct s3c2416_data *s3c_freq)
+> +static void s3c2416_cpufreq_cfg_regulator(struct s3c2416_data *s3c_freq)
+>  {
+>         int count, v, i, found;
+>         struct cpufreq_frequency_table *pos;
+> @@ -333,7 +333,7 @@ static struct notifier_block s3c2416_cpufreq_reboot_notifier = {
+>         .notifier_call = s3c2416_cpufreq_reboot_notifier_evt,
+>  };
+>
+> -static int __init s3c2416_cpufreq_driver_init(struct cpufreq_policy *policy)
+> +static int s3c2416_cpufreq_driver_init(struct cpufreq_policy *policy)
+>  {
+>         struct s3c2416_data *s3c_freq = &s3c2416_cpufreq;
+>         struct cpufreq_frequency_table *pos;
+> diff --git a/drivers/cpufreq/s3c24xx-cpufreq.c b/drivers/cpufreq/s3c24xx-cpufreq.c
+> index d00f1cee4509..bd340a1ca87d 100644
+> --- a/drivers/cpufreq/s3c24xx-cpufreq.c
+> +++ b/drivers/cpufreq/s3c24xx-cpufreq.c
+> @@ -454,7 +454,7 @@ static struct cpufreq_driver s3c24xx_driver = {
+>  };
+>
+>
+> -int __init s3c_cpufreq_register(struct s3c_cpufreq_info *info)
+> +int s3c_cpufreq_register(struct s3c_cpufreq_info *info)
+>  {
+>         if (!info || !info->name) {
+>                 printk(KERN_ERR "%s: failed to pass valid information\n",
 
-Any comments about this patch?
-
-Best regards,
-Zhou Wang
-
-On 2015/1/12 15:05, Zhou Wang wrote:
-> This series add the support for the GPIOs of Hisilicon Soc hip04. Hip04 uses
-> synopsis' GPIO IP, and we use the dwapb GPIO driver here. This series add the
-> corresponding dts. The default value of ARCH_NR_GPIOS is used to find gpio
-> base here.
-> 
-> I resend this patchset with new E-mail address in signed-off-by.
-> 
-> Change in v6:
-> - Change E-mail address in signed-off-by to "wangzhou1 at hisilicon.com"
-> Change in v5:
-> - Base on v3.19-rc1
-> - Just use default value of ARCH_NR_GPIOS to find gpio base. Remove the new
->   added patch(3/4) in v4.
-> Change in v4:
-> - Delete "default 128 if ARCH_HIP04" in arch/arm/Kconfig
-> - add a new patch to support find GPIO base number in increasing order
-> - add gpio-number-forward property in snps gpio binding doc
-> Change in v3:
-> - Move CONFIG_GPIO_DWAPB to hisi_defconfig
-> - Add CONFIG_GPIOLIB, CONFIG_GPIO_SYSFS in hisi_defconfig
-> Change in v2:
-> - Add select GPIO_DWAPB in arch/arm/mach-hisi/Kconfig
-> 
-> Link for v4:
-> - http://www.spinics.net/lists/arm-kernel/msg383883.html
-> Link for v3:
-> - http://www.spinics.net/lists/devicetree/msg60324.html
-> 
-> Zhou Wang (2):
->   ARM: hip04: add GPIO configure in hisi_defconfig
->   ARM: dts: hip04: add GPIO pieces
-> 
->  arch/arm/boot/dts/hip04.dtsi    | 75 +++++++++++++++++++++++++++++++++++++++++
->  arch/arm/configs/hisi_defconfig |  1 +
->  2 files changed, 76 insertions(+)
-> 
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
