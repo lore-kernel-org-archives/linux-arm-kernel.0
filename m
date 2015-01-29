@@ -1,58 +1,62 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Thu, 29 Jan 2015 11:24:34 -0800
-Subject: [PATCH 2/4] MAINTAINERS: update Broadcom Cygnus SoC git tree
-In-Reply-To: <CAKdAkRSXYDdUxMVms4B53aV3fm=hkO3hnyHPhyzKGGW5Bxs4-Q@mail.gmail.com>
-References: <1420843541-5166-1-git-send-email-f.fainelli@gmail.com>	<1420843541-5166-3-git-send-email-f.fainelli@gmail.com>	<54B05AFD.2030105@broadcom.com>
- <CAKdAkRSXYDdUxMVms4B53aV3fm=hkO3hnyHPhyzKGGW5Bxs4-Q@mail.gmail.com>
-Message-ID: <54CA88F2.5080700@broadcom.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 29 Jan 2015 19:26:11 +0000
+Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher
+ constraints with dma-parms
+In-Reply-To: <CAF6AEGtTmFg66TK_AFkQ-xp7Nd9Evk3nqe6xCBp7K=77OmXTxA@mail.gmail.com>
+References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
+ <1422347154-15258-2-git-send-email-sumit.semwal@linaro.org>
+ <20150129143908.GA26493@n2100.arm.linux.org.uk>
+ <CAO_48GEOQ1pBwirgEWeVVXW-iOmaC=Xerr2VyYYz9t1QDXgVsw@mail.gmail.com>
+ <20150129154718.GB26493@n2100.arm.linux.org.uk>
+ <CAF6AEGtTmFg66TK_AFkQ-xp7Nd9Evk3nqe6xCBp7K=77OmXTxA@mail.gmail.com>
+Message-ID: <20150129192610.GE26493@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 1/29/2015 11:01 AM, Dmitry Torokhov wrote:
-> On Fri, Jan 9, 2015 at 2:49 PM, Ray Jui <rjui@broadcom.com> wrote:
->>
->>
->> On 1/9/2015 2:45 PM, Florian Fainelli wrote:
->>> The Cygnus SoC git tree is moved from github.com/brcm/linux.git to its
->>> own git tree at github.com/Broadcom/cygnus-linux.git.
->>>
->>> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
->>> ---
->>>  MAINTAINERS | 2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/MAINTAINERS b/MAINTAINERS
->>> index ff73215cd165..4a8f3459f9c2 100644
->>> --- a/MAINTAINERS
->>> +++ b/MAINTAINERS
->>> @@ -2192,7 +2192,7 @@ M:      Ray Jui <rjui@broadcom.com>
->>>  M:   Scott Branden <sbranden@broadcom.com>
->>>  L:   linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->>>  L:   bcm-kernel-feedback-list at broadcom.com
->>> -T:   git git://git.github.com/brcm/linux.git
->>> +T:   git git://git.github.com/Broadcom/cygnus-linux.git
->>
->> Looks fine to me!
+On Thu, Jan 29, 2015 at 01:52:09PM -0500, Rob Clark wrote:
+> Quite possibly for some of these edge some of cases, some of the
+> dma-buf exporters are going to need to get more clever (ie. hand off
+> different scatterlists to different clients).  Although I think by far
+> the two common cases will be "I can support anything via an iommu/mmu"
+> and "I need phys contig".
 > 
-> Hmm, the address does not work for me unless I drop 'git.' from the front:
-> 
-> git://github.com/Broadcom/cygnus-linux.git
-> 
-> Thanks.
-> 
-Thanks, Dmitry.
+> But that isn't an issue w/ dma-buf itself, so much as it is an issue
+> w/ drivers.  I guess there would be more interest in fixing up drivers
+> when actual hw comes along that needs it..
 
-I just tried it myself and also got a connection timeout with
-git://git.github.com/Broadcom/cygnus-linux.git
+However, validating the attachments is the business of dma-buf.  This
+is actual infrastructure, which should ensure some kind of sanity such
+as the issues I've raised.
 
-fatal: unable to connect to git.github.com:
-git.github.com[0: 23.235.47.133]: errno=Connection timed out
+The whole "we can push it onto our users" is really on - what that
+results in is the users ignoring most of the requirements and just doing
+their own thing, which ultimately ends up with the whole thing turning
+into a disgusting mess - one which becomes very difficult to fix later.
 
-Same issue for git://git.github.com/broadcom/stblinux.git and
-git://git.github.com/broadcom/arm-bcm63xx.git
+Now, if we're going to do the "more clever" thing you mention above,
+that rather negates the point of this two-part patch set, which is to
+provide the union of the DMA capabilities of all users.  A union in
+that case is no longer sane as we'd be tailoring the SG lists to each
+user.
 
-git://github.com/Broadcom/cygnus-linux.git works fine as you mentioned.
+If we aren't going to do the "more clever" thing, then yes, we need this
+code to calculate that union, but we _also_ need it to do sanity checking
+right from the start, and refuse conditions which ultimately break the
+ability to make use of that union - in other words, when the union of
+the DMA capabilities means that the dmabuf can't be represented.
 
-Florian, I think we need to fix this. Thanks.
+Unless we do that, we'll just end up with random drivers interpreting
+what they want from the DMA capabilities, and we'll have some drivers
+exporting (eg) scatterlists which satisfy the maximum byte size of an
+element, but ignoring the maximum number of entries or vice versa, and
+that'll most probably hide the case of "too small a union".
+
+It really doesn't make sense to do both either: that route is even more
+madness, because we'll end up with two classes of drivers - those which
+use the union approach, and those which don't.
+
+The KISS principle applies here.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
