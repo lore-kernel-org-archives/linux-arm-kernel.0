@@ -1,63 +1,101 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 29 Jan 2015 15:47:18 +0000
-Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher
- constraints with dma-parms
-In-Reply-To: <CAO_48GEOQ1pBwirgEWeVVXW-iOmaC=Xerr2VyYYz9t1QDXgVsw@mail.gmail.com>
-References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
- <1422347154-15258-2-git-send-email-sumit.semwal@linaro.org>
- <20150129143908.GA26493@n2100.arm.linux.org.uk>
- <CAO_48GEOQ1pBwirgEWeVVXW-iOmaC=Xerr2VyYYz9t1QDXgVsw@mail.gmail.com>
-Message-ID: <20150129154718.GB26493@n2100.arm.linux.org.uk>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Thu, 29 Jan 2015 10:49:34 -0500
+Subject: [PATCH v10 2/2] tty/serial: Add Spreadtrum sc9836-uart driver
+ support
+In-Reply-To: <54CA5128.8050500@gmail.com>
+References: <sc9836-serial-v10>
+ <1422443324-25082-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1422443324-25082-3-git-send-email-chunyan.zhang@spreadtrum.com>
+ <54CA5128.8050500@gmail.com>
+Message-ID: <54CA568E.6080306@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 29, 2015 at 09:00:11PM +0530, Sumit Semwal wrote:
-> So, short answer is, it is left to the exporter to decide. The dma-buf
-> framework should not even attempt to decide or enforce any of the
-> above.
+Hi Varka,
+
+On 01/29/2015 10:26 AM, Varka Bhadram wrote:
+> Hi,
 > 
-> At each dma_buf_attach(), there's a callback to the exporter, where
-> the exporter can decide, if it intends to handle these kind of cases,
-> on the best way forward.
+> On Wednesday 28 January 2015 04:38 PM, Chunyan Zhang wrote:
+>> Add a full sc9836-uart driver for SC9836 SoC which is based on the
+>> spreadtrum sharkl64 platform.
+>> This driver also support earlycon.
+>>
+>> Originally-by: Lanqing Liu <lanqing.liu@spreadtrum.com>
+>> Signed-off-by: Orson Zhai <orson.zhai@spreadtrum.com>
+>> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+>> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>> Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
+>> ---
+>>   drivers/tty/serial/Kconfig       |   18 +
+>>   drivers/tty/serial/Makefile      |    1 +
+>>   drivers/tty/serial/sprd_serial.c |  793 ++++++++++++++++++++++++++++++++++++++
+>>   include/uapi/linux/serial_core.h |    3 +
+>>   4 files changed, 815 insertions(+)
+>>   create mode 100644 drivers/tty/serial/sprd_serial.c
+>>
+> (...)
 > 
-> The exporter might, for example, decide to migrate backing storage,
-
-That's a decision which the exporter can not take.  Think about it...
-
-If subsystem Y has mapped the buffer, it could be accessing the buffer's
-backing storage at the same time that subsystem Z tries to attach to the
-buffer.
-
-Once the buffer has been exported to another user, the exporter has
-effectively lost control over mediating accesses to that buffer.
-
-All that it can do with the way the dma-buf API is today is to allocate
-a _different_ scatter list pointing at the same backing storage which
-satisfies the segment size and number of segments, etc.
-
-There's also another issue which you haven't addressed.  What if several
-attachments result in lowering max_segment_size and max_segment_count
-such that:
-
-	max_segment_size * max_segment_count < dmabuf->size
-
-but individually, the attachments allow dmabuf->size to be represented
-as a scatterlist?
-
-If an exporter were to take notice of the max_segment_size and
-max_segment_count, the resulting buffer is basically unrepresentable
-as a scatterlist.
-
-> > Please consider the possible sequences of use (such as the scenario
-> > above) when creating or augmenting an API.
-> >
+>> +static int sprd_probe(struct platform_device *pdev)
+>> +{
+>> +    struct resource *res;
+>> +    struct uart_port *up;
+>> +    struct clk *clk;
+>> +    int irq;
+>> +    int index;
+>> +    int ret;
+>> +
+>> +    for (index = 0; index < ARRAY_SIZE(sprd_port); index++)
+>> +        if (sprd_port[index] == NULL)
+>> +            break;
+>> +
+>> +    if (index == ARRAY_SIZE(sprd_port))
+>> +        return -EBUSY;
+>> +
+>> +    index = sprd_probe_dt_alias(index, &pdev->dev);
+>> +
+>> +    sprd_port[index] = devm_kzalloc(&pdev->dev,
+>> +        sizeof(*sprd_port[index]), GFP_KERNEL);
+>> +    if (!sprd_port[index])
+>> +        return -ENOMEM;
+>> +
+>> +    up = &sprd_port[index]->port;
+>> +    up->dev = &pdev->dev;
+>> +    up->line = index;
+>> +    up->type = PORT_SPRD;
+>> +    up->iotype = SERIAL_IO_PORT;
+>> +    up->uartclk = SPRD_DEF_RATE;
+>> +    up->fifosize = SPRD_FIFO_SIZE;
+>> +    up->ops = &serial_sprd_ops;
+>> +    up->flags = UPF_BOOT_AUTOCONF;
+>> +
+>> +    clk = devm_clk_get(&pdev->dev, NULL);
+>> +    if (!IS_ERR(clk))
+>> +        up->uartclk = clk_get_rate(clk);
+>> +
+>> +    res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +    if (!res) {
+>> +        dev_err(&pdev->dev, "not provide mem resource\n");
+>> +        return -ENODEV;
+>> +    }
 > 
-> I tried to think of the scenarios I could think of, but If you still
-> feel this approach doesn't help with your concerns, I'll graciously
-> accept advice to improve it.
+> This check is not required. It will be done by devm_ioremap_resource()
 
-See the new one above :)
+I disagree. devm_ioremap_resource() interprets the NULL resource as
+a bad parameter and returns -EINVAL which is then forwarded as the
+return value from the probe.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+-ENODEV is the correct return value from the probe if the expected
+resource is not available (either because it doesn't exist or was already
+claimed by another driver).
+
+Regards,
+Peter Hurley
+
+>> +    up->mapbase = res->start;
+>> +    up->membase = devm_ioremap_resource(&pdev->dev, res);
+>> +    if (IS_ERR(up->membase))
+>> +        return PTR_ERR(up->membase);
+>> +
+>>
+> 
