@@ -1,454 +1,274 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 29 Jan 2015 15:09:13 +0100
-Subject: [PATCH v6 5/8] iio: adc: fsl,imx25-gcq driver
-In-Reply-To: <1422540556-14828-1-git-send-email-mpa@pengutronix.de>
-References: <1422540556-14828-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1422540556-14828-6-git-send-email-mpa@pengutronix.de>
+From: maarten.lankhorst@canonical.com (Maarten Lankhorst)
+Date: Thu, 29 Jan 2015 15:16:49 +0100
+Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher constraints
+ with dma-parms
+In-Reply-To: <1422347154-15258-2-git-send-email-sumit.semwal@linaro.org>
+References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
+ <1422347154-15258-2-git-send-email-sumit.semwal@linaro.org>
+Message-ID: <54CA40D1.4000701@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a conversion queue driver for the mx25 SoC. It uses the central
-ADC which is used by two seperate independent queues. This driver
-prepares different conversion configurations for each possible input.
-For a conversion it creates a conversionqueue of one item with the
-correct configuration for the chosen channel. It then executes the queue
-once and disables the conversion queue afterwards.
+Op 27-01-15 om 09:25 schreef Sumit Semwal:
+> Add some helpers to share the constraints of devices while attaching
+> to the dmabuf buffer.
+>
+> At each attach, the constraints are calculated based on the following:
+> - max_segment_size, max_segment_count, segment_boundary_mask from
+>    device_dma_parameters.
+>
+> In case the attaching device's constraints don't match up, attach() fails.
+>
+> At detach, the constraints are recalculated based on the remaining
+> attached devices.
+>
+> Two helpers are added:
+> - dma_buf_get_constraints - which gives the current constraints as calculated
+>       during each attach on the buffer till the time,
+> - dma_buf_recalc_constraints - which recalculates the constraints for all
+>       currently attached devices for the 'paranoid' ones amongst us.
+>
+> The idea of this patch is largely taken from Rob Clark's RFC at
+> https://lkml.org/lkml/2012/7/19/285, and the comments received on it.
+>
+> Cc: Rob Clark <robdclark@gmail.com>
+> Signed-off-by: Sumit Semwal <sumit.semwal@linaro.org>
+> ---
+> v3: 
+> - Thanks to Russell's comment, remove dma_mask and coherent_dma_mask from
+>   constraints' calculation; has a nice side effect of letting us use
+>   device_dma_parameters directly to list constraints.
+> - update the debugfs output to show constraint info as well.
+>   
+> v2: split constraints-sharing and allocation helpers
+>
+>  drivers/dma-buf/dma-buf.c | 126 +++++++++++++++++++++++++++++++++++++++++++++-
+>  include/linux/dma-buf.h   |   7 +++
+>  2 files changed, 132 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/dma-buf/dma-buf.c b/drivers/dma-buf/dma-buf.c
+> index 5be225c2ba98..f363f1440803 100644
+> --- a/drivers/dma-buf/dma-buf.c
+> +++ b/drivers/dma-buf/dma-buf.c
+> @@ -264,6 +264,66 @@ static inline int is_dma_buf_file(struct file *file)
+>  	return file->f_op == &dma_buf_fops;
+>  }
+>  
+> +static inline void init_constraints(struct device_dma_parameters *cons)
+> +{
+> +	cons->max_segment_count = (unsigned int)-1;
+> +	cons->max_segment_size = (unsigned int)-1;
+> +	cons->segment_boundary_mask = (unsigned long)-1;
+> +}
+Use DMA_SEGMENTS_MAX_SEG_COUNT or UINT/ULONG_MAX here instead?
 
-The reference voltages are configurable through devicetree subnodes,
-depending on the connections of the ADC inputs.
-
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-Signed-off-by: Denis Carikli <denis@eukrea.com>
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- drivers/iio/adc/Kconfig                     |   7 +
- drivers/iio/adc/Makefile                    |   1 +
- drivers/iio/adc/fsl-imx25-gcq.c             | 361 ++++++++++++++++++++++++++++
- include/dt-bindings/iio/adc/fsl-imx25-gcq.h |  18 ++
- 4 files changed, 387 insertions(+)
- create mode 100644 drivers/iio/adc/fsl-imx25-gcq.c
- create mode 100644 include/dt-bindings/iio/adc/fsl-imx25-gcq.h
-
-diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
-index 0f79e4725763..fccbb4bf44cc 100644
---- a/drivers/iio/adc/Kconfig
-+++ b/drivers/iio/adc/Kconfig
-@@ -143,6 +143,13 @@ config EXYNOS_ADC
- 	  of SoCs for drivers such as the touchscreen and hwmon to use to share
- 	  this resource.
- 
-+config FSL_MX25_ADC
-+	tristate "Freescale MX25 ADC driver"
-+	depends on MFD_MX25_TSADC
-+	help
-+	  Generic Conversion Queue driver used for general purpose ADC in the
-+	  MX25. This driver supports single measurements using the MX25 ADC.
-+
- config LP8788_ADC
- 	tristate "LP8788 ADC driver"
- 	depends on MFD_LP8788
-diff --git a/drivers/iio/adc/Makefile b/drivers/iio/adc/Makefile
-index 701fdb7c96aa..acab8d956371 100644
---- a/drivers/iio/adc/Makefile
-+++ b/drivers/iio/adc/Makefile
-@@ -16,6 +16,7 @@ obj-$(CONFIG_AD799X) += ad799x.o
- obj-$(CONFIG_AT91_ADC) += at91_adc.o
- obj-$(CONFIG_AXP288_ADC) += axp288_adc.o
- obj-$(CONFIG_EXYNOS_ADC) += exynos_adc.o
-+obj-$(CONFIG_FSL_MX25_ADC) += fsl-imx25-gcq.o
- obj-$(CONFIG_LP8788_ADC) += lp8788_adc.o
- obj-$(CONFIG_MAX1027) += max1027.o
- obj-$(CONFIG_MAX1363) += max1363.o
-diff --git a/drivers/iio/adc/fsl-imx25-gcq.c b/drivers/iio/adc/fsl-imx25-gcq.c
-new file mode 100644
-index 000000000000..398e40c0e4fd
---- /dev/null
-+++ b/drivers/iio/adc/fsl-imx25-gcq.c
-@@ -0,0 +1,361 @@
-+/*
-+ * Copyright 2014 Markus Pargmann, Pengutronix <mpa@pengutronix.de>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ *
-+ * This is the driver for the imx25 GCQ (Generic Conversion Queue)
-+ * connected to the imx25 ADC.
-+ */
-+
-+#include <dt-bindings/iio/adc/fsl-imx25-gcq.h>
-+#include <linux/clk.h>
-+#include <linux/iio/iio.h>
-+#include <linux/interrupt.h>
-+#include <linux/mfd/imx25-tsadc.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+#include <linux/regulator/consumer.h>
-+
-+#define MX25_GCQ_TIMEOUT (msecs_to_jiffies(2000))
-+
-+enum mx25_gcq_cfgs {
-+	MX25_CFG_XP = 0,
-+	MX25_CFG_YP,
-+	MX25_CFG_XN,
-+	MX25_CFG_YN,
-+	MX25_CFG_WIPER,
-+	MX25_CFG_INAUX0,
-+	MX25_CFG_INAUX1,
-+	MX25_CFG_INAUX2,
-+	MX25_NUM_CFGS,
-+};
-+
-+struct mx25_gcq_priv {
-+	struct regmap *regs;
-+	struct completion completed;
-+	unsigned int settling_time;
-+	struct clk *clk;
-+	int irq;
-+	struct regulator *ext_vref;
-+	u32 channel_vref_mv[MX25_NUM_CFGS];
-+};
-+
-+#define MX25_CQG_CHAN(chan, id) {\
-+	.type = IIO_VOLTAGE,\
-+	.indexed = 1,\
-+	.channel = chan,\
-+	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),\
-+	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE),\
-+	.datasheet_name = id,\
-+}
-+
-+static const struct iio_chan_spec mx25_gcq_channels[MX25_NUM_CFGS] = {
-+	MX25_CQG_CHAN(0, "xp"),
-+	MX25_CQG_CHAN(1, "yp"),
-+	MX25_CQG_CHAN(2, "xn"),
-+	MX25_CQG_CHAN(3, "yn"),
-+	MX25_CQG_CHAN(4, "wiper"),
-+	MX25_CQG_CHAN(5, "inaux0"),
-+	MX25_CQG_CHAN(6, "inaux1"),
-+	MX25_CQG_CHAN(7, "inaux2"),
-+};
-+
-+static void mx25_gcq_disable_eoq(struct mx25_gcq_priv *priv)
-+{
-+	regmap_update_bits(priv->regs, MX25_ADCQ_MR, MX25_ADCQ_MR_EOQ_IRQ,
-+			   MX25_ADCQ_MR_EOQ_IRQ);
-+}
-+
-+static void mx25_gcq_enable_eoq(struct mx25_gcq_priv *priv)
-+{
-+	regmap_update_bits(priv->regs, MX25_ADCQ_MR,
-+			   MX25_ADCQ_MR_EOQ_IRQ, 0);
-+}
-+
-+static irqreturn_t mx25_gcq_irq(int irq, void *data)
-+{
-+	struct mx25_gcq_priv *priv = data;
-+	u32 stats;
-+
-+	regmap_read(priv->regs, MX25_ADCQ_SR, &stats);
-+
-+	if (stats & MX25_ADCQ_SR_EOQ) {
-+		mx25_gcq_disable_eoq(priv);
-+		complete(&priv->completed);
-+	}
-+
-+	/* Disable conversion queue run */
-+	regmap_update_bits(priv->regs, MX25_ADCQ_CR, MX25_ADCQ_CR_FQS, 0);
-+
-+	/* Acknowledge all possible irqs */
-+	regmap_write(priv->regs, MX25_ADCQ_SR, MX25_ADCQ_SR_FRR |
-+		     MX25_ADCQ_SR_FUR | MX25_ADCQ_SR_FOR |
-+		     MX25_ADCQ_SR_EOQ | MX25_ADCQ_SR_PD);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int mx25_gcq_get_raw_value(struct device *dev,
-+				  struct iio_chan_spec const *chan,
-+				  struct mx25_gcq_priv *priv,
-+				  int *val)
-+{
-+	long timeout;
-+	u32 data;
-+
-+	/* Setup the configuration we want to use */
-+	regmap_write(priv->regs, MX25_ADCQ_ITEM_7_0,
-+		     MX25_ADCQ_ITEM(0, chan->channel));
-+
-+	mx25_gcq_enable_eoq(priv);
-+
-+	/* Trigger queue for one run */
-+	regmap_update_bits(priv->regs, MX25_ADCQ_CR, MX25_ADCQ_CR_FQS,
-+			   MX25_ADCQ_CR_FQS);
-+
-+	timeout = wait_for_completion_interruptible_timeout(
-+		&priv->completed, MX25_GCQ_TIMEOUT);
-+	if (timeout < 0) {
-+		dev_err(dev,
-+			"ADC wait for measurement failed\n");
-+		return timeout;
-+	} else if (timeout == 0) {
-+		dev_err(dev, "ADC timed out\n");
-+		return -ETIMEDOUT;
-+	}
-+
-+	regmap_read(priv->regs, MX25_ADCQ_FIFO, &data);
-+
-+	*val = MX25_ADCQ_FIFO_DATA(data);
-+
-+	return IIO_VAL_INT;
-+}
-+
-+static int mx25_gcq_read_raw(struct iio_dev *indio_dev,
-+			     struct iio_chan_spec const *chan, int *val,
-+			     int *val2, long mask)
-+{
-+	struct mx25_gcq_priv *priv = iio_priv(indio_dev);
-+	int ret = 0;
-+
-+	switch (mask) {
-+	case IIO_CHAN_INFO_RAW:
-+		mutex_lock(&indio_dev->mlock);
-+		ret = mx25_gcq_get_raw_value(&indio_dev->dev, chan, priv, val);
-+		mutex_unlock(&indio_dev->mlock);
-+		return ret;
-+
-+	case IIO_CHAN_INFO_SCALE:
-+		*val = priv->channel_vref_mv[chan->channel];
-+		*val2 = 12;
-+		return IIO_VAL_FRACTIONAL_LOG2;
-+
-+	default:
-+		return -EINVAL;
-+	}
-+}
-+
-+static const struct iio_info mx25_gcq_iio_info = {
-+	.read_raw = mx25_gcq_read_raw,
-+};
-+
-+static const struct regmap_config mx25_gcq_regconfig = {
-+	.max_register = 0x5c,
-+	.reg_bits = 32,
-+	.val_bits = 32,
-+	.reg_stride = 4,
-+};
-+
-+static int mx25_gcq_setup_cfgs(struct platform_device *pdev,
-+			       struct mx25_gcq_priv *priv)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct device_node *child;
-+	struct device *dev = &pdev->dev;
-+	int ret, i;
-+
-+	/*
-+	 * Setup all configurations registers with a default conversion
-+	 * configuration for each input
-+	 */
-+	for (i = 0; i < MX25_NUM_CFGS; ++i)
-+		regmap_write(priv->regs, MX25_ADCQ_CFG(i),
-+			     MX25_ADCQ_CFG_YPLL_OFF |
-+			     MX25_ADCQ_CFG_XNUR_OFF |
-+			     MX25_ADCQ_CFG_XPUL_OFF |
-+			     MX25_ADCQ_CFG_REFP_INT |
-+			     MX25_ADCQ_CFG_IN(i) |
-+			     MX25_ADCQ_CFG_REFN_NGND2);
-+
-+	for_each_child_of_node(np, child) {
-+		u32 reg;
-+		u32 refp = MX25_ADCQ_CFG_REFP_INT;
-+		u32 refn = MX25_ADCQ_CFG_REFN_NGND2;
-+
-+		ret = of_property_read_u32(child, "reg", &reg);
-+		if (ret) {
-+			dev_err(dev, "Failed to get reg property\n");
-+			return ret;
-+		}
-+
-+		if (reg >= MX25_NUM_CFGS) {
-+			dev_err(dev,
-+				"reg value is greater than the number of available configuration registers\n");
-+			return -EINVAL;
-+		}
-+
-+		of_property_read_u32(child, "fsl,adc-refp", &refp);
-+		of_property_read_u32(child, "fsl,adc-refn", &refn);
-+
-+		/*
-+		 * Shift the read values to the correct positions within the
-+		 * register.
-+		 */
-+		refp = MX25_ADCQ_CFG_REFP(refp);
-+		refn = MX25_ADCQ_CFG_REFN(refn);
-+
-+		if ((refp & MX25_ADCQ_CFG_REFP_MASK) != refp) {
-+			dev_err(dev, "Invalid fsl,adc-refp property value\n");
-+			return -EINVAL;
-+		}
-+		if ((refn & MX25_ADCQ_CFG_REFN_MASK) != refn) {
-+			dev_err(dev, "Invalid fsl,adc-refn property value");
-+			return -EINVAL;
-+		}
-+
-+		regmap_update_bits(priv->regs, MX25_ADCQ_CFG(reg),
-+				   MX25_ADCQ_CFG_REFP_MASK |
-+				   MX25_ADCQ_CFG_REFN_MASK,
-+				   refp | refn);
-+	}
-+	regmap_update_bits(priv->regs, MX25_ADCQ_CR,
-+			   MX25_ADCQ_CR_FRST | MX25_ADCQ_CR_QRST,
-+			   MX25_ADCQ_CR_FRST | MX25_ADCQ_CR_QRST);
-+
-+	regmap_write(priv->regs, MX25_ADCQ_CR,
-+		     MX25_ADCQ_CR_PDMSK |
-+		     MX25_ADCQ_CR_QSM_FQS);
-+
-+	return 0;
-+}
-+
-+static int mx25_gcq_probe(struct platform_device *pdev)
-+{
-+	struct iio_dev *indio_dev;
-+	struct mx25_gcq_priv *priv;
-+	struct mx25_tsadc *tsadc = dev_get_drvdata(pdev->dev.parent);
-+	struct device *dev = &pdev->dev;
-+	struct resource *res;
-+	void __iomem *mem;
-+	int ret;
-+
-+	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*priv));
-+	if (!indio_dev)
-+		return -ENOMEM;
-+
-+	priv = iio_priv(indio_dev);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	mem = devm_ioremap_resource(dev, res);
-+	if (!mem)
-+		return -ENOMEM;
-+
-+	priv->regs = devm_regmap_init_mmio(dev, mem, &mx25_gcq_regconfig);
-+	if (IS_ERR(priv->regs)) {
-+		dev_err(dev, "Failed to initialize regmap\n");
-+		return PTR_ERR(priv->regs);
-+	}
-+
-+	init_completion(&priv->completed);
-+
-+	/* Optional external regulator */
-+	priv->ext_vref = devm_regulator_get(&pdev->dev, "vref");
-+	if (!IS_ERR_OR_NULL(priv->ext_vref)) {
-+		ret = regulator_enable(priv->ext_vref);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	ret = mx25_gcq_setup_cfgs(pdev, priv);
-+	if (ret)
-+		return ret;
-+
-+	priv->clk = tsadc->clk;
-+	ret = clk_prepare_enable(priv->clk);
-+	if (ret) {
-+		dev_err(dev, "Failed to enable clock\n");
-+		return ret;
-+	}
-+
-+	priv->irq = platform_get_irq(pdev, 0);
-+	if (priv->irq <= 0) {
-+		dev_err(dev, "Failed to get IRQ\n");
-+		ret = priv->irq;
-+		goto err_clk_unprepare;
-+	}
-+
-+	ret = request_irq(priv->irq, mx25_gcq_irq, 0, pdev->name, priv);
-+	if (ret) {
-+		dev_err(dev, "Failed requesting IRQ\n");
-+		goto err_clk_unprepare;
-+	}
-+
-+	indio_dev->dev.parent = &pdev->dev;
-+	indio_dev->channels = mx25_gcq_channels;
-+	indio_dev->num_channels = ARRAY_SIZE(mx25_gcq_channels);
-+	indio_dev->info = &mx25_gcq_iio_info;
-+
-+	ret = iio_device_register(indio_dev);
-+	if (ret) {
-+		dev_err(dev, "Failed to register iio device\n");
-+		goto err_irq_free;
-+	}
-+
-+	platform_set_drvdata(pdev, priv);
-+
-+	return 0;
-+
-+err_irq_free:
-+	free_irq(priv->irq, (void *)priv);
-+err_clk_unprepare:
-+	clk_disable_unprepare(priv->clk);
-+	return ret;
-+}
-+
-+static int mx25_gcq_remove(struct platform_device *pdev)
-+{
-+	struct mx25_gcq_priv *priv = platform_get_drvdata(pdev);
-+	struct iio_dev *indio_dev = iio_priv_to_dev(pdev);
-+
-+	iio_device_unregister(indio_dev);
-+	free_irq(priv->irq, priv);
-+	clk_disable_unprepare(priv->clk);
-+
-+	return 0;
-+}
-+
-+static struct of_device_id mx25_gcq_ids[] = {
-+	{ .compatible = "fsl,imx25-gcq", },
-+	{ /* Sentinel */ }
-+};
-+
-+static struct platform_driver mx25_gcq_driver = {
-+	.driver		= {
-+		.name	= "mx25-gcq",
-+		.of_match_table = mx25_gcq_ids,
-+	},
-+	.probe		= mx25_gcq_probe,
-+	.remove		= mx25_gcq_remove,
-+};
-+module_platform_driver(mx25_gcq_driver);
-+
-+MODULE_DESCRIPTION("ADC driver for Freescale mx25");
-+MODULE_AUTHOR("Markus Pargmann <mpa@pengutronix.de>");
-+MODULE_LICENSE("GPL v2");
-diff --git a/include/dt-bindings/iio/adc/fsl-imx25-gcq.h b/include/dt-bindings/iio/adc/fsl-imx25-gcq.h
-new file mode 100644
-index 000000000000..4f2f4a9baafe
---- /dev/null
-+++ b/include/dt-bindings/iio/adc/fsl-imx25-gcq.h
-@@ -0,0 +1,18 @@
-+/*
-+ * This header provides constants for configuring the I.MX25 ADC
-+ */
-+
-+#ifndef _DT_BINDINGS_IIO_ADC_FS_IMX25_GCQ_H
-+#define _DT_BINDINGS_IIO_ADC_FS_IMX25_GCQ_H
-+
-+#define MX25_ADC_REFP_YP	0 /* YP voltage reference */
-+#define MX25_ADC_REFP_XP	1 /* XP voltage reference */
-+#define MX25_ADC_REFP_INT	2 /* Internal voltage reference */
-+#define MX25_ADC_REFP_EXT	3 /* External voltage reference */
-+
-+#define MX25_ADC_REFN_XN	0
-+#define MX25_ADC_REFN_YN	1
-+#define MX25_ADC_REFN_NGND	2
-+#define MX25_ADC_REFN_NGND2	3
-+
-+#endif
--- 
-2.1.4
+Patches look sane,
+Reviewed-By: Maarten Lankhorst <maarten.lankhorst@canonical.com>
+> +/*
+> + * calc_constraints - calculates if the new attaching device's constraints
+> + * match, with the constraints of already attached devices; if yes, returns
+> + * the constraints; else return ERR_PTR(-EINVAL)
+> + */
+> +static int calc_constraints(struct device *dev,
+> +			    struct device_dma_parameters *calc_cons)
+> +{
+> +	struct device_dma_parameters cons = *calc_cons;
+> +
+> +	cons.max_segment_count = min(cons.max_segment_count,
+> +					dma_get_max_seg_count(dev));
+> +	cons.max_segment_size = min(cons.max_segment_size,
+> +					dma_get_max_seg_size(dev));
+> +	cons.segment_boundary_mask &= dma_get_seg_boundary(dev);
+> +
+> +	if (!cons.max_segment_count ||
+> +	    !cons.max_segment_size ||
+> +	    !cons.segment_boundary_mask) {
+> +		pr_err("Dev: %s's constraints don't match\n", dev_name(dev));
+> +		return -EINVAL;
+> +	}
+> +
+> +	*calc_cons = cons;
+> +
+> +	return 0;
+> +}
+> +
+> +/*
+> + * recalc_constraints - recalculates constraints for all attached devices;
+> + *  useful for detach() recalculation, and for dma_buf_recalc_constraints()
+> + *  helper.
+> + *  Returns recalculated constraints in recalc_cons, or error in the unlikely
+> + *  case when constraints of attached devices might have changed.
+> + */
+> +static int recalc_constraints(struct dma_buf *dmabuf,
+> +			      struct device_dma_parameters *recalc_cons)
+> +{
+> +	struct device_dma_parameters calc_cons;
+> +	struct dma_buf_attachment *attach;
+> +	int ret = 0;
+> +
+> +	init_constraints(&calc_cons);
+> +
+> +	list_for_each_entry(attach, &dmabuf->attachments, node) {
+> +		ret = calc_constraints(attach->dev, &calc_cons);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +	*recalc_cons = calc_cons;
+> +	return 0;
+> +}
+> +
+>  /**
+>   * dma_buf_export_named - Creates a new dma_buf, and associates an anon file
+>   * with this buffer, so it can be exported.
+> @@ -313,6 +373,9 @@ struct dma_buf *dma_buf_export_named(void *priv, const struct dma_buf_ops *ops,
+>  	dmabuf->ops = ops;
+>  	dmabuf->size = size;
+>  	dmabuf->exp_name = exp_name;
+> +
+> +	init_constraints(&dmabuf->constraints);
+> +
+>  	init_waitqueue_head(&dmabuf->poll);
+>  	dmabuf->cb_excl.poll = dmabuf->cb_shared.poll = &dmabuf->poll;
+>  	dmabuf->cb_excl.active = dmabuf->cb_shared.active = 0;
+> @@ -422,7 +485,7 @@ struct dma_buf_attachment *dma_buf_attach(struct dma_buf *dmabuf,
+>  					  struct device *dev)
+>  {
+>  	struct dma_buf_attachment *attach;
+> -	int ret;
+> +	int ret = 0;
+>  
+>  	if (WARN_ON(!dmabuf || !dev))
+>  		return ERR_PTR(-EINVAL);
+> @@ -436,6 +499,9 @@ struct dma_buf_attachment *dma_buf_attach(struct dma_buf *dmabuf,
+>  
+>  	mutex_lock(&dmabuf->lock);
+>  
+> +	if (calc_constraints(dev, &dmabuf->constraints))
+> +		goto err_constraints;
+> +
+>  	if (dmabuf->ops->attach) {
+>  		ret = dmabuf->ops->attach(dmabuf, dev, attach);
+>  		if (ret)
+> @@ -448,6 +514,7 @@ struct dma_buf_attachment *dma_buf_attach(struct dma_buf *dmabuf,
+>  
+>  err_attach:
+>  	kfree(attach);
+> +err_constraints:
+>  	mutex_unlock(&dmabuf->lock);
+>  	return ERR_PTR(ret);
+>  }
+> @@ -470,6 +537,8 @@ void dma_buf_detach(struct dma_buf *dmabuf, struct dma_buf_attachment *attach)
+>  	if (dmabuf->ops->detach)
+>  		dmabuf->ops->detach(dmabuf, attach);
+>  
+> +	recalc_constraints(dmabuf, &dmabuf->constraints);
+> +
+>  	mutex_unlock(&dmabuf->lock);
+>  	kfree(attach);
+>  }
+> @@ -770,6 +839,56 @@ void dma_buf_vunmap(struct dma_buf *dmabuf, void *vaddr)
+>  }
+>  EXPORT_SYMBOL_GPL(dma_buf_vunmap);
+>  
+> +/**
+> + * dma_buf_get_constraints - get the *current* constraints of the dmabuf,
+> + *  as calculated during each attach(); returns error on invalid inputs
+> + *
+> + * @dmabuf:		[in]	buffer to get constraints of
+> + * @constraints:	[out]	current constraints are returned in this
+> + */
+> +int dma_buf_get_constraints(struct dma_buf *dmabuf,
+> +			    struct device_dma_parameters *constraints)
+> +{
+> +	if (WARN_ON(!dmabuf || !constraints))
+> +		return -EINVAL;
+> +
+> +	mutex_lock(&dmabuf->lock);
+> +	*constraints = dmabuf->constraints;
+> +	mutex_unlock(&dmabuf->lock);
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(dma_buf_get_constraints);
+> +
+> +/**
+> + * dma_buf_recalc_constraints - *recalculate* the constraints for the buffer
+> + *  afresh, from the list of currently attached devices; this could be useful
+> + *  cross-check the current constraints, for exporters that might want to be
+> + *  'paranoid' about the device constraints.
+> + *
+> + *  returns error on invalid inputs
+> + *
+> + * @dmabuf:		[in]	buffer to get constraints of
+> + * @constraints:	[out]	recalculated constraints are returned in this
+> + */
+> +int dma_buf_recalc_constraints(struct dma_buf *dmabuf,
+> +			    struct device_dma_parameters *constraints)
+> +{
+> +	struct device_dma_parameters calc_cons;
+> +	int ret = 0;
+> +
+> +	if (WARN_ON(!dmabuf || !constraints))
+> +		return -EINVAL;
+> +
+> +	mutex_lock(&dmabuf->lock);
+> +	ret = recalc_constraints(dmabuf, &calc_cons);
+> +	if (!ret)
+> +		*constraints = calc_cons;
+> +
+> +	mutex_unlock(&dmabuf->lock);
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(dma_buf_recalc_constraints);
+> +
+>  #ifdef CONFIG_DEBUG_FS
+>  static int dma_buf_describe(struct seq_file *s)
+>  {
+> @@ -801,6 +920,11 @@ static int dma_buf_describe(struct seq_file *s)
+>  				buf_obj->file->f_flags, buf_obj->file->f_mode,
+>  				file_count(buf_obj->file),
+>  				buf_obj->exp_name);
+> +		seq_printf(s, "\tConstraints: Seg Count: %08u, Seg Size: %08u",
+> +				buf_obj->constraints.max_segment_count,
+> +				buf_obj->constraints.max_segment_size);
+> +		seq_printf(s, " seg boundary mask: %08lx\n",
+> +				buf_obj->constraints.segment_boundary_mask);
+>  
+>  		seq_puts(s, "\tAttached Devices:\n");
+>  		attach_count = 0;
+> diff --git a/include/linux/dma-buf.h b/include/linux/dma-buf.h
+> index 694e1fe1c4b4..489ad9b2e5ae 100644
+> --- a/include/linux/dma-buf.h
+> +++ b/include/linux/dma-buf.h
+> @@ -34,6 +34,7 @@
+>  #include <linux/wait.h>
+>  
+>  struct device;
+> +struct device_dma_parameters;
+>  struct dma_buf;
+>  struct dma_buf_attachment;
+>  
+> @@ -116,6 +117,7 @@ struct dma_buf_ops {
+>   * @ops: dma_buf_ops associated with this buffer object.
+>   * @exp_name: name of the exporter; useful for debugging.
+>   * @list_node: node for dma_buf accounting and debugging.
+> + * @constraints: calculated constraints of attached devices.
+>   * @priv: exporter specific private data for this buffer object.
+>   * @resv: reservation object linked to this dma-buf
+>   */
+> @@ -130,6 +132,7 @@ struct dma_buf {
+>  	void *vmap_ptr;
+>  	const char *exp_name;
+>  	struct list_head list_node;
+> +	struct device_dma_parameters constraints;
+>  	void *priv;
+>  	struct reservation_object *resv;
+>  
+> @@ -211,4 +214,8 @@ void *dma_buf_vmap(struct dma_buf *);
+>  void dma_buf_vunmap(struct dma_buf *, void *vaddr);
+>  int dma_buf_debugfs_create_file(const char *name,
+>  				int (*write)(struct seq_file *));
+> +
+> +int dma_buf_get_constraints(struct dma_buf *, struct device_dma_parameters *);
+> +int dma_buf_recalc_constraints(struct dma_buf *,
+> +					struct device_dma_parameters *);
+>  #endif /* __DMA_BUF_H__ */
