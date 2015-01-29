@@ -1,75 +1,51 @@
-From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Thu, 29 Jan 2015 14:38:23 -0800
-Subject: [PATCH v2] drivers: net: xgene: fix: Out of order descriptor bytes
- read
-Message-ID: <1422571103-17497-1-git-send-email-isubramanian@apm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 29 Jan 2015 23:37:54 +0100
+Subject: [GIT PULL 0/3] Second round of KVM/ARM fixes for 3.19
+Message-ID: <1422571077-14576-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the following kernel crash,
+Hi Paolo,
 
-	WARNING: CPU: 2 PID: 0 at net/ipv4/tcp_input.c:3079 tcp_clean_rtx_queue+0x658/0x80c()
-	Call trace:
-	[<fffffe0000096b7c>] dump_backtrace+0x0/0x184
-	[<fffffe0000096d10>] show_stack+0x10/0x1c
-	[<fffffe0000685ea0>] dump_stack+0x74/0x98
-	[<fffffe00000b44e0>] warn_slowpath_common+0x88/0xb0
-	[<fffffe00000b461c>] warn_slowpath_null+0x14/0x20
-	[<fffffe00005b5c1c>] tcp_clean_rtx_queue+0x654/0x80c
-	[<fffffe00005b6228>] tcp_ack+0x454/0x688
-	[<fffffe00005b6ca8>] tcp_rcv_established+0x4a4/0x62c
-	[<fffffe00005bf4b4>] tcp_v4_do_rcv+0x16c/0x350
-	[<fffffe00005c225c>] tcp_v4_rcv+0x8e8/0x904
-	[<fffffe000059d470>] ip_local_deliver_finish+0x100/0x26c
-	[<fffffe000059dad8>] ip_local_deliver+0xac/0xc4
-	[<fffffe000059d6c4>] ip_rcv_finish+0xe8/0x328
-	[<fffffe000059dd3c>] ip_rcv+0x24c/0x38c
-	[<fffffe0000563950>] __netif_receive_skb_core+0x29c/0x7c8
-	[<fffffe0000563ea4>] __netif_receive_skb+0x28/0x7c
-	[<fffffe0000563f54>] netif_receive_skb_internal+0x5c/0xe0
-	[<fffffe0000564810>] napi_gro_receive+0xb4/0x110
-	[<fffffe0000482a2c>] xgene_enet_process_ring+0x144/0x338
-	[<fffffe0000482d18>] xgene_enet_napi+0x1c/0x50
-	[<fffffe0000565454>] net_rx_action+0x154/0x228
-	[<fffffe00000b804c>] __do_softirq+0x110/0x28c
-	[<fffffe00000b8424>] irq_exit+0x8c/0xc0
-	[<fffffe0000093898>] handle_IRQ+0x44/0xa8
-	[<fffffe000009032c>] gic_handle_irq+0x38/0x7c
-	[...]
+Please pull this second round of fixes for KVM/ARM for 3.19.  Hopefully there
+is time to get this upstream before the final release of 3.19.
 
-Software writes poison data into the descriptor bytes[15:8] and upon
-receiving the interrupt, if those bytes are overwritten by the hardware with
-the valid data, software also reads bytes[7:0] and executes receive/tx
-completion logic.
+The series fixes the notorious memory corruption issues on APM platforms and
+swapping issues on DMA-coherent systems.
 
-If the CPU executes the above two reads in out of order fashion, then the
-bytes[7:0] will have older data and causing the kernel panic.  We have to
-force the order of the reads and thus this patch introduces read memory
-barrier between these reads.
+The following changes since commit f3747379accba8e95d70cec0eae0582c8c182050:
 
-Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
-Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
----
+  KVM: x86: SYSENTER emulation is broken (2015-01-23 13:57:15 +0100)
 
-v2: Address comments from v1
-* replaced smp_rmb() with dma_rmb()
+are available in the git repository at:
 
----
- drivers/net/ethernet/apm/xgene/xgene_enet_main.c | 2 ++
- 1 file changed, 2 insertions(+)
+  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-fixes-3.19-2
 
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-index 83a5028..793f3b7 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-@@ -369,6 +369,8 @@ static int xgene_enet_process_ring(struct xgene_enet_desc_ring *ring,
- 		if (unlikely(xgene_enet_is_desc_slot_empty(raw_desc)))
- 			break;
- 
-+		/* read fpqnum field after dataaddr field */
-+		dma_rmb();
- 		if (is_rx_desc(raw_desc))
- 			ret = xgene_enet_rx_frame(ring, raw_desc);
- 		else
--- 
-1.9.1
+for you to fetch changes up to 0d3e4d4fade6b04e933b11e69e80044f35e9cd60:
+
+  arm/arm64: KVM: Use kernel mapping to perform invalidation on page fault (2015-01-29 23:24:57 +0100)
+
+Thanks,
+Christoffer
+
+----------------------------------------------------------------
+Marc Zyngier (3):
+      arm/arm64: KVM: Use set/way op trapping to track the state of the caches
+      arm/arm64: KVM: Invalidate data cache on unmap
+      arm/arm64: KVM: Use kernel mapping to perform invalidation on page fault
+
+ arch/arm/include/asm/kvm_emulate.h   |  10 +++
+ arch/arm/include/asm/kvm_host.h      |   3 -
+ arch/arm/include/asm/kvm_mmu.h       |  77 +++++++++++++---
+ arch/arm/kvm/arm.c                   |  10 ---
+ arch/arm/kvm/coproc.c                |  70 +++------------
+ arch/arm/kvm/coproc.h                |   6 +-
+ arch/arm/kvm/coproc_a15.c            |   2 +-
+ arch/arm/kvm/coproc_a7.c             |   2 +-
+ arch/arm/kvm/mmu.c                   | 164 ++++++++++++++++++++++++++++++-----
+ arch/arm/kvm/trace.h                 |  39 +++++++++
+ arch/arm64/include/asm/kvm_emulate.h |  10 +++
+ arch/arm64/include/asm/kvm_host.h    |   3 -
+ arch/arm64/include/asm/kvm_mmu.h     |  34 ++++++--
+ arch/arm64/kvm/sys_regs.c            |  75 +++-------------
+ 14 files changed, 327 insertions(+), 178 deletions(-)
