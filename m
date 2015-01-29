@@ -1,108 +1,99 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 29 Jan 2015 14:08:51 +0100
-Subject: [PATCH v5 00/13] AT91 pm cleanup for 3.20
-In-Reply-To: <1422513316-21509-1-git-send-email-wenyou.yang@atmel.com>
-References: <1422513316-21509-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <54CA30E3.2050301@atmel.com>
+From: vbabka@suse.cz (Vlastimil Babka)
+Date: Thu, 29 Jan 2015 14:13:38 +0100
+Subject: [PATCHv2] mm: Don't offset memmap for flatmem
+In-Reply-To: <20150126155617.GA2395@suse.de>
+References: <1421804273-29947-1-git-send-email-lauraa@codeaurora.org>
+ <1421888500-24364-1-git-send-email-lauraa@codeaurora.org>
+ <20150122162021.aa861aeb53c22206a19ebbcb@linux-foundation.org>
+ <54C196D0.6040900@codeaurora.org> <54C20EEC.1060809@suse.cz>
+ <20150126155617.GA2395@suse.de>
+Message-ID: <54CA3202.8020609@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 29/01/2015 07:35, Wenyou Yang a ?crit :
-> Hi Nicolas,
-> 
-> This version is rebased on the branch: at91-3.20-cleanup of the repository
-> 	git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git
-> 
-> It is purpose to clean up the PM code, includes the patches from Peter Rosin and Sylvain Rochet.
-> 
-> Since verifying the USB clock and USB PLL disabling before suspending to memory,
-> it aslo depends on the following patch serials from Sylvain:
-> 	[PATCHv6 0/5] USB: gadget: atmel_usba_udc: Driver improvements
-> 	[PATCHv7 0/6] USB: host: Atmel OHCI and EHCI drivers improvements
-> 
-> Removes CONFIG_AT91_SLOW_CLOCK config item to simply the PM config,
-> The suspend to standby mode uses the same sram function as the suspend to memory mode.
-> Remove some unused code.
-> 
-> Alexandr & Sylvain, Thank you very much for so many feedbacks.
+On 01/26/2015 04:56 PM, Mel Gorman wrote:
+> On Fri, Jan 23, 2015 at 10:05:48AM +0100, Vlastimil Babka wrote:
+>> On 01/23/2015 01:33 AM, Laura Abbott wrote:
+>>> On 1/22/2015 4:20 PM, Andrew Morton wrote:
+>>>>
+>>>> I don't think v2 addressed Vlastimil's review comment?
+>>>>
+>>>
+>>> We're still adding the offset to node_mem_map and then subtracting it from
+>>> just mem_map. Did I miss another comment somewhere?
+>>
+>> Yes that was addressed, thanks. But I don't feel comfortable acking
+>> it yet, as I have no idea if we are doing the right thing for
+>> CONFIG_HAVE_MEMBLOCK_NODE_MAP && CONFIG_FLATMEM case here.
+>>
+>> Also putting the CONFIG_FLATMEM && !CONFIG_HAVE_MEMBLOCK_NODE_MAP
+>> under the "if (page_to_pfn(mem_map) != pgdat->node_start_pfn)" will
+>> probably do the right thing, but looks like a weird test for this
+>> case here.
+>>
+>> I have no good suggestion though, so let's CC Mel who apparently
+>> wrote the ARCH_PFN_OFFSET correction?
+>>
+>
+> I don't recall introducing ARCH_PFN_OFFSET, are you sure it was me?  I'm just
+> back today after been offline a week so didn't review the patch but IIRC,
+> ARCH_PFN_OFFSET deals with the case where physical memory does not start
+> at 0. Without the offset, virtual _PAGE_OFFSET would not physical page 0.
+> I don't recall it being related to the alignment of node 0 so if there
+> are crashes due to misalignment of node 0 and the fix is ARCH_PFN_OFFSET
+> related then I'm surprised.
 
-Wenyou,
+You're right that ARCH_PFN_OFFSET wasn't added by you, but by commit 
+467bc461d2 which was a bugfix to your commit c713216dee, which did 
+introduce the mem_map correction code, and after which the code looked like:
 
-I'm sorry but the PM "cleanup" and "improvement" series won't be merged
-for 3.20 (so you can remove this from the series subject). The series
-are pretty big, address a sensitive aspect of the chips and are not
-completely ready. So I propose to slow down the pace of versions and
-focus on these two objectives:
-
-1/ try to extract a handful of patches that could be sent as "fixes" for
-3.20 (no more than 5-6 patches). If they are enough urgent, I can try to
-add them to an early "fixes" branch during the 3.20 stabilization process.
-
-2/ try to figure out if from this big amount of assembly code can't be
-extracted some parts that can be converted to C or parts that can use
-ARM common code (for cache management for instance).
-
-During 3.21 development phase, we will come back to the "cleanup" series
-and prepare something that can host the sama5 PM support. Finally we
-will add sama5d3/sama5d4 PM enhancements.
-
-
-> Changes in v5:
->  - Rebase the branch: at91-3.20-cleanup HEAD:fa9df37
-> 
-> Changes in v4:
->  - Clear unused state argument in at91_pm_verify_clocks()
->  - Remove pr_info("AT91:... slow_clock ? ..") in patch 07/13.
-> 
-> Changes in v3
->  - Sylvain splits the patch in two
->  - Add handling if no sram allocated for PM
->  - Retain the STANDBY and SUSPEND_MEM select in at91_pm_enter.
-> 
-> Changes in v2:
->  - Rebase on the at91-3.20-cleanup branch
->  - Recover the verify clock condition, only for suspend to memory.
->  - Collect ACK from Alexandre
->  - Add the macro for PM mode
-> 
-> Peter Rosin (1):
->   pm: at91: Workaround DDRSDRC self-refresh bug with LPDDR1 memories.
-> 
-> Sylvain Rochet (2):
->   pm: at91: pm_slowclock: fix suspend/resume hang up in timeouts
->   pm: at91: pm_slowclock: remove clocks which are already stopped when
->     entering slow clock mode
-> 
-> Wenyou Yang (10):
->   pm: at91: pm_slowclock: remove the unused code related with
->     SLOWDOWN_MASTER_CLOCK
->   pm: at91: move the copying the sram function to the sram
->     initializationi phase
->   ARM: at91: move select SRAM to ARCH_AT91
->   pm: at91: remove the config item CONFIG_AT91_SLOW_CLOCK
->   pm: at91: the standby mode uses the same sram function as the suspend
->     to memory mode
->   pm: at91: rename file name: pm_slowclock.S -->pm_suspend.S
->   pm: at91: rename function name:
->     at91_slow_clock()-->at91_pm_suspend_sram_fn
->   pm: at91: remove the at91_xxx_standby() function definitions in the
->     pm.h
->   pm: at91: remove the data member at91_xxx_standby() of struct
->     ramc_ids
->   pm: at91: amend the pm_suspend entry for at91_cpuidle_device
-> 
->  arch/arm/mach-at91/Kconfig         |   17 +-
->  arch/arm/mach-at91/Makefile        |    2 +-
->  arch/arm/mach-at91/pm.c            |  166 +++++++++---------
->  arch/arm/mach-at91/pm.h            |  100 +----------
->  arch/arm/mach-at91/pm_slowclock.S  |  323 ------------------------------------
->  arch/arm/mach-at91/pm_suspend.S    |  277 +++++++++++++++++++++++++++++++
->  include/soc/at91/at91sam9_ddrsdr.h |    2 +-
->  7 files changed, 366 insertions(+), 521 deletions(-)
->  delete mode 100644 arch/arm/mach-at91/pm_slowclock.S
->  create mode 100644 arch/arm/mach-at91/pm_suspend.S
-> 
+mem_map = NODE_DATA(0)->node_mem_map;
+#ifdef CONFIG_ARCH_POPULATES_NODE_MAP
+                if (page_to_pfn(mem_map) != pgdat->node_start_pfn)
+                        mem_map -= pgdat->node_start_pfn;
+#endif /* CONFIG_ARCH_POPULATES_NODE_MAP */
 
 
--- 
-Nicolas Ferre
+It's from 2006 so I can't expect you remember the details, but I had 
+some trouble finding out what this does. I assume it makes sure that 
+mem_map points to struct page corresponding to pfn 0, because that's 
+what translations using mem_map expect.
+But pgdat->node_mem_map points to struct page corresponding to 
+pgdat->node_start_pfn, which might not be 0. So it subtracts 
+node_start_pfn to fix that. This is OK, as the node_mem_map is allocated 
+(in this very function) with padding so that it covers a 
+MAX_ORDER_NR_PAGES aligned area where node_mem_map may point to the 
+middle of it.
+
+Commit 467bc461d2 fixed this in case the first pfn is not 0, but 
+ARCH_PFN_OFFSET. So mem_map points to struct page corresponding to 
+pfn=ARCH_PFN_OFFSET, which is OK. But I still have few doubts:
+
+1) The "if (page_to_pfn(mem_map) != pgdat->node_start_pfn)" sort of 
+silently assumes that mem_map is allocated at the beginning of the node, 
+i.e. at pgdat->node_start_pfn. And the only reason for this if-condition 
+to be true, is that we haven't corrected the page_to_pfn translation, 
+which uses mem_map. Is this assumption always OK to do? Shouldn't the 
+if-condition be instead about pgdat->node_start_pfn not being aligned?
+
+2) The #ifdef guard is about CONFIG_ARCH_POPULATES_NODE_MAP, which is 
+nowadays called CONFIG_HAVE_MEMBLOCK_NODE_MAP. But shouldn't it be 
+#ifdef FLATMEM instead? After all, we are correcting value of mem_map 
+based on page_to_pfn code variant used on FLATMEM. arm doesn't define
+CONFIG_ARCH_POPULATES_NODE_MAP but apparently needs this correction.
+
+3) The node_mem_map allocation code aligns the allocation to 
+MAX_ORDER_NR_PAGES, so the offset between the start of the allocated map 
+and where node_mem_map points to will be up to MAX_ORDER_NR_PAGES.
+However, here we subtract (in current kernel) (pgdat->node_start_pfn - 
+ARCH_PFN_OFFSET). That looks like another silent assumption, that 
+pgdat->node_start_pfn is always between ARCH_PFN_OFFSET and 
+ARCH_PFN_OFFSET + MAX_ORDER_NR_PAGES. If it were larger, the mem_map 
+correction would subtract too much and end up below what was allocated 
+for node_mem_map, no? The bug report behind this patch said that first 
+2MB of memory was reserved using "no-map flag using DT". Unless this 
+somehow translates to ARCH_PFN_OFFSET at build time, we would underflow 
+mem_map, right? Maybe I'm just overly paranoid here and of course 
+ARCH_PFN_OFFSET is determined properly on arm...
+
+If anyone can confirm my doubts or point me to what I'm missing, thanks.
