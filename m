@@ -1,35 +1,33 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 29 Jan 2015 12:36:28 +0100
-Subject: [PATCH v4 5/7] ARM: mvebu: Use macros for interrupt flags on Armada
- 38x sdhci node
-In-Reply-To: <1422531390-31038-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1422531390-31038-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1422531390-31038-6-git-send-email-gregory.clement@free-electrons.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 29 Jan 2015 11:41:34 +0000
+Subject: [PATCH] ASoC: Samsung: add missing I2C/SPI dependencies
+In-Reply-To: <1815674.ObkQWLfgIW@wuerfel>
+References: <1815674.ObkQWLfgIW@wuerfel>
+Message-ID: <20150129114134.GC21293@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of hardcoding the values of the interrupt flags, use the
-macros provided by <include/dt-bindings/interrupt-controller/irq.h>
-and <include/dt-bindings/interrupt-controller/arm-gic.h> for the
-Armada 38x SDHCI node.
+On Wed, Jan 28, 2015 at 10:28:55PM +0100, Arnd Bergmann wrote:
+> The SND_SOC_ARNDALE_RT5631_ALC5631 selects the rt5631 codec
+> that requires I2C to work, so we get a build error if I2C
+> is disabled:
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/boot/dts/armada-38x.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+You rather buried the lead about there being other drivers in this
+changelog, makes the code a bit surprising when you find it.
 
-diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index 79c4acf186e2..71d4eca5b497 100644
---- a/arch/arm/boot/dts/armada-38x.dtsi
-+++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -516,7 +516,7 @@
- 			sdhci at d8000 {
- 				compatible = "marvell,armada-380-sdhci";
- 				reg = <0xd8000 0x1000>, <0xdc000 0x100>;
--				interrupts = <0 25 0x4>;
-+				interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&gateclk 17>;
- 				mrvl,clk-delay-cycles = <0x1F>;
- 				status = "disabled";
--- 
-2.1.0
+>  config SND_SOC_SPEYSIDE
+>  	tristate "Audio support for Wolfson Speyside"
+> -	depends on SND_SOC_SAMSUNG && MACH_WLF_CRAGG_6410
+> +	depends on SND_SOC_SAMSUNG && MACH_WLF_CRAGG_6410 && SPI_MASTER
+>  	select SND_SAMSUNG_I2S
+>  	select SND_SOC_WM8996
+>  	select SND_SOC_WM9081
+
+Why only add a dependency on SPI here?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150129/740b01cf/attachment-0001.sig>
