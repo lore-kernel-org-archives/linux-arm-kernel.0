@@ -1,51 +1,56 @@
-From: gerg@uclinux.org (Greg Ungerer)
-Date: Thu, 29 Jan 2015 11:15:34 +1000
-Subject: [PATCH] mm: export "high_memory" symbol on !MMU
-In-Reply-To: <2715923.qFZi90ffep@wuerfel>
-References: <2715923.qFZi90ffep@wuerfel>
-Message-ID: <54C989B6.4080006@uclinux.org>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 29 Jan 2015 10:31:22 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Fixes for v3.20
+Message-ID: <cover.1422492899.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/01/15 00:43, Arnd Bergmann wrote:
->>From f391eb37fafc8a22d7fd9574b8d220f0d90a91d0 Mon Sep 17 00:00:00 2001
-> From: Arnd Bergmann <arnd@arndb.de>
-> Date: Mon, 25 Aug 2014 16:24:41 +0200
-> Subject: [PATCH] mm: export "high_memory" symbol on !MMU
-> 
-> The symbol 'high_memory' is provided on both MMU- and NOMMU-kernels,
-> but only one of them is exported, which leads to module build errors
-> in drivers that work fine built-in:
-> 
-> ERROR: "high_memory" [drivers/net/virtio_net.ko] undefined!
-> ERROR: "high_memory" [drivers/net/ppp/ppp_mppe.ko] undefined!
-> ERROR: "high_memory" [drivers/mtd/nand/nand.ko] undefined!
-> ERROR: "high_memory" [crypto/tcrypt.ko] undefined!
-> ERROR: "high_memory" [crypto/cts.ko] undefined!
-> 
-> This exports the symbol to get these to work on NOMMU as well.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Here is an ack if you want one:
+Please consider these Renesas ARM based SoC defconfig fixes for v3.20.
 
-Acked-by: Greg Ungerer <gerg@uclinux.org>
-
-Regards
-Greg
+This pull request is based on "Second Round of Renesas ARM Based SoC
+Defconfig Updates for v3.20", tagged as renesas-defconfig2-for-v3.20, which
+you have previously pulled.
 
 
-> diff --git a/mm/nommu.c b/mm/nommu.c
-> index e9228cbe46de..7bdeb281ad0e 100644
-> --- a/mm/nommu.c
-> +++ b/mm/nommu.c
-> @@ -59,6 +59,7 @@
->  #endif
->  
->  void *high_memory;
-> +EXPORT_SYMBOL(high_memory);
->  struct page *mem_map;
->  unsigned long max_mapnr;
->  unsigned long highest_memmap_pfn;
-> 
-> 
+That pull-request was comprised of a single patch "ARM: shmobile: Enable
+kzm9g board in multiplatform defconfig" which updated the mach_shmobile
+based on the output of make savedefconfig run on a tree with sh73a0/kzm9g
+multiplatform support present. And due to REGULATOR being indirectly
+selected by Kconfig with that support prsent it was not present in the
+resulting shmobile_defconfig.
+
+However, sh73a0/kzm9g multiplatform supportsupport is no longer queued up
+for v3.20 and thus is not enabled by make shmobile_defconfig resulting at
+least in SDHI not working on boards based on R-Car Gen2 SoCs.
+
+It may have been better if I had held off on the patch in question
+until sh73a0/kzm9g multiplatform support was merged, something I expected
+to occur for v3.20. But things being as they are this pull-request
+provides a simple fix for the fallout.
+
+
+The following changes since commit eb4513482d1c4882e3633528ccc48d77581b7bb1:
+
+  ARM: shmobile: Enable kzm9g board in multiplatform defconfig (2015-01-14 09:51:08 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig-fixes-for-v3.20
+
+for you to fetch changes up to 30aca3c84bd79b48154908b6c1592347f4df3d53:
+
+  ARM: shmobile: Select CONFIG_REGULATOR in defconfig once again (2015-01-26 16:14:04 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Defconfig Fixes for v3.20
+
+* Select CONFIG_REGULATOR in mach_shmobile defconfig once again
+
+----------------------------------------------------------------
+Kuninori Morimoto (1):
+      ARM: shmobile: Select CONFIG_REGULATOR in defconfig once again
+
+ arch/arm/configs/shmobile_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
