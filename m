@@ -1,70 +1,39 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 29 Jan 2015 16:44:19 +0100
-Subject: [PATCH v2] MediaTek PMIC support
-In-Reply-To: <20150129142740.GH12209@pengutronix.de>
-References: <1422022202-7526-1-git-send-email-s.hauer@pengutronix.de>
- <20150126114735.GA3178@pengutronix.de>
- <CABuKBe+x9o5OiysnMq-gvOBx3nKoaheL2efZGA6YQ7ZT5aqijw@mail.gmail.com>
- <20150129142740.GH12209@pengutronix.de>
-Message-ID: <CABuKBe+gCH9+qOAyu0NGknt83eLjMhe7+MeuEU0k9H=qoHV7oQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 29 Jan 2015 15:46:25 +0000
+Subject: [PATCH 0/2] Fix secondary CPU boot for thumb2 kernels
+In-Reply-To: <54C94511.30508@codeaurora.org>
+References: <1421869698-27341-1-git-send-email-sboyd@codeaurora.org>
+ <54C94511.30508@codeaurora.org>
+Message-ID: <20150129154624.GH8951@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-01-29 15:27 GMT+01:00 Sascha Hauer <s.hauer@pengutronix.de>:
-> On Thu, Jan 29, 2015 at 01:39:42PM +0100, Matthias Brugger wrote:
->> Hi Sascha,
->>
->> 2015-01-26 12:47 GMT+01:00 Sascha Hauer <s.hauer@pengutronix.de>:
->> > Olof, Arnd,
->> >
->> > OK to put the driver into drivers/soc/mediatek? Can you take these
->> > patches?
->>
->> How does this patches fit together with the one James clock framework patches?
->> Both use the same compatible "mediatek,mt8135-infracfg" and
->> "mediatek,mt8135-pericfg".
->>
->> I had a look on other implementations and they attach the reset
->> controller to the clk driver, if they share the same hw block.
->> Might we run into problems if we implement the clocks in the mfd, as
->> we need the clocks early in boot (e.g. for the timer)?
->
-> From my experience the clocks are needed by the timer before any driver
-> initializes.
->
->>
->> In mt6589 pericfg apart from the clocks and reset controller provides
->> registers for AXI bus control and USB wakeup and USB clock selection.
->> The infracfg block provides top AXI bus fabric control signals and
->> remap registers for the modem.
->> Mike, Stephen, what do you think. Can we implement the clk in a mfd
->> driver? Or do you prefer to implement the whole block in the clk
->> driver?
->
-> Currently the clk support uses regular CLK_OF_DECLARE which handles the
-> clock part of pericfg/infracfg and then later a regular driver for
-> pericfg/infracfg comes and handles the rest of the functionality. Since
-> both use separate registers in the device register space it should work
-> fine.
+On Wed, Jan 28, 2015 at 08:22:41PM +0000, Stephen Boyd wrote:
+> On 01/21/15 11:48, Stephen Boyd wrote:
+> > Currently I can't boot up secondary CPUs on qcom platforms when I
+> > compile the kernel for THUMB2 mode. This is because we always enter
+> > the kernel in ARM mode regardless of what mode the kernel is compiled
+> > for. This patchset adds a small wrapper to secondary_startup() called
+> > secondary_startup_arm() that allows us to switch into THUMB2 mode if
+> > we need to. If the kernel is compiled for ARM mode it shouldn't have
+> > any effect.
+> >
+> > Stephen Boyd (2):
+> >   ARM: Add a secondary_startup that assumes ARM mode
+> >   ARM: qcom: Use secondary_startup_arm()
+> >
+> >  arch/arm/kernel/head.S       | 7 +++++++
+> >  arch/arm/mach-qcom/platsmp.c | 4 ++--
+> >  2 files changed, 9 insertions(+), 2 deletions(-)
+> 
+> Any comments here? Perhaps I can send this through the patch tracker?
 
-It should work until some driver start to use request and map, as you
-provide the whole register space.
-If you want to implement drivers for pericfg/infracfg like this, why
-don't you implement the reset controller in drivers/reset?
+FWIW, they look fine to me.
 
-Anyway I'm not really happy with the solution of having several device
-drivers for the same dts compatible string.
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
->
-> Sascha
->
-> --
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+I guess the reason it works fine on other platforms is because the
+secondary start address we pass to firmware has bit 0 set and this
+causes the jump to the kernel in Thumb-2 mode.
 
-
-
--- 
-motzblog.wordpress.com
+Catalin
