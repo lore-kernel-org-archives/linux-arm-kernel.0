@@ -1,89 +1,66 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 29 Jan 2015 21:42:18 +0100
-Subject: 3.19 on Nokia n900: audio quality awful
-In-Reply-To: <54CA173F.1070301@ti.com>
-References: <20150106170433.GA5408@amd> <20150118120139.GA1509@amd>
- <54C63F1C.6010703@ti.com> <54C92752.9000004@bitmer.com>
- <20150128224144.GA28956@amd> <20150129073529.GA19122@bitmer.com>
- <54CA173F.1070301@ti.com>
-Message-ID: <20150129204218.GC3962@amd>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 29 Jan 2015 12:51:46 -0800
+Subject: [PATCH 2/4] MAINTAINERS: update Broadcom Cygnus SoC git tree
+In-Reply-To: <54CA88F2.5080700@broadcom.com>
+References: <1420843541-5166-1-git-send-email-f.fainelli@gmail.com>	<1420843541-5166-3-git-send-email-f.fainelli@gmail.com>	<54B05AFD.2030105@broadcom.com>
+ <CAKdAkRSXYDdUxMVms4B53aV3fm=hkO3hnyHPhyzKGGW5Bxs4-Q@mail.gmail.com>
+ <54CA88F2.5080700@broadcom.com>
+Message-ID: <54CA9D62.2050908@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> >> I did this:
-> >>
-> >> I'm not sure which one is "main" microphone and which is headset, but
-> >> I guess 2V should be "close enough" to 2.5V to produce something
-> >> different from zeros..?
-> >>
-> > Main or integrated is digital microphone which does AD conversion itself
-> > and headset is analogue. If DMIC is without bias codec will sample plain
-> > zeros from DMIC input but analogue input should always produce some random
-> > LSB bits from codec's AD converter.
-> > 
-> > If codec produces zeros also from analogue input then I suppose codec
-> > ADC is not powered up or similar. One way to hunt regression if
-> > bisecting is not possible due reason or another is to dump and diff codec
-> > registers from /sys/kernel/debug/regmap/ using both working commit
-> >and head.
-
-I tried 2.6.28... where recording was, but it does not support
-regmap. Then I tried 3.14, but could not get recording to work there.
-
-> >>  	tlv320aic3x_aux: tlv320aic3x at 19 {
-> >> @@ -502,6 +504,8 @@
-> >>  		DRVDD-supply = <&vmmc2>;
-> >>  		IOVDD-supply = <&vio>;
-> >>  		DVDD-supply = <&vio>;
-> >> +
-> >> +		ai3x-micbias-vg = <1>;
-> >>  	};
-> > This should be 2, i.e. 2.5 V according to
-> > Documentation/devicetree/bindings/sound/tlv320aic3x.txt. I think 2 V is
-> > too low for some headset mics and that was the reason for 2.5 V.
-
-Ok, tried that, but no change.
-
-> Can you also try this patch to correct the DAPM route for the rx51:
-
-Yes, with the patch below (and dts updates I did) recording works.
-
-Another interesting note is that audio quality is not that horrible
-when playing 8 kHz, mono signal... it is mostly what I'd
-expect. Playing 44.1kHz, stereo mp3 .. is not good.
-
-Tested-by: Pavel Machek <pavel@ucw.cz>
-
-Thanks,
-									Pavel
-
-> diff --git a/sound/soc/omap/rx51.c b/sound/soc/omap/rx51.c
-> index 04896d6252a2..7f299357c2d2 100644
-> --- a/sound/soc/omap/rx51.c
-> +++ b/sound/soc/omap/rx51.c
-> @@ -250,14 +250,14 @@ static const struct snd_soc_dapm_route audio_map[] = {
->  	{"FM Transmitter", NULL, "LLOUT"},
->  	{"FM Transmitter", NULL, "RLOUT"},
+On 29/01/15 11:24, Ray Jui wrote:
 > 
-> -	{"DMic Rate 64", NULL, "Mic Bias"},
-> -	{"Mic Bias", NULL, "DMic"},
-> +	{"DMic Rate 64", NULL, "DMic"},
-> +	{"DMic", NULL, "Mic Bias"},
 > 
->  	{"b LINE2R", NULL, "MONO_LOUT"},
->  	{"Earphone", NULL, "b HPLOUT"},
+> On 1/29/2015 11:01 AM, Dmitry Torokhov wrote:
+>> On Fri, Jan 9, 2015 at 2:49 PM, Ray Jui <rjui@broadcom.com> wrote:
+>>>
+>>>
+>>> On 1/9/2015 2:45 PM, Florian Fainelli wrote:
+>>>> The Cygnus SoC git tree is moved from github.com/brcm/linux.git to its
+>>>> own git tree at github.com/Broadcom/cygnus-linux.git.
+>>>>
+>>>> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+>>>> ---
+>>>>  MAINTAINERS | 2 +-
+>>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/MAINTAINERS b/MAINTAINERS
+>>>> index ff73215cd165..4a8f3459f9c2 100644
+>>>> --- a/MAINTAINERS
+>>>> +++ b/MAINTAINERS
+>>>> @@ -2192,7 +2192,7 @@ M:      Ray Jui <rjui@broadcom.com>
+>>>>  M:   Scott Branden <sbranden@broadcom.com>
+>>>>  L:   linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>>>>  L:   bcm-kernel-feedback-list at broadcom.com
+>>>> -T:   git git://git.github.com/brcm/linux.git
+>>>> +T:   git git://git.github.com/Broadcom/cygnus-linux.git
+>>>
+>>> Looks fine to me!
+>>
+>> Hmm, the address does not work for me unless I drop 'git.' from the front:
+>>
+>> git://github.com/Broadcom/cygnus-linux.git
+>>
+>> Thanks.
+>>
+> Thanks, Dmitry.
 > 
-> -	{"LINE1L", NULL, "b Mic Bias"},
-> -	{"b Mic Bias", NULL, "HS Mic"}
-> +	{"LINE1L", NULL, "HS Mic"},
-> +	{"HS Mic", NULL, "b Mic Bias"},
->  };
+> I just tried it myself and also got a connection timeout with
+> git://git.github.com/Broadcom/cygnus-linux.git
 > 
->  static const char * const spk_function[] = {"Off", "On"};
+> fatal: unable to connect to git.github.com:
+> git.github.com[0: 23.235.47.133]: errno=Connection timed out
 > 
+> Same issue for git://git.github.com/broadcom/stblinux.git and
+> git://git.github.com/broadcom/arm-bcm63xx.git
+> 
+> git://github.com/Broadcom/cygnus-linux.git works fine as you mentioned.
+> 
+> Florian, I think we need to fix this. Thanks.
 
+Thanks for noticing, somehow I copy/pasted the original entry for cygnus
+which was not working either. A new pull request has been submitted,
+let's see if we can it merged or if incremental fixes are needed.
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Florian
