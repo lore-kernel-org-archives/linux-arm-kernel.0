@@ -1,110 +1,120 @@
-From: ajaynumb@gmail.com (Ajay kumar)
-Date: Thu, 29 Jan 2015 20:09:07 +0530
-Subject: [PATCH V9 04/14] drm/bridge: ptn3460: Convert to i2c driver model
-In-Reply-To: <20150129142919.GN2001@joana>
-References: <1421771935-31618-1-git-send-email-ajaykumar.rs@samsung.com>
- <1421771935-31618-5-git-send-email-ajaykumar.rs@samsung.com>
- <20150129142919.GN2001@joana>
-Message-ID: <CAEC9eQMKrUsdUdSRPNqE_YOobb__8nXLLe454kKXab14rPg-ZA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 29 Jan 2015 14:39:08 +0000
+Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher
+ constraints with dma-parms
+In-Reply-To: <1422347154-15258-2-git-send-email-sumit.semwal@linaro.org>
+References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
+ <1422347154-15258-2-git-send-email-sumit.semwal@linaro.org>
+Message-ID: <20150129143908.GA26493@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gustavo,
+On Tue, Jan 27, 2015 at 01:55:54PM +0530, Sumit Semwal wrote:
+> +/*
+> + * recalc_constraints - recalculates constraints for all attached devices;
+> + *  useful for detach() recalculation, and for dma_buf_recalc_constraints()
+> + *  helper.
+> + *  Returns recalculated constraints in recalc_cons, or error in the unlikely
+> + *  case when constraints of attached devices might have changed.
+> + */
 
-I think Thierry already fixed it. Check this.
-http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/drivers/gpu/drm/bridge/Kconfig
+Please see kerneldoc documentation for the proper format of these comments.
 
+> +static int recalc_constraints(struct dma_buf *dmabuf,
+> +			      struct device_dma_parameters *recalc_cons)
+> +{
+> +	struct device_dma_parameters calc_cons;
+> +	struct dma_buf_attachment *attach;
+> +	int ret = 0;
+> +
+> +	init_constraints(&calc_cons);
+> +
+> +	list_for_each_entry(attach, &dmabuf->attachments, node) {
+> +		ret = calc_constraints(attach->dev, &calc_cons);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +	*recalc_cons = calc_cons;
+> +	return 0;
+> +}
+> +
+>  /**
+>   * dma_buf_export_named - Creates a new dma_buf, and associates an anon file
+>   * with this buffer, so it can be exported.
+> @@ -313,6 +373,9 @@ struct dma_buf *dma_buf_export_named(void *priv, const struct dma_buf_ops *ops,
+>  	dmabuf->ops = ops;
+>  	dmabuf->size = size;
+>  	dmabuf->exp_name = exp_name;
+> +
+> +	init_constraints(&dmabuf->constraints);
+> +
+>  	init_waitqueue_head(&dmabuf->poll);
+>  	dmabuf->cb_excl.poll = dmabuf->cb_shared.poll = &dmabuf->poll;
+>  	dmabuf->cb_excl.active = dmabuf->cb_shared.active = 0;
+> @@ -422,7 +485,7 @@ struct dma_buf_attachment *dma_buf_attach(struct dma_buf *dmabuf,
+>  					  struct device *dev)
+>  {
+>  	struct dma_buf_attachment *attach;
+> -	int ret;
+> +	int ret = 0;
+>  
+>  	if (WARN_ON(!dmabuf || !dev))
+>  		return ERR_PTR(-EINVAL);
+> @@ -436,6 +499,9 @@ struct dma_buf_attachment *dma_buf_attach(struct dma_buf *dmabuf,
+>  
+>  	mutex_lock(&dmabuf->lock);
+>  
+> +	if (calc_constraints(dev, &dmabuf->constraints))
+> +		goto err_constraints;
+> +
+>  	if (dmabuf->ops->attach) {
+>  		ret = dmabuf->ops->attach(dmabuf, dev, attach);
+>  		if (ret)
+> @@ -448,6 +514,7 @@ struct dma_buf_attachment *dma_buf_attach(struct dma_buf *dmabuf,
+>  
+>  err_attach:
+>  	kfree(attach);
+> +err_constraints:
+>  	mutex_unlock(&dmabuf->lock);
+>  	return ERR_PTR(ret);
+>  }
+> @@ -470,6 +537,8 @@ void dma_buf_detach(struct dma_buf *dmabuf, struct dma_buf_attachment *attach)
+>  	if (dmabuf->ops->detach)
+>  		dmabuf->ops->detach(dmabuf, attach);
+>  
+> +	recalc_constraints(dmabuf, &dmabuf->constraints);
+> +
 
-Regards,
-Ajay
+To me, this whole thing seems horribly racy.
 
+What happens if subsystem X creates a dmabuf, which is passed to
+userspace. It's then passed to subsystem Y, which starts making use
+of it, calling dma_buf_map_attachment() on it.
 
+The same buffer is also passed (via unix domain sockets) to another
+program, which then passes it independently into subsystem Z, and
+subsystem Z has more restrictive DMA constraints.
 
-On Thu, Jan 29, 2015 at 7:59 PM, Gustavo Padovan <gustavo@padovan.org> wrote:
-> Hi Ajay,
->
-> 2015-01-20 Ajay Kumar <ajaykumar.rs@samsung.com>:
->
->> Use drm_bridge helpers to modify the driver to support
->> i2c driver model.
->>
->> Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
->> Acked-by: Inki Dae <inki.dae@samsung.com>
->> Tested-by: Rahul Sharma <rahul.sharma@samsung.com>
->> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> Tested-by: Gustavo Padovan <gustavo.padovan@collabora.co.uk>
->> Tested-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
->> ---
->>  drivers/gpu/drm/bridge/Kconfig          |    2 +
->>  drivers/gpu/drm/bridge/ptn3460.c        |  124 +++++++++++++++++++++----------
->>  drivers/gpu/drm/exynos/exynos_dp_core.c |   22 ------
->>  3 files changed, 86 insertions(+), 62 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
->> index 884923f..4254c2b 100644
->> --- a/drivers/gpu/drm/bridge/Kconfig
->> +++ b/drivers/gpu/drm/bridge/Kconfig
->> @@ -1,5 +1,7 @@
->>  config DRM_PTN3460
->>       tristate "PTN3460 DP/LVDS bridge"
->>       depends on DRM
->> +     depends on OF && I2C
->
-> Adding I2C here is causing this circular dependency:
->
-> scripts/kconfig/conf --silentoldconfig Kconfig
-> drivers/video/fbdev/Kconfig:5:error: recursive dependency detected!
-> drivers/video/fbdev/Kconfig:5:  symbol FB is selected by DRM_KMS_FB_HELPER
-> drivers/gpu/drm/Kconfig:34:     symbol DRM_KMS_FB_HELPER depends on
-> DRM_KMS_HELPER
-> drivers/gpu/drm/Kconfig:28:     symbol DRM_KMS_HELPER is selected by
-> DRM_PTN3460
-> drivers/gpu/drm/bridge/Kconfig:1:       symbol DRM_PTN3460 depends on I2C
-> drivers/i2c/Kconfig:7:  symbol I2C is selected by FB_DDC
-> drivers/video/fbdev/Kconfig:59: symbol FB_DDC is selected by FB_CYBER2000_DDC
-> drivers/video/fbdev/Kconfig:374:        symbol FB_CYBER2000_DDC depends on
-> FB_CYBER2000
-> drivers/video/fbdev/Kconfig:362:        symbol FB_CYBER2000 depends on FB
->
-> To solve this we just need to remove I2C from depends as DRM already selects
-> I2C. This was already fixed by:
->
->
-> commit 90bde571ad194adb039cb92a11a5b346f15eb610
-> Author: Arnd Bergmann <arnd@arndb.de>
-> Date:   Tue Mar 25 12:06:46 2014 +0100
->
->     drm/bridge: PTN3460 needs DRM_KMS_HELPER
->
->     The recently added PTN3460 device driver uses interfaces that
->     are provided by the KMS helper infrastructure, so we should
->     explicitly select that to avoid this linker error:
->
->     ERROR: "drm_helper_probe_single_connector_modes" [drivers/gpu/drm/bridge/ptn3460.ko] undefined!
->     ERROR: "drm_helper_connector_dpms" [drivers/gpu/drm/bridge/ptn3460.ko] undefined!
->
->     We have to drop the I2C dependency to avoid a circular dependency
->     chain, but that's ok because DRM already selects I2C.
->
->     Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->     Signed-off-by: Dave Airlie <airlied@redhat.com>
->
->
-> But you may have introduced it again on a rebase. The following patch fixes it:
->
-> diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
-> index 990b4b2..946d1ef 100644
-> --- a/drivers/gpu/drm/bridge/Kconfig
-> +++ b/drivers/gpu/drm/bridge/Kconfig
-> @@ -1,7 +1,6 @@
->  config DRM_PTN3460
->         tristate "PTN3460 DP/LVDS bridge"
-> -       depends on DRM
-> -       depends on OF && I2C
-> +       depends on DRM && OF
->         select DRM_KMS_HELPER
->         select DRM_PANEL
->         ---help---
->
->
->         Gustavo
+What happens at this point?
+
+Subsystems such as DRM cache the scatter table, and return it for
+subsequent attach calls, so DRM drivers using the default
+drm_gem_map_dma_buf() implementation would not see the restrictions
+placed upon the dmabuf.  Moreover, the returned scatterlist would not
+be modified for those restrictions either.
+
+What would other subsystems do?
+
+This needs more thought before it's merged.
+
+For example, in the above situation, should we deny the ability to
+create a new attachment when a dmabuf has already been mapped by an
+existing attachment?  Should we deny it only when the new attachment
+has more restrictive DMA constraints?
+
+Please consider the possible sequences of use (such as the scenario
+above) when creating or augmenting an API.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
