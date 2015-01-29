@@ -1,64 +1,56 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 29 Jan 2015 08:53:19 +0530
-Subject: [PATCH 1/3] cpufreq: s3c: remove incorrect __init annotations
-In-Reply-To: <1422451015-390439-2-git-send-email-arnd@arndb.de>
+Date: Thu, 29 Jan 2015 08:53:31 +0530
+Subject: [PATCH 2/3] cpufreq: s3c: remove last use of resume_clocks
+ callback
+In-Reply-To: <1422451015-390439-3-git-send-email-arnd@arndb.de>
 References: <1422451015-390439-1-git-send-email-arnd@arndb.de>
- <1422451015-390439-2-git-send-email-arnd@arndb.de>
-Message-ID: <CAKohpok5XsZ3o-Q_Ber8n5GaThe1x7BiHqFyHPSDLUDpyCXxog@mail.gmail.com>
+ <1422451015-390439-3-git-send-email-arnd@arndb.de>
+Message-ID: <CAKohpo=v7SLii7ykqWfpf0ZAzCF6Oi9_ARVNmTu9u4j9poXafA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 28 January 2015 at 18:46, Arnd Bergmann <arnd@arndb.de> wrote:
-> The two functions s3c2416_cpufreq_driver_init and s3c_cpufreq_register
-> are marked init but are called from a context that might be run after
-> the __init sections are discarded, as the compiler points out:
+> Commit 32726d2d550 ("ARM: SAMSUNG: Remove legacy clock code")
+> already removed the callback pointer, but there was one remaining
+> user:
 >
-> WARNING: vmlinux.o(.data+0x1ad9dc): Section mismatch in reference from the variable s3c2416_cpufreq_driver to the function .init.text:s3c2416_cpufreq_driver_init()
-> WARNING: drivers/built-in.o(.text+0x35b5dc): Section mismatch in reference from the function s3c2410a_cpufreq_add() to the function .init.text:s3c_cpufreq_register()
->
-> This removes the __init markings.
+> drivers/cpufreq/s3c24xx-cpufreq.c: In function 's3c_cpufreq_resume_clocks':
+> drivers/cpufreq/s3c24xx-cpufreq.c:149:14: error: 'struct s3c_cpufreq_info' has no member named 'resume_clocks'
+>   cpu_cur.info->resume_clocks();
+>               ^
 >
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: stable at vger.kernel.org
+> Fixes: 32726d2d550 ("ARM: SAMSUNG: Remove legacy clock code")
+> Cc: stable at vger.kernel.org # v3.17+
 > ---
->  drivers/cpufreq/s3c2416-cpufreq.c | 4 ++--
->  drivers/cpufreq/s3c24xx-cpufreq.c | 2 +-
->  2 files changed, 3 insertions(+), 3 deletions(-)
+>  drivers/cpufreq/s3c24xx-cpufreq.c | 8 --------
+>  1 file changed, 8 deletions(-)
 >
-> diff --git a/drivers/cpufreq/s3c2416-cpufreq.c b/drivers/cpufreq/s3c2416-cpufreq.c
-> index 2fd53eaaec20..d6d425773fa4 100644
-> --- a/drivers/cpufreq/s3c2416-cpufreq.c
-> +++ b/drivers/cpufreq/s3c2416-cpufreq.c
-> @@ -263,7 +263,7 @@ out:
->  }
->
->  #ifdef CONFIG_ARM_S3C2416_CPUFREQ_VCORESCALE
-> -static void __init s3c2416_cpufreq_cfg_regulator(struct s3c2416_data *s3c_freq)
-> +static void s3c2416_cpufreq_cfg_regulator(struct s3c2416_data *s3c_freq)
->  {
->         int count, v, i, found;
->         struct cpufreq_frequency_table *pos;
-> @@ -333,7 +333,7 @@ static struct notifier_block s3c2416_cpufreq_reboot_notifier = {
->         .notifier_call = s3c2416_cpufreq_reboot_notifier_evt,
->  };
->
-> -static int __init s3c2416_cpufreq_driver_init(struct cpufreq_policy *policy)
-> +static int s3c2416_cpufreq_driver_init(struct cpufreq_policy *policy)
->  {
->         struct s3c2416_data *s3c_freq = &s3c2416_cpufreq;
->         struct cpufreq_frequency_table *pos;
 > diff --git a/drivers/cpufreq/s3c24xx-cpufreq.c b/drivers/cpufreq/s3c24xx-cpufreq.c
-> index d00f1cee4509..bd340a1ca87d 100644
+> index bd340a1ca87d..733aa5153e74 100644
 > --- a/drivers/cpufreq/s3c24xx-cpufreq.c
 > +++ b/drivers/cpufreq/s3c24xx-cpufreq.c
-> @@ -454,7 +454,7 @@ static struct cpufreq_driver s3c24xx_driver = {
->  };
+> @@ -144,11 +144,6 @@ static void s3c_cpufreq_setfvco(struct s3c_cpufreq_config *cfg)
+>         (cfg->info->set_fvco)(cfg);
+>  }
 >
->
-> -int __init s3c_cpufreq_register(struct s3c_cpufreq_info *info)
-> +int s3c_cpufreq_register(struct s3c_cpufreq_info *info)
+> -static inline void s3c_cpufreq_resume_clocks(void)
+> -{
+> -       cpu_cur.info->resume_clocks();
+> -}
+> -
+>  static inline void s3c_cpufreq_updateclk(struct clk *clk,
+>                                          unsigned int freq)
 >  {
->         if (!info || !info->name) {
->                 printk(KERN_ERR "%s: failed to pass valid information\n",
+> @@ -417,9 +412,6 @@ static int s3c_cpufreq_resume(struct cpufreq_policy *policy)
+>
+>         last_target = ~0;       /* invalidate last_target setting */
+>
+> -       /* first, find out what speed we resumed at. */
+> -       s3c_cpufreq_resume_clocks();
+> -
+>         /* whilst we will be called later on, we try and re-set the
+>          * cpu frequencies as soon as possible so that we do not end
+>          * up resuming devices and then immediately having to re-set
 
 Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
