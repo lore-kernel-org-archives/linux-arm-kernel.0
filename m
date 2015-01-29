@@ -1,173 +1,89 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 29 Jan 2015 16:19:50 +0100
-Subject: [PATCH] ARM: efm32: switch to vendor,device compatible strings
-Message-ID: <1422544790-5247-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: varkabhadram@gmail.com (Varka Bhadram)
+Date: Thu, 29 Jan 2015 20:56:32 +0530
+Subject: [PATCH v10 2/2] tty/serial: Add Spreadtrum sc9836-uart driver
+ support
+In-Reply-To: <1422443324-25082-3-git-send-email-chunyan.zhang@spreadtrum.com>
+References: <sc9836-serial-v10>
+ <1422443324-25082-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1422443324-25082-3-git-send-email-chunyan.zhang@spreadtrum.com>
+Message-ID: <54CA5128.8050500@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mainline drivers were fixed in commits
+Hi,
 
- - 4ea8dafd2475 (serial: efm32: use $vendor,$device scheme for
-   compatible string)
- - 12f6dd860cf8 (spi: efm32: use $vendor,$device scheme for compatible
-   string)
- - 63cc122381bd (clocksource: efm32: use $vendor,$device scheme for
-   compatible string)
+On Wednesday 28 January 2015 04:38 PM, Chunyan Zhang wrote:
+> Add a full sc9836-uart driver for SC9836 SoC which is based on the
+> spreadtrum sharkl64 platform.
+> This driver also support earlycon.
+>
+> Originally-by: Lanqing Liu <lanqing.liu@spreadtrum.com>
+> Signed-off-by: Orson Zhai <orson.zhai@spreadtrum.com>
+> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
+> ---
+>   drivers/tty/serial/Kconfig       |   18 +
+>   drivers/tty/serial/Makefile      |    1 +
+>   drivers/tty/serial/sprd_serial.c |  793 ++++++++++++++++++++++++++++++++++++++
+>   include/uapi/linux/serial_core.h |    3 +
+>   4 files changed, 815 insertions(+)
+>   create mode 100644 drivers/tty/serial/sprd_serial.c
+>
+(...)
 
-which are all in 3.16-rc1 to also support these compatible strings.
+> +static int sprd_probe(struct platform_device *pdev)
+> +{
+> +	struct resource *res;
+> +	struct uart_port *up;
+> +	struct clk *clk;
+> +	int irq;
+> +	int index;
+> +	int ret;
+> +
+> +	for (index = 0; index < ARRAY_SIZE(sprd_port); index++)
+> +		if (sprd_port[index] == NULL)
+> +			break;
+> +
+> +	if (index == ARRAY_SIZE(sprd_port))
+> +		return -EBUSY;
+> +
+> +	index = sprd_probe_dt_alias(index, &pdev->dev);
+> +
+> +	sprd_port[index] = devm_kzalloc(&pdev->dev,
+> +		sizeof(*sprd_port[index]), GFP_KERNEL);
+> +	if (!sprd_port[index])
+> +		return -ENOMEM;
+> +
+> +	up = &sprd_port[index]->port;
+> +	up->dev = &pdev->dev;
+> +	up->line = index;
+> +	up->type = PORT_SPRD;
+> +	up->iotype = SERIAL_IO_PORT;
+> +	up->uartclk = SPRD_DEF_RATE;
+> +	up->fifosize = SPRD_FIFO_SIZE;
+> +	up->ops = &serial_sprd_ops;
+> +	up->flags = UPF_BOOT_AUTOCONF;
+> +
+> +	clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (!IS_ERR(clk))
+> +		up->uartclk = clk_get_rate(clk);
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!res) {
+> +		dev_err(&pdev->dev, "not provide mem resource\n");
+> +		return -ENODEV;
+> +	}
 
-For the other affected peripherals (adc and gpio) there are no drivers in
-mainline yet.
+This check is not required. It will be done by devm_ioremap_resource()
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/boot/dts/efm32gg.dtsi | 32 ++++++++++++++++----------------
- 1 file changed, 16 insertions(+), 16 deletions(-)
+> +	up->mapbase = res->start;
+> +	up->membase = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(up->membase))
+> +		return PTR_ERR(up->membase);
+> +
+>
 
-diff --git a/arch/arm/boot/dts/efm32gg.dtsi b/arch/arm/boot/dts/efm32gg.dtsi
-index 106d505..c747983 100644
---- a/arch/arm/boot/dts/efm32gg.dtsi
-+++ b/arch/arm/boot/dts/efm32gg.dtsi
-@@ -23,7 +23,7 @@
- 
- 	soc {
- 		adc: adc at 40002000 {
--			compatible = "efm32,adc";
-+			compatible = "energymicro,efm32-adc";
- 			reg = <0x40002000 0x400>;
- 			interrupts = <7>;
- 			clocks = <&cmu clk_HFPERCLKADC0>;
-@@ -31,7 +31,7 @@
- 		};
- 
- 		gpio: gpio at 40006000 {
--			compatible = "efm32,gpio";
-+			compatible = "energymicro,efm32-gpio";
- 			reg = <0x40006000 0x1000>;
- 			interrupts = <1 11>;
- 			gpio-controller;
-@@ -45,7 +45,7 @@
- 		i2c0: i2c at 4000a000 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
--			compatible = "efm32,i2c";
-+			compatible = "energymicro,efm32-i2c";
- 			reg = <0x4000a000 0x400>;
- 			interrupts = <9>;
- 			clocks = <&cmu clk_HFPERCLKI2C0>;
-@@ -56,7 +56,7 @@
- 		i2c1: i2c at 4000a400 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
--			compatible = "efm32,i2c";
-+			compatible = "energymicro,efm32-i2c";
- 			reg = <0x4000a400 0x400>;
- 			interrupts = <10>;
- 			clocks = <&cmu clk_HFPERCLKI2C1>;
-@@ -67,7 +67,7 @@
- 		spi0: spi at 4000c000 { /* USART0 */
- 			#address-cells = <1>;
- 			#size-cells = <0>;
--			compatible = "efm32,spi";
-+			compatible = "energymicro,efm32-spi";
- 			reg = <0x4000c000 0x400>;
- 			interrupts = <3 4>;
- 			clocks = <&cmu clk_HFPERCLKUSART0>;
-@@ -77,7 +77,7 @@
- 		spi1: spi at 4000c400 { /* USART1 */
- 			#address-cells = <1>;
- 			#size-cells = <0>;
--			compatible = "efm32,spi";
-+			compatible = "energymicro,efm32-spi";
- 			reg = <0x4000c400 0x400>;
- 			interrupts = <15 16>;
- 			clocks = <&cmu clk_HFPERCLKUSART1>;
-@@ -87,7 +87,7 @@
- 		spi2: spi at 4000c800 { /* USART2 */
- 			#address-cells = <1>;
- 			#size-cells = <0>;
--			compatible = "efm32,spi";
-+			compatible = "energymicro,efm32-spi";
- 			reg = <0x4000c800 0x400>;
- 			interrupts = <18 19>;
- 			clocks = <&cmu clk_HFPERCLKUSART2>;
-@@ -95,7 +95,7 @@
- 		};
- 
- 		uart0: uart at 4000c000 { /* USART0 */
--			compatible = "efm32,uart";
-+			compatible = "energymicro,efm32-uart";
- 			reg = <0x4000c000 0x400>;
- 			interrupts = <3 4>;
- 			clocks = <&cmu clk_HFPERCLKUSART0>;
-@@ -103,7 +103,7 @@
- 		};
- 
- 		uart1: uart at 4000c400 { /* USART1 */
--			compatible = "efm32,uart";
-+			compatible = "energymicro,efm32-uart";
- 			reg = <0x4000c400 0x400>;
- 			interrupts = <15 16>;
- 			clocks = <&cmu clk_HFPERCLKUSART1>;
-@@ -111,7 +111,7 @@
- 		};
- 
- 		uart2: uart at 4000c800 { /* USART2 */
--			compatible = "efm32,uart";
-+			compatible = "energymicro,efm32-uart";
- 			reg = <0x4000c800 0x400>;
- 			interrupts = <18 19>;
- 			clocks = <&cmu clk_HFPERCLKUSART2>;
-@@ -119,7 +119,7 @@
- 		};
- 
- 		uart3: uart at 4000e000 { /* UART0 */
--			compatible = "efm32,uart";
-+			compatible = "energymicro,efm32-uart";
- 			reg = <0x4000e000 0x400>;
- 			interrupts = <20 21>;
- 			clocks = <&cmu clk_HFPERCLKUART0>;
-@@ -127,7 +127,7 @@
- 		};
- 
- 		uart4: uart at 4000e400 { /* UART1 */
--			compatible = "efm32,uart";
-+			compatible = "energymicro,efm32-uart";
- 			reg = <0x4000e400 0x400>;
- 			interrupts = <22 23>;
- 			clocks = <&cmu clk_HFPERCLKUART1>;
-@@ -135,28 +135,28 @@
- 		};
- 
- 		timer0: timer at 40010000 {
--			compatible = "efm32,timer";
-+			compatible = "energymicro,efm32-timer";
- 			reg = <0x40010000 0x400>;
- 			interrupts = <2>;
- 			clocks = <&cmu clk_HFPERCLKTIMER0>;
- 		};
- 
- 		timer1: timer at 40010400 {
--			compatible = "efm32,timer";
-+			compatible = "energymicro,efm32-timer";
- 			reg = <0x40010400 0x400>;
- 			interrupts = <12>;
- 			clocks = <&cmu clk_HFPERCLKTIMER1>;
- 		};
- 
- 		timer2: timer at 40010800 {
--			compatible = "efm32,timer";
-+			compatible = "energymicro,efm32-timer";
- 			reg = <0x40010800 0x400>;
- 			interrupts = <13>;
- 			clocks = <&cmu clk_HFPERCLKTIMER2>;
- 		};
- 
- 		timer3: timer at 40010c00 {
--			compatible = "efm32,timer";
-+			compatible = "energymicro,efm32-timer";
- 			reg = <0x40010c00 0x400>;
- 			interrupts = <14>;
- 			clocks = <&cmu clk_HFPERCLKTIMER3>;
 -- 
-2.1.4
+Thanks,
+Varka Bhadram.
