@@ -1,89 +1,68 @@
-From: varkabhadram@gmail.com (Varka Bhadram)
-Date: Thu, 29 Jan 2015 20:56:32 +0530
-Subject: [PATCH v10 2/2] tty/serial: Add Spreadtrum sc9836-uart driver
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 29 Jan 2015 15:29:23 +0000
+Subject: [PATCH v7 13/17] ARM64 / ACPI: Add GICv2 specific ACPI boot
  support
-In-Reply-To: <1422443324-25082-3-git-send-email-chunyan.zhang@spreadtrum.com>
-References: <sc9836-serial-v10>
- <1422443324-25082-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1422443324-25082-3-git-send-email-chunyan.zhang@spreadtrum.com>
-Message-ID: <54CA5128.8050500@gmail.com>
+In-Reply-To: <CACxGe6vb8au6sc0gDMDu4kuzmYBCuOrcObWkbj1mDoCGTgVLVw@mail.gmail.com>
+References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
+ <1421247905-3749-14-git-send-email-hanjun.guo@linaro.org>
+ <54B8F2E3.80306@arm.com>
+ <CACxGe6tBb8L8upS3zenZbrOc_c0E=MA=DqLjkSezEbregaAaaA@mail.gmail.com>
+ <54B92245.6080306@arm.com>
+ <CACxGe6vb8au6sc0gDMDu4kuzmYBCuOrcObWkbj1mDoCGTgVLVw@mail.gmail.com>
+Message-ID: <20150129152922.GG8951@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Jan 27, 2015 at 04:12:08PM +0000, Grant Likely wrote:
+> On Fri, Jan 16, 2015 at 2:37 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> >>>> @@ -78,6 +79,10 @@ void __init set_handle_irq(void (*handle_irq)(struct pt_regs *))
+> >>>>  void __init init_IRQ(void)
+> >>>>  {
+> >>>>     irqchip_init();
+> >>>> +
+> >>>> +   if (!handle_arch_irq)
+> >>>> +           acpi_gic_init();
+> >>>> +
+> >>>
+> >>> Why isn't this called from irqchip_init? It would seem like the logical
+> >>> spot to probe an interrupt controller.
+> >>
+> >> What has been done here isn't an unusual choice. We've got stuff all
+> >> over the kernel that may or may not be implemented depending on what
+> >> the architecture supports. If the function call is renamed to
+> >> acpi_init_irq(), are you content?
+> >
+> > My (full) suggestion was to do it like we've done it for DT, and I don't
+> > think I varied much from this point of view. Yes, calling it
+> > acpi_irq_init() would be a good start, and having the ACPI-compatible
+> > irqchips to be self-probable even better.
+> >
+> > <lack-of-sleep-rant>
+> >
+> > Hell, if nobody beats me to it, maybe I'll just write that code, with
+> > proper entry points in the various GIC drivers. Yes, this is
+> > infrastructure. Maybe it is grossly overdesigned. But I really spend too
+> > much time dealing with the crap that people are happy to pile on top of
+> > the GIC code to be madly enthusiastic about the general "good enough"
+> > attitude.
+> >
+> > </lack-of-sleep-rant>
+> >
+> > Or to put it in a slightly more diplomatic way: If ACPI is to be our
+> > future, can we please make the future look a bit better?
+> 
+> Hi Marc,
+> 
+> As per our off-list discussion, I completely agree. We don't want to
+> be adding hack upon hack, and I will be first in line to NAK any
+> patches taking that approach. However, for this initial series, it
+> only supports exactly one GIC that can be set up by ACPI. Can we agree
+> to leave it as is in this series, with the agreement that it will be
+> replaced for v2m and v3 support with a proper pluggable initializer?
 
-On Wednesday 28 January 2015 04:38 PM, Chunyan Zhang wrote:
-> Add a full sc9836-uart driver for SC9836 SoC which is based on the
-> spreadtrum sharkl64 platform.
-> This driver also support earlycon.
->
-> Originally-by: Lanqing Liu <lanqing.liu@spreadtrum.com>
-> Signed-off-by: Orson Zhai <orson.zhai@spreadtrum.com>
-> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
-> ---
->   drivers/tty/serial/Kconfig       |   18 +
->   drivers/tty/serial/Makefile      |    1 +
->   drivers/tty/serial/sprd_serial.c |  793 ++++++++++++++++++++++++++++++++++++++
->   include/uapi/linux/serial_core.h |    3 +
->   4 files changed, 815 insertions(+)
->   create mode 100644 drivers/tty/serial/sprd_serial.c
->
-(...)
-
-> +static int sprd_probe(struct platform_device *pdev)
-> +{
-> +	struct resource *res;
-> +	struct uart_port *up;
-> +	struct clk *clk;
-> +	int irq;
-> +	int index;
-> +	int ret;
-> +
-> +	for (index = 0; index < ARRAY_SIZE(sprd_port); index++)
-> +		if (sprd_port[index] == NULL)
-> +			break;
-> +
-> +	if (index == ARRAY_SIZE(sprd_port))
-> +		return -EBUSY;
-> +
-> +	index = sprd_probe_dt_alias(index, &pdev->dev);
-> +
-> +	sprd_port[index] = devm_kzalloc(&pdev->dev,
-> +		sizeof(*sprd_port[index]), GFP_KERNEL);
-> +	if (!sprd_port[index])
-> +		return -ENOMEM;
-> +
-> +	up = &sprd_port[index]->port;
-> +	up->dev = &pdev->dev;
-> +	up->line = index;
-> +	up->type = PORT_SPRD;
-> +	up->iotype = SERIAL_IO_PORT;
-> +	up->uartclk = SPRD_DEF_RATE;
-> +	up->fifosize = SPRD_FIFO_SIZE;
-> +	up->ops = &serial_sprd_ops;
-> +	up->flags = UPF_BOOT_AUTOCONF;
-> +
-> +	clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (!IS_ERR(clk))
-> +		up->uartclk = clk_get_rate(clk);
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res) {
-> +		dev_err(&pdev->dev, "not provide mem resource\n");
-> +		return -ENODEV;
-> +	}
-
-This check is not required. It will be done by devm_ioremap_resource()
-
-> +	up->mapbase = res->start;
-> +	up->membase = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(up->membase))
-> +		return PTR_ERR(up->membase);
-> +
->
+Can we at least call it acpi_init_irq() and avoid #including
+gic-specific header files? IOW hide the apci_gic_init() behind some
+generically named macro until the full solution is in place.
 
 -- 
-Thanks,
-Varka Bhadram.
+Catalin
