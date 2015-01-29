@@ -1,8 +1,8 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 29 Jan 2015 18:20:06 +0000
+Date: Thu, 29 Jan 2015 18:28:34 +0000
 Subject: [Linaro-acpi] [PATCH v7 04/17] ARM64 / ACPI: Introduce
  early_param for "acpi" and pass acpi=force to enable ACPI
-In-Reply-To: <20150129151956.GF8951@e104818-lin.cambridge.arm.com>
+In-Reply-To: <54CA7A42.5080800@codeaurora.org>
 References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
  <1421247905-3749-5-git-send-email-hanjun.guo@linaro.org>
  <CAOZdJXU2bFR1T4ZnGavvnrUXAp5e=vNt9g6WKX46H8qs1wz-TQ@mail.gmail.com>
@@ -10,51 +10,31 @@ References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
  <20150128181453.GG31752@e104818-lin.cambridge.arm.com>
  <54C92804.5090806@codeaurora.org>
  <20150129151956.GF8951@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu_=si=L5+vvg+8hRgwmTahqdePw5bZxUMFSZ8obk-VXFQ@mail.gmail.com>
+ <CAKv+Gu_=si=L5+vvg+8hRgwmTahqdePw5bZxUMFSZ8obk-VXFQ@mail.gmail.com>
+ <54CA7A42.5080800@codeaurora.org>
+Message-ID: <CAKv+Gu_a6_zjt=MsRuQH2rr05XxDayy0gACtbPXZaDAyhWrigg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 January 2015 at 15:19, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Wed, Jan 28, 2015 at 06:18:44PM +0000, Timur Tabi wrote:
->> On 01/28/2015 12:14 PM, Catalin Marinas wrote:
->> >> >So it looks like there's a whole conversation about this already in
->> >> >this thread that I didn't notice.  However, reading through all of it,
->> >> >I still don't understand sure why the presence of ACPI tables is
->> >> >insufficient to enable ACPI.
+On 29 January 2015 at 18:21, Timur Tabi <timur@codeaurora.org> wrote:
+> On 01/29/2015 12:20 PM, Ard Biesheuvel wrote:
 >>
->> > Because ACPI on arm64 is still experimental, no matter how many people
->> > claim that it is production ready in their private setups.
->>
->> Fair enough.  Does this mean that passing "acpi=force" on the kernel
->> command line is a requirement for ARM64 servers?
+>> If we are going with this solution, we should also mandate that an
+>> ACPI enabled firmware should not supply a non-DT DTB
 >
-> Please read my other email and ideally the whole sub-thread. The
-> acpi=force should only be required if the SoC is described (from
-> firmware) by both DT and ACPI.
 >
->> >> >In what situation would we want to ignore ACPI tables that are
->> >> >present?
->>
->> > When DT tables are also present (and for the first platforms, that's
->> > highly recommended, though not easily enforceable at the kernel level).
->>
->> My understanding is that the EFI stub creates a device tree (and it
->> contains some important information), so I don't understand how we can
->> ever have an ACPI-only platform on ARM64 servers.
->
-> If EFI stub creates the DT itself (not passed by firmware), it will
-> write some information in the chosen node that the rest of the kernel
-> can make use of and take the appropriate decision on whether to use ACPI
-> or not. That's something that will be used by kexec and Xen as well
-> which may want to boot with ACPI tables outside an EFI environment.
+> What is a non-DT DTB?  I thought the "DT" in "DTB" stood for device tree.
 >
 
-If we are going with this solution, we should also mandate that an
-ACPI enabled firmware should not supply a non-DT DTB, or we wouldn't
-spot the difference. Not sure how likely this is, but I could imagine
-a firmware setting up an initrd and hence populating the /chosen node
-in an otherwise empty DTB. In this case, the stub would not add its
-'I-created-an-empty-dtb' property.
+The UEFI stub in the kernel uses the DTB file format (FDT) to pass
+information about the UEFI memory map and system table to the kernel.
+It does so even if there is no device tree that describes the
+platform. In this case, the file only contains a /chosen DT node, and
+nothing else, and it is up to the kernel to figure out that it can ask
+UEFI for a set of ACPI tables that it can use instead to configure the
+system. Otherwise, the /chosen node properties are added to a device
+tree that contains the full platform description.
 
--- 
-Ard.
+The problem is that we have to decide how to distinguish a
+conventional device tree DTB from a DTB that only exists to
+communicate the UEFI entry points.
