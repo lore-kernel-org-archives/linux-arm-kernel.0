@@ -1,44 +1,75 @@
 From: agross@codeaurora.org (Andy Gross)
-Date: Fri, 30 Jan 2015 00:25:29 -0600
-Subject: [Patch v2 0/6] GSBI CRCI Autoconfiguration Support
-Message-ID: <1422599135-5588-1-git-send-email-agross@codeaurora.org>
+Date: Fri, 30 Jan 2015 00:25:33 -0600
+Subject: [Patch v2 4/6] ARM: DT: ipq8064: Add TCSR support
+In-Reply-To: <1422599135-5588-1-git-send-email-agross@codeaurora.org>
+References: <1422599135-5588-1-git-send-email-agross@codeaurora.org>
+Message-ID: <1422599135-5588-5-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set adds support for automatic configuration of GSBI DMA CRCI values.
+This patch adds TCSR support for use by the GSBI to automatically configure ADM
+CRCI values based on the GSBI port configuration.
 
-DMA operations require that the ADM CRCI mux values be properly configured in
-the TCSR (Top Control and Status Register) block.  During probing of a GSBI
-device, the client mode must be declared and this can be used to lookup the
-correct TCSR ADM CRCI MUX settings and then program them so that they are
-correct before any clients are populated.
+Signed-off-by: Andy Gross <agross@codeaurora.org>
+---
+ arch/arm/boot/dts/qcom-ipq8064.dtsi |   17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-These patches add the TCSR as a syscon device and that allows the GSBI to
-access and manipulate the ADM CRCI MUX registers to correctly configure the
-values based on the GSBI port configuration.
-
-Changes since v1:
-  - Fixed various review comments
-
-Andy Gross (6):
-  soc: qcom: gsbi: Add support for ADM CRCI muxing
-  mfd: qcom,tcsr: Add device tree binding for TCSR
-  ARM: DT: apq8064: Add TCSR support
-  ARM: DT: ipq8064: Add TCSR support
-  ARM: DT: msm8660: Add TCSR support
-  ARM: DT: msm8960: Add TCSR support
-
- .../devicetree/bindings/mfd/qcom,tcsr.txt          |   22 +++
- .../devicetree/bindings/soc/qcom/qcom,gsbi.txt     |   18 ++-
- arch/arm/boot/dts/qcom-apq8064.dtsi                |   17 +++
- arch/arm/boot/dts/qcom-ipq8064.dtsi                |   17 +++
- arch/arm/boot/dts/qcom-msm8660.dtsi                |   11 ++
- arch/arm/boot/dts/qcom-msm8960.dtsi                |   11 ++
- drivers/soc/qcom/Kconfig                           |    1 +
- drivers/soc/qcom/qcom_gsbi.c                       |  153 ++++++++++++++++++++
- 8 files changed, 249 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/mfd/qcom,tcsr.txt
-
+diff --git a/arch/arm/boot/dts/qcom-ipq8064.dtsi b/arch/arm/boot/dts/qcom-ipq8064.dtsi
+index 63b2146..8939d31 100644
+--- a/arch/arm/boot/dts/qcom-ipq8064.dtsi
++++ b/arch/arm/boot/dts/qcom-ipq8064.dtsi
+@@ -9,6 +9,12 @@
+ 	compatible = "qcom,ipq8064";
+ 	interrupt-parent = <&intc>;
+ 
++	aliases {
++		gsbi2 = &gsbi2;
++		gsbi4 = &gsbi4;
++		gsbi5 = &gsbi5;
++	};
++
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -128,6 +134,8 @@
+ 			ranges;
+ 			status = "disabled";
+ 
++			syscon-tcsr = <&tcsr>;
++
+ 			serial at 12490000 {
+ 				compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
+ 				reg = <0x12490000 0x1000>,
+@@ -163,6 +171,8 @@
+ 			ranges;
+ 			status = "disabled";
+ 
++			syscon-tcsr = <&tcsr>;
++
+ 			serial at 16340000 {
+ 				compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
+ 				reg = <0x16340000 0x1000>,
+@@ -197,6 +207,8 @@
+ 			ranges;
+ 			status = "disabled";
+ 
++			syscon-tcsr = <&tcsr>;
++
+ 			serial at 1a240000 {
+ 				compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
+ 				reg = <0x1a240000 0x1000>,
+@@ -279,5 +291,10 @@
+ 			#clock-cells = <1>;
+ 			#reset-cells = <1>;
+ 		};
++
++		tcsr: syscon at 1a400000 {
++			compatible = "qcom,tcsr-ipq8064", "syscon";
++			reg = <0x1a400000 0x100>;
++		};
+ 	};
+ };
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
