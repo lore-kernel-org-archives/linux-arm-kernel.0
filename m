@@ -1,31 +1,36 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 30 Jan 2015 07:11:18 +0100
-Subject: [PATCH 4/6] i2c: busses: add SLIMpro I2C device driver on APM
- X-Gene platform
-In-Reply-To: <CAL85gmCuJtS2DMVHc96FtM_nP2++wMXNrrUp0Kvx0qajKsFuCw@mail.gmail.com>
-References: <1412726809-7525-1-git-send-email-fkan@apm.com>
- <1412726809-7525-5-git-send-email-fkan@apm.com>
- <1894616.4yY7dajl4R@wuerfel>
- <CAL85gmCuJtS2DMVHc96FtM_nP2++wMXNrrUp0Kvx0qajKsFuCw@mail.gmail.com>
-Message-ID: <20150130061118.GA995@katana>
+From: ricardo.ribalda@gmail.com (Ricardo Ribalda Delgado)
+Date: Fri, 30 Jan 2015 07:13:10 +0100
+Subject: [PATCH v2 12/15] spi/xilinx: Remove iowrite/ioread wrappers
+In-Reply-To: <1422447834-23116-13-git-send-email-ricardo.ribalda@gmail.com>
+References: <1422447834-23116-1-git-send-email-ricardo.ribalda@gmail.com>
+ <1422447834-23116-13-git-send-email-ricardo.ribalda@gmail.com>
+Message-ID: <CAPybu_24k6v3GJG9G2adYL08X-Uv-S4CYs3Kit0k=9emDCcuUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Mark
 
-> > ctx->dev is probably the wrong device here. The i2c controller is not
-> > DMA capable itself, you need to have a pointer to the device that actually
-> > performs the DMA here.
-> 
-> Arnd, I do agree this may not be the best identification. There is no
-> representation for this on the Linux side. I could put it as NULL. However,
-> there are other i2c bus drivers that seem to do the same thing. Please
-> let me know what you think.
+This patch has caused a lot of issues on linux-next :S, sorry.
 
-For completeness: Those drivers need fixing!
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150130/41b913cb/attachment.sig>
+The root of the issue is that iowrite/ioread behaves differently in
+different arches.
+
+1) It does not necesary need to be a symbol in all the arches. It can
+be declared as a function macro:
+
+#define iowrite32(a,b) iowrite32(a,b)
+
+2) Sometimes, even the function has a different prototype.
+
+ include/asm-generic/iomap.h
+ extern unsigned int ioread16be(void __iomem *);
+
+ include/asm-generic/io.h
+ extern unsigned int ioread16be(void __iomem *);
+
+Until this is fixed, please revert this patch.
+
+Sorry for the mess.
+
+-- 
+Ricardo Ribalda
