@@ -1,29 +1,31 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 30 Jan 2015 22:58:19 +0100
-Subject: [PATCH] net/tulip: don't warn about unknown ARM architecture
-Message-ID: <1780413.LLpv9s01CB@wuerfel>
+Date: Fri, 30 Jan 2015 22:59:21 +0100
+Subject: [PATCH] ARM: integrator: remove unused variable
+Message-ID: <1666566.z9ZP4KJ7VA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM has 32-byte cache lines, which according to the comment in
-the init registers function seems to work best with the default
-value of 0x4800 that is also used on sparc and parisc.
+The patch to add the new generic config space accessors removed
+a useless spinlock, but left the flags variable in place, which
+now causes a build warning:
 
-This adds ARM to the same list, to use that default but no
-longer warn about it.
+arch/arm/mach-integrator/pci_v3.c: In function 'pci_v3_preinit':
+arch/arm/mach-integrator/pci_v3.c:614:16: warning: unused variable 'flags' [-Wunused-variable]
+
+This removes it.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 1ba525109219 ("ARM: integrator: Convert PCI to use generic config accessors")
 
-diff --git a/drivers/net/ethernet/dec/tulip/winbond-840.c b/drivers/net/ethernet/dec/tulip/winbond-840.c
-index 6aa887e0e1cb..9beb3d34d4ba 100644
---- a/drivers/net/ethernet/dec/tulip/winbond-840.c
-+++ b/drivers/net/ethernet/dec/tulip/winbond-840.c
-@@ -904,7 +904,7 @@ static void init_registers(struct net_device *dev)
- 	}
- #elif defined(__powerpc__) || defined(__i386__) || defined(__alpha__) || defined(__ia64__) || defined(__x86_64__)
- 	i |= 0xE000;
--#elif defined(CONFIG_SPARC) || defined (CONFIG_PARISC)
-+#elif defined(CONFIG_SPARC) || defined (CONFIG_PARISC) || defined(CONFIG_ARM)
- 	i |= 0x4800;
- #else
- #warning Processor architecture undefined
+diff --git a/arch/arm/mach-integrator/pci_v3.c b/arch/arm/mach-integrator/pci_v3.c
+index dc7782f26cbb..2565f0e7b5cf 100644
+--- a/arch/arm/mach-integrator/pci_v3.c
++++ b/arch/arm/mach-integrator/pci_v3.c
+@@ -611,7 +611,6 @@ static int __init pci_v3_setup(int nr, struct pci_sys_data *sys)
+  */
+ static void __init pci_v3_preinit(void)
+ {
+-	unsigned long flags;
+ 	unsigned int temp;
+ 	phys_addr_t io_address = pci_pio_to_address(io_mem.start);
+ 
