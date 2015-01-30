@@ -1,80 +1,34 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 31 Jan 2015 01:52:16 +0300
-Subject: [PATCH] ARM: shmobile: silk: initial device tree
-In-Reply-To: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
-References: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
-Message-ID: <1608366.HtA9yBksdO@wasted.cogentembedded.com>
+From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
+Date: Fri, 30 Jan 2015 15:54:24 -0700
+Subject: [PATCH 0/2] Coresight Support for arm64 
+Message-ID: <1422658466-23984-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the initial device tree for the R8A7794 SoC based SILK low cost board.
-SCIF2 serial port support is included, so that the serial console can work.
+From: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Other than tracers, the coresight IP blocks are 64-bit ready.  This
+would normally be a trivial addition had it not been for the first
+patch that is adding cpu index lookup functionality.
 
----
-This patch is against the 'renesas-devel-20150129-v3.19-rc6' tag of Simon
-Horman's 'renesas.git' repo.
+The feature exists in the 32 world and the fact that it doesn't on
+64 bit means that 1) nobody needed it as of yet or 2) people have found
+a different way to proceed.
 
- arch/arm/boot/dts/Makefile         |    1 
- arch/arm/boot/dts/r8a7794-silk.dts |   41 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 42 insertions(+)
+Please have a look and tell me what you think.
 
-Index: renesas/arch/arm/boot/dts/Makefile
-===================================================================
---- renesas.orig/arch/arm/boot/dts/Makefile
-+++ renesas/arch/arm/boot/dts/Makefile
-@@ -421,6 +421,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += eme
- 	r8a7791-koelsch.dtb \
- 	r8a7791-porter.dtb \
- 	r8a7794-alt.dtb \
-+	r8a7794-silk.dtb \
- 	sh73a0-kzm9g.dtb
- dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_arria5_socdk.dtb \
- 	socfpga_arria10_socdk.dtb \
-Index: renesas/arch/arm/boot/dts/r8a7794-silk.dts
-===================================================================
---- /dev/null
-+++ renesas/arch/arm/boot/dts/r8a7794-silk.dts
-@@ -0,0 +1,41 @@
-+/*
-+ * Device Tree Source for the SILK board
-+ *
-+ * Copyright (C) 2014 Renesas Electronics Corporation
-+ * Copyright (C) 2014-2015 Renesas Solutions Corp.
-+ * Copyright (C) 2014-2015 Cogent Embedded, Inc.
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+/dts-v1/;
-+#include "r8a7794.dtsi"
-+
-+/ {
-+	model = "SILK";
-+	compatible = "renesas,silk", "renesas,r8a7794";
-+
-+	aliases {
-+		serial0 = &scif2;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttySC0,38400 ignore_loglevel";
-+		stdout-path = &scif2;
-+	};
-+
-+	memory at 40000000 {
-+		device_type = "memory";
-+		reg = <0 0x40000000 0 0x40000000>;
-+	};
-+};
-+
-+&extal_clk {
-+	clock-frequency = <20000000>;
-+};
-+
-+&scif2 {
-+	status = "okay";
-+};
+Many thanks,
+Mathieu
+
+Mathieu Poirier (2):
+  arm64: adding cpu lookup functionality
+  coresight: Adding coresight support to arm64
+
+ arch/arm64/Kconfig.debug            | 48 +++++++++++++++++++++++++++++++++++++
+ arch/arm64/include/asm/smp_plat.h   | 12 ++++++++++
+ drivers/coresight/coresight-etb10.c |  2 +-
+ drivers/coresight/coresight-tmc.c   |  2 +-
+ 4 files changed, 62 insertions(+), 2 deletions(-)
+
+-- 
+1.9.1
