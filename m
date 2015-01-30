@@ -1,70 +1,142 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 30 Jan 2015 11:06:32 +0100
-Subject: [PATCH] spi/xilinx: Fix access invalid memory on xilinx_spi_tx
-In-Reply-To: <1422598209-5999-1-git-send-email-ricardo.ribalda@gmail.com>
-References: <1422598209-5999-1-git-send-email-ricardo.ribalda@gmail.com>
-Message-ID: <CAMuHMdU7=w1C6xjDhHwaFmw7Ct4OwfUHCKr8KsZKEoLZzfpf0Q@mail.gmail.com>
+From: teawater@gmail.com (Hui Zhu)
+Date: Fri, 30 Jan 2015 18:06:57 +0800
+Subject: CMA related memory questions
+In-Reply-To: <54CB46B9.2040604@suse.cz>
+References: <CABymUCNMjM2KHXXB-LM=x+FTcJL6S5_jhG3GbP7VRi2vBoW49g@mail.gmail.com>
+ <CABymUCO+xaify95bUqfbCLsEjkLzEC0yT_fgkhV+qzC36JNgoA@mail.gmail.com>
+ <CABymUCPgEh93QsBtRyg0S+FyE0FHwjAF75qk+NWh5TS8ehWuew@mail.gmail.com>
+ <54CAF314.4070301@linaro.org> <54CAF9A4.1040606@samsung.com>
+ <54CAFDC4.5070408@linaro.org> <54CB132F.60604@samsung.com>
+ <54CB46B9.2040604@suse.cz>
+Message-ID: <CANFwon0+1c=OHAvZxUTK4gtvYwT_Uo1UhdkBN0pt373L_hNKuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ricardo,
-
-On Fri, Jan 30, 2015 at 7:10 AM, Ricardo Ribalda Delgado
-<ricardo.ribalda@gmail.com> wrote:
-> On 1 and 2 bytes per word, the transfer of the 3 last bytes will access
-> memory outside rx_ptr.
+On Fri, Jan 30, 2015 at 4:54 PM, Vlastimil Babka <vbabka@suse.cz> wrote:
+> [CC some usual CMA suspects]
 >
-> Although this has not trigger any error on real hardware, we should
-> better fix this.
+> On 01/30/2015 06:14 AM, Heesub Shin wrote:
+>>
+>>
+>> On 01/30/2015 12:43 PM, Jun Nie wrote:
+>>> On 2015?01?30? 11:25, Heesub Shin wrote:
+>>>>
+>>>>
+>>>> On 01/30/2015 11:57 AM, Jun Nie wrote:
+>>>>> On 2015?01?30? 10:36, Jun Nie wrote:
+>>>>>> Hi Marek & Arnd,
+>>>>>>
+>>>>>> Did you ever know issue that free CMA memory is high, but system is
+>>>>>> hungry for memory and page cache is very low? I am enabling CMA in
+>>>>>> Android on my board with 512MB memory and see FreeMem in /proc/meminfo
+>>>>>> increase a lot with CMA comparing the reservation solution on boot. But
+>>>>>> I find system is not borrowing memory from CMA pool when running 3dmark
+>>>>>> (high webkit workload at start). Because the FreeMem size is high, but
+>>>>>> cache size decreasing significantly to several MB during benchmark run,
+>>>>>> I suppose system is trying to reclaim memory from pagecache for new
+>>>>>> allocation. My question is that what API that page cache and webkit
+>>>>>> related functionality are using to allocate memory. Maybe page cache
+>>>>>> require memory that is not movable/reclaimable memory, where we may
+>>>>>> have
+>>>>>> optimization to go thru dma_alloc_xxx to borrow CMA memory? I suppose
+>>>>>> app level memory allocation shall be movable/reclaimable memory and can
+>>>>>> borrow from CMA pool, but not sure whether the flag match the
+>>>>>> movable/reclaimable memory and go thru the right path.
+>>>>>>
+>>>>>> Could you help share your experience/thoughts on this? Thanks!
+>>>>
+>>>> CC'ed linux-mm at kvack.org
+>>>>
+>>>> __zone_watermark_ok() assumes that free pages from CMA pageblock are not
+>>>> free when ALLOC_CMA is not set on alloc_flags. The main goal was to
+>>>> force core mm to keep some non-CMA always free and thus let kernel to
+>>>> allocate a few unmovable pages from any context (including atomic, irq,
+>>>> etc.). However, this behavior may cause excessive page reclamation as it
+>>>> is sometimes very hard to satisfy the high wmark + balance_gap with only
+>>>> non-CMA pages and reclaiming CMA pages does not help at all.
+>>> Seems it is tricky to tune it. Could you help share some experience on
+>>> this, how to change the parameters, what's pro/con? Thanks!
+>>
+>> AFAIK, unfortunately there's no other way rather than reducing the
+>> number of CMA pageblocks which are making anomalies. Selectively
+>> ignoring CMA pages when we isolate pages from LRU could be an
+>> alternative, but it has another side effect. I also want to know how to
+>> handle this problem nicely.
 >
-> Fixes: 24ba5e593f391507 Remove rx_fn and tx_fn pointer
-> Signed-off-by: Ricardo Ribalda Delgado <ricardo.ribalda@gmail.com>
-> ---
->  drivers/spi/spi-xilinx.c | 17 ++++++++++++++++-
->  1 file changed, 16 insertions(+), 1 deletion(-)
+> Well maybe zone_balanced() could check watermarks with passing ALLOC_CMA in
+> alloc_flags instead of 0? This would mean that high watermark will be satisfied
+> for movable allocations, which pass ALLOC_CMA. That should fix your too-depleted
+> page cache problem, I think? But in that case it should probably also check low
+> watermark without ALLOC_CMA, to make sure unmovable/reclaimable allocations
+> won't stall.
 >
-> diff --git a/drivers/spi/spi-xilinx.c b/drivers/spi/spi-xilinx.c
-> index 2ca55f6..a1b664d 100644
-> --- a/drivers/spi/spi-xilinx.c
-> +++ b/drivers/spi/spi-xilinx.c
-> @@ -97,11 +97,26 @@ struct xilinx_spi {
+> There might however still be some side effects. IIRC unmovable allocations are
+> already treated badly due to CMA, and it could make it worse. And we should also
+> check if direct reclaim paths use watermark checking with proper alloc_flags and
+> classzone_idx. IIRC they don't always do, which can also result in mismatched
+> decisions on compaction.
 >
->  static void xilinx_spi_tx(struct xilinx_spi *xspi)
->  {
-> +       u32 data = 0;
-> +
->         if (!xspi->tx_ptr) {
->                 xspi->write_fn(0, xspi->regs + XSPI_TXD_OFFSET);
->                 return;
->         }
-> -       xspi->write_fn(*(u32 *)(xspi->tx_ptr), xspi->regs + XSPI_TXD_OFFSET);
-> +
-> +       switch (xspi->bytes_per_word) {
-> +       case 1:
-> +               data = *(u8 *)(xspi->rx_ptr);
-> +               break;
-> +       case 2:
-> +               data = *(u16 *)(xspi->rx_ptr);
-> +               break;
-> +       case 4:
-> +               data = *(u32 *)(xspi->rx_ptr);
-> +               break;
-> +       }
-> +
-> +       xspi->write_fn(data, xspi->regs + XSPI_TXD_OFFSET);
+> But maybe this is all moot if the plan for moving CMA to a different zone works
+> out...
 
-Is this endian-safe?
+I did a lot of works around it to make current CMA code work OK with watermark.
+It need too much work around it.  For example, my patch
+https://lkml.org/lkml/2015/1/18/28 (It still has something wrong).
+To make it work OK we need add more and more hook to page alloc code.
 
->         xspi->tx_ptr += xspi->bytes_per_word;
->  }
+So I think special zone is the best way for that.
 
-Gr{oetje,eeting}s,
+After we got CMA_ZONE, we can begin to handle the issue that how to
+make it work OK with different board.
 
-                        Geert
+Thanks,
+Hui
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+>
+>>>>
+>>>> It is observed that page cache pages are excessively reclaimed and
+>>>> entire system falls into thrashing even though the amount of free pages
+>>>> are much higer than the high wmark. In this case, majority of the free
+>>>> pages were from CMA page block (and about 30% pages in highmem zone were
+>>>> from CMA pageblock). Therefore, kswapd kept running and reclaiming too
+>>>> many pages. Although it is relatively rare and only observed on a
+>>>> specific workload, the device gets in an unresponsive state for a while
+>>>> (up to 10 secs), once it happens.
+>>>>
+>>> I am in this situation. kswapd is busy and most FreeMem is from CMA
+>>> because I have 192MB CMA memblock and most of them are free.
+>>>> regards,
+>>>> heesub
+>>>>
+>>>>>>
+>>>>>>
+>>>>>> B.R.
+>>>>>> Jun
+>>>>>
+>>>>> Add more people.
+>>>>>
+>>>>> _______________________________________________
+>>>>> linux-arm-kernel mailing list
+>>>>> linux-arm-kernel at lists.infradead.org
+>>>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>>
+>>> --
+>>> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+>>> the body to majordomo at kvack.org.  For more info on Linux MM,
+>>> see: http://www.linux-mm.org/ .
+>>> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
+>>>
+>>
+>> --
+>> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+>> the body to majordomo at kvack.org.  For more info on Linux MM,
+>> see: http://www.linux-mm.org/ .
+>> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
+>>
+>
+> --
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org.  For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
