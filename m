@@ -1,110 +1,120 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Fri, 30 Jan 2015 09:16:22 +0100
-Subject: 3.19 on Nokia n900: audio quality awful
-In-Reply-To: <20150129204218.GC3962@amd>
-References: <20150106170433.GA5408@amd> <54CA173F.1070301@ti.com>
- <20150129204218.GC3962@amd>
-Message-ID: <201501300916.22364@pali>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Fri, 30 Jan 2015 09:16:31 +0100
+Subject: [PATCH v6 5/8] iio: adc: fsl,imx25-gcq driver
+In-Reply-To: <54CA4419.1060207@gmail.com>
+References: <1422540556-14828-1-git-send-email-mpa@pengutronix.de>
+ <1422540556-14828-6-git-send-email-mpa@pengutronix.de>
+ <54CA4419.1060207@gmail.com>
+Message-ID: <20150130081631.GF16879@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 29 January 2015 21:42:18 Pavel Machek wrote:
-> Hi!
-> 
-> > >> I did this:
-> > >> 
-> > >> I'm not sure which one is "main" microphone and which is
-> > >> headset, but I guess 2V should be "close enough" to 2.5V
-> > >> to produce something different from zeros..?
-> > > 
-> > > Main or integrated is digital microphone which does AD
-> > > conversion itself and headset is analogue. If DMIC is
-> > > without bias codec will sample plain zeros from DMIC
-> > > input but analogue input should always produce some
-> > > random LSB bits from codec's AD converter.
-> > > 
-> > > If codec produces zeros also from analogue input then I
-> > > suppose codec ADC is not powered up or similar. One way
-> > > to hunt regression if bisecting is not possible due
-> > > reason or another is to dump and diff codec registers
-> > > from /sys/kernel/debug/regmap/ using both working commit
-> > >
-> > >and head.
-> 
-> I tried 2.6.28... where recording was, but it does not support
-> regmap. Then I tried 3.14, but could not get recording to work
-> there.
-> 
-> > >>  	tlv320aic3x_aux: tlv320aic3x at 19 {
-> > >> 
-> > >> @@ -502,6 +504,8 @@
-> > >> 
-> > >>  		DRVDD-supply = <&vmmc2>;
-> > >>  		IOVDD-supply = <&vio>;
-> > >>  		DVDD-supply = <&vio>;
-> > >> 
-> > >> +
-> > >> +		ai3x-micbias-vg = <1>;
-> > >> 
-> > >>  	};
-> > > 
-> > > This should be 2, i.e. 2.5 V according to
-> > > Documentation/devicetree/bindings/sound/tlv320aic3x.txt. I
-> > > think 2 V is too low for some headset mics and that was
-> > > the reason for 2.5 V.
-> 
-> Ok, tried that, but no change.
-> 
-> > Can you also try this patch to correct the DAPM route for the 
-rx51:
-> Yes, with the patch below (and dts updates I did) recording
-> works.
-> 
-> Another interesting note is that audio quality is not that
-> horrible when playing 8 kHz, mono signal... it is mostly what
-> I'd expect. Playing 44.1kHz, stereo mp3 .. is not good.
-> 
-> Tested-by: Pavel Machek <pavel@ucw.cz>
-> 
-> Thanks,
-> 									Pavel
-> 
-> > diff --git a/sound/soc/omap/rx51.c b/sound/soc/omap/rx51.c
-> > index 04896d6252a2..7f299357c2d2 100644
-> > --- a/sound/soc/omap/rx51.c
-> > +++ b/sound/soc/omap/rx51.c
-> > @@ -250,14 +250,14 @@ static const struct snd_soc_dapm_route
-> > audio_map[] = {
-> > 
-> >  	{"FM Transmitter", NULL, "LLOUT"},
-> >  	{"FM Transmitter", NULL, "RLOUT"},
-> > 
-> > -	{"DMic Rate 64", NULL, "Mic Bias"},
-> > -	{"Mic Bias", NULL, "DMic"},
-> > +	{"DMic Rate 64", NULL, "DMic"},
-> > +	{"DMic", NULL, "Mic Bias"},
-> > 
-> >  	{"b LINE2R", NULL, "MONO_LOUT"},
-> >  	{"Earphone", NULL, "b HPLOUT"},
-> > 
-> > -	{"LINE1L", NULL, "b Mic Bias"},
-> > -	{"b Mic Bias", NULL, "HS Mic"}
-> > +	{"LINE1L", NULL, "HS Mic"},
-> > +	{"HS Mic", NULL, "b Mic Bias"},
-> > 
-> >  };
-> >  
-> >  static const char * const spk_function[] = {"Off", "On"};
+Hi,
 
-Can you try DT and non-DT boot of 3.19? If there is difference?
+On Thu, Jan 29, 2015 at 08:00:49PM +0530, Varka Bhadram wrote:
+> Hi,
+> 
+> On Thursday 29 January 2015 07:39 PM, Markus Pargmann wrote:
+> >This is a conversion queue driver for the mx25 SoC. It uses the central
+> >ADC which is used by two seperate independent queues. This driver
+> >prepares different conversion configurations for each possible input.
+> >For a conversion it creates a conversionqueue of one item with the
+> >correct configuration for the chosen channel. It then executes the queue
+> >once and disables the conversion queue afterwards.
+> >
+> >The reference voltages are configurable through devicetree subnodes,
+> >depending on the connections of the ADC inputs.
+> >
+> >Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> >Signed-off-by: Denis Carikli <denis@eukrea.com>
+> >Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> >---
+> >  drivers/iio/adc/Kconfig                     |   7 +
+> >  drivers/iio/adc/Makefile                    |   1 +
+> >  drivers/iio/adc/fsl-imx25-gcq.c             | 361 ++++++++++++++++++++++++++++
+> >  include/dt-bindings/iio/adc/fsl-imx25-gcq.h |  18 ++
+> >  4 files changed, 387 insertions(+)
+> >  create mode 100644 drivers/iio/adc/fsl-imx25-gcq.c
+> >  create mode 100644 include/dt-bindings/iio/adc/fsl-imx25-gcq.h
+> >
+> (...)
+> 
+> >+static int mx25_gcq_probe(struct platform_device *pdev)
+> >+{
+> >+	struct iio_dev *indio_dev;
+> >+	struct mx25_gcq_priv *priv;
+> >+	struct mx25_tsadc *tsadc = dev_get_drvdata(pdev->dev.parent);
+> >+	struct device *dev = &pdev->dev;
+> >+	struct resource *res;
+> >+	void __iomem *mem;
+> >+	int ret;
+> >+
+> >+	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*priv));
+> >+	if (!indio_dev)
+> >+		return -ENOMEM;
+> >+
+> >+	priv = iio_priv(indio_dev);
+> >+
+> >+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> >+	mem = devm_ioremap_resource(dev, res);
+> >+	if (!mem)
+> >+		return -ENOMEM;
+> >+
+> >+	priv->regs = devm_regmap_init_mmio(dev, mem, &mx25_gcq_regconfig);
+> >+	if (IS_ERR(priv->regs)) {
+> >+		dev_err(dev, "Failed to initialize regmap\n");
+> >+		return PTR_ERR(priv->regs);
+> >+	}
+> >+
+> >+	init_completion(&priv->completed);
+> >+
+> >+	/* Optional external regulator */
+> >+	priv->ext_vref = devm_regulator_get(&pdev->dev, "vref");
+> >+	if (!IS_ERR_OR_NULL(priv->ext_vref)) {
+> >+		ret = regulator_enable(priv->ext_vref);
+> >+		if (ret)
+> >+			return ret;
+> >+	}
+> >+
+> >+	ret = mx25_gcq_setup_cfgs(pdev, priv);
+> >+	if (ret)
+> >+		return ret;
+> >+
+> >+	priv->clk = tsadc->clk;
+> >+	ret = clk_prepare_enable(priv->clk);
+> >+	if (ret) {
+> >+		dev_err(dev, "Failed to enable clock\n");
+> >+		return ret;
+> >+	}
+> >+
+> >+	priv->irq = platform_get_irq(pdev, 0);
+> >+	if (priv->irq <= 0) {
+> >+		dev_err(dev, "Failed to get IRQ\n");
+> >+		ret = priv->irq;
+> >+		goto err_clk_unprepare;
+> >+	}
+> >+
+> >+	ret = request_irq(priv->irq, mx25_gcq_irq, 0, pdev->name, priv);
+> 
+> Use of devm_* API
+
+It seems to be save to use it here, as the interrupt handler only uses
+memory allocated for this driver and not the iio framework. So I will
+probably change it to devm_*.
+
+Thanks,
+
+Markus
 
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150130/32aa80ed/attachment.sig>
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150130/4824a8ec/attachment.sig>
