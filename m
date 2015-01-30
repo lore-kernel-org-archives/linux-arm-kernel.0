@@ -1,101 +1,60 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Fri, 30 Jan 2015 07:03:03 -0500
-Subject: [PATCH v10 2/2] tty/serial: Add Spreadtrum sc9836-uart driver
- support
-In-Reply-To: <20150130101838.GC16744@ulmo>
-References: <sc9836-serial-v10>
- <1422443324-25082-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1422443324-25082-3-git-send-email-chunyan.zhang@spreadtrum.com>
- <54CA5128.8050500@gmail.com> <54CA568E.6080306@hurleysoftware.com>
- <20150129160553.GC26493@n2100.arm.linux.org.uk> <20150130101838.GC16744@ulmo>
-Message-ID: <54CB72F7.8060706@hurleysoftware.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 30 Jan 2015 13:03:59 +0100
+Subject: [PATCH] ARM: dts: mvebu: add ethernet to the cm-a510 board
+In-Reply-To: <20150130124144.501cf81d@armhf>
+References: <E1YH5bU-0005mG-3L@bombadil.infradead.org>
+ <54CB5267.5060004@gmail.com> <20150130113118.5523ed68@armhf>
+ <54CB6440.1010002@gmail.com> <20150130124144.501cf81d@armhf>
+Message-ID: <54CB732F.7010409@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/30/2015 05:18 AM, Thierry Reding wrote:
-> On Thu, Jan 29, 2015 at 04:05:53PM +0000, Russell King - ARM Linux wrote:
->> On Thu, Jan 29, 2015 at 10:49:34AM -0500, Peter Hurley wrote:
->>> Hi Varka,
->>>
->>> On 01/29/2015 10:26 AM, Varka Bhadram wrote:
->>>> This check is not required. It will be done by devm_ioremap_resource()
->>>
->>> I disagree. devm_ioremap_resource() interprets the NULL resource as
->>> a bad parameter and returns -EINVAL which is then forwarded as the
->>> return value from the probe.
->>>
->>> -ENODEV is the correct return value from the probe if the expected
->>> resource is not available (either because it doesn't exist or was already
->>> claimed by another driver).
->>
->> (Adding Thierry as the author of this function.)
->>
->> I believe devm_ioremap_resource() was explicitly designed to remove such
->> error handling from drivers, and to give drivers a unified error response
->> to such things as missing resources.
->>
->> See the comments for this function in lib/devres.c.
-> 
-> Right. Before the introduction of this function drivers would copy the
-> same boilerplate but would use completely inconsistent return codes.
-> Well, to be correct devm_request_and_ioremap() was introduced first to
-> reduce the boilerplate, but one of the problems was that it returned a
-> NULL pointer on failure, so it was impossible to distinguish between
-> specific error conditions. It also had the negative side-effect of not
-> giving drivers any directions on what to do with the NULL return value
-> other than the example in the kerneldoc. But most people just didn't
-> seem to look at that, so instead of using -EADDRNOTAVAIL they'd again
-> go and do completely inconsistent things everywhere.
-> 
-> When we introduced devm_ioremap_resource(), the idea was to remove any
-> of these inconsistencies once and for all. You call the function and if
-> it fails you simply propagate the error code, so you get consistent
-> behaviour everywhere.
-> 
-> If I remember correctly the error codes for the various conditions were
-> discussed quite extensively, and what we currently have is what we got
-> by concensus.
-> 
-> -ENODEV is certainly not the correct return value if a resource is not
-> available. It translates to "no such device", but the device must
-> clearly be there, otherwise the ->probe() shouldn't have been called.
+On 30.01.2015 12:41, Jean-Francois Moine wrote:
+> On Fri, 30 Jan 2015 12:00:16 +0100
+> Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+>> Adapting the .config and removing drivers is actually not an option.
+>> IMHO, introducing DT was meant for a single multi-arch kernel that
+>> can be shipped with common Linux distros. Therefore, DT is the place
+>> you enable/disable available resources. You leave most of the SoC (and
+>> SoM) nodes disabled as long as you cannot tell if there is a
+>> corresponding connector available.
+>
+> Well, I don't know too much about the hardware, and less about the
+> hardware modules (SoM?).
 
--ENODEV is the appropriate return from the probe(); there is no device.
-That returning that value doesn't make sense from devm_ioremap_resource
-is simply a reflection of the awkward construct.
+Sorry, SoM is for System-on-Module, i.e. the CM-A510 itself.
 
-> Or if it really isn't there, then you'd at least need a memory region
-> to probe, otherwise you can't determine whether it's there or not. So
-> from the perspective of a device driver I think a missing, or NULL,
-> resource, is indeed an "invalid argument".
+You can see from the block diagram that it comprises the Dove SoC,
+power circuitry, touch-screen controller, WiFi, GbE PHY for GbE-0, GbE
+controller on PCIe for GbE-1, I2S audio codec, RS232 Level Shifter for
+UART0, an USB2 Hub, SPI flash, NAND and RAM.
 
-Trying to argue that a missing host bus window is an "invalid argument"
-to probe() is just trying to make the shoe fit.
+That basically is what will be represented in the som.dtsi. If any of
+the functions above and the SoC will be _accessible_ on the baseboard is
+another story.
 
-> I understand that people might see some ambiguity there, and -EINVAL is
-> certainly not a very accurate description, but such is the nature of
-> error codes. You pick what fits best. -ENXIO and -EADDRNOTAVAIL had been
-> under discussion as well if I remember correctly, but they both equally
-> ambiguous. -ENODATA might have been a better fit, but that too has a
-> different meaning in other contexts.
-> 
-> Besides, there's an error message that goes along with the error code
-> return, that should remove any ambiguity for people looking at dmesg.
-> 
-> All of that said, the original assertion that the check is not required
-> is still valid. We can argue at length about the specific error code but
-> if we decide that it needs to change, then we should modify
-> devm_ioremap_resource() rather than requiring all callers to perform the
-> extra check again.
+> As seen in the Compulab documents, there are a lot of hardware modules.
+> For the DT, do you mean that there would be as many .dts's as the whole
+> number of connection possibilities?
 
-None of the devm_ioremap_resource() changes have been submitted for
-serial drivers. I see no problem with accepting the Spreadtrum driver
-as is, and if someone wants to do a massive changeset to rework the
-platform_get_resource()/devm_ioremap_resource() idiom for serial drivers
-for 3.21, then the Spreadtrum driver would be included then.
+Nope. One dove.dtsi, one dove-cm-a510.dtsi, and one baseboard.dts
+including dove-cm-a510.dtsi for every baseboard we stumble upon.
 
-That said, I'd prefer to see that idiom wrapped in a single function
-rather than what's being suggested.
+> I'd have better seen the inverted case as the actual empty cm-board dts:
+> enable every option in the (generic) .dts and let the vendor/user create
+> a specific .dts from this one for the board according to the installed
+> modules.
 
-Regards,
-Peter Hurley
+That what dtsi's are made for with one exception: the dtsi cannot "run"
+on its own but needs at least one baseboard.dts that includes it. We
+could create a "bare"-baseboard that represents what is (easily)
+accessible on the SoM itself. Given the fact that even UART0 needs a
+baseboard that grabs it from the SoM connector, I see no value in that.
+
+> In any case, any real cm-a510 board should work with the
+> generic/full .dts even if some hardware modules are lacking. No?
+
+Nope. The cm-a510 is just an add-on for a baseboard, it does not make
+a working board. Just think of it as a feature-improved SoC.
+
+Sebastian
