@@ -1,82 +1,84 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 30 Jan 2015 01:14:12 +0100
-Subject: [PATCH v2] cpufreq: suspend cpufreq governors on shutdown
-In-Reply-To: <CAKohpo=iEb19QGKUXJO1PURPjUkv1ZCeVFg-i+AFihi7Gmjf0Q@mail.gmail.com>
-References: <1419401388-20171-1-git-send-email-dianders@chromium.org>
- <CAKohpo=iEb19QGKUXJO1PURPjUkv1ZCeVFg-i+AFihi7Gmjf0Q@mail.gmail.com>
-Message-ID: <1548953.lJ1trAVWhn@vostro.rjw.lan>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Thu, 29 Jan 2015 16:07:42 -0800
+Subject: [PATCH 2/9] regulator: core: Introduce set_optimum_mode op
+In-Reply-To: <20150128195204.GN21293@sirena.org.uk>
+References: <1422413199-17273-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1422413199-17273-3-git-send-email-bjorn.andersson@sonymobile.com>
+ <20150128195204.GN21293@sirena.org.uk>
+Message-ID: <20150130000741.GP11960@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, December 29, 2014 09:45:42 AM Viresh Kumar wrote:
-> On 24 December 2014 at 11:39, Doug Anderson <dianders@chromium.org> wrote:
-> > We should stop cpufreq governors when we shut down the system.  If we
-> > don't do this, we can end up with this deadlock:
-> >
-> > 1. cpufreq governor may be running on a CPU other than CPU0.
-> > 2. In machine_restart() we call smp_send_stop() which stops CPUs.
-> >    If one of these CPUs was actively running a cpufreq governor
-> >    then it may have the mutex / spinlock needed to access the main
-> >    PMIC in the system (perhaps over I2C)
-> > 3. If a machine needs access to the main PMIC in order to shutdown
-> >    then it will never get it since the mutex was lost when the other
-> >    CPU stopped.
-> > 4. We'll hang (possibly eventually hitting the hard lockup detector).
-> >
-> > Let's avoid the problem by stopping the cpufreq governor at shutdown,
-> > which is a sensible thing to do anyway.
-> >
-> > Signed-off-by: Doug Anderson <dianders@chromium.org>
-> > ---
-> > Changes in v2:
-> > - Add a comment about why we register
-> > - Don't create cpufreq_shutdown() wrapper function
-> >
-> >  drivers/cpufreq/cpufreq.c | 11 +++++++++++
-> >  1 file changed, 11 insertions(+)
-> >
-> > diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
-> > index a09a29c..33f3d65 100644
-> > --- a/drivers/cpufreq/cpufreq.c
-> > +++ b/drivers/cpufreq/cpufreq.c
-> > @@ -27,6 +27,7 @@
-> >  #include <linux/mutex.h>
-> >  #include <linux/slab.h>
-> >  #include <linux/suspend.h>
-> > +#include <linux/syscore_ops.h>
-> >  #include <linux/tick.h>
-> >  #include <trace/events/power.h>
-> >
-> > @@ -2550,6 +2551,14 @@ int cpufreq_unregister_driver(struct cpufreq_driver *driver)
-> >  }
-> >  EXPORT_SYMBOL_GPL(cpufreq_unregister_driver);
-> >
-> > +/*
-> > + * Stop cpufreq at shutdown to make sure it isn't holding any locks
-> > + * or mutexes when secondary CPUs are halted.
-> > + */
-> > +static struct syscore_ops cpufreq_syscore_ops = {
-> > +       .shutdown = cpufreq_suspend,
-> > +};
-> > +
-> >  static int __init cpufreq_core_init(void)
-> >  {
-> >         if (cpufreq_disabled())
-> > @@ -2558,6 +2567,8 @@ static int __init cpufreq_core_init(void)
-> >         cpufreq_global_kobject = kobject_create();
-> >         BUG_ON(!cpufreq_global_kobject);
-> >
-> > +       register_syscore_ops(&cpufreq_syscore_ops);
-> > +
-> >         return 0;
-> >  }
-> >  core_initcall(cpufreq_core_init);
+On Wed 28 Jan 11:52 PST 2015, Mark Brown wrote:
+
+> On Tue, Jan 27, 2015 at 06:46:32PM -0800, Bjorn Andersson wrote:
 > 
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> > +	/* set most efficient regulator operating mode for load */
+> > +	int (*set_optimum_mode)(struct regulator_dev *, int input_uV,
+> > +				int output_uV, int load_uA);
+> 
+> This is basically fine but can you please rename this to be something
+> that more directly reflects the fact that we're just informing the
+> driver about the operating parameters - there are other things a driver
+> could usefully do with this, for example set current limits so that if
+> something starts to consume excessive current the device will flag this
+> as an error.
+> 
 
-Queued up for 3.20, thanks!
+The purpose of the series was to be able to implement patch 9, which
+will utilize the load_uA to set the "mode" of the Qualcomm regulators.
+
+So I would like it to be a "setter of current consumption".
+
+I'm not sure what to name the function to have it cover these additional
+cases.
+
+> It'd also be better to split the voltage specs out into a separate
+> function, especially for the output voltage where obviously we have a
+> separate range based interface for setting that.
+
+I was fishing for a statement regarding this in the cover letter, but
+here we go.
+
+The current implementors of get_optimum_mode all ignore the voltages, so
+we could effectively simplify the interface to:
+
+ get_optimum_mode(rdev, load);
+
+Question is if there are any implementations where we don't know the
+output voltage in the regulator driver (as locking prevents us from
+using the standard interface of querying this). Input voltage is just a
+query away.
 
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Having drms_uA_update() request an appropriate mode for the given load
+and then calling set_mode directly (the current implementation) gives us
+a single point of entry to the regulator drivers related to setting
+modes (regulator_set_mode and drms_uA_update calls set_mode). But seen
+from a consumer there's no consistency; the last call to
+regulator_set_mode() and regulator_set_optimum_mode() will win.
+
+Further more, get_optimum_mode is not exposed to the consumers and there
+are no other users in the regulator framework. So it could be completely
+internal to the regulator drivers, without loss of functionality.
+
+
+Looking at the consumers, in my mind they should not be aware of the
+operating performance characteristics of the regulator supplying them.
+So I think they should all use regulator_set_optimum_mode() rather than
+"guessing" what performance mode the regulator should run in. (Maybe
+some board code could use set_mode?).
+
+With this in mind I was going to follow up after this series with a
+rename of regulator_set_optimum_mode() to regulator_set_current() and
+set_optimum_mode() to set_current().
+
+I was also going to suggest dropping regulator_set_mode() and set_mode
+to make the consumer facing API consistent.
+
+
+I think this covers your concern about patch 3-7 as well, please let me
+know what you think.
+
+Regards,
+Bjorn
