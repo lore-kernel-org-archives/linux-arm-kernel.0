@@ -1,84 +1,35 @@
-From: wills.wang.open@gmail.com (Wills Wang)
-Date: Fri, 30 Jan 2015 12:03:58 +0800
-Subject: [PATCH 21/26] ARM: sun7i: hummingbird: Relicense the device tree
- under GPLv2/X11
-In-Reply-To: <1413538728-17705-21-git-send-email-maxime.ripard@free-electrons.com>
-References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
- <1413538728-17705-21-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <54CB02AE.9010600@gmail.com>
+From: brucembeach@gmail.com (bruce m beach)
+Date: Thu, 29 Jan 2015 20:56:44 -0800
+Subject: Unable to boot mainline on snow chromebook since 3.15
+Message-ID: <CAArymCnPE10YmaYYV5CXdCTePbgL9b5p_+8+Da2dPK-3CkoNBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Wills Wang <wills.wang.open@gmail.com>
+Hello everybody
 
-On 10/17/2014 05:38 PM, Maxime Ripard wrote:
-> The current GPL only licensing on the DTSI makes it very impractical for other
-> software components licensed under another license.
->
-> In order to make it easier for them to reuse our device trees, relicense our
-> device trees under a GPL/X11 dual-license.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Wills Wang <wills.wang.open@gmail.com>
-> ---
->   arch/arm/boot/dts/sun7i-a20-hummingbird.dts | 46 +++++++++++++++++++++++++----
->   1 file changed, 41 insertions(+), 5 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/sun7i-a20-hummingbird.dts b/arch/arm/boot/dts/sun7i-a20-hummingbird.dts
-> index 0e4bfa3b2b85..93763214caa9 100644
-> --- a/arch/arm/boot/dts/sun7i-a20-hummingbird.dts
-> +++ b/arch/arm/boot/dts/sun7i-a20-hummingbird.dts
-> @@ -3,12 +3,48 @@
->    *
->    * Wills Wang <wills.wang.open@gmail.com>
->    *
-> - * The code contained herein is licensed under the GNU General Public
-> - * License. You may obtain a copy of the GNU General Public License
-> - * Version 2 or later at the following locations:
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
->    *
-> - * http://www.opensource.org/licenses/gpl-license.html
-> - * http://www.gnu.org/copyleft/gpl.html
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + *     You should have received a copy of the GNU General Public
-> + *     License along with this file; if not, write to the Free
-> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-> + *     MA 02110-1301 USA
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
->    */
->   
->   /dts-v1/;
+I am trying to boot a mainline kernel on a Samsung exynos
+chromebook (snow) and am having (surprise, surprise) some
+trouble.  I am somewhat new to this but am getting some sort of
+feel for what needs to be done. Having read the postings for
+"Unable to boot mainline on snow chromebook since 3.15" I decided
+to send this mail under that subject. My question is what is the
+latest kernel that actually did boot and is there a current
+kernel somewhere that works. I have tried
+           3.18.3 and
+           3.18.4
+The screen goes black and the system reboots to the initial
+chrome flash screen. I tried linux-3.14.30 which was better.
+After a strange screen of what appeared to be timeing information
+the kernel booted (off sda2) and ran normally until the final
+message
+
+   Waiting for root device /dev/sda3
+
+which is where the root system was supposed to be and then went
+no further. For u-boot I am using the binary
+
+        nv_uboot-snow-simplefb.kpart
+
+   Regards Bruce
+
+PS. please cc me as I am not on the list
