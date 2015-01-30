@@ -1,106 +1,210 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Fri, 30 Jan 2015 15:29:44 -0800
-Subject: [PATCH v7 1/4] Documentation: dt: add common bindings for
- hwspinlock
-In-Reply-To: <CAK=WgbYBqPoUm9byx0du_g5ZmHdYaUVLpSPZYHoCVzNoatNKpw@mail.gmail.com>
-References: <1421269101-51105-1-git-send-email-s-anna@ti.com>
- <1421269101-51105-2-git-send-email-s-anna@ti.com>
- <20150115135201.GG16217@leverpostej>
- <20150115135556.GH16217@leverpostej>
- <CAL_JsqL2LZAooMk-V8+xeF2g6acZE21M+-OBRw8aEVa-5wVHuQ@mail.gmail.com>
- <CAK=WgbYQ=BbinqJ5fsw2Y+FKdy=nasLsw9mX8pw6S_o3owy9-g@mail.gmail.com>
- <20150116101746.GA21809@leverpostej>
- <CAK=WgbYBqPoUm9byx0du_g5ZmHdYaUVLpSPZYHoCVzNoatNKpw@mail.gmail.com>
-Message-ID: <CAJAp7Og+-KQd7bygWQjTS72Kye3fkp3s3ry+2bw7Gcv7aPF5AQ@mail.gmail.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Fri, 30 Jan 2015 15:31:21 -0800
+Subject: [PATCH 2/8] arm64: Convert hcalls to use ISS field
+In-Reply-To: <20150126182621.GH14048@e104818-lin.cambridge.arm.com>
+References: <cover.1421449714.git.geoff@infradead.org>
+ <6719b2520095926ae0e8ac888663b87f2098f565.1421449714.git.geoff@infradead.org>
+ <20150126182621.GH14048@e104818-lin.cambridge.arm.com>
+Message-ID: <1422660681.21823.38.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 4:46 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> Mark,
->
-> On Fri, Jan 16, 2015 at 12:17 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->>> The hwlock is a basic hardware primitive that allow synchronization
->>> between different processors in the system, which may be running Linux
->>> as well as other operating systems, and may have no other means of
->>> communication.
->>>
->>> The hwlock id numbers are predefined, global and static across the
->>> entire system: Linux may boot well after other operating systems are
->>> already running and using these hwlocks to communicate, and therefore,
->>> in order to use these hardware devices, it must not enumerate them
->>> differently than the rest of the system.
->>
->> That's not true.
->>
->> In order to communicate it must agree with the other users as to the
->> meaning of each instance, and the protocol for use. That doesn't
->> necessarily mean that Linux needs to know the numerical ID from a
->> datasheet, and regardless that ID is separate from the logical ID Linux
->> uses internally.
->
-> Let me describe hwspinlocks a bit more so we all get to know it better
-> and can then agree on a proper solution.
->
-> - What makes handling of hwspinlock ID numbers convenient is the fact
-> that it's not based on random datasheet numbers. In fact, hwspinlocks
-> is just special memory: usually datasheets just define the base
-> address and the size of the hwspinlock area. So any numerical ID we
-> use to call the locks themselves are already logical and sane, similar
-> to the way we handle memory (i.e. if we have 32 locks we'll always use
-> 0..31). So hwlocks ids are very much like memory addressing, and not
-> irq numbers.
->
+On Mon, 2015-01-26 at 18:26 +0000, Catalin Marinas wrote:
+> On Sat, Jan 17, 2015 at 12:23:34AM +0000, Geoff Levand wrote:
+> > To allow for additional hcalls to be defined and to make the arm64 hcall API
+> > more consistent across exception vector routines, change the hcall implementations
+> > to use the ISS field of the ESR_EL2 register to specify the hcall type.
+> > 
+> > The existing arm64 hcall implementations are limited in that they only allow
+> > for two distinct hcalls; with the x0 register either zero, or not zero.  Also,
+> > the API of the hyp-stub exception vector routines and the KVM exception vector
+> > routines differ; hyp-stub uses a non-zero value in x0 to implement
+> > __hyp_set_vectors, whereas KVM uses it to implement kvm_call_hyp.
+> > 
+> > Define three new preprocessor macros HVC_GET_VECTORS, HVC_SET_VECTORS and
+> > HVC_CALL_HYP and to be used as hcall type specifiers and convert the
+> > existing __hyp_get_vectors(), __hyp_set_vectors() and kvm_call_hyp() routines
+> > to use these new macros when executing an HVC call.  Also change the
+> > corresponding hyp-stub and KVM el1_sync exception vector routines to use these
+> > new macros.
+> > 
+> > Signed-off-by: Geoff Levand <geoff@infradead.org>
+> 
+> Using the #imm value for HVC to separate what gets called looks fine to
+> me. However, I'd like to see a review from Marc/Christoffer on this
+> patch.
 
-But that's exactly how irqs or gpios work as well. If you have 32
-gpios in a system they used to be numbered 0-31 and people would
-reference them directly by that number. Every one of the systems that
-was designed in this way is moving away from it.
+Marc, Christopher, comments please?
 
-> - Sometimes Linux will have to dynamically allocate a hwlock, and send
-> the ID of the allocated lock to a remote processor (which may not be
-> running Linux).
+> Some comments below:
+> 
+> > diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+> > index 7a5df52..99c319c 100644
+> > --- a/arch/arm64/include/asm/virt.h
+> > +++ b/arch/arm64/include/asm/virt.h
+> > @@ -21,6 +21,26 @@
+> >  #define BOOT_CPU_MODE_EL1	(0xe11)
+> >  #define BOOT_CPU_MODE_EL2	(0xe12)
+> >  
+> > +/*
+> > + * HVC_GET_VECTORS - Return the value of the vbar_el2 register.
+> > + */
+> > +
+> > +#define HVC_GET_VECTORS 1
+> > +
+> > +/*
+> > + * HVC_SET_VECTORS - Set the value of the vbar_el2 register.
+> > + *
+> > + * @x0: Physical address of the new vector table.
+> > + */
+> > +
+> > +#define HVC_SET_VECTORS 2
+> > +
+> > +/*
+> > + * HVC_CALL_HYP - Execute a hyp routine.
+> > + */
+> > +
+> > +#define HVC_CALL_HYP 3
+> 
+> I think you can ignore this case (make it the default), just define it
+> as 0 as that's the normal use-case after initialisation and avoid
+> checking it explicitly.
 
-In a system where you have two hwlock blocks lckA and lckB, each
-consisting of 8 locks and you have dspB that can only access lckB;
-will you tell the firmware engineers to always subtract 8 from the
-numbers you pass them?
+OK, I changed this so that HVC_CALL_HYP is the default at 0.
 
-Wouldn't it make much more sense to have local indexes here and pass
-them e.g lckB:2?
+> >  /*
+> > diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
+> > index a272f33..e3db3fd 100644
+> > --- a/arch/arm64/kernel/hyp-stub.S
+> > +++ b/arch/arm64/kernel/hyp-stub.S
+> > @@ -22,6 +22,7 @@
+> >  #include <linux/irqchip/arm-gic-v3.h>
+> >  
+> >  #include <asm/assembler.h>
+> > +#include <asm/kvm_arm.h>
+> >  #include <asm/ptrace.h>
+> >  #include <asm/virt.h>
+> >  
+> > @@ -53,14 +54,22 @@ ENDPROC(__hyp_stub_vectors)
+> >  	.align 11
+> >  
+> >  el1_sync:
+> > -	mrs	x1, esr_el2
+> > -	lsr	x1, x1, #26
+> > -	cmp	x1, #0x16
+> > -	b.ne	2f				// Not an HVC trap
+> > -	cbz	x0, 1f
+> > -	msr	vbar_el2, x0			// Set vbar_el2
+> > +	mrs	x18, esr_el2
+> > +	lsr	x17, x18, #ESR_ELx_EC_SHIFT
+> > +	and	x18, x18, #ESR_ELx_ISS_MASK
+> > +
+> > +	cmp     x17, #ESR_ELx_EC_HVC64
+> > +	b.ne    2f				// Not an HVC trap
+> > +
+> > +	cmp	x18, #HVC_GET_VECTORS
+> > +	b.ne	1f
+> > +	mrs	x0, vbar_el2
+> >  	b	2f
+> > -1:	mrs	x0, vbar_el2			// Return vbar_el2
+> > +
+> > +1:	cmp	x18, #HVC_SET_VECTORS
+> > +	b.ne	2f
+> > +	msr	vbar_el2, x0
+> > +
+> >  2:	eret
+> >  ENDPROC(el1_sync)
+> 
+> You seem to be using x17 and x18 here freely. Do you have any guarantees
+> that the caller saved/restored those registers? I guess you assume they
+> are temporary registers and the caller first branches to a function
+> (like __kvm_hyp_call) and expects them to be corrupted. But I'm not sure
+> that's always the case. Take for example the __invoke_psci_fn_hvc where
+> the function is in C (we should change this for other reasons).
 
-> - Sometimes a remote processor, which may not be running Linux, will
-> have to dynamically allocate a hwlock, and send the ID of the
-> allocated lock to us (another processor running Linux)
->
+Yes, I assume the compiler will not expect them to be preserved.  I
+missed __invoke_psci_fn_hvc.  Can we just add x17 and x18 to the
+clobbered list?
 
-I'm sorry but you cannot have a system on both sides that is allowed
-to do dynamic allocation from a limited set of resources.
-
-Further more this dynamic allocation leads to interesting race
-conditions as what happens if you dynamically allocate a hwlock that
-is statically allocated by another part of the system?
-The only solution I can think of is to have a static allocation of ids
-that the dynamic allocator might use, and then we're just carrying
-extra code when the system is already statically configured...
-
-> We cannot tell in advance what kind of IPC is going to be used for
-> sending and receiving this hwlock ID. Some are handled by Linux
-> (kernel) and some by the user space. So we must be able to expose an
-> ID the system will understand as well as receive one.
->
-
-Designing this interface to take into consideration that someone might
-send us something completely crazy isn't productive.
+        asm volatile(
+                        __asmeq("%0", "x0")
+                        __asmeq("%1", "x1")
+                        __asmeq("%2", "x2")
+                        __asmeq("%3", "x3")
+                        "hvc    #0\n"
+                : "+r" (function_id)
+-               : "r" (arg0), "r" (arg1), "r" (arg2));
++               : "r" (arg0), "r" (arg1), "r" (arg2)
++               : "x17", "x18");
 
 
-The only reason for having num-locks and base-id in device tree is
-because of the current Linux implementation. base-id is not a property
-of the hardware and num-locks is not needed for anything but book
-keeping of base-id's in the hwlock framework.
+> > diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+> > index c0d8202..1916c89 100644
+> > --- a/arch/arm64/kvm/hyp.S
+> > +++ b/arch/arm64/kvm/hyp.S
+> > @@ -27,6 +27,7 @@
+> >  #include <asm/kvm_asm.h>
+> >  #include <asm/kvm_mmu.h>
+> >  #include <asm/memory.h>
+> > +#include <asm/virt.h>
+> >  
+> >  #define CPU_GP_REG_OFFSET(x)	(CPU_GP_REGS + x)
+> >  #define CPU_XREG_OFFSET(x)	CPU_GP_REG_OFFSET(CPU_USER_PT_REGS + 8*x)
+> > @@ -1106,12 +1107,9 @@ __hyp_panic_str:
+> >   * in Hyp mode (see init_hyp_mode in arch/arm/kvm/arm.c).  Return values are
+> >   * passed in r0 and r1.
+> >   *
+> > - * A function pointer with a value of 0 has a special meaning, and is
+> > - * used to implement __hyp_get_vectors in the same way as in
+> > - * arch/arm64/kernel/hyp_stub.S.
+> >   */
+> >  ENTRY(kvm_call_hyp)
+> > -	hvc	#0
+> > +	hvc	#HVC_CALL_HYP
+> >  	ret
+> >  ENDPROC(kvm_call_hyp)
+> >  
+> > @@ -1142,6 +1140,7 @@ el1_sync:					// Guest trapped into EL2
+> >  
+> >  	mrs	x1, esr_el2
+> >  	lsr	x2, x1, #ESR_ELx_EC_SHIFT
+> > +	and	x0, x1, #ESR_ELx_ISS_MASK
+> >  
+> >  	cmp	x2, #ESR_ELx_EC_HVC64
+> >  	b.ne	el1_trap
+> > @@ -1150,15 +1149,19 @@ el1_sync:					// Guest trapped into EL2
+> >  	cbnz	x3, el1_trap			// called HVC
+> >  
+> >  	/* Here, we're pretty sure the host called HVC. */
+> > +	mov	x18, x0
+> 
+> Same comment here about corrupting x18. If it is safe, maybe add some
+> comments in the calling place.
 
-This is why I preferred Sumans earlier suggestion of having the
-binding consist of #hwlock-cells = <X> and the necessary accessor
-functions for resolving a hwlock based on a dt reference.
+I added a comment regarding this to virt.h where the HVC_XXX macros
+are defined.  I'll post that fixed up patch for review.
 
-Regards,
-Bjorn
+> 
+> >  	pop	x2, x3
+> >  	pop	x0, x1
+> >  
+> > -	/* Check for __hyp_get_vectors */
+> > -	cbnz	x0, 1f
+> > +	cmp	x18, #HVC_GET_VECTORS
+> > +	b.ne	1f
+> >  	mrs	x0, vbar_el2
+> >  	b	2f
+> >  
+> > -1:	push	lr, xzr
+> > +1:	cmp	x18, #HVC_CALL_HYP
+> > +	b.ne	2f
+> > +
+> > +	push	lr, xzr
+> 
+> At this point, we expect either HVC_GET_VECTORS or HVC_CALL_HYP. I think
+> you can simply assume HVC_CALL_HYP as default and ignore the additional
+> cmp.
+
+OK, did that.
+
+-Geoff
