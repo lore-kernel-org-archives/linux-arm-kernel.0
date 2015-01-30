@@ -1,163 +1,74 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 30 Jan 2015 17:20:36 +0200
-Subject: [PATCH 00/11] ARM: OMAP3: legacy clock data move under clk driver
-In-Reply-To: <20150130004224.22722.56051@quantum>
-References: <1418746856-17173-1-git-send-email-t-kristo@ti.com>
- <20150107230006.GE13010@atomide.com> <54CA95D1.6080700@ti.com>
- <20150130004224.22722.56051@quantum>
-Message-ID: <54CBA144.8020409@ti.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Fri, 30 Jan 2015 10:23:52 -0500
+Subject: [PATCH v4 1/6] of: iommu: add ptr to OF node arg to
+ of_iommu_configure()
+In-Reply-To: <1612981.2C6LXFqAIA@avalon>
+References: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
+ <5349994.6VHXzPdIxs@avalon>
+ <CAL_Jsq+rzwk0Rw5RRKf9oLqXNFFgnJb4UQ_AzpJLxN1Z0rJWMQ@mail.gmail.com>
+ <1612981.2C6LXFqAIA@avalon>
+Message-ID: <54CBA208.5020005@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/30/2015 02:42 AM, Mike Turquette wrote:
-> Quoting Tero Kristo (2015-01-29 12:19:29)
->> On 01/08/2015 01:00 AM, Tony Lindgren wrote:
->>> * Tero Kristo <t-kristo@ti.com> [141216 08:22]:
->>>> Hi,
->>>>
->>>> These patches move the legacy clock data for omap3 under drivers/clk/ti.
->>>> After these patches are applied, it should be possible to get rid of
->>>> clk-private.h (long pending project for Mike.)
->>>>
->>>> Testing done (on top of 3.18-rc1):
->>>>
->>>> omap3-beagle: boot / suspend-resume (ret/off) / cpuidle (ret/off)
->>>> omap3-beagle-xm: boot upto fs mount (see note below)
->>>> sdp3430: boot
->>>> n900: boot
->>>>
->>>> Note: beagle-xm failed with FS mount on the board I have access to, but
->>>>         this happens with clean 3.18-rc1 and linux-next also at the moment.
->>>>         The board has probably corrupted filesystem image but I am unable
->>>>         to fix this atm (remote board.)
->>>>
->>>> Test branch:
->>>> tree: https://github.com/t-kristo/linux-pm.git
->>>> branch: 3.18-rc1-omap3-clk-rework
->>>
->>> Great, hopefully this will finally allow Mike to make the
->>> generic struct clk private to drivers/clk :)
->>>
->>> Seems to boot just fine based on a quick legacy booting test
->>> on n900.
->>>
->>> Mike, assuming no other issues, can you please apply these into a
->>> immutable branch against v3.19-rc1 that Paul and I can also merge
->>> in as needed?
->>>
->>> Please also feel free to add:
->>>
->>> Acked-by: Tony Lindgren <tony@atomide.com>
->>>
+On 01/29/2015 07:24 PM, Laurent Pinchart wrote:
+> Hi Rob,
+>
+> On Thursday 29 January 2015 10:49:38 Rob Herring wrote:
+>> On Wed, Jan 28, 2015 at 5:32 PM, Laurent Pinchart wrote:
+>>> On Wednesday 28 January 2015 13:32:19 Will Deacon wrote:
+>>>> On Wed, Jan 28, 2015 at 01:15:10PM +0000, Laurent Pinchart wrote:
+>>>>> On Wednesday 28 January 2015 12:29:42 Will Deacon wrote:
+>>>>>> On Wed, Jan 28, 2015 at 12:23:03PM +0000, Laurent Pinchart wrote:
+>>>>>>> On Wednesday 28 January 2015 11:33:00 Will Deacon wrote:
+>>>>>>>> On Mon, Jan 26, 2015 at 06:49:01PM +0000, Murali Karicheri wrote:
+>>>>>>>> On 01/25/2015 08:32 AM, Laurent Pinchart wrote:
+>>>>>>>>>> On Friday 23 January 2015 17:32:34 Murali Karicheri wrote:
+>>>>>>>>>>> Function of_iommu_configure() is called from of_dma_configure()
+>>>>>>>>>>> to setup iommu ops using DT property. This API is currently used
+>>>>>>>>>>> for platform devices for which DMA configuration (including iommu
+>>>>>>>>>>> ops) may come from device's parent. To extend this functionality
+>>>>>>>>>>> for PCI devices, this API need to take a parent node ptr as an
+>>>>>>>>>>> argument instead of assuming device's parent. This is needed since
+>>>>>>>>>>> for PCI, the dma configuration may be defined in the DT node of
+>>>>>>>>>>> the root bus bridge's parent device. Currently only dma-range is
+>>>>>>>>>>> used for PCI and iommu is not supported. So return error if the
+>>>>>>>>>>> device is PCI.
 >>
->> I just rebased these patches on top of 3.19-rc1, and noticed a problem
->> with dpll5 on beagle-xm (basically a divide-by-zero error + locking
->> issue during boot.) The extra diff at the end of this email fixes the
->> problems, I will also send the updated two patches as v2. Updated branch
->> available in my tree under name 3.19-rc1-omap3-clk-rework.
+>> [...]
+>>
+>>>>> If I understand Murali's patch set right (please correct me if that's
+>>>>> not the case) the PCI code walks up the DT nodes hierarchy to the
+>>>>> parent node that contains the iommus attribute and passes a pointer to
+>>>>> that node to this function. It's thus a PCI-specific solution. As a
+>>>>> temporary hack that's OK I suppose, but if implementing it right
+>>>>> straight away isn't difficult that would be better.
+>>>>
+>>>> It looks to me like the code walks the PCI topology to get the DT node
+>>>> for the host controller, and passes *that* to of_dma_configure. That
+>>>> sounds like the right thing to do to me, especially since the PCI
+>>>> topology is likely not encoded in the device-tree. So actually, it is
+>>>> passing the first parent node afaict.
+>>>
+>>> Indeed, that's right. I forgot for a moment that we have non-DT devices
+>>> ;-)
+>>>
+>>> Acked-by: Laurent Pinchart<laurent.pinchart@ideasonboard.com>
+>>>
+>>> Murali, nitpicking a bit, shouldn't the iommu_np parameter be renamed ? It
+>>> points to the node containing the iommus parameter, not to the iommu node,
+>>> so the current name is slightly confusing. A brief kerneldoc above the
+>>> function would also help. This can be the subject of a separate patch.
+>>
+>> It was more confusing having np and node within the function.
 >
-> I've applied these 11 patches on top of v3.19-rc1, including the two V2
-> patches for #6 and #8 to the clk-omap-legacy branch here:
+> Agreed.
 >
-> git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-omap-legacy
+> How about master_np or iommu_master_np ? The latter might be a bit long.
 >
-> Let me know if I screwed anything up. I've merged this immutable branch
-> into clk-next.
->
-> In addition I've made some changes to remove clk-private.h permanently.
-> I'll post those later today. Again, please let me know if I screwed
-> anything up.
+Probabaly master_np suffice as this function is named 
+of_iommu_configure(). I will update it.
 
-I can't see the clk-omap-legacy merged to clk-next so far, maybe you did 
-not push it yet? The branch itself is identical copy of mine, so can't 
-see any issues there so far.
-
--Tero
-
->
-> Regards,
-> Mike
->
->>
->> - Tero
->>
->> ---------------------
->>
->> diff --git a/drivers/clk/ti/clk-3xxx-legacy.c
->> b/drivers/clk/ti/clk-3xxx-legacy.c
->> index 81ad510..e0732a4 100644
->> --- a/drivers/clk/ti/clk-3xxx-legacy.c
->> +++ b/drivers/clk/ti/clk-3xxx-legacy.c
->> @@ -136,6 +136,7 @@ static struct ti_clk_dpll dpll3_ck_data = {
->>          .idlest_mask = 0x1,
->>          .auto_recal_bit = 0x3,
->>          .max_divider = 0x80,
->> +       .min_divider = 0x1,
->>          .recal_en_bit = 0x5,
->>          .max_multiplier = 0x7ff,
->>          .enable_mask = 0x7,
->> @@ -307,6 +308,7 @@ static struct ti_clk_dpll dpll4_ck_data = {
->>          .idlest_mask = 0x2,
->>          .auto_recal_bit = 0x13,
->>          .max_divider = 0x80,
->> +       .min_divider = 0x1,
->>          .recal_en_bit = 0x6,
->>          .max_multiplier = 0x7ff,
->>          .enable_mask = 0x70000,
->> @@ -507,6 +509,7 @@ static struct ti_clk_dpll dpll5_ck_data = {
->>          .idlest_mask = 0x1,
->>          .auto_recal_bit = 0x3,
->>          .max_divider = 0x80,
->> +       .min_divider = 0x1,
->>          .recal_en_bit = 0x19,
->>          .max_multiplier = 0x7ff,
->>          .enable_mask = 0x7,
->> @@ -1271,6 +1274,7 @@ static struct ti_clk_dpll dpll1_ck_data = {
->>          .idlest_mask = 0x1,
->>          .auto_recal_bit = 0x3,
->>          .max_divider = 0x80,
->> +       .min_divider = 0x1,
->>          .recal_en_bit = 0x7,
->>          .max_multiplier = 0x7ff,
->>          .enable_mask = 0x7,
->> @@ -2154,6 +2158,7 @@ static struct ti_clk_dpll dpll2_ck_data = {
->>          .idlest_mask = 0x1,
->>          .auto_recal_bit = 0x3,
->>          .max_divider = 0x80,
->> +       .min_divider = 0x1,
->>          .recal_en_bit = 0x8,
->>          .max_multiplier = 0x7ff,
->>          .enable_mask = 0x7,
->> @@ -2513,6 +2518,7 @@ static struct ti_clk_dpll dpll4_ck_omap36xx_data = {
->>          .idlest_mask = 0x2,
->>          .auto_recal_bit = 0x13,
->>          .max_divider = 0x80,
->> +       .min_divider = 0x1,
->>          .recal_en_bit = 0x6,
->>          .max_multiplier = 0xfff,
->>          .enable_mask = 0x70000,
->> diff --git a/drivers/clk/ti/clock.h b/drivers/clk/ti/clock.h
->> index 8d9c603..404158d 100644
->> --- a/drivers/clk/ti/clock.h
->> +++ b/drivers/clk/ti/clock.h
->> @@ -148,6 +148,7 @@ struct ti_clk_dpll {
->>          u32 sddiv_mask;
->>          u16 max_multiplier;
->>          u16 max_divider;
->> +       u8 min_divider;
->>          u8 auto_recal_bit;
->>          u8 recal_en_bit;
->>          u8 recal_st_bit;
->> diff --git a/drivers/clk/ti/dpll.c b/drivers/clk/ti/dpll.c
->> index 7d67639..47ebff7 100644
->> --- a/drivers/clk/ti/dpll.c
->> +++ b/drivers/clk/ti/dpll.c
->> @@ -243,6 +243,7 @@ struct clk *ti_clk_register_dpll(struct ti_clk *setup)
->>          dd->sddiv_mask = dpll->sddiv_mask;
->>          dd->dco_mask = dpll->dco_mask;
->>          dd->max_divider = dpll->max_divider;
->> +       dd->min_divider = dpll->min_divider;
->>          dd->max_multiplier = dpll->max_multiplier;
->>          dd->auto_recal_bit = dpll->auto_recal_bit;
->>          dd->recal_en_bit = dpll->recal_en_bit;
->>
+-- 
+Murali Karicheri
+Linux Kernel, Texas Instruments
