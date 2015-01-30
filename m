@@ -1,34 +1,50 @@
 From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
-Date: Fri, 30 Jan 2015 15:54:24 -0700
-Subject: [PATCH 0/2] Coresight Support for arm64 
-Message-ID: <1422658466-23984-1-git-send-email-mathieu.poirier@linaro.org>
+Date: Fri, 30 Jan 2015 15:54:25 -0700
+Subject: [PATCH 1/2] arm64: adding cpu lookup functionality
+In-Reply-To: <1422658466-23984-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1422658466-23984-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1422658466-23984-2-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-Other than tracers, the coresight IP blocks are 64-bit ready.  This
-would normally be a trivial addition had it not been for the first
-patch that is adding cpu index lookup functionality.
+Adding a lookup function allowing for quick and easy mapping
+between processor HWID (as found, for example) in DT specifications
+and the CPU index known to the kernel.
 
-The feature exists in the 32 world and the fact that it doesn't on
-64 bit means that 1) nobody needed it as of yet or 2) people have found
-a different way to proceed.
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ arch/arm64/include/asm/smp_plat.h | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-Please have a look and tell me what you think.
-
-Many thanks,
-Mathieu
-
-Mathieu Poirier (2):
-  arm64: adding cpu lookup functionality
-  coresight: Adding coresight support to arm64
-
- arch/arm64/Kconfig.debug            | 48 +++++++++++++++++++++++++++++++++++++
- arch/arm64/include/asm/smp_plat.h   | 12 ++++++++++
- drivers/coresight/coresight-etb10.c |  2 +-
- drivers/coresight/coresight-tmc.c   |  2 +-
- 4 files changed, 62 insertions(+), 2 deletions(-)
-
+diff --git a/arch/arm64/include/asm/smp_plat.h b/arch/arm64/include/asm/smp_plat.h
+index 59e282311b58..8e4b011303b1 100644
+--- a/arch/arm64/include/asm/smp_plat.h
++++ b/arch/arm64/include/asm/smp_plat.h
+@@ -19,6 +19,7 @@
+ #ifndef __ASM_SMP_PLAT_H
+ #define __ASM_SMP_PLAT_H
+ 
++#include <linux/cpumask.h>
+ #include <asm/types.h>
+ 
+ struct mpidr_hash {
+@@ -40,4 +41,15 @@ static inline u32 mpidr_hash_size(void)
+ extern u64 __cpu_logical_map[NR_CPUS];
+ #define cpu_logical_map(cpu)    __cpu_logical_map[cpu]
+ 
++static inline int get_logical_index(u64 mpidr)
++{
++	int cpu;
++
++	for (cpu = 0; cpu < nr_cpu_ids; cpu++)
++		if (cpu_logical_map(cpu) == mpidr)
++			return cpu;
++	return -EINVAL;
++}
++
++
+ #endif /* __ASM_SMP_PLAT_H */
 -- 
 1.9.1
