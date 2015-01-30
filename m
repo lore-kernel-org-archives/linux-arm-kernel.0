@@ -1,41 +1,61 @@
-From: jonas@microbit.se (Jonas Andersson)
-Date: Fri, 30 Jan 2015 12:25:10 +0100
-Subject: [PATCH] ARM: dts: at91sam9260: fix usart pinctrl
-Message-ID: <54CB6A16.4070601@microbit.se>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Fri, 30 Jan 2015 12:30:59 +0100
+Subject: [GIT PULL 0/3] Second round of KVM/ARM fixes for 3.19
+In-Reply-To: <1422571077-14576-1-git-send-email-christoffer.dall@linaro.org>
+References: <1422571077-14576-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <54CB6B73.8020600@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Corrected pins used by usart3.
 
-Signed-off-by: Jonas Andersson <jonas@microbit.se>
----
-  arch/arm/boot/dts/at91sam9260.dtsi | 4 ++--
-  1 file changed, 2 insertions(+), 2 deletions(-)
+On 29/01/2015 23:37, Christoffer Dall wrote:
+> Hi Paolo,
+> 
+> Please pull this second round of fixes for KVM/ARM for 3.19.  Hopefully there
+> is time to get this upstream before the final release of 3.19.
+> 
+> The series fixes the notorious memory corruption issues on APM platforms and
+> swapping issues on DMA-coherent systems.
+> 
+> The following changes since commit f3747379accba8e95d70cec0eae0582c8c182050:
+> 
+>   KVM: x86: SYSENTER emulation is broken (2015-01-23 13:57:15 +0100)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-fixes-3.19-2
+> 
+> for you to fetch changes up to 0d3e4d4fade6b04e933b11e69e80044f35e9cd60:
+> 
+>   arm/arm64: KVM: Use kernel mapping to perform invalidation on page fault (2015-01-29 23:24:57 +0100)
+> 
+> Thanks,
+> Christoffer
+> 
+> ----------------------------------------------------------------
+> Marc Zyngier (3):
+>       arm/arm64: KVM: Use set/way op trapping to track the state of the caches
+>       arm/arm64: KVM: Invalidate data cache on unmap
+>       arm/arm64: KVM: Use kernel mapping to perform invalidation on page fault
+> 
+>  arch/arm/include/asm/kvm_emulate.h   |  10 +++
+>  arch/arm/include/asm/kvm_host.h      |   3 -
+>  arch/arm/include/asm/kvm_mmu.h       |  77 +++++++++++++---
+>  arch/arm/kvm/arm.c                   |  10 ---
+>  arch/arm/kvm/coproc.c                |  70 +++------------
+>  arch/arm/kvm/coproc.h                |   6 +-
+>  arch/arm/kvm/coproc_a15.c            |   2 +-
+>  arch/arm/kvm/coproc_a7.c             |   2 +-
+>  arch/arm/kvm/mmu.c                   | 164 ++++++++++++++++++++++++++++++-----
+>  arch/arm/kvm/trace.h                 |  39 +++++++++
+>  arch/arm64/include/asm/kvm_emulate.h |  10 +++
+>  arch/arm64/include/asm/kvm_host.h    |   3 -
+>  arch/arm64/include/asm/kvm_mmu.h     |  34 ++++++--
+>  arch/arm64/kvm/sys_regs.c            |  75 +++-------------
+>  14 files changed, 327 insertions(+), 178 deletions(-)
+> 
 
-diff --git a/arch/arm/boot/dts/at91sam9260.dtsi 
-b/arch/arm/boot/dts/at91sam9260.dtsi
-index dd1313c..16ccfd9 100644
---- a/arch/arm/boot/dts/at91sam9260.dtsi
-+++ b/arch/arm/boot/dts/at91sam9260.dtsi
-@@ -489,12 +489,12 @@
+Applied, thanks.
 
-                      pinctrl_usart3_rts: usart3_rts-0 {
-                          atmel,pins =
--                            <AT91_PIOB 8 AT91_PERIPH_B 
-AT91_PINCTRL_NONE>;    /* PC8 periph B */
-+                            <AT91_PIOC 8 AT91_PERIPH_B 
-AT91_PINCTRL_NONE>;    /* PC8 periph B */
-                      };
-
-                      pinctrl_usart3_cts: usart3_cts-0 {
-                          atmel,pins =
--                            <AT91_PIOB 10 AT91_PERIPH_B 
-AT91_PINCTRL_NONE>;    /* PC10 periph B */
-+                            <AT91_PIOC 10 AT91_PERIPH_B 
-AT91_PINCTRL_NONE>;    /* PC10 periph B */
-                      };
-                  };
-
--- 
-1.9.3
+Paolo
