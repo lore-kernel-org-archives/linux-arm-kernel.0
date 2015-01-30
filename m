@@ -1,35 +1,66 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 30 Jan 2015 17:28:32 -0200
-Subject: [PATCH V2 RESEND] clk: mxs: Fix invalid 32-bit access to frac
- registers
-In-Reply-To: <1422645610-3052-1-git-send-email-stefan.wahren@i2se.com>
-References: <1422645610-3052-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <CAOMZO5CTaqzs2bwXL4V9boMSjOw6TcGBLXe9U=9-wEvwfvGYeQ@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 30 Jan 2015 19:33:56 +0000 (UTC)
+Subject: [PATCH 24/24] Documentation: DT bindings: add nvidia, denver
+ compatible string
+In-Reply-To: <CAL_JsqJq8D86gUdw80Nev=zmW=kYR90iNKiTzciwpaGx2qNJsA@mail.gmail.com>
+References: <20150128234935.20644.89300.stgit@dusk.lan>
+ <20150128234938.20644.69989.stgit@dusk.lan>
+ <CAL_JsqJq8D86gUdw80Nev=zmW=kYR90iNKiTzciwpaGx2qNJsA@mail.gmail.com>
+Message-ID: <alpine.DEB.2.02.1501301933170.6569@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 30, 2015 at 5:20 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> According to i.MX23 and i.MX28 reference manual [1],[2] the fractional
-> clock control register is 32-bit wide, but is separated in 4 parts.
-> So write instructions must not apply to more than 1 part at once.
->
-> The clk init for the i.MX28 violates this restriction and all the other
-> accesses on that register suggest that there isn't such a restriction.
->
-> This patch restricts the access to this register to byte instructions and
-> extends the comment in the init functions.
->
-> Btw the imx23 init now uses a R-M-W sequence just like imx28 init
-> to avoid any clock glitches.
->
-> The changes has been tested with a i.MX23 and a i.MX28 board.
->
-> [1] - http://cache.freescale.com/files/dsp/doc/ref_manual/IMX23RM.pdf
-> [2] - http://cache.freescale.com/files/dsp/doc/ref_manual/MCIMX28RM.pdf
->
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> Reviewed-by: Marek Vasut <marex@denx.de>
+Hi Rob
 
-Reviewed-by: Fabio Estevam <fabio.estevam@freescale.com>
+On Thu, 29 Jan 2015, Rob Herring wrote:
 
-Thanks
+> On Wed, Jan 28, 2015 at 5:49 PM, Paul Walmsley <paul@pwsan.com> wrote:
+> >
+> > Add a compatible string for the NVIDIA Denver CPU to the ARM CPU DT
+> > binding documentation file.  The primary objective here is to keep
+> > checkpatch.pl from warning when the compatible string is used in an
+> > SoC DT file, per:
+> >
+> > http://marc.info/?l=linux-tegra&m=142201349727836&w=2
+> >
+> >
+> > Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> > Cc: Rob Herring <robh+dt@kernel.org>
+> > Cc: Pawel Moll <pawel.moll@arm.com>
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> > Cc: Kumar Gala <galak@codeaurora.org>
+> > Cc: Heiko Stuebner <heiko@sntech.de>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Olof Johansson <olof@lixom.net>
+> > Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > Cc: Rohit Vaswani <rvaswani@codeaurora.org>
+> > Cc: Paul Walmsley <pwalmsley@nvidia.com>
+> > Cc: Marc Carino <marc.ceeeee@gmail.com>
+> > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Cc: devicetree at vger.kernel.org
+> > Cc: linux-kernel at vger.kernel.org
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > ---
+> >  Documentation/devicetree/bindings/arm/cpus.txt |    1 +
+> >  1 file changed, 1 insertion(+)
+> >
+> > diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+> > index b2aacbe16ed9..4ea31f0b7764 100644
+> > --- a/Documentation/devicetree/bindings/arm/cpus.txt
+> > +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+> > @@ -175,6 +175,7 @@ nodes to be present and contain the properties described below.
+> >                             "marvell,pj4a"
+> >                             "marvell,pj4b"
+> >                             "marvell,sheeva-v5"
+> > +                           "nvidia,denver" (not yet matched in the code)
+> 
+> There's not variations or versions of Denver cores or plans to change
+> from the codename?
+
+Hard to say what the future will bring.  I'll change it to 
+"nvidia,tegra132-denver".
+
+
+- Paul
