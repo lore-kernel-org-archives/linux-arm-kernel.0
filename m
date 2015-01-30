@@ -1,34 +1,33 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 30 Jan 2015 14:31:25 +0100
-Subject: [PATCH] pinctrl: hide PCONFDUMP in #ifdef
-In-Reply-To: <4217929.mzU2TuSLSj@wuerfel>
-References: <4217929.mzU2TuSLSj@wuerfel>
-Message-ID: <CACRpkdZD-LHQaNOH_b+WWvo8RrbVKj5DB7q_m-aNq=W-sEfvtw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 30 Jan 2015 14:26:36 +0100
+Subject: [PATCH 21/26] ARM: sun7i: hummingbird: Relicense the device tree
+ under GPLv2/X11
+In-Reply-To: <54CB02AE.9010600@gmail.com>
+References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1413538728-17705-21-git-send-email-maxime.ripard@free-electrons.com>
+ <54CB02AE.9010600@gmail.com>
+Message-ID: <20150130132636.GC9821@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 28, 2015 at 5:08 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+Hi,
 
-> The zynq and qcom-spmi pinctrl drivers both use pin_config_item arrays
-> to provide extra interfaces in debugfs. This structure and the
-> PCONFDUMP macro are not defined if CONFIG_DEBUG_FS is turned off,
-> so we get build errors like:
->
-> pinctrl/qcom/pinctrl-spmi-gpio.c:139:37: error: array type has incomplete element type
->  static const struct pin_config_item pmic_conf_items[ARRAY_SIZE(pmic_gpio_bindings)] = {
->                                      ^
-> pinctrl/qcom/pinctrl-spmi-gpio.c:140:2: error: implicit declaration of function 'PCONFDUMP' [-Werror=implicit-function-declaration]
->   PCONFDUMP(PMIC_GPIO_CONF_PULL_UP,  "pull up strength", NULL, true),
->   ^
-> pinctrl/qcom/pinctrl-spmi-gpio.c:139:37: warning: 'pmic_conf_items' defined but not used [-Wunused-variable]
->  static const struct pin_config_item pmic_conf_items[ARRAY_SIZE(pmic_gpio_bindings)] = {
->
-> Lacking any better idea to solve this nicely, this patch uses #ifdef
-> to hide the structures, just like the pinctrl core does.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+On Fri, Jan 30, 2015 at 12:03:58PM +0800, Wills Wang wrote:
+> Acked-by: Wills Wang <wills.wang.open@gmail.com>
 
-Patch applied.
+Thanks, applied the patch and queued it for 3.21, with everyone's
+acked-by.
 
-Yours,
-Linus Walleij
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150130/109913ef/attachment.sig>
