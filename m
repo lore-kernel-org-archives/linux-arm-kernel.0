@@ -1,109 +1,106 @@
-From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
-Date: Fri, 30 Jan 2015 15:54:26 -0700
-Subject: [PATCH 2/2] coresight: Adding coresight support to arm64
-In-Reply-To: <1422658466-23984-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1422658466-23984-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1422658466-23984-3-git-send-email-mathieu.poirier@linaro.org>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Fri, 30 Jan 2015 15:29:44 -0800
+Subject: [PATCH v7 1/4] Documentation: dt: add common bindings for
+ hwspinlock
+In-Reply-To: <CAK=WgbYBqPoUm9byx0du_g5ZmHdYaUVLpSPZYHoCVzNoatNKpw@mail.gmail.com>
+References: <1421269101-51105-1-git-send-email-s-anna@ti.com>
+ <1421269101-51105-2-git-send-email-s-anna@ti.com>
+ <20150115135201.GG16217@leverpostej>
+ <20150115135556.GH16217@leverpostej>
+ <CAL_JsqL2LZAooMk-V8+xeF2g6acZE21M+-OBRw8aEVa-5wVHuQ@mail.gmail.com>
+ <CAK=WgbYQ=BbinqJ5fsw2Y+FKdy=nasLsw9mX8pw6S_o3owy9-g@mail.gmail.com>
+ <20150116101746.GA21809@leverpostej>
+ <CAK=WgbYBqPoUm9byx0du_g5ZmHdYaUVLpSPZYHoCVzNoatNKpw@mail.gmail.com>
+Message-ID: <CAJAp7Og+-KQd7bygWQjTS72Kye3fkp3s3ry+2bw7Gcv7aPF5AQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mathieu Poirier <mathieu.poirier@linaro.org>
+On Fri, Jan 16, 2015 at 4:46 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> Mark,
+>
+> On Fri, Jan 16, 2015 at 12:17 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>>> The hwlock is a basic hardware primitive that allow synchronization
+>>> between different processors in the system, which may be running Linux
+>>> as well as other operating systems, and may have no other means of
+>>> communication.
+>>>
+>>> The hwlock id numbers are predefined, global and static across the
+>>> entire system: Linux may boot well after other operating systems are
+>>> already running and using these hwlocks to communicate, and therefore,
+>>> in order to use these hardware devices, it must not enumerate them
+>>> differently than the rest of the system.
+>>
+>> That's not true.
+>>
+>> In order to communicate it must agree with the other users as to the
+>> meaning of each instance, and the protocol for use. That doesn't
+>> necessarily mean that Linux needs to know the numerical ID from a
+>> datasheet, and regardless that ID is separate from the logical ID Linux
+>> uses internally.
+>
+> Let me describe hwspinlocks a bit more so we all get to know it better
+> and can then agree on a proper solution.
+>
+> - What makes handling of hwspinlock ID numbers convenient is the fact
+> that it's not based on random datasheet numbers. In fact, hwspinlocks
+> is just special memory: usually datasheets just define the base
+> address and the size of the hwspinlock area. So any numerical ID we
+> use to call the locks themselves are already logical and sane, similar
+> to the way we handle memory (i.e. if we have 32 locks we'll always use
+> 0..31). So hwlocks ids are very much like memory addressing, and not
+> irq numbers.
+>
 
-Aside from tracers, all currently supported coresight IP blocks
-are 64 bit ready.  As such add the required symbol definition to
-compile the framework and drivers.
+But that's exactly how irqs or gpios work as well. If you have 32
+gpios in a system they used to be numbered 0-31 and people would
+reference them directly by that number. Every one of the systems that
+was designed in this way is moving away from it.
 
-Also fixing a couple of warnings picked up by the 64bit compiler.
+> - Sometimes Linux will have to dynamically allocate a hwlock, and send
+> the ID of the allocated lock to a remote processor (which may not be
+> running Linux).
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- arch/arm64/Kconfig.debug            | 48 +++++++++++++++++++++++++++++++++++++
- drivers/coresight/coresight-etb10.c |  2 +-
- drivers/coresight/coresight-tmc.c   |  2 +-
- 3 files changed, 50 insertions(+), 2 deletions(-)
+In a system where you have two hwlock blocks lckA and lckB, each
+consisting of 8 locks and you have dspB that can only access lckB;
+will you tell the firmware engineers to always subtract 8 from the
+numbers you pass them?
 
-diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-index 5fdd6dce8061..77dfebbcbffe 100644
---- a/arch/arm64/Kconfig.debug
-+++ b/arch/arm64/Kconfig.debug
-@@ -66,4 +66,52 @@ config DEBUG_SET_MODULE_RONX
-           against certain classes of kernel exploits.
-           If in doubt, say "N".
- 
-+menuconfig CORESIGHT
-+	bool "CoreSight Tracing Support"
-+	select ARM_AMBA
-+	help
-+	  This framework provides a kernel interface for the CoreSight debug
-+	  and trace drivers to register themselves with. It's intended to build
-+	  a topological view of the CoreSight components based on a DT
-+	  specification and configure the right serie of components when a
-+	  trace source gets enabled.
-+
-+if CORESIGHT
-+config CORESIGHT_LINKS_AND_SINKS
-+	bool "CoreSight Link and Sink drivers"
-+	help
-+	  This enables support for CoreSight link and sink drivers that are
-+	  responsible for transporting and collecting the trace data
-+	  respectively.  Link and sinks are dynamically aggregated with a trace
-+	  entity at run time to form a complete trace path.
-+
-+config CORESIGHT_LINK_AND_SINK_TMC
-+	bool "Coresight generic TMC driver"
-+	depends on CORESIGHT_LINKS_AND_SINKS
-+	help
-+	  This enables support for the Trace Memory Controller driver.
-+	  Depending on its configuration the device can act as a link (embedded
-+	  trace router - ETR) or sink (embedded trace FIFO).  The driver
-+	  complies with the generic implementation of the component without
-+	  special enhancement or added features.
-+
-+config CORESIGHT_SINK_TPIU
-+	bool "Coresight generic TPIU driver"
-+	depends on CORESIGHT_LINKS_AND_SINKS
-+	help
-+	  This enables support for the Trace Port Interface Unit driver,
-+	  responsible for bridging the gap between the on-chip coresight
-+	  components and a trace for bridging the gap between the on-chip
-+	  coresight components and a trace port collection engine, typically
-+	  connected to an external host for use case capturing more traces than
-+	  the on-board coresight memory can handle.
-+
-+config CORESIGHT_SINK_ETBV10
-+	bool "Coresight ETBv1.0 driver"
-+	depends on CORESIGHT_LINKS_AND_SINKS
-+	help
-+	  This enables support for the Embedded Trace Buffer version 1.0 driver
-+	  that complies with the generic implementation of the component without
-+	  special enhancement or added features.
-+endif
- endmenu
-diff --git a/drivers/coresight/coresight-etb10.c b/drivers/coresight/coresight-etb10.c
-index c9acd406f0d0..aa47d31fe2a2 100644
---- a/drivers/coresight/coresight-etb10.c
-+++ b/drivers/coresight/coresight-etb10.c
-@@ -314,7 +314,7 @@ static ssize_t etb_read(struct file *file, char __user *data,
- 	*ppos += len;
- 
- 	dev_dbg(drvdata->dev, "%s: %d bytes copied, %d bytes left\n",
--		__func__, len, (int) (depth * 4 - *ppos));
-+		__func__, (int)len, (int)(depth * 4 - *ppos));
- 	return len;
- }
- 
-diff --git a/drivers/coresight/coresight-tmc.c b/drivers/coresight/coresight-tmc.c
-index 3ff232f9ddf7..d08460327bd2 100644
---- a/drivers/coresight/coresight-tmc.c
-+++ b/drivers/coresight/coresight-tmc.c
-@@ -534,7 +534,7 @@ static ssize_t tmc_read(struct file *file, char __user *data, size_t len,
- 	*ppos += len;
- 
- 	dev_dbg(drvdata->dev, "%s: %d bytes copied, %d bytes left\n",
--		__func__, len, (int) (drvdata->size - *ppos));
-+		__func__, (int)len, (int)(drvdata->size - *ppos));
- 	return len;
- }
- 
--- 
-1.9.1
+Wouldn't it make much more sense to have local indexes here and pass
+them e.g lckB:2?
+
+> - Sometimes a remote processor, which may not be running Linux, will
+> have to dynamically allocate a hwlock, and send the ID of the
+> allocated lock to us (another processor running Linux)
+>
+
+I'm sorry but you cannot have a system on both sides that is allowed
+to do dynamic allocation from a limited set of resources.
+
+Further more this dynamic allocation leads to interesting race
+conditions as what happens if you dynamically allocate a hwlock that
+is statically allocated by another part of the system?
+The only solution I can think of is to have a static allocation of ids
+that the dynamic allocator might use, and then we're just carrying
+extra code when the system is already statically configured...
+
+> We cannot tell in advance what kind of IPC is going to be used for
+> sending and receiving this hwlock ID. Some are handled by Linux
+> (kernel) and some by the user space. So we must be able to expose an
+> ID the system will understand as well as receive one.
+>
+
+Designing this interface to take into consideration that someone might
+send us something completely crazy isn't productive.
+
+
+The only reason for having num-locks and base-id in device tree is
+because of the current Linux implementation. base-id is not a property
+of the hardware and num-locks is not needed for anything but book
+keeping of base-id's in the hwlock framework.
+
+This is why I preferred Sumans earlier suggestion of having the
+binding consist of #hwlock-cells = <X> and the necessary accessor
+functions for resolving a hwlock based on a dt reference.
+
+Regards,
+Bjorn
