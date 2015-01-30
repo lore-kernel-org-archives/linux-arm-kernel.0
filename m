@@ -1,110 +1,95 @@
-From: chrisp@alliedtelesis.co.nz (Chris Packham)
-Date: Sat, 31 Jan 2015 05:21:47 +1300 (NZDT)
-Subject: [PATCH] dtc: Use quotes to include header files
-In-Reply-To: <20150129155646.BBA8AC413BE@trevor.secretlab.ca>
-References: <7947240.7yktm8fT2X@wuerfel>
- <1418696004-12829-1-git-send-email-chris.packham@alliedtelesis.co.nz>
- <20150129155646.BBA8AC413BE@trevor.secretlab.ca>
-Message-ID: <alpine.DEB.2.10.1501310514250.16453@chrisp-dl.ws.atlnz.lc>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Fri, 30 Jan 2015 10:32:58 -0600
+Subject: [Patch v2 1/6] soc: qcom: gsbi: Add support for ADM CRCI muxing
+In-Reply-To: <1422599135-5588-2-git-send-email-agross@codeaurora.org>
+References: <1422599135-5588-1-git-send-email-agross@codeaurora.org>
+ <1422599135-5588-2-git-send-email-agross@codeaurora.org>
+Message-ID: <B36DEAB1-2D89-4B6B-991E-C2EDBEB684D9@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+On Jan 30, 2015, at 12:25 AM, Andy Gross <agross@codeaurora.org> wrote:
 
-On Thu, 29 Jan 2015, Grant Likely wrote:
+> This patch adds automatic configuration for the ADM CRCI muxing required to
+> support DMA operations for GSBI clients.  The GSBI mode and instance determine
+> the correct TCSR ADM CRCI MUX value that must be programmed so that the DMA
+> works properly.
+> 
+> Signed-off-by: Andy Gross <agross@codeaurora.org>
+> ---
+> .../devicetree/bindings/soc/qcom/qcom,gsbi.txt     |   18 ++-
+> drivers/soc/qcom/Kconfig                           |    1 +
+> drivers/soc/qcom/qcom_gsbi.c                       |  153 ++++++++++++++++++++
+> 3 files changed, 171 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,gsbi.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,gsbi.txt
+> index 4ce24d4..8fe7b37 100644
+> --- a/Documentation/devicetree/bindings/soc/qcom/qcom,gsbi.txt
+> +++ b/Documentation/devicetree/bindings/soc/qcom/qcom,gsbi.txt
+> @@ -6,7 +6,7 @@ configuration settings.  The mode setting will govern the input/output mode of
+> the 4 GSBI IOs.
+> 
+> Required properties:
+> -- compatible: must contain "qcom,gsbi-v1.0.0" for APQ8064/IPQ8064
+> +- compatible:	Should contain "qcom,gsbi-v1.0.0"
+> - reg: Address range for GSBI registers
+> - clocks: required clock
+> - clock-names: must contain "iface" entry
+> @@ -16,12 +16,16 @@ Required properties:
+> Optional properties:
+> - qcom,crci : indicates CRCI MUX value for QUP CRCI ports.  Please reference
+>   dt-bindings/soc/qcom,gsbi.h for valid CRCI mux values.
+> +- syscon-tcsr: indicates phandle of TCSR syscon node.  Required if child uses
+> +  dma.
+> 
+> Required properties if child node exists:
+> - #address-cells: Must be 1
+> - #size-cells: Must be 1
+> - ranges: Must be present
+> 
+> +Note: Each GSBI should have an alias correctly numbered in "aliases" node.
+> +
+> Properties for children:
+> 
+> A GSBI controller node can contain 0 or more child nodes representing serial
+> @@ -37,6 +41,10 @@ Example for APQ8064:
+> 
+> #include <dt-bindings/soc/qcom,gsbi.h>
+> 
+> +	aliases {
+> +		gsbi4 = <&gsbi4>;
+> +	};
 
-> On Tue, 16 Dec 2014 15:13:24 +1300
-> , Chris Packham <chris.packham@alliedtelesis.co.nz>
-> wrote:
->> Currently in arch and driver code that needs early access to the
->> flattened device tree it is necessary to add specific CFLAGS so that
->> when scripts/dtc/libfdt/libfdt.h is included the C preprocessor is able
->> to locate the libfdt versions of libfdt_env.h and fdt.h without
->> generating an error.
->>
->> We already provide an alternative linux-specific
->> version of libfdt_env.h and directly include scripts/dtc/libfdt/fdt.h
->> so the inclusion by scripts/dtc/libfdt/libfdt.h is a no-op thanks to the
->> inclusion guards.
->>
->> By using quotes in scripts/dtc/libfdt/libfdt.h it picks up fdt.h and
->> libfdt_env.h from the source directory without needing to add CFLAGS for
->> the sources that happen to include linux/libfdt.h.
->>
->> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
->> ---
->> Hi,
->>
->> This probably should come via git://git.jdl.com/software/dtc.git however
->> this appears to be inaccessible at the moment. Is this still the
->> canonical source for the device tree compiler and libfdt or has it been
->> moved? How much deviation from the canonical source are we prepared to
->> live with in the kernel?
->>
->> This came up on the arm-LKML[1]. Basically in the name of backwards
->> compatibility I need to add a .dt_fixup to add some required nodes to
->> the flattened device tree prior to the tree being un-flattened and
->> processed. This is a trick powerpc makes use of fairly extensively and
->> there are a few other instances of this.
->>
->> For the files that include linux/libfdt.h we currently also have to
->> specify additional CFLAGS to satisfy the CPP.
->>
->>   $ git grep '<linux/libfdt.h>'
->>   arch/mips/cavium-octeon/octeon-platform.c:#include <linux/libfdt.h>
->>   arch/mips/cavium-octeon/setup.c:#include <linux/libfdt.h>
->>   arch/mips/mti-sead3/sead3-setup.c:#include <linux/libfdt.h>
->>   arch/powerpc/kernel/prom.c:#include <linux/libfdt.h>
->>   drivers/firmware/efi/libstub/fdt.c:#include <linux/libfdt.h>
->>   drivers/of/fdt.c:#include <linux/libfdt.h>
->>   drivers/of/fdt_address.c:#include <linux/libfdt.h>
->>
->>   $ git grep -e '-I.*dtc/libfdt'
->>   arch/mips/cavium-octeon/Makefile:CFLAGS_octeon-platform.o = -I$(src)/../../../scripts/dtc/libfdt
->>   arch/mips/cavium-octeon/Makefile:CFLAGS_setup.o = -I$(src)/../../../scripts/dtc/libfdt
->>   arch/mips/mti-sead3/Makefile:CFLAGS_sead3-setup.o = -I$(src)/../../../scripts/dtc/libfdt
->>   arch/powerpc/kernel/Makefile:CFLAGS_prom.o              = -I$(src)/../../../scripts/dtc/libfdt
->>   drivers/firmware/efi/libstub/Makefile:CFLAGS_fdt.o += -I$(srctree)/scripts/dtc/libfdt/
->>   drivers/of/Makefile:CFLAGS_fdt.o = -I$(src)/../../scripts/dtc/libfdt
->>   drivers/of/Makefile:CFLAGS_fdt_address.o = -I$(src)/../../scripts/dtc/libfdt
->>   lib/Makefile:   $(eval CFLAGS_$(file) = -I$(src)/../scripts/dtc/libfdt))
->>
->> Simply by switching to using quotes we can avoid having this extra step.
->>
->> Assuming that this patch is acceptable a follow on clean up would be to
->> remove the instances of CFLAGS_... listed above.
->>
->> Regards,
->> Chris
->> --
->> [1] - http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/310840.html
->>
->>  scripts/dtc/libfdt/libfdt.h | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/scripts/dtc/libfdt/libfdt.h b/scripts/dtc/libfdt/libfdt.h
->> index 73f4975..ea1ddcd 100644
->> --- a/scripts/dtc/libfdt/libfdt.h
->> +++ b/scripts/dtc/libfdt/libfdt.h
->> @@ -51,8 +51,8 @@
->>   *     EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
->>   */
->>
->> -#include <libfdt_env.h>
->> -#include <fdt.h>
->> +#include "libfdt_env.h"
->> +#include "fdt.h"
->
-> Until this is resolved with upstream DTC, what about adding dummy
-> libfdt.h, libfdt_env.h and fdt.h to include/linux? That would get this
-> out of the blocker path for merging this code.
->
-> g.
->
+You appear to be using the alias name to determine a index number for the gsbi, if that is the case, than you should probably just add a cell-index node to the gsbi?s for this purpose.
 
-I'm traveling right now but I could work up an example patch next week.
+> +
+> 	gsbi4 at 16300000 {
+> 		compatible = "qcom,gsbi-v1.0.0";
+> 		reg = <0x16300000 0x100>;
+> @@ -48,6 +56,8 @@ Example for APQ8064:
+> 		qcom,mode = <GSBI_PROT_I2C_UART>;
+> 		qcom,crci = <GSBI_CRCI_QUP>;
+> 
+> +		syscon-tcsr = <&tcsr>;
+> +
+> 		/* child nodes go under here */
+> 
+> 		i2c_qup4: i2c at 16380000 {
+> @@ -76,3 +86,9 @@ Example for APQ8064:
+> 		};
+> 	};
+> 
+> +	tcsr: syscon at 1a400000 {
+> +		compatible = "qcom,apq8064-tcsr", "syscon";
+> +		reg = <0x1a400000 0x100>;
+> +	};
+> +
+> +
 
->From the other discussions I think there are arguments in favor of keeping 
-the angle brackets for the userspace libfdt usage. Any change in the 
-kernel either adding dummy files in the system include path or performing 
-a subsititution in an import script would probably be permanent.
+- k
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
