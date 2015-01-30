@@ -1,57 +1,36 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 30 Jan 2015 09:46:22 +0200
-Subject: [PATCH] video/mmpfb: allow modular build
-In-Reply-To: <8150312.I9dm5QVFgr@wuerfel>
-References: <8150312.I9dm5QVFgr@wuerfel>
-Message-ID: <54CB36CE.3090404@ti.com>
+From: wuyun.wu@huawei.com (Yun Wu)
+Date: Fri, 30 Jan 2015 15:46:46 +0800
+Subject: [PATCH 2/5] irqchip: gicv3-its: zero itt before handling to hardware
+In-Reply-To: <1422604009-9248-1-git-send-email-wuyun.wu@huawei.com>
+References: <1422604009-9248-1-git-send-email-wuyun.wu@huawei.com>
+Message-ID: <1422604009-9248-3-git-send-email-wuyun.wu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/01/15 22:13, Arnd Bergmann wrote:
-> The frame buffer core can be a module, which means any fb drivers
-> should be able to build as modules too. This turns mmpfb into
-> a tristate option to allow that and fix a possible randconfig
-> build error.
-> 
-> drivers/built-in.o: In function `modes_setup':
-> :(.text+0x11b34): undefined reference to `fb_videomode_to_modelist'
-> :(.text+0x11b5c): undefined reference to `fb_videomode_to_var'
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> diff --git a/drivers/video/fbdev/mmp/Makefile b/drivers/video/fbdev/mmp/Makefile
-> index a014cb358bf8..924dd0930cc7 100644
-> --- a/drivers/video/fbdev/mmp/Makefile
-> +++ b/drivers/video/fbdev/mmp/Makefile
-> @@ -1 +1,3 @@
-> -obj-y += core.o hw/ panel/ fb/
-> +obj-$(CONFIG_MMP_DISP) += mmp_disp.o hw/ panel/ fb/
-> +
-> +mmp_disp-y		+= core.o
-> diff --git a/drivers/video/fbdev/mmp/fb/Kconfig b/drivers/video/fbdev/mmp/fb/Kconfig
-> index 9b0141f105f5..985e1a7cd254 100644
-> --- a/drivers/video/fbdev/mmp/fb/Kconfig
-> +++ b/drivers/video/fbdev/mmp/fb/Kconfig
-> @@ -1,7 +1,7 @@
->  if MMP_DISP
->  
->  config MMP_FB
-> -	bool "fb driver for Marvell MMP Display Subsystem"
-> +	tristate "fb driver for Marvell MMP Display Subsystem"
->  	depends on FB
->  	select FB_CFB_FILLRECT
->  	select FB_CFB_COPYAREA
-> 
+Some kind of brain-dead implementations chooses to insert ITEes in
+rapid sequence of disabled ITEes, and an un-zeroed ITT will confuse
+ITS on judging whether an ITE is really enabled or not. Considering
+the implementations are still supported by the GICv3 architecture,
+in which ITT is not required to be zeroed before being handled to
+hardware, we do the favor in ITS driver.
 
-Thanks, queued for 3.20.
+Signed-off-by: Yun Wu <wuyun.wu@huawei.com>
+---
+ drivers/irqchip/irq-gic-v3-its.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- Tomi
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index a391417..2a08d85 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -1063,7 +1063,7 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+ 	nr_ites = max(2UL, roundup_pow_of_two(nvecs));
+ 	sz = nr_ites * its->ite_size;
+ 	sz = max(sz, ITS_ITT_ALIGN) + ITS_ITT_ALIGN - 1;
+-	itt = kmalloc(sz, GFP_KERNEL);
++	itt = kzalloc(sz, GFP_KERNEL);
+ 	lpi_map = its_lpi_alloc_chunks(nvecs, &lpi_base, &nr_lpis);
 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150130/1b19b5db/attachment.sig>
+ 	if (!dev || !itt || !lpi_map) {
+--
+1.8.0
