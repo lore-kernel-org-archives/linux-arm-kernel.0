@@ -1,166 +1,84 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 30 Jan 2015 12:17:44 +0100
-Subject: [PATCH v3 4/6] mmc: pwrseq_simple: Add optional reference clock
- support
-In-Reply-To: <1422543608-24704-5-git-send-email-javier.martinez@collabora.co.uk>
-References: <1422543608-24704-1-git-send-email-javier.martinez@collabora.co.uk>
- <1422543608-24704-5-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <CAPDyKFp5tGogzjU27jTDcHviUUwnTSgq4EP484_OprV_nPBsOg@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 30 Jan 2015 14:20:48 +0300
+Subject: [PATCH v5 05/13] pm: at91: move the copying the sram function
+ to the sram initializationi phase
+In-Reply-To: <B256D81BAE5131468A838E5D7A243641BFD3A07F@penmbx01>
+References: <1422513316-21509-1-git-send-email-wenyou.yang@atmel.com>
+ <1422513535-23885-1-git-send-email-wenyou.yang@atmel.com>
+ <54CA0739.2030101@cogentembedded.com>
+ <B256D81BAE5131468A838E5D7A243641BFD3A07F@penmbx01>
+Message-ID: <54CB6910.4040907@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 January 2015 at 16:00, Javier Martinez Canillas
-<javier.martinez@collabora.co.uk> wrote:
-> Some WLAN chips attached to a SDIO interface, need a reference clock.
->
-> Since this is very common, extend the prseq_simple driver to support
-> an optional clock that is enabled prior the card power up procedure.
->
-> Note: the external clock is optional. Thus an error is not returned
-> if the clock is not found.
->
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> ---
->
-> Changes since v2:
->  - Add a clk_enabled bool to struct mmc_pwrseq_simple to track clock
->    gate/ungate since .power_off can be called prior to .pre_power_on.
->    Suggested by Ulf Hansson.
->  - clk_get() does not return -ENOSYS so don't check for that.
->    Suggested by Ulf Hansson.
->
-> Changes since v1:
->  - Rebase on top of latest changes.
->  - Use IS_ERR() instead of checking for NULL to see if the clock exists.
-> ---
->  drivers/mmc/core/pwrseq_simple.c | 38 ++++++++++++++++++++++++++++++++++++--
->  1 file changed, 36 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/mmc/core/pwrseq_simple.c
-> index e53d3c7e059c..50d09d920430 100644
-> --- a/drivers/mmc/core/pwrseq_simple.c
-> +++ b/drivers/mmc/core/pwrseq_simple.c
-> @@ -7,6 +7,7 @@
->   *
->   *  Simple MMC power sequence management
->   */
-> +#include <linux/clk.h>
->  #include <linux/kernel.h>
->  #include <linux/slab.h>
->  #include <linux/device.h>
-> @@ -20,6 +21,8 @@
->
->  struct mmc_pwrseq_simple {
->         struct mmc_pwrseq pwrseq;
-> +       bool clk_enabled;
-> +       struct clk *ext_clk;
->         int nr_gpios;
->         struct gpio_desc *reset_gpios[0];
->  };
-> @@ -39,6 +42,11 @@ static void mmc_pwrseq_simple_pre_power_on(struct mmc_host *host)
->         struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
->                                         struct mmc_pwrseq_simple, pwrseq);
->
-> +       if (!IS_ERR(pwrseq->ext_clk)) {
+Hello.
 
-This should be:
+On 1/30/2015 9:54 AM, Yang, Wenyou wrote:
 
-if (!IS_ERR(pwrseq->ext_clk) && !pwrseq->clk_enabled) {
+> Thank you for your review and suggestion.
 
+    Not at all.
 
-> +               clk_prepare_enable(pwrseq->ext_clk);
-> +               pwrseq->clk_enabled = true;
-> +       }
-> +
->         mmc_pwrseq_simple_set_gpios_value(pwrseq, 1);
->  }
->
-> @@ -50,6 +58,19 @@ static void mmc_pwrseq_simple_post_power_on(struct mmc_host *host)
->         mmc_pwrseq_simple_set_gpios_value(pwrseq, 0);
->  }
->
-> +static void mmc_pwrseq_simple_power_off(struct mmc_host *host)
-> +{
-> +       struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
-> +                                       struct mmc_pwrseq_simple, pwrseq);
-> +
-> +       mmc_pwrseq_simple_set_gpios_value(pwrseq, 1);
-> +
-> +       if (pwrseq->clk_enabled) {
+>> -----Original Message-----
+>> From: Sergei Shtylyov [mailto:sergei.shtylyov at cogentembedded.com]
+>> Sent: Thursday, January 29, 2015 6:11 PM
+>> To: Yang, Wenyou; Ferre, Nicolas; linux at arm.linux.org.uk
+>> Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+>> alexandre.belloni at free-electrons.com; sylvain.rochet at finsecur.com;
+>> peda at axentia.se; linux at maxim.org.za
+>> Subject: Re: [PATCH v5 05/13] pm: at91: move the copying the sram function to
+>> the sram initializationi phase
 
-I changed this as well, but that was just to make code clearer.
+>> Hello.
 
-if (!IS_ERR(pwrseq->ext_clk) && pwrseq->clk_enabled) {
+>> On 1/29/2015 9:38 AM, Wenyou Yang wrote:
 
+>>> To decrease the suspend time, move the copying the sram function to
+>>> the sram initialization phase, instead of every time go to suspend.
 
-> +               clk_disable_unprepare(pwrseq->ext_clk);
-> +               pwrseq->clk_enabled = false;
-> +       }
-> +}
-> +
->  static void mmc_pwrseq_simple_free(struct mmc_host *host)
->  {
->         struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
-> @@ -60,6 +81,9 @@ static void mmc_pwrseq_simple_free(struct mmc_host *host)
->                 if (!IS_ERR(pwrseq->reset_gpios[i]))
->                         gpiod_put(pwrseq->reset_gpios[i]);
->
-> +       if (!IS_ERR(pwrseq->ext_clk))
-> +               clk_put(pwrseq->ext_clk);
-> +
->         kfree(pwrseq);
->         host->pwrseq = NULL;
->  }
-> @@ -67,7 +91,7 @@ static void mmc_pwrseq_simple_free(struct mmc_host *host)
->  static struct mmc_pwrseq_ops mmc_pwrseq_simple_ops = {
->         .pre_power_on = mmc_pwrseq_simple_pre_power_on,
->         .post_power_on = mmc_pwrseq_simple_post_power_on,
-> -       .power_off = mmc_pwrseq_simple_pre_power_on,
-> +       .power_off = mmc_pwrseq_simple_power_off,
->         .free = mmc_pwrseq_simple_free,
->  };
->
-> @@ -85,6 +109,13 @@ int mmc_pwrseq_simple_alloc(struct mmc_host *host, struct device *dev)
->         if (!pwrseq)
->                 return -ENOMEM;
->
-> +       pwrseq->ext_clk = clk_get(dev, "ext_clock");
-> +       if (IS_ERR(pwrseq->ext_clk) &&
-> +           PTR_ERR(pwrseq->ext_clk) != -ENOENT) {
-> +               ret = PTR_ERR(pwrseq->ext_clk);
-> +               goto free;
-> +       }
-> +
->         for (i = 0; i < nr_gpios; i++) {
->                 pwrseq->reset_gpios[i] = gpiod_get_index(dev, "reset", i,
->                                                          GPIOD_OUT_HIGH);
-> @@ -96,7 +127,7 @@ int mmc_pwrseq_simple_alloc(struct mmc_host *host, struct device *dev)
->                         while (--i)
->                                 gpiod_put(pwrseq->reset_gpios[i]);
->
-> -                       goto free;
-> +                       goto clk_put;
->                 }
->         }
->
-> @@ -105,6 +136,9 @@ int mmc_pwrseq_simple_alloc(struct mmc_host *host, struct device *dev)
->         host->pwrseq = &pwrseq->pwrseq;
->
->         return 0;
-> +clk_put:
-> +       if (!IS_ERR(pwrseq->ext_clk))
-> +               clk_put(pwrseq->ext_clk);
->  free:
->         kfree(pwrseq);
->         return ret;
-> --
-> 2.1.3
->
+>>> In the meanwhile, if there is no sram allocated for PM, the PM is not supported.
 
-As I stated in the response to he coverletter for the patchset, this
-patch is applied for next with above changes.
+>>> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+>>> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>>> ---
+>>>    arch/arm/mach-at91/pm.c |   12 +++++++-----
+>>>    1 file changed, 7 insertions(+), 5 deletions(-)
 
-Thanks!
+>>> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c index
+>>> daa998d..6df0152 100644
+>>> --- a/arch/arm/mach-at91/pm.c
+>>> +++ b/arch/arm/mach-at91/pm.c
+>>> @@ -163,10 +163,6 @@ static int at91_pm_enter(suspend_state_t state)
+>>>    			 * turning off the main oscillator; reverse on wakeup.
+>>>    			 */
+>>>    			if (slow_clock) {
+>>> -#ifdef CONFIG_AT91_SLOW_CLOCK
+>>> -				/* copy slow_clock handler to SRAM, and call it */
+>>> -				memcpy(slow_clock, at91_slow_clock,
+>>> at91_slow_clock_sz);
+>>> -#endif
+>>>    				slow_clock(at91_pmc_base, at91_ramc_base[0],
+>>>    					   at91_ramc_base[1],
+>>>    					   at91_pm_data.memctrl);
+>>> @@ -311,6 +307,9 @@ static void __init at91_pm_sram_init(void)
+>>>    	sram_pbase = gen_pool_virt_to_phys(sram_pool, sram_base);
+>>>    	slow_clock = __arm_ioremap_exec(sram_pbase, at91_slow_clock_sz,
+>>> false);
+>>>
+>>> +	/* Copy the slow_clock handler to SRAM */
+>>> +	memcpy(slow_clock, at91_slow_clock, at91_slow_clock_sz);
 
-Kind regards
-Uffe
+>>      AFAIU (looking at the code above and below), __arm_ioremap_exec() can return
+>> NULL and in this case memcpy() will cause kernel oops.
+
+> Will add a condition before copying
+> 	if (sram_pbase)
+
+    I rather meant *if* (slow_clock).
+
+[...]
+
+> Best Regards,
+> Wenyou Yang
+
+WBR, Sergei
