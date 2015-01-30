@@ -1,31 +1,151 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 30 Jan 2015 22:59:21 +0100
-Subject: [PATCH] ARM: integrator: remove unused variable
-Message-ID: <1666566.z9ZP4KJ7VA@wuerfel>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Fri, 30 Jan 2015 17:51:24 -0400
+Subject: [PATCH 3/3] cpufreq: exynos: allow modular build
+In-Reply-To: <5048920.rXbXJT1FvO@wuerfel>
+References: <1422451015-390439-1-git-send-email-arnd@arndb.de>
+ <1642077.OrkdxhO2uI@wuerfel>
+ <20150129222150.GA29837@developer.amazonguestwifi.org>
+ <5048920.rXbXJT1FvO@wuerfel>
+Message-ID: <20150130215118.GA14374@developer.amazonguestwifi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch to add the new generic config space accessors removed
-a useless spinlock, but left the flags variable in place, which
-now causes a build warning:
+On Fri, Jan 30, 2015 at 10:24:12PM +0100, Arnd Bergmann wrote:
+> On Thursday 29 January 2015 18:21:51 Eduardo Valentin wrote:
+> > Hello Arnd and Viresh,
+> > 
+> > On Thu, Jan 29, 2015 at 01:42:32PM +0100, Arnd Bergmann wrote:
+> > > On Thursday 29 January 2015 15:40:15 Viresh Kumar wrote:
+> > > >  obj-$(CONFIG_ARCH_DAVINCI)             += davinci-cpufreq.o
+> > > >  obj-$(CONFIG_UX500_SOC_DB8500)         += dbx500-cpufreq.o
+> > > > -obj-$(CONFIG_ARM_EXYNOS_CPUFREQ)       += exynos-cpufreq.o
+> > > > -obj-$(CONFIG_ARM_EXYNOS4210_CPUFREQ)   += exynos4210-cpufreq.o
+> > > > -obj-$(CONFIG_ARM_EXYNOS4X12_CPUFREQ)   += exynos4x12-cpufreq.o
+> > > > -obj-$(CONFIG_ARM_EXYNOS5250_CPUFREQ)   += exynos5250-cpufreq.o
+> > > > +obj-$(CONFIG_ARM_EXYNOS4210_CPUFREQ)   += exynos-cpufreq.o exynos4210-cpufreq.o
+> > > > +obj-$(CONFIG_ARM_EXYNOS4X12_CPUFREQ)   += exynos-cpufreq.o exynos4x12-cpufreq.o
+> > > > +obj-$(CONFIG_ARM_EXYNOS5250_CPUFREQ)   += exynos-cpufreq.o exynos5250-cpufreq.o
+> > > > 
+> > > 
+> > > I'd have to try it, but this might fail if one of the three drivers
+> > > is built-in and another one is a module.
+> > > 
+> > > 	Arnd
+> > 
+> > Let me make one step back here. The original issue is, now this exynos
+> > cpufreq driver depends on of thermal; but of thermal can be built as
+> > module, while this cpufreq driver cannot. Original proposal is to allow
+> > module build in the exynos cpufreq driver.
+> > 
+> > On the original proposal, my concern is that the driver code does not
+> > have separated modules, but one single module platform driver,  which uses functions from
+> > other c files. On top of that, the patch originally allows four
+> > (independent) modules builds. Although the children drivers still
+> > selects the core part, we would still need to change the original patch
+> > to add module dependency too.
+> > 
+> > So, my proposal was to, in order to allow module builds on this cpufreq
+> > driver, we also need to properly construct the driver into a single
+> > module, instead of several modules. The issue with my patch was the fact
+> > that it was allowing platforms that do not use that driver, to select it
+> > by default. And eventually this may cause a unusable module being loaded
+> > into those systems.
+> > 
+> > Well, trying harder here in the same approach. The diff bellow is based
+> > on Arnd's original patch and on Viresh's amendment, except that the core
+> > part is now dependent on all the supported platforms, instead of
+> > ARCH_EXYNOS. This way, it wont load in platforms that are not supposed
+> > to be loaded. The user will be able to build the support for all
+> > platforms, or select which platforms he/she wants (as originally),
+> > except that now it can be a module, instead.
+> > 
+> > I believe now by default it will still keep the driver only on those
+> > configs that expect it to be on. And it won't compile/load on platforms
+> > that it is not supposed to. It brings closer a config that is dependent on this
+> > driver, so it looks better in the menuconfig.
+> > 
+> > Let me know if I missed something (feel free to amend to your patch):
+> 
+> Yes, I think your refined approach works and is better than my
+> original patch, thanks a lot for giving it more thought!
+> 
+> One tiny problem:
+> 
+> > @@ -90,6 +84,20 @@ config ARM_EXYNOS_CPU_FREQ_BOOST_SW
+> >  
+> >  	  If in doubt, say N.
+> >  
+> > +config ARM_EXYNOS5440_CPUFREQ
+> > +	bool "SAMSUNG EXYNOS5440"
+> > +	depends on SOC_EXYNOS5440
+> > +	depends on HAVE_CLK && OF
+> > +	select PM_OPP
+> > +	default y
+> > +	help
+> > +	  This adds the CPUFreq driver for Samsung EXYNOS5440
+> > +	  SoC. The nature of exynos5440 clock controller is
+> > +	  different than previous exynos controllers so not using
+> > +	  the common exynos framework.
+> > +
+> > +	  If in doubt, say N.
+> 
+> I believe this one also has to be tristate, for the same reason.
+> 
 
-arch/arm/mach-integrator/pci_v3.c: In function 'pci_v3_preinit':
-arch/arm/mach-integrator/pci_v3.c:614:16: warning: unused variable 'flags' [-Wunused-variable]
+I agree with you that it is better if we make it tristate. So, on my
+side, I have no concerns changing it to tristate.
 
-This removes it.
+However, the exynos5440 cpufreq driver does not depend on of thermal as
+of today, and therefore, I did not touch this driver for this matter.
+Meaning, if it is not causing troubles, no need to mess with it.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 1ba525109219 ("ARM: integrator: Convert PCI to use generic config accessors")
+But I can add this change. No issues, on my side.
 
-diff --git a/arch/arm/mach-integrator/pci_v3.c b/arch/arm/mach-integrator/pci_v3.c
-index dc7782f26cbb..2565f0e7b5cf 100644
---- a/arch/arm/mach-integrator/pci_v3.c
-+++ b/arch/arm/mach-integrator/pci_v3.c
-@@ -611,7 +611,6 @@ static int __init pci_v3_setup(int nr, struct pci_sys_data *sys)
-  */
- static void __init pci_v3_preinit(void)
- {
--	unsigned long flags;
- 	unsigned int temp;
- 	phys_addr_t io_address = pci_pio_to_address(io_mem.start);
- 
+> >  
+> > -#ifdef CONFIG_ARM_EXYNOS4210_CPUFREQ
+> > +#if IS_ENABLED(CONFIG_ARM_EXYNOS4210_CPUFREQ)
+> >  extern int exynos4210_cpufreq_init(struct exynos_dvfs_info *);
+> >  #else
+> >  static inline int exynos4210_cpufreq_init(struct exynos_dvfs_info *info)
+> > @@ -61,7 +61,7 @@ static inline int exynos4210_cpufreq_init(struct exynos_dvfs_info *info)
+> >  	return -EOPNOTSUPP;
+> >  }
+> >  #endif
+> > -#ifdef CONFIG_ARM_EXYNOS4X12_CPUFREQ
+> > +#if IS_ENABLED(CONFIG_ARM_EXYNOS4X12_CPUFREQ)
+> >  extern int exynos4x12_cpufreq_init(struct exynos_dvfs_info *);
+> >  #else
+> >  static inline int exynos4x12_cpufreq_init(struct exynos_dvfs_info *info)
+> > @@ -69,7 +69,7 @@ static inline int exynos4x12_cpufreq_init(struct exynos_dvfs_info *info)
+> >  	return -EOPNOTSUPP;
+> >  }
+> >  #endif
+> > -#ifdef CONFIG_ARM_EXYNOS5250_CPUFREQ
+> > +#if IS_ENABLED(CONFIG_ARM_EXYNOS5250_CPUFREQ)
+> >  extern int exynos5250_cpufreq_init(struct exynos_dvfs_info *);
+> >  #else
+> >  static inline int exynos5250_cpufreq_init(struct exynos_dvfs_info *info)
+> 
+> This change is ok, but not needed, because the three extra symbols are still
+> bool. I would leave that change out, but I also don't mind it.
+
+Indeed.
+
+> 
+> With the change to make ARM_EXYNOS5440_CPUFREQ tristate:
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+I will repost this patch with the minor amendments. Now, we only need
+an ack from cpufreq folks.
+
+BR,
+
+Eduardo Valentin
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150130/5da259c5/attachment.sig>
