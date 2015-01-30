@@ -1,44 +1,163 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 30 Jan 2015 15:12:14 +0000
-Subject: [Linaro-acpi] [PATCH v7 04/17] ARM64 / ACPI: Introduce
- early_param for "acpi" and pass acpi=force to enable ACPI
-In-Reply-To: <54CB99B5.7070505@codeaurora.org>
-References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
- <1421247905-3749-5-git-send-email-hanjun.guo@linaro.org>
- <CAOZdJXU2bFR1T4ZnGavvnrUXAp5e=vNt9g6WKX46H8qs1wz-TQ@mail.gmail.com>
- <CAOZdJXXe+29rux1L3QYBX0yHLy3kdi+ZJrXVd=XfgYN=R6DtKA@mail.gmail.com>
- <20150128181453.GG31752@e104818-lin.cambridge.arm.com>
- <54C92804.5090806@codeaurora.org>
- <20150129151956.GF8951@e104818-lin.cambridge.arm.com>
- <CAKv+Gu_=si=L5+vvg+8hRgwmTahqdePw5bZxUMFSZ8obk-VXFQ@mail.gmail.com>
- <20150130111311.GA27542@e104818-lin.cambridge.arm.com>
- <54CB99B5.7070505@codeaurora.org>
-Message-ID: <CAKv+Gu-+iQtMqzrh+hahOSvcSyF2tP-=0VjRU6A42vNnXRYuTg@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 30 Jan 2015 17:20:36 +0200
+Subject: [PATCH 00/11] ARM: OMAP3: legacy clock data move under clk driver
+In-Reply-To: <20150130004224.22722.56051@quantum>
+References: <1418746856-17173-1-git-send-email-t-kristo@ti.com>
+ <20150107230006.GE13010@atomide.com> <54CA95D1.6080700@ti.com>
+ <20150130004224.22722.56051@quantum>
+Message-ID: <54CBA144.8020409@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 January 2015 at 14:48, Timur Tabi <timur@codeaurora.org> wrote:
-> Catalin Marinas wrote:
+On 01/30/2015 02:42 AM, Mike Turquette wrote:
+> Quoting Tero Kristo (2015-01-29 12:19:29)
+>> On 01/08/2015 01:00 AM, Tony Lindgren wrote:
+>>> * Tero Kristo <t-kristo@ti.com> [141216 08:22]:
+>>>> Hi,
+>>>>
+>>>> These patches move the legacy clock data for omap3 under drivers/clk/ti.
+>>>> After these patches are applied, it should be possible to get rid of
+>>>> clk-private.h (long pending project for Mike.)
+>>>>
+>>>> Testing done (on top of 3.18-rc1):
+>>>>
+>>>> omap3-beagle: boot / suspend-resume (ret/off) / cpuidle (ret/off)
+>>>> omap3-beagle-xm: boot upto fs mount (see note below)
+>>>> sdp3430: boot
+>>>> n900: boot
+>>>>
+>>>> Note: beagle-xm failed with FS mount on the board I have access to, but
+>>>>         this happens with clean 3.18-rc1 and linux-next also at the moment.
+>>>>         The board has probably corrupted filesystem image but I am unable
+>>>>         to fix this atm (remote board.)
+>>>>
+>>>> Test branch:
+>>>> tree: https://github.com/t-kristo/linux-pm.git
+>>>> branch: 3.18-rc1-omap3-clk-rework
+>>>
+>>> Great, hopefully this will finally allow Mike to make the
+>>> generic struct clk private to drivers/clk :)
+>>>
+>>> Seems to boot just fine based on a quick legacy booting test
+>>> on n900.
+>>>
+>>> Mike, assuming no other issues, can you please apply these into a
+>>> immutable branch against v3.19-rc1 that Paul and I can also merge
+>>> in as needed?
+>>>
+>>> Please also feel free to add:
+>>>
+>>> Acked-by: Tony Lindgren <tony@atomide.com>
+>>>
 >>
->> Anyway, rather than a "I-created-an-empty-dtb" property, I would
->> actually say something like "dtb-contains-no-hardware-description".
+>> I just rebased these patches on top of 3.19-rc1, and noticed a problem
+>> with dpll5 on beagle-xm (basically a divide-by-zero error + locking
+>> issue during boot.) The extra diff at the end of this email fixes the
+>> problems, I will also send the updated two patches as v2. Updated branch
+>> available in my tree under name 3.19-rc1-omap3-clk-rework.
 >
+> I've applied these 11 patches on top of v3.19-rc1, including the two V2
+> patches for #6 and #8 to the clk-omap-legacy branch here:
 >
-> Why do we need a property for this?  Wouldn't the absence of a hardware
-> description be the best way to see if the dtb contains no hardware
-> description?  It's like putting a sign on an empty bookshelf that says,
-> "there are no books here."
+> git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-omap-legacy
 >
+> Let me know if I screwed anything up. I've merged this immutable branch
+> into clk-next.
+>
+> In addition I've made some changes to remove clk-private.h permanently.
+> I'll post those later today. Again, please let me know if I screwed
+> anything up.
 
-So what constitutes a 'hardware description'? A /cpu node? A memory node?
-I don't think there is a mandated minimal set of nodes, even if
-booting without cpu and memory nodes doesn't get you very far.
+I can't see the clk-omap-legacy merged to clk-next so far, maybe you did 
+not push it yet? The branch itself is identical copy of mine, so can't 
+see any issues there so far.
 
-So those should go hand in hand: if we are going to implement logic
-that decides a DTB is considered empty if it has no /cpu node, we
-should update the boot protocol to mandate the presence of a /cpu node
-for DT boot, and not change the rules every couple of months if
-someone's use case requires it.
+-Tero
 
--- 
-Ard.
+>
+> Regards,
+> Mike
+>
+>>
+>> - Tero
+>>
+>> ---------------------
+>>
+>> diff --git a/drivers/clk/ti/clk-3xxx-legacy.c
+>> b/drivers/clk/ti/clk-3xxx-legacy.c
+>> index 81ad510..e0732a4 100644
+>> --- a/drivers/clk/ti/clk-3xxx-legacy.c
+>> +++ b/drivers/clk/ti/clk-3xxx-legacy.c
+>> @@ -136,6 +136,7 @@ static struct ti_clk_dpll dpll3_ck_data = {
+>>          .idlest_mask = 0x1,
+>>          .auto_recal_bit = 0x3,
+>>          .max_divider = 0x80,
+>> +       .min_divider = 0x1,
+>>          .recal_en_bit = 0x5,
+>>          .max_multiplier = 0x7ff,
+>>          .enable_mask = 0x7,
+>> @@ -307,6 +308,7 @@ static struct ti_clk_dpll dpll4_ck_data = {
+>>          .idlest_mask = 0x2,
+>>          .auto_recal_bit = 0x13,
+>>          .max_divider = 0x80,
+>> +       .min_divider = 0x1,
+>>          .recal_en_bit = 0x6,
+>>          .max_multiplier = 0x7ff,
+>>          .enable_mask = 0x70000,
+>> @@ -507,6 +509,7 @@ static struct ti_clk_dpll dpll5_ck_data = {
+>>          .idlest_mask = 0x1,
+>>          .auto_recal_bit = 0x3,
+>>          .max_divider = 0x80,
+>> +       .min_divider = 0x1,
+>>          .recal_en_bit = 0x19,
+>>          .max_multiplier = 0x7ff,
+>>          .enable_mask = 0x7,
+>> @@ -1271,6 +1274,7 @@ static struct ti_clk_dpll dpll1_ck_data = {
+>>          .idlest_mask = 0x1,
+>>          .auto_recal_bit = 0x3,
+>>          .max_divider = 0x80,
+>> +       .min_divider = 0x1,
+>>          .recal_en_bit = 0x7,
+>>          .max_multiplier = 0x7ff,
+>>          .enable_mask = 0x7,
+>> @@ -2154,6 +2158,7 @@ static struct ti_clk_dpll dpll2_ck_data = {
+>>          .idlest_mask = 0x1,
+>>          .auto_recal_bit = 0x3,
+>>          .max_divider = 0x80,
+>> +       .min_divider = 0x1,
+>>          .recal_en_bit = 0x8,
+>>          .max_multiplier = 0x7ff,
+>>          .enable_mask = 0x7,
+>> @@ -2513,6 +2518,7 @@ static struct ti_clk_dpll dpll4_ck_omap36xx_data = {
+>>          .idlest_mask = 0x2,
+>>          .auto_recal_bit = 0x13,
+>>          .max_divider = 0x80,
+>> +       .min_divider = 0x1,
+>>          .recal_en_bit = 0x6,
+>>          .max_multiplier = 0xfff,
+>>          .enable_mask = 0x70000,
+>> diff --git a/drivers/clk/ti/clock.h b/drivers/clk/ti/clock.h
+>> index 8d9c603..404158d 100644
+>> --- a/drivers/clk/ti/clock.h
+>> +++ b/drivers/clk/ti/clock.h
+>> @@ -148,6 +148,7 @@ struct ti_clk_dpll {
+>>          u32 sddiv_mask;
+>>          u16 max_multiplier;
+>>          u16 max_divider;
+>> +       u8 min_divider;
+>>          u8 auto_recal_bit;
+>>          u8 recal_en_bit;
+>>          u8 recal_st_bit;
+>> diff --git a/drivers/clk/ti/dpll.c b/drivers/clk/ti/dpll.c
+>> index 7d67639..47ebff7 100644
+>> --- a/drivers/clk/ti/dpll.c
+>> +++ b/drivers/clk/ti/dpll.c
+>> @@ -243,6 +243,7 @@ struct clk *ti_clk_register_dpll(struct ti_clk *setup)
+>>          dd->sddiv_mask = dpll->sddiv_mask;
+>>          dd->dco_mask = dpll->dco_mask;
+>>          dd->max_divider = dpll->max_divider;
+>> +       dd->min_divider = dpll->min_divider;
+>>          dd->max_multiplier = dpll->max_multiplier;
+>>          dd->auto_recal_bit = dpll->auto_recal_bit;
+>>          dd->recal_en_bit = dpll->recal_en_bit;
+>>
