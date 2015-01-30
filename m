@@ -1,45 +1,35 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 30 Jan 2015 19:24:53 +0000
-Subject: [PATCH 2/5] irqchip: gicv3-its: zero itt before handling to
- hardware
-In-Reply-To: <1422604009-9248-3-git-send-email-wuyun.wu@huawei.com>
-References: <1422604009-9248-1-git-send-email-wuyun.wu@huawei.com>
- <1422604009-9248-3-git-send-email-wuyun.wu@huawei.com>
-Message-ID: <54CBDA85.7040902@arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 30 Jan 2015 17:28:32 -0200
+Subject: [PATCH V2 RESEND] clk: mxs: Fix invalid 32-bit access to frac
+ registers
+In-Reply-To: <1422645610-3052-1-git-send-email-stefan.wahren@i2se.com>
+References: <1422645610-3052-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <CAOMZO5CTaqzs2bwXL4V9boMSjOw6TcGBLXe9U=9-wEvwfvGYeQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/01/15 07:46, Yun Wu wrote:
-> Some kind of brain-dead implementations chooses to insert ITEes in
-> rapid sequence of disabled ITEes, and an un-zeroed ITT will confuse
-> ITS on judging whether an ITE is really enabled or not. Considering
-> the implementations are still supported by the GICv3 architecture,
-> in which ITT is not required to be zeroed before being handled to
-> hardware, we do the favor in ITS driver.
-> 
-> Signed-off-by: Yun Wu <wuyun.wu@huawei.com>
-> ---
->  drivers/irqchip/irq-gic-v3-its.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index a391417..2a08d85 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -1063,7 +1063,7 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
->  	nr_ites = max(2UL, roundup_pow_of_two(nvecs));
->  	sz = nr_ites * its->ite_size;
->  	sz = max(sz, ITS_ITT_ALIGN) + ITS_ITT_ALIGN - 1;
-> -	itt = kmalloc(sz, GFP_KERNEL);
-> +	itt = kzalloc(sz, GFP_KERNEL);
->  	lpi_map = its_lpi_alloc_chunks(nvecs, &lpi_base, &nr_lpis);
-> 
->  	if (!dev || !itt || !lpi_map) {
+On Fri, Jan 30, 2015 at 5:20 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> According to i.MX23 and i.MX28 reference manual [1],[2] the fractional
+> clock control register is 32-bit wide, but is separated in 4 parts.
+> So write instructions must not apply to more than 1 part at once.
+>
+> The clk init for the i.MX28 violates this restriction and all the other
+> accesses on that register suggest that there isn't such a restriction.
+>
+> This patch restricts the access to this register to byte instructions and
+> extends the comment in the init functions.
+>
+> Btw the imx23 init now uses a R-M-W sequence just like imx28 init
+> to avoid any clock glitches.
+>
+> The changes has been tested with a i.MX23 and a i.MX28 board.
+>
+> [1] - http://cache.freescale.com/files/dsp/doc/ref_manual/IMX23RM.pdf
+> [2] - http://cache.freescale.com/files/dsp/doc/ref_manual/MCIMX28RM.pdf
+>
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> Reviewed-by: Marek Vasut <marex@denx.de>
 
-Fair enough. I suppose this cannot really hurt if we have stupid HW around.
+Reviewed-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Thanks
