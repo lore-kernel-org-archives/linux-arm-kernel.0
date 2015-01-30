@@ -1,57 +1,180 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Fri, 30 Jan 2015 05:18:56 +0000
-Subject: [PATCH v2 1/3] ARM: shmobile: armadillo800eva: Properly specify
- HDMI audio link format
-In-Reply-To: <1421847492-8857-1-git-send-email-lars@metafoo.de>
-References: <1421847492-8857-1-git-send-email-lars@metafoo.de>
-Message-ID: <87d25wg804.wl%kuninori.morimoto.gx@renesas.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Fri, 30 Jan 2015 10:56:28 +0530
+Subject: [PATCH v6 2/6] input: touchscreen: ti_am335x_tsc: Remove udelay
+ in interrupt handler
+In-Reply-To: <1420609779-11156-3-git-send-email-vigneshr@ti.com>
+References: <1420609779-11156-1-git-send-email-vigneshr@ti.com>
+ <1420609779-11156-3-git-send-email-vigneshr@ti.com>
+Message-ID: <54CB1604.9030709@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Hi Lars, Simon
 
-> The DAI link format should be specified for the whole link rather than just
-> one component on the link. So move the format specification for the HDMI
-> audio link from the CPU component to the link itself.
+On Wednesday 07 January 2015 11:19 AM, Vignesh R wrote:
+> From: Brad Griffis <bgriffis@ti.com>
 > 
-> Since the sh-mobile-hdmi DAI driver doesn't implement the set_fmt() callback
-> in this case there is no functional difference between only specifying the
-> the format for the CPU side or for the whole link, but the later it will
-> allow us to remove support for just specifying the format for one component.
+> TSC interrupt handler had udelay to avoid reporting of false pen-up
+> interrupt to user space. This patch implements workaround suggesting in
+> Advisory 1.0.31 of silicon errata for am335x, thus eliminating udelay
+> and touchscreen lag. This also improves performance of touchscreen and
+> eliminates sudden jump of cursor at touch release.
 > 
-> Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
+> IDLECONFIG and CHARGECONFIG registers are to be configured
+> with same values in order to eliminate false pen-up events. This
+> workaround may result in false pen-down to be detected, hence considerable
+> charge step delay needs to be added. The charge delay is set to 0xB000
+> (in terms of ADC clock cycles) by default.
+> 
+> TSC steps are disabled at the end of every sampling cycle and EOS bit is
+> set. Once the EOS bit is set, the TSC steps need to be re-enabled to begin
+> next sampling cycle.
+> 
+> Signed-off-by: Brad Griffis <bgriffis@ti.com>
+> [vigneshr at ti.com: Ported the patch from v3.12 to v3.19rc1]
+> 
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
 > ---
 
-I tested these 3 patches on armadillo800eva
+Ping... Can somebody pick this patch series if there are no more comments??
 
-	[PATCH v2 1/3] ARM: shmobile: armadillo800eva: Properly specify HDMI audio link format
-	[PATCH v2 2/3] ASoC: sh: fsi: Fix clock inversion
-	[PATCH v2 3/3] ASoC: simple-card: Remove support for setting differing DAI formats
-
-Tested-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-
-2/3 patch changed behavior for clock inversion on FSI driver.
-FSI + wm8978 on armadillo800eva worked without any issues,
-but, I don't know how much effect it has for other board.
-We used this inversion flags on each board for historical reasons (copy-paste),
-but, almost all these were not needed (except some picky board) on FSI.
-Maybe Lars's 2/3 patch is correct, but, it is difficult to check/confirm for all boards.
-And unfortunately, Renesas don't use FSI anymore.
-So, I think keeping current FSI driver as-is is more safety for old boards.
-armadillo800eva works well with below patch (as 2/3 patch)
-
---------------
-diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
-index 75de26c..36aaeb1 100644
---- a/arch/arm/mach-shmobile/board-armadillo800eva.c
-+++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
-@@ -1015,7 +1015,6 @@ static struct asoc_simple_card_info fsi_wm8978_info = {
-        .platform       = "sh_fsi2",
-        .daifmt         = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBM_CFM,
-        .cpu_dai = {
--               .fmt    = SND_SOC_DAIFMT_IB_NF,
-                .name   = "fsia-dai",
-        },
-        .codec_dai = {
---------------
+> v5:
+>  - enable TSC steps only on EOS interrup
+> 
+> v4:
+>  - check for PEN_IRQ bit in ADCFSM to avoid false-pen when ADC
+>    and TSC are used together.
+>  - Set charge delay to 0x400 as default. Most devices function
+>    normally at this value.
+> 
+>  drivers/input/touchscreen/ti_am335x_tsc.c | 67 ++++++++++++++-----------------
+>  include/linux/mfd/ti_am335x_tscadc.h      |  3 +-
+>  2 files changed, 33 insertions(+), 37 deletions(-)
+> 
+> diff --git a/drivers/input/touchscreen/ti_am335x_tsc.c b/drivers/input/touchscreen/ti_am335x_tsc.c
+> index dfbb9fe6a270..0625c102a1d0 100644
+> --- a/drivers/input/touchscreen/ti_am335x_tsc.c
+> +++ b/drivers/input/touchscreen/ti_am335x_tsc.c
+> @@ -173,11 +173,9 @@ static void titsc_step_config(struct titsc *ts_dev)
+>  		titsc_writel(ts_dev, REG_STEPDELAY(i), STEPCONFIG_OPENDLY);
+>  	}
+>  
+> -	/* Charge step configuration */
+> -	config = ts_dev->bit_xp | ts_dev->bit_yn |
+> -			STEPCHARGE_RFP_XPUL | STEPCHARGE_RFM_XNUR |
+> -			STEPCHARGE_INM_AN1 | STEPCHARGE_INP(ts_dev->inp_yp);
+> +	/* Make CHARGECONFIG same as IDLECONFIG */
+>  
+> +	config = titsc_readl(ts_dev, REG_IDLECONFIG);
+>  	titsc_writel(ts_dev, REG_CHARGECONFIG, config);
+>  	titsc_writel(ts_dev, REG_CHARGEDELAY, CHARGEDLY_OPENDLY);
+>  
+> @@ -261,12 +259,34 @@ static irqreturn_t titsc_irq(int irq, void *dev)
+>  {
+>  	struct titsc *ts_dev = dev;
+>  	struct input_dev *input_dev = ts_dev->input;
+> -	unsigned int status, irqclr = 0;
+> +	unsigned int fsm, status, irqclr = 0;
+>  	unsigned int x = 0, y = 0;
+>  	unsigned int z1, z2, z;
+> -	unsigned int fsm;
+>  
+> -	status = titsc_readl(ts_dev, REG_IRQSTATUS);
+> +	status = titsc_readl(ts_dev, REG_RAWIRQSTATUS);
+> +	if (status & IRQENB_HW_PEN) {
+> +		ts_dev->pen_down = true;
+> +		titsc_writel(ts_dev, REG_IRQWAKEUP, 0x00);
+> +		titsc_writel(ts_dev, REG_IRQCLR, IRQENB_HW_PEN);
+> +		irqclr |= IRQENB_HW_PEN;
+> +	}
+> +
+> +	if (status & IRQENB_PENUP) {
+> +		fsm = titsc_readl(ts_dev, REG_ADCFSM);
+> +		if (fsm == ADCFSM_STEPID) {
+> +			ts_dev->pen_down = false;
+> +			input_report_key(input_dev, BTN_TOUCH, 0);
+> +			input_report_abs(input_dev, ABS_PRESSURE, 0);
+> +			input_sync(input_dev);
+> +		} else {
+> +			ts_dev->pen_down = true;
+> +		}
+> +		irqclr |= IRQENB_PENUP;
+> +	}
+> +
+> +	if (status & IRQENB_EOS)
+> +		irqclr |= IRQENB_EOS;
+> +
+>  	/*
+>  	 * ADC and touchscreen share the IRQ line.
+>  	 * FIFO1 interrupts are used by ADC. Handle FIFO0 IRQs here only
+> @@ -297,37 +317,11 @@ static irqreturn_t titsc_irq(int irq, void *dev)
+>  		}
+>  		irqclr |= IRQENB_FIFO0THRES;
+>  	}
+> -
+> -	/*
+> -	 * Time for sequencer to settle, to read
+> -	 * correct state of the sequencer.
+> -	 */
+> -	udelay(SEQ_SETTLE);
+> -
+> -	status = titsc_readl(ts_dev, REG_RAWIRQSTATUS);
+> -	if (status & IRQENB_PENUP) {
+> -		/* Pen up event */
+> -		fsm = titsc_readl(ts_dev, REG_ADCFSM);
+> -		if (fsm == ADCFSM_STEPID) {
+> -			ts_dev->pen_down = false;
+> -			input_report_key(input_dev, BTN_TOUCH, 0);
+> -			input_report_abs(input_dev, ABS_PRESSURE, 0);
+> -			input_sync(input_dev);
+> -		} else {
+> -			ts_dev->pen_down = true;
+> -		}
+> -		irqclr |= IRQENB_PENUP;
+> -	}
+> -
+> -	if (status & IRQENB_HW_PEN) {
+> -
+> -		titsc_writel(ts_dev, REG_IRQWAKEUP, 0x00);
+> -		titsc_writel(ts_dev, REG_IRQCLR, IRQENB_HW_PEN);
+> -	}
+> -
+>  	if (irqclr) {
+>  		titsc_writel(ts_dev, REG_IRQSTATUS, irqclr);
+> -		am335x_tsc_se_set_cache(ts_dev->mfd_tscadc, ts_dev->step_mask);
+> +		if (status & IRQENB_EOS)
+> +			am335x_tsc_se_set_cache(ts_dev->mfd_tscadc,
+> +						ts_dev->step_mask);
+>  		return IRQ_HANDLED;
+>  	}
+>  	return IRQ_NONE;
+> @@ -417,6 +411,7 @@ static int titsc_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	titsc_writel(ts_dev, REG_IRQENABLE, IRQENB_FIFO0THRES);
+> +	titsc_writel(ts_dev, REG_IRQENABLE, IRQENB_EOS);
+>  	err = titsc_config_wires(ts_dev);
+>  	if (err) {
+>  		dev_err(&pdev->dev, "wrong i/p wire configuration\n");
+> diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
+> index e2e70053470e..3f4e994ace2b 100644
+> --- a/include/linux/mfd/ti_am335x_tscadc.h
+> +++ b/include/linux/mfd/ti_am335x_tscadc.h
+> @@ -52,6 +52,7 @@
+>  
+>  /* IRQ enable */
+>  #define IRQENB_HW_PEN		BIT(0)
+> +#define IRQENB_EOS		BIT(1)
+>  #define IRQENB_FIFO0THRES	BIT(2)
+>  #define IRQENB_FIFO0OVRRUN	BIT(3)
+>  #define IRQENB_FIFO0UNDRFLW	BIT(4)
+> @@ -107,7 +108,7 @@
+>  /* Charge delay */
+>  #define CHARGEDLY_OPEN_MASK	(0x3FFFF << 0)
+>  #define CHARGEDLY_OPEN(val)	((val) << 0)
+> -#define CHARGEDLY_OPENDLY	CHARGEDLY_OPEN(1)
+> +#define CHARGEDLY_OPENDLY	CHARGEDLY_OPEN(0x400)
+>  
+>  /* Control register */
+>  #define CNTRLREG_TSCSSENB	BIT(0)
+> 
