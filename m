@@ -1,38 +1,54 @@
-From: grantgrundler@gmail.com (Grant Grundler)
-Date: Fri, 30 Jan 2015 14:08:15 -0800
-Subject: [PATCH] net/tulip: don't warn about unknown ARM architecture
-In-Reply-To: <1780413.LLpv9s01CB@wuerfel>
-References: <1780413.LLpv9s01CB@wuerfel>
-Message-ID: <CAP6odjj5ZQL-x4dV73Jvz2BWU=CPXiWkx5Ot5ZCAEOpD-=B-gA@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 30 Jan 2015 15:11:04 -0700
+Subject: [PATCH v2 3/3] Documentation: DT bindings: add nvidia,
+ tegra132-denver compatible string
+In-Reply-To: <20150130221104.4761.50643.stgit@dusk.lan>
+References: <20150130221104.4761.50643.stgit@dusk.lan>
+Message-ID: <20150130221104.4761.82708.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 30, 2015 at 1:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> ARM has 32-byte cache lines, which according to the comment in
-> the init registers function seems to work best with the default
-> value of 0x4800 that is also used on sparc and parisc.
->
-> This adds ARM to the same list, to use that default but no
-> longer warn about it.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Add a compatible string for the NVIDIA Denver CPU to the ARM CPU DT
+binding documentation file.  The primary objective here is to keep
+checkpatch.pl from warning when the compatible string is used in an
+SoC DT file, per:
 
-Acked-by: Grant Grundler <grundler@parisc-linux.org>
+http://marc.info/?l=linux-tegra&m=142201349727836&w=2
 
-thanks!
-grant
+This second version changes the string from "nvidia,denver" to
+"nvidia,tegra132-denver" to more precisely describe the revision of
+the Denver CPU complex that is present in the Tegra132 SoC.
 
-> diff --git a/drivers/net/ethernet/dec/tulip/winbond-840.c b/drivers/net/ethernet/dec/tulip/winbond-840.c
-> index 6aa887e0e1cb..9beb3d34d4ba 100644
-> --- a/drivers/net/ethernet/dec/tulip/winbond-840.c
-> +++ b/drivers/net/ethernet/dec/tulip/winbond-840.c
-> @@ -904,7 +904,7 @@ static void init_registers(struct net_device *dev)
->         }
->  #elif defined(__powerpc__) || defined(__i386__) || defined(__alpha__) || defined(__ia64__) || defined(__x86_64__)
->         i |= 0xE000;
-> -#elif defined(CONFIG_SPARC) || defined (CONFIG_PARISC)
-> +#elif defined(CONFIG_SPARC) || defined (CONFIG_PARISC) || defined(CONFIG_ARM)
->         i |= 0x4800;
->  #else
->  #warning Processor architecture undefined
->
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: Kumar Gala <galak@codeaurora.org>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Rohit Vaswani <rvaswani@codeaurora.org>
+Cc: Paul Walmsley <pwalmsley@nvidia.com>
+Cc: Marc Carino <marc.ceeeee@gmail.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ Documentation/devicetree/bindings/arm/cpus.txt |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index b2aacbe16ed9..8b9e0a95de31 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -175,6 +175,7 @@ nodes to be present and contain the properties described below.
+ 			    "marvell,pj4a"
+ 			    "marvell,pj4b"
+ 			    "marvell,sheeva-v5"
++			    "nvidia,tegra132-denver"
+ 			    "qcom,krait"
+ 			    "qcom,scorpion"
+ 	- enable-method
