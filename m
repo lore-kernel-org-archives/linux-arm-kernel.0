@@ -1,93 +1,63 @@
-From: heesub.shin@samsung.com (Heesub Shin)
-Date: Fri, 30 Jan 2015 14:14:23 +0900
-Subject: CMA related memory questions
-In-Reply-To: <54CAFDC4.5070408@linaro.org>
-References: <CABymUCNMjM2KHXXB-LM=x+FTcJL6S5_jhG3GbP7VRi2vBoW49g@mail.gmail.com>
- <CABymUCO+xaify95bUqfbCLsEjkLzEC0yT_fgkhV+qzC36JNgoA@mail.gmail.com>
- <CABymUCPgEh93QsBtRyg0S+FyE0FHwjAF75qk+NWh5TS8ehWuew@mail.gmail.com>
- <54CAF314.4070301@linaro.org> <54CAF9A4.1040606@samsung.com>
- <54CAFDC4.5070408@linaro.org>
-Message-ID: <54CB132F.60604@samsung.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 30 Jan 2015 10:47:15 +0530
+Subject: [RFC V2] OPP: Redefine bindings to overcome shortcomings
+In-Reply-To: <CAL_Jsq+mhuR-DnjXo9Mmgpazgb_3R+sm+Ztkd7+6Q3iVw0aKOA@mail.gmail.com>
+References: <cbe949d7a69c3b16a3e9d6e5429eb81d3ae9d8b9.1422009157.git.viresh.kumar@linaro.org>
+ <20150128200600.GR21293@sirena.org.uk>
+ <CAKohpokxdpF2nTeOnDpofNM1vW3aZRyDBE3WKmvZ8wJedf-TGw@mail.gmail.com>
+ <CAL_Jsq+mhuR-DnjXo9Mmgpazgb_3R+sm+Ztkd7+6Q3iVw0aKOA@mail.gmail.com>
+Message-ID: <CAKohpokig+CA00SSPhHfdMMgVm8PYHMRf+PLy0cGPbFYF6XT=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 29 January 2015 at 21:12, Rob Herring <robherring2@gmail.com> wrote:
+> On Wed, Jan 28, 2015 at 7:39 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
 
-
-On 01/30/2015 12:43 PM, Jun Nie wrote:
-> On 2015?01?30? 11:25, Heesub Shin wrote:
->>
->>
->> On 01/30/2015 11:57 AM, Jun Nie wrote:
->>> On 2015?01?30? 10:36, Jun Nie wrote:
->>>> Hi Marek & Arnd,
->>>>
->>>> Did you ever know issue that free CMA memory is high, but system is
->>>> hungry for memory and page cache is very low? I am enabling CMA in
->>>> Android on my board with 512MB memory and see FreeMem in /proc/meminfo
->>>> increase a lot with CMA comparing the reservation solution on boot. But
->>>> I find system is not borrowing memory from CMA pool when running 3dmark
->>>> (high webkit workload at start). Because the FreeMem size is high, but
->>>> cache size decreasing significantly to several MB during benchmark run,
->>>> I suppose system is trying to reclaim memory from pagecache for new
->>>> allocation. My question is that what API that page cache and webkit
->>>> related functionality are using to allocate memory. Maybe page cache
->>>> require memory that is not movable/reclaimable memory, where we may
->>>> have
->>>> optimization to go thru dma_alloc_xxx to borrow CMA memory? I suppose
->>>> app level memory allocation shall be movable/reclaimable memory and can
->>>> borrow from CMA pool, but not sure whether the flag match the
->>>> movable/reclaimable memory and go thru the right path.
->>>>
->>>> Could you help share your experience/thoughts on this? Thanks!
->>
->> CC'ed linux-mm at kvack.org
->>
->> __zone_watermark_ok() assumes that free pages from CMA pageblock are not
->> free when ALLOC_CMA is not set on alloc_flags. The main goal was to
->> force core mm to keep some non-CMA always free and thus let kernel to
->> allocate a few unmovable pages from any context (including atomic, irq,
->> etc.). However, this behavior may cause excessive page reclamation as it
->> is sometimes very hard to satisfy the high wmark + balance_gap with only
->> non-CMA pages and reclaiming CMA pages does not help at all.
-> Seems it is tricky to tune it. Could you help share some experience on
-> this, how to change the parameters, what's pro/con? Thanks!
-
-AFAIK, unfortunately there's no other way rather than reducing the 
-number of CMA pageblocks which are making anomalies. Selectively 
-ignoring CMA pages when we isolate pages from LRU could be an 
-alternative, but it has another side effect. I also want to know how to 
-handle this problem nicely.
-
->>
->> It is observed that page cache pages are excessively reclaimed and
->> entire system falls into thrashing even though the amount of free pages
->> are much higer than the high wmark. In this case, majority of the free
->> pages were from CMA page block (and about 30% pages in highmem zone were
->> from CMA pageblock). Therefore, kswapd kept running and reclaiming too
->> many pages. Although it is relatively rare and only observed on a
->> specific workload, the device gets in an unresponsive state for a while
->> (up to 10 secs), once it happens.
->>
-> I am in this situation. kswapd is busy and most FreeMem is from CMA
-> because I have 192MB CMA memblock and most of them are free.
->> regards,
->> heesub
->>
->>>>
->>>>
->>>> B.R.
->>>> Jun
->>>
->>> Add more people.
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> The goal is to choose the driver which we want to probe for a platform. There
+>> can be multiple DT enabled cpufreq drivers present in a build and the platform
+>> needs some way to choose one of them.
 >
-> --
-> To unsubscribe, send a message with 'unsubscribe linux-mm' in
-> the body to majordomo at kvack.org.  For more info on Linux MM,
-> see: http://www.linux-mm.org/ .
-> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
+> That was not my original thought, but rather it is versioning the
+> binding and a way to find OPP nodes. That doesn't mean we can't do
+> things to make it easier to match to drivers.
+
+Okay.
+
+>> For example, if both cpufreq-dt, exynos-cpufreq and arm-big-little drivers are
+>> present in a kernel build, the how do we specify which one a platform wants to
+>> use.
 >
+> What does the exynos driver do that the other 2 don't?
+
+There are efforts going on to start using cpufreq-dt instead
+of exynos drivers. So, they might die at some point of time.
+
+Anyway, there can be cpufreq drivers which co-exist
+cpufreq-dt, even if they are parsing the same bindings.
+
+> I will likely nak any such strings that are solely there to match to
+> these 2 drivers. The information is there in DT already. It's just not
+> a single property to match on. You can tell it is a big.LITTLE system
+> by the fact your have 2 different cpu types. You can use the top level
+> compatible strings when you need a machine specific driver. I would
+> not be trying to get cpufreq platform devices to be created by
+> of_platform_populate. The other issue I have is you may not always
+> have 2 drivers for bL and non-bL. Really symmetric multi-cluster or
+> single cluster should be a subset of functionality of bL.
+>
+> I think you just need to have an initcall which does this:
+>
+> if (of_find_matching_node_and_match(machine_specific_driver_match list))
+>   platform_device_create(match->data);
+> else if (is_big_little() && has_opp)
+>   platform_device_create(big_little_device);
+> else if (has_opp)
+>   platform_device_create(cpufreq_dt_device);
+>
+> Or perhaps you handle the generic ones late in boot only if no machine
+> specific driver has been probed. There is no generic solution ATM for
+> selecting the best driver when there are multiple matches.
+
+One thing is clear. The compatibility string here isn't going to be
+like what I had in mind. So, let it just define the versioning
+here and I will see how can I solve the driver-probe problem.
