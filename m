@@ -1,64 +1,78 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 30 Jan 2015 14:54:23 +0100
-Subject: [PATCH 1/4] pinctrl: Broadcom Cygnus pinctrl device tree binding
-In-Reply-To: <54C1AE9F.3020407@broadcom.com>
-References: <rjui@broadcom.com>
- <1417131990-17954-1-git-send-email-rjui@broadcom.com>
- <1417131990-17954-2-git-send-email-rjui@broadcom.com>
- <CACRpkdb5pNMbXmWGjrGpAYNLLwv6pWWOJQy0C6BLetNcStFM6A@mail.gmail.com>
- <54B01D44.5080601@broadcom.com>
- <CACRpkdbW5P=w0CPYYf_gfBuD7W0WOdAYCKpTXM5MsK9mdYDc5w@mail.gmail.com>
- <54C1AE9F.3020407@broadcom.com>
-Message-ID: <CACRpkdZF8UHQEQh6AULEQ4RktgY2QNx0rbN_NHRj6gDsUJqM0A@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 30 Jan 2015 14:08:54 +0000
+Subject: [PATCH v10 2/2] tty/serial: Add Spreadtrum sc9836-uart driver
+ support
+In-Reply-To: <54CB72F7.8060706@hurleysoftware.com>
+References: <sc9836-serial-v10>
+ <1422443324-25082-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1422443324-25082-3-git-send-email-chunyan.zhang@spreadtrum.com>
+ <54CA5128.8050500@gmail.com> <54CA568E.6080306@hurleysoftware.com>
+ <20150129160553.GC26493@n2100.arm.linux.org.uk>
+ <20150130101838.GC16744@ulmo> <54CB72F7.8060706@hurleysoftware.com>
+Message-ID: <20150130140854.GJ26493@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 23, 2015 at 3:14 AM, Ray Jui <rjui@broadcom.com> wrote:
+On Fri, Jan 30, 2015 at 07:03:03AM -0500, Peter Hurley wrote:
+> On 01/30/2015 05:18 AM, Thierry Reding wrote:
+> > -ENODEV is certainly not the correct return value if a resource is not
+> > available. It translates to "no such device", but the device must
+> > clearly be there, otherwise the ->probe() shouldn't have been called.
+> 
+> -ENODEV is the appropriate return from the probe(); there is no device.
 
-> I have another question here. In the B0 revision of our Cygnus chip, the
-> ASIC team added a feature to allow individual pins to be muxed to GPIO.
-> The pinmux controller can still only do group-based muxing in general,
-> but at the same time, you can override most (but not all) individual
-> pins to GPIO.
->
-> I believe this HW design actually forces us to mix use "groups" and
-> "pins" in DT.
->
-> For example, assuming we mux pins 1 - 10 as MMC (one cmd line, one clk
-> line, and 8 data lines). One might make the decision that he only needs
-> 4 data lines instead of 8 data lines, and he wants to free up the 4 data
-> lines and uses as GPIO.
+No it is not.  "no such device" means "the device is not present".  If
+the device is not present, we wouldn't have a struct device associated
+with it.
 
-I would split the 8 available data lines in two groups,
-like "data-1-4" and "data-5-8" since the use case is such
-that either you use four or eight lines, not 6 or 7, either
-just "data-1-4" or both "data-1-4" and "data-5-8".
+The missing resource is an error condition: what it's saying is that the
+device is there, but something has failed in providing the IO regions
+necessary to access it.  That's really something very different from
+"there is no device present".
 
-> Based on this example, is the following DT
-> configuration valid?
+> > Or if it really isn't there, then you'd at least need a memory region
+> > to probe, otherwise you can't determine whether it's there or not. So
+> > from the perspective of a device driver I think a missing, or NULL,
+> > resource, is indeed an "invalid argument".
+> 
+> Trying to argue that a missing host bus window is an "invalid argument"
+> to probe() is just trying to make the shoe fit.
 
-> sd_node {
->     function = "sd";
->     groups = "sd_grps";
-> };
->
-> gpio_node {
->     function = "gpio";
->     pins = "gpio_7", "gpio_8", "gpio_9", "gpio_10"; /* assuming 1:1
-> mapping between gpio and pin number to make this example simple */
-> };
+As is arguing that -ENODEV is an appropriate return value for the missing
+resource.
 
-Muxing an individual GPIO from the device tree is seldom a
-good idea as you realized in your follow-up mail ;)
+Moreover, returning -ENODEV is actually *bad* in this case - the kernel's
+generic probe handling does not report the failure of the driver to bind
+given this, so a missing resource potentially becomes a silent failure of
+a driver - leading users to wonder why their devices aren't found.
 
-But this:
+If we /really/ have a problem with the error code, then why not invent
+a new error code to cater for this condition - maybe, EBADRES (bad resource).
 
-sd_node {
-     function = "sd";
-     groups = "data-1-4", "data-5-8", "other-pin-group";
-};
+> > I understand that people might see some ambiguity there, and -EINVAL is
+> > certainly not a very accurate description, but such is the nature of
+> > error codes. You pick what fits best. -ENXIO and -EADDRNOTAVAIL had been
+> > under discussion as well if I remember correctly, but they both equally
+> > ambiguous. -ENODATA might have been a better fit, but that too has a
+> > different meaning in other contexts.
+> > 
+> > Besides, there's an error message that goes along with the error code
+> > return, that should remove any ambiguity for people looking at dmesg.
+> > 
+> > All of that said, the original assertion that the check is not required
+> > is still valid. We can argue at length about the specific error code but
+> > if we decide that it needs to change, then we should modify
+> > devm_ioremap_resource() rather than requiring all callers to perform the
+> > extra check again.
+> 
+> None of the devm_ioremap_resource() changes have been submitted for
+> serial drivers.
 
-Is perfectly fine. One function, several groups.
+$ grep devm_ioremap_resource drivers/tty/serial/ -r | wc -l
+10
 
-Yours,
-Linus Walleij
+It seems that statement is false.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
