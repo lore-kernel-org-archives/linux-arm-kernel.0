@@ -1,43 +1,29 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 30 Jan 2015 01:43:15 +0100
-Subject: Pull Request of PM / Devfreq (for next)
-In-Reply-To: <CAJ0PZbTSbjSKFH8Q=F1umscTMijO2W4_DioiQCUFFjEtnc08Ww@mail.gmail.com>
-References: <CAJ0PZbTSbjSKFH8Q=F1umscTMijO2W4_DioiQCUFFjEtnc08Ww@mail.gmail.com>
-Message-ID: <5002115.kzLYeD34gJ@vostro.rjw.lan>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Thu, 29 Jan 2015 16:22:57 -0800
+Subject: [PATCH] regulator: qcom-rpm: Make it possible to specify supply
+Message-ID: <1422577377-31986-1-git-send-email-bjorn.andersson@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, January 29, 2015 11:08:08 PM MyungJoo Ham wrote:
-> Dear Rafael,
-> 
-> 
-> Here goes a pull request from PM / devfreq to Linux-PM, for-next.
-> (linux-3.20 rc-X)
-> 
-> 
-> 
-> Cheers,
-> MyungJoo
-> 
-> 
-> 
-> The following changes since commit 26bc420b59a38e4e6685a73345a0def461136dce:
-> 
->   Linux 3.19-rc6 (2015-01-25 20:04:41 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/mzx/devfreq.git
-> tags/pull_req_20150129
-> 
-> for you to fetch changes up to 846d4ee701e883f3e4647662e1f4069d0cd2694b:
-> 
->   PM / devfreq: event: Add documentation for exynos-ppmu devfreq-event
-> driver (2015-01-29 21:52:53 +0900)
+Make it possible to specify the supply of a regulator, through the
+vin-supply property in dt.
 
-Pulled, thanks!
+Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+---
+ drivers/regulator/qcom_rpm-regulator.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-
+diff --git a/drivers/regulator/qcom_rpm-regulator.c b/drivers/regulator/qcom_rpm-regulator.c
+index e3120bf..00c5cc3 100644
+--- a/drivers/regulator/qcom_rpm-regulator.c
++++ b/drivers/regulator/qcom_rpm-regulator.c
+@@ -679,6 +679,7 @@ static int rpm_reg_probe(struct platform_device *pdev)
+ 	vreg->desc.owner = THIS_MODULE;
+ 	vreg->desc.type = REGULATOR_VOLTAGE;
+ 	vreg->desc.name = pdev->dev.of_node->name;
++	vreg->desc.supply_name = "vin";
+ 
+ 	vreg->rpm = dev_get_drvdata(pdev->dev.parent);
+ 	if (!vreg->rpm) {
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+1.9.1
