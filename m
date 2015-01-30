@@ -1,35 +1,29 @@
-From: brucembeach@gmail.com (bruce m beach)
-Date: Thu, 29 Jan 2015 20:56:44 -0800
-Subject: Unable to boot mainline on snow chromebook since 3.15
-Message-ID: <CAArymCnPE10YmaYYV5CXdCTePbgL9b5p_+8+Da2dPK-3CkoNBw@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Fri, 30 Jan 2015 07:02:51 +0200
+Subject: [PATCH] arm: reduce conflicts in Kcinfig.debug
+In-Reply-To: <20150130130117.4d9fbd70@canb.auug.org.au>
+References: <20150130130117.4d9fbd70@canb.auug.org.au>
+Message-ID: <20150130050251.GN19448@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello everybody
+Hi Stephen,
 
-I am trying to boot a mainline kernel on a Samsung exynos
-chromebook (snow) and am having (surprise, surprise) some
-trouble.  I am somewhat new to this but am getting some sort of
-feel for what needs to be done. Having read the postings for
-"Unable to boot mainline on snow chromebook since 3.15" I decided
-to send this mail under that subject. My question is what is the
-latest kernel that actually did boot and is there a current
-kernel somewhere that works. I have tried
-           3.18.3 and
-           3.18.4
-The screen goes black and the system reboots to the initial
-chrome flash screen. I tried linux-3.14.30 which was better.
-After a strange screen of what appeared to be timeing information
-the kernel booted (off sda2) and ran normally until the final
-message
+On Fri, Jan 30, 2015 at 01:01:17PM +1100, Stephen Rothwell wrote:
+> I have seen several conflicts in this file (and other Kconfig files)
+> over time, so I suggest a solution like below.
+> 
+> Create new config symbols that can be selected by other configs
+> and use them as single dependencies rather than having long lists of
+> other config symbols as dependencies.
+> 
+> Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
 
-   Waiting for root device /dev/sda3
+For subject: s/Kcinfig/Kconfig/
 
-which is where the root system was supposed to be and then went
-no further. For u-boot I am using the binary
+baruch
 
-        nv_uboot-snow-simplefb.kpart
-
-   Regards Bruce
-
-PS. please cc me as I am not on the list
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
