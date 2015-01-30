@@ -1,95 +1,71 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Fri, 30 Jan 2015 10:32:58 -0600
-Subject: [Patch v2 1/6] soc: qcom: gsbi: Add support for ADM CRCI muxing
-In-Reply-To: <1422599135-5588-2-git-send-email-agross@codeaurora.org>
-References: <1422599135-5588-1-git-send-email-agross@codeaurora.org>
- <1422599135-5588-2-git-send-email-agross@codeaurora.org>
-Message-ID: <B36DEAB1-2D89-4B6B-991E-C2EDBEB684D9@codeaurora.org>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 30 Jan 2015 16:37:32 +0000
+Subject: [PATCH] arm/mm: fix compiler warning in pmdp_invalidate() (in -next)
+In-Reply-To: <20150130100620.GL2395@suse.de>
+References: <20150130100620.GL2395@suse.de>
+Message-ID: <1422635852-21569-1-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Commit ff61d185f4e7 ("mm: convert p[te|md]_mknonnuma and remaining
+page table manipulations") removed a check in
+mm/pgtable-generic.c:pmdp_invalidate(), which leaves the
+pmd_mknotpresent macro the only user of the entry variable.
+For ARM/LPAE we use a constant 0 without referencing the argument to
+mark this condition, so the entry variable is no longer used here:
 
-On Jan 30, 2015, at 12:25 AM, Andy Gross <agross@codeaurora.org> wrote:
+mm/pgtable-generic.c: In function 'pmdp_invalidate':
+mm/pgtable-generic.c:195:8: warning: unused variable 'entry' [-Wunused-variable]
+  pmd_t entry = *pmdp;
+        ^
 
-> This patch adds automatic configuration for the ADM CRCI muxing required to
-> support DMA operations for GSBI clients.  The GSBI mode and instance determine
-> the correct TCSR ADM CRCI MUX value that must be programmed so that the DMA
-> works properly.
-> 
-> Signed-off-by: Andy Gross <agross@codeaurora.org>
-> ---
-> .../devicetree/bindings/soc/qcom/qcom,gsbi.txt     |   18 ++-
-> drivers/soc/qcom/Kconfig                           |    1 +
-> drivers/soc/qcom/qcom_gsbi.c                       |  153 ++++++++++++++++++++
-> 3 files changed, 171 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,gsbi.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,gsbi.txt
-> index 4ce24d4..8fe7b37 100644
-> --- a/Documentation/devicetree/bindings/soc/qcom/qcom,gsbi.txt
-> +++ b/Documentation/devicetree/bindings/soc/qcom/qcom,gsbi.txt
-> @@ -6,7 +6,7 @@ configuration settings.  The mode setting will govern the input/output mode of
-> the 4 GSBI IOs.
-> 
-> Required properties:
-> -- compatible: must contain "qcom,gsbi-v1.0.0" for APQ8064/IPQ8064
-> +- compatible:	Should contain "qcom,gsbi-v1.0.0"
-> - reg: Address range for GSBI registers
-> - clocks: required clock
-> - clock-names: must contain "iface" entry
-> @@ -16,12 +16,16 @@ Required properties:
-> Optional properties:
-> - qcom,crci : indicates CRCI MUX value for QUP CRCI ports.  Please reference
->   dt-bindings/soc/qcom,gsbi.h for valid CRCI mux values.
-> +- syscon-tcsr: indicates phandle of TCSR syscon node.  Required if child uses
-> +  dma.
-> 
-> Required properties if child node exists:
-> - #address-cells: Must be 1
-> - #size-cells: Must be 1
-> - ranges: Must be present
-> 
-> +Note: Each GSBI should have an alias correctly numbered in "aliases" node.
-> +
-> Properties for children:
-> 
-> A GSBI controller node can contain 0 or more child nodes representing serial
-> @@ -37,6 +41,10 @@ Example for APQ8064:
-> 
-> #include <dt-bindings/soc/qcom,gsbi.h>
-> 
-> +	aliases {
-> +		gsbi4 = <&gsbi4>;
-> +	};
+Replace the ARM macro implementation with a static inline function to
+get rid of this warning.
 
-You appear to be using the alias name to determine a index number for the gsbi, if that is the case, than you should probably just add a cell-index node to the gsbi?s for this purpose.
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+Hi Andrew,
 
-> +
-> 	gsbi4 at 16300000 {
-> 		compatible = "qcom,gsbi-v1.0.0";
-> 		reg = <0x16300000 0x100>;
-> @@ -48,6 +56,8 @@ Example for APQ8064:
-> 		qcom,mode = <GSBI_PROT_I2C_UART>;
-> 		qcom,crci = <GSBI_CRCI_QUP>;
-> 
-> +		syscon-tcsr = <&tcsr>;
-> +
-> 		/* child nodes go under here */
-> 
-> 		i2c_qup4: i2c at 16380000 {
-> @@ -76,3 +86,9 @@ Example for APQ8064:
-> 		};
-> 	};
-> 
-> +	tcsr: syscon at 1a400000 {
-> +		compatible = "qcom,apq8064-tcsr", "syscon";
-> +		reg = <0x1a400000 0x100>;
-> +	};
-> +
-> +
+Mel mentioned that I should send that simple fix below to you to
+merge it with his original mmotm patch:
+mm-convert-p_mknonnuma-and-remaining-page-table-manipulations.patch
+The commit message above contains the mmotm-reference to this patch,
+which will break when it hits mainline.
 
-- k
+Can you consider this? Given that's only a warning fix I am also
+happy with resending it after -rc1, if you reckon that this arch/arm
+change should not go via mmotm.
 
+
+On 30/01/15 10:06, Mel Gorman wrote:
+> Patch looks fine to me but this is against a mmotm patch that is
+> included in mmotm. The commit ID is not going to last. This should be
+> sent to Andrew Morton with a note saying it's a fix to the mmotm patch
+> mm-convert-p_mknonnuma-and-remaining-page-table-manipulations.patch .
+> He'll then fold your fix into the original patch so that bisection works
+> correctly when merged to mainline. Do you mind doing that please?
+
+Cheers,
+Andre
+
+ arch/arm/include/asm/pgtable-3level.h |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+index 370684d..0e51fbe 100644
+--- a/arch/arm/include/asm/pgtable-3level.h
++++ b/arch/arm/include/asm/pgtable-3level.h
+@@ -259,7 +259,10 @@ PMD_BIT_FUNC(mkyoung,   |= PMD_SECT_AF);
+ #define mk_pmd(page,prot)	pfn_pmd(page_to_pfn(page),prot)
+ 
+ /* represent a notpresent pmd by zero, this is used by pmdp_invalidate */
+-#define pmd_mknotpresent(pmd)	(__pmd(0))
++static inline pmd_t pmd_mknotpresent(pmd_t pmd)
++{
++	return 0;
++}
+ 
+ static inline pmd_t pmd_modify(pmd_t pmd, pgprot_t newprot)
+ {
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.7.9.5
