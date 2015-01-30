@@ -1,51 +1,76 @@
-From: js1304@gmail.com (Joonsoo Kim)
-Date: Fri, 30 Jan 2015 21:58:48 +0900
-Subject: CMA related memory questions
-In-Reply-To: <54CAF9A4.1040606@samsung.com>
-References: <CABymUCNMjM2KHXXB-LM=x+FTcJL6S5_jhG3GbP7VRi2vBoW49g@mail.gmail.com>
- <CABymUCO+xaify95bUqfbCLsEjkLzEC0yT_fgkhV+qzC36JNgoA@mail.gmail.com>
- <CABymUCPgEh93QsBtRyg0S+FyE0FHwjAF75qk+NWh5TS8ehWuew@mail.gmail.com>
- <54CAF314.4070301@linaro.org> <54CAF9A4.1040606@samsung.com>
-Message-ID: <CAAmzW4OfrKt0XK5bDO0TNR5Ofv=rLDkpS7HAOCk0NRV1WdOhNg@mail.gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Fri, 30 Jan 2015 14:03:33 +0100
+Subject: [PATCH v3 4/6] mmc: pwrseq_simple: Add optional reference clock
+ support
+In-Reply-To: <CAPDyKFp5tGogzjU27jTDcHviUUwnTSgq4EP484_OprV_nPBsOg@mail.gmail.com>
+References: <1422543608-24704-1-git-send-email-javier.martinez@collabora.co.uk>	<1422543608-24704-5-git-send-email-javier.martinez@collabora.co.uk>
+ <CAPDyKFp5tGogzjU27jTDcHviUUwnTSgq4EP484_OprV_nPBsOg@mail.gmail.com>
+Message-ID: <54CB8125.7030107@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-01-30 12:25 GMT+09:00 Heesub Shin <heesub.shin@samsung.com>:
->
->
-> On 01/30/2015 11:57 AM, Jun Nie wrote:
+Hello Ulf,
+
+On 01/30/2015 12:17 PM, Ulf Hansson wrote:
+>>  };
+>> @@ -39,6 +42,11 @@ static void mmc_pwrseq_simple_pre_power_on(struct mmc_host *host)
+>>         struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
+>>                                         struct mmc_pwrseq_simple, pwrseq);
 >>
->> On 2015?01?30? 10:36, Jun Nie wrote:
->>>
->>> Hi Marek & Arnd,
->>>
->>> Did you ever know issue that free CMA memory is high, but system is
->>> hungry for memory and page cache is very low? I am enabling CMA in
->>> Android on my board with 512MB memory and see FreeMem in /proc/meminfo
->>> increase a lot with CMA comparing the reservation solution on boot. But
->>> I find system is not borrowing memory from CMA pool when running 3dmark
->>> (high webkit workload at start). Because the FreeMem size is high, but
->>> cache size decreasing significantly to several MB during benchmark run,
->>> I suppose system is trying to reclaim memory from pagecache for new
->>> allocation. My question is that what API that page cache and webkit
->>> related functionality are using to allocate memory. Maybe page cache
->>> require memory that is not movable/reclaimable memory, where we may have
->>> optimization to go thru dma_alloc_xxx to borrow CMA memory? I suppose
->>> app level memory allocation shall be movable/reclaimable memory and can
->>> borrow from CMA pool, but not sure whether the flag match the
->>> movable/reclaimable memory and go thru the right path.
+>> +       if (!IS_ERR(pwrseq->ext_clk)) {
+> 
+> This should be:
+> 
+> if (!IS_ERR(pwrseq->ext_clk) && !pwrseq->clk_enabled) {
+> 
+>
 
-Hello,
+Oh, I thought that it was not possible to enter mmc_pwrseq_pre_power_on()
+twice without a prior call to mmc_pwrseq_power_off() but I guess I didn't
+read the MMC core code carefully...
+ 
+>> +               clk_prepare_enable(pwrseq->ext_clk);
+>> +               pwrseq->clk_enabled = true;
+>> +       }
+>> +
+>>         mmc_pwrseq_simple_set_gpios_value(pwrseq, 1);
+>>  }
+>>
+>> @@ -50,6 +58,19 @@ static void mmc_pwrseq_simple_post_power_on(struct mmc_host *host)
+>>         mmc_pwrseq_simple_set_gpios_value(pwrseq, 0);
+>>  }
+>>
+>> +static void mmc_pwrseq_simple_power_off(struct mmc_host *host)
+>> +{
+>> +       struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
+>> +                                       struct mmc_pwrseq_simple, pwrseq);
+>> +
+>> +       mmc_pwrseq_simple_set_gpios_value(pwrseq, 1);
+>> +
+>> +       if (pwrseq->clk_enabled) {
+> 
+> I changed this as well, but that was just to make code clearer.
+> 
+> if (!IS_ERR(pwrseq->ext_clk) && pwrseq->clk_enabled) {
+> 
+>
 
-Maybe, you experienced the problem what I tried to solve.
-CMA freepage allocation logic in mainline doesn't work well now since
-they are only allocated in fallback case. See below link for detailed
-explanation.
+Yeah, if IS_ERR(pwrseq->ext_clk) then clk_enabled will always be false but I
+agree that the change makes the code to be more consistent.
 
-https://lkml.org/lkml/2014/5/28/64
+>>
+> 
+> As I stated in the response to he coverletter for the patchset, this
+> patch is applied for next with above changes.
+> 
+> Thanks!
+>
 
-This problem can be solved by aggressive allocation approach in that link, but,
-there are too many issues left in CMA. So, I'm trying to implement ZONE_CMA
-now. Prototyping is nearly finished so I will send it soon.
+Thanks a lot for your help and for fixing these things!
 
-Thanks.
+> Kind regards
+> Uffe
+>
+
+Best regards,
+Javier
