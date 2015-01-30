@@ -1,34 +1,83 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Fri, 30 Jan 2015 11:31:18 +0100
-Subject: [PATCH] ARM: dts: mvebu: add ethernet to the cm-a510 board
-In-Reply-To: <54CB5267.5060004@gmail.com>
-References: <E1YH5bU-0005mG-3L@bombadil.infradead.org>
- <54CB5267.5060004@gmail.com>
-Message-ID: <20150130113118.5523ed68@armhf>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 30 Jan 2015 11:33:04 +0100
+Subject: [PATCH v4 2/3] irqchip: vf610-mscm: dt-bindings: add MSCM bindings
+In-Reply-To: <1422613985-11726-1-git-send-email-stefan@agner.ch>
+References: <1422613985-11726-1-git-send-email-stefan@agner.ch>
+Message-ID: <1422613985-11726-3-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 30 Jan 2015 10:44:07 +0100
-Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+Add binding documentation for CPU configuration and interrupt router
+submodule of the Miscellaneous System Control Module. The MSCM is
+used in all variants of Freescale Vybrid SoC's.
 
-> I had a closer look on the Compulab website of the SoM [1] and think
-> that we'll have to convert it to dove-cm-a510.dtsi and the baseboard
-> Gabriel is using (maybe SBC-A510 [2]).
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ .../arm/freescale/fsl,vf610-mscm-cpucfg.txt        | 14 +++++++++
+ .../bindings/arm/freescale/fsl,vf610-mscm-ir.txt   | 33 ++++++++++++++++++++++
+ 2 files changed, 47 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm-cpucfg.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm-ir.txt
 
-Sebastian,
-
-I don't understand why the A510 contained in the cm-a510 should be
-different from the one of the other boards (I just noticed a second
-ethernet and a WiFi device - but, is the Compulab document up to date?).
-
-If it is the same, the dove.dtsi should work (and it seems to work for
-Gabriel).
-
-The only difference with the cm-a510 is the presence or not of the
-connectors. So, all the Dove devices could be enabled in the DT, and,
-if some room is needed in the board, the .config could be adapted
-removing the useless drivers and have a minimal kernel.
-
+diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm-cpucfg.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm-cpucfg.txt
+new file mode 100644
+index 0000000..44aa3c4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm-cpucfg.txt
+@@ -0,0 +1,14 @@
++Freescale Vybrid Miscellaneous System Control - CPU Configuration
++
++The MSCM IP contains multiple sub modules, this binding describes the first
++block of registers which contains CPU configuration information.
++
++Required properties:
++- compatible:	"fsl,vf610-mscm-cpucfg", "syscon"
++- reg:		the register range of the MSCM CPU configuration registers
++
++Example:
++	mscm_cpucfg: cpucfg at 40001000 {
++		compatible = "fsl,vf610-mscm-cpucfg", "syscon";
++		reg = <0x40001000 0x800>;
++	}
+diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm-ir.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm-ir.txt
+new file mode 100644
+index 0000000..669808b2a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm-ir.txt
+@@ -0,0 +1,33 @@
++Freescale Vybrid Miscellaneous System Control - Interrupt Router
++
++The MSCM IP contains multiple sub modules, this binding describes the second
++block of registers which control the interrupt router. The interrupt router
++allows to configure the recipient of each peripheral interrupt. Furthermore
++it controls the directed processor interrupts. The module is available in all
++Vybrid SoC's but is only really useful in dual core configurations (VF6xx
++which comes with a Cortex-A5/Cortex-M4 combination).
++
++Required properties:
++- compatible:		"fsl,vf610-mscm-ir"
++- reg:			the register range of the MSCM Interrupt Router
++- fsl,cpucfg:		The handle to the MSCM CPU configuration node, required
++			to get the current CPU ID
++- interrupt-controller:	Identifies the node as an interrupt controller
++- #interrupt-cells:	Two cells, interrupt number and cells.
++			The hardware interrupt number according to interrupt
++			assignment of the interrupt router is required.
++			Flags get passed only when using GIC as parent. Flags
++			encoding as documented by the GIC bindings.
++- interrupt-parent:	Should be the phandle for the interrupt controller of
++			the CPU the device tree is intended to be used on. This
++			is either the node of the GIC or NVIC controller.
++
++Example:
++	mscm_ir: interrupt-controller at 40001800 {
++		compatible = "fsl,vf610-mscm-ir";
++		reg = <0x40001800 0x400>;
++		fsl,cpucfg = <&mscm_cpucfg>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++		interrupt-parent = <&intc>;
++	}
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+2.2.2
