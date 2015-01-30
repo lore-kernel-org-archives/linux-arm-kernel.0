@@ -1,79 +1,36 @@
-From: John.Youn@synopsys.com (John Youn)
-Date: Thu, 29 Jan 2015 18:12:21 -0800
-Subject: [PATCH] usb: dwc2: fix USB core dependencies
-In-Reply-To: <20150129162444.GI21217@saruman.tx.rr.com>
-References: <1554724.zbFzpEsGrd@wuerfel>
- <20150129162444.GI21217@saruman.tx.rr.com>
-Message-ID: <54CAE885.8070603@synopsys.com>
+From: jun.nie@linaro.org (Jun Nie)
+Date: Fri, 30 Jan 2015 10:57:24 +0800
+Subject: CMA related memory questions
+In-Reply-To: <CABymUCPgEh93QsBtRyg0S+FyE0FHwjAF75qk+NWh5TS8ehWuew@mail.gmail.com>
+References: <CABymUCNMjM2KHXXB-LM=x+FTcJL6S5_jhG3GbP7VRi2vBoW49g@mail.gmail.com>	<CABymUCO+xaify95bUqfbCLsEjkLzEC0yT_fgkhV+qzC36JNgoA@mail.gmail.com>
+ <CABymUCPgEh93QsBtRyg0S+FyE0FHwjAF75qk+NWh5TS8ehWuew@mail.gmail.com>
+Message-ID: <54CAF314.4070301@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/29/2015 08:25 AM, Felipe Balbi wrote:
-> Hi,
-> 
-> Adding John
-> 
-> On Wed, Jan 28, 2015 at 10:49:00PM +0100, Arnd Bergmann wrote:
->> It is currently possible to configure the dwc2 driver as built-in
->> when host mode or dual-role is enabled, but the USB core is
->> a loadable module. This leads to a link failure:
->>
->> drivers/built-in.o: In function `_dwc2_hcd_start':
->> :(.text+0x84538): undefined reference to `usb_hcd_resume_root_hub'
->> drivers/built-in.o: In function `_dwc2_hcd_urb_dequeue':
->> :(.text+0x84aa0): undefined reference to `usb_hcd_check_unlink_urb'
->> :(.text+0x84e4c): undefined reference to `usb_hcd_unlink_urb_from_ep'
->> :(.text+0x84e74): undefined reference to `usb_hcd_giveback_urb'
->> drivers/built-in.o: In function `dwc2_assign_and_init_hc':
->> :(.text+0x86b98): undefined reference to `usb_hcd_unmap_urb_for_dma'
->> drivers/built-in.o: In function `_dwc2_hcd_urb_enqueue':
->> :(.text+0x8717c): undefined reference to `usb_hcd_link_urb_to_ep'
->> :(.text+0x872f4): undefined reference to `usb_hcd_unlink_urb_from_ep'
->> drivers/built-in.o: In function `dwc2_host_complete':
->> :(.text+0x875d4): undefined reference to `usb_hcd_unlink_urb_from_ep'
->> :(.text+0x87600): undefined reference to `usb_hcd_giveback_urb'
->> drivers/built-in.o: In function `dwc2_hcd_init':
->> :(.text+0x87ba8): undefined reference to `usb_disabled'
->> :(.text+0x87d38): undefined reference to `usb_create_hcd'
->> :(.text+0x88094): undefined reference to `usb_add_hcd'
->> :(.text+0x880dc): undefined reference to `usb_put_hcd'
->> drivers/built-in.o: In function `dwc2_hcd_remove':
->> :(.text+0x8821c): undefined reference to `usb_remove_hcd'
->> :(.text+0x8823c): undefined reference to `usb_put_hcd'
->> drivers/built-in.o: In function `dwc2_hc_handle_tt_clear.isra.10':
->> :(.text+0x88e2c): undefined reference to `usb_hub_clear_tt_buffer'
->> drivers/built-in.o: In function `dwc2_hcd_qtd_add':
->> :(.text+0x8b554): undefined reference to `usb_calc_bus_time'
->>
->> To fix the problem, this patch changes the dependencies so that
->> dwc2 host mode can only be enabled if either the USB core is
->> built-in or both USB and dwc2 are modules.
->>
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->>
->> diff --git a/drivers/usb/dwc2/Kconfig b/drivers/usb/dwc2/Kconfig
->> index b323c4c11b0a..76b9ba4dc925 100644
->> --- a/drivers/usb/dwc2/Kconfig
->> +++ b/drivers/usb/dwc2/Kconfig
->> @@ -23,7 +23,7 @@ choice
->>  
->>  config USB_DWC2_HOST
->>  	bool "Host only mode"
->> -	depends on USB
->> +	depends on USB=y || (USB_DWC2=m && USB)
->>  	help
->>  	  The Designware USB2.0 high-speed host controller
->>  	  integrated into many SoCs. Select this option if you want the
->> @@ -42,7 +42,7 @@ config USB_DWC2_PERIPHERAL
->>  
->>  config USB_DWC2_DUAL_ROLE
->>  	bool "Dual Role mode"
->> -	depends on (USB=y || USB=USB_DWC2) && (USB_GADGET=y || USB_GADGET=USB_DWC2)
->> +	depends on (USB=y && USB_GADGET=y) || (USB_DWC2=m && USB && USB_GADGET)
->>  	help
->>  	  Select this option if you want the driver to work in a dual-role
->>  	  mode. In this mode both host and gadget features are enabled, and
->>
->>
+On 2015?01?30? 10:36, Jun Nie wrote:
+> Hi Marek & Arnd,
+>
+> Did you ever know issue that free CMA memory is high, but system is
+> hungry for memory and page cache is very low? I am enabling CMA in
+> Android on my board with 512MB memory and see FreeMem in /proc/meminfo
+> increase a lot with CMA comparing the reservation solution on boot. But
+> I find system is not borrowing memory from CMA pool when running 3dmark
+> (high webkit workload at start). Because the FreeMem size is high, but
+> cache size decreasing significantly to several MB during benchmark run,
+> I suppose system is trying to reclaim memory from pagecache for new
+> allocation. My question is that what API that page cache and webkit
+> related functionality are using to allocate memory. Maybe page cache
+> require memory that is not movable/reclaimable memory, where we may have
+> optimization to go thru dma_alloc_xxx to borrow CMA memory? I suppose
+> app level memory allocation shall be movable/reclaimable memory and can
+> borrow from CMA pool, but not sure whether the flag match the
+> movable/reclaimable memory and go thru the right path.
+>
+> Could you help share your experience/thoughts on this? Thanks!
+>
+>
+> B.R.
+> Jun
 
-Acked-by: John Youn <johnyoun@synopsys.com>
+Add more people.
