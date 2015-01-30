@@ -1,94 +1,47 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 30 Jan 2015 14:05:45 +0100
-Subject: [PATCH 2/2] dmaengine: fsl-edma: add PM suspend/resume support
-In-Reply-To: <1419928907-18053-3-git-send-email-jingchang.lu@freescale.com>
-References: <1419928907-18053-1-git-send-email-jingchang.lu@freescale.com>
- <1419928907-18053-3-git-send-email-jingchang.lu@freescale.com>
-Message-ID: <c6942c16d473173034df25b1bfa7f03c@agner.ch>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Fri, 30 Jan 2015 14:06:55 +0100
+Subject: [PATCH v3 0/6] Add multiple GPIO and external clock to MMC
+ pwrseq_simple
+In-Reply-To: <CAPDyKFqx-dhhVmtGnP2YpmR63Y20Ns=YyxnYrE2ewTuNXPA7Ag@mail.gmail.com>
+References: <1422543608-24704-1-git-send-email-javier.martinez@collabora.co.uk>
+ <CAPDyKFqx-dhhVmtGnP2YpmR63Y20Ns=YyxnYrE2ewTuNXPA7Ag@mail.gmail.com>
+Message-ID: <54CB81EF.8030603@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-12-30 09:41, Jingchang Lu wrote:
-> This adds power management suspend/resume support for
-> the fsl-edma driver.
+Hello Ulf,
+
+On 01/30/2015 12:13 PM, Ulf Hansson wrote:
+>>
+>> Patch #1 extends the simple MMC power sequence DT binding to support more
+>> than one GPIO and patch #2 adds the actual implementation.
+>>
+>> In the same way, patch #3 and #4 extend the simple MMC power sequence DT
+>> binding and pwrseq_simple driver to support an optional external clock.
+>>
+>> Finally as an example, patch #5 and patch #6 adds support for the wifi
+>> chip in the Exynos5250 Snow that needs all these resources. These two
+>> patches were added to the series only for completeness and should be
+>> picked by Kukjin through his linux-samsung tree.
+>>
+>> Best regards,
+>> Javier
 > 
-> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
-> ---
->  drivers/dma/fsl-edma.c | 38 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 38 insertions(+)
+> Thanks Javier! I have applied patch 1 -> 4 for my next branch.
 > 
-> diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
-> index e0bd517..6a81699 100644
-> --- a/drivers/dma/fsl-edma.c
-> +++ b/drivers/dma/fsl-edma.c
-> @@ -1017,6 +1017,43 @@ static int fsl_edma_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_PM_SLEEP
-> +static int fsl_edma_pm_suspend(struct device *dev)
-> +{
-> +	struct fsl_edma_engine *fsl_edma = dev_get_drvdata(dev);
-> +	struct fsl_edma_chan *fsl_chan;
-> +	int i;
-> +
-> +	for (i = 0; i < fsl_edma->n_chans; i++) {
-> +		fsl_chan = &fsl_edma->chans[i];
-> +		fsl_edma_chan_mux(fsl_chan, 0, false);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int fsl_edma_pm_resume(struct device *dev)
-> +{
-> +	struct fsl_edma_engine *fsl_edma = dev_get_drvdata(dev);
-> +	struct fsl_edma_chan *fsl_chan;
-> +	int i;
-> +
-> +	for (i = 0; i < fsl_edma->n_chans; i++) {
-> +		fsl_chan = &fsl_edma->chans[i];
-> +		edma_writew(fsl_edma, 0x0, fsl_edma->membase + EDMA_TCD_CSR(i));
+> I made some minor fix to patch4, I send a separate response to that
+> patch so you know.
+>
 
-What is the expectation of the suspend mode, are the registers and
-descriptors cleared during suspend? So this makes sure we have all
-descriptors disabled on wake-up, right?
+Great, thanks a lot!
 
-> +		/* restore the channel slave id configuration */
-> +		fsl_edma_chan_mux(fsl_chan, fsl_chan->slave_id, true);
+Kukjin,
 
-And here the channel gets muxed again.
+Could you please pick patches #5 and #6 then now that Ulf picked the others?
+ 
+> Kind regards
+> Uffe
+> 
 
-But the user is expected to reconfigure a channel, e.g. using
-dmaengine_slave_config and the dmaengine_prep*? Also and cyclic DMA
-which has been paused before would be interrupted, is this correct?
-
-I don't know what the common exception of the API is, I'm just asking so
-I now what I can expect when using the DMA driver in other device
-drivers...
-
---
-Stefan
-
-> +	}
-> +
-> +	edma_writel(fsl_edma, EDMA_CR_ERGA | EDMA_CR_ERCA,
-> +		    fsl_edma->membase + EDMA_CR);
-> +
-> +	return 0;
-> +}
-> +#endif
-> +static
-> +SIMPLE_DEV_PM_OPS(fsl_edma_pm_ops, fsl_edma_pm_suspend, fsl_edma_pm_resume);
-> +
->  static const struct of_device_id fsl_edma_dt_ids[] = {
->  	{ .compatible = "fsl,vf610-edma", },
->  	{ /* sentinel */ }
-> @@ -1027,6 +1064,7 @@ static struct platform_driver fsl_edma_driver = {
->  	.driver		= {
->  		.name	= "fsl-edma",
->  		.of_match_table = fsl_edma_dt_ids,
-> +		.pm	= &fsl_edma_pm_ops,
->  	},
->  	.probe          = fsl_edma_probe,
->  	.remove		= fsl_edma_remove,
+Best regards,
+Javier
