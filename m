@@ -1,41 +1,27 @@
-From: ricardo.ribalda@gmail.com (Ricardo Ribalda Delgado)
-Date: Fri, 30 Jan 2015 13:23:01 +0100
-Subject: [PATCH] spi/xilinx: Fix access invalid memory on xilinx_spi_tx
-In-Reply-To: <CAMuHMdU7=w1C6xjDhHwaFmw7Ct4OwfUHCKr8KsZKEoLZzfpf0Q@mail.gmail.com>
-References: <1422598209-5999-1-git-send-email-ricardo.ribalda@gmail.com>
- <CAMuHMdU7=w1C6xjDhHwaFmw7Ct4OwfUHCKr8KsZKEoLZzfpf0Q@mail.gmail.com>
-Message-ID: <CAPybu_3W3pSBLCxnVKyPVgnFQkitYMGu=xYbX+PpeTZcQH1oXA@mail.gmail.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Fri, 30 Jan 2015 13:39:13 +0100
+Subject: [PATCH] ARM: dts: mvebu: add ethernet to the cm-a510 board
+In-Reply-To: <54CB732F.7010409@gmail.com>
+References: <E1YH5bU-0005mG-3L@bombadil.infradead.org>
+ <54CB5267.5060004@gmail.com> <20150130113118.5523ed68@armhf>
+ <54CB6440.1010002@gmail.com> <20150130124144.501cf81d@armhf>
+ <54CB732F.7010409@gmail.com>
+Message-ID: <20150130133913.083d1ade@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 Jan 2015 11:06, "Geert Uytterhoeven" <geert@linux-m68k.org> wrote:
+On Fri, 30 Jan 2015 13:03:59 +0100
+Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
 
-> Is this endian-safe?
+> Nope. The cm-a510 is just an add-on for a baseboard, it does not make
+> a working board. Just think of it as a feature-improved SoC.
 
-As endianness safe as the original code, but there is also an issue. It is
-using rx_ptr.
+Well, I understand a bit, but I don't see clearly the physical system,
+nor how each part gets its configuration for booting.
 
-I am away until  Sunday. So I cannot make a new patch until then. I tried
-to make this patch before leaving in the morning and was obviously a
-mistake.
+As you know better than I, it seems that you are the right person to
+create the .dtsi/.dts's :) and to explain Gabriel how to use them!
 
-Again, Sorry for the mess this is really embarrassing.
-Regards
->         xspi->tx_ptr += xspi->bytes_per_word;
-
-> >  }
->
-> Gr{oetje,eeting}s,
->
->                         Geert
->
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 --
-> geert at linux-m68k.org <javascript:;>
->
-> In personal conversations with technical people, I call myself a hacker.
-> But
-> when I'm talking to journalists I just say "programmer" or something like
-> that.
->                                 -- Linus Torvalds
->
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
