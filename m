@@ -1,45 +1,53 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Fri, 30 Jan 2015 13:47:11 -0800
-Subject: [PATCH 4/8] arm64: Add EL2 switch to soft_restart
-In-Reply-To: <20150127175740.GK3226@e104818-lin.cambridge.arm.com>
-References: <cover.1421449714.git.geoff@infradead.org>
- <bb44d4eee4fab15278e4a8829a0981878bc9acd7.1421449714.git.geoff@infradead.org>
- <20150127175740.GK3226@e104818-lin.cambridge.arm.com>
-Message-ID: <1422654431.21823.33.camel@infradead.org>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Fri, 30 Jan 2015 15:48:26 -0600
+Subject: [Patch v2 1/6] soc: qcom: gsbi: Add support for ADM CRCI muxing
+In-Reply-To: <54CBF9AE.6060902@codeaurora.org>
+References: <1422599135-5588-1-git-send-email-agross@codeaurora.org>
+ <1422599135-5588-2-git-send-email-agross@codeaurora.org>
+ <B36DEAB1-2D89-4B6B-991E-C2EDBEB684D9@codeaurora.org>
+ <54CBF9AE.6060902@codeaurora.org>
+Message-ID: <C168E827-6052-4A7B-80EA-6330E8E08D51@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
 
-On Tue, 2015-01-27 at 17:57 +0000, Catalin Marinas wrote:
-> On Sat, Jan 17, 2015 at 12:23:34AM +0000, Geoff Levand wrote:
-> >  ENTRY(cpu_reset)
-> > -	mrs	x1, sctlr_el1
-> > -	bic	x1, x1, #1
-> > -	msr	sctlr_el1, x1			// disable the MMU
-> > +	mrs	x2, sctlr_el1
-> > +	bic	x2, x2, #1
-> > +	msr	sctlr_el1, x2			// disable the MMU
-> >  	isb
-> > -	ret	x0
-> > +
-> > +	cbz	x0, 1f				// el2_switch?
-> > +	mov	x0, x1
-> > +	mov	x1, xzr
-> > +	mov	x2, xzr
-> > +	mov	x3, xzr
-> > +	hvc	#HVC_CALL_FUNC			// no return
+On Jan 30, 2015, at 3:37 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+
+> On 01/30/15 08:32, Kumar Gala wrote:
+>> On Jan 30, 2015, at 12:25 AM, Andy Gross <agross@codeaurora.org> wrote:
+>> 
+>>> Required properties if child node exists:
+>>> - #address-cells: Must be 1
+>>> - #size-cells: Must be 1
+>>> - ranges: Must be present
+>>> 
+>>> +Note: Each GSBI should have an alias correctly numbered in "aliases" node.
+>>> +
+>>> Properties for children:
+>>> 
+>>> A GSBI controller node can contain 0 or more child nodes representing serial
+>>> @@ -37,6 +41,10 @@ Example for APQ8064:
+>>> 
+>>> #include <dt-bindings/soc/qcom,gsbi.h>
+>>> 
+>>> +	aliases {
+>>> +		gsbi4 = <&gsbi4>;
+>>> +	};
+>> You appear to be using the alias name to determine a index number for the gsbi, if that is the case, than you should probably just add a cell-index node to the gsbi?s for this purpose.
+>> 
 > 
-> If that's the only user of HVC_CALL_FUNC, why do we bother with
-> arguments, calling convention?
+> I thought cell-index was "deprecated" and referred more to things like
+> enumerating all the devices on a bus by assigning them a unique ID.
+> Aliases, on the other hand, allow us to enumerate a subset of devices
+> that share the same bus with other devices of different types. For
+> example, how would I know that a device is gsbi1 vs serial1 if they both
+> used cell-index and they both had the same parent node?
 
-It was intended that HVC_CALL_FUNC be a mechanism to call a generic
-function in hyp mode.  cpu_reset() is the only user of it now.
+I think the problem was cell-index was never well understood and abused.  For the example you are giving you wouldn?t use cell-index because you are talking about things that would have different compatibles.  For what it appears we really are enumerating the GSBI hardware to match some programming interface convention.  If that is the case than I think cell-index is proper.
 
-As Mark explained in another post, the use of x18 by the hyp stub
-is to avoid the complication of setting up a stack for EL2.  We
-thought this solution was acceptable since there are relatively
-few HVC_CALL_FUNC calls and we could assure they would do the
-right thing.
+- k
 
--Geoff 
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
