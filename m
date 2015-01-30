@@ -1,88 +1,43 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 30 Jan 2015 13:51:48 -0600
-Subject: [PATCH 2/3] tty/serial: of_serial: add support for PXA/MMP uarts
-In-Reply-To: <54C91E67.2070501@hurleysoftware.com>
-References: <1422334209-23125-1-git-send-email-robh@kernel.org>
- <1422334209-23125-2-git-send-email-robh@kernel.org>
- <54C78823.7050504@hurleysoftware.com>
- <CAL_Jsq+8jDN+fYyed5RYd2e1K+H_R1NkjT38WXSpKfxTLgsDbQ@mail.gmail.com>
- <54C7AA2D.7080202@hurleysoftware.com>
- <CAL_Jsq+wxY0=S1ff-Fk0xDBxHdhBvNopLpjfCETVoo_mou658w@mail.gmail.com>
- <54C91E67.2070501@hurleysoftware.com>
-Message-ID: <CAL_Jsq+6jg7C0z=0ZS=yp32_6yWzfx_zr5dtu-n3mv0JWiGq2g@mail.gmail.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Fri, 30 Jan 2015 23:01:01 +0300
+Subject: [PATCH v2 0/5] ARM: sa1100: implement irq driver as proper irqchip
+ driver
+Message-ID: <1422648066-7897-1-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 28, 2015 at 11:37 AM, Peter Hurley <peter@hurleysoftware.com> wrote:
-> On 01/27/2015 11:44 AM, Rob Herring wrote:
->> On Tue, Jan 27, 2015 at 9:09 AM, Peter Hurley <peter@hurleysoftware.com> wrote:
->
-> [...]
->
->>> Maybe Kconfig should warn if they're both built-in or both modules?
->>
->> Is there a way to do that?
->
-> Well, it's not what I had in mind originally, but the diff below
-> generates a broken dependencies warning without causing build problems:
->         $ scripts/kconfig/mconf Kconfig
->         warning: (SERIAL_PXA) selects TTYS_DRIVER_PXA which has unmet direct dependencies (TTY && HAS_IOMEM && !TTYS_DRIVER)
->
-> (My original idea was thwarted by the requirement that choice/endchoice
-> requires prompts).
+Hello,
 
-Okay, but this should be a separate patch. The problem exists with or
-without my patch.
+This is a second attempt to move Intel StrongARM SA-11x0 IRQ driver
+to drivers/irqchip/ place.
 
-> That said, for PXA, I think we agree splitting out a standalone 8250 platform
-> driver is the solution.
+Changes since V1:
 
-So after all the discussion, you are okay with the original patch?
+ - Added soc/sa1100/pwer.h header containing sa11x0_*_set_wake()
+   prototypes.
 
-Rob
+ - Removed spinlock from mask/unmask functions
 
->
-> Regards,
-> Peter Hurley
->
-> --
-> diff --git a/drivers/tty/serial/8250/Kconfig b/drivers/tty/serial/8250/Kconfig
-> index 0fcbcd2..c367542 100644
-> --- a/drivers/tty/serial/8250/Kconfig
-> +++ b/drivers/tty/serial/8250/Kconfig
-> @@ -6,6 +6,7 @@
->  config SERIAL_8250
->         tristate "8250/16550 and compatible serial support"
->         select SERIAL_CORE
-> +       select TTYS_DRIVER
->         ---help---
->           This selects whether you want to include the driver for the standard
->           serial ports.  The standard answer is Y.  People who might say N
-> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-> index c79b43c..10c3e27 100644
-> --- a/drivers/tty/serial/Kconfig
-> +++ b/drivers/tty/serial/Kconfig
-> @@ -7,6 +7,13 @@ if TTY
->  menu "Serial drivers"
->         depends on HAS_IOMEM
->
-> +config TTYS_DRIVER
-> +       tristate
-> +
-> +config TTYS_DRIVER_PXA
-> +       tristate
-> +       depends on !TTYS_DRIVER
-> +
->  config SERIAL_EARLYCON
->         bool
->         help
-> @@ -438,6 +445,7 @@ config SERIAL_PXA
->         bool "PXA serial port support"
->         depends on ARCH_PXA || ARCH_MMP
->         select SERIAL_CORE
-> +       select TTYS_DRIVER_PXA
->         help
->           If you have a machine based on an Intel XScale PXA2xx CPU you
->           can enable its onboard serial ports by enabling this option.
->
->
+ - Minor whitespace changes.
+
+The patches are based on my previous sa1100 patches that can be found
+in Russell's for-next branch or in linux-next tree.
+
+----------------------------------------------------------------
+Dmitry Eremin-Solenikov (5):
+      ARM: sa1100: add platform functions to handle PWER settings
+      ARM: sa1100: use sa11x0_sc_set_wake() in irq driver
+      ARM: sa1100: use ioremapped memory to access SC registers
+      irqchip: add sa1100 driver
+      ARM: sa1100: drop irq driver
+
+ arch/arm/mach-sa1100/Makefile                      |  2 +-
+ arch/arm/mach-sa1100/generic.c                     | 37 ++++++++++
+ drivers/irqchip/Makefile                           |  1 +
+ .../irq.c => drivers/irqchip/irq-sa11x0.c          | 82 +++++++++++-----------
+ include/linux/irqchip/irq-sa11x0.h                 | 16 +++++
+ include/soc/sa1100/pwer.h                          | 15 ++++
+ 6 files changed, 110 insertions(+), 43 deletions(-)
+ rename arch/arm/mach-sa1100/irq.c => drivers/irqchip/irq-sa11x0.c (66%)
+ create mode 100644 include/linux/irqchip/irq-sa11x0.h
+ create mode 100644 include/soc/sa1100/pwer.h
