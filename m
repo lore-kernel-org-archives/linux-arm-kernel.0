@@ -1,41 +1,60 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 30 Jan 2015 08:57:29 +0000
-Subject: [PATCH] regulator: qcom-rpm: Make it possible to specify supply
-In-Reply-To: <1422577377-31986-1-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1422577377-31986-1-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <54CB4779.6070107@linaro.org>
+From: yao.yuan@freescale.com (Yao Yuan)
+Date: Fri, 30 Jan 2015 09:00:28 +0000
+Subject: [PATCH 1/2] dmaengine: fsl-edma: add dma memcpy support
+In-Reply-To: <BN3PR0301MB12364CA46991F6616348AD9087410@BN3PR0301MB1236.namprd03.prod.outlook.com>
+References: <1419928907-18053-1-git-send-email-jingchang.lu@freescale.com>
+ <1419928907-18053-2-git-send-email-jingchang.lu@freescale.com>
+ <BN3PR0301MB12364CA46991F6616348AD9087410@BN3PR0301MB1236.namprd03.prod.outlook.com>
+Message-ID: <BL2PR03MB338511438EF5AA594C0B7A883310@BL2PR03MB338.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
-Thanks for sending this patch.. I almost forgot about this.
+Hi Vinod,
 
-Shouldn?t we update the DT Bindings with this info?
+Could you please take some times help to review the two patches?
 
-Other than that:
-Acked-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Thanks.
 
---srini
+Best Regards,
+Yuan Yao
 
-On 30/01/15 00:22, Bjorn Andersson wrote:
-> Make it possible to specify the supply of a regulator, through the
-> vin-supply property in dt.
->
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> ---
->   drivers/regulator/qcom_rpm-regulator.c | 1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/regulator/qcom_rpm-regulator.c b/drivers/regulator/qcom_rpm-regulator.c
-> index e3120bf..00c5cc3 100644
-> --- a/drivers/regulator/qcom_rpm-regulator.c
-> +++ b/drivers/regulator/qcom_rpm-regulator.c
-> @@ -679,6 +679,7 @@ static int rpm_reg_probe(struct platform_device *pdev)
->   	vreg->desc.owner = THIS_MODULE;
->   	vreg->desc.type = REGULATOR_VOLTAGE;
->   	vreg->desc.name = pdev->dev.of_node->name;
-> +	vreg->desc.supply_name = "vin";
->
->   	vreg->rpm = dev_get_drvdata(pdev->dev.parent);
->   	if (!vreg->rpm) {
->
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org]
+> On Behalf Of Jingchang Lu
+> Sent: Wednesday, January 14, 2015 5:37 PM
+> To: Lu Jingchang-B35083; vinod.koul at intel.com
+> Cc: dmaengine at vger.kernel.org; dan.j.williams at intel.com; linux-
+> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: RE: [PATCH 1/2] dmaengine: fsl-edma: add dma memcpy support
+> 
+> Hi, Vinod,
+> 
+>    Could you please help review the two patches, and merge them if possible?
+> Thanks!
+> 
+> 
+> Best Regards,
+> Jingchang
+> 
+> >-----Original Message-----
+> >From: Jingchang Lu [mailto:jingchang.lu at freescale.com]
+> >Sent: Tuesday, December 30, 2014 4:42 PM
+> >To: vinod.koul at intel.com
+> >Cc: dan.j.williams at intel.com; dmaengine at vger.kernel.org; linux-
+> >kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Lu
+> >Jingchang-B35083
+> >Subject: [PATCH 1/2] dmaengine: fsl-edma: add dma memcpy support
+> >
+> >This adds the memory copy capability support, the memcpy functionality
+> >needs to configure the DMAMUX of the channel with the always on slave id.
+> >
+> >Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
+> >---
+> > drivers/dma/fsl-edma.c | 63
+> >++++++++++++++++++++++++++++++++++++++++++++++++--
+> > 1 file changed, 61 insertions(+), 2 deletions(-)
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
