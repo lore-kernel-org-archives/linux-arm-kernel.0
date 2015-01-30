@@ -1,85 +1,61 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 30 Jan 2015 11:13:11 +0000
-Subject: [Linaro-acpi] [PATCH v7 04/17] ARM64 / ACPI: Introduce
- early_param for "acpi" and pass acpi=force to enable ACPI
-In-Reply-To: <CAKv+Gu_=si=L5+vvg+8hRgwmTahqdePw5bZxUMFSZ8obk-VXFQ@mail.gmail.com>
-References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
- <1421247905-3749-5-git-send-email-hanjun.guo@linaro.org>
- <CAOZdJXU2bFR1T4ZnGavvnrUXAp5e=vNt9g6WKX46H8qs1wz-TQ@mail.gmail.com>
- <CAOZdJXXe+29rux1L3QYBX0yHLy3kdi+ZJrXVd=XfgYN=R6DtKA@mail.gmail.com>
- <20150128181453.GG31752@e104818-lin.cambridge.arm.com>
- <54C92804.5090806@codeaurora.org>
- <20150129151956.GF8951@e104818-lin.cambridge.arm.com>
- <CAKv+Gu_=si=L5+vvg+8hRgwmTahqdePw5bZxUMFSZ8obk-VXFQ@mail.gmail.com>
-Message-ID: <20150130111311.GA27542@e104818-lin.cambridge.arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 30 Jan 2015 12:13:52 +0100
+Subject: [PATCH v3 0/6] Add multiple GPIO and external clock to MMC
+ pwrseq_simple
+In-Reply-To: <1422543608-24704-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1422543608-24704-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <CAPDyKFqx-dhhVmtGnP2YpmR63Y20Ns=YyxnYrE2ewTuNXPA7Ag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 29, 2015 at 06:20:06PM +0000, Ard Biesheuvel wrote:
-> On 29 January 2015 at 15:19, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Wed, Jan 28, 2015 at 06:18:44PM +0000, Timur Tabi wrote:
-> >> On 01/28/2015 12:14 PM, Catalin Marinas wrote:
-> >> >> >So it looks like there's a whole conversation about this already in
-> >> >> >this thread that I didn't notice.  However, reading through all of it,
-> >> >> >I still don't understand sure why the presence of ACPI tables is
-> >> >> >insufficient to enable ACPI.
-> >>
-> >> > Because ACPI on arm64 is still experimental, no matter how many people
-> >> > claim that it is production ready in their private setups.
-> >>
-> >> Fair enough.  Does this mean that passing "acpi=force" on the kernel
-> >> command line is a requirement for ARM64 servers?
-> >
-> > Please read my other email and ideally the whole sub-thread. The
-> > acpi=force should only be required if the SoC is described (from
-> > firmware) by both DT and ACPI.
-> >
-> >> >> >In what situation would we want to ignore ACPI tables that are
-> >> >> >present?
-> >>
-> >> > When DT tables are also present (and for the first platforms, that's
-> >> > highly recommended, though not easily enforceable at the kernel level).
-> >>
-> >> My understanding is that the EFI stub creates a device tree (and it
-> >> contains some important information), so I don't understand how we can
-> >> ever have an ACPI-only platform on ARM64 servers.
-> >
-> > If EFI stub creates the DT itself (not passed by firmware), it will
-> > write some information in the chosen node that the rest of the kernel
-> > can make use of and take the appropriate decision on whether to use ACPI
-> > or not. That's something that will be used by kexec and Xen as well
-> > which may want to boot with ACPI tables outside an EFI environment.
+On 29 January 2015 at 16:00, Javier Martinez Canillas
+<javier.martinez@collabora.co.uk> wrote:
+> Hello Ulf,
+>
+> Many WLAN chips attached to an SDIO interface needs more than one GPIO
+> for their reset sequence and also an external clock to be operational.
+>
+> Since this is very common, this series extend the simple MMC power sequence
+> to support more than one reset GPIO and also an optional external clock.
+>
+> This is the third version of the series that addressed issues pointed out
+> in the previous versions.
+>
+> The series depend on v4 "mmc: core: Add support for MMC power sequences":
+>
+> http://comments.gmane.org/gmane.linux.kernel.mmc/30665
+>
+> Javier Martinez Canillas (6):
+>   mmc: pwrseq: Document that simple sequence support more than one GPIO
+>   mmc: pwrseq_simple: Extend to support more pins
+>   mmc: pwrseq: Document optional clock for the simple power sequence
+>   mmc: pwrseq_simple: Add optional reference clock support
+>   ARM: dts: exynos5250-snow: Enable wifi power-on
+>   ARM: dts: exynos5250-snow: Add cap-sdio-irq to wifi mmc node
+>
+>  .../devicetree/bindings/mmc/mmc-pwrseq-simple.txt  | 11 ++-
+>  arch/arm/boot/dts/exynos5250-snow.dts              | 26 ++++++-
+>  drivers/mmc/core/pwrseq_simple.c                   | 89 ++++++++++++++++++----
+>  3 files changed, 107 insertions(+), 19 deletions(-)
+>
+> Patch #1 extends the simple MMC power sequence DT binding to support more
+> than one GPIO and patch #2 adds the actual implementation.
+>
+> In the same way, patch #3 and #4 extend the simple MMC power sequence DT
+> binding and pwrseq_simple driver to support an optional external clock.
+>
+> Finally as an example, patch #5 and patch #6 adds support for the wifi
+> chip in the Exynos5250 Snow that needs all these resources. These two
+> patches were added to the series only for completeness and should be
+> picked by Kukjin through his linux-samsung tree.
+>
+> Best regards,
+> Javier
 
-For Timur's reference, here's Hanjun's proposal:
+Thanks Javier! I have applied patch 1 -> 4 for my next branch.
 
-http://article.gmane.org/gmane.linux.acpi.devel/73061
+I made some minor fix to patch4, I send a separate response to that
+patch so you know.
 
-> If we are going with this solution, we should also mandate that an
-> ACPI enabled firmware should not supply a non-DT DTB, or we wouldn't
-> spot the difference. Not sure how likely this is, but I could imagine
-> a firmware setting up an initrd and hence populating the /chosen node
-> in an otherwise empty DTB. In this case, the stub would not add its
-> 'I-created-an-empty-dtb' property.
-
-I think that's a sane requirement. For the normal case of UEFI firmware
-booting Linux as an EFI application (stub), if the firmware passes a DTB
-it _must_ contain the full SoC description and be able to boot the
-kernel without acpi=force. Passing initrd is really not a feature of the
-SoC to be described in DT by firmware. We leave this to the EFI stub to
-transfer the command line arguments into the chosen DT node.
-
-Apart from UEFI, we have Xen and kexec and I think the plan is to
-emulate the EFI stub behaviour when starting the kernel and they'll
-state whether the dtb contains SoC description or not. All we need to do
-here is make sure that the EFI stub <-> kernel protocol via the /chosen
-node is well documented. We won't be able to prevent, for example,
-U-Boot booting Linux with ACPI but I don't see why we should care.
-
-Anyway, rather than a "I-created-an-empty-dtb" property, I would
-actually say something like "dtb-contains-no-hardware-description".
-Alternatively, we could avoid any such properties and look for signs of
-hardware description like more nodes than /chosen, CPU nodes, "model"
-property etc. and we won't need to change the stub code at all.
-
--- 
-Catalin
+Kind regards
+Uffe
