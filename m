@@ -1,108 +1,459 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 30 Jan 2015 12:14:45 +0000
-Subject: [PATCH 7/8] arm64/kexec: Add checks for KVM
-In-Reply-To: <54CB206D.7040705@linaro.org>
-References: <cover.1421449714.git.geoff@infradead.org>
- <a3353cf2ac47f49c20bbbb88405301cbaa359805.1421449714.git.geoff@infradead.org>
- <20150126191942.GQ23313@leverpostej> <54CA041C.6020403@linaro.org>
- <54CA12A1.8090508@arm.com> <20150129184747.GV17721@leverpostej>
- <54CB206D.7040705@linaro.org>
-Message-ID: <20150130121444.GA9730@leverpostej>
+From: chenhui.zhao@freescale.com (Chenhui Zhao)
+Date: Fri, 30 Jan 2015 20:22:18 +0800
+Subject: [PATCH 1/4] fsl: add EPU FSM configuration for deep sleep
+Message-ID: <1422620541-6843-1-git-send-email-chenhui.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 30, 2015 at 06:10:53AM +0000, AKASHI Takahiro wrote:
-> Hello Marc, Mark
-> 
-> Thank you for your useful comments.
-> I need to look at Marc's commit(5a677ce044f) more carefully
-> about trampoline code.
-> 
-> On 01/30/2015 03:47 AM, Mark Rutland wrote:
-> > On Thu, Jan 29, 2015 at 10:59:45AM +0000, Marc Zyngier wrote:
-> >>
-> >> On 29/01/15 09:57, AKASHI Takahiro wrote:
-> >>> Hello,
-> >>>
-> >>> On 01/27/2015 04:19 AM, Mark Rutland wrote:
-> >>>> On Sat, Jan 17, 2015 at 12:23:34AM +0000, Geoff Levand wrote:
-> >>>>> Add runtime checks that fail the arm64 kexec syscall for situations that would
-> >>>>> result in system instability do to problems in the KVM kernel support.
-> >>>>> These checks should be removed when the KVM problems are resolved fixed.
-> >>>>>
-> >>>>> Signed-off-by: Geoff Levand <geoff@infradead.org>
-> >>>>> ---
-> >>>>>    arch/arm64/kernel/machine_kexec.c | 10 ++++++++++
-> >>>>>    1 file changed, 10 insertions(+)
-> >>>>>
-> >>>>> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-> >>>>> index 3d84759..a36459d 100644
-> >>>>> --- a/arch/arm64/kernel/machine_kexec.c
-> >>>>> +++ b/arch/arm64/kernel/machine_kexec.c
-> >>>>> @@ -16,6 +16,9 @@
-> >>>>>    #include <asm/cacheflush.h>
-> >>>>>    #include <asm/system_misc.h>
-> >>>>>
-> >>>>> +/* TODO: Remove this include when KVM can support a kexec reboot. */
-> >>>>> +#include <asm/virt.h>
-> >>>>> +
-> >>>>>    /* Global variables for the relocate_kernel routine. */
-> >>>>>    extern const unsigned char relocate_new_kernel[];
-> >>>>>    extern const unsigned long relocate_new_kernel_size;
-> >>>>> @@ -100,6 +103,13 @@ int machine_kexec_prepare(struct kimage *image)
-> >>>>>
-> >>>>>    	kexec_image_info(image);
-> >>>>>
-> >>>>> +	/* TODO: Remove this message when KVM can support a kexec reboot. */
-> >>>>> +	if (IS_ENABLED(CONFIG_KVM) && is_hyp_mode_available()) {
-> >>>>> +		pr_err("%s: Your kernel is configured with KVM support (CONFIG_KVM=y) which currently does not allow for kexec re-boot.\n",
-> >>>>> +			__func__);
-> >>>>> +		return -ENOSYS;
-> >>>>> +	}
-> >>>>
-> >>>> If you really don't want to implement KVM teardown, surely this should
-> >>>> be at the start of the series, so we don't have a point in the middle
-> >>>> where things may explode in this case?
-> >>>
-> >>> I'm going to fix this KVM issue (teardown) in cooperation with Geoff.
-> >>>
-> >>> Looking into kvm init code, kvm_arch_init() in particular,
-> >>> I guess that teardown function (kvm_arch_exit()) should do
-> >>>     (reverting kvm_timer_hyp_init() per cpu)
-> >>> - stop arch timer
-> >>
-> >> No need, there shouldn't be any guest running at that point.
-> >>
-> >>>     (reverting cpu_init_hyp_mode() per cpu)
-> >>> - flush TLB
-> >>> - jump into identical mapping (using boot_hyp_pgd?)
-> >>> - disable MMU?
-> >>
-> >> Yes, and for that, you need to go back to an idmap
-> >>
-> >>> - restore vbar_el2 to __hyp_stub_vectors (or NULL?)
-> >>
-> >> It doesn't matter, you want to stay in HYP for the next kernel.
-> >
-> > Well, it depends on how the teardown is implemented. I'd imagined we'd
-> > have KVM tear itself down (restoring the hyp stub) as part of shut down.
-> > Later kexec/soft_restart would call the stub to get back to EL2.
-> >
-> > That way kexec doesn't need to know anything about KVM, and it has one
-> > path that works regardless of whether KVM is compiled into the kernel.
-> 
-> Initially, I thought that we would define kvm_arch_exit() and call it
-> somewhere in the middle of kexec path (no idea yet).
-> But Geoff suggested me to implement a new hvc call, HVC_CPU_SHUTDOWN(??),
-> and make it called via cpu_notifier(CPU_DYING_FROZEN) initiated by
-> machine_shutdown() from kernel_kexec().
-> (As you know, a hook is already there for cpu online in kvm/arm.c.)
+T104x, T1024 and LS1021 of Freescale have a Finite State Machine (FSM)
+to control the hardware precedure in deep sleep. Software will start
+the FSM to enter deep sleep after finishing prepare work.
+Then, when receiving a wakeup event, the FSM will restore the SoC to
+work.
 
-I think it would make far more sense to have the KVM teardown entirely
-contained within KVM (e.g. in kvm_arch_exit). That way there's no need
-for an interdependency between KVM and kexec, and we'd be a step closer
-to KVM as a module.
+This driver configures and clears the FSM registers for deep sleep. Note
+that the sequence of clearing the FSM registers does matter, should follow
+the sequence mentioned in the reference manual.
 
-I'm not keen on having KVM teardown in the middle of the kexec path.
+Signed-off-by: Chenhui Zhao <chenhui.zhao@freescale.com>
+---
+ drivers/platform/Kconfig         |   2 +
+ drivers/platform/Makefile        |   1 +
+ drivers/platform/fsl/Kconfig     |  11 ++
+ drivers/platform/fsl/Makefile    |   5 +
+ drivers/platform/fsl/sleep_fsm.c | 263 +++++++++++++++++++++++++++++++++++++++
+ drivers/platform/fsl/sleep_fsm.h | 104 ++++++++++++++++
+ 6 files changed, 386 insertions(+)
+ create mode 100644 drivers/platform/fsl/Kconfig
+ create mode 100644 drivers/platform/fsl/Makefile
+ create mode 100644 drivers/platform/fsl/sleep_fsm.c
+ create mode 100644 drivers/platform/fsl/sleep_fsm.h
 
-Mark.
+diff --git a/drivers/platform/Kconfig b/drivers/platform/Kconfig
+index 09fde58..85e3c95 100644
+--- a/drivers/platform/Kconfig
++++ b/drivers/platform/Kconfig
+@@ -6,3 +6,5 @@ source "drivers/platform/goldfish/Kconfig"
+ endif
+ 
+ source "drivers/platform/chrome/Kconfig"
++
++source "drivers/platform/fsl/Kconfig"
+diff --git a/drivers/platform/Makefile b/drivers/platform/Makefile
+index 3656b7b..37c6f72 100644
+--- a/drivers/platform/Makefile
++++ b/drivers/platform/Makefile
+@@ -6,3 +6,4 @@ obj-$(CONFIG_X86)		+= x86/
+ obj-$(CONFIG_OLPC)		+= olpc/
+ obj-$(CONFIG_GOLDFISH)		+= goldfish/
+ obj-$(CONFIG_CHROME_PLATFORMS)	+= chrome/
++obj-$(CONFIG_FSL_SOC)		+= fsl/
+diff --git a/drivers/platform/fsl/Kconfig b/drivers/platform/fsl/Kconfig
+new file mode 100644
+index 0000000..a1ea46e
+--- /dev/null
++++ b/drivers/platform/fsl/Kconfig
+@@ -0,0 +1,11 @@
++#
++# Freescale Specific Power Management Drivers
++#
++
++config FSL_SLEEP_FSM
++	bool
++	help
++	  This driver configures a hardware FSM (Finite State Machine) used in deep sleep.
++	  The FSM finishes clean-ups at the last stage of entering deep sleep, and also
++	  wakes up system when a wake up event happens. So far, T104x, T1024 and LS1021
++	  need this.
+diff --git a/drivers/platform/fsl/Makefile b/drivers/platform/fsl/Makefile
+new file mode 100644
+index 0000000..d99ca0e
+--- /dev/null
++++ b/drivers/platform/fsl/Makefile
+@@ -0,0 +1,5 @@
++#
++# Makefile for linux/drivers/platform/fsl
++# Freescale Specific Power Management Drivers
++#
++obj-$(CONFIG_FSL_SLEEP_FSM)	+= sleep_fsm.o
+diff --git a/drivers/platform/fsl/sleep_fsm.c b/drivers/platform/fsl/sleep_fsm.c
+new file mode 100644
+index 0000000..0a0480a
+--- /dev/null
++++ b/drivers/platform/fsl/sleep_fsm.c
+@@ -0,0 +1,263 @@
++/*
++ * Freescale deep sleep FSM (finite-state machine) configuration
++ *
++ * Copyright 2014-2015 Freescale Semiconductor Inc.
++ *
++ * Author: Hongbo Zhang <hongbo.zhang@freescale.com>
++ *         Chenhui Zhao <chenhui.zhao@freescale.com>
++ *
++ * This program is free software; you can redistribute  it and/or modify it
++ * under  the terms of  the GNU General  Public License as published by the
++ * Free Software Foundation;  either version 2 of the  License, or (at your
++ * option) any later version.
++ */
++
++#include <linux/kernel.h>
++#include <linux/io.h>
++#include <linux/types.h>
++
++#include "sleep_fsm.h"
++/*
++ * These values are from chip's reference manual. For example,
++ * the values for T1040 can be found in "8.4.3.8 Programming
++ * supporting deep sleep mode" of Chapter 8 "Run Control and
++ * Power Management (RCPM)".
++ * The default value can be applied to T104x, T1024 and LS1021.
++ */
++struct fsm_reg_vals epu_default_val[] = {
++	/* EPGCR (Event Processor Global Control Register) */
++	{EPGCR, 0},
++	/* EPECR (Event Processor Event Control Registers) */
++	{EPECR0 + EPECR_STRIDE * 0, 0},
++	{EPECR0 + EPECR_STRIDE * 1, 0},
++	{EPECR0 + EPECR_STRIDE * 2, 0xF0004004},
++	{EPECR0 + EPECR_STRIDE * 3, 0x80000084},
++	{EPECR0 + EPECR_STRIDE * 4, 0x20000084},
++	{EPECR0 + EPECR_STRIDE * 5, 0x08000004},
++	{EPECR0 + EPECR_STRIDE * 6, 0x80000084},
++	{EPECR0 + EPECR_STRIDE * 7, 0x80000084},
++	{EPECR0 + EPECR_STRIDE * 8, 0x60000084},
++	{EPECR0 + EPECR_STRIDE * 9, 0x08000084},
++	{EPECR0 + EPECR_STRIDE * 10, 0x42000084},
++	{EPECR0 + EPECR_STRIDE * 11, 0x90000084},
++	{EPECR0 + EPECR_STRIDE * 12, 0x80000084},
++	{EPECR0 + EPECR_STRIDE * 13, 0x08000084},
++	{EPECR0 + EPECR_STRIDE * 14, 0x02000084},
++	{EPECR0 + EPECR_STRIDE * 15, 0x00000004},
++	/*
++	 * EPEVTCR (Event Processor EVT Pin Control Registers)
++	 * SCU8 triger EVT2, and SCU11 triger EVT9
++	 */
++	{EPEVTCR0 + EPEVTCR_STRIDE * 0, 0},
++	{EPEVTCR0 + EPEVTCR_STRIDE * 1, 0},
++	{EPEVTCR0 + EPEVTCR_STRIDE * 2, 0x80000001},
++	{EPEVTCR0 + EPEVTCR_STRIDE * 3, 0},
++	{EPEVTCR0 + EPEVTCR_STRIDE * 4, 0},
++	{EPEVTCR0 + EPEVTCR_STRIDE * 5, 0},
++	{EPEVTCR0 + EPEVTCR_STRIDE * 6, 0},
++	{EPEVTCR0 + EPEVTCR_STRIDE * 7, 0},
++	{EPEVTCR0 + EPEVTCR_STRIDE * 8, 0},
++	{EPEVTCR0 + EPEVTCR_STRIDE * 9, 0xB0000001},
++	/* EPCMPR (Event Processor Counter Compare Registers) */
++	{EPCMPR0 + EPCMPR_STRIDE * 0, 0},
++	{EPCMPR0 + EPCMPR_STRIDE * 1, 0},
++	{EPCMPR0 + EPCMPR_STRIDE * 2, 0x000000FF},
++	{EPCMPR0 + EPCMPR_STRIDE * 3, 0},
++	{EPCMPR0 + EPCMPR_STRIDE * 4, 0x000000FF},
++	{EPCMPR0 + EPCMPR_STRIDE * 5, 0x00000020},
++	{EPCMPR0 + EPCMPR_STRIDE * 6, 0},
++	{EPCMPR0 + EPCMPR_STRIDE * 7, 0},
++	{EPCMPR0 + EPCMPR_STRIDE * 8, 0x000000FF},
++	{EPCMPR0 + EPCMPR_STRIDE * 9, 0x000000FF},
++	{EPCMPR0 + EPCMPR_STRIDE * 10, 0x000000FF},
++	{EPCMPR0 + EPCMPR_STRIDE * 11, 0x000000FF},
++	{EPCMPR0 + EPCMPR_STRIDE * 12, 0x000000FF},
++	{EPCMPR0 + EPCMPR_STRIDE * 13, 0},
++	{EPCMPR0 + EPCMPR_STRIDE * 14, 0x000000FF},
++	{EPCMPR0 + EPCMPR_STRIDE * 15, 0x000000FF},
++	/* EPCCR (Event Processor Counter Control Registers) */
++	{EPCCR0 + EPCCR_STRIDE * 0, 0},
++	{EPCCR0 + EPCCR_STRIDE * 1, 0},
++	{EPCCR0 + EPCCR_STRIDE * 2, 0x92840000},
++	{EPCCR0 + EPCCR_STRIDE * 3, 0},
++	{EPCCR0 + EPCCR_STRIDE * 4, 0x92840000},
++	{EPCCR0 + EPCCR_STRIDE * 5, 0x92840000},
++	{EPCCR0 + EPCCR_STRIDE * 6, 0},
++	{EPCCR0 + EPCCR_STRIDE * 7, 0},
++	{EPCCR0 + EPCCR_STRIDE * 8, 0x92840000},
++	{EPCCR0 + EPCCR_STRIDE * 9, 0x92840000},
++	{EPCCR0 + EPCCR_STRIDE * 10, 0x92840000},
++	{EPCCR0 + EPCCR_STRIDE * 11, 0x92840000},
++	{EPCCR0 + EPCCR_STRIDE * 12, 0x92840000},
++	{EPCCR0 + EPCCR_STRIDE * 13, 0},
++	{EPCCR0 + EPCCR_STRIDE * 14, 0x92840000},
++	{EPCCR0 + EPCCR_STRIDE * 15, 0x92840000},
++	/* EPSMCR (Event Processor SCU Mux Control Registers) */
++	{EPSMCR0 + EPSMCR_STRIDE * 0, 0},
++	{EPSMCR0 + EPSMCR_STRIDE * 1, 0},
++	{EPSMCR0 + EPSMCR_STRIDE * 2, 0x6C700000},
++	{EPSMCR0 + EPSMCR_STRIDE * 3, 0x2F000000},
++	{EPSMCR0 + EPSMCR_STRIDE * 4, 0x002F0000},
++	{EPSMCR0 + EPSMCR_STRIDE * 5, 0x00002E00},
++	{EPSMCR0 + EPSMCR_STRIDE * 6, 0x7C000000},
++	{EPSMCR0 + EPSMCR_STRIDE * 7, 0x30000000},
++	{EPSMCR0 + EPSMCR_STRIDE * 8, 0x64300000},
++	{EPSMCR0 + EPSMCR_STRIDE * 9, 0x00003000},
++	{EPSMCR0 + EPSMCR_STRIDE * 10, 0x65000030},
++	{EPSMCR0 + EPSMCR_STRIDE * 11, 0x31740000},
++	{EPSMCR0 + EPSMCR_STRIDE * 12, 0x7F000000},
++	{EPSMCR0 + EPSMCR_STRIDE * 13, 0x00003100},
++	{EPSMCR0 + EPSMCR_STRIDE * 14, 0x00000031},
++	{EPSMCR0 + EPSMCR_STRIDE * 15, 0x76000000},
++	/* EPACR (Event Processor Action Control Registers) */
++	{EPACR0 + EPACR_STRIDE * 0, 0},
++	{EPACR0 + EPACR_STRIDE * 1, 0},
++	{EPACR0 + EPACR_STRIDE * 2, 0},
++	{EPACR0 + EPACR_STRIDE * 3, 0x00000080},
++	{EPACR0 + EPACR_STRIDE * 4, 0},
++	{EPACR0 + EPACR_STRIDE * 5, 0x00000040},
++	{EPACR0 + EPACR_STRIDE * 6, 0},
++	{EPACR0 + EPACR_STRIDE * 7, 0},
++	{EPACR0 + EPACR_STRIDE * 8, 0},
++	{EPACR0 + EPACR_STRIDE * 9, 0x0000001C},
++	{EPACR0 + EPACR_STRIDE * 10, 0x00000020},
++	{EPACR0 + EPACR_STRIDE * 11, 0},
++	{EPACR0 + EPACR_STRIDE * 12, 0x00000003},
++	{EPACR0 + EPACR_STRIDE * 13, 0x06000000},
++	{EPACR0 + EPACR_STRIDE * 14, 0x04000000},
++	{EPACR0 + EPACR_STRIDE * 15, 0x02000000},
++	/* EPIMCR (Event Processor Input Mux Control Registers) */
++	{EPIMCR0 + EPIMCR_STRIDE * 0, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 1, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 2, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 3, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 4, 0x44000000},
++	{EPIMCR0 + EPIMCR_STRIDE * 5, 0x40000000},
++	{EPIMCR0 + EPIMCR_STRIDE * 6, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 7, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 8, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 9, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 10, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 11, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 12, 0x44000000},
++	{EPIMCR0 + EPIMCR_STRIDE * 13, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 14, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 15, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 16, 0x6A000000},
++	{EPIMCR0 + EPIMCR_STRIDE * 17, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 18, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 19, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 20, 0x48000000},
++	{EPIMCR0 + EPIMCR_STRIDE * 21, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 22, 0x6C000000},
++	{EPIMCR0 + EPIMCR_STRIDE * 23, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 24, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 25, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 26, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 27, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 28, 0x76000000},
++	{EPIMCR0 + EPIMCR_STRIDE * 29, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 30, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 31, 0x76000000},
++	/* EPXTRIGCR (Event Processor Crosstrigger Control Register) */
++	{EPXTRIGCR, 0x0000FFDF},
++	/* end */
++	{FSM_END_FLAG, 0},
++};
++
++struct fsm_reg_vals npc_default_val[] = {
++	/* NPC triggered Memory-Mapped Access Registers */
++	{NCR, 0x80000000},
++	{MCCR1, 0},
++	{MCSR1, 0},
++	{MMAR1LO, 0},
++	{MMAR1HI, 0},
++	{MMDR1, 0},
++	{MCSR2, 0},
++	{MMAR2LO, 0},
++	{MMAR2HI, 0},
++	{MMDR2, 0},
++	{MCSR3, 0x80000000},
++	{MMAR3LO, 0x000E2130},
++	{MMAR3HI, 0x00030000},
++	{MMDR3, 0x00020000},
++	/* end */
++	{FSM_END_FLAG, 0},
++};
++
++static void fsl_fsm_setup(void __iomem *base, struct fsm_reg_vals *val)
++{
++	struct fsm_reg_vals *data = val;
++
++	BUG_ON(!base || !data);
++	while (data->offset != FSM_END_FLAG) {
++		iowrite32be(data->value, base + data->offset);
++		data++;
++	}
++}
++
++/**
++ * fsl_epu_setup - Configure EPU registers
++ * @epu_base: the base address of EPU registers
++ */
++void fsl_epu_setup(void __iomem *epu_base)
++{
++	fsl_fsm_setup(epu_base, epu_default_val);
++}
++
++/**
++ * fsl_npc_setup - Configure NPC registers
++ * @npc_base: the base address of NPC registers
++ */
++void fsl_npc_setup(void __iomem *npc_base)
++{
++	fsl_fsm_setup(npc_base, npc_default_val);
++}
++
++/**
++ * fsl_epu_clean - Clear EPU registers
++ * @epu_base: the base address of EPU registers
++ */
++void fsl_epu_clean(void __iomem *epu_base)
++{
++	u32 offset;
++
++	/* follow the exact sequence to clear the registers */
++	/* Clear EPACRn */
++	for (offset = EPACR0; offset <= EPACR15; offset += EPACR_STRIDE)
++		iowrite32be(0, epu_base + offset);
++
++	/* Clear EPEVTCRn */
++	for (offset = EPEVTCR0; offset <= EPEVTCR9; offset += EPEVTCR_STRIDE)
++		iowrite32be(0, epu_base + offset);
++
++	/* Clear EPGCR */
++	iowrite32be(0, epu_base + EPGCR);
++
++	/* Clear EPSMCRn */
++	for (offset = EPSMCR0; offset <= EPSMCR15; offset += EPSMCR_STRIDE)
++		iowrite32be(0, epu_base + offset);
++
++	/* Clear EPCCRn */
++	for (offset = EPCCR0; offset <= EPCCR31; offset += EPCCR_STRIDE)
++		iowrite32be(0, epu_base + offset);
++
++	/* Clear EPCMPRn */
++	for (offset = EPCMPR0; offset <= EPCMPR31; offset += EPCMPR_STRIDE)
++		iowrite32be(0, epu_base + offset);
++
++	/* Clear EPCTRn */
++	for (offset = EPCTR0; offset <= EPCTR31; offset += EPCTR_STRIDE)
++		iowrite32be(0, epu_base + offset);
++
++	/* Clear EPIMCRn */
++	for (offset = EPIMCR0; offset <= EPIMCR31; offset += EPIMCR_STRIDE)
++		iowrite32be(0, epu_base + offset);
++
++	/* Clear EPXTRIGCRn */
++	iowrite32be(0, epu_base + EPXTRIGCR);
++
++	/* Clear EPECRn */
++	for (offset = EPECR0; offset <= EPECR15; offset += EPECR_STRIDE)
++		iowrite32be(0, epu_base + offset);
++}
+diff --git a/drivers/platform/fsl/sleep_fsm.h b/drivers/platform/fsl/sleep_fsm.h
+new file mode 100644
+index 0000000..88b60f6
+--- /dev/null
++++ b/drivers/platform/fsl/sleep_fsm.h
+@@ -0,0 +1,104 @@
++/*
++ * Freescale deep sleep FSM (finite-state machine) configuration
++ *
++ * Copyright 2014-2015 Freescale Semiconductor Inc.
++ *
++ * This program is free software; you can redistribute  it and/or modify it
++ * under  the terms of  the GNU General  Public License as published by the
++ * Free Software Foundation;  either version 2 of the  License, or (at your
++ * option) any later version.
++ */
++#ifndef _FSL_SLEEP_FSM_H
++#define _FSL_SLEEP_FSM_H
++
++#define FSL_STRIDE_4B	4
++#define FSL_STRIDE_8B	8
++
++/* End flag */
++#define FSM_END_FLAG		0xFFFFFFFFUL
++
++/* Block offsets */
++#define RCPM_BLOCK_OFFSET	0x00022000
++#define EPU_BLOCK_OFFSET	0x00000000
++#define NPC_BLOCK_OFFSET	0x00001000
++
++/* EPGCR (Event Processor Global Control Register) */
++#define EPGCR		0x000
++
++/* EPEVTCR0-9 (Event Processor EVT Pin Control Registers) */
++#define EPEVTCR0	0x050
++#define EPEVTCR9	0x074
++#define EPEVTCR_STRIDE	FSL_STRIDE_4B
++
++/* EPXTRIGCR (Event Processor Crosstrigger Control Register) */
++#define EPXTRIGCR	0x090
++
++/* EPIMCR0-31 (Event Processor Input Mux Control Registers) */
++#define EPIMCR0		0x100
++#define EPIMCR31	0x17C
++#define EPIMCR_STRIDE	FSL_STRIDE_4B
++
++/* EPSMCR0-15 (Event Processor SCU Mux Control Registers) */
++#define EPSMCR0		0x200
++#define EPSMCR15	0x278
++#define EPSMCR_STRIDE	FSL_STRIDE_8B
++
++/* EPECR0-15 (Event Processor Event Control Registers) */
++#define EPECR0		0x300
++#define EPECR15		0x33C
++#define EPECR_STRIDE	FSL_STRIDE_4B
++
++/* EPACR0-15 (Event Processor Action Control Registers) */
++#define EPACR0		0x400
++#define EPACR15		0x43C
++#define EPACR_STRIDE	FSL_STRIDE_4B
++
++/* EPCCRi0-15 (Event Processor Counter Control Registers) */
++#define EPCCR0		0x800
++#define EPCCR15		0x83C
++#define EPCCR31		0x87C
++#define EPCCR_STRIDE	FSL_STRIDE_4B
++
++/* EPCMPR0-15 (Event Processor Counter Compare Registers) */
++#define EPCMPR0		0x900
++#define EPCMPR15	0x93C
++#define EPCMPR31	0x97C
++#define EPCMPR_STRIDE	FSL_STRIDE_4B
++
++/* EPCTR0-31 (Event Processor Counter Register) */
++#define EPCTR0		0xA00
++#define EPCTR31		0xA7C
++#define EPCTR_STRIDE	FSL_STRIDE_4B
++
++/* NPC triggered Memory-Mapped Access Registers */
++#define NCR		0x000
++#define MCCR1		0x0CC
++#define MCSR1		0x0D0
++#define MMAR1LO		0x0D4
++#define MMAR1HI		0x0D8
++#define MMDR1		0x0DC
++#define MCSR2		0x0E0
++#define MMAR2LO		0x0E4
++#define MMAR2HI		0x0E8
++#define MMDR2		0x0EC
++#define MCSR3		0x0F0
++#define MMAR3LO		0x0F4
++#define MMAR3HI		0x0F8
++#define MMDR3		0x0FC
++
++/* RCPM Core State Action Control Register 0 */
++#define CSTTACR0	0xB00
++
++/* RCPM Core Group 1 Configuration Register 0 */
++#define CG1CR0		0x31C
++
++struct fsm_reg_vals {
++	u32 offset;
++	u32 value;
++};
++
++void fsl_epu_setup(void __iomem *epu_base);
++void fsl_npc_setup(void __iomem *npc_base);
++void fsl_epu_clean(void __iomem *epu_base);
++
++#endif /* _FSL_SLEEP_FSM_H */
+-- 
+1.9.1
