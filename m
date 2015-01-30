@@ -1,31 +1,29 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 30 Jan 2015 22:55:55 +0100
-Subject: [PATCH] iommu: arm-smmu: avoid build warning
-Message-ID: <1754709.y30A9Ie4hF@wuerfel>
+Date: Fri, 30 Jan 2015 22:58:19 +0100
+Subject: [PATCH] net/tulip: don't warn about unknown ARM architecture
+Message-ID: <1780413.LLpv9s01CB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM allmodconfig gained a new warning when dma_addr_t is 32-bit wide:
+ARM has 32-byte cache lines, which according to the comment in
+the init registers function seems to work best with the default
+value of 0x4800 that is also used on sparc and parisc.
 
-drivers/iommu/arm-smmu.c: In function 'arm_smmu_iova_to_phys_hard':
-drivers/iommu/arm-smmu.c:1255:3: warning: right shift count >= width of type
-
-This changes the calculation so that the effective type is always
-64-bit.
+This adds ARM to the same list, to use that default but no
+longer warn about it.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 859a732e4f713 ("iommu/arm-smmu: add support for iova_to_phys through ATS1PR")
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 1d6d43bb3395..fc13dd56953e 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1252,7 +1252,7 @@ static phys_addr_t arm_smmu_iova_to_phys_hard(struct iommu_domain *domain,
- 	} else {
- 		u32 reg = iova & ~0xfff;
- 		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
--		reg = (iova & ~0xfff) >> 32;
-+		reg = ((u64)iova & ~0xfff) >> 32;
- 		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_HI);
+diff --git a/drivers/net/ethernet/dec/tulip/winbond-840.c b/drivers/net/ethernet/dec/tulip/winbond-840.c
+index 6aa887e0e1cb..9beb3d34d4ba 100644
+--- a/drivers/net/ethernet/dec/tulip/winbond-840.c
++++ b/drivers/net/ethernet/dec/tulip/winbond-840.c
+@@ -904,7 +904,7 @@ static void init_registers(struct net_device *dev)
  	}
- 
+ #elif defined(__powerpc__) || defined(__i386__) || defined(__alpha__) || defined(__ia64__) || defined(__x86_64__)
+ 	i |= 0xE000;
+-#elif defined(CONFIG_SPARC) || defined (CONFIG_PARISC)
++#elif defined(CONFIG_SPARC) || defined (CONFIG_PARISC) || defined(CONFIG_ARM)
+ 	i |= 0x4800;
+ #else
+ #warning Processor architecture undefined
