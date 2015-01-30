@@ -1,44 +1,45 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 30 Jan 2015 13:37:50 -0800
-Subject: [Patch v2 1/6] soc: qcom: gsbi: Add support for ADM CRCI muxing
-In-Reply-To: <B36DEAB1-2D89-4B6B-991E-C2EDBEB684D9@codeaurora.org>
-References: <1422599135-5588-1-git-send-email-agross@codeaurora.org>
- <1422599135-5588-2-git-send-email-agross@codeaurora.org>
- <B36DEAB1-2D89-4B6B-991E-C2EDBEB684D9@codeaurora.org>
-Message-ID: <54CBF9AE.6060902@codeaurora.org>
+From: geoff@infradead.org (Geoff Levand)
+Date: Fri, 30 Jan 2015 13:47:11 -0800
+Subject: [PATCH 4/8] arm64: Add EL2 switch to soft_restart
+In-Reply-To: <20150127175740.GK3226@e104818-lin.cambridge.arm.com>
+References: <cover.1421449714.git.geoff@infradead.org>
+ <bb44d4eee4fab15278e4a8829a0981878bc9acd7.1421449714.git.geoff@infradead.org>
+ <20150127175740.GK3226@e104818-lin.cambridge.arm.com>
+Message-ID: <1422654431.21823.33.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/30/15 08:32, Kumar Gala wrote:
-> On Jan 30, 2015, at 12:25 AM, Andy Gross <agross@codeaurora.org> wrote:
->
->> Required properties if child node exists:
->> - #address-cells: Must be 1
->> - #size-cells: Must be 1
->> - ranges: Must be present
->>
->> +Note: Each GSBI should have an alias correctly numbered in "aliases" node.
->> +
->> Properties for children:
->>
->> A GSBI controller node can contain 0 or more child nodes representing serial
->> @@ -37,6 +41,10 @@ Example for APQ8064:
->>
->> #include <dt-bindings/soc/qcom,gsbi.h>
->>
->> +	aliases {
->> +		gsbi4 = <&gsbi4>;
->> +	};
-> You appear to be using the alias name to determine a index number for the gsbi, if that is the case, than you should probably just add a cell-index node to the gsbi?s for this purpose.
->
+Hi Catalin,
 
-I thought cell-index was "deprecated" and referred more to things like
-enumerating all the devices on a bus by assigning them a unique ID.
-Aliases, on the other hand, allow us to enumerate a subset of devices
-that share the same bus with other devices of different types. For
-example, how would I know that a device is gsbi1 vs serial1 if they both
-used cell-index and they both had the same parent node?
+On Tue, 2015-01-27 at 17:57 +0000, Catalin Marinas wrote:
+> On Sat, Jan 17, 2015 at 12:23:34AM +0000, Geoff Levand wrote:
+> >  ENTRY(cpu_reset)
+> > -	mrs	x1, sctlr_el1
+> > -	bic	x1, x1, #1
+> > -	msr	sctlr_el1, x1			// disable the MMU
+> > +	mrs	x2, sctlr_el1
+> > +	bic	x2, x2, #1
+> > +	msr	sctlr_el1, x2			// disable the MMU
+> >  	isb
+> > -	ret	x0
+> > +
+> > +	cbz	x0, 1f				// el2_switch?
+> > +	mov	x0, x1
+> > +	mov	x1, xzr
+> > +	mov	x2, xzr
+> > +	mov	x3, xzr
+> > +	hvc	#HVC_CALL_FUNC			// no return
+> 
+> If that's the only user of HVC_CALL_FUNC, why do we bother with
+> arguments, calling convention?
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+It was intended that HVC_CALL_FUNC be a mechanism to call a generic
+function in hyp mode.  cpu_reset() is the only user of it now.
+
+As Mark explained in another post, the use of x18 by the hyp stub
+is to avoid the complication of setting up a stack for EL2.  We
+thought this solution was acceptable since there are relatively
+few HVC_CALL_FUNC calls and we could assure they would do the
+right thing.
+
+-Geoff 
