@@ -1,30 +1,74 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Fri, 30 Jan 2015 11:40:54 -0300
-Subject: [PATCH V3 2/2] perf symbols: debuglink should take symfs option
- into account
-In-Reply-To: <20150129065450.GD24182@sejong>
-References: <1422340442-4673-1-git-send-email-victor.kamensky@linaro.org>
- <1422340442-4673-3-git-send-email-victor.kamensky@linaro.org>
- <20150129013809.GB24182@sejong>
- <CAA3XUr1twCC6s=1Y3Fk7W3ER9t6hFKJBC57vyzx9zjTD9fMW1Q@mail.gmail.com>
- <20150129065450.GD24182@sejong>
-Message-ID: <20150130144054.GC3101@kernel.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 30 Jan 2015 15:47:39 +0100
+Subject: [PATCH v3 01/20] power_supply: Add driver private data
+In-Reply-To: <1422629278-12202-1-git-send-email-k.kozlowski@samsung.com>
+References: <1422629278-12202-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1422629278-12202-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Thu, Jan 29, 2015 at 03:54:50PM +0900, Namhyung Kim escreveu:
-> On Wed, Jan 28, 2015 at 08:08:30PM -0800, Victor Kamensky wrote:
-> > On 28 January 2015 at 17:38, Namhyung Kim <namhyung@kernel.org> wrote:
-> > > Acked-by: Namhyung Kim <namhyung@kernel.org>
+Allow drivers to store private data inside power_supply structure for
+later usage in power supply operations.
 
-> > Thank you for the Acks! Is there any action items on my side?
-> > Should I repost patches with your Acks? Or you or Arnaldo
-> > will add them once they got merged in proper tree for
-> > upstreaming?
+Usage of driver private data is necessary to access driver's state
+container object from power supply calls (like get_property()) if struct
+'power_supply' is a stored there as a pointer, for example:
+
+struct some_driver_info {
+	struct i2c_client       *client;
+	struct power_supply     *power_supply;
+	...
+}
+
+In such case one cannot use container_of() and must store pointer to
+state container as private data.
+
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Reviewed-by: Sebastian Reichel <sre@kernel.org>
+---
+ drivers/power/power_supply_core.c | 6 ++++++
+ include/linux/power_supply.h      | 4 ++++
+ 2 files changed, 10 insertions(+)
+
+diff --git a/drivers/power/power_supply_core.c b/drivers/power/power_supply_core.c
+index 694e8cddd5c1..84ef3f40e7bf 100644
+--- a/drivers/power/power_supply_core.c
++++ b/drivers/power/power_supply_core.c
+@@ -629,6 +629,12 @@ void power_supply_unregister(struct power_supply *psy)
+ }
+ EXPORT_SYMBOL_GPL(power_supply_unregister);
  
-> I think Arnaldo will merge them with Acks. ;-)
-
-Yes, I like acks, they are not a guarantee for patches to be merged, but
-they sure help ;-)
-
-- Arnaldo
++void *power_supply_get_drvdata(struct power_supply *psy)
++{
++	return psy->drv_data;
++}
++EXPORT_SYMBOL_GPL(power_supply_get_drvdata);
++
+ static int __init power_supply_class_init(void)
+ {
+ 	power_supply_class = class_create(THIS_MODULE, "power_supply");
+diff --git a/include/linux/power_supply.h b/include/linux/power_supply.h
+index 096dbced02ac..a5743f24e03e 100644
+--- a/include/linux/power_supply.h
++++ b/include/linux/power_supply.h
+@@ -209,6 +209,9 @@ struct power_supply {
+ 	/* For APM emulation, think legacy userspace. */
+ 	int use_for_apm;
+ 
++	/* Driver private data */
++	void *drv_data;
++
+ 	/* private */
+ 	struct device *dev;
+ 	struct work_struct changed_work;
+@@ -281,6 +284,7 @@ extern int power_supply_register_no_ws(struct device *parent,
+ extern void power_supply_unregister(struct power_supply *psy);
+ extern int power_supply_powers(struct power_supply *psy, struct device *dev);
+ 
++extern void *power_supply_get_drvdata(struct power_supply *psy);
+ /* For APM emulation, think legacy userspace. */
+ extern struct class *power_supply_class;
+ 
+-- 
+1.9.1
