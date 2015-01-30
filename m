@@ -1,27 +1,48 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Fri, 30 Jan 2015 11:28:47 +0300
-Subject: [patch] irqchip: mtk-sysirq: fix an error code
-Message-ID: <20150130082847.GB21357@mwanda>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 30 Jan 2015 09:52:08 +0100
+Subject: 3.19 on Nokia n900: audio quality awful
+In-Reply-To: <201501300916.22364@pali>
+References: <20150106170433.GA5408@amd> <54CA173F.1070301@ti.com>
+ <20150129204218.GC3962@amd> <201501300916.22364@pali>
+Message-ID: <20150130085208.GA12212@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"chip_data->intpol_base" used to be an ERR_PTR() but we recently changed
-it to be NULL.  We need to update the error code as well because
-"PTR_ERR(NULL)" means success where really we want to return -ENOMEM.
+Hi!
 
-Fixes: cdb647a772e9 ('irqchip: mtk-sysirq: Get irq number from register resource size')
-Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+> > > diff --git a/sound/soc/omap/rx51.c b/sound/soc/omap/rx51.c
+> > > index 04896d6252a2..7f299357c2d2 100644
+> > > --- a/sound/soc/omap/rx51.c
+> > > +++ b/sound/soc/omap/rx51.c
+> > > @@ -250,14 +250,14 @@ static const struct snd_soc_dapm_route
+> > > audio_map[] = {
+> > > 
+> > >  	{"FM Transmitter", NULL, "LLOUT"},
+> > >  	{"FM Transmitter", NULL, "RLOUT"},
+> > > 
+> > > -	{"DMic Rate 64", NULL, "Mic Bias"},
+> > > -	{"Mic Bias", NULL, "DMic"},
+> > > +	{"DMic Rate 64", NULL, "DMic"},
+> > > +	{"DMic", NULL, "Mic Bias"},
+> > > 
+> > >  	{"b LINE2R", NULL, "MONO_LOUT"},
+> > >  	{"Earphone", NULL, "b HPLOUT"},
+> > > 
+> > > -	{"LINE1L", NULL, "b Mic Bias"},
+> > > -	{"b Mic Bias", NULL, "HS Mic"}
+> > > +	{"LINE1L", NULL, "HS Mic"},
+> > > +	{"HS Mic", NULL, "b Mic Bias"},
+> > > 
+> > >  };
+> > >  
+> > >  static const char * const spk_function[] = {"Off", "On"};
+> 
+> Can you try DT and non-DT boot of 3.19? If there is difference?
 
-diff --git a/drivers/irqchip/irq-mtk-sysirq.c b/drivers/irqchip/irq-mtk-sysirq.c
-index eaf0a71..22eb34c 100644
---- a/drivers/irqchip/irq-mtk-sysirq.c
-+++ b/drivers/irqchip/irq-mtk-sysirq.c
-@@ -144,7 +144,7 @@ static int __init mtk_sysirq_of_init(struct device_node *node,
- 	chip_data->intpol_base = ioremap(res.start, size);
- 	if (!chip_data->intpol_base) {
- 		pr_err("mtk_sysirq: unable to map sysirq register\n");
--		ret = PTR_ERR(chip_data->intpol_base);
-+		ret = -ENOMEM;
- 		goto out_free;
- 	}
- 
+Audio recording now works for me. No, I could not get non-DT boot of
+3.19 to work :-(.
+
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
