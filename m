@@ -1,84 +1,164 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 30 Jan 2015 18:38:58 +0100
-Subject: [PATCH v3 1/1] arm64: kernel: remove ARM64_CPU_SUSPEND config
- option
-In-Reply-To: <20150130170118.GA11122@red-moon>
-References: <1422297224-27834-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1598265.lHdhMYsZXo@amdc1032> <20150130170118.GA11122@red-moon>
-Message-ID: <1431736.neD4SrGVzg@amdc1032>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Fri, 30 Jan 2015 13:06:27 -0500
+Subject: [PATCH v4 3/6] of: fix size when dma-range is not used
+In-Reply-To: <20150128173048.GE31752@e104818-lin.cambridge.arm.com>
+References: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
+ <1422052359-12384-4-git-send-email-m-karicheri2@ti.com>
+ <54C77616.80301@arm.com> <54C7DF13.20402@ti.com>
+ <20150128110523.GC6646@e104818-lin.cambridge.arm.com>
+ <54C9068D.8050701@arm.com>
+ <20150128173048.GE31752@e104818-lin.cambridge.arm.com>
+Message-ID: <54CBC823.3020905@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, January 30, 2015 05:01:18 PM Lorenzo Pieralisi wrote:
-> On Fri, Jan 30, 2015 at 04:18:27PM +0000, Bartlomiej Zolnierkiewicz wrote:
-> > 
-> > Hi,
-> > 
-> > On Monday, January 26, 2015 06:33:44 PM Lorenzo Pieralisi wrote:
-> > > ARM64_CPU_SUSPEND config option was introduced to make code providing
-> > > context save/restore selectable only on platforms requiring power
-> > > management capabilities.
-> > >
-> > > Currently ARM64_CPU_SUSPEND depends on the PM_SLEEP config option which
-> > > in turn is set by the SUSPEND config option.
-> > >
-> > > The introduction of CPU_IDLE for arm64 requires that code configured
-> > > by ARM64_CPU_SUSPEND (context save/restore) should be compiled in
-> > > in order to enable the CPU idle driver to rely on CPU operations
-> > > carrying out context save/restore.
-> > >
-> > > The ARM64_CPUIDLE config option (ARM64 generic idle driver) is therefore
-> > > forced to select ARM64_CPU_SUSPEND, even if there may be (ie PM_SLEEP)
-> > > failed dependencies, which is not a clean way of handling the kernel
-> > > configuration option.
-> > >
-> > > For these reasons, this patch removes the ARM64_CPU_SUSPEND config option
-> > > and makes the context save/restore dependent on CPU_PM, which is selected
-> > > whenever either SUSPEND or CPU_IDLE are configured, cleaning up dependencies
-> > > in the process.
-> > >
-> > > This way, code previously configured through ARM64_CPU_SUSPEND is
-> > > compiled in whenever a power management subsystem requires it to be
-> > > present in the kernel (SUSPEND || CPU_IDLE), which is the behaviour
-> > > expected on ARM64 kernels.
-> > >
-> > > The cpu_suspend and cpu_init_idle CPU operations are added only if
-> > > CPU_IDLE is selected, since they are CPU_IDLE specific methods and
-> > > should be grouped and defined accordingly.
-> > >
-> > > PSCI CPU operations are updated to reflect the introduced changes.
-> > 
-> > cpu_suspend CPU operation is currently CPU_IDLE specific but I wonder
-> > whether this is correct in the context of PSCI?
-> 
-> On arm64 cpu_suspend() is the function interfacing the idle driver to
-> the arch code, I will rename it in a subsequent clean-up that will
-> include cpu_ops.cpu_suspend too (ie cpu_enter_idle).
-> 
-> PSCI implements the cpu_ops.cpu_suspend operation through the PSCI CPU
-> suspend call.
-> 
-> > 
-> > [ On 32-bit ARM PSCI cpu_suspend operation can be used in suspend code-path
-> >   (please take a look at arch/arm/mach-highbank/pm.c), on 64-bit ARM PSCI
-> >   this is not possible currently. ]
-> 
-> I did not merge that code, and in that context PSCI CPU suspend has been
-> used to enter what I guess what the deepest idle state, it slipped my
-> review, it is a valid usage, should have been documented though before
-> implementing it that way.
-> 
-> On arm64 we are defining a specific system suspend interface to give
-> system suspend a clearer semantics:
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/318540.html
-> 
-> Does this answer your question ?
+On 01/28/2015 12:30 PM, Catalin Marinas wrote:
+> On Wed, Jan 28, 2015 at 03:55:57PM +0000, Robin Murphy wrote:
+>> On 28/01/15 11:05, Catalin Marinas wrote:
+>>> On Tue, Jan 27, 2015 at 06:55:15PM +0000, Murali Karicheri wrote:
+>>>> How about having the logic like this?
+>>>>
+>>>> 	ret = of_dma_get_range(np,&dma_addr,&paddr,&size);
+>>>> 	if (ret<  0) {
+>>>> 		dma_addr = offset = 0;
+>>>> 		size = dev->coherent_dma_mask + 1;
+>>>> 	} else {
+>>>> 		offset = PFN_DOWN(paddr - dma_addr);
+>>>> 		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
+>>>> 	}
+>>>>
+>>>> 	if (is_power_of_2(size + 1))
+>>>> 		size = size + 1;
+>>>> 	else if (!is_power_of_2(size))
+>>>> 	{
+>>>> 		dev_err(dev, "invalid size\n");
+>>>> 		return;
+>>>> 	}
+>>>
+>>> In of_dma_configure(), we currently assume that the default coherent
+>>> mask is 32-bit. In this thread:
+>>>
+>>> http://article.gmane.org/gmane.linux.kernel/1835096
+>>>
+>>> we talked about setting the coherent mask based on size automatically.
+>>> I'm not sure about the size but I think we can assume is 32-bit mask + 1
+>>> if it is not specified in the DT. Instead of just assuming a default
+>>> mask, let's assume a default size and create the mask based on this
+>>> (untested):
+>>>
+>>> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+>>> index 5b33c6a21807..9ff8d1286b44 100644
+>>> --- a/drivers/of/platform.c
+>>> +++ b/drivers/of/platform.c
+>>> @@ -170,10 +170,10 @@ static void of_dma_configure(struct device *dev)
+>>>    	struct iommu_ops *iommu;
+>>>
+>>>    	/*
+>>> -	 * Set default dma-mask to 32 bit. Drivers are expected to setup
+>>> -	 * the correct supported dma_mask.
+>>> +	 * Set default size to cover the 32-bit. Drivers are expected to setup
+>>> +	 * the correct size and dma_mask.
+>>>    	 */
+>>> -	dev->coherent_dma_mask = DMA_BIT_MASK(32);
+>>> +	size = 1ULL<<  32;
+>>>
+>>>    	/*
+>>>    	 * Set it to coherent_dma_mask by default if the architecture
+>>> @@ -185,13 +185,24 @@ static void of_dma_configure(struct device *dev)
+>>>    	ret = of_dma_get_range(dev->of_node,&dma_addr,&paddr,&size);
+>>>    	if (ret<  0) {
+>>>    		dma_addr = offset = 0;
+>>> -		size = dev->coherent_dma_mask;
+>>>    	} else {
+>>>    		offset = PFN_DOWN(paddr - dma_addr);
+>>>    		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
+>>>    	}
+>>>    	dev->dma_pfn_offset = offset;
+>>>
+>>> +	/*
+>>> +	 * Workaround for DTs setting the size to a mask or 0.
+>>> +	 */
+>>> +	if (is_power_of_2(size + 1))
+>>> +		size += 1;
+>>
+>> In fact, since the ilog2 below ends up effectively rounding down, we
+>> might as well do away with this check as well and just add 1
+>> unconditionally. The only time it makes any difference is when we want
+>> it to anyway!
+>
+> Well, we could simply ignore the is_power_of_2() check but without
+> incrementing size as we don't know what arch_setup_dma_ops() does with
+> it.
+>
+> I think we can remove this check altogether (we leaved without it for a
+> while) but we need to add 1 when calculating the mask:
+>
+> 	dev->coherent_dma_mask = min(DMA_BIT_MASK(32),
+> 				     DMA_BIT_MASK(ilog2(size + 1)));
+>
+For Keystone, the dma_addr is to be taken care as well to determine the 
+mask. The above will not work.
 
-Yes.  Thank you!
+Based on the discussion so far, this is the function I have come up with 
+incorporating the suggestions. Please review this and see if I have 
+missed out any. This works fine on Keystone.
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+void of_dma_configure(struct device *dev, struct device_node *np)
+{
+	u64 dma_addr = 0, paddr, size;
+	int ret;
+	bool coherent;
+	unsigned long offset = 0;
+	struct iommu_ops *iommu;
+
+	/*
+	 * Set default size to cover the 32-bit. Drivers are expected to setup
+	 * the correct size and dma_mask.
+   	 */
+	size = 1ULL << 32;
+
+	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
+	if (!ret) {
+		offset = PFN_DOWN(paddr - dma_addr);
+		if (!size) {
+			dev_err(dev, "Invalid size (%llx)\n",
+				size);
+			return;
+		}
+		if (size & 1) {
+			size = size + 1;
+			dev_warn(dev, "Incorrect usage of size (%llx)\n",
+				 size);
+		}
+		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
+	}
+	dev->dma_pfn_offset = offset;
+
+	/*
+	 * Coherent DMA masks larger than 32-bit must be explicitly set by the
+	 * driver.
+	 */
+	dev->coherent_dma_mask = min(DMA_BIT_MASK(32),
+				     DMA_BIT_MASK(ilog2(dma_addr + size)));
+	/*
+	 * Set dma_mask to coherent_dma_mask by default if the architecture
+	 * code has not set it.
+	 */
+	if (!dev->dma_mask)
+		dev->dma_mask = &dev->coherent_dma_mask;
+
+	coherent = of_dma_is_coherent(np);
+	dev_dbg(dev, "device is%sdma coherent\n",
+		coherent ? " " : " not ");
+
+	iommu = of_iommu_configure(dev, np);
+	dev_dbg(dev, "device is%sbehind an iommu\n",
+		iommu ? " " : " not ");
+
+	arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
+}
+
+
+-- 
+Murali Karicheri
+Linux Kernel, Texas Instruments
