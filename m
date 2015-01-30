@@ -1,48 +1,69 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 30 Jan 2015 10:39:56 +0100
-Subject: [PATCH] pinctrl: rockchip: Only mask interrupts; never disable
-In-Reply-To: <1422289444-15142-1-git-send-email-dianders@chromium.org>
-References: <1422289444-15142-1-git-send-email-dianders@chromium.org>
-Message-ID: <CACRpkdb-=brQmJT9oUwD1bqNLGHX9i+4LSuR4_Vi6BtKgaRKqQ@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 30 Jan 2015 10:44:07 +0100
+Subject: [PATCH] ARM: dts: mvebu: add ethernet to the cm-a510 board
+In-Reply-To: <E1YH5bU-0005mG-3L@bombadil.infradead.org>
+References: <E1YH5bU-0005mG-3L@bombadil.infradead.org>
+Message-ID: <54CB5267.5060004@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 26, 2015 at 5:24 PM, Doug Anderson <dianders@chromium.org> wrote:
+[added MVEBU maintainers and Gabriel to Cc]
 
-> The Rockchip GPIO interrupt controller totally throws away all status
-> about an interrupt when you "disable" the interrupt.  That has
-> unfortunate consequences in the following situation:
+On 30.01.2015 07:06, Jean-Francois Moine wrote:
+> This patch enables the ethernet device by default, permitting CM-A510
+> boards to access the network when an ethernet connector is present.
 >
-> 1. An edge-triggered interrupt is enabled and should wake the system.
-> 2. System suspend happens: interrupt is disabled and marked for wake.
-> 3. rockchip_irq_suspend() reenables the interrupt so we can wake.
-> 4. Interrupt happens when asleep.
-> 5. rockchip_irq_resume() redisables the interrupt.
-> 6. Disabling the interrupt throws away all status about it.
-> 7. Normal system resume happens and we enable the interrupt again,
->    since we threw away status about the interrupt we don't know it
->    fired while suspended.  Even worse: if we need both edges of the
->    interrupt the logic to swap edges never runs.
->
-> Note: even if we somehow can post the status about wakeup interrupts
-> in rockchip_irq_resume() we would still have a window of losing any
-> edges that came in while interrupts were disabled.
->
-> If we use mask only then we don't need to worry.  The GPIO Interrupt
-> controller keeps track of pending interrupts that are enabled and just
-> masked.
->
-> There was no real strong reason to support the enable/disable
-> functionality (other than that it seemed right), so let's go back to
-> just supporting mask/unmask but actually map it to the real
-> mask/unmask.  This ends up with slightly different (and more correct)
-> behavior than before (f2dd028 pinctrl: rockchip: Fix
-> enable/disable/mask/unmask).
->
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> Tested-by: Gabriel Dobato <dobatog@gmail.com>
 
-Patch applied with Heiko's review tag, but not as a fix at this point,
-it will be for v3.20.
+Jean-Francois,
 
-Yours,
-Linus Walleij
+great you are helping out Gabriel to get his CM-A510 up and running!
+
+I had a closer look on the Compulab website of the SoM [1] and think
+that we'll have to convert it to dove-cm-a510.dtsi and the baseboard
+Gabriel is using (maybe SBC-A510 [2]).
+
+The dove-cm-a510.dts was a blind port of what was in mach-dove when
+we started with DT, so most of it is probably bogus.
+
+For the ethernet port this patch is about, the PHY (RTL8211) is part
+of the SoM, the jack is not. So, we cannot really tell, if that port
+can ever be used on a specific baseboard. I suggest to put the
+corresponding nodes into the dtsi, but leave them status = "disabled".
+
+The baseboard dts should enable them like your patch does, if the
+ethernet jack is available. The same is true for the sdio0 and sata0
+nodes you can see below. However, sdio1 is connected to a USI WiFi
+module with Marvel 8686 on the SoM.
+
+Can you take over and prepare the necessary patches? That would
+be great!
+
+BTW, I wouldn't mind if the cm510 related dts files you are touching
+move over to dual-license [3] now :)
+
+Sebastian
+
+[1] http://www.compulab.co.il/products/computer-on-modules/cm-a510/#diagram
+[2] www.compulab.co.il/products/sbcs/sbc-a510/
+[3] http://permalink.gmane.org/gmane.linux.ports.arm.kernel/389206
+
+> ---
+>   arch/arm/boot/dts/dove-cm-a510.dts | 2 ++
+>   1 file changed, 2 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/dove-cm-a510.dts b/arch/arm/boot/dts/dove-cm-a510.dts
+> index 50c0d69..404e983 100644
+> --- a/arch/arm/boot/dts/dove-cm-a510.dts
+> +++ b/arch/arm/boot/dts/dove-cm-a510.dts
+> @@ -21,6 +21,8 @@
+>   &sdio0 { status = "okay"; };
+>   &sdio1 { status = "okay"; };
+>   &sata0 { status = "okay"; };
+> +&eth { status = "okay"; };
+> +&mdio { status ="okay";};
+>
+>   &spi0 {
+>   	status = "okay";
+>
