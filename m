@@ -1,69 +1,50 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 30 Jan 2015 10:44:07 +0100
-Subject: [PATCH] ARM: dts: mvebu: add ethernet to the cm-a510 board
-In-Reply-To: <E1YH5bU-0005mG-3L@bombadil.infradead.org>
-References: <E1YH5bU-0005mG-3L@bombadil.infradead.org>
-Message-ID: <54CB5267.5060004@gmail.com>
+From: mgorman@suse.de (Mel Gorman)
+Date: Fri, 30 Jan 2015 10:04:06 +0000
+Subject: [PATCH] mm: remove remaining references to NUMA hinting bits and
+ helpers -fix
+In-Reply-To: <CAPvkgC3OLdf7ZgDfAC5R4wgZDirAZAmY+ZsBLQedpjq+HJHACw@mail.gmail.com>
+References: <20150128152412.GX21293@sirena.org.uk>
+ <CAPvkgC3OLdf7ZgDfAC5R4wgZDirAZAmY+ZsBLQedpjq+HJHACw@mail.gmail.com>
+Message-ID: <20150130100406.GK2395@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[added MVEBU maintainers and Gabriel to Cc]
+The patch "mm: remove remaining references to NUMA hinting bits and helpers"
+was meant to remove NUMA hinting bits and helpers but broke is_swap_pte.
+>From the original bug report
 
-On 30.01.2015 07:06, Jean-Francois Moine wrote:
-> This patch enables the ethernet device by default, permitting CM-A510
-> boards to access the network when an ethernet connector is present.
->
-> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
-> Tested-by: Gabriel Dobato <dobatog@gmail.com>
+	For at least the past couple of days tests of libhugetlbfs have
+	been hanging on mustang in the mlock test running ARMv8 defconfig
+	with both 32 bit and 64 bit userspace - after the mprotect test
+	(the one before it) we get no console output for several hours so
+	it appears that the test has deadlocked.  The tail of the log is:
 
-Jean-Francois,
+	| find_path (2M: 64):   PASS
+	| unlinked_fd (2M: 64): PASS
+	| readback (2M: 64):    PASS
+	| truncate (2M: 64):    PASS
+	| shared (2M: 64):      PASS
+	| mprotect (2M: 64):    PASS
 
-great you are helping out Gabriel to get his CM-A510 up and running!
+This patch should address the problem and is a fix to the mmotm patch
+mm-remove-remaining-references-to-numa-hinting-bits-and-helpers.patch
 
-I had a closer look on the Compulab website of the SoM [1] and think
-that we'll have to convert it to dove-cm-a510.dtsi and the baseboard
-Gabriel is using (maybe SBC-A510 [2]).
+Reported-by: Mark Brown <broonie@kernel.org>
+Signed-off-by: Mel Gorman <mgorman@suse.de>
+---
+ include/linux/swapops.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-The dove-cm-a510.dts was a blind port of what was in mach-dove when
-we started with DT, so most of it is probably bogus.
-
-For the ethernet port this patch is about, the PHY (RTL8211) is part
-of the SoM, the jack is not. So, we cannot really tell, if that port
-can ever be used on a specific baseboard. I suggest to put the
-corresponding nodes into the dtsi, but leave them status = "disabled".
-
-The baseboard dts should enable them like your patch does, if the
-ethernet jack is available. The same is true for the sdio0 and sata0
-nodes you can see below. However, sdio1 is connected to a USI WiFi
-module with Marvel 8686 on the SoM.
-
-Can you take over and prepare the necessary patches? That would
-be great!
-
-BTW, I wouldn't mind if the cm510 related dts files you are touching
-move over to dual-license [3] now :)
-
-Sebastian
-
-[1] http://www.compulab.co.il/products/computer-on-modules/cm-a510/#diagram
-[2] www.compulab.co.il/products/sbcs/sbc-a510/
-[3] http://permalink.gmane.org/gmane.linux.ports.arm.kernel/389206
-
-> ---
->   arch/arm/boot/dts/dove-cm-a510.dts | 2 ++
->   1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/dove-cm-a510.dts b/arch/arm/boot/dts/dove-cm-a510.dts
-> index 50c0d69..404e983 100644
-> --- a/arch/arm/boot/dts/dove-cm-a510.dts
-> +++ b/arch/arm/boot/dts/dove-cm-a510.dts
-> @@ -21,6 +21,8 @@
->   &sdio0 { status = "okay"; };
->   &sdio1 { status = "okay"; };
->   &sata0 { status = "okay"; };
-> +&eth { status = "okay"; };
-> +&mdio { status ="okay";};
->
->   &spi0 {
->   	status = "okay";
->
+diff --git a/include/linux/swapops.h b/include/linux/swapops.h
+index 73ca28070a92..cedf3d3c373f 100644
+--- a/include/linux/swapops.h
++++ b/include/linux/swapops.h
+@@ -54,7 +54,7 @@ static inline pgoff_t swp_offset(swp_entry_t entry)
+ /* check whether a pte points to a swap entry */
+ static inline int is_swap_pte(pte_t pte)
+ {
+-	return !pte_none(pte);
++	return !pte_none(pte) && !pte_present(pte);
+ }
+ #endif
+ 
