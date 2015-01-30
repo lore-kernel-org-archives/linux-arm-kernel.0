@@ -1,43 +1,83 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Fri, 30 Jan 2015 23:01:01 +0300
-Subject: [PATCH v2 0/5] ARM: sa1100: implement irq driver as proper irqchip
- driver
-Message-ID: <1422648066-7897-1-git-send-email-dbaryshkov@gmail.com>
+Date: Fri, 30 Jan 2015 23:01:02 +0300
+Subject: [PATCH v2 1/5] ARM: sa1100: add platform functions to handle PWER
+ settings
+In-Reply-To: <1422648066-7897-1-git-send-email-dbaryshkov@gmail.com>
+References: <1422648066-7897-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1422648066-7897-2-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+PWER settings logically belongs neither to GPIO nor to system IRQ code.
+Add special functions to handle PWER (for GPIO and for system IRQs)
+from platform code.
 
-This is a second attempt to move Intel StrongARM SA-11x0 IRQ driver
-to drivers/irqchip/ place.
-
-Changes since V1:
-
- - Added soc/sa1100/pwer.h header containing sa11x0_*_set_wake()
-   prototypes.
-
- - Removed spinlock from mask/unmask functions
-
- - Minor whitespace changes.
-
-The patches are based on my previous sa1100 patches that can be found
-in Russell's for-next branch or in linux-next tree.
-
-----------------------------------------------------------------
-Dmitry Eremin-Solenikov (5):
-      ARM: sa1100: add platform functions to handle PWER settings
-      ARM: sa1100: use sa11x0_sc_set_wake() in irq driver
-      ARM: sa1100: use ioremapped memory to access SC registers
-      irqchip: add sa1100 driver
-      ARM: sa1100: drop irq driver
-
- arch/arm/mach-sa1100/Makefile                      |  2 +-
- arch/arm/mach-sa1100/generic.c                     | 37 ++++++++++
- drivers/irqchip/Makefile                           |  1 +
- .../irq.c => drivers/irqchip/irq-sa11x0.c          | 82 +++++++++++-----------
- include/linux/irqchip/irq-sa11x0.h                 | 16 +++++
- include/soc/sa1100/pwer.h                          | 15 ++++
- 6 files changed, 110 insertions(+), 43 deletions(-)
- rename arch/arm/mach-sa1100/irq.c => drivers/irqchip/irq-sa11x0.c (66%)
- create mode 100644 include/linux/irqchip/irq-sa11x0.h
+Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+---
+ arch/arm/mach-sa1100/generic.c | 24 ++++++++++++++++++++++++
+ include/soc/sa1100/pwer.h      | 15 +++++++++++++++
+ 2 files changed, 39 insertions(+)
  create mode 100644 include/soc/sa1100/pwer.h
+
+diff --git a/arch/arm/mach-sa1100/generic.c b/arch/arm/mach-sa1100/generic.c
+index 40e0d86..c651f6e 100644
+--- a/arch/arm/mach-sa1100/generic.c
++++ b/arch/arm/mach-sa1100/generic.c
+@@ -23,6 +23,8 @@
+ 
+ #include <video/sa1100fb.h>
+ 
++#include <soc/sa1100/pwer.h>
++
+ #include <asm/div64.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/flash.h>
+@@ -416,3 +418,25 @@ void sa1110_mb_enable(void)
+ 	local_irq_restore(flags);
+ }
+ 
++int sa11x0_gpio_set_wake(unsigned int gpio, unsigned int on)
++{
++	if (on)
++		PWER |= BIT(gpio);
++	else
++		PWER &= ~BIT(gpio);
++
++	return 0;
++}
++
++int sa11x0_sc_set_wake(unsigned int irq, unsigned int on)
++{
++	if (BIT(irq) != IC_RTCAlrm)
++		return -EINVAL;
++
++	if (on)
++		PWER |= PWER_RTC;
++	else
++		PWER &= ~PWER_RTC;
++
++	return 0;
++}
+diff --git a/include/soc/sa1100/pwer.h b/include/soc/sa1100/pwer.h
+new file mode 100644
+index 0000000..15a545b
+--- /dev/null
++++ b/include/soc/sa1100/pwer.h
+@@ -0,0 +1,15 @@
++#ifndef SOC_SA1100_PWER_H
++#define SOC_SA1100_PWER_H
++
++/*
++ * Copyright (C) 2015, Dmitry Eremin-Solenikov
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++int sa11x0_gpio_set_wake(unsigned int gpio, unsigned int on);
++int sa11x0_sc_set_wake(unsigned int irq, unsigned int on);
++
++#endif
+-- 
+2.1.4
