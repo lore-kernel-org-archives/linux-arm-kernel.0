@@ -1,38 +1,80 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 30 Jan 2015 16:15:04 -0600
-Subject: [PATCH] ARM: integrator: remove unused variable
-In-Reply-To: <1666566.z9ZP4KJ7VA@wuerfel>
-References: <1666566.z9ZP4KJ7VA@wuerfel>
-Message-ID: <CAErSpo7iqe07HQBpbGfr8=FwK3wF0dkCFvjAJRBvd7HusMjjvg@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 31 Jan 2015 01:52:16 +0300
+Subject: [PATCH] ARM: shmobile: silk: initial device tree
+In-Reply-To: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
+References: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
+Message-ID: <1608366.HtA9yBksdO@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 30, 2015 at 3:59 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> The patch to add the new generic config space accessors removed
-> a useless spinlock, but left the flags variable in place, which
-> now causes a build warning:
->
-> arch/arm/mach-integrator/pci_v3.c: In function 'pci_v3_preinit':
-> arch/arm/mach-integrator/pci_v3.c:614:16: warning: unused variable 'flags' [-Wunused-variable]
->
-> This removes it.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 1ba525109219 ("ARM: integrator: Convert PCI to use generic config accessors")
+Add the initial device tree for the R8A7794 SoC based SILK low cost board.
+SCIF2 serial port support is included, so that the serial console can work.
 
-Folded in, thanks!
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
->
-> diff --git a/arch/arm/mach-integrator/pci_v3.c b/arch/arm/mach-integrator/pci_v3.c
-> index dc7782f26cbb..2565f0e7b5cf 100644
-> --- a/arch/arm/mach-integrator/pci_v3.c
-> +++ b/arch/arm/mach-integrator/pci_v3.c
-> @@ -611,7 +611,6 @@ static int __init pci_v3_setup(int nr, struct pci_sys_data *sys)
->   */
->  static void __init pci_v3_preinit(void)
->  {
-> -       unsigned long flags;
->         unsigned int temp;
->         phys_addr_t io_address = pci_pio_to_address(io_mem.start);
->
->
+---
+This patch is against the 'renesas-devel-20150129-v3.19-rc6' tag of Simon
+Horman's 'renesas.git' repo.
+
+ arch/arm/boot/dts/Makefile         |    1 
+ arch/arm/boot/dts/r8a7794-silk.dts |   41 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 42 insertions(+)
+
+Index: renesas/arch/arm/boot/dts/Makefile
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/Makefile
++++ renesas/arch/arm/boot/dts/Makefile
+@@ -421,6 +421,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += eme
+ 	r8a7791-koelsch.dtb \
+ 	r8a7791-porter.dtb \
+ 	r8a7794-alt.dtb \
++	r8a7794-silk.dtb \
+ 	sh73a0-kzm9g.dtb
+ dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_arria5_socdk.dtb \
+ 	socfpga_arria10_socdk.dtb \
+Index: renesas/arch/arm/boot/dts/r8a7794-silk.dts
+===================================================================
+--- /dev/null
++++ renesas/arch/arm/boot/dts/r8a7794-silk.dts
+@@ -0,0 +1,41 @@
++/*
++ * Device Tree Source for the SILK board
++ *
++ * Copyright (C) 2014 Renesas Electronics Corporation
++ * Copyright (C) 2014-2015 Renesas Solutions Corp.
++ * Copyright (C) 2014-2015 Cogent Embedded, Inc.
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
++
++/dts-v1/;
++#include "r8a7794.dtsi"
++
++/ {
++	model = "SILK";
++	compatible = "renesas,silk", "renesas,r8a7794";
++
++	aliases {
++		serial0 = &scif2;
++	};
++
++	chosen {
++		bootargs = "console=ttySC0,38400 ignore_loglevel";
++		stdout-path = &scif2;
++	};
++
++	memory at 40000000 {
++		device_type = "memory";
++		reg = <0 0x40000000 0 0x40000000>;
++	};
++};
++
++&extal_clk {
++	clock-frequency = <20000000>;
++};
++
++&scif2 {
++	status = "okay";
++};
