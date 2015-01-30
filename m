@@ -1,47 +1,88 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Fri, 30 Jan 2015 11:48:24 -0800
-Subject: [PATCH 7/8] arm64/kexec: Add checks for KVM
-In-Reply-To: <54CB206D.7040705@linaro.org>
-References: <cover.1421449714.git.geoff@infradead.org>
- <a3353cf2ac47f49c20bbbb88405301cbaa359805.1421449714.git.geoff@infradead.org>
- <20150126191942.GQ23313@leverpostej> <54CA041C.6020403@linaro.org>
- <54CA12A1.8090508@arm.com> <20150129184747.GV17721@leverpostej>
- <54CB206D.7040705@linaro.org>
-Message-ID: <1422647304.21823.31.camel@infradead.org>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 30 Jan 2015 13:51:48 -0600
+Subject: [PATCH 2/3] tty/serial: of_serial: add support for PXA/MMP uarts
+In-Reply-To: <54C91E67.2070501@hurleysoftware.com>
+References: <1422334209-23125-1-git-send-email-robh@kernel.org>
+ <1422334209-23125-2-git-send-email-robh@kernel.org>
+ <54C78823.7050504@hurleysoftware.com>
+ <CAL_Jsq+8jDN+fYyed5RYd2e1K+H_R1NkjT38WXSpKfxTLgsDbQ@mail.gmail.com>
+ <54C7AA2D.7080202@hurleysoftware.com>
+ <CAL_Jsq+wxY0=S1ff-Fk0xDBxHdhBvNopLpjfCETVoo_mou658w@mail.gmail.com>
+ <54C91E67.2070501@hurleysoftware.com>
+Message-ID: <CAL_Jsq+6jg7C0z=0ZS=yp32_6yWzfx_zr5dtu-n3mv0JWiGq2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Takahiro.
+On Wed, Jan 28, 2015 at 11:37 AM, Peter Hurley <peter@hurleysoftware.com> wrote:
+> On 01/27/2015 11:44 AM, Rob Herring wrote:
+>> On Tue, Jan 27, 2015 at 9:09 AM, Peter Hurley <peter@hurleysoftware.com> wrote:
+>
+> [...]
+>
+>>> Maybe Kconfig should warn if they're both built-in or both modules?
+>>
+>> Is there a way to do that?
+>
+> Well, it's not what I had in mind originally, but the diff below
+> generates a broken dependencies warning without causing build problems:
+>         $ scripts/kconfig/mconf Kconfig
+>         warning: (SERIAL_PXA) selects TTYS_DRIVER_PXA which has unmet direct dependencies (TTY && HAS_IOMEM && !TTYS_DRIVER)
+>
+> (My original idea was thwarted by the requirement that choice/endchoice
+> requires prompts).
 
-On Fri, 2015-01-30 at 15:10 +0900, AKASHI Takahiro wrote:
-> Initially, I thought that we would define kvm_arch_exit() and call it
-> somewhere in the middle of kexec path (no idea yet).
-> But Geoff suggested me to implement a new hvc call, HVC_CPU_SHUTDOWN(??),
-> and make it called via cpu_notifier(CPU_DYING_FROZEN) initiated by
-> machine_shutdown() from kernel_kexec().
+Okay, but this should be a separate patch. The problem exists with or
+without my patch.
 
-As an initial implementation we can hook into the CPU_DYING_FROZEN
-notifier sent to hyp_init_cpu_notify().  The longer term solution
-should use kvm_arch_hardware_enable() and kvm_arch_hardware_disable().
+> That said, for PXA, I think we agree splitting out a standalone 8250 platform
+> driver is the solution.
 
-The calls to cpu_notifier(CPU_DYING_FROZEN) are part of cpu hot
-plug, and independent of kexec.  If someone were to add spin-table
-cpu un-plug, then it would be used for that also.  It seems we should
-be able to test without kexec by using cpu hot plug.
+So after all the discussion, you are okay with the original patch?
 
-To tear down KVM you need to get back to hyp mode, and hence
-the need for HVC_CPU_SHUTDOWN.  The sequence I envisioned would
-be like this:
+Rob
 
-cpu_notifier(CPU_DYING_FROZEN)
- -> kvm_cpu_shutdown() 
-    prepare for hvc
-    -> HVC_CPU_SHUTDOWN
-       now in hyp mode, do KVM tear down, restore default exception vectors
-
-Once the default exception vectors are restored soft_restart()
-can then execute the cpu_reset routine in EL2.
-
-Some notes are here for those with access:  https://cards.linaro.org/browse/KWG-611
-
--Geoff
+>
+> Regards,
+> Peter Hurley
+>
+> --
+> diff --git a/drivers/tty/serial/8250/Kconfig b/drivers/tty/serial/8250/Kconfig
+> index 0fcbcd2..c367542 100644
+> --- a/drivers/tty/serial/8250/Kconfig
+> +++ b/drivers/tty/serial/8250/Kconfig
+> @@ -6,6 +6,7 @@
+>  config SERIAL_8250
+>         tristate "8250/16550 and compatible serial support"
+>         select SERIAL_CORE
+> +       select TTYS_DRIVER
+>         ---help---
+>           This selects whether you want to include the driver for the standard
+>           serial ports.  The standard answer is Y.  People who might say N
+> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+> index c79b43c..10c3e27 100644
+> --- a/drivers/tty/serial/Kconfig
+> +++ b/drivers/tty/serial/Kconfig
+> @@ -7,6 +7,13 @@ if TTY
+>  menu "Serial drivers"
+>         depends on HAS_IOMEM
+>
+> +config TTYS_DRIVER
+> +       tristate
+> +
+> +config TTYS_DRIVER_PXA
+> +       tristate
+> +       depends on !TTYS_DRIVER
+> +
+>  config SERIAL_EARLYCON
+>         bool
+>         help
+> @@ -438,6 +445,7 @@ config SERIAL_PXA
+>         bool "PXA serial port support"
+>         depends on ARCH_PXA || ARCH_MMP
+>         select SERIAL_CORE
+> +       select TTYS_DRIVER_PXA
+>         help
+>           If you have a machine based on an Intel XScale PXA2xx CPU you
+>           can enable its onboard serial ports by enabling this option.
+>
+>
