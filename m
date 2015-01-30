@@ -1,29 +1,70 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Thu, 29 Jan 2015 16:22:57 -0800
-Subject: [PATCH] regulator: qcom-rpm: Make it possible to specify supply
-Message-ID: <1422577377-31986-1-git-send-email-bjorn.andersson@sonymobile.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 30 Jan 2015 02:24:51 +0200
+Subject: [PATCH v4 1/6] of: iommu: add ptr to OF node arg to
+ of_iommu_configure()
+In-Reply-To: <CAL_Jsq+rzwk0Rw5RRKf9oLqXNFFgnJb4UQ_AzpJLxN1Z0rJWMQ@mail.gmail.com>
+References: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
+ <5349994.6VHXzPdIxs@avalon>
+ <CAL_Jsq+rzwk0Rw5RRKf9oLqXNFFgnJb4UQ_AzpJLxN1Z0rJWMQ@mail.gmail.com>
+Message-ID: <1612981.2C6LXFqAIA@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make it possible to specify the supply of a regulator, through the
-vin-supply property in dt.
+Hi Rob,
 
-Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
----
- drivers/regulator/qcom_rpm-regulator.c | 1 +
- 1 file changed, 1 insertion(+)
+On Thursday 29 January 2015 10:49:38 Rob Herring wrote:
+> On Wed, Jan 28, 2015 at 5:32 PM, Laurent Pinchart wrote:
+> > On Wednesday 28 January 2015 13:32:19 Will Deacon wrote:
+> >> On Wed, Jan 28, 2015 at 01:15:10PM +0000, Laurent Pinchart wrote:
+> >>> On Wednesday 28 January 2015 12:29:42 Will Deacon wrote:
+> >>>> On Wed, Jan 28, 2015 at 12:23:03PM +0000, Laurent Pinchart wrote:
+> >>>>> On Wednesday 28 January 2015 11:33:00 Will Deacon wrote:
+> >>>>>> On Mon, Jan 26, 2015 at 06:49:01PM +0000, Murali Karicheri wrote:
+> >>>>>> On 01/25/2015 08:32 AM, Laurent Pinchart wrote:
+> >>>>>>>> On Friday 23 January 2015 17:32:34 Murali Karicheri wrote:
+> >>>>>>>>> Function of_iommu_configure() is called from of_dma_configure()
+> >>>>>>>>> to setup iommu ops using DT property. This API is currently used
+> >>>>>>>>> for platform devices for which DMA configuration (including iommu
+> >>>>>>>>> ops) may come from device's parent. To extend this functionality
+> >>>>>>>>> for PCI devices, this API need to take a parent node ptr as an
+> >>>>>>>>> argument instead of assuming device's parent. This is needed since
+> >>>>>>>>> for PCI, the dma configuration may be defined in the DT node of
+> >>>>>>>>> the root bus bridge's parent device. Currently only dma-range is
+> >>>>>>>>> used for PCI and iommu is not supported. So return error if the
+> >>>>>>>>> device is PCI.
+> 
+> [...]
+> 
+> >>> If I understand Murali's patch set right (please correct me if that's
+> >>> not the case) the PCI code walks up the DT nodes hierarchy to the
+> >>> parent node that contains the iommus attribute and passes a pointer to
+> >>> that node to this function. It's thus a PCI-specific solution. As a
+> >>> temporary hack that's OK I suppose, but if implementing it right
+> >>> straight away isn't difficult that would be better.
+> >> 
+> >> It looks to me like the code walks the PCI topology to get the DT node
+> >> for the host controller, and passes *that* to of_dma_configure. That
+> >> sounds like the right thing to do to me, especially since the PCI
+> >> topology is likely not encoded in the device-tree. So actually, it is
+> >> passing the first parent node afaict.
+> > 
+> > Indeed, that's right. I forgot for a moment that we have non-DT devices
+> > ;-)
+> > 
+> > Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > 
+> > Murali, nitpicking a bit, shouldn't the iommu_np parameter be renamed ? It
+> > points to the node containing the iommus parameter, not to the iommu node,
+> > so the current name is slightly confusing. A brief kerneldoc above the
+> > function would also help. This can be the subject of a separate patch.
+> 
+> It was more confusing having np and node within the function.
 
-diff --git a/drivers/regulator/qcom_rpm-regulator.c b/drivers/regulator/qcom_rpm-regulator.c
-index e3120bf..00c5cc3 100644
---- a/drivers/regulator/qcom_rpm-regulator.c
-+++ b/drivers/regulator/qcom_rpm-regulator.c
-@@ -679,6 +679,7 @@ static int rpm_reg_probe(struct platform_device *pdev)
- 	vreg->desc.owner = THIS_MODULE;
- 	vreg->desc.type = REGULATOR_VOLTAGE;
- 	vreg->desc.name = pdev->dev.of_node->name;
-+	vreg->desc.supply_name = "vin";
- 
- 	vreg->rpm = dev_get_drvdata(pdev->dev.parent);
- 	if (!vreg->rpm) {
+Agreed.
+
+How about master_np or iommu_master_np ? The latter might be a bit long.
+
 -- 
-1.9.1
+Regards,
+
+Laurent Pinchart
