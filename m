@@ -1,59 +1,123 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 30 Jan 2015 15:47:42 +0100
-Subject: [PATCH v3 04/20] power_supply: sysfs: Use power_supply_*() API for
- accessing function attrs
+Date: Fri, 30 Jan 2015 15:47:56 +0100
+Subject: [PATCH v3 18/20] power_supply: bq2415x_charger: Decrement the power
+ supply's device reference counter
 In-Reply-To: <1422629278-12202-1-git-send-email-k.kozlowski@samsung.com>
 References: <1422629278-12202-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1422629278-12202-5-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1422629278-12202-19-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace direct calls to power supply function attributes with wrappers.
-Wrappers provide safe access in case of unregistering the power
-supply (e.g. by removing the driver). Replace:
- - get_property -> power_supply_get_property
- - set_property -> power_supply_set_property
- - property_is_writeable -> power_supply_property_is_writeable
+Use power_supply_put() to decrement the power supply's device reference
+counter (increased by power_supply_get_by_name() or
+power_supply_get_by_phandle()).
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Acked-by: Jonghwa Lee <jonghwa3.lee@samusng.com>
 Acked-by: Pavel Machek <pavel@ucw.cz>
 Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 Reviewed-by: Sebastian Reichel <sre@kernel.org>
 ---
- drivers/power/power_supply_sysfs.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/power/bq2415x_charger.c | 31 ++++++++++++++++++-------------
+ 1 file changed, 18 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/power/power_supply_sysfs.c b/drivers/power/power_supply_sysfs.c
-index 62653f50a524..f817aab80813 100644
---- a/drivers/power/power_supply_sysfs.c
-+++ b/drivers/power/power_supply_sysfs.c
-@@ -76,7 +76,7 @@ static ssize_t power_supply_show_property(struct device *dev,
- 	if (off == POWER_SUPPLY_PROP_TYPE) {
- 		value.intval = psy->type;
+diff --git a/drivers/power/bq2415x_charger.c b/drivers/power/bq2415x_charger.c
+index cb92022df8eb..4adcd65bef5b 100644
+--- a/drivers/power/bq2415x_charger.c
++++ b/drivers/power/bq2415x_charger.c
+@@ -1601,27 +1601,27 @@ static int bq2415x_probe(struct i2c_client *client,
+ 		ret = of_property_read_u32(np, "ti,current-limit",
+ 				&bq->init_data.current_limit);
+ 		if (ret)
+-			goto error_2;
++			goto error_3;
+ 		ret = of_property_read_u32(np, "ti,weak-battery-voltage",
+ 				&bq->init_data.weak_battery_voltage);
+ 		if (ret)
+-			goto error_2;
++			goto error_3;
+ 		ret = of_property_read_u32(np, "ti,battery-regulation-voltage",
+ 				&bq->init_data.battery_regulation_voltage);
+ 		if (ret)
+-			goto error_2;
++			goto error_3;
+ 		ret = of_property_read_u32(np, "ti,charge-current",
+ 				&bq->init_data.charge_current);
+ 		if (ret)
+-			goto error_2;
++			goto error_3;
+ 		ret = of_property_read_u32(np, "ti,termination-current",
+ 				&bq->init_data.termination_current);
+ 		if (ret)
+-			goto error_2;
++			goto error_3;
+ 		ret = of_property_read_u32(np, "ti,resistor-sense",
+ 				&bq->init_data.resistor_sense);
+ 		if (ret)
+-			goto error_2;
++			goto error_3;
  	} else {
--		ret = psy->get_property(psy, off, &value);
-+		ret = power_supply_get_property(psy, off, &value);
+ 		memcpy(&bq->init_data, pdata, sizeof(bq->init_data));
+ 	}
+@@ -1631,19 +1631,19 @@ static int bq2415x_probe(struct i2c_client *client,
+ 	ret = bq2415x_power_supply_init(bq);
+ 	if (ret) {
+ 		dev_err(bq->dev, "failed to register power supply: %d\n", ret);
+-		goto error_2;
++		goto error_3;
+ 	}
  
- 		if (ret < 0) {
- 			if (ret == -ENODATA)
-@@ -125,7 +125,7 @@ static ssize_t power_supply_store_property(struct device *dev,
+ 	ret = bq2415x_sysfs_init(bq);
+ 	if (ret) {
+ 		dev_err(bq->dev, "failed to create sysfs entries: %d\n", ret);
+-		goto error_3;
++		goto error_4;
+ 	}
  
- 	value.intval = long_val;
+ 	ret = bq2415x_set_defaults(bq);
+ 	if (ret) {
+ 		dev_err(bq->dev, "failed to set default values: %d\n", ret);
+-		goto error_4;
++		goto error_5;
+ 	}
  
--	ret = psy->set_property(psy, off, &value);
-+	ret = power_supply_set_property(psy, off, &value);
- 	if (ret < 0)
- 		return ret;
+ 	if (bq->notify_psy) {
+@@ -1651,7 +1651,7 @@ static int bq2415x_probe(struct i2c_client *client,
+ 		ret = power_supply_reg_notifier(&bq->nb);
+ 		if (ret) {
+ 			dev_err(bq->dev, "failed to reg notifier: %d\n", ret);
+-			goto error_5;
++			goto error_6;
+ 		}
  
-@@ -223,7 +223,7 @@ static umode_t power_supply_attr_is_visible(struct kobject *kobj,
+ 		/* Query for initial reported_mode and set it */
+@@ -1671,11 +1671,14 @@ static int bq2415x_probe(struct i2c_client *client,
+ 	dev_info(bq->dev, "driver registered\n");
+ 	return 0;
  
- 		if (property == attrno) {
- 			if (psy->property_is_writeable &&
--			    psy->property_is_writeable(psy, property) > 0)
-+			    power_supply_property_is_writeable(psy, property) > 0)
- 				mode |= S_IWUSR;
++error_6:
+ error_5:
+-error_4:
+ 	bq2415x_sysfs_exit(bq);
+-error_3:
++error_4:
+ 	bq2415x_power_supply_exit(bq);
++error_3:
++	if (!IS_ERR(bq->notify_psy))
++		power_supply_put(bq->notify_psy);
+ error_2:
+ 	kfree(name);
+ error_1:
+@@ -1692,8 +1695,10 @@ static int bq2415x_remove(struct i2c_client *client)
+ {
+ 	struct bq2415x_device *bq = i2c_get_clientdata(client);
  
- 			return mode;
+-	if (bq->notify_psy)
++	if (bq->notify_psy) {
+ 		power_supply_unreg_notifier(&bq->nb);
++		power_supply_put(bq->notify_psy);
++	}
+ 
+ 	bq2415x_sysfs_exit(bq);
+ 	bq2415x_power_supply_exit(bq);
 -- 
 1.9.1
