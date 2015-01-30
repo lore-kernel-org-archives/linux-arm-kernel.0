@@ -1,10 +1,10 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 30 Jan 2015 15:47:48 +0100
-Subject: [PATCH v3 10/20] power_supply: charger-manager: Use power_supply_*()
+Date: Fri, 30 Jan 2015 15:47:43 +0100
+Subject: [PATCH v3 05/20] power_supply: 88pm860x_charger: Use power_supply_*()
  API for accessing function attrs
 In-Reply-To: <1422629278-12202-1-git-send-email-k.kozlowski@samsung.com>
 References: <1422629278-12202-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1422629278-12202-11-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1422629278-12202-6-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,6 +12,7 @@ Replace direct calls to power supply function attributes with wrappers.
 Wrappers provide safe access in case of unregistering the power
 supply (e.g. by removing the driver). Replace:
  - get_property -> power_supply_get_property
+ - set_property -> power_supply_set_property
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 Acked-by: Jonghwa Lee <jonghwa3.lee@samusng.com>
@@ -19,152 +20,57 @@ Acked-by: Pavel Machek <pavel@ucw.cz>
 Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 Reviewed-by: Sebastian Reichel <sre@kernel.org>
 ---
- drivers/power/charger-manager.c | 37 ++++++++++++++++++++-----------------
- 1 file changed, 20 insertions(+), 17 deletions(-)
+ drivers/power/88pm860x_charger.c | 13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/power/charger-manager.c b/drivers/power/charger-manager.c
-index 1acb04629fa0..3a8ceacb1bee 100644
---- a/drivers/power/charger-manager.c
-+++ b/drivers/power/charger-manager.c
-@@ -103,8 +103,8 @@ static bool is_batt_present(struct charger_manager *cm)
- 		if (!psy)
- 			break;
- 
--		ret = psy->get_property(psy,
--				POWER_SUPPLY_PROP_PRESENT, &val);
-+		ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_PRESENT,
-+				&val);
- 		if (ret == 0 && val.intval)
- 			present = true;
- 		break;
-@@ -118,8 +118,8 @@ static bool is_batt_present(struct charger_manager *cm)
- 				continue;
- 			}
- 
--			ret = psy->get_property(psy, POWER_SUPPLY_PROP_PRESENT,
--					&val);
-+			ret = power_supply_get_property(psy,
-+				POWER_SUPPLY_PROP_PRESENT, &val);
- 			if (ret == 0 && val.intval) {
- 				present = true;
- 				break;
-@@ -155,7 +155,8 @@ static bool is_ext_pwr_online(struct charger_manager *cm)
- 			continue;
- 		}
- 
--		ret = psy->get_property(psy, POWER_SUPPLY_PROP_ONLINE, &val);
-+		ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_ONLINE,
-+				&val);
- 		if (ret == 0 && val.intval) {
- 			online = true;
- 			break;
-@@ -183,7 +184,7 @@ static int get_batt_uV(struct charger_manager *cm, int *uV)
- 	if (!fuel_gauge)
- 		return -ENODEV;
- 
--	ret = fuel_gauge->get_property(fuel_gauge,
-+	ret = power_supply_get_property(fuel_gauge,
- 				POWER_SUPPLY_PROP_VOLTAGE_NOW, &val);
+diff --git a/drivers/power/88pm860x_charger.c b/drivers/power/88pm860x_charger.c
+index ac352a6c03ea..98e31419d9cf 100644
+--- a/drivers/power/88pm860x_charger.c
++++ b/drivers/power/88pm860x_charger.c
+@@ -296,12 +296,13 @@ static int set_charging_fsm(struct pm860x_charger_info *info)
+ 	psy = power_supply_get_by_name(pm860x_supplied_to[0]);
+ 	if (!psy)
+ 		return -EINVAL;
+-	ret = psy->get_property(psy, POWER_SUPPLY_PROP_VOLTAGE_NOW, &data);
++	ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_VOLTAGE_NOW,
++			&data);
  	if (ret)
  		return ret;
-@@ -223,7 +224,8 @@ static bool is_charging(struct charger_manager *cm)
- 		}
+ 	vbatt = data.intval / 1000;
  
- 		/* 2. The charger should be online (ext-power) */
--		ret = psy->get_property(psy, POWER_SUPPLY_PROP_ONLINE, &val);
-+		ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_ONLINE,
+-	ret = psy->get_property(psy, POWER_SUPPLY_PROP_PRESENT, &data);
++	ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_PRESENT, &data);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -430,7 +431,7 @@ static irqreturn_t pm860x_temp_handler(int irq, void *data)
+ 	psy = power_supply_get_by_name(pm860x_supplied_to[0]);
+ 	if (!psy)
+ 		goto out;
+-	ret = psy->get_property(psy, POWER_SUPPLY_PROP_TEMP, &temp);
++	ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_TEMP, &temp);
+ 	if (ret)
+ 		goto out;
+ 	value = temp.intval / 10;
+@@ -485,7 +486,8 @@ static irqreturn_t pm860x_done_handler(int irq, void *data)
+ 	psy = power_supply_get_by_name(pm860x_supplied_to[0]);
+ 	if (!psy)
+ 		goto out;
+-	ret = psy->get_property(psy, POWER_SUPPLY_PROP_VOLTAGE_NOW, &val);
++	ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_VOLTAGE_NOW,
++			&val);
+ 	if (ret)
+ 		goto out;
+ 	vbatt = val.intval / 1000;
+@@ -500,7 +502,8 @@ static irqreturn_t pm860x_done_handler(int irq, void *data)
+ 	if (ret < 0)
+ 		goto out;
+ 	if (vbatt > CHARGE_THRESHOLD && ret & STATUS2_CHG)
+-		psy->set_property(psy, POWER_SUPPLY_PROP_CHARGE_FULL, &val);
++		power_supply_set_property(psy, POWER_SUPPLY_PROP_CHARGE_FULL,
 +				&val);
- 		if (ret) {
- 			dev_warn(cm->dev, "Cannot read ONLINE value from %s\n",
- 				 cm->desc->psy_charger_stat[i]);
-@@ -236,7 +238,8 @@ static bool is_charging(struct charger_manager *cm)
- 		 * 3. The charger should not be FULL, DISCHARGING,
- 		 * or NOT_CHARGING.
- 		 */
--		ret = psy->get_property(psy, POWER_SUPPLY_PROP_STATUS, &val);
-+		ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_STATUS,
-+				&val);
- 		if (ret) {
- 			dev_warn(cm->dev, "Cannot read STATUS value from %s\n",
- 				 cm->desc->psy_charger_stat[i]);
-@@ -279,7 +282,7 @@ static bool is_full_charged(struct charger_manager *cm)
- 		val.intval = 0;
  
- 		/* Not full if capacity of fuel gauge isn't full */
--		ret = fuel_gauge->get_property(fuel_gauge,
-+		ret = power_supply_get_property(fuel_gauge,
- 				POWER_SUPPLY_PROP_CHARGE_FULL, &val);
- 		if (!ret && val.intval > desc->fullbatt_full_capacity)
- 			return true;
-@@ -296,7 +299,7 @@ static bool is_full_charged(struct charger_manager *cm)
- 	if (desc->fullbatt_soc > 0) {
- 		val.intval = 0;
- 
--		ret = fuel_gauge->get_property(fuel_gauge,
-+		ret = power_supply_get_property(fuel_gauge,
- 				POWER_SUPPLY_PROP_CAPACITY, &val);
- 		if (!ret && val.intval >= desc->fullbatt_soc)
- 			return true;
-@@ -580,7 +583,7 @@ static int cm_get_battery_temperature_by_psy(struct charger_manager *cm,
- 	if (!fuel_gauge)
- 		return -ENODEV;
- 
--	return fuel_gauge->get_property(fuel_gauge,
-+	return power_supply_get_property(fuel_gauge,
- 				POWER_SUPPLY_PROP_TEMP,
- 				(union power_supply_propval *)temp);
- }
-@@ -901,7 +904,7 @@ static int charger_get_property(struct power_supply *psy,
- 			ret = -ENODEV;
- 			break;
- 		}
--		ret = fuel_gauge->get_property(fuel_gauge,
-+		ret = power_supply_get_property(fuel_gauge,
- 				POWER_SUPPLY_PROP_CURRENT_NOW, val);
- 		break;
- 	case POWER_SUPPLY_PROP_TEMP:
-@@ -924,7 +927,7 @@ static int charger_get_property(struct power_supply *psy,
- 		mdelay(2000);
- 		pr_err("End wait...\n");
- 
--		ret = fuel_gauge->get_property(fuel_gauge,
-+		ret = power_supply_get_property(fuel_gauge,
- 					POWER_SUPPLY_PROP_CAPACITY, val);
- 		if (ret)
- 			break;
-@@ -980,7 +983,7 @@ static int charger_get_property(struct power_supply *psy,
- 				break;
- 			}
- 
--			ret = fuel_gauge->get_property(fuel_gauge,
-+			ret = power_supply_get_property(fuel_gauge,
- 						POWER_SUPPLY_PROP_CHARGE_NOW,
- 						val);
- 			if (ret) {
-@@ -1429,7 +1432,7 @@ static int cm_init_thermal_data(struct charger_manager *cm,
- 	int ret;
- 
- 	/* Verify whether fuel gauge provides battery temperature */
--	ret = fuel_gauge->get_property(fuel_gauge,
-+	ret = power_supply_get_property(fuel_gauge,
- 					POWER_SUPPLY_PROP_TEMP, &val);
- 
- 	if (!ret) {
-@@ -1723,13 +1726,13 @@ static int charger_manager_probe(struct platform_device *pdev)
- 	cm->charger_psy.num_properties = psy_default.num_properties;
- 
- 	/* Find which optional psy-properties are available */
--	if (!fuel_gauge->get_property(fuel_gauge,
-+	if (!power_supply_get_property(fuel_gauge,
- 					  POWER_SUPPLY_PROP_CHARGE_NOW, &val)) {
- 		cm->charger_psy.properties[cm->charger_psy.num_properties] =
- 				POWER_SUPPLY_PROP_CHARGE_NOW;
- 		cm->charger_psy.num_properties++;
- 	}
--	if (!fuel_gauge->get_property(fuel_gauge,
-+	if (!power_supply_get_property(fuel_gauge,
- 					  POWER_SUPPLY_PROP_CURRENT_NOW,
- 					  &val)) {
- 		cm->charger_psy.properties[cm->charger_psy.num_properties] =
+ out:
+ 	mutex_unlock(&info->lock);
 -- 
 1.9.1
