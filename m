@@ -1,61 +1,82 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 30 Jan 2015 00:43:11 +0100
-Subject: [PATCH 2/2] ARM: dts: rockchip: move the hdmi ddc-i2c-bus property to
- the actual boards
-In-Reply-To: <3746086.qLJlieorB7@diego>
-References: <3746086.qLJlieorB7@diego>
-Message-ID: <7335328.BluQKWqSL0@diego>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 30 Jan 2015 01:14:12 +0100
+Subject: [PATCH v2] cpufreq: suspend cpufreq governors on shutdown
+In-Reply-To: <CAKohpo=iEb19QGKUXJO1PURPjUkv1ZCeVFg-i+AFihi7Gmjf0Q@mail.gmail.com>
+References: <1419401388-20171-1-git-send-email-dianders@chromium.org>
+ <CAKohpo=iEb19QGKUXJO1PURPjUkv1ZCeVFg-i+AFihi7Gmjf0Q@mail.gmail.com>
+Message-ID: <1548953.lJ1trAVWhn@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the hdmi driver is using one of the soc i2c busses for ddc probing
-and while documentation always specifies i2c5 as hdmi-i2c it could very well
-be any other bus as well.
+On Monday, December 29, 2014 09:45:42 AM Viresh Kumar wrote:
+> On 24 December 2014 at 11:39, Doug Anderson <dianders@chromium.org> wrote:
+> > We should stop cpufreq governors when we shut down the system.  If we
+> > don't do this, we can end up with this deadlock:
+> >
+> > 1. cpufreq governor may be running on a CPU other than CPU0.
+> > 2. In machine_restart() we call smp_send_stop() which stops CPUs.
+> >    If one of these CPUs was actively running a cpufreq governor
+> >    then it may have the mutex / spinlock needed to access the main
+> >    PMIC in the system (perhaps over I2C)
+> > 3. If a machine needs access to the main PMIC in order to shutdown
+> >    then it will never get it since the mutex was lost when the other
+> >    CPU stopped.
+> > 4. We'll hang (possibly eventually hitting the hard lockup detector).
+> >
+> > Let's avoid the problem by stopping the cpufreq governor at shutdown,
+> > which is a sensible thing to do anyway.
+> >
+> > Signed-off-by: Doug Anderson <dianders@chromium.org>
+> > ---
+> > Changes in v2:
+> > - Add a comment about why we register
+> > - Don't create cpufreq_shutdown() wrapper function
+> >
+> >  drivers/cpufreq/cpufreq.c | 11 +++++++++++
+> >  1 file changed, 11 insertions(+)
+> >
+> > diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
+> > index a09a29c..33f3d65 100644
+> > --- a/drivers/cpufreq/cpufreq.c
+> > +++ b/drivers/cpufreq/cpufreq.c
+> > @@ -27,6 +27,7 @@
+> >  #include <linux/mutex.h>
+> >  #include <linux/slab.h>
+> >  #include <linux/suspend.h>
+> > +#include <linux/syscore_ops.h>
+> >  #include <linux/tick.h>
+> >  #include <trace/events/power.h>
+> >
+> > @@ -2550,6 +2551,14 @@ int cpufreq_unregister_driver(struct cpufreq_driver *driver)
+> >  }
+> >  EXPORT_SYMBOL_GPL(cpufreq_unregister_driver);
+> >
+> > +/*
+> > + * Stop cpufreq at shutdown to make sure it isn't holding any locks
+> > + * or mutexes when secondary CPUs are halted.
+> > + */
+> > +static struct syscore_ops cpufreq_syscore_ops = {
+> > +       .shutdown = cpufreq_suspend,
+> > +};
+> > +
+> >  static int __init cpufreq_core_init(void)
+> >  {
+> >         if (cpufreq_disabled())
+> > @@ -2558,6 +2567,8 @@ static int __init cpufreq_core_init(void)
+> >         cpufreq_global_kobject = kobject_create();
+> >         BUG_ON(!cpufreq_global_kobject);
+> >
+> > +       register_syscore_ops(&cpufreq_syscore_ops);
+> > +
+> >         return 0;
+> >  }
+> >  core_initcall(cpufreq_core_init);
+> 
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-Therefore this is a property of the board and should be specified there.
+Queued up for 3.20, thanks!
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm/boot/dts/rk3288-evb.dtsi     | 1 +
- arch/arm/boot/dts/rk3288-firefly.dtsi | 1 +
- arch/arm/boot/dts/rk3288.dtsi         | 1 -
- 3 files changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
-index 6857730..86ede58 100644
---- a/arch/arm/boot/dts/rk3288-evb.dtsi
-+++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-@@ -105,6 +105,7 @@
- };
- 
- &hdmi {
-+	ddc-i2c-bus = <&i2c5>;
- 	status = "okay";
- };
- 
-diff --git a/arch/arm/boot/dts/rk3288-firefly.dtsi b/arch/arm/boot/dts/rk3288-firefly.dtsi
-index 6dcc5e9..e6f873a 100644
---- a/arch/arm/boot/dts/rk3288-firefly.dtsi
-+++ b/arch/arm/boot/dts/rk3288-firefly.dtsi
-@@ -180,6 +180,7 @@
- };
- 
- &hdmi {
-+	ddc-i2c-bus = <&i2c5>;
- 	status = "okay";
- };
- 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 1e75a0f..1141850 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -646,7 +646,6 @@
- 		compatible = "rockchip,rk3288-dw-hdmi";
- 		reg = <0xff980000 0x20000>;
- 		reg-io-width = <4>;
--		ddc-i2c-bus = <&i2c5>;
- 		rockchip,grf = <&grf>;
- 		interrupts = <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&cru  PCLK_HDMI_CTRL>, <&cru SCLK_HDMI_HDCP>;
 -- 
-2.1.1
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
