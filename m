@@ -1,47 +1,70 @@
-From: mpeg.blue@free.fr (Mason)
-Date: Sat, 31 Jan 2015 00:44:15 +0100
-Subject: RFC on cpufreq implementation
-In-Reply-To: <CAKohponrzDb4ZGvRtJ5jtGTPAy4RCfRsYGvdjR5fx51K2=evCg@mail.gmail.com>
-References: <54B7F7CD.7030903@free.fr> <54CA6327.5070707@free.fr>
- <CAKohponrzDb4ZGvRtJ5jtGTPAy4RCfRsYGvdjR5fx51K2=evCg@mail.gmail.com>
-Message-ID: <54CC174F.10703@free.fr>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sat, 31 Jan 2015 00:53:46 +0100
+Subject: [PATCH] ARM: extend SMP_ON_UP detection for A5 MPCore devices with 1
+ CPU
+Message-ID: <1422662026-12968-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/01/2015 02:15, Viresh Kumar wrote:
+On the non-SMP Cortex-A5 Vybrid SoC detection of SMP_ON_UP fails.
+Some variants of this SoC have a secondary Cortex-M4 CPU, which
+might be the reason the MPIDR register reporting a multiprocessor
+system.
 
-> What do you want to do with this driver? If you want to get it reviewed,
-> please send it properly with git-send-email instead of attachments..
-> 
-> If its just an internal one, then sorry, the lists aren't for such reviews.
+The code introduced in bc41b8724f ("ARM: 7846/1: Update SMP_ON_UP
+code to detect A9MPCore with 1 CPU devices") proved applicable
+for Vybrid too: The SCU register number of CPUs reports b00
+indicating only one A5 MPCore being present in the system. This
+patch lets Cortex-A5 CPU's use the SCU check too.
 
-The long-term goal is to mainline the whole port, but it's rather
-overwhelming, and I haven't found a way to divide-and-conquer, yet.
-I've been reading guides and documentation for weeks, but nothing
-has made my brain click.
+On the Vybrid platform this did not lead to CPU faults (so far),
+but is_smp checks evaluate to true which is not optimal
+performance wise.
 
-Everything seems to involve DeviceTree, and AFAIU, going down that
-rabbit-hole means making lots of changes all over. (But I probably
-misunderstood that part too.)
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+A boot log of the Vybrid SoC with this patch applied is available at:
+http://www.agner.ch/vybrid-vf610-3.19-rc6-smp-fixup.txt
 
-Right now, all I have is this cleaned up cpufreq driver. And I don't
-even know where to put it!
+ arch/arm/kernel/head.S | 21 +++++++++++++--------
+ 1 file changed, 13 insertions(+), 8 deletions(-)
 
-I see some platforms have it in their machine-specific folder, others
-are in drivers/cpufreq. (When to use mach vs plat?)
-
-If it's supposed to go in drivers/cpufreq, I suppose there are naming
-conventions to follow?
-
-Also, if it's in drivers/cpufreq, we are not supposed to include
-any machine-specific includes? And I'm back to my original question
-where am I supposed to store machine-specific information, such as
-register descriptions and MMIO addresses and offsets?
-
-Two months ago, Arnd wrote:
-> I meant the IO_ADDRESS stuff. Modern code uses ioremap() instead
-> since the IO_ADDRESS was platform specific, and drivers can no longer
-> use platform headers on CONFIG_ARCH_MULTIPLATFORM, which is used
-> for all new code now.
-
-Regards.
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index 664eee8..35982af 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -492,19 +492,24 @@ __fixup_smp:
+ 	mrc	p15, 0, r0, c0, c0, 5	@ read MPIDR
+ 	and	r0, r0, #0xc0000000	@ multiprocessing extensions and
+ 	teq	r0, #0x80000000		@ not part of a uniprocessor system?
+-	bne    __fixup_smp_on_up	@ no, assume UP
++	bne	__fixup_smp_on_up	@ no, assume UP
+ 
+-	@ Core indicates it is SMP. Check for Aegis SOC where a single
+-	@ Cortex-A9 CPU is present but SMP operations fault.
++	@ Core indicates it is SMP. Check for Vybrid/Aegis SoC where a single
++	@ Cortex-A5/A9 CPU is present
+ 	mov	r4, #0x41000000
+ 	orr	r4, r4, #0x0000c000
+-	orr	r4, r4, #0x00000090
+-	teq	r3, r4			@ Check for ARM Cortex-A9
+-	retne	lr			@ Not ARM Cortex-A9,
+-
++	orr	r0, r4, #0x00000090
++	teq	r3, r0			@ Check for ARM Cortex-A9
++	beq	__fixup_smp_by_scu
++	orr	r0, r4, #0x00000050
++	teq	r3, r0			@ Check for ARM Cortex-A5
++	beq	__fixup_smp_by_scu
++	ret	lr			@ Not ARM Cortex-A5 or A9, assume SMP
++
++__fixup_smp_by_scu:
+ 	@ If a future SoC *does* use 0x0 as the PERIPH_BASE, then the
+ 	@ below address check will need to be #ifdef'd or equivalent
+-	@ for the Aegis platform.
++	@ for the Vybrid and Aegis platform.
+ 	mrc	p15, 4, r0, c15, c0	@ get SCU base address
+ 	teq	r0, #0x0		@ '0' on actual UP A9 hardware
+ 	beq	__fixup_smp_on_up	@ So its an A9 UP
+-- 
+2.2.2
