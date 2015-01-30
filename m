@@ -1,86 +1,175 @@
-From: nathan.sullivan@ni.com (Nathan Sullivan)
-Date: Fri, 30 Jan 2015 12:40:15 -0600
-Subject: [PATCH] clocksource: mark sched_clock_read functions notrace
-Message-ID: <1422643216-26673-1-git-send-email-nathan.sullivan@ni.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 30 Jan 2015 10:45:58 -0800
+Subject: [PATCH 00/11] ARM: OMAP3: legacy clock data move under clk driver
+In-Reply-To: <54CBA144.8020409@ti.com>
+References: <1418746856-17173-1-git-send-email-t-kristo@ti.com>
+ <20150107230006.GE13010@atomide.com> <54CA95D1.6080700@ti.com>
+ <20150130004224.22722.56051@quantum> <54CBA144.8020409@ti.com>
+Message-ID: <20150130184558.22722.90397@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These functions will be called by ftrace code when function_graph is
-used, so mark them notrace to avoid infinite recursion.
+Quoting Tero Kristo (2015-01-30 07:20:36)
+> On 01/30/2015 02:42 AM, Mike Turquette wrote:
+> > Quoting Tero Kristo (2015-01-29 12:19:29)
+> >> On 01/08/2015 01:00 AM, Tony Lindgren wrote:
+> >>> * Tero Kristo <t-kristo@ti.com> [141216 08:22]:
+> >>>> Hi,
+> >>>>
+> >>>> These patches move the legacy clock data for omap3 under drivers/clk/ti.
+> >>>> After these patches are applied, it should be possible to get rid of
+> >>>> clk-private.h (long pending project for Mike.)
+> >>>>
+> >>>> Testing done (on top of 3.18-rc1):
+> >>>>
+> >>>> omap3-beagle: boot / suspend-resume (ret/off) / cpuidle (ret/off)
+> >>>> omap3-beagle-xm: boot upto fs mount (see note below)
+> >>>> sdp3430: boot
+> >>>> n900: boot
+> >>>>
+> >>>> Note: beagle-xm failed with FS mount on the board I have access to, but
+> >>>>         this happens with clean 3.18-rc1 and linux-next also at the moment.
+> >>>>         The board has probably corrupted filesystem image but I am unable
+> >>>>         to fix this atm (remote board.)
+> >>>>
+> >>>> Test branch:
+> >>>> tree: https://github.com/t-kristo/linux-pm.git
+> >>>> branch: 3.18-rc1-omap3-clk-rework
+> >>>
+> >>> Great, hopefully this will finally allow Mike to make the
+> >>> generic struct clk private to drivers/clk :)
+> >>>
+> >>> Seems to boot just fine based on a quick legacy booting test
+> >>> on n900.
+> >>>
+> >>> Mike, assuming no other issues, can you please apply these into a
+> >>> immutable branch against v3.19-rc1 that Paul and I can also merge
+> >>> in as needed?
+> >>>
+> >>> Please also feel free to add:
+> >>>
+> >>> Acked-by: Tony Lindgren <tony@atomide.com>
+> >>>
+> >>
+> >> I just rebased these patches on top of 3.19-rc1, and noticed a problem
+> >> with dpll5 on beagle-xm (basically a divide-by-zero error + locking
+> >> issue during boot.) The extra diff at the end of this email fixes the
+> >> problems, I will also send the updated two patches as v2. Updated branch
+> >> available in my tree under name 3.19-rc1-omap3-clk-rework.
+> >
+> > I've applied these 11 patches on top of v3.19-rc1, including the two V2
+> > patches for #6 and #8 to the clk-omap-legacy branch here:
+> >
+> > git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-omap-legacy
+> >
+> > Let me know if I screwed anything up. I've merged this immutable branch
+> > into clk-next.
+> >
+> > In addition I've made some changes to remove clk-private.h permanently.
+> > I'll post those later today. Again, please let me know if I screwed
+> > anything up.
+> 
+> I can't see the clk-omap-legacy merged to clk-next so far, maybe you did 
+> not push it yet? The branch itself is identical copy of mine, so can't 
+> see any issues there so far.
 
-Signed-off-by: Nathan Sullivan <nathan.sullivan@ni.com>
----
- drivers/clocksource/arm_arch_timer.c    |    2 +-
- drivers/clocksource/arm_global_timer.c  |    2 +-
- drivers/clocksource/samsung_pwm_timer.c |    2 +-
- drivers/clocksource/timer-prima2.c      |    2 +-
- drivers/clocksource/timer-sun5i.c       |    2 +-
- 5 files changed, 5 insertions(+), 5 deletions(-)
+That is correct. There are a lot of unrelated changes in clk-next right
+now so I didn't push this OMAP stuff last night. Turns out to be a good
+thing since linux-next had some breakage today. Once that is resolved
+I'll push this out, but clk-omap-legacy IS merged locally in my tree,
+just not on the public git that linux-next pulls.
 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 095c177..df5af55 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -405,7 +405,7 @@ u32 arch_timer_get_rate(void)
- 	return arch_timer_rate;
- }
- 
--static u64 arch_counter_get_cntvct_mem(void)
-+static u64 notrace arch_counter_get_cntvct_mem(void)
- {
- 	u32 vct_lo, vct_hi, tmp_hi;
- 
-diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
-index e683377..b4e221a 100644
---- a/drivers/clocksource/arm_global_timer.c
-+++ b/drivers/clocksource/arm_global_timer.c
-@@ -60,7 +60,7 @@ static struct clock_event_device __percpu *gt_evt;
-  *  different to the 32-bit upper value read previously, go back to step 2.
-  *  Otherwise the 64-bit timer counter value is correct.
-  */
--static u64 gt_counter_read(void)
-+static u64 notrace gt_counter_read(void)
- {
- 	u64 counter;
- 	u32 lower;
-diff --git a/drivers/clocksource/samsung_pwm_timer.c b/drivers/clocksource/samsung_pwm_timer.c
-index 5645cfc..09f4ee3 100644
---- a/drivers/clocksource/samsung_pwm_timer.c
-+++ b/drivers/clocksource/samsung_pwm_timer.c
-@@ -310,7 +310,7 @@ static void samsung_clocksource_resume(struct clocksource *cs)
- 	samsung_time_start(pwm.source_id, true);
- }
- 
--static cycle_t samsung_clocksource_read(struct clocksource *c)
-+static cycle_t notrace samsung_clocksource_read(struct clocksource *c)
- {
- 	return ~readl_relaxed(pwm.source_reg);
- }
-diff --git a/drivers/clocksource/timer-prima2.c b/drivers/clocksource/timer-prima2.c
-index ce18d57..4410817 100644
---- a/drivers/clocksource/timer-prima2.c
-+++ b/drivers/clocksource/timer-prima2.c
-@@ -73,7 +73,7 @@ static irqreturn_t sirfsoc_timer_interrupt(int irq, void *dev_id)
- }
- 
- /* read 64-bit timer counter */
--static cycle_t sirfsoc_timer_read(struct clocksource *cs)
-+static cycle_t notrace sirfsoc_timer_read(struct clocksource *cs)
- {
- 	u64 cycles;
- 
-diff --git a/drivers/clocksource/timer-sun5i.c b/drivers/clocksource/timer-sun5i.c
-index 0226844..604b3bf 100644
---- a/drivers/clocksource/timer-sun5i.c
-+++ b/drivers/clocksource/timer-sun5i.c
-@@ -137,7 +137,7 @@ static struct irqaction sun5i_timer_irq = {
- 	.dev_id = &sun5i_clockevent,
- };
- 
--static u64 sun5i_timer_sched_read(void)
-+static u64 notrace sun5i_timer_sched_read(void)
- {
- 	return ~readl(timer_base + TIMER_CNTVAL_LO_REG(1));
- }
--- 
-1.7.10.4
+Regards,
+Mike
+
+> 
+> -Tero
+> 
+> >
+> > Regards,
+> > Mike
+> >
+> >>
+> >> - Tero
+> >>
+> >> ---------------------
+> >>
+> >> diff --git a/drivers/clk/ti/clk-3xxx-legacy.c
+> >> b/drivers/clk/ti/clk-3xxx-legacy.c
+> >> index 81ad510..e0732a4 100644
+> >> --- a/drivers/clk/ti/clk-3xxx-legacy.c
+> >> +++ b/drivers/clk/ti/clk-3xxx-legacy.c
+> >> @@ -136,6 +136,7 @@ static struct ti_clk_dpll dpll3_ck_data = {
+> >>          .idlest_mask = 0x1,
+> >>          .auto_recal_bit = 0x3,
+> >>          .max_divider = 0x80,
+> >> +       .min_divider = 0x1,
+> >>          .recal_en_bit = 0x5,
+> >>          .max_multiplier = 0x7ff,
+> >>          .enable_mask = 0x7,
+> >> @@ -307,6 +308,7 @@ static struct ti_clk_dpll dpll4_ck_data = {
+> >>          .idlest_mask = 0x2,
+> >>          .auto_recal_bit = 0x13,
+> >>          .max_divider = 0x80,
+> >> +       .min_divider = 0x1,
+> >>          .recal_en_bit = 0x6,
+> >>          .max_multiplier = 0x7ff,
+> >>          .enable_mask = 0x70000,
+> >> @@ -507,6 +509,7 @@ static struct ti_clk_dpll dpll5_ck_data = {
+> >>          .idlest_mask = 0x1,
+> >>          .auto_recal_bit = 0x3,
+> >>          .max_divider = 0x80,
+> >> +       .min_divider = 0x1,
+> >>          .recal_en_bit = 0x19,
+> >>          .max_multiplier = 0x7ff,
+> >>          .enable_mask = 0x7,
+> >> @@ -1271,6 +1274,7 @@ static struct ti_clk_dpll dpll1_ck_data = {
+> >>          .idlest_mask = 0x1,
+> >>          .auto_recal_bit = 0x3,
+> >>          .max_divider = 0x80,
+> >> +       .min_divider = 0x1,
+> >>          .recal_en_bit = 0x7,
+> >>          .max_multiplier = 0x7ff,
+> >>          .enable_mask = 0x7,
+> >> @@ -2154,6 +2158,7 @@ static struct ti_clk_dpll dpll2_ck_data = {
+> >>          .idlest_mask = 0x1,
+> >>          .auto_recal_bit = 0x3,
+> >>          .max_divider = 0x80,
+> >> +       .min_divider = 0x1,
+> >>          .recal_en_bit = 0x8,
+> >>          .max_multiplier = 0x7ff,
+> >>          .enable_mask = 0x7,
+> >> @@ -2513,6 +2518,7 @@ static struct ti_clk_dpll dpll4_ck_omap36xx_data = {
+> >>          .idlest_mask = 0x2,
+> >>          .auto_recal_bit = 0x13,
+> >>          .max_divider = 0x80,
+> >> +       .min_divider = 0x1,
+> >>          .recal_en_bit = 0x6,
+> >>          .max_multiplier = 0xfff,
+> >>          .enable_mask = 0x70000,
+> >> diff --git a/drivers/clk/ti/clock.h b/drivers/clk/ti/clock.h
+> >> index 8d9c603..404158d 100644
+> >> --- a/drivers/clk/ti/clock.h
+> >> +++ b/drivers/clk/ti/clock.h
+> >> @@ -148,6 +148,7 @@ struct ti_clk_dpll {
+> >>          u32 sddiv_mask;
+> >>          u16 max_multiplier;
+> >>          u16 max_divider;
+> >> +       u8 min_divider;
+> >>          u8 auto_recal_bit;
+> >>          u8 recal_en_bit;
+> >>          u8 recal_st_bit;
+> >> diff --git a/drivers/clk/ti/dpll.c b/drivers/clk/ti/dpll.c
+> >> index 7d67639..47ebff7 100644
+> >> --- a/drivers/clk/ti/dpll.c
+> >> +++ b/drivers/clk/ti/dpll.c
+> >> @@ -243,6 +243,7 @@ struct clk *ti_clk_register_dpll(struct ti_clk *setup)
+> >>          dd->sddiv_mask = dpll->sddiv_mask;
+> >>          dd->dco_mask = dpll->dco_mask;
+> >>          dd->max_divider = dpll->max_divider;
+> >> +       dd->min_divider = dpll->min_divider;
+> >>          dd->max_multiplier = dpll->max_multiplier;
+> >>          dd->auto_recal_bit = dpll->auto_recal_bit;
+> >>          dd->recal_en_bit = dpll->recal_en_bit;
+> >>
+> 
