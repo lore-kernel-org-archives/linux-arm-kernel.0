@@ -1,66 +1,47 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 30 Jan 2015 19:33:56 +0000 (UTC)
-Subject: [PATCH 24/24] Documentation: DT bindings: add nvidia, denver
- compatible string
-In-Reply-To: <CAL_JsqJq8D86gUdw80Nev=zmW=kYR90iNKiTzciwpaGx2qNJsA@mail.gmail.com>
-References: <20150128234935.20644.89300.stgit@dusk.lan>
- <20150128234938.20644.69989.stgit@dusk.lan>
- <CAL_JsqJq8D86gUdw80Nev=zmW=kYR90iNKiTzciwpaGx2qNJsA@mail.gmail.com>
-Message-ID: <alpine.DEB.2.02.1501301933170.6569@utopia.booyaka.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Fri, 30 Jan 2015 11:48:24 -0800
+Subject: [PATCH 7/8] arm64/kexec: Add checks for KVM
+In-Reply-To: <54CB206D.7040705@linaro.org>
+References: <cover.1421449714.git.geoff@infradead.org>
+ <a3353cf2ac47f49c20bbbb88405301cbaa359805.1421449714.git.geoff@infradead.org>
+ <20150126191942.GQ23313@leverpostej> <54CA041C.6020403@linaro.org>
+ <54CA12A1.8090508@arm.com> <20150129184747.GV17721@leverpostej>
+ <54CB206D.7040705@linaro.org>
+Message-ID: <1422647304.21823.31.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob
+Hi Takahiro.
 
-On Thu, 29 Jan 2015, Rob Herring wrote:
+On Fri, 2015-01-30 at 15:10 +0900, AKASHI Takahiro wrote:
+> Initially, I thought that we would define kvm_arch_exit() and call it
+> somewhere in the middle of kexec path (no idea yet).
+> But Geoff suggested me to implement a new hvc call, HVC_CPU_SHUTDOWN(??),
+> and make it called via cpu_notifier(CPU_DYING_FROZEN) initiated by
+> machine_shutdown() from kernel_kexec().
 
-> On Wed, Jan 28, 2015 at 5:49 PM, Paul Walmsley <paul@pwsan.com> wrote:
-> >
-> > Add a compatible string for the NVIDIA Denver CPU to the ARM CPU DT
-> > binding documentation file.  The primary objective here is to keep
-> > checkpatch.pl from warning when the compatible string is used in an
-> > SoC DT file, per:
-> >
-> > http://marc.info/?l=linux-tegra&m=142201349727836&w=2
-> >
-> >
-> > Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> > Cc: Rob Herring <robh+dt@kernel.org>
-> > Cc: Pawel Moll <pawel.moll@arm.com>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> > Cc: Kumar Gala <galak@codeaurora.org>
-> > Cc: Heiko Stuebner <heiko@sntech.de>
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Olof Johansson <olof@lixom.net>
-> > Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > Cc: Rohit Vaswani <rvaswani@codeaurora.org>
-> > Cc: Paul Walmsley <pwalmsley@nvidia.com>
-> > Cc: Marc Carino <marc.ceeeee@gmail.com>
-> > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Cc: devicetree at vger.kernel.org
-> > Cc: linux-kernel at vger.kernel.org
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > ---
-> >  Documentation/devicetree/bindings/arm/cpus.txt |    1 +
-> >  1 file changed, 1 insertion(+)
-> >
-> > diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-> > index b2aacbe16ed9..4ea31f0b7764 100644
-> > --- a/Documentation/devicetree/bindings/arm/cpus.txt
-> > +++ b/Documentation/devicetree/bindings/arm/cpus.txt
-> > @@ -175,6 +175,7 @@ nodes to be present and contain the properties described below.
-> >                             "marvell,pj4a"
-> >                             "marvell,pj4b"
-> >                             "marvell,sheeva-v5"
-> > +                           "nvidia,denver" (not yet matched in the code)
-> 
-> There's not variations or versions of Denver cores or plans to change
-> from the codename?
+As an initial implementation we can hook into the CPU_DYING_FROZEN
+notifier sent to hyp_init_cpu_notify().  The longer term solution
+should use kvm_arch_hardware_enable() and kvm_arch_hardware_disable().
 
-Hard to say what the future will bring.  I'll change it to 
-"nvidia,tegra132-denver".
+The calls to cpu_notifier(CPU_DYING_FROZEN) are part of cpu hot
+plug, and independent of kexec.  If someone were to add spin-table
+cpu un-plug, then it would be used for that also.  It seems we should
+be able to test without kexec by using cpu hot plug.
 
+To tear down KVM you need to get back to hyp mode, and hence
+the need for HVC_CPU_SHUTDOWN.  The sequence I envisioned would
+be like this:
 
-- Paul
+cpu_notifier(CPU_DYING_FROZEN)
+ -> kvm_cpu_shutdown() 
+    prepare for hvc
+    -> HVC_CPU_SHUTDOWN
+       now in hyp mode, do KVM tear down, restore default exception vectors
+
+Once the default exception vectors are restored soft_restart()
+can then execute the cpu_reset routine in EL2.
+
+Some notes are here for those with access:  https://cards.linaro.org/browse/KWG-611
+
+-Geoff
