@@ -1,27 +1,49 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 30 Jan 2015 14:49:26 +0100
-Subject: [PATCH v4 1/3] pinctrl: add driver for Amlogic Meson SoCs
-In-Reply-To: <2015012310244690614024@163.com>
-References: <1421518516-26976-1-git-send-email-b.galvani@gmail.com>
- <1421518516-26976-2-git-send-email-b.galvani@gmail.com>
- <CACRpkdZ6CX1XePa0sOY-0B9He9jYPNLqUtkk3LEGeT6eSQW9ew@mail.gmail.com>
- <2015012211022773401912@163.com>
- <CACRpkdb=9K62kJbQHWK=Bqfcz7zVckKcF3riC-9RDdd-8vG7bg@mail.gmail.com>
- <2015012310244690614024@163.com>
-Message-ID: <CACRpkdbp4VXuGA+Lhm0sE_SGzQT8OEx7B+BBKZmXoxOUHw1r-g@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 30 Jan 2015 13:58:39 +0000
+Subject: [PATCH] xen/arm: allow console=hvc0 to be omitted for guests
+Message-ID: <1422626319-30752-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 23, 2015 at 3:25 AM, 48169172 <48169172@163.com> wrote:
+This patch registers hvc0 as the preferred console if no console
+has been specified explicitly on the kernel command line.
 
-> Hi Linus?
-> I do not find the meson dir,
-> https://git.kernel.org/cgit/linux/kernel/git/linusw/linux-pinctrl.git/tree/drivers/pinctrl?h=devel
-> Is there something wrong?
+The purpose is to allow platform agnostic kernels and boot images
+(such as distro installers) to boot in a Xen/ARM domU without the
+need to modify the command line by hand.
 
-Maybe I took time pushing it out?
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
 
-It's certainly there now, even on the link you sent.
+This applies on top of the patch Julien is cooking up to move the
+call to xen_guest_init() to an earlier boot stage. This needs to
+be at least before the call to console_init() in start_kernel()
+for this patch to do anything meaningful.
 
-Yours,
-Linus Walleij
+ arch/arm/xen/enlighten.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index c7ca936ebd99..61382cafa877 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -24,6 +24,7 @@
+ #include <linux/cpuidle.h>
+ #include <linux/cpufreq.h>
+ #include <linux/cpu.h>
++#include <linux/console.h>
+ 
+ #include <linux/mm.h>
+ 
+@@ -322,6 +323,9 @@ static int __init xen_guest_init(void)
+ 
+ 	register_cpu_notifier(&xen_cpu_notifier);
+ 
++	if (!console_set_on_cmdline)
++		add_preferred_console("hvc", 0, NULL);
++
+ 	return 0;
+ }
+ early_initcall(xen_guest_init);
+-- 
+1.8.3.2
