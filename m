@@ -1,69 +1,93 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 30 Jan 2015 17:08:40 -0800
-Subject: =?windows-1252?Q?PROBLEM=3A=A0BUG__appearing_when_tr?=
- =?windows-1252?Q?ying_to_allocate_interrupt_on_Exynos_MCT_?=
- =?windows-1252?Q?after_CPU_hotplug?=
-In-Reply-To: <5450C391.2070007@samsung.com>
-References: <544907D4.1020409@samsung.com>
- <20141023140644.GI27405@n2100.arm.linux.org.uk>
- <54494BEE.9020702@codeaurora.org> <544A52B0.9050901@samsung.com>
- <544EA810.6090502@codeaurora.org> <5450C391.2070007@samsung.com>
-Message-ID: <54CC2B18.2070809@codeaurora.org>
+Date: Fri, 30 Jan 2015 17:31:58 -0800
+Subject: [PATCH v13 4/6] clk: Add rate constraints to clocks
+In-Reply-To: <54CA8662.7040008@codeaurora.org>
+References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1422011024-32283-5-git-send-email-tomeu.vizoso@collabora.com>
+ <CAMuHMdUGgA70o2SgdJR3X6AkCcMssHU0POLfzppADT-O=BrYDw@mail.gmail.com>
+ <54CA8662.7040008@codeaurora.org>
+Message-ID: <20150131013158.GA4323@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kept meaning to get back to this thread. Have you resolved it?
+On 01/29, Stephen Boyd wrote:
+> On 01/29/15 05:31, Geert Uytterhoeven wrote:
+> > Hi Tomeu, Mike,
+> >
+> > On Fri, Jan 23, 2015 at 12:03 PM, Tomeu Vizoso
+> > <tomeu.vizoso@collabora.com> wrote:
+> >> --- a/drivers/clk/clk.c
+> >> +++ b/drivers/clk/clk.c
+> >> @@ -2391,25 +2543,24 @@ int __clk_get(struct clk *clk)
+> >>         return 1;
+> >>  }
+> >>
+> >> -static void clk_core_put(struct clk_core *core)
+> >> +void __clk_put(struct clk *clk)
+> >>  {
+> >>         struct module *owner;
+> >>
+> >> -       owner = core->owner;
+> >> +       if (!clk || WARN_ON_ONCE(IS_ERR(clk)))
+> >> +               return;
+> >>
+> >>         clk_prepare_lock();
+> >> -       kref_put(&core->ref, __clk_release);
+> >> +
+> >> +       hlist_del(&clk->child_node);
+> >> +       clk_core_set_rate_nolock(clk->core, clk->core->req_rate);
+> > At this point, clk->core->req_rate is still zero, causing
+> > cpg_div6_clock_round_rate() to be called with a zero "rate" parameter,
+> > e.g. on r8a7791:
+> 
+> Hmm.. I wonder if we should assign core->req_rate to be the same as
+> core->rate during __clk_init()? That would make this call to
+> clk_core_set_rate_nolock() a nop in this case.
+> 
 
-On 10/29/14 03:38, Marcin Jabrzyk wrote:
-> So I've tried this patch, it resolves one problem but introduces also
-> new ones. As expected the BUG warning is not showing after applying
-> this patch but there are some interesting side effects.
+Here's a patch to do this
 
-Well that's half good news.
+---8<----
+From: Stephen Boyd <sboyd@codeaurora.org>
+Subject: [PATCH] clk: Assign a requested rate by default
 
-> I was looking on /proc/interrupts output. IRQ for CPU0 have "MCT" name
-> and IRQ for CPU1 has unexpectedly no name at all.
+We need to assign a requested rate here so that we avoid
+requesting a rate of 0 on clocks when we remove clock consumers.
 
-This is pretty confusing. I don't see how the patch could cause this to
-happen.
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/clk/clk.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-> After making hotplug cycle of CPU1 I've observed that IRQs attached
-> originally for that CPU are generating on really low count and not in
-> order with IRQ for CPU0.
-> What's more the interrupt for CPU1 is showing to me as being counted
-> for both CPUs, so it's probably not being attached to CPU1.
->
-
-yeah. Can you give the output of /proc/timer_list in addition to
-/proc/interrupts? It may give some hints on what's going on. It may also
-be interesting to see if irq_force_affinity() is failing. Please check
-the return value and print an error
-
-
-diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-index 1800053b4644..3c4538e26731 100644
---- a/drivers/clocksource/exynos_mct.c
-+++ b/drivers/clocksource/exynos_mct.c
-@@ -450,6 +450,7 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
- {
- 	struct mct_clock_event_device *mevt;
- 	unsigned int cpu = smp_processor_id();
-+	int ret;
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index a29daf9edea4..8416ed1c40be 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -2142,6 +2142,7 @@ int __clk_init(struct device *dev, struct clk *clk_user)
+ 	struct clk_core *orphan;
+ 	struct hlist_node *tmp2;
+ 	struct clk_core *clk;
++	unsigned long rate;
  
- 	mevt = container_of(evt, struct mct_clock_event_device, evt);
+ 	if (!clk_user)
+ 		return -EINVAL;
+@@ -2266,12 +2267,13 @@ int __clk_init(struct device *dev, struct clk *clk_user)
+ 	 * then rate is set to zero.
+ 	 */
+ 	if (clk->ops->recalc_rate)
+-		clk->rate = clk->ops->recalc_rate(clk->hw,
++		rate = clk->ops->recalc_rate(clk->hw,
+ 				clk_core_get_rate_nolock(clk->parent));
+ 	else if (clk->parent)
+-		clk->rate = clk->parent->rate;
++		rate = clk->parent->rate;
+ 	else
+-		clk->rate = 0;
++		rate = 0;
++	clk->rate = clk->req_rate = rate;
  
-@@ -468,7 +469,9 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
- 	if (mct_int_type == MCT_INT_SPI) {
- 		evt->irq = mct_irqs[MCT_L0_IRQ + cpu];
- 		enable_irq(evt->irq);
--		irq_force_affinity(mct_irqs[MCT_L0_IRQ + cpu], cpumask_of(cpu));
-+		ret = irq_force_affinity(mct_irqs[MCT_L0_IRQ + cpu], cpumask_of(cpu));
-+		if (ret)
-+			pr_err("force failed %d\n", ret);
- 	} else {
- 		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
- 	}
-
+ 	/*
+ 	 * walk the list of orphan clocks and reparent any that are children of
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 a Linux Foundation Collaborative Project
