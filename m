@@ -1,84 +1,32 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sat, 31 Jan 2015 10:21:54 +0100
-Subject: =?UTF-8?B?UFJPQkxFTTrCoEJVRyAgYXBwZWFyaW5nIHdoZW4gdHJ5aW5nIHQ=?=
- =?UTF-8?B?byBhbGxvY2F0ZSBpbnRlcnJ1cHQgb24gRXh5bm9zIE1DVCBhZnRlciBDUFUgaG8=?=
- =?UTF-8?B?dHBsdWc=?=
-In-Reply-To: <54CC2B18.2070809@codeaurora.org>
-References: <544907D4.1020409@samsung.com>
- <20141023140644.GI27405@n2100.arm.linux.org.uk>
- <54494BEE.9020702@codeaurora.org> <544A52B0.9050901@samsung.com>
- <544EA810.6090502@codeaurora.org> <5450C391.2070007@samsung.com>
- <54CC2B18.2070809@codeaurora.org>
-Message-ID: <54CC9EB2.7010409@linaro.org>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Sat, 31 Jan 2015 17:28:15 +0800
+Subject: [PATCH] i2c: hix5hd2: add COMPILE_TEST
+Message-ID: <1422696495-27282-1-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/31/2015 02:08 AM, Stephen Boyd wrote:
-> Kept meaning to get back to this thread. Have you resolved it?
->
-> On 10/29/14 03:38, Marcin Jabrzyk wrote:
->> So I've tried this patch, it resolves one problem but introduces also
->> new ones. As expected the BUG warning is not showing after applying
->> this patch but there are some interesting side effects.
->
-> Well that's half good news.
->
->> I was looking on /proc/interrupts output. IRQ for CPU0 have "MCT" name
->> and IRQ for CPU1 has unexpectedly no name at all.
->
-> This is pretty confusing. I don't see how the patch could cause this to
-> happen.
->
->> After making hotplug cycle of CPU1 I've observed that IRQs attached
->> originally for that CPU are generating on really low count and not in
->> order with IRQ for CPU0.
->> What's more the interrupt for CPU1 is showing to me as being counted
->> for both CPUs, so it's probably not being attached to CPU1.
->>
->
-> yeah. Can you give the output of /proc/timer_list in addition to
-> /proc/interrupts? It may give some hints on what's going on. It may also
-> be interesting to see if irq_force_affinity() is failing. Please check
-> the return value and print an error
+Commit 9439eb3ab9d1ec ("asm-generic: io: implement relaxed
+accessor macros as conditional wrappers") has added
+{read,write}{b,w,l,q}_relaxed to include/asm-generic/io.h.
+So COMPILE_TEST can be added.
 
-Hi Stephen, Marcin,
+Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+---
+ drivers/i2c/busses/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-can you have a look if the patch [1] fixes this issue ?
-
-  -- Daniel
-
-[1] https://lkml.org/lkml/2015/1/30/423
-
-
-> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-> index 1800053b4644..3c4538e26731 100644
-> --- a/drivers/clocksource/exynos_mct.c
-> +++ b/drivers/clocksource/exynos_mct.c
-> @@ -450,6 +450,7 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
->   {
->   	struct mct_clock_event_device *mevt;
->   	unsigned int cpu = smp_processor_id();
-> +	int ret;
->
->   	mevt = container_of(evt, struct mct_clock_event_device, evt);
->
-> @@ -468,7 +469,9 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
->   	if (mct_int_type == MCT_INT_SPI) {
->   		evt->irq = mct_irqs[MCT_L0_IRQ + cpu];
->   		enable_irq(evt->irq);
-> -		irq_force_affinity(mct_irqs[MCT_L0_IRQ + cpu], cpumask_of(cpu));
-> +		ret = irq_force_affinity(mct_irqs[MCT_L0_IRQ + cpu], cpumask_of(cpu));
-> +		if (ret)
-> +			pr_err("force failed %d\n", ret);
->   	} else {
->   		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
->   	}
->
-
-
+diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+index 31e8308ba899..ddf486389dc4 100644
+--- a/drivers/i2c/busses/Kconfig
++++ b/drivers/i2c/busses/Kconfig
+@@ -79,7 +79,7 @@ config I2C_AMD8111
+ 
+ config I2C_HIX5HD2
+ 	tristate "Hix5hd2 high-speed I2C driver"
+-	depends on ARCH_HIX5HD2
++	depends on ARCH_HIX5HD2 || COMPILE_TEST
+ 	help
+ 	  Say Y here to include support for high-speed I2C controller in the
+ 	  Hisilicon based hix5hd2 SoCs.
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.9.1
