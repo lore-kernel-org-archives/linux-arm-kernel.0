@@ -1,59 +1,52 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sat, 31 Jan 2015 12:15:19 +0100
-Subject: [PATCH] ARM: dts: at91sam9260: fix usart pinctrl
-In-Reply-To: <54CB6A16.4070601@microbit.se>
-References: <54CB6A16.4070601@microbit.se>
-Message-ID: <20150131111519.GI4164@piout.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 31 Jan 2015 11:36:59 +0000
+Subject: [PATCH v2 12/12] dt-bindings: Add documentation for Rockchip
+ dw-hdmi-audio
+In-Reply-To: <1422618253-27312-1-git-send-email-ykk@rock-chips.com>
+References: <1422617031-25098-1-git-send-email-ykk@rock-chips.com>
+ <1422618253-27312-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <20150131113659.GA26493@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Added the maintainers in Cc)
-
-On 30/01/2015 at 12:25:10 +0100, Jonas Andersson wrote :
+On Fri, Jan 30, 2015 at 06:44:13AM -0500, Yakir Yang wrote:
+> Required properties:
+> - compatible: platform specific
+> - cpu-of-node: the device node of cpu_dai
 > 
-> Corrected pins used by usart3.
-> 
-> Signed-off-by: Jonas Andersson <jonas@microbit.se>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
 > ---
->  arch/arm/boot/dts/at91sam9260.dtsi | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> Changes in v2:
+> - remove codec-name and codec-dai-name
+> - rename rockchip,rockchip-hdmi-audio.txt to rockchip,rockchip-dw-hdmi-audio.txt
 > 
-> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi
-> b/arch/arm/boot/dts/at91sam9260.dtsi
-> index dd1313c..16ccfd9 100644
-> --- a/arch/arm/boot/dts/at91sam9260.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
-> @@ -489,12 +489,12 @@
+>  .../bindings/sound/rockchip,rockchip-dw-hdmi-audio.txt       | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/sound/rockchip,rockchip-dw-hdmi-audio.txt
 > 
->                      pinctrl_usart3_rts: usart3_rts-0 {
->                          atmel,pins =
-> -                            <AT91_PIOB 8 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-> /* PC8 periph B */
-> +                            <AT91_PIOC 8 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-> /* PC8 periph B */
->                      };
-> 
->                      pinctrl_usart3_cts: usart3_cts-0 {
->                          atmel,pins =
-> -                            <AT91_PIOB 10 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-> /* PC10 periph B */
-> +                            <AT91_PIOC 10 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-> /* PC10 periph B */
->                      };
->                  };
-> 
-> -- 
-> 1.9.3
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> diff --git a/Documentation/devicetree/bindings/sound/rockchip,rockchip-dw-hdmi-audio.txt b/Documentation/devicetree/bindings/sound/rockchip,rockchip-dw-hdmi-audio.txt
+> new file mode 100644
+> index 0000000..5b86eed
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/sound/rockchip,rockchip-dw-hdmi-audio.txt
+> @@ -0,0 +1,12 @@
+> +Rockchip hdmi audio bindings
+> +
+> +Required properties:
+> +- compatible: platform specific
+> +- cpu-of-node: the device node of cpu_dai
+> +
+> +Example:
+> +
+> +sound {
+> +	compatible = "rockchip,rk3288-hdmi-audio";
+> +	cpu-of-node = <&i2s>;
+> +};
+
+In patch 11, it looks like you parse a property called i2s-controller.
+This doesn't appear to be documented.  Maybe it's what you call
+"cpu-of-node" above?
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
