@@ -1,93 +1,53 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 30 Jan 2015 17:31:58 -0800
-Subject: [PATCH v13 4/6] clk: Add rate constraints to clocks
-In-Reply-To: <54CA8662.7040008@codeaurora.org>
-References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
- <1422011024-32283-5-git-send-email-tomeu.vizoso@collabora.com>
- <CAMuHMdUGgA70o2SgdJR3X6AkCcMssHU0POLfzppADT-O=BrYDw@mail.gmail.com>
- <54CA8662.7040008@codeaurora.org>
-Message-ID: <20150131013158.GA4323@codeaurora.org>
+From: wuyun.wu@huawei.com (Yun Wu (Abel))
+Date: Sat, 31 Jan 2015 09:33:57 +0800
+Subject: [PATCH 3/5] irqchip: gicv3-its: use 64KB page as default granule
+In-Reply-To: <54CBD8FD.1030908@arm.com>
+References: <1422604009-9248-1-git-send-email-wuyun.wu@huawei.com>
+ <1422604009-9248-4-git-send-email-wuyun.wu@huawei.com>
+ <54CBD8FD.1030908@arm.com>
+Message-ID: <54CC3105.1050200@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/29, Stephen Boyd wrote:
-> On 01/29/15 05:31, Geert Uytterhoeven wrote:
-> > Hi Tomeu, Mike,
-> >
-> > On Fri, Jan 23, 2015 at 12:03 PM, Tomeu Vizoso
-> > <tomeu.vizoso@collabora.com> wrote:
-> >> --- a/drivers/clk/clk.c
-> >> +++ b/drivers/clk/clk.c
-> >> @@ -2391,25 +2543,24 @@ int __clk_get(struct clk *clk)
-> >>         return 1;
-> >>  }
-> >>
-> >> -static void clk_core_put(struct clk_core *core)
-> >> +void __clk_put(struct clk *clk)
-> >>  {
-> >>         struct module *owner;
-> >>
-> >> -       owner = core->owner;
-> >> +       if (!clk || WARN_ON_ONCE(IS_ERR(clk)))
-> >> +               return;
-> >>
-> >>         clk_prepare_lock();
-> >> -       kref_put(&core->ref, __clk_release);
-> >> +
-> >> +       hlist_del(&clk->child_node);
-> >> +       clk_core_set_rate_nolock(clk->core, clk->core->req_rate);
-> > At this point, clk->core->req_rate is still zero, causing
-> > cpg_div6_clock_round_rate() to be called with a zero "rate" parameter,
-> > e.g. on r8a7791:
+On 2015/1/31 3:18, Marc Zyngier wrote:
+
+> On 30/01/15 07:46, Yun Wu wrote:
+>> The field of page size in register GITS_BASERn might be read-only
+>> if an implementation only supports a single, fixed page size. But
+>> currently the ITS driver will throw out an error when PAGE_SIZE
+>> is less than the minimum size supported by an ITS. So addressing
+>> this problem by using 64KB pages as default granule for all the
+>> ITS base tables.
 > 
-> Hmm.. I wonder if we should assign core->req_rate to be the same as
-> core->rate during __clk_init()? That would make this call to
-> clk_core_set_rate_nolock() a nop in this case.
+> Do you actually know of an implementation with such a behaviour?
+
+Yes, Hisilicon implemented a fixed page size of 16KB.
+
+> 
+>> Signed-off-by: Yun Wu <wuyun.wu@huawei.com>
+>> ---
+>>  drivers/irqchip/irq-gic-v3-its.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+>> index 2a08d85..430bc92 100644
+>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>> @@ -801,7 +801,7 @@ static int its_alloc_tables(struct its_node *its)
+>>  	int err;
+>>  	int i;
+>>  	int size;
+>> -	int psz = PAGE_SIZE;
+>> +	int psz = SZ_64K;
+>>  	u64 shr = GITS_BASER_InnerShareable;
+>>
+>>  	for (i = 0; i < GITS_BASER_NR_REGS; i++) {
+> 
+> Assuming such an implementation exists, you'll have to rebase this on
+> top of the patch I mentioned in my reply to patch #1.
 > 
 
-Here's a patch to do this
+OK, I will.
 
----8<----
-From: Stephen Boyd <sboyd@codeaurora.org>
-Subject: [PATCH] clk: Assign a requested rate by default
-
-We need to assign a requested rate here so that we avoid
-requesting a rate of 0 on clocks when we remove clock consumers.
-
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/clk/clk.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index a29daf9edea4..8416ed1c40be 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -2142,6 +2142,7 @@ int __clk_init(struct device *dev, struct clk *clk_user)
- 	struct clk_core *orphan;
- 	struct hlist_node *tmp2;
- 	struct clk_core *clk;
-+	unsigned long rate;
- 
- 	if (!clk_user)
- 		return -EINVAL;
-@@ -2266,12 +2267,13 @@ int __clk_init(struct device *dev, struct clk *clk_user)
- 	 * then rate is set to zero.
- 	 */
- 	if (clk->ops->recalc_rate)
--		clk->rate = clk->ops->recalc_rate(clk->hw,
-+		rate = clk->ops->recalc_rate(clk->hw,
- 				clk_core_get_rate_nolock(clk->parent));
- 	else if (clk->parent)
--		clk->rate = clk->parent->rate;
-+		rate = clk->parent->rate;
- 	else
--		clk->rate = 0;
-+		rate = 0;
-+	clk->rate = clk->req_rate = rate;
- 
- 	/*
- 	 * walk the list of orphan clocks and reparent any that are children of
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Thanks,
+	Abel
