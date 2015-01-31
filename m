@@ -1,45 +1,95 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 31 Jan 2015 19:49:15 +0000
-Subject: [PATCH resend 0/4] module loading for large kernels and Thumb-2
-Message-ID: <1422733759-27236-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Sat, 31 Jan 2015 19:49:16 +0000
+Subject: [PATCH resend 1/4] ARM: handle interworking and out-of-range
+ relocations separately
+In-Reply-To: <1422733759-27236-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1422733759-27236-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1422733759-27236-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I sent these patches to the list a while ago (end of November) and the
-first 2 were acked by Nico and put in rmk's patch system as 
+Currently, interworking calls on module boundaries are not supported,
+and are handled by the same error handling code path as non-interworking
+calls whose targets are simply out of range.
 
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8219/1
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8220/1
+Before modifying the handling of those out-of-range jump and call
+relocations in a subsequent patch, move the handling of interworking
+restrictions out of it.
 
-Patch #1 and #2 implement a module PLT to help prevent module loading
-errors with big kernels and/or modules.
+Acked-by: Nicolas Pitre <nico@linaro.org>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm/kernel/module.c | 38 ++++++++++++++++++++++++--------------
+ 1 file changed, 24 insertions(+), 14 deletions(-)
 
-Patch #3 is arguably a bug fix, although I don't think the issue it fixes
-has been observed in the wild.
-
-Patch #4 implements Thumb -> ARM interworking function calls, mainly
-for modules like accelerated crypto that are built around an assembler
-implementation which requires additional work to be built in Thumb-2
-mode. (e.g., the SHA-1 and SHA-512 modules currently cannot be built
-in Thumb-2 mode for this exact reason, although I think the code works
-fine when adding .syntax unified etc)
-
-Ard Biesheuvel (4): 
-  ARM: handle interworking and out-of-range relocations separately
-  ARM: allow modules outside of bl range
-  ARM: Thumb-2: infer function annotation for external ksyms
-  ARM: add partial interworking support to Thumb-2 kernel
-
- arch/arm/Kconfig              |  17 +++-
- arch/arm/Makefile             |   4 +
- arch/arm/include/asm/module.h |  12 ++-
- arch/arm/kernel/Makefile      |   1 +
- arch/arm/kernel/module-plts.c | 182 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm/kernel/module.c      | 101 +++++++++++++++++++----
- arch/arm/kernel/module.lds    |   4 +
- 7 files changed, 305 insertions(+), 16 deletions(-)
- create mode 100644 arch/arm/kernel/module-plts.c
- create mode 100644 arch/arm/kernel/module.lds
-
+diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+index 6a4dffefd357..16804df4857c 100644
+--- a/arch/arm/kernel/module.c
++++ b/arch/arm/kernel/module.c
+@@ -98,14 +98,19 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+ 		case R_ARM_PC24:
+ 		case R_ARM_CALL:
+ 		case R_ARM_JUMP24:
++			if (sym->st_value & 3) {
++				pr_err("%s: section %u reloc %u sym '%s': unsupported interworking call (ARM -> Thumb)\n",
++				       module->name, relindex, i, symname);
++				return -ENOEXEC;
++			}
++
+ 			offset = __mem_to_opcode_arm(*(u32 *)loc);
+ 			offset = (offset & 0x00ffffff) << 2;
+ 			if (offset & 0x02000000)
+ 				offset -= 0x04000000;
+ 
+ 			offset += sym->st_value - loc;
+-			if (offset & 3 ||
+-			    offset <= (s32)0xfe000000 ||
++			if (offset <= (s32)0xfe000000 ||
+ 			    offset >= (s32)0x02000000) {
+ 				pr_err("%s: section %u reloc %u sym '%s': relocation %u out of range (%#lx -> %#x)\n",
+ 				       module->name, relindex, i, symname,
+@@ -155,6 +160,22 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+ #ifdef CONFIG_THUMB2_KERNEL
+ 		case R_ARM_THM_CALL:
+ 		case R_ARM_THM_JUMP24:
++			/*
++			 * For function symbols, only Thumb addresses are
++			 * allowed (no interworking).
++			 *
++			 * For non-function symbols, the destination
++			 * has no specific ARM/Thumb disposition, so
++			 * the branch is resolved under the assumption
++			 * that interworking is not required.
++			 */
++			if (ELF32_ST_TYPE(sym->st_info) == STT_FUNC &&
++			    !(sym->st_value & 1)) {
++				pr_err("%s: section %u reloc %u sym '%s': unsupported interworking call (Thumb -> ARM)\n",
++				       module->name, relindex, i, symname);
++				return -ENOEXEC;
++			}
++
+ 			upper = __mem_to_opcode_thumb16(*(u16 *)loc);
+ 			lower = __mem_to_opcode_thumb16(*(u16 *)(loc + 2));
+ 
+@@ -182,18 +203,7 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+ 				offset -= 0x02000000;
+ 			offset += sym->st_value - loc;
+ 
+-			/*
+-			 * For function symbols, only Thumb addresses are
+-			 * allowed (no interworking).
+-			 *
+-			 * For non-function symbols, the destination
+-			 * has no specific ARM/Thumb disposition, so
+-			 * the branch is resolved under the assumption
+-			 * that interworking is not required.
+-			 */
+-			if ((ELF32_ST_TYPE(sym->st_info) == STT_FUNC &&
+-				!(offset & 1)) ||
+-			    offset <= (s32)0xff000000 ||
++			if (offset <= (s32)0xff000000 ||
+ 			    offset >= (s32)0x01000000) {
+ 				pr_err("%s: section %u reloc %u sym '%s': relocation %u out of range (%#lx -> %#x)\n",
+ 				       module->name, relindex, i, symname,
 -- 
 1.8.3.2
