@@ -1,21 +1,50 @@
-From: airlied@gmail.com (Dave Airlie)
-Date: Sat, 31 Jan 2015 10:13:49 +1000
-Subject: [PATCH 0/5] drm: add missing dependencies
-In-Reply-To: <1422452889-415782-1-git-send-email-arnd@arndb.de>
-References: <1422452889-415782-1-git-send-email-arnd@arndb.de>
-Message-ID: <CAPM=9typDPKouFxcO-wA5f1mPG5qwr1+vbATAT9KisXx+W45og@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 31 Jan 2015 00:22:53 +0000
+Subject: Continuing kallsyms failures - large kernels, XIP kernels, and
+ large XIP kernels
+In-Reply-To: <alpine.LFD.2.11.1501301224180.1322@knanqh.ubzr>
+References: <20150130145642.GK26493@n2100.arm.linux.org.uk>
+ <20150130153414.GM26493@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1501301224180.1322@knanqh.ubzr>
+Message-ID: <20150131002253.GR26493@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 January 2015 at 23:48, Arnd Bergmann <arnd@arndb.de> wrote:
-> I did lots of randconfig tests over time, which resulted in many patches,
-> five of which are for drm. In each of these cases, the Kconfig dependencies
-> are incomplete, which can lead to broken builds, and specifying the
-> complete dependencies solves it.
->
-> The patches are all independent from one another and solve separate
-> issues. Please apply.
+On Fri, Jan 30, 2015 at 12:29:30PM -0500, Nicolas Pitre wrote:
+> On Fri, 30 Jan 2015, Russell King - ARM Linux wrote:
+> > +#ifdef CONFIG_XIP_KERNEL
+> > +/*
+> > + * __data_loc is not only the LMA of the data section, but also the VMA of
+> > + * the end of the .rodata section.  This must not overlap the VMA of the
+> > + * data section.  Since the .text section starts in module space, and that
+> > + * is always below the .data section, this should be sufficient.
+> > + */
+> > +ASSERT((_data >= __data_loc), "Text section oversize")
+> > +#endif
+> 
+> I agree with this patch.
+> 
+> Acked-by: Nicolas Pitre <nico@linaro.org>
+> 
+> This might not prevent a config leading to this from happening, but at 
+> least it makes the issue much clearer.  XIP kernel was created for 
+> systems where the total amount of RAM is often smaller than the imposed
+> size limit here.
 
-Thanks Arnd, I've taken these all into drm-next in case any is wondering.
+Yes, I expect more of Arnd's randconfigs to fail with this patch applied.
 
-Dave.
+I did also notice that we still have swapper_pg_dir at _data - 0x4000
+for XIP kernels - so the above check is slightly too lenient.  A better
+threshold for __data_loc might be MODULES_END, since we can't allow the
+XIP part to overlap into RAM.
+
+#ifdef CONFIG_HIGHMEM
+#define MODULES_END             (PAGE_OFFSET - PMD_SIZE)
+#else
+#define MODULES_END             (PAGE_OFFSET)
+#endif
+
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
