@@ -1,51 +1,70 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Sat, 31 Jan 2015 07:41:20 +0200
-Subject: [PATCH v7 1/4] Documentation: dt: add common bindings for
- hwspinlock
-In-Reply-To: <CAJAp7Og+-KQd7bygWQjTS72Kye3fkp3s3ry+2bw7Gcv7aPF5AQ@mail.gmail.com>
-References: <1421269101-51105-1-git-send-email-s-anna@ti.com>
- <1421269101-51105-2-git-send-email-s-anna@ti.com>
- <20150115135201.GG16217@leverpostej>
- <20150115135556.GH16217@leverpostej>
- <CAL_JsqL2LZAooMk-V8+xeF2g6acZE21M+-OBRw8aEVa-5wVHuQ@mail.gmail.com>
- <CAK=WgbYQ=BbinqJ5fsw2Y+FKdy=nasLsw9mX8pw6S_o3owy9-g@mail.gmail.com>
- <20150116101746.GA21809@leverpostej>
- <CAK=WgbYBqPoUm9byx0du_g5ZmHdYaUVLpSPZYHoCVzNoatNKpw@mail.gmail.com>
- <CAJAp7Og+-KQd7bygWQjTS72Kye3fkp3s3ry+2bw7Gcv7aPF5AQ@mail.gmail.com>
-Message-ID: <CAK=WgbZ2986xxuAFvMSoyQLaPAxdUpZ8e5g-mSjyETfvd4KKHw@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Sat, 31 Jan 2015 01:09:39 -0600
+Subject: [PATCH] irqchip: gic: Don't complain in gic_get_cpumask() if UP
+ system
+In-Reply-To: <1422665010-5854-1-git-send-email-sboyd@codeaurora.org>
+References: <1422665010-5854-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20150131070939.GA4068@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 31, 2015 at 1:29 AM, Bjorn Andersson <bjorn@kryo.se> wrote:
-> In a system where you have two hwlock blocks lckA and lckB, each
-> consisting of 8 locks and you have dspB that can only access lckB
++linux-omap
 
-This is a good example - thanks. To be able to cope with such cases we
-will have to pass a hwlock block reference and its relative lock id.
+On Fri, Jan 30, 2015 at 04:43:30PM -0800, Stephen Boyd wrote:
+> In a uniprocessor implementation the interrupt processor targets
+> registers are read-as-zero/write-ignored (RAZ/WI). Unfortunately
+> gic_get_cpumask() will print a critical message saying
+> 
+>  GIC CPU mask not found - kernel will fail to boot.
+> 
+> if these registers all read as zero, but there won't actually be
+> a problem on uniprocessor systems and the kernel will boot just
+> fine. Skip this check if we're running a UP kernel or if we
+> detect that the hardware only supports a single processor.
+> 
 
-The DT binding should definitely be prepared for such cases (just kill
-the base-id field?), but let's see what it means about the Linux
-implementation.
+Nice, I'll test this on AM437x on Monday but certainly looks promising:
 
-Since the existence of several hwblocks is still fictional (Bjorn,
-please confirm too?), we may prefer to introduce changes to support it
-only when it shows up; it all depends on the amount of changes needed.
-Suman, care to take a look please?
+Acked-by: Felipe Balbi <balbi@ti.com>
 
->> - Sometimes a remote processor, which may not be running Linux, will
->> have to dynamically allocate a hwlock, and send the ID of the
->> allocated lock to us (another processor running Linux)
->>
-> I'm sorry but you cannot have a system on both sides that is allowed
-> to do dynamic allocation from a limited set of resources.
 
-Of course not. On such systems, Linux is not the one responsible for
-allocating the hwlocks, at least not during part of the time or from
-part of the hwlocks. There were a few different use cases, with
-different semantics, that required communicating to Linux an hwlock
-id, but since none of them have reached mainline, we should only
-remember they may show up one day, but not put too much effort to
-support them right now.
+> Acked-by: Nicolas Pitre <nico@linaro.org>
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> Cc: Stefan Agner <stefan@agner.ch>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  drivers/irqchip/irq-gic.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index d617ee5a3d8a..1b70e0de0f6e 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -346,7 +346,7 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
+>  			break;
+>  	}
+>  
+> -	if (!mask)
+> +	if (!mask && num_possible_cpus() > 1)
+>  		pr_crit("GIC CPU mask not found - kernel will fail to boot.\n");
+>  
+>  	return mask;
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
 
-Thanks,
-Ohad.
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150131/7eb07cdf/attachment.sig>
