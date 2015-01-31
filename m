@@ -1,60 +1,40 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 31 Jan 2015 23:33:01 +0100
-Subject: [PATCH] ARM: pxa: fix pxa interrupts handling in DT
-Message-ID: <1422743581-31548-1-git-send-email-robert.jarzmik@free.fr>
+Date: Sat, 31 Jan 2015 23:36:23 +0100
+Subject: [PATCH] ARM: pxa: pxa27x skip default device initialization with DT
+Message-ID: <1422743783-32511-1-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit "ARM: pxa: arbitrarily set first interrupt number" changed
-the first pxa interrupt to 16.
+When booting via DT, the default PXA devices must not have been probed
+before, otherwise the augmented information from the device tree is
+ignored.
 
-As a consequence, device-tree builds got broken, because :
- - pxa_mask_irq() and pxa_unmask_irq() are using IRQ_BIT()
- - IRQ_BIT(x) calculates the interrupts as : x - PXA_IRQ(0)
-
-Before the commit, the first interrupt shift, PXA_IRQ(0) was 0,
-therefore IRQ_BIT(x) was x. After the change, it is necessary that the
-same shift of 16 is applied between the virtual interrupt number and the
-hardware irq number.
-
-This situation comes from the common irq_chip shared between legacy
-platform builds and device-tree builds.
-
-Fix the broken interrupts in DT case by adding this shift in the DT case
-too.
+This is the twin commit of commit 82ce44d104dc ("ARM: pxa3xx: skip
+default device initialization when booting via DT").
 
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- arch/arm/mach-pxa/irq.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+ arch/arm/mach-pxa/pxa27x.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
-index 0eecd83..59a9351 100644
---- a/arch/arm/mach-pxa/irq.c
-+++ b/arch/arm/mach-pxa/irq.c
-@@ -214,10 +214,10 @@ static int pxa_irq_map(struct irq_domain *h, unsigned int virq,
- 	if (cpu_has_ipr)
- 		__raw_writel(hw | IPR_VALID, pxa_irq_base + IPR(hw));
+diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
+index 0485248..b5abdeb 100644
+--- a/arch/arm/mach-pxa/pxa27x.c
++++ b/arch/arm/mach-pxa/pxa27x.c
+@@ -307,8 +307,12 @@ static int __init pxa27x_init(void)
+ 		register_syscore_ops(&pxa_irq_syscore_ops);
+ 		register_syscore_ops(&pxa2xx_mfp_syscore_ops);
  
--	irq_set_chip_and_handler(hw, &pxa_internal_irq_chip,
-+	irq_set_chip_and_handler(virq, &pxa_internal_irq_chip,
- 				 handle_level_irq);
--	irq_set_chip_data(hw, base);
--	set_irq_flags(hw, IRQF_VALID);
-+	irq_set_chip_data(virq, base);
-+	set_irq_flags(virq, IRQF_VALID);
- 
- 	return 0;
- }
-@@ -267,7 +267,8 @@ void __init pxa_dt_irq_init(int (*fn)(struct irq_data *, unsigned int))
- 		return;
+-		pxa_register_device(&pxa27x_device_gpio, &pxa27x_gpio_info);
+-		ret = platform_add_devices(devices, ARRAY_SIZE(devices));
++		if (!of_have_populated_dt()) {
++			pxa_register_device(&pxa27x_device_gpio,
++					    &pxa27x_gpio_info);
++			ret = platform_add_devices(devices,
++						   ARRAY_SIZE(devices));
++		}
  	}
  
--	pxa_irq_domain = irq_domain_add_legacy(node, pxa_internal_irq_nr, 0, 0,
-+	pxa_irq_domain = irq_domain_add_legacy(node, pxa_internal_irq_nr,
-+					       PXA_IRQ(0), 0,
- 					       &pxa_irq_ops, NULL);
- 	if (!pxa_irq_domain)
- 		panic("Unable to add PXA IRQ domain\n");
+ 	return ret;
 -- 
 2.1.0
