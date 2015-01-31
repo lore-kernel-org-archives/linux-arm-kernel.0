@@ -1,39 +1,43 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 31 Jan 2015 23:48:29 +0100
-Subject: [PATCH 4/5] ARM: dts: pxa: add pxa27x-keypad to pxa27x
+Date: Sat, 31 Jan 2015 23:48:30 +0100
+Subject: [PATCH 5/5] ARM: dts: pxa: add pxa-timer to pxa27x
 In-Reply-To: <1422744510-3179-1-git-send-email-robert.jarzmik@free.fr>
 References: <1422744510-3179-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1422744510-3179-4-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1422744510-3179-5-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Each pxa27x has an embedded keypad controller. Add it in the pxa27x
-device-tree description.
+Each pxa has an embedded OS Timers IP. The kernel cannot work without a
+valid clocksource, and this adds the OS Timers to the pxa device-tree
+description.
 
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- arch/arm/boot/dts/pxa27x.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/boot/dts/pxa27x.dtsi | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
 diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
-index 979560c..7f93828 100644
+index 7f93828..9e6bf60 100644
 --- a/arch/arm/boot/dts/pxa27x.dtsi
 +++ b/arch/arm/boot/dts/pxa27x.dtsi
-@@ -73,6 +73,15 @@
- 			status = "disabled";
+@@ -97,5 +97,18 @@
+ 			status = "okay";
  		};
- 
-+		keypad: keypad at 41500000 {
-+			compatible = "marvell,pxa27x-keypad";
-+			reg = <0x41500000 0x4c>;
-+			interrupts = <4>;
-+			clocks = <&pxa2xx_clks CLK_KEYPAD>;
-+			status = "disabled";
-+		};
-+	};
+ 	};
 +
- 	clocks {
- 	       /*
- 		* The muxing of external clocks/internal dividers for osc* clock
++	clocksources {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		pxa-timer at 40a00000 {
++			compatible = "marvell,pxa-timer";
++			reg = <0x40a00000 0x20>;
++			interrupts = <26>;
++			clocks = <&pxa2xx_clks CLK_OSTIMER>;
++			status = "okay";
++		};
+ 	};
+ };
 -- 
 2.1.0
