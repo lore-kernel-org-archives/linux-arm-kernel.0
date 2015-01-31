@@ -1,173 +1,45 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Sat, 31 Jan 2015 14:59:42 -0400
-Subject: [PATCHv2 1/1] cpufreq: exynos: allow modular build
-Message-ID: <1422730782-13055-1-git-send-email-edubezval@gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat, 31 Jan 2015 19:49:15 +0000
+Subject: [PATCH resend 0/4] module loading for large kernels and Thumb-2
+Message-ID: <1422733759-27236-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
+I sent these patches to the list a while ago (end of November) and the
+first 2 were acked by Nico and put in rmk's patch system as 
 
-The exynos cpufreq driver code recently gained a dependency on the
-cooling code, which may be a loadable module. This breaks an ARM
-allmodconfig build:
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8219/1
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8220/1
 
-drivers/built-in.o: In function `exynos_cpufreq_probe':
-:(.text+0x1748e8): undefined reference to `of_cpufreq_cooling_register'
+Patch #1 and #2 implement a module PLT to help prevent module loading
+errors with big kernels and/or modules.
 
-To avoid this problem, change cpufreq Kconfig to allow the drivers
-to be loadable modules as well and enforce a dependency on the
-thermal module.
+Patch #3 is arguably a bug fix, although I don't think the issue it fixes
+has been observed in the wild.
 
-This change, in order to allow module builds on this cpufreq
-driver, properly constructs the driver into a single module,
-instead of several modules. The change also keeps the proper
-platform dependency, and therefore, it wont load in platforms
-that are not supposed to be loaded. The user will be able to
-build the support for all platforms, or select which platforms
-(s)he wants (as originally), except that now it can be a module,
-instead.
+Patch #4 implements Thumb -> ARM interworking function calls, mainly
+for modules like accelerated crypto that are built around an assembler
+implementation which requires additional work to be built in Thumb-2
+mode. (e.g., the SHA-1 and SHA-512 modules currently cannot be built
+in Thumb-2 mode for this exact reason, although I think the code works
+fine when adding .syntax unified etc)
 
-Besides, it will still keep the driver only on those configs
-that expect it to be on. And it won't compile/load on platforms
-that it is not supposed to. It brings the config ARM_EXYNOS_CPU_FREQ_BOOST_SW
-closer to this driver, so it looks better in the menuconfig.
+Ard Biesheuvel (4): 
+  ARM: handle interworking and out-of-range relocations separately
+  ARM: allow modules outside of bl range
+  ARM: Thumb-2: infer function annotation for external ksyms
+  ARM: add partial interworking support to Thumb-2 kernel
 
-We intentionally change ARM_EXYNOS5440_CPUFREQ to be tristate too, to
-avoid future troubles.
+ arch/arm/Kconfig              |  17 +++-
+ arch/arm/Makefile             |   4 +
+ arch/arm/include/asm/module.h |  12 ++-
+ arch/arm/kernel/Makefile      |   1 +
+ arch/arm/kernel/module-plts.c | 182 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/module.c      | 101 +++++++++++++++++++----
+ arch/arm/kernel/module.lds    |   4 +
+ 7 files changed, 305 insertions(+), 16 deletions(-)
+ create mode 100644 arch/arm/kernel/module-plts.c
+ create mode 100644 arch/arm/kernel/module.lds
 
-Cc: Viresh Kumar <viresh.kumar@linaro.org>
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-pm at vger.kernel.org
-Cc: linux-samsung-soc at vger.kernel.org
-Fixes: e725d26c4857 ("cpufreq: exynos: Use device tree to determine if cpufreq cooling should be registered")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Eduardo Valentin <edubezval@gmail.com>
----
- drivers/cpufreq/Kconfig.arm | 44 ++++++++++++++++++++++++++------------------
- drivers/cpufreq/Makefile    |  9 +++++----
- 2 files changed, 31 insertions(+), 22 deletions(-)
----
-Changes from V1:
-- Instead of having several modules, the driver now is constructed by several
-files into a single module, depending on config.
-- The patch does not change existing user defconfigs.
-
-If no objections, I will include this in into my -fixes branch.
-
-Cheers,
-
-Eduardo Valentin
-
-
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index 0f9a2c3..1b06fc4 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -26,13 +26,21 @@ config ARM_VEXPRESS_SPC_CPUFREQ
- 
- 
- config ARM_EXYNOS_CPUFREQ
--	bool
-+	tristate "SAMSUNG EXYNOS CPUfreq Driver"
-+	depends on CPU_EXYNOS4210 || SOC_EXYNOS4212 || SOC_EXYNOS4412 || SOC_EXYNOS5250
-+	depends on THERMAL
-+	help
-+	  This adds the CPUFreq driver for Samsung EXYNOS platforms.
-+	  Supported SoC versions are:
-+	     Exynos4210, Exynos4212, Exynos4412, and Exynos5250.
-+
-+	  If in doubt, say N.
- 
- config ARM_EXYNOS4210_CPUFREQ
- 	bool "SAMSUNG EXYNOS4210"
- 	depends on CPU_EXYNOS4210
-+	depends on ARM_EXYNOS_CPUFREQ
- 	default y
--	select ARM_EXYNOS_CPUFREQ
- 	help
- 	  This adds the CPUFreq driver for Samsung EXYNOS4210
- 	  SoC (S5PV310 or S5PC210).
-@@ -42,8 +50,8 @@ config ARM_EXYNOS4210_CPUFREQ
- config ARM_EXYNOS4X12_CPUFREQ
- 	bool "SAMSUNG EXYNOS4x12"
- 	depends on SOC_EXYNOS4212 || SOC_EXYNOS4412
-+	depends on ARM_EXYNOS_CPUFREQ
- 	default y
--	select ARM_EXYNOS_CPUFREQ
- 	help
- 	  This adds the CPUFreq driver for Samsung EXYNOS4X12
- 	  SoC (EXYNOS4212 or EXYNOS4412).
-@@ -53,28 +61,14 @@ config ARM_EXYNOS4X12_CPUFREQ
- config ARM_EXYNOS5250_CPUFREQ
- 	bool "SAMSUNG EXYNOS5250"
- 	depends on SOC_EXYNOS5250
-+	depends on ARM_EXYNOS_CPUFREQ
- 	default y
--	select ARM_EXYNOS_CPUFREQ
- 	help
- 	  This adds the CPUFreq driver for Samsung EXYNOS5250
- 	  SoC.
- 
- 	  If in doubt, say N.
- 
--config ARM_EXYNOS5440_CPUFREQ
--	bool "SAMSUNG EXYNOS5440"
--	depends on SOC_EXYNOS5440
--	depends on HAVE_CLK && OF
--	select PM_OPP
--	default y
--	help
--	  This adds the CPUFreq driver for Samsung EXYNOS5440
--	  SoC. The nature of exynos5440 clock controller is
--	  different than previous exynos controllers so not using
--	  the common exynos framework.
--
--	  If in doubt, say N.
--
- config ARM_EXYNOS_CPU_FREQ_BOOST_SW
- 	bool "EXYNOS Frequency Overclocking - Software"
- 	depends on ARM_EXYNOS_CPUFREQ && THERMAL
-@@ -90,6 +84,20 @@ config ARM_EXYNOS_CPU_FREQ_BOOST_SW
- 
- 	  If in doubt, say N.
- 
-+config ARM_EXYNOS5440_CPUFREQ
-+	tristate "SAMSUNG EXYNOS5440"
-+	depends on SOC_EXYNOS5440
-+	depends on HAVE_CLK && OF
-+	select PM_OPP
-+	default y
-+	help
-+	  This adds the CPUFreq driver for Samsung EXYNOS5440
-+	  SoC. The nature of exynos5440 clock controller is
-+	  different than previous exynos controllers so not using
-+	  the common exynos framework.
-+
-+	  If in doubt, say N.
-+
- config ARM_HIGHBANK_CPUFREQ
- 	tristate "Calxeda Highbank-based"
- 	depends on ARCH_HIGHBANK && CPUFREQ_DT && REGULATOR
-diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-index b3ca7b0..b26e2bf 100644
---- a/drivers/cpufreq/Makefile
-+++ b/drivers/cpufreq/Makefile
-@@ -51,10 +51,11 @@ obj-$(CONFIG_ARM_DT_BL_CPUFREQ)		+= arm_big_little_dt.o
- 
- obj-$(CONFIG_ARCH_DAVINCI)		+= davinci-cpufreq.o
- obj-$(CONFIG_UX500_SOC_DB8500)		+= dbx500-cpufreq.o
--obj-$(CONFIG_ARM_EXYNOS_CPUFREQ)	+= exynos-cpufreq.o
--obj-$(CONFIG_ARM_EXYNOS4210_CPUFREQ)	+= exynos4210-cpufreq.o
--obj-$(CONFIG_ARM_EXYNOS4X12_CPUFREQ)	+= exynos4x12-cpufreq.o
--obj-$(CONFIG_ARM_EXYNOS5250_CPUFREQ)	+= exynos5250-cpufreq.o
-+obj-$(CONFIG_ARM_EXYNOS_CPUFREQ)	+= arm-exynos-cpufreq.o
-+arm-exynos-cpufreq-y					:= exynos-cpufreq.o
-+arm-exynos-cpufreq-$(CONFIG_ARM_EXYNOS4210_CPUFREQ)	+= exynos4210-cpufreq.o
-+arm-exynos-cpufreq-$(CONFIG_ARM_EXYNOS4X12_CPUFREQ)	+= exynos4x12-cpufreq.o
-+arm-exynos-cpufreq-$(CONFIG_ARM_EXYNOS5250_CPUFREQ)	+= exynos5250-cpufreq.o
- obj-$(CONFIG_ARM_EXYNOS5440_CPUFREQ)	+= exynos5440-cpufreq.o
- obj-$(CONFIG_ARM_HIGHBANK_CPUFREQ)	+= highbank-cpufreq.o
- obj-$(CONFIG_ARM_IMX6Q_CPUFREQ)		+= imx6q-cpufreq.o
 -- 
-2.1.3
+1.8.3.2
