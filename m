@@ -1,54 +1,87 @@
-From: ykk@rock-chips.com (Yang Kuankuan)
-Date: Sat, 31 Jan 2015 08:51:40 -0500
-Subject: [PATCH v2 12/12] dt-bindings: Add documentation for Rockchip
- dw-hdmi-audio
-In-Reply-To: <20150131113659.GA26493@n2100.arm.linux.org.uk>
-References: <1422617031-25098-1-git-send-email-ykk@rock-chips.com>
- <1422618253-27312-1-git-send-email-ykk@rock-chips.com>
- <20150131113659.GA26493@n2100.arm.linux.org.uk>
-Message-ID: <54CCDDEC.5050706@rock-chips.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sat, 31 Jan 2015 17:32:57 +0100
+Subject: [PATCH 04/11] dt-bindings: Add documentation for rockchip lvds
+In-Reply-To: <1422721984-27782-1-git-send-email-heiko@sntech.de>
+References: <1422721984-27782-1-git-send-email-heiko@sntech.de>
+Message-ID: <1422721984-27782-5-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Mark Yao <yzq@rock-chips.com>
 
-On 01/31/2015 06:36 AM, Russell King - ARM Linux wrote:
-> On Fri, Jan 30, 2015 at 06:44:13AM -0500, Yakir Yang wrote:
->> Required properties:
->> - compatible: platform specific
->> - cpu-of-node: the device node of cpu_dai
->>
->> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
->> ---
->> Changes in v2:
->> - remove codec-name and codec-dai-name
->> - rename rockchip,rockchip-hdmi-audio.txt to rockchip,rockchip-dw-hdmi-audio.txt
->>
->>   .../bindings/sound/rockchip,rockchip-dw-hdmi-audio.txt       | 12 ++++++++++++
->>   1 file changed, 12 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/sound/rockchip,rockchip-dw-hdmi-audio.txt
->>
->> diff --git a/Documentation/devicetree/bindings/sound/rockchip,rockchip-dw-hdmi-audio.txt b/Documentation/devicetree/bindings/sound/rockchip,rockchip-dw-hdmi-audio.txt
->> new file mode 100644
->> index 0000000..5b86eed
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/sound/rockchip,rockchip-dw-hdmi-audio.txt
->> @@ -0,0 +1,12 @@
->> +Rockchip hdmi audio bindings
->> +
->> +Required properties:
->> +- compatible: platform specific
->> +- cpu-of-node: the device node of cpu_dai
->> +
->> +Example:
->> +
->> +sound {
->> +	compatible = "rockchip,rk3288-hdmi-audio";
->> +	cpu-of-node = <&i2s>;
->> +};
-> In patch 11, it looks like you parse a property called i2s-controller.
-> This doesn't appear to be documented.  Maybe it's what you call
-> "cpu-of-node" above?
->
-Mistaken, i will modify dt-bings in next version v3.
+Add binding documentation for Rockchip SoC LVDS driver.
 
-Thanks for your kindness remind.  : )
+Signed-off-by: Mark Yao <yzq@rock-chips.com>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ .../devicetree/bindings/video/rockchip-lvds.txt    | 59 ++++++++++++++++++++++
+ 1 file changed, 59 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/video/rockchip-lvds.txt
+
+diff --git a/Documentation/devicetree/bindings/video/rockchip-lvds.txt b/Documentation/devicetree/bindings/video/rockchip-lvds.txt
+new file mode 100644
+index 0000000..1616d7e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/video/rockchip-lvds.txt
+@@ -0,0 +1,59 @@
++Rockchip RK3288 LVDS interface
++================================
++
++Required properties:
++- compatible: "rockchip,rk3288-lvds";
++
++- reg: physical base address of the controller and length
++	of memory mapped region.
++- clocks: must include clock specifiers corresponding to entries in the
++	clock-names property.
++- clock-names: must contain "pclk_lvds"
++
++- avdd1v0-supply: regulator phandle for 1.0V analog power
++- avdd1v8-supply: regulator phandle for 1.8V analog power
++- avdd3v3-supply: regulator phandle for 3.3V analog power
++
++- rockchip,grf: phandle to the general register files syscon
++- rockchip,panel: phandle to a panel node as described by
++	Documentation/devicetree/bindings/panel/*
++
++- rockchip,data-mapping: should be "vesa" or "jeida",
++	This describes how the color bits are laid out in the
++	serialized LVDS signal.
++- rockchip,data-width : should be <18> or <24>;
++- rockchip,output: should be "rgb", "lvds" or "duallvds",
++	This describes the output face.
++
++- ports: contain a port node with endpoint definitions as defined in
++	Documentation/devicetree/bindings/media/video-interfaces.txt.
++
++Example:
++	lvds: lvds at ff96c000 {
++		compatible = "rockchip,rk3288-lvds";
++		rockchip,grf = <&grf>;
++		reg = <0xff96c000 0x4000>;
++		clocks = <&cru PCLK_LVDS_PHY>;
++		clock-names = "pclk_lvds";
++		avdd1v0-supply = <&vdd10_lcd>;
++		avdd1v8-supply = <&vcc18_lcd>;
++		avdd3v3-supply = <&vcca_33>;
++		rockchip,panel = <&panel>;
++		rockchip,data-mapping = "jeida";
++		rockchip,data-width = <24>;
++		rockchip,output = "rgb";
++		ports {
++			lvds_in: port {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				lvds_in_vopb: endpoint at 0 {
++					reg = <0>;
++					remote-endpoint = <&vopb_out_lvds>;
++				};
++				lvds_in_vopl: endpoint at 1 {
++					reg = <1>;
++					remote-endpoint = <&vopl_out_lvds>;
++				};
++			};
++		};
++	};
+-- 
+2.1.1
