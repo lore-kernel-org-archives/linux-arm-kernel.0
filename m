@@ -1,48 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 31 Jan 2015 23:37:01 +0100
-Subject: [PATCH 3/3] cpufreq: exynos: allow modular build
-In-Reply-To: <20150130215118.GA14374@developer.amazonguestwifi.org>
-References: <1422451015-390439-1-git-send-email-arnd@arndb.de>
- <5048920.rXbXJT1FvO@wuerfel>
- <20150130215118.GA14374@developer.amazonguestwifi.org>
-Message-ID: <2204000.ofqAym34Rh@wuerfel>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 31 Jan 2015 23:48:26 +0100
+Subject: [PATCH 1/5] ARM: dts: pxa: add pwri2c to pxa device-tree
+Message-ID: <1422744510-3179-1-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 30 January 2015 17:51:24 Eduardo Valentin wrote:
-> > > @@ -90,6 +84,20 @@ config ARM_EXYNOS_CPU_FREQ_BOOST_SW
-> > >  
-> > >       If in doubt, say N.
-> > >  
-> > > +config ARM_EXYNOS5440_CPUFREQ
-> > > +   bool "SAMSUNG EXYNOS5440"
-> > > +   depends on SOC_EXYNOS5440
-> > > +   depends on HAVE_CLK && OF
-> > > +   select PM_OPP
-> > > +   default y
-> > > +   help
-> > > +     This adds the CPUFreq driver for Samsung EXYNOS5440
-> > > +     SoC. The nature of exynos5440 clock controller is
-> > > +     different than previous exynos controllers so not using
-> > > +     the common exynos framework.
-> > > +
-> > > +     If in doubt, say N.
-> > 
-> > I believe this one also has to be tristate, for the same reason.
-> > 
-> 
-> I agree with you that it is better if we make it tristate. So, on my
-> side, I have no concerns changing it to tristate.
-> 
-> However, the exynos5440 cpufreq driver does not depend on of thermal as
-> of today, and therefore, I did not touch this driver for this matter.
-> Meaning, if it is not causing troubles, no need to mess with it.
-> 
-> But I can add this change. No issues, on my side.
+Each pxa variant has 2 I2C busses on the SoC :
+ - the casual I2C
+ - the power I2C, normally driving power regulators, and capable of
+ receiving orders on core frequency modifications
 
-Sorry, my mistake. I remembered incorrectly that the problem was
-in both modules, but you are right that it does not exist in the exynos5440
-one. It is not a mistake to turn this into tristate, but there is no
-immediate neeed, so either version is fine.
+Add the missing pwri2c to pxa description.
 
-	Arnd
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ arch/arm/boot/dts/pxa2xx.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/arch/arm/boot/dts/pxa2xx.dtsi b/arch/arm/boot/dts/pxa2xx.dtsi
+index c08f846..2371d9b 100644
+--- a/arch/arm/boot/dts/pxa2xx.dtsi
++++ b/arch/arm/boot/dts/pxa2xx.dtsi
+@@ -103,6 +103,15 @@
+ 			status = "disabled";
+ 		};
+ 
++		pwri2c: i2c at 40f000180 {
++			compatible = "mrvl,pxa-i2c";
++			reg = <0x40f00180 0x24>;
++			interrupts = <6>;
++			#address-cells = <0x1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
+ 		pxai2c1: i2c at 40301680 {
+ 			compatible = "mrvl,pxa-i2c";
+ 			reg = <0x40301680 0x30>;
+-- 
+2.1.0
