@@ -1,66 +1,107 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 31 Jan 2015 21:27:05 +0300
-Subject: [PATCH] ARM: shmobile: silk: initial device tree
-In-Reply-To: <20150131042143.GB7605@verge.net.au>
-References: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
- <1608366.HtA9yBksdO@wasted.cogentembedded.com>
- <20150131042143.GB7605@verge.net.au>
-Message-ID: <54CD1E79.6090700@cogentembedded.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Sat, 31 Jan 2015 19:36:22 +0100
+Subject: [PATCH v13 4/6] clk: Add rate constraints to clocks
+In-Reply-To: <20150131013158.GA4323@codeaurora.org>
+References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1422011024-32283-5-git-send-email-tomeu.vizoso@collabora.com>
+ <CAMuHMdUGgA70o2SgdJR3X6AkCcMssHU0POLfzppADT-O=BrYDw@mail.gmail.com>
+ <54CA8662.7040008@codeaurora.org> <20150131013158.GA4323@codeaurora.org>
+Message-ID: <CAAObsKDxhV7Vveq5FizTUp9ur2Rsq1bM+YQa4uPksh5ntMQV3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 31 January 2015 at 02:31, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 01/29, Stephen Boyd wrote:
+>> On 01/29/15 05:31, Geert Uytterhoeven wrote:
+>> > Hi Tomeu, Mike,
+>> >
+>> > On Fri, Jan 23, 2015 at 12:03 PM, Tomeu Vizoso
+>> > <tomeu.vizoso@collabora.com> wrote:
+>> >> --- a/drivers/clk/clk.c
+>> >> +++ b/drivers/clk/clk.c
+>> >> @@ -2391,25 +2543,24 @@ int __clk_get(struct clk *clk)
+>> >>         return 1;
+>> >>  }
+>> >>
+>> >> -static void clk_core_put(struct clk_core *core)
+>> >> +void __clk_put(struct clk *clk)
+>> >>  {
+>> >>         struct module *owner;
+>> >>
+>> >> -       owner = core->owner;
+>> >> +       if (!clk || WARN_ON_ONCE(IS_ERR(clk)))
+>> >> +               return;
+>> >>
+>> >>         clk_prepare_lock();
+>> >> -       kref_put(&core->ref, __clk_release);
+>> >> +
+>> >> +       hlist_del(&clk->child_node);
+>> >> +       clk_core_set_rate_nolock(clk->core, clk->core->req_rate);
+>> > At this point, clk->core->req_rate is still zero, causing
+>> > cpg_div6_clock_round_rate() to be called with a zero "rate" parameter,
+>> > e.g. on r8a7791:
+>>
+>> Hmm.. I wonder if we should assign core->req_rate to be the same as
+>> core->rate during __clk_init()? That would make this call to
+>> clk_core_set_rate_nolock() a nop in this case.
+>>
+>
+> Here's a patch to do this
+>
+> ---8<----
+> From: Stephen Boyd <sboyd@codeaurora.org>
+> Subject: [PATCH] clk: Assign a requested rate by default
+>
+> We need to assign a requested rate here so that we avoid
+> requesting a rate of 0 on clocks when we remove clock consumers.
 
-On 1/31/2015 7:21 AM, Simon Horman wrote:
+Hi, this looks good to me.
 
->> Add the initial device tree for the R8A7794 SoC based SILK low cost board.
->> SCIF2 serial port support is included, so that the serial console can work.
+Reviewed-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Thanks,
 
->> ---
->> This patch is against the 'renesas-devel-20150129-v3.19-rc6' tag of Simon
->> Horman's 'renesas.git' repo.
+Tomeu
 
->>   arch/arm/boot/dts/Makefile         |    1
->>   arch/arm/boot/dts/r8a7794-silk.dts |   41 +++++++++++++++++++++++++++++++++++++
->>   2 files changed, 42 insertions(+)
-
-[...]
->> Index: renesas/arch/arm/boot/dts/r8a7794-silk.dts
->> ===================================================================
->> --- /dev/null
->> +++ renesas/arch/arm/boot/dts/r8a7794-silk.dts
->> @@ -0,0 +1,41 @@
->> +/*
->> + * Device Tree Source for the SILK board
->> + *
->> + * Copyright (C) 2014 Renesas Electronics Corporation
->> + * Copyright (C) 2014-2015 Renesas Solutions Corp.
->> + * Copyright (C) 2014-2015 Cogent Embedded, Inc.
->> + *
->> + * This file is licensed under the terms of the GNU General Public License
->> + * version 2.  This program is licensed "as is" without any warranty of any
->> + * kind, whether express or implied.
->> + */
->> +
->> +/dts-v1/;
->> +#include "r8a7794.dtsi"
->> +
->> +/ {
->> +	model = "SILK";
->> +	compatible = "renesas,silk", "renesas,r8a7794";
->> +
->> +	aliases {
->> +		serial0 = &scif2;
->> +	};
->> +
->> +	chosen {
->> +		bootargs = "console=ttySC0,38400 ignore_loglevel";
-
-> Please remove console= for consistency with other boards
-> based on Renesas SoCs.
-
-    I can't, there will be no console at all.
-
-WBR, Sergei
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  drivers/clk/clk.c | 8 +++++---
+>  1 file changed, 5 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index a29daf9edea4..8416ed1c40be 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -2142,6 +2142,7 @@ int __clk_init(struct device *dev, struct clk *clk_user)
+>         struct clk_core *orphan;
+>         struct hlist_node *tmp2;
+>         struct clk_core *clk;
+> +       unsigned long rate;
+>
+>         if (!clk_user)
+>                 return -EINVAL;
+> @@ -2266,12 +2267,13 @@ int __clk_init(struct device *dev, struct clk *clk_user)
+>          * then rate is set to zero.
+>          */
+>         if (clk->ops->recalc_rate)
+> -               clk->rate = clk->ops->recalc_rate(clk->hw,
+> +               rate = clk->ops->recalc_rate(clk->hw,
+>                                 clk_core_get_rate_nolock(clk->parent));
+>         else if (clk->parent)
+> -               clk->rate = clk->parent->rate;
+> +               rate = clk->parent->rate;
+>         else
+> -               clk->rate = 0;
+> +               rate = 0;
+> +       clk->rate = clk->req_rate = rate;
+>
+>         /*
+>          * walk the list of orphan clocks and reparent any that are children of
+> --
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
