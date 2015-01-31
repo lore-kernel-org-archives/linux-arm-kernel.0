@@ -1,284 +1,382 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 31 Jan 2015 17:32:59 +0100
-Subject: [PATCH 06/11] drm/rockchip: lvds: register a bridge when no panel is
- set
+Date: Sat, 31 Jan 2015 17:32:56 +0100
+Subject: [PATCH 03/11] drm: add driver for simple vga encoders
 In-Reply-To: <1422721984-27782-1-git-send-email-heiko@sntech.de>
 References: <1422721984-27782-1-git-send-email-heiko@sntech.de>
-Message-ID: <1422721984-27782-7-git-send-email-heiko@sntech.de>
+Message-ID: <1422721984-27782-4-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On socs using the lvds components it also controls the use of the
-general rgb outputs and must thus be configured for things like
-external encoders.
+There exist simple vga encoders without any type of management interface
+and just maybe a simple gpio for turning it on or off. Examples for these
+are the Analog Devices ADV7123, Chipsea CS7123 or Micronas SDA7123.
 
-Therefore register a drm_bridge in this case, an encoder can attach to.
+Add a generic encoder driver for those that can be used by drm drivers
+using the component framework.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- .../devicetree/bindings/video/rockchip-lvds.txt    |   8 +-
- drivers/gpu/drm/rockchip/rockchip_lvds.c           | 167 ++++++++++++++++++---
- 2 files changed, 153 insertions(+), 22 deletions(-)
+ drivers/gpu/drm/i2c/Kconfig      |   6 +
+ drivers/gpu/drm/i2c/Makefile     |   2 +
+ drivers/gpu/drm/i2c/vga-simple.c | 325 +++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 333 insertions(+)
+ create mode 100644 drivers/gpu/drm/i2c/vga-simple.c
 
-diff --git a/Documentation/devicetree/bindings/video/rockchip-lvds.txt b/Documentation/devicetree/bindings/video/rockchip-lvds.txt
-index 1616d7e..6ab69b4 100644
---- a/Documentation/devicetree/bindings/video/rockchip-lvds.txt
-+++ b/Documentation/devicetree/bindings/video/rockchip-lvds.txt
-@@ -15,8 +15,6 @@ Required properties:
- - avdd3v3-supply: regulator phandle for 3.3V analog power
+diff --git a/drivers/gpu/drm/i2c/Kconfig b/drivers/gpu/drm/i2c/Kconfig
+index 22c7ed6..319f2cb 100644
+--- a/drivers/gpu/drm/i2c/Kconfig
++++ b/drivers/gpu/drm/i2c/Kconfig
+@@ -31,4 +31,10 @@ config DRM_I2C_NXP_TDA998X
+ 	help
+ 	  Support for NXP Semiconductors TDA998X HDMI encoders.
  
- - rockchip,grf: phandle to the general register files syscon
--- rockchip,panel: phandle to a panel node as described by
--	Documentation/devicetree/bindings/panel/*
- 
- - rockchip,data-mapping: should be "vesa" or "jeida",
- 	This describes how the color bits are laid out in the
-@@ -28,6 +26,12 @@ Required properties:
- - ports: contain a port node with endpoint definitions as defined in
- 	Documentation/devicetree/bindings/media/video-interfaces.txt.
- 
-+Optional properties:
-+- rockchip,panel: phandle to a panel node as described by
-+	Documentation/devicetree/bindings/panel/*
-+	If no panel reference is set the lvds will act like a
-+	bridge for other outbound interfaces.
++config DRM_VGA_SIMPLE
++	tristate "Generic simple vga encoder"
++	help
++	  Support for vga encoder chips without any special settings
++	  and at most a power-control gpio.
 +
- Example:
- 	lvds: lvds at ff96c000 {
- 		compatible = "rockchip,rk3288-lvds";
-diff --git a/drivers/gpu/drm/rockchip/rockchip_lvds.c b/drivers/gpu/drm/rockchip/rockchip_lvds.c
-index a01a3cb..46308fb 100644
---- a/drivers/gpu/drm/rockchip/rockchip_lvds.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_lvds.c
-@@ -42,6 +42,9 @@
- #define encoder_to_lvds(c) \
- 		container_of(c, struct rockchip_lvds, encoder)
+ endmenu
+diff --git a/drivers/gpu/drm/i2c/Makefile b/drivers/gpu/drm/i2c/Makefile
+index 2c72eb5..858961f 100644
+--- a/drivers/gpu/drm/i2c/Makefile
++++ b/drivers/gpu/drm/i2c/Makefile
+@@ -10,3 +10,5 @@ obj-$(CONFIG_DRM_I2C_SIL164) += sil164.o
  
-+#define bridge_to_lvds(c) \
-+		container_of(c, struct rockchip_lvds, bridge)
+ tda998x-y := tda998x_drv.o
+ obj-$(CONFIG_DRM_I2C_NXP_TDA998X) += tda998x.o
 +
- /*
-  * @grf_offset: offset inside the grf regmap for setting the rockchip lvds
-  */
-@@ -67,6 +70,7 @@ struct rockchip_lvds {
- 	struct drm_panel *panel;
- 	struct drm_connector connector;
- 	struct drm_encoder encoder;
-+	struct drm_bridge bridge;
- 
- 	struct mutex suspend_lock;
- 	int suspend;
-@@ -247,11 +251,10 @@ rockchip_lvds_encoder_mode_fixup(struct drm_encoder *encoder,
- 	return true;
- }
- 
--static void rockchip_lvds_encoder_mode_set(struct drm_encoder *encoder,
--					  struct drm_display_mode *mode,
--					  struct drm_display_mode *adjusted)
-+static void rockchip_lvds_mode_set(struct rockchip_lvds *lvds,
-+				   struct drm_display_mode *mode,
-+				   struct drm_display_mode *adjusted)
- {
--	struct rockchip_lvds *lvds = encoder_to_lvds(encoder);
- 	u32 h_bp = mode->htotal - mode->hsync_start;
- 	u8 pin_hsync = (mode->flags & DRM_MODE_FLAG_PHSYNC) ? 1 : 0;
- 	u8 pin_dclk = (mode->flags & DRM_MODE_FLAG_PCSYNC) ? 1 : 0;
-@@ -346,32 +349,52 @@ static void rockchip_lvds_encoder_mode_set(struct drm_encoder *encoder,
- 	dsb();
- }
- 
--static void rockchip_lvds_encoder_prepare(struct drm_encoder *encoder)
-+static void rockchip_lvds_encoder_mode_set(struct drm_encoder *encoder,
-+					   struct drm_display_mode *mode,
-+					   struct drm_display_mode *adjusted)
++obj-$(CONFIG_DRM_VGA_SIMPLE) += vga-simple.o
+diff --git a/drivers/gpu/drm/i2c/vga-simple.c b/drivers/gpu/drm/i2c/vga-simple.c
+new file mode 100644
+index 0000000..bb9d19c
+--- /dev/null
++++ b/drivers/gpu/drm/i2c/vga-simple.c
+@@ -0,0 +1,325 @@
++/*
++ * Simple vga encoder driver
++ *
++ * Copyright (C) 2014 Heiko Stuebner <heiko@sntech.de>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/module.h>
++#include <linux/component.h>
++#include <linux/gpio.h>
++#include <linux/gpio/consumer.h>
++#include <linux/i2c.h>
++#include <linux/regulator/consumer.h>
++#include <drm/drm_of.h>
++#include <drm/drmP.h>
++#include <drm/drm_crtc.h>
++#include <drm/drm_crtc_helper.h>
++#include <drm/drm_edid.h>
++
++#define connector_to_vga_simple(x) container_of(x, struct vga_simple, connector)
++#define encoder_to_vga_simple(x) container_of(x, struct vga_simple, encoder)
++
++struct vga_simple {
++	struct drm_connector connector;
++	struct drm_encoder encoder;
++
++	struct device *dev;
++	struct i2c_adapter *ddc;
++
++	struct regulator *vaa_reg;
++	struct gpio_desc *enable_gpio;
++
++	struct mutex enable_lock;
++	bool enabled;
++};
++
++/*
++ * Connector functions
++ */
++
++enum drm_connector_status vga_simple_detect(struct drm_connector *connector,
++					    bool force)
 +{
-+	rockchip_lvds_mode_set(encoder_to_lvds(encoder), mode, adjusted);
++	struct vga_simple *vga = connector_to_vga_simple(connector);
++
++	if (!vga->ddc)
++		return connector_status_unknown;
++
++	if (drm_probe_ddc(vga->ddc))
++		return connector_status_connected;
++
++	return connector_status_disconnected;
 +}
 +
-+static int rockchip_lvds_set_vop_source(struct rockchip_lvds *lvds,
-+					struct drm_encoder *encoder)
- {
--	struct rockchip_lvds *lvds = encoder_to_lvds(encoder);
- 	u32 val;
- 	int ret;
- 
--	ret = rockchip_drm_crtc_mode_config(encoder->crtc,
--						lvds->connector.connector_type,
--						ROCKCHIP_OUT_MODE_P888);
--	if (ret < 0) {
--		dev_err(lvds->dev, "Could not set crtc mode config: %d\n", ret);
--		return;
--	}
--
- 	ret = rockchip_drm_encoder_get_mux_id(lvds->dev->of_node, encoder);
- 	if (ret < 0)
--		return;
-+		return ret;
- 
- 	if (ret)
- 		val = RK3288_LVDS_SOC_CON6_SEL_VOP_LIT |
- 		      (RK3288_LVDS_SOC_CON6_SEL_VOP_LIT << 16);
- 	else
- 		val = RK3288_LVDS_SOC_CON6_SEL_VOP_LIT << 16;
++void vga_simple_connector_destroy(struct drm_connector *connector)
++{
++	drm_connector_unregister(connector);
++	drm_connector_cleanup(connector);
++}
 +
- 	ret = regmap_write(lvds->grf, lvds->soc_data->grf_soc_con6, val);
--	if (ret != 0) {
--		dev_err(lvds->dev, "Could not write to GRF: %d\n", ret);
-+	if (ret < 0)
++struct drm_connector_funcs vga_simple_connector_funcs = {
++	.dpms = drm_helper_connector_dpms,
++	.fill_modes = drm_helper_probe_single_connector_modes,
++	.detect = vga_simple_detect,
++	.destroy = vga_simple_connector_destroy,
++};
++
++/*
++ * Connector helper functions
++ */
++
++static int vga_simple_connector_get_modes(struct drm_connector *connector)
++{
++	struct vga_simple *vga = connector_to_vga_simple(connector);
++	struct edid *edid;
++	int ret = 0;
++
++	if (!vga->ddc)
++		return 0;
++
++	edid = drm_get_edid(connector, vga->ddc);
++	if (edid) {
++		drm_mode_connector_update_edid_property(connector, edid);
++		ret = drm_add_edid_modes(connector, edid);
++		kfree(edid);
++	}
++
++	return ret;
++}
++
++static int vga_simple_connector_mode_valid(struct drm_connector *connector,
++					struct drm_display_mode *mode)
++{
++	return MODE_OK;
++}
++
++static struct drm_encoder
++*vga_simple_connector_best_encoder(struct drm_connector *connector)
++{
++	struct vga_simple *vga = connector_to_vga_simple(connector);
++
++	return &vga->encoder;
++}
++
++static struct drm_connector_helper_funcs vga_simple_connector_helper_funcs = {
++	.get_modes = vga_simple_connector_get_modes,
++	.best_encoder = vga_simple_connector_best_encoder,
++	.mode_valid = vga_simple_connector_mode_valid,
++};
++
++/*
++ * Encoder functions
++ */
++
++static void vga_simple_encoder_destroy(struct drm_encoder *encoder)
++{
++	drm_encoder_cleanup(encoder);
++}
++
++static const struct drm_encoder_funcs vga_simple_encoder_funcs = {
++	.destroy = vga_simple_encoder_destroy,
++};
++
++/*
++ * Encoder helper functions
++ */
++
++static void vga_simple_encoder_dpms(struct drm_encoder *encoder, int mode)
++{
++	struct vga_simple *vga = encoder_to_vga_simple(encoder);
++
++	mutex_lock(&vga->enable_lock);
++
++	switch (mode) {
++	case DRM_MODE_DPMS_ON:
++		if (vga->enabled)
++			goto out;
++
++		if (!IS_ERR(vga->vaa_reg))
++			regulator_enable(vga->vaa_reg);
++
++		if (vga->enable_gpio)
++			gpiod_set_value(vga->enable_gpio, 1);
++
++		vga->enabled = true;
++		break;
++	case DRM_MODE_DPMS_STANDBY:
++	case DRM_MODE_DPMS_SUSPEND:
++	case DRM_MODE_DPMS_OFF:
++		if (!vga->enabled)
++			goto out;
++
++		if (vga->enable_gpio)
++			gpiod_set_value(vga->enable_gpio, 0);
++
++		if (!IS_ERR(vga->vaa_reg))
++			regulator_enable(vga->vaa_reg);
++
++		vga->enabled = false;
++		break;
++	default:
++		break;
++	}
++
++out:
++	mutex_unlock(&vga->enable_lock);
++}
++
++static bool vga_simple_mode_fixup(struct drm_encoder *encoder,
++				  const struct drm_display_mode *mode,
++				  struct drm_display_mode *adjusted_mode)
++{
++	return true;
++}
++
++static void vga_simple_encoder_prepare(struct drm_encoder *encoder)
++{
++}
++
++static void vga_simple_encoder_mode_set(struct drm_encoder *encoder,
++					struct drm_display_mode *mode,
++					struct drm_display_mode *adjusted_mode)
++{
++}
++
++static void vga_simple_encoder_commit(struct drm_encoder *encoder)
++{
++	vga_simple_encoder_dpms(encoder, DRM_MODE_DPMS_ON);
++}
++
++static void vga_simple_encoder_disable(struct drm_encoder *encoder)
++{
++	vga_simple_encoder_dpms(encoder, DRM_MODE_DPMS_OFF);
++}
++
++static const struct drm_encoder_helper_funcs vga_simple_encoder_helper_funcs = {
++	.dpms = vga_simple_encoder_dpms,
++	.mode_fixup = vga_simple_mode_fixup,
++	.prepare = vga_simple_encoder_prepare,
++	.mode_set = vga_simple_encoder_mode_set,
++	.commit = vga_simple_encoder_commit,
++	.disable = vga_simple_encoder_disable,
++};
++
++/*
++ * Component helper functions
++ */
++
++static int vga_simple_bind(struct device *dev, struct device *master,
++				 void *data)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct drm_device *drm = data;
++
++	struct device_node *ddc_node, *np = pdev->dev.of_node;
++	struct vga_simple *vga;
++	int ret;
++
++	if (!np)
++		return -ENODEV;
++
++	vga = devm_kzalloc(dev, sizeof(*vga), GFP_KERNEL);
++	if (!vga)
++		return -ENOMEM;
++
++	vga->dev = dev;
++	dev_set_drvdata(dev, vga);
++	mutex_init(&vga->enable_lock);
++
++	vga->enable_gpio = devm_gpiod_get_optional(dev, "enable",
++						   GPIOD_OUT_LOW);
++	if (IS_ERR(vga->enable_gpio)) {
++		ret = PTR_ERR(vga->enable_gpio);
++		dev_err(dev, "failed to request GPIO: %d\n", ret);
 +		return ret;
++	}
++
++	vga->enabled = false;
++
++	ddc_node = of_parse_phandle(np, "ddc-i2c-bus", 0);
++	if (ddc_node) {
++		vga->ddc = of_find_i2c_adapter_by_node(ddc_node);
++		of_node_put(ddc_node);
++		if (!vga->ddc) {
++			dev_dbg(vga->dev, "failed to read ddc node\n");
++			return -EPROBE_DEFER;
++		}
++	} else {
++		dev_dbg(vga->dev, "no ddc property found\n");
++	}
++
++	vga->vaa_reg = devm_regulator_get_optional(dev, "vaa");
++
++	vga->encoder.possible_crtcs = drm_of_find_possible_crtcs(drm, np);
++	vga->encoder.of_node = np;
++	vga->connector.polled = DRM_CONNECTOR_POLL_CONNECT |
++				DRM_CONNECTOR_POLL_DISCONNECT;
++
++	drm_encoder_helper_add(&vga->encoder, &vga_simple_encoder_helper_funcs);
++	drm_encoder_init(drm, &vga->encoder, &vga_simple_encoder_funcs,
++			 DRM_MODE_ENCODER_DAC);
++
++	drm_connector_helper_add(&vga->connector,
++				 &vga_simple_connector_helper_funcs);
++	drm_connector_init(drm, &vga->connector, &vga_simple_connector_funcs,
++			   DRM_MODE_CONNECTOR_VGA);
++
++	drm_mode_connector_attach_encoder(&vga->connector, &vga->encoder);
 +
 +	return 0;
 +}
 +
-+static void rockchip_lvds_encoder_prepare(struct drm_encoder *encoder)
++static void vga_simple_unbind(struct device *dev, struct device *master,
++				    void *data)
 +{
-+	struct rockchip_lvds *lvds = encoder_to_lvds(encoder);
-+	int ret;
++	struct vga_simple *vga = dev_get_drvdata(dev);
 +
-+	ret = rockchip_drm_crtc_mode_config(encoder->crtc,
-+						lvds->connector.connector_type,
-+						ROCKCHIP_OUT_MODE_P888);
-+	if (ret < 0) {
-+		dev_err(lvds->dev, "Could not set crtc mode config: %d\n", ret);
-+		return;
-+	}
-+
-+	ret = rockchip_lvds_set_vop_source(lvds, encoder);
-+	if (ret < 0) {
-+		dev_err(lvds->dev, "Could not set vop source: %d\n", ret);
- 		return;
- 	}
- }
-@@ -404,6 +427,97 @@ static struct drm_encoder_funcs rockchip_lvds_encoder_funcs = {
- 	.destroy = rockchip_lvds_encoder_destroy,
- };
- 
-+static void rockchip_lvds_bridge_mode_set(struct drm_bridge *bridge,
-+					  struct drm_display_mode *mode,
-+					  struct drm_display_mode *adjusted)
-+{
-+	rockchip_lvds_mode_set(bridge_to_lvds(bridge), mode, adjusted);
++	vga->connector.funcs->destroy(&vga->connector);
++	vga->encoder.funcs->destroy(&vga->encoder);
 +}
 +
-+static void rockchip_lvds_bridge_pre_enable(struct drm_bridge *bridge)
-+{
-+}
-+
-+/*
-+ * post_disable is alled right after encoder prepare, so do lvds and crtc
-+ * mode config here.
-+ */
-+static void rockchip_lvds_bridge_post_disable(struct drm_bridge *bridge)
-+{
-+	struct rockchip_lvds *lvds = bridge_to_lvds(bridge);
-+	struct drm_connector *connector;
-+	int ret, connector_type = DRM_MODE_CONNECTOR_Unknown;
-+
-+	if (!bridge->encoder->crtc)
-+		return;
-+
-+	list_for_each_entry(connector, &bridge->dev->mode_config.connector_list,
-+			head) {
-+		if (connector->encoder == bridge->encoder)
-+			connector_type = connector->connector_type;
-+	}
-+
-+	ret = rockchip_drm_crtc_mode_config(bridge->encoder->crtc,
-+						connector_type,
-+						ROCKCHIP_OUT_MODE_P888);
-+	if (ret < 0) {
-+		dev_err(lvds->dev, "Could not set crtc mode config: %d\n", ret);
-+		return;
-+	}
-+
-+	ret = rockchip_lvds_set_vop_source(lvds, bridge->encoder);
-+	if (ret < 0) {
-+		dev_err(lvds->dev, "Could not set vop source: %d\n", ret);
-+		return;
-+	}
-+}
-+
-+static void rockchip_lvds_bridge_enable(struct drm_bridge *bridge)
-+{
-+	struct rockchip_lvds *lvds = bridge_to_lvds(bridge);
-+	int ret;
-+
-+	mutex_lock(&lvds->suspend_lock);
-+
-+	if (!lvds->suspend)
-+		goto out;
-+
-+	ret = rockchip_lvds_poweron(lvds);
-+	if (ret < 0) {
-+		dev_err(lvds->dev, "could not enable lvds\n");
-+		goto out;
-+	}
-+
-+	lvds->suspend = false;
-+
-+out:
-+	mutex_unlock(&lvds->suspend_lock);
-+}
-+
-+static void rockchip_lvds_bridge_disable(struct drm_bridge *bridge)
-+{
-+	struct rockchip_lvds *lvds = bridge_to_lvds(bridge);
-+
-+	mutex_lock(&lvds->suspend_lock);
-+
-+	if (lvds->suspend)
-+		goto out;
-+
-+	rockchip_lvds_poweroff(lvds);
-+	lvds->suspend = true;
-+
-+out:
-+	mutex_unlock(&lvds->suspend_lock);
-+}
-+
-+static struct drm_bridge_funcs rockchip_lvds_bridge_funcs = {
-+	.mode_set = rockchip_lvds_bridge_mode_set,
-+	.enable = rockchip_lvds_bridge_enable,
-+	.disable = rockchip_lvds_bridge_disable,
-+	.pre_enable = rockchip_lvds_bridge_pre_enable,
-+	.post_disable = rockchip_lvds_bridge_post_disable,
++static const struct component_ops vga_simple_ops = {
++	.bind = vga_simple_bind,
++	.unbind = vga_simple_unbind,
 +};
 +
- static struct rockchip_lvds_soc_data rk3288_lvds_data = {
- 	.grf_soc_con6 = 0x025c,
- 	.grf_soc_con7 = 0x0260,
-@@ -525,9 +639,20 @@ static int rockchip_lvds_bind(struct device *dev, struct device *master,
- 
- 		lvds->panel = panel;
- 	} else {
--		dev_err(&pdev->dev, "no panel node found\n");
--		ret = -EINVAL;
--		goto err_unprepare_pclk;
-+		/*
-+		 * When no panel is found, register a bridge instead.
-+		 * We expect the code handling external encoders to
-+		 * connect encoder and bridge.
-+		 */
-+		lvds->bridge.funcs = &rockchip_lvds_bridge_funcs;
-+		lvds->bridge.of_node = dev->of_node;
-+		ret = drm_bridge_add(&lvds->bridge);
-+		if (ret) {
-+			dev_err(&pdev->dev, "failed to add bridge %d\n", ret);
-+			goto err_unprepare_pclk;
-+		}
++static int vga_simple_probe(struct platform_device *pdev)
++{
++	return component_add(&pdev->dev, &vga_simple_ops);
++}
 +
-+		return 0;
- 	}
- 
- 	encoder = &lvds->encoder;
-@@ -592,6 +717,8 @@ static void rockchip_lvds_unbind(struct device *dev, struct device *master,
- 
- 		drm_connector_cleanup(&lvds->connector);
- 		drm_encoder_cleanup(&lvds->encoder);
-+	} else {
-+		drm_bridge_remove(&lvds->bridge);
- 	}
- 
- 	clk_unprepare(lvds->pclk);
++static int vga_simple_remove(struct platform_device *pdev)
++{
++	component_del(&pdev->dev, &vga_simple_ops);
++
++	return 0;
++}
++
++static const struct of_device_id vga_simple_ids[] = {
++	{ .compatible = "adi,adv7123", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, vga_simple_ids);
++
++static struct platform_driver vga_simple_driver = {
++	.probe  = vga_simple_probe,
++	.remove = vga_simple_remove,
++	.driver = {
++		.name = "vga-simple",
++		.of_match_table = vga_simple_ids,
++	},
++};
++module_platform_driver(vga_simple_driver);
++
++MODULE_AUTHOR("Heiko Stuebner <heiko@sntech.de>");
++MODULE_DESCRIPTION("Simple vga converter");
++MODULE_LICENSE("GPL");
 -- 
 2.1.1
