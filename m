@@ -1,55 +1,84 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Sat, 31 Jan 2015 09:11:53 +0000
-Subject: [PATCH] mm: remove remaining references to NUMA hinting bits and
- helpers -fix
-In-Reply-To: <20150130100406.GK2395@suse.de>
-References: <20150128152412.GX21293@sirena.org.uk>
- <CAPvkgC3OLdf7ZgDfAC5R4wgZDirAZAmY+ZsBLQedpjq+HJHACw@mail.gmail.com>
- <20150130100406.GK2395@suse.de>
-Message-ID: <20150131091153.GA31002@linaro.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Sat, 31 Jan 2015 10:21:54 +0100
+Subject: =?UTF-8?B?UFJPQkxFTTrCoEJVRyAgYXBwZWFyaW5nIHdoZW4gdHJ5aW5nIHQ=?=
+ =?UTF-8?B?byBhbGxvY2F0ZSBpbnRlcnJ1cHQgb24gRXh5bm9zIE1DVCBhZnRlciBDUFUgaG8=?=
+ =?UTF-8?B?dHBsdWc=?=
+In-Reply-To: <54CC2B18.2070809@codeaurora.org>
+References: <544907D4.1020409@samsung.com>
+ <20141023140644.GI27405@n2100.arm.linux.org.uk>
+ <54494BEE.9020702@codeaurora.org> <544A52B0.9050901@samsung.com>
+ <544EA810.6090502@codeaurora.org> <5450C391.2070007@samsung.com>
+ <54CC2B18.2070809@codeaurora.org>
+Message-ID: <54CC9EB2.7010409@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 30, 2015 at 10:04:06AM +0000, Mel Gorman wrote:
-> The patch "mm: remove remaining references to NUMA hinting bits and helpers"
-> was meant to remove NUMA hinting bits and helpers but broke is_swap_pte.
-> From the original bug report
-> 
-> 	For at least the past couple of days tests of libhugetlbfs have
-> 	been hanging on mustang in the mlock test running ARMv8 defconfig
-> 	with both 32 bit and 64 bit userspace - after the mprotect test
-> 	(the one before it) we get no console output for several hours so
-> 	it appears that the test has deadlocked.  The tail of the log is:
-> 
-> 	| find_path (2M: 64):   PASS
-> 	| unlinked_fd (2M: 64): PASS
-> 	| readback (2M: 64):    PASS
-> 	| truncate (2M: 64):    PASS
-> 	| shared (2M: 64):      PASS
-> 	| mprotect (2M: 64):    PASS
-> 
-> This patch should address the problem and is a fix to the mmotm patch
-> mm-remove-remaining-references-to-numa-hinting-bits-and-helpers.patch
-> 
-> Reported-by: Mark Brown <broonie@kernel.org>
-> Signed-off-by: Mel Gorman <mgorman@suse.de>
+On 01/31/2015 02:08 AM, Stephen Boyd wrote:
+> Kept meaning to get back to this thread. Have you resolved it?
+>
+> On 10/29/14 03:38, Marcin Jabrzyk wrote:
+>> So I've tried this patch, it resolves one problem but introduces also
+>> new ones. As expected the BUG warning is not showing after applying
+>> this patch but there are some interesting side effects.
+>
+> Well that's half good news.
+>
+>> I was looking on /proc/interrupts output. IRQ for CPU0 have "MCT" name
+>> and IRQ for CPU1 has unexpectedly no name at all.
+>
+> This is pretty confusing. I don't see how the patch could cause this to
+> happen.
+>
+>> After making hotplug cycle of CPU1 I've observed that IRQs attached
+>> originally for that CPU are generating on really low count and not in
+>> order with IRQ for CPU0.
+>> What's more the interrupt for CPU1 is showing to me as being counted
+>> for both CPUs, so it's probably not being attached to CPU1.
+>>
+>
+> yeah. Can you give the output of /proc/timer_list in addition to
+> /proc/interrupts? It may give some hints on what's going on. It may also
+> be interesting to see if irq_force_affinity() is failing. Please check
+> the return value and print an error
 
-Acked-by: Steve Capper <steve.capper@linaro.org>
+Hi Stephen, Marcin,
 
-> ---
->  include/linux/swapops.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/include/linux/swapops.h b/include/linux/swapops.h
-> index 73ca28070a92..cedf3d3c373f 100644
-> --- a/include/linux/swapops.h
-> +++ b/include/linux/swapops.h
-> @@ -54,7 +54,7 @@ static inline pgoff_t swp_offset(swp_entry_t entry)
->  /* check whether a pte points to a swap entry */
->  static inline int is_swap_pte(pte_t pte)
->  {
-> -	return !pte_none(pte);
-> +	return !pte_none(pte) && !pte_present(pte);
->  }
->  #endif
->  
+can you have a look if the patch [1] fixes this issue ?
+
+  -- Daniel
+
+[1] https://lkml.org/lkml/2015/1/30/423
+
+
+> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+> index 1800053b4644..3c4538e26731 100644
+> --- a/drivers/clocksource/exynos_mct.c
+> +++ b/drivers/clocksource/exynos_mct.c
+> @@ -450,6 +450,7 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
+>   {
+>   	struct mct_clock_event_device *mevt;
+>   	unsigned int cpu = smp_processor_id();
+> +	int ret;
+>
+>   	mevt = container_of(evt, struct mct_clock_event_device, evt);
+>
+> @@ -468,7 +469,9 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
+>   	if (mct_int_type == MCT_INT_SPI) {
+>   		evt->irq = mct_irqs[MCT_L0_IRQ + cpu];
+>   		enable_irq(evt->irq);
+> -		irq_force_affinity(mct_irqs[MCT_L0_IRQ + cpu], cpumask_of(cpu));
+> +		ret = irq_force_affinity(mct_irqs[MCT_L0_IRQ + cpu], cpumask_of(cpu));
+> +		if (ret)
+> +			pr_err("force failed %d\n", ret);
+>   	} else {
+>   		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
+>   	}
+>
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
