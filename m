@@ -1,40 +1,48 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 31 Jan 2015 23:36:23 +0100
-Subject: [PATCH] ARM: pxa: pxa27x skip default device initialization with DT
-Message-ID: <1422743783-32511-1-git-send-email-robert.jarzmik@free.fr>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 31 Jan 2015 23:37:01 +0100
+Subject: [PATCH 3/3] cpufreq: exynos: allow modular build
+In-Reply-To: <20150130215118.GA14374@developer.amazonguestwifi.org>
+References: <1422451015-390439-1-git-send-email-arnd@arndb.de>
+ <5048920.rXbXJT1FvO@wuerfel>
+ <20150130215118.GA14374@developer.amazonguestwifi.org>
+Message-ID: <2204000.ofqAym34Rh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When booting via DT, the default PXA devices must not have been probed
-before, otherwise the augmented information from the device tree is
-ignored.
+On Friday 30 January 2015 17:51:24 Eduardo Valentin wrote:
+> > > @@ -90,6 +84,20 @@ config ARM_EXYNOS_CPU_FREQ_BOOST_SW
+> > >  
+> > >       If in doubt, say N.
+> > >  
+> > > +config ARM_EXYNOS5440_CPUFREQ
+> > > +   bool "SAMSUNG EXYNOS5440"
+> > > +   depends on SOC_EXYNOS5440
+> > > +   depends on HAVE_CLK && OF
+> > > +   select PM_OPP
+> > > +   default y
+> > > +   help
+> > > +     This adds the CPUFreq driver for Samsung EXYNOS5440
+> > > +     SoC. The nature of exynos5440 clock controller is
+> > > +     different than previous exynos controllers so not using
+> > > +     the common exynos framework.
+> > > +
+> > > +     If in doubt, say N.
+> > 
+> > I believe this one also has to be tristate, for the same reason.
+> > 
+> 
+> I agree with you that it is better if we make it tristate. So, on my
+> side, I have no concerns changing it to tristate.
+> 
+> However, the exynos5440 cpufreq driver does not depend on of thermal as
+> of today, and therefore, I did not touch this driver for this matter.
+> Meaning, if it is not causing troubles, no need to mess with it.
+> 
+> But I can add this change. No issues, on my side.
 
-This is the twin commit of commit 82ce44d104dc ("ARM: pxa3xx: skip
-default device initialization when booting via DT").
+Sorry, my mistake. I remembered incorrectly that the problem was
+in both modules, but you are right that it does not exist in the exynos5440
+one. It is not a mistake to turn this into tristate, but there is no
+immediate neeed, so either version is fine.
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
- arch/arm/mach-pxa/pxa27x.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
-index 0485248..b5abdeb 100644
---- a/arch/arm/mach-pxa/pxa27x.c
-+++ b/arch/arm/mach-pxa/pxa27x.c
-@@ -307,8 +307,12 @@ static int __init pxa27x_init(void)
- 		register_syscore_ops(&pxa_irq_syscore_ops);
- 		register_syscore_ops(&pxa2xx_mfp_syscore_ops);
- 
--		pxa_register_device(&pxa27x_device_gpio, &pxa27x_gpio_info);
--		ret = platform_add_devices(devices, ARRAY_SIZE(devices));
-+		if (!of_have_populated_dt()) {
-+			pxa_register_device(&pxa27x_device_gpio,
-+					    &pxa27x_gpio_info);
-+			ret = platform_add_devices(devices,
-+						   ARRAY_SIZE(devices));
-+		}
- 	}
- 
- 	return ret;
--- 
-2.1.0
+	Arnd
