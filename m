@@ -1,70 +1,85 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Sat, 31 Jan 2015 01:09:39 -0600
-Subject: [PATCH] irqchip: gic: Don't complain in gic_get_cpumask() if UP
- system
-In-Reply-To: <1422665010-5854-1-git-send-email-sboyd@codeaurora.org>
-References: <1422665010-5854-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20150131070939.GA4068@saruman.tx.rr.com>
+From: tsahee@annapurnalabs.com (Tsahee Zidenberg)
+Date: Sat, 31 Jan 2015 10:30:12 +0200
+Subject: [PATCH v2 0/5] Introducing the Alpine platform.
+Message-ID: <54cc9294.fsWS9gCuQbEe29Sh%tsahee@annapurnalabs.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+linux-omap
+Annapurna Labs(TM) is a technology company providing innovative solutions
+including chips, software, and systems for the datacenter and enterprise
+infrastructure.
 
-On Fri, Jan 30, 2015 at 04:43:30PM -0800, Stephen Boyd wrote:
-> In a uniprocessor implementation the interrupt processor targets
-> registers are read-as-zero/write-ignored (RAZ/WI). Unfortunately
-> gic_get_cpumask() will print a critical message saying
-> 
->  GIC CPU mask not found - kernel will fail to boot.
-> 
-> if these registers all read as zero, but there won't actually be
-> a problem on uniprocessor systems and the kernel will boot just
-> fine. Skip this check if we're running a UP kernel or if we
-> detect that the hardware only supports a single processor.
-> 
+Alpine(TM) is one of Annapurna Labs? chip products targeting storage and
+networking applications. It is a complete Platform-On-Chip,
+integrating 2-4 cortex-A15 cores and multiple innovations to provide
+a seamless networking and storage fabric for enterprise and datacenter
+equipment.
 
-Nice, I'll test this on AM437x on Monday but certainly looks promising:
+This patchset provides initial support for the Alpine platform.
 
-Acked-by: Felipe Balbi <balbi@ti.com>
+Patch #1 contains minimal, single-cpu architecture support.
 
+Patch #2 adds early-debug capabilities via Alpine UART 0.
 
-> Acked-by: Nicolas Pitre <nico@linaro.org>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Cc: Stefan Agner <stefan@agner.ch>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  drivers/irqchip/irq-gic.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index d617ee5a3d8a..1b70e0de0f6e 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -346,7 +346,7 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
->  			break;
->  	}
->  
-> -	if (!mask)
-> +	if (!mask && num_possible_cpus() > 1)
->  		pr_crit("GIC CPU mask not found - kernel will fail to boot.\n");
->  
->  	return mask;
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> a Linux Foundation Collaborative Project
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Patch #3 adds smp-support and a secondary cpu enable-method for the platform.
+
+Patch #4 provides documentation for the available device-tree nodes.
+
+Patch #5 provides a device-tree for Alpine soc and development board.
+
+The patchset was tested with multi_v7_defconfig, adding CONFIG_ARCH_ALPINE
+
+---
+V2:
+* map physical cpu-id from logical on cpu wakeup
+* use syscon/regmap for sysfabric_service implementation
+* devicetree format:
+**  split between .dtsi and dts
+**  dual license
+**  node and manufacturer naming
+* intoduce devicetree in two separate patches
+* multiple format fixes
+* rebased on d932006 (for-next)
+
+---
+Some CC'd on a prev. message that didn't make it through to the list.. hope this
+time it will work. Sorry (removing CCs to avoid spamming you).
+
+Tsahee Zidenberg (5):
+  ARM: Alpine: Initial support for Alpine platform
+  ARM: Alpine: early-debug print support
+  ARM: Alpine: smp support
+  ARM: dts: Alpine platform binding documentation
+  ARM: dts: Alpine platform devicetree
+
+ .../devicetree/bindings/arm/al,alpine.txt          |  88 +++++++++++++
+ .../bindings/arm/cpu-enable-method/al,alpine-smp   |  52 ++++++++
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/Kconfig                                   |   2 +
+ arch/arm/Kconfig.debug                             |  12 +-
+ arch/arm/Makefile                                  |   1 +
+ arch/arm/boot/dts/Makefile                         |   4 +
+ arch/arm/boot/dts/alpine-db.dts                    |  35 +++++
+ arch/arm/boot/dts/alpine.dtsi                      | 141 +++++++++++++++++++++
+ arch/arm/mach-alpine/Kconfig                       |  10 ++
+ arch/arm/mach-alpine/Makefile                      |   6 +
+ arch/arm/mach-alpine/alpine_cpu_pm.c               |  69 ++++++++++
+ arch/arm/mach-alpine/alpine_cpu_pm.h               |  26 ++++
+ arch/arm/mach-alpine/alpine_cpu_resume.h           |  38 ++++++
+ arch/arm/mach-alpine/alpine_machine.c              |  28 ++++
+ arch/arm/mach-alpine/platsmp.c                     |  49 +++++++
+ 16 files changed, 561 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/al,alpine.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/cpu-enable-method/al,alpine-smp
+ create mode 100644 arch/arm/boot/dts/alpine-db.dts
+ create mode 100644 arch/arm/boot/dts/alpine.dtsi
+ create mode 100644 arch/arm/mach-alpine/Kconfig
+ create mode 100644 arch/arm/mach-alpine/Makefile
+ create mode 100644 arch/arm/mach-alpine/alpine_cpu_pm.c
+ create mode 100644 arch/arm/mach-alpine/alpine_cpu_pm.h
+ create mode 100644 arch/arm/mach-alpine/alpine_cpu_resume.h
+ create mode 100644 arch/arm/mach-alpine/alpine_machine.c
+ create mode 100644 arch/arm/mach-alpine/platsmp.c
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150131/7eb07cdf/attachment.sig>
+1.9.1
