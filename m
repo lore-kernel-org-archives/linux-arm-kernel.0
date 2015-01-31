@@ -1,225 +1,55 @@
-From: tsahee@annapurnalabs.com (Tsahee Zidenberg)
-Date: Sat, 31 Jan 2015 10:32:35 +0200
-Subject: [PATCH v2 5/5] ARM: dts: Alpine platform devicetree
-Message-ID: <54cc9323.pyRf02x4vq/hJNoi%tsahee@annapurnalabs.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Sat, 31 Jan 2015 09:11:53 +0000
+Subject: [PATCH] mm: remove remaining references to NUMA hinting bits and
+ helpers -fix
+In-Reply-To: <20150130100406.GK2395@suse.de>
+References: <20150128152412.GX21293@sirena.org.uk>
+ <CAPvkgC3OLdf7ZgDfAC5R4wgZDirAZAmY+ZsBLQedpjq+HJHACw@mail.gmail.com>
+ <20150130100406.GK2395@suse.de>
+Message-ID: <20150131091153.GA31002@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces devicetree for the Alpine platform, and
-for a development board based on the same platform.
+On Fri, Jan 30, 2015 at 10:04:06AM +0000, Mel Gorman wrote:
+> The patch "mm: remove remaining references to NUMA hinting bits and helpers"
+> was meant to remove NUMA hinting bits and helpers but broke is_swap_pte.
+> From the original bug report
+> 
+> 	For at least the past couple of days tests of libhugetlbfs have
+> 	been hanging on mustang in the mlock test running ARMv8 defconfig
+> 	with both 32 bit and 64 bit userspace - after the mprotect test
+> 	(the one before it) we get no console output for several hours so
+> 	it appears that the test has deadlocked.  The tail of the log is:
+> 
+> 	| find_path (2M: 64):   PASS
+> 	| unlinked_fd (2M: 64): PASS
+> 	| readback (2M: 64):    PASS
+> 	| truncate (2M: 64):    PASS
+> 	| shared (2M: 64):      PASS
+> 	| mprotect (2M: 64):    PASS
+> 
+> This patch should address the problem and is a fix to the mmotm patch
+> mm-remove-remaining-references-to-numa-hinting-bits-and-helpers.patch
+> 
+> Reported-by: Mark Brown <broonie@kernel.org>
+> Signed-off-by: Mel Gorman <mgorman@suse.de>
 
-Signed-off-by: Barak Wasserstrom <barak@annapurnalabs.com>
-Signed-off-by: Tsahee Zidenberg <tsahee@annapurnalabs.com>
----
- arch/arm/boot/dts/Makefile      |   4 ++
- arch/arm/boot/dts/alpine-db.dts |  35 ++++++++++
- arch/arm/boot/dts/alpine.dtsi   | 141 ++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 180 insertions(+)
- create mode 100644 arch/arm/boot/dts/alpine-db.dts
- create mode 100644 arch/arm/boot/dts/alpine.dtsi
+Acked-by: Steve Capper <steve.capper@linaro.org>
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index f07348e..ece027c 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -2,6 +2,10 @@ ifeq ($(CONFIG_OF),y)
- 
- dtb-$(CONFIG_MACH_ASM9260) += \
- 	alphascale-asm9260-devkit.dtb
-+
-+dtb-$(CONFIG_ARCH_ALPINE) += \
-+	alpine_db.dtb
-+
- # Keep at91 dtb files sorted alphabetically for each SoC
- dtb-$(CONFIG_SOC_SAM_V4_V5) += \
- 	at91rm9200ek.dtb \
-diff --git a/arch/arm/boot/dts/alpine-db.dts b/arch/arm/boot/dts/alpine-db.dts
-new file mode 100644
-index 0000000..dfb5a08
---- /dev/null
-+++ b/arch/arm/boot/dts/alpine-db.dts
-@@ -0,0 +1,35 @@
-+/*
-+ * Copyright 2015 Annapurna Labs Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * Alternatively, redistribution and use in source and binary forms, with or
-+ * without modification, are permitted provided that the following conditions
-+ * are met:
-+ *
-+ *   *   Redistributions of source code must retain the above copyright notice,
-+ *       this list of conditions and the following disclaimer.
-+ *
-+ *   *   Redistributions in binary form must reproduce the above copyright
-+ *       notice, this list of conditions and the following disclaimer in
-+ *       the documentation and/or other materials provided with the
-+ *       distribution.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ */
-+
-+/dts-v1/;
-+
-+#include "alpine.dtsi"
-+
-+/ {
-+	model = "Annapurna Labs Alpine Dev Board";
-+	/* no need for anything outside SOC */
-+};
-+
-diff --git a/arch/arm/boot/dts/alpine.dtsi b/arch/arm/boot/dts/alpine.dtsi
-new file mode 100644
-index 0000000..3cce55a
---- /dev/null
-+++ b/arch/arm/boot/dts/alpine.dtsi
-@@ -0,0 +1,141 @@
-+/*
-+ * Copyright 2015 Annapurna Labs Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * Alternatively, redistribution and use in source and binary forms, with or
-+ * without modification, are permitted provided that the following conditions
-+ * are met:
-+ *
-+ *   *   Redistributions of source code must retain the above copyright notice,
-+ *       this list of conditions and the following disclaimer.
-+ *
-+ *   *   Redistributions in binary form must reproduce the above copyright
-+ *       notice, this list of conditions and the following disclaimer in
-+ *       the documentation and/or other materials provided with the
-+ *       distribution.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ */
-+
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include "skeleton64.dtsi"
-+
-+/ {
-+	/* SOC compatibility */
-+	compatible = "al,alpine";
-+
-+	/* CPU Configuration */
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		enable-method = "al,alpine-smp";
-+
-+		cpu at 0 {
-+			compatible = "arm,cortex-a15";
-+			device_type = "cpu";
-+			reg = <0>;
-+			clock-frequency = <0>; /* Filled by loader */
-+		};
-+
-+		cpu at 1 {
-+			compatible = "arm,cortex-a15";
-+			device_type = "cpu";
-+			reg = <1>;
-+			clock-frequency = <0>; /* Filled by loader */
-+		};
-+
-+		cpu at 2 {
-+			compatible = "arm,cortex-a15";
-+			device_type = "cpu";
-+			reg = <2>;
-+			clock-frequency = <0>; /* Filled by loader */
-+		};
-+
-+		cpu at 3 {
-+			compatible = "arm,cortex-a15";
-+			device_type = "cpu";
-+			reg = <3>;
-+			clock-frequency = <0>; /* Filled by loader */
-+		};
-+	};
-+
-+	soc {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		compatible = "simple-bus";
-+		interrupt-parent = <&gic>;
-+		ranges;
-+
-+		arch-timer {
-+			compatible = "arm,cortex-a15-timer",
-+				     "arm,armv7-timer";
-+			interrupts =
-+				<GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+				<GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+				<GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+				<GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-+			clock-frequency = <0>; /* Filled by loader */
-+		};
-+
-+		/* Interrupt Controller */
-+		gic: gic at fb001000 {
-+			compatible = "arm,cortex-a15-gic";
-+			#interrupt-cells = <3>;
-+			#size-cells = <0>;
-+			#address-cells = <0>;
-+			interrupt-controller;
-+			reg = <0x0 0xfb001000 0x0 0x1000>,
-+			      <0x0 0xfb002000 0x0 0x2000>,
-+			      <0x0 0xfb004000 0x0 0x1000>,
-+			      <0x0 0xfb006000 0x0 0x2000>;
-+			interrupts =
-+				<GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-+		};
-+
-+		/* CPU Resume registers */
-+		cpu-resume at fbff5ec0 {
-+			compatible = "al,alpine-cpu-resume";
-+			reg = <0x0 0xfbff5ec0 0x0 0x30>;
-+		};
-+
-+		/* North Bridge Service Registers */
-+		sysfabric-service at fb070000 {
-+			compatible = "al,alpine-sysfabric-service", "syscon", "simple-bus";
-+			reg = <0x0 0xfb070000 0x0 0x10000>;
-+		};
-+
-+		/* Performance Monitor Unit */
-+		pmu {
-+			compatible = "arm,cortex-a15-pmu";
-+			interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
-+		};
-+
-+		uart0:uart at fd883000 {
-+			compatible = "ns16550a";
-+			reg = <0x0 0xfd883000 0x0 0x1000>;
-+			clock-frequency = <0>; /* Filled by loader */
-+			interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+		};
-+
-+		uart1:uart at 0xfd884000 {
-+			compatible = "ns16550a";
-+			reg = <0x0 0xfd884000 0x0 0x1000>;
-+			clock-frequency = <0>; /* Filled by loader */
-+			interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+		};
-+	};
-+};
--- 
-1.9.1
+> ---
+>  include/linux/swapops.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/include/linux/swapops.h b/include/linux/swapops.h
+> index 73ca28070a92..cedf3d3c373f 100644
+> --- a/include/linux/swapops.h
+> +++ b/include/linux/swapops.h
+> @@ -54,7 +54,7 @@ static inline pgoff_t swp_offset(swp_entry_t entry)
+>  /* check whether a pte points to a swap entry */
+>  static inline int is_swap_pte(pte_t pte)
+>  {
+> -	return !pte_none(pte);
+> +	return !pte_none(pte) && !pte_present(pte);
+>  }
+>  #endif
+>  
