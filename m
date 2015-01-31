@@ -1,35 +1,35 @@
 From: wuyun.wu@huawei.com (Yun Wu (Abel))
-Date: Sat, 31 Jan 2015 09:43:16 +0800
-Subject: [PATCH 5/5] irqchip: gicv3-its: add support for power down
-In-Reply-To: <54CBDA14.3010503@arm.com>
+Date: Sat, 31 Jan 2015 09:57:06 +0800
+Subject: [PATCH 1/5] irqchip: gicv3-its: allocate proper size for DT
+In-Reply-To: <54CBD715.9040000@arm.com>
 References: <1422604009-9248-1-git-send-email-wuyun.wu@huawei.com>
- <1422604009-9248-6-git-send-email-wuyun.wu@huawei.com>
- <54CBDA14.3010503@arm.com>
-Message-ID: <54CC3334.9010705@huawei.com>
+ <1422604009-9248-2-git-send-email-wuyun.wu@huawei.com>
+ <54CBD715.9040000@arm.com>
+Message-ID: <54CC3672.4050406@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/1/31 3:23, Marc Zyngier wrote:
+On 2015/1/31 3:10, Marc Zyngier wrote:
 
 > On 30/01/15 07:46, Yun Wu wrote:
->> Configurations of an ITS cannot be changed if the ITS is in an
->> active status, so it might not be safe to perform a soft reboot
->> with all the active ITSes un-disabled, etc. kexec.
+>> A hardware implementation may be designed to search the device
+>> table (DT) using a direct mapping between device ID and memory
+>> address, and in this scenario a single page, currently allocated
+>> for DT in ITS driver, will be probably not enough.
 >>
->> This patch will make sure all the active ITSes disabled before
->> enabling them again without resetting ITS hardware.
+>> This patch will try best to get this addressed by enlarging DT
+>> size with a limitation of MAX_ORDER pages.
+>>
+>> Signed-off-by: Yun Wu <wuyun.wu@huawei.com>
 > 
-> And what happens if the kernel crashes or gets rebooted from a watchdog?
-> Or if the bootloader messes things up? The ITS is in an unknown state
-> when we start again.
+> A similar patch has been posted already (and is already in my queue):
 > 
-> Wouldn't it be better to address this instead? Enforcing an safe initial
-> state seems a better solution that relying on mechanisms that may not be
-> relevant for all cases.
+> https://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/commit/?h=irq/gic-fixes&id=4be3de2af2a58476f84d678f3e8a3596f23f80d5
 > 
 
-Sure, checking the ITS state before initializing it is really a better
-solution, I will rewrite this patch and test again.
+Oh, now I see it. How about allocating a order of MAX_ORDER pages and
+throwing out a warning if the number of device id bits exceeds maximum
+order kernel supports, instead of letting the ITS fail in probing.
 
 Thanks,
 	Abel
