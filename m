@@ -1,92 +1,24 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Sat, 31 Jan 2015 13:21:43 +0900
-Subject: [PATCH] ARM: shmobile: silk: initial device tree
-In-Reply-To: <1608366.HtA9yBksdO@wasted.cogentembedded.com>
-References: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
- <1608366.HtA9yBksdO@wasted.cogentembedded.com>
-Message-ID: <20150131042143.GB7605@verge.net.au>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 30 Jan 2015 21:31:05 -0800
+Subject: Clock Regression in next-20150130 caused by cb75a8fcd14e
+In-Reply-To: <20150131010443.GE16250@atomide.com>
+References: <20150131010443.GE16250@atomide.com>
+Message-ID: <20150131053105.GA20944@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 31, 2015 at 01:52:16AM +0300, Sergei Shtylyov wrote:
-> Add the initial device tree for the R8A7794 SoC based SILK low cost board.
-> SCIF2 serial port support is included, so that the serial console can work.
+On Fri, Jan 30, 2015 at 05:04:44PM -0800, Tony Lindgren wrote:
+> Hi all,
 > 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Looks like commit cb75a8fcd14e ("clk: Add rate constraints to clocks")
+> causes a regression on at least omaps where the serial console either
+> does not show anything, or just prints garbage.
 > 
-> ---
-> This patch is against the 'renesas-devel-20150129-v3.19-rc6' tag of Simon
-> Horman's 'renesas.git' repo.
+> Reverting cb75a8fcd14e makes things work again on next-20150130.
 > 
->  arch/arm/boot/dts/Makefile         |    1 
->  arch/arm/boot/dts/r8a7794-silk.dts |   41 +++++++++++++++++++++++++++++++++++++
->  2 files changed, 42 insertions(+)
+> Any ideas?
 > 
-> Index: renesas/arch/arm/boot/dts/Makefile
-> ===================================================================
-> --- renesas.orig/arch/arm/boot/dts/Makefile
-> +++ renesas/arch/arm/boot/dts/Makefile
-> @@ -421,6 +421,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += eme
->  	r8a7791-koelsch.dtb \
->  	r8a7791-porter.dtb \
->  	r8a7794-alt.dtb \
-> +	r8a7794-silk.dtb \
->  	sh73a0-kzm9g.dtb
->  dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_arria5_socdk.dtb \
->  	socfpga_arria10_socdk.dtb \
-> Index: renesas/arch/arm/boot/dts/r8a7794-silk.dts
-> ===================================================================
-> --- /dev/null
-> +++ renesas/arch/arm/boot/dts/r8a7794-silk.dts
-> @@ -0,0 +1,41 @@
-> +/*
-> + * Device Tree Source for the SILK board
-> + *
-> + * Copyright (C) 2014 Renesas Electronics Corporation
-> + * Copyright (C) 2014-2015 Renesas Solutions Corp.
-> + * Copyright (C) 2014-2015 Cogent Embedded, Inc.
-> + *
-> + * This file is licensed under the terms of the GNU General Public License
-> + * version 2.  This program is licensed "as is" without any warranty of any
-> + * kind, whether express or implied.
-> + */
-> +
-> +/dts-v1/;
-> +#include "r8a7794.dtsi"
-> +
-> +/ {
-> +	model = "SILK";
-> +	compatible = "renesas,silk", "renesas,r8a7794";
-> +
-> +	aliases {
-> +		serial0 = &scif2;
-> +	};
-> +
-> +	chosen {
-> +		bootargs = "console=ttySC0,38400 ignore_loglevel";
+The patch seems to have some problems.
+Also see http://www.spinics.net/lists/kernel/msg1916843.html.
 
-Please remove console= for consistency with other boards
-based on Renesas SoCs.
-
-> +		stdout-path = &scif2;
-> +	};
-> +
-> +	memory at 40000000 {
-> +		device_type = "memory";
-> +		reg = <0 0x40000000 0 0x40000000>;
-> +	};
-> +};
-> +
-> +&extal_clk {
-> +	clock-frequency = <20000000>;
-> +};
-> +
-> +&scif2 {
-> +	status = "okay";
-> +};
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Guenter
