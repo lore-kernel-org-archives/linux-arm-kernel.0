@@ -1,9 +1,9 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun,  1 Feb 2015 14:50:13 +0100
-Subject: [PATCH 29/30] ARM: sun7i: pcduino3: Convert to DT label based syntax
+Date: Sun,  1 Feb 2015 14:50:08 +0100
+Subject: [PATCH 24/30] ARM: sun7i: i12 tvbox: Convert to DT label based syntax
 In-Reply-To: <1422798614-3581-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1422798614-3581-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1422798614-3581-30-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1422798614-3581-25-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,16 +13,16 @@ when overriding DTSI nodes, convert the board to this syntax
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun7i-a20-pcduino3.dts | 210 +++++++++++++++----------------
- 1 file changed, 104 insertions(+), 106 deletions(-)
+ arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts | 252 +++++++++++++++---------------
+ 1 file changed, 125 insertions(+), 127 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-pcduino3.dts b/arch/arm/boot/dts/sun7i-a20-pcduino3.dts
-index 0a2c2aeb4687..09ec96b2b7d7 100644
---- a/arch/arm/boot/dts/sun7i-a20-pcduino3.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-pcduino3.dts
-@@ -59,105 +59,6 @@
- 	model = "LinkSprite pcDuino3";
- 	compatible = "linksprite,pcduino3", "allwinner,sun7i-a20";
+diff --git a/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts b/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts
+index 06148b4d000f..baee563a0051 100644
+--- a/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts
++++ b/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts
+@@ -57,125 +57,6 @@
+ 	model = "I12 / Q5 / QT840A A20 tvbox";
+ 	compatible = "allwinner,i12-tvbox", "allwinner,sun7i-a20";
  
 -	soc at 01c00000 {
 -		mmc0: mmc at 01c0f000 {
@@ -32,6 +32,15 @@ index 0a2c2aeb4687..09ec96b2b7d7 100644
 -			bus-width = <4>;
 -			cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
 -			cd-inverted;
+-			status = "okay";
+-		};
+-
+-		mmc3: mmc at 01c12000 {
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&mmc3_pins_a>;
+-			vmmc-supply = <&reg_vmmc3>;
+-			bus-width = <4>;
+-			non-removable;
 -			status = "okay";
 -		};
 -
@@ -49,11 +58,6 @@ index 0a2c2aeb4687..09ec96b2b7d7 100644
 -			status = "okay";
 -		};
 -
--		ahci: sata at 01c18000 {
--			target-supply = <&reg_ahci_5v>;
--			status = "okay";
--		};
--
 -		ehci1: usb at 01c1c000 {
 -			status = "okay";
 -		};
@@ -63,20 +67,35 @@ index 0a2c2aeb4687..09ec96b2b7d7 100644
 -		};
 -
 -		pinctrl at 01c20800 {
--			ahci_pwr_pin_a: ahci_pwr_pin at 0 {
--				allwinner,pins = "PH2";
+-			mmc3_pins_a: mmc3 at 0 {
+-				/* AP6210 / AP6330 requires pull-up */
+-				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
 -			};
 -
--			led_pins_pcduino3: led_pins at 0 {
--				allwinner,pins = "PH15", "PH16";
+-			vmmc3_pin_i12_tvbox: vmmc3_pin at 0 {
+-				allwinner,pins = "PH2";
 -				allwinner,function = "gpio_out";
 -				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
 -				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
 -			};
 -
--			key_pins_pcduino3: key_pins at 0 {
--				allwinner,pins = "PH17", "PH18", "PH19";
--				allwinner,function = "gpio_in";
+-			vmmc3_io_pin_i12_tvbox: vmmc3_io_pin at 0 {
+-				allwinner,pins = "PH12";
+-				allwinner,function = "gpio_out";
+-				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+-				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+-			};
+-
+-			gmac_power_pin_i12_tvbox: gmac_power_pin at 0 {
+-				allwinner,pins = "PH21";
+-				allwinner,function = "gpio_out";
+-				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+-				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+-			};
+-
+-			led_pins_i12_tvbox: led_pins at 0 {
+-				allwinner,pins = "PH9", "PH20";
+-				allwinner,function = "gpio_out";
 -				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
 -				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
 -			};
@@ -115,6 +134,7 @@ index 0a2c2aeb4687..09ec96b2b7d7 100644
 -			pinctrl-0 = <&gmac_pins_mii_a>;
 -			phy = <&phy1>;
 -			phy-mode = "mii";
+-			phy-supply = <&reg_gmac_3v3>;
 -			status = "okay";
 -
 -			phy1: ethernet-phy at 1 {
@@ -126,20 +146,25 @@ index 0a2c2aeb4687..09ec96b2b7d7 100644
  	leds {
  		compatible = "gpio-leds";
  		pinctrl-names = "default";
-@@ -196,17 +97,114 @@
- 			gpios = <&pio 7 19 GPIO_ACTIVE_LOW>;
+@@ -192,14 +73,6 @@
  		};
  	};
-+};
-+
-+&ahci {
-+	target-supply = <&reg_ahci_5v>;
-+	status = "okay";
-+};
-+
-+&ahci_pwr_pin_a {
-+	allwinner,pins = "PH2";
-+};
+ 
+-	reg_usb1_vbus: usb1-vbus {
+-		status = "okay";
+-	};
+-
+-	reg_usb2_vbus: usb2-vbus {
+-		status = "okay";
+-	};
+-
+ 	reg_vmmc3: vmmc3 {
+ 		compatible = "regulator-fixed";
+ 		pinctrl-names = "default";
+@@ -236,3 +109,128 @@
+ 		gpio = <&pio 7 21 GPIO_ACTIVE_HIGH>;
+ 	};
+ };
 +
 +&ehci0 {
 +	status = "okay";
@@ -154,6 +179,7 @@ index 0a2c2aeb4687..09ec96b2b7d7 100644
 +	pinctrl-0 = <&gmac_pins_mii_a>;
 +	phy = <&phy1>;
 +	phy-mode = "mii";
++	phy-supply = <&reg_gmac_3v3>;
 +	status = "okay";
 +
 +	phy1: ethernet-phy at 1 {
@@ -171,12 +197,10 @@ index 0a2c2aeb4687..09ec96b2b7d7 100644
 +		reg = <0x34>;
 +		interrupt-parent = <&nmi_intc>;
 +		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
- 
--	reg_usb1_vbus: usb1-vbus {
--		status = "okay";
++
 +		interrupt-controller;
 +		#interrupt-cells = <1>;
- 	};
++	};
 +};
 +
 +&ir0 {
@@ -184,9 +208,7 @@ index 0a2c2aeb4687..09ec96b2b7d7 100644
 +	pinctrl-0 = <&ir0_pins_a>;
 +	status = "okay";
 +};
- 
--	reg_usb2_vbus: usb2-vbus {
--		status = "okay";
++
 +&mmc0 {
 +	pinctrl-names = "default";
 +	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
@@ -195,6 +217,20 @@ index 0a2c2aeb4687..09ec96b2b7d7 100644
 +	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
 +	cd-inverted;
 +	status = "okay";
++};
++
++&mmc3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc3_pins_a>;
++	vmmc-supply = <&reg_vmmc3>;
++	bus-width = <4>;
++	non-removable;
++	status = "okay";
++};
++
++&mmc3_pins_a {
++	/* AP6210 / AP6330 requires pull-up */
++	allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
 +};
 +
 +&ohci0 {
@@ -206,27 +242,33 @@ index 0a2c2aeb4687..09ec96b2b7d7 100644
 +};
 +
 +&pio {
-+	led_pins_pcduino3: led_pins at 0 {
-+		allwinner,pins = "PH15", "PH16";
++	vmmc3_pin_i12_tvbox: vmmc3_pin at 0 {
++		allwinner,pins = "PH2";
 +		allwinner,function = "gpio_out";
 +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
 +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 	};
- 
--	reg_ahci_5v: ahci-5v {
--		gpio = <&pio 7 2 GPIO_ACTIVE_HIGH>;
--		status = "okay";
-+	key_pins_pcduino3: key_pins at 0 {
-+		allwinner,pins = "PH17", "PH18", "PH19";
-+		allwinner,function = "gpio_in";
++	};
++
++	vmmc3_io_pin_i12_tvbox: vmmc3_io_pin at 0 {
++		allwinner,pins = "PH12";
++		allwinner,function = "gpio_out";
 +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
 +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 	};
- };
++	};
 +
-+&reg_ahci_5v {
-+	gpio = <&pio 7 2 GPIO_ACTIVE_HIGH>;
-+	status = "okay";
++	gmac_power_pin_i12_tvbox: gmac_power_pin at 0 {
++		allwinner,pins = "PH21";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
++	led_pins_i12_tvbox: led_pins at 0 {
++		allwinner,pins = "PH9", "PH20";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
 +};
 +
 +&reg_usb1_vbus {
