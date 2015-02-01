@@ -1,9 +1,9 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun,  1 Feb 2015 14:49:48 +0100
-Subject: [PATCH 04/30] ARM: sun4i: a1000: Convert to DT label based syntax
+Date: Sun,  1 Feb 2015 14:49:50 +0100
+Subject: [PATCH 06/30] ARM: sun4i: cubieboard: Convert to DT label based syntax
 In-Reply-To: <1422798614-3581-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1422798614-3581-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1422798614-3581-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1422798614-3581-7-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,16 +13,16 @@ when overriding DTSI nodes, convert the board to this syntax
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun4i-a10-a1000.dts | 200 +++++++++++++++++-----------------
- 1 file changed, 99 insertions(+), 101 deletions(-)
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts | 214 ++++++++++++++---------------
+ 1 file changed, 106 insertions(+), 108 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-a1000.dts b/arch/arm/boot/dts/sun4i-a10-a1000.dts
-index b67e5be618cf..648626bc58a1 100644
---- a/arch/arm/boot/dts/sun4i-a10-a1000.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-a1000.dts
-@@ -58,103 +58,6 @@
- 	model = "Mele A1000";
- 	compatible = "mele,a1000", "allwinner,sun4i-a10";
+diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+index 4260c2b47607..07c2f64b14ee 100644
+--- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
++++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+@@ -57,104 +57,6 @@
+ 	model = "Cubietech Cubieboard";
+ 	compatible = "cubietech,a10-cubieboard", "allwinner,sun4i-a10";
  
 -	soc at 01c00000 {
 -		emac: ethernet at 01c0b000 {
@@ -33,7 +33,6 @@ index b67e5be618cf..648626bc58a1 100644
 -		};
 -
 -		mdio at 01c0b080 {
--			phy-supply = <&reg_emac_3v3>;
 -			status = "okay";
 -
 -			phy1: ethernet-phy at 1 {
@@ -66,6 +65,7 @@ index b67e5be618cf..648626bc58a1 100644
 -		};
 -
 -		ahci: sata at 01c18000 {
+-			target-supply = <&reg_ahci_5v>;
 -			status = "okay";
 -		};
 -
@@ -78,17 +78,10 @@ index b67e5be618cf..648626bc58a1 100644
 -		};
 -
 -		pinctrl at 01c20800 {
--			emac_power_pin_a1000: emac_power_pin at 0 {
--				allwinner,pins = "PH15";
+-			led_pins_cubieboard: led_pins at 0 {
+-				allwinner,pins = "PH20", "PH21";
 -				allwinner,function = "gpio_out";
--				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
--				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
--			};
--
--			led_pins_a1000: led_pins at 0 {
--				allwinner,pins = "PH10", "PH20";
--				allwinner,function = "gpio_out";
--				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+-				allwinner,drive = <SUN4I_PINCTRL_20_MA>;
 -				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
 -			};
 -		};
@@ -111,27 +104,43 @@ index b67e5be618cf..648626bc58a1 100644
 -			status = "okay";
 -
 -			axp209: pmic at 34 {
--				compatible = "x-powers,axp209";
 -				reg = <0x34>;
 -				interrupts = <0>;
--
--				interrupt-controller;
--				#interrupt-cells = <1>;
 -			};
+-		};
+-
+-		i2c1: i2c at 01c2b000 {
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&i2c1_pins_a>;
+-			status = "okay";
+-		};
+-
+-		spi0: spi at 01c05000 {
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&spi0_pins_a>;
+-			status = "okay";
 -		};
 -	};
 -
  	leds {
  		compatible = "gpio-leds";
  		pinctrl-names = "default";
-@@ -181,12 +84,107 @@
- 		enable-active-high;
- 		gpio = <&pio 7 15 GPIO_ACTIVE_HIGH>;
+@@ -171,26 +73,96 @@
+ 			linux,default-trigger = "heartbeat";
+ 		};
  	};
 +};
-+
+ 
+-	reg_ahci_5v: ahci-5v {
+-		status = "okay";
+-	};
 +&ahci {
++	target-supply = <&reg_ahci_5v>;
 +	status = "okay";
++};
++
++&cpu0 {
++	cpu-supply = <&reg_dcdc2>;
 +};
 +
 +&ehci0 {
@@ -148,20 +157,26 @@ index b67e5be618cf..648626bc58a1 100644
 +	phy = <&phy1>;
 +	status = "okay";
 +};
-+
+ 
+-	reg_usb1_vbus: usb1-vbus {
+-		status = "okay";
 +&i2c0 {
 +	pinctrl-names = "default";
 +	pinctrl-0 = <&i2c0_pins_a>;
 +	status = "okay";
 +
 +	axp209: pmic at 34 {
-+		compatible = "x-powers,axp209";
 +		reg = <0x34>;
 +		interrupts = <0>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
-+	};
+ 	};
++};
+ 
+-	reg_usb2_vbus: usb2-vbus {
+-		status = "okay";
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins_a>;
++	status = "okay";
 +};
 +
 +&ir0 {
@@ -171,14 +186,14 @@ index b67e5be618cf..648626bc58a1 100644
 +};
 +
 +&mdio {
-+	phy-supply = <&reg_emac_3v3>;
 +	status = "okay";
 +
 +	phy1: ethernet-phy at 1 {
 +		reg = <1>;
-+	};
-+};
-+
+ 	};
+ };
+ 
+-#include "axp209.dtsi"
 +&mmc0 {
 +	pinctrl-names = "default";
 +	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
@@ -188,33 +203,38 @@ index b67e5be618cf..648626bc58a1 100644
 +	cd-inverted;
 +	status = "okay";
 +};
-+
+ 
+-&cpu0 {
+-	cpu-supply = <&reg_dcdc2>;
 +&ohci0 {
 +	status = "okay";
-+};
-+
+ };
+ 
 +&ohci1 {
 +	status = "okay";
 +};
- 
--	reg_usb1_vbus: usb1-vbus {
--		status = "okay";
++
 +&pio {
-+	emac_power_pin_a1000: emac_power_pin at 0 {
-+		allwinner,pins = "PH15";
++	led_pins_cubieboard: led_pins at 0 {
++		allwinner,pins = "PH20", "PH21";
 +		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,drive = <SUN4I_PINCTRL_20_MA>;
 +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 	};
- 
--	reg_usb2_vbus: usb2-vbus {
--		status = "okay";
-+	led_pins_a1000: led_pins at 0 {
-+		allwinner,pins = "PH10", "PH20";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 	};
++	};
++};
++
++&reg_ahci_5v {
++	status = "okay";
++};
++
++#include "axp209.dtsi"
++
+ &reg_dcdc2 {
+ 	regulator-always-on;
+ 	regulator-min-microvolt = <1000000>;
+@@ -215,3 +187,29 @@
+ 	regulator-max-microvolt = <3000000>;
+ 	regulator-name = "avcc";
  };
 +
 +&reg_usb1_vbus {
@@ -222,6 +242,12 @@ index b67e5be618cf..648626bc58a1 100644
 +};
 +
 +&reg_usb2_vbus {
++	status = "okay";
++};
++
++&spi0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&spi0_pins_a>;
 +	status = "okay";
 +};
 +
