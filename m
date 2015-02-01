@@ -1,5 +1,5 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 1 Feb 2015 08:42:45 +0000
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Sun, 1 Feb 2015 10:11:59 +0100
 Subject: nvram and generic_nvram modules are problematic, was Re: [PATCH]
  arch: m68k: mac: misc.c: Remove some unused functions
 In-Reply-To: <alpine.LNX.2.00.1502011230150.32582@nippy.intranet>
@@ -7,27 +7,42 @@ References: <1420131732-31039-1-git-send-email-rickard_strandqvist@spectrumdigit
  <alpine.LNX.2.00.1501041045020.15927@nippy.intranet>
  <CAMuHMdXFu3n4d0dMZop186UF+QG=MtLHV=oQr+VszftpEA1kFQ@mail.gmail.com>
  <alpine.LNX.2.00.1502011230150.32582@nippy.intranet>
-Message-ID: <20150201084245.GF26493@n2100.arm.linux.org.uk>
+Message-ID: <CAMuHMdXcV8nxCvhMDZ3WRrWKXxxjR6d8Uf8gp5w9NUTkyTNTjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 01, 2015 at 02:39:42PM +1100, Finn Thain wrote:
-> I find the ARM support in drivers/char/nvram to be surprising, not to say 
-> questionable. The /proc/driver/nvram implementation, given 
-> defined(__arm__), decodes the NVRAM contents in exactly the same format as 
-> when defined(__i386__) || defined(__x86_64__).
+On Sun, Feb 1, 2015 at 4:39 AM, Finn Thain <fthain@telegraphics.com.au> wrote:
+> On Sun, 4 Jan 2015, Geert Uytterhoeven wrote:
+>
+>> On Sun, Jan 4, 2015 at 8:21 AM, Finn Thain <fthain@telegraphics.com.au> wrote:
+>> > On Thu, 1 Jan 2015, Rickard Strandqvist wrote:
+>> > > Removes some functions that are not used anywhere:
+>> > > mac_pram_write() mac_pram_read()
+>> >
+>> > ... I'd rather not remove all of this code. Better to finish the
+>> > implementation.
+>>
+>> Indeed.
+>>
+>> > Would it be acceptable to utilize drivers/char/generic_nvram.c and
+>> > CONFIG_GENERIC_NVRAM? This is the PowerMac PRAM driver but looks
+>> > generic enough that it may not need any modification for 68k Macs.
+>>
+>> Yes, that would be great.
+>>
+>
+> Unfortunately, it seems to be unworkable.
 
-That's because it's used on the Netwinder and EBSA285 platforms, which
-are PCI-like, complete with a southbridge which makes them look like a
-PC.
+An alternative could be to just provide an nvram attribute file in sysfs,
+like many RTC drivers do.
 
-> Whereas, only MIPS and 
-> PowerPC defconfigs set CONFIG_RTC_DRV_CMOS at all, and without that symbol 
-> the driver will never be built for ARM. This raises the question, does 
-> /proc/driver/nvram do anything useful on any ARM platforms?
+Gr{oetje,eeting}s,
 
-Yes.
+                        Geert
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
