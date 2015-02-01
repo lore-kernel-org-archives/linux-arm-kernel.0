@@ -1,42 +1,39 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Sun, 1 Feb 2015 13:00:13 +0200
-Subject: [PATCH v7 1/4] Documentation: dt: add common bindings for
- hwspinlock
-In-Reply-To: <CAK=WgbZ2986xxuAFvMSoyQLaPAxdUpZ8e5g-mSjyETfvd4KKHw@mail.gmail.com>
-References: <1421269101-51105-1-git-send-email-s-anna@ti.com>
- <1421269101-51105-2-git-send-email-s-anna@ti.com>
- <20150115135201.GG16217@leverpostej>
- <20150115135556.GH16217@leverpostej>
- <CAL_JsqL2LZAooMk-V8+xeF2g6acZE21M+-OBRw8aEVa-5wVHuQ@mail.gmail.com>
- <CAK=WgbYQ=BbinqJ5fsw2Y+FKdy=nasLsw9mX8pw6S_o3owy9-g@mail.gmail.com>
- <20150116101746.GA21809@leverpostej>
- <CAK=WgbYBqPoUm9byx0du_g5ZmHdYaUVLpSPZYHoCVzNoatNKpw@mail.gmail.com>
- <CAJAp7Og+-KQd7bygWQjTS72Kye3fkp3s3ry+2bw7Gcv7aPF5AQ@mail.gmail.com>
- <CAK=WgbZ2986xxuAFvMSoyQLaPAxdUpZ8e5g-mSjyETfvd4KKHw@mail.gmail.com>
-Message-ID: <CAK=WgbZFZXcHuZUFVg4aAwjqzTQQxpV+Hp-DUYPKg5D8AsQ4Pg@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sun, 01 Feb 2015 12:01:12 +0100
+Subject: [PATCH] ARM: pxa: fix pxa interrupts handling in DT
+In-Reply-To: <1422743581-31548-1-git-send-email-robert.jarzmik@free.fr>
+ (Robert Jarzmik's message of "Sat, 31 Jan 2015 23:33:01 +0100")
+References: <1422743581-31548-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <878ughuc93.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 31, 2015 at 7:41 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> On Sat, Jan 31, 2015 at 1:29 AM, Bjorn Andersson <bjorn@kryo.se> wrote:
-> > In a system where you have two hwlock blocks lckA and lckB, each
-> > consisting of 8 locks and you have dspB that can only access lckB
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
+
+> The commit "ARM: pxa: arbitrarily set first interrupt number" changed
+> the first pxa interrupt to 16.
 >
-> This is a good example - thanks. To be able to cope with such cases we
-> will have to pass a hwlock block reference and its relative lock id.
+> As a consequence, device-tree builds got broken, because :
+>  - pxa_mask_irq() and pxa_unmask_irq() are using IRQ_BIT()
+>  - IRQ_BIT(x) calculates the interrupts as : x - PXA_IRQ(0)
+>
+> Before the commit, the first interrupt shift, PXA_IRQ(0) was 0,
+> therefore IRQ_BIT(x) was x. After the change, it is necessary that the
+> same shift of 16 is applied between the virtual interrupt number and the
+> hardware irq number.
+>
+> This situation comes from the common irq_chip shared between legacy
+> platform builds and device-tree builds.
+>
+> Fix the broken interrupts in DT case by adding this shift in the DT case
+> too.
 
-Additionally, to support such a scenario, we can no longer retain the
-simple dynamic allocation API we have today, because it might end up
-allocating dspB an hwlock from IckA.
+Actually, this work should be pushed a bit more for the irq_chip functions, so
+that they're freed from the IRQ_BIT(x) macro. A more complete work would be to
+use BIT(irqd_to_hwirq(d)) instead of IRQ_BIT(d->irq) in :
+ - pxa_mask_irq()
+ - pxa_unmask_irq()
+And add the legacy irq_domain in pxa_init_irq().
 
-We will have to make sure hwlocks are allocated only from pools
-visible to the user, something that will change not only the
-hwspinlock API but also the way it maintains the hwlocks.
-
-I suspect we want to wait for such hardware to show up first, and only
-then add framework support for it. Regardless, we obviously do want to
-make sure our DT binding is prepared for the worse, so we'll drop the
-"base-id" field.
-
-Thanks,
-Ohad.
+--
+Robert
