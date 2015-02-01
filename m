@@ -1,64 +1,33 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Thu, 01 Jan 2015 07:29:17 +0530
-Subject: [RFC 0/8] ARM64: Uprobe support added
-In-Reply-To: <cover.1420038188.git.panand@redhat.com>
-References: <cover.1420038188.git.panand@redhat.com>
-Message-ID: <54A4A9F5.6070800@redhat.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 1 Feb 2015 08:42:45 +0000
+Subject: nvram and generic_nvram modules are problematic, was Re: [PATCH]
+ arch: m68k: mac: misc.c: Remove some unused functions
+In-Reply-To: <alpine.LNX.2.00.1502011230150.32582@nippy.intranet>
+References: <1420131732-31039-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+ <alpine.LNX.2.00.1501041045020.15927@nippy.intranet>
+ <CAMuHMdXFu3n4d0dMZop186UF+QG=MtLHV=oQr+VszftpEA1kFQ@mail.gmail.com>
+ <alpine.LNX.2.00.1502011230150.32582@nippy.intranet>
+Message-ID: <20150201084245.GF26493@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Dave
+On Sun, Feb 01, 2015 at 02:39:42PM +1100, Finn Thain wrote:
+> I find the ARM support in drivers/char/nvram to be surprising, not to say 
+> questionable. The /proc/driver/nvram implementation, given 
+> defined(__arm__), decodes the NVRAM contents in exactly the same format as 
+> when defined(__i386__) || defined(__x86_64__).
 
-Sorry, I took all cc list from your kprobe patches and forgot to add you. :(
+That's because it's used on the Netwinder and EBSA285 platforms, which
+are PCI-like, complete with a southbridge which makes them look like a
+PC.
 
-Please review.
+> Whereas, only MIPS and 
+> PowerPC defconfigs set CONFIG_RTC_DRV_CMOS at all, and without that symbol 
+> the driver will never be built for ARM. This raises the question, does 
+> /proc/driver/nvram do anything useful on any ARM platforms?
 
-On Wednesday 31 December 2014 08:51 PM, Pratyush Anand wrote:
-> These patches have been prepared on top of ARM64 kprobe v3 patches [1]
-> under review.
->
-> Unit test for following has been done so far and they have been found
-> working
->      1. Normal instruction, which can be probed like sub, ldr, add etc.
->      2. Instructions which can be simulated like ret.
->      3. uretprobe
->
->
->
-> [1]https://lkml.org/lkml/2014/11/18/33
->
-> Pratyush Anand (8):
->    ARM64: Move BRK opcodes defines from kprobes.h to insn.h
->    ARM64: Refactor kprobes-arm64
->    Kernel/uprobe: Define arch_uprobe_exception_notify as __weak
->    ARM64: Add instruction_pointer_set function
->    ARM64: Re-factor flush_ptrace_access
->    ARM64: Handle TRAP_HWBRKPT for user mode as well
->    ARM64: Handle TRAP_BRKPT for user mode as well
->    ARM64: Add uprobe support
->
->   arch/arm/kernel/uprobes.c                          |   6 -
->   arch/arm64/Kconfig                                 |   3 +
->   arch/arm64/include/asm/insn.h                      |   8 +
->   arch/arm64/include/asm/probes.h                    |  26 ++-
->   arch/arm64/include/asm/ptrace.h                    |   7 +
->   arch/arm64/include/asm/thread_info.h               |   5 +-
->   arch/arm64/include/asm/uprobes.h                   |  43 ++++
->   arch/arm64/kernel/Makefile                         |   5 +-
->   arch/arm64/kernel/debug-monitors.c                 |  14 +-
->   arch/arm64/kernel/kprobes.c                        |  11 +-
->   arch/arm64/kernel/kprobes.h                        |   7 +-
->   .../kernel/{kprobes-arm64.c => probes-arm64.c}     |  84 +++----
->   .../kernel/{kprobes-arm64.h => probes-arm64.h}     |  17 +-
->   arch/arm64/kernel/probes-condn-check.c             |   2 +-
->   arch/arm64/kernel/probes-decode.h                  |   4 +-
->   arch/arm64/kernel/signal.c                         |   4 +-
->   arch/arm64/kernel/uprobes.c                        | 255 +++++++++++++++++++++
->   arch/arm64/mm/flush.c                              |  30 ++-
->   kernel/events/uprobes.c                            |  18 ++
->   19 files changed, 445 insertions(+), 104 deletions(-)
->   create mode 100644 arch/arm64/include/asm/uprobes.h
->   rename arch/arm64/kernel/{kprobes-arm64.c => probes-arm64.c} (79%)
->   rename arch/arm64/kernel/{kprobes-arm64.h => probes-arm64.h} (60%)
->   create mode 100644 arch/arm64/kernel/uprobes.c
->
+Yes.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
