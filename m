@@ -1,85 +1,73 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 1 Feb 2015 21:56:03 +0100
-Subject: bq2415x_charger.c: battery is discharged (fast, 224mA) when it
- should be charged
-In-Reply-To: <20150201094702.GA21628@amd>
-References: <20150201094702.GA21628@amd>
-Message-ID: <20150201205603.GA23044@amd>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Sun, 01 Feb 2015 13:24:32 -0800
+Subject: [PATCH v13 3/6] clk: Make clk API return per-user struct clk
+ instances
+In-Reply-To: <1422011024-32283-4-git-send-email-tomeu.vizoso@collabora.com>
+References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1422011024-32283-4-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <20150201212432.22722.70917@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun 2015-02-01 10:47:02, Pavel Machek wrote:
-> Hi!
+Quoting Tomeu Vizoso (2015-01-23 03:03:30)
+> Moves clock state to struct clk_core, but takes care to change as little API as
+> possible.
 > 
-> I connected N900 with full battery using USB. For some reason, charge
-> limit was set to 100mA, battery was "full" and was discharging:
+> struct clk_hw still has a pointer to a struct clk, which is the
+> implementation's per-user clk instance, for backwards compatibility.
 > 
-> root at n900:/my/tui/ofone# ./tefone
-> Ready.
-> Battery  4.017 V  4.039 V  81 %  0 %  0 / 0 / 2056 mAh  Full -242.224 / 550 / 100  mA
+> The struct clk that clk_get_parent() returns isn't owned by the caller, but by
+> the clock implementation, so the former shouldn't call clk_put() on it.
 > 
-> I adjusted the current limit, but got no change, battery is still
-> discharging, fast:
-> 
-> root at n900:/my/tui/ofone# echo 500 > /sys/class/power_supply/bq24150a-0/current_limit
-> root at n900:/my/tui/ofone# ./tefone
-> Ready.
-> Battery  3.994 V  4.034 V  78 %  0 %  0 / 0 / 2056 mAh  Full   -251.506 / 550 / 500  mA
-> Battery  4.0 V  4.037 V  79 %  0 %  0 / 0 / 2056 mAh  Full   -223.125 / 550 / 500  mA
-> Battery  4.005 V  4.037 V  79 %  0 %  0 / 0 / 2056 mAh  Full   -224.91 / 550 / 500  mA
-> Battery  3.994 V  4.037 V  78 %  0 %  0 / 0 / 2056 mAh  Full   -224.91 / 550 / 500  mA
-> Battery  4.023 V  4.037 V  81 %  0 %  0 / 0 / 2056 mAh  Full   -224.91 / 550 / 500  mA
-> Battery  4.011 V  4.037 V  80 %  0 %  0 / 0 / 2056 mAh  Full   -224.91 / 550 / 500  mA
-> Battery  3.994 V  4.031 V  78 %  0 %  0 / 0 / 2056 mAh  Full   -256.504 / 550 / 500  mA
-> Battery  3.994 V  4.029 V  78 %  0 %  0 / 0 / 2056 mAh  Full   -224.017 / 550 / 500  mA
-> Battery  3.988 V  4.029 V  77 %  0 %  0 / 0 / 2056 mAh  Full   -224.731 / 550 / 500  mA
-> Battery  4.005 V  4.023 V  79 %  0 %  0 / 0 / 2056 mAh  Full   -223.66 / 550 / 500  mA
-> 
-> I'm getting a lot of
-> 
-> [  208.037719] bq27x00-battery 2-0055: battery is not calibrated! ignoring capacity values
-> [  238.038024] bq27x00-battery 2-0055: battery is not calibrated! ignoring capacity values
-> 
-> messages, that's why all the 0s in battery information dump.
-> 
-> Any ideas?
+> Because some boards in mach-omap2 still register clocks statically, their clock
+> registration had to be updated to take into account that the clock information
+> is stored in struct clk_core now.
 
-Reset kicked the charger back into the charging mode:
+Tero, Paul & Tony,
 
-root at n900:/sys/class/power_supply/bq24150a-0# echo reset > mode
-root at n900:/sys/class/power_supply/bq24150a-0# cat mode
-auto (host)
-root at n900:/sys/class/power_supply/bq24150a-0#
+Tomeu's patch unveils a problem with omap3_noncore_dpll_enable and
+struct dpll_data, namely this snippet from
+arch/arm/mach-omap2/dpll3xxx.c:
 
-Battery  4.017 V  4.037 V  81 %  0 %  0 / 0 / 2056 mAh  Charging -109.42 / 650 / 500  mA
-Battery  4.017 V  4.039 V  81 %  0 %  0 / 0 / 2056 mAh  Charging -103.173 / 650 / 500  mA
+        parent = __clk_get_parent(hw->clk);
 
-...and discharge current reduced. I tried adjusting current limit, but
-it still discharges at 100mA (with screen on).
+        if (__clk_get_rate(hw->clk) == __clk_get_rate(dd->clk_bypass)) {
+                WARN(parent != dd->clk_bypass,
+                                "here0, parent name is %s, bypass name is %s\n",
+                                __clk_get_name(parent), __clk_get_name(dd->clk_bypass));
+                r = _omap3_noncore_dpll_bypass(clk);
+        } else {
+                WARN(parent != dd->clk_ref,
+                                "here1, parent name is %s, ref name is %s\n",
+                                __clk_get_name(parent), __clk_get_name(dd->clk_ref));
+                r = _omap3_noncore_dpll_lock(clk);
+        }
 
-USB extension cable was probably part of a problem. It works better
-with n900 plugged in directly into the PC.
+struct dpll_data has members clk_ref and clk_bypass which are struct clk
+pointers. This was always a bit of a violation of the clk.h contract
+since drivers are not supposed to deref struct clk pointers. Now that we
+generate unique pointers for each call to clk_get (clk_ref & clk_bypass
+are populated by of_clk_get in ti_clk_register_dpll) then the pointer
+comparisons above will never be equal (even if they resolve down to the
+same struct clk_core). I added the verbose traces to the WARNs above to
+illustrate the point: the names are always the same but the pointers
+differ.
 
-(But it still will not terminate the charge:
+AFAICT this doesn't break anything, but booting on OMAP3+ results in
+noisy WARNs.
 
-Battery  4.158 V  4.177 V  95 %  0 %  0 / 0 / 2056 mAh  Charging   13.03 / 650 / 500  mA
-Battery  4.164 V  4.177 V  96 %  0 %  0 / 0 / 2056 mAh  Charging   13.03 / 650 / 500  mA
-Battery  4.164 V  4.177 V  96 %  0 %  0 / 0 / 2056 mAh  Charging   10.888 / 650 / 500  mA
-Battery  4.164 V  4.177 V  96 %  0 %  0 / 0 / 2056 mAh  Charging   1.249 / 650 / 500  mA
-Battery  4.164 V  4.177 V  96 %  0 %  0 / 0 / 2056 mAh  Charging   10.353 / 650 / 500  mA
-Battery  4.158 V  4.177 V  95 %  0 %  0 / 0 / 2056 mAh  Charging   9.639 / 650 / 500  mA
-Battery  4.164 V  4.177 V  96 %  0 %  0 / 0 / 2056 mAh  Charging   10.71 / 650 / 500  mA
-Battery  4.164 V  4.177 V  96 %  0 %  0 / 0 / 2056 mAh  Charging   7.497 / 650 / 500  mA
-Battery  4.158 V  4.177 V  95 %  0 %  0 / 0 / 2056 mAh  Charging   9.639 / 650 / 500  mA
-Battery  4.164 V  4.177 V  96 %  0 %  0 / 0 / 2056 mAh  Charging   6.247 / 650 / 500  mA
-Battery  4.164 V  4.177 V  96 %  0 %  0 / 0 / 2056 mAh  Charging   5.533 / 650 / 500  mA
-Battery  4.164 V  4.177 V  96 %  0 %  0 / 0 / 2056 mAh  Charging   4.284 / 650 / 500  mA
-Battery  4.164 V  4.177 V  96 %  0 %  0 / 0 / 2056 mAh  Charging   4.284 / 650 / 500  mA
-Battery  4.164 V  4.177 V  96 %  0 %  0 / 0 / 2056 mAh  Charging   3.927 / 650 / 500  mA
-)
+I think the correct fix is to replace clk_bypass and clk_ref pointers
+with a simple integer parent_index. In fact we already have this index.
+See how the pointers are populated in ti_clk_register_dpll:
 
 
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+        dd->clk_ref = of_clk_get(node, 0);
+        dd->clk_bypass = of_clk_get(node, 1);
+
+Tony, the same problem affects the FAPLL code which copy/pastes some of
+the DPLL code.
+
+Thoughts?
+
+Regards,
+Mike
