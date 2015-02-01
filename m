@@ -1,45 +1,55 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 1 Feb 2015 12:38:13 +0100
-Subject: bq2415x_charger.c: battery is discharged (fast, 224mA) when it
- should be charged
-In-Reply-To: <201502011108.16071@pali>
-References: <20150201094702.GA21628@amd>
- <201502011108.16071@pali>
-Message-ID: <20150201113813.GA6570@amd>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Sun, 1 Feb 2015 13:07:55 +0000
+Subject: [PATCH 5/5] ARM: dts: pxa: add pxa-timer to pxa27x
+In-Reply-To: <1422744510-3179-5-git-send-email-robert.jarzmik@free.fr>
+References: <1422744510-3179-1-git-send-email-robert.jarzmik@free.fr>
+ <1422744510-3179-5-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <20150201130755.GA25767@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-On Sun 2015-02-01 11:08:16, Pali Roh?r wrote:
-> On Sunday 01 February 2015 10:47:02 Pavel Machek wrote:
-> > Hi!
-> > 
-> > I connected N900 with full battery using USB. For some reason,
-> > charge limit was set to 100mA, battery was "full" and was
-> > discharging:
-> > 
+On Sat, Jan 31, 2015 at 10:48:30PM +0000, Robert Jarzmik wrote:
+> Each pxa has an embedded OS Timers IP. The kernel cannot work without a
+> valid clocksource, and this adds the OS Timers to the pxa device-tree
+> description.
 > 
-> Make sure you have loaded some usb gadget. Without it battery 
-> charging via dedicated wallcharger (and probably also usb host 
-> charger) does not working. g_nokia should be OK.
-
-I had that loaded (was running from root over USB at the moment.)
-
-> Try also compiling kernel with CONFIG_USB_GADGET_VBUS_DRAW=500
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> ---
+>  arch/arm/boot/dts/pxa27x.dtsi | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
 > 
-> Also for charger autodetection you need to have loaded 
-> isp1704_charer.ko module (or compiled into kernel).
+> diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
+> index 7f93828..9e6bf60 100644
+> --- a/arch/arm/boot/dts/pxa27x.dtsi
+> +++ b/arch/arm/boot/dts/pxa27x.dtsi
+> @@ -97,5 +97,18 @@
+>  			status = "okay";
+>  		};
+>  	};
+> +
+> +	clocksources {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+
+There is absolutely no need for this container node.
+
+Please get rid of it and place the node below directly under the parent
+node.
+
+Mark.
+
+> +		pxa-timer at 40a00000 {
+> +			compatible = "marvell,pxa-timer";
+> +			reg = <0x40a00000 0x20>;
+> +			interrupts = <26>;
+> +			clocks = <&pxa2xx_clks CLK_OSTIMER>;
+> +			status = "okay";
+> +		};
+>  	};
+>  };
+> -- 
+> 2.1.0
 > 
-> And make sure that isp1704_charger is loaded before module 
-> bq2415x_charger (there is some probe defer, no idea if it works 
-> as excepted).
-
-It seems bq2415x_charger is the problem: it all started working when I
-did echo reset > mode... 
-
-Best regards,
-								Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+> 
