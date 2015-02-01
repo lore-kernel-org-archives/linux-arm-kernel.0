@@ -1,294 +1,547 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun,  1 Feb 2015 14:50:08 +0100
-Subject: [PATCH 24/30] ARM: sun7i: i12 tvbox: Convert to DT label based syntax
+Date: Sun,  1 Feb 2015 14:49:45 +0100
+Subject: [PATCH 01/30] ARM: sun5i: Add a DTSI common to A10s and A13
 In-Reply-To: <1422798614-3581-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1422798614-3581-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1422798614-3581-25-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1422798614-3581-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to lessen the amount of duplication of the DT tree, ease the
-new and follow the trend that prefers to use label based references
-when overriding DTSI nodes, convert the board to this syntax
+The A10s and the A13 are very similar SoCs, the only difference being the
+number of pins and the number of devices available (number of UARTs, EMAC only
+in the A10s, etc.), and the clocks and pinctrl functions obviously.
+
+Create a common DTSI that will be included by the A10s and A13 DTSI, that will
+add their SoC differences in there.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts | 252 +++++++++++++++---------------
- 1 file changed, 125 insertions(+), 127 deletions(-)
+ arch/arm/boot/dts/sun5i.dtsi | 517 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 517 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun5i.dtsi
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts b/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts
-index 06148b4d000f..baee563a0051 100644
---- a/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts
-@@ -57,125 +57,6 @@
- 	model = "I12 / Q5 / QT840A A20 tvbox";
- 	compatible = "allwinner,i12-tvbox", "allwinner,sun7i-a20";
- 
--	soc at 01c00000 {
--		mmc0: mmc at 01c0f000 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
--			vmmc-supply = <&reg_vcc3v3>;
--			bus-width = <4>;
--			cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
--			cd-inverted;
--			status = "okay";
--		};
--
--		mmc3: mmc at 01c12000 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&mmc3_pins_a>;
--			vmmc-supply = <&reg_vmmc3>;
--			bus-width = <4>;
--			non-removable;
--			status = "okay";
--		};
--
--		usbphy: phy at 01c13400 {
--			usb1_vbus-supply = <&reg_usb1_vbus>;
--			usb2_vbus-supply = <&reg_usb2_vbus>;
--			status = "okay";
--		};
--
--		ehci0: usb at 01c14000 {
--			status = "okay";
--		};
--
--		ohci0: usb at 01c14400 {
--			status = "okay";
--		};
--
--		ehci1: usb at 01c1c000 {
--			status = "okay";
--		};
--
--		ohci1: usb at 01c1c400 {
--			status = "okay";
--		};
--
--		pinctrl at 01c20800 {
--			mmc3_pins_a: mmc3 at 0 {
--				/* AP6210 / AP6330 requires pull-up */
--				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
--			};
--
--			vmmc3_pin_i12_tvbox: vmmc3_pin at 0 {
--				allwinner,pins = "PH2";
--				allwinner,function = "gpio_out";
--				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
--				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
--			};
--
--			vmmc3_io_pin_i12_tvbox: vmmc3_io_pin at 0 {
--				allwinner,pins = "PH12";
--				allwinner,function = "gpio_out";
--				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
--				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
--			};
--
--			gmac_power_pin_i12_tvbox: gmac_power_pin at 0 {
--				allwinner,pins = "PH21";
--				allwinner,function = "gpio_out";
--				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
--				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
--			};
--
--			led_pins_i12_tvbox: led_pins at 0 {
--				allwinner,pins = "PH9", "PH20";
--				allwinner,function = "gpio_out";
--				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
--				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
--			};
--		};
--
--		ir0: ir at 01c21800 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&ir0_pins_a>;
--			status = "okay";
--		};
--
--		uart0: serial at 01c28000 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&uart0_pins_a>;
--			status = "okay";
--		};
--
--		i2c0: i2c at 01c2ac00 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&i2c0_pins_a>;
--			status = "okay";
--
--			axp209: pmic at 34 {
--				compatible = "x-powers,axp209";
--				reg = <0x34>;
--				interrupt-parent = <&nmi_intc>;
--				interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
--
--				interrupt-controller;
--				#interrupt-cells = <1>;
--			};
--		};
--
--		gmac: ethernet at 01c50000 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&gmac_pins_mii_a>;
--			phy = <&phy1>;
--			phy-mode = "mii";
--			phy-supply = <&reg_gmac_3v3>;
--			status = "okay";
--
--			phy1: ethernet-phy at 1 {
--				reg = <1>;
--			};
--		};
--	};
--
- 	leds {
- 		compatible = "gpio-leds";
- 		pinctrl-names = "default";
-@@ -192,14 +73,6 @@
- 		};
- 	};
- 
--	reg_usb1_vbus: usb1-vbus {
--		status = "okay";
--	};
--
--	reg_usb2_vbus: usb2-vbus {
--		status = "okay";
--	};
--
- 	reg_vmmc3: vmmc3 {
- 		compatible = "regulator-fixed";
- 		pinctrl-names = "default";
-@@ -236,3 +109,128 @@
- 		gpio = <&pio 7 21 GPIO_ACTIVE_HIGH>;
- 	};
- };
+diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+new file mode 100644
+index 000000000000..3beff037dcba
+--- /dev/null
++++ b/arch/arm/boot/dts/sun5i.dtsi
+@@ -0,0 +1,517 @@
++/*
++ * Copyright 2012-2015 Maxime Ripard
++ *
++ * Maxime Ripard <maxime.ripard@free-electrons.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *     You should have received a copy of the GNU General Public
++ *     License along with this library; if not, write to the Free
++ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
++ *     MA 02110-1301 USA
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
-+&ehci0 {
-+	status = "okay";
-+};
++#include "skeleton.dtsi"
 +
-+&ehci1 {
-+	status = "okay";
-+};
++#include <dt-bindings/dma/sun4i-a10.h>
++#include <dt-bindings/pinctrl/sun4i-a10.h>
 +
-+&gmac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&gmac_pins_mii_a>;
-+	phy = <&phy1>;
-+	phy-mode = "mii";
-+	phy-supply = <&reg_gmac_3v3>;
-+	status = "okay";
++/ {
++	interrupt-parent = <&intc>;
 +
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+	};
-+};
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "okay";
-+
-+	axp209: pmic at 34 {
-+		compatible = "x-powers,axp209";
-+		reg = <0x34>;
-+		interrupt-parent = <&nmi_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
-+	};
-+};
-+
-+&ir0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ir0_pins_a>;
-+	status = "okay";
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&mmc3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc3_pins_a>;
-+	vmmc-supply = <&reg_vmmc3>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
-+};
-+
-+&mmc3_pins_a {
-+	/* AP6210 / AP6330 requires pull-up */
-+	allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+};
-+
-+&ohci0 {
-+	status = "okay";
-+};
-+
-+&ohci1 {
-+	status = "okay";
-+};
-+
-+&pio {
-+	vmmc3_pin_i12_tvbox: vmmc3_pin at 0 {
-+		allwinner,pins = "PH2";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++		cpu0: cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a8";
++			reg = <0x0>;
++			clocks = <&cpu>;
++		};
 +	};
 +
-+	vmmc3_io_pin_i12_tvbox: vmmc3_io_pin at 0 {
-+		allwinner,pins = "PH12";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		/*
++		 * This is a dummy clock, to be used as placeholder on
++		 * other mux clocks when a specific parent clock is not
++		 * yet implemented. It should be dropped when the driver
++		 * is complete.
++		 */
++		dummy: dummy {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <0>;
++		};
++
++		osc24M: clk at 01c20050 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-osc-clk";
++			reg = <0x01c20050 0x4>;
++			clock-frequency = <24000000>;
++			clock-output-names = "osc24M";
++		};
++
++		osc32k: clk at 0 {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <32768>;
++			clock-output-names = "osc32k";
++		};
++
++		pll1: clk at 01c20000 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-pll1-clk";
++			reg = <0x01c20000 0x4>;
++			clocks = <&osc24M>;
++			clock-output-names = "pll1";
++		};
++
++		pll4: clk at 01c20018 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-pll1-clk";
++			reg = <0x01c20018 0x4>;
++			clocks = <&osc24M>;
++			clock-output-names = "pll4";
++		};
++
++		pll5: clk at 01c20020 {
++			#clock-cells = <1>;
++			compatible = "allwinner,sun4i-a10-pll5-clk";
++			reg = <0x01c20020 0x4>;
++			clocks = <&osc24M>;
++			clock-output-names = "pll5_ddr", "pll5_other";
++		};
++
++		pll6: clk at 01c20028 {
++			#clock-cells = <1>;
++			compatible = "allwinner,sun4i-a10-pll6-clk";
++			reg = <0x01c20028 0x4>;
++			clocks = <&osc24M>;
++			clock-output-names = "pll6_sata", "pll6_other", "pll6";
++		};
++
++		/* dummy is 200M */
++		cpu: cpu at 01c20054 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-cpu-clk";
++			reg = <0x01c20054 0x4>;
++			clocks = <&osc32k>, <&osc24M>, <&pll1>, <&dummy>;
++			clock-output-names = "cpu";
++		};
++
++		axi: axi at 01c20054 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-axi-clk";
++			reg = <0x01c20054 0x4>;
++			clocks = <&cpu>;
++			clock-output-names = "axi";
++		};
++
++		ahb: ahb at 01c20054 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-ahb-clk";
++			reg = <0x01c20054 0x4>;
++			clocks = <&axi>;
++			clock-output-names = "ahb";
++		};
++
++		apb0: apb0 at 01c20054 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-apb0-clk";
++			reg = <0x01c20054 0x4>;
++			clocks = <&ahb>;
++			clock-output-names = "apb0";
++		};
++
++		apb1: clk at 01c20058 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-apb1-clk";
++			reg = <0x01c20058 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&osc32k>;
++			clock-output-names = "apb1";
++		};
++
++		axi_gates: clk at 01c2005c {
++			#clock-cells = <1>;
++			compatible = "allwinner,sun4i-a10-axi-gates-clk";
++			reg = <0x01c2005c 0x4>;
++			clocks = <&axi>;
++			clock-output-names = "axi_dram";
++		};
++
++		nand_clk: clk at 01c20080 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-mod0-clk";
++			reg = <0x01c20080 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++			clock-output-names = "nand";
++		};
++
++		ms_clk: clk at 01c20084 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-mod0-clk";
++			reg = <0x01c20084 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++			clock-output-names = "ms";
++		};
++
++		mmc0_clk: clk at 01c20088 {
++			#clock-cells = <1>;
++			compatible = "allwinner,sun4i-a10-mmc-clk";
++			reg = <0x01c20088 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++			clock-output-names = "mmc0",
++					     "mmc0_output",
++					     "mmc0_sample";
++		};
++
++		mmc1_clk: clk at 01c2008c {
++			#clock-cells = <1>;
++			compatible = "allwinner,sun4i-a10-mmc-clk";
++			reg = <0x01c2008c 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++			clock-output-names = "mmc1",
++					     "mmc1_output",
++					     "mmc1_sample";
++		};
++
++		mmc2_clk: clk at 01c20090 {
++			#clock-cells = <1>;
++			compatible = "allwinner,sun4i-a10-mmc-clk";
++			reg = <0x01c20090 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++			clock-output-names = "mmc2",
++					     "mmc2_output",
++					     "mmc2_sample";
++		};
++
++		ts_clk: clk at 01c20098 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-mod0-clk";
++			reg = <0x01c20098 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++			clock-output-names = "ts";
++		};
++
++		ss_clk: clk at 01c2009c {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-mod0-clk";
++			reg = <0x01c2009c 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++			clock-output-names = "ss";
++		};
++
++		spi0_clk: clk at 01c200a0 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-mod0-clk";
++			reg = <0x01c200a0 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++			clock-output-names = "spi0";
++		};
++
++		spi1_clk: clk at 01c200a4 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-mod0-clk";
++			reg = <0x01c200a4 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++			clock-output-names = "spi1";
++		};
++
++		spi2_clk: clk at 01c200a8 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-mod0-clk";
++			reg = <0x01c200a8 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++			clock-output-names = "spi2";
++		};
++
++		ir0_clk: clk at 01c200b0 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-mod0-clk";
++			reg = <0x01c200b0 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++			clock-output-names = "ir0";
++		};
++
++		usb_clk: clk at 01c200cc {
++			#clock-cells = <1>;
++		        #reset-cells = <1>;
++			compatible = "allwinner,sun5i-a13-usb-clk";
++			reg = <0x01c200cc 0x4>;
++			clocks = <&pll6 1>;
++			clock-output-names = "usb_ohci0", "usb_phy";
++		};
++
++		mbus_clk: clk at 01c2015c {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun5i-a13-mbus-clk";
++			reg = <0x01c2015c 0x4>;
++			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++			clock-output-names = "mbus";
++		};
 +	};
 +
-+	gmac_power_pin_i12_tvbox: gmac_power_pin at 0 {
-+		allwinner,pins = "PH21";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	soc at 01c00000 {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		dma: dma-controller at 01c02000 {
++			compatible = "allwinner,sun4i-a10-dma";
++			reg = <0x01c02000 0x1000>;
++			interrupts = <27>;
++			clocks = <&ahb_gates 6>;
++			#dma-cells = <2>;
++		};
++
++		spi0: spi at 01c05000 {
++			compatible = "allwinner,sun4i-a10-spi";
++			reg = <0x01c05000 0x1000>;
++			interrupts = <10>;
++			clocks = <&ahb_gates 20>, <&spi0_clk>;
++			clock-names = "ahb", "mod";
++			dmas = <&dma SUN4I_DMA_DEDICATED 27>,
++			       <&dma SUN4I_DMA_DEDICATED 26>;
++			dma-names = "rx", "tx";
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		spi1: spi at 01c06000 {
++			compatible = "allwinner,sun4i-a10-spi";
++			reg = <0x01c06000 0x1000>;
++			interrupts = <11>;
++			clocks = <&ahb_gates 21>, <&spi1_clk>;
++			clock-names = "ahb", "mod";
++			dmas = <&dma SUN4I_DMA_DEDICATED 9>,
++			       <&dma SUN4I_DMA_DEDICATED 8>;
++			dma-names = "rx", "tx";
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		mmc0: mmc at 01c0f000 {
++			compatible = "allwinner,sun5i-a13-mmc";
++			reg = <0x01c0f000 0x1000>;
++			clocks = <&ahb_gates 8>,
++				 <&mmc0_clk 0>,
++				 <&mmc0_clk 1>,
++				 <&mmc0_clk 2>;
++			clock-names = "ahb",
++				      "mmc",
++				      "output",
++				      "sample";
++			interrupts = <32>;
++			status = "disabled";
++		};
++
++		mmc2: mmc at 01c11000 {
++			compatible = "allwinner,sun5i-a13-mmc";
++			reg = <0x01c11000 0x1000>;
++			clocks = <&ahb_gates 10>,
++				 <&mmc2_clk 0>,
++				 <&mmc2_clk 1>,
++				 <&mmc2_clk 2>;
++			clock-names = "ahb",
++				      "mmc",
++				      "output",
++				      "sample";
++			interrupts = <34>;
++			status = "disabled";
++		};
++
++		usbphy: phy at 01c13400 {
++			#phy-cells = <1>;
++			compatible = "allwinner,sun5i-a13-usb-phy";
++			reg = <0x01c13400 0x10 0x01c14800 0x4>;
++			reg-names = "phy_ctrl", "pmu1";
++			clocks = <&usb_clk 8>;
++			clock-names = "usb_phy";
++			resets = <&usb_clk 0>, <&usb_clk 1>;
++			reset-names = "usb0_reset", "usb1_reset";
++			status = "disabled";
++		};
++
++		ehci0: usb at 01c14000 {
++			reg = <0x01c14000 0x100>;
++			interrupts = <39>;
++			clocks = <&ahb_gates 1>;
++			phys = <&usbphy 1>;
++			phy-names = "usb";
++			status = "disabled";
++		};
++
++		ohci0: usb at 01c14400 {
++			reg = <0x01c14400 0x100>;
++			interrupts = <40>;
++			clocks = <&usb_clk 6>, <&ahb_gates 2>;
++			phys = <&usbphy 1>;
++			phy-names = "usb";
++			status = "disabled";
++		};
++
++		spi2: spi at 01c17000 {
++			compatible = "allwinner,sun4i-a10-spi";
++			reg = <0x01c17000 0x1000>;
++			interrupts = <12>;
++			clocks = <&ahb_gates 22>, <&spi2_clk>;
++			clock-names = "ahb", "mod";
++			dmas = <&dma SUN4I_DMA_DEDICATED 29>,
++			       <&dma SUN4I_DMA_DEDICATED 28>;
++			dma-names = "rx", "tx";
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		intc: interrupt-controller at 01c20400 {
++			compatible = "allwinner,sun4i-a10-ic";
++			reg = <0x01c20400 0x400>;
++			interrupt-controller;
++			#interrupt-cells = <1>;
++		};
++
++		pio: pinctrl at 01c20800 {
++			reg = <0x01c20800 0x400>;
++			interrupts = <28>;
++			clocks = <&apb0_gates 5>;
++			gpio-controller;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			#size-cells = <0>;
++			#gpio-cells = <3>;
++		};
++
++		timer at 01c20c00 {
++			compatible = "allwinner,sun4i-a10-timer";
++			reg = <0x01c20c00 0x90>;
++			interrupts = <22>;
++			clocks = <&osc24M>;
++		};
++
++		wdt: watchdog at 01c20c90 {
++			compatible = "allwinner,sun4i-a10-wdt";
++			reg = <0x01c20c90 0x10>;
++		};
++
++		lradc: lradc at 01c22800 {
++			compatible = "allwinner,sun4i-a10-lradc-keys";
++			reg = <0x01c22800 0x100>;
++			interrupts = <31>;
++			status = "disabled";
++		};
++
++		sid: eeprom at 01c23800 {
++			compatible = "allwinner,sun4i-a10-sid";
++			reg = <0x01c23800 0x10>;
++		};
++
++		rtp: rtp at 01c25000 {
++			compatible = "allwinner,sun4i-a10-ts";
++			reg = <0x01c25000 0x100>;
++			interrupts = <29>;
++			#thermal-sensor-cells = <0>;
++		};
++
++		uart1: serial at 01c28400 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x01c28400 0x400>;
++			interrupts = <2>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&apb1_gates 17>;
++			status = "disabled";
++		};
++
++		uart3: serial at 01c28c00 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x01c28c00 0x400>;
++			interrupts = <4>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&apb1_gates 19>;
++			status = "disabled";
++		};
++
++		i2c0: i2c at 01c2ac00 {
++			compatible = "allwinner,sun4i-a10-i2c";
++			reg = <0x01c2ac00 0x400>;
++			interrupts = <7>;
++			clocks = <&apb1_gates 0>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		i2c1: i2c at 01c2b000 {
++			compatible = "allwinner,sun4i-a10-i2c";
++			reg = <0x01c2b000 0x400>;
++			interrupts = <8>;
++			clocks = <&apb1_gates 1>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		i2c2: i2c at 01c2b400 {
++			compatible = "allwinner,sun4i-a10-i2c";
++			reg = <0x01c2b400 0x400>;
++			interrupts = <9>;
++			clocks = <&apb1_gates 2>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		timer at 01c60000 {
++			compatible = "allwinner,sun5i-a13-hstimer";
++			reg = <0x01c60000 0x1000>;
++			interrupts = <82>, <83>;
++			clocks = <&ahb_gates 28>;
++		};
 +	};
-+
-+	led_pins_i12_tvbox: led_pins at 0 {
-+		allwinner,pins = "PH9", "PH20";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
-+&reg_usb1_vbus {
-+	status = "okay";
-+};
-+
-+&reg_usb2_vbus {
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	usb1_vbus-supply = <&reg_usb1_vbus>;
-+	usb2_vbus-supply = <&reg_usb2_vbus>;
-+	status = "okay";
 +};
 -- 
 2.2.2
