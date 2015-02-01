@@ -1,240 +1,82 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun,  1 Feb 2015 19:20:16 +0100
-Subject: [PATCH v2] ARM: pxa: fix pxa interrupts handling in DT
-In-Reply-To: <1422743783-32511-1-git-send-email-robert.jarzmik@free.fr>
-References: <1422743783-32511-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1422814816-23887-1-git-send-email-robert.jarzmik@free.fr>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Sun, 01 Feb 2015 13:26:33 -0500
+Subject: [PATCH v2 1/4] tty: serial: Add 8250 earlycon to support noinit
+ option
+In-Reply-To: <54CE53F3.5040709@hurleysoftware.com>
+References: <1421068104-30463-1-git-send-email-eddie.huang@mediatek.com>
+ <1421068104-30463-2-git-send-email-eddie.huang@mediatek.com>
+ <54CE53F3.5040709@hurleysoftware.com>
+Message-ID: <54CE6FD9.5030606@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit "ARM: pxa: arbitrarily set first interrupt number" changed
-the first pxa interrupt to 16.
+On 02/01/2015 11:27 AM, Peter Hurley wrote:
+> Hi Eddie,
+> 
+> On 01/12/2015 08:08 AM, Eddie Huang wrote:
+>> Add earlycon support not only baudrate option, but also add noinit option.
+>> If use noinit option, 8250 earlycon will not init serial hardware and use
+>> loader setting.
+> 
+> I see this went into Greg's tty-testing branch.
+> 
+> The only point of this is to not program the divisor, right?
+> 
+> I ask because early_serial8250_setup() could already handle this without
+> extra options by simply not doing divisor programming if no baud option is
+> present.
 
-As a consequence, device-tree builds got broken, because :
- - pxa_mask_irq() and pxa_unmask_irq() are using IRQ_BIT()
- - IRQ_BIT(x) calculates the interrupts as : x - PXA_IRQ(0)
+Does the patch below work for your use-case?
 
-Before the commit, the first interrupt shift, PXA_IRQ(0) was 0,
-therefore IRQ_BIT(x) was x. After the change, it is necessary that the
-same shift of 16 is applied between the virtual interrupt number and the
-hardware irq number.
+[ Note: the patch applies to 3.19-rcX. To test, your noinit patches need to be
+  reverted first.
+]
 
-This situation comes from the common irq_chip shared between legacy
-platform builds and device-tree builds.
+--- >% ---
+From: Peter Hurley <peter@hurleysoftware.com>
+Subject: [PATCH] serial: 8250_early: Assume uart already initialized if no
+ baud option
 
-Fix the broken interrupts in DT case by adding this shift in the DT case
-too.
+The <baud><parity><bit> option string is not supplied if the earlycon
+is started via devicetree and OF_EARLYCON_DECLARE(). The option string
+is also not required if started via kernel command line parameters of
+the form:
+  earlycon=uart,mmio,<addr>
+  console=uart,mmio,<addr>
 
-As a consequence of the IRQ_BIT() is removed alltogether from interrupts
-handling, even in the platform data types of platforms :
- - a legacy irq domain is used
- - the irq_chip handles hardware interrupts
- - the virtual to hardware interrupt conversion is fully handled by irq
-   domain mechanics
+If earlycon_device->baud is 0, then an option string was not supplied.
+In this case, assume the uart has already been initialized by the
+bootloader or firmware.
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Signed-off-by: Peter Hurley <peter@hurleysoftware.com>
 ---
-Since v1: add irq domain to legacy platforms (not DT) irq handling
----
- arch/arm/mach-pxa/irq.c | 111 +++++++++++++++++++++---------------------------
- 1 file changed, 48 insertions(+), 63 deletions(-)
+ drivers/tty/serial/8250/8250_early.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
-index 0eecd83..9c14365 100644
---- a/arch/arm/mach-pxa/irq.c
-+++ b/arch/arm/mach-pxa/irq.c
-@@ -11,6 +11,7 @@
-  *  it under the terms of the GNU General Public License version 2 as
-  *  published by the Free Software Foundation.
-  */
-+#include <linux/bitops.h>
- #include <linux/init.h>
- #include <linux/module.h>
- #include <linux/interrupt.h>
-@@ -40,7 +41,6 @@
- #define ICHP_VAL_IRQ		(1 << 31)
- #define ICHP_IRQ(i)		(((i) >> 16) & 0x7fff)
- #define IPR_VALID		(1 << 31)
--#define IRQ_BIT(n)		(((n) - PXA_IRQ(0)) & 0x1f)
+diff --git a/drivers/tty/serial/8250/8250_early.c b/drivers/tty/serial/8250/8250_early.c
+index d7b831b..1701d00 100644
+--- a/drivers/tty/serial/8250/8250_early.c
++++ b/drivers/tty/serial/8250/8250_early.c
+@@ -149,12 +149,18 @@ static int __init early_serial8250_setup(struct earlycon_device *device,
+ 		return 0;
  
- #define MAX_INTERNAL_IRQS	128
- 
-@@ -51,6 +51,7 @@
- static void __iomem *pxa_irq_base;
- static int pxa_internal_irq_nr;
- static bool cpu_has_ipr;
-+static struct irq_domain *pxa_irq_domain;
- 
- static inline void __iomem *irq_base(int i)
- {
-@@ -66,18 +67,20 @@ static inline void __iomem *irq_base(int i)
- void pxa_mask_irq(struct irq_data *d)
- {
- 	void __iomem *base = irq_data_get_irq_chip_data(d);
-+	irq_hw_number_t irq = irqd_to_hwirq(d);
- 	uint32_t icmr = __raw_readl(base + ICMR);
- 
--	icmr &= ~(1 << IRQ_BIT(d->irq));
-+	icmr &= ~BIT(irq);
- 	__raw_writel(icmr, base + ICMR);
- }
- 
- void pxa_unmask_irq(struct irq_data *d)
- {
- 	void __iomem *base = irq_data_get_irq_chip_data(d);
-+	irq_hw_number_t irq = irqd_to_hwirq(d);
- 	uint32_t icmr = __raw_readl(base + ICMR);
- 
--	icmr |= 1 << IRQ_BIT(d->irq);
-+	icmr |= BIT(irq);
- 	__raw_writel(icmr, base + ICMR);
- }
- 
-@@ -118,40 +121,63 @@ asmlinkage void __exception_irq_entry ichp_handle_irq(struct pt_regs *regs)
- 	} while (1);
- }
- 
--void __init pxa_init_irq(int irq_nr, int (*fn)(struct irq_data *, unsigned int))
-+static int pxa_irq_map(struct irq_domain *h, unsigned int virq,
-+		       irq_hw_number_t hw)
- {
--	int irq, i, n;
-+	void __iomem *base = irq_base(hw / 32);
- 
--	BUG_ON(irq_nr > MAX_INTERNAL_IRQS);
-+	/* initialize interrupt priority */
-+	if (cpu_has_ipr)
-+		__raw_writel(hw | IPR_VALID, pxa_irq_base + IPR(hw));
+ 	if (!device->baud) {
++		struct uart_port *port = &device->port;
++		unsigned int ier;
 +
-+	irq_set_chip_and_handler(virq, &pxa_internal_irq_chip,
-+				 handle_level_irq);
-+	irq_set_chip_data(virq, base);
-+	set_irq_flags(virq, IRQF_VALID);
-+
-+	return 0;
-+}
-+
-+static struct irq_domain_ops pxa_irq_ops = {
-+	.map    = pxa_irq_map,
-+	.xlate  = irq_domain_xlate_onecell,
-+};
-+
-+static __init void
-+pxa_init_irq_common(struct device_node *node, int irq_nr,
-+		    int (*fn)(struct irq_data *, unsigned int))
-+{
-+	int n;
- 
- 	pxa_internal_irq_nr = irq_nr;
--	cpu_has_ipr = !cpu_is_pxa25x();
--	pxa_irq_base = io_p2v(0x40d00000);
-+	pxa_irq_domain = irq_domain_add_legacy(node, irq_nr,
-+					       PXA_IRQ(0), 0,
-+					       &pxa_irq_ops, NULL);
-+	if (!pxa_irq_domain)
-+		panic("Unable to add PXA IRQ domain\n");
-+	irq_set_default_host(pxa_irq_domain);
- 
- 	for (n = 0; n < irq_nr; n += 32) {
- 		void __iomem *base = irq_base(n >> 5);
- 
- 		__raw_writel(0, base + ICMR);	/* disable all IRQs */
- 		__raw_writel(0, base + ICLR);	/* all IRQs are IRQ, not FIQ */
--		for (i = n; (i < (n + 32)) && (i < irq_nr); i++) {
--			/* initialize interrupt priority */
--			if (cpu_has_ipr)
--				__raw_writel(i | IPR_VALID, pxa_irq_base + IPR(i));
--
--			irq = PXA_IRQ(i);
--			irq_set_chip_and_handler(irq, &pxa_internal_irq_chip,
--						 handle_level_irq);
--			irq_set_chip_data(irq, base);
--			set_irq_flags(irq, IRQF_VALID);
--		}
- 	}
--
- 	/* only unmasked interrupts kick us out of idle */
- 	__raw_writel(1, irq_base(0) + ICCR);
- 
- 	pxa_internal_irq_chip.irq_set_wake = fn;
- }
- 
-+void __init pxa_init_irq(int irq_nr, int (*fn)(struct irq_data *, unsigned int))
-+{
-+	BUG_ON(irq_nr > MAX_INTERNAL_IRQS);
-+
-+	pxa_irq_base = io_p2v(0x40d00000);
-+	cpu_has_ipr = !cpu_is_pxa25x();
-+	pxa_init_irq_common(NULL, irq_nr, fn);
-+}
-+
- #ifdef CONFIG_PM
- static unsigned long saved_icmr[MAX_INTERNAL_IRQS/32];
- static unsigned long saved_ipr[MAX_INTERNAL_IRQS];
-@@ -203,30 +229,6 @@ struct syscore_ops pxa_irq_syscore_ops = {
- };
- 
- #ifdef CONFIG_OF
--static struct irq_domain *pxa_irq_domain;
--
--static int pxa_irq_map(struct irq_domain *h, unsigned int virq,
--		       irq_hw_number_t hw)
--{
--	void __iomem *base = irq_base(hw / 32);
--
--	/* initialize interrupt priority */
--	if (cpu_has_ipr)
--		__raw_writel(hw | IPR_VALID, pxa_irq_base + IPR(hw));
--
--	irq_set_chip_and_handler(hw, &pxa_internal_irq_chip,
--				 handle_level_irq);
--	irq_set_chip_data(hw, base);
--	set_irq_flags(hw, IRQF_VALID);
--
--	return 0;
--}
--
--static struct irq_domain_ops pxa_irq_ops = {
--	.map    = pxa_irq_map,
--	.xlate  = irq_domain_xlate_onecell,
--};
--
- static const struct of_device_id intc_ids[] __initconst = {
- 	{ .compatible = "marvell,pxa-intc", },
- 	{}
-@@ -236,7 +238,7 @@ void __init pxa_dt_irq_init(int (*fn)(struct irq_data *, unsigned int))
- {
- 	struct device_node *node;
- 	struct resource res;
--	int n, ret;
-+	int ret;
- 
- 	node = of_find_matching_node(NULL, intc_ids);
- 	if (!node) {
-@@ -267,23 +269,6 @@ void __init pxa_dt_irq_init(int (*fn)(struct irq_data *, unsigned int))
- 		return;
- 	}
- 
--	pxa_irq_domain = irq_domain_add_legacy(node, pxa_internal_irq_nr, 0, 0,
--					       &pxa_irq_ops, NULL);
--	if (!pxa_irq_domain)
--		panic("Unable to add PXA IRQ domain\n");
--
--	irq_set_default_host(pxa_irq_domain);
--
--	for (n = 0; n < pxa_internal_irq_nr; n += 32) {
--		void __iomem *base = irq_base(n >> 5);
--
--		__raw_writel(0, base + ICMR);	/* disable all IRQs */
--		__raw_writel(0, base + ICLR);	/* all IRQs are IRQ, not FIQ */
+ 		device->baud = probe_baud(&device->port);
+ 		snprintf(device->options, sizeof(device->options), "%u",
+ 			 device->baud);
 -	}
--
--	/* only unmasked interrupts kick us out of idle */
--	__raw_writel(1, irq_base(0) + ICCR);
--
--	pxa_internal_irq_chip.irq_set_wake = fn;
-+	pxa_init_irq_common(node, pxa_internal_irq_nr, fn);
- }
- #endif /* CONFIG_OF */
+ 
+-	init_port(device);
++		/* assume the device was initialized, only mask interrupts */
++		ier = serial8250_early_in(port, UART_IER);
++		serial8250_early_out(port, UART_IER, ier & UART_IER_UUE);
++	} else
++		init_port(device);
+ 
+ 	device->con->write = early_serial8250_write;
+ 	return 0;
 -- 
-2.1.0
+2.2.2
