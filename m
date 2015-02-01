@@ -1,40 +1,72 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sun, 1 Feb 2015 10:11:59 +0100
-Subject: nvram and generic_nvram modules are problematic, was Re: [PATCH]
- arch: m68k: mac: misc.c: Remove some unused functions
-In-Reply-To: <alpine.LNX.2.00.1502011230150.32582@nippy.intranet>
-References: <1420131732-31039-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
- <alpine.LNX.2.00.1501041045020.15927@nippy.intranet>
- <CAMuHMdXFu3n4d0dMZop186UF+QG=MtLHV=oQr+VszftpEA1kFQ@mail.gmail.com>
- <alpine.LNX.2.00.1502011230150.32582@nippy.intranet>
-Message-ID: <CAMuHMdXcV8nxCvhMDZ3WRrWKXxxjR6d8Uf8gp5w9NUTkyTNTjg@mail.gmail.com>
+Date: Sun, 1 Feb 2015 10:36:54 +0100
+Subject: [PATCH v4 5/5] drivers: bus: Add Simple Power-Managed Bus Driver
+In-Reply-To: <CAPDyKFpf74Mxova+QsYfhSVPc26-NhC7A4vFJfywPzP9oHkVhw@mail.gmail.com>
+References: <1422288977-20353-1-git-send-email-geert+renesas@glider.be>
+ <1422288977-20353-6-git-send-email-geert+renesas@glider.be>
+ <CAPDyKFpf74Mxova+QsYfhSVPc26-NhC7A4vFJfywPzP9oHkVhw@mail.gmail.com>
+Message-ID: <CAMuHMdVCHYSo-OWDqHWQ+0YHa_gn8o_7-vUSOiRKO-r-c6+Rcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 1, 2015 at 4:39 AM, Finn Thain <fthain@telegraphics.com.au> wrote:
-> On Sun, 4 Jan 2015, Geert Uytterhoeven wrote:
->
->> On Sun, Jan 4, 2015 at 8:21 AM, Finn Thain <fthain@telegraphics.com.au> wrote:
->> > On Thu, 1 Jan 2015, Rickard Strandqvist wrote:
->> > > Removes some functions that are not used anywhere:
->> > > mac_pram_write() mac_pram_read()
->> >
->> > ... I'd rather not remove all of this code. Better to finish the
->> > implementation.
->>
->> Indeed.
->>
->> > Would it be acceptable to utilize drivers/char/generic_nvram.c and
->> > CONFIG_GENERIC_NVRAM? This is the PowerMac PRAM driver but looks
->> > generic enough that it may not need any modification for 68k Macs.
->>
->> Yes, that would be great.
->>
->
-> Unfortunately, it seems to be unworkable.
+Hi Ulf,
 
-An alternative could be to just provide an nvram attribute file in sysfs,
-like many RTC drivers do.
+On Fri, Jan 30, 2015 at 10:34 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 26 January 2015 at 17:16, Geert Uytterhoeven <geert+renesas@glider.be> wrote:
+>> Add a driver for transparent busses that don't need a real driver, but
+>> where the bus controller is part of a PM domain, or under the control of
+>> a functional clock.  Typically, the bus controller's PM domain and/or
+>> clock must be enabled for child devices connected to the bus (either
+>> on-SoC or externally) to function.
+>>
+>> Hence the sole purpose of this driver is to enable its clock and PM
+>> domain (if exist(s)), which are specified in the DT and managed from
+>> platform and PM domain code, and to probe for child devices.
+>>
+>> Due to the child-parent relationship with devices connected to the bus,
+>> PM domain and clock state transitions are handled in the correct order.
+>>
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> Tested-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+
+>> --- /dev/null
+>> +++ b/drivers/bus/simple-pm-bus.c
+
+>> +static int simple_pm_bus_probe(struct platform_device *pdev)
+>> +{
+>> +       struct device_node *np = pdev->dev.of_node;
+>> +
+>> +       dev_dbg(&pdev->dev, "%s\n", __func__);
+>> +
+>> +       pm_runtime_enable(&pdev->dev);
+>> +
+>> +       if (np)
+>> +               of_platform_populate(np, NULL, NULL, &pdev->dev);
+>> +
+>
+> I am not sure my comments is valid in this initial step. Yet, you
+> state in the DT documentation, that this driver supports clocks and PM
+> domains.
+>
+> How you are going add that support it quite interesting. :-) I also
+
+The clock can be controlled through e.g. pm_clk domain (pm_clk_notifier
+and pm_clk_{suspend,resume}()) or genpd (GENPD_FLAG_PM_CLK,
+which you have added yourself ;-)
+
+> especially interested how the interaction (child to parents) through
+> runtime PM will look like.
+
+When a child is to be runtime-resumed, the core make sure the parent is
+runtime-resumed. When all children have been runtime-suspended, the parent
+is runtime-suspended. This is already working. This patch series is the
+only missing piece: without a driver that calls pm_runtime_enable(), the
+parent is not runtime-managed.
+
+> Overall, I like the idea in patchset, but I would like to understand a
+> bit more around the above.
+
+Thanks!
 
 Gr{oetje,eeting}s,
 
