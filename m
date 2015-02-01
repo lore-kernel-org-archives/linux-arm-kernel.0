@@ -1,82 +1,64 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Sun, 01 Feb 2015 13:26:33 -0500
-Subject: [PATCH v2 1/4] tty: serial: Add 8250 earlycon to support noinit
- option
-In-Reply-To: <54CE53F3.5040709@hurleysoftware.com>
-References: <1421068104-30463-1-git-send-email-eddie.huang@mediatek.com>
- <1421068104-30463-2-git-send-email-eddie.huang@mediatek.com>
- <54CE53F3.5040709@hurleysoftware.com>
-Message-ID: <54CE6FD9.5030606@hurleysoftware.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 1 Feb 2015 20:17:50 +0100
+Subject: bq2415x_charger.c: battery is discharged (fast, 224mA) when it
+ should be charged
+In-Reply-To: <20150201113813.GA6570@amd>
+References: <20150201094702.GA21628@amd> <201502011108.16071@pali>
+ <20150201113813.GA6570@amd>
+Message-ID: <20150201191750.GA27467@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/01/2015 11:27 AM, Peter Hurley wrote:
-> Hi Eddie,
+On Sun 2015-02-01 12:38:13, Pavel Machek wrote:
+> Hi!
 > 
-> On 01/12/2015 08:08 AM, Eddie Huang wrote:
->> Add earlycon support not only baudrate option, but also add noinit option.
->> If use noinit option, 8250 earlycon will not init serial hardware and use
->> loader setting.
+> On Sun 2015-02-01 11:08:16, Pali Roh?r wrote:
+> > On Sunday 01 February 2015 10:47:02 Pavel Machek wrote:
+> > > Hi!
+> > > 
+> > > I connected N900 with full battery using USB. For some reason,
+> > > charge limit was set to 100mA, battery was "full" and was
+> > > discharging:
+> > > 
+> > 
+> > Make sure you have loaded some usb gadget. Without it battery 
+> > charging via dedicated wallcharger (and probably also usb host 
+> > charger) does not working. g_nokia should be OK.
 > 
-> I see this went into Greg's tty-testing branch.
+> I had that loaded (was running from root over USB at the moment.)
 > 
-> The only point of this is to not program the divisor, right?
+> > Try also compiling kernel with CONFIG_USB_GADGET_VBUS_DRAW=500
+> > 
+> > Also for charger autodetection you need to have loaded 
+> > isp1704_charer.ko module (or compiled into kernel).
+> > 
+> > And make sure that isp1704_charger is loaded before module 
+> > bq2415x_charger (there is some probe defer, no idea if it works 
+> > as excepted).
 > 
-> I ask because early_serial8250_setup() could already handle this without
-> extra options by simply not doing divisor programming if no baud option is
-> present.
+> It seems bq2415x_charger is the problem: it all started working when I
+> did echo reset > mode... 
 
-Does the patch below work for your use-case?
+It does not switch from "Full" to "Charging", and it does not seem to
+switch from "Charging" to "Full", either...:
 
-[ Note: the patch applies to 3.19-rcX. To test, your noinit patches need to be
-  reverted first.
-]
+root at n900:/my/tui/ofone# ./tefone
+Ready.
+Battery  4.152 V  4.161 V  95 %  0 %  0 / 0 / 2056 mAh  Charging   40.876 / 650 / 500  mA
+Battery  4.152 V  4.161 V  95 %  0 %  0 / 0 / 2056 mAh  Charging   48.195 / 650 / 500  mA
+Battery  4.152 V  4.164 V  95 %  0 %  0 / 0 / 2056 mAh  Charging   43.554 / 650 / 500  mA
+Battery  4.14 V  4.164 V  94 %  0 %  0 / 0 / 2056 mAh  Charging   40.162 / 650 / 500  mA
+Battery  4.158 V  4.172 V  95 %  0 %  0 / 0 / 2056 mAh  Charging   54.621 / 650 / 500  mA
+Battery  4.158 V  4.175 V  95 %  0 %  0 / 0 / 2056 mAh  Charging   33.736 / 650 / 500  mA
+aHello, world
+Battery  4.164 V  4.175 V  96 %  0 %  0 / 0 / 2056 mAh  Charging   2.142 / 650 / 500  mA
+Battery  4.164 V  4.177 V  96 %  0 %  0 / 0 / 2056 mAh  Charging   19.992 / 650 / 500  mA
+Battery  4.158 V  4.177 V  95 %  0 %  0 / 0 / 2056 mAh  Charging   18.207 / 650 / 500  mA
+Battery  4.158 V  4.177 V  95 %  0 %  0 / 0 / 2056 mAh  Charging   17.493 / 650 / 500  mA
+Battery  4.164 V  4.177 V  96 %  0 %  0 / 0 / 2056 mAh  Charging   16.243 / 650 / 500  mA
+Battery  4.158 V  4.177 V  95 %  0 %  0 / 0 / 2056 mAh  Charging   16.243 / 650 / 500  mA
 
---- >% ---
-From: Peter Hurley <peter@hurleysoftware.com>
-Subject: [PATCH] serial: 8250_early: Assume uart already initialized if no
- baud option
 
-The <baud><parity><bit> option string is not supplied if the earlycon
-is started via devicetree and OF_EARLYCON_DECLARE(). The option string
-is also not required if started via kernel command line parameters of
-the form:
-  earlycon=uart,mmio,<addr>
-  console=uart,mmio,<addr>
-
-If earlycon_device->baud is 0, then an option string was not supplied.
-In this case, assume the uart has already been initialized by the
-bootloader or firmware.
-
-Signed-off-by: Peter Hurley <peter@hurleysoftware.com>
----
- drivers/tty/serial/8250/8250_early.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/tty/serial/8250/8250_early.c b/drivers/tty/serial/8250/8250_early.c
-index d7b831b..1701d00 100644
---- a/drivers/tty/serial/8250/8250_early.c
-+++ b/drivers/tty/serial/8250/8250_early.c
-@@ -149,12 +149,18 @@ static int __init early_serial8250_setup(struct earlycon_device *device,
- 		return 0;
- 
- 	if (!device->baud) {
-+		struct uart_port *port = &device->port;
-+		unsigned int ier;
-+
- 		device->baud = probe_baud(&device->port);
- 		snprintf(device->options, sizeof(device->options), "%u",
- 			 device->baud);
--	}
- 
--	init_port(device);
-+		/* assume the device was initialized, only mask interrupts */
-+		ier = serial8250_early_in(port, UART_IER);
-+		serial8250_early_out(port, UART_IER, ier & UART_IER_UUE);
-+	} else
-+		init_port(device);
- 
- 	device->con->write = early_serial8250_write;
- 	return 0;
 -- 
-2.2.2
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
