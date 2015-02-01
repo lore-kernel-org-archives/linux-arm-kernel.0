@@ -1,54 +1,96 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sun, 1 Feb 2015 15:28:20 +0100
-Subject: [PATCH v3 07/10] ARM: dts: sunxi: Add usb3_vbus regulator to
- common regulators dtsi
-In-Reply-To: <20150201142007.GH4827@lukather>
+Date: Sun, 1 Feb 2015 15:31:06 +0100
+Subject: [PATCH v3 06/10] ARM: dts: sun9i: Add USB host controller nodes
+ to a80 dtsi
+In-Reply-To: <20150201141750.GG4827@lukather>
 References: <1422388455-25923-1-git-send-email-wens@csie.org>
- <1422388455-25923-8-git-send-email-wens@csie.org>
- <20150201142007.GH4827@lukather>
-Message-ID: <CAGb2v64SaEQiJ1LYUGWj+cv_UG-oEn_gtUuoGGndGuX_pJbZWQ@mail.gmail.com>
+ <1422388455-25923-7-git-send-email-wens@csie.org>
+ <20150201141750.GG4827@lukather>
+Message-ID: <CAGb2v67cSq4oWWy4POR8uMruG_2cvdv8PPrzOTOx2JUJ=uBH+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 1, 2015 at 3:20 PM, Maxime Ripard
+Hi,
+
+On Sun, Feb 1, 2015 at 3:17 PM, Maxime Ripard
 <maxime.ripard@free-electrons.com> wrote:
-> On Wed, Jan 28, 2015 at 03:54:12AM +0800, Chen-Yu Tsai wrote:
->> Some SoCs have a total of 4 possible USB controllers. One such example
->> is the A80, which has one USB3 dual role device and 3 EHCI/OHCI pairs.
->>
->> Add a common VBUS regulator for the last host controller.
+> On Wed, Jan 28, 2015 at 03:54:11AM +0800, Chen-Yu Tsai wrote:
+>> The A80 has 3 EHCI/OHCI USB controllers.
 >>
 >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 >> ---
->>  arch/arm/boot/dts/sunxi-common-regulators.dtsi | 10 ++++++++++
->>  1 file changed, 10 insertions(+)
+>>  arch/arm/boot/dts/sun9i-a80.dtsi | 70 ++++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 70 insertions(+)
 >>
->> diff --git a/arch/arm/boot/dts/sunxi-common-regulators.dtsi b/arch/arm/boot/dts/sunxi-common-regulators.dtsi
->> index e02baa66b33c..97fe8d73c4f7 100644
->> --- a/arch/arm/boot/dts/sunxi-common-regulators.dtsi
->> +++ b/arch/arm/boot/dts/sunxi-common-regulators.dtsi
->> @@ -130,6 +130,16 @@
->>               status = "disabled";
->>       };
+>> diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
+>> index d7ebd9390b01..9483b15bfda7 100644
+>> --- a/arch/arm/boot/dts/sun9i-a80.dtsi
+>> +++ b/arch/arm/boot/dts/sun9i-a80.dtsi
+>> @@ -355,6 +355,28 @@
+>>                */
+>>               ranges = <0 0 0 0x20000000>;
 >>
->> +     reg_usb3_vbus: usb3-vbus {
->> +             compatible = "regulator-fixed";
->> +             pinctrl-names = "default";
->> +             regulator-name = "usb3-vbus";
->> +             regulator-min-microvolt = <5000000>;
->> +             regulator-max-microvolt = <5000000>;
->> +             enable-active-high;
->> +             status = "disabled";
->> +     };
+>> +             ehci0: usb at 00a00000 {
+>> +                     compatible = "allwinner,sun9i-a80-ehci", "generic-ehci";
+>> +                     reg = <0x00a00000 0x100>;
+>> +                     interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
+>> +                     clocks = <&usb_mod_clk 1>;
+>> +                     resets = <&usb_mod_clk 17>;
+>> +                     phys = <&usbphy1>;
+>> +                     phy-names = "usb";
+>> +                     status = "disabled";
+>> +             };
+>> +
+>> +             ohci0: usb at 00a00400 {
+>> +                     compatible = "allwinner,sun9i-a80-ohci", "generic-ohci";
+>> +                     reg = <0x00a00400 0x100>;
+>> +                     interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
+>> +                     clocks = <&usb_mod_clk 1>, <&usb_mod_clk 2>;
+>> +                     resets = <&usb_mod_clk 17>;
+>> +                     phys = <&usbphy1>;
+>> +                     phy-names = "usb";
+>> +                     status = "disabled";
+>> +             };
+>> +
+>>               usbphy1: phy at 00a00800 {
+>>                       compatible = "allwinner,sun9i-a80-usb-phy";
+>>                       reg = <0x00a00800 0x4>;
+>> @@ -366,6 +388,32 @@
+>>                       #phy-cells = <0>;
+>>               };
+>>
+>> +             ehci1: usb at 00a01000 {
+>> +                     compatible = "allwinner,sun9i-a80-ehci", "generic-ehci";
+>> +                     reg = <0x00a01000 0x100>;
+>> +                     interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
+>> +                     clocks = <&usb_mod_clk 3>;
+>> +                     resets = <&usb_mod_clk 18>;
+>> +                     phys = <&usbphy2>;
+>> +                     phy-names = "usb";
+>> +                     status = "disabled";
+>> +             };
+>> +
+>> +             /*
+>> +              * Even though ohci1 exists, it is never used as
+>> +              * usb1 only has HSIC pins routed externally
+>> +              */
+>> +             ohci1: usb at 00a01400 {
+>> +                     compatible = "allwinner,sun9i-a80-ohci", "generic-ohci";
+>> +                     reg = <0x00a01400 0x100>;
+>> +                     interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
+>> +                     clocks = <&usb_mod_clk 3>, <&usb_mod_clk 4>;
+>> +                     resets = <&usb_mod_clk 18>;
+>> +                     phys = <&usbphy2>;
+>> +                     phy-names = "usb";
+>> +                     status = "disabled";
+>> +             };
 >> +
 >
-> I don't think you replied to this one. What other SoC is using the
-> USB3 regulator? Is it worth it to put it in there and bloat all the
-> other DTS for something that is only used on a single board so far?
+> Is it worth declaring it then? If it's not never ever going to be used
+> since no pins are routed outside of the SoC, I don't think it should
+> be declared in the DTSI.
 
-Yes I missed this one. The only other one is A31, which has OHCI2,
-but no board routes it to a USB connector with a VBUS regulator.
-
-So yeah, I'll move it to the board DTS.
+You have a point. Also the user manual doesn't even list OHCI1. I did
+this work before the manual was available. I will update this patch.
 
 ChenYu
