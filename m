@@ -1,73 +1,48 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Sun, 01 Feb 2015 13:24:32 -0800
-Subject: [PATCH v13 3/6] clk: Make clk API return per-user struct clk
- instances
-In-Reply-To: <1422011024-32283-4-git-send-email-tomeu.vizoso@collabora.com>
-References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
- <1422011024-32283-4-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <20150201212432.22722.70917@quantum>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sun, 01 Feb 2015 22:25:56 +0100
+Subject: [PATCH] irqchip: gic: Don't complain in
+ =?UTF-8?Q?gic=5Fget=5Fcpumask=28=29=20if=20UP=20system?=
+In-Reply-To: <1422665010-5854-1-git-send-email-sboyd@codeaurora.org>
+References: <1422665010-5854-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <9143d197d772c6e6ee10fd54bdcd557b@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tomeu Vizoso (2015-01-23 03:03:30)
-> Moves clock state to struct clk_core, but takes care to change as little API as
-> possible.
+On 2015-01-31 01:43, Stephen Boyd wrote:
+> In a uniprocessor implementation the interrupt processor targets
+> registers are read-as-zero/write-ignored (RAZ/WI). Unfortunately
+> gic_get_cpumask() will print a critical message saying
 > 
-> struct clk_hw still has a pointer to a struct clk, which is the
-> implementation's per-user clk instance, for backwards compatibility.
+>  GIC CPU mask not found - kernel will fail to boot.
 > 
-> The struct clk that clk_get_parent() returns isn't owned by the caller, but by
-> the clock implementation, so the former shouldn't call clk_put() on it.
+> if these registers all read as zero, but there won't actually be
+> a problem on uniprocessor systems and the kernel will boot just
+> fine. Skip this check if we're running a UP kernel or if we
+> detect that the hardware only supports a single processor.
+
+Does the job for my device too, thx.
+
+Acked-by: Stefan Agner <stefan@agner.ch>
+
 > 
-> Because some boards in mach-omap2 still register clocks statically, their clock
-> registration had to be updated to take into account that the clock information
-> is stored in struct clk_core now.
-
-Tero, Paul & Tony,
-
-Tomeu's patch unveils a problem with omap3_noncore_dpll_enable and
-struct dpll_data, namely this snippet from
-arch/arm/mach-omap2/dpll3xxx.c:
-
-        parent = __clk_get_parent(hw->clk);
-
-        if (__clk_get_rate(hw->clk) == __clk_get_rate(dd->clk_bypass)) {
-                WARN(parent != dd->clk_bypass,
-                                "here0, parent name is %s, bypass name is %s\n",
-                                __clk_get_name(parent), __clk_get_name(dd->clk_bypass));
-                r = _omap3_noncore_dpll_bypass(clk);
-        } else {
-                WARN(parent != dd->clk_ref,
-                                "here1, parent name is %s, ref name is %s\n",
-                                __clk_get_name(parent), __clk_get_name(dd->clk_ref));
-                r = _omap3_noncore_dpll_lock(clk);
-        }
-
-struct dpll_data has members clk_ref and clk_bypass which are struct clk
-pointers. This was always a bit of a violation of the clk.h contract
-since drivers are not supposed to deref struct clk pointers. Now that we
-generate unique pointers for each call to clk_get (clk_ref & clk_bypass
-are populated by of_clk_get in ti_clk_register_dpll) then the pointer
-comparisons above will never be equal (even if they resolve down to the
-same struct clk_core). I added the verbose traces to the WARNs above to
-illustrate the point: the names are always the same but the pointers
-differ.
-
-AFAICT this doesn't break anything, but booting on OMAP3+ results in
-noisy WARNs.
-
-I think the correct fix is to replace clk_bypass and clk_ref pointers
-with a simple integer parent_index. In fact we already have this index.
-See how the pointers are populated in ti_clk_register_dpll:
-
-
-        dd->clk_ref = of_clk_get(node, 0);
-        dd->clk_bypass = of_clk_get(node, 1);
-
-Tony, the same problem affects the FAPLL code which copy/pastes some of
-the DPLL code.
-
-Thoughts?
-
-Regards,
-Mike
+> Acked-by: Nicolas Pitre <nico@linaro.org>
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> Cc: Stefan Agner <stefan@agner.ch>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  drivers/irqchip/irq-gic.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index d617ee5a3d8a..1b70e0de0f6e 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -346,7 +346,7 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
+>  			break;
+>  	}
+>  
+> -	if (!mask)
+> +	if (!mask && num_possible_cpus() > 1)
+>  		pr_crit("GIC CPU mask not found - kernel will fail to boot.\n");
+>  
+>  	return mask;
