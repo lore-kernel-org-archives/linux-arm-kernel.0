@@ -1,108 +1,240 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Sun, 1 Feb 2015 09:55:02 -0800
-Subject: [PATCH v7 1/4] Documentation: dt: add common bindings for
- hwspinlock
-In-Reply-To: <CAK=WgbZ2986xxuAFvMSoyQLaPAxdUpZ8e5g-mSjyETfvd4KKHw@mail.gmail.com>
-References: <1421269101-51105-1-git-send-email-s-anna@ti.com>
- <1421269101-51105-2-git-send-email-s-anna@ti.com>
- <20150115135201.GG16217@leverpostej>
- <20150115135556.GH16217@leverpostej>
- <CAL_JsqL2LZAooMk-V8+xeF2g6acZE21M+-OBRw8aEVa-5wVHuQ@mail.gmail.com>
- <CAK=WgbYQ=BbinqJ5fsw2Y+FKdy=nasLsw9mX8pw6S_o3owy9-g@mail.gmail.com>
- <20150116101746.GA21809@leverpostej>
- <CAK=WgbYBqPoUm9byx0du_g5ZmHdYaUVLpSPZYHoCVzNoatNKpw@mail.gmail.com>
- <CAJAp7Og+-KQd7bygWQjTS72Kye3fkp3s3ry+2bw7Gcv7aPF5AQ@mail.gmail.com>
- <CAK=WgbZ2986xxuAFvMSoyQLaPAxdUpZ8e5g-mSjyETfvd4KKHw@mail.gmail.com>
-Message-ID: <CAJAp7OjVULNRd113TtOEwaa6QO-XCDa0oxBm2H5NPvp_kLTSpA@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sun,  1 Feb 2015 19:20:16 +0100
+Subject: [PATCH v2] ARM: pxa: fix pxa interrupts handling in DT
+In-Reply-To: <1422743783-32511-1-git-send-email-robert.jarzmik@free.fr>
+References: <1422743783-32511-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1422814816-23887-1-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 30, 2015 at 9:41 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> On Sat, Jan 31, 2015 at 1:29 AM, Bjorn Andersson <bjorn@kryo.se> wrote:
->> In a system where you have two hwlock blocks lckA and lckB, each
->> consisting of 8 locks and you have dspB that can only access lckB
->
-> This is a good example - thanks. To be able to cope with such cases we
-> will have to pass a hwlock block reference and its relative lock id.
->
+The commit "ARM: pxa: arbitrarily set first interrupt number" changed
+the first pxa interrupt to 16.
 
-Correct, so the #hwlock-cells and hwlock part from the proposal are
-the important one. Having an optional hwlock-names will make things
-easier to read as well, but is not necessary.
+As a consequence, device-tree builds got broken, because :
+ - pxa_mask_irq() and pxa_unmask_irq() are using IRQ_BIT()
+ - IRQ_BIT(x) calculates the interrupts as : x - PXA_IRQ(0)
 
-> The DT binding should definitely be prepared for such cases (just kill
-> the base-id field?), but let's see what it means about the Linux
-> implementation.
->
+Before the commit, the first interrupt shift, PXA_IRQ(0) was 0,
+therefore IRQ_BIT(x) was x. After the change, it is necessary that the
+same shift of 16 is applied between the virtual interrupt number and the
+hardware irq number.
 
->From the dt binding PoV, we should be able to skip num-locks as well.
-It seems most hwlock blocks have a fixed amount of locks provided and
-the drivers are reporting this to the core when registering.
+This situation comes from the common irq_chip shared between legacy
+platform builds and device-tree builds.
 
-So I think we can reduce the binding to:
+Fix the broken interrupts in DT case by adding this shift in the DT case
+too.
 
-Providers:
-#hwlock-cells
+As a consequence of the IRQ_BIT() is removed alltogether from interrupts
+handling, even in the platform data types of platforms :
+ - a legacy irq domain is used
+ - the irq_chip handles hardware interrupts
+ - the virtual to hardware interrupt conversion is fully handled by irq
+   domain mechanics
 
-Consumers:
-hwlocks
-hwlock-names
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+Since v1: add irq domain to legacy platforms (not DT) irq handling
+---
+ arch/arm/mach-pxa/irq.c | 111 +++++++++++++++++++++---------------------------
+ 1 file changed, 48 insertions(+), 63 deletions(-)
 
-For the hardware where number of locks is actually variable (e.g.
-different variants of same block) there can be driver specific entries
-for this.
-
-> Since the existence of several hwblocks is still fictional (Bjorn,
-> please confirm too?), we may prefer to introduce changes to support it
-> only when it shows up; it all depends on the amount of changes needed.
-> Suman, care to take a look please?
->
-
-I haven't seen any such systems yet.
-
-We could introduce the logic found in other subsystems of allowing -1
-as base_id and having the core find a available range. This will work
-for all cases where the global ids doesn't have to be static; either
-due to the fact that we use block:local-id or that the indices are
-hard coded. (Referencing locks via dt is equivalent of the
-block:local-id case)
-
->>> - Sometimes a remote processor, which may not be running Linux, will
->>> have to dynamically allocate a hwlock, and send the ID of the
->>> allocated lock to us (another processor running Linux)
->>>
->> I'm sorry but you cannot have a system on both sides that is allowed
->> to do dynamic allocation from a limited set of resources.
->
-> Of course not. On such systems, Linux is not the one responsible for
-> allocating the hwlocks, at least not during part of the time or from
-> part of the hwlocks. There were a few different use cases, with
-> different semantics, that required communicating to Linux an hwlock
-> id, but since none of them have reached mainline, we should only
-> remember they may show up one day, but not put too much effort to
-> support them right now.
->
-
-That makes more sense, although I still believe that you end up with a
-system wide setup where locks are statically allocated in some
-document beforehand. Either that or you will have to feed that other
-system with the list of constraints.
-
-Non the less, that's "unrelated".
-
-If we get an incoming message saying lckX:Y (or the global lckZ), we
-probably wouldn't define that in DT. We would need a way to resolve
-the hwlock-block "lckX" so we can request lock Y from that block. We
-would basically build the DT reference on the fly.
-
-I think this is a future problem to be solved and more importantly I
-don't think it's limited to hwlocks. If a system architect designs a
-system where a remote entity will do allocation of resources for us,
-they will most likely do so not only for hwlocks but also for gpios,
-irqs and other resources that we today reference with arguments in DT.
-Hopefully that will not happen anytime soon, so let's just ignore that
-problem for now and go for a simple binding that will cover todays use
-cases (with some thought into multi-block support).
-
-Regards,
-Bjorn
+diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
+index 0eecd83..9c14365 100644
+--- a/arch/arm/mach-pxa/irq.c
++++ b/arch/arm/mach-pxa/irq.c
+@@ -11,6 +11,7 @@
+  *  it under the terms of the GNU General Public License version 2 as
+  *  published by the Free Software Foundation.
+  */
++#include <linux/bitops.h>
+ #include <linux/init.h>
+ #include <linux/module.h>
+ #include <linux/interrupt.h>
+@@ -40,7 +41,6 @@
+ #define ICHP_VAL_IRQ		(1 << 31)
+ #define ICHP_IRQ(i)		(((i) >> 16) & 0x7fff)
+ #define IPR_VALID		(1 << 31)
+-#define IRQ_BIT(n)		(((n) - PXA_IRQ(0)) & 0x1f)
+ 
+ #define MAX_INTERNAL_IRQS	128
+ 
+@@ -51,6 +51,7 @@
+ static void __iomem *pxa_irq_base;
+ static int pxa_internal_irq_nr;
+ static bool cpu_has_ipr;
++static struct irq_domain *pxa_irq_domain;
+ 
+ static inline void __iomem *irq_base(int i)
+ {
+@@ -66,18 +67,20 @@ static inline void __iomem *irq_base(int i)
+ void pxa_mask_irq(struct irq_data *d)
+ {
+ 	void __iomem *base = irq_data_get_irq_chip_data(d);
++	irq_hw_number_t irq = irqd_to_hwirq(d);
+ 	uint32_t icmr = __raw_readl(base + ICMR);
+ 
+-	icmr &= ~(1 << IRQ_BIT(d->irq));
++	icmr &= ~BIT(irq);
+ 	__raw_writel(icmr, base + ICMR);
+ }
+ 
+ void pxa_unmask_irq(struct irq_data *d)
+ {
+ 	void __iomem *base = irq_data_get_irq_chip_data(d);
++	irq_hw_number_t irq = irqd_to_hwirq(d);
+ 	uint32_t icmr = __raw_readl(base + ICMR);
+ 
+-	icmr |= 1 << IRQ_BIT(d->irq);
++	icmr |= BIT(irq);
+ 	__raw_writel(icmr, base + ICMR);
+ }
+ 
+@@ -118,40 +121,63 @@ asmlinkage void __exception_irq_entry ichp_handle_irq(struct pt_regs *regs)
+ 	} while (1);
+ }
+ 
+-void __init pxa_init_irq(int irq_nr, int (*fn)(struct irq_data *, unsigned int))
++static int pxa_irq_map(struct irq_domain *h, unsigned int virq,
++		       irq_hw_number_t hw)
+ {
+-	int irq, i, n;
++	void __iomem *base = irq_base(hw / 32);
+ 
+-	BUG_ON(irq_nr > MAX_INTERNAL_IRQS);
++	/* initialize interrupt priority */
++	if (cpu_has_ipr)
++		__raw_writel(hw | IPR_VALID, pxa_irq_base + IPR(hw));
++
++	irq_set_chip_and_handler(virq, &pxa_internal_irq_chip,
++				 handle_level_irq);
++	irq_set_chip_data(virq, base);
++	set_irq_flags(virq, IRQF_VALID);
++
++	return 0;
++}
++
++static struct irq_domain_ops pxa_irq_ops = {
++	.map    = pxa_irq_map,
++	.xlate  = irq_domain_xlate_onecell,
++};
++
++static __init void
++pxa_init_irq_common(struct device_node *node, int irq_nr,
++		    int (*fn)(struct irq_data *, unsigned int))
++{
++	int n;
+ 
+ 	pxa_internal_irq_nr = irq_nr;
+-	cpu_has_ipr = !cpu_is_pxa25x();
+-	pxa_irq_base = io_p2v(0x40d00000);
++	pxa_irq_domain = irq_domain_add_legacy(node, irq_nr,
++					       PXA_IRQ(0), 0,
++					       &pxa_irq_ops, NULL);
++	if (!pxa_irq_domain)
++		panic("Unable to add PXA IRQ domain\n");
++	irq_set_default_host(pxa_irq_domain);
+ 
+ 	for (n = 0; n < irq_nr; n += 32) {
+ 		void __iomem *base = irq_base(n >> 5);
+ 
+ 		__raw_writel(0, base + ICMR);	/* disable all IRQs */
+ 		__raw_writel(0, base + ICLR);	/* all IRQs are IRQ, not FIQ */
+-		for (i = n; (i < (n + 32)) && (i < irq_nr); i++) {
+-			/* initialize interrupt priority */
+-			if (cpu_has_ipr)
+-				__raw_writel(i | IPR_VALID, pxa_irq_base + IPR(i));
+-
+-			irq = PXA_IRQ(i);
+-			irq_set_chip_and_handler(irq, &pxa_internal_irq_chip,
+-						 handle_level_irq);
+-			irq_set_chip_data(irq, base);
+-			set_irq_flags(irq, IRQF_VALID);
+-		}
+ 	}
+-
+ 	/* only unmasked interrupts kick us out of idle */
+ 	__raw_writel(1, irq_base(0) + ICCR);
+ 
+ 	pxa_internal_irq_chip.irq_set_wake = fn;
+ }
+ 
++void __init pxa_init_irq(int irq_nr, int (*fn)(struct irq_data *, unsigned int))
++{
++	BUG_ON(irq_nr > MAX_INTERNAL_IRQS);
++
++	pxa_irq_base = io_p2v(0x40d00000);
++	cpu_has_ipr = !cpu_is_pxa25x();
++	pxa_init_irq_common(NULL, irq_nr, fn);
++}
++
+ #ifdef CONFIG_PM
+ static unsigned long saved_icmr[MAX_INTERNAL_IRQS/32];
+ static unsigned long saved_ipr[MAX_INTERNAL_IRQS];
+@@ -203,30 +229,6 @@ struct syscore_ops pxa_irq_syscore_ops = {
+ };
+ 
+ #ifdef CONFIG_OF
+-static struct irq_domain *pxa_irq_domain;
+-
+-static int pxa_irq_map(struct irq_domain *h, unsigned int virq,
+-		       irq_hw_number_t hw)
+-{
+-	void __iomem *base = irq_base(hw / 32);
+-
+-	/* initialize interrupt priority */
+-	if (cpu_has_ipr)
+-		__raw_writel(hw | IPR_VALID, pxa_irq_base + IPR(hw));
+-
+-	irq_set_chip_and_handler(hw, &pxa_internal_irq_chip,
+-				 handle_level_irq);
+-	irq_set_chip_data(hw, base);
+-	set_irq_flags(hw, IRQF_VALID);
+-
+-	return 0;
+-}
+-
+-static struct irq_domain_ops pxa_irq_ops = {
+-	.map    = pxa_irq_map,
+-	.xlate  = irq_domain_xlate_onecell,
+-};
+-
+ static const struct of_device_id intc_ids[] __initconst = {
+ 	{ .compatible = "marvell,pxa-intc", },
+ 	{}
+@@ -236,7 +238,7 @@ void __init pxa_dt_irq_init(int (*fn)(struct irq_data *, unsigned int))
+ {
+ 	struct device_node *node;
+ 	struct resource res;
+-	int n, ret;
++	int ret;
+ 
+ 	node = of_find_matching_node(NULL, intc_ids);
+ 	if (!node) {
+@@ -267,23 +269,6 @@ void __init pxa_dt_irq_init(int (*fn)(struct irq_data *, unsigned int))
+ 		return;
+ 	}
+ 
+-	pxa_irq_domain = irq_domain_add_legacy(node, pxa_internal_irq_nr, 0, 0,
+-					       &pxa_irq_ops, NULL);
+-	if (!pxa_irq_domain)
+-		panic("Unable to add PXA IRQ domain\n");
+-
+-	irq_set_default_host(pxa_irq_domain);
+-
+-	for (n = 0; n < pxa_internal_irq_nr; n += 32) {
+-		void __iomem *base = irq_base(n >> 5);
+-
+-		__raw_writel(0, base + ICMR);	/* disable all IRQs */
+-		__raw_writel(0, base + ICLR);	/* all IRQs are IRQ, not FIQ */
+-	}
+-
+-	/* only unmasked interrupts kick us out of idle */
+-	__raw_writel(1, irq_base(0) + ICCR);
+-
+-	pxa_internal_irq_chip.irq_set_wake = fn;
++	pxa_init_irq_common(node, pxa_internal_irq_nr, fn);
+ }
+ #endif /* CONFIG_OF */
+-- 
+2.1.0
