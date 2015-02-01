@@ -1,48 +1,117 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Sun, 01 Feb 2015 22:25:56 +0100
-Subject: [PATCH] irqchip: gic: Don't complain in
- =?UTF-8?Q?gic=5Fget=5Fcpumask=28=29=20if=20UP=20system?=
-In-Reply-To: <1422665010-5854-1-git-send-email-sboyd@codeaurora.org>
-References: <1422665010-5854-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <9143d197d772c6e6ee10fd54bdcd557b@agner.ch>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Sun, 01 Feb 2015 14:18:56 -0800
+Subject: [PATCH v13 4/6] clk: Add rate constraints to clocks
+In-Reply-To: <CAAObsKDxhV7Vveq5FizTUp9ur2Rsq1bM+YQa4uPksh5ntMQV3Q@mail.gmail.com>
+References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1422011024-32283-5-git-send-email-tomeu.vizoso@collabora.com>
+ <CAMuHMdUGgA70o2SgdJR3X6AkCcMssHU0POLfzppADT-O=BrYDw@mail.gmail.com>
+ <54CA8662.7040008@codeaurora.org> <20150131013158.GA4323@codeaurora.org>
+ <CAAObsKDxhV7Vveq5FizTUp9ur2Rsq1bM+YQa4uPksh5ntMQV3Q@mail.gmail.com>
+Message-ID: <20150201221856.421.6151@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-01-31 01:43, Stephen Boyd wrote:
-> In a uniprocessor implementation the interrupt processor targets
-> registers are read-as-zero/write-ignored (RAZ/WI). Unfortunately
-> gic_get_cpumask() will print a critical message saying
+Quoting Tomeu Vizoso (2015-01-31 10:36:22)
+> On 31 January 2015 at 02:31, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> > On 01/29, Stephen Boyd wrote:
+> >> On 01/29/15 05:31, Geert Uytterhoeven wrote:
+> >> > Hi Tomeu, Mike,
+> >> >
+> >> > On Fri, Jan 23, 2015 at 12:03 PM, Tomeu Vizoso
+> >> > <tomeu.vizoso@collabora.com> wrote:
+> >> >> --- a/drivers/clk/clk.c
+> >> >> +++ b/drivers/clk/clk.c
+> >> >> @@ -2391,25 +2543,24 @@ int __clk_get(struct clk *clk)
+> >> >>         return 1;
+> >> >>  }
+> >> >>
+> >> >> -static void clk_core_put(struct clk_core *core)
+> >> >> +void __clk_put(struct clk *clk)
+> >> >>  {
+> >> >>         struct module *owner;
+> >> >>
+> >> >> -       owner = core->owner;
+> >> >> +       if (!clk || WARN_ON_ONCE(IS_ERR(clk)))
+> >> >> +               return;
+> >> >>
+> >> >>         clk_prepare_lock();
+> >> >> -       kref_put(&core->ref, __clk_release);
+> >> >> +
+> >> >> +       hlist_del(&clk->child_node);
+> >> >> +       clk_core_set_rate_nolock(clk->core, clk->core->req_rate);
+> >> > At this point, clk->core->req_rate is still zero, causing
+> >> > cpg_div6_clock_round_rate() to be called with a zero "rate" parameter,
+> >> > e.g. on r8a7791:
+> >>
+> >> Hmm.. I wonder if we should assign core->req_rate to be the same as
+> >> core->rate during __clk_init()? That would make this call to
+> >> clk_core_set_rate_nolock() a nop in this case.
+> >>
+> >
+> > Here's a patch to do this
+> >
+> > ---8<----
+> > From: Stephen Boyd <sboyd@codeaurora.org>
+> > Subject: [PATCH] clk: Assign a requested rate by default
+> >
+> > We need to assign a requested rate here so that we avoid
+> > requesting a rate of 0 on clocks when we remove clock consumers.
 > 
->  GIC CPU mask not found - kernel will fail to boot.
+> Hi, this looks good to me.
 > 
-> if these registers all read as zero, but there won't actually be
-> a problem on uniprocessor systems and the kernel will boot just
-> fine. Skip this check if we're running a UP kernel or if we
-> detect that the hardware only supports a single processor.
+> Reviewed-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 
-Does the job for my device too, thx.
+It seems to fix the total boot failure on OMAPs, and hopefully does the
+same for SH Mobile and others. I've squashed this into Tomeu's rate
+constraints patch to maintain bisect.
 
-Acked-by: Stefan Agner <stefan@agner.ch>
+Regards,
+Mike
 
 > 
-> Acked-by: Nicolas Pitre <nico@linaro.org>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Cc: Stefan Agner <stefan@agner.ch>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  drivers/irqchip/irq-gic.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Thanks,
 > 
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index d617ee5a3d8a..1b70e0de0f6e 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -346,7 +346,7 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
->  			break;
->  	}
->  
-> -	if (!mask)
-> +	if (!mask && num_possible_cpus() > 1)
->  		pr_crit("GIC CPU mask not found - kernel will fail to boot.\n");
->  
->  	return mask;
+> Tomeu
+> 
+> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> > ---
+> >  drivers/clk/clk.c | 8 +++++---
+> >  1 file changed, 5 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> > index a29daf9edea4..8416ed1c40be 100644
+> > --- a/drivers/clk/clk.c
+> > +++ b/drivers/clk/clk.c
+> > @@ -2142,6 +2142,7 @@ int __clk_init(struct device *dev, struct clk *clk_user)
+> >         struct clk_core *orphan;
+> >         struct hlist_node *tmp2;
+> >         struct clk_core *clk;
+> > +       unsigned long rate;
+> >
+> >         if (!clk_user)
+> >                 return -EINVAL;
+> > @@ -2266,12 +2267,13 @@ int __clk_init(struct device *dev, struct clk *clk_user)
+> >          * then rate is set to zero.
+> >          */
+> >         if (clk->ops->recalc_rate)
+> > -               clk->rate = clk->ops->recalc_rate(clk->hw,
+> > +               rate = clk->ops->recalc_rate(clk->hw,
+> >                                 clk_core_get_rate_nolock(clk->parent));
+> >         else if (clk->parent)
+> > -               clk->rate = clk->parent->rate;
+> > +               rate = clk->parent->rate;
+> >         else
+> > -               clk->rate = 0;
+> > +               rate = 0;
+> > +       clk->rate = clk->req_rate = rate;
+> >
+> >         /*
+> >          * walk the list of orphan clocks and reparent any that are children of
+> > --
+> > Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> > a Linux Foundation Collaborative Project
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
