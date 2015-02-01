@@ -1,39 +1,42 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 01 Feb 2015 12:01:12 +0100
-Subject: [PATCH] ARM: pxa: fix pxa interrupts handling in DT
-In-Reply-To: <1422743581-31548-1-git-send-email-robert.jarzmik@free.fr>
- (Robert Jarzmik's message of "Sat, 31 Jan 2015 23:33:01 +0100")
-References: <1422743581-31548-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <878ughuc93.fsf@free.fr>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sun, 01 Feb 2015 14:26:50 +0300
+Subject: [PATCH 5/5] ARM: dts: pxa: add pxa-timer to pxa27x
+In-Reply-To: <1422744510-3179-5-git-send-email-robert.jarzmik@free.fr>
+References: <1422744510-3179-1-git-send-email-robert.jarzmik@free.fr>
+ <1422744510-3179-5-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <54CE0D7A.3070603@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Robert Jarzmik <robert.jarzmik@free.fr> writes:
+Hello.
 
-> The commit "ARM: pxa: arbitrarily set first interrupt number" changed
-> the first pxa interrupt to 16.
->
-> As a consequence, device-tree builds got broken, because :
->  - pxa_mask_irq() and pxa_unmask_irq() are using IRQ_BIT()
->  - IRQ_BIT(x) calculates the interrupts as : x - PXA_IRQ(0)
->
-> Before the commit, the first interrupt shift, PXA_IRQ(0) was 0,
-> therefore IRQ_BIT(x) was x. After the change, it is necessary that the
-> same shift of 16 is applied between the virtual interrupt number and the
-> hardware irq number.
->
-> This situation comes from the common irq_chip shared between legacy
-> platform builds and device-tree builds.
->
-> Fix the broken interrupts in DT case by adding this shift in the DT case
-> too.
+On 2/1/2015 1:48 AM, Robert Jarzmik wrote:
 
-Actually, this work should be pushed a bit more for the irq_chip functions, so
-that they're freed from the IRQ_BIT(x) macro. A more complete work would be to
-use BIT(irqd_to_hwirq(d)) instead of IRQ_BIT(d->irq) in :
- - pxa_mask_irq()
- - pxa_unmask_irq()
-And add the legacy irq_domain in pxa_init_irq().
+> Each pxa has an embedded OS Timers IP. The kernel cannot work without a
+> valid clocksource, and this adds the OS Timers to the pxa device-tree
+> description.
 
---
-Robert
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> ---
+>   arch/arm/boot/dts/pxa27x.dtsi | 13 +++++++++++++
+>   1 file changed, 13 insertions(+)
+
+> diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
+> index 7f93828..9e6bf60 100644
+> --- a/arch/arm/boot/dts/pxa27x.dtsi
+> +++ b/arch/arm/boot/dts/pxa27x.dtsi
+> @@ -97,5 +97,18 @@
+>   			status = "okay";
+>   		};
+>   	};
+> +
+> +	clocksources {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		pxa-timer at 40a00000 {
+
+    Just "timer at 40a00000", please.
+
+WBR, Sergei
