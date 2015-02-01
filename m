@@ -1,420 +1,130 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun,  1 Feb 2015 14:50:07 +0100
-Subject: [PATCH 23/30] ARM: sun7i: hummingbird: Convert to DT label based
- syntax
-In-Reply-To: <1422798614-3581-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1422798614-3581-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1422798614-3581-24-git-send-email-maxime.ripard@free-electrons.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Sun, 01 Feb 2015 11:27:31 -0500
+Subject: [PATCH v2 1/4] tty: serial: Add 8250 earlycon to support noinit
+ option
+In-Reply-To: <1421068104-30463-2-git-send-email-eddie.huang@mediatek.com>
+References: <1421068104-30463-1-git-send-email-eddie.huang@mediatek.com>
+ <1421068104-30463-2-git-send-email-eddie.huang@mediatek.com>
+Message-ID: <54CE53F3.5040709@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to lessen the amount of duplication of the DT tree, ease the
-new and follow the trend that prefers to use label based references
-when overriding DTSI nodes, convert the board to this syntax
+Hi Eddie,
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/sun7i-a20-hummingbird.dts | 384 ++++++++++++++--------------
- 1 file changed, 191 insertions(+), 193 deletions(-)
+On 01/12/2015 08:08 AM, Eddie Huang wrote:
+> Add earlycon support not only baudrate option, but also add noinit option.
+> If use noinit option, 8250 earlycon will not init serial hardware and use
+> loader setting.
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-hummingbird.dts b/arch/arm/boot/dts/sun7i-a20-hummingbird.dts
-index 2a9ee72b2b4a..8c30e126abe6 100644
---- a/arch/arm/boot/dts/sun7i-a20-hummingbird.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-hummingbird.dts
-@@ -67,199 +67,6 @@
- 		serial4 = &uart5;
- 	};
- 
--	soc at 01c00000 {
--		mmc0: mmc at 01c0f000 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
--			vmmc-supply = <&reg_vcc3v0>;
--			bus-width = <4>;
--			cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
--			cd-inverted;
--			status = "okay";
--		};
--
--		mmc3: mmc at 01c12000 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&mmc3_pins_a>;
--			vmmc-supply = <&reg_mmc3_vdd>;
--			bus-width = <4>;
--			non-removable;
--			status = "okay";
--		};
--
--		usbphy: phy at 01c13400 {
--			usb1_vbus-supply = <&reg_usb1_vbus>;
--			usb2_vbus-supply = <&reg_usb2_vbus>;
--			status = "okay";
--		};
--
--		ehci0: usb at 01c14000 {
--			status = "okay";
--		};
--
--		ohci0: usb at 01c14400 {
--			status = "okay";
--		};
--
--		ahci: sata at 01c18000 {
--			target-supply = <&reg_ahci_5v>;
--			status = "okay";
--		};
--
--		ehci1: usb at 01c1c000 {
--			status = "okay";
--		};
--
--		ohci1: usb at 01c1c400 {
--			status = "okay";
--		};
--
--		pio: pinctrl at 01c20800 {
--			ahci_pwr_pin_a20_hummingbird: ahci_pwr_pin at 0 {
--				allwinner,pins = "PH15";
--				allwinner,function = "gpio_out";
--				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
--				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
--			};
--
--			usb1_vbus_pin_a20_hummingbird: usb1_vbus_pin at 0 {
--				allwinner,pins = "PH2";
--				allwinner,function = "gpio_out";
--				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
--				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
--			};
--
--			mmc3_vdd_pin_a20_hummingbird: mmc3_vdd_pin at 0 {
--				allwinner,pins = "PH9";
--				allwinner,function = "gpio_out";
--				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
--				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
--			};
--
--			gmac_vdd_pin_a20_hummingbird: gmac_vdd_pin at 0 {
--				allwinner,pins = "PH16";
--				allwinner,function = "gpio_out";
--				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
--				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
--			};
--		};
--
--		pwm: pwm at 01c20e00 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&pwm0_pins_a>;
--			status = "okay";
--		};
--
--		ir0: ir at 01c21800 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&ir0_pins_a>;
--			status = "okay";
--		};
--
--		uart0: serial at 01c28000 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&uart0_pins_a>;
--			status = "okay";
--		};
--
--		uart2: serial at 01c28800 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&uart2_pins_a>;
--			status = "okay";
--		};
--
--		uart3: serial at 01c28c00 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&uart3_pins_a>;
--			status = "okay";
--		};
--
--		uart4: serial at 01c29000 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&uart4_pins_a>;
--			status = "okay";
--		};
--
--		uart5: serial at 01c29400 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&uart5_pins_a>;
--			status = "okay";
--		};
--
--		i2c0: i2c at 01c2ac00 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&i2c0_pins_a>;
--			status = "okay";
--
--			axp209: pmic at 34 {
--				compatible = "x-powers,axp209";
--				reg = <0x34>;
--				interrupt-parent = <&nmi_intc>;
--				interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
--				interrupt-controller;
--				#interrupt-cells = <1>;
--			};
--		};
--
--		i2c1: i2c at 01c2b000 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&i2c1_pins_a>;
--			status = "okay";
--		};
--
--		i2c2: i2c at 01c2b400 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&i2c2_pins_a>;
--			status = "okay";
--		};
--
--		i2c3: i2c at 01c2b800 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&i2c3_pins_a>;
--			status = "okay";
--		};
--
--		spi2: spi at 01c17000 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&spi2_pins_b>;
--			status = "okay";
--		};
--
--		gmac: ethernet at 01c50000 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&gmac_pins_rgmii_a>;
--			phy = <&phy1>;
--			phy-mode = "rgmii";
--			phy-supply = <&reg_gmac_vdd>;
--			/* phy reset config */
--			snps,reset-gpio = <&pio 0 17 GPIO_ACTIVE_HIGH>; /* PA17 */
--			snps,reset-active-low;
--			/* wait 1s after reset, otherwise fail to read phy id */
--			snps,reset-delays-us = <0 10000 1000000>;
--			status = "okay";
--
--			phy1: ethernet-phy at 1 {
--				reg = <1>;
--			};
--		};
--	};
--
--	reg_ahci_5v: ahci-5v {
--		pinctrl-0 = <&ahci_pwr_pin_a20_hummingbird>;
--		gpio = <&pio 7 15 GPIO_ACTIVE_HIGH>; /* PH15 */
--		status = "okay";
--	};
--
--	reg_usb1_vbus: usb1-vbus {
--		pinctrl-0 = <&usb1_vbus_pin_a20_hummingbird>;
--		gpio = <&pio 7 2 GPIO_ACTIVE_HIGH>; /* PH2 */
--		status = "okay";
--	};
--
--	reg_usb2_vbus: usb2-vbus {
--		status = "okay";
--	};
--
- 	reg_mmc3_vdd: mmc3_vdd {
- 		compatible = "regulator-fixed";
- 		pinctrl-names = "default";
-@@ -282,3 +89,194 @@
- 		gpio = <&pio 7 16 GPIO_ACTIVE_HIGH>; /* PH16 */
- 	};
- };
-+
-+&ahci {
-+	target-supply = <&reg_ahci_5v>;
-+	status = "okay";
-+};
-+
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+&ehci1 {
-+	status = "okay";
-+};
-+
-+&gmac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&gmac_pins_rgmii_a>;
-+	phy = <&phy1>;
-+	phy-mode = "rgmii";
-+	phy-supply = <&reg_gmac_vdd>;
-+	/* phy reset config */
-+	snps,reset-gpio = <&pio 0 17 GPIO_ACTIVE_HIGH>; /* PA17 */
-+	snps,reset-active-low;
-+	/* wait 1s after reset, otherwise fail to read phy id */
-+	snps,reset-delays-us = <0 10000 1000000>;
-+	status = "okay";
-+
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+	};
-+};
-+
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "okay";
-+
-+	axp209: pmic at 34 {
-+		compatible = "x-powers,axp209";
-+		reg = <0x34>;
-+		interrupt-parent = <&nmi_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
-+	};
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins_a>;
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_pins_a>;
-+	status = "okay";
-+};
-+
-+&i2c3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c3_pins_a>;
-+	status = "okay";
-+};
-+
-+&ir0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ir0_pins_a>;
-+	status = "okay";
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
-+	vmmc-supply = <&reg_vcc3v0>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&mmc3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc3_pins_a>;
-+	vmmc-supply = <&reg_mmc3_vdd>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
-+};
-+
-+&ohci0 {
-+	status = "okay";
-+};
-+
-+&ohci1 {
-+	status = "okay";
-+};
-+
-+&pio {
-+	ahci_pwr_pin_a20_hummingbird: ahci_pwr_pin at 0 {
-+		allwinner,pins = "PH15";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
-+	usb1_vbus_pin_a20_hummingbird: usb1_vbus_pin at 0 {
-+		allwinner,pins = "PH2";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
-+	mmc3_vdd_pin_a20_hummingbird: mmc3_vdd_pin at 0 {
-+		allwinner,pins = "PH9";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
-+	gmac_vdd_pin_a20_hummingbird: gmac_vdd_pin at 0 {
-+		allwinner,pins = "PH16";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
-+&pwm {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pwm0_pins_a>;
-+	status = "okay";
-+};
-+
-+&reg_ahci_5v {
-+	pinctrl-0 = <&ahci_pwr_pin_a20_hummingbird>;
-+	gpio = <&pio 7 15 GPIO_ACTIVE_HIGH>; /* PH15 */
-+	status = "okay";
-+};
-+
-+&reg_usb1_vbus {
-+	pinctrl-0 = <&usb1_vbus_pin_a20_hummingbird>;
-+	gpio = <&pio 7 2 GPIO_ACTIVE_HIGH>; /* PH2 */
-+	status = "okay";
-+};
-+
-+&reg_usb2_vbus {
-+	status = "okay";
-+};
-+
-+&spi2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&spi2_pins_b>;
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart2_pins_a>;
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart3_pins_a>;
-+	status = "okay";
-+};
-+
-+&uart4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart4_pins_a>;
-+	status = "okay";
-+};
-+
-+&uart5 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart5_pins_a>;
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	usb1_vbus-supply = <&reg_usb1_vbus>;
-+	usb2_vbus-supply = <&reg_usb2_vbus>;
-+	status = "okay";
-+};
--- 
-2.2.2
+I see this went into Greg's tty-testing branch.
+
+The only point of this is to not program the divisor, right?
+
+I ask because early_serial8250_setup() could already handle this without
+extra options by simply not doing divisor programming if no baud option is
+present.
+
+And this blows up if the optional console= form is used:
+    console=uart,mmio32,<addr>,noinit
+because the ttyS console will expect line settings for console match.
+
+Regards,
+Peter Hurley
+
+> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+> ---
+>  drivers/tty/serial/8250/8250_early.c |  7 ++++---
+>  drivers/tty/serial/earlycon.c        | 17 ++++++++++++-----
+>  include/linux/serial_8250.h          |  2 ++
+>  include/linux/serial_core.h          |  1 +
+>  4 files changed, 19 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/8250/8250_early.c b/drivers/tty/serial/8250/8250_early.c
+> index 4858b8a..a13d757 100644
+> --- a/drivers/tty/serial/8250/8250_early.c
+> +++ b/drivers/tty/serial/8250/8250_early.c
+> @@ -138,19 +138,20 @@ static void __init init_port(struct earlycon_device *device)
+>  	serial8250_early_out(port, UART_LCR, c & ~UART_LCR_DLAB);
+>  }
+>  
+> -static int __init early_serial8250_setup(struct earlycon_device *device,
+> +int __init early_serial8250_setup(struct earlycon_device *device,
+>  					 const char *options)
+>  {
+>  	if (!(device->port.membase || device->port.iobase))
+>  		return 0;
+>  
+> -	if (!device->baud) {
+> +	if (!device->baud && !device->noinit) {
+>  		device->baud = probe_baud(&device->port);
+>  		snprintf(device->options, sizeof(device->options), "%u",
+>  			 device->baud);
+>  	}
+>  
+> -	init_port(device);
+> +	if (!device->noinit)
+> +		init_port(device);
+>  
+>  	early_device = device;
+>  	device->con->write = early_serial8250_write;
+> diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
+> index 64fe25a..4891251 100644
+> --- a/drivers/tty/serial/earlycon.c
+> +++ b/drivers/tty/serial/earlycon.c
+> @@ -58,7 +58,7 @@ static int __init parse_options(struct earlycon_device *device,
+>  				char *options)
+>  {
+>  	struct uart_port *port = &device->port;
+> -	int mmio, mmio32, length;
+> +	int noinit, mmio, mmio32, length;
+>  	unsigned long addr;
+>  
+>  	if (!options)
+> @@ -92,10 +92,17 @@ static int __init parse_options(struct earlycon_device *device,
+>  	options = strchr(options, ',');
+>  	if (options) {
+>  		options++;
+> -		device->baud = simple_strtoul(options, NULL, 0);
+> -		length = min(strcspn(options, " ") + 1,
+> -			     (size_t)(sizeof(device->options)));
+> -		strlcpy(device->options, options, length);
+> +		noinit = !strncmp(options, "noinit", 6);
+> +		if (noinit) {
+> +			device->noinit = noinit;
+> +			strlcpy(device->options, options, 6);
+> +			device->options[6] = '\0';
+> +		} else {
+> +			device->baud = simple_strtoul(options, NULL, 0);
+> +			length = min(strcspn(options, " ") + 1,
+> +					(size_t)(sizeof(device->options)));
+> +			strlcpy(device->options, options, length);
+> +		}
+>  	}
+>  
+>  	if (port->iotype == UPIO_MEM || port->iotype == UPIO_MEM32)
+> diff --git a/include/linux/serial_8250.h b/include/linux/serial_8250.h
+> index e02acf0..0e26eec 100644
+> --- a/include/linux/serial_8250.h
+> +++ b/include/linux/serial_8250.h
+> @@ -119,6 +119,8 @@ extern int serial8250_find_port(struct uart_port *p);
+>  extern int serial8250_find_port_for_earlycon(void);
+>  extern unsigned int serial8250_early_in(struct uart_port *port, int offset);
+>  extern void serial8250_early_out(struct uart_port *port, int offset, int value);
+> +extern int early_serial8250_setup(struct earlycon_device *device,
+> +					 const char *options);
+>  extern int setup_early_serial8250_console(char *cmdline);
+>  extern void serial8250_do_set_termios(struct uart_port *port,
+>  		struct ktermios *termios, struct ktermios *old);
+> diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
+> index 057038c..72c6698 100644
+> --- a/include/linux/serial_core.h
+> +++ b/include/linux/serial_core.h
+> @@ -326,6 +326,7 @@ struct earlycon_device {
+>  	struct uart_port port;
+>  	char options[16];		/* e.g., 115200n8 */
+>  	unsigned int baud;
+> +	int noinit;
+>  };
+>  int setup_earlycon(char *buf, const char *match,
+>  		   int (*setup)(struct earlycon_device *, const char *));
+> 
