@@ -1,59 +1,46 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 02 Feb 2015 23:57:50 +0300
-Subject: [PATCH] ARM: shmobile: silk: initial device tree
-In-Reply-To: <20150202110557.GC7459@leverpostej>
-References: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
- <1608366.HtA9yBksdO@wasted.cogentembedded.com>
- <20150202110557.GC7459@leverpostej>
-Message-ID: <54CFE4CE.5090406@cogentembedded.com>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Mon,  2 Feb 2015 16:58:04 -0400
+Subject: [PATCH 01/14] cpufreq: exynos4210: properly put of node
+In-Reply-To: <1422910697-5920-1-git-send-email-edubezval@gmail.com>
+References: <1422910697-5920-1-git-send-email-edubezval@gmail.com>
+Message-ID: <1422910697-5920-2-git-send-email-edubezval@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Call of_node_put when necessary during init.
 
-On 02/02/2015 02:05 PM, Mark Rutland wrote:
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Cc: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: linux-pm at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-samsung-soc at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Signed-off-by: Eduardo Valentin <edubezval@gmail.com>
+---
+ drivers/cpufreq/exynos4210-cpufreq.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
->> Add the initial device tree for the R8A7794 SoC based SILK low cost board.
->> SCIF2 serial port support is included, so that the serial console can work.
-
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
-[...]
-
->> Index: renesas/arch/arm/boot/dts/r8a7794-silk.dts
->> ===================================================================
->> --- /dev/null
->> +++ renesas/arch/arm/boot/dts/r8a7794-silk.dts
->> @@ -0,0 +1,41 @@
->> +/*
->> + * Device Tree Source for the SILK board
->> + *
->> + * Copyright (C) 2014 Renesas Electronics Corporation
->> + * Copyright (C) 2014-2015 Renesas Solutions Corp.
->> + * Copyright (C) 2014-2015 Cogent Embedded, Inc.
->> + *
->> + * This file is licensed under the terms of the GNU General Public License
->> + * version 2.  This program is licensed "as is" without any warranty of any
->> + * kind, whether express or implied.
->> + */
->> +
->> +/dts-v1/;
->> +#include "r8a7794.dtsi"
->> +
->> +/ {
->> +	model = "SILK";
-
-> Shouldn't that have a "Renesas" prefix or something like that?
-
-    Historically. no SH-Mobile .dts has used the vendor name in the "model" 
-prop. I defer the decision to Simon but I think we should be at least consistent.
-
-> It's unlikely that there will be another board called "SILK", but it
-> does make it hard for someone to get an idea of what the board is from
-> the model string alone.
-
-    Tend to agree here.
-
-> Mark.
-
-WBR, Sergei
+diff --git a/drivers/cpufreq/exynos4210-cpufreq.c b/drivers/cpufreq/exynos4210-cpufreq.c
+index 843ec82..dba48f0 100644
+--- a/drivers/cpufreq/exynos4210-cpufreq.c
++++ b/drivers/cpufreq/exynos4210-cpufreq.c
+@@ -169,6 +169,7 @@ int exynos4210_cpufreq_init(struct exynos_dvfs_info *info)
+ 	info->set_freq = exynos4210_set_frequency;
+ 
+ 	cpufreq = info;
++	of_node_put(np);
+ 
+ 	return 0;
+ 
+@@ -179,6 +180,8 @@ err_mout_mpll:
+ err_moutcore:
+ 	clk_put(cpu_clk);
+ 
++	of_node_put(np);
+ 	pr_debug("%s: failed initialization\n", __func__);
++
+ 	return -EINVAL;
+ }
+-- 
+2.1.3
