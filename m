@@ -1,92 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 2 Feb 2015 09:04:59 -0800
-Subject: [PATCH v13 3/6] clk: Make clk API return per-user struct clk
- instances
-In-Reply-To: <20150201212432.22722.70917@quantum>
-References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
- <1422011024-32283-4-git-send-email-tomeu.vizoso@collabora.com>
- <20150201212432.22722.70917@quantum>
-Message-ID: <20150202170458.GB9418@atomide.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 02 Feb 2015 20:07:53 +0300
+Subject: [PATCH v2] ahci_xgene: Fix the dma state machine lockup for the
+ ATA_CMD_SMART PIO mode command.
+In-Reply-To: <1422878229-20488-2-git-send-email-stripathi@apm.com>
+References: <1422878229-20488-1-git-send-email-stripathi@apm.com>
+ <1422878229-20488-2-git-send-email-stripathi@apm.com>
+Message-ID: <54CFAEE9.30002@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mike Turquette <mturquette@linaro.org> [150201 13:27]:
-> Quoting Tomeu Vizoso (2015-01-23 03:03:30)
-> > Moves clock state to struct clk_core, but takes care to change as little API as
-> > possible.
-> > 
-> > struct clk_hw still has a pointer to a struct clk, which is the
-> > implementation's per-user clk instance, for backwards compatibility.
-> > 
-> > The struct clk that clk_get_parent() returns isn't owned by the caller, but by
-> > the clock implementation, so the former shouldn't call clk_put() on it.
-> > 
-> > Because some boards in mach-omap2 still register clocks statically, their clock
-> > registration had to be updated to take into account that the clock information
-> > is stored in struct clk_core now.
-> 
-> Tero, Paul & Tony,
-> 
-> Tomeu's patch unveils a problem with omap3_noncore_dpll_enable and
-> struct dpll_data, namely this snippet from
-> arch/arm/mach-omap2/dpll3xxx.c:
-> 
->         parent = __clk_get_parent(hw->clk);
-> 
->         if (__clk_get_rate(hw->clk) == __clk_get_rate(dd->clk_bypass)) {
->                 WARN(parent != dd->clk_bypass,
->                                 "here0, parent name is %s, bypass name is %s\n",
->                                 __clk_get_name(parent), __clk_get_name(dd->clk_bypass));
->                 r = _omap3_noncore_dpll_bypass(clk);
->         } else {
->                 WARN(parent != dd->clk_ref,
->                                 "here1, parent name is %s, ref name is %s\n",
->                                 __clk_get_name(parent), __clk_get_name(dd->clk_ref));
->                 r = _omap3_noncore_dpll_lock(clk);
->         }
-> 
-> struct dpll_data has members clk_ref and clk_bypass which are struct clk
-> pointers. This was always a bit of a violation of the clk.h contract
-> since drivers are not supposed to deref struct clk pointers. Now that we
-> generate unique pointers for each call to clk_get (clk_ref & clk_bypass
-> are populated by of_clk_get in ti_clk_register_dpll) then the pointer
-> comparisons above will never be equal (even if they resolve down to the
-> same struct clk_core). I added the verbose traces to the WARNs above to
-> illustrate the point: the names are always the same but the pointers
-> differ.
-> 
-> AFAICT this doesn't break anything, but booting on OMAP3+ results in
-> noisy WARNs.
+Hello.
 
-Also on at least omap4 like I posted. So sounds like the check for
-WARN is wrong but harmless. Paul & Tero, what do you want to do
-about that?
- 
-> I think the correct fix is to replace clk_bypass and clk_ref pointers
-> with a simple integer parent_index. In fact we already have this index.
-> See how the pointers are populated in ti_clk_register_dpll:
-> 
-> 
->         dd->clk_ref = of_clk_get(node, 0);
->         dd->clk_bypass = of_clk_get(node, 1);
-> 
-> Tony, the same problem affects the FAPLL code which copy/pastes some of
-> the DPLL code.
-> 
-> Thoughts?
+On 02/02/2015 02:57 PM, Suman Tripathi wrote:
 
-Not seeing these warnings with dm186x as fapll.c does not use
-dpll3xxx.c. This is because of the way the PLL's child synthesizers
-need to also access the PLL registers for power and bypass mode.
+> This patch addresses the issue with ATA_CMD_SMART pio mode
+> command for enumeration and device detection with ATA devices.
+> The X-Gene AHCI controller has an errata in which it cannot clear
+> the BSY bit after the PIO setup FIS. The dma state machine enters
+> CMFatalErrorUpdate state and locks up. It is the same issue as
+> in the commit 2a0bdff6b958d1b2523d2754b6cd5e0ea4053016(fix the
 
-Not related to the $subject bug, but to me it seems that we could
-possibly have Linux generic PLL code if we add support for
-parent_in_bypass_mode in addition to the parent_rate. This is because
-the PLL can in theory generate the same rate both in bypass mode and
-regular mode so parent_rate is not enough to tell it to the child
-synthesizers. Not sure how the PLL registers enabling and disabling
-it's children should be handled, maybe regmap would work there.
+    You forgot a space before '('.
 
-Regards,
+> dma state machine lockup for the IDENTIFY DEVICE PIO mode
+> command).
 
-Tony
+    Actually, the summary is "ahci_xgene: fix the dma state machine lockup for 
+the IDENTIFY DEVICE PIO mode command.", i.e. yours is missing a prefix.
+
+[...]
+
+> Signed-off-by: Suman Tripathi <stripathi@apm.com>
+> Reported-by:   Mark Langsdorf <mlangsdo@redhat.com>
+
+MBR, Sergei
