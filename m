@@ -1,59 +1,58 @@
-From: ricardo.ribalda@gmail.com (Ricardo Ribalda Delgado)
-Date: Mon,  2 Feb 2015 11:06:56 +0100
-Subject: [PATCH v2] spi/xilinx: Fix access invalid memory on xilinx_spi_tx
-Message-ID: <1422871616-6686-1-git-send-email-ricardo.ribalda@gmail.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Mon, 2 Feb 2015 18:15:46 +0800
+Subject: [PATCH] media: atmel-isi: increase the burst length to improve
+ the performance
+In-Reply-To: <1416907825-23826-1-git-send-email-josh.wu@atmel.com>
+References: <1416907825-23826-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <54CF4E52.6020901@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 and 2 bytes per word, the transfer of the 3 last bytes will access
-memory outside tx_ptr.
+Hi, Guennadi
 
-Although this has not trigger any error on real hardware, we should
-better fix this.
+Ping? what about the status of this patch?
 
-Fixes: 24ba5e593f391507 Remove rx_fn and tx_fn pointer
-Signed-off-by: Ricardo Ribalda Delgado <ricardo.ribalda@gmail.com>
----
+Best Regards,
+Josh Wu
 
-v2:
-
-v1 was completely wrong, sorry about that :(. This v2 has been tested on x86
- 1 byte per word
-
- drivers/spi/spi-xilinx.c | 17 ++++++++++++++++-
- 1 file changed, 16 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/spi/spi-xilinx.c b/drivers/spi/spi-xilinx.c
-index d1901d5..133f53a 100644
---- a/drivers/spi/spi-xilinx.c
-+++ b/drivers/spi/spi-xilinx.c
-@@ -117,11 +117,26 @@ static unsigned int xspi_read32_be(void __iomem *addr)
- 
- static void xilinx_spi_tx(struct xilinx_spi *xspi)
- {
-+	u32 data = 0;
-+
- 	if (!xspi->tx_ptr) {
- 		xspi->write_fn(0, xspi->regs + XSPI_TXD_OFFSET);
- 		return;
- 	}
--	xspi->write_fn(*(u32 *)(xspi->tx_ptr), xspi->regs + XSPI_TXD_OFFSET);
-+
-+	switch (xspi->bytes_per_word) {
-+	case 1:
-+		data = *(u8 *)(xspi->tx_ptr);
-+		break;
-+	case 2:
-+		data = *(u16 *)(xspi->tx_ptr);
-+		break;
-+	case 4:
-+		data = *(u32 *)(xspi->tx_ptr);
-+		break;
-+	}
-+
-+	xspi->write_fn(data, xspi->regs + XSPI_TXD_OFFSET);
- 	xspi->tx_ptr += xspi->bytes_per_word;
- }
- 
--- 
-2.1.4
+On 11/25/2014 5:30 PM, Josh Wu wrote:
+> The burst length could be BEATS_4/8/16. Before this patch, isi use default
+> value BEATS_4. To imporve the performance we could set it to BEATS_16.
+>
+> Otherwise sometime it would cause the ISI overflow error.
+>
+> Reported-by: Bo Shen <voice.shen@atmel.com>
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> ---
+>   drivers/media/platform/soc_camera/atmel-isi.c | 2 ++
+>   include/media/atmel-isi.h                     | 4 ++++
+>   2 files changed, 6 insertions(+)
+>
+> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
+> index ee5650f..fda587b 100644
+> --- a/drivers/media/platform/soc_camera/atmel-isi.c
+> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
+> @@ -839,6 +839,8 @@ static int isi_camera_set_bus_param(struct soc_camera_device *icd)
+>   	if (isi->pdata.full_mode)
+>   		cfg1 |= ISI_CFG1_FULL_MODE;
+>   
+> +	cfg1 |= ISI_CFG1_THMASK_BEATS_16;
+> +
+>   	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
+>   	isi_writel(isi, ISI_CFG1, cfg1);
+>   
+> diff --git a/include/media/atmel-isi.h b/include/media/atmel-isi.h
+> index c2e5703..6008b09 100644
+> --- a/include/media/atmel-isi.h
+> +++ b/include/media/atmel-isi.h
+> @@ -59,6 +59,10 @@
+>   #define		ISI_CFG1_FRATE_DIV_MASK		(7 << 8)
+>   #define ISI_CFG1_DISCR				(1 << 11)
+>   #define ISI_CFG1_FULL_MODE			(1 << 12)
+> +/* Definition for THMASK(ISI_V2) */
+> +#define		ISI_CFG1_THMASK_BEATS_4		(0 << 13)
+> +#define		ISI_CFG1_THMASK_BEATS_8		(1 << 13)
+> +#define		ISI_CFG1_THMASK_BEATS_16	(2 << 13)
+>   
+>   /* Bitfields in CFG2 */
+>   #define ISI_CFG2_GRAYSCALE			(1 << 13)
