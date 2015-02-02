@@ -1,46 +1,37 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Mon,  2 Feb 2015 16:58:16 -0400
-Subject: [PATCH 13/14] cpufreq: exynos5250: remove unused symbol cpufreq
-In-Reply-To: <1422910697-5920-1-git-send-email-edubezval@gmail.com>
-References: <1422910697-5920-1-git-send-email-edubezval@gmail.com>
-Message-ID: <1422910697-5920-14-git-send-email-edubezval@gmail.com>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Mon,  2 Feb 2015 13:03:12 -0800
+Subject: [GIT PULL 1/2] soc: ti: Keystone Navigator SOC driver updates for 3.20
+Message-ID: <1422910993-4634-1-git-send-email-santosh.shilimkar@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the set_freq call back receives the intended
-data struct, the global cpufreq variable may be removed.
+The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
 
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Cc: Viresh Kumar <viresh.kumar@linaro.org>
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: linux-pm at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-samsung-soc at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Eduardo Valentin <edubezval@gmail.com>
----
- drivers/cpufreq/exynos5250-cpufreq.c | 2 --
- 1 file changed, 2 deletions(-)
+  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
 
-diff --git a/drivers/cpufreq/exynos5250-cpufreq.c b/drivers/cpufreq/exynos5250-cpufreq.c
-index 191a511..ee274c9 100644
---- a/drivers/cpufreq/exynos5250-cpufreq.c
-+++ b/drivers/cpufreq/exynos5250-cpufreq.c
-@@ -25,7 +25,6 @@ static struct clk *cpu_clk;
- static struct clk *moutcore;
- static struct clk *mout_mpll;
- static struct clk *mout_apll;
--static struct exynos_dvfs_info *cpufreq;
- 
- static unsigned int exynos5250_volt_table[] = {
- 	1300000, 1250000, 1225000, 1200000, 1150000,
-@@ -197,7 +196,6 @@ int exynos5250_cpufreq_init(struct exynos_dvfs_info *info)
- 	info->freq_table = exynos5250_freq_table;
- 	info->set_freq = exynos5250_set_frequency;
- 
--	cpufreq = info;
- 	of_node_put(np);
- 
- 	return 0;
--- 
-2.1.3
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/drivers-soc-ti
+
+for you to fetch changes up to a68094c67bf1fa86630bd011d2d212899c41e1bc:
+
+  soc: ti: knav_qmss_queue: change knav_range_setup_acc_irq to static (2015-01-29 13:23:51 -0800)
+
+----------------------------------------------------------------
+Keystone Navigator SOC driver updates for 3.20
+
+	- Makefile tweak so that knav_qmss and knav_dma can be made loadable
+		modules without depedency issues.
+	- Few more exports to support ARM allmodconfig.
+	- Marking knav_range_setup_acc_irq() local function as static.
+
+----------------------------------------------------------------
+Murali Karicheri (3):
+      soc: ti: knav_qmss_queue: export API calls for use by user driver
+      soc: ti: knav_qmss_queue: makefile tweak to build as dynamic module
+      soc: ti: knav_qmss_queue: change knav_range_setup_acc_irq to static
+
+ drivers/soc/ti/Makefile          | 3 ++-
+ drivers/soc/ti/knav_qmss_acc.c   | 2 +-
+ drivers/soc/ti/knav_qmss_queue.c | 9 +++++++++
+ 3 files changed, 12 insertions(+), 2 deletions(-)
