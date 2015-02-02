@@ -1,69 +1,78 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 02 Feb 2015 14:20:20 +0100
-Subject: [PATCH v5 1/9] PM / Domains: Add a note about power domain subdomains
+Date: Mon, 02 Feb 2015 14:20:28 +0100
+Subject: [PATCH v5 9/9] drm/exynos: add support for 'hdmi' clock
 In-Reply-To: <1422883228-10690-1-git-send-email-m.szyprowski@samsung.com>
 References: <1422883228-10690-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1422883228-10690-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1422883228-10690-10-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a note on defining subdomains to generic PM domain
-binding documentation to let power domain providers use common approach
-for defining power domain hierarchy.
+Mixed need to have hdmi clock enabled to properly perform power on/off
+sequences, so add handling of this clock directly to the mixer driver.
+Dependency between hdmi clock and mixer module has been observed on
+Exynos4 based boards.
 
+Suggested-by: Andrzej Hajda <a.hajda@samsung.com>
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- .../devicetree/bindings/power/power_domain.txt     | 29 ++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ Documentation/devicetree/bindings/video/exynos_mixer.txt | 1 +
+ drivers/gpu/drm/exynos/exynos_mixer.c                    | 9 +++++++++
+ 2 files changed, 10 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
-index 98c16672ab5f..0f8ed3710c66 100644
---- a/Documentation/devicetree/bindings/power/power_domain.txt
-+++ b/Documentation/devicetree/bindings/power/power_domain.txt
-@@ -19,6 +19,16 @@ Required properties:
-    providing multiple PM domains (e.g. power controllers), but can be any value
-    as specified by device tree binding documentation of particular provider.
+diff --git a/Documentation/devicetree/bindings/video/exynos_mixer.txt b/Documentation/devicetree/bindings/video/exynos_mixer.txt
+index 08b394b1edbf..3e38128f866b 100644
+--- a/Documentation/devicetree/bindings/video/exynos_mixer.txt
++++ b/Documentation/devicetree/bindings/video/exynos_mixer.txt
+@@ -15,6 +15,7 @@ Required properties:
+ 	a) mixer: Gate of Mixer IP bus clock.
+ 	b) sclk_hdmi: HDMI Special clock, one of the two possible inputs of
+                mixer mux.
++	c) hdmi: Gate of HDMI IP bus clock, needed together with sclk_hdmi.
  
-+Optional properties:
-+ - power-domains : A phandle and PM domain specifier as defined by bindings of
-+                   the power controller specified by phandle.
-+   Some power domains might be powered from another power domain (or have
-+   other hardware specific dependencies). For representing such dependency
-+   a standard PM domain consumer binding is used. When provided, all domains
-+   created by the given provider should be subdomains of the domain
-+   specified by this binding. More details about power domain specifier are
-+   available in the next section.
-+
  Example:
  
- 	power: power-controller at 12340000 {
-@@ -30,6 +40,25 @@ Example:
- The node above defines a power controller that is a PM domain provider and
- expects one cell as its phandle argument.
+diff --git a/drivers/gpu/drm/exynos/exynos_mixer.c b/drivers/gpu/drm/exynos/exynos_mixer.c
+index 820b76234ef4..8212c8299625 100644
+--- a/drivers/gpu/drm/exynos/exynos_mixer.c
++++ b/drivers/gpu/drm/exynos/exynos_mixer.c
+@@ -72,6 +72,7 @@ struct mixer_resources {
+ 	spinlock_t		reg_slock;
+ 	struct clk		*mixer;
+ 	struct clk		*vp;
++	struct clk		*hdmi;
+ 	struct clk		*sclk_mixer;
+ 	struct clk		*sclk_hdmi;
+ 	struct clk		*mout_mixer;
+@@ -774,6 +775,12 @@ static int mixer_resources_init(struct mixer_context *mixer_ctx)
+ 		return -ENODEV;
+ 	}
  
-+Example 2:
++	mixer_res->hdmi = devm_clk_get(dev, "hdmi");
++	if (IS_ERR(mixer_res->hdmi)) {
++		dev_err(dev, "failed to get clock 'hdmi'\n");
++		return PTR_ERR(mixer_res->hdmi);
++	}
 +
-+	parent: power-controller at 12340000 {
-+		compatible = "foo,power-controller";
-+		reg = <0x12340000 0x1000>;
-+		#power-domain-cells = <1>;
-+	};
-+
-+	child: power-controller at 12340000 {
-+		compatible = "foo,power-controller";
-+		reg = <0x12341000 0x1000>;
-+		power-domains = <&parent 0>;
-+		#power-domain-cells = <1>;
-+	};
-+
-+The nodes above define two power controllers: 'parent' and 'child'.
-+Domains created by the 'child' power controller are subdomains of '0' power
-+domain provided by the 'parent' power controller.
-+
- ==PM domain consumers==
+ 	mixer_res->sclk_hdmi = devm_clk_get(dev, "sclk_hdmi");
+ 	if (IS_ERR(mixer_res->sclk_hdmi)) {
+ 		dev_err(dev, "failed to get clock 'sclk_hdmi'\n");
+@@ -1095,6 +1102,7 @@ static void mixer_poweron(struct exynos_drm_manager *mgr)
+ 	pm_runtime_get_sync(ctx->dev);
  
- Required properties:
+ 	clk_prepare_enable(res->mixer);
++	clk_prepare_enable(res->hdmi);
+ 	if (ctx->vp_enabled) {
+ 		clk_prepare_enable(res->vp);
+ 		if (ctx->has_sclk)
+@@ -1134,6 +1142,7 @@ static void mixer_poweroff(struct exynos_drm_manager *mgr)
+ 	ctx->powered = false;
+ 	mutex_unlock(&ctx->mixer_mutex);
+ 
++	clk_disable_unprepare(res->hdmi);
+ 	clk_disable_unprepare(res->mixer);
+ 	if (ctx->vp_enabled) {
+ 		clk_disable_unprepare(res->vp);
 -- 
 1.9.2
