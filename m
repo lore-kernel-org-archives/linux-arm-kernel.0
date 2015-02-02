@@ -1,89 +1,312 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 02 Feb 2015 23:18:24 +0100
-Subject: [PATCH v8 05/21] ACPI / sleep: Introduce sleep_arm.c
-In-Reply-To: <1422881149-8177-6-git-send-email-hanjun.guo@linaro.org>
+Date: Mon, 02 Feb 2015 23:23:06 +0100
+Subject: [PATCH v8 16/21] irqchip: Add GICv2 specific ACPI boot support
+In-Reply-To: <1422881149-8177-17-git-send-email-hanjun.guo@linaro.org>
 References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
- <1422881149-8177-6-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1685897.h4vAPfoguo@vostro.rjw.lan>
+ <1422881149-8177-17-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <2167210.TxrivgRTIS@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, February 02, 2015 08:45:33 PM Hanjun Guo wrote:
-> From: Graeme Gregory <graeme.gregory@linaro.org>
+On Monday, February 02, 2015 08:45:44 PM Hanjun Guo wrote:
+> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 > 
-> ACPI 5.1 does not currently support S states for ARM64 hardware but
-> ACPI code will call acpi_target_system_state() for device power
-> managment, so introduce sleep_arm.c to allow other drivers to function
-> until S states are defined.
+> ACPI kernel uses MADT table for proper GIC initialization. It needs to
+> parse GIC related subtables, collect CPU interface and distributor
+> addresses and call driver initialization function (which is hardware
+> abstraction agnostic). In a similar way, FDT initialize GICv1/2.
 > 
-> CC: Rafael J. Wysocki <rjw@rjwysocki.net>
+> NOTE: This commit allow to initialize GICv1/2 basic functionality.
+> While now simple GICv2 init call is used, any further GIC features
+> require generic infrastructure for proper ACPI irqchip initialization.
+> That mechanism and stacked irqdomains to support GICv2 MSI/vitalization
+> extension, GICv3/4 and its ITS are considered as next steps.
+> 
+> CC: Jason Cooper <jason@lakedaemon.net>
+> CC: Marc Zyngier <marc.zyngier@arm.com>
 > Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 > Tested-by: Yijing Wang <wangyijing@huawei.com>
 > Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
 > Tested-by: Jon Masters <jcm@redhat.com>
 > Tested-by: Timur Tabi <timur@codeaurora.org>
-> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
 > Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  drivers/acpi/Makefile    |  4 ++++
->  drivers/acpi/sleep_arm.c | 28 ++++++++++++++++++++++++++++
->  2 files changed, 32 insertions(+)
->  create mode 100644 drivers/acpi/sleep_arm.c
-> 
-> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-> index f74317c..bcec54e 100644
-> --- a/drivers/acpi/Makefile
-> +++ b/drivers/acpi/Makefile
-> @@ -23,7 +23,11 @@ acpi-y				+= nvs.o
->  
->  # Power management related files
->  acpi-y				+= wakeup.o
-> +ifeq ($(ARCH), arm64)
-> +acpi-y				+= sleep_arm.o
-> +else # X86, IA64
->  acpi-y				+= sleep.o
-> +endif
->  acpi-y				+= device_pm.o
->  acpi-$(CONFIG_ACPI_SLEEP)	+= proc.o
->  
-> diff --git a/drivers/acpi/sleep_arm.c b/drivers/acpi/sleep_arm.c
-> new file mode 100644
-> index 0000000..54578ef
-> --- /dev/null
-> +++ b/drivers/acpi/sleep_arm.c
-> @@ -0,0 +1,28 @@
-> +/*
-> + *  ARM64 Specific Sleep Functionality
-> + *
-> + *  Copyright (C) 2013-2014, Linaro Ltd.
-> + *      Author: Graeme Gregory <graeme.gregory@linaro.org>
-> + *
-> + *  This program is free software; you can redistribute it and/or modify
-> + *  it under the terms of the GNU General Public License version 2 as
-> + *  published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/acpi.h>
-> +
-> +/*
-> + * Currently the ACPI 5.1 standard does not define S states in a
-> + * manner which is usable for ARM64. These two stubs are sufficient
-> + * that system initialises and device PM works.
-> + */
-> +u32 acpi_target_system_state(void)
-> +{
-> +	return ACPI_STATE_S0;
-> +}
-> +EXPORT_SYMBOL_GPL(acpi_target_system_state);
-> +
-> +int __init acpi_sleep_init(void)
-> +{
-> +	return -ENOSYS;
-> +}
-> 
 
-Why does this need to be in drivers/acpi/ ?
+An ACK from Thomas Gleixner is absolutely necessary for anything touching
+drivers/irqchip/.
+
+> ---
+>  arch/arm64/include/asm/acpi.h        |   2 +
+>  arch/arm64/kernel/acpi.c             |  25 +++++++++
+>  drivers/irqchip/irq-gic.c            | 102 +++++++++++++++++++++++++++++++++++
+>  drivers/irqchip/irqchip.c            |   3 ++
+>  include/linux/acpi.h                 |  15 ++++++
+>  include/linux/irqchip/arm-gic-acpi.h |  31 +++++++++++
+>  6 files changed, 178 insertions(+)
+>  create mode 100644 include/linux/irqchip/arm-gic-acpi.h
+> 
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index 7e825b9..ea4d2b3 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -12,6 +12,8 @@
+>  #ifndef _ASM_ACPI_H
+>  #define _ASM_ACPI_H
+>  
+> +#include <linux/irqchip/arm-gic-acpi.h>
+> +
+>  #include <asm/smp_plat.h>
+>  
+>  /* Basic configuration for ACPI */
+> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> index f86a982..437315e 100644
+> --- a/arch/arm64/kernel/acpi.c
+> +++ b/arch/arm64/kernel/acpi.c
+> @@ -319,6 +319,31 @@ void __init acpi_boot_table_init(void)
+>  	}
+>  }
+>  
+> +void __init acpi_gic_init(void)
+> +{
+> +	struct acpi_table_header *table;
+> +	acpi_status status;
+> +	acpi_size tbl_size;
+> +	int err;
+> +
+> +	if (acpi_disabled)
+> +		return;
+> +
+> +	status = acpi_get_table_with_size(ACPI_SIG_MADT, 0, &table, &tbl_size);
+> +	if (ACPI_FAILURE(status)) {
+> +		const char *msg = acpi_format_exception(status);
+> +
+> +		pr_err("Failed to get MADT table, %s\n", msg);
+> +		return;
+> +	}
+> +
+> +	err = gic_v2_acpi_init(table);
+> +	if (err)
+> +		pr_err("Failed to initialize GIC IRQ controller");
+> +
+> +	early_acpi_os_unmap_memory((char *)table, tbl_size);
+> +}
+> +
+>  static int __init parse_acpi(char *arg)
+>  {
+>  	if (!arg)
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index d617ee5..7f874d6 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -33,12 +33,14 @@
+>  #include <linux/of.h>
+>  #include <linux/of_address.h>
+>  #include <linux/of_irq.h>
+> +#include <linux/acpi.h>
+>  #include <linux/irqdomain.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/percpu.h>
+>  #include <linux/slab.h>
+>  #include <linux/irqchip/chained_irq.h>
+>  #include <linux/irqchip/arm-gic.h>
+> +#include <linux/irqchip/arm-gic-acpi.h>
+>  
+>  #include <asm/cputype.h>
+>  #include <asm/irq.h>
+> @@ -1083,3 +1085,103 @@ IRQCHIP_DECLARE(msm_8660_qgic, "qcom,msm-8660-qgic", gic_of_init);
+>  IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", gic_of_init);
+>  
+>  #endif
+> +
+> +#ifdef CONFIG_ACPI
+> +static phys_addr_t dist_phy_base, cpu_phy_base;
+> +static int cpu_base_assigned;
+> +
+> +static int __init
+> +gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
+> +			const unsigned long end)
+> +{
+> +	struct acpi_madt_generic_interrupt *processor;
+> +	phys_addr_t gic_cpu_base;
+> +
+> +	processor = (struct acpi_madt_generic_interrupt *)header;
+> +
+> +	if (BAD_MADT_ENTRY(processor, end))
+> +		return -EINVAL;
+> +
+> +	/*
+> +	 * There is no support for non-banked GICv1/2 register in ACPI spec.
+> +	 * All CPU interface addresses have to be the same.
+> +	 */
+> +	gic_cpu_base = processor->base_address;
+> +	if (cpu_base_assigned && gic_cpu_base != cpu_phy_base)
+> +		return -EINVAL;
+> +
+> +	cpu_phy_base = gic_cpu_base;
+> +	cpu_base_assigned = 1;
+> +	return 0;
+> +}
+> +
+> +static int __init
+> +gic_acpi_parse_madt_distributor(struct acpi_subtable_header *header,
+> +				const unsigned long end)
+> +{
+> +	struct acpi_madt_generic_distributor *dist;
+> +
+> +	dist = (struct acpi_madt_generic_distributor *)header;
+> +
+> +	if (BAD_MADT_ENTRY(dist, end))
+> +		return -EINVAL;
+> +
+> +	dist_phy_base = dist->base_address;
+> +	return 0;
+> +}
+> +
+> +int __init
+> +gic_v2_acpi_init(struct acpi_table_header *table)
+> +{
+> +	void __iomem *cpu_base, *dist_base;
+> +	int count;
+> +
+> +	/* Collect CPU base addresses */
+> +	count = acpi_parse_entries(ACPI_SIG_MADT,
+> +				   sizeof(struct acpi_table_madt),
+> +				   gic_acpi_parse_madt_cpu, table,
+> +				   ACPI_MADT_TYPE_GENERIC_INTERRUPT, 0);
+> +	if (count <= 0) {
+> +		pr_err("No valid GICC entries exist\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	/*
+> +	 * Find distributor base address. We expect one distributor entry since
+> +	 * ACPI 5.1 spec neither support multi-GIC instances nor GIC cascade.
+> +	 */
+> +	count = acpi_parse_entries(ACPI_SIG_MADT,
+> +				   sizeof(struct acpi_table_madt),
+> +				   gic_acpi_parse_madt_distributor, table,
+> +				   ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR, 0);
+> +	if (count <= 0) {
+> +		pr_err("No valid GICD entries exist\n");
+> +		return -EINVAL;
+> +	} else if (count > 1) {
+> +		pr_err("More than one GICD entry detected\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	cpu_base = ioremap(cpu_phy_base, ACPI_GIC_CPU_IF_MEM_SIZE);
+> +	if (!cpu_base) {
+> +		pr_err("Unable to map GICC registers\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	dist_base = ioremap(dist_phy_base, ACPI_GICV2_DIST_MEM_SIZE);
+> +	if (!dist_base) {
+> +		pr_err("Unable to map GICD registers\n");
+> +		iounmap(cpu_base);
+> +		return -ENOMEM;
+> +	}
+> +
+> +	/*
+> +	 * Initialize zero GIC instance (no multi-GIC support). Also, set GIC
+> +	 * as default IRQ domain to allow for GSI registration and GSI to IRQ
+> +	 * number translation (see acpi_register_gsi() and acpi_gsi_to_irq()).
+> +	 */
+> +	gic_init_bases(0, -1, dist_base, cpu_base, 0, NULL);
+> +	irq_set_default_host(gic_data[0].domain);
+> +	return 0;
+> +}
+> +#endif
+> diff --git a/drivers/irqchip/irqchip.c b/drivers/irqchip/irqchip.c
+> index 0fe2f71..5855240 100644
+> --- a/drivers/irqchip/irqchip.c
+> +++ b/drivers/irqchip/irqchip.c
+> @@ -8,6 +8,7 @@
+>   * warranty of any kind, whether express or implied.
+>   */
+>  
+> +#include <linux/acpi.h>
+>  #include <linux/init.h>
+>  #include <linux/of_irq.h>
+>  #include <linux/irqchip.h>
+> @@ -26,4 +27,6 @@ extern struct of_device_id __irqchip_of_table[];
+>  void __init irqchip_init(void)
+>  {
+>  	of_irq_init(__irqchip_of_table);
+> +
+> +	acpi_irq_init();
+>  }
+> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+> index 87f365e..536991b 100644
+> --- a/include/linux/acpi.h
+> +++ b/include/linux/acpi.h
+> @@ -162,6 +162,16 @@ extern u32 acpi_irq_not_handled;
+>  extern int sbf_port;
+>  extern unsigned long acpi_realmode_flags;
+>  
+> +static inline void acpi_irq_init(void)
+> +{
+> +	/*
+> +	 * Hardcode ACPI IRQ chip initialization to GICv2 for now.
+> +	 * Proper irqchip infrastructure will be implemented along with
+> +	 * incoming  GICv2m|GICv3|ITS bits.
+> +	 */
+> +	acpi_gic_init();
+> +}
+> +
+>  int acpi_register_gsi (struct device *dev, u32 gsi, int triggering, int polarity);
+>  int acpi_gsi_to_irq (u32 gsi, unsigned int *irq);
+>  int acpi_isa_irq_to_gsi (unsigned isa_irq, u32 *gsi);
+> @@ -508,6 +518,11 @@ static inline int acpi_table_parse(char *id,
+>  	return -ENODEV;
+>  }
+>  
+> +static inline void acpi_irq_init(void)
+> +{
+> +	return;
+> +}
+> +
+>  static inline int acpi_nvs_register(__u64 start, __u64 size)
+>  {
+>  	return 0;
+> diff --git a/include/linux/irqchip/arm-gic-acpi.h b/include/linux/irqchip/arm-gic-acpi.h
+> new file mode 100644
+> index 0000000..ad5b577
+> --- /dev/null
+> +++ b/include/linux/irqchip/arm-gic-acpi.h
+> @@ -0,0 +1,31 @@
+> +/*
+> + * Copyright (C) 2014, Linaro Ltd.
+> + *	Author: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef ARM_GIC_ACPI_H_
+> +#define ARM_GIC_ACPI_H_
+> +
+> +#ifdef CONFIG_ACPI
+> +
+> +/*
+> + * Hard code here, we can not get memory size from MADT (but FDT does),
+> + * Actually no need to do that, because this size can be inferred
+> + * from GIC spec.
+> + */
+> +#define ACPI_GICV2_DIST_MEM_SIZE	(SZ_4K)
+> +#define ACPI_GIC_CPU_IF_MEM_SIZE	(SZ_8K)
+> +
+> +struct acpi_table_header;
+> +
+> +void acpi_gic_init(void);
+> +int gic_v2_acpi_init(struct acpi_table_header *table);
+> +#else
+> +static inline void acpi_gic_init(void) { }
+> +#endif
+> +
+> +#endif /* ARM_GIC_ACPI_H_ */
+> 
 
 -- 
 I speak only for myself.
