@@ -1,249 +1,71 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 02 Feb 2015 23:23:58 +0100
-Subject: [PATCH v8 17/21] clocksource / arch_timer: Parse GTDT to
- initialize arch timer
-In-Reply-To: <1422881149-8177-18-git-send-email-hanjun.guo@linaro.org>
-References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
- <1422881149-8177-18-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <3447958.XfVzbZ6OCs@vostro.rjw.lan>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 2 Feb 2015 15:06:16 -0700
+Subject: [PATCH 2/2] coresight: Adding coresight support to arm64
+In-Reply-To: <20150202134512.GE31847@arm.com>
+References: <1422658466-23984-1-git-send-email-mathieu.poirier@linaro.org>
+ <1422658466-23984-3-git-send-email-mathieu.poirier@linaro.org>
+ <20150202134512.GE31847@arm.com>
+Message-ID: <CANLsYky9_ptcvihnKNVvrAH_iB4wA57m4OSwVsYANX3q28gc0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, February 02, 2015 08:45:45 PM Hanjun Guo wrote:
-> Using the information presented by GTDT (Generic Timer Description Table)
-> to initialize the arch timer (not memory-mapped).
-> 
-> CC: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Originally-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> Tested-by: Yijing Wang <wangyijing@huawei.com>
-> Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
-> Tested-by: Jon Masters <jcm@redhat.com>
-> Tested-by: Timur Tabi <timur@codeaurora.org>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  arch/arm64/kernel/time.c             |   7 ++
->  drivers/clocksource/arm_arch_timer.c | 132 ++++++++++++++++++++++++++++-------
+On 2 February 2015 at 06:45, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Jan 30, 2015 at 10:54:26PM +0000, mathieu.poirier at linaro.org wrote:
+>> From: Mathieu Poirier <mathieu.poirier@linaro.org>
+>>
+>> Aside from tracers, all currently supported coresight IP blocks
+>> are 64 bit ready.  As such add the required symbol definition to
+>> compile the framework and drivers.
+>>
+>> Also fixing a couple of warnings picked up by the 64bit compiler.
+>>
+>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> ---
+>>  arch/arm64/Kconfig.debug            | 48 +++++++++++++++++++++++++++++++++++++
+>>  drivers/coresight/coresight-etb10.c |  2 +-
+>>  drivers/coresight/coresight-tmc.c   |  2 +-
+>>  3 files changed, 50 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+>> index 5fdd6dce8061..77dfebbcbffe 100644
+>> --- a/arch/arm64/Kconfig.debug
+>> +++ b/arch/arm64/Kconfig.debug
+>> @@ -66,4 +66,52 @@ config DEBUG_SET_MODULE_RONX
+>>            against certain classes of kernel exploits.
+>>            If in doubt, say "N".
+>>
+>> +menuconfig CORESIGHT
+>> +     bool "CoreSight Tracing Support"
+>> +     select ARM_AMBA
+>> +     help
+>> +       This framework provides a kernel interface for the CoreSight debug
+>> +       and trace drivers to register themselves with. It's intended to build
+>> +       a topological view of the CoreSight components based on a DT
+>> +       specification and configure the right serie of components when a
+>> +       trace source gets enabled.
+>
+> Why does this need to be duplicated by each architecture wanting to make
+> use of coresight capabilities defined under drivers/coresight? Can't we
+> instead have this menuconfig and associated suboptions defined by a core
+> Kconfig file, then have HAVE_ARCH_CORESIGHT_TRACE or something which can
+> be selected by architectures wanting to make use of the framework?
+>
+> Will
 
-An ACK from Thomas Gleixner is necessary for that.
+"arch/arm/Kconfig.debug" and "arch/arm64/Kconfig.debug" already have a
+fair amount of duplication so I wasn't sure if this is the approach
+you guys wanted to take.  I agree that a common core Kconfig file
+would make much more sense and I see a couple of ways to do this:
 
->  include/linux/clocksource.h          |   6 ++
->  3 files changed, 118 insertions(+), 27 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
-> index 1a7125c..42f9195 100644
-> --- a/arch/arm64/kernel/time.c
-> +++ b/arch/arm64/kernel/time.c
-> @@ -35,6 +35,7 @@
->  #include <linux/delay.h>
->  #include <linux/clocksource.h>
->  #include <linux/clk-provider.h>
-> +#include <linux/acpi.h>
->  
->  #include <clocksource/arm_arch_timer.h>
->  
-> @@ -72,6 +73,12 @@ void __init time_init(void)
->  
->  	tick_setup_hrtimer_broadcast();
->  
-> +	/*
-> +	 * Since ACPI or FDT will only one be available in the system,
-> +	 * we can use acpi_generic_timer_init() here safely
-> +	 */
-> +	acpi_generic_timer_init();
-> +
->  	arch_timer_rate = arch_timer_get_rate();
->  	if (!arch_timer_rate)
->  		panic("Unable to initialise architected timer.\n");
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 095c177..407aa63 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -21,6 +21,7 @@
->  #include <linux/io.h>
->  #include <linux/slab.h>
->  #include <linux/sched_clock.h>
-> +#include <linux/acpi.h>
->  
->  #include <asm/arch_timer.h>
->  #include <asm/virt.h>
-> @@ -370,8 +371,12 @@ arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
->  	if (arch_timer_rate)
->  		return;
->  
-> -	/* Try to determine the frequency from the device tree or CNTFRQ */
-> -	if (of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
-> +	/*
-> +	 * Try to determine the frequency from the device tree or CNTFRQ,
-> +	 * if ACPI is enabled, get the frequency from CNTFRQ ONLY.
-> +	 */
-> +	if (!acpi_disabled ||
-> +	    of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
->  		if (cntbase)
->  			arch_timer_rate = readl_relaxed(cntbase + CNTFRQ);
->  		else
-> @@ -690,28 +695,8 @@ static void __init arch_timer_common_init(void)
->  	arch_timer_arch_init();
->  }
->  
-> -static void __init arch_timer_init(struct device_node *np)
-> +static void __init arch_timer_init(void)
->  {
-> -	int i;
-> -
-> -	if (arch_timers_present & ARCH_CP15_TIMER) {
-> -		pr_warn("arch_timer: multiple nodes in dt, skipping\n");
-> -		return;
-> -	}
-> -
-> -	arch_timers_present |= ARCH_CP15_TIMER;
-> -	for (i = PHYS_SECURE_PPI; i < MAX_TIMER_PPI; i++)
-> -		arch_timer_ppi[i] = irq_of_parse_and_map(np, i);
-> -	arch_timer_detect_rate(NULL, np);
-> -
-> -	/*
-> -	 * If we cannot rely on firmware initializing the timer registers then
-> -	 * we should use the physical timers instead.
-> -	 */
-> -	if (IS_ENABLED(CONFIG_ARM) &&
-> -	    of_property_read_bool(np, "arm,cpu-registers-not-fw-configured"))
-> -			arch_timer_use_virtual = false;
-> -
->  	/*
->  	 * If HYP mode is available, we know that the physical timer
->  	 * has been configured to be accessible from PL1. Use it, so
-> @@ -730,13 +715,39 @@ static void __init arch_timer_init(struct device_node *np)
->  		}
->  	}
->  
-> -	arch_timer_c3stop = !of_property_read_bool(np, "always-on");
-> -
->  	arch_timer_register();
->  	arch_timer_common_init();
->  }
-> -CLOCKSOURCE_OF_DECLARE(armv7_arch_timer, "arm,armv7-timer", arch_timer_init);
-> -CLOCKSOURCE_OF_DECLARE(armv8_arch_timer, "arm,armv8-timer", arch_timer_init);
-> +
-> +static void __init arch_timer_of_init(struct device_node *np)
-> +{
-> +	int i;
-> +
-> +	if (arch_timers_present & ARCH_CP15_TIMER) {
-> +		pr_warn("arch_timer: multiple nodes in dt, skipping\n");
-> +		return;
-> +	}
-> +
-> +	arch_timers_present |= ARCH_CP15_TIMER;
-> +	for (i = PHYS_SECURE_PPI; i < MAX_TIMER_PPI; i++)
-> +		arch_timer_ppi[i] = irq_of_parse_and_map(np, i);
-> +
-> +	arch_timer_detect_rate(NULL, np);
-> +
-> +	arch_timer_c3stop = !of_property_read_bool(np, "always-on");
-> +
-> +	/*
-> +	 * If we cannot rely on firmware initializing the timer registers then
-> +	 * we should use the physical timers instead.
-> +	 */
-> +	if (IS_ENABLED(CONFIG_ARM) &&
-> +	    of_property_read_bool(np, "arm,cpu-registers-not-fw-configured"))
-> +			arch_timer_use_virtual = false;
-> +
-> +	arch_timer_init();
-> +}
-> +CLOCKSOURCE_OF_DECLARE(armv7_arch_timer, "arm,armv7-timer", arch_timer_of_init);
-> +CLOCKSOURCE_OF_DECLARE(armv8_arch_timer, "arm,armv8-timer", arch_timer_of_init);
->  
->  static void __init arch_timer_mem_init(struct device_node *np)
->  {
-> @@ -803,3 +814,70 @@ static void __init arch_timer_mem_init(struct device_node *np)
->  }
->  CLOCKSOURCE_OF_DECLARE(armv7_arch_timer_mem, "arm,armv7-timer-mem",
->  		       arch_timer_mem_init);
-> +
-> +#ifdef CONFIG_ACPI
-> +static int __init map_generic_timer_interrupt(u32 interrupt, u32 flags)
-> +{
-> +	int trigger, polarity;
-> +
-> +	if (!interrupt)
-> +		return 0;
-> +
-> +	trigger = (flags & ACPI_GTDT_INTERRUPT_MODE) ? ACPI_EDGE_SENSITIVE
-> +			: ACPI_LEVEL_SENSITIVE;
-> +
-> +	polarity = (flags & ACPI_GTDT_INTERRUPT_POLARITY) ? ACPI_ACTIVE_LOW
-> +			: ACPI_ACTIVE_HIGH;
-> +
-> +	return acpi_register_gsi(NULL, interrupt, trigger, polarity);
-> +}
-> +
-> +/* Initialize per-processor generic timer */
-> +static int __init arch_timer_acpi_init(struct acpi_table_header *table)
-> +{
-> +	struct acpi_table_gtdt *gtdt;
-> +
-> +	if (arch_timers_present & ARCH_CP15_TIMER) {
-> +		pr_warn("arch_timer: already initialized, skipping\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	gtdt = container_of(table, struct acpi_table_gtdt, header);
-> +
-> +	arch_timers_present |= ARCH_CP15_TIMER;
-> +
-> +	arch_timer_ppi[PHYS_SECURE_PPI] =
-> +		map_generic_timer_interrupt(gtdt->secure_el1_interrupt,
-> +		gtdt->secure_el1_flags);
-> +
-> +	arch_timer_ppi[PHYS_NONSECURE_PPI] =
-> +		map_generic_timer_interrupt(gtdt->non_secure_el1_interrupt,
-> +		gtdt->non_secure_el1_flags);
-> +
-> +	arch_timer_ppi[VIRT_PPI] =
-> +		map_generic_timer_interrupt(gtdt->virtual_timer_interrupt,
-> +		gtdt->virtual_timer_flags);
-> +
-> +	arch_timer_ppi[HYP_PPI] =
-> +		map_generic_timer_interrupt(gtdt->non_secure_el2_interrupt,
-> +		gtdt->non_secure_el2_flags);
-> +
-> +	/* Get the frequency from CNTFRQ */
-> +	arch_timer_detect_rate(NULL, NULL);
-> +
-> +	/* Always-on capability */
-> +	arch_timer_c3stop = !(gtdt->non_secure_el1_flags & ACPI_GTDT_ALWAYS_ON);
-> +
-> +	arch_timer_init();
-> +	return 0;
-> +}
-> +
-> +/* Initialize all the generic timers presented in GTDT */
-> +void __init acpi_generic_timer_init(void)
-> +{
-> +	if (acpi_disabled)
-> +		return;
-> +
-> +	acpi_table_parse(ACPI_SIG_GTDT, arch_timer_acpi_init);
-> +}
-> +#endif
-> diff --git a/include/linux/clocksource.h b/include/linux/clocksource.h
-> index abcafaa..af6155a 100644
-> --- a/include/linux/clocksource.h
-> +++ b/include/linux/clocksource.h
-> @@ -346,4 +346,10 @@ extern void clocksource_of_init(void);
->  static inline void clocksource_of_init(void) {}
->  #endif
->  
-> +#ifdef CONFIG_ACPI
-> +void acpi_generic_timer_init(void);
-> +#else
-> +static inline void acpi_generic_timer_init(void) { }
-> +#endif
-> +
->  #endif /* _LINUX_CLOCKSOURCE_H */
-> 
+1) lib/Kconfig.debug being sourced by both arm/Kconfig.debug and
+arm64/Kconfig.debug.  We can add a lib/Kconfig.coresight or
+lib/Kconfig.arm and source them the same way.
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+2) Adding coresight entries to the Kconfig.debug made sense a while
+back.  Maybe it is time to move them to drivers/coresight/Kconfig...
+That way it would be easily accessible by both arm and arm64.
+
+You may have ideas of your own too...
+
+Thanks,
+Mathieu
