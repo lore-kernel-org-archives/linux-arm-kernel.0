@@ -1,129 +1,101 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 02 Feb 2015 22:38:42 +0100
-Subject: [GIT PULL]: clockevents: new material for 3.20
-In-Reply-To: <54CA3044.6070501@linaro.org>
-References: <54CA3044.6070501@linaro.org>
-Message-ID: <54CFEE62.30805@linaro.org>
+From: julia.lawall@lip6.fr (Julia Lawall)
+Date: Mon, 2 Feb 2015 22:31:29 +0100 (CET)
+Subject: [PATCH v13 3/6] clk: Make clk API return per-user struct clk
+ instances
+In-Reply-To: <54CFE1FE.7040404@codeaurora.org>
+References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1422011024-32283-4-git-send-email-tomeu.vizoso@collabora.com>
+ <20150201212432.22722.70917@quantum> <54CFE1FE.7040404@codeaurora.org>
+Message-ID: <alpine.DEB.2.02.1502022230110.2045@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Hi Thomas,
 
-just a gentle reminder ;)
+On Mon, 2 Feb 2015, Stephen Boyd wrote:
 
-Thanks
+> On 02/01/15 13:24, Mike Turquette wrote:
+> > Quoting Tomeu Vizoso (2015-01-23 03:03:30)
+> >> Moves clock state to struct clk_core, but takes care to change as little API as
+> >> possible.
+> >>
+> >> struct clk_hw still has a pointer to a struct clk, which is the
+> >> implementation's per-user clk instance, for backwards compatibility.
+> >>
+> >> The struct clk that clk_get_parent() returns isn't owned by the caller, but by
+> >> the clock implementation, so the former shouldn't call clk_put() on it.
+> >>
+> >> Because some boards in mach-omap2 still register clocks statically, their clock
+> >> registration had to be updated to take into account that the clock information
+> >> is stored in struct clk_core now.
+> > Tero, Paul & Tony,
+> >
+> > Tomeu's patch unveils a problem with omap3_noncore_dpll_enable and
+> > struct dpll_data, namely this snippet from
+> > arch/arm/mach-omap2/dpll3xxx.c:
+> >
+> >         parent = __clk_get_parent(hw->clk);
+> >
+> >         if (__clk_get_rate(hw->clk) == __clk_get_rate(dd->clk_bypass)) {
+> >                 WARN(parent != dd->clk_bypass,
+> >                                 "here0, parent name is %s, bypass name is %s\n",
+> >                                 __clk_get_name(parent), __clk_get_name(dd->clk_bypass));
+> >                 r = _omap3_noncore_dpll_bypass(clk);
+> >         } else {
+> >                 WARN(parent != dd->clk_ref,
+> >                                 "here1, parent name is %s, ref name is %s\n",
+> >                                 __clk_get_name(parent), __clk_get_name(dd->clk_ref));
+> >                 r = _omap3_noncore_dpll_lock(clk);
+> >         }
+> >
+> > struct dpll_data has members clk_ref and clk_bypass which are struct clk
+> > pointers. This was always a bit of a violation of the clk.h contract
+> > since drivers are not supposed to deref struct clk pointers. 
+> 
+> Julia,
+> 
+> Is there a way we can write a coccinelle script to check for this? The
+> goal being to find all drivers that are comparing struct clk pointers or
+> attempting to dereference them. There are probably other frameworks that
+> could use the same type of check (regulator, gpiod, reset, pwm, etc.).
+> Probably anything that has a get/put API.
 
-   -- Daniel
+Comparing or dereferencing pointers of a particular type should be 
+straightforward to check for.  Is there an example of how to use the 
+parent_index value to fix the problem?
 
-> On 01/29/2015 02:06 PM, Daniel Lezcano wrote:
-> this pull request contains the following changes:
->
->   * Barry Song renamed the marco timer to atlas7
->
->   * Baruch Siach provided a new driver for the Conexant Digicolor SoCs
->
->   * Daniel Lezcano added a new driver for the rockchip rk3288 board
->
->   * Oleksij Rempel added a new driver asm9260 for mips
->
->   * Rob Herring added the DT definition for the versatile AB/PB boards
-> as these ones are compatible with the Versatile clocksource
->
->   * Thierry Reding removed an used variable for the sirf driver
->
-> The following changes since commit
-> 9bc7491906b4113b4c5ae442157c7dfc4e10cd14:
->
->    hrtimer: Prevent stale expiry time in hrtimer_interrupt() (2015-01-23
-> 12:13:20 +0100)
->
-> are available in the git repository at:
->
->    http://git.linaro.org/people/daniel.lezcano/linux.git clockevents/3.20
->
-> for you to fetch changes up to 35a8578e8b83eb13f8d57ab40b98bcfd5199d3d4:
->
->    dts: versatile: Add sysregs node (2015-01-29 14:02:16 +0100)
->
-> ----------------------------------------------------------------
-> Barry Song (1):
->        clocksource: marco: Rename marco to atlas7
->
-> Baruch Siach (2):
->        clocksource: devicetree: Document Conexant Digicolor timer binding
->        clocksource: Driver for Conexant Digicolor SoC timer
->
-> Daniel Lezcano (1):
->        clockevents: rockchip: Add rockchip timer for rk3288
->
-> Oleksij Rempel (1):
->        ARM: clocksource: Add asm9260_timer driver
->
-> Rob Herring (3):
->        dt/bindings: Add binding for Versatile system registers
->        clocksource: versatile: Adapt for Versatile AB and PB boards
->        dts: versatile: Add sysregs node
->
-> Thierry Reding (1):
->        clocksource: sirf: Remove unused variable
->
->   Documentation/devicetree/bindings/arm/versatile-sysreg.txt        | 10
-> ++++++++++
->   Documentation/devicetree/bindings/timer/digicolor-timer.txt       | 18
-> +++++++++++++++++
->   Documentation/devicetree/bindings/timer/rockchip,rk3288-timer.txt | 18
-> +++++++++++++++++
->   MAINTAINERS                                                       |
-> 2 +-
->   arch/arm/boot/dts/versatile-ab.dts                                | 5
-> +++++
->   arch/arm/mach-rockchip/Kconfig                                    |   1 +
->   drivers/clocksource/Kconfig                                       | 17
-> ++++++++++++++++
->   drivers/clocksource/Makefile                                      | 5
-> ++++-
->   drivers/clocksource/asm9260_timer.c                               |
-> 220
-> ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->
->   drivers/clocksource/rockchip_timer.c                              |
-> 180
-> +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->
->   drivers/clocksource/{timer-marco.c => timer-atlas7.c}             | 15
-> +++++++-------
->   drivers/clocksource/timer-digicolor.c                             |
-> 199
-> +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->
->   drivers/clocksource/versatile.c                                   | 4
-> +++-
->   13 files changed, 683 insertions(+), 11 deletions(-)
->   create mode 100644
-> Documentation/devicetree/bindings/arm/versatile-sysreg.txt
->   create mode 100644
-> Documentation/devicetree/bindings/timer/digicolor-timer.txt
->   create mode 100644
-> Documentation/devicetree/bindings/timer/rockchip,rk3288-timer.txt
->   create mode 100644 drivers/clocksource/asm9260_timer.c
->   create mode 100644 drivers/clocksource/rockchip_timer.c
->   rename drivers/clocksource/{timer-marco.c => timer-atlas7.c} (95%)
->   create mode 100644 drivers/clocksource/timer-digicolor.c--
->
->
->
->   <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
->
-> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-> <http://twitter.com/#!/linaroorg> Twitter |
-> <http://www.linaro.org/linaro-blog/> Blog
->
+julia
 
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> 
+> -Stephen
+> 
+> > Now that we
+> > generate unique pointers for each call to clk_get (clk_ref & clk_bypass
+> > are populated by of_clk_get in ti_clk_register_dpll) then the pointer
+> > comparisons above will never be equal (even if they resolve down to the
+> > same struct clk_core). I added the verbose traces to the WARNs above to
+> > illustrate the point: the names are always the same but the pointers
+> > differ.
+> >
+> > AFAICT this doesn't break anything, but booting on OMAP3+ results in
+> > noisy WARNs.
+> >
+> > I think the correct fix is to replace clk_bypass and clk_ref pointers
+> > with a simple integer parent_index. In fact we already have this index.
+> > See how the pointers are populated in ti_clk_register_dpll:
+> >
+> >
+> >         dd->clk_ref = of_clk_get(node, 0);
+> >         dd->clk_bypass = of_clk_get(node, 1);
+> >
+> > Tony, the same problem affects the FAPLL code which copy/pastes some of
+> > the DPLL code.
+> >
+> > Thoughts?
+> >
+> -- 
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+> 
+> 
