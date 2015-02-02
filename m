@@ -1,101 +1,104 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 2 Feb 2015 10:22:06 -0600
-Subject: [PATCH] PCI: Fix pcibios_update_irq misuse of irq number
-In-Reply-To: <54CFA29B.9000200@arm.com>
-References: <1422456683-797-1-git-send-email-marc.zyngier@arm.com>
- <54C8FE61.1030304@linux.intel.com> <54C8FFE0.3030007@arm.com>
- <CAErSpo6jOs+MBpAjDxkeVp5AqU1Ln+_-k8Xgb2eqPm3Lv6Udzw@mail.gmail.com>
- <54CFA29B.9000200@arm.com>
-Message-ID: <CAErSpo7+Wv0vEQdhMYVMnzTGm15+m7YZ6usVfcbKtC66AMGZ4A@mail.gmail.com>
+From: tsahee@annapurnalabs.com (Tsahee Zidenberg)
+Date: Mon, 2 Feb 2015 18:23:23 +0200
+Subject: [PATCH v3 0/5] Introducing the Alpine platform.
+In-Reply-To: <54CF6C85.10207@st.com>
+References: <54cf5d7a.G0ajxAXqnwTy0CfX%tsahee@annapurnalabs.com>
+ <54CF6C85.10207@st.com>
+Message-ID: <CABM=7knTPUnYxbLv9fM+vtgObRJXOkQHYA42NtL8DXSUO8q-gQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 2, 2015 at 10:15 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 28/01/15 15:43, Bjorn Helgaas wrote:
->> On Wed, Jan 28, 2015 at 9:27 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>> Hi Gerry,
->>>
->>> On 28/01/15 15:21, Jiang Liu wrote:
->>>>
->>>>
->>>> On 2015/1/28 22:51, Marc Zyngier wrote:
->>>>> pcibios_update_irq writes an irq number into the config space
->>>>> of a given PCI device, but ignores the fact that this number
->>>>> is a virtual interrupt number, which might be a very different
->>>>> value from what the underlying hardware is using.
->>>>>
->>>>> The obvious fix is to fetch the HW interrupt number from the
->>>>> corresponding irq_data structure. This is slightly complicated
->>>>> by the fact that this interrupt might be services by a stacked
->>>>> domain.
->>>>>
->>>>> This has been tested on KVM with kvmtool.
->>>>>
->>>>> Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->>>>> Tested-by: Andre Przywara <andre.przywara@arm.com>
->>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>>> ---
->>>>>  drivers/pci/setup-irq.c | 12 ++++++++++--
->>>>>  1 file changed, 10 insertions(+), 2 deletions(-)
->>>>>
->>>>> diff --git a/drivers/pci/setup-irq.c b/drivers/pci/setup-irq.c
->>>>> index 4e2d595..828cbc9 100644
->>>>> --- a/drivers/pci/setup-irq.c
->>>>> +++ b/drivers/pci/setup-irq.c
->>>>> @@ -15,11 +15,19 @@
->>>>>  #include <linux/errno.h>
->>>>>  #include <linux/ioport.h>
->>>>>  #include <linux/cache.h>
->>>>> +#include <linux/irq.h>
->>>>>
->>>>>  void __weak pcibios_update_irq(struct pci_dev *dev, int irq)
->>>>>  {
->>>>> -    dev_dbg(&dev->dev, "assigning IRQ %02d\n", irq);
->>>>> -    pci_write_config_byte(dev, PCI_INTERRUPT_LINE, irq);
->>>>> +    struct irq_data *d;
->>>>> +
->>>>> +    d = irq_get_irq_data(irq);
->>>>> +#ifdef CONFIG_IRQ_DOMAIN_HIERARCHY
->>>>> +    while (d->parent_data)
->>>>> +            d = d->parent_data;
->>>>> +#endif
->>>>> +    dev_dbg(&dev->dev, "assigning IRQ %02ld\n", d->hwirq);
->>>>> +    pci_write_config_byte(dev, PCI_INTERRUPT_LINE, d->hwirq);
->>>>>  }
->>>> Hi Mark,
->>>>       Instead of modifying the common version, how about
->>>> implementing an arch specific version? Arch may have different
->>>> way to determine the irq number. Above implementation doesn't
->>>> work with x86, for example.
->>>
->>> If you look at the Makefile, this file is used on:
->>>
->>> obj-$(CONFIG_ALPHA) += setup-irq.o
->>> obj-$(CONFIG_ARM) += setup-irq.o
->>> obj-$(CONFIG_UNICORE32) += setup-irq.o
->>> obj-$(CONFIG_SUPERH) += setup-irq.o
->>> obj-$(CONFIG_MIPS) += setup-irq.o
->>> obj-$(CONFIG_TILE) += setup-irq.o
->>> obj-$(CONFIG_SPARC_LEON) += setup-irq.o
->>> obj-$(CONFIG_M68K) += setup-irq.o
->>>
->>> x86 doesn't use that at all.
+Thank you!
+will do.
+
+On 2 February 2015 at 14:24, Maxime Coquelin <maxime.coquelin@st.com> wrote:
+> Hi Tsahee,
+>
+> On 02/02/2015 12:20 PM, Tsahee Zidenberg wrote:
 >>
->> Since you're looking at this, Marc, do you see a nice way to get rid
->> of these arch dependencies in the Makefile and unify this a bit?  We
->> still have this pci_fixup_irqs() ugliness -- it's not really
->> arch-specific at all, but it's called from arch code, and it uses
->> for_each_pci_dev(), which obviously only works for things present at
->> boot and not for things hot-added later.
+>> Annapurna Labs(TM) is a technology company providing innovative solutions
+>> including chips, software, and systems for the datacenter and enterprise
+>> infrastructure.
+>>
+>> Alpine(TM) is one of Annapurna Labs? chip products targeting storage and
+>> networking applications. It is a complete Platform-On-Chip,
+>> integrating 2-4 cortex-A15 cores and multiple innovations to provide
+>> a seamless networking and storage fabric for enterprise and datacenter
+>> equipment.
+>>
+>> This patchset provides initial support for the Alpine platform.
+>>
+>> Patch #1 contains minimal, single-cpu architecture support.
+>>
+>> Patch #2 adds early-debug capabilities via Alpine UART 0.
+>>
+>> Patch #3 adds smp-support and a secondary cpu enable-method for the
+>> platform.
+>>
+>> Patch #4 provides documentation for the available device-tree nodes.
+>>
+>> Patch #5 provides a device-tree for Alpine soc and development board.
+>>
+>> The patchset was tested with multi_v7_defconfig, adding CONFIG_ARCH_ALPINE
+>>
+>> ---
+>> V2:
+>> * map physical cpu-id from logical on cpu wakeup
+>> * use syscon/regmap for sysfabric_service implementation
+>> * devicetree format:
+>> **  split between .dtsi and dts
+>> **  dual license
+>> **  node and manufacturer naming
+>> * intoduce devicetree in two separate patches
+>> * multiple format fixes
+>> * rebased on d932006 (for-next)
+>>
+>> ---
+>> V3:
+>> * small format changes
+>> * rebased on f9db7e2 (for-next)
+>>
+>> Tsahee Zidenberg (5):
+>>    ARM: Alpine: Initial support for Alpine platform
+>>    ARM: Alpine: early-debug print support
+>>    ARM: Alpine: smp support
+>>    ARM: dts: Alpine platform binding documentation
+>>    ARM: dts: Alpine platform devicetree
+>>
+>>   .../devicetree/bindings/arm/al,alpine.txt          |  88 +++++++++++++
+>>   .../bindings/arm/cpu-enable-method/al,alpine-smp   |  52 ++++++++
+>>   .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+>>   arch/arm/Kconfig                                   |   2 +
+>>   arch/arm/Kconfig.debug                             |  12 +-
+>>   arch/arm/Makefile                                  |   1 +
+>>   arch/arm/boot/dts/Makefile                         |   4 +
+>>   arch/arm/boot/dts/alpine-db.dts                    |  35 +++++
+>>   arch/arm/boot/dts/alpine.dtsi                      | 141
+>> +++++++++++++++++++++
+>>   arch/arm/mach-alpine/Kconfig                       |  10 ++
+>>   arch/arm/mach-alpine/Makefile                      |   6 +
+>>   arch/arm/mach-alpine/alpine_cpu_pm.c               |  70 ++++++++++
+>>   arch/arm/mach-alpine/alpine_cpu_pm.h               |  26 ++++
+>>   arch/arm/mach-alpine/alpine_cpu_resume.h           |  38 ++++++
+>>   arch/arm/mach-alpine/alpine_machine.c              |  28 ++++
+>>   arch/arm/mach-alpine/platsmp.c                     |  49 +++++++
+>>   16 files changed, 562 insertions(+), 1 deletion(-)
+>>   create mode 100644 Documentation/devicetree/bindings/arm/al,alpine.txt
+>>   create mode 100644
+>> Documentation/devicetree/bindings/arm/cpu-enable-method/al,alpine-smp
+>>   create mode 100644 arch/arm/boot/dts/alpine-db.dts
+>>   create mode 100644 arch/arm/boot/dts/alpine.dtsi
+>>   create mode 100644 arch/arm/mach-alpine/Kconfig
+>>   create mode 100644 arch/arm/mach-alpine/Makefile
+>>   create mode 100644 arch/arm/mach-alpine/alpine_cpu_pm.c
+>>   create mode 100644 arch/arm/mach-alpine/alpine_cpu_pm.h
+>>   create mode 100644 arch/arm/mach-alpine/alpine_cpu_resume.h
+>>   create mode 100644 arch/arm/mach-alpine/alpine_machine.c
+>>   create mode 100644 arch/arm/mach-alpine/platsmp.c
+>>
+> You need to add an entry in the MAINTAINERS file, so that get_maintainers.pl
+> script
+> adds the right guys for patch impacting your machine.
 >
-> I can have a look at this in the next cycle - I'm a bit strapped for
-> time just now.
->
-> As for for_each_pci_dev(), I'm not completely clear about what it should
-> be replaced for. Do we have some form of notifier for this?
-
-I think this should be done somewhere in the enumeration path, e.g.,
-maybe in pci_device_add().  Then we shouldn't need a
-for_each_pci_dev() loop or a notifier at all.
-
-Bjorn
+> Br,
+> Maxime
