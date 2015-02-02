@@ -1,164 +1,67 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Mon,  2 Feb 2015 16:43:06 +0100
-Subject: [PATCH v3] mmc: moxart: fix probe logic
-In-Reply-To: <4754899.RDUhFfxBSW@wuerfel>
-References: <4754899.RDUhFfxBSW@wuerfel>
-Message-ID: <1422891786-23071-1-git-send-email-jonas.jensen@gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Mon, 2 Feb 2015 09:57:45 -0600
+Subject: [PATCH] PCI: Fix pcibios_update_irq misuse of irq number
+In-Reply-To: <1422456683-797-1-git-send-email-marc.zyngier@arm.com>
+References: <1422456683-797-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <CAErSpo5=NhPZ5RNbBeGqKuLbKdOyTD1m+ijWM2SzQFWuKLTJfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jonas Jensen wanted to submit a patch for these, but apparently
-forgot about it. I stumbled over this symptom first:
+On Wed, Jan 28, 2015 at 8:51 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> pcibios_update_irq writes an irq number into the config space
+> of a given PCI device, but ignores the fact that this number
+> is a virtual interrupt number, which might be a very different
+> value from what the underlying hardware is using.
+>
+> The obvious fix is to fetch the HW interrupt number from the
+> corresponding irq_data structure. This is slightly complicated
+> by the fact that this interrupt might be services by a stacked
+> domain.
+>
+> This has been tested on KVM with kvmtool.
+>
+> Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Tested-by: Andre Przywara <andre.przywara@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-drivers/built-in.o: In function `moxart_probe':
-:(.text+0x2af128): undefined reference to `of_dma_request_slave_channel'
+Jiang, are you OK with this patch as-is now, since it isn't used on x86?
 
-This is because of_dma_request_slave_channel is an internal helper
-and not exported to loadable module. I'm changing the driver to
-use dma_request_slave_channel_reason() instead.
+Marc, Lorenzo, I assume this actually fixes a bug.  Can we get any
+more details about what happens when you hit the bug, and how you
+reproduced it (what platform, driver, etc.)?
 
-Further problems from inspection:
+Bjorn
 
-* The remove function must not call kfree on the host pointer,
-  because it is allocated together with the mmc_host.
-
-* The clock is never released
-
-* The dma_cap_mask_t is completely unused and can be removed
-
-* deferred probing does not work if the dma driver is loaded
-  after the mmc driver.
-
-This patch should fix all of the above.
-
-Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
----
-
-Notes:
-    This is a forward (with a single line fix) of Arnd's v2 patch.
-    
-    v2:  do not call clk_put() on an error pointer
-    v3:  fix NULL dereference on host->clk
-    
-    Applies to next-20150113
-
- drivers/mmc/host/moxart-mmc.c | 34 +++++++++++++++++++---------------
- 1 file changed, 19 insertions(+), 15 deletions(-)
-
-diff --git a/drivers/mmc/host/moxart-mmc.c b/drivers/mmc/host/moxart-mmc.c
-index d2a1ef6..6ab57d1e 100644
---- a/drivers/mmc/host/moxart-mmc.c
-+++ b/drivers/mmc/host/moxart-mmc.c
-@@ -17,6 +17,7 @@
- #include <linux/init.h>
- #include <linux/platform_device.h>
- #include <linux/delay.h>
-+#include <linux/errno.h>
- #include <linux/interrupt.h>
- #include <linux/blkdev.h>
- #include <linux/dma-mapping.h>
-@@ -131,6 +132,7 @@ struct moxart_host {
- 	struct mmc_host			*mmc;
- 	struct mmc_request		*mrq;
- 	struct scatterlist		*cur_sg;
-+	struct clk			*clk;
- 	struct completion		dma_complete;
- 	struct completion		pio_complete;
- 
-@@ -560,9 +562,7 @@ static int moxart_probe(struct platform_device *pdev)
- 	struct mmc_host *mmc;
- 	struct moxart_host *host = NULL;
- 	struct dma_slave_config cfg;
--	struct clk *clk;
- 	void __iomem *reg_mmc;
--	dma_cap_mask_t mask;
- 	int irq, ret;
- 	u32 i;
- 
-@@ -573,6 +573,8 @@ static int moxart_probe(struct platform_device *pdev)
- 		goto out;
- 	}
- 
-+	host = mmc_priv(mmc);
-+
- 	ret = of_address_to_resource(node, 0, &res_mmc);
- 	if (ret) {
- 		dev_err(dev, "of_address_to_resource failed\n");
-@@ -586,10 +588,11 @@ static int moxart_probe(struct platform_device *pdev)
- 		goto out;
- 	}
- 
--	clk = of_clk_get(node, 0);
--	if (IS_ERR(clk)) {
-+	host->clk = of_clk_get(node, 0);
-+	if (IS_ERR(host->clk)) {
- 		dev_err(dev, "of_clk_get failed\n");
--		ret = PTR_ERR(clk);
-+		ret = PTR_ERR(host->clk);
-+		host->clk = NULL;
- 		goto out;
- 	}
- 
-@@ -603,18 +606,14 @@ static int moxart_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto out;
- 
--	dma_cap_zero(mask);
--	dma_cap_set(DMA_SLAVE, mask);
--
--	host = mmc_priv(mmc);
- 	host->mmc = mmc;
- 	host->base = reg_mmc;
- 	host->reg_phys = res_mmc.start;
- 	host->timeout = msecs_to_jiffies(1000);
--	host->sysclk = clk_get_rate(clk);
-+	host->sysclk = clk_get_rate(host->clk);
- 	host->fifo_width = readl(host->base + REG_FEATURE) << 2;
--	host->dma_chan_tx = of_dma_request_slave_channel(node, "tx");
--	host->dma_chan_rx = of_dma_request_slave_channel(node, "rx");
-+	host->dma_chan_tx = dma_request_slave_channel_reason(dev, "tx");
-+	host->dma_chan_rx = dma_request_slave_channel_reason(dev, "rx");
- 
- 	spin_lock_init(&host->lock);
- 
-@@ -624,6 +623,11 @@ static int moxart_probe(struct platform_device *pdev)
- 	mmc->ocr_avail = 0xffff00;	/* Support 2.0v - 3.6v power. */
- 
- 	if (IS_ERR(host->dma_chan_tx) || IS_ERR(host->dma_chan_rx)) {
-+		if (PTR_ERR(host->dma_chan_tx) == -EPROBE_DEFER ||
-+		    PTR_ERR(host->dma_chan_rx) == -EPROBE_DEFER) {
-+			ret = -EPROBE_DEFER;
-+			goto out;
-+		}
- 		dev_dbg(dev, "PIO mode transfer enabled\n");
- 		host->have_dma = false;
- 	} else {
-@@ -677,6 +681,8 @@ static int moxart_probe(struct platform_device *pdev)
- 	return 0;
- 
- out:
-+	if (host->clk)
-+		clk_put(host->clk);
- 	if (mmc)
- 		mmc_free_host(mmc);
- 	return ret;
-@@ -694,6 +700,7 @@ static int moxart_remove(struct platform_device *pdev)
- 			dma_release_channel(host->dma_chan_tx);
- 		if (!IS_ERR(host->dma_chan_rx))
- 			dma_release_channel(host->dma_chan_rx);
-+		clk_put(host->clk);
- 		mmc_remove_host(mmc);
- 		mmc_free_host(mmc);
- 
-@@ -702,9 +709,6 @@ static int moxart_remove(struct platform_device *pdev)
- 		writel(readl(host->base + REG_CLOCK_CONTROL) | CLK_OFF,
- 		       host->base + REG_CLOCK_CONTROL);
- 	}
--
--	kfree(host);
--
- 	return 0;
- }
- 
--- 
-1.8.2.1
+> ---
+>  drivers/pci/setup-irq.c | 12 ++++++++++--
+>  1 file changed, 10 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/pci/setup-irq.c b/drivers/pci/setup-irq.c
+> index 4e2d595..828cbc9 100644
+> --- a/drivers/pci/setup-irq.c
+> +++ b/drivers/pci/setup-irq.c
+> @@ -15,11 +15,19 @@
+>  #include <linux/errno.h>
+>  #include <linux/ioport.h>
+>  #include <linux/cache.h>
+> +#include <linux/irq.h>
+>
+>  void __weak pcibios_update_irq(struct pci_dev *dev, int irq)
+>  {
+> -       dev_dbg(&dev->dev, "assigning IRQ %02d\n", irq);
+> -       pci_write_config_byte(dev, PCI_INTERRUPT_LINE, irq);
+> +       struct irq_data *d;
+> +
+> +       d = irq_get_irq_data(irq);
+> +#ifdef CONFIG_IRQ_DOMAIN_HIERARCHY
+> +       while (d->parent_data)
+> +               d = d->parent_data;
+> +#endif
+> +       dev_dbg(&dev->dev, "assigning IRQ %02ld\n", d->hwirq);
+> +       pci_write_config_byte(dev, PCI_INTERRUPT_LINE, d->hwirq);
+>  }
+>
+>  static void pdev_fixup_irq(struct pci_dev *dev,
+> --
+> 2.1.4
+>
