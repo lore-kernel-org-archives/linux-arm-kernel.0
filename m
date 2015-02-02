@@ -1,78 +1,75 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Mon, 02 Feb 2015 00:43:50 -0500
-Subject: [PATCH v2 1/4] tty: serial: Add 8250 earlycon to support noinit
- option
-In-Reply-To: <1422855202.26131.31.camel@mtksdaap41>
-References: <1421068104-30463-1-git-send-email-eddie.huang@mediatek.com>	
- <1421068104-30463-2-git-send-email-eddie.huang@mediatek.com>	
- <54CE53F3.5040709@hurleysoftware.com> <54CE6FD9.5030606@hurleysoftware.com>	
- <1422846994.5512.25.camel@mtksdaap41> <54CEF2C8.1050808@hurleysoftware.com>	
- <20150202042843.GA24765@kroah.com> <54CF07F3.2040100@hurleysoftware.com>	
- <20150202052423.GA3346@kroah.com> <1422855202.26131.31.camel@mtksdaap41>
-Message-ID: <54CF0E96.10703@hurleysoftware.com>
+From: sumit.semwal@linaro.org (Sumit Semwal)
+Date: Mon, 2 Feb 2015 11:23:35 +0530
+Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher constraints
+ with dma-parms
+In-Reply-To: <20150129192610.GE26493@n2100.arm.linux.org.uk>
+References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
+ <1422347154-15258-2-git-send-email-sumit.semwal@linaro.org>
+ <20150129143908.GA26493@n2100.arm.linux.org.uk>
+ <CAO_48GEOQ1pBwirgEWeVVXW-iOmaC=Xerr2VyYYz9t1QDXgVsw@mail.gmail.com>
+ <20150129154718.GB26493@n2100.arm.linux.org.uk>
+ <CAF6AEGtTmFg66TK_AFkQ-xp7Nd9Evk3nqe6xCBp7K=77OmXTxA@mail.gmail.com>
+ <20150129192610.GE26493@n2100.arm.linux.org.uk>
+Message-ID: <CAO_48GGqtYWMnweUx_8_p4HOyf58h2q0PbvehVNN5Wm5p_N00w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/02/2015 12:33 AM, Eddie Huang wrote:
-> Hi Peter,
-> 
-> On Sun, 2015-02-01 at 21:24 -0800, Greg Kroah-Hartman wrote:
->> On Mon, Feb 02, 2015 at 12:15:31AM -0500, Peter Hurley wrote:
->>> On 02/01/2015 11:28 PM, Greg Kroah-Hartman wrote:
->>>> On Sun, Feb 01, 2015 at 10:45:12PM -0500, Peter Hurley wrote:
->>>>> On 02/01/2015 10:16 PM, Eddie Huang wrote:
->>>
->>>>> I'll respin proper patches on top of Greg's tty-testing branch with reverts
->>>>> for the noinit options. I noticed that one of the noinit patches actually
->>>>> has the linkage for the mtk earlycon, so I'll be sure to preserve that.
->>>>
->>>> I can just drop the patches in the tty-testing branch, that's what it is
->>>> there for :)
->>>>
->>>> Just let me know the specific patches and I will do so, thanks.
->>>
->>> Well that pretty much means dropping the 3 patches that add earlycon to
->>> 8250_mtk and then applying my patch (needs fixed to apply cleanly, which
->>> I can do) and then applying a fixed-up replacement patch to add earlycon
->>> to 8250_mtk (which I can also supply).
->>>
->>> Is that the way you want to go?
+Hi Russell,
+
+On 30 January 2015 at 00:56, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Jan 29, 2015 at 01:52:09PM -0500, Rob Clark wrote:
+>> Quite possibly for some of these edge some of cases, some of the
+>> dma-buf exporters are going to need to get more clever (ie. hand off
+>> different scatterlists to different clients).  Although I think by far
+>> the two common cases will be "I can support anything via an iommu/mmu"
+>> and "I need phys contig".
 >>
->> Sounds good to me, send your patch, and I'll fix it all up tomorrow.
->>
->> thanks,
->>
->> greg k-h
-> 
-> Actually, your patch is a little different from my original idea.
-> Although my use case only care about divisor now, but other hardware
-> setting is still hard-code, not from parameter. In init_port()
-> function:   
-> 	serial8250_early_out(port, UART_LCR, 0x3); /* 8n1 */
-> 	serial8250_early_out(port, UART_IER, 0);/* no interrupt */
-> 	serial8250_early_out(port, UART_FCR, 0); /* no fifo */
-> 	serial8250_early_out(port, UART_MCR, 0x3); /* DTR + RTS */
-> 
-> This is why I propose a new option "noinit".
-> 
-> After checking further, in my case, I found that your patch should be
-> unnecessary because if skip baudrate, probe_baud() read DLL/DLM register
-> and init_port() write the same DLL/DLM value back, no touch any high
-> speed register, which means keep uart divisor setting as loader
-> 
-> Since I don't take "console=uart,mmio32,<addr>,noinit" into
-> consideration, it is good to drop my patches in the tty-testing branch.
-> For my case, I can send another series without noinit, just 8250_mtk.c
-> and its linkage modification in 8250_early.c
+>> But that isn't an issue w/ dma-buf itself, so much as it is an issue
+>> w/ drivers.  I guess there would be more interest in fixing up drivers
+>> when actual hw comes along that needs it..
+>
+> However, validating the attachments is the business of dma-buf.  This
+> is actual infrastructure, which should ensure some kind of sanity such
+> as the issues I've raised.
+>
+> The whole "we can push it onto our users" is really on - what that
+> results in is the users ignoring most of the requirements and just doing
+> their own thing, which ultimately ends up with the whole thing turning
+> into a disgusting mess - one which becomes very difficult to fix later.
+>
+> Now, if we're going to do the "more clever" thing you mention above,
+> that rather negates the point of this two-part patch set, which is to
+> provide the union of the DMA capabilities of all users.  A union in
+> that case is no longer sane as we'd be tailoring the SG lists to each
+> user.
+>
+> If we aren't going to do the "more clever" thing, then yes, we need this
+> code to calculate that union, but we _also_ need it to do sanity checking
+> right from the start, and refuse conditions which ultimately break the
+> ability to make use of that union - in other words, when the union of
+> the DMA capabilities means that the dmabuf can't be represented.
+>
+> Unless we do that, we'll just end up with random drivers interpreting
+> what they want from the DMA capabilities, and we'll have some drivers
+> exporting (eg) scatterlists which satisfy the maximum byte size of an
+> element, but ignoring the maximum number of entries or vice versa, and
+> that'll most probably hide the case of "too small a union".
+>
+I agree, and I'll add the check for
+max_segment_size * max_segment_count < dmabuf->size
+and resend; will that be alright with you?
 
-Ok.
+> It really doesn't make sense to do both either: that route is even more
+> madness, because we'll end up with two classes of drivers - those which
+> use the union approach, and those which don't.
+>
+> The KISS principle applies here.
+>
+> --
+> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+> according to speedtest.net.
 
-Greg,
 
-The patches to drop from tty-testing are:
-* 405017d Document: Modify 8250 earlycon kernel parameters
-* 0dff3a4 tty: serial: 8250_mtk: Add earlycon
-* b829735 tty: serial: Add 8250 earlycon to support noinit option
-
-Regards,
-Peter Hurley
+Best regards,
+~Sumit.
