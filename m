@@ -1,68 +1,58 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 2 Feb 2015 11:22:56 +0100 (CET)
-Subject: [PATCH] media: atmel-isi: increase the burst length to improve
- the performance
-In-Reply-To: <54CF4E52.6020901@atmel.com>
-References: <1416907825-23826-1-git-send-email-josh.wu@atmel.com>
- <54CF4E52.6020901@atmel.com>
-Message-ID: <Pine.LNX.4.64.1502021122140.31366@axis700.grange>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 02 Feb 2015 11:39:07 +0100
+Subject: [PATCH 2/2] ARM: dts: Add syscon phandle to the video-phy node for
+ Exynos4
+In-Reply-To: <1421429438-32090-2-git-send-email-s.nawrocki@samsung.com>
+References: <1421429438-32090-1-git-send-email-s.nawrocki@samsung.com>
+ <1421429438-32090-2-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <54CF53CB.3050100@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
+Hi Kukjin,
 
-On Mon, 2 Feb 2015, Josh Wu wrote:
-
-> Hi, Guennadi
+On 16/01/15 18:30, Sylwester Nawrocki wrote:
+> This is required to fix regression after introducing the PMU device
+> nodes required for the PMU driver modified in commit
+> 14fc8b93d47323561edf5d482d4a4b3ee1b90286
+> ("ARM: EXYNOS: Add platform driver support for Exynos PMU").
+> This change is needed to make MIPI DSI displays and MIPI CSI-2
+> camera sensors working again on Exynos4 boards.
 > 
-> Ping? what about the status of this patch?
-
-Right, got lost, sorry... Added to the queue now.
-
-Thanks
-Guennadi
-
-> Best Regards,
-> Josh Wu
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos4.dtsi |    1 +
+>  1 file changed, 1 insertion(+)
 > 
-> On 11/25/2014 5:30 PM, Josh Wu wrote:
-> > The burst length could be BEATS_4/8/16. Before this patch, isi use default
-> > value BEATS_4. To imporve the performance we could set it to BEATS_16.
-> > 
-> > Otherwise sometime it would cause the ISI overflow error.
-> > 
-> > Reported-by: Bo Shen <voice.shen@atmel.com>
-> > Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> > ---
-> >   drivers/media/platform/soc_camera/atmel-isi.c | 2 ++
-> >   include/media/atmel-isi.h                     | 4 ++++
-> >   2 files changed, 6 insertions(+)
-> > 
-> > diff --git a/drivers/media/platform/soc_camera/atmel-isi.c
-> > b/drivers/media/platform/soc_camera/atmel-isi.c
-> > index ee5650f..fda587b 100644
-> > --- a/drivers/media/platform/soc_camera/atmel-isi.c
-> > +++ b/drivers/media/platform/soc_camera/atmel-isi.c
-> > @@ -839,6 +839,8 @@ static int isi_camera_set_bus_param(struct
-> > soc_camera_device *icd)
-> >   	if (isi->pdata.full_mode)
-> >   		cfg1 |= ISI_CFG1_FULL_MODE;
-> >   +	cfg1 |= ISI_CFG1_THMASK_BEATS_16;
-> > +
-> >   	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
-> >   	isi_writel(isi, ISI_CFG1, cfg1);
-> >   diff --git a/include/media/atmel-isi.h b/include/media/atmel-isi.h
-> > index c2e5703..6008b09 100644
-> > --- a/include/media/atmel-isi.h
-> > +++ b/include/media/atmel-isi.h
-> > @@ -59,6 +59,10 @@
-> >   #define		ISI_CFG1_FRATE_DIV_MASK		(7 << 8)
-> >   #define ISI_CFG1_DISCR				(1 << 11)
-> >   #define ISI_CFG1_FULL_MODE			(1 << 12)
-> > +/* Definition for THMASK(ISI_V2) */
-> > +#define		ISI_CFG1_THMASK_BEATS_4		(0 << 13)
-> > +#define		ISI_CFG1_THMASK_BEATS_8		(1 << 13)
-> > +#define		ISI_CFG1_THMASK_BEATS_16	(2 << 13)
-> >     /* Bitfields in CFG2 */
-> >   #define ISI_CFG2_GRAYSCALE			(1 << 13)
-> 
+> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+> index b8168f1..250ee50 100644
+> --- a/arch/arm/boot/dts/exynos4.dtsi
+> +++ b/arch/arm/boot/dts/exynos4.dtsi
+> @@ -76,6 +76,7 @@
+>  		compatible = "samsung,s5pv210-mipi-video-phy";
+>  		reg = <0x10020710 8>;
+>  		#phy-cells = <1>;
+> +		syscon = <&pmu_system_controller>;
+>  	};
+>  
+>  	pd_mfc: mfc-power-domain at 10023C40 {
+
+I'd like to remind you about a few pending dts patches I send to you, except
+the above one there are:
+
+[PATCH V3 15/15] ARM: dts: Fix I2S1, I2S2 compatible for exynos4 SoCs
+[PATCH] ARM: dts: Fix CLK_MOUT_CAMn parent clocks assignment for Trats2
+[PATCH] ARM: dts: Fix CLK_UART_ISP_SCLK clock assignment in exynos4x12.dtsi
+ 
+and
+
+[PATCH v2 14/16] ARM: dts: Exynos4 and Odroid X2/U3 sound device nodes update
+
+but this one depends on ASoC patch:
+[PATCH V3 11/15] ASoC: samsung: i2s: Add clk provider DT binding documentation
+
+hence it could be probably merged only after 3.20-rc1 release. 
+
+--
+Thanks,
+Sylwester
