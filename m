@@ -1,71 +1,116 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 2 Feb 2015 16:33:44 +0000
-Subject: [PATCH] PCI: Fix pcibios_update_irq misuse of irq number
-In-Reply-To: <1422456683-797-1-git-send-email-marc.zyngier@arm.com>
-References: <1422456683-797-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150202163344.GF8656@n2100.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 2 Feb 2015 16:51:30 +0000
+Subject: [PATCHv2 0/5] arm: specify PMU type in platform data
+In-Reply-To: <20150121143028.GG5044@leverpostej>
+References: <1421770049-32029-1-git-send-email-mark.rutland@arm.com>
+ <20150121001717.GB338@verge.net.au>
+ <20150121143028.GG5044@leverpostej>
+Message-ID: <20150202165130.GH21175@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 28, 2015 at 02:51:23PM +0000, Marc Zyngier wrote:
->  void __weak pcibios_update_irq(struct pci_dev *dev, int irq)
->  {
-> -	dev_dbg(&dev->dev, "assigning IRQ %02d\n", irq);
-> -	pci_write_config_byte(dev, PCI_INTERRUPT_LINE, irq);
-> +	struct irq_data *d;
-> +
-> +	d = irq_get_irq_data(irq);
-> +#ifdef CONFIG_IRQ_DOMAIN_HIERARCHY
-> +	while (d->parent_data)
-> +		d = d->parent_data;
-> +#endif
-> +	dev_dbg(&dev->dev, "assigning IRQ %02ld\n", d->hwirq);
-> +	pci_write_config_byte(dev, PCI_INTERRUPT_LINE, d->hwirq);
+[adding arm at kernel.org]
 
-I'm really not convinced about this being the correct thing to do.
+Arnd/Olof, are you happy to take these?
 
-Let's take an older ARM system, such as a Footbridge based system with a
-PCI southbridge.
+Everything has been appropriately acked, and as mentioned below the
+series can also be found on my kernel.org tree:
 
-Such a system has IRQs 0-15 as the PCI southbridge ISA interrupts.  Then
-there are four PCI interrupts provided by the on-board Footbridge.
+git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arm/perf/platform-updates
 
-Right now, PCI devices are programmed with the OS specific interrupt
-number - eg:
+Thanks,
+Mark.
 
-00:06.1 IDE interface: Contaq Microsystems 82c693 (prog-if 80 [Master])
-        Flags: medium devsel, IRQ 14
-30: 00 00 00 00 00 00 00 00 00 00 00 00 0e 01 00 00
-
-00:06.2 IDE interface: Contaq Microsystems 82c693 (prog-if 00 [])
-        Flags: medium devsel, IRQ 15
-30: 00 00 00 00 00 00 00 00 00 00 00 00 0f 02 00 00
-
-00:06.3 USB Controller: Contaq Microsystems 82c693 (prog-if 10 [OHCI])
-        Flags: medium devsel, IRQ 12
-30: 00 00 00 00 00 00 00 00 00 00 00 00 0c 01 00 00
-
-00:07.0 Mass storage controller: Integrated Technology Express, Inc. IT/ITE8212
-Dual channel ATA RAID controller (rev 13)
-        Flags: bus master, 66MHz, medium devsel, latency 0, IRQ 24
-30: 00 00 02 04 80 00 00 00 00 00 00 00 18 01 08 08
-
-00:08.0 Ethernet controller: 3Com Corporation 3c905C-TX/TX-M [Tornado] (rev 74)
-        Flags: bus master, medium devsel, latency 32, IRQ 22
-30: 00 00 06 04 dc 00 00 00 00 00 00 00 16 01 0a 0a
-
-00:09.0 VGA compatible controller: S3 Inc. 86c775/86c785 [Trio 64V2/DX or /GX] (rev 16) (prog-if 00 [VGA controller])
-        Flags: medium devsel, IRQ 21
-30: 00 00 00 0c 00 00 00 00 00 00 00 00 15 01 00 00
-
-What your change would mean is that the IRQs currently being programmed
->= 16 would be programmed into with numbers with 16 removed from them.
-This means that legacy stuff (eg on the Southbridge which really do signal
-via the ISA IRQ controller) end up using the same number range as those
-which take PCI specific IRQs.
-
-This surely is not sane.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+On Wed, Jan 21, 2015 at 02:30:28PM +0000, Mark Rutland wrote:
+> On Wed, Jan 21, 2015 at 12:17:18AM +0000, Simon Horman wrote:
+> > On Tue, Jan 20, 2015 at 04:07:24PM +0000, Mark Rutland wrote:
+> > > Currently the ARMv6, ARMv7, and XScale PMU drivers are coupled with each
+> > > other, and all included in the same c file. To enable the splitting of
+> > > the ARMv6, ARMv7, and XScale PMU drivers, and the conversion of the
+> > > arm_pmu framework to a pure library, we need to be a be more precise
+> > > when describing PMUs, to enable association of the PMU with the right
+> > > driver. In device tree this is already implicit in the compatible
+> > > string, but platform data currently only specifies "arm-pmu".
+> > > 
+> > > Commit 253d8c3d2518ca6f (arm: perf: add more specific platform device
+> > > IDs) added "armv6-pmu", "armv7-pmu", and "xscale-pmu" platform device
+> > > IDs, enabling the three to be distinguished. This series updates
+> > > platform code to use these strings.
+> > > 
+> > > A later patch series will decouple the drivers.
+> > > 
+> > > Since v1 [1]:
+> > > * Rebase to v3.19-rc4.
+> > > * Add Acks.
+> > > * Drop vexpress patches (platform code deleted).
+> > > 
+> > > Simon, in v1 you mentioned you were happy to take the shmobile patch
+> > > through your tree. Are you still happy to do so, or to give your ack
+> > > such that these can go through arm-soc together?
+> > > 
+> > > While I'm not too concerned which route these patches take, it would be
+> > > nice to have a single base for the patches splitting the drivers.
+> > 
+> > Hi Mark,
+> > 
+> > assuming that this is targeted at v3.20 then it looks like your
+> > changes do not conflict with anything I have queued up and
+> > I am not likely to queue anything more up for the files in question
+> > for that release. As my main concern is about conflicts I'm therefore
+> > quite happy for you to take the shmobile patch through your tree.
+> > I'll supply an ack accordingly.
+> 
+> Thanks, Simon, it's much appreciated.
+> 
+> Arnd, Olof, are you happy to pick this up for v3.20? I believe all the
+> patches have now been appropriately acked.
+> 
+> If it makes things any easier I've placed the series (with new acks) on
+> my arm/perf/platform-updates branch [2], based atop of v3.19-rc4.
+> 
+> Thanks,
+> Mark.
+> 
+> [2] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arm/perf/platform-updates
+> 
+> > 
+> > > Thanks,
+> > > Mark.
+> > > 
+> > > [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/304078.html
+> > > 
+> > > Mark Rutland (5):
+> > >   arm: realview: specify PMU types
+> > >   arm: pxa: specify PMUs are for XScale CPUs
+> > >   arm: iop: specify PMUs are for XScale CPUs
+> > >   arm: shmobile: specify PMUs are for ARMv7 CPUs
+> > >   arm: omap: specify PMUs are for ARMv7 CPUs
+> > > 
+> > >  arch/arm/mach-omap2/pmu.c                | 5 +++--
+> > >  arch/arm/mach-pxa/devices.c              | 2 +-
+> > >  arch/arm/mach-realview/realview_eb.c     | 3 ++-
+> > >  arch/arm/mach-realview/realview_pb1176.c | 2 +-
+> > >  arch/arm/mach-realview/realview_pb11mp.c | 2 +-
+> > >  arch/arm/mach-realview/realview_pba8.c   | 2 +-
+> > >  arch/arm/mach-realview/realview_pbx.c    | 2 +-
+> > >  arch/arm/mach-shmobile/setup-r8a7740.c   | 2 +-
+> > >  arch/arm/mach-shmobile/setup-sh73a0.c    | 2 +-
+> > >  arch/arm/plat-iop/pmu.c                  | 2 +-
+> > >  10 files changed, 13 insertions(+), 11 deletions(-)
+> > > 
+> > > -- 
+> > > 1.9.1
+> > > 
+> > > 
+> > > _______________________________________________
+> > > linux-arm-kernel mailing list
+> > > linux-arm-kernel at lists.infradead.org
+> > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > > 
+> > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
