@@ -1,14 +1,16 @@
-From: k.kozlowski.k@gmail.com (=?UTF-8?Q?Krzysztof_Koz=C5=82owski?=)
-Date: Mon, 2 Feb 2015 09:24:26 +0100
+From: m.jabrzyk@samsung.com (Marcin Jabrzyk)
+Date: Mon, 02 Feb 2015 09:42:33 +0100
 Subject: [PATCH] clocksource: exynos_mct: fix for sleeping in atomic ctx
  handling cpu hotplug notif.
 In-Reply-To: <1422627691-10774-1-git-send-email-d.eppel@samsung.com>
 References: <1422627691-10774-1-git-send-email-d.eppel@samsung.com>
-Message-ID: <CAJKOXPfxd258ozSYgYJSLs-wX=-f88kNiYfvuvB-2x5VNeUCow@mail.gmail.com>
+Message-ID: <54CF3879.7080908@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-01-30 15:21 GMT+01:00 Damian Eppel <d.eppel@samsung.com>:
+
+
+On 30/01/15 15:21, Damian Eppel wrote:
 > This is to fix an issue of sleeping in atomic context when processing
 > hotplug notifications in Exynos MCT(Multi-Core Timer).
 > The issue was reproducible on Exynos 3250 (Rinato board) and Exynos 5420
@@ -73,105 +75,103 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > Cc: <stable@vger.kernel.org>
 > Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 > ---
->  drivers/clocksource/exynos_mct.c | 45 ++++++++++++++++++++++++++++------------
->  1 file changed, 32 insertions(+), 13 deletions(-)
-
-Hi,
-
-Look fine from my point of view.
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
-Tested on Arndale Octa Board. Fixes the sleep-in-atomic.
-Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
-Best regards,
-Krzysztof
-
+>   drivers/clocksource/exynos_mct.c | 45 ++++++++++++++++++++++++++++------------
+>   1 file changed, 32 insertions(+), 13 deletions(-)
 >
 > diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
 > index 83564c9..9beca58 100644
 > --- a/drivers/clocksource/exynos_mct.c
 > +++ b/drivers/clocksource/exynos_mct.c
 > @@ -466,15 +466,12 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
->         exynos4_mct_write(TICK_BASE_CNT, mevt->base + MCT_L_TCNTB_OFFSET);
+>   	exynos4_mct_write(TICK_BASE_CNT, mevt->base + MCT_L_TCNTB_OFFSET);
 >
->         if (mct_int_type == MCT_INT_SPI) {
-> -               evt->irq = mct_irqs[MCT_L0_IRQ + cpu];
-> -               if (request_irq(evt->irq, exynos4_mct_tick_isr,
-> -                               IRQF_TIMER | IRQF_NOBALANCING,
-> -                               evt->name, mevt)) {
-> -                       pr_err("exynos-mct: cannot register IRQ %d\n",
-> -                               evt->irq);
+>   	if (mct_int_type == MCT_INT_SPI) {
+> -		evt->irq = mct_irqs[MCT_L0_IRQ + cpu];
+> -		if (request_irq(evt->irq, exynos4_mct_tick_isr,
+> -				IRQF_TIMER | IRQF_NOBALANCING,
+> -				evt->name, mevt)) {
+> -			pr_err("exynos-mct: cannot register IRQ %d\n",
+> -				evt->irq);
 > +
-> +               if (evt->irq == -1)
->                         return -EIO;
-> -               }
-> -               irq_force_affinity(mct_irqs[MCT_L0_IRQ + cpu], cpumask_of(cpu));
+> +		if (evt->irq == -1)
+>   			return -EIO;
+> -		}
+> -		irq_force_affinity(mct_irqs[MCT_L0_IRQ + cpu], cpumask_of(cpu));
 > +
-> +               irq_force_affinity(evt->irq, cpumask_of(cpu));
-> +               enable_irq(evt->irq);
->         } else {
->                 enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
->         }
+> +		irq_force_affinity(evt->irq, cpumask_of(cpu));
+> +		enable_irq(evt->irq);
+>   	} else {
+>   		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
+>   	}
 > @@ -487,10 +484,12 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
->  static void exynos4_local_timer_stop(struct clock_event_device *evt)
->  {
->         evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
-> -       if (mct_int_type == MCT_INT_SPI)
-> -               free_irq(evt->irq, this_cpu_ptr(&percpu_mct_tick));
-> -       else
-> +       if (mct_int_type == MCT_INT_SPI) {
-> +               if (evt->irq != -1)
-> +                       disable_irq_nosync(evt->irq);
-> +       } else {
->                 disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
-> +       }
->  }
+>   static void exynos4_local_timer_stop(struct clock_event_device *evt)
+>   {
+>   	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
+> -	if (mct_int_type == MCT_INT_SPI)
+> -		free_irq(evt->irq, this_cpu_ptr(&percpu_mct_tick));
+> -	else
+> +	if (mct_int_type == MCT_INT_SPI) {
+> +		if (evt->irq != -1)
+> +			disable_irq_nosync(evt->irq);
+> +	} else {
+>   		disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
+> +	}
+>   }
 >
->  static int exynos4_mct_cpu_notify(struct notifier_block *self,
+>   static int exynos4_mct_cpu_notify(struct notifier_block *self,
 > @@ -522,7 +521,7 @@ static struct notifier_block exynos4_mct_cpu_nb = {
 >
->  static void __init exynos4_timer_resources(struct device_node *np, void __iomem *base)
->  {
-> -       int err;
-> +       int err, cpu;
->         struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
->         struct clk *mct_clk, *tick_clk;
+>   static void __init exynos4_timer_resources(struct device_node *np, void __iomem *base)
+>   {
+> -	int err;
+> +	int err, cpu;
+>   	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
+>   	struct clk *mct_clk, *tick_clk;
 >
 > @@ -549,7 +548,27 @@ static void __init exynos4_timer_resources(struct device_node *np, void __iomem
->                 WARN(err, "MCT: can't request IRQ %d (%d)\n",
->                      mct_irqs[MCT_L0_IRQ], err);
->         } else {
-> -               irq_set_affinity(mct_irqs[MCT_L0_IRQ], cpumask_of(0));
-> +               for_each_possible_cpu(cpu) {
-> +                       int mct_irq = mct_irqs[MCT_L0_IRQ + cpu];
-> +                       struct mct_clock_event_device *pcpu_mevt =
-> +                               per_cpu_ptr(&percpu_mct_tick, cpu);
+>   		WARN(err, "MCT: can't request IRQ %d (%d)\n",
+>   		     mct_irqs[MCT_L0_IRQ], err);
+>   	} else {
+> -		irq_set_affinity(mct_irqs[MCT_L0_IRQ], cpumask_of(0));
+> +		for_each_possible_cpu(cpu) {
+> +			int mct_irq = mct_irqs[MCT_L0_IRQ + cpu];
+> +			struct mct_clock_event_device *pcpu_mevt =
+> +				per_cpu_ptr(&percpu_mct_tick, cpu);
 > +
-> +                       pcpu_mevt->evt.irq = -1;
+> +			pcpu_mevt->evt.irq = -1;
 > +
-> +                       if (request_irq(mct_irq,
-> +                                       exynos4_mct_tick_isr,
-> +                                       IRQF_TIMER | IRQF_NOBALANCING,
-> +                                       pcpu_mevt->name, pcpu_mevt)) {
-> +                               pr_err("exynos-mct: cannot register IRQ (cpu%d)\n",
-> +                                                                       cpu);
+> +			if (request_irq(mct_irq,
+> +					exynos4_mct_tick_isr,
+> +					IRQF_TIMER | IRQF_NOBALANCING,
+> +					pcpu_mevt->name, pcpu_mevt)) {
+> +				pr_err("exynos-mct: cannot register IRQ (cpu%d)\n",
+> +									cpu);
 > +
-> +                               continue;
-> +                       }
-> +                       pcpu_mevt->evt.irq = mct_irq;
-> +                       irq_force_affinity(mct_irq, cpumask_of(cpu));
+> +				continue;
+> +			}
+> +			pcpu_mevt->evt.irq = mct_irq;
+> +			irq_force_affinity(mct_irq, cpumask_of(cpu));
 > +
-> +                       disable_irq(mct_irq);
-> +               }
->         }
+> +			disable_irq(mct_irq);
+> +		}
+>   	}
 >
->         err = register_cpu_notifier(&exynos4_mct_cpu_nb);
-> --
-> 1.9.1
+>   	err = register_cpu_notifier(&exynos4_mct_cpu_nb);
 >
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+Tested-by: Marcin Jabrzyk <m.jabrzyk@samsung.com>
+
+Test hardware: Rinato B2 (Exynos 3250) board
+
+I can confirm that this fixes bug reported here [1] "BUG appearing when 
+trying to allocate interrupt on Exynos MCT after CPU hotplug".
+
+
+[1] 
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/296500.html
+
+Best regards,
+Marcin Jabrzyk
+
+Samsung R&D Institute Poland
+Samsung Electronics
