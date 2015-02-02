@@ -1,540 +1,872 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon,  2 Feb 2015 20:45:48 +0800
-Subject: [PATCH v8 20/21] Documentation: ACPI for ARM64
+Date: Mon,  2 Feb 2015 20:45:49 +0800
+Subject: [PATCH v8 21/21] arm64: ACPI: additions of ACPI documentation for
+ arm64
 In-Reply-To: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
 References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1422881149-8177-21-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1422881149-8177-22-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Graeme Gregory <graeme.gregory@linaro.org>
+From: Al Stone <al.stone@linaro.org>
 
-Add documentation for the guidelines of how to use ACPI
-on ARM64.
+Two more documentation files are also being added:
+(1) A verbatim copy of the "Why ACPI on ARM?" blog posting by Grant Likely,
+    which is also summarized in arm-acpi.txt, and
 
-Reviewed-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-Reviewed-by: Yi Li <phoenix.liyi@huawei.com>
-Reviewed-by: Mark Langsdorf <mlangsdo@redhat.com>
-Reviewed-by: Ashwin Chaugule <ashwinc@codeaurora.org>
-Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+(2) A section by section review of the ACPI spec (acpi_object_usage.txt)
+    to note recommendations and prohibitions on the use of the numerous
+    ACPI tables and objects.  This sets out the current expectations of
+    the firmware by Linux very explicitly (or as explicitly as I can, for
+    now).
+
+CC: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+CC: Yi Li <phoenix.liyi@huawei.com>
+CC: Mark Langsdorf <mlangsdo@redhat.com>
+CC: Ashwin Chaugule <ashwinc@codeaurora.org>
 Signed-off-by: Al Stone <al.stone@linaro.org>
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- Documentation/arm64/arm-acpi.txt | 506 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 506 insertions(+)
- create mode 100644 Documentation/arm64/arm-acpi.txt
+ Documentation/arm64/acpi_object_usage.txt | 592 ++++++++++++++++++++++++++++++
+ Documentation/arm64/why_use_acpi.txt      | 231 ++++++++++++
+ 2 files changed, 823 insertions(+)
+ create mode 100644 Documentation/arm64/acpi_object_usage.txt
+ create mode 100644 Documentation/arm64/why_use_acpi.txt
 
-diff --git a/Documentation/arm64/arm-acpi.txt b/Documentation/arm64/arm-acpi.txt
+diff --git a/Documentation/arm64/acpi_object_usage.txt b/Documentation/arm64/acpi_object_usage.txt
 new file mode 100644
-index 0000000..275524e
+index 0000000..2c4f733
 --- /dev/null
-+++ b/Documentation/arm64/arm-acpi.txt
-@@ -0,0 +1,506 @@
-+ACPI on ARMv8 Servers
-+---------------------
-+ACPI can be used for ARMv8 general purpose servers designed to follow
-+the ARM SBSA (Server Base System Architecture) [0] and SBBR (Server 
-+Base Boot Requirements) [1] specifications.  Please note that the SBBR
-+can be retrieved simply by visiting [1], but the SBSA is currently only
-+available to those with an ARM login due to ARM IP licensing concerns.
-+
-+The ARMv8 kernel implements the reduced hardware model of ACPI version
-+5.1 or later.  Links to the specification and all external documents
-+it refers to are managed by the UEFI Forum.  The specification is
-+available at http://www.uefi.org/specifications and documents referenced
-+by the specification can be found via http://www.uefi.org/acpi.
-+
-+If an ARMv8 system does not meet the requirements of the SBSA and SBBR,
-+or cannot be described using the mechanisms defined in the required ACPI
-+specifications, then ACPI may not be a good fit for the hardware.
-+
-+While the documents mentioned above set out the requirements for building
-+industry-standard ARMv8 servers, they also apply to more than one operating
-+system.  The purpose of this document is to describe the interaction between
-+ACPI and Linux only, on an ARMv8 system -- that is, what Linux expects of
-+ACPI and what ACPI can expect of Linux.
-+
-+
-+Why ACPI on ARM?
-+----------------
-+Before examining the details of the interface between ACPI and Linux, it is
-+useful to understand why ACPI is being used.  Several technologies already
-+exist in Linux for describing non-enumerable hardware, after all.  In this
-+section we summarize a blog post [2] from Grant Likely that outlines the
-+reasoning behind ACPI on ARMv8 servers.  Actually, we snitch a good portion
-+of the summary text almost directly, to be honest.
-+
-+The short form of the rationale for ACPI on ARM is:
-+
-+-- ACPI???s bytecode (AML) allows the platform to encode hardware behavior,
-+   while DT explicitly does not support this.  For hardware vendors, being
-+   able to encode behavior is a key tool used in supporting operating 
-+   system releases on new hardware.
-+
-+-- ACPI???s OSPM defines a power management model that constrains what the 
-+   platform is allowed to do into a specific model, while still providing
-+   flexibility in hardware design.
-+
-+-- In the enterprise server environment, ACPI has established bindings (such
-+   as for RAS) which are currently used in production systems.  DT does not.
-+   Such bindings could be defined in DT at some point, but doing so means ARM
-+   and x86 would end up using completely different code paths in both firmware
-+   and the kernel.
-+
-+-- Choosing a single interface to describe the abstraction between a platform
-+   and an OS is important.  Hardware vendors would not be required to implement
-+   both DT and ACPI if they want to support multiple operating systems.  And,
-+   agreeing on a single interface instead of being fragmented into per OS
-+   interfaces makes for better interoperability overall.
-+
-+-- The new ACPI governance process works well and Linux is now at the same
-+   table as hardware vendors and other OS vendors.  In fact, there is no
-+   longer any reason to feel that ACPI is only belongs to Windows or that
-+   Linux is in any way secondary to Microsoft in this arena.  The move of
-+   ACPI governance into the UEFI forum has significantly opened up the
-+   specification development process, and currently, a large portion of the
-+   changes being made to ACPI is being driven by Linux.
-+
-+Key to the use of ACPI is the support model.  For servers in general, the
-+responsibility for hardware behaviour cannot solely be the domain of the
-+kernel, but rather must be split between the platform and the kernel, in
-+order to allow for orderly change over time.  ACPI frees the OS from needing
-+to understand all the minute details of the hardware so that the OS doesn???t
-+need to be ported to each and every device individually.  It allows the
-+hardware vendors to take responsibility for power management behaviour without
-+depending on an OS release cycle which is not under their control.
-+
-+ACPI is also important because hardware and OS vendors have already worked
-+out the mechanisms for supporting a general purpose computing ecosystem.  The
-+infrastructure is in place, the bindings are in place, and the processes are
-+in place.  DT does exactly what Linux needs it to when working with vertically
-+integrated devices, but there are no good processes for supporting what the
-+server vendors need.  Linux could potentially get there with DT, but doing so
-+really just duplicates something that already works.  ACPI already does what
-+the hardware vendors need, Microsoft won???t collaborate on DT, and hardware
-+vendors would still end up providing two completely separate firmware
-+interfaces -- one for Linux and one for Windows.
-+
-+
-+Kernel Compatibility
-+--------------------
-+One of the primary motivations for ACPI is standardization, and using that
-+to provide backward compatibility for Linux kernels.  In the server market,
-+software and hardware are often used for long periods.  ACPI allows the
-+kernel and firmware to agree on a consistent abstraction that can be
-+maintained over time, even as hardware or software change.  As long as the
-+abstraction is supported, systems can be updated without necessarily having
-+to replace the kernel.
-+
-+When a Linux driver or subsystem is first implemented using ACPI, it by
-+definition ends up requiring a specific version of the ACPI specification
-+-- it's baseline.  ACPI firmware must continue to work, even though it may
-+not be optimal, with the earliest kernel version that first provides support
-+for that baseline version of ACPI.  There may be a need for additional drivers,
-+but adding new functionality (e.g., CPU power management) should not break
-+older kernel versions.  Further, ACPI firmware must also work with the most
-+recent version of the kernel.
++++ b/Documentation/arm64/acpi_object_usage.txt
+@@ -0,0 +1,592 @@
++ACPI Tables
++-----------
++The expectations of individual ACPI tables are discussed in the list that
++follows.
++
++If a section number is used, it refers to a section number in the ACPI
++specification where the object is defined.  If "Signature Reserved" is used,
++the table signature (the first four bytes of the table) is the only portion
++of the table recognized by the specification, and the actual table is defined
++outside of the UEFI Forum (see Section 5.2.6 of the specification).
++
++For ACPI on arm64, tables also fall into the following categories:
++
++	-- Required: DSDT, FADT, GTDT, MADT, MCFG, RSDP, SPCR, XSDT
++
++	-- Recommended: BERT, EINJ, ERST, HEST, SSDT
++
++	-- Optional: BGRT, CPEP, CSRT, DRTM, ECDT, FACS, FPDT, MCHI, MPST,
++	   MSCT, RASF, SBST, SLIT, SPMI, SRAT, TCPA, TPM2, UEFI
++
++	-- Not supported: BOOT, DBG2, DBGP, DMAR, ETDT, HPET, IBFT, IVRS,
++	   LPIT, MSDM, RSDT, SLIC, WAET, WDAT, WDRT, WPBT
++
++
++Table	Usage for ARMv8 Linux
++-----	----------------------------------------------------------------
++BERT	Section 18.3 (signature == "BERT")
++	== Boot Error Record Table ==
++	Must be supplied if RAS support is provided by the platform.  It
++	is recommended this table be supplied.
++
++BOOT	Signature Reserved (signature == "BOOT")
++	== simple BOOT flag table ==
++	Microsoft only table, will not be supported.
++
++BGRT	Section 5.2.22 (signature == "BGRT")
++	== Boot Graphics Resource Table ==
++	Optional, not currently supported, with no real use-case for an
++	ARM server.
++
++CPEP	Section 5.2.18 (signature == "CPEP")
++	== Corrected Platform Error Polling table ==
++	Optional, not currently supported, and not recommended until such
++	time as ARM-compatible hardware is available, and the specification
++	suitably modified.
++
++CSRT	Signature Reserved (signature == "CSRT")
++	== Core System Resources Table ==
++	Optional, not currently supported.
++
++DBG2	Signature Reserved (signature == "DBG2")
++	== DeBuG port table 2 ==
++	Microsoft only table, will not be supported.
++
++DBGP	Signature Reserved (signature == "DBGP")
++	== DeBuG Port table ==
++	Microsoft only table, will not be supported.
++
++DSDT	Section 5.2.11.1 (signature == "DSDT")
++	== Differentiated System Description Table ==
++	A DSDT is required; see also SSDT.
++
++	ACPI tables contain only one DSDT but can contain one or more SSDTs,
++	which are optional.  Each SSDT can only add to the ACPI namespace,
++	but cannot modify or replace anything in the DSDT.
++
++DMAR	Signature Reserved (signature == "DMAR")
++	== DMA Remapping table ==
++	x86 only table, will not be supported.
++
++DRTM	Signature Reserved (signature == "DRTM")
++	== Dynamic Root of Trust for Measurement table ==
++	Optional, not currently supported.
++
++ECDT	Section 5.2.16 (signature == "ECDT")
++	== Embedded Controller Description Table ==
++	Optional, not currently supported, but could be used on ARM if and
++	only if one uses the GPE_BIT field to represent an IRQ number, since
++	there are no GPE blocks defined in hardware reduced mode.  This would
++	need to be modified in the ACPI specification.
++
++EINJ	Section 18.6 (signature == "EINJ")
++	== Error Injection table ==
++	This table is very useful for testing platform response to error
++	conditions; it allows one to inject an error into the system as
++	if it had actually occurred.  However, this table should not be
++	shipped with a production system; it should be dynamically loaded
++	and executed with the ACPICA tools only during testing.
++
++ERST	Section 18.5 (signature == "ERST")
++	== Error Record Serialization Table ==
++	Must be supplied if RAS support is provided by the platform.  It
++	is recommended this table be supplied.
++
++ETDT	Signature Reserved (signature == "ETDT")
++	== Event Timer Description Table ==
++	Obsolete table, will not be supported.
++
++FACS	Section 5.2.10 (signature == "FACS")
++	== Firmware ACPI Control Structure ==
++	It is unlikely that this table will be terribly useful.  If it is
++	provided, the Global Lock will NOT be used since it is not part of
++	the hardware reduced profile, and only 64-bit address fields will
++	be considered valid.
++
++FADT	Section 5.2.9 (signature == "FACP")
++	== Fixed ACPI Description Table ==
++	Required for arm64.
++
++	The HW_REDUCED_ACPI flag must be set.  All of the fields that are
++	to be ignored when HW_REDUCED_ACPI is set are expected to be set to
++	zero.
++
++	If an FACS table is provided, the X_FIRMWARE_CTRL field is to be
++	used, not FIRMWARE_CTRL.
++
++	If PSCI is used (as is recommended), make sure that ARM_BOOT_ARCH is
++	filled in properly -- that the PSCI_COMPLIANT flag is set and that
++	PSCI_USE_HVC is set or unset as needed (see table 5-37).
++
++	For the DSDT that is also required, the X_DSDT field is to be used,
++	not the DSDT field.
++
++FPDT	Section 5.2.23 (signature == "FPDT")
++	== Firmware Performance Data Table ==
++	Optional, not currently supported.
++
++GTDT	Section 5.2.24 (signature == "GTDT")
++	== Generic Timer Description Table ==
++	Required for arm64.
++
++HEST	Section 18.3.2 (signature == "HEST")
++	== Hardware Error Source Table ==
++	Until further error source types are defined, use only types 6 (AER
++	Root Port), 7 (AER Endpoint), 8 (AER Bridge), or 9 (Generic Hardware
++	Error Source).  Firmware first error handling is possible if and only
++	if Trusted Firmware is being used on arm64.
++
++	Must be supplied if RAS support is provided by the platform.  It
++	is recommended this table be supplied.
++
++HPET	Signature Reserved (signature == "HPET")
++	== High Precision Event timer Table ==
++	x86 only table, will not be supported.
++
++IBFT	Signature Reserved (signature == "IBFT")
++	== iSCSI Boot Firmware Table ==
++	Microsoft defined table, support TBD.
++
++IVRS	Signature Reserved (signature == "IVRS")
++	== I/O Virtualization Reporting Structure ==
++	x86_64 (AMD) only table, will not be supported.
++
++LPIT	Signature Reserved (signature == "LPIT")
++	== Low Power Idle Table ==
++	x86 only table as of ACPI 5.1; future versions have been adapted for
++	use with ARM and will be recommended in order to support ACPI power
++	management.
++
++MADT	Section 5.2.12 (signature == "APIC")
++	== Multiple APIC Description Table ==
++	Required for arm64.  Only the GIC interrupt controller structures 
++	should be used (types 0xA - 0xE).
++
++MCFG	Signature Reserved (signature == "MCFG")
++	== Memory-mapped ConFiGuration space ==
++	If the platform supports PCI/PCIe, an MCFG table is required.
++
++MCHI	Signature Reserved (signature == "MCHI")
++	== Management Controller Host Interface table ==
++	Optional, not currently supported.
++
++MPST	Section 5.2.21 (signature == "MPST")
++	== Memory Power State Table ==
++	Optional, not currently supported.
++
++MSDM	Signature Reserved (signature == "MSDM")
++	== Microsoft Data Management table ==
++	Microsoft only table, will not be supported.
++
++MSCT	Section 5.2.19 (signature == "MSCT")
++	== Maximum System Characteristic Table ==
++	Optional, not currently supported.
++
++RASF	Section 5.2.20 (signature == "RASF")
++	== RAS Feature table ==
++	Optional, not currently supported.
++
++RSDP	Section 5.2.5 (signature == "RSD PTR")
++	== Root System Description PoinTeR ==
++	Required for arm64.
++
++RSDT	Section 5.2.7 (signature == "RSDT")
++	== Root System Description Table ==
++	Since this table can only provide 32-bit addresses, it is deprecated
++	on arm64, and will not be used.
++
++SBST	Section 5.2.14 (signature == "SBST")
++	== Smart Battery Subsystem Table ==
++	Optional, not currently supported.
++
++SLIC	Signature Reserved (signature == "SLIC")
++	== Software LIcensing table ==
++	Microsoft only table, will not be supported.
++
++SLIT	Section 5.2.17 (signature == "SLIT")
++	== System Locality distance Information Table ==
++	Optional in general, but required for NUMA systems.
++
++SPCR	Signature Reserved (signature == "SPCR")
++	== Serial Port Console Redirection table ==
++	Required for arm64.
++
++SPMI	Signature Reserved (signature == "SPMI")
++	== Server Platform Management Interface table ==
++	Optional, not currently supported.
++
++SRAT	Section 5.2.16 (signature == "SRAT")
++	== System Resource Affinity Table ==
++	Optional, but if used, only the GICC Affinity structures are read.
++	To support NUMA, this table is required.
++
++SSDT	Section 5.2.11.2 (signature == "SSDT")
++	== Secondary System Description Table ==
++	These tables are a continuation of the DSDT; these are recommended
++	for use with devices that can be added to a running system, but can
++	also serve the purpose of dividing up device descriptions into more
++	manageable pieces.
++
++	An SSDT can only ADD to the ACPI namespace.  It cannot modify or
++	replace existing device descriptions already in the namespace.
++
++	These tables are optional, however.  ACPI tables should contain only
++	one DSDT but can contain many SSDTs.
++
++TCPA	Signature Reserved (signature == "TCPA")
++	== Trusted Computing Platform Alliance table ==
++	Optional, not currently supported, and may need changes to fully
++	interoperate with arm64.
++
++TPM2	Signature Reserved (signature == "TPM2")
++	== Trusted Platform Module 2 table ==
++	Optional, not currently supported, and may need changes to fully
++	interoperate with arm64.
++
++UEFI	Signature Reserved (signature == "UEFI")
++	== UEFI ACPI data table ==
++	Optional, not currently supported.  No known use case for arm64,
++	at present.
++
++WAET	Signature Reserved (signature == "WAET")
++	== Windows ACPI Emulated devices Table ==
++	Microsoft only table, will not be supported.
++
++WDAT	Signature Reserved (signature == "WDAT")
++	== Watch Dog Action Table ==
++	Microsoft only table, will not be supported.
++
++WDRT	Signature Reserved (signature == "WDRT")
++	== Watch Dog Resource Table ==
++	Microsoft only table, will not be supported.
++
++WPBT	Signature Reserved (signature == "WPBT")
++	== Windows Platform Binary Table ==
++	Microsoft only table, will not be supported.
++
++XSDT	Section 5.2.8 (signature == "XSDT")
++	== eXtended System Description Table ==
++	Required for arm64.
 +
-+
-+Relationship with Device Tree
-+-----------------------------
-+ACPI support in drivers and subsystems for ARMv8 should never be mutually
-+exclusive with DT support at compile time.
-+
-+At boot time the kernel will only use one description method depending on
-+parameters passed from the bootloader (including kernel bootargs).
-+
-+Regardless of whether DT or ACPI is used, the kernel must always be capable
-+of booting with either scheme (in kernels with both schemes enabled at compile
-+time).
-+
-+
-+Booting using ACPI tables
-+-------------------------
-+The only defined method for passing ACPI tables to the kernel on ARMv8
-+is via the UEFI system configuration table.  Just so it is explicit, this
-+means that ACPI is only supported on platforms that boot via UEFI.
-+
-+When an ARMv8 system boots, it can either have DT information, ACPI tables,
-+or in some very unusual cases, both.  If no command line parameters are used,
-+the kernel will try to use DT for device enumeration; if there is no DT
-+present, the kernel will try to use ACPI tables, but only if they are present.
-+In neither is available, the kernel will not boot.  If acpi=force is used
-+on the command line, the kernel will attempt to use ACPI tables first, but
-+fall back to DT if there are no ACPI tables present.  The basic idea is that
-+the kernel will not fail to boot unless it absolutely has no other choice.
-+
-+Processing of ACPI tables may be disabled by passing acpi=off on the kernel
-+command line; this is the default behavior.
-+
-+In order for the kernel to load and use ACPI tables, the UEFI implementation
-+MUST set the ACPI_20_TABLE_GUID to point to the RSDP table (the table with
-+the ACPI signature "RSD PTR ").  If this pointer is incorrect and acpi=force
-+is used, the kernel will disable ACPI and try to use DT to boot instead; the
-+kernel has, in effect, determined that ACPI tables are not present at that
-+point.
-+
-+If the pointer to the RSDP table is correct, the table will be mapped into
-+the kernel by the ACPI core, using the address provided by UEFI.
-+
-+The ACPI core will then locate and map in all other ACPI tables provided by
-+using the addresses in the RSDP table to find the XSDT (eXtended System
-+Description Table).  The XSDT in turn provides the addresses to all other
-+ACPI tables provided by the system firmware; the ACPI core will then traverse
-+this table and map in the tables listed.
-+
-+The ACPI core will ignore any provided RSDT (Root System Description Table).
-+RSDTs have been deprecated and are ignored on arm64 since they only allow
-+for 32-bit addresses.
-+
-+Further, the ACPI core will only use the 64-bit address fields in the FADT
-+(Fixed ACPI Description Table).  Any 32-bit address fields in the FADT will
-+be ignored on arm64.
-+
-+Hardware reduced mode (see Section 4.1 of the ACPI 5.1 specification) will
-+be enforced by the ACPI core on arm64.  Doing so allows the ACPI core to
-+run less complex code since it no longer has to provide support for legacy
-+hardware from other architectures.  Any fields that are not to be used for
-+hardware reduced mode must be set to zero.
-+
-+For the ACPI core to operate properly, and in turn provide the information
-+the kernel needs to configure devices, it expects to find the following
-+tables (all section numbers refer to the ACPI 5.1 specfication):
-+
-+    -- RSDP (Root System Description Pointer), section 5.2.5
-+
-+    -- XSDT (eXtended System Description Table), section 5.2.8
-+
-+    -- FADT (Fixed ACPI Description Table), section 5.2.9
-+
-+    -- DSDT (Differentiated System Description Table), section
-+       5.2.11.1
-+
-+    -- MADT (Multiple APIC Description Table), section 5.2.12
-+
-+    -- GTDT (Generic Timer Description Table), section 5.2.24
-+
-+    -- If PCI is supported, the MCFG (Memory mapped ConFiGuration
-+       Table), section 5.2.6, specifically Table 5-31.
-+
-+If the above tables are not all present, the kernel may or may not be
-+able to boot properly since it may not be able to configure all of the
-+devices available.
-+
-+
-+ACPI Detection
-+--------------
-+Drivers should determine their probe() type by checking for a null
-+value for ACPI_HANDLE, or checking .of_node, or other information in
-+the device structure.  This is detailed further in the "Driver 
-+Recommendations" section.
-+
-+In non-driver code, if the presence of ACPI needs to be detected at
-+runtime, then check the value of acpi_disabled. If CONFIG_ACPI is not
-+set, acpi_disabled will always be 1.
-+
-+
-+Device Enumeration
-+------------------
-+Device descriptions in ACPI should use standard recognized ACPI interfaces.
-+These may contain less information than is typically provided via a Device
-+Tree description for the same device.  This is also one of the reasons that
-+ACPI can be useful -- the driver takes into account that it may have less
-+detailed information about the device and uses sensible defaults instead.
-+If done properly in the driver, the hardware can change and improve over
-+time without the driver having to change at all.
-+
-+Clocks provide an excellent example.  In DT, clocks need to be specified
-+and the drivers need to take them into account.  In ACPI, the assumption
-+is that UEFI will leave the device in a reasonable default state, including
-+any clock settings.  If for some reason the driver needs to change a clock
-+value, this can be done in an ACPI method; all the driver needs to do is
-+invoke the method and not concern itself with what the method needs to do
-+to change the clock.  Changing the hardware can then take place over time
-+by changing what the ACPI method does, and not the driver.
-+
-+In DT, the parameters needed by the driver to set up clocks as in the example
-+above are known as "bindings"; in ACPI, these are known as "Device Properties"
-+and provided to a driver via the _DSD object.
-+
-+ACPI tables are described with a formal language called ASL, the ACPI
-+Source Language (section 19 of the specification).  This means that there
-+are always multiple ways to describe the same thing -- including device
-+properties.  For example, device properties could use an ASL construct
-+that looks like this: Name(KEY0, "value0").  An ACPI device driver would
-+then retrieve the value of the property by evaluating the KEY0 object.
-+However, using Name() this way has multiple problems: (1) ACPI limits
-+names ("KEY0") to four characters unlike DT; (2) there is no industry
-+wide registry that maintains a list of names, minimzing re-use; (3)
-+there is also no registry for the definition of property values ("value0"),
-+again making re-use difficult; and (4) how does one maintain backward
-+compatibility as new hardware comes out?  The _DSD method was created
-+to solve precisely these sorts of problems; Linux drivers should ALWAYS
-+use the _DSD method for device properties and nothing else.
-+
-+The _DSM object (ACPI Section 9.14.1) could also be used for conveying
-+device properties to a driver.  Linux drivers should only expect it to
-+be used if _DSD cannot represent the data required, and there is no way
-+to create a new UUID for the _DSD object.  Note that there is even less
-+regulation of the use of _DSM than there is of _DSD.  Drivers that depend
-+on the contents of _DSM objects will be more difficult to maintain over
-+time because of this; as of this writing, the use of _DSM is the cause
-+of quite a few firmware problems and is not recommended.
-+
-+Drivers should look for device properties in the _DSD object ONLY; the _DSD
-+object is described in the ACPI specification section 6.2.5, but this only
-+describes how to define the structure of an object returned via _DSD, and
-+how specific data structures are defined by specific UUIDs.  Linux should
-+only use the _DSD Device Properties UUID [5]:
-+
-+   -- UUID: daffd814-6eba-4d8c-8a91-bc9bbf4aa301
-+   
-+   -- http://www.uefi.org/sites/default/files/resources/_DSD-device-properties-UUID.pdf
-+
-+The UEFI Forum provides a mechanism for registering device properties [4]
-+so that they may be used across all operating systems supporting ACPI.
-+Device properties that have not been registered with the UEFI Forum should
-+not be used.
-+
-+Before creating new device properties, check to be sure that they have not
-+been defined before and either registered in the Linux kernel documentation
-+as DT bindings, or the UEFI Forum as device properties.  While we do not want
-+to simply move all DT bindings into ACPI device properties, we can learn from
-+what has been previously defined.
-+
-+If it is necessary to define a new device property, or if it makes sense to
-+synthesize the definition of a binding so it can be used in any firmware,
-+both DT bindings and ACPI device properties for device drivers have review
-+processes.  Use them both.  When the driver itself is submitted for review
-+to the Linux mailing lists, the device property definitions needed must be
-+submitted at the same time.  A driver that supports ACPI and uses device
-+properties will not be considered complete without their definitions.  Once
-+the device property has been accepted by the Linux community, it must be
-+registered with the UEFI Forum [4], which will review it again for consistency
-+within the registry.  This may require iteration.  The UEFI Forum, though,
-+will always be the canonical site for device property definitions.
-+
-+It may make sense to provide notice to the UEFI Forum that there is the
-+intent to register a previously unused device property name as a means of
-+reserving the name for later use.  Other operating system vendors will
-+also be submitting registration requests and this may help smooth the
-+process.
-+
-+Once registration and review have been completed, the kernel provides an
-+interface for looking up device properties in a manner independent of
-+whether DT or ACPI is being used.  This API should be used [6]; it can
-+eliminate some duplication of code paths in driver probing functions and
-+discourage divergence between DT bindings and ACPI device properties.
-+
-+
-+Programmable Power Control Resources
-+------------------------------------
-+Programmable power control resources include such resources as voltage/current
-+providers (regulators) and clock sources.
-+
-+With ACPI, the kernel clock and regulator framework is not expected to be used
-+at all.
-+
-+The kernel assumes that power control of these resources is represented with
-+Power Resource Objects (ACPI section 7.1).  The ACPI core will then handle
-+correctly enabling and disabling resources as they are needed.  In order to
-+get that to work, ACPI assumes each device has defined D-states and that these
-+can be controlled through the optional ACPI methods _PS0, _PS1, _PS2, and _PS3;
-+in ACPI, _PS0 is the method to invoke to turn a device full on, and _PS3 is for
-+turning a device full off.
-+
-+There are two options for using those Power Resources.  They can:
-+
-+   -- be managed in a _PSx method which gets called on entry to power
-+      state Dx.
-+
-+   -- be declared separately as power resources with their own _ON and _OFF
-+      methods.  They are then tied back to D-states for a particular device
-+      via _PRx which specifies which power resources a device needs to be on
-+      while in Dx.  Kernel then tracks number of devices using a power resource
-+      and calls _ON/_OFF as needed.
-+
-+The kernel ACPI code will also assume that the _PSx methods follow the normal
-+ACPI rules for such methods:
-+
-+   -- If either _PS0 or _PS3 is implemented, then the other method must also
-+      be implemented.
-+
-+   -- If a device requires usage or setup of a power resource when on, the ASL
-+      should organize that it is allocated/enabled using the _PS0 method.
-+
-+   -- Resources allocated or enabled in the _PS0 method should be disabled
-+      or de-allocated in the _PS3 method.
-+
-+   -- Firmware will leave the resources in a reasonable state before handing
-+      over control to the kernel.
-+
-+Such code in _PSx methods will of course be very platform specific.  But,
-+this allows the driver to abstract out the interface for operating the device
-+and avoid having to read special non-standard values from ACPI tables. Further,
-+abstracting the use of these resources allows the hardware to change over time
-+without requiring updates to the driver.
-+
-+
-+Clocks
-+------
-+ACPI makes the assumption that clocks are initialized by the firmware -- 
-+UEFI, in this case -- to some working value before control is handed over
-+to the kernel.  This has implications for devices such as UARTs, or SoC-driven
-+LCD displays, for example.
-+
-+When the kernel boots, the clocks are assumed to be set to reasonable
-+working values.  If for some reason the frequency needs to change -- e.g.,
-+throttling for power management -- the device driver should expect that 
-+process to be abstracted out into some ACPI method that can be invoked 
-+(please see the ACPI specification for further recommendations on standard
-+methods to be expected).  The only exceptions to this are CPU clocks where
-+CPPC provides a much richer interface than ACPI methods.  If the clocks
-+are not set, there is no direct way for Linux to control them.
-+
-+If an SoC vendor wants to provide fine-grained control of the system clocks,
-+they could do so by providing ACPI methods that could be invoked by Linux
-+drivers.  However, this is NOT recommended and Linux drivers should NOT use
-+such methods, even if they are provided.  Such methods are not currently
-+standardized in the ACPI specification, and using them could tie a kernel
-+to a very specific SoC, or tie an SoC to a very specific version of the
-+kernel, both of which we are trying to avoid.
-+
-+
-+Driver Recommendations
-+----------------------
-+DO NOT remove any DT handling when adding ACPI support for a driver.  The
-+same device may be used on many different systems.
-+
-+DO try to structure the driver so that it is data-driven.  That is, set up
-+a struct containing internal per-device state based on defaults and whatever
-+else must be discovered by the driver probe function.  Then, have the rest
-+of the driver operate off of the contents of that struct.  Doing so should
-+allow most divergence between ACPI and DT functionality to be kept local to
-+the probe function instead of being scattered throughout the driver.  For
-+example:
-+
-+static int device_probe_dt(struct platform_device *pdev)
-+{
-+	/* DT specific functionality */
-+	...
-+}
-+
-+static int device_probe_acpi(struct platform_device *pdev)
-+{
-+	/* ACPI specific functionality */
-+	...
-+}
-+
-+static int device_probe(stuct platform_device *pdev)
-+{
-+	...
-+	struct device_node node = pdev->dev.of_node;
-+	...
-+
-+	if (node)
-+		ret = device_probe_dt(pdev);
-+	else if (ACPI_HANDLE(&pdev->dev))
-+		ret = device_probe_acpi(pdev);
-+	else
-+		/* other initialization */
-+		...
-+	/* Continue with any generic probe operations */
-+	...
-+}
-+
-+DO keep the MODULE_DEVICE_TABLE entries together in the driver to make it
-+clear the different names the driver is probed for, both from DT and from
-+ACPI:
-+
-+static struct of_device_id virtio_mmio_match[] = {
-+        { .compatible = "virtio,mmio", },
-+        { }
-+};
-+MODULE_DEVICE_TABLE(of, virtio_mmio_match);
-+
-+static const struct acpi_device_id virtio_mmio_acpi_match[] = {
-+        { "LNRO0005", },
-+        { }
-+};
-+MODULE_DEVICE_TABLE(acpi, virtio_mmio_acpi_match);
-+
-+
-+ASWG
-+----
-+The ACPI specification changes regularly.  During the year 2014, for instance,
-+version 5.1 was released and version 6.0 substantially completed, with most of
-+the changes being driven by ARM-specific requirements.  Proposed changes are
-+presented and discussed in the ASWG (ACPI Specification Working Group) which
-+is a part of the UEFI Forum.
-+
-+Participation in this group is open to all UEFI members.  Please see
-+http://www.uefi.org/workinggroup for details on group membership.
-+
-+It is the intent of the ARMv8 ACPI kernel code to follow the ACPI specification
-+as closely as possible, and to only implement functionality that complies with
-+the released standards from UEFI ASWG.  As a practical matter, there will be
-+vendors that provide bad ACPI tables or violate the standards in some way.
-+If this is because of errors, quirks and fixups may be necessary, but will
-+be avoided if possible.  If there are features missing from ACPI that preclude
-+it from being used on a platform, ECRs (Engineering Change Requests) should be
-+submitted to ASWG and go through the normal approval process; for those that
-+are not UEFI members, many other members of the Linux community are and would
-+likely be willing to assist in submitting ECRs.
-+
-+
-+Linux Code
-+----------
-+Individual items specific to Linux on ARM, contained in the the Linux
-+source code, are in the list that follows:
-+
-+ACPI_OS_NAME		This macro defines the string to be returned when
-+			an ACPI method invokes the _OS method.  On ARM64
-+			systems, this macro will be "Linux" by default.
-+			The command line parameter acpi_os=<string>
-+			can be used to set it to some other value.  The
-+			default value for other architectures is "Microsoft
-+			Windows NT", for example.
 +
 +ACPI Objects
 +------------
-+Detailed expectations for ACPI tables and object are listed in the file
-+Documentation/arm64/acpi_object_usage.txt.
++The expectations on individual ACPI objects are discussed in the list that
++follows:
++
++Name	Section		Usage for ARMv8 Linux
++----	------------	-------------------------------------------------
++_ADR	6.1.1		Use as needed.
++
++_BBN	6.5.5		Use as needed; PCI-specific.
++
++_BDN	6.5.3		Optional; not likely to be used on arm64.
++
++_CCA	6.2.17		This method should be defined for all bus masters
++			on arm64.  While cache coherency is assumed, making
++			it explicit ensures the kernel will set up DMA as
++			it should.
++
++_CDM	6.2.1		Optional, to be used only for processor devices.
++
++_CID	6.1.2		Use as needed.
++
++_CLS	6.1.3		Use as needed.
++
++_CRS	6.2.2		Required on arm64.
++
++_DCK	6.5.2		Optional; not likely to be used on arm64.
++
++_DDN	6.1.4		This field can be used for a device name.  However,
++			it is meant for DOS device names (e.g., COM1), so be
++			careful of its use across OSes.
++
++_DEP	6.5.8		Use as needed.
++
++_DIS	6.2.3		Optional, for power management use.
++
++_DLM	5.7.5		Optional.
++
++_DMA	6.2.4		Optional.
++
++_DSD	6.2.5		To be used with caution.  If this object is used, try
++			to use it within the constraints already defined by the
++			Device Properties UUID.  Only in rare circumstances
++			should it be necessary to create a new _DSD UUID.
++
++			In either case, submit the _DSD definition along with
++			any driver patches for discussion, especially when
++			device properties are used.  A driver will not be 
++			considered complete without a corresponding _DSD
++			description.  Once approved by kernel maintainers,
++			the UUID or device properties must then be registered
++			with the UEFI Forum; this may cause some iteration as
++			more than one OS will be registering entries.
++
++_DSM			Do not use this method.  It is not standardized, the
++			return values are not well documented, and it is
++			currently a frequent source of error.
++
++_DSW	7.2.1		Use as needed; power management specific.
++
++_EDL	6.3.1		Optional.
++
++_EJD	6.3.2		Optional.
++
++_EJx	6.3.3		Optional.
++
++_FIX	6.2.7		x86 specific, not used on arm64.
++
++\_GL	5.7.1		This object is not to be used in hardware reduced
++			mode, and therefore should not be used on arm64.
++
++_GLK	6.5.7		This object requires a global lock be defined; there
++			is no global lock on arm64 since it runs in hardware
++			reduced mode.  Hence, do not use this object on arm64.
++
++\_GPE	5.3.1		This namespace is for x86 use only.  Do not use it
++			on arm64.
++
++_GSB	6.2.7		Optional.
++
++_HID	6.1.5		Use as needed.  This is the primary object to use in
++			device probing, though _CID and _CLS may also be used.
++
++_HPP	6.2.8		Optional, PCI specific.
++
++_HPX	6.2.9		Optional, PCI specific.
++
++_HRV	6.1.6		Optional, use as needed to clarify device behavior; in
++			some cases, this may be easier to use than _DSD.
++
++_INI	6.5.1		Not required, but can be useful in setting up devices
++			when UEFI leaves them in a state that may not be what
++			the driver expects before it starts probing.
++
++_IRC	7.2.15		Use as needed; power management specific.
++
++_LCK	6.3.4		Optional.
++
++_MAT	6.2.10		Optional; see also the MADT.
++
++_MLS	6.1.7		Optional, but highly recommended for use in 
++			internationalization.
++
++_OFF	7.1.2		It is recommended to define this method for any device
++			that can be turned on or off.
++
++_ON	7.1.3		It is recommended to define this method for any device
++			that can be turned on or off.
++
++\_OS	5.7.3		This method will return "Linux" by default (this is
++			the value of the macro ACPI_OS_NAME on Linux).  The
++			command line parameter acpi_os=<string> can be used
++			to set it to some other value.
++
++_OSC	6.2.11		This method can be a global method in ACPI (i.e.,
++			\_SB._OSC), or it may be associated with a specific
++			device (e.g., \_SB.DEV0._OSC), or both.  When used
++			as a global method, only capabilities published in
++			the ACPI specification are allowed.  When used as
++			a device-specifc method, the process described for
++			using _DSD MUST be used to create an _OSC definition;
++			out-of-process use of _OSC is not allowed.  That is,
++			submit the device-specific _OSC usage description as
++			part of the kernel driver submission, get it approved
++			by the kernel community, then register it with the
++			UEFI Forum.
++
++\_OSI	5.7.2		Deprecated on ARM64.  Any invocation of this method
++			will print a warning on the console and return false.
++			That is, as far as ACPI firmware is concerned, _OSI
++			cannot be used to determine what sort of system is
++			being used or what functionality is provided.  The
++			_OSC method is to be used instead.
++
++_OST	6.3.5		Optional.
++
++_PDC	8.4.1		Deprecated, do not use on arm64.
++
++\_PIC	5.8.1		The method should not be used.  On arm64, the only
++			interrupt model available is GIC.
++
++_PLD	6.1.8		Optional.
++
++\_PR	5.3.1		This namespace is for x86 use only on legacy systems.
++			Do not use it on arm64.
++
++_PRS	6.2.12		Optional.
++
++_PRT	6.2.13		Required as part of the definition of all PCI root
++			devices.
++
++_PRW	7.2.13		Use as needed; power management specific.
++
++_PRx	7.2.8-11	Use as needed; power management specific.  If _PR0 is
++			defined, _PR3 must also be defined. 
++
++_PSC	7.2.6		Use as needed; power management specific.
++
++_PSE	7.2.7		Use as needed; power management specific.
++
++_PSW	7.2.14		Use as needed; power management specific.
++
++_PSx	7.2.2-5		Use as needed; power management specific.  If _PS0 is
++			defined, _PS3 must also be defined.  If clocks or
++			regulators need adjusting to be consistent with power
++			usage, change them in these methods.
++
++\_PTS	7.3.1		Use as needed; power management specific.
++
++_PXM	6.2.14		Optional.
++
++_REG	6.5.4		Use as needed.
++
++\_REV	5.7.4		Always returns the latest version of ACPI supported.
++
++_RMV	6.3.6		Optional.
++
++\_SB	5.3.1		Required on arm64; all devices must be defined in this
++			namespace.
++
++_SEG	6.5.6		Use as needed; PCI-specific.
++
++\_SI	5.3.1,		Optional.
++	9.1
++
++_SLI	6.2.15		Optional; recommended when SLIT table is in use.
++
++_STA	6.3.7,		It is recommended to define this method for any device
++	7.1.4		that can be turned on or off.
++
++_SRS	6.2.16		Optional; see also _PRS.
++
++_STR	6.1.10		Recommended for conveying device names to end users;
++			this is preferred over using _DDN.
++
++_SUB	6.1.9		Use as needed; _HID or _CID are preferred.
++
++_SUN	6.1.11		Optional.
++
++\_Sx	7.3.2		Use as needed; power management specific.
++
++_SxD	7.2.16-19	Use as needed; power management specific.
++
++_SxW	7.2.20-24	Use as needed; power management specific.
++
++_SWS	7.3.3		Use as needed; power management specific; this may
++			require specification changes for use on arm64.
++
++\_TTS	7.3.4		Use as needed; power management specific.
++
++\_TZ	5.3.1		Optional.
++
++_UID	6.1.12		Recommended for distinguishing devices of the same
++			class; define it if at all possible.
++
++\_WAK	7.3.5		Use as needed; power management specific.
 +
 +
-+References
-+----------
-+[0] http://silver.arm.com -- document ARM-DEN-0029, or newer
-+    "Server Base System Architecture", version 2.3, dated 27 Mar 2014
-+
-+[1] http://infocenter.arm.com/help/topic/com.arm.doc.den0044a/Server_Base_Boot_Requirements.pdf
-+    Document ARM-DEN-0044A, or newer: "Server Base Boot Requirements, System
-+    Software on ARM Platforms", dated 16 Aug 2014
-+
-+[2] http://www.secretlab.ca/archives/151, 10 Jan 2015, Copyright (c) 2015,
-+    Linaro Ltd., written by Grant Likely.  A copy of the verbatim text (apart
-+    from formatting) is also in Documentation/arm64/why_use_acpi.txt.
-+
-+[3] AMD ACPI for Seattle platform documentation:
-+    http://amd-dev.wpengine.netdna-cdn.com/wordpress/media/2012/10/Seattle_ACPI_Guide.pdf 
-+
-+[4] http://www.uefi.org/acpi -- please see the link for the "ACPI _DSD Device
-+    Property Registry Instructions"
-+
-+[5] http://www.uefi.org/acpi -- please see the link for the "_DSD (Device
-+    Specific Data) Implementation Guide"
-+
-+[6] Kernel code for the unified device property interface can be found in
-+    include/linux/property.h and drivers/base/property.c.
++ACPI Event Model
++----------------
++Do not use GPE block devices; these are not supported in the hardware reduced
++profile used by arm64.  Since there are no GPE blocks defined for use on ARM
++platforms, GPIO-signaled interrupts should be used for creating system events.
 +
 +
-+Authors
++ACPI Processor Control
++----------------------
++Section 8 of the ACPI specification is currently undergoing change that
++should be completed in the 6.0 version of the specification.  Processor
++performance control will be handled differently for arm64 at that point
++in time.  Processor aggregator devices (section 8.5) will not be used,
++for example, but another similar mechanism instead.
++
++While UEFI constrains what we can say until the release of 6.0, it is
++recommended that CPPC (8.4.5) be used as the primary model.  This will
++still be useful into the future.  C-states and P-states will still be
++provided, but most of the current design work appears to favor CPPC.
++
++Further, it is essential that the ARMv8 SoC provide a fully functional
++implementation of PSCI; this will be the only mechanism supported by ACPI
++to control CPU power state (including secondary CPU booting).
++
++More details will be provided on the release of the ACPI 6.0 specification.
++
++
++ACPI System Address Map Interfaces
++----------------------------------
++In Section 15 of the ACPI specification, several methods are mentioned as
++possible mechanisms for conveying memory resource information to the kernel.
++For arm64, we will only support UEFI for booting with ACPI, hence the UEFI
++GetMemoryMap() boot service is the only mechanism that will be used.
++
++
++ACPI Platform Error Interfaces (APEI)
++-------------------------------------
++The APEI tables supported are described above.
++
++APEI requires the equivalent of an SCI and an NMI on ARMv8.  The SCI is used
++to notify the OSPM of errors that have occurred but can be corrected and the
++system can continue correct operation, even if possibly degraded.  The NMI is
++used to indicate fatal errors that cannot be corrected, and require immediate
++attention.
++
++Since there is no direct equivalent of the x86 SCI or NMI, arm64 handles
++these slightly differently.  The SCI is handled as a normal GPIO-signaled
++interrupt; given that these are corrected (or correctable) errors being
++reported, this is sufficient.  The NMI is emulated as the highest priority
++GPIO-signaled interrupt possible.  This implies some caution must be used
++since there could be interrupts at higher privilege levels or even interrupts
++at the same priority as the emulated NMI.  In Linux, this should not be the
++case but one should be aware it could happen.
++
++
++ACPI Objects Not Supported on ARM64
++-----------------------------------
++While this may change in the future, there are several classes of objects
++that can be defined, but are not currently of general interest to ARM servers.
++
++These are not supported:
++
++	-- Section 9.2: ambient light sensor devices
++
++	-- Section 9.3: battery devices
++
++	-- Section 9.4: lids (e.g., laptop lids)
++
++	-- Section 9.8.2: IDE controllers
++
++	-- Section 9.9: floppy controllers
++
++	-- Section 9.10: GPE block devices
++
++	-- Section 9.15: PC/AT RTC/CMOS devices
++
++	-- Section 9.16: user presence detection devices
++
++	-- Section 9.17: I/O APIC devices; all GICs must be enumerable via MADT
++
++	-- Section 9.18: time and alarm devices (see 9.15)
++
++
++ACPI Objects Not Yet Implemented
++--------------------------------
++While these objects have x86 equivalents, and they do make some sense in ARM
++servers, there is either no hardware available at present, or in some cases
++there may not yet be a non-ARM implementation.  Hence, they are currently not
++implemented though that may change in the future.
++
++Not yet implemented are:
++
++	-- Section 10: power source and power meter devices
++
++	-- Section 11: thermal management
++
++	-- Section 12: embedded controllers interface
++
++	-- Section 13: SMBus interfaces
++
++	-- Section 17: NUMA support (prototypes have been submitted for
++	   review)
++
+diff --git a/Documentation/arm64/why_use_acpi.txt b/Documentation/arm64/why_use_acpi.txt
+new file mode 100644
+index 0000000..9bb583e
+--- /dev/null
++++ b/Documentation/arm64/why_use_acpi.txt
+@@ -0,0 +1,231 @@
++Why ACPI on ARM?
++----------------
++Copyright (c) 2015, Linaro, Ltd.
++Author: Grant Likely <grant.likely@linaro.org>
++
++Why are we doing ACPI on ARM? That question has been asked many times, but
++we haven???t yet had a good summary of the most important reasons for wanting
++ACPI on ARM. This article is an attempt to state the rationale clearly.
++
++During an email conversation late last year, Catalin Marinas asked for
++a summary of exactly why we want ACPI on ARM, Dong Wei replied with the 
++following list:
++> 1. Support multiple OSes, including Linux and Windows
++> 2. Support device configurations
++> 3. Support dynamic device configurations (hot add/removal)
++> 4. Support hardware abstraction through control methods
++> 5. Support power management
++> 6. Support thermal management
++> 7. Support RAS interfaces
++
++The above list is certainly true in that all of them need to be supported.
++However, that list doesn???t give the rationale for choosing ACPI. We already
++have DT mechanisms for doing most of the above, and can certainly create
++new bindings for anything that is missing. So, if it isn???t an issue of
++functionality, then how does ACPI differ from DT and why is ACPI a better
++fit for general purpose ARM servers?
++
++The difference is in the support model. To explain what I mean, I???m first
++going to expand on each of the items above and discuss the similarities and
++differences between ACPI and DT. Then, with that as the groundwork, I???ll
++discuss how ACPI is a better fit for the general purpose hardware support
++model.
++
++
++Device Configurations
++---------------------
++2. Support device configurations
++3. Support dynamic device configurations (hot add/removal)
++
++From day one, DT was about device configurations. There isn???t any significant
++difference between ACPI & DT here. In fact, the majority of ACPI tables are
++completely analogous to DT descriptions. With the exception of the DSDT and
++SSDT tables, most ACPI tables are merely flat data used to describe hardware.
++
++DT platforms have also supported dynamic configuration and hotplug for years.
++There isn???t a lot here that differentiates between ACPI and DT. The biggest
++difference is that dynamic changes to the ACPI namespace can be triggered by
++ACPI methods, whereas for DT changes are received as messages from firmware
++and have been very much platform specific (e.g. IBM pSeries does this)
++
++
++Power Management
++----------------
++4. Support hardware abstraction through control methods
++5. Support power management
++6. Support thermal management
++
++Power, thermal, and clock management can all be dealt with as a group. ACPI
++defines a power management model (OSPM) that both the platform and the OS
++conform to. The OS implements the OSPM state machine, but the platform can
++provide state change behaviour in the form of bytecode methods. Methods can
++access hardware directly or hand off PM operations to a coprocessor. The OS
++really doesn???t have to care about the details as long as the platform obeys
++the rules of the OSPM model.
++
++With DT, the kernel has device drivers for each and every component in the
++platform, and configures them using DT data. DT itself doesn???t have a PM model.
++Rather the PM model is an implementation detail of the kernel. Device drivers
++use DT data to decide how to handle PM state changes. We have clock, pinctrl,
++and regulator frameworks in the kernel for working out runtime PM. However,
++this only works when all the drivers and support code have been merged into
++the kernel. When the kernel???s PM model doesn???t work for new hardware, then we
++change the model. This works very well for mobile/embedded because the vendor
++controls the kernel. We can change things when we need to, but we also struggle
++with getting board support mainlined.
++
++This difference has a big impact when it comes to OS support. Engineers from
++hardware vendors, Microsoft, and most vocally Red Hat have all told me bluntly
++that rebuilding the kernel doesn???t work for enterprise OS support. Their model
++is based around a fixed OS release that ideally boots out-of-the-box. It may
++still need additional device drivers for specific peripherals/features, but
++from a system view, the OS works. When additional drivers are provided 
++separately, those drivers fit within the existing OSPM model for power 
++management. This is where ACPI has a technical advantage over DT. The ACPI
++OSPM model and it???s bytecode gives the HW vendors a level of abstraction 
++under their control, not the kernel???s. When the hardware behaves differently
++from what the OS expects, the vendor is able to change the behaviour without
++changing the HW or patching the OS.
++
++At this point you???d be right to point out that it is harder to get the whole
++system working correctly when behaviour is split between the kernel and the
++platform. The OS must trust that the platform doesn???t violate the OSPM model.
++All manner of bad things happen if it does. That is exactly why the DT model
++doesn???t encode behaviour: It is easier to make changes and fix bugs when
++everything is within the same code base. We don???t need a platform/kernel 
++split when we can modify the kernel.
++
++However, the enterprise folks don???t have that luxury. The platform/kernel
++split isn???t a design choice. It is a characteristic of the market. Hardware
++and OS vendors each have their own product timetables, and they don???t line
++up. The timeline for getting patches into the kernel and flowing through into
++OS releases puts OS support far downstream from the actual release of hardware.
++Hardware vendors simply cannot wait for OS support to come online to be able to
++release their products. They need to be able to work with available releases,
++and make their hardware behave in the way the OS expects. The advantage of ACPI
++OSPM is that it defines behaviour and limits what the hardware is allowed to do
++without involving the kernel.
++
++What remains is sorting out how we make sure everything works. How do we make
++sure there is enough cross platform testing to ensure new hardware doesn???t 
++ship broken and that new OS releases don???t break on old hardware? Those are
++the reasons why a UEFI/ACPI firmware summit is being organized, it???s why the
++UEFI forum holds plugfests 3 times a year, and it is why we???re working on 
++FWTS and LuvOS.
++
++
++Reliability, Availability & Serviceability (RAS)
++------------------------------------------------
++7. Support RAS interfaces
++
++This isn???t a question of whether or not DT can support RAS. Of course it can.
++Rather it is a matter of RAS bindings already existing for ACPI, including a
++usage model. We???ve barely begun to explore this on DT. This item doesn???t make
++ACPI technically superior to DT, but it certainly makes it more mature.
++
++
++Multiplatform Support
++---------------------
++1. Support multiple OSes, including Linux and Windows
++
++I???m tackling this item last because I think it is the most contentious for
++those of us in the Linux world. I wanted to get the other issues out of the
++way before addressing it.
++
++The separation between hardware vendors and OS vendors in the server market
++is new for ARM. For the first time ARM hardware and OS release cycles are
++completely decoupled from each other, and neither are expected to have specific
++knowledge of the other (ie. the hardware vendor doesn???t control the choice of
++OS). ARM and their partners want to create an ecosystem of independent OSes
++and hardware platforms that don???t explicitly require the former to be ported
++to the latter.
++
++Now, one could argue that Linux is driving the potential market for ARM
++servers, and therefore Linux is the only thing that matters, but hardware
++vendors don???t see it that way. For hardware vendors it is in their best
++interest to support as wide a choice of OSes as possible in order to catch
++the widest potential customer base. Even if the majority choose Linux, some
++will choose BSD, some will choose Windows, and some will choose something
++else. Whether or not we think this is foolish is beside the point; it isn???t
++something we have influence over.
++
++During early ARM server planning meetings between ARM, its partners and other
++industry representatives (myself included) we discussed this exact point.
++Before us were two options, DT and ACPI. As one of the Linux people in the
++room, I advised that ACPI???s closed governance model was a show stopper for
++Linux and that DT is the working interface. Microsoft on the other hand made
++it abundantly clear that ACPI was the only interface that they would support.
++For their part, the hardware vendors stated the platform abstraction behaviour
++of ACPI is a hard requirement for their support model and that they would not
++close the door on either Linux or Windows.
++
++However, the one thing that all of us could agree on was that supporting
++multiple interfaces doesn???t help anyone: It would require twice as much 
++effort on defining bindings (once for Linux-DT and once for Windows-ACPI)
++and it would require firmware to describe everything twice. Eventually we
++reached the compromise to use ACPI, but on the condition of opening the
++governance process to give Linux engineers equal influence over the
++specification. The fact that we now have a much better seat at the ACPI
++table, for both ARM and x86, is a direct result of these early ARM server
++negotiations. We are no longer second class citizens in the ACPI world and
++are actually driving much of the recent development.
++
++I know that this line of thought is more about market forces rather than a
++hard technical argument between ACPI and DT, but it is an equally significant
++one. Agreeing on a single way of doing things is important. The ARM server
++ecosystem is better for the agreement to use the same interface for all
++operating systems. This is what is meant by standards compliant. The standard
++is a codification of the mutually agreed interface. It provides confidence
++that all vendors are using the same rules for interoperability.
++
++
++Summary
 +-------
-+Al Stone <al.stone@linaro.org>
-+Graeme Gregory <graeme.gregory@linaro.org>
-+Hanjun Guo <hanjun.guo@linaro.org>
++To summarize, here is the short form rationale for ACPI on ARM:
 +
-+Grant Likely <grant.likely@linaro.org>, for the "Why ACPI on ARM?" section
++-- ACPI???s bytecode allows the platform to encode behaviour. DT explicitly
++   does not support this. For hardware vendors, being able to encode behaviour
++   is an important tool for supporting operating system releases on new
++   hardware.
++
++-- ACPI???s OSPM defines a power management model that constrains what the 
++   platform is allowed into a specific model while still having flexibility
++   in hardware design.
++
++-- For enterprise use-cases, ACPI has extablished bindings, such as for RAS,
++   which are used in production. DT does not. Yes, we can define those bindings
++   but doing so means ARM and x86 will use completely different code paths in
++   both firmware and the kernel.
++
++-- Choosing a single interface for platform/OS abstraction is important. It
++   is not reasonable to require vendors to implement both DT and ACPI if they
++   want to support multiple operating systems. Agreeing on a single interface
++   instead of being fragmented into per-OS interfaces makes for better
++   interoperability overall.
++
++-- The ACPI governance process works well and we???re at the same table as HW
++   vendors and other OS vendors. In fact, there is no longer any reason to
++   feel that ACPI is a Windows thing or that we are playing second fiddle to
++   Microsoft. The move of ACPI governance into the UEFI forum has significantly
++   opened up the processes, and currently, a large portion of the changes being
++   made to ACPI is being driven by Linux.
++
++At the beginning of this article I made the statement that the difference
++is in the support model. For servers, responsibility for hardware behaviour
++cannot be purely the domain of the kernel, but rather is split between the
++platform and the kernel. ACPI frees the OS from needing to understand all
++the minute details of the hardware so that the OS doesn???t need to be ported
++to each and every device individually. It allows the hardware vendors to take
++responsibility for PM behaviour without depending on an OS release cycle which
++it is not under their control.
++
++ACPI is also important because hardware and OS vendors have already worked
++out how to use it to support the general purpose ecosystem. The infrastructure
++is in place, the bindings are in place, and the process is in place. DT does
++exactly what we need it to when working with vertically integrated devices,
++but we don???t have good processes for supporting what the server vendors need.
++We could potentially get there with DT, but doing so doesn???t buy us anything.
++ACPI already does what the hardware vendors need, Microsoft won???t collaborate
++with us on DT, and the hardware vendors would still need to provide two
++completely separate firmware interface; one for Linux and one for Windows.
 +
 -- 
 1.9.1
