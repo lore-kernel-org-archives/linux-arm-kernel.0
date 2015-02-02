@@ -1,71 +1,177 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon, 02 Feb 2015 17:18:19 +0900
-Subject: [PATCH 7/8] arm64/kexec: Add checks for KVM
-In-Reply-To: <1422647304.21823.31.camel@infradead.org>
-References: <cover.1421449714.git.geoff@infradead.org>	
- <a3353cf2ac47f49c20bbbb88405301cbaa359805.1421449714.git.geoff@infradead.org>	
- <20150126191942.GQ23313@leverpostej> <54CA041C.6020403@linaro.org>	
- <54CA12A1.8090508@arm.com> <20150129184747.GV17721@leverpostej>	
- <54CB206D.7040705@linaro.org> <1422647304.21823.31.camel@infradead.org>
-Message-ID: <54CF32CB.1060507@linaro.org>
+From: k.kozlowski.k@gmail.com (=?UTF-8?Q?Krzysztof_Koz=C5=82owski?=)
+Date: Mon, 2 Feb 2015 09:24:26 +0100
+Subject: [PATCH] clocksource: exynos_mct: fix for sleeping in atomic ctx
+ handling cpu hotplug notif.
+In-Reply-To: <1422627691-10774-1-git-send-email-d.eppel@samsung.com>
+References: <1422627691-10774-1-git-send-email-d.eppel@samsung.com>
+Message-ID: <CAJKOXPfxd258ozSYgYJSLs-wX=-f88kNiYfvuvB-2x5VNeUCow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Geoff,
-
-On 01/31/2015 04:48 AM, Geoff Levand wrote:
-> Hi Takahiro.
+2015-01-30 15:21 GMT+01:00 Damian Eppel <d.eppel@samsung.com>:
+> This is to fix an issue of sleeping in atomic context when processing
+> hotplug notifications in Exynos MCT(Multi-Core Timer).
+> The issue was reproducible on Exynos 3250 (Rinato board) and Exynos 5420
+> (Arndale Octa board).
 >
-> On Fri, 2015-01-30 at 15:10 +0900, AKASHI Takahiro wrote:
->> Initially, I thought that we would define kvm_arch_exit() and call it
->> somewhere in the middle of kexec path (no idea yet).
->> But Geoff suggested me to implement a new hvc call, HVC_CPU_SHUTDOWN(??),
->> and make it called via cpu_notifier(CPU_DYING_FROZEN) initiated by
->> machine_shutdown() from kernel_kexec().
+> Whilst testing cpu hotplug events on kernel configured with DEBUG_PREEMPT
+> and DEBUG_ATOMIC_SLEEP we get following BUG message, caused by calling
+> request_irq() and free_irq() in the context of hotplug notification
+> (which is in this case atomic context).
 >
-> As an initial implementation we can hook into the CPU_DYING_FROZEN
-> notifier sent to hyp_init_cpu_notify().  The longer term solution
-> should use kvm_arch_hardware_enable() and kvm_arch_hardware_disable().
-
-Are these two different approaches? I mean,
-kexec will initiate cpu hotplug:
-kernel_exec() -> machine_shutdown() -> disable_nonboot_cpu()
-    -> _cpu_down() -> cpu_notify_nofail(CPU_DEAD|...)
-
-On the other hand, kvm already has a hook into kvm_arch_hardware_disable():
-   (ignoring kvm_usage_count here)
-kvm_cpu_hotplug(CPU_DYING) -> hardware_disable()
-    -> hardware_disable_nolock() -> kvm_arch_hardware_disable()
-
-So it seems that we don't have to add a new hook at hyp_init_cpu_notify()
-if kvm_arch_hardware_disable() is properly implemented.
-disable_nonboot_cpu() will not inovke cpu hotplug on *boot* cpu, and
-we should handle it in a separate way though.
-
-Do I misunderstand anything here?
-
-
--Takahiro AKASHI
-
-> The calls to cpu_notifier(CPU_DYING_FROZEN) are part of cpu hot
-> plug, and independent of kexec.  If someone were to add spin-table
-> cpu un-plug, then it would be used for that also.  It seems we should
-> be able to test without kexec by using cpu hot plug.
+> root at target:~# echo 0 > /sys/devices/system/cpu/cpu1/online
 >
-> To tear down KVM you need to get back to hyp mode, and hence
-> the need for HVC_CPU_SHUTDOWN.  The sequence I envisioned would
-> be like this:
+> [   25.157867] IRQ18 no longer affine to CPU1
+> ...
+> [   25.158445] CPU1: shutdown
 >
-> cpu_notifier(CPU_DYING_FROZEN)
->   -> kvm_cpu_shutdown()
->      prepare for hvc
->      -> HVC_CPU_SHUTDOWN
->         now in hyp mode, do KVM tear down, restore default exception vectors
+> root at target:~# echo 1 > /sys/devices/system/cpu/cpu1/online
 >
-> Once the default exception vectors are restored soft_restart()
-> can then execute the cpu_reset routine in EL2.
+> [   40.785859] CPU1: Software reset
+> [   40.786660] BUG: sleeping function called from invalid context at mm/slub.c:1241
+> [   40.786668] in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper/1
+> [   40.786678] Preemption disabled at:[<  (null)>]   (null)
+> [   40.786681]
+> [   40.786692] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 3.19.0-rc4-00024-g7dca860 #36
+> [   40.786698] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+> [   40.786728] [<c0014a00>] (unwind_backtrace) from [<c0011980>] (show_stack+0x10/0x14)
+> [   40.786747] [<c0011980>] (show_stack) from [<c0449ba0>] (dump_stack+0x70/0xbc)
+> [   40.786767] [<c0449ba0>] (dump_stack) from [<c00c6124>] (kmem_cache_alloc+0xd8/0x170)
+> [   40.786785] [<c00c6124>] (kmem_cache_alloc) from [<c005d6f8>] (request_threaded_irq+0x64/0x128)
+> [   40.786804] [<c005d6f8>] (request_threaded_irq) from [<c0350b8c>] (exynos4_local_timer_setup+0xc0/0x13c)
+> [   40.786820] [<c0350b8c>] (exynos4_local_timer_setup) from [<c0350ca8>] (exynos4_mct_cpu_notify+0x30/0xa8)
+> [   40.786838] [<c0350ca8>] (exynos4_mct_cpu_notify) from [<c003b330>] (notifier_call_chain+0x44/0x84)
+> [   40.786857] [<c003b330>] (notifier_call_chain) from [<c0022fd4>] (__cpu_notify+0x28/0x44)
+> [   40.786873] [<c0022fd4>] (__cpu_notify) from [<c0013714>] (secondary_start_kernel+0xec/0x150)
+> [   40.786886] [<c0013714>] (secondary_start_kernel) from [<40008764>] (0x40008764)
 >
-> Some notes are here for those with access:  https://cards.linaro.org/browse/KWG-611
+> Solution:
+> Clockevent irqs cannot be requested/freed every time cpu is
+> hot-plugged/unplugged as CPU_STARTING/CPU_DYING notifications
+> that signals hotplug or unplug events are sent with both preemption
+> and local interrupts disabled. Since request_irq() may sleep it is
+> moved to the initialization stage and performed for all possible
+> cpus prior putting them online. Then, in the case of hotplug event
+> the irq asociated with the given cpu will simply be enabled.
+> Similarly on cpu unplug event the interrupt is not freed but just
+> disabled.
 >
-> -Geoff
+> Note that after successful request_irq() call for a clockevent device
+> associated to given cpu the requested irq is disabled (via disable_irq()).
+> That is to make things symmetric as we expect hotplug event as a next
+> thing (which will enable irq again). This should not pose any problems
+> because at the time of requesting irq the clockevent device is not
+> fully initialized yet, therefore should not produce interrupts at that point.
 >
+> For disabling an irq at cpu unplug notification disable_irq_nosync() is
+> chosen which is a non-blocking function. This again shouldn't be a problem as
+> prior sending CPU_DYING notification interrupts are migrated away
+> from the cpu.
+>
+> Fixes: 7114cd749a12 ("clocksource: exynos_mct: use (request/free)_irq calls for local timer registration")
+> Signed-off-by: Damian Eppel <d.eppel@samsung.com>
+> Cc: <stable@vger.kernel.org>
+> Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  drivers/clocksource/exynos_mct.c | 45 ++++++++++++++++++++++++++++------------
+>  1 file changed, 32 insertions(+), 13 deletions(-)
+
+Hi,
+
+Look fine from my point of view.
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+Tested on Arndale Octa Board. Fixes the sleep-in-atomic.
+Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+Best regards,
+Krzysztof
+
+>
+> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+> index 83564c9..9beca58 100644
+> --- a/drivers/clocksource/exynos_mct.c
+> +++ b/drivers/clocksource/exynos_mct.c
+> @@ -466,15 +466,12 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
+>         exynos4_mct_write(TICK_BASE_CNT, mevt->base + MCT_L_TCNTB_OFFSET);
+>
+>         if (mct_int_type == MCT_INT_SPI) {
+> -               evt->irq = mct_irqs[MCT_L0_IRQ + cpu];
+> -               if (request_irq(evt->irq, exynos4_mct_tick_isr,
+> -                               IRQF_TIMER | IRQF_NOBALANCING,
+> -                               evt->name, mevt)) {
+> -                       pr_err("exynos-mct: cannot register IRQ %d\n",
+> -                               evt->irq);
+> +
+> +               if (evt->irq == -1)
+>                         return -EIO;
+> -               }
+> -               irq_force_affinity(mct_irqs[MCT_L0_IRQ + cpu], cpumask_of(cpu));
+> +
+> +               irq_force_affinity(evt->irq, cpumask_of(cpu));
+> +               enable_irq(evt->irq);
+>         } else {
+>                 enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
+>         }
+> @@ -487,10 +484,12 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
+>  static void exynos4_local_timer_stop(struct clock_event_device *evt)
+>  {
+>         evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
+> -       if (mct_int_type == MCT_INT_SPI)
+> -               free_irq(evt->irq, this_cpu_ptr(&percpu_mct_tick));
+> -       else
+> +       if (mct_int_type == MCT_INT_SPI) {
+> +               if (evt->irq != -1)
+> +                       disable_irq_nosync(evt->irq);
+> +       } else {
+>                 disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
+> +       }
+>  }
+>
+>  static int exynos4_mct_cpu_notify(struct notifier_block *self,
+> @@ -522,7 +521,7 @@ static struct notifier_block exynos4_mct_cpu_nb = {
+>
+>  static void __init exynos4_timer_resources(struct device_node *np, void __iomem *base)
+>  {
+> -       int err;
+> +       int err, cpu;
+>         struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
+>         struct clk *mct_clk, *tick_clk;
+>
+> @@ -549,7 +548,27 @@ static void __init exynos4_timer_resources(struct device_node *np, void __iomem
+>                 WARN(err, "MCT: can't request IRQ %d (%d)\n",
+>                      mct_irqs[MCT_L0_IRQ], err);
+>         } else {
+> -               irq_set_affinity(mct_irqs[MCT_L0_IRQ], cpumask_of(0));
+> +               for_each_possible_cpu(cpu) {
+> +                       int mct_irq = mct_irqs[MCT_L0_IRQ + cpu];
+> +                       struct mct_clock_event_device *pcpu_mevt =
+> +                               per_cpu_ptr(&percpu_mct_tick, cpu);
+> +
+> +                       pcpu_mevt->evt.irq = -1;
+> +
+> +                       if (request_irq(mct_irq,
+> +                                       exynos4_mct_tick_isr,
+> +                                       IRQF_TIMER | IRQF_NOBALANCING,
+> +                                       pcpu_mevt->name, pcpu_mevt)) {
+> +                               pr_err("exynos-mct: cannot register IRQ (cpu%d)\n",
+> +                                                                       cpu);
+> +
+> +                               continue;
+> +                       }
+> +                       pcpu_mevt->evt.irq = mct_irq;
+> +                       irq_force_affinity(mct_irq, cpumask_of(cpu));
+> +
+> +                       disable_irq(mct_irq);
+> +               }
+>         }
+>
+>         err = register_cpu_notifier(&exynos4_mct_cpu_nb);
+> --
+> 1.9.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
