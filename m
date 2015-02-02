@@ -1,34 +1,71 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 2 Feb 2015 00:00:13 -0800
-Subject: [PATCH 0/4] mtd: nand: atmel: Rework DT representation of NFC/NAND
-In-Reply-To: <1417732214-3292-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1417732214-3292-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150202080013.GD3523@norris-Latitude-E6410>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Mon, 02 Feb 2015 17:18:19 +0900
+Subject: [PATCH 7/8] arm64/kexec: Add checks for KVM
+In-Reply-To: <1422647304.21823.31.camel@infradead.org>
+References: <cover.1421449714.git.geoff@infradead.org>	
+ <a3353cf2ac47f49c20bbbb88405301cbaa359805.1421449714.git.geoff@infradead.org>	
+ <20150126191942.GQ23313@leverpostej> <54CA041C.6020403@linaro.org>	
+ <54CA12A1.8090508@arm.com> <20150129184747.GV17721@leverpostej>	
+ <54CB206D.7040705@linaro.org> <1422647304.21823.31.camel@infradead.org>
+Message-ID: <54CF32CB.1060507@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 04, 2014 at 11:30:10PM +0100, Boris Brezillon wrote:
-> While working on the EBI driver [1] I noticed that the relationship between
-> the NFC (NAND Flash Controller) and the NAND chip it is attached to would
-> make things harder to represent when moving the NAND node under the EBI bus
-> (another useless 'ranges' definition).
-> 
-> Actually this representation might be even more problematic if one wants
-> decide to connect two NAND chips on his sama5 based board, because the NFC
-> node is a child of the NAND chip node, and thus can only be attached to a
-> single NAND chip.
-> 
-> To address this problem the current series moves the NFC node outside of
-> the NAND chip device which then reference the NFC using the "atmel,nfc"
-> property.
-> 
-> The series does not implement multi-chip support, but at least the new
-> representation should make it possible.
+Geoff,
 
-I made some comments on the DT binding. I'm not as familiar withi the
-hardware details here, so I may be off base. At any rate, the code looks
-OK, so if we settle the binding issue OK, then I'd be happy with a
-rebased version of this patch set.
+On 01/31/2015 04:48 AM, Geoff Levand wrote:
+> Hi Takahiro.
+>
+> On Fri, 2015-01-30 at 15:10 +0900, AKASHI Takahiro wrote:
+>> Initially, I thought that we would define kvm_arch_exit() and call it
+>> somewhere in the middle of kexec path (no idea yet).
+>> But Geoff suggested me to implement a new hvc call, HVC_CPU_SHUTDOWN(??),
+>> and make it called via cpu_notifier(CPU_DYING_FROZEN) initiated by
+>> machine_shutdown() from kernel_kexec().
+>
+> As an initial implementation we can hook into the CPU_DYING_FROZEN
+> notifier sent to hyp_init_cpu_notify().  The longer term solution
+> should use kvm_arch_hardware_enable() and kvm_arch_hardware_disable().
 
-Regards,
-Brian
+Are these two different approaches? I mean,
+kexec will initiate cpu hotplug:
+kernel_exec() -> machine_shutdown() -> disable_nonboot_cpu()
+    -> _cpu_down() -> cpu_notify_nofail(CPU_DEAD|...)
+
+On the other hand, kvm already has a hook into kvm_arch_hardware_disable():
+   (ignoring kvm_usage_count here)
+kvm_cpu_hotplug(CPU_DYING) -> hardware_disable()
+    -> hardware_disable_nolock() -> kvm_arch_hardware_disable()
+
+So it seems that we don't have to add a new hook at hyp_init_cpu_notify()
+if kvm_arch_hardware_disable() is properly implemented.
+disable_nonboot_cpu() will not inovke cpu hotplug on *boot* cpu, and
+we should handle it in a separate way though.
+
+Do I misunderstand anything here?
+
+
+-Takahiro AKASHI
+
+> The calls to cpu_notifier(CPU_DYING_FROZEN) are part of cpu hot
+> plug, and independent of kexec.  If someone were to add spin-table
+> cpu un-plug, then it would be used for that also.  It seems we should
+> be able to test without kexec by using cpu hot plug.
+>
+> To tear down KVM you need to get back to hyp mode, and hence
+> the need for HVC_CPU_SHUTDOWN.  The sequence I envisioned would
+> be like this:
+>
+> cpu_notifier(CPU_DYING_FROZEN)
+>   -> kvm_cpu_shutdown()
+>      prepare for hvc
+>      -> HVC_CPU_SHUTDOWN
+>         now in hyp mode, do KVM tear down, restore default exception vectors
+>
+> Once the default exception vectors are restored soft_restart()
+> can then execute the cpu_reset routine in EL2.
+>
+> Some notes are here for those with access:  https://cards.linaro.org/browse/KWG-611
+>
+> -Geoff
+>
