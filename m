@@ -1,62 +1,173 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Mon, 2 Feb 2015 17:36:10 -0500
-Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher constraints
- with dma-parms
-In-Reply-To: <20150202214616.GI8656@n2100.arm.linux.org.uk>
-References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
- <1422347154-15258-2-git-send-email-sumit.semwal@linaro.org>
- <20150129143908.GA26493@n2100.arm.linux.org.uk>
- <CAO_48GEOQ1pBwirgEWeVVXW-iOmaC=Xerr2VyYYz9t1QDXgVsw@mail.gmail.com>
- <20150129154718.GB26493@n2100.arm.linux.org.uk>
- <CAF6AEGtTmFg66TK_AFkQ-xp7Nd9Evk3nqe6xCBp7K=77OmXTxA@mail.gmail.com>
- <20150129192610.GE26493@n2100.arm.linux.org.uk>
- <CAF6AEGujk8UC4X6T=yhTrz1s+SyZUQ=m05h_WcxLDGZU6bydbw@mail.gmail.com>
- <20150202165405.GX14009@phenom.ffwll.local>
- <CAF6AEGuESM+e3HSRGM6zLqrp8kqRLGUYvA3KKECdm7m-nt0M=Q@mail.gmail.com>
- <20150202214616.GI8656@n2100.arm.linux.org.uk>
-Message-ID: <CAF6AEGvE78a9u9=C6HbuuYs_zwGf6opdXUNfxb51kixFa7zLwA@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 02 Feb 2015 14:41:39 -0800
+Subject: [PATCH v13 3/6] clk: Make clk API return per-user struct clk
+ instances
+In-Reply-To: <54CFD0B1.2000003@ti.com>
+References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1422011024-32283-4-git-send-email-tomeu.vizoso@collabora.com>
+ <20150201212432.22722.70917@quantum> <54CFD0B1.2000003@ti.com>
+Message-ID: <20150202224139.421.84094@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 2, 2015 at 4:46 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Feb 02, 2015 at 03:30:21PM -0500, Rob Clark wrote:
->> On Mon, Feb 2, 2015 at 11:54 AM, Daniel Vetter <daniel@ffwll.ch> wrote:
->> >> My initial thought is for dma-buf to not try to prevent something than
->> >> an exporter can actually do.. I think the scenario you describe could
->> >> be handled by two sg-lists, if the exporter was clever enough.
->> >
->> > That's already needed, each attachment has it's own sg-list. After all
->> > there's no array of dma_addr_t in the sg tables, so you can't use one sg
->> > for more than one mapping. And due to different iommu different devices
->> > can easily end up with different addresses.
->>
->>
->> Well, to be fair it may not be explicitly stated, but currently one
->> should assume the dma_addr_t's in the dmabuf sglist are bogus.  With
->> gpu's that implement per-process/context page tables, I'm not really
->> sure that there is a sane way to actually do anything else..
->
-> That's incorrect - and goes dead against the design of scatterlists.
+Quoting Tero Kristo (2015-02-02 11:32:01)
+> On 02/01/2015 11:24 PM, Mike Turquette wrote:
+> > Quoting Tomeu Vizoso (2015-01-23 03:03:30)
+> >> Moves clock state to struct clk_core, but takes care to change as little API as
+> >> possible.
+> >>
+> >> struct clk_hw still has a pointer to a struct clk, which is the
+> >> implementation's per-user clk instance, for backwards compatibility.
+> >>
+> >> The struct clk that clk_get_parent() returns isn't owned by the caller, but by
+> >> the clock implementation, so the former shouldn't call clk_put() on it.
+> >>
+> >> Because some boards in mach-omap2 still register clocks statically, their clock
+> >> registration had to be updated to take into account that the clock information
+> >> is stored in struct clk_core now.
+> >
+> > Tero, Paul & Tony,
+> >
+> > Tomeu's patch unveils a problem with omap3_noncore_dpll_enable and
+> > struct dpll_data, namely this snippet from
+> > arch/arm/mach-omap2/dpll3xxx.c:
+> >
+> >          parent = __clk_get_parent(hw->clk);
+> >
+> >          if (__clk_get_rate(hw->clk) == __clk_get_rate(dd->clk_bypass)) {
+> >                  WARN(parent != dd->clk_bypass,
+> >                                  "here0, parent name is %s, bypass name is %s\n",
+> >                                  __clk_get_name(parent), __clk_get_name(dd->clk_bypass));
+> >                  r = _omap3_noncore_dpll_bypass(clk);
+> >          } else {
+> >                  WARN(parent != dd->clk_ref,
+> >                                  "here1, parent name is %s, ref name is %s\n",
+> >                                  __clk_get_name(parent), __clk_get_name(dd->clk_ref));
+> >                  r = _omap3_noncore_dpll_lock(clk);
+> >          }
+> >
+> > struct dpll_data has members clk_ref and clk_bypass which are struct clk
+> > pointers. This was always a bit of a violation of the clk.h contract
+> > since drivers are not supposed to deref struct clk pointers. Now that we
+> > generate unique pointers for each call to clk_get (clk_ref & clk_bypass
+> > are populated by of_clk_get in ti_clk_register_dpll) then the pointer
+> > comparisons above will never be equal (even if they resolve down to the
+> > same struct clk_core). I added the verbose traces to the WARNs above to
+> > illustrate the point: the names are always the same but the pointers
+> > differ.
+> >
+> > AFAICT this doesn't break anything, but booting on OMAP3+ results in
+> > noisy WARNs.
+> >
+> > I think the correct fix is to replace clk_bypass and clk_ref pointers
+> > with a simple integer parent_index. In fact we already have this index.
+> > See how the pointers are populated in ti_clk_register_dpll:
+> 
+> The problem is we still need to be able to get runtime parent clock 
+> rates (the parent rate may change also), so simple index value is not 
+> sufficient. We need a handle of some sort to the bypass/ref clocks. The 
+> DPLL code generally requires knowledge of the bypass + reference clock 
+> rates to work properly, as it calculates the M/N values based on these.
 
-yeah, a bit of an abuse, although I'm not sure I see a much better way
-when a device vaddr depends on user context..
+We can maybe introduce something like of_clk_get_parent_rate, as we have
+analogous stuff for getting parent names and indexes. Without
+introducing a new helper you could probably just do:
 
-> Not only that, but it is entirely possible that you may get handed
-> memory via dmabufs for which there are no struct page's associated
-> with that memory - think about display systems which have their own
-> video memory which is accessible to the GPU, but it isn't system
-> memory.
+	clk_ref = clk_get_parent_by_index(dpll_clk, 0);
+	ref_rate = clk_get_rate(clk_ref);
 
-well, I guess anyways when it comes to sharing buffers, it won't be
-the vram placement of the bo that gets shared ;-)
+	clk_bypass = clk_get_parent_by_index(dpll_clk, 1);
+	bypass_rate = clk_get_rate(clk_bypass);
 
-BR,
--R
+Currently the semantics around this call are weird. It seems like it
+would create a new struct clk pointer but it does not. So don't call
+clk_put on clk_ref and clk_bypass yet. That might change in the future
+as we iron out this brave new world that we all live in. Probably best
+to leave a FIXME in there.
 
-> In those circumstances, you have to use the dma_addr_t's and not the
-> pages.
->
-> --
-> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-> according to speedtest.net.
+Stephen & Tomeu, let me know if I got any of that wrong.
+
+> 
+> Shall I change the DPLL code to check against clk_hw pointers or what is 
+> the preferred approach here? The patch at the end does this and fixes 
+> the dpll related warnings.
+
+Yes, for now that is fine, but feels a bit hacky to me. I don't know
+honestly, let me sleep on it. Anyways for 3.20 that is perfectly fine
+but we might want to switch to something like the scheme above.
+
+> 
+> Btw, the rate constraints patch broke boot for me completely, but sounds 
+> like you reverted it already.
+
+Fixed with Stephen's patch from last week. Thanks for dealing with all
+the breakage so promptly. It has helped a lot!
+
+Regards,
+Mike
+
+> 
+> -Tero
+> 
+> --------------------
+> 
+> Author: Tero Kristo <t-kristo@ti.com>
+> Date:   Mon Feb 2 17:19:17 2015 +0200
+> 
+>      ARM: OMAP3+: clock: dpll: fix logic for comparing parent clocks
+> 
+>      DPLL code uses reference and bypass clock pointers for determining 
+> runtime
+>      properties for these clocks, like parent clock rates.
+> 
+>      As clock API now returns per-user clock structs, using a global handle
+>      in the clock driver code does not work properly anymore. Fix this by
+>      using the clk_hw instead, and comparing this against the parents.
+> 
+>      Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>      Fixes: 59cf3fcf9baf ("clk: Make clk API return per-user struct clk 
+> instances")
+> 
+> diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
+> index c2da2a0..49752d7 100644
+> --- a/arch/arm/mach-omap2/dpll3xxx.c
+> +++ b/arch/arm/mach-omap2/dpll3xxx.c
+> @@ -410,7 +410,7 @@ int omap3_noncore_dpll_enable(struct clk_hw *hw)
+>         struct clk_hw_omap *clk = to_clk_hw_omap(hw);
+>         int r;
+>         struct dpll_data *dd;
+> -       struct clk *parent;
+> +       struct clk_hw *parent;
+> 
+>         dd = clk->dpll_data;
+>         if (!dd)
+> @@ -427,13 +427,13 @@ int omap3_noncore_dpll_enable(struct clk_hw *hw)
+>                 }
+>         }
+> 
+> -       parent = __clk_get_parent(hw->clk);
+> +       parent = __clk_get_hw(__clk_get_parent(hw->clk));
+> 
+>         if (__clk_get_rate(hw->clk) == __clk_get_rate(dd->clk_bypass)) {
+> -               WARN_ON(parent != dd->clk_bypass);
+> +               WARN_ON(parent != __clk_get_hw(dd->clk_bypass));
+>                 r = _omap3_noncore_dpll_bypass(clk);
+>         } else {
+> -               WARN_ON(parent != dd->clk_ref);
+> +               WARN_ON(parent != __clk_get_hw(dd->clk_ref));
+>                 r = _omap3_noncore_dpll_lock(clk);
+>         }
+> 
+> @@ -549,7 +549,8 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, 
+> unsigned long rate,
+>         if (!dd)
+>                 return -EINVAL;
+> 
+> -       if (__clk_get_parent(hw->clk) != dd->clk_ref)
+> +       if (__clk_get_hw(__clk_get_parent(hw->clk)) !=
+> +           __clk_get_hw(dd->clk_ref))
+>                 return -EINVAL;
+> 
+>         if (dd->last_rounded_rate == 0)
+> 
+> 
