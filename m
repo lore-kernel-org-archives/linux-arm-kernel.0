@@ -1,66 +1,30 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Mon, 2 Feb 2015 11:55:03 +0800
-Subject: [RFC] change non-atomic bitops method
-Message-ID: <35FD53F367049845BC99AC72306C23D1044A02027E0A@CNBJMBX05.corpusers.net>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 2 Feb 2015 09:28:19 +0530
+Subject: RFC on cpufreq implementation
+In-Reply-To: <54CC174F.10703@free.fr>
+References: <54B7F7CD.7030903@free.fr> <54CA6327.5070707@free.fr>
+ <CAKohponrzDb4ZGvRtJ5jtGTPAy4RCfRsYGvdjR5fx51K2=evCg@mail.gmail.com>
+ <54CC174F.10703@free.fr>
+Message-ID: <CAKohpomzCEjXUrxUJjypaA77=r4j_ZPa+x3gM=cNN0kc3ux0uQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch change non-atomic bitops,
-add a if() condition to test it, before set/clear the bit.
-so that we don't need dirty the cache line, if this bit
-have been set or clear. On SMP system, dirty cache line will
-need invalidate other processors cache line, this will have
-some impact on SMP systems.
+On 31 January 2015 at 05:14, Mason <mpeg.blue@free.fr> wrote:
+> I see some platforms have it in their machine-specific folder, others
+> are in drivers/cpufreq. (When to use mach vs plat?)
 
-Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
----
- include/asm-generic/bitops/non-atomic.h | 13 +++++++++----
- 1 file changed, 9 insertions(+), 4 deletions(-)
+drivers/cpufreq/
 
-diff --git a/include/asm-generic/bitops/non-atomic.h b/include/asm-generic/bitops/non-atomic.h
-index 697cc2b..e4ef18a 100644
---- a/include/asm-generic/bitops/non-atomic.h
-+++ b/include/asm-generic/bitops/non-atomic.h
-@@ -17,7 +17,9 @@ static inline void __set_bit(int nr, volatile unsigned long *addr)
- 	unsigned long mask = BIT_MASK(nr);
- 	unsigned long *p = ((unsigned long *)addr) + BIT_WORD(nr);
- 
--	*p  |= mask;
-+	if ((*p & mask) == 0)
-+		*p  |= mask;
-+
- }
- 
- static inline void __clear_bit(int nr, volatile unsigned long *addr)
-@@ -25,7 +27,8 @@ static inline void __clear_bit(int nr, volatile unsigned long *addr)
- 	unsigned long mask = BIT_MASK(nr);
- 	unsigned long *p = ((unsigned long *)addr) + BIT_WORD(nr);
- 
--	*p &= ~mask;
-+	if ((*p & mask) != 0)
-+		*p &= ~mask;
- }
- 
- /**
-@@ -60,7 +63,8 @@ static inline int __test_and_set_bit(int nr, volatile unsigned long *addr)
- 	unsigned long *p = ((unsigned long *)addr) + BIT_WORD(nr);
- 	unsigned long old = *p;
- 
--	*p = old | mask;
-+	if ((old & mask) == 0)
-+		*p = old | mask;
- 	return (old & mask) != 0;
- }
- 
-@@ -79,7 +83,8 @@ static inline int __test_and_clear_bit(int nr, volatile unsigned long *addr)
- 	unsigned long *p = ((unsigned long *)addr) + BIT_WORD(nr);
- 	unsigned long old = *p;
- 
--	*p = old & ~mask;
-+	if ((old & mask) != 0)
-+		*p = old & ~mask;
- 	return (old & mask) != 0;
- }
- 
--- 
-2.2.2
+> If it's supposed to go in drivers/cpufreq, I suppose there are naming
+> conventions to follow?
+
+You can check existing drivers.
+
+> Also, if it's in drivers/cpufreq, we are not supposed to include
+> any machine-specific includes? And I'm back to my original question
+> where am I supposed to store machine-specific information, such as
+> register descriptions and MMIO addresses and offsets?
+
+Define registers/etc in your driver only or somewhere in include/ .
+Also, try to see if you can reuse cpufreq-dt.c, your driver wouldn't make
+it to the kernel otherwise.
