@@ -1,93 +1,66 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 02 Feb 2015 14:20:47 -0700
-Subject: [PATCH 3/3] dt: paz00: define nvec as child of i2c bus
-In-Reply-To: <1422516022-27161-4-git-send-email-danindrey@mail.ru>
-References: <1422516022-27161-1-git-send-email-danindrey@mail.ru>
- <1422516022-27161-4-git-send-email-danindrey@mail.ru>
-Message-ID: <54CFEA2F.8040701@wwwdotorg.org>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 02 Feb 2015 22:31:25 +0100
+Subject: gzip initramfs while only lz4/lzop selected
+Message-ID: <9c809c0a07de100e6e0112f482a589b9@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/29/2015 12:20 AM, Andrey Danin wrote:
-> NVEC driver was reimplemented to use tegra i2c. Use common i2c bindings
-> for NVEC node.
+Hi all,
 
-> diff --git a/Documentation/devicetree/bindings/nvec/nvidia,nvec.txt b/Documentation/devicetree/bindings/nvec/nvidia,nvec.txt
+Configuring the kernel without gzip support for initramfs but with
+LZO/LZ4, while not having LZ4 on the build system, leads to a kernel
+which is not bootable:
 
-The changes to this file make more sense either as a standalone patch 
-1/4, or as part of the driver changes.
+...
+[    0.488232] RPC: Registered udp transport module.
+[    0.493437] RPC: Registered tcp transport module.
+[    0.498693] RPC: Registered tcp NFSv4.1 backchannel transport module.
+[    0.505922] Kernel panic - not syncing: compression method gzip not
+configured
+[    0.513855] ---[ end Kernel panic - not syncing: compression method
+gzip not configured
 
-> @@ -2,20 +2,5 @@ NVIDIA compliant embedded controller
->
->   Required properties:
->   - compatible : should be "nvidia,nvec".
-> -- reg : the iomem of the i2c slave controller
-> -- interrupts : the interrupt line of the i2c slave controller
-> -- clock-frequency : the frequency of the i2c bus
-> -- gpios : the gpio used for ec request
-> -- slave-addr: the i2c address of the slave controller
-> -- clocks : Must contain an entry for each entry in clock-names.
-> -  See ../clocks/clock-bindings.txt for details.
-> -- clock-names : Must include the following entries:
-> -  Tegra20/Tegra30:
-> -  - div-clk
-> -  - fast-clk
-> -  Tegra114:
-> -  - div-clk
-> -- resets : Must contain an entry for each entry in reset-names.
-> -  See ../reset/reset.txt for details.
-> -- reset-names : Must include the following entries:
-> -  - i2c
-> +- request-gpios : the gpio used for ec request
-> +- reg: the i2c address of the slave controller
+I wondered, what format my initramfs might be, looking at the build
+output suggested LZ4...
 
-This change breaks ABI.
+...
+  CC      arch/arm/common/firmware.o
+  CC      arch/arm/mm/dma-mapping.o
+  CC      arch/arm/kernel/elf.o
+  GEN     usr/initramfs_data.cpio.lz4
+  AS      usr/initramfs_data.o
+...
 
-Instead of modifying the definition of the existing compatible value, I 
-think you should introduce a new compatible value to describe the 
-external NVEC chip.
+However...
+$ file usr/initramfs_data.cpio.lz4
+usr/initramfs_data.cpio.lz4: gzip compressed data, max compression, from
+Unix
 
-> diff --git a/arch/arm/boot/dts/tegra20-paz00.dts b/arch/arm/boot/dts/tegra20-paz00.dts
+I actually use LZO and enabled LZ4 just to test some initramfs. But the
+build system seem to have chosen it as its preferred compression method
+for the built-in initramfs. 
 
-> -	nvec at 7000c500 {
-> -		compatible = "nvidia,nvec";
-> -		reg = <0x7000c500 0x100>;
-> -		interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>;
-> -		#address-cells = <1>;
-> -		#size-cells = <0>;
-> +	i2c at 7000c500 {
-> +		status = "okay";
->   		clock-frequency = <80000>;
-> -		request-gpios = <&gpio TEGRA_GPIO(V, 2) GPIO_ACTIVE_HIGH>;
-> -		slave-addr = <138>;
-> -		clocks = <&tegra_car TEGRA20_CLK_I2C3>,
-> -		         <&tegra_car TEGRA20_CLK_PLL_P_OUT3>;
-> -		clock-names = "div-clk", "fast-clk";
-> -		resets = <&tegra_car 67>;
-> -		reset-names = "i2c";
-> +
-> +		nvec: nvec at 45 {
+I would have expected a build error or at least a warning on such a
+situation.
 
-This doesn't feel correct. There's nothing here to indicate that this 
-child device is a slave that is implemented by the host SoC rather than 
-something external attached to the I2C bus.
+The relevant .config part looks like this:
+...
+CONFIG_BLK_DEV_INITRD=y
+CONFIG_INITRAMFS_SOURCE=""
+# CONFIG_RD_GZIP is not set
+# CONFIG_RD_BZIP2 is not set
+# CONFIG_RD_LZMA is not set
+# CONFIG_RD_XZ is not set
+CONFIG_RD_LZO=y
+CONFIG_RD_LZ4=y
+...
 
-Perhaps you can get away with this, since the driver for nvidia,nvec 
-only calls I2C APIs suitable for internal slaves rather than external 
-slaves? Even so though, I think the distinction needs to be clearly 
-marked in the DT so that any generic code outside the NVEC driver that 
-parses the DT can determine the difference.
+I hit this because my build machine produced binaries which did not boot
+anymore (unfortunately, the tty is not initialized at that point, so I
+was completely left in the dark at first).
 
-I would recommend the I2C controller having #address-cells=<2> with cell 
-0 being 0==master,1==slave, cell 1 being the I2C address. The I2C driver 
-would need to support #address-cells=<1> for backwards-compatibility.
+There was a similar problem some time ago:
+https://lkml.org/lkml/2009/2/17/477
 
-> +			compatible = "nvidia,nvec";
-> +			request-gpios = <&gpio TEGRA_GPIO(V, 2)
-> +				GPIO_ACTIVE_HIGH>;
-> +			reg = <0x45>;
-
-The order is typically compatible, reg, other properties.
-
-> +		};
->   	};
+--
+Stefan
