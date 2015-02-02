@@ -1,84 +1,34 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 2 Feb 2015 08:59:57 +0100
-Subject: [PATCH v13 4/6] clk: Add rate constraints to clocks
-In-Reply-To: <20150201221856.421.6151@quantum>
-References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
- <1422011024-32283-5-git-send-email-tomeu.vizoso@collabora.com>
- <CAMuHMdUGgA70o2SgdJR3X6AkCcMssHU0POLfzppADT-O=BrYDw@mail.gmail.com>
- <54CA8662.7040008@codeaurora.org>
- <20150131013158.GA4323@codeaurora.org>
- <CAAObsKDxhV7Vveq5FizTUp9ur2Rsq1bM+YQa4uPksh5ntMQV3Q@mail.gmail.com>
- <20150201221856.421.6151@quantum>
-Message-ID: <CAMuHMdU4QBVOb4WqmcfHkj2K7v8dt1hKKWXS0qAnTvsJSafdPQ@mail.gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 2 Feb 2015 00:00:13 -0800
+Subject: [PATCH 0/4] mtd: nand: atmel: Rework DT representation of NFC/NAND
+In-Reply-To: <1417732214-3292-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1417732214-3292-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20150202080013.GD3523@norris-Latitude-E6410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 1, 2015 at 11:18 PM, Mike Turquette <mturquette@linaro.org> wrote:
-> Quoting Tomeu Vizoso (2015-01-31 10:36:22)
->> On 31 January 2015 at 02:31, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> > On 01/29, Stephen Boyd wrote:
->> >> On 01/29/15 05:31, Geert Uytterhoeven wrote:
->> >> > Hi Tomeu, Mike,
->> >> >
->> >> > On Fri, Jan 23, 2015 at 12:03 PM, Tomeu Vizoso
->> >> > <tomeu.vizoso@collabora.com> wrote:
->> >> >> --- a/drivers/clk/clk.c
->> >> >> +++ b/drivers/clk/clk.c
->> >> >> @@ -2391,25 +2543,24 @@ int __clk_get(struct clk *clk)
->> >> >>         return 1;
->> >> >>  }
->> >> >>
->> >> >> -static void clk_core_put(struct clk_core *core)
->> >> >> +void __clk_put(struct clk *clk)
->> >> >>  {
->> >> >>         struct module *owner;
->> >> >>
->> >> >> -       owner = core->owner;
->> >> >> +       if (!clk || WARN_ON_ONCE(IS_ERR(clk)))
->> >> >> +               return;
->> >> >>
->> >> >>         clk_prepare_lock();
->> >> >> -       kref_put(&core->ref, __clk_release);
->> >> >> +
->> >> >> +       hlist_del(&clk->child_node);
->> >> >> +       clk_core_set_rate_nolock(clk->core, clk->core->req_rate);
->> >> > At this point, clk->core->req_rate is still zero, causing
->> >> > cpg_div6_clock_round_rate() to be called with a zero "rate" parameter,
->> >> > e.g. on r8a7791:
->> >>
->> >> Hmm.. I wonder if we should assign core->req_rate to be the same as
->> >> core->rate during __clk_init()? That would make this call to
->> >> clk_core_set_rate_nolock() a nop in this case.
->> >>
->> >
->> > Here's a patch to do this
->> >
->> > ---8<----
->> > From: Stephen Boyd <sboyd@codeaurora.org>
->> > Subject: [PATCH] clk: Assign a requested rate by default
->> >
->> > We need to assign a requested rate here so that we avoid
->> > requesting a rate of 0 on clocks when we remove clock consumers.
->>
->> Hi, this looks good to me.
->>
->> Reviewed-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
->
-> It seems to fix the total boot failure on OMAPs, and hopefully does the
-> same for SH Mobile and others. I've squashed this into Tomeu's rate
-> constraints patch to maintain bisect.
+On Thu, Dec 04, 2014 at 11:30:10PM +0100, Boris Brezillon wrote:
+> While working on the EBI driver [1] I noticed that the relationship between
+> the NFC (NAND Flash Controller) and the NAND chip it is attached to would
+> make things harder to represent when moving the NAND node under the EBI bus
+> (another useless 'ranges' definition).
+> 
+> Actually this representation might be even more problematic if one wants
+> decide to connect two NAND chips on his sama5 based board, because the NFC
+> node is a child of the NAND chip node, and thus can only be attached to a
+> single NAND chip.
+> 
+> To address this problem the current series moves the NFC node outside of
+> the NAND chip device which then reference the NFC using the "atmel,nfc"
+> property.
+> 
+> The series does not implement multi-chip support, but at least the new
+> representation should make it possible.
 
-Yes, it fixes shmobile. .round_rate() is now called with a sane value of rate.
+I made some comments on the DT binding. I'm not as familiar withi the
+hardware details here, so I may be off base. At any rate, the code looks
+OK, so if we settle the binding issue OK, then I'd be happy with a
+rebased version of this patch set.
 
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Regards,
+Brian
