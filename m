@@ -1,225 +1,26 @@
-From: tsahee@annapurnalabs.com (Tsahee Zidenberg)
-Date: Mon, 02 Feb 2015 13:20:44 +0200
-Subject: [PATCH v3 5/5] ARM: dts: Alpine platform devicetree
-Message-ID: <54cf5d8c.sl7aclyeuuh66jXt%tsahee@annapurnalabs.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 2 Feb 2015 12:17:43 +0000
+Subject: [PATCH v2] spi/xilinx: Fix access invalid memory on xilinx_spi_tx
+In-Reply-To: <1422871616-6686-1-git-send-email-ricardo.ribalda@gmail.com>
+References: <1422871616-6686-1-git-send-email-ricardo.ribalda@gmail.com>
+Message-ID: <20150202121743.GQ21293@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces devicetree for the Alpine platform, and
-for a development board based on the same platform.
+On Mon, Feb 02, 2015 at 11:06:56AM +0100, Ricardo Ribalda Delgado wrote:
+> On 1 and 2 bytes per word, the transfer of the 3 last bytes will access
+> memory outside tx_ptr.
+> 
+> Although this has not trigger any error on real hardware, we should
+> better fix this.
+> 
+> Fixes: 24ba5e593f391507 Remove rx_fn and tx_fn pointer
 
-Signed-off-by: Barak Wasserstrom <barak@annapurnalabs.com>
-Signed-off-by: Tsahee Zidenberg <tsahee@annapurnalabs.com>
----
- arch/arm/boot/dts/Makefile      |   4 ++
- arch/arm/boot/dts/alpine-db.dts |  35 ++++++++++
- arch/arm/boot/dts/alpine.dtsi   | 141 ++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 180 insertions(+)
- create mode 100644 arch/arm/boot/dts/alpine-db.dts
- create mode 100644 arch/arm/boot/dts/alpine.dtsi
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index a1c776b..024d107 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -2,6 +2,10 @@ ifeq ($(CONFIG_OF),y)
- 
- dtb-$(CONFIG_MACH_ASM9260) += \
- 	alphascale-asm9260-devkit.dtb
-+
-+dtb-$(CONFIG_ARCH_ALPINE) += \
-+	alpine_db.dtb
-+
- # Keep at91 dtb files sorted alphabetically for each SoC
- dtb-$(CONFIG_SOC_SAM_V4_V5) += \
- 	at91rm9200ek.dtb \
-diff --git a/arch/arm/boot/dts/alpine-db.dts b/arch/arm/boot/dts/alpine-db.dts
-new file mode 100644
-index 0000000..dfb5a08
---- /dev/null
-+++ b/arch/arm/boot/dts/alpine-db.dts
-@@ -0,0 +1,35 @@
-+/*
-+ * Copyright 2015 Annapurna Labs Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * Alternatively, redistribution and use in source and binary forms, with or
-+ * without modification, are permitted provided that the following conditions
-+ * are met:
-+ *
-+ *   *   Redistributions of source code must retain the above copyright notice,
-+ *       this list of conditions and the following disclaimer.
-+ *
-+ *   *   Redistributions in binary form must reproduce the above copyright
-+ *       notice, this list of conditions and the following disclaimer in
-+ *       the documentation and/or other materials provided with the
-+ *       distribution.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ */
-+
-+/dts-v1/;
-+
-+#include "alpine.dtsi"
-+
-+/ {
-+	model = "Annapurna Labs Alpine Dev Board";
-+	/* no need for anything outside SOC */
-+};
-+
-diff --git a/arch/arm/boot/dts/alpine.dtsi b/arch/arm/boot/dts/alpine.dtsi
-new file mode 100644
-index 0000000..3cce55a
---- /dev/null
-+++ b/arch/arm/boot/dts/alpine.dtsi
-@@ -0,0 +1,141 @@
-+/*
-+ * Copyright 2015 Annapurna Labs Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * Alternatively, redistribution and use in source and binary forms, with or
-+ * without modification, are permitted provided that the following conditions
-+ * are met:
-+ *
-+ *   *   Redistributions of source code must retain the above copyright notice,
-+ *       this list of conditions and the following disclaimer.
-+ *
-+ *   *   Redistributions in binary form must reproduce the above copyright
-+ *       notice, this list of conditions and the following disclaimer in
-+ *       the documentation and/or other materials provided with the
-+ *       distribution.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ */
-+
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include "skeleton64.dtsi"
-+
-+/ {
-+	/* SOC compatibility */
-+	compatible = "al,alpine";
-+
-+	/* CPU Configuration */
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		enable-method = "al,alpine-smp";
-+
-+		cpu at 0 {
-+			compatible = "arm,cortex-a15";
-+			device_type = "cpu";
-+			reg = <0>;
-+			clock-frequency = <0>; /* Filled by loader */
-+		};
-+
-+		cpu at 1 {
-+			compatible = "arm,cortex-a15";
-+			device_type = "cpu";
-+			reg = <1>;
-+			clock-frequency = <0>; /* Filled by loader */
-+		};
-+
-+		cpu at 2 {
-+			compatible = "arm,cortex-a15";
-+			device_type = "cpu";
-+			reg = <2>;
-+			clock-frequency = <0>; /* Filled by loader */
-+		};
-+
-+		cpu at 3 {
-+			compatible = "arm,cortex-a15";
-+			device_type = "cpu";
-+			reg = <3>;
-+			clock-frequency = <0>; /* Filled by loader */
-+		};
-+	};
-+
-+	soc {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		compatible = "simple-bus";
-+		interrupt-parent = <&gic>;
-+		ranges;
-+
-+		arch-timer {
-+			compatible = "arm,cortex-a15-timer",
-+				     "arm,armv7-timer";
-+			interrupts =
-+				<GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+				<GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+				<GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+				<GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-+			clock-frequency = <0>; /* Filled by loader */
-+		};
-+
-+		/* Interrupt Controller */
-+		gic: gic at fb001000 {
-+			compatible = "arm,cortex-a15-gic";
-+			#interrupt-cells = <3>;
-+			#size-cells = <0>;
-+			#address-cells = <0>;
-+			interrupt-controller;
-+			reg = <0x0 0xfb001000 0x0 0x1000>,
-+			      <0x0 0xfb002000 0x0 0x2000>,
-+			      <0x0 0xfb004000 0x0 0x1000>,
-+			      <0x0 0xfb006000 0x0 0x2000>;
-+			interrupts =
-+				<GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-+		};
-+
-+		/* CPU Resume registers */
-+		cpu-resume at fbff5ec0 {
-+			compatible = "al,alpine-cpu-resume";
-+			reg = <0x0 0xfbff5ec0 0x0 0x30>;
-+		};
-+
-+		/* North Bridge Service Registers */
-+		sysfabric-service at fb070000 {
-+			compatible = "al,alpine-sysfabric-service", "syscon", "simple-bus";
-+			reg = <0x0 0xfb070000 0x0 0x10000>;
-+		};
-+
-+		/* Performance Monitor Unit */
-+		pmu {
-+			compatible = "arm,cortex-a15-pmu";
-+			interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
-+		};
-+
-+		uart0:uart at fd883000 {
-+			compatible = "ns16550a";
-+			reg = <0x0 0xfd883000 0x0 0x1000>;
-+			clock-frequency = <0>; /* Filled by loader */
-+			interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+		};
-+
-+		uart1:uart at 0xfd884000 {
-+			compatible = "ns16550a";
-+			reg = <0x0 0xfd884000 0x0 0x1000>;
-+			clock-frequency = <0>; /* Filled by loader */
-+			interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+		};
-+	};
-+};
--- 
-1.9.1
+Applied, thanks.  Fixes: usually has () around the commit title.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150202/f4dcae8d/attachment.sig>
