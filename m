@@ -1,73 +1,140 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 02 Feb 2015 14:20:27 +0100
-Subject: [PATCH v5 8/9] ARM: dts: exynos5250: add display power domain
-In-Reply-To: <1422883228-10690-1-git-send-email-m.szyprowski@samsung.com>
-References: <1422883228-10690-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1422883228-10690-9-git-send-email-m.szyprowski@samsung.com>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Mon, 2 Feb 2015 18:51:58 +0530
+Subject: [PATCH v4 0/8] Support for Fujitsu MB86S7X SoCs
+In-Reply-To: <1421663016-1327-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+References: <1421663016-1327-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+Message-ID: <CAJe_ZhdqsTwD0KxzVzCCHExsoepCkLR2hXUbjnnmvSFhhvmgdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrzej Hajda <a.hajda@samsung.com>
+Hi Arnd,  Hi Olof,
 
-The patch adds domain definition and references to it in appropriate devices.
+  ... just a polite ping on the patchset.
 
-Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-[mszyprow: rebased onto generic power domains dt bindings]
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
----
- arch/arm/boot/dts/exynos5250.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+Thanks.
 
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index e8c67fdb69fb..ae22bd98f956 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -102,6 +102,12 @@
- 		#power-domain-cells = <0>;
- 	};
- 
-+	pd_disp1: disp1-power-domain at 100440A0 {
-+		compatible = "samsung,exynos4210-pd";
-+		reg = <0x100440A0 0x20>;
-+		#power-domain-cells = <0>;
-+	};
-+
- 	clock: clock-controller at 10010000 {
- 		compatible = "samsung,exynos5250-clock";
- 		reg = <0x10010000 0x30000>;
-@@ -719,6 +725,7 @@
- 	hdmi: hdmi {
- 		compatible = "samsung,exynos4212-hdmi";
- 		reg = <0x14530000 0x70000>;
-+		power-domains = <&pd_disp1>;
- 		interrupts = <0 95 0>;
- 		clocks = <&clock CLK_HDMI>, <&clock CLK_SCLK_HDMI>,
- 			 <&clock CLK_SCLK_PIXEL>, <&clock CLK_SCLK_HDMIPHY>,
-@@ -731,6 +738,7 @@
- 	mixer {
- 		compatible = "samsung,exynos5250-mixer";
- 		reg = <0x14450000 0x10000>;
-+		power-domains = <&pd_disp1>;
- 		interrupts = <0 94 0>;
- 		clocks = <&clock CLK_MIXER>, <&clock CLK_HDMI>,
- 			 <&clock CLK_SCLK_HDMI>;
-@@ -744,6 +752,7 @@
- 	};
- 
- 	dp: dp-controller at 145B0000 {
-+		power-domains = <&pd_disp1>;
- 		clocks = <&clock CLK_DP>;
- 		clock-names = "dp";
- 		phys = <&dp_phy>;
-@@ -751,6 +760,7 @@
- 	};
- 
- 	fimd: fimd at 14400000 {
-+		power-domains = <&pd_disp1>;
- 		clocks = <&clock CLK_SCLK_FIMD1>, <&clock CLK_FIMD1>;
- 		clock-names = "sclk_fimd", "fimd";
- 	};
+On 19 January 2015 at 15:53, Vincent Yang
+<vincent.yang.fujitsu@gmail.com> wrote:
+> Hello,
+>
+>   Fujitsu have a series of SoC already shipping based around
+> variations of 2xCA7+2xCA15 big.LITTLE architecture, and we would like
+> to upstream the basic support in this series.
+>
+>   MB86S70 is a big.LITTLE platform with 2xCA7+2xCA15 and an additional
+> CM3 as the master. MB86S73 is a simple 2xCA7 and an additional CM3
+> master.
+>
+>   The DT includes references to sdhci patches which are being sent to
+> the mmc list at the same time.
+>
+>   We welcome any comments or questions.
+>
+> Changes since v3:
+> * Identify platform, by checking presence of DT node
+> "fujitsu,mb86s70-scb-1.0" before populating cpu clocks and MCPM
+> support.
+> * Disable clock upon gpio module remove
+> * Lower init level of gpio driver from subsys_initcall to module_init
+> * Use managed device resource allocation in MHU driver
+>
+> Changes since v2:
+> * Minor cleanup of MCPM as suggested by Nicolas Pitre.
+>
+> Changes since v1:
+> * Thanks to Arnd, modified clock driver to populate clocks only when
+> some user need them. Node name changed from "fujitsu,mb86s70-clk" to
+> "fujitsu,mb86s70-crg11" . Controller+Domain+Port of a clock are now
+> three cells specified by the user node.
+> * aliases moved into board DTS files
+> * Voltage supply moved as per-board DT node.
+> * Removed default overly verbose loglevel=8
+> * Specify -march=armv7-a flag for mcpm.c and smc.S that contain ARMv7
+> specific code.
+> * Removed wrongly put outer_flush_all(), now using standard
+> v7_exit_coherency_flush() instead of platform specific macro.
+> * Simplified GPIO offset calculations in gpio-mb86s70.c driver. And
+> added .remove() for the driver
+> * ARM MHU driver provided a .remove() to enable module unloading.
+> * A few other misc cleanups suggested in v1 submission.
+>
+> Thanks.
+>
+> Jassi Brar (8):
+>   ARM: Add platform support for Fujitsu MB86S7X SoCs
+>   mailbox: arm_mhu: add driver for ARM MHU controller
+>   ARM: MB86S7X: Add MCPM support
+>   clk: Add clock driver for mb86s7x
+>   gpio: Add Fujitsu MB86S7x GPIO driver
+>   dt: mb86s7x: add dt files for MB86S7x evbs
+>   of: add Fujitsu vendor prefix
+>   ARM: MB86S7x: Add configs
+>
+>  Documentation/devicetree/bindings/arm/mb86s7x.txt  |   8 +
+>  .../bindings/clock/fujitsu,mb86s70-crg11.txt       |  26 +
+>  .../bindings/gpio/fujitsu,mb86s70-gpio.txt         |  20 +
+>  .../devicetree/bindings/mailbox/arm-mhu.txt        |  33 ++
+>  .../devicetree/bindings/soc/mb86s7x/scb_mhu.txt    |  35 ++
+>  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+>  MAINTAINERS                                        |   7 +
+>  arch/arm/Kconfig                                   |   2 +
+>  arch/arm/Makefile                                  |   1 +
+>  arch/arm/boot/dts/Makefile                         |   1 +
+>  arch/arm/boot/dts/mb86s70.dtsi                     |  91 ++++
+>  arch/arm/boot/dts/mb86s70eb.dts                    |  57 +++
+>  arch/arm/boot/dts/mb86s73.dtsi                     |  63 +++
+>  arch/arm/boot/dts/mb86s73eb.dts                    |  44 ++
+>  arch/arm/boot/dts/mb86s7x.dtsi                     | 140 ++++++
+>  arch/arm/configs/fujitsu_defconfig                 | 232 +++++++++
+>  arch/arm/configs/multi_v7_defconfig                |   5 +
+>  arch/arm/mach-mb86s7x/Kconfig                      |  19 +
+>  arch/arm/mach-mb86s7x/Makefile                     |   3 +
+>  arch/arm/mach-mb86s7x/board.c                      |  23 +
+>  arch/arm/mach-mb86s7x/mcpm.c                       | 318 +++++++++++++
+>  arch/arm/mach-mb86s7x/smc.S                        |  27 ++
+>  drivers/clk/Makefile                               |   1 +
+>  drivers/clk/clk-mb86s7x.c                          | 386 +++++++++++++++
+>  drivers/gpio/Kconfig                               |   6 +
+>  drivers/gpio/Makefile                              |   1 +
+>  drivers/gpio/gpio-mb86s7x.c                        | 232 +++++++++
+>  drivers/mailbox/Kconfig                            |   7 +
+>  drivers/mailbox/Makefile                           |   2 +
+>  drivers/mailbox/arm_mhu.c                          | 211 ++++++++
+>  drivers/soc/Makefile                               |   1 +
+>  drivers/soc/mb86s7x/Makefile                       |   4 +
+>  drivers/soc/mb86s7x/scb_mhu.c                      | 528 +++++++++++++++++++++
+>  include/soc/mb86s7x/scb_mhu.h                      | 105 ++++
+>  34 files changed, 2640 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/mb86s7x.txt
+>  create mode 100644 Documentation/devicetree/bindings/clock/fujitsu,mb86s70-crg11.txt
+>  create mode 100644 Documentation/devicetree/bindings/gpio/fujitsu,mb86s70-gpio.txt
+>  create mode 100644 Documentation/devicetree/bindings/mailbox/arm-mhu.txt
+>  create mode 100644 Documentation/devicetree/bindings/soc/mb86s7x/scb_mhu.txt
+>  create mode 100644 arch/arm/boot/dts/mb86s70.dtsi
+>  create mode 100644 arch/arm/boot/dts/mb86s70eb.dts
+>  create mode 100644 arch/arm/boot/dts/mb86s73.dtsi
+>  create mode 100644 arch/arm/boot/dts/mb86s73eb.dts
+>  create mode 100644 arch/arm/boot/dts/mb86s7x.dtsi
+>  create mode 100644 arch/arm/configs/fujitsu_defconfig
+>  create mode 100644 arch/arm/mach-mb86s7x/Kconfig
+>  create mode 100644 arch/arm/mach-mb86s7x/Makefile
+>  create mode 100644 arch/arm/mach-mb86s7x/board.c
+>  create mode 100644 arch/arm/mach-mb86s7x/mcpm.c
+>  create mode 100644 arch/arm/mach-mb86s7x/smc.S
+>  create mode 100644 drivers/clk/clk-mb86s7x.c
+>  create mode 100644 drivers/gpio/gpio-mb86s7x.c
+>  create mode 100644 drivers/mailbox/arm_mhu.c
+>  create mode 100644 drivers/soc/mb86s7x/Makefile
+>  create mode 100644 drivers/soc/mb86s7x/scb_mhu.c
+>  create mode 100644 include/soc/mb86s7x/scb_mhu.h
+>
+> --
+> 1.9.0
+>
+
+
+
 -- 
-1.9.2
+Linaro.org ? Open source software for ARM SoCs | Follow Linaro
+http://facebook.com/pages/Linaro/155974581091106  -
+http://twitter.com/#!/linaroorg - http://linaro.org/linaro-blog
