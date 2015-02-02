@@ -1,72 +1,92 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Tue, 03 Feb 2015 00:06:43 +0800
-Subject: [PATCH] PCI: Fix pcibios_update_irq misuse of irq number
-In-Reply-To: <CAErSpo5=NhPZ5RNbBeGqKuLbKdOyTD1m+ijWM2SzQFWuKLTJfg@mail.gmail.com>
-References: <1422456683-797-1-git-send-email-marc.zyngier@arm.com>
- <CAErSpo5=NhPZ5RNbBeGqKuLbKdOyTD1m+ijWM2SzQFWuKLTJfg@mail.gmail.com>
-Message-ID: <54CFA093.9040508@linux.intel.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Mon, 2 Feb 2015 11:10:26 -0500
+Subject: [PATCH v4 3/6] of: fix size when dma-range is not used
+In-Reply-To: <20150202121843.GD22661@e104818-lin.cambridge.arm.com>
+References: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
+ <1422052359-12384-4-git-send-email-m-karicheri2@ti.com>
+ <54C77616.80301@arm.com> <54C7DF13.20402@ti.com>
+ <20150128110523.GC6646@e104818-lin.cambridge.arm.com>
+ <54C9068D.8050701@arm.com>
+ <20150128173048.GE31752@e104818-lin.cambridge.arm.com>
+ <54CBC823.3020905@ti.com>
+ <20150202121843.GD22661@e104818-lin.cambridge.arm.com>
+Message-ID: <54CFA172.8070408@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/2/2 23:57, Bjorn Helgaas wrote:
-> On Wed, Jan 28, 2015 at 8:51 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> pcibios_update_irq writes an irq number into the config space
->> of a given PCI device, but ignores the fact that this number
->> is a virtual interrupt number, which might be a very different
->> value from what the underlying hardware is using.
+On 02/02/2015 07:18 AM, Catalin Marinas wrote:
+> On Fri, Jan 30, 2015 at 06:06:27PM +0000, Murali Karicheri wrote:
+>> On 01/28/2015 12:30 PM, Catalin Marinas wrote:
+>>> I think we can remove this check altogether (we leaved without it for a
+>>> while) but we need to add 1 when calculating the mask:
+>>>
+>>> 	dev->coherent_dma_mask = min(DMA_BIT_MASK(32),
+>>> 				     DMA_BIT_MASK(ilog2(size + 1)));
+>>>
+>> For Keystone, the dma_addr is to be taken care as well to determine the
+>> mask. The above will not work.
+>
+> This was discussed before (not on this thread) and dma_addr should not
+> affect the mask, it only affects the pfn offset.
+>
+>> Based on the discussion so far, this is the function I have come up with
+>> incorporating the suggestions. Please review this and see if I have
+>> missed out any. This works fine on Keystone.
 >>
->> The obvious fix is to fetch the HW interrupt number from the
->> corresponding irq_data structure. This is slightly complicated
->> by the fact that this interrupt might be services by a stacked
->> domain.
+>> void of_dma_configure(struct device *dev, struct device_node *np)
+>> {
+>> 	u64 dma_addr = 0, paddr, size;
+>> 	int ret;
+>> 	bool coherent;
+>> 	unsigned long offset = 0;
+>> 	struct iommu_ops *iommu;
 >>
->> This has been tested on KVM with kvmtool.
+>> 	/*
+>> 	 * Set default size to cover the 32-bit. Drivers are expected to setup
+>> 	 * the correct size and dma_mask.
+>>     	 */
+>> 	size = 1ULL<<  32;
 >>
->> Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Tested-by: Andre Przywara <andre.przywara@arm.com>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> Jiang, are you OK with this patch as-is now, since it isn't used on x86?
-Sure, I'm OK. I missed the point that it's not used on x86 at all
-in previous review.
+>> 	ret = of_dma_get_range(np,&dma_addr,&paddr,&size);
+>> 	if (!ret) {
+>> 		offset = PFN_DOWN(paddr - dma_addr);
+>> 		if (!size) {
+>> 			dev_err(dev, "Invalid size (%llx)\n",
+>> 				size);
+>> 			return;
+>> 		}
+>> 		if (size&  1) {
+>> 			size = size + 1;
+>> 			dev_warn(dev, "Incorrect usage of size (%llx)\n",
+>> 				 size);
+>> 		}
+>> 		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
+>> 	}
+>> 	dev->dma_pfn_offset = offset;
+>>
+>> 	/*
+>> 	 * Coherent DMA masks larger than 32-bit must be explicitly set by the
+>> 	 * driver.
+>> 	 */
+>> 	dev->coherent_dma_mask = min(DMA_BIT_MASK(32),
+>> 				     DMA_BIT_MASK(ilog2(dma_addr + size)));
+>
+> That's not correct, coherent_dma_mask should still be calculated solely
+> based on size, not dma_addr.
+>
+> Functions like swiotlb_dma_supported() use phys_to_dma() which on ARM
+> (32-bit) subtracts the dma_pfn_offset, so the mask based on size works
+> fine.
+>
+> In the arm64 tree, we haven't taken dma_pfn_offset into account for
+> phys_to_dma() yet but if needed for a SoC, we'll add it.
+>
+I need to hear Arnd's comment on this. I am seeing an issue without this 
+change. Probably it needs a change else where. I will post the error I 
+am getting to this list.
 
-> 
-> Marc, Lorenzo, I assume this actually fixes a bug.  Can we get any
-> more details about what happens when you hit the bug, and how you
-> reproduced it (what platform, driver, etc.)?
-> 
-> Bjorn
-> 
->> ---
->>  drivers/pci/setup-irq.c | 12 ++++++++++--
->>  1 file changed, 10 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/pci/setup-irq.c b/drivers/pci/setup-irq.c
->> index 4e2d595..828cbc9 100644
->> --- a/drivers/pci/setup-irq.c
->> +++ b/drivers/pci/setup-irq.c
->> @@ -15,11 +15,19 @@
->>  #include <linux/errno.h>
->>  #include <linux/ioport.h>
->>  #include <linux/cache.h>
->> +#include <linux/irq.h>
->>
->>  void __weak pcibios_update_irq(struct pci_dev *dev, int irq)
->>  {
->> -       dev_dbg(&dev->dev, "assigning IRQ %02d\n", irq);
->> -       pci_write_config_byte(dev, PCI_INTERRUPT_LINE, irq);
->> +       struct irq_data *d;
->> +
->> +       d = irq_get_irq_data(irq);
->> +#ifdef CONFIG_IRQ_DOMAIN_HIERARCHY
->> +       while (d->parent_data)
->> +               d = d->parent_data;
->> +#endif
->> +       dev_dbg(&dev->dev, "assigning IRQ %02ld\n", d->hwirq);
->> +       pci_write_config_byte(dev, PCI_INTERRUPT_LINE, d->hwirq);
->>  }
->>
->>  static void pdev_fixup_irq(struct pci_dev *dev,
->> --
->> 2.1.4
->>
+Murali
+
+-- 
+Murali Karicheri
+Linux Kernel, Texas Instruments
