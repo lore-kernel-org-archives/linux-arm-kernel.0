@@ -1,62 +1,34 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon,  2 Feb 2015 17:00:54 +0100
-Subject: [PATCH] mmc: core: Invoke mmc_pwrseq_post_power_on() prior
- MMC_POWER_ON state
-Message-ID: <1422892854-3655-1-git-send-email-ulf.hansson@linaro.org>
+From: tsahee@annapurnalabs.com (Tsahee Zidenberg)
+Date: Mon, 2 Feb 2015 18:04:29 +0200
+Subject: [PATCH v3 5/5] ARM: dts: Alpine platform devicetree
+In-Reply-To: <20150202154149.GD21175@leverpostej>
+References: <54cf5d8c.sl7aclyeuuh66jXt%tsahee@annapurnalabs.com>
+ <20150202134051.GB21175@leverpostej>
+ <CABM=7kmcPyxqah8Yek1PoSOzZarMh8eMFdakgz5k418FzMvc_g@mail.gmail.com>
+ <20150202154149.GD21175@leverpostej>
+Message-ID: <CABM=7kkTMLPemxyCcpFye99F9=84nW3KdXa7C6ynHYFBPeV8kQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Host drivers have different ways to sends their "init stream" to the
-card. Some need to do it as part of a request, some do it from the
-->set_ios() callback in the MMC_POWER_ON state and some don't send an
-"init stream" at all.
+On 2 February 2015 at 17:41, Mark Rutland <mark.rutland@arm.com> wrote:
 
-To be able to use the reset GPIOs from the simple MMC power sequence
-provider, the card need to be powered and the "init stream" must not
-have been sent.
+>> > Why is "simple-bus" on the end?
+>> >
+>>
+>> Nodes that are used with "syscon_regmap_lookup_by_compatible" appear
+>> both with and without compatibility to "simple-bus" in the
+>> device-trees.
+>> examples with: "fsl,imx6q-anatop", "xlnx,zynq-slcr"
+>> examples without: "fsl,imx6q-iomuxc-gpr", "rockchip,rk3066-pmu"
+>> Both ways work, I'm not if there is reasoning behind this difference
+>> in current device-trees or which is the better example to follow. I
+>> have no problem working either way. Is there a consensus on this?
+>
+> The "simple-bus" entry is wrong, and should be removed.
+>
+> In other cases it's also likely to be wrong, but I'd have to inspect
+> them to be sure.
+>
+Will be fixed, then. Thank you!
 
-To cope with these requirements, invoke mmc_pwrseq_post_power_on()
-prior we change the state to MMC_POWER_ON in mmc_power_up().
-
-Host drivers shall perform power up operations in the MMC_POWER_UP
-state. Unfortunate three hosts (au1xmmc, cb710-mmc and toshsd) don't
-conform to this expectation. Instead those ignore the MMC_POWER_UP
-state and delays their power up operations to the MMC_POWER_ON state.
-
-Those hosts needs to change their behavior to enable proper support for
-the simple MMC power sequence provider.
-
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
-
-Some background to this patch:
-http://marc.info/?t=142165904000001&r=1&w=2
-
----
- drivers/mmc/core/core.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-index 0dc64e6..23f10f7 100644
---- a/drivers/mmc/core/core.c
-+++ b/drivers/mmc/core/core.c
-@@ -1637,6 +1637,8 @@ void mmc_power_up(struct mmc_host *host, u32 ocr)
- 	 */
- 	mmc_delay(10);
- 
-+	mmc_pwrseq_post_power_on(host);
-+
- 	host->ios.clock = host->f_init;
- 
- 	host->ios.power_mode = MMC_POWER_ON;
-@@ -1648,8 +1650,6 @@ void mmc_power_up(struct mmc_host *host, u32 ocr)
- 	 */
- 	mmc_delay(10);
- 
--	mmc_pwrseq_post_power_on(host);
--
- 	mmc_host_clk_release(host);
- }
- 
--- 
-1.9.1
+Tsahee.
