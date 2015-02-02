@@ -1,223 +1,59 @@
-From: jbottomley@parallels.com (James Bottomley)
-Date: Mon, 2 Feb 2015 15:30:27 +0000
-Subject: [PATCH] phy: qcom-ufs: export symbols needed by main drivers
-In-Reply-To: <1840882.huchmEIh5K@wuerfel>
-References: <1840882.huchmEIh5K@wuerfel>
-Message-ID: <1422891069.2103.1.camel@parallels.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 2 Feb 2015 15:36:49 +0000
+Subject: [PATCH 1/2] arm64: adding cpu lookup functionality
+In-Reply-To: <1422658466-23984-2-git-send-email-mathieu.poirier@linaro.org>
+References: <1422658466-23984-1-git-send-email-mathieu.poirier@linaro.org>
+ <1422658466-23984-2-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <20150202153649.GC21175@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-01-28 at 17:18 +0100, Arnd Bergmann wrote:
-> The qcom ufs phy support is split into three separate loadable
-> modules, however none of the interfaces are exported, resulting
-> in a link error:
+On Fri, Jan 30, 2015 at 10:54:25PM +0000, mathieu.poirier at linaro.org wrote:
+> From: Mathieu Poirier <mathieu.poirier@linaro.org>
 > 
-> ERROR: "ufs_qcom_phy_power_off" [drivers/phy/phy-qcom-ufs-qmp-20nm.ko] undefined!
-> ERROR: "ufs_qcom_phy_power_on" [drivers/phy/phy-qcom-ufs-qmp-20nm.ko] undefined!
-> ERROR: "ufs_qcom_phy_exit" [drivers/phy/phy-qcom-ufs-qmp-20nm.ko] undefined!
-> ERROR: "ufs_qcom_phy_generic_probe" [drivers/phy/phy-qcom-ufs-qmp-20nm.ko] undefined!
-> ERROR: "ufs_qcom_phy_init_vregulators" [drivers/phy/phy-qcom-ufs-qmp-20nm.ko] undefined!
-> ERROR: "ufs_qcom_phy_init_clks" [drivers/phy/phy-qcom-ufs-qmp-20nm.ko] undefined!
-> ERROR: "ufs_qcom_phy_calibrate" [drivers/phy/phy-qcom-ufs-qmp-20nm.ko] undefined!
-> ERROR: "ufs_qcom_phy_remove" [drivers/phy/phy-qcom-ufs-qmp-20nm.ko] undefined!
-> ERROR: "get_ufs_qcom_phy" [drivers/phy/phy-qcom-ufs-qmp-20nm.ko] undefined!
-> ERROR: "ufs_qcom_phy_power_off" [drivers/phy/phy-qcom-ufs-qmp-14nm.ko] undefined!
-> ERROR: "ufs_qcom_phy_power_on" [drivers/phy/phy-qcom-ufs-qmp-14nm.ko] undefined!
-> ERROR: "ufs_qcom_phy_exit" [drivers/phy/phy-qcom-ufs-qmp-14nm.ko] undefined!
-> ERROR: "ufs_qcom_phy_generic_probe" [drivers/phy/phy-qcom-ufs-qmp-14nm.ko] undefined!
-> ERROR: "ufs_qcom_phy_init_vregulators" [drivers/phy/phy-qcom-ufs-qmp-14nm.ko] undefined!
-> ERROR: "ufs_qcom_phy_init_clks" [drivers/phy/phy-qcom-ufs-qmp-14nm.ko] undefined!
-> ERROR: "ufs_qcom_phy_calibrate" [drivers/phy/phy-qcom-ufs-qmp-14nm.ko] undefined!
-> ERROR: "ufs_qcom_phy_remove" [drivers/phy/phy-qcom-ufs-qmp-14nm.ko] undefined!
-> ERROR: "get_ufs_qcom_phy" [drivers/phy/phy-qcom-ufs-qmp-14nm.ko] undefined!
+> Adding a lookup function allowing for quick and easy mapping
+> between processor HWID (as found, for example) in DT specifications
+> and the CPU index known to the kernel.
 > 
-> This exports all of the symbols that are provided by the base library
-> module and used by the two driver modules.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: adaafaa393ef ("phy: qcom-ufs: add support for QUALCOMM Technologies UFS PHY drivers")
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 > ---
-
-
-Cc added for linux-scsi, since this is the origin of the problem.  How
-important is bisectability in this?  It won't affect any non-embedded
-user, since most don't build with UFS, so I can go either way on folding
-or just applying as an extra patch.
-
-James
-
-> The broken patch is currently in the scsi tree, so if the phy maintainer
-> thinks that my fix is correct, it should go there too.
+>  arch/arm64/include/asm/smp_plat.h | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
 > 
-> An alternative approach would be to link all three phy-qcom-ufs source
-> files into a single module.
-> 
->  drivers/phy/phy-qcom-ufs.c | 21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
-> 
-> diff --git a/drivers/phy/phy-qcom-ufs.c b/drivers/phy/phy-qcom-ufs.c
-> index 44ee983d57fe..c8f8c2dac18c 100644
-> --- a/drivers/phy/phy-qcom-ufs.c
-> +++ b/drivers/phy/phy-qcom-ufs.c
-> @@ -73,6 +73,7 @@ int ufs_qcom_phy_calibrate(struct ufs_qcom_phy *ufs_qcom_phy,
->  out:
->  	return ret;
->  }
-> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_calibrate);
+> diff --git a/arch/arm64/include/asm/smp_plat.h b/arch/arm64/include/asm/smp_plat.h
+> index 59e282311b58..8e4b011303b1 100644
+> --- a/arch/arm64/include/asm/smp_plat.h
+> +++ b/arch/arm64/include/asm/smp_plat.h
+> @@ -19,6 +19,7 @@
+>  #ifndef __ASM_SMP_PLAT_H
+>  #define __ASM_SMP_PLAT_H
 >  
->  struct phy *ufs_qcom_phy_generic_probe(struct platform_device *pdev,
->  				struct ufs_qcom_phy *common_cfg,
-> @@ -110,6 +111,7 @@ struct phy *ufs_qcom_phy_generic_probe(struct platform_device *pdev,
->  out:
->  	return generic_phy;
->  }
-> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_generic_probe);
+> +#include <linux/cpumask.h>
+>  #include <asm/types.h>
 >  
->  /*
->   * This assumes the embedded phy structure inside generic_phy is of type
-> @@ -121,6 +123,7 @@ struct ufs_qcom_phy *get_ufs_qcom_phy(struct phy *generic_phy)
->  {
->  	return (struct ufs_qcom_phy *)phy_get_drvdata(generic_phy);
->  }
-> +EXPORT_SYMBOL_GPL(get_ufs_qcom_phy);
+>  struct mpidr_hash {
+> @@ -40,4 +41,15 @@ static inline u32 mpidr_hash_size(void)
+>  extern u64 __cpu_logical_map[NR_CPUS];
+>  #define cpu_logical_map(cpu)    __cpu_logical_map[cpu]
 >  
->  static
->  int ufs_qcom_phy_base_init(struct platform_device *pdev,
-> @@ -228,6 +231,7 @@ ufs_qcom_phy_init_clks(struct phy *generic_phy,
->  out:
->  	return err;
->  }
-> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_init_clks);
->  
->  int
->  ufs_qcom_phy_init_vregulators(struct phy *generic_phy,
-> @@ -252,6 +256,7 @@ ufs_qcom_phy_init_vregulators(struct phy *generic_phy,
->  out:
->  	return err;
->  }
-> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_init_vregulators);
->  
->  static int __ufs_qcom_phy_init_vreg(struct phy *phy,
->  		struct ufs_qcom_phy_vreg *vreg, const char *name, bool optional)
-> @@ -443,6 +448,7 @@ out_disable_src:
->  out:
->  	return ret;
->  }
-> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_enable_ref_clk);
->  
->  static
->  int ufs_qcom_phy_disable_vreg(struct phy *phy,
-> @@ -485,6 +491,7 @@ void ufs_qcom_phy_disable_ref_clk(struct phy *generic_phy)
->  		phy->is_ref_clk_enabled = false;
->  	}
->  }
-> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_disable_ref_clk);
->  
->  #define UFS_REF_CLK_EN	(1 << 5)
->  
-> @@ -523,16 +530,19 @@ static void ufs_qcom_phy_dev_ref_clk_ctrl(struct phy *generic_phy, bool enable)
->  		phy->is_dev_ref_clk_enabled = enable;
->  	}
->  }
-> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_dev_ref_clk_ctrl);
->  
->  void ufs_qcom_phy_enable_dev_ref_clk(struct phy *generic_phy)
->  {
->  	ufs_qcom_phy_dev_ref_clk_ctrl(generic_phy, true);
->  }
-> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_enable_dev_ref_clk);
->  
->  void ufs_qcom_phy_disable_dev_ref_clk(struct phy *generic_phy)
->  {
->  	ufs_qcom_phy_dev_ref_clk_ctrl(generic_phy, false);
->  }
-> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_disable_dev_ref_clk);
->  
->  /* Turn ON M-PHY RMMI interface clocks */
->  int ufs_qcom_phy_enable_iface_clk(struct phy *generic_phy)
-> @@ -561,6 +571,7 @@ int ufs_qcom_phy_enable_iface_clk(struct phy *generic_phy)
->  out:
->  	return ret;
->  }
-> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_enable_iface_clk);
->  
->  /* Turn OFF M-PHY RMMI interface clocks */
->  void ufs_qcom_phy_disable_iface_clk(struct phy *generic_phy)
-> @@ -573,6 +584,7 @@ void ufs_qcom_phy_disable_iface_clk(struct phy *generic_phy)
->  		phy->is_iface_clk_enabled = false;
->  	}
->  }
-> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_disable_iface_clk);
->  
->  int ufs_qcom_phy_start_serdes(struct phy *generic_phy)
->  {
-> @@ -589,6 +601,7 @@ int ufs_qcom_phy_start_serdes(struct phy *generic_phy)
->  
->  	return ret;
->  }
-> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_start_serdes);
->  
->  int ufs_qcom_phy_set_tx_lane_enable(struct phy *generic_phy, u32 tx_lanes)
->  {
-> @@ -606,6 +619,7 @@ int ufs_qcom_phy_set_tx_lane_enable(struct phy *generic_phy, u32 tx_lanes)
->  
->  	return ret;
->  }
-> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_set_tx_lane_enable);
->  
->  void ufs_qcom_phy_save_controller_version(struct phy *generic_phy,
->  					  u8 major, u16 minor, u16 step)
-> @@ -616,6 +630,7 @@ void ufs_qcom_phy_save_controller_version(struct phy *generic_phy,
->  	ufs_qcom_phy->host_ctrl_rev_minor = minor;
->  	ufs_qcom_phy->host_ctrl_rev_step = step;
->  }
-> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_save_controller_version);
->  
->  int ufs_qcom_phy_calibrate_phy(struct phy *generic_phy, bool is_rate_B)
->  {
-> @@ -636,6 +651,7 @@ int ufs_qcom_phy_calibrate_phy(struct phy *generic_phy, bool is_rate_B)
->  
->  	return ret;
->  }
-> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_calibrate_phy);
->  
->  int ufs_qcom_phy_remove(struct phy *generic_phy,
->  			struct ufs_qcom_phy *ufs_qcom_phy)
-> @@ -647,6 +663,7 @@ int ufs_qcom_phy_remove(struct phy *generic_phy,
->  
->  	return 0;
->  }
-> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_remove);
->  
->  int ufs_qcom_phy_exit(struct phy *generic_phy)
->  {
-> @@ -657,6 +674,7 @@ int ufs_qcom_phy_exit(struct phy *generic_phy)
->  
->  	return 0;
->  }
-> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_exit);
->  
->  int ufs_qcom_phy_is_pcs_ready(struct phy *generic_phy)
->  {
-> @@ -671,6 +689,7 @@ int ufs_qcom_phy_is_pcs_ready(struct phy *generic_phy)
->  	return ufs_qcom_phy->phy_spec_ops->
->  			is_physical_coding_sublayer_ready(ufs_qcom_phy);
->  }
-> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_is_pcs_ready);
->  
->  int ufs_qcom_phy_power_on(struct phy *generic_phy)
->  {
-> @@ -725,6 +744,7 @@ out_disable_phy:
->  out:
->  	return err;
->  }
-> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_power_on);
->  
->  int ufs_qcom_phy_power_off(struct phy *generic_phy)
->  {
-> @@ -743,3 +763,4 @@ int ufs_qcom_phy_power_off(struct phy *generic_phy)
->  
->  	return 0;
->  }
-> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_power_off);
-> 
+> +static inline int get_logical_index(u64 mpidr)
+> +{
+> +	int cpu;
+> +
+> +	for (cpu = 0; cpu < nr_cpu_ids; cpu++)
+> +		if (cpu_logical_map(cpu) == mpidr)
+> +			return cpu;
+> +	return -EINVAL;
+> +}
+
+Are there some pending updates for of_coresight.c that aren't in
+mainline yet? It looks like even with this the parsing would be broken
+if /cpus/#address-cells is greater than 1 (as with juno.dts), and it'll
+just assume CPU0 in that case.
+
+It would be nicer if we instead had a CPU node to logical ID mapping
+function in the core OF code. We already have the inverse with
+of_get_cpu_node, so I assume the necessary infrastructure is already
+there.
+
+Mark.
