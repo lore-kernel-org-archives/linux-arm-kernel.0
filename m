@@ -1,40 +1,62 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 02 Feb 2015 14:35:59 -0800
-Subject: [PATCH v13 3/6] clk: Make clk API return per-user struct clk
- instances
-In-Reply-To: <alpine.DEB.2.02.1502022230110.2045@localhost6.localdomain6>
-References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
- <1422011024-32283-4-git-send-email-tomeu.vizoso@collabora.com>
- <20150201212432.22722.70917@quantum> <54CFE1FE.7040404@codeaurora.org>
- <alpine.DEB.2.02.1502022230110.2045@localhost6.localdomain6>
-Message-ID: <54CFFBCF.90706@codeaurora.org>
+From: robdclark@gmail.com (Rob Clark)
+Date: Mon, 2 Feb 2015 17:36:10 -0500
+Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher constraints
+ with dma-parms
+In-Reply-To: <20150202214616.GI8656@n2100.arm.linux.org.uk>
+References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
+ <1422347154-15258-2-git-send-email-sumit.semwal@linaro.org>
+ <20150129143908.GA26493@n2100.arm.linux.org.uk>
+ <CAO_48GEOQ1pBwirgEWeVVXW-iOmaC=Xerr2VyYYz9t1QDXgVsw@mail.gmail.com>
+ <20150129154718.GB26493@n2100.arm.linux.org.uk>
+ <CAF6AEGtTmFg66TK_AFkQ-xp7Nd9Evk3nqe6xCBp7K=77OmXTxA@mail.gmail.com>
+ <20150129192610.GE26493@n2100.arm.linux.org.uk>
+ <CAF6AEGujk8UC4X6T=yhTrz1s+SyZUQ=m05h_WcxLDGZU6bydbw@mail.gmail.com>
+ <20150202165405.GX14009@phenom.ffwll.local>
+ <CAF6AEGuESM+e3HSRGM6zLqrp8kqRLGUYvA3KKECdm7m-nt0M=Q@mail.gmail.com>
+ <20150202214616.GI8656@n2100.arm.linux.org.uk>
+Message-ID: <CAF6AEGvE78a9u9=C6HbuuYs_zwGf6opdXUNfxb51kixFa7zLwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/02/15 13:31, Julia Lawall wrote:
->
-> On Mon, 2 Feb 2015, Stephen Boyd wrote:
->
->> Julia,
+On Mon, Feb 2, 2015 at 4:46 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Feb 02, 2015 at 03:30:21PM -0500, Rob Clark wrote:
+>> On Mon, Feb 2, 2015 at 11:54 AM, Daniel Vetter <daniel@ffwll.ch> wrote:
+>> >> My initial thought is for dma-buf to not try to prevent something than
+>> >> an exporter can actually do.. I think the scenario you describe could
+>> >> be handled by two sg-lists, if the exporter was clever enough.
+>> >
+>> > That's already needed, each attachment has it's own sg-list. After all
+>> > there's no array of dma_addr_t in the sg tables, so you can't use one sg
+>> > for more than one mapping. And due to different iommu different devices
+>> > can easily end up with different addresses.
 >>
->> Is there a way we can write a coccinelle script to check for this? The
->> goal being to find all drivers that are comparing struct clk pointers or
->> attempting to dereference them. There are probably other frameworks that
->> could use the same type of check (regulator, gpiod, reset, pwm, etc.).
->> Probably anything that has a get/put API.
-> Comparing or dereferencing pointers of a particular type should be 
-> straightforward to check for.  Is there an example of how to use the 
-> parent_index value to fix the problem?
+>>
+>> Well, to be fair it may not be explicitly stated, but currently one
+>> should assume the dma_addr_t's in the dmabuf sglist are bogus.  With
+>> gpu's that implement per-process/context page tables, I'm not really
+>> sure that there is a sane way to actually do anything else..
 >
+> That's incorrect - and goes dead against the design of scatterlists.
 
-I'm not sure how to fix this case with parent_index values generically.
-I imagine it would be highly specific to the surrounding code to the
-point where we couldn't fix it automatically. For example, if it's a clk
-consumer (not provider like in this case) using an index wouldn't be the
-right fix. We would need some sort of clk API that we don't currently
-have and I would wonder why clock consumers even care to compare such
-pointers in the first place.
+yeah, a bit of an abuse, although I'm not sure I see a much better way
+when a device vaddr depends on user context..
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> Not only that, but it is entirely possible that you may get handed
+> memory via dmabufs for which there are no struct page's associated
+> with that memory - think about display systems which have their own
+> video memory which is accessible to the GPU, but it isn't system
+> memory.
+
+well, I guess anyways when it comes to sharing buffers, it won't be
+the vram placement of the bo that gets shared ;-)
+
+BR,
+-R
+
+> In those circumstances, you have to use the dma_addr_t's and not the
+> pages.
+>
+> --
+> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+> according to speedtest.net.
