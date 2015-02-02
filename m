@@ -1,45 +1,52 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Mon, 2 Feb 2015 14:22:15 -0400
-Subject: [PATCHv2 1/1] cpufreq: exynos: allow modular build
-In-Reply-To: <CAKohpondsvLm2S_V+aBSoCg252nHONJ6TbyTuHoVYuwxBDEuDA@mail.gmail.com>
-References: <1422730782-13055-1-git-send-email-edubezval@gmail.com>
- <CAKohpondsvLm2S_V+aBSoCg252nHONJ6TbyTuHoVYuwxBDEuDA@mail.gmail.com>
-Message-ID: <20150202182213.GF17425@developer.hsd1.ca.comcast.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 2 Feb 2015 18:24:35 +0000
+Subject: ask for help about swiotlb buffer is full
+In-Reply-To: <54CC5346.5070402@huawei.com>
+References: <54CB5820.9020102@huawei.com> <54CB5AA4.7050705@huawei.com>
+ <20150130115915.GB27542@e104818-lin.cambridge.arm.com>
+ <54CC5346.5070402@huawei.com>
+Message-ID: <20150202182435.GH22661@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 02, 2015 at 09:33:09AM +0530, Viresh Kumar wrote:
-> On 1 February 2015 at 00:29, Eduardo Valentin <edubezval@gmail.com> wrote:
-> > From: Arnd Bergmann <arnd@arndb.de>
-> >
-
-<big cut>
-
+On Sat, Jan 31, 2015 at 04:00:06AM +0000, Kefeng Wang wrote:
+> On 2015-01-30 19:59, Catalin Marinas wrote:
+> > On Fri, Jan 30, 2015 at 10:19:16AM +0000, Kefeng Wang wrote:
+> >> On 2015-01-30 18:08, Kefeng Wang wrote:
+> >>>   There is an AHCI compliant SATA controller in our arm64 soc, and
+> >>>   it only supports 32bit DMA(used coherent dma_ops). It works well
+> >>>   in v3.16. Recently, we update kernel from linux v3.16 to linux
+> >>>   v3.19-rc4(use defconfig in arm64), but we get errors when test
+> >>>   sata driver, as follows.
+> >>>
+> >>> ------------------------------------------------------------------------------
+> >>> ahci b1002800.sata: swiotlb buffer is full (sz: 65536 bytes)
+> >>> DMA: Out of SW-IOMMU space for 65536 bytes at device b1002800.sata
+> > 
+> > Do you use a 64KB page kernel configuration?
+> > 
+> > What does your kernel log say about "software IO TLB [mem ...]"?
+> > 
 > 
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-
-Thanks!
-
+> 4kb page,  use Make ARCH=arm64 defconfig in v3.19 to generate config.
 > 
-> Now as these are all compilable as modules, should we look into the drivers as
-> well to see what they are doing on module unload ?
+> [    0.678293] software IO TLB [mem 0x7e800000-0x7ec00000] (4MB) mapped at [ffffffc07e800000-ffffffc07ebfffff]
+> [    0.686991] DMA: preallocated 256 KiB pool for atomic allocations
 
-hmm.. it seams to be the case, yes. From a quick look, there are unreleased resources
-that needs to be freed. However, they are not really on module unload,
-but on device removal. Which should be a reproducible but even today, in
-case one manually unbinds the device.
+Was the swiotlb buffer size the same in the 3.16 kernel? The only thing
+I recall adding was the atomic pool allocations but these are only for
+non-coherent DMA ops and only for dma_alloc/free. I assume, in the case
+of SATA, the failure is on the dma_map_sg() path.
 
-Let me have a look here and will be sending something soon.
+Maybe with a 3.19 kernel you get more than 4MB swiotlb buffers used at a
+time with your tests; can you try increasing this via a kernel command
+like to, let's say, 8MB? If I got my calculations correctly (an IO TLB
+slab is 1 << 11):
 
+	swiotlb=4096
 
-Thanks,
+If it still runs out with bigger buffers, we may need to look into
+potential leaks.
 
-Eduardo Valentin
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150202/b3f7e5ad/attachment.sig>
+-- 
+Catalin
