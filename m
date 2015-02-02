@@ -1,52 +1,48 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 2 Feb 2015 18:24:35 +0000
-Subject: ask for help about swiotlb buffer is full
-In-Reply-To: <54CC5346.5070402@huawei.com>
-References: <54CB5820.9020102@huawei.com> <54CB5AA4.7050705@huawei.com>
- <20150130115915.GB27542@e104818-lin.cambridge.arm.com>
- <54CC5346.5070402@huawei.com>
-Message-ID: <20150202182435.GH22661@e104818-lin.cambridge.arm.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 02 Feb 2015 19:33:01 +0100
+Subject: [PATCH v2,
+ RFC] RTC: PXA: Fix regression of interrupt before ioremap
+In-Reply-To: <54CF90F1.4020703@tul.cz> (Petr Cvek's message of "Mon, 02 Feb
+ 2015 16:00:01 +0100")
+References: <54CA1ECA.8050000@tul.cz> <87fvatnzl7.fsf@free.fr>
+ <54CF90F1.4020703@tul.cz>
+Message-ID: <87a90wb1uq.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 31, 2015 at 04:00:06AM +0000, Kefeng Wang wrote:
-> On 2015-01-30 19:59, Catalin Marinas wrote:
-> > On Fri, Jan 30, 2015 at 10:19:16AM +0000, Kefeng Wang wrote:
-> >> On 2015-01-30 18:08, Kefeng Wang wrote:
-> >>>   There is an AHCI compliant SATA controller in our arm64 soc, and
-> >>>   it only supports 32bit DMA(used coherent dma_ops). It works well
-> >>>   in v3.16. Recently, we update kernel from linux v3.16 to linux
-> >>>   v3.19-rc4(use defconfig in arm64), but we get errors when test
-> >>>   sata driver, as follows.
-> >>>
-> >>> ------------------------------------------------------------------------------
-> >>> ahci b1002800.sata: swiotlb buffer is full (sz: 65536 bytes)
-> >>> DMA: Out of SW-IOMMU space for 65536 bytes at device b1002800.sata
-> > 
-> > Do you use a 64KB page kernel configuration?
-> > 
-> > What does your kernel log say about "software IO TLB [mem ...]"?
-> > 
-> 
-> 4kb page,  use Make ARCH=arm64 defconfig in v3.19 to generate config.
-> 
-> [    0.678293] software IO TLB [mem 0x7e800000-0x7ec00000] (4MB) mapped at [ffffffc07e800000-ffffffc07ebfffff]
-> [    0.686991] DMA: preallocated 256 KiB pool for atomic allocations
+Petr Cvek <petr.cvek@tul.cz> writes:
 
-Was the swiotlb buffer size the same in the 3.16 kernel? The only thing
-I recall adding was the atomic pool allocations but these are only for
-non-coherent DMA ops and only for dma_alloc/free. I assume, in the case
-of SATA, the failure is on the dma_map_sg() path.
+> I agree that driver without .open looks ugly, but only thing in rtc-pxa .open
+> were two request_irq and I don't think it is good idea to have them there
+> (interrupts should be disabled trough register settings and not by handler
+> freeing).
+>
+> I'm not familiar with the linux RTC subsystem, so I don't know if it is OK to
+> get interrupt (and rtc_update_irq) without opened /dev/rtc. Intuitively I have
+> feeling it is OK, but even if not disabling can be done with some register flag.
+>
+> BTW It seems that kernel have only around 9 drivers in drivers/rtc which contain
+> .open function.
+>
+> OT: rtc-sa1100 seems to be compatible with PXAxxx (it is even in Kconfig). Are
+> there any reasons to have two drivers for one SoC?
+Yes, there is a reason :
+  http://marc.info/?l=linux-arm-kernel&m=122306289606732&w=2
 
-Maybe with a 3.19 kernel you get more than 4MB swiotlb buffers used at a
-time with your tests; can you try increasing this via a kernel command
-like to, let's say, 8MB? If I got my calculations correctly (an IO TLB
-slab is 1 << 11):
+At that time we decided this were 2 different IPs (more or less) sharing the
+same IO region and IRQ. 2 IPs for pxa27x and greater, only 1 IP for pxa25x and
+lower.
 
-	swiotlb=4096
+Now you should know that both rtc-sa1100 and rtc-pxa should be able to work
+together in the same kernel (at least that was the case so far). The open()
+decided who got a grip on the interrupt. This lets userland choose which rtc it
+relies on : either the increasing count, or the
+day/month/year/hour/minute/second counters (which are independant).
 
-If it still runs out with bigger buffers, we may need to look into
-potential leaks.
+Moreover, if there are multiple rtc device, how on earth can it work, ie. how
+can an ioctl() be sent to a specific rtc device if there is no open() ???
 
--- 
-Catalin
+Cheers.
+
+--
+Robert
