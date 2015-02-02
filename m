@@ -1,28 +1,44 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Mon, 02 Feb 2015 10:53:16 -0800
-Subject: [RFC] change non-atomic bitops method
-In-Reply-To: <35FD53F367049845BC99AC72306C23D1044A02027E0A@CNBJMBX05.corpusers.net>
-References: <35FD53F367049845BC99AC72306C23D1044A02027E0A@CNBJMBX05.corpusers.net>
-Message-ID: <54CFC79C.2040005@codeaurora.org>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Mon, 2 Feb 2015 20:00:41 +0100
+Subject: [PATCH] mmc: core: Invoke mmc_pwrseq_post_power_on() prior
+ MMC_POWER_ON state
+In-Reply-To: <1422892854-3655-1-git-send-email-ulf.hansson@linaro.org>
+References: <1422892854-3655-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <CABxcv==yr9ssqZisOUL1MYNSjPQG=fLw+JwXtKgPLap9BmZudg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/1/2015 7:55 PM, Wang, Yalin wrote:
-> This patch change non-atomic bitops,
-> add a if() condition to test it, before set/clear the bit.
-> so that we don't need dirty the cache line, if this bit
-> have been set or clear. On SMP system, dirty cache line will
-> need invalidate other processors cache line, this will have
-> some impact on SMP systems.
+Hello Ulf,
+
+On Mon, Feb 2, 2015 at 5:00 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> Host drivers have different ways to sends their "init stream" to the
+> card. Some need to do it as part of a request, some do it from the
+> ->set_ios() callback in the MMC_POWER_ON state and some don't send an
+> "init stream" at all.
 >
+> To be able to use the reset GPIOs from the simple MMC power sequence
+> provider, the card need to be powered and the "init stream" must not
+> have been sent.
+>
+> To cope with these requirements, invoke mmc_pwrseq_post_power_on()
+> prior we change the state to MMC_POWER_ON in mmc_power_up().
+>
+> Host drivers shall perform power up operations in the MMC_POWER_UP
+> state. Unfortunate three hosts (au1xmmc, cb710-mmc and toshsd) don't
+> conform to this expectation. Instead those ignore the MMC_POWER_UP
+> state and delays their power up operations to the MMC_POWER_ON state.
+>
+> Those hosts needs to change their behavior to enable proper support for
+> the simple MMC power sequence provider.
+>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-Any actual numbers to give an idea of the impact?
+The patch looks good to me and I tested that the WLAN chip attached to
+the SDIO interface in my Exynos5250 Snow Chromebook is reset / powered
+up correctly so:
 
-Thanks,
-Laura
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-
--- 
-Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Best regards,
+Javier
