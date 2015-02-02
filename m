@@ -1,86 +1,33 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 02 Feb 2015 14:20:24 +0100
-Subject: [PATCH v5 5/9] ARM: dts: exynos4412-odroid: enable hdmi support
+Date: Mon, 02 Feb 2015 14:20:23 +0100
+Subject: [PATCH v5 4/9] ARM: dts: exynos4: add dependency between TV and LCD0
+ power domains
 In-Reply-To: <1422883228-10690-1-git-send-email-m.szyprowski@samsung.com>
 References: <1422883228-10690-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1422883228-10690-6-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1422883228-10690-5-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds nodes specific to Exynos4412 based Odroid X/X2/U2/U3
-boards required for enabling HDMI display.
+TV Mixer needs both TV and LCD0 domains enabled to be fully operational.
+This dependency is modelled by making TV power domains a sub-domain of
+LCD0 power domain.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- arch/arm/boot/dts/exynos4412-odroid-common.dtsi | 44 +++++++++++++++++++++++++
- 1 file changed, 44 insertions(+)
+ arch/arm/boot/dts/exynos4.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-index ffcf17bbf63b..dfb24bb56cf3 100644
---- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-+++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-@@ -231,6 +231,20 @@
- 					regulator-always-on;
- 				};
- 
-+				ldo8_reg: ldo at 8 {
-+					regulator-compatible = "LDO8";
-+					regulator-name = "VDD10_HDMI_1.0V";
-+					regulator-min-microvolt = <1000000>;
-+					regulator-max-microvolt = <1000000>;
-+				};
-+
-+				ldo10_reg: ldo at 10 {
-+					regulator-compatible = "LDO10";
-+					regulator-name = "VDDQ_MIPIHSI_1.8V";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+				};
-+
- 				ldo11_reg: LDO11 {
- 					regulator-name = "VDD18_ABB1_1.8V";
- 					regulator-min-microvolt = <1800000>;
-@@ -390,6 +404,31 @@
- 	ehci: ehci at 12580000 {
- 		status = "okay";
+diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+index d9516471c41e..a59b3fae3680 100644
+--- a/arch/arm/boot/dts/exynos4.dtsi
++++ b/arch/arm/boot/dts/exynos4.dtsi
+@@ -101,6 +101,7 @@
+ 		compatible = "samsung,exynos4210-pd";
+ 		reg = <0x10023C20 0x20>;
+ 		#power-domain-cells = <0>;
++		power-domains = <&pd_lcd0>;
  	};
-+
-+	mixer: mixer at 12C10000 {
-+		status = "okay";
-+	};
-+
-+	hdmi at 12D00000 {
-+		hpd-gpio = <&gpx3 7 0>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&hdmi_hpd>;
-+		vdd-supply = <&ldo8_reg>;
-+		vdd_osc-supply = <&ldo10_reg>;
-+		vdd_pll-supply = <&ldo8_reg>;
-+		ddc = <&hdmi_ddc>;
-+		status = "okay";
-+	};
-+
-+	hdmi_ddc: i2c at 13880000 {
-+		status = "okay";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&i2c2_bus>;
-+	};
-+
-+	i2c at 138E0000 {
-+		status = "okay";
-+	};
- };
  
- &pinctrl_1 {
-@@ -404,4 +443,9 @@
- 		samsung,pin-pud = <0>;
- 		samsung,pin-drv = <0>;
- 	};
-+
-+	hdmi_hpd: hdmi-hpd {
-+		samsung,pins = "gpx3-7";
-+		samsung,pin-pud = <1>;
-+	};
- };
+ 	pd_cam: cam-power-domain at 10023C00 {
 -- 
 1.9.2
