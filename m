@@ -1,95 +1,72 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 2 Feb 2015 17:05:39 +0100
-Subject: [PATCH v6 6/8] input: touchscreen: imx25 tcq driver
-In-Reply-To: <20150130185721.GA11695@dtor-ws>
-References: <1422540556-14828-1-git-send-email-mpa@pengutronix.de>
- <1422540556-14828-7-git-send-email-mpa@pengutronix.de>
- <54CA4320.4030607@gmail.com> <20150130185721.GA11695@dtor-ws>
-Message-ID: <20150202160539.GS16879@pengutronix.de>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Tue, 03 Feb 2015 00:06:43 +0800
+Subject: [PATCH] PCI: Fix pcibios_update_irq misuse of irq number
+In-Reply-To: <CAErSpo5=NhPZ5RNbBeGqKuLbKdOyTD1m+ijWM2SzQFWuKLTJfg@mail.gmail.com>
+References: <1422456683-797-1-git-send-email-marc.zyngier@arm.com>
+ <CAErSpo5=NhPZ5RNbBeGqKuLbKdOyTD1m+ijWM2SzQFWuKLTJfg@mail.gmail.com>
+Message-ID: <54CFA093.9040508@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Jan 30, 2015 at 10:57:21AM -0800, Dmitry Torokhov wrote:
-> On Thu, Jan 29, 2015 at 07:56:40PM +0530, Varka Bhadram wrote:
-> > Hi,
-> > 
-> > On Thursday 29 January 2015 07:39 PM, Markus Pargmann wrote:
-> > >This is a driver for the imx25 ADC/TSC module. It controls the
-> > >touchscreen conversion queue and creates a touchscreen input device.
-> > >The driver currently only supports 4 wire touchscreens. The driver uses
-> > >a simple conversion queue of precharge, touch detection, X measurement,
-> > >Y measurement, precharge and another touch detection.
-> > >
-> > >This driver uses the regmap from the parent to setup some touch specific
-> > >settings in the core driver and setup a idle configuration with touch
-> > >detection.
-> > >
-> > >Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > >Signed-off-by: Denis Carikli <denis@eukrea.com>
-> > >Acked-by: Dmitry Torokhov <dtor@vmware.com>
-> > >Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > >---
-> > >  drivers/input/touchscreen/Kconfig         |   6 +
-> > >  drivers/input/touchscreen/Makefile        |   1 +
-> > >  drivers/input/touchscreen/fsl-imx25-tcq.c | 587 ++++++++++++++++++++++++++++++
-> > >  3 files changed, 594 insertions(+)
-> > >  create mode 100644 drivers/input/touchscreen/fsl-imx25-tcq.c
-> > >
-> > (...)
-> > 
-> > >+	ret = request_threaded_irq(priv->irq, mx25_tcq_irq, mx25_tcq_irq_thread,
-> > >+				   IRQF_ONESHOT, pdev->name, priv);
-> > 
-> > We can use devres API for request_thread_irq()...
-> > 
-> > >+	if (ret) {
-> > >+		dev_err(dev, "Failed requesting IRQ\n");
-> > >+		goto err_clk_unprepare;
-> > >+	}
-> > >+
-> > >+	ret = mx25_tcq_init(priv);
-> > >+	if (ret) {
-> > >+		dev_err(dev, "Failed to init tcq\n");
-> > >+		goto error_free_irq;
-> > >+	}
-> > >+
-> > >+	platform_set_drvdata(pdev, priv);
-> > >+
-> > >+	return 0;
-> > >+
-> > >+error_free_irq:
-> > >+	free_irq(priv->irq, priv);
-> > 
-> > This is not required if we use devres API
+On 2015/2/2 23:57, Bjorn Helgaas wrote:
+> On Wed, Jan 28, 2015 at 8:51 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> pcibios_update_irq writes an irq number into the config space
+>> of a given PCI device, but ignores the fact that this number
+>> is a virtual interrupt number, which might be a very different
+>> value from what the underlying hardware is using.
+>>
+>> The obvious fix is to fetch the HW interrupt number from the
+>> corresponding irq_data structure. This is slightly complicated
+>> by the fact that this interrupt might be services by a stacked
+>> domain.
+>>
+>> This has been tested on KVM with kvmtool.
+>>
+>> Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Tested-by: Andre Przywara <andre.przywara@arm.com>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > 
-> Yes it does - you do not really want to stop clocks in the middle of
-> servicing interrupt.
+> Jiang, are you OK with this patch as-is now, since it isn't used on x86?
+Sure, I'm OK. I missed the point that it's not used on x86 at all
+in previous review.
 
-Thanks, I missed the clocks. I will not use devm here then.
-
-For the gcq (ADC) driver, it would still works to use devm_request_irq as the
-interrupt can only trigger when the user requested an ADC conversion. So as
-soon as the device is unregistered from the IIO subsystem, there should
-not be any interrupts. However I would like to keep free_irq in the gcq
-driver as well. Unexpected interrupts wouldn't be a problem and
-especially if the driver is extended for continous conversion in the
-future, this may be better.
-
-Best regards,
-
-Markus
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150202/af3b8aeb/attachment.sig>
+> 
+> Marc, Lorenzo, I assume this actually fixes a bug.  Can we get any
+> more details about what happens when you hit the bug, and how you
+> reproduced it (what platform, driver, etc.)?
+> 
+> Bjorn
+> 
+>> ---
+>>  drivers/pci/setup-irq.c | 12 ++++++++++--
+>>  1 file changed, 10 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/pci/setup-irq.c b/drivers/pci/setup-irq.c
+>> index 4e2d595..828cbc9 100644
+>> --- a/drivers/pci/setup-irq.c
+>> +++ b/drivers/pci/setup-irq.c
+>> @@ -15,11 +15,19 @@
+>>  #include <linux/errno.h>
+>>  #include <linux/ioport.h>
+>>  #include <linux/cache.h>
+>> +#include <linux/irq.h>
+>>
+>>  void __weak pcibios_update_irq(struct pci_dev *dev, int irq)
+>>  {
+>> -       dev_dbg(&dev->dev, "assigning IRQ %02d\n", irq);
+>> -       pci_write_config_byte(dev, PCI_INTERRUPT_LINE, irq);
+>> +       struct irq_data *d;
+>> +
+>> +       d = irq_get_irq_data(irq);
+>> +#ifdef CONFIG_IRQ_DOMAIN_HIERARCHY
+>> +       while (d->parent_data)
+>> +               d = d->parent_data;
+>> +#endif
+>> +       dev_dbg(&dev->dev, "assigning IRQ %02ld\n", d->hwirq);
+>> +       pci_write_config_byte(dev, PCI_INTERRUPT_LINE, d->hwirq);
+>>  }
+>>
+>>  static void pdev_fixup_irq(struct pci_dev *dev,
+>> --
+>> 2.1.4
+>>
