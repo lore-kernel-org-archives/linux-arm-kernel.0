@@ -1,49 +1,36 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 02 Feb 2015 21:22:01 +0100
-Subject: [PATCH v2] ARM: pxa: fix pxa interrupts handling in DT
-In-Reply-To: <1422814816-23887-1-git-send-email-robert.jarzmik@free.fr>
- (Robert Jarzmik's message of "Sun, 1 Feb 2015 19:20:16 +0100")
-References: <1422743783-32511-1-git-send-email-robert.jarzmik@free.fr>
- <1422814816-23887-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <87wq409i8m.fsf@free.fr>
+From: robdclark@gmail.com (Rob Clark)
+Date: Mon, 2 Feb 2015 15:30:21 -0500
+Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher constraints
+ with dma-parms
+In-Reply-To: <20150202165405.GX14009@phenom.ffwll.local>
+References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
+ <1422347154-15258-2-git-send-email-sumit.semwal@linaro.org>
+ <20150129143908.GA26493@n2100.arm.linux.org.uk>
+ <CAO_48GEOQ1pBwirgEWeVVXW-iOmaC=Xerr2VyYYz9t1QDXgVsw@mail.gmail.com>
+ <20150129154718.GB26493@n2100.arm.linux.org.uk>
+ <CAF6AEGtTmFg66TK_AFkQ-xp7Nd9Evk3nqe6xCBp7K=77OmXTxA@mail.gmail.com>
+ <20150129192610.GE26493@n2100.arm.linux.org.uk>
+ <CAF6AEGujk8UC4X6T=yhTrz1s+SyZUQ=m05h_WcxLDGZU6bydbw@mail.gmail.com>
+ <20150202165405.GX14009@phenom.ffwll.local>
+Message-ID: <CAF6AEGuESM+e3HSRGM6zLqrp8kqRLGUYvA3KKECdm7m-nt0M=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Robert Jarzmik <robert.jarzmik@free.fr> writes:
+On Mon, Feb 2, 2015 at 11:54 AM, Daniel Vetter <daniel@ffwll.ch> wrote:
+>> My initial thought is for dma-buf to not try to prevent something than
+>> an exporter can actually do.. I think the scenario you describe could
+>> be handled by two sg-lists, if the exporter was clever enough.
+>
+> That's already needed, each attachment has it's own sg-list. After all
+> there's no array of dma_addr_t in the sg tables, so you can't use one sg
+> for more than one mapping. And due to different iommu different devices
+> can easily end up with different addresses.
 
-> @@ -66,18 +67,20 @@ static inline void __iomem *irq_base(int i)
->  void pxa_mask_irq(struct irq_data *d)
->  {
->  	void __iomem *base = irq_data_get_irq_chip_data(d);
-> +	irq_hw_number_t irq = irqd_to_hwirq(d);
->  	uint32_t icmr = __raw_readl(base + ICMR);
->  
-> -	icmr &= ~(1 << IRQ_BIT(d->irq));
-> +	icmr &= ~BIT(irq);
-This should be : icmr &= ~BIT(irq & 0x1f);
 
->  	__raw_writel(icmr, base + ICMR);
->  }
->  
->  void pxa_unmask_irq(struct irq_data *d)
->  {
->  	void __iomem *base = irq_data_get_irq_chip_data(d);
-> +	irq_hw_number_t irq = irqd_to_hwirq(d);
->  	uint32_t icmr = __raw_readl(base + ICMR);
->  
-> -	icmr |= 1 << IRQ_BIT(d->irq);
-> +	icmr |= BIT(irq);
-Ditto.
+Well, to be fair it may not be explicitly stated, but currently one
+should assume the dma_addr_t's in the dmabuf sglist are bogus.  With
+gpu's that implement per-process/context page tables, I'm not really
+sure that there is a sane way to actually do anything else..
 
-> +void __init pxa_init_irq(int irq_nr, int (*fn)(struct irq_data *, unsigned int))
-> +{
-> +	BUG_ON(irq_nr > MAX_INTERNAL_IRQS);
-> +
-> +	pxa_irq_base = io_p2v(0x40d00000);
-> +	cpu_has_ipr = !cpu_is_pxa25x();
-> +	pxa_init_irq_common(NULL, irq_nr, fn);
-> +}
-This requires "select IRQ_DOMAIN" in arch/arm/Kconfig in ARCH_PXA.
-
--- 
-Robert
+BR,
+-R
