@@ -1,85 +1,95 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 2 Feb 2015 16:04:52 +0000
-Subject: [PATCH 2/8] arm64: Convert hcalls to use ISS field
-In-Reply-To: <1422660681.21823.38.camel@infradead.org>
-References: <cover.1421449714.git.geoff@infradead.org>
- <6719b2520095926ae0e8ac888663b87f2098f565.1421449714.git.geoff@infradead.org>
- <20150126182621.GH14048@e104818-lin.cambridge.arm.com>
- <1422660681.21823.38.camel@infradead.org>
-Message-ID: <20150202160452.GF22661@e104818-lin.cambridge.arm.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Mon, 2 Feb 2015 17:05:39 +0100
+Subject: [PATCH v6 6/8] input: touchscreen: imx25 tcq driver
+In-Reply-To: <20150130185721.GA11695@dtor-ws>
+References: <1422540556-14828-1-git-send-email-mpa@pengutronix.de>
+ <1422540556-14828-7-git-send-email-mpa@pengutronix.de>
+ <54CA4320.4030607@gmail.com> <20150130185721.GA11695@dtor-ws>
+Message-ID: <20150202160539.GS16879@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 30, 2015 at 11:31:21PM +0000, Geoff Levand wrote:
-> On Mon, 2015-01-26 at 18:26 +0000, Catalin Marinas wrote:
-> > On Sat, Jan 17, 2015 at 12:23:34AM +0000, Geoff Levand wrote:
-> > >  /*
-> > > diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
-> > > index a272f33..e3db3fd 100644
-> > > --- a/arch/arm64/kernel/hyp-stub.S
-> > > +++ b/arch/arm64/kernel/hyp-stub.S
-> > > @@ -22,6 +22,7 @@
-> > >  #include <linux/irqchip/arm-gic-v3.h>
-> > >  
-> > >  #include <asm/assembler.h>
-> > > +#include <asm/kvm_arm.h>
-> > >  #include <asm/ptrace.h>
-> > >  #include <asm/virt.h>
-> > >  
-> > > @@ -53,14 +54,22 @@ ENDPROC(__hyp_stub_vectors)
-> > >  	.align 11
-> > >  
-> > >  el1_sync:
-> > > -	mrs	x1, esr_el2
-> > > -	lsr	x1, x1, #26
-> > > -	cmp	x1, #0x16
-> > > -	b.ne	2f				// Not an HVC trap
-> > > -	cbz	x0, 1f
-> > > -	msr	vbar_el2, x0			// Set vbar_el2
-> > > +	mrs	x18, esr_el2
-> > > +	lsr	x17, x18, #ESR_ELx_EC_SHIFT
-> > > +	and	x18, x18, #ESR_ELx_ISS_MASK
-> > > +
-> > > +	cmp     x17, #ESR_ELx_EC_HVC64
-> > > +	b.ne    2f				// Not an HVC trap
-> > > +
-> > > +	cmp	x18, #HVC_GET_VECTORS
-> > > +	b.ne	1f
-> > > +	mrs	x0, vbar_el2
-> > >  	b	2f
-> > > -1:	mrs	x0, vbar_el2			// Return vbar_el2
-> > > +
-> > > +1:	cmp	x18, #HVC_SET_VECTORS
-> > > +	b.ne	2f
-> > > +	msr	vbar_el2, x0
-> > > +
-> > >  2:	eret
-> > >  ENDPROC(el1_sync)
-> > 
-> > You seem to be using x17 and x18 here freely. Do you have any guarantees
-> > that the caller saved/restored those registers? I guess you assume they
-> > are temporary registers and the caller first branches to a function
-> > (like __kvm_hyp_call) and expects them to be corrupted. But I'm not sure
-> > that's always the case. Take for example the __invoke_psci_fn_hvc where
-> > the function is in C (we should change this for other reasons).
-> 
-> Yes, I assume the compiler will not expect them to be preserved.  I
-> missed __invoke_psci_fn_hvc.  Can we just add x17 and x18 to the
-> clobbered list?
-> 
->         asm volatile(
->                         __asmeq("%0", "x0")
->                         __asmeq("%1", "x1")
->                         __asmeq("%2", "x2")
->                         __asmeq("%3", "x3")
->                         "hvc    #0\n"
->                 : "+r" (function_id)
-> -               : "r" (arg0), "r" (arg1), "r" (arg2));
-> +               : "r" (arg0), "r" (arg1), "r" (arg2)
-> +               : "x17", "x18");
+Hi,
 
-I think we can ignore these because they would be called from a guest
-context and IIUC we would only clobber x18 on the host HVC side.
+On Fri, Jan 30, 2015 at 10:57:21AM -0800, Dmitry Torokhov wrote:
+> On Thu, Jan 29, 2015 at 07:56:40PM +0530, Varka Bhadram wrote:
+> > Hi,
+> > 
+> > On Thursday 29 January 2015 07:39 PM, Markus Pargmann wrote:
+> > >This is a driver for the imx25 ADC/TSC module. It controls the
+> > >touchscreen conversion queue and creates a touchscreen input device.
+> > >The driver currently only supports 4 wire touchscreens. The driver uses
+> > >a simple conversion queue of precharge, touch detection, X measurement,
+> > >Y measurement, precharge and another touch detection.
+> > >
+> > >This driver uses the regmap from the parent to setup some touch specific
+> > >settings in the core driver and setup a idle configuration with touch
+> > >detection.
+> > >
+> > >Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > >Signed-off-by: Denis Carikli <denis@eukrea.com>
+> > >Acked-by: Dmitry Torokhov <dtor@vmware.com>
+> > >Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > >---
+> > >  drivers/input/touchscreen/Kconfig         |   6 +
+> > >  drivers/input/touchscreen/Makefile        |   1 +
+> > >  drivers/input/touchscreen/fsl-imx25-tcq.c | 587 ++++++++++++++++++++++++++++++
+> > >  3 files changed, 594 insertions(+)
+> > >  create mode 100644 drivers/input/touchscreen/fsl-imx25-tcq.c
+> > >
+> > (...)
+> > 
+> > >+	ret = request_threaded_irq(priv->irq, mx25_tcq_irq, mx25_tcq_irq_thread,
+> > >+				   IRQF_ONESHOT, pdev->name, priv);
+> > 
+> > We can use devres API for request_thread_irq()...
+> > 
+> > >+	if (ret) {
+> > >+		dev_err(dev, "Failed requesting IRQ\n");
+> > >+		goto err_clk_unprepare;
+> > >+	}
+> > >+
+> > >+	ret = mx25_tcq_init(priv);
+> > >+	if (ret) {
+> > >+		dev_err(dev, "Failed to init tcq\n");
+> > >+		goto error_free_irq;
+> > >+	}
+> > >+
+> > >+	platform_set_drvdata(pdev, priv);
+> > >+
+> > >+	return 0;
+> > >+
+> > >+error_free_irq:
+> > >+	free_irq(priv->irq, priv);
+> > 
+> > This is not required if we use devres API
+> 
+> Yes it does - you do not really want to stop clocks in the middle of
+> servicing interrupt.
+
+Thanks, I missed the clocks. I will not use devm here then.
+
+For the gcq (ADC) driver, it would still works to use devm_request_irq as the
+interrupt can only trigger when the user requested an ADC conversion. So as
+soon as the device is unregistered from the IIO subsystem, there should
+not be any interrupts. However I would like to keep free_irq in the gcq
+driver as well. Unexpected interrupts wouldn't be a problem and
+especially if the driver is extended for continous conversion in the
+future, this may be better.
+
+Best regards,
+
+Markus
 
 -- 
-Catalin
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150202/af3b8aeb/attachment.sig>
