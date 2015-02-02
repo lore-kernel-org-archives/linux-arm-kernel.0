@@ -1,67 +1,62 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 2 Feb 2015 09:57:45 -0600
-Subject: [PATCH] PCI: Fix pcibios_update_irq misuse of irq number
-In-Reply-To: <1422456683-797-1-git-send-email-marc.zyngier@arm.com>
-References: <1422456683-797-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <CAErSpo5=NhPZ5RNbBeGqKuLbKdOyTD1m+ijWM2SzQFWuKLTJfg@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon,  2 Feb 2015 17:00:54 +0100
+Subject: [PATCH] mmc: core: Invoke mmc_pwrseq_post_power_on() prior
+ MMC_POWER_ON state
+Message-ID: <1422892854-3655-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 28, 2015 at 8:51 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> pcibios_update_irq writes an irq number into the config space
-> of a given PCI device, but ignores the fact that this number
-> is a virtual interrupt number, which might be a very different
-> value from what the underlying hardware is using.
->
-> The obvious fix is to fetch the HW interrupt number from the
-> corresponding irq_data structure. This is slightly complicated
-> by the fact that this interrupt might be services by a stacked
-> domain.
->
-> This has been tested on KVM with kvmtool.
->
-> Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Tested-by: Andre Przywara <andre.przywara@arm.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Host drivers have different ways to sends their "init stream" to the
+card. Some need to do it as part of a request, some do it from the
+->set_ios() callback in the MMC_POWER_ON state and some don't send an
+"init stream" at all.
 
-Jiang, are you OK with this patch as-is now, since it isn't used on x86?
+To be able to use the reset GPIOs from the simple MMC power sequence
+provider, the card need to be powered and the "init stream" must not
+have been sent.
 
-Marc, Lorenzo, I assume this actually fixes a bug.  Can we get any
-more details about what happens when you hit the bug, and how you
-reproduced it (what platform, driver, etc.)?
+To cope with these requirements, invoke mmc_pwrseq_post_power_on()
+prior we change the state to MMC_POWER_ON in mmc_power_up().
 
-Bjorn
+Host drivers shall perform power up operations in the MMC_POWER_UP
+state. Unfortunate three hosts (au1xmmc, cb710-mmc and toshsd) don't
+conform to this expectation. Instead those ignore the MMC_POWER_UP
+state and delays their power up operations to the MMC_POWER_ON state.
 
-> ---
->  drivers/pci/setup-irq.c | 12 ++++++++++--
->  1 file changed, 10 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/pci/setup-irq.c b/drivers/pci/setup-irq.c
-> index 4e2d595..828cbc9 100644
-> --- a/drivers/pci/setup-irq.c
-> +++ b/drivers/pci/setup-irq.c
-> @@ -15,11 +15,19 @@
->  #include <linux/errno.h>
->  #include <linux/ioport.h>
->  #include <linux/cache.h>
-> +#include <linux/irq.h>
->
->  void __weak pcibios_update_irq(struct pci_dev *dev, int irq)
->  {
-> -       dev_dbg(&dev->dev, "assigning IRQ %02d\n", irq);
-> -       pci_write_config_byte(dev, PCI_INTERRUPT_LINE, irq);
-> +       struct irq_data *d;
-> +
-> +       d = irq_get_irq_data(irq);
-> +#ifdef CONFIG_IRQ_DOMAIN_HIERARCHY
-> +       while (d->parent_data)
-> +               d = d->parent_data;
-> +#endif
-> +       dev_dbg(&dev->dev, "assigning IRQ %02ld\n", d->hwirq);
-> +       pci_write_config_byte(dev, PCI_INTERRUPT_LINE, d->hwirq);
->  }
->
->  static void pdev_fixup_irq(struct pci_dev *dev,
-> --
-> 2.1.4
->
+Those hosts needs to change their behavior to enable proper support for
+the simple MMC power sequence provider.
+
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+
+Some background to this patch:
+http://marc.info/?t=142165904000001&r=1&w=2
+
+---
+ drivers/mmc/core/core.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+index 0dc64e6..23f10f7 100644
+--- a/drivers/mmc/core/core.c
++++ b/drivers/mmc/core/core.c
+@@ -1637,6 +1637,8 @@ void mmc_power_up(struct mmc_host *host, u32 ocr)
+ 	 */
+ 	mmc_delay(10);
+ 
++	mmc_pwrseq_post_power_on(host);
++
+ 	host->ios.clock = host->f_init;
+ 
+ 	host->ios.power_mode = MMC_POWER_ON;
+@@ -1648,8 +1650,6 @@ void mmc_power_up(struct mmc_host *host, u32 ocr)
+ 	 */
+ 	mmc_delay(10);
+ 
+-	mmc_pwrseq_post_power_on(host);
+-
+ 	mmc_host_clk_release(host);
+ }
+ 
+-- 
+1.9.1
