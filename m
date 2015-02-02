@@ -1,55 +1,47 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Mon, 2 Feb 2015 14:51:47 +0800
-Subject: [PATCH 4/4] ARM: at91: dt: sama5d4ek: enable audio
-In-Reply-To: <1422859907-14881-1-git-send-email-voice.shen@atmel.com>
-References: <1422859907-14881-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <1422859907-14881-5-git-send-email-voice.shen@atmel.com>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Mon, 2 Feb 2015 08:54:30 +0100
+Subject: [PATCH] rc: st_rc: Use CONFIG_PM_SLEEP instead of CONFIG_PM for
+ st_rc_suspend() and st_rc_resume()
+In-Reply-To: <54CE3B47.6050909@sunrus.com.cn>
+References: <54CE3B47.6050909@sunrus.com.cn>
+Message-ID: <54CF2D36.5060002@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable audio support for sama5d4ek board.
+Hi Chen
 
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
----
+On 02/01/2015 03:42 PM, Chen Gang S wrote:
+> st_rc_suspend() and st_rc_resume() depend on CONFIG_PM_SLEEP finally, so
+> they need CONFIG_PM_SLEEP instead of CONFIG_PM, or they will cause build
+> warning (with allmodconfig under xtensa):
+>
+>      CC [M]  drivers/media/pci/smipcie/smipcie.o
+>    drivers/media/rc/st_rc.c:338:12: warning: 'st_rc_suspend' defined but not used [-Wunused-function]
+>     static int st_rc_suspend(struct device *dev)
+>                ^
+>    drivers/media/rc/st_rc.c:359:12: warning: 'st_rc_resume' defined but not used [-Wunused-function]
+>     static int st_rc_resume(struct device *dev)
+>                ^
+>
+> Signed-off-by: Chen Gang <gang.chen.5i5j@gmail.com>
+> ---
+>   drivers/media/rc/st_rc.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/media/rc/st_rc.c b/drivers/media/rc/st_rc.c
+> index 0e758ae..fbfe958 100644
+> --- a/drivers/media/rc/st_rc.c
+> +++ b/drivers/media/rc/st_rc.c
+> @@ -334,7 +334,7 @@ err:
+>   	return ret;
+>   }
+>   
+> -#ifdef CONFIG_PM
+> +#ifdef CONFIG_PM_SLEEP
+>   static int st_rc_suspend(struct device *dev)
+>   {
+>   	struct st_rc_device *rc_dev = dev_get_drvdata(dev);
 
- arch/arm/boot/dts/at91-sama5d4ek.dts | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+Acked-by: Patrice Chotard <patrice.chotard@st.com>
 
-diff --git a/arch/arm/boot/dts/at91-sama5d4ek.dts b/arch/arm/boot/dts/at91-sama5d4ek.dts
-index 7f47d92..0df5f1b 100644
---- a/arch/arm/boot/dts/at91-sama5d4ek.dts
-+++ b/arch/arm/boot/dts/at91-sama5d4ek.dts
-@@ -190,6 +190,10 @@
- 						atmel,pins =
- 							<AT91_PIOE 13 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>; /* PE13 gpio */
- 					};
-+					pinctrl_pck2_as_audio_mck: pck2_as_audio_mck {
-+						atmel,pins =
-+							<AT91_PIOB 10 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-+					};
- 				};
- 			};
- 		};
-@@ -268,4 +272,20 @@
- 			gpio-key,wakeup;
- 		};
- 	};
-+
-+	sound {
-+		compatible = "atmel,asoc-wm8904";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_pck2_as_audio_mck>;
-+
-+		atmel,model = "wm8904 @ SAMA5D4EK";
-+		atmel,audio-routing =
-+			"Headphone Jack", "HPOUTL",
-+			"Headphone Jack", "HPOUTR",
-+			"IN1L", "Line In Jack",
-+			"IN1R", "Line In Jack";
-+
-+		atmel,ssc-controller = <&ssc0>;
-+		atmel,audio-codec = <&wm8904>;
-+	};
- };
--- 
-2.3.0.rc0
+Thanks
