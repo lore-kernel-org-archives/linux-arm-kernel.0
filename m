@@ -1,111 +1,139 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 2 Feb 2015 20:27:54 +0100
-Subject: [GIT PULL] at91: cleanup/soc for 3.20 #4 (bis)
-In-Reply-To: <CAOesGMhycUD4ZfQccjD=zzRB901u0YT1NqCuA7chNTnvgt7Fsg@mail.gmail.com>
-References: <CAOesGMhycUD4ZfQccjD=zzRB901u0YT1NqCuA7chNTnvgt7Fsg@mail.gmail.com>
-Message-ID: <1422905274-9303-1-git-send-email-nicolas.ferre@atmel.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 2 Feb 2015 21:32:01 +0200
+Subject: [PATCH v13 3/6] clk: Make clk API return per-user struct clk
+ instances
+In-Reply-To: <20150201212432.22722.70917@quantum>
+References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1422011024-32283-4-git-send-email-tomeu.vizoso@collabora.com>
+ <20150201212432.22722.70917@quantum>
+Message-ID: <54CFD0B1.2000003@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+On 02/01/2015 11:24 PM, Mike Turquette wrote:
+> Quoting Tomeu Vizoso (2015-01-23 03:03:30)
+>> Moves clock state to struct clk_core, but takes care to change as little API as
+>> possible.
+>>
+>> struct clk_hw still has a pointer to a struct clk, which is the
+>> implementation's per-user clk instance, for backwards compatibility.
+>>
+>> The struct clk that clk_get_parent() returns isn't owned by the caller, but by
+>> the clock implementation, so the former shouldn't call clk_put() on it.
+>>
+>> Because some boards in mach-omap2 still register clocks statically, their clock
+>> registration had to be updated to take into account that the clock information
+>> is stored in struct clk_core now.
+>
+> Tero, Paul & Tony,
+>
+> Tomeu's patch unveils a problem with omap3_noncore_dpll_enable and
+> struct dpll_data, namely this snippet from
+> arch/arm/mach-omap2/dpll3xxx.c:
+>
+>          parent = __clk_get_parent(hw->clk);
+>
+>          if (__clk_get_rate(hw->clk) == __clk_get_rate(dd->clk_bypass)) {
+>                  WARN(parent != dd->clk_bypass,
+>                                  "here0, parent name is %s, bypass name is %s\n",
+>                                  __clk_get_name(parent), __clk_get_name(dd->clk_bypass));
+>                  r = _omap3_noncore_dpll_bypass(clk);
+>          } else {
+>                  WARN(parent != dd->clk_ref,
+>                                  "here1, parent name is %s, ref name is %s\n",
+>                                  __clk_get_name(parent), __clk_get_name(dd->clk_ref));
+>                  r = _omap3_noncore_dpll_lock(clk);
+>          }
+>
+> struct dpll_data has members clk_ref and clk_bypass which are struct clk
+> pointers. This was always a bit of a violation of the clk.h contract
+> since drivers are not supposed to deref struct clk pointers. Now that we
+> generate unique pointers for each call to clk_get (clk_ref & clk_bypass
+> are populated by of_clk_get in ti_clk_register_dpll) then the pointer
+> comparisons above will never be equal (even if they resolve down to the
+> same struct clk_core). I added the verbose traces to the WARNs above to
+> illustrate the point: the names are always the same but the pointers
+> differ.
+>
+> AFAICT this doesn't break anything, but booting on OMAP3+ results in
+> noisy WARNs.
+>
+> I think the correct fix is to replace clk_bypass and clk_ref pointers
+> with a simple integer parent_index. In fact we already have this index.
+> See how the pointers are populated in ti_clk_register_dpll:
 
-As advised by Olof, here is a second attempt with this pull-request but this
-time with the at91-3.19-fixes branch as a base. Here is how I did it:
-- took v3.19-rc4
-- merged my at91-3.19-fixes branch that is now in Linus' tree
-- merged my at91-cleanup3 tag that you already have in your "soc" branch. These
-  patches obviously depend on this tag.
-- stacked the contend of this cleanup/soc pull-request.
+The problem is we still need to be able to get runtime parent clock 
+rates (the parent rate may change also), so simple index value is not 
+sufficient. We need a handle of some sort to the bypass/ref clocks. The 
+DPLL code generally requires knowledge of the bypass + reference clock 
+rates to work properly, as it calculates the M/N values based on these.
 
-I hope that it's what you had in mind.
+Shall I change the DPLL code to check against clk_hw pointers or what is 
+the preferred approach here? The patch at the end does this and fixes 
+the dpll related warnings.
 
-Here is the older message, for the record:
-"
-This is a batch of cleanup/soc modifications that you may also stack on top of
-your "soc" branch as the previous one.
-It collects some more cleanup material and simplifies the AT91 boot code. Only
-some little details remain before having a classical DT boot (without
-additional
-mapping of registers for instance). This part will be addressed in 3.21.
+Btw, the rate constraints patch broke boot for me completely, but sounds 
+like you reverted it already.
 
-The switch to multi-platform is not included as it needs some patches in ASoC,
-ata and arm-soc/next/drivers to be able to compile. I may send patches or a
-pull-request that can be send to Linus late during the merge-window. Tell me
-how you feel it can be done (or delayed to 3.21).
+-Tero
 
-The conflict related to the rename of board-dt-sama5.c => sama5.c is solved in
-this branch:
-https://git.kernel.org/cgit/linux/kernel/git/nferre/linux-at91.git/log/?h=arm-soc-for-next%2bat91-3.20-cleanup
-"
+--------------------
 
-Thanks, best regards,
+Author: Tero Kristo <t-kristo@ti.com>
+Date:   Mon Feb 2 17:19:17 2015 +0200
 
-The following changes since commit 980657d8cdff97343619cf2e3332b8307e9d07ea:
+     ARM: OMAP3+: clock: dpll: fix logic for comparing parent clocks
 
-  Merge tag 'at91-cleanup3' into at91-3.20-soc (2015-02-02 10:59:34 +0100)
+     DPLL code uses reference and bypass clock pointers for determining 
+runtime
+     properties for these clocks, like parent clock rates.
 
-are available in the git repository at:
+     As clock API now returns per-user clock structs, using a global handle
+     in the clock driver code does not work properly anymore. Fix this by
+     using the clk_hw instead, and comparing this against the parents.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-soc4
+     Signed-off-by: Tero Kristo <t-kristo@ti.com>
+     Fixes: 59cf3fcf9baf ("clk: Make clk API return per-user struct clk 
+instances")
 
-for you to fetch changes up to ad3fc3e316891cbc4f33116a61c57c4a9b2a2518:
+diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
+index c2da2a0..49752d7 100644
+--- a/arch/arm/mach-omap2/dpll3xxx.c
++++ b/arch/arm/mach-omap2/dpll3xxx.c
+@@ -410,7 +410,7 @@ int omap3_noncore_dpll_enable(struct clk_hw *hw)
+  	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
+  	int r;
+  	struct dpll_data *dd;
+-	struct clk *parent;
++	struct clk_hw *parent;
 
-  ARM: at91/trivial: unify functions and machine names (2015-02-02 11:01:29 +0100)
+  	dd = clk->dpll_data;
+  	if (!dd)
+@@ -427,13 +427,13 @@ int omap3_noncore_dpll_enable(struct clk_hw *hw)
+  		}
+  	}
 
-----------------------------------------------------------------
-Fourth cleanup/soc batch for 3.20:
-- merge all the at91sam9 code and remove the empty SoC-specific files
-- remove the at91_boot_soc that is now useless in a DT context
-- move the sram code in PM code as it's now only used there
-- some file + function name changes after this big cleanup
+-	parent = __clk_get_parent(hw->clk);
++	parent = __clk_get_hw(__clk_get_parent(hw->clk));
 
-----------------------------------------------------------------
-Alexandre Belloni (4):
-      ARM: at91: at91rm9200: set idle and restart from rm9200_dt_device_init()
-      ARM: at91: merge all SOC_AT91SAM9xxx
-      ARM: at91: remove at91_boot_soc
-      ARM: at91: remove at91_dt_initialize and machine init_early()
+  	if (__clk_get_rate(hw->clk) == __clk_get_rate(dd->clk_bypass)) {
+-		WARN_ON(parent != dd->clk_bypass);
++		WARN_ON(parent != __clk_get_hw(dd->clk_bypass));
+  		r = _omap3_noncore_dpll_bypass(clk);
+  	} else {
+-		WARN_ON(parent != dd->clk_ref);
++		WARN_ON(parent != __clk_get_hw(dd->clk_ref));
+  		r = _omap3_noncore_dpll_lock(clk);
+  	}
 
-Nicolas Ferre (3):
-      ARM: at91: move alternative initial mapping to board-dt-sama5.c
-      ARM: at91: change board files into SoC files
-      ARM: at91/trivial: unify functions and machine names
+@@ -549,7 +549,8 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, 
+unsigned long rate,
+  	if (!dd)
+  		return -EINVAL;
 
- arch/arm/configs/at91_dt_defconfig                 | 10 +--
- arch/arm/mach-at91/Kconfig                         | 92 ++++++----------------
- arch/arm/mach-at91/Makefile                        | 18 +----
- arch/arm/mach-at91/at91rm9200.c                    | 57 +++++++++-----
- arch/arm/mach-at91/{board-dt-sam9.c => at91sam9.c} | 33 ++++----
- arch/arm/mach-at91/at91sam9260.c                   | 26 ------
- arch/arm/mach-at91/at91sam9261.c                   | 25 ------
- arch/arm/mach-at91/at91sam9263.c                   | 24 ------
- arch/arm/mach-at91/at91sam9g45.c                   | 24 ------
- arch/arm/mach-at91/at91sam9n12.c                   | 20 -----
- arch/arm/mach-at91/at91sam9rl.c                    | 25 ------
- arch/arm/mach-at91/at91sam9x5.c                    | 20 -----
- arch/arm/mach-at91/board-dt-rm9200.c               | 54 -------------
- arch/arm/mach-at91/generic.h                       | 19 ++---
- arch/arm/mach-at91/include/mach/cpu.h              | 52 ++++--------
- arch/arm/mach-at91/pm.c                            | 52 +++++++++++-
- arch/arm/mach-at91/{board-dt-sama5.c => sama5.c}   | 47 +++++++++--
- arch/arm/mach-at91/sama5d3.c                       | 29 -------
- arch/arm/mach-at91/sama5d4.c                       | 63 ---------------
- arch/arm/mach-at91/setup.c                         | 77 ------------------
- arch/arm/mach-at91/soc.h                           | 77 ------------------
- 21 files changed, 193 insertions(+), 651 deletions(-)
- rename arch/arm/mach-at91/{board-dt-sam9.c => at91sam9.c} (63%)
- delete mode 100644 arch/arm/mach-at91/at91sam9260.c
- delete mode 100644 arch/arm/mach-at91/at91sam9261.c
- delete mode 100644 arch/arm/mach-at91/at91sam9263.c
- delete mode 100644 arch/arm/mach-at91/at91sam9g45.c
- delete mode 100644 arch/arm/mach-at91/at91sam9n12.c
- delete mode 100644 arch/arm/mach-at91/at91sam9rl.c
- delete mode 100644 arch/arm/mach-at91/at91sam9x5.c
- delete mode 100644 arch/arm/mach-at91/board-dt-rm9200.c
- rename arch/arm/mach-at91/{board-dt-sama5.c => sama5.c} (54%)
- delete mode 100644 arch/arm/mach-at91/sama5d3.c
- delete mode 100644 arch/arm/mach-at91/sama5d4.c
- delete mode 100644 arch/arm/mach-at91/soc.h
+-	if (__clk_get_parent(hw->clk) != dd->clk_ref)
++	if (__clk_get_hw(__clk_get_parent(hw->clk)) !=
++	    __clk_get_hw(dd->clk_ref))
+  		return -EINVAL;
 
--- 
-Nicolas Ferre
+  	if (dd->last_rounded_rate == 0)
