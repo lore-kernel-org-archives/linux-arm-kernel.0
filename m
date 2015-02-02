@@ -1,39 +1,75 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Sun, 01 Feb 2015 15:26:36 -0800
-Subject: Clock Regression in next-20150130 caused by cb75a8fcd14e
-In-Reply-To: <20150131010443.GE16250@atomide.com>
-References: <20150131010443.GE16250@atomide.com>
-Message-ID: <20150201232636.421.58980@quantum>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 2 Feb 2015 09:19:12 +0900
+Subject: [PATCH] ARM: shmobile: silk: initial device tree
+In-Reply-To: <54CD1E79.6090700@cogentembedded.com>
+References: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
+ <1608366.HtA9yBksdO@wasted.cogentembedded.com>
+ <20150131042143.GB7605@verge.net.au>
+ <54CD1E79.6090700@cogentembedded.com>
+Message-ID: <20150202001910.GA29383@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tony Lindgren (2015-01-30 17:04:44)
-> Hi all,
-> 
-> Looks like commit cb75a8fcd14e ("clk: Add rate constraints to clocks")
-> causes a regression on at least omaps where the serial console either
-> does not show anything, or just prints garbage.
-> 
-> Reverting cb75a8fcd14e makes things work again on next-20150130.
-> 
-> Any ideas?
+Hi Sergei,
 
-Stephen posted a patch[0] to fix this. I've squashed that into Tomeu's
-commit that you reference above and my Panda board is booting fine once
-again.
-
-[0] http://lkml.kernel.org/r/<20150131013158.GA4323@codeaurora.org>
-
-Please let me know if any other issues pop up. There are new WARNs for
-OMAP3+ boards introduced by a different patch from Tomeu, but this is
-really because the OMAP DPLL and FAPLL code are dereferencing struct clk
-pointers when they should not be and is a separate issue from the
-constraints patch (with a separate email thread).
-
-Regards,
-Mike
-
+On Sat, Jan 31, 2015 at 09:27:05PM +0300, Sergei Shtylyov wrote:
+> Hello.
 > 
-> Regards,
+> On 1/31/2015 7:21 AM, Simon Horman wrote:
 > 
-> Tony
+> >>Add the initial device tree for the R8A7794 SoC based SILK low cost board.
+> >>SCIF2 serial port support is included, so that the serial console can work.
+> 
+> >>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
+> >>---
+> >>This patch is against the 'renesas-devel-20150129-v3.19-rc6' tag of Simon
+> >>Horman's 'renesas.git' repo.
+> 
+> >>  arch/arm/boot/dts/Makefile         |    1
+> >>  arch/arm/boot/dts/r8a7794-silk.dts |   41 +++++++++++++++++++++++++++++++++++++
+> >>  2 files changed, 42 insertions(+)
+> 
+> [...]
+> >>Index: renesas/arch/arm/boot/dts/r8a7794-silk.dts
+> >>===================================================================
+> >>--- /dev/null
+> >>+++ renesas/arch/arm/boot/dts/r8a7794-silk.dts
+> >>@@ -0,0 +1,41 @@
+> >>+/*
+> >>+ * Device Tree Source for the SILK board
+> >>+ *
+> >>+ * Copyright (C) 2014 Renesas Electronics Corporation
+> >>+ * Copyright (C) 2014-2015 Renesas Solutions Corp.
+> >>+ * Copyright (C) 2014-2015 Cogent Embedded, Inc.
+> >>+ *
+> >>+ * This file is licensed under the terms of the GNU General Public License
+> >>+ * version 2.  This program is licensed "as is" without any warranty of any
+> >>+ * kind, whether express or implied.
+> >>+ */
+> >>+
+> >>+/dts-v1/;
+> >>+#include "r8a7794.dtsi"
+> >>+
+> >>+/ {
+> >>+	model = "SILK";
+> >>+	compatible = "renesas,silk", "renesas,r8a7794";
+> >>+
+> >>+	aliases {
+> >>+		serial0 = &scif2;
+> >>+	};
+> >>+
+> >>+	chosen {
+> >>+		bootargs = "console=ttySC0,38400 ignore_loglevel";
+> 
+> >Please remove console= for consistency with other boards
+> >based on Renesas SoCs.
+> 
+>    I can't, there will be no console at all.
+
+Its not clear to me why that should be the case when you also have:
+
+		stdout-path = &scif2;
+
+Is this a baud issue? If so is it possible to set uboot to 115200 bps?
+This would be consistent with the way other boards are handled in mainline.
