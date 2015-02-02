@@ -1,48 +1,84 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 02 Feb 2015 19:33:01 +0100
-Subject: [PATCH v2,
- RFC] RTC: PXA: Fix regression of interrupt before ioremap
-In-Reply-To: <54CF90F1.4020703@tul.cz> (Petr Cvek's message of "Mon, 02 Feb
- 2015 16:00:01 +0100")
-References: <54CA1ECA.8050000@tul.cz> <87fvatnzl7.fsf@free.fr>
- <54CF90F1.4020703@tul.cz>
-Message-ID: <87a90wb1uq.fsf@free.fr>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 2 Feb 2015 10:46:39 -0800
+Subject: [PATCH v2 1/4] tty: serial: Add 8250 earlycon to support noinit
+ option
+In-Reply-To: <54CF0E96.10703@hurleysoftware.com>
+References: <1421068104-30463-2-git-send-email-eddie.huang@mediatek.com>
+ <54CE53F3.5040709@hurleysoftware.com>
+ <54CE6FD9.5030606@hurleysoftware.com>
+ <1422846994.5512.25.camel@mtksdaap41>
+ <54CEF2C8.1050808@hurleysoftware.com>
+ <20150202042843.GA24765@kroah.com>
+ <54CF07F3.2040100@hurleysoftware.com>
+ <20150202052423.GA3346@kroah.com>
+ <1422855202.26131.31.camel@mtksdaap41>
+ <54CF0E96.10703@hurleysoftware.com>
+Message-ID: <20150202184639.GA29752@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Petr Cvek <petr.cvek@tul.cz> writes:
+On Mon, Feb 02, 2015 at 12:43:50AM -0500, Peter Hurley wrote:
+> On 02/02/2015 12:33 AM, Eddie Huang wrote:
+> > Hi Peter,
+> > 
+> > On Sun, 2015-02-01 at 21:24 -0800, Greg Kroah-Hartman wrote:
+> >> On Mon, Feb 02, 2015 at 12:15:31AM -0500, Peter Hurley wrote:
+> >>> On 02/01/2015 11:28 PM, Greg Kroah-Hartman wrote:
+> >>>> On Sun, Feb 01, 2015 at 10:45:12PM -0500, Peter Hurley wrote:
+> >>>>> On 02/01/2015 10:16 PM, Eddie Huang wrote:
+> >>>
+> >>>>> I'll respin proper patches on top of Greg's tty-testing branch with reverts
+> >>>>> for the noinit options. I noticed that one of the noinit patches actually
+> >>>>> has the linkage for the mtk earlycon, so I'll be sure to preserve that.
+> >>>>
+> >>>> I can just drop the patches in the tty-testing branch, that's what it is
+> >>>> there for :)
+> >>>>
+> >>>> Just let me know the specific patches and I will do so, thanks.
+> >>>
+> >>> Well that pretty much means dropping the 3 patches that add earlycon to
+> >>> 8250_mtk and then applying my patch (needs fixed to apply cleanly, which
+> >>> I can do) and then applying a fixed-up replacement patch to add earlycon
+> >>> to 8250_mtk (which I can also supply).
+> >>>
+> >>> Is that the way you want to go?
+> >>
+> >> Sounds good to me, send your patch, and I'll fix it all up tomorrow.
+> >>
+> >> thanks,
+> >>
+> >> greg k-h
+> > 
+> > Actually, your patch is a little different from my original idea.
+> > Although my use case only care about divisor now, but other hardware
+> > setting is still hard-code, not from parameter. In init_port()
+> > function:   
+> > 	serial8250_early_out(port, UART_LCR, 0x3); /* 8n1 */
+> > 	serial8250_early_out(port, UART_IER, 0);/* no interrupt */
+> > 	serial8250_early_out(port, UART_FCR, 0); /* no fifo */
+> > 	serial8250_early_out(port, UART_MCR, 0x3); /* DTR + RTS */
+> > 
+> > This is why I propose a new option "noinit".
+> > 
+> > After checking further, in my case, I found that your patch should be
+> > unnecessary because if skip baudrate, probe_baud() read DLL/DLM register
+> > and init_port() write the same DLL/DLM value back, no touch any high
+> > speed register, which means keep uart divisor setting as loader
+> > 
+> > Since I don't take "console=uart,mmio32,<addr>,noinit" into
+> > consideration, it is good to drop my patches in the tty-testing branch.
+> > For my case, I can send another series without noinit, just 8250_mtk.c
+> > and its linkage modification in 8250_early.c
+> 
+> Ok.
+> 
+> Greg,
+> 
+> The patches to drop from tty-testing are:
+> * 405017d Document: Modify 8250 earlycon kernel parameters
+> * 0dff3a4 tty: serial: 8250_mtk: Add earlycon
+> * b829735 tty: serial: Add 8250 earlycon to support noinit option
 
-> I agree that driver without .open looks ugly, but only thing in rtc-pxa .open
-> were two request_irq and I don't think it is good idea to have them there
-> (interrupts should be disabled trough register settings and not by handler
-> freeing).
->
-> I'm not familiar with the linux RTC subsystem, so I don't know if it is OK to
-> get interrupt (and rtc_update_irq) without opened /dev/rtc. Intuitively I have
-> feeling it is OK, but even if not disabling can be done with some register flag.
->
-> BTW It seems that kernel have only around 9 drivers in drivers/rtc which contain
-> .open function.
->
-> OT: rtc-sa1100 seems to be compatible with PXAxxx (it is even in Kconfig). Are
-> there any reasons to have two drivers for one SoC?
-Yes, there is a reason :
-  http://marc.info/?l=linux-arm-kernel&m=122306289606732&w=2
+Ok, now dropped, thanks.
 
-At that time we decided this were 2 different IPs (more or less) sharing the
-same IO region and IRQ. 2 IPs for pxa27x and greater, only 1 IP for pxa25x and
-lower.
-
-Now you should know that both rtc-sa1100 and rtc-pxa should be able to work
-together in the same kernel (at least that was the case so far). The open()
-decided who got a grip on the interrupt. This lets userland choose which rtc it
-relies on : either the increasing count, or the
-day/month/year/hour/minute/second counters (which are independant).
-
-Moreover, if there are multiple rtc device, how on earth can it work, ie. how
-can an ioctl() be sent to a specific rtc device if there is no open() ???
-
-Cheers.
-
---
-Robert
+greg k-h
