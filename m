@@ -1,115 +1,111 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 2 Feb 2015 11:21:17 -0800
-Subject: [PATCH v13 4/6] clk: Add rate constraints to clocks
-In-Reply-To: <20150202174646.421.52331@quantum>
-References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
- <1422011024-32283-5-git-send-email-tomeu.vizoso@collabora.com>
- <CAMuHMdUGgA70o2SgdJR3X6AkCcMssHU0POLfzppADT-O=BrYDw@mail.gmail.com>
- <54CA8662.7040008@codeaurora.org>
- <20150131013158.GA4323@codeaurora.org>
- <CAAObsKDxhV7Vveq5FizTUp9ur2Rsq1bM+YQa4uPksh5ntMQV3Q@mail.gmail.com>
- <20150201221856.421.6151@quantum>
- <CAMuHMdU4QBVOb4WqmcfHkj2K7v8dt1hKKWXS0qAnTvsJSafdPQ@mail.gmail.com>
- <20150202161237.GG16250@atomide.com>
- <20150202174646.421.52331@quantum>
-Message-ID: <20150202192116.GF9418@atomide.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 2 Feb 2015 20:27:54 +0100
+Subject: [GIT PULL] at91: cleanup/soc for 3.20 #4 (bis)
+In-Reply-To: <CAOesGMhycUD4ZfQccjD=zzRB901u0YT1NqCuA7chNTnvgt7Fsg@mail.gmail.com>
+References: <CAOesGMhycUD4ZfQccjD=zzRB901u0YT1NqCuA7chNTnvgt7Fsg@mail.gmail.com>
+Message-ID: <1422905274-9303-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mike Turquette <mturquette@linaro.org> [150202 09:50]:
-> Quoting Tony Lindgren (2015-02-02 08:12:37)
-> > 
-> > [   10.568206] ------------[ cut here ]------------
-> > [   10.568206] WARNING: CPU: 0 PID: 1 at drivers/clk/clk.c:925 clk_disable+0x28/0x34()
-> > [   10.568237] Modules linked in:
-> > [   10.568237] CPU: 0 PID: 1 Comm: swapper/0 Tainted: G        W       3.19.0-rc6-next-20150202 #2037
-> > [   10.568237] Hardware name: Generic OMAP4 (Flattened Device Tree)
-> > [   10.568267] [<c0015bdc>] (unwind_backtrace) from [<c001222c>] (show_stack+0x10/0x14)
-> > [   10.568267] [<c001222c>] (show_stack) from [<c05d2014>] (dump_stack+0x84/0x9c)
-> > [   10.568267] [<c05d2014>] (dump_stack) from [<c003ea90>] (warn_slowpath_common+0x7c/0xb8)
-> > [   10.568298] [<c003ea90>] (warn_slowpath_common) from [<c003eb68>] (warn_slowpath_null+0x1c/0x24)
-> > [   10.568298] [<c003eb68>] (warn_slowpath_null) from [<c04c1ffc>] (clk_disable+0x28/0x34)
-> > [   10.568328] [<c04c1ffc>] (clk_disable) from [<c0025b3c>] (_disable_clocks+0x18/0x68)
-> > [   10.568328] [<c0025b3c>] (_disable_clocks) from [<c0026f14>] (_idle+0x10c/0x214)
-> > [   10.568328] [<c0026f14>] (_idle) from [<c0855fac>] (_setup+0x338/0x410)
-> > [   10.568359] [<c0855fac>] (_setup) from [<c0027360>] (omap_hwmod_for_each+0x34/0x60)
-> > [   10.568359] [<c0027360>] (omap_hwmod_for_each) from [<c08563c4>] (__omap_hwmod_setup_all+0x30/0x40)
-> > [   10.568389] [<c08563c4>] (__omap_hwmod_setup_all) from [<c0008a04>] (do_one_initcall+0x80/0x1dc)
-> > [   10.568389] [<c0008a04>] (do_one_initcall) from [<c0848ea0>] (kernel_init_freeable+0x204/0x2d0)
-> > [   10.568420] [<c0848ea0>] (kernel_init_freeable) from [<c05cdab8>] (kernel_init+0x8/0xec)
-> > [   10.568420] [<c05cdab8>] (kernel_init) from [<c000e790>] (ret_from_fork+0x14/0x24)
-> > [   10.568420] ---[ end trace cb88537fdc8fa211 ]---
+Arnd, Olof, Kevin,
 
-For reference, the above is line 992 in clk-next.
+As advised by Olof, here is a second attempt with this pull-request but this
+time with the at91-3.19-fixes branch as a base. Here is how I did it:
+- took v3.19-rc4
+- merged my at91-3.19-fixes branch that is now in Linus' tree
+- merged my at91-cleanup3 tag that you already have in your "soc" branch. These
+  patches obviously depend on this tag.
+- stacked the contend of this cleanup/soc pull-request.
 
-> This looks like mis-matched enable/disable calls. We now have unique
-> struct clk pointers for every call to clk_get. I haven't yet looked
-> through the hwmod code but I have a feeling that we're doing something
-> like this:
-> 
-> 	/* enable clock */
-> 	my_clk = clk_get(...);
-> 	clk_prepare_enable(my_clk);
-> 	clk_put(my_clk);
-> 
-> 	/* do some work */
-> 	do_work();
-> 
-> 	/* disable clock */
-> 	my_clk = clk_get(...);
-> 	clk_disable_unprepare(my_clk);
-> 	clk_put(my_clk);
-> 
-> The above pattern no longer works since my_clk will be two different
-> unique pointers, but it really should be one stable pointer across the
-> whole usage of the clk. E.g:
-> 
-> 	/* enable clock */
-> 	my_clk = clk_get(...);
-> 	clk_prepare_enable(my_clk);
-> 
-> 	/* do some work */
-> 	do_work();
-> 
-> 	/* disable clock */
-> 	clk_disable_unprepare(my_clk);
-> 	clk_put(my_clk);
-> 
-> Again, I haven't looked through the code, so the above is just an
-> educated guess.
-> 
-> Anyways I am testing with an OMAP4460 Panda ES and I didn't see the
-> above. Is there a test you are running to get this?
+I hope that it's what you had in mind.
 
-Just booting 4430-sdp with omap2plus_defconfig. And git bisect
-points to 59cf3fcf9baf ("clk: Make clk API return per-user struct
-clk instances") as you already guessed.
- 
-> > [   10.568450] ------------[ cut here ]------------
-> > [   10.568450] WARNING: CPU: 0 PID: 1 at arch/arm/mach-omap2/dpll3xxx.c:436 omap3_noncore_dpll_enable+0xdc/0
-> > x10c()
-> > [   10.568450] Modules linked in:
-> > [   10.568481] CPU: 0 PID: 1 Comm: swapper/0 Tainted: G        W       3.19.0-rc6-next-20150202 #2037
-> > [   10.568481] Hardware name: Generic OMAP4 (Flattened Device Tree)
-> > [   10.568481] [<c0015bdc>] (unwind_backtrace) from [<c001222c>] (show_stack+0x10/0x14)
-> > [   10.568511] [<c001222c>] (show_stack) from [<c05d2014>] (dump_stack+0x84/0x9c)
-> > [   10.568511] [<c05d2014>] (dump_stack) from [<c003ea90>] (warn_slowpath_common+0x7c/0xb8)
-> > [   10.568511] [<c003ea90>] (warn_slowpath_common) from [<c003eb68>] (warn_slowpath_null+0x1c/0x24)
-> > [   10.568542] [<c003eb68>] (warn_slowpath_null) from [<c0035800>] (omap3_noncore_dpll_enable+0xdc/0x10c)
-> > [   10.568542] [<c0035800>] (omap3_noncore_dpll_enable) from [<c04c0a10>] (clk_core_enable+0x60/0x9c)
-> > [   10.568572] [<c04c0a10>] (clk_core_enable) from [<c04c09f0>] (clk_core_enable+0x40/0x9c)
-> > [   10.568572] ---[ end trace cb88537fdc8fa212 ]---
-> > ...
-> 
-> This is the same issue discussed already in this thread[0]. Feedback
-> from Tero & Paul on how to handle it would be nice.
+Here is the older message, for the record:
+"
+This is a batch of cleanup/soc modifications that you may also stack on top of
+your "soc" branch as the previous one.
+It collects some more cleanup material and simplifies the AT91 boot code. Only
+some little details remain before having a classical DT boot (without
+additional
+mapping of registers for instance). This part will be addressed in 3.21.
 
-Yes that one is a separate issue.
- 
-> Please let me know if anything else breaks for you.
+The switch to multi-platform is not included as it needs some patches in ASoC,
+ata and arm-soc/next/drivers to be able to compile. I may send patches or a
+pull-request that can be send to Linus late during the merge-window. Tell me
+how you feel it can be done (or delayed to 3.21).
 
-Also off-idle on omap3 seems to be broken by commit 59cf3fcf9baf.
+The conflict related to the rename of board-dt-sama5.c => sama5.c is solved in
+this branch:
+https://git.kernel.org/cgit/linux/kernel/git/nferre/linux-at91.git/log/?h=arm-soc-for-next%2bat91-3.20-cleanup
+"
 
-Regards,
+Thanks, best regards,
 
-Tony
+The following changes since commit 980657d8cdff97343619cf2e3332b8307e9d07ea:
+
+  Merge tag 'at91-cleanup3' into at91-3.20-soc (2015-02-02 10:59:34 +0100)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-soc4
+
+for you to fetch changes up to ad3fc3e316891cbc4f33116a61c57c4a9b2a2518:
+
+  ARM: at91/trivial: unify functions and machine names (2015-02-02 11:01:29 +0100)
+
+----------------------------------------------------------------
+Fourth cleanup/soc batch for 3.20:
+- merge all the at91sam9 code and remove the empty SoC-specific files
+- remove the at91_boot_soc that is now useless in a DT context
+- move the sram code in PM code as it's now only used there
+- some file + function name changes after this big cleanup
+
+----------------------------------------------------------------
+Alexandre Belloni (4):
+      ARM: at91: at91rm9200: set idle and restart from rm9200_dt_device_init()
+      ARM: at91: merge all SOC_AT91SAM9xxx
+      ARM: at91: remove at91_boot_soc
+      ARM: at91: remove at91_dt_initialize and machine init_early()
+
+Nicolas Ferre (3):
+      ARM: at91: move alternative initial mapping to board-dt-sama5.c
+      ARM: at91: change board files into SoC files
+      ARM: at91/trivial: unify functions and machine names
+
+ arch/arm/configs/at91_dt_defconfig                 | 10 +--
+ arch/arm/mach-at91/Kconfig                         | 92 ++++++----------------
+ arch/arm/mach-at91/Makefile                        | 18 +----
+ arch/arm/mach-at91/at91rm9200.c                    | 57 +++++++++-----
+ arch/arm/mach-at91/{board-dt-sam9.c => at91sam9.c} | 33 ++++----
+ arch/arm/mach-at91/at91sam9260.c                   | 26 ------
+ arch/arm/mach-at91/at91sam9261.c                   | 25 ------
+ arch/arm/mach-at91/at91sam9263.c                   | 24 ------
+ arch/arm/mach-at91/at91sam9g45.c                   | 24 ------
+ arch/arm/mach-at91/at91sam9n12.c                   | 20 -----
+ arch/arm/mach-at91/at91sam9rl.c                    | 25 ------
+ arch/arm/mach-at91/at91sam9x5.c                    | 20 -----
+ arch/arm/mach-at91/board-dt-rm9200.c               | 54 -------------
+ arch/arm/mach-at91/generic.h                       | 19 ++---
+ arch/arm/mach-at91/include/mach/cpu.h              | 52 ++++--------
+ arch/arm/mach-at91/pm.c                            | 52 +++++++++++-
+ arch/arm/mach-at91/{board-dt-sama5.c => sama5.c}   | 47 +++++++++--
+ arch/arm/mach-at91/sama5d3.c                       | 29 -------
+ arch/arm/mach-at91/sama5d4.c                       | 63 ---------------
+ arch/arm/mach-at91/setup.c                         | 77 ------------------
+ arch/arm/mach-at91/soc.h                           | 77 ------------------
+ 21 files changed, 193 insertions(+), 651 deletions(-)
+ rename arch/arm/mach-at91/{board-dt-sam9.c => at91sam9.c} (63%)
+ delete mode 100644 arch/arm/mach-at91/at91sam9260.c
+ delete mode 100644 arch/arm/mach-at91/at91sam9261.c
+ delete mode 100644 arch/arm/mach-at91/at91sam9263.c
+ delete mode 100644 arch/arm/mach-at91/at91sam9g45.c
+ delete mode 100644 arch/arm/mach-at91/at91sam9n12.c
+ delete mode 100644 arch/arm/mach-at91/at91sam9rl.c
+ delete mode 100644 arch/arm/mach-at91/at91sam9x5.c
+ delete mode 100644 arch/arm/mach-at91/board-dt-rm9200.c
+ rename arch/arm/mach-at91/{board-dt-sama5.c => sama5.c} (54%)
+ delete mode 100644 arch/arm/mach-at91/sama5d3.c
+ delete mode 100644 arch/arm/mach-at91/sama5d4.c
+ delete mode 100644 arch/arm/mach-at91/soc.h
+
+-- 
+Nicolas Ferre
