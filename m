@@ -1,78 +1,51 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 2 Feb 2015 13:40:51 +0000
-Subject: [PATCH v3 5/5] ARM: dts: Alpine platform devicetree
-In-Reply-To: <54cf5d8c.sl7aclyeuuh66jXt%tsahee@annapurnalabs.com>
-References: <54cf5d8c.sl7aclyeuuh66jXt%tsahee@annapurnalabs.com>
-Message-ID: <20150202134051.GB21175@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 2 Feb 2015 13:45:12 +0000
+Subject: [PATCH 2/2] coresight: Adding coresight support to arm64
+In-Reply-To: <1422658466-23984-3-git-send-email-mathieu.poirier@linaro.org>
+References: <1422658466-23984-1-git-send-email-mathieu.poirier@linaro.org>
+ <1422658466-23984-3-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <20150202134512.GE31847@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 02, 2015 at 11:20:44AM +0000, Tsahee Zidenberg wrote:
-> This patch introduces devicetree for the Alpine platform, and
-> for a development board based on the same platform.
+On Fri, Jan 30, 2015 at 10:54:26PM +0000, mathieu.poirier at linaro.org wrote:
+> From: Mathieu Poirier <mathieu.poirier@linaro.org>
 > 
-> Signed-off-by: Barak Wasserstrom <barak@annapurnalabs.com>
-> Signed-off-by: Tsahee Zidenberg <tsahee@annapurnalabs.com>
+> Aside from tracers, all currently supported coresight IP blocks
+> are 64 bit ready.  As such add the required symbol definition to
+> compile the framework and drivers.
+> 
+> Also fixing a couple of warnings picked up by the 64bit compiler.
+> 
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 > ---
->  arch/arm/boot/dts/Makefile      |   4 ++
->  arch/arm/boot/dts/alpine-db.dts |  35 ++++++++++
->  arch/arm/boot/dts/alpine.dtsi   | 141 ++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 180 insertions(+)
->  create mode 100644 arch/arm/boot/dts/alpine-db.dts
->  create mode 100644 arch/arm/boot/dts/alpine.dtsi
+>  arch/arm64/Kconfig.debug            | 48 +++++++++++++++++++++++++++++++++++++
+>  drivers/coresight/coresight-etb10.c |  2 +-
+>  drivers/coresight/coresight-tmc.c   |  2 +-
+>  3 files changed, 50 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+> index 5fdd6dce8061..77dfebbcbffe 100644
+> --- a/arch/arm64/Kconfig.debug
+> +++ b/arch/arm64/Kconfig.debug
+> @@ -66,4 +66,52 @@ config DEBUG_SET_MODULE_RONX
+>            against certain classes of kernel exploits.
+>            If in doubt, say "N".
+>  
+> +menuconfig CORESIGHT
+> +	bool "CoreSight Tracing Support"
+> +	select ARM_AMBA
+> +	help
+> +	  This framework provides a kernel interface for the CoreSight debug
+> +	  and trace drivers to register themselves with. It's intended to build
+> +	  a topological view of the CoreSight components based on a DT
+> +	  specification and configure the right serie of components when a
+> +	  trace source gets enabled.
 
-[...]
+Why does this need to be duplicated by each architecture wanting to make
+use of coresight capabilities defined under drivers/coresight? Can't we
+instead have this menuconfig and associated suboptions defined by a core
+Kconfig file, then have HAVE_ARCH_CORESIGHT_TRACE or something which can
+be selected by architectures wanting to make use of the framework?
 
-> +	soc {
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		compatible = "simple-bus";
-> +		interrupt-parent = <&gic>;
-> +		ranges;
-> +
-> +		arch-timer {
-> +			compatible = "arm,cortex-a15-timer",
-> +				     "arm,armv7-timer";
-> +			interrupts =
-> +				<GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-> +				<GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-> +				<GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-> +				<GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-> +			clock-frequency = <0>; /* Filled by loader */
-
-Your loader doesn't configure CNTFRQ?
-
-> +		};
-> +
-> +		/* Interrupt Controller */
-> +		gic: gic at fb001000 {
-> +			compatible = "arm,cortex-a15-gic";
-> +			#interrupt-cells = <3>;
-> +			#size-cells = <0>;
-> +			#address-cells = <0>;
-> +			interrupt-controller;
-> +			reg = <0x0 0xfb001000 0x0 0x1000>,
-> +			      <0x0 0xfb002000 0x0 0x2000>,
-> +			      <0x0 0xfb004000 0x0 0x1000>,
-> +			      <0x0 0xfb006000 0x0 0x2000>;
-> +			interrupts =
-> +				<GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-> +		};
-> +
-> +		/* CPU Resume registers */
-> +		cpu-resume at fbff5ec0 {
-> +			compatible = "al,alpine-cpu-resume";
-> +			reg = <0x0 0xfbff5ec0 0x0 0x30>;
-> +		};
-> +
-> +		/* North Bridge Service Registers */
-> +		sysfabric-service at fb070000 {
-> +			compatible = "al,alpine-sysfabric-service", "syscon", "simple-bus";
-> +			reg = <0x0 0xfb070000 0x0 0x10000>;
-> +		};
-
-That compatible list makes no sense whatsoever.
-
-Why is "simple-bus" on the end?
-
-Mark.
+Will
