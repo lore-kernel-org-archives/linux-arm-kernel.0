@@ -1,61 +1,36 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Mon, 2 Feb 2015 15:07:42 -0600
-Subject: [PATCH v7 1/4] Documentation: dt: add common bindings for
- hwspinlock
-In-Reply-To: <CAJAp7OjVULNRd113TtOEwaa6QO-XCDa0oxBm2H5NPvp_kLTSpA@mail.gmail.com>
-References: <1421269101-51105-1-git-send-email-s-anna@ti.com>	<1421269101-51105-2-git-send-email-s-anna@ti.com>	<20150115135201.GG16217@leverpostej>	<20150115135556.GH16217@leverpostej>	<CAL_JsqL2LZAooMk-V8+xeF2g6acZE21M+-OBRw8aEVa-5wVHuQ@mail.gmail.com>	<CAK=WgbYQ=BbinqJ5fsw2Y+FKdy=nasLsw9mX8pw6S_o3owy9-g@mail.gmail.com>	<20150116101746.GA21809@leverpostej>	<CAK=WgbYBqPoUm9byx0du_g5ZmHdYaUVLpSPZYHoCVzNoatNKpw@mail.gmail.com>	<CAJAp7Og+-KQd7bygWQjTS72Kye3fkp3s3ry+2bw7Gcv7aPF5AQ@mail.gmail.com>	<CAK=WgbZ2986xxuAFvMSoyQLaPAxdUpZ8e5g-mSjyETfvd4KKHw@mail.gmail.com>
- <CAJAp7OjVULNRd113TtOEwaa6QO-XCDa0oxBm2H5NPvp_kLTSpA@mail.gmail.com>
-Message-ID: <54CFE71E.20905@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 02 Feb 2015 14:08:36 -0700
+Subject: [PATCH v3 01/10] ARM: tegra: Set the sound card model that alsaucm
+ expects
+In-Reply-To: <1422442278-10405-2-git-send-email-tomeu.vizoso@collabora.com>
+References: <1422442278-10405-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1422442278-10405-2-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <54CFE754.7000500@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/01/2015 11:55 AM, Bjorn Andersson wrote:
-> On Fri, Jan 30, 2015 at 9:41 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
->> On Sat, Jan 31, 2015 at 1:29 AM, Bjorn Andersson <bjorn@kryo.se> wrote:
->>> In a system where you have two hwlock blocks lckA and lckB, each
->>> consisting of 8 locks and you have dspB that can only access lckB
->>
->> This is a good example - thanks. To be able to cope with such cases we
->> will have to pass a hwlock block reference and its relative lock id.
->>
-> 
-> Correct, so the #hwlock-cells and hwlock part from the proposal are
-> the important one. Having an optional hwlock-names will make things
-> easier to read as well, but is not necessary.
+On 01/28/2015 03:50 AM, Tomeu Vizoso wrote:
+> Patches are on its way to add a config file to alsaucm for the Nyan
+> boards. Use the same card ID that alsaucm will expect.
 
-Right, if anything, it would be useful only for the clients, but the
-hwspinlock core itself would not need it. So, I would forgo adding the
-hwlock-names for now.
+> diff --git a/arch/arm/boot/dts/tegra124-nyan-big.dts b/arch/arm/boot/dts/tegra124-nyan-big.dts
 
-> 
->> The DT binding should definitely be prepared for such cases (just kill
->> the base-id field?), but let's see what it means about the Linux
->> implementation.
->>
-> 
-> From the dt binding PoV, we should be able to skip num-locks as well.
-> It seems most hwlock blocks have a fixed amount of locks provided and
-> the drivers are reporting this to the core when registering.
+>   	sound {
+> -		compatible = "nvidia,tegra-audio-max98090-nyan-big",
+> +		compatible = "nvidia,tegra-audio-max98090-nyan",
+>   			     "nvidia,tegra-audio-max98090";
 
-I added this originally based on the initial MSM HW Mutex block bindings.
+I'm not convinced that removing the board-specific compatible value is a 
+great idea. What if we find we need to distinguish between different 
+boards that use this same binding in the future. That situation is 
+exactly why we have board-/SoC-specific values in compatible even if we 
+don't immediately use them.
 
-> 
-> So I think we can reduce the binding to:
-> 
-> Providers:
-> #hwlock-cells
-> 
-> Consumers:
-> hwlocks
-> hwlock-names
-> 
-> For the hardware where number of locks is actually variable (e.g.
-> different variants of same block) there can be driver specific entries
-> for this.
+> -		nvidia,model = "Acer Chromebook 13";
+> +		nvidia,model = "GoogleNyan";
 
-Right, we should be able to drop this and use the driver match data. As
-it is, the field is used during registration of the block with the
-hwspinlock core.
+I believe this also technically breaks ABI, since some user-space tools 
+use the model to look up saved state. Can we not leave this as is, and 
+just have the UCM files know about both names?
 
-regards
-Suman
+Aside from that, I think the series looks OK at a quick glance.
