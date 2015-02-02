@@ -1,97 +1,179 @@
-From: m.jabrzyk@samsung.com (Marcin Jabrzyk)
-Date: Mon, 02 Feb 2015 09:47:29 +0100
-Subject: =?UTF-8?B?UFJPQkxFTTrCoEJVRyAgYXBwZWFyaW5nIHdoZW4gdHJ5aW5nIHQ=?=
- =?UTF-8?B?byBhbGxvY2F0ZSBpbnRlcnJ1cHQgb24gRXh5bm9zIE1DVCBhZnRlciBDUFUgaG8=?=
- =?UTF-8?B?dHBsdWc=?=
-In-Reply-To: <54CC9EB2.7010409@linaro.org>
-References: <544907D4.1020409@samsung.com>
- <20141023140644.GI27405@n2100.arm.linux.org.uk>
- <54494BEE.9020702@codeaurora.org> <544A52B0.9050901@samsung.com>
- <544EA810.6090502@codeaurora.org> <5450C391.2070007@samsung.com>
- <54CC2B18.2070809@codeaurora.org> <54CC9EB2.7010409@linaro.org>
-Message-ID: <54CF39A1.50003@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 2 Feb 2015 08:53:51 +0000
+Subject: [PATCH v9 2/5] mfd: AXP20x: Add bindings documentation
+In-Reply-To: <CAGb2v67-znKNUVJQPVJqMXhiHEyfkjBGZFPc5hW+w0ODQ+HMmg@mail.gmail.com>
+References: <1421941147-9682-1-git-send-email-wens@csie.org>
+ <1421941147-9682-3-git-send-email-wens@csie.org>
+ <20150122160252.GE9129@x1>
+ <CAGb2v67-znKNUVJQPVJqMXhiHEyfkjBGZFPc5hW+w0ODQ+HMmg@mail.gmail.com>
+Message-ID: <20150202085351.GB12723@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, 31 Jan 2015, Chen-Yu Tsai wrote:
 
+> Hi Lee,
+> 
+> On Thu, Jan 22, 2015 at 5:02 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Thu, 22 Jan 2015, Chen-Yu Tsai wrote:
+> >
+> >> From: Carlo Caione <carlo@caione.org>
+> >>
+> >> Bindings documentation for the AXP20x driver. In this file also
+> >> sub-nodes are documented.
+> >>
+> >> Signed-off-by: Carlo Caione <carlo@caione.org>
+> >> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> >> [wens at csie.org: clarify interrupt source for the axp PMIC]
+> >> [wens at csie.org: explain dcdc-workmode in detail and trim lines to 80 chars]
+> >> [wens at csie.org: make regulator supplies optional if using unregulated input]
+> >> [wens at csie.org: use cubieboard2 regulator nodes as example]
+> >> [wens at csie.org: change dcdc-workmode to dcdc-workmode-pwm boolean property]
+> >> [wens at csie.org: use clock-frequency for dcdc regulator work frequency]
+> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >> ---
+> >>  Documentation/devicetree/bindings/mfd/axp20x.txt | 102 +++++++++++++++++++++++
+> >>  1 file changed, 102 insertions(+)
+> >>  create mode 100644 Documentation/devicetree/bindings/mfd/axp20x.txt
+> >
+> > This looks okay to me now.
+> >
+> > If Mark is happy with the remainder, I'll merge this.
+> 
+> So Mark is not happy with this actually, for a few reasons:
+> 
+> 1. The driver was already merged a couple versions back, and
+>    we have been using the dcdc-freq binding.
+> 
+> 2. Furthermore, the dcdc-freq binding has nothing to do with
+>    the common clock framework. Using the clock-frequencies
+>    binding implies it does.
+> 
+> 3. The change from a integer value to a boolean flag for
+>    dcdc-mode makes it less capable, i.e. the kernel can't
+>    just accept the current state of the hardware, which
+>    should be a valid option for regulators to not screw
+>    up the system accidentally.
+> 
+> Any chance you could merge the previous version (v8)?
 
-On 31/01/15 10:21, Daniel Lezcano wrote:
-> On 01/31/2015 02:08 AM, Stephen Boyd wrote:
->> Kept meaning to get back to this thread. Have you resolved it?
->>
->> On 10/29/14 03:38, Marcin Jabrzyk wrote:
->>> So I've tried this patch, it resolves one problem but introduces also
->>> new ones. As expected the BUG warning is not showing after applying
->>> this patch but there are some interesting side effects.
->>
->> Well that's half good news.
->>
->>> I was looking on /proc/interrupts output. IRQ for CPU0 have "MCT" name
->>> and IRQ for CPU1 has unexpectedly no name at all.
->>
->> This is pretty confusing. I don't see how the patch could cause this to
->> happen.
->>
->>> After making hotplug cycle of CPU1 I've observed that IRQs attached
->>> originally for that CPU are generating on really low count and not in
->>> order with IRQ for CPU0.
->>> What's more the interrupt for CPU1 is showing to me as being counted
->>> for both CPUs, so it's probably not being attached to CPU1.
->>>
->>
->> yeah. Can you give the output of /proc/timer_list in addition to
->> /proc/interrupts? It may give some hints on what's going on. It may also
->> be interesting to see if irq_force_affinity() is failing. Please check
->> the return value and print an error
->
-> Hi Stephen, Marcin,
->
-> can you have a look if the patch [1] fixes this issue ?
->
->   -- Daniel
->
-> [1] https://lkml.org/lkml/2015/1/30/423
->
->
-Hi Daniel,
+You'll have to re-send it as v10 and obtain Acks in the normal way.
 
-I've checked this patch on the board that have problems and it fixes 
-this issue completely. Everything looks fine after power cycle of the CPU.
-
-Best regards,
-Marcin Jabrzyk
-
->> diff --git a/drivers/clocksource/exynos_mct.c
->> b/drivers/clocksource/exynos_mct.c
->> index 1800053b4644..3c4538e26731 100644
->> --- a/drivers/clocksource/exynos_mct.c
->> +++ b/drivers/clocksource/exynos_mct.c
->> @@ -450,6 +450,7 @@ static int exynos4_local_timer_setup(struct
->> clock_event_device *evt)
->>   {
->>       struct mct_clock_event_device *mevt;
->>       unsigned int cpu = smp_processor_id();
->> +    int ret;
->>
->>       mevt = container_of(evt, struct mct_clock_event_device, evt);
->>
->> @@ -468,7 +469,9 @@ static int exynos4_local_timer_setup(struct
->> clock_event_device *evt)
->>       if (mct_int_type == MCT_INT_SPI) {
->>           evt->irq = mct_irqs[MCT_L0_IRQ + cpu];
->>           enable_irq(evt->irq);
->> -        irq_force_affinity(mct_irqs[MCT_L0_IRQ + cpu], cpumask_of(cpu));
->> +        ret = irq_force_affinity(mct_irqs[MCT_L0_IRQ + cpu],
->> cpumask_of(cpu));
->> +        if (ret)
->> +            pr_err("force failed %d\n", ret);
->>       } else {
->>           enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
->>       }
->>
->
->
+> > For my own reference:
+> > Acked-by: Lee Jones <lee.jones@linaro.org>
+> >
+> >> diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+> >> new file mode 100644
+> >> index 000000000000..c3c80db242c7
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+> >> @@ -0,0 +1,102 @@
+> >> +AXP202/AXP209 device tree bindings
+> >> +
+> >> +The axp20x family current members :
+> >> +axp202 (X-Powers)
+> >> +axp209 (X-Powers)
+> >> +
+> >> +Required properties:
+> >> +- compatible: "x-powers,axp202" or "x-powers,axp209"
+> >> +- reg: The I2C slave address for the AXP chip
+> >> +- interrupt-parent: The parent interrupt controller
+> >> +- interrupts: SoC NMI / GPIO interrupt connected to the PMIC's IRQ pin
+> >> +- interrupt-controller: axp20x has its own internal IRQs
+> >> +- #interrupt-cells: Should be set to 1
+> >> +- regulators: A node that houses a sub-node for each regulator. The regulators
+> >> +           are bound using their name as listed here: dcdc2, dcdc3, ldo1,
+> >> +           ldo2, ldo3, ldo4, ldo5.  The bindings details of individual
+> >> +           regulator device can be found in:
+> >> +           Documentation/devicetree/bindings/regulator/regulator.txt with
+> >> +           the exception of x-powers,dcdc-freq. Regulators not used should
+> >> +           still be listed for completeness and that the regulator subsystem
+> >> +           properly registers them.
+> >> +
+> >> +Optional properties:
+> >> +- regulator supplies - may be omitted if inputs are unregulated, such as using
+> >> +                    the IPSOUT output from the PMIC
+> >> +  - acin-supply: The input supply for LDO1
+> >> +  - vin2-supply: The input supply for DCDC2
+> >> +  - vin3-supply: The input supply for DCDC3
+> >> +  - ldo24in-supply: The input supply for LDO2, LDO4
+> >> +  - ldo3in-supply: The input supply for LDO3
+> >> +  - ldo5in-supply: The input supply for LDO5
+> >> +
+> >> +Optional properties for regulators node:
+> >> +- clock-frequency: defines the work frequency of DC-DC regulators
+> >> +                (range: 750kHz - 1875kHz). Default: 1.5MHz
+> >> +
+> >> +Optional properties for DCDC regulators:
+> >> +- x-powers,dcdc-workmode-pwm: Force the DCDC regulators to run in PWM mode
+> >> +                           The DCDC regulators rormally work in a mixed
+> >> +                           PWM/PFM mode, using PFM under light loads and
+> >> +                           switching to PWM for heavier loads. Forcing
+> >> +                           PWM mode trades efficiency under light loads
+> >> +                           for lower output noise. This probably makes
+> >> +                           sense for HiFi audio related applications that
+> >> +                           aren't battery constrained.
+> >> +
+> >> +Example:
+> >> +
+> >> +axp209: pmic at 34 {
+> >> +     compatible = "x-powers,axp209";
+> >> +     reg = <0x34>;
+> >> +     interrupt-parent = <&nmi_intc>;
+> >> +     interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+> >> +     interrupt-controller;
+> >> +     #interrupt-cells = <1>;
+> >> +
+> >> +     regulators {
+> >> +             clock-frequency = <1500000>;
+> >> +
+> >> +             vdd_cpu: dcdc2 {
+> >> +                     regulator-always-on;
+> >> +                     regulator-min-microvolt = <1000000>;
+> >> +                     regulator-max-microvolt = <1450000>;
+> >> +                     regulator-name = "vdd-cpu";
+> >> +             };
+> >> +
+> >> +             vdd_int_dll: dcdc3 {
+> >> +                     regulator-always-on;
+> >> +                     regulator-min-microvolt = <1000000>;
+> >> +                     regulator-max-microvolt = <1400000>;
+> >> +                     regulator-name = "vdd-int-dll";
+> >> +             };
+> >> +
+> >> +             vdd_rtc: ldo1 {
+> >> +                     regulator-always-on;
+> >> +                     regulator-min-microvolt = <1200000>;
+> >> +                     regulator-max-microvolt = <1400000>;
+> >> +                     regulator-name = "vdd-rtc";
+> >> +             };
+> >> +
+> >> +             avcc: ldo2 {
+> >> +                     regulator-always-on;
+> >> +                     regulator-min-microvolt = <2700000>;
+> >> +                     regulator-max-microvolt = <3300000>;
+> >> +                     regulator-name = "avcc";
+> >> +             };
+> >> +
+> >> +             ldo3 {
+> >> +                     /* unused */
+> >> +             };
+> >> +
+> >> +             csi1_io_2v8: ldo4 {
+> >> +                     /* output on extension headers */
+> >> +                     regulator-name = "csi1-io-2v8";
+> >> +             };
+> >> +
+> >> +             ldo5 {
+> >> +                     /* unused */
+> >> +             };
+> >> +     };
+> >> +};
+> >> +
+> >
 
 -- 
-Samsung R&D Institute Poland
-Samsung Electronics
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
