@@ -1,101 +1,50 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Mon, 2 Feb 2015 22:31:29 +0100 (CET)
-Subject: [PATCH v13 3/6] clk: Make clk API return per-user struct clk
- instances
-In-Reply-To: <54CFE1FE.7040404@codeaurora.org>
-References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
- <1422011024-32283-4-git-send-email-tomeu.vizoso@collabora.com>
- <20150201212432.22722.70917@quantum> <54CFE1FE.7040404@codeaurora.org>
-Message-ID: <alpine.DEB.2.02.1502022230110.2045@localhost6.localdomain6>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 2 Feb 2015 21:46:16 +0000
+Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher
+ constraints with dma-parms
+In-Reply-To: <CAF6AEGuESM+e3HSRGM6zLqrp8kqRLGUYvA3KKECdm7m-nt0M=Q@mail.gmail.com>
+References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
+ <1422347154-15258-2-git-send-email-sumit.semwal@linaro.org>
+ <20150129143908.GA26493@n2100.arm.linux.org.uk>
+ <CAO_48GEOQ1pBwirgEWeVVXW-iOmaC=Xerr2VyYYz9t1QDXgVsw@mail.gmail.com>
+ <20150129154718.GB26493@n2100.arm.linux.org.uk>
+ <CAF6AEGtTmFg66TK_AFkQ-xp7Nd9Evk3nqe6xCBp7K=77OmXTxA@mail.gmail.com>
+ <20150129192610.GE26493@n2100.arm.linux.org.uk>
+ <CAF6AEGujk8UC4X6T=yhTrz1s+SyZUQ=m05h_WcxLDGZU6bydbw@mail.gmail.com>
+ <20150202165405.GX14009@phenom.ffwll.local>
+ <CAF6AEGuESM+e3HSRGM6zLqrp8kqRLGUYvA3KKECdm7m-nt0M=Q@mail.gmail.com>
+Message-ID: <20150202214616.GI8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Mon, 2 Feb 2015, Stephen Boyd wrote:
-
-> On 02/01/15 13:24, Mike Turquette wrote:
-> > Quoting Tomeu Vizoso (2015-01-23 03:03:30)
-> >> Moves clock state to struct clk_core, but takes care to change as little API as
-> >> possible.
-> >>
-> >> struct clk_hw still has a pointer to a struct clk, which is the
-> >> implementation's per-user clk instance, for backwards compatibility.
-> >>
-> >> The struct clk that clk_get_parent() returns isn't owned by the caller, but by
-> >> the clock implementation, so the former shouldn't call clk_put() on it.
-> >>
-> >> Because some boards in mach-omap2 still register clocks statically, their clock
-> >> registration had to be updated to take into account that the clock information
-> >> is stored in struct clk_core now.
-> > Tero, Paul & Tony,
+On Mon, Feb 02, 2015 at 03:30:21PM -0500, Rob Clark wrote:
+> On Mon, Feb 2, 2015 at 11:54 AM, Daniel Vetter <daniel@ffwll.ch> wrote:
+> >> My initial thought is for dma-buf to not try to prevent something than
+> >> an exporter can actually do.. I think the scenario you describe could
+> >> be handled by two sg-lists, if the exporter was clever enough.
 > >
-> > Tomeu's patch unveils a problem with omap3_noncore_dpll_enable and
-> > struct dpll_data, namely this snippet from
-> > arch/arm/mach-omap2/dpll3xxx.c:
-> >
-> >         parent = __clk_get_parent(hw->clk);
-> >
-> >         if (__clk_get_rate(hw->clk) == __clk_get_rate(dd->clk_bypass)) {
-> >                 WARN(parent != dd->clk_bypass,
-> >                                 "here0, parent name is %s, bypass name is %s\n",
-> >                                 __clk_get_name(parent), __clk_get_name(dd->clk_bypass));
-> >                 r = _omap3_noncore_dpll_bypass(clk);
-> >         } else {
-> >                 WARN(parent != dd->clk_ref,
-> >                                 "here1, parent name is %s, ref name is %s\n",
-> >                                 __clk_get_name(parent), __clk_get_name(dd->clk_ref));
-> >                 r = _omap3_noncore_dpll_lock(clk);
-> >         }
-> >
-> > struct dpll_data has members clk_ref and clk_bypass which are struct clk
-> > pointers. This was always a bit of a violation of the clk.h contract
-> > since drivers are not supposed to deref struct clk pointers. 
-> 
-> Julia,
-> 
-> Is there a way we can write a coccinelle script to check for this? The
-> goal being to find all drivers that are comparing struct clk pointers or
-> attempting to dereference them. There are probably other frameworks that
-> could use the same type of check (regulator, gpiod, reset, pwm, etc.).
-> Probably anything that has a get/put API.
-
-Comparing or dereferencing pointers of a particular type should be 
-straightforward to check for.  Is there an example of how to use the 
-parent_index value to fix the problem?
-
-julia
-
-
-> 
-> -Stephen
-> 
-> > Now that we
-> > generate unique pointers for each call to clk_get (clk_ref & clk_bypass
-> > are populated by of_clk_get in ti_clk_register_dpll) then the pointer
-> > comparisons above will never be equal (even if they resolve down to the
-> > same struct clk_core). I added the verbose traces to the WARNs above to
-> > illustrate the point: the names are always the same but the pointers
-> > differ.
-> >
-> > AFAICT this doesn't break anything, but booting on OMAP3+ results in
-> > noisy WARNs.
-> >
-> > I think the correct fix is to replace clk_bypass and clk_ref pointers
-> > with a simple integer parent_index. In fact we already have this index.
-> > See how the pointers are populated in ti_clk_register_dpll:
-> >
-> >
-> >         dd->clk_ref = of_clk_get(node, 0);
-> >         dd->clk_bypass = of_clk_get(node, 1);
-> >
-> > Tony, the same problem affects the FAPLL code which copy/pastes some of
-> > the DPLL code.
-> >
-> > Thoughts?
-> >
-> -- 
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+> > That's already needed, each attachment has it's own sg-list. After all
+> > there's no array of dma_addr_t in the sg tables, so you can't use one sg
+> > for more than one mapping. And due to different iommu different devices
+> > can easily end up with different addresses.
 > 
 > 
+> Well, to be fair it may not be explicitly stated, but currently one
+> should assume the dma_addr_t's in the dmabuf sglist are bogus.  With
+> gpu's that implement per-process/context page tables, I'm not really
+> sure that there is a sane way to actually do anything else..
+
+That's incorrect - and goes dead against the design of scatterlists.
+
+Not only that, but it is entirely possible that you may get handed
+memory via dmabufs for which there are no struct page's associated
+with that memory - think about display systems which have their own
+video memory which is accessible to the GPU, but it isn't system
+memory.
+
+In those circumstances, you have to use the dma_addr_t's and not the
+pages.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
