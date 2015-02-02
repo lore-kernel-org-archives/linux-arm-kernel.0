@@ -1,41 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 02 Feb 2015 15:58:49 +0100
-Subject: [PATCH v2] mmc: moxart: fix probe logic
-In-Reply-To: <CACmBeS0RGJUzqztQLZtHyTYgCd=jpAoYYk-roH7_VLbfy-+ftw@mail.gmail.com>
-References: <8340872.32GezMfzR1@wuerfel> <1862200.Pj3heKAtuk@wuerfel>
- <CACmBeS0RGJUzqztQLZtHyTYgCd=jpAoYYk-roH7_VLbfy-+ftw@mail.gmail.com>
-Message-ID: <4754899.RDUhFfxBSW@wuerfel>
+From: petr.cvek@tul.cz (Petr Cvek)
+Date: Mon, 02 Feb 2015 16:00:01 +0100
+Subject: [PATCH v2, RFC] RTC: PXA: Fix regression of interrupt before
+ ioremap
+In-Reply-To: <87fvatnzl7.fsf@free.fr>
+References: <54CA1ECA.8050000@tul.cz> <87fvatnzl7.fsf@free.fr>
+Message-ID: <54CF90F1.4020703@tul.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 02 February 2015 11:52:44 Jonas Jensen wrote:
-> 
-> On 29 January 2015 at 23:06, Arnd Bergmann <arnd@arndb.de> wrote:
-> > Jonas Jensen wanted to submit a patch for these, but apparently
-> > forgot about it. I stumbled over this symptom first:
-> 
-> Sorry about this, I remember thinking about the changes but only made
-> a mental note (which was lost over time). I was sidetracked with other
-> changes and work.
-> 
-> 
-> > @@ -586,10 +586,10 @@ static int moxart_probe(struct platform_device *pdev)
-> >                 goto out;
-> >         }
-> >
-> > -       clk = of_clk_get(node, 0);
-> > -       if (IS_ERR(clk)) {
-> > +       host->clk = of_clk_get(node, 0);
-> 
-> host->clk is a NULL dereference at this point in probe() (log below).
-> 
-> I moved the single line "host = mmc_priv(mmc);" to happen just before,
-> and everything is working normally again.
+I agree that driver without .open looks ugly, but only thing in rtc-pxa 
+.open were two request_irq and I don't think it is good idea to have 
+them there (interrupts should be disabled trough register settings and 
+not by handler freeing).
 
-Thanks a lot for testing, and finding the second embarrassing bug
-in my patch!
+I'm not familiar with the linux RTC subsystem, so I don't know if it is 
+OK to get interrupt (and rtc_update_irq) without opened /dev/rtc. 
+Intuitively I have feeling it is OK, but even if not disabling can be 
+done with some register flag.
 
-Can you forward the patch you successfully tested with your
-Signed-off-by?
+BTW It seems that kernel have only around 9 drivers in drivers/rtc which 
+contain .open function.
 
-	Arnd
+OT: rtc-sa1100 seems to be compatible with PXAxxx (it is even in 
+Kconfig). Are there any reasons to have two drivers for one SoC?
+
+Petr
+
+On 29.1.2015 20:42, Robert Jarzmik wrote:
+> Petr Cvek <petr.cvek@tul.cz> writes:
+>
+>> Interrupts appear before register set of the PXA2xx RTC controller is ioremaped.
+>>
+>> This fixes regression from:
+>>    'commit a44802f8fb7e593adabc6ef53c8df45a1717fa9b ("drivers/rtc/rtc-pxa.c: fix alarm can't wake up system issue")'
+>>    'commit 2f6e5f9458646263d3d9ffadd5e11e3d8d15a7d0 ("drivers/rtc: remove IRQF_DISABLED")'
+>>
+>> Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
+>
+> No sorry, I don't like this.
+> It's not your patch I don't like, it fixes a real problem, but what happens then
+> if :
+>   - kernel boots
+>   - a process opens /dev/rtc0
+>
+> The real issue is with patch a44802f "drivers/rtc/rtc-pxa.c: fix alarm can't
+> wake up system issue". I'd rather have you revert a44802f, which makes no sense
+> to me ...
+>
+> Leo if you want to comment on it, feel free, and tell me if you tried your patch
+> with the code in Documentation/rtc.txt ?
+>
+> Cheers.
+>
+> --
+> Robert
+>
