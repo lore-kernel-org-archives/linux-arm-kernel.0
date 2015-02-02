@@ -1,48 +1,46 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon,  2 Feb 2015 20:45:30 +0800
-Subject: [PATCH v8 02/21] acpi: fix acpi_os_ioremap for arm64
+Date: Mon,  2 Feb 2015 20:45:31 +0800
+Subject: [PATCH v8 03/21] arm64: allow late use of early_ioremap
 In-Reply-To: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
 References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1422881149-8177-3-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1422881149-8177-4-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Mark Salter <msalter@redhat.com>
 
-The acpi_os_ioremap() function may be used to map normal RAM or IO
-regions. The current implementation simply uses ioremap_cache(). This
-will work for some architectures, but arm64 ioremap_cache() cannot be
-used to map IO regions which don't support caching. So for arm64, use
-ioremap() for non-RAM regions.
+Commit 0e63ea48b4d8 (arm64/efi: add missing call to early_ioremap_reset())
+added a missing call to early_ioremap_reset(). This triggers a BUG if code
+tries using early_ioremap() after the early_ioremap_reset(). This is a
+problem for some ACPI code which needs short-lived temporary mappings
+after paging_init() but before acpi_early_init() in start_kernel(). This
+patch adds definitions for the __late_set_fixmap() and __late_clear_fixmap()
+which avoids the BUG by allowing later use of early_ioremap().
 
-CC: Rafael J Wysocki <rjw@rjwysocki.net>
+CC: Leif Lindholm <leif.lindholm@linaro.org>
+CC: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
+Tested-by: Jon Masters <jcm@redhat.com>
 Signed-off-by: Mark Salter <msalter@redhat.com>
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- include/acpi/acpi_io.h | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm64/include/asm/fixmap.h | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/include/acpi/acpi_io.h b/include/acpi/acpi_io.h
-index 444671e..9d573db 100644
---- a/include/acpi/acpi_io.h
-+++ b/include/acpi/acpi_io.h
-@@ -1,11 +1,17 @@
- #ifndef _ACPI_IO_H_
- #define _ACPI_IO_H_
+diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
+index 9ef6eca..e629c70 100644
+--- a/arch/arm64/include/asm/fixmap.h
++++ b/arch/arm64/include/asm/fixmap.h
+@@ -61,6 +61,9 @@ void __init early_fixmap_init(void);
  
-+#include <linux/mm.h>
- #include <linux/io.h>
+ #define __early_set_fixmap __set_fixmap
  
- static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
- 					    acpi_size size)
- {
-+#ifdef CONFIG_ARM64
-+	if (!page_is_ram(phys >> PAGE_SHIFT))
-+		return ioremap(phys, size);
-+#endif
++#define __late_set_fixmap __set_fixmap
++#define __late_clear_fixmap(idx) __set_fixmap((idx), 0, FIXMAP_PAGE_CLEAR)
 +
-        return ioremap_cache(phys, size);
- }
+ extern void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot);
  
+ #include <asm-generic/fixmap.h>
 -- 
 1.9.1
