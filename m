@@ -1,71 +1,83 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 2 Feb 2015 15:06:16 -0700
-Subject: [PATCH 2/2] coresight: Adding coresight support to arm64
-In-Reply-To: <20150202134512.GE31847@arm.com>
-References: <1422658466-23984-1-git-send-email-mathieu.poirier@linaro.org>
- <1422658466-23984-3-git-send-email-mathieu.poirier@linaro.org>
- <20150202134512.GE31847@arm.com>
-Message-ID: <CANLsYky9_ptcvihnKNVvrAH_iB4wA57m4OSwVsYANX3q28gc0g@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 03 Feb 2015 01:10:57 +0300
+Subject: [PATCH] ARM: shmobile: alt dts: Drop console= bootargs parameter
+In-Reply-To: <20150131041731.GA7605@verge.net.au>
+References: <1415075018-27529-1-git-send-email-horms+renesas@verge.net.au>
+ <54CBFC63.4070808@cogentembedded.com> <20150131041731.GA7605@verge.net.au>
+Message-ID: <54CFF5F1.2040007@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 February 2015 at 06:45, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Jan 30, 2015 at 10:54:26PM +0000, mathieu.poirier at linaro.org wrote:
->> From: Mathieu Poirier <mathieu.poirier@linaro.org>
->>
->> Aside from tracers, all currently supported coresight IP blocks
->> are 64 bit ready.  As such add the required symbol definition to
->> compile the framework and drivers.
->>
->> Also fixing a couple of warnings picked up by the 64bit compiler.
->>
->> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->> ---
->>  arch/arm64/Kconfig.debug            | 48 +++++++++++++++++++++++++++++++++++++
->>  drivers/coresight/coresight-etb10.c |  2 +-
->>  drivers/coresight/coresight-tmc.c   |  2 +-
->>  3 files changed, 50 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
->> index 5fdd6dce8061..77dfebbcbffe 100644
->> --- a/arch/arm64/Kconfig.debug
->> +++ b/arch/arm64/Kconfig.debug
->> @@ -66,4 +66,52 @@ config DEBUG_SET_MODULE_RONX
->>            against certain classes of kernel exploits.
->>            If in doubt, say "N".
->>
->> +menuconfig CORESIGHT
->> +     bool "CoreSight Tracing Support"
->> +     select ARM_AMBA
->> +     help
->> +       This framework provides a kernel interface for the CoreSight debug
->> +       and trace drivers to register themselves with. It's intended to build
->> +       a topological view of the CoreSight components based on a DT
->> +       specification and configure the right serie of components when a
->> +       trace source gets enabled.
->
-> Why does this need to be duplicated by each architecture wanting to make
-> use of coresight capabilities defined under drivers/coresight? Can't we
-> instead have this menuconfig and associated suboptions defined by a core
-> Kconfig file, then have HAVE_ARCH_CORESIGHT_TRACE or something which can
-> be selected by architectures wanting to make use of the framework?
->
-> Will
+Hello.
 
-"arch/arm/Kconfig.debug" and "arch/arm64/Kconfig.debug" already have a
-fair amount of duplication so I wasn't sure if this is the approach
-you guys wanted to take.  I agree that a common core Kconfig file
-would make much more sense and I see a couple of ways to do this:
+On 01/31/2015 07:17 AM, Simon Horman wrote:
 
-1) lib/Kconfig.debug being sourced by both arm/Kconfig.debug and
-arm64/Kconfig.debug.  We can add a lib/Kconfig.coresight or
-lib/Kconfig.arm and source them the same way.
+>>> Alt is booted from DT, so chosen/stdout-path is
+>>> always used, and we can drop the "console=" parameter from chosen/bootargs.
 
-2) Adding coresight entries to the Kconfig.debug made sense a while
-back.  Maybe it is time to move them to drivers/coresight/Kconfig...
-That way it would be easily accessible by both arm and arm64.
+>>> This change has a side-effect of changing the console speed from 38400
+>>> to 115200. This is intentional as 115200 is consistently used on
+>>> all other shmobile boards.
 
-You may have ideas of your own too...
+>>     I'd say it's not very practical to change the console's baud rate from
+>> U-Boot's default
 
-Thanks,
-Mathieu
+> It is consistent with the handling of all other boards with
+> renesas SoCs that are present in mainline.
+
+    Well, not quite: Henninger/Porter is still using 38400.
+
+>> (AFAIR changing baud rate in U-Boot didn't work)...
+
+    That was a recollection from the other board though, I haven't yet tried 
+to do it on the SILK board (and I'm unable to currently as the power supply 
+seems dead).
+
+> Perhaps that relates to the version of built of uboot.
+> On the board I have access to I see:
+
+> ver=U-Boot 2013.01.01-g5df9446 (Oct 01 2014 - 14:59:23)
+
+U-Boot 2013.01.01 (Oct 17 2014 - 20:59:18)
+
+> And the following setting altered the baud rate of u-boot (IIRC).
+
+> baudrate=115200
+
+    I was going to try that but the board just didn't power up.
+
+>>> Cc: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+>>> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+>>> Cc: devicetree at vger.kernel.org
+>>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>>> ---
+>>>   arch/arm/boot/dts/r8a7794-alt.dts | 2 +-
+>>>   1 file changed, 1 insertion(+), 1 deletion(-)
+
+>>> diff --git a/arch/arm/boot/dts/r8a7794-alt.dts b/arch/arm/boot/dts/r8a7794-alt.dts
+>>> index 8aec512..f2cf757 100644
+>>> --- a/arch/arm/boot/dts/r8a7794-alt.dts
+>>> +++ b/arch/arm/boot/dts/r8a7794-alt.dts
+>>> @@ -20,7 +20,7 @@
+>>>   	};
+>>>
+>>>   	chosen {
+>>> -		bootargs = "console=ttySC0,38400 ignore_loglevel rw root=/dev/nfs ip=dhcp";
+>>> +		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
+
+>>     Hm, does this even work as intended? I've tried to boot another R8A7794
+>> based board and I couldn't get any output with alike command line. Booting
+>> with 'earlyprintk=serial' has shown that tty0 was enabled as a console which
+>> is not what we wanted.
+
+> If you are backporting this change then I believe it has some dependencies
+> that I can follow up on if it is useful to you.
+
+    Contrariwise, I'm forward-porting.
+
+> If you are using mainline (e.g. next or renesas-next) then yes,
+> it works. I have tested it numerous times since the patch was merged.
+
+    I'm traditionally using the 'renesas-devel-*' tags.
+
+WBR, Sergei
