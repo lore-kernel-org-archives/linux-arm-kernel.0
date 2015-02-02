@@ -1,83 +1,92 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon,  2 Feb 2015 20:45:33 +0800
-Subject: [PATCH v8 05/21] ACPI / sleep: Introduce sleep_arm.c
+Date: Mon,  2 Feb 2015 20:45:34 +0800
+Subject: [PATCH v8 06/21] ARM64 / ACPI: Introduce PCI stub functions for ACPI
 In-Reply-To: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
 References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1422881149-8177-6-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1422881149-8177-7-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Graeme Gregory <graeme.gregory@linaro.org>
+CONFIG_ACPI depends CONFIG_PCI on x86 and ia64, in ARM64 server
+world we will have PCIe in most cases, but some of them may not,
+make CONFIG_ACPI depend CONFIG_PCI on ARM64 will satisfy both.
 
-ACPI 5.1 does not currently support S states for ARM64 hardware but
-ACPI code will call acpi_target_system_state() for device power
-managment, so introduce sleep_arm.c to allow other drivers to function
-until S states are defined.
+With that case, we need some arch dependent PCI functions to
+access the config space before the PCI root bridge is created, and
+pci_acpi_scan_root() to create the PCI root bus. So introduce
+some stub function here to make ACPI core compile and revisit
+them later when implemented on ARM64.
 
-CC: Rafael J. Wysocki <rjw@rjwysocki.net>
+CC: Liviu Dudau <Liviu.Dudau@arm.com>
+CC: Catalin Marinas <catalin.marinas@arm.com>
+CC: Will Deacon <will.deacon@arm.com>
 Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 Tested-by: Yijing Wang <wangyijing@huawei.com>
 Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
 Tested-by: Jon Masters <jcm@redhat.com>
 Tested-by: Timur Tabi <timur@codeaurora.org>
-Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- drivers/acpi/Makefile    |  4 ++++
- drivers/acpi/sleep_arm.c | 28 ++++++++++++++++++++++++++++
- 2 files changed, 32 insertions(+)
- create mode 100644 drivers/acpi/sleep_arm.c
+ arch/arm64/include/asm/pci.h |  6 ++++++
+ arch/arm64/kernel/pci.c      | 25 +++++++++++++++++++++++++
+ 2 files changed, 31 insertions(+)
 
-diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-index f74317c..bcec54e 100644
---- a/drivers/acpi/Makefile
-+++ b/drivers/acpi/Makefile
-@@ -23,7 +23,11 @@ acpi-y				+= nvs.o
+diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
+index 872ba93..fded096 100644
+--- a/arch/arm64/include/asm/pci.h
++++ b/arch/arm64/include/asm/pci.h
+@@ -24,6 +24,12 @@
+  */
+ #define PCI_DMA_BUS_IS_PHYS	(0)
  
- # Power management related files
- acpi-y				+= wakeup.o
-+ifeq ($(ARCH), arm64)
-+acpi-y				+= sleep_arm.o
-+else # X86, IA64
- acpi-y				+= sleep.o
-+endif
- acpi-y				+= device_pm.o
- acpi-$(CONFIG_ACPI_SLEEP)	+= proc.o
- 
-diff --git a/drivers/acpi/sleep_arm.c b/drivers/acpi/sleep_arm.c
-new file mode 100644
-index 0000000..54578ef
---- /dev/null
-+++ b/drivers/acpi/sleep_arm.c
-@@ -0,0 +1,28 @@
-+/*
-+ *  ARM64 Specific Sleep Functionality
-+ *
-+ *  Copyright (C) 2013-2014, Linaro Ltd.
-+ *      Author: Graeme Gregory <graeme.gregory@linaro.org>
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2 as
-+ *  published by the Free Software Foundation.
-+ */
++static inline int pci_get_legacy_ide_irq(struct pci_dev *dev, int channel)
++{
++	/* no legacy IRQ on arm64 */
++	return -ENODEV;
++}
 +
+ extern int isa_dma_bridge_buggy;
+ 
+ #ifdef CONFIG_PCI
+diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+index ce5836c..c17e7ea 100644
+--- a/arch/arm64/kernel/pci.c
++++ b/arch/arm64/kernel/pci.c
+@@ -10,6 +10,7 @@
+  *
+  */
+ 
 +#include <linux/acpi.h>
+ #include <linux/init.h>
+ #include <linux/io.h>
+ #include <linux/kernel.h>
+@@ -68,3 +69,27 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+ 	bus->domain_nr = domain;
+ }
+ #endif
 +
 +/*
-+ * Currently the ACPI 5.1 standard does not define S states in a
-+ * manner which is usable for ARM64. These two stubs are sufficient
-+ * that system initialises and device PM works.
++ * raw_pci_read/write - Platform-specific PCI config space access.
 + */
-+u32 acpi_target_system_state(void)
++int raw_pci_read(unsigned int domain, unsigned int bus,
++		  unsigned int devfn, int reg, int len, u32 *val)
 +{
-+	return ACPI_STATE_S0;
++	return -EINVAL;
 +}
-+EXPORT_SYMBOL_GPL(acpi_target_system_state);
 +
-+int __init acpi_sleep_init(void)
++int raw_pci_write(unsigned int domain, unsigned int bus,
++		unsigned int devfn, int reg, int len, u32 val)
 +{
-+	return -ENOSYS;
++	return -EINVAL;
 +}
++
++#ifdef CONFIG_ACPI
++/* Root bridge scanning */
++struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
++{
++	/* TODO: Should be revisited when implementing PCI on ACPI */
++	return NULL;
++}
++#endif
 -- 
 1.9.1
