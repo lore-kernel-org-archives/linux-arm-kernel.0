@@ -1,62 +1,59 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Mon, 2 Feb 2015 15:14:54 -0600
-Subject: [PATCH v7 1/4] Documentation: dt: add common bindings for
- hwspinlock
-In-Reply-To: <CAK=WgbZFZXcHuZUFVg4aAwjqzTQQxpV+Hp-DUYPKg5D8AsQ4Pg@mail.gmail.com>
-References: <1421269101-51105-1-git-send-email-s-anna@ti.com>
- <1421269101-51105-2-git-send-email-s-anna@ti.com>
- <20150115135201.GG16217@leverpostej> <20150115135556.GH16217@leverpostej>
- <CAL_JsqL2LZAooMk-V8+xeF2g6acZE21M+-OBRw8aEVa-5wVHuQ@mail.gmail.com>
- <CAK=WgbYQ=BbinqJ5fsw2Y+FKdy=nasLsw9mX8pw6S_o3owy9-g@mail.gmail.com>
- <20150116101746.GA21809@leverpostej>
- <CAK=WgbYBqPoUm9byx0du_g5ZmHdYaUVLpSPZYHoCVzNoatNKpw@mail.gmail.com>
- <CAJAp7Og+-KQd7bygWQjTS72Kye3fkp3s3ry+2bw7Gcv7aPF5AQ@mail.gmail.com>
- <CAK=WgbZ2986xxuAFvMSoyQLaPAxdUpZ8e5g-mSjyETfvd4KKHw@mail.gmail.com>
- <CAK=WgbZFZXcHuZUFVg4aAwjqzTQQxpV+Hp-DUYPKg5D8AsQ4Pg@mail.gmail.com>
-Message-ID: <54CFE8CE.2080804@ti.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 2 Feb 2015 14:20:09 -0700
+Subject: [PATCH 1/2] arm64: adding cpu lookup functionality
+In-Reply-To: <20150202135039.GF31847@arm.com>
+References: <1422658466-23984-1-git-send-email-mathieu.poirier@linaro.org>
+ <1422658466-23984-2-git-send-email-mathieu.poirier@linaro.org>
+ <20150202135039.GF31847@arm.com>
+Message-ID: <CANLsYkzrTUNzPErN0J5tHSDNnfwZy92tP+NHnEwtioAUOE_oXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/01/2015 05:00 AM, Ohad Ben-Cohen wrote:
-> On Sat, Jan 31, 2015 at 7:41 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
->> On Sat, Jan 31, 2015 at 1:29 AM, Bjorn Andersson <bjorn@kryo.se> wrote:
->>> In a system where you have two hwlock blocks lckA and lckB, each
->>> consisting of 8 locks and you have dspB that can only access lckB
+On 2 February 2015 at 06:50, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Jan 30, 2015 at 10:54:25PM +0000, mathieu.poirier at linaro.org wrote:
+>> From: Mathieu Poirier <mathieu.poirier@linaro.org>
 >>
->> This is a good example - thanks. To be able to cope with such cases we
->> will have to pass a hwlock block reference and its relative lock id.
+>> Adding a lookup function allowing for quick and easy mapping
+>> between processor HWID (as found, for example) in DT specifications
+>> and the CPU index known to the kernel.
+>>
+>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> ---
+>>  arch/arm64/include/asm/smp_plat.h | 12 ++++++++++++
+>>  1 file changed, 12 insertions(+)
+>>
+>> diff --git a/arch/arm64/include/asm/smp_plat.h b/arch/arm64/include/asm/smp_plat.h
+>> index 59e282311b58..8e4b011303b1 100644
+>> --- a/arch/arm64/include/asm/smp_plat.h
+>> +++ b/arch/arm64/include/asm/smp_plat.h
+>> @@ -19,6 +19,7 @@
+>>  #ifndef __ASM_SMP_PLAT_H
+>>  #define __ASM_SMP_PLAT_H
+>>
+>> +#include <linux/cpumask.h>
+>>  #include <asm/types.h>
+>>
+>>  struct mpidr_hash {
+>> @@ -40,4 +41,15 @@ static inline u32 mpidr_hash_size(void)
+>>  extern u64 __cpu_logical_map[NR_CPUS];
+>>  #define cpu_logical_map(cpu)    __cpu_logical_map[cpu]
+>>
+>> +static inline int get_logical_index(u64 mpidr)
+>> +{
+>> +     int cpu;
+>> +
+>> +     for (cpu = 0; cpu < nr_cpu_ids; cpu++)
+>> +             if (cpu_logical_map(cpu) == mpidr)
+>> +                     return cpu;
+>> +     return -EINVAL;
+>> +}
+>
+> Can you not achieve the same thing using arch_find_n_match_cpu_physical_id
+> in the coresight code?
+>
+> Will
 
-So, you mean lckB is only between the host and dspB. Obviously, if it
-were shared between dspA and dspB only, then the allocation and
-management would be completely outside the host Linux driver's scope.
+I ended up using "of_get_cpu_node()", which uses
+"arch_find_n_match_cpu_physical_id()".  Thanks for pointing this out.
 
-> 
-> Additionally, to support such a scenario, we can no longer retain the
-> simple dynamic allocation API we have today, because it might end up
-> allocating dspB an hwlock from IckA.
-> 
-> We will have to make sure hwlocks are allocated only from pools
-> visible to the user, something that will change not only the
-> hwspinlock API but also the way it maintains the hwlocks.
-
-Right, the current API definitely will not scale for that. It was
-designed around the concept that it's easier to exchange a single global
-id, rather than a lcbB:id or some other similar semantics that needs to
-be interpreted.
-
-> 
-> I suspect we want to wait for such hardware to show up first, and only
-> then add framework support for it. 
-
-Agreed.
-
-regards
-Suman
-
-> Regardless, we obviously do want to
-> make sure our DT binding is prepared for the worse, so we'll drop the
-> "base-id" field.
-> 
-> Thanks,
-> Ohad.
-> 
+Mathieu
