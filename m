@@ -1,129 +1,277 @@
-From: Ying.Liu@freescale.com (Liu Ying)
-Date: Mon, 2 Feb 2015 10:17:45 +0800
-Subject: [PATCH RFC v8 00/21] Add support for i.MX MIPI DSI DRM driver
-In-Reply-To: <1420014219-915-1-git-send-email-Ying.Liu@freescale.com>
-References: <1420014219-915-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <20150202021743.GA32567@victor>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Mon,  2 Feb 2015 10:43:03 +0800
+Subject: [Patch v2 18/23] PCI: Use common resource list management code
+ instead of private implementation
+In-Reply-To: <1422844988-13854-1-git-send-email-jiang.liu@linux.intel.com>
+References: <1422844988-13854-1-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <1422844988-13854-19-git-send-email-jiang.liu@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Use common resource list management data structure and interfaces
+instead of private implementation.
 
-This version has been submitted for a while.
-And, it looks there is no comments on this version.
-Can the maintainers consider to take this?
+Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+---
+ arch/arm/kernel/bios32.c            |    5 ++---
+ arch/x86/pci/bus_numa.c             |    4 ++--
+ drivers/pci/bus.c                   |   18 ++++++------------
+ drivers/pci/host-bridge.c           |    8 ++++----
+ drivers/pci/host/pci-host-generic.c |    4 ++--
+ drivers/pci/host/pci-xgene.c        |    4 ++--
+ drivers/pci/host/pcie-xilinx.c      |    4 ++--
+ drivers/pci/probe.c                 |   10 +++++-----
+ include/linux/pci.h                 |    9 ++-------
+ 9 files changed, 27 insertions(+), 39 deletions(-)
 
-Mike, any comments on patch 01/21?  It's a clock driver change.
-
-Regards,
-Liu Ying
-
-On Wed, Dec 31, 2014 at 04:23:18PM +0800, Liu Ying wrote:
-> Hi,
-> 
-> This version mainly fixes the Kconfig for the Synopsys DesignWare MIPI DSI
-> host controller bridge driver so that we may pass the allmodconfig for ARM.
-> Also, this version contains a minor change for the Himax HX8369A panel
-> driver to remove several unnecessary headers included.
-> 
-> The i.MX MIPI DSI is a Synopsys DesignWare MIPI DSI host controller IP.
-> This series adds support for a Synopsys DesignWare MIPI DSI host controller
-> DRM bridge driver and a i.MX MIPI DSI specific DRM driver.
-> Currently, the MIPI DSI drivers only support the burst with sync pulse mode.
-> 
-> This series also includes a DRM panel driver for the Truly TFT480800-16-E panel
-> which is driven by the Himax HX8369A driver IC.  The driver IC data sheet could
-> be found at [1].  As mentioned by the data sheet, the driver IC supports several
-> interface modes.  Currently, the DRM panel driver only supports the MIPI DSI video
-> mode.  New interface modes could be added later(perhaps, just like the way the DRM
-> simple panel driver supports both MIPI DSI interface panels and simple(parallel)
-> interface panels).
-> 
-> The MIPI DSI feature is tested on i.MX6Q SabreSD board and i.MX6DL SabreSD board.
-> The MIPI DSI display could be enabled directly on i.MX6Q SabreSD board after
-> applying this series, because the 26.4MHz pixel clock the panel requires could be
-> derived from the IPU HSP clock(264MHz) with an integer divider.
-> On i.MX6DL SabreSD board, we need to manually disable the LVDS and HDMI displays in
-> the device tree blob, since the i.MX6DL IPU HSP clock is 198MHz at present, which
-> makes the pixel clock share the PLL5 video clock source with the LVDS and HDMI,
-> thus, the panel cannot get the pixel clock rate it wants.
-> 
-> Patch 01/21 is needed to get a precise pixel clock rate(26.4MHz) from the PLL5 video
-> clock.  If we don't have this patch, the pixel clock rate is about 20MHz, which
-> causes a horitonal shift on the display image.
-> 
-> This series can be applied on the drm-next branch.
-> 
-> [1] http://www.allshore.com/pdf/Himax_HX8369-A.pdf
-> 
-> Liu Ying (21):
->   clk: divider: Correct parent clk round rate if no bestdiv is normally
->     found
->   of: Add vendor prefix for Himax Technologies Inc.
->   of: Add vendor prefix for Truly Semiconductors Limited
->   ARM: imx6q: Add GPR3 MIPI muxing control register field shift bits
->     definition
->   ARM: imx6q: clk: Add the video_27m clock
->   ARM: imx6q: clk: Change hdmi_isfr clock's parent to be video_27m clock
->   ARM: imx6q: clk: Change hsi_tx clock to be a shared clock gate
->   ARM: imx6q: clk: Add support for mipi_core_cfg clock as a shared clock
->     gate
->   ARM: dts: imx6qdl: Move existing MIPI DSI ports into a new 'ports'
->     node
->   drm/dsi: Add a helper to get bits per pixel of MIPI DSI pixel format
->   Documentation: dt-bindings: Add bindings for Synopsys DW MIPI DSI DRM
->     bridge driver
->   drm/bridge: Add Synopsys DesignWare MIPI DSI host controller driver
->   Documentation: dt-bindings: Add bindings for i.MX specific Synopsys DW
->     MIPI DSI driver
->   drm: imx: Support Synopsys DesignWare MIPI DSI host controller
->   Documentation: dt-bindings: Add bindings for Himax HX8369A DRM panel
->     driver
->   drm: panel: Add support for Himax HX8369A MIPI DSI panel
->   ARM: dtsi: imx6qdl: Add support for MIPI DSI host controller
->   ARM: dts: imx6qdl-sabresd: Add support for TRULY TFT480800-16-E MIPI
->     DSI panel
->   ARM: imx_v6_v7_defconfig: Cleanup for imx drm being moved out of
->     staging
->   ARM: imx_v6_v7_defconfig: Add support for MIPI DSI host controller
->   ARM: imx_v6_v7_defconfig: Add support for Himax HX8369A panel
-> 
->  .../devicetree/bindings/drm/bridge/dw_mipi_dsi.txt |  73 ++
->  .../devicetree/bindings/drm/imx/mipi_dsi.txt       |  78 ++
->  .../devicetree/bindings/panel/himax,hx8369a.txt    |  39 +
->  .../devicetree/bindings/vendor-prefixes.txt        |   2 +
->  arch/arm/boot/dts/imx6q.dtsi                       |  20 +-
->  arch/arm/boot/dts/imx6qdl-sabresd.dtsi             |  20 +
->  arch/arm/boot/dts/imx6qdl.dtsi                     |  29 +-
->  arch/arm/configs/imx_v6_v7_defconfig               |  17 +-
->  arch/arm/mach-imx/clk-imx6q.c                      |   7 +-
->  drivers/clk/clk-divider.c                          |   3 +-
->  drivers/gpu/drm/bridge/Kconfig                     |  10 +
->  drivers/gpu/drm/bridge/Makefile                    |   1 +
->  drivers/gpu/drm/bridge/dw_mipi_dsi.c               | 996 +++++++++++++++++++++
->  drivers/gpu/drm/imx/Kconfig                        |   7 +
->  drivers/gpu/drm/imx/Makefile                       |   1 +
->  drivers/gpu/drm/imx/dw_mipi_dsi-imx.c              | 230 +++++
->  drivers/gpu/drm/panel/Kconfig                      |   5 +
->  drivers/gpu/drm/panel/Makefile                     |   1 +
->  drivers/gpu/drm/panel/panel-himax-hx8369a.c        | 610 +++++++++++++
->  include/drm/bridge/dw_mipi_dsi.h                   |  27 +
->  include/drm/drm_mipi_dsi.h                         |  14 +
->  include/dt-bindings/clock/imx6qdl-clock.h          |   4 +-
->  include/linux/mfd/syscon/imx6q-iomuxc-gpr.h        |   1 +
->  23 files changed, 2165 insertions(+), 30 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/drm/bridge/dw_mipi_dsi.txt
->  create mode 100644 Documentation/devicetree/bindings/drm/imx/mipi_dsi.txt
->  create mode 100644 Documentation/devicetree/bindings/panel/himax,hx8369a.txt
->  create mode 100644 drivers/gpu/drm/bridge/dw_mipi_dsi.c
->  create mode 100644 drivers/gpu/drm/imx/dw_mipi_dsi-imx.c
->  create mode 100644 drivers/gpu/drm/panel/panel-himax-hx8369a.c
->  create mode 100644 include/drm/bridge/dw_mipi_dsi.h
-> 
-> -- 
-> 2.1.0
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> http://lists.freedesktop.org/mailman/listinfo/dri-devel
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index a4effd6d8f2f..968b03cb6376 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -422,17 +422,16 @@ static int pcibios_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+ static int pcibios_init_resources(int busnr, struct pci_sys_data *sys)
+ {
+ 	int ret;
+-	struct pci_host_bridge_window *window;
++	struct resource_list_entry *window;
+ 
+ 	if (list_empty(&sys->resources)) {
+ 		pci_add_resource_offset(&sys->resources,
+ 			 &iomem_resource, sys->mem_offset);
+ 	}
+ 
+-	list_for_each_entry(window, &sys->resources, list) {
++	resource_list_for_each_entry(window, &sys->resources)
+ 		if (resource_type(window->res) == IORESOURCE_IO)
+ 			return 0;
+-	}
+ 
+ 	sys->io_res.start = (busnr * SZ_64K) ?  : pcibios_min_io;
+ 	sys->io_res.end = (busnr + 1) * SZ_64K - 1;
+diff --git a/arch/x86/pci/bus_numa.c b/arch/x86/pci/bus_numa.c
+index f3a2cfc14125..6785af30ed39 100644
+--- a/arch/x86/pci/bus_numa.c
++++ b/arch/x86/pci/bus_numa.c
+@@ -31,7 +31,7 @@ void x86_pci_root_bus_resources(int bus, struct list_head *resources)
+ {
+ 	struct pci_root_info *info = x86_find_pci_root_info(bus);
+ 	struct pci_root_res *root_res;
+-	struct pci_host_bridge_window *window;
++	struct resource_list_entry *window;
+ 	bool found = false;
+ 
+ 	if (!info)
+@@ -41,7 +41,7 @@ void x86_pci_root_bus_resources(int bus, struct list_head *resources)
+ 	       bus);
+ 
+ 	/* already added by acpi ? */
+-	list_for_each_entry(window, resources, list)
++	resource_list_for_each_entry(window, resources)
+ 		if (window->res->flags & IORESOURCE_BUS) {
+ 			found = true;
+ 			break;
+diff --git a/drivers/pci/bus.c b/drivers/pci/bus.c
+index 8fb16188cd82..c850c48d81d2 100644
+--- a/drivers/pci/bus.c
++++ b/drivers/pci/bus.c
+@@ -20,17 +20,16 @@
+ void pci_add_resource_offset(struct list_head *resources, struct resource *res,
+ 			     resource_size_t offset)
+ {
+-	struct pci_host_bridge_window *window;
++	struct resource_list_entry *entry;
+ 
+-	window = kzalloc(sizeof(struct pci_host_bridge_window), GFP_KERNEL);
+-	if (!window) {
++	entry = resource_list_create_entry(res, 0);
++	if (!entry) {
+ 		printk(KERN_ERR "PCI: can't add host bridge window %pR\n", res);
+ 		return;
+ 	}
+ 
+-	window->res = res;
+-	window->offset = offset;
+-	list_add_tail(&window->list, resources);
++	entry->offset = offset;
++	resource_list_add_tail(entry, resources);
+ }
+ EXPORT_SYMBOL(pci_add_resource_offset);
+ 
+@@ -42,12 +41,7 @@ EXPORT_SYMBOL(pci_add_resource);
+ 
+ void pci_free_resource_list(struct list_head *resources)
+ {
+-	struct pci_host_bridge_window *window, *tmp;
+-
+-	list_for_each_entry_safe(window, tmp, resources, list) {
+-		list_del(&window->list);
+-		kfree(window);
+-	}
++	resource_list_free(resources);
+ }
+ EXPORT_SYMBOL(pci_free_resource_list);
+ 
+diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
+index 0e5f3c95af5b..3ea13883e6a5 100644
+--- a/drivers/pci/host-bridge.c
++++ b/drivers/pci/host-bridge.c
+@@ -35,10 +35,10 @@ void pcibios_resource_to_bus(struct pci_bus *bus, struct pci_bus_region *region,
+ 			     struct resource *res)
+ {
+ 	struct pci_host_bridge *bridge = find_pci_host_bridge(bus);
+-	struct pci_host_bridge_window *window;
++	struct resource_list_entry *window;
+ 	resource_size_t offset = 0;
+ 
+-	list_for_each_entry(window, &bridge->windows, list) {
++	resource_list_for_each_entry(window, &bridge->windows) {
+ 		if (resource_contains(window->res, res)) {
+ 			offset = window->offset;
+ 			break;
+@@ -60,10 +60,10 @@ void pcibios_bus_to_resource(struct pci_bus *bus, struct resource *res,
+ 			     struct pci_bus_region *region)
+ {
+ 	struct pci_host_bridge *bridge = find_pci_host_bridge(bus);
+-	struct pci_host_bridge_window *window;
++	struct resource_list_entry *window;
+ 	resource_size_t offset = 0;
+ 
+-	list_for_each_entry(window, &bridge->windows, list) {
++	resource_list_for_each_entry(window, &bridge->windows) {
+ 		struct pci_bus_region bus_region;
+ 
+ 		if (resource_type(res) != resource_type(window->res))
+diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+index 6eb1aa75bd37..16d5d6eeb35a 100644
+--- a/drivers/pci/host/pci-host-generic.c
++++ b/drivers/pci/host/pci-host-generic.c
+@@ -149,14 +149,14 @@ static int gen_pci_parse_request_of_pci_ranges(struct gen_pci *pci)
+ 	struct device *dev = pci->host.dev.parent;
+ 	struct device_node *np = dev->of_node;
+ 	resource_size_t iobase;
+-	struct pci_host_bridge_window *win;
++	struct resource_list_entry *win;
+ 
+ 	err = of_pci_get_host_bridge_resources(np, 0, 0xff, &pci->resources,
+ 					       &iobase);
+ 	if (err)
+ 		return err;
+ 
+-	list_for_each_entry(win, &pci->resources, list) {
++	resource_list_for_each_entry(win, &pci->resources) {
+ 		struct resource *parent, *res = win->res;
+ 
+ 		switch (resource_type(res)) {
+diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+index b1d0596457c5..e335b834f950 100644
+--- a/drivers/pci/host/pci-xgene.c
++++ b/drivers/pci/host/pci-xgene.c
+@@ -401,11 +401,11 @@ static int xgene_pcie_map_ranges(struct xgene_pcie_port *port,
+ 				 struct list_head *res,
+ 				 resource_size_t io_base)
+ {
+-	struct pci_host_bridge_window *window;
++	struct resource_list_entry *window;
+ 	struct device *dev = port->dev;
+ 	int ret;
+ 
+-	list_for_each_entry(window, res, list) {
++	resource_list_for_each_entry(window, res) {
+ 		struct resource *res = window->res;
+ 		u64 restype = resource_type(res);
+ 
+diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
+index ef3ebaf9a738..253e993a111f 100644
+--- a/drivers/pci/host/pcie-xilinx.c
++++ b/drivers/pci/host/pcie-xilinx.c
+@@ -737,7 +737,7 @@ static int xilinx_pcie_parse_and_add_res(struct xilinx_pcie_port *port)
+ 	resource_size_t offset;
+ 	struct of_pci_range_parser parser;
+ 	struct of_pci_range range;
+-	struct pci_host_bridge_window *win;
++	struct resource_list_entry *win;
+ 	int err = 0, mem_resno = 0;
+ 
+ 	/* Get the ranges */
+@@ -807,7 +807,7 @@ static int xilinx_pcie_parse_and_add_res(struct xilinx_pcie_port *port)
+ 
+ free_resources:
+ 	release_child_resources(&iomem_resource);
+-	list_for_each_entry(win, &port->resources, list)
++	resource_list_for_each_entry(win, &port->resources)
+ 		devm_kfree(dev, win->res);
+ 	pci_free_resource_list(&port->resources);
+ 
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 23212f8ae09b..df6a40932aa0 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1895,7 +1895,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+ 	int error;
+ 	struct pci_host_bridge *bridge;
+ 	struct pci_bus *b, *b2;
+-	struct pci_host_bridge_window *window, *n;
++	struct resource_list_entry *window, *n;
+ 	struct resource *res;
+ 	resource_size_t offset;
+ 	char bus_addr[64];
+@@ -1959,8 +1959,8 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+ 		printk(KERN_INFO "PCI host bridge to bus %s\n", dev_name(&b->dev));
+ 
+ 	/* Add initial resources to the bus */
+-	list_for_each_entry_safe(window, n, resources, list) {
+-		list_move_tail(&window->list, &bridge->windows);
++	resource_list_for_each_entry_safe(window, n, resources) {
++		list_move_tail(&window->node, &bridge->windows);
+ 		res = window->res;
+ 		offset = window->offset;
+ 		if (res->flags & IORESOURCE_BUS)
+@@ -2060,12 +2060,12 @@ void pci_bus_release_busn_res(struct pci_bus *b)
+ struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
+ 		struct pci_ops *ops, void *sysdata, struct list_head *resources)
+ {
+-	struct pci_host_bridge_window *window;
++	struct resource_list_entry *window;
+ 	bool found = false;
+ 	struct pci_bus *b;
+ 	int max;
+ 
+-	list_for_each_entry(window, resources, list)
++	resource_list_for_each_entry(window, resources)
+ 		if (window->res->flags & IORESOURCE_BUS) {
+ 			found = true;
+ 			break;
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 9603094ed59b..6aa40d62cdab 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -29,6 +29,7 @@
+ #include <linux/atomic.h>
+ #include <linux/device.h>
+ #include <linux/io.h>
++#include <linux/resource_ext.h>
+ #include <uapi/linux/pci.h>
+ 
+ #include <linux/pci_ids.h>
+@@ -397,16 +398,10 @@ static inline int pci_channel_offline(struct pci_dev *pdev)
+ 	return (pdev->error_state != pci_channel_io_normal);
+ }
+ 
+-struct pci_host_bridge_window {
+-	struct list_head list;
+-	struct resource *res;		/* host bridge aperture (CPU address) */
+-	resource_size_t offset;		/* bus address + offset = CPU address */
+-};
+-
+ struct pci_host_bridge {
+ 	struct device dev;
+ 	struct pci_bus *bus;		/* root bus */
+-	struct list_head windows;	/* pci_host_bridge_windows */
++	struct list_head windows;	/* resource_list_entry */
+ 	void (*release_fn)(struct pci_host_bridge *);
+ 	void *release_data;
+ };
+-- 
+1.7.10.4
