@@ -1,152 +1,248 @@
-From: graeme.gregory@linaro.org (Graeme Gregory)
-Date: Mon, 2 Feb 2015 13:50:52 +0000
-Subject: [PATCH v8 08/21] dt / chosen: Add linux,uefi-stub-generated-dtb
- property
-In-Reply-To: <20150202134033.GR4278@bivouac.eciton.net>
-References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
- <1422881149-8177-9-git-send-email-hanjun.guo@linaro.org>
- <20150202134033.GR4278@bivouac.eciton.net>
-Message-ID: <20150202135051.GA3825@xora-haswell.xora.org.uk>
+From: ygardi@codeaurora.org (ygardi at codeaurora.org)
+Date: Mon, 2 Feb 2015 14:31:59 -0000
+Subject: [PATCH] phy: qcom-ufs: export symbols needed by main drivers
+In-Reply-To: <1840882.huchmEIh5K@wuerfel>
+References: <1840882.huchmEIh5K@wuerfel>
+Message-ID: <7dbea2dd0edafbb35cbd36f8a9b135ed.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 02, 2015 at 01:40:33PM +0000, Leif Lindholm wrote:
-> On Mon, Feb 02, 2015 at 08:45:36PM +0800, Hanjun Guo wrote:
-> > When system supporting both DT and ACPI but firmware providing
-> > no dtb, we can use this linux,uefi-stub-generated-dtb property
-> > to let kernel know that we can try ACPI configuration data even
-> > if no "acpi=force" is passed in early parameters.
-> > 
-> > CC: Mark Rutland <mark.rutland@arm.com>
-> > CC: Jonathan Corbet <corbet@lwn.net>
-> > CC: Catalin Marinas <catalin.marinas@arm.com>
-> > CC: Will Deacon <will.deacon@arm.com>
-> > CC: Leif Lindholm <leif.lindholm@linaro.org>
-> > CC: Grant Likely <grant.likely@linaro.org>
-> > CC: Matt Fleming <matt.fleming@intel.com>
-> > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> > ---
-> >  Documentation/arm/uefi.txt         |  3 +++
-> >  arch/arm64/include/asm/acpi.h      |  1 +
-> >  arch/arm64/kernel/setup.c          | 30 ++++++++++++++++++++++++++++++
-> >  drivers/firmware/efi/libstub/fdt.c |  8 ++++++++
-> >  4 files changed, 42 insertions(+)
-> > 
-> > diff --git a/Documentation/arm/uefi.txt b/Documentation/arm/uefi.txt
-> > index d60030a..5f86eae 100644
-> > --- a/Documentation/arm/uefi.txt
-> > +++ b/Documentation/arm/uefi.txt
-> > @@ -60,5 +60,8 @@ linux,uefi-mmap-desc-ver  | 32-bit | Version of the mmap descriptor format.
-> >  --------------------------------------------------------------------------------
-> >  linux,uefi-stub-kern-ver  | string | Copy of linux_banner from build.
-> >  --------------------------------------------------------------------------------
-> > +linux,uefi-stub-generated-dtb  | bool | Indication for no DTB provided by
-> > +			       |      | firmware.
-> > +--------------------------------------------------------------------------------
-> 
-> Apologies for the late bikeshedding, but the discussion on this topic
-> previsously was lively enough that I thought I'd let it die down a bit
-> before seeing if I had anything to add.
-> 
-> That, and I just realised something:
-> One alternative to this added DT entry is that we could treat the
-> absence of a registered UEFI configuration table as the indication
-> that no HW description was provided from firmware, since the stub does
-> not call InstallConfigurationTable() on the DT it generates. This does
-> move the ability to detect to after efi_init(), but this should be
-> fine for ACPI-purposes.
-> 
-That would not work as expected in the kexec/Xen use case though as they
-may genuinely boot with DT from an ACPI host without UEFI.
+> The qcom ufs phy support is split into three separate loadable
+> modules, however none of the interfaces are exported, resulting
+> in a link error:
+>
+> ERROR: "ufs_qcom_phy_power_off" [drivers/phy/phy-qcom-ufs-qmp-20nm.ko]
+> undefined!
+> ERROR: "ufs_qcom_phy_power_on" [drivers/phy/phy-qcom-ufs-qmp-20nm.ko]
+> undefined!
+> ERROR: "ufs_qcom_phy_exit" [drivers/phy/phy-qcom-ufs-qmp-20nm.ko]
+> undefined!
+> ERROR: "ufs_qcom_phy_generic_probe" [drivers/phy/phy-qcom-ufs-qmp-20nm.ko]
+> undefined!
+> ERROR: "ufs_qcom_phy_init_vregulators"
+> [drivers/phy/phy-qcom-ufs-qmp-20nm.ko] undefined!
+> ERROR: "ufs_qcom_phy_init_clks" [drivers/phy/phy-qcom-ufs-qmp-20nm.ko]
+> undefined!
+> ERROR: "ufs_qcom_phy_calibrate" [drivers/phy/phy-qcom-ufs-qmp-20nm.ko]
+> undefined!
+> ERROR: "ufs_qcom_phy_remove" [drivers/phy/phy-qcom-ufs-qmp-20nm.ko]
+> undefined!
+> ERROR: "get_ufs_qcom_phy" [drivers/phy/phy-qcom-ufs-qmp-20nm.ko]
+> undefined!
+> ERROR: "ufs_qcom_phy_power_off" [drivers/phy/phy-qcom-ufs-qmp-14nm.ko]
+> undefined!
+> ERROR: "ufs_qcom_phy_power_on" [drivers/phy/phy-qcom-ufs-qmp-14nm.ko]
+> undefined!
+> ERROR: "ufs_qcom_phy_exit" [drivers/phy/phy-qcom-ufs-qmp-14nm.ko]
+> undefined!
+> ERROR: "ufs_qcom_phy_generic_probe" [drivers/phy/phy-qcom-ufs-qmp-14nm.ko]
+> undefined!
+> ERROR: "ufs_qcom_phy_init_vregulators"
+> [drivers/phy/phy-qcom-ufs-qmp-14nm.ko] undefined!
+> ERROR: "ufs_qcom_phy_init_clks" [drivers/phy/phy-qcom-ufs-qmp-14nm.ko]
+> undefined!
+> ERROR: "ufs_qcom_phy_calibrate" [drivers/phy/phy-qcom-ufs-qmp-14nm.ko]
+> undefined!
+> ERROR: "ufs_qcom_phy_remove" [drivers/phy/phy-qcom-ufs-qmp-14nm.ko]
+> undefined!
+> ERROR: "get_ufs_qcom_phy" [drivers/phy/phy-qcom-ufs-qmp-14nm.ko]
+> undefined!
+>
+> This exports all of the symbols that are provided by the base library
+> module and used by the two driver modules.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: adaafaa393ef ("phy: qcom-ufs: add support for QUALCOMM Technologies
+> UFS PHY drivers")
+> ---
+>
+> The broken patch is currently in the scsi tree, so if the phy maintainer
+> thinks that my fix is correct, it should go there too.
 
-> If that is deemed undesirable, I would still prefer Catalin's
-> suggested name ("linux,bare-dtb"), which describes the state rather
-> than the route we took to get there.
-> 
-I agree.
+I believe that exporting all interface functions is a good solution.
 
-Graeme
-
-> >  For verbose debug messages, specify 'uefi_debug' on the kernel command line.
-> > diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-> > index 496c33b..9fcf632 100644
-> > --- a/arch/arm64/include/asm/acpi.h
-> > +++ b/arch/arm64/include/asm/acpi.h
-> > @@ -49,6 +49,7 @@ static inline void arch_fix_phys_package_id(int num, u32 slot) { }
-> >  
-> >  #else
-> >  static inline void disable_acpi(void) { }
-> > +static inline void enable_acpi(void) { }
-> >  #endif /* CONFIG_ACPI */
-> >  
-> >  #endif /*_ASM_ACPI_H*/
-> > diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> > index fc4fb7b..510a681 100644
-> > --- a/arch/arm64/kernel/setup.c
-> > +++ b/arch/arm64/kernel/setup.c
-> > @@ -371,6 +371,29 @@ static void __init request_standard_resources(void)
-> >  	}
-> >  }
-> >  
-> > +static int __init dt_scan_chosen(unsigned long node, const char *uname,
-> > +			int depth, void *data)
-> > +{
-> > +	const char *p;
-> > +
-> > +	if (depth != 1 || !data || (strcmp(uname, "chosen") != 0))
-> > +		return 0;
-> > +
-> > +	p = of_get_flat_dt_prop(node, "linux,uefi-stub-generated-dtb", NULL);
-> > +	*(bool *)data = p ? true : false;
-> > +
-> > +	return 1;
-> > +}
-> > +
-> > +static bool __init is_uefi_stub_generated_dtb(void)
-> > +{
-> > +	bool flag = false;
-> > +
-> > +	of_scan_flat_dt(dt_scan_chosen, &flag);
-> > +
-> > +	return flag;
-> > +}
-> > +
-> >  u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
-> >  
-> >  void __init setup_arch(char **cmdline_p)
-> > @@ -399,6 +422,13 @@ void __init setup_arch(char **cmdline_p)
-> >  	parse_early_param();
-> >  
-> >  	/*
-> > +	 * If no dtb provided by firmware, enable ACPI and give system a
-> > +	 * chance to boot with ACPI configuration data
-> > +	 */
-> > +	if (is_uefi_stub_generated_dtb() && acpi_disabled)
-> > +		enable_acpi();
-> > +
-> > +	/*
-> >  	 *  Unmask asynchronous aborts after bringing up possible earlycon.
-> >  	 * (Report possible System Errors once we can report this occurred)
-> >  	 */
-> > diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
-> > index c846a96..3777d50 100644
-> > --- a/drivers/firmware/efi/libstub/fdt.c
-> > +++ b/drivers/firmware/efi/libstub/fdt.c
-> > @@ -154,6 +154,14 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
-> >  	if (status)
-> >  		goto fdt_set_fail;
-> >  
-> > +	/* Add a property to show the dtb is generated by uefi stub */
-> > +	if (!orig_fdt) {
-> > +		status = fdt_setprop(fdt, node,
-> > +				     "linux,uefi-stub-generated-dtb", NULL, 0);
-> > +		if (status)
-> > +			goto fdt_set_fail;
-> > +	}
-> > +
-> >  	return EFI_SUCCESS;
-> >  
-> >  fdt_set_fail:
-> > -- 
-> > 1.9.1
-> > 
+>
+> An alternative approach would be to link all three phy-qcom-ufs source
+> files into a single module.
+>
+>  drivers/phy/phy-qcom-ufs.c | 21 +++++++++++++++++++++
+>  1 file changed, 21 insertions(+)
+>
+> diff --git a/drivers/phy/phy-qcom-ufs.c b/drivers/phy/phy-qcom-ufs.c
+> index 44ee983d57fe..c8f8c2dac18c 100644
+> --- a/drivers/phy/phy-qcom-ufs.c
+> +++ b/drivers/phy/phy-qcom-ufs.c
+> @@ -73,6 +73,7 @@ int ufs_qcom_phy_calibrate(struct ufs_qcom_phy
+> *ufs_qcom_phy,
+>  out:
+>  	return ret;
+>  }
+> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_calibrate);
+>
+>  struct phy *ufs_qcom_phy_generic_probe(struct platform_device *pdev,
+>  				struct ufs_qcom_phy *common_cfg,
+> @@ -110,6 +111,7 @@ struct phy *ufs_qcom_phy_generic_probe(struct
+> platform_device *pdev,
+>  out:
+>  	return generic_phy;
+>  }
+> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_generic_probe);
+>
+>  /*
+>   * This assumes the embedded phy structure inside generic_phy is of type
+> @@ -121,6 +123,7 @@ struct ufs_qcom_phy *get_ufs_qcom_phy(struct phy
+> *generic_phy)
+>  {
+>  	return (struct ufs_qcom_phy *)phy_get_drvdata(generic_phy);
+>  }
+> +EXPORT_SYMBOL_GPL(get_ufs_qcom_phy);
+>
+>  static
+>  int ufs_qcom_phy_base_init(struct platform_device *pdev,
+> @@ -228,6 +231,7 @@ ufs_qcom_phy_init_clks(struct phy *generic_phy,
+>  out:
+>  	return err;
+>  }
+> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_init_clks);
+>
+>  int
+>  ufs_qcom_phy_init_vregulators(struct phy *generic_phy,
+> @@ -252,6 +256,7 @@ ufs_qcom_phy_init_vregulators(struct phy *generic_phy,
+>  out:
+>  	return err;
+>  }
+> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_init_vregulators);
+>
+>  static int __ufs_qcom_phy_init_vreg(struct phy *phy,
+>  		struct ufs_qcom_phy_vreg *vreg, const char *name, bool optional)
+> @@ -443,6 +448,7 @@ out_disable_src:
+>  out:
+>  	return ret;
+>  }
+> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_enable_ref_clk);
+>
+>  static
+>  int ufs_qcom_phy_disable_vreg(struct phy *phy,
+> @@ -485,6 +491,7 @@ void ufs_qcom_phy_disable_ref_clk(struct phy
+> *generic_phy)
+>  		phy->is_ref_clk_enabled = false;
+>  	}
+>  }
+> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_disable_ref_clk);
+>
+>  #define UFS_REF_CLK_EN	(1 << 5)
+>
+> @@ -523,16 +530,19 @@ static void ufs_qcom_phy_dev_ref_clk_ctrl(struct phy
+> *generic_phy, bool enable)
+>  		phy->is_dev_ref_clk_enabled = enable;
+>  	}
+>  }
+> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_dev_ref_clk_ctrl);
+>
+>  void ufs_qcom_phy_enable_dev_ref_clk(struct phy *generic_phy)
+>  {
+>  	ufs_qcom_phy_dev_ref_clk_ctrl(generic_phy, true);
+>  }
+> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_enable_dev_ref_clk);
+>
+>  void ufs_qcom_phy_disable_dev_ref_clk(struct phy *generic_phy)
+>  {
+>  	ufs_qcom_phy_dev_ref_clk_ctrl(generic_phy, false);
+>  }
+> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_disable_dev_ref_clk);
+>
+>  /* Turn ON M-PHY RMMI interface clocks */
+>  int ufs_qcom_phy_enable_iface_clk(struct phy *generic_phy)
+> @@ -561,6 +571,7 @@ int ufs_qcom_phy_enable_iface_clk(struct phy
+> *generic_phy)
+>  out:
+>  	return ret;
+>  }
+> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_enable_iface_clk);
+>
+>  /* Turn OFF M-PHY RMMI interface clocks */
+>  void ufs_qcom_phy_disable_iface_clk(struct phy *generic_phy)
+> @@ -573,6 +584,7 @@ void ufs_qcom_phy_disable_iface_clk(struct phy
+> *generic_phy)
+>  		phy->is_iface_clk_enabled = false;
+>  	}
+>  }
+> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_disable_iface_clk);
+>
+>  int ufs_qcom_phy_start_serdes(struct phy *generic_phy)
+>  {
+> @@ -589,6 +601,7 @@ int ufs_qcom_phy_start_serdes(struct phy *generic_phy)
+>
+>  	return ret;
+>  }
+> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_start_serdes);
+>
+>  int ufs_qcom_phy_set_tx_lane_enable(struct phy *generic_phy, u32
+> tx_lanes)
+>  {
+> @@ -606,6 +619,7 @@ int ufs_qcom_phy_set_tx_lane_enable(struct phy
+> *generic_phy, u32 tx_lanes)
+>
+>  	return ret;
+>  }
+> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_set_tx_lane_enable);
+>
+>  void ufs_qcom_phy_save_controller_version(struct phy *generic_phy,
+>  					  u8 major, u16 minor, u16 step)
+> @@ -616,6 +630,7 @@ void ufs_qcom_phy_save_controller_version(struct phy
+> *generic_phy,
+>  	ufs_qcom_phy->host_ctrl_rev_minor = minor;
+>  	ufs_qcom_phy->host_ctrl_rev_step = step;
+>  }
+> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_save_controller_version);
+>
+>  int ufs_qcom_phy_calibrate_phy(struct phy *generic_phy, bool is_rate_B)
+>  {
+> @@ -636,6 +651,7 @@ int ufs_qcom_phy_calibrate_phy(struct phy
+> *generic_phy, bool is_rate_B)
+>
+>  	return ret;
+>  }
+> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_calibrate_phy);
+>
+>  int ufs_qcom_phy_remove(struct phy *generic_phy,
+>  			struct ufs_qcom_phy *ufs_qcom_phy)
+> @@ -647,6 +663,7 @@ int ufs_qcom_phy_remove(struct phy *generic_phy,
+>
+>  	return 0;
+>  }
+> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_remove);
+>
+>  int ufs_qcom_phy_exit(struct phy *generic_phy)
+>  {
+> @@ -657,6 +674,7 @@ int ufs_qcom_phy_exit(struct phy *generic_phy)
+>
+>  	return 0;
+>  }
+> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_exit);
+>
+>  int ufs_qcom_phy_is_pcs_ready(struct phy *generic_phy)
+>  {
+> @@ -671,6 +689,7 @@ int ufs_qcom_phy_is_pcs_ready(struct phy *generic_phy)
+>  	return ufs_qcom_phy->phy_spec_ops->
+>  			is_physical_coding_sublayer_ready(ufs_qcom_phy);
+>  }
+> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_is_pcs_ready);
+>
+>  int ufs_qcom_phy_power_on(struct phy *generic_phy)
+>  {
+> @@ -725,6 +744,7 @@ out_disable_phy:
+>  out:
+>  	return err;
+>  }
+> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_power_on);
+>
+>  int ufs_qcom_phy_power_off(struct phy *generic_phy)
+>  {
+> @@ -743,3 +763,4 @@ int ufs_qcom_phy_power_off(struct phy *generic_phy)
+>
+>  	return 0;
+>  }
+> +EXPORT_SYMBOL_GPL(ufs_qcom_phy_power_off);
+>
+>
