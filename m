@@ -1,139 +1,124 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon,  2 Feb 2015 20:45:35 +0800
-Subject: [PATCH v8 07/21] ARM64 / ACPI: Introduce early_param for "acpi" and
- pass acpi=force to enable ACPI
+Date: Mon,  2 Feb 2015 20:45:36 +0800
+Subject: [PATCH v8 08/21] dt / chosen: Add linux,
+ uefi-stub-generated-dtb property
 In-Reply-To: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
 References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1422881149-8177-8-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1422881149-8177-9-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Al Stone <al.stone@linaro.org>
+When system supporting both DT and ACPI but firmware providing
+no dtb, we can use this linux,uefi-stub-generated-dtb property
+to let kernel know that we can try ACPI configuration data even
+if no "acpi=force" is passed in early parameters.
 
-Introduce two early parameters "off" and "force" for "acpi", acpi=off
-will be the default behavior for ARM64, so introduce acpi=force to
-enable ACPI on ARM64.
-
-Disable ACPI before early parameters parsed, and enable it to pass
-"acpi=force" if people want use ACPI on ARM64. This ensures DT be
-the prefer one if ACPI table and DT both are provided at this moment.
-
+CC: Mark Rutland <mark.rutland@arm.com>
+CC: Jonathan Corbet <corbet@lwn.net>
 CC: Catalin Marinas <catalin.marinas@arm.com>
 CC: Will Deacon <will.deacon@arm.com>
-CC: Rafael J. Wysocki <rjw@rjwysocki.net>
-Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-Tested-by: Yijing Wang <wangyijing@huawei.com>
-Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
-Tested-by: Jon Masters <jcm@redhat.com>
-Tested-by: Timur Tabi <timur@codeaurora.org>
-Signed-off-by: Al Stone <al.stone@linaro.org>
-Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+CC: Leif Lindholm <leif.lindholm@linaro.org>
+CC: Grant Likely <grant.likely@linaro.org>
+CC: Matt Fleming <matt.fleming@intel.com>
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- Documentation/kernel-parameters.txt |  3 ++-
- arch/arm64/include/asm/acpi.h       |  9 +++++++++
- arch/arm64/kernel/acpi.c            | 17 +++++++++++++++++
- arch/arm64/kernel/setup.c           |  8 ++++++++
- 4 files changed, 36 insertions(+), 1 deletion(-)
+ Documentation/arm/uefi.txt         |  3 +++
+ arch/arm64/include/asm/acpi.h      |  1 +
+ arch/arm64/kernel/setup.c          | 30 ++++++++++++++++++++++++++++++
+ drivers/firmware/efi/libstub/fdt.c |  8 ++++++++
+ 4 files changed, 42 insertions(+)
 
-diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
-index 176d4fe..d6a952e 100644
---- a/Documentation/kernel-parameters.txt
-+++ b/Documentation/kernel-parameters.txt
-@@ -165,7 +165,7 @@ multipliers 'Kilo', 'Mega', and 'Giga', equalling 2^10, 2^20, and 2^30
- bytes respectively. Such letter suffixes can also be entirely omitted.
+diff --git a/Documentation/arm/uefi.txt b/Documentation/arm/uefi.txt
+index d60030a..5f86eae 100644
+--- a/Documentation/arm/uefi.txt
++++ b/Documentation/arm/uefi.txt
+@@ -60,5 +60,8 @@ linux,uefi-mmap-desc-ver  | 32-bit | Version of the mmap descriptor format.
+ --------------------------------------------------------------------------------
+ linux,uefi-stub-kern-ver  | string | Copy of linux_banner from build.
+ --------------------------------------------------------------------------------
++linux,uefi-stub-generated-dtb  | bool | Indication for no DTB provided by
++			       |      | firmware.
++--------------------------------------------------------------------------------
  
- 
--	acpi=		[HW,ACPI,X86]
-+	acpi=		[HW,ACPI,X86,ARM64]
- 			Advanced Configuration and Power Interface
- 			Format: { force | off | strict | noirq | rsdt }
- 			force -- enable ACPI if default was off
-@@ -175,6 +175,7 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
- 				strictly ACPI specification compliant.
- 			rsdt -- prefer RSDT over (default) XSDT
- 			copy_dsdt -- copy DSDT to memory
-+			For ARM64, ONLY "acpi=off" or "acpi=force" are available
- 
- 			See also Documentation/power/runtime_pm.txt, pci=noacpi
- 
+ For verbose debug messages, specify 'uefi_debug' on the kernel command line.
 diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-index 8b837ab..496c33b 100644
+index 496c33b..9fcf632 100644
 --- a/arch/arm64/include/asm/acpi.h
 +++ b/arch/arm64/include/asm/acpi.h
-@@ -26,6 +26,13 @@ static inline void disable_acpi(void)
- 	acpi_noirq = 1;
- }
+@@ -49,6 +49,7 @@ static inline void arch_fix_phys_package_id(int num, u32 slot) { }
  
-+static inline void enable_acpi(void)
-+{
-+	acpi_disabled = 0;
-+	acpi_pci_disabled = 0;
-+	acpi_noirq = 0;
-+}
-+
- /*
-  * It's used from ACPI core in kdump to boot UP system with SMP kernel,
-  * with this check the ACPI core will not override the CPU index
-@@ -40,6 +47,8 @@ static inline bool acpi_has_cpu_in_madt(void)
- 
- static inline void arch_fix_phys_package_id(int num, u32 slot) { }
- 
-+#else
-+static inline void disable_acpi(void) { }
+ #else
+ static inline void disable_acpi(void) { }
++static inline void enable_acpi(void) { }
  #endif /* CONFIG_ACPI */
  
  #endif /*_ASM_ACPI_H*/
-diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-index 7f67c01..afe10b4 100644
---- a/arch/arm64/kernel/acpi.c
-+++ b/arch/arm64/kernel/acpi.c
-@@ -67,3 +67,20 @@ void __init acpi_boot_table_init(void)
- 	if (acpi_table_init())
- 		disable_acpi();
- }
-+
-+static int __init parse_acpi(char *arg)
-+{
-+	if (!arg)
-+		return -EINVAL;
-+
-+	/* "acpi=off" disables both ACPI table parsing and interpreter */
-+	if (strcmp(arg, "off") == 0)
-+		disable_acpi();
-+	else if (strcmp(arg, "force") == 0) /* force ACPI to be enabled */
-+		enable_acpi();
-+	else
-+		return -EINVAL;	/* Core will print when we return error */
-+
-+	return 0;
-+}
-+early_param("acpi", parse_acpi);
 diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 726b019..fc4fb7b 100644
+index fc4fb7b..510a681 100644
 --- a/arch/arm64/kernel/setup.c
 +++ b/arch/arm64/kernel/setup.c
-@@ -62,6 +62,7 @@
- #include <asm/memblock.h>
- #include <asm/psci.h>
- #include <asm/efi.h>
-+#include <asm/acpi.h>
+@@ -371,6 +371,29 @@ static void __init request_standard_resources(void)
+ 	}
+ }
  
- unsigned int processor_id;
- EXPORT_SYMBOL(processor_id);
-@@ -388,6 +389,13 @@ void __init setup_arch(char **cmdline_p)
- 	early_fixmap_init();
- 	early_ioremap_init();
- 
-+	/*
-+	 * Disable ACPI before early parameters parsed and
-+	 * it will be enabled in parse_early_param() if
-+	 * "acpi=force" is passed
-+	 */
-+	disable_acpi();
++static int __init dt_scan_chosen(unsigned long node, const char *uname,
++			int depth, void *data)
++{
++	const char *p;
 +
++	if (depth != 1 || !data || (strcmp(uname, "chosen") != 0))
++		return 0;
++
++	p = of_get_flat_dt_prop(node, "linux,uefi-stub-generated-dtb", NULL);
++	*(bool *)data = p ? true : false;
++
++	return 1;
++}
++
++static bool __init is_uefi_stub_generated_dtb(void)
++{
++	bool flag = false;
++
++	of_scan_flat_dt(dt_scan_chosen, &flag);
++
++	return flag;
++}
++
+ u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
+ 
+ void __init setup_arch(char **cmdline_p)
+@@ -399,6 +422,13 @@ void __init setup_arch(char **cmdline_p)
  	parse_early_param();
  
  	/*
++	 * If no dtb provided by firmware, enable ACPI and give system a
++	 * chance to boot with ACPI configuration data
++	 */
++	if (is_uefi_stub_generated_dtb() && acpi_disabled)
++		enable_acpi();
++
++	/*
+ 	 *  Unmask asynchronous aborts after bringing up possible earlycon.
+ 	 * (Report possible System Errors once we can report this occurred)
+ 	 */
+diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
+index c846a96..3777d50 100644
+--- a/drivers/firmware/efi/libstub/fdt.c
++++ b/drivers/firmware/efi/libstub/fdt.c
+@@ -154,6 +154,14 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
+ 	if (status)
+ 		goto fdt_set_fail;
+ 
++	/* Add a property to show the dtb is generated by uefi stub */
++	if (!orig_fdt) {
++		status = fdt_setprop(fdt, node,
++				     "linux,uefi-stub-generated-dtb", NULL, 0);
++		if (status)
++			goto fdt_set_fail;
++	}
++
+ 	return EFI_SUCCESS;
+ 
+ fdt_set_fail:
 -- 
 1.9.1
