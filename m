@@ -1,77 +1,121 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 02 Feb 2015 14:20:21 +0100
-Subject: [PATCH v5 2/9] ARM: Exynos: add support for sub-power domains
+Date: Mon, 02 Feb 2015 14:20:22 +0100
+Subject: [PATCH v5 3/9] ARM: dts: exynos4: add hdmi related nodes
 In-Reply-To: <1422883228-10690-1-git-send-email-m.szyprowski@samsung.com>
 References: <1422883228-10690-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1422883228-10690-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1422883228-10690-4-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for making one power domain a sub-domain of
-other domain. This is useful for modeling power dependences for devices
-like TV Mixer or Camera ISP, which needs to have more than one power
-domain enabled to be operational.
-
-Based on previous work by Amit Daniel Kachhap <amit.daniel@samsung.com>.
+This patch adds entries for HDMI, Mixer and i2c with hdmi-phy modules
+found in Exynos 4210 and 4x12 SoCs.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- .../bindings/arm/exynos/power_domain.txt           |  2 ++
- arch/arm/mach-exynos/pm_domains.c                  | 28 ++++++++++++++++++++++
- 2 files changed, 30 insertions(+)
+ arch/arm/boot/dts/exynos4.dtsi    | 40 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos4210.dtsi |  8 ++++++++
+ arch/arm/boot/dts/exynos4x12.dtsi | 11 +++++++++++
+ 3 files changed, 59 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-index f4445e5a2bbb..1e097037349c 100644
---- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-+++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-@@ -22,6 +22,8 @@ Optional Properties:
- 	- pclkN, clkN: Pairs of parent of input clock and input clock to the
- 		devices in this power domain. Maximum of 4 pairs (N = 0 to 3)
- 		are supported currently.
-+- power-domains: phandle pointing to the parent power domain, for more details
-+		 see Documentation/devicetree/bindings/power/power_domain.txt
+diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+index c5dc2efb99ed..d9516471c41e 100644
+--- a/arch/arm/boot/dts/exynos4.dtsi
++++ b/arch/arm/boot/dts/exynos4.dtsi
+@@ -38,6 +38,7 @@
+ 		i2c5 = &i2c_5;
+ 		i2c6 = &i2c_6;
+ 		i2c7 = &i2c_7;
++		i2c8 = &i2c_8;
+ 		csis0 = &csis_0;
+ 		csis1 = &csis_1;
+ 		fimc0 = &fimc_0;
+@@ -544,6 +545,22 @@
+ 		status = "disabled";
+ 	};
  
- Node of a device using power domains must have a power-domains property
- defined with a phandle to respective power domain.
-diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
-index 20f267121b3e..37266a826437 100644
---- a/arch/arm/mach-exynos/pm_domains.c
-+++ b/arch/arm/mach-exynos/pm_domains.c
-@@ -161,6 +161,34 @@ no_clk:
- 		of_genpd_add_provider_simple(np, &pd->pd);
- 	}
- 
-+	/* Assign the child power domains to their parents */
-+	for_each_compatible_node(np, NULL, "samsung,exynos4210-pd") {
-+		struct generic_pm_domain *child_domain, *parent_domain;
-+		struct of_phandle_args args;
++	i2c_8: i2c at 138E0000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "samsung,s3c2440-hdmiphy-i2c";
++		reg = <0x138E0000 0x100>;
++		interrupts = <0 93 0>;
++		clocks = <&clock CLK_I2C_HDMI>;
++		clock-names = "i2c";
++		status = "disabled";
 +
-+		args.np = np;
-+		args.args_count = 0;
-+		child_domain = of_genpd_get_from_provider(&args);
-+		if (!child_domain)
-+			continue;
++		hdmi_i2c_phy: hdmiphy at 38 {
++			compatible = "exynos4210-hdmiphy";
++			reg = <0x38>;
++		};
++	};
 +
-+		if (of_parse_phandle_with_args(np, "power-domains",
-+					 "#power-domain-cells", 0, &args) != 0)
-+			continue;
+ 	spi_0: spi at 13920000 {
+ 		compatible = "samsung,exynos4210-spi";
+ 		reg = <0x13920000 0x100>;
+@@ -652,4 +669,27 @@
+ 		samsung,sysreg = <&sys_reg>;
+ 		status = "disabled";
+ 	};
 +
-+		parent_domain = of_genpd_get_from_provider(&args);
-+		if (!parent_domain)
-+			continue;
++	hdmi: hdmi at 12D00000 {
++		compatible = "samsung,exynos4210-hdmi";
++		reg = <0x12D00000 0x70000>;
++		interrupts = <0 92 0>;
++		clock-names = "hdmi", "sclk_hdmi", "sclk_pixel", "sclk_hdmiphy",
++			"mout_hdmi";
++		clocks = <&clock CLK_HDMI>, <&clock CLK_SCLK_HDMI>,
++			<&clock CLK_SCLK_PIXEL>, <&clock CLK_SCLK_HDMIPHY>,
++			<&clock CLK_MOUT_HDMI>;
++		phy = <&hdmi_i2c_phy>;
++		power-domains = <&pd_tv>;
++		samsung,syscon-phandle = <&pmu_system_controller>;
++		status = "disabled";
++	};
 +
-+		if (pm_genpd_add_subdomain(parent_domain, child_domain))
-+			pr_warn("%s failed to add subdomain: %s\n",
-+				parent_domain->name, child_domain->name);
-+		else
-+			pr_info("%s has as child subdomain: %s.\n",
-+				parent_domain->name, child_domain->name);
-+		of_node_put(np);
-+	}
++	mixer: mixer at 12C10000 {
++		compatible = "samsung,exynos4210-mixer";
++		interrupts = <0 91 0>;
++		reg = <0x12C10000 0x2100>, <0x12c00000 0x300>;
++		power-domains = <&pd_tv>;
++		status = "disabled";
++	};
+ };
+diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+index 6728aaa2af9d..1b410027bbc8 100644
+--- a/arch/arm/boot/dts/exynos4210.dtsi
++++ b/arch/arm/boot/dts/exynos4210.dtsi
+@@ -193,4 +193,12 @@
+ 			samsung,lcd-wb;
+ 		};
+ 	};
 +
- 	return 0;
- }
- arch_initcall(exynos4_pm_init_power_domain);
++	mixer: mixer at 12C10000 {
++		clock-names = "mixer", "hdmi", "sclk_hdmi", "vp", "mout_mixer",
++			"sclk_mixer";
++		clocks = <&clock CLK_MIXER>, <&clock CLK_HDMI>,
++			<&clock CLK_SCLK_HDMI>, <&clock CLK_VP>,
++			<&clock CLK_MOUT_MIXER>, <&clock CLK_SCLK_MIXER>;
++	};
+ };
+diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
+index da8734e25f50..a26503826363 100644
+--- a/arch/arm/boot/dts/exynos4x12.dtsi
++++ b/arch/arm/boot/dts/exynos4x12.dtsi
+@@ -283,4 +283,15 @@
+ 		clock-names = "tmu_apbif";
+ 		status = "disabled";
+ 	};
++
++	hdmi: hdmi at 12D00000 {
++		compatible = "samsung,exynos4212-hdmi";
++	};
++
++	mixer: mixer at 12C10000 {
++		compatible = "samsung,exynos4212-mixer";
++		clock-names = "mixer", "hdmi", "sclk_hdmi", "vp";
++		clocks = <&clock CLK_MIXER>, <&clock CLK_HDMI>,
++			 <&clock CLK_SCLK_HDMI>, <&clock CLK_VP>;
++	};
+ };
 -- 
 1.9.2
