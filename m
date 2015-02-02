@@ -1,92 +1,139 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon,  2 Feb 2015 20:45:34 +0800
-Subject: [PATCH v8 06/21] ARM64 / ACPI: Introduce PCI stub functions for ACPI
+Date: Mon,  2 Feb 2015 20:45:35 +0800
+Subject: [PATCH v8 07/21] ARM64 / ACPI: Introduce early_param for "acpi" and
+ pass acpi=force to enable ACPI
 In-Reply-To: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
 References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1422881149-8177-7-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1422881149-8177-8-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_ACPI depends CONFIG_PCI on x86 and ia64, in ARM64 server
-world we will have PCIe in most cases, but some of them may not,
-make CONFIG_ACPI depend CONFIG_PCI on ARM64 will satisfy both.
+From: Al Stone <al.stone@linaro.org>
 
-With that case, we need some arch dependent PCI functions to
-access the config space before the PCI root bridge is created, and
-pci_acpi_scan_root() to create the PCI root bus. So introduce
-some stub function here to make ACPI core compile and revisit
-them later when implemented on ARM64.
+Introduce two early parameters "off" and "force" for "acpi", acpi=off
+will be the default behavior for ARM64, so introduce acpi=force to
+enable ACPI on ARM64.
 
-CC: Liviu Dudau <Liviu.Dudau@arm.com>
+Disable ACPI before early parameters parsed, and enable it to pass
+"acpi=force" if people want use ACPI on ARM64. This ensures DT be
+the prefer one if ACPI table and DT both are provided at this moment.
+
 CC: Catalin Marinas <catalin.marinas@arm.com>
 CC: Will Deacon <will.deacon@arm.com>
+CC: Rafael J. Wysocki <rjw@rjwysocki.net>
 Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 Tested-by: Yijing Wang <wangyijing@huawei.com>
 Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
 Tested-by: Jon Masters <jcm@redhat.com>
 Tested-by: Timur Tabi <timur@codeaurora.org>
+Signed-off-by: Al Stone <al.stone@linaro.org>
+Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- arch/arm64/include/asm/pci.h |  6 ++++++
- arch/arm64/kernel/pci.c      | 25 +++++++++++++++++++++++++
- 2 files changed, 31 insertions(+)
+ Documentation/kernel-parameters.txt |  3 ++-
+ arch/arm64/include/asm/acpi.h       |  9 +++++++++
+ arch/arm64/kernel/acpi.c            | 17 +++++++++++++++++
+ arch/arm64/kernel/setup.c           |  8 ++++++++
+ 4 files changed, 36 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
-index 872ba93..fded096 100644
---- a/arch/arm64/include/asm/pci.h
-+++ b/arch/arm64/include/asm/pci.h
-@@ -24,6 +24,12 @@
-  */
- #define PCI_DMA_BUS_IS_PHYS	(0)
+diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+index 176d4fe..d6a952e 100644
+--- a/Documentation/kernel-parameters.txt
++++ b/Documentation/kernel-parameters.txt
+@@ -165,7 +165,7 @@ multipliers 'Kilo', 'Mega', and 'Giga', equalling 2^10, 2^20, and 2^30
+ bytes respectively. Such letter suffixes can also be entirely omitted.
  
-+static inline int pci_get_legacy_ide_irq(struct pci_dev *dev, int channel)
-+{
-+	/* no legacy IRQ on arm64 */
-+	return -ENODEV;
-+}
-+
- extern int isa_dma_bridge_buggy;
  
- #ifdef CONFIG_PCI
-diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-index ce5836c..c17e7ea 100644
---- a/arch/arm64/kernel/pci.c
-+++ b/arch/arm64/kernel/pci.c
-@@ -10,6 +10,7 @@
-  *
-  */
+-	acpi=		[HW,ACPI,X86]
++	acpi=		[HW,ACPI,X86,ARM64]
+ 			Advanced Configuration and Power Interface
+ 			Format: { force | off | strict | noirq | rsdt }
+ 			force -- enable ACPI if default was off
+@@ -175,6 +175,7 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+ 				strictly ACPI specification compliant.
+ 			rsdt -- prefer RSDT over (default) XSDT
+ 			copy_dsdt -- copy DSDT to memory
++			For ARM64, ONLY "acpi=off" or "acpi=force" are available
  
-+#include <linux/acpi.h>
- #include <linux/init.h>
- #include <linux/io.h>
- #include <linux/kernel.h>
-@@ -68,3 +69,27 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
- 	bus->domain_nr = domain;
+ 			See also Documentation/power/runtime_pm.txt, pci=noacpi
+ 
+diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+index 8b837ab..496c33b 100644
+--- a/arch/arm64/include/asm/acpi.h
++++ b/arch/arm64/include/asm/acpi.h
+@@ -26,6 +26,13 @@ static inline void disable_acpi(void)
+ 	acpi_noirq = 1;
  }
- #endif
-+
-+/*
-+ * raw_pci_read/write - Platform-specific PCI config space access.
-+ */
-+int raw_pci_read(unsigned int domain, unsigned int bus,
-+		  unsigned int devfn, int reg, int len, u32 *val)
+ 
++static inline void enable_acpi(void)
 +{
-+	return -EINVAL;
++	acpi_disabled = 0;
++	acpi_pci_disabled = 0;
++	acpi_noirq = 0;
 +}
 +
-+int raw_pci_write(unsigned int domain, unsigned int bus,
-+		unsigned int devfn, int reg, int len, u32 val)
-+{
-+	return -EINVAL;
-+}
+ /*
+  * It's used from ACPI core in kdump to boot UP system with SMP kernel,
+  * with this check the ACPI core will not override the CPU index
+@@ -40,6 +47,8 @@ static inline bool acpi_has_cpu_in_madt(void)
+ 
+ static inline void arch_fix_phys_package_id(int num, u32 slot) { }
+ 
++#else
++static inline void disable_acpi(void) { }
+ #endif /* CONFIG_ACPI */
+ 
+ #endif /*_ASM_ACPI_H*/
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index 7f67c01..afe10b4 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -67,3 +67,20 @@ void __init acpi_boot_table_init(void)
+ 	if (acpi_table_init())
+ 		disable_acpi();
+ }
 +
-+#ifdef CONFIG_ACPI
-+/* Root bridge scanning */
-+struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
++static int __init parse_acpi(char *arg)
 +{
-+	/* TODO: Should be revisited when implementing PCI on ACPI */
-+	return NULL;
++	if (!arg)
++		return -EINVAL;
++
++	/* "acpi=off" disables both ACPI table parsing and interpreter */
++	if (strcmp(arg, "off") == 0)
++		disable_acpi();
++	else if (strcmp(arg, "force") == 0) /* force ACPI to be enabled */
++		enable_acpi();
++	else
++		return -EINVAL;	/* Core will print when we return error */
++
++	return 0;
 +}
-+#endif
++early_param("acpi", parse_acpi);
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 726b019..fc4fb7b 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -62,6 +62,7 @@
+ #include <asm/memblock.h>
+ #include <asm/psci.h>
+ #include <asm/efi.h>
++#include <asm/acpi.h>
+ 
+ unsigned int processor_id;
+ EXPORT_SYMBOL(processor_id);
+@@ -388,6 +389,13 @@ void __init setup_arch(char **cmdline_p)
+ 	early_fixmap_init();
+ 	early_ioremap_init();
+ 
++	/*
++	 * Disable ACPI before early parameters parsed and
++	 * it will be enabled in parse_early_param() if
++	 * "acpi=force" is passed
++	 */
++	disable_acpi();
++
+ 	parse_early_param();
+ 
+ 	/*
 -- 
 1.9.1
