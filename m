@@ -1,36 +1,55 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 02 Feb 2015 20:07:53 +0300
-Subject: [PATCH v2] ahci_xgene: Fix the dma state machine lockup for the
- ATA_CMD_SMART PIO mode command.
-In-Reply-To: <1422878229-20488-2-git-send-email-stripathi@apm.com>
-References: <1422878229-20488-1-git-send-email-stripathi@apm.com>
- <1422878229-20488-2-git-send-email-stripathi@apm.com>
-Message-ID: <54CFAEE9.30002@cogentembedded.com>
+From: grygorii.strashko@linaro.org (grygorii.strashko at linaro.org)
+Date: Mon,  2 Feb 2015 19:14:31 +0200
+Subject: [PATCH] hwmon: tmp102: add hibernation callbacks
+Message-ID: <1422897271-24068-1-git-send-email-grygorii.strashko@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+From: Grygorii Strashko <Grygorii.Strashko@linaro.org>
 
-On 02/02/2015 02:57 PM, Suman Tripathi wrote:
+Setting a dev_pm_ops suspend/resume pair but not a set of
+hibernation functions means those pm functions will not be
+called upon hibernation.
+Fix this by using SIMPLE_DEV_PM_OPS, which appropriately
+assigns the suspend and hibernation handlers.
 
-> This patch addresses the issue with ATA_CMD_SMART pio mode
-> command for enumeration and device detection with ATA devices.
-> The X-Gene AHCI controller has an errata in which it cannot clear
-> the BSY bit after the PIO setup FIS. The dma state machine enters
-> CMFatalErrorUpdate state and locks up. It is the same issue as
-> in the commit 2a0bdff6b958d1b2523d2754b6cd5e0ea4053016(fix the
+Signed-off-by: Grygorii Strashko <Grygorii.Strashko@linaro.org>
+---
+ drivers/hwmon/tmp102.c | 13 +++----------
+ 1 file changed, 3 insertions(+), 10 deletions(-)
 
-    You forgot a space before '('.
-
-> dma state machine lockup for the IDENTIFY DEVICE PIO mode
-> command).
-
-    Actually, the summary is "ahci_xgene: fix the dma state machine lockup for 
-the IDENTIFY DEVICE PIO mode command.", i.e. yours is missing a prefix.
-
-[...]
-
-> Signed-off-by: Suman Tripathi <stripathi@apm.com>
-> Reported-by:   Mark Langsdorf <mlangsdo@redhat.com>
-
-MBR, Sergei
+diff --git a/drivers/hwmon/tmp102.c b/drivers/hwmon/tmp102.c
+index 6748b45..4f790f5 100644
+--- a/drivers/hwmon/tmp102.c
++++ b/drivers/hwmon/tmp102.c
+@@ -281,17 +281,10 @@ static int tmp102_resume(struct device *dev)
+ 	config &= ~TMP102_CONF_SD;
+ 	return i2c_smbus_write_word_swapped(client, TMP102_CONF_REG, config);
+ }
+-
+-static const struct dev_pm_ops tmp102_dev_pm_ops = {
+-	.suspend	= tmp102_suspend,
+-	.resume		= tmp102_resume,
+-};
+-
+-#define TMP102_DEV_PM_OPS (&tmp102_dev_pm_ops)
+-#else
+-#define	TMP102_DEV_PM_OPS NULL
+ #endif /* CONFIG_PM */
+ 
++SIMPLE_DEV_PM_OPS(tmp102_dev_pm_ops, tmp102_suspend, tmp102_resume);
++
+ static const struct i2c_device_id tmp102_id[] = {
+ 	{ "tmp102", 0 },
+ 	{ }
+@@ -300,7 +293,7 @@ MODULE_DEVICE_TABLE(i2c, tmp102_id);
+ 
+ static struct i2c_driver tmp102_driver = {
+ 	.driver.name	= DRIVER_NAME,
+-	.driver.pm	= TMP102_DEV_PM_OPS,
++	.driver.pm	= &tmp102_dev_pm_ops,
+ 	.probe		= tmp102_probe,
+ 	.remove		= tmp102_remove,
+ 	.id_table	= tmp102_id,
+-- 
+1.9.1
