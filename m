@@ -1,102 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 2 Feb 2015 12:44:02 -0800
-Subject: [PATCH v13 3/6] clk: Make clk API return per-user struct clk
- instances
-In-Reply-To: <54CFD0B1.2000003@ti.com>
-References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
- <1422011024-32283-4-git-send-email-tomeu.vizoso@collabora.com>
- <20150201212432.22722.70917@quantum> <54CFD0B1.2000003@ti.com>
-Message-ID: <20150202204402.GG9418@atomide.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 02 Feb 2015 23:49:32 +0300
+Subject: [PATCH] ARM: shmobile: silk: initial device tree
+In-Reply-To: <1608366.HtA9yBksdO@wasted.cogentembedded.com>
+References: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
+ <1608366.HtA9yBksdO@wasted.cogentembedded.com>
+Message-ID: <54CFE2DC.10100@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [150202 11:35]:
-> On 02/01/2015 11:24 PM, Mike Turquette wrote:
-> >Quoting Tomeu Vizoso (2015-01-23 03:03:30)
-> >
-> >AFAICT this doesn't break anything, but booting on OMAP3+ results in
-> >noisy WARNs.
-> >
-> >I think the correct fix is to replace clk_bypass and clk_ref pointers
-> >with a simple integer parent_index. In fact we already have this index.
-> >See how the pointers are populated in ti_clk_register_dpll:
-> 
-> The problem is we still need to be able to get runtime parent clock rates
-> (the parent rate may change also), so simple index value is not sufficient.
-> We need a handle of some sort to the bypass/ref clocks. The DPLL code
-> generally requires knowledge of the bypass + reference clock rates to work
-> properly, as it calculates the M/N values based on these.
-> 
-> Shall I change the DPLL code to check against clk_hw pointers or what is the
-> preferred approach here? The patch at the end does this and fixes the dpll
-> related warnings.
-> 
-> Btw, the rate constraints patch broke boot for me completely, but sounds
-> like you reverted it already.
+Hello.
 
-Thanks Tero, looks like your fix fixes all the issues I'm seeing with
-commit 59cf3fcf9baf. That is noisy dmesg, dpll_abe_ck not locking
-on 4430sdp, and off-idle not working for omap3.
+On 01/31/2015 01:52 AM, Sergei Shtylyov wrote:
 
-I could not get the patch to apply, below is what I applied manually.
+> Add the initial device tree for the R8A7794 SoC based SILK low cost board.
+> SCIF2 serial port support is included, so that the serial console can work.
 
-Mike, If possible, maybe fold this into 59cf3fcf9baf? It applies with
-some fuzz on that too. And inn that case, please feel also to add the
-following for Tomeu's patch:
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Tested-by: Tony Lindgren <tony@atomide.com>
+> ---
+> This patch is against the 'renesas-devel-20150129-v3.19-rc6' tag of Simon
+> Horman's 'renesas.git' repo.
+>
+>   arch/arm/boot/dts/Makefile         |    1
+>   arch/arm/boot/dts/r8a7794-silk.dts |   41 +++++++++++++++++++++++++++++++++++++
+>   2 files changed, 42 insertions(+)
+>
+> Index: renesas/arch/arm/boot/dts/Makefile
+> ===================================================================
+> --- renesas.orig/arch/arm/boot/dts/Makefile
+> +++ renesas/arch/arm/boot/dts/Makefile
+> @@ -421,6 +421,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += eme
+>   	r8a7791-koelsch.dtb \
+>   	r8a7791-porter.dtb \
 
-8<------------
-From: Tero Kristo <t-kristo@ti.com>
-Date: Mon, 2 Feb 2015 12:17:00 -0800
-Subject: [PATCH] ARM: OMAP3+: clock: dpll: fix logic for comparing parent clocks
+    Oops, the patch was additionally against the Henninger->Porter rename 
+patch. I will fix that.
 
-DPLL code uses reference and bypass clock pointers for determining runtime
-properties for these clocks, like parent clock rates.
-As clock API now returns per-user clock structs, using a global handle
-in the clock driver code does not work properly anymore. Fix this by
-using the clk_hw instead, and comparing this against the parents.
+>   	r8a7794-alt.dtb \
+> +	r8a7794-silk.dtb \
+>   	sh73a0-kzm9g.dtb
 
-Fixes: 59cf3fcf9baf ("clk: Make clk API return per-user struct clk instances")
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
-[tony at atomide.com: updated to apply]
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/arch/arm/mach-omap2/dpll3xxx.c
-+++ b/arch/arm/mach-omap2/dpll3xxx.c
-@@ -410,7 +410,7 @@ int omap3_noncore_dpll_enable(struct clk_hw *hw)
- 	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
- 	int r;
- 	struct dpll_data *dd;
--	struct clk *parent;
-+	struct clk_hw *parent;
- 
- 	dd = clk->dpll_data;
- 	if (!dd)
-@@ -427,13 +427,13 @@ int omap3_noncore_dpll_enable(struct clk_hw *hw)
- 		}
- 	}
- 
--	parent = __clk_get_parent(hw->clk);
-+	parent = __clk_get_hw(__clk_get_parent(hw->clk));
- 
- 	if (__clk_get_rate(hw->clk) == __clk_get_rate(dd->clk_bypass)) {
--		WARN_ON(parent != dd->clk_bypass);
-+		WARN_ON(parent != __clk_get_hw(dd->clk_bypass));
- 		r = _omap3_noncore_dpll_bypass(clk);
- 	} else {
--		WARN_ON(parent != dd->clk_ref);
-+		WARN_ON(parent != __clk_get_hw(dd->clk_ref));
- 		r = _omap3_noncore_dpll_lock(clk);
- 	}
- 
-@@ -549,7 +549,8 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
- 	if (!dd)
- 		return -EINVAL;
- 
--	if (__clk_get_parent(hw->clk) != dd->clk_ref)
-+	if (__clk_get_hw(__clk_get_parent(hw->clk)) !=
-+	    __clk_get_hw(dd->clk_ref))
- 		return -EINVAL;
- 
- 	if (dd->last_rounded_rate == 0)
+WBR, Sergei
