@@ -1,99 +1,118 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 02 Feb 2015 16:15:23 +0000
-Subject: [PATCH] PCI: Fix pcibios_update_irq misuse of irq number
-In-Reply-To: <CAErSpo6jOs+MBpAjDxkeVp5AqU1Ln+_-k8Xgb2eqPm3Lv6Udzw@mail.gmail.com>
-References: <1422456683-797-1-git-send-email-marc.zyngier@arm.com>
- <54C8FE61.1030304@linux.intel.com> <54C8FFE0.3030007@arm.com>
- <CAErSpo6jOs+MBpAjDxkeVp5AqU1Ln+_-k8Xgb2eqPm3Lv6Udzw@mail.gmail.com>
-Message-ID: <54CFA29B.9000200@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 2 Feb 2015 08:12:37 -0800
+Subject: [PATCH v13 4/6] clk: Add rate constraints to clocks
+In-Reply-To: <CAMuHMdU4QBVOb4WqmcfHkj2K7v8dt1hKKWXS0qAnTvsJSafdPQ@mail.gmail.com>
+References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1422011024-32283-5-git-send-email-tomeu.vizoso@collabora.com>
+ <CAMuHMdUGgA70o2SgdJR3X6AkCcMssHU0POLfzppADT-O=BrYDw@mail.gmail.com>
+ <54CA8662.7040008@codeaurora.org>
+ <20150131013158.GA4323@codeaurora.org>
+ <CAAObsKDxhV7Vveq5FizTUp9ur2Rsq1bM+YQa4uPksh5ntMQV3Q@mail.gmail.com>
+ <20150201221856.421.6151@quantum>
+ <CAMuHMdU4QBVOb4WqmcfHkj2K7v8dt1hKKWXS0qAnTvsJSafdPQ@mail.gmail.com>
+Message-ID: <20150202161237.GG16250@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/01/15 15:43, Bjorn Helgaas wrote:
-> On Wed, Jan 28, 2015 at 9:27 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> Hi Gerry,
->>
->> On 28/01/15 15:21, Jiang Liu wrote:
->>>
->>>
->>> On 2015/1/28 22:51, Marc Zyngier wrote:
->>>> pcibios_update_irq writes an irq number into the config space
->>>> of a given PCI device, but ignores the fact that this number
->>>> is a virtual interrupt number, which might be a very different
->>>> value from what the underlying hardware is using.
->>>>
->>>> The obvious fix is to fetch the HW interrupt number from the
->>>> corresponding irq_data structure. This is slightly complicated
->>>> by the fact that this interrupt might be services by a stacked
->>>> domain.
->>>>
->>>> This has been tested on KVM with kvmtool.
->>>>
->>>> Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->>>> Tested-by: Andre Przywara <andre.przywara@arm.com>
->>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>> ---
->>>>  drivers/pci/setup-irq.c | 12 ++++++++++--
->>>>  1 file changed, 10 insertions(+), 2 deletions(-)
->>>>
->>>> diff --git a/drivers/pci/setup-irq.c b/drivers/pci/setup-irq.c
->>>> index 4e2d595..828cbc9 100644
->>>> --- a/drivers/pci/setup-irq.c
->>>> +++ b/drivers/pci/setup-irq.c
->>>> @@ -15,11 +15,19 @@
->>>>  #include <linux/errno.h>
->>>>  #include <linux/ioport.h>
->>>>  #include <linux/cache.h>
->>>> +#include <linux/irq.h>
->>>>
->>>>  void __weak pcibios_update_irq(struct pci_dev *dev, int irq)
->>>>  {
->>>> -    dev_dbg(&dev->dev, "assigning IRQ %02d\n", irq);
->>>> -    pci_write_config_byte(dev, PCI_INTERRUPT_LINE, irq);
->>>> +    struct irq_data *d;
->>>> +
->>>> +    d = irq_get_irq_data(irq);
->>>> +#ifdef CONFIG_IRQ_DOMAIN_HIERARCHY
->>>> +    while (d->parent_data)
->>>> +            d = d->parent_data;
->>>> +#endif
->>>> +    dev_dbg(&dev->dev, "assigning IRQ %02ld\n", d->hwirq);
->>>> +    pci_write_config_byte(dev, PCI_INTERRUPT_LINE, d->hwirq);
->>>>  }
->>> Hi Mark,
->>>       Instead of modifying the common version, how about
->>> implementing an arch specific version? Arch may have different
->>> way to determine the irq number. Above implementation doesn't
->>> work with x86, for example.
->>
->> If you look at the Makefile, this file is used on:
->>
->> obj-$(CONFIG_ALPHA) += setup-irq.o
->> obj-$(CONFIG_ARM) += setup-irq.o
->> obj-$(CONFIG_UNICORE32) += setup-irq.o
->> obj-$(CONFIG_SUPERH) += setup-irq.o
->> obj-$(CONFIG_MIPS) += setup-irq.o
->> obj-$(CONFIG_TILE) += setup-irq.o
->> obj-$(CONFIG_SPARC_LEON) += setup-irq.o
->> obj-$(CONFIG_M68K) += setup-irq.o
->>
->> x86 doesn't use that at all.
+* Geert Uytterhoeven <geert@linux-m68k.org> [150202 00:03]:
+> On Sun, Feb 1, 2015 at 11:18 PM, Mike Turquette <mturquette@linaro.org> wrote:
+> > Quoting Tomeu Vizoso (2015-01-31 10:36:22)
+> >> On 31 January 2015 at 02:31, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> >> > On 01/29, Stephen Boyd wrote:
+> >> >> On 01/29/15 05:31, Geert Uytterhoeven wrote:
+> >> >> > Hi Tomeu, Mike,
+> >> >> >
+> >> >> > On Fri, Jan 23, 2015 at 12:03 PM, Tomeu Vizoso
+> >> >> > <tomeu.vizoso@collabora.com> wrote:
+> >> >> >> --- a/drivers/clk/clk.c
+> >> >> >> +++ b/drivers/clk/clk.c
+> >> >> >> @@ -2391,25 +2543,24 @@ int __clk_get(struct clk *clk)
+> >> >> >>         return 1;
+> >> >> >>  }
+> >> >> >>
+> >> >> >> -static void clk_core_put(struct clk_core *core)
+> >> >> >> +void __clk_put(struct clk *clk)
+> >> >> >>  {
+> >> >> >>         struct module *owner;
+> >> >> >>
+> >> >> >> -       owner = core->owner;
+> >> >> >> +       if (!clk || WARN_ON_ONCE(IS_ERR(clk)))
+> >> >> >> +               return;
+> >> >> >>
+> >> >> >>         clk_prepare_lock();
+> >> >> >> -       kref_put(&core->ref, __clk_release);
+> >> >> >> +
+> >> >> >> +       hlist_del(&clk->child_node);
+> >> >> >> +       clk_core_set_rate_nolock(clk->core, clk->core->req_rate);
+> >> >> > At this point, clk->core->req_rate is still zero, causing
+> >> >> > cpg_div6_clock_round_rate() to be called with a zero "rate" parameter,
+> >> >> > e.g. on r8a7791:
+> >> >>
+> >> >> Hmm.. I wonder if we should assign core->req_rate to be the same as
+> >> >> core->rate during __clk_init()? That would make this call to
+> >> >> clk_core_set_rate_nolock() a nop in this case.
+> >> >>
+> >> >
+> >> > Here's a patch to do this
+> >> >
+> >> > ---8<----
+> >> > From: Stephen Boyd <sboyd@codeaurora.org>
+> >> > Subject: [PATCH] clk: Assign a requested rate by default
+> >> >
+> >> > We need to assign a requested rate here so that we avoid
+> >> > requesting a rate of 0 on clocks when we remove clock consumers.
+> >>
+> >> Hi, this looks good to me.
+> >>
+> >> Reviewed-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> >
+> > It seems to fix the total boot failure on OMAPs, and hopefully does the
+> > same for SH Mobile and others. I've squashed this into Tomeu's rate
+> > constraints patch to maintain bisect.
 > 
-> Since you're looking at this, Marc, do you see a nice way to get rid
-> of these arch dependencies in the Makefile and unify this a bit?  We
-> still have this pci_fixup_irqs() ugliness -- it's not really
-> arch-specific at all, but it's called from arch code, and it uses
-> for_each_pci_dev(), which obviously only works for things present at
-> boot and not for things hot-added later.
+> Yes, it fixes shmobile. .round_rate() is now called with a sane value of rate.
 
-I can have a look at this in the next cycle - I'm a bit strapped for
-time just now.
+Looks like next-20150202 now produces tons of the following errors,
+these from omap4:
 
-As for for_each_pci_dev(), I'm not completely clear about what it should
-be replaced for. Do we have some form of notifier for this?
+[   10.568206] ------------[ cut here ]------------
+[   10.568206] WARNING: CPU: 0 PID: 1 at drivers/clk/clk.c:925 clk_disable+0x28/0x34()
+[   10.568237] Modules linked in:
+[   10.568237] CPU: 0 PID: 1 Comm: swapper/0 Tainted: G        W       3.19.0-rc6-next-20150202 #2037
+[   10.568237] Hardware name: Generic OMAP4 (Flattened Device Tree)
+[   10.568267] [<c0015bdc>] (unwind_backtrace) from [<c001222c>] (show_stack+0x10/0x14)
+[   10.568267] [<c001222c>] (show_stack) from [<c05d2014>] (dump_stack+0x84/0x9c)
+[   10.568267] [<c05d2014>] (dump_stack) from [<c003ea90>] (warn_slowpath_common+0x7c/0xb8)
+[   10.568298] [<c003ea90>] (warn_slowpath_common) from [<c003eb68>] (warn_slowpath_null+0x1c/0x24)
+[   10.568298] [<c003eb68>] (warn_slowpath_null) from [<c04c1ffc>] (clk_disable+0x28/0x34)
+[   10.568328] [<c04c1ffc>] (clk_disable) from [<c0025b3c>] (_disable_clocks+0x18/0x68)
+[   10.568328] [<c0025b3c>] (_disable_clocks) from [<c0026f14>] (_idle+0x10c/0x214)
+[   10.568328] [<c0026f14>] (_idle) from [<c0855fac>] (_setup+0x338/0x410)
+[   10.568359] [<c0855fac>] (_setup) from [<c0027360>] (omap_hwmod_for_each+0x34/0x60)
+[   10.568359] [<c0027360>] (omap_hwmod_for_each) from [<c08563c4>] (__omap_hwmod_setup_all+0x30/0x40)
+[   10.568389] [<c08563c4>] (__omap_hwmod_setup_all) from [<c0008a04>] (do_one_initcall+0x80/0x1dc)
+[   10.568389] [<c0008a04>] (do_one_initcall) from [<c0848ea0>] (kernel_init_freeable+0x204/0x2d0)
+[   10.568420] [<c0848ea0>] (kernel_init_freeable) from [<c05cdab8>] (kernel_init+0x8/0xec)
+[   10.568420] [<c05cdab8>] (kernel_init) from [<c000e790>] (ret_from_fork+0x14/0x24)
+[   10.568420] ---[ end trace cb88537fdc8fa211 ]---
 
-Thanks,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+[   10.568450] ------------[ cut here ]------------
+[   10.568450] WARNING: CPU: 0 PID: 1 at arch/arm/mach-omap2/dpll3xxx.c:436 omap3_noncore_dpll_enable+0xdc/0
+x10c()
+[   10.568450] Modules linked in:
+[   10.568481] CPU: 0 PID: 1 Comm: swapper/0 Tainted: G        W       3.19.0-rc6-next-20150202 #2037
+[   10.568481] Hardware name: Generic OMAP4 (Flattened Device Tree)
+[   10.568481] [<c0015bdc>] (unwind_backtrace) from [<c001222c>] (show_stack+0x10/0x14)
+[   10.568511] [<c001222c>] (show_stack) from [<c05d2014>] (dump_stack+0x84/0x9c)
+[   10.568511] [<c05d2014>] (dump_stack) from [<c003ea90>] (warn_slowpath_common+0x7c/0xb8)
+[   10.568511] [<c003ea90>] (warn_slowpath_common) from [<c003eb68>] (warn_slowpath_null+0x1c/0x24)
+[   10.568542] [<c003eb68>] (warn_slowpath_null) from [<c0035800>] (omap3_noncore_dpll_enable+0xdc/0x10c)
+[   10.568542] [<c0035800>] (omap3_noncore_dpll_enable) from [<c04c0a10>] (clk_core_enable+0x60/0x9c)
+[   10.568572] [<c04c0a10>] (clk_core_enable) from [<c04c09f0>] (clk_core_enable+0x40/0x9c)
+[   10.568572] ---[ end trace cb88537fdc8fa212 ]---
+...
+
+Regards,
+
+Tony
