@@ -1,140 +1,49 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Mon, 2 Feb 2015 18:51:58 +0530
-Subject: [PATCH v4 0/8] Support for Fujitsu MB86S7X SoCs
-In-Reply-To: <1421663016-1327-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
-References: <1421663016-1327-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
-Message-ID: <CAJe_ZhdqsTwD0KxzVzCCHExsoepCkLR2hXUbjnnmvSFhhvmgdw@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 2 Feb 2015 14:39:36 +0100
+Subject: N900 v3.19-rc5 arm atags_to_fdt.c is broken
+In-Reply-To: <alpine.LFD.2.11.1501271014160.1322@knanqh.ubzr>
+References: <201501232239.55801@pali> <201501232336.36187@pali>
+ <20150126161454.GE28663@atomide.com> <201501261723.10505@pali>
+ <20150126170323.GF28663@atomide.com>
+ <alpine.LFD.2.11.1501261318590.1322@knanqh.ubzr>
+ <20150127133739.GB25306@amd>
+ <alpine.LFD.2.11.1501271014160.1322@knanqh.ubzr>
+Message-ID: <20150202133936.GA26985@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,  Hi Olof,
+On Tue 2015-01-27 10:16:24, Nicolas Pitre wrote:
+> On Tue, 27 Jan 2015, Pavel Machek wrote:
+> 
+> > 
+> > > > > I would say, problem is because omap3-n900 binary DT is too large
+> > > 
+> > > I agree.
+> > > 
+> > > > OK if that's the case, then your patch makes sense to me. It also
+> > > > seems we can have the temporary stack be larger than the initial
+> > > > stack just for atags_to_fdt.
+> > > 
+> > > The stack size isn't the issue, but rather its location.  We need to 
+> > > position it away from the DT data.  The DT size is known and we could 
+> > > use that, plus some room for the insertion of new data coming from the
+> > > ATAG conversion.
+> > > 
+> > > Something like the following would be a more robust solution:
+> > 
+> > Tested-by: Pavel Machek <pavel@ucw.cz>
+> > 
+> > (Note, that in 3.19 dts for n900 got too big, so we are actually
+> > triggering old bugs. That means that this is a regression fix, and
+> > should go in ASAP).
+> 
+> It is queued here:
+> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8294/1
 
-  ... just a polite ping on the patchset.
-
-Thanks.
-
-On 19 January 2015 at 15:53, Vincent Yang
-<vincent.yang.fujitsu@gmail.com> wrote:
-> Hello,
->
->   Fujitsu have a series of SoC already shipping based around
-> variations of 2xCA7+2xCA15 big.LITTLE architecture, and we would like
-> to upstream the basic support in this series.
->
->   MB86S70 is a big.LITTLE platform with 2xCA7+2xCA15 and an additional
-> CM3 as the master. MB86S73 is a simple 2xCA7 and an additional CM3
-> master.
->
->   The DT includes references to sdhci patches which are being sent to
-> the mmc list at the same time.
->
->   We welcome any comments or questions.
->
-> Changes since v3:
-> * Identify platform, by checking presence of DT node
-> "fujitsu,mb86s70-scb-1.0" before populating cpu clocks and MCPM
-> support.
-> * Disable clock upon gpio module remove
-> * Lower init level of gpio driver from subsys_initcall to module_init
-> * Use managed device resource allocation in MHU driver
->
-> Changes since v2:
-> * Minor cleanup of MCPM as suggested by Nicolas Pitre.
->
-> Changes since v1:
-> * Thanks to Arnd, modified clock driver to populate clocks only when
-> some user need them. Node name changed from "fujitsu,mb86s70-clk" to
-> "fujitsu,mb86s70-crg11" . Controller+Domain+Port of a clock are now
-> three cells specified by the user node.
-> * aliases moved into board DTS files
-> * Voltage supply moved as per-board DT node.
-> * Removed default overly verbose loglevel=8
-> * Specify -march=armv7-a flag for mcpm.c and smc.S that contain ARMv7
-> specific code.
-> * Removed wrongly put outer_flush_all(), now using standard
-> v7_exit_coherency_flush() instead of platform specific macro.
-> * Simplified GPIO offset calculations in gpio-mb86s70.c driver. And
-> added .remove() for the driver
-> * ARM MHU driver provided a .remove() to enable module unloading.
-> * A few other misc cleanups suggested in v1 submission.
->
-> Thanks.
->
-> Jassi Brar (8):
->   ARM: Add platform support for Fujitsu MB86S7X SoCs
->   mailbox: arm_mhu: add driver for ARM MHU controller
->   ARM: MB86S7X: Add MCPM support
->   clk: Add clock driver for mb86s7x
->   gpio: Add Fujitsu MB86S7x GPIO driver
->   dt: mb86s7x: add dt files for MB86S7x evbs
->   of: add Fujitsu vendor prefix
->   ARM: MB86S7x: Add configs
->
->  Documentation/devicetree/bindings/arm/mb86s7x.txt  |   8 +
->  .../bindings/clock/fujitsu,mb86s70-crg11.txt       |  26 +
->  .../bindings/gpio/fujitsu,mb86s70-gpio.txt         |  20 +
->  .../devicetree/bindings/mailbox/arm-mhu.txt        |  33 ++
->  .../devicetree/bindings/soc/mb86s7x/scb_mhu.txt    |  35 ++
->  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
->  MAINTAINERS                                        |   7 +
->  arch/arm/Kconfig                                   |   2 +
->  arch/arm/Makefile                                  |   1 +
->  arch/arm/boot/dts/Makefile                         |   1 +
->  arch/arm/boot/dts/mb86s70.dtsi                     |  91 ++++
->  arch/arm/boot/dts/mb86s70eb.dts                    |  57 +++
->  arch/arm/boot/dts/mb86s73.dtsi                     |  63 +++
->  arch/arm/boot/dts/mb86s73eb.dts                    |  44 ++
->  arch/arm/boot/dts/mb86s7x.dtsi                     | 140 ++++++
->  arch/arm/configs/fujitsu_defconfig                 | 232 +++++++++
->  arch/arm/configs/multi_v7_defconfig                |   5 +
->  arch/arm/mach-mb86s7x/Kconfig                      |  19 +
->  arch/arm/mach-mb86s7x/Makefile                     |   3 +
->  arch/arm/mach-mb86s7x/board.c                      |  23 +
->  arch/arm/mach-mb86s7x/mcpm.c                       | 318 +++++++++++++
->  arch/arm/mach-mb86s7x/smc.S                        |  27 ++
->  drivers/clk/Makefile                               |   1 +
->  drivers/clk/clk-mb86s7x.c                          | 386 +++++++++++++++
->  drivers/gpio/Kconfig                               |   6 +
->  drivers/gpio/Makefile                              |   1 +
->  drivers/gpio/gpio-mb86s7x.c                        | 232 +++++++++
->  drivers/mailbox/Kconfig                            |   7 +
->  drivers/mailbox/Makefile                           |   2 +
->  drivers/mailbox/arm_mhu.c                          | 211 ++++++++
->  drivers/soc/Makefile                               |   1 +
->  drivers/soc/mb86s7x/Makefile                       |   4 +
->  drivers/soc/mb86s7x/scb_mhu.c                      | 528 +++++++++++++++++++++
->  include/soc/mb86s7x/scb_mhu.h                      | 105 ++++
->  34 files changed, 2640 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/mb86s7x.txt
->  create mode 100644 Documentation/devicetree/bindings/clock/fujitsu,mb86s70-crg11.txt
->  create mode 100644 Documentation/devicetree/bindings/gpio/fujitsu,mb86s70-gpio.txt
->  create mode 100644 Documentation/devicetree/bindings/mailbox/arm-mhu.txt
->  create mode 100644 Documentation/devicetree/bindings/soc/mb86s7x/scb_mhu.txt
->  create mode 100644 arch/arm/boot/dts/mb86s70.dtsi
->  create mode 100644 arch/arm/boot/dts/mb86s70eb.dts
->  create mode 100644 arch/arm/boot/dts/mb86s73.dtsi
->  create mode 100644 arch/arm/boot/dts/mb86s73eb.dts
->  create mode 100644 arch/arm/boot/dts/mb86s7x.dtsi
->  create mode 100644 arch/arm/configs/fujitsu_defconfig
->  create mode 100644 arch/arm/mach-mb86s7x/Kconfig
->  create mode 100644 arch/arm/mach-mb86s7x/Makefile
->  create mode 100644 arch/arm/mach-mb86s7x/board.c
->  create mode 100644 arch/arm/mach-mb86s7x/mcpm.c
->  create mode 100644 arch/arm/mach-mb86s7x/smc.S
->  create mode 100644 drivers/clk/clk-mb86s7x.c
->  create mode 100644 drivers/gpio/gpio-mb86s7x.c
->  create mode 100644 drivers/mailbox/arm_mhu.c
->  create mode 100644 drivers/soc/mb86s7x/Makefile
->  create mode 100644 drivers/soc/mb86s7x/scb_mhu.c
->  create mode 100644 include/soc/mb86s7x/scb_mhu.h
->
-> --
-> 1.9.0
->
-
-
-
+Hmm, but it should be on kernel.org, not in private arm trees, as it
+fixes a regression. Russell, you are the ARM maintainer, can you push
+it to Linus?
+									Pavel
 -- 
-Linaro.org ? Open source software for ARM SoCs | Follow Linaro
-http://facebook.com/pages/Linaro/155974581091106  -
-http://twitter.com/#!/linaroorg - http://linaro.org/linaro-blog
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
