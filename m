@@ -1,33 +1,52 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 02 Feb 2015 14:20:23 +0100
-Subject: [PATCH v5 4/9] ARM: dts: exynos4: add dependency between TV and LCD0
- power domains
+Date: Mon, 02 Feb 2015 14:20:26 +0100
+Subject: [PATCH v5 7/9] ARM: dts: Exynos: add 'hdmi' clock to mixer nodes
 In-Reply-To: <1422883228-10690-1-git-send-email-m.szyprowski@samsung.com>
 References: <1422883228-10690-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1422883228-10690-5-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1422883228-10690-8-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TV Mixer needs both TV and LCD0 domains enabled to be fully operational.
-This dependency is modelled by making TV power domains a sub-domain of
-LCD0 power domain.
+Mixed block needs to control hdmi clock to properly perform power on/off
+operation, so add 'hdmi' clock also to mixer nodes.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- arch/arm/boot/dts/exynos4.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/exynos5250.dtsi | 5 +++--
+ arch/arm/boot/dts/exynos5420.dtsi | 5 +++--
+ 2 files changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-index d9516471c41e..a59b3fae3680 100644
---- a/arch/arm/boot/dts/exynos4.dtsi
-+++ b/arch/arm/boot/dts/exynos4.dtsi
-@@ -101,6 +101,7 @@
- 		compatible = "samsung,exynos4210-pd";
- 		reg = <0x10023C20 0x20>;
- 		#power-domain-cells = <0>;
-+		power-domains = <&pd_lcd0>;
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index 9bb1b0b738f5..e8c67fdb69fb 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -732,8 +732,9 @@
+ 		compatible = "samsung,exynos5250-mixer";
+ 		reg = <0x14450000 0x10000>;
+ 		interrupts = <0 94 0>;
+-		clocks = <&clock CLK_MIXER>, <&clock CLK_SCLK_HDMI>;
+-		clock-names = "mixer", "sclk_hdmi";
++		clocks = <&clock CLK_MIXER>, <&clock CLK_HDMI>,
++			 <&clock CLK_SCLK_HDMI>;
++		clock-names = "mixer", "hdmi", "sclk_hdmi";
  	};
  
- 	pd_cam: cam-power-domain at 10023C00 {
+ 	dp_phy: video-phy at 10040720 {
+diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+index 9dc2e9773b30..1b624104f84a 100644
+--- a/arch/arm/boot/dts/exynos5420.dtsi
++++ b/arch/arm/boot/dts/exynos5420.dtsi
+@@ -740,8 +740,9 @@
+ 		compatible = "samsung,exynos5420-mixer";
+ 		reg = <0x14450000 0x10000>;
+ 		interrupts = <0 94 0>;
+-		clocks = <&clock CLK_MIXER>, <&clock CLK_SCLK_HDMI>;
+-		clock-names = "mixer", "sclk_hdmi";
++		clocks = <&clock CLK_MIXER>, <&clock CLK_HDMI>,
++			 <&clock CLK_SCLK_HDMI>;
++		clock-names = "mixer", "hdmi", "sclk_hdmi";
+ 		power-domains = <&disp_pd>;
+ 	};
+ 
 -- 
 1.9.2
