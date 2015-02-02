@@ -1,46 +1,30 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 02 Feb 2015 13:54:54 +0100
-Subject: [PATCH v4 9/9] drm/exynos: add support for 'hdmi' clock
-In-Reply-To: <CAOMZO5BSvxvbM0nOHk2ogY0j23PwazFCMikiiEv-XtHae3=L_g@mail.gmail.com>
-References: <1421756219-21037-1-git-send-email-m.szyprowski@samsung.com>
- <1421756219-21037-10-git-send-email-m.szyprowski@samsung.com>
- <CAOMZO5BSvxvbM0nOHk2ogY0j23PwazFCMikiiEv-XtHae3=L_g@mail.gmail.com>
-Message-ID: <54CF739E.2070407@samsung.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Mon, 2 Feb 2015 14:13:06 +0100
+Subject: [PATCH] clocksource: mark sched_clock_read functions notrace
+In-Reply-To: <1422643216-26673-1-git-send-email-nathan.sullivan@ni.com>
+References: <1422643216-26673-1-git-send-email-nathan.sullivan@ni.com>
+Message-ID: <54CF77E2.1060901@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On 2015-01-22 14:00, Fabio Estevam wrote:
-> On Tue, Jan 20, 2015 at 10:16 AM, Marek Szyprowski
-> <m.szyprowski@samsung.com> wrote:
+Hi Nathan,
+On 01/30/2015 07:40 PM, Nathan Sullivan wrote:
+> These functions will be called by ftrace code when function_graph is
+> used, so mark them notrace to avoid infinite recursion.
 >
->> +       mixer_res->hdmi = devm_clk_get(dev, "hdmi");
->> +       if (IS_ERR(mixer_res->hdmi)) {
->> +               dev_err(dev, "failed to get clock 'hdmi'\n");
->> +               return -ENODEV;
-> 'return PTR_ERR(mixer_res->hdmi);' would be better.
+> Signed-off-by: Nathan Sullivan <nathan.sullivan@ni.com>
+> ---
+>   drivers/clocksource/arm_arch_timer.c    |    2 +-
+>   drivers/clocksource/arm_global_timer.c  |    2 +-
+For the ARM Global timer part, you can add my:
+Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 
-ok.
+Thanks,
+Maxime
 
+>   drivers/clocksource/samsung_pwm_timer.c |    2 +-
+>   drivers/clocksource/timer-prima2.c      |    2 +-
+>   drivers/clocksource/timer-sun5i.c       |    2 +-
+>   5 files changed, 5 insertions(+), 5 deletions(-)
 >
->> +       }
->> +
->>          mixer_res->sclk_hdmi = devm_clk_get(dev, "sclk_hdmi");
->>          if (IS_ERR(mixer_res->sclk_hdmi)) {
->>                  dev_err(dev, "failed to get clock 'sclk_hdmi'\n");
->> @@ -1095,6 +1102,7 @@ static void mixer_poweron(struct exynos_drm_manager *mgr)
->>          pm_runtime_get_sync(ctx->dev);
->>
->>          clk_prepare_enable(res->mixer);
->> +       clk_prepare_enable(res->hdmi);
-> Better check whether clk_prepare_enable failed.
-
-This will be handled by a separate patch, because checking for error 
-values from
-clk_repare_enable is missing almost all over the Exynos DRM driver.
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+>
