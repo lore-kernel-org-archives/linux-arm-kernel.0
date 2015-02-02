@@ -1,50 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 2 Feb 2015 21:46:16 +0000
-Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher
- constraints with dma-parms
-In-Reply-To: <CAF6AEGuESM+e3HSRGM6zLqrp8kqRLGUYvA3KKECdm7m-nt0M=Q@mail.gmail.com>
-References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
- <1422347154-15258-2-git-send-email-sumit.semwal@linaro.org>
- <20150129143908.GA26493@n2100.arm.linux.org.uk>
- <CAO_48GEOQ1pBwirgEWeVVXW-iOmaC=Xerr2VyYYz9t1QDXgVsw@mail.gmail.com>
- <20150129154718.GB26493@n2100.arm.linux.org.uk>
- <CAF6AEGtTmFg66TK_AFkQ-xp7Nd9Evk3nqe6xCBp7K=77OmXTxA@mail.gmail.com>
- <20150129192610.GE26493@n2100.arm.linux.org.uk>
- <CAF6AEGujk8UC4X6T=yhTrz1s+SyZUQ=m05h_WcxLDGZU6bydbw@mail.gmail.com>
- <20150202165405.GX14009@phenom.ffwll.local>
- <CAF6AEGuESM+e3HSRGM6zLqrp8kqRLGUYvA3KKECdm7m-nt0M=Q@mail.gmail.com>
-Message-ID: <20150202214616.GI8656@n2100.arm.linux.org.uk>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Mon, 02 Feb 2015 23:14:39 +0100
+Subject: [PATCH v8 02/21] acpi: fix acpi_os_ioremap for arm64
+In-Reply-To: <1422881149-8177-3-git-send-email-hanjun.guo@linaro.org>
+References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
+ <1422881149-8177-3-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <2422968.Es7R0p3loO@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 02, 2015 at 03:30:21PM -0500, Rob Clark wrote:
-> On Mon, Feb 2, 2015 at 11:54 AM, Daniel Vetter <daniel@ffwll.ch> wrote:
-> >> My initial thought is for dma-buf to not try to prevent something than
-> >> an exporter can actually do.. I think the scenario you describe could
-> >> be handled by two sg-lists, if the exporter was clever enough.
-> >
-> > That's already needed, each attachment has it's own sg-list. After all
-> > there's no array of dma_addr_t in the sg tables, so you can't use one sg
-> > for more than one mapping. And due to different iommu different devices
-> > can easily end up with different addresses.
+On Monday, February 02, 2015 08:45:30 PM Hanjun Guo wrote:
+> From: Mark Salter <msalter@redhat.com>
 > 
+> The acpi_os_ioremap() function may be used to map normal RAM or IO
+> regions. The current implementation simply uses ioremap_cache(). This
+> will work for some architectures, but arm64 ioremap_cache() cannot be
+> used to map IO regions which don't support caching. So for arm64, use
+> ioremap() for non-RAM regions.
 > 
-> Well, to be fair it may not be explicitly stated, but currently one
-> should assume the dma_addr_t's in the dmabuf sglist are bogus.  With
-> gpu's that implement per-process/context page tables, I'm not really
-> sure that there is a sane way to actually do anything else..
+> CC: Rafael J Wysocki <rjw@rjwysocki.net>
+> Signed-off-by: Mark Salter <msalter@redhat.com>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  include/acpi/acpi_io.h | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/include/acpi/acpi_io.h b/include/acpi/acpi_io.h
+> index 444671e..9d573db 100644
+> --- a/include/acpi/acpi_io.h
+> +++ b/include/acpi/acpi_io.h
+> @@ -1,11 +1,17 @@
+>  #ifndef _ACPI_IO_H_
+>  #define _ACPI_IO_H_
+>  
+> +#include <linux/mm.h>
+>  #include <linux/io.h>
+>  
+>  static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
+>  					    acpi_size size)
+>  {
+> +#ifdef CONFIG_ARM64
+> +	if (!page_is_ram(phys >> PAGE_SHIFT))
+> +		return ioremap(phys, size);
+> +#endif
 
-That's incorrect - and goes dead against the design of scatterlists.
+I don't want to see #ifdef CONFIG_ARM64 in this file.
 
-Not only that, but it is entirely possible that you may get handed
-memory via dmabufs for which there are no struct page's associated
-with that memory - think about display systems which have their own
-video memory which is accessible to the GPU, but it isn't system
-memory.
+There are multiple examples of how things like this are done.  Generally,
+the logic is "If the architecture provides its own function for this, use
+that one, or use the generic one provided here otherwise."
 
-In those circumstances, you have to use the dma_addr_t's and not the
-pages.
+> +
+>         return ioremap_cache(phys, size);
+>  }
+>  
+> 
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
