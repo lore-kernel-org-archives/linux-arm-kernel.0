@@ -1,124 +1,102 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon,  2 Feb 2015 20:45:36 +0800
-Subject: [PATCH v8 08/21] dt / chosen: Add linux,
- uefi-stub-generated-dtb property
+Date: Mon,  2 Feb 2015 20:45:37 +0800
+Subject: [PATCH v8 09/21] ARM64 / ACPI: Disable ACPI if FADT revision is less
+ than 5.1
 In-Reply-To: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
 References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1422881149-8177-9-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1422881149-8177-10-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When system supporting both DT and ACPI but firmware providing
-no dtb, we can use this linux,uefi-stub-generated-dtb property
-to let kernel know that we can try ACPI configuration data even
-if no "acpi=force" is passed in early parameters.
+FADT Major.Minor version was introduced in ACPI 5.1, it is the same
+as ACPI version.
 
-CC: Mark Rutland <mark.rutland@arm.com>
-CC: Jonathan Corbet <corbet@lwn.net>
+In ACPI 5.1, some major gaps are fixed for ARM, such as updates in
+MADT table for GIC and SMP init, without those updates, we can not
+get the MPIDR for SMP init, and GICv2/3 related init information, so
+we can't boot arm64 ACPI properly with table versions predating 5.1.
+
+If firmware provides ACPI tables with ACPI version less than 5.1,
+OS has no way to retrieve the configuration data that is necessary
+to init SMP boot protocol and the GIC properly, so disable ACPI if
+we get an FADT table with version less that 5.1.
+
+CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 CC: Catalin Marinas <catalin.marinas@arm.com>
 CC: Will Deacon <will.deacon@arm.com>
-CC: Leif Lindholm <leif.lindholm@linaro.org>
-CC: Grant Likely <grant.likely@linaro.org>
-CC: Matt Fleming <matt.fleming@intel.com>
+Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+Tested-by: Yijing Wang <wangyijing@huawei.com>
+Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
+Tested-by: Jon Masters <jcm@redhat.com>
+Tested-by: Timur Tabi <timur@codeaurora.org>
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- Documentation/arm/uefi.txt         |  3 +++
- arch/arm64/include/asm/acpi.h      |  1 +
- arch/arm64/kernel/setup.c          | 30 ++++++++++++++++++++++++++++++
- drivers/firmware/efi/libstub/fdt.c |  8 ++++++++
- 4 files changed, 42 insertions(+)
+ arch/arm64/kernel/acpi.c | 34 +++++++++++++++++++++++++++++++++-
+ 1 file changed, 33 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/arm/uefi.txt b/Documentation/arm/uefi.txt
-index d60030a..5f86eae 100644
---- a/Documentation/arm/uefi.txt
-+++ b/Documentation/arm/uefi.txt
-@@ -60,5 +60,8 @@ linux,uefi-mmap-desc-ver  | 32-bit | Version of the mmap descriptor format.
- --------------------------------------------------------------------------------
- linux,uefi-stub-kern-ver  | string | Copy of linux_banner from build.
- --------------------------------------------------------------------------------
-+linux,uefi-stub-generated-dtb  | bool | Indication for no DTB provided by
-+			       |      | firmware.
-+--------------------------------------------------------------------------------
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index afe10b4..b9f64ec 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -13,6 +13,8 @@
+  *  published by the Free Software Foundation.
+  */
  
- For verbose debug messages, specify 'uefi_debug' on the kernel command line.
-diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-index 496c33b..9fcf632 100644
---- a/arch/arm64/include/asm/acpi.h
-+++ b/arch/arm64/include/asm/acpi.h
-@@ -49,6 +49,7 @@ static inline void arch_fix_phys_package_id(int num, u32 slot) { }
- 
- #else
- static inline void disable_acpi(void) { }
-+static inline void enable_acpi(void) { }
- #endif /* CONFIG_ACPI */
- 
- #endif /*_ASM_ACPI_H*/
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index fc4fb7b..510a681 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -371,6 +371,29 @@ static void __init request_standard_resources(void)
- 	}
++#define pr_fmt(fmt) "ACPI: " fmt
++
+ #include <linux/acpi.h>
+ #include <linux/bootmem.h>
+ #include <linux/cpumask.h>
+@@ -49,10 +51,32 @@ void __init __acpi_unmap_table(char *map, unsigned long size)
+ 	early_memunmap(map, size);
  }
  
-+static int __init dt_scan_chosen(unsigned long node, const char *uname,
-+			int depth, void *data)
++static int __init acpi_parse_fadt(struct acpi_table_header *table)
 +{
-+	const char *p;
-+
-+	if (depth != 1 || !data || (strcmp(uname, "chosen") != 0))
-+		return 0;
-+
-+	p = of_get_flat_dt_prop(node, "linux,uefi-stub-generated-dtb", NULL);
-+	*(bool *)data = p ? true : false;
-+
-+	return 1;
-+}
-+
-+static bool __init is_uefi_stub_generated_dtb(void)
-+{
-+	bool flag = false;
-+
-+	of_scan_flat_dt(dt_scan_chosen, &flag);
-+
-+	return flag;
-+}
-+
- u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
- 
- void __init setup_arch(char **cmdline_p)
-@@ -399,6 +422,13 @@ void __init setup_arch(char **cmdline_p)
- 	parse_early_param();
- 
- 	/*
-+	 * If no dtb provided by firmware, enable ACPI and give system a
-+	 * chance to boot with ACPI configuration data
-+	 */
-+	if (is_uefi_stub_generated_dtb() && acpi_disabled)
-+		enable_acpi();
++	struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
 +
 +	/*
- 	 *  Unmask asynchronous aborts after bringing up possible earlycon.
- 	 * (Report possible System Errors once we can report this occurred)
- 	 */
-diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
-index c846a96..3777d50 100644
---- a/drivers/firmware/efi/libstub/fdt.c
-+++ b/drivers/firmware/efi/libstub/fdt.c
-@@ -154,6 +154,14 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
- 	if (status)
- 		goto fdt_set_fail;
++	 * Revision in table header is the FADT Major revision, and there
++	 * is a minor revision of FADT which was introduced by ACPI 5.1,
++	 * we only deal with ACPI 5.1 or newer revision to get GIC and SMP
++	 * boot protocol configuration data, or we will disable ACPI.
++	 */
++	if (table->revision > 5 ||
++	    (table->revision == 5 && fadt->minor_revision >= 1))
++		return 0;
++
++	pr_warn("Unsupported FADT revision %d.%d, should be 5.1+, will disable ACPI\n",
++		table->revision, fadt->minor_revision);
++	disable_acpi();
++
++	return -EINVAL;
++}
++
+ /*
+  * acpi_boot_table_init() called from setup_arch(), always.
+  *	1. find RSDP and get its address, and then find XSDT
+  *	2. extract all tables and checksums them all
++ *	3. check ACPI FADT revision
+  *
+  * We can parse ACPI boot-time tables such as MADT after
+  * this function is called.
+@@ -64,8 +88,16 @@ void __init acpi_boot_table_init(void)
+ 		return;
  
-+	/* Add a property to show the dtb is generated by uefi stub */
-+	if (!orig_fdt) {
-+		status = fdt_setprop(fdt, node,
-+				     "linux,uefi-stub-generated-dtb", NULL, 0);
-+		if (status)
-+			goto fdt_set_fail;
+ 	/* Initialize the ACPI boot-time table parser. */
+-	if (acpi_table_init())
++	if (acpi_table_init()) {
++		disable_acpi();
++		return;
 +	}
 +
- 	return EFI_SUCCESS;
++	if (acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt)) {
++		/* disable ACPI if no FADT is found */
+ 		disable_acpi();
++		pr_err("Can't find FADT\n");
++	}
+ }
  
- fdt_set_fail:
+ static int __init parse_acpi(char *arg)
 -- 
 1.9.1
