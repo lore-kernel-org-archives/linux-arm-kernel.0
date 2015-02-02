@@ -1,65 +1,56 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 2 Feb 2015 17:14:18 +0200
-Subject: pull request for Tegra clock updates for 3.20
-Message-ID: <20150202151418.GA15776@tbergstrom-lnx.Nvidia.com>
+From: tsahee@annapurnalabs.com (Tsahee Zidenberg)
+Date: Mon, 2 Feb 2015 17:27:48 +0200
+Subject: [PATCH v3 5/5] ARM: dts: Alpine platform devicetree
+In-Reply-To: <20150202134051.GB21175@leverpostej>
+References: <54cf5d8c.sl7aclyeuuh66jXt%tsahee@annapurnalabs.com>
+ <20150202134051.GB21175@leverpostej>
+Message-ID: <CABM=7kmcPyxqah8Yek1PoSOzZarMh8eMFdakgz5k418FzMvc_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Thank you for your review!
 
-A few bug fixes and support for Tegra132 clocks.
+On 2 February 2015 at 15:40, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Mon, Feb 02, 2015 at 11:20:44AM +0000, Tsahee Zidenberg wrote:
+>> +             arch-timer {
+>> +                     compatible = "arm,cortex-a15-timer",
+>> +                                  "arm,armv7-timer";
+>> +                     interrupts =
+>> +                             <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+>> +                             <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+>> +                             <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+>> +                             <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
+>> +                     clock-frequency = <0>; /* Filled by loader */
+>
+> Your loader doesn't configure CNTFRQ?
+>
 
-Thanks,
+Not currently. setting CNTFRQ must be done in the firmware, to be
+valid across all CPUs and through power-cycles. This isn't supported
+on current firmware, which is used in currently available devices. I
+will add this as a required feature from next-gen firmware.
+clock-frequency property is read by linux-kernel before attempting to
+read CNTFRQ.
 
-Peter.
 
-The following changes since commit e36f014edff70fc02b3d3d79cead1d58f289332e:
+>> +             /* North Bridge Service Registers */
+>> +             sysfabric-service at fb070000 {
+>> +                     compatible = "al,alpine-sysfabric-service", "syscon", "simple-bus";
+>> +                     reg = <0x0 0xfb070000 0x0 0x10000>;
+>> +             };
+>
+> That compatible list makes no sense whatsoever.
+>
+> Why is "simple-bus" on the end?
+>
 
-  Linux 3.19-rc7 (2015-02-01 20:07:21 -0800)
+Nodes that are used with "syscon_regmap_lookup_by_compatible" appear
+both with and without compatibility to "simple-bus" in the
+device-trees.
+examples with: "fsl,imx6q-anatop", "xlnx,zynq-slcr"
+examples without: "fsl,imx6q-iomuxc-gpr", "rockchip,rk3066-pmu"
+Both ways work, I'm not if there is reasoning behind this difference
+in current device-trees or which is the better example to follow. I
+have no problem working either way. Is there a consensus on this?
 
-are available in the git repository at:
-
-  git://nv-tegra.nvidia.com/user/pdeschrijver/linux.git tags/tegra-clk-3.20
-
-for you to fetch changes up to b270491eb9a033a1ab6c66e778c9dd3e3a4f7639:
-
-  clk: tegra: Define PLLD_DSI and remove dsia(b)_mux (2015-02-02 16:22:34 +0200)
-
-----------------------------------------------------------------
-Tegra clock fixes for 3.20
-
-----------------------------------------------------------------
-Andrew Bresticker (1):
-      clk: tegra: SDMMC controllers are on APB
-
-Mark Zhang (1):
-      clk: tegra: Define PLLD_DSI and remove dsia(b)_mux
-
-Paul Walmsley (2):
-      clk: tegra: split Tegra124 clock header file
-      clk: tegra: Add support for the Tegra132 CAR IP block
-
-Peter De Schrijver (2):
-      clk: tegra: make tegra_clocks_apply_init_table() arch_initcall
-      clk: tegra: Update binding doc for Tegra132
-
-Sean Paul (1):
-      clk: tegra124: Add init data for dsi lp clocks
-
-Tomeu Vizoso (1):
-      clk: tegra: Fix order of arguments in WARN
-
- .../bindings/clock/nvidia,tegra124-car.txt         |  10 +-
- arch/arm/mach-tegra/tegra.c                        |   2 -
- drivers/clk/tegra/Makefile                         |   1 +
- drivers/clk/tegra/clk-id.h                         |   2 -
- drivers/clk/tegra/clk-pll.c                        |  18 +-
- drivers/clk/tegra/clk-tegra-periph.c               |  18 +-
- drivers/clk/tegra/clk-tegra114.c                   |  10 +-
- drivers/clk/tegra/clk-tegra124.c                   | 168 ++++++++--
- drivers/clk/tegra/clk.c                            |   7 +-
- include/dt-bindings/clock/tegra124-car-common.h    | 345 +++++++++++++++++++++
- include/dt-bindings/clock/tegra124-car.h           | 345 +--------------------
- include/linux/clk/tegra.h                          |   2 -
- 12 files changed, 532 insertions(+), 396 deletions(-)
- create mode 100644 include/dt-bindings/clock/tegra124-car-common.h
+> Mark.
