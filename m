@@ -1,139 +1,84 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 2 Feb 2015 21:32:01 +0200
-Subject: [PATCH v13 3/6] clk: Make clk API return per-user struct clk
- instances
-In-Reply-To: <20150201212432.22722.70917@quantum>
-References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
- <1422011024-32283-4-git-send-email-tomeu.vizoso@collabora.com>
- <20150201212432.22722.70917@quantum>
-Message-ID: <54CFD0B1.2000003@ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 2 Feb 2015 20:31:54 +0100
+Subject: [RFC] change non-atomic bitops method
+In-Reply-To: <35FD53F367049845BC99AC72306C23D1044A02027E0A@CNBJMBX05.corpusers.net>
+References: <35FD53F367049845BC99AC72306C23D1044A02027E0A@CNBJMBX05.corpusers.net>
+Message-ID: <20150202193154.GC10842@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/01/2015 11:24 PM, Mike Turquette wrote:
-> Quoting Tomeu Vizoso (2015-01-23 03:03:30)
->> Moves clock state to struct clk_core, but takes care to change as little API as
->> possible.
->>
->> struct clk_hw still has a pointer to a struct clk, which is the
->> implementation's per-user clk instance, for backwards compatibility.
->>
->> The struct clk that clk_get_parent() returns isn't owned by the caller, but by
->> the clock implementation, so the former shouldn't call clk_put() on it.
->>
->> Because some boards in mach-omap2 still register clocks statically, their clock
->> registration had to be updated to take into account that the clock information
->> is stored in struct clk_core now.
->
-> Tero, Paul & Tony,
->
-> Tomeu's patch unveils a problem with omap3_noncore_dpll_enable and
-> struct dpll_data, namely this snippet from
-> arch/arm/mach-omap2/dpll3xxx.c:
->
->          parent = __clk_get_parent(hw->clk);
->
->          if (__clk_get_rate(hw->clk) == __clk_get_rate(dd->clk_bypass)) {
->                  WARN(parent != dd->clk_bypass,
->                                  "here0, parent name is %s, bypass name is %s\n",
->                                  __clk_get_name(parent), __clk_get_name(dd->clk_bypass));
->                  r = _omap3_noncore_dpll_bypass(clk);
->          } else {
->                  WARN(parent != dd->clk_ref,
->                                  "here1, parent name is %s, ref name is %s\n",
->                                  __clk_get_name(parent), __clk_get_name(dd->clk_ref));
->                  r = _omap3_noncore_dpll_lock(clk);
->          }
->
-> struct dpll_data has members clk_ref and clk_bypass which are struct clk
-> pointers. This was always a bit of a violation of the clk.h contract
-> since drivers are not supposed to deref struct clk pointers. Now that we
-> generate unique pointers for each call to clk_get (clk_ref & clk_bypass
-> are populated by of_clk_get in ti_clk_register_dpll) then the pointer
-> comparisons above will never be equal (even if they resolve down to the
-> same struct clk_core). I added the verbose traces to the WARNs above to
-> illustrate the point: the names are always the same but the pointers
-> differ.
->
-> AFAICT this doesn't break anything, but booting on OMAP3+ results in
-> noisy WARNs.
->
-> I think the correct fix is to replace clk_bypass and clk_ref pointers
-> with a simple integer parent_index. In fact we already have this index.
-> See how the pointers are populated in ti_clk_register_dpll:
+On Mon, Feb 02, 2015 at 11:55:03AM +0800, Wang, Yalin wrote:
+> This patch change non-atomic bitops,
+> add a if() condition to test it, before set/clear the bit.
+> so that we don't need dirty the cache line, if this bit
+> have been set or clear. On SMP system, dirty cache line will
+> need invalidate other processors cache line, this will have
+> some impact on SMP systems.
+> 
+> Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
+> ---
+>  include/asm-generic/bitops/non-atomic.h | 13 +++++++++----
+>  1 file changed, 9 insertions(+), 4 deletions(-)
+> 
+> diff --git a/include/asm-generic/bitops/non-atomic.h b/include/asm-generic/bitops/non-atomic.h
+> index 697cc2b..e4ef18a 100644
+> --- a/include/asm-generic/bitops/non-atomic.h
+> +++ b/include/asm-generic/bitops/non-atomic.h
+> @@ -17,7 +17,9 @@ static inline void __set_bit(int nr, volatile unsigned long *addr)
+>  	unsigned long mask = BIT_MASK(nr);
+>  	unsigned long *p = ((unsigned long *)addr) + BIT_WORD(nr);
+>  
+> -	*p  |= mask;
+> +	if ((*p & mask) == 0)
+> +		*p  |= mask;
+Care to fix the double space here while touching the code?
 
-The problem is we still need to be able to get runtime parent clock 
-rates (the parent rate may change also), so simple index value is not 
-sufficient. We need a handle of some sort to the bypass/ref clocks. The 
-DPLL code generally requires knowledge of the bypass + reference clock 
-rates to work properly, as it calculates the M/N values based on these.
+I think the more natural check here is:
 
-Shall I change the DPLL code to check against clk_hw pointers or what is 
-the preferred approach here? The patch at the end does this and fixes 
-the dpll related warnings.
+	if ((~*p & mask) != 0)
+		*p |= mask;
 
-Btw, the rate constraints patch broke boot for me completely, but sounds 
-like you reverted it already.
+Might be a matter of taste, but this check is equivalent to
 
--Tero
+	*p != (*p | mask)
 
---------------------
+which is what you really want to test for. (Your check only has this
+property for values of mask that have a single bit set, which is ok here
+of course.)
 
-Author: Tero Kristo <t-kristo@ti.com>
-Date:   Mon Feb 2 17:19:17 2015 +0200
+> +
+>  }
+>  
+>  static inline void __clear_bit(int nr, volatile unsigned long *addr)
+> @@ -25,7 +27,8 @@ static inline void __clear_bit(int nr, volatile unsigned long *addr)
+>  	unsigned long mask = BIT_MASK(nr);
+>  	unsigned long *p = ((unsigned long *)addr) + BIT_WORD(nr);
+>  
+> -	*p &= ~mask;
+> +	if ((*p & mask) != 0)
+> +		*p &= ~mask;
+This is already fine.
 
-     ARM: OMAP3+: clock: dpll: fix logic for comparing parent clocks
+>  }
+>  
+>  /**
+> @@ -60,7 +63,8 @@ static inline int __test_and_set_bit(int nr, volatile unsigned long *addr)
+>  	unsigned long *p = ((unsigned long *)addr) + BIT_WORD(nr);
+>  	unsigned long old = *p;
+>  
+> -	*p = old | mask;
+> +	if ((old & mask) == 0)
+> +		*p = old | mask;
+Here it would be:
 
-     DPLL code uses reference and bypass clock pointers for determining 
-runtime
-     properties for these clocks, like parent clock rates.
+	if ((~old & mask) != 0)
+	
+>  	return (old & mask) != 0;
+>  }
 
-     As clock API now returns per-user clock structs, using a global handle
-     in the clock driver code does not work properly anymore. Fix this by
-     using the clk_hw instead, and comparing this against the parents.
+Best regards
+Uwe
 
-     Signed-off-by: Tero Kristo <t-kristo@ti.com>
-     Fixes: 59cf3fcf9baf ("clk: Make clk API return per-user struct clk 
-instances")
-
-diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
-index c2da2a0..49752d7 100644
---- a/arch/arm/mach-omap2/dpll3xxx.c
-+++ b/arch/arm/mach-omap2/dpll3xxx.c
-@@ -410,7 +410,7 @@ int omap3_noncore_dpll_enable(struct clk_hw *hw)
-  	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
-  	int r;
-  	struct dpll_data *dd;
--	struct clk *parent;
-+	struct clk_hw *parent;
-
-  	dd = clk->dpll_data;
-  	if (!dd)
-@@ -427,13 +427,13 @@ int omap3_noncore_dpll_enable(struct clk_hw *hw)
-  		}
-  	}
-
--	parent = __clk_get_parent(hw->clk);
-+	parent = __clk_get_hw(__clk_get_parent(hw->clk));
-
-  	if (__clk_get_rate(hw->clk) == __clk_get_rate(dd->clk_bypass)) {
--		WARN_ON(parent != dd->clk_bypass);
-+		WARN_ON(parent != __clk_get_hw(dd->clk_bypass));
-  		r = _omap3_noncore_dpll_bypass(clk);
-  	} else {
--		WARN_ON(parent != dd->clk_ref);
-+		WARN_ON(parent != __clk_get_hw(dd->clk_ref));
-  		r = _omap3_noncore_dpll_lock(clk);
-  	}
-
-@@ -549,7 +549,8 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, 
-unsigned long rate,
-  	if (!dd)
-  		return -EINVAL;
-
--	if (__clk_get_parent(hw->clk) != dd->clk_ref)
-+	if (__clk_get_hw(__clk_get_parent(hw->clk)) !=
-+	    __clk_get_hw(dd->clk_ref))
-  		return -EINVAL;
-
-  	if (dd->last_rounded_rate == 0)
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
