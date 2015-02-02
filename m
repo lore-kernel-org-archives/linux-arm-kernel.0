@@ -1,23 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 2 Feb 2015 14:46:22 +0000
-Subject: [PATCH v4 2/8] mailbox: arm_mhu: add driver for ARM MHU controller
-In-Reply-To: <1421663463-1426-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
-References: <1421663016-1327-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <1421663463-1426-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
-Message-ID: <20150202144622.GD8656@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 02 Feb 2015 15:58:49 +0100
+Subject: [PATCH v2] mmc: moxart: fix probe logic
+In-Reply-To: <CACmBeS0RGJUzqztQLZtHyTYgCd=jpAoYYk-roH7_VLbfy-+ftw@mail.gmail.com>
+References: <8340872.32GezMfzR1@wuerfel> <1862200.Pj3heKAtuk@wuerfel>
+ <CACmBeS0RGJUzqztQLZtHyTYgCd=jpAoYYk-roH7_VLbfy-+ftw@mail.gmail.com>
+Message-ID: <4754899.RDUhFfxBSW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 19, 2015 at 06:31:03PM +0800, Vincent Yang wrote:
-> From: Jassi Brar <jaswinder.singh@linaro.org>
+On Monday 02 February 2015 11:52:44 Jonas Jensen wrote:
 > 
-> Add driver for the ARM Message-Handling-Unit (MHU).
+> On 29 January 2015 at 23:06, Arnd Bergmann <arnd@arndb.de> wrote:
+> > Jonas Jensen wanted to submit a patch for these, but apparently
+> > forgot about it. I stumbled over this symptom first:
+> 
+> Sorry about this, I remember thinking about the changes but only made
+> a mental note (which was lost over time). I was sidetracked with other
+> changes and work.
+> 
+> 
+> > @@ -586,10 +586,10 @@ static int moxart_probe(struct platform_device *pdev)
+> >                 goto out;
+> >         }
+> >
+> > -       clk = of_clk_get(node, 0);
+> > -       if (IS_ERR(clk)) {
+> > +       host->clk = of_clk_get(node, 0);
+> 
+> host->clk is a NULL dereference at this point in probe() (log below).
+> 
+> I moved the single line "host = mmc_priv(mmc);" to happen just before,
+> and everything is working normally again.
 
-Is this an AMBA Primecell peripheral?  If so, it should not be a platform
-driver.
+Thanks a lot for testing, and finding the second embarrassing bug
+in my patch!
 
-Thanks.
+Can you forward the patch you successfully tested with your
+Signed-off-by?
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+	Arnd
