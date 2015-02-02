@@ -1,179 +1,109 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 2 Feb 2015 09:33:09 +0530
-Subject: [PATCHv2 1/1] cpufreq: exynos: allow modular build
-In-Reply-To: <1422730782-13055-1-git-send-email-edubezval@gmail.com>
-References: <1422730782-13055-1-git-send-email-edubezval@gmail.com>
-Message-ID: <CAKohpondsvLm2S_V+aBSoCg252nHONJ6TbyTuHoVYuwxBDEuDA@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Sun, 1 Feb 2015 20:28:43 -0800
+Subject: [PATCH v2 1/4] tty: serial: Add 8250 earlycon to support noinit
+ option
+In-Reply-To: <54CEF2C8.1050808@hurleysoftware.com>
+References: <1421068104-30463-1-git-send-email-eddie.huang@mediatek.com>
+ <1421068104-30463-2-git-send-email-eddie.huang@mediatek.com>
+ <54CE53F3.5040709@hurleysoftware.com>
+ <54CE6FD9.5030606@hurleysoftware.com>
+ <1422846994.5512.25.camel@mtksdaap41>
+ <54CEF2C8.1050808@hurleysoftware.com>
+Message-ID: <20150202042843.GA24765@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 February 2015 at 00:29, Eduardo Valentin <edubezval@gmail.com> wrote:
-> From: Arnd Bergmann <arnd@arndb.de>
->
-> The exynos cpufreq driver code recently gained a dependency on the
-> cooling code, which may be a loadable module. This breaks an ARM
-> allmodconfig build:
->
-> drivers/built-in.o: In function `exynos_cpufreq_probe':
-> :(.text+0x1748e8): undefined reference to `of_cpufreq_cooling_register'
->
-> To avoid this problem, change cpufreq Kconfig to allow the drivers
-> to be loadable modules as well and enforce a dependency on the
-> thermal module.
->
-> This change, in order to allow module builds on this cpufreq
-> driver, properly constructs the driver into a single module,
-> instead of several modules. The change also keeps the proper
-> platform dependency, and therefore, it wont load in platforms
-> that are not supposed to be loaded. The user will be able to
-> build the support for all platforms, or select which platforms
-> (s)he wants (as originally), except that now it can be a module,
-> instead.
->
-> Besides, it will still keep the driver only on those configs
-> that expect it to be on. And it won't compile/load on platforms
-> that it is not supposed to. It brings the config ARM_EXYNOS_CPU_FREQ_BOOST_SW
-> closer to this driver, so it looks better in the menuconfig.
->
-> We intentionally change ARM_EXYNOS5440_CPUFREQ to be tristate too, to
-> avoid future troubles.
->
-> Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-pm at vger.kernel.org
-> Cc: linux-samsung-soc at vger.kernel.org
-> Fixes: e725d26c4857 ("cpufreq: exynos: Use device tree to determine if cpufreq cooling should be registered")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Eduardo Valentin <edubezval@gmail.com>
-> ---
->  drivers/cpufreq/Kconfig.arm | 44 ++++++++++++++++++++++++++------------------
->  drivers/cpufreq/Makefile    |  9 +++++----
->  2 files changed, 31 insertions(+), 22 deletions(-)
-> ---
-> Changes from V1:
-> - Instead of having several modules, the driver now is constructed by several
-> files into a single module, depending on config.
-> - The patch does not change existing user defconfigs.
->
-> If no objections, I will include this in into my -fixes branch.
->
-> Cheers,
->
-> Eduardo Valentin
->
->
-> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> index 0f9a2c3..1b06fc4 100644
-> --- a/drivers/cpufreq/Kconfig.arm
-> +++ b/drivers/cpufreq/Kconfig.arm
-> @@ -26,13 +26,21 @@ config ARM_VEXPRESS_SPC_CPUFREQ
->
->
->  config ARM_EXYNOS_CPUFREQ
-> -       bool
-> +       tristate "SAMSUNG EXYNOS CPUfreq Driver"
-> +       depends on CPU_EXYNOS4210 || SOC_EXYNOS4212 || SOC_EXYNOS4412 || SOC_EXYNOS5250
-> +       depends on THERMAL
-> +       help
-> +         This adds the CPUFreq driver for Samsung EXYNOS platforms.
-> +         Supported SoC versions are:
-> +            Exynos4210, Exynos4212, Exynos4412, and Exynos5250.
-> +
-> +         If in doubt, say N.
->
->  config ARM_EXYNOS4210_CPUFREQ
->         bool "SAMSUNG EXYNOS4210"
->         depends on CPU_EXYNOS4210
-> +       depends on ARM_EXYNOS_CPUFREQ
->         default y
-> -       select ARM_EXYNOS_CPUFREQ
->         help
->           This adds the CPUFreq driver for Samsung EXYNOS4210
->           SoC (S5PV310 or S5PC210).
-> @@ -42,8 +50,8 @@ config ARM_EXYNOS4210_CPUFREQ
->  config ARM_EXYNOS4X12_CPUFREQ
->         bool "SAMSUNG EXYNOS4x12"
->         depends on SOC_EXYNOS4212 || SOC_EXYNOS4412
-> +       depends on ARM_EXYNOS_CPUFREQ
->         default y
-> -       select ARM_EXYNOS_CPUFREQ
->         help
->           This adds the CPUFreq driver for Samsung EXYNOS4X12
->           SoC (EXYNOS4212 or EXYNOS4412).
-> @@ -53,28 +61,14 @@ config ARM_EXYNOS4X12_CPUFREQ
->  config ARM_EXYNOS5250_CPUFREQ
->         bool "SAMSUNG EXYNOS5250"
->         depends on SOC_EXYNOS5250
-> +       depends on ARM_EXYNOS_CPUFREQ
->         default y
-> -       select ARM_EXYNOS_CPUFREQ
->         help
->           This adds the CPUFreq driver for Samsung EXYNOS5250
->           SoC.
->
->           If in doubt, say N.
->
-> -config ARM_EXYNOS5440_CPUFREQ
-> -       bool "SAMSUNG EXYNOS5440"
-> -       depends on SOC_EXYNOS5440
-> -       depends on HAVE_CLK && OF
-> -       select PM_OPP
-> -       default y
-> -       help
-> -         This adds the CPUFreq driver for Samsung EXYNOS5440
-> -         SoC. The nature of exynos5440 clock controller is
-> -         different than previous exynos controllers so not using
-> -         the common exynos framework.
-> -
-> -         If in doubt, say N.
-> -
->  config ARM_EXYNOS_CPU_FREQ_BOOST_SW
->         bool "EXYNOS Frequency Overclocking - Software"
->         depends on ARM_EXYNOS_CPUFREQ && THERMAL
-> @@ -90,6 +84,20 @@ config ARM_EXYNOS_CPU_FREQ_BOOST_SW
->
->           If in doubt, say N.
->
-> +config ARM_EXYNOS5440_CPUFREQ
-> +       tristate "SAMSUNG EXYNOS5440"
-> +       depends on SOC_EXYNOS5440
-> +       depends on HAVE_CLK && OF
-> +       select PM_OPP
-> +       default y
-> +       help
-> +         This adds the CPUFreq driver for Samsung EXYNOS5440
-> +         SoC. The nature of exynos5440 clock controller is
-> +         different than previous exynos controllers so not using
-> +         the common exynos framework.
-> +
-> +         If in doubt, say N.
-> +
->  config ARM_HIGHBANK_CPUFREQ
->         tristate "Calxeda Highbank-based"
->         depends on ARCH_HIGHBANK && CPUFREQ_DT && REGULATOR
-> diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-> index b3ca7b0..b26e2bf 100644
-> --- a/drivers/cpufreq/Makefile
-> +++ b/drivers/cpufreq/Makefile
-> @@ -51,10 +51,11 @@ obj-$(CONFIG_ARM_DT_BL_CPUFREQ)             += arm_big_little_dt.o
->
->  obj-$(CONFIG_ARCH_DAVINCI)             += davinci-cpufreq.o
->  obj-$(CONFIG_UX500_SOC_DB8500)         += dbx500-cpufreq.o
-> -obj-$(CONFIG_ARM_EXYNOS_CPUFREQ)       += exynos-cpufreq.o
-> -obj-$(CONFIG_ARM_EXYNOS4210_CPUFREQ)   += exynos4210-cpufreq.o
-> -obj-$(CONFIG_ARM_EXYNOS4X12_CPUFREQ)   += exynos4x12-cpufreq.o
-> -obj-$(CONFIG_ARM_EXYNOS5250_CPUFREQ)   += exynos5250-cpufreq.o
-> +obj-$(CONFIG_ARM_EXYNOS_CPUFREQ)       += arm-exynos-cpufreq.o
-> +arm-exynos-cpufreq-y                                   := exynos-cpufreq.o
-> +arm-exynos-cpufreq-$(CONFIG_ARM_EXYNOS4210_CPUFREQ)    += exynos4210-cpufreq.o
-> +arm-exynos-cpufreq-$(CONFIG_ARM_EXYNOS4X12_CPUFREQ)    += exynos4x12-cpufreq.o
-> +arm-exynos-cpufreq-$(CONFIG_ARM_EXYNOS5250_CPUFREQ)    += exynos5250-cpufreq.o
->  obj-$(CONFIG_ARM_EXYNOS5440_CPUFREQ)   += exynos5440-cpufreq.o
->  obj-$(CONFIG_ARM_HIGHBANK_CPUFREQ)     += highbank-cpufreq.o
->  obj-$(CONFIG_ARM_IMX6Q_CPUFREQ)                += imx6q-cpufreq.o
+On Sun, Feb 01, 2015 at 10:45:12PM -0500, Peter Hurley wrote:
+> On 02/01/2015 10:16 PM, Eddie Huang wrote:
+> > Hi Peter,
+> > 
+> > On Sun, 2015-02-01 at 13:26 -0500, Peter Hurley wrote:
+> >> On 02/01/2015 11:27 AM, Peter Hurley wrote:
+> >>> Hi Eddie,
+> >>>
+> >>> On 01/12/2015 08:08 AM, Eddie Huang wrote:
+> >>>> Add earlycon support not only baudrate option, but also add noinit option.
+> >>>> If use noinit option, 8250 earlycon will not init serial hardware and use
+> >>>> loader setting.
+> >>>
+> >>> I see this went into Greg's tty-testing branch.
+> >>>
+> >>> The only point of this is to not program the divisor, right?
+> >>>
+> >>> I ask because early_serial8250_setup() could already handle this without
+> >>> extra options by simply not doing divisor programming if no baud option is
+> >>> present.
+> >>
+> >> Does the patch below work for your use-case?
+> >>
+> >> [ Note: the patch applies to 3.19-rcX. To test, your noinit patches need to be
+> >>   reverted first.
+> >> ]
+> >>
+> >> --- >% ---
+> >> From: Peter Hurley <peter@hurleysoftware.com>
+> >> Subject: [PATCH] serial: 8250_early: Assume uart already initialized if no
+> >>  baud option
+> >>
+> >> The <baud><parity><bit> option string is not supplied if the earlycon
+> >> is started via devicetree and OF_EARLYCON_DECLARE(). The option string
+> >> is also not required if started via kernel command line parameters of
+> >> the form:
+> >>   earlycon=uart,mmio,<addr>
+> >>   console=uart,mmio,<addr>
+> >>
+> >> If earlycon_device->baud is 0, then an option string was not supplied.
+> >> In this case, assume the uart has already been initialized by the
+> >> bootloader or firmware.
+> >>
+> >> Signed-off-by: Peter Hurley <peter@hurleysoftware.com>
+> >> ---
+> >>  drivers/tty/serial/8250/8250_early.c | 10 ++++++++--
+> >>  1 file changed, 8 insertions(+), 2 deletions(-)
+> >>
+> >> diff --git a/drivers/tty/serial/8250/8250_early.c b/drivers/tty/serial/8250/8250_early.c
+> >> index d7b831b..1701d00 100644
+> >> --- a/drivers/tty/serial/8250/8250_early.c
+> >> +++ b/drivers/tty/serial/8250/8250_early.c
+> >> @@ -149,12 +149,18 @@ static int __init early_serial8250_setup(struct earlycon_device *device,
+> >>  		return 0;
+> >>  
+> >>  	if (!device->baud) {
+> >> +		struct uart_port *port = &device->port;
+> >> +		unsigned int ier;
+> >> +
+> >>  		device->baud = probe_baud(&device->port);
+> >>  		snprintf(device->options, sizeof(device->options), "%u",
+> >>  			 device->baud);
+> >> -	}
+> >>  
+> >> -	init_port(device);
+> >> +		/* assume the device was initialized, only mask interrupts */
+> >> +		ier = serial8250_early_in(port, UART_IER);
+> >> +		serial8250_early_out(port, UART_IER, ier & UART_IER_UUE);
+> >> +	} else
+> >> +		init_port(device);
+> > Should add brace in else.
+> 
+> I don't do that unless I have to.
+> 
+> > Where is original line here.
+> >           early_device = device;
+> 
+> Whoops :)
+> 
+> I wrote the patch from a private branch which implements extensible console
+> matching (so a console can define its own match function) and a bunch of
+> other console cleanup and code removal. In that series, early_device becomes
+> unnecessary and is removed.
+> 
+> I'll respin proper patches on top of Greg's tty-testing branch with reverts
+> for the noinit options. I noticed that one of the noinit patches actually
+> has the linkage for the mtk earlycon, so I'll be sure to preserve that.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+I can just drop the patches in the tty-testing branch, that's what it is
+there for :)
 
-Now as these are all compilable as modules, should we look into the drivers as
-well to see what they are doing on module unload ?
+Just let me know the specific patches and I will do so, thanks.
+
+greg k-h
