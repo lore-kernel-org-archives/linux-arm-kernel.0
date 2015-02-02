@@ -1,44 +1,44 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Mon, 2 Feb 2015 12:33:19 -0700
-Subject: Tegra baseline test results for v3.19-rc7
-Message-ID: <54CFD0FF.4060008@nvidia.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 02 Feb 2015 22:44:15 +0300
+Subject: [PATCH v3] ahci_xgene: Fix the dma state machine lockup for the
+ ATA_CMD_SMART PIO mode command.
+In-Reply-To: <CAOHikRBMPbyS0q6814+Xkez7ToBwrC7Yzp4sy=NMmPDg-5wCBA@mail.gmail.com>
+References: <1422900439-5541-1-git-send-email-stripathi@apm.com>	<1422900439-5541-2-git-send-email-stripathi@apm.com>	<54CFCC28.6050609@cogentembedded.com>
+ <CAOHikRBMPbyS0q6814+Xkez7ToBwrC7Yzp4sy=NMmPDg-5wCBA@mail.gmail.com>
+Message-ID: <54CFD38F.2060803@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v3.19-rc7.
-Logs and other details at:
+On 02/02/2015 10:37 PM, Suman Tripathi wrote:
 
-     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.19-rc7/20150201210104/
+    Ugh, please avoid using HTML when posting to the lists hosted on 
+vger.kernel.org -- it's configured to ignore such mails AFAIK.
 
+>>>     This patch addresses the issue with ATA_CMD_SMART pio mode
+>>>     command for enumeration and device detection with ATA devices.
+>>>     The X-Gene AHCI controller has an errata in which it cannot clear
+>>>     the BSY bit after the PIO setup FIS. The dma state machine enters
 
-Test summary
-------------
+>>     Hum, if this happens after every PIO command (PIO setup FISes are not
+>> specific to the command, right?), perhaps it would make more sense to record
+>> the *protocol* used by the last command?
 
-Build: zImage:
-     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+> No it happens for IDENTIFY DEVICE, ATA_CMD_PACKET and ATA_CMD_SMART commands .
+> It is actually the commands associated with a BSY bit clearing.
 
-Boot to userspace: multi_v7_defconfig:
-     Pass: ( 3/ 3): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra30-beaver
+    I don't understand that -- BSY bit is cleared for *every* command, either 
+at the end of it, or along with setting the DRQ bit for PIO data transfer.
 
-Boot to userspace: tegra_defconfig:
-     Pass: ( 3/ 3): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra30-beaver
+>>>     CMFatalErrorUpdate state and locks up. It is the same issue as
+>>>     in the commit 2a0bdff6b958d1b2523d2754b6cd5e__0ea4053016 (ahci-xgene:
+>>>     fix the dma state machine lockup for the IDENTIFY DEVICE PIO mode
+>>>     command).
 
+>> [...]
 
-vmlinux object size
-(delta in bytes from test_v3.19-rc6 (26bc420b59a38e4e6685a73345a0def461136dce)):
-    text     data      bss    total  kernel
-   -1192       -8        0    -1200  multi_v7_defconfig
-   -1076      +72        0    -1004  tegra_defconfig
+>>>     Signed-off-by: Suman Tripathi <stripathi at apm.com <mailto:stripathi@apm.com>>
+>>>     Reported-by:   Mark Langsdorf <mlangsdo@redhat.com
+>>>     <mailto:mlangsdo@redhat.com>>
+>>>
 
-
-Boot-time memory difference
-(delta in bytes from test_v3.19-rc6 (26bc420b59a38e4e6685a73345a0def461136dce))
-     avail    rsrvd     high    freed                board              kconfig                  dtb
-         .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-         .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-         .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-         .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-         .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+MBR, Sergei
