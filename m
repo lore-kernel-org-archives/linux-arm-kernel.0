@@ -1,45 +1,89 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon,  2 Feb 2015 20:45:38 +0800
-Subject: [PATCH v8 10/21] ARM64 / ACPI: If we chose to boot from acpi then
- disable FDT
+Date: Mon,  2 Feb 2015 20:45:40 +0800
+Subject: [PATCH v8 12/21] ACPI / table: Print GIC information when MADT is
+ parsed
 In-Reply-To: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
 References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1422881149-8177-11-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1422881149-8177-13-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Graeme Gregory <graeme.gregory@linaro.org>
+When MADT is parsed, print GIC information to make the boot
+log look pretty:
 
-If the early boot methods of acpi are happy that we have valid ACPI
-tables and acpi=force has been passed, then do not unflat devicetree
-effectively disabling further hardware probing from DT.
+ACPI: GICC (acpi_id[0x0000] address[00000000e112f000] MPIDR[0x0] enabled)
+ACPI: GICC (acpi_id[0x0001] address[00000000e112f000] MPIDR[0x1] enabled)
+...
+ACPI: GICC (acpi_id[0x0201] address[00000000e112f000] MPIDR[0x201] enabled)
 
-CC: Catalin Marinas <catalin.marinas@arm.com>
-CC: Will Deacon <will.deacon@arm.com>
+These information will be very helpful to bring up early systems to
+see if acpi_id and MPIDR are matched or not as spec defined.
+
+CC: Rafael J. Wysocki <rjw@rjwysocki.net>
 Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 Tested-by: Yijing Wang <wangyijing@huawei.com>
 Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
 Tested-by: Jon Masters <jcm@redhat.com>
 Tested-by: Timur Tabi <timur@codeaurora.org>
-Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 ---
- arch/arm64/kernel/setup.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/acpi/tables.c | 43 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 510a681..553967d 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -446,7 +446,8 @@ void __init setup_arch(char **cmdline_p)
- 	efi_idmap_init();
- 	early_ioremap_reset();
+diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
+index 93b8152..42d314f 100644
+--- a/drivers/acpi/tables.c
++++ b/drivers/acpi/tables.c
+@@ -183,6 +183,49 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+ 		}
+ 		break;
  
--	unflatten_device_tree();
-+	if (acpi_disabled)
-+		unflatten_device_tree();
- 
- 	psci_init();
- 
++	case ACPI_MADT_TYPE_GENERIC_INTERRUPT:
++		{
++			struct acpi_madt_generic_interrupt *p =
++				(struct acpi_madt_generic_interrupt *)header;
++			pr_info("GICC (acpi_id[0x%04x] address[%p] MPIDR[0x%llx] %s)\n",
++				p->uid, (void *)(unsigned long)p->base_address,
++				p->arm_mpidr,
++				(p->flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
++
++		}
++		break;
++
++	case ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR:
++		{
++			struct acpi_madt_generic_distributor *p =
++				(struct acpi_madt_generic_distributor *)header;
++			pr_info("GIC Distributor (gic_id[0x%04x] address[%p] gsi_base[%d])\n",
++				p->gic_id,
++				(void *)(unsigned long)p->base_address,
++				p->global_irq_base);
++		}
++		break;
++
++	case ACPI_MADT_TYPE_GENERIC_MSI_FRAME:
++		{
++			struct acpi_madt_generic_msi_frame *p =
++				(struct acpi_madt_generic_msi_frame *)header;
++			pr_info("GIC MSI Frame (msi_fame_id[%d] address[%p])\n",
++				p->msi_frame_id,
++				(void *)(unsigned long)p->base_address);
++		}
++		break;
++
++	case ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR:
++		{
++			struct acpi_madt_generic_redistributor *p =
++				(struct acpi_madt_generic_redistributor *)header;
++			pr_info("GIC Redistributor (address[%p] region_size[0x%x])\n",
++				(void *)(unsigned long)p->base_address,
++				p->length);
++		}
++		break;
++
+ 	default:
+ 		pr_warn("Found unsupported MADT entry (type = 0x%x)\n",
+ 			header->type);
 -- 
 1.9.1
