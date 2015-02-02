@@ -1,90 +1,49 @@
-From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Mon, 02 Feb 2015 12:10:02 -0800
-Subject: [PATCH] iommu/arm-smmu: use a threaded handler for context
- interrupts
-In-Reply-To: <20150128120738.GJ1569@arm.com> (Will Deacon's message of "Wed,
- 28 Jan 2015 12:07:39 +0000")
-References: <1421970482-11722-1-git-send-email-mitchelh@codeaurora.org>
- <20150123112415.GD23058@arm.com>
- <vnkw61bx2klr.fsf@mitchelh-linux.qualcomm.com>
- <20150128120738.GJ1569@arm.com>
-Message-ID: <vnkwa90why79.fsf@mitchelh-linux.qualcomm.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 02 Feb 2015 21:22:01 +0100
+Subject: [PATCH v2] ARM: pxa: fix pxa interrupts handling in DT
+In-Reply-To: <1422814816-23887-1-git-send-email-robert.jarzmik@free.fr>
+ (Robert Jarzmik's message of "Sun, 1 Feb 2015 19:20:16 +0100")
+References: <1422743783-32511-1-git-send-email-robert.jarzmik@free.fr>
+ <1422814816-23887-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <87wq409i8m.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 28 2015 at 04:07:39 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Jan 23, 2015 at 10:33:20PM +0000, Mitchel Humpherys wrote:
->> On Fri, Jan 23 2015 at 03:24:15 AM, Will Deacon <will.deacon@arm.com> wrote:
->> > On Thu, Jan 22, 2015 at 11:48:02PM +0000, Mitchel Humpherys wrote:
->> >> Context interrupts can call domain-specific handlers which might sleep.
->> >> Currently we register our handler with request_irq, so our handler is
->> >> called in atomic context, so domain handlers that sleep result in an
->> >> invalid context BUG.  Fix this by using request_threaded_irq.
->> >> 
->> >> This also prepares the way for doing things like enabling clocks within
->> >> our interrupt handler.
->> >> 
->> >> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
->> >> ---
->> >>  drivers/iommu/arm-smmu.c | 5 +++--
->> >>  1 file changed, 3 insertions(+), 2 deletions(-)
->> >> 
->> >> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
->> >> index 6cd47b75286f..81f6b54d94b1 100644
->> >> --- a/drivers/iommu/arm-smmu.c
->> >> +++ b/drivers/iommu/arm-smmu.c
->> >> @@ -973,8 +973,9 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
->> >>  	spin_unlock_irqrestore(&smmu_domain->lock, flags);
->> >>  
->> >>  	irq = smmu->irqs[smmu->num_global_irqs + cfg->irptndx];
->> >> -	ret = request_irq(irq, arm_smmu_context_fault, IRQF_SHARED,
->> >> -			  "arm-smmu-context-fault", domain);
->> >> +	ret = request_threaded_irq(irq, NULL, arm_smmu_context_fault,
->> >> +				IRQF_ONESHOT | IRQF_SHARED,
->> >> +				"arm-smmu-context-fault", domain);
->> >>  	if (IS_ERR_VALUE(ret)) {
->> >>  		dev_err(smmu->dev, "failed to request context IRQ %d (%u)\n",
->> >>  			cfg->irptndx, irq);
->> >
->> > I think I'd rather keep a simple atomic handler, then have a threaded
->> > handler for actually issuing the report_iommu_fault. i.e. we only wake
->> > the thread when it looks like there's some work to do. That also works
->> > much better for shared interrupts.
->> 
->> Are you still against adding clock support to the driver?  If not, we'll
->> need to move to a threaded handler when clocks come in anyways...
->> 
->> Can you elaborate what you mean regarding shared interrupts?  Even
->> without clocks it seems like the code clarity / performance tradeoff
->> would favor a threaded handler, given that performance isn't important
->> here.
->
-> With a shared handler (e.g. a bunch of context banks have the same IRQ)
-> then I assume that we don't want to end up with multiple handler threads
-> all tripping over each other. I'd rather have one thread that handles work
-> queued up by multiple low-level handlers.
->
-> Do you have a preference either way?
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
 
-Ok I think I understand the scenario you're describing.  If multiple
-context banks are sharing an interrupt line their handlers currently
-execute serially, but with threaded handlers they would all be woken up
-and possibly execute concurrently.  I hadn't really considered this
-because none of our targets have CBs sharing interrupts.  In any case,
-the CBs that aren't interrupting should quickly return IRQ_NONE when
-they notice that !(fsr & FSR_FAULT), so is this really a concern?
+> @@ -66,18 +67,20 @@ static inline void __iomem *irq_base(int i)
+>  void pxa_mask_irq(struct irq_data *d)
+>  {
+>  	void __iomem *base = irq_data_get_irq_chip_data(d);
+> +	irq_hw_number_t irq = irqd_to_hwirq(d);
+>  	uint32_t icmr = __raw_readl(base + ICMR);
+>  
+> -	icmr &= ~(1 << IRQ_BIT(d->irq));
+> +	icmr &= ~BIT(irq);
+This should be : icmr &= ~BIT(irq & 0x1f);
 
-Anyways, we can always hold off on this until we have a more compelling
-motivation for it.  For example, if we need to enable clocks to read
-registers then threaded IRQs seem like the best solution.  Hopefully
-I'll find time to have another go at the clocks stuff soon, which is the
-real reason why we're using threaded IRQs for context interrupts in our
-msm tree.
+>  	__raw_writel(icmr, base + ICMR);
+>  }
+>  
+>  void pxa_unmask_irq(struct irq_data *d)
+>  {
+>  	void __iomem *base = irq_data_get_irq_chip_data(d);
+> +	irq_hw_number_t irq = irqd_to_hwirq(d);
+>  	uint32_t icmr = __raw_readl(base + ICMR);
+>  
+> -	icmr |= 1 << IRQ_BIT(d->irq);
+> +	icmr |= BIT(irq);
+Ditto.
 
-
--Mitch
+> +void __init pxa_init_irq(int irq_nr, int (*fn)(struct irq_data *, unsigned int))
+> +{
+> +	BUG_ON(irq_nr > MAX_INTERNAL_IRQS);
+> +
+> +	pxa_irq_base = io_p2v(0x40d00000);
+> +	cpu_has_ipr = !cpu_is_pxa25x();
+> +	pxa_init_irq_common(NULL, irq_nr, fn);
+> +}
+This requires "select IRQ_DOMAIN" in arch/arm/Kconfig in ARCH_PXA.
 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Robert
