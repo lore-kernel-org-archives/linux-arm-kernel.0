@@ -1,58 +1,113 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 3 Feb 2015 16:57:33 +0000
-Subject: __HAVE_ARCH_CMPXCHG on ARM?
-In-Reply-To: <20150203164848.GA15156@nathan3500-linux-VM>
-References: <20150129185618.GA31459@nathan3500-linux-VM>
- <CAM2zO=CVCZFNiSukgcgNNT0==xgLK4w5HF3Pz=dcFmrEHPtLdw@mail.gmail.com>
- <20150202133933.GD31847@arm.com>
- <20150203164848.GA15156@nathan3500-linux-VM>
-Message-ID: <20150203165733.GE25497@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 Feb 2015 16:58:29 +0000
+Subject: [Linaro-mm-sig] [RFCv3 2/2] dma-buf: add helpers for sharing
+ attacher constraints with dma-parms
+In-Reply-To: <6906596.JU5vQoa1jV@wuerfel>
+References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
+ <3783167.LiVXgA35gN@wuerfel>
+ <20150203155404.GV8656@n2100.arm.linux.org.uk>
+ <6906596.JU5vQoa1jV@wuerfel>
+Message-ID: <20150203165829.GW8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 03, 2015 at 04:48:48PM +0000, Nathan Sullivan wrote:
-> On Mon, Feb 02, 2015 at 01:39:33PM +0000, Will Deacon wrote:
-> > On Fri, Jan 30, 2015 at 08:44:48AM +0000, Yong Zhang wrote:
-> > > On Fri, Jan 30, 2015 at 2:56 AM, Nathan Sullivan <nathan.sullivan at ni.com<mailto:nathan.sullivan@ni.com>> wrote:
-> > > 
-> > > While investigating a performance issue on RT 3.14, I noticed that
-> > > __HAVE_ARCH_CMPXCHG is not defined for ARM.  This causes -rt locks to
-> > > always use the slow path and impacts performance.  ARMv6 and above
-> > > have a cmpxchg implementation already that will work just fine.
-> > > 
-> > > In 2012, Yong Zhang submitted a patch to fix this[1], but it mysteriously
-> > > disappeared afterwards.  I did notice that the s-o-b line has a different
-> > > email address than the windriver one.  Yong, do you mind re-submitting the
-> > > 
-> > > It actually doesn't matter. Anyway feel free to add another s-o-b to
-> > > the patch:
-> > > 
-> > > Signed-off-by: Yong Zhang <yong.zhang at windriver.com<mailto:yong.zhang@windriver.com>>
+On Tue, Feb 03, 2015 at 05:12:40PM +0100, Arnd Bergmann wrote:
+> On Tuesday 03 February 2015 15:54:04 Russell King - ARM Linux wrote:
+> > On Tue, Feb 03, 2015 at 04:31:13PM +0100, Arnd Bergmann wrote:
+> > > The dma_map_* interfaces assign the virtual addresses internally,
+> > > using typically either a global address space for all devices, or one
+> > > address space per device.
 > > 
-> > [...]
+> > We shouldn't be doing one address space per device for precisely this
+> > reason.  We should be doing one address space per *bus*.  I did have
+> > a nice diagram to illustrate the point in my previous email, but I
+> > deleted it, I wish I hadn't... briefly:
 > > 
-> > > diff --git a/arch/arm/include/asm/cmpxchg.h b/arch/arm/include/asm/cmpxchg.h
-> > > index 7eb18c1..a91b44e 100644
-> > > --- a/arch/arm/include/asm/cmpxchg.h
-> > > +++ b/arch/arm/include/asm/cmpxchg.h
-> > > @@ -127,6 +127,8 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
-> > > 
-> > >  #else  /* min ARCH >= ARMv6 */
-> > > 
-> > > +#define __HAVE_ARCH_CMPXCHG 1
+> > Fig. 1.
+> >                                                  +------------------+
+> >                                                  |+-----+  device   |
+> > CPU--L1cache--L2cache--Memory--SysMMU---<iobus>----IOMMU-->         |
+> >                                                  |+-----+           |
+> >                                                  +------------------+
 > > 
-> > Is it even possible to have CONFIG_SMP=y on an architecture that doesn't
-> > support native cmpxchg? Certainly, the asm-generic cmpxchg.h barfs if
-> > SMP, so couldn't we just change/extend the __HAVE_ARCH_CMPXCHG check in
-> > rtmutex.c to work automatically with SMP architectures? That would help
-> > arm64 too.
+> > Fig.1 represents what I'd call the "GPU" issue that we're talking about
+> > in this thread.
 > > 
-> > Will
+> > Fig. 2.
+> > CPU--L1cache--L2cache--Memory--SysMMU---<iobus>--IOMMU--device
+> > 
+> > The DMA API should be responsible (at the very least) for everything on
+> > the left of "<iobus>" in and should be providing a dma_addr_t which is
+> > representative of what the device (in Fig.1) as a whole sees.  That's
+> > the "system" part.  
+> > 
+> > I believe this is the approach which is taken by x86 and similar platforms,
+> > simply because they tend not to have an IOMMU on individual devices (and
+> > if they did, eg, on a PCI card, it's clearly the responsibility of the
+> > device driver.)
+> > 
+> > Whether the DMA API also handles the IOMMU in Fig.1 or 2 is questionable.
+> > For fig.2, it is entirely possible that the same device could appear
+> > without an IOMMU, and in that scenario, you would want the IOMMU to be
+> > handled transparently.
+> > 
+> > However, by doing so for everything, you run into exactly the problem
+> > which is being discussed here - the need to separate out the cache
+> > coherency from the IOMMU aspects.  You probably also have a setup very
+> > similar to fig.1 (which is certainly true of Vivante GPUs.)
+> > 
+> > If you have the need to separately control both, then using the DMA API
+> > to encapsulate both does not make sense - at which point, the DMA API
+> > should be responsible for the minimum only - in other words, everything
+> > to the left of <iobus> (so including the system MMU.)  The control of
+> > the device IOMMU should be the responsibility of device driver in this
+> > case.
+> > 
+> > So, dma_map_sg() would be responsible for dealing with the CPU cache
+> > coherency issues, and setting up the system MMU.  dma_sync_*() would
+> > be responsible for the CPU cache coherency issues, and dma_unmap_sg()
+> > would (again) deal with the CPU cache and tear down the system MMU
+> > mappings.
+> > 
+> > Meanwhile, the device driver has ultimate control over its IOMMU, the
+> > creation and destruction of mappings and context switches at the
+> > appropriate times.
 > 
-> What about single Cortex-A8s, for example?  Seems like a non-SMP build
-> should still have cmpxchg.
+> I agree for the case you are describing here. From what I understood
+> from Rob was that he is looking at something more like:
+> 
+> Fig 3
+> CPU--L1cache--L2cache--Memory--IOMMU---<iobus>--device
+> 
+> where the IOMMU controls one or more contexts per device, and is
+> shared across GPU and non-GPU devices. Here, we need to use the
+> dmap-mapping interface to set up the IO page table for any device
+> that is unable to address all of system RAM, and we can use it
+> for purposes like isolation of the devices. There are also cases
+> where using the IOMMU is not optional.
 
-If you have benchmarks that show an improvement then sure, but I don't
-know how much an uncontended rtmutex would really care.
+Okay, but switching contexts is not something which the DMA API has
+any knowledge of (so it can't know which context to associate with
+which mapping.)  While it knows which device, it has no knowledge
+(nor is there any way for it to gain knowledge) about contexts.
 
-Will
+My personal view is that extending the DMA API in this way feels quite
+dirty - it's a violation of the DMA API design, which is to (a) demark
+the buffer ownership between CPU and DMA agent, and (b) to translate
+buffer locations into a cookie which device drivers can use to instruct
+their device to access that memory.  To see why, consider... that you
+map a buffer to a device in context A, and then you switch to context B,
+which means the dma_addr_t given previously is no longer valid.  You
+then try to unmap it... which is normally done using the (now no longer
+valid) dma_addr_t.
+
+It seems to me that to support this at DMA API level, we would need to
+completely revamp the DMA API, which IMHO isn't going to be nice.  (It
+would mean that we end up with three APIs - the original PCI DMA API,
+the existing DMA API, and some new DMA API.)
+
+Do we have any views on how common this feature is?
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
