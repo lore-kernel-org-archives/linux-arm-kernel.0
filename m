@@ -1,75 +1,91 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Tue, 3 Feb 2015 13:50:29 +0800
-Subject: [PATCH] media: atmel-isi: increase the burst length to improve
- the performance
-In-Reply-To: <Pine.LNX.4.64.1502021122140.31366@axis700.grange>
-References: <1416907825-23826-1-git-send-email-josh.wu@atmel.com>
- <54CF4E52.6020901@atmel.com>
- <Pine.LNX.4.64.1502021122140.31366@axis700.grange>
-Message-ID: <54D061A5.3000503@atmel.com>
+From: fthain@telegraphics.com.au (Finn Thain)
+Date: Tue, 3 Feb 2015 17:11:25 +1100 (AEDT)
+Subject: nvram and generic_nvram modules are problematic, was Re: [PATCH]
+ arch: m68k: mac: misc.c: Remove some unused functions
+In-Reply-To: <20150201084245.GF26493@n2100.arm.linux.org.uk>
+References: <1420131732-31039-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+ <alpine.LNX.2.00.1501041045020.15927@nippy.intranet>
+ <CAMuHMdXFu3n4d0dMZop186UF+QG=MtLHV=oQr+VszftpEA1kFQ@mail.gmail.com>
+ <alpine.LNX.2.00.1502011230150.32582@nippy.intranet>
+ <20150201084245.GF26493@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LNX.2.00.1502031453160.21644@nippy.intranet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Guennadi
 
-On 2/2/2015 6:22 PM, Guennadi Liakhovetski wrote:
-> Hi Josh,
->
-> On Mon, 2 Feb 2015, Josh Wu wrote:
->
->> Hi, Guennadi
->>
->> Ping? what about the status of this patch?
-> Right, got lost, sorry... Added to the queue now.
-Thank you.
+On Sun, 1 Feb 2015, Russell King - ARM Linux wrote:
 
-Best Regards,
-Josh Wu
+> On Sun, Feb 01, 2015 at 02:39:42PM +1100, Finn Thain wrote:
+> > I find the ARM support in drivers/char/nvram to be surprising, not to 
+> > say questionable. The /proc/driver/nvram implementation, given 
+> > defined(__arm__), decodes the NVRAM contents in exactly the same 
+> > format as when defined(__i386__) || defined(__x86_64__).
+> 
+> That's because it's used on the Netwinder and EBSA285 platforms, which 
+> are PCI-like, complete with a southbridge which makes them look like a 
+> PC.
 
->
-> Thanks
-> Guennadi
->
->> Best Regards,
->> Josh Wu
->>
->> On 11/25/2014 5:30 PM, Josh Wu wrote:
->>> The burst length could be BEATS_4/8/16. Before this patch, isi use default
->>> value BEATS_4. To imporve the performance we could set it to BEATS_16.
->>>
->>> Otherwise sometime it would cause the ISI overflow error.
->>>
->>> Reported-by: Bo Shen <voice.shen@atmel.com>
->>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
->>> ---
->>>    drivers/media/platform/soc_camera/atmel-isi.c | 2 ++
->>>    include/media/atmel-isi.h                     | 4 ++++
->>>    2 files changed, 6 insertions(+)
->>>
->>> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c
->>> b/drivers/media/platform/soc_camera/atmel-isi.c
->>> index ee5650f..fda587b 100644
->>> --- a/drivers/media/platform/soc_camera/atmel-isi.c
->>> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
->>> @@ -839,6 +839,8 @@ static int isi_camera_set_bus_param(struct
->>> soc_camera_device *icd)
->>>    	if (isi->pdata.full_mode)
->>>    		cfg1 |= ISI_CFG1_FULL_MODE;
->>>    +	cfg1 |= ISI_CFG1_THMASK_BEATS_16;
->>> +
->>>    	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
->>>    	isi_writel(isi, ISI_CFG1, cfg1);
->>>    diff --git a/include/media/atmel-isi.h b/include/media/atmel-isi.h
->>> index c2e5703..6008b09 100644
->>> --- a/include/media/atmel-isi.h
->>> +++ b/include/media/atmel-isi.h
->>> @@ -59,6 +59,10 @@
->>>    #define		ISI_CFG1_FRATE_DIV_MASK		(7 << 8)
->>>    #define ISI_CFG1_DISCR				(1 << 11)
->>>    #define ISI_CFG1_FULL_MODE			(1 << 12)
->>> +/* Definition for THMASK(ISI_V2) */
->>> +#define		ISI_CFG1_THMASK_BEATS_4		(0 << 13)
->>> +#define		ISI_CFG1_THMASK_BEATS_8		(1 << 13)
->>> +#define		ISI_CFG1_THMASK_BEATS_16	(2 << 13)
->>>      /* Bitfields in CFG2 */
->>>    #define ISI_CFG2_GRAYSCALE			(1 << 13)
+Well, that explains the presence of RTC NVRAM, but the question was also 
+about the format of that NVRAM.
+
+The the code in question in drivers/char/nvram.c decodes RTC NVRAM on ARM 
+as if it took the same format as x86 PC RTC NVRAM. Apparently they are not 
+in the same format (for EBSA-285 at least).
+
+I downloaded the EBSA-285 BIOS,
+ftp://ftp.arm.linux.org.uk/pub/armlinux/source/boot/bios-1.11.tar.gz
+
+This is from bios/init/cfg.c --
+
+        img_nr = rtc_read_cmos(0);
+        root_dev = rtc_read_cmos(2) | rtc_read_cmos(3) << 8;
+
+        for (i = 0; i < 80; i++) {
+                extra_args[i] = rtc_read_cmos(128+i);
+                if (!extra_args[i])
+                        break;
+        }
+        extra_args[79] = '\0';
+
+(Like /dev/nvram, file offset 0 is actually device offset 14.)
+
+This EBSA-285 BIOS code uses bytes 128 through 208 as "extra_args", 
+whereas /dev/nvram has only 114 bytes in total. The EBSA-285 BIOS doesn't 
+read or write any checksum.
+
+The first two bytes aren't reported in /proc/driver/nvram, whereas 
+EBSA-285 BIOS uses them for img_nr and root_dev. The next one is reported 
+as "floppy type" on x86 PC, though the EBSA-285 BIOS uses it for 
+root_dev >> 8.
+
+This is from an x86 PC, for example:
+
+# cat /proc/driver/nvram 
+Checksum status: valid
+# floppies     : 1
+Floppy 0 type  : none
+Floppy 1 type  : none
+HD 0 type      : 01
+HD 1 type      : none
+HD type 48 data: 512/0/0 C/H/S, precomp 0, lz 256
+HD type 49 data: 1/124/0 C/H/S, precomp 0, lz 0
+DOS base memory: 640 kB
+Extended memory: 64512 kB (configured), 64512 kB (tested)
+Gfx adapter    : EGA, VGA, ... (with BIOS)
+FPU            : installed
+
+My original question was whether the CONFIG_PROC_FS support found in 
+drivers/char/nvram.c should be moved to arch/x86 and arch/m68k.
+
+So that question now seems to hinge on the Netwinder ROM ("nettrom") which 
+I gather is proprietary (I didn't find any source code). Does anyone know 
+what format the Netwinder NVRAM takes?
+
+If NVRAM on Netwinder has a different format to x86 PC, then the 
+CONFIG_PROC_FS code in drivers/char/nvram should go elsewhere.
+
+And if the NVRAM on Netwinder had no checksum, drivers/char/nvram.c would 
+become a generic /dev/nvram misc device, and drivers/char/generic_nvram.c 
+could go away, along with its inherent problems.
+
+-- 
