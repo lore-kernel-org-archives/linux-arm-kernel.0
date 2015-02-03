@@ -1,50 +1,39 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Tue, 3 Feb 2015 09:44:57 -0500
-Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher constraints
- with dma-parms
-In-Reply-To: <20150203143715.GQ8656@n2100.arm.linux.org.uk>
-References: <20150129143908.GA26493@n2100.arm.linux.org.uk>
- <CAO_48GEOQ1pBwirgEWeVVXW-iOmaC=Xerr2VyYYz9t1QDXgVsw@mail.gmail.com>
- <20150129154718.GB26493@n2100.arm.linux.org.uk>
- <CAF6AEGtTmFg66TK_AFkQ-xp7Nd9Evk3nqe6xCBp7K=77OmXTxA@mail.gmail.com>
- <20150129192610.GE26493@n2100.arm.linux.org.uk>
- <CAF6AEGujk8UC4X6T=yhTrz1s+SyZUQ=m05h_WcxLDGZU6bydbw@mail.gmail.com>
- <20150202165405.GX14009@phenom.ffwll.local>
- <CAF6AEGuESM+e3HSRGM6zLqrp8kqRLGUYvA3KKECdm7m-nt0M=Q@mail.gmail.com>
- <20150203074856.GF14009@phenom.ffwll.local>
- <CAF6AEGu0-TgyE4BjiaSWXQCSk31VU7dogq=6xDRUhi79rGgbxg@mail.gmail.com>
- <20150203143715.GQ8656@n2100.arm.linux.org.uk>
-Message-ID: <CAF6AEGtBfr3fGEoFjFFpy1KrMJMZ-13VPPJX73fAkwiaLk+XGQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 Feb 2015 14:46:11 +0000
+Subject: [PATCH v5 2/7] mailbox: arm_mhu: add driver for ARM MHU controller
+In-Reply-To: <CAJe_ZhdL6=4bMPRitFeCqrO2jeYQuDa9071estTBd3PTbmURYA@mail.gmail.com>
+References: <1422955310-6542-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <1422955763-6630-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <20150203123216.GO8656@n2100.arm.linux.org.uk>
+ <CAJe_ZhdL6=4bMPRitFeCqrO2jeYQuDa9071estTBd3PTbmURYA@mail.gmail.com>
+Message-ID: <20150203144611.GS8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 3, 2015 at 9:37 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Feb 03, 2015 at 09:04:03AM -0500, Rob Clark wrote:
->> Since I'm stuck w/ an iommu, instead of built in mmu, my plan was to
->> drop use of dma-mapping entirely (incl the current call to dma_map_sg,
->> which I just need until we can use drm_cflush on arm), and
->> attach/detach iommu domains directly to implement context switches.
->> At that point, dma_addr_t really has no sensible meaning for me.
->
-> So how do you intend to import from a subsystem which only gives you
-> the dma_addr_t?
->
-> If you aren't passing system memory, you have no struct page.  You can't
-> fake up a struct page.  What this means is that struct scatterlist can't
-> represent it any other way.
+On Tue, Feb 03, 2015 at 08:09:34PM +0530, Jassi Brar wrote:
+> On 3 February 2015 at 18:02, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Tue, Feb 03, 2015 at 05:29:23PM +0800, Vincent Yang wrote:
+> >> +static int mhu_send_data(struct mbox_chan *chan, void *data)
+> >> +{
+> >> +     struct mhu_link *mlink = chan->con_priv;
+> >> +
+> >> +     pr_debug("%s:%d\n", __func__, __LINE__);
+> >> +     if (!mhu_last_tx_done(chan)) {
+> >> +             dev_err(chan->mbox->dev, "Last TX(%d) pending!\n", mlink->irq);
+> >> +             return -EBUSY;
+> >> +     }
+> >> +
+> >> +     writel_relaxed((u32)data, mlink->tx_reg + INTR_SET_OFS);
+> >
+> > Doesn't that cause a GCC warning?
+> >
+> I don't see any, but I'll drop the cast.
 
-Tell the exporter to stop using carveouts, and give me proper memory
-instead.. ;-)
+A cast is probably needed.  You're right that GCC no longer warns about
+this - I'm pretty sure it used to complain about casting pointers to
+ints, and we used to need to cast to "unsigned long" first.
 
-Well, at least on these SoC's, I think the only valid use for carveout
-memory is the bootloader splashscreen.  And I was planning on just
-hanging on to that for myself for fbdev scanout buffer or other
-internal (non shared) usage..
-
-BR,
--R
-
-> --
-> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-> according to speedtest.net.
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
