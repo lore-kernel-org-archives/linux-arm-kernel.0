@@ -1,37 +1,40 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Tue, 3 Feb 2015 11:22:01 -0500
-Subject: [Linaro-mm-sig] [RFCv3 2/2] dma-buf: add helpers for sharing
- attacher constraints with dma-parms
-In-Reply-To: <6906596.JU5vQoa1jV@wuerfel>
-References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
- <3783167.LiVXgA35gN@wuerfel>
- <20150203155404.GV8656@n2100.arm.linux.org.uk>
- <6906596.JU5vQoa1jV@wuerfel>
-Message-ID: <CAF6AEGsttiufoqPbDiZfUX2ndbv2XfeZzcfyaf-AcUJgJpgLkA@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 3 Feb 2015 16:21:28 +0000
+Subject: [RFC PATCH] ASoC: wm8731: let codec to manage clock by itself
+In-Reply-To: <CAOLZvyEVQmqg9Jn5Kt_2m5K0-taJcGf6mweK4T=fwKOwn-Ovxg@mail.gmail.com>
+References: <1422934415-24957-1-git-send-email-voice.shen@atmel.com>
+ <CAOLZvyE6W8-X2_M+-KQNry2VPwLzwbBLuxr5Z5EdBQo7Skv2RQ@mail.gmail.com>
+ <20150203124441.GK21293@sirena.org.uk>
+ <CAOLZvyEVQmqg9Jn5Kt_2m5K0-taJcGf6mweK4T=fwKOwn-Ovxg@mail.gmail.com>
+Message-ID: <20150203162128.GP21293@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 3, 2015 at 11:12 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> I agree for the case you are describing here. From what I understood
-> from Rob was that he is looking at something more like:
->
-> Fig 3
-> CPU--L1cache--L2cache--Memory--IOMMU---<iobus>--device
->
-> where the IOMMU controls one or more contexts per device, and is
-> shared across GPU and non-GPU devices. Here, we need to use the
-> dmap-mapping interface to set up the IO page table for any device
-> that is unable to address all of system RAM, and we can use it
-> for purposes like isolation of the devices. There are also cases
-> where using the IOMMU is not optional.
+On Tue, Feb 03, 2015 at 03:40:45PM +0100, Manuel Lauss wrote:
+> On Tue, Feb 3, 2015 at 1:44 PM, Mark Brown <broonie@kernel.org> wrote:
 
+> >> +    wm8731->mclk = devm_clk_get(&spi->dev, "mclk");
+> >> +    if (IS_ERR(wm8731->mclk)) {
+> >> +        wm8731->mclk = NULL;
+> >> +        dev_warn(&spi->dev, "assuming static MCLK\n");
+> >> +    }
 
-Actually, just to clarify, the IOMMU instance is specific to the GPU..
-not shared with other devices.  Otherwise managing multiple contexts
-would go quite badly..
+> > This is broken for both deferred probe and in the case where the clock
+> > API genuinely returns a NULL clock.  Other than that it's the kind of
+> > thing that we've done for some other drivers, though it's not good to
+> > have to do this.  Check them for correct behaviour.
 
-But other devices have their own instance of the same IOMMU.. so same
-driver could be used.
+> Hm, so the only option is to create the simples possible 12MHz clk object?
 
-BR,
--R
+Well, that's the best option in general.  You can get away with just
+making sure that -EPROBE_DEFER is handled and that IS_ERR() is used to
+check for an invalid clock but if you can define a clock that's even
+better (and should be pretty painless), we're going to want to do that
+transition at some point.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150203/d76d31be/attachment.sig>
