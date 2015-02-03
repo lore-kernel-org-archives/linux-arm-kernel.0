@@ -1,71 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Feb 2015 20:28:42 +0000
-Subject: [PATCH] coresight: Adding coresight support for arm64 architecture
-In-Reply-To: <1422990133-26342-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1422990133-26342-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20150203202842.GZ8656@n2100.arm.linux.org.uk>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Tue, 3 Feb 2015 12:38:48 -0800
+Subject: [PATCH 0/3] Add initial DT support for Qualcomm SPMI PMIC devices
+In-Reply-To: <1422965880-11047-1-git-send-email-iivanov@mm-sol.com>
+References: <1422965880-11047-1-git-send-email-iivanov@mm-sol.com>
+Message-ID: <CAJAp7OjL6+QLs45LM8pEsZ4tHQ2jgM9z2tg8pb6A=xAxBO7pGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 03, 2015 at 12:02:13PM -0700, mathieu.poirier at linaro.org wrote:
-> diff --git a/drivers/coresight/Kconfig b/drivers/coresight/Kconfig
-> new file mode 100644
-> index 000000000000..271fad830ae4
-> --- /dev/null
-> +++ b/drivers/coresight/Kconfig
-> @@ -0,0 +1,60 @@
-> +#
-> +# Coresight configuration
-> +#
-> +menuconfig CORESIGHT
-> +	bool "CoreSight Tracing Support"
-> +	select ARM_AMBA
-> +	help
-> +	  This framework provides a kernel interface for the CoreSight debug
-> +	  and trace drivers to register themselves with. It's intended to build
-> +	  a topological view of the CoreSight components based on a DT
-> +	  specification and configure the right serie of components when a
-> +	  trace source gets enabled.
-> +
+On Tue, Feb 3, 2015 at 4:17 AM, Ivan T. Ivanov <iivanov@mm-sol.com> wrote:
+> Following set of patches add initial DT support for PMIC devices
+> found on recent Quqalcomm chipsets. Details for SPMI bus and PMIC arbiter
+> could be found here [1].
+>
+> Regards,
+> Ivan
+>
+> [1] http://lwn.net/Articles/564637/
+>
+> Ivan T. Ivanov (3):
+>   ARM: dts: qcom: Add SPMI PMIC Arbiter nodes for APQ8084 and MSM8974
+>   ARM: dts: qcom: Add 8x74 chipset SPMI PMIC's nodes
+>   ARM: dts: qcom: Add APQ8084 chipset SPMI PMIC's nodes
+>
 
-You could surround the following options with
+Looks good.
 
-if CORESIGHT
-...
-endif
+Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 
-which will implicitly make anything between depend on CORESIGHT instead of
-having to specify it every time.
-
-> diff --git a/drivers/coresight/coresight-etb10.c b/drivers/coresight/coresight-etb10.c
-> index c9acd406f0d0..aa47d31fe2a2 100644
-> --- a/drivers/coresight/coresight-etb10.c
-> +++ b/drivers/coresight/coresight-etb10.c
-> @@ -314,7 +314,7 @@ static ssize_t etb_read(struct file *file, char __user *data,
->  	*ppos += len;
->  
->  	dev_dbg(drvdata->dev, "%s: %d bytes copied, %d bytes left\n",
-> -		__func__, len, (int) (depth * 4 - *ppos));
-> +		__func__, (int)len, (int)(depth * 4 - *ppos));
-
-Please use %zu for size_t types.
-
->  	return len;
->  }
->  
-> diff --git a/drivers/coresight/coresight-tmc.c b/drivers/coresight/coresight-tmc.c
-> index 3ff232f9ddf7..d08460327bd2 100644
-> --- a/drivers/coresight/coresight-tmc.c
-> +++ b/drivers/coresight/coresight-tmc.c
-> @@ -534,7 +534,7 @@ static ssize_t tmc_read(struct file *file, char __user *data, size_t len,
->  	*ppos += len;
->  
->  	dev_dbg(drvdata->dev, "%s: %d bytes copied, %d bytes left\n",
-> -		__func__, len, (int) (drvdata->size - *ppos));
-> +		__func__, (int)len, (int)(drvdata->size - *ppos));
-
-Ditto.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Regards,
+Bjorn
