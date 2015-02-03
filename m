@@ -1,77 +1,29 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Tue, 03 Feb 2015 13:28:59 +0900
-Subject: [PATCH 2/2] ARM: dts: Add syscon phandle to the video-phy node for
- Exynos4
-In-Reply-To: <54CF53CB.3050100@samsung.com>
-References: <1421429438-32090-1-git-send-email-s.nawrocki@samsung.com>
- <1421429438-32090-2-git-send-email-s.nawrocki@samsung.com>
- <54CF53CB.3050100@samsung.com>
-Message-ID: <07a601d03f69$ee394130$caabc390$@kernel.org>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 3 Feb 2015 16:28:19 +1100
+Subject: linux-next: manual merge of the clk tree with the arm-soc tree
+Message-ID: <20150203162819.5693d5d1@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sylwester Nawrocki wrote:
-> 
-> Hi Kukjin,
-> 
-Hi,
+Hi Mike,
 
-> On 16/01/15 18:30, Sylwester Nawrocki wrote:
-> > This is required to fix regression after introducing the PMU device
-> > nodes required for the PMU driver modified in commit
-> > 14fc8b93d47323561edf5d482d4a4b3ee1b90286
-> > ("ARM: EXYNOS: Add platform driver support for Exynos PMU").
-> > This change is needed to make MIPI DSI displays and MIPI CSI-2
-> > camera sensors working again on Exynos4 boards.
-> >
-> > Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> > ---
-> >  arch/arm/boot/dts/exynos4.dtsi |    1 +
-> >  1 file changed, 1 insertion(+)
-> >
-> > diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-> > index b8168f1..250ee50 100644
-> > --- a/arch/arm/boot/dts/exynos4.dtsi
-> > +++ b/arch/arm/boot/dts/exynos4.dtsi
-> > @@ -76,6 +76,7 @@
-> >  		compatible = "samsung,s5pv210-mipi-video-phy";
-> >  		reg = <0x10020710 8>;
-> >  		#phy-cells = <1>;
-> > +		syscon = <&pmu_system_controller>;
-> >  	};
-> >
-> >  	pd_mfc: mfc-power-domain at 10023C40 {
-> 
-Applied this.
+Today's linux-next merge of the clk tree got a conflict in
+arch/arm/mach-omap2/io.c between commit c27964b5d2f3 ("ARM: OMAP2+: Fix
+ti81xx class type") from the arm-soc tree and commit eded36fe29e1
+("ARM: OMAP3: use clock data from TI clock driver for legacy boot")
+from the clk tree.
 
-> I'd like to remind you about a few pending dts patches I send to you, except
-> the above one there are:
-> 
-> [PATCH V3 15/15] ARM: dts: Fix I2S1, I2S2 compatible for exynos4 SoCs
-I thought Mark applied the whole series including above patch.
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/316326.html
-And I knew he didn't when I checked his comment on 13/15 patch ;)
+I fixed it up (the former seems to have incorporated the conflicting
+part of the latter) and can carry the fix as necessary (no action is
+required).
 
-> [PATCH] ARM: dts: Fix CLK_MOUT_CAMn parent clocks assignment for Trats2
-Done.
-
-> [PATCH] ARM: dts: Fix CLK_UART_ISP_SCLK clock assignment in exynos4x12.dtsi
-Done.
-> 
-> and
-> 
-> [PATCH v2 14/16] ARM: dts: Exynos4 and Odroid X2/U3 sound device nodes update
-> 
-> but this one depends on ASoC patch:
-> [PATCH V3 11/15] ASoC: samsung: i2s: Add clk provider DT binding documentation
-> 
-> hence it could be probably merged only after 3.20-rc1 release.
-> 
-+ Mark
-
-I see. I'll take 13 to 15 in the series for late DT updates if Mark has no
-objection. (I commented about that on the mail thread.)
-
-Thanks for your reminder.
-
-- Kukjin
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150203/249db117/attachment-0001.sig>
