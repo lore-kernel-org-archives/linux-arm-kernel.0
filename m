@@ -1,96 +1,128 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Feb 2015 15:54:04 +0000
-Subject: [Linaro-mm-sig] [RFCv3 2/2] dma-buf: add helpers for sharing
- attacher constraints with dma-parms
-In-Reply-To: <3783167.LiVXgA35gN@wuerfel>
-References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
- <4830208.H6zxrGlT1D@wuerfel>
- <20150203152204.GU8656@n2100.arm.linux.org.uk>
- <3783167.LiVXgA35gN@wuerfel>
-Message-ID: <20150203155404.GV8656@n2100.arm.linux.org.uk>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Tue,  3 Feb 2015 16:55:54 +0100
+Subject: [PATCH v4] mmc: moxart: fix probe logic
+In-Reply-To: <6294882.EhDcdWGRYz@wuerfel>
+References: <6294882.EhDcdWGRYz@wuerfel>
+Message-ID: <1422978954-14547-1-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 03, 2015 at 04:31:13PM +0100, Arnd Bergmann wrote:
-> On Tuesday 03 February 2015 15:22:05 Russell King - ARM Linux wrote:
-> > Don't we already have those in the DMA API?  dma_sync_*() ?
-> >
-> > dma_map_sg() - sets up the system MMU and deals with initial cache
-> > coherency handling.  Device IOMMU being the responsibility of the
-> > GPU driver.
-> 
-> dma_sync_*() works with whatever comes out of dma_map_*(), true,
-> but this is not what they want to do here.
->  
-> > The GPU can then do dma_sync_*() on the scatterlist as is necessary
-> > to synchronise the cache coherency (while respecting the ownership
-> > rules - which are very important on ARM to follow as some sync()s are
-> > destructive to any dirty data in the CPU cache.)
-> > 
-> > dma_unmap_sg() tears down the system MMU and deals with the final cache
-> > handling.
-> > 
-> > Why do we need more DMA API interfaces?
-> 
-> The dma_map_* interfaces assign the virtual addresses internally,
-> using typically either a global address space for all devices, or one
-> address space per device.
+From: Arnd Bergmann <arnd@arndb.de>
 
-We shouldn't be doing one address space per device for precisely this
-reason.  We should be doing one address space per *bus*.  I did have
-a nice diagram to illustrate the point in my previous email, but I
-deleted it, I wish I hadn't... briefly:
+Jonas Jensen wanted to submit a patch for these, but apparently
+forgot about it. I stumbled over this symptom first:
 
-Fig. 1.
-                                                 +------------------+
-                                                 |+-----+  device   |
-CPU--L1cache--L2cache--Memory--SysMMU---<iobus>----IOMMU-->         |
-                                                 |+-----+           |
-                                                 +------------------+
+drivers/built-in.o: In function `moxart_probe':
+:(.text+0x2af128): undefined reference to `of_dma_request_slave_channel'
 
-Fig.1 represents what I'd call the "GPU" issue that we're talking about
-in this thread.
+This is because of_dma_request_slave_channel is an internal helper
+and not exported to loadable module. I'm changing the driver to
+use dma_request_slave_channel_reason() instead.
 
-Fig. 2.
-CPU--L1cache--L2cache--Memory--SysMMU---<iobus>--IOMMU--device
+Further problems from inspection:
 
-The DMA API should be responsible (at the very least) for everything on
-the left of "<iobus>" in and should be providing a dma_addr_t which is
-representative of what the device (in Fig.1) as a whole sees.  That's
-the "system" part.  
+* The remove function must not call kfree on the host pointer,
+  because it is allocated together with the mmc_host.
 
-I believe this is the approach which is taken by x86 and similar platforms,
-simply because they tend not to have an IOMMU on individual devices (and
-if they did, eg, on a PCI card, it's clearly the responsibility of the
-device driver.)
+* The clock is never released
 
-Whether the DMA API also handles the IOMMU in Fig.1 or 2 is questionable.
-For fig.2, it is entirely possible that the same device could appear
-without an IOMMU, and in that scenario, you would want the IOMMU to be
-handled transparently.
+* The dma_cap_mask_t is completely unused and can be removed
 
-However, by doing so for everything, you run into exactly the problem
-which is being discussed here - the need to separate out the cache
-coherency from the IOMMU aspects.  You probably also have a setup very
-similar to fig.1 (which is certainly true of Vivante GPUs.)
+* deferred probing does not work if the dma driver is loaded
+  after the mmc driver.
 
-If you have the need to separately control both, then using the DMA API
-to encapsulate both does not make sense - at which point, the DMA API
-should be responsible for the minimum only - in other words, everything
-to the left of <iobus> (so including the system MMU.)  The control of
-the device IOMMU should be the responsibility of device driver in this
-case.
+This patch should fix all of the above.
 
-So, dma_map_sg() would be responsible for dealing with the CPU cache
-coherency issues, and setting up the system MMU.  dma_sync_*() would
-be responsible for the CPU cache coherency issues, and dma_unmap_sg()
-would (again) deal with the CPU cache and tear down the system MMU
-mappings.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+---
 
-Meanwhile, the device driver has ultimate control over its IOMMU, the
-creation and destruction of mappings and context switches at the
-appropriate times.
+Notes:
+    This is a forward of Arnd's v2 patch.
+    
+    v2:  do not call clk_put() on an error pointer
+    v3:  fix NULL dereference on host->clk
+    v4:  rework to use devm_clk_get()
+    
+    Applies to next-20150113
 
+ drivers/mmc/host/moxart-mmc.c | 21 ++++++++++-----------
+ 1 file changed, 10 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/mmc/host/moxart-mmc.c b/drivers/mmc/host/moxart-mmc.c
+index d2a1ef6..6cb4053 100644
+--- a/drivers/mmc/host/moxart-mmc.c
++++ b/drivers/mmc/host/moxart-mmc.c
+@@ -17,6 +17,7 @@
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <linux/delay.h>
++#include <linux/errno.h>
+ #include <linux/interrupt.h>
+ #include <linux/blkdev.h>
+ #include <linux/dma-mapping.h>
+@@ -562,7 +563,6 @@ static int moxart_probe(struct platform_device *pdev)
+ 	struct dma_slave_config cfg;
+ 	struct clk *clk;
+ 	void __iomem *reg_mmc;
+-	dma_cap_mask_t mask;
+ 	int irq, ret;
+ 	u32 i;
+ 
+@@ -586,9 +586,9 @@ static int moxart_probe(struct platform_device *pdev)
+ 		goto out;
+ 	}
+ 
+-	clk = of_clk_get(node, 0);
++	clk = devm_clk_get(dev, 0);
+ 	if (IS_ERR(clk)) {
+-		dev_err(dev, "of_clk_get failed\n");
++		dev_err(dev, "devm_clk_get failed\n");
+ 		ret = PTR_ERR(clk);
+ 		goto out;
+ 	}
+@@ -603,9 +603,6 @@ static int moxart_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		goto out;
+ 
+-	dma_cap_zero(mask);
+-	dma_cap_set(DMA_SLAVE, mask);
+-
+ 	host = mmc_priv(mmc);
+ 	host->mmc = mmc;
+ 	host->base = reg_mmc;
+@@ -613,8 +610,8 @@ static int moxart_probe(struct platform_device *pdev)
+ 	host->timeout = msecs_to_jiffies(1000);
+ 	host->sysclk = clk_get_rate(clk);
+ 	host->fifo_width = readl(host->base + REG_FEATURE) << 2;
+-	host->dma_chan_tx = of_dma_request_slave_channel(node, "tx");
+-	host->dma_chan_rx = of_dma_request_slave_channel(node, "rx");
++	host->dma_chan_tx = dma_request_slave_channel_reason(dev, "tx");
++	host->dma_chan_rx = dma_request_slave_channel_reason(dev, "rx");
+ 
+ 	spin_lock_init(&host->lock);
+ 
+@@ -624,6 +621,11 @@ static int moxart_probe(struct platform_device *pdev)
+ 	mmc->ocr_avail = 0xffff00;	/* Support 2.0v - 3.6v power. */
+ 
+ 	if (IS_ERR(host->dma_chan_tx) || IS_ERR(host->dma_chan_rx)) {
++		if (PTR_ERR(host->dma_chan_tx) == -EPROBE_DEFER ||
++		    PTR_ERR(host->dma_chan_rx) == -EPROBE_DEFER) {
++			ret = -EPROBE_DEFER;
++			goto out;
++		}
+ 		dev_dbg(dev, "PIO mode transfer enabled\n");
+ 		host->have_dma = false;
+ 	} else {
+@@ -702,9 +704,6 @@ static int moxart_remove(struct platform_device *pdev)
+ 		writel(readl(host->base + REG_CLOCK_CONTROL) | CLK_OFF,
+ 		       host->base + REG_CLOCK_CONTROL);
+ 	}
+-
+-	kfree(host);
+-
+ 	return 0;
+ }
+ 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+1.8.2.1
