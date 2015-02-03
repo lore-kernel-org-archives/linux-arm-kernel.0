@@ -1,73 +1,95 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 3 Feb 2015 09:36:10 +0900
-Subject: [PATCH] ARM: shmobile: silk: initial device tree
-In-Reply-To: <54CFE4CE.5090406@cogentembedded.com>
-References: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
- <1608366.HtA9yBksdO@wasted.cogentembedded.com>
- <20150202110557.GC7459@leverpostej>
- <54CFE4CE.5090406@cogentembedded.com>
-Message-ID: <20150203003610.GA17629@verge.net.au>
+Date: Tue, 3 Feb 2015 09:41:46 +0900
+Subject: [PATCH] ARM: shmobile: alt dts: Drop console= bootargs parameter
+In-Reply-To: <54CFF5F1.2040007@cogentembedded.com>
+References: <1415075018-27529-1-git-send-email-horms+renesas@verge.net.au>
+ <54CBFC63.4070808@cogentembedded.com>
+ <20150131041731.GA7605@verge.net.au>
+ <54CFF5F1.2040007@cogentembedded.com>
+Message-ID: <20150203004146.GB17629@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 02, 2015 at 11:57:50PM +0300, Sergei Shtylyov wrote:
+On Tue, Feb 03, 2015 at 01:10:57AM +0300, Sergei Shtylyov wrote:
 > Hello.
 > 
-> On 02/02/2015 02:05 PM, Mark Rutland wrote:
+> On 01/31/2015 07:17 AM, Simon Horman wrote:
 > 
-> >>Add the initial device tree for the R8A7794 SoC based SILK low cost board.
-> >>SCIF2 serial port support is included, so that the serial console can work.
+> >>>Alt is booted from DT, so chosen/stdout-path is
+> >>>always used, and we can drop the "console=" parameter from chosen/bootargs.
 > 
-> >>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >>>This change has a side-effect of changing the console speed from 38400
+> >>>to 115200. This is intentional as 115200 is consistently used on
+> >>>all other shmobile boards.
 > 
-> [...]
+> >>    I'd say it's not very practical to change the console's baud rate from
+> >>U-Boot's default
 > 
-> >>Index: renesas/arch/arm/boot/dts/r8a7794-silk.dts
-> >>===================================================================
-> >>--- /dev/null
-> >>+++ renesas/arch/arm/boot/dts/r8a7794-silk.dts
-> >>@@ -0,0 +1,41 @@
-> >>+/*
-> >>+ * Device Tree Source for the SILK board
-> >>+ *
-> >>+ * Copyright (C) 2014 Renesas Electronics Corporation
-> >>+ * Copyright (C) 2014-2015 Renesas Solutions Corp.
-> >>+ * Copyright (C) 2014-2015 Cogent Embedded, Inc.
-> >>+ *
-> >>+ * This file is licensed under the terms of the GNU General Public License
-> >>+ * version 2.  This program is licensed "as is" without any warranty of any
-> >>+ * kind, whether express or implied.
-> >>+ */
-> >>+
-> >>+/dts-v1/;
-> >>+#include "r8a7794.dtsi"
-> >>+
-> >>+/ {
-> >>+	model = "SILK";
+> >It is consistent with the handling of all other boards with
+> >renesas SoCs that are present in mainline.
 > 
-> >Shouldn't that have a "Renesas" prefix or something like that?
-> 
->    Historically. no SH-Mobile .dts has used the vendor name in the "model"
-> prop. I defer the decision to Simon but I think we should be at least
-> consistent.
+>    Well, not quite: Henninger/Porter is still using 38400.
 
-They are also my thoughts (except the bit about deferring to myself).
+>From my point of view that is an oversight which I would have
+resolved had I ever obtained access to the hardware.
 
-If there is a good motivation for a Renesas prefix then that is fine by me.
-But in that case it seems that it would be appropriate to update
-the existing renesas boards too.
+> >>(AFAIR changing baud rate in U-Boot didn't work)...
+> 
+>    That was a recollection from the other board though, I haven't yet tried
+> to do it on the SILK board (and I'm unable to currently as the power supply
+> seems dead).
+> 
+> >Perhaps that relates to the version of built of uboot.
+> >On the board I have access to I see:
+> 
+> >ver=U-Boot 2013.01.01-g5df9446 (Oct 01 2014 - 14:59:23)
+> 
+> U-Boot 2013.01.01 (Oct 17 2014 - 20:59:18)
 
-The only thing that stood out to me about "SILK" was that unlike
-other renesas boards names in .dtsi files it is all-capitals.
-Its not a bit deal but as we are on the topic: is that intentional?
+It looks like my version has some extra patches (the g5df9446 bit).
+But I could be reading things wrong.
 
-> >It's unlikely that there will be another board called "SILK", but it
-> >does make it hard for someone to get an idea of what the board is from
-> >the model string alone.
+> >And the following setting altered the baud rate of u-boot (IIRC).
 > 
->    Tend to agree here.
+> >baudrate=115200
 > 
-> >Mark.
+>    I was going to try that but the board just didn't power up.
 > 
-> WBR, Sergei
+> >>>Cc: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+> >>>Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+> >>>Cc: devicetree at vger.kernel.org
+> >>>Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >>>---
+> >>>  arch/arm/boot/dts/r8a7794-alt.dts | 2 +-
+> >>>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
+> >>>diff --git a/arch/arm/boot/dts/r8a7794-alt.dts b/arch/arm/boot/dts/r8a7794-alt.dts
+> >>>index 8aec512..f2cf757 100644
+> >>>--- a/arch/arm/boot/dts/r8a7794-alt.dts
+> >>>+++ b/arch/arm/boot/dts/r8a7794-alt.dts
+> >>>@@ -20,7 +20,7 @@
+> >>>  	};
+> >>>
+> >>>  	chosen {
+> >>>-		bootargs = "console=ttySC0,38400 ignore_loglevel rw root=/dev/nfs ip=dhcp";
+> >>>+		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
+> 
+> >>    Hm, does this even work as intended? I've tried to boot another R8A7794
+> >>based board and I couldn't get any output with alike command line. Booting
+> >>with 'earlyprintk=serial' has shown that tty0 was enabled as a console which
+> >>is not what we wanted.
+> 
+> >If you are backporting this change then I believe it has some dependencies
+> >that I can follow up on if it is useful to you.
+> 
+>    Contrariwise, I'm forward-porting.
+> 
+> >If you are using mainline (e.g. next or renesas-next) then yes,
+> >it works. I have tested it numerous times since the patch was merged.
+> 
+>    I'm traditionally using the 'renesas-devel-*' tags.
+
+If you are using 'renesas-devel-*' tags (and forward porting) then
+you should be in good shape. But if you would like me to verify a particular
+tag I'm happy to do so. It is not unheard of for different instances of
+the same board behave in different ways.
