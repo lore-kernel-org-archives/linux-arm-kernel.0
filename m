@@ -1,64 +1,110 @@
-From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
-Date: Tue,  3 Feb 2015 11:52:56 -0700
-Subject: [PATCH] coresight: making cpu index lookup arm64 compliant
-Message-ID: <1422989576-23277-1-git-send-email-mathieu.poirier@linaro.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 03 Feb 2015 11:00:35 -0800
+Subject: [PATCH v4 3/6] ARM: Alpine: smp support
+In-Reply-To: <54d0cd2c.9vODWxCn7cznpq0G%tsahee@annapurnalabs.com>
+References: <54d0cd2c.9vODWxCn7cznpq0G%tsahee@annapurnalabs.com>
+Message-ID: <54D11AD3.1030600@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mathieu Poirier <mathieu.poirier@linaro.org>
+On 02/03/15 05:29, Tsahee Zidenberg wrote:
+> diff --git a/arch/arm/mach-alpine/alpine_cpu_pm.h b/arch/arm/mach-alpine/alpine_cpu_pm.h
+> new file mode 100644
+> index 0000000..4d32716
+> --- /dev/null
+> +++ b/arch/arm/mach-alpine/alpine_cpu_pm.h
+> @@ -0,0 +1,26 @@
+> +/*
+> + * Low-level power-management support for Alpine platform.
+> + *
+> + * Copyright (C) 2015 Annapurna Labs Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#ifndef __ALPINE_CPU_PM_H__
+> +#define __ALPINE_CPU_PM_H__
+> +
+> +/* Alpine CPU Power Management Services Initialization */
+> +void __init alpine_cpu_pm_init(void);
 
-Function "get_logical_index()" is not available on arm64.
-Instead of adding the function simply using "of_get_cpu_node()" and
-comparing the return value with cpu handles yields the same
-result.
+No need to have __init in header files.
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- drivers/coresight/of_coresight.c | 18 ++++++------------
- 1 file changed, 6 insertions(+), 12 deletions(-)
+>
+> diff --git a/arch/arm/mach-alpine/platsmp.c b/arch/arm/mach-alpine/platsmp.c
+> new file mode 100644
+> index 0000000..43b7641
+> --- /dev/null
+> +++ b/arch/arm/mach-alpine/platsmp.c
+> @@ -0,0 +1,49 @@
+> +/*
+> + * SMP operations for Alpine platform.
+> + *
+> + * Copyright (C) 2015 Annapurna Labs Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/init.h>
+> +#include <linux/errno.h>
+> +#include <linux/io.h>
+> +#include <linux/of.h>
+> +
+> +#include <asm/smp_plat.h>
+> +
+> +#include "alpine_cpu_pm.h"
+> +
+> +int __cpuinit alpine_boot_secondary(unsigned int cpu, struct task_struct *idle)
 
-diff --git a/drivers/coresight/of_coresight.c b/drivers/coresight/of_coresight.c
-index c3efa418a86d..f3cc8e97a0f8 100644
---- a/drivers/coresight/of_coresight.c
-+++ b/drivers/coresight/of_coresight.c
-@@ -22,6 +22,7 @@
- #include <linux/platform_device.h>
- #include <linux/amba/bus.h>
- #include <linux/coresight.h>
-+#include <linux/cpumask.h>
- #include <asm/smp_plat.h>
- 
- 
-@@ -113,7 +114,7 @@ static int of_coresight_alloc_memory(struct device *dev,
- struct coresight_platform_data *of_get_coresight_platform_data(
- 				struct device *dev, struct device_node *node)
- {
--	int i = 0, ret = 0;
-+	int i = 0, ret = 0, cpu;
- 	struct coresight_platform_data *pdata;
- 	struct of_endpoint endpoint, rendpoint;
- 	struct device *rdev;
-@@ -187,17 +188,10 @@ struct coresight_platform_data *of_get_coresight_platform_data(
- 	/* Affinity defaults to CPU0 */
- 	pdata->cpu = 0;
- 	dn = of_parse_phandle(node, "cpu", 0);
--	if (dn) {
--		const u32 *cell;
--		int len, index;
--		u64 hwid;
--
--		cell = of_get_property(dn, "reg", &len);
--		if (cell) {
--			hwid = of_read_number(cell, of_n_addr_cells(dn));
--			index = get_logical_index(hwid);
--			if (index != -EINVAL)
--				pdata->cpu = index;
-+	for (cpu = 0; dn && cpu < nr_cpu_ids; cpu++) {
-+		if (dn == of_get_cpu_node(cpu, NULL)) {
-+			pdata->cpu = cpu;
-+			break;
- 		}
- 	}
- 
+static? There's no such thing as __cpuinit anymore, please remove.
+
+> +{
+> +	phys_addr_t addr;
+> +
+> +	addr = virt_to_phys(secondary_startup);
+> +
+> +	if (addr > (phys_addr_t)(uint32_t)(-1)) {
+> +		pr_err("FAIL: resume address over 32bit (%pa)", &addr);
+> +		return -EINVAL;
+> +	}
+> +
+> +	return alpine_cpu_wakeup(cpu_logical_map(cpu), (uint32_t)addr);
+> +}
+> +
+> +void __init alpine_smp_prepare_cpus(unsigned int max_cpus)
+
+static?
+
+> +{
+> +	alpine_cpu_pm_init();
+> +}
+> +
+> +struct smp_operations __initdata alpine_smp_ops = {
+
+static struct smp_operations alpine_smp_ops __initdata= {
+
+> +	.smp_prepare_cpus	= alpine_smp_prepare_cpus,
+> +	.smp_boot_secondary	= alpine_boot_secondary,
+> +};
+> +CPU_METHOD_OF_DECLARE(alpine_smp, "al,alpine-smp", &alpine_smp_ops);
+
+
 -- 
-1.9.1
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
