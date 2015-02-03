@@ -1,65 +1,43 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Tue, 3 Feb 2015 14:55:35 -0600
-Subject: [PATCH v3 0/2] couple of generic remoteproc enhancements
-In-Reply-To: <54C17130.5060002@ti.com>
-References: <1420838519-15669-1-git-send-email-s-anna@ti.com>
- <54C17130.5060002@ti.com>
-Message-ID: <54D135C7.4040501@ti.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 03 Feb 2015 13:08:49 -0800
+Subject: [PATCH V2 RESEND] clk: mxs: Fix invalid 32-bit access to frac
+ registers
+In-Reply-To: <CAOMZO5CTaqzs2bwXL4V9boMSjOw6TcGBLXe9U=9-wEvwfvGYeQ@mail.gmail.com>
+References: <1422645610-3052-1-git-send-email-stefan.wahren@i2se.com>
+ <CAOMZO5CTaqzs2bwXL4V9boMSjOw6TcGBLXe9U=9-wEvwfvGYeQ@mail.gmail.com>
+Message-ID: <20150203210849.421.54288@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ohad,
+Quoting Fabio Estevam (2015-01-30 11:28:32)
+> On Fri, Jan 30, 2015 at 5:20 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> > According to i.MX23 and i.MX28 reference manual [1],[2] the fractional
+> > clock control register is 32-bit wide, but is separated in 4 parts.
+> > So write instructions must not apply to more than 1 part at once.
+> >
+> > The clk init for the i.MX28 violates this restriction and all the other
+> > accesses on that register suggest that there isn't such a restriction.
+> >
+> > This patch restricts the access to this register to byte instructions and
+> > extends the comment in the init functions.
+> >
+> > Btw the imx23 init now uses a R-M-W sequence just like imx28 init
+> > to avoid any clock glitches.
+> >
+> > The changes has been tested with a i.MX23 and a i.MX28 board.
+> >
+> > [1] - http://cache.freescale.com/files/dsp/doc/ref_manual/IMX23RM.pdf
+> > [2] - http://cache.freescale.com/files/dsp/doc/ref_manual/MCIMX28RM.pdf
+> >
+> > Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> > Reviewed-by: Marek Vasut <marex@denx.de>
+> 
+> Reviewed-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-> On 01/09/2015 03:21 PM, Suman Anna wrote:
->> Hi Ohad,
->>
->> The following is an updated patchset addressing the previous pending comments
->> from v1 & v2, and are rebased onto the latest 3.19-rc3 (are rc independent
->> actually). 
->>
->> The patches are mainly developed to support the WkupM3 remote processor driver
->> on TI AM335x/AM437x SoCs, and I have verified the loading using the latest
->> version of Dave's WkupM3 remoteproc work [1]
->>
->> The only change in v3 is on the second patch, it mainly leverages the
->> memcpy_toio and memset_io functions for copying/loading code into the
->> internal memory sections. An additional argument has to be added to the
->> rproc_da_to_va function to make this distinction.
-> 
-> Any comments on this series, or can I assume that this will make it to
-> v3.20?
+Applied to clk-next.
 
-ping, want to make sure this has not fallen off your radar..
+Thanks,
+Mike
 
 > 
-> regards
-> Suman
-> 
->>
->> [1] http://marc.info/?l=linux-omap&m=142022842323885&w=2
->>
->> v2:
->> http://marc.info/?l=linux-omap&m=141089879412807&w=2
->> - Add explicit setting of the .has_iommu field in each of the existing
->>   remoteproc platform drivers
->> - Update patch description to add the usecase details for the change
->>   summary
->> - Fixed a minor checkpatch warning.
->>
->> v1:
->> http://marc.info/?l=linux-omap&m=140483657604924&w=2
->>
->> Suman Anna (2):
->>   remoteproc: use a flag to detect the presence of IOMMU
->>   remoteproc: add support to handle internal memories
->>
->>  drivers/remoteproc/da8xx_remoteproc.c      |   1 +
->>  drivers/remoteproc/omap_remoteproc.c       |   5 ++
->>  drivers/remoteproc/remoteproc_core.c       | 104 ++++++++++++++++++++++++-----
->>  drivers/remoteproc/remoteproc_elf_loader.c |  23 +++++--
->>  drivers/remoteproc/remoteproc_internal.h   |   6 +-
->>  drivers/remoteproc/ste_modem_rproc.c       |   1 +
->>  include/linux/remoteproc.h                 |  45 ++++++++++++-
->>  7 files changed, 161 insertions(+), 24 deletions(-)
->>
-> 
+> Thanks
