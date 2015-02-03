@@ -1,43 +1,52 @@
-From: joshc@ni.com (Josh Cartwright)
-Date: Tue, 3 Feb 2015 14:13:26 -0600
-Subject: [PATCH] clocksource: mark sched_clock_read functions notrace
-In-Reply-To: <1422643216-26673-1-git-send-email-nathan.sullivan@ni.com>
-References: <1422643216-26673-1-git-send-email-nathan.sullivan@ni.com>
-Message-ID: <20150203201326.GH11832@jcartwri.amer.corp.natinst.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Tue, 3 Feb 2015 12:16:04 -0800
+Subject: [PATCH v3 3/4] pinctrl: cygnus: add initial IOMUX driver support
+In-Reply-To: <20150203200009.GB15969@dtor-ws>
+References: <rjui@broadcom.com>
+ <1422928894-20716-1-git-send-email-rjui@broadcom.com>
+ <1422928894-20716-4-git-send-email-rjui@broadcom.com>
+ <20150203174042.GA15969@dtor-ws> <54D121A0.6070602@broadcom.com>
+ <20150203200009.GB15969@dtor-ws>
+Message-ID: <54D12C84.9020505@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 30, 2015 at 12:40:15PM -0600, Nathan Sullivan wrote:
-> These functions will be called by ftrace code when function_graph is
-> used, so mark them notrace to avoid infinite recursion.
 
-It would be useful to have a full stack trace to show the particular
-case you're hitting.  Is the issue that trace_clock_local() is calling
-sched_clock(), and in these cases sched_clock() isn't being marked
-notrace?
 
-> Signed-off-by: Nathan Sullivan <nathan.sullivan@ni.com>
-> ---
->  drivers/clocksource/arm_arch_timer.c    |    2 +-
->  drivers/clocksource/arm_global_timer.c  |    2 +-
->  drivers/clocksource/samsung_pwm_timer.c |    2 +-
->  drivers/clocksource/timer-prima2.c      |    2 +-
->  drivers/clocksource/timer-sun5i.c       |    2 +-
->  5 files changed, 5 insertions(+), 5 deletions(-)
+On 2/3/2015 12:00 PM, Dmitry Torokhov wrote:
+> On Tue, Feb 03, 2015 at 11:29:36AM -0800, Ray Jui wrote:
+>> On 2/3/2015 9:40 AM, Dmitry Torokhov wrote:
+>>> On Mon, Feb 02, 2015 at 06:01:33PM -0800, Ray Jui wrote:
+>>>> +
+>>>> +/*
+>>>> + * List of pins in Cygnus
+>>>> + */
+>>>> +static struct cygnus_pin cygnus_pins[] = {
+>>>
+>>> const?
+>>>
+>> I cannot make it const here, since the address of "gpio_mux" is later
+>> passed to pinctrl_pin_desc's private data:
+>>
+>> pins[i].drv_data = &cygnus_pins[i].gpio_mux;
 > 
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 095c177..df5af55 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -405,7 +405,7 @@ u32 arch_timer_get_rate(void)
->  	return arch_timer_rate;
->  }
->  
-> -static u64 arch_counter_get_cntvct_mem(void)
-> +static u64 notrace arch_counter_get_cntvct_mem(void)
+> The pinctrl code says:
+> 
+> "@drv_data: driver-defined per-pin data. pinctrl core does not touch
+> this"
+> 
+> so we could theoretically cast away the constness and restore it when
+> we access drv_data in pin control methods, but I won't insist. I am
+> not sure which way looks nicer.
+> 
+> Thanks.
+> 
+Yeah, I agreed that by declaring the cygnus_pins array const, it makes
+it more obvious that "we do not expect any of its parameters to change."
+But later if we cast &gpio_mux to void * before assigned to drv_data of
+pinctrl_pin_desc, we sort of break it up...I'll keep this part of code
+as it is for now.
 
-Assuming you're trying to mark all sched_clock() implementations
-notrace, then you missed a few: arch_counter_get_cntvct and
-arch_counter_get_cntpct.
+Thanks,
 
-  Josh
+Ray
