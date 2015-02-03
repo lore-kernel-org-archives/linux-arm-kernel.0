@@ -1,29 +1,34 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 3 Feb 2015 14:03:56 +0100
-Subject: [PATCH] pinctrl: imx25: fix numbering for pins
-In-Reply-To: <1422402356-12171-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20150127232440.GK29856@pengutronix.de>
- <1422402356-12171-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <CACRpkdZT64A8ZYyVzSM=S-_xRnge4o5ntBeGi2UiOfXPyaEYAA@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 3 Feb 2015 13:11:27 +0000
+Subject: [PATCH V3 13/15] ARM: dts: Exynos4 and Odroid X2/U3 sound device
+ nodes update
+In-Reply-To: <54D0AB30.2010504@samsung.com>
+References: <1421260962-16892-1-git-send-email-s.nawrocki@samsung.com>
+ <1421260962-16892-14-git-send-email-s.nawrocki@samsung.com>
+ <20150114195452.GM3043@sirena.org.uk>
+ <07a501d03f69$aba222b0$02e66810$@kernel.org>
+ <54D0AB30.2010504@samsung.com>
+Message-ID: <20150203131127.GM21293@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 28, 2015 at 12:45 AM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
+On Tue, Feb 03, 2015 at 12:04:16PM +0100, Sylwester Nawrocki wrote:
 
-> The pin id for a given tuple listed in a fsl,pins property is calculated
-> by dividing the first entry (which is also a register offset) by 4.
-> As the first available register is at offset 0x8 and configures the pad
-> MX25_PAD_A10 the right id for this pin is 2. All other pins are off by
-> one, too.
->
-> This patch drops the definition MX25_PAD_RESERVE1 (together with its
-> only use) and decrements all following values by 1.
->
-> Fixes: b4a87c9b966f ("pinctrl: pinctrl-imx: add imx25 pinctrl driver")
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> >> Sorry, I should've said - I applied the ASoC patches, not these.
 
-Patch applied with Fabio's Test tag.
+> > Shall I take 13 to 15 DT patches in Samsung tree?
 
-Yours,
-Linus Walleij
+> Patches 13, 14 use macro definitions which are added in patch which is
+> already in Mark's sound tree ("ASoC: samsung: i2s: Add clk provider DT
+> binding documentation") [1]. We would need to consider that to avoid
+> build breaks.
+
+OK, I can apply them if people want but I'd need a resend - I discarded
+them since they'd normally go via the arch tree.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150203/af941f75/attachment.sig>
