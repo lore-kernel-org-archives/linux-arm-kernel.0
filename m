@@ -1,16 +1,27 @@
-From: info@creatingtools.biz (Alina)
-Date: Tue, 3 Feb 2015 13:03:51 +0530
-Subject: Web Listing
-Message-ID: <IDwONakYt9fREkum2vNHjKt74BgJYj1aiWleNjsoYTLD@creatingtools.biz>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 3 Feb 2015 14:23:15 +0100
+Subject: [PATCH 1/3] dt/bindings: Add binding for Versatile system
+ registers
+In-Reply-To: <1422467792-2065-2-git-send-email-robh@kernel.org>
+References: <1422467792-2065-1-git-send-email-robh@kernel.org>
+ <1422467792-2065-2-git-send-email-robh@kernel.org>
+Message-ID: <CACRpkdaS7dH9uTcWSvsEAiqsZVEPnfaT_RssWdeA_K-Ny7RJbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Jan 28, 2015 at 6:56 PM, Rob Herring <robh@kernel.org> wrote:
 
+> Add binding for Versatile board system registers found in the FPGA of the
+> Versatile/AB and Versatile/PB boards.
+>
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: Kumar Gala <galak@codeaurora.org>
+> Cc: devicetree at vger.kernel.org
 
-Hi, 
-My name is Alina and I am an Online Strategist.
-I've been tracking the success of your website while doing some research on your industry-I'm impressed with your company, but there are some real opportunities for growth that you currently are missing.Are you interested in several proven strategies to use content and social media to drive relevant traffic to your site? In 20 minutes I can show you how to fuel your brand and generate more revenue from search engines and social networks. This is a $500 value free of charge. I'd like to follow up about this with a quick phone call. Can I call you this week to discuss your campaign?
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Thank you
-Best regards,
-Alina
+Yours,
+Linus Walleij
