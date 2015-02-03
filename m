@@ -1,92 +1,60 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Tue, 3 Feb 2015 09:25:30 -0500
-Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher constraints
- with dma-parms
-In-Reply-To: <20150203122813.GN8656@n2100.arm.linux.org.uk>
-References: <1422347154-15258-2-git-send-email-sumit.semwal@linaro.org>
- <20150129143908.GA26493@n2100.arm.linux.org.uk>
- <CAO_48GEOQ1pBwirgEWeVVXW-iOmaC=Xerr2VyYYz9t1QDXgVsw@mail.gmail.com>
- <20150129154718.GB26493@n2100.arm.linux.org.uk>
- <CAF6AEGtTmFg66TK_AFkQ-xp7Nd9Evk3nqe6xCBp7K=77OmXTxA@mail.gmail.com>
- <20150129192610.GE26493@n2100.arm.linux.org.uk>
- <CAF6AEGujk8UC4X6T=yhTrz1s+SyZUQ=m05h_WcxLDGZU6bydbw@mail.gmail.com>
- <20150202165405.GX14009@phenom.ffwll.local>
- <CAF6AEGuESM+e3HSRGM6zLqrp8kqRLGUYvA3KKECdm7m-nt0M=Q@mail.gmail.com>
- <20150203074856.GF14009@phenom.ffwll.local>
- <20150203122813.GN8656@n2100.arm.linux.org.uk>
-Message-ID: <CAF6AEGuu=xBY-Con2CVYJ5kPfNk-emT6DqCuukiGErPzntcusA@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 03 Feb 2015 15:55:05 +0100
+Subject: [PATCH v8 06/21] ARM64 / ACPI: Introduce PCI stub functions for
+ ACPI
+In-Reply-To: <54D0CD58.2000609@linaro.org>
+References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
+ <20150203121546.GD3677@e104818-lin.cambridge.arm.com>
+ <54D0CD58.2000609@linaro.org>
+Message-ID: <2157836.CgDKH4QWp1@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 3, 2015 at 7:28 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Feb 03, 2015 at 08:48:56AM +0100, Daniel Vetter wrote:
->> On Mon, Feb 02, 2015 at 03:30:21PM -0500, Rob Clark wrote:
->> > On Mon, Feb 2, 2015 at 11:54 AM, Daniel Vetter <daniel@ffwll.ch> wrote:
->> > >> My initial thought is for dma-buf to not try to prevent something than
->> > >> an exporter can actually do.. I think the scenario you describe could
->> > >> be handled by two sg-lists, if the exporter was clever enough.
->> > >
->> > > That's already needed, each attachment has it's own sg-list. After all
->> > > there's no array of dma_addr_t in the sg tables, so you can't use one sg
->> > > for more than one mapping. And due to different iommu different devices
->> > > can easily end up with different addresses.
->> >
->> >
->> > Well, to be fair it may not be explicitly stated, but currently one
->> > should assume the dma_addr_t's in the dmabuf sglist are bogus.  With
->> > gpu's that implement per-process/context page tables, I'm not really
->> > sure that there is a sane way to actually do anything else..
->>
->> Hm, what does per-process/context page tables have to do here? At least on
->> i915 we have a two levels of page tables:
->> - first level for vm/device isolation, used through dma api
->> - 2nd level for per-gpu-context isolation and context switching, handled
->>   internally.
->>
->> Since atm the dma api doesn't have any context of contexts or different
->> pagetables, I don't see who you could use that at all.
->
-> What I've found with *my* etnaviv drm implementation (not Christian's - I
-> found it impossible to work with Christian, especially with the endless
-> "msm doesn't do it that way, so we shouldn't" responses and his attitude
-> towards cherry-picking my development work [*]) is that it's much easier to
-> keep the GPU MMU local to the GPU and under the control of the DRM MM code,
-> rather than attaching the IOMMU to the DMA API and handling it that way.
->
-> There are several reasons for that:
->
-> 1. DRM has a better idea about when the memory needs to be mapped to the
->    GPU, and it can more effectively manage the GPU MMU.
->
-> 2. The GPU MMU may have TLBs which can only be flushed via a command in
->    the GPU command stream, so it's fundamentally necessary for the MMU to
->    be managed by the GPU driver so that it knows when (and how) to insert
->    the flushes.
->
+On Tuesday, February 03, 2015 09:30:00 PM Hanjun Guo wrote:
+> On 2015?02?03? 20:15, Catalin Marinas wrote:
+> > On Mon, Feb 02, 2015 at 12:45:34PM +0000, Hanjun Guo wrote:
+> >> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+> >> index ce5836c..c17e7ea 100644
+> >> --- a/arch/arm64/kernel/pci.c
+> >> +++ b/arch/arm64/kernel/pci.c
+> >> @@ -10,6 +10,7 @@
+> >>    *
+> >>    */
+> >>
+> >> +#include <linux/acpi.h>
+> >>   #include <linux/init.h>
+> >>   #include <linux/io.h>
+> >>   #include <linux/kernel.h>
+> >> @@ -68,3 +69,27 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+> >>   	bus->domain_nr = domain;
+> >>   }
+> >>   #endif
+> >> +
+> >> +/*
+> >> + * raw_pci_read/write - Platform-specific PCI config space access.
+> >> + */
+> >> +int raw_pci_read(unsigned int domain, unsigned int bus,
+> >> +		  unsigned int devfn, int reg, int len, u32 *val)
+> >> +{
+> >> +	return -EINVAL;
+> >> +}
+> >> +
+> >> +int raw_pci_write(unsigned int domain, unsigned int bus,
+> >> +		unsigned int devfn, int reg, int len, u32 val)
+> >> +{
+> >> +	return -EINVAL;
+> >> +}
+> >
+> > You said you'll make these return -ENOSYS, which I think makes more
+> > sense.
+> 
+> I'm sorry, I missed that, my bad, I will fix that in next version.
 
-If gpu mmu needs some/all updates to happen from command-stream then
-probably better to handle it internally..
+Actually, -ENOSYS *specifically* means "not implemented system call".
+It should not be used for anything other than that.  -ENXIO is what
+should be used instead.
 
-That is a slightly different scenario from msm, where we have many
-instances of the same iommu[*] scattered through the SoC in front of
-various different devices.
 
-BR,
--R
-
-[*] at least from iommu register layout, same driver is used for all
-instances.. but maybe the tlb+walker are maybe more tightly integrated
-to the gpu, but that is just speculation on implementation details
-based on some paper I found along the way
-
->
-> * - as a direct result of that, I've stopped all further development of
-> etnaviv drm, and I'm intending to strip it out from my Xorg DDX driver
-> as the etnaviv drm API which Christian wants is completely incompatible
-> with the non-etnaviv drm, and that just creates far too much pain in the
-> DDX driver.
->
-> --
-> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-> according to speedtest.net.
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
