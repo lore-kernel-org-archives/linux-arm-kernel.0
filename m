@@ -1,121 +1,55 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Tue, 03 Feb 2015 12:29:36 -0500
-Subject: [PATCH v8 02/21] acpi: fix acpi_os_ioremap for arm64
-In-Reply-To: <2422968.Es7R0p3loO@vostro.rjw.lan>
-References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
- <1422881149-8177-3-git-send-email-hanjun.guo@linaro.org>
- <2422968.Es7R0p3loO@vostro.rjw.lan>
-Message-ID: <1422984576.18187.82.camel@deneb.redhat.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Tue, 3 Feb 2015 19:35:03 +0200
+Subject: [PATCH v13 5/6] clkdev: Export clk_register_clkdev
+In-Reply-To: <1422011024-32283-6-git-send-email-tomeu.vizoso@collabora.com>
+References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1422011024-32283-6-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <CAHp75VfN1-dwN5nAp=VLkm6Q-9UqhGHsB2ZFhq+b238mgjVoMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-02-02 at 23:14 +0100, Rafael J. Wysocki wrote:
-> On Monday, February 02, 2015 08:45:30 PM Hanjun Guo wrote:
-> > From: Mark Salter <msalter@redhat.com>
-> > 
-> > The acpi_os_ioremap() function may be used to map normal RAM or IO
-> > regions. The current implementation simply uses ioremap_cache(). This
-> > will work for some architectures, but arm64 ioremap_cache() cannot be
-> > used to map IO regions which don't support caching. So for arm64, use
-> > ioremap() for non-RAM regions.
-> > 
-> > CC: Rafael J Wysocki <rjw@rjwysocki.net>
-> > Signed-off-by: Mark Salter <msalter@redhat.com>
-> > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> > ---
-> >  include/acpi/acpi_io.h | 6 ++++++
-> >  1 file changed, 6 insertions(+)
-> > 
-> > diff --git a/include/acpi/acpi_io.h b/include/acpi/acpi_io.h
-> > index 444671e..9d573db 100644
-> > --- a/include/acpi/acpi_io.h
-> > +++ b/include/acpi/acpi_io.h
-> > @@ -1,11 +1,17 @@
-> >  #ifndef _ACPI_IO_H_
-> >  #define _ACPI_IO_H_
-> >  
-> > +#include <linux/mm.h>
-> >  #include <linux/io.h>
-> >  
-> >  static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
-> >  					    acpi_size size)
-> >  {
-> > +#ifdef CONFIG_ARM64
-> > +	if (!page_is_ram(phys >> PAGE_SHIFT))
-> > +		return ioremap(phys, size);
-> > +#endif
-> 
-> I don't want to see #ifdef CONFIG_ARM64 in this file.
-> 
+On Fri, Jan 23, 2015 at 1:03 PM, Tomeu Vizoso
+<tomeu.vizoso@collabora.com> wrote:
+> So it can be used from modules such as clk-test.ko.
+>
+> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 
-How about something like:
+Sorry for late answer, but this is useless.
 
-From: Mark Salter <msalter@redhat.com>
-Date: Tue, 3 Feb 2015 10:51:16 -0500
-Subject: [PATCH] acpi: fix acpi_os_ioremap for arm64
+We have to provide the way how to get the allocated clk_lookup.
+Otherwise you have no way but memory leak at the ->remove() stage.
 
-The acpi_os_ioremap() function may be used to map normal RAM or IO
-regions. The current implementation simply uses ioremap_cache(). This
-will work for some architectures, but arm64 ioremap_cache() cannot be
-used to map IO regions which don't support caching. So for arm64, use
-ioremap() for non-RAM regions.
+(By the way I used to have the exact patch locally, that's why
+discovered the change in upsteam)
 
-CC: Rafael J Wysocki <rjw@rjwysocki.net>
-Signed-off-by: Mark Salter <msalter@redhat.com>
----
- arch/arm64/include/asm/acpi.h | 14 ++++++++++++++
- include/acpi/acpi_io.h        |  3 +++
- 2 files changed, 17 insertions(+)
+> ---
+>  drivers/clk/clkdev.c | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+> index 901d242..29a1ab7 100644
+> --- a/drivers/clk/clkdev.c
+> +++ b/drivers/clk/clkdev.c
+> @@ -377,6 +377,7 @@ int clk_register_clkdev(struct clk *clk, const char *con_id,
+>
+>         return 0;
+>  }
+> +EXPORT_SYMBOL(clk_register_clkdev);
+>
+>  /**
+>   * clk_register_clkdevs - register a set of clk_lookup for a struct clk
+> --
+> 1.9.3
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
 
-diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-index ea4d2b3..db82bc3 100644
---- a/arch/arm64/include/asm/acpi.h
-+++ b/arch/arm64/include/asm/acpi.h
-@@ -14,6 +14,7 @@
- 
- #include <linux/irqchip/arm-gic-acpi.h>
- 
-+#include <linux/mm.h>
- #include <asm/smp_plat.h>
- 
- /* Basic configuration for ACPI */
-@@ -100,4 +101,17 @@ static inline bool acpi_psci_use_hvc(void) { return false; }
- static inline void acpi_init_cpus(void) { }
- #endif /* CONFIG_ACPI */
- 
-+/*
-+ * ACPI table mapping
-+ */
-+static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
-+					    acpi_size size)
-+{
-+	if (!page_is_ram(phys >> PAGE_SHIFT))
-+		return ioremap(phys, size);
-+
-+       return ioremap_cache(phys, size);
-+}
-+#define acpi_os_ioremap acpi_os_ioremap
-+
- #endif /*_ASM_ACPI_H*/
-diff --git a/include/acpi/acpi_io.h b/include/acpi/acpi_io.h
-index 444671e..48f504a 100644
---- a/include/acpi/acpi_io.h
-+++ b/include/acpi/acpi_io.h
-@@ -2,12 +2,15 @@
- #define _ACPI_IO_H_
- 
- #include <linux/io.h>
-+#include <asm/acpi.h>
- 
-+#ifndef acpi_os_ioremap
- static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
- 					    acpi_size size)
- {
-        return ioremap_cache(phys, size);
- }
-+#endif
- 
- void __iomem *__init_refok
- acpi_os_map_iomem(acpi_physical_address phys, acpi_size size);
+
+
 -- 
-1.8.3.1
+With Best Regards,
+Andy Shevchenko
