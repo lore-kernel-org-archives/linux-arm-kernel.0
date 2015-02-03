@@ -1,116 +1,96 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 03 Feb 2015 10:51:44 -0500
-Subject: [GIT PULL] ARM: mvebu: DT changes for v3.20 (round 3)
-In-Reply-To: <54D0ECF2.9050104@free-electrons.com>
-References: <54D0ECF2.9050104@free-electrons.com>
-Message-ID: <54D0EE90.1040708@lakedaemon.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 Feb 2015 15:54:04 +0000
+Subject: [Linaro-mm-sig] [RFCv3 2/2] dma-buf: add helpers for sharing
+ attacher constraints with dma-parms
+In-Reply-To: <3783167.LiVXgA35gN@wuerfel>
+References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
+ <4830208.H6zxrGlT1D@wuerfel>
+ <20150203152204.GU8656@n2100.arm.linux.org.uk>
+ <3783167.LiVXgA35gN@wuerfel>
+Message-ID: <20150203155404.GV8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/3/15 10:44 AM, Gregory CLEMENT wrote:
-> Hi Olof, Arnd,
->
-> This is the third incremental pull request for mvebu/dt. I now it
-> comes very late, but as explained in my email series it should not
-> introduce any regression as all the change are made inside the comment
-> blocks, so for the stability it should be safe to take them.
->
-> My main motivation for having this series merged in 3.20 is to avoid
-> asking each author of the dts(i) patches if he agrees with the dual
-> license during the next cycle. At the end it is not something
-> essential but it will make our life easier.
->
-> Thanks,
->
-> Gregory
->
-> The following changes since commit 6cc082a84e13f3a0078973a08adf22f1404acc3d:
->
->    ARM: mvebu: make DTS comments reflect DEBUG_LL changes (2015-01-21 18:36:14 -0600)
+On Tue, Feb 03, 2015 at 04:31:13PM +0100, Arnd Bergmann wrote:
+> On Tuesday 03 February 2015 15:22:05 Russell King - ARM Linux wrote:
+> > Don't we already have those in the DMA API?  dma_sync_*() ?
+> >
+> > dma_map_sg() - sets up the system MMU and deals with initial cache
+> > coherency handling.  Device IOMMU being the responsibility of the
+> > GPU driver.
+> 
+> dma_sync_*() works with whatever comes out of dma_map_*(), true,
+> but this is not what they want to do here.
+>  
+> > The GPU can then do dma_sync_*() on the scatterlist as is necessary
+> > to synchronise the cache coherency (while respecting the ownership
+> > rules - which are very important on ARM to follow as some sync()s are
+> > destructive to any dirty data in the CPU cache.)
+> > 
+> > dma_unmap_sg() tears down the system MMU and deals with the final cache
+> > handling.
+> > 
+> > Why do we need more DMA API interfaces?
+> 
+> The dma_map_* interfaces assign the virtual addresses internally,
+> using typically either a global address space for all devices, or one
+> address space per device.
 
-Good incremental pull from the previous tag.
+We shouldn't be doing one address space per device for precisely this
+reason.  We should be doing one address space per *bus*.  I did have
+a nice diagram to illustrate the point in my previous email, but I
+deleted it, I wish I hadn't... briefly:
 
->
-> are available in the git repository at:
->
->    ssh://git.infradead.org/srv/git/linux-mvebu.git tags/mvebu-dt-3.20-3
+Fig. 1.
+                                                 +------------------+
+                                                 |+-----+  device   |
+CPU--L1cache--L2cache--Memory--SysMMU---<iobus>----IOMMU-->         |
+                                                 |+-----+           |
+                                                 +------------------+
 
-oops.  Please resend with the git:// url.  I tend to have two remotes 
-for this sort of thing, 'mvebu' -> ssh://, and 'mvebu-pub' -> git://
+Fig.1 represents what I'd call the "GPU" issue that we're talking about
+in this thread.
 
-Then, I just make sure I see 'mvebu-pub' in the middle of the 
-request-pull command.
+Fig. 2.
+CPU--L1cache--L2cache--Memory--SysMMU---<iobus>--IOMMU--device
 
-hth,
+The DMA API should be responsible (at the very least) for everything on
+the left of "<iobus>" in and should be providing a dma_addr_t which is
+representative of what the device (in Fig.1) as a whole sees.  That's
+the "system" part.  
 
-Jason.
+I believe this is the approach which is taken by x86 and similar platforms,
+simply because they tend not to have an IOMMU on individual devices (and
+if they did, eg, on a PCI card, it's clearly the responsibility of the
+device driver.)
 
->
-> for you to fetch changes up to 3c21b5fa897ae4b594d6b76a4572741fea7824b7:
->
->    ARM: mvebu: armada-xp-synology-ds414: Relicense the device tree under GPLv2+/X11 (2015-01-26 19:28:13 -0600)
->
-> ----------------------------------------------------------------
-> Relicense all Armada dts{i} files under dual license of GPLv2+ and
-> X11. This should make it easier to reuse these files with other
-> operating systems and boot loaders.
->
-> ----------------------------------------------------------------
-> Gregory CLEMENT (27):
->        ARM: mvebu: armada-370-db: Relicense the device tree under GPLv2+/X11
->        ARM: mvebu: armada-370: Relicense the device tree under GPLv2+/X11
->        ARM: mvebu: armada-370-mirabox: Relicense the device tree under GPLv2+/X11
->        ARM: mvebu: armada-370-netgear-rn102: Relicense the device tree under GPLv2+/X11
->        ARM: mvebu: armada-370-netgear-rn104: Relicense the device tree under GPLv2+/X11
->        ARM: mvebu: armada-370-rd: Relicense the device tree under GPLv2+/X11
->        ARM: mvebu: armada-370-synology-ds213j: Relicense the device tree under GPLv2+/X11
->        ARM: mvebu: armada-370-xp: Relicense the device tree under GPLv2+/X11
->        ARM: mvebu: armada-375-db: Relicense the device tree under GPLv2+/X11
->        ARM: mvebu: armada-375: Relicense the device tree under GPLv2+/X11
->        ARM: mvebu: armada-380: Relicense the device tree under GPLv2+/X11
->        ARM: mvebu: armada-388-db: Relicense the device tree under GPLv2+/X11
->        ARM: mvebu: armada-385: Relicense the device tree under GPLv2+/X11
->        ARM: mvebu: armada-388-rd: Relicense the device tree under GPLv2+/X11
->        ARM: mvebu: armada-38x: Relicense the device tree under GPLv2+/X11
->        ARM: mvebu: armada-xp-axpwifiap: Relicense the device tree under GPLv2+/X11
->        ARM: mvebu: armada-xp-db: Relicense the device tree under GPLv2+/X11
->        ARM: mvebu: armada-xp: Relicense the device tree under GPLv2+/X11
->        ARM: mvebu: armada-xp-gp: Relicense the device tree under GPLv2+/X11
->        ARM: mvebu: armada-xp-lenovo-ix4-300d: Relicense the device tree under GPLv2+/X11
->        ARM: mvebu: armada-xp-matrix: Relicense the device tree under GPLv2+/X11
->        ARM: mvebu: armada-xp-mv78230: Relicense the device tree under GPLv2+/X11
->        ARM: mvebu: armada-xp-mv78260: Relicense the device tree under GPLv2+/X11
->        ARM: mvebu: armada-xp-mv78460: Relicense the device tree under GPLv2+/X11
->        ARM: mvebu: armada-xp-netgear-rn2120: Relicense the device tree under GPLv2+/X11
->        ARM: mvebu: armada-xp-openblocks-ax3-4: Relicense the device tree under GPLv2+/X11
->        ARM: mvebu: armada-xp-synology-ds414: Relicense the device tree under GPLv2+/X11
->
->   arch/arm/boot/dts/armada-370-db.dts              | 40 +++++++++++++++++++++++++++++++++++++---
->   arch/arm/boot/dts/armada-370-mirabox.dts         | 40 +++++++++++++++++++++++++++++++++++++---
->   arch/arm/boot/dts/armada-370-netgear-rn102.dts   | 41 +++++++++++++++++++++++++++++++++++++----
->   arch/arm/boot/dts/armada-370-netgear-rn104.dts   | 41 +++++++++++++++++++++++++++++++++++++----
->   arch/arm/boot/dts/armada-370-rd.dts              | 40 +++++++++++++++++++++++++++++++++++++---
->   arch/arm/boot/dts/armada-370-synology-ds213j.dts | 41 +++++++++++++++++++++++++++++++++++++----
->   arch/arm/boot/dts/armada-370-xp.dtsi             | 40 +++++++++++++++++++++++++++++++++++++---
->   arch/arm/boot/dts/armada-370.dtsi                | 40 +++++++++++++++++++++++++++++++++++++---
->   arch/arm/boot/dts/armada-375-db.dts              | 40 +++++++++++++++++++++++++++++++++++++---
->   arch/arm/boot/dts/armada-375.dtsi                | 40 +++++++++++++++++++++++++++++++++++++---
->   arch/arm/boot/dts/armada-380.dtsi                | 40 +++++++++++++++++++++++++++++++++++++---
->   arch/arm/boot/dts/armada-385.dtsi                | 40 +++++++++++++++++++++++++++++++++++++---
->   arch/arm/boot/dts/armada-388-db.dts              | 40 +++++++++++++++++++++++++++++++++++++---
->   arch/arm/boot/dts/armada-388-rd.dts              | 40 +++++++++++++++++++++++++++++++++++++---
->   arch/arm/boot/dts/armada-38x.dtsi                | 40 +++++++++++++++++++++++++++++++++++++---
->   arch/arm/boot/dts/armada-xp-axpwifiap.dts        | 40 +++++++++++++++++++++++++++++++++++++---
->   arch/arm/boot/dts/armada-xp-db.dts               | 40 +++++++++++++++++++++++++++++++++++++---
->   arch/arm/boot/dts/armada-xp-gp.dts               | 40 +++++++++++++++++++++++++++++++++++++---
->   arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts  | 41 +++++++++++++++++++++++++++++++++++++----
->   arch/arm/boot/dts/armada-xp-matrix.dts           | 40 +++++++++++++++++++++++++++++++++++++---
->   arch/arm/boot/dts/armada-xp-mv78230.dtsi         | 40 +++++++++++++++++++++++++++++++++++++---
->   arch/arm/boot/dts/armada-xp-mv78260.dtsi         | 40 +++++++++++++++++++++++++++++++++++++---
->   arch/arm/boot/dts/armada-xp-mv78460.dtsi         | 40 +++++++++++++++++++++++++++++++++++++---
->   arch/arm/boot/dts/armada-xp-netgear-rn2120.dts   | 41 +++++++++++++++++++++++++++++++++++++----
->   arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 40 +++++++++++++++++++++++++++++++++++++---
->   arch/arm/boot/dts/armada-xp-synology-ds414.dts   | 41 +++++++++++++++++++++++++++++++++++++----
->   arch/arm/boot/dts/armada-xp.dtsi                 | 40 +++++++++++++++++++++++++++++++++++++---
->   27 files changed, 999 insertions(+), 87 deletions(-)
->
+Whether the DMA API also handles the IOMMU in Fig.1 or 2 is questionable.
+For fig.2, it is entirely possible that the same device could appear
+without an IOMMU, and in that scenario, you would want the IOMMU to be
+handled transparently.
+
+However, by doing so for everything, you run into exactly the problem
+which is being discussed here - the need to separate out the cache
+coherency from the IOMMU aspects.  You probably also have a setup very
+similar to fig.1 (which is certainly true of Vivante GPUs.)
+
+If you have the need to separately control both, then using the DMA API
+to encapsulate both does not make sense - at which point, the DMA API
+should be responsible for the minimum only - in other words, everything
+to the left of <iobus> (so including the system MMU.)  The control of
+the device IOMMU should be the responsibility of device driver in this
+case.
+
+So, dma_map_sg() would be responsible for dealing with the CPU cache
+coherency issues, and setting up the system MMU.  dma_sync_*() would
+be responsible for the CPU cache coherency issues, and dma_unmap_sg()
+would (again) deal with the CPU cache and tear down the system MMU
+mappings.
+
+Meanwhile, the device driver has ultimate control over its IOMMU, the
+creation and destruction of mappings and context switches at the
+appropriate times.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
