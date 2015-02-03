@@ -1,78 +1,44 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 3 Feb 2015 14:00:49 +0100
-Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher
- constraints with dma-parms
-In-Reply-To: <20150203122813.GN8656@n2100.arm.linux.org.uk>
-References: <20150129143908.GA26493@n2100.arm.linux.org.uk>
- <CAO_48GEOQ1pBwirgEWeVVXW-iOmaC=Xerr2VyYYz9t1QDXgVsw@mail.gmail.com>
- <20150129154718.GB26493@n2100.arm.linux.org.uk>
- <CAF6AEGtTmFg66TK_AFkQ-xp7Nd9Evk3nqe6xCBp7K=77OmXTxA@mail.gmail.com>
- <20150129192610.GE26493@n2100.arm.linux.org.uk>
- <CAF6AEGujk8UC4X6T=yhTrz1s+SyZUQ=m05h_WcxLDGZU6bydbw@mail.gmail.com>
- <20150202165405.GX14009@phenom.ffwll.local>
- <CAF6AEGuESM+e3HSRGM6zLqrp8kqRLGUYvA3KKECdm7m-nt0M=Q@mail.gmail.com>
- <20150203074856.GF14009@phenom.ffwll.local>
- <20150203122813.GN8656@n2100.arm.linux.org.uk>
-Message-ID: <20150203130049.GN14009@phenom.ffwll.local>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 3 Feb 2015 14:01:09 +0100
+Subject: [PATCH] pinctrl: pinctrl-imx: don't use invalid value of conf_reg
+In-Reply-To: <1422399025-25636-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1422399025-25636-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <CACRpkdbtpGU57-tPn9Z0rNvY4zLk+QE6A9Pd87vLUHOmRiB2yg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 03, 2015 at 12:28:14PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Feb 03, 2015 at 08:48:56AM +0100, Daniel Vetter wrote:
-> > On Mon, Feb 02, 2015 at 03:30:21PM -0500, Rob Clark wrote:
-> > > On Mon, Feb 2, 2015 at 11:54 AM, Daniel Vetter <daniel@ffwll.ch> wrote:
-> > > >> My initial thought is for dma-buf to not try to prevent something than
-> > > >> an exporter can actually do.. I think the scenario you describe could
-> > > >> be handled by two sg-lists, if the exporter was clever enough.
-> > > >
-> > > > That's already needed, each attachment has it's own sg-list. After all
-> > > > there's no array of dma_addr_t in the sg tables, so you can't use one sg
-> > > > for more than one mapping. And due to different iommu different devices
-> > > > can easily end up with different addresses.
-> > > 
-> > > 
-> > > Well, to be fair it may not be explicitly stated, but currently one
-> > > should assume the dma_addr_t's in the dmabuf sglist are bogus.  With
-> > > gpu's that implement per-process/context page tables, I'm not really
-> > > sure that there is a sane way to actually do anything else..
-> > 
-> > Hm, what does per-process/context page tables have to do here? At least on
-> > i915 we have a two levels of page tables:
-> > - first level for vm/device isolation, used through dma api
-> > - 2nd level for per-gpu-context isolation and context switching, handled
-> >   internally.
-> > 
-> > Since atm the dma api doesn't have any context of contexts or different
-> > pagetables, I don't see who you could use that at all.
-> 
-> What I've found with *my* etnaviv drm implementation (not Christian's - I
-> found it impossible to work with Christian, especially with the endless
-> "msm doesn't do it that way, so we shouldn't" responses and his attitude
-> towards cherry-picking my development work [*]) is that it's much easier to
-> keep the GPU MMU local to the GPU and under the control of the DRM MM code,
-> rather than attaching the IOMMU to the DMA API and handling it that way.
-> 
-> There are several reasons for that:
-> 
-> 1. DRM has a better idea about when the memory needs to be mapped to the
->    GPU, and it can more effectively manage the GPU MMU.
-> 
-> 2. The GPU MMU may have TLBs which can only be flushed via a command in
->    the GPU command stream, so it's fundamentally necessary for the MMU to
->    be managed by the GPU driver so that it knows when (and how) to insert
->    the flushes.
+On Tue, Jan 27, 2015 at 11:50 PM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
 
-3. Switching between different address spaces (for per gpu context
-isolation) often requires intricate knowledge about the gpu and close
-coordination. Well maybe just a part of 2 really, but an important one.
+> The right check for conf_reg to be invalid it testing against -1 not 0
+> as is done in the rest of the driver.
+>
+> This fixes an oops that can be triggered by:
+>
+>         cat /sys/kernel/debug/pinctrl/43fac000.iomuxc/*
+>
+> Fixes: ae75ff814538 ("pinctrl: pinctrl-imx: add imx pinctrl core driver")
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Fully agree and tbh I'm not sure whether the current push in arm to expose
-all gpu mmus as iommus is solid. Even for pasid (per-context iommu tables)
-which is a big official standard there's still a lot of open questions
-about how to do it properly. And it requires strict hw support so that the
-hw always knows which pasid it should use for a given dma access.
--Daniel
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+Patch applied.
+
+But...
+
+> -       if (!pin_reg || !pin_reg->conf_reg) {
+> +       if (!pin_reg || pin_reg->conf_reg == -1) {
+
+I can see that the other code checks for -1 in this variable.
+But where is conf_reg ever set to -1?
+
+freescale]$ git grep "\-1"
+pinctrl-imx.c:          if (pin_reg->mux_reg == -1) {
+pinctrl-imx.c:  if (pin_reg->mux_reg == -1)
+pinctrl-imx.c:  if (pin_reg->mux_reg == -1)
+pinctrl-imx.c:  if (pin_reg->conf_reg == -1) {
+pinctrl-imx.c:  if (pin_reg->conf_reg == -1) {
+pinctrl-imx.c:  if (!pin_reg || pin_reg->conf_reg == -1) {
+
+Only checked for, never assigned.
+
+Yours,
+Linus Walleij
