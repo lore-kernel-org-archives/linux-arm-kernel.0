@@ -1,50 +1,37 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 3 Feb 2015 02:59:25 -0800
-Subject: [RFC] change non-atomic bitops method
-In-Reply-To: <35FD53F367049845BC99AC72306C23D1044A02027E0E@CNBJMBX05.corpusers.net>
-References: <35FD53F367049845BC99AC72306C23D1044A02027E0A@CNBJMBX05.corpusers.net>
- <20150202152909.13bfd11f192fb0268b2ab4bf@linux-foundation.org>
- <20150203011730.GA15653@node.dhcp.inet.fi>
- <35FD53F367049845BC99AC72306C23D1044A02027E0B@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D1044A02027E0C@CNBJMBX05.corpusers.net>
- <20150202223851.f30768d0.akpm@linux-foundation.org>
- <35FD53F367049845BC99AC72306C23D1044A02027E0D@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D1044A02027E0E@CNBJMBX05.corpusers.net>
-Message-ID: <20150203025925.d1c95fb8.akpm@linux-foundation.org>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 03 Feb 2015 12:04:16 +0100
+Subject: [PATCH V3 13/15] ARM: dts: Exynos4 and Odroid X2/U3 sound device
+ nodes update
+In-Reply-To: <07a501d03f69$aba222b0$02e66810$@kernel.org>
+References: <1421260962-16892-1-git-send-email-s.nawrocki@samsung.com>
+ <1421260962-16892-14-git-send-email-s.nawrocki@samsung.com>
+ <20150114195452.GM3043@sirena.org.uk>
+ <07a501d03f69$aba222b0$02e66810$@kernel.org>
+Message-ID: <54D0AB30.2010504@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 3 Feb 2015 16:42:14 +0800 "Wang, Yalin" <Yalin.Wang@sonymobile.com> wrote:
-
-> I make a change in kernel to test hit/miss ratio:
-
-Neat, thanks.
-
->
-> ...
->
-> After use the phone some time:
-> root at D5303:/ # cat /proc/meminfo
-> VmallocUsed:       10348 kB
-> VmallocChunk:      75632 kB
-> __set_bit_miss_count:10002 __set_bit_success_count:1096661
-> __clear_bit_miss_count:359484 __clear_bit_success_count:3674617
-> __test_and_set_bit_miss_count:7 __test_and_set_bit_success_count:221
-> __test_and_clear_bit_miss_count:924611 __test_and_clear_bit_success_count:193
+On 03/02/15 05:27, Kukjin Kim wrote:
+> Mark Brown wrote:
+>> On Wed, Jan 14, 2015 at 07:42:40PM +0100, Sylwester Nawrocki wrote:
+>>> Clock related properties are added to the Exynos4 I2S device nodes
+>>> so they can be referred to as clock providers. Missing i2s_opclk1
+>>> clock is added to the I2S0 node and clock properties are added
+>>> to the MAX98090 codec node to allow it to control/read frequency
+>>> of the MCLK clock directly.
+>>
+>> Sorry, I should've said - I applied the ASoC patches, not these.
 > 
-> __test_and_clear_bit_miss_count has a very high miss rate.
-> In fact, I think set/clear/test_and_set(clear)_bit atomic version can also
-> Be investigated to see its miss ratio,
-> I have not tested the atomic version,
-> Because it reside in different architectures.
+> Shall I take 13 to 15 DT patches in Samsung tree?
 
-Hopefully misses in test_and_X_bit are not a problem.  The CPU
-implementation would be pretty stupid to go and dirty the cacheline
-when it knows it didn't change anything.  But maybe I'm wrong about
-that.  
+Patches 13, 14 use macro definitions which are added in patch which is
+already in Mark's sound tree ("ASoC: samsung: i2s: Add clk provider DT
+binding documentation") [1]. We would need to consider that to avoid
+build breaks.
 
-That we're running clear_bit against a cleared bit 10% of the time is a
-bit alarming.  I wonder where that's coming from.
+--
+Thanks,
+Sylwester
 
-The enormous miss count in test_and_clear_bit() might indicate an
-inefficiency somewhere.
+[1]
+https://git.kernel.org/cgit/linux/kernel/git/broonie/sound.git/commit/?h=for-next&id=0d40c61279510b8ce2368e1c6adcc2c4dc1af279
