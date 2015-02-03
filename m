@@ -1,69 +1,96 @@
-From: grygorii.strashko@linaro.org (grygorii.strashko at linaro.org)
-Date: Tue,  3 Feb 2015 17:01:58 +0200
-Subject: [PATCH v2] hwmon: tmp102: add hibernation callbacks
-Message-ID: <1422975718-871-1-git-send-email-grygorii.strashko@linaro.org>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Tue,  3 Feb 2015 10:01:13 -0500
+Subject: [PATCH v3 01/15] drm: bridge/dw_hdmi: add irq control to
+ suspend/resume
+In-Reply-To: <1422975418-13302-1-git-send-email-ykk@rock-chips.com>
+References: <1422975418-13302-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1422975673-13456-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Grygorii Strashko <Grygorii.Strashko@linaro.org>
+when kernel enter into suspend, cpus will shutdown, hdmi registers
+will reset invisibly. After kernel resume, drm core will call the
+bridge enable function. All of hdmi registers will be setup again
+except the interrupt registers. In that case we should mute all the
+interrupt in suspend stage, and umnute the interrupt we need in the
+resume stage.
 
-Setting a dev_pm_ops suspend/resume pair but not a set of
-hibernation functions means those pm functions will not be
-called upon hibernation.
-Fix this by using SIMPLE_DEV_PM_OPS, which appropriately
-assigns the suspend and hibernation handlers and move
-mp102_suspend/tmp102_resume under CONFIG_PM_SLEEP to avoid
-build warnings.
-
-Signed-off-by: Grygorii Strashko <Grygorii.Strashko@linaro.org>
+Signed-off-by: Yakir Yang <ykk@rock-chips.com>
 ---
-V1:
-- https://lkml.org/lkml/2015/2/2/509
+Changes in v3:
+- Clear Hotplug interrupts before dw_hdmi_fb_register
 
- drivers/hwmon/tmp102.c | 15 ++++-----------
- 1 file changed, 4 insertions(+), 11 deletions(-)
+Changes in v2:
+- Add irq control to suspend/resume interfaces
 
-diff --git a/drivers/hwmon/tmp102.c b/drivers/hwmon/tmp102.c
-index ba9f478..565df47 100644
---- a/drivers/hwmon/tmp102.c
-+++ b/drivers/hwmon/tmp102.c
-@@ -253,7 +253,7 @@ static int tmp102_remove(struct i2c_client *client)
- 	return 0;
+ drivers/gpu/drm/bridge/dw_hdmi.c | 41 ++++++++++++++++++++++++++++++++++++++++
+ include/drm/bridge/dw_hdmi.h     |  2 ++
+ 2 files changed, 43 insertions(+)
+
+diff --git a/drivers/gpu/drm/bridge/dw_hdmi.c b/drivers/gpu/drm/bridge/dw_hdmi.c
+index cd6a706..dc314f5 100644
+--- a/drivers/gpu/drm/bridge/dw_hdmi.c
++++ b/drivers/gpu/drm/bridge/dw_hdmi.c
+@@ -1699,6 +1699,47 @@ void dw_hdmi_unbind(struct device *dev, struct device *master, void *data)
  }
+ EXPORT_SYMBOL_GPL(dw_hdmi_unbind);
  
--#ifdef CONFIG_PM
-+#ifdef CONFIG_PM_SLEEP
- static int tmp102_suspend(struct device *dev)
- {
- 	struct i2c_client *client = to_i2c_client(dev);
-@@ -279,17 +279,10 @@ static int tmp102_resume(struct device *dev)
- 	config &= ~TMP102_CONF_SD;
- 	return i2c_smbus_write_word_swapped(client, TMP102_CONF_REG, config);
- }
--
--static const struct dev_pm_ops tmp102_dev_pm_ops = {
--	.suspend	= tmp102_suspend,
--	.resume		= tmp102_resume,
--};
--
--#define TMP102_DEV_PM_OPS (&tmp102_dev_pm_ops)
--#else
--#define	TMP102_DEV_PM_OPS NULL
- #endif /* CONFIG_PM */
- 
-+SIMPLE_DEV_PM_OPS(tmp102_dev_pm_ops, tmp102_suspend, tmp102_resume);
++int dw_hdmi_suspend(struct device *dev)
++{
++	struct dw_hdmi *hdmi = dev_get_drvdata(dev);
++	u8 ih_mute;
 +
- static const struct i2c_device_id tmp102_id[] = {
- 	{ "tmp102", 0 },
- 	{ }
-@@ -298,7 +291,7 @@ MODULE_DEVICE_TABLE(i2c, tmp102_id);
++	/* Disable all interrupts */
++	hdmi_writeb(hdmi, ~0, HDMI_IH_MUTE_PHY_STAT0);
++
++	 /* Disable top level interrupt bits in HDMI block */
++	ih_mute = hdmi_readb(hdmi, HDMI_IH_MUTE) |
++		  HDMI_IH_MUTE_MUTE_WAKEUP_INTERRUPT |
++		  HDMI_IH_MUTE_MUTE_ALL_INTERRUPT;
++
++	hdmi_writeb(hdmi, ih_mute, HDMI_IH_MUTE);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(dw_hdmi_suspend);
++
++int dw_hdmi_resume(struct device *dev)
++{
++	struct dw_hdmi *hdmi = dev_get_drvdata(dev);
++
++	/*
++	 * Configure registers related to HDMI interrupt
++	 * generation before registering IRQ.
++	 */
++	hdmi_writeb(hdmi, HDMI_PHY_HPD, HDMI_PHY_POL0);
++
++	/* Clear Hotplug interrupts */
++	hdmi_writeb(hdmi, HDMI_IH_PHY_STAT0_HPD, HDMI_IH_PHY_STAT0);
++
++	dw_hdmi_fb_registered(hdmi);
++
++	/* Unmute interrupts */
++	hdmi_writeb(hdmi, ~HDMI_IH_PHY_STAT0_HPD, HDMI_IH_MUTE_PHY_STAT0);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(dw_hdmi_resume);
++
+ MODULE_AUTHOR("Sascha Hauer <s.hauer@pengutronix.de>");
+ MODULE_AUTHOR("Andy Yan <andy.yan@rock-chips.com>");
+ MODULE_AUTHOR("Yakir Yang <ykk@rock-chips.com>");
+diff --git a/include/drm/bridge/dw_hdmi.h b/include/drm/bridge/dw_hdmi.h
+index 5a4f490..e8cfe1c 100644
+--- a/include/drm/bridge/dw_hdmi.h
++++ b/include/drm/bridge/dw_hdmi.h
+@@ -53,6 +53,8 @@ struct dw_hdmi_plat_data {
+ 					   struct drm_display_mode *mode);
+ };
  
- static struct i2c_driver tmp102_driver = {
- 	.driver.name	= DRIVER_NAME,
--	.driver.pm	= TMP102_DEV_PM_OPS,
-+	.driver.pm	= &tmp102_dev_pm_ops,
- 	.probe		= tmp102_probe,
- 	.remove		= tmp102_remove,
- 	.id_table	= tmp102_id,
++int dw_hdmi_resume(struct device *dev);
++int dw_hdmi_suspend(struct device *dev);
+ void dw_hdmi_unbind(struct device *dev, struct device *master, void *data);
+ int dw_hdmi_bind(struct device *dev, struct device *master,
+ 		 void *data, struct drm_encoder *encoder,
 -- 
-1.9.1
+2.1.2
