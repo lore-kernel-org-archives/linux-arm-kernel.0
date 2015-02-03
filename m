@@ -1,104 +1,100 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Tue, 3 Feb 2015 11:33:35 +0800
-Subject: [RFC PATCH] ASoC: wm8731: let codec to manage clock by itself
-Message-ID: <1422934415-24957-1-git-send-email-voice.shen@atmel.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Tue, 03 Feb 2015 12:58:24 +0900
+Subject: [PATCH v5 0/9] Enable HDMI support on Exynos platforms
+In-Reply-To: <1422883228-10690-1-git-send-email-m.szyprowski@samsung.com>
+References: <1422883228-10690-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <066101d03f65$a870dcc0$f9529640$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let the wm8731 codec to manage clock by itself.
+Marek Szyprowski wrote:
+> 
+> Hi all,
+> 
+> This is yet another update on patchset, which enables HDMI support for
+> Exynos based platforms.
+> 
+> Beside DTS changes, this patchset adds parent domain support for Exynos
+> PM domains and add support for 'hdmi' clock directly to Exynos DRM mixer
+> driver.
+> 
+> The patchset is based on samsung/for-next branch and 'PM / Domains:
+> Export of_genpd_get_from_provider function' patch merged as commit
+> 7496fcbe8a643097efc061160e1c3b65ee2fa350 to v3.19-rc4.
+> 
+> Regards
+> Marek Szyprowski
+> 
+> 
+> Changelog:
+> 
+> v5:
+> - fixed error value for clk_get() in mixer patch
+> - rebased onto samsung/for-next branch
+> 
+> v4: (http://www.spinics.net/lists/linux-samsung-soc/msg41375.html)
+> - added patches, which add 'hdmi' clock handling to mixed block, this
+>   finally solves the initialization related issues, thanks for Tobias
+>   Jakobi for testing
+> - added acks/reviewed/tested by tags
+> 
+> v3: (http://www.spinics.net/lists/linux-samsung-soc/msg41020.html)
+> - added a note on defining subdomains to generic PM domain binding
+>   documentation (requested by Ulf Hansson)
+> 
+> v2: (http://www.spinics.net/lists/linux-samsung-soc/msg40980.html)
+> - rewrote subdomains patch according to suggestions from Geert
+>   Uytterhoeven and Amit Daniel Kachhap.
+> 
+> v1 resend: (http://www.spinics.net/lists/linux-samsung-soc/msg39428.html)
+> - added handling of generic 'power-domains' binding in subdomains
+> 
+> v1: (http://www.spinics.net/lists/linux-samsung-soc/msg38914.html)
+> - resolved power domain on/off issue with 'clk: samsung: exynos4: set
+>   parent of mixer gate clock to hdmi' patch
+> 
+> v0: (http://www.spinics.net/lists/linux-samsung-soc/msg33498.html)
+> - first attempt, used 'always on' power domains hack
+> 
+> 
+> Patch summary:
+> 
+> 
+> *** BLURB HERE ***
+> 
+> Andrzej Hajda (1):
+>   ARM: dts: exynos5250: add display power domain
+> 
+> Marek Szyprowski (7):
+>   PM / Domains: Add a note about power domain subdomains
+>   ARM: Exynos: add support for sub-power domains
+>   ARM: dts: exynos4: add hdmi related nodes
+>   ARM: dts: exynos4: add dependency between TV and LCD0 power domains
+>   ARM: dts: exynos4412-odroid: enable hdmi support
+>   ARM: dts: Exynos: add 'hdmi' clock to mixer nodes
+>   drm/exynos: add support for 'hdmi' clock
+> 
+> Tomasz Stanislawski (1):
+>   ARM: dts: exynos4210-universal_c210: enable hdmi support
+> 
+>  .../bindings/arm/exynos/power_domain.txt           |  2 +
+>  .../devicetree/bindings/power/power_domain.txt     | 29 +++++++++++
+>  .../devicetree/bindings/video/exynos_mixer.txt     |  1 +
+>  arch/arm/boot/dts/exynos4.dtsi                     | 41 ++++++++++++++++
+>  arch/arm/boot/dts/exynos4210-universal_c210.dts    | 57 ++++++++++++++++++++++
+>  arch/arm/boot/dts/exynos4210.dtsi                  |  8 +++
+>  arch/arm/boot/dts/exynos4412-odroid-common.dtsi    | 44 +++++++++++++++++
+>  arch/arm/boot/dts/exynos4x12.dtsi                  | 11 +++++
+>  arch/arm/boot/dts/exynos5250.dtsi                  | 15 +++++-
+>  arch/arm/boot/dts/exynos5420.dtsi                  |  5 +-
+>  arch/arm/mach-exynos/pm_domains.c                  | 28 +++++++++++
+>  drivers/gpu/drm/exynos/exynos_mixer.c              |  9 ++++
+>  12 files changed, 246 insertions(+), 4 deletions(-)
+> 
+> --
+I have no objection on this series, but just wondering my tree should be fine
+without 9/9 drm patch and it will be handled for 3.20?
 
-As all at91 related boards have been switch to CCF framework. So, on
-the at91 related boards which use wm8731 will let it manage the clock,
-or else the board use wm8731 is broken.
+I'll take 1 to 8 patches once drm patch is landed for 3.20.
 
-However, at the same time the wm8731 codec is used on other boards,
-I am sure this change will broken some boards.
-
-For example: poodle and corgi based on PXA SoC (in default configuration
-file, no one use it). DB1200 board which is a mips based board. So I have
-no idea how to fix them.
-
-So, my suggestion is to add CCF check based on the following patch? Any
-idea or suggestions?
-
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
----
-
- sound/soc/codecs/wm8731.c | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
-
-diff --git a/sound/soc/codecs/wm8731.c b/sound/soc/codecs/wm8731.c
-index b9211b4..83f75d66 100644
---- a/sound/soc/codecs/wm8731.c
-+++ b/sound/soc/codecs/wm8731.c
-@@ -13,6 +13,7 @@
-  * published by the Free Software Foundation.
-  */
- 
-+#include <linux/clk.h>
- #include <linux/module.h>
- #include <linux/moduleparam.h>
- #include <linux/init.h>
-@@ -45,6 +46,7 @@ static const char *wm8731_supply_names[WM8731_NUM_SUPPLIES] = {
- /* codec private data */
- struct wm8731_priv {
- 	struct regmap *regmap;
-+	struct clk *mclk;
- 	struct regulator_bulk_data supplies[WM8731_NUM_SUPPLIES];
- 	const struct snd_pcm_hw_constraint_list *constraints;
- 	unsigned int sysclk;
-@@ -389,6 +391,8 @@ static int wm8731_set_dai_sysclk(struct snd_soc_dai *codec_dai,
- 	switch (clk_id) {
- 	case WM8731_SYSCLK_XTAL:
- 	case WM8731_SYSCLK_MCLK:
-+		if (clk_set_rate(wm8731->mclk, freq))
-+			return -EINVAL;
- 		wm8731->sysclk_type = clk_id;
- 		break;
- 	default:
-@@ -490,6 +494,7 @@ static int wm8731_set_bias_level(struct snd_soc_codec *codec,
- 
- 	switch (level) {
- 	case SND_SOC_BIAS_ON:
-+		clk_prepare_enable(wm8731->mclk);
- 		break;
- 	case SND_SOC_BIAS_PREPARE:
- 		break;
-@@ -508,6 +513,7 @@ static int wm8731_set_bias_level(struct snd_soc_codec *codec,
- 		snd_soc_write(codec, WM8731_PWR, reg | 0x0040);
- 		break;
- 	case SND_SOC_BIAS_OFF:
-+		clk_disable_unprepare(wm8731->mclk);
- 		snd_soc_write(codec, WM8731_PWR, 0xffff);
- 		regulator_bulk_disable(ARRAY_SIZE(wm8731->supplies),
- 				       wm8731->supplies);
-@@ -666,6 +672,13 @@ static int wm8731_spi_probe(struct spi_device *spi)
- 	if (wm8731 == NULL)
- 		return -ENOMEM;
- 
-+	wm8731->mclk = devm_clk_get(&spi->dev, "mclk");
-+	if (IS_ERR(wm8731->mclk)) {
-+		ret = PTR_ERR(wm8731->mclk);
-+		dev_err(&spi->dev, "Failed to get MCLK\n");
-+		return ret;
-+	}
-+
- 	mutex_init(&wm8731->lock);
- 
- 	wm8731->regmap = devm_regmap_init_spi(spi, &wm8731_regmap);
-@@ -717,6 +730,13 @@ static int wm8731_i2c_probe(struct i2c_client *i2c,
- 	if (wm8731 == NULL)
- 		return -ENOMEM;
- 
-+	wm8731->mclk = devm_clk_get(&i2c->dev, "mclk");
-+	if (IS_ERR(wm8731->mclk)) {
-+		ret = PTR_ERR(wm8731->mclk);
-+		dev_err(&i2c->dev, "Failed to get MCLK\n");
-+		return ret;
-+	}
-+
- 	wm8731->regmap = devm_regmap_init_i2c(i2c, &wm8731_regmap);
- 	if (IS_ERR(wm8731->regmap)) {
- 		ret = PTR_ERR(wm8731->regmap);
--- 
-2.3.0.rc0
+- Kukjin
