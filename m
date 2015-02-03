@@ -1,89 +1,118 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 3 Feb 2015 11:14:41 +0200
-Subject: [PATCHv5 2/2] leds: tlc591xx: Driver for the TI 8/16 Channel
- i2c LED driver
-In-Reply-To: <54C7727D.70000@ti.com>
-References: <1421879364-8573-1-git-send-email-andrew@lunn.ch>
- <1421879364-8573-3-git-send-email-andrew@lunn.ch> <54C62919.8000205@ti.com>
- <20150126171052.GC5015@lunn.ch> <54C7727D.70000@ti.com>
-Message-ID: <54D09181.9050206@ti.com>
+From: vincent.yang.fujitsu@gmail.com (Vincent Yang)
+Date: Tue,  3 Feb 2015 17:21:50 +0800
+Subject: [PATCH v5 0/7] Support for Fujitsu MB86S7X SoCs
+Message-ID: <1422955310-6542-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/27/2015 01:11 PM, Tomi Valkeinen wrote:
-> Hi,
-> 
-> On 26/01/15 19:10, Andrew Lunn wrote:
->>> So... To me it's still slightly unclear when should one write a PWM
->>> driver and when a LED driver. But I would say that as the TLC591xx
->>> outputs a PWM signal, it should be a PWM driver. Then the different
->>> users of this PWM signal could be made on top of that (LED, backlight, GPO).
->>>
->>> What would be the technical drawbacks with having the TLC591xx driver as
->>> a PWM, instead of LED?
->>  
->> Hi Tomi
->>
->> We have been through this once, but the big technical drawback is that
->> this hardware cannot do what the Linux Kernel defines as PWM.
->>
->> It cannot correctly implement the PMW call:
->>
->> int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns);
->>
->> This hardware has a fixed period, since it is clocked at 97-kHz.  So
->> you cannot set the period. The duty is also somewhat restrictive, in
->> that it only allows 1/256 increments of the 97Khz.
+Hello,
 
-The duty_ns and period_ns will give you the on and off time your user is
-asking for. If you can not change frequency, then you don't (97KHz that is).
-1/256 is the resolution you can configure the on/off times, nothing
-exceptional about it.
-The twl4030/5030's LED drivers have 128 clock cycle to play with while twl6030
-has 256 clock cycles. These PMICs also have PWM drivers which has 128 steps.
-drivers/pwm/pwm-twl.c and pwm-twl-led.c
+  Fujitsu have a series of SoC already shipping based around
+variations of 2xCA7+2xCA15 big.LITTLE architecture, and we would like
+to upstream the basic support in this series.
 
-and these just work fine when used via pwm-led or the pwm backlight or
-whatever driver.
+  MB86S70 is a big.LITTLE platform with 2xCA7+2xCA15 and an additional
+CM3 as the master. MB86S73 is a simple 2xCA7 and an additional CM3
+master.
 
-There's no issue to have PWM driver for tlc591xx IMHO.
+  The DT includes references to sdhci patches which are being sent to
+the mmc list at the same time.
 
-> Surely other PWM devices also have restrictions in the period or duty cycle?
-> 
->> This hardware does however perfectly fit the LED API:
->>
->> enum led_brightness {
->>         LED_OFF         = 0,
->>         LED_HALF        = 127,
->>         LED_FULL        = 255,
->> };
->>
->>         void            (*brightness_set)(struct led_classdev *led_cdev,
->>                                           enum led_brightness brightness);
->>
->> So we can model it perfectly as an LED driver, or badly as a PWM
->> driver.
-> 
-> Maybe so, but what does it mean in practice? If it's implemented as a
-> PWM driver, and the existing leds-pwm driver is used for the led
-> functionality, shall we miss some brightness values? Is the
-> configuration more difficult? Or what?
-> 
-> So my point here is that it outputs a PWM signal, so it makes sense to
-> have it as a PWM driver. It has restricted configurability compared to
-> more versatile PWM hardware, but I so far don't see why that would be an
-> issue.
-> 
-> If it is a PWM driver, we get backlight support for free via the
-> existing pwm_bl driver, and LED support via leds-pwm. And there has been
-> a clear acceptance on GPO functionality with PWM outputs (in the Peter's
-> mail thread), whereas I would bet that a LED based GPO functionality
-> would encounter resistance, because that doesn't quite make sense.
-> 
->  Tomi
-> 
-> 
+  We welcome any comments or questions.
 
+Changes since v4:
+* Convert ARM MHU driver to be an AMBA driver
+
+Changes since v3:
+* Identify platform, by checking presence of DT node
+"fujitsu,mb86s70-scb-1.0" before populating cpu clocks and MCPM
+support.
+* Disable clock upon gpio module remove
+* Lower init level of gpio driver from subsys_initcall to module_init
+* Use managed device resource allocation in MHU driver
+
+Changes since v2:
+* Minor cleanup of MCPM as suggested by Nicolas Pitre.
+
+Changes since v1:
+* Thanks to Arnd, modified clock driver to populate clocks only when
+some user need them. Node name changed from "fujitsu,mb86s70-clk" to
+"fujitsu,mb86s70-crg11" . Controller+Domain+Port of a clock are now
+three cells specified by the user node.
+* aliases moved into board DTS files
+* Voltage supply moved as per-board DT node.
+* Removed default overly verbose loglevel=8
+* Specify -march=armv7-a flag for mcpm.c and smc.S that contain ARMv7
+specific code.
+* Removed wrongly put outer_flush_all(), now using standard
+v7_exit_coherency_flush() instead of platform specific macro.
+* Simplified GPIO offset calculations in gpio-mb86s70.c driver. And
+added .remove() for the driver
+* ARM MHU driver provided a .remove() to enable module unloading.
+* A few other misc cleanups suggested in v1 submission.
+
+Thanks.
+
+Jassi Brar (7):
+  ARM: Add platform support for Fujitsu MB86S7X SoCs
+  mailbox: arm_mhu: add driver for ARM MHU controller
+  ARM: MB86S7X: Add MCPM support
+  clk: Add clock driver for mb86s7x
+  dt: mb86s7x: add dt files for MB86S7x evbs
+  of: add Fujitsu vendor prefix
+  ARM: MB86S7x: Add configs
+
+ Documentation/devicetree/bindings/arm/mb86s7x.txt  |   8 +
+ .../bindings/clock/fujitsu,mb86s70-crg11.txt       |  26 +
+ .../devicetree/bindings/mailbox/arm-mhu.txt        |  35 ++
+ .../devicetree/bindings/soc/mb86s7x/scb_mhu.txt    |  35 ++
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ MAINTAINERS                                        |   7 +
+ arch/arm/Kconfig                                   |   2 +
+ arch/arm/Makefile                                  |   1 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/mb86s70.dtsi                     |  91 ++++
+ arch/arm/boot/dts/mb86s70eb.dts                    |  57 +++
+ arch/arm/boot/dts/mb86s73.dtsi                     |  63 +++
+ arch/arm/boot/dts/mb86s73eb.dts                    |  44 ++
+ arch/arm/boot/dts/mb86s7x.dtsi                     | 142 ++++++
+ arch/arm/configs/fujitsu_defconfig                 | 232 +++++++++
+ arch/arm/configs/multi_v7_defconfig                |   5 +
+ arch/arm/mach-mb86s7x/Kconfig                      |  19 +
+ arch/arm/mach-mb86s7x/Makefile                     |   3 +
+ arch/arm/mach-mb86s7x/board.c                      |  23 +
+ arch/arm/mach-mb86s7x/mcpm.c                       | 318 +++++++++++++
+ arch/arm/mach-mb86s7x/smc.S                        |  27 ++
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/clk-mb86s7x.c                          | 386 +++++++++++++++
+ drivers/mailbox/Kconfig                            |   7 +
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/arm_mhu.c                          | 203 ++++++++
+ drivers/soc/Makefile                               |   1 +
+ drivers/soc/mb86s7x/Makefile                       |   4 +
+ drivers/soc/mb86s7x/scb_mhu.c                      | 528 +++++++++++++++++++++
+ include/soc/mb86s7x/scb_mhu.h                      | 105 ++++
+ 30 files changed, 2377 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/mb86s7x.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/fujitsu,mb86s70-crg11.txt
+ create mode 100644 Documentation/devicetree/bindings/mailbox/arm-mhu.txt
+ create mode 100644 Documentation/devicetree/bindings/soc/mb86s7x/scb_mhu.txt
+ create mode 100644 arch/arm/boot/dts/mb86s70.dtsi
+ create mode 100644 arch/arm/boot/dts/mb86s70eb.dts
+ create mode 100644 arch/arm/boot/dts/mb86s73.dtsi
+ create mode 100644 arch/arm/boot/dts/mb86s73eb.dts
+ create mode 100644 arch/arm/boot/dts/mb86s7x.dtsi
+ create mode 100644 arch/arm/configs/fujitsu_defconfig
+ create mode 100644 arch/arm/mach-mb86s7x/Kconfig
+ create mode 100644 arch/arm/mach-mb86s7x/Makefile
+ create mode 100644 arch/arm/mach-mb86s7x/board.c
+ create mode 100644 arch/arm/mach-mb86s7x/mcpm.c
+ create mode 100644 arch/arm/mach-mb86s7x/smc.S
+ create mode 100644 drivers/clk/clk-mb86s7x.c
+ create mode 100644 drivers/mailbox/arm_mhu.c
+ create mode 100644 drivers/soc/mb86s7x/Makefile
+ create mode 100644 drivers/soc/mb86s7x/scb_mhu.c
+ create mode 100644 include/soc/mb86s7x/scb_mhu.h
 
 -- 
-P?ter
+1.9.0
