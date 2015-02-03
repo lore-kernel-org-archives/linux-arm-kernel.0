@@ -1,24 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 03 Feb 2015 13:54:42 +0100
-Subject: [PATCH] ARM: berlin: add a defconfig
-In-Reply-To: <1422962932-12603-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1422962932-12603-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <3962783.sVjmOB1hYm@wuerfel>
+From: rsahu@apm.com (Rameshwar Prasad Sahu)
+Date: Tue,  3 Feb 2015 18:25:04 +0530
+Subject: [PATCH v5 0/3] dmaengine: APM X-Gene SoC DMA engine driver support
+Message-ID: <1422968107-23125-1-git-send-email-rsahu@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 February 2015 12:28:52 Antoine Tenart wrote:
-> Marvell Berlin SoCs did not have a custom defconfig and were only
-> supported in multi_v7_defconfig.
-> 
-> Adds a proper defconfig, allowing to boot a Berlin SoC with all the
-> currently supported features: SMP, Pinmux, AHCI, Ethernet, I2C, GPIO,
-> USB, SDHCI.
-> 
-> 
+This patch set implements the APM X-Gene SoC DMA driver
+support to offload the DMA operations such as memory copy(memcpy),
+scatter gathering.
 
-Are there any features that are not currently supported by
-multi_v7_defconfig? If so, please also add them there as
-loadable modules.
+v5 changes:
+	1. Minor changes in coding style.
+	2. Added DMA_CTRL_ACK flag initialization
+v4 changes:
+	1. Fixed dma-ranges property on DTS.
 
-	Arnd
+Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
+Signed-off-by: Loc Ho <lho@apm.com>
+---
+
+Rameshwar Prasad Sahu (3):
+  dmaengine: Add support for APM X-Gene SoC DMA engine driver
+  arm64: dts: Add APM X-Gene DMA device and DMA clock DTS nodes
+  Documentation: dma: Add APM X-Gene SoC DMA engine driver documentation
+
+ .../devicetree/bindings/dma/apm-xgene-dma.txt      |   49 +
+ arch/arm64/boot/dts/apm/apm-storm.dtsi             |   26 +
+ drivers/dma/Kconfig                                |    8 +
+ drivers/dma/Makefile                               |    1 +
+ drivers/dma/xgene-dma.c                            | 1597 ++++++++++++++++++++
+ 5 files changed, 1681 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/apm-xgene-dma.txt
+ create mode 100755 drivers/dma/xgene-dma.c
+
+--
+1.8.2.1
