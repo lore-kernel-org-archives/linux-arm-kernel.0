@@ -1,40 +1,64 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 3 Feb 2015 16:21:28 +0000
-Subject: [RFC PATCH] ASoC: wm8731: let codec to manage clock by itself
-In-Reply-To: <CAOLZvyEVQmqg9Jn5Kt_2m5K0-taJcGf6mweK4T=fwKOwn-Ovxg@mail.gmail.com>
-References: <1422934415-24957-1-git-send-email-voice.shen@atmel.com>
- <CAOLZvyE6W8-X2_M+-KQNry2VPwLzwbBLuxr5Z5EdBQo7Skv2RQ@mail.gmail.com>
- <20150203124441.GK21293@sirena.org.uk>
- <CAOLZvyEVQmqg9Jn5Kt_2m5K0-taJcGf6mweK4T=fwKOwn-Ovxg@mail.gmail.com>
-Message-ID: <20150203162128.GP21293@sirena.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 03 Feb 2015 09:35:47 -0700
+Subject: [PATCH v3 01/10] ARM: tegra: Set the sound card model that alsaucm
+ expects
+In-Reply-To: <CAAObsKCm-9GOvis=MZ-nyA0N+g_ZuWYUfDSdEcVy5p5ykCmkcQ@mail.gmail.com>
+References: <1422442278-10405-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1422442278-10405-2-git-send-email-tomeu.vizoso@collabora.com>
+ <54CFE754.7000500@wwwdotorg.org>
+ <CAAObsKCm-9GOvis=MZ-nyA0N+g_ZuWYUfDSdEcVy5p5ykCmkcQ@mail.gmail.com>
+Message-ID: <54D0F8E3.3020902@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 03, 2015 at 03:40:45PM +0100, Manuel Lauss wrote:
-> On Tue, Feb 3, 2015 at 1:44 PM, Mark Brown <broonie@kernel.org> wrote:
+On 02/03/2015 06:13 AM, Tomeu Vizoso wrote:
+> On 2 February 2015 at 22:08, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 01/28/2015 03:50 AM, Tomeu Vizoso wrote:
+>>>
+>>> Patches are on its way to add a config file to alsaucm for the Nyan
+>>> boards. Use the same card ID that alsaucm will expect.
+>>
+>>
+>>> diff --git a/arch/arm/boot/dts/tegra124-nyan-big.dts
+>>> b/arch/arm/boot/dts/tegra124-nyan-big.dts
+>>
+>>
+>>>          sound {
+>>> -               compatible = "nvidia,tegra-audio-max98090-nyan-big",
+>>> +               compatible = "nvidia,tegra-audio-max98090-nyan",
+>>>                               "nvidia,tegra-audio-max98090";
+>>
+>>
+>> I'm not convinced that removing the board-specific compatible value is a
+>> great idea. What if we find we need to distinguish between different boards
+>> that use this same binding in the future. That situation is exactly why we
+>> have board-/SoC-specific values in compatible even if we don't immediately
+>> use them.
+>
+> I understand the need of naming each component variant so they can be
+> distinguished in the future, but in this case it's the exact same hw.
 
-> >> +    wm8731->mclk = devm_clk_get(&spi->dev, "mclk");
-> >> +    if (IS_ERR(wm8731->mclk)) {
-> >> +        wm8731->mclk = NULL;
-> >> +        dev_warn(&spi->dev, "assuming static MCLK\n");
-> >> +    }
+That's not true. These are two different boards that are derived from 
+the same base design. The intent may be that they are the same, but the 
+whole point of board-specific compatible values is to cover the case 
+where mistakes and exceptions appear later.
 
-> > This is broken for both deferred probe and in the case where the clock
-> > API genuinely returns a NULL clock.  Other than that it's the kind of
-> > thing that we've done for some other drivers, though it's not good to
-> > have to do this.  Check them for correct behaviour.
+>>> -               nvidia,model = "Acer Chromebook 13";
+>>> +               nvidia,model = "GoogleNyan";
+>>
+>>
+>> I believe this also technically breaks ABI, since some user-space tools use
+>> the model to look up saved state. Can we not leave this as is, and just have
+>> the UCM files know about both names?
+>
+> Well, "A13" isn't a great card id. Given that there's no users yet, I
+> would prefer to take this chance to put a sane value in there. Btw,
+> alsa-lib has now a UCM config for this and it uses the GoogleNyan card
+> id (has been picked up already by OpenSUSE).
 
-> Hm, so the only option is to create the simples possible 12MHz clk object?
+"A13" didn't appear anywhere, did it? Perhaps that was a shorthand for 
+"Acer Chromebook 13". Yes, I agree we should use the user-visible model 
+number here; "Acer CB5" or perhaps "Acer CB5-xxx" whatever xxx actually is.
 
-Well, that's the best option in general.  You can get away with just
-making sure that -EPROBE_DEFER is handled and that IS_ERR() is used to
-check for an invalid clock but if you can define a clock that's even
-better (and should be pretty painless), we're going to want to do that
-transition at some point.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150203/d76d31be/attachment.sig>
+> So in this case, I think it would be good to change the card id now
+> before people start to actually use it.
