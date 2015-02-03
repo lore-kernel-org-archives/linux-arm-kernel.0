@@ -1,80 +1,309 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 03 Feb 2015 09:29:21 +0000
-Subject: [PATCH v3] dma-buf: cleanup dma_buf_export() to make it easily
- extensible
-In-Reply-To: <1422449643-7829-1-git-send-email-sumit.semwal@linaro.org>
-References: <1422449643-7829-1-git-send-email-sumit.semwal@linaro.org>
-Message-ID: <54D094F1.50404@linaro.org>
+From: vincent.yang.fujitsu@gmail.com (Vincent Yang)
+Date: Tue,  3 Feb 2015 17:29:23 +0800
+Subject: [PATCH v5 2/7] mailbox: arm_mhu: add driver for ARM MHU controller
+In-Reply-To: <1422955310-6542-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+References: <1422955310-6542-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+Message-ID: <1422955763-6630-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/01/15 12:54, Sumit Semwal wrote:
-> At present, dma_buf_export() takes a series of parameters, which
-> makes it difficult to add any new parameters for exporters, if required.
-> 
-> Make it simpler by moving all these parameters into a struct, and pass
-> the struct * as parameter to dma_buf_export().
-> 
-> While at it, unite dma_buf_export_named() with dma_buf_export(), and
-> change all callers accordingly.
-> 
-> Signed-off-by: Sumit Semwal <sumit.semwal@linaro.org>
+From: Jassi Brar <jaswinder.singh@linaro.org>
 
-Sorry, a few more comments. Should have sent these before but at least
-the are all related only to documentation. Once that is fixed then:
-Reviewed-by: Daniel Thompson <daniel.thompson@linaro.org>
+Add driver for the ARM Primecell Message-Handling-Unit(MHU) controller.
 
+Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+Signed-off-by: Andy Green <andy.green@linaro.org>
+Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
+Signed-off-by: Tetsuya Nuriya <nuriya.tetsuya@jp.fujitsu.com>
+---
+ .../devicetree/bindings/mailbox/arm-mhu.txt        |  35 ++++
+ drivers/mailbox/Kconfig                            |   7 +
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/arm_mhu.c                          | 203 +++++++++++++++++++++
+ 4 files changed, 247 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/arm-mhu.txt
+ create mode 100644 drivers/mailbox/arm_mhu.c
 
-> ---
-> v3: Daniel Thompson caught the C99 warning issue w/ using {0}; using
->     {.exp_name = xxx} instead.
-> 
-> v2: add macro to zero out local struct, and fill KBUILD_MODNAME by default
-> 
->  drivers/dma-buf/dma-buf.c                      | 47 +++++++++++++-------------
->  drivers/gpu/drm/armada/armada_gem.c            | 10 ++++--
->  drivers/gpu/drm/drm_prime.c                    | 12 ++++---
->  drivers/gpu/drm/exynos/exynos_drm_dmabuf.c     |  9 +++--
->  drivers/gpu/drm/i915/i915_gem_dmabuf.c         | 10 ++++--
->  drivers/gpu/drm/omapdrm/omap_gem_dmabuf.c      |  9 ++++-
->  drivers/gpu/drm/tegra/gem.c                    | 10 ++++--
->  drivers/gpu/drm/ttm/ttm_object.c               |  9 +++--
->  drivers/gpu/drm/udl/udl_dmabuf.c               |  9 ++++-
->  drivers/media/v4l2-core/videobuf2-dma-contig.c |  8 ++++-
->  drivers/media/v4l2-core/videobuf2-dma-sg.c     |  8 ++++-
->  drivers/media/v4l2-core/videobuf2-vmalloc.c    |  8 ++++-
->  drivers/staging/android/ion/ion.c              |  9 +++--
->  include/linux/dma-buf.h                        | 34 +++++++++++++++----
-
-Documentation/dma-buf-sharing.txt needs updating as a result of these
-changes but its not in the diffstat.
-
-
->  14 files changed, 142 insertions(+), 50 deletions(-)
-> 
-> diff --git a/drivers/dma-buf/dma-buf.c b/drivers/dma-buf/dma-buf.c
-> index 5be225c2ba98..6d3df3dd9310 100644
-> --- a/drivers/dma-buf/dma-buf.c
-> +++ b/drivers/dma-buf/dma-buf.c
-> @@ -265,7 +265,7 @@ static inline int is_dma_buf_file(struct file *file)
->  }
->  
->  /**
-> - * dma_buf_export_named - Creates a new dma_buf, and associates an anon file
-> + * dma_buf_export - Creates a new dma_buf, and associates an anon file
->   * with this buffer, so it can be exported.
->   * Also connect the allocator specific data and ops to the buffer.
->   * Additionally, provide a name string for exporter; useful in debugging.
-> @@ -277,31 +277,32 @@ static inline int is_dma_buf_file(struct file *file)
->   * @exp_name:	[in]	name of the exporting module - useful for debugging.
->   * @resv:	[in]	reservation-object, NULL to allocate default one.
->   *
-> + * All the above info comes from struct dma_buf_export_info.
-> + *
-
-I'm not at all sure about this. Its a novel trick but won't this make
-the HTML docs come out looking a bit weird? Is there any prior art for
-double-documenting the structure members like this?
-
-
-Daniel.
+diff --git a/Documentation/devicetree/bindings/mailbox/arm-mhu.txt b/Documentation/devicetree/bindings/mailbox/arm-mhu.txt
+new file mode 100644
+index 0000000..986a205
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mailbox/arm-mhu.txt
+@@ -0,0 +1,35 @@
++ARM MHU Mailbox Driver
++======================
++
++The ARM's Message-Handling-Unit (MHU) is a mailbox controller that has
++3 independent channels/links to communicate with remote processor(s).
++ MHU links are hardwired on a platform. A link raises interrupt for any
++received data. However, there is no specified way of knowing if the sent
++data has been read by the remote. This driver assumes the sender polls
++STAT register and the remote clears it after having read the data.
++
++Mailbox Device Node:
++====================
++
++Required properties:
++--------------------
++- compatible:		Shall be "arm,mhu" & "arm,primecell"
++- reg:			Contains the mailbox register address range (base
++			address and length)
++- #mbox-cells		Shall be 1
++- interrupts:		Contains the interrupt information corresponding to
++			each of the 3 links of MHU.
++
++Example:
++--------
++
++	mhu: mailbox at 2b1f0000 {
++		#mbox-cells = <1>;
++		compatible = "arm,mhu", "arm,primecell";
++		reg = <0 0x2b1f0000 0x1000>;
++		interrupts = <0 36 4>,
++			     <0 35 4>,
++			     <0 37 4>;
++		clocks = <&clock 0 2 1>;
++		clock-names = "apb_pclk";
++	};
+diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
+index c04fed9..9238440 100644
+--- a/drivers/mailbox/Kconfig
++++ b/drivers/mailbox/Kconfig
+@@ -6,6 +6,13 @@ menuconfig MAILBOX
+ 	  signals. Say Y if your platform supports hardware mailboxes.
+ 
+ if MAILBOX
++
++config ARM_MHU
++	tristate "ARM MHU Mailbox"
++	depends on ARM
++	help
++	  Say Y here if you want to build the ARM MHU controller driver
++
+ config PL320_MBOX
+ 	bool "ARM PL320 Mailbox"
+ 	depends on ARM_AMBA
+diff --git a/drivers/mailbox/Makefile b/drivers/mailbox/Makefile
+index dd412c2..c83791d 100644
+--- a/drivers/mailbox/Makefile
++++ b/drivers/mailbox/Makefile
+@@ -2,6 +2,8 @@
+ 
+ obj-$(CONFIG_MAILBOX)		+= mailbox.o
+ 
++obj-$(CONFIG_ARM_MHU)	+= arm_mhu.o
++
+ obj-$(CONFIG_PL320_MBOX)	+= pl320-ipc.o
+ 
+ obj-$(CONFIG_OMAP2PLUS_MBOX)	+= omap-mailbox.o
+diff --git a/drivers/mailbox/arm_mhu.c b/drivers/mailbox/arm_mhu.c
+new file mode 100644
+index 0000000..5768936
+--- /dev/null
++++ b/drivers/mailbox/arm_mhu.c
+@@ -0,0 +1,203 @@
++/*
++ * Copyright (C) 2013-2015 Fujitsu Semiconductor Ltd.
++ * Copyright (C) 2015 Linaro Ltd.
++ * Author: Jassi Brar <jaswinder.singh@linaro.org>
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/interrupt.h>
++#include <linux/spinlock.h>
++#include <linux/mutex.h>
++#include <linux/delay.h>
++#include <linux/slab.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/amba/bus.h>
++#include <linux/mailbox_controller.h>
++
++#define INTR_STAT_OFS	0x0
++#define INTR_SET_OFS	0x8
++#define INTR_CLR_OFS	0x10
++
++struct mhu_link {
++	unsigned irq;
++	void __iomem *tx_reg;
++	void __iomem *rx_reg;
++};
++
++struct arm_mhu {
++	void __iomem *base;
++	struct mhu_link mlink[3];
++	struct mbox_chan chan[3];
++	struct mbox_controller mbox;
++};
++
++static irqreturn_t mhu_rx_interrupt(int irq, void *p)
++{
++	struct mbox_chan *chan = p;
++	struct mhu_link *mlink = chan->con_priv;
++	u32 val;
++
++	pr_debug("%s:%d\n", __func__, __LINE__);
++	val = readl_relaxed(mlink->rx_reg + INTR_STAT_OFS);
++	if (!val)
++		return IRQ_NONE;
++
++	mbox_chan_received_data(chan, (void *)val);
++
++	writel_relaxed(val, mlink->rx_reg + INTR_CLR_OFS);
++
++	return IRQ_HANDLED;
++}
++
++static bool mhu_last_tx_done(struct mbox_chan *chan)
++{
++	struct mhu_link *mlink = chan->con_priv;
++	u32 val;
++
++	pr_debug("%s:%d\n", __func__, __LINE__);
++	val = readl_relaxed(mlink->tx_reg + INTR_STAT_OFS);
++
++	return (val == 0);
++}
++
++static int mhu_send_data(struct mbox_chan *chan, void *data)
++{
++	struct mhu_link *mlink = chan->con_priv;
++
++	pr_debug("%s:%d\n", __func__, __LINE__);
++	if (!mhu_last_tx_done(chan)) {
++		dev_err(chan->mbox->dev, "Last TX(%d) pending!\n", mlink->irq);
++		return -EBUSY;
++	}
++
++	writel_relaxed((u32)data, mlink->tx_reg + INTR_SET_OFS);
++
++	return 0;
++}
++
++static int mhu_startup(struct mbox_chan *chan)
++{
++	struct mhu_link *mlink = chan->con_priv;
++	u32 val;
++	int ret;
++
++	pr_debug("%s:%d\n", __func__, __LINE__);
++	val = readl_relaxed(mlink->tx_reg + INTR_STAT_OFS);
++	writel_relaxed(val, mlink->tx_reg + INTR_CLR_OFS);
++
++	ret = request_irq(mlink->irq, mhu_rx_interrupt, 0, "mhu_link", chan);
++	if (ret) {
++		dev_err(chan->mbox->dev,
++			"Unable to aquire IRQ %d\n", mlink->irq);
++		return ret;
++	}
++
++	return 0;
++}
++
++static void mhu_shutdown(struct mbox_chan *chan)
++{
++	struct mhu_link *mlink = chan->con_priv;
++
++	pr_debug("%s:%d\n", __func__, __LINE__);
++	free_irq(mlink->irq, chan);
++}
++
++static struct mbox_chan_ops mhu_ops = {
++	.send_data = mhu_send_data,
++	.startup = mhu_startup,
++	.shutdown = mhu_shutdown,
++	.last_tx_done = mhu_last_tx_done,
++};
++
++static int mhu_probe(struct amba_device *adev, const struct amba_id *id)
++{
++	int i, err;
++	struct arm_mhu *mhu;
++	struct device *dev = &adev->dev;
++	int mhu_reg[3] = {0x0, 0x20, 0x200};
++
++	err = amba_request_regions(adev, NULL);
++	if (err)
++		return err;
++
++	/* Allocate memory for device */
++	mhu = devm_kzalloc(dev, sizeof(*mhu), GFP_KERNEL);
++	if (!mhu)
++		return -ENOMEM;
++
++	mhu->base = devm_ioremap(dev, adev->res.start,
++				 resource_size(&adev->res));
++	if (!mhu->base) {
++		dev_err(dev, "ioremap failed\n");
++		return -ENXIO;
++	}
++
++	for (i = 0; i < 3; i++) {
++		mhu->chan[i].con_priv = &mhu->mlink[i];
++		mhu->mlink[i].irq = adev->irq[i];
++		mhu->mlink[i].rx_reg = mhu->base + mhu_reg[i];
++		mhu->mlink[i].tx_reg = mhu->mlink[i].rx_reg + 0x100;
++	}
++
++	mhu->mbox.dev = dev;
++	mhu->mbox.chans = &mhu->chan[0];
++	mhu->mbox.num_chans = 3;
++	mhu->mbox.ops = &mhu_ops;
++	mhu->mbox.txdone_irq = false;
++	mhu->mbox.txdone_poll = true;
++	mhu->mbox.txpoll_period = 10;
++
++	amba_set_drvdata(adev, mhu);
++
++	err = mbox_controller_register(&mhu->mbox);
++	if (err) {
++		dev_err(dev, "Failed to register mailboxes %d\n", err);
++		return err;
++	}
++
++	dev_err(dev, "ARM MHU Mailbox registered\n");
++	return 0;
++}
++
++static int mhu_remove(struct amba_device *adev)
++{
++	struct arm_mhu *mhu = amba_get_drvdata(adev);
++
++	mbox_controller_unregister(&mhu->mbox);
++
++	return 0;
++}
++
++static struct amba_id mhu_ids[] = {
++	{
++		.id	= 0x1bb098,
++		.mask	= 0xffffff,
++	},
++	{ 0, 0 },
++};
++MODULE_DEVICE_TABLE(amba, mhu_ids);
++
++static struct amba_driver arm_mhu_driver = {
++	.drv = {
++		.name	= "mhu",
++	},
++	.id_table	= mhu_ids,
++	.probe		= mhu_probe,
++	.remove		= mhu_remove,
++};
++module_amba_driver(arm_mhu_driver);
++
++MODULE_LICENSE("GPL v2");
++MODULE_DESCRIPTION("ARM MHU Driver");
++MODULE_AUTHOR("Jassi Brar <jassisinghbrar@gmail.com>");
+-- 
+1.9.0
