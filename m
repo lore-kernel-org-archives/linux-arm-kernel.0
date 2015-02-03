@@ -1,181 +1,35 @@
 From: rjui@broadcom.com (Ray Jui)
-Date: Tue, 3 Feb 2015 10:33:10 -0800
-Subject: [PATCH v4 5/5] ARM: dts: enable clock support for Broadcom Cygnus
+Date: Tue, 3 Feb 2015 10:33:08 -0800
+Subject: [PATCH v4 3/5] clk: Change bcm clocks build dependency
 In-Reply-To: <1422988390-24369-1-git-send-email-rjui@broadcom.com>
 References: <Ray Jui <rjui@broadcom.com>
  <1422988390-24369-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1422988390-24369-6-git-send-email-rjui@broadcom.com>
+Message-ID: <1422988390-24369-4-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace current device tree dummy clocks with real clock support for
-Broadcom Cygnus SoC
+The clock code under drivers/clk/bcm now contains code for both the
+Broadcom mobile SoCs and the iProc SoCs. Change the the makefile
+dependency to be under config flag CONFIG_ARCH_BCM that's enabled for
+both families of SoCs
 
 Signed-off-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Scott Branden <sbraden@broadcom.com>
 ---
- arch/arm/boot/dts/bcm-cygnus-clock.dtsi |  110 ++++++++++++++++++++++++-------
- arch/arm/boot/dts/bcm-cygnus.dtsi       |    2 +-
- 2 files changed, 86 insertions(+), 26 deletions(-)
+ drivers/clk/Makefile |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/bcm-cygnus-clock.dtsi b/arch/arm/boot/dts/bcm-cygnus-clock.dtsi
-index 60d8389..abb8a3f 100644
---- a/arch/arm/boot/dts/bcm-cygnus-clock.dtsi
-+++ b/arch/arm/boot/dts/bcm-cygnus-clock.dtsi
-@@ -36,56 +36,116 @@ clocks {
- 	ranges;
- 
- 	osc: oscillator {
-+		#clock-cells = <0>;
- 		compatible = "fixed-clock";
--		#clock-cells = <1>;
- 		clock-frequency = <25000000>;
- 	};
- 
--	apb_clk: apb_clk {
--		compatible = "fixed-clock";
-+	/* Cygnus ARM PLL */
-+	armpll: armpll {
- 		#clock-cells = <0>;
--		clock-frequency = <1000000000>;
-+		compatible = "brcm,cygnus-armpll";
-+		clocks = <&osc>;
-+		reg = <0x19000000 0x1000>;
- 	};
- 
--	periph_clk: periph_clk {
--		compatible = "fixed-clock";
-+	/* peripheral clock for system timer */
-+	arm_periph_clk: arm_periph_clk {
- 		#clock-cells = <0>;
--		clock-frequency = <500000000>;
-+		compatible = "fixed-factor-clock";
-+		clocks = <&armpll>;
-+		clock-div = <2>;
-+		clock-mult = <1>;
- 	};
- 
--	sdio_clk: lcpll_ch2 {
--		compatible = "fixed-clock";
-+	/* APB bus clock */
-+	apb_clk: apb_clk {
- 		#clock-cells = <0>;
--		clock-frequency = <200000000>;
-+		compatible = "fixed-factor-clock";
-+		clocks = <&armpll>;
-+		clock-div = <4>;
-+		clock-mult = <1>;
- 	};
- 
--	axi81_clk: axi81_clk {
--		compatible = "fixed-clock";
-+	genpll: genpll {
- 		#clock-cells = <0>;
--		clock-frequency = <100000000>;
-+		compatible = "brcm,cygnus-genpll";
-+		reg = <0x0301d000 0x2c>,
-+			<0x0301c020 0x4>;
-+		clocks = <&osc>;
- 	};
- 
--	keypad_clk: keypad_clk {
--		compatible = "fixed-clock";
-+	/* various clocks running off the GENPLL */
-+	genpll_clks: genpll_clks {
-+		#clock-cells = <1>;
-+		compatible = "brcm,cygnus-genpll-clk";
-+		reg = <0x0301d000 0x2c>;
-+		clocks = <&genpll>;
-+		clock-output-names = "axi21", "250mhz", "ihost_sys",
-+			"enet_sw", "audio_125", "can";
-+	};
-+
-+	/* always 1/2 of the axi21 clock */
-+	axi41_clk: axi41_clk {
- 		#clock-cells = <0>;
--		clock-frequency = <31806>;
-+		compatible = "fixed-factor-clock";
-+		clocks = <&genpll_clks 0>;
-+		clock-div = <2>;
-+		clock-mult = <1>;
- 	};
- 
--	adc_clk: adc_clk {
--		compatible = "fixed-clock";
-+	/* always 1/4 of the axi21 clock */
-+	axi81_clk: axi81_clk {
- 		#clock-cells = <0>;
--		clock-frequency = <1562500>;
-+		compatible = "fixed-factor-clock";
-+		clocks = <&genpll_clks 0>;
-+		clock-div = <4>;
-+		clock-mult = <1>;
- 	};
- 
--	pwm_clk: pwm_clk {
--		compatible = "fixed-clock";
-+	lcpll0: lcpll0 {
- 		#clock-cells = <0>;
--		clock-frequency = <1000000>;
-+		compatible = "brcm,cygnus-lcpll0";
-+		reg = <0x0301d02c 0x1c>,
-+			<0x0301c020 0x4>;
-+		clocks = <&osc>;
- 	};
- 
--	lcd_clk: mipipll_ch1 {
--		compatible = "fixed-clock";
-+	/* various clocks running off the LCPLL0 */
-+	lcpll0_clks: lcpll0_clks {
-+		#clock-cells = <1>;
-+		compatible = "brcm,cygnus-lcpll0-clk";
-+		reg = <0x0301d02c 0x1c>;
-+		clocks = <&lcpll0>;
-+		clock-output-names = "pcie_phy", "ddr_phy", "sdio",
-+			"usb_phy", "smart_card", "ch5";
-+	};
-+
-+	mipipll: mipipll {
- 		#clock-cells = <0>;
--		clock-frequency = <100000000>;
-+		compatible = "brcm,cygnus-mipipll";
-+		reg = <0x180a9800 0x2c>,
-+			<0x0301c020 0x4>,
-+			<0x180aa024 0x4>;
-+		clock-frequency = <2100000000>;
-+		clocks = <&osc>;
-+	};
-+
-+	mipipll_clks: mipipll_clks {
-+		#clock-cells = <1>;
-+		compatible = "brcm,cygnus-mipipll-clk";
-+		reg = <0x180a9800 0x2c>;
-+		clocks = <&mipipll>;
-+		clock-output-names = "ch0_unused", "ch1_lcd", "ch2_unused",
-+			"ch3_unused", "ch4_unused", "ch5_unused";
-+	};
-+
-+	asiu_clks: asiu_clks {
-+		#clock-cells = <1>;
-+		compatible = "brcm,cygnus-asiu-clk";
-+		reg = <0x0301d048 0xc>,
-+			<0x180aa024 0x4>;
-+		clocks = <&osc>;
-+		clock-output-names = "keypad", "adc/touch", "pwm";
- 	};
- };
-diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
-index 5126f9e..2b99e9c 100644
---- a/arch/arm/boot/dts/bcm-cygnus.dtsi
-+++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
-@@ -134,7 +134,7 @@
- 		compatible = "arm,cortex-a9-global-timer";
- 		reg = <0x19020200 0x100>;
- 		interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
--		clocks = <&periph_clk>;
-+		clocks = <&arm_periph_clk>;
- 	};
- 
- };
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index d5fba5b..eff0213 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -41,7 +41,7 @@ obj-$(CONFIG_ARCH_VT8500)		+= clk-vt8500.o
+ obj-$(CONFIG_COMMON_CLK_WM831X)		+= clk-wm831x.o
+ obj-$(CONFIG_COMMON_CLK_XGENE)		+= clk-xgene.o
+ obj-$(CONFIG_COMMON_CLK_AT91)		+= at91/
+-obj-$(CONFIG_ARCH_BCM_MOBILE)		+= bcm/
++obj-$(CONFIG_ARCH_BCM)			+= bcm/
+ obj-$(CONFIG_ARCH_BERLIN)		+= berlin/
+ obj-$(CONFIG_ARCH_HI3xxx)		+= hisilicon/
+ obj-$(CONFIG_ARCH_HIP04)		+= hisilicon/
 -- 
 1.7.9.5
