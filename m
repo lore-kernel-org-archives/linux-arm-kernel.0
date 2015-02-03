@@ -1,198 +1,146 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 3 Feb 2015 10:46:51 +0200
-Subject: [PATCH v13 3/6] clk: Make clk API return per-user struct clk
- instances
-In-Reply-To: <54D072AC.5090206@collabora.com>
-References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
- <1422011024-32283-4-git-send-email-tomeu.vizoso@collabora.com>
- <20150201212432.22722.70917@quantum> <54CFD0B1.2000003@ti.com>
- <20150202224139.421.84094@quantum> <54D072AC.5090206@collabora.com>
-Message-ID: <54D08AFB.7040203@ti.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Tue, 3 Feb 2015 16:46:15 +0800
+Subject: [PATCH 2/4] mtd: nand: atmel: Update DT documentation after
+ splitting NFC and NAND
+In-Reply-To: <20150202104236.649f99ad@bbrezillon>
+References: <1417732214-3292-1-git-send-email-boris.brezillon@free-electrons.com>	<1417732214-3292-3-git-send-email-boris.brezillon@free-electrons.com>	<20150202075737.GC3523@norris-Latitude-E6410>
+ <20150202104236.649f99ad@bbrezillon>
+Message-ID: <54D08AD7.3050209@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/03/2015 09:03 AM, Tomeu Vizoso wrote:
-> On 02/02/2015 11:41 PM, Mike Turquette wrote:
->> Quoting Tero Kristo (2015-02-02 11:32:01)
->>> On 02/01/2015 11:24 PM, Mike Turquette wrote:
->>>> Quoting Tomeu Vizoso (2015-01-23 03:03:30)
->>>>> Moves clock state to struct clk_core, but takes care to change as little API as
->>>>> possible.
->>>>>
->>>>> struct clk_hw still has a pointer to a struct clk, which is the
->>>>> implementation's per-user clk instance, for backwards compatibility.
->>>>>
->>>>> The struct clk that clk_get_parent() returns isn't owned by the caller, but by
->>>>> the clock implementation, so the former shouldn't call clk_put() on it.
->>>>>
->>>>> Because some boards in mach-omap2 still register clocks statically, their clock
->>>>> registration had to be updated to take into account that the clock information
->>>>> is stored in struct clk_core now.
->>>>
->>>> Tero, Paul & Tony,
->>>>
->>>> Tomeu's patch unveils a problem with omap3_noncore_dpll_enable and
->>>> struct dpll_data, namely this snippet from
->>>> arch/arm/mach-omap2/dpll3xxx.c:
->>>>
->>>>           parent = __clk_get_parent(hw->clk);
->>>>
->>>>           if (__clk_get_rate(hw->clk) == __clk_get_rate(dd->clk_bypass)) {
->>>>                   WARN(parent != dd->clk_bypass,
->>>>                                   "here0, parent name is %s, bypass name is %s\n",
->>>>                                   __clk_get_name(parent), __clk_get_name(dd->clk_bypass));
->>>>                   r = _omap3_noncore_dpll_bypass(clk);
->>>>           } else {
->>>>                   WARN(parent != dd->clk_ref,
->>>>                                   "here1, parent name is %s, ref name is %s\n",
->>>>                                   __clk_get_name(parent), __clk_get_name(dd->clk_ref));
->>>>                   r = _omap3_noncore_dpll_lock(clk);
->>>>           }
->>>>
->>>> struct dpll_data has members clk_ref and clk_bypass which are struct clk
->>>> pointers. This was always a bit of a violation of the clk.h contract
->>>> since drivers are not supposed to deref struct clk pointers. Now that we
->>>> generate unique pointers for each call to clk_get (clk_ref & clk_bypass
->>>> are populated by of_clk_get in ti_clk_register_dpll) then the pointer
->>>> comparisons above will never be equal (even if they resolve down to the
->>>> same struct clk_core). I added the verbose traces to the WARNs above to
->>>> illustrate the point: the names are always the same but the pointers
->>>> differ.
->>>>
->>>> AFAICT this doesn't break anything, but booting on OMAP3+ results in
->>>> noisy WARNs.
->>>>
->>>> I think the correct fix is to replace clk_bypass and clk_ref pointers
->>>> with a simple integer parent_index. In fact we already have this index.
->>>> See how the pointers are populated in ti_clk_register_dpll:
+Hi, Boris, Brian
+
+On 2/2/2015 5:42 PM, Boris Brezillon wrote:
+> Hi Brian,
+>
+> On Sun, 1 Feb 2015 23:57:37 -0800
+> Brian Norris <computersforpeace@gmail.com> wrote:
+>
+>> Hi Boris,
+>>
+>> BTW, this series has a few conflicts with other things I have queued, so
+>> you'll need to refresh.
+> Yes, that's not a problem, but I'd like to be sure this is the way we
+> want to go before rebasing this series.
+>
+>> On Thu, Dec 04, 2014 at 11:30:12PM +0100, Boris Brezillon wrote:
+>>> The NAND and NFC (NAND Flash Controller) were linked together with a
+>>> parent <-> child relationship.
 >>>
->>> The problem is we still need to be able to get runtime parent clock
->>> rates (the parent rate may change also), so simple index value is not
->>> sufficient. We need a handle of some sort to the bypass/ref clocks. The
->>> DPLL code generally requires knowledge of the bypass + reference clock
->>> rates to work properly, as it calculates the M/N values based on these.
->>
->> We can maybe introduce something like of_clk_get_parent_rate, as we have
->> analogous stuff for getting parent names and indexes. Without
->> introducing a new helper you could probably just do:
->>
->> 	clk_ref = clk_get_parent_by_index(dpll_clk, 0);
->> 	ref_rate = clk_get_rate(clk_ref);
->>
->> 	clk_bypass = clk_get_parent_by_index(dpll_clk, 1);
->> 	bypass_rate = clk_get_rate(clk_bypass);
->>
->> Currently the semantics around this call are weird. It seems like it
->> would create a new struct clk pointer but it does not. So don't call
->> clk_put on clk_ref and clk_bypass yet. That might change in the future
->> as we iron out this brave new world that we all live in. Probably best
->> to leave a FIXME in there.
->>
->> Stephen & Tomeu, let me know if I got any of that wrong.
+>>> This model has several drawbacks:
+>>> - it does not allow for multiple NAND chip handling while the controller
+>>>    support multi-chip (even though the driver is not ready yet)
+>>> - it mixes NAND partitions and NFC nodes at the same level (which is a bit
+>>>    disturbing)
+>> I agree that this is disturbing. (FWIW, it also seems a bit disturbing
+>> that atmel_nand.c actually registers two different drivers and the tries
+>> to synchronize them; this seems like it could be handled better, but I'm
+>> not sure how at the moment.)
+> Yep, that's my feeling too, but I'm not sure how this could/should be
+> done.
+> My problem here is that the pinmux should be requested by the EBI
+> device because the EBI manages several type of devices and the data and
+> address signals are shared by all the devices, hence the idea of
+> defining the nand chip node under the EBI node.
+> In the other hand, the NFC is not part of the EBI bus, and thus should
+> not be defined under the EBI node.
 >
-> I think you got it right, just wanted to mention that we can and
-> probably should make the clk_get_parent_* calls in the consumer API to
-> return per-user clk instances but that we need to make sure first that
-> callers call clk_put afterwards.
->
-> This should also allow us to remove the reference to struct clk from
-> clk_hw, which is at best awkward.
->
-> Regards,
+> This might lead to the NFC device being probed before the NAND chip,
+> hence the need for this synchronization.
 
-For the DPLL code it should just be fine to be able to get the current 
-parent index (not parent clock handle), and read a parent clock rate 
-based on an arbitrary index (not just the current one.) I don't think 
-there is any other need for having the clk_ref / clk_bypass clock 
-handles around.
+OMHO, there is another way, which is change the NFC node to many NFC 
+properties, just like PMECC.
+As NFC, PMECC or hamming ecc HW could be part of current NAND node (in 
+sama5, HSMC maybe a better name for this node. )
 
--Tero
+And this change can avoid the sync problem and avoid two drivers in 
+atmel_nand.c.
 
 >
-> Tomeu
+>>> - the introduction of the EBI bus implies defining NAND chips under the
+>>>    EBI node, and the ranges available under the EBI node should be
+>>>    restricted to EBI address space, while the NFC references several
+>>>    registers outside of these EBI ranges.
+>> That's an interesting bit. I've actually run across this sort of problem
+>> on other SoCs, where we have a relationship between two pieces of
+>> hardware--the NAND chip and the NAND controller--where the former might
+>> be on one bus (like your EBI bus, with chip selects), and the latter is
+>> part of the top-level MMIO register space.
+>>
+>> But can you elaborate here a bit more? Does the NAND chip actually need
+>> to be represented under your EBI bus?
+> Yes, as said above this is all about pinmux conflicts, the NAND
+> controller has to request the appropriate pinmux for its NAND chips but
+> it will conflict with the pinmux requested by the EBI bus (data and
+> address signals are shared by all the devices connected on the EBI).
 >
->>>
->>> Shall I change the DPLL code to check against clk_hw pointers or what is
->>> the preferred approach here? The patch at the end does this and fixes
->>> the dpll related warnings.
->>
->> Yes, for now that is fine, but feels a bit hacky to me. I don't know
->> honestly, let me sleep on it. Anyways for 3.20 that is perfectly fine
->> but we might want to switch to something like the scheme above.
->>
->>>
->>> Btw, the rate constraints patch broke boot for me completely, but sounds
->>> like you reverted it already.
->>
->> Fixed with Stephen's patch from last week. Thanks for dealing with all
->> the breakage so promptly. It has helped a lot!
->>
->> Regards,
->> Mike
->>
->>>
->>> -Tero
->>>
->>> --------------------
->>>
->>> Author: Tero Kristo <t-kristo@ti.com>
->>> Date:   Mon Feb 2 17:19:17 2015 +0200
->>>
->>>       ARM: OMAP3+: clock: dpll: fix logic for comparing parent clocks
->>>
->>>       DPLL code uses reference and bypass clock pointers for determining
->>> runtime
->>>       properties for these clocks, like parent clock rates.
->>>
->>>       As clock API now returns per-user clock structs, using a global handle
->>>       in the clock driver code does not work properly anymore. Fix this by
->>>       using the clk_hw instead, and comparing this against the parents.
->>>
->>>       Signed-off-by: Tero Kristo <t-kristo@ti.com>
->>>       Fixes: 59cf3fcf9baf ("clk: Make clk API return per-user struct clk
->>> instances")
->>>
->>> diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
->>> index c2da2a0..49752d7 100644
->>> --- a/arch/arm/mach-omap2/dpll3xxx.c
->>> +++ b/arch/arm/mach-omap2/dpll3xxx.c
->>> @@ -410,7 +410,7 @@ int omap3_noncore_dpll_enable(struct clk_hw *hw)
->>>          struct clk_hw_omap *clk = to_clk_hw_omap(hw);
->>>          int r;
->>>          struct dpll_data *dd;
->>> -       struct clk *parent;
->>> +       struct clk_hw *parent;
->>>
->>>          dd = clk->dpll_data;
->>>          if (!dd)
->>> @@ -427,13 +427,13 @@ int omap3_noncore_dpll_enable(struct clk_hw *hw)
->>>                  }
->>>          }
->>>
->>> -       parent = __clk_get_parent(hw->clk);
->>> +       parent = __clk_get_hw(__clk_get_parent(hw->clk));
->>>
->>>          if (__clk_get_rate(hw->clk) == __clk_get_rate(dd->clk_bypass)) {
->>> -               WARN_ON(parent != dd->clk_bypass);
->>> +               WARN_ON(parent != __clk_get_hw(dd->clk_bypass));
->>>                  r = _omap3_noncore_dpll_bypass(clk);
->>>          } else {
->>> -               WARN_ON(parent != dd->clk_ref);
->>> +               WARN_ON(parent != __clk_get_hw(dd->clk_ref));
->>>                  r = _omap3_noncore_dpll_lock(clk);
->>>          }
->>>
->>> @@ -549,7 +549,8 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw,
->>> unsigned long rate,
->>>          if (!dd)
->>>                  return -EINVAL;
->>>
->>> -       if (__clk_get_parent(hw->clk) != dd->clk_ref)
->>> +       if (__clk_get_hw(__clk_get_parent(hw->clk)) !=
->>> +           __clk_get_hw(dd->clk_ref))
->>>                  return -EINVAL;
->>>
->>>          if (dd->last_rounded_rate == 0)
->>>
->>>
+>>> Move the NFC node outside of the NAND node, to get a more future-proof
+>>> model.
+>> I'm curious if an alternative solution might work, maybe one like the
+>> Allwiner NAND (sunxi-nand) DT, which just reverses the roles; the 'NFC'
+>> is the parent of the NAND chip(s). We've seen this pattern in other
+>> contexts too.
+
+I also prefer this. Then the dt node should looks like finally:
+
+nand (SMC may be more correct) node {
+     PMECC properties
+     NFC properties --> we can make the NFC not a node, just many NFC 
+properties.
+
+     pinctrl-nand0
+     nand chip 0: {
+         partitions...
+     }
+
+     pinctrl-nand1
+     nand chip 1: {
+         partitions...
+     }
+}
+
+> I would have preferred this solution too, but the EBI/pinmux constraint
+> explained above prevents this approach.
+I am not very clear about the pinmux constraint.
+Maybe we just leave one DT node (either EBI or current nand node) to 
+take care the pins.
+
+> What I can do though, is reverse the referencing: reference nand chips
+> from the nand controller node.
+
+I guess the dt looks like: (correct me if I am wrong)
+
+EBI node {
+     pinctrl-nand0
+     nand chip 0: {
+         partitions...
+     }
+
+     pinctrl-nand1
+     nand chip 1: {
+         partitions...
+     }
+}
+
+nand (SMC/HSMC may be more correct) node {
+     PMECC properties
+     NFC properties --> we can make the NFC not a node, just many NFC 
+properties.
+
+     &nand chip0
+     &nand chip1
+}
+
+This is still looks nice to me.
+
 >
+> Josh, Brian, any idea to solve this EBI/nand-chip/nand-controller
+> dependency problem is welcome.
+>
+> Best Regards,
+>
+> Boris
+>
+Best Regards,
+Josh Wu
