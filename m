@@ -1,101 +1,58 @@
-From: kirill@shutemov.name (Kirill A. Shutemov)
-Date: Tue, 3 Feb 2015 03:17:30 +0200
-Subject: [RFC] change non-atomic bitops method
-In-Reply-To: <20150202152909.13bfd11f192fb0268b2ab4bf@linux-foundation.org>
-References: <35FD53F367049845BC99AC72306C23D1044A02027E0A@CNBJMBX05.corpusers.net>
- <20150202152909.13bfd11f192fb0268b2ab4bf@linux-foundation.org>
-Message-ID: <20150203011730.GA15653@node.dhcp.inet.fi>
+From: rjui@broadcom.com (Ray Jui)
+Date: Mon, 2 Feb 2015 18:01:30 -0800
+Subject: [PATCH v3 0/4] Add pinctrl support to Broadcom Cygnus SoC
+In-Reply-To: <Ray Jui <rjui@broadcom.com>
+References: <Ray Jui <rjui@broadcom.com>
+Message-ID: <1422928894-20716-1-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 02, 2015 at 03:29:09PM -0800, Andrew Morton wrote:
-> On Mon, 2 Feb 2015 11:55:03 +0800 "Wang, Yalin" <Yalin.Wang@sonymobile.com> wrote:
-> 
-> > This patch change non-atomic bitops,
-> > add a if() condition to test it, before set/clear the bit.
-> > so that we don't need dirty the cache line, if this bit
-> > have been set or clear. On SMP system, dirty cache line will
-> > need invalidate other processors cache line, this will have
-> > some impact on SMP systems.
-> > 
-> > --- a/include/asm-generic/bitops/non-atomic.h
-> > +++ b/include/asm-generic/bitops/non-atomic.h
-> > @@ -17,7 +17,9 @@ static inline void __set_bit(int nr, volatile unsigned long *addr)
-> >  	unsigned long mask = BIT_MASK(nr);
-> >  	unsigned long *p = ((unsigned long *)addr) + BIT_WORD(nr);
-> >  
-> > -	*p  |= mask;
-> > +	if ((*p & mask) == 0)
-> > +		*p  |= mask;
-> > +
-> >  }
-> 
-> hm, maybe.
-> 
-> It will speed up set_bit on an already-set bit.  But it will slow down
-> set_bit on a not-set bit.  And the latter case is presumably much, much
-> more common.
-> 
-> How do we know the patch is a net performance gain?
+This patchset contains the initial pinctrl (IOMUX) support for the Broadcom
+Cygnus SoC. The Cygnus IOMUX controller supports group based mux configuration
+and allows certain pins to be muxed to GPIO function individually
 
-Let's try to measure. The micro benchmark:
+Changes from v2:
+ - Consolidate all Broadcom pinctrl drivers into drivers/pinctrl/bcm/*
+ - Change the Cygnus IOMUX driver to use standard Linux pinctrl subnode
+properties such as "function" and "groups" for pinmux configuration, instead
+of non-standard properties such as "brcm,function" and "brcm,group"
+ - Use real function names like "spi0", "lcd", "key", and etc. instead of HW
+specific mux names like "alt1", "alt2", "alt3", and etc.
+ - Add suffix "grp" to all group names
+ - Add support to allow individual pins to be muxed to GPIO function through
+subsystem callbacks "gpio_request_enable" and "gpio_disable_free", and get rid
+of all GPIO groups
+ - Other minor improvements in the driver
 
-	#include <stdio.h>
-	#include <time.h>
-	#include <sys/mman.h>
+Changes from v1:
+ - Fix a typo in device tree binding document
 
-	#ifdef CACHE_HOT
-	#define SIZE (2UL << 20)
-	#define TIMES 10000000
-	#else
-	#define SIZE (1UL << 30)
-	#define TIMES 10000
-	#endif
+Ray Jui (4):
+  pinctrl: bcm: consolidate Broadcom pinctrl drivers
+  pinctrl: Broadcom Cygnus pinctrl device tree binding
+  pinctrl: cygnus: add initial IOMUX driver support
+  ARM: dts: enable IOMUX for Broadcom Cygnus
 
-	int main(int argc, char **argv)
-	{
-		struct timespec a, b, diff;
-		unsigned long i, *p, times = TIMES;
-
-		p = mmap(NULL, SIZE, PROT_READ | PROT_WRITE,
-				MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, -1, 0);
-		
-		clock_gettime(CLOCK_MONOTONIC, &a);
-		while (times--) {
-			for (i = 0; i < SIZE/64/sizeof(*p); i++) {
-	#ifdef CHECK_BEFORE_SET
-				if (p[i] != times)
-	#endif
-					p[i] = times;
-			}
-		}
-		clock_gettime(CLOCK_MONOTONIC, &b);
-
-		diff.tv_sec = b.tv_sec - a.tv_sec;
-		if (a.tv_nsec > b.tv_nsec) {
-			diff.tv_sec--;
-			diff.tv_nsec = 1000000000 + b.tv_nsec - a.tv_nsec;
-		} else
-			diff.tv_nsec = b.tv_nsec - a.tv_nsec;
-
-		printf("%lu.%09lu\n", diff.tv_sec, diff.tv_nsec);
-		return 0;
-	}
-
-Results for 10 runs on my laptop -- i5-3427U (IvyBridge 1.8 Ghz, 2.8Ghz Turbo
-with 3MB LLC):
-
-				Avg		Stddev
-baseline			21.5351		0.5315
--DCHECK_BEFORE_SET		21.9834		0.0789
--DCACHE_HOT			14.9987		0.0365
--DCACHE_HOT -DCHECK_BEFORE_SET	29.9010		0.0204
-
-Difference between -DCACHE_HOT and -DCACHE_HOT -DCHECK_BEFORE_SET appears
-huge, but if you recalculate it to CPU cycles per inner loop @ 2.8 Ghz,
-it's 1.02530 and 2.04401 CPU cycles respectively.
-
-Basically, the check is free on decent CPU. 
+ .../bindings/pinctrl/brcm,cygnus-pinmux.txt        |  159 +++
+ arch/arm/boot/dts/bcm-cygnus.dtsi                  |    6 +
+ drivers/pinctrl/Kconfig                            |   19 +-
+ drivers/pinctrl/Makefile                           |    4 +-
+ drivers/pinctrl/bcm/Kconfig                        |   34 +
+ drivers/pinctrl/bcm/Makefile                       |    5 +
+ drivers/pinctrl/bcm/pinctrl-bcm281xx.c             | 1455 ++++++++++++++++++++
+ drivers/pinctrl/bcm/pinctrl-bcm2835.c              | 1072 ++++++++++++++
+ drivers/pinctrl/bcm/pinctrl-cygnus-mux.c           | 1087 +++++++++++++++
+ drivers/pinctrl/pinctrl-bcm281xx.c                 | 1455 --------------------
+ drivers/pinctrl/pinctrl-bcm2835.c                  | 1072 --------------
+ 11 files changed, 3821 insertions(+), 2547 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/brcm,cygnus-pinmux.txt
+ create mode 100644 drivers/pinctrl/bcm/Kconfig
+ create mode 100644 drivers/pinctrl/bcm/Makefile
+ create mode 100644 drivers/pinctrl/bcm/pinctrl-bcm281xx.c
+ create mode 100644 drivers/pinctrl/bcm/pinctrl-bcm2835.c
+ create mode 100644 drivers/pinctrl/bcm/pinctrl-cygnus-mux.c
+ delete mode 100644 drivers/pinctrl/pinctrl-bcm281xx.c
+ delete mode 100644 drivers/pinctrl/pinctrl-bcm2835.c
 
 -- 
- Kirill A. Shutemov
+1.7.9.5
