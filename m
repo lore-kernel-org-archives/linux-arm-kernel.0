@@ -1,55 +1,136 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Tue,  3 Feb 2015 09:47:30 +0100
-Subject: [PATCH 0/2] dma: fix DMA_ATTR_NO_KERNEL_MAPPING for no-IOMMU platforms
-Message-ID: <1422953252-10835-1-git-send-email-carlo@caione.org>
+Date: Tue,  3 Feb 2015 09:47:31 +0100
+Subject: [PATCH 1/2] drm/exynos: fix DMA_ATTR_NO_KERNEL_MAPPING usage
+In-Reply-To: <1422953252-10835-1-git-send-email-carlo@caione.org>
+References: <1422953252-10835-1-git-send-email-carlo@caione.org>
+Message-ID: <1422953252-10835-2-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DMA_ATTR_NO_KERNEL_MAPPING attribute is used to notify dma-mapping core
-that the driver will not use kernel mapping for the allocated buffer at all, so
-the core can skip creating it.
+The Exynos DRM driver doesn't follow the correct API when dealing with
+dma_{alloc, mmap, free}_attrs functions and the
+DMA_ATTR_NO_KERNEL_MAPPING attribute.
 
-Unfortunately at the moment this attribute is only valid for IOMMU setups. In
-non-IOMMU setups the codepath doesn't obey DMA_ATTR_NO_KERNEL_MAPPING so when
-the CMA region is in high-memory all the buffers created with this attribute
-that do not require a kernel virtual address space still put pressure on the
-vmalloc area (for reference see
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/279325.html)
+When a IOMMU is not available and the DMA_ATTR_NO_KERNEL_MAPPING is
+used, the driver should use the pointer returned by dma_alloc_attr() as
+a cookie.
 
-This patchset is composed by two patches.
+The Exynos DRM driver directly uses the non-requested virtual
+kernel address returned by the DMA mapping subsystem. This just works
+now because the non-IOMMU codepath doesn't obey
+DMA_ATTR_NO_KERNEL_MAPPING but we need to fix it before fixing the DMA
+layer.
 
-The first patch fixes the Exynos DRM driver so that it keeps working when the
-non-IOMMU DMA layer is fixed. The Exynos DRM driver doesn't follow the
-recommendations in DMA-attributes.txt so in the non-IOMMU case when
-DMA_ATTR_NO_KERNEL_MAPPING is used the driver directly uses the returned kernel
-virtual address which it explicitly requested not to be assigned. That must be
-fixed before the underlying DMA subsystem is improved to obey
-DMA_ATTR_NO_KERNEL_MAPPING.
+Signed-off-by: Carlo Caione <carlo@caione.org>
+---
+ drivers/gpu/drm/exynos/exynos_drm_buf.c   |  6 +++---
+ drivers/gpu/drm/exynos/exynos_drm_fbdev.c | 29 +++++++++--------------------
+ drivers/gpu/drm/exynos/exynos_drm_gem.h   |  2 ++
+ 3 files changed, 14 insertions(+), 23 deletions(-)
 
-The second patch implements DMA_ATTR_NO_KERNEL_MAPPING for non-IOMMU capable
-platforms.
-
-Please note that:
-
-* The first patch must be applied before the second one to avoid breaking the
-Exynos DRM driver. This patch without the DMA layer fix works fine (we save
-git-bisect) but it's not fully correct (we have double mapping in kernel
-address space).
-
-* The second patch breaks the Exynos DRM driver unless the first patch is
-* applied first
-
-Carlo Caione (1):
-  drm/exynos: fix DMA_ATTR_NO_KERNEL_MAPPING usage
-
-Jasper St. Pierre (1):
-  arm/dma-mapping: Respect NO_KERNEL_MAPPING when we don't have an IOMMU
-
- arch/arm/mm/dma-mapping.c                 | 67 +++++++++++++++++++------------
- drivers/gpu/drm/exynos/exynos_drm_buf.c   |  6 +--
- drivers/gpu/drm/exynos/exynos_drm_fbdev.c | 29 +++++--------
- drivers/gpu/drm/exynos/exynos_drm_gem.h   |  2 +
- 4 files changed, 55 insertions(+), 49 deletions(-)
-
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_buf.c b/drivers/gpu/drm/exynos/exynos_drm_buf.c
+index 9c80884..24994ba 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_buf.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_buf.c
+@@ -63,11 +63,11 @@ static int lowlevel_buffer_allocate(struct drm_device *dev,
+ 			return -ENOMEM;
+ 		}
+ 
+-		buf->kvaddr = (void __iomem *)dma_alloc_attrs(dev->dev,
++		buf->cookie = dma_alloc_attrs(dev->dev,
+ 					buf->size,
+ 					&buf->dma_addr, GFP_KERNEL,
+ 					&buf->dma_attrs);
+-		if (!buf->kvaddr) {
++		if (!buf->cookie) {
+ 			DRM_ERROR("failed to allocate buffer.\n");
+ 			ret = -ENOMEM;
+ 			goto err_free;
+@@ -132,7 +132,7 @@ static void lowlevel_buffer_deallocate(struct drm_device *dev,
+ 	buf->sgt = NULL;
+ 
+ 	if (!is_drm_iommu_supported(dev)) {
+-		dma_free_attrs(dev->dev, buf->size, buf->kvaddr,
++		dma_free_attrs(dev->dev, buf->size, buf->cookie,
+ 				(dma_addr_t)buf->dma_addr, &buf->dma_attrs);
+ 		drm_free_large(buf->pages);
+ 	} else
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+index e12ea90..84f8dfe 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+@@ -79,9 +79,9 @@ static int exynos_drm_fbdev_update(struct drm_fb_helper *helper,
+ 				     struct drm_framebuffer *fb)
+ {
+ 	struct fb_info *fbi = helper->fbdev;
+-	struct drm_device *dev = helper->dev;
+ 	struct exynos_drm_gem_buf *buffer;
+ 	unsigned int size = fb->width * fb->height * (fb->bits_per_pixel >> 3);
++	unsigned int nr_pages;
+ 	unsigned long offset;
+ 
+ 	drm_fb_helper_fill_fix(fbi, fb->pitches[0], fb->depth);
+@@ -94,25 +94,14 @@ static int exynos_drm_fbdev_update(struct drm_fb_helper *helper,
+ 		return -EFAULT;
+ 	}
+ 
+-	/* map pages with kernel virtual space. */
++	nr_pages = buffer->size >> PAGE_SHIFT;
++
++	buffer->kvaddr = (void __iomem *) vmap(buffer->pages,
++			nr_pages, VM_MAP,
++			pgprot_writecombine(PAGE_KERNEL));
+ 	if (!buffer->kvaddr) {
+-		if (is_drm_iommu_supported(dev)) {
+-			unsigned int nr_pages = buffer->size >> PAGE_SHIFT;
+-
+-			buffer->kvaddr = (void __iomem *) vmap(buffer->pages,
+-					nr_pages, VM_MAP,
+-					pgprot_writecombine(PAGE_KERNEL));
+-		} else {
+-			phys_addr_t dma_addr = buffer->dma_addr;
+-			if (dma_addr)
+-				buffer->kvaddr = (void __iomem *)phys_to_virt(dma_addr);
+-			else
+-				buffer->kvaddr = (void __iomem *)NULL;
+-		}
+-		if (!buffer->kvaddr) {
+-			DRM_ERROR("failed to map pages to kernel space.\n");
+-			return -EIO;
+-		}
++		DRM_ERROR("failed to map pages to kernel space.\n");
++		return -EIO;
+ 	}
+ 
+ 	/* buffer count to framebuffer always is 1 at booting time. */
+@@ -313,7 +302,7 @@ static void exynos_drm_fbdev_destroy(struct drm_device *dev,
+ 	struct exynos_drm_gem_obj *exynos_gem_obj = exynos_fbd->exynos_gem_obj;
+ 	struct drm_framebuffer *fb;
+ 
+-	if (is_drm_iommu_supported(dev) && exynos_gem_obj->buffer->kvaddr)
++	if (exynos_gem_obj->buffer->kvaddr)
+ 		vunmap(exynos_gem_obj->buffer->kvaddr);
+ 
+ 	/* release drm framebuffer and real buffer */
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_gem.h b/drivers/gpu/drm/exynos/exynos_drm_gem.h
+index ec58fe9..308173c 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_gem.h
++++ b/drivers/gpu/drm/exynos/exynos_drm_gem.h
+@@ -22,6 +22,7 @@
+ /*
+  * exynos drm gem buffer structure.
+  *
++ * @cookie: cookie returned by dma_alloc_attrs
+  * @kvaddr: kernel virtual address to allocated memory region.
+  * *userptr: user space address.
+  * @dma_addr: bus address(accessed by dma) to allocated memory region.
+@@ -35,6 +36,7 @@
+  *	VM_PFNMAP or not.
+  */
+ struct exynos_drm_gem_buf {
++	void 			*cookie;
+ 	void __iomem		*kvaddr;
+ 	unsigned long		userptr;
+ 	dma_addr_t		dma_addr;
 -- 
 2.2.2
