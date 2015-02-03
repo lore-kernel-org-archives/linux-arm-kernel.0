@@ -1,133 +1,123 @@
 From: ykk@rock-chips.com (Yakir Yang)
-Date: Tue,  3 Feb 2015 10:16:54 -0500
-Subject: [PATCH v3 11/15] drm: bridge/dw_hdmi: add audio clock control
- interfaces
+Date: Tue,  3 Feb 2015 10:17:41 -0500
+Subject: [PATCH v3 12/15] drm: bridge/dw_hdmi: creat dw-hdmi-audio platform
+ device
 In-Reply-To: <1422975418-13302-1-git-send-email-ykk@rock-chips.com>
 References: <1422975418-13302-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1422976614-30400-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1422976661-30447-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add audio clock enable/disable/restore interfacess, those functions
-can be called concurrently on multiple different threads of execution
-to change the hdmi audio enable state.
+creat dw-hdmi-audio device dynamically in probe function,
+and transfer some interfaces to dw-hdmi-audio driver for
+setting hdmi audio format & control hdmi audio clock.
 
 Signed-off-by: Yakir Yang <ykk@rock-chips.com>
 ---
 Changes in v3:
-- Delete hdmi_audio_config interface and modify audio clock control functions
+- Remove audio_config & get_connect_status callback functions
+  and add write/read/mod register callback functions
 
 Changes in v2:
-- Add audio config interfaces to dw_hdmi driver
+- Update the audio control interfaces
 
- drivers/gpu/drm/bridge/dw_hdmi.c | 60 ++++++++++++++++++++++++++++++++++++----
- 1 file changed, 54 insertions(+), 6 deletions(-)
+ drivers/gpu/drm/bridge/dw_hdmi.c | 29 +++++++++++++++++++++++++++++
+ include/drm/bridge/dw_hdmi.h     | 15 +++++++++++++++
+ 2 files changed, 44 insertions(+)
 
 diff --git a/drivers/gpu/drm/bridge/dw_hdmi.c b/drivers/gpu/drm/bridge/dw_hdmi.c
-index 44e95f3..92fc12d 100644
+index 92fc12d..9734532 100644
 --- a/drivers/gpu/drm/bridge/dw_hdmi.c
 +++ b/drivers/gpu/drm/bridge/dw_hdmi.c
-@@ -16,6 +16,7 @@
- #include <linux/err.h>
- #include <linux/clk.h>
- #include <linux/hdmi.h>
-+#include <linux/mutex.h>
- #include <linux/of_device.h>
+@@ -124,6 +124,8 @@ struct dw_hdmi {
+ 	struct drm_encoder *encoder;
+ 	struct drm_bridge *bridge;
  
- #include <drm/drm_of.h>
-@@ -146,6 +147,9 @@ struct dw_hdmi {
- 	void __iomem *regs;
- 
- 	unsigned int sample_rate;
-+	struct mutex audio_mutex;
-+	bool audio_enable;
++	struct platform_device *audio_pdev;
 +
- 	int ratio;
- 
- 	void (*write)(struct dw_hdmi *hdmi, u8 val, int offset);
-@@ -1234,6 +1238,53 @@ static void dw_hdmi_phy_disable(struct dw_hdmi *hdmi)
- 	hdmi->phy_enabled = false;
+ 	enum dw_hdmi_devtype dev_type;
+ 	struct device *dev;
+ 	struct clk *isfr_clk;
+@@ -499,6 +501,12 @@ static void hdmi_clk_regenerator_update_pixel_clock(struct dw_hdmi *hdmi)
+ 	hdmi_set_clk_regenerator(hdmi, hdmi->hdmi_data.video_mode.mpixelclock);
  }
  
-+static void dw_hdmi_audio_clk_enable(struct dw_hdmi *hdmi)
++static void hdmi_set_sample_rate(struct dw_hdmi *hdmi, unsigned int sample_rate)
 +{
-+	hdmi_modb(hdmi, 0, HDMI_MC_CLKDIS_AUDCLK_DISABLE, HDMI_MC_CLKDIS);
++	hdmi->sample_rate = sample_rate;
++	hdmi_set_clk_regenerator(hdmi, hdmi->hdmi_data.video_mode.mpixelclock);
 +}
 +
-+static void dw_hdmi_audio_clk_disable(struct dw_hdmi *hdmi)
-+{
-+	hdmi_modb(hdmi, HDMI_MC_CLKDIS_AUDCLK_DISABLE,
-+			HDMI_MC_CLKDIS_AUDCLK_DISABLE, HDMI_MC_CLKDIS);
-+}
-+
-+static void hdmi_audio_restore(struct dw_hdmi *hdmi)
-+{
-+	mutex_lock(&hdmi->audio_mutex);
-+
-+	if (hdmi->audio_enable)
-+		dw_hdmi_audio_clk_enable(hdmi);
-+	else
-+		dw_hdmi_audio_clk_disable(hdmi);
-+
-+	mutex_unlock(&hdmi->audio_mutex);
-+}
-+
-+static void hdmi_audio_enable(struct dw_hdmi *hdmi)
-+{
-+	mutex_lock(&hdmi->audio_mutex);
-+
-+	if (!hdmi->audio_enable) {
-+		hdmi->audio_enable = true;
-+		dw_hdmi_audio_clk_enable(hdmi);
-+	}
-+
-+	mutex_unlock(&hdmi->audio_mutex);
-+}
-+
-+static void hdmi_audio_disable(struct dw_hdmi *hdmi)
-+{
-+	mutex_lock(&hdmi->audio_mutex);
-+
-+	if (hdmi->audio_enable) {
-+		hdmi->audio_enable = false;
-+		dw_hdmi_audio_clk_disable(hdmi);
-+	}
-+
-+	mutex_unlock(&hdmi->audio_mutex);
-+}
-+
- /* HDMI Initialization Step B.4 */
- static void dw_hdmi_enable_video_path(struct dw_hdmi *hdmi)
+ /*
+  * this submodule is responsible for the video data synchronization.
+  * for example, for RGB 4:4:4 input, the data map is defined as
+@@ -1787,6 +1795,8 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
+ 		 struct resource *iores, int irq,
+ 		 const struct dw_hdmi_plat_data *plat_data)
  {
-@@ -1264,11 +1315,6 @@ static void dw_hdmi_enable_video_path(struct dw_hdmi *hdmi)
- 	}
- }
++	struct platform_device_info pdevinfo;
++	struct dw_hdmi_audio_data audio;
+ 	struct drm_device *drm = data;
+ 	struct device_node *np = dev->of_node;
+ 	struct device_node *ddc_node;
+@@ -1906,6 +1916,25 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
  
--static void hdmi_enable_audio_clk(struct dw_hdmi *hdmi)
--{
--	hdmi_modb(hdmi, 0, HDMI_MC_CLKDIS_AUDCLK_DISABLE, HDMI_MC_CLKDIS);
--}
--
- /* Workaround to clear the overflow condition */
- static void dw_hdmi_clear_overflow(struct dw_hdmi *hdmi)
- {
-@@ -1364,7 +1410,7 @@ static int dw_hdmi_setup(struct dw_hdmi *hdmi, struct drm_display_mode *mode)
+ 	dev_set_drvdata(dev, hdmi);
  
- 		/* HDMI Initialization Step E - Configure audio */
- 		hdmi_clk_regenerator_update_pixel_clock(hdmi);
--		hdmi_enable_audio_clk(hdmi);
-+		hdmi_audio_restore(hdmi);
++	memset(&pdevinfo, 0, sizeof(pdevinfo));
++	pdevinfo.parent = dev;
++	pdevinfo.id = PLATFORM_DEVID_NONE;
++
++	audio.irq = irq;
++	audio.dw = hdmi;
++	audio.mod = hdmi_modb;
++	audio.read = hdmi_readb;
++	audio.write = hdmi_writeb;
++	audio.enable = hdmi_audio_enable;
++	audio.disable = hdmi_audio_disable;
++	audio.set_sample_rate = hdmi_set_sample_rate;
++
++	pdevinfo.name = "dw-hdmi-audio";
++	pdevinfo.data = &audio;
++	pdevinfo.size_data = sizeof(audio);
++	pdevinfo.dma_mask = DMA_BIT_MASK(32);
++	hdmi->audio_pdev = platform_device_register_full(&pdevinfo);
++
+ 	return 0;
  
- 		/* HDMI Initialization Step F - Configure AVI InfoFrame */
- 		hdmi_config_AVI(hdmi);
-@@ -1758,6 +1804,8 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
- 	hdmi->sample_rate = 48000;
- 	hdmi->ratio = 100;
- 	hdmi->encoder = encoder;
-+	hdmi->audio_enable = false;
-+	mutex_init(&hdmi->audio_mutex);
+ err_iahb:
+diff --git a/include/drm/bridge/dw_hdmi.h b/include/drm/bridge/dw_hdmi.h
+index e8cfe1c..23ca491 100644
+--- a/include/drm/bridge/dw_hdmi.h
++++ b/include/drm/bridge/dw_hdmi.h
+@@ -12,6 +12,8 @@
  
- 	of_property_read_u32(np, "reg-io-width", &val);
+ #include <drm/drmP.h>
  
++struct dw_hdmi;
++
+ enum {
+ 	DW_HDMI_RES_8,
+ 	DW_HDMI_RES_10,
+@@ -44,6 +46,19 @@ struct dw_hdmi_sym_term {
+ 	u16 term;       /*transmission termination value*/
+ };
+ 
++struct dw_hdmi_audio_data {
++	int irq;
++	struct dw_hdmi *dw;
++
++	u8 (*read)(struct dw_hdmi *hdmi, int offset);
++	void (*write)(struct dw_hdmi *hdmi, u8 val, int offset);
++	void (*mod)(struct dw_hdmi *hdmi, u8 data, u8 mask, unsigned reg);
++
++	void (*enable)(struct dw_hdmi *hdmi);
++	void (*disable)(struct dw_hdmi *hdmi);
++	void (*set_sample_rate)(struct dw_hdmi *hdmi, unsigned int rate);
++};
++
+ struct dw_hdmi_plat_data {
+ 	enum dw_hdmi_devtype dev_type;
+ 	const struct dw_hdmi_mpll_config *mpll_cfg;
 -- 
 2.1.2
