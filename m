@@ -1,66 +1,53 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue,  3 Feb 2015 17:22:54 -0600
-Subject: [PATCH 3/4] ARM: sa1100: remove unused RTC register definitions
+Date: Tue,  3 Feb 2015 17:22:55 -0600
+Subject: [PATCH 4/4] ARM: mmp: remove unused RTC register definitions
 In-Reply-To: <1423005775-26457-1-git-send-email-robh@kernel.org>
 References: <1423005775-26457-1-git-send-email-robh@kernel.org>
-Message-ID: <1423005775-26457-4-git-send-email-robh@kernel.org>
+Message-ID: <1423005775-26457-5-git-send-email-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that register definitions have been moved to the driver, we can remove
-them from machine specific code.
+Now that register definitions have been moved to the driver, regs-rtc.h is
+no longer used and can be removed.
 
 Signed-off-by: Rob Herring <robh@kernel.org>
+Cc: Eric Miao <eric.y.miao@gmail.com>
+Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: linux-arm-kernel at lists.infradead.org
 ---
- arch/arm/mach-sa1100/include/mach/SA-1100.h | 34 -----------------------------
- 1 file changed, 34 deletions(-)
+ arch/arm/mach-mmp/include/mach/regs-rtc.h | 23 -----------------------
+ 1 file changed, 23 deletions(-)
+ delete mode 100644 arch/arm/mach-mmp/include/mach/regs-rtc.h
 
-diff --git a/arch/arm/mach-sa1100/include/mach/SA-1100.h b/arch/arm/mach-sa1100/include/mach/SA-1100.h
-index 0ac6cc0..7972617 100644
---- a/arch/arm/mach-sa1100/include/mach/SA-1100.h
-+++ b/arch/arm/mach-sa1100/include/mach/SA-1100.h
-@@ -858,40 +858,6 @@
- 
- 
- /*
-- * Real-Time Clock (RTC) control registers
-- *
-- * Registers
-- *    RTAR      	Real-Time Clock (RTC) Alarm Register (read/write).
-- *    RCNR      	Real-Time Clock (RTC) CouNt Register (read/write).
-- *    RTTR      	Real-Time Clock (RTC) Trim Register (read/write).
-- *    RTSR      	Real-Time Clock (RTC) Status Register (read/write).
-- *
-- * Clocks
-- *    frtx, Trtx	Frequency, period of the real-time clock crystal
-- *              	(32.768 kHz nominal).
-- *    frtc, Trtc	Frequency, period of the real-time clock counter
-- *              	(1 Hz nominal).
-- */
+diff --git a/arch/arm/mach-mmp/include/mach/regs-rtc.h b/arch/arm/mach-mmp/include/mach/regs-rtc.h
+deleted file mode 100644
+index 5bff886..0000000
+--- a/arch/arm/mach-mmp/include/mach/regs-rtc.h
++++ /dev/null
+@@ -1,23 +0,0 @@
+-#ifndef __ASM_MACH_REGS_RTC_H
+-#define __ASM_MACH_REGS_RTC_H
 -
--#define RTAR		__REG(0x90010000)  /* RTC Alarm Reg. */
--#define RCNR		__REG(0x90010004)  /* RTC CouNt Reg. */
--#define RTTR		__REG(0x90010008)  /* RTC Trim Reg. */
--#define RTSR		__REG(0x90010010)  /* RTC Status Reg. */
+-#include <mach/addr-map.h>
 -
--#define RTTR_C  	Fld (16, 0)	/* clock divider Count - 1         */
--#define RTTR_D  	Fld (10, 16)	/* trim Delete count               */
--                	        	/* frtc = (1023*(C + 1) - D)*frtx/ */
--                	        	/*        (1023*(C + 1)^2)         */
--                	        	/* Trtc = (1023*(C + 1)^2)*Trtx/   */
--                	        	/*        (1023*(C + 1) - D)       */
--
--#define RTSR_AL 	0x00000001	/* ALarm detected                  */
--#define RTSR_HZ 	0x00000002	/* 1 Hz clock detected             */
--#define RTSR_ALE	0x00000004	/* ALarm interrupt Enable          */
--#define RTSR_HZE	0x00000008	/* 1 Hz clock interrupt Enable     */
--
+-#define RTC_VIRT_BASE	(APB_VIRT_BASE + 0x10000)
+-#define RTC_REG(x)	(*((volatile u32 __iomem *)(RTC_VIRT_BASE + (x))))
 -
 -/*
-  * Power Manager (PM) control registers
-  *
-  * Registers
+- * Real Time Clock
+- */
+-
+-#define RCNR		RTC_REG(0x00)	/* RTC Count Register */
+-#define RTAR		RTC_REG(0x04)	/* RTC Alarm Register */
+-#define RTSR		RTC_REG(0x08)	/* RTC Status Register */
+-#define RTTR		RTC_REG(0x0C)	/* RTC Timer Trim Register */
+-
+-#define RTSR_HZE	(1 << 3)	/* HZ interrupt enable */
+-#define RTSR_ALE	(1 << 2)	/* RTC alarm interrupt enable */
+-#define RTSR_HZ		(1 << 1)	/* HZ rising-edge detected */
+-#define RTSR_AL		(1 << 0)	/* RTC alarm detected */
+-
+-#endif /* __ASM_MACH_REGS_RTC_H */
 -- 
 2.1.0
