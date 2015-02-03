@@ -1,32 +1,24 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 3 Feb 2015 12:44:41 +0000
-Subject: [RFC PATCH] ASoC: wm8731: let codec to manage clock by itself
-In-Reply-To: <CAOLZvyE6W8-X2_M+-KQNry2VPwLzwbBLuxr5Z5EdBQo7Skv2RQ@mail.gmail.com>
-References: <1422934415-24957-1-git-send-email-voice.shen@atmel.com>
- <CAOLZvyE6W8-X2_M+-KQNry2VPwLzwbBLuxr5Z5EdBQo7Skv2RQ@mail.gmail.com>
-Message-ID: <20150203124441.GK21293@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 03 Feb 2015 13:54:42 +0100
+Subject: [PATCH] ARM: berlin: add a defconfig
+In-Reply-To: <1422962932-12603-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1422962932-12603-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <3962783.sVjmOB1hYm@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 03, 2015 at 08:54:57AM +0100, Manuel Lauss wrote:
+On Tuesday 03 February 2015 12:28:52 Antoine Tenart wrote:
+> Marvell Berlin SoCs did not have a custom defconfig and were only
+> supported in multi_v7_defconfig.
+> 
+> Adds a proper defconfig, allowing to boot a Berlin SoC with all the
+> currently supported features: SMP, Pinmux, AHCI, Ethernet, I2C, GPIO,
+> USB, SDHCI.
+> 
+> 
 
-> +    wm8731->mclk = devm_clk_get(&spi->dev, "mclk");
-> +    if (IS_ERR(wm8731->mclk)) {
-> +        wm8731->mclk = NULL;
-> +        dev_warn(&spi->dev, "assuming static MCLK\n");
-> +    }
+Are there any features that are not currently supported by
+multi_v7_defconfig? If so, please also add them there as
+loadable modules.
 
-This is broken for both deferred probe and in the case where the clock
-API genuinely returns a NULL clock.  Other than that it's the kind of
-thing that we've done for some other drivers, though it's not good to
-have to do this.  Check them for correct behaviour.
-
-The coding style is also not right for the whole patch and there's a
-lot of missing error checking.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150203/18ab4af5/attachment.sig>
+	Arnd
