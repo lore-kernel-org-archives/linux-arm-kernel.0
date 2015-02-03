@@ -1,176 +1,77 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 3 Feb 2015 09:02:22 +0100
-Subject: [PATCH v3] mmc: moxart: fix probe logic
-In-Reply-To: <1422891786-23071-1-git-send-email-jonas.jensen@gmail.com>
-References: <4754899.RDUhFfxBSW@wuerfel>
- <1422891786-23071-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <CAPDyKFoppJBHx4nio111GM9RPv8pkfm4yZg2+AedLjnSZhmFsg@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 03 Feb 2015 09:06:13 +0100
+Subject: [RESEND PATCH] ARM: EXYNOS: Add missing static to file-scope
+ declarations
+In-Reply-To: <06c201d03f67$48da45b0$da8ed110$@kernel.org>
+References: <1420819476-23344-1-git-send-email-k.kozlowski@samsung.com>
+ <06c201d03f67$48da45b0$da8ed110$@kernel.org>
+Message-ID: <1422950773.10086.1.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 February 2015 at 16:43, Jonas Jensen <jonas.jensen@gmail.com> wrote:
-> Jonas Jensen wanted to submit a patch for these, but apparently
-> forgot about it. I stumbled over this symptom first:
->
-> drivers/built-in.o: In function `moxart_probe':
-> :(.text+0x2af128): undefined reference to `of_dma_request_slave_channel'
->
-> This is because of_dma_request_slave_channel is an internal helper
-> and not exported to loadable module. I'm changing the driver to
-> use dma_request_slave_channel_reason() instead.
->
-> Further problems from inspection:
->
-> * The remove function must not call kfree on the host pointer,
->   because it is allocated together with the mmc_host.
->
-> * The clock is never released
->
-> * The dma_cap_mask_t is completely unused and can be removed
->
-> * deferred probing does not work if the dma driver is loaded
->   after the mmc driver.
->
-> This patch should fix all of the above.
->
-> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
-> ---
->
-> Notes:
->     This is a forward (with a single line fix) of Arnd's v2 patch.
->
->     v2:  do not call clk_put() on an error pointer
->     v3:  fix NULL dereference on host->clk
->
->     Applies to next-20150113
->
->  drivers/mmc/host/moxart-mmc.c | 34 +++++++++++++++++++---------------
->  1 file changed, 19 insertions(+), 15 deletions(-)
->
-> diff --git a/drivers/mmc/host/moxart-mmc.c b/drivers/mmc/host/moxart-mmc.c
-> index d2a1ef6..6ab57d1e 100644
-> --- a/drivers/mmc/host/moxart-mmc.c
-> +++ b/drivers/mmc/host/moxart-mmc.c
-> @@ -17,6 +17,7 @@
->  #include <linux/init.h>
->  #include <linux/platform_device.h>
->  #include <linux/delay.h>
-> +#include <linux/errno.h>
->  #include <linux/interrupt.h>
->  #include <linux/blkdev.h>
->  #include <linux/dma-mapping.h>
-> @@ -131,6 +132,7 @@ struct moxart_host {
->         struct mmc_host                 *mmc;
->         struct mmc_request              *mrq;
->         struct scatterlist              *cur_sg;
-> +       struct clk                      *clk;
->         struct completion               dma_complete;
->         struct completion               pio_complete;
->
-> @@ -560,9 +562,7 @@ static int moxart_probe(struct platform_device *pdev)
->         struct mmc_host *mmc;
->         struct moxart_host *host = NULL;
->         struct dma_slave_config cfg;
-> -       struct clk *clk;
->         void __iomem *reg_mmc;
-> -       dma_cap_mask_t mask;
->         int irq, ret;
->         u32 i;
->
-> @@ -573,6 +573,8 @@ static int moxart_probe(struct platform_device *pdev)
->                 goto out;
->         }
->
-> +       host = mmc_priv(mmc);
-> +
->         ret = of_address_to_resource(node, 0, &res_mmc);
->         if (ret) {
->                 dev_err(dev, "of_address_to_resource failed\n");
-> @@ -586,10 +588,11 @@ static int moxart_probe(struct platform_device *pdev)
->                 goto out;
->         }
->
-> -       clk = of_clk_get(node, 0);
+On wto, 2015-02-03 at 13:10 +0900, Kukjin Kim wrote:
+> Krzysztof Kozlowski wrote:
+> > 
+> > The 'pm_data', 'exynos_release_ret_regs' and
+> > 'exynos5420_release_ret_regs' are not exported nor used outside of
+> > suspend.c file. Make them static.
+> > 
+> > This fixes following sparse warnings:
+> > arch/arm/mach-exynos/suspend.c:83:23: warning: symbol 'pm_data' was not declared. Should it be static?
+> > arch/arm/mach-exynos/suspend.c:106:14: warning: symbol 'exynos_release_ret_regs' was not declared.
+> > Should it be static?
+> > arch/arm/mach-exynos/suspend.c:117:14: warning: symbol 'exynos5420_release_ret_regs' was not declared.
+> > Should it be static?
+> > 
+> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > ---
+> >  arch/arm/mach-exynos/suspend.c | 6 +++---
+> >  1 file changed, 3 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
+> > index 342797b9bf3b..fef091f8e59f 100644
+> > --- a/arch/arm/mach-exynos/suspend.c
+> > +++ b/arch/arm/mach-exynos/suspend.c
+> > @@ -75,7 +75,7 @@ struct exynos_pm_data {
+> >  	int (*cpu_suspend)(unsigned long);
+> >  };
+> > 
+> > -struct exynos_pm_data *pm_data;
+> > +static struct exynos_pm_data *pm_data;
+> > 
+> >  static int exynos5420_cpu_state;
+> >  static unsigned int exynos_pmu_spare3;
+> > @@ -98,7 +98,7 @@ static const struct exynos_wkup_irq exynos5250_wkup_irq[] = {
+> >  	{ /* sentinel */ },
+> >  };
+> > 
+> > -unsigned int exynos_release_ret_regs[] = {
+> > +static unsigned int exynos_release_ret_regs[] = {
+> >  	S5P_PAD_RET_MAUDIO_OPTION,
+> >  	S5P_PAD_RET_GPIO_OPTION,
+> >  	S5P_PAD_RET_UART_OPTION,
+> > @@ -109,7 +109,7 @@ unsigned int exynos_release_ret_regs[] = {
+> >  	REG_TABLE_END,
+> >  };
+> > 
+> > -unsigned int exynos5420_release_ret_regs[] = {
+> > +static unsigned int exynos5420_release_ret_regs[] = {
+> >  	EXYNOS_PAD_RET_DRAM_OPTION,
+> >  	EXYNOS_PAD_RET_MAUDIO_OPTION,
+> >  	EXYNOS_PAD_RET_JTAG_OPTION,
+> > --
+> 
+> Looks ok to me, how about re-spin this patch including following?
+> 
+> ...
+> +static unsigned int exynos3250_release_ret_regs[] = {
 
-This code would be simpler using devm_clk_get(), since then error
-wouldn't be needed.
+Sure, I'll resend extended version.
 
-Any reason to why you don't want to use that?
+Best regards,
+Krzysztof
 
-> -       if (IS_ERR(clk)) {
-> +       host->clk = of_clk_get(node, 0);
-> +       if (IS_ERR(host->clk)) {
->                 dev_err(dev, "of_clk_get failed\n");
-> -               ret = PTR_ERR(clk);
-> +               ret = PTR_ERR(host->clk);
-> +               host->clk = NULL;
->                 goto out;
->         }
->
-> @@ -603,18 +606,14 @@ static int moxart_probe(struct platform_device *pdev)
->         if (ret)
->                 goto out;
->
-> -       dma_cap_zero(mask);
-> -       dma_cap_set(DMA_SLAVE, mask);
-> -
-> -       host = mmc_priv(mmc);
->         host->mmc = mmc;
->         host->base = reg_mmc;
->         host->reg_phys = res_mmc.start;
->         host->timeout = msecs_to_jiffies(1000);
-> -       host->sysclk = clk_get_rate(clk);
-> +       host->sysclk = clk_get_rate(host->clk);
->         host->fifo_width = readl(host->base + REG_FEATURE) << 2;
-> -       host->dma_chan_tx = of_dma_request_slave_channel(node, "tx");
-> -       host->dma_chan_rx = of_dma_request_slave_channel(node, "rx");
-> +       host->dma_chan_tx = dma_request_slave_channel_reason(dev, "tx");
-> +       host->dma_chan_rx = dma_request_slave_channel_reason(dev, "rx");
->
->         spin_lock_init(&host->lock);
->
-> @@ -624,6 +623,11 @@ static int moxart_probe(struct platform_device *pdev)
->         mmc->ocr_avail = 0xffff00;      /* Support 2.0v - 3.6v power. */
->
->         if (IS_ERR(host->dma_chan_tx) || IS_ERR(host->dma_chan_rx)) {
-> +               if (PTR_ERR(host->dma_chan_tx) == -EPROBE_DEFER ||
-> +                   PTR_ERR(host->dma_chan_rx) == -EPROBE_DEFER) {
-> +                       ret = -EPROBE_DEFER;
-> +                       goto out;
-> +               }
->                 dev_dbg(dev, "PIO mode transfer enabled\n");
->                 host->have_dma = false;
->         } else {
-> @@ -677,6 +681,8 @@ static int moxart_probe(struct platform_device *pdev)
->         return 0;
->
->  out:
-> +       if (host->clk)
-> +               clk_put(host->clk);
->         if (mmc)
->                 mmc_free_host(mmc);
->         return ret;
-> @@ -694,6 +700,7 @@ static int moxart_remove(struct platform_device *pdev)
->                         dma_release_channel(host->dma_chan_tx);
->                 if (!IS_ERR(host->dma_chan_rx))
->                         dma_release_channel(host->dma_chan_rx);
-> +               clk_put(host->clk);
->                 mmc_remove_host(mmc);
->                 mmc_free_host(mmc);
->
-> @@ -702,9 +709,6 @@ static int moxart_remove(struct platform_device *pdev)
->                 writel(readl(host->base + REG_CLOCK_CONTROL) | CLK_OFF,
->                        host->base + REG_CLOCK_CONTROL);
->         }
-> -
-> -       kfree(host);
-> -
->         return 0;
->  }
->
-> --
-> 1.8.2.1
->
-
-Kind regards
-Uffe
+> ...
+> 
+> Thanks,
+> Kukjin
