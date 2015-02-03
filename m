@@ -1,27 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 3 Feb 2015 14:23:57 +0100
-Subject: [PATCH 3/3] dts: versatile: add sysregs node
-In-Reply-To: <1422467792-2065-4-git-send-email-robh@kernel.org>
-References: <1422467792-2065-1-git-send-email-robh@kernel.org>
- <1422467792-2065-4-git-send-email-robh@kernel.org>
-Message-ID: <CACRpkdaJ7Etuk0BGYuC0JwHR5Xp73dn96kOgDwM4+8+5EZ0jaA@mail.gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 03 Feb 2015 21:28:11 +0800
+Subject: [PATCH v8 17/21] clocksource / arch_timer: Parse GTDT to
+ initialize arch timer
+In-Reply-To: <3447958.XfVzbZ6OCs@vostro.rjw.lan>
+References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
+ <1422881149-8177-18-git-send-email-hanjun.guo@linaro.org>
+ <3447958.XfVzbZ6OCs@vostro.rjw.lan>
+Message-ID: <54D0CCEB.2020200@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 28, 2015 at 6:56 PM, Rob Herring <robh@kernel.org> wrote:
-
-> The Versatile boards have the same sysregs as other ARM Ltd boards. Add
-> the nodes in order to enable support for 24MHz counter as sched_clock.
+On 2015?02?03? 06:23, Rafael J. Wysocki wrote:
+> On Monday, February 02, 2015 08:45:45 PM Hanjun Guo wrote:
+>> Using the information presented by GTDT (Generic Timer Description Table)
+>> to initialize the arch timer (not memory-mapped).
+>>
+>> CC: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> Originally-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+>> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>> Tested-by: Yijing Wang <wangyijing@huawei.com>
+>> Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
+>> Tested-by: Jon Masters <jcm@redhat.com>
+>> Tested-by: Timur Tabi <timur@codeaurora.org>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> ---
+>>   arch/arm64/kernel/time.c             |   7 ++
+>>   drivers/clocksource/arm_arch_timer.c | 132 ++++++++++++++++++++++++++++-------
 >
-> This is a minimal node definition as the existing sub node definition
-> used on VExpress has some issues raised by Linus W.
->
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: devicetree at vger.kernel.org
+> An ACK from Thomas Gleixner is necessary for that.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+I will CC Thomas in the change log in next version
+with both patch 16/17.
 
-Yours,
-Linus Walleij
+Thanks
+Hanjun
