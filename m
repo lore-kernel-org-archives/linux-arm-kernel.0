@@ -1,277 +1,38 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Tue, 3 Feb 2015 16:42:14 +0800
-Subject: [RFC] change non-atomic bitops method
-In-Reply-To: <35FD53F367049845BC99AC72306C23D1044A02027E0D@CNBJMBX05.corpusers.net>
-References: <35FD53F367049845BC99AC72306C23D1044A02027E0A@CNBJMBX05.corpusers.net>
- <20150202152909.13bfd11f192fb0268b2ab4bf@linux-foundation.org>
- <20150203011730.GA15653@node.dhcp.inet.fi>
- <35FD53F367049845BC99AC72306C23D1044A02027E0B@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D1044A02027E0C@CNBJMBX05.corpusers.net>
- <20150202223851.f30768d0.akpm@linux-foundation.org>
- <35FD53F367049845BC99AC72306C23D1044A02027E0D@CNBJMBX05.corpusers.net>
-Message-ID: <35FD53F367049845BC99AC72306C23D1044A02027E0E@CNBJMBX05.corpusers.net>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 03 Feb 2015 16:44:26 +0800
+Subject: [PATCH v8 20/21] Documentation: ACPI for ARM64
+In-Reply-To: <54CFC97C.3080402@codeaurora.org>
+References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
+ <1422881149-8177-21-git-send-email-hanjun.guo@linaro.org>
+ <54CFC97C.3080402@codeaurora.org>
+Message-ID: <54D08A6A.80301@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Wang, Yalin
-> Sent: Tuesday, February 03, 2015 3:04 PM
-> To: 'Andrew Morton'
-> Cc: 'Kirill A. Shutemov'; 'arnd at arndb.de'; 'linux-arch at vger.kernel.org';
-> 'linux-kernel at vger.kernel.org'; 'linux at arm.linux.org.uk'; 'linux-arm-
-> kernel at lists.infradead.org'
-> Subject: RE: [RFC] change non-atomic bitops method
-> 
-> > -----Original Message-----
-> > From: Andrew Morton [mailto:akpm at linux-foundation.org]
-> > Sent: Tuesday, February 03, 2015 2:39 PM
-> > To: Wang, Yalin
-> > Cc: 'Kirill A. Shutemov'; 'arnd at arndb.de'; 'linux-arch at vger.kernel.org';
-> > 'linux-kernel at vger.kernel.org'; 'linux at arm.linux.org.uk'; 'linux-arm-
-> > kernel at lists.infradead.org'
-> > Subject: Re: [RFC] change non-atomic bitops method
-> >
-> > On Tue, 3 Feb 2015 13:42:45 +0800 "Wang, Yalin"
-> <Yalin.Wang@sonymobile.com>
-> > wrote:
-> > >
-> > > ...
-> > >
-> > > #ifdef CHECK_BEFORE_SET
-> > > 			if (p[i] != times)
-> > > #endif
-> > >
-> > > ...
-> > >
-> > > ----
-> > > One run on CPU0, reader thread run on CPU1,
-> > > Test result:
-> > > sudo ./cache_test
-> > > reader:8.426228173
-> > > 8.672198335
-> > >
-> > > With -DCHECK_BEFORE_SET
-> > > sudo ./cache_test_check
-> > > reader:7.537036819
-> > > 10.799746531
-> > >
-> >
-> > You aren't measuring the right thing.  You should compare
-> >
-> > 	if (p[i] != x)
-> > 		p[i] = x;
-> >
-> > versus
-> >
-> > 	p[i] = x;
-> >
-> > and you should do this for two cases:
-> >
-> > a) p[i] == x
-> >
-> > b) p[i] != x
-> >
-> >
-> > The first code sequence will be slower when (p[i] != x) and faster when
-> > (p[i] == x).
-> >
-> >
-> > Next, we should instrument the kernel to work out the frequency of
-> > set_bit on an already-set bit.
-> >
-> > It is only with both these ratios that we can work out whether the
-> > patch is a net gain.  My suspicion is that set_bit on an already-set
-> > bit is so rare that the patch will be a loss.
-> I see, let's change the test a little:
-> 1)
-> 	memset(p, 0, SIZE);
-> 	if (p[i] != 0)
-> 		p[i] = 0;  // never called
-> 
-> 	#sudo ./cache_test_check
-> 	6.698153838
-> 	reader:7.529402625
-> 
-> 
-> 2)
-> 	memset(p, 0, SIZE);
-> 	if (p[i] == 0)
-> 		p[i] = 0; // always called
-> 	#sudo ./cache_test_check
-> 	reader:7.895421311
-> 	9.000889973
-> 
-> Thanks
-> 
-> 
-I make a change in kernel to test hit/miss ratio:
----
-diff --git a/fs/proc/meminfo.c b/fs/proc/meminfo.c
-index 80e4645..a82937b 100644
---- a/fs/proc/meminfo.c
-+++ b/fs/proc/meminfo.c
-@@ -2,6 +2,7 @@
- #include <linux/hugetlb.h>
- #include <linux/init.h>
- #include <linux/kernel.h>
-+#include <linux/module.h>
- #include <linux/mm.h>
- #include <linux/mman.h>
- #include <linux/mmzone.h>
-@@ -15,6 +16,41 @@
- #include <asm/pgtable.h>
- #include "internal.h"
- 
-+atomic_t __set_bit_success_count = ATOMIC_INIT(0);
-+atomic_t __set_bit_miss_count = ATOMIC_INIT(0);
-+EXPORT_SYMBOL_GPL(__set_bit_success_count);
-+EXPORT_SYMBOL_GPL(__set_bit_miss_count);
-+
-+atomic_t __clear_bit_success_count = ATOMIC_INIT(0);
-+atomic_t __clear_bit_miss_count = ATOMIC_INIT(0);
-+EXPORT_SYMBOL_GPL(__clear_bit_success_count);
-+EXPORT_SYMBOL_GPL(__clear_bit_miss_count);
-+
-+atomic_t __test_and_set_bit_success_count = ATOMIC_INIT(0);
-+atomic_t __test_and_set_bit_miss_count = ATOMIC_INIT(0);
-+EXPORT_SYMBOL_GPL(__test_and_set_bit_success_count);
-+EXPORT_SYMBOL_GPL(__test_and_set_bit_miss_count);
-+
-+atomic_t __test_and_clear_bit_success_count = ATOMIC_INIT(0);
-+atomic_t __test_and_clear_bit_miss_count = ATOMIC_INIT(0);
-+EXPORT_SYMBOL_GPL(__test_and_clear_bit_success_count);
-+EXPORT_SYMBOL_GPL(__test_and_clear_bit_miss_count);
-+
-+/*
-+ * atomic bitops
-+ */
-+atomic_t set_bit_success_count = ATOMIC_INIT(0);
-+atomic_t set_bit_miss_count = ATOMIC_INIT(0);
-+
-+atomic_t clear_bit_success_count = ATOMIC_INIT(0);
-+atomic_t clear_bit_miss_count = ATOMIC_INIT(0);
-+
-+atomic_t test_and_set_bit_success_count = ATOMIC_INIT(0);
-+atomic_t test_and_set_bit_miss_count = ATOMIC_INIT(0);
-+
-+atomic_t test_and_clear_bit_success_count = ATOMIC_INIT(0);
-+atomic_t test_and_clear_bit_miss_count = ATOMIC_INIT(0);
-+
- void __attribute__((weak)) arch_report_meminfo(struct seq_file *m)
- {
- }
-@@ -165,6 +201,18 @@ static int meminfo_proc_show(struct seq_file *m, void *v)
- 		   HPAGE_PMD_NR)
- #endif
- 		);
-+	seq_printf(m,   "__set_bit_miss_count:%d __set_bit_success_count:%d\n"
-+			"__clear_bit_miss_count:%d __clear_bit_success_count:%d\n"
-+			"__test_and_set_bit_miss_count:%d __test_and_set_bit_success_count:%d\n"
-+			"__test_and_clear_bit_miss_count:%d __test_and_clear_bit_success_count:%d\n",
-+			atomic_read(&__set_bit_miss_count), atomic_read(&__set_bit_success_count),
-+			atomic_read(&__clear_bit_miss_count), atomic_read(&__clear_bit_success_count),
-+
-+			atomic_read(&__test_and_set_bit_miss_count),
-+			atomic_read(&__test_and_set_bit_success_count),
-+
-+			atomic_read(&__test_and_clear_bit_miss_count),
-+			atomic_read(&__test_and_clear_bit_success_count));
- 
- 	hugetlb_report_meminfo(m);
- 
-diff --git a/include/asm-generic/bitops/non-atomic.h b/include/asm-generic/bitops/non-atomic.h
-index 697cc2b..1895133 100644
---- a/include/asm-generic/bitops/non-atomic.h
-+++ b/include/asm-generic/bitops/non-atomic.h
-@@ -2,7 +2,18 @@
- #define _ASM_GENERIC_BITOPS_NON_ATOMIC_H_
- 
- #include <asm/types.h>
-+#include <asm/atomic.h>
-+extern atomic_t __set_bit_success_count;
-+extern atomic_t __set_bit_miss_count;
- 
-+extern atomic_t __clear_bit_success_count;
-+extern atomic_t __clear_bit_miss_count;
-+
-+extern atomic_t __test_and_set_bit_success_count;
-+extern atomic_t __test_and_set_bit_miss_count;
-+
-+extern atomic_t __test_and_clear_bit_success_count;
-+extern atomic_t __test_and_clear_bit_miss_count;
- /**
-  * __set_bit - Set a bit in memory
-  * @nr: the bit to set
-@@ -17,7 +28,13 @@ static inline void __set_bit(int nr, volatile unsigned long *addr)
- 	unsigned long mask = BIT_MASK(nr);
- 	unsigned long *p = ((unsigned long *)addr) + BIT_WORD(nr);
- 
--	*p  |= mask;
-+	if ((*p & mask) == 0) {
-+		atomic_inc(&__set_bit_success_count);
-+		*p  |= mask;
-+	} else {
-+		atomic_inc(&__set_bit_miss_count);
-+	}
-+
- }
- 
- static inline void __clear_bit(int nr, volatile unsigned long *addr)
-@@ -25,7 +42,12 @@ static inline void __clear_bit(int nr, volatile unsigned long *addr)
- 	unsigned long mask = BIT_MASK(nr);
- 	unsigned long *p = ((unsigned long *)addr) + BIT_WORD(nr);
- 
--	*p &= ~mask;
-+	if ((*p & mask) != 0) {
-+		atomic_inc(&__clear_bit_success_count);
-+		*p &= ~mask;
-+	} else {
-+		atomic_inc(&__clear_bit_miss_count);
-+	}
- }
- 
- /**
-@@ -60,7 +82,12 @@ static inline int __test_and_set_bit(int nr, volatile unsigned long *addr)
- 	unsigned long *p = ((unsigned long *)addr) + BIT_WORD(nr);
- 	unsigned long old = *p;
- 
--	*p = old | mask;
-+	if ((old & mask) == 0) {
-+		atomic_inc(&__test_and_set_bit_success_count);
-+		*p = old | mask;
-+	} else {
-+		atomic_inc(&__test_and_set_bit_miss_count);
-+	}
- 	return (old & mask) != 0;
- }
- 
-@@ -79,7 +106,12 @@ static inline int __test_and_clear_bit(int nr, volatile unsigned long *addr)
- 	unsigned long *p = ((unsigned long *)addr) + BIT_WORD(nr);
- 	unsigned long old = *p;
- 
--	*p = old & ~mask;
-+	if ((old & mask) != 0) {
-+		atomic_inc(&__test_and_clear_bit_success_count);
-+		*p = old & ~mask;
-+	} else {
-+		atomic_inc(&__test_and_clear_bit_miss_count);
-+	}
- 	return (old & mask) != 0;
- }
----
-After use the phone some time:
-root at D5303:/ # cat /proc/meminfo
-VmallocUsed:       10348 kB
-VmallocChunk:      75632 kB
-__set_bit_miss_count:10002 __set_bit_success_count:1096661
-__clear_bit_miss_count:359484 __clear_bit_success_count:3674617
-__test_and_set_bit_miss_count:7 __test_and_set_bit_success_count:221
-__test_and_clear_bit_miss_count:924611 __test_and_clear_bit_success_count:193
+On 2015?02?03? 03:01, Timur Tabi wrote:
+> On 02/02/2015 06:45 AM, Hanjun Guo wrote:
+>> From: Graeme Gregory <graeme.gregory@linaro.org>
+>>
+>> Add documentation for the guidelines of how to use ACPI
+>> on ARM64.
+>
+> This patch has a slight corruption to it:
+>
+> In-Reply-To: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
+> References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
+> MIME-Version: 1.0
+> Content-Type: text/plain; charset=n
+>                                    ^
+> git-am chokes on this:
+>
+>      fatal: cannot convert from n to UTF-8
+>
+> Replacing the 'n' with '"us-ascii"' fixes it.
+>
+> Patch #21 has the same problem, although it also has a trailing
+> whitespace problem.
 
-__test_and_clear_bit_miss_count has a very high miss rate.
-In fact, I think set/clear/test_and_set(clear)_bit atomic version can also
-Be investigated to see its miss ratio,
-I have not tested the atomic version,
-Because it reside in different architectures.
+Hi Timur, I will fix that in next version.
 
 Thanks
+Hanjun
