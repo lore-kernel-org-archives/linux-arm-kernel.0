@@ -1,32 +1,30 @@
-From: grygorii.strashko@linaro.org (Grygorii Strashko)
-Date: Tue, 3 Feb 2015 19:59:09 +0200
-Subject: [PATCH v2] hwmon: tmp102: add hibernation callbacks
-In-Reply-To: <20150203174519.GA31926@roeck-us.net>
-References: <1422975718-871-1-git-send-email-grygorii.strashko@linaro.org>
- <20150203174519.GA31926@roeck-us.net>
-Message-ID: <CAO5CWPLiqwM3nE0LqhPUdH5MoYWRahk9qn2sFjTjXvoKx-+nuA@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 03 Feb 2015 10:25:05 -0800
+Subject: linux-next: manual merge of the clk tree with the arm-soc tree
+In-Reply-To: <20150203163140.3edfe607@canb.auug.org.au>
+References: <20150203163140.3edfe607@canb.auug.org.au>
+Message-ID: <20150203182505.421.11849@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 February 2015 at 19:45, Guenter Roeck <linux@roeck-us.net> wrote:
-> On Tue, Feb 03, 2015 at 05:01:58PM +0200, grygorii.strashko at linaro.org wrote:
->> From: Grygorii Strashko <Grygorii.Strashko@linaro.org>
->>
->> Setting a dev_pm_ops suspend/resume pair but not a set of
->> hibernation functions means those pm functions will not be
->> called upon hibernation.
->> Fix this by using SIMPLE_DEV_PM_OPS, which appropriately
->> assigns the suspend and hibernation handlers and move
->> mp102_suspend/tmp102_resume under CONFIG_PM_SLEEP to avoid
->> build warnings.
->>
->> Signed-off-by: Grygorii Strashko <Grygorii.Strashko@linaro.org>
->
-> Applied to -next.
+Quoting Stephen Rothwell (2015-02-02 21:31:40)
+> Hi Mike,
+> 
+> Today's linux-next merge of the clk tree got a conflict in
+> arch/arm/mach-omap2/cclock3xxx_data.c between commit ca662ee7b8a8
+> ("ARM: OMAP2+: Remove unused ti81xx platform init code") from the
+> arm-soc tree and commit d6540b193719 ("ARM: OMAP3: remove legacy clock
+> data") from the clk tree.
+> 
+> I fixed it up (the latter removed the file, so I did that) and can
+> carry the fix as necessary (no action is required).
 
+That is the correct fix.
 
-Thanks
+Thanks,
+Mike
 
--- 
-Best regards,
--grygorii
+> 
+> -- 
+> Cheers,
+> Stephen Rothwell                    sfr at canb.auug.org.au
