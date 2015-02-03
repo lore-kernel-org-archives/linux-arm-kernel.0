@@ -1,22 +1,63 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 02 Feb 2015 18:54:01 -0800 (PST)
-Subject: [PATCH] net/tulip: don't warn about unknown ARM architecture
-In-Reply-To: <1780413.LLpv9s01CB@wuerfel>
-References: <1780413.LLpv9s01CB@wuerfel>
-Message-ID: <20150202.185401.1529004777101807716.davem@davemloft.net>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Tue, 03 Feb 2015 12:20:19 +0900
+Subject: [PATCH] ARM: EXYNOS: Handle of of_iomap() failure
+In-Reply-To: <1421077065-30175-1-git-send-email-k.kozlowski@samsung.com>
+References: <1421077065-30175-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <054001d03f60$58535150$08f9f3f0$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Fri, 30 Jan 2015 22:58:19 +0100
-
-> ARM has 32-byte cache lines, which according to the comment in
-> the init registers function seems to work best with the default
-> value of 0x4800 that is also used on sparc and parisc.
+Krzysztof Kozlowski wrote:
 > 
-> This adds ARM to the same list, to use that default but no
-> longer warn about it.
+> Prevent possible NULL pointer dereference if of_iomap() fails. Handle
+> the error by skipping such power domain.
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  arch/arm/mach-exynos/pm_domains.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+> index 20f267121b3e..fd7640a6b503 100644
+> --- a/arch/arm/mach-exynos/pm_domains.c
+> +++ b/arch/arm/mach-exynos/pm_domains.c
+> @@ -128,6 +128,13 @@ static __init int exynos4_pm_init_power_domain(void)
+>  		pd->pd.name = kstrdup(np->name, GFP_KERNEL);
+>  		pd->name = pd->pd.name;
+>  		pd->base = of_iomap(np, 0);
+> +		if (!pd->base) {
+> +			dev_warn(&pdev->dev, "Failed to map memory\n");
+> +			kfree(pd);
+> +			of_node_put(np);
+> +			continue;
+> +		}
+> +
+>  		pd->pd.power_off = exynos_pd_power_off;
+>  		pd->pd.power_on = exynos_pd_power_on;
+> 
+> --
 
-Applied, thanks a lot.
+Looks good and applied. BTW if we need more error handling like this, how about
+error handling for failing of of_find_device_by_node() something like following?
+
+diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+index 20f2671..234f967 100644
+--- a/arch/arm/mach-exynos/pm_domains.c
++++ b/arch/arm/mach-exynos/pm_domains.c
+@@ -116,6 +116,10 @@ static __init int exynos4_pm_init_power_domain(void)
+ 		struct device *dev;
+
+ 		pdev = of_find_device_by_node(np);
++		if (!pdev) {
++			/* error handling */
++		}
++
+ 		dev = &pdev->dev;
+
+ 		pd = kzalloc(sizeof(*pd), GFP_KERNEL);
+
+I mean I'm not sure how many error/exception handling is required...
+
+Note you can see your patch in Samsung tree tonight in my time.
+
+Thanks, Kukjin
