@@ -1,253 +1,98 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Tue, 3 Feb 2015 13:42:45 +0800
-Subject: [RFC] change non-atomic bitops method
-In-Reply-To: <35FD53F367049845BC99AC72306C23D1044A02027E0B@CNBJMBX05.corpusers.net>
-References: <35FD53F367049845BC99AC72306C23D1044A02027E0A@CNBJMBX05.corpusers.net>
- <20150202152909.13bfd11f192fb0268b2ab4bf@linux-foundation.org>
- <20150203011730.GA15653@node.dhcp.inet.fi>
- <35FD53F367049845BC99AC72306C23D1044A02027E0B@CNBJMBX05.corpusers.net>
-Message-ID: <35FD53F367049845BC99AC72306C23D1044A02027E0C@CNBJMBX05.corpusers.net>
+From: matthijsvanduin@gmail.com (Matthijs van Duin)
+Date: Tue, 3 Feb 2015 06:51:34 +0100
+Subject: [PATCH 4/4] ARM: dts: Add minimal support for dm8168-evm
+In-Reply-To: <20150202174416.GE9418@atomide.com>
+References: <20150117164709.GS18552@atomide.com>
+ <CAALWOA-v=-KZ5W+Giwq9Z7rdA8JM2Q+zgqZPz-5sDrHD_b-_7A@mail.gmail.com>
+ <20150117181404.GW18552@atomide.com>
+ <CAALWOA-cdqPbLo4JvykGFODy2xUOozWg6OjzoGPLasJA022kJg@mail.gmail.com>
+ <20150119172914.GY18552@atomide.com>
+ <CAALWOA_54qoQgyCkGy10v+7-eQ87ddeCTG-dbP-P6x493HAswA@mail.gmail.com>
+ <20150123164756.GB7718@atomide.com>
+ <CAALWOA9F7UH5ORXdjyHAyekohZdSiE-+enNg5vsxOV5RgfqEdw@mail.gmail.com>
+ <20150126155850.GD28663@atomide.com>
+ <CAALWOA9gSegCofYF-csg_2zdRkz=W5g8UAOqBbrA-NG0-oR1ww@mail.gmail.com>
+ <20150202174416.GE9418@atomide.com>
+Message-ID: <CAALWOA_6Lx1_MrDFwSe0hOiub3FxzrrCburQf=VWnXabKbjtmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Wang, Yalin
-> Sent: Tuesday, February 03, 2015 10:13 AM
-> To: 'Kirill A. Shutemov'; Andrew Morton
-> Cc: 'arnd at arndb.de'; 'linux-arch at vger.kernel.org'; 'linux-
-> kernel at vger.kernel.org'; 'linux at arm.linux.org.uk'; 'linux-arm-
-> kernel at lists.infradead.org'
-> Subject: RE: [RFC] change non-atomic bitops method
-> 
-> > -----Original Message-----
-> > From: Kirill A. Shutemov [mailto:kirill at shutemov.name]
-> > Sent: Tuesday, February 03, 2015 9:18 AM
-> > To: Andrew Morton
-> > Cc: Wang, Yalin; 'arnd at arndb.de'; 'linux-arch at vger.kernel.org'; 'linux-
-> > kernel at vger.kernel.org'; 'linux at arm.linux.org.uk'; 'linux-arm-
-> > kernel at lists.infradead.org'
-> > Subject: Re: [RFC] change non-atomic bitops method
-> >
-> > On Mon, Feb 02, 2015 at 03:29:09PM -0800, Andrew Morton wrote:
-> > > On Mon, 2 Feb 2015 11:55:03 +0800 "Wang, Yalin"
-> > <Yalin.Wang@sonymobile.com> wrote:
-> > >
-> > > > This patch change non-atomic bitops,
-> > > > add a if() condition to test it, before set/clear the bit.
-> > > > so that we don't need dirty the cache line, if this bit
-> > > > have been set or clear. On SMP system, dirty cache line will
-> > > > need invalidate other processors cache line, this will have
-> > > > some impact on SMP systems.
-> > > >
-> > > > --- a/include/asm-generic/bitops/non-atomic.h
-> > > > +++ b/include/asm-generic/bitops/non-atomic.h
-> > > > @@ -17,7 +17,9 @@ static inline void __set_bit(int nr, volatile
-> > unsigned long *addr)
-> > > >  	unsigned long mask = BIT_MASK(nr);
-> > > >  	unsigned long *p = ((unsigned long *)addr) + BIT_WORD(nr);
-> > > >
-> > > > -	*p  |= mask;
-> > > > +	if ((*p & mask) == 0)
-> > > > +		*p  |= mask;
-> > > > +
-> > > >  }
-> > >
-> > > hm, maybe.
-> > >
-> > > It will speed up set_bit on an already-set bit.  But it will slow down
-> > > set_bit on a not-set bit.  And the latter case is presumably much, much
-> > > more common.
-> > >
-> > > How do we know the patch is a net performance gain?
-> >
-> > Let's try to measure. The micro benchmark:
-> >
-> > 	#include <stdio.h>
-> > 	#include <time.h>
-> > 	#include <sys/mman.h>
-> >
-> > 	#ifdef CACHE_HOT
-> > 	#define SIZE (2UL << 20)
-> > 	#define TIMES 10000000
-> > 	#else
-> > 	#define SIZE (1UL << 30)
-> > 	#define TIMES 10000
-> > 	#endif
-> >
-> > 	int main(int argc, char **argv)
-> > 	{
-> > 		struct timespec a, b, diff;
-> > 		unsigned long i, *p, times = TIMES;
-> >
-> > 		p = mmap(NULL, SIZE, PROT_READ | PROT_WRITE,
-> > 				MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, -1,
-> > 0);
-> >
-> > 		clock_gettime(CLOCK_MONOTONIC, &a);
-> > 		while (times--) {
-> > 			for (i = 0; i < SIZE/64/sizeof(*p); i++) {
-> > 	#ifdef CHECK_BEFORE_SET
-> > 				if (p[i] != times)
-> > 	#endif
-> > 					p[i] = times;
-> > 			}
-> > 		}
-> > 		clock_gettime(CLOCK_MONOTONIC, &b);
-> >
-> > 		diff.tv_sec = b.tv_sec - a.tv_sec;
-> > 		if (a.tv_nsec > b.tv_nsec) {
-> > 			diff.tv_sec--;
-> > 			diff.tv_nsec = 1000000000 + b.tv_nsec - a.tv_nsec;
-> > 		} else
-> > 			diff.tv_nsec = b.tv_nsec - a.tv_nsec;
-> >
-> > 		printf("%lu.%09lu\n", diff.tv_sec, diff.tv_nsec);
-> > 		return 0;
-> > 	}
-> >
-> > Results for 10 runs on my laptop -- i5-3427U (IvyBridge 1.8 Ghz, 2.8Ghz
-> > Turbo
-> > with 3MB LLC):
-> >
-> > 				Avg		Stddev
-> > baseline			21.5351		0.5315
-> > -DCHECK_BEFORE_SET		21.9834		0.0789
-> > -DCACHE_HOT			14.9987		0.0365
-> > -DCACHE_HOT -DCHECK_BEFORE_SET	29.9010		0.0204
-> >
-> > Difference between -DCACHE_HOT and -DCACHE_HOT -DCHECK_BEFORE_SET appears
-> > huge, but if you recalculate it to CPU cycles per inner loop @ 2.8 Ghz,
-> > it's 1.02530 and 2.04401 CPU cycles respectively.
-> >
-> > Basically, the check is free on decent CPU.
-> >
-> Awesome test, but you only test the one cpu which running this code,
-> Have not consider the other CPUs, whose cache line will be invalidate if
-> The cache is dirtied by writer CPU,
-> So another test should be running 2 thread on two different CPUs(bind to
-> CPU),
-> One write , one read, to see the impact on the reader CPU.
-I make a little change about your test progrom,
-Add a new thread to test SMP cache impact.
----
-#include <stdio.h>
-#include <time.h>
-#include <sys/mman.h>
-#include <errno.h>
-#define _GNU_SOURCE
-#define __USE_GNU
-#include <sched.h>
-#include <pthread.h>
+On 2 February 2015 at 18:44, Tony Lindgren <tony@atomide.com> wrote:
+> * Matthijs van Duin <matthijsvanduin@gmail.com> [150128 13:46]:
+>> On 26 January 2015 at 16:58, Tony Lindgren <tony@atomide.com> wrote:
+>> > I'm pretty sure I verified the that the audio_pll_clk1 is hardwwired
+>> > to 32KiHz by looking at it with a scope on the clkout pin.
+>>
+>> Yeah it comes straight from the "rtcdivider" so it'll produce
+>> 0.0016384 * devosc.
+>
+> Not much about "rtcdivider" in the dm816x TRM..
+> [..]
+> That seems to be in the dm814x TRM. OK so it looks like in
+> mainline kernel drivers/clk/ti/fapll.c we can then fix the hardcoded
+> value in ti_fapll_synth_recalc_rate() to return the rate of fd->clk_ref
+> multiplied 0.0016384 instead of 32768.
 
-#ifdef CACHE_HOT
-#define SIZE (2UL << 20)
-#define TIMES 100000
-#else
-#define SIZE (1UL << 20)
-#define TIMES 10000
-#endif
-static void *reader_thread(void *arg)
-{
+Ah sorry, yes, for some reason I thought you meant the dm814x one...
+(which makes no sense in retrospect)
 
-	struct timespec a, b, diff;
-	unsigned long *p = arg;
-	volatile unsigned long temp;
-	unsigned long i, ret, times = TIMES;
-	cpu_set_t set;
-	CPU_ZERO(&set);
-	CPU_SET(1, &set);
-	ret = sched_setaffinity(-1, sizeof(cpu_set_t), &set);
-	if (ret < 0) {
-		printf("sched_setaffinity error:%s", strerror(errno));
-	}
-	clock_gettime(CLOCK_MONOTONIC, &a);
-	while (times--) {
-		for (i = 0; i < SIZE/sizeof(*p); i++) {
-				temp = p[i];
-		}
-	}
-	clock_gettime(CLOCK_MONOTONIC, &b);
+It seems however the situation is actually similar on the dm816x since
+the diagram of the audio FAPLL also shows clock 1 deriving directly
+from devosc, and the associated audio frequency/divider 1 registers
+read as zero. Presumably it was produced by the audio PLL in some
+early design but replaced by a fixed synthesizer later on, later named
+"rtcdivider" in the dm814x. Note that the multiplier 0.0016384 = 32768
+/ 20e6 is for the dm814x, it'll be 32768 / 27e6 on the dm816x.
 
-	diff.tv_sec = b.tv_sec - a.tv_sec;
-	if (a.tv_nsec > b.tv_nsec) {
-		diff.tv_sec--;
-		diff.tv_nsec = 1000000000 + b.tv_nsec - a.tv_nsec;
+I think "audio 1" should be kept out of the fapll code entirely given
+that it doesn't seem to be related to the audio FAPLL anymore in any
+way other than in name.
 
-	} else
-		diff.tv_nsec = b.tv_nsec - a.tv_nsec;
 
-	printf("reader:%lu.%09lu\n", diff.tv_sec, diff.tv_nsec);
-}
+I've also been looking at the rest of Netra's 32KiHz clock tree, but
+the TRM is a real mess there, often contradicting both itself and the
+TI kernel. As far as I can tell they agree on:
 
-int main(int argc, char **argv)
-{
-	struct timespec a, b, diff;
-	unsigned long i, ret, *p, times = TIMES;
-	pthread_t thread;
-	cpu_set_t set;
-	CPU_ZERO(&set);
-	CPU_SET(0, &set);
-	ret = sched_setaffinity(-1, sizeof(cpu_set_t), &set);
-	if (ret < 0) {
-		printf("sched_setaffinity error:%s", strerror(errno));
-	}
-	p = mmap(NULL, SIZE, PROT_READ | PROT_WRITE,
-			MAP_LOCKED | MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, -1, 0);
-	pthread_create(&thread, NULL, reader_thread, p);
-	clock_gettime(CLOCK_MONOTONIC, &a);
-	while (times--) {
-		for (i = 0; i < SIZE/sizeof(*p); i++) {
-#ifdef CHECK_BEFORE_SET
-			if (p[i] != times)
-#endif
-				p[i] = times;
-		}
-	}
-	clock_gettime(CLOCK_MONOTONIC, &b);
+audio_1 = devosc * (32768 / 27e6);
 
-	diff.tv_sec = b.tv_sec - a.tv_sec;
-	if (a.tv_nsec > b.tv_nsec) {
-		diff.tv_sec--;
-		diff.tv_nsec = 1000000000 + b.tv_nsec - a.tv_nsec;
+audio_a = audio_1 / (CM_DPLL_APA_CLKSEL + 1);
+rtc_fck = { clkin32, audio_a }[CM_DPLL_SYSCLK18_CLKSEL];
 
-	} else
-		diff.tv_nsec = b.tv_nsec - a.tv_nsec;
+but the TRM seems to suggest the mux output is the "sec_clk32k"
+specifically for the RTC while the signal I called "audio_a" here is
+sysclk18 provided for debouncing and as timer option.  In contrast the
+TI kernel considers the mux the only user of audio_a and its output
+sysclk18.  It does also define a secure 32k but without parent or any
+apparent users.
 
-	printf("%lu.%09lu\n", diff.tv_sec, diff.tv_nsec);
-	return 0;
-}
-----
-One run on CPU0, reader thread run on CPU1,
-Test result:
-sudo ./cache_test
-reader:8.426228173
-8.672198335
+(The audio FAPLL description (1.10.3.1.4) also claims mux option 0
+selects the synthesized 32k clock, but that contradicts all other
+evidence so I will ignore that.)
 
-With -DCHECK_BEFORE_SET
-sudo ./cache_test_check
-reader:7.537036819
-10.799746531
+I'm leaning more towards believing the TI kernel since on Centaurus
+(all flavors) sysclk18 definitely comes from the mux. It adds a twist
+however: PRCM's clkin32 doesn't come straight from the pin but PLLSS
+inserts another mux which by default *also* feeds it the synthesized
+32k:
 
-You can see reader can save some time if cache not dirtied.
-Also we can see that for writer, it will increase some impact
-Because it need read the data before change it,
+rtcdivider = devosc * (32768 / 20e6);  // former audio 1
+prcm_clkin32 = { rtcdivider, clkin32 }[PLLSS_SYSCLK18_CLKSRC];
 
-I think if the system have lots of cores, reader performance
-Improve is more useful .
+sysclk18_a = rtcdivider / (CM_DPLL_RTCDIVA_CLKSEL + 1);
+sysclk18 = { prcm_clkin32, sysclk18_a }[CM_DPLL_SYSCLK18_CLKSEL];
 
-My CPU info:
+I confirmed the above on our board where clkin32 is not connected, so
+I could "manually" toggle it using the internal pull up/down. This
+also revealed that mux in PLLSS, unlike the PRCM one, is not
+glitch-free but takes immediate effect. It also revealed the TRM's
+statement that  "If newly selected clock is idle, a switchover never
+occurs (previously selected clock continues to pass through the mux)"
+is false. Switching sysclk18 to the idle clkin32 stopped timers fed by
+it (including the "synctimer32k") and switching back also proved
+impossible without toggling clkin32 or having PLLSS feed it the
+rtcdivider clock. This may be the reason this (otherwise redundant)
+mux exists in the first place.
 
-28851195 at cnbjlx20570:~/test$ cat /proc/cpuinfo
-processor       : 0
-vendor_id       : GenuineIntel
-cpu family      : 6
-model           : 37
-model name      : Intel(R) Core(TM) i5 CPU         660  @ 3.33GHz
-stepping        : 5
-microcode       : 0x2
-cpu MHz         : 1199.000
-cache size      : 4096 KB
-physical id     : 0
-siblings        : 4
-
-Thanks for your test program very much!
+Finally, Centaurus also has an internal ~32kHz RC osc as option for
+the watchdog and on the 811x (also known as Jacinto 5 Eco) the clkin32
+is upgraded from clock input to oscillator.
