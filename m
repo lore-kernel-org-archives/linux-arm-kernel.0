@@ -1,58 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Feb 2015 15:22:05 +0000
-Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher
- constraints with dma-parms
-In-Reply-To: <4830208.H6zxrGlT1D@wuerfel>
-References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
- <4689826.8DDCrX2ZhK@wuerfel>
- <20150203144109.GR8656@n2100.arm.linux.org.uk>
- <4830208.H6zxrGlT1D@wuerfel>
-Message-ID: <20150203152204.GU8656@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 3 Feb 2015 07:22:15 -0800
+Subject: [PATCH v13 3/6] clk: Make clk API return per-user struct clk
+ instances
+In-Reply-To: <54D08AFB.7040203@ti.com>
+References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1422011024-32283-4-git-send-email-tomeu.vizoso@collabora.com>
+ <20150201212432.22722.70917@quantum> <54CFD0B1.2000003@ti.com>
+ <20150202224139.421.84094@quantum> <54D072AC.5090206@collabora.com>
+ <54D08AFB.7040203@ti.com>
+Message-ID: <20150203152214.GA25235@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 03, 2015 at 03:52:48PM +0100, Arnd Bergmann wrote:
-> On Tuesday 03 February 2015 14:41:09 Russell King - ARM Linux wrote:
-> > I'd go as far as saying that the "DMA API on top of IOMMU" is more
-> > intended to be for a system IOMMU for the bus in question, rather
-> > than a device-level IOMMU.
-> > 
-> > If an IOMMU is part of a device, then the device should handle it
-> > (maybe via an abstraction) and not via the DMA API.  The DMA API should
-> > be handing the bus addresses to the device driver which the device's
-> > IOMMU would need to generate.  (In other words, in this circumstance,
-> > the DMA API shouldn't give you the device internal address.)
+* Tero Kristo <t-kristo@ti.com> [150203 00:49]:
+> On 02/03/2015 09:03 AM, Tomeu Vizoso wrote:
+> >
+> >I think you got it right, just wanted to mention that we can and
+> >probably should make the clk_get_parent_* calls in the consumer API to
+> >return per-user clk instances but that we need to make sure first that
+> >callers call clk_put afterwards.
+> >
+> >This should also allow us to remove the reference to struct clk from
+> >clk_hw, which is at best awkward.
 > 
-> Exactly. And the abstraction that people choose at the moment is the
-> iommu API, for better or worse. It makes a lot of sense to use this
-> API if the same iommu is used for other devices as well (which is
-> the case on Tegra and probably a lot of others). Unfortunately the
-> iommu API lacks support for cache management, and probably other things
-> as well, because this was not an issue for the original use case
-> (device assignment on KVM/x86).
-> 
-> This could be done by adding explicit or implied cache management
-> to the IOMMU mapping interfaces, or by extending the dma-mapping
-> interfaces in a way that covers the use case of the device managing
-> its own address space, in addition to the existing coherent and
-> streaming interfaces.
+> For the DPLL code it should just be fine to be able to get the current
+> parent index (not parent clock handle), and read a parent clock rate based
+> on an arbitrary index (not just the current one.) I don't think there is any
+> other need for having the clk_ref / clk_bypass clock handles around.
 
-Don't we already have those in the DMA API?  dma_sync_*() ?
+I'd like to avoid the situation where the children have know that
+certain parent index and parent rate means bypass mode for both
+parent and children. 
 
-dma_map_sg() - sets up the system MMU and deals with initial cache
-coherency handling.  Device IOMMU being the responsibility of the
-GPU driver.
+Maybe we can hide that knowledge into some Linux generic PLL code so
+the children can get the PLL output as a mux clock. For a PLL, there
+can be three mux clock outputs: refclk*multi/div, bypass clock, or no
+output.
 
-The GPU can then do dma_sync_*() on the scatterlist as is necessary
-to synchronise the cache coherency (while respecting the ownership
-rules - which are very important on ARM to follow as some sync()s are
-destructive to any dirty data in the CPU cache.)
+Regards,
 
-dma_unmap_sg() tears down the system MMU and deals with the final cache
-handling.
-
-Why do we need more DMA API interfaces?
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Tony
