@@ -1,9 +1,10 @@
 From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 3 Feb 2015 08:46:43 +0100
+Date: Tue, 3 Feb 2015 08:48:56 +0100
 Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher
  constraints with dma-parms
-In-Reply-To: <20150202214616.GI8656@n2100.arm.linux.org.uk>
-References: <1422347154-15258-2-git-send-email-sumit.semwal@linaro.org>
+In-Reply-To: <CAF6AEGuESM+e3HSRGM6zLqrp8kqRLGUYvA3KKECdm7m-nt0M=Q@mail.gmail.com>
+References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
+ <1422347154-15258-2-git-send-email-sumit.semwal@linaro.org>
  <20150129143908.GA26493@n2100.arm.linux.org.uk>
  <CAO_48GEOQ1pBwirgEWeVVXW-iOmaC=Xerr2VyYYz9t1QDXgVsw@mail.gmail.com>
  <20150129154718.GB26493@n2100.arm.linux.org.uk>
@@ -12,55 +13,35 @@ References: <1422347154-15258-2-git-send-email-sumit.semwal@linaro.org>
  <CAF6AEGujk8UC4X6T=yhTrz1s+SyZUQ=m05h_WcxLDGZU6bydbw@mail.gmail.com>
  <20150202165405.GX14009@phenom.ffwll.local>
  <CAF6AEGuESM+e3HSRGM6zLqrp8kqRLGUYvA3KKECdm7m-nt0M=Q@mail.gmail.com>
- <20150202214616.GI8656@n2100.arm.linux.org.uk>
-Message-ID: <20150203074643.GE14009@phenom.ffwll.local>
+Message-ID: <20150203074856.GF14009@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 02, 2015 at 09:46:16PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Feb 02, 2015 at 03:30:21PM -0500, Rob Clark wrote:
-> > On Mon, Feb 2, 2015 at 11:54 AM, Daniel Vetter <daniel@ffwll.ch> wrote:
-> > >> My initial thought is for dma-buf to not try to prevent something than
-> > >> an exporter can actually do.. I think the scenario you describe could
-> > >> be handled by two sg-lists, if the exporter was clever enough.
-> > >
-> > > That's already needed, each attachment has it's own sg-list. After all
-> > > there's no array of dma_addr_t in the sg tables, so you can't use one sg
-> > > for more than one mapping. And due to different iommu different devices
-> > > can easily end up with different addresses.
-> > 
-> > 
-> > Well, to be fair it may not be explicitly stated, but currently one
-> > should assume the dma_addr_t's in the dmabuf sglist are bogus.  With
-> > gpu's that implement per-process/context page tables, I'm not really
-> > sure that there is a sane way to actually do anything else..
+On Mon, Feb 02, 2015 at 03:30:21PM -0500, Rob Clark wrote:
+> On Mon, Feb 2, 2015 at 11:54 AM, Daniel Vetter <daniel@ffwll.ch> wrote:
+> >> My initial thought is for dma-buf to not try to prevent something than
+> >> an exporter can actually do.. I think the scenario you describe could
+> >> be handled by two sg-lists, if the exporter was clever enough.
+> >
+> > That's already needed, each attachment has it's own sg-list. After all
+> > there's no array of dma_addr_t in the sg tables, so you can't use one sg
+> > for more than one mapping. And due to different iommu different devices
+> > can easily end up with different addresses.
 > 
-> That's incorrect - and goes dead against the design of scatterlists.
 > 
-> Not only that, but it is entirely possible that you may get handed
-> memory via dmabufs for which there are no struct page's associated
-> with that memory - think about display systems which have their own
-> video memory which is accessible to the GPU, but it isn't system
-> memory.
-> 
-> In those circumstances, you have to use the dma_addr_t's and not the
-> pages.
+> Well, to be fair it may not be explicitly stated, but currently one
+> should assume the dma_addr_t's in the dmabuf sglist are bogus.  With
+> gpu's that implement per-process/context page tables, I'm not really
+> sure that there is a sane way to actually do anything else..
 
-Yeah exactly. At least with i915 we'd really want to be able to share
-stolen memory in some cases, and since that's stolen there's no struct
-pages for them. On top of that any cpu access is also blocked to that
-range in the memory controller, so the dma_addr_t is really the _only_
-thing you can use to get at those memory ranges. And afaik the camera pipe
-on intel soc can get there - unfortunately that one doesn't have an
-upstream driver :(
+Hm, what does per-process/context page tables have to do here? At least on
+i915 we have a two levels of page tables:
+- first level for vm/device isolation, used through dma api
+- 2nd level for per-gpu-context isolation and context switching, handled
+  internally.
 
-And just to clarify: All current dma-buf exporter that I've seen implement
-the sg mapping correctly and _do_ map the sg table into device address
-space with dma_map_sg. In other words: The dma_addr_t are all valid, it's
-just that e.g. with ttm no one has bothered to teach ttm a dma-buf
-correctly. The internal abstraction is all there, ttm-internal buffer
-object interface match what dma-buf exposes fairly closes (hey I didn't do
-shit when designing those interfaces ;-)
+Since atm the dma api doesn't have any context of contexts or different
+pagetables, I don't see who you could use that at all.
 -Daniel
 -- 
 Daniel Vetter
