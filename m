@@ -1,69 +1,54 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Tue, 03 Feb 2015 13:10:02 +0900
-Subject: [RESEND PATCH] ARM: EXYNOS: Add missing static to file-scope
- declarations
-In-Reply-To: <1420819476-23344-1-git-send-email-k.kozlowski@samsung.com>
-References: <1420819476-23344-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <06c201d03f67$48da45b0$da8ed110$@kernel.org>
+Date: Tue, 03 Feb 2015 13:12:13 +0900
+Subject: [PATCH] ARM: dts: Fix CLK_UART_ISP_SCLK clock assignment in
+ exynos4x12.dtsi
+In-Reply-To: <1421329871-18819-1-git-send-email-s.nawrocki@samsung.com>
+References: <1421329871-18819-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <06d501d03f67$96bc2b40$c43481c0$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Krzysztof Kozlowski wrote:
+Sylwester Nawrocki wrote:
 > 
-> The 'pm_data', 'exynos_release_ret_regs' and
-> 'exynos5420_release_ret_regs' are not exported nor used outside of
-> suspend.c file. Make them static.
+> Assign proper FIMC-IS UART gate clock in the device DT node and not
+> use the SRC_MASK gate. This fixes regression introduced in commit
+> a37c82a3b3c0910019abfd22a97be1f ("clk: samsung: exynos4: Remove
+> SRC_MASK_ISP gates").
 > 
-> This fixes following sparse warnings:
-> arch/arm/mach-exynos/suspend.c:83:23: warning: symbol 'pm_data' was not declared. Should it be static?
-> arch/arm/mach-exynos/suspend.c:106:14: warning: symbol 'exynos_release_ret_regs' was not declared.
-> Should it be static?
-> arch/arm/mach-exynos/suspend.c:117:14: warning: symbol 'exynos5420_release_ret_regs' was not declared.
-> Should it be static?
+> Without this change exynos4 fimc-is driver fails to probe with an
+> error log:
 > 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> [    1.842447] ERROR: could not get clock /camera/fimc-is at 12000000:uart(13)
+> [    1.848529] exynos4-fimc-is 12000000.fimc-is: failed to get clock: uart
+> [    1.855275] exynos4-fimc-is: probe of 12000000.fimc-is failed with error -2
+> 
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 > ---
->  arch/arm/mach-exynos/suspend.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
 > 
-> diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
-> index 342797b9bf3b..fef091f8e59f 100644
-> --- a/arch/arm/mach-exynos/suspend.c
-> +++ b/arch/arm/mach-exynos/suspend.c
-> @@ -75,7 +75,7 @@ struct exynos_pm_data {
->  	int (*cpu_suspend)(unsigned long);
->  };
+> Kukjin, could you take this patch into your tree ? I have been applying it
+> for several kernel releases now to get the Exynos4 FIMC driver even passing
+> probing.
 > 
-> -struct exynos_pm_data *pm_data;
-> +static struct exynos_pm_data *pm_data;
+> Thanks,
+> Sylwester
+>  arch/arm/boot/dts/exynos4x12.dtsi |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
->  static int exynos5420_cpu_state;
->  static unsigned int exynos_pmu_spare3;
-> @@ -98,7 +98,7 @@ static const struct exynos_wkup_irq exynos5250_wkup_irq[] = {
->  	{ /* sentinel */ },
->  };
-> 
-> -unsigned int exynos_release_ret_regs[] = {
-> +static unsigned int exynos_release_ret_regs[] = {
->  	S5P_PAD_RET_MAUDIO_OPTION,
->  	S5P_PAD_RET_GPIO_OPTION,
->  	S5P_PAD_RET_UART_OPTION,
-> @@ -109,7 +109,7 @@ unsigned int exynos_release_ret_regs[] = {
->  	REG_TABLE_END,
->  };
-> 
-> -unsigned int exynos5420_release_ret_regs[] = {
-> +static unsigned int exynos5420_release_ret_regs[] = {
->  	EXYNOS_PAD_RET_DRAM_OPTION,
->  	EXYNOS_PAD_RET_MAUDIO_OPTION,
->  	EXYNOS_PAD_RET_JTAG_OPTION,
+> diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
+> index 93b7040..86e1800 100644
+> --- a/arch/arm/boot/dts/exynos4x12.dtsi
+> +++ b/arch/arm/boot/dts/exynos4x12.dtsi
+> @@ -225,7 +225,7 @@
+>  				 <&clock CLK_DIV_ISP0>,<&clock CLK_DIV_ISP1>,
+>  				 <&clock CLK_DIV_MCUISP0>,
+>  				 <&clock CLK_DIV_MCUISP1>,
+> -				 <&clock CLK_SCLK_UART_ISP>,
+> +				 <&clock CLK_UART_ISP_SCLK>,
+>  				 <&clock CLK_ACLK200>, <&clock CLK_DIV_ACLK200>,
+>  				 <&clock CLK_ACLK400_MCUISP>,
+>  				 <&clock CLK_DIV_ACLK400_MCUISP>;
 > --
 
-Looks ok to me, how about re-spin this patch including following?
+Applied, thanks.
 
-...
-+static unsigned int exynos3250_release_ret_regs[] = {
-...
-
-Thanks,
-Kukjin
+- Kukjin
