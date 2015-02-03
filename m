@@ -1,92 +1,33 @@
-From: graeme.gregory@linaro.org (Graeme Gregory)
-Date: Tue, 3 Feb 2015 16:18:22 +0000
-Subject: [PATCH v8 05/21] ACPI / sleep: Introduce sleep_arm.c
-In-Reply-To: <1685897.h4vAPfoguo@vostro.rjw.lan>
-References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
- <1422881149-8177-6-git-send-email-hanjun.guo@linaro.org>
- <1685897.h4vAPfoguo@vostro.rjw.lan>
-Message-ID: <20150203161821.GB24474@xora-haswell.xora.org.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 3 Feb 2015 16:19:54 +0000
+Subject: [PATCH V3 13/15] ARM: dts: Exynos4 and Odroid X2/U3 sound device
+ nodes update
+In-Reply-To: <54D0D5B0.20803@samsung.com>
+References: <1421260962-16892-1-git-send-email-s.nawrocki@samsung.com>
+ <1421260962-16892-14-git-send-email-s.nawrocki@samsung.com>
+ <20150114195452.GM3043@sirena.org.uk>
+ <07a501d03f69$aba222b0$02e66810$@kernel.org>
+ <54D0AB30.2010504@samsung.com>
+ <20150203131127.GM21293@sirena.org.uk> <54D0D5B0.20803@samsung.com>
+Message-ID: <20150203161954.GO21293@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 02, 2015 at 11:18:24PM +0100, Rafael J. Wysocki wrote:
-> On Monday, February 02, 2015 08:45:33 PM Hanjun Guo wrote:
-> > From: Graeme Gregory <graeme.gregory@linaro.org>
-> > 
-> > ACPI 5.1 does not currently support S states for ARM64 hardware but
-> > ACPI code will call acpi_target_system_state() for device power
-> > managment, so introduce sleep_arm.c to allow other drivers to function
-> > until S states are defined.
-> > 
-> > CC: Rafael J. Wysocki <rjw@rjwysocki.net>
-> > Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> > Tested-by: Yijing Wang <wangyijing@huawei.com>
-> > Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
-> > Tested-by: Jon Masters <jcm@redhat.com>
-> > Tested-by: Timur Tabi <timur@codeaurora.org>
-> > Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-> > Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> > ---
-> >  drivers/acpi/Makefile    |  4 ++++
-> >  drivers/acpi/sleep_arm.c | 28 ++++++++++++++++++++++++++++
-> >  2 files changed, 32 insertions(+)
-> >  create mode 100644 drivers/acpi/sleep_arm.c
-> > 
-> > diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-> > index f74317c..bcec54e 100644
-> > --- a/drivers/acpi/Makefile
-> > +++ b/drivers/acpi/Makefile
-> > @@ -23,7 +23,11 @@ acpi-y				+= nvs.o
-> >  
-> >  # Power management related files
-> >  acpi-y				+= wakeup.o
-> > +ifeq ($(ARCH), arm64)
-> > +acpi-y				+= sleep_arm.o
-> > +else # X86, IA64
-> >  acpi-y				+= sleep.o
-> > +endif
-> >  acpi-y				+= device_pm.o
-> >  acpi-$(CONFIG_ACPI_SLEEP)	+= proc.o
-> >  
-> > diff --git a/drivers/acpi/sleep_arm.c b/drivers/acpi/sleep_arm.c
-> > new file mode 100644
-> > index 0000000..54578ef
-> > --- /dev/null
-> > +++ b/drivers/acpi/sleep_arm.c
-> > @@ -0,0 +1,28 @@
-> > +/*
-> > + *  ARM64 Specific Sleep Functionality
-> > + *
-> > + *  Copyright (C) 2013-2014, Linaro Ltd.
-> > + *      Author: Graeme Gregory <graeme.gregory@linaro.org>
-> > + *
-> > + *  This program is free software; you can redistribute it and/or modify
-> > + *  it under the terms of the GNU General Public License version 2 as
-> > + *  published by the Free Software Foundation.
-> > + */
-> > +
-> > +#include <linux/acpi.h>
-> > +
-> > +/*
-> > + * Currently the ACPI 5.1 standard does not define S states in a
-> > + * manner which is usable for ARM64. These two stubs are sufficient
-> > + * that system initialises and device PM works.
-> > + */
-> > +u32 acpi_target_system_state(void)
-> > +{
-> > +	return ACPI_STATE_S0;
-> > +}
-> > +EXPORT_SYMBOL_GPL(acpi_target_system_state);
-> > +
-> > +int __init acpi_sleep_init(void)
-> > +{
-> > +	return -ENOSYS;
-> > +}
-> > 
-> 
-> Why does this need to be in drivers/acpi/ ?
-> 
-Sorry it doesn't it got left behind when we moved some other stuff.
+On Tue, Feb 03, 2015 at 03:05:36PM +0100, Sylwester Nawrocki wrote:
+> On 03/02/15 14:11, Mark Brown wrote:
 
-Graeme
+> > OK, I can apply them if people want but I'd need a resend - I discarded
+> > them since they'd normally go via the arch tree.
+
+> I will resend the last 3 patches then. There also shouldn't be any issues
+> if 13, 14 are only merged through ASoC tree and patch 15 through Samsung
+> tree.
+
+OK.  Kukjin, are you OK with me applying some or all of these?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150203/647103a6/attachment-0001.sig>
