@@ -1,140 +1,93 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 03 Feb 2015 16:57:09 +0100
-Subject: [GIT PULL] ARM: mvebu: DT changes for v3.20 (round 3)
-In-Reply-To: <54D0EE90.1040708@lakedaemon.net>
-References: <54D0ECF2.9050104@free-electrons.com>
- <54D0EE90.1040708@lakedaemon.net>
-Message-ID: <54D0EFD5.5090500@free-electrons.com>
+From: lambert.quentin@gmail.com (Quentin Lambert)
+Date: Tue, 03 Feb 2015 17:04:09 +0100
+Subject: [Cocci] [PATCH v13 3/6] clk: Make clk API return per-user struct
+ clk instances
+In-Reply-To: <20150202225036.421.43421@quantum>
+References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1422011024-32283-4-git-send-email-tomeu.vizoso@collabora.com>
+ <20150201212432.22722.70917@quantum> <54CFE1FE.7040404@codeaurora.org>
+ <alpine.DEB.2.02.1502022230110.2045@localhost6.localdomain6>
+ <54CFFBCF.90706@codeaurora.org> <20150202225036.421.43421@quantum>
+Message-ID: <54D0F179.1040906@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/2015 16:51, Jason Cooper wrote:
-> On 2/3/15 10:44 AM, Gregory CLEMENT wrote:
->> Hi Olof, Arnd,
->>
->> This is the third incremental pull request for mvebu/dt. I now it
->> comes very late, but as explained in my email series it should not
->> introduce any regression as all the change are made inside the comment
->> blocks, so for the stability it should be safe to take them.
->>
->> My main motivation for having this series merged in 3.20 is to avoid
->> asking each author of the dts(i) patches if he agrees with the dual
->> license during the next cycle. At the end it is not something
->> essential but it will make our life easier.
->>
->> Thanks,
->>
->> Gregory
->>
->> The following changes since commit 6cc082a84e13f3a0078973a08adf22f1404acc3d:
->>
->>    ARM: mvebu: make DTS comments reflect DEBUG_LL changes (2015-01-21 18:36:14 -0600)
-> 
-> Good incremental pull from the previous tag.
-> 
->>
->> are available in the git repository at:
->>
->>    ssh://git.infradead.org/srv/git/linux-mvebu.git tags/mvebu-dt-3.20-3
-> 
-> oops.  Please resend with the git:// url.  I tend to have two remotes 
-> for this sort of thing, 'mvebu' -> ssh://, and 'mvebu-pub' -> git://
-> 
-> Then, I just make sure I see 'mvebu-pub' in the middle of the 
-> request-pull command.
+Hello,
+Julia asked me to have a look and see if I can help.
 
-I have noticed you have this configuration, and it was with this mistake that I realized
-how useful is it.
-
-Thanks,
-
-Gregory
-
-> 
-> hth,
-> 
-> Jason.
-> 
+On 02/02/2015 23:50, Mike Turquette wrote:
+> Quoting Stephen Boyd (2015-02-02 14:35:59)
+>> On 02/02/15 13:31, Julia Lawall wrote:
+>>> On Mon, 2 Feb 2015, Stephen Boyd wrote:
+>>>
+>>>> Julia,
+>>>>
+>>>> Is there a way we can write a coccinelle script to check for this? The
+>>>> goal being to find all drivers that are comparing struct clk pointers or
+>>>> attempting to dereference them. There are probably other frameworks that
+>>>> could use the same type of check (regulator, gpiod, reset, pwm, etc.).
+>>>> Probably anything that has a get/put API.
+>>> Comparing or dereferencing pointers of a particular type should be
+>>> straightforward to check for.  Is there an example of how to use the
+>>> parent_index value to fix the problem?
+>>>
+>> I'm not sure how to fix this case with parent_index values generically.
+>> I imagine it would be highly specific to the surrounding code to the
+>> point where we couldn't fix it automatically. For example, if it's a clk
+>> consumer (not provider like in this case) using an index wouldn't be the
+>> right fix. We would need some sort of clk API that we don't currently
+>> have and I would wonder why clock consumers even care to compare such
+>> pointers in the first place.
+> Ack. Is there precedent for a "Don't do that" kind of response?
+>
+> Regards,
+> Mike
+>
+>> -- 
+>> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+>> a Linux Foundation Collaborative Project
 >>
->> for you to fetch changes up to 3c21b5fa897ae4b594d6b76a4572741fea7824b7:
->>
->>    ARM: mvebu: armada-xp-synology-ds414: Relicense the device tree under GPLv2+/X11 (2015-01-26 19:28:13 -0600)
->>
->> ----------------------------------------------------------------
->> Relicense all Armada dts{i} files under dual license of GPLv2+ and
->> X11. This should make it easier to reuse these files with other
->> operating systems and boot loaders.
->>
->> ----------------------------------------------------------------
->> Gregory CLEMENT (27):
->>        ARM: mvebu: armada-370-db: Relicense the device tree under GPLv2+/X11
->>        ARM: mvebu: armada-370: Relicense the device tree under GPLv2+/X11
->>        ARM: mvebu: armada-370-mirabox: Relicense the device tree under GPLv2+/X11
->>        ARM: mvebu: armada-370-netgear-rn102: Relicense the device tree under GPLv2+/X11
->>        ARM: mvebu: armada-370-netgear-rn104: Relicense the device tree under GPLv2+/X11
->>        ARM: mvebu: armada-370-rd: Relicense the device tree under GPLv2+/X11
->>        ARM: mvebu: armada-370-synology-ds213j: Relicense the device tree under GPLv2+/X11
->>        ARM: mvebu: armada-370-xp: Relicense the device tree under GPLv2+/X11
->>        ARM: mvebu: armada-375-db: Relicense the device tree under GPLv2+/X11
->>        ARM: mvebu: armada-375: Relicense the device tree under GPLv2+/X11
->>        ARM: mvebu: armada-380: Relicense the device tree under GPLv2+/X11
->>        ARM: mvebu: armada-388-db: Relicense the device tree under GPLv2+/X11
->>        ARM: mvebu: armada-385: Relicense the device tree under GPLv2+/X11
->>        ARM: mvebu: armada-388-rd: Relicense the device tree under GPLv2+/X11
->>        ARM: mvebu: armada-38x: Relicense the device tree under GPLv2+/X11
->>        ARM: mvebu: armada-xp-axpwifiap: Relicense the device tree under GPLv2+/X11
->>        ARM: mvebu: armada-xp-db: Relicense the device tree under GPLv2+/X11
->>        ARM: mvebu: armada-xp: Relicense the device tree under GPLv2+/X11
->>        ARM: mvebu: armada-xp-gp: Relicense the device tree under GPLv2+/X11
->>        ARM: mvebu: armada-xp-lenovo-ix4-300d: Relicense the device tree under GPLv2+/X11
->>        ARM: mvebu: armada-xp-matrix: Relicense the device tree under GPLv2+/X11
->>        ARM: mvebu: armada-xp-mv78230: Relicense the device tree under GPLv2+/X11
->>        ARM: mvebu: armada-xp-mv78260: Relicense the device tree under GPLv2+/X11
->>        ARM: mvebu: armada-xp-mv78460: Relicense the device tree under GPLv2+/X11
->>        ARM: mvebu: armada-xp-netgear-rn2120: Relicense the device tree under GPLv2+/X11
->>        ARM: mvebu: armada-xp-openblocks-ax3-4: Relicense the device tree under GPLv2+/X11
->>        ARM: mvebu: armada-xp-synology-ds414: Relicense the device tree under GPLv2+/X11
->>
->>   arch/arm/boot/dts/armada-370-db.dts              | 40 +++++++++++++++++++++++++++++++++++++---
->>   arch/arm/boot/dts/armada-370-mirabox.dts         | 40 +++++++++++++++++++++++++++++++++++++---
->>   arch/arm/boot/dts/armada-370-netgear-rn102.dts   | 41 +++++++++++++++++++++++++++++++++++++----
->>   arch/arm/boot/dts/armada-370-netgear-rn104.dts   | 41 +++++++++++++++++++++++++++++++++++++----
->>   arch/arm/boot/dts/armada-370-rd.dts              | 40 +++++++++++++++++++++++++++++++++++++---
->>   arch/arm/boot/dts/armada-370-synology-ds213j.dts | 41 +++++++++++++++++++++++++++++++++++++----
->>   arch/arm/boot/dts/armada-370-xp.dtsi             | 40 +++++++++++++++++++++++++++++++++++++---
->>   arch/arm/boot/dts/armada-370.dtsi                | 40 +++++++++++++++++++++++++++++++++++++---
->>   arch/arm/boot/dts/armada-375-db.dts              | 40 +++++++++++++++++++++++++++++++++++++---
->>   arch/arm/boot/dts/armada-375.dtsi                | 40 +++++++++++++++++++++++++++++++++++++---
->>   arch/arm/boot/dts/armada-380.dtsi                | 40 +++++++++++++++++++++++++++++++++++++---
->>   arch/arm/boot/dts/armada-385.dtsi                | 40 +++++++++++++++++++++++++++++++++++++---
->>   arch/arm/boot/dts/armada-388-db.dts              | 40 +++++++++++++++++++++++++++++++++++++---
->>   arch/arm/boot/dts/armada-388-rd.dts              | 40 +++++++++++++++++++++++++++++++++++++---
->>   arch/arm/boot/dts/armada-38x.dtsi                | 40 +++++++++++++++++++++++++++++++++++++---
->>   arch/arm/boot/dts/armada-xp-axpwifiap.dts        | 40 +++++++++++++++++++++++++++++++++++++---
->>   arch/arm/boot/dts/armada-xp-db.dts               | 40 +++++++++++++++++++++++++++++++++++++---
->>   arch/arm/boot/dts/armada-xp-gp.dts               | 40 +++++++++++++++++++++++++++++++++++++---
->>   arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts  | 41 +++++++++++++++++++++++++++++++++++++----
->>   arch/arm/boot/dts/armada-xp-matrix.dts           | 40 +++++++++++++++++++++++++++++++++++++---
->>   arch/arm/boot/dts/armada-xp-mv78230.dtsi         | 40 +++++++++++++++++++++++++++++++++++++---
->>   arch/arm/boot/dts/armada-xp-mv78260.dtsi         | 40 +++++++++++++++++++++++++++++++++++++---
->>   arch/arm/boot/dts/armada-xp-mv78460.dtsi         | 40 +++++++++++++++++++++++++++++++++++++---
->>   arch/arm/boot/dts/armada-xp-netgear-rn2120.dts   | 41 +++++++++++++++++++++++++++++++++++++----
->>   arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 40 +++++++++++++++++++++++++++++++++++++---
->>   arch/arm/boot/dts/armada-xp-synology-ds414.dts   | 41 +++++++++++++++++++++++++++++++++++++----
->>   arch/arm/boot/dts/armada-xp.dtsi                 | 40 +++++++++++++++++++++++++++++++++++++---
->>   27 files changed, 999 insertions(+), 87 deletions(-)
->>
-> 
-> 
 > _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> Cocci mailing list
+> Cocci at systeme.lip6.fr
+> https://systeme.lip6.fr/mailman/listinfo/cocci
+I have found these three cases using Coccinnelle in the mach-omap2
+directory.
 
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+
+./arch/arm/mach-omap2/clkt_clksel.c
+@@ -67,7 +67,6 @@ static const struct clksel *_get_clksel_
+                 return NULL;
+
+         for (clks = clk->clksel; clks->parent; clks++)
+                 if (clks->parent == src_clk)
+                         break; /* Found the requested parent */
+
+         if (!clks->parent) {
+./arch/arm/mach-omap2/dpll3xxx.c
+@@ -551,7 +549,6 @@ int omap3_noncore_dpll_set_rate(struct c
+         if (!dd)
+                 return -EINVAL;
+
+         if (__clk_get_parent(hw->clk) != dd->clk_ref)
+                 return -EINVAL;
+
+         if (dd->last_rounded_rate == 0)
+./arch/arm/mach-omap2/timer.c
+@@ -298,7 +298,6 @@ static int __init omap_dm_timer_init_one
+         if (IS_ERR(src))
+                 return PTR_ERR(src);
+
+         if (clk_get_parent(timer->fclk) != src) {
+                 r = clk_set_parent(timer->fclk, src);
+                 if (r < 0) {
+                         pr_warn("%s: %s cannot set source\n", __func__,
+
+
+Are they instances of your issue?
+Do you have any suggestion on how to fix them?
+If you want me to I can enlarge the search to other directories.
+
+
+Quentin
