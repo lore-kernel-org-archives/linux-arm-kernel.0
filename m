@@ -1,100 +1,69 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Tue, 03 Feb 2015 12:58:24 +0900
-Subject: [PATCH v5 0/9] Enable HDMI support on Exynos platforms
-In-Reply-To: <1422883228-10690-1-git-send-email-m.szyprowski@samsung.com>
-References: <1422883228-10690-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <066101d03f65$a870dcc0$f9529640$@kernel.org>
+Date: Tue, 03 Feb 2015 13:10:02 +0900
+Subject: [RESEND PATCH] ARM: EXYNOS: Add missing static to file-scope
+ declarations
+In-Reply-To: <1420819476-23344-1-git-send-email-k.kozlowski@samsung.com>
+References: <1420819476-23344-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <06c201d03f67$48da45b0$da8ed110$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Szyprowski wrote:
+Krzysztof Kozlowski wrote:
 > 
-> Hi all,
+> The 'pm_data', 'exynos_release_ret_regs' and
+> 'exynos5420_release_ret_regs' are not exported nor used outside of
+> suspend.c file. Make them static.
 > 
-> This is yet another update on patchset, which enables HDMI support for
-> Exynos based platforms.
+> This fixes following sparse warnings:
+> arch/arm/mach-exynos/suspend.c:83:23: warning: symbol 'pm_data' was not declared. Should it be static?
+> arch/arm/mach-exynos/suspend.c:106:14: warning: symbol 'exynos_release_ret_regs' was not declared.
+> Should it be static?
+> arch/arm/mach-exynos/suspend.c:117:14: warning: symbol 'exynos5420_release_ret_regs' was not declared.
+> Should it be static?
 > 
-> Beside DTS changes, this patchset adds parent domain support for Exynos
-> PM domains and add support for 'hdmi' clock directly to Exynos DRM mixer
-> driver.
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  arch/arm/mach-exynos/suspend.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 > 
-> The patchset is based on samsung/for-next branch and 'PM / Domains:
-> Export of_genpd_get_from_provider function' patch merged as commit
-> 7496fcbe8a643097efc061160e1c3b65ee2fa350 to v3.19-rc4.
+> diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
+> index 342797b9bf3b..fef091f8e59f 100644
+> --- a/arch/arm/mach-exynos/suspend.c
+> +++ b/arch/arm/mach-exynos/suspend.c
+> @@ -75,7 +75,7 @@ struct exynos_pm_data {
+>  	int (*cpu_suspend)(unsigned long);
+>  };
 > 
-> Regards
-> Marek Szyprowski
+> -struct exynos_pm_data *pm_data;
+> +static struct exynos_pm_data *pm_data;
 > 
+>  static int exynos5420_cpu_state;
+>  static unsigned int exynos_pmu_spare3;
+> @@ -98,7 +98,7 @@ static const struct exynos_wkup_irq exynos5250_wkup_irq[] = {
+>  	{ /* sentinel */ },
+>  };
 > 
-> Changelog:
+> -unsigned int exynos_release_ret_regs[] = {
+> +static unsigned int exynos_release_ret_regs[] = {
+>  	S5P_PAD_RET_MAUDIO_OPTION,
+>  	S5P_PAD_RET_GPIO_OPTION,
+>  	S5P_PAD_RET_UART_OPTION,
+> @@ -109,7 +109,7 @@ unsigned int exynos_release_ret_regs[] = {
+>  	REG_TABLE_END,
+>  };
 > 
-> v5:
-> - fixed error value for clk_get() in mixer patch
-> - rebased onto samsung/for-next branch
-> 
-> v4: (http://www.spinics.net/lists/linux-samsung-soc/msg41375.html)
-> - added patches, which add 'hdmi' clock handling to mixed block, this
->   finally solves the initialization related issues, thanks for Tobias
->   Jakobi for testing
-> - added acks/reviewed/tested by tags
-> 
-> v3: (http://www.spinics.net/lists/linux-samsung-soc/msg41020.html)
-> - added a note on defining subdomains to generic PM domain binding
->   documentation (requested by Ulf Hansson)
-> 
-> v2: (http://www.spinics.net/lists/linux-samsung-soc/msg40980.html)
-> - rewrote subdomains patch according to suggestions from Geert
->   Uytterhoeven and Amit Daniel Kachhap.
-> 
-> v1 resend: (http://www.spinics.net/lists/linux-samsung-soc/msg39428.html)
-> - added handling of generic 'power-domains' binding in subdomains
-> 
-> v1: (http://www.spinics.net/lists/linux-samsung-soc/msg38914.html)
-> - resolved power domain on/off issue with 'clk: samsung: exynos4: set
->   parent of mixer gate clock to hdmi' patch
-> 
-> v0: (http://www.spinics.net/lists/linux-samsung-soc/msg33498.html)
-> - first attempt, used 'always on' power domains hack
-> 
-> 
-> Patch summary:
-> 
-> 
-> *** BLURB HERE ***
-> 
-> Andrzej Hajda (1):
->   ARM: dts: exynos5250: add display power domain
-> 
-> Marek Szyprowski (7):
->   PM / Domains: Add a note about power domain subdomains
->   ARM: Exynos: add support for sub-power domains
->   ARM: dts: exynos4: add hdmi related nodes
->   ARM: dts: exynos4: add dependency between TV and LCD0 power domains
->   ARM: dts: exynos4412-odroid: enable hdmi support
->   ARM: dts: Exynos: add 'hdmi' clock to mixer nodes
->   drm/exynos: add support for 'hdmi' clock
-> 
-> Tomasz Stanislawski (1):
->   ARM: dts: exynos4210-universal_c210: enable hdmi support
-> 
->  .../bindings/arm/exynos/power_domain.txt           |  2 +
->  .../devicetree/bindings/power/power_domain.txt     | 29 +++++++++++
->  .../devicetree/bindings/video/exynos_mixer.txt     |  1 +
->  arch/arm/boot/dts/exynos4.dtsi                     | 41 ++++++++++++++++
->  arch/arm/boot/dts/exynos4210-universal_c210.dts    | 57 ++++++++++++++++++++++
->  arch/arm/boot/dts/exynos4210.dtsi                  |  8 +++
->  arch/arm/boot/dts/exynos4412-odroid-common.dtsi    | 44 +++++++++++++++++
->  arch/arm/boot/dts/exynos4x12.dtsi                  | 11 +++++
->  arch/arm/boot/dts/exynos5250.dtsi                  | 15 +++++-
->  arch/arm/boot/dts/exynos5420.dtsi                  |  5 +-
->  arch/arm/mach-exynos/pm_domains.c                  | 28 +++++++++++
->  drivers/gpu/drm/exynos/exynos_mixer.c              |  9 ++++
->  12 files changed, 246 insertions(+), 4 deletions(-)
-> 
+> -unsigned int exynos5420_release_ret_regs[] = {
+> +static unsigned int exynos5420_release_ret_regs[] = {
+>  	EXYNOS_PAD_RET_DRAM_OPTION,
+>  	EXYNOS_PAD_RET_MAUDIO_OPTION,
+>  	EXYNOS_PAD_RET_JTAG_OPTION,
 > --
-I have no objection on this series, but just wondering my tree should be fine
-without 9/9 drm patch and it will be handled for 3.20?
 
-I'll take 1 to 8 patches once drm patch is landed for 3.20.
+Looks ok to me, how about re-spin this patch including following?
 
-- Kukjin
+...
++static unsigned int exynos3250_release_ret_regs[] = {
+...
+
+Thanks,
+Kukjin
