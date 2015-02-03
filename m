@@ -1,57 +1,118 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 02 Feb 2015 18:05:04 -0800
-Subject: [Patch v2 1/6] soc: qcom: gsbi: Add support for ADM CRCI muxing
-In-Reply-To: <C168E827-6052-4A7B-80EA-6330E8E08D51@codeaurora.org>
-References: <1422599135-5588-1-git-send-email-agross@codeaurora.org>
- <1422599135-5588-2-git-send-email-agross@codeaurora.org>
- <B36DEAB1-2D89-4B6B-991E-C2EDBEB684D9@codeaurora.org>
- <54CBF9AE.6060902@codeaurora.org>
- <C168E827-6052-4A7B-80EA-6330E8E08D51@codeaurora.org>
-Message-ID: <54D02CD0.4090806@codeaurora.org>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Tue, 3 Feb 2015 10:13:00 +0800
+Subject: [RFC] change non-atomic bitops method
+In-Reply-To: <20150203011730.GA15653@node.dhcp.inet.fi>
+References: <35FD53F367049845BC99AC72306C23D1044A02027E0A@CNBJMBX05.corpusers.net>
+ <20150202152909.13bfd11f192fb0268b2ab4bf@linux-foundation.org>
+ <20150203011730.GA15653@node.dhcp.inet.fi>
+Message-ID: <35FD53F367049845BC99AC72306C23D1044A02027E0B@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/30/15 13:48, Kumar Gala wrote:
-> On Jan 30, 2015, at 3:37 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->
->> On 01/30/15 08:32, Kumar Gala wrote:
->>> On Jan 30, 2015, at 12:25 AM, Andy Gross <agross@codeaurora.org> wrote:
->>>
->>>> Required properties if child node exists:
->>>> - #address-cells: Must be 1
->>>> - #size-cells: Must be 1
->>>> - ranges: Must be present
->>>>
->>>> +Note: Each GSBI should have an alias correctly numbered in "aliases" node.
->>>> +
->>>> Properties for children:
->>>>
->>>> A GSBI controller node can contain 0 or more child nodes representing serial
->>>> @@ -37,6 +41,10 @@ Example for APQ8064:
->>>>
->>>> #include <dt-bindings/soc/qcom,gsbi.h>
->>>>
->>>> +	aliases {
->>>> +		gsbi4 = <&gsbi4>;
->>>> +	};
->>> You appear to be using the alias name to determine a index number for the gsbi, if that is the case, than you should probably just add a cell-index node to the gsbi?s for this purpose.
->>>
->> I thought cell-index was "deprecated" and referred more to things like
->> enumerating all the devices on a bus by assigning them a unique ID.
->> Aliases, on the other hand, allow us to enumerate a subset of devices
->> that share the same bus with other devices of different types. For
->> example, how would I know that a device is gsbi1 vs serial1 if they both
->> used cell-index and they both had the same parent node?
-> I think the problem was cell-index was never well understood and abused.  For the example you are giving you wouldn?t use cell-index because you are talking about things that would have different compatibles.  For what it appears we really are enumerating the GSBI hardware to match some programming interface convention.  If that is the case than I think cell-index is proper.
-
-Can you please explain when cell-index should be used and when aliases
-should be used? I'm confused because I recall this message from Rob
-Herring[1] where it's indicated that cell-index is pretty much
-deprecated. I'm also interested to find out what cell means in
-cell-index. Does it have any relation to *-cells properties?
-
-[1] https://lkml.org/lkml/2012/11/10/102
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> -----Original Message-----
+> From: Kirill A. Shutemov [mailto:kirill at shutemov.name]
+> Sent: Tuesday, February 03, 2015 9:18 AM
+> To: Andrew Morton
+> Cc: Wang, Yalin; 'arnd at arndb.de'; 'linux-arch at vger.kernel.org'; 'linux-
+> kernel at vger.kernel.org'; 'linux at arm.linux.org.uk'; 'linux-arm-
+> kernel at lists.infradead.org'
+> Subject: Re: [RFC] change non-atomic bitops method
+> 
+> On Mon, Feb 02, 2015 at 03:29:09PM -0800, Andrew Morton wrote:
+> > On Mon, 2 Feb 2015 11:55:03 +0800 "Wang, Yalin"
+> <Yalin.Wang@sonymobile.com> wrote:
+> >
+> > > This patch change non-atomic bitops,
+> > > add a if() condition to test it, before set/clear the bit.
+> > > so that we don't need dirty the cache line, if this bit
+> > > have been set or clear. On SMP system, dirty cache line will
+> > > need invalidate other processors cache line, this will have
+> > > some impact on SMP systems.
+> > >
+> > > --- a/include/asm-generic/bitops/non-atomic.h
+> > > +++ b/include/asm-generic/bitops/non-atomic.h
+> > > @@ -17,7 +17,9 @@ static inline void __set_bit(int nr, volatile
+> unsigned long *addr)
+> > >  	unsigned long mask = BIT_MASK(nr);
+> > >  	unsigned long *p = ((unsigned long *)addr) + BIT_WORD(nr);
+> > >
+> > > -	*p  |= mask;
+> > > +	if ((*p & mask) == 0)
+> > > +		*p  |= mask;
+> > > +
+> > >  }
+> >
+> > hm, maybe.
+> >
+> > It will speed up set_bit on an already-set bit.  But it will slow down
+> > set_bit on a not-set bit.  And the latter case is presumably much, much
+> > more common.
+> >
+> > How do we know the patch is a net performance gain?
+> 
+> Let's try to measure. The micro benchmark:
+> 
+> 	#include <stdio.h>
+> 	#include <time.h>
+> 	#include <sys/mman.h>
+> 
+> 	#ifdef CACHE_HOT
+> 	#define SIZE (2UL << 20)
+> 	#define TIMES 10000000
+> 	#else
+> 	#define SIZE (1UL << 30)
+> 	#define TIMES 10000
+> 	#endif
+> 
+> 	int main(int argc, char **argv)
+> 	{
+> 		struct timespec a, b, diff;
+> 		unsigned long i, *p, times = TIMES;
+> 
+> 		p = mmap(NULL, SIZE, PROT_READ | PROT_WRITE,
+> 				MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, -1,
+> 0);
+> 
+> 		clock_gettime(CLOCK_MONOTONIC, &a);
+> 		while (times--) {
+> 			for (i = 0; i < SIZE/64/sizeof(*p); i++) {
+> 	#ifdef CHECK_BEFORE_SET
+> 				if (p[i] != times)
+> 	#endif
+> 					p[i] = times;
+> 			}
+> 		}
+> 		clock_gettime(CLOCK_MONOTONIC, &b);
+> 
+> 		diff.tv_sec = b.tv_sec - a.tv_sec;
+> 		if (a.tv_nsec > b.tv_nsec) {
+> 			diff.tv_sec--;
+> 			diff.tv_nsec = 1000000000 + b.tv_nsec - a.tv_nsec;
+> 		} else
+> 			diff.tv_nsec = b.tv_nsec - a.tv_nsec;
+> 
+> 		printf("%lu.%09lu\n", diff.tv_sec, diff.tv_nsec);
+> 		return 0;
+> 	}
+> 
+> Results for 10 runs on my laptop -- i5-3427U (IvyBridge 1.8 Ghz, 2.8Ghz
+> Turbo
+> with 3MB LLC):
+> 
+> 				Avg		Stddev
+> baseline			21.5351		0.5315
+> -DCHECK_BEFORE_SET		21.9834		0.0789
+> -DCACHE_HOT			14.9987		0.0365
+> -DCACHE_HOT -DCHECK_BEFORE_SET	29.9010		0.0204
+> 
+> Difference between -DCACHE_HOT and -DCACHE_HOT -DCHECK_BEFORE_SET appears
+> huge, but if you recalculate it to CPU cycles per inner loop @ 2.8 Ghz,
+> it's 1.02530 and 2.04401 CPU cycles respectively.
+> 
+> Basically, the check is free on decent CPU.
+> 
+Awesome test, but you only test the one cpu which running this code,
+Have not consider the other CPUs, whose cache line will be invalidate if
+The cache is dirtied by writer CPU,
+So another test should be running 2 thread on two different CPUs(bind to CPU),
+One write , one read, to see the impact on the reader CPU.
