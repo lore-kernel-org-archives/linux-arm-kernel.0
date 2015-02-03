@@ -1,97 +1,88 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Tue,  3 Feb 2015 09:56:58 -0500
-Subject: [PATCH v3 0/15] Those patches is used for dw_hdmi audio support
-Message-ID: <1422975418-13302-1-git-send-email-ykk@rock-chips.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 Feb 2015 14:58:17 +0000
+Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher
+ constraints with dma-parms
+In-Reply-To: <CAF6AEGtBfr3fGEoFjFFpy1KrMJMZ-13VPPJX73fAkwiaLk+XGQ@mail.gmail.com>
+References: <20150129154718.GB26493@n2100.arm.linux.org.uk>
+ <CAF6AEGtTmFg66TK_AFkQ-xp7Nd9Evk3nqe6xCBp7K=77OmXTxA@mail.gmail.com>
+ <20150129192610.GE26493@n2100.arm.linux.org.uk>
+ <CAF6AEGujk8UC4X6T=yhTrz1s+SyZUQ=m05h_WcxLDGZU6bydbw@mail.gmail.com>
+ <20150202165405.GX14009@phenom.ffwll.local>
+ <CAF6AEGuESM+e3HSRGM6zLqrp8kqRLGUYvA3KKECdm7m-nt0M=Q@mail.gmail.com>
+ <20150203074856.GF14009@phenom.ffwll.local>
+ <CAF6AEGu0-TgyE4BjiaSWXQCSk31VU7dogq=6xDRUhi79rGgbxg@mail.gmail.com>
+ <20150203143715.GQ8656@n2100.arm.linux.org.uk>
+ <CAF6AEGtBfr3fGEoFjFFpy1KrMJMZ-13VPPJX73fAkwiaLk+XGQ@mail.gmail.com>
+Message-ID: <20150203145817.GT8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Feb 03, 2015 at 09:44:57AM -0500, Rob Clark wrote:
+> On Tue, Feb 3, 2015 at 9:37 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Tue, Feb 03, 2015 at 09:04:03AM -0500, Rob Clark wrote:
+> >> Since I'm stuck w/ an iommu, instead of built in mmu, my plan was to
+> >> drop use of dma-mapping entirely (incl the current call to dma_map_sg,
+> >> which I just need until we can use drm_cflush on arm), and
+> >> attach/detach iommu domains directly to implement context switches.
+> >> At that point, dma_addr_t really has no sensible meaning for me.
+> >
+> > So how do you intend to import from a subsystem which only gives you
+> > the dma_addr_t?
+> >
+> > If you aren't passing system memory, you have no struct page.  You can't
+> > fake up a struct page.  What this means is that struct scatterlist can't
+> > represent it any other way.
+> 
+> Tell the exporter to stop using carveouts, and give me proper memory
+> instead.. ;-)
+> 
+> Well, at least on these SoC's, I think the only valid use for carveout
+> memory is the bootloader splashscreen.  And I was planning on just
+> hanging on to that for myself for fbdev scanout buffer or other
+> internal (non shared) usage..
 
-We found Designware hdmi driver only support audio clock config, we can not play sound through it.
-To add Designware HDMI Audio support, we make those patch set:
-1): fixed dw_hdmi irq bug, add irq control to suspend/resume interfaces.
-2): add suspend/resume callback for dw_hdmi rockchip driver.
-3): Warp irq control in functions.
-4): Combine hdmi_set_clock_regenerator_n() and hdmi_regenerate_cts()
-5): Adjust n/cts config order.
-6): Set ncts_atomic_write & cts_manual, according to dw_hdmi document.
-7): Add audio support for more display resolutions(eg. 800x600).
-8): Add audio support for No-CEA display resolutions.
-9): Add Audio Sample Channel Status config interfaces to dw_hdmi driver.
-10): add audio clock control interfaces o dw_hdmi driver.
-11): creat "dw_hdmi-audio" platform device in dw_hdmi driver.
-12): add codec driver for hdmi audio, callback dw_hdmi audio config functions.
-13): add sound driver for hdmi audio, creat hdmi audio sound card.
-14): add dt-bings file and add hdmi_audio node to corresponding dt file.
+I wasn't thinking about carveouts - as I already mentioned earlier in this
+thread, it may be memory which couldn't possibly ever be system memory -
+for example, a separate chunk of memory which is tightly coupled to the
+graphics system but not so to the CPU.
 
+In such a case, we wouldn't want to use that as normal system memory, but
+we would want to allocate framebuffers and the like from it, and maybe
+pass them around.
 
-Changes in v3:
-- Clear Hotplug interrupts before dw_hdmi_fb_register
-- Wrap irq control in fucntions
-- Setting the .pm member instead of suspend/resume
-- Add ID registers parse and record
-- Combine hdmi_set_clock_regenerator_n() and hdmi_regenerate_cts()
-- Only adjust the n/cts setting order
-- Set ncts_atomic_write & cts_manual
-- Determine whether sample channel should set by desig_id.
-- Delete hdmi_audio_config interface and modify audio clock control functions
-- Remove audio_config & get_connect_status callback functions
-  and add write/read/mod register callback functions
-- Keep audio format config function in dw-hdmi-audio driver
-  and remove audio_config & get_connect_status functions,
-  move jack control to dw-hdmi-audio completely.
-- Delete the operation of jack in rockchip-hdmi-audio driver,
-  get ready to switch to simple-audio-card driver.
-- modify cpu-of-node to i2s-controller
+While it may not be appropriate for MSM, it's still something that needs
+to be considered, because there may be (and I know there are) dmabuf
+users which do pass memory this way.
 
-Changes in v2:
-- Add irq control to suspend/resume interfaces
-- Add suspend/resume support for dw_hdmi_rockchip driver
-- add more n/cts combinations for more display resolutions
-- enable audio support for No-CEA display mode
-- Add audio sample channel status setting
-- Add audio config interfaces to dw_hdmi driver
-- Update the audio control interfaces
-- Update dw_hdmi audio control interfaces, and adjust jack report process
-- give "codec-name" & "codec-dai-name" an const name
-- remove codec-name and codec-dai-name
-- rename rockchip,rockchip-hdmi-audio.txt to rockchip,rockchip-dw-hdmi-audio.txt
+So, what I'm saying is that for the purposes of the dmabuf API, we can't
+mandate that the scatterlists will contain a valid struct page pointer.
+It'd probably be a good idea for the importer to validate the scatterlist
+at import time if it has this requirement.
 
-Yakir Yang (15):
-  drm: bridge/dw_hdmi: add irq control to suspend/resume
-  drm: bridge/dw_hdmi: wrap irq control in fucntions
-  drm: rockchip/dw_hdmi_rockchip: add resume/suspend support
-  drm: bridge/dw_hdmi: add indentification registers parse and record
-  drm: bridge/dw_hdmi: combine hdmi_set_clock_regenerator_n() and
-    hdmi_regenerate_cts()
-  drm: bridge/dw_hdmi: adjust n/cts setting order
-  drm: bridge/dw_hdmi: set ncts_atomic_write & cts_manual
-  drm: bridge/dw_hdmi: add audio support for more display resolutions
-  drm: bridge/dw_hdmi: enable audio support for No-CEA display
-    resolutions
-  drm: bridge/dw_hdmi: add audio sample channel status setting
-  drm: bridge/dw_hdmi: add audio clock control interfaces
-  drm: bridge/dw_hdmi: creat dw-hdmi-audio platform device
-  ASoC: dw-hdmi-audio: add codec driver for dw hdmi audio
-  ASoC: rockchip-hdmi-audio: add sound driver for hdmi audio
-  dt-bindings: Add documentation for Rockchip dw-hdmi-audio
+However, thinking about this more, I think that from a generic design
+point of view, we really should limit the "struct page" usage to a
+special MSM-ism - something which should definitely not be copied by
+other drivers.  As has been mentioned previously, if there is a system
+MMU which needs to be programmed to map system memory onto the bus, the
+struct page becomes absolutely useless, and the only thing that gives
+you the correct "handle" to that memory is the dma_addr_t.
 
- .../sound/rockchip,rockchip-dw-hdmi-audio.txt      |  12 +
- drivers/gpu/drm/bridge/dw_hdmi.c                   | 361 ++++++++++++++++++---
- drivers/gpu/drm/bridge/dw_hdmi.h                   |  49 +++
- drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c        |  16 +
- include/drm/bridge/dw_hdmi.h                       |  17 +
- sound/soc/codecs/Kconfig                           |   4 +
- sound/soc/codecs/Makefile                          |   2 +
- sound/soc/codecs/dw-hdmi-audio.c                   | 333 +++++++++++++++++++
- sound/soc/codecs/dw-hdmi-audio.h                   |  79 +++++
- sound/soc/rockchip/Kconfig                         |   9 +
- sound/soc/rockchip/Makefile                        |   2 +
- sound/soc/rockchip/rockchip_hdmi_audio.c           | 168 ++++++++++
- 12 files changed, 1013 insertions(+), 39 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/sound/rockchip,rockchip-dw-hdmi-audio.txt
- create mode 100644 sound/soc/codecs/dw-hdmi-audio.c
- create mode 100644 sound/soc/codecs/dw-hdmi-audio.h
- create mode 100644 sound/soc/rockchip/rockchip_hdmi_audio.c
+Finally, note that n_mapped = dma_map_sg(dev, sg, n_ent, dir) - n_mapped
+can be less than n_ent when there's the presence of an IOMMU, since an
+IOMMU is permitted to coalesce individual scatterlist entries if it
+so chooses, and when walking the scatterlist for DMA purposes, the
+scatterlist sg_dma_*() accessors should be used, and it should be
+iterated over from 0 to n_mapped, not 0 to n_ent.  It's important to
+realise that in driver code, sg->length may not be the same as
+sg_dma_len(sg) for exactly this reason:
+
+#ifdef CONFIG_NEED_SG_DMA_LENGTH
+#define sg_dma_len(sg)          ((sg)->dma_length)
+#else
+#define sg_dma_len(sg)          ((sg)->length)
+#endif
 
 -- 
-2.1.2
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
