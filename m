@@ -1,241 +1,237 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue,  3 Feb 2015 19:06:55 +0000
-Subject: [PATCH 3.19-rc6 v16 4/6] printk: Simple implementation for NMI
- backtracing
+Date: Tue,  3 Feb 2015 19:06:57 +0000
+Subject: [PATCH 3.19-rc6 v16 6/6] ARM: Add support for on-demand backtrace of
+ other CPUs
 In-Reply-To: <1422990417-1783-1-git-send-email-daniel.thompson@linaro.org>
 References: <1422022952-31552-1-git-send-email-daniel.thompson@linaro.org>
  <1422990417-1783-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1422990417-1783-5-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1422990417-1783-7-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently there is a quite a pile of code sitting in
-arch/x86/kernel/apic/hw_nmi.c to support safe all-cpu backtracing from NMI.
-The code is inaccessible to backtrace implementations for other
-architectures, which is a shame because they would probably like to be
-safe too.
+Replicate the x86 code to trigger a backtrace using an NMI and hook
+it up to IPI on ARM.
 
-Copy this code into printk. We'll port the x86 NMI backtrace to it in a
-later patch.
+The code differs slightly from the code on x86 because, on ARM, we do
+now know at compile time whether a platform is capable of supporting FIQ.
+We must avoid using an IPI to request a backtrace from the CPU on which
+the backtrace was requested if interrupts are disabled and fall back to
+generating it directly.
 
-Incidentally, technically I think it might be safe to call
-printk_nmi_prepare() from NMI, providing care were taken to honour the
-return code. printk_nmi_complete() cannot be called from NMI but could
-be scheduled using irq_work_queue(). However honouring the return code
-means sometimes it is impossible to get the message out so in most cases
-I'd say using this code in such a way should probably attract sympathy
-and/or derision rather than admiration.
+In addition the implementation of arch_trigger_all_cpu_backtrace() the
+patch also includes a few small items of plumbing that must be hooked
+up for the new code to work.
 
 Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Steven Rostedt <rostedt@goodmis.org>
 ---
- include/linux/printk.h |  18 ++++++
- init/Kconfig           |   3 +
- kernel/printk/printk.c | 149 +++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 170 insertions(+)
+ arch/arm/Kconfig               |  1 +
+ arch/arm/include/asm/hardirq.h |  2 +-
+ arch/arm/include/asm/irq.h     |  5 +++
+ arch/arm/include/asm/smp.h     |  3 ++
+ arch/arm/kernel/smp.c          | 80 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/traps.c        |  3 ++
+ 6 files changed, 93 insertions(+), 1 deletion(-)
 
-diff --git a/include/linux/printk.h b/include/linux/printk.h
-index c8f170324e64..03c6921b3fcd 100644
---- a/include/linux/printk.h
-+++ b/include/linux/printk.h
-@@ -219,6 +219,24 @@ static inline void show_regs_print_info(const char *log_lvl)
- }
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 97d07ed60a0b..45f52e012e22 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -74,6 +74,7 @@ config ARM
+ 	select OLD_SIGACTION
+ 	select OLD_SIGSUSPEND3
+ 	select PERF_USE_VMALLOC
++	select PRINTK_NMI
+ 	select RTC_LIB
+ 	select SYS_SUPPORTS_APM_EMULATION
+ 	# Above selects are sorted alphabetically; please add new ones
+diff --git a/arch/arm/include/asm/hardirq.h b/arch/arm/include/asm/hardirq.h
+index fe3ea776dc34..5df33e30ae1b 100644
+--- a/arch/arm/include/asm/hardirq.h
++++ b/arch/arm/include/asm/hardirq.h
+@@ -5,7 +5,7 @@
+ #include <linux/threads.h>
+ #include <asm/irq.h>
+ 
+-#define NR_IPI	8
++#define NR_IPI	9
+ 
+ typedef struct {
+ 	unsigned int __softirq_pending;
+diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
+index 53c15dec7af6..be1d07d59ee9 100644
+--- a/arch/arm/include/asm/irq.h
++++ b/arch/arm/include/asm/irq.h
+@@ -35,6 +35,11 @@ extern void (*handle_arch_irq)(struct pt_regs *);
+ extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
  #endif
  
-+#ifdef CONFIG_PRINTK_NMI
-+/*
-+ * printk_nmi_prepare/complete are called to prepare the system for
-+ * some or all cores to issue trace from NMI. printk_nmi_complete will
-+ * print buffered output and cannot (safely) be called from NMI.
-+ */
-+extern int printk_nmi_prepare(void);
-+extern void printk_nmi_complete(void);
-+
-+/*
-+ * printk_nmi_this_cpu_begin/end are used divert/restore printk on this
-+ * cpu. The result is the output of printk() (by this CPU) will be
-+ * stored in temporary buffers for later printing by printk_nmi_complete.
-+ */
-+extern void printk_nmi_this_cpu_begin(void);
-+extern void printk_nmi_this_cpu_end(void);
++#ifdef CONFIG_SMP
++extern void arch_trigger_all_cpu_backtrace(bool);
++#define arch_trigger_all_cpu_backtrace(x) arch_trigger_all_cpu_backtrace(x)
 +#endif
 +
- extern asmlinkage void dump_stack(void) __cold;
+ #endif
  
- #ifndef pr_fmt
-diff --git a/init/Kconfig b/init/Kconfig
-index 9afb971497f4..13b843e3b5f4 100644
---- a/init/Kconfig
-+++ b/init/Kconfig
-@@ -1430,6 +1430,9 @@ config PRINTK
- 	  very difficult to diagnose system problems, saying N here is
- 	  strongly discouraged.
+ #endif
+diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
+index 18f5a554134f..b076584ac0fa 100644
+--- a/arch/arm/include/asm/smp.h
++++ b/arch/arm/include/asm/smp.h
+@@ -18,6 +18,8 @@
+ # error "<asm/smp.h> included in non-SMP build"
+ #endif
  
-+config PRINTK_NMI
-+	bool
++#define SMP_IPI_FIQ_MASK 0x0100
 +
- config BUG
- 	bool "BUG() support" if EXPERT
- 	default y
-diff --git a/kernel/printk/printk.c b/kernel/printk/printk.c
-index 02d6b6d28796..fe1cd57ea349 100644
---- a/kernel/printk/printk.c
-+++ b/kernel/printk/printk.c
-@@ -1829,6 +1829,155 @@ EXPORT_SYMBOL_GPL(vprintk_default);
-  */
- DEFINE_PER_CPU(printk_func_t, printk_func) = vprintk_default;
+ #define raw_smp_processor_id() (current_thread_info()->cpu)
  
-+#ifdef CONFIG_PRINTK_NMI
+ struct seq_file;
+@@ -79,6 +81,7 @@ extern void arch_send_call_function_single_ipi(int cpu);
+ extern void arch_send_call_function_ipi_mask(const struct cpumask *mask);
+ extern void arch_send_wakeup_ipi_mask(const struct cpumask *mask);
+ 
++extern void ipi_cpu_backtrace(struct pt_regs *regs);
+ extern int register_ipi_completion(struct completion *completion, int cpu);
+ 
+ struct smp_operations {
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 86ef244c5a24..828277c4c248 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -26,6 +26,7 @@
+ #include <linux/completion.h>
+ #include <linux/cpufreq.h>
+ #include <linux/irq_work.h>
++#include <linux/seq_buf.h>
+ 
+ #include <linux/atomic.h>
+ #include <asm/smp.h>
+@@ -72,6 +73,7 @@ enum ipi_msg_type {
+ 	IPI_CPU_STOP,
+ 	IPI_IRQ_WORK,
+ 	IPI_COMPLETION,
++	IPI_CPU_BACKTRACE,
+ };
+ 
+ static DECLARE_COMPLETION(cpu_running);
+@@ -456,6 +458,7 @@ static const char *ipi_types[NR_IPI] __tracepoint_string = {
+ 	S(IPI_CPU_STOP, "CPU stop interrupts"),
+ 	S(IPI_IRQ_WORK, "IRQ work interrupts"),
+ 	S(IPI_COMPLETION, "completion interrupts"),
++	S(IPI_CPU_BACKTRACE, "backtrace interrupts"),
+ };
+ 
+ static void smp_cross_call(const struct cpumask *target, unsigned int ipinr)
+@@ -570,6 +573,8 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+ 	unsigned int cpu = smp_processor_id();
+ 	struct pt_regs *old_regs = set_irq_regs(regs);
+ 
++	BUILD_BUG_ON(SMP_IPI_FIQ_MASK != BIT(IPI_CPU_BACKTRACE));
 +
-+#define NMI_BUF_SIZE		4096
+ 	if ((unsigned)ipinr < NR_IPI) {
+ 		trace_ipi_entry(ipi_types[ipinr]);
+ 		__inc_irq_stat(cpu, ipi_irqs[ipinr]);
+@@ -623,6 +628,12 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+ 		irq_exit();
+ 		break;
+ 
++	case IPI_CPU_BACKTRACE:
++		irq_enter();
++		ipi_cpu_backtrace(regs);
++		irq_exit();
++		break;
 +
-+struct nmi_seq_buf {
-+	unsigned char		buffer[NMI_BUF_SIZE];
-+	struct seq_buf		seq;
-+};
+ 	default:
+ 		pr_crit("CPU%u: Unknown IPI message 0x%x\n",
+ 		        cpu, ipinr);
+@@ -717,3 +728,72 @@ static int __init register_cpufreq_notifier(void)
+ core_initcall(register_cpufreq_notifier);
+ 
+ #endif
 +
-+/* Safe printing in NMI context */
-+static DEFINE_PER_CPU(struct nmi_seq_buf, nmi_print_seq);
++/* For reliability, we're prepared to waste bits here. */
++static DECLARE_BITMAP(backtrace_mask, NR_CPUS) __read_mostly;
 +
-+static DEFINE_PER_CPU(printk_func_t, nmi_print_saved_print_func);
-+
-+/* "in progress" flag of NMI printing */
-+static unsigned long nmi_print_flag;
-+
-+static int __init printk_nmi_init(void)
++void arch_trigger_all_cpu_backtrace(bool include_self)
 +{
-+	struct nmi_seq_buf *s;
-+	int cpu;
++	int i;
++	int this_cpu = get_cpu();
 +
-+	for_each_possible_cpu(cpu) {
-+		s = &per_cpu(nmi_print_seq, cpu);
-+		seq_buf_init(&s->seq, s->buffer, NMI_BUF_SIZE);
-+	}
-+
-+	return 0;
-+}
-+pure_initcall(printk_nmi_init);
-+
-+/*
-+ * It is not safe to call printk() directly from NMI handlers.
-+ * It may be fine if the NMI detected a lock up and we have no choice
-+ * but to do so, but doing a NMI on all other CPUs to get a back trace
-+ * can be done with a sysrq-l. We don't want that to lock up, which
-+ * can happen if the NMI interrupts a printk in progress.
-+ *
-+ * Instead, we redirect the vprintk() to this nmi_vprintk() that writes
-+ * the content into a per cpu seq_buf buffer. Then when the NMIs are
-+ * all done, we can safely dump the contents of the seq_buf to a printk()
-+ * from a non NMI context.
-+ *
-+ * This is not a generic printk() implementation and must be used with
-+ * great care. In particular there is a static limit on the quantity of
-+ * data that may be emitted during NMI, only one client can be active at
-+ * one time (arbitrated by the return value of printk_nmi_begin() and
-+ * it is required that something at task or interrupt context be scheduled
-+ * to issue the output.
-+ */
-+static int nmi_vprintk(const char *fmt, va_list args)
-+{
-+	struct nmi_seq_buf *s = this_cpu_ptr(&nmi_print_seq);
-+	unsigned int len = seq_buf_used(&s->seq);
-+
-+	seq_buf_vprintf(&s->seq, fmt, args);
-+	return seq_buf_used(&s->seq) - len;
-+}
-+
-+/*
-+ * Reserve the NMI printk mechanism. Return an error if some other component
-+ * is already using it.
-+ */
-+int printk_nmi_prepare(void)
-+{
-+	if (test_and_set_bit(0, &nmi_print_flag)) {
++	if (0 != printk_nmi_prepare()) {
 +		/*
-+		 * If something is already using the NMI print facility we
-+		 * can't allow a second one...
++		 * If there is already an nmi printk sequence in
++		 * progress then just give up...
 +		 */
-+		return -EBUSY;
++		put_cpu();
++		return;
 +	}
 +
-+	return 0;
-+}
-+
-+static void print_seq_line(struct nmi_seq_buf *s, int start, int end)
-+{
-+	const char *buf = s->buffer + start;
-+
-+	printk("%.*s", (end - start) + 1, buf);
-+}
-+
-+void printk_nmi_complete(void)
-+{
-+	struct nmi_seq_buf *s;
-+	int len, cpu, i, last_i;
++	cpumask_copy(to_cpumask(backtrace_mask), cpu_online_mask);
 +
 +	/*
-+	 * Now that all the NMIs have triggered, we can dump out their
-+	 * back traces safely to the console.
++	 * If irqs are disabled on the current processor then, if
++	 * IPI_CPU_BACKTRACE is delivered using IRQ, we will won't be able to
++	 * react to IPI_CPU_BACKTRACE until we leave this function. We avoid
++	 * the potential timeout (not to mention the failure to print useful
++	 * information) by calling the backtrace directly.
 +	 */
-+	for_each_possible_cpu(cpu) {
-+		s = &per_cpu(nmi_print_seq, cpu);
-+		last_i = 0;
-+
-+		len = seq_buf_used(&s->seq);
-+		if (!len)
-+			continue;
-+
-+		/* Print line by line. */
-+		for (i = 0; i < len; i++) {
-+			if (s->buffer[i] == '\n') {
-+				print_seq_line(s, last_i, i);
-+				last_i = i + 1;
-+			}
-+		}
-+		/* Check if there was a partial line. */
-+		if (last_i < len) {
-+			print_seq_line(s, last_i, len - 1);
-+			pr_cont("\n");
-+		}
-+
-+		/* Wipe out the buffer ready for the next time around. */
-+		seq_buf_clear(&s->seq);
++	if (irqs_disabled()) {
++		ipi_cpu_backtrace(in_interrupt() ? get_irq_regs() : NULL);
++		include_self = false;
 +	}
 +
-+	clear_bit(0, &nmi_print_flag);
-+	smp_mb__after_atomic();
-+}
++	if (!include_self)
++		cpumask_clear_cpu(this_cpu, to_cpumask(backtrace_mask));
 +
-+void printk_nmi_this_cpu_begin(void)
-+{
-+	/*
-+	 * Detect double-begins and report them. This code is unsafe (because
-+	 * it will print from NMI) but things are pretty badly damaged if the
-+	 * NMI re-enters and is somehow granted permission to use NMI printk,
-+	 * so how much worse can it get? Also since this code interferes with
-+	 * the operation of printk it is unlikely that any consequential
-+	 * failures will be able to log anything making this our last
-+	 * opportunity to tell anyone that something is wrong.
-+	 */
-+	if (this_cpu_read(nmi_print_saved_print_func)) {
-+		this_cpu_write(printk_func, vprintk_default);
-+		BUG();
++	if (!cpumask_empty(to_cpumask(backtrace_mask))) {
++		pr_info("Sending FIQ to %s CPUs:\n",
++			(include_self ? "all" : "other"));
++		smp_cross_call(to_cpumask(backtrace_mask), IPI_CPU_BACKTRACE);
 +	}
 +
-+	this_cpu_write(nmi_print_saved_print_func, this_cpu_read(printk_func));
-+	this_cpu_write(printk_func, nmi_vprintk);
++	/* Wait for up to 10 seconds for all CPUs to do the backtrace */
++	for (i = 0; i < 10 * 1000; i++) {
++		if (cpumask_empty(to_cpumask(backtrace_mask)))
++			break;
++		mdelay(1);
++		touch_softlockup_watchdog();
++	}
++
++	printk_nmi_complete();
++	put_cpu();
 +}
 +
-+void printk_nmi_this_cpu_end(void)
++void ipi_cpu_backtrace(struct pt_regs *regs)
 +{
-+	this_cpu_write(printk_func, this_cpu_read(nmi_print_saved_print_func));
-+	this_cpu_write(nmi_print_saved_print_func, NULL);
++	int cpu = smp_processor_id();
++
++	if (cpumask_test_cpu(cpu, to_cpumask(backtrace_mask))) {
++		printk_nmi_this_cpu_begin();
++		pr_warn("FIQ backtrace for cpu %d\n", cpu);
++		if (regs != NULL)
++			show_regs(regs);
++		else
++			dump_stack();
++		printk_nmi_this_cpu_end();
++
++		cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));
++	}
 +}
-+
-+#endif /* CONFIG_PRINTK_NMI */
-+
- /**
-  * printk - print a kernel message
-  * @fmt: format string
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index b35e220ae1b1..1836415b8a5c 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -483,6 +483,9 @@ asmlinkage void __exception_irq_entry handle_fiq_as_nmi(struct pt_regs *regs)
+ #ifdef CONFIG_ARM_GIC
+ 	gic_handle_fiq_ipi();
+ #endif
++#ifdef CONFIG_SMP
++	ipi_cpu_backtrace(regs);
++#endif
+ 
+ 	nmi_exit();
+ 
 -- 
 1.9.3
