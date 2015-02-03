@@ -1,31 +1,71 @@
-From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
-Date: Tue, 03 Feb 2015 17:18:45 -0300
-Subject: [linux-sunxi] Re: [PATCH v4] dma: sun4i: Add support for the
- DMA engine on sun[457]i SoCs
-In-Reply-To: <CAKON4Oydvex28FsYsHOr3Cv9othhUqu=xOEuLPMcisLPtc1imA@mail.gmail.com>
-References: <1422745124-22103-1-git-send-email-emilio@elopez.com.ar>	<1422745124-22103-2-git-send-email-emilio@elopez.com.ar>	<1422785038.28275.34.camel@plaes.org>	<54D116D4.3030004@elopez.com.ar>
- <CAKON4Oydvex28FsYsHOr3Cv9othhUqu=xOEuLPMcisLPtc1imA@mail.gmail.com>
-Message-ID: <54D12D25.5000408@elopez.com.ar>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 Feb 2015 20:28:42 +0000
+Subject: [PATCH] coresight: Adding coresight support for arm64 architecture
+In-Reply-To: <1422990133-26342-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1422990133-26342-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <20150203202842.GZ8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Feb 03, 2015 at 12:02:13PM -0700, mathieu.poirier at linaro.org wrote:
+> diff --git a/drivers/coresight/Kconfig b/drivers/coresight/Kconfig
+> new file mode 100644
+> index 000000000000..271fad830ae4
+> --- /dev/null
+> +++ b/drivers/coresight/Kconfig
+> @@ -0,0 +1,60 @@
+> +#
+> +# Coresight configuration
+> +#
+> +menuconfig CORESIGHT
+> +	bool "CoreSight Tracing Support"
+> +	select ARM_AMBA
+> +	help
+> +	  This framework provides a kernel interface for the CoreSight debug
+> +	  and trace drivers to register themselves with. It's intended to build
+> +	  a topological view of the CoreSight components based on a DT
+> +	  specification and configure the right serie of components when a
+> +	  trace source gets enabled.
+> +
 
-El 03/02/15 a las 16:39, jonsmirl at gmail.com escibi?:
-> Did you fix multiple simultaneous DMA transfers in this? And easy test
-> is to start jack audio. Jack will start simultaneous cyclic transfers
-> on both the ALSA input and output. Since cyclic transfers never end,
-> multiple simultaneous transfers has to work. Last time I tried it I
-> got an immediate GPF when the second cyclic transfer was started.
+You could surround the following options with
 
-I didn't get a chance to test with jack yet, but I don't see any reason 
-why two cyclic transfers wouldn't work, assuming they're on different 
-vchans.
+if CORESIGHT
+...
+endif
 
-Were you by any chance booting off of NAND by the way? That caused a GPF 
-because the bootloader left the hardware in a dirty state, but it should 
-be fixed now.
+which will implicitly make anything between depend on CORESIGHT instead of
+having to specify it every time.
 
-Cheers,
+> diff --git a/drivers/coresight/coresight-etb10.c b/drivers/coresight/coresight-etb10.c
+> index c9acd406f0d0..aa47d31fe2a2 100644
+> --- a/drivers/coresight/coresight-etb10.c
+> +++ b/drivers/coresight/coresight-etb10.c
+> @@ -314,7 +314,7 @@ static ssize_t etb_read(struct file *file, char __user *data,
+>  	*ppos += len;
+>  
+>  	dev_dbg(drvdata->dev, "%s: %d bytes copied, %d bytes left\n",
+> -		__func__, len, (int) (depth * 4 - *ppos));
+> +		__func__, (int)len, (int)(depth * 4 - *ppos));
 
-Emilio
+Please use %zu for size_t types.
+
+>  	return len;
+>  }
+>  
+> diff --git a/drivers/coresight/coresight-tmc.c b/drivers/coresight/coresight-tmc.c
+> index 3ff232f9ddf7..d08460327bd2 100644
+> --- a/drivers/coresight/coresight-tmc.c
+> +++ b/drivers/coresight/coresight-tmc.c
+> @@ -534,7 +534,7 @@ static ssize_t tmc_read(struct file *file, char __user *data, size_t len,
+>  	*ppos += len;
+>  
+>  	dev_dbg(drvdata->dev, "%s: %d bytes copied, %d bytes left\n",
+> -		__func__, len, (int) (drvdata->size - *ppos));
+> +		__func__, (int)len, (int)(drvdata->size - *ppos));
+
+Ditto.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
