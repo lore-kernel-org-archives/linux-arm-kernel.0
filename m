@@ -1,90 +1,109 @@
-From: christian.gmeiner@gmail.com (Christian Gmeiner)
-Date: Tue, 3 Feb 2015 14:28:26 +0100
-Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher constraints
- with dma-parms
-In-Reply-To: <20150203122813.GN8656@n2100.arm.linux.org.uk>
-References: <1422347154-15258-2-git-send-email-sumit.semwal@linaro.org>
- <20150129143908.GA26493@n2100.arm.linux.org.uk>
- <CAO_48GEOQ1pBwirgEWeVVXW-iOmaC=Xerr2VyYYz9t1QDXgVsw@mail.gmail.com>
- <20150129154718.GB26493@n2100.arm.linux.org.uk>
- <CAF6AEGtTmFg66TK_AFkQ-xp7Nd9Evk3nqe6xCBp7K=77OmXTxA@mail.gmail.com>
- <20150129192610.GE26493@n2100.arm.linux.org.uk>
- <CAF6AEGujk8UC4X6T=yhTrz1s+SyZUQ=m05h_WcxLDGZU6bydbw@mail.gmail.com>
- <20150202165405.GX14009@phenom.ffwll.local>
- <CAF6AEGuESM+e3HSRGM6zLqrp8kqRLGUYvA3KKECdm7m-nt0M=Q@mail.gmail.com>
- <20150203074856.GF14009@phenom.ffwll.local>
- <20150203122813.GN8656@n2100.arm.linux.org.uk>
-Message-ID: <CAH9NwWcJRtNz1zAOmdjPN15UHPGiqGg9wNC9z3fMe-qn5ymdpA@mail.gmail.com>
+From: tsahee@annapurnalabs.com (Tsahee Zidenberg)
+Date: Tue, 03 Feb 2015 15:29:00 +0200
+Subject: [PATCH v4 1/6] ARM: Alpine: Initial support for Alpine platform
+Message-ID: <54d0cd1c.JZPcRllcuDW7d5v+%tsahee@annapurnalabs.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-02-03 13:28 GMT+01:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Tue, Feb 03, 2015 at 08:48:56AM +0100, Daniel Vetter wrote:
->> On Mon, Feb 02, 2015 at 03:30:21PM -0500, Rob Clark wrote:
->> > On Mon, Feb 2, 2015 at 11:54 AM, Daniel Vetter <daniel@ffwll.ch> wrote:
->> > >> My initial thought is for dma-buf to not try to prevent something than
->> > >> an exporter can actually do.. I think the scenario you describe could
->> > >> be handled by two sg-lists, if the exporter was clever enough.
->> > >
->> > > That's already needed, each attachment has it's own sg-list. After all
->> > > there's no array of dma_addr_t in the sg tables, so you can't use one sg
->> > > for more than one mapping. And due to different iommu different devices
->> > > can easily end up with different addresses.
->> >
->> >
->> > Well, to be fair it may not be explicitly stated, but currently one
->> > should assume the dma_addr_t's in the dmabuf sglist are bogus.  With
->> > gpu's that implement per-process/context page tables, I'm not really
->> > sure that there is a sane way to actually do anything else..
->>
->> Hm, what does per-process/context page tables have to do here? At least on
->> i915 we have a two levels of page tables:
->> - first level for vm/device isolation, used through dma api
->> - 2nd level for per-gpu-context isolation and context switching, handled
->>   internally.
->>
->> Since atm the dma api doesn't have any context of contexts or different
->> pagetables, I don't see who you could use that at all.
->
-> What I've found with *my* etnaviv drm implementation (not Christian's - I
-> found it impossible to work with Christian, especially with the endless
-> "msm doesn't do it that way, so we shouldn't" responses and his attitude
-> towards cherry-picking my development work [*]) is that it's much easier to
-> keep the GPU MMU local to the GPU and under the control of the DRM MM code,
-> rather than attaching the IOMMU to the DMA API and handling it that way.
->
+This patch introduces initial architecture and device-tree support.
 
-Keep in mind that I tried to reach you several times via mail and irc
-and you simply
-ignored me. Did you know that took almost all of your patches (with
-small changes)?
-And I needed to cherry pick you patches as they were a) wrong, b) solved in a
-different way or c) had "hack" in the subject. I am quite sorry that I
-ended that
-way, but it is not only my fault!
+Signed-off-by: Saeed Bishara <saeed@annapurnalabs.com>
+Signed-off-by: Tsahee Zidenberg <tsahee@annapurnalabs.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/Kconfig                      |  2 ++
+ arch/arm/Makefile                     |  1 +
+ arch/arm/mach-alpine/Kconfig          |  8 ++++++++
+ arch/arm/mach-alpine/Makefile         |  5 +++++
+ arch/arm/mach-alpine/alpine_machine.c | 28 ++++++++++++++++++++++++++++
+ 5 files changed, 44 insertions(+)
+ create mode 100644 arch/arm/mach-alpine/Kconfig
+ create mode 100644 arch/arm/mach-alpine/Makefile
+ create mode 100644 arch/arm/mach-alpine/alpine_machine.c
 
-> There are several reasons for that:
->
-> 1. DRM has a better idea about when the memory needs to be mapped to the
->    GPU, and it can more effectively manage the GPU MMU.
->
-> 2. The GPU MMU may have TLBs which can only be flushed via a command in
->    the GPU command stream, so it's fundamentally necessary for the MMU to
->    be managed by the GPU driver so that it knows when (and how) to insert
->    the flushes.
->
->
-> * - as a direct result of that, I've stopped all further development of
-> etnaviv drm, and I'm intending to strip it out from my Xorg DDX driver
-> as the etnaviv drm API which Christian wants is completely incompatible
-> with the non-etnaviv drm, and that just creates far too much pain in the
-> DDX driver.
->
-
-That is bad, but life moves on.
-
-greets
---
-Christian Gmeiner, MSc
-
-https://soundcloud.com/christian-gmeiner
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index f5dd6e9..c74441b 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -842,6 +842,8 @@ config ARCH_VIRT
+ #
+ source "arch/arm/mach-mvebu/Kconfig"
+ 
++source "arch/arm/mach-alpine/Kconfig"
++
+ source "arch/arm/mach-asm9260/Kconfig"
+ 
+ source "arch/arm/mach-at91/Kconfig"
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index c1785ee..bcc4113 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -143,6 +143,7 @@ textofs-$(CONFIG_ARCH_AXXIA) := 0x00308000
+ 
+ # Machine directory name.  This list is sorted alphanumerically
+ # by CONFIG_* macro name.
++machine-$(CONFIG_ARCH_ALPINE)		+= alpine
+ machine-$(CONFIG_ARCH_AT91)		+= at91
+ machine-$(CONFIG_ARCH_AXXIA)		+= axxia
+ machine-$(CONFIG_ARCH_BCM)		+= bcm
+diff --git a/arch/arm/mach-alpine/Kconfig b/arch/arm/mach-alpine/Kconfig
+new file mode 100644
+index 0000000..4548f32
+--- /dev/null
++++ b/arch/arm/mach-alpine/Kconfig
+@@ -0,0 +1,8 @@
++config ARCH_ALPINE
++        bool "Annapurna Labs Alpine platform" if ARCH_MULTI_V7
++	select ARM_AMBA
++	select ARM_GIC
++	select GENERIC_IRQ_CHIP
++	select HAVE_ARM_ARCH_TIMER
++	help
++	  This enables support for the Annapurna Labs Alpine V1 boards.
+diff --git a/arch/arm/mach-alpine/Makefile b/arch/arm/mach-alpine/Makefile
+new file mode 100644
+index 0000000..8ba9e99
+--- /dev/null
++++ b/arch/arm/mach-alpine/Makefile
+@@ -0,0 +1,5 @@
++#
++# Makefile for the linux kernel.
++#
++
++obj-y				+= alpine_machine.o
+diff --git a/arch/arm/mach-alpine/alpine_machine.c b/arch/arm/mach-alpine/alpine_machine.c
+new file mode 100644
+index 0000000..cf77053
+--- /dev/null
++++ b/arch/arm/mach-alpine/alpine_machine.c
+@@ -0,0 +1,28 @@
++/*
++ * Machine declaration for Alpine platforms.
++ *
++ * Copyright (C) 2015 Annapurna Labs Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/of_platform.h>
++
++#include <asm/mach/arch.h>
++
++static const char *al_match[] __initconst = {
++	"al,alpine",
++	NULL,
++};
++
++DT_MACHINE_START(AL_DT, "Annapurna Labs Alpine")
++	.dt_compat	= al_match,
++MACHINE_END
+-- 
+1.9.1
