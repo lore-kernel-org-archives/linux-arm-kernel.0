@@ -1,111 +1,176 @@
-From: manuel.lauss@gmail.com (Manuel Lauss)
-Date: Tue, 3 Feb 2015 08:54:57 +0100
-Subject: [RFC PATCH] ASoC: wm8731: let codec to manage clock by itself
-In-Reply-To: <1422934415-24957-1-git-send-email-voice.shen@atmel.com>
-References: <1422934415-24957-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <CAOLZvyE6W8-X2_M+-KQNry2VPwLzwbBLuxr5Z5EdBQo7Skv2RQ@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 3 Feb 2015 09:02:22 +0100
+Subject: [PATCH v3] mmc: moxart: fix probe logic
+In-Reply-To: <1422891786-23071-1-git-send-email-jonas.jensen@gmail.com>
+References: <4754899.RDUhFfxBSW@wuerfel>
+ <1422891786-23071-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <CAPDyKFoppJBHx4nio111GM9RPv8pkfm4yZg2+AedLjnSZhmFsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 3, 2015 at 4:33 AM, Bo Shen <voice.shen@atmel.com> wrote:
-> Let the wm8731 codec to manage clock by itself.
+On 2 February 2015 at 16:43, Jonas Jensen <jonas.jensen@gmail.com> wrote:
+> Jonas Jensen wanted to submit a patch for these, but apparently
+> forgot about it. I stumbled over this symptom first:
 >
-> As all at91 related boards have been switch to CCF framework. So, on
-> the at91 related boards which use wm8731 will let it manage the clock,
-> or else the board use wm8731 is broken.
+> drivers/built-in.o: In function `moxart_probe':
+> :(.text+0x2af128): undefined reference to `of_dma_request_slave_channel'
 >
-> However, at the same time the wm8731 codec is used on other boards,
-> I am sure this change will broken some boards.
+> This is because of_dma_request_slave_channel is an internal helper
+> and not exported to loadable module. I'm changing the driver to
+> use dma_request_slave_channel_reason() instead.
 >
-> For example: poodle and corgi based on PXA SoC (in default configuration
-> file, no one use it). DB1200 board which is a mips based board. So I have
-> no idea how to fix them.
+> Further problems from inspection:
 >
-> So, my suggestion is to add CCF check based on the following patch? Any
-> idea or suggestions?
+> * The remove function must not call kfree on the host pointer,
+>   because it is allocated together with the mmc_host.
+>
+> * The clock is never released
+>
+> * The dma_cap_mask_t is completely unused and can be removed
+>
+> * deferred probing does not work if the dma driver is loaded
+>   after the mmc driver.
+>
+> This patch should fix all of the above.
+>
+> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+> ---
+>
+> Notes:
+>     This is a forward (with a single line fix) of Arnd's v2 patch.
+>
+>     v2:  do not call clk_put() on an error pointer
+>     v3:  fix NULL dereference on host->clk
+>
+>     Applies to next-20150113
+>
+>  drivers/mmc/host/moxart-mmc.c | 34 +++++++++++++++++++---------------
+>  1 file changed, 19 insertions(+), 15 deletions(-)
+>
+> diff --git a/drivers/mmc/host/moxart-mmc.c b/drivers/mmc/host/moxart-mmc.c
+> index d2a1ef6..6ab57d1e 100644
+> --- a/drivers/mmc/host/moxart-mmc.c
+> +++ b/drivers/mmc/host/moxart-mmc.c
+> @@ -17,6 +17,7 @@
+>  #include <linux/init.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/delay.h>
+> +#include <linux/errno.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/blkdev.h>
+>  #include <linux/dma-mapping.h>
+> @@ -131,6 +132,7 @@ struct moxart_host {
+>         struct mmc_host                 *mmc;
+>         struct mmc_request              *mrq;
+>         struct scatterlist              *cur_sg;
+> +       struct clk                      *clk;
+>         struct completion               dma_complete;
+>         struct completion               pio_complete;
+>
+> @@ -560,9 +562,7 @@ static int moxart_probe(struct platform_device *pdev)
+>         struct mmc_host *mmc;
+>         struct moxart_host *host = NULL;
+>         struct dma_slave_config cfg;
+> -       struct clk *clk;
+>         void __iomem *reg_mmc;
+> -       dma_cap_mask_t mask;
+>         int irq, ret;
+>         u32 i;
+>
+> @@ -573,6 +573,8 @@ static int moxart_probe(struct platform_device *pdev)
+>                 goto out;
+>         }
+>
+> +       host = mmc_priv(mmc);
+> +
+>         ret = of_address_to_resource(node, 0, &res_mmc);
+>         if (ret) {
+>                 dev_err(dev, "of_address_to_resource failed\n");
+> @@ -586,10 +588,11 @@ static int moxart_probe(struct platform_device *pdev)
+>                 goto out;
+>         }
+>
+> -       clk = of_clk_get(node, 0);
 
-What about the patch below?  It makes absence of mclk object non-fatal and
-checks if wm8731->mclk is non-NULL before enabling/disabling it.  Works on
-my DB1200/DB1300 boards:
+This code would be simpler using devm_clk_get(), since then error
+wouldn't be needed.
 
-diff --git a/sound/soc/codecs/wm8731.c b/sound/soc/codecs/wm8731.c
-index b115ed8..648b8cd 100644
---- a/sound/soc/codecs/wm8731.c
-+++ b/sound/soc/codecs/wm8731.c
-@@ -13,6 +13,7 @@
-  * published by the Free Software Foundation.
-  */
+Any reason to why you don't want to use that?
 
-+#include <linux/clk.h>
- #include <linux/module.h>
- #include <linux/moduleparam.h>
- #include <linux/init.h>
-@@ -45,6 +46,7 @@ static const char
-*wm8731_supply_names[WM8731_NUM_SUPPLIES] = {
- /* codec private data */
- struct wm8731_priv {
-     struct regmap *regmap;
-+    struct clk *mclk;
-     struct regulator_bulk_data supplies[WM8731_NUM_SUPPLIES];
-     const struct snd_pcm_hw_constraint_list *constraints;
-     unsigned int sysclk;
-@@ -389,6 +391,8 @@ static int wm8731_set_dai_sysclk(struct
-snd_soc_dai *codec_dai,
-     switch (clk_id) {
-     case WM8731_SYSCLK_XTAL:
-     case WM8731_SYSCLK_MCLK:
-+        if (wm8731->mclk && clk_set_rate(wm8731->mclk, freq))
-+            return -EINVAL;
-         wm8731->sysclk_type = clk_id;
-         break;
-     default:
-@@ -490,6 +494,8 @@ static int wm8731_set_bias_level(struct
-snd_soc_codec *codec,
+> -       if (IS_ERR(clk)) {
+> +       host->clk = of_clk_get(node, 0);
+> +       if (IS_ERR(host->clk)) {
+>                 dev_err(dev, "of_clk_get failed\n");
+> -               ret = PTR_ERR(clk);
+> +               ret = PTR_ERR(host->clk);
+> +               host->clk = NULL;
+>                 goto out;
+>         }
+>
+> @@ -603,18 +606,14 @@ static int moxart_probe(struct platform_device *pdev)
+>         if (ret)
+>                 goto out;
+>
+> -       dma_cap_zero(mask);
+> -       dma_cap_set(DMA_SLAVE, mask);
+> -
+> -       host = mmc_priv(mmc);
+>         host->mmc = mmc;
+>         host->base = reg_mmc;
+>         host->reg_phys = res_mmc.start;
+>         host->timeout = msecs_to_jiffies(1000);
+> -       host->sysclk = clk_get_rate(clk);
+> +       host->sysclk = clk_get_rate(host->clk);
+>         host->fifo_width = readl(host->base + REG_FEATURE) << 2;
+> -       host->dma_chan_tx = of_dma_request_slave_channel(node, "tx");
+> -       host->dma_chan_rx = of_dma_request_slave_channel(node, "rx");
+> +       host->dma_chan_tx = dma_request_slave_channel_reason(dev, "tx");
+> +       host->dma_chan_rx = dma_request_slave_channel_reason(dev, "rx");
+>
+>         spin_lock_init(&host->lock);
+>
+> @@ -624,6 +623,11 @@ static int moxart_probe(struct platform_device *pdev)
+>         mmc->ocr_avail = 0xffff00;      /* Support 2.0v - 3.6v power. */
+>
+>         if (IS_ERR(host->dma_chan_tx) || IS_ERR(host->dma_chan_rx)) {
+> +               if (PTR_ERR(host->dma_chan_tx) == -EPROBE_DEFER ||
+> +                   PTR_ERR(host->dma_chan_rx) == -EPROBE_DEFER) {
+> +                       ret = -EPROBE_DEFER;
+> +                       goto out;
+> +               }
+>                 dev_dbg(dev, "PIO mode transfer enabled\n");
+>                 host->have_dma = false;
+>         } else {
+> @@ -677,6 +681,8 @@ static int moxart_probe(struct platform_device *pdev)
+>         return 0;
+>
+>  out:
+> +       if (host->clk)
+> +               clk_put(host->clk);
+>         if (mmc)
+>                 mmc_free_host(mmc);
+>         return ret;
+> @@ -694,6 +700,7 @@ static int moxart_remove(struct platform_device *pdev)
+>                         dma_release_channel(host->dma_chan_tx);
+>                 if (!IS_ERR(host->dma_chan_rx))
+>                         dma_release_channel(host->dma_chan_rx);
+> +               clk_put(host->clk);
+>                 mmc_remove_host(mmc);
+>                 mmc_free_host(mmc);
+>
+> @@ -702,9 +709,6 @@ static int moxart_remove(struct platform_device *pdev)
+>                 writel(readl(host->base + REG_CLOCK_CONTROL) | CLK_OFF,
+>                        host->base + REG_CLOCK_CONTROL);
+>         }
+> -
+> -       kfree(host);
+> -
+>         return 0;
+>  }
+>
+> --
+> 1.8.2.1
+>
 
-     switch (level) {
-     case SND_SOC_BIAS_ON:
-+        if (wm8731->mclk)
-+            clk_prepare_enable(wm8731->mclk);
-         break;
-     case SND_SOC_BIAS_PREPARE:
-         break;
-@@ -508,6 +514,8 @@ static int wm8731_set_bias_level(struct
-snd_soc_codec *codec,
-         snd_soc_write(codec, WM8731_PWR, reg | 0x0040);
-         break;
-     case SND_SOC_BIAS_OFF:
-+        if (wm8731->mclk)
-+            clk_disable_unprepare(wm8731->mclk);
-         snd_soc_write(codec, WM8731_PWR, 0xffff);
-         regulator_bulk_disable(ARRAY_SIZE(wm8731->supplies),
-                        wm8731->supplies);
-@@ -666,6 +674,12 @@ static int wm8731_spi_probe(struct spi_device *spi)
-     if (wm8731 == NULL)
-         return -ENOMEM;
-
-+    wm8731->mclk = devm_clk_get(&spi->dev, "mclk");
-+    if (IS_ERR(wm8731->mclk)) {
-+        wm8731->mclk = NULL;
-+        dev_warn(&spi->dev, "assuming static MCLK\n");
-+    }
-+
-     mutex_init(&wm8731->lock);
-
-     wm8731->regmap = devm_regmap_init_spi(spi, &wm8731_regmap);
-@@ -719,6 +733,12 @@ static int wm8731_i2c_probe(struct i2c_client *i2c,
-
-     mutex_init(&wm8731->lock);
-
-+    wm8731->mclk = devm_clk_get(&i2c->dev, "mclk");
-+    if (IS_ERR(wm8731->mclk)) {
-+        wm8731->mclk = NULL;
-+        dev_warn(&i2c->dev, "assuming static MCLK\n");
-+    }
-+
-     wm8731->regmap = devm_regmap_init_i2c(i2c, &wm8731_regmap);
-     if (IS_ERR(wm8731->regmap)) {
-         ret = PTR_ERR(wm8731->regmap);
-
--- 
-
-Manuel
+Kind regards
+Uffe
