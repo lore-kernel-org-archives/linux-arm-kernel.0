@@ -1,33 +1,37 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 3 Feb 2015 16:19:54 +0000
-Subject: [PATCH V3 13/15] ARM: dts: Exynos4 and Odroid X2/U3 sound device
- nodes update
-In-Reply-To: <54D0D5B0.20803@samsung.com>
-References: <1421260962-16892-1-git-send-email-s.nawrocki@samsung.com>
- <1421260962-16892-14-git-send-email-s.nawrocki@samsung.com>
- <20150114195452.GM3043@sirena.org.uk>
- <07a501d03f69$aba222b0$02e66810$@kernel.org>
- <54D0AB30.2010504@samsung.com>
- <20150203131127.GM21293@sirena.org.uk> <54D0D5B0.20803@samsung.com>
-Message-ID: <20150203161954.GO21293@sirena.org.uk>
+From: robdclark@gmail.com (Rob Clark)
+Date: Tue, 3 Feb 2015 11:22:01 -0500
+Subject: [Linaro-mm-sig] [RFCv3 2/2] dma-buf: add helpers for sharing
+ attacher constraints with dma-parms
+In-Reply-To: <6906596.JU5vQoa1jV@wuerfel>
+References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
+ <3783167.LiVXgA35gN@wuerfel>
+ <20150203155404.GV8656@n2100.arm.linux.org.uk>
+ <6906596.JU5vQoa1jV@wuerfel>
+Message-ID: <CAF6AEGsttiufoqPbDiZfUX2ndbv2XfeZzcfyaf-AcUJgJpgLkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 03, 2015 at 03:05:36PM +0100, Sylwester Nawrocki wrote:
-> On 03/02/15 14:11, Mark Brown wrote:
+On Tue, Feb 3, 2015 at 11:12 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> I agree for the case you are describing here. From what I understood
+> from Rob was that he is looking at something more like:
+>
+> Fig 3
+> CPU--L1cache--L2cache--Memory--IOMMU---<iobus>--device
+>
+> where the IOMMU controls one or more contexts per device, and is
+> shared across GPU and non-GPU devices. Here, we need to use the
+> dmap-mapping interface to set up the IO page table for any device
+> that is unable to address all of system RAM, and we can use it
+> for purposes like isolation of the devices. There are also cases
+> where using the IOMMU is not optional.
 
-> > OK, I can apply them if people want but I'd need a resend - I discarded
-> > them since they'd normally go via the arch tree.
 
-> I will resend the last 3 patches then. There also shouldn't be any issues
-> if 13, 14 are only merged through ASoC tree and patch 15 through Samsung
-> tree.
+Actually, just to clarify, the IOMMU instance is specific to the GPU..
+not shared with other devices.  Otherwise managing multiple contexts
+would go quite badly..
 
-OK.  Kukjin, are you OK with me applying some or all of these?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150203/647103a6/attachment-0001.sig>
+But other devices have their own instance of the same IOMMU.. so same
+driver could be used.
+
+BR,
+-R
