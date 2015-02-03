@@ -1,50 +1,74 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 03 Feb 2015 11:37:30 +0000
-Subject: [PATCH] PCI: Fix pcibios_update_irq misuse of irq number
-In-Reply-To: <4324891.mqG6Yyfi6J@wuerfel>
-References: <1422456683-797-1-git-send-email-marc.zyngier@arm.com>
- <4145359.V8A0ARGtXz@wuerfel> <54D0A521.7030405@arm.com>
- <4324891.mqG6Yyfi6J@wuerfel>
-Message-ID: <54D0B2FA.9080600@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 3 Feb 2015 11:37:44 +0000
+Subject: [PATCH v8 02/21] acpi: fix acpi_os_ioremap for arm64
+In-Reply-To: <54D0901A.2080406@linaro.org>
+References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
+ <1422881149-8177-3-git-send-email-hanjun.guo@linaro.org>
+ <2422968.Es7R0p3loO@vostro.rjw.lan> <54D0901A.2080406@linaro.org>
+Message-ID: <20150203113744.GA3677@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/15 11:31, Arnd Bergmann wrote:
-> On Tuesday 03 February 2015 10:38:25 Marc Zyngier wrote:
->>
->> That's exactly what I thought until Lorenzo reported kvmtool falling
->> over because of this write. Obviously, some platforms must actually
->> require this (possibly for bridges that are not known by the firmware).
+On Tue, Feb 03, 2015 at 09:08:42AM +0000, Hanjun Guo wrote:
+> On 2015?02?03? 06:14, Rafael J. Wysocki wrote:
+> > On Monday, February 02, 2015 08:45:30 PM Hanjun Guo wrote:
+> >> From: Mark Salter <msalter@redhat.com>
+> >>
+> >> The acpi_os_ioremap() function may be used to map normal RAM or IO
+> >> regions. The current implementation simply uses ioremap_cache(). This
+> >> will work for some architectures, but arm64 ioremap_cache() cannot be
+> >> used to map IO regions which don't support caching. So for arm64, use
+> >> ioremap() for non-RAM regions.
+> >>
+> >> CC: Rafael J Wysocki <rjw@rjwysocki.net>
+> >> Signed-off-by: Mark Salter <msalter@redhat.com>
+> >> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> >> ---
+> >>   include/acpi/acpi_io.h | 6 ++++++
+> >>   1 file changed, 6 insertions(+)
+> >>
+> >> diff --git a/include/acpi/acpi_io.h b/include/acpi/acpi_io.h
+> >> index 444671e..9d573db 100644
+> >> --- a/include/acpi/acpi_io.h
+> >> +++ b/include/acpi/acpi_io.h
+> >> @@ -1,11 +1,17 @@
+> >>   #ifndef _ACPI_IO_H_
+> >>   #define _ACPI_IO_H_
+> >>
+> >> +#include <linux/mm.h>
+> >>   #include <linux/io.h>
+> >>
+> >>   static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
+> >>   					    acpi_size size)
+> >>   {
+> >> +#ifdef CONFIG_ARM64
+> >> +	if (!page_is_ram(phys >> PAGE_SHIFT))
+> >> +		return ioremap(phys, size);
+> >> +#endif
+> >
+> > I don't want to see #ifdef CONFIG_ARM64 in this file.
+> >
+> > There are multiple examples of how things like this are done.  Generally,
+> > the logic is "If the architecture provides its own function for this, use
+> > that one, or use the generic one provided here otherwise."
 > 
-> This sounds much like a bug in kvmtool.
+> OK. I think weak function would work.
 
-Lorenzo and I just came to a similar conclusion, given that the HW
-should never use that information.
+Probably not in a header file. It's better to define acpi_os_ioremap()
+in an arm64 kernel file, together with something like:
 
->> Entirely removing that code solves my problem too, but that'd cannot be
->> the right solution...
-> 
-> The comment in pdev_fixup_irq() says 
-> 
->         /* Always tell the device, so the driver knows what is
->            the real IRQ to use; the device does not use it. */
-> 
-> which I read to mean that there are drivers that incorrectly use
-> 'pci_read_config_byte(dev, PCI_INTERRUPT_LINE)' as the number
-> they pass into request_irq, rather than using dev->irq.
-> However, this means that your patch is actually wrong, because
-> what the driver cares about is the virtual irq number (which
-> request_irq expects), not the number relative to some interrupt
-> controller.
+#define ARCH_HAS_ACPI_OS_IOREMAP
 
-Yes, I now realise that. That makes a lot more sense actually, because I
-was getting very confused about how the HW should interpret that number.
+and the corresponding #ifdef's in the acpi_io.h file.
 
-Side question: In the probe-only case, should we still allow this write
-to happen?
+On arm64 could we make this function call iorema (nocache) all the time?
+We need to clarify the contexts where this is used in the core ACPI
+code. The acpi_map() function for example checks if the page is ram and
+does a kmap(). Do we need to handle the NVS on arm64? AFAICT, we don't
+even compile drivers/acpi/sleep.c in.
 
-Thanks,
+Are there other cases where acpi_os_ioremap() is called directly and it
+needs a cacheable mapping?
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Catalin
