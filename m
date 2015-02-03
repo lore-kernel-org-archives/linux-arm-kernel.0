@@ -1,37 +1,72 @@
 From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Tue,  3 Feb 2015 14:17:57 +0200
-Subject: [PATCH 0/3] Add initial DT support for Qualcomm SPMI PMIC devices
-Message-ID: <1422965880-11047-1-git-send-email-iivanov@mm-sol.com>
+Date: Tue,  3 Feb 2015 14:17:58 +0200
+Subject: [PATCH 1/3] ARM: dts: qcom: Add SPMI PMIC Arbiter nodes for APQ8084
+ and MSM8974
+In-Reply-To: <1422965880-11047-1-git-send-email-iivanov@mm-sol.com>
+References: <1422965880-11047-1-git-send-email-iivanov@mm-sol.com>
+Message-ID: <1422965880-11047-2-git-send-email-iivanov@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following set of patches add initial DT support for PMIC devices
-found on recent Quqalcomm chipsets. Details for SPMI bus and PMIC arbiter
-could be found here [1].
+Add SPMI PMIC Arbiter configuration nodes for APQ8084 and MSM8974.
 
-Regards,
-Ivan
+Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
+---
+ arch/arm/boot/dts/qcom-apq8084.dtsi | 16 ++++++++++++++++
+ arch/arm/boot/dts/qcom-msm8974.dtsi | 16 ++++++++++++++++
+ 2 files changed, 32 insertions(+)
 
-[1] http://lwn.net/Articles/564637/
-
-Ivan T. Ivanov (3):
-  ARM: dts: qcom: Add SPMI PMIC Arbiter nodes for APQ8084 and MSM8974
-  ARM: dts: qcom: Add 8x74 chipset SPMI PMIC's nodes
-  ARM: dts: qcom: Add APQ8084 chipset SPMI PMIC's nodes
-
- arch/arm/boot/dts/qcom-apq8074-dragonboard.dts        |  2 ++
- arch/arm/boot/dts/qcom-apq8084-ifc6540.dts            |  1 +
- arch/arm/boot/dts/qcom-apq8084-mtp.dts                |  1 +
- arch/arm/boot/dts/qcom-apq8084.dtsi                   | 16 ++++++++++++++++
- arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts |  2 ++
- arch/arm/boot/dts/qcom-msm8974.dtsi                   | 16 ++++++++++++++++
- arch/arm/boot/dts/qcom-pm8841.dtsi                    | 18 ++++++++++++++++++
- arch/arm/boot/dts/qcom-pm8941.dtsi                    | 18 ++++++++++++++++++
- arch/arm/boot/dts/qcom-pma8084.dtsi                   | 18 ++++++++++++++++++
- 9 files changed, 92 insertions(+)
- create mode 100644 arch/arm/boot/dts/qcom-pm8841.dtsi
- create mode 100644 arch/arm/boot/dts/qcom-pm8941.dtsi
- create mode 100644 arch/arm/boot/dts/qcom-pma8084.dtsi
-
+diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
+index 1f130bc..dbedf64 100644
+--- a/arch/arm/boot/dts/qcom-apq8084.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
+@@ -226,5 +226,21 @@
+ 			clock-names = "core", "iface";
+ 			status = "disabled";
+ 		};
++
++		spmi_bus: spmi at fc4cf000 {
++			compatible = "qcom,spmi-pmic-arb";
++			reg-names = "core", "intr", "cnfg";
++			reg = <0xfc4cf000 0x1000>,
++			      <0xfc4cb000 0x1000>,
++			      <0xfc4ca000 0x1000>;
++			interrupt-names = "periph_irq";
++			interrupts = <0 190 0>;
++			qcom,ee = <0>;
++			qcom,channel = <0>;
++			#address-cells = <2>;
++			#size-cells = <0>;
++			interrupt-controller;
++			#interrupt-cells = <4>;
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+index e265ec1..2d11641 100644
+--- a/arch/arm/boot/dts/qcom-msm8974.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+@@ -247,5 +247,21 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 		};
++
++		spmi_bus: spmi at fc4cf000 {
++			compatible = "qcom,spmi-pmic-arb";
++			reg-names = "core", "intr", "cnfg";
++			reg = <0xfc4cf000 0x1000>,
++			      <0xfc4cb000 0x1000>,
++			      <0xfc4ca000 0x1000>;
++			interrupt-names = "periph_irq";
++			interrupts = <0 190 0>;
++			qcom,ee = <0>;
++			qcom,channel = <0>;
++			#address-cells = <2>;
++			#size-cells = <0>;
++			interrupt-controller;
++			#interrupt-cells = <4>;
++		};
+ 	};
+ };
 --
 1.9.1
