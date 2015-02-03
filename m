@@ -1,46 +1,40 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Feb 2015 17:01:46 +0000
-Subject: [Linaro-mm-sig] [RFCv3 2/2] dma-buf: add helpers for sharing
- attacher constraints with dma-parms
-In-Reply-To: <CAF6AEGsttiufoqPbDiZfUX2ndbv2XfeZzcfyaf-AcUJgJpgLkA@mail.gmail.com>
-References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
- <3783167.LiVXgA35gN@wuerfel>
- <20150203155404.GV8656@n2100.arm.linux.org.uk>
- <6906596.JU5vQoa1jV@wuerfel>
- <CAF6AEGsttiufoqPbDiZfUX2ndbv2XfeZzcfyaf-AcUJgJpgLkA@mail.gmail.com>
-Message-ID: <20150203170146.GX8656@n2100.arm.linux.org.uk>
+Date: Tue, 3 Feb 2015 17:17:33 +0000
+Subject: [alsa-devel] [RFC PATCH] ASoC: wm8731: let codec to manage clock
+ by itself
+In-Reply-To: <54D0FD1C.9020305@metafoo.de>
+References: <1422934415-24957-1-git-send-email-voice.shen@atmel.com>
+ <CAOLZvyE6W8-X2_M+-KQNry2VPwLzwbBLuxr5Z5EdBQo7Skv2RQ@mail.gmail.com>
+ <20150203124441.GK21293@sirena.org.uk>
+ <54D0FD1C.9020305@metafoo.de>
+Message-ID: <20150203171733.GY8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 03, 2015 at 11:22:01AM -0500, Rob Clark wrote:
-> On Tue, Feb 3, 2015 at 11:12 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > I agree for the case you are describing here. From what I understood
-> > from Rob was that he is looking at something more like:
+On Tue, Feb 03, 2015 at 05:53:48PM +0100, Lars-Peter Clausen wrote:
+> On 02/03/2015 01:44 PM, Mark Brown wrote:
+> >On Tue, Feb 03, 2015 at 08:54:57AM +0100, Manuel Lauss wrote:
 > >
-> > Fig 3
-> > CPU--L1cache--L2cache--Memory--IOMMU---<iobus>--device
+> >>+    wm8731->mclk = devm_clk_get(&spi->dev, "mclk");
+> >>+    if (IS_ERR(wm8731->mclk)) {
+> >>+        wm8731->mclk = NULL;
+> >>+        dev_warn(&spi->dev, "assuming static MCLK\n");
+> >>+    }
 > >
-> > where the IOMMU controls one or more contexts per device, and is
-> > shared across GPU and non-GPU devices. Here, we need to use the
-> > dmap-mapping interface to set up the IO page table for any device
-> > that is unable to address all of system RAM, and we can use it
-> > for purposes like isolation of the devices. There are also cases
-> > where using the IOMMU is not optional.
+> >This is broken for both deferred probe and in the case where the clock
+> >API genuinely returns a NULL clock.  Other than that it's the kind of
+> >thing that we've done for some other drivers, though it's not good to
+> >have to do this.  Check them for correct behaviour.
 > 
-> 
-> Actually, just to clarify, the IOMMU instance is specific to the GPU..
-> not shared with other devices.  Otherwise managing multiple contexts
-> would go quite badly..
-> 
-> But other devices have their own instance of the same IOMMU.. so same
-> driver could be used.
+> Ideally we'd introduce a {devm_}clk_get_optional(), with the same semantics
+> as gpiod_get_optional(), which handles the finer details of differentiating
+> between clock specified, but not yet probed, clock specified, but
+> incorrectly and no clock specified, so this doesn't have to be done over and
+> over by each driver.
 
-Okay, so that is my Fig.2 case, and we don't have to worry about Fig.3.
-
-One thing I forgot in Fig.1/2 which my original did have were to mark
-the system MMU as optional.  (Think an ARM64 with SMMU into a 32-bit
-peripheral bus.)  Do we support stacked MMUs in the DMA API?  We may
-need to if we keep IOMMUs in the DMA API.
+No, we don't need to.  It clk_get() already knows this distinction, and
+it appropriately returns -ENOENT vs -EPROBE_DEFER according to whether
+there's a clock specified in DT or not.
 
 -- 
 FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
