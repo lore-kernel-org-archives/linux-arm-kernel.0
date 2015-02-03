@@ -1,34 +1,58 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 03 Feb 2015 15:05:36 +0100
-Subject: [PATCH V3 13/15] ARM: dts: Exynos4 and Odroid X2/U3 sound device
- nodes update
-In-Reply-To: <20150203131127.GM21293@sirena.org.uk>
-References: <1421260962-16892-1-git-send-email-s.nawrocki@samsung.com>
- <1421260962-16892-14-git-send-email-s.nawrocki@samsung.com>
- <20150114195452.GM3043@sirena.org.uk>
- <07a501d03f69$aba222b0$02e66810$@kernel.org> <54D0AB30.2010504@samsung.com>
- <20150203131127.GM21293@sirena.org.uk>
-Message-ID: <54D0D5B0.20803@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 03 Feb 2015 15:17:27 +0100
+Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher constraints
+ with dma-parms
+In-Reply-To: <CAF6AEGu0-TgyE4BjiaSWXQCSk31VU7dogq=6xDRUhi79rGgbxg@mail.gmail.com>
+References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
+ <20150203074856.GF14009@phenom.ffwll.local>
+ <CAF6AEGu0-TgyE4BjiaSWXQCSk31VU7dogq=6xDRUhi79rGgbxg@mail.gmail.com>
+Message-ID: <4689826.8DDCrX2ZhK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/15 14:11, Mark Brown wrote:
-> On Tue, Feb 03, 2015 at 12:04:16PM +0100, Sylwester Nawrocki wrote:
+On Tuesday 03 February 2015 09:04:03 Rob Clark wrote:
+> On Tue, Feb 3, 2015 at 2:48 AM, Daniel Vetter <daniel@ffwll.ch> wrote:
+> > On Mon, Feb 02, 2015 at 03:30:21PM -0500, Rob Clark wrote:
+> >> On Mon, Feb 2, 2015 at 11:54 AM, Daniel Vetter <daniel@ffwll.ch> wrote:
+> >> >> My initial thought is for dma-buf to not try to prevent something than
+> >> >> an exporter can actually do.. I think the scenario you describe could
+> >> >> be handled by two sg-lists, if the exporter was clever enough.
+> >> >
+> >> > That's already needed, each attachment has it's own sg-list. After all
+> >> > there's no array of dma_addr_t in the sg tables, so you can't use one sg
+> >> > for more than one mapping. And due to different iommu different devices
+> >> > can easily end up with different addresses.
+> >>
+> >>
+> >> Well, to be fair it may not be explicitly stated, but currently one
+> >> should assume the dma_addr_t's in the dmabuf sglist are bogus.  With
+> >> gpu's that implement per-process/context page tables, I'm not really
+> >> sure that there is a sane way to actually do anything else..
+> >
+> > Hm, what does per-process/context page tables have to do here? At least on
+> > i915 we have a two levels of page tables:
+> > - first level for vm/device isolation, used through dma api
+> > - 2nd level for per-gpu-context isolation and context switching, handled
+> >   internally.
+> >
+> > Since atm the dma api doesn't have any context of contexts or different
+> > pagetables, I don't see who you could use that at all.
 > 
->>>> > >> Sorry, I should've said - I applied the ASoC patches, not these.
->>> > > Shall I take 13 to 15 DT patches in Samsung tree?
->> > Patches 13, 14 use macro definitions which are added in patch which is
->> > already in Mark's sound tree ("ASoC: samsung: i2s: Add clk provider DT
->> > binding documentation") [1]. We would need to consider that to avoid
->> > build breaks.
->
-> OK, I can apply them if people want but I'd need a resend - I discarded
-> them since they'd normally go via the arch tree.
+> Since I'm stuck w/ an iommu, instead of built in mmu, my plan was to
+> drop use of dma-mapping entirely (incl the current call to dma_map_sg,
+> which I just need until we can use drm_cflush on arm), and
+> attach/detach iommu domains directly to implement context switches.
+> At that point, dma_addr_t really has no sensible meaning for me.
 
-I will resend the last 3 patches then. There also shouldn't be any issues
-if 13, 14 are only merged through ASoC tree and patch 15 through Samsung
-tree.
+I think what you see here is a quite common hardware setup and we really
+lack the right abstraction for it at the moment. Everybody seems to
+work around it with a mix of the dma-mapping API and the iommu API.
+These are doing different things, and even though the dma-mapping API
+can be implemented on top of the iommu API, they are not really compatible.
 
---
-Thanks,
-Sylwester
+The drm_clflush helpers don't seem like the right solution to me,
+because all other devices outside of drm will face the same issue,
+and I suspect we should fill the missing gaps in the API in a
+more generic way.
+
+	Arnd
