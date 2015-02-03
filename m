@@ -1,59 +1,36 @@
-From: linux@rasmusvillemoes.dk (Rasmus Villemoes)
-Date: Tue, 03 Feb 2015 10:34:05 +0100
-Subject: [RFC] change non-atomic bitops method
-In-Reply-To: <20150202223851.f30768d0.akpm@linux-foundation.org> (Andrew
- Morton's message of "Mon, 2 Feb 2015 22:38:51 -0800")
-References: <35FD53F367049845BC99AC72306C23D1044A02027E0A@CNBJMBX05.corpusers.net>
- <20150202152909.13bfd11f192fb0268b2ab4bf@linux-foundation.org>
- <20150203011730.GA15653@node.dhcp.inet.fi>
- <35FD53F367049845BC99AC72306C23D1044A02027E0B@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D1044A02027E0C@CNBJMBX05.corpusers.net>
- <20150202223851.f30768d0.akpm@linux-foundation.org>
-Message-ID: <8761bjjq42.fsf@rasmusvillemoes.dk>
+From: vincent.yang.fujitsu@gmail.com (Vincent Yang)
+Date: Tue,  3 Feb 2015 17:34:28 +0800
+Subject: [PATCH v5 6/7] of: add Fujitsu vendor prefix
+In-Reply-To: <1422955310-6542-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+References: <1422955310-6542-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+Message-ID: <1422956068-6796-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 03 2015, Andrew Morton <akpm@linux-foundation.org> wrote:
+From: Jassi Brar <jaswinder.singh@linaro.org>
 
->
-> You aren't measuring the right thing.  You should compare
->
-> 	if (p[i] != x)
-> 		p[i] = x;
->
-> versus
->
-> 	p[i] = x;
->
-> and you should do this for two cases:
->
-> a) p[i] == x
->
-> b) p[i] != x
->
->
-> The first code sequence will be slower when (p[i] != x) and faster when
-> (p[i] == x).
->
->
-> Next, we should instrument the kernel to work out the frequency of
-> set_bit on an already-set bit.
->
-> It is only with both these ratios that we can work out whether the
-> patch is a net gain.  My suspicion is that set_bit on an already-set
-> bit is so rare that the patch will be a loss.
+Add 'fujitsu' as the vendor prefix for Fujitsu Semiconductor Ltd.
 
-There's also the code-bloat issue to consider (instruction cache and all
-that); the conditional versions will usually require three extra
-instructions and an extra register. Also, the cache line might already
-be dirty because of something in the surrounding code. Instruction cache
-misses and larger stack footprint (from larger register pressure) won't
-show up in a microbenchmark, so I think this needs a real-world example
-to justify.
+Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+Signed-off-by: Andy Green <andy.green@linaro.org>
+Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Tetsuya Nuriya <nuriya.tetsuya@jp.fujitsu.com>
+---
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-But even if one finds some hot spot that would benefit from the
-conditional, that should simply be added explicitly there, instead of
-pessimizing every other user. (A good example of that is 358eec18243a
-("vfs: decrapify dput(), fix cache behavior under normal load")).
-
-Rasmus
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index d443279..e0ac020 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -59,6 +59,7 @@ everest	Everest Semiconductor Co. Ltd.
+ excito	Excito
+ fcs	Fairchild Semiconductor
+ fsl	Freescale Semiconductor
++fujitsu Fujitsu Semiconductor Ltd.
+ GEFanuc	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
+ gef	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
+ geniatech	Geniatech, Inc.
+-- 
+1.9.0
