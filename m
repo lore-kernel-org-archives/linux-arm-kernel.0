@@ -1,176 +1,101 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 03 Feb 2015 09:49:09 +0900
-Subject: [PATCH v11 2/4] ARM: dts: Add PPMU dt node for Exynos4 SoCs
-In-Reply-To: <1422924551-10474-1-git-send-email-cw00.choi@samsung.com>
-References: <1422924551-10474-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1422924551-10474-3-git-send-email-cw00.choi@samsung.com>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Tue, 3 Feb 2015 03:17:30 +0200
+Subject: [RFC] change non-atomic bitops method
+In-Reply-To: <20150202152909.13bfd11f192fb0268b2ab4bf@linux-foundation.org>
+References: <35FD53F367049845BC99AC72306C23D1044A02027E0A@CNBJMBX05.corpusers.net>
+ <20150202152909.13bfd11f192fb0268b2ab4bf@linux-foundation.org>
+Message-ID: <20150203011730.GA15653@node.dhcp.inet.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add PPMU (Platform Performance Monitoring Unit) dt node for Exynos4
-(Exynos4210/4212/4412) SoC. PPMU dt node is used to monitor the utilization of
-each IP.
+On Mon, Feb 02, 2015 at 03:29:09PM -0800, Andrew Morton wrote:
+> On Mon, 2 Feb 2015 11:55:03 +0800 "Wang, Yalin" <Yalin.Wang@sonymobile.com> wrote:
+> 
+> > This patch change non-atomic bitops,
+> > add a if() condition to test it, before set/clear the bit.
+> > so that we don't need dirty the cache line, if this bit
+> > have been set or clear. On SMP system, dirty cache line will
+> > need invalidate other processors cache line, this will have
+> > some impact on SMP systems.
+> > 
+> > --- a/include/asm-generic/bitops/non-atomic.h
+> > +++ b/include/asm-generic/bitops/non-atomic.h
+> > @@ -17,7 +17,9 @@ static inline void __set_bit(int nr, volatile unsigned long *addr)
+> >  	unsigned long mask = BIT_MASK(nr);
+> >  	unsigned long *p = ((unsigned long *)addr) + BIT_WORD(nr);
+> >  
+> > -	*p  |= mask;
+> > +	if ((*p & mask) == 0)
+> > +		*p  |= mask;
+> > +
+> >  }
+> 
+> hm, maybe.
+> 
+> It will speed up set_bit on an already-set bit.  But it will slow down
+> set_bit on a not-set bit.  And the latter case is presumably much, much
+> more common.
+> 
+> How do we know the patch is a net performance gain?
 
-The Exynos4210/Exynos4212/Exynos4412 SoC includes following PPMUs:
-- PPMU_DMC0      0x106A_0000
-- PPMU_DMC1      0x106B_0000
-- PPMU_CPU       0x106C_0000
-- PPMU_ACP       0x10AE_0000
-- PPMU_RIGHT_BUS 0x112A_0000
-- PPMU_LEFT_BUS  0x116A_0000
-- PPMU_FSYS      0x1263_0000
-- PPMU_LCD0      0x11E4_0000
-- PPMU_CAMIF     0x11AC_0000
-- PPMU_IMAGE     0x12AA_0000
-- PPMU_TV        0x12E4_0000
-- PPMU_3D        0x1322_0000
-- PPMU_MFC_LEFT  0x1366_0000
-- PPMU_MFC_RIGHT 0x1367_0000
+Let's try to measure. The micro benchmark:
 
-Additionally, the Exynos4210 SoC includes following PPMUs:
-- PPMU_LCD1      0x1224_0000
+	#include <stdio.h>
+	#include <time.h>
+	#include <sys/mman.h>
 
-Cc: Kukjin Kim <kgene@kernel.org>
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Acked-by: MyungJoo Ham <myungjoo.ham@samsung.com>
----
- arch/arm/boot/dts/exynos4.dtsi    | 108 ++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/exynos4210.dtsi |   8 +++
- 2 files changed, 116 insertions(+)
+	#ifdef CACHE_HOT
+	#define SIZE (2UL << 20)
+	#define TIMES 10000000
+	#else
+	#define SIZE (1UL << 30)
+	#define TIMES 10000
+	#endif
 
-diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-index b8168f1..70064dc 100644
---- a/arch/arm/boot/dts/exynos4.dtsi
-+++ b/arch/arm/boot/dts/exynos4.dtsi
-@@ -645,4 +645,112 @@
- 		samsung,sysreg = <&sys_reg>;
- 		status = "disabled";
- 	};
-+
-+	ppmu_dmc0: ppmu_dmc0 at 106a0000 {
-+		compatible = "samsung,exynos-ppmu";
-+		reg = <0x106a0000 0x2000>;
-+		clocks = <&clock CLK_PPMUDMC0>;
-+		clock-names = "ppmu";
-+		status = "disabled";
-+	};
-+
-+	ppmu_dmc1: ppmu_dmc1 at 106b0000 {
-+		compatible = "samsung,exynos-ppmu";
-+		reg = <0x106b0000 0x2000>;
-+		clocks = <&clock CLK_PPMUDMC1>;
-+		clock-names = "ppmu";
-+		status = "disabled";
-+	};
-+
-+	ppmu_cpu: ppmu_cpu at 106c0000 {
-+		compatible = "samsung,exynos-ppmu";
-+		reg = <0x106c0000 0x2000>;
-+		clocks = <&clock CLK_PPMUCPU>;
-+		clock-names = "ppmu";
-+		status = "disabled";
-+	};
-+
-+	ppmu_acp: ppmu_acp at 10ae0000 {
-+		compatible = "samsung,exynos-ppmu";
-+		reg = <0x106e0000 0x2000>;
-+		status = "disabled";
-+	};
-+
-+	ppmu_rightbus: ppmu_rightbus at 112a0000 {
-+		compatible = "samsung,exynos-ppmu";
-+		reg = <0x112a0000 0x2000>;
-+		clocks = <&clock CLK_PPMURIGHT>;
-+		clock-names = "ppmu";
-+		status = "disabled";
-+	};
-+
-+	ppmu_leftbus: ppmu_leftbus0 at 116a0000 {
-+		compatible = "samsung,exynos-ppmu";
-+		reg = <0x116a0000 0x2000>;
-+		clocks = <&clock CLK_PPMULEFT>;
-+		clock-names = "ppmu";
-+		status = "disabled";
-+	};
-+
-+	ppmu_camif: ppmu_camif at 11ac0000 {
-+		compatible = "samsung,exynos-ppmu";
-+		reg = <0x11ac0000 0x2000>;
-+		clocks = <&clock CLK_PPMUCAMIF>;
-+		clock-names = "ppmu";
-+		status = "disabled";
-+	};
-+
-+	ppmu_lcd0: ppmu_lcd0 at 11e40000 {
-+		compatible = "samsung,exynos-ppmu";
-+		reg = <0x11e40000 0x2000>;
-+		clocks = <&clock CLK_PPMULCD0>;
-+		clock-names = "ppmu";
-+		status = "disabled";
-+	};
-+
-+	ppmu_fsys: ppmu_g3d at 12630000 {
-+		compatible = "samsung,exynos-ppmu";
-+		reg = <0x12630000 0x2000>;
-+		status = "disabled";
-+	};
-+
-+	ppmu_image: ppmu_image at 12aa0000 {
-+		compatible = "samsung,exynos-ppmu";
-+		reg = <0x12aa0000 0x2000>;
-+		clocks = <&clock CLK_PPMUIMAGE>;
-+		clock-names = "ppmu";
-+		status = "disabled";
-+	};
-+
-+	ppmu_tv: ppmu_tv at 12e40000 {
-+		compatible = "samsung,exynos-ppmu";
-+		reg = <0x12e40000 0x2000>;
-+		clocks = <&clock CLK_PPMUTV>;
-+		clock-names = "ppmu";
-+		status = "disabled";
-+	};
-+
-+	ppmu_g3d: ppmu_g3d at 13220000 {
-+		compatible = "samsung,exynos-ppmu";
-+		reg = <0x13220000 0x2000>;
-+		clocks = <&clock CLK_PPMUG3D>;
-+		clock-names = "ppmu";
-+		status = "disabled";
-+	};
-+
-+	ppmu_mfc_left: ppmu_mfc_left at 13660000 {
-+		compatible = "samsung,exynos-ppmu";
-+		reg = <0x13660000 0x2000>;
-+		clocks = <&clock CLK_PPMUMFC_L>;
-+		clock-names = "ppmu";
-+		status = "disabled";
-+	};
-+
-+	ppmu_mfc_right: ppmu_mfc_right at 13670000 {
-+		compatible = "samsung,exynos-ppmu";
-+		reg = <0x13670000 0x2000>;
-+		clocks = <&clock CLK_PPMUMFC_R>;
-+		clock-names = "ppmu";
-+		status = "disabled";
-+	};
- };
-diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-index bcc9e63..b2598de 100644
---- a/arch/arm/boot/dts/exynos4210.dtsi
-+++ b/arch/arm/boot/dts/exynos4210.dtsi
-@@ -192,4 +192,12 @@
- 			samsung,lcd-wb;
- 		};
- 	};
-+
-+	ppmu_lcd1: ppmu_lcd1 at 12240000 {
-+		compatible = "samsung,exynos-ppmu";
-+		reg = <0x12240000 0x2000>;
-+		clocks = <&clock CLK_PPMULCD1>;
-+		clock-names = "ppmu";
-+		status = "disabled";
-+	};
- };
+	int main(int argc, char **argv)
+	{
+		struct timespec a, b, diff;
+		unsigned long i, *p, times = TIMES;
+
+		p = mmap(NULL, SIZE, PROT_READ | PROT_WRITE,
+				MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, -1, 0);
+		
+		clock_gettime(CLOCK_MONOTONIC, &a);
+		while (times--) {
+			for (i = 0; i < SIZE/64/sizeof(*p); i++) {
+	#ifdef CHECK_BEFORE_SET
+				if (p[i] != times)
+	#endif
+					p[i] = times;
+			}
+		}
+		clock_gettime(CLOCK_MONOTONIC, &b);
+
+		diff.tv_sec = b.tv_sec - a.tv_sec;
+		if (a.tv_nsec > b.tv_nsec) {
+			diff.tv_sec--;
+			diff.tv_nsec = 1000000000 + b.tv_nsec - a.tv_nsec;
+		} else
+			diff.tv_nsec = b.tv_nsec - a.tv_nsec;
+
+		printf("%lu.%09lu\n", diff.tv_sec, diff.tv_nsec);
+		return 0;
+	}
+
+Results for 10 runs on my laptop -- i5-3427U (IvyBridge 1.8 Ghz, 2.8Ghz Turbo
+with 3MB LLC):
+
+				Avg		Stddev
+baseline			21.5351		0.5315
+-DCHECK_BEFORE_SET		21.9834		0.0789
+-DCACHE_HOT			14.9987		0.0365
+-DCACHE_HOT -DCHECK_BEFORE_SET	29.9010		0.0204
+
+Difference between -DCACHE_HOT and -DCACHE_HOT -DCHECK_BEFORE_SET appears
+huge, but if you recalculate it to CPU cycles per inner loop @ 2.8 Ghz,
+it's 1.02530 and 2.04401 CPU cycles respectively.
+
+Basically, the check is free on decent CPU. 
+
 -- 
-1.8.5.5
+ Kirill A. Shutemov
