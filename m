@@ -1,184 +1,121 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 03 Feb 2015 18:28:56 +0100
-Subject: [PATCH] ARM: EXYNOS: Fix failed second suspend on Exynos4
-Message-ID: <1422984536-17769-1-git-send-email-k.kozlowski@samsung.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Tue, 03 Feb 2015 12:29:36 -0500
+Subject: [PATCH v8 02/21] acpi: fix acpi_os_ioremap for arm64
+In-Reply-To: <2422968.Es7R0p3loO@vostro.rjw.lan>
+References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
+ <1422881149-8177-3-git-send-email-hanjun.guo@linaro.org>
+ <2422968.Es7R0p3loO@vostro.rjw.lan>
+Message-ID: <1422984576.18187.82.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Exynos4412 boards (Trats2, Odroid U3) after enabling L2 cache in
-56b60b8bce4a ("ARM: 8265/1: dts: exynos4: Add nodes for L2 cache
-controller") the second suspend to RAM failed. First suspend worked fine
-but the next one hang just after powering down of secondary CPUs (system
-consumed energy as it would be running but was not responsive).
+On Mon, 2015-02-02 at 23:14 +0100, Rafael J. Wysocki wrote:
+> On Monday, February 02, 2015 08:45:30 PM Hanjun Guo wrote:
+> > From: Mark Salter <msalter@redhat.com>
+> > 
+> > The acpi_os_ioremap() function may be used to map normal RAM or IO
+> > regions. The current implementation simply uses ioremap_cache(). This
+> > will work for some architectures, but arm64 ioremap_cache() cannot be
+> > used to map IO regions which don't support caching. So for arm64, use
+> > ioremap() for non-RAM regions.
+> > 
+> > CC: Rafael J Wysocki <rjw@rjwysocki.net>
+> > Signed-off-by: Mark Salter <msalter@redhat.com>
+> > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> > ---
+> >  include/acpi/acpi_io.h | 6 ++++++
+> >  1 file changed, 6 insertions(+)
+> > 
+> > diff --git a/include/acpi/acpi_io.h b/include/acpi/acpi_io.h
+> > index 444671e..9d573db 100644
+> > --- a/include/acpi/acpi_io.h
+> > +++ b/include/acpi/acpi_io.h
+> > @@ -1,11 +1,17 @@
+> >  #ifndef _ACPI_IO_H_
+> >  #define _ACPI_IO_H_
+> >  
+> > +#include <linux/mm.h>
+> >  #include <linux/io.h>
+> >  
+> >  static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
+> >  					    acpi_size size)
+> >  {
+> > +#ifdef CONFIG_ARM64
+> > +	if (!page_is_ram(phys >> PAGE_SHIFT))
+> > +		return ioremap(phys, size);
+> > +#endif
+> 
+> I don't want to see #ifdef CONFIG_ARM64 in this file.
+> 
 
-The issue was caused by enabling delayed reset assertion for CPU0 just
-after issuing power down of cores. This was introduced for Exynos4 in
-13cfa6c4f7fa ("ARM: EXYNOS: Fix CPU idle clock down after CPU off").
+How about something like:
 
-The whole behavior is not well documented but after checking with vendor
-code this should be done like this (on Exynos4):
-1. Enable delayed reset assertion when system is running (for all CPUs).
-2. Disable delayed reset assertion before suspending the system.
-   This can be done after powering off secondary CPUs.
-3. Re-enable the delayed reset assertion when system is resumed.
+From: Mark Salter <msalter@redhat.com>
+Date: Tue, 3 Feb 2015 10:51:16 -0500
+Subject: [PATCH] acpi: fix acpi_os_ioremap for arm64
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+The acpi_os_ioremap() function may be used to map normal RAM or IO
+regions. The current implementation simply uses ioremap_cache(). This
+will work for some architectures, but arm64 ioremap_cache() cannot be
+used to map IO regions which don't support caching. So for arm64, use
+ioremap() for non-RAM regions.
+
+CC: Rafael J Wysocki <rjw@rjwysocki.net>
+Signed-off-by: Mark Salter <msalter@redhat.com>
 ---
- arch/arm/mach-exynos/common.h  |  2 ++
- arch/arm/mach-exynos/exynos.c  | 27 +++++++++++++++++++++++++++
- arch/arm/mach-exynos/platsmp.c | 39 ++-------------------------------------
- arch/arm/mach-exynos/suspend.c |  3 +++
- 4 files changed, 34 insertions(+), 37 deletions(-)
+ arch/arm64/include/asm/acpi.h | 14 ++++++++++++++
+ include/acpi/acpi_io.h        |  3 +++
+ 2 files changed, 17 insertions(+)
 
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index f70eca7ee705..0ef8d4b47102 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -153,6 +153,8 @@ extern void exynos_enter_aftr(void);
+diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+index ea4d2b3..db82bc3 100644
+--- a/arch/arm64/include/asm/acpi.h
++++ b/arch/arm64/include/asm/acpi.h
+@@ -14,6 +14,7 @@
  
- extern struct cpuidle_exynos_data cpuidle_coupled_exynos_data;
+ #include <linux/irqchip/arm-gic-acpi.h>
  
-+extern void exynos_set_delayed_reset_assertion(bool enable);
-+
- extern void s5p_init_cpu(void __iomem *cpuid_addr);
- extern unsigned int samsung_rev(void);
- extern void __iomem *cpu_boot_reg_base(void);
-diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index 2013f73797ed..e2f46295eed7 100644
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@ -166,6 +166,33 @@ static void __init exynos_init_io(void)
- 	exynos_map_io();
- }
++#include <linux/mm.h>
+ #include <asm/smp_plat.h>
+ 
+ /* Basic configuration for ACPI */
+@@ -100,4 +101,17 @@ static inline bool acpi_psci_use_hvc(void) { return false; }
+ static inline void acpi_init_cpus(void) { }
+ #endif /* CONFIG_ACPI */
  
 +/*
-+ * Set or clear the USE_DELAYED_RESET_ASSERTION option. Used by smp code
-+ * and suspend.
-+ *
-+ * This is necessary only on Exynos4 SoCs. When system is running
-+ * USE_DELAYED_RESET_ASSERTION should be set so the ARM CLK clock down
-+ * feature could properly detect global idle state when secondary CPU is
-+ * powered down.
-+ *
-+ * However this should not be set when such system is going into suspend.
++ * ACPI table mapping
 + */
-+void exynos_set_delayed_reset_assertion(bool enable)
++static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
++					    acpi_size size)
 +{
-+	if (soc_is_exynos4()) {
-+		unsigned int tmp, core_id;
++	if (!page_is_ram(phys >> PAGE_SHIFT))
++		return ioremap(phys, size);
 +
-+		for (core_id = 0; core_id < num_possible_cpus(); core_id++) {
-+			tmp = pmu_raw_readl(EXYNOS_ARM_CORE_OPTION(core_id));
-+			if (enable)
-+				tmp |= S5P_USE_DELAYED_RESET_ASSERTION;
-+			else
-+				tmp &= ~(S5P_USE_DELAYED_RESET_ASSERTION);
-+			pmu_raw_writel(tmp, EXYNOS_ARM_CORE_OPTION(core_id));
-+		}
-+	}
++       return ioremap_cache(phys, size);
 +}
++#define acpi_os_ioremap acpi_os_ioremap
 +
- static const struct of_device_id exynos_dt_pmu_match[] = {
- 	{ .compatible = "samsung,exynos3250-pmu" },
- 	{ .compatible = "samsung,exynos4210-pmu" },
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index 3f32c47a6d74..19d5c87c842c 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -34,30 +34,6 @@
+ #endif /*_ASM_ACPI_H*/
+diff --git a/include/acpi/acpi_io.h b/include/acpi/acpi_io.h
+index 444671e..48f504a 100644
+--- a/include/acpi/acpi_io.h
++++ b/include/acpi/acpi_io.h
+@@ -2,12 +2,15 @@
+ #define _ACPI_IO_H_
  
- extern void exynos4_secondary_startup(void);
+ #include <linux/io.h>
++#include <asm/acpi.h>
  
--/*
-- * Set or clear the USE_DELAYED_RESET_ASSERTION option, set on Exynos4 SoCs
-- * during hot-(un)plugging CPUx.
-- *
-- * The feature can be cleared safely during first boot of secondary CPU.
-- *
-- * Exynos4 SoCs require setting USE_DELAYED_RESET_ASSERTION during powering
-- * down a CPU so the CPU idle clock down feature could properly detect global
-- * idle state when CPUx is off.
-- */
--static void exynos_set_delayed_reset_assertion(u32 core_id, bool enable)
--{
--	if (soc_is_exynos4()) {
--		unsigned int tmp;
--
--		tmp = pmu_raw_readl(EXYNOS_ARM_CORE_OPTION(core_id));
--		if (enable)
--			tmp |= S5P_USE_DELAYED_RESET_ASSERTION;
--		else
--			tmp &= ~(S5P_USE_DELAYED_RESET_ASSERTION);
--		pmu_raw_writel(tmp, EXYNOS_ARM_CORE_OPTION(core_id));
--	}
--}
--
- #ifdef CONFIG_HOTPLUG_CPU
- static inline void cpu_leave_lowpower(u32 core_id)
++#ifndef acpi_os_ioremap
+ static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
+ 					    acpi_size size)
  {
-@@ -73,8 +49,6 @@ static inline void cpu_leave_lowpower(u32 core_id)
- 	  : "=&r" (v)
- 	  : "Ir" (CR_C), "Ir" (0x40)
- 	  : "cc");
--
--	 exynos_set_delayed_reset_assertion(core_id, false);
+        return ioremap_cache(phys, size);
  }
++#endif
  
- static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
-@@ -87,14 +61,6 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
- 		/* Turn the CPU off on next WFI instruction. */
- 		exynos_cpu_power_down(core_id);
- 
--		/*
--		 * Exynos4 SoCs require setting
--		 * USE_DELAYED_RESET_ASSERTION so the CPU idle
--		 * clock down feature could properly detect
--		 * global idle state when CPUx is off.
--		 */
--		exynos_set_delayed_reset_assertion(core_id, true);
--
- 		wfi();
- 
- 		if (pen_release == core_id) {
-@@ -355,9 +321,6 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 		udelay(10);
- 	}
- 
--	/* No harm if this is called during first boot of secondary CPU */
--	exynos_set_delayed_reset_assertion(core_id, false);
--
- 	/*
- 	 * now the secondary core is starting up let it run its
- 	 * calibrations, then wait for it to finish
-@@ -404,6 +367,8 @@ static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
- 
- 	exynos_sysram_init();
- 
-+	exynos_set_delayed_reset_assertion(true);
-+
- 	if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9)
- 		scu_enable(scu_base_addr());
- 
-diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
-index 666ec3e5b03f..d4da035cc88a 100644
---- a/arch/arm/mach-exynos/suspend.c
-+++ b/arch/arm/mach-exynos/suspend.c
-@@ -235,6 +235,8 @@ static void exynos_pm_enter_sleep_mode(void)
- 
- static void exynos_pm_prepare(void)
- {
-+	exynos_set_delayed_reset_assertion(false);
-+
- 	/* Set wake-up mask registers */
- 	exynos_pm_set_wakeup_mask();
- 
-@@ -383,6 +385,7 @@ early_wakeup:
- 
- 	/* Clear SLEEP mode set in INFORM1 */
- 	pmu_raw_writel(0x0, S5P_INFORM1);
-+	exynos_set_delayed_reset_assertion(true);
- }
- 
- static void exynos3250_pm_resume(void)
+ void __iomem *__init_refok
+ acpi_os_map_iomem(acpi_physical_address phys, acpi_size size);
 -- 
-1.9.1
+1.8.3.1
