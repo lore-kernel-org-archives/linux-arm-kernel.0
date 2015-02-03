@@ -1,134 +1,50 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue,  3 Feb 2015 12:28:52 +0100
-Subject: [PATCH] ARM: berlin: add a defconfig
-Message-ID: <1422962932-12603-1-git-send-email-antoine.tenart@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 03 Feb 2015 12:31:43 +0100
+Subject: [PATCH] PCI: Fix pcibios_update_irq misuse of irq number
+In-Reply-To: <54D0A521.7030405@arm.com>
+References: <1422456683-797-1-git-send-email-marc.zyngier@arm.com>
+ <4145359.V8A0ARGtXz@wuerfel> <54D0A521.7030405@arm.com>
+Message-ID: <4324891.mqG6Yyfi6J@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marvell Berlin SoCs did not have a custom defconfig and were only
-supported in multi_v7_defconfig.
+On Tuesday 03 February 2015 10:38:25 Marc Zyngier wrote:
+> 
+> That's exactly what I thought until Lorenzo reported kvmtool falling
+> over because of this write. Obviously, some platforms must actually
+> require this (possibly for bridges that are not known by the firmware).
 
-Adds a proper defconfig, allowing to boot a Berlin SoC with all the
-currently supported features: SMP, Pinmux, AHCI, Ethernet, I2C, GPIO,
-USB, SDHCI.
+This sounds much like a bug in kvmtool.
+ 
+> Entirely removing that code solves my problem too, but that'd cannot be
+> the right solution...
 
-Booting with the rootfs on NFS is also supported.
+The comment in pdev_fixup_irq() says 
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
----
- arch/arm/configs/berlin_defconfig | 104 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 104 insertions(+)
- create mode 100644 arch/arm/configs/berlin_defconfig
+        /* Always tell the device, so the driver knows what is
+           the real IRQ to use; the device does not use it. */
 
-diff --git a/arch/arm/configs/berlin_defconfig b/arch/arm/configs/berlin_defconfig
-new file mode 100644
-index 000000000000..12430995cab2
---- /dev/null
-+++ b/arch/arm/configs/berlin_defconfig
-@@ -0,0 +1,104 @@
-+CONFIG_IKCONFIG=y
-+CONFIG_IKCONFIG_PROC=y
-+CONFIG_EMBEDDED=y
-+# CONFIG_VM_EVENT_COUNTERS is not set
-+# CONFIG_SLUB_DEBUG is not set
-+# CONFIG_COMPAT_BRK is not set
-+CONFIG_JUMP_LABEL=y
-+CONFIG_ARCH_BERLIN=y
-+CONFIG_MACH_BERLIN_BG2=y
-+CONFIG_MACH_BERLIN_BG2CD=y
-+CONFIG_MACH_BERLIN_BG2Q=y
-+CONFIG_SMP=y
-+CONFIG_AEABI=y
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_ARM_ATAG_DTB_COMPAT=y
-+CONFIG_CMDLINE="console=ttyS0,115200"
-+CONFIG_VFP=y
-+CONFIG_NEON=y
-+# CONFIG_SUSPEND is not set
-+CONFIG_NET=y
-+CONFIG_PACKET=y
-+CONFIG_UNIX=y
-+CONFIG_INET=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
-+# CONFIG_INET_XFRM_MODE_TUNNEL is not set
-+# CONFIG_INET_XFRM_MODE_BEET is not set
-+# CONFIG_INET_LRO is not set
-+# CONFIG_INET_DIAG is not set
-+CONFIG_TCP_CONG_ADVANCED=y
-+# CONFIG_INET6_XFRM_MODE_TRANSPORT is not set
-+# CONFIG_INET6_XFRM_MODE_TUNNEL is not set
-+# CONFIG_INET6_XFRM_MODE_BEET is not set
-+# CONFIG_IPV6_SIT is not set
-+# CONFIG_WIRELESS is not set
-+# CONFIG_UEVENT_HELPER is not set
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
-+# CONFIG_FW_LOADER is not set
-+# CONFIG_BLK_DEV is not set
-+CONFIG_BLK_DEV_SD=y
-+# CONFIG_SCSI_LOWLEVEL is not set
-+CONFIG_ATA=y
-+# CONFIG_ATA_VERBOSE_ERROR is not set
-+CONFIG_SATA_AHCI_PLATFORM=y
-+CONFIG_NETDEVICES=y
-+# CONFIG_NET_CORE is not set
-+# CONFIG_NET_VENDOR_ARC is not set
-+# CONFIG_NET_CADENCE is not set
-+# CONFIG_NET_VENDOR_BROADCOM is not set
-+# CONFIG_NET_VENDOR_CIRRUS is not set
-+# CONFIG_NET_VENDOR_FARADAY is not set
-+# CONFIG_NET_VENDOR_HISILICON is not set
-+# CONFIG_NET_VENDOR_INTEL is not set
-+CONFIG_PXA168_ETH=y
-+# CONFIG_NET_VENDOR_MICREL is not set
-+# CONFIG_NET_VENDOR_NATSEMI is not set
-+# CONFIG_NET_VENDOR_QUALCOMM is not set
-+# CONFIG_NET_VENDOR_ROCKER is not set
-+# CONFIG_NET_VENDOR_SAMSUNG is not set
-+# CONFIG_NET_VENDOR_SEEQ is not set
-+# CONFIG_NET_VENDOR_SMSC is not set
-+# CONFIG_NET_VENDOR_STMICRO is not set
-+# CONFIG_NET_VENDOR_VIA is not set
-+# CONFIG_NET_VENDOR_WIZNET is not set
-+# CONFIG_USB_NET_DRIVERS is not set
-+# CONFIG_WLAN is not set
-+# CONFIG_INPUT_MOUSEDEV is not set
-+# CONFIG_INPUT_KEYBOARD is not set
-+# CONFIG_INPUT_MOUSE is not set
-+CONFIG_SERIAL_8250=y
-+CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_8250_DW=y
-+# CONFIG_HW_RANDOM is not set
-+CONFIG_I2C=y
-+CONFIG_I2C_DESIGNWARE_PLATFORM=y
-+CONFIG_GPIO_DWAPB=y
-+# CONFIG_HWMON is not set
-+CONFIG_REGULATOR=y
-+CONFIG_REGULATOR_FIXED_VOLTAGE=y
-+CONFIG_USB=y
-+CONFIG_USB_EHCI_HCD=y
-+CONFIG_USB_STORAGE=y
-+CONFIG_USB_CHIPIDEA=y
-+CONFIG_USB_CHIPIDEA_HOST=y
-+CONFIG_MMC=y
-+CONFIG_MMC_SDHCI=y
-+CONFIG_MMC_SDHCI_PLTFM=y
-+CONFIG_MMC_SDHCI_PXAV3=y
-+# CONFIG_IOMMU_SUPPORT is not set
-+CONFIG_PHY_BERLIN_USB=y
-+CONFIG_PHY_BERLIN_SATA=y
-+CONFIG_EXT4_FS=y
-+CONFIG_CONFIGFS_FS=y
-+# CONFIG_MISC_FILESYSTEMS is not set
-+CONFIG_NFS_FS=y
-+CONFIG_NFS_V4=y
-+CONFIG_ROOT_NFS=y
-+CONFIG_PRINTK_TIME=y
-+# CONFIG_SCHED_DEBUG is not set
-+# CONFIG_FTRACE is not set
-+# CONFIG_CRYPTO_ANSI_CPRNG is not set
-+# CONFIG_CRYPTO_HW is not set
--- 
-2.2.2
+which I read to mean that there are drivers that incorrectly use
+'pci_read_config_byte(dev, PCI_INTERRUPT_LINE)' as the number
+they pass into request_irq, rather than using dev->irq.
+However, this means that your patch is actually wrong, because
+what the driver cares about is the virtual irq number (which
+request_irq expects), not the number relative to some interrupt
+controller.
+
+There is another comment in include/linux/pci.h that states
+       /*
+        * Instead of touching interrupt line and base address registers
+        * directly, use the values stored here. They might be different!
+        */
+       unsigned int    irq;
+
+so apparently this has been a cause for problems in the past,
+and drivers that rely on the number are already broken.
+
+I also checked ancient kernel versions from the 2.1 days when the
+code was first added. And indeed at the time drivers used to read
+the word, but now none of them use the number for anything real,
+they were all fixed during linux-2.2 at the latest.
+
+	Arnd
