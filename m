@@ -1,508 +1,206 @@
-From: dtor@google.com (Dmitry Torokhov)
-Date: Tue, 3 Feb 2015 09:40:42 -0800
-Subject: [PATCH v3 3/4] pinctrl: cygnus: add initial IOMUX driver support
-In-Reply-To: <1422928894-20716-4-git-send-email-rjui@broadcom.com>
-References: <rjui@broadcom.com>
- <1422928894-20716-1-git-send-email-rjui@broadcom.com>
- <1422928894-20716-4-git-send-email-rjui@broadcom.com>
-Message-ID: <20150203174042.GA15969@dtor-ws>
+From: a.ryabinin@samsung.com (Andrey Ryabinin)
+Date: Tue, 03 Feb 2015 20:43:09 +0300
+Subject: [PATCH v11 16/19] mm: vmalloc: pass additional vm_flags to
+ __vmalloc_node_range()
+In-Reply-To: <1422985392-28652-1-git-send-email-a.ryabinin@samsung.com>
+References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
+ <1422985392-28652-1-git-send-email-a.ryabinin@samsung.com>
+Message-ID: <1422985392-28652-17-git-send-email-a.ryabinin@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ray,
+For instrumenting global variables KASan will shadow memory
+backing memory for modules. So on module loading we will need
+to allocate memory for shadow and map it at address in shadow
+that corresponds to the address allocated in module_alloc().
 
-On Mon, Feb 02, 2015 at 06:01:33PM -0800, Ray Jui wrote:
-> This adds the initial driver support for the Broadcom Cygnus IOMUX
-> controller. The Cygnus IOMUX controller supports group based mux
-> configuration but allows certain pins to be muxed to GPIO individually
-> 
-> Signed-off-by: Ray Jui <rjui@broadcom.com>
-> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+__vmalloc_node_range() could be used for this purpose,
+except it puts a guard hole after allocated area. Guard hole
+in shadow memory should be a problem because at some future
+point we might need to have a shadow memory at address
+occupied by guard hole. So we could fail to allocate shadow
+for module_alloc().
 
-Just a few random nits/comments...
+Now we have VM_NO_GUARD flag disabling guard page, so we need to
+pass into __vmalloc_node_range(). Add new parameter 'vm_flags'
+to __vmalloc_node_range() function.
 
-> ---
->  drivers/pinctrl/bcm/Kconfig              |   13 +
->  drivers/pinctrl/bcm/Makefile             |    5 +-
->  drivers/pinctrl/bcm/pinctrl-cygnus-mux.c | 1087 ++++++++++++++++++++++++++++++
->  3 files changed, 1103 insertions(+), 2 deletions(-)
->  create mode 100644 drivers/pinctrl/bcm/pinctrl-cygnus-mux.c
-> 
-> diff --git a/drivers/pinctrl/bcm/Kconfig b/drivers/pinctrl/bcm/Kconfig
-> index bc6d048..eb13201 100644
-> --- a/drivers/pinctrl/bcm/Kconfig
-> +++ b/drivers/pinctrl/bcm/Kconfig
-> @@ -19,3 +19,16 @@ config PINCTRL_BCM2835
->  	bool
->  	select PINMUX
->  	select PINCONF
-> +
-> +config PINCTRL_CYGNUS_MUX
-> +	bool "Broadcom Cygnus IOMUX driver"
-> +	depends on (ARCH_BCM_CYGNUS || COMPILE_TEST)
-> +	select PINMUX
-> +	select GENERIC_PINCONF
-> +	default ARCH_BCM_CYGNUS
-> +	help
-> +	  Say yes here to enable the Broadcom Cygnus IOMUX driver.
-> +
-> +	  The Broadcom Cygnus IOMUX driver supports group based IOMUX
-> +	  configuration, with the exception that certain individual pins
-> +	  can be overrided to GPIO function
-> diff --git a/drivers/pinctrl/bcm/Makefile b/drivers/pinctrl/bcm/Makefile
-> index 7ba80a3..bb6beb6 100644
-> --- a/drivers/pinctrl/bcm/Makefile
-> +++ b/drivers/pinctrl/bcm/Makefile
-> @@ -1,4 +1,5 @@
->  # Broadcom pinctrl support
->  
-> -obj-$(CONFIG_PINCTRL_BCM281XX)	+= pinctrl-bcm281xx.o
-> -obj-$(CONFIG_PINCTRL_BCM2835)	+= pinctrl-bcm2835.o
-> +obj-$(CONFIG_PINCTRL_BCM281XX)		+= pinctrl-bcm281xx.o
-> +obj-$(CONFIG_PINCTRL_BCM2835)		+= pinctrl-bcm2835.o
-> +obj-$(CONFIG_PINCTRL_CYGNUS_MUX)	+= pinctrl-cygnus-mux.o
-> diff --git a/drivers/pinctrl/bcm/pinctrl-cygnus-mux.c b/drivers/pinctrl/bcm/pinctrl-cygnus-mux.c
-> new file mode 100644
-> index 0000000..33565b4
-> --- /dev/null
-> +++ b/drivers/pinctrl/bcm/pinctrl-cygnus-mux.c
-> @@ -0,0 +1,1087 @@
-> +/* Copyright (C) 2014-2015 Broadcom Corporation
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation version 2.
-> + *
-> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-> + * kind, whether express or implied; without even the implied warranty
-> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * This file contains the Cygnus IOMUX driver that supports group based PINMUX
-> + * configuration. Although PINMUX configuration is mainly group based, the
-> + * Cygnus IOMUX controller allows certain pins to be individually muxed to GPIO
-> + * function, and therefore be controlled by the Cygnus ASIU GPIO controller
-> + */
-> +
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/slab.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/pinctrl/pinctrl.h>
-> +#include <linux/pinctrl/pinmux.h>
-> +#include <linux/pinctrl/pinconf.h>
-> +#include <linux/pinctrl/pinconf-generic.h>
-> +#include "../core.h"
-> +#include "../pinctrl-utils.h"
-> +
-> +#define CYGNUS_NUM_IOMUX_REGS     8
-> +#define CYGNUS_NUM_MUX_PER_REG    8
-> +#define CYGNUS_NUM_IOMUX          (CYGNUS_NUM_IOMUX_REGS * \
-> +				   CYGNUS_NUM_MUX_PER_REG)
-> +
-> +/*
-> + * Cygnus IOMUX register description
-> + *
-> + * @offset: register offset for mux configuration of a group
-> + * @shift: bit shift for mux configuration of a group
-> + * @alt: alternate function to set to
-> + */
-> +struct cygnus_mux {
-> +	unsigned int offset;
-> +	unsigned int shift;
-> +	unsigned int alt;
-> +};
-> +
-> +/*
-> + * Keep track of Cygnus IOMUX configuration and prevent double configuration
-> + *
-> + * @cygnus_mux: Cygnus IOMUX register description
-> + * @is_configured: flag to indicate whether a mux setting has already been
-> + * configured
-> + */
-> +struct cygnus_mux_log {
-> +	struct cygnus_mux mux;
-> +	bool is_configured;
-> +};
-> +
-> +/*
-> + * Group based IOMUX configuration
-> + *
-> + * @name: name of the group
-> + * @pins: array of pins used by this group
-> + * @num_pins: total number of pins used by this group
-> + * @mux: Cygnus group based IOMUX configuration
-> + */
-> +struct cygnus_pin_group {
-> +	const char *name;
-> +	const unsigned *pins;
-> +	const unsigned num_pins;
-> +	const struct cygnus_mux mux;
+Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
+---
+ arch/arm/kernel/module.c       |  2 +-
+ arch/arm64/kernel/module.c     |  4 ++--
+ arch/mips/kernel/module.c      |  2 +-
+ arch/parisc/kernel/module.c    |  2 +-
+ arch/s390/kernel/module.c      |  2 +-
+ arch/sparc/kernel/module.c     |  2 +-
+ arch/unicore32/kernel/module.c |  2 +-
+ arch/x86/kernel/module.c       |  2 +-
+ include/linux/vmalloc.h        |  4 +++-
+ mm/vmalloc.c                   | 10 ++++++----
+ 10 files changed, 18 insertions(+), 14 deletions(-)
 
-Not: the last 2 consts are quite weird - if you want to make an instance
-of cygnus_pin_group immutable you declare it as a const (and I see you
-are already doing that below). With the structure as it laid out
-currently you can only do static initializers.
-
-> +};
-> +
-> +/*
-> + * Cygnus mux function and supported pin groups
-> + *
-> + * @name: name of the function
-> + * @groups: array of groups that can be supported by this function
-> + * @num_groups: total number of groups that can be supported by this function
-> + */
-> +struct cygnus_pin_function {
-> +	const char *name;
-> +	const char * const *groups;
-> +	const unsigned num_groups;
-
-Here as well.
-
-...
-
-> +
-> +/*
-> + * List of pins in Cygnus
-> + */
-> +static struct cygnus_pin cygnus_pins[] = {
-
-const?
-
-> +	CYGNUS_PIN_DESC(0, "ext_device_reset_n", 0, 0, 0),
-> +	CYGNUS_PIN_DESC(1, "chip_mode0", 0, 0, 0),
-
-...
-
-> +#define CYGNUS_PIN_GROUP(group_name, off, sh, al)	\
-> +{							\
-> +	.name = #group_name"""_grp",			\
-
-Why do we need extra pair of quotes? BTW we can also do
-
-	.name = __stringify(group_name) "_grp",
-
-> +	.pins = group_name ## _pins,			\
-> +	.num_pins = ARRAY_SIZE(group_name ## _pins),	\
-> +	.mux = {					\
-> +		.offset = off,				\
-> +		.shift = sh,				\
-> +		.alt = al,				\
-> +	}						\
-> +}
-
-...
-
-> +
-> +static struct pinctrl_ops cygnus_pinctrl_ops = {
-
-const?
-
-> +	.get_groups_count = cygnus_get_groups_count,
-> +	.get_group_name = cygnus_get_group_name,
-> +	.get_group_pins = cygnus_get_group_pins,
-> +	.pin_dbg_show = cygnus_pin_dbg_show,
-> +	.dt_node_to_map = cygnus_dt_node_to_map,
-> +	.dt_free_map = pinctrl_utils_dt_free_map,
-> +};
-> +
-> +static int cygnus_get_functions_count(struct pinctrl_dev *pctrl_dev)
-> +{
-> +	struct cygnus_pinctrl *pinctrl = pinctrl_dev_get_drvdata(pctrl_dev);
-> +
-> +	return pinctrl->num_functions;
-> +}
-> +
-> +static const char *cygnus_get_function_name(struct pinctrl_dev *pctrl_dev,
-> +					    unsigned selector)
-> +{
-> +	struct cygnus_pinctrl *pinctrl = pinctrl_dev_get_drvdata(pctrl_dev);
-> +
-> +	return pinctrl->functions[selector].name;
-> +}
-> +
-> +static int cygnus_get_function_groups(struct pinctrl_dev *pctrl_dev,
-> +				      unsigned selector,
-> +				      const char * const **groups,
-> +				      unsigned * const num_groups)
-> +{
-> +	struct cygnus_pinctrl *pinctrl = pinctrl_dev_get_drvdata(pctrl_dev);
-> +
-> +	*groups = pinctrl->functions[selector].groups;
-> +	*num_groups = pinctrl->functions[selector].num_groups;
-> +
-> +	return 0;
-> +}
-> +
-> +static int cygnus_pinmux_set(struct cygnus_pinctrl *pinctrl,
-> +			     const struct cygnus_pin_function *func,
-> +			     const struct cygnus_pin_group *grp,
-> +			     struct cygnus_mux_log *mux_log)
-> +{
-> +	const struct cygnus_mux *mux = &grp->mux;
-> +	int i;
-> +	u32 val, mask = 0x7;
-> +	unsigned long flags;
-> +
-> +	for (i = 0; i < CYGNUS_NUM_IOMUX; i++) {
-> +		if (mux->offset != mux_log[i].mux.offset ||
-> +		    mux->shift != mux_log[i].mux.shift)
-> +			continue;
-> +
-> +		/* match found if we reach here */
-> +
-> +		/* if this is a new configuration, just do it! */
-> +		if (!mux_log[i].is_configured)
-> +			break;
-> +
-> +		/*
-> +		 * IOMUX has been configured previously and one is trying to
-> +		 * configure it to a different function
-> +		 */
-> +		if (mux_log[i].mux.alt != mux->alt) {
-> +			dev_err(pinctrl->dev,
-> +				"double configuration error detected!\n");
-> +			dev_err(pinctrl->dev, "func:%s grp:%s\n",
-> +				func->name, grp->name);
-> +			return -EINVAL;
-> +		} else {
-> +			/*
-> +			 * One tries to configure it to the same function.
-> +			 * Just quit and don't bother
-> +			 */
-> +			return 0;
-> +		}
-> +	}
-> +
-> +	mux_log[i].mux.alt = mux->alt;
-> +	mux_log[i].is_configured = true;
-> +
-> +	spin_lock_irqsave(&pinctrl->lock, flags);
-> +
-> +	val = readl(pinctrl->base0 + grp->mux.offset);
-> +	val &= ~(mask << grp->mux.shift);
-> +	val |= grp->mux.alt << grp->mux.shift;
-> +	writel(val, pinctrl->base0 + grp->mux.offset);
-> +
-> +	spin_unlock_irqrestore(&pinctrl->lock, flags);
-> +
-> +	return 0;
-> +}
-> +
-> +static int cygnus_pinmux_set_mux(struct pinctrl_dev *pctrl_dev,
-> +				 unsigned func_select, unsigned grp_select)
-> +{
-> +	struct cygnus_pinctrl *pinctrl = pinctrl_dev_get_drvdata(pctrl_dev);
-> +	const struct cygnus_pin_function *func =
-> +		&pinctrl->functions[func_select];
-> +	const struct cygnus_pin_group *grp = &pinctrl->groups[grp_select];
-> +
-> +	dev_dbg(pctrl_dev->dev, "func:%u name:%s grp:%u name:%s\n",
-> +		func_select, func->name, grp_select, grp->name);
-> +
-> +	dev_dbg(pctrl_dev->dev, "offset:0x%08x shift:%u alt:%u\n",
-> +		grp->mux.offset, grp->mux.shift, grp->mux.alt);
-> +
-> +	return cygnus_pinmux_set(pinctrl, func, grp, pinctrl->mux_log);
-> +}
-> +
-> +static int cygnus_gpio_request_enable(struct pinctrl_dev *pctrl_dev,
-> +				      struct pinctrl_gpio_range *range,
-> +				      unsigned pin)
-> +{
-> +	struct cygnus_pinctrl *pinctrl = pinctrl_dev_get_drvdata(pctrl_dev);
-> +	struct cygnus_gpio_mux *mux = pctrl_dev->desc->pins[pin].drv_data;
-
-const?
-
-> +	u32 val;
-> +	unsigned long flags;
-> +
-> +	/* not all pins support GPIO pinmux override */
-> +	if (!mux->is_supported)
-> +		return -ENOTSUPP;
-> +
-> +	spin_lock_irqsave(&pinctrl->lock, flags);
-> +
-> +	val = readl(pinctrl->base1 + mux->offset);
-> +	val |= 0x3 << mux->shift;
-> +	writel(val, pinctrl->base1 + mux->offset);
-> +
-> +	spin_unlock_irqrestore(&pinctrl->lock, flags);
-> +
-> +	dev_dbg(pctrl_dev->dev,
-> +		"gpio request enable pin=%u offset=0x%x shift=%u\n",
-> +		pin, mux->offset, mux->shift);
-> +
-> +	return 0;
-> +}
-> +
-> +static void cygnus_gpio_disable_free(struct pinctrl_dev *pctrl_dev,
-> +				     struct pinctrl_gpio_range *range,
-> +				     unsigned pin)
-> +{
-> +	struct cygnus_pinctrl *pinctrl = pinctrl_dev_get_drvdata(pctrl_dev);
-> +	struct cygnus_gpio_mux *mux = pctrl_dev->desc->pins[pin].drv_data;
-> +	u32 val;
-> +	unsigned long flags;
-> +
-> +	if (!mux->is_supported)
-> +		return;
-> +
-> +	spin_lock_irqsave(&pinctrl->lock, flags);
-> +
-> +	val = readl(pinctrl->base1 + mux->offset);
-> +	val &= ~(0x3 << mux->shift);
-> +	writel(val, pinctrl->base1 + mux->offset);
-> +
-> +	spin_unlock_irqrestore(&pinctrl->lock, flags);
-> +
-> +	dev_err(pctrl_dev->dev,
-> +		"gpio disable free pin=%u offset=0x%x shift=%u\n",
-> +		pin, mux->offset, mux->shift);
-> +}
-> +
-> +static struct pinmux_ops cygnus_pinmux_ops = {
-
-const?
-
-> +	.get_functions_count = cygnus_get_functions_count,
-> +	.get_function_name = cygnus_get_function_name,
-> +	.get_function_groups = cygnus_get_function_groups,
-> +	.set_mux = cygnus_pinmux_set_mux,
-> +	.gpio_request_enable = cygnus_gpio_request_enable,
-> +	.gpio_disable_free = cygnus_gpio_disable_free,
-> +};
-> +
-> +static struct pinctrl_desc cygnus_pinctrl_desc = {
-> +	.name = "cygnus-pinmux",
-> +	.pctlops = &cygnus_pinctrl_ops,
-> +	.pmxops = &cygnus_pinmux_ops,
-> +};
-> +
-> +static int cygnus_mux_log_init(struct cygnus_pinctrl *pinctrl)
-> +{
-> +	struct cygnus_mux_log *log;
-> +	unsigned int i, j;
-> +
-> +	pinctrl->mux_log = devm_kcalloc(pinctrl->dev, CYGNUS_NUM_IOMUX,
-> +					sizeof(struct cygnus_mux_log),
-> +					GFP_KERNEL);
-> +	if (!pinctrl->mux_log)
-> +		return -ENOMEM;
-> +
-> +	log = pinctrl->mux_log;
-> +	for (i = 0; i < CYGNUS_NUM_IOMUX_REGS; i++) {
-> +		for (j = 0; j < CYGNUS_NUM_MUX_PER_REG; j++) {
-> +			log = &pinctrl->mux_log[i * CYGNUS_NUM_MUX_PER_REG
-> +				+ j];
-> +			log->mux.offset = i * 4;
-> +			log->mux.shift = j * 4;
-> +			log->mux.alt = 0;
-> +			log->is_configured = false;
-> +		}
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int cygnus_pinmux_probe(struct platform_device *pdev)
-> +{
-> +	struct cygnus_pinctrl *pinctrl;
-> +	struct resource *res;
-> +	int i, ret;
-> +	struct pinctrl_pin_desc *pins;
-> +	unsigned num_pins = ARRAY_SIZE(cygnus_pins);
-> +
-> +	pinctrl = devm_kzalloc(&pdev->dev, sizeof(*pinctrl), GFP_KERNEL);
-> +	if (!pinctrl)
-> +		return -ENOMEM;
-> +
-> +	pinctrl->dev = &pdev->dev;
-> +	platform_set_drvdata(pdev, pinctrl);
-> +	spin_lock_init(&pinctrl->lock);
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	pinctrl->base0 = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(pinctrl->base0)) {
-> +		dev_err(&pdev->dev, "unable to map I/O space\n");
-> +		return PTR_ERR(pinctrl->base0);
-> +	}
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-> +	pinctrl->base1 = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(pinctrl->base1)) {
-> +		dev_err(&pdev->dev, "unable to map I/O space\n");
-> +		return PTR_ERR(pinctrl->base1);
-> +	}
-> +
-> +	ret = cygnus_mux_log_init(pinctrl);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "unable to initialize IOMUX log\n");
-> +		return ret;
-> +	}
-> +
-> +	pins = devm_kcalloc(&pdev->dev, num_pins, sizeof(*pins), GFP_KERNEL);
-> +	if (!pins)
-> +		return -ENOMEM;
-> +
-> +	for (i = 0; i < num_pins; i++) {
-> +		pins[i].number = cygnus_pins[i].pin;
-> +		pins[i].name = cygnus_pins[i].name;
-> +		pins[i].drv_data = &cygnus_pins[i].gpio_mux;
-> +	}
-> +
-> +	pinctrl->groups = cygnus_pin_groups;
-> +	pinctrl->num_groups = ARRAY_SIZE(cygnus_pin_groups);
-> +	pinctrl->functions = cygnus_pin_functions;
-> +	pinctrl->num_functions = ARRAY_SIZE(cygnus_pin_functions);
-> +	cygnus_pinctrl_desc.pins = pins;
-> +	cygnus_pinctrl_desc.npins = num_pins;
-> +
-> +	pinctrl->pctl = pinctrl_register(&cygnus_pinctrl_desc, &pdev->dev,
-> +			pinctrl);
-> +	if (!pinctrl->pctl) {
-> +		dev_err(&pdev->dev, "unable to register Cygnus IOMUX pinctrl\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static struct of_device_id cygnus_pinmux_of_match[] = {
-> +	{ .compatible = "brcm,cygnus-pinmux" },
-> +	{ }
-> +};
-> +
-> +static struct platform_driver cygnus_pinmux_driver = {
-> +	.driver = {
-> +		.name = "cygnus-pinmux",
-> +		.of_match_table = cygnus_pinmux_of_match,
-> +	},
-> +	.probe = cygnus_pinmux_probe,
-
-You also need to either provide remove() method or disallow unbinding
-via sysfs by setting suppress_bind_attrs in platform driver.
-
-> +};
-> +
-> +static int __init cygnus_pinmux_init(void)
-> +{
-> +	return platform_driver_register(&cygnus_pinmux_driver);
-> +}
-> +arch_initcall(cygnus_pinmux_init);
-> +
-> +MODULE_AUTHOR("Ray Jui <rjui@broadcom.com>");
-> +MODULE_DESCRIPTION("Broadcom Cygnus IOMUX driver");
-> +MODULE_LICENSE("GPL v2");
-> -- 
-> 1.7.9.5
-> 
-
-Thanks.
-
+diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+index bea7db9..2e11961 100644
+--- a/arch/arm/kernel/module.c
++++ b/arch/arm/kernel/module.c
+@@ -41,7 +41,7 @@
+ void *module_alloc(unsigned long size)
+ {
+ 	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
+-				GFP_KERNEL, PAGE_KERNEL_EXEC, NUMA_NO_NODE,
++				GFP_KERNEL, PAGE_KERNEL_EXEC, 0, NUMA_NO_NODE,
+ 				__builtin_return_address(0));
+ }
+ #endif
+diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
+index 9b6f71d..67bf410 100644
+--- a/arch/arm64/kernel/module.c
++++ b/arch/arm64/kernel/module.c
+@@ -35,8 +35,8 @@
+ void *module_alloc(unsigned long size)
+ {
+ 	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
+-				    GFP_KERNEL, PAGE_KERNEL_EXEC, NUMA_NO_NODE,
+-				    __builtin_return_address(0));
++				    GFP_KERNEL, PAGE_KERNEL_EXEC, 0,
++				    NUMA_NO_NODE, __builtin_return_address(0));
+ }
+ 
+ enum aarch64_reloc_op {
+diff --git a/arch/mips/kernel/module.c b/arch/mips/kernel/module.c
+index 2a52568..1833f51 100644
+--- a/arch/mips/kernel/module.c
++++ b/arch/mips/kernel/module.c
+@@ -47,7 +47,7 @@ static DEFINE_SPINLOCK(dbe_lock);
+ void *module_alloc(unsigned long size)
+ {
+ 	return __vmalloc_node_range(size, 1, MODULE_START, MODULE_END,
+-				GFP_KERNEL, PAGE_KERNEL, NUMA_NO_NODE,
++				GFP_KERNEL, PAGE_KERNEL, 0, NUMA_NO_NODE,
+ 				__builtin_return_address(0));
+ }
+ #endif
+diff --git a/arch/parisc/kernel/module.c b/arch/parisc/kernel/module.c
+index 5822e8e..3c63a82 100644
+--- a/arch/parisc/kernel/module.c
++++ b/arch/parisc/kernel/module.c
+@@ -219,7 +219,7 @@ void *module_alloc(unsigned long size)
+ 	 * init_data correctly */
+ 	return __vmalloc_node_range(size, 1, VMALLOC_START, VMALLOC_END,
+ 				    GFP_KERNEL | __GFP_HIGHMEM,
+-				    PAGE_KERNEL_RWX, NUMA_NO_NODE,
++				    PAGE_KERNEL_RWX, 0, NUMA_NO_NODE,
+ 				    __builtin_return_address(0));
+ }
+ 
+diff --git a/arch/s390/kernel/module.c b/arch/s390/kernel/module.c
+index 409d152..36154a2 100644
+--- a/arch/s390/kernel/module.c
++++ b/arch/s390/kernel/module.c
+@@ -50,7 +50,7 @@ void *module_alloc(unsigned long size)
+ 	if (PAGE_ALIGN(size) > MODULES_LEN)
+ 		return NULL;
+ 	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
+-				    GFP_KERNEL, PAGE_KERNEL, NUMA_NO_NODE,
++				    GFP_KERNEL, PAGE_KERNEL, 0, NUMA_NO_NODE,
+ 				    __builtin_return_address(0));
+ }
+ #endif
+diff --git a/arch/sparc/kernel/module.c b/arch/sparc/kernel/module.c
+index 97655e0..192a617 100644
+--- a/arch/sparc/kernel/module.c
++++ b/arch/sparc/kernel/module.c
+@@ -29,7 +29,7 @@ static void *module_map(unsigned long size)
+ 	if (PAGE_ALIGN(size) > MODULES_LEN)
+ 		return NULL;
+ 	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
+-				GFP_KERNEL, PAGE_KERNEL, NUMA_NO_NODE,
++				GFP_KERNEL, PAGE_KERNEL, 0, NUMA_NO_NODE,
+ 				__builtin_return_address(0));
+ }
+ #else
+diff --git a/arch/unicore32/kernel/module.c b/arch/unicore32/kernel/module.c
+index dc41f6d..e191b34 100644
+--- a/arch/unicore32/kernel/module.c
++++ b/arch/unicore32/kernel/module.c
+@@ -25,7 +25,7 @@
+ void *module_alloc(unsigned long size)
+ {
+ 	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
+-				GFP_KERNEL, PAGE_KERNEL_EXEC, NUMA_NO_NODE,
++				GFP_KERNEL, PAGE_KERNEL_EXEC, 0, NUMA_NO_NODE,
+ 				__builtin_return_address(0));
+ }
+ 
+diff --git a/arch/x86/kernel/module.c b/arch/x86/kernel/module.c
+index e69f988..e830e61 100644
+--- a/arch/x86/kernel/module.c
++++ b/arch/x86/kernel/module.c
+@@ -88,7 +88,7 @@ void *module_alloc(unsigned long size)
+ 	return __vmalloc_node_range(size, 1,
+ 				    MODULES_VADDR + get_module_load_offset(),
+ 				    MODULES_END, GFP_KERNEL | __GFP_HIGHMEM,
+-				    PAGE_KERNEL_EXEC, NUMA_NO_NODE,
++				    PAGE_KERNEL_EXEC, 0, NUMA_NO_NODE,
+ 				    __builtin_return_address(0));
+ }
+ 
+diff --git a/include/linux/vmalloc.h b/include/linux/vmalloc.h
+index 1526fe7..7d7acb3 100644
+--- a/include/linux/vmalloc.h
++++ b/include/linux/vmalloc.h
+@@ -76,7 +76,9 @@ extern void *vmalloc_32_user(unsigned long size);
+ extern void *__vmalloc(unsigned long size, gfp_t gfp_mask, pgprot_t prot);
+ extern void *__vmalloc_node_range(unsigned long size, unsigned long align,
+ 			unsigned long start, unsigned long end, gfp_t gfp_mask,
+-			pgprot_t prot, int node, const void *caller);
++			pgprot_t prot, unsigned long vm_flags, int node,
++			const void *caller);
++
+ extern void vfree(const void *addr);
+ 
+ extern void *vmap(struct page **pages, unsigned int count,
+diff --git a/mm/vmalloc.c b/mm/vmalloc.c
+index 2e74e99..35b25e1 100644
+--- a/mm/vmalloc.c
++++ b/mm/vmalloc.c
+@@ -1619,6 +1619,7 @@ fail:
+  *	@end:		vm area range end
+  *	@gfp_mask:	flags for the page level allocator
+  *	@prot:		protection mask for the allocated pages
++ *	@vm_flags:	additional vm area flags (e.g. %VM_NO_GUARD)
+  *	@node:		node to use for allocation or NUMA_NO_NODE
+  *	@caller:	caller's return address
+  *
+@@ -1628,7 +1629,8 @@ fail:
+  */
+ void *__vmalloc_node_range(unsigned long size, unsigned long align,
+ 			unsigned long start, unsigned long end, gfp_t gfp_mask,
+-			pgprot_t prot, int node, const void *caller)
++			pgprot_t prot, unsigned long vm_flags, int node,
++			const void *caller)
+ {
+ 	struct vm_struct *area;
+ 	void *addr;
+@@ -1638,8 +1640,8 @@ void *__vmalloc_node_range(unsigned long size, unsigned long align,
+ 	if (!size || (size >> PAGE_SHIFT) > totalram_pages)
+ 		goto fail;
+ 
+-	area = __get_vm_area_node(size, align, VM_ALLOC | VM_UNINITIALIZED,
+-				  start, end, node, gfp_mask, caller);
++	area = __get_vm_area_node(size, align, VM_ALLOC | VM_UNINITIALIZED |
++				vm_flags, start, end, node, gfp_mask, caller);
+ 	if (!area)
+ 		goto fail;
+ 
+@@ -1688,7 +1690,7 @@ static void *__vmalloc_node(unsigned long size, unsigned long align,
+ 			    int node, const void *caller)
+ {
+ 	return __vmalloc_node_range(size, align, VMALLOC_START, VMALLOC_END,
+-				gfp_mask, prot, node, caller);
++				gfp_mask, prot, 0, node, caller);
+ }
+ 
+ void *__vmalloc(unsigned long size, gfp_t gfp_mask, pgprot_t prot)
 -- 
-Dmitry
+2.2.2
