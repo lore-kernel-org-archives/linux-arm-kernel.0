@@ -1,65 +1,50 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 03 Feb 2015 13:48:41 +0300
-Subject: [PATCH] ARM: shmobile: silk: initial device tree
-In-Reply-To: <20150203003610.GA17629@verge.net.au>
-References: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
- <1608366.HtA9yBksdO@wasted.cogentembedded.com>
- <20150202110557.GC7459@leverpostej> <54CFE4CE.5090406@cogentembedded.com>
- <20150203003610.GA17629@verge.net.au>
-Message-ID: <54D0A789.5070707@cogentembedded.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 3 Feb 2015 02:59:25 -0800
+Subject: [RFC] change non-atomic bitops method
+In-Reply-To: <35FD53F367049845BC99AC72306C23D1044A02027E0E@CNBJMBX05.corpusers.net>
+References: <35FD53F367049845BC99AC72306C23D1044A02027E0A@CNBJMBX05.corpusers.net>
+ <20150202152909.13bfd11f192fb0268b2ab4bf@linux-foundation.org>
+ <20150203011730.GA15653@node.dhcp.inet.fi>
+ <35FD53F367049845BC99AC72306C23D1044A02027E0B@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D1044A02027E0C@CNBJMBX05.corpusers.net>
+ <20150202223851.f30768d0.akpm@linux-foundation.org>
+ <35FD53F367049845BC99AC72306C23D1044A02027E0D@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D1044A02027E0E@CNBJMBX05.corpusers.net>
+Message-ID: <20150203025925.d1c95fb8.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tue, 3 Feb 2015 16:42:14 +0800 "Wang, Yalin" <Yalin.Wang@sonymobile.com> wrote:
 
-On 2/3/2015 3:36 AM, Simon Horman wrote:
+> I make a change in kernel to test hit/miss ratio:
 
->>>> Add the initial device tree for the R8A7794 SoC based SILK low cost board.
->>>> SCIF2 serial port support is included, so that the serial console can work.
+Neat, thanks.
 
->>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>
+> ...
+>
+> After use the phone some time:
+> root at D5303:/ # cat /proc/meminfo
+> VmallocUsed:       10348 kB
+> VmallocChunk:      75632 kB
+> __set_bit_miss_count:10002 __set_bit_success_count:1096661
+> __clear_bit_miss_count:359484 __clear_bit_success_count:3674617
+> __test_and_set_bit_miss_count:7 __test_and_set_bit_success_count:221
+> __test_and_clear_bit_miss_count:924611 __test_and_clear_bit_success_count:193
+> 
+> __test_and_clear_bit_miss_count has a very high miss rate.
+> In fact, I think set/clear/test_and_set(clear)_bit atomic version can also
+> Be investigated to see its miss ratio,
+> I have not tested the atomic version,
+> Because it reside in different architectures.
 
->> [...]
+Hopefully misses in test_and_X_bit are not a problem.  The CPU
+implementation would be pretty stupid to go and dirty the cacheline
+when it knows it didn't change anything.  But maybe I'm wrong about
+that.  
 
->>>> Index: renesas/arch/arm/boot/dts/r8a7794-silk.dts
->>>> ===================================================================
->>>> --- /dev/null
->>>> +++ renesas/arch/arm/boot/dts/r8a7794-silk.dts
->>>> @@ -0,0 +1,41 @@
->>>> +/*
->>>> + * Device Tree Source for the SILK board
->>>> + *
->>>> + * Copyright (C) 2014 Renesas Electronics Corporation
->>>> + * Copyright (C) 2014-2015 Renesas Solutions Corp.
->>>> + * Copyright (C) 2014-2015 Cogent Embedded, Inc.
->>>> + *
->>>> + * This file is licensed under the terms of the GNU General Public License
->>>> + * version 2.  This program is licensed "as is" without any warranty of any
->>>> + * kind, whether express or implied.
->>>> + */
->>>> +
->>>> +/dts-v1/;
->>>> +#include "r8a7794.dtsi"
->>>> +
->>>> +/ {
->>>> +	model = "SILK";
+That we're running clear_bit against a cleared bit 10% of the time is a
+bit alarming.  I wonder where that's coming from.
 
->>> Shouldn't that have a "Renesas" prefix or something like that?
-
->>     Historically. no SH-Mobile .dts has used the vendor name in the "model"
->> prop. I defer the decision to Simon but I think we should be at least
->> consistent.
-
-> They are also my thoughts (except the bit about deferring to myself).
-
-> If there is a good motivation for a Renesas prefix then that is fine by me.
-> But in that case it seems that it would be appropriate to update
-> the existing renesas boards too.
-
-> The only thing that stood out to me about "SILK" was that unlike
-> other renesas boards names in .dtsi files it is all-capitals.
-> Its not a bit deal but as we are on the topic: is that intentional?
-
-    Yes, it is all uppercase. See e.g. http://www.elinux.org/R-Car/Boards/SILK.
-
-WBR, Sergei
+The enormous miss count in test_and_clear_bit() might indicate an
+inefficiency somewhere.
