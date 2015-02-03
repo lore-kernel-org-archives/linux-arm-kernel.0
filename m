@@ -1,51 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 03 Feb 2015 15:52:48 +0100
-Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher constraints
- with dma-parms
-In-Reply-To: <20150203144109.GR8656@n2100.arm.linux.org.uk>
-References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
- <4689826.8DDCrX2ZhK@wuerfel> <20150203144109.GR8656@n2100.arm.linux.org.uk>
-Message-ID: <4830208.H6zxrGlT1D@wuerfel>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Tue,  3 Feb 2015 15:53:04 +0100
+Subject: [PATCH] ARM: multi_v7_defconfig: update Berlin config
+Message-ID: <1422975184-25985-1-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 February 2015 14:41:09 Russell King - ARM Linux wrote:
-> On Tue, Feb 03, 2015 at 03:17:27PM +0100, Arnd Bergmann wrote:
-> > On Tuesday 03 February 2015 09:04:03 Rob Clark wrote:
-> > > Since I'm stuck w/ an iommu, instead of built in mmu, my plan was to
-> > > drop use of dma-mapping entirely (incl the current call to dma_map_sg,
-> > > which I just need until we can use drm_cflush on arm), and
-> > > attach/detach iommu domains directly to implement context switches.
-> > > At that point, dma_addr_t really has no sensible meaning for me.
-> > 
-> > I think what you see here is a quite common hardware setup and we really
-> > lack the right abstraction for it at the moment. Everybody seems to
-> > work around it with a mix of the dma-mapping API and the iommu API.
-> > These are doing different things, and even though the dma-mapping API
-> > can be implemented on top of the iommu API, they are not really compatible.
-> 
-> I'd go as far as saying that the "DMA API on top of IOMMU" is more
-> intended to be for a system IOMMU for the bus in question, rather
-> than a device-level IOMMU.
-> 
-> If an IOMMU is part of a device, then the device should handle it
-> (maybe via an abstraction) and not via the DMA API.  The DMA API should
-> be handing the bus addresses to the device driver which the device's
-> IOMMU would need to generate.  (In other words, in this circumstance,
-> the DMA API shouldn't give you the device internal address.)
+Marvell Berlin SoCs are supported in the multi_v7_defconfig. However
+some options were missing to support some features.
 
-Exactly. And the abstraction that people choose at the moment is the
-iommu API, for better or worse. It makes a lot of sense to use this
-API if the same iommu is used for other devices as well (which is
-the case on Tegra and probably a lot of others). Unfortunately the
-iommu API lacks support for cache management, and probably other things
-as well, because this was not an issue for the original use case
-(device assignment on KVM/x86).
+This patch adds the missing features: pxa168 Ethernet, Berlin USB PHY
+and Berlin SATA PHY.
 
-This could be done by adding explicit or implied cache management
-to the IOMMU mapping interfaces, or by extending the dma-mapping
-interfaces in a way that covers the use case of the device managing
-its own address space, in addition to the existing coherent and
-streaming interfaces.
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
+ arch/arm/configs/multi_v7_defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
-	Arnd
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index bc393b7e5ece..8e803d42142d 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -161,6 +161,7 @@ CONFIG_NET_CALXEDA_XGMAC=y
+ CONFIG_IGB=y
+ CONFIG_MV643XX_ETH=y
+ CONFIG_MVNETA=y
++CONFIG_PXA168_ETH=y
+ CONFIG_KS8851=y
+ CONFIG_R8169=y
+ CONFIG_SMSC911X=y
+@@ -452,6 +453,8 @@ CONFIG_PWM=y
+ CONFIG_PWM_TEGRA=y
+ CONFIG_PWM_VT8500=y
+ CONFIG_PHY_HIX5HD2_SATA=y
++CONFIG_PHY_BERLIN_USB=y
++CONFIG_PHY_BERLIN_SATA=y
+ CONFIG_OMAP_USB2=y
+ CONFIG_TI_PIPE3=y
+ CONFIG_PHY_MIPHY365X=y
+-- 
+2.2.2
