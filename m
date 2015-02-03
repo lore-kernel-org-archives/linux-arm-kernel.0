@@ -1,67 +1,85 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Tue, 3 Feb 2015 19:43:59 +0200
-Subject: [PATCH v13 5/6] clkdev: Export clk_register_clkdev
-In-Reply-To: <CAHp75VfN1-dwN5nAp=VLkm6Q-9UqhGHsB2ZFhq+b238mgjVoMQ@mail.gmail.com>
-References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
- <1422011024-32283-6-git-send-email-tomeu.vizoso@collabora.com>
- <CAHp75VfN1-dwN5nAp=VLkm6Q-9UqhGHsB2ZFhq+b238mgjVoMQ@mail.gmail.com>
-Message-ID: <CAHp75VeUgYup++JUf4kVNBK6HNppcF3DcKtaWjUF4o+ZbOBUpg@mail.gmail.com>
+From: al.stone@linaro.org (Al Stone)
+Date: Tue, 03 Feb 2015 10:43:57 -0700
+Subject: [Linaro-acpi] [PATCH v8 00/21] Introduce ACPI for ARM64 based
+ on ACPI 5.1
+In-Reply-To: <20150203164727.GC32750@leverpostej>
+References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
+ <20150203164727.GC32750@leverpostej>
+Message-ID: <54D108DD.6050509@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 3, 2015 at 7:35 PM, Andy Shevchenko
-<andy.shevchenko@gmail.com> wrote:
-> On Fri, Jan 23, 2015 at 1:03 PM, Tomeu Vizoso
-> <tomeu.vizoso@collabora.com> wrote:
->> So it can be used from modules such as clk-test.ko.
+On 02/03/2015 09:47 AM, Mark Rutland wrote:
+> On Mon, Feb 02, 2015 at 12:45:28PM +0000, Hanjun Guo wrote:
+>> Hi,
 >>
->> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
->> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
->
-> Sorry for late answer, but this is useless.
->
-> We have to provide the way how to get the allocated clk_lookup.
-> Otherwise you have no way but memory leak at the ->remove() stage.
->
-> (By the way I used to have the exact patch locally, that's why
-> discovered the change in upsteam)
->
+>> This is the v8 of ACPI core patches for ARM64 based on ACPI 5.1, there are
+>> some updates since v7:
+>>
+>>  - Add two more documantation to explain why we need ACPI in ARM64 servers
+>>    by Grant, and recommendations and prohibitions on the use of the numerous
+>>    ACPI tables and objects by Al Stone.
+>>
+>>  - Add two patches which is need to map acpi tables after acpi_gbl_permanent_mmap
+>>    is set
+>>
+>>  - Add another patch "dt / chosen: Add linux,uefi-stub-generated-dtb property"
+>>    to address that if firmware providing no dtb, we can try ACPI configuration data
+>>    even if no "acpi=force" is passed in early parameters. (I think ACPI for XEN and
+>>    kexec need consider sperately as disscussed, correct me if I'm wrong).
+>>
+>>  - Add CC in the patch to the subsystem maintainers and modify the subject
+>>    of the patch to explicitly show the subsystem touched by this patch set,
+>>    please help us to review and ack them if they make sense, thanks.
+>>
+>>  - Add Tested-by from Qualcomm and Redhat;
+>>
+>>  - Make ACPI depends on PCI suggested by Catalin;
+>>
+>>  - Clean up SMP init function as Lorenzo suggested, remove physical
+>>    CPU hot-plug code in the patch;
+>>
+>>  - Address some comments from Marc and explicitly state that will
+>>    implment statcked irqdomain and GIC init framework when GICv3 and
+>>    ITS, GICv2m are implemented;
+>>
+>>  - Rebased on top of 3.19-rc7.
+>>
+>> previous version is here:
+>> v7: https://lkml.org/lkml/2015/1/14/586
+>> v6: https://lkml.org/lkml/2015/1/4/40
+>>
+>> Any comments are welcome :)
+> 
+> I note that for ACPI the PMU interrupt information is stored in the GICC
+> (as "Performance Interrupt" and "Performance Interrupt Mode"), but I
+> don't see any code for handling that as part of this series.
+> 
+> Is anyone currently looking into that?
 
-Will send a patch soon to fix this.
+Yes.  IIRC, it's a pretty small patch that I'll be including in the
+Seattle patches that build on top of this core set.
 
->> ---
->>  drivers/clk/clkdev.c | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
->> index 901d242..29a1ab7 100644
->> --- a/drivers/clk/clkdev.c
->> +++ b/drivers/clk/clkdev.c
->> @@ -377,6 +377,7 @@ int clk_register_clkdev(struct clk *clk, const char *con_id,
->>
->>         return 0;
->>  }
->> +EXPORT_SYMBOL(clk_register_clkdev);
->>
->>  /**
->>   * clk_register_clkdevs - register a set of clk_lookup for a struct clk
->> --
->> 1.9.3
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> Please read the FAQ at  http://www.tux.org/lkml/
->
->
->
-> --
-> With Best Regards,
-> Andy Shevchenko
+> For those systems ACPI is being developed on do we know that the GICC
+> information for the PMU interrupts is sane?
 
+Yes.  We know this works for Seattle platforms, using their latest firmware.
 
+> I'm slightly worried about the prospect of adding support later only to
+> find that the performance interrupt data in contemporary GICC tables is
+> invalid; it's going to be extremely painful to detect that being the
+> case in order to perform any kind of workaround.
+
+That will depend on the error, of course.  It was pretty straightforward
+when the interrupt value was set to zero in some of the early tables we
+used.
 
 -- 
-With Best Regards,
-Andy Shevchenko
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Linaro Enterprise Group
+al.stone at linaro.org
+-----------------------------------
