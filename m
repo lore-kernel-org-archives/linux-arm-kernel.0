@@ -1,28 +1,253 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 3 Feb 2015 16:31:40 +1100
-Subject: linux-next: manual merge of the clk tree with the arm-soc tree
-Message-ID: <20150203163140.3edfe607@canb.auug.org.au>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Tue, 3 Feb 2015 13:42:45 +0800
+Subject: [RFC] change non-atomic bitops method
+In-Reply-To: <35FD53F367049845BC99AC72306C23D1044A02027E0B@CNBJMBX05.corpusers.net>
+References: <35FD53F367049845BC99AC72306C23D1044A02027E0A@CNBJMBX05.corpusers.net>
+ <20150202152909.13bfd11f192fb0268b2ab4bf@linux-foundation.org>
+ <20150203011730.GA15653@node.dhcp.inet.fi>
+ <35FD53F367049845BC99AC72306C23D1044A02027E0B@CNBJMBX05.corpusers.net>
+Message-ID: <35FD53F367049845BC99AC72306C23D1044A02027E0C@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+> -----Original Message-----
+> From: Wang, Yalin
+> Sent: Tuesday, February 03, 2015 10:13 AM
+> To: 'Kirill A. Shutemov'; Andrew Morton
+> Cc: 'arnd at arndb.de'; 'linux-arch at vger.kernel.org'; 'linux-
+> kernel at vger.kernel.org'; 'linux at arm.linux.org.uk'; 'linux-arm-
+> kernel at lists.infradead.org'
+> Subject: RE: [RFC] change non-atomic bitops method
+> 
+> > -----Original Message-----
+> > From: Kirill A. Shutemov [mailto:kirill at shutemov.name]
+> > Sent: Tuesday, February 03, 2015 9:18 AM
+> > To: Andrew Morton
+> > Cc: Wang, Yalin; 'arnd at arndb.de'; 'linux-arch at vger.kernel.org'; 'linux-
+> > kernel at vger.kernel.org'; 'linux at arm.linux.org.uk'; 'linux-arm-
+> > kernel at lists.infradead.org'
+> > Subject: Re: [RFC] change non-atomic bitops method
+> >
+> > On Mon, Feb 02, 2015 at 03:29:09PM -0800, Andrew Morton wrote:
+> > > On Mon, 2 Feb 2015 11:55:03 +0800 "Wang, Yalin"
+> > <Yalin.Wang@sonymobile.com> wrote:
+> > >
+> > > > This patch change non-atomic bitops,
+> > > > add a if() condition to test it, before set/clear the bit.
+> > > > so that we don't need dirty the cache line, if this bit
+> > > > have been set or clear. On SMP system, dirty cache line will
+> > > > need invalidate other processors cache line, this will have
+> > > > some impact on SMP systems.
+> > > >
+> > > > --- a/include/asm-generic/bitops/non-atomic.h
+> > > > +++ b/include/asm-generic/bitops/non-atomic.h
+> > > > @@ -17,7 +17,9 @@ static inline void __set_bit(int nr, volatile
+> > unsigned long *addr)
+> > > >  	unsigned long mask = BIT_MASK(nr);
+> > > >  	unsigned long *p = ((unsigned long *)addr) + BIT_WORD(nr);
+> > > >
+> > > > -	*p  |= mask;
+> > > > +	if ((*p & mask) == 0)
+> > > > +		*p  |= mask;
+> > > > +
+> > > >  }
+> > >
+> > > hm, maybe.
+> > >
+> > > It will speed up set_bit on an already-set bit.  But it will slow down
+> > > set_bit on a not-set bit.  And the latter case is presumably much, much
+> > > more common.
+> > >
+> > > How do we know the patch is a net performance gain?
+> >
+> > Let's try to measure. The micro benchmark:
+> >
+> > 	#include <stdio.h>
+> > 	#include <time.h>
+> > 	#include <sys/mman.h>
+> >
+> > 	#ifdef CACHE_HOT
+> > 	#define SIZE (2UL << 20)
+> > 	#define TIMES 10000000
+> > 	#else
+> > 	#define SIZE (1UL << 30)
+> > 	#define TIMES 10000
+> > 	#endif
+> >
+> > 	int main(int argc, char **argv)
+> > 	{
+> > 		struct timespec a, b, diff;
+> > 		unsigned long i, *p, times = TIMES;
+> >
+> > 		p = mmap(NULL, SIZE, PROT_READ | PROT_WRITE,
+> > 				MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, -1,
+> > 0);
+> >
+> > 		clock_gettime(CLOCK_MONOTONIC, &a);
+> > 		while (times--) {
+> > 			for (i = 0; i < SIZE/64/sizeof(*p); i++) {
+> > 	#ifdef CHECK_BEFORE_SET
+> > 				if (p[i] != times)
+> > 	#endif
+> > 					p[i] = times;
+> > 			}
+> > 		}
+> > 		clock_gettime(CLOCK_MONOTONIC, &b);
+> >
+> > 		diff.tv_sec = b.tv_sec - a.tv_sec;
+> > 		if (a.tv_nsec > b.tv_nsec) {
+> > 			diff.tv_sec--;
+> > 			diff.tv_nsec = 1000000000 + b.tv_nsec - a.tv_nsec;
+> > 		} else
+> > 			diff.tv_nsec = b.tv_nsec - a.tv_nsec;
+> >
+> > 		printf("%lu.%09lu\n", diff.tv_sec, diff.tv_nsec);
+> > 		return 0;
+> > 	}
+> >
+> > Results for 10 runs on my laptop -- i5-3427U (IvyBridge 1.8 Ghz, 2.8Ghz
+> > Turbo
+> > with 3MB LLC):
+> >
+> > 				Avg		Stddev
+> > baseline			21.5351		0.5315
+> > -DCHECK_BEFORE_SET		21.9834		0.0789
+> > -DCACHE_HOT			14.9987		0.0365
+> > -DCACHE_HOT -DCHECK_BEFORE_SET	29.9010		0.0204
+> >
+> > Difference between -DCACHE_HOT and -DCACHE_HOT -DCHECK_BEFORE_SET appears
+> > huge, but if you recalculate it to CPU cycles per inner loop @ 2.8 Ghz,
+> > it's 1.02530 and 2.04401 CPU cycles respectively.
+> >
+> > Basically, the check is free on decent CPU.
+> >
+> Awesome test, but you only test the one cpu which running this code,
+> Have not consider the other CPUs, whose cache line will be invalidate if
+> The cache is dirtied by writer CPU,
+> So another test should be running 2 thread on two different CPUs(bind to
+> CPU),
+> One write , one read, to see the impact on the reader CPU.
+I make a little change about your test progrom,
+Add a new thread to test SMP cache impact.
+---
+#include <stdio.h>
+#include <time.h>
+#include <sys/mman.h>
+#include <errno.h>
+#define _GNU_SOURCE
+#define __USE_GNU
+#include <sched.h>
+#include <pthread.h>
 
-Today's linux-next merge of the clk tree got a conflict in
-arch/arm/mach-omap2/cclock3xxx_data.c between commit ca662ee7b8a8
-("ARM: OMAP2+: Remove unused ti81xx platform init code") from the
-arm-soc tree and commit d6540b193719 ("ARM: OMAP3: remove legacy clock
-data") from the clk tree.
+#ifdef CACHE_HOT
+#define SIZE (2UL << 20)
+#define TIMES 100000
+#else
+#define SIZE (1UL << 20)
+#define TIMES 10000
+#endif
+static void *reader_thread(void *arg)
+{
 
-I fixed it up (the latter removed the file, so I did that) and can
-carry the fix as necessary (no action is required).
+	struct timespec a, b, diff;
+	unsigned long *p = arg;
+	volatile unsigned long temp;
+	unsigned long i, ret, times = TIMES;
+	cpu_set_t set;
+	CPU_ZERO(&set);
+	CPU_SET(1, &set);
+	ret = sched_setaffinity(-1, sizeof(cpu_set_t), &set);
+	if (ret < 0) {
+		printf("sched_setaffinity error:%s", strerror(errno));
+	}
+	clock_gettime(CLOCK_MONOTONIC, &a);
+	while (times--) {
+		for (i = 0; i < SIZE/sizeof(*p); i++) {
+				temp = p[i];
+		}
+	}
+	clock_gettime(CLOCK_MONOTONIC, &b);
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150203/6341502c/attachment.sig>
+	diff.tv_sec = b.tv_sec - a.tv_sec;
+	if (a.tv_nsec > b.tv_nsec) {
+		diff.tv_sec--;
+		diff.tv_nsec = 1000000000 + b.tv_nsec - a.tv_nsec;
+
+	} else
+		diff.tv_nsec = b.tv_nsec - a.tv_nsec;
+
+	printf("reader:%lu.%09lu\n", diff.tv_sec, diff.tv_nsec);
+}
+
+int main(int argc, char **argv)
+{
+	struct timespec a, b, diff;
+	unsigned long i, ret, *p, times = TIMES;
+	pthread_t thread;
+	cpu_set_t set;
+	CPU_ZERO(&set);
+	CPU_SET(0, &set);
+	ret = sched_setaffinity(-1, sizeof(cpu_set_t), &set);
+	if (ret < 0) {
+		printf("sched_setaffinity error:%s", strerror(errno));
+	}
+	p = mmap(NULL, SIZE, PROT_READ | PROT_WRITE,
+			MAP_LOCKED | MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, -1, 0);
+	pthread_create(&thread, NULL, reader_thread, p);
+	clock_gettime(CLOCK_MONOTONIC, &a);
+	while (times--) {
+		for (i = 0; i < SIZE/sizeof(*p); i++) {
+#ifdef CHECK_BEFORE_SET
+			if (p[i] != times)
+#endif
+				p[i] = times;
+		}
+	}
+	clock_gettime(CLOCK_MONOTONIC, &b);
+
+	diff.tv_sec = b.tv_sec - a.tv_sec;
+	if (a.tv_nsec > b.tv_nsec) {
+		diff.tv_sec--;
+		diff.tv_nsec = 1000000000 + b.tv_nsec - a.tv_nsec;
+
+	} else
+		diff.tv_nsec = b.tv_nsec - a.tv_nsec;
+
+	printf("%lu.%09lu\n", diff.tv_sec, diff.tv_nsec);
+	return 0;
+}
+----
+One run on CPU0, reader thread run on CPU1,
+Test result:
+sudo ./cache_test
+reader:8.426228173
+8.672198335
+
+With -DCHECK_BEFORE_SET
+sudo ./cache_test_check
+reader:7.537036819
+10.799746531
+
+You can see reader can save some time if cache not dirtied.
+Also we can see that for writer, it will increase some impact
+Because it need read the data before change it,
+
+I think if the system have lots of cores, reader performance
+Improve is more useful .
+
+My CPU info:
+
+28851195 at cnbjlx20570:~/test$ cat /proc/cpuinfo
+processor       : 0
+vendor_id       : GenuineIntel
+cpu family      : 6
+model           : 37
+model name      : Intel(R) Core(TM) i5 CPU         660  @ 3.33GHz
+stepping        : 5
+microcode       : 0x2
+cpu MHz         : 1199.000
+cache size      : 4096 KB
+physical id     : 0
+siblings        : 4
+
+Thanks for your test program very much!
