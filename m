@@ -1,57 +1,104 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue,  3 Feb 2015 23:38:09 +0800
-Subject: [PATCH] ARM: sirf: drop redundant function and marco declaration
-Message-ID: <1422977889-10000-1-git-send-email-21cnbao@gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 03 Feb 2015 16:44:50 +0100
+Subject: [GIT PULL] ARM: mvebu: DT changes for v3.20 (round 3)
+Message-ID: <54D0ECF2.9050104@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <Baohua.Song@csr.com>
+Hi Olof, Arnd,
 
-with the patchset to add CSR atlas7 support, the below stuff
-has no user now:
-SIRFSOC_VA
-sirfsoc_map_lluart
-sirfsoc_map_scu
+This is the third incremental pull request for mvebu/dt. I now it
+comes very late, but as explained in my email series it should not
+introduce any regression as all the change are made inside the comment
+blocks, so for the stability it should be safe to take them.
 
-the related patches missed to drop them.
+My main motivation for having this series merged in 3.20 is to avoid
+asking each author of the dts(i) patches if he agrees with the dual
+license during the next cycle. At the end it is not something
+essential but it will make our life easier.
 
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- arch/arm/mach-prima2/common.h | 15 ---------------
- 1 file changed, 15 deletions(-)
+Thanks,
 
-diff --git a/arch/arm/mach-prima2/common.h b/arch/arm/mach-prima2/common.h
-index 07d3e5e..3916a66 100644
---- a/arch/arm/mach-prima2/common.h
-+++ b/arch/arm/mach-prima2/common.h
-@@ -15,9 +15,6 @@
- #include <asm/mach/time.h>
- #include <asm/exception.h>
- 
--#define SIRFSOC_VA_BASE		_AC(0xFEC00000, UL)
--#define SIRFSOC_VA(x)		(SIRFSOC_VA_BASE + ((x) & 0x00FFF000))
--
- extern struct smp_operations   sirfsoc_smp_ops;
- extern void sirfsoc_secondary_startup(void);
- extern void sirfsoc_cpu_die(unsigned int cpu);
-@@ -25,18 +22,6 @@ extern void sirfsoc_cpu_die(unsigned int cpu);
- extern void __init sirfsoc_of_irq_init(void);
- extern asmlinkage void __exception_irq_entry sirfsoc_handle_irq(struct pt_regs *regs);
- 
--#ifndef CONFIG_DEBUG_LL
--static inline void sirfsoc_map_lluart(void)  {}
--#else
--extern void __init sirfsoc_map_lluart(void);
--#endif
--
--#ifndef CONFIG_SMP
--static inline void sirfsoc_map_scu(void) {}
--#else
--extern void sirfsoc_map_scu(void);
--#endif
--
- #ifdef CONFIG_SUSPEND
- extern int sirfsoc_pm_init(void);
- #else
+Gregory
+
+The following changes since commit 6cc082a84e13f3a0078973a08adf22f1404acc3d:
+
+  ARM: mvebu: make DTS comments reflect DEBUG_LL changes (2015-01-21 18:36:14 -0600)
+
+are available in the git repository at:
+
+  ssh://git.infradead.org/srv/git/linux-mvebu.git tags/mvebu-dt-3.20-3
+
+for you to fetch changes up to 3c21b5fa897ae4b594d6b76a4572741fea7824b7:
+
+  ARM: mvebu: armada-xp-synology-ds414: Relicense the device tree under GPLv2+/X11 (2015-01-26 19:28:13 -0600)
+
+----------------------------------------------------------------
+Relicense all Armada dts{i} files under dual license of GPLv2+ and
+X11. This should make it easier to reuse these files with other
+operating systems and boot loaders.
+
+----------------------------------------------------------------
+Gregory CLEMENT (27):
+      ARM: mvebu: armada-370-db: Relicense the device tree under GPLv2+/X11
+      ARM: mvebu: armada-370: Relicense the device tree under GPLv2+/X11
+      ARM: mvebu: armada-370-mirabox: Relicense the device tree under GPLv2+/X11
+      ARM: mvebu: armada-370-netgear-rn102: Relicense the device tree under GPLv2+/X11
+      ARM: mvebu: armada-370-netgear-rn104: Relicense the device tree under GPLv2+/X11
+      ARM: mvebu: armada-370-rd: Relicense the device tree under GPLv2+/X11
+      ARM: mvebu: armada-370-synology-ds213j: Relicense the device tree under GPLv2+/X11
+      ARM: mvebu: armada-370-xp: Relicense the device tree under GPLv2+/X11
+      ARM: mvebu: armada-375-db: Relicense the device tree under GPLv2+/X11
+      ARM: mvebu: armada-375: Relicense the device tree under GPLv2+/X11
+      ARM: mvebu: armada-380: Relicense the device tree under GPLv2+/X11
+      ARM: mvebu: armada-388-db: Relicense the device tree under GPLv2+/X11
+      ARM: mvebu: armada-385: Relicense the device tree under GPLv2+/X11
+      ARM: mvebu: armada-388-rd: Relicense the device tree under GPLv2+/X11
+      ARM: mvebu: armada-38x: Relicense the device tree under GPLv2+/X11
+      ARM: mvebu: armada-xp-axpwifiap: Relicense the device tree under GPLv2+/X11
+      ARM: mvebu: armada-xp-db: Relicense the device tree under GPLv2+/X11
+      ARM: mvebu: armada-xp: Relicense the device tree under GPLv2+/X11
+      ARM: mvebu: armada-xp-gp: Relicense the device tree under GPLv2+/X11
+      ARM: mvebu: armada-xp-lenovo-ix4-300d: Relicense the device tree under GPLv2+/X11
+      ARM: mvebu: armada-xp-matrix: Relicense the device tree under GPLv2+/X11
+      ARM: mvebu: armada-xp-mv78230: Relicense the device tree under GPLv2+/X11
+      ARM: mvebu: armada-xp-mv78260: Relicense the device tree under GPLv2+/X11
+      ARM: mvebu: armada-xp-mv78460: Relicense the device tree under GPLv2+/X11
+      ARM: mvebu: armada-xp-netgear-rn2120: Relicense the device tree under GPLv2+/X11
+      ARM: mvebu: armada-xp-openblocks-ax3-4: Relicense the device tree under GPLv2+/X11
+      ARM: mvebu: armada-xp-synology-ds414: Relicense the device tree under GPLv2+/X11
+
+ arch/arm/boot/dts/armada-370-db.dts              | 40 +++++++++++++++++++++++++++++++++++++---
+ arch/arm/boot/dts/armada-370-mirabox.dts         | 40 +++++++++++++++++++++++++++++++++++++---
+ arch/arm/boot/dts/armada-370-netgear-rn102.dts   | 41 +++++++++++++++++++++++++++++++++++++----
+ arch/arm/boot/dts/armada-370-netgear-rn104.dts   | 41 +++++++++++++++++++++++++++++++++++++----
+ arch/arm/boot/dts/armada-370-rd.dts              | 40 +++++++++++++++++++++++++++++++++++++---
+ arch/arm/boot/dts/armada-370-synology-ds213j.dts | 41 +++++++++++++++++++++++++++++++++++++----
+ arch/arm/boot/dts/armada-370-xp.dtsi             | 40 +++++++++++++++++++++++++++++++++++++---
+ arch/arm/boot/dts/armada-370.dtsi                | 40 +++++++++++++++++++++++++++++++++++++---
+ arch/arm/boot/dts/armada-375-db.dts              | 40 +++++++++++++++++++++++++++++++++++++---
+ arch/arm/boot/dts/armada-375.dtsi                | 40 +++++++++++++++++++++++++++++++++++++---
+ arch/arm/boot/dts/armada-380.dtsi                | 40 +++++++++++++++++++++++++++++++++++++---
+ arch/arm/boot/dts/armada-385.dtsi                | 40 +++++++++++++++++++++++++++++++++++++---
+ arch/arm/boot/dts/armada-388-db.dts              | 40 +++++++++++++++++++++++++++++++++++++---
+ arch/arm/boot/dts/armada-388-rd.dts              | 40 +++++++++++++++++++++++++++++++++++++---
+ arch/arm/boot/dts/armada-38x.dtsi                | 40 +++++++++++++++++++++++++++++++++++++---
+ arch/arm/boot/dts/armada-xp-axpwifiap.dts        | 40 +++++++++++++++++++++++++++++++++++++---
+ arch/arm/boot/dts/armada-xp-db.dts               | 40 +++++++++++++++++++++++++++++++++++++---
+ arch/arm/boot/dts/armada-xp-gp.dts               | 40 +++++++++++++++++++++++++++++++++++++---
+ arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts  | 41 +++++++++++++++++++++++++++++++++++++----
+ arch/arm/boot/dts/armada-xp-matrix.dts           | 40 +++++++++++++++++++++++++++++++++++++---
+ arch/arm/boot/dts/armada-xp-mv78230.dtsi         | 40 +++++++++++++++++++++++++++++++++++++---
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi         | 40 +++++++++++++++++++++++++++++++++++++---
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi         | 40 +++++++++++++++++++++++++++++++++++++---
+ arch/arm/boot/dts/armada-xp-netgear-rn2120.dts   | 41 +++++++++++++++++++++++++++++++++++++----
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 40 +++++++++++++++++++++++++++++++++++++---
+ arch/arm/boot/dts/armada-xp-synology-ds414.dts   | 41 +++++++++++++++++++++++++++++++++++++----
+ arch/arm/boot/dts/armada-xp.dtsi                 | 40 +++++++++++++++++++++++++++++++++++++---
+ 27 files changed, 999 insertions(+), 87 deletions(-)
+
 -- 
-2.2.1
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
