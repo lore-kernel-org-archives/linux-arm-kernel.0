@@ -1,72 +1,25 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Tue, 03 Feb 2015 18:49:02 +0100
-Subject: [alsa-devel] [RFC PATCH] ASoC: wm8731: let codec to manage clock
- by itself
-In-Reply-To: <54D104AC.5010603@metafoo.de>
-References: <1422934415-24957-1-git-send-email-voice.shen@atmel.com>
- <CAOLZvyE6W8-X2_M+-KQNry2VPwLzwbBLuxr5Z5EdBQo7Skv2RQ@mail.gmail.com>
- <20150203124441.GK21293@sirena.org.uk> <54D0FD1C.9020305@metafoo.de>
- <20150203171733.GY8656@n2100.arm.linux.org.uk> <54D104AC.5010603@metafoo.de>
-Message-ID: <54D10A0E.5050907@metafoo.de>
+From: joro@8bytes.org (joro at 8bytes.org)
+Date: Tue, 3 Feb 2015 18:54:15 +0100
+Subject: [PATCH] iommu: arm-smmu: avoid build warning
+In-Reply-To: <20150202102048.GB30699@arm.com>
+References: <1754709.y30A9Ie4hF@wuerfel>
+ <20150202102048.GB30699@arm.com>
+Message-ID: <20150203175415.GB29585@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/03/2015 06:26 PM, Lars-Peter Clausen wrote:
-> On 02/03/2015 06:17 PM, Russell King - ARM Linux wrote:
->> On Tue, Feb 03, 2015 at 05:53:48PM +0100, Lars-Peter Clausen wrote:
->>> On 02/03/2015 01:44 PM, Mark Brown wrote:
->>>> On Tue, Feb 03, 2015 at 08:54:57AM +0100, Manuel Lauss wrote:
->>>>
->>>>> +    wm8731->mclk = devm_clk_get(&spi->dev, "mclk");
->>>>> +    if (IS_ERR(wm8731->mclk)) {
->>>>> +        wm8731->mclk = NULL;
->>>>> +        dev_warn(&spi->dev, "assuming static MCLK\n");
->>>>> +    }
->>>>
->>>> This is broken for both deferred probe and in the case where the clock
->>>> API genuinely returns a NULL clock.  Other than that it's the kind of
->>>> thing that we've done for some other drivers, though it's not good to
->>>> have to do this.  Check them for correct behaviour.
->>>
->>> Ideally we'd introduce a {devm_}clk_get_optional(), with the same semantics
->>> as gpiod_get_optional(), which handles the finer details of differentiating
->>> between clock specified, but not yet probed, clock specified, but
->>> incorrectly and no clock specified, so this doesn't have to be done over and
->>> over by each driver.
->>
->> No, we don't need to.  It clk_get() already knows this distinction, and
->> it appropriately returns -ENOENT vs -EPROBE_DEFER according to whether
->> there's a clock specified in DT or not.
->
-> I know, but it returns a error when no clock is specified (-ENOENT), whereas
-> gpiod_get_optional()-like semantics mean, it would return no error.
+On Mon, Feb 02, 2015 at 10:20:49AM +0000, Will Deacon wrote:
+> On Fri, Jan 30, 2015 at 09:55:55PM +0000, Arnd Bergmann wrote:
+> > -		reg = (iova & ~0xfff) >> 32;
+> > +		reg = ((u64)iova & ~0xfff) >> 32;
+> >  		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_HI);
+> >  	}
+> 
+> Thanks, Arnd.
+> 
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> 
+> Joerg, could you pick this one up directly please? I don't have any other
+> ARM SMMU fixes queued at the moment.
 
-What I wanted to say is that pretty much every user of clk_get() that wants 
-a optional clock gets the handling wrong. E.g. they check for PTR_ERR(clk) 
-== -EPROBE_DEFER rather than checking for PTR_ERR(clk) != -ENOENT. Which 
-causes errors when the clock is specified, but incorrectly specified (e.g. 
-invalid phandle or specifier) to be silently ignored.
-
-My hope is that having a explicit API for requesting a optional clock might 
-make it easier for users to gets things right.
-
-If you have coccinelle you can use the following script to find good and bad 
-users:
-
-@@
-expression clk;
-@@
-clk =
-(
-devm_clk_get
-|
-clk_get
-)
-  (...);
-<+...
-(
-*PTR_ERR(clk) == -EPROBE_DEFER
-|
-*PTR_ERR(clk) != -ENOENT
-)
-...+>
+Done, thanks.
