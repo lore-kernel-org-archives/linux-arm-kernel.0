@@ -1,39 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 03 Feb 2015 17:36:59 +0100
-Subject: [Linaro-mm-sig] [RFCv3 2/2] dma-buf: add helpers for sharing
- attacher constraints with dma-parms
-In-Reply-To: <CAF6AEGsttiufoqPbDiZfUX2ndbv2XfeZzcfyaf-AcUJgJpgLkA@mail.gmail.com>
-References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
- <6906596.JU5vQoa1jV@wuerfel>
- <CAF6AEGsttiufoqPbDiZfUX2ndbv2XfeZzcfyaf-AcUJgJpgLkA@mail.gmail.com>
-Message-ID: <7233574.nKiRa7HnXU@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 3 Feb 2015 17:39:50 +0100
+Subject: [GIT PULL] ARM: mvebu: DT changes for v3.20 (round 3)
+In-Reply-To: <54D0EE90.1040708@lakedaemon.net>
+References: <54D0ECF2.9050104@free-electrons.com>
+ <54D0EE90.1040708@lakedaemon.net>
+Message-ID: <20150203163950.GR4827@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 February 2015 11:22:01 Rob Clark wrote:
-> On Tue, Feb 3, 2015 at 11:12 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > I agree for the case you are describing here. From what I understood
-> > from Rob was that he is looking at something more like:
+On Tue, Feb 03, 2015 at 10:51:44AM -0500, Jason Cooper wrote:
+> >are available in the git repository at:
 > >
-> > Fig 3
-> > CPU--L1cache--L2cache--Memory--IOMMU---<iobus>--device
-> >
-> > where the IOMMU controls one or more contexts per device, and is
-> > shared across GPU and non-GPU devices. Here, we need to use the
-> > dmap-mapping interface to set up the IO page table for any device
-> > that is unable to address all of system RAM, and we can use it
-> > for purposes like isolation of the devices. There are also cases
-> > where using the IOMMU is not optional.
+> >   ssh://git.infradead.org/srv/git/linux-mvebu.git tags/mvebu-dt-3.20-3
 > 
+> oops.  Please resend with the git:// url.  I tend to have two remotes for
+> this sort of thing, 'mvebu' -> ssh://, and 'mvebu-pub' -> git://
 > 
-> Actually, just to clarify, the IOMMU instance is specific to the GPU..
-> not shared with other devices.  Otherwise managing multiple contexts
-> would go quite badly..
-> 
-> But other devices have their own instance of the same IOMMU.. so same
-> driver could be used.
+> Then, I just make sure I see 'mvebu-pub' in the middle of the request-pull
+> command.
 
-I think from the driver perspective, I'd view those two cases as
-identical. Not sure if Russell agrees with that.
+There's actually two different URLs you can set up for the remotes in
+your git config: "url", for when you want to pull, and "pushURL", for
+when you want to push.
 
-	Arnd
+That way, you just have a single remote, and everything just works,
+avoiding mistakes like the above.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150203/d46bd69e/attachment.sig>
