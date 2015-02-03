@@ -1,206 +1,57 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Tue, 3 Feb 2015 10:33:06 -0800
-Subject: [PATCH v4 1/5] clk: iproc: define Broadcom iProc clock binding
-In-Reply-To: <1422988390-24369-1-git-send-email-rjui@broadcom.com>
-References: <Ray Jui <rjui@broadcom.com>
- <1422988390-24369-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1422988390-24369-2-git-send-email-rjui@broadcom.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 03 Feb 2015 19:31:49 +0100
+Subject: [PATCH v2,
+ RFC] RTC: PXA: Fix regression of interrupt before ioremap
+In-Reply-To: <54D0D034.1060204@tul.cz> (Petr Cvek's message of "Tue, 03 Feb
+ 2015 14:42:12 +0100")
+References: <54CA1ECA.8050000@tul.cz> <87fvatnzl7.fsf@free.fr>
+ <54CF90F1.4020703@tul.cz> <87a90wb1uq.fsf@free.fr>
+ <54D0D034.1060204@tul.cz>
+Message-ID: <87siemalt6.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the device tree binding for Broadcom iProc architecture based
-clock controller
+Petr Cvek <petr.cvek@tul.cz> writes:
 
-Signed-off-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
----
- brcm,iproc-clocks.txt |  178 +++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 178 insertions(+)
- create mode 100644 brcm,iproc-clocks.txt
+> On 2.2.2015 19:33, Robert Jarzmik wrote:
+>> Petr Cvek <petr.cvek@tul.cz> writes:
+> Actually only thing I want to know after reverting a44802f is how wakeup will
+> work. Because a44802f suggests rtc-pxa needs to have interrupt enabled for
+> waking up (and I cannot test it, because suspend subsystem on my machine needs
+> to be fixed first).
+Process X does :
+ - open /dev/rtc0
+ - call ioctl(fd, RTC_ALM_SET, &time_of_wakeup)
+ - call ioctl(fd, RTC_AIE_ON, 0)
+   - either read(fd, &data, sizeof(unsigned long))
+   - or does write "mem" > /sys/power/state
 
-diff --git a/brcm,iproc-clocks.txt b/brcm,iproc-clocks.txt
-new file mode 100644
-index 0000000..cc64fd2
---- /dev/null
-+++ b/brcm,iproc-clocks.txt
-@@ -0,0 +1,178 @@
-+Broadcom iProc Family Clocks
-+
-+This binding uses the common clock binding:
-+    Documentation/devicetree/bindings/clock/clock-bindings.txt
-+
-+The iProc clock controller manages clocks that are common to the iProc family.
-+An SoC from the iProc family may have several PPLs, e.g., ARMPLL, GENPLL,
-+LCPLL0, MIPIPLL, and etc., all derived from an onboard crystal. Each PLL
-+comprises of several leaf clocks
-+
-+Required properties for PLLs:
-+- compatible:
-+    Should have a value of the form "brcm,<soc>-<pll>". For example, GENPLL on
-+Cygnus has a compatible string of "brcm,cygnus-genpll"
-+
-+- #clock-cells:
-+    Must be <0>
-+
-+- reg:
-+    Define the base and range of the I/O address space that contain the iProc
-+clock control registers required for the PLL
-+
-+- clocks:
-+    The input parent clock phandle for the PLL. For all iProc PLLs, this is an
-+onboard crystal with a fixed rate
-+
-+Optional Properties for PLLs:
-+- clock-frequency:
-+    PLL frequency in Hz. If specified, PLL will be configured to run at
-+<clock-frequency> instead of the default frequency after chip reset, provided
-+that <clock-frequency> and its parameters are defined in the SoC specific
-+frequency parameter table
-+
-+Example:
-+
-+	osc: oscillator {
-+		#clock-cells = <0>;
-+		compatible = "fixed-clock";
-+		clock-frequency = <25000000>;
-+	};
-+
-+	genpll: genpll {
-+		#clock-cells = <0>;
-+		compatible = "brcm,cygnus-genpll";
-+		reg = <0x0301d000 0x2c>,
-+			<0x0301c020 0x4>;
-+		clocks = <&osc>;
-+	};
-+
-+Required properties for leaf clocks of a PLL:
-+
-+- compatible:
-+    Should have a value of the form "brcm,<soc>-<pll>-clk". For example, leaf
-+clocks derived from the GENPLL on Cygnus SoC have a compatible string of
-+"brcm,cygnus-genpll-clk"
-+
-+- #clock-cells:
-+    Have a value of <1> since there are more than 1 leaf clock of a
-+given PLL
-+
-+- reg:
-+    Define the base and range of the I/O address space that contain the iProc
-+clock control registers required for the PLL leaf clocks
-+
-+- clocks:
-+    The input parent PLL phandle for the leaf clock
-+
-+- clock-output-names:
-+    An ordered list of strings defining the names of the leaf clocks
-+
-+Example:
-+
-+	genpll: genpll {
-+		#clock-cells = <0>;
-+		compatible = "brcm,cygnus-genpll";
-+		reg = <0x0301d000 0x2c>,
-+			<0x0301c020 0x4>;
-+		clocks = <&osc>;
-+	};
-+
-+	genpll_clks: genpll_clks {
-+		#clock-cells = <1>;
-+		compatible = "brcm,cygnus-genpll-clk";
-+		reg = <0x0301d000 0x2c>;
-+		clocks = <&genpll>;
-+		clock-output-names = "axi21", "250mhz", "ihost_sys",
-+			"enet_sw", "audio_125", "can";
-+	};
-+
-+Required properties for ASIU clocks:
-+
-+ASIU clocks are a special case. These clocks are derived directly from the
-+reference clock of the onboard crystal
-+
-+- compatible:
-+    Should have a value of the form "brcm,<soc>-asiu-clk". For example, ASIU
-+clocks for Cygnus have a compatible string of "brcm,cygnus-asiu-clk"
-+
-+- #clock-cells:
-+    Have a value of <1> since there are more than 1 ASIU clocks
-+
-+- reg:
-+    Define the base and range of the I/O address space that contain the iProc
-+clock control registers required for ASIU clocks
-+
-+- clocks:
-+    The input parent clock phandle for the ASIU clock, i.e., the onboard
-+crystal
-+
-+- clock-output-names:
-+    An ordered list of strings defining the names of the ASIU clocks
-+
-+Example:
-+
-+	osc: oscillator {
-+		#clock-cells = <0>;
-+		compatible = "fixed-clock";
-+		clock-frequency = <25000000>;
-+	};
-+
-+	asiu_clks: asiu_clks {
-+		#clock-cells = <1>;
-+		compatible = "brcm,cygnus-asiu-clk";
-+		reg = <0x0301d048 0xc>,
-+			<0x180aa024 0x4>;
-+		clocks = <&osc>;
-+		clock-output-names = "keypad", "adc/touch", "pwm";
-+	};
-+
-+Cygnus
-+------
-+PLL and leaf clock compatible strings for Cygnus are:
-+    "brcm,cygnus-armpll"
-+    "brcm,cygnus-genpll"
-+    "brcm,cygnus-lcpll0"
-+    "brcm,cygnus-mipipll"
-+    "brcm,cygnus-genpll-clk"
-+    "brcm,cygnus-lcpll0-clk"
-+    "brcm,cygnus-mipipll-clk"
-+    "brcm,cygnus-asiu-clk"
-+
-+The following table defines the set of PLL/clock index and ID for Cygnus.
-+These clock IDs are defined in:
-+    "include/dt-bindings/clock/bcm-cygnus.h"
-+
-+    Clock      Source           Index   ID
-+    ---        -----            -----   ---------
-+    crystal    N/A              N/A     N/A
-+
-+    armpll     crystal          N/A     N/A
-+    genpll     crystal          N/A     N/A
-+    lcpll0     crystal          N/A     N/A
-+    mipipll    crystal          N/A     N/A
-+
-+    keypad     crystal (ASIU)   0       BCM_CYGNUS_ASIU_KEYPAD_CLK
-+    adc/tsc    crystal (ASIU)   1       BCM_CYGNUS_ASIU_ADC_CLK
-+    pwm        crystal (ASIU)   2       BCM_CYGNUS_ASIU_PWM_CLK
-+
-+    axi21      genpll           0       BCM_CYGNUS_GENPLL_AXI21_CLK
-+    250mhz     genpll           1       BCM_CYGNUS_GENPLL_250MHZ_CLK
-+    ihost_sys  genpll           2       BCM_CYGNUS_GENPLL_IHOST_SYS_CLK
-+    enet_sw    genpll           3       BCM_CYGNUS_GENPLL_ENET_SW_CLK
-+    audio_125  genpll           4       BCM_CYGNUS_GENPLL_AUDIO_125_CLK
-+    can        genpll           5       BCM_CYGNUS_GENPLL_CAN_CLK
-+
-+    pcie_phy   lcpll0           0       BCM_CYGNUS_LCPLL0_PCIE_PHY_REF_CLK
-+    ddr_phy    lcpll0           1       BCM_CYGNUS_LCPLL0_DDR_PHY_CLK
-+    sdio       lcpll0           2       BCM_CYGNUS_LCPLL0_SDIO_CLK
-+    usb_phy    lcpll0           3       BCM_CYGNUS_LCPLL0_USB_PHY_REF_CLK
-+    smart_card lcpll0           4       BCM_CYGNUS_LCPLL0_SMART_CARD_CLK
-+    ch5        lcpll0           5       BCM_CYGNUS_LCPLL0_CH5_UNUSED
-+
-+    ch0_unused mipipll          0       BCM_CYGNUS_MIPIPLL_CH0_UNUSED
-+    ch1_lcd    mipipll          1       BCM_CYGNUS_MIPIPLL_CH1_LCD
-+    ch2_unused mipipll          2       BCM_CYGNUS_MIPIPLL_CH2_UNUSED
-+    ch3_unused mipipll          3       BCM_CYGNUS_MIPIPLL_CH3_UNUSED
-+    ch4_unused mipipll          4       BCM_CYGNUS_MIPIPLL_CH4_UNUSED
-+    ch5_unused mipipll          5       BCM_CYGNUS_MIPIPLL_CH5_UNUSED
+ - ... platform sleeps ...
+ - alarm time comes up, RTC IP raises the interrupt line
+ - because in its pxa_rtc_probe(), the driver called device_init_wakeup(dev, 1),
+   the register PWER was set to wakeup the platform if RTC interrupt is raised,
+   the platform wakes up
+
+>> Moreover, if there are multiple rtc device, how on earth can it work, ie. how
+>> can an ioctl() be sent to a specific rtc device if there is no open() ???
+>
+> It confuses me too, so I tried to look it up and it seems rtc_dev_open() in
+> drivers/rtc/rtc-dev.c handles this by:
+>
+> 	err = ops->open ? ops->open(rtc->dev.parent) : 0;
+>     if (err == 0) {
+>         spin_lock_irq(&rtc->irq_lock);
+>         rtc->irq_data = 0;
+>         spin_unlock_irq(&rtc->irq_lock);
+>
+>         return 0;
+>     }
+>
+> , so without any .open() it just continues with success.
+Yes, true, yet how do you set on a specific RTC block the alarm if you have many
+of them on the system ?
+
+Cheers.
+
 -- 
-1.7.9.5
+Robert
