@@ -1,41 +1,81 @@
-From: dtor@google.com (Dmitry Torokhov)
-Date: Tue, 3 Feb 2015 12:00:09 -0800
-Subject: [PATCH v3 3/4] pinctrl: cygnus: add initial IOMUX driver support
-In-Reply-To: <54D121A0.6070602@broadcom.com>
-References: <rjui@broadcom.com>
- <1422928894-20716-1-git-send-email-rjui@broadcom.com>
- <1422928894-20716-4-git-send-email-rjui@broadcom.com>
- <20150203174042.GA15969@dtor-ws> <54D121A0.6070602@broadcom.com>
-Message-ID: <20150203200009.GB15969@dtor-ws>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Tue, 3 Feb 2015 21:04:35 +0100
+Subject: [Linaro-mm-sig] [RFCv3 2/2] dma-buf: add helpers for sharing
+ attacher constraints with dma-parms
+In-Reply-To: <7233574.nKiRa7HnXU@wuerfel>
+References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
+ <6906596.JU5vQoa1jV@wuerfel>
+ <CAF6AEGsttiufoqPbDiZfUX2ndbv2XfeZzcfyaf-AcUJgJpgLkA@mail.gmail.com>
+ <7233574.nKiRa7HnXU@wuerfel>
+Message-ID: <20150203200435.GX14009@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 03, 2015 at 11:29:36AM -0800, Ray Jui wrote:
-> On 2/3/2015 9:40 AM, Dmitry Torokhov wrote:
-> > On Mon, Feb 02, 2015 at 06:01:33PM -0800, Ray Jui wrote:
-> >> +
-> >> +/*
-> >> + * List of pins in Cygnus
-> >> + */
-> >> +static struct cygnus_pin cygnus_pins[] = {
+On Tue, Feb 03, 2015 at 05:36:59PM +0100, Arnd Bergmann wrote:
+> On Tuesday 03 February 2015 11:22:01 Rob Clark wrote:
+> > On Tue, Feb 3, 2015 at 11:12 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > > I agree for the case you are describing here. From what I understood
+> > > from Rob was that he is looking at something more like:
+> > >
+> > > Fig 3
+> > > CPU--L1cache--L2cache--Memory--IOMMU---<iobus>--device
+> > >
+> > > where the IOMMU controls one or more contexts per device, and is
+> > > shared across GPU and non-GPU devices. Here, we need to use the
+> > > dmap-mapping interface to set up the IO page table for any device
+> > > that is unable to address all of system RAM, and we can use it
+> > > for purposes like isolation of the devices. There are also cases
+> > > where using the IOMMU is not optional.
 > > 
-> > const?
 > > 
-> I cannot make it const here, since the address of "gpio_mux" is later
-> passed to pinctrl_pin_desc's private data:
+> > Actually, just to clarify, the IOMMU instance is specific to the GPU..
+> > not shared with other devices.  Otherwise managing multiple contexts
+> > would go quite badly..
+> > 
+> > But other devices have their own instance of the same IOMMU.. so same
+> > driver could be used.
 > 
-> pins[i].drv_data = &cygnus_pins[i].gpio_mux;
+> I think from the driver perspective, I'd view those two cases as
+> identical. Not sure if Russell agrees with that.
 
-The pinctrl code says:
+Imo whether the iommu is private to the device and required for gpu
+functionality like context switching or shared across a bunch of devices
+is fairly important. Assuming I understand this discussion correctly we
+have two different things pulling in opposite directions:
 
-"@drv_data: driver-defined per-pin data. pinctrl core does not touch
-this"
+- From a gpu functionality perspective we want to give the gpu driver full
+  control over the device-private iommu, pushing it out of the control of
+  the dma api. dma_map_sg would just map to whatever bus addresses that
+  iommu would need to use for generating access cycles.
 
-so we could theoretically cast away the constness and restore it when
-we access drv_data in pin control methods, but I won't insist. I am
-not sure which way looks nicer.
+  This is the design used by every gpu driver we have in upstream thus far
+  (where you always have some on-gpu iommu/pagetable walker thing), on top
+  of whatever system iommu that might be there or not (which is then
+  managed by the dma apis).
 
-Thanks.
+- On many soc people love to reuse iommus with the same or similar
+  interface all over the place. The solution thus far adopted on arm
+  platforms is to write an iommu driver for those and then implement the
+  dma-api on top of this iommu.
 
+  But if we unconditionally do this then we rob the gpu driver's ability
+  to control its private iommu like it wants to, because a lot of the
+  functionality is lost behind the dma api abstraction.
+
+Again assuming I'm not confused can't we just solve this by pushing the
+dma api abstraction down one layer for just the gpu, and let it use its
+private iommmu directly? Steps for binding a buffer would be:
+1. dma_map_sg
+2. Noodle the dma_addr_t out of the sg table and feed those into a 2nd
+level mapping set up through the iommu api for the gpu-private mmu.
+
+Again, this is what i915 and all the ttm based drivers already do, except
+that we don't use the generic iommu interfaces but have our own (i915 has
+its interface in i915_gem_gtt.c, ttm just calls them tt for translation
+tables ...).
+
+Cheers, Daniel
 -- 
-Dmitry
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
