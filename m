@@ -1,204 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 3 Feb 2015 17:59:32 +0100
-Subject: [PATCH 00/11] ARM: OMAP3: legacy clock data move under clk driver
-In-Reply-To: <20150107230006.GE13010@atomide.com>
-References: <1418746856-17173-1-git-send-email-t-kristo@ti.com>
- <20150107230006.GE13010@atomide.com>
-Message-ID: <201502031759.32261.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 Feb 2015 17:01:46 +0000
+Subject: [Linaro-mm-sig] [RFCv3 2/2] dma-buf: add helpers for sharing
+ attacher constraints with dma-parms
+In-Reply-To: <CAF6AEGsttiufoqPbDiZfUX2ndbv2XfeZzcfyaf-AcUJgJpgLkA@mail.gmail.com>
+References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
+ <3783167.LiVXgA35gN@wuerfel>
+ <20150203155404.GV8656@n2100.arm.linux.org.uk>
+ <6906596.JU5vQoa1jV@wuerfel>
+ <CAF6AEGsttiufoqPbDiZfUX2ndbv2XfeZzcfyaf-AcUJgJpgLkA@mail.gmail.com>
+Message-ID: <20150203170146.GX8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 January 2015, Tony Lindgren wrote:
-
-> Great, hopefully this will finally allow Mike to make the
-> generic struct clk private to drivers/clk :)
+On Tue, Feb 03, 2015 at 11:22:01AM -0500, Rob Clark wrote:
+> On Tue, Feb 3, 2015 at 11:12 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > I agree for the case you are describing here. From what I understood
+> > from Rob was that he is looking at something more like:
+> >
+> > Fig 3
+> > CPU--L1cache--L2cache--Memory--IOMMU---<iobus>--device
+> >
+> > where the IOMMU controls one or more contexts per device, and is
+> > shared across GPU and non-GPU devices. Here, we need to use the
+> > dmap-mapping interface to set up the IO page table for any device
+> > that is unable to address all of system RAM, and we can use it
+> > for purposes like isolation of the devices. There are also cases
+> > where using the IOMMU is not optional.
 > 
-> Seems to boot just fine based on a quick legacy booting test
-> on n900.
 > 
-> Mike, assuming no other issues, can you please apply these into a
-> immutable branch against v3.19-rc1 that Paul and I can also merge
-> in as needed?
+> Actually, just to clarify, the IOMMU instance is specific to the GPU..
+> not shared with other devices.  Otherwise managing multiple contexts
+> would go quite badly..
 > 
-> Please also feel free to add:
-> 
-> Acked-by: Tony Lindgren <tony@atomide.com>
+> But other devices have their own instance of the same IOMMU.. so same
+> driver could be used.
 
-The series has arrived in linux-next and promptly triggered a few
-randconfig build errors. Here is a patch that fixes it. Feel free
-to replace it with a different patch if you don't like this version.
+Okay, so that is my Fig.2 case, and we don't have to worry about Fig.3.
 
-8<--------
-Subject: clk: omap: compile legacy omap3 clocks conditionally
+One thing I forgot in Fig.1/2 which my original did have were to mark
+the system MMU as optional.  (Think an ARM64 with SMMU into a 32-bit
+peripheral bus.)  Do we support stacked MMUs in the DMA API?  We may
+need to if we keep IOMMUs in the DMA API.
 
-The 'ARM: OMAP3: legacy clock data move under clk driver' patch series
-causes build errors when CONFIG_OMAP3 is not set:
-
-drivers/clk/ti/dpll.c: In function 'ti_clk_register_dpll':
-drivers/clk/ti/dpll.c:199:31: error: 'omap3_dpll_ck_ops' undeclared (first use in this function)
-  const struct clk_ops *ops = &omap3_dpll_ck_ops;
-                               ^
-drivers/clk/ti/dpll.c:199:31: note: each undeclared identifier is reported only once for each function it appears in
-drivers/clk/ti/dpll.c:259:10: error: 'omap3_dpll_per_ck_ops' undeclared (first use in this function)
-   ops = &omap3_dpll_per_ck_ops;
-          ^
-
-drivers/built-in.o: In function `ti_clk_register_gate':
-drivers/clk/ti/gate.c:179: undefined reference to `clkhwops_omap3430es2_dss_usbhost_wait'
-drivers/clk/ti/gate.c:179: undefined reference to `clkhwops_am35xx_ipss_module_wait'
--in.o: In function `ti_clk_register_interface':
-drivers/clk/ti/interface.c:100: undefined reference to `clkhwops_omap3430es2_iclk_hsotgusb_wait'
-drivers/clk/ti/interface.c:100: undefined reference to `clkhwops_omap3430es2_iclk_dss_usbhost_wait'
-drivers/clk/ti/interface.c:100: undefined reference to `clkhwops_omap3430es2_iclk_ssi_wait'
-drivers/clk/ti/interface.c:100: undefined reference to `clkhwops_am35xx_ipss_wait'
-drivers/built-in.o: In function `ti_clk_register_composite':
-:(.text+0x3da768): undefined reference to `ti_clk_build_component_gate'
-
-In order to fix that problem, this patch makes the omap3 legacy code
-compiled only when both CONFIG_OMAP3 and CONFIG_ATAGS are set.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-----
-diff --git a/drivers/clk/ti/Makefile b/drivers/clk/ti/Makefile
-index 14e6686a5eea..105ffd0f5e79 100644
---- a/drivers/clk/ti/Makefile
-+++ b/drivers/clk/ti/Makefile
-@@ -1,4 +1,3 @@
--ifneq ($(CONFIG_OF),)
- obj-y					+= clk.o autoidle.o clockdomain.o
- clk-common				= dpll.o composite.o divider.o gate.o \
- 					  fixed-factor.o mux.o apll.o
-@@ -6,10 +5,13 @@ obj-$(CONFIG_SOC_AM33XX)		+= $(clk-common) clk-33xx.o
- obj-$(CONFIG_SOC_TI81XX)		+= $(clk-common) fapll.o clk-816x.o
- obj-$(CONFIG_ARCH_OMAP2)		+= $(clk-common) interface.o clk-2xxx.o
- obj-$(CONFIG_ARCH_OMAP3)		+= $(clk-common) interface.o \
--					   clk-3xxx.o clk-3xxx-legacy.o
-+					   clk-3xxx.o
- obj-$(CONFIG_ARCH_OMAP4)		+= $(clk-common) clk-44xx.o
- obj-$(CONFIG_SOC_OMAP5)			+= $(clk-common) clk-54xx.o
- obj-$(CONFIG_SOC_DRA7XX)		+= $(clk-common) clk-7xx.o \
- 					   clk-dra7-atl.o
- obj-$(CONFIG_SOC_AM43XX)		+= $(clk-common) clk-43xx.o
-+
-+ifdef CONFIG_ATAGS
-+obj-$(CONFIG_ARCH_OMAP3)                += clk-3xxx-legacy.o
- endif
-diff --git a/drivers/clk/ti/clk.c b/drivers/clk/ti/clk.c
-index 546dae405402..e22b95646e09 100644
---- a/drivers/clk/ti/clk.c
-+++ b/drivers/clk/ti/clk.c
-@@ -186,6 +186,7 @@ void ti_dt_clk_init_retry_clks(void)
- 	}
- }
- 
-+#if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_ATAGS)
- void __init ti_clk_patch_legacy_clks(struct ti_clk **patch)
- {
- 	while (*patch) {
-@@ -308,3 +309,4 @@ int __init ti_clk_register_legacy_clks(struct ti_clk_alias *clks)
- 
- 	return 0;
- }
-+#endif
-diff --git a/drivers/clk/ti/composite.c b/drivers/clk/ti/composite.c
-index 3a9665fce041..3654f61912eb 100644
---- a/drivers/clk/ti/composite.c
-+++ b/drivers/clk/ti/composite.c
-@@ -118,6 +118,7 @@ static inline struct clk_hw *_get_hw(struct clk_hw_omap_comp *clk, int idx)
- 
- #define to_clk_hw_comp(_hw) container_of(_hw, struct clk_hw_omap_comp, hw)
- 
-+#if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_ATAGS)
- struct clk *ti_clk_register_composite(struct ti_clk *setup)
- {
- 	struct ti_clk_composite *comp;
-@@ -153,6 +154,7 @@ struct clk *ti_clk_register_composite(struct ti_clk *setup)
- 
- 	return clk;
- }
-+#endif
- 
- static void __init _register_composite(struct clk_hw *hw,
- 				       struct device_node *node)
-diff --git a/drivers/clk/ti/dpll.c b/drivers/clk/ti/dpll.c
-index 47ebff772b13..81dc4698dc41 100644
---- a/drivers/clk/ti/dpll.c
-+++ b/drivers/clk/ti/dpll.c
-@@ -176,6 +176,7 @@ cleanup:
- 	kfree(clk_hw);
- }
- 
-+#if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_ATAGS)
- void __iomem *_get_reg(u8 module, u16 offset)
- {
- 	u32 reg;
-@@ -271,6 +272,7 @@ cleanup:
- 	kfree(clk_hw);
- 	return clk;
- }
-+#endif
- 
- #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5) || \
- 	defined(CONFIG_SOC_DRA7XX) || defined(CONFIG_SOC_AM33XX) || \
-diff --git a/drivers/clk/ti/gate.c b/drivers/clk/ti/gate.c
-index d4f6cb20e16e..d493307b73f4 100644
---- a/drivers/clk/ti/gate.c
-+++ b/drivers/clk/ti/gate.c
-@@ -130,6 +130,7 @@ static struct clk *_register_gate(struct device *dev, const char *name,
- 	return clk;
- }
- 
-+#if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_ATAGS)
- struct clk *ti_clk_register_gate(struct ti_clk *setup)
- {
- 	const struct clk_ops *ops = &omap_gate_clk_ops;
-@@ -208,6 +209,7 @@ struct clk_hw *ti_clk_build_component_gate(struct ti_clk_gate *setup)
- 
- 	return &gate->hw;
- }
-+#endif
- 
- static void __init _of_ti_gate_clk_setup(struct device_node *node,
- 					 const struct clk_ops *ops,
-diff --git a/drivers/clk/ti/interface.c b/drivers/clk/ti/interface.c
-index d71cd9b5de46..265d91f071c5 100644
---- a/drivers/clk/ti/interface.c
-+++ b/drivers/clk/ti/interface.c
-@@ -68,6 +68,7 @@ static struct clk *_register_interface(struct device *dev, const char *name,
- 	return clk;
- }
- 
-+#if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_ATAGS)
- struct clk *ti_clk_register_interface(struct ti_clk *setup)
- {
- 	const struct clk_hw_omap_ops *ops = &clkhwops_iclk_wait;
-@@ -98,6 +99,7 @@ struct clk *ti_clk_register_interface(struct ti_clk *setup)
- 	return _register_interface(NULL, setup->name, gate->parent,
- 				   (void __iomem *)reg, gate->bit_shift, ops);
- }
-+#endif
- 
- static void __init _of_ti_interface_clk_setup(struct device_node *node,
- 					      const struct clk_hw_omap_ops *ops)
-diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
-index 0eac65054283..67844003493d 100644
---- a/include/linux/clk/ti.h
-+++ b/include/linux/clk/ti.h
-@@ -360,9 +360,17 @@ extern const struct clk_hw_omap_ops clkhwops_omap3430es2_iclk_ssi_wait;
- extern const struct clk_hw_omap_ops clkhwops_omap3430es2_iclk_dss_usbhost_wait;
- extern const struct clk_hw_omap_ops clkhwops_omap3430es2_iclk_hsotgusb_wait;
- 
-+#ifdef CONFIG_ATAGS
- int omap3430_clk_legacy_init(void);
- int omap3430es1_clk_legacy_init(void);
- int omap36xx_clk_legacy_init(void);
- int am35xx_clk_legacy_init(void);
-+#else
-+static inline int omap3430_clk_legacy_init(void) { return -ENXIO; }
-+static inline int omap3430es1_clk_legacy_init(void) { return -ENXIO; }
-+static inline int omap36xx_clk_legacy_init(void) { return -ENXIO; }
-+static inline int am35xx_clk_legacy_init(void) { return -ENXIO; }
-+#endif
-+
- 
- #endif
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
