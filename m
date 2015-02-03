@@ -1,37 +1,68 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 03 Feb 2015 12:04:16 +0100
-Subject: [PATCH V3 13/15] ARM: dts: Exynos4 and Odroid X2/U3 sound device
- nodes update
-In-Reply-To: <07a501d03f69$aba222b0$02e66810$@kernel.org>
-References: <1421260962-16892-1-git-send-email-s.nawrocki@samsung.com>
- <1421260962-16892-14-git-send-email-s.nawrocki@samsung.com>
- <20150114195452.GM3043@sirena.org.uk>
- <07a501d03f69$aba222b0$02e66810$@kernel.org>
-Message-ID: <54D0AB30.2010504@samsung.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 03 Feb 2015 12:06:39 +0100
+Subject: [PATCH v2 1/3] ARM: EXYNOS: Add missing static to file-scope
+ declarations
+Message-ID: <1422961601-7087-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/15 05:27, Kukjin Kim wrote:
-> Mark Brown wrote:
->> On Wed, Jan 14, 2015 at 07:42:40PM +0100, Sylwester Nawrocki wrote:
->>> Clock related properties are added to the Exynos4 I2S device nodes
->>> so they can be referred to as clock providers. Missing i2s_opclk1
->>> clock is added to the I2S0 node and clock properties are added
->>> to the MAX98090 codec node to allow it to control/read frequency
->>> of the MCLK clock directly.
->>
->> Sorry, I should've said - I applied the ASoC patches, not these.
-> 
-> Shall I take 13 to 15 DT patches in Samsung tree?
+The 'pm_data', 'exynos_release_ret_regs', 'exynos3250_release_ret_regs'
+and 'exynos5420_release_ret_regs' are not exported nor used outside of
+suspend.c file. Make them static.
 
-Patches 13, 14 use macro definitions which are added in patch which is
-already in Mark's sound tree ("ASoC: samsung: i2s: Add clk provider DT
-binding documentation") [1]. We would need to consider that to avoid
-build breaks.
+This fixes following sparse warnings:
+arch/arm/mach-exynos/suspend.c:83:23: warning: symbol 'pm_data' was not declared. Should it be static?
+arch/arm/mach-exynos/suspend.c:106:14: warning: symbol 'exynos_release_ret_regs' was not declared. Should it be static?
+arch/arm/mach-exynos/suspend.c:117:14: warning: symbol 'exynos5420_release_ret_regs' was not declared. Should it be static?
 
---
-Thanks,
-Sylwester
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-[1]
-https://git.kernel.org/cgit/linux/kernel/git/broonie/sound.git/commit/?h=for-next&id=0d40c61279510b8ce2368e1c6adcc2c4dc1af279
+---
+Changes since v1:
+1. Add static to 'exynos3250_release_ret_regs' (suggested by Kukjin).
+---
+ arch/arm/mach-exynos/suspend.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
+index 82e6b6fba23f..77cc39bdad47 100644
+--- a/arch/arm/mach-exynos/suspend.c
++++ b/arch/arm/mach-exynos/suspend.c
+@@ -75,7 +75,7 @@ struct exynos_pm_data {
+ 	int (*cpu_suspend)(unsigned long);
+ };
+ 
+-struct exynos_pm_data *pm_data;
++static struct exynos_pm_data *pm_data;
+ 
+ static int exynos5420_cpu_state;
+ static unsigned int exynos_pmu_spare3;
+@@ -104,7 +104,7 @@ static const struct exynos_wkup_irq exynos5250_wkup_irq[] = {
+ 	{ /* sentinel */ },
+ };
+ 
+-unsigned int exynos_release_ret_regs[] = {
++static unsigned int exynos_release_ret_regs[] = {
+ 	S5P_PAD_RET_MAUDIO_OPTION,
+ 	S5P_PAD_RET_GPIO_OPTION,
+ 	S5P_PAD_RET_UART_OPTION,
+@@ -115,7 +115,7 @@ unsigned int exynos_release_ret_regs[] = {
+ 	REG_TABLE_END,
+ };
+ 
+-unsigned int exynos3250_release_ret_regs[] = {
++static unsigned int exynos3250_release_ret_regs[] = {
+ 	S5P_PAD_RET_MAUDIO_OPTION,
+ 	S5P_PAD_RET_GPIO_OPTION,
+ 	S5P_PAD_RET_UART_OPTION,
+@@ -128,7 +128,7 @@ unsigned int exynos3250_release_ret_regs[] = {
+ 	REG_TABLE_END,
+ };
+ 
+-unsigned int exynos5420_release_ret_regs[] = {
++static unsigned int exynos5420_release_ret_regs[] = {
+ 	EXYNOS_PAD_RET_DRAM_OPTION,
+ 	EXYNOS_PAD_RET_MAUDIO_OPTION,
+ 	EXYNOS_PAD_RET_JTAG_OPTION,
+-- 
+1.9.1
