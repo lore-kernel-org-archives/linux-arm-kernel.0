@@ -1,82 +1,75 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 3 Feb 2015 11:41:05 +0000
-Subject: [PATCH v8 02/21] acpi: fix acpi_os_ioremap for arm64
-In-Reply-To: <20150203113744.GA3677@e104818-lin.cambridge.arm.com>
-References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
- <1422881149-8177-3-git-send-email-hanjun.guo@linaro.org>
- <2422968.Es7R0p3loO@vostro.rjw.lan> <54D0901A.2080406@linaro.org>
- <20150203113744.GA3677@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu9LV_Uh9R84ixqgMRnDTvPtBzT5R-0BHDL=yomBY4E4dg@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 3 Feb 2015 11:58:55 +0000
+Subject: [PATCH 2/2] coresight: Adding coresight support to arm64
+In-Reply-To: <CANLsYky9_ptcvihnKNVvrAH_iB4wA57m4OSwVsYANX3q28gc0g@mail.gmail.com>
+References: <1422658466-23984-1-git-send-email-mathieu.poirier@linaro.org>
+ <1422658466-23984-3-git-send-email-mathieu.poirier@linaro.org>
+ <20150202134512.GE31847@arm.com>
+ <CANLsYky9_ptcvihnKNVvrAH_iB4wA57m4OSwVsYANX3q28gc0g@mail.gmail.com>
+Message-ID: <20150203115855.GC3677@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 February 2015 at 11:37, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Tue, Feb 03, 2015 at 09:08:42AM +0000, Hanjun Guo wrote:
->> On 2015?02?03? 06:14, Rafael J. Wysocki wrote:
->> > On Monday, February 02, 2015 08:45:30 PM Hanjun Guo wrote:
->> >> From: Mark Salter <msalter@redhat.com>
->> >>
->> >> The acpi_os_ioremap() function may be used to map normal RAM or IO
->> >> regions. The current implementation simply uses ioremap_cache(). This
->> >> will work for some architectures, but arm64 ioremap_cache() cannot be
->> >> used to map IO regions which don't support caching. So for arm64, use
->> >> ioremap() for non-RAM regions.
->> >>
->> >> CC: Rafael J Wysocki <rjw@rjwysocki.net>
->> >> Signed-off-by: Mark Salter <msalter@redhat.com>
->> >> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> >> ---
->> >>   include/acpi/acpi_io.h | 6 ++++++
->> >>   1 file changed, 6 insertions(+)
->> >>
->> >> diff --git a/include/acpi/acpi_io.h b/include/acpi/acpi_io.h
->> >> index 444671e..9d573db 100644
->> >> --- a/include/acpi/acpi_io.h
->> >> +++ b/include/acpi/acpi_io.h
->> >> @@ -1,11 +1,17 @@
->> >>   #ifndef _ACPI_IO_H_
->> >>   #define _ACPI_IO_H_
->> >>
->> >> +#include <linux/mm.h>
->> >>   #include <linux/io.h>
->> >>
->> >>   static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
->> >>                                        acpi_size size)
->> >>   {
->> >> +#ifdef CONFIG_ARM64
->> >> +  if (!page_is_ram(phys >> PAGE_SHIFT))
->> >> +          return ioremap(phys, size);
->> >> +#endif
->> >
->> > I don't want to see #ifdef CONFIG_ARM64 in this file.
->> >
->> > There are multiple examples of how things like this are done.  Generally,
->> > the logic is "If the architecture provides its own function for this, use
->> > that one, or use the generic one provided here otherwise."
->>
->> OK. I think weak function would work.
->
-> Probably not in a header file. It's better to define acpi_os_ioremap()
-> in an arm64 kernel file, together with something like:
->
-> #define ARCH_HAS_ACPI_OS_IOREMAP
->
-> and the corresponding #ifdef's in the acpi_io.h file.
->
-> On arm64 could we make this function call iorema (nocache) all the time?
-> We need to clarify the contexts where this is used in the core ACPI
-> code. The acpi_map() function for example checks if the page is ram and
-> does a kmap(). Do we need to handle the NVS on arm64? AFAICT, we don't
-> even compile drivers/acpi/sleep.c in.
->
-> Are there other cases where acpi_os_ioremap() is called directly and it
-> needs a cacheable mapping?
->
+On Mon, Feb 02, 2015 at 10:06:16PM +0000, Mathieu Poirier wrote:
+> On 2 February 2015 at 06:45, Will Deacon <will.deacon@arm.com> wrote:
+> > On Fri, Jan 30, 2015 at 10:54:26PM +0000, mathieu.poirier at linaro.org wrote:
+> >> From: Mathieu Poirier <mathieu.poirier@linaro.org>
+> >>
+> >> Aside from tracers, all currently supported coresight IP blocks
+> >> are 64 bit ready.  As such add the required symbol definition to
+> >> compile the framework and drivers.
+> >>
+> >> Also fixing a couple of warnings picked up by the 64bit compiler.
+> >>
+> >> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> >> ---
+> >>  arch/arm64/Kconfig.debug            | 48 +++++++++++++++++++++++++++++++++++++
+> >>  drivers/coresight/coresight-etb10.c |  2 +-
+> >>  drivers/coresight/coresight-tmc.c   |  2 +-
+> >>  3 files changed, 50 insertions(+), 2 deletions(-)
+> >>
+> >> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+> >> index 5fdd6dce8061..77dfebbcbffe 100644
+> >> --- a/arch/arm64/Kconfig.debug
+> >> +++ b/arch/arm64/Kconfig.debug
+> >> @@ -66,4 +66,52 @@ config DEBUG_SET_MODULE_RONX
+> >>            against certain classes of kernel exploits.
+> >>            If in doubt, say "N".
+> >>
+> >> +menuconfig CORESIGHT
+> >> +     bool "CoreSight Tracing Support"
+> >> +     select ARM_AMBA
+> >> +     help
+> >> +       This framework provides a kernel interface for the CoreSight debug
+> >> +       and trace drivers to register themselves with. It's intended to build
+> >> +       a topological view of the CoreSight components based on a DT
+> >> +       specification and configure the right serie of components when a
+> >> +       trace source gets enabled.
+> >
+> > Why does this need to be duplicated by each architecture wanting to make
+> > use of coresight capabilities defined under drivers/coresight? Can't we
+> > instead have this menuconfig and associated suboptions defined by a core
+> > Kconfig file, then have HAVE_ARCH_CORESIGHT_TRACE or something which can
+> > be selected by architectures wanting to make use of the framework?
+> >
+> > Will
+> 
+> "arch/arm/Kconfig.debug" and "arch/arm64/Kconfig.debug" already have a
+> fair amount of duplication so I wasn't sure if this is the approach
+> you guys wanted to take.  I agree that a common core Kconfig file
+> would make much more sense and I see a couple of ways to do this:
+> 
+> 1) lib/Kconfig.debug being sourced by both arm/Kconfig.debug and
+> arm64/Kconfig.debug.  We can add a lib/Kconfig.coresight or
+> lib/Kconfig.arm and source them the same way.
+> 
+> 2) Adding coresight entries to the Kconfig.debug made sense a while
+> back.  Maybe it is time to move them to drivers/coresight/Kconfig...
+> That way it would be easily accessible by both arm and arm64.
 
-The logic behind acpi_os_ioremap() could be based on the physmem
-series I am preparing for 3.21 timeframe.
-It allows us to classify physical ranges as backed by RAM or not, and
-call the appropriate flavor of ioremap()
+Since the C files and Makefile are in drivers/coresight/, it makes sense
+to add a drivers/coresight/Kconfig that could be sourced from
+arch/arm*/Kconfig (we do this with PCI for example).
 
 -- 
-Ard.
+Catalin
