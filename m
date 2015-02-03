@@ -1,88 +1,69 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Feb 2015 14:58:17 +0000
-Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher
- constraints with dma-parms
-In-Reply-To: <CAF6AEGtBfr3fGEoFjFFpy1KrMJMZ-13VPPJX73fAkwiaLk+XGQ@mail.gmail.com>
-References: <20150129154718.GB26493@n2100.arm.linux.org.uk>
- <CAF6AEGtTmFg66TK_AFkQ-xp7Nd9Evk3nqe6xCBp7K=77OmXTxA@mail.gmail.com>
- <20150129192610.GE26493@n2100.arm.linux.org.uk>
- <CAF6AEGujk8UC4X6T=yhTrz1s+SyZUQ=m05h_WcxLDGZU6bydbw@mail.gmail.com>
- <20150202165405.GX14009@phenom.ffwll.local>
- <CAF6AEGuESM+e3HSRGM6zLqrp8kqRLGUYvA3KKECdm7m-nt0M=Q@mail.gmail.com>
- <20150203074856.GF14009@phenom.ffwll.local>
- <CAF6AEGu0-TgyE4BjiaSWXQCSk31VU7dogq=6xDRUhi79rGgbxg@mail.gmail.com>
- <20150203143715.GQ8656@n2100.arm.linux.org.uk>
- <CAF6AEGtBfr3fGEoFjFFpy1KrMJMZ-13VPPJX73fAkwiaLk+XGQ@mail.gmail.com>
-Message-ID: <20150203145817.GT8656@n2100.arm.linux.org.uk>
+From: grygorii.strashko@linaro.org (grygorii.strashko at linaro.org)
+Date: Tue,  3 Feb 2015 17:01:58 +0200
+Subject: [PATCH v2] hwmon: tmp102: add hibernation callbacks
+Message-ID: <1422975718-871-1-git-send-email-grygorii.strashko@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 03, 2015 at 09:44:57AM -0500, Rob Clark wrote:
-> On Tue, Feb 3, 2015 at 9:37 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Tue, Feb 03, 2015 at 09:04:03AM -0500, Rob Clark wrote:
-> >> Since I'm stuck w/ an iommu, instead of built in mmu, my plan was to
-> >> drop use of dma-mapping entirely (incl the current call to dma_map_sg,
-> >> which I just need until we can use drm_cflush on arm), and
-> >> attach/detach iommu domains directly to implement context switches.
-> >> At that point, dma_addr_t really has no sensible meaning for me.
-> >
-> > So how do you intend to import from a subsystem which only gives you
-> > the dma_addr_t?
-> >
-> > If you aren't passing system memory, you have no struct page.  You can't
-> > fake up a struct page.  What this means is that struct scatterlist can't
-> > represent it any other way.
-> 
-> Tell the exporter to stop using carveouts, and give me proper memory
-> instead.. ;-)
-> 
-> Well, at least on these SoC's, I think the only valid use for carveout
-> memory is the bootloader splashscreen.  And I was planning on just
-> hanging on to that for myself for fbdev scanout buffer or other
-> internal (non shared) usage..
+From: Grygorii Strashko <Grygorii.Strashko@linaro.org>
 
-I wasn't thinking about carveouts - as I already mentioned earlier in this
-thread, it may be memory which couldn't possibly ever be system memory -
-for example, a separate chunk of memory which is tightly coupled to the
-graphics system but not so to the CPU.
+Setting a dev_pm_ops suspend/resume pair but not a set of
+hibernation functions means those pm functions will not be
+called upon hibernation.
+Fix this by using SIMPLE_DEV_PM_OPS, which appropriately
+assigns the suspend and hibernation handlers and move
+mp102_suspend/tmp102_resume under CONFIG_PM_SLEEP to avoid
+build warnings.
 
-In such a case, we wouldn't want to use that as normal system memory, but
-we would want to allocate framebuffers and the like from it, and maybe
-pass them around.
+Signed-off-by: Grygorii Strashko <Grygorii.Strashko@linaro.org>
+---
+V1:
+- https://lkml.org/lkml/2015/2/2/509
 
-While it may not be appropriate for MSM, it's still something that needs
-to be considered, because there may be (and I know there are) dmabuf
-users which do pass memory this way.
+ drivers/hwmon/tmp102.c | 15 ++++-----------
+ 1 file changed, 4 insertions(+), 11 deletions(-)
 
-So, what I'm saying is that for the purposes of the dmabuf API, we can't
-mandate that the scatterlists will contain a valid struct page pointer.
-It'd probably be a good idea for the importer to validate the scatterlist
-at import time if it has this requirement.
-
-However, thinking about this more, I think that from a generic design
-point of view, we really should limit the "struct page" usage to a
-special MSM-ism - something which should definitely not be copied by
-other drivers.  As has been mentioned previously, if there is a system
-MMU which needs to be programmed to map system memory onto the bus, the
-struct page becomes absolutely useless, and the only thing that gives
-you the correct "handle" to that memory is the dma_addr_t.
-
-Finally, note that n_mapped = dma_map_sg(dev, sg, n_ent, dir) - n_mapped
-can be less than n_ent when there's the presence of an IOMMU, since an
-IOMMU is permitted to coalesce individual scatterlist entries if it
-so chooses, and when walking the scatterlist for DMA purposes, the
-scatterlist sg_dma_*() accessors should be used, and it should be
-iterated over from 0 to n_mapped, not 0 to n_ent.  It's important to
-realise that in driver code, sg->length may not be the same as
-sg_dma_len(sg) for exactly this reason:
-
-#ifdef CONFIG_NEED_SG_DMA_LENGTH
-#define sg_dma_len(sg)          ((sg)->dma_length)
-#else
-#define sg_dma_len(sg)          ((sg)->length)
-#endif
-
+diff --git a/drivers/hwmon/tmp102.c b/drivers/hwmon/tmp102.c
+index ba9f478..565df47 100644
+--- a/drivers/hwmon/tmp102.c
++++ b/drivers/hwmon/tmp102.c
+@@ -253,7 +253,7 @@ static int tmp102_remove(struct i2c_client *client)
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_PM
++#ifdef CONFIG_PM_SLEEP
+ static int tmp102_suspend(struct device *dev)
+ {
+ 	struct i2c_client *client = to_i2c_client(dev);
+@@ -279,17 +279,10 @@ static int tmp102_resume(struct device *dev)
+ 	config &= ~TMP102_CONF_SD;
+ 	return i2c_smbus_write_word_swapped(client, TMP102_CONF_REG, config);
+ }
+-
+-static const struct dev_pm_ops tmp102_dev_pm_ops = {
+-	.suspend	= tmp102_suspend,
+-	.resume		= tmp102_resume,
+-};
+-
+-#define TMP102_DEV_PM_OPS (&tmp102_dev_pm_ops)
+-#else
+-#define	TMP102_DEV_PM_OPS NULL
+ #endif /* CONFIG_PM */
+ 
++SIMPLE_DEV_PM_OPS(tmp102_dev_pm_ops, tmp102_suspend, tmp102_resume);
++
+ static const struct i2c_device_id tmp102_id[] = {
+ 	{ "tmp102", 0 },
+ 	{ }
+@@ -298,7 +291,7 @@ MODULE_DEVICE_TABLE(i2c, tmp102_id);
+ 
+ static struct i2c_driver tmp102_driver = {
+ 	.driver.name	= DRIVER_NAME,
+-	.driver.pm	= TMP102_DEV_PM_OPS,
++	.driver.pm	= &tmp102_dev_pm_ops,
+ 	.probe		= tmp102_probe,
+ 	.remove		= tmp102_remove,
+ 	.id_table	= tmp102_id,
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
