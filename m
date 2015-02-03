@@ -1,52 +1,68 @@
-From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
-Date: Tue, 03 Feb 2015 08:42:01 +0100
-Subject: [PATCH 0/6] PCI: MMCONFIG clean up
-In-Reply-To: <20150202204253.GB5176@google.com>
-References: <1416413091-13452-1-git-send-email-tomasz.nowicki@linaro.org>
- <20150202204253.GB5176@google.com>
-Message-ID: <54D07BC9.1040506@linaro.org>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Tue, 3 Feb 2015 08:46:43 +0100
+Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher
+ constraints with dma-parms
+In-Reply-To: <20150202214616.GI8656@n2100.arm.linux.org.uk>
+References: <1422347154-15258-2-git-send-email-sumit.semwal@linaro.org>
+ <20150129143908.GA26493@n2100.arm.linux.org.uk>
+ <CAO_48GEOQ1pBwirgEWeVVXW-iOmaC=Xerr2VyYYz9t1QDXgVsw@mail.gmail.com>
+ <20150129154718.GB26493@n2100.arm.linux.org.uk>
+ <CAF6AEGtTmFg66TK_AFkQ-xp7Nd9Evk3nqe6xCBp7K=77OmXTxA@mail.gmail.com>
+ <20150129192610.GE26493@n2100.arm.linux.org.uk>
+ <CAF6AEGujk8UC4X6T=yhTrz1s+SyZUQ=m05h_WcxLDGZU6bydbw@mail.gmail.com>
+ <20150202165405.GX14009@phenom.ffwll.local>
+ <CAF6AEGuESM+e3HSRGM6zLqrp8kqRLGUYvA3KKECdm7m-nt0M=Q@mail.gmail.com>
+ <20150202214616.GI8656@n2100.arm.linux.org.uk>
+Message-ID: <20150203074643.GE14009@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02.02.2015 21:42, Bjorn Helgaas wrote:
-> On Wed, Nov 19, 2014 at 05:04:45PM +0100, Tomasz Nowicki wrote:
->> MMCFG ACPI table has no arch dependencies so it can be used across all
->> architectures. Currently MMCONFIG related code resides in arch/x86 directories.
->> This patch set is goint to isolate non-architecure specific code and make
->> it accessible from drivers/pci/ directory.
->>
->> Tomasz Nowicki (6):
->>    x86, acpi, pci: Reorder logic of pci_mmconfig_insert() function
->>    x86, acpi, pci: Move arch-agnostic MMCFG code out of arch/x86/
->>      directory
->>    x86, acpi, pci: Move PCI config space accessors.
->>    x86, acpi, pci: mmconfig_{32,64}.c code refactoring - remove code
->>      duplication.
->>    x86, acpi, pci: mmconfig_64.c becomes default implementation for arch
->>      agnostic low-level direct PCI config space accessors via MMCONFIG.
->>    pci, acpi: Share ACPI PCI config space accessors.
->
-> Hi Tomasz,
->
-> I'm just checking to make sure we aren't deadlocked here, with me waiting
-> for you and you waiting for me.  I gave you some comments about
-> abbreviations (MCFG/MMCFG/MMCONFIG/ECAM), weak functions, code placement
-> (drivers/acpi vs. drivers/pci), and the mmio_config_*() naming, so I've
-> been waiting to continue those discussions.  But maybe you're waiting for
-> me, too?
->
-> I think this sort of cleanup is a great idea and I hope we can make some
-> progress on it.  If it's easier to do it in small pieces, e.g., starting
-> out by moving code and renaming things with no functional changes, that
-> would be great with me.
+On Mon, Feb 02, 2015 at 09:46:16PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Feb 02, 2015 at 03:30:21PM -0500, Rob Clark wrote:
+> > On Mon, Feb 2, 2015 at 11:54 AM, Daniel Vetter <daniel@ffwll.ch> wrote:
+> > >> My initial thought is for dma-buf to not try to prevent something than
+> > >> an exporter can actually do.. I think the scenario you describe could
+> > >> be handled by two sg-lists, if the exporter was clever enough.
+> > >
+> > > That's already needed, each attachment has it's own sg-list. After all
+> > > there's no array of dma_addr_t in the sg tables, so you can't use one sg
+> > > for more than one mapping. And due to different iommu different devices
+> > > can easily end up with different addresses.
+> > 
+> > 
+> > Well, to be fair it may not be explicitly stated, but currently one
+> > should assume the dma_addr_t's in the dmabuf sglist are bogus.  With
+> > gpu's that implement per-process/context page tables, I'm not really
+> > sure that there is a sane way to actually do anything else..
+> 
+> That's incorrect - and goes dead against the design of scatterlists.
+> 
+> Not only that, but it is entirely possible that you may get handed
+> memory via dmabufs for which there are no struct page's associated
+> with that memory - think about display systems which have their own
+> video memory which is accessible to the GPU, but it isn't system
+> memory.
+> 
+> In those circumstances, you have to use the dma_addr_t's and not the
+> pages.
 
-Hi Bjorn,
+Yeah exactly. At least with i915 we'd really want to be able to share
+stolen memory in some cases, and since that's stolen there's no struct
+pages for them. On top of that any cpu access is also blocked to that
+range in the memory controller, so the dma_addr_t is really the _only_
+thing you can use to get at those memory ranges. And afaik the camera pipe
+on intel soc can get there - unfortunately that one doesn't have an
+upstream driver :(
 
-It is not deadlock, it is rather me suffering with lack of time :)
-
-I definitely want to make that cleanup happen and was about to start 
-working on it again. Thanks for remanding me, patches/comments should 
-come up soon.
-
-Regards,
-Tomasz
+And just to clarify: All current dma-buf exporter that I've seen implement
+the sg mapping correctly and _do_ map the sg table into device address
+space with dma_map_sg. In other words: The dma_addr_t are all valid, it's
+just that e.g. with ttm no one has bothered to teach ttm a dma-buf
+correctly. The internal abstraction is all there, ttm-internal buffer
+object interface match what dma-buf exposes fairly closes (hey I didn't do
+shit when designing those interfaces ;-)
+-Daniel
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
