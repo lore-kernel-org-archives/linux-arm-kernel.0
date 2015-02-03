@@ -1,79 +1,134 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 03 Feb 2015 12:06:41 +0100
-Subject: [PATCH v2 3/3] ARM: EXYNOS: Remove left over 'extra_save'
-In-Reply-To: <1422961601-7087-1-git-send-email-k.kozlowski@samsung.com>
-References: <1422961601-7087-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1422961601-7087-3-git-send-email-k.kozlowski@samsung.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Tue,  3 Feb 2015 12:28:52 +0100
+Subject: [PATCH] ARM: berlin: add a defconfig
+Message-ID: <1422962932-12603-1-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since 32b0aa9aaeb4 ("ARM: EXYNOS: Remove i2c sys configuration related
-code") the Exynos 5250 no longer saves additional registers under
-'exynos_pm_data.extra_save' field.
+Marvell Berlin SoCs did not have a custom defconfig and were only
+supported in multi_v7_defconfig.
 
-No one else uses this code so get rid of it making also 'exynos_pm_data'
-const everywhere.
+Adds a proper defconfig, allowing to boot a Berlin SoC with all the
+currently supported features: SMP, Pinmux, AHCI, Ethernet, I2C, GPIO,
+USB, SDHCI.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Booting with the rootfs on NFS is also supported.
 
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
-Changes since v1:
-1. New patch.
----
- arch/arm/mach-exynos/suspend.c | 13 ++-----------
- 1 file changed, 2 insertions(+), 11 deletions(-)
+ arch/arm/configs/berlin_defconfig | 104 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 104 insertions(+)
+ create mode 100644 arch/arm/configs/berlin_defconfig
 
-diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
-index e6c961126087..d56bd6ca5e86 100644
---- a/arch/arm/mach-exynos/suspend.c
-+++ b/arch/arm/mach-exynos/suspend.c
-@@ -63,7 +63,6 @@ static struct sleep_save exynos_core_save[] = {
- 
- struct exynos_pm_data {
- 	const struct exynos_wkup_irq *wkup_irq;
--	struct sleep_save *extra_save;
- 	int num_extra_save;
- 	unsigned int wake_disable_mask;
- 	unsigned int *release_ret_regs;
-@@ -75,7 +74,7 @@ struct exynos_pm_data {
- 	int (*cpu_suspend)(unsigned long);
- };
- 
--static struct exynos_pm_data *pm_data;
-+static const struct exynos_pm_data *pm_data;
- 
- static int exynos5420_cpu_state;
- static unsigned int exynos_pmu_spare3;
-@@ -240,10 +239,6 @@ static void exynos_pm_prepare(void)
- 
- 	s3c_pm_do_save(exynos_core_save, ARRAY_SIZE(exynos_core_save));
- 
--	 if (pm_data->extra_save)
--		s3c_pm_do_save(pm_data->extra_save,
--				pm_data->num_extra_save);
--
- 	exynos_pm_enter_sleep_mode();
- 
- 	/* ensure at least INFORM0 has the resume address */
-@@ -362,10 +357,6 @@ static void exynos_pm_resume(void)
- 	/* For release retention */
- 	exynos_pm_release_retention();
- 
--	if (pm_data->extra_save)
--		s3c_pm_do_restore_core(pm_data->extra_save,
--					pm_data->num_extra_save);
--
- 	s3c_pm_do_restore_core(exynos_core_save, ARRAY_SIZE(exynos_core_save));
- 
- 	if (cpuid == ARM_CPU_PART_CORTEX_A9)
-@@ -618,7 +609,7 @@ void __init exynos_pm_init(void)
- 		pr_err("Failed to find PMU node\n");
- 		return;
- 	}
--	pm_data = (struct exynos_pm_data *) match->data;
-+	pm_data = (const struct exynos_pm_data *) match->data;
- 
- 	/* Platform-specific GIC callback */
- 	gic_arch_extn.irq_set_wake = exynos_irq_set_wake;
+diff --git a/arch/arm/configs/berlin_defconfig b/arch/arm/configs/berlin_defconfig
+new file mode 100644
+index 000000000000..12430995cab2
+--- /dev/null
++++ b/arch/arm/configs/berlin_defconfig
+@@ -0,0 +1,104 @@
++CONFIG_IKCONFIG=y
++CONFIG_IKCONFIG_PROC=y
++CONFIG_EMBEDDED=y
++# CONFIG_VM_EVENT_COUNTERS is not set
++# CONFIG_SLUB_DEBUG is not set
++# CONFIG_COMPAT_BRK is not set
++CONFIG_JUMP_LABEL=y
++CONFIG_ARCH_BERLIN=y
++CONFIG_MACH_BERLIN_BG2=y
++CONFIG_MACH_BERLIN_BG2CD=y
++CONFIG_MACH_BERLIN_BG2Q=y
++CONFIG_SMP=y
++CONFIG_AEABI=y
++CONFIG_ARM_APPENDED_DTB=y
++CONFIG_ARM_ATAG_DTB_COMPAT=y
++CONFIG_CMDLINE="console=ttyS0,115200"
++CONFIG_VFP=y
++CONFIG_NEON=y
++# CONFIG_SUSPEND is not set
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
++# CONFIG_INET_XFRM_MODE_TUNNEL is not set
++# CONFIG_INET_XFRM_MODE_BEET is not set
++# CONFIG_INET_LRO is not set
++# CONFIG_INET_DIAG is not set
++CONFIG_TCP_CONG_ADVANCED=y
++# CONFIG_INET6_XFRM_MODE_TRANSPORT is not set
++# CONFIG_INET6_XFRM_MODE_TUNNEL is not set
++# CONFIG_INET6_XFRM_MODE_BEET is not set
++# CONFIG_IPV6_SIT is not set
++# CONFIG_WIRELESS is not set
++# CONFIG_UEVENT_HELPER is not set
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++# CONFIG_FW_LOADER is not set
++# CONFIG_BLK_DEV is not set
++CONFIG_BLK_DEV_SD=y
++# CONFIG_SCSI_LOWLEVEL is not set
++CONFIG_ATA=y
++# CONFIG_ATA_VERBOSE_ERROR is not set
++CONFIG_SATA_AHCI_PLATFORM=y
++CONFIG_NETDEVICES=y
++# CONFIG_NET_CORE is not set
++# CONFIG_NET_VENDOR_ARC is not set
++# CONFIG_NET_CADENCE is not set
++# CONFIG_NET_VENDOR_BROADCOM is not set
++# CONFIG_NET_VENDOR_CIRRUS is not set
++# CONFIG_NET_VENDOR_FARADAY is not set
++# CONFIG_NET_VENDOR_HISILICON is not set
++# CONFIG_NET_VENDOR_INTEL is not set
++CONFIG_PXA168_ETH=y
++# CONFIG_NET_VENDOR_MICREL is not set
++# CONFIG_NET_VENDOR_NATSEMI is not set
++# CONFIG_NET_VENDOR_QUALCOMM is not set
++# CONFIG_NET_VENDOR_ROCKER is not set
++# CONFIG_NET_VENDOR_SAMSUNG is not set
++# CONFIG_NET_VENDOR_SEEQ is not set
++# CONFIG_NET_VENDOR_SMSC is not set
++# CONFIG_NET_VENDOR_STMICRO is not set
++# CONFIG_NET_VENDOR_VIA is not set
++# CONFIG_NET_VENDOR_WIZNET is not set
++# CONFIG_USB_NET_DRIVERS is not set
++# CONFIG_WLAN is not set
++# CONFIG_INPUT_MOUSEDEV is not set
++# CONFIG_INPUT_KEYBOARD is not set
++# CONFIG_INPUT_MOUSE is not set
++CONFIG_SERIAL_8250=y
++CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_8250_DW=y
++# CONFIG_HW_RANDOM is not set
++CONFIG_I2C=y
++CONFIG_I2C_DESIGNWARE_PLATFORM=y
++CONFIG_GPIO_DWAPB=y
++# CONFIG_HWMON is not set
++CONFIG_REGULATOR=y
++CONFIG_REGULATOR_FIXED_VOLTAGE=y
++CONFIG_USB=y
++CONFIG_USB_EHCI_HCD=y
++CONFIG_USB_STORAGE=y
++CONFIG_USB_CHIPIDEA=y
++CONFIG_USB_CHIPIDEA_HOST=y
++CONFIG_MMC=y
++CONFIG_MMC_SDHCI=y
++CONFIG_MMC_SDHCI_PLTFM=y
++CONFIG_MMC_SDHCI_PXAV3=y
++# CONFIG_IOMMU_SUPPORT is not set
++CONFIG_PHY_BERLIN_USB=y
++CONFIG_PHY_BERLIN_SATA=y
++CONFIG_EXT4_FS=y
++CONFIG_CONFIGFS_FS=y
++# CONFIG_MISC_FILESYSTEMS is not set
++CONFIG_NFS_FS=y
++CONFIG_NFS_V4=y
++CONFIG_ROOT_NFS=y
++CONFIG_PRINTK_TIME=y
++# CONFIG_SCHED_DEBUG is not set
++# CONFIG_FTRACE is not set
++# CONFIG_CRYPTO_ANSI_CPRNG is not set
++# CONFIG_CRYPTO_HW is not set
 -- 
-1.9.1
+2.2.2
