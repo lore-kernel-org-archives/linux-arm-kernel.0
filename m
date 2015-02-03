@@ -1,223 +1,244 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 3 Feb 2015 11:11:57 -0800
-Subject: [PATCH 00/11] ARM: OMAP3: legacy clock data move under clk driver
-In-Reply-To: <20150203190359.GB25235@atomide.com>
-References: <1418746856-17173-1-git-send-email-t-kristo@ti.com>
- <20150107230006.GE13010@atomide.com> <201502031759.32261.arnd@arndb.de>
- <20150203190359.GB25235@atomide.com>
-Message-ID: <CAPtuhTgzGiZkTCCJUiLRicFVufgsueewh5J4sRK64pn_CeXaBQ@mail.gmail.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Tue, 3 Feb 2015 20:13:36 +0100
+Subject: [PATCH 2/2] arm/dma-mapping: Respect NO_KERNEL_MAPPING when we
+ don't have an IOMMU
+In-Reply-To: <54D10B60.6020002@codeaurora.org>
+References: <1422953252-10835-1-git-send-email-carlo@caione.org>
+ <1422953252-10835-3-git-send-email-carlo@caione.org>
+ <54D10B60.6020002@codeaurora.org>
+Message-ID: <CAOQ7t2YmgxvM59sS1sigDi+dw0GGLOuVoYZ2=99HXa=QYx=N0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 3, 2015 at 11:04 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Arnd Bergmann <arnd@arndb.de> [150203 09:03]:
->> On Thursday 08 January 2015, Tony Lindgren wrote:
+On Tue, Feb 3, 2015 at 6:54 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
+> On 2/3/2015 12:47 AM, Carlo Caione wrote:
 >>
->> > Great, hopefully this will finally allow Mike to make the
->> > generic struct clk private to drivers/clk :)
->> >
->> > Seems to boot just fine based on a quick legacy booting test
->> > on n900.
->> >
->> > Mike, assuming no other issues, can you please apply these into a
->> > immutable branch against v3.19-rc1 that Paul and I can also merge
->> > in as needed?
->> >
->> > Please also feel free to add:
->> >
->> > Acked-by: Tony Lindgren <tony@atomide.com>
+>> From: "Jasper St. Pierre" <jstpierre@mecheye.net>
 >>
->> The series has arrived in linux-next and promptly triggered a few
->> randconfig build errors. Here is a patch that fixes it. Feel free
->> to replace it with a different patch if you don't like this version.
+>> Even without an iommu, NO_KERNEL_MAPPING is still convenient to save on
+>> kernel address space in places where we don't need a kernel mapping.
+>> Implement support for it in the two places where we're creating an
+>> expensive mapping.
 >>
->> 8<--------
->> Subject: clk: omap: compile legacy omap3 clocks conditionally
+>> __alloc_from_pool uses an internal pool from which we already have
+>> virtual addresses, so it's not relevant, and __alloc_simple_buffer
+>> uses alloc_pages, which will always return a lowmem page, which is
+>> already mapped into kernel space, so we can't prevent a mapping for it
+>> in that case.
 >>
->> The 'ARM: OMAP3: legacy clock data move under clk driver' patch series
->> causes build errors when CONFIG_OMAP3 is not set:
+>> Signed-off-by: Jasper St. Pierre <jstpierre@mecheye.net>
+>> Signed-off-by: Carlo Caione <carlo@caione.org>
+>> Reviewed-by: Rob Clark <robdclark@gmail.com>
+>> Reviewed-by: Daniel Drake <dsd@endlessm.com>
+>> ---
+>>   arch/arm/mm/dma-mapping.c | 67
+>> +++++++++++++++++++++++++++++------------------
+>>   1 file changed, 41 insertions(+), 26 deletions(-)
 >>
->> drivers/clk/ti/dpll.c: In function 'ti_clk_register_dpll':
->> drivers/clk/ti/dpll.c:199:31: error: 'omap3_dpll_ck_ops' undeclared (first use in this function)
->>   const struct clk_ops *ops = &omap3_dpll_ck_ops;
->>                                ^
->> drivers/clk/ti/dpll.c:199:31: note: each undeclared identifier is reported only once for each function it appears in
->> drivers/clk/ti/dpll.c:259:10: error: 'omap3_dpll_per_ck_ops' undeclared (first use in this function)
->>    ops = &omap3_dpll_per_ck_ops;
->>           ^
+>> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+>> index a673c7f..6843293 100644
+>> --- a/arch/arm/mm/dma-mapping.c
+>> +++ b/arch/arm/mm/dma-mapping.c
+>> @@ -289,11 +289,11 @@ static void __dma_free_buffer(struct page *page,
+>> size_t size)
 >>
->> drivers/built-in.o: In function `ti_clk_register_gate':
->> drivers/clk/ti/gate.c:179: undefined reference to `clkhwops_omap3430es2_dss_usbhost_wait'
->> drivers/clk/ti/gate.c:179: undefined reference to `clkhwops_am35xx_ipss_module_wait'
->> -in.o: In function `ti_clk_register_interface':
->> drivers/clk/ti/interface.c:100: undefined reference to `clkhwops_omap3430es2_iclk_hsotgusb_wait'
->> drivers/clk/ti/interface.c:100: undefined reference to `clkhwops_omap3430es2_iclk_dss_usbhost_wait'
->> drivers/clk/ti/interface.c:100: undefined reference to `clkhwops_omap3430es2_iclk_ssi_wait'
->> drivers/clk/ti/interface.c:100: undefined reference to `clkhwops_am35xx_ipss_wait'
->> drivers/built-in.o: In function `ti_clk_register_composite':
->> :(.text+0x3da768): undefined reference to `ti_clk_build_component_gate'
+>>   static void *__alloc_from_contiguous(struct device *dev, size_t size,
+>>                                      pgprot_t prot, struct page
+>> **ret_page,
+>> -                                    const void *caller);
+>> +                                    const void *caller, bool want_vaddr);
 >>
->> In order to fix that problem, this patch makes the omap3 legacy code
->> compiled only when both CONFIG_OMAP3 and CONFIG_ATAGS are set.
->
-> Looks OK to me:
->
-> Acked-by: Tony Lindgren <tony@atomide.com>
-
-Thanks for the fix Arnd and for the Ack Tony. I beautified the commitlog a bit.
-
-Applied to clk-next.
-
-Regards,
-Mike
-
->
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->> ----
->> diff --git a/drivers/clk/ti/Makefile b/drivers/clk/ti/Makefile
->> index 14e6686a5eea..105ffd0f5e79 100644
->> --- a/drivers/clk/ti/Makefile
->> +++ b/drivers/clk/ti/Makefile
->> @@ -1,4 +1,3 @@
->> -ifneq ($(CONFIG_OF),)
->>  obj-y                                        += clk.o autoidle.o clockdomain.o
->>  clk-common                           = dpll.o composite.o divider.o gate.o \
->>                                         fixed-factor.o mux.o apll.o
->> @@ -6,10 +5,13 @@ obj-$(CONFIG_SOC_AM33XX)            += $(clk-common) clk-33xx.o
->>  obj-$(CONFIG_SOC_TI81XX)             += $(clk-common) fapll.o clk-816x.o
->>  obj-$(CONFIG_ARCH_OMAP2)             += $(clk-common) interface.o clk-2xxx.o
->>  obj-$(CONFIG_ARCH_OMAP3)             += $(clk-common) interface.o \
->> -                                        clk-3xxx.o clk-3xxx-legacy.o
->> +                                        clk-3xxx.o
->>  obj-$(CONFIG_ARCH_OMAP4)             += $(clk-common) clk-44xx.o
->>  obj-$(CONFIG_SOC_OMAP5)                      += $(clk-common) clk-54xx.o
->>  obj-$(CONFIG_SOC_DRA7XX)             += $(clk-common) clk-7xx.o \
->>                                          clk-dra7-atl.o
->>  obj-$(CONFIG_SOC_AM43XX)             += $(clk-common) clk-43xx.o
+>>   static void *__alloc_remap_buffer(struct device *dev, size_t size, gfp_t
+>> gfp,
+>>                                  pgprot_t prot, struct page **ret_page,
+>> -                                const void *caller);
+>> +                                const void *caller, bool want_vaddr);
+>>
+>>   static void *
+>>   __dma_alloc_remap(struct page *page, size_t size, gfp_t gfp, pgprot_t
+>> prot,
+>> @@ -357,10 +357,10 @@ static int __init atomic_pool_init(void)
+>>
+>>         if (dev_get_cma_area(NULL))
+>>                 ptr = __alloc_from_contiguous(NULL, atomic_pool_size,
+>> prot,
+>> -                                             &page, atomic_pool_init);
+>> +                                             &page, atomic_pool_init,
+>> true);
+>>         else
+>>                 ptr = __alloc_remap_buffer(NULL, atomic_pool_size, gfp,
+>> prot,
+>> -                                          &page, atomic_pool_init);
+>> +                                          &page, atomic_pool_init, true);
+>>         if (ptr) {
+>>                 int ret;
+>>
+>> @@ -467,13 +467,15 @@ static void __dma_remap(struct page *page, size_t
+>> size, pgprot_t prot)
+>>
+>>   static void *__alloc_remap_buffer(struct device *dev, size_t size, gfp_t
+>> gfp,
+>>                                  pgprot_t prot, struct page **ret_page,
+>> -                                const void *caller)
+>> +                                const void *caller, bool want_vaddr)
+>>   {
+>>         struct page *page;
+>> -       void *ptr;
+>> +       void *ptr = NULL;
+>>         page = __dma_alloc_buffer(dev, size, gfp);
+>>         if (!page)
+>>                 return NULL;
+>> +       if (!want_vaddr)
+>> +               goto out;
+>>
+>>         ptr = __dma_alloc_remap(page, size, gfp, prot, caller);
+>>         if (!ptr) {
+>> @@ -481,6 +483,7 @@ static void *__alloc_remap_buffer(struct device *dev,
+>> size_t size, gfp_t gfp,
+>>                 return NULL;
+>>         }
+>>
+>> + out:
+>>         *ret_page = page;
+>>         return ptr;
+>>   }
+>> @@ -523,12 +526,12 @@ static int __free_from_pool(void *start, size_t
+>> size)
+>>
+>>   static void *__alloc_from_contiguous(struct device *dev, size_t size,
+>>                                      pgprot_t prot, struct page
+>> **ret_page,
+>> -                                    const void *caller)
+>> +                                    const void *caller, bool want_vaddr)
+>>   {
+>>         unsigned long order = get_order(size);
+>>         size_t count = size >> PAGE_SHIFT;
+>>         struct page *page;
+>> -       void *ptr;
+>> +       void *ptr = NULL;
+>>
+>>         page = dma_alloc_from_contiguous(dev, count, order);
+>>         if (!page)
+>> @@ -536,6 +539,9 @@ static void *__alloc_from_contiguous(struct device
+>> *dev, size_t size,
+>>
+>>         __dma_clear_buffer(page, size);
+>>
+>> +       if (!want_vaddr)
+>> +               goto out;
 >> +
->> +ifdef CONFIG_ATAGS
->> +obj-$(CONFIG_ARCH_OMAP3)                += clk-3xxx-legacy.o
->>  endif
->> diff --git a/drivers/clk/ti/clk.c b/drivers/clk/ti/clk.c
->> index 546dae405402..e22b95646e09 100644
->> --- a/drivers/clk/ti/clk.c
->> +++ b/drivers/clk/ti/clk.c
->> @@ -186,6 +186,7 @@ void ti_dt_clk_init_retry_clks(void)
->>       }
->>  }
->>
->> +#if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_ATAGS)
->>  void __init ti_clk_patch_legacy_clks(struct ti_clk **patch)
->>  {
->>       while (*patch) {
->> @@ -308,3 +309,4 @@ int __init ti_clk_register_legacy_clks(struct ti_clk_alias *clks)
->>
->>       return 0;
->>  }
->> +#endif
->> diff --git a/drivers/clk/ti/composite.c b/drivers/clk/ti/composite.c
->> index 3a9665fce041..3654f61912eb 100644
->> --- a/drivers/clk/ti/composite.c
->> +++ b/drivers/clk/ti/composite.c
->> @@ -118,6 +118,7 @@ static inline struct clk_hw *_get_hw(struct clk_hw_omap_comp *clk, int idx)
->>
->>  #define to_clk_hw_comp(_hw) container_of(_hw, struct clk_hw_omap_comp, hw)
->>
->> +#if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_ATAGS)
->>  struct clk *ti_clk_register_composite(struct ti_clk *setup)
->>  {
->>       struct ti_clk_composite *comp;
->> @@ -153,6 +154,7 @@ struct clk *ti_clk_register_composite(struct ti_clk *setup)
->>
->>       return clk;
->>  }
->> +#endif
->>
->>  static void __init _register_composite(struct clk_hw *hw,
->>                                      struct device_node *node)
->> diff --git a/drivers/clk/ti/dpll.c b/drivers/clk/ti/dpll.c
->> index 47ebff772b13..81dc4698dc41 100644
->> --- a/drivers/clk/ti/dpll.c
->> +++ b/drivers/clk/ti/dpll.c
->> @@ -176,6 +176,7 @@ cleanup:
->>       kfree(clk_hw);
->>  }
->>
->> +#if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_ATAGS)
->>  void __iomem *_get_reg(u8 module, u16 offset)
->>  {
->>       u32 reg;
->> @@ -271,6 +272,7 @@ cleanup:
->>       kfree(clk_hw);
->>       return clk;
->>  }
->> +#endif
->>
->>  #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5) || \
->>       defined(CONFIG_SOC_DRA7XX) || defined(CONFIG_SOC_AM33XX) || \
->> diff --git a/drivers/clk/ti/gate.c b/drivers/clk/ti/gate.c
->> index d4f6cb20e16e..d493307b73f4 100644
->> --- a/drivers/clk/ti/gate.c
->> +++ b/drivers/clk/ti/gate.c
->> @@ -130,6 +130,7 @@ static struct clk *_register_gate(struct device *dev, const char *name,
->>       return clk;
->>  }
->>
->> +#if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_ATAGS)
->>  struct clk *ti_clk_register_gate(struct ti_clk *setup)
->>  {
->>       const struct clk_ops *ops = &omap_gate_clk_ops;
->> @@ -208,6 +209,7 @@ struct clk_hw *ti_clk_build_component_gate(struct ti_clk_gate *setup)
->>
->>       return &gate->hw;
->>  }
->> +#endif
->>
->>  static void __init _of_ti_gate_clk_setup(struct device_node *node,
->>                                        const struct clk_ops *ops,
->> diff --git a/drivers/clk/ti/interface.c b/drivers/clk/ti/interface.c
->> index d71cd9b5de46..265d91f071c5 100644
->> --- a/drivers/clk/ti/interface.c
->> +++ b/drivers/clk/ti/interface.c
->> @@ -68,6 +68,7 @@ static struct clk *_register_interface(struct device *dev, const char *name,
->>       return clk;
->>  }
->>
->> +#if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_ATAGS)
->>  struct clk *ti_clk_register_interface(struct ti_clk *setup)
->>  {
->>       const struct clk_hw_omap_ops *ops = &clkhwops_iclk_wait;
->> @@ -98,6 +99,7 @@ struct clk *ti_clk_register_interface(struct ti_clk *setup)
->>       return _register_interface(NULL, setup->name, gate->parent,
->>                                  (void __iomem *)reg, gate->bit_shift, ops);
->>  }
->> +#endif
->>
->>  static void __init _of_ti_interface_clk_setup(struct device_node *node,
->>                                             const struct clk_hw_omap_ops *ops)
->> diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
->> index 0eac65054283..67844003493d 100644
->> --- a/include/linux/clk/ti.h
->> +++ b/include/linux/clk/ti.h
->> @@ -360,9 +360,17 @@ extern const struct clk_hw_omap_ops clkhwops_omap3430es2_iclk_ssi_wait;
->>  extern const struct clk_hw_omap_ops clkhwops_omap3430es2_iclk_dss_usbhost_wait;
->>  extern const struct clk_hw_omap_ops clkhwops_omap3430es2_iclk_hsotgusb_wait;
->>
->> +#ifdef CONFIG_ATAGS
->>  int omap3430_clk_legacy_init(void);
->>  int omap3430es1_clk_legacy_init(void);
->>  int omap36xx_clk_legacy_init(void);
->>  int am35xx_clk_legacy_init(void);
->> +#else
->> +static inline int omap3430_clk_legacy_init(void) { return -ENXIO; }
->> +static inline int omap3430es1_clk_legacy_init(void) { return -ENXIO; }
->> +static inline int omap36xx_clk_legacy_init(void) { return -ENXIO; }
->> +static inline int am35xx_clk_legacy_init(void) { return -ENXIO; }
->> +#endif
+>>         if (PageHighMem(page)) {
+>>                 ptr = __dma_alloc_remap(page, size, GFP_KERNEL, prot,
+>> caller);
+>>                 if (!ptr) {
+>> @@ -546,17 +552,21 @@ static void *__alloc_from_contiguous(struct device
+>> *dev, size_t size,
+>>                 __dma_remap(page, size, prot);
+>>                 ptr = page_address(page);
+>>         }
 >> +
+>> + out:
+>>         *ret_page = page;
+>>         return ptr;
+>>   }
 >>
->>  #endif
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>   static void __free_from_contiguous(struct device *dev, struct page
+>> *page,
+>> -                                  void *cpu_addr, size_t size)
+>> +                                  void *cpu_addr, size_t size, bool
+>> want_vaddr)
+>>   {
+>> -       if (PageHighMem(page))
+>> -               __dma_free_remap(cpu_addr, size);
+>> -       else
+>> -               __dma_remap(page, size, PAGE_KERNEL);
+>> +       if (want_vaddr) {
+>> +               if (PageHighMem(page))
+>> +                       __dma_free_remap(cpu_addr, size);
+>> +               else
+>> +                       __dma_remap(page, size, PAGE_KERNEL);
+>> +       }
+>>         dma_release_from_contiguous(dev, page, size >> PAGE_SHIFT);
+>>   }
+>>
+>> @@ -574,12 +584,12 @@ static inline pgprot_t __get_dma_pgprot(struct
+>> dma_attrs *attrs, pgprot_t prot)
+>>
+>>   #define nommu() 1
+>>
+>> -#define __get_dma_pgprot(attrs, prot)  __pgprot(0)
+>> -#define __alloc_remap_buffer(dev, size, gfp, prot, ret, c)     NULL
+>> +#define __get_dma_pgprot(attrs, prot)
+>> __pgprot(0)
+>> +#define __alloc_remap_buffer(dev, size, gfp, prot, ret, c, wv) NULL
+>>   #define __alloc_from_pool(size, ret_page)                     NULL
+>> -#define __alloc_from_contiguous(dev, size, prot, ret, c)       NULL
+>> +#define __alloc_from_contiguous(dev, size, prot, ret, c, wv)   NULL
+>>   #define __free_from_pool(cpu_addr, size)                      0
+>> -#define __free_from_contiguous(dev, page, cpu_addr, size)      do { }
+>> while (0)
+>> +#define __free_from_contiguous(dev, page, cpu_addr, size, wv)  do { }
+>> while (0)
+>>   #define __dma_free_remap(cpu_addr, size)                      do { }
+>> while (0)
+>>
+>>   #endif        /* CONFIG_MMU */
+>> @@ -599,11 +609,13 @@ static void *__alloc_simple_buffer(struct device
+>> *dev, size_t size, gfp_t gfp,
+>>
+>>
+>>   static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t
+>> *handle,
+>> -                        gfp_t gfp, pgprot_t prot, bool is_coherent, const
+>> void *caller)
+>> +                        gfp_t gfp, pgprot_t prot, bool is_coherent,
+>> +                        struct dma_attrs *attrs, const void *caller)
+>>   {
+>>         u64 mask = get_coherent_dma_mask(dev);
+>>         struct page *page = NULL;
+>>         void *addr;
+>> +       bool want_vaddr;
+>>
+>>   #ifdef CONFIG_DMA_API_DEBUG
+>>         u64 limit = (mask + 1) & ~mask;
+>> @@ -631,20 +643,21 @@ static void *__dma_alloc(struct device *dev, size_t
+>> size, dma_addr_t *handle,
+>>
+>>         *handle = DMA_ERROR_CODE;
+>>         size = PAGE_ALIGN(size);
+>> +       want_vaddr = !dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs);
+>>
+>>         if (is_coherent || nommu())
+>>                 addr = __alloc_simple_buffer(dev, size, gfp, &page);
+>>         else if (!(gfp & __GFP_WAIT))
+>>                 addr = __alloc_from_pool(size, &page);
+>>         else if (!dev_get_cma_area(dev))
+>> -               addr = __alloc_remap_buffer(dev, size, gfp, prot, &page,
+>> caller);
+>> +               addr = __alloc_remap_buffer(dev, size, gfp, prot, &page,
+>> caller, want_vaddr);
+>>         else
+>> -               addr = __alloc_from_contiguous(dev, size, prot, &page,
+>> caller);
+>> +               addr = __alloc_from_contiguous(dev, size, prot, &page,
+>> caller, want_vaddr);
+>>
+>> -       if (addr)
+>> +       if (page)
+>>                 *handle = pfn_to_dma(dev, page_to_pfn(page));
+>>
+>> -       return addr;
+>> +       return want_vaddr ? addr : &page;
+>>   }
+>>
+>  What happens if __alloc_remap_buffer or __alloc_from_contiguous fails to
+> allocate?
+> From this, its seems like we will return &page which will always be non-null
+> so it will look like a success.
+
+Good catch. I'll fix it in v2.
+
+Thank you,
+
+-- 
+Carlo Caione
