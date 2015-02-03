@@ -1,101 +1,62 @@
 From: tsahee@annapurnalabs.com (Tsahee Zidenberg)
-Date: Tue, 03 Feb 2015 15:29:05 +0200
-Subject: [PATCH v4 0/6] Introducing the Alpine platform.
-Message-ID: <54d0cd21.WWf8LEKnly7HnqEK%tsahee@annapurnalabs.com>
+Date: Tue, 03 Feb 2015 15:29:10 +0200
+Subject: [PATCH v4 2/6] ARM: Alpine: early-debug print support
+Message-ID: <54d0cd26.IizQ8Xs0Kr9x2FTu%tsahee@annapurnalabs.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If possible to introduce this into 3.20 - I would really appreciate it. If any 
-action by me can make it happen - please let me know.
+Alpine platform includes UART8250 that can be used for early prints.
 
-Thank you!
-
+Signed-off-by: Saeed Bishara <saeed@annapurnalabs.com>
+Signed-off-by: Tsahee Zidenberg <tsahee@annapurnalabs.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
-Annapurna Labs(TM) is a technology company providing innovative solutions
-including chips, software, and systems for the datacenter and enterprise
-infrastructure.
+ arch/arm/Kconfig.debug | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-Alpine(TM) is one of Annapurna Labs? chip products targeting storage and
-networking applications. It is a complete Platform-On-Chip,
-integrating 2-4 cortex-A15 cores and multiple innovations to provide
-a seamless networking and storage fabric for enterprise and datacenter
-equipment.
-
-This patchset provides initial support for the Alpine platform.
-
-Patch #1 contains minimal, single-cpu architecture support.
-
-Patch #2 adds early-debug capabilities via Alpine UART 0.
-
-Patch #3 adds smp-support and a secondary cpu enable-method for the platform.
-
-Patch #4 provides documentation for the available device-tree nodes.
-
-Patch #5 provides a device-tree for Alpine soc and development board.
-
-Patch #6 adds an entry to MAINTAINERS file.
-
-The patchset was tested with multi_v7_defconfig, adding CONFIG_ARCH_ALPINE
-
----
-V2:
-* map physical cpu-id from logical on cpu wakeup
-* use syscon/regmap for sysfabric_service implementation
-* devicetree format:
-**  split between .dtsi and dts
-**  dual license
-**  node and manufacturer naming
-* intoduce devicetree in two separate patches
-* multiple format fixes
-* rebased on d932006 (for-next)
-
----
-V3:
-* small format changes
-* rebased on f9db7e2 (for-next)
-
----
-V4:
-* removed unnecessary "compatible" property
-* added entry to MAINTAINERS file, in a separate patch.
-
-Tsahee Zidenberg (6):
-  ARM: Alpine: Initial support for Alpine platform
-  ARM: Alpine: early-debug print support
-  ARM: Alpine: smp support
-  ARM: dts: Alpine platform binding documentation
-  ARM: dts: Alpine platform devicetree
-  MAINTAINERS: add maintainer for Alpine Arm machine
-
- .../devicetree/bindings/arm/al,alpine.txt          |  88 +++++++++++++
- .../bindings/arm/cpu-enable-method/al,alpine-smp   |  52 ++++++++
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- MAINTAINERS                                        |   5 +
- arch/arm/Kconfig                                   |   2 +
- arch/arm/Kconfig.debug                             |  12 +-
- arch/arm/Makefile                                  |   1 +
- arch/arm/boot/dts/Makefile                         |   4 +
- arch/arm/boot/dts/alpine-db.dts                    |  35 +++++
- arch/arm/boot/dts/alpine.dtsi                      | 141 +++++++++++++++++++++
- arch/arm/mach-alpine/Kconfig                       |  10 ++
- arch/arm/mach-alpine/Makefile                      |   6 +
- arch/arm/mach-alpine/alpine_cpu_pm.c               |  70 ++++++++++
- arch/arm/mach-alpine/alpine_cpu_pm.h               |  26 ++++
- arch/arm/mach-alpine/alpine_cpu_resume.h           |  38 ++++++
- arch/arm/mach-alpine/alpine_machine.c              |  28 ++++
- arch/arm/mach-alpine/platsmp.c                     |  49 +++++++
- 17 files changed, 567 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/arm/al,alpine.txt
- create mode 100644 Documentation/devicetree/bindings/arm/cpu-enable-method/al,alpine-smp
- create mode 100644 arch/arm/boot/dts/alpine-db.dts
- create mode 100644 arch/arm/boot/dts/alpine.dtsi
- create mode 100644 arch/arm/mach-alpine/Kconfig
- create mode 100644 arch/arm/mach-alpine/Makefile
- create mode 100644 arch/arm/mach-alpine/alpine_cpu_pm.c
- create mode 100644 arch/arm/mach-alpine/alpine_cpu_pm.h
- create mode 100644 arch/arm/mach-alpine/alpine_cpu_resume.h
- create mode 100644 arch/arm/mach-alpine/alpine_machine.c
- create mode 100644 arch/arm/mach-alpine/platsmp.c
-
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index b6a073d..b8412c3 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -93,6 +93,14 @@ choice
+ 	prompt "Kernel low-level debugging port"
+ 	depends on DEBUG_LL
+ 
++	config DEBUG_ALPINE_UART0
++		bool "Kernel low-level debugging messages via Alpine UART0"
++		depends on ARCH_ALPINE
++		select DEBUG_UART_8250
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on Alpine based platforms.
++
+ 	config DEBUG_ASM9260_UART
+ 		bool "Kernel low-level debugging via asm9260 UART"
+ 		depends on MACH_ASM9260
+@@ -1367,6 +1375,7 @@ config DEBUG_UART_PHYS
+ 	default 0xf8b00000 if DEBUG_HIX5HD2_UART
+ 	default 0xf991e000 if DEBUG_QCOM_UARTDM
+ 	default 0xfcb00000 if DEBUG_HI3620_UART
++	default 0xfd883000 if DEBUG_ALPINE_UART0
+ 	default 0xfe800000 if ARCH_IOP32X
+ 	default 0xff690000 if DEBUG_RK32_UART2
+ 	default 0xffc02000 if DEBUG_SOCFPGA_UART
+@@ -1427,6 +1436,7 @@ config DEBUG_UART_VIRT
+ 	default 0xfd000000 if ARCH_SPEAR3XX || ARCH_SPEAR6XX
+ 	default 0xfd000000 if ARCH_SPEAR13XX
+ 	default 0xfd012000 if ARCH_MV78XX0
++	default 0xfd883000 if DEBUG_ALPINE_UART0
+ 	default 0xfde12000 if ARCH_DOVE
+ 	default 0xfe012000 if ARCH_ORION5X
+ 	default 0xf31004c0 if DEBUG_MESON_UARTAO
+@@ -1482,7 +1492,7 @@ config DEBUG_UART_8250_WORD
+ 	depends on DEBUG_LL_UART_8250 || DEBUG_UART_8250
+ 	depends on DEBUG_UART_8250_SHIFT >= 2
+ 	default y if DEBUG_PICOXCELL_UART || DEBUG_SOCFPGA_UART || \
+-		ARCH_KEYSTONE || \
++		ARCH_KEYSTONE || DEBUG_ALPINE_UART0 || \
+ 		DEBUG_DAVINCI_DMx_UART0 || DEBUG_DAVINCI_DA8XX_UART1 || \
+ 		DEBUG_DAVINCI_DA8XX_UART2 || \
+ 		DEBUG_BCM_KONA_UART || DEBUG_RK32_UART2 || \
 -- 
 1.9.1
