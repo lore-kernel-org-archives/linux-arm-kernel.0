@@ -1,54 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 03 Feb 2015 16:25:11 +0100
-Subject: [PATCH v5 2/7] mailbox: arm_mhu: add driver for ARM MHU controller
-In-Reply-To: <20150203144611.GS8656@n2100.arm.linux.org.uk>
-References: <1422955310-6542-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <CAJe_ZhdL6=4bMPRitFeCqrO2jeYQuDa9071estTBd3PTbmURYA@mail.gmail.com>
- <20150203144611.GS8656@n2100.arm.linux.org.uk>
-Message-ID: <4344803.3qsb2TUUaZ@wuerfel>
+From: robdclark@gmail.com (Rob Clark)
+Date: Tue, 3 Feb 2015 10:25:50 -0500
+Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher constraints
+ with dma-parms
+In-Reply-To: <4830208.H6zxrGlT1D@wuerfel>
+References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
+ <4689826.8DDCrX2ZhK@wuerfel>
+ <20150203144109.GR8656@n2100.arm.linux.org.uk>
+ <4830208.H6zxrGlT1D@wuerfel>
+Message-ID: <CAF6AEGt5TcpdTFv+2GJ1GMzyr52BEkSBffZTW5C1ytg9G6N7Qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 February 2015 14:46:11 Russell King - ARM Linux wrote:
-> On Tue, Feb 03, 2015 at 08:09:34PM +0530, Jassi Brar wrote:
-> > On 3 February 2015 at 18:02, Russell King - ARM Linux
-> > <linux@arm.linux.org.uk> wrote:
-> > > On Tue, Feb 03, 2015 at 05:29:23PM +0800, Vincent Yang wrote:
-> > >> +static int mhu_send_data(struct mbox_chan *chan, void *data)
-> > >> +{
-> > >> +     struct mhu_link *mlink = chan->con_priv;
-> > >> +
-> > >> +     pr_debug("%s:%d\n", __func__, __LINE__);
-> > >> +     if (!mhu_last_tx_done(chan)) {
-> > >> +             dev_err(chan->mbox->dev, "Last TX(%d) pending!\n", mlink->irq);
-> > >> +             return -EBUSY;
-> > >> +     }
-> > >> +
-> > >> +     writel_relaxed((u32)data, mlink->tx_reg + INTR_SET_OFS);
-> > >
-> > > Doesn't that cause a GCC warning?
-> > >
-> > I don't see any, but I'll drop the cast.
-> 
-> A cast is probably needed.  You're right that GCC no longer warns about
-> this - I'm pretty sure it used to complain about casting pointers to
-> ints, and we used to need to cast to "unsigned long" first.
+On Tue, Feb 3, 2015 at 9:52 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 03 February 2015 14:41:09 Russell King - ARM Linux wrote:
+>> On Tue, Feb 03, 2015 at 03:17:27PM +0100, Arnd Bergmann wrote:
+>> > On Tuesday 03 February 2015 09:04:03 Rob Clark wrote:
+>> > > Since I'm stuck w/ an iommu, instead of built in mmu, my plan was to
+>> > > drop use of dma-mapping entirely (incl the current call to dma_map_sg,
+>> > > which I just need until we can use drm_cflush on arm), and
+>> > > attach/detach iommu domains directly to implement context switches.
+>> > > At that point, dma_addr_t really has no sensible meaning for me.
+>> >
+>> > I think what you see here is a quite common hardware setup and we really
+>> > lack the right abstraction for it at the moment. Everybody seems to
+>> > work around it with a mix of the dma-mapping API and the iommu API.
+>> > These are doing different things, and even though the dma-mapping API
+>> > can be implemented on top of the iommu API, they are not really compatible.
+>>
+>> I'd go as far as saying that the "DMA API on top of IOMMU" is more
+>> intended to be for a system IOMMU for the bus in question, rather
+>> than a device-level IOMMU.
+>>
+>> If an IOMMU is part of a device, then the device should handle it
+>> (maybe via an abstraction) and not via the DMA API.  The DMA API should
+>> be handing the bus addresses to the device driver which the device's
+>> IOMMU would need to generate.  (In other words, in this circumstance,
+>> the DMA API shouldn't give you the device internal address.)
+>
+> Exactly. And the abstraction that people choose at the moment is the
+> iommu API, for better or worse. It makes a lot of sense to use this
+> API if the same iommu is used for other devices as well (which is
+> the case on Tegra and probably a lot of others). Unfortunately the
+> iommu API lacks support for cache management, and probably other things
+> as well, because this was not an issue for the original use case
+> (device assignment on KVM/x86).
+>
+> This could be done by adding explicit or implied cache management
+> to the IOMMU mapping interfaces, or by extending the dma-mapping
+> interfaces in a way that covers the use case of the device managing
+> its own address space, in addition to the existing coherent and
+> streaming interfaces.
 
-It definitely warns about converting an u64 to pointer or back,
-and it warns on 64-bit machines about this conversion.
+I think for gpu's, we'd prefer explicit and less abstraction..  which
+is probably opposite of what every other driver would want
 
-On a related note, I wonder why the driver actually converts a pointer to
-int. I believe we have discussed this in the past but don't remember the
-outcome. I had expected to see here something like:
+In the end, my eventual goal is explicit control of tlb flush, and
+control of my address space.  And in fact in some cases we are going
+to want to use the gpu to bang on iommu registers to do context
+switches and tlb flushes.  (Which is obviously not the first step..
+and something that is fairly difficult to get right/secure.. but the
+performance win seems significant so I'm not sure we can avoid it.)
 
-static int mhu_send_data(struct mbox_chan *chan, void *data)
-{
-	struct mhu_link *mlink = chan->con_priv;
-	u32 *arg = data;
+BR,
+-R
 
-	writel_relaxed(*arg, mlink->tx_reg + INTR_SET_OFS);
-}
-
-i.e. dereferencing the pointer instead of using the actual value.
-
-	Arnd
+>
+>         Arnd
