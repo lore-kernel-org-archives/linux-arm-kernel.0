@@ -1,46 +1,92 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Tue, 3 Feb 2015 11:18:09 -0500
-Subject: [PATCH v3] ahci_xgene: Fix the dma state machine lockup for the
- ATA_CMD_SMART PIO mode command.
-In-Reply-To: <1422900439-5541-2-git-send-email-stripathi@apm.com>
-References: <1422900439-5541-1-git-send-email-stripathi@apm.com>
- <1422900439-5541-2-git-send-email-stripathi@apm.com>
-Message-ID: <20150203161809.GG19463@htj.dyndns.org>
+From: graeme.gregory@linaro.org (Graeme Gregory)
+Date: Tue, 3 Feb 2015 16:18:22 +0000
+Subject: [PATCH v8 05/21] ACPI / sleep: Introduce sleep_arm.c
+In-Reply-To: <1685897.h4vAPfoguo@vostro.rjw.lan>
+References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
+ <1422881149-8177-6-git-send-email-hanjun.guo@linaro.org>
+ <1685897.h4vAPfoguo@vostro.rjw.lan>
+Message-ID: <20150203161821.GB24474@xora-haswell.xora.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 02, 2015 at 11:37:19PM +0530, Suman Tripathi wrote:
-> This patch addresses the issue with ATA_CMD_SMART pio mode
-> command for enumeration and device detection with ATA devices.
-> The X-Gene AHCI controller has an errata in which it cannot clear
-> the BSY bit after the PIO setup FIS. The dma state machine enters
-> CMFatalErrorUpdate state and locks up. It is the same issue as
-> in the commit 2a0bdff6b958d1b2523d2754b6cd5e0ea4053016 (ahci-xgene:
-
-The right format is 2a0bdff6b958 ("ahci-xgene: fix the dma state
-machine lockup for the IDENTIFY DEVICE PIO mode command").
-
-> fix the dma state machine lockup for the IDENTIFY DEVICE PIO mode
-> command).
+On Mon, Feb 02, 2015 at 11:18:24PM +0100, Rafael J. Wysocki wrote:
+> On Monday, February 02, 2015 08:45:33 PM Hanjun Guo wrote:
+> > From: Graeme Gregory <graeme.gregory@linaro.org>
+> > 
+> > ACPI 5.1 does not currently support S states for ARM64 hardware but
+> > ACPI code will call acpi_target_system_state() for device power
+> > managment, so introduce sleep_arm.c to allow other drivers to function
+> > until S states are defined.
+> > 
+> > CC: Rafael J. Wysocki <rjw@rjwysocki.net>
+> > Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> > Tested-by: Yijing Wang <wangyijing@huawei.com>
+> > Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
+> > Tested-by: Jon Masters <jcm@redhat.com>
+> > Tested-by: Timur Tabi <timur@codeaurora.org>
+> > Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> > Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> > ---
+> >  drivers/acpi/Makefile    |  4 ++++
+> >  drivers/acpi/sleep_arm.c | 28 ++++++++++++++++++++++++++++
+> >  2 files changed, 32 insertions(+)
+> >  create mode 100644 drivers/acpi/sleep_arm.c
+> > 
+> > diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+> > index f74317c..bcec54e 100644
+> > --- a/drivers/acpi/Makefile
+> > +++ b/drivers/acpi/Makefile
+> > @@ -23,7 +23,11 @@ acpi-y				+= nvs.o
+> >  
+> >  # Power management related files
+> >  acpi-y				+= wakeup.o
+> > +ifeq ($(ARCH), arm64)
+> > +acpi-y				+= sleep_arm.o
+> > +else # X86, IA64
+> >  acpi-y				+= sleep.o
+> > +endif
+> >  acpi-y				+= device_pm.o
+> >  acpi-$(CONFIG_ACPI_SLEEP)	+= proc.o
+> >  
+> > diff --git a/drivers/acpi/sleep_arm.c b/drivers/acpi/sleep_arm.c
+> > new file mode 100644
+> > index 0000000..54578ef
+> > --- /dev/null
+> > +++ b/drivers/acpi/sleep_arm.c
+> > @@ -0,0 +1,28 @@
+> > +/*
+> > + *  ARM64 Specific Sleep Functionality
+> > + *
+> > + *  Copyright (C) 2013-2014, Linaro Ltd.
+> > + *      Author: Graeme Gregory <graeme.gregory@linaro.org>
+> > + *
+> > + *  This program is free software; you can redistribute it and/or modify
+> > + *  it under the terms of the GNU General Public License version 2 as
+> > + *  published by the Free Software Foundation.
+> > + */
+> > +
+> > +#include <linux/acpi.h>
+> > +
+> > +/*
+> > + * Currently the ACPI 5.1 standard does not define S states in a
+> > + * manner which is usable for ARM64. These two stubs are sufficient
+> > + * that system initialises and device PM works.
+> > + */
+> > +u32 acpi_target_system_state(void)
+> > +{
+> > +	return ACPI_STATE_S0;
+> > +}
+> > +EXPORT_SYMBOL_GPL(acpi_target_system_state);
+> > +
+> > +int __init acpi_sleep_init(void)
+> > +{
+> > +	return -ENOSYS;
+> > +}
+> > 
 > 
-> For example :  without this patch it results in READ DMA command failure
-> as shown below :
+> Why does this need to be in drivers/acpi/ ?
 > 
->  [  126.700072] ata2.00: exception Emask 0x0 SAct 0x0
-> 		SErr 0x0 action 0x6 frozen
->  [  126.707089] ata2.00: failed command: READ DMA
->  [  126.711426] ata2.00: cmd c8/00:08:00:55:57/00:00:00:00:00/e1 tag 1
->                 dma 4096 in
->  [  126.711426]  res 40/00:ff:00:00:00/00:00:00:00:00/40 Emask
-> 		0x4 (timeout)
->  [  126.725956] ata2.00: status: { DRDY }
-> 
-> Signed-off-by: Suman Tripathi <stripathi@apm.com>
-> Reported-by:   Mark Langsdorf <mlangsdo@redhat.com>
+Sorry it doesn't it got left behind when we moved some other stuff.
 
-Applied to libata/for-3.19-fixes.
-
-Thanks.
-
--- 
-tejun
+Graeme
