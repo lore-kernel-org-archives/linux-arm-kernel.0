@@ -1,74 +1,42 @@
-From: petr.cvek@tul.cz (Petr Cvek)
-Date: Tue, 03 Feb 2015 14:42:12 +0100
-Subject: [PATCH v2, RFC] RTC: PXA: Fix regression of interrupt before
- ioremap
-In-Reply-To: <87a90wb1uq.fsf@free.fr>
-References: <54CA1ECA.8050000@tul.cz> <87fvatnzl7.fsf@free.fr>
- <54CF90F1.4020703@tul.cz> <87a90wb1uq.fsf@free.fr>
-Message-ID: <54D0D034.1060204@tul.cz>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Tue, 3 Feb 2015 14:47:52 +0100
+Subject: [PATCH] ARM: berlin: add a defconfig
+In-Reply-To: <3962783.sVjmOB1hYm@wuerfel>
+References: <1422962932-12603-1-git-send-email-antoine.tenart@free-electrons.com>
+ <3962783.sVjmOB1hYm@wuerfel>
+Message-ID: <20150203134752.GA12908@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2.2.2015 19:33, Robert Jarzmik wrote:
-> Petr Cvek <petr.cvek@tul.cz> writes:
->
->> I agree that driver without .open looks ugly, but only thing in rtc-pxa .open
->> were two request_irq and I don't think it is good idea to have them there
->> (interrupts should be disabled trough register settings and not by handler
->> freeing).
->>
->> I'm not familiar with the linux RTC subsystem, so I don't know if it is OK to
->> get interrupt (and rtc_update_irq) without opened /dev/rtc. Intuitively I have
->> feeling it is OK, but even if not disabling can be done with some register flag.
->>
->> BTW It seems that kernel have only around 9 drivers in drivers/rtc which contain
->> .open function.
->>
->> OT: rtc-sa1100 seems to be compatible with PXAxxx (it is even in Kconfig). Are
->> there any reasons to have two drivers for one SoC?
-> Yes, there is a reason :
->    http://marc.info/?l=linux-arm-kernel&m=122306289606732&w=2
->
-> At that time we decided this were 2 different IPs (more or less) sharing the
-> same IO region and IRQ. 2 IPs for pxa27x and greater, only 1 IP for pxa25x and
-> lower.
->
-> Now you should know that both rtc-sa1100 and rtc-pxa should be able to work
-> together in the same kernel (at least that was the case so far). The open()
-> decided who got a grip on the interrupt. This lets userland choose which rtc it
-> relies on : either the increasing count, or the
-> day/month/year/hour/minute/second counters (which are independant).
->
+Hi Arnd,
 
-I see, thanks for info, I never thought that these two drivers were 
-specially crafted to be able to coexist (if it is good idea I can write 
-info for Kconfig help section).
+On Tue, Feb 03, 2015 at 01:54:42PM +0100, Arnd Bergmann wrote:
+> On Tuesday 03 February 2015 12:28:52 Antoine Tenart wrote:
+> > Marvell Berlin SoCs did not have a custom defconfig and were only
+> > supported in multi_v7_defconfig.
+> > 
+> > Adds a proper defconfig, allowing to boot a Berlin SoC with all the
+> > currently supported features: SMP, Pinmux, AHCI, Ethernet, I2C, GPIO,
+> > USB, SDHCI.
+> > 
+> > 
+> 
+> Are there any features that are not currently supported by
+> multi_v7_defconfig? If so, please also add them there as
+> loadable modules.
 
-I still don't think it is a good idea to do "mutex" by racing who gets 
-both request_irq first, but I don't have better solution other than 
-making both drivers fully independent on each other or merging them 
-together (probably with checkbox for enabling enhanced features in PXA27x).
+I just checked and it seems some of them are missing:
+- pxa168 ethernet support
+- Berlin USB PHY support
+- Berlin SATA PHY support
 
-Actually only thing I want to know after reverting a44802f is how wakeup 
-will work. Because a44802f suggests rtc-pxa needs to have interrupt 
-enabled for waking up (and I cannot test it, because suspend subsystem 
-on my machine needs to be fixed first).
+I'll cook up a patch to add these 3 features into multi_v7_defconfig.
 
-> Moreover, if there are multiple rtc device, how on earth can it work, ie. how
-> can an ioctl() be sent to a specific rtc device if there is no open() ???
+Thanks!
 
-It confuses me too, so I tried to look it up and it seems rtc_dev_open() 
-in drivers/rtc/rtc-dev.c handles this by:
+Antoine
 
-	err = ops->open ? ops->open(rtc->dev.parent) : 0;
-     if (err == 0) {
-         spin_lock_irq(&rtc->irq_lock);
-         rtc->irq_data = 0;
-         spin_unlock_irq(&rtc->irq_lock);
-
-         return 0;
-     }
-
-, so without any .open() it just continues with success.
-
-Petr
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
