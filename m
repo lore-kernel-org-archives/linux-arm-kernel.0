@@ -1,25 +1,21 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Tue, 3 Feb 2015 13:42:02 +0530
-Subject: [PATCH v4 2/8] mailbox: arm_mhu: add driver for ARM MHU controller
-In-Reply-To: <20150202144622.GD8656@n2100.arm.linux.org.uk>
-References: <1421663016-1327-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <1421663463-1426-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <20150202144622.GD8656@n2100.arm.linux.org.uk>
-Message-ID: <CAJe_ZhdevMHgoqRM-t+XS4-ZBSMVytG9aZncvH_GeuUT0qc6UQ@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 03 Feb 2015 00:40:31 -0800 (PST)
+Subject: [RFC] change non-atomic bitops method
+In-Reply-To: <20150202223851.f30768d0.akpm@linux-foundation.org>
+References: <35FD53F367049845BC99AC72306C23D1044A02027E0B@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D1044A02027E0C@CNBJMBX05.corpusers.net>
+ <20150202223851.f30768d0.akpm@linux-foundation.org>
+Message-ID: <20150203.004031.593368249759204527.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 February 2015 at 20:16, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Jan 19, 2015 at 06:31:03PM +0800, Vincent Yang wrote:
->> From: Jassi Brar <jaswinder.singh@linaro.org>
->>
->> Add driver for the ARM Message-Handling-Unit (MHU).
->
-> Is this an AMBA Primecell peripheral?  If so, it should not be a platform
-> driver.
->
-Yes, it is. We have revised the driver and should be part of the
-revised patchset to be submitted shortly.
+From: Andrew Morton <akpm@linux-foundation.org>
+Date: Mon, 2 Feb 2015 22:38:51 -0800
 
-Thank you.
+> It is only with both these ratios that we can work out whether the
+> patch is a net gain.  My suspicion is that set_bit on an already-set
+> bit is so rare that the patch will be a loss.
+
+A common pattern is implementing a "referenced" bit, and in that case
+the bit is often already set, and in such a scenerio the proposed
+change is a huge win.
