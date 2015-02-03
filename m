@@ -1,82 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 3 Feb 2015 17:20:48 +0000
-Subject: [PATCH v8 09/21] ARM64 / ACPI: Disable ACPI if FADT revision is
- less than 5.1
-In-Reply-To: <1422881149-8177-10-git-send-email-hanjun.guo@linaro.org>
-References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
- <1422881149-8177-10-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20150203172047.GA13339@e104818-lin.cambridge.arm.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 03 Feb 2015 18:26:04 +0100
+Subject: [alsa-devel] [RFC PATCH] ASoC: wm8731: let codec to manage clock
+ by itself
+In-Reply-To: <20150203171733.GY8656@n2100.arm.linux.org.uk>
+References: <1422934415-24957-1-git-send-email-voice.shen@atmel.com>
+ <CAOLZvyE6W8-X2_M+-KQNry2VPwLzwbBLuxr5Z5EdBQo7Skv2RQ@mail.gmail.com>
+ <20150203124441.GK21293@sirena.org.uk> <54D0FD1C.9020305@metafoo.de>
+ <20150203171733.GY8656@n2100.arm.linux.org.uk>
+Message-ID: <54D104AC.5010603@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 02, 2015 at 12:45:37PM +0000, Hanjun Guo wrote:
-> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> index afe10b4..b9f64ec 100644
-> --- a/arch/arm64/kernel/acpi.c
-> +++ b/arch/arm64/kernel/acpi.c
-> @@ -13,6 +13,8 @@
->   *  published by the Free Software Foundation.
->   */
->  
-> +#define pr_fmt(fmt) "ACPI: " fmt
-> +
->  #include <linux/acpi.h>
->  #include <linux/bootmem.h>
->  #include <linux/cpumask.h>
-> @@ -49,10 +51,32 @@ void __init __acpi_unmap_table(char *map, unsigned long size)
->  	early_memunmap(map, size);
->  }
->  
-> +static int __init acpi_parse_fadt(struct acpi_table_header *table)
-> +{
-> +	struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
-> +
-> +	/*
-> +	 * Revision in table header is the FADT Major revision, and there
-> +	 * is a minor revision of FADT which was introduced by ACPI 5.1,
-> +	 * we only deal with ACPI 5.1 or newer revision to get GIC and SMP
-> +	 * boot protocol configuration data, or we will disable ACPI.
-> +	 */
-> +	if (table->revision > 5 ||
-> +	    (table->revision == 5 && fadt->minor_revision >= 1))
-> +		return 0;
-> +
-> +	pr_warn("Unsupported FADT revision %d.%d, should be 5.1+, will disable ACPI\n",
-> +		table->revision, fadt->minor_revision);
-> +	disable_acpi();
-> +
-> +	return -EINVAL;
-> +}
-> +
->  /*
->   * acpi_boot_table_init() called from setup_arch(), always.
->   *	1. find RSDP and get its address, and then find XSDT
->   *	2. extract all tables and checksums them all
-> + *	3. check ACPI FADT revision
->   *
->   * We can parse ACPI boot-time tables such as MADT after
->   * this function is called.
-> @@ -64,8 +88,16 @@ void __init acpi_boot_table_init(void)
->  		return;
->  
->  	/* Initialize the ACPI boot-time table parser. */
-> -	if (acpi_table_init())
-> +	if (acpi_table_init()) {
-> +		disable_acpi();
-> +		return;
-> +	}
-> +
-> +	if (acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt)) {
-> +		/* disable ACPI if no FADT is found */
->  		disable_acpi();
-> +		pr_err("Can't find FADT\n");
-> +	}
->  }
+On 02/03/2015 06:17 PM, Russell King - ARM Linux wrote:
+> On Tue, Feb 03, 2015 at 05:53:48PM +0100, Lars-Peter Clausen wrote:
+>> On 02/03/2015 01:44 PM, Mark Brown wrote:
+>>> On Tue, Feb 03, 2015 at 08:54:57AM +0100, Manuel Lauss wrote:
+>>>
+>>>> +    wm8731->mclk = devm_clk_get(&spi->dev, "mclk");
+>>>> +    if (IS_ERR(wm8731->mclk)) {
+>>>> +        wm8731->mclk = NULL;
+>>>> +        dev_warn(&spi->dev, "assuming static MCLK\n");
+>>>> +    }
+>>>
+>>> This is broken for both deferred probe and in the case where the clock
+>>> API genuinely returns a NULL clock.  Other than that it's the kind of
+>>> thing that we've done for some other drivers, though it's not good to
+>>> have to do this.  Check them for correct behaviour.
+>>
+>> Ideally we'd introduce a {devm_}clk_get_optional(), with the same semantics
+>> as gpiod_get_optional(), which handles the finer details of differentiating
+>> between clock specified, but not yet probed, clock specified, but
+>> incorrectly and no clock specified, so this doesn't have to be done over and
+>> over by each driver.
+>
+> No, we don't need to.  It clk_get() already knows this distinction, and
+> it appropriately returns -ENOENT vs -EPROBE_DEFER according to whether
+> there's a clock specified in DT or not.
 
-It looks fine to call disable_acpi() here but a bit weird to call it
-again in acpi_parse_fadt(). I guess that's because acpi_table_parse()
-ignores the return value of the handler() call. I think it's better to
-fix the core code (can be an additional patch on top of this series).
-
--- 
-Catalin
+I know, but it returns a error when no clock is specified (-ENOENT), whereas 
+gpiod_get_optional()-like semantics mean, it would return no error.
