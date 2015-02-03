@@ -1,55 +1,52 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Tue, 3 Feb 2015 19:35:03 +0200
-Subject: [PATCH v13 5/6] clkdev: Export clk_register_clkdev
-In-Reply-To: <1422011024-32283-6-git-send-email-tomeu.vizoso@collabora.com>
-References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
- <1422011024-32283-6-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <CAHp75VfN1-dwN5nAp=VLkm6Q-9UqhGHsB2ZFhq+b238mgjVoMQ@mail.gmail.com>
+From: robdclark@gmail.com (Rob Clark)
+Date: Tue, 3 Feb 2015 12:35:34 -0500
+Subject: [Linaro-mm-sig] [RFCv3 2/2] dma-buf: add helpers for sharing
+ attacher constraints with dma-parms
+In-Reply-To: <20150203165829.GW8656@n2100.arm.linux.org.uk>
+References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
+ <3783167.LiVXgA35gN@wuerfel>
+ <20150203155404.GV8656@n2100.arm.linux.org.uk>
+ <6906596.JU5vQoa1jV@wuerfel>
+ <20150203165829.GW8656@n2100.arm.linux.org.uk>
+Message-ID: <CAF6AEGuf6XBe3YOjhtbBcSyqJrkZ7sNMfc83hZdnKsE3P=vSuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 23, 2015 at 1:03 PM, Tomeu Vizoso
-<tomeu.vizoso@collabora.com> wrote:
-> So it can be used from modules such as clk-test.ko.
+On Tue, Feb 3, 2015 at 11:58 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 >
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
-
-Sorry for late answer, but this is useless.
-
-We have to provide the way how to get the allocated clk_lookup.
-Otherwise you have no way but memory leak at the ->remove() stage.
-
-(By the way I used to have the exact patch locally, that's why
-discovered the change in upsteam)
-
-> ---
->  drivers/clk/clkdev.c | 1 +
->  1 file changed, 1 insertion(+)
+> Okay, but switching contexts is not something which the DMA API has
+> any knowledge of (so it can't know which context to associate with
+> which mapping.)  While it knows which device, it has no knowledge
+> (nor is there any way for it to gain knowledge) about contexts.
 >
-> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-> index 901d242..29a1ab7 100644
-> --- a/drivers/clk/clkdev.c
-> +++ b/drivers/clk/clkdev.c
-> @@ -377,6 +377,7 @@ int clk_register_clkdev(struct clk *clk, const char *con_id,
+> My personal view is that extending the DMA API in this way feels quite
+> dirty - it's a violation of the DMA API design, which is to (a) demark
+> the buffer ownership between CPU and DMA agent, and (b) to translate
+> buffer locations into a cookie which device drivers can use to instruct
+> their device to access that memory.  To see why, consider... that you
+> map a buffer to a device in context A, and then you switch to context B,
+> which means the dma_addr_t given previously is no longer valid.  You
+> then try to unmap it... which is normally done using the (now no longer
+> valid) dma_addr_t.
 >
->         return 0;
->  }
-> +EXPORT_SYMBOL(clk_register_clkdev);
+> It seems to me that to support this at DMA API level, we would need to
+> completely revamp the DMA API, which IMHO isn't going to be nice.  (It
+> would mean that we end up with three APIs - the original PCI DMA API,
+> the existing DMA API, and some new DMA API.)
 >
->  /**
->   * clk_register_clkdevs - register a set of clk_lookup for a struct clk
-> --
-> 1.9.3
+> Do we have any views on how common this feature is?
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
 
+I can't think of cases outside of GPU's..  if it were more common I'd
+be in favor of teaching dma api about multiple contexts, but right now
+I think that would just amount to forcing a lot of churn on everyone
+else for the benefit of GPU's.
 
+IMHO it makes more sense for GPU drivers to bypass the dma api if they
+need to.  Plus, sooner or later, someone will discover that with some
+trick or optimization they can get moar fps, but the extra layer of
+abstraction will just be getting in the way.
 
--- 
-With Best Regards,
-Andy Shevchenko
+BR,
+-R
