@@ -1,309 +1,167 @@
-From: vincent.yang.fujitsu@gmail.com (Vincent Yang)
-Date: Tue,  3 Feb 2015 17:29:23 +0800
-Subject: [PATCH v5 2/7] mailbox: arm_mhu: add driver for ARM MHU controller
-In-Reply-To: <1422955310-6542-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
-References: <1422955310-6542-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
-Message-ID: <1422955763-6630-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
+Date: Tue, 03 Feb 2015 10:30:00 +0100
+Subject: [PATCH 3/6] x86, acpi, pci: Move PCI config space accessors.
+In-Reply-To: <20141210231746.GF6692@google.com>
+References: <1416413091-13452-1-git-send-email-tomasz.nowicki@linaro.org>
+ <1416413091-13452-4-git-send-email-tomasz.nowicki@linaro.org>
+ <20141210231746.GF6692@google.com>
+Message-ID: <54D09518.4040103@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jassi Brar <jaswinder.singh@linaro.org>
+On 11.12.2014 00:17, Bjorn Helgaas wrote:
+> On Wed, Nov 19, 2014 at 05:04:48PM +0100, Tomasz Nowicki wrote:
+>> We are going to use mmio_config_{} name convention across all architectures.
+>
+> mmio_config_*() are workarounds for an AMD Fam10h defect [1].  I would prefer
+> not to extend these names to other architectures, because they should be
+> able to use readb()/writeb()/etc. directly, as we did on x86 before
+> 3320ad994afb ("x86: Work around mmio config space quirk on AMD Fam10h").
+>
+> In fact, it would be nice if we could use readb()/writeb()/etc. on x86, and
+> only use mmio_config_*() when we're on AMD Fam10h.  Maybe there could be a
+> "struct pci_raw_ops pci_mmcfg_amd_fam10h" that used mmio_config_*(), and we
+> could set raw_pci_ext_ops to those ops instead of the default ones when
+> we're on AMD Fam10h.  Then x86 should be able to use the generic
+> readb()-based ops on most platforms.
+That's good point, I will readb()/writeb() instead.
 
-Add driver for the ARM Primecell Message-Handling-Unit(MHU) controller.
+>
+> Bjorn
+>
+> [1] 3320ad994afb ("x86: Work around mmio config space quirk on AMD Fam10h")
+>
+> Somewhere in this process, I'd like to update the AMD Fam10h comment to fix
+> the typos and reference the spec that talks about this, i.e., the "BIOS and
+> Kernel Developer's Guide (BKDG) For AMD Family 10h Processors," rev 3.48,
+> sec 2.11.1, "MMIO Configuration Coding Requirements."
+>
+> That can be a separate patch since it's only cosmetic.
 
-Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
-Signed-off-by: Andy Green <andy.green@linaro.org>
-Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
-Signed-off-by: Tetsuya Nuriya <nuriya.tetsuya@jp.fujitsu.com>
----
- .../devicetree/bindings/mailbox/arm-mhu.txt        |  35 ++++
- drivers/mailbox/Kconfig                            |   7 +
- drivers/mailbox/Makefile                           |   2 +
- drivers/mailbox/arm_mhu.c                          | 203 +++++++++++++++++++++
- 4 files changed, 247 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mailbox/arm-mhu.txt
- create mode 100644 drivers/mailbox/arm_mhu.c
+Sure, will do.
 
-diff --git a/Documentation/devicetree/bindings/mailbox/arm-mhu.txt b/Documentation/devicetree/bindings/mailbox/arm-mhu.txt
-new file mode 100644
-index 0000000..986a205
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mailbox/arm-mhu.txt
-@@ -0,0 +1,35 @@
-+ARM MHU Mailbox Driver
-+======================
-+
-+The ARM's Message-Handling-Unit (MHU) is a mailbox controller that has
-+3 independent channels/links to communicate with remote processor(s).
-+ MHU links are hardwired on a platform. A link raises interrupt for any
-+received data. However, there is no specified way of knowing if the sent
-+data has been read by the remote. This driver assumes the sender polls
-+STAT register and the remote clears it after having read the data.
-+
-+Mailbox Device Node:
-+====================
-+
-+Required properties:
-+--------------------
-+- compatible:		Shall be "arm,mhu" & "arm,primecell"
-+- reg:			Contains the mailbox register address range (base
-+			address and length)
-+- #mbox-cells		Shall be 1
-+- interrupts:		Contains the interrupt information corresponding to
-+			each of the 3 links of MHU.
-+
-+Example:
-+--------
-+
-+	mhu: mailbox at 2b1f0000 {
-+		#mbox-cells = <1>;
-+		compatible = "arm,mhu", "arm,primecell";
-+		reg = <0 0x2b1f0000 0x1000>;
-+		interrupts = <0 36 4>,
-+			     <0 35 4>,
-+			     <0 37 4>;
-+		clocks = <&clock 0 2 1>;
-+		clock-names = "apb_pclk";
-+	};
-diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
-index c04fed9..9238440 100644
---- a/drivers/mailbox/Kconfig
-+++ b/drivers/mailbox/Kconfig
-@@ -6,6 +6,13 @@ menuconfig MAILBOX
- 	  signals. Say Y if your platform supports hardware mailboxes.
- 
- if MAILBOX
-+
-+config ARM_MHU
-+	tristate "ARM MHU Mailbox"
-+	depends on ARM
-+	help
-+	  Say Y here if you want to build the ARM MHU controller driver
-+
- config PL320_MBOX
- 	bool "ARM PL320 Mailbox"
- 	depends on ARM_AMBA
-diff --git a/drivers/mailbox/Makefile b/drivers/mailbox/Makefile
-index dd412c2..c83791d 100644
---- a/drivers/mailbox/Makefile
-+++ b/drivers/mailbox/Makefile
-@@ -2,6 +2,8 @@
- 
- obj-$(CONFIG_MAILBOX)		+= mailbox.o
- 
-+obj-$(CONFIG_ARM_MHU)	+= arm_mhu.o
-+
- obj-$(CONFIG_PL320_MBOX)	+= pl320-ipc.o
- 
- obj-$(CONFIG_OMAP2PLUS_MBOX)	+= omap-mailbox.o
-diff --git a/drivers/mailbox/arm_mhu.c b/drivers/mailbox/arm_mhu.c
-new file mode 100644
-index 0000000..5768936
---- /dev/null
-+++ b/drivers/mailbox/arm_mhu.c
-@@ -0,0 +1,203 @@
-+/*
-+ * Copyright (C) 2013-2015 Fujitsu Semiconductor Ltd.
-+ * Copyright (C) 2015 Linaro Ltd.
-+ * Author: Jassi Brar <jaswinder.singh@linaro.org>
-+ *
-+ * This program is free software: you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation, version 2 of the License.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/interrupt.h>
-+#include <linux/spinlock.h>
-+#include <linux/mutex.h>
-+#include <linux/delay.h>
-+#include <linux/slab.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/amba/bus.h>
-+#include <linux/mailbox_controller.h>
-+
-+#define INTR_STAT_OFS	0x0
-+#define INTR_SET_OFS	0x8
-+#define INTR_CLR_OFS	0x10
-+
-+struct mhu_link {
-+	unsigned irq;
-+	void __iomem *tx_reg;
-+	void __iomem *rx_reg;
-+};
-+
-+struct arm_mhu {
-+	void __iomem *base;
-+	struct mhu_link mlink[3];
-+	struct mbox_chan chan[3];
-+	struct mbox_controller mbox;
-+};
-+
-+static irqreturn_t mhu_rx_interrupt(int irq, void *p)
-+{
-+	struct mbox_chan *chan = p;
-+	struct mhu_link *mlink = chan->con_priv;
-+	u32 val;
-+
-+	pr_debug("%s:%d\n", __func__, __LINE__);
-+	val = readl_relaxed(mlink->rx_reg + INTR_STAT_OFS);
-+	if (!val)
-+		return IRQ_NONE;
-+
-+	mbox_chan_received_data(chan, (void *)val);
-+
-+	writel_relaxed(val, mlink->rx_reg + INTR_CLR_OFS);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static bool mhu_last_tx_done(struct mbox_chan *chan)
-+{
-+	struct mhu_link *mlink = chan->con_priv;
-+	u32 val;
-+
-+	pr_debug("%s:%d\n", __func__, __LINE__);
-+	val = readl_relaxed(mlink->tx_reg + INTR_STAT_OFS);
-+
-+	return (val == 0);
-+}
-+
-+static int mhu_send_data(struct mbox_chan *chan, void *data)
-+{
-+	struct mhu_link *mlink = chan->con_priv;
-+
-+	pr_debug("%s:%d\n", __func__, __LINE__);
-+	if (!mhu_last_tx_done(chan)) {
-+		dev_err(chan->mbox->dev, "Last TX(%d) pending!\n", mlink->irq);
-+		return -EBUSY;
-+	}
-+
-+	writel_relaxed((u32)data, mlink->tx_reg + INTR_SET_OFS);
-+
-+	return 0;
-+}
-+
-+static int mhu_startup(struct mbox_chan *chan)
-+{
-+	struct mhu_link *mlink = chan->con_priv;
-+	u32 val;
-+	int ret;
-+
-+	pr_debug("%s:%d\n", __func__, __LINE__);
-+	val = readl_relaxed(mlink->tx_reg + INTR_STAT_OFS);
-+	writel_relaxed(val, mlink->tx_reg + INTR_CLR_OFS);
-+
-+	ret = request_irq(mlink->irq, mhu_rx_interrupt, 0, "mhu_link", chan);
-+	if (ret) {
-+		dev_err(chan->mbox->dev,
-+			"Unable to aquire IRQ %d\n", mlink->irq);
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static void mhu_shutdown(struct mbox_chan *chan)
-+{
-+	struct mhu_link *mlink = chan->con_priv;
-+
-+	pr_debug("%s:%d\n", __func__, __LINE__);
-+	free_irq(mlink->irq, chan);
-+}
-+
-+static struct mbox_chan_ops mhu_ops = {
-+	.send_data = mhu_send_data,
-+	.startup = mhu_startup,
-+	.shutdown = mhu_shutdown,
-+	.last_tx_done = mhu_last_tx_done,
-+};
-+
-+static int mhu_probe(struct amba_device *adev, const struct amba_id *id)
-+{
-+	int i, err;
-+	struct arm_mhu *mhu;
-+	struct device *dev = &adev->dev;
-+	int mhu_reg[3] = {0x0, 0x20, 0x200};
-+
-+	err = amba_request_regions(adev, NULL);
-+	if (err)
-+		return err;
-+
-+	/* Allocate memory for device */
-+	mhu = devm_kzalloc(dev, sizeof(*mhu), GFP_KERNEL);
-+	if (!mhu)
-+		return -ENOMEM;
-+
-+	mhu->base = devm_ioremap(dev, adev->res.start,
-+				 resource_size(&adev->res));
-+	if (!mhu->base) {
-+		dev_err(dev, "ioremap failed\n");
-+		return -ENXIO;
-+	}
-+
-+	for (i = 0; i < 3; i++) {
-+		mhu->chan[i].con_priv = &mhu->mlink[i];
-+		mhu->mlink[i].irq = adev->irq[i];
-+		mhu->mlink[i].rx_reg = mhu->base + mhu_reg[i];
-+		mhu->mlink[i].tx_reg = mhu->mlink[i].rx_reg + 0x100;
-+	}
-+
-+	mhu->mbox.dev = dev;
-+	mhu->mbox.chans = &mhu->chan[0];
-+	mhu->mbox.num_chans = 3;
-+	mhu->mbox.ops = &mhu_ops;
-+	mhu->mbox.txdone_irq = false;
-+	mhu->mbox.txdone_poll = true;
-+	mhu->mbox.txpoll_period = 10;
-+
-+	amba_set_drvdata(adev, mhu);
-+
-+	err = mbox_controller_register(&mhu->mbox);
-+	if (err) {
-+		dev_err(dev, "Failed to register mailboxes %d\n", err);
-+		return err;
-+	}
-+
-+	dev_err(dev, "ARM MHU Mailbox registered\n");
-+	return 0;
-+}
-+
-+static int mhu_remove(struct amba_device *adev)
-+{
-+	struct arm_mhu *mhu = amba_get_drvdata(adev);
-+
-+	mbox_controller_unregister(&mhu->mbox);
-+
-+	return 0;
-+}
-+
-+static struct amba_id mhu_ids[] = {
-+	{
-+		.id	= 0x1bb098,
-+		.mask	= 0xffffff,
-+	},
-+	{ 0, 0 },
-+};
-+MODULE_DEVICE_TABLE(amba, mhu_ids);
-+
-+static struct amba_driver arm_mhu_driver = {
-+	.drv = {
-+		.name	= "mhu",
-+	},
-+	.id_table	= mhu_ids,
-+	.probe		= mhu_probe,
-+	.remove		= mhu_remove,
-+};
-+module_amba_driver(arm_mhu_driver);
-+
-+MODULE_LICENSE("GPL v2");
-+MODULE_DESCRIPTION("ARM MHU Driver");
-+MODULE_AUTHOR("Jassi Brar <jassisinghbrar@gmail.com>");
--- 
-1.9.0
+Regards,
+Tomasz
+
+>
+>> Currently it belongs to asm/pci_x86.h header which should be included
+>> only for x86 specific files. From now on, those accessors are in asm/pci.h
+>> header which can be included in non-architecture code much easier.
+>>
+>> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+>> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> ---
+>>   arch/x86/include/asm/pci.h     | 42 +++++++++++++++++++++++++++++++++++++++++
+>>   arch/x86/include/asm/pci_x86.h | 43 ------------------------------------------
+>>   2 files changed, 42 insertions(+), 43 deletions(-)
+>>
+>> diff --git a/arch/x86/include/asm/pci.h b/arch/x86/include/asm/pci.h
+>> index 0892ea0..5ba3720 100644
+>> --- a/arch/x86/include/asm/pci.h
+>> +++ b/arch/x86/include/asm/pci.h
+>> @@ -71,6 +71,48 @@ void pcibios_set_master(struct pci_dev *dev);
+>>   struct irq_routing_table *pcibios_get_irq_routing_table(void);
+>>   int pcibios_set_irq_routing(struct pci_dev *dev, int pin, int irq);
+>>
+>> +/*
+>> + * AMD Fam10h CPUs are buggy, and cannot access MMIO config space
+>> + * on their northbrige except through the * %eax register. As such, you MUST
+>> + * NOT use normal IOMEM accesses, you need to only use the magic mmio-config
+>> + * accessor functions.
+>> + * In fact just use pci_config_*, nothing else please.
+>> + */
+>> +static inline unsigned char mmio_config_readb(void __iomem *pos)
+>> +{
+>> +	u8 val;
+>> +	asm volatile("movb (%1),%%al" : "=a" (val) : "r" (pos));
+>> +	return val;
+>> +}
+>> +
+>> +static inline unsigned short mmio_config_readw(void __iomem *pos)
+>> +{
+>> +	u16 val;
+>> +	asm volatile("movw (%1),%%ax" : "=a" (val) : "r" (pos));
+>> +	return val;
+>> +}
+>> +
+>> +static inline unsigned int mmio_config_readl(void __iomem *pos)
+>> +{
+>> +	u32 val;
+>> +	asm volatile("movl (%1),%%eax" : "=a" (val) : "r" (pos));
+>> +	return val;
+>> +}
+>> +
+>> +static inline void mmio_config_writeb(void __iomem *pos, u8 val)
+>> +{
+>> +	asm volatile("movb %%al,(%1)" : : "a" (val), "r" (pos) : "memory");
+>> +}
+>> +
+>> +static inline void mmio_config_writew(void __iomem *pos, u16 val)
+>> +{
+>> +	asm volatile("movw %%ax,(%1)" : : "a" (val), "r" (pos) : "memory");
+>> +}
+>> +
+>> +static inline void mmio_config_writel(void __iomem *pos, u32 val)
+>> +{
+>> +	asm volatile("movl %%eax,(%1)" : : "a" (val), "r" (pos) : "memory");
+>> +}
+>>
+>>   #define HAVE_PCI_MMAP
+>>   extern int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
+>> diff --git a/arch/x86/include/asm/pci_x86.h b/arch/x86/include/asm/pci_x86.h
+>> index caba141..42e7332 100644
+>> --- a/arch/x86/include/asm/pci_x86.h
+>> +++ b/arch/x86/include/asm/pci_x86.h
+>> @@ -121,49 +121,6 @@ extern int __init pcibios_init(void);
+>>   extern int pci_legacy_init(void);
+>>   extern void pcibios_fixup_irqs(void);
+>>
+>> -/*
+>> - * AMD Fam10h CPUs are buggy, and cannot access MMIO config space
+>> - * on their northbrige except through the * %eax register. As such, you MUST
+>> - * NOT use normal IOMEM accesses, you need to only use the magic mmio-config
+>> - * accessor functions.
+>> - * In fact just use pci_config_*, nothing else please.
+>> - */
+>> -static inline unsigned char mmio_config_readb(void __iomem *pos)
+>> -{
+>> -	u8 val;
+>> -	asm volatile("movb (%1),%%al" : "=a" (val) : "r" (pos));
+>> -	return val;
+>> -}
+>> -
+>> -static inline unsigned short mmio_config_readw(void __iomem *pos)
+>> -{
+>> -	u16 val;
+>> -	asm volatile("movw (%1),%%ax" : "=a" (val) : "r" (pos));
+>> -	return val;
+>> -}
+>> -
+>> -static inline unsigned int mmio_config_readl(void __iomem *pos)
+>> -{
+>> -	u32 val;
+>> -	asm volatile("movl (%1),%%eax" : "=a" (val) : "r" (pos));
+>> -	return val;
+>> -}
+>> -
+>> -static inline void mmio_config_writeb(void __iomem *pos, u8 val)
+>> -{
+>> -	asm volatile("movb %%al,(%1)" : : "a" (val), "r" (pos) : "memory");
+>> -}
+>> -
+>> -static inline void mmio_config_writew(void __iomem *pos, u16 val)
+>> -{
+>> -	asm volatile("movw %%ax,(%1)" : : "a" (val), "r" (pos) : "memory");
+>> -}
+>> -
+>> -static inline void mmio_config_writel(void __iomem *pos, u32 val)
+>> -{
+>> -	asm volatile("movl %%eax,(%1)" : : "a" (val), "r" (pos) : "memory");
+>> -}
+>> -
+>>   #ifdef CONFIG_PCI
+>>   # ifdef CONFIG_ACPI
+>>   #  define x86_default_pci_init		pci_acpi_init
+>> --
+>> 1.9.1
+>>
