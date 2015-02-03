@@ -1,54 +1,44 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 3 Feb 2015 10:53:01 +0100
-Subject: [PATCH] ARM: shmobile: silk: initial device tree
-In-Reply-To: <20150203003610.GA17629@verge.net.au>
-References: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
- <1608366.HtA9yBksdO@wasted.cogentembedded.com>
- <20150202110557.GC7459@leverpostej>
- <54CFE4CE.5090406@cogentembedded.com>
- <20150203003610.GA17629@verge.net.au>
-Message-ID: <CAMuHMdV1U9XV7diKYPwpxAqdzD7tst6e0k=bLgJQ27=YDndn=Q@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 03 Feb 2015 10:38:25 +0000
+Subject: [PATCH] PCI: Fix pcibios_update_irq misuse of irq number
+In-Reply-To: <4145359.V8A0ARGtXz@wuerfel>
+References: <1422456683-797-1-git-send-email-marc.zyngier@arm.com>
+ <4145359.V8A0ARGtXz@wuerfel>
+Message-ID: <54D0A521.7030405@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 3, 2015 at 1:36 AM, Simon Horman <horms@verge.net.au> wrote:
-> The only thing that stood out to me about "SILK" was that unlike
-> other renesas boards names in .dtsi files it is all-capitals.
-> Its not a bit deal but as we are on the topic: is that intentional?
+On 02/02/15 17:02, Arnd Bergmann wrote:
+> On Wednesday 28 January 2015 14:51:23 Marc Zyngier wrote:
+>>  void __weak pcibios_update_irq(struct pci_dev *dev, int irq)
+>>  {
+>> -       dev_dbg(&dev->dev, "assigning IRQ %02d\n", irq);
+>> -       pci_write_config_byte(dev, PCI_INTERRUPT_LINE, irq);
+>> +       struct irq_data *d;
+>> +
+>> +       d = irq_get_irq_data(irq);
+>> +#ifdef CONFIG_IRQ_DOMAIN_HIERARCHY
+>> +       while (d->parent_data)
+>> +               d = d->parent_data;
+>> +#endif
+>> +       dev_dbg(&dev->dev, "assigning IRQ %02ld\n", d->hwirq);
+>> +       pci_write_config_byte(dev, PCI_INTERRUPT_LINE, d->hwirq);
+>>  }
+> 
+> I'm puzzled by this. Why is it even important what we write into
+> the config space? Isn't this just an interface between BIOS and
+> OS for systems that rely on the interrupt numbers to be statically
+> assigned before boot?
 
-Seems like we can use some consistency:
+That's exactly what I thought until Lorenzo reported kvmtool falling
+over because of this write. Obviously, some platforms must actually
+require this (possibly for bridges that are not known by the firmware).
 
-$ git grep -w model -- $(git grep -l renesas, -- arch/arm/boot/dts)
-arch/arm/boot/dts/emev2-kzm9d.dts:      model = "EMEV2 KZM9D Board";
-arch/arm/boot/dts/r7s72100-genmai.dts:  model = "Genmai";
-arch/arm/boot/dts/r8a73a4-ape6evm.dts:  model = "APE6EVM";
-arch/arm/boot/dts/r8a7740-armadillo800eva.dts:  model = "armadillo 800 eva";
-arch/arm/boot/dts/r8a7778-bockw-reference.dts:  model = "bockw";
-arch/arm/boot/dts/r8a7778-bockw.dts:    model = "bockw";
-arch/arm/boot/dts/r8a7779-marzen.dts:   model = "marzen";
-arch/arm/boot/dts/r8a7790-lager.dts:    model = "Lager";
-arch/arm/boot/dts/r8a7791-henninger.dts:        model = "Henninger";
-arch/arm/boot/dts/r8a7791-koelsch.dts:  model = "Koelsch";
-arch/arm/boot/dts/r8a7794-alt.dts:      model = "Alt";
-arch/arm/boot/dts/sh73a0-kzm9g.dts:     model = "KZM-A9-GT";
-$
+Entirely removing that code solves my problem too, but that'd cannot be
+the right solution...
 
-ePAPR says:
+Thanks,
 
-"The recommended format is: ?manufacturer,model?, where manufacturer is a
- string describing the name of the manufacturer (such as a stock ticker symbol),
- and model specifies the model number.
-
- Example:
-         model = ?fsl,MPC8349EMITX?;"
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+	M.
+-- 
+Jazz is not dead. It just smells funny...
