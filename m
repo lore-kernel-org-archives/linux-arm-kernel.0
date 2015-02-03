@@ -1,75 +1,75 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 3 Feb 2015 11:58:55 +0000
-Subject: [PATCH 2/2] coresight: Adding coresight support to arm64
-In-Reply-To: <CANLsYky9_ptcvihnKNVvrAH_iB4wA57m4OSwVsYANX3q28gc0g@mail.gmail.com>
-References: <1422658466-23984-1-git-send-email-mathieu.poirier@linaro.org>
- <1422658466-23984-3-git-send-email-mathieu.poirier@linaro.org>
- <20150202134512.GE31847@arm.com>
- <CANLsYky9_ptcvihnKNVvrAH_iB4wA57m4OSwVsYANX3q28gc0g@mail.gmail.com>
-Message-ID: <20150203115855.GC3677@e104818-lin.cambridge.arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 3 Feb 2015 13:03:03 +0100
+Subject: [PATCH 03/14] drm/bridge: make bridge registration independent
+ of drm flow
+In-Reply-To: <CAF6AEGs8GbgYMLmaPjGnXAv=Gsf6gMhNj+Zt0-2GKHOnHv4d4Q@mail.gmail.com>
+References: <1421771935-31618-1-git-send-email-ajaykumar.rs@samsung.com>
+ <1421771935-31618-4-git-send-email-ajaykumar.rs@samsung.com>
+ <CAF6AEGs8GbgYMLmaPjGnXAv=Gsf6gMhNj+Zt0-2GKHOnHv4d4Q@mail.gmail.com>
+Message-ID: <20150203120301.GB15068@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 02, 2015 at 10:06:16PM +0000, Mathieu Poirier wrote:
-> On 2 February 2015 at 06:45, Will Deacon <will.deacon@arm.com> wrote:
-> > On Fri, Jan 30, 2015 at 10:54:26PM +0000, mathieu.poirier at linaro.org wrote:
-> >> From: Mathieu Poirier <mathieu.poirier@linaro.org>
-> >>
-> >> Aside from tracers, all currently supported coresight IP blocks
-> >> are 64 bit ready.  As such add the required symbol definition to
-> >> compile the framework and drivers.
-> >>
-> >> Also fixing a couple of warnings picked up by the 64bit compiler.
-> >>
-> >> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> >> ---
-> >>  arch/arm64/Kconfig.debug            | 48 +++++++++++++++++++++++++++++++++++++
-> >>  drivers/coresight/coresight-etb10.c |  2 +-
-> >>  drivers/coresight/coresight-tmc.c   |  2 +-
-> >>  3 files changed, 50 insertions(+), 2 deletions(-)
-> >>
-> >> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-> >> index 5fdd6dce8061..77dfebbcbffe 100644
-> >> --- a/arch/arm64/Kconfig.debug
-> >> +++ b/arch/arm64/Kconfig.debug
-> >> @@ -66,4 +66,52 @@ config DEBUG_SET_MODULE_RONX
-> >>            against certain classes of kernel exploits.
-> >>            If in doubt, say "N".
-> >>
-> >> +menuconfig CORESIGHT
-> >> +     bool "CoreSight Tracing Support"
-> >> +     select ARM_AMBA
-> >> +     help
-> >> +       This framework provides a kernel interface for the CoreSight debug
-> >> +       and trace drivers to register themselves with. It's intended to build
-> >> +       a topological view of the CoreSight components based on a DT
-> >> +       specification and configure the right serie of components when a
-> >> +       trace source gets enabled.
+On Fri, Jan 30, 2015 at 10:37:19AM -0500, Rob Clark wrote:
+> On Tue, Jan 20, 2015 at 11:38 AM, Ajay Kumar <ajaykumar.rs@samsung.com> wrote:
+> > Currently, third party bridge drivers(ptn3460) are dependent
+> > on the corresponding encoder driver init, since bridge driver
+> > needs a drm_device pointer to finish drm initializations.
+> > The encoder driver passes the drm_device pointer to the
+> > bridge driver. Because of this dependency, third party drivers
+> > like ptn3460 doesn't adhere to the driver model.
 > >
-> > Why does this need to be duplicated by each architecture wanting to make
-> > use of coresight capabilities defined under drivers/coresight? Can't we
-> > instead have this menuconfig and associated suboptions defined by a core
-> > Kconfig file, then have HAVE_ARCH_CORESIGHT_TRACE or something which can
-> > be selected by architectures wanting to make use of the framework?
+> > In this patch, we reframe the bridge registration framework
+> > so that bridge initialization is split into 2 steps, and
+> > bridge registration happens independent of drm flow:
+> > --Step 1: gather all the bridge settings independent of drm and
+> >           add the bridge onto a global list of bridges.
+> > --Step 2: when the encoder driver is probed, call drm_bridge_attach
+> >           for the corresponding bridge so that the bridge receives
+> >           drm_device pointer and continues with connector and other
+> >           drm initializations.
 > >
-> > Will
+> > The old set of bridge helpers are removed, and a set of new helpers
+> > are added to accomplish the 2 step initialization.
+> >
+> > The bridge devices register themselves onto global list of bridges
+> > when they get probed by calling "drm_bridge_add".
+> >
+> > The parent encoder driver waits till the bridge is available
+> > in the lookup table(by calling "of_drm_find_bridge") and then
+> > continues with its initialization.
+> >
+> > The encoder driver should also call "drm_bridge_attach" to pass
+> > on the drm_device to the bridge object.
+> >
+> > drm_bridge_attach inturn calls "bridge->funcs->attach" so that
+> > bridge can continue with drm related initializations.
 > 
-> "arch/arm/Kconfig.debug" and "arch/arm64/Kconfig.debug" already have a
-> fair amount of duplication so I wasn't sure if this is the approach
-> you guys wanted to take.  I agree that a common core Kconfig file
-> would make much more sense and I see a couple of ways to do this:
+> ok, so I probably should have had a closer look at this before it
+> landed in drm-next, so if it is too late to revert (and deal w/
+> untangling subsequent patches that depend on this) some of these
+> issues we'll just have to fix with follow-on patches.
 > 
-> 1) lib/Kconfig.debug being sourced by both arm/Kconfig.debug and
-> arm64/Kconfig.debug.  We can add a lib/Kconfig.coresight or
-> lib/Kconfig.arm and source them the same way.
-> 
-> 2) Adding coresight entries to the Kconfig.debug made sense a while
-> back.  Maybe it is time to move them to drivers/coresight/Kconfig...
-> That way it would be easily accessible by both arm and arm64.
+> 1) needs headerdoc for new fxns in drm_bridge.c, and needs to be added
+> in drm.tmpl
 
-Since the C files and Makefile are in drivers/coresight/, it makes sense
-to add a drivers/coresight/Kconfig that could be sourced from
-arch/arm*/Kconfig (we do this with PCI for example).
+drm_panel.c is missing kerneldoc as well, though I have a local patch to
+add it. If nobody else steps up I'll take this.
 
--- 
-Catalin
+> 2) as far as I can tell, the new approach to cleaning up bridge
+> objects is to just let them leak !?!
+
+With this series bridges are no longer part of the DRM device and it's
+the driver that provides them that needs to free them (in ->remove()).
+It's not a completely perfect solution yet, but with the registry patch
+that I proposed a while back all the remaining issues should go away.
+Now if I could get anybody to look at that patch...
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150203/443d0324/attachment.sig>
