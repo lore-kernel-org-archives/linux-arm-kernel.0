@@ -1,30 +1,27 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 3 Feb 2015 00:48:41 -0800
-Subject: [RFC] change non-atomic bitops method
-In-Reply-To: <20150203.004031.593368249759204527.davem@davemloft.net>
-References: <35FD53F367049845BC99AC72306C23D1044A02027E0B@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D1044A02027E0C@CNBJMBX05.corpusers.net>
- <20150202223851.f30768d0.akpm@linux-foundation.org>
- <20150203.004031.593368249759204527.davem@davemloft.net>
-Message-ID: <20150203004841.b48e84df.akpm@linux-foundation.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 03 Feb 2015 10:06:51 +0100
+Subject: [PATCH v3] mmc: moxart: fix probe logic
+In-Reply-To: <CAPDyKFoppJBHx4nio111GM9RPv8pkfm4yZg2+AedLjnSZhmFsg@mail.gmail.com>
+References: <4754899.RDUhFfxBSW@wuerfel>
+ <1422891786-23071-1-git-send-email-jonas.jensen@gmail.com>
+ <CAPDyKFoppJBHx4nio111GM9RPv8pkfm4yZg2+AedLjnSZhmFsg@mail.gmail.com>
+Message-ID: <11355014.PH1MhDAcRs@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 03 Feb 2015 00:40:31 -0800 (PST) David Miller <davem@davemloft.net> wrote:
-
-> From: Andrew Morton <akpm@linux-foundation.org>
-> Date: Mon, 2 Feb 2015 22:38:51 -0800
+On Tuesday 03 February 2015 09:02:22 Ulf Hansson wrote:
+> > @@ -586,10 +588,11 @@ static int moxart_probe(struct platform_device *pdev)
+> >                 goto out;
+> >         }
+> >
+> > -       clk = of_clk_get(node, 0);
 > 
-> > It is only with both these ratios that we can work out whether the
-> > patch is a net gain.  My suspicion is that set_bit on an already-set
-> > bit is so rare that the patch will be a loss.
+> This code would be simpler using devm_clk_get(), since then error
+> wouldn't be needed.
 > 
-> A common pattern is implementing a "referenced" bit, and in that case
-> the bit is often already set, and in such a scenerio the proposed
-> change is a huge win.
+> Any reason to why you don't want to use that?
 
-pagecache, dcache and icache already perform this optimisation (and
-only pagecache uses bitops for it anyway).  I'm not sure what's left.
+You are absolutely right, and that would have avoided both of the bugs
+I introduced.
 
-But there's really no point in speculating about this - it's trivial to
-instrument the kernel and get real numbers.
+	Arnd
