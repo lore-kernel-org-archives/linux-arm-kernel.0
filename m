@@ -1,50 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 03 Feb 2015 12:31:43 +0100
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 03 Feb 2015 11:37:30 +0000
 Subject: [PATCH] PCI: Fix pcibios_update_irq misuse of irq number
-In-Reply-To: <54D0A521.7030405@arm.com>
+In-Reply-To: <4324891.mqG6Yyfi6J@wuerfel>
 References: <1422456683-797-1-git-send-email-marc.zyngier@arm.com>
  <4145359.V8A0ARGtXz@wuerfel> <54D0A521.7030405@arm.com>
-Message-ID: <4324891.mqG6Yyfi6J@wuerfel>
+ <4324891.mqG6Yyfi6J@wuerfel>
+Message-ID: <54D0B2FA.9080600@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 February 2015 10:38:25 Marc Zyngier wrote:
+On 03/02/15 11:31, Arnd Bergmann wrote:
+> On Tuesday 03 February 2015 10:38:25 Marc Zyngier wrote:
+>>
+>> That's exactly what I thought until Lorenzo reported kvmtool falling
+>> over because of this write. Obviously, some platforms must actually
+>> require this (possibly for bridges that are not known by the firmware).
 > 
-> That's exactly what I thought until Lorenzo reported kvmtool falling
-> over because of this write. Obviously, some platforms must actually
-> require this (possibly for bridges that are not known by the firmware).
+> This sounds much like a bug in kvmtool.
 
-This sounds much like a bug in kvmtool.
- 
-> Entirely removing that code solves my problem too, but that'd cannot be
-> the right solution...
+Lorenzo and I just came to a similar conclusion, given that the HW
+should never use that information.
 
-The comment in pdev_fixup_irq() says 
+>> Entirely removing that code solves my problem too, but that'd cannot be
+>> the right solution...
+> 
+> The comment in pdev_fixup_irq() says 
+> 
+>         /* Always tell the device, so the driver knows what is
+>            the real IRQ to use; the device does not use it. */
+> 
+> which I read to mean that there are drivers that incorrectly use
+> 'pci_read_config_byte(dev, PCI_INTERRUPT_LINE)' as the number
+> they pass into request_irq, rather than using dev->irq.
+> However, this means that your patch is actually wrong, because
+> what the driver cares about is the virtual irq number (which
+> request_irq expects), not the number relative to some interrupt
+> controller.
 
-        /* Always tell the device, so the driver knows what is
-           the real IRQ to use; the device does not use it. */
+Yes, I now realise that. That makes a lot more sense actually, because I
+was getting very confused about how the HW should interpret that number.
 
-which I read to mean that there are drivers that incorrectly use
-'pci_read_config_byte(dev, PCI_INTERRUPT_LINE)' as the number
-they pass into request_irq, rather than using dev->irq.
-However, this means that your patch is actually wrong, because
-what the driver cares about is the virtual irq number (which
-request_irq expects), not the number relative to some interrupt
-controller.
+Side question: In the probe-only case, should we still allow this write
+to happen?
 
-There is another comment in include/linux/pci.h that states
-       /*
-        * Instead of touching interrupt line and base address registers
-        * directly, use the values stored here. They might be different!
-        */
-       unsigned int    irq;
+Thanks,
 
-so apparently this has been a cause for problems in the past,
-and drivers that rely on the number are already broken.
-
-I also checked ancient kernel versions from the 2.1 days when the
-code was first added. And indeed at the time drivers used to read
-the word, but now none of them use the number for anything real,
-they were all fixed during linux-2.2 at the latest.
-
-	Arnd
+	M.
+-- 
+Jazz is not dead. It just smells funny...
