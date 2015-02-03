@@ -1,42 +1,54 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 3 Feb 2015 07:22:15 -0800
-Subject: [PATCH v13 3/6] clk: Make clk API return per-user struct clk
- instances
-In-Reply-To: <54D08AFB.7040203@ti.com>
-References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
- <1422011024-32283-4-git-send-email-tomeu.vizoso@collabora.com>
- <20150201212432.22722.70917@quantum> <54CFD0B1.2000003@ti.com>
- <20150202224139.421.84094@quantum> <54D072AC.5090206@collabora.com>
- <54D08AFB.7040203@ti.com>
-Message-ID: <20150203152214.GA25235@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 03 Feb 2015 16:25:11 +0100
+Subject: [PATCH v5 2/7] mailbox: arm_mhu: add driver for ARM MHU controller
+In-Reply-To: <20150203144611.GS8656@n2100.arm.linux.org.uk>
+References: <1422955310-6542-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <CAJe_ZhdL6=4bMPRitFeCqrO2jeYQuDa9071estTBd3PTbmURYA@mail.gmail.com>
+ <20150203144611.GS8656@n2100.arm.linux.org.uk>
+Message-ID: <4344803.3qsb2TUUaZ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [150203 00:49]:
-> On 02/03/2015 09:03 AM, Tomeu Vizoso wrote:
-> >
-> >I think you got it right, just wanted to mention that we can and
-> >probably should make the clk_get_parent_* calls in the consumer API to
-> >return per-user clk instances but that we need to make sure first that
-> >callers call clk_put afterwards.
-> >
-> >This should also allow us to remove the reference to struct clk from
-> >clk_hw, which is at best awkward.
+On Tuesday 03 February 2015 14:46:11 Russell King - ARM Linux wrote:
+> On Tue, Feb 03, 2015 at 08:09:34PM +0530, Jassi Brar wrote:
+> > On 3 February 2015 at 18:02, Russell King - ARM Linux
+> > <linux@arm.linux.org.uk> wrote:
+> > > On Tue, Feb 03, 2015 at 05:29:23PM +0800, Vincent Yang wrote:
+> > >> +static int mhu_send_data(struct mbox_chan *chan, void *data)
+> > >> +{
+> > >> +     struct mhu_link *mlink = chan->con_priv;
+> > >> +
+> > >> +     pr_debug("%s:%d\n", __func__, __LINE__);
+> > >> +     if (!mhu_last_tx_done(chan)) {
+> > >> +             dev_err(chan->mbox->dev, "Last TX(%d) pending!\n", mlink->irq);
+> > >> +             return -EBUSY;
+> > >> +     }
+> > >> +
+> > >> +     writel_relaxed((u32)data, mlink->tx_reg + INTR_SET_OFS);
+> > >
+> > > Doesn't that cause a GCC warning?
+> > >
+> > I don't see any, but I'll drop the cast.
 > 
-> For the DPLL code it should just be fine to be able to get the current
-> parent index (not parent clock handle), and read a parent clock rate based
-> on an arbitrary index (not just the current one.) I don't think there is any
-> other need for having the clk_ref / clk_bypass clock handles around.
+> A cast is probably needed.  You're right that GCC no longer warns about
+> this - I'm pretty sure it used to complain about casting pointers to
+> ints, and we used to need to cast to "unsigned long" first.
 
-I'd like to avoid the situation where the children have know that
-certain parent index and parent rate means bypass mode for both
-parent and children. 
+It definitely warns about converting an u64 to pointer or back,
+and it warns on 64-bit machines about this conversion.
 
-Maybe we can hide that knowledge into some Linux generic PLL code so
-the children can get the PLL output as a mux clock. For a PLL, there
-can be three mux clock outputs: refclk*multi/div, bypass clock, or no
-output.
+On a related note, I wonder why the driver actually converts a pointer to
+int. I believe we have discussed this in the past but don't remember the
+outcome. I had expected to see here something like:
 
-Regards,
+static int mhu_send_data(struct mbox_chan *chan, void *data)
+{
+	struct mhu_link *mlink = chan->con_priv;
+	u32 *arg = data;
 
-Tony
+	writel_relaxed(*arg, mlink->tx_reg + INTR_SET_OFS);
+}
+
+i.e. dereferencing the pointer instead of using the actual value.
+
+	Arnd
