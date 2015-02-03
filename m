@@ -1,97 +1,64 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 03 Feb 2015 10:52:31 -0800
-Subject: [PATCH v4 1/6] ARM: Alpine: Initial support for Alpine platform
-In-Reply-To: <54d0cd1c.JZPcRllcuDW7d5v+%tsahee@annapurnalabs.com>
-References: <54d0cd1c.JZPcRllcuDW7d5v+%tsahee@annapurnalabs.com>
-Message-ID: <54D118EF.4040605@codeaurora.org>
+From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
+Date: Tue,  3 Feb 2015 11:52:56 -0700
+Subject: [PATCH] coresight: making cpu index lookup arm64 compliant
+Message-ID: <1422989576-23277-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/03/15 05:29, Tsahee Zidenberg wrote:
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index c1785ee..bcc4113 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -143,6 +143,7 @@ textofs-$(CONFIG_ARCH_AXXIA) := 0x00308000
->  
->  # Machine directory name.  This list is sorted alphanumerically
->  # by CONFIG_* macro name.
-> +machine-$(CONFIG_ARCH_ALPINE)		+= alpine
->  machine-$(CONFIG_ARCH_AT91)		+= at91
->  machine-$(CONFIG_ARCH_AXXIA)		+= axxia
->  machine-$(CONFIG_ARCH_BCM)		+= bcm
-> diff --git a/arch/arm/mach-alpine/Kconfig b/arch/arm/mach-alpine/Kconfig
-> new file mode 100644
-> index 0000000..4548f32
-> --- /dev/null
-> +++ b/arch/arm/mach-alpine/Kconfig
-> @@ -0,0 +1,8 @@
-> +config ARCH_ALPINE
-> +        bool "Annapurna Labs Alpine platform" if ARCH_MULTI_V7
+From: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-s/ */\t/
+Function "get_logical_index()" is not available on arm64.
+Instead of adding the function simply using "of_get_cpu_node()" and
+comparing the return value with cpu handles yields the same
+result.
 
-> +	select ARM_AMBA
-> +	select ARM_GIC
-> +	select GENERIC_IRQ_CHIP
-> +	select HAVE_ARM_ARCH_TIMER
-> +	help
-> +	  This enables support for the Annapurna Labs Alpine V1 boards.
-> diff --git a/arch/arm/mach-alpine/Makefile b/arch/arm/mach-alpine/Makefile
-> new file mode 100644
-> index 0000000..8ba9e99
-> --- /dev/null
-> +++ b/arch/arm/mach-alpine/Makefile
-> @@ -0,0 +1,5 @@
-> +#
-> +# Makefile for the linux kernel.
-> +#
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ drivers/coresight/of_coresight.c | 18 ++++++------------
+ 1 file changed, 6 insertions(+), 12 deletions(-)
 
-Remove comment because this isn't the Makefile for the linux kernel?
-
-> +
-> +obj-y				+= alpine_machine.o
-> diff --git a/arch/arm/mach-alpine/alpine_machine.c b/arch/arm/mach-alpine/alpine_machine.c
-> new file mode 100644
-> index 0000000..cf77053
-> --- /dev/null
-> +++ b/arch/arm/mach-alpine/alpine_machine.c
-> @@ -0,0 +1,28 @@
-> +/*
-> + * Machine declaration for Alpine platforms.
-> + *
-> + * Copyright (C) 2015 Annapurna Labs Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/of_platform.h>
-> +
-> +#include <asm/mach/arch.h>
-> +
-> +static const char *al_match[] __initconst = {
-
-static const char * const al_match[] ...
-
-> +	"al,alpine",
-> +	NULL,
-> +};
-> +
-> +DT_MACHINE_START(AL_DT, "Annapurna Labs Alpine")
-> +	.dt_compat	= al_match,
-> +MACHINE_END
-
-Technically we don't even need this file because the default machine
-descriptor for DT based platforms will work the same.
-
+diff --git a/drivers/coresight/of_coresight.c b/drivers/coresight/of_coresight.c
+index c3efa418a86d..f3cc8e97a0f8 100644
+--- a/drivers/coresight/of_coresight.c
++++ b/drivers/coresight/of_coresight.c
+@@ -22,6 +22,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/amba/bus.h>
+ #include <linux/coresight.h>
++#include <linux/cpumask.h>
+ #include <asm/smp_plat.h>
+ 
+ 
+@@ -113,7 +114,7 @@ static int of_coresight_alloc_memory(struct device *dev,
+ struct coresight_platform_data *of_get_coresight_platform_data(
+ 				struct device *dev, struct device_node *node)
+ {
+-	int i = 0, ret = 0;
++	int i = 0, ret = 0, cpu;
+ 	struct coresight_platform_data *pdata;
+ 	struct of_endpoint endpoint, rendpoint;
+ 	struct device *rdev;
+@@ -187,17 +188,10 @@ struct coresight_platform_data *of_get_coresight_platform_data(
+ 	/* Affinity defaults to CPU0 */
+ 	pdata->cpu = 0;
+ 	dn = of_parse_phandle(node, "cpu", 0);
+-	if (dn) {
+-		const u32 *cell;
+-		int len, index;
+-		u64 hwid;
+-
+-		cell = of_get_property(dn, "reg", &len);
+-		if (cell) {
+-			hwid = of_read_number(cell, of_n_addr_cells(dn));
+-			index = get_logical_index(hwid);
+-			if (index != -EINVAL)
+-				pdata->cpu = index;
++	for (cpu = 0; dn && cpu < nr_cpu_ids; cpu++) {
++		if (dn == of_get_cpu_node(cpu, NULL)) {
++			pdata->cpu = cpu;
++			break;
+ 		}
+ 	}
+ 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.9.1
