@@ -1,93 +1,149 @@
-From: lambert.quentin@gmail.com (Quentin Lambert)
-Date: Tue, 03 Feb 2015 17:04:09 +0100
-Subject: [Cocci] [PATCH v13 3/6] clk: Make clk API return per-user struct
- clk instances
-In-Reply-To: <20150202225036.421.43421@quantum>
-References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
- <1422011024-32283-4-git-send-email-tomeu.vizoso@collabora.com>
- <20150201212432.22722.70917@quantum> <54CFE1FE.7040404@codeaurora.org>
- <alpine.DEB.2.02.1502022230110.2045@localhost6.localdomain6>
- <54CFFBCF.90706@codeaurora.org> <20150202225036.421.43421@quantum>
-Message-ID: <54D0F179.1040906@gmail.com>
+From: stripathi@apm.com (Suman Tripathi)
+Date: Tue, 3 Feb 2015 21:42:48 +0530
+Subject: [PATCH v3] ahci_xgene: Fix the dma state machine lockup for the
+ ATA_CMD_SMART PIO mode command.
+In-Reply-To: <CAOHikRDZ-xxBxT_jr44HmKiDHfn2Q1K0ihbNDH-6LvYaq08=gw@mail.gmail.com>
+References: <1422900439-5541-1-git-send-email-stripathi@apm.com>
+ <1422900439-5541-2-git-send-email-stripathi@apm.com>
+ <54CFCC28.6050609@cogentembedded.com>
+ <CAOHikRBMPbyS0q6814+Xkez7ToBwrC7Yzp4sy=NMmPDg-5wCBA@mail.gmail.com>
+ <54CFD38F.2060803@cogentembedded.com>
+ <CAOHikRDZ-xxBxT_jr44HmKiDHfn2Q1K0ihbNDH-6LvYaq08=gw@mail.gmail.com>
+Message-ID: <CAOHikRCnDTQXrfZB6yYSvFpDpiRi68yM2WS8nw5PB0UEM9ZQZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-Julia asked me to have a look and see if I can help.
+   Ugh, please avoid using HTML when posting to the lists hosted on
+vger.kernel.org -- it's configured to ignore such mails AFAIK.
+Yeah forgot to set the plain text mode. Sorry for that
 
-On 02/02/2015 23:50, Mike Turquette wrote:
-> Quoting Stephen Boyd (2015-02-02 14:35:59)
->> On 02/02/15 13:31, Julia Lawall wrote:
->>> On Mon, 2 Feb 2015, Stephen Boyd wrote:
->>>
->>>> Julia,
+>>>     This patch addresses the issue with ATA_CMD_SMART pio mode
+>>>     command for enumeration and device detection with ATA devices.
+>>>     The X-Gene AHCI controller has an errata in which it cannot clear
+>>>     the BSY bit after the PIO setup FIS. The dma state machine enters
+
+
+>>     Hum, if this happens after every PIO command (PIO setup FISes are not
+>> specific to the command, right?), perhaps it would make more sense to record
+>> the *protocol* used by the last command?
+
+
+> No it happens for IDENTIFY DEVICE, ATA_CMD_PACKET and ATA_CMD_SMART commands .
+> It is actually the commands associated with a BSY bit clearing.
+
+
+   I don't understand that -- BSY bit is cleared for *every* command,
+either at the end of it, or along with setting the DRQ bit for PIO
+data transfer.
+BSY bit is cleared after the end of these commands by the controller.
+So due to the bug it doesn't clear it. When the DMA commands is issued
+, it check for the BSY bit cleared or not and finds not cleared and
+results in CMFatalErrorUpdate  and hangs.
+
+Ping ?? Any problem with this last posted version  Actually Mark from
+redhat reported this issue while using smartctl and we found that
+ATA_CMD_SMART also has BSY bit not clearing issue..
+
+On Tue, Feb 3, 2015 at 1:18 AM, Suman Tripathi <stripathi@apm.com> wrote:
+>    Ugh, please avoid using HTML when posting to the lists hosted on
+> vger.kernel.org -- it's configured to ignore such mails AFAIK.
+> Yeah forgot to set the plain text mode. Sorry for that
+>
+>>>>     This patch addresses the issue with ATA_CMD_SMART pio mode
+>>>>     command for enumeration and device detection with ATA devices.
+>>>>     The X-Gene AHCI controller has an errata in which it cannot clear
+>>>>     the BSY bit after the PIO setup FIS. The dma state machine enters
+>
+>
+>>>     Hum, if this happens after every PIO command (PIO setup FISes are not
+>>> specific to the command, right?), perhaps it would make more sense to record
+>>> the *protocol* used by the last command?
+>
+>
+>> No it happens for IDENTIFY DEVICE, ATA_CMD_PACKET and ATA_CMD_SMART commands .
+>> It is actually the commands associated with a BSY bit clearing.
+>
+>
+>    I don't understand that -- BSY bit is cleared for *every* command,
+> either at the end of it, or along with setting the DRQ bit for PIO
+> data transfer.
+> BSY bit is cleared after the end of these commands by the controller.
+> So due to the bug it doesn't clear it. When the DMA commands is issued
+> , it check for the BSY bit cleared or not and finds not cleared and
+> results in CMFatalErrorUpdate  and hangs.
+>
+>>>>     CMFatalErrorUpdate state and locks up. It is the same issue as
+>>>>     in the commit 2a0bdff6b958d1b2523d2754b6cd5e__0ea4053016 (ahci-xgene:
+>>>>     fix the dma state machine lockup for the IDENTIFY DEVICE PIO mode
+>>>>     command).
+>
+>
+>>> [...]
+>
+>
+>>>>     Signed-off-by: Suman Tripathi <stripathi at apm.com <mailto:stripathi@apm.com>>
+>>>>     Reported-by:   Mark Langsdorf <mlangsdo@redhat.com
+>>>>     <mailto:mlangsdo@redhat.com>>
 >>>>
->>>> Is there a way we can write a coccinelle script to check for this? The
->>>> goal being to find all drivers that are comparing struct clk pointers or
->>>> attempting to dereference them. There are probably other frameworks that
->>>> could use the same type of check (regulator, gpiod, reset, pwm, etc.).
->>>> Probably anything that has a get/put API.
->>> Comparing or dereferencing pointers of a particular type should be
->>> straightforward to check for.  Is there an example of how to use the
->>> parent_index value to fix the problem?
->>>
->> I'm not sure how to fix this case with parent_index values generically.
->> I imagine it would be highly specific to the surrounding code to the
->> point where we couldn't fix it automatically. For example, if it's a clk
->> consumer (not provider like in this case) using an index wouldn't be the
->> right fix. We would need some sort of clk API that we don't currently
->> have and I would wonder why clock consumers even care to compare such
->> pointers in the first place.
-> Ack. Is there precedent for a "Don't do that" kind of response?
 >
-> Regards,
-> Mike
+> MBR, Sergei
 >
->> -- 
->> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
->> a Linux Foundation Collaborative Project
+> On Tue, Feb 3, 2015 at 1:14 AM, Sergei Shtylyov
+> <sergei.shtylyov@cogentembedded.com> wrote:
+>> On 02/02/2015 10:37 PM, Suman Tripathi wrote:
 >>
-> _______________________________________________
-> Cocci mailing list
-> Cocci at systeme.lip6.fr
-> https://systeme.lip6.fr/mailman/listinfo/cocci
-I have found these three cases using Coccinnelle in the mach-omap2
-directory.
+>>    Ugh, please avoid using HTML when posting to the lists hosted on
+>> vger.kernel.org -- it's configured to ignore such mails AFAIK.
+>>
+>>>>>     This patch addresses the issue with ATA_CMD_SMART pio mode
+>>>>>     command for enumeration and device detection with ATA devices.
+>>>>>     The X-Gene AHCI controller has an errata in which it cannot clear
+>>>>>     the BSY bit after the PIO setup FIS. The dma state machine enters
+>>
+>>
+>>>>     Hum, if this happens after every PIO command (PIO setup FISes are not
+>>>> specific to the command, right?), perhaps it would make more sense to
+>>>> record
+>>>> the *protocol* used by the last command?
+>>
+>>
+>>> No it happens for IDENTIFY DEVICE, ATA_CMD_PACKET and ATA_CMD_SMART
+>>> commands .
+>>> It is actually the commands associated with a BSY bit clearing.
+>>
+>>
+>>    I don't understand that -- BSY bit is cleared for *every* command, either
+>> at the end of it, or along with setting the DRQ bit for PIO data transfer.
+>>
+>>>>>     CMFatalErrorUpdate state and locks up. It is the same issue as
+>>>>>     in the commit 2a0bdff6b958d1b2523d2754b6cd5e__0ea4053016
+>>>>> (ahci-xgene:
+>>>>>     fix the dma state machine lockup for the IDENTIFY DEVICE PIO mode
+>>>>>     command).
+>>
+>>
+>>>> [...]
+>>
+>>
+>>>>>     Signed-off-by: Suman Tripathi <stripathi@apm.com
+>>>>> <mailto:stripathi@apm.com>>
+>>>>>     Reported-by:   Mark Langsdorf <mlangsdo@redhat.com
+>>>>>     <mailto:mlangsdo@redhat.com>>
+>>>>>
+>>
+>> MBR, Sergei
+>>
+>
+>
+>
+> --
+> Thanks,
+> with regards,
+> Suman Tripathi
 
 
 
-./arch/arm/mach-omap2/clkt_clksel.c
-@@ -67,7 +67,6 @@ static const struct clksel *_get_clksel_
-                 return NULL;
-
-         for (clks = clk->clksel; clks->parent; clks++)
-                 if (clks->parent == src_clk)
-                         break; /* Found the requested parent */
-
-         if (!clks->parent) {
-./arch/arm/mach-omap2/dpll3xxx.c
-@@ -551,7 +549,6 @@ int omap3_noncore_dpll_set_rate(struct c
-         if (!dd)
-                 return -EINVAL;
-
-         if (__clk_get_parent(hw->clk) != dd->clk_ref)
-                 return -EINVAL;
-
-         if (dd->last_rounded_rate == 0)
-./arch/arm/mach-omap2/timer.c
-@@ -298,7 +298,6 @@ static int __init omap_dm_timer_init_one
-         if (IS_ERR(src))
-                 return PTR_ERR(src);
-
-         if (clk_get_parent(timer->fclk) != src) {
-                 r = clk_set_parent(timer->fclk, src);
-                 if (r < 0) {
-                         pr_warn("%s: %s cannot set source\n", __func__,
-
-
-Are they instances of your issue?
-Do you have any suggestion on how to fix them?
-If you want me to I can enlarge the search to other directories.
-
-
-Quentin
+-- 
+Thanks,
+with regards,
+Suman Tripathi
