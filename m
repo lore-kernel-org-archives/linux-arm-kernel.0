@@ -1,49 +1,67 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 3 Feb 2015 12:15:46 +0000
-Subject: [PATCH v8 06/21] ARM64 / ACPI: Introduce PCI stub functions for
- ACPI
-In-Reply-To: <1422881149-8177-7-git-send-email-hanjun.guo@linaro.org>
-References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
- <1422881149-8177-7-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20150203121546.GD3677@e104818-lin.cambridge.arm.com>
+From: iivanov@mm-sol.com (Ivan T. Ivanov)
+Date: Tue,  3 Feb 2015 14:18:00 +0200
+Subject: [PATCH 3/3] ARM: dts: qcom: Add APQ8084 chipset SPMI PMIC's nodes
+In-Reply-To: <1422965880-11047-1-git-send-email-iivanov@mm-sol.com>
+References: <1422965880-11047-1-git-send-email-iivanov@mm-sol.com>
+Message-ID: <1422965880-11047-4-git-send-email-iivanov@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 02, 2015 at 12:45:34PM +0000, Hanjun Guo wrote:
-> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> index ce5836c..c17e7ea 100644
-> --- a/arch/arm64/kernel/pci.c
-> +++ b/arch/arm64/kernel/pci.c
-> @@ -10,6 +10,7 @@
->   *
->   */
->  
-> +#include <linux/acpi.h>
->  #include <linux/init.h>
->  #include <linux/io.h>
->  #include <linux/kernel.h>
-> @@ -68,3 +69,27 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
->  	bus->domain_nr = domain;
->  }
->  #endif
-> +
-> +/*
-> + * raw_pci_read/write - Platform-specific PCI config space access.
-> + */
-> +int raw_pci_read(unsigned int domain, unsigned int bus,
-> +		  unsigned int devfn, int reg, int len, u32 *val)
-> +{
-> +	return -EINVAL;
-> +}
-> +
-> +int raw_pci_write(unsigned int domain, unsigned int bus,
-> +		unsigned int devfn, int reg, int len, u32 val)
-> +{
-> +	return -EINVAL;
-> +}
+PMA8084 have 2 SPMI devices per physical package. Add their
+configuration nodes and include them in boards which are using
+AQP8084 based chipset.
 
-You said you'll make these return -ENOSYS, which I think makes more
-sense.
+Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
+---
+ arch/arm/boot/dts/qcom-apq8084-ifc6540.dts |  1 +
+ arch/arm/boot/dts/qcom-apq8084-mtp.dts     |  1 +
+ arch/arm/boot/dts/qcom-pma8084.dtsi        | 18 ++++++++++++++++++
+ 3 files changed, 20 insertions(+)
+ create mode 100644 arch/arm/boot/dts/qcom-pma8084.dtsi
 
--- 
-Catalin
+diff --git a/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts b/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts
+index c9ff108..f7725b9 100644
+--- a/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts
++++ b/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts
+@@ -1,4 +1,5 @@
+ #include "qcom-apq8084.dtsi"
++#include "qcom-pma8084.dtsi"
+
+ / {
+ 	model = "Qualcomm APQ8084/IFC6540";
+diff --git a/arch/arm/boot/dts/qcom-apq8084-mtp.dts b/arch/arm/boot/dts/qcom-apq8084-mtp.dts
+index 8ecec58..cb43acf 100644
+--- a/arch/arm/boot/dts/qcom-apq8084-mtp.dts
++++ b/arch/arm/boot/dts/qcom-apq8084-mtp.dts
+@@ -1,4 +1,5 @@
+ #include "qcom-apq8084.dtsi"
++#include "qcom-pma8084.dtsi"
+
+ / {
+ 	model = "Qualcomm APQ 8084-MTP";
+diff --git a/arch/arm/boot/dts/qcom-pma8084.dtsi b/arch/arm/boot/dts/qcom-pma8084.dtsi
+new file mode 100644
+index 0000000..a5a4fe6
+--- /dev/null
++++ b/arch/arm/boot/dts/qcom-pma8084.dtsi
+@@ -0,0 +1,18 @@
++#include <dt-bindings/spmi/spmi.h>
++
++&spmi_bus {
++
++	usid0: pma8084 at 0 {
++		compatible = "qcom,spmi-pmic";
++		reg = <0x0 SPMI_USID>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++	};
++
++	usid1: pma8084 at 1 {
++		compatible = "qcom,spmi-pmic";
++		reg = <0x1 SPMI_USID>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++	};
++};
+--
+1.9.1
