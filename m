@@ -1,72 +1,73 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Tue,  3 Feb 2015 14:17:58 +0200
-Subject: [PATCH 1/3] ARM: dts: qcom: Add SPMI PMIC Arbiter nodes for APQ8084
- and MSM8974
-In-Reply-To: <1422965880-11047-1-git-send-email-iivanov@mm-sol.com>
-References: <1422965880-11047-1-git-send-email-iivanov@mm-sol.com>
-Message-ID: <1422965880-11047-2-git-send-email-iivanov@mm-sol.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 Feb 2015 12:28:14 +0000
+Subject: [RFCv3 2/2] dma-buf: add helpers for sharing attacher
+ constraints with dma-parms
+In-Reply-To: <20150203074856.GF14009@phenom.ffwll.local>
+References: <1422347154-15258-2-git-send-email-sumit.semwal@linaro.org>
+ <20150129143908.GA26493@n2100.arm.linux.org.uk>
+ <CAO_48GEOQ1pBwirgEWeVVXW-iOmaC=Xerr2VyYYz9t1QDXgVsw@mail.gmail.com>
+ <20150129154718.GB26493@n2100.arm.linux.org.uk>
+ <CAF6AEGtTmFg66TK_AFkQ-xp7Nd9Evk3nqe6xCBp7K=77OmXTxA@mail.gmail.com>
+ <20150129192610.GE26493@n2100.arm.linux.org.uk>
+ <CAF6AEGujk8UC4X6T=yhTrz1s+SyZUQ=m05h_WcxLDGZU6bydbw@mail.gmail.com>
+ <20150202165405.GX14009@phenom.ffwll.local>
+ <CAF6AEGuESM+e3HSRGM6zLqrp8kqRLGUYvA3KKECdm7m-nt0M=Q@mail.gmail.com>
+ <20150203074856.GF14009@phenom.ffwll.local>
+Message-ID: <20150203122813.GN8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SPMI PMIC Arbiter configuration nodes for APQ8084 and MSM8974.
+On Tue, Feb 03, 2015 at 08:48:56AM +0100, Daniel Vetter wrote:
+> On Mon, Feb 02, 2015 at 03:30:21PM -0500, Rob Clark wrote:
+> > On Mon, Feb 2, 2015 at 11:54 AM, Daniel Vetter <daniel@ffwll.ch> wrote:
+> > >> My initial thought is for dma-buf to not try to prevent something than
+> > >> an exporter can actually do.. I think the scenario you describe could
+> > >> be handled by two sg-lists, if the exporter was clever enough.
+> > >
+> > > That's already needed, each attachment has it's own sg-list. After all
+> > > there's no array of dma_addr_t in the sg tables, so you can't use one sg
+> > > for more than one mapping. And due to different iommu different devices
+> > > can easily end up with different addresses.
+> > 
+> > 
+> > Well, to be fair it may not be explicitly stated, but currently one
+> > should assume the dma_addr_t's in the dmabuf sglist are bogus.  With
+> > gpu's that implement per-process/context page tables, I'm not really
+> > sure that there is a sane way to actually do anything else..
+> 
+> Hm, what does per-process/context page tables have to do here? At least on
+> i915 we have a two levels of page tables:
+> - first level for vm/device isolation, used through dma api
+> - 2nd level for per-gpu-context isolation and context switching, handled
+>   internally.
+> 
+> Since atm the dma api doesn't have any context of contexts or different
+> pagetables, I don't see who you could use that at all.
 
-Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
----
- arch/arm/boot/dts/qcom-apq8084.dtsi | 16 ++++++++++++++++
- arch/arm/boot/dts/qcom-msm8974.dtsi | 16 ++++++++++++++++
- 2 files changed, 32 insertions(+)
+What I've found with *my* etnaviv drm implementation (not Christian's - I
+found it impossible to work with Christian, especially with the endless
+"msm doesn't do it that way, so we shouldn't" responses and his attitude
+towards cherry-picking my development work [*]) is that it's much easier to
+keep the GPU MMU local to the GPU and under the control of the DRM MM code,
+rather than attaching the IOMMU to the DMA API and handling it that way.
 
-diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
-index 1f130bc..dbedf64 100644
---- a/arch/arm/boot/dts/qcom-apq8084.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
-@@ -226,5 +226,21 @@
- 			clock-names = "core", "iface";
- 			status = "disabled";
- 		};
-+
-+		spmi_bus: spmi at fc4cf000 {
-+			compatible = "qcom,spmi-pmic-arb";
-+			reg-names = "core", "intr", "cnfg";
-+			reg = <0xfc4cf000 0x1000>,
-+			      <0xfc4cb000 0x1000>,
-+			      <0xfc4ca000 0x1000>;
-+			interrupt-names = "periph_irq";
-+			interrupts = <0 190 0>;
-+			qcom,ee = <0>;
-+			qcom,channel = <0>;
-+			#address-cells = <2>;
-+			#size-cells = <0>;
-+			interrupt-controller;
-+			#interrupt-cells = <4>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-index e265ec1..2d11641 100644
---- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-@@ -247,5 +247,21 @@
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 		};
-+
-+		spmi_bus: spmi at fc4cf000 {
-+			compatible = "qcom,spmi-pmic-arb";
-+			reg-names = "core", "intr", "cnfg";
-+			reg = <0xfc4cf000 0x1000>,
-+			      <0xfc4cb000 0x1000>,
-+			      <0xfc4ca000 0x1000>;
-+			interrupt-names = "periph_irq";
-+			interrupts = <0 190 0>;
-+			qcom,ee = <0>;
-+			qcom,channel = <0>;
-+			#address-cells = <2>;
-+			#size-cells = <0>;
-+			interrupt-controller;
-+			#interrupt-cells = <4>;
-+		};
- 	};
- };
---
-1.9.1
+There are several reasons for that:
+
+1. DRM has a better idea about when the memory needs to be mapped to the
+   GPU, and it can more effectively manage the GPU MMU.
+
+2. The GPU MMU may have TLBs which can only be flushed via a command in
+   the GPU command stream, so it's fundamentally necessary for the MMU to
+   be managed by the GPU driver so that it knows when (and how) to insert
+   the flushes.
+
+
+* - as a direct result of that, I've stopped all further development of
+etnaviv drm, and I'm intending to strip it out from my Xorg DDX driver
+as the etnaviv drm API which Christian wants is completely incompatible
+with the non-etnaviv drm, and that just creates far too much pain in the
+DDX driver.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
