@@ -1,214 +1,250 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 3 Feb 2015 11:04:00 -0800
-Subject: [PATCH 00/11] ARM: OMAP3: legacy clock data move under clk driver
-In-Reply-To: <201502031759.32261.arnd@arndb.de>
-References: <1418746856-17173-1-git-send-email-t-kristo@ti.com>
- <20150107230006.GE13010@atomide.com>
- <201502031759.32261.arnd@arndb.de>
-Message-ID: <20150203190359.GB25235@atomide.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue,  3 Feb 2015 19:06:51 +0000
+Subject: [PATCH 3.19-rc6 v16 0/6] irq/arm: Implement
+ arch_trigger_all_cpu_backtrace
+In-Reply-To: <1422022952-31552-1-git-send-email-daniel.thompson@linaro.org>
+References: <1422022952-31552-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1422990417-1783-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [150203 09:03]:
-> On Thursday 08 January 2015, Tony Lindgren wrote:
-> 
-> > Great, hopefully this will finally allow Mike to make the
-> > generic struct clk private to drivers/clk :)
-> > 
-> > Seems to boot just fine based on a quick legacy booting test
-> > on n900.
-> > 
-> > Mike, assuming no other issues, can you please apply these into a
-> > immutable branch against v3.19-rc1 that Paul and I can also merge
-> > in as needed?
-> > 
-> > Please also feel free to add:
-> > 
-> > Acked-by: Tony Lindgren <tony@atomide.com>
-> 
-> The series has arrived in linux-next and promptly triggered a few
-> randconfig build errors. Here is a patch that fixes it. Feel free
-> to replace it with a different patch if you don't like this version.
-> 
-> 8<--------
-> Subject: clk: omap: compile legacy omap3 clocks conditionally
-> 
-> The 'ARM: OMAP3: legacy clock data move under clk driver' patch series
-> causes build errors when CONFIG_OMAP3 is not set:
-> 
-> drivers/clk/ti/dpll.c: In function 'ti_clk_register_dpll':
-> drivers/clk/ti/dpll.c:199:31: error: 'omap3_dpll_ck_ops' undeclared (first use in this function)
->   const struct clk_ops *ops = &omap3_dpll_ck_ops;
->                                ^
-> drivers/clk/ti/dpll.c:199:31: note: each undeclared identifier is reported only once for each function it appears in
-> drivers/clk/ti/dpll.c:259:10: error: 'omap3_dpll_per_ck_ops' undeclared (first use in this function)
->    ops = &omap3_dpll_per_ck_ops;
->           ^
-> 
-> drivers/built-in.o: In function `ti_clk_register_gate':
-> drivers/clk/ti/gate.c:179: undefined reference to `clkhwops_omap3430es2_dss_usbhost_wait'
-> drivers/clk/ti/gate.c:179: undefined reference to `clkhwops_am35xx_ipss_module_wait'
-> -in.o: In function `ti_clk_register_interface':
-> drivers/clk/ti/interface.c:100: undefined reference to `clkhwops_omap3430es2_iclk_hsotgusb_wait'
-> drivers/clk/ti/interface.c:100: undefined reference to `clkhwops_omap3430es2_iclk_dss_usbhost_wait'
-> drivers/clk/ti/interface.c:100: undefined reference to `clkhwops_omap3430es2_iclk_ssi_wait'
-> drivers/clk/ti/interface.c:100: undefined reference to `clkhwops_am35xx_ipss_wait'
-> drivers/built-in.o: In function `ti_clk_register_composite':
-> :(.text+0x3da768): undefined reference to `ti_clk_build_component_gate'
-> 
-> In order to fix that problem, this patch makes the omap3 legacy code
-> compiled only when both CONFIG_OMAP3 and CONFIG_ATAGS are set.
+This patchset modifies the GIC driver to allow it, on supported
+platforms, to route IPI interrupts to FIQ. It then uses this
+feature to implement arch_trigger_all_cpu_backtrace for arm.
+In order to neatly (and safely) bring in the changes for the arm
+we also make the sched_clock implementation NMI-safe and rearrange
+some of the existing x86 NMI code to make it architecture neutral.
 
-Looks OK to me:
+This patchset touches a fairly large number of different sub-systems
+(irq, printk, x86, arm). However, of the six patches, four fall under
+one of tglx's maintainerships (either through irq or x86) and another
+(printk) has no explicit maintainer. Thus unless there are objections
+I'd like to gather acks from some of the folks Cc:ed on the patches.
+Then I can wrap it up nicely and send it to Thomas.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
- 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ----
-> diff --git a/drivers/clk/ti/Makefile b/drivers/clk/ti/Makefile
-> index 14e6686a5eea..105ffd0f5e79 100644
-> --- a/drivers/clk/ti/Makefile
-> +++ b/drivers/clk/ti/Makefile
-> @@ -1,4 +1,3 @@
-> -ifneq ($(CONFIG_OF),)
->  obj-y					+= clk.o autoidle.o clockdomain.o
->  clk-common				= dpll.o composite.o divider.o gate.o \
->  					  fixed-factor.o mux.o apll.o
-> @@ -6,10 +5,13 @@ obj-$(CONFIG_SOC_AM33XX)		+= $(clk-common) clk-33xx.o
->  obj-$(CONFIG_SOC_TI81XX)		+= $(clk-common) fapll.o clk-816x.o
->  obj-$(CONFIG_ARCH_OMAP2)		+= $(clk-common) interface.o clk-2xxx.o
->  obj-$(CONFIG_ARCH_OMAP3)		+= $(clk-common) interface.o \
-> -					   clk-3xxx.o clk-3xxx-legacy.o
-> +					   clk-3xxx.o
->  obj-$(CONFIG_ARCH_OMAP4)		+= $(clk-common) clk-44xx.o
->  obj-$(CONFIG_SOC_OMAP5)			+= $(clk-common) clk-54xx.o
->  obj-$(CONFIG_SOC_DRA7XX)		+= $(clk-common) clk-7xx.o \
->  					   clk-dra7-atl.o
->  obj-$(CONFIG_SOC_AM43XX)		+= $(clk-common) clk-43xx.o
-> +
-> +ifdef CONFIG_ATAGS
-> +obj-$(CONFIG_ARCH_OMAP3)                += clk-3xxx-legacy.o
->  endif
-> diff --git a/drivers/clk/ti/clk.c b/drivers/clk/ti/clk.c
-> index 546dae405402..e22b95646e09 100644
-> --- a/drivers/clk/ti/clk.c
-> +++ b/drivers/clk/ti/clk.c
-> @@ -186,6 +186,7 @@ void ti_dt_clk_init_retry_clks(void)
->  	}
->  }
->  
-> +#if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_ATAGS)
->  void __init ti_clk_patch_legacy_clks(struct ti_clk **patch)
->  {
->  	while (*patch) {
-> @@ -308,3 +309,4 @@ int __init ti_clk_register_legacy_clks(struct ti_clk_alias *clks)
->  
->  	return 0;
->  }
-> +#endif
-> diff --git a/drivers/clk/ti/composite.c b/drivers/clk/ti/composite.c
-> index 3a9665fce041..3654f61912eb 100644
-> --- a/drivers/clk/ti/composite.c
-> +++ b/drivers/clk/ti/composite.c
-> @@ -118,6 +118,7 @@ static inline struct clk_hw *_get_hw(struct clk_hw_omap_comp *clk, int idx)
->  
->  #define to_clk_hw_comp(_hw) container_of(_hw, struct clk_hw_omap_comp, hw)
->  
-> +#if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_ATAGS)
->  struct clk *ti_clk_register_composite(struct ti_clk *setup)
->  {
->  	struct ti_clk_composite *comp;
-> @@ -153,6 +154,7 @@ struct clk *ti_clk_register_composite(struct ti_clk *setup)
->  
->  	return clk;
->  }
-> +#endif
->  
->  static void __init _register_composite(struct clk_hw *hw,
->  				       struct device_node *node)
-> diff --git a/drivers/clk/ti/dpll.c b/drivers/clk/ti/dpll.c
-> index 47ebff772b13..81dc4698dc41 100644
-> --- a/drivers/clk/ti/dpll.c
-> +++ b/drivers/clk/ti/dpll.c
-> @@ -176,6 +176,7 @@ cleanup:
->  	kfree(clk_hw);
->  }
->  
-> +#if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_ATAGS)
->  void __iomem *_get_reg(u8 module, u16 offset)
->  {
->  	u32 reg;
-> @@ -271,6 +272,7 @@ cleanup:
->  	kfree(clk_hw);
->  	return clk;
->  }
-> +#endif
->  
->  #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5) || \
->  	defined(CONFIG_SOC_DRA7XX) || defined(CONFIG_SOC_AM33XX) || \
-> diff --git a/drivers/clk/ti/gate.c b/drivers/clk/ti/gate.c
-> index d4f6cb20e16e..d493307b73f4 100644
-> --- a/drivers/clk/ti/gate.c
-> +++ b/drivers/clk/ti/gate.c
-> @@ -130,6 +130,7 @@ static struct clk *_register_gate(struct device *dev, const char *name,
->  	return clk;
->  }
->  
-> +#if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_ATAGS)
->  struct clk *ti_clk_register_gate(struct ti_clk *setup)
->  {
->  	const struct clk_ops *ops = &omap_gate_clk_ops;
-> @@ -208,6 +209,7 @@ struct clk_hw *ti_clk_build_component_gate(struct ti_clk_gate *setup)
->  
->  	return &gate->hw;
->  }
-> +#endif
->  
->  static void __init _of_ti_gate_clk_setup(struct device_node *node,
->  					 const struct clk_ops *ops,
-> diff --git a/drivers/clk/ti/interface.c b/drivers/clk/ti/interface.c
-> index d71cd9b5de46..265d91f071c5 100644
-> --- a/drivers/clk/ti/interface.c
-> +++ b/drivers/clk/ti/interface.c
-> @@ -68,6 +68,7 @@ static struct clk *_register_interface(struct device *dev, const char *name,
->  	return clk;
->  }
->  
-> +#if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_ATAGS)
->  struct clk *ti_clk_register_interface(struct ti_clk *setup)
->  {
->  	const struct clk_hw_omap_ops *ops = &clkhwops_iclk_wait;
-> @@ -98,6 +99,7 @@ struct clk *ti_clk_register_interface(struct ti_clk *setup)
->  	return _register_interface(NULL, setup->name, gate->parent,
->  				   (void __iomem *)reg, gate->bit_shift, ops);
->  }
-> +#endif
->  
->  static void __init _of_ti_interface_clk_setup(struct device_node *node,
->  					      const struct clk_hw_omap_ops *ops)
-> diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
-> index 0eac65054283..67844003493d 100644
-> --- a/include/linux/clk/ti.h
-> +++ b/include/linux/clk/ti.h
-> @@ -360,9 +360,17 @@ extern const struct clk_hw_omap_ops clkhwops_omap3430es2_iclk_ssi_wait;
->  extern const struct clk_hw_omap_ops clkhwops_omap3430es2_iclk_dss_usbhost_wait;
->  extern const struct clk_hw_omap_ops clkhwops_omap3430es2_iclk_hsotgusb_wait;
->  
-> +#ifdef CONFIG_ATAGS
->  int omap3430_clk_legacy_init(void);
->  int omap3430es1_clk_legacy_init(void);
->  int omap36xx_clk_legacy_init(void);
->  int am35xx_clk_legacy_init(void);
-> +#else
-> +static inline int omap3430_clk_legacy_init(void) { return -ENXIO; }
-> +static inline int omap3430es1_clk_legacy_init(void) { return -ENXIO; }
-> +static inline int omap36xx_clk_legacy_init(void) { return -ENXIO; }
-> +static inline int am35xx_clk_legacy_init(void) { return -ENXIO; }
-> +#endif
-> +
->  
->  #endif
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+The patches have been runtime tested on two systems capable of
+supporting FIQ (Freescale i.MX6 and STiH416) and two that do not
+(vexpress-a9 and Qualcomm Snapdragon 600), the changes to the x86
+logic were tested on qemu and all patches have been compile tested
+on x86, arm and arm64.
+
+Note: On platforms not capable of supporting FIQ, the IPI to generate a
+      backtrace will fall back to using IRQ for propagation instead.
+      The backtrace logic contains a timeout to we will not wedge the
+      requesting CPU if other CPUs are not responsive.
+
+v16:
+
+* Significant clean up of the printk patches (Thomas Gleixner).
+  Replacing macros with real functions, CONFIG_ARCH_WANT_NMI_PRINTK
+  -> CONFIG_PRINTK_NMI, prefixing global functions with printk_nmi,
+  removing pointless exports, removing cpu_mask from the interfaces,
+  removal of just-in-time initialization of trace buffers, prevented
+  call sites having to save state, rolled up variable declarations
+  into single lines.
+
+* Dropped the sched_clock() patches from *this* patchset and managed
+  them separately (http://thread.gmane.org/gmane.linux.kernel/1879261 ).
+  The cross-dependancies between the patches are minimal; the backtrace
+  code only calls sched_clock() if we are ftracing and backtracing is
+  normally only triggered to report information about about a broken
+  system (although users can type SysRq-l for amusement, most use it
+  to find out why the system it dead).
+
+* Squashed together the final two patches. Essentially these duplicated
+  the x86 code and slavishly avoided changing it before, in the next
+  patch, fixing it to work better on ARM. It seems better that the code
+  just works first time!
+
+v15:
+
+* Added a patch to make sched_clock safe to call from NMI (Stephen
+  Boyd). Note that sched_clock() is not called by the NMI handlers that
+  have been added for the arm but it could be called if tools such as
+  ftrace are deployed.
+
+* Fixed some warnings picked up during bisectability testing.
+
+v14:
+
+* Moved a nmi_vprintk() and friends from arch/x86/kernel/apic/hw_nmi.c
+  to printk.c (Steven Rostedt)
+
+v13:
+
+* Updated the code to print the backtrace to replicate Steven Rostedt's
+  x86 work to make SysRq-l safe. This is pretty much a total rewrite of
+  patches 4 and 5.
+
+v12:
+
+* Squash first two patches into a single one and re-describe
+  (Thomas Gleixner).
+
+* Improve description of "irqchip: gic: Make gic_raise_softirq FIQ-safe"
+  (Thomas Gleixner).
+
+v11:
+
+* Optimized gic_raise_softirq() by replacing a register read with
+  a memory read (Jason Cooper).
+
+v10:
+
+* Add a further patch to optimize away some of the locking on systems
+  where CONFIG_BL_SWITCHER is not set (Marc Zyngier). Compiles OK with
+  exynos_defconfig (which is the only defconfig to set this option).
+
+* Whitespace fixes in patch 4. That patch previously used spaces for
+  alignment of new constants but the rest of the file used tabs.
+
+v9:
+
+* Improved documentation and structure of initial patch (now initial
+  two patches) to make gic_raise_softirq() safe to call from FIQ
+  (Thomas Gleixner).
+
+* Avoid masking interrupts during gic_raise_softirq(). The use of the
+  read lock makes this redundant (because we can safely re-enter the
+  function).
+
+v8:
+
+* Fixed build on arm64 causes by a spurious include file in irq-gic.c.
+
+v7-2 (accidentally released twice with same number):
+
+* Fixed boot regression on vexpress-a9 (reported by Russell King).
+
+* Rebased on v3.18-rc3; removed one patch from set that is already
+  included in mainline.
+
+* Dropped arm64/fiq.h patch from the set (still useful but not related
+  to issuing backtraces).
+
+v7:
+
+* Re-arranged code within the patch series to fix a regression
+  introduced midway through the series and corrected by a later patch
+  (testing by Olof's autobuilder). Tested offending patch in isolation
+  using defconfig identified by the autobuilder.
+
+v6:
+
+* Renamed svc_entry's call_trace argument to just trace (example code
+  from Russell King).
+
+* Fixed mismatched ENDPROC() in __fiq_abt (example code from Russell
+  King).
+
+* Modified usr_entry to optional avoid calling into the trace code and
+  used this in FIQ entry from usr path. Modified corresponding exit code
+  to avoid calling into trace code and the scheduler (example code from
+  Russell King).
+
+* Ensured the default FIQ register state is restored when the default
+  FIQ handler is reinstalled (example code from Russell King).
+
+* Renamed no_fiq_insn to dfl_fiq_insn to reflect the effect of adopting
+  a default FIQ handler.
+
+* Re-instated fiq_safe_migration_lock and associated logic in
+  gic_raise_softirq(). gic_raise_softirq() is called by wake_up_klogd()
+  in the console unlock logic.
+
+v5:
+
+* Rebased on 3.17-rc4.
+
+* Removed a spurious line from the final "glue it together" patch
+  that broke the build.
+
+v4:
+
+* Replaced push/pop with stmfd/ldmfd respectively (review of Nicolas
+  Pitre).
+
+* Really fix bad pt_regs pointer generation in __fiq_abt.
+
+* Remove fiq_safe_migration_lock and associated logic in
+  gic_raise_softirq() (review of Russell King)
+
+* Restructured to introduce the default FIQ handler first, before the
+  new features (review of Russell King).
+
+v3:
+
+* Removed redundant header guards from arch/arm64/include/asm/fiq.h
+  (review of Catalin Marinas).
+
+* Moved svc_exit_via_fiq macro to entry-header.S (review of Nicolas
+  Pitre).
+
+v2:
+
+* Restructured to sit nicely on a similar FYI patchset from Russell
+  King. It now effectively replaces the work in progress final patch
+  with something much more complete.
+
+* Implemented (and tested) a Thumb-2 implementation of svc_exit_via_fiq
+  (review of Nicolas Pitre)
+
+* Dropped the GIC group 0 workaround patch. The issue of FIQ interrupts
+  being acknowledged by the IRQ handler does still exist but should be
+  harmless because the IRQ handler will still wind up calling
+  ipi_cpu_backtrace().
+
+* Removed any dependency on CONFIG_FIQ; all cpu backtrace effectively
+  becomes a platform feature (although the use of non-maskable
+  interrupts to implement it is best effort rather than guaranteed).
+
+* Better comments highlighting usage of RAZ/WI registers (and parts of
+  registers) in the GIC code.
+
+Changes *before* v1:
+
+* This patchset is a hugely cut-down successor to "[PATCH v11 00/19]
+  arm: KGDB NMI/FIQ support". Thanks to Thomas Gleixner for suggesting
+  the new structure. For historic details see:
+        https://lkml.org/lkml/2014/9/2/227
+
+* Fix bug in __fiq_abt (no longer passes a bad struct pt_regs value).
+  In fixing this we also remove the useless indirection previously
+  found in the fiq_handler macro.
+
+* Make default fiq handler "always on" by migrating from fiq.c to
+  traps.c and replace do_unexp_fiq with the new handler (review
+  of Russell King).
+
+* Add arm64 version of fiq.h (review of Russell King)
+
+* Removed conditional branching and code from irq-gic.c, this is
+  replaced by much simpler code that relies on the GIC specification's
+  heavy use of read-as-zero/write-ignored (review of Russell King)
+
+
+Daniel Thompson (6):
+  irqchip: gic: Optimize locking in gic_raise_softirq
+  irqchip: gic: Make gic_raise_softirq FIQ-safe
+  irqchip: gic: Introduce plumbing for IPI FIQ
+  printk: Simple implementation for NMI backtracing
+  x86/nmi: Use common printk functions
+  ARM: Add support for on-demand backtrace of other CPUs
+
+ arch/arm/Kconfig                |   1 +
+ arch/arm/include/asm/hardirq.h  |   2 +-
+ arch/arm/include/asm/irq.h      |   5 +
+ arch/arm/include/asm/smp.h      |   3 +
+ arch/arm/kernel/smp.c           |  80 ++++++++++++++++
+ arch/arm/kernel/traps.c         |   8 +-
+ arch/x86/Kconfig                |   1 +
+ arch/x86/kernel/apic/hw_nmi.c   | 101 ++------------------
+ drivers/irqchip/irq-gic.c       | 203 +++++++++++++++++++++++++++++++++++++---
+ include/linux/irqchip/arm-gic.h |   8 ++
+ include/linux/printk.h          |  18 ++++
+ init/Kconfig                    |   3 +
+ kernel/printk/printk.c          | 149 +++++++++++++++++++++++++++++
+ 13 files changed, 471 insertions(+), 111 deletions(-)
+
+--
+1.9.3
