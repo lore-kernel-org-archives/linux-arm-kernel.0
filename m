@@ -1,149 +1,91 @@
-From: stripathi@apm.com (Suman Tripathi)
-Date: Tue, 3 Feb 2015 21:42:48 +0530
-Subject: [PATCH v3] ahci_xgene: Fix the dma state machine lockup for the
- ATA_CMD_SMART PIO mode command.
-In-Reply-To: <CAOHikRDZ-xxBxT_jr44HmKiDHfn2Q1K0ihbNDH-6LvYaq08=gw@mail.gmail.com>
-References: <1422900439-5541-1-git-send-email-stripathi@apm.com>
- <1422900439-5541-2-git-send-email-stripathi@apm.com>
- <54CFCC28.6050609@cogentembedded.com>
- <CAOHikRBMPbyS0q6814+Xkez7ToBwrC7Yzp4sy=NMmPDg-5wCBA@mail.gmail.com>
- <54CFD38F.2060803@cogentembedded.com>
- <CAOHikRDZ-xxBxT_jr44HmKiDHfn2Q1K0ihbNDH-6LvYaq08=gw@mail.gmail.com>
-Message-ID: <CAOHikRCnDTQXrfZB6yYSvFpDpiRi68yM2WS8nw5PB0UEM9ZQZw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 03 Feb 2015 17:12:40 +0100
+Subject: [Linaro-mm-sig] [RFCv3 2/2] dma-buf: add helpers for sharing
+ attacher constraints with dma-parms
+In-Reply-To: <20150203155404.GV8656@n2100.arm.linux.org.uk>
+References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
+ <3783167.LiVXgA35gN@wuerfel> <20150203155404.GV8656@n2100.arm.linux.org.uk>
+Message-ID: <6906596.JU5vQoa1jV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-   Ugh, please avoid using HTML when posting to the lists hosted on
-vger.kernel.org -- it's configured to ignore such mails AFAIK.
-Yeah forgot to set the plain text mode. Sorry for that
+On Tuesday 03 February 2015 15:54:04 Russell King - ARM Linux wrote:
+> On Tue, Feb 03, 2015 at 04:31:13PM +0100, Arnd Bergmann wrote:
+> > The dma_map_* interfaces assign the virtual addresses internally,
+> > using typically either a global address space for all devices, or one
+> > address space per device.
+> 
+> We shouldn't be doing one address space per device for precisely this
+> reason.  We should be doing one address space per *bus*.  I did have
+> a nice diagram to illustrate the point in my previous email, but I
+> deleted it, I wish I hadn't... briefly:
+> 
+> Fig. 1.
+>                                                  +------------------+
+>                                                  |+-----+  device   |
+> CPU--L1cache--L2cache--Memory--SysMMU---<iobus>----IOMMU-->         |
+>                                                  |+-----+           |
+>                                                  +------------------+
+> 
+> Fig.1 represents what I'd call the "GPU" issue that we're talking about
+> in this thread.
+> 
+> Fig. 2.
+> CPU--L1cache--L2cache--Memory--SysMMU---<iobus>--IOMMU--device
+> 
+> The DMA API should be responsible (at the very least) for everything on
+> the left of "<iobus>" in and should be providing a dma_addr_t which is
+> representative of what the device (in Fig.1) as a whole sees.  That's
+> the "system" part.  
+> 
+> I believe this is the approach which is taken by x86 and similar platforms,
+> simply because they tend not to have an IOMMU on individual devices (and
+> if they did, eg, on a PCI card, it's clearly the responsibility of the
+> device driver.)
+> 
+> Whether the DMA API also handles the IOMMU in Fig.1 or 2 is questionable.
+> For fig.2, it is entirely possible that the same device could appear
+> without an IOMMU, and in that scenario, you would want the IOMMU to be
+> handled transparently.
+> 
+> However, by doing so for everything, you run into exactly the problem
+> which is being discussed here - the need to separate out the cache
+> coherency from the IOMMU aspects.  You probably also have a setup very
+> similar to fig.1 (which is certainly true of Vivante GPUs.)
+> 
+> If you have the need to separately control both, then using the DMA API
+> to encapsulate both does not make sense - at which point, the DMA API
+> should be responsible for the minimum only - in other words, everything
+> to the left of <iobus> (so including the system MMU.)  The control of
+> the device IOMMU should be the responsibility of device driver in this
+> case.
+> 
+> So, dma_map_sg() would be responsible for dealing with the CPU cache
+> coherency issues, and setting up the system MMU.  dma_sync_*() would
+> be responsible for the CPU cache coherency issues, and dma_unmap_sg()
+> would (again) deal with the CPU cache and tear down the system MMU
+> mappings.
+> 
+> Meanwhile, the device driver has ultimate control over its IOMMU, the
+> creation and destruction of mappings and context switches at the
+> appropriate times.
 
->>>     This patch addresses the issue with ATA_CMD_SMART pio mode
->>>     command for enumeration and device detection with ATA devices.
->>>     The X-Gene AHCI controller has an errata in which it cannot clear
->>>     the BSY bit after the PIO setup FIS. The dma state machine enters
+I agree for the case you are describing here. From what I understood
+from Rob was that he is looking at something more like:
 
+Fig 3
+CPU--L1cache--L2cache--Memory--IOMMU---<iobus>--device
 
->>     Hum, if this happens after every PIO command (PIO setup FISes are not
->> specific to the command, right?), perhaps it would make more sense to record
->> the *protocol* used by the last command?
+where the IOMMU controls one or more contexts per device, and is
+shared across GPU and non-GPU devices. Here, we need to use the
+dmap-mapping interface to set up the IO page table for any device
+that is unable to address all of system RAM, and we can use it
+for purposes like isolation of the devices. There are also cases
+where using the IOMMU is not optional.
 
+So unlike the scenario you describe, the driver cannot at the
+same time control the cache (using the dma-mapping API) and
+the I/O page tables (using the iommu API or some internal
+functions).
 
-> No it happens for IDENTIFY DEVICE, ATA_CMD_PACKET and ATA_CMD_SMART commands .
-> It is actually the commands associated with a BSY bit clearing.
-
-
-   I don't understand that -- BSY bit is cleared for *every* command,
-either at the end of it, or along with setting the DRQ bit for PIO
-data transfer.
-BSY bit is cleared after the end of these commands by the controller.
-So due to the bug it doesn't clear it. When the DMA commands is issued
-, it check for the BSY bit cleared or not and finds not cleared and
-results in CMFatalErrorUpdate  and hangs.
-
-Ping ?? Any problem with this last posted version  Actually Mark from
-redhat reported this issue while using smartctl and we found that
-ATA_CMD_SMART also has BSY bit not clearing issue..
-
-On Tue, Feb 3, 2015 at 1:18 AM, Suman Tripathi <stripathi@apm.com> wrote:
->    Ugh, please avoid using HTML when posting to the lists hosted on
-> vger.kernel.org -- it's configured to ignore such mails AFAIK.
-> Yeah forgot to set the plain text mode. Sorry for that
->
->>>>     This patch addresses the issue with ATA_CMD_SMART pio mode
->>>>     command for enumeration and device detection with ATA devices.
->>>>     The X-Gene AHCI controller has an errata in which it cannot clear
->>>>     the BSY bit after the PIO setup FIS. The dma state machine enters
->
->
->>>     Hum, if this happens after every PIO command (PIO setup FISes are not
->>> specific to the command, right?), perhaps it would make more sense to record
->>> the *protocol* used by the last command?
->
->
->> No it happens for IDENTIFY DEVICE, ATA_CMD_PACKET and ATA_CMD_SMART commands .
->> It is actually the commands associated with a BSY bit clearing.
->
->
->    I don't understand that -- BSY bit is cleared for *every* command,
-> either at the end of it, or along with setting the DRQ bit for PIO
-> data transfer.
-> BSY bit is cleared after the end of these commands by the controller.
-> So due to the bug it doesn't clear it. When the DMA commands is issued
-> , it check for the BSY bit cleared or not and finds not cleared and
-> results in CMFatalErrorUpdate  and hangs.
->
->>>>     CMFatalErrorUpdate state and locks up. It is the same issue as
->>>>     in the commit 2a0bdff6b958d1b2523d2754b6cd5e__0ea4053016 (ahci-xgene:
->>>>     fix the dma state machine lockup for the IDENTIFY DEVICE PIO mode
->>>>     command).
->
->
->>> [...]
->
->
->>>>     Signed-off-by: Suman Tripathi <stripathi at apm.com <mailto:stripathi@apm.com>>
->>>>     Reported-by:   Mark Langsdorf <mlangsdo@redhat.com
->>>>     <mailto:mlangsdo@redhat.com>>
->>>>
->
-> MBR, Sergei
->
-> On Tue, Feb 3, 2015 at 1:14 AM, Sergei Shtylyov
-> <sergei.shtylyov@cogentembedded.com> wrote:
->> On 02/02/2015 10:37 PM, Suman Tripathi wrote:
->>
->>    Ugh, please avoid using HTML when posting to the lists hosted on
->> vger.kernel.org -- it's configured to ignore such mails AFAIK.
->>
->>>>>     This patch addresses the issue with ATA_CMD_SMART pio mode
->>>>>     command for enumeration and device detection with ATA devices.
->>>>>     The X-Gene AHCI controller has an errata in which it cannot clear
->>>>>     the BSY bit after the PIO setup FIS. The dma state machine enters
->>
->>
->>>>     Hum, if this happens after every PIO command (PIO setup FISes are not
->>>> specific to the command, right?), perhaps it would make more sense to
->>>> record
->>>> the *protocol* used by the last command?
->>
->>
->>> No it happens for IDENTIFY DEVICE, ATA_CMD_PACKET and ATA_CMD_SMART
->>> commands .
->>> It is actually the commands associated with a BSY bit clearing.
->>
->>
->>    I don't understand that -- BSY bit is cleared for *every* command, either
->> at the end of it, or along with setting the DRQ bit for PIO data transfer.
->>
->>>>>     CMFatalErrorUpdate state and locks up. It is the same issue as
->>>>>     in the commit 2a0bdff6b958d1b2523d2754b6cd5e__0ea4053016
->>>>> (ahci-xgene:
->>>>>     fix the dma state machine lockup for the IDENTIFY DEVICE PIO mode
->>>>>     command).
->>
->>
->>>> [...]
->>
->>
->>>>>     Signed-off-by: Suman Tripathi <stripathi@apm.com
->>>>> <mailto:stripathi@apm.com>>
->>>>>     Reported-by:   Mark Langsdorf <mlangsdo@redhat.com
->>>>>     <mailto:mlangsdo@redhat.com>>
->>>>>
->>
->> MBR, Sergei
->>
->
->
->
-> --
-> Thanks,
-> with regards,
-> Suman Tripathi
-
-
-
--- 
-Thanks,
-with regards,
-Suman Tripathi
+	Arnd
