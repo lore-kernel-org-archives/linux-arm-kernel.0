@@ -1,64 +1,39 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 03 Feb 2015 09:35:47 -0700
-Subject: [PATCH v3 01/10] ARM: tegra: Set the sound card model that alsaucm
- expects
-In-Reply-To: <CAAObsKCm-9GOvis=MZ-nyA0N+g_ZuWYUfDSdEcVy5p5ykCmkcQ@mail.gmail.com>
-References: <1422442278-10405-1-git-send-email-tomeu.vizoso@collabora.com>
- <1422442278-10405-2-git-send-email-tomeu.vizoso@collabora.com>
- <54CFE754.7000500@wwwdotorg.org>
- <CAAObsKCm-9GOvis=MZ-nyA0N+g_ZuWYUfDSdEcVy5p5ykCmkcQ@mail.gmail.com>
-Message-ID: <54D0F8E3.3020902@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 03 Feb 2015 17:36:59 +0100
+Subject: [Linaro-mm-sig] [RFCv3 2/2] dma-buf: add helpers for sharing
+ attacher constraints with dma-parms
+In-Reply-To: <CAF6AEGsttiufoqPbDiZfUX2ndbv2XfeZzcfyaf-AcUJgJpgLkA@mail.gmail.com>
+References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
+ <6906596.JU5vQoa1jV@wuerfel>
+ <CAF6AEGsttiufoqPbDiZfUX2ndbv2XfeZzcfyaf-AcUJgJpgLkA@mail.gmail.com>
+Message-ID: <7233574.nKiRa7HnXU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/03/2015 06:13 AM, Tomeu Vizoso wrote:
-> On 2 February 2015 at 22:08, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 01/28/2015 03:50 AM, Tomeu Vizoso wrote:
->>>
->>> Patches are on its way to add a config file to alsaucm for the Nyan
->>> boards. Use the same card ID that alsaucm will expect.
->>
->>
->>> diff --git a/arch/arm/boot/dts/tegra124-nyan-big.dts
->>> b/arch/arm/boot/dts/tegra124-nyan-big.dts
->>
->>
->>>          sound {
->>> -               compatible = "nvidia,tegra-audio-max98090-nyan-big",
->>> +               compatible = "nvidia,tegra-audio-max98090-nyan",
->>>                               "nvidia,tegra-audio-max98090";
->>
->>
->> I'm not convinced that removing the board-specific compatible value is a
->> great idea. What if we find we need to distinguish between different boards
->> that use this same binding in the future. That situation is exactly why we
->> have board-/SoC-specific values in compatible even if we don't immediately
->> use them.
->
-> I understand the need of naming each component variant so they can be
-> distinguished in the future, but in this case it's the exact same hw.
+On Tuesday 03 February 2015 11:22:01 Rob Clark wrote:
+> On Tue, Feb 3, 2015 at 11:12 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > I agree for the case you are describing here. From what I understood
+> > from Rob was that he is looking at something more like:
+> >
+> > Fig 3
+> > CPU--L1cache--L2cache--Memory--IOMMU---<iobus>--device
+> >
+> > where the IOMMU controls one or more contexts per device, and is
+> > shared across GPU and non-GPU devices. Here, we need to use the
+> > dmap-mapping interface to set up the IO page table for any device
+> > that is unable to address all of system RAM, and we can use it
+> > for purposes like isolation of the devices. There are also cases
+> > where using the IOMMU is not optional.
+> 
+> 
+> Actually, just to clarify, the IOMMU instance is specific to the GPU..
+> not shared with other devices.  Otherwise managing multiple contexts
+> would go quite badly..
+> 
+> But other devices have their own instance of the same IOMMU.. so same
+> driver could be used.
 
-That's not true. These are two different boards that are derived from 
-the same base design. The intent may be that they are the same, but the 
-whole point of board-specific compatible values is to cover the case 
-where mistakes and exceptions appear later.
+I think from the driver perspective, I'd view those two cases as
+identical. Not sure if Russell agrees with that.
 
->>> -               nvidia,model = "Acer Chromebook 13";
->>> +               nvidia,model = "GoogleNyan";
->>
->>
->> I believe this also technically breaks ABI, since some user-space tools use
->> the model to look up saved state. Can we not leave this as is, and just have
->> the UCM files know about both names?
->
-> Well, "A13" isn't a great card id. Given that there's no users yet, I
-> would prefer to take this chance to put a sane value in there. Btw,
-> alsa-lib has now a UCM config for this and it uses the GoogleNyan card
-> id (has been picked up already by OpenSUSE).
-
-"A13" didn't appear anywhere, did it? Perhaps that was a shorthand for 
-"Acer Chromebook 13". Yes, I agree we should use the user-visible model 
-number here; "Acer CB5" or perhaps "Acer CB5-xxx" whatever xxx actually is.
-
-> So in this case, I think it would be good to change the card id now
-> before people start to actually use it.
+	Arnd
