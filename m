@@ -1,58 +1,76 @@
-From: tsahee@annapurnalabs.com (Tsahee Zidenberg)
-Date: Wed, 4 Feb 2015 13:19:04 +0200
-Subject: [PATCH v4 0/6] Introducing the Alpine platform.
-In-Reply-To: <4916446.z10l5moOdI@wuerfel>
-References: <54d0cd21.WWf8LEKnly7HnqEK%tsahee@annapurnalabs.com>
- <4916446.z10l5moOdI@wuerfel>
-Message-ID: <CABM=7kn-Q-poN-6xam419we-CFV-_GyLLFx4UZ-Q4RdKMbJ6dg@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 4 Feb 2015 11:21:05 +0000
+Subject: [PATCH v8 14/21] ACPI / processor: Make it possible to get CPU
+ hardware ID via GICC
+In-Reply-To: <54D1EAD5.4080105@linaro.org>
+References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
+ <1422881149-8177-15-git-send-email-hanjun.guo@linaro.org>
+ <20150203141749.GA32536@leverpostej>
+ <20150203200936.GA21731@e104818-lin.cambridge.arm.com>
+ <54D1EAD5.4080105@linaro.org>
+Message-ID: <20150204112105.GA26006@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi arnd!
+On Wed, Feb 04, 2015 at 09:48:05AM +0000, Hanjun Guo wrote:
+> On 2015?02?04? 04:09, Catalin Marinas wrote:
+> > diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> > index ea4d2b35c57b..4fafd62b1b86 100644
+> > --- a/arch/arm64/include/asm/acpi.h
+> > +++ b/arch/arm64/include/asm/acpi.h
+> > @@ -49,33 +49,12 @@ static inline void enable_acpi(void)
+> >   	acpi_noirq = 0;
+> >   }
+> >
+> > -/* MPIDR value provided in GICC structure is 64 bits, but the
+> > - * existing phys_id (CPU hardware ID) using in acpi processor
+> > - * driver is 32-bit, to conform to the same datatype we need
+> > - * to repack the GICC structure MPIDR.
+> > - *
+> > - * bits other than following 32 bits are defined as 0, so it
+> > - * will be no information lost after repacked.
+> > - *
+> > - * Bits [0:7] Aff0;
+> > - * Bits [8:15] Aff1;
+> > - * Bits [16:23] Aff2;
+> > - * Bits [32:39] Aff3;
+> > - */
+> > -static inline u32 pack_mpidr(u64 mpidr)
+> > -{
+> > -	return (u32) ((mpidr & 0xff00000000) >> 8) | mpidr;
+> > -}
+> > -
+> >   /*
+> >    * The ACPI processor driver for ACPI core code needs this macro
+> >    * to find out this cpu was already mapped (mapping from CPU hardware
+> >    * ID to CPU logical ID) or not.
+> > - *
+> > - * cpu_logical_map(cpu) is the mapping of MPIDR and the logical cpu,
+> > - * and MPIDR is the cpu hardware ID we needed to pack.
+> >    */
+> > -#define cpu_physical_id(cpu) pack_mpidr(cpu_logical_map(cpu))
+> > +#define cpu_physical_id(cpu) cpu_logical_map(cpu)
+> >
+> >   /*
+> >    * It's used from ACPI core in kdump to boot UP system with SMP kernel,
+> > diff --git a/arch/arm64/include/asm/smp_plat.h b/arch/arm64/include/asm/smp_plat.h
+> > index 59e282311b58..a492276e008d 100644
+> > --- a/arch/arm64/include/asm/smp_plat.h
+> > +++ b/arch/arm64/include/asm/smp_plat.h
+> > @@ -40,4 +40,6 @@ static inline u32 mpidr_hash_size(void)
+> >   extern u64 __cpu_logical_map[NR_CPUS];
+> >   #define cpu_logical_map(cpu)    __cpu_logical_map[cpu]
+> >
+> > +typedef u64 cpuid_t;
+> 
+> I think cpuid_t is a little confused because people may recognize
+> it as cpu logical id, its original meaning is the physical cpu ID,
+> so how about:
+> 
+> typedef u64 phys_id_t; ?
 
-On 3 February 2015 at 15:55, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 03 February 2015 15:29:05 Tsahee Zidenberg wrote:
->> If possible to introduce this into 3.20 - I would really appreciate it. If any
->> action by me can make it happen - please let me know.
->>
->
-> Hi Tsahee,
->
-> This is not directly related to your patches, but since I got curious I
-> looked at the source code published by Synology. I don't know how far
-> you've come in modernizing this, but this is what I found:
->
-> * The hardware looked really nice
-> * You only have a couple of custom drivers, but they all have the
->   same mistake in using a private 'hardware abstraction layer'. Don't
->   do this, and use the kernel's interfaces directly
+I would keep "cpu" somewhere in the name as "phys" is too generic, maybe
+phys_cpuid_t.
 
-The main motivations for adding a HAL:
-* re-using code between linux kernel and other systems.
-* re-using common code between different drivers (e.g. - different
-hardware units use the same DMA engine)
-* a basic approach that states our HAL is in-fact part of the chip's API
-I believe we will find a middle ground that will allow keeping these
-benefits without compromise of the kernel coding style. The HALs were
-written from day 1 with kernel coding-style in mind, and we do realize
-there may be some more changes required in the process.
-
-> * The serdes driver should register as a generic PHY driver
-> * If possible, move the PCI initialization into the boot loader
->   and use drivers/pci/pci_host_generic.c to avoid having your
->   own driver.
-
-PCI support will probably be the next topic for Alpine merging. I am
-working on the patchset, and it will use the generic pci driver and
-device-tree node.
-
-> * the memory controller driver should live in drivers/memory
-> * the baseidx addition to the pl061 driver is not going in, use
->   the new devm_gpiod_* interfaces to avoid relying on particular
->   gpio numbers.
-> * The spi driver already has a binding, which is incompatible to
->   the one you use.
-
-Thank you! We will take these into consideration!
->
->         Arnd
+-- 
+Catalin
