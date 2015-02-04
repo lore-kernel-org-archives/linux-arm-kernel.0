@@ -1,96 +1,78 @@
-From: ahs3@redhat.com (Al Stone)
-Date: Wed, 04 Feb 2015 15:46:17 -0700
-Subject: [PATCH v2 3/5] ACPI: add arch-specific compilation for _OSI and
- the blacklist
-In-Reply-To: <2903181.4VVp3X75UK@vostro.rjw.lan>
-References: <1423009304-5007-1-git-send-email-al.stone@linaro.org>
- <1423009304-5007-4-git-send-email-al.stone@linaro.org>
- <2298661.ffvhncbLpr@vostro.rjw.lan> <2903181.4VVp3X75UK@vostro.rjw.lan>
-Message-ID: <54D2A139.5030602@redhat.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 05 Feb 2015 01:46:59 +0300
+Subject: [PATCH] ARM: shmobile: silk: initial device tree
+In-Reply-To: <20150202001910.GA29383@verge.net.au>
+References: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
+ <1608366.HtA9yBksdO@wasted.cogentembedded.com>
+ <20150131042143.GB7605@verge.net.au> <54CD1E79.6090700@cogentembedded.com>
+ <20150202001910.GA29383@verge.net.au>
+Message-ID: <54D2A163.3010207@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/04/2015 07:03 AM, Rafael J. Wysocki wrote:
-> On Wednesday, February 04, 2015 03:00:15 PM Rafael J. Wysocki wrote:
->> On Tuesday, February 03, 2015 05:21:42 PM al.stone at linaro.org wrote:
->>> From: Al Stone <al.stone@linaro.org>
->>>
->>> Now that all of the _OSI functionality has been separated out, we can
->>> provide arch-specific functionality for it.  This also allows us to do
->>> the same for the acpi_blacklisted() function.
->>>
->>> Whether arch-specific functions are used or not now depends on the config
->>> options CONFIG_ACPI_ARCH_SPECIFIC_OSI and CONFIG_ARCH_SPECIFIC_BLACKLIST.
->>> By default, both are set false which causes the x86/ia64 versions to be
->>> used, just as is done today.  Setting one or both of these options true
->>> will cause architecture-specific implementations to be built instead; this
->>> patch also provides arm64 implementations.
->>>
->>> For x86/ia64, there is no functional change.
->>>
->>> For arm64, any use of _OSI will issue a warning that it is deprecated.
->>> All use of _OSI will return false -- i.e., it will return no useful
->>> information to any firmware using it.  The ability to temporarily turn
->>> on _OSI, or turn off _OSI, or affect it in other ways from the command
->>> line is no longer available for arm64, either.  The blacklist for ACPI
->>> on arm64 is empty.  This will, of course, require ACPI to be enabled
->>> for arm64.
->>>
->>> Signed-off-by: Al Stone <al.stone@linaro.org>
->>> ---
->>>  drivers/acpi/Kconfig         | 22 ++++++++++++++++++++++
->>>  drivers/acpi/Makefile        | 19 ++++++++++++++++++-
->>>  drivers/acpi/blacklist-arm.c | 20 ++++++++++++++++++++
->>>  drivers/acpi/blacklist.c     |  5 +++++
->>>  drivers/acpi/osi-arm.c       | 25 +++++++++++++++++++++++++
->>>  5 files changed, 90 insertions(+), 1 deletion(-)
->>>  create mode 100644 drivers/acpi/blacklist-arm.c
->>>  create mode 100644 drivers/acpi/osi-arm.c
->>>
->>> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
->>> index 3e3bd35..4190940 100644
->>> --- a/drivers/acpi/Kconfig
->>> +++ b/drivers/acpi/Kconfig
->>> @@ -369,6 +369,28 @@ config ACPI_REDUCED_HARDWARE_ONLY
->>>  
->>>  	  If you are unsure what to do, do not enable this option.
->>>  
->>> +config ACPI_ARCH_SPECIFIC_OSI
->>
->> I woulnd't make this and the other one user-selectable.  Let architectures
->> select them from their top-level Kconfig files.
->>
->> That's what we do with the other CONFIG_ARCH_ things.
->>
->> So in the architecture-specific Kconfig you'll have
->>
->> config ACPI_ARCH_SPECIFIC_OSI
->> 	def_bool n
->> 	depends on ACPI
->>
->> Moreover, I'd call that ARCH_SPECIFIC_ACPI_OSI.
-> 
-> Or even better, you can define them here (drivers/acpi/Kconfig/) as
-> 
-> config ARCH_SPECIFIC_ACPI_OSI
-> 	def_bool n
-> 
-> and then do
-> 
-> 	select ARCH_SPECIFIC_ACPI_OSI if ACPI
-> 
-> as you did in [4/5].
-> 
-> 
+On 02/02/2015 03:19 AM, Simon Horman wrote:
 
-Ah, indeed I did.  Okay; I'll touch that up.
+>>>> Add the initial device tree for the R8A7794 SoC based SILK low cost board.
+>>>> SCIF2 serial port support is included, so that the serial console can work.
 
--- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Red Hat, Inc.
-ahs3 at redhat.com
------------------------------------
+>>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
+>>>> ---
+>>>> This patch is against the 'renesas-devel-20150129-v3.19-rc6' tag of Simon
+>>>> Horman's 'renesas.git' repo.
+
+>>>>   arch/arm/boot/dts/Makefile         |    1
+>>>>   arch/arm/boot/dts/r8a7794-silk.dts |   41 +++++++++++++++++++++++++++++++++++++
+>>>>   2 files changed, 42 insertions(+)
+
+>> [...]
+>>>> Index: renesas/arch/arm/boot/dts/r8a7794-silk.dts
+>>>> ===================================================================
+>>>> --- /dev/null
+>>>> +++ renesas/arch/arm/boot/dts/r8a7794-silk.dts
+>>>> @@ -0,0 +1,41 @@
+>>>> +/*
+>>>> + * Device Tree Source for the SILK board
+>>>> + *
+>>>> + * Copyright (C) 2014 Renesas Electronics Corporation
+>>>> + * Copyright (C) 2014-2015 Renesas Solutions Corp.
+>>>> + * Copyright (C) 2014-2015 Cogent Embedded, Inc.
+>>>> + *
+>>>> + * This file is licensed under the terms of the GNU General Public License
+>>>> + * version 2.  This program is licensed "as is" without any warranty of any
+>>>> + * kind, whether express or implied.
+>>>> + */
+>>>> +
+>>>> +/dts-v1/;
+>>>> +#include "r8a7794.dtsi"
+>>>> +
+>>>> +/ {
+>>>> +	model = "SILK";
+>>>> +	compatible = "renesas,silk", "renesas,r8a7794";
+>>>> +
+>>>> +	aliases {
+>>>> +		serial0 = &scif2;
+>>>> +	};
+>>>> +
+>>>> +	chosen {
+>>>> +		bootargs = "console=ttySC0,38400 ignore_loglevel";
+
+>>> Please remove console= for consistency with other boards
+>>> based on Renesas SoCs.
+
+>>     I can't, there will be no console at all.
+
+> Its not clear to me why that should be the case when you also have:
+
+> 		stdout-path = &scif2;
+
+> Is this a baud issue?
+
+    Don't think so, I would have seen at least some garbage on the console.
+There was nothing. I'm still not sure what the problem was...
+
+> If so is it possible to set uboot to 115200 bps?
+
+    Possible with the new board.
+
+WBR, Sergei
