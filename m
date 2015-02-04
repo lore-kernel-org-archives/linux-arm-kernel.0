@@ -1,56 +1,109 @@
-From: mpeg.blue@free.fr (Mason)
-Date: Tue, 03 Feb 2015 16:07:18 -0800
-Subject: RFC on cpufreq implementation
-In-Reply-To: <CAKohpomzCEjXUrxUJjypaA77=r4j_ZPa+x3gM=cNN0kc3ux0uQ@mail.gmail.com>
-References: <54B7F7CD.7030903@free.fr>	<54CA6327.5070707@free.fr>	<CAKohponrzDb4ZGvRtJ5jtGTPAy4RCfRsYGvdjR5fx51K2=evCg@mail.gmail.com>	<54CC174F.10703@free.fr>
- <CAKohpomzCEjXUrxUJjypaA77=r4j_ZPa+x3gM=cNN0kc3ux0uQ@mail.gmail.com>
-Message-ID: <54D162B6.2050602@free.fr>
+From: jy0922.shim@samsung.com (Joonyoung Shim)
+Date: Wed, 04 Feb 2015 09:09:46 +0900
+Subject: [PATCH v5 0/9] Enable HDMI support on Exynos platforms
+In-Reply-To: <066101d03f65$a870dcc0$f9529640$@kernel.org>
+References: <1422883228-10690-1-git-send-email-m.szyprowski@samsung.com>
+ <066101d03f65$a870dcc0$f9529640$@kernel.org>
+Message-ID: <54D1634A.4040300@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Viresh Kumar wrote:
+Hi,
 
-> Mason wrote:
->
->> If it's supposed to go in drivers/cpufreq, I suppose there are naming
->> conventions to follow?
->
-> You can check existing drivers.
+On 02/03/2015 12:58 PM, Kukjin Kim wrote:
+> Marek Szyprowski wrote:
+>>
+>> Hi all,
+>>
+>> This is yet another update on patchset, which enables HDMI support for
+>> Exynos based platforms.
+>>
+>> Beside DTS changes, this patchset adds parent domain support for Exynos
+>> PM domains and add support for 'hdmi' clock directly to Exynos DRM mixer
+>> driver.
+>>
+>> The patchset is based on samsung/for-next branch and 'PM / Domains:
+>> Export of_genpd_get_from_provider function' patch merged as commit
+>> 7496fcbe8a643097efc061160e1c3b65ee2fa350 to v3.19-rc4.
+>>
+>> Regards
+>> Marek Szyprowski
+>>
+>>
+>> Changelog:
+>>
+>> v5:
+>> - fixed error value for clk_get() in mixer patch
+>> - rebased onto samsung/for-next branch
+>>
+>> v4: (http://www.spinics.net/lists/linux-samsung-soc/msg41375.html)
+>> - added patches, which add 'hdmi' clock handling to mixed block, this
+>>   finally solves the initialization related issues, thanks for Tobias
+>>   Jakobi for testing
+>> - added acks/reviewed/tested by tags
+>>
+>> v3: (http://www.spinics.net/lists/linux-samsung-soc/msg41020.html)
+>> - added a note on defining subdomains to generic PM domain binding
+>>   documentation (requested by Ulf Hansson)
+>>
+>> v2: (http://www.spinics.net/lists/linux-samsung-soc/msg40980.html)
+>> - rewrote subdomains patch according to suggestions from Geert
+>>   Uytterhoeven and Amit Daniel Kachhap.
+>>
+>> v1 resend: (http://www.spinics.net/lists/linux-samsung-soc/msg39428.html)
+>> - added handling of generic 'power-domains' binding in subdomains
+>>
+>> v1: (http://www.spinics.net/lists/linux-samsung-soc/msg38914.html)
+>> - resolved power domain on/off issue with 'clk: samsung: exynos4: set
+>>   parent of mixer gate clock to hdmi' patch
+>>
+>> v0: (http://www.spinics.net/lists/linux-samsung-soc/msg33498.html)
+>> - first attempt, used 'always on' power domains hack
+>>
+>>
+>> Patch summary:
+>>
+>>
+>> *** BLURB HERE ***
+>>
+>> Andrzej Hajda (1):
+>>   ARM: dts: exynos5250: add display power domain
+>>
+>> Marek Szyprowski (7):
+>>   PM / Domains: Add a note about power domain subdomains
+>>   ARM: Exynos: add support for sub-power domains
+>>   ARM: dts: exynos4: add hdmi related nodes
+>>   ARM: dts: exynos4: add dependency between TV and LCD0 power domains
+>>   ARM: dts: exynos4412-odroid: enable hdmi support
+>>   ARM: dts: Exynos: add 'hdmi' clock to mixer nodes
+>>   drm/exynos: add support for 'hdmi' clock
+>>
+>> Tomasz Stanislawski (1):
+>>   ARM: dts: exynos4210-universal_c210: enable hdmi support
+>>
+>>  .../bindings/arm/exynos/power_domain.txt           |  2 +
+>>  .../devicetree/bindings/power/power_domain.txt     | 29 +++++++++++
+>>  .../devicetree/bindings/video/exynos_mixer.txt     |  1 +
+>>  arch/arm/boot/dts/exynos4.dtsi                     | 41 ++++++++++++++++
+>>  arch/arm/boot/dts/exynos4210-universal_c210.dts    | 57 ++++++++++++++++++++++
+>>  arch/arm/boot/dts/exynos4210.dtsi                  |  8 +++
+>>  arch/arm/boot/dts/exynos4412-odroid-common.dtsi    | 44 +++++++++++++++++
+>>  arch/arm/boot/dts/exynos4x12.dtsi                  | 11 +++++
+>>  arch/arm/boot/dts/exynos5250.dtsi                  | 15 +++++-
+>>  arch/arm/boot/dts/exynos5420.dtsi                  |  5 +-
+>>  arch/arm/mach-exynos/pm_domains.c                  | 28 +++++++++++
+>>  drivers/gpu/drm/exynos/exynos_mixer.c              |  9 ++++
+>>  12 files changed, 246 insertions(+), 4 deletions(-)
+>>
+>> --
+> I have no objection on this series, but just wondering my tree should be fine
+> without 9/9 drm patch and it will be handled for 3.20?
+> 
+> I'll take 1 to 8 patches once drm patch is landed for 3.20.
+> 
 
-All of them?
+I also hope this patchset merged,
 
-~/linux-3.19-rc7$ wc drivers/cpufreq/*
-  31542  95730 813482 total
+Inki, could you follow up exynos drm part of this patchset?
 
-Are there perhaps 1 or 2 "golden standard" drivers that are well-written
-and up-to-date with respect to current conventions?
-
->> Also, if it's in drivers/cpufreq, we are not supposed to include
->> any machine-specific includes? And I'm back to my original question
->> where am I supposed to store machine-specific information, such as
->> register descriptions and MMIO addresses and offsets?
->
-> Define registers/etc in your driver only or somewhere in include/ .
-
-Like Samsung did with include/dt-bindings/clock/exynos*.h ?
-
-> Also, try to see if you can reuse cpufreq-dt.c, your driver wouldn't make
-> it to the kernel otherwise.
-
-Are you saying that use of DeviceTree is mandatory for new ARM ports?
-
-In other words, ports using "board files" will not be accepted into
-mainline, nor will drivers not using DT?
-
-If that is correct, then my proposed cpufreq driver has exactly 0%
-chance of being mainlined as-is, right?
-
-I took a look at cpufreq-dt.c but I think it doesn't quite fit my use-case.
-In my driver, I define "clock dividers" (typically 1,2,3,5,9) and these are
-used to divide some baseline frequency that the cpufreq code doesn't need to
-know. The baseline frequency is set by the boot loader, and Linux is not
-supposed to change that, only apply the dividers if necessary.
-
-What do you think of this use-case?
-
-Regards.
+Thanks.
