@@ -1,47 +1,53 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 04 Feb 2015 15:16:27 +0100
-Subject: [rcu] [ INFO: suspicious RCU usage. ]
-In-Reply-To: <20150204131420.GC5370@linux.vnet.ibm.com>
-References: <20150201025922.GA16820@wfg-t540p.sh.intel.com>
- <1422957702.17540.1.camel@AMDC1943>
- <20150203162704.GR19109@linux.vnet.ibm.com>
- <1423049947.19547.6.camel@AMDC1943>
- <20150204130018.GG8656@n2100.arm.linux.org.uk>
- <20150204131420.GC5370@linux.vnet.ibm.com>
-Message-ID: <1423059387.24415.2.camel@AMDC1943>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 04 Feb 2015 15:39:49 +0100
+Subject: [PATCH 0/8] PM / Domains: Re-structure code for adding/removing
+ devices to genpd
+In-Reply-To: <1422389625-11730-1-git-send-email-ulf.hansson@linaro.org>
+References: <1422389625-11730-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <5703029.cMXmjeytH4@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ?ro, 2015-02-04 at 05:14 -0800, Paul E. McKenney wrote:
-> On Wed, Feb 04, 2015 at 01:00:18PM +0000, Russell King - ARM Linux wrote:
-> > On Wed, Feb 04, 2015 at 12:39:07PM +0100, Krzysztof Kozlowski wrote:
-> > > +Cc some ARM people
-> > 
-> > I wish that people would CC this list with problems seen on ARM.  I'm
-> > minded to just ignore this message because of this in the hope that by
-> > doing so, people will learn something...
-> > 
-> > > > Another thing I could do would be to have an arch-specific Kconfig
-> > > > variable that made ARM responsible for informing RCU that the CPU
-> > > > was departing, which would allow a call to as follows to be placed
-> > > > immediately after the complete():
-> > > > 
-> > > > rcu_cpu_notify(NULL, CPU_DYING_IDLE, (void *)(long)smp_processor_id());
-> > > > 
-> > > > Note:  This absolutely requires that the rcu_cpu_notify() -always-
-> > > > be allowed to execute!!!  This will not work if there is -any- possibility
-> > > > of __cpu_die() powering off the outgoing CPU before the call to
-> > > > rcu_cpu_notify() returns.
-> > 
-> > Exactly, so that's not going to be possible.  The completion at that
-> > point marks the point at which power _could_ be removed from the CPU
-> > going down.
+On Tuesday, January 27, 2015 09:13:37 PM Ulf Hansson wrote:
+> While adding error handling of genpd's ->attach_dev() callback, I realized that
+> we also had a need to re-structure some of the code which deals with
+> adding/removing devices to genpd. Especially the APIs, __pm_genpd_add_device()
+> and pm_genpd_remove_device() deserved some attention.
 > 
-> OK, sounds like a polling loop is required.
+> Patch 1 -> 4, can be considered as more simple cleanups and should not impact
+> the behavior for current clients using the APIs. 
+> 
+> Patch 5, eliminates a mutex for generic_pm_domain_data by re-order the
+> initialization/cleanup of dev_pm_qos notifiers.
+> 
+> Patch 6, move some code around to fix a potenial memory leakage of a struct
+> pm_subsys_data.
+> 
+> Patch 7, code restructuring which impacts locking behavior while adding/removing
+> devices. Should improve code readability and decrease critical regions of
+> holding locks.
+> 
+> Patch 8, Adds error handling of genpd's ->attach_dev() callback
+> 
+> 
+> Ulf Hansson (8):
+>   PM / Domains: Rename __pm_genpd_alloc|free_dev_data()
+>   PM / Domains: Remove reference counting for the generic_pm_domain_data
+>   PM / Domains: Don't allow an existing generic_pm_domain_data
+>   PM / Domains: Don't check for an existing device when adding a new
+>   PM / Domains: Eliminate the mutex for the generic_pm_domain_data
+>   PM / Domains: Free pm_subsys_data in error path in
+>     __pm_genpd_add_device()
+>   PM / Domains: Re-order initialization of generic_pm_domain_data
+>   PM / Domains: Handle errors from genpd's ->attach_dev() callback
+> 
+>  drivers/base/power/domain.c | 137 +++++++++++++++++++++-----------------------
+>  include/linux/pm_domain.h   |   2 -
+>  2 files changed, 65 insertions(+), 74 deletions(-)
 
-I thought about using wait_on_bit() in __cpu_die() (the waiting thread)
-and clearing the bit on CPU being powered down. What do you think about
-such idea?
+Whole series queued up for 3.20, thanks!
 
-Best regards,
-Krzysztof
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
