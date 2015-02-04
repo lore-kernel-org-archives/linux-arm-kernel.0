@@ -1,61 +1,28 @@
-From: wangnan0@huawei.com (Wang Nan)
-Date: Wed, 4 Feb 2015 19:01:36 +0800
-Subject: [PATCH -tip/urgent  0/2]kprobes bugfixes around optprobe
-In-Reply-To: <54C5D2CE.5030402@huawei.com>
-References: <20150123064217.30731.49156.stgit@localhost.localdomain>
- <54C5D2CE.5030402@huawei.com>
-Message-ID: <54D1FC10.1020505@huawei.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 4 Feb 2015 11:13:49 +0000
+Subject: [RFC PATCH] ASoC: wm8731: let codec to manage clock by itself
+In-Reply-To: <54D195D9.4090101@atmel.com>
+References: <1422934415-24957-1-git-send-email-voice.shen@atmel.com>
+ <CAOLZvyE6W8-X2_M+-KQNry2VPwLzwbBLuxr5Z5EdBQo7Skv2RQ@mail.gmail.com>
+ <20150203124441.GK21293@sirena.org.uk>
+ <CAOLZvyEVQmqg9Jn5Kt_2m5K0-taJcGf6mweK4T=fwKOwn-Ovxg@mail.gmail.com>
+ <20150203162128.GP21293@sirena.org.uk> <54D195D9.4090101@atmel.com>
+Message-ID: <20150204111349.GV21293@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ingo (and others),
+On Wed, Feb 04, 2015 at 11:45:29AM +0800, Bo Shen wrote:
 
-These 2 bugs still exist in mainline kernel. Could you please have a look at them?
+> Do you mean I send my RFC patch as the formal patch, and let other boards
+> which use the wm8731 to add clk object, am I right?
 
-Thanks!
-
-On 2015/1/26 13:38, Wang Nan wrote:
-> Hi Ingo,
-> 
-> Is there any problem on these patches? I'm unable to find them in upstream kernel
-> and -tip repository.
-> 
-> Thank you.
-> 
-> On 2015/1/23 14:42, Masami Hiramatsu wrote:
->> Hi Ingo,
->>
->> Here are two patches for fixing bugs in kprobes, related to
->> optprobe and enable/disable kprobe knob.
->>
->> These are reported and fixed by Wang Nan.
->> https://lkml.org/lkml/2015/1/5/270
->> https://lkml.org/lkml/2015/1/19/680
->>
->> Thank you,
->>
->>
->> ---
->>
->> Wang Nan (2):
->>       [BUGFIX]kprobes: set kprobes_all_disarmed earlier to enable re-optimization.
->>       [BUGFIX]kprobes: makes kprobes/enabled works correctly for optimized kprobes.
->>
->>
->>  kernel/kprobes.c |   18 +++++++++++++++---
->>  1 file changed, 15 insertions(+), 3 deletions(-)
->>
->> --
->> Masami HIRAMATSU
->> Software Platform Research Dpt. Linux Technology Center
->> Hitachi, Ltd., Yokohama Research Laboratory
->> E-mail: masami.hiramatsu.pt at hitachi.com
->>
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+No, we need to keep the boards working so we either need patches adding
+the fixed clocks for existing boards or we need to have the handling of
+missing clocks that Manuel suggested.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150204/f3afd7d7/attachment.sig>
