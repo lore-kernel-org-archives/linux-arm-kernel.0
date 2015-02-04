@@ -1,31 +1,43 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed,  4 Feb 2015 14:52:44 +0100
-Subject: [PATCH 1/3] PM / Domains: R-Mobile SYSC: Document R-Mobile APE6
- (r8a73a4) binding
+Date: Wed,  4 Feb 2015 14:52:46 +0100
+Subject: [PATCH 3/3] drivers: sh: Disable PM runtime for multi-platform
+ r8a73a4 with genpd
 In-Reply-To: <1423057966-23321-1-git-send-email-geert+renesas@glider.be>
 References: <1423057966-23321-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1423057966-23321-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <1423057966-23321-4-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-R-Mobile APE6 (r8a73a4) is handled fine by the same driver and bindings.
+If the default PM domain using PM_CLK is used for PM runtime, the real PM
+domain(s) cannot be registered from DT later.
+
+Hence do not enable it when running a multi-platform kernel with genpd
+support on an r8a73a4. The R-Mobile PM domain driver will take care of
+PM runtime management of the module clocks.
+
+The default PM domain is still needed for:
+  - platforms without genpd support,
+  - the legacy (non-DT) case, where genpd may take over later, except
+    for the C5 "always on" PM domain.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- Documentation/devicetree/bindings/power/renesas,sysc-rmobile.txt | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/sh/pm_runtime.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/power/renesas,sysc-rmobile.txt b/Documentation/devicetree/bindings/power/renesas,sysc-rmobile.txt
-index cc3b1f0a9b1a2b75..beda7d2efc304350 100644
---- a/Documentation/devicetree/bindings/power/renesas,sysc-rmobile.txt
-+++ b/Documentation/devicetree/bindings/power/renesas,sysc-rmobile.txt
-@@ -11,6 +11,7 @@ Required properties:
- - compatible: Should be "renesas,sysc-<soctype>", "renesas,sysc-rmobile" as
- 	      fallback.
- 	      Examples with soctypes are:
-+		- "renesas,sysc-r8a73a4" (R-Mobile APE6)
- 		- "renesas,sysc-r8a7740" (R-Mobile A1)
- 		- "renesas,sysc-sh73a0" (SH-Mobile AG5)
- - reg: Two address start and address range blocks for the device:
+diff --git a/drivers/sh/pm_runtime.c b/drivers/sh/pm_runtime.c
+index 6b16a67ba618b793..89b7785de1fcf5b7 100644
+--- a/drivers/sh/pm_runtime.c
++++ b/drivers/sh/pm_runtime.c
+@@ -80,8 +80,8 @@ static int __init sh_pm_runtime_init(void)
+ 	if (IS_ENABLED(CONFIG_ARCH_SHMOBILE_MULTI)) {
+ 		if (!of_machine_is_compatible("renesas,emev2") &&
+ 		    !of_machine_is_compatible("renesas,r7s72100") &&
+-		    !of_machine_is_compatible("renesas,r8a73a4") &&
+ #ifndef CONFIG_PM_GENERIC_DOMAINS_OF
++		    !of_machine_is_compatible("renesas,r8a73a4") &&
+ 		    !of_machine_is_compatible("renesas,r8a7740") &&
+ 		    !of_machine_is_compatible("renesas,sh73a0") &&
+ #endif
 -- 
 1.9.1
