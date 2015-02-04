@@ -1,52 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 4 Feb 2015 10:29:53 +0000
-Subject: [PATCH v2 1/2] drm/exynos: fix DMA_ATTR_NO_KERNEL_MAPPING usage
-In-Reply-To: <54D1F263.4000006@samsung.com>
-References: <1423041800-27859-1-git-send-email-carlo@caione.org>
- <1423041800-27859-2-git-send-email-carlo@caione.org>
- <54D1F263.4000006@samsung.com>
-Message-ID: <20150204102953.GD8656@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 04 Feb 2015 11:29:55 +0100
+Subject: [PATCH v5 2/7] mailbox: arm_mhu: add driver for ARM MHU controller
+In-Reply-To: <CAJe_Zhfyr9ts=k_=kyXqC=aGtQdrq9MtrRXt6LQKR7iofKjqKg@mail.gmail.com>
+References: <1422955310-6542-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <4344803.3qsb2TUUaZ@wuerfel>
+ <CAJe_Zhfyr9ts=k_=kyXqC=aGtQdrq9MtrRXt6LQKR7iofKjqKg@mail.gmail.com>
+Message-ID: <4418090.U8XOXMKsEU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 04, 2015 at 11:20:19AM +0100, Marek Szyprowski wrote:
-> >diff --git a/drivers/gpu/drm/exynos/exynos_drm_buf.c b/drivers/gpu/drm/exynos/exynos_drm_buf.c
-> >index 9c80884..24994ba 100644
-> >--- a/drivers/gpu/drm/exynos/exynos_drm_buf.c
-> >+++ b/drivers/gpu/drm/exynos/exynos_drm_buf.c
-> >@@ -63,11 +63,11 @@ static int lowlevel_buffer_allocate(struct drm_device *dev,
-> >  			return -ENOMEM;
-> >  		}
-> >-		buf->kvaddr = (void __iomem *)dma_alloc_attrs(dev->dev,
-> >+		buf->cookie = dma_alloc_attrs(dev->dev,
-> >  					buf->size,
-> >  					&buf->dma_addr, GFP_KERNEL,
-> >  					&buf->dma_attrs);
-> >-		if (!buf->kvaddr) {
-> >+		if (!buf->cookie) {
-> >  			DRM_ERROR("failed to allocate buffer.\n");
-> >  			ret = -ENOMEM;
-> >  			goto err_free;
+On Wednesday 04 February 2015 08:57:43 Jassi Brar wrote:
+> On 3 February 2015 at 20:55, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Tuesday 03 February 2015 14:46:11 Russell King - ARM Linux wrote:
+> >> On Tue, Feb 03, 2015 at 08:09:34PM +0530, Jassi Brar wrote:
 
-I wonder whether anyone has looked at what exynos is doing with this.
+> > I had expected to see here something like:
+> >
+> > static int mhu_send_data(struct mbox_chan *chan, void *data)
+> > {
+> >         struct mhu_link *mlink = chan->con_priv;
+> >         u32 *arg = data;
+> >
+> >         writel_relaxed(*arg, mlink->tx_reg + INTR_SET_OFS);
+> > }
+> >
+> > i.e. dereferencing the pointer instead of using the actual value.
+> >
+> OK, just curious how is this (dereferencing to the u32 variable on
+> stack of the client driver) better?
 
-                start_addr = buf->dma_addr;
-                while (i < nr_pages) {
-                        buf->pages[i] = phys_to_page(start_addr);
-                        start_addr += PAGE_SIZE;
-                        i++;
-                }
+The API as I understand is defined to use the pointer to point to
+a chunk of data of fixed size, with the size being known to both
+the client driver and the mailbox driver. This is the reason for
+having a pointer in the first place.
 
-There is no guarantee that DMA addresses are the same as physical addresses
-in the kernel, so this is a layering violation.  If you want to do this,
-then a better way to do this on ARM would be:
+Using the bits of the pointer as the message instead of pointing
+to the message feels like an abuse of the API.
 
-			buf->pages[i] = pfn_to_page(dma_to_pfn(dev, start_addr));
+Maybe it would have been better to pass the size explictly as 
+a third argument in the API to make that clear.
 
-The difference here is that dma_to_pfn() knows how to convert a dma_addr_t
-to a PFN which can then be converted to a struct page (provided it is
-backed by kernel managed system memory.)
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+	Arnd
