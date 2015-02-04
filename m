@@ -1,75 +1,138 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 04 Feb 2015 13:33:21 +0100
-Subject: [PATCH v4 0/6] Introducing the Alpine platform.
-In-Reply-To: <CABM=7kn-Q-poN-6xam419we-CFV-_GyLLFx4UZ-Q4RdKMbJ6dg@mail.gmail.com>
-References: <54d0cd21.WWf8LEKnly7HnqEK%tsahee@annapurnalabs.com>
- <4916446.z10l5moOdI@wuerfel>
- <CABM=7kn-Q-poN-6xam419we-CFV-_GyLLFx4UZ-Q4RdKMbJ6dg@mail.gmail.com>
-Message-ID: <4902057.1c5MpYALGg@wuerfel>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 04 Feb 2015 19:07:53 +0100
+Subject: [PATCH] ARM: EXYNOS: cpuidle: Fix build breakage on !SMP
+In-Reply-To: <1423045646-20592-1-git-send-email-k.kozlowski@samsung.com>
+References: <1423045646-20592-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <8043345.BDfdhXvZOx@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 February 2015 13:19:04 Tsahee Zidenberg wrote:
-> Hi arnd!
+
+Hi,
+
+On Wednesday, February 04, 2015 11:27:26 AM Krzysztof Kozlowski wrote:
+> The Exynos cpuidle driver has coupled cpuidle built-in so it cannot be
+> built without SMP:
 > 
-> On 3 February 2015 at 15:55, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Tuesday 03 February 2015 15:29:05 Tsahee Zidenberg wrote:
-> >> If possible to introduce this into 3.20 - I would really appreciate it. If any
-> >> action by me can make it happen - please let me know.
-> >>
-> >
-> > Hi Tsahee,
-> >
-> > This is not directly related to your patches, but since I got curious I
-> > looked at the source code published by Synology. I don't know how far
-> > you've come in modernizing this, but this is what I found:
-> >
-> > * The hardware looked really nice
-> > * You only have a couple of custom drivers, but they all have the
-> >   same mistake in using a private 'hardware abstraction layer'. Don't
-> >   do this, and use the kernel's interfaces directly
+> arch/arm/mach-exynos/pm.c: In function ?exynos_cpu0_enter_aftr?:
+> arch/arm/mach-exynos/pm.c:246:4: error: implicit declaration of function ?arch_send_wakeup_ipi_mask? [-Werror=implicit-function-declaration]
+> arch/arm/mach-exynos/built-in.o: In function `exynos_pre_enter_aftr':
+> ../arch/arm/mach-exynos/pm.c:300: undefined reference to `cpu_boot_reg_base'
+> arch/arm/mach-exynos/built-in.o: In function `exynos_cpu1_powerdown':
+> ../arch/arm/mach-exynos/pm.c:282: undefined reference to `exynos_cpu_power_down'
 > 
-> The main motivations for adding a HAL:
-> * re-using code between linux kernel and other systems.
-> * re-using common code between different drivers (e.g. - different
-> hardware units use the same DMA engine)
-> * a basic approach that states our HAL is in-fact part of the chip's API
-> I believe we will find a middle ground that will allow keeping these
-> benefits without compromise of the kernel coding style. The HALs were
-> written from day 1 with kernel coding-style in mind, and we do realize
-> there may be some more changes required in the process.
+> Make the cpuidle driver depending on SMP because this will be the
+> fastest way to fix build break without adding a bunch of ifdefs in few
+> places.
 
-I understand where you are coming from, as this is something that
-everyone gets wrong at first. However, you will not be able to merge
-the drivers with a HAL like this. The kernel abstracts all the
-components of typical SoCs already and I suspect you just did not
-use the right abstraction because you either didn't find it, or it
-was not there at the time you started the work.
+There shouldn't be a lot of new ifdefs (please see below) and I would
+very much prefer for cpuidle to stay supported also on UP kernels.
 
-For example, a DMA subsystem that is used by multiple slave drivers
-should use a driver in drivers/dma that registers to the slave-dma API,
-and a clock driver should register in drivers/clk, and the smmu
-belongs into drivers/iommu.
-
-I expect that for each exported function of your HAL, we already have
-a subsystem that lets you express the same functionality in a more
-general way. I can help you find the right place if you are unsure about
-some of them.
-
-If there is some code that does not have a proper subsystem it can be
-moved into, we should discuss about adding a subsystem with soc-independent
-interfaces, but I don't think we need this for a chip like yours that
-uses fairly standard components.
-
-> > * The serdes driver should register as a generic PHY driver
-> > * If possible, move the PCI initialization into the boot loader
-> >   and use drivers/pci/pci_host_generic.c to avoid having your
-> >   own driver.
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  arch/arm/mach-exynos/pm.c   | 2 ++
+>  drivers/cpuidle/Kconfig.arm | 3 ++-
+>  2 files changed, 4 insertions(+), 1 deletion(-)
 > 
-> PCI support will probably be the next topic for Alpine merging. I am
-> working on the patchset, and it will use the generic pci driver and
-> device-tree node.
+> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+> index e6209dadc00d..17db00ff7f3a 100644
+> --- a/arch/arm/mach-exynos/pm.c
+> +++ b/arch/arm/mach-exynos/pm.c
+> @@ -181,6 +181,7 @@ void exynos_enter_aftr(void)
+>  	cpu_pm_exit();
+>  }
+>  
+> +#ifdef CONFIG_ARM_EXYNOS_CPUIDLE
+>  static atomic_t cpu1_wakeup = ATOMIC_INIT(0);
+>  
+>  static int exynos_cpu0_enter_aftr(void)
+> @@ -302,3 +303,4 @@ struct cpuidle_exynos_data cpuidle_coupled_exynos_data = {
+>  	.pre_enter_aftr		= exynos_pre_enter_aftr,
+>  	.post_enter_aftr		= exynos_post_enter_aftr,
+>  };
+> +#endif /* CONFIG_ARM_EXYNOS_CPUIDLE */
+> diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
+> index 8e07c9419153..5eb86a4f74d9 100644
+> --- a/drivers/cpuidle/Kconfig.arm
+> +++ b/drivers/cpuidle/Kconfig.arm
+> @@ -55,7 +55,8 @@ config ARM_AT91_CPUIDLE
+>  config ARM_EXYNOS_CPUIDLE
+>  	bool "Cpu Idle Driver for the Exynos processors"
+>  	depends on ARCH_EXYNOS
+> -	select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP
+> +	depends on SMP
+> +	select ARCH_NEEDS_CPU_IDLE_COUPLED
+>  	help
+>  	  Select this to enable cpuidle for Exynos processors
 
-Ok, sounds good.
+How's about the patch below instead?  It builds fine for UP and SMP.
+I will do more testing tomorrow (unfortunately it seems that something
+else broke Origen4210 in -next).
 
-	Arnd
+From: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Subject: [PATCH] ARM: EXYNOS: cpuidle: Fix build breakage on !SMP
+
+The Exynos cpuidle driver has coupled cpuidle built-in so it cannot be
+built without SMP:
+
+arch/arm/mach-exynos/pm.c: In function ?exynos_cpu0_enter_aftr?:
+arch/arm/mach-exynos/pm.c:246:4: error: implicit declaration of function ?arch_send_wakeup_ipi_mask? [-Werror=implicit-function-declaration]
+arch/arm/mach-exynos/built-in.o: In function `exynos_pre_enter_aftr':
+../arch/arm/mach-exynos/pm.c:300: undefined reference to `cpu_boot_reg_base'
+arch/arm/mach-exynos/built-in.o: In function `exynos_cpu1_powerdown':
+../arch/arm/mach-exynos/pm.c:282: undefined reference to `exynos_cpu_power_down'
+
+Fix it by adding missing checks for SMP.
+
+Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+ arch/arm/mach-exynos/exynos.c    |    2 +-
+ arch/arm/mach-exynos/pm.c        |    2 ++
+ drivers/cpuidle/cpuidle-exynos.c |    3 ++-
+ 3 files changed, 5 insertions(+), 2 deletions(-)
+
+Index: b/arch/arm/mach-exynos/exynos.c
+===================================================================
+--- a/arch/arm/mach-exynos/exynos.c	2015-02-04 18:30:23.555819717 +0100
++++ b/arch/arm/mach-exynos/exynos.c	2015-02-04 18:43:23.539807815 +0100
+@@ -211,7 +211,7 @@ static void __init exynos_dt_machine_ini
+ 	if (!IS_ENABLED(CONFIG_SMP))
+ 		exynos_sysram_init();
+ 
+-#ifdef CONFIG_ARM_EXYNOS_CPUIDLE
++#if defined(CONFIG_SMP) && defined(CONFIG_ARM_EXYNOS_CPUIDLE)
+ 	if (of_machine_is_compatible("samsung,exynos4210"))
+ 		exynos_cpuidle.dev.platform_data = &cpuidle_coupled_exynos_data;
+ #endif
+Index: b/arch/arm/mach-exynos/pm.c
+===================================================================
+--- a/arch/arm/mach-exynos/pm.c	2015-02-04 18:30:23.563819719 +0100
++++ b/arch/arm/mach-exynos/pm.c	2015-02-04 18:47:32.951804008 +0100
+@@ -181,6 +181,7 @@ void exynos_enter_aftr(void)
+ 	cpu_pm_exit();
+ }
+ 
++#if defined(CONFIG_SMP) && defined(CONFIG_ARM_EXYNOS_CPUIDLE)
+ static atomic_t cpu1_wakeup = ATOMIC_INIT(0);
+ 
+ static int exynos_cpu0_enter_aftr(void)
+@@ -302,3 +303,4 @@ struct cpuidle_exynos_data cpuidle_coupl
+ 	.pre_enter_aftr		= exynos_pre_enter_aftr,
+ 	.post_enter_aftr		= exynos_post_enter_aftr,
+ };
++#endif /* CONFIG_SMP && CONFIG_ARM_EXYNOS_CPUIDLE */
+Index: b/drivers/cpuidle/cpuidle-exynos.c
+===================================================================
+--- a/drivers/cpuidle/cpuidle-exynos.c	2015-02-04 18:30:32.935819577 +0100
++++ b/drivers/cpuidle/cpuidle-exynos.c	2015-02-04 18:46:01.619805400 +0100
+@@ -117,7 +117,8 @@ static int exynos_cpuidle_probe(struct p
+ {
+ 	int ret;
+ 
+-	if (of_machine_is_compatible("samsung,exynos4210")) {
++	if (IS_ENABLED(CONFIG_SMP) &&
++	    of_machine_is_compatible("samsung,exynos4210")) {
+ 		exynos_cpuidle_pdata = pdev->dev.platform_data;
+ 
+ 		ret = cpuidle_register(&exynos_coupled_idle_driver,
