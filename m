@@ -1,43 +1,53 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Wed, 4 Feb 2015 11:45:29 +0800
-Subject: [RFC PATCH] ASoC: wm8731: let codec to manage clock by itself
-In-Reply-To: <20150203162128.GP21293@sirena.org.uk>
-References: <1422934415-24957-1-git-send-email-voice.shen@atmel.com>
- <CAOLZvyE6W8-X2_M+-KQNry2VPwLzwbBLuxr5Z5EdBQo7Skv2RQ@mail.gmail.com>
- <20150203124441.GK21293@sirena.org.uk>
- <CAOLZvyEVQmqg9Jn5Kt_2m5K0-taJcGf6mweK4T=fwKOwn-Ovxg@mail.gmail.com>
- <20150203162128.GP21293@sirena.org.uk>
-Message-ID: <54D195D9.4090101@atmel.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 4 Feb 2015 09:42:48 +0530
+Subject: RFC on cpufreq implementation
+In-Reply-To: <54D162B6.2050602@free.fr>
+References: <54B7F7CD.7030903@free.fr> <54CA6327.5070707@free.fr>
+ <CAKohponrzDb4ZGvRtJ5jtGTPAy4RCfRsYGvdjR5fx51K2=evCg@mail.gmail.com>
+ <54CC174F.10703@free.fr>
+ <CAKohpomzCEjXUrxUJjypaA77=r4j_ZPa+x3gM=cNN0kc3ux0uQ@mail.gmail.com>
+ <54D162B6.2050602@free.fr>
+Message-ID: <CAKohpokPseRu9jGEKc7gL+y8O6j8WvV72RCYzm_J-J4wKwf3eQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On 4 February 2015 at 05:37, Mason <mpeg.blue@free.fr> wrote:
+> All of them?
+>
+> ~/linux-3.19-rc7$ wc drivers/cpufreq/*
+>  31542  95730 813482 total
+>
+> Are there perhaps 1 or 2 "golden standard" drivers that are well-written
+> and up-to-date with respect to current conventions?
 
-On 02/04/2015 12:21 AM, Mark Brown wrote:
-> On Tue, Feb 03, 2015 at 03:40:45PM +0100, Manuel Lauss wrote:
->> On Tue, Feb 3, 2015 at 1:44 PM, Mark Brown <broonie@kernel.org> wrote:
->
->>>> +    wm8731->mclk = devm_clk_get(&spi->dev, "mclk");
->>>> +    if (IS_ERR(wm8731->mclk)) {
->>>> +        wm8731->mclk = NULL;
->>>> +        dev_warn(&spi->dev, "assuming static MCLK\n");
->>>> +    }
->
->>> This is broken for both deferred probe and in the case where the clock
->>> API genuinely returns a NULL clock.  Other than that it's the kind of
->>> thing that we've done for some other drivers, though it's not good to
->>> have to do this.  Check them for correct behaviour.
->
->> Hm, so the only option is to create the simples possible 12MHz clk object?
->
-> Well, that's the best option in general.  You can get away with just
-> making sure that -EPROBE_DEFER is handled and that IS_ERR() is used to
-> check for an invalid clock but if you can define a clock that's even
-> better (and should be pretty painless), we're going to want to do that
-> transition at some point.
+cpufreq-dt.c
 
-Do you mean I send my RFC patch as the formal patch, and let other 
-boards which use the wm8731 to add clk object, am I right?
+> Like Samsung did with include/dt-bindings/clock/exynos*.h ?
 
-Best Regards,
-Bo Shen
+Yeah.
+
+> Are you saying that use of DeviceTree is mandatory for new ARM ports?
+
+Yes.
+
+> In other words, ports using "board files" will not be accepted into
+> mainline, nor will drivers not using DT?
+
+It wouldn't be good for you as well, that's all I can say.
+
+> If that is correct, then my proposed cpufreq driver has exactly 0%
+> chance of being mainlined as-is, right?
+
+:)
+
+> I took a look at cpufreq-dt.c but I think it doesn't quite fit my use-case.
+> In my driver, I define "clock dividers" (typically 1,2,3,5,9) and these are
+> used to divide some baseline frequency that the cpufreq code doesn't need to
+> know. The baseline frequency is set by the boot loader, and Linux is not
+> supposed to change that, only apply the dividers if necessary.
+>
+> What do you think of this use-case?
+
+You need to write a backend clock driver for this. Most of the other platforms
+are doing this. cpufreq-dt driver does clk_get(), clk_get_rate(), clk_set_rate()
+and your backend driver should handle these to change the frequencies.
