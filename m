@@ -1,66 +1,146 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 04 Feb 2015 11:16:52 +0100
-Subject: [PATCH v3] ARM: multi_v7_defconfig: Enable shmobile platforms
-In-Reply-To: <CAMuHMdU2B2wsR+UOnBAt-D1E1UkSDN9yxtiYjSWLRON-coq1QQ@mail.gmail.com>
-References: <1421684018-11894-1-git-send-email-geert+renesas@glider.be>
- <1624861.F2XBvOBm9V@wuerfel>
- <CAMuHMdU2B2wsR+UOnBAt-D1E1UkSDN9yxtiYjSWLRON-coq1QQ@mail.gmail.com>
-Message-ID: <2967681.UbimAH7lHr@wuerfel>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 04 Feb 2015 11:20:19 +0100
+Subject: [PATCH v2 1/2] drm/exynos: fix DMA_ATTR_NO_KERNEL_MAPPING usage
+In-Reply-To: <1423041800-27859-2-git-send-email-carlo@caione.org>
+References: <1423041800-27859-1-git-send-email-carlo@caione.org>
+ <1423041800-27859-2-git-send-email-carlo@caione.org>
+Message-ID: <54D1F263.4000006@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 February 2015 11:12:36 Geert Uytterhoeven wrote:
-> Hi Arnd,
-> 
-> On Wed, Jan 21, 2015 at 2:15 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Wednesday 21 January 2015 14:09:56 Geert Uytterhoeven wrote:
-> >> On Wed, Jan 21, 2015 at 2:02 PM, Laurent Pinchart
-> >> <laurent.pinchart@ideasonboard.com> wrote:
-> >> > To avoid bloating the kernel needlessly, couldn't at least some of the drivers
-> >> > needed for the shmobile boards be compiled as modules ? Audio, USB, SATA,
-> >> > touchscreen are possible candidates, depending on what we need to boot the
-> >> > boards to userspace.
-> >>
-> >> That's a possibility.
-> >>
-> >> Note that currently there are almost no modules in multi_v7_defconfig:
-> >> CONFIG_INET6_AH=m
-> >> CONFIG_INET6_ESP=m
-> >> CONFIG_INET6_IPCOMP=m
-> >> CONFIG_IPV6_MIP6=m
-> >> CONFIG_IPV6_TUNNEL=m
-> >> CONFIG_CFG80211=m
-> >> CONFIG_MAC80211=m
-> >> CONFIG_BRCMFMAC=m
-> >> CONFIG_RT2X00=m
-> >> CONFIG_RT2800USB=m
-> >>
-> >> Arnd, Olof: What do you prefer?
-> >
-> > I think it would be nice to move to having more loadable modules. We
-> > haven't really asked people to do that in the past, but the size is
-> > starting to become a problem and we may end up having to change a lot
-> > of the '=y' to '=m' in the future.
-> 
-> Do you want me to respin this patch with some options as modules?
+Hello,
 
-I think it would be a good start, and I'll ask others to do the same
-in the future/
+On 2015-02-04 10:23, Carlo Caione wrote:
+> The Exynos DRM driver doesn't follow the correct API when dealing with
+> dma_{alloc, mmap, free}_attrs functions and the
+> DMA_ATTR_NO_KERNEL_MAPPING attribute.
+>
+> When a IOMMU is not available and the DMA_ATTR_NO_KERNEL_MAPPING is
+> used, the driver should use the pointer returned by dma_alloc_attr() as
+> a cookie.
+>
+> The Exynos DRM driver directly uses the non-requested virtual kernel
+> address returned by the DMA mapping subsystem. This just works now
+> because the non-IOMMU codepath doesn't obey DMA_ATTR_NO_KERNEL_MAPPING
+> but we need to fix it before fixing the DMA layer.
+>
+> Signed-off-by: Carlo Caione <carlo@caione.org>
+> Acked-by: Joonyoung Shim <jy0922.shim@samsung.com>
 
-> One disadvantage of that is that it lets us discover less runtime-conflicts
-> between platforms using multi_v7_defconfig
+Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-Good point. My feeling is that the bloat we get in the kernel image
-when everything is built-in weighs more though. 
+> ---
+>   drivers/gpu/drm/exynos/exynos_drm_buf.c   |  6 +++---
+>   drivers/gpu/drm/exynos/exynos_drm_fbdev.c | 29 +++++++++--------------------
+>   drivers/gpu/drm/exynos/exynos_drm_gem.h   |  2 ++
+>   3 files changed, 14 insertions(+), 23 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_buf.c b/drivers/gpu/drm/exynos/exynos_drm_buf.c
+> index 9c80884..24994ba 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_buf.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_buf.c
+> @@ -63,11 +63,11 @@ static int lowlevel_buffer_allocate(struct drm_device *dev,
+>   			return -ENOMEM;
+>   		}
+>   
+> -		buf->kvaddr = (void __iomem *)dma_alloc_attrs(dev->dev,
+> +		buf->cookie = dma_alloc_attrs(dev->dev,
+>   					buf->size,
+>   					&buf->dma_addr, GFP_KERNEL,
+>   					&buf->dma_attrs);
+> -		if (!buf->kvaddr) {
+> +		if (!buf->cookie) {
+>   			DRM_ERROR("failed to allocate buffer.\n");
+>   			ret = -ENOMEM;
+>   			goto err_free;
+> @@ -132,7 +132,7 @@ static void lowlevel_buffer_deallocate(struct drm_device *dev,
+>   	buf->sgt = NULL;
+>   
+>   	if (!is_drm_iommu_supported(dev)) {
+> -		dma_free_attrs(dev->dev, buf->size, buf->kvaddr,
+> +		dma_free_attrs(dev->dev, buf->size, buf->cookie,
+>   				(dma_addr_t)buf->dma_addr, &buf->dma_attrs);
+>   		drm_free_large(buf->pages);
+>   	} else
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+> index e12ea90..84f8dfe 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+> @@ -79,9 +79,9 @@ static int exynos_drm_fbdev_update(struct drm_fb_helper *helper,
+>   				     struct drm_framebuffer *fb)
+>   {
+>   	struct fb_info *fbi = helper->fbdev;
+> -	struct drm_device *dev = helper->dev;
+>   	struct exynos_drm_gem_buf *buffer;
+>   	unsigned int size = fb->width * fb->height * (fb->bits_per_pixel >> 3);
+> +	unsigned int nr_pages;
+>   	unsigned long offset;
+>   
+>   	drm_fb_helper_fill_fix(fbi, fb->pitches[0], fb->depth);
+> @@ -94,25 +94,14 @@ static int exynos_drm_fbdev_update(struct drm_fb_helper *helper,
+>   		return -EFAULT;
+>   	}
+>   
+> -	/* map pages with kernel virtual space. */
+> +	nr_pages = buffer->size >> PAGE_SHIFT;
+> +
+> +	buffer->kvaddr = (void __iomem *) vmap(buffer->pages,
+> +			nr_pages, VM_MAP,
+> +			pgprot_writecombine(PAGE_KERNEL));
+>   	if (!buffer->kvaddr) {
+> -		if (is_drm_iommu_supported(dev)) {
+> -			unsigned int nr_pages = buffer->size >> PAGE_SHIFT;
+> -
+> -			buffer->kvaddr = (void __iomem *) vmap(buffer->pages,
+> -					nr_pages, VM_MAP,
+> -					pgprot_writecombine(PAGE_KERNEL));
+> -		} else {
+> -			phys_addr_t dma_addr = buffer->dma_addr;
+> -			if (dma_addr)
+> -				buffer->kvaddr = (void __iomem *)phys_to_virt(dma_addr);
+> -			else
+> -				buffer->kvaddr = (void __iomem *)NULL;
+> -		}
+> -		if (!buffer->kvaddr) {
+> -			DRM_ERROR("failed to map pages to kernel space.\n");
+> -			return -EIO;
+> -		}
+> +		DRM_ERROR("failed to map pages to kernel space.\n");
+> +		return -EIO;
+>   	}
+>   
+>   	/* buffer count to framebuffer always is 1 at booting time. */
+> @@ -313,7 +302,7 @@ static void exynos_drm_fbdev_destroy(struct drm_device *dev,
+>   	struct exynos_drm_gem_obj *exynos_gem_obj = exynos_fbd->exynos_gem_obj;
+>   	struct drm_framebuffer *fb;
+>   
+> -	if (is_drm_iommu_supported(dev) && exynos_gem_obj->buffer->kvaddr)
+> +	if (exynos_gem_obj->buffer->kvaddr)
+>   		vunmap(exynos_gem_obj->buffer->kvaddr);
+>   
+>   	/* release drm framebuffer and real buffer */
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_gem.h b/drivers/gpu/drm/exynos/exynos_drm_gem.h
+> index ec58fe9..308173c 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_gem.h
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_gem.h
+> @@ -22,6 +22,7 @@
+>   /*
+>    * exynos drm gem buffer structure.
+>    *
+> + * @cookie: cookie returned by dma_alloc_attrs
+>    * @kvaddr: kernel virtual address to allocated memory region.
+>    * *userptr: user space address.
+>    * @dma_addr: bus address(accessed by dma) to allocated memory region.
+> @@ -35,6 +36,7 @@
+>    *	VM_PFNMAP or not.
+>    */
+>   struct exynos_drm_gem_buf {
+> +	void 			*cookie;
+>   	void __iomem		*kvaddr;
+>   	unsigned long		userptr;
+>   	dma_addr_t		dma_addr;
 
-> (does anyone boot arm allyesconfig on his farm?).
-
-It's currently impossible to run allmodconfig on real hardware, there
-are a couple of options that prevent you from doing this.
-
-allyesconfig cannot currently be built even, mostly due to bad interaction
-of the way we link the kernel with how the linker is implemented: we
-get lots of failed relocations for cross-section calls larger than
-32MB away.
-
-	Arnd
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
