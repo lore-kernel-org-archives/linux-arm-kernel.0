@@ -1,83 +1,54 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 04 Feb 2015 08:50:10 -0500 (EST)
-Subject: Continuing kallsyms failures - large kernels, XIP kernels,
- and large XIP kernels
-In-Reply-To: <20150204094414.GC8656@n2100.arm.linux.org.uk>
-References: <20150130145642.GK26493@n2100.arm.linux.org.uk>
- <20150130153414.GM26493@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1501301224180.1322@knanqh.ubzr>
- <20150131002253.GR26493@n2100.arm.linux.org.uk>
- <20150204000307.GA8656@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1502032054460.1322@knanqh.ubzr>
- <20150204094414.GC8656@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.11.1502040845320.1322@knanqh.ubzr>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Wed,  4 Feb 2015 14:52:43 +0100
+Subject: [PATCH 0/3] ARM: shmobile: r8a73a4: DT PM domain support
+Message-ID: <1423057966-23321-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 4 Feb 2015, Russell King - ARM Linux wrote:
+	Hi Simon, Magnus,
 
-> On Tue, Feb 03, 2015 at 08:59:15PM -0500, Nicolas Pitre wrote:
-> > On Wed, 4 Feb 2015, Russell King - ARM Linux wrote:
-> > 
-> > > It looks like we have cases where this falsely triggers.  Consider EFM32:
-> > > 
-> > > CONFIG_DRAM_BASE=0x88000000
-> > > CONFIG_DRAM_SIZE=0x00400000
-> > > CONFIG_FLASH_MEM_BASE=0x8c000000
-> > > CONFIG_FLASH_SIZE=0x01000000
-> > > 
-> > > This means that we quite legally end up with the .data section below the
-> > > .text section, which makes:
-> > > 
-> > > ASSERT((_data >= __data_loc), "Text section oversize") 
-> > > 
-> > > falsely trigger.
-> > > 
-> > > The linker has the capacity to specify regions of ROM and RAM in the
-> > > linker file, I wonder if we should be using those for XIP.  Merely
-> > > adding the MEMORY table to the linker file is not good enough - we
-> > > also need to explicitly tell the linker which memory regions to place
-> > > the output sections, otherwise the linker ends up making assumptions.
-> > > 
-> > > What that means is... asm-generic/vmlinux.lds.h breaks for us.
-> > > 
-> > > Any ideas?  I think using the MEMORY table would be the best approach,
-> > > because that should allow us to properly verify that the resulting
-> > > binary should fit in the memory regions.
-> > 
-> > Maybe simply having an assert() on the size of the .text section could 
-> > be all that is needed.  We already know the maximum size in advance.
-> 
-> That doesn't work, it's not just the .text section but also .rodata,
-> __bug_table, __ksymtab, __ksymtab_gpl, __kcrctab, __kcrctab_gpl,
-> __ksymtab_strings, __param, __modver, __ex_table, .notes, .vectors,
-> .stubs, .init.text, maybe .exit.text, .init.arch.info, .init.tagtable,
-> .init.smpalt, .init.pv_table, 
+This patch series enables DT support for PM domains on the Renesas
+R-Mobile APE6 (r8a73a4) SoC.
 
-My suggestion would be to put a symbol at the end of it all to size the 
-lot.
+This series builds further upon the DT PM Domain support for R-Mobile
+A1 (r8a7740) and SH-Mobile AG5 (sh73a0).  Due to the similarity of the
+SYSC System-Controller on the various SH-Mobile/R-Mobile SoCs, and the
+abstraction of PM domains in DT, the same driver can handle r8a73a4,
+without any additional modifications, and without changing the DT
+bindings.
 
-> and apparently .init.data (which is
-> surely wrong?)  The following is from Arnd's failing configuration:
-> 
->  18 .init.tagtable 00000040  80073a9c  80073a9c  0100ba9c  2**2
->                   CONTENTS, ALLOC, LOAD, READONLY, DATA
->  19 .init.data    000010e8  80073adc  80073adc  0100badc  2**2
->                   CONTENTS, ALLOC, LOAD, DATA
->  20 .data         003552c4  80008000  80074bc4  01010000  2**8
->                   CONTENTS, ALLOC, LOAD, DATA
-> 
-> Hmm, if .init.data is contained in the flash section (which it seemingly
-> is), it seems that XIP support is currently broken - that section is
-> definitely a read/write section.  No one has seemingly noticed that it's
-> broken and it's been broken for a long time, so maybe the simple answer
-> then is just to rip XIP support out?
+Dependencies:
+  1. Patch 1 (DT binding doc) depends on the R-Mobile DT PM Domain
+     work for sh73a0, which depends on the multiplatform work for
+     sh73a0, which is blocked on simple-pm-bus,
+  2. Patch 2 (dtsi) depends on the multiplatform work for r8a73a4,
+     which is blocked on simple-pm-bus,
+  3. Patch 3 (drivers/sh) depends on all of the above.
 
-That's what I proposed a couple years ago but some people were 
-apparently still using it.
+This was tested on ape6evm-multiplatform.
 
-Now with all the buzz around IOT it is well possible that XIP will gain 
-more traction again.
+Thanks for your comments!
 
+Geert Uytterhoeven (3):
+  PM / Domains: R-Mobile SYSC: Document R-Mobile APE6 (r8a73a4) binding
+  ARM: shmobile: r8a73a4 dtsi: Add PM domain support
+  drivers: sh: Disable PM runtime for multi-platform r8a73a4 with genpd
 
-Nicolas
+ .../bindings/power/renesas,sysc-rmobile.txt        |   1 +
+ arch/arm/boot/dts/r8a73a4.dtsi                     | 177 +++++++++++++++++++++
+ drivers/sh/pm_runtime.c                            |   2 +-
+ 3 files changed, 179 insertions(+), 1 deletion(-)
+
+-- 
+1.9.1
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
