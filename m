@@ -1,74 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 04 Feb 2015 15:44:23 +0100
-Subject: Continuing kallsyms failures - large kernels, XIP kernels,
- and large XIP kernels
-In-Reply-To: <20150204094414.GC8656@n2100.arm.linux.org.uk>
-References: <20150130145642.GK26493@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1502032054460.1322@knanqh.ubzr>
- <20150204094414.GC8656@n2100.arm.linux.org.uk>
-Message-ID: <8085056.h8oiDn7EOb@wuerfel>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Wed, 4 Feb 2015 22:48:03 +0800
+Subject: ask for help about swiotlb buffer is full
+In-Reply-To: <20150204133205.GC26006@e104818-lin.cambridge.arm.com>
+References: <54CB5820.9020102@huawei.com> <54CB5AA4.7050705@huawei.com>
+ <20150130115915.GB27542@e104818-lin.cambridge.arm.com>
+ <54CC5346.5070402@huawei.com>
+ <20150202182435.GH22661@e104818-lin.cambridge.arm.com>
+ <54D209FD.40100@huawei.com>
+ <20150204133205.GC26006@e104818-lin.cambridge.arm.com>
+Message-ID: <54D23123.3040208@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 February 2015 09:44:14 Russell King - ARM Linux wrote:
-> On Tue, Feb 03, 2015 at 08:59:15PM -0500, Nicolas Pitre wrote:
-> > On Wed, 4 Feb 2015, Russell King - ARM Linux wrote:
-> > 
-> > > It looks like we have cases where this falsely triggers.  Consider EFM32:
-> > > 
-> > > CONFIG_DRAM_BASE=0x88000000
-> > > CONFIG_DRAM_SIZE=0x00400000
-> > > CONFIG_FLASH_MEM_BASE=0x8c000000
-> > > CONFIG_FLASH_SIZE=0x01000000
-> > > 
-> > > This means that we quite legally end up with the .data section below the
-> > > .text section, which makes:
-> > > 
-> > > ASSERT((_data >= __data_loc), "Text section oversize") 
-> > > 
-> > > falsely trigger.
-> > > 
-> > > The linker has the capacity to specify regions of ROM and RAM in the
-> > > linker file, I wonder if we should be using those for XIP.  Merely
-> > > adding the MEMORY table to the linker file is not good enough - we
-> > > also need to explicitly tell the linker which memory regions to place
-> > > the output sections, otherwise the linker ends up making assumptions.
-> > > 
-> > > What that means is... asm-generic/vmlinux.lds.h breaks for us.
-> > > 
-> > > Any ideas?  I think using the MEMORY table would be the best approach,
-> > > because that should allow us to properly verify that the resulting
-> > > binary should fit in the memory regions.
-> > 
-> > Maybe simply having an assert() on the size of the .text section could 
-> > be all that is needed.  We already know the maximum size in advance.
+On 2015/2/4 21:32, Catalin Marinas wrote:
+> On Wed, Feb 04, 2015 at 12:01:01PM +0000, Kefeng Wang wrote:
+>> On 2015-02-03 2:24, Catalin Marinas wrote:
+>>> On Sat, Jan 31, 2015 at 04:00:06AM +0000, Kefeng Wang wrote:
+>>>> On 2015-01-30 19:59, Catalin Marinas wrote:
+>> [...]
+>>>>>
+>>>>
+>>>> 4kb page,  use Make ARCH=arm64 defconfig in v3.19 to generate config.
+>>>>
+>>>> [    0.678293] software IO TLB [mem 0x7e800000-0x7ec00000] (4MB) mapped at [ffffffc07e800000-ffffffc07ebfffff]
+>>>> [    0.686991] DMA: preallocated 256 KiB pool for atomic allocations
+>>>
+>>> Was the swiotlb buffer size the same in the 3.16 kernel? The only thing
+>>> I recall adding was the atomic pool allocations but these are only for
+>>> non-coherent DMA ops and only for dma_alloc/free. I assume, in the case
+>>> of SATA, the failure is on the dma_map_sg() path.
+>>
+>> Swiotlb buffer size is both 4M in v3.16 and v3.19-rc4, and the failure is
+>> on the dma_map_sg() -> swiotlb_map_sg_attrs.
+>>
+>>> Maybe with a 3.19 kernel you get more than 4MB swiotlb buffers used at a
+>>> time with your tests; can you try increasing this via a kernel command
+>>> like to, let's say, 8MB? If I got my calculations correctly (an IO TLB
+>>> slab is 1 << 11):
+>>>
+>>> 	swiotlb=4096
+>>>
+>>> If it still runs out with bigger buffers, we may need to look into
+>>> potential leaks.
+>>
+>> The buddy allocator can only support 4M contiguous physical memory, so it's
+>> useless to increase swiotlb buffer.
 > 
-> That doesn't work, it's not just the .text section but also .rodata,
-> __bug_table, __ksymtab, __ksymtab_gpl, __kcrctab, __kcrctab_gpl,
-> __ksymtab_strings, __param, __modver, __ex_table, .notes, .vectors,
-> .stubs, .init.text, maybe .exit.text, .init.arch.info, .init.tagtable,
-> .init.smpalt, .init.pv_table, and apparently .init.data (which is
-> surely wrong?)  The following is from Arnd's failing configuration:
+> You could hack arch/arm64/Kconfig to set a higher
+> CONFIG_FORCE_MAX_ZONEORDER as a test. Depending on the test result, we
+> can look for an alternative solution.
 > 
->  18 .init.tagtable 00000040  80073a9c  80073a9c  0100ba9c  2**2
->                   CONTENTS, ALLOC, LOAD, READONLY, DATA
->  19 .init.data    000010e8  80073adc  80073adc  0100badc  2**2
->                   CONTENTS, ALLOC, LOAD, DATA
->  20 .data         003552c4  80008000  80074bc4  01010000  2**8
->                   CONTENTS, ALLOC, LOAD, DATA
-> 
-> Hmm, if .init.data is contained in the flash section (which it seemingly
-> is), it seems that XIP support is currently broken - that section is
-> definitely a read/write section.  No one has seemingly noticed that it's
-> broken and it's been broken for a long time, so maybe the simple answer
-> then is just to rip XIP support out?
-> 
-> How does EFM32 work?  Does it work?
-
-I believe that Uwe has a patch series on top of mainline that he still
-requires for using the platform.
-
-The part I'm sure about is that it does not work without XIP_KERNEL,
-given the tight memory constraints (2MB RAM?).
-
-	Arnd
+I have try this before and could fix the problem, but I think it is not a perfect solution,.
