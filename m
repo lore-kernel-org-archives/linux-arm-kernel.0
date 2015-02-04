@@ -1,119 +1,38 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 04 Feb 2015 14:22:10 +0100
-Subject: [PATCH v8 02/21] acpi: fix acpi_os_ioremap for arm64
-In-Reply-To: <20150204104832.GF8656@n2100.arm.linux.org.uk>
-References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
- <8901765.mLfPOCUyAN@vostro.rjw.lan>
- <20150204104832.GF8656@n2100.arm.linux.org.uk>
-Message-ID: <1918367.3D21c7WuYp@vostro.rjw.lan>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 4 Feb 2015 13:00:18 +0000
+Subject: [rcu] [ INFO: suspicious RCU usage. ]
+In-Reply-To: <1423049947.19547.6.camel@AMDC1943>
+References: <20150201025922.GA16820@wfg-t540p.sh.intel.com>
+ <1422957702.17540.1.camel@AMDC1943>
+ <20150203162704.GR19109@linux.vnet.ibm.com>
+ <1423049947.19547.6.camel@AMDC1943>
+Message-ID: <20150204130018.GG8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, February 04, 2015 10:48:32 AM Russell King - ARM Linux wrote:
-> On Tue, Feb 03, 2015 at 11:04:27PM +0100, Rafael J. Wysocki wrote:
-> > On Tuesday, February 03, 2015 12:29:36 PM Mark Salter wrote:
-> > > On Mon, 2015-02-02 at 23:14 +0100, Rafael J. Wysocki wrote:
-> > > > On Monday, February 02, 2015 08:45:30 PM Hanjun Guo wrote:
-> > > > > From: Mark Salter <msalter@redhat.com>
-> > > > > 
-> > > > > The acpi_os_ioremap() function may be used to map normal RAM or IO
-> > > > > regions. The current implementation simply uses ioremap_cache(). This
-> > > > > will work for some architectures, but arm64 ioremap_cache() cannot be
-> > > > > used to map IO regions which don't support caching. So for arm64, use
-> > > > > ioremap() for non-RAM regions.
-> > > > > 
-> > > > > CC: Rafael J Wysocki <rjw@rjwysocki.net>
-> > > > > Signed-off-by: Mark Salter <msalter@redhat.com>
-> > > > > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> > > > > ---
-> > > > >  include/acpi/acpi_io.h | 6 ++++++
-> > > > >  1 file changed, 6 insertions(+)
-> > > > > 
-> > > > > diff --git a/include/acpi/acpi_io.h b/include/acpi/acpi_io.h
-> > > > > index 444671e..9d573db 100644
-> > > > > --- a/include/acpi/acpi_io.h
-> > > > > +++ b/include/acpi/acpi_io.h
-> > > > > @@ -1,11 +1,17 @@
-> > > > >  #ifndef _ACPI_IO_H_
-> > > > >  #define _ACPI_IO_H_
-> > > > >  
-> > > > > +#include <linux/mm.h>
-> > > > >  #include <linux/io.h>
-> > > > >  
-> > > > >  static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
-> > > > >  					    acpi_size size)
-> > > > >  {
-> > > > > +#ifdef CONFIG_ARM64
-> > > > > +	if (!page_is_ram(phys >> PAGE_SHIFT))
-> > > > > +		return ioremap(phys, size);
-> > > > > +#endif
-> > > > 
-> > > > I don't want to see #ifdef CONFIG_ARM64 in this file.
-> > > > 
-> > > 
-> > > How about something like:
-> > > 
-> > > From: Mark Salter <msalter@redhat.com>
-> > > Date: Tue, 3 Feb 2015 10:51:16 -0500
-> > > Subject: [PATCH] acpi: fix acpi_os_ioremap for arm64
-> > > 
-> > > The acpi_os_ioremap() function may be used to map normal RAM or IO
-> > > regions. The current implementation simply uses ioremap_cache(). This
-> > > will work for some architectures, but arm64 ioremap_cache() cannot be
-> > > used to map IO regions which don't support caching. So for arm64, use
-> > > ioremap() for non-RAM regions.
-> > > 
-> > > CC: Rafael J Wysocki <rjw@rjwysocki.net>
-> > > Signed-off-by: Mark Salter <msalter@redhat.com>
-> > > ---
-> > >  arch/arm64/include/asm/acpi.h | 14 ++++++++++++++
-> > >  include/acpi/acpi_io.h        |  3 +++
-> > >  2 files changed, 17 insertions(+)
-> > > 
-> > > diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-> > > index ea4d2b3..db82bc3 100644
-> > > --- a/arch/arm64/include/asm/acpi.h
-> > > +++ b/arch/arm64/include/asm/acpi.h
-> > > @@ -14,6 +14,7 @@
-> > >  
-> > >  #include <linux/irqchip/arm-gic-acpi.h>
-> > >  
-> > > +#include <linux/mm.h>
-> > >  #include <asm/smp_plat.h>
-> > >  
-> > >  /* Basic configuration for ACPI */
-> > > @@ -100,4 +101,17 @@ static inline bool acpi_psci_use_hvc(void) { return false; }
-> > >  static inline void acpi_init_cpus(void) { }
-> > >  #endif /* CONFIG_ACPI */
-> > >  
-> > > +/*
-> > > + * ACPI table mapping
-> > > + */
-> > > +static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
-> > > +					    acpi_size size)
-> > > +{
-> > > +	if (!page_is_ram(phys >> PAGE_SHIFT))
-> > > +		return ioremap(phys, size);
-> > > +
-> > > +       return ioremap_cache(phys, size);
-> > > +}
-> > > +#define acpi_os_ioremap acpi_os_ioremap
+On Wed, Feb 04, 2015 at 12:39:07PM +0100, Krzysztof Kozlowski wrote:
+> +Cc some ARM people
+
+I wish that people would CC this list with problems seen on ARM.  I'm
+minded to just ignore this message because of this in the hope that by
+doing so, people will learn something...
+
+> > Another thing I could do would be to have an arch-specific Kconfig
+> > variable that made ARM responsible for informing RCU that the CPU
+> > was departing, which would allow a call to as follows to be placed
+> > immediately after the complete():
 > > 
-> > If you want to do it this way, use __weak.  You won't need the #define then.
-> > Otherwise, please use a proper CONFIG_ARCH_ symbol.
-> 
-> How does __weak work with inline functions?  I don't believe it does.
+> > rcu_cpu_notify(NULL, CPU_DYING_IDLE, (void *)(long)smp_processor_id());
+> > 
+> > Note:  This absolutely requires that the rcu_cpu_notify() -always-
+> > be allowed to execute!!!  This will not work if there is -any- possibility
+> > of __cpu_die() powering off the outgoing CPU before the call to
+> > rcu_cpu_notify() returns.
 
-It doesn't work with inline funtions, but the function here doesn't have to be
-inline.
-
-> Moreover, __weak is positively harmful when you consider it adds bloat
-> and dead code - the overriden __weak function is left behind in the
-> resulting final image.
-
-Fair enough.
-
+Exactly, so that's not going to be possible.  The completion at that
+point marks the point at which power _could_ be removed from the CPU
+going down.
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
