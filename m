@@ -1,254 +1,288 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 04 Feb 2015 11:21:34 +0100
-Subject: [PATCH v2 2/2] arm/dma-mapping: Respect NO_KERNEL_MAPPING when we
- don't have an IOMMU
-In-Reply-To: <1423041800-27859-3-git-send-email-carlo@caione.org>
-References: <1423041800-27859-1-git-send-email-carlo@caione.org>
- <1423041800-27859-3-git-send-email-carlo@caione.org>
-Message-ID: <54D1F2AE.4070003@samsung.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Wed, 4 Feb 2015 18:23:52 +0800
+Subject: [PATCH 2/4] mtd: nand: atmel: Update DT documentation after
+ splitting NFC and NAND
+In-Reply-To: <20150203103736.3bcc222e@bbrezillon>
+References: <1417732214-3292-1-git-send-email-boris.brezillon@free-electrons.com>	<1417732214-3292-3-git-send-email-boris.brezillon@free-electrons.com>	<20150202075737.GC3523@norris-Latitude-E6410>	<20150202104236.649f99ad@bbrezillon>	<54D08AD7.3050209@atmel.com>
+ <20150203103736.3bcc222e@bbrezillon>
+Message-ID: <54D1F338.4080005@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi, Boris
 
-On 2015-02-04 10:23, Carlo Caione wrote:
-> From: "Jasper St. Pierre" <jstpierre@mecheye.net>
->
-> Even without an iommu, NO_KERNEL_MAPPING is still convenient to save on
-> kernel address space in places where we don't need a kernel mapping.
-> Implement support for it in the two places where we're creating an
-> expensive mapping.
->
-> __alloc_from_pool uses an internal pool from which we already have
-> virtual addresses, so it's not relevant, and __alloc_simple_buffer uses
-> alloc_pages, which will always return a lowmem page, which is already
-> mapped into kernel space, so we can't prevent a mapping for it in that
-> case.
->
-> Signed-off-by: Jasper St. Pierre <jstpierre@mecheye.net>
-> Signed-off-by: Carlo Caione <carlo@caione.org>
-> Reviewed-by: Rob Clark <robdclark@gmail.com>
-> Reviewed-by: Daniel Drake <dsd@endlessm.com>
+Thanks a lot for your explanation, check my reply for more description 
+for my suggestion.
 
-Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
-
-> ---
->   arch/arm/mm/dma-mapping.c | 67 +++++++++++++++++++++++++++++------------------
->   1 file changed, 41 insertions(+), 26 deletions(-)
+On 2/3/2015 5:37 PM, Boris Brezillon wrote:
+> On Tue, 3 Feb 2015 16:46:15 +0800
+> Josh Wu <josh.wu@atmel.com> wrote:
 >
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index a673c7f..d767bba 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -289,11 +289,11 @@ static void __dma_free_buffer(struct page *page, size_t size)
->   
->   static void *__alloc_from_contiguous(struct device *dev, size_t size,
->   				     pgprot_t prot, struct page **ret_page,
-> -				     const void *caller);
-> +				     const void *caller, bool want_vaddr);
->   
->   static void *__alloc_remap_buffer(struct device *dev, size_t size, gfp_t gfp,
->   				 pgprot_t prot, struct page **ret_page,
-> -				 const void *caller);
-> +				 const void *caller, bool want_vaddr);
->   
->   static void *
->   __dma_alloc_remap(struct page *page, size_t size, gfp_t gfp, pgprot_t prot,
-> @@ -357,10 +357,10 @@ static int __init atomic_pool_init(void)
->   
->   	if (dev_get_cma_area(NULL))
->   		ptr = __alloc_from_contiguous(NULL, atomic_pool_size, prot,
-> -					      &page, atomic_pool_init);
-> +					      &page, atomic_pool_init, true);
->   	else
->   		ptr = __alloc_remap_buffer(NULL, atomic_pool_size, gfp, prot,
-> -					   &page, atomic_pool_init);
-> +					   &page, atomic_pool_init, true);
->   	if (ptr) {
->   		int ret;
->   
-> @@ -467,13 +467,15 @@ static void __dma_remap(struct page *page, size_t size, pgprot_t prot)
->   
->   static void *__alloc_remap_buffer(struct device *dev, size_t size, gfp_t gfp,
->   				 pgprot_t prot, struct page **ret_page,
-> -				 const void *caller)
-> +				 const void *caller, bool want_vaddr)
->   {
->   	struct page *page;
-> -	void *ptr;
-> +	void *ptr = NULL;
->   	page = __dma_alloc_buffer(dev, size, gfp);
->   	if (!page)
->   		return NULL;
-> +	if (!want_vaddr)
-> +		goto out;
->   
->   	ptr = __dma_alloc_remap(page, size, gfp, prot, caller);
->   	if (!ptr) {
-> @@ -481,6 +483,7 @@ static void *__alloc_remap_buffer(struct device *dev, size_t size, gfp_t gfp,
->   		return NULL;
->   	}
->   
-> + out:
->   	*ret_page = page;
->   	return ptr;
->   }
-> @@ -523,12 +526,12 @@ static int __free_from_pool(void *start, size_t size)
->   
->   static void *__alloc_from_contiguous(struct device *dev, size_t size,
->   				     pgprot_t prot, struct page **ret_page,
-> -				     const void *caller)
-> +				     const void *caller, bool want_vaddr)
->   {
->   	unsigned long order = get_order(size);
->   	size_t count = size >> PAGE_SHIFT;
->   	struct page *page;
-> -	void *ptr;
-> +	void *ptr = NULL;
->   
->   	page = dma_alloc_from_contiguous(dev, count, order);
->   	if (!page)
-> @@ -536,6 +539,9 @@ static void *__alloc_from_contiguous(struct device *dev, size_t size,
->   
->   	__dma_clear_buffer(page, size);
->   
-> +	if (!want_vaddr)
-> +		goto out;
-> +
->   	if (PageHighMem(page)) {
->   		ptr = __dma_alloc_remap(page, size, GFP_KERNEL, prot, caller);
->   		if (!ptr) {
-> @@ -546,17 +552,21 @@ static void *__alloc_from_contiguous(struct device *dev, size_t size,
->   		__dma_remap(page, size, prot);
->   		ptr = page_address(page);
->   	}
-> +
-> + out:
->   	*ret_page = page;
->   	return ptr;
->   }
->   
->   static void __free_from_contiguous(struct device *dev, struct page *page,
-> -				   void *cpu_addr, size_t size)
-> +				   void *cpu_addr, size_t size, bool want_vaddr)
->   {
-> -	if (PageHighMem(page))
-> -		__dma_free_remap(cpu_addr, size);
-> -	else
-> -		__dma_remap(page, size, PAGE_KERNEL);
-> +	if (want_vaddr) {
-> +		if (PageHighMem(page))
-> +			__dma_free_remap(cpu_addr, size);
-> +		else
-> +			__dma_remap(page, size, PAGE_KERNEL);
-> +	}
->   	dma_release_from_contiguous(dev, page, size >> PAGE_SHIFT);
->   }
->   
-> @@ -574,12 +584,12 @@ static inline pgprot_t __get_dma_pgprot(struct dma_attrs *attrs, pgprot_t prot)
->   
->   #define nommu() 1
->   
-> -#define __get_dma_pgprot(attrs, prot)	__pgprot(0)
-> -#define __alloc_remap_buffer(dev, size, gfp, prot, ret, c)	NULL
-> +#define __get_dma_pgprot(attrs, prot)				__pgprot(0)
-> +#define __alloc_remap_buffer(dev, size, gfp, prot, ret, c, wv)	NULL
->   #define __alloc_from_pool(size, ret_page)			NULL
-> -#define __alloc_from_contiguous(dev, size, prot, ret, c)	NULL
-> +#define __alloc_from_contiguous(dev, size, prot, ret, c, wv)	NULL
->   #define __free_from_pool(cpu_addr, size)			0
-> -#define __free_from_contiguous(dev, page, cpu_addr, size)	do { } while (0)
-> +#define __free_from_contiguous(dev, page, cpu_addr, size, wv)	do { } while (0)
->   #define __dma_free_remap(cpu_addr, size)			do { } while (0)
->   
->   #endif	/* CONFIG_MMU */
-> @@ -599,11 +609,13 @@ static void *__alloc_simple_buffer(struct device *dev, size_t size, gfp_t gfp,
->   
->   
->   static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
-> -			 gfp_t gfp, pgprot_t prot, bool is_coherent, const void *caller)
-> +			 gfp_t gfp, pgprot_t prot, bool is_coherent,
-> +			 struct dma_attrs *attrs, const void *caller)
->   {
->   	u64 mask = get_coherent_dma_mask(dev);
->   	struct page *page = NULL;
->   	void *addr;
-> +	bool want_vaddr;
->   
->   #ifdef CONFIG_DMA_API_DEBUG
->   	u64 limit = (mask + 1) & ~mask;
-> @@ -631,20 +643,21 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
->   
->   	*handle = DMA_ERROR_CODE;
->   	size = PAGE_ALIGN(size);
-> +	want_vaddr = !dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs);
->   
->   	if (is_coherent || nommu())
->   		addr = __alloc_simple_buffer(dev, size, gfp, &page);
->   	else if (!(gfp & __GFP_WAIT))
->   		addr = __alloc_from_pool(size, &page);
->   	else if (!dev_get_cma_area(dev))
-> -		addr = __alloc_remap_buffer(dev, size, gfp, prot, &page, caller);
-> +		addr = __alloc_remap_buffer(dev, size, gfp, prot, &page, caller, want_vaddr);
->   	else
-> -		addr = __alloc_from_contiguous(dev, size, prot, &page, caller);
-> +		addr = __alloc_from_contiguous(dev, size, prot, &page, caller, want_vaddr);
->   
-> -	if (addr)
-> +	if (page)
->   		*handle = pfn_to_dma(dev, page_to_pfn(page));
->   
-> -	return addr;
-> +	return want_vaddr ? addr : page;
->   }
->   
->   /*
-> @@ -661,7 +674,7 @@ void *arm_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
->   		return memory;
->   
->   	return __dma_alloc(dev, size, handle, gfp, prot, false,
-> -			   __builtin_return_address(0));
-> +			   attrs, __builtin_return_address(0));
->   }
->   
->   static void *arm_coherent_dma_alloc(struct device *dev, size_t size,
-> @@ -674,7 +687,7 @@ static void *arm_coherent_dma_alloc(struct device *dev, size_t size,
->   		return memory;
->   
->   	return __dma_alloc(dev, size, handle, gfp, prot, true,
-> -			   __builtin_return_address(0));
-> +			   attrs, __builtin_return_address(0));
->   }
->   
->   /*
-> @@ -715,6 +728,7 @@ static void __arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
->   			   bool is_coherent)
->   {
->   	struct page *page = pfn_to_page(dma_to_pfn(dev, handle));
-> +	bool want_vaddr = !dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs);
->   
->   	if (dma_release_from_coherent(dev, get_order(size), cpu_addr))
->   		return;
-> @@ -726,14 +740,15 @@ static void __arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
->   	} else if (__free_from_pool(cpu_addr, size)) {
->   		return;
->   	} else if (!dev_get_cma_area(dev)) {
-> -		__dma_free_remap(cpu_addr, size);
-> +		if (want_vaddr)
-> +			__dma_free_remap(cpu_addr, size);
->   		__dma_free_buffer(page, size);
->   	} else {
->   		/*
->   		 * Non-atomic allocations cannot be freed with IRQs disabled
->   		 */
->   		WARN_ON(irqs_disabled());
-> -		__free_from_contiguous(dev, page, cpu_addr, size);
-> +		__free_from_contiguous(dev, page, cpu_addr, size, want_vaddr);
->   	}
->   }
->   
+>> Hi, Boris, Brian
+>>
+>> On 2/2/2015 5:42 PM, Boris Brezillon wrote:
+>>> Hi Brian,
+>>>
+>>> On Sun, 1 Feb 2015 23:57:37 -0800
+>>> Brian Norris <computersforpeace@gmail.com> wrote:
+>>>
+>>>> Hi Boris,
+>>>>
+>>>> BTW, this series has a few conflicts with other things I have queued, so
+>>>> you'll need to refresh.
+>>> Yes, that's not a problem, but I'd like to be sure this is the way we
+>>> want to go before rebasing this series.
+>>>
+>>>> On Thu, Dec 04, 2014 at 11:30:12PM +0100, Boris Brezillon wrote:
+>>>>> The NAND and NFC (NAND Flash Controller) were linked together with a
+>>>>> parent <-> child relationship.
+>>>>>
+>>>>> This model has several drawbacks:
+>>>>> - it does not allow for multiple NAND chip handling while the controller
+>>>>>     support multi-chip (even though the driver is not ready yet)
+>>>>> - it mixes NAND partitions and NFC nodes at the same level (which is a bit
+>>>>>     disturbing)
+>>>> I agree that this is disturbing. (FWIW, it also seems a bit disturbing
+>>>> that atmel_nand.c actually registers two different drivers and the tries
+>>>> to synchronize them; this seems like it could be handled better, but I'm
+>>>> not sure how at the moment.)
+>>> Yep, that's my feeling too, but I'm not sure how this could/should be
+>>> done.
+>>> My problem here is that the pinmux should be requested by the EBI
+>>> device because the EBI manages several type of devices and the data and
+>>> address signals are shared by all the devices, hence the idea of
+>>> defining the nand chip node under the EBI node.
+>>> In the other hand, the NFC is not part of the EBI bus, and thus should
+>>> not be defined under the EBI node.
+>>>
+>>> This might lead to the NFC device being probed before the NAND chip,
+>>> hence the need for this synchronization.
+>> OMHO, there is another way, which is change the NFC node to many NFC
+>> properties, just like PMECC.
+>> As NFC, PMECC or hamming ecc HW could be part of current NAND node (in
+>> sama5, HSMC maybe a better name for this node. )
+>>
+>> And this change can avoid the sync problem and avoid two drivers in
+>> atmel_nand.c.
+> Sorry I don't get it...
+> You gave a pseudo DT example in your following answers but I still
+> don't understand how you'll link the NFC and its associated NAND chips.
+>
+>>>>> - the introduction of the EBI bus implies defining NAND chips under the
+>>>>>     EBI node, and the ranges available under the EBI node should be
+>>>>>     restricted to EBI address space, while the NFC references several
+>>>>>     registers outside of these EBI ranges.
+>>>> That's an interesting bit. I've actually run across this sort of problem
+>>>> on other SoCs, where we have a relationship between two pieces of
+>>>> hardware--the NAND chip and the NAND controller--where the former might
+>>>> be on one bus (like your EBI bus, with chip selects), and the latter is
+>>>> part of the top-level MMIO register space.
+>>>>
+>>>> But can you elaborate here a bit more? Does the NAND chip actually need
+>>>> to be represented under your EBI bus?
+>>> Yes, as said above this is all about pinmux conflicts, the NAND
+>>> controller has to request the appropriate pinmux for its NAND chips but
+>>> it will conflict with the pinmux requested by the EBI bus (data and
+>>> address signals are shared by all the devices connected on the EBI).
+>>>
+>>>>> Move the NFC node outside of the NAND node, to get a more future-proof
+>>>>> model.
+>>>> I'm curious if an alternative solution might work, maybe one like the
+>>>> Allwiner NAND (sunxi-nand) DT, which just reverses the roles; the 'NFC'
+>>>> is the parent of the NAND chip(s). We've seen this pattern in other
+>>>> contexts too.
+>> I also prefer this. Then the dt node should looks like finally:
+>>
+>> nand (SMC may be more correct) node {
+> This nand node contains nand chip nodes, so 'nand' is definitely not
+> the appropriate name for this node.
+> We could name it SMC, but I'd like to keep EBI (External Bus
+> Interface), because the only thing that can register child devices in
+> linux are busses (or MFD devices :-)).
+> The SMC (Static Memory Controller) is just a additional control logic
+> acting on top of the EBI.
+After further thought, It seems the SMC should be correct name for nand 
+chips' parent.
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Before SAMA5 chips, the PMECC/ECC registers address is out of SMC address.
+
+In SAMA5 chips, the PMECC/NFC-hw registers address is in SMC address.
+take sama5d3 for example:
+     NFC regs: 0xffffc000 0x00000070
+     PMECC regs: 0xffffc070 0x00000490
+     PMECC error regs: 0xffffc500 0x00000100
+
+And the HSMC regs is: 0xffffc000 0x00000700
+which include PMECC/NFC-hw registers.
+
+>>       PMECC properties
+>>       NFC properties --> we can make the NFC not a node, just many NFC
+>> properties.
+> But all NAND chips will have to point to the same nfc struct, and I'd
+> rather represent the NFC IP in the DT than hide it into the driver's
+> logic.
+> Moreover, the NFC IP is not part of the EBI memory range, so I'd prefer
+> to keep it outside of the EBI node (though I'm not sure you're trying to
+> represent the EBI bus here).
+>
+>>       pinctrl-nand0
+>>       nand chip 0: {
+>>           partitions...
+>>       }
+>>
+>>       pinctrl-nand1
+>>       nand chip 1: {
+>>           partitions...
+>>       }
+>> }
+>
+> Could you give a real DT example instead of a pseudo DT representation,
+> maybe I'll understand what you're suggesting then.
+>
+>>> I would have preferred this solution too, but the EBI/pinmux constraint
+>>> explained above prevents this approach.
+>> I am not very clear about the pinmux constraint.
+>> Maybe we just leave one DT node (either EBI or current nand node) to
+>> take care the pins.
+>>
+>>> What I can do though, is reverse the referencing: reference nand chips
+>>> from the nand controller node.
+>> I guess the dt looks like: (correct me if I am wrong)
+>>
+>> EBI node {
+>>       pinctrl-nand0
+>>       nand chip 0: {
+>>           partitions...
+>>       }
+>>
+>>       pinctrl-nand1
+>>       nand chip 1: {
+>>           partitions...
+>>       }
+>> }
+> Well, that's more someting like:
+>
+> ebi at xxxx {
+> 	pinctrl-0 = <&ebi_data_bus_pins &ebi_addr_bus_pins
+> 		     &ebi_nand_cs0_pin &ebi_nand_rb0_pin ...>;
+>
+> 	nand at 0,xxxx {
+> 		/* ../ */
+> 	};
+>
+> 	nand at 1,xxxx {
+> 		/* ../ */
+> 	}
+> }
+well, so nand driver should be probed after this ebi node probed, since 
+ebi will configure the nand pins.
+There should be a sync issue to solve. or maybe I miss something?
+
+>> nand (SMC/HSMC may be more correct) node {
+>>       PMECC properties
+>>       NFC properties --> we can make the NFC not a node, just many NFC
+>> properties.
+>>
+>>       &nand chip0
+>>       &nand chip1
+>> }
+> Okay, I guess I understand what you were talking about in your previous
+> suggestion, and I'm not a big fan of this representation.
+>
+> The SMC IP provides a set of registers to configure external devices
+> timings (and other related stuff).
+> Here you're representing NAND chip devices under the SMC node, which is
+> not exactly how I would represent them.
+> The IP controlling the available NAND chips is actually the NFC (NAND
+> Flash Controller).
+> How about this representation instead ?
+>
+> nfc at xxxxx {
+> 	nand-chips = <&nand0 &nand1>;
+> }
+
+This should be ok, but this nfc at xxxxx should be a logic block. As the 
+real NFC hardware only appeared since SAMA5 chips.
+And we can disabled it. Without the real hardware NFC the nand should 
+also works well.
+
+> Josh, could you rework your proposal with a real DT representation so
+> that I'll be sure to understand what you're suggesting ?
+
+Okay, first I prefer to remove the atmel_nand_nfc driver, the work that 
+be done in atmel_nand_nfc_probe() function will move to atmel_nand_probe().
+The dt should looks like:
+         nand0: nand at 80000000 {
+             compatible = "atmel,sama5d4-nand", "atmel,at91rm9200-nand";
+             #address-cells = <1>;
+             #size-cells = <1>;
+             ranges;
+             reg = <    0x80000000 0x08000000    /* EBI CS3 */
+                 0xfc05c070 0x00000490    /* SMC PMECC regs */
+                 0xfc05c500 0x00000100    /* SMC PMECC Error Location 
+regs */
+                 0x90000000 0x08000000    /* NFC Command Registers */
+                 0xfc05c000 0x00000070    /* NFC HSMC regs */
+                 0x00100000 0x00100000    /* NFC SRAM banks */
+                 >;
+             interrupts = <22 IRQ_TYPE_LEVEL_HIGH 6>;
+             atmel,nand-addr-offset = <21>;
+             atmel,nand-cmd-offset = <22>;
+             atmel,nand-has-dma;
+             pinctrl-names = "default";
+             pinctrl-0 = <&pinctrl_nand>;
+             status = "disabled";
+             clocks = <&hsmc_clk>;
+             atmel,write-by-sram;
+         };
+
+The &hsmc_clk & atmel,write-by-sram will move to uplayer.
+And the hardware NFC can be disabled in menuconfig some options. or add 
+some dt properties like atmel,enable-nfc.
+
+Then we can make use of EBI/SMC node,
+
+nfc at xxxxx {
+     compatible = "atmel,sama5d4-nand", "atmel,at91rm9200-nand";
+     #address-cells = <1>;
+     #size-cells = <1>;
+     ranges;
+     reg = <
+                 0xfc05c070 0x00000490    /* SMC PMECC regs */
+                 0xfc05c500 0x00000100    /* SMC PMECC Error Location 
+regs */
+                 0xfc05c000 0x00000070    /* NFC HSMC regs */
+         /* all above address will be overlay with smc regs, maybe we 
+can use it from smc? */
+
+                 0x00100000 0x00100000    /* NFC SRAM banks */
+                 0x90000000 0x08000000    /* NFC Command Registers */
+                 >;
+     interrupts = <22 IRQ_TYPE_LEVEL_HIGH 6>;
+     atmel,nand-addr-offset = <21>;
+     atmel,nand-cmd-offset = <22>;
+     atmel,nand-has-dma;
+     clocks = <&hsmc_clk>;    /* needed for all smc components, like 
+pmecc, nfc hardware */
+
+     atmel,nfc-disabled;    /* disabled hw NFC */
+     atmel,nfc-write-by-sram;
+     status = "disabled";
+
+     nand-chips = <&nand0 &nand1>;
+  }
+
+I am not familiar with the EBI/SMC dt node, so above should have errors, 
+but it's just a draft for us to discuss.
+
+>
+> Thanks.
+>
+> Best Regards,
+>
+> Boris
+>
+>
+>
+Best Regards,
+Josh Wu
