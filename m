@@ -1,79 +1,26 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Wed, 4 Feb 2015 08:28:14 -0800
-Subject: [rcu] [ INFO: suspicious RCU usage. ]
-In-Reply-To: <1423066256.24415.13.camel@AMDC1943>
-References: <1422957702.17540.1.camel@AMDC1943>
- <20150203162704.GR19109@linux.vnet.ibm.com>
- <1423049947.19547.6.camel@AMDC1943>
- <20150204130018.GG8656@n2100.arm.linux.org.uk>
- <20150204131420.GC5370@linux.vnet.ibm.com>
- <1423059387.24415.2.camel@AMDC1943>
- <20150204151028.GD5370@linux.vnet.ibm.com>
- <1423063348.24415.10.camel@AMDC1943>
- <20150204155615.GF5370@linux.vnet.ibm.com>
- <1423066256.24415.13.camel@AMDC1943>
-Message-ID: <20150204162814.GG5370@linux.vnet.ibm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 04 Feb 2015 17:36:09 +0100
+Subject: [PATCH v2 2/5] ARM: shmobile: r8a7740: Migrate to generic l2c OF
+ initialization
+In-Reply-To: <CAMuHMdVi3kq2p30cNFYW2WCM-OvMSFC1W0r5nYkaN5Np=zW4_Q@mail.gmail.com>
+References: <1423059315-28519-1-git-send-email-geert+renesas@glider.be>
+ <7800327.b3sMA1XGtZ@wuerfel>
+ <CAMuHMdVi3kq2p30cNFYW2WCM-OvMSFC1W0r5nYkaN5Np=zW4_Q@mail.gmail.com>
+Message-ID: <3598552.qKIyokxIlF@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 04, 2015 at 05:10:56PM +0100, Krzysztof Kozlowski wrote:
-> On ?ro, 2015-02-04 at 07:56 -0800, Paul E. McKenney wrote:
-> > On Wed, Feb 04, 2015 at 04:22:28PM +0100, Krzysztof Kozlowski wrote:
-> > > 
-> > > Actually the timeout versions but I think that doesn't matter.
-> > > The wait_on_bit will busy-loop with testing for the bit. Inside the loop
-> > > it calls the 'action' which in my case will be bit_wait_io_timeout().
-> > > This calls schedule_timeout().
-> > 
-> > Ah, good point.
-> > 
-> > > See proof of concept in attachment. One observed issue: hot unplug from
-> > > commandline takes a lot more time. About 7 seconds instead of ~0.5.
-> > > Probably I did something wrong.
-> > 
-> > Well, you do set the timeout to five seconds, and so if the condition
-> > does not get set before the surviving CPU finds its way to the
-> > out_of_line_wait_on_bit_timeout(), you are guaranteed to wait for at
-> > least five seconds.
-> >
-> > One alternative approach would be to have a loop around a series of
-> > shorter waits.  Other thoughts?
+On Wednesday 04 February 2015 15:43:43 Geert Uytterhoeven wrote:
 > 
-> Right! That was the issue. It seems it works. I'll think also on
-> self-adapting interval as you said below. I'll test it more and send a
-> patch.
+> Indeed. Note that I only try to preserve the register value before and after
+> migrating to generic l2c OF initialization. I did read (part of) the pl310
+> documentation, but it's still not clear to me if we really need
+> L2C_AUX_CTRL_SHARED_OVERRIDE. Perhaps this was just copied from
+> somewhere else without much afterthought?
 
-Sounds good!
+Have you checked what the hardware/bootloader actually sets in that bit?
 
-Are you doing ARM, ARM64, or both?  I of course vote for both.  ;-)
+Maybe you can remove that override completely and the initial Linux
+default was just set to the same that is already set on powerup?
 
-							Thanx, Paul
-
-> Best regards,
-> Krzysztof
-> 
-> > 
-> > > > You know, this situation is giving me a bad case of nostalgia for the
-> > > > old Sequent Symmetry and NUMA-Q hardware.  On those platforms, the
-> > > > outgoing CPU could turn itself off, and thus didn't need to tell some
-> > > > other CPU when it was ready to be turned off.  Seems to me that this
-> > > > self-turn-off capability would be a great feature for future systems!
-> > > 
-> > > There are a lot more issues with hotplug on ARM...
-> > 
-> > Just trying to clean up this particular corner at the moment.  ;-)
-> > 
-> > > Patch/RFC attached.
-> > 
-> > Again, I believe that you will need to loop over a shorter timeout
-> > in order to get reasonable latencies.  If waiting a millisecond at
-> > a time is an energy-efficiency concern (don't know why it would be
-> > in this rare case, but...), then one approach would be to start
-> > with very short waits, then increase the wait time, for example,
-> > doubling the wait time on each pass through the loop would result
-> > in a smallish number of wakeups, but would mean that you waited
-> > no more than twice as long as necessary.
-> > 
-> > Thoughts?
-> 
-> 
+	Arnd
