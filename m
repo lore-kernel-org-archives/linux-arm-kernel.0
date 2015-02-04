@@ -1,52 +1,38 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 4 Feb 2015 18:12:29 +0000
-Subject: [PATCH v8 21/21] arm64: ACPI: additions of ACPI documentation
- for arm64
-In-Reply-To: <54D16A74.3030206@linaro.org>
-References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
- <1422881149-8177-22-git-send-email-hanjun.guo@linaro.org>
- <54D16A74.3030206@linaro.org>
-Message-ID: <20150204181229.GB21293@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 04 Feb 2015 19:33:31 +0100
+Subject: [PATCH v2 2/5] ARM: shmobile: r8a7740: Migrate to generic l2c OF
+ initialization
+In-Reply-To: <CAMuHMdU-GahSaQj6v2Yhmxsj8gmt1sbwrPfqm=ydMCc=uDcenA@mail.gmail.com>
+References: <1423059315-28519-1-git-send-email-geert+renesas@glider.be>
+ <3598552.qKIyokxIlF@wuerfel>
+ <CAMuHMdU-GahSaQj6v2Yhmxsj8gmt1sbwrPfqm=ydMCc=uDcenA@mail.gmail.com>
+Message-ID: <2328848.sGW6KXzxun@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 03, 2015 at 05:40:20PM -0700, Al Stone wrote:
-> Much removed to cut down the size on this and to highlight a couple of specific
-> sections pertinent to the ACPI on ARMv8 TODO List.....
+On Wednesday 04 February 2015 18:04:57 Geert Uytterhoeven wrote:
+> On Wed, Feb 4, 2015 at 5:36 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Wednesday 04 February 2015 15:43:43 Geert Uytterhoeven wrote:
+> >>
+> >> Indeed. Note that I only try to preserve the register value before and after
+> >> migrating to generic l2c OF initialization. I did read (part of) the pl310
+> >> documentation, but it's still not clear to me if we really need
+> >> L2C_AUX_CTRL_SHARED_OVERRIDE. Perhaps this was just copied from
+> >> somewhere else without much afterthought?
+> >
+> > Have you checked what the hardware/bootloader actually sets in that bit?
+> 
+> Yes, it boots with 0x02040000, i.e. L2C_AUX_CTRL_SHARED_OVERRIDE
+> (bit 22) is not set.
+> 
+> After the l2c driver is finished with it, it contains 0x46440001.
 
-This is of course good practice when replying to anything!
+I see. I guess someone understand the effect of this flag.
+Does it make a difference on the machine you are looking at?
 
-> > +_DSD	6.2.5		To be used with caution.  If this object is used, try
-> > +			to use it within the constraints already defined by the
-> > +			Device Properties UUID.  Only in rare circumstances
-> > +			should it be necessary to create a new _DSD UUID.
-> > +
-> > +			In either case, submit the _DSD definition along with
-> > +			any driver patches for discussion, especially when
-> > +			device properties are used.  A driver will not be 
-> > +			considered complete without a corresponding _DSD
-> > +			description.  Once approved by kernel maintainers,
-> > +			the UUID or device properties must then be registered
-> > +			with the UEFI Forum; this may cause some iteration as
-> > +			more than one OS will be registering entries.
+I've read the spec at http://infocenter.arm.com/help/topic/com.arm.doc.ddi0246a/DDI0246A_l2cc_pl310_r0p0_trm.pdf
+on the topic but couldn't make sense of it to understand whether a
+particular setting might be required for specific hardware or might
+be a performance optimization.
 
-> [snip...]
-
-> So, this is my attempt to encapsulate what I think people want to have happen
-> around the use of _DSD; I just want to make sure I point it out so it doesn't
-> inadvertently get lost somehow.
-
-> Is this far too little?  Is it sufficient?  If it only addresses part of the
-> concerns, what did I miss?
-
-This does take us back to the issue of how exactly one is supposed to
-register/approve _DSD bindings and what format they're written in which
-I don't think we ever fully got to the bottom of it (there's some stuff
-on the UEFI website but it's definitely looking a bit placeholderish).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150204/53797735/attachment.sig>
+	Arnd
