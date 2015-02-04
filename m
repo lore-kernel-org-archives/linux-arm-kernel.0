@@ -1,38 +1,55 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 4 Feb 2015 13:19:30 +0100
-Subject: [PATCH v2 0/5] ARM: sa1100: implement irq driver as proper
- irqchip driver
-In-Reply-To: <1422648066-7897-1-git-send-email-dbaryshkov@gmail.com>
-References: <1422648066-7897-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <CACRpkdbstAkL0Tyt6UHrzwkccMteOehoPwGROJxoUbpDJ1yxjg@mail.gmail.com>
+From: tsahee@annapurnalabs.com (Tsahee Zidenberg)
+Date: Wed, 4 Feb 2015 14:48:55 +0200
+Subject: [PATCH v4 4/6] ARM: dts: Alpine platform binding documentation
+In-Reply-To: <54D11B2A.8020507@codeaurora.org>
+References: <54d0cd2e.gI5kk97sYr5JVQ9k%tsahee@annapurnalabs.com>
+ <54D11B2A.8020507@codeaurora.org>
+Message-ID: <CABM=7kngfhRn8EEWXXURgm_pOhm6QqewDydNSqcFoA1BgKbxmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 30, 2015 at 9:01 PM, Dmitry Eremin-Solenikov
-<dbaryshkov@gmail.com> wrote:
+Thank you! will be fixed!
+(as well as your comments for the other patches in the set)
 
-> Hello,
+On 3 February 2015 at 21:02, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 02/03/15 05:29, Tsahee Zidenberg wrote:
+>> +* Alpine CPU resume registers
+>> +
+>> +The CPU resume register are used to define required resume address after
+>> +reset.
+>> +
+>> +Properties:
+>> +- compatible : Should contain "al,al-cpu-resume".
+>> +- reg : Offset and length of the register set for the device
+>> +
+>> +Example:
+>> +
+>> +cpu_resume {
+>> +     compatible = "al,alpine-cpu-resume";
+>> +     reg = <0xfbff5ed0 0x30>;
+>> +};
+>> +
+>> +* Alpine System-Fabric Service Registers
+>> +
+>> +The System-Fabric Service Registers allow various operation on CPU and
+>> +system fabric, like powering CPUs off.
+>> +
+>> +Properties:
+>> +- compatible : Should contain "al,al-sysfabric-service".
 >
-> This is a second attempt to move Intel StrongARM SA-11x0 IRQ driver
-> to drivers/irqchip/ place.
+> and syscon?
 >
-> Changes since V1:
+>> +- reg : Offset and length of the register set for the device
+>> +
+>> +Example:
+>> +
+>> +nb_service {
+>> +        compatible = "al,alpine-sysfabric-service";
+>> +        reg = <0xfb070000 0x10000>;
+>> +};
+>>
 >
->  - Added soc/sa1100/pwer.h header containing sa11x0_*_set_wake()
->    prototypes.
+> --
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
 >
->  - Removed spinlock from mask/unmask functions
->
->  - Minor whitespace changes.
->
-> The patches are based on my previous sa1100 patches that can be found
-> in Russell's for-next branch or in linux-next tree.
-
-I have applied it and tested on the Compaq iPaq h3600:
-Tested-by: Linus Walleij <linus.walleij@linaro.org>
-
-Very nice to see the SC and GPIO offsets in /proc/interrupts
-and very clean code, good work!
-
-Yours,
-Linus Walleij
