@@ -1,136 +1,87 @@
-From: al.stone@linaro.org (Al Stone)
-Date: Tue, 03 Feb 2015 17:40:20 -0700
-Subject: [PATCH v8 21/21] arm64: ACPI: additions of ACPI documentation
- for arm64
-In-Reply-To: <1422881149-8177-22-git-send-email-hanjun.guo@linaro.org>
-References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
- <1422881149-8177-22-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <54D16A74.3030206@linaro.org>
+From: rjui@broadcom.com (Ray Jui)
+Date: Tue, 3 Feb 2015 17:09:04 -0800
+Subject: [PATCH v7 0/4] Add gpio/pinconf support to Broadcom Cygnus SoC
+In-Reply-To: <Ray Jui <rjui@broadcom.com>
+References: <Ray Jui <rjui@broadcom.com>
+Message-ID: <1423012148-22560-1-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Much removed to cut down the size on this and to highlight a couple of specific
-sections pertinent to the ACPI on ARMv8 TODO List.....
+This patchset contains the initial GPIO/PINCONF support for the Broadcom
+Cygnus SoC.
 
-On 02/02/2015 05:45 AM, Hanjun Guo wrote:
-> From: Al Stone <al.stone@linaro.org>
-> 
-> Two more documentation files are also being added:
-> (1) A verbatim copy of the "Why ACPI on ARM?" blog posting by Grant Likely,
->     which is also summarized in arm-acpi.txt, and
-> 
-> (2) A section by section review of the ACPI spec (acpi_object_usage.txt)
->     to note recommendations and prohibitions on the use of the numerous
->     ACPI tables and objects.  This sets out the current expectations of
->     the firmware by Linux very explicitly (or as explicitly as I can, for
->     now).
-> 
-> CC: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> CC: Yi Li <phoenix.liyi@huawei.com>
-> CC: Mark Langsdorf <mlangsdo@redhat.com>
-> CC: Ashwin Chaugule <ashwinc@codeaurora.org>
-> Signed-off-by: Al Stone <al.stone@linaro.org>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  Documentation/arm64/acpi_object_usage.txt | 592 ++++++++++++++++++++++++++++++
->  Documentation/arm64/why_use_acpi.txt      | 231 ++++++++++++
->  2 files changed, 823 insertions(+)
->  create mode 100644 Documentation/arm64/acpi_object_usage.txt
->  create mode 100644 Documentation/arm64/why_use_acpi.txt
-> 
-> diff --git a/Documentation/arm64/acpi_object_usage.txt b/Documentation/arm64/acpi_object_usage.txt
-> new file mode 100644
-> index 0000000..2c4f733
-> --- /dev/null
-> +++ b/Documentation/arm64/acpi_object_usage.txt
-> @@ -0,0 +1,592 @@
-> +ACPI Tables
-> +-----------
-> +The expectations of individual ACPI tables are discussed in the list that
-> +follows.
-> +
-> +If a section number is used, it refers to a section number in the ACPI
-> +specification where the object is defined.  If "Signature Reserved" is used,
-> +the table signature (the first four bytes of the table) is the only portion
-> +of the table recognized by the specification, and the actual table is defined
-> +outside of the UEFI Forum (see Section 5.2.6 of the specification).
-> +
-[snip....]
+Cygnus has 3 GPIO controllers: 1) the ASIU GPIO; 2) the chipCommonG GPIO;
+and 3) the ALWAYS-ON GPIO. All 3 types of GPIO controllers are supported by
+the this driver.
 
-> +
-> +ACPI Objects
-> +------------
-> +The expectations on individual ACPI objects are discussed in the list that
-> +follows:
-> +
-> +Name	Section		Usage for ARMv8 Linux
-> +----	------------	-------------------------------------------------
-> +_ADR	6.1.1		Use as needed.
-[snip....]
-> +
-> +_DMA	6.2.4		Optional.
-> +
-> +_DSD	6.2.5		To be used with caution.  If this object is used, try
-> +			to use it within the constraints already defined by the
-> +			Device Properties UUID.  Only in rare circumstances
-> +			should it be necessary to create a new _DSD UUID.
-> +
-> +			In either case, submit the _DSD definition along with
-> +			any driver patches for discussion, especially when
-> +			device properties are used.  A driver will not be 
-> +			considered complete without a corresponding _DSD
-> +			description.  Once approved by kernel maintainers,
-> +			the UUID or device properties must then be registered
-> +			with the UEFI Forum; this may cause some iteration as
-> +			more than one OS will be registering entries.
-> +
-[snip...]
+All 3 Cygnus GPIO controllers support basic PINCONF functions such as bias
+pull up, pull down, and drive strength configurations, when these pins are
+muxed to GPIO.
 
-So, this is my attempt to encapsulate what I think people want to have happen
-around the use of _DSD; I just want to make sure I point it out so it doesn't
-inadvertently get lost somehow.
+Pins from the ASIU GPIO can be individually muxed to GPIO function, through
+interaction with the Cygnus IOMUX controller.
 
-Is this far too little?  Is it sufficient?  If it only addresses part of the
-concerns, what did I miss?
+Note this patchset has a dependency on the other patchset "Add pinctrl support
+to Broadcom Cygnus SoC" that is also under review
 
-> +
-> +_OSC	6.2.11		This method can be a global method in ACPI (i.e.,
-> +			\_SB._OSC), or it may be associated with a specific
-> +			device (e.g., \_SB.DEV0._OSC), or both.  When used
-> +			as a global method, only capabilities published in
-> +			the ACPI specification are allowed.  When used as
-> +			a device-specifc method, the process described for
-> +			using _DSD MUST be used to create an _OSC definition;
-> +			out-of-process use of _OSC is not allowed.  That is,
-> +			submit the device-specific _OSC usage description as
-> +			part of the kernel driver submission, get it approved
-> +			by the kernel community, then register it with the
-> +			UEFI Forum.
+Changes from v6:
+ - Move the driver from drivers/gpio/* to drivers/pinctrl/* since this driver
+   supports both GPIO and some basic PINCONF features
+ - Support PINCONF features through standard DT subnodes properties including
+   "bias-disable", "bias-pull-up", "bias-pull-down", and "drive-strength", by
+   creating local PINCONF controller
+ - Add support to allow individual ASIU GPIO pins to be muxed as GPIO, through
+   interactions with the Cygnus IOMUX driver
+ - Convert the driver to use standard GPIOCHIP_IRQ APIs. This helps to reduce
+   customized code in the driver
+ - Other miscellaneous imrpovements in the driver
+ - Enable GPIO based phone hook detection support for BCM911360 phone factor
+   board
 
-Note that _OSC is very similar to _DSD in how it is defined in the ACPI spec.
-Hence, I suggest a very similar mechanism for vetting the use of _OSC in the
-kernel.  Again: is this sufficient?
+Changes from v5:
+ - Get rid of DT property "linux,gpio-base". Use dynamic allocation for GPIO base
+   number
 
-> +
-> +\_OSI	5.7.2		Deprecated on ARM64.  Any invocation of this method
-> +			will print a warning on the console and return false.
-> +			That is, as far as ACPI firmware is concerned, _OSI
-> +			cannot be used to determine what sort of system is
-> +			being used or what functionality is provided.  The
-> +			_OSC method is to be used instead.
-> +
+Changes from v4:
+ - Use DT property "linux,gpio-base" to define GPIO base number
+ - factorize common code to improve code readability and reduce code size
+ - remove "bcm_" prefix on function and struct names
+ - improve debugging prints
+ - default GPIO_BCM_CYGNUS to y in Kconfig (it still depends on
+   ARCH_BCM_CYGNUS). This way we do not need to select it from the
+   arch/arm/mach-bcm/Kconfig
+ - Get rid of redundant MAINTAINER entry for this driver. It will be maintained
+   by Broadcom iProc/Cygnus maintainers
+ - Update device tree document based on driver changes
 
-Just a side note that patches have been sent out to deprecate _OSI for arm64,
-and that a change request has been sent in to the ACPI spec committee to make
-it official (with an additional forewarning that _OSI will eventually be
-deprecated completely for all architectures).
+Changes from v3:
+ - Fix dt property tpyo
+ - Fix incorrect GPIO compatible ID in device tree binding document example
+
+Changes from v2:
+ - Consolidate different compatible IDs into "brcm,cygnus-gpio"
+ - Get rid of redundant "no-interrupt" property
+
+Changes from v1:
+ - Get rid of inline qualifier
+ - Get rid of redundant check in the ISR
+ - Other minor fixes to imrove code readability
+
+Ray Jui (4):
+  pinctrl: Cygnus: define Broadcom Cygnus GPIO/PINCONF binding
+  pinctrl: cygnus: add gpio/pinconf driver
+  ARM: dts: enable GPIO for Broadcom Cygnus
+  ARM: dts: cygnus: enable GPIO based hook detection
+
+ .../bindings/pinctrl/brcm,cygnus-gpio.txt          |  102 +++
+ arch/arm/boot/dts/bcm-cygnus.dtsi                  |   33 +
+ arch/arm/boot/dts/bcm911360_entphn.dts             |   13 +
+ drivers/pinctrl/bcm/Kconfig                        |   22 +
+ drivers/pinctrl/bcm/Makefile                       |    1 +
+ drivers/pinctrl/bcm/pinctrl-cygnus-gpio.c          |  920 ++++++++++++++++++++
+ 6 files changed, 1091 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt
+ create mode 100644 drivers/pinctrl/bcm/pinctrl-cygnus-gpio.c
 
 -- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Linaro Enterprise Group
-al.stone at linaro.org
------------------------------------
+1.7.9.5
