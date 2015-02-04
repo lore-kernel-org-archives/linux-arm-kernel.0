@@ -1,142 +1,68 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed,  4 Feb 2015 15:20:14 +0100
-Subject: [PATCH] clk: at91: usb: propagate rate modification to the parent clk
-Message-ID: <1423059614-10450-1-git-send-email-boris.brezillon@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 04 Feb 2015 15:24:14 +0100
+Subject: [PATCH 2/4] rtc: sa1100: convert to run-time register mapping
+In-Reply-To: <CAL_JsqLSHrbQq2qFSpZyoiZ757xs8MHjNFD8+PKBGBTPmEatwA@mail.gmail.com>
+References: <1423005775-26457-1-git-send-email-robh@kernel.org>
+ <CAL_JsqL8iahGwkPyDuB+2j_SvkH0TYYNDErgLOgHOgHvERU-9A@mail.gmail.com>
+ <CAL_JsqLSHrbQq2qFSpZyoiZ757xs8MHjNFD8+PKBGBTPmEatwA@mail.gmail.com>
+Message-ID: <4228990.Thq3aQIjz2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The at91sam9n12 and at91sam9x5 usb clocks do not propagate rate
-modification requests to their parents.
-This causes a bug when the PLLB is left uninitialized by the bootloader
-(PLL multiplier set to 0, or in other words, PLL rate = 0 Hz).
+On Wednesday 04 February 2015 07:49:25 Rob Herring wrote:
+> On Wed, Feb 4, 2015 at 7:44 AM, Rob Herring <robh@kernel.org> wrote:
+> > On Wed, Feb 4, 2015 at 7:25 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> On Tuesday 03 February 2015 17:22:53 Rob Herring wrote:
+> >>> SA1100 and PXA differ only in register offsets which are currently
+> >>> hardcoded in a machine specific header. Some arm64 platforms (PXA1928)
+> >>> have this RTC block also.
+> >>>
+> >>> Convert the driver to use ioremap and set the register offsets dynamically.
+> >>> Since we are touching all the register accesses, convert them all to
+> >>> readl/writel.
+> >>>
+> >>> Signed-off-by: Rob Herring <robh@kernel.org>
+> >>> Cc: Alessandro Zummo <a.zummo@towertech.it>
+> >>> Cc: rtc-linux at googlegroups.com
+> >>
+> >> Hmm, I really should have sent out my version of the patch ages ago. 
+> >
+> > Got any others? 
 
-Implement the determinate_rate method and propagate the change rate
-request to the parent clk.
+Look at the whole branch, it converts a couple of platforms
+to CONFIG_MULTIPLATFORM: msm, mmp, realview, s3c64xx, versatile (your
+patches), ep93xx (partially), gemini.
 
-Cc: <stable@vger.kernel.org> # v3.14+
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Reported-by: Bo Shen <voice.shen@atmel.com>
-Tested-by: Bo Shen <voice.shen@atmel.com>
----
-Hi Mike,
+The patches are in different states and at least need proper
+review, in some cases rewrite. The mmp patches should be
+pretty much ready but I never got around to submit them.
 
-I haven't taken Tomeu's rework of the determine_rate prototype [1] into
-account in this patch, but will do once his patch series is accepted.
+> >> Can you have a look at
+> >>
+> >> http://git.kernel.org/cgit/linux/kernel/git/arnd/playground.git/commit/?h=multiplatform-3.19-next&id=4d9727883a363fb839e7d1633599166c0a08d644
+> >>
+> >> to see compare the approaches and see if there is anything I did that you
+> >> missed?
+> >
+> > You used the relaxed variants seems to be the main difference. Yours
+> > won't build on arm64 either.
+> 
+> Also, I noticed the rtc-puv3 driver appears to be the same programming
+> model. The quirks around interrupt clearing seem to be a bit different
+> though.
 
-Best Regards,
+Yes, I noticed before that not only is arch/unicore32 more or less a clone
+of arch/arm (aside from cleanups that I asked for when it was submitted),
+but the pkunity is also modeled around some IP blocks from sa1100/pxa.
+According to http://mprc.pku.edu.cn/eng/intro.html, the work on that
+SoC was done in a university lab with funding from Intel.
 
-Boris
+The CPU instruction set apparently has some differences, and the same
+is likely true for the peripherals, it might be interesting to look at
+drivers/video/fbdev/fb-puv3.c, drivers/i2c/busses/i2c-puv3.c,
+drivers/pwm/pwm-puv3.c, arch/unicore32/kernel/gpio.c and
+arch/unicore32/kernel/irq.c for more similarities. I don't think anyone
+would bother changing those to use a common driver though, given the
+state of unicore32.
 
-[1] https://lkml.org/lkml/2015/1/23/222
-
- drivers/clk/at91/clk-usb.c | 62 +++++++++++++++++++++++++++++++++++-----------
- 1 file changed, 47 insertions(+), 15 deletions(-)
-
-diff --git a/drivers/clk/at91/clk-usb.c b/drivers/clk/at91/clk-usb.c
-index a23ac0c..0283a57 100644
---- a/drivers/clk/at91/clk-usb.c
-+++ b/drivers/clk/at91/clk-usb.c
-@@ -56,22 +56,53 @@ static unsigned long at91sam9x5_clk_usb_recalc_rate(struct clk_hw *hw,
- 	return DIV_ROUND_CLOSEST(parent_rate, (usbdiv + 1));
- }
- 
--static long at91sam9x5_clk_usb_round_rate(struct clk_hw *hw, unsigned long rate,
--					  unsigned long *parent_rate)
-+static long at91sam9x5_clk_usb_determine_rate(struct clk_hw *hw,
-+					      unsigned long rate,
-+					      unsigned long *best_parent_rate,
-+					      struct clk_hw **best_parent_hw)
- {
--	unsigned long div;
-+	struct clk *parent = NULL;
-+	long best_rate = -EINVAL;
-+	unsigned long tmp_rate;
-+	int best_diff = -1;
-+	int tmp_diff;
-+	int i;
- 
--	if (!rate)
--		return -EINVAL;
-+	for (i = 0; i < __clk_get_num_parents(hw->clk); i++) {
-+		int div;
- 
--	if (rate >= *parent_rate)
--		return *parent_rate;
-+		parent = clk_get_parent_by_index(hw->clk, i);
-+		if (!parent)
-+			continue;
-+
-+		for (div = 1; div < SAM9X5_USB_MAX_DIV + 2; div++) {
-+			unsigned long tmp_parent_rate;
-+
-+			tmp_parent_rate = rate * div;
-+			tmp_parent_rate = __clk_round_rate(parent,
-+							   tmp_parent_rate);
-+			tmp_rate = DIV_ROUND_CLOSEST(tmp_parent_rate, div);
-+			if (tmp_rate < rate)
-+				tmp_diff = rate - tmp_rate;
-+			else
-+				tmp_diff = tmp_rate - rate;
-+
-+			if (best_diff < 0 || best_diff > tmp_diff) {
-+				best_rate = tmp_rate;
-+				best_diff = tmp_diff;
-+				*best_parent_rate = tmp_parent_rate;
-+				*best_parent_hw = __clk_get_hw(parent);
-+			}
-+
-+			if (!best_diff || tmp_rate < rate)
-+				break;
-+		}
- 
--	div = DIV_ROUND_CLOSEST(*parent_rate, rate);
--	if (div > SAM9X5_USB_MAX_DIV + 1)
--		div = SAM9X5_USB_MAX_DIV + 1;
-+		if (!best_diff)
-+			break;
-+	}
- 
--	return DIV_ROUND_CLOSEST(*parent_rate, div);
-+	return best_rate;
- }
- 
- static int at91sam9x5_clk_usb_set_parent(struct clk_hw *hw, u8 index)
-@@ -121,7 +152,7 @@ static int at91sam9x5_clk_usb_set_rate(struct clk_hw *hw, unsigned long rate,
- 
- static const struct clk_ops at91sam9x5_usb_ops = {
- 	.recalc_rate = at91sam9x5_clk_usb_recalc_rate,
--	.round_rate = at91sam9x5_clk_usb_round_rate,
-+	.determine_rate = at91sam9x5_clk_usb_determine_rate,
- 	.get_parent = at91sam9x5_clk_usb_get_parent,
- 	.set_parent = at91sam9x5_clk_usb_set_parent,
- 	.set_rate = at91sam9x5_clk_usb_set_rate,
-@@ -159,7 +190,7 @@ static const struct clk_ops at91sam9n12_usb_ops = {
- 	.disable = at91sam9n12_clk_usb_disable,
- 	.is_enabled = at91sam9n12_clk_usb_is_enabled,
- 	.recalc_rate = at91sam9x5_clk_usb_recalc_rate,
--	.round_rate = at91sam9x5_clk_usb_round_rate,
-+	.determine_rate = at91sam9x5_clk_usb_determine_rate,
- 	.set_rate = at91sam9x5_clk_usb_set_rate,
- };
- 
-@@ -179,7 +210,8 @@ at91sam9x5_clk_register_usb(struct at91_pmc *pmc, const char *name,
- 	init.ops = &at91sam9x5_usb_ops;
- 	init.parent_names = parent_names;
- 	init.num_parents = num_parents;
--	init.flags = CLK_SET_RATE_GATE | CLK_SET_PARENT_GATE;
-+	init.flags = CLK_SET_RATE_GATE | CLK_SET_PARENT_GATE |
-+		     CLK_SET_RATE_PARENT;
- 
- 	usb->hw.init = &init;
- 	usb->pmc = pmc;
-@@ -207,7 +239,7 @@ at91sam9n12_clk_register_usb(struct at91_pmc *pmc, const char *name,
- 	init.ops = &at91sam9n12_usb_ops;
- 	init.parent_names = &parent_name;
- 	init.num_parents = 1;
--	init.flags = CLK_SET_RATE_GATE;
-+	init.flags = CLK_SET_RATE_GATE | CLK_SET_RATE_PARENT;
- 
- 	usb->hw.init = &init;
- 	usb->pmc = pmc;
--- 
-1.9.1
+	Arnd
