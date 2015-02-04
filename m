@@ -1,43 +1,61 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 4 Feb 2015 10:13:17 +0100
-Subject: [PATCH v2 1/2] mtd: nand: pxa3xx: Fix PIO FIFO draining
-In-Reply-To: <1422284164-16867-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1422284164-16867-1-git-send-email-maxime.ripard@free-electrons.com>
- <1422284164-16867-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20150204091317.GA5492@lukather>
+From: carlo@caione.org (Carlo Caione)
+Date: Wed,  4 Feb 2015 10:23:18 +0100
+Subject: [PATCH v2 0/2] dma: fix DMA_ATTR_NO_KERNEL_MAPPING for no-IOMMU
+ platforms
+Message-ID: <1423041800-27859-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
+The DMA_ATTR_NO_KERNEL_MAPPING attribute is used to notify dma-mapping core
+that the driver will not use kernel mapping for the allocated buffer at all, so
+the core can skip creating it.
 
-On Mon, Jan 26, 2015 at 03:56:03PM +0100, Maxime Ripard wrote:
-> The NDDB register holds the data that are needed by the read and write
-> commands.
-> 
-> However, during a read PIO access, the datasheet specifies that after each 32
-> bits read in that register, when BCH is enabled, we have to make sure that the
-> RDDREQ bit is set in the NDSR register.
-> 
-> This fixes an issue that was seen on the Armada 385, and presumably other mvebu
-> SoCs, when a read on a newly erased page would end up in the driver reporting a
-> timeout from the NAND.
-> 
-> Cc: <stable@vger.kernel.org> # v3.14
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Unfortunately at the moment this attribute is only valid for IOMMU setups. In
+non-IOMMU setups the codepath doesn't obey DMA_ATTR_NO_KERNEL_MAPPING so when
+the CMA region is in high-memory all the buffers created with this attribute
+that do not require a kernel virtual address space still put pressure on the
+vmalloc area (for reference see
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/279325.html)
 
-Any chance for this fix to come in 3.19?
+This patchset is composed by two patches.
 
-Thanks,
-Maxime
+The first patch fixes the Exynos DRM driver so that it keeps working when the
+non-IOMMU DMA layer is fixed. The Exynos DRM driver doesn't follow the
+recommendations in DMA-attributes.txt so in the non-IOMMU case when
+DMA_ATTR_NO_KERNEL_MAPPING is used the driver directly uses the returned kernel
+virtual address which it explicitly requested not to be assigned. That must be
+fixed before the underlying DMA subsystem is improved to obey
+DMA_ATTR_NO_KERNEL_MAPPING.
+
+The second patch implements DMA_ATTR_NO_KERNEL_MAPPING for non-IOMMU capable
+platforms.
+
+Please note that:
+
+* The first patch must be applied before the second one to avoid breaking the
+Exynos DRM driver. This patch without the DMA layer fix works fine (we save
+git-bisect) but it's not fully correct (we have double mapping in kernel
+address space).
+
+* The second patch breaks the Exynos DRM driver unless the first patch is
+* applied first
+
+Changelog v2:
+
+* Return page instead of &page as cookie so the caller can detect if
+__alloc_remap_buffer or __alloc_from_contiguous fails to allocate the buffer
+
+Carlo Caione (1):
+  drm/exynos: fix DMA_ATTR_NO_KERNEL_MAPPING usage
+
+Jasper St. Pierre (1):
+  arm/dma-mapping: Respect NO_KERNEL_MAPPING when we don't have an IOMMU
+
+ arch/arm/mm/dma-mapping.c                 | 67 +++++++++++++++++++------------
+ drivers/gpu/drm/exynos/exynos_drm_buf.c   |  6 +--
+ drivers/gpu/drm/exynos/exynos_drm_fbdev.c | 29 +++++--------
+ drivers/gpu/drm/exynos/exynos_drm_gem.h   |  2 +
+ 4 files changed, 55 insertions(+), 49 deletions(-)
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150204/4b55a865/attachment.sig>
+2.2.2
