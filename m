@@ -1,64 +1,43 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Wed, 4 Feb 2015 08:57:43 +0530
-Subject: [PATCH v5 2/7] mailbox: arm_mhu: add driver for ARM MHU controller
-In-Reply-To: <4344803.3qsb2TUUaZ@wuerfel>
-References: <1422955310-6542-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <CAJe_ZhdL6=4bMPRitFeCqrO2jeYQuDa9071estTBd3PTbmURYA@mail.gmail.com>
- <20150203144611.GS8656@n2100.arm.linux.org.uk>
- <4344803.3qsb2TUUaZ@wuerfel>
-Message-ID: <CAJe_Zhfyr9ts=k_=kyXqC=aGtQdrq9MtrRXt6LQKR7iofKjqKg@mail.gmail.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Wed, 4 Feb 2015 11:45:29 +0800
+Subject: [RFC PATCH] ASoC: wm8731: let codec to manage clock by itself
+In-Reply-To: <20150203162128.GP21293@sirena.org.uk>
+References: <1422934415-24957-1-git-send-email-voice.shen@atmel.com>
+ <CAOLZvyE6W8-X2_M+-KQNry2VPwLzwbBLuxr5Z5EdBQo7Skv2RQ@mail.gmail.com>
+ <20150203124441.GK21293@sirena.org.uk>
+ <CAOLZvyEVQmqg9Jn5Kt_2m5K0-taJcGf6mweK4T=fwKOwn-Ovxg@mail.gmail.com>
+ <20150203162128.GP21293@sirena.org.uk>
+Message-ID: <54D195D9.4090101@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 February 2015 at 20:55, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 03 February 2015 14:46:11 Russell King - ARM Linux wrote:
->> On Tue, Feb 03, 2015 at 08:09:34PM +0530, Jassi Brar wrote:
->> > On 3 February 2015 at 18:02, Russell King - ARM Linux
->> > <linux@arm.linux.org.uk> wrote:
->> > > On Tue, Feb 03, 2015 at 05:29:23PM +0800, Vincent Yang wrote:
->> > >> +static int mhu_send_data(struct mbox_chan *chan, void *data)
->> > >> +{
->> > >> +     struct mhu_link *mlink = chan->con_priv;
->> > >> +
->> > >> +     pr_debug("%s:%d\n", __func__, __LINE__);
->> > >> +     if (!mhu_last_tx_done(chan)) {
->> > >> +             dev_err(chan->mbox->dev, "Last TX(%d) pending!\n", mlink->irq);
->> > >> +             return -EBUSY;
->> > >> +     }
->> > >> +
->> > >> +     writel_relaxed((u32)data, mlink->tx_reg + INTR_SET_OFS);
->> > >
->> > > Doesn't that cause a GCC warning?
->> > >
->> > I don't see any, but I'll drop the cast.
->>
->> A cast is probably needed.  You're right that GCC no longer warns about
->> this - I'm pretty sure it used to complain about casting pointers to
->> ints, and we used to need to cast to "unsigned long" first.
->
-> It definitely warns about converting an u64 to pointer or back,
-> and it warns on 64-bit machines about this conversion.
->
-> On a related note, I wonder why the driver actually converts a pointer to
-> int. I believe we have discussed this in the past but don't remember the
-> outcome.
-We never discussed this (MHU) driver. It was the generic mailbox API
-where, IIRC, I did take into account all your comments. The API does
-do what you had asked.
+Hi Mark,
 
-> I had expected to see here something like:
+On 02/04/2015 12:21 AM, Mark Brown wrote:
+> On Tue, Feb 03, 2015 at 03:40:45PM +0100, Manuel Lauss wrote:
+>> On Tue, Feb 3, 2015 at 1:44 PM, Mark Brown <broonie@kernel.org> wrote:
 >
-> static int mhu_send_data(struct mbox_chan *chan, void *data)
-> {
->         struct mhu_link *mlink = chan->con_priv;
->         u32 *arg = data;
+>>>> +    wm8731->mclk = devm_clk_get(&spi->dev, "mclk");
+>>>> +    if (IS_ERR(wm8731->mclk)) {
+>>>> +        wm8731->mclk = NULL;
+>>>> +        dev_warn(&spi->dev, "assuming static MCLK\n");
+>>>> +    }
 >
->         writel_relaxed(*arg, mlink->tx_reg + INTR_SET_OFS);
-> }
+>>> This is broken for both deferred probe and in the case where the clock
+>>> API genuinely returns a NULL clock.  Other than that it's the kind of
+>>> thing that we've done for some other drivers, though it's not good to
+>>> have to do this.  Check them for correct behaviour.
 >
-> i.e. dereferencing the pointer instead of using the actual value.
+>> Hm, so the only option is to create the simples possible 12MHz clk object?
 >
-OK, just curious how is this (dereferencing to the u32 variable on
-stack of the client driver) better?
+> Well, that's the best option in general.  You can get away with just
+> making sure that -EPROBE_DEFER is handled and that IS_ERR() is used to
+> check for an invalid clock but if you can define a clock that's even
+> better (and should be pretty painless), we're going to want to do that
+> transition at some point.
 
-Thanks.
+Do you mean I send my RFC patch as the formal patch, and let other 
+boards which use the wm8731 to add clk object, am I right?
+
+Best Regards,
+Bo Shen
