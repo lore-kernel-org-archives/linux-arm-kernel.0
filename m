@@ -1,55 +1,119 @@
-From: tsahee@annapurnalabs.com (Tsahee Zidenberg)
-Date: Wed, 4 Feb 2015 14:48:55 +0200
-Subject: [PATCH v4 4/6] ARM: dts: Alpine platform binding documentation
-In-Reply-To: <54D11B2A.8020507@codeaurora.org>
-References: <54d0cd2e.gI5kk97sYr5JVQ9k%tsahee@annapurnalabs.com>
- <54D11B2A.8020507@codeaurora.org>
-Message-ID: <CABM=7kngfhRn8EEWXXURgm_pOhm6QqewDydNSqcFoA1BgKbxmA@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 04 Feb 2015 14:22:10 +0100
+Subject: [PATCH v8 02/21] acpi: fix acpi_os_ioremap for arm64
+In-Reply-To: <20150204104832.GF8656@n2100.arm.linux.org.uk>
+References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
+ <8901765.mLfPOCUyAN@vostro.rjw.lan>
+ <20150204104832.GF8656@n2100.arm.linux.org.uk>
+Message-ID: <1918367.3D21c7WuYp@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thank you! will be fixed!
-(as well as your comments for the other patches in the set)
+On Wednesday, February 04, 2015 10:48:32 AM Russell King - ARM Linux wrote:
+> On Tue, Feb 03, 2015 at 11:04:27PM +0100, Rafael J. Wysocki wrote:
+> > On Tuesday, February 03, 2015 12:29:36 PM Mark Salter wrote:
+> > > On Mon, 2015-02-02 at 23:14 +0100, Rafael J. Wysocki wrote:
+> > > > On Monday, February 02, 2015 08:45:30 PM Hanjun Guo wrote:
+> > > > > From: Mark Salter <msalter@redhat.com>
+> > > > > 
+> > > > > The acpi_os_ioremap() function may be used to map normal RAM or IO
+> > > > > regions. The current implementation simply uses ioremap_cache(). This
+> > > > > will work for some architectures, but arm64 ioremap_cache() cannot be
+> > > > > used to map IO regions which don't support caching. So for arm64, use
+> > > > > ioremap() for non-RAM regions.
+> > > > > 
+> > > > > CC: Rafael J Wysocki <rjw@rjwysocki.net>
+> > > > > Signed-off-by: Mark Salter <msalter@redhat.com>
+> > > > > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> > > > > ---
+> > > > >  include/acpi/acpi_io.h | 6 ++++++
+> > > > >  1 file changed, 6 insertions(+)
+> > > > > 
+> > > > > diff --git a/include/acpi/acpi_io.h b/include/acpi/acpi_io.h
+> > > > > index 444671e..9d573db 100644
+> > > > > --- a/include/acpi/acpi_io.h
+> > > > > +++ b/include/acpi/acpi_io.h
+> > > > > @@ -1,11 +1,17 @@
+> > > > >  #ifndef _ACPI_IO_H_
+> > > > >  #define _ACPI_IO_H_
+> > > > >  
+> > > > > +#include <linux/mm.h>
+> > > > >  #include <linux/io.h>
+> > > > >  
+> > > > >  static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
+> > > > >  					    acpi_size size)
+> > > > >  {
+> > > > > +#ifdef CONFIG_ARM64
+> > > > > +	if (!page_is_ram(phys >> PAGE_SHIFT))
+> > > > > +		return ioremap(phys, size);
+> > > > > +#endif
+> > > > 
+> > > > I don't want to see #ifdef CONFIG_ARM64 in this file.
+> > > > 
+> > > 
+> > > How about something like:
+> > > 
+> > > From: Mark Salter <msalter@redhat.com>
+> > > Date: Tue, 3 Feb 2015 10:51:16 -0500
+> > > Subject: [PATCH] acpi: fix acpi_os_ioremap for arm64
+> > > 
+> > > The acpi_os_ioremap() function may be used to map normal RAM or IO
+> > > regions. The current implementation simply uses ioremap_cache(). This
+> > > will work for some architectures, but arm64 ioremap_cache() cannot be
+> > > used to map IO regions which don't support caching. So for arm64, use
+> > > ioremap() for non-RAM regions.
+> > > 
+> > > CC: Rafael J Wysocki <rjw@rjwysocki.net>
+> > > Signed-off-by: Mark Salter <msalter@redhat.com>
+> > > ---
+> > >  arch/arm64/include/asm/acpi.h | 14 ++++++++++++++
+> > >  include/acpi/acpi_io.h        |  3 +++
+> > >  2 files changed, 17 insertions(+)
+> > > 
+> > > diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> > > index ea4d2b3..db82bc3 100644
+> > > --- a/arch/arm64/include/asm/acpi.h
+> > > +++ b/arch/arm64/include/asm/acpi.h
+> > > @@ -14,6 +14,7 @@
+> > >  
+> > >  #include <linux/irqchip/arm-gic-acpi.h>
+> > >  
+> > > +#include <linux/mm.h>
+> > >  #include <asm/smp_plat.h>
+> > >  
+> > >  /* Basic configuration for ACPI */
+> > > @@ -100,4 +101,17 @@ static inline bool acpi_psci_use_hvc(void) { return false; }
+> > >  static inline void acpi_init_cpus(void) { }
+> > >  #endif /* CONFIG_ACPI */
+> > >  
+> > > +/*
+> > > + * ACPI table mapping
+> > > + */
+> > > +static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
+> > > +					    acpi_size size)
+> > > +{
+> > > +	if (!page_is_ram(phys >> PAGE_SHIFT))
+> > > +		return ioremap(phys, size);
+> > > +
+> > > +       return ioremap_cache(phys, size);
+> > > +}
+> > > +#define acpi_os_ioremap acpi_os_ioremap
+> > 
+> > If you want to do it this way, use __weak.  You won't need the #define then.
+> > Otherwise, please use a proper CONFIG_ARCH_ symbol.
+> 
+> How does __weak work with inline functions?  I don't believe it does.
 
-On 3 February 2015 at 21:02, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 02/03/15 05:29, Tsahee Zidenberg wrote:
->> +* Alpine CPU resume registers
->> +
->> +The CPU resume register are used to define required resume address after
->> +reset.
->> +
->> +Properties:
->> +- compatible : Should contain "al,al-cpu-resume".
->> +- reg : Offset and length of the register set for the device
->> +
->> +Example:
->> +
->> +cpu_resume {
->> +     compatible = "al,alpine-cpu-resume";
->> +     reg = <0xfbff5ed0 0x30>;
->> +};
->> +
->> +* Alpine System-Fabric Service Registers
->> +
->> +The System-Fabric Service Registers allow various operation on CPU and
->> +system fabric, like powering CPUs off.
->> +
->> +Properties:
->> +- compatible : Should contain "al,al-sysfabric-service".
->
-> and syscon?
->
->> +- reg : Offset and length of the register set for the device
->> +
->> +Example:
->> +
->> +nb_service {
->> +        compatible = "al,alpine-sysfabric-service";
->> +        reg = <0xfb070000 0x10000>;
->> +};
->>
->
-> --
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
->
+It doesn't work with inline funtions, but the function here doesn't have to be
+inline.
+
+> Moreover, __weak is positively harmful when you consider it adds bloat
+> and dead code - the overriden __weak function is left behind in the
+> resulting final image.
+
+Fair enough.
+
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
