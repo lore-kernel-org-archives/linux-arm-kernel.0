@@ -1,79 +1,61 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 04 Feb 2015 15:26:19 -0800
-Subject: [Cocci] [PATCH v13 3/6] clk: Make clk API return per-user struct
- clk instances
-In-Reply-To: <54D0F179.1040906@gmail.com>
-References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
- <1422011024-32283-4-git-send-email-tomeu.vizoso@collabora.com>
- <20150201212432.22722.70917@quantum> <54CFE1FE.7040404@codeaurora.org>
- <alpine.DEB.2.02.1502022230110.2045@localhost6.localdomain6>
- <54CFFBCF.90706@codeaurora.org> <20150202225036.421.43421@quantum>
- <54D0F179.1040906@gmail.com>
-Message-ID: <54D2AA9B.7010800@codeaurora.org>
+From: rjui@broadcom.com (Ray Jui)
+Date: Wed, 4 Feb 2015 15:33:27 -0800
+Subject: [PATCH v4 2/5] clk: iproc: add initial common clock support
+In-Reply-To: <54D2A7B7.6020007@codeaurora.org>
+References: <Ray Jui <rjui@broadcom.com>
+ <1422988390-24369-1-git-send-email-rjui@broadcom.com>
+ <1422988390-24369-3-git-send-email-rjui@broadcom.com>
+ <54D2A7B7.6020007@codeaurora.org>
+Message-ID: <54D2AC47.8080201@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/03/15 08:04, Quentin Lambert wrote:
-> Hello,
-> Julia asked me to have a look and see if I can help.
->
-> I have found these three cases using Coccinnelle in the mach-omap2
-> directory.
->
->
->
-> ./arch/arm/mach-omap2/clkt_clksel.c
-> @@ -67,7 +67,6 @@ static const struct clksel *_get_clksel_
->                 return NULL;
->
->         for (clks = clk->clksel; clks->parent; clks++)
->                 if (clks->parent == src_clk)
 
-This probably needs to compare hw pointers again given that it's in the
-clk-provider code. It would be nice if we could use indices instead though.
 
->                         break; /* Found the requested parent */
->
->         if (!clks->parent) {
-> ./arch/arm/mach-omap2/dpll3xxx.c
-> @@ -551,7 +549,6 @@ int omap3_noncore_dpll_set_rate(struct c
->         if (!dd)
->                 return -EINVAL;
->
->         if (__clk_get_parent(hw->clk) != dd->clk_ref)
+On 2/4/2015 3:13 PM, Stephen Boyd wrote:
+> On 02/03/15 10:33, Ray Jui wrote:
+>> +/*
+>> + * Get the clock rate based on name
+>> + */
+>> +static unsigned long __get_rate(const char *clk_name)
+>> +{
+>> +	struct clk *clk;
+>> +
+>> +	clk = __clk_lookup(clk_name);
+>> +	if (!clk) {
+>> +		pr_err("%s: unable to find clock by name: %s\n", __func__,
+>> +				clk_name);
+>> +		return 0;
+>> +	}
+>> +
+>> +	return clk_get_rate(clk);
+>> +}
+>> +
+> 
+> This looks like something we should be providing in the core framework.
+> Care to make it into an of_clk_get_parent_rate() API?
+> 
 
-This one is what this thread has started on about. Comparing hw pointers
-is ok for now...
+I would love to! Note __get_rate here is really getting the clock rate
+with a name provided. Can you be more specific on what you want? If I'm
+not mistaken, what you really want is this?
 
->                 return -EINVAL;
->
->         if (dd->last_rounded_rate == 0)
-> ./arch/arm/mach-omap2/timer.c
-> @@ -298,7 +298,6 @@ static int __init omap_dm_timer_init_one
->         if (IS_ERR(src))
->                 return PTR_ERR(src);
->
->         if (clk_get_parent(timer->fclk) != src) {
+unsigned long of_clk_get_parent_rate(struct device_node *np, int index);
 
-This one looks like an optimization. We can just always try to set the
-parent and if it's already the current parent then the core should bail
-out early without an error. So the fix would be to just remove the if
-condition.
+>> +extern void __init iproc_armpll_setup(struct device_node *node);
+>> +extern void __init iproc_pll_setup(struct device_node *node,
+>> +		const struct iproc_pll_ctrl *ctrl,
+>> +		const struct iproc_pll_vco_freq_param *vco_param,
+>> +		unsigned int num_freqs);
+>> +extern void __init iproc_clk_setup(struct device_node *node,
+>> +		const struct iproc_clk_ctrl *ctrl, unsigned int num_clks);
+>> +extern void __init iproc_asiu_setup(struct device_node *node,
+>> +		const struct iproc_asiu_div *div,
+>> +		const struct iproc_asiu_gate *gate, unsigned int num_clks);
+> 
+> __init is not necessary in header files.
+> 
 
->                 r = clk_set_parent(timer->fclk, src);
->                 if (r < 0) {
->                         pr_warn("%s: %s cannot set source\n", __func__,
->
->
-> Are they instances of your issue?
+Okay I'll remove __init. Thanks.
 
-Yes these all look like instances of the problem.
-
-> If you want me to I can enlarge the search to other directories.
-
-Yes please do. And if you could share the coccinelle patch that would be
-great. Thanks.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Ray
