@@ -1,47 +1,47 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed,  4 Feb 2015 15:15:12 +0100
-Subject: [PATCH v2 2/5] ARM: shmobile: r8a7740: Migrate to generic l2c OF
- initialization
+Date: Wed,  4 Feb 2015 15:15:14 +0100
+Subject: [PATCH v2 4/5] ARM: shmobile: r8a7740: Remove mapping of L2 cache
+ controller registers
 In-Reply-To: <1423059315-28519-1-git-send-email-geert+renesas@glider.be>
 References: <1423059315-28519-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1423059315-28519-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <1423059315-28519-5-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Migrate the generic r8a7740 platform from calling l2x0_of_init() to the
-generic l2c OF initialization.
+Now all r8a7740-based platforms have been migrated to the generic l2c OF
+initialization, it's no longer needed to map the L2 cache controller
+registers from .map_io().
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
-v2
-  - Keep only {,~}L2C_AUX_CTRL_SHARED_OVERRIDE
+v2:
+  - No changes.
 ---
- arch/arm/mach-shmobile/setup-r8a7740.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ arch/arm/mach-shmobile/setup-r8a7740.c | 12 ------------
+ 1 file changed, 12 deletions(-)
 
 diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
-index d191cf4197313482..3ebd4dfc8e853a9b 100644
+index 3ebd4dfc8e853a9b..ab005e2a0cde6892 100644
 --- a/arch/arm/mach-shmobile/setup-r8a7740.c
 +++ b/arch/arm/mach-shmobile/setup-r8a7740.c
-@@ -835,10 +835,6 @@ static void __init r8a7740_generic_init(void)
- {
- 	r8a7740_meram_workaround();
- 
+@@ -51,18 +51,6 @@ static struct map_desc r8a7740_io_desc[] __initdata = {
+ 		.length		= 160 << 20,
+ 		.type		= MT_DEVICE_NONSHARED
+ 	},
 -#ifdef CONFIG_CACHE_L2X0
--	/* Shared attribute override enable, 32K*8way */
--	l2x0_init(IOMEM(0xf0002000), 0x00400000, 0xc20f0fff);
+-	/*
+-	 * for l2x0_init()
+-	 * 0xf0100000-0xf0101000 -> 0xf0002000-0xf0003000
+-	 */
+-	{
+-		.virtual	= 0xf0002000,
+-		.pfn		= __phys_to_pfn(0xf0100000),
+-		.length		= PAGE_SIZE,
+-		.type		= MT_DEVICE_NONSHARED
+-	},
 -#endif
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
-@@ -855,6 +851,8 @@ static const char *r8a7740_boards_compat_dt[] __initdata = {
  };
  
- DT_MACHINE_START(R8A7740_DT, "Generic R8A7740 (Flattened Device Tree)")
-+	.l2c_aux_val	= L2C_AUX_CTRL_SHARED_OVERRIDE,
-+	.l2c_aux_mask	= ~L2C_AUX_CTRL_SHARED_OVERRIDE,
- 	.map_io		= r8a7740_map_io,
- 	.init_early	= shmobile_init_delay,
- 	.init_irq	= r8a7740_init_irq_of,
+ void __init r8a7740_map_io(void)
 -- 
 1.9.1
