@@ -1,72 +1,99 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 4 Feb 2015 09:44:14 +0000
-Subject: Continuing kallsyms failures - large kernels, XIP kernels, and
- large XIP kernels
-In-Reply-To: <alpine.LFD.2.11.1502032054460.1322@knanqh.ubzr>
-References: <20150130145642.GK26493@n2100.arm.linux.org.uk>
- <20150130153414.GM26493@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1501301224180.1322@knanqh.ubzr>
- <20150131002253.GR26493@n2100.arm.linux.org.uk>
- <20150204000307.GA8656@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1502032054460.1322@knanqh.ubzr>
-Message-ID: <20150204094414.GC8656@n2100.arm.linux.org.uk>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 04 Feb 2015 17:48:05 +0800
+Subject: [PATCH v8 14/21] ACPI / processor: Make it possible to get CPU
+ hardware ID via GICC
+In-Reply-To: <20150203200936.GA21731@e104818-lin.cambridge.arm.com>
+References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
+ <1422881149-8177-15-git-send-email-hanjun.guo@linaro.org>
+ <20150203141749.GA32536@leverpostej>
+ <20150203200936.GA21731@e104818-lin.cambridge.arm.com>
+Message-ID: <54D1EAD5.4080105@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 03, 2015 at 08:59:15PM -0500, Nicolas Pitre wrote:
-> On Wed, 4 Feb 2015, Russell King - ARM Linux wrote:
-> 
-> > It looks like we have cases where this falsely triggers.  Consider EFM32:
-> > 
-> > CONFIG_DRAM_BASE=0x88000000
-> > CONFIG_DRAM_SIZE=0x00400000
-> > CONFIG_FLASH_MEM_BASE=0x8c000000
-> > CONFIG_FLASH_SIZE=0x01000000
-> > 
-> > This means that we quite legally end up with the .data section below the
-> > .text section, which makes:
-> > 
-> > ASSERT((_data >= __data_loc), "Text section oversize") 
-> > 
-> > falsely trigger.
-> > 
-> > The linker has the capacity to specify regions of ROM and RAM in the
-> > linker file, I wonder if we should be using those for XIP.  Merely
-> > adding the MEMORY table to the linker file is not good enough - we
-> > also need to explicitly tell the linker which memory regions to place
-> > the output sections, otherwise the linker ends up making assumptions.
-> > 
-> > What that means is... asm-generic/vmlinux.lds.h breaks for us.
-> > 
-> > Any ideas?  I think using the MEMORY table would be the best approach,
-> > because that should allow us to properly verify that the resulting
-> > binary should fit in the memory regions.
-> 
-> Maybe simply having an assert() on the size of the .text section could 
-> be all that is needed.  We already know the maximum size in advance.
+On 2015?02?04? 04:09, Catalin Marinas wrote:
+> On Tue, Feb 03, 2015 at 02:17:49PM +0000, Mark Rutland wrote:
+>> On Mon, Feb 02, 2015 at 12:45:42PM +0000, Hanjun Guo wrote:
+>>> Introduce a new function map_gicc_mpidr() to allow MPIDRs to be obtained
+>>> from the GICC Structure introduced by ACPI 5.1.
+>>>
+>>> MPIDR is the CPU hardware ID as local APIC ID on x86 platform, so we use
+>>> MPIDR not the GIC CPU interface ID to identify CPUs.
+>>>
+>>> Further steps would typedef a phys_id_t for in arch code(with
+>>> appropriate size and a corresponding invalid value, say ~0) and use that
+>>> instead of an int in drivers/acpi/processor_core.c to store phys_id, then
+>>> no need for mpidr packing.
+>>
+>> I don't understand why we don't fix this now, and I'm very worried that
+>> this patch leaves much potential for FW bugs due to potential Linux
+>> bugs.
+>>
+>> Having a function called cpu_physical_id which _does not_ return a
+>> physical ID makes no sense to me. Any time we really need a physical
+>> ID, we're still going to have to unpack it (in an architecture-specific
+>> manner).
+>
+> Do you mean something like this? Only briefly tested on Juno and I may
+> have missed other calls:
 
-That doesn't work, it's not just the .text section but also .rodata,
-__bug_table, __ksymtab, __ksymtab_gpl, __kcrctab, __kcrctab_gpl,
-__ksymtab_strings, __param, __modver, __ex_table, .notes, .vectors,
-.stubs, .init.text, maybe .exit.text, .init.arch.info, .init.tagtable,
-.init.smpalt, .init.pv_table, and apparently .init.data (which is
-surely wrong?)  The following is from Arnd's failing configuration:
+Thanks, I think it is Mark's suggestion (and also Lorenzo's)
 
- 18 .init.tagtable 00000040  80073a9c  80073a9c  0100ba9c  2**2
-                  CONTENTS, ALLOC, LOAD, READONLY, DATA
- 19 .init.data    000010e8  80073adc  80073adc  0100badc  2**2
-                  CONTENTS, ALLOC, LOAD, DATA
- 20 .data         003552c4  80008000  80074bc4  01010000  2**8
-                  CONTENTS, ALLOC, LOAD, DATA
+>
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index ea4d2b35c57b..4fafd62b1b86 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -49,33 +49,12 @@ static inline void enable_acpi(void)
+>   	acpi_noirq = 0;
+>   }
+>
+> -/* MPIDR value provided in GICC structure is 64 bits, but the
+> - * existing phys_id (CPU hardware ID) using in acpi processor
+> - * driver is 32-bit, to conform to the same datatype we need
+> - * to repack the GICC structure MPIDR.
+> - *
+> - * bits other than following 32 bits are defined as 0, so it
+> - * will be no information lost after repacked.
+> - *
+> - * Bits [0:7] Aff0;
+> - * Bits [8:15] Aff1;
+> - * Bits [16:23] Aff2;
+> - * Bits [32:39] Aff3;
+> - */
+> -static inline u32 pack_mpidr(u64 mpidr)
+> -{
+> -	return (u32) ((mpidr & 0xff00000000) >> 8) | mpidr;
+> -}
+> -
+>   /*
+>    * The ACPI processor driver for ACPI core code needs this macro
+>    * to find out this cpu was already mapped (mapping from CPU hardware
+>    * ID to CPU logical ID) or not.
+> - *
+> - * cpu_logical_map(cpu) is the mapping of MPIDR and the logical cpu,
+> - * and MPIDR is the cpu hardware ID we needed to pack.
+>    */
+> -#define cpu_physical_id(cpu) pack_mpidr(cpu_logical_map(cpu))
+> +#define cpu_physical_id(cpu) cpu_logical_map(cpu)
+>
+>   /*
+>    * It's used from ACPI core in kdump to boot UP system with SMP kernel,
+> diff --git a/arch/arm64/include/asm/smp_plat.h b/arch/arm64/include/asm/smp_plat.h
+> index 59e282311b58..a492276e008d 100644
+> --- a/arch/arm64/include/asm/smp_plat.h
+> +++ b/arch/arm64/include/asm/smp_plat.h
+> @@ -40,4 +40,6 @@ static inline u32 mpidr_hash_size(void)
+>   extern u64 __cpu_logical_map[NR_CPUS];
+>   #define cpu_logical_map(cpu)    __cpu_logical_map[cpu]
+>
+> +typedef u64 cpuid_t;
 
-Hmm, if .init.data is contained in the flash section (which it seemingly
-is), it seems that XIP support is currently broken - that section is
-definitely a read/write section.  No one has seemingly noticed that it's
-broken and it's been broken for a long time, so maybe the simple answer
-then is just to rip XIP support out?
+I think cpuid_t is a little confused because people may recognize
+it as cpu logical id, its original meaning is the physical cpu ID,
+so how about:
 
-How does EFM32 work?  Does it work?
+typedef u64 phys_id_t; ?
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Thanks
+Hanjun
