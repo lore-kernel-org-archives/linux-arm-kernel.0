@@ -1,133 +1,69 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 4 Feb 2015 18:59:29 +0000
-Subject: [PATCH v8 17/21] clocksource / arch_timer: Parse GTDT to
- initialize arch timer
-In-Reply-To: <1422881149-8177-18-git-send-email-hanjun.guo@linaro.org>
+From: al.stone@linaro.org (Al Stone)
+Date: Wed, 04 Feb 2015 12:06:14 -0700
+Subject: [PATCH v8 21/21] arm64: ACPI: additions of ACPI documentation
+ for arm64
+In-Reply-To: <20150204181229.GB21293@sirena.org.uk>
 References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
- <1422881149-8177-18-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20150204185929.GH22035@red-moon>
+ <1422881149-8177-22-git-send-email-hanjun.guo@linaro.org>
+ <54D16A74.3030206@linaro.org> <20150204181229.GB21293@sirena.org.uk>
+Message-ID: <54D26DA6.9000700@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 02, 2015 at 12:45:45PM +0000, Hanjun Guo wrote:
-> Using the information presented by GTDT (Generic Timer Description Table)
-> to initialize the arch timer (not memory-mapped).
-
-Why are you not initializing the memory mapped timer ?
-
-> CC: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Originally-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> Tested-by: Yijing Wang <wangyijing@huawei.com>
-> Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
-> Tested-by: Jon Masters <jcm@redhat.com>
-> Tested-by: Timur Tabi <timur@codeaurora.org>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  arch/arm64/kernel/time.c             |   7 ++
->  drivers/clocksource/arm_arch_timer.c | 132 ++++++++++++++++++++++++++++-------
->  include/linux/clocksource.h          |   6 ++
->  3 files changed, 118 insertions(+), 27 deletions(-)
+On 02/04/2015 11:12 AM, Mark Brown wrote:
+> On Tue, Feb 03, 2015 at 05:40:20PM -0700, Al Stone wrote:
+>> Much removed to cut down the size on this and to highlight a couple of
+>> specific sections pertinent to the ACPI on ARMv8 TODO List.....
 > 
-> diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
-> index 1a7125c..42f9195 100644
-> --- a/arch/arm64/kernel/time.c
-> +++ b/arch/arm64/kernel/time.c
-> @@ -35,6 +35,7 @@
->  #include <linux/delay.h>
->  #include <linux/clocksource.h>
->  #include <linux/clk-provider.h>
-> +#include <linux/acpi.h>
->  
->  #include <clocksource/arm_arch_timer.h>
->  
-> @@ -72,6 +73,12 @@ void __init time_init(void)
->  
->  	tick_setup_hrtimer_broadcast();
->  
-> +	/*
-> +	 * Since ACPI or FDT will only one be available in the system,
-> +	 * we can use acpi_generic_timer_init() here safely
-> +	 */
-> +	acpi_generic_timer_init();
-> +
->  	arch_timer_rate = arch_timer_get_rate();
->  	if (!arch_timer_rate)
->  		panic("Unable to initialise architected timer.\n");
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 095c177..407aa63 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -21,6 +21,7 @@
->  #include <linux/io.h>
->  #include <linux/slab.h>
->  #include <linux/sched_clock.h>
-> +#include <linux/acpi.h>
->  
->  #include <asm/arch_timer.h>
->  #include <asm/virt.h>
-> @@ -370,8 +371,12 @@ arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
->  	if (arch_timer_rate)
->  		return;
->  
-> -	/* Try to determine the frequency from the device tree or CNTFRQ */
-> -	if (of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
-> +	/*
-> +	 * Try to determine the frequency from the device tree or CNTFRQ,
-> +	 * if ACPI is enabled, get the frequency from CNTFRQ ONLY.
-> +	 */
-> +	if (!acpi_disabled ||
-> +	    of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
+> This is of course good practice when replying to anything!
 
-This is getting a mess. cntbase tells you it is a memory mapped timer,
-node pointer that you are probing through DT, and to top it all
-acpi_disabled detects if you are probing in ACPI or DT mode.
+Yup :).
 
-I think this function should be simplified, this driver is also
-pending a refactoring to split arch timer and the memory mapped one
-so I think you'd better wait that work to make things simpler.
+>>> +_DSD	6.2.5		To be used with caution.  If this object is used, try +
+>>> to use it within the constraints already defined by the +			Device
+>>> Properties UUID.  Only in rare circumstances +			should it be necessary
+>>> to create a new _DSD UUID. + +			In either case, submit the _DSD
+>>> definition along with +			any driver patches for discussion, especially
+>>> when +			device properties are used.  A driver will not be +
+>>> considered complete without a corresponding _DSD +			description.  Once
+>>> approved by kernel maintainers, +			the UUID or device properties must
+>>> then be registered +			with the UEFI Forum; this may cause some
+>>> iteration as +			more than one OS will be registering entries.
+> 
+>> [snip...]
+> 
+>> So, this is my attempt to encapsulate what I think people want to have
+>> happen around the use of _DSD; I just want to make sure I point it out so
+>> it doesn't inadvertently get lost somehow.
+> 
+>> Is this far too little?  Is it sufficient?  If it only addresses part of
+>> the concerns, what did I miss?
+> 
+> This does take us back to the issue of how exactly one is supposed to 
+> register/approve _DSD bindings and what format they're written in which I
+> don't think we ever fully got to the bottom of it (there's some stuff on
+> the UEFI website but it's definitely looking a bit placeholderish).
 
-[...]
+Right; the UEFI stuff is indeed place-holder-ish.  This is one of the places
+where Linux is really driving what happens in the spec, so it's a little bit
+of a chicken-and-egg problem.  I will go repair the UEFI data once I have
+a better understanding of what's needed.
 
-> +/* Initialize all the generic timers presented in GTDT */
-> +void __init acpi_generic_timer_init(void)
-> +{
-> +	if (acpi_disabled)
-> +		return;
+I guess what I'm trying to figure out is: how specific does this need to be?
+Does it need to be a step-by-step description, something like
+Documentation/bindings/submitting-patches.txt, or something far more detailed
+than that, with templates to fill out, and circles and arrows and a paragraph
+on the back explaining each one [0] :)?
 
-acpi_disabled used again here, I repeat myself this is going to be
-hard to track. You should try to organize the code something like:
 
-if (acpi_disabled)
-	timer_dt_probe();
-else
-	timer_acpi_probe();
+[0] http://en.wikipedia.org/wiki/Alice%27s_Restaurant
 
-mixing the code paths is getting unwieldy, see above to see my
-reasoning.
-
-> +
-> +	acpi_table_parse(ACPI_SIG_GTDT, arch_timer_acpi_init);
-> +}
-> +#endif
-> diff --git a/include/linux/clocksource.h b/include/linux/clocksource.h
-> index abcafaa..af6155a 100644
-> --- a/include/linux/clocksource.h
-> +++ b/include/linux/clocksource.h
-> @@ -346,4 +346,10 @@ extern void clocksource_of_init(void);
->  static inline void clocksource_of_init(void) {}
->  #endif
->  
-> +#ifdef CONFIG_ACPI
-> +void acpi_generic_timer_init(void);
-> +#else
-> +static inline void acpi_generic_timer_init(void) { }
-> +#endif
-> +
-
-That's not nice, it is a generic header, arch specific stuff should be
-avoided. I think you should have an ACPI generic layer similar to
-clocksource_of_init(), and probe from there when matching the respective
-timers.
-
-Lorenzo
+-- 
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Linaro Enterprise Group
+al.stone at linaro.org
+-----------------------------------
