@@ -1,82 +1,60 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 4 Feb 2015 11:10:28 +0100
-Subject: [PATCH v2 1/2] mtd: nand: pxa3xx: Fix PIO FIFO draining
-In-Reply-To: <1422284164-16867-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1422284164-16867-1-git-send-email-maxime.ripard@free-electrons.com>
- <1422284164-16867-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20150204111028.2f0bd376@bbrezillon>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 4 Feb 2015 11:12:36 +0100
+Subject: [PATCH v3] ARM: multi_v7_defconfig: Enable shmobile platforms
+In-Reply-To: <1624861.F2XBvOBm9V@wuerfel>
+References: <1421684018-11894-1-git-send-email-geert+renesas@glider.be>
+ <1467925.IxO001Hv1t@avalon>
+ <CAMuHMdWObPPnpDPQbrq1HRj9BSBFuNNusQkDhaDTxP+_16oMNg@mail.gmail.com>
+ <1624861.F2XBvOBm9V@wuerfel>
+Message-ID: <CAMuHMdU2B2wsR+UOnBAt-D1E1UkSDN9yxtiYjSWLRON-coq1QQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hi Arnd,
 
-On Mon, 26 Jan 2015 15:56:03 +0100
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+On Wed, Jan 21, 2015 at 2:15 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 21 January 2015 14:09:56 Geert Uytterhoeven wrote:
+>> On Wed, Jan 21, 2015 at 2:02 PM, Laurent Pinchart
+>> <laurent.pinchart@ideasonboard.com> wrote:
+>> > To avoid bloating the kernel needlessly, couldn't at least some of the drivers
+>> > needed for the shmobile boards be compiled as modules ? Audio, USB, SATA,
+>> > touchscreen are possible candidates, depending on what we need to boot the
+>> > boards to userspace.
+>>
+>> That's a possibility.
+>>
+>> Note that currently there are almost no modules in multi_v7_defconfig:
+>> CONFIG_INET6_AH=m
+>> CONFIG_INET6_ESP=m
+>> CONFIG_INET6_IPCOMP=m
+>> CONFIG_IPV6_MIP6=m
+>> CONFIG_IPV6_TUNNEL=m
+>> CONFIG_CFG80211=m
+>> CONFIG_MAC80211=m
+>> CONFIG_BRCMFMAC=m
+>> CONFIG_RT2X00=m
+>> CONFIG_RT2800USB=m
+>>
+>> Arnd, Olof: What do you prefer?
+>
+> I think it would be nice to move to having more loadable modules. We
+> haven't really asked people to do that in the past, but the size is
+> starting to become a problem and we may end up having to change a lot
+> of the '=y' to '=m' in the future.
 
-> The NDDB register holds the data that are needed by the read and write
-> commands.
-> 
-> However, during a read PIO access, the datasheet specifies that after each 32
-> bits read in that register, when BCH is enabled, we have to make sure that the
-> RDDREQ bit is set in the NDSR register.
-> 
-> This fixes an issue that was seen on the Armada 385, and presumably other mvebu
-> SoCs, when a read on a newly erased page would end up in the driver reporting a
-> timeout from the NAND.
-> 
-> Cc: <stable@vger.kernel.org> # v3.14
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/mtd/nand/pxa3xx_nand.c | 45 ++++++++++++++++++++++++++++++++++++------
->  1 file changed, 39 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-> index 96b0b1d27df1..e6918befb951 100644
-> --- a/drivers/mtd/nand/pxa3xx_nand.c
-> +++ b/drivers/mtd/nand/pxa3xx_nand.c
-> @@ -23,6 +23,7 @@
->  #include <linux/mtd/partitions.h>
->  #include <linux/io.h>
->  #include <linux/irq.h>
-> +#include <linux/jiffies.h>
->  #include <linux/slab.h>
->  #include <linux/of.h>
->  #include <linux/of_device.h>
-> @@ -480,6 +481,38 @@ static void disable_int(struct pxa3xx_nand_info *info, uint32_t int_mask)
->  	nand_writel(info, NDCR, ndcr | int_mask);
->  }
->  
-> +static void drain_fifo(struct pxa3xx_nand_info *info, void *data, int len)
-> +{
-> +	u32 *dst = (u32 *)data;
-> +
-> +	if (info->ecc_bch) {
-> +		while (len--) {
-> +			u32 timeout;
-> +
-> +			*dst++ = nand_readl(info, NDDB);
-> +
-> +			/*
-> +			 * According to the datasheet, when reading
-> +			 * from NDDB with BCH enabled, after each 32
-> +			 * bits reads, we have to make sure that the
-> +			 * NDSR.RDDREQ bit is set
-> +			 */
+Do you want me to respin this patch with some options as modules?
 
-I know the datasheet says this bit should be checked after each
-transfer, but I wonder if we shouldn't check it before reading the data.
-What happens if you drain all the data available in the FIFO ? Is the
-controller still setting the RDDREQ bit ?
+One disadvantage of that is that it lets us discover less runtime-conflicts
+between platforms using multi_v7_defconfig (does anyone boot arm
+allyesconfig on his farm?).
 
-Moreover, the datasheet says this RDDREQ bit should be checked after
-each 32 bytes (not 32 bits) transfer.
-Testing it after each readl call shouldn't hurt though.
+Gr{oetje,eeting}s,
 
-Best Regards,
+                        Geert
 
-Boris
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
