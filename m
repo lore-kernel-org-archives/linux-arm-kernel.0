@@ -1,47 +1,65 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 04 Feb 2015 09:08:39 -0800
-Subject: [PATCH v3] ARM: multi_v7_defconfig: Enable shmobile platforms
-In-Reply-To: <CAMuHMdWObPPnpDPQbrq1HRj9BSBFuNNusQkDhaDTxP+_16oMNg@mail.gmail.com>
- (Geert Uytterhoeven's message of "Wed, 21 Jan 2015 14:09:56 +0100")
-References: <1421684018-11894-1-git-send-email-geert+renesas@glider.be>
- <1467925.IxO001Hv1t@avalon>
- <CAMuHMdWObPPnpDPQbrq1HRj9BSBFuNNusQkDhaDTxP+_16oMNg@mail.gmail.com>
-Message-ID: <7h1tm5li3s.fsf@deeprootsystems.com>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Wed, 04 Feb 2015 09:19:06 -0800
+Subject: [PATCH] iommu/arm-smmu: use a threaded handler for context
+ interrupts
+In-Reply-To: <20150204113305.GA28902@arm.com> (Will Deacon's message of "Wed,
+ 4 Feb 2015 11:33:05 +0000")
+References: <1421970482-11722-1-git-send-email-mitchelh@codeaurora.org>
+ <20150123112415.GD23058@arm.com>
+ <vnkw61bx2klr.fsf@mitchelh-linux.qualcomm.com>
+ <20150128120738.GJ1569@arm.com>
+ <vnkwa90why79.fsf@mitchelh-linux.qualcomm.com>
+ <20150204113305.GA28902@arm.com>
+Message-ID: <vnkwiofhppbp.fsf@mitchelh-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Geert Uytterhoeven <geert@linux-m68k.org> writes:
-
-> Hi Laurent,
+On Wed, Feb 04 2015 at 03:33:05 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Feb 02, 2015 at 08:10:02PM +0000, Mitchel Humpherys wrote:
+>> On Wed, Jan 28 2015 at 04:07:39 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> > With a shared handler (e.g. a bunch of context banks have the same IRQ)
+>> > then I assume that we don't want to end up with multiple handler threads
+>> > all tripping over each other. I'd rather have one thread that handles work
+>> > queued up by multiple low-level handlers.
+>> >
+>> > Do you have a preference either way?
+>> 
+>> Ok I think I understand the scenario you're describing.  If multiple
+>> context banks are sharing an interrupt line their handlers currently
+>> execute serially, but with threaded handlers they would all be woken up
+>> and possibly execute concurrently.  I hadn't really considered this
+>> because none of our targets have CBs sharing interrupts.  In any case,
+>> the CBs that aren't interrupting should quickly return IRQ_NONE when
+>> they notice that !(fsr & FSR_FAULT), so is this really a concern?
 >
-> On Wed, Jan 21, 2015 at 2:02 PM, Laurent Pinchart
-> <laurent.pinchart@ideasonboard.com> wrote:
->> To avoid bloating the kernel needlessly, couldn't at least some of the drivers
->> needed for the shmobile boards be compiled as modules ? Audio, USB, SATA,
->> touchscreen are possible candidates, depending on what we need to boot the
->> boards to userspace.
->
-> That's a possibility.
->
-> Note that currently there are almost no modules in multi_v7_defconfig:
-> CONFIG_INET6_AH=m
-> CONFIG_INET6_ESP=m
-> CONFIG_INET6_IPCOMP=m
-> CONFIG_IPV6_MIP6=m
-> CONFIG_IPV6_TUNNEL=m
-> CONFIG_CFG80211=m
-> CONFIG_MAC80211=m
-> CONFIG_BRCMFMAC=m
-> CONFIG_RT2X00=m
-> CONFIG_RT2800USB=m
->
-> Arnd, Olof: What do you prefer?
+> Well, with my stall-mode hat on, the FSR check could be done in the
+> low-level handler, with the actual page fault handling or whatever done
+> in the thread.
 
-The general rule (though not really enforced) has been: if it's needed for
-a rootfs, it's OK to be built in (e.g. MMC, network, etc.)  Everything
-else should be modules.
+But we'll need to turn on clocks just to read the FSR, which can't be
+done from atomic context.
 
-FWIW, in my farm, modules are built and installed into the ramdisk so if
-the kernel/rootfs needs them, they will be loaded.
+>
+>> Anyways, we can always hold off on this until we have a more compelling
+>> motivation for it.  For example, if we need to enable clocks to read
+>> registers then threaded IRQs seem like the best solution.  Hopefully
+>> I'll find time to have another go at the clocks stuff soon, which is the
+>> real reason why we're using threaded IRQs for context interrupts in our
+>> msm tree.
+>
+> Okey doke. Having the clocks stuff supported in iommu core would be my
+> preference.
 
-Kevin
+Yeah I'll try to come up with something.  In this particular case I
+guess we'd actually have to call out to some iommu_enable_access API so
+it wouldn't be completely transparent.  Everywhere else I think the
+iommu core can wrap the various iommu_ops callbacks with the
+enable/disable calls.
+
+
+-Mitch
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
