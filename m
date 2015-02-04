@@ -1,49 +1,89 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 4 Feb 2015 09:54:04 +0100
-Subject: [PATCH] ARM: berlin: add a defconfig
-In-Reply-To: <54D14B26.4050406@gmail.com>
-References: <1422962932-12603-1-git-send-email-antoine.tenart@free-electrons.com>
- <3962783.sVjmOB1hYm@wuerfel> <54D14B26.4050406@gmail.com>
-Message-ID: <20150204085404.GB12908@kwain>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 04 Feb 2015 10:04:33 +0100
+Subject: [PATCH v4 0/5] Add a new RTC driver for recent mvebu SoCs
+In-Reply-To: <1421342601-20384-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1421342601-20384-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <54D1E0A1.4000702@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
+Hi,
 
-On Tue, Feb 03, 2015 at 11:26:46PM +0100, Sebastian Hesselbarth wrote:
-> On 03.02.2015 13:54, Arnd Bergmann wrote:
-> >On Tuesday 03 February 2015 12:28:52 Antoine Tenart wrote:
-> >>Marvell Berlin SoCs did not have a custom defconfig and were only
-> >>supported in multi_v7_defconfig.
-> >>
-> >>Adds a proper defconfig, allowing to boot a Berlin SoC with all the
-> >>currently supported features: SMP, Pinmux, AHCI, Ethernet, I2C, GPIO,
-> >>USB, SDHCI.
-> >>
-> >>
-> >
-> >Are there any features that are not currently supported by
-> >multi_v7_defconfig? If so, please also add them there as
-> >loadable modules.
+
+On 15/01/2015 18:23, Gregory CLEMENT wrote:
+> Hi,
 > 
-> do we really need two potentially diverging defconfigs?
+> The Marvell Armada 38x SoCs contains an RTC which differs from the RTC
+> used in the other mvebu SoCs until now. This forth version of the
+> patch set adds support for this new IP and enable it in the Device
+> Tree of the Armada 38x SoC.
+
+This last version of this series have been sent 3 weeks ago. Is there
+an hope to be merged in 3.20 ?
+
+Should they go through via Andrew Morten's tree ?
+
+
+Thanks,
+
+Gregory
+
+
 > 
-> I am aware that multi_v7_defconfig adds a lot of stuff that is
-> not required for Berlin, but still I think in terms of coverage
-> (both Berlin and non-Berlin stuff) multi_v7 is sufficient, isn't
-> it?
+> Thanks,
+> 
+> Gr?gory
+> 
+> Changelog
+> 
+> v3 -> v4:
+> 
+> - Formatted the device tree binding documentation in a better way
+> - Renamed the soc-int regmap to rtc-soc because this group of register
+>   was not only about the interrupt.
+> - Fixed the rtc_delayed_write function. I found the exact description
+>   of the WA to use, and the wait should really be after the write.
+> 
+> v2 -> v3:
+> 
+> - Fixed the reg-names description in the dt binding documentation
+> - Used the delayed version of the writel in everyplace.
+> 
+> v1 -> v2:
+> 
+> - Used reg-names to identify the registers in the device tree
+> - Changed the space into tab in the MAINTAINERS file
+> - Emphasized that the 5s wait was only needed between two consecutive
+>   writes
+> - Reduced the wait in the set_time function, 100ms were enough
+> - If no interrupt was available, then disable the alarm related
+>   functions
+> - Fixed the critical sections
+> - Updated the mvebu_v7_defconfig by enabling the new RTC support
+> 
+> 
+> Gregory CLEMENT (5):
+>   rtc: armada38x: Add the device tree binding documentation
+>   drivers/rtc/rtc-armada38x: Add a new RTC driver for recent mvebu SoCs
+>   MAINTAINERS: Add the RTC driver for the Armada38x
+>   ARM: mvebu: add Device Tree description of RTC on Armada 38x
+>   ARM: mvebu: enable Armada 38x RTC driver in mvebu_v7_defconfig
+> 
+>  .../devicetree/bindings/rtc/armada-380-rtc.txt     |  22 ++
+>  MAINTAINERS                                        |   1 +
+>  arch/arm/boot/dts/armada-38x.dtsi                  |   7 +
+>  arch/arm/configs/mvebu_v7_defconfig                |   1 +
+>  drivers/rtc/Kconfig                                |  10 +
+>  drivers/rtc/Makefile                               |   1 +
+>  drivers/rtc/rtc-armada38x.c                        | 320 +++++++++++++++++++++
+>  7 files changed, 362 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/rtc/armada-380-rtc.txt
+>  create mode 100644 drivers/rtc/rtc-armada38x.c
+> 
 
-In term of coverage, multi_v7_defconfig should be sufficient. The main
-advantage of having a custom Berlin defconfig would be for me to have a
-small kernel image and a configuration to start with without having to
-maintain it out of tree, for Berlin related developments.
-
-It's not mandatory, but it's useful at least for me. So the question
-is whether we want this defconfig mainlined or out of tree.
-
-Antoine
 
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
 http://free-electrons.com
