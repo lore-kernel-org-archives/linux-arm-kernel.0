@@ -1,144 +1,252 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 04 Feb 2015 11:20:19 +0100
-Subject: [PATCH v2 1/2] drm/exynos: fix DMA_ATTR_NO_KERNEL_MAPPING usage
-In-Reply-To: <1423041800-27859-2-git-send-email-carlo@caione.org>
+Date: Wed, 04 Feb 2015 11:21:34 +0100
+Subject: [PATCH v2 2/2] arm/dma-mapping: Respect NO_KERNEL_MAPPING when we
+ don't have an IOMMU
+In-Reply-To: <1423041800-27859-3-git-send-email-carlo@caione.org>
 References: <1423041800-27859-1-git-send-email-carlo@caione.org>
- <1423041800-27859-2-git-send-email-carlo@caione.org>
-Message-ID: <54D1F263.4000006@samsung.com>
+ <1423041800-27859-3-git-send-email-carlo@caione.org>
+Message-ID: <54D1F2AE.4070003@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
 On 2015-02-04 10:23, Carlo Caione wrote:
-> The Exynos DRM driver doesn't follow the correct API when dealing with
-> dma_{alloc, mmap, free}_attrs functions and the
-> DMA_ATTR_NO_KERNEL_MAPPING attribute.
+> From: "Jasper St. Pierre" <jstpierre@mecheye.net>
 >
-> When a IOMMU is not available and the DMA_ATTR_NO_KERNEL_MAPPING is
-> used, the driver should use the pointer returned by dma_alloc_attr() as
-> a cookie.
+> Even without an iommu, NO_KERNEL_MAPPING is still convenient to save on
+> kernel address space in places where we don't need a kernel mapping.
+> Implement support for it in the two places where we're creating an
+> expensive mapping.
 >
-> The Exynos DRM driver directly uses the non-requested virtual kernel
-> address returned by the DMA mapping subsystem. This just works now
-> because the non-IOMMU codepath doesn't obey DMA_ATTR_NO_KERNEL_MAPPING
-> but we need to fix it before fixing the DMA layer.
+> __alloc_from_pool uses an internal pool from which we already have
+> virtual addresses, so it's not relevant, and __alloc_simple_buffer uses
+> alloc_pages, which will always return a lowmem page, which is already
+> mapped into kernel space, so we can't prevent a mapping for it in that
+> case.
 >
+> Signed-off-by: Jasper St. Pierre <jstpierre@mecheye.net>
 > Signed-off-by: Carlo Caione <carlo@caione.org>
-> Acked-by: Joonyoung Shim <jy0922.shim@samsung.com>
+> Reviewed-by: Rob Clark <robdclark@gmail.com>
+> Reviewed-by: Daniel Drake <dsd@endlessm.com>
 
 Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
 > ---
->   drivers/gpu/drm/exynos/exynos_drm_buf.c   |  6 +++---
->   drivers/gpu/drm/exynos/exynos_drm_fbdev.c | 29 +++++++++--------------------
->   drivers/gpu/drm/exynos/exynos_drm_gem.h   |  2 ++
->   3 files changed, 14 insertions(+), 23 deletions(-)
+>   arch/arm/mm/dma-mapping.c | 67 +++++++++++++++++++++++++++++------------------
+>   1 file changed, 41 insertions(+), 26 deletions(-)
 >
-> diff --git a/drivers/gpu/drm/exynos/exynos_drm_buf.c b/drivers/gpu/drm/exynos/exynos_drm_buf.c
-> index 9c80884..24994ba 100644
-> --- a/drivers/gpu/drm/exynos/exynos_drm_buf.c
-> +++ b/drivers/gpu/drm/exynos/exynos_drm_buf.c
-> @@ -63,11 +63,11 @@ static int lowlevel_buffer_allocate(struct drm_device *dev,
->   			return -ENOMEM;
->   		}
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index a673c7f..d767bba 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -289,11 +289,11 @@ static void __dma_free_buffer(struct page *page, size_t size)
 >   
-> -		buf->kvaddr = (void __iomem *)dma_alloc_attrs(dev->dev,
-> +		buf->cookie = dma_alloc_attrs(dev->dev,
->   					buf->size,
->   					&buf->dma_addr, GFP_KERNEL,
->   					&buf->dma_attrs);
-> -		if (!buf->kvaddr) {
-> +		if (!buf->cookie) {
->   			DRM_ERROR("failed to allocate buffer.\n");
->   			ret = -ENOMEM;
->   			goto err_free;
-> @@ -132,7 +132,7 @@ static void lowlevel_buffer_deallocate(struct drm_device *dev,
->   	buf->sgt = NULL;
+>   static void *__alloc_from_contiguous(struct device *dev, size_t size,
+>   				     pgprot_t prot, struct page **ret_page,
+> -				     const void *caller);
+> +				     const void *caller, bool want_vaddr);
 >   
->   	if (!is_drm_iommu_supported(dev)) {
-> -		dma_free_attrs(dev->dev, buf->size, buf->kvaddr,
-> +		dma_free_attrs(dev->dev, buf->size, buf->cookie,
->   				(dma_addr_t)buf->dma_addr, &buf->dma_attrs);
->   		drm_free_large(buf->pages);
->   	} else
-> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
-> index e12ea90..84f8dfe 100644
-> --- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
-> +++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
-> @@ -79,9 +79,9 @@ static int exynos_drm_fbdev_update(struct drm_fb_helper *helper,
->   				     struct drm_framebuffer *fb)
+>   static void *__alloc_remap_buffer(struct device *dev, size_t size, gfp_t gfp,
+>   				 pgprot_t prot, struct page **ret_page,
+> -				 const void *caller);
+> +				 const void *caller, bool want_vaddr);
+>   
+>   static void *
+>   __dma_alloc_remap(struct page *page, size_t size, gfp_t gfp, pgprot_t prot,
+> @@ -357,10 +357,10 @@ static int __init atomic_pool_init(void)
+>   
+>   	if (dev_get_cma_area(NULL))
+>   		ptr = __alloc_from_contiguous(NULL, atomic_pool_size, prot,
+> -					      &page, atomic_pool_init);
+> +					      &page, atomic_pool_init, true);
+>   	else
+>   		ptr = __alloc_remap_buffer(NULL, atomic_pool_size, gfp, prot,
+> -					   &page, atomic_pool_init);
+> +					   &page, atomic_pool_init, true);
+>   	if (ptr) {
+>   		int ret;
+>   
+> @@ -467,13 +467,15 @@ static void __dma_remap(struct page *page, size_t size, pgprot_t prot)
+>   
+>   static void *__alloc_remap_buffer(struct device *dev, size_t size, gfp_t gfp,
+>   				 pgprot_t prot, struct page **ret_page,
+> -				 const void *caller)
+> +				 const void *caller, bool want_vaddr)
 >   {
->   	struct fb_info *fbi = helper->fbdev;
-> -	struct drm_device *dev = helper->dev;
->   	struct exynos_drm_gem_buf *buffer;
->   	unsigned int size = fb->width * fb->height * (fb->bits_per_pixel >> 3);
-> +	unsigned int nr_pages;
->   	unsigned long offset;
+>   	struct page *page;
+> -	void *ptr;
+> +	void *ptr = NULL;
+>   	page = __dma_alloc_buffer(dev, size, gfp);
+>   	if (!page)
+>   		return NULL;
+> +	if (!want_vaddr)
+> +		goto out;
 >   
->   	drm_fb_helper_fill_fix(fbi, fb->pitches[0], fb->depth);
-> @@ -94,25 +94,14 @@ static int exynos_drm_fbdev_update(struct drm_fb_helper *helper,
->   		return -EFAULT;
+>   	ptr = __dma_alloc_remap(page, size, gfp, prot, caller);
+>   	if (!ptr) {
+> @@ -481,6 +483,7 @@ static void *__alloc_remap_buffer(struct device *dev, size_t size, gfp_t gfp,
+>   		return NULL;
 >   	}
 >   
-> -	/* map pages with kernel virtual space. */
-> +	nr_pages = buffer->size >> PAGE_SHIFT;
+> + out:
+>   	*ret_page = page;
+>   	return ptr;
+>   }
+> @@ -523,12 +526,12 @@ static int __free_from_pool(void *start, size_t size)
+>   
+>   static void *__alloc_from_contiguous(struct device *dev, size_t size,
+>   				     pgprot_t prot, struct page **ret_page,
+> -				     const void *caller)
+> +				     const void *caller, bool want_vaddr)
+>   {
+>   	unsigned long order = get_order(size);
+>   	size_t count = size >> PAGE_SHIFT;
+>   	struct page *page;
+> -	void *ptr;
+> +	void *ptr = NULL;
+>   
+>   	page = dma_alloc_from_contiguous(dev, count, order);
+>   	if (!page)
+> @@ -536,6 +539,9 @@ static void *__alloc_from_contiguous(struct device *dev, size_t size,
+>   
+>   	__dma_clear_buffer(page, size);
+>   
+> +	if (!want_vaddr)
+> +		goto out;
 > +
-> +	buffer->kvaddr = (void __iomem *) vmap(buffer->pages,
-> +			nr_pages, VM_MAP,
-> +			pgprot_writecombine(PAGE_KERNEL));
->   	if (!buffer->kvaddr) {
-> -		if (is_drm_iommu_supported(dev)) {
-> -			unsigned int nr_pages = buffer->size >> PAGE_SHIFT;
-> -
-> -			buffer->kvaddr = (void __iomem *) vmap(buffer->pages,
-> -					nr_pages, VM_MAP,
-> -					pgprot_writecombine(PAGE_KERNEL));
-> -		} else {
-> -			phys_addr_t dma_addr = buffer->dma_addr;
-> -			if (dma_addr)
-> -				buffer->kvaddr = (void __iomem *)phys_to_virt(dma_addr);
-> -			else
-> -				buffer->kvaddr = (void __iomem *)NULL;
-> -		}
-> -		if (!buffer->kvaddr) {
-> -			DRM_ERROR("failed to map pages to kernel space.\n");
-> -			return -EIO;
-> -		}
-> +		DRM_ERROR("failed to map pages to kernel space.\n");
-> +		return -EIO;
+>   	if (PageHighMem(page)) {
+>   		ptr = __dma_alloc_remap(page, size, GFP_KERNEL, prot, caller);
+>   		if (!ptr) {
+> @@ -546,17 +552,21 @@ static void *__alloc_from_contiguous(struct device *dev, size_t size,
+>   		__dma_remap(page, size, prot);
+>   		ptr = page_address(page);
 >   	}
+> +
+> + out:
+>   	*ret_page = page;
+>   	return ptr;
+>   }
 >   
->   	/* buffer count to framebuffer always is 1 at booting time. */
-> @@ -313,7 +302,7 @@ static void exynos_drm_fbdev_destroy(struct drm_device *dev,
->   	struct exynos_drm_gem_obj *exynos_gem_obj = exynos_fbd->exynos_gem_obj;
->   	struct drm_framebuffer *fb;
+>   static void __free_from_contiguous(struct device *dev, struct page *page,
+> -				   void *cpu_addr, size_t size)
+> +				   void *cpu_addr, size_t size, bool want_vaddr)
+>   {
+> -	if (PageHighMem(page))
+> -		__dma_free_remap(cpu_addr, size);
+> -	else
+> -		__dma_remap(page, size, PAGE_KERNEL);
+> +	if (want_vaddr) {
+> +		if (PageHighMem(page))
+> +			__dma_free_remap(cpu_addr, size);
+> +		else
+> +			__dma_remap(page, size, PAGE_KERNEL);
+> +	}
+>   	dma_release_from_contiguous(dev, page, size >> PAGE_SHIFT);
+>   }
 >   
-> -	if (is_drm_iommu_supported(dev) && exynos_gem_obj->buffer->kvaddr)
-> +	if (exynos_gem_obj->buffer->kvaddr)
->   		vunmap(exynos_gem_obj->buffer->kvaddr);
+> @@ -574,12 +584,12 @@ static inline pgprot_t __get_dma_pgprot(struct dma_attrs *attrs, pgprot_t prot)
 >   
->   	/* release drm framebuffer and real buffer */
-> diff --git a/drivers/gpu/drm/exynos/exynos_drm_gem.h b/drivers/gpu/drm/exynos/exynos_drm_gem.h
-> index ec58fe9..308173c 100644
-> --- a/drivers/gpu/drm/exynos/exynos_drm_gem.h
-> +++ b/drivers/gpu/drm/exynos/exynos_drm_gem.h
-> @@ -22,6 +22,7 @@
+>   #define nommu() 1
+>   
+> -#define __get_dma_pgprot(attrs, prot)	__pgprot(0)
+> -#define __alloc_remap_buffer(dev, size, gfp, prot, ret, c)	NULL
+> +#define __get_dma_pgprot(attrs, prot)				__pgprot(0)
+> +#define __alloc_remap_buffer(dev, size, gfp, prot, ret, c, wv)	NULL
+>   #define __alloc_from_pool(size, ret_page)			NULL
+> -#define __alloc_from_contiguous(dev, size, prot, ret, c)	NULL
+> +#define __alloc_from_contiguous(dev, size, prot, ret, c, wv)	NULL
+>   #define __free_from_pool(cpu_addr, size)			0
+> -#define __free_from_contiguous(dev, page, cpu_addr, size)	do { } while (0)
+> +#define __free_from_contiguous(dev, page, cpu_addr, size, wv)	do { } while (0)
+>   #define __dma_free_remap(cpu_addr, size)			do { } while (0)
+>   
+>   #endif	/* CONFIG_MMU */
+> @@ -599,11 +609,13 @@ static void *__alloc_simple_buffer(struct device *dev, size_t size, gfp_t gfp,
+>   
+>   
+>   static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+> -			 gfp_t gfp, pgprot_t prot, bool is_coherent, const void *caller)
+> +			 gfp_t gfp, pgprot_t prot, bool is_coherent,
+> +			 struct dma_attrs *attrs, const void *caller)
+>   {
+>   	u64 mask = get_coherent_dma_mask(dev);
+>   	struct page *page = NULL;
+>   	void *addr;
+> +	bool want_vaddr;
+>   
+>   #ifdef CONFIG_DMA_API_DEBUG
+>   	u64 limit = (mask + 1) & ~mask;
+> @@ -631,20 +643,21 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+>   
+>   	*handle = DMA_ERROR_CODE;
+>   	size = PAGE_ALIGN(size);
+> +	want_vaddr = !dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs);
+>   
+>   	if (is_coherent || nommu())
+>   		addr = __alloc_simple_buffer(dev, size, gfp, &page);
+>   	else if (!(gfp & __GFP_WAIT))
+>   		addr = __alloc_from_pool(size, &page);
+>   	else if (!dev_get_cma_area(dev))
+> -		addr = __alloc_remap_buffer(dev, size, gfp, prot, &page, caller);
+> +		addr = __alloc_remap_buffer(dev, size, gfp, prot, &page, caller, want_vaddr);
+>   	else
+> -		addr = __alloc_from_contiguous(dev, size, prot, &page, caller);
+> +		addr = __alloc_from_contiguous(dev, size, prot, &page, caller, want_vaddr);
+>   
+> -	if (addr)
+> +	if (page)
+>   		*handle = pfn_to_dma(dev, page_to_pfn(page));
+>   
+> -	return addr;
+> +	return want_vaddr ? addr : page;
+>   }
+>   
 >   /*
->    * exynos drm gem buffer structure.
->    *
-> + * @cookie: cookie returned by dma_alloc_attrs
->    * @kvaddr: kernel virtual address to allocated memory region.
->    * *userptr: user space address.
->    * @dma_addr: bus address(accessed by dma) to allocated memory region.
-> @@ -35,6 +36,7 @@
->    *	VM_PFNMAP or not.
->    */
->   struct exynos_drm_gem_buf {
-> +	void 			*cookie;
->   	void __iomem		*kvaddr;
->   	unsigned long		userptr;
->   	dma_addr_t		dma_addr;
+> @@ -661,7 +674,7 @@ void *arm_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+>   		return memory;
+>   
+>   	return __dma_alloc(dev, size, handle, gfp, prot, false,
+> -			   __builtin_return_address(0));
+> +			   attrs, __builtin_return_address(0));
+>   }
+>   
+>   static void *arm_coherent_dma_alloc(struct device *dev, size_t size,
+> @@ -674,7 +687,7 @@ static void *arm_coherent_dma_alloc(struct device *dev, size_t size,
+>   		return memory;
+>   
+>   	return __dma_alloc(dev, size, handle, gfp, prot, true,
+> -			   __builtin_return_address(0));
+> +			   attrs, __builtin_return_address(0));
+>   }
+>   
+>   /*
+> @@ -715,6 +728,7 @@ static void __arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
+>   			   bool is_coherent)
+>   {
+>   	struct page *page = pfn_to_page(dma_to_pfn(dev, handle));
+> +	bool want_vaddr = !dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs);
+>   
+>   	if (dma_release_from_coherent(dev, get_order(size), cpu_addr))
+>   		return;
+> @@ -726,14 +740,15 @@ static void __arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
+>   	} else if (__free_from_pool(cpu_addr, size)) {
+>   		return;
+>   	} else if (!dev_get_cma_area(dev)) {
+> -		__dma_free_remap(cpu_addr, size);
+> +		if (want_vaddr)
+> +			__dma_free_remap(cpu_addr, size);
+>   		__dma_free_buffer(page, size);
+>   	} else {
+>   		/*
+>   		 * Non-atomic allocations cannot be freed with IRQs disabled
+>   		 */
+>   		WARN_ON(irqs_disabled());
+> -		__free_from_contiguous(dev, page, cpu_addr, size);
+> +		__free_from_contiguous(dev, page, cpu_addr, size, want_vaddr);
+>   	}
+>   }
+>   
 
 Best regards
 -- 
