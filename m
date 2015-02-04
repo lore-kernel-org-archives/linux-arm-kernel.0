@@ -1,27 +1,70 @@
-From: marek@goldelico.com (Marek Belisko)
-Date: Wed,  4 Feb 2015 23:14:35 +0100
-Subject: [PATCH v3 6/6] power: twl4030_madc_battery: Add missing MODULE_ALIAS
-In-Reply-To: <1423088075-10025-1-git-send-email-marek@goldelico.com>
-References: <1423088075-10025-1-git-send-email-marek@goldelico.com>
-Message-ID: <1423088075-10025-7-git-send-email-marek@goldelico.com>
+From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
+Date: Wed,  4 Feb 2015 15:18:53 -0700
+Subject: [PATCH] coresight-stm: Bindings for System Trace Macrocell
+Message-ID: <1423088333-14914-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without MODULE_ALIAS twl4030_madc_battery won't get loaded automatically.
+From: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-Signed-off-by: Marek Belisko <marek@goldelico.com>
+The System Trace Macrocell (STM) is an IP block falling under the
+CoreSight umbrella.  It's main purpose it so expose stimulus channels
+to any system component for the purpose of information logging.
+
+Bindings for this IP block adds a couple of items to the current
+mandatory definition for CoreSight components.
+
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/power/twl4030_madc_battery.c | 1 +
- 1 file changed, 1 insertion(+)
+ .../devicetree/bindings/arm/coresight.txt          | 25 ++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-diff --git a/drivers/power/twl4030_madc_battery.c b/drivers/power/twl4030_madc_battery.c
-index e6075ae..cea0927 100644
---- a/drivers/power/twl4030_madc_battery.c
-+++ b/drivers/power/twl4030_madc_battery.c
-@@ -355,3 +355,4 @@ module_platform_driver(twl4030_madc_battery_driver);
- MODULE_LICENSE("GPL");
- MODULE_AUTHOR("Lukas M?rdian <lukas@goldelico.com>");
- MODULE_DESCRIPTION("twl4030_madc battery driver");
-+MODULE_ALIAS("platform:twl4030_madc_battery");
+diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
+index a3089359aaa6..854127578718 100644
+--- a/Documentation/devicetree/bindings/arm/coresight.txt
++++ b/Documentation/devicetree/bindings/arm/coresight.txt
+@@ -17,6 +17,7 @@ its hardware characteristcs.
+ 		- "arm,coresight-tmc", "arm,primecell";
+ 		- "arm,coresight-funnel", "arm,primecell";
+ 		- "arm,coresight-etm3x", "arm,primecell";
++		- "arm,coresight-stm", "arm,primecell";
+ 
+ 	* reg: physical base address and length of the register
+ 	  set(s) of the component.
+@@ -31,6 +32,14 @@ its hardware characteristcs.
+ 	  layout using the generic DT graph presentation found in
+ 	  "bindings/graph.txt".
+ 
++* Additional required properly for System Trace Macrocells (STM):
++	* reg: along with the physical base address and length of the register
++	  set as described above, another entry is required to describe the
++	  mapping of the extended stimulus port area.
++
++	* reg-names: the only acceptable values are "stm-base" and
++	  "stm-channel-base", each corresponding to the areas defined in "reg".
++
+ * Required properties for devices that don't show up on the AMBA bus, such as
+   non-configurable replicators:
+ 
+@@ -198,3 +207,19 @@ Example:
+ 			};
+ 		};
+ 	};
++
++4. STM
++	stm at 20100000 {
++		compatible = "arm,coresight-stm", "arm,primecell";
++		reg = <0 0x20100000 0 0x1000>,
++		      <0 0x28000000 0 0x180000>;
++		reg-names = "stm-base", "stm-channel-base";
++
++		clocks = <&soc_smc50mhz>;
++		clock-names = "apb_pclk";
++		port {
++			stm_out_port: endpoint {
++				remote-endpoint = <&main_funnel_in_port2>;
++			};
++		};
++	};
 -- 
 1.9.1
