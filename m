@@ -1,52 +1,212 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 4 Feb 2015 13:32:05 +0000
-Subject: ask for help about swiotlb buffer is full
-In-Reply-To: <54D209FD.40100@huawei.com>
-References: <54CB5820.9020102@huawei.com> <54CB5AA4.7050705@huawei.com>
- <20150130115915.GB27542@e104818-lin.cambridge.arm.com>
- <54CC5346.5070402@huawei.com>
- <20150202182435.GH22661@e104818-lin.cambridge.arm.com>
- <54D209FD.40100@huawei.com>
-Message-ID: <20150204133205.GC26006@e104818-lin.cambridge.arm.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 04 Feb 2015 15:00:15 +0100
+Subject: [PATCH v2 3/5] ACPI: add arch-specific compilation for _OSI and
+ the blacklist
+In-Reply-To: <1423009304-5007-4-git-send-email-al.stone@linaro.org>
+References: <1423009304-5007-1-git-send-email-al.stone@linaro.org>
+ <1423009304-5007-4-git-send-email-al.stone@linaro.org>
+Message-ID: <2298661.ffvhncbLpr@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 04, 2015 at 12:01:01PM +0000, Kefeng Wang wrote:
-> On 2015-02-03 2:24, Catalin Marinas wrote:
-> > On Sat, Jan 31, 2015 at 04:00:06AM +0000, Kefeng Wang wrote:
-> >> On 2015-01-30 19:59, Catalin Marinas wrote:
-> [...]
-> >>>
-> >>
-> >> 4kb page,  use Make ARCH=arm64 defconfig in v3.19 to generate config.
-> >>
-> >> [    0.678293] software IO TLB [mem 0x7e800000-0x7ec00000] (4MB) mapped at [ffffffc07e800000-ffffffc07ebfffff]
-> >> [    0.686991] DMA: preallocated 256 KiB pool for atomic allocations
-> > 
-> > Was the swiotlb buffer size the same in the 3.16 kernel? The only thing
-> > I recall adding was the atomic pool allocations but these are only for
-> > non-coherent DMA ops and only for dma_alloc/free. I assume, in the case
-> > of SATA, the failure is on the dma_map_sg() path.
+On Tuesday, February 03, 2015 05:21:42 PM al.stone at linaro.org wrote:
+> From: Al Stone <al.stone@linaro.org>
 > 
-> Swiotlb buffer size is both 4M in v3.16 and v3.19-rc4, and the failure is
-> on the dma_map_sg() -> swiotlb_map_sg_attrs.
+> Now that all of the _OSI functionality has been separated out, we can
+> provide arch-specific functionality for it.  This also allows us to do
+> the same for the acpi_blacklisted() function.
 > 
-> > Maybe with a 3.19 kernel you get more than 4MB swiotlb buffers used at a
-> > time with your tests; can you try increasing this via a kernel command
-> > like to, let's say, 8MB? If I got my calculations correctly (an IO TLB
-> > slab is 1 << 11):
-> > 
-> > 	swiotlb=4096
-> > 
-> > If it still runs out with bigger buffers, we may need to look into
-> > potential leaks.
+> Whether arch-specific functions are used or not now depends on the config
+> options CONFIG_ACPI_ARCH_SPECIFIC_OSI and CONFIG_ARCH_SPECIFIC_BLACKLIST.
+> By default, both are set false which causes the x86/ia64 versions to be
+> used, just as is done today.  Setting one or both of these options true
+> will cause architecture-specific implementations to be built instead; this
+> patch also provides arm64 implementations.
 > 
-> The buddy allocator can only support 4M contiguous physical memory, so it's
-> useless to increase swiotlb buffer.
+> For x86/ia64, there is no functional change.
+> 
+> For arm64, any use of _OSI will issue a warning that it is deprecated.
+> All use of _OSI will return false -- i.e., it will return no useful
+> information to any firmware using it.  The ability to temporarily turn
+> on _OSI, or turn off _OSI, or affect it in other ways from the command
+> line is no longer available for arm64, either.  The blacklist for ACPI
+> on arm64 is empty.  This will, of course, require ACPI to be enabled
+> for arm64.
+> 
+> Signed-off-by: Al Stone <al.stone@linaro.org>
+> ---
+>  drivers/acpi/Kconfig         | 22 ++++++++++++++++++++++
+>  drivers/acpi/Makefile        | 19 ++++++++++++++++++-
+>  drivers/acpi/blacklist-arm.c | 20 ++++++++++++++++++++
+>  drivers/acpi/blacklist.c     |  5 +++++
+>  drivers/acpi/osi-arm.c       | 25 +++++++++++++++++++++++++
+>  5 files changed, 90 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/acpi/blacklist-arm.c
+>  create mode 100644 drivers/acpi/osi-arm.c
+> 
+> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> index 3e3bd35..4190940 100644
+> --- a/drivers/acpi/Kconfig
+> +++ b/drivers/acpi/Kconfig
+> @@ -369,6 +369,28 @@ config ACPI_REDUCED_HARDWARE_ONLY
+>  
+>  	  If you are unsure what to do, do not enable this option.
+>  
+> +config ACPI_ARCH_SPECIFIC_OSI
 
-You could hack arch/arm64/Kconfig to set a higher
-CONFIG_FORCE_MAX_ZONEORDER as a test. Depending on the test result, we
-can look for an alternative solution.
+I woulnd't make this and the other one user-selectable.  Let architectures
+select them from their top-level Kconfig files.
+
+That's what we do with the other CONFIG_ARCH_ things.
+
+So in the architecture-specific Kconfig you'll have
+
+config ACPI_ARCH_SPECIFIC_OSI
+	def_bool n
+	depends on ACPI
+
+Moreover, I'd call that ARCH_SPECIFIC_ACPI_OSI.
+
+And analogously for the blacklist thing (and do we need two of them really?).
+
+> +	bool "Use an arch-specific _OSI implementation" if EXPERT
+> +	def_bool n
+> +	help
+> +	  If this option is set, the ACPI driver will use an
+> +	  implementation of _OSI that is specific to the target
+> +	  architecture, instead of the default implementation
+> +	  originally created for x86 and then used on ia64.
+> +
+> +	  If you are unsure what to do, do not enable this option.
+> +
+> +config ACPI_ARCH_SPECIFIC_BLACKLIST
+> +	bool "Use an arch-specific ACPI blacklist" if EXPERT
+> +	def_bool n
+> +	help
+> +	  If this option is set, the ACPI driver will use a blacklist
+> +	  that is specific to the target architecture, instead of the
+> +	  default implementation originally created for x86 and then
+> +	  used on ia64.
+> +
+> +	  If you are unsure what to do, do not enable this option.
+> +
+>  source "drivers/acpi/apei/Kconfig"
+>  
+>  config ACPI_EXTLOG
+> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+> index df348b3..beefb17 100644
+> --- a/drivers/acpi/Makefile
+> +++ b/drivers/acpi/Makefile
+> @@ -18,9 +18,26 @@ obj-y				+= acpi.o \
+>  					acpica/
+>  
+>  # All the builtin files are in the "acpi." module_param namespace.
+> -acpi-y				+= osl.o utils.o reboot.o osi.o
+> +acpi-y				+= osl.o utils.o reboot.o
+>  acpi-y				+= nvs.o
+>  
+> +# _OSI related files
+> +ifeq ($(CONFIG_ACPI_ARCH_SPECIFIC_OSI), y)
+> +ifeq ($(ARCH), arm64)
+> +acpi-y				+= osi-arm.o
+
+No, no.  Please no osi-arm.c or blacklist-arm.c in drivers/acpi/.
+The arch-specific stuff needs to go into arch/
+
+> +endif
+> +else # X86, IA64
+> +acpi-y				+= osi.o
+> +endif
+> +
+> +ifeq ($(CONFIG_ACPI_ARCH_SPECIFIC_BLACKLIST), y)
+> +ifeq ($(ARCH), arm64)
+> +acpi-y				+= blacklist-arm.o
+> +endif
+> +else # X86, IA64
+> +acpi-y				+= blacklist.o
+> +endif
+> +
+>  # Power management related files
+>  acpi-y				+= wakeup.o
+>  ifeq ($(ARCH), arm64)
+> diff --git a/drivers/acpi/blacklist-arm.c b/drivers/acpi/blacklist-arm.c
+> new file mode 100644
+> index 0000000..1be6a56
+> --- /dev/null
+> +++ b/drivers/acpi/blacklist-arm.c
+> @@ -0,0 +1,20 @@
+> +/*
+> + *  ARM64 Specific ACPI Blacklist Support
+> + *
+> + *  Copyright (C) 2015, Linaro Ltd.
+> + *	Author: Al Stone <al.stone@linaro.org>
+> + *
+> + *  This program is free software; you can redistribute it and/or modify
+> + *  it under the terms of the GNU General Public License version 2 as
+> + *  published by the Free Software Foundation.
+> + */
+> +
+> +#define pr_fmt(fmt) "ACPI: " fmt
+> +
+> +#include <linux/acpi.h>
+> +
+> +/* The arm64 ACPI blacklist is currently empty.  */
+> +int __init acpi_blacklisted(void)
+> +{
+> +	return 0;
+> +}
+> diff --git a/drivers/acpi/blacklist.c b/drivers/acpi/blacklist.c
+> index 3931e19..222c82d 100644
+> --- a/drivers/acpi/blacklist.c
+> +++ b/drivers/acpi/blacklist.c
+> @@ -34,9 +34,14 @@
+>  
+>  #include "internal.h"
+>  
+> +#ifdef CONFIG_ACPI_ARCH_SPECIFIC_OSI
+> +void __init acpi_dmi_osi_linux(int enable, const struct dmi_system_id *d) { }
+> +void __init acpi_osi_setup(char *str) { }
+> +#else
+>  extern void __init acpi_dmi_osi_linux(int enable,
+>  				      const struct dmi_system_id *d);
+>  extern void __init acpi_osi_setup(char *str);
+> +#endif
+>  
+>  enum acpi_blacklist_predicates {
+>  	all_versions,
+> diff --git a/drivers/acpi/osi-arm.c b/drivers/acpi/osi-arm.c
+> new file mode 100644
+> index 0000000..bb351f4
+> --- /dev/null
+> +++ b/drivers/acpi/osi-arm.c
+> @@ -0,0 +1,25 @@
+> +/*
+> + *  ARM64 Specific ACPI _OSI Support
+> + *
+> + *  Copyright (C) 2015, Linaro Ltd.
+> + *	Author: Al Stone <al.stone@linaro.org>
+> + *
+> + *  This program is free software; you can redistribute it and/or modify
+> + *  it under the terms of the GNU General Public License version 2 as
+> + *  published by the Free Software Foundation.
+> + */
+> +
+> +#define pr_fmt(fmt) "ACPI: " fmt
+> +
+> +#include <linux/acpi.h>
+> +
+> +/*
+> + * Consensus is to deprecate _OSI for all new ACPI-supported architectures.
+> + * So, for arm64, reduce _OSI to a warning message, and tell the firmware
+> + * nothing of value.
+> + */
+> +u32 acpi_osi_handler(acpi_string interface, u32 supported)
+> +{
+> +	pr_warn("_OSI was called, but is deprecated for this architecture.\n");
+> +	return false;
+> +}
+> 
 
 -- 
-Catalin
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
