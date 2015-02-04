@@ -1,36 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 4 Feb 2015 15:16:24 +0000
-Subject: [rcu] [ INFO: suspicious RCU usage. ]
-In-Reply-To: <20150204151028.GD5370@linux.vnet.ibm.com>
-References: <20150201025922.GA16820@wfg-t540p.sh.intel.com>
- <1422957702.17540.1.camel@AMDC1943>
- <20150203162704.GR19109@linux.vnet.ibm.com>
- <1423049947.19547.6.camel@AMDC1943>
- <20150204130018.GG8656@n2100.arm.linux.org.uk>
- <20150204131420.GC5370@linux.vnet.ibm.com>
- <1423059387.24415.2.camel@AMDC1943>
- <20150204151028.GD5370@linux.vnet.ibm.com>
-Message-ID: <20150204151624.GI8656@n2100.arm.linux.org.uk>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Thu, 05 Feb 2015 00:19:00 +0900
+Subject: [PATCH v3 0/6] Add multiple GPIO and external clock to MMC
+ pwrseq_simple
+In-Reply-To: <54D23591.7050208@collabora.co.uk>
+References: <1422543608-24704-1-git-send-email-javier.martinez@collabora.co.uk>
+ <CAPDyKFqx-dhhVmtGnP2YpmR63Y20Ns=YyxnYrE2ewTuNXPA7Ag@mail.gmail.com>
+ <54CB81EF.8030603@collabora.co.uk> <54D23591.7050208@collabora.co.uk>
+Message-ID: <54D23864.7050705@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 04, 2015 at 07:10:28AM -0800, Paul E. McKenney wrote:
-> You know, this situation is giving me a bad case of nostalgia for the
-> old Sequent Symmetry and NUMA-Q hardware.  On those platforms, the
-> outgoing CPU could turn itself off, and thus didn't need to tell some
-> other CPU when it was ready to be turned off.  Seems to me that this
-> self-turn-off capability would be a great feature for future systems!
+On 02/05/15 00:06, Javier Martinez Canillas wrote:
+> Hello Kukjin,
+> 
+Hi,
 
-Unfortunately, some briliant people decided that secure firmware on
-their platforms (which is sometimes needed to turn the secondary CPUs
-off) can only be called by CPU0...
+> On 01/30/2015 02:06 PM, Javier Martinez Canillas wrote:
+>> On 01/30/2015 12:13 PM, Ulf Hansson wrote:
+>>>>
+>>>> Patch #1 extends the simple MMC power sequence DT binding to support more
+>>>> than one GPIO and patch #2 adds the actual implementation.
+>>>>
+>>>> In the same way, patch #3 and #4 extend the simple MMC power sequence DT
+>>>> binding and pwrseq_simple driver to support an optional external clock.
+>>>>
+>>>> Finally as an example, patch #5 and patch #6 adds support for the wifi
+>>>> chip in the Exynos5250 Snow that needs all these resources. These two
+>>>> patches were added to the series only for completeness and should be
+>>>> picked by Kukjin through his linux-samsung tree.
+>>>>
+>>>> Best regards,
+>>>> Javier
+>>>
+>>> Thanks Javier! I have applied patch 1 -> 4 for my next branch.
+>>>
+>>> I made some minor fix to patch4, I send a separate response to that
+>>> patch so you know.
+>>>
+>>
+>> Great, thanks a lot!
+>>
+>> Kukjin,
+>>
+>> Could you please pick patches #5 and #6 then now that Ulf picked the others?
+>>
+> 
+> I noticed that you are applying patches to your Samsung tree, do you want me to
+> re-send patches #5 and #6 or is OK for you to pick them from from this series?
+> 
+Oh, I've missed and it looks good to me. Applied, it means you don't
+need to re-send ;)
 
-Other people decide that they can power down the secondary CPU when it
-hits a WFI (wait for interrupt) instruction after arming that state
-change, which is far saner - but we still need to know on the requesting
-CPU when the dying CPU has completed the time-expensive parts of the
-offlining process.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Thanks,
+Kukjin
