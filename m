@@ -1,5 +1,5 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Wed, 04 Feb 2015 16:38:59 +0000
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 4 Feb 2015 10:41:11 -0600
 Subject: [PATCH v8 02/21] acpi: fix acpi_os_ioremap for arm64
 In-Reply-To: <20150204162536.GJ8656@n2100.arm.linux.org.uk>
 References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
@@ -9,39 +9,29 @@ References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
  <20150204104832.GF8656@n2100.arm.linux.org.uk>
  <CAErSpo71fVU5mJgXnxMwiE_TUrNyfSYHo5RDF-=u2BK5grDYAw@mail.gmail.com>
  <20150204162536.GJ8656@n2100.arm.linux.org.uk>
-Message-ID: <1423067939.3011.72.camel@infradead.org>
+Message-ID: <CAErSpo69LoS0P_bzJ2JJyF=H_YyJua85FCJ7DdMi2_na=aHRiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-02-04 at 16:25 +0000, Russell King - ARM Linux wrote:
-> I haven't experimented with it myself, but I think David Woodhouse
-> has some experience in this area.
+On Wed, Feb 4, 2015 at 10:25 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Feb 04, 2015 at 09:53:28AM -0600, Bjorn Helgaas wrote:
+>> On Wed, Feb 4, 2015 at 4:48 AM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > Moreover, __weak is positively harmful when you consider it adds bloat
+>> > and dead code - the overriden __weak function is left behind in the
+>> > resulting final image.
+>>
+>> Huh, I didn't realize that.  Is that a linker bug, or is there some
+>> reason the weak function has to be in the final image?  I tried a
+>> trivial test on x86 with gcc-4.8.2/ld-2.24, and I think the weak
+>> function text was omitted, but a string constant used only by the weak
+>> function was included.
+> ...
+> The reason this happens is because normally, each function text is
+> emitted into the .text section of the object file, one after each
+> other.  When the image is linked, the linker copies the contents of
+> the complete input section to the output file, and then resolves the
+> symbolic information and relocations.
 
-In many kernel configurations there are actually quite a lot of
-functions that are never called, and I was quite surprised the first
-time I played with this stuff.
-
-There are a few ways of dealing with it. One is to use
--ffunction-section -fdata-sections --gc-sections as you noted. I once
-also played with using GCC's --combine during the brief period that it
-was supported and not *entirely* broken, with similar effects:
-https://lwn.net/Articles/197097/
-
-These days, the better answer is probably LTO. We could potentially
-still look at --gc-sections, but I suspect we're better off using LTO
-and just filing toolchain bugs until everything that --gc-sections
-*would* have dropped is also dropped from the LTO build :)
-
-Unless --gc-sections actually speeds up the build in a significant way;
-a full LTO link of the kernel takes insane amounts of memory IIRC.
-
--- 
-David Woodhouse                            Open Source Technology Centre
-David.Woodhouse at intel.com                              Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 5745 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150204/a5418034/attachment-0001.bin>
+OK, that makes sense.  Thanks a lot for the detailed explanation!
