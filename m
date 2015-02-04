@@ -1,28 +1,115 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 04 Feb 2015 15:48:37 +0100
-Subject: [PATCH v5 2/7] mailbox: arm_mhu: add driver for ARM MHU controller
-In-Reply-To: <CAJe_Zhe_d-H10J8cH-fxcbusoJV8jMUW-pruXVkEKY7PnLMGFA@mail.gmail.com>
-References: <1422955310-6542-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <4418090.U8XOXMKsEU@wuerfel>
- <CAJe_Zhe_d-H10J8cH-fxcbusoJV8jMUW-pruXVkEKY7PnLMGFA@mail.gmail.com>
-Message-ID: <3593142.nVgVfPmW1o@wuerfel>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Wed, 04 Feb 2015 23:50:23 +0900
+Subject: [PATCH v5 0/9] Enable HDMI support on Exynos platforms
+In-Reply-To: <54D1634A.4040300@samsung.com>
+References: <1422883228-10690-1-git-send-email-m.szyprowski@samsung.com>
+ <066101d03f65$a870dcc0$f9529640$@kernel.org> <54D1634A.4040300@samsung.com>
+Message-ID: <54D231AF.4040903@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 February 2015 20:04:21 Jassi Brar wrote:
+On 02/04/15 09:09, Joonyoung Shim wrote:
+> Hi,
 > 
-> > Using the bits of the pointer as the message instead of pointing
-> > to the message feels like an abuse of the API.
-> >
-> I can see your POV.
-> Now consider a client, like mine, that sends a u32 value as the data.
-> But unlike me, the client uses the mailbox api in 'async' mode i.e,
-> register a callback function, submit a 32bit message and move on. It
-> is perfectly doable, but doesn't kalloc'ing a u32 for each submission,
-> seem overkill?
+Hi,
 
-That could easily be done by dereferencing the message data in the
-function that queues the asynchronous message: instead of queuing
-the pointer, you queue the data in the driver.
+> On 02/03/2015 12:58 PM, Kukjin Kim wrote:
+>> Marek Szyprowski wrote:
+>>>
+>>> Hi all,
+>>>
+>>> This is yet another update on patchset, which enables HDMI support for
+>>> Exynos based platforms.
+>>>
+>>> Beside DTS changes, this patchset adds parent domain support for Exynos
+>>> PM domains and add support for 'hdmi' clock directly to Exynos DRM mixer
+>>> driver.
+>>>
+>>> The patchset is based on samsung/for-next branch and 'PM / Domains:
+>>> Export of_genpd_get_from_provider function' patch merged as commit
+>>> 7496fcbe8a643097efc061160e1c3b65ee2fa350 to v3.19-rc4.
+>>>
+>>> Regards
+>>> Marek Szyprowski
+>>>
+>>>
+>>> Changelog:
+>>>
+>>> v5:
+>>> - fixed error value for clk_get() in mixer patch
+>>> - rebased onto samsung/for-next branch
+>>>
+>>> v4: (http://www.spinics.net/lists/linux-samsung-soc/msg41375.html)
+>>> - added patches, which add 'hdmi' clock handling to mixed block, this
+>>>   finally solves the initialization related issues, thanks for Tobias
+>>>   Jakobi for testing
+>>> - added acks/reviewed/tested by tags
+>>>
+>>> v3: (http://www.spinics.net/lists/linux-samsung-soc/msg41020.html)
+>>> - added a note on defining subdomains to generic PM domain binding
+>>>   documentation (requested by Ulf Hansson)
+>>>
+>>> v2: (http://www.spinics.net/lists/linux-samsung-soc/msg40980.html)
+>>> - rewrote subdomains patch according to suggestions from Geert
+>>>   Uytterhoeven and Amit Daniel Kachhap.
+>>>
+>>> v1 resend: (http://www.spinics.net/lists/linux-samsung-soc/msg39428.html)
+>>> - added handling of generic 'power-domains' binding in subdomains
+>>>
+>>> v1: (http://www.spinics.net/lists/linux-samsung-soc/msg38914.html)
+>>> - resolved power domain on/off issue with 'clk: samsung: exynos4: set
+>>>   parent of mixer gate clock to hdmi' patch
+>>>
+>>> v0: (http://www.spinics.net/lists/linux-samsung-soc/msg33498.html)
+>>> - first attempt, used 'always on' power domains hack
+>>>
+>>>
+>>> Patch summary:
+>>>
+>>>
+>>> *** BLURB HERE ***
+>>>
+>>> Andrzej Hajda (1):
+>>>   ARM: dts: exynos5250: add display power domain
+>>>
+>>> Marek Szyprowski (7):
+>>>   PM / Domains: Add a note about power domain subdomains
+>>>   ARM: Exynos: add support for sub-power domains
+>>>   ARM: dts: exynos4: add hdmi related nodes
+>>>   ARM: dts: exynos4: add dependency between TV and LCD0 power domains
+>>>   ARM: dts: exynos4412-odroid: enable hdmi support
+>>>   ARM: dts: Exynos: add 'hdmi' clock to mixer nodes
+>>>   drm/exynos: add support for 'hdmi' clock
+>>>
+>>> Tomasz Stanislawski (1):
+>>>   ARM: dts: exynos4210-universal_c210: enable hdmi support
+>>>
+>>>  .../bindings/arm/exynos/power_domain.txt           |  2 +
+>>>  .../devicetree/bindings/power/power_domain.txt     | 29 +++++++++++
+>>>  .../devicetree/bindings/video/exynos_mixer.txt     |  1 +
+>>>  arch/arm/boot/dts/exynos4.dtsi                     | 41 ++++++++++++++++
+>>>  arch/arm/boot/dts/exynos4210-universal_c210.dts    | 57 ++++++++++++++++++++++
+>>>  arch/arm/boot/dts/exynos4210.dtsi                  |  8 +++
+>>>  arch/arm/boot/dts/exynos4412-odroid-common.dtsi    | 44 +++++++++++++++++
+>>>  arch/arm/boot/dts/exynos4x12.dtsi                  | 11 +++++
+>>>  arch/arm/boot/dts/exynos5250.dtsi                  | 15 +++++-
+>>>  arch/arm/boot/dts/exynos5420.dtsi                  |  5 +-
+>>>  arch/arm/mach-exynos/pm_domains.c                  | 28 +++++++++++
+>>>  drivers/gpu/drm/exynos/exynos_mixer.c              |  9 ++++
+>>>  12 files changed, 246 insertions(+), 4 deletions(-)
+>>>
+>>> --
+>> I have no objection on this series, but just wondering my tree should be fine
+>> without 9/9 drm patch and it will be handled for 3.20?
+>>
+>> I'll take 1 to 8 patches once drm patch is landed for 3.20.
+>>
+> 
+> I also hope this patchset merged,
+> 
+> Inki, could you follow up exynos drm part of this patchset?
+> 
+I checked and I'll apply 1 to 8 patches in samsung tree.
 
-	Arnd
+Thanks,
+Kukjin
