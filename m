@@ -1,109 +1,46 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 4 Feb 2015 11:25:08 +0000
-Subject: [PATCH v8 02/21] acpi: fix acpi_os_ioremap for arm64
-In-Reply-To: <1422984576.18187.82.camel@deneb.redhat.com>
-References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
- <1422881149-8177-3-git-send-email-hanjun.guo@linaro.org>
- <2422968.Es7R0p3loO@vostro.rjw.lan>
- <1422984576.18187.82.camel@deneb.redhat.com>
-Message-ID: <20150204112508.GB26006@e104818-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 4 Feb 2015 11:33:05 +0000
+Subject: [PATCH] iommu/arm-smmu: use a threaded handler for context
+ interrupts
+In-Reply-To: <vnkwa90why79.fsf@mitchelh-linux.qualcomm.com>
+References: <1421970482-11722-1-git-send-email-mitchelh@codeaurora.org>
+ <20150123112415.GD23058@arm.com>
+ <vnkw61bx2klr.fsf@mitchelh-linux.qualcomm.com>
+ <20150128120738.GJ1569@arm.com>
+ <vnkwa90why79.fsf@mitchelh-linux.qualcomm.com>
+Message-ID: <20150204113305.GA28902@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 03, 2015 at 05:29:36PM +0000, Mark Salter wrote:
-> On Mon, 2015-02-02 at 23:14 +0100, Rafael J. Wysocki wrote:
-> > On Monday, February 02, 2015 08:45:30 PM Hanjun Guo wrote:
-> > > From: Mark Salter <msalter@redhat.com>
-> > > 
-> > > The acpi_os_ioremap() function may be used to map normal RAM or IO
-> > > regions. The current implementation simply uses ioremap_cache(). This
-> > > will work for some architectures, but arm64 ioremap_cache() cannot be
-> > > used to map IO regions which don't support caching. So for arm64, use
-> > > ioremap() for non-RAM regions.
-> > > 
-> > > CC: Rafael J Wysocki <rjw@rjwysocki.net>
-> > > Signed-off-by: Mark Salter <msalter@redhat.com>
-> > > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> > > ---
-> > >  include/acpi/acpi_io.h | 6 ++++++
-> > >  1 file changed, 6 insertions(+)
-> > > 
-> > > diff --git a/include/acpi/acpi_io.h b/include/acpi/acpi_io.h
-> > > index 444671e..9d573db 100644
-> > > --- a/include/acpi/acpi_io.h
-> > > +++ b/include/acpi/acpi_io.h
-> > > @@ -1,11 +1,17 @@
-> > >  #ifndef _ACPI_IO_H_
-> > >  #define _ACPI_IO_H_
-> > >  
-> > > +#include <linux/mm.h>
-> > >  #include <linux/io.h>
-> > >  
-> > >  static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
-> > >  					    acpi_size size)
-> > >  {
-> > > +#ifdef CONFIG_ARM64
-> > > +	if (!page_is_ram(phys >> PAGE_SHIFT))
-> > > +		return ioremap(phys, size);
-> > > +#endif
-> > 
-> > I don't want to see #ifdef CONFIG_ARM64 in this file.
+On Mon, Feb 02, 2015 at 08:10:02PM +0000, Mitchel Humpherys wrote:
+> On Wed, Jan 28 2015 at 04:07:39 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > With a shared handler (e.g. a bunch of context banks have the same IRQ)
+> > then I assume that we don't want to end up with multiple handler threads
+> > all tripping over each other. I'd rather have one thread that handles work
+> > queued up by multiple low-level handlers.
+> >
+> > Do you have a preference either way?
 > 
-> How about something like:
-> 
-> From: Mark Salter <msalter@redhat.com>
-> Date: Tue, 3 Feb 2015 10:51:16 -0500
-> Subject: [PATCH] acpi: fix acpi_os_ioremap for arm64
-> 
-> The acpi_os_ioremap() function may be used to map normal RAM or IO
-> regions. The current implementation simply uses ioremap_cache(). This
-> will work for some architectures, but arm64 ioremap_cache() cannot be
-> used to map IO regions which don't support caching. So for arm64, use
-> ioremap() for non-RAM regions.
-> 
-> CC: Rafael J Wysocki <rjw@rjwysocki.net>
-> Signed-off-by: Mark Salter <msalter@redhat.com>
-> ---
->  arch/arm64/include/asm/acpi.h | 14 ++++++++++++++
->  include/acpi/acpi_io.h        |  3 +++
->  2 files changed, 17 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-> index ea4d2b3..db82bc3 100644
-> --- a/arch/arm64/include/asm/acpi.h
-> +++ b/arch/arm64/include/asm/acpi.h
-> @@ -14,6 +14,7 @@
->  
->  #include <linux/irqchip/arm-gic-acpi.h>
->  
-> +#include <linux/mm.h>
->  #include <asm/smp_plat.h>
->  
->  /* Basic configuration for ACPI */
-> @@ -100,4 +101,17 @@ static inline bool acpi_psci_use_hvc(void) { return false; }
->  static inline void acpi_init_cpus(void) { }
->  #endif /* CONFIG_ACPI */
->  
-> +/*
-> + * ACPI table mapping
-> + */
-> +static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
-> +					    acpi_size size)
-> +{
-> +	if (!page_is_ram(phys >> PAGE_SHIFT))
-> +		return ioremap(phys, size);
-> +
-> +       return ioremap_cache(phys, size);
-> +}
-> +#define acpi_os_ioremap acpi_os_ioremap
+> Ok I think I understand the scenario you're describing.  If multiple
+> context banks are sharing an interrupt line their handlers currently
+> execute serially, but with threaded handlers they would all be woken up
+> and possibly execute concurrently.  I hadn't really considered this
+> because none of our targets have CBs sharing interrupts.  In any case,
+> the CBs that aren't interrupting should quickly return IRQ_NONE when
+> they notice that !(fsr & FSR_FAULT), so is this really a concern?
 
-That's one way of doing this, I'm not too bothered with the approach
-(define the function name, an ARCH_HAS macro or a Kconfig option, it's
-up to Rafael).
+Well, with my stall-mode hat on, the FSR check could be done in the
+low-level handler, with the actual page fault handling or whatever done
+in the thread.
 
-But a question I already asked is what we need ioremap_cache() for? We
-don't use NVS on arm64 yet, so is there anything else requiring
-cacheable mapping?
+> Anyways, we can always hold off on this until we have a more compelling
+> motivation for it.  For example, if we need to enable clocks to read
+> registers then threaded IRQs seem like the best solution.  Hopefully
+> I'll find time to have another go at the clocks stuff soon, which is the
+> real reason why we're using threaded IRQs for context interrupts in our
+> msm tree.
 
--- 
-Catalin
+Okey doke. Having the clocks stuff supported in iommu core would be my
+preference.
+
+Will
