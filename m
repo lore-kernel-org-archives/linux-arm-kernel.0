@@ -1,77 +1,48 @@
-From: al.stone@linaro.org (al.stone at linaro.org)
-Date: Tue,  3 Feb 2015 17:21:44 -0700
-Subject: [PATCH v2 5/5] ACPI: arm64: use "Linux" as ACPI_OS_NAME for _OS on
- arm64
-In-Reply-To: <1423009304-5007-1-git-send-email-al.stone@linaro.org>
-References: <1423009304-5007-1-git-send-email-al.stone@linaro.org>
-Message-ID: <1423009304-5007-6-git-send-email-al.stone@linaro.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 4 Feb 2015 09:28:59 +0900
+Subject: [PATCH] ARM: shmobile: silk: initial device tree
+In-Reply-To: <CAMuHMdV1U9XV7diKYPwpxAqdzD7tst6e0k=bLgJQ27=YDndn=Q@mail.gmail.com>
+References: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
+ <1608366.HtA9yBksdO@wasted.cogentembedded.com>
+ <20150202110557.GC7459@leverpostej>
+ <54CFE4CE.5090406@cogentembedded.com>
+ <20150203003610.GA17629@verge.net.au>
+ <CAMuHMdV1U9XV7diKYPwpxAqdzD7tst6e0k=bLgJQ27=YDndn=Q@mail.gmail.com>
+Message-ID: <20150204002858.GB29128@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Al Stone <al.stone@linaro.org>
+On Tue, Feb 03, 2015 at 10:53:01AM +0100, Geert Uytterhoeven wrote:
+> On Tue, Feb 3, 2015 at 1:36 AM, Simon Horman <horms@verge.net.au> wrote:
+> > The only thing that stood out to me about "SILK" was that unlike
+> > other renesas boards names in .dtsi files it is all-capitals.
+> > Its not a bit deal but as we are on the topic: is that intentional?
+> 
+> Seems like we can use some consistency:
+> 
+> $ git grep -w model -- $(git grep -l renesas, -- arch/arm/boot/dts)
+> arch/arm/boot/dts/emev2-kzm9d.dts:      model = "EMEV2 KZM9D Board";
+> arch/arm/boot/dts/r7s72100-genmai.dts:  model = "Genmai";
+> arch/arm/boot/dts/r8a73a4-ape6evm.dts:  model = "APE6EVM";
+> arch/arm/boot/dts/r8a7740-armadillo800eva.dts:  model = "armadillo 800 eva";
+> arch/arm/boot/dts/r8a7778-bockw-reference.dts:  model = "bockw";
+> arch/arm/boot/dts/r8a7778-bockw.dts:    model = "bockw";
+> arch/arm/boot/dts/r8a7779-marzen.dts:   model = "marzen";
+> arch/arm/boot/dts/r8a7790-lager.dts:    model = "Lager";
+> arch/arm/boot/dts/r8a7791-henninger.dts:        model = "Henninger";
+> arch/arm/boot/dts/r8a7791-koelsch.dts:  model = "Koelsch";
+> arch/arm/boot/dts/r8a7794-alt.dts:      model = "Alt";
+> arch/arm/boot/dts/sh73a0-kzm9g.dts:     model = "KZM-A9-GT";
+> $
+> 
+> ePAPR says:
+> 
+> "The recommended format is: ?manufacturer,model?, where manufacturer is a
+>  string describing the name of the manufacturer (such as a stock ticker symbol),
+>  and model specifies the model number.
+> 
+>  Example:
+>          model = ?fsl,MPC8349EMITX?;"
 
-ACPI_OS_NAME is globally defined as "Microsoft Windows NT" for now.
-That doesn't make much sense in the ARM context, so set it to "Linux"
-when CONFIG_ARM64.
-
-If it is necessary to change the return value from \_OS_ (that is, return
-some value other than the default in ACPI_OS_NAME), use the kernel parameter
-"acpi_os_name=<string>".
-
-Many thanks to Rafael Wysocki for this greatly simplified form of the patch.
-
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Signed-off-by: Al Stone <al.stone@linaro.org>
----
- arch/arm64/Kconfig              | 5 +++++
- include/acpi/acconfig.h         | 2 ++
- include/acpi/platform/aclinux.h | 4 ++++
- 3 files changed, 11 insertions(+)
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index d01d3f7..9a13d28 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -88,6 +88,11 @@ config ARM64
- config 64BIT
- 	def_bool y
- 
-+config ACPI_OS_NAME
-+	string
-+	default "Linux"
-+	depends on ACPI
-+
- config ARCH_PHYS_ADDR_T_64BIT
- 	def_bool y
- 
-diff --git a/include/acpi/acconfig.h b/include/acpi/acconfig.h
-index 5a0a3e5..1980bf4 100644
---- a/include/acpi/acconfig.h
-+++ b/include/acpi/acconfig.h
-@@ -69,7 +69,9 @@
-  * code that will not execute the _OSI method unless _OS matches the string
-  * below.  Therefore, change this string at your own risk.
-  */
-+#ifndef ACPI_OS_NAME
- #define ACPI_OS_NAME                    "Microsoft Windows NT"
-+#endif
- 
- /* Maximum objects in the various object caches */
- 
-diff --git a/include/acpi/platform/aclinux.h b/include/acpi/platform/aclinux.h
-index 1ba7c19..a871cdd 100644
---- a/include/acpi/platform/aclinux.h
-+++ b/include/acpi/platform/aclinux.h
-@@ -69,6 +69,10 @@
- #define ACPI_REDUCED_HARDWARE 1
- #endif
- 
-+#ifdef CONFIG_ACPI_OS_NAME
-+#define ACPI_OS_NAME CONFIG_ACPI_OS_NAME
-+#endif
-+
- #include <linux/string.h>
- #include <linux/kernel.h>
- #include <linux/ctype.h>
--- 
-2.1.0
+Agree we could use some consistency but before we start cooking up names
+do we expect this to have any effect on compatibility for users?
