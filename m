@@ -1,33 +1,25 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 04 Feb 2015 16:22:34 +0100
-Subject: [PATCH v3 0/6] Add multiple GPIO and external clock to MMC
- pwrseq_simple
-In-Reply-To: <54D23864.7050705@kernel.org>
-References: <1422543608-24704-1-git-send-email-javier.martinez@collabora.co.uk>
- <CAPDyKFqx-dhhVmtGnP2YpmR63Y20Ns=YyxnYrE2ewTuNXPA7Ag@mail.gmail.com>
- <54CB81EF.8030603@collabora.co.uk> <54D23591.7050208@collabora.co.uk>
- <54D23864.7050705@kernel.org>
-Message-ID: <54D2393A.1080209@collabora.co.uk>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Thu, 05 Feb 2015 00:30:47 +0900
+Subject: [PATCH V9 13/14] ARM: dts: snow: represent the connection between
+ bridge and panel using videoport and endpoints
+In-Reply-To: <CAEC9eQP+BiiM=-rMu+kqA721L76whbHCkpc15ctfhV3Z1ETwLw@mail.gmail.com>
+References: <1421771935-31618-1-git-send-email-ajaykumar.rs@samsung.com>	<1421771935-31618-14-git-send-email-ajaykumar.rs@samsung.com>	<0c9401d036da$71046bf0$530d43d0$@kernel.org>
+ <CAEC9eQP+BiiM=-rMu+kqA721L76whbHCkpc15ctfhV3Z1ETwLw@mail.gmail.com>
+Message-ID: <54D23B27.4020301@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Kukjin,
-
-On 02/04/2015 04:19 PM, Kukjin Kim wrote:
-> On 02/05/15 00:06, Javier Martinez Canillas wrote:
->> 
->> I noticed that you are applying patches to your Samsung tree, do you want me to
->> re-send patches #5 and #6 or is OK for you to pick them from from this series?
->> 
-> Oh, I've missed and it looks good to me. Applied, it means you don't
-> need to re-send ;)
->
-
-Great, thanks!
- 
-> Thanks,
-> Kukjin
+On 01/27/15 13:27, Ajay kumar wrote:
+> Hi Kukjin,
 > 
+Hi,
 
-Best regards,
-Javier
+[...]
+>>
+>> I'm fine on the DT changes in this series, shall I take 13/14 and 14/14 in
+>> Samsung tree?
+> Yes, please take these patches.
+> 
+Done, thanks.
+
+- Kukjin
