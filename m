@@ -1,90 +1,49 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 05 Feb 2015 00:21:34 +0100
-Subject: [PATCH v2 1/5] ACPI: move acpi_os_handler() so it can be made
- arch-dependent later
-In-Reply-To: <54D2A0E2.8050504@redhat.com>
-References: <1423009304-5007-1-git-send-email-al.stone@linaro.org>
- <3836210.OLr0JokInG@vostro.rjw.lan> <54D2A0E2.8050504@redhat.com>
-Message-ID: <31637855.MY7BmyVont@vostro.rjw.lan>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 04 Feb 2015 15:13:59 -0800
+Subject: [PATCH v4 2/5] clk: iproc: add initial common clock support
+In-Reply-To: <1422988390-24369-3-git-send-email-rjui@broadcom.com>
+References: <Ray Jui <rjui@broadcom.com>
+ <1422988390-24369-1-git-send-email-rjui@broadcom.com>
+ <1422988390-24369-3-git-send-email-rjui@broadcom.com>
+Message-ID: <54D2A7B7.6020007@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, February 04, 2015 03:44:50 PM Al Stone wrote:
-> On 02/04/2015 06:50 AM, Rafael J. Wysocki wrote:
-> > On Tuesday, February 03, 2015 05:21:40 PM al.stone at linaro.org wrote:
-> >> From: Al Stone <al.stone@linaro.org>
-> >>
-> >> In order to deprecate the use of _OSI for arm64 or other new architectures,
-> >> we need to make the default handler something we can change for various
-> >> platforms.  This patch moves the definition of acpi_osi_handler() -- the
-> >> function used by ACPICA as a callback for evaluating _OSI -- into a separate
-> >> file.  Subsequent patches will change which files get built so that we can
-> >> then build the version of _OSI we need for a particular architecture.
-> >>
-> >> There is no functional change.
-> >>
-> >> Signed-off-by: Al Stone <al.stone@linaro.org>
-> >> ---
-> >>  drivers/acpi/Makefile |   2 +-
-> >>  drivers/acpi/osi.c    | 100 ++++++++++++++++++++++++++++++++++++++++++++++++++
-> >>  drivers/acpi/osl.c    |  24 ------------
-> >>  include/linux/acpi.h  |   1 +
-> >>  4 files changed, 102 insertions(+), 25 deletions(-)
-> >>  create mode 100644 drivers/acpi/osi.c
-> >>
-> >> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-> >> index c346011..df348b3 100644
-> >> --- a/drivers/acpi/Makefile
-> >> +++ b/drivers/acpi/Makefile
-> >> @@ -18,7 +18,7 @@ obj-y				+= acpi.o \
-> >>  					acpica/
-> >>  
-> >>  # All the builtin files are in the "acpi." module_param namespace.
-> >> -acpi-y				+= osl.o utils.o reboot.o
-> >> +acpi-y				+= osl.o utils.o reboot.o osi.o
-> >>  acpi-y				+= nvs.o
-> >>  
-> >>  # Power management related files
-> >> diff --git a/drivers/acpi/osi.c b/drivers/acpi/osi.c
-> >> new file mode 100644
-> >> index 0000000..fff2b0c
-> >> --- /dev/null
-> >> +++ b/drivers/acpi/osi.c
-> >> @@ -0,0 +1,100 @@
-> >> +/*
-> >> + *  osi.c - _OSI implementation (moved from drivers/acpi/osl.c)
-> >> + *
-> >> + *  Copyright (C) 2000       Andrew Henroid
-> >> + *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
-> >> + *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
-> >> + *  Copyright (c) 2008 Intel Corporation
-> >> + *   Author: Matthew Wilcox <willy@linux.intel.com>
-> >> + *
-> >> + * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-> >> + *
-> >> + *  This program is free software; you can redistribute it and/or modify
-> >> + *  it under the terms of the GNU General Public License as published by
-> >> + *  the Free Software Foundation; either version 2 of the License, or
-> >> + *  (at your option) any later version.
-> >> + *
-> >> + *  This program is distributed in the hope that it will be useful,
-> >> + *  but WITHOUT ANY WARRANTY; without even the implied warranty of
-> >> + *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> >> + *  GNU General Public License for more details.
-> > 
-> > Nit: The street address of the FSF is not really useful here.  What if they move? :-)
-> 
-> This was one of the things checkpatch complained about, understandably :).  It's
-> a direct cut'n'paste from osl.c.
-> 
-> I can clean these up in the new file; would it help to clean up osl.c (at least
-> from checkpatch's point of view), as long as I'm at it?
+On 02/03/15 10:33, Ray Jui wrote:
+> +/*
+> + * Get the clock rate based on name
+> + */
+> +static unsigned long __get_rate(const char *clk_name)
+> +{
+> +	struct clk *clk;
+> +
+> +	clk = __clk_lookup(clk_name);
+> +	if (!clk) {
+> +		pr_err("%s: unable to find clock by name: %s\n", __func__,
+> +				clk_name);
+> +		return 0;
+> +	}
+> +
+> +	return clk_get_rate(clk);
+> +}
+> +
 
-Yeah, won't hurt. :-)
+This looks like something we should be providing in the core framework.
+Care to make it into an of_clk_get_parent_rate() API?
 
-In a separate patch please, though.
+> +extern void __init iproc_armpll_setup(struct device_node *node);
+> +extern void __init iproc_pll_setup(struct device_node *node,
+> +		const struct iproc_pll_ctrl *ctrl,
+> +		const struct iproc_pll_vco_freq_param *vco_param,
+> +		unsigned int num_freqs);
+> +extern void __init iproc_clk_setup(struct device_node *node,
+> +		const struct iproc_clk_ctrl *ctrl, unsigned int num_clks);
+> +extern void __init iproc_asiu_setup(struct device_node *node,
+> +		const struct iproc_asiu_div *div,
+> +		const struct iproc_asiu_gate *gate, unsigned int num_clks);
 
+__init is not necessary in header files.
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
