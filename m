@@ -1,41 +1,79 @@
-From: gregory.0xf0@gmail.com (Gregory Fong)
-Date: Wed,  4 Feb 2015 15:22:43 -0800
-Subject: [PATCH] ARM: print cma-reserved pages from show_mem
-Message-ID: <1423092164-9145-1-git-send-email-gregory.0xf0@gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 04 Feb 2015 15:26:19 -0800
+Subject: [Cocci] [PATCH v13 3/6] clk: Make clk API return per-user struct
+ clk instances
+In-Reply-To: <54D0F179.1040906@gmail.com>
+References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1422011024-32283-4-git-send-email-tomeu.vizoso@collabora.com>
+ <20150201212432.22722.70917@quantum> <54CFE1FE.7040404@codeaurora.org>
+ <alpine.DEB.2.02.1502022230110.2045@localhost6.localdomain6>
+ <54CFFBCF.90706@codeaurora.org> <20150202225036.421.43421@quantum>
+ <54D0F179.1040906@gmail.com>
+Message-ID: <54D2AA9B.7010800@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add cma reserved information to the ARM-specific show_mem.  It was
-added to the generic implementation by commit
-49abd8c28046adf77c5ce1949549aa64d7221881 "lib/show_mem.c: add cma
-reserved information".
+On 02/03/15 08:04, Quentin Lambert wrote:
+> Hello,
+> Julia asked me to have a look and see if I can help.
+>
+> I have found these three cases using Coccinnelle in the mach-omap2
+> directory.
+>
+>
+>
+> ./arch/arm/mach-omap2/clkt_clksel.c
+> @@ -67,7 +67,6 @@ static const struct clksel *_get_clksel_
+>                 return NULL;
+>
+>         for (clks = clk->clksel; clks->parent; clks++)
+>                 if (clks->parent == src_clk)
 
-Signed-off-by: Gregory Fong <gregory.0xf0@gmail.com>
----
- arch/arm/mm/init.c | 4 ++++
- 1 file changed, 4 insertions(+)
+This probably needs to compare hw pointers again given that it's in the
+clk-provider code. It would be nice if we could use indices instead though.
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 2495c8c..da77507 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -22,6 +22,7 @@
- #include <linux/memblock.h>
- #include <linux/dma-contiguous.h>
- #include <linux/sizes.h>
-+#include <linux/cma.h>
- 
- #include <asm/cp15.h>
- #include <asm/mach-types.h>
-@@ -130,6 +131,9 @@ void show_mem(unsigned int filter)
- 	printk("%d pages of RAM\n", total);
- 	printk("%d free pages\n", free);
- 	printk("%d reserved pages\n", reserved);
-+#ifdef CONFIG_CMA
-+	printk("%lu cma reserved pages\n", totalcma_pages);
-+#endif
- 	printk("%d slab pages\n", slab);
- 	printk("%d pages shared\n", shared);
- 	printk("%d pages swap cached\n", cached);
+>                         break; /* Found the requested parent */
+>
+>         if (!clks->parent) {
+> ./arch/arm/mach-omap2/dpll3xxx.c
+> @@ -551,7 +549,6 @@ int omap3_noncore_dpll_set_rate(struct c
+>         if (!dd)
+>                 return -EINVAL;
+>
+>         if (__clk_get_parent(hw->clk) != dd->clk_ref)
+
+This one is what this thread has started on about. Comparing hw pointers
+is ok for now...
+
+>                 return -EINVAL;
+>
+>         if (dd->last_rounded_rate == 0)
+> ./arch/arm/mach-omap2/timer.c
+> @@ -298,7 +298,6 @@ static int __init omap_dm_timer_init_one
+>         if (IS_ERR(src))
+>                 return PTR_ERR(src);
+>
+>         if (clk_get_parent(timer->fclk) != src) {
+
+This one looks like an optimization. We can just always try to set the
+parent and if it's already the current parent then the core should bail
+out early without an error. So the fix would be to just remove the if
+condition.
+
+>                 r = clk_set_parent(timer->fclk, src);
+>                 if (r < 0) {
+>                         pr_warn("%s: %s cannot set source\n", __func__,
+>
+>
+> Are they instances of your issue?
+
+Yes these all look like instances of the problem.
+
+> If you want me to I can enlarge the search to other directories.
+
+Yes please do. And if you could share the coccinelle patch that would be
+great. Thanks.
+
 -- 
-1.9.1
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
