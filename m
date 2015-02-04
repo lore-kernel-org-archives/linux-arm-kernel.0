@@ -1,126 +1,133 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Wed, 04 Feb 2015 13:58:14 -0500
-Subject: [PATCH v8 02/21] acpi: fix acpi_os_ioremap for arm64
-In-Reply-To: <20150204175734.GI26006@e104818-lin.cambridge.arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 4 Feb 2015 18:59:29 +0000
+Subject: [PATCH v8 17/21] clocksource / arch_timer: Parse GTDT to
+ initialize arch timer
+In-Reply-To: <1422881149-8177-18-git-send-email-hanjun.guo@linaro.org>
 References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
- <1422881149-8177-3-git-send-email-hanjun.guo@linaro.org>
- <2422968.Es7R0p3loO@vostro.rjw.lan>
- <1422984576.18187.82.camel@deneb.redhat.com>
- <20150204112508.GB26006@e104818-lin.cambridge.arm.com>
- <1423066107.18187.99.camel@deneb.redhat.com>
- <20150204175734.GI26006@e104818-lin.cambridge.arm.com>
-Message-ID: <1423076294.18187.103.camel@deneb.redhat.com>
+ <1422881149-8177-18-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20150204185929.GH22035@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-02-04 at 17:57 +0000, Catalin Marinas wrote:
-> On Wed, Feb 04, 2015 at 04:08:27PM +0000, Mark Salter wrote:
-> > On Wed, 2015-02-04 at 11:25 +0000, Catalin Marinas wrote:
-> > > On Tue, Feb 03, 2015 at 05:29:36PM +0000, Mark Salter wrote:
-> > > > On Mon, 2015-02-02 at 23:14 +0100, Rafael J. Wysocki wrote:
-> > > > > On Monday, February 02, 2015 08:45:30 PM Hanjun Guo wrote:
-> > > > > > From: Mark Salter <msalter@redhat.com>
-> > > > > > 
-> > > > > > The acpi_os_ioremap() function may be used to map normal RAM or IO
-> > > > > > regions. The current implementation simply uses ioremap_cache(). This
-> > > > > > will work for some architectures, but arm64 ioremap_cache() cannot be
-> > > > > > used to map IO regions which don't support caching. So for arm64, use
-> > > > > > ioremap() for non-RAM regions.
-> > > > > > 
-> > > > > > CC: Rafael J Wysocki <rjw@rjwysocki.net>
-> > > > > > Signed-off-by: Mark Salter <msalter@redhat.com>
-> > > > > > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> > > > > > ---
-> > > > > >  include/acpi/acpi_io.h | 6 ++++++
-> > > > > >  1 file changed, 6 insertions(+)
-> > > > > > 
-> > > > > > diff --git a/include/acpi/acpi_io.h b/include/acpi/acpi_io.h
-> > > > > > index 444671e..9d573db 100644
-> > > > > > --- a/include/acpi/acpi_io.h
-> > > > > > +++ b/include/acpi/acpi_io.h
-> > > > > > @@ -1,11 +1,17 @@
-> > > > > >  #ifndef _ACPI_IO_H_
-> > > > > >  #define _ACPI_IO_H_
-> > > > > >  
-> > > > > > +#include <linux/mm.h>
-> > > > > >  #include <linux/io.h>
-> > > > > >  
-> > > > > >  static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
-> > > > > >  					    acpi_size size)
-> > > > > >  {
-> > > > > > +#ifdef CONFIG_ARM64
-> > > > > > +	if (!page_is_ram(phys >> PAGE_SHIFT))
-> > > > > > +		return ioremap(phys, size);
-> > > > > > +#endif
-> > > > > 
-> > > > > I don't want to see #ifdef CONFIG_ARM64 in this file.
-> > > > 
-> > > > How about something like:
-> > > > 
-> > > > From: Mark Salter <msalter@redhat.com>
-> > > > Date: Tue, 3 Feb 2015 10:51:16 -0500
-> > > > Subject: [PATCH] acpi: fix acpi_os_ioremap for arm64
-> > > > 
-> > > > The acpi_os_ioremap() function may be used to map normal RAM or IO
-> > > > regions. The current implementation simply uses ioremap_cache(). This
-> > > > will work for some architectures, but arm64 ioremap_cache() cannot be
-> > > > used to map IO regions which don't support caching. So for arm64, use
-> > > > ioremap() for non-RAM regions.
-> > > > 
-> > > > CC: Rafael J Wysocki <rjw@rjwysocki.net>
-> > > > Signed-off-by: Mark Salter <msalter@redhat.com>
-> > > > ---
-> > > >  arch/arm64/include/asm/acpi.h | 14 ++++++++++++++
-> > > >  include/acpi/acpi_io.h        |  3 +++
-> > > >  2 files changed, 17 insertions(+)
-> > > > 
-> > > > diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-> > > > index ea4d2b3..db82bc3 100644
-> > > > --- a/arch/arm64/include/asm/acpi.h
-> > > > +++ b/arch/arm64/include/asm/acpi.h
-> > > > @@ -14,6 +14,7 @@
-> > > >  
-> > > >  #include <linux/irqchip/arm-gic-acpi.h>
-> > > >  
-> > > > +#include <linux/mm.h>
-> > > >  #include <asm/smp_plat.h>
-> > > >  
-> > > >  /* Basic configuration for ACPI */
-> > > > @@ -100,4 +101,17 @@ static inline bool acpi_psci_use_hvc(void) { return false; }
-> > > >  static inline void acpi_init_cpus(void) { }
-> > > >  #endif /* CONFIG_ACPI */
-> > > >  
-> > > > +/*
-> > > > + * ACPI table mapping
-> > > > + */
-> > > > +static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
-> > > > +					    acpi_size size)
-> > > > +{
-> > > > +	if (!page_is_ram(phys >> PAGE_SHIFT))
-> > > > +		return ioremap(phys, size);
-> > > > +
-> > > > +       return ioremap_cache(phys, size);
-> > > > +}
-> > > > +#define acpi_os_ioremap acpi_os_ioremap
-> > > 
-> > > That's one way of doing this, I'm not too bothered with the approach
-> > > (define the function name, an ARCH_HAS macro or a Kconfig option, it's
-> > > up to Rafael).
-> > > 
-> > > But a question I already asked is what we need ioremap_cache() for? We
-> > > don't use NVS on arm64 yet, so is there anything else requiring
-> > > cacheable mapping?
-> > 
-> > acpi_os_remap() is used to map ACPI tables. These tables may be in ram
-> > which are already included in the kernel's linear RAM mapping. So we
-> > need ioremap_cache to avoid two mappings to the same physical page
-> > having different caching attributes.
-> 
-> What's the call path to acpi_os_ioremap() on such tables already in the
-> linear mapping? I can see an acpi_map() function which already takes
-> care of the RAM mapping case but there are other cases where
-> acpi_os_ioremap() is called directly. For example,
-> acpi_os_read_memory(), can it be called on both RAM and I/O?
-> 
+On Mon, Feb 02, 2015 at 12:45:45PM +0000, Hanjun Guo wrote:
+> Using the information presented by GTDT (Generic Timer Description Table)
+> to initialize the arch timer (not memory-mapped).
 
-acpi_map() is the one I've seen. I'm not sure about others.
+Why are you not initializing the memory mapped timer ?
+
+> CC: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Originally-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> Tested-by: Yijing Wang <wangyijing@huawei.com>
+> Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
+> Tested-by: Jon Masters <jcm@redhat.com>
+> Tested-by: Timur Tabi <timur@codeaurora.org>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  arch/arm64/kernel/time.c             |   7 ++
+>  drivers/clocksource/arm_arch_timer.c | 132 ++++++++++++++++++++++++++++-------
+>  include/linux/clocksource.h          |   6 ++
+>  3 files changed, 118 insertions(+), 27 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
+> index 1a7125c..42f9195 100644
+> --- a/arch/arm64/kernel/time.c
+> +++ b/arch/arm64/kernel/time.c
+> @@ -35,6 +35,7 @@
+>  #include <linux/delay.h>
+>  #include <linux/clocksource.h>
+>  #include <linux/clk-provider.h>
+> +#include <linux/acpi.h>
+>  
+>  #include <clocksource/arm_arch_timer.h>
+>  
+> @@ -72,6 +73,12 @@ void __init time_init(void)
+>  
+>  	tick_setup_hrtimer_broadcast();
+>  
+> +	/*
+> +	 * Since ACPI or FDT will only one be available in the system,
+> +	 * we can use acpi_generic_timer_init() here safely
+> +	 */
+> +	acpi_generic_timer_init();
+> +
+>  	arch_timer_rate = arch_timer_get_rate();
+>  	if (!arch_timer_rate)
+>  		panic("Unable to initialise architected timer.\n");
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index 095c177..407aa63 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -21,6 +21,7 @@
+>  #include <linux/io.h>
+>  #include <linux/slab.h>
+>  #include <linux/sched_clock.h>
+> +#include <linux/acpi.h>
+>  
+>  #include <asm/arch_timer.h>
+>  #include <asm/virt.h>
+> @@ -370,8 +371,12 @@ arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
+>  	if (arch_timer_rate)
+>  		return;
+>  
+> -	/* Try to determine the frequency from the device tree or CNTFRQ */
+> -	if (of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
+> +	/*
+> +	 * Try to determine the frequency from the device tree or CNTFRQ,
+> +	 * if ACPI is enabled, get the frequency from CNTFRQ ONLY.
+> +	 */
+> +	if (!acpi_disabled ||
+> +	    of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
+
+This is getting a mess. cntbase tells you it is a memory mapped timer,
+node pointer that you are probing through DT, and to top it all
+acpi_disabled detects if you are probing in ACPI or DT mode.
+
+I think this function should be simplified, this driver is also
+pending a refactoring to split arch timer and the memory mapped one
+so I think you'd better wait that work to make things simpler.
+
+[...]
+
+> +/* Initialize all the generic timers presented in GTDT */
+> +void __init acpi_generic_timer_init(void)
+> +{
+> +	if (acpi_disabled)
+> +		return;
+
+acpi_disabled used again here, I repeat myself this is going to be
+hard to track. You should try to organize the code something like:
+
+if (acpi_disabled)
+	timer_dt_probe();
+else
+	timer_acpi_probe();
+
+mixing the code paths is getting unwieldy, see above to see my
+reasoning.
+
+> +
+> +	acpi_table_parse(ACPI_SIG_GTDT, arch_timer_acpi_init);
+> +}
+> +#endif
+> diff --git a/include/linux/clocksource.h b/include/linux/clocksource.h
+> index abcafaa..af6155a 100644
+> --- a/include/linux/clocksource.h
+> +++ b/include/linux/clocksource.h
+> @@ -346,4 +346,10 @@ extern void clocksource_of_init(void);
+>  static inline void clocksource_of_init(void) {}
+>  #endif
+>  
+> +#ifdef CONFIG_ACPI
+> +void acpi_generic_timer_init(void);
+> +#else
+> +static inline void acpi_generic_timer_init(void) { }
+> +#endif
+> +
+
+That's not nice, it is a generic header, arch specific stuff should be
+avoided. I think you should have an ACPI generic layer similar to
+clocksource_of_init(), and probe from there when matching the respective
+timers.
+
+Lorenzo
