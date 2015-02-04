@@ -1,38 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 4 Feb 2015 13:00:18 +0000
-Subject: [rcu] [ INFO: suspicious RCU usage. ]
-In-Reply-To: <1423049947.19547.6.camel@AMDC1943>
-References: <20150201025922.GA16820@wfg-t540p.sh.intel.com>
- <1422957702.17540.1.camel@AMDC1943>
- <20150203162704.GR19109@linux.vnet.ibm.com>
- <1423049947.19547.6.camel@AMDC1943>
-Message-ID: <20150204130018.GG8656@n2100.arm.linux.org.uk>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 4 Feb 2015 05:04:18 -0800
+Subject: [PATCH v2 1/3] usb: XHCI: platform: Move the Marvell quirks
+ after the enabling the clocks
+In-Reply-To: <20150204093522.GB5492@lukather>
+References: <1421672474-2945-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1421672474-2945-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20150204093522.GB5492@lukather>
+Message-ID: <20150204130418.GB5659@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 04, 2015 at 12:39:07PM +0100, Krzysztof Kozlowski wrote:
-> +Cc some ARM people
-
-I wish that people would CC this list with problems seen on ARM.  I'm
-minded to just ignore this message because of this in the hope that by
-doing so, people will learn something...
-
-> > Another thing I could do would be to have an arch-specific Kconfig
-> > variable that made ARM responsible for informing RCU that the CPU
-> > was departing, which would allow a call to as follows to be placed
-> > immediately after the complete():
+On Wed, Feb 04, 2015 at 10:35:22AM +0100, Maxime Ripard wrote:
+> Hi Mathias, Greg,
+> 
+> On Mon, Jan 19, 2015 at 02:01:12PM +0100, Maxime Ripard wrote:
+> > The commit 973747928514 ("usb: host: xhci-plat: add support for the Armada
+> > 375/38x XHCI controllers") extended the xhci-plat driver to support the Armada
+> > 375/38x SoCs, mostly by adding a quirk configuring the MBUS window.
 > > 
-> > rcu_cpu_notify(NULL, CPU_DYING_IDLE, (void *)(long)smp_processor_id());
+> > However, that quirk was run before the clock the controllers needs has been
+> > enabled. This usually worked because the clock was first enabled by the
+> > bootloader, and left as such until the driver is probe, where it tries to
+> > access the MBUS configuration registers before enabling the clock.
 > > 
-> > Note:  This absolutely requires that the rcu_cpu_notify() -always-
-> > be allowed to execute!!!  This will not work if there is -any- possibility
-> > of __cpu_die() powering off the outgoing CPU before the call to
-> > rcu_cpu_notify() returns.
+> > Things get messy when EPROBE_DEFER is involved during the probe, since as part
+> > of its error path, the driver will rightfully disable the clock. When the
+> > driver will be reprobed, it will retry to access the MBUS registers, but this
+> > time with the clock disabled, which hangs forever.
+> > 
+> > Fix this by running the quirks after the clock has been enabled by the driver.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > Cc: <stable@vger.kernel.org> # v3.16+
+> 
+> Any chance for this to go in 3.19?
 
-Exactly, so that's not going to be possible.  The completion at that
-point marks the point at which power _could_ be removed from the CPU
-going down.
+For 3.19?  It's too late, I'm not sending anything else to Linus as 3.19
+will be out in a few days.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+thanks,
+
+greg k-h
