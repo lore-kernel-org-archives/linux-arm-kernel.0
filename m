@@ -1,52 +1,74 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 4 Feb 2015 15:43:43 +0100
-Subject: [PATCH v2 2/5] ARM: shmobile: r8a7740: Migrate to generic l2c OF
- initialization
-In-Reply-To: <7800327.b3sMA1XGtZ@wuerfel>
-References: <1423059315-28519-1-git-send-email-geert+renesas@glider.be>
- <1423059315-28519-3-git-send-email-geert+renesas@glider.be>
- <7800327.b3sMA1XGtZ@wuerfel>
-Message-ID: <CAMuHMdVi3kq2p30cNFYW2WCM-OvMSFC1W0r5nYkaN5Np=zW4_Q@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 04 Feb 2015 15:44:23 +0100
+Subject: Continuing kallsyms failures - large kernels, XIP kernels,
+ and large XIP kernels
+In-Reply-To: <20150204094414.GC8656@n2100.arm.linux.org.uk>
+References: <20150130145642.GK26493@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1502032054460.1322@knanqh.ubzr>
+ <20150204094414.GC8656@n2100.arm.linux.org.uk>
+Message-ID: <8085056.h8oiDn7EOb@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Wednesday 04 February 2015 09:44:14 Russell King - ARM Linux wrote:
+> On Tue, Feb 03, 2015 at 08:59:15PM -0500, Nicolas Pitre wrote:
+> > On Wed, 4 Feb 2015, Russell King - ARM Linux wrote:
+> > 
+> > > It looks like we have cases where this falsely triggers.  Consider EFM32:
+> > > 
+> > > CONFIG_DRAM_BASE=0x88000000
+> > > CONFIG_DRAM_SIZE=0x00400000
+> > > CONFIG_FLASH_MEM_BASE=0x8c000000
+> > > CONFIG_FLASH_SIZE=0x01000000
+> > > 
+> > > This means that we quite legally end up with the .data section below the
+> > > .text section, which makes:
+> > > 
+> > > ASSERT((_data >= __data_loc), "Text section oversize") 
+> > > 
+> > > falsely trigger.
+> > > 
+> > > The linker has the capacity to specify regions of ROM and RAM in the
+> > > linker file, I wonder if we should be using those for XIP.  Merely
+> > > adding the MEMORY table to the linker file is not good enough - we
+> > > also need to explicitly tell the linker which memory regions to place
+> > > the output sections, otherwise the linker ends up making assumptions.
+> > > 
+> > > What that means is... asm-generic/vmlinux.lds.h breaks for us.
+> > > 
+> > > Any ideas?  I think using the MEMORY table would be the best approach,
+> > > because that should allow us to properly verify that the resulting
+> > > binary should fit in the memory regions.
+> > 
+> > Maybe simply having an assert() on the size of the .text section could 
+> > be all that is needed.  We already know the maximum size in advance.
+> 
+> That doesn't work, it's not just the .text section but also .rodata,
+> __bug_table, __ksymtab, __ksymtab_gpl, __kcrctab, __kcrctab_gpl,
+> __ksymtab_strings, __param, __modver, __ex_table, .notes, .vectors,
+> .stubs, .init.text, maybe .exit.text, .init.arch.info, .init.tagtable,
+> .init.smpalt, .init.pv_table, and apparently .init.data (which is
+> surely wrong?)  The following is from Arnd's failing configuration:
+> 
+>  18 .init.tagtable 00000040  80073a9c  80073a9c  0100ba9c  2**2
+>                   CONTENTS, ALLOC, LOAD, READONLY, DATA
+>  19 .init.data    000010e8  80073adc  80073adc  0100badc  2**2
+>                   CONTENTS, ALLOC, LOAD, DATA
+>  20 .data         003552c4  80008000  80074bc4  01010000  2**8
+>                   CONTENTS, ALLOC, LOAD, DATA
+> 
+> Hmm, if .init.data is contained in the flash section (which it seemingly
+> is), it seems that XIP support is currently broken - that section is
+> definitely a read/write section.  No one has seemingly noticed that it's
+> broken and it's been broken for a long time, so maybe the simple answer
+> then is just to rip XIP support out?
+> 
+> How does EFM32 work?  Does it work?
 
-On Wed, Feb 4, 2015 at 3:34 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 04 February 2015 15:15:12 Geert Uytterhoeven wrote:
->>  DT_MACHINE_START(R8A7740_DT, "Generic R8A7740 (Flattened Device Tree)")
->> +       .l2c_aux_val    = L2C_AUX_CTRL_SHARED_OVERRIDE,
->> +       .l2c_aux_mask   = ~L2C_AUX_CTRL_SHARED_OVERRIDE,
->>         .map_io         = r8a7740_map_io,
->>         .init_early     = shmobile_init_delay,
->>         .init_irq       = r8a7740_init_irq_of,
->
-> +Russell
->
-> I'd hope we could avoid having any overrides in here that are not
-> specified in DT. I can never remember what we discussed about particular
-> bits in the past though. Is this bit something we could add a binding
-> for, or could we make it enabled by default?
->
-> I assume you have to add it because the boot loader sets the wrong
-> default, right?
+I believe that Uwe has a patch series on top of mainline that he still
+requires for using the platform.
 
-Indeed. Note that I only try to preserve the register value before and after
-migrating to generic l2c OF initialization. I did read (part of) the pl310
-documentation, but it's still not clear to me if we really need
-L2C_AUX_CTRL_SHARED_OVERRIDE. Perhaps this was just copied from
-somewhere else without much afterthought?
+The part I'm sure about is that it does not work without XIP_KERNEL,
+given the tight memory constraints (2MB RAM?).
 
-The previous version was in thread
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/318328.html
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+	Arnd
