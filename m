@@ -1,47 +1,62 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 03 Feb 2015 20:59:15 -0500 (EST)
-Subject: Continuing kallsyms failures - large kernels, XIP kernels,
- and large XIP kernels
-In-Reply-To: <20150204000307.GA8656@n2100.arm.linux.org.uk>
-References: <20150130145642.GK26493@n2100.arm.linux.org.uk>
- <20150130153414.GM26493@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1501301224180.1322@knanqh.ubzr>
- <20150131002253.GR26493@n2100.arm.linux.org.uk>
- <20150204000307.GA8656@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.11.1502032054460.1322@knanqh.ubzr>
+From: rjui@broadcom.com (Ray Jui)
+Date: Tue, 3 Feb 2015 18:09:57 -0800
+Subject: [PATCH v4 0/4] Add pinctrl support to Broadcom Cygnus SoC
+In-Reply-To: <Ray Jui <rjui@broadcom.com>
+References: <Ray Jui <rjui@broadcom.com>
+Message-ID: <1423015801-26967-1-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 4 Feb 2015, Russell King - ARM Linux wrote:
+This patchset contains the initial pinctrl (IOMUX) support for the Broadcom
+Cygnus SoC. The Cygnus IOMUX controller supports group based mux configuration
+and allows certain pins to be muxed to GPIO function individually
 
-> It looks like we have cases where this falsely triggers.  Consider EFM32:
-> 
-> CONFIG_DRAM_BASE=0x88000000
-> CONFIG_DRAM_SIZE=0x00400000
-> CONFIG_FLASH_MEM_BASE=0x8c000000
-> CONFIG_FLASH_SIZE=0x01000000
-> 
-> This means that we quite legally end up with the .data section below the
-> .text section, which makes:
-> 
-> ASSERT((_data >= __data_loc), "Text section oversize") 
-> 
-> falsely trigger.
-> 
-> The linker has the capacity to specify regions of ROM and RAM in the
-> linker file, I wonder if we should be using those for XIP.  Merely
-> adding the MEMORY table to the linker file is not good enough - we
-> also need to explicitly tell the linker which memory regions to place
-> the output sections, otherwise the linker ends up making assumptions.
-> 
-> What that means is... asm-generic/vmlinux.lds.h breaks for us.
-> 
-> Any ideas?  I think using the MEMORY table would be the best approach,
-> because that should allow us to properly verify that the resulting
-> binary should fit in the memory regions.
+Changes from v3:
+ - Fix the driver to have more proper use of "const" in various places
+ - Other minor improvements
 
-Maybe simply having an assert() on the size of the .text section could 
-be all that is needed.  We already know the maximum size in advance.
+Changes from v2:
+ - Consolidate all Broadcom pinctrl drivers into drivers/pinctrl/bcm/*
+ - Change the Cygnus IOMUX driver to use standard Linux pinctrl subnode
+properties such as "function" and "groups" for pinmux configuration, instead
+of non-standard properties such as "brcm,function" and "brcm,group"
+ - Use real function names like "spi0", "lcd", "key", and etc. instead of HW
+specific mux names like "alt1", "alt2", "alt3", and etc.
+ - Add suffix "grp" to all group names
+ - Add support to allow individual pins to be muxed to GPIO function through
+subsystem callbacks "gpio_request_enable" and "gpio_disable_free", and get rid
+of all GPIO groups
+ - Other minor improvements in the driver
 
+Changes from v1:
+ - Fix a typo in device tree binding document
 
-Nicolas
+Ray Jui (4):
+  pinctrl: bcm: consolidate Broadcom pinctrl drivers
+  pinctrl: Broadcom Cygnus pinctrl device tree binding
+  pinctrl: cygnus: add initial IOMUX driver support
+  ARM: dts: enable IOMUX for Broadcom Cygnus
+
+ .../bindings/pinctrl/brcm,cygnus-pinmux.txt        |  157 +++
+ arch/arm/boot/dts/bcm-cygnus.dtsi                  |    6 +
+ drivers/pinctrl/Kconfig                            |   19 +-
+ drivers/pinctrl/Makefile                           |    4 +-
+ drivers/pinctrl/bcm/Kconfig                        |   34 +
+ drivers/pinctrl/bcm/Makefile                       |    5 +
+ drivers/pinctrl/bcm/pinctrl-bcm281xx.c             | 1455 ++++++++++++++++++++
+ drivers/pinctrl/bcm/pinctrl-bcm2835.c              | 1072 ++++++++++++++
+ drivers/pinctrl/bcm/pinctrl-cygnus-mux.c           | 1088 +++++++++++++++
+ drivers/pinctrl/pinctrl-bcm281xx.c                 | 1455 --------------------
+ drivers/pinctrl/pinctrl-bcm2835.c                  | 1072 --------------
+ 11 files changed, 3820 insertions(+), 2547 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/brcm,cygnus-pinmux.txt
+ create mode 100644 drivers/pinctrl/bcm/Kconfig
+ create mode 100644 drivers/pinctrl/bcm/Makefile
+ create mode 100644 drivers/pinctrl/bcm/pinctrl-bcm281xx.c
+ create mode 100644 drivers/pinctrl/bcm/pinctrl-bcm2835.c
+ create mode 100644 drivers/pinctrl/bcm/pinctrl-cygnus-mux.c
+ delete mode 100644 drivers/pinctrl/pinctrl-bcm281xx.c
+ delete mode 100644 drivers/pinctrl/pinctrl-bcm2835.c
+
+-- 
+1.7.9.5
