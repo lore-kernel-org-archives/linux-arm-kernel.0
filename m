@@ -1,77 +1,56 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 4 Feb 2015 00:03:08 +0000
-Subject: Continuing kallsyms failures - large kernels, XIP kernels, and
- large XIP kernels
-In-Reply-To: <20150131002253.GR26493@n2100.arm.linux.org.uk>
-References: <20150130145642.GK26493@n2100.arm.linux.org.uk>
- <20150130153414.GM26493@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1501301224180.1322@knanqh.ubzr>
- <20150131002253.GR26493@n2100.arm.linux.org.uk>
-Message-ID: <20150204000307.GA8656@n2100.arm.linux.org.uk>
+From: mpeg.blue@free.fr (Mason)
+Date: Tue, 03 Feb 2015 16:07:18 -0800
+Subject: RFC on cpufreq implementation
+In-Reply-To: <CAKohpomzCEjXUrxUJjypaA77=r4j_ZPa+x3gM=cNN0kc3ux0uQ@mail.gmail.com>
+References: <54B7F7CD.7030903@free.fr>	<54CA6327.5070707@free.fr>	<CAKohponrzDb4ZGvRtJ5jtGTPAy4RCfRsYGvdjR5fx51K2=evCg@mail.gmail.com>	<54CC174F.10703@free.fr>
+ <CAKohpomzCEjXUrxUJjypaA77=r4j_ZPa+x3gM=cNN0kc3ux0uQ@mail.gmail.com>
+Message-ID: <54D162B6.2050602@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 31, 2015 at 12:22:53AM +0000, Russell King - ARM Linux wrote:
-> On Fri, Jan 30, 2015 at 12:29:30PM -0500, Nicolas Pitre wrote:
-> > On Fri, 30 Jan 2015, Russell King - ARM Linux wrote:
-> > > +#ifdef CONFIG_XIP_KERNEL
-> > > +/*
-> > > + * __data_loc is not only the LMA of the data section, but also the VMA of
-> > > + * the end of the .rodata section.  This must not overlap the VMA of the
-> > > + * data section.  Since the .text section starts in module space, and that
-> > > + * is always below the .data section, this should be sufficient.
-> > > + */
-> > > +ASSERT((_data >= __data_loc), "Text section oversize")
-> > > +#endif
-> > 
-> > I agree with this patch.
-> > 
-> > Acked-by: Nicolas Pitre <nico@linaro.org>
-> > 
-> > This might not prevent a config leading to this from happening, but at 
-> > least it makes the issue much clearer.  XIP kernel was created for 
-> > systems where the total amount of RAM is often smaller than the imposed
-> > size limit here.
-> 
-> Yes, I expect more of Arnd's randconfigs to fail with this patch applied.
-> 
-> I did also notice that we still have swapper_pg_dir at _data - 0x4000
-> for XIP kernels - so the above check is slightly too lenient.  A better
-> threshold for __data_loc might be MODULES_END, since we can't allow the
-> XIP part to overlap into RAM.
-> 
-> #ifdef CONFIG_HIGHMEM
-> #define MODULES_END             (PAGE_OFFSET - PMD_SIZE)
-> #else
-> #define MODULES_END             (PAGE_OFFSET)
-> #endif
+Viresh Kumar wrote:
 
-It looks like we have cases where this falsely triggers.  Consider EFM32:
+> Mason wrote:
+>
+>> If it's supposed to go in drivers/cpufreq, I suppose there are naming
+>> conventions to follow?
+>
+> You can check existing drivers.
 
-CONFIG_DRAM_BASE=0x88000000
-CONFIG_DRAM_SIZE=0x00400000
-CONFIG_FLASH_MEM_BASE=0x8c000000
-CONFIG_FLASH_SIZE=0x01000000
+All of them?
 
-This means that we quite legally end up with the .data section below the
-.text section, which makes:
+~/linux-3.19-rc7$ wc drivers/cpufreq/*
+  31542  95730 813482 total
 
-ASSERT((_data >= __data_loc), "Text section oversize") 
+Are there perhaps 1 or 2 "golden standard" drivers that are well-written
+and up-to-date with respect to current conventions?
 
-falsely trigger.
+>> Also, if it's in drivers/cpufreq, we are not supposed to include
+>> any machine-specific includes? And I'm back to my original question
+>> where am I supposed to store machine-specific information, such as
+>> register descriptions and MMIO addresses and offsets?
+>
+> Define registers/etc in your driver only or somewhere in include/ .
 
-The linker has the capacity to specify regions of ROM and RAM in the
-linker file, I wonder if we should be using those for XIP.  Merely
-adding the MEMORY table to the linker file is not good enough - we
-also need to explicitly tell the linker which memory regions to place
-the output sections, otherwise the linker ends up making assumptions.
+Like Samsung did with include/dt-bindings/clock/exynos*.h ?
 
-What that means is... asm-generic/vmlinux.lds.h breaks for us.
+> Also, try to see if you can reuse cpufreq-dt.c, your driver wouldn't make
+> it to the kernel otherwise.
 
-Any ideas?  I think using the MEMORY table would be the best approach,
-because that should allow us to properly verify that the resulting
-binary should fit in the memory regions.
+Are you saying that use of DeviceTree is mandatory for new ARM ports?
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+In other words, ports using "board files" will not be accepted into
+mainline, nor will drivers not using DT?
+
+If that is correct, then my proposed cpufreq driver has exactly 0%
+chance of being mainlined as-is, right?
+
+I took a look at cpufreq-dt.c but I think it doesn't quite fit my use-case.
+In my driver, I define "clock dividers" (typically 1,2,3,5,9) and these are
+used to divide some baseline frequency that the cpufreq code doesn't need to
+know. The baseline frequency is set by the boot loader, and Linux is not
+supposed to change that, only apply the dividers if necessary.
+
+What do you think of this use-case?
+
+Regards.
