@@ -1,53 +1,87 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 4 Feb 2015 09:42:48 +0530
-Subject: RFC on cpufreq implementation
-In-Reply-To: <54D162B6.2050602@free.fr>
-References: <54B7F7CD.7030903@free.fr> <54CA6327.5070707@free.fr>
- <CAKohponrzDb4ZGvRtJ5jtGTPAy4RCfRsYGvdjR5fx51K2=evCg@mail.gmail.com>
- <54CC174F.10703@free.fr>
- <CAKohpomzCEjXUrxUJjypaA77=r4j_ZPa+x3gM=cNN0kc3ux0uQ@mail.gmail.com>
- <54D162B6.2050602@free.fr>
-Message-ID: <CAKohpokPseRu9jGEKc7gL+y8O6j8WvV72RCYzm_J-J4wKwf3eQ@mail.gmail.com>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Wed, 04 Feb 2015 14:13:00 +0900
+Subject: [PATCH v5 9/9] drm/exynos: add support for 'hdmi' clock
+In-Reply-To: <1422883228-10690-10-git-send-email-m.szyprowski@samsung.com>
+References: <1422883228-10690-1-git-send-email-m.szyprowski@samsung.com>
+ <1422883228-10690-10-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <54D1AA5C.7040501@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 February 2015 at 05:37, Mason <mpeg.blue@free.fr> wrote:
-> All of them?
->
-> ~/linux-3.19-rc7$ wc drivers/cpufreq/*
->  31542  95730 813482 total
->
-> Are there perhaps 1 or 2 "golden standard" drivers that are well-written
-> and up-to-date with respect to current conventions?
+Hi Marek,
 
-cpufreq-dt.c
+On 2015? 02? 02? 22:20, Marek Szyprowski wrote:
+> Mixed need to have hdmi clock enabled to properly perform power on/off
+> sequences, so add handling of this clock directly to the mixer driver.
+> Dependency between hdmi clock and mixer module has been observed on
+> Exynos4 based boards.
 
-> Like Samsung did with include/dt-bindings/clock/exynos*.h ?
+Picked it up.
 
-Yeah.
+Thanks,
+Inki Dae.
 
-> Are you saying that use of DeviceTree is mandatory for new ARM ports?
-
-Yes.
-
-> In other words, ports using "board files" will not be accepted into
-> mainline, nor will drivers not using DT?
-
-It wouldn't be good for you as well, that's all I can say.
-
-> If that is correct, then my proposed cpufreq driver has exactly 0%
-> chance of being mainlined as-is, right?
-
-:)
-
-> I took a look at cpufreq-dt.c but I think it doesn't quite fit my use-case.
-> In my driver, I define "clock dividers" (typically 1,2,3,5,9) and these are
-> used to divide some baseline frequency that the cpufreq code doesn't need to
-> know. The baseline frequency is set by the boot loader, and Linux is not
-> supposed to change that, only apply the dividers if necessary.
->
-> What do you think of this use-case?
-
-You need to write a backend clock driver for this. Most of the other platforms
-are doing this. cpufreq-dt driver does clk_get(), clk_get_rate(), clk_set_rate()
-and your backend driver should handle these to change the frequencies.
+> 
+> Suggested-by: Andrzej Hajda <a.hajda@samsung.com>
+> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  Documentation/devicetree/bindings/video/exynos_mixer.txt | 1 +
+>  drivers/gpu/drm/exynos/exynos_mixer.c                    | 9 +++++++++
+>  2 files changed, 10 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/video/exynos_mixer.txt b/Documentation/devicetree/bindings/video/exynos_mixer.txt
+> index 08b394b1edbf..3e38128f866b 100644
+> --- a/Documentation/devicetree/bindings/video/exynos_mixer.txt
+> +++ b/Documentation/devicetree/bindings/video/exynos_mixer.txt
+> @@ -15,6 +15,7 @@ Required properties:
+>  	a) mixer: Gate of Mixer IP bus clock.
+>  	b) sclk_hdmi: HDMI Special clock, one of the two possible inputs of
+>                 mixer mux.
+> +	c) hdmi: Gate of HDMI IP bus clock, needed together with sclk_hdmi.
+>  
+>  Example:
+>  
+> diff --git a/drivers/gpu/drm/exynos/exynos_mixer.c b/drivers/gpu/drm/exynos/exynos_mixer.c
+> index 820b76234ef4..8212c8299625 100644
+> --- a/drivers/gpu/drm/exynos/exynos_mixer.c
+> +++ b/drivers/gpu/drm/exynos/exynos_mixer.c
+> @@ -72,6 +72,7 @@ struct mixer_resources {
+>  	spinlock_t		reg_slock;
+>  	struct clk		*mixer;
+>  	struct clk		*vp;
+> +	struct clk		*hdmi;
+>  	struct clk		*sclk_mixer;
+>  	struct clk		*sclk_hdmi;
+>  	struct clk		*mout_mixer;
+> @@ -774,6 +775,12 @@ static int mixer_resources_init(struct mixer_context *mixer_ctx)
+>  		return -ENODEV;
+>  	}
+>  
+> +	mixer_res->hdmi = devm_clk_get(dev, "hdmi");
+> +	if (IS_ERR(mixer_res->hdmi)) {
+> +		dev_err(dev, "failed to get clock 'hdmi'\n");
+> +		return PTR_ERR(mixer_res->hdmi);
+> +	}
+> +
+>  	mixer_res->sclk_hdmi = devm_clk_get(dev, "sclk_hdmi");
+>  	if (IS_ERR(mixer_res->sclk_hdmi)) {
+>  		dev_err(dev, "failed to get clock 'sclk_hdmi'\n");
+> @@ -1095,6 +1102,7 @@ static void mixer_poweron(struct exynos_drm_manager *mgr)
+>  	pm_runtime_get_sync(ctx->dev);
+>  
+>  	clk_prepare_enable(res->mixer);
+> +	clk_prepare_enable(res->hdmi);
+>  	if (ctx->vp_enabled) {
+>  		clk_prepare_enable(res->vp);
+>  		if (ctx->has_sclk)
+> @@ -1134,6 +1142,7 @@ static void mixer_poweroff(struct exynos_drm_manager *mgr)
+>  	ctx->powered = false;
+>  	mutex_unlock(&ctx->mixer_mutex);
+>  
+> +	clk_disable_unprepare(res->hdmi);
+>  	clk_disable_unprepare(res->mixer);
+>  	if (ctx->vp_enabled) {
+>  		clk_disable_unprepare(res->vp);
+> 
