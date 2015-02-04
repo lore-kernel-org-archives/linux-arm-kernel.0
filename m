@@ -1,99 +1,132 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 04 Feb 2015 17:48:05 +0800
-Subject: [PATCH v8 14/21] ACPI / processor: Make it possible to get CPU
- hardware ID via GICC
-In-Reply-To: <20150203200936.GA21731@e104818-lin.cambridge.arm.com>
-References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
- <1422881149-8177-15-git-send-email-hanjun.guo@linaro.org>
- <20150203141749.GA32536@leverpostej>
- <20150203200936.GA21731@e104818-lin.cambridge.arm.com>
-Message-ID: <54D1EAD5.4080105@linaro.org>
+From: hongbo.zhang@linaro.org (Hongbo Zhang)
+Date: Wed, 4 Feb 2015 17:53:25 +0800
+Subject: [PATCH v5 00/18] Exynos SYSMMU (IOMMU) integration with DT and
+ DMA-mapping subsystem
+In-Reply-To: <1422028288-891-1-git-send-email-m.szyprowski@samsung.com>
+References: <1422028288-891-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CAOhR-w3xdFtNGi=cfEM=N4ntjrjGwMUzxnqHWoRwy6r-AQOAjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?02?04? 04:09, Catalin Marinas wrote:
-> On Tue, Feb 03, 2015 at 02:17:49PM +0000, Mark Rutland wrote:
->> On Mon, Feb 02, 2015 at 12:45:42PM +0000, Hanjun Guo wrote:
->>> Introduce a new function map_gicc_mpidr() to allow MPIDRs to be obtained
->>> from the GICC Structure introduced by ACPI 5.1.
->>>
->>> MPIDR is the CPU hardware ID as local APIC ID on x86 platform, so we use
->>> MPIDR not the GIC CPU interface ID to identify CPUs.
->>>
->>> Further steps would typedef a phys_id_t for in arch code(with
->>> appropriate size and a corresponding invalid value, say ~0) and use that
->>> instead of an int in drivers/acpi/processor_core.c to store phys_id, then
->>> no need for mpidr packing.
->>
->> I don't understand why we don't fix this now, and I'm very worried that
->> this patch leaves much potential for FW bugs due to potential Linux
->> bugs.
->>
->> Having a function called cpu_physical_id which _does not_ return a
->> physical ID makes no sense to me. Any time we really need a physical
->> ID, we're still going to have to unpack it (in an architecture-specific
->> manner).
->
-> Do you mean something like this? Only briefly tested on Juno and I may
-> have missed other calls:
+Hi Marek,
+This is patch set against v3.19-rc4 plus 'Add HDMI support for
+Exynos5420 platform', right?
+No other dependencies? If there is, do you have a public git tree to be cloned?
 
-Thanks, I think it is Mark's suggestion (and also Lorenzo's)
+Thanks.
 
+On 23 January 2015 at 23:51, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> Hello Everyone,
 >
-> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-> index ea4d2b35c57b..4fafd62b1b86 100644
-> --- a/arch/arm64/include/asm/acpi.h
-> +++ b/arch/arm64/include/asm/acpi.h
-> @@ -49,33 +49,12 @@ static inline void enable_acpi(void)
->   	acpi_noirq = 0;
->   }
+> This is yet another attempt to get Exynos SYSMMU driver with integrated
+> with IOMMU & DMA-mapping subsystems. The main change from previous
+> version is a rebase onto some more pending Exynos DTS patches and minor
+> fixes of the reported issues.
 >
-> -/* MPIDR value provided in GICC structure is 64 bits, but the
-> - * existing phys_id (CPU hardware ID) using in acpi processor
-> - * driver is 32-bit, to conform to the same datatype we need
-> - * to repack the GICC structure MPIDR.
-> - *
-> - * bits other than following 32 bits are defined as 0, so it
-> - * will be no information lost after repacked.
-> - *
-> - * Bits [0:7] Aff0;
-> - * Bits [8:15] Aff1;
-> - * Bits [16:23] Aff2;
-> - * Bits [32:39] Aff3;
-> - */
-> -static inline u32 pack_mpidr(u64 mpidr)
-> -{
-> -	return (u32) ((mpidr & 0xff00000000) >> 8) | mpidr;
-> -}
-> -
->   /*
->    * The ACPI processor driver for ACPI core code needs this macro
->    * to find out this cpu was already mapped (mapping from CPU hardware
->    * ID to CPU logical ID) or not.
-> - *
-> - * cpu_logical_map(cpu) is the mapping of MPIDR and the logical cpu,
-> - * and MPIDR is the cpu hardware ID we needed to pack.
->    */
-> -#define cpu_physical_id(cpu) pack_mpidr(cpu_logical_map(cpu))
-> +#define cpu_physical_id(cpu) cpu_logical_map(cpu)
+> Merge plan for this patchset:
 >
->   /*
->    * It's used from ACPI core in kdump to boot UP system with SMP kernel,
-> diff --git a/arch/arm64/include/asm/smp_plat.h b/arch/arm64/include/asm/smp_plat.h
-> index 59e282311b58..a492276e008d 100644
-> --- a/arch/arm64/include/asm/smp_plat.h
-> +++ b/arch/arm64/include/asm/smp_plat.h
-> @@ -40,4 +40,6 @@ static inline u32 mpidr_hash_size(void)
->   extern u64 __cpu_logical_map[NR_CPUS];
->   #define cpu_logical_map(cpu)    __cpu_logical_map[cpu]
+> 1. All iommu related patches (with 'iommu: exynos') can be merged to
+> iommu tree. They don't have any direct dependencies on the DTS, DRM and
+> power domain initialization change - without them the driver will simply
+> not initialize, when no exynos,sysmmu nodes are provided in device tree.
 >
-> +typedef u64 cpuid_t;
-
-I think cpuid_t is a little confused because people may recognize
-it as cpu logical id, its original meaning is the physical cpu ID,
-so how about:
-
-typedef u64 phys_id_t; ?
-
-Thanks
-Hanjun
+> Joerg, could you merge those patches?
+>
+>
+> 2. DTS and power domain patches should go to Samsung Exynos tree. Those
+> patches depends on earlier DTS patches for Exynos SoCs, which make
+> this patchset really complete:
+> - 'ARM: DTS: Exynos: convert to generic power domain bindings'
+>   (http://www.spinics.net/lists/linux-samsung-soc/msg40584.html)
+> - '[PATCH v4 0/7] Enable HDMI support on Exynos platforms'
+>   (http://www.spinics.net/lists/arm-kernel/msg391148.html)
+> - '[PATCH 0/2] Add HDMI support for Exynos5420 platform'
+>   (http://www.spinics.net/lists/linux-samsung-soc/msg41364.html)
+>
+> Kukjin, could you merge those patches?
+>
+>
+> 3. Exynos DRM fix. This patch in my opinion should go Exynos DRM tree.
+>
+> Inki, could you merge it?
+>
+>
+> Best regards
+> Marek Szyprowski
+> Samsung R&D Institute Poland
+>
+>
+> Changelog:
+>
+> v5:
+> - rebased onto 'Add HDMI support for Exynos5420 platform' patchset
+> - fixed 'const' issue in 'iommu: exynos: init from dt-specific callback
+>   instead of initcall' patch, thanks to Tobias Jakobi for reporting it
+> - fixed copy-paste typo in exynos5250 dts patch
+>
+> v4: http://www.spinics.net/lists/linux-samsung-soc/msg41177.html
+> - rebased onto v3.19-rc4 and other Exynos DTS queued patches
+> - added DTS patch for Exynos 5250 & 5420/5422/5800
+>
+> v3: http://www.spinics.net/lists/linux-samsung-soc/msg39168.html
+> - rebased onto "[RFC PATCH v4 0/8] Introduce automatic DMA
+>   configuration for IOMMU masters"
+> - added some minor fixes for iommu and dma-mapping frameworks
+>
+> v2: http://thread.gmane.org/gmane.linux.kernel.iommu/6472/
+> - rebased onto "[RFC PATCH v3 0/7] Introduce automatic DMA
+>   configuration for IOMMU masters" patches:
+>   http://www.spinics.net/lists/arm-kernel/msg362076.html
+> - changed initialization from bus notifiers to DT related callbacks
+> - removed support for separate IO address spaces - this will be
+>   discussed separately after the basic support gets merged
+> - removed support for power domain notifier-based runtime power
+>   management - this also will be discussed separately later
+>
+> v1: https://lkml.org/lkml/2014/8/5/183
+> - initial version, feature complete, completely rewrote integration
+>   approach
+>
+>
+> Patch summary:
+>
+> Marek Szyprowski (18):
+>   drm: exynos: detach from default dma-mapping domain on init
+>   arm: exynos: pm_domains: add support for devices registered before
+>     arch_initcall
+>   ARM: dts: exynos4: add sysmmu nodes
+>   ARM: dts: exynos5250: add sysmmu nodes
+>   ARM: dts: exynos5420: add sysmmu nodes
+>   iommu: exynos: don't read version register on every tlb operation
+>   iommu: exynos: remove unused functions
+>   iommu: exynos: remove useless spinlock
+>   iommu: exynos: refactor function parameters to simplify code
+>   iommu: exynos: remove unused functions, part 2
+>   iommu: exynos: remove useless device_add/remove callbacks
+>   iommu: exynos: add support for binding more than one sysmmu to master
+>     device
+>   iommu: exynos: add support for runtime_pm
+>   iommu: exynos: rename variables to reflect their purpose
+>   iommu: exynos: document internal structures
+>   iommu: exynos: remove excessive includes and sort others
+>     alphabetically
+>   iommu: exynos: init from dt-specific callback instead of initcall
+>   iommu: exynos: add callback for initializing devices from device tree
+>
+>  arch/arm/boot/dts/exynos4.dtsi            | 118 +++++++
+>  arch/arm/boot/dts/exynos4210.dtsi         |  23 ++
+>  arch/arm/boot/dts/exynos4x12.dtsi         |  82 +++++
+>  arch/arm/boot/dts/exynos5250.dtsi         | 250 +++++++++++++++
+>  arch/arm/boot/dts/exynos5420.dtsi         | 181 +++++++++++
+>  arch/arm/mach-exynos/pm_domains.c         |   9 +-
+>  drivers/gpu/drm/exynos/exynos_drm_iommu.c |   3 +
+>  drivers/iommu/exynos-iommu.c              | 492 ++++++++++++++----------------
+>  8 files changed, 888 insertions(+), 270 deletions(-)
+>
+> --
+> 1.9.2
+>
+> _______________________________________________
+> iommu mailing list
+> iommu at lists.linux-foundation.org
+> https://lists.linuxfoundation.org/mailman/listinfo/iommu
