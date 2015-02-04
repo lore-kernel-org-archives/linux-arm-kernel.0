@@ -1,58 +1,33 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 04 Feb 2015 18:30:21 +0100
-Subject: [PATCH 2/4] rtc: sa1100: convert to run-time register mapping
-In-Reply-To: <1423005775-26457-3-git-send-email-robh@kernel.org> (Rob
- Herring's message of "Tue, 3 Feb 2015 17:22:53 -0600")
-References: <1423005775-26457-1-git-send-email-robh@kernel.org>
- <1423005775-26457-3-git-send-email-robh@kernel.org>
-Message-ID: <87h9v1a8k2.fsf@free.fr>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 4 Feb 2015 17:52:56 +0000
+Subject: [PATCH v8 02/21] acpi: fix acpi_os_ioremap for arm64
+In-Reply-To: <54D245E2.2030003@codeaurora.org>
+References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
+ <1422881149-8177-3-git-send-email-hanjun.guo@linaro.org>
+ <2422968.Es7R0p3loO@vostro.rjw.lan>
+ <1422984576.18187.82.camel@deneb.redhat.com>
+ <20150204112508.GB26006@e104818-lin.cambridge.arm.com>
+ <1423066107.18187.99.camel@deneb.redhat.com>
+ <54D245E2.2030003@codeaurora.org>
+Message-ID: <20150204175256.GH26006@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob Herring <robh@kernel.org> writes:
+On Wed, Feb 04, 2015 at 04:16:34PM +0000, Timur Tabi wrote:
+> On 02/04/2015 10:08 AM, Mark Salter wrote:
+> > acpi_os_remap() is used to map ACPI tables. These tables may be in ram
+> > which are already included in the kernel's linear RAM mapping. So we
+> > need ioremap_cache to avoid two mappings to the same physical page
+> > having different caching attributes.
+> 
+> Would it be possible to modify ioremap() so that it can tell whether the 
+> memory is already mapped in some way, and then use a compatible remapping?
 
-Hi Rob,
+No. We have some semantics for ioremap() and it should return
+non-cacheable mapping.
 
-> SA1100 and PXA differ only in register offsets which are currently
-> hardcoded in a machine specific header. Some arm64 platforms (PXA1928)
-> have this RTC block also.
->
-> Convert the driver to use ioremap and set the register offsets dynamically.
-> Since we are touching all the register accesses, convert them all to
-> readl/writel.
-A general comment, probably made by Arnd already, why not using the relaxed
-accessors ?
-
-... zip ...
-
-> +	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	base = devm_ioremap_resource(&pdev->dev, iores);
-> +	if (IS_ERR(base))
-> +		return PTR_ERR(base);
-> +
-> +	if (IS_ENABLED(CONFIG_ARCH_SA1100) ||
-> +	    of_device_is_compatible(pdev->dev.of_node, "mrvl,sa1100-rtc")) {
-> +		info->rcnr = base + 0x04;
-> +		info->rtsr = base + 0x10;
-> +		info->rtar = base + 0x00;
-> +		info->rttr = base + 0x08;
-> +	} else {
-> +		info->rcnr = base + 0x0;
-> +		info->rtsr = base + 0x8;
-> +		info->rtar = base + 0x4;
-> +		info->rttr = base + 0xc;
-> +	}
-> +
-This is making me feel a bit uncomfortable. What if a single kernel is built for
-both SA1100 and PXA, and used in a PXA platform (as this drivers is also used in
-pxa2xx and pxa3xx) ?
-
-And just for your information, both rtc-sa1100 and rtc-pxa can be used at the
-same time in a pxa kernel.
-
-Apart from that worry it's quite nice.
-
-Cheers.
+ioremap_cache() checks whether the page is RAM already and returns the
+existing kernel linear mapping on arm64.
 
 -- 
-Robert
+Catalin
