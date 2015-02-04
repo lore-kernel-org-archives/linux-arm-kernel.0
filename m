@@ -1,53 +1,23 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 04 Feb 2015 15:39:49 +0100
-Subject: [PATCH 0/8] PM / Domains: Re-structure code for adding/removing
- devices to genpd
-In-Reply-To: <1422389625-11730-1-git-send-email-ulf.hansson@linaro.org>
-References: <1422389625-11730-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <5703029.cMXmjeytH4@vostro.rjw.lan>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 4 Feb 2015 15:21:27 +0100
+Subject: imx_v6_v7_defconfig needs lzop
+Message-ID: <CAMuHMdVjqp52BQqH32Ut7kxDYzmyY4+JEVuhXgTqU8V24kQyZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, January 27, 2015 09:13:37 PM Ulf Hansson wrote:
-> While adding error handling of genpd's ->attach_dev() callback, I realized that
-> we also had a need to re-structure some of the code which deals with
-> adding/removing devices to genpd. Especially the APIs, __pm_genpd_add_device()
-> and pm_genpd_remove_device() deserved some attention.
-> 
-> Patch 1 -> 4, can be considered as more simple cleanups and should not impact
-> the behavior for current clients using the APIs. 
-> 
-> Patch 5, eliminates a mutex for generic_pm_domain_data by re-order the
-> initialization/cleanup of dev_pm_qos notifiers.
-> 
-> Patch 6, move some code around to fix a potenial memory leakage of a struct
-> pm_subsys_data.
-> 
-> Patch 7, code restructuring which impacts locking behavior while adding/removing
-> devices. Should improve code readability and decrease critical regions of
-> holding locks.
-> 
-> Patch 8, Adds error handling of genpd's ->attach_dev() callback
-> 
-> 
-> Ulf Hansson (8):
->   PM / Domains: Rename __pm_genpd_alloc|free_dev_data()
->   PM / Domains: Remove reference counting for the generic_pm_domain_data
->   PM / Domains: Don't allow an existing generic_pm_domain_data
->   PM / Domains: Don't check for an existing device when adding a new
->   PM / Domains: Eliminate the mutex for the generic_pm_domain_data
->   PM / Domains: Free pm_subsys_data in error path in
->     __pm_genpd_add_device()
->   PM / Domains: Re-order initialization of generic_pm_domain_data
->   PM / Domains: Handle errors from genpd's ->attach_dev() callback
-> 
->  drivers/base/power/domain.c | 137 +++++++++++++++++++++-----------------------
->  include/linux/pm_domain.h   |   2 -
->  2 files changed, 65 insertions(+), 74 deletions(-)
+http://kisskb.ellerman.id.au/kisskb/buildresult/12358024/
 
-Whole series queued up for 3.20, thanks!
+/bin/sh: 1: lzop: not found
+cat: write error: Broken pipe
+make[3]: *** [arch/arm/boot/compressed/piggy.lzo] Error 1
 
+Gr{oetje,eeting}s,
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
