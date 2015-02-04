@@ -1,40 +1,33 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Wed, 4 Feb 2015 21:17:17 +0800
-Subject: [patch] irqchip: mtk-sysirq: fix an error code
-In-Reply-To: <20150130082847.GB21357@mwanda>
-References: <20150130082847.GB21357@mwanda>
-Message-ID: <1423055837.31210.29.camel@mtksdaap41>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 04 Feb 2015 14:25:07 +0100
+Subject: [PATCH 2/4] rtc: sa1100: convert to run-time register mapping
+In-Reply-To: <1423005775-26457-3-git-send-email-robh@kernel.org>
+References: <1423005775-26457-1-git-send-email-robh@kernel.org>
+ <1423005775-26457-3-git-send-email-robh@kernel.org>
+Message-ID: <39285522.vUKlahhjIR@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-01-30 at 11:28 +0300, Dan Carpenter wrote:
-> "chip_data->intpol_base" used to be an ERR_PTR() but we recently changed
-> it to be NULL.  We need to update the error code as well because
-> "PTR_ERR(NULL)" means success where really we want to return -ENOMEM.
+On Tuesday 03 February 2015 17:22:53 Rob Herring wrote:
+> SA1100 and PXA differ only in register offsets which are currently
+> hardcoded in a machine specific header. Some arm64 platforms (PXA1928)
+> have this RTC block also.
 > 
-> Fixes: cdb647a772e9 ('irqchip: mtk-sysirq: Get irq number from register resource size')
-> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+> Convert the driver to use ioremap and set the register offsets dynamically.
+> Since we are touching all the register accesses, convert them all to
+> readl/writel.
 > 
-> diff --git a/drivers/irqchip/irq-mtk-sysirq.c b/drivers/irqchip/irq-mtk-sysirq.c
-> index eaf0a71..22eb34c 100644
-> --- a/drivers/irqchip/irq-mtk-sysirq.c
-> +++ b/drivers/irqchip/irq-mtk-sysirq.c
-> @@ -144,7 +144,7 @@ static int __init mtk_sysirq_of_init(struct device_node *node,
->  	chip_data->intpol_base = ioremap(res.start, size);
->  	if (!chip_data->intpol_base) {
->  		pr_err("mtk_sysirq: unable to map sysirq register\n");
-> -		ret = PTR_ERR(chip_data->intpol_base);
-> +		ret = -ENOMEM;
->  		goto out_free;
->  	}
->  
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Alessandro Zummo <a.zummo@towertech.it>
+> Cc: rtc-linux at googlegroups.com
 
-Dan,
+Hmm, I really should have sent out my version of the patch ages ago. :(
 
-Thanks for catching this.
-Acked-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+Can you have a look at
 
-I changed to use ioremap(), and remember to change the null pointer
-check but not the return type. Sorry for the mistake.
+http://git.kernel.org/cgit/linux/kernel/git/arnd/playground.git/commit/?h=multiplatform-3.19-next&id=4d9727883a363fb839e7d1633599166c0a08d644
 
-Joe.C
+to see compare the approaches and see if there is anything I did that you
+missed?
+
+	Arnd
