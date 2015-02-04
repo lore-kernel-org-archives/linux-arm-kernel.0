@@ -1,82 +1,72 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 04 Feb 2015 17:41:40 +0800
-Subject: [Linaro-acpi] [PATCH v8 00/21] Introduce ACPI for ARM64 based
- on ACPI 5.1
-In-Reply-To: <54D108DD.6050509@linaro.org>
-References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
- <20150203164727.GC32750@leverpostej> <54D108DD.6050509@linaro.org>
-Message-ID: <54D1E954.4050003@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 4 Feb 2015 09:44:14 +0000
+Subject: Continuing kallsyms failures - large kernels, XIP kernels, and
+ large XIP kernels
+In-Reply-To: <alpine.LFD.2.11.1502032054460.1322@knanqh.ubzr>
+References: <20150130145642.GK26493@n2100.arm.linux.org.uk>
+ <20150130153414.GM26493@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1501301224180.1322@knanqh.ubzr>
+ <20150131002253.GR26493@n2100.arm.linux.org.uk>
+ <20150204000307.GA8656@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1502032054460.1322@knanqh.ubzr>
+Message-ID: <20150204094414.GC8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?02?04? 01:43, Al Stone wrote:
-> On 02/03/2015 09:47 AM, Mark Rutland wrote:
->> On Mon, Feb 02, 2015 at 12:45:28PM +0000, Hanjun Guo wrote:
->>> Hi,
->>>
->>> This is the v8 of ACPI core patches for ARM64 based on ACPI 5.1, there are
->>> some updates since v7:
->>>
->>>   - Add two more documantation to explain why we need ACPI in ARM64 servers
->>>     by Grant, and recommendations and prohibitions on the use of the numerous
->>>     ACPI tables and objects by Al Stone.
->>>
->>>   - Add two patches which is need to map acpi tables after acpi_gbl_permanent_mmap
->>>     is set
->>>
->>>   - Add another patch "dt / chosen: Add linux,uefi-stub-generated-dtb property"
->>>     to address that if firmware providing no dtb, we can try ACPI configuration data
->>>     even if no "acpi=force" is passed in early parameters. (I think ACPI for XEN and
->>>     kexec need consider sperately as disscussed, correct me if I'm wrong).
->>>
->>>   - Add CC in the patch to the subsystem maintainers and modify the subject
->>>     of the patch to explicitly show the subsystem touched by this patch set,
->>>     please help us to review and ack them if they make sense, thanks.
->>>
->>>   - Add Tested-by from Qualcomm and Redhat;
->>>
->>>   - Make ACPI depends on PCI suggested by Catalin;
->>>
->>>   - Clean up SMP init function as Lorenzo suggested, remove physical
->>>     CPU hot-plug code in the patch;
->>>
->>>   - Address some comments from Marc and explicitly state that will
->>>     implment statcked irqdomain and GIC init framework when GICv3 and
->>>     ITS, GICv2m are implemented;
->>>
->>>   - Rebased on top of 3.19-rc7.
->>>
->>> previous version is here:
->>> v7: https://lkml.org/lkml/2015/1/14/586
->>> v6: https://lkml.org/lkml/2015/1/4/40
->>>
->>> Any comments are welcome :)
->>
->> I note that for ACPI the PMU interrupt information is stored in the GICC
->> (as "Performance Interrupt" and "Performance Interrupt Mode"), but I
->> don't see any code for handling that as part of this series.
->>
->> Is anyone currently looking into that?
->
-> Yes.  IIRC, it's a pretty small patch that I'll be including in the
-> Seattle patches that build on top of this core set.
->
->> For those systems ACPI is being developed on do we know that the GICC
->> information for the PMU interrupts is sane?
->
-> Yes.  We know this works for Seattle platforms, using their latest firmware.
->
->> I'm slightly worried about the prospect of adding support later only to
->> find that the performance interrupt data in contemporary GICC tables is
->> invalid; it's going to be extremely painful to detect that being the
->> case in order to perform any kind of workaround.
->
-> That will depend on the error, of course.  It was pretty straightforward
-> when the interrupt value was set to zero in some of the early tables we
-> used.
+On Tue, Feb 03, 2015 at 08:59:15PM -0500, Nicolas Pitre wrote:
+> On Wed, 4 Feb 2015, Russell King - ARM Linux wrote:
+> 
+> > It looks like we have cases where this falsely triggers.  Consider EFM32:
+> > 
+> > CONFIG_DRAM_BASE=0x88000000
+> > CONFIG_DRAM_SIZE=0x00400000
+> > CONFIG_FLASH_MEM_BASE=0x8c000000
+> > CONFIG_FLASH_SIZE=0x01000000
+> > 
+> > This means that we quite legally end up with the .data section below the
+> > .text section, which makes:
+> > 
+> > ASSERT((_data >= __data_loc), "Text section oversize") 
+> > 
+> > falsely trigger.
+> > 
+> > The linker has the capacity to specify regions of ROM and RAM in the
+> > linker file, I wonder if we should be using those for XIP.  Merely
+> > adding the MEMORY table to the linker file is not good enough - we
+> > also need to explicitly tell the linker which memory regions to place
+> > the output sections, otherwise the linker ends up making assumptions.
+> > 
+> > What that means is... asm-generic/vmlinux.lds.h breaks for us.
+> > 
+> > Any ideas?  I think using the MEMORY table would be the best approach,
+> > because that should allow us to properly verify that the resulting
+> > binary should fit in the memory regions.
+> 
+> Maybe simply having an assert() on the size of the .text section could 
+> be all that is needed.  We already know the maximum size in advance.
 
-If we are not worrying about too much patch in this series, I can
-cherry-pick Mark Salter's ACPI PMU patch for Seattle in next version.
+That doesn't work, it's not just the .text section but also .rodata,
+__bug_table, __ksymtab, __ksymtab_gpl, __kcrctab, __kcrctab_gpl,
+__ksymtab_strings, __param, __modver, __ex_table, .notes, .vectors,
+.stubs, .init.text, maybe .exit.text, .init.arch.info, .init.tagtable,
+.init.smpalt, .init.pv_table, and apparently .init.data (which is
+surely wrong?)  The following is from Arnd's failing configuration:
 
-Thanks
-Hanjun
+ 18 .init.tagtable 00000040  80073a9c  80073a9c  0100ba9c  2**2
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+ 19 .init.data    000010e8  80073adc  80073adc  0100badc  2**2
+                  CONTENTS, ALLOC, LOAD, DATA
+ 20 .data         003552c4  80008000  80074bc4  01010000  2**8
+                  CONTENTS, ALLOC, LOAD, DATA
+
+Hmm, if .init.data is contained in the flash section (which it seemingly
+is), it seems that XIP support is currently broken - that section is
+definitely a read/write section.  No one has seemingly noticed that it's
+broken and it's been broken for a long time, so maybe the simple answer
+then is just to rip XIP support out?
+
+How does EFM32 work?  Does it work?
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
