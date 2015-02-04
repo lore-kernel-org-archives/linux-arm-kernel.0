@@ -1,169 +1,85 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 04 Feb 2015 17:53:55 +0100
-Subject: [PATCH] ARM: Don't use complete() during __cpu_die
-Message-ID: <1423068835-25470-1-git-send-email-k.kozlowski@samsung.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 04 Feb 2015 09:56:26 -0700
+Subject: [PATCH v3 01/10] ARM: tegra: Set the sound card model that alsaucm
+ expects
+In-Reply-To: <54D1E2B6.4050004@collabora.com>
+References: <1422442278-10405-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1422442278-10405-2-git-send-email-tomeu.vizoso@collabora.com>
+ <54CFE754.7000500@wwwdotorg.org>
+ <CAAObsKCm-9GOvis=MZ-nyA0N+g_ZuWYUfDSdEcVy5p5ykCmkcQ@mail.gmail.com>
+ <54D0F8E3.3020902@wwwdotorg.org> <54D1E2B6.4050004@collabora.com>
+Message-ID: <54D24F3A.5000206@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The complete() should not be used on offlined CPU. Rewrite the
-wait-complete mechanism with wait_on_bit_timeout().
+On 02/04/2015 02:13 AM, Tomeu Vizoso wrote:
+> On 02/03/2015 05:35 PM, Stephen Warren wrote:
+>> On 02/03/2015 06:13 AM, Tomeu Vizoso wrote:
+>>> On 2 February 2015 at 22:08, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>>> On 01/28/2015 03:50 AM, Tomeu Vizoso wrote:
+>>>>>
+>>>>> Patches are on its way to add a config file to alsaucm for the Nyan
+>>>>> boards. Use the same card ID that alsaucm will expect.
+>>>>
+>>>>
+>>>>> diff --git a/arch/arm/boot/dts/tegra124-nyan-big.dts
+>>>>> b/arch/arm/boot/dts/tegra124-nyan-big.dts
+>>>>
+>>>>
+>>>>>           sound {
+>>>>> -               compatible = "nvidia,tegra-audio-max98090-nyan-big",
+>>>>> +               compatible = "nvidia,tegra-audio-max98090-nyan",
+>>>>>                                "nvidia,tegra-audio-max98090";
+>>>>
+>>>>
+>>>> I'm not convinced that removing the board-specific compatible value is a
+>>>> great idea. What if we find we need to distinguish between different boards
+>>>> that use this same binding in the future. That situation is exactly why we
+>>>> have board-/SoC-specific values in compatible even if we don't immediately
+>>>> use them.
+>>>
+>>> I understand the need of naming each component variant so they can be
+>>> distinguished in the future, but in this case it's the exact same hw.
+>>
+>> That's not true. These are two different boards that are derived from
+>> the same base design. The intent may be that they are the same, but the
+>> whole point of board-specific compatible values is to cover the case
+>> where mistakes and exceptions appear later.
+>
+> Fair enough.
+>
+>>>>> -               nvidia,model = "Acer Chromebook 13";
+>>>>> +               nvidia,model = "GoogleNyan";
+>>>>
+>>>>
+>>>> I believe this also technically breaks ABI, since some user-space tools use
+>>>> the model to look up saved state. Can we not leave this as is, and just have
+>>>> the UCM files know about both names?
+>>>
+>>> Well, "A13" isn't a great card id. Given that there's no users yet, I
+>>> would prefer to take this chance to put a sane value in there. Btw,
+>>> alsa-lib has now a UCM config for this and it uses the GoogleNyan card
+>>> id (has been picked up already by OpenSUSE).
+>>
+>> "A13" didn't appear anywhere, did it? Perhaps that was a shorthand for
+>> "Acer Chromebook 13". Yes, I agree we should use the user-visible model
+>> number here; "Acer CB5" or perhaps "Acer CB5-xxx" whatever xxx actually is.
+>
+> Ok, so we can go with Acer-CB5-311 for the nyan big.
+>
+> Unfortunately there doesn't exist a single product id that corresponds
+> with the nyan blaze, but at least four: K4K83UA, K4K11UA, K4K78UA and
+> K4K23UA. The commercial name of the series that contain a blaze board is
+> "HP Chromebook 14 G3", but that doesn't fit in the card id field (16 byte).
 
-The CPU triggering hot unplug (e.g. CPU0) will loop until some bit is
-cleared. In each iteration schedule_timeout() is used with initial sleep
-time of 1 ms.  Later it is increased to 10 ms.
+Oh, the 16-byte limit is rather annoying:-( Some of our existing DT 
+files don't fit into that limit.
 
-The dying CPU will clear the bit which is safe in that context.
+> What do you think of using GoogleNyanBig and GoogleNyanBlaze? Or maybe
+> just NyanBig and NyanBlaze? IMO it's more important that the card ids
+> correspond 1-to-1 to the hw than their recognizability, as it's not
+> something that end users will be messing with.
 
-This fixes following RCU warning on ARMv8 (Exynos 4412, Trats2) during
-suspend to RAM:
-
-[   31.113925] ===============================
-[   31.113928] [ INFO: suspicious RCU usage. ]
-[   31.113935] 3.19.0-rc7-next-20150203 #1914 Not tainted
-[   31.113938] -------------------------------
-[   31.113943] kernel/sched/fair.c:4740 suspicious rcu_dereference_check() usage!
-[   31.113946]
-[   31.113946] other info that might help us debug this:
-[   31.113946]
-[   31.113952]
-[   31.113952] RCU used illegally from offline CPU!
-[   31.113952] rcu_scheduler_active = 1, debug_locks = 0
-[   31.113957] 3 locks held by swapper/1/0:
-[   31.113988]  #0:  ((cpu_died).wait.lock){......}, at: [<c005a114>] complete+0x14/0x44
-[   31.114012]  #1:  (&p->pi_lock){-.-.-.}, at: [<c004a790>] try_to_wake_up+0x28/0x300
-[   31.114035]  #2:  (rcu_read_lock){......}, at: [<c004f1b8>] select_task_rq_fair+0x5c/0xa04
-[   31.114038]
-[   31.114038] stack backtrace:
-[   31.114046] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 3.19.0-rc7-next-20150203 #1914
-[   31.114050] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
-[   31.114076] [<c0014ce4>] (unwind_backtrace) from [<c0011c30>] (show_stack+0x10/0x14)
-[   31.114091] [<c0011c30>] (show_stack) from [<c04dc048>] (dump_stack+0x70/0xbc)
-[   31.114105] [<c04dc048>] (dump_stack) from [<c004f83c>] (select_task_rq_fair+0x6e0/0xa04)
-[   31.114118] [<c004f83c>] (select_task_rq_fair) from [<c004a83c>] (try_to_wake_up+0xd4/0x300)
-[   31.114129] [<c004a83c>] (try_to_wake_up) from [<c00598a0>] (__wake_up_common+0x4c/0x80)
-[   31.114140] [<c00598a0>] (__wake_up_common) from [<c00598e8>] (__wake_up_locked+0x14/0x1c)
-[   31.114150] [<c00598e8>] (__wake_up_locked) from [<c005a134>] (complete+0x34/0x44)
-[   31.114167] [<c005a134>] (complete) from [<c04d6ca4>] (cpu_die+0x24/0x84)
-[   31.114179] [<c04d6ca4>] (cpu_die) from [<c005a508>] (cpu_startup_entry+0x328/0x358)
-[   31.114189] [<c005a508>] (cpu_startup_entry) from [<40008784>] (0x40008784)
-[   31.114226] CPU1: shutdown
-
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/kernel/smp.c | 52 ++++++++++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 49 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 86ef244c5a24..bb8ff465975f 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -26,6 +26,7 @@
- #include <linux/completion.h>
- #include <linux/cpufreq.h>
- #include <linux/irq_work.h>
-+#include <linux/wait.h>
- 
- #include <linux/atomic.h>
- #include <asm/smp.h>
-@@ -76,6 +77,9 @@ enum ipi_msg_type {
- 
- static DECLARE_COMPLETION(cpu_running);
- 
-+#define CPU_DIE_WAIT_BIT		0
-+static unsigned long wait_cpu_die;
-+
- static struct smp_operations smp_ops;
- 
- void __init smp_set_ops(struct smp_operations *ops)
-@@ -133,6 +137,8 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
- 		pr_err("CPU%u: failed to boot: %d\n", cpu, ret);
- 	}
- 
-+	set_bit(CPU_DIE_WAIT_BIT, &wait_cpu_die);
-+	smp_mb__after_atomic();
- 
- 	memset(&secondary_data, 0, sizeof(secondary_data));
- 	return ret;
-@@ -213,7 +219,40 @@ int __cpu_disable(void)
- 	return 0;
- }
- 
--static DECLARE_COMPLETION(cpu_died);
-+/*
-+ * Wait for 5000*1 ms for 'wait_cpu_die' bit to be cleared.
-+ * Actually the real wait time will be longer because of schedule()
-+ * called bit_wait_timeout.
-+ *
-+ * Returns 0 if bit was cleared (CPU died) or non-zero
-+ * otherwise (1 or negative ERRNO).
-+ */
-+static int wait_for_cpu_die(void)
-+{
-+	int retries = 5000, sleep_ms = 1, ret = 0;
-+
-+	might_sleep();
-+
-+	smp_mb__before_atomic();
-+	while (test_bit(CPU_DIE_WAIT_BIT, &wait_cpu_die)) {
-+		ret = out_of_line_wait_on_bit_timeout(&wait_cpu_die,
-+				CPU_DIE_WAIT_BIT, bit_wait_timeout,
-+				TASK_UNINTERRUPTIBLE,
-+				msecs_to_jiffies(sleep_ms));
-+		if (!ret || (--retries <= 0))
-+			break;
-+
-+		if (retries < 4000) {
-+			/* After ~1000 ms increase sleeping time to 10 ms */
-+			retries = 400;
-+			sleep_ms = 10;
-+		}
-+
-+		smp_mb__before_atomic(); /* For next test_bit() in loop */
-+	}
-+
-+	return ret;
-+}
- 
- /*
-  * called on the thread which is asking for a CPU to be shutdown -
-@@ -221,7 +260,7 @@ static DECLARE_COMPLETION(cpu_died);
-  */
- void __cpu_die(unsigned int cpu)
- {
--	if (!wait_for_completion_timeout(&cpu_died, msecs_to_jiffies(5000))) {
-+	if (wait_for_cpu_die()) {
- 		pr_err("CPU%u: cpu didn't die\n", cpu);
- 		return;
- 	}
-@@ -236,6 +275,10 @@ void __cpu_die(unsigned int cpu)
- 	 */
- 	if (!platform_cpu_kill(cpu))
- 		pr_err("CPU%u: unable to kill\n", cpu);
-+
-+	/* Prepare the bit for some next CPU die */
-+	set_bit(CPU_DIE_WAIT_BIT, &wait_cpu_die);
-+	smp_mb__after_atomic();
- }
- 
- /*
-@@ -250,6 +293,8 @@ void __ref cpu_die(void)
- {
- 	unsigned int cpu = smp_processor_id();
- 
-+	WARN_ON(!test_bit(CPU_DIE_WAIT_BIT, &wait_cpu_die));
-+
- 	idle_task_exit();
- 
- 	local_irq_disable();
-@@ -267,7 +312,8 @@ void __ref cpu_die(void)
- 	 * this returns, power and/or clocks can be removed@any point
- 	 * from this CPU and its cache by platform_cpu_kill().
- 	 */
--	complete(&cpu_died);
-+	clear_bit(CPU_DIE_WAIT_BIT, &wait_cpu_die);
-+	smp_mb__after_atomic();
- 
- 	/*
- 	 * Ensure that the cache lines associated with that completion are
--- 
-1.9.1
+I'm not entirely sure that the user won't ever see those values; don't 
+some X11 GUI tools display them? Still, as you say there isn't too much 
+we can do, so since these names are unique/complete I figure they're OK.
