@@ -1,55 +1,86 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Thu, 05 Feb 2015 00:19:00 +0900
-Subject: [PATCH v3 0/6] Add multiple GPIO and external clock to MMC
- pwrseq_simple
-In-Reply-To: <54D23591.7050208@collabora.co.uk>
-References: <1422543608-24704-1-git-send-email-javier.martinez@collabora.co.uk>
- <CAPDyKFqx-dhhVmtGnP2YpmR63Y20Ns=YyxnYrE2ewTuNXPA7Ag@mail.gmail.com>
- <54CB81EF.8030603@collabora.co.uk> <54D23591.7050208@collabora.co.uk>
-Message-ID: <54D23864.7050705@kernel.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 04 Feb 2015 16:22:28 +0100
+Subject: [rcu] [ INFO: suspicious RCU usage. ]
+In-Reply-To: <20150204151028.GD5370@linux.vnet.ibm.com>
+References: <20150201025922.GA16820@wfg-t540p.sh.intel.com>
+ <1422957702.17540.1.camel@AMDC1943>
+ <20150203162704.GR19109@linux.vnet.ibm.com>
+ <1423049947.19547.6.camel@AMDC1943>
+ <20150204130018.GG8656@n2100.arm.linux.org.uk>
+ <20150204131420.GC5370@linux.vnet.ibm.com> <1423059387.24415.2.camel@AMDC1943>
+ <20150204151028.GD5370@linux.vnet.ibm.com>
+Message-ID: <1423063348.24415.10.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/15 00:06, Javier Martinez Canillas wrote:
-> Hello Kukjin,
+On ?ro, 2015-02-04 at 07:10 -0800, Paul E. McKenney wrote:
+> On Wed, Feb 04, 2015 at 03:16:27PM +0100, Krzysztof Kozlowski wrote:
+> > On ?ro, 2015-02-04 at 05:14 -0800, Paul E. McKenney wrote:
+> > > On Wed, Feb 04, 2015 at 01:00:18PM +0000, Russell King - ARM Linux wrote:
+> > > > On Wed, Feb 04, 2015 at 12:39:07PM +0100, Krzysztof Kozlowski wrote:
+> > > > > +Cc some ARM people
+> > > > 
+> > > > I wish that people would CC this list with problems seen on ARM.  I'm
+> > > > minded to just ignore this message because of this in the hope that by
+> > > > doing so, people will learn something...
+> > > > 
+> > > > > > Another thing I could do would be to have an arch-specific Kconfig
+> > > > > > variable that made ARM responsible for informing RCU that the CPU
+> > > > > > was departing, which would allow a call to as follows to be placed
+> > > > > > immediately after the complete():
+> > > > > > 
+> > > > > > rcu_cpu_notify(NULL, CPU_DYING_IDLE, (void *)(long)smp_processor_id());
+> > > > > > 
+> > > > > > Note:  This absolutely requires that the rcu_cpu_notify() -always-
+> > > > > > be allowed to execute!!!  This will not work if there is -any- possibility
+> > > > > > of __cpu_die() powering off the outgoing CPU before the call to
+> > > > > > rcu_cpu_notify() returns.
+> > > > 
+> > > > Exactly, so that's not going to be possible.  The completion at that
+> > > > point marks the point at which power _could_ be removed from the CPU
+> > > > going down.
+> > > 
+> > > OK, sounds like a polling loop is required.
+> > 
+> > I thought about using wait_on_bit() in __cpu_die() (the waiting thread)
+> > and clearing the bit on CPU being powered down. What do you think about
+> > such idea?
 > 
-Hi,
+> Hmmm...  It looks to me that wait_on_bit() calls out_of_line_wait_on_bit(),
+> which in turn calls __wait_on_bit(), which calls prepare_to_wait() and
+> finish_wait().  These are in the scheduler, but this is being called from
+> the CPU that remains online, so that should be OK.
+> 
+> But what do you invoke on the outgoing CPU?  Can you get away with
+> simply clearing the bit, or do you also have to do a wakeup?  It looks
+> to me like a wakeup is required, which would be illegal on the outgoing
+> CPU, which is at a point where it cannot legally invoke the scheduler.
+> Or am I missing something?
 
-> On 01/30/2015 02:06 PM, Javier Martinez Canillas wrote:
->> On 01/30/2015 12:13 PM, Ulf Hansson wrote:
->>>>
->>>> Patch #1 extends the simple MMC power sequence DT binding to support more
->>>> than one GPIO and patch #2 adds the actual implementation.
->>>>
->>>> In the same way, patch #3 and #4 extend the simple MMC power sequence DT
->>>> binding and pwrseq_simple driver to support an optional external clock.
->>>>
->>>> Finally as an example, patch #5 and patch #6 adds support for the wifi
->>>> chip in the Exynos5250 Snow that needs all these resources. These two
->>>> patches were added to the series only for completeness and should be
->>>> picked by Kukjin through his linux-samsung tree.
->>>>
->>>> Best regards,
->>>> Javier
->>>
->>> Thanks Javier! I have applied patch 1 -> 4 for my next branch.
->>>
->>> I made some minor fix to patch4, I send a separate response to that
->>> patch so you know.
->>>
->>
->> Great, thanks a lot!
->>
->> Kukjin,
->>
->> Could you please pick patches #5 and #6 then now that Ulf picked the others?
->>
-> 
-> I noticed that you are applying patches to your Samsung tree, do you want me to
-> re-send patches #5 and #6 or is OK for you to pick them from from this series?
-> 
-Oh, I've missed and it looks good to me. Applied, it means you don't
-need to re-send ;)
+Actually the timeout versions but I think that doesn't matter.
+The wait_on_bit will busy-loop with testing for the bit. Inside the loop
+it calls the 'action' which in my case will be bit_wait_io_timeout().
+This calls schedule_timeout().
 
-Thanks,
-Kukjin
+See proof of concept in attachment. One observed issue: hot unplug from
+commandline takes a lot more time. About 7 seconds instead of ~0.5.
+Probably I did something wrong.
+
+> 
+> You know, this situation is giving me a bad case of nostalgia for the
+> old Sequent Symmetry and NUMA-Q hardware.  On those platforms, the
+> outgoing CPU could turn itself off, and thus didn't need to tell some
+> other CPU when it was ready to be turned off.  Seems to me that this
+> self-turn-off capability would be a great feature for future systems!
+
+There are a lot more issues with hotplug on ARM...
+
+Patch/RFC attached.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-ARM-Don-t-use-complete-during-__cpu_die.patch
+Type: text/x-patch
+Size: 2311 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150204/717de999/attachment-0001.bin>
