@@ -1,109 +1,30 @@
-From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Wed, 04 Feb 2015 09:09:46 +0900
-Subject: [PATCH v5 0/9] Enable HDMI support on Exynos platforms
-In-Reply-To: <066101d03f65$a870dcc0$f9529640$@kernel.org>
-References: <1422883228-10690-1-git-send-email-m.szyprowski@samsung.com>
- <066101d03f65$a870dcc0$f9529640$@kernel.org>
-Message-ID: <54D1634A.4040300@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 4 Feb 2015 00:14:39 +0000
+Subject: [Linaro-mm-sig] [RFCv3 2/2] dma-buf: add helpers for sharing
+ attacher constraints with dma-parms
+In-Reply-To: <3327782.QV7DJfvifL@wuerfel>
+References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
+ <7233574.nKiRa7HnXU@wuerfel>
+ <20150203200435.GX14009@phenom.ffwll.local>
+ <3327782.QV7DJfvifL@wuerfel>
+Message-ID: <20150204001439.GB8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Feb 03, 2015 at 10:42:26PM +0100, Arnd Bergmann wrote:
+> Right, if you have a private iommu, there is no problem. The tricky part
+> is using a single driver for the system-level translation and the gpu
+> private mappings when there is only one type of iommu in the system.
 
-On 02/03/2015 12:58 PM, Kukjin Kim wrote:
-> Marek Szyprowski wrote:
->>
->> Hi all,
->>
->> This is yet another update on patchset, which enables HDMI support for
->> Exynos based platforms.
->>
->> Beside DTS changes, this patchset adds parent domain support for Exynos
->> PM domains and add support for 'hdmi' clock directly to Exynos DRM mixer
->> driver.
->>
->> The patchset is based on samsung/for-next branch and 'PM / Domains:
->> Export of_genpd_get_from_provider function' patch merged as commit
->> 7496fcbe8a643097efc061160e1c3b65ee2fa350 to v3.19-rc4.
->>
->> Regards
->> Marek Szyprowski
->>
->>
->> Changelog:
->>
->> v5:
->> - fixed error value for clk_get() in mixer patch
->> - rebased onto samsung/for-next branch
->>
->> v4: (http://www.spinics.net/lists/linux-samsung-soc/msg41375.html)
->> - added patches, which add 'hdmi' clock handling to mixed block, this
->>   finally solves the initialization related issues, thanks for Tobias
->>   Jakobi for testing
->> - added acks/reviewed/tested by tags
->>
->> v3: (http://www.spinics.net/lists/linux-samsung-soc/msg41020.html)
->> - added a note on defining subdomains to generic PM domain binding
->>   documentation (requested by Ulf Hansson)
->>
->> v2: (http://www.spinics.net/lists/linux-samsung-soc/msg40980.html)
->> - rewrote subdomains patch according to suggestions from Geert
->>   Uytterhoeven and Amit Daniel Kachhap.
->>
->> v1 resend: (http://www.spinics.net/lists/linux-samsung-soc/msg39428.html)
->> - added handling of generic 'power-domains' binding in subdomains
->>
->> v1: (http://www.spinics.net/lists/linux-samsung-soc/msg38914.html)
->> - resolved power domain on/off issue with 'clk: samsung: exynos4: set
->>   parent of mixer gate clock to hdmi' patch
->>
->> v0: (http://www.spinics.net/lists/linux-samsung-soc/msg33498.html)
->> - first attempt, used 'always on' power domains hack
->>
->>
->> Patch summary:
->>
->>
->> *** BLURB HERE ***
->>
->> Andrzej Hajda (1):
->>   ARM: dts: exynos5250: add display power domain
->>
->> Marek Szyprowski (7):
->>   PM / Domains: Add a note about power domain subdomains
->>   ARM: Exynos: add support for sub-power domains
->>   ARM: dts: exynos4: add hdmi related nodes
->>   ARM: dts: exynos4: add dependency between TV and LCD0 power domains
->>   ARM: dts: exynos4412-odroid: enable hdmi support
->>   ARM: dts: Exynos: add 'hdmi' clock to mixer nodes
->>   drm/exynos: add support for 'hdmi' clock
->>
->> Tomasz Stanislawski (1):
->>   ARM: dts: exynos4210-universal_c210: enable hdmi support
->>
->>  .../bindings/arm/exynos/power_domain.txt           |  2 +
->>  .../devicetree/bindings/power/power_domain.txt     | 29 +++++++++++
->>  .../devicetree/bindings/video/exynos_mixer.txt     |  1 +
->>  arch/arm/boot/dts/exynos4.dtsi                     | 41 ++++++++++++++++
->>  arch/arm/boot/dts/exynos4210-universal_c210.dts    | 57 ++++++++++++++++++++++
->>  arch/arm/boot/dts/exynos4210.dtsi                  |  8 +++
->>  arch/arm/boot/dts/exynos4412-odroid-common.dtsi    | 44 +++++++++++++++++
->>  arch/arm/boot/dts/exynos4x12.dtsi                  | 11 +++++
->>  arch/arm/boot/dts/exynos5250.dtsi                  | 15 +++++-
->>  arch/arm/boot/dts/exynos5420.dtsi                  |  5 +-
->>  arch/arm/mach-exynos/pm_domains.c                  | 28 +++++++++++
->>  drivers/gpu/drm/exynos/exynos_mixer.c              |  9 ++++
->>  12 files changed, 246 insertions(+), 4 deletions(-)
->>
->> --
-> I have no objection on this series, but just wondering my tree should be fine
-> without 9/9 drm patch and it will be handled for 3.20?
-> 
-> I'll take 1 to 8 patches once drm patch is landed for 3.20.
-> 
+You've got a problem anyway with this approach.  If you look at my
+figure 2 and apply it to this scenario, you have two MMUs stacked
+on top of each other.  That's something that (afaik) we don't support,
+but it's entirely possible that will come along with ARM64.
 
-I also hope this patchset merged,
+It may not be nice to have to treat GPUs specially, but I think we
+really do need to, and forget the idea that the GPU's IOMMU (as
+opposed to a system MMU) should appear in a generic form in DT.
 
-Inki, could you follow up exynos drm part of this patchset?
-
-Thanks.
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
