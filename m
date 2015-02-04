@@ -1,49 +1,41 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 04 Feb 2015 15:13:59 -0800
-Subject: [PATCH v4 2/5] clk: iproc: add initial common clock support
-In-Reply-To: <1422988390-24369-3-git-send-email-rjui@broadcom.com>
-References: <Ray Jui <rjui@broadcom.com>
- <1422988390-24369-1-git-send-email-rjui@broadcom.com>
- <1422988390-24369-3-git-send-email-rjui@broadcom.com>
-Message-ID: <54D2A7B7.6020007@codeaurora.org>
+From: gregory.0xf0@gmail.com (Gregory Fong)
+Date: Wed,  4 Feb 2015 15:22:43 -0800
+Subject: [PATCH] ARM: print cma-reserved pages from show_mem
+Message-ID: <1423092164-9145-1-git-send-email-gregory.0xf0@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/03/15 10:33, Ray Jui wrote:
-> +/*
-> + * Get the clock rate based on name
-> + */
-> +static unsigned long __get_rate(const char *clk_name)
-> +{
-> +	struct clk *clk;
-> +
-> +	clk = __clk_lookup(clk_name);
-> +	if (!clk) {
-> +		pr_err("%s: unable to find clock by name: %s\n", __func__,
-> +				clk_name);
-> +		return 0;
-> +	}
-> +
-> +	return clk_get_rate(clk);
-> +}
-> +
+Add cma reserved information to the ARM-specific show_mem.  It was
+added to the generic implementation by commit
+49abd8c28046adf77c5ce1949549aa64d7221881 "lib/show_mem.c: add cma
+reserved information".
 
-This looks like something we should be providing in the core framework.
-Care to make it into an of_clk_get_parent_rate() API?
+Signed-off-by: Gregory Fong <gregory.0xf0@gmail.com>
+---
+ arch/arm/mm/init.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-> +extern void __init iproc_armpll_setup(struct device_node *node);
-> +extern void __init iproc_pll_setup(struct device_node *node,
-> +		const struct iproc_pll_ctrl *ctrl,
-> +		const struct iproc_pll_vco_freq_param *vco_param,
-> +		unsigned int num_freqs);
-> +extern void __init iproc_clk_setup(struct device_node *node,
-> +		const struct iproc_clk_ctrl *ctrl, unsigned int num_clks);
-> +extern void __init iproc_asiu_setup(struct device_node *node,
-> +		const struct iproc_asiu_div *div,
-> +		const struct iproc_asiu_gate *gate, unsigned int num_clks);
-
-__init is not necessary in header files.
-
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 2495c8c..da77507 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -22,6 +22,7 @@
+ #include <linux/memblock.h>
+ #include <linux/dma-contiguous.h>
+ #include <linux/sizes.h>
++#include <linux/cma.h>
+ 
+ #include <asm/cp15.h>
+ #include <asm/mach-types.h>
+@@ -130,6 +131,9 @@ void show_mem(unsigned int filter)
+ 	printk("%d pages of RAM\n", total);
+ 	printk("%d free pages\n", free);
+ 	printk("%d reserved pages\n", reserved);
++#ifdef CONFIG_CMA
++	printk("%lu cma reserved pages\n", totalcma_pages);
++#endif
+ 	printk("%d slab pages\n", slab);
+ 	printk("%d pages shared\n", shared);
+ 	printk("%d pages swap cached\n", cached);
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.9.1
