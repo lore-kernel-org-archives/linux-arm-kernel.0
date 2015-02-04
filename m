@@ -1,53 +1,28 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Wed, 4 Feb 2015 22:48:03 +0800
-Subject: ask for help about swiotlb buffer is full
-In-Reply-To: <20150204133205.GC26006@e104818-lin.cambridge.arm.com>
-References: <54CB5820.9020102@huawei.com> <54CB5AA4.7050705@huawei.com>
- <20150130115915.GB27542@e104818-lin.cambridge.arm.com>
- <54CC5346.5070402@huawei.com>
- <20150202182435.GH22661@e104818-lin.cambridge.arm.com>
- <54D209FD.40100@huawei.com>
- <20150204133205.GC26006@e104818-lin.cambridge.arm.com>
-Message-ID: <54D23123.3040208@huawei.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 04 Feb 2015 15:48:37 +0100
+Subject: [PATCH v5 2/7] mailbox: arm_mhu: add driver for ARM MHU controller
+In-Reply-To: <CAJe_Zhe_d-H10J8cH-fxcbusoJV8jMUW-pruXVkEKY7PnLMGFA@mail.gmail.com>
+References: <1422955310-6542-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <4418090.U8XOXMKsEU@wuerfel>
+ <CAJe_Zhe_d-H10J8cH-fxcbusoJV8jMUW-pruXVkEKY7PnLMGFA@mail.gmail.com>
+Message-ID: <3593142.nVgVfPmW1o@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/2/4 21:32, Catalin Marinas wrote:
-> On Wed, Feb 04, 2015 at 12:01:01PM +0000, Kefeng Wang wrote:
->> On 2015-02-03 2:24, Catalin Marinas wrote:
->>> On Sat, Jan 31, 2015 at 04:00:06AM +0000, Kefeng Wang wrote:
->>>> On 2015-01-30 19:59, Catalin Marinas wrote:
->> [...]
->>>>>
->>>>
->>>> 4kb page,  use Make ARCH=arm64 defconfig in v3.19 to generate config.
->>>>
->>>> [    0.678293] software IO TLB [mem 0x7e800000-0x7ec00000] (4MB) mapped at [ffffffc07e800000-ffffffc07ebfffff]
->>>> [    0.686991] DMA: preallocated 256 KiB pool for atomic allocations
->>>
->>> Was the swiotlb buffer size the same in the 3.16 kernel? The only thing
->>> I recall adding was the atomic pool allocations but these are only for
->>> non-coherent DMA ops and only for dma_alloc/free. I assume, in the case
->>> of SATA, the failure is on the dma_map_sg() path.
->>
->> Swiotlb buffer size is both 4M in v3.16 and v3.19-rc4, and the failure is
->> on the dma_map_sg() -> swiotlb_map_sg_attrs.
->>
->>> Maybe with a 3.19 kernel you get more than 4MB swiotlb buffers used at a
->>> time with your tests; can you try increasing this via a kernel command
->>> like to, let's say, 8MB? If I got my calculations correctly (an IO TLB
->>> slab is 1 << 11):
->>>
->>> 	swiotlb=4096
->>>
->>> If it still runs out with bigger buffers, we may need to look into
->>> potential leaks.
->>
->> The buddy allocator can only support 4M contiguous physical memory, so it's
->> useless to increase swiotlb buffer.
+On Wednesday 04 February 2015 20:04:21 Jassi Brar wrote:
 > 
-> You could hack arch/arm64/Kconfig to set a higher
-> CONFIG_FORCE_MAX_ZONEORDER as a test. Depending on the test result, we
-> can look for an alternative solution.
-> 
-I have try this before and could fix the problem, but I think it is not a perfect solution,.
+> > Using the bits of the pointer as the message instead of pointing
+> > to the message feels like an abuse of the API.
+> >
+> I can see your POV.
+> Now consider a client, like mine, that sends a u32 value as the data.
+> But unlike me, the client uses the mailbox api in 'async' mode i.e,
+> register a callback function, submit a 32bit message and move on. It
+> is perfectly doable, but doesn't kalloc'ing a u32 for each submission,
+> seem overkill?
+
+That could easily be done by dereferencing the message data in the
+function that queues the asynchronous message: instead of queuing
+the pointer, you queue the data in the driver.
+
+	Arnd
