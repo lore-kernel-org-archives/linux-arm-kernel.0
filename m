@@ -1,86 +1,41 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 04 Feb 2015 15:03:22 +0100
-Subject: [PATCH v2 3/5] ACPI: add arch-specific compilation for _OSI and
- the blacklist
-In-Reply-To: <2298661.ffvhncbLpr@vostro.rjw.lan>
-References: <1423009304-5007-1-git-send-email-al.stone@linaro.org>
- <1423009304-5007-4-git-send-email-al.stone@linaro.org>
- <2298661.ffvhncbLpr@vostro.rjw.lan>
-Message-ID: <2903181.4VVp3X75UK@vostro.rjw.lan>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 4 Feb 2015 07:44:31 -0600
+Subject: [PATCH 2/4] rtc: sa1100: convert to run-time register mapping
+In-Reply-To: <39285522.vUKlahhjIR@wuerfel>
+References: <1423005775-26457-1-git-send-email-robh@kernel.org>
+ <1423005775-26457-3-git-send-email-robh@kernel.org>
+ <39285522.vUKlahhjIR@wuerfel>
+Message-ID: <CAL_JsqL8iahGwkPyDuB+2j_SvkH0TYYNDErgLOgHOgHvERU-9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, February 04, 2015 03:00:15 PM Rafael J. Wysocki wrote:
-> On Tuesday, February 03, 2015 05:21:42 PM al.stone at linaro.org wrote:
-> > From: Al Stone <al.stone@linaro.org>
-> > 
-> > Now that all of the _OSI functionality has been separated out, we can
-> > provide arch-specific functionality for it.  This also allows us to do
-> > the same for the acpi_blacklisted() function.
-> > 
-> > Whether arch-specific functions are used or not now depends on the config
-> > options CONFIG_ACPI_ARCH_SPECIFIC_OSI and CONFIG_ARCH_SPECIFIC_BLACKLIST.
-> > By default, both are set false which causes the x86/ia64 versions to be
-> > used, just as is done today.  Setting one or both of these options true
-> > will cause architecture-specific implementations to be built instead; this
-> > patch also provides arm64 implementations.
-> > 
-> > For x86/ia64, there is no functional change.
-> > 
-> > For arm64, any use of _OSI will issue a warning that it is deprecated.
-> > All use of _OSI will return false -- i.e., it will return no useful
-> > information to any firmware using it.  The ability to temporarily turn
-> > on _OSI, or turn off _OSI, or affect it in other ways from the command
-> > line is no longer available for arm64, either.  The blacklist for ACPI
-> > on arm64 is empty.  This will, of course, require ACPI to be enabled
-> > for arm64.
-> > 
-> > Signed-off-by: Al Stone <al.stone@linaro.org>
-> > ---
-> >  drivers/acpi/Kconfig         | 22 ++++++++++++++++++++++
-> >  drivers/acpi/Makefile        | 19 ++++++++++++++++++-
-> >  drivers/acpi/blacklist-arm.c | 20 ++++++++++++++++++++
-> >  drivers/acpi/blacklist.c     |  5 +++++
-> >  drivers/acpi/osi-arm.c       | 25 +++++++++++++++++++++++++
-> >  5 files changed, 90 insertions(+), 1 deletion(-)
-> >  create mode 100644 drivers/acpi/blacklist-arm.c
-> >  create mode 100644 drivers/acpi/osi-arm.c
-> > 
-> > diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-> > index 3e3bd35..4190940 100644
-> > --- a/drivers/acpi/Kconfig
-> > +++ b/drivers/acpi/Kconfig
-> > @@ -369,6 +369,28 @@ config ACPI_REDUCED_HARDWARE_ONLY
-> >  
-> >  	  If you are unsure what to do, do not enable this option.
-> >  
-> > +config ACPI_ARCH_SPECIFIC_OSI
-> 
-> I woulnd't make this and the other one user-selectable.  Let architectures
-> select them from their top-level Kconfig files.
-> 
-> That's what we do with the other CONFIG_ARCH_ things.
-> 
-> So in the architecture-specific Kconfig you'll have
-> 
-> config ACPI_ARCH_SPECIFIC_OSI
-> 	def_bool n
-> 	depends on ACPI
-> 
-> Moreover, I'd call that ARCH_SPECIFIC_ACPI_OSI.
+On Wed, Feb 4, 2015 at 7:25 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 03 February 2015 17:22:53 Rob Herring wrote:
+>> SA1100 and PXA differ only in register offsets which are currently
+>> hardcoded in a machine specific header. Some arm64 platforms (PXA1928)
+>> have this RTC block also.
+>>
+>> Convert the driver to use ioremap and set the register offsets dynamically.
+>> Since we are touching all the register accesses, convert them all to
+>> readl/writel.
+>>
+>> Signed-off-by: Rob Herring <robh@kernel.org>
+>> Cc: Alessandro Zummo <a.zummo@towertech.it>
+>> Cc: rtc-linux at googlegroups.com
+>
+> Hmm, I really should have sent out my version of the patch ages ago. :(
 
-Or even better, you can define them here (drivers/acpi/Kconfig/) as
+Got any others? :)
 
-config ARCH_SPECIFIC_ACPI_OSI
-	def_bool n
+>
+> Can you have a look at
+>
+> http://git.kernel.org/cgit/linux/kernel/git/arnd/playground.git/commit/?h=multiplatform-3.19-next&id=4d9727883a363fb839e7d1633599166c0a08d644
+>
+> to see compare the approaches and see if there is anything I did that you
+> missed?
 
-and then do
+You used the relaxed variants seems to be the main difference. Yours
+won't build on arm64 either.
 
-	select ARCH_SPECIFIC_ACPI_OSI if ACPI
-
-as you did in [4/5].
-
-
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Rob
