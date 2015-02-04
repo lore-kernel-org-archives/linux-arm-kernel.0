@@ -1,48 +1,82 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 4 Feb 2015 10:35:22 +0100
-Subject: [PATCH v2 1/3] usb: XHCI: platform: Move the Marvell quirks
- after the enabling the clocks
-In-Reply-To: <1421672474-2945-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1421672474-2945-1-git-send-email-maxime.ripard@free-electrons.com>
- <1421672474-2945-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20150204093522.GB5492@lukather>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 04 Feb 2015 17:41:40 +0800
+Subject: [Linaro-acpi] [PATCH v8 00/21] Introduce ACPI for ARM64 based
+ on ACPI 5.1
+In-Reply-To: <54D108DD.6050509@linaro.org>
+References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
+ <20150203164727.GC32750@leverpostej> <54D108DD.6050509@linaro.org>
+Message-ID: <54D1E954.4050003@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mathias, Greg,
+On 2015?02?04? 01:43, Al Stone wrote:
+> On 02/03/2015 09:47 AM, Mark Rutland wrote:
+>> On Mon, Feb 02, 2015 at 12:45:28PM +0000, Hanjun Guo wrote:
+>>> Hi,
+>>>
+>>> This is the v8 of ACPI core patches for ARM64 based on ACPI 5.1, there are
+>>> some updates since v7:
+>>>
+>>>   - Add two more documantation to explain why we need ACPI in ARM64 servers
+>>>     by Grant, and recommendations and prohibitions on the use of the numerous
+>>>     ACPI tables and objects by Al Stone.
+>>>
+>>>   - Add two patches which is need to map acpi tables after acpi_gbl_permanent_mmap
+>>>     is set
+>>>
+>>>   - Add another patch "dt / chosen: Add linux,uefi-stub-generated-dtb property"
+>>>     to address that if firmware providing no dtb, we can try ACPI configuration data
+>>>     even if no "acpi=force" is passed in early parameters. (I think ACPI for XEN and
+>>>     kexec need consider sperately as disscussed, correct me if I'm wrong).
+>>>
+>>>   - Add CC in the patch to the subsystem maintainers and modify the subject
+>>>     of the patch to explicitly show the subsystem touched by this patch set,
+>>>     please help us to review and ack them if they make sense, thanks.
+>>>
+>>>   - Add Tested-by from Qualcomm and Redhat;
+>>>
+>>>   - Make ACPI depends on PCI suggested by Catalin;
+>>>
+>>>   - Clean up SMP init function as Lorenzo suggested, remove physical
+>>>     CPU hot-plug code in the patch;
+>>>
+>>>   - Address some comments from Marc and explicitly state that will
+>>>     implment statcked irqdomain and GIC init framework when GICv3 and
+>>>     ITS, GICv2m are implemented;
+>>>
+>>>   - Rebased on top of 3.19-rc7.
+>>>
+>>> previous version is here:
+>>> v7: https://lkml.org/lkml/2015/1/14/586
+>>> v6: https://lkml.org/lkml/2015/1/4/40
+>>>
+>>> Any comments are welcome :)
+>>
+>> I note that for ACPI the PMU interrupt information is stored in the GICC
+>> (as "Performance Interrupt" and "Performance Interrupt Mode"), but I
+>> don't see any code for handling that as part of this series.
+>>
+>> Is anyone currently looking into that?
+>
+> Yes.  IIRC, it's a pretty small patch that I'll be including in the
+> Seattle patches that build on top of this core set.
+>
+>> For those systems ACPI is being developed on do we know that the GICC
+>> information for the PMU interrupts is sane?
+>
+> Yes.  We know this works for Seattle platforms, using their latest firmware.
+>
+>> I'm slightly worried about the prospect of adding support later only to
+>> find that the performance interrupt data in contemporary GICC tables is
+>> invalid; it's going to be extremely painful to detect that being the
+>> case in order to perform any kind of workaround.
+>
+> That will depend on the error, of course.  It was pretty straightforward
+> when the interrupt value was set to zero in some of the early tables we
+> used.
 
-On Mon, Jan 19, 2015 at 02:01:12PM +0100, Maxime Ripard wrote:
-> The commit 973747928514 ("usb: host: xhci-plat: add support for the Armada
-> 375/38x XHCI controllers") extended the xhci-plat driver to support the Armada
-> 375/38x SoCs, mostly by adding a quirk configuring the MBUS window.
-> 
-> However, that quirk was run before the clock the controllers needs has been
-> enabled. This usually worked because the clock was first enabled by the
-> bootloader, and left as such until the driver is probe, where it tries to
-> access the MBUS configuration registers before enabling the clock.
-> 
-> Things get messy when EPROBE_DEFER is involved during the probe, since as part
-> of its error path, the driver will rightfully disable the clock. When the
-> driver will be reprobed, it will retry to access the MBUS registers, but this
-> time with the clock disabled, which hangs forever.
-> 
-> Fix this by running the quirks after the clock has been enabled by the driver.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: <stable@vger.kernel.org> # v3.16+
+If we are not worrying about too much patch in this series, I can
+cherry-pick Mark Salter's ACPI PMU patch for Seattle in next version.
 
-Any chance for this to go in 3.19?
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150204/6c6f3cf9/attachment.sig>
+Thanks
+Hanjun
