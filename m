@@ -1,107 +1,101 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 05 Feb 2015 01:43:01 +0300
-Subject: [PATCH] ARM: shmobile: alt dts: Drop console= bootargs parameter
-In-Reply-To: <20150203004146.GB17629@verge.net.au>
-References: <1415075018-27529-1-git-send-email-horms+renesas@verge.net.au>
- <54CBFC63.4070808@cogentembedded.com> <20150131041731.GA7605@verge.net.au>
- <54CFF5F1.2040007@cogentembedded.com> <20150203004146.GB17629@verge.net.au>
-Message-ID: <54D2A075.3020904@cogentembedded.com>
+From: ahs3@redhat.com (Al Stone)
+Date: Wed, 04 Feb 2015 15:44:50 -0700
+Subject: [PATCH v2 1/5] ACPI: move acpi_os_handler() so it can be made
+ arch-dependent later
+In-Reply-To: <3836210.OLr0JokInG@vostro.rjw.lan>
+References: <1423009304-5007-1-git-send-email-al.stone@linaro.org>
+ <1423009304-5007-2-git-send-email-al.stone@linaro.org>
+ <3836210.OLr0JokInG@vostro.rjw.lan>
+Message-ID: <54D2A0E2.8050504@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 02/04/2015 06:50 AM, Rafael J. Wysocki wrote:
+> On Tuesday, February 03, 2015 05:21:40 PM al.stone at linaro.org wrote:
+>> From: Al Stone <al.stone@linaro.org>
+>>
+>> In order to deprecate the use of _OSI for arm64 or other new architectures,
+>> we need to make the default handler something we can change for various
+>> platforms.  This patch moves the definition of acpi_osi_handler() -- the
+>> function used by ACPICA as a callback for evaluating _OSI -- into a separate
+>> file.  Subsequent patches will change which files get built so that we can
+>> then build the version of _OSI we need for a particular architecture.
+>>
+>> There is no functional change.
+>>
+>> Signed-off-by: Al Stone <al.stone@linaro.org>
+>> ---
+>>  drivers/acpi/Makefile |   2 +-
+>>  drivers/acpi/osi.c    | 100 ++++++++++++++++++++++++++++++++++++++++++++++++++
+>>  drivers/acpi/osl.c    |  24 ------------
+>>  include/linux/acpi.h  |   1 +
+>>  4 files changed, 102 insertions(+), 25 deletions(-)
+>>  create mode 100644 drivers/acpi/osi.c
+>>
+>> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+>> index c346011..df348b3 100644
+>> --- a/drivers/acpi/Makefile
+>> +++ b/drivers/acpi/Makefile
+>> @@ -18,7 +18,7 @@ obj-y				+= acpi.o \
+>>  					acpica/
+>>  
+>>  # All the builtin files are in the "acpi." module_param namespace.
+>> -acpi-y				+= osl.o utils.o reboot.o
+>> +acpi-y				+= osl.o utils.o reboot.o osi.o
+>>  acpi-y				+= nvs.o
+>>  
+>>  # Power management related files
+>> diff --git a/drivers/acpi/osi.c b/drivers/acpi/osi.c
+>> new file mode 100644
+>> index 0000000..fff2b0c
+>> --- /dev/null
+>> +++ b/drivers/acpi/osi.c
+>> @@ -0,0 +1,100 @@
+>> +/*
+>> + *  osi.c - _OSI implementation (moved from drivers/acpi/osl.c)
+>> + *
+>> + *  Copyright (C) 2000       Andrew Henroid
+>> + *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
+>> + *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
+>> + *  Copyright (c) 2008 Intel Corporation
+>> + *   Author: Matthew Wilcox <willy@linux.intel.com>
+>> + *
+>> + * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+>> + *
+>> + *  This program is free software; you can redistribute it and/or modify
+>> + *  it under the terms of the GNU General Public License as published by
+>> + *  the Free Software Foundation; either version 2 of the License, or
+>> + *  (at your option) any later version.
+>> + *
+>> + *  This program is distributed in the hope that it will be useful,
+>> + *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + *  GNU General Public License for more details.
+> 
+> Nit: The street address of the FSF is not really useful here.  What if they move? :-)
 
-On 02/03/2015 03:41 AM, Simon Horman wrote:
+This was one of the things checkpatch complained about, understandably :).  It's
+a direct cut'n'paste from osl.c.
 
->>>>> Alt is booted from DT, so chosen/stdout-path is
->>>>> always used, and we can drop the "console=" parameter from chosen/bootargs.
+I can clean these up in the new file; would it help to clean up osl.c (at least
+from checkpatch's point of view), as long as I'm at it?
 
->>>>> This change has a side-effect of changing the console speed from 38400
->>>>> to 115200. This is intentional as 115200 is consistently used on
->>>>> all other shmobile boards.
+>> + *
+>> + *  You should have received a copy of the GNU General Public License
+>> + *  along with this program; if not, write to the Free Software
+>> + *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+>> + *
+>> + * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+>> + *
+>> + */
+[snip...]
 
->>>>     I'd say it's not very practical to change the console's baud rate from
->>>> U-Boot's default
-
->>> It is consistent with the handling of all other boards with
->>> renesas SoCs that are present in mainline.
-
->>     Well, not quite: Henninger/Porter is still using 38400.
-
->  From my point of view that is an oversight which I would have
-> resolved had I ever obtained access to the hardware.
-
-    I'll look into that when I have time.
-
->>>> (AFAIR changing baud rate in U-Boot didn't work)...
-
->>     That was a recollection from the other board though, I haven't yet tried
->> to do it on the SILK board (and I'm unable to currently as the power supply
->> seems dead).
-
->>> Perhaps that relates to the version of built of uboot.
->>> On the board I have access to I see:
-
->>> ver=U-Boot 2013.01.01-g5df9446 (Oct 01 2014 - 14:59:23)
-
->> U-Boot 2013.01.01 (Oct 17 2014 - 20:59:18)
-
-> It looks like my version has some extra patches (the g5df9446 bit).
-> But I could be reading things wrong.
-
->>> And the following setting altered the baud rate of u-boot (IIRC).
-
->>> baudrate=115200
-
->>     I was going to try that but the board just didn't power up.
-
-    I have switched to another board now (with newer U-Boot flashed),
-and I was able to change the baud rate in U-Boot. However, SPL and U-Boot
-still start at 38400 and now I'm having garbage instead of the version and 
-hardware info. :-(
-
->>>>> Cc: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
->>>>> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
->>>>> Cc: devicetree at vger.kernel.org
->>>>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->>>>> ---
->>>>>   arch/arm/boot/dts/r8a7794-alt.dts | 2 +-
->>>>>   1 file changed, 1 insertion(+), 1 deletion(-)
-
->>>>> diff --git a/arch/arm/boot/dts/r8a7794-alt.dts b/arch/arm/boot/dts/r8a7794-alt.dts
->>>>> index 8aec512..f2cf757 100644
->>>>> --- a/arch/arm/boot/dts/r8a7794-alt.dts
->>>>> +++ b/arch/arm/boot/dts/r8a7794-alt.dts
->>>>> @@ -20,7 +20,7 @@
->>>>>   	};
->>>>>
->>>>>   	chosen {
->>>>> -		bootargs = "console=ttySC0,38400 ignore_loglevel rw root=/dev/nfs ip=dhcp";
->>>>> +		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
-
->>>>     Hm, does this even work as intended? I've tried to boot another R8A7794
->>>> based board and I couldn't get any output with alike command line. Booting
->>>> with 'earlyprintk=serial' has shown that tty0 was enabled as a console which
->>>> is not what we wanted.
-
-    The kernel console started working automagically for me at 115200 on the 
-new board.
-
->>> If you are backporting this change then I believe it has some dependencies
->>> that I can follow up on if it is useful to you.
-
->>     Contrariwise, I'm forward-porting.
-
->>> If you are using mainline (e.g. next or renesas-next) then yes,
->>> it works. I have tested it numerous times since the patch was merged.
-
->>     I'm traditionally using the 'renesas-devel-*' tags.
-
-> If you are using 'renesas-devel-*' tags (and forward porting) then
-> you should be in good shape. But if you would like me to verify a particular
-> tag I'm happy to do so. It is not unheard of for different instances of
-> the same board behave in different ways.
-
-    Thank you, looks like there's no need now.
-
-WBR, Sergei
+-- 
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Red Hat, Inc.
+ahs3 at redhat.com
+-----------------------------------
