@@ -1,87 +1,144 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Wed, 04 Feb 2015 14:13:00 +0900
-Subject: [PATCH v5 9/9] drm/exynos: add support for 'hdmi' clock
-In-Reply-To: <1422883228-10690-10-git-send-email-m.szyprowski@samsung.com>
-References: <1422883228-10690-1-git-send-email-m.szyprowski@samsung.com>
- <1422883228-10690-10-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <54D1AA5C.7040501@samsung.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 4 Feb 2015 09:40:51 +0100
+Subject: [PATCH v4] mmc: moxart: fix probe logic
+In-Reply-To: <1422978954-14547-1-git-send-email-jonas.jensen@gmail.com>
+References: <6294882.EhDcdWGRYz@wuerfel>
+ <1422978954-14547-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <CAPDyKFr1ieNhcFDLxTNNAAi7sAjGVSCgYRZWHJh=TOZReTX53w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+On 3 February 2015 at 16:55, Jonas Jensen <jonas.jensen@gmail.com> wrote:
+> From: Arnd Bergmann <arnd@arndb.de>
+>
+> Jonas Jensen wanted to submit a patch for these, but apparently
+> forgot about it. I stumbled over this symptom first:
+>
+> drivers/built-in.o: In function `moxart_probe':
+> :(.text+0x2af128): undefined reference to `of_dma_request_slave_channel'
+>
+> This is because of_dma_request_slave_channel is an internal helper
+> and not exported to loadable module. I'm changing the driver to
+> use dma_request_slave_channel_reason() instead.
+>
+> Further problems from inspection:
+>
+> * The remove function must not call kfree on the host pointer,
+>   because it is allocated together with the mmc_host.
+>
+> * The clock is never released
+>
+> * The dma_cap_mask_t is completely unused and can be removed
+>
+> * deferred probing does not work if the dma driver is loaded
+>   after the mmc driver.
+>
+> This patch should fix all of the above.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
 
-On 2015? 02? 02? 22:20, Marek Szyprowski wrote:
-> Mixed need to have hdmi clock enabled to properly perform power on/off
-> sequences, so add handling of this clock directly to the mixer driver.
-> Dependency between hdmi clock and mixer module has been observed on
-> Exynos4 based boards.
+Thanks! Applied for next, with minor fixes - see below.
 
-Picked it up.
+Kind regards
+Uffe
 
-Thanks,
-Inki Dae.
-
-> 
-> Suggested-by: Andrzej Hajda <a.hajda@samsung.com>
-> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 > ---
->  Documentation/devicetree/bindings/video/exynos_mixer.txt | 1 +
->  drivers/gpu/drm/exynos/exynos_mixer.c                    | 9 +++++++++
->  2 files changed, 10 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/video/exynos_mixer.txt b/Documentation/devicetree/bindings/video/exynos_mixer.txt
-> index 08b394b1edbf..3e38128f866b 100644
-> --- a/Documentation/devicetree/bindings/video/exynos_mixer.txt
-> +++ b/Documentation/devicetree/bindings/video/exynos_mixer.txt
-> @@ -15,6 +15,7 @@ Required properties:
->  	a) mixer: Gate of Mixer IP bus clock.
->  	b) sclk_hdmi: HDMI Special clock, one of the two possible inputs of
->                 mixer mux.
-> +	c) hdmi: Gate of HDMI IP bus clock, needed together with sclk_hdmi.
->  
->  Example:
->  
-> diff --git a/drivers/gpu/drm/exynos/exynos_mixer.c b/drivers/gpu/drm/exynos/exynos_mixer.c
-> index 820b76234ef4..8212c8299625 100644
-> --- a/drivers/gpu/drm/exynos/exynos_mixer.c
-> +++ b/drivers/gpu/drm/exynos/exynos_mixer.c
-> @@ -72,6 +72,7 @@ struct mixer_resources {
->  	spinlock_t		reg_slock;
->  	struct clk		*mixer;
->  	struct clk		*vp;
-> +	struct clk		*hdmi;
->  	struct clk		*sclk_mixer;
->  	struct clk		*sclk_hdmi;
->  	struct clk		*mout_mixer;
-> @@ -774,6 +775,12 @@ static int mixer_resources_init(struct mixer_context *mixer_ctx)
->  		return -ENODEV;
->  	}
->  
-> +	mixer_res->hdmi = devm_clk_get(dev, "hdmi");
-> +	if (IS_ERR(mixer_res->hdmi)) {
-> +		dev_err(dev, "failed to get clock 'hdmi'\n");
-> +		return PTR_ERR(mixer_res->hdmi);
-> +	}
-> +
->  	mixer_res->sclk_hdmi = devm_clk_get(dev, "sclk_hdmi");
->  	if (IS_ERR(mixer_res->sclk_hdmi)) {
->  		dev_err(dev, "failed to get clock 'sclk_hdmi'\n");
-> @@ -1095,6 +1102,7 @@ static void mixer_poweron(struct exynos_drm_manager *mgr)
->  	pm_runtime_get_sync(ctx->dev);
->  
->  	clk_prepare_enable(res->mixer);
-> +	clk_prepare_enable(res->hdmi);
->  	if (ctx->vp_enabled) {
->  		clk_prepare_enable(res->vp);
->  		if (ctx->has_sclk)
-> @@ -1134,6 +1142,7 @@ static void mixer_poweroff(struct exynos_drm_manager *mgr)
->  	ctx->powered = false;
->  	mutex_unlock(&ctx->mixer_mutex);
->  
-> +	clk_disable_unprepare(res->hdmi);
->  	clk_disable_unprepare(res->mixer);
->  	if (ctx->vp_enabled) {
->  		clk_disable_unprepare(res->vp);
-> 
+>
+> Notes:
+>     This is a forward of Arnd's v2 patch.
+>
+>     v2:  do not call clk_put() on an error pointer
+>     v3:  fix NULL dereference on host->clk
+>     v4:  rework to use devm_clk_get()
+>
+>     Applies to next-20150113
+>
+>  drivers/mmc/host/moxart-mmc.c | 21 ++++++++++-----------
+>  1 file changed, 10 insertions(+), 11 deletions(-)
+>
+> diff --git a/drivers/mmc/host/moxart-mmc.c b/drivers/mmc/host/moxart-mmc.c
+> index d2a1ef6..6cb4053 100644
+> --- a/drivers/mmc/host/moxart-mmc.c
+> +++ b/drivers/mmc/host/moxart-mmc.c
+> @@ -17,6 +17,7 @@
+>  #include <linux/init.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/delay.h>
+> +#include <linux/errno.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/blkdev.h>
+>  #include <linux/dma-mapping.h>
+> @@ -562,7 +563,6 @@ static int moxart_probe(struct platform_device *pdev)
+>         struct dma_slave_config cfg;
+>         struct clk *clk;
+>         void __iomem *reg_mmc;
+> -       dma_cap_mask_t mask;
+>         int irq, ret;
+>         u32 i;
+>
+> @@ -586,9 +586,9 @@ static int moxart_probe(struct platform_device *pdev)
+>                 goto out;
+>         }
+>
+> -       clk = of_clk_get(node, 0);
+> +       clk = devm_clk_get(dev, 0);
+
+Changed to:
+clk = devm_clk_get(dev, NULL);
+
+>         if (IS_ERR(clk)) {
+> -               dev_err(dev, "of_clk_get failed\n");
+> +               dev_err(dev, "devm_clk_get failed\n");
+
+No need to print this, handled by clock framework.
+
+>                 ret = PTR_ERR(clk);
+>                 goto out;
+>         }
+> @@ -603,9 +603,6 @@ static int moxart_probe(struct platform_device *pdev)
+>         if (ret)
+>                 goto out;
+>
+> -       dma_cap_zero(mask);
+> -       dma_cap_set(DMA_SLAVE, mask);
+> -
+>         host = mmc_priv(mmc);
+>         host->mmc = mmc;
+>         host->base = reg_mmc;
+> @@ -613,8 +610,8 @@ static int moxart_probe(struct platform_device *pdev)
+>         host->timeout = msecs_to_jiffies(1000);
+>         host->sysclk = clk_get_rate(clk);
+>         host->fifo_width = readl(host->base + REG_FEATURE) << 2;
+> -       host->dma_chan_tx = of_dma_request_slave_channel(node, "tx");
+> -       host->dma_chan_rx = of_dma_request_slave_channel(node, "rx");
+> +       host->dma_chan_tx = dma_request_slave_channel_reason(dev, "tx");
+> +       host->dma_chan_rx = dma_request_slave_channel_reason(dev, "rx");
+>
+>         spin_lock_init(&host->lock);
+>
+> @@ -624,6 +621,11 @@ static int moxart_probe(struct platform_device *pdev)
+>         mmc->ocr_avail = 0xffff00;      /* Support 2.0v - 3.6v power. */
+>
+>         if (IS_ERR(host->dma_chan_tx) || IS_ERR(host->dma_chan_rx)) {
+> +               if (PTR_ERR(host->dma_chan_tx) == -EPROBE_DEFER ||
+> +                   PTR_ERR(host->dma_chan_rx) == -EPROBE_DEFER) {
+> +                       ret = -EPROBE_DEFER;
+> +                       goto out;
+> +               }
+>                 dev_dbg(dev, "PIO mode transfer enabled\n");
+>                 host->have_dma = false;
+>         } else {
+> @@ -702,9 +704,6 @@ static int moxart_remove(struct platform_device *pdev)
+>                 writel(readl(host->base + REG_CLOCK_CONTROL) | CLK_OFF,
+>                        host->base + REG_CLOCK_CONTROL);
+>         }
+> -
+> -       kfree(host);
+> -
+>         return 0;
+>  }
+>
+> --
+> 1.8.2.1
+>
