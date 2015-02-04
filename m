@@ -1,76 +1,41 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Wed, 04 Feb 2015 22:00:32 +0100
-Subject: [PATCH] GPU-DRM-Exynos: Delete unnecessary checks before two function
- calls
-In-Reply-To: <5317A59D.4@users.sourceforge.net>
-References: <5307CAA2.8060406@users.sourceforge.net>
- <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
- <530A086E.8010901@users.sourceforge.net>
- <alpine.DEB.2.02.1402231635510.1985@localhost6.localdomain6>
- <530A72AA.3000601@users.sourceforge.net>
- <alpine.DEB.2.02.1402240658210.2090@localhost6.localdomain6>
- <530B5FB6.6010207@users.sourceforge.net>
- <alpine.DEB.2.10.1402241710370.2074@hadrien>
- <530C5E18.1020800@users.sourceforge.net>
- <alpine.DEB.2.10.1402251014170.2080@hadrien>
- <530CD2C4.4050903@users.sourceforge.net>
- <alpine.DEB.2.10.1402251840450.7035@hadrien>
- <530CF8FF.8080600@users.sourceforge.net>
- <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
- <530DD06F.4090703@users.sourceforge.net>
- <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
- <5317A59D.4@users.sourceforge.net>
-Message-ID: <54D28870.3060400@users.sourceforge.net>
+From: marek@goldelico.com (Marek Belisko)
+Date: Wed,  4 Feb 2015 23:14:29 +0100
+Subject: [PATCH v3 0/6] Convert twl4030_madc_battery to IIO consumer and add
+ DT aupport
+Message-ID: <1423088075-10025-1-git-send-email-marek@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Wed, 4 Feb 2015 21:54:45 +0100
+This patches adding support for twl4030_madc_battery to use twl4030_madc iio framework + DT support.
+Patches was tested on gta04 board. twl4030_madc_battery driver is converted in
+first patch to iio consumer and in next patches is added support for devicetree
++ some small fixes for module autoloading.
 
-The functions phy_power_on() and vunmap() perform also input
-parameter validation. Thus the test around their calls is not needed.
+Changes from V2:
+- fix property names
+- add MODULE_DEVICE_TABLE and MODULE_ALIAS
 
-This issue was detected by using the Coccinelle software.
+Changes from V1:
+- use iio_read_channel_processed instead iio_read_channel_processed
+- convert probe to use devm_ as part of adding error handling for iio
+- free iio channels on error and on module removal
 
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- drivers/gpu/drm/exynos/exynos_dp_core.c   | 6 ++----
- drivers/gpu/drm/exynos/exynos_drm_fbdev.c | 2 +-
- 2 files changed, 3 insertions(+), 5 deletions(-)
+[1] - https://lkml.org/lkml/2014/2/26/482dd
 
-diff --git a/drivers/gpu/drm/exynos/exynos_dp_core.c b/drivers/gpu/drm/exynos/exynos_dp_core.c
-index 34d46aa..306cf1d 100644
---- a/drivers/gpu/drm/exynos/exynos_dp_core.c
-+++ b/drivers/gpu/drm/exynos/exynos_dp_core.c
-@@ -1057,14 +1057,12 @@ static int exynos_dp_create_connector(struct exynos_drm_display *display,
- 
- static void exynos_dp_phy_init(struct exynos_dp_device *dp)
- {
--	if (dp->phy)
--		phy_power_on(dp->phy);
-+	phy_power_on(dp->phy);
- }
- 
- static void exynos_dp_phy_exit(struct exynos_dp_device *dp)
- {
--	if (dp->phy)
--		phy_power_off(dp->phy);
-+	phy_power_off(dp->phy);
- }
- 
- static void exynos_dp_poweron(struct exynos_drm_display *display)
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
-index e12ea90..0dd448a 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
-@@ -313,7 +313,7 @@ static void exynos_drm_fbdev_destroy(struct drm_device *dev,
- 	struct exynos_drm_gem_obj *exynos_gem_obj = exynos_fbd->exynos_gem_obj;
- 	struct drm_framebuffer *fb;
- 
--	if (is_drm_iommu_supported(dev) && exynos_gem_obj->buffer->kvaddr)
-+	if (is_drm_iommu_supported(dev))
- 		vunmap(exynos_gem_obj->buffer->kvaddr);
- 
- 	/* release drm framebuffer and real buffer */
+Marek Belisko (6):
+  power: twl4030-madc-battery: Convert to iio consumer.
+  power: twl4030_madc_battery: Add device tree support
+  Documentation: DT: Document twl4030-madc-battery bindings
+  ARM: dts: omap3-gta04: Add battery support
+  power: twl4030_madc_battery: Add of_twl4030_madc_match to
+    MODULE_DEVICE_TABLE
+  power: twl4030_madc_battery: Add missing MODULE_ALIAS
+
+ .../bindings/power_supply/twl4030_madc_battery.txt |  43 +++++
+ arch/arm/boot/dts/omap3-gta04.dtsi                 |  30 ++++
+ drivers/power/twl4030_madc_battery.c               | 183 +++++++++++++++++----
+ 3 files changed, 221 insertions(+), 35 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power_supply/twl4030_madc_battery.txt
+
 -- 
-2.2.2
+1.9.1
