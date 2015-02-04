@@ -1,45 +1,38 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Wed, 4 Feb 2015 20:01:01 +0800
-Subject: ask for help about swiotlb buffer is full
-In-Reply-To: <20150202182435.GH22661@e104818-lin.cambridge.arm.com>
-References: <54CB5820.9020102@huawei.com> <54CB5AA4.7050705@huawei.com>
- <20150130115915.GB27542@e104818-lin.cambridge.arm.com>
- <54CC5346.5070402@huawei.com>
- <20150202182435.GH22661@e104818-lin.cambridge.arm.com>
-Message-ID: <54D209FD.40100@huawei.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 4 Feb 2015 13:19:30 +0100
+Subject: [PATCH v2 0/5] ARM: sa1100: implement irq driver as proper
+ irqchip driver
+In-Reply-To: <1422648066-7897-1-git-send-email-dbaryshkov@gmail.com>
+References: <1422648066-7897-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <CACRpkdbstAkL0Tyt6UHrzwkccMteOehoPwGROJxoUbpDJ1yxjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-02-03 2:24, Catalin Marinas wrote:
-> On Sat, Jan 31, 2015 at 04:00:06AM +0000, Kefeng Wang wrote:
->> On 2015-01-30 19:59, Catalin Marinas wrote:
-[...]
->>>
->>
->> 4kb page,  use Make ARCH=arm64 defconfig in v3.19 to generate config.
->>
->> [    0.678293] software IO TLB [mem 0x7e800000-0x7ec00000] (4MB) mapped at [ffffffc07e800000-ffffffc07ebfffff]
->> [    0.686991] DMA: preallocated 256 KiB pool for atomic allocations
-> 
-> Was the swiotlb buffer size the same in the 3.16 kernel? The only thing
-> I recall adding was the atomic pool allocations but these are only for
-> non-coherent DMA ops and only for dma_alloc/free. I assume, in the case
-> of SATA, the failure is on the dma_map_sg() path.
+On Fri, Jan 30, 2015 at 9:01 PM, Dmitry Eremin-Solenikov
+<dbaryshkov@gmail.com> wrote:
 
-Swiotlb buffer size is both 4M in v3.16 and v3.19-rc4, and the failure is
-on the dma_map_sg() -> swiotlb_map_sg_attrs.
+> Hello,
+>
+> This is a second attempt to move Intel StrongARM SA-11x0 IRQ driver
+> to drivers/irqchip/ place.
+>
+> Changes since V1:
+>
+>  - Added soc/sa1100/pwer.h header containing sa11x0_*_set_wake()
+>    prototypes.
+>
+>  - Removed spinlock from mask/unmask functions
+>
+>  - Minor whitespace changes.
+>
+> The patches are based on my previous sa1100 patches that can be found
+> in Russell's for-next branch or in linux-next tree.
 
-> 
-> Maybe with a 3.19 kernel you get more than 4MB swiotlb buffers used at a
-> time with your tests; can you try increasing this via a kernel command
-> like to, let's say, 8MB? If I got my calculations correctly (an IO TLB
-> slab is 1 << 11):
-> 
-> 	swiotlb=4096
-> 
-> If it still runs out with bigger buffers, we may need to look into
-> potential leaks.
-> 
+I have applied it and tested on the Compaq iPaq h3600:
+Tested-by: Linus Walleij <linus.walleij@linaro.org>
 
-The buddy allocator can only support 4M contiguous physical memory, so it's
-useless to increase swiotlb buffer.
+Very nice to see the SC and GPIO offsets in /proc/interrupts
+and very clean code, good work!
+
+Yours,
+Linus Walleij
