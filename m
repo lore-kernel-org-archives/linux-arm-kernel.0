@@ -1,69 +1,27 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 04 Feb 2015 17:10:56 +0100
-Subject: [rcu] [ INFO: suspicious RCU usage. ]
-In-Reply-To: <20150204155615.GF5370@linux.vnet.ibm.com>
-References: <20150201025922.GA16820@wfg-t540p.sh.intel.com>
- <1422957702.17540.1.camel@AMDC1943>
- <20150203162704.GR19109@linux.vnet.ibm.com>
- <1423049947.19547.6.camel@AMDC1943>
- <20150204130018.GG8656@n2100.arm.linux.org.uk>
- <20150204131420.GC5370@linux.vnet.ibm.com> <1423059387.24415.2.camel@AMDC1943>
- <20150204151028.GD5370@linux.vnet.ibm.com>
- <1423063348.24415.10.camel@AMDC1943>
- <20150204155615.GF5370@linux.vnet.ibm.com>
-Message-ID: <1423066256.24415.13.camel@AMDC1943>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 04 Feb 2015 10:16:34 -0600
+Subject: [PATCH v8 02/21] acpi: fix acpi_os_ioremap for arm64
+In-Reply-To: <1423066107.18187.99.camel@deneb.redhat.com>
+References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>	
+ <1422881149-8177-3-git-send-email-hanjun.guo@linaro.org>	
+ <2422968.Es7R0p3loO@vostro.rjw.lan>	
+ <1422984576.18187.82.camel@deneb.redhat.com>	
+ <20150204112508.GB26006@e104818-lin.cambridge.arm.com>
+ <1423066107.18187.99.camel@deneb.redhat.com>
+Message-ID: <54D245E2.2030003@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ?ro, 2015-02-04 at 07:56 -0800, Paul E. McKenney wrote:
-> On Wed, Feb 04, 2015 at 04:22:28PM +0100, Krzysztof Kozlowski wrote:
-> > 
-> > Actually the timeout versions but I think that doesn't matter.
-> > The wait_on_bit will busy-loop with testing for the bit. Inside the loop
-> > it calls the 'action' which in my case will be bit_wait_io_timeout().
-> > This calls schedule_timeout().
-> 
-> Ah, good point.
-> 
-> > See proof of concept in attachment. One observed issue: hot unplug from
-> > commandline takes a lot more time. About 7 seconds instead of ~0.5.
-> > Probably I did something wrong.
-> 
-> Well, you do set the timeout to five seconds, and so if the condition
-> does not get set before the surviving CPU finds its way to the
-> out_of_line_wait_on_bit_timeout(), you are guaranteed to wait for at
-> least five seconds.
->
-> One alternative approach would be to have a loop around a series of
-> shorter waits.  Other thoughts?
+On 02/04/2015 10:08 AM, Mark Salter wrote:
+> acpi_os_remap() is used to map ACPI tables. These tables may be in ram
+> which are already included in the kernel's linear RAM mapping. So we
+> need ioremap_cache to avoid two mappings to the same physical page
+> having different caching attributes.
 
-Right! That was the issue. It seems it works. I'll think also on
-self-adapting interval as you said below. I'll test it more and send a
-patch.
+Would it be possible to modify ioremap() so that it can tell whether the 
+memory is already mapped in some way, and then use a compatible remapping?
 
-Best regards,
-Krzysztof
-
-> 
-> > > You know, this situation is giving me a bad case of nostalgia for the
-> > > old Sequent Symmetry and NUMA-Q hardware.  On those platforms, the
-> > > outgoing CPU could turn itself off, and thus didn't need to tell some
-> > > other CPU when it was ready to be turned off.  Seems to me that this
-> > > self-turn-off capability would be a great feature for future systems!
-> > 
-> > There are a lot more issues with hotplug on ARM...
-> 
-> Just trying to clean up this particular corner at the moment.  ;-)
-> 
-> > Patch/RFC attached.
-> 
-> Again, I believe that you will need to loop over a shorter timeout
-> in order to get reasonable latencies.  If waiting a millisecond at
-> a time is an energy-efficiency concern (don't know why it would be
-> in this rare case, but...), then one approach would be to start
-> with very short waits, then increase the wait time, for example,
-> doubling the wait time on each pass through the loop would result
-> in a smallish number of wakeups, but would mean that you waited
-> no more than twice as long as necessary.
-> 
-> Thoughts?
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
