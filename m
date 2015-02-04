@@ -1,74 +1,38 @@
-From: gregory.0xf0@gmail.com (Gregory Fong)
-Date: Tue,  3 Feb 2015 18:49:26 -0800
-Subject: [PATCH] Documentation: arm: Update for DT-only platforms
-Message-ID: <1423018169-31221-1-git-send-email-gregory.0xf0@gmail.com>
+From: jy0922.shim@samsung.com (Joonyoung Shim)
+Date: Wed, 04 Feb 2015 11:59:23 +0900
+Subject: [PATCH 1/2] drm/exynos: fix DMA_ATTR_NO_KERNEL_MAPPING usage
+In-Reply-To: <1422953252-10835-2-git-send-email-carlo@caione.org>
+References: <1422953252-10835-1-git-send-email-carlo@caione.org>
+ <1422953252-10835-2-git-send-email-carlo@caione.org>
+Message-ID: <54D18B0B.5060208@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The documentation specified that a machine type is mandatory and made
-that assumption in a few places.  However, for DT-only platforms, the
-current advice is that no machine type should be registered, so update
-accordingly.
+Hi,
 
-Signed-off-by: Gregory Fong <gregory.0xf0@gmail.com>
----
- Documentation/arm/Booting |  9 +++++++--
- Documentation/arm/README  | 15 +++++++++++----
- 2 files changed, 18 insertions(+), 6 deletions(-)
+On 02/03/2015 05:47 PM, Carlo Caione wrote:
+> The Exynos DRM driver doesn't follow the correct API when dealing with
+> dma_{alloc, mmap, free}_attrs functions and the
+> DMA_ATTR_NO_KERNEL_MAPPING attribute.
+> 
+> When a IOMMU is not available and the DMA_ATTR_NO_KERNEL_MAPPING is
+> used, the driver should use the pointer returned by dma_alloc_attr() as
+> a cookie.
+> 
+> The Exynos DRM driver directly uses the non-requested virtual
+> kernel address returned by the DMA mapping subsystem. This just works
+> now because the non-IOMMU codepath doesn't obey
+> DMA_ATTR_NO_KERNEL_MAPPING but we need to fix it before fixing the DMA
+> layer.
+> 
+> Signed-off-by: Carlo Caione <carlo@caione.org>
+> ---
+>  drivers/gpu/drm/exynos/exynos_drm_buf.c   |  6 +++---
+>  drivers/gpu/drm/exynos/exynos_drm_fbdev.c | 29 +++++++++--------------------
+>  drivers/gpu/drm/exynos/exynos_drm_gem.h   |  2 ++
+>  3 files changed, 14 insertions(+), 23 deletions(-)
+> 
 
-diff --git a/Documentation/arm/Booting b/Documentation/arm/Booting
-index 371814a..83c1df2 100644
---- a/Documentation/arm/Booting
-+++ b/Documentation/arm/Booting
-@@ -58,13 +58,18 @@ serial format options as described in
- --------------------------
- 
- Existing boot loaders:		OPTIONAL
--New boot loaders:		MANDATORY
-+New boot loaders:		MANDATORY except for DT-only platforms
- 
- The boot loader should detect the machine type its running on by some
- method.  Whether this is a hard coded value or some algorithm that
- looks at the connected hardware is beyond the scope of this document.
- The boot loader must ultimately be able to provide a MACH_TYPE_xxx
--value to the kernel. (see linux/arch/arm/tools/mach-types).
-+value to the kernel. (see linux/arch/arm/tools/mach-types).  This
-+should be passed to the kernel in register r1.
-+
-+For DT-only platforms, the machine type will be determined by device
-+tree.  set the machine type to all ones (~0).  This is not strictly
-+necessary, but assures that it will not match any existing types.
- 
- 4. Setup boot data
- ------------------
-diff --git a/Documentation/arm/README b/Documentation/arm/README
-index aea3409..9d1e5b2 100644
---- a/Documentation/arm/README
-+++ b/Documentation/arm/README
-@@ -185,13 +185,20 @@ Kernel entry (head.S)
-   board devices are used, or the device is setup, and provides that
-   machine specific "personality."
- 
--  This fine-grained machine specific selection is controlled by the machine
--  type ID, which acts both as a run-time and a compile-time code selection
--  method.
-+  For platforms that support device tree (DT), the machine selection is
-+  controlled at runtime by passing the device tree blob to the kernel.  At
-+  compile-time, support for the machine type must be selected.  This allows for
-+  a single multiplatform kernel build to be used for several machine types.
- 
--  You can register a new machine via the web site at:
-+  For platforms that do not use device tree, this machine selection is
-+  controlled by the machine type ID, which acts both as a run-time and a
-+  compile-time code selection method.  You can register a new machine via the
-+  web site at:
- 
-     <http://www.arm.linux.org.uk/developer/machines/>
- 
-+  Note: Please do not register a machine type for DT-only platforms.  If your
-+  platform is DT-only, you do not need a registered machine type.
-+
- ---
- Russell King (15/03/2004)
--- 
-1.9.1
+Acked-by: Joonyoung Shim <jy0922.shim@samsung.com>
+
+Thanks.
