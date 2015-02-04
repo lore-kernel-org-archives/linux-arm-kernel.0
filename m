@@ -1,40 +1,40 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Wed, 4 Feb 2015 05:14:20 -0800
-Subject: [rcu] [ INFO: suspicious RCU usage. ]
-In-Reply-To: <20150204130018.GG8656@n2100.arm.linux.org.uk>
-References: <20150201025922.GA16820@wfg-t540p.sh.intel.com>
- <1422957702.17540.1.camel@AMDC1943>
- <20150203162704.GR19109@linux.vnet.ibm.com>
- <1423049947.19547.6.camel@AMDC1943>
- <20150204130018.GG8656@n2100.arm.linux.org.uk>
-Message-ID: <20150204131420.GC5370@linux.vnet.ibm.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Wed, 4 Feb 2015 21:17:17 +0800
+Subject: [patch] irqchip: mtk-sysirq: fix an error code
+In-Reply-To: <20150130082847.GB21357@mwanda>
+References: <20150130082847.GB21357@mwanda>
+Message-ID: <1423055837.31210.29.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 04, 2015 at 01:00:18PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Feb 04, 2015 at 12:39:07PM +0100, Krzysztof Kozlowski wrote:
-> > +Cc some ARM people
+On Fri, 2015-01-30 at 11:28 +0300, Dan Carpenter wrote:
+> "chip_data->intpol_base" used to be an ERR_PTR() but we recently changed
+> it to be NULL.  We need to update the error code as well because
+> "PTR_ERR(NULL)" means success where really we want to return -ENOMEM.
 > 
-> I wish that people would CC this list with problems seen on ARM.  I'm
-> minded to just ignore this message because of this in the hope that by
-> doing so, people will learn something...
+> Fixes: cdb647a772e9 ('irqchip: mtk-sysirq: Get irq number from register resource size')
+> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
 > 
-> > > Another thing I could do would be to have an arch-specific Kconfig
-> > > variable that made ARM responsible for informing RCU that the CPU
-> > > was departing, which would allow a call to as follows to be placed
-> > > immediately after the complete():
-> > > 
-> > > rcu_cpu_notify(NULL, CPU_DYING_IDLE, (void *)(long)smp_processor_id());
-> > > 
-> > > Note:  This absolutely requires that the rcu_cpu_notify() -always-
-> > > be allowed to execute!!!  This will not work if there is -any- possibility
-> > > of __cpu_die() powering off the outgoing CPU before the call to
-> > > rcu_cpu_notify() returns.
-> 
-> Exactly, so that's not going to be possible.  The completion at that
-> point marks the point at which power _could_ be removed from the CPU
-> going down.
+> diff --git a/drivers/irqchip/irq-mtk-sysirq.c b/drivers/irqchip/irq-mtk-sysirq.c
+> index eaf0a71..22eb34c 100644
+> --- a/drivers/irqchip/irq-mtk-sysirq.c
+> +++ b/drivers/irqchip/irq-mtk-sysirq.c
+> @@ -144,7 +144,7 @@ static int __init mtk_sysirq_of_init(struct device_node *node,
+>  	chip_data->intpol_base = ioremap(res.start, size);
+>  	if (!chip_data->intpol_base) {
+>  		pr_err("mtk_sysirq: unable to map sysirq register\n");
+> -		ret = PTR_ERR(chip_data->intpol_base);
+> +		ret = -ENOMEM;
+>  		goto out_free;
+>  	}
+>  
 
-OK, sounds like a polling loop is required.
+Dan,
 
-							Thanx, Paul
+Thanks for catching this.
+Acked-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+
+I changed to use ioremap(), and remember to change the null pointer
+check but not the return type. Sorry for the mistake.
+
+Joe.C
