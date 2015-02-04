@@ -1,44 +1,47 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 4 Feb 2015 18:04:57 +0100
-Subject: [PATCH v2 2/5] ARM: shmobile: r8a7740: Migrate to generic l2c OF
- initialization
-In-Reply-To: <3598552.qKIyokxIlF@wuerfel>
-References: <1423059315-28519-1-git-send-email-geert+renesas@glider.be>
- <7800327.b3sMA1XGtZ@wuerfel>
- <CAMuHMdVi3kq2p30cNFYW2WCM-OvMSFC1W0r5nYkaN5Np=zW4_Q@mail.gmail.com>
- <3598552.qKIyokxIlF@wuerfel>
-Message-ID: <CAMuHMdU-GahSaQj6v2Yhmxsj8gmt1sbwrPfqm=ydMCc=uDcenA@mail.gmail.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 04 Feb 2015 09:08:39 -0800
+Subject: [PATCH v3] ARM: multi_v7_defconfig: Enable shmobile platforms
+In-Reply-To: <CAMuHMdWObPPnpDPQbrq1HRj9BSBFuNNusQkDhaDTxP+_16oMNg@mail.gmail.com>
+ (Geert Uytterhoeven's message of "Wed, 21 Jan 2015 14:09:56 +0100")
+References: <1421684018-11894-1-git-send-email-geert+renesas@glider.be>
+ <1467925.IxO001Hv1t@avalon>
+ <CAMuHMdWObPPnpDPQbrq1HRj9BSBFuNNusQkDhaDTxP+_16oMNg@mail.gmail.com>
+Message-ID: <7h1tm5li3s.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Geert Uytterhoeven <geert@linux-m68k.org> writes:
 
-On Wed, Feb 4, 2015 at 5:36 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 04 February 2015 15:43:43 Geert Uytterhoeven wrote:
->>
->> Indeed. Note that I only try to preserve the register value before and after
->> migrating to generic l2c OF initialization. I did read (part of) the pl310
->> documentation, but it's still not clear to me if we really need
->> L2C_AUX_CTRL_SHARED_OVERRIDE. Perhaps this was just copied from
->> somewhere else without much afterthought?
+> Hi Laurent,
 >
-> Have you checked what the hardware/bootloader actually sets in that bit?
+> On Wed, Jan 21, 2015 at 2:02 PM, Laurent Pinchart
+> <laurent.pinchart@ideasonboard.com> wrote:
+>> To avoid bloating the kernel needlessly, couldn't at least some of the drivers
+>> needed for the shmobile boards be compiled as modules ? Audio, USB, SATA,
+>> touchscreen are possible candidates, depending on what we need to boot the
+>> boards to userspace.
+>
+> That's a possibility.
+>
+> Note that currently there are almost no modules in multi_v7_defconfig:
+> CONFIG_INET6_AH=m
+> CONFIG_INET6_ESP=m
+> CONFIG_INET6_IPCOMP=m
+> CONFIG_IPV6_MIP6=m
+> CONFIG_IPV6_TUNNEL=m
+> CONFIG_CFG80211=m
+> CONFIG_MAC80211=m
+> CONFIG_BRCMFMAC=m
+> CONFIG_RT2X00=m
+> CONFIG_RT2800USB=m
+>
+> Arnd, Olof: What do you prefer?
 
-Yes, it boots with 0x02040000, i.e. L2C_AUX_CTRL_SHARED_OVERRIDE
-(bit 22) is not set.
+The general rule (though not really enforced) has been: if it's needed for
+a rootfs, it's OK to be built in (e.g. MMC, network, etc.)  Everything
+else should be modules.
 
-After the l2c driver is finished with it, it contains 0x46440001.
+FWIW, in my farm, modules are built and installed into the ramdisk so if
+the kernel/rootfs needs them, they will be loaded.
 
-> Maybe you can remove that override completely and the initial Linux
-> default was just set to the same that is already set on powerup?
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Kevin
