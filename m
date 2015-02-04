@@ -1,64 +1,47 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed,  4 Feb 2015 15:15:10 +0100
-Subject: [PATCH v2 0/5] ARM: shmobile: r8a7740/armadillo: Migrate to generic
- l2c OF
-Message-ID: <1423059315-28519-1-git-send-email-geert+renesas@glider.be>
+Date: Wed,  4 Feb 2015 15:15:12 +0100
+Subject: [PATCH v2 2/5] ARM: shmobile: r8a7740: Migrate to generic l2c OF
+ initialization
+In-Reply-To: <1423059315-28519-1-git-send-email-geert+renesas@glider.be>
+References: <1423059315-28519-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1423059315-28519-3-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	Hi Simon, Magnus,
-
-This patch series migrates the DT-based generic r8a7740 platform and
-the armadillo legacy platform from calling l2x0_of_init() to the
+Migrate the generic r8a7740 platform from calling l2x0_of_init() to the
 generic l2c OF initialization.
 
-Changes in v2:
-  - Fix interrupt reference in DT,
-  - Describe L2 better in DT,
-  - Keep only {,~}L2C_AUX_CTRL_SHARED_OVERRIDE in
-    machine_desc.l2c_aux_{val,mask}, as there's no DT property for
-    this.
-  - Add L1 cache to DT.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+v2
+  - Keep only {,~}L2C_AUX_CTRL_SHARED_OVERRIDE
+---
+ arch/arm/mach-shmobile/setup-r8a7740.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-Dependencies:
-  - The first patch depends on r8a7740 DT PM Domain support (tag
-    renesas-dt2-for-v3.20 in Simon's repository),
-  - Although there are separate patches for dtsi, SoC code, and board code,
-    there are dependencies among the individual patches:
-      - patches 2, 3, and 5 depend on patch 1,
-      - patch 4 depends on patches 2 and 3 (and thus 1).
-
-Note that this conversion should be done on sh73a0, r8a7778, and r8a7779,
-too.
-
-This was tested on armadillo-legacy and armadillo-multiplatform.
-
-Thanks!
-
-Geert Uytterhoeven (5):
-  ARM: shmobile: r8a7740 dtsi: Add cache-controller node
-  ARM: shmobile: r8a7740: Migrate to generic l2c OF initialization
-  ARM: shmobile: armadillo legacy: Migrate to generic l2c OF
-    initialization
-  ARM: shmobile: r8a7740: Remove mapping of L2 cache controller
-    registers
-  ARM: shmobile: r8a7740: Add L1 cache information to CPU node
-
- arch/arm/boot/dts/r8a7740.dtsi                 | 24 ++++++++++++++++++++++++
- arch/arm/mach-shmobile/board-armadillo800eva.c |  8 ++------
- arch/arm/mach-shmobile/setup-r8a7740.c         | 18 ++----------------
- 3 files changed, 28 insertions(+), 22 deletions(-)
-
+diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
+index d191cf4197313482..3ebd4dfc8e853a9b 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7740.c
++++ b/arch/arm/mach-shmobile/setup-r8a7740.c
+@@ -835,10 +835,6 @@ static void __init r8a7740_generic_init(void)
+ {
+ 	r8a7740_meram_workaround();
+ 
+-#ifdef CONFIG_CACHE_L2X0
+-	/* Shared attribute override enable, 32K*8way */
+-	l2x0_init(IOMEM(0xf0002000), 0x00400000, 0xc20f0fff);
+-#endif
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+@@ -855,6 +851,8 @@ static const char *r8a7740_boards_compat_dt[] __initdata = {
+ };
+ 
+ DT_MACHINE_START(R8A7740_DT, "Generic R8A7740 (Flattened Device Tree)")
++	.l2c_aux_val	= L2C_AUX_CTRL_SHARED_OVERRIDE,
++	.l2c_aux_mask	= ~L2C_AUX_CTRL_SHARED_OVERRIDE,
+ 	.map_io		= r8a7740_map_io,
+ 	.init_early	= shmobile_init_delay,
+ 	.init_irq	= r8a7740_init_irq_of,
 -- 
 1.9.1
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
