@@ -1,99 +1,42 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed,  4 Feb 2015 15:39:50 +0000
-Subject: [PATCH] kvmtool: don't use PCI config space IRQ line field
-In-Reply-To: <4324891.mqG6Yyfi6J@wuerfel>
-References: <4324891.mqG6Yyfi6J@wuerfel>
-Message-ID: <1423064390-15269-1-git-send-email-andre.przywara@arm.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Wed, 4 Feb 2015 07:46:13 -0800
+Subject: [rcu] [ INFO: suspicious RCU usage. ]
+In-Reply-To: <20150204151624.GI8656@n2100.arm.linux.org.uk>
+References: <20150201025922.GA16820@wfg-t540p.sh.intel.com>
+ <1422957702.17540.1.camel@AMDC1943>
+ <20150203162704.GR19109@linux.vnet.ibm.com>
+ <1423049947.19547.6.camel@AMDC1943>
+ <20150204130018.GG8656@n2100.arm.linux.org.uk>
+ <20150204131420.GC5370@linux.vnet.ibm.com>
+ <1423059387.24415.2.camel@AMDC1943>
+ <20150204151028.GD5370@linux.vnet.ibm.com>
+ <20150204151624.GI8656@n2100.arm.linux.org.uk>
+Message-ID: <20150204154613.GE5370@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In PCI config space there is an interrupt line field (offset 0x3f),
-which is used to initially communicate the IRQ line number from
-firmware to the OS. _Hardware_ should never use this information,
-as the OS is free to write any information in there.
-But kvmtool uses this number when it triggers IRQs in the guest,
-which fails starting with Linux 3.19-rc1, where the PCI layer starts
-writing the virtual IRQ number in there.
+On Wed, Feb 04, 2015 at 03:16:24PM +0000, Russell King - ARM Linux wrote:
+> On Wed, Feb 04, 2015 at 07:10:28AM -0800, Paul E. McKenney wrote:
+> > You know, this situation is giving me a bad case of nostalgia for the
+> > old Sequent Symmetry and NUMA-Q hardware.  On those platforms, the
+> > outgoing CPU could turn itself off, and thus didn't need to tell some
+> > other CPU when it was ready to be turned off.  Seems to me that this
+> > self-turn-off capability would be a great feature for future systems!
+> 
+> Unfortunately, some briliant people decided that secure firmware on
+> their platforms (which is sometimes needed to turn the secondary CPUs
+> off) can only be called by CPU0...
+> 
+> Other people decide that they can power down the secondary CPU when it
+> hits a WFI (wait for interrupt) instruction after arming that state
+> change, which is far saner - but we still need to know on the requesting
+> CPU when the dying CPU has completed the time-expensive parts of the
+> offlining process.
 
-Fix that by storing the IRQ number in a separate field in
-struct virtio_pci, which is independent from the PCI config space
-and cannot be influenced by the guest.
+I suppose that you could grant the outgoing CPU the ability to arm
+that state, but easy for me to say...
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
-Hi,
+Anyway, still looks like a pure polling loop is required, with short
+timed waits running on the surviving CPU.
 
-this fixes the hangs we have seen with kvmtool and PCI in 3.19-rc1+.
-I scanned kvmtool's code for further usage of that config space
-field, but couldn't find anything relevant except pci-shmem.c, which
-is completely broken atm, so I didn't bother to fix this.
-
-Cheers,
-Andre.
-
- tools/kvm/include/kvm/virtio-pci.h |    8 ++++++++
- tools/kvm/virtio/pci.c             |    9 ++++++---
- 2 files changed, 14 insertions(+), 3 deletions(-)
-
-diff --git a/tools/kvm/include/kvm/virtio-pci.h b/tools/kvm/include/kvm/virtio-pci.h
-index c795ce7..b70cadd 100644
---- a/tools/kvm/include/kvm/virtio-pci.h
-+++ b/tools/kvm/include/kvm/virtio-pci.h
-@@ -30,6 +30,14 @@ struct virtio_pci {
- 	u8			isr;
- 	u32			features;
- 
-+	/*
-+	 * We cannot rely on the INTERRUPT_LINE byte in the config space once
-+	 * we have run guest code, as the OS is allowed to use that field
-+	 * as a scratch pad to communicate between driver and PCI layer.
-+	 * So store our legacy interrupt line number in here for internal use.
-+	 */
-+	u8			legacy_irq_line;
-+
- 	/* MSI-X */
- 	u16			config_vector;
- 	u32			config_gsi;
-diff --git a/tools/kvm/virtio/pci.c b/tools/kvm/virtio/pci.c
-index 7556239..e17e5a9 100644
---- a/tools/kvm/virtio/pci.c
-+++ b/tools/kvm/virtio/pci.c
-@@ -141,7 +141,7 @@ static bool virtio_pci__io_in(struct ioport *ioport, struct kvm_cpu *vcpu, u16 p
- 		break;
- 	case VIRTIO_PCI_ISR:
- 		ioport__write8(data, vpci->isr);
--		kvm__irq_line(kvm, vpci->pci_hdr.irq_line, VIRTIO_IRQ_LOW);
-+		kvm__irq_line(kvm, vpci->legacy_irq_line, VIRTIO_IRQ_LOW);
- 		vpci->isr = VIRTIO_IRQ_LOW;
- 		break;
- 	default:
-@@ -299,7 +299,7 @@ int virtio_pci__signal_vq(struct kvm *kvm, struct virtio_device *vdev, u32 vq)
- 			kvm__irq_trigger(kvm, vpci->gsis[vq]);
- 	} else {
- 		vpci->isr = VIRTIO_IRQ_HIGH;
--		kvm__irq_trigger(kvm, vpci->pci_hdr.irq_line);
-+		kvm__irq_trigger(kvm, vpci->legacy_irq_line);
- 	}
- 	return 0;
- }
-@@ -323,7 +323,7 @@ int virtio_pci__signal_config(struct kvm *kvm, struct virtio_device *vdev)
- 			kvm__irq_trigger(kvm, vpci->config_gsi);
- 	} else {
- 		vpci->isr = VIRTIO_PCI_ISR_CONFIG;
--		kvm__irq_trigger(kvm, vpci->pci_hdr.irq_line);
-+		kvm__irq_trigger(kvm, vpci->legacy_irq_line);
- 	}
- 
- 	return 0;
-@@ -422,6 +422,9 @@ int virtio_pci__init(struct kvm *kvm, void *dev, struct virtio_device *vdev,
- 	if (r < 0)
- 		goto free_msix_mmio;
- 
-+	/* save the IRQ that device__register() has allocated */
-+	vpci->legacy_irq_line = vpci->pci_hdr.irq_line;
-+
- 	return 0;
- 
- free_msix_mmio:
--- 
-1.7.9.5
+							Thanx, Paul
