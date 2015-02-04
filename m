@@ -1,64 +1,113 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 4 Feb 2015 10:02:53 -0600
-Subject: [PATCH RFC v8 02/21] of: Add vendor prefix for Himax Technologies
- Inc.
-In-Reply-To: <1420014219-915-3-git-send-email-Ying.Liu@freescale.com>
-References: <1420014219-915-1-git-send-email-Ying.Liu@freescale.com>
- <1420014219-915-3-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <CAL_JsqJQuVSBQ73v45GEy+-OR74iZ+AT-R8vaExqJfpSMupAWA@mail.gmail.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Wed, 04 Feb 2015 11:08:27 -0500
+Subject: [PATCH v8 02/21] acpi: fix acpi_os_ioremap for arm64
+In-Reply-To: <20150204112508.GB26006@e104818-lin.cambridge.arm.com>
+References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
+ <1422881149-8177-3-git-send-email-hanjun.guo@linaro.org>
+ <2422968.Es7R0p3loO@vostro.rjw.lan>
+ <1422984576.18187.82.camel@deneb.redhat.com>
+ <20150204112508.GB26006@e104818-lin.cambridge.arm.com>
+Message-ID: <1423066107.18187.99.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 31, 2014 at 2:23 AM, Liu Ying <Ying.Liu@freescale.com> wrote:
-> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+On Wed, 2015-02-04 at 11:25 +0000, Catalin Marinas wrote:
+> On Tue, Feb 03, 2015 at 05:29:36PM +0000, Mark Salter wrote:
+> > On Mon, 2015-02-02 at 23:14 +0100, Rafael J. Wysocki wrote:
+> > > On Monday, February 02, 2015 08:45:30 PM Hanjun Guo wrote:
+> > > > From: Mark Salter <msalter@redhat.com>
+> > > > 
+> > > > The acpi_os_ioremap() function may be used to map normal RAM or IO
+> > > > regions. The current implementation simply uses ioremap_cache(). This
+> > > > will work for some architectures, but arm64 ioremap_cache() cannot be
+> > > > used to map IO regions which don't support caching. So for arm64, use
+> > > > ioremap() for non-RAM regions.
+> > > > 
+> > > > CC: Rafael J Wysocki <rjw@rjwysocki.net>
+> > > > Signed-off-by: Mark Salter <msalter@redhat.com>
+> > > > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> > > > ---
+> > > >  include/acpi/acpi_io.h | 6 ++++++
+> > > >  1 file changed, 6 insertions(+)
+> > > > 
+> > > > diff --git a/include/acpi/acpi_io.h b/include/acpi/acpi_io.h
+> > > > index 444671e..9d573db 100644
+> > > > --- a/include/acpi/acpi_io.h
+> > > > +++ b/include/acpi/acpi_io.h
+> > > > @@ -1,11 +1,17 @@
+> > > >  #ifndef _ACPI_IO_H_
+> > > >  #define _ACPI_IO_H_
+> > > >  
+> > > > +#include <linux/mm.h>
+> > > >  #include <linux/io.h>
+> > > >  
+> > > >  static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
+> > > >  					    acpi_size size)
+> > > >  {
+> > > > +#ifdef CONFIG_ARM64
+> > > > +	if (!page_is_ram(phys >> PAGE_SHIFT))
+> > > > +		return ioremap(phys, size);
+> > > > +#endif
+> > > 
+> > > I don't want to see #ifdef CONFIG_ARM64 in this file.
+> > 
+> > How about something like:
+> > 
+> > From: Mark Salter <msalter@redhat.com>
+> > Date: Tue, 3 Feb 2015 10:51:16 -0500
+> > Subject: [PATCH] acpi: fix acpi_os_ioremap for arm64
+> > 
+> > The acpi_os_ioremap() function may be used to map normal RAM or IO
+> > regions. The current implementation simply uses ioremap_cache(). This
+> > will work for some architectures, but arm64 ioremap_cache() cannot be
+> > used to map IO regions which don't support caching. So for arm64, use
+> > ioremap() for non-RAM regions.
+> > 
+> > CC: Rafael J Wysocki <rjw@rjwysocki.net>
+> > Signed-off-by: Mark Salter <msalter@redhat.com>
+> > ---
+> >  arch/arm64/include/asm/acpi.h | 14 ++++++++++++++
+> >  include/acpi/acpi_io.h        |  3 +++
+> >  2 files changed, 17 insertions(+)
+> > 
+> > diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> > index ea4d2b3..db82bc3 100644
+> > --- a/arch/arm64/include/asm/acpi.h
+> > +++ b/arch/arm64/include/asm/acpi.h
+> > @@ -14,6 +14,7 @@
+> >  
+> >  #include <linux/irqchip/arm-gic-acpi.h>
+> >  
+> > +#include <linux/mm.h>
+> >  #include <asm/smp_plat.h>
+> >  
+> >  /* Basic configuration for ACPI */
+> > @@ -100,4 +101,17 @@ static inline bool acpi_psci_use_hvc(void) { return false; }
+> >  static inline void acpi_init_cpus(void) { }
+> >  #endif /* CONFIG_ACPI */
+> >  
+> > +/*
+> > + * ACPI table mapping
+> > + */
+> > +static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
+> > +					    acpi_size size)
+> > +{
+> > +	if (!page_is_ram(phys >> PAGE_SHIFT))
+> > +		return ioremap(phys, size);
+> > +
+> > +       return ioremap_cache(phys, size);
+> > +}
+> > +#define acpi_os_ioremap acpi_os_ioremap
+> 
+> That's one way of doing this, I'm not too bothered with the approach
+> (define the function name, an ARCH_HAS macro or a Kconfig option, it's
+> up to Rafael).
+> 
+> But a question I already asked is what we need ioremap_cache() for? We
+> don't use NVS on arm64 yet, so is there anything else requiring
+> cacheable mapping?
 
-I don't know what the status is for the rest of the series, but I'm
-applying this and patch 3 so you don't have to keep sending them.
-
-Rob
-
-> ---
-> v7->v8:
->  * None.
->
-> v6->v7:
->  * None.
->
-> v5->v6:
->  * None.
->
-> v4->v5:
->  * None.
->
-> v3->v4:
->  * Fix an ordering issue to address Stefan Wahren's comment.
->
-> v2->v3:
->  * None.
->
-> v1->v2:
->  * None.
->
->  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index 78efebb..f46adb2 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -67,6 +67,7 @@ gumstix       Gumstix, Inc.
->  gw     Gateworks Corporation
->  hannstar       HannStar Display Corporation
->  haoyu  Haoyu Microelectronic Co. Ltd.
-> +himax  Himax Technologies, Inc.
->  hisilicon      Hisilicon Limited.
->  hit    Hitachi Ltd.
->  honeywell      Honeywell
-> --
-> 2.1.0
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+acpi_os_remap() is used to map ACPI tables. These tables may be in ram
+which are already included in the kernel's linear RAM mapping. So we
+need ioremap_cache to avoid two mappings to the same physical page
+having different caching attributes.
