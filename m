@@ -1,26 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 04 Feb 2015 17:36:09 +0100
-Subject: [PATCH v2 2/5] ARM: shmobile: r8a7740: Migrate to generic l2c OF
- initialization
-In-Reply-To: <CAMuHMdVi3kq2p30cNFYW2WCM-OvMSFC1W0r5nYkaN5Np=zW4_Q@mail.gmail.com>
-References: <1423059315-28519-1-git-send-email-geert+renesas@glider.be>
- <7800327.b3sMA1XGtZ@wuerfel>
- <CAMuHMdVi3kq2p30cNFYW2WCM-OvMSFC1W0r5nYkaN5Np=zW4_Q@mail.gmail.com>
-Message-ID: <3598552.qKIyokxIlF@wuerfel>
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Wed, 04 Feb 2015 16:38:59 +0000
+Subject: [PATCH v8 02/21] acpi: fix acpi_os_ioremap for arm64
+In-Reply-To: <20150204162536.GJ8656@n2100.arm.linux.org.uk>
+References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
+ <2422968.Es7R0p3loO@vostro.rjw.lan>
+ <1422984576.18187.82.camel@deneb.redhat.com>
+ <8901765.mLfPOCUyAN@vostro.rjw.lan>
+ <20150204104832.GF8656@n2100.arm.linux.org.uk>
+ <CAErSpo71fVU5mJgXnxMwiE_TUrNyfSYHo5RDF-=u2BK5grDYAw@mail.gmail.com>
+ <20150204162536.GJ8656@n2100.arm.linux.org.uk>
+Message-ID: <1423067939.3011.72.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 February 2015 15:43:43 Geert Uytterhoeven wrote:
-> 
-> Indeed. Note that I only try to preserve the register value before and after
-> migrating to generic l2c OF initialization. I did read (part of) the pl310
-> documentation, but it's still not clear to me if we really need
-> L2C_AUX_CTRL_SHARED_OVERRIDE. Perhaps this was just copied from
-> somewhere else without much afterthought?
+On Wed, 2015-02-04 at 16:25 +0000, Russell King - ARM Linux wrote:
+> I haven't experimented with it myself, but I think David Woodhouse
+> has some experience in this area.
 
-Have you checked what the hardware/bootloader actually sets in that bit?
+In many kernel configurations there are actually quite a lot of
+functions that are never called, and I was quite surprised the first
+time I played with this stuff.
 
-Maybe you can remove that override completely and the initial Linux
-default was just set to the same that is already set on powerup?
+There are a few ways of dealing with it. One is to use
+-ffunction-section -fdata-sections --gc-sections as you noted. I once
+also played with using GCC's --combine during the brief period that it
+was supported and not *entirely* broken, with similar effects:
+https://lwn.net/Articles/197097/
 
-	Arnd
+These days, the better answer is probably LTO. We could potentially
+still look at --gc-sections, but I suspect we're better off using LTO
+and just filing toolchain bugs until everything that --gc-sections
+*would* have dropped is also dropped from the LTO build :)
+
+Unless --gc-sections actually speeds up the build in a significant way;
+a full LTO link of the kernel takes insane amounts of memory IIRC.
+
+-- 
+David Woodhouse                            Open Source Technology Centre
+David.Woodhouse at intel.com                              Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 5745 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150204/a5418034/attachment-0001.bin>
