@@ -1,128 +1,68 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 5 Feb 2015 12:20:48 +0000
-Subject: [PATCH 1/4] arm64: dts: fix PMU IRQ ordering for Juno
-In-Reply-To: <20150205120920.GF23241@arm.com>
-References: <1422294858-28100-1-git-send-email-will.deacon@arm.com>
- <20150205114642.GG11344@leverpostej>
- <20150205115416.GE23241@arm.com>
- <20150205115933.GI11344@leverpostej>
- <20150205120920.GF23241@arm.com>
-Message-ID: <20150205122048.GJ11344@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 05 Feb 2015 13:21:56 +0100
+Subject: [PATCH v4 0/6] Introducing the Alpine platform.
+In-Reply-To: <CAC9K06yaA30e+HnRH50QJeF0=a_oCeWaaT_sYuS+OVcq1ZnVzg@mail.gmail.com>
+References: <54d0cd21.WWf8LEKnly7HnqEK%tsahee@annapurnalabs.com>
+ <4902057.1c5MpYALGg@wuerfel>
+ <CAC9K06yaA30e+HnRH50QJeF0=a_oCeWaaT_sYuS+OVcq1ZnVzg@mail.gmail.com>
+Message-ID: <2737362.aK8nBa7Wi3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Adding dtc folk]
+On Thursday 05 February 2015 10:28:02 Ronen Shitrit wrote:
+> On 4 February 2015 at 14:33, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Wednesday 04 February 2015 13:19:04 Tsahee Zidenberg wrote:
 
-On Thu, Feb 05, 2015 at 12:09:20PM +0000, Will Deacon wrote:
-> On Thu, Feb 05, 2015 at 11:59:33AM +0000, Mark Rutland wrote:
-> > On Thu, Feb 05, 2015 at 11:54:16AM +0000, Will Deacon wrote:
-> > > On Thu, Feb 05, 2015 at 11:46:42AM +0000, Mark Rutland wrote:
-> > > > On Mon, Jan 26, 2015 at 05:54:15PM +0000, Will Deacon wrote:
-> > > > > diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
-> > > > > index cb3073e4e7a8..4ed9287aaef1 100644
-> > > > > --- a/arch/arm64/boot/dts/arm/juno.dts
-> > > > > +++ b/arch/arm64/boot/dts/arm/juno.dts
-> > > > > @@ -107,11 +107,11 @@
-> > > > >  	pmu {
-> > > > >  		compatible = "arm,armv8-pmuv3";
-> > > > >  		interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
-> > > > > +			     <GIC_SPI 02 IRQ_TYPE_LEVEL_HIGH>,
-> > > > > +			     <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>,
-> > > > >  			     <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>,
-> > > > >  			     <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>,
-> > > > > -			     <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>,
-> > > > > -			     <GIC_SPI 02 IRQ_TYPE_LEVEL_HIGH>,
-> > > > > -			     <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>;
-> > > > > +			     <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
-> > > > >  	};
-> > > > 
-> > > > I am very much not keen on this. While this may get things working
-> > > > today, it completely relies on Linux-internal details (the order of CPU
-> > > > bringup, which in this case is different from the order of entries in
-> > > > /cpus).
-> > > > 
-> > > > In all other dts that I am aware of, the order of entries in /cpus
-> > > > aligns with the order of interrupts in the PMU node, and the first entry
-> > > > is the boot CPU.
-> > > > 
-> > > > I think that we should ensure that the ordering of CPU nodes matches the
-> > > > order of interrupts here. That way we can fall back to that ordering (if
-> > > > not explicitly overridden), and even after an arbitrary logical
-> > > > renumbering (e.g. after a kexec) the relationship should stay intact.
-> > > 
-> > > There are a few problems with reordering the CPU nodes:
-> > > 
-> > >   (1) It breaks any existing users of taskset to pin on big/little
-> > >       clusters.
-> > 
-> > This is unfortunate, but this is also the case if the boot CPU is
-> > different.
+> > I understand where you are coming from, as this is something that
+> > everyone gets wrong at first.
 > 
-> Right, so don't change the boot CPU. In that vain, we also shouldn't change
-> the CPU order in the .dts -- the current .dts is working for taskset and
-> we shouldn't break people's scripts just because they want to use the PMU.
+> In order to bring up a completely new silicon with lots of
+> technologies challenges in such short time and take it to production,
+> with multi discipline environments, few OSs support and small software
+> group, we had to share code as much as possible == hal.
 
-I think this is an orthogonal discussion. If Linux is booted on a
-different CPU, it's not the fault of Linux that CPU0 is different.
+I think the most important part for you to understand is not to call
+something a hal (or os abstraction, which would be worse), as that
+is universally hated. ;-)
 
-> > >   (2) It's not generally possible if, for example, the bootloader decides
-> > >       to boot Linux on a different CPU then we have no choice but to
-> > >       change the PMU interrupt order.
-> > 
-> > In that case _this_ patch is broken.
+> We were aware from first day of the obstacles of merging hal code to
+> the mainline, that why we implemented it using linux coding style,
+> trying to minimize the "resistance", and we hoped (and still are :) to
+> find a path to keep part of our low level code into the mainline.
+> If it wont work out, we will rewrite it...
+
+It's not as bad if something is contained within one driver: if you have
+e.g. a network driver that consists of a low-level part that talks to
+the hardware and a high-level part that talks to linux, that can
+be ok. What you should avoid is having interfaces that span across
+multiple driver components and use a global header file for the
+interface but are specific to one SoC family.
+
+> >However, you will not be able to merge
+> > the drivers with a HAL like this. The kernel abstracts all the
+> > components of typical SoCs already and I suspect you just did not
+> > use the right abstraction because you either didn't find it, or it
+> > was not there at the time you started the work.
+> >
+> > For example, a DMA subsystem that is used by multiple slave drivers
+> > should use a driver in drivers/dma that registers to the slave-dma API,
 > 
-> Why? I'm not denying that changing the boot CPU causes problems, I'm saying
-> that you *can't* fix that by changing the CPU node order. You still have
-> to change the interrupt order in that case, so why not just localise the
-> changes there in the first place?
+> If you are referring to the dma-engine api, than this is a good
+> example where we don't want to use the generic framework as its
+> overhead on performance is unacceptable.
 
-If we're going to try to maintain support for these DTs long-term (with
-kexec and whatever logical renumbering can occur there), then we need a
-consistent invariant that we can rely on to associate interrupts and
-CPUs correctly.
+It also illustrates my point: When we introduce a second interface
+in parallel to the existing one, this puts a burden on us upstream
+maintainers which now have to understand and maintain both. We used
+to have all sorts of interfaces per SoC and are almost done consolidating
+them to all use dmaengine for this reason.
+I do realize that the dmaengine API is not perfect though, so if you
+have specific problems with it, we expect you to help figure out what
+they are and what we can do about them so that everybody benefits.
 
-The Linux logical ordering is not invariant, so we know that this _will_
-break.
+To a certain extent, this is how we make progress in the kernel with
+generic interfaces: someone has a particular need and it's up to them
+to implement the groundwork. In return they get all the features of
+the kernel that someone else needed and implemented already.
 
-As far as I am aware, every other DT lists the boot CPU first, and the
-order of entries in /cpus mathes the logical order. Using the order of
-entries in /cpus will remain consistent in the face of arbitrary
-renumbering, and is (currently) consistent with logical numbering.
-
-So keeping the CPU nodes and interrupt entries in the same order
-provides us with a long-term consistent order, regardless of which CPU
-is the boot CPU.
-
-This DT is currently broken. If we're going to make it work we should do
-so in a manner that will continue to work. Anything else is a broken
-bodge that hurts us in the long-term as we'll have to hack around it.
-
-> > If we associate the interrupt with a CPU by node order, the relationship
-> > is preserved regardless of which CPU is the boot CPU (whether it was the
-> > bootloader's choice, kexec, or whatever).
-> 
-> Sure, and that requires code changes. If we're going to change the code,
-> then I'd much rather we make the binding explicit, like I did in the
-> follow-up patches to this one. As I mentioned before, this is a .dts fix
-> to get things working with the current code. It's really too late to argue
-> about the existing binding, even if it sucks.
-
-Sure, the binding sucks.
-
-This DT has also _never_ worked.
-
-If we're going to fix things, let's not introduce a middle step that's
-broken in a different way.
-
-> > >   (3) I didn't think that the ordering of CPU nodes was guaranteed to be
-> > >       preserved by dtc, whereas the order of the interrupts will be.
-> > 
-> > The order of nodes is presently preserved.
-> 
-> It's not about the present behaviour; I need a _guarantee_ that dtc/libfdt
-> will *never* reorder CPU nodes. Today's working .dts file needs to continue
-> to work with future tools.
-
-Jon, David, Grant, thoughts?
-
-Mark.
+	Arnd
