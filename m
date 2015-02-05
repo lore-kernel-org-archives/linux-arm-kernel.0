@@ -1,100 +1,154 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu,  5 Feb 2015 11:11:24 +0100
-Subject: [PATCH v5 1/5] drivers: bus: Sort Kconfig entries alphabetically
-In-Reply-To: <1423131088-7835-1-git-send-email-geert+renesas@glider.be>
-References: <1423131088-7835-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1423131088-7835-2-git-send-email-geert+renesas@glider.be>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 05 Feb 2015 18:11:47 +0800
+Subject: [PATCH v8 17/21] clocksource / arch_timer: Parse GTDT to
+ initialize arch timer
+In-Reply-To: <20150204185929.GH22035@red-moon>
+References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
+ <1422881149-8177-18-git-send-email-hanjun.guo@linaro.org>
+ <20150204185929.GH22035@red-moon>
+Message-ID: <54D341E3.9020402@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Tested-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-Reviewed-by: Kevin Hilman <khilman@linaro.org>
----
-v5:
-  - Add Reviewed-by,
+Hi Lorenzo,
 
-v4:
-  - No changes,
+On 2015?02?05? 02:59, Lorenzo Pieralisi wrote:
+> On Mon, Feb 02, 2015 at 12:45:45PM +0000, Hanjun Guo wrote:
+>> Using the information presented by GTDT (Generic Timer Description Table)
+>> to initialize the arch timer (not memory-mapped).
+>
+> Why are you not initializing the memory mapped timer ?
 
-v3:
-  - Add Tested-by,
+We left it for later work because no need for that to boot
+available ARM64 hardware at now, and we have no hardware to
+test unless I missed some of platforms.
 
-v2:
-  - New.
----
- drivers/bus/Kconfig | 44 ++++++++++++++++++++++----------------------
- 1 file changed, 22 insertions(+), 22 deletions(-)
+>
+>> CC: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> Originally-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+>> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>> Tested-by: Yijing Wang <wangyijing@huawei.com>
+>> Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
+>> Tested-by: Jon Masters <jcm@redhat.com>
+>> Tested-by: Timur Tabi <timur@codeaurora.org>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> ---
+>>   arch/arm64/kernel/time.c             |   7 ++
+>>   drivers/clocksource/arm_arch_timer.c | 132 ++++++++++++++++++++++++++++-------
+>>   include/linux/clocksource.h          |   6 ++
+>>   3 files changed, 118 insertions(+), 27 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
+>> index 1a7125c..42f9195 100644
+>> --- a/arch/arm64/kernel/time.c
+>> +++ b/arch/arm64/kernel/time.c
+>> @@ -35,6 +35,7 @@
+>>   #include <linux/delay.h>
+>>   #include <linux/clocksource.h>
+>>   #include <linux/clk-provider.h>
+>> +#include <linux/acpi.h>
+>>
+>>   #include <clocksource/arm_arch_timer.h>
+>>
+>> @@ -72,6 +73,12 @@ void __init time_init(void)
+>>
+>>   	tick_setup_hrtimer_broadcast();
+>>
+>> +	/*
+>> +	 * Since ACPI or FDT will only one be available in the system,
+>> +	 * we can use acpi_generic_timer_init() here safely
+>> +	 */
+>> +	acpi_generic_timer_init();
+>> +
+>>   	arch_timer_rate = arch_timer_get_rate();
+>>   	if (!arch_timer_rate)
+>>   		panic("Unable to initialise architected timer.\n");
+>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+>> index 095c177..407aa63 100644
+>> --- a/drivers/clocksource/arm_arch_timer.c
+>> +++ b/drivers/clocksource/arm_arch_timer.c
+>> @@ -21,6 +21,7 @@
+>>   #include <linux/io.h>
+>>   #include <linux/slab.h>
+>>   #include <linux/sched_clock.h>
+>> +#include <linux/acpi.h>
+>>
+>>   #include <asm/arch_timer.h>
+>>   #include <asm/virt.h>
+>> @@ -370,8 +371,12 @@ arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
+>>   	if (arch_timer_rate)
+>>   		return;
+>>
+>> -	/* Try to determine the frequency from the device tree or CNTFRQ */
+>> -	if (of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
+>> +	/*
+>> +	 * Try to determine the frequency from the device tree or CNTFRQ,
+>> +	 * if ACPI is enabled, get the frequency from CNTFRQ ONLY.
+>> +	 */
+>> +	if (!acpi_disabled ||
+>> +	    of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
+>
+> This is getting a mess. cntbase tells you it is a memory mapped timer,
+> node pointer that you are probing through DT, and to top it all
+> acpi_disabled detects if you are probing in ACPI or DT mode.
+>
+> I think this function should be simplified, this driver is also
+> pending a refactoring to split arch timer and the memory mapped one
+> so I think you'd better wait that work to make things simpler.
 
-diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-index b99729e368608bda..626960819e6df16c 100644
---- a/drivers/bus/Kconfig
-+++ b/drivers/bus/Kconfig
-@@ -4,6 +4,21 @@
- 
- menu "Bus devices"
- 
-+config ARM_CCI
-+	bool "ARM CCI driver support"
-+	depends on ARM && OF && CPU_V7
-+	help
-+	  Driver supporting the CCI cache coherent interconnect for ARM
-+	  platforms.
-+
-+config ARM_CCN
-+	bool "ARM CCN driver support"
-+	depends on ARM || ARM64
-+	depends on PERF_EVENTS
-+	help
-+	  PMU (perf) driver supporting the ARM CCN (Cache Coherent Network)
-+	  interconnect.
-+
- config BRCMSTB_GISB_ARB
- 	bool "Broadcom STB GISB bus arbiter"
- 	depends on ARM || MIPS
-@@ -27,15 +42,6 @@ config MVEBU_MBUS
- 	  Driver needed for the MBus configuration on Marvell EBU SoCs
- 	  (Kirkwood, Dove, Orion5x, MV78XX0 and Armada 370/XP).
- 
--config OMAP_OCP2SCP
--	tristate "OMAP OCP2SCP DRIVER"
--	depends on ARCH_OMAP2PLUS
--	help
--	  Driver to enable ocp2scp module which transforms ocp interface
--	  protocol to scp protocol. In OMAP4, USB PHY is connected via
--	  OCP2SCP and in OMAP5, both USB PHY and SATA PHY is connected via
--	  OCP2SCP.
--
- config OMAP_INTERCONNECT
- 	tristate "OMAP INTERCONNECT DRIVER"
- 	depends on ARCH_OMAP2PLUS
-@@ -43,20 +49,14 @@ config OMAP_INTERCONNECT
- 	help
- 	  Driver to enable OMAP interconnect error handling driver.
- 
--config ARM_CCI
--	bool "ARM CCI driver support"
--	depends on ARM && OF && CPU_V7
--	help
--	  Driver supporting the CCI cache coherent interconnect for ARM
--	  platforms.
--
--config ARM_CCN
--	bool "ARM CCN driver support"
--	depends on ARM || ARM64
--	depends on PERF_EVENTS
-+config OMAP_OCP2SCP
-+	tristate "OMAP OCP2SCP DRIVER"
-+	depends on ARCH_OMAP2PLUS
- 	help
--	  PMU (perf) driver supporting the ARM CCN (Cache Coherent Network)
--	  interconnect.
-+	  Driver to enable ocp2scp module which transforms ocp interface
-+	  protocol to scp protocol. In OMAP4, USB PHY is connected via
-+	  OCP2SCP and in OMAP5, both USB PHY and SATA PHY is connected via
-+	  OCP2SCP.
- 
- config VEXPRESS_CONFIG
- 	bool "Versatile Express configuration bus"
--- 
-1.9.1
+Does anyone working on this now?
+
+>
+> [...]
+>
+>> +/* Initialize all the generic timers presented in GTDT */
+>> +void __init acpi_generic_timer_init(void)
+>> +{
+>> +	if (acpi_disabled)
+>> +		return;
+>
+> acpi_disabled used again here, I repeat myself this is going to be
+> hard to track. You should try to organize the code something like:
+>
+> if (acpi_disabled)
+> 	timer_dt_probe();
+> else
+> 	timer_acpi_probe();
+>
+> mixing the code paths is getting unwieldy, see above to see my
+> reasoning.
+
+Olof is unhappy with such approach, I think if (acpi_disabled) is
+self-contained because we only get DT or ACPI in the system, we
+can call this function time_init() without more if (acpi_disabled).
+
+>
+>> +
+>> +	acpi_table_parse(ACPI_SIG_GTDT, arch_timer_acpi_init);
+>> +}
+>> +#endif
+>> diff --git a/include/linux/clocksource.h b/include/linux/clocksource.h
+>> index abcafaa..af6155a 100644
+>> --- a/include/linux/clocksource.h
+>> +++ b/include/linux/clocksource.h
+>> @@ -346,4 +346,10 @@ extern void clocksource_of_init(void);
+>>   static inline void clocksource_of_init(void) {}
+>>   #endif
+>>
+>> +#ifdef CONFIG_ACPI
+>> +void acpi_generic_timer_init(void);
+>> +#else
+>> +static inline void acpi_generic_timer_init(void) { }
+>> +#endif
+>> +
+>
+> That's not nice, it is a generic header, arch specific stuff should be
+> avoided. I think you should have an ACPI generic layer similar to
+> clocksource_of_init(), and probe from there when matching the respective
+> timers.
+
+I think I'm OK with it, but do we really need to introduce a heavy
+framework to init just arm arch timer (memory mapped or not) ?
+
+Thanks
+Hanjun
