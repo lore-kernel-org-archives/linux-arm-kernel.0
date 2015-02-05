@@ -1,91 +1,76 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Thu, 05 Feb 2015 17:28:12 +0100
-Subject: [PATCH] coresight-stm: adding driver for CoreSight STM component
-In-Reply-To: <CANLsYkx-XeiWAMxgMs=dAZc5oMf0NmF_2_6TzYXQtd1JdL5LrA@mail.gmail.com>
-References: <1423088550-15780-1-git-send-email-mathieu.poirier@linaro.org>
- <1423135651.27378.32.camel@x220>
- <CANLsYkx-XeiWAMxgMs=dAZc5oMf0NmF_2_6TzYXQtd1JdL5LrA@mail.gmail.com>
-Message-ID: <1423153692.27378.60.camel@x220>
+From: al.stone@linaro.org (Al Stone)
+Date: Thu, 05 Feb 2015 09:42:19 -0700
+Subject: [Linaro-acpi] [PATCH v8 02/21] acpi: fix acpi_os_ioremap for arm64
+In-Reply-To: <1423144447.18187.110.camel@deneb.redhat.com>
+References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
+ <1422881149-8177-3-git-send-email-hanjun.guo@linaro.org>
+ <2422968.Es7R0p3loO@vostro.rjw.lan>
+ <1422984576.18187.82.camel@deneb.redhat.com>
+ <20150204112508.GB26006@e104818-lin.cambridge.arm.com>
+ <1423066107.18187.99.camel@deneb.redhat.com>
+ <20150204175734.GI26006@e104818-lin.cambridge.arm.com>
+ <1423076294.18187.103.camel@deneb.redhat.com>
+ <20150205104149.GA18158@e104818-lin.cambridge.arm.com>
+ <1423144447.18187.110.camel@deneb.redhat.com>
+Message-ID: <54D39D6B.5090304@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-02-05 at 08:51 -0700, Mathieu Poirier wrote:
-> On 5 February 2015 at 04:27, Paul Bolle <pebolle@tiscali.nl> wrote:
-> > On Wed, 2015-02-04 at 15:22 -0700, mathieu.poirier at linaro.org wrote:
-> >> @@ -58,4 +58,14 @@ config CORESIGHT_SOURCE_ETM3X
-> >>         which allows tracing the instructions that a processor is executing
-> >>         This is primarily useful for instruction level tracing.  Depending
-> >>         the ETM version data tracing may also be available.
-> >> +
-> >> +config CORESIGHT_STM
-> >> +     bool "CoreSight System Trace Macrocell driver"
-> >> +     depends on (ARM && !(CPU_32v4 || CPU_32v4T)) || ARM64 || (64BIT && COMPILE_TEST)
-> >
-> > I'm _guessing_ that CPU_32v4 and CPU_32v4T are needed for the ldrd and
-> > strd assembler instructions. If that's right a next _guess_ would be
-> > that you also need to mention CPU_32v3 here.
-> >
-> > Furthermore, this file is only sourced by arch/arm/Kconfig.debug and
-> > arch/arm64/Kconfig.debug. So 64BIT should always be equal to ARM64 and
-> > the
-> >      || (64BIT && COMPILE_TEST)
-> >
-> > part shouldn't be needed, isn't it?
+On 02/05/2015 06:54 AM, Mark Salter wrote:
+> On Thu, 2015-02-05 at 10:41 +0000, Catalin Marinas wrote:
+>> On Wed, Feb 04, 2015 at 06:58:14PM +0000, Mark Salter wrote:
+>>> On Wed, 2015-02-04 at 17:57 +0000, Catalin Marinas wrote:
+>>>> On Wed, Feb 04, 2015 at 04:08:27PM +0000, Mark Salter wrote:
+>>>>> acpi_os_remap() is used to map ACPI tables. These tables may be in ram
+>>>>> which are already included in the kernel's linear RAM mapping. So we
+>>>>> need ioremap_cache to avoid two mappings to the same physical page
+>>>>> having different caching attributes.
+>>>>
+>>>> What's the call path to acpi_os_ioremap() on such tables already in the
+>>>> linear mapping? I can see an acpi_map() function which already takes
+>>>> care of the RAM mapping case but there are other cases where
+>>>> acpi_os_ioremap() is called directly. For example,
+>>>> acpi_os_read_memory(), can it be called on both RAM and I/O?
+>>>
+>>> acpi_map() is the one I've seen.
+>>
+>> By default, if should_use_kmap() is not patched for arm64, it translates
+>> to page_is_ram(); acpi_map() would simply use a kmap() which returns the
+>> current kernel linear mapping on arm64.
 > 
-> Things have changed in the driver (and accessor functions) since I
-> wrote this Kconfig condition - Let me think on the above 2 comments.
+> The problem with kmap() is that it only maps a single page. I've seen
+> tables over 4k which is why I patched acpi_map() not to use kmap() on
+> arm64.
 
-In the meantime it occurred to me that the current dependency could be
-written as just
-    !CPU_32v4 && !CPU_32v4T
+Right.  Mark replied to this before I could; using kmap() enforced a 4k
+(one page) limit that we kept breaking with some ACPI tables being larger
+than that (DSDTs and SSDTs, fwiw).  This would lead to some very odd behaviors
+when most but not all of a device definition was within the page; using the
+table checksums was one way of detecting the issues.
 
-That shouldn't change anything, neither for both ARM nor for ARM64.
-(This is because exactly one of ARM and ARM64 will always be set.)
-Anyhow, I'll see what you'll come up with.
-
-> >> +     select CORESIGHT_LINKS_AND_SINKS
-> >> +     help
-> >> +       This driver provides support for hardware assisted software
-> >> +       instrumentation based tracing. This is primarily used for
-> >> +       logging useful software events or data coming from various entities
-> >> +       in the system, possibly running different OSs
-> >>  endif
-
-> >> +static ssize_t entities_show(struct device *dev,
-> >> +                          struct device_attribute *attr, char *buf)
-> >> +{
-> >> +     struct stm_drvdata *drvdata = dev_get_drvdata(dev->parent);
-> >> +     ssize_t len;
-> >> +
-> >> +     len = bitmap_scnprintf(buf, PAGE_SIZE, drvdata->entities,
-> >> +                            STM_ENTITY_MAX);
-> >> +
-> >
-> > bitmap_scnprintf is gone in current linux-next. I changed it to
-> >         len = scnprintf(buf, PAGE_SIZE, "%*pb", STM_ENTITY_MAX,
-> >                         drvdata->entities);
-> >
-> > to get this file to compile. (On x86_64, that is, but please don't tell
-> > anybody!)
+>>
+>>> I'm not sure about others.
+>>
+>> Question for the ARM ACPI guys: what happens if you implement
+>> acpi_os_ioremap() on arm64 as just ioremap()? Do you get any WARN_ON()
+>> (__ioremap_caller() checks whether the memory is RAM)?
+>>
 > 
-> I was not aware that "bitmap_scnprintf()" had disappeared - thanks for
-> pointing this out.  Did you mean cross-compile from an x86_64 host or
-> compile for a x86_64 target?  I don't get how you could have in the
-> latter case.
-
-I compiled for the x86_64 target! I used a hack, not sure where it's
-documented, to build object files by bypassing most of the build
-infrastructure:
-     make drivers/coresight/coresight-stm.o
-
-But, since in this case that doesn't handle <linux/coresight-stm.h>
-correctly, I used an ever bigger hack:
-    make EXTRA_CFLAGS="-DCONFIG_CORESIGHT_STM" drivers/coresight/coresight-stm.o
-
-This only works as long as the code doesn't use stuff that can't
-possibly be reached in x86_64 (eg, it doesn't use platform specific
-headers). It's a quick and dirty way to test changes to files normally
-not compiled for your target.
+> 
+> 
+> _______________________________________________
+> Linaro-acpi mailing list
+> Linaro-acpi at lists.linaro.org
+> http://lists.linaro.org/mailman/listinfo/linaro-acpi
+> 
 
 
-Paul Bolle
+-- 
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Linaro Enterprise Group
+al.stone at linaro.org
+-----------------------------------
