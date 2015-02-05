@@ -1,95 +1,121 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Thu, 5 Feb 2015 14:16:54 -0800
-Subject: [PATCH 2/9] regulator: core: Introduce set_optimum_mode op
-In-Reply-To: <20150130000741.GP11960@sonymobile.com>
-References: <1422413199-17273-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1422413199-17273-3-git-send-email-bjorn.andersson@sonymobile.com>
- <20150128195204.GN21293@sirena.org.uk>
- <20150130000741.GP11960@sonymobile.com>
-Message-ID: <CAJAp7Ogi9WePGgopCYmUYzhNtV_E8+StquK+yM1cu91e7eQNfg@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 5 Feb 2015 22:44:40 +0000
+Subject: [PATCH v4 3/6] of: fix size when dma-range is not used
+In-Reply-To: <54D3E3C3.1040104@ti.com>
+References: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
+ <1422052359-12384-4-git-send-email-m-karicheri2@ti.com>
+ <54C77616.80301@arm.com> <54C7DF13.20402@ti.com>
+ <20150128110523.GC6646@e104818-lin.cambridge.arm.com>
+ <54C9068D.8050701@arm.com>
+ <20150128173048.GE31752@e104818-lin.cambridge.arm.com>
+ <54CBC823.3020905@ti.com>
+ <20150202121843.GD22661@e104818-lin.cambridge.arm.com>
+ <54D3E3C3.1040104@ti.com>
+Message-ID: <20150205224439.GA19250@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 29, 2015 at 4:07 PM, Bjorn Andersson
-<bjorn.andersson@sonymobile.com> wrote:
-> On Wed 28 Jan 11:52 PST 2015, Mark Brown wrote:
->
->> On Tue, Jan 27, 2015 at 06:46:32PM -0800, Bjorn Andersson wrote:
->>
->> > +   /* set most efficient regulator operating mode for load */
->> > +   int (*set_optimum_mode)(struct regulator_dev *, int input_uV,
->> > +                           int output_uV, int load_uA);
->>
->> This is basically fine but can you please rename this to be something
->> that more directly reflects the fact that we're just informing the
->> driver about the operating parameters - there are other things a driver
->> could usefully do with this, for example set current limits so that if
->> something starts to consume excessive current the device will flag this
->> as an error.
->>
->
-> The purpose of the series was to be able to implement patch 9, which
-> will utilize the load_uA to set the "mode" of the Qualcomm regulators.
->
-> So I would like it to be a "setter of current consumption".
->
-> I'm not sure what to name the function to have it cover these additional
-> cases.
->
->> It'd also be better to split the voltage specs out into a separate
->> function, especially for the output voltage where obviously we have a
->> separate range based interface for setting that.
->
-> I was fishing for a statement regarding this in the cover letter, but
-> here we go.
->
-> The current implementors of get_optimum_mode all ignore the voltages, so
-> we could effectively simplify the interface to:
->
->  get_optimum_mode(rdev, load);
->
-> Question is if there are any implementations where we don't know the
-> output voltage in the regulator driver (as locking prevents us from
-> using the standard interface of querying this). Input voltage is just a
-> query away.
->
->
-> Having drms_uA_update() request an appropriate mode for the given load
-> and then calling set_mode directly (the current implementation) gives us
-> a single point of entry to the regulator drivers related to setting
-> modes (regulator_set_mode and drms_uA_update calls set_mode). But seen
-> from a consumer there's no consistency; the last call to
-> regulator_set_mode() and regulator_set_optimum_mode() will win.
->
-> Further more, get_optimum_mode is not exposed to the consumers and there
-> are no other users in the regulator framework. So it could be completely
-> internal to the regulator drivers, without loss of functionality.
->
->
-> Looking at the consumers, in my mind they should not be aware of the
-> operating performance characteristics of the regulator supplying them.
-> So I think they should all use regulator_set_optimum_mode() rather than
-> "guessing" what performance mode the regulator should run in. (Maybe
-> some board code could use set_mode?).
->
-> With this in mind I was going to follow up after this series with a
-> rename of regulator_set_optimum_mode() to regulator_set_current() and
-> set_optimum_mode() to set_current().
->
-> I was also going to suggest dropping regulator_set_mode() and set_mode
-> to make the consumer facing API consistent.
->
->
-> I think this covers your concern about patch 3-7 as well, please let me
-> know what you think.
->
+Murali,
 
-Mark, any suggestions on this?
+On Thu, Feb 05, 2015 at 09:42:27PM +0000, Murali Karicheri wrote:
+> On 02/02/2015 07:18 AM, Catalin Marinas wrote:
+> > On Fri, Jan 30, 2015 at 06:06:27PM +0000, Murali Karicheri wrote:
+> >> On 01/28/2015 12:30 PM, Catalin Marinas wrote:
+> >>> I think we can remove this check altogether (we leaved without it for a
+> >>> while) but we need to add 1 when calculating the mask:
+> >>>
+> >>> 	dev->coherent_dma_mask = min(DMA_BIT_MASK(32),
+> >>> 				     DMA_BIT_MASK(ilog2(size + 1)));
+> >>>
+> >> For Keystone, the dma_addr is to be taken care as well to determine the
+> >> mask. The above will not work.
+> >
+> > This was discussed before (not on this thread) and dma_addr should not
+> > affect the mask, it only affects the pfn offset.
+> >
+> >> Based on the discussion so far, this is the function I have come up with
+> >> incorporating the suggestions. Please review this and see if I have
+> >> missed out any. This works fine on Keystone.
+> >>
+> >> void of_dma_configure(struct device *dev, struct device_node *np)
+> >> {
+> >> 	u64 dma_addr = 0, paddr, size;
+> >> 	int ret;
+> >> 	bool coherent;
+> >> 	unsigned long offset = 0;
+> >> 	struct iommu_ops *iommu;
+> >>
+> >> 	/*
+> >> 	 * Set default size to cover the 32-bit. Drivers are expected to setup
+> >> 	 * the correct size and dma_mask.
+> >>     	 */
+> >> 	size = 1ULL<<  32;
+> >>
+> >> 	ret = of_dma_get_range(np,&dma_addr,&paddr,&size);
+> >> 	if (!ret) {
+> >> 		offset = PFN_DOWN(paddr - dma_addr);
+> >> 		if (!size) {
+> >> 			dev_err(dev, "Invalid size (%llx)\n",
+> >> 				size);
+> >> 			return;
+> >> 		}
+> >> 		if (size&  1) {
+> >> 			size = size + 1;
+> >> 			dev_warn(dev, "Incorrect usage of size (%llx)\n",
+> >> 				 size);
+> >> 		}
+> >> 		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
+> >> 	}
+> >> 	dev->dma_pfn_offset = offset;
+> >>
+> >> 	/*
+> >> 	 * Coherent DMA masks larger than 32-bit must be explicitly set by the
+> >> 	 * driver.
+> >> 	 */
+> >> 	dev->coherent_dma_mask = min(DMA_BIT_MASK(32),
+> >> 				     DMA_BIT_MASK(ilog2(dma_addr + size)));
+> >
+> > That's not correct, coherent_dma_mask should still be calculated solely
+> > based on size, not dma_addr.
+> >
+> > Functions like swiotlb_dma_supported() use phys_to_dma() which on ARM
+> > (32-bit) subtracts the dma_pfn_offset, so the mask based on size works
+> > fine.
+> >
+> > In the arm64 tree, we haven't taken dma_pfn_offset into account for
+> > phys_to_dma() yet but if needed for a SoC, we'll add it.
+> 
+> The size based dma mask calculation itself can be a separate topic 
+> patch. This series is adding important fix to get the PCI driver 
+> functional and I would like to get this merged as soon as possible.
 
-I need a way to pass the expected current consumption from the mmc
-framework through our regulator driver to the RPM to make our eMMC
-stable.
-We can discuss the proposed "cleanups" next time we meet if you prefer.
+Well as long as you don't break the existing users of
+of_dma_configure() ;).
 
-Regards,
-Bjorn
+> I also want to hear from Arnd about yout comment as we had discussed
+> this in the initial discussion of this patch series and 8/8 is
+> essentially added based on that discussion. I will add a simple check
+> to catch and warn the incorrect size setting in DT for dma-range as
+> suggested by Rob Herring and create a new patch to for size based mask
+> calculation. I will be sending v6 (expected to be merged soon) today
+> and will work to add a new patch. Before that we need to agree on what
+> is the content of the patch.
+> 
+> 1. On keystone, DMA address start at 0x8000_0000 and DMA-able memory is 
+> 2G from the above base address. So without taking into account the
+> dma_addr, mask calculated will be 0x7fff_ffff where as we need that to 
+> be 0xffff_ffff for keystone. So need to use this in the calculation.
+
+Ah, you are right. I confused dma_addr in your patch with the offset.
+
+> 2. W.r.t arm_pfn_offset, this was added to support Keystone as the DDR 
+> physical address for LPAE startes at 0x8_0000_0000 and the pfn offset is 
+> calculated as the PFN of (0x8_0000_0000 - 0x8000_0000) to do the dma 
+> address to DDR address translation.
+
+Indeed.
+
+I'll look at your patches again tomorrow.
+
+-- 
+Catalin
