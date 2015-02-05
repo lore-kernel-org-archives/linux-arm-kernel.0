@@ -1,45 +1,93 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 5 Feb 2015 11:02:06 -0800
-Subject: [PATCH 0/3] arm64,hi6220: Enable Hisilicon Hi6220 SoC
-In-Reply-To: <CANMBJr685FzZzQ660Z1aNJX+Kzkw1OqM6RJAviARbL+5a=MJ2A@mail.gmail.com>
-References: <1423128277-10297-1-git-send-email-bintian.wang@huawei.com>
- <CANMBJr685FzZzQ660Z1aNJX+Kzkw1OqM6RJAviARbL+5a=MJ2A@mail.gmail.com>
-Message-ID: <CAOesGMgjv9iLnLmpLADQYoAw=oUkJDAJs72Q5q=DQ75paQ+A-g@mail.gmail.com>
+From: al.stone@linaro.org (Al Stone)
+Date: Thu, 05 Feb 2015 12:03:41 -0700
+Subject: [Linaro-acpi] [PATCH v8 11/21] ARM64 / ACPI: Get PSCI flags in
+ FADT for PSCI init
+In-Reply-To: <20150205174904.GA24468@red-moon>
+References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
+ <1422881149-8177-12-git-send-email-hanjun.guo@linaro.org>
+ <20150204164328.GF22035@red-moon> <54D3A443.7050303@linaro.org>
+ <20150205174904.GA24468@red-moon>
+Message-ID: <54D3BE8D.7010401@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 5, 2015 at 10:46 AM, Tyler Baker <tyler.baker@linaro.org> wrote:
-> Hi Bintian,
->
-> On 5 February 2015 at 01:24, Bintian Wang <bintian.wang@huawei.com> wrote:
->> Hello,
->>
->> Hi6220 is one mobile solution of Hisilicon, this patchset contains
->> initial support for Hi6220 SoC and HiKey development board, which
->> is based on ARM Cortex A53 architecture. Initial support is minimal
->> and includes just the arch configuration, clock driver, device tree
->> configuration.
->>
->> Many peripheral drivers will be submitted later.
->>
->> Any comments will be appreciated!
->>
->> Thanks,
->>
->> Bintian Wang (3):
->>   arm64: Enable Hisilicon ARMv8 SoC family in Kconfig and defconfig
->>   clk: hi6220: Clock driver support for Hisilicon hi6220 SoC
->>   arm64: dts: Add dts files for Hisilicon Hi6220 SoC
->
-> Thanks for posting these! I've applied this series on top of
-> next-20150204, however there was some fuzz that needed to be cleaned
-> up on 3/3 [1]. I've confirmed the platform is booting to a basic user
-> space without issue.
+On 02/05/2015 10:49 AM, Lorenzo Pieralisi wrote:
+> Hi Al,
 
->From ramdisk only, right? Given the timing of the posting of this
-patch set, I'm not going to merge it for 3.20. Hopefully for 3.21
-there will be some more peripheral support as well -- at least some
-sort of storage device.
+Howdy, Lorenzo.
 
+> On Thu, Feb 05, 2015 at 05:11:31PM +0000, Al Stone wrote:
+>> On 02/04/2015 09:43 AM, Lorenzo Pieralisi wrote:
+>>> On Mon, Feb 02, 2015 at 12:45:39PM +0000, Hanjun Guo wrote:
+>>>> From: Graeme Gregory <graeme.gregory@linaro.org>
+>>>>
+>>>> There are two flags: PSCI_COMPLIANT and PSCI_USE_HVC. When set,
+>>>> the former signals to the OS that the firmware is PSCI compliant.
+>>>> The latter selects the appropriate conduit for PSCI calls by
+>>>> toggling between Hypervisor Calls (HVC) and Secure Monitor Calls
+>>>> (SMC).
+>>>>
+>>>> FADT table contains such information in ACPI 5.1, FADT table was
+>>>> parsed in ACPI table init and copy to struct acpi_gbl_FADT, so
+>>>> use the flags in struct acpi_gbl_FADT for PSCI init.
+>>>
+>>> So you do rely on a global FADT being available, if you use it for PSCI
+>>> detection you can use it for ACPI revision detection too, right ?
+>>>
+>>> Point is, either we should not use the global FADT table, or we use
+>>> it consistently, or there is something I am unaware of that prevents
+>>> you from using in some code paths and I would like to understand
+>>> why.
+>>
+>> The FADT is a required table for arm64, as noted in the documentation
+>> and the SBBR.  While unfortunately the spec does not say it is mandatory,
+>> even x86 systems are pretty useless without it.  So yes, we rely on it
+>> being available, not only for the PSCI info, but other flags such as
+>> HW_REDUCED_ACPI.
+>>
+>> I suppose it does not have to be globally scoped.  However, the FADT is
+>> frequently used, especially on x86, so it makes sense to me from an
+>> efficiency standpoint to have a global reference to it.
+>>
+>> I'm not sure I understand what is meant by using FADT for ACPI revision
+>> detection; there are fields in the FADT that provide a major and minor
+>> number for the FADT itself, but I don't believe there's any guarantee
+>> those will be the same as the level of the specification that is being
+>> supported by the kernel (chances are they will, but it's not mandatory).
+>>
+>> I've probably just missed a part of a thread somewhere; could you point
+>> me to where the inconsistency lies?  I'm just not understanding right this
+>> second....
+> 
+> Yes, it is my fault, I was referring to another thread/patch (9), where you
+> need to check the FADT revision to "validate it" (ie >= 5.1) for the arm64
+> kernel. What I am saying is: if the global FADT is there to parse PSCI
+> info, it is there to check the FADT revision too, I do not necessarily
+> see the need for calling acpi_table_parse() again to do it, the FADT
+> revision checking can be carried out as for PSCI, that's all I wanted
+> to say.
+> 
+> Thanks,
+> Lorenzo
+> 
 
--Olof
+Aha.  I understand now.  Another colleague was also trying to explain this
+to me and I think I just hadn't had enough coffee yet.  The underlying ACPI
+code maps tables into the kernel in two phases; it may be that when the code
+in patch 9 is run, the global table is not yet available, while here it is;
+I don't recall off-hand.
+
+I'll take a look at this and talk it over with Hanjun.  If the global table
+is available, it would indeed make sense to be consistent.
+
+Thanks for the explanation; that really helped me.
+
+-- 
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Linaro Enterprise Group
+al.stone at linaro.org
+-----------------------------------
