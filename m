@@ -1,101 +1,145 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 5 Feb 2015 12:55:39 +0000
-Subject: [PATCH v8 02/21] acpi: fix acpi_os_ioremap for arm64
-In-Reply-To: <20150205120720.GD18158@e104818-lin.cambridge.arm.com>
-References: <2422968.Es7R0p3loO@vostro.rjw.lan>
- <1422984576.18187.82.camel@deneb.redhat.com>
- <20150204112508.GB26006@e104818-lin.cambridge.arm.com>
- <1423066107.18187.99.camel@deneb.redhat.com>
- <20150204175734.GI26006@e104818-lin.cambridge.arm.com>
- <1423076294.18187.103.camel@deneb.redhat.com>
- <20150205104149.GA18158@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-tqY4C0eaRvp5FAzx9PqOGMg+sFNzxr2f25omdJKr7JA@mail.gmail.com>
- <20150205105945.GC18158@e104818-lin.cambridge.arm.com>
- <20150205111443.GC24474@xora-haswell.xora.org.uk>
- <20150205120720.GD18158@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu9c9EQ_D+T96w7rCHXYCD_LsFFRhsCTvPobcuyd7j-TMg@mail.gmail.com>
+From: david@gibson.dropbear.id.au (David Gibson)
+Date: Thu, 5 Feb 2015 23:48:33 +1100
+Subject: [PATCH 1/4] arm64: dts: fix PMU IRQ ordering for Juno
+In-Reply-To: <20150205122048.GJ11344@leverpostej>
+References: <1422294858-28100-1-git-send-email-will.deacon@arm.com>
+ <20150205114642.GG11344@leverpostej>
+ <20150205115416.GE23241@arm.com>
+ <20150205115933.GI11344@leverpostej>
+ <20150205120920.GF23241@arm.com>
+ <20150205122048.GJ11344@leverpostej>
+Message-ID: <20150205124833.GV25675@voom.fritz.box>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 February 2015 at 12:07, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Thu, Feb 05, 2015 at 11:14:43AM +0000, Graeme Gregory wrote:
->> On Thu, Feb 05, 2015 at 10:59:45AM +0000, Catalin Marinas wrote:
->> > On Thu, Feb 05, 2015 at 10:47:23AM +0000, Ard Biesheuvel wrote:
->> > > On 5 February 2015 at 10:41, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> > > > On Wed, Feb 04, 2015 at 06:58:14PM +0000, Mark Salter wrote:
->> > > >> On Wed, 2015-02-04 at 17:57 +0000, Catalin Marinas wrote:
->> > > >> > On Wed, Feb 04, 2015 at 04:08:27PM +0000, Mark Salter wrote:
->> > > >> > > acpi_os_remap() is used to map ACPI tables. These tables may be in ram
->> > > >> > > which are already included in the kernel's linear RAM mapping. So we
->> > > >> > > need ioremap_cache to avoid two mappings to the same physical page
->> > > >> > > having different caching attributes.
->> > > >> >
->> > > >> > What's the call path to acpi_os_ioremap() on such tables already in the
->> > > >> > linear mapping? I can see an acpi_map() function which already takes
->> > > >> > care of the RAM mapping case but there are other cases where
->> > > >> > acpi_os_ioremap() is called directly. For example,
->> > > >> > acpi_os_read_memory(), can it be called on both RAM and I/O?
->> > > >>
->> > > >> acpi_map() is the one I've seen.
->> > > >
->> > > > By default, if should_use_kmap() is not patched for arm64, it translates
->> > > > to page_is_ram(); acpi_map() would simply use a kmap() which returns the
->> > > > current kernel linear mapping on arm64.
->> > > >
->> > > >> I'm not sure about others.
->> > > >
->> > > > Question for the ARM ACPI guys: what happens if you implement
->> > > > acpi_os_ioremap() on arm64 as just ioremap()? Do you get any WARN_ON()
->> > > > (__ioremap_caller() checks whether the memory is RAM)?
->> > >
->> > > Regardless of whether you hit any WARN_ON()s now,
->> >
->> > Actually following the WARN_ON(), ioremap() returns NULL, so it may not
->> > go entirely unnoticed.
->> >
->> > > we still need to distinguish between MMIO ranges with device
->> > > semantics, and ACPI or other tables whose data may not be naturally
->> > > aligned all the time, and hence requiring memory semantics.
->> > > acpi_os_ioremap() may be used for both, afaik
->> >
->> > Is acpi_os_ioremap() called directly (outside acpi_map()) to map RAM
->> > that already part of the kernel linear memory? If yes, then I agree that
->> > we need to do such check.
->> >
->> > Another question, can we distinguish, in the ACPI core code, whether the
->> > mapping is for an ACPI table in RAM or some I/O space?
->>
->> Yes I think we do,
->>
->> acpi_os_map_memory() is called to map tables
->>
->> acpi_os_map_iomem() is called to map device IO
->>
->> currently both end up in acpi_map but I guess they do not have to or
->> we can add extra arguments as its an internal API.
->
-> Ending up in acpi_map() is ok as this function checks whether it should
-> use kmap() or acpi_os_ioremap().
->
+On Thu, Feb 05, 2015 at 12:20:48PM +0000, Mark Rutland wrote:
+> [Adding dtc folk]
+> 
+> On Thu, Feb 05, 2015 at 12:09:20PM +0000, Will Deacon wrote:
+> > On Thu, Feb 05, 2015 at 11:59:33AM +0000, Mark Rutland wrote:
+> > > On Thu, Feb 05, 2015 at 11:54:16AM +0000, Will Deacon wrote:
+> > > > On Thu, Feb 05, 2015 at 11:46:42AM +0000, Mark Rutland wrote:
+> > > > > On Mon, Jan 26, 2015 at 05:54:15PM +0000, Will Deacon wrote:
+> > > > > > diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+> > > > > > index cb3073e4e7a8..4ed9287aaef1 100644
+> > > > > > --- a/arch/arm64/boot/dts/arm/juno.dts
+> > > > > > +++ b/arch/arm64/boot/dts/arm/juno.dts
+> > > > > > @@ -107,11 +107,11 @@
+> > > > > >  	pmu {
+> > > > > >  		compatible = "arm,armv8-pmuv3";
+> > > > > >  		interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
+> > > > > > +			     <GIC_SPI 02 IRQ_TYPE_LEVEL_HIGH>,
+> > > > > > +			     <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>,
+> > > > > >  			     <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>,
+> > > > > >  			     <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>,
+> > > > > > -			     <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>,
+> > > > > > -			     <GIC_SPI 02 IRQ_TYPE_LEVEL_HIGH>,
+> > > > > > -			     <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>;
+> > > > > > +			     <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
+> > > > > >  	};
+> > > > > 
+> > > > > I am very much not keen on this. While this may get things working
+> > > > > today, it completely relies on Linux-internal details (the order of CPU
+> > > > > bringup, which in this case is different from the order of entries in
+> > > > > /cpus).
+> > > > > 
+> > > > > In all other dts that I am aware of, the order of entries in /cpus
+> > > > > aligns with the order of interrupts in the PMU node, and the first entry
+> > > > > is the boot CPU.
+> > > > > 
+> > > > > I think that we should ensure that the ordering of CPU nodes matches the
+> > > > > order of interrupts here. That way we can fall back to that ordering (if
+> > > > > not explicitly overridden), and even after an arbitrary logical
+> > > > > renumbering (e.g. after a kexec) the relationship should stay intact.
+> > > > 
+> > > > There are a few problems with reordering the CPU nodes:
+> > > > 
+> > > >   (1) It breaks any existing users of taskset to pin on big/little
+> > > >       clusters.
+> > > 
+> > > This is unfortunate, but this is also the case if the boot CPU is
+> > > different.
+> > 
+> > Right, so don't change the boot CPU. In that vain, we also shouldn't change
+> > the CPU order in the .dts -- the current .dts is working for taskset and
+> > we shouldn't break people's scripts just because they want to use the PMU.
+> 
+> I think this is an orthogonal discussion. If Linux is booted on a
+> different CPU, it's not the fault of Linux that CPU0 is different.
+> 
+> > > >   (2) It's not generally possible if, for example, the bootloader decides
+> > > >       to boot Linux on a different CPU then we have no choice but to
+> > > >       change the PMU interrupt order.
+> > > 
+> > > In that case _this_ patch is broken.
+> > 
+> > Why? I'm not denying that changing the boot CPU causes problems, I'm saying
+> > that you *can't* fix that by changing the CPU node order. You still have
+> > to change the interrupt order in that case, so why not just localise the
+> > changes there in the first place?
+> 
+> If we're going to try to maintain support for these DTs long-term (with
+> kexec and whatever logical renumbering can occur there), then we need a
+> consistent invariant that we can rely on to associate interrupts and
+> CPUs correctly.
+> 
+> The Linux logical ordering is not invariant, so we know that this _will_
+> break.
+> 
+> As far as I am aware, every other DT lists the boot CPU first, and the
+> order of entries in /cpus mathes the logical order. Using the order of
+> entries in /cpus will remain consistent in the face of arbitrary
+> renumbering, and is (currently) consistent with logical numbering.
+> 
+> So keeping the CPU nodes and interrupt entries in the same order
+> provides us with a long-term consistent order, regardless of which CPU
+> is the boot CPU.
+> 
+> This DT is currently broken. If we're going to make it work we should do
+> so in a manner that will continue to work. Anything else is a broken
+> bodge that hurts us in the long-term as we'll have to hack around it.
+> 
+> > > If we associate the interrupt with a CPU by node order, the relationship
+> > > is preserved regardless of which CPU is the boot CPU (whether it was the
+> > > bootloader's choice, kexec, or whatever).
+> > 
+> > Sure, and that requires code changes. If we're going to change the code,
+> > then I'd much rather we make the binding explicit, like I did in the
+> > follow-up patches to this one. As I mentioned before, this is a .dts fix
+> > to get things working with the current code. It's really too late to argue
+> > about the existing binding, even if it sucks.
+> 
+> Sure, the binding sucks.
+> 
+> This DT has also _never_ worked.
+> 
+> If we're going to fix things, let's not introduce a middle step that's
+> broken in a different way.
+> 
+> > > >   (3) I didn't think that the ordering of CPU nodes was guaranteed to be
+> > > >       preserved by dtc, whereas the order of the interrupts will be.
+> > > 
+> > > The order of nodes is presently preserved.
+> > 
+> > It's not about the present behaviour; I need a _guarantee_ that dtc/libfdt
+> > will *never* reorder CPU nodes. Today's working .dts file needs to continue
+> > to work with future tools.
+> 
+> Jon, David, Grant, thoughts?
 
-This still only addresses the mismatched attributes part: regions that
-require memory semantics may still end up being mapped as device
-memory if they are not covered by the linear mapping, which could
-happen if the region resides below the kernel in memory, or if we
-passed a mem= parameter and it sits at the very top.
-
->> But I have not checked that no user sneaks in direct calls.
->
-> Grep'ing for acpi_os_ioremap():
->
-> suspend_nvs_save() - we don't care about this yet for arm64 as the
-> function is only compiled in if CONFIG_ACPI_SLEEP
->
-> acpi_os_read_memory() and acpi_os_write_memory() - do you know what kind
-> of memory are these used on?
->
-> couple of intel drm files that are not used on arm.
->
+As a general rule, neither dtc nor libfdt will re-order any nodes
+unless you explicitly ask them to (e.g. dtc's "-s" option).  That
+said, you should try not to rely on dt order.
 
 -- 
-Ard.
+David Gibson			| I'll have my music baroque, and my code
+david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
+				| _way_ _around_!
+http://www.ozlabs.org/~dgibson
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150205/4bcc5625/attachment.sig>
