@@ -1,53 +1,49 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 5 Feb 2015 14:53:34 +0100
-Subject: [PATCH] pinctrl: pinctrl-imx: don't use invalid value of conf_reg
-In-Reply-To: <20150203190141.GE10842@pengutronix.de>
-References: <1422399025-25636-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <CACRpkdbtpGU57-tPn9Z0rNvY4zLk+QE6A9Pd87vLUHOmRiB2yg@mail.gmail.com>
- <20150203190141.GE10842@pengutronix.de>
-Message-ID: <CACRpkdYXW5X7bSiRPTC3uHT=s+hjxj+jS0YJCBWrcmzHWkpqHg@mail.gmail.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Thu, 05 Feb 2015 08:54:07 -0500
+Subject: [PATCH v8 02/21] acpi: fix acpi_os_ioremap for arm64
+In-Reply-To: <20150205104149.GA18158@e104818-lin.cambridge.arm.com>
+References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
+ <1422881149-8177-3-git-send-email-hanjun.guo@linaro.org>
+ <2422968.Es7R0p3loO@vostro.rjw.lan>
+ <1422984576.18187.82.camel@deneb.redhat.com>
+ <20150204112508.GB26006@e104818-lin.cambridge.arm.com>
+ <1423066107.18187.99.camel@deneb.redhat.com>
+ <20150204175734.GI26006@e104818-lin.cambridge.arm.com>
+ <1423076294.18187.103.camel@deneb.redhat.com>
+ <20150205104149.GA18158@e104818-lin.cambridge.arm.com>
+Message-ID: <1423144447.18187.110.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 3, 2015 at 8:01 PM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> On Tue, Feb 03, 2015 at 02:01:09PM +0100, Linus Walleij wrote:
->> On Tue, Jan 27, 2015 at 11:50 PM, Uwe Kleine-K?nig
->> <u.kleine-koenig@pengutronix.de> wrote:
->>
->> > The right check for conf_reg to be invalid it testing against -1 not 0
->> > as is done in the rest of the driver.
->> >
->> > This fixes an oops that can be triggered by:
->> >
->> >         cat /sys/kernel/debug/pinctrl/43fac000.iomuxc/*
->> >
->> > Fixes: ae75ff814538 ("pinctrl: pinctrl-imx: add imx pinctrl core driver")
->> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->>
->> Patch applied.
->>
->> But...
->>
->> > -       if (!pin_reg || !pin_reg->conf_reg) {
->> > +       if (!pin_reg || pin_reg->conf_reg == -1) {
->>
->> I can see that the other code checks for -1 in this variable.
->> But where is conf_reg ever set to -1?
->>
->> freescale]$ git grep "\-1"
->> pinctrl-imx.c:          if (pin_reg->mux_reg == -1) {
->> pinctrl-imx.c:  if (pin_reg->mux_reg == -1)
->> pinctrl-imx.c:  if (pin_reg->mux_reg == -1)
->> pinctrl-imx.c:  if (pin_reg->conf_reg == -1) {
->> pinctrl-imx.c:  if (pin_reg->conf_reg == -1) {
->> pinctrl-imx.c:  if (!pin_reg || pin_reg->conf_reg == -1) {
-> Uah, ugly. This member gets -1 by means of:
->
->         memset(info->pin_regs, 0xff, sizeof(*info->pin_regs) * info->npins);
+On Thu, 2015-02-05 at 10:41 +0000, Catalin Marinas wrote:
+> On Wed, Feb 04, 2015 at 06:58:14PM +0000, Mark Salter wrote:
+> > On Wed, 2015-02-04 at 17:57 +0000, Catalin Marinas wrote:
+> > > On Wed, Feb 04, 2015 at 04:08:27PM +0000, Mark Salter wrote:
+> > > > acpi_os_remap() is used to map ACPI tables. These tables may be in ram
+> > > > which are already included in the kernel's linear RAM mapping. So we
+> > > > need ioremap_cache to avoid two mappings to the same physical page
+> > > > having different caching attributes.
+> > > 
+> > > What's the call path to acpi_os_ioremap() on such tables already in the
+> > > linear mapping? I can see an acpi_map() function which already takes
+> > > care of the RAM mapping case but there are other cases where
+> > > acpi_os_ioremap() is called directly. For example,
+> > > acpi_os_read_memory(), can it be called on both RAM and I/O?
+> > 
+> > acpi_map() is the one I've seen.
+> 
+> By default, if should_use_kmap() is not patched for arm64, it translates
+> to page_is_ram(); acpi_map() would simply use a kmap() which returns the
+> current kernel linear mapping on arm64.
 
-OMG. Uwe can you make a patch changing that initialization
-code to something sane? We can't have it like this.
+The problem with kmap() is that it only maps a single page. I've seen
+tables over 4k which is why I patched acpi_map() not to use kmap() on
+arm64.
 
-Yours,
-Linus Walleij
+> 
+> > I'm not sure about others.
+> 
+> Question for the ARM ACPI guys: what happens if you implement
+> acpi_os_ioremap() on arm64 as just ioremap()? Do you get any WARN_ON()
+> (__ioremap_caller() checks whether the memory is RAM)?
+> 
