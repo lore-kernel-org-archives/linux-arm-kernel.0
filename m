@@ -1,54 +1,50 @@
-From: addy.ke@rock-chips.com (Addy Ke)
-Date: Thu,  5 Feb 2015 19:06:59 +0800
-Subject: [PATCH] mmc: core: add runtime-resume caps to support resume at
- runtime_resume
-Message-ID: <1423134419-23109-1-git-send-email-addy.ke@rock-chips.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 5 Feb 2015 12:12:17 +0100
+Subject: imx_v6_v7_defconfig needs lzop
+In-Reply-To: <20150205105951.GU10842@pengutronix.de>
+References: <CAMuHMdVjqp52BQqH32Ut7kxDYzmyY4+JEVuhXgTqU8V24kQyZA@mail.gmail.com>
+ <CAOMZO5Dh0Wv61Y0J_Ue1G=Y8vc23yM2Fxq6CqhpmNBHa-2Lkvg@mail.gmail.com>
+ <CAMuHMdXJCh32e-+7rqNzCdbYX4AH3qfBQ3uZ_t9kC_8+1P1jJQ@mail.gmail.com>
+ <20150205105951.GU10842@pengutronix.de>
+Message-ID: <CAMuHMdU_gBiqVouvHaVh+kC=BcdXw5waE6A4phn_MrjkLTu7Ow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
----
- Documentation/devicetree/bindings/mmc/mmc.txt | 11 +++++++++++
- drivers/mmc/core/host.c                       |  2 ++
- 2 files changed, 13 insertions(+)
+On Thu, Feb 5, 2015 at 11:59 AM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> On Wed, Feb 04, 2015 at 03:41:45PM +0100, Geert Uytterhoeven wrote:
+>> On Wed, Feb 4, 2015 at 3:32 PM, Fabio Estevam <festevam@gmail.com> wrote:
+>> > On Wed, Feb 4, 2015 at 12:21 PM, Geert Uytterhoeven
+>> > <geert@linux-m68k.org> wrote:
+>> >> http://kisskb.ellerman.id.au/kisskb/buildresult/12358024/
+>> >>
+>> >> /bin/sh: 1: lzop: not found
+>> >> cat: write error: Broken pipe
+>> >> make[3]: *** [arch/arm/boot/compressed/piggy.lzo] Error 1
+>> >
+>> > Isn't this error happening due to the lack of 'lzop' package installed
+>> > on the host machine?
+>>
+>> Indeed.
+> I guess you don't want to ask for help or report a build breakage, but
+> question if it's sensible to let a defconfig depend on a host tool that
+> isn't commonly installed, right?
 
-diff --git a/Documentation/devicetree/bindings/mmc/mmc.txt b/Documentation/devicetree/bindings/mmc/mmc.txt
-index 438899e..303b448 100644
---- a/Documentation/devicetree/bindings/mmc/mmc.txt
-+++ b/Documentation/devicetree/bindings/mmc/mmc.txt
-@@ -40,9 +40,20 @@ Optional properties:
- - mmc-hs200-1_2v: eMMC HS200 mode(1.2V I/O) is supported
- - mmc-hs400-1_8v: eMMC HS400 mode(1.8V I/O) is supported
- - mmc-hs400-1_2v: eMMC HS400 mode(1.2V I/O) is supported
-+- runtime-resume: resume at runtime_resume is supported
- - dsr: Value the card's (optional) Driver Stage Register (DSR) should be
-   programmed with. Valid range: [0 .. 0xffff].
- 
-+Card power and reset control:
-+The following properties can be specified for cases where the MMC
-+peripheral needs additional reset, regulator and clock lines. It is for
-+example common for WiFi/BT adapters to have these separate from the main
-+MMC bus:
-+  - card-reset-gpios: Specify GPIOs for card reset (reset active low)
-+  - card-external-vcc-supply: Regulator to drive (independent) card VCC
-+  - clock with name "card_ext_clock": External clock provided to the card
-+>>>>>>> 0064e63... FROMLIST: mmc: core: add runtime-resume caps to support resume at runtime_resume
-+
- *NOTE* on CD and WP polarity. To use common for all SD/MMC host controllers line
- polarity properties, we have to fix the meaning of the "normal" and "inverted"
- line levels. We choose to follow the SDHCI standard, which specifies both those
-diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
-index 8be0df7..cb44c85 100644
---- a/drivers/mmc/core/host.c
-+++ b/drivers/mmc/core/host.c
-@@ -422,6 +422,8 @@ int mmc_of_parse(struct mmc_host *host)
- 		host->caps |= MMC_CAP_POWER_OFF_CARD;
- 	if (of_find_property(np, "cap-sdio-irq", &len))
- 		host->caps |= MMC_CAP_SDIO_IRQ;
-+	if (of_find_property(np, "runtime-resume", &len))
-+		host->caps |= MMC_CAP_RUNTIME_RESUME;
- 	if (of_find_property(np, "full-pwr-cycle", &len))
- 		host->caps2 |= MMC_CAP2_FULL_PWR_CYCLE;
- 	if (of_find_property(np, "keep-power-in-suspend", &len))
--- 
-1.8.3.2
+Right.
+
+The maintainers of the host machines were in the To-header, in the hope they
+would install the missing tool.
+The arm people were in the Cc-header, so they can question their defconfig.
+
+Sorry, I should have been clearer from the beginning.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
