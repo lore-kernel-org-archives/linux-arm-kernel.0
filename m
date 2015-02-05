@@ -1,132 +1,80 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 05 Feb 2015 14:14:01 -0800
-Subject: [PATCH v13 3/6] clk: Make clk API return per-user struct clk
- instances
-In-Reply-To: <54D3CD6A.1010209@codeaurora.org>
-References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
- <1422011024-32283-4-git-send-email-tomeu.vizoso@collabora.com>
- <54D3C803.30706@samsung.com> <54D3CD6A.1010209@codeaurora.org>
-Message-ID: <54D3EB29.4090007@codeaurora.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 05 Feb 2015 23:13:58 +0100
+Subject: [PATCH] ARM: dts: mvebu: add ethernet to the cm-a510 board
+In-Reply-To: <54CE354F.5090106@gmail.com>
+References: <E1YH5bU-0005mG-3L@bombadil.infradead.org>
+ <54CB5267.5060004@gmail.com> <20150130113118.5523ed68@armhf>
+ <54CB6440.1010002@gmail.com> <20150130124144.501cf81d@armhf>
+ <54CB732F.7010409@gmail.com> <20150130133913.083d1ade@armhf>
+ <54CB7E33.3080909@gmail.com> <54CE354F.5090106@gmail.com>
+Message-ID: <54D3EB26.9020909@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/15 12:07, Stephen Boyd wrote:
-> On 02/05/15 11:44, Sylwester Nawrocki wrote:
->> Hi Tomeu,
+On 01.02.2015 15:16, Gabriel Dobato wrote:
+>> I'd be happy to take over, but I admit that my current lack of spare
+>> time would only allow me to support Gabriel and you.
 >>
->> On 23/01/15 12:03, Tomeu Vizoso wrote:
->>>  int __clk_get(struct clk *clk)
->>>  {
->>> -	if (clk) {
->>> -		if (!try_module_get(clk->owner))
->>> +	struct clk_core *core = !clk ? NULL : clk->core;
->>> +
->>> +	if (core) {
->>> +		if (!try_module_get(core->owner))
->>>  			return 0;
->>>  
->>> -		kref_get(&clk->ref);
->>> +		kref_get(&core->ref);
->>>  	}
->>>  	return 1;
->>>  }
->>>  
->>> -void __clk_put(struct clk *clk)
->>> +static void clk_core_put(struct clk_core *core)
->>>  {
->>>  	struct module *owner;
->>>  
->>> -	if (!clk || WARN_ON_ONCE(IS_ERR(clk)))
->>> -		return;
->>> +	owner = core->owner;
->>>  
->>>  	clk_prepare_lock();
->>> -	owner = clk->owner;
->>> -	kref_put(&clk->ref, __clk_release);
->>> +	kref_put(&core->ref, __clk_release);
->>>  	clk_prepare_unlock();
->>>  
->>>  	module_put(owner);
->>>  }
->>>  
->>> +void __clk_put(struct clk *clk)
->>> +{
->>> +	if (!clk || WARN_ON_ONCE(IS_ERR(clk)))
->>> +		return;
->>> +
->>> +	clk_core_put(clk->core);
->>> +	kfree(clk);
->> Why do we have kfree() here? clk_get() doesn't allocate the data structure 
->> being freed here. What happens if we do clk_get(), clk_put(), clk_get() 
->> on same clock?
->>
->> I suspect __clk_free_clk() should be called in __clk_release() callback
->> instead, but then there is an issue of safely getting reference to
->> struct clk from struct clk_core pointer.
->>
->> I tested linux-next on Odroid U3 and booting fails with oopses as below.
->> There is no problems when the above kfree() is commented out.
->>
->>
-> Ah now I get it. You meant to say that of_clk_get_by_clkspec() doesn't
-> return an allocated clk pointer. Let's fix that.
+>> Let's wait for Gabriel's response on how he can help improving
+>> Dove mainline with his cm-a510 and baseboard.
 >
-> ----8<----
+> First of all, I would like to give thanks all people like you for all
+> your help and support. I really appreciate it.
 >
-> From: Stephen Boyd <sboyd@codeaurora.org>
-> Subject: [PATCH] clkdev: Always allocate a struct clk in OF functions
+> DT is new for me, I have never worked using this kind of hardware
+> description, so I am involving in many issues due to my lack of skills
+> in this kind of structure.
 >
-> of_clk_get_by_clkspec() returns a struct clk pointer but it
-> doesn't create a new handle for the consumers. Instead it just
-> returns whatever the OF clk provider hands out. Let's create a
-> per-user handle here so that clk_put() can properly unlink it and
-> free it when the consumer is done.
+> At this moment, I am focusing in the update of the version of the kernel
+> on the CM-A510 board (from 2.6 to 3.1x)in order to give more features to
+> the system, but as I said before, I have lots of problems.
 >
-> Fixes: 035a61c314eb "clk: Make clk API return per-user struct clk instances"
-> Reported-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  drivers/clk/clkdev.c | 44 +++++++++++++++++++++++---------------------
->  1 file changed, 23 insertions(+), 21 deletions(-)
->
-> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-> index 29a1ab7af4b8..00d747d09b2a 100644
-> --- a/drivers/clk/clkdev.c
-> +++ b/drivers/clk/clkdev.c
-> @@ -29,15 +29,8 @@ static DEFINE_MUTEX(clocks_mutex);
->  
->  #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
->  
-> -/**
-> - * of_clk_get_by_clkspec() - Lookup a clock form a clock provider
-> - * @clkspec: pointer to a clock specifier data structure
-> - *
-> - * This function looks up a struct clk from the registered list of clock
-> - * providers, an input is a clock specifier data structure as returned
-> - * from the of_parse_phandle_with_args() function call.
-> - */
-> -struct clk *of_clk_get_by_clkspec(struct of_phandle_args *clkspec)
-> +static struct clk *__of_clk_get_by_clkspec(struct of_phandle_args *clkspec,
-> +					 const char *dev_id, const char *con_id)
->  {
->  	struct clk *clk;
->  
-> @@ -47,6 +40,8 @@ struct clk *of_clk_get_by_clkspec(struct of_phandle_args *clkspec)
->  	of_clk_lock();
->  	clk = __of_clk_get_from_provider(clkspec);
->  
-> +	if (!IS_ERR(clk))
-> +		clk = __clk_create_clk(__clk_get_hw(clk), dev_id, con_id);
->  	if (!IS_ERR(clk) && !__clk_get(clk))
->  		clk = ERR_PTR(-ENOENT);
->
+> Thanks to the help and support of Jean-Francois Moine, I have achieved
+> to boot the kernel completely and to mount the rootfs via NFS. I have a
+> prompt, what has been a very big step for me.
 
-Actually we can bury the __clk_create_clk() inside
-__of_clk_get_from_provider(). We should also move __clk_get() into there
-because right now we have a hole where whoever calls
-of_clk_get_from_provider() never calls __clk_get() on the clk, leading
-to possible badness. v2 coming soon.
+Gabriel,
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+great you can boot a recent kernel. I guess you had to quite heavily
+modify current dove-cm-a510.dts? Can you upload the one you use now
+to any pastebin and send the link?
+
+>> Nope. One dove.dtsi, one dove-cm-a510.dtsi, and one baseboard.dts
+>> including dove-cm-a510.dtsi for every baseboard we stumble upon.
+>
+> In reference to the structure of .dts and .dtsi files, I agree with this
+> kind of structure, of course, nobody as you can consider it better. I
+> think the idea of make a dove-cm-a510.dtsi file and different
+> baseboards.dts depending of the peripherals used is great. But as I say,
+> maybe I am not the right person to decide it, Jean-Froncois Moine and
+> you have better criteria.So, whatever you decide I would very happy to help.
+
+You didn't mention if you really use the sb-a510, i.e. the Compulab
+reference baseboard. Is it what you are using with your cm-a510?
+
+> At this moment, I am trying to configure the framebuffer, but as Moine
+> told me,it seems there is not video driver support for this board in
+> DT... :( .
+
+Not quite true. Video is made up of at least 4 different devices:
+Framebuffer, GPU, Decode engine, and usually DVI/HDMI transmitter or
+VGA.
+
+We do have a driver for the framebuffer (armada_drm) and there is great
+work from Russell King and others on the GPU and Decode engine (IIRC).
+
+If you are using the sb-a510, I can see from the manual, that DVI
+transmitter is SIL164.. AFAIS there is a driver for it, that maybe
+needs some polishing. Nobody ever tested VGA, but it shouldn't be too
+hard to add support for it as it is directly supported by the
+framebuffer HW.
+
+One quite important driver at least for Dove is a clock source for
+video. Internal clock generators for video are way to limited with
+respect to frequencies to allow any useful resolution.
+
+I'll see if I can have a look at the dts stuff this weekend.. that
+way we'll have at least the basic done before moving to the other
+devices.
+
+Sebastian
