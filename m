@@ -1,163 +1,220 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu,  5 Feb 2015 16:25:33 +0100
-Subject: [PATCH 3/8] dt: bindings: Add MediaTek MT8135/MT8173 reset controller
- defines
+Date: Thu,  5 Feb 2015 16:25:36 +0100
+Subject: [PATCH 6/8] ARM: dts: mt8135-evbp1: Add PMIC support
 In-Reply-To: <1423149938-14471-1-git-send-email-s.hauer@pengutronix.de>
 References: <1423149938-14471-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1423149938-14471-4-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1423149938-14471-7-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the reset defines for the MT8135/MT8173 pericfg and infracfg
-controllers. Needed for device trees to specify the reset numbers in
-pericfg / infracfg reset consumers
+The MT8135 eval board contains a MT6397 PMIC. This adds the
+corresponding device node to the dts file.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- .../dt-bindings/reset-controller/mt8135-resets.h   | 64 ++++++++++++++++++++++
- .../dt-bindings/reset-controller/mt8173-resets.h   | 63 +++++++++++++++++++++
- 2 files changed, 127 insertions(+)
- create mode 100644 include/dt-bindings/reset-controller/mt8135-resets.h
- create mode 100644 include/dt-bindings/reset-controller/mt8173-resets.h
+ arch/arm/boot/dts/mt8135-evbp1.dts | 193 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 193 insertions(+)
 
-diff --git a/include/dt-bindings/reset-controller/mt8135-resets.h b/include/dt-bindings/reset-controller/mt8135-resets.h
-new file mode 100644
-index 0000000..1fb6295
---- /dev/null
-+++ b/include/dt-bindings/reset-controller/mt8135-resets.h
-@@ -0,0 +1,64 @@
-+/*
-+ * Copyright (c) 2014 MediaTek Inc.
-+ * Author: Flora Fu, MediaTek
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
+diff --git a/arch/arm/boot/dts/mt8135-evbp1.dts b/arch/arm/boot/dts/mt8135-evbp1.dts
+index a5adf97..3be2c8b 100644
+--- a/arch/arm/boot/dts/mt8135-evbp1.dts
++++ b/arch/arm/boot/dts/mt8135-evbp1.dts
+@@ -23,3 +23,196 @@
+ 		reg = <0 0x80000000 0 0x40000000>;
+ 	};
+ };
 +
-+#ifndef _DT_BINDINGS_RESET_CONTROLLER_MT8135
-+#define _DT_BINDINGS_RESET_CONTROLLER_MT8135
++&pwrap {
++	pmic: mt6397 {
++		compatible = "mediatek,mt6397";
 +
-+/* INFRACFG resets */
-+#define MT8135_INFRA_EMI_REG_RST        0
-+#define MT8135_INFRA_DRAMC0_A0_RST      1
-+#define MT8135_INFRA_CCIF0_RST          2
-+#define MT8135_INFRA_APCIRQ_EINT_RST    3
-+#define MT8135_INFRA_APXGPT_RST         4
-+#define MT8135_INFRA_SCPSYS_RST         5
-+#define MT8135_INFRA_CCIF1_RST          6
-+#define MT8135_INFRA_PMIC_WRAP_RST      7
-+#define MT8135_INFRA_KP_RST             8
-+#define MT8135_INFRA_EMI_RST            32
-+#define MT8135_INFRA_DRAMC0_RST         34
-+#define MT8135_INFRA_SMI_RST            35
-+#define MT8135_INFRA_M4U_RST            36
++		mt6397regulator: mt6397regulator {
++			compatible = "mediatek,mt6397-regulator";
 +
-+/*  PERICFG resets */
-+#define MT8135_PERI_UART0_SW_RST        0
-+#define MT8135_PERI_UART1_SW_RST        1
-+#define MT8135_PERI_UART2_SW_RST        2
-+#define MT8135_PERI_UART3_SW_RST        3
-+#define MT8135_PERI_IRDA_SW_RST         4
-+#define MT8135_PERI_PTP_SW_RST          5
-+#define MT8135_PERI_AP_HIF_SW_RST       6
-+#define MT8135_PERI_GPCU_SW_RST         7
-+#define MT8135_PERI_MD_HIF_SW_RST       8
-+#define MT8135_PERI_NLI_SW_RST          9
-+#define MT8135_PERI_AUXADC_SW_RST       10
-+#define MT8135_PERI_DMA_SW_RST          11
-+#define MT8135_PERI_NFI_SW_RST          14
-+#define MT8135_PERI_PWM_SW_RST          15
-+#define MT8135_PERI_THERM_SW_RST        16
-+#define MT8135_PERI_MSDC0_SW_RST        17
-+#define MT8135_PERI_MSDC1_SW_RST        18
-+#define MT8135_PERI_MSDC2_SW_RST        19
-+#define MT8135_PERI_MSDC3_SW_RST        20
-+#define MT8135_PERI_I2C0_SW_RST         22
-+#define MT8135_PERI_I2C1_SW_RST         23
-+#define MT8135_PERI_I2C2_SW_RST         24
-+#define MT8135_PERI_I2C3_SW_RST         25
-+#define MT8135_PERI_I2C4_SW_RST         26
-+#define MT8135_PERI_I2C5_SW_RST         27
-+#define MT8135_PERI_I2C6_SW_RST         28
-+#define MT8135_PERI_USB_SW_RST          29
-+#define MT8135_PERI_SPI1_SW_RST         33
-+#define MT8135_PERI_PWRAP_BRIDGE_SW_RST 34
++			mt6397_vpca15_reg: buck_vpca15 {
++				regulator-compatible = "buck_vpca15";
++				regulator-name = "vpca15";
++				regulator-min-microvolt = < 850000>;
++				regulator-max-microvolt = <1350000>;
++				regulator-ramp-delay = <12500>;
++				regulator-always-on;
++			};
 +
-+#endif  /* _DT_BINDINGS_RESET_CONTROLLER_MT8135 */
-diff --git a/include/dt-bindings/reset-controller/mt8173-resets.h b/include/dt-bindings/reset-controller/mt8173-resets.h
-new file mode 100644
-index 0000000..9464b37
---- /dev/null
-+++ b/include/dt-bindings/reset-controller/mt8173-resets.h
-@@ -0,0 +1,63 @@
-+/*
-+ * Copyright (c) 2014 MediaTek Inc.
-+ * Author: Flora Fu, MediaTek
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
++			mt6397_vpca7_reg: buck_vpca7 {
++				regulator-compatible = "buck_vpca7";
++				regulator-name = "vpca7";
++				regulator-min-microvolt = < 850000>;
++				regulator-max-microvolt = <1350000>;
++				regulator-ramp-delay = <12500>;
++				regulator-always-on;
++			};
 +
-+#ifndef _DT_BINDINGS_RESET_CONTROLLER_MT8173
-+#define _DT_BINDINGS_RESET_CONTROLLER_MT8173
++			mt6397_vsramca15_reg: buck_vsramca15 {
++				regulator-compatible = "buck_vsramca15";
++				regulator-name = "vsramca15";
++				regulator-min-microvolt = < 850000>;
++				regulator-max-microvolt = <1350000>;
++				regulator-ramp-delay = <12500>;
++				regulator-always-on;
++			};
 +
-+/* INFRACFG resets */
-+#define MT8173_INFRA_EMI_REG_RST        0
-+#define MT8173_INFRA_DRAMC0_A0_RST      1
-+#define MT8173_INFRA_APCIRQ_EINT_RST    3
-+#define MT8173_INFRA_APXGPT_RST         4
-+#define MT8173_INFRA_SCPSYS_RST         5
-+#define MT8173_INFRA_KP_RST             6
-+#define MT8173_INFRA_PMIC_WRAP_RST      7
-+#define MT8173_INFRA_MPIP_RST           8
-+#define MT8173_INFRA_CEC_RST            9
-+#define MT8173_INFRA_EMI_RST            32
-+#define MT8173_INFRA_DRAMC0_RST         34
-+#define MT8173_INFRA_APMIXEDSYS_RST     35
-+#define MT8173_INFRA_MIPI_DSI_RST       36
-+#define MT8173_INFRA_TRNG_RST           37
-+#define MT8173_INFRA_SYSIRQ_RST         38
-+#define MT8173_INFRA_MIPI_CSI_RST       39
-+#define MT8173_INFRA_GCE_FAXI_RST       40
-+#define MT8173_INFRA_MMIOMMURST         47
++			mt6397_vsramca7_reg: buck_vsramca7 {
++				regulator-compatible = "buck_vsramca7";
++				regulator-name = "vsramca7";
++				regulator-min-microvolt = < 850000>;
++				regulator-max-microvolt = <1350000>;
++				regulator-ramp-delay = <12500>;
++				regulator-always-on;
++			};
 +
++			mt6397_vcore_reg: buck_vcore {
++				regulator-compatible = "buck_vcore";
++				regulator-name = "vcore";
++				regulator-min-microvolt = < 850000>;
++				regulator-max-microvolt = <1350000>;
++				regulator-ramp-delay = <12500>;
++				regulator-always-on;
++			};
 +
-+/*  PERICFG resets */
-+#define MT8173_PERI_UART0_SW_RST        0
-+#define MT8173_PERI_UART1_SW_RST        1
-+#define MT8173_PERI_UART2_SW_RST        2
-+#define MT8173_PERI_UART3_SW_RST        3
-+#define MT8173_PERI_IRRX_SW_RST         4
-+#define MT8173_PERI_PWM_SW_RST          8
-+#define MT8173_PERI_AUXADC_SW_RST       10
-+#define MT8173_PERI_DMA_SW_RST          11
-+#define MT8173_PERI_I2C6_SW_RST         13
-+#define MT8173_PERI_NFI_SW_RST          14
-+#define MT8173_PERI_THERM_SW_RST        16
-+#define MT8173_PERI_MSDC2_SW_RST        17
-+#define MT8173_PERI_MSDC3_SW_RST        18
-+#define MT8173_PERI_MSDC0_SW_RST        19
-+#define MT8173_PERI_MSDC1_SW_RST        20
-+#define MT8173_PERI_I2C0_SW_RST         22
-+#define MT8173_PERI_I2C1_SW_RST         23
-+#define MT8173_PERI_I2C2_SW_RST         24
-+#define MT8173_PERI_I2C3_SW_RST         25
-+#define MT8173_PERI_I2C4_SW_RST         26
-+#define MT8173_PERI_HDMI_SW_RST         29
-+#define MT8173_PERI_SPI0_SW_RST         33
++			mt6397_vgpu_reg: buck_vgpu {
++				regulator-compatible = "buck_vgpu";
++				regulator-name = "vgpu";
++				regulator-min-microvolt = < 700000>;
++				regulator-max-microvolt = <1350000>;
++				regulator-ramp-delay = <12500>;
++				regulator-enable-ramp-delay = <115>;
++			};
 +
-+#endif  /* _DT_BINDINGS_RESET_CONTROLLER_MT8173 */
++			mt6397_vdrm_reg: buck_vdrm {
++				regulator-compatible = "buck_vdrm";
++				regulator-name = "vdrm";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <1400000>;
++				regulator-ramp-delay = <12500>;
++				regulator-always-on;
++			};
++
++			mt6397_vio18_reg: buck_vio18 {
++				regulator-compatible = "buck_vio18";
++				regulator-name = "vio18";
++				regulator-min-microvolt = <1620000>;
++				regulator-max-microvolt = <1980000>;
++				regulator-ramp-delay = <12500>;
++				regulator-always-on;
++			};
++
++			mt6397_vtcxo_reg: ldo_vtcxo {
++				regulator-compatible = "ldo_vtcxo";
++				regulator-name = "vtcxo";
++				regulator-always-on;
++			};
++
++			mt6397_va28_reg: ldo_va28 {
++				regulator-compatible = "ldo_va28";
++				regulator-name = "va28";
++				regulator-always-on;
++			};
++
++			mt6397_vcama_reg: ldo_vcama {
++				regulator-compatible = "ldo_vcama";
++				regulator-name = "vcama";
++				regulator-min-microvolt = <1500000>;
++				regulator-max-microvolt = <2800000>;
++				regulator-enable-ramp-delay = <218>;
++			};
++
++			mt6397_vio28_reg: ldo_vio28 {
++				regulator-compatible = "ldo_vio28";
++				regulator-name = "vio28";
++				regulator-always-on;
++			};
++
++			mt6397_vusb_reg: ldo_vusb {
++				regulator-compatible = "ldo_vusb";
++				regulator-name = "vusb";
++			};
++
++			mt6397_vmc_reg: ldo_vmc {
++				regulator-compatible = "ldo_vmc";
++				regulator-name = "vmc";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-enable-ramp-delay = <218>;
++			};
++
++			mt6397_vmch_reg: ldo_vmch {
++				regulator-compatible = "ldo_vmch";
++				regulator-name = "vmch";
++				regulator-min-microvolt = <3000000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-enable-ramp-delay = <218>;
++			};
++
++			mt6397_vemc_3v3_reg: ldo_vemc3v3 {
++				regulator-compatible = "ldo_vemc3v3";
++				regulator-name = "vemc_3v3";
++				regulator-min-microvolt = <3000000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-enable-ramp-delay = <218>;
++			};
++
++			mt6397_vgp1_reg: ldo_vgp1 {
++				regulator-compatible = "ldo_vgp1";
++				regulator-name = "vcamd";
++				regulator-min-microvolt = <1220000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-enable-ramp-delay = <240>;
++			};
++
++			mt6397_vgp2_reg: ldo_vgp2 {
++				regulator-compatible = "ldo_vgp2";
++				regulator-name = "vcamio";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-enable-ramp-delay = <218>;
++			};
++
++			mt6397_vgp3_reg: ldo_vgp3 {
++				regulator-compatible = "ldo_vgp3";
++				regulator-name = "vcamaf";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-enable-ramp-delay = <218>;
++			};
++
++			mt6397_vgp4_reg: ldo_vgp4 {
++				regulator-compatible = "ldo_vgp4";
++				regulator-name = "vgp4";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-enable-ramp-delay = <218>;
++			};
++
++			mt6397_vgp5_reg: ldo_vgp5 {
++				regulator-compatible = "ldo_vgp5";
++				regulator-name = "vgp5";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-enable-ramp-delay = <218>;
++			};
++
++			mt6397_vgp6_reg: ldo_vgp6 {
++				regulator-compatible = "ldo_vgp6";
++				regulator-name = "vgp6";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-enable-ramp-delay = <218>;
++			};
++
++			mt6397_vibr_reg: ldo_vibr {
++				regulator-compatible = "ldo_vibr";
++				regulator-name = "vibr";
++				regulator-min-microvolt = <1300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-enable-ramp-delay = <218>;
++			};
++		};
++	};
++};
 -- 
 2.1.4
