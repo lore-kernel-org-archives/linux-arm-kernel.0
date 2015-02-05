@@ -1,33 +1,72 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 5 Feb 2015 02:02:18 +0000
-Subject: [PATCH v8 21/21] arm64: ACPI: additions of ACPI documentation
- for arm64
-In-Reply-To: <54D26DA6.9000700@linaro.org>
-References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
- <1422881149-8177-22-git-send-email-hanjun.guo@linaro.org>
- <54D16A74.3030206@linaro.org>
- <20150204181229.GB21293@sirena.org.uk>
- <54D26DA6.9000700@linaro.org>
-Message-ID: <20150205020218.GR21293@sirena.org.uk>
+From: Ying.Liu@freescale.com (Liu Ying)
+Date: Thu, 5 Feb 2015 10:20:59 +0800
+Subject: [PATCH RFC v8 02/21] of: Add vendor prefix for Himax
+ Technologies Inc.
+In-Reply-To: <CAL_JsqJQuVSBQ73v45GEy+-OR74iZ+AT-R8vaExqJfpSMupAWA@mail.gmail.com>
+References: <1420014219-915-1-git-send-email-Ying.Liu@freescale.com>
+ <1420014219-915-3-git-send-email-Ying.Liu@freescale.com>
+ <CAL_JsqJQuVSBQ73v45GEy+-OR74iZ+AT-R8vaExqJfpSMupAWA@mail.gmail.com>
+Message-ID: <20150205022057.GA26592@victor>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 04, 2015 at 12:06:14PM -0700, Al Stone wrote:
+On Wed, Feb 04, 2015 at 10:02:53AM -0600, Rob Herring wrote:
+> On Wed, Dec 31, 2014 at 2:23 AM, Liu Ying <Ying.Liu@freescale.com> wrote:
+> > Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+> 
+> I don't know what the status is for the rest of the series, but I'm
+> applying this and patch 3 so you don't have to keep sending them.
 
-> I guess what I'm trying to figure out is: how specific does this need to be?
-> Does it need to be a step-by-step description, something like
-> Documentation/bindings/submitting-patches.txt, or something far more detailed
-> than that, with templates to fill out, and circles and arrows and a paragraph
-> on the back explaining each one [0] :)?
+Thank you, Rob.
 
-I'd say it should have a reference to where someone can learn how to do
-the right thing; explicitly going through every single thing here sounds
-like overkill and duplication but it's also bad if nobody can tell how
-they're supposed to diligently follow the instructions.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150205/b001aba9/attachment-0001.sig>
+Regards,
+Liu Ying
+
+> 
+> Rob
+> 
+> > ---
+> > v7->v8:
+> >  * None.
+> >
+> > v6->v7:
+> >  * None.
+> >
+> > v5->v6:
+> >  * None.
+> >
+> > v4->v5:
+> >  * None.
+> >
+> > v3->v4:
+> >  * Fix an ordering issue to address Stefan Wahren's comment.
+> >
+> > v2->v3:
+> >  * None.
+> >
+> > v1->v2:
+> >  * None.
+> >
+> >  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+> >  1 file changed, 1 insertion(+)
+> >
+> > diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> > index 78efebb..f46adb2 100644
+> > --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> > +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> > @@ -67,6 +67,7 @@ gumstix       Gumstix, Inc.
+> >  gw     Gateworks Corporation
+> >  hannstar       HannStar Display Corporation
+> >  haoyu  Haoyu Microelectronic Co. Ltd.
+> > +himax  Himax Technologies, Inc.
+> >  hisilicon      Hisilicon Limited.
+> >  hit    Hitachi Ltd.
+> >  honeywell      Honeywell
+> > --
+> > 2.1.0
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
