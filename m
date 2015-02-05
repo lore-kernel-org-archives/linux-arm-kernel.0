@@ -1,45 +1,40 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Thu, 5 Feb 2015 15:33:21 -0800
-Subject: [PATCH v3 1/3] genirq: Allow the irqchip state of an IRQ to be
- save/restored
-In-Reply-To: <1420653062-23361-2-git-send-email-marc.zyngier@arm.com>
-References: <1420653062-23361-1-git-send-email-marc.zyngier@arm.com>
- <1420653062-23361-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <CAJAp7Oju0yD14Y53T7xC2D9oHUANyUs2BT42S4g=iJ1md76TGg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 5 Feb 2015 23:37:16 +0000
+Subject: [PATCH 2/4] rtc: sa1100: convert to run-time register mapping
+In-Reply-To: <8761bg9ngy.fsf@free.fr>
+References: <1423005775-26457-1-git-send-email-robh@kernel.org>
+ <1423005775-26457-3-git-send-email-robh@kernel.org>
+ <87h9v1a8k2.fsf@free.fr>
+ <CAL_JsqLiiKvzxQqE=bEx7qoLSZXLZOegt87A=+pR3PJuSBK95w@mail.gmail.com>
+ <20150205135037.GP8656@n2100.arm.linux.org.uk>
+ <8761bg9ngy.fsf@free.fr>
+Message-ID: <20150205233716.GU8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 7, 2015 at 9:51 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> There is a number of cases where a kernel subsystem may want to
-> introspect the state of an interrupt at the irqchip level:
->
-> - When a peripheral is shared between virtual machines,
->   its interrupt state becomes part of the guest's state,
->   and must be switched accordingly. KVM on arm/arm64 requires
->   this for its guest-visible timer
-> - Some GPIO controllers seem to require peeking into the
->   interrupt controller they are connected to to report
->   their internal state
->
-> This seem to be a pattern that is common enough for the core code
-> to try and support this without too many horrible hacks. Introduce
-> a pair of accessors (irq_get_irqchip_state/irq_set_irqchip_state)
-> to retrieve the bits that can be of interest to another subsystem:
-> pending, active, and masked.
->
-> - irq_get_irqchip_state returns the state of the interrupt according
->   to a parameter set to IRQCHIP_STATE_PENDING, IRQCHIP_STATE_ACTIVE,
->   IRQCHIP_STATE_MASKED or IRQCHIP_STATE_LINE_LEVEL.
-> - irq_set_irqchip_state similarly sets the state of the interrupt.
->
-> Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> Tested-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+On Thu, Feb 05, 2015 at 08:18:05PM +0100, Robert Jarzmik wrote:
+> As a consequence, I'm pretty much in favor of :
+>  - making rtc-pxa and rtc-sa1100 exclusive
+>  - adding to rtc-pxa driver :
+>    - a new rtc device (ie. it will register 2 rtc devices, one of the sa1100
+>      kind, one of the pxa specific kind)
+> 
+> This has flaws :
+>  - a bit of code will be duplicated between rtc-pxa and rtc-sa1100
+>  - the ordering in rtc-pxa between the 2 rtc devices will be important, as if I
+>  remember correctly /dev/rtc points to the first /dev/rtc0 registered
+> 
+> But it opens up :
+>  - DT path to both drivers
+>  - isolation between sa1100 architecture changes and pxa architecture changes
+>  - Rob's current patches can remain almost the same
 
-Any update on the status of this?
+Or you make one export a set of "library" calls which are referenced
+by the other driver, and only declare one platform device.  Not
+_particularly_ nice but would avoid the code duplication issue (but
+has the benefit of not eating up module space, especially when the
+strict rw/execute protections are in effect.)
 
-I would like to be able to move ahead with the pinctrl driver for the
-Qualcomm PM8921 pmic, that depends on this being in place.
-
-Regards,
-Bjorn
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
