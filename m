@@ -1,79 +1,79 @@
 From: rjui@broadcom.com (Ray Jui)
-Date: Wed, 4 Feb 2015 16:55:00 -0800
-Subject: [PATCH v5 1/6] clk: add of_clk_get_parent_rate function
-In-Reply-To: <1423097705-22939-1-git-send-email-rjui@broadcom.com>
+Date: Wed, 4 Feb 2015 16:54:59 -0800
+Subject: [PATCH v5 0/6] Add common clock support for Broadcom iProc
+ architecture
+In-Reply-To: <Ray Jui <rjui@broadcom.com>
 References: <Ray Jui <rjui@broadcom.com>
- <1423097705-22939-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1423097705-22939-2-git-send-email-rjui@broadcom.com>
+Message-ID: <1423097705-22939-1-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sometimes a clock needs to know the rate of its parent before itself is
-registered to the framework. An example is that a PLL may need to
-initialize itself to a specific VCO frequency, before registering to the
-framework. The parent rate needs to be known, for PLL multipliers and
-divisors to be configured properly.
+This patchset contains the initial common clock support for Broadcom's iProc
+family of SoCs. The iProc clock architecture comprises of various PLLs, e.g.,
+ARMPLL, GENPLL, LCPLL0, MIPIPLL, and etc. An onboard crystal serves as the
+basic reference clock for these PLLs. Each PLL may have several leaf clocks.
+One special group of clocks is the ASIU clocks, which are dervied directly
+from the crystal reference clock.
 
-Introduce helper function of_clk_get_parent_rate, which can be used to
-obtain the parent rate of a clock, given a device node and index.
+This patchset also contains the basic clock support for the Broadcom Cygnus
+SoC, which implements the iProc clock architecture
 
-Signed-off-by: Ray Jui <rjui@broadcom.com>
----
- drivers/clk/clk.c            |   17 +++++++++++++++++
- include/linux/clk-provider.h |    6 +++++-
- 2 files changed, 22 insertions(+), 1 deletion(-)
+Changes from v4:
+ - Add of_clk_get_parent_rate helper function into the clock framework
+ - Switch to use of_clk_get_parent_rate in the iProc PLL clock driver
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index d48ac71..e1893a2 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -2581,6 +2581,23 @@ const char *of_clk_get_parent_name(struct device_node *np, int index)
- }
- EXPORT_SYMBOL_GPL(of_clk_get_parent_name);
- 
-+unsigned long of_clk_get_parent_rate(struct device_node *np, int index)
-+{
-+	const char *parent_name;
-+	struct clk *parent_clk;
-+
-+	parent_name = of_clk_get_parent_name(np, index);
-+	if (!parent_name)
-+		return 0;
-+
-+	parent_clk = __clk_lookup(parent_name);
-+	if (!parent_clk)
-+		return 0;
-+
-+	return clk_get_rate(parent_clk);
-+}
-+EXPORT_SYMBOL_GPL(of_clk_get_parent_rate);
-+
- struct clock_provider {
- 	of_clk_init_cb_t clk_init_cb;
- 	struct device_node *np;
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index d936409..e1e2d95 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -585,7 +585,7 @@ struct clk *of_clk_src_simple_get(struct of_phandle_args *clkspec,
- struct clk *of_clk_src_onecell_get(struct of_phandle_args *clkspec, void *data);
- int of_clk_get_parent_count(struct device_node *np);
- const char *of_clk_get_parent_name(struct device_node *np, int index);
--
-+unsigned long of_clk_get_parent_rate(struct device_node *np, int index);
- void of_clk_init(const struct of_device_id *matches);
- 
- #else /* !CONFIG_OF */
-@@ -614,6 +614,10 @@ static inline const char *of_clk_get_parent_name(struct device_node *np,
- {
- 	return NULL;
- }
-+static unsigned long of_clk_get_parent_rate(struct device_node *np, int index)
-+{
-+	return 0;
-+}
- #define of_clk_init(matches) \
- 	{ while (0); }
- #endif /* CONFIG_OF */
+Changes from v3:
+ - Fix incorrect use of passing in of_clk_src_onecell_get when adding ARM PLL
+   and other iProc PLLs as clock provider. These PLLs have zero cells in DT and
+   thefore of_clk_src_simple_get should be used instead
+ - Rename Cygnus MIPI PLL Channel 2 clock from BCM_CYGNUS_MIPIPLL_CH2_UNUSED
+   to BCM_CYGNUS_MIPIPLL_CH2_V3D, since a 3D graphic rendering engine has been
+   integrated into Cygnus revision B0 and has its core clock running off
+   MIPI PLL Channel 2
+ - Changed default MIPI PLL VCO frequency from 1.75 GHz to 2.1 GHz. This allows
+   us to derive 300 MHz V3D clock from channel 2 through the post divisor
+
+Changes from v2:
+ - Re-arrange Cygnus clock/pll init functions so each init function is right
+   next to its clock table
+ - Removed #defines for number of clocks in Cygnus. Have the number of clocks
+   automatically determined based on array size of the clock table
+
+Changes from v1:
+ - Separate drivers/clk/Makefile change for drivers/clk/bcm out to a standalone patch
+
+Ray Jui (6):
+  clk: add of_clk_get_parent_rate function
+  clk: iproc: define Broadcom iProc clock binding
+  clk: iproc: add initial common clock support
+  clk: Change bcm clocks build dependency
+  clk: cygnus: add clock support for Broadcom Cygnus
+  ARM: dts: enable clock support for Broadcom Cygnus
+
+ arch/arm/boot/dts/bcm-cygnus-clock.dtsi |  110 ++++++--
+ arch/arm/boot/dts/bcm-cygnus.dtsi       |    2 +-
+ brcm,iproc-clocks.txt                   |  178 ++++++++++++
+ drivers/clk/Makefile                    |    2 +-
+ drivers/clk/bcm/Kconfig                 |    9 +
+ drivers/clk/bcm/Makefile                |    2 +
+ drivers/clk/bcm/clk-cygnus.c            |  277 +++++++++++++++++++
+ drivers/clk/bcm/clk-iproc-armpll.c      |  282 +++++++++++++++++++
+ drivers/clk/bcm/clk-iproc-asiu.c        |  275 ++++++++++++++++++
+ drivers/clk/bcm/clk-iproc-clk.c         |  238 ++++++++++++++++
+ drivers/clk/bcm/clk-iproc-pll.c         |  461 +++++++++++++++++++++++++++++++
+ drivers/clk/bcm/clk-iproc.h             |  157 +++++++++++
+ drivers/clk/clk.c                       |   17 ++
+ include/dt-bindings/clock/bcm-cygnus.h  |   65 +++++
+ include/linux/clk-provider.h            |    6 +-
+ 15 files changed, 2053 insertions(+), 28 deletions(-)
+ create mode 100644 brcm,iproc-clocks.txt
+ create mode 100644 drivers/clk/bcm/clk-cygnus.c
+ create mode 100644 drivers/clk/bcm/clk-iproc-armpll.c
+ create mode 100644 drivers/clk/bcm/clk-iproc-asiu.c
+ create mode 100644 drivers/clk/bcm/clk-iproc-clk.c
+ create mode 100644 drivers/clk/bcm/clk-iproc-pll.c
+ create mode 100644 drivers/clk/bcm/clk-iproc.h
+ create mode 100644 include/dt-bindings/clock/bcm-cygnus.h
+
 -- 
 1.7.9.5
