@@ -1,154 +1,45 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 05 Feb 2015 18:11:47 +0800
-Subject: [PATCH v8 17/21] clocksource / arch_timer: Parse GTDT to
- initialize arch timer
-In-Reply-To: <20150204185929.GH22035@red-moon>
-References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
- <1422881149-8177-18-git-send-email-hanjun.guo@linaro.org>
- <20150204185929.GH22035@red-moon>
-Message-ID: <54D341E3.9020402@linaro.org>
+From: carlo@caione.org (Carlo Caione)
+Date: Thu, 5 Feb 2015 11:13:15 +0100
+Subject: [PATCH v2 2/2] arm/dma-mapping: Respect NO_KERNEL_MAPPING when we
+ don't have an IOMMU
+In-Reply-To: <54D1F2AE.4070003@samsung.com>
+References: <1423041800-27859-1-git-send-email-carlo@caione.org>
+ <1423041800-27859-3-git-send-email-carlo@caione.org>
+ <54D1F2AE.4070003@samsung.com>
+Message-ID: <CAOQ7t2ZtWA4gnatMgRuk17BPycM8A6MaPD7s6jeprr3VWqOaPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
-
-On 2015?02?05? 02:59, Lorenzo Pieralisi wrote:
-> On Mon, Feb 02, 2015 at 12:45:45PM +0000, Hanjun Guo wrote:
->> Using the information presented by GTDT (Generic Timer Description Table)
->> to initialize the arch timer (not memory-mapped).
+On Wed, Feb 4, 2015 at 11:21 AM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> Hello,
 >
-> Why are you not initializing the memory mapped timer ?
-
-We left it for later work because no need for that to boot
-available ARM64 hardware at now, and we have no hardware to
-test unless I missed some of platforms.
-
->
->> CC: Daniel Lezcano <daniel.lezcano@linaro.org>
->> Originally-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->> Tested-by: Yijing Wang <wangyijing@huawei.com>
->> Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
->> Tested-by: Jon Masters <jcm@redhat.com>
->> Tested-by: Timur Tabi <timur@codeaurora.org>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> ---
->>   arch/arm64/kernel/time.c             |   7 ++
->>   drivers/clocksource/arm_arch_timer.c | 132 ++++++++++++++++++++++++++++-------
->>   include/linux/clocksource.h          |   6 ++
->>   3 files changed, 118 insertions(+), 27 deletions(-)
+> On 2015-02-04 10:23, Carlo Caione wrote:
 >>
->> diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
->> index 1a7125c..42f9195 100644
->> --- a/arch/arm64/kernel/time.c
->> +++ b/arch/arm64/kernel/time.c
->> @@ -35,6 +35,7 @@
->>   #include <linux/delay.h>
->>   #include <linux/clocksource.h>
->>   #include <linux/clk-provider.h>
->> +#include <linux/acpi.h>
+>> From: "Jasper St. Pierre" <jstpierre@mecheye.net>
 >>
->>   #include <clocksource/arm_arch_timer.h>
+>> Even without an iommu, NO_KERNEL_MAPPING is still convenient to save on
+>> kernel address space in places where we don't need a kernel mapping.
+>> Implement support for it in the two places where we're creating an
+>> expensive mapping.
 >>
->> @@ -72,6 +73,12 @@ void __init time_init(void)
+>> __alloc_from_pool uses an internal pool from which we already have
+>> virtual addresses, so it's not relevant, and __alloc_simple_buffer uses
+>> alloc_pages, which will always return a lowmem page, which is already
+>> mapped into kernel space, so we can't prevent a mapping for it in that
+>> case.
 >>
->>   	tick_setup_hrtimer_broadcast();
->>
->> +	/*
->> +	 * Since ACPI or FDT will only one be available in the system,
->> +	 * we can use acpi_generic_timer_init() here safely
->> +	 */
->> +	acpi_generic_timer_init();
->> +
->>   	arch_timer_rate = arch_timer_get_rate();
->>   	if (!arch_timer_rate)
->>   		panic("Unable to initialise architected timer.\n");
->> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
->> index 095c177..407aa63 100644
->> --- a/drivers/clocksource/arm_arch_timer.c
->> +++ b/drivers/clocksource/arm_arch_timer.c
->> @@ -21,6 +21,7 @@
->>   #include <linux/io.h>
->>   #include <linux/slab.h>
->>   #include <linux/sched_clock.h>
->> +#include <linux/acpi.h>
->>
->>   #include <asm/arch_timer.h>
->>   #include <asm/virt.h>
->> @@ -370,8 +371,12 @@ arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
->>   	if (arch_timer_rate)
->>   		return;
->>
->> -	/* Try to determine the frequency from the device tree or CNTFRQ */
->> -	if (of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
->> +	/*
->> +	 * Try to determine the frequency from the device tree or CNTFRQ,
->> +	 * if ACPI is enabled, get the frequency from CNTFRQ ONLY.
->> +	 */
->> +	if (!acpi_disabled ||
->> +	    of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
+>> Signed-off-by: Jasper St. Pierre <jstpierre@mecheye.net>
+>> Signed-off-by: Carlo Caione <carlo@caione.org>
+>> Reviewed-by: Rob Clark <robdclark@gmail.com>
+>> Reviewed-by: Daniel Drake <dsd@endlessm.com>
 >
-> This is getting a mess. cntbase tells you it is a memory mapped timer,
-> node pointer that you are probing through DT, and to top it all
-> acpi_disabled detects if you are probing in ACPI or DT mode.
 >
-> I think this function should be simplified, this driver is also
-> pending a refactoring to split arch timer and the memory mapped one
-> so I think you'd better wait that work to make things simpler.
+> Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-Does anyone working on this now?
+Thanks. Who is supposed to take this patch? Russel?
 
->
-> [...]
->
->> +/* Initialize all the generic timers presented in GTDT */
->> +void __init acpi_generic_timer_init(void)
->> +{
->> +	if (acpi_disabled)
->> +		return;
->
-> acpi_disabled used again here, I repeat myself this is going to be
-> hard to track. You should try to organize the code something like:
->
-> if (acpi_disabled)
-> 	timer_dt_probe();
-> else
-> 	timer_acpi_probe();
->
-> mixing the code paths is getting unwieldy, see above to see my
-> reasoning.
+Cheers,
 
-Olof is unhappy with such approach, I think if (acpi_disabled) is
-self-contained because we only get DT or ACPI in the system, we
-can call this function time_init() without more if (acpi_disabled).
-
->
->> +
->> +	acpi_table_parse(ACPI_SIG_GTDT, arch_timer_acpi_init);
->> +}
->> +#endif
->> diff --git a/include/linux/clocksource.h b/include/linux/clocksource.h
->> index abcafaa..af6155a 100644
->> --- a/include/linux/clocksource.h
->> +++ b/include/linux/clocksource.h
->> @@ -346,4 +346,10 @@ extern void clocksource_of_init(void);
->>   static inline void clocksource_of_init(void) {}
->>   #endif
->>
->> +#ifdef CONFIG_ACPI
->> +void acpi_generic_timer_init(void);
->> +#else
->> +static inline void acpi_generic_timer_init(void) { }
->> +#endif
->> +
->
-> That's not nice, it is a generic header, arch specific stuff should be
-> avoided. I think you should have an ACPI generic layer similar to
-> clocksource_of_init(), and probe from there when matching the respective
-> timers.
-
-I think I'm OK with it, but do we really need to introduce a heavy
-framework to init just arm arch timer (memory mapped or not) ?
-
-Thanks
-Hanjun
+-- 
+Carlo Caione
