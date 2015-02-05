@@ -1,39 +1,38 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 5 Feb 2015 17:11:14 +0200
-Subject: [PATCH v3 0/2] couple of generic remoteproc enhancements
-In-Reply-To: <54D135C7.4040501@ti.com>
-References: <1420838519-15669-1-git-send-email-s-anna@ti.com>
- <54C17130.5060002@ti.com> <54D135C7.4040501@ti.com>
-Message-ID: <CAK=WgbYYi+kojNw=CQ0q3iKEkYE7QxUcinCF400OB9PUSXN-fA@mail.gmail.com>
+From: j.uzycki@elproma.com.pl (=?UTF-8?B?SmFudXN6IFXFvHlja2k=?=)
+Date: Thu, 05 Feb 2015 16:17:22 +0100
+Subject: arm: kprobe compilation error
+Message-ID: <54D38982.6000100@elproma.com.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suman,
+Hi,
 
-On Tue, Feb 3, 2015 at 10:55 PM, Suman Anna <s-anna@ti.com> wrote:
-> > On 01/09/2015 03:21 PM, Suman Anna wrote:
-> >> Hi Ohad,
-> >>
-> >> The following is an updated patchset addressing the previous pending comments
-> >> from v1 & v2, and are rebased onto the latest 3.19-rc3 (are rc independent
-> >> actually).
-> >>
-> >> The patches are mainly developed to support the WkupM3 remote processor driver
-> >> on TI AM335x/AM437x SoCs, and I have verified the loading using the latest
-> >> version of Dave's WkupM3 remoteproc work [1]
-> >>
-> >> The only change in v3 is on the second patch, it mainly leverages the
-> >> memcpy_toio and memset_io functions for copying/loading code into the
-> >> internal memory sections. An additional argument has to be added to the
-> >> rproc_da_to_va function to make this distinction.
-> >
-> > Any comments on this series, or can I assume that this will make it to
-> > v3.20?
->
-> ping, want to make sure this has not fallen off your radar..
+I got the compilation error on next-20150204:
 
-It has not. I'm a bit swamped so apologies for not taking care of this
-faster. I believe I'll get to it next week.
+   CC      arch/arm/probes/kprobes/actions-arm.o
+In file included from arch/arm/probes/kprobes/actions-common.c:18:
+arch/arm/probes/kprobes/core.h:43: error: '[*]' not allowed in other 
+than a declaration
+make[2]: *** [arch/arm/probes/kprobes/actions-common.o] B??d 1
+make[2]: *** Oczekiwanie na niezako?czone zadania....
+In file included from arch/arm/probes/kprobes/actions-arm.c:66:
+arch/arm/probes/kprobes/core.h:43: error: '[*]' not allowed in other 
+than a declaration
+make[2]: *** [arch/arm/probes/kprobes/actions-arm.o] B??d 1
+In file included from arch/arm/probes/kprobes/core.c:37:
+arch/arm/probes/kprobes/core.h:43: error: '[*]' not allowed in other 
+than a declaration
+make[2]: *** [arch/arm/probes/kprobes/core.o] B??d 1
+make[1]: *** [arch/arm/probes/kprobes] B??d 2
+make: *** [arch/arm/probes] B??d 2
 
-Thanks,
-Ohad.
+reason is *[*]:
+const struct decode_checker *[*]);
+                                                      ^
+
+target: mxs (arm926)
+gcc version 4.2.4
+
+
+best regards
+Janusz
