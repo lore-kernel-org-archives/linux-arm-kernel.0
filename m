@@ -1,107 +1,64 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 5 Feb 2015 18:22:41 +0000
-Subject: [RFC/PATCH 2/2] of: allow for boolean flags to have value
-In-Reply-To: <1423159266-25561-2-git-send-email-balbi@ti.com>
-References: <1423159266-25561-1-git-send-email-balbi@ti.com>
- <1423159266-25561-2-git-send-email-balbi@ti.com>
-Message-ID: <20150205182240.GD20735@leverpostej>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 05 Feb 2015 21:24:01 +0300
+Subject: [PATCH 2/4] Documentation: dt-bindings: add dt binding info for
+ hi6220
+In-Reply-To: <1423147620-5760-3-git-send-email-zhangfei.gao@linaro.org>
+References: <1423147620-5760-1-git-send-email-zhangfei.gao@linaro.org>
+ <1423147620-5760-3-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <54D3B541.1070404@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 05, 2015 at 06:01:06PM +0000, Felipe Balbi wrote:
-> allowing values to boolean flags lets us setup
-> defaults on DTSI which can get disabled later
-> at board DTS if, for whatever reason, board can't
-> use that default.
-> 
-> One such example is DM81xx EVM where we can't use
-> MUSB's multipoint feature even though SoC supports
-> it. Something at the board level prevents us from
-> using the feature.
-> 
-> Instead of removing "multipoint;" from DTSI and
-> adding it to all board DTS just so we can remove
-> it from our quirky board seems like overkill when
-> we could just add:
-> 
-> 	multipoint = <0>;
-> 
-> to that quirky board's DTS.
-> 
-> Note that the description here is but one example
-> and it's likely many others have faced something
-> similar.
-> 
+Hello.
 
-While I appreciate that adding and removing properties in this way is
-painful, I think that this must be dealt with at DTB compile-time rather
-than kernel run-time.
+On 02/05/2015 05:46 PM, Zhangfei Gao wrote:
 
-There are codebases other than Linux which parse DTs, and not all
-drivers call of_property_read_bool to parse boolean properties, an awful
-lot still just check of_find_property. Additionally, some bindings
-_explicitly_ state boolean properties are empty and have no value, which
-this extension would break.
-
-I think that this patch only adds to the inconsistency we currently
-have, and given that, I would rather not have this extension to
-of_property_read_bool.
-
-Arguably of_proeprty_read_bool should warn if it encounters a non-empty
-property.
-
-Thanks,
-Mark.
-
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
 > ---
->  include/linux/of.h | 22 ++++++++++++++++++++--
->  1 file changed, 20 insertions(+), 2 deletions(-)
-> 
-> diff --git a/include/linux/of.h b/include/linux/of.h
-> index 76c055b20fef..c5ee9320f237 100644
-> --- a/include/linux/of.h
-> +++ b/include/linux/of.h
-> @@ -792,14 +792,32 @@ static inline int of_property_read_u32(const struct device_node *np,
->   * @propname:	name of the property to be searched.
->   *
->   * Search for a property in a device node.
-> - * Returns true if the property exist false otherwise.
-> + * Returns true if the property exist and has a value greater than zero,
-> + * fals otherwise.
->   */
->  static inline bool of_property_read_bool(const struct device_node *np,
->  					 const char *propname)
->  {
->  	struct property *prop = of_find_property(np, propname, NULL);
-> +	int rc;
-> +	u32 val;
->  
-> -	return prop ? true : false;
-> +	if (!prop)
-> +		return false;
+>   .../devicetree/bindings/usb/hi6220-usb.txt         | 50 ++++++++++++++++++++++
+>   1 file changed, 50 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/usb/hi6220-usb.txt
+
+> diff --git a/Documentation/devicetree/bindings/usb/hi6220-usb.txt b/Documentation/devicetree/bindings/usb/hi6220-usb.txt
+> new file mode 100644
+> index 0000000..e926364
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/usb/hi6220-usb.txt
+> @@ -0,0 +1,50 @@
+> +Hisilicon hi6220  SoC USB controlle
+
+    Controller.
+
+> +-----------------------------
 > +
-> +	rc = of_property_read_u32(np, propname, &val);
+> +usb controller is inherited from dwc2, refer dwc2.txt
+> +-----
 > +
-> +	/*
-> +	 * if property doesn't have a value, or prop->length == 0 and
-> +	 * we overflow, treat it as simple value-less flag.
-> +	 */
-> +	if (rc == -ENODATA || rc == -EOVERFLOW)
-> +		return true;
-> +	if (WARN(rc < 0, "failed to read '%s' value -> %d\n",
-> +				propname, rc))
-> +		return false;
+> +Required properties:
+> +- compatible: "hisilicon,hi6220-usb-phy"
+
+    PHY? I thought you were describing the USB controller.
+
+> +Refer to dwc2.txt for dwc2 usb properties
 > +
-> +	return !!val;
->  }
->  
->  static inline int of_property_read_s32(const struct device_node *np,
-> -- 
-> 2.3.0-rc1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> +
+> +phy:
+> +-----
+> +
+> +Required properties:
+> +- compatible: "hisilicon,hi6220-usb-phy"
+> +- vcc-supply: phandle to the regulator that provides power to the PHY.
+> +- clocks: phandle to the PHY clock. Use as per Documentation/devicetree
+
+    Actually, it's phandle and clock specifier.
+
+> +  /bindings/clock/clock-bindings.txt
+> +- hisilicon,peripheral-syscon: phandle of syscon used to control peripheral.
+> +- hisilicon,gpio_vbus_det: gpio of detecting vbus.
+> +- hisilicon,gpio_id_det: gpio of detecting id.
+
+    Hyphens are preferred over underscores in the prop names.
+
+[...]
+
+WBR, Sergei
