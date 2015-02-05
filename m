@@ -1,40 +1,65 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 5 Feb 2015 23:37:16 +0000
-Subject: [PATCH 2/4] rtc: sa1100: convert to run-time register mapping
-In-Reply-To: <8761bg9ngy.fsf@free.fr>
-References: <1423005775-26457-1-git-send-email-robh@kernel.org>
- <1423005775-26457-3-git-send-email-robh@kernel.org>
- <87h9v1a8k2.fsf@free.fr>
- <CAL_JsqLiiKvzxQqE=bEx7qoLSZXLZOegt87A=+pR3PJuSBK95w@mail.gmail.com>
- <20150205135037.GP8656@n2100.arm.linux.org.uk>
- <8761bg9ngy.fsf@free.fr>
-Message-ID: <20150205233716.GU8656@n2100.arm.linux.org.uk>
+From: ldv@altlinux.org (Dmitry V. Levin)
+Date: Fri, 6 Feb 2015 02:39:45 +0300
+Subject: [PATCH v5 3/5] x86: Split syscall_trace_enter into two phases
+In-Reply-To: <CAGXu5jJtHT9o8WMoynifN13=uZoARt4G9iVcgZsc9xYOBEwWsg@mail.gmail.com>
+References: <cover.1409954077.git.luto@amacapital.net>
+ <2df320a600020fda055fccf2b668145729dd0c04.1409954077.git.luto@amacapital.net>
+ <20150205211916.GA31367@altlinux.org>
+ <CAGXu5j+aXxt55LsxxbNkfGGF719ubXBZ2JAFwUPNARwKMVFgng@mail.gmail.com>
+ <20150205214027.GB31367@altlinux.org>
+ <CALCETrXFzcXngHsX=_72hYZqms32Zf7oFYDBgC3XNw7zOGdDCA@mail.gmail.com>
+ <CAGXu5jJtHT9o8WMoynifN13=uZoARt4G9iVcgZsc9xYOBEwWsg@mail.gmail.com>
+Message-ID: <20150205233945.GA31540@altlinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 05, 2015 at 08:18:05PM +0100, Robert Jarzmik wrote:
-> As a consequence, I'm pretty much in favor of :
->  - making rtc-pxa and rtc-sa1100 exclusive
->  - adding to rtc-pxa driver :
->    - a new rtc device (ie. it will register 2 rtc devices, one of the sa1100
->      kind, one of the pxa specific kind)
+On Thu, Feb 05, 2015 at 03:12:39PM -0800, Kees Cook wrote:
+> On Thu, Feb 5, 2015 at 1:52 PM, Andy Lutomirski <luto@amacapital.net> wrote:
+> > On Thu, Feb 5, 2015 at 1:40 PM, Dmitry V. Levin <ldv@altlinux.org> wrote:
+> >> On Thu, Feb 05, 2015 at 01:27:16PM -0800, Kees Cook wrote:
+> >>> On Thu, Feb 5, 2015 at 1:19 PM, Dmitry V. Levin <ldv@altlinux.org> wrote:
+> >>> > Hi,
+> >>> >
+> >>> > On Fri, Sep 05, 2014 at 03:13:54PM -0700, Andy Lutomirski wrote:
+> >>> >> This splits syscall_trace_enter into syscall_trace_enter_phase1 and
+> >>> >> syscall_trace_enter_phase2.  Only phase 2 has full pt_regs, and only
+> >>> >> phase 2 is permitted to modify any of pt_regs except for orig_ax.
+> >>> >
+> >>> > This breaks ptrace, see below.
+> >>> >
+[...]
+> >>> >> +             ret = seccomp_phase1(&sd);
+> >>> >> +             if (ret == SECCOMP_PHASE1_SKIP) {
+> >>> >> +                     regs->orig_ax = -1;
+> >>> >
+> >>> > How the tracer is expected to get the correct syscall number after that?
+> >>>
+> >>> There shouldn't be a tracer if a skip is encountered. (A seccomp skip
+> >>> would skip ptrace.) This behavior hasn't changed, but maybe I don't
+> >>> see what you mean? (I haven't encountered any problems with syscall
+> >>> tracing as a result of these changes.)
+> >>
+> >> SECCOMP_RET_ERRNO leads to SECCOMP_PHASE1_SKIP, and if there is a tracer,
+> >> it will get -1 as a syscall number.
+> >>
+> >> I've found this while testing a strace parser for
+> >> SECCOMP_MODE_FILTER/SECCOMP_SET_MODE_FILTER, so the problem is quite real.
+> >
+> > Hasn't it always been this way?
 > 
-> This has flaws :
->  - a bit of code will be duplicated between rtc-pxa and rtc-sa1100
->  - the ordering in rtc-pxa between the 2 rtc devices will be important, as if I
->  remember correctly /dev/rtc points to the first /dev/rtc0 registered
-> 
-> But it opens up :
->  - DT path to both drivers
->  - isolation between sa1100 architecture changes and pxa architecture changes
->  - Rob's current patches can remain almost the same
+> As far as I know, yes, it's always been this way. The point is to the
+> skip the syscall, which is what the -1 signals. Userspace then reads
+> back the errno.
 
-Or you make one export a set of "library" calls which are referenced
-by the other driver, and only declare one platform device.  Not
-_particularly_ nice but would avoid the code duplication issue (but
-has the benefit of not eating up module space, especially when the
-strict rw/execute protections are in effect.)
+There is a clear difference: before these changes, SECCOMP_RET_ERRNO used
+to keep the syscall number unchanged and suppress syscall-exit-stop event,
+which was awful because userspace cannot distinguish syscall-enter-stop
+from syscall-exit-stop and therefore relies on the kernel that
+syscall-enter-stop is followed by syscall-exit-stop (or tracee's death, etc.).
+
+After these changes, SECCOMP_RET_ERRNO no longer causes syscall-exit-stop
+events to be suppressed, but now the syscall number is lost.
+
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+ldv
