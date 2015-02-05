@@ -1,101 +1,79 @@
-From: al.stone@linaro.org (Al Stone)
-Date: Wed, 04 Feb 2015 16:49:32 -0700
-Subject: [PATCH v2 1/5] ACPI: move acpi_os_handler() so it can be made
- arch-dependent later
-In-Reply-To: <31637855.MY7BmyVont@vostro.rjw.lan>
-References: <1423009304-5007-1-git-send-email-al.stone@linaro.org>
- <3836210.OLr0JokInG@vostro.rjw.lan> <54D2A0E2.8050504@redhat.com>
- <31637855.MY7BmyVont@vostro.rjw.lan>
-Message-ID: <54D2B00C.3000804@linaro.org>
+From: rjui@broadcom.com (Ray Jui)
+Date: Wed, 4 Feb 2015 16:55:00 -0800
+Subject: [PATCH v5 1/6] clk: add of_clk_get_parent_rate function
+In-Reply-To: <1423097705-22939-1-git-send-email-rjui@broadcom.com>
+References: <Ray Jui <rjui@broadcom.com>
+ <1423097705-22939-1-git-send-email-rjui@broadcom.com>
+Message-ID: <1423097705-22939-2-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/04/2015 04:21 PM, Rafael J. Wysocki wrote:
-> On Wednesday, February 04, 2015 03:44:50 PM Al Stone wrote:
->> On 02/04/2015 06:50 AM, Rafael J. Wysocki wrote:
->>> On Tuesday, February 03, 2015 05:21:40 PM al.stone at linaro.org wrote:
->>>> From: Al Stone <al.stone@linaro.org>
->>>>
->>>> In order to deprecate the use of _OSI for arm64 or other new architectures,
->>>> we need to make the default handler something we can change for various
->>>> platforms.  This patch moves the definition of acpi_osi_handler() -- the
->>>> function used by ACPICA as a callback for evaluating _OSI -- into a separate
->>>> file.  Subsequent patches will change which files get built so that we can
->>>> then build the version of _OSI we need for a particular architecture.
->>>>
->>>> There is no functional change.
->>>>
->>>> Signed-off-by: Al Stone <al.stone@linaro.org>
->>>> ---
->>>>  drivers/acpi/Makefile |   2 +-
->>>>  drivers/acpi/osi.c    | 100 ++++++++++++++++++++++++++++++++++++++++++++++++++
->>>>  drivers/acpi/osl.c    |  24 ------------
->>>>  include/linux/acpi.h  |   1 +
->>>>  4 files changed, 102 insertions(+), 25 deletions(-)
->>>>  create mode 100644 drivers/acpi/osi.c
->>>>
->>>> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
->>>> index c346011..df348b3 100644
->>>> --- a/drivers/acpi/Makefile
->>>> +++ b/drivers/acpi/Makefile
->>>> @@ -18,7 +18,7 @@ obj-y				+= acpi.o \
->>>>  					acpica/
->>>>  
->>>>  # All the builtin files are in the "acpi." module_param namespace.
->>>> -acpi-y				+= osl.o utils.o reboot.o
->>>> +acpi-y				+= osl.o utils.o reboot.o osi.o
->>>>  acpi-y				+= nvs.o
->>>>  
->>>>  # Power management related files
->>>> diff --git a/drivers/acpi/osi.c b/drivers/acpi/osi.c
->>>> new file mode 100644
->>>> index 0000000..fff2b0c
->>>> --- /dev/null
->>>> +++ b/drivers/acpi/osi.c
->>>> @@ -0,0 +1,100 @@
->>>> +/*
->>>> + *  osi.c - _OSI implementation (moved from drivers/acpi/osl.c)
->>>> + *
->>>> + *  Copyright (C) 2000       Andrew Henroid
->>>> + *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
->>>> + *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
->>>> + *  Copyright (c) 2008 Intel Corporation
->>>> + *   Author: Matthew Wilcox <willy@linux.intel.com>
->>>> + *
->>>> + * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
->>>> + *
->>>> + *  This program is free software; you can redistribute it and/or modify
->>>> + *  it under the terms of the GNU General Public License as published by
->>>> + *  the Free Software Foundation; either version 2 of the License, or
->>>> + *  (at your option) any later version.
->>>> + *
->>>> + *  This program is distributed in the hope that it will be useful,
->>>> + *  but WITHOUT ANY WARRANTY; without even the implied warranty of
->>>> + *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>>> + *  GNU General Public License for more details.
->>>
->>> Nit: The street address of the FSF is not really useful here.  What if they move? :-)
->>
->> This was one of the things checkpatch complained about, understandably :).  It's
->> a direct cut'n'paste from osl.c.
->>
->> I can clean these up in the new file; would it help to clean up osl.c (at least
->> from checkpatch's point of view), as long as I'm at it?
-> 
-> Yeah, won't hurt. :-)
-> 
-> In a separate patch please, though.
-> 
-> 
+Sometimes a clock needs to know the rate of its parent before itself is
+registered to the framework. An example is that a PLL may need to
+initialize itself to a specific VCO frequency, before registering to the
+framework. The parent rate needs to be known, for PLL multipliers and
+divisors to be configured properly.
 
-Of course.  Will do.
+Introduce helper function of_clk_get_parent_rate, which can be used to
+obtain the parent rate of a clock, given a device node and index.
 
+Signed-off-by: Ray Jui <rjui@broadcom.com>
+---
+ drivers/clk/clk.c            |   17 +++++++++++++++++
+ include/linux/clk-provider.h |    6 +++++-
+ 2 files changed, 22 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index d48ac71..e1893a2 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -2581,6 +2581,23 @@ const char *of_clk_get_parent_name(struct device_node *np, int index)
+ }
+ EXPORT_SYMBOL_GPL(of_clk_get_parent_name);
+ 
++unsigned long of_clk_get_parent_rate(struct device_node *np, int index)
++{
++	const char *parent_name;
++	struct clk *parent_clk;
++
++	parent_name = of_clk_get_parent_name(np, index);
++	if (!parent_name)
++		return 0;
++
++	parent_clk = __clk_lookup(parent_name);
++	if (!parent_clk)
++		return 0;
++
++	return clk_get_rate(parent_clk);
++}
++EXPORT_SYMBOL_GPL(of_clk_get_parent_rate);
++
+ struct clock_provider {
+ 	of_clk_init_cb_t clk_init_cb;
+ 	struct device_node *np;
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index d936409..e1e2d95 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -585,7 +585,7 @@ struct clk *of_clk_src_simple_get(struct of_phandle_args *clkspec,
+ struct clk *of_clk_src_onecell_get(struct of_phandle_args *clkspec, void *data);
+ int of_clk_get_parent_count(struct device_node *np);
+ const char *of_clk_get_parent_name(struct device_node *np, int index);
+-
++unsigned long of_clk_get_parent_rate(struct device_node *np, int index);
+ void of_clk_init(const struct of_device_id *matches);
+ 
+ #else /* !CONFIG_OF */
+@@ -614,6 +614,10 @@ static inline const char *of_clk_get_parent_name(struct device_node *np,
+ {
+ 	return NULL;
+ }
++static unsigned long of_clk_get_parent_rate(struct device_node *np, int index)
++{
++	return 0;
++}
+ #define of_clk_init(matches) \
+ 	{ while (0); }
+ #endif /* CONFIG_OF */
 -- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Linaro Enterprise Group
-al.stone at linaro.org
------------------------------------
+1.7.9.5
