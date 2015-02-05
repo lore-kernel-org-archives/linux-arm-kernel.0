@@ -1,59 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 5 Feb 2015 11:30:47 +0000
-Subject: [PATCH v2] ARM: Don't use complete() during __cpu_die
-In-Reply-To: <20150205112805.GE11344@leverpostej>
-References: <1423131270-24047-1-git-send-email-k.kozlowski@samsung.com>
- <20150205105035.GL8656@n2100.arm.linux.org.uk>
- <20150205112805.GE11344@leverpostej>
-Message-ID: <20150205113047.GN8656@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 05 Feb 2015 12:43:09 +0100
+Subject: [PATCH v5 2/7] mailbox: arm_mhu: add driver for ARM MHU controller
+In-Reply-To: <CAJe_ZhcXR4oaBKZx3n0ckCzXgbREoezUXjizJ09QXQVqEQ3G_g@mail.gmail.com>
+References: <1422955310-6542-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <3540319.u6RL7AO77m@wuerfel>
+ <CAJe_ZhcXR4oaBKZx3n0ckCzXgbREoezUXjizJ09QXQVqEQ3G_g@mail.gmail.com>
+Message-ID: <2790199.44Rvt91EcZ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 05, 2015 at 11:28:05AM +0000, Mark Rutland wrote:
-> Hi Russell,
-> 
-> On Thu, Feb 05, 2015 at 10:50:35AM +0000, Russell King - ARM Linux wrote:
-> > On Thu, Feb 05, 2015 at 11:14:30AM +0100, Krzysztof Kozlowski wrote:
-> > > The complete() should not be used on offlined CPU. Rewrite the
-> > > wait-complete mechanism with wait_on_bit_timeout().
-> > 
-> > Yuck.
-> > 
-> > I think that the IPI idea would be far better, and a much smaller patch.
-> > We can continue using the completions, but instead of running the
-> > completion on the dying CPU, the dying CPU triggers an IPI which does
-> > the completion on the requesting CPU.
-> 
-> This does look _much_ nicer than the bitmask approach.
-> 
-> [...]
-> 
-> > diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> > index 194df2f1aa87..c623e27a9c85 100644
-> > --- a/arch/arm/kernel/smp.c
-> > +++ b/arch/arm/kernel/smp.c
-> > @@ -73,6 +73,9 @@ enum ipi_msg_type {
-> >  	IPI_IRQ_WORK,
-> >  	IPI_COMPLETION,
-> >  	IPI_CPU_BACKTRACE,
-> > +#ifdef CONFIG_HOTPLUG_CPU
-> > +	IPI_CPU_DEAD,
-> > +#endif
-> >  };
-> 
-> [...]
-> 
-> >  static const char *ipi_types[NR_IPI] __tracepoint_string = {
-> >  #define S(x,s)	[x] = s
-> >  	S(IPI_WAKEUP, "CPU wakeup interrupts"),
-> 
-> We'll probably want to add an entry here ("CPU teardown interrupts"?),
-> and bump NR_IPI in asm/hardirq.h.
+On Thursday 05 February 2015 10:38:16 Jassi Brar wrote:
+> Passing pointer to a structure on stack will be automatically punished
+> as a random crash/behavior.
+> We just need to make sure no client passes a value directly in 'void
+> *data', right?
 
-I'd need to move IPI_CPU_BACKTRACE out of the way then - that'll mostly
-always be zero (even if the NMI IPI happens.)  I'll sort that when I
-backport the patch to mainline kernels. :)
+Yes.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+> 
+> I know typedef's are frowned upon, but how bad is the following option?
+>        typedef void*  mbox_data_info
+>        int mbox_send_message(struct mbox_chan *chan, mbox_data_info data);
+
+I don't see how that would help. I believe typedefs for pointer types
+are particularly bad because they hide what is going on. If we want to
+enforce the use of pointers to point to data, having the pointer in 
+the function prototype should be enough as a hint to driver developers ;-)
+
+	Arnd
