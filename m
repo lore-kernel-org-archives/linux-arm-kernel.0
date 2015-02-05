@@ -1,52 +1,79 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu,  5 Feb 2015 16:25:30 +0100
-Subject: [PATCH v3] MediaTek PMIC support
-Message-ID: <1423149938-14471-1-git-send-email-s.hauer@pengutronix.de>
+Date: Thu,  5 Feb 2015 16:25:35 +0100
+Subject: [PATCH 5/8] ARM: dts: mt8135: Add pericfg,
+ infracfg and pmic wrapper nodes
+In-Reply-To: <1423149938-14471-1-git-send-email-s.hauer@pengutronix.de>
+References: <1423149938-14471-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1423149938-14471-6-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds initial support for the MediaTek MT6397 PMIC and the
-necessary infrastructure to attach it on the MT8135 / MT8173 SoCs.
+This adds the perisys, infracfg and pmic wrapper nodes to the
+MediaTek MT8135 dtsi file.
 
-The infrastructure includes:
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/boot/dts/mt8135.dtsi | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-- pericfg / infracfg controller support
-  The pericfg / infracfg controllers contain miscellaneous registers for
-  reset controllers and clocks.
-
-- PMIC wrapper support
-  On MediaTek MT8135, MT8173 and other SoCs the PMIC is connected via
-  SPI. The SPI master interface is not directly visible to the CPU, but
-  only through the PMIC wrapper inside the SoC. The communication between
-  the SoC and the PMIC can optionally be encrypted. Also a non standard
-  Dual IO SPI mode can be used to increase speed. The MT8135 also supports
-  a special feature named "IP Pairing". With IP Pairing the pins of some
-  SoC internal peripherals can be on the PMIC. The signals of these pins
-  are routed over the SPI bus using the pwrap bridge. Because of these
-  optional non SPI conform features the PMIC driver is not implemented as
-  a SPI bus master driver.
-
-The MT6397 PMIC itself is implemented as a regular mfd device driver which
-uses regmap to access the PMIC registers.
-
-This series also adds regulator support for the MT6397 PMIC.
-
-The first 6 patches can be merged through the ARM SoC tree. The mfd
-patch is independent of the first 6 patches and can be merged through the
-mfd maintainer trees.
-
-changes since v2:
-
-- put device tree docs into a separate patch
-- Fix lockdep issues in irq mt6397 handler
-- cosmetic changes
-
-Changes since v1:
-
-- document reset bindings for infracfg/pericfg
-- fix base addresses in infracfg binding example
-- Remove more Email addresses from Flora Fu (She is not working at
-  MediaTek anymore, her address is no longer valid)
-- drop Regulator support patch, it's already in next
-
-Sascha
+diff --git a/arch/arm/boot/dts/mt8135.dtsi b/arch/arm/boot/dts/mt8135.dtsi
+index 7d56a98..14ba41d 100644
+--- a/arch/arm/boot/dts/mt8135.dtsi
++++ b/arch/arm/boot/dts/mt8135.dtsi
+@@ -14,6 +14,7 @@
+ 
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/reset-controller/mt8135-resets.h>
+ #include "skeleton64.dtsi"
+ 
+ / {
+@@ -86,6 +87,12 @@
+ 			clock-frequency = <32000>;
+ 			#clock-cells = <0>;
+ 		};
++
++		clk_26m: clk26m {
++			compatible = "fixed-clock";
++			clock-frequency = <26000000>;
++			#clock-cells = <0>;
++		};
+ 	};
+ 
+ 	soc {
+@@ -94,6 +101,33 @@
+ 		compatible = "simple-bus";
+ 		ranges;
+ 
++		infracfg: infracfg at 10001000 {
++			#reset-cells = <1>;
++			#clock-cells = <1>;
++			compatible = "mediatek,mt8135-infracfg";
++			reg = <0 0x10001000 0 0x1000>;
++		};
++
++		pericfg: pericfg at 10003000 {
++			#reset-cells = <1>;
++			#clock-cells = <1>;
++			compatible = "mediatek,mt8135-pericfg";
++			reg = <0 0x10003000 0 0x1000>;
++		};
++
++		pwrap: pwrap at 1000f000 {
++			compatible = "mediatek,mt8135-pwrap";
++			reg = <0 0x1000f000 0 0x1000>,
++				<0 0x11017000 0 0x1000>;
++			reg-names = "pwrap-base", "pwrap-bridge-base";
++			interrupts = <GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH>;
++			resets = <&infracfg MT8135_INFRA_PMIC_WRAP_RST>,
++					<&pericfg MT8135_PERI_PWRAP_BRIDGE_SW_RST>;
++			reset-names = "pwrap", "pwrap-bridge";
++			clocks = <&clk_26m>, <&clk_26m>;
++			clock-names = "spi", "wrap";
++		};
++
+ 		timer: timer at 10008000 {
+ 			compatible = "mediatek,mt8135-timer",
+ 					"mediatek,mt6577-timer";
+-- 
+2.1.4
