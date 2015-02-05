@@ -1,60 +1,95 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 5 Feb 2015 22:16:03 +0000
-Subject: [Linaro-acpi] [PATCH v8 02/21] acpi: fix acpi_os_ioremap for arm64
-In-Reply-To: <20150205174826.GD21970@e104818-lin.cambridge.arm.com>
-References: <1422881149-8177-3-git-send-email-hanjun.guo@linaro.org>
- <2422968.Es7R0p3loO@vostro.rjw.lan>
- <1422984576.18187.82.camel@deneb.redhat.com>
- <20150204112508.GB26006@e104818-lin.cambridge.arm.com>
- <1423066107.18187.99.camel@deneb.redhat.com>
- <20150204175734.GI26006@e104818-lin.cambridge.arm.com>
- <1423076294.18187.103.camel@deneb.redhat.com>
- <20150205104149.GA18158@e104818-lin.cambridge.arm.com>
- <1423144447.18187.110.camel@deneb.redhat.com>
- <54D39D6B.5090304@linaro.org>
- <20150205174826.GD21970@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu922UwYRN7ZgFNTR7yGGKPLTU8Us7KbvXX-Q8=rqLKNog@mail.gmail.com>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Thu, 5 Feb 2015 14:16:54 -0800
+Subject: [PATCH 2/9] regulator: core: Introduce set_optimum_mode op
+In-Reply-To: <20150130000741.GP11960@sonymobile.com>
+References: <1422413199-17273-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1422413199-17273-3-git-send-email-bjorn.andersson@sonymobile.com>
+ <20150128195204.GN21293@sirena.org.uk>
+ <20150130000741.GP11960@sonymobile.com>
+Message-ID: <CAJAp7Ogi9WePGgopCYmUYzhNtV_E8+StquK+yM1cu91e7eQNfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 February 2015 at 17:48, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Thu, Feb 05, 2015 at 04:42:19PM +0000, Al Stone wrote:
->> On 02/05/2015 06:54 AM, Mark Salter wrote:
->> > On Thu, 2015-02-05 at 10:41 +0000, Catalin Marinas wrote:
->> >> On Wed, Feb 04, 2015 at 06:58:14PM +0000, Mark Salter wrote:
->> >>> On Wed, 2015-02-04 at 17:57 +0000, Catalin Marinas wrote:
->> >>>> On Wed, Feb 04, 2015 at 04:08:27PM +0000, Mark Salter wrote:
->> >>>>> acpi_os_remap() is used to map ACPI tables. These tables may be in ram
->> >>>>> which are already included in the kernel's linear RAM mapping. So we
->> >>>>> need ioremap_cache to avoid two mappings to the same physical page
->> >>>>> having different caching attributes.
->> >>>>
->> >>>> What's the call path to acpi_os_ioremap() on such tables already in the
->> >>>> linear mapping? I can see an acpi_map() function which already takes
->> >>>> care of the RAM mapping case but there are other cases where
->> >>>> acpi_os_ioremap() is called directly. For example,
->> >>>> acpi_os_read_memory(), can it be called on both RAM and I/O?
->> >>>
->> >>> acpi_map() is the one I've seen.
->> >>
->> >> By default, if should_use_kmap() is not patched for arm64, it translates
->> >> to page_is_ram(); acpi_map() would simply use a kmap() which returns the
->> >> current kernel linear mapping on arm64.
->> >
->> > The problem with kmap() is that it only maps a single page. I've seen
->> > tables over 4k which is why I patched acpi_map() not to use kmap() on
->> > arm64.
->>
->> Right.  Mark replied to this before I could; using kmap() enforced a 4k
->> (one page) limit that we kept breaking with some ACPI tables being larger
->> than that (DSDTs and SSDTs, fwiw).  This would lead to some very odd behaviors
->> when most but not all of a device definition was within the page; using the
->> table checksums was one way of detecting the issues.
+On Thu, Jan 29, 2015 at 4:07 PM, Bjorn Andersson
+<bjorn.andersson@sonymobile.com> wrote:
+> On Wed 28 Jan 11:52 PST 2015, Mark Brown wrote:
 >
-> OK. So I think Mark's original patch was ok, assuming that the System
-> Memory cases mentioned by Graeme are detected with page_is_ram().
+>> On Tue, Jan 27, 2015 at 06:46:32PM -0800, Bjorn Andersson wrote:
+>>
+>> > +   /* set most efficient regulator operating mode for load */
+>> > +   int (*set_optimum_mode)(struct regulator_dev *, int input_uV,
+>> > +                           int output_uV, int load_uA);
+>>
+>> This is basically fine but can you please rename this to be something
+>> that more directly reflects the fact that we're just informing the
+>> driver about the operating parameters - there are other things a driver
+>> could usefully do with this, for example set current limits so that if
+>> something starts to consume excessive current the device will flag this
+>> as an error.
+>>
+>
+> The purpose of the series was to be able to implement patch 9, which
+> will utilize the load_uA to set the "mode" of the Qualcomm regulators.
+>
+> So I would like it to be a "setter of current consumption".
+>
+> I'm not sure what to name the function to have it cover these additional
+> cases.
+>
+>> It'd also be better to split the voltage specs out into a separate
+>> function, especially for the output voltage where obviously we have a
+>> separate range based interface for setting that.
+>
+> I was fishing for a statement regarding this in the cover letter, but
+> here we go.
+>
+> The current implementors of get_optimum_mode all ignore the voltages, so
+> we could effectively simplify the interface to:
+>
+>  get_optimum_mode(rdev, load);
+>
+> Question is if there are any implementations where we don't know the
+> output voltage in the regulator driver (as locking prevents us from
+> using the standard interface of querying this). Input voltage is just a
+> query away.
+>
+>
+> Having drms_uA_update() request an appropriate mode for the given load
+> and then calling set_mode directly (the current implementation) gives us
+> a single point of entry to the regulator drivers related to setting
+> modes (regulator_set_mode and drms_uA_update calls set_mode). But seen
+> from a consumer there's no consistency; the last call to
+> regulator_set_mode() and regulator_set_optimum_mode() will win.
+>
+> Further more, get_optimum_mode is not exposed to the consumers and there
+> are no other users in the regulator framework. So it could be completely
+> internal to the regulator drivers, without loss of functionality.
+>
+>
+> Looking at the consumers, in my mind they should not be aware of the
+> operating performance characteristics of the regulator supplying them.
+> So I think they should all use regulator_set_optimum_mode() rather than
+> "guessing" what performance mode the regulator should run in. (Maybe
+> some board code could use set_mode?).
+>
+> With this in mind I was going to follow up after this series with a
+> rename of regulator_set_optimum_mode() to regulator_set_current() and
+> set_optimum_mode() to set_current().
+>
+> I was also going to suggest dropping regulator_set_mode() and set_mode
+> to make the consumer facing API consistent.
+>
+>
+> I think this covers your concern about patch 3-7 as well, please let me
+> know what you think.
 >
 
-page_is_ram() returns whether a pfn is covered by the linear mapping,
-so memory before the kernel or after a mem= limit will be
-misidentified.
+Mark, any suggestions on this?
+
+I need a way to pass the expected current consumption from the mmc
+framework through our regulator driver to the RPM to make our eMMC
+stable.
+We can discuss the proposed "cleanups" next time we meet if you prefer.
+
+Regards,
+Bjorn
