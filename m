@@ -1,36 +1,91 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 5 Feb 2015 16:11:00 +0000
-Subject: [PATCH v2] ARM: Don't use complete() during __cpu_die
-In-Reply-To: <20150205142918.GA10634@linux.vnet.ibm.com>
-References: <1423131270-24047-1-git-send-email-k.kozlowski@samsung.com>
- <20150205105035.GL8656@n2100.arm.linux.org.uk>
- <20150205142918.GA10634@linux.vnet.ibm.com>
-Message-ID: <20150205161100.GQ8656@n2100.arm.linux.org.uk>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Thu, 05 Feb 2015 17:28:12 +0100
+Subject: [PATCH] coresight-stm: adding driver for CoreSight STM component
+In-Reply-To: <CANLsYkx-XeiWAMxgMs=dAZc5oMf0NmF_2_6TzYXQtd1JdL5LrA@mail.gmail.com>
+References: <1423088550-15780-1-git-send-email-mathieu.poirier@linaro.org>
+ <1423135651.27378.32.camel@x220>
+ <CANLsYkx-XeiWAMxgMs=dAZc5oMf0NmF_2_6TzYXQtd1JdL5LrA@mail.gmail.com>
+Message-ID: <1423153692.27378.60.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 05, 2015 at 06:29:18AM -0800, Paul E. McKenney wrote:
-> Works for me, assuming no hidden uses of RCU in the IPI code.  ;-)
+On Thu, 2015-02-05 at 08:51 -0700, Mathieu Poirier wrote:
+> On 5 February 2015 at 04:27, Paul Bolle <pebolle@tiscali.nl> wrote:
+> > On Wed, 2015-02-04 at 15:22 -0700, mathieu.poirier at linaro.org wrote:
+> >> @@ -58,4 +58,14 @@ config CORESIGHT_SOURCE_ETM3X
+> >>         which allows tracing the instructions that a processor is executing
+> >>         This is primarily useful for instruction level tracing.  Depending
+> >>         the ETM version data tracing may also be available.
+> >> +
+> >> +config CORESIGHT_STM
+> >> +     bool "CoreSight System Trace Macrocell driver"
+> >> +     depends on (ARM && !(CPU_32v4 || CPU_32v4T)) || ARM64 || (64BIT && COMPILE_TEST)
+> >
+> > I'm _guessing_ that CPU_32v4 and CPU_32v4T are needed for the ldrd and
+> > strd assembler instructions. If that's right a next _guess_ would be
+> > that you also need to mention CPU_32v3 here.
+> >
+> > Furthermore, this file is only sourced by arch/arm/Kconfig.debug and
+> > arch/arm64/Kconfig.debug. So 64BIT should always be equal to ARM64 and
+> > the
+> >      || (64BIT && COMPILE_TEST)
+> >
+> > part shouldn't be needed, isn't it?
+> 
+> Things have changed in the driver (and accessor functions) since I
+> wrote this Kconfig condition - Let me think on the above 2 comments.
 
-Sigh... I kind'a new it wouldn't be this simple.  The gic code which
-actually raises the IPI takes a raw spinlock, so it's not going to be
-this simple - there's a small theoretical window where we have taken
-this lock, written the register to send the IPI, and then dropped the
-lock - the update to the lock to release it could get lost if the
-CPU power is quickly cut at that point.
+In the meantime it occurred to me that the current dependency could be
+written as just
+    !CPU_32v4 && !CPU_32v4T
 
-Also, we _do_ need the second cache flush in place to ensure that the
-unlock is seen to other CPUs.
+That shouldn't change anything, neither for both ARM nor for ARM64.
+(This is because exactly one of ARM and ARM64 will always be set.)
+Anyhow, I'll see what you'll come up with.
 
-We could work around that by taking and releasing the lock in the IPI
-processing function... but this is starting to look less attractive
-as the lock is private to irq-gic.c.
+> >> +     select CORESIGHT_LINKS_AND_SINKS
+> >> +     help
+> >> +       This driver provides support for hardware assisted software
+> >> +       instrumentation based tracing. This is primarily used for
+> >> +       logging useful software events or data coming from various entities
+> >> +       in the system, possibly running different OSs
+> >>  endif
 
-Well, we're very close to 3.19, we're too close to be trying to sort
-this out, so I'm hoping that your changes which cause this RCU error
-are *not* going in during this merge window, because we seem to have
-something of a problem right now which needs more time to resolve.
+> >> +static ssize_t entities_show(struct device *dev,
+> >> +                          struct device_attribute *attr, char *buf)
+> >> +{
+> >> +     struct stm_drvdata *drvdata = dev_get_drvdata(dev->parent);
+> >> +     ssize_t len;
+> >> +
+> >> +     len = bitmap_scnprintf(buf, PAGE_SIZE, drvdata->entities,
+> >> +                            STM_ENTITY_MAX);
+> >> +
+> >
+> > bitmap_scnprintf is gone in current linux-next. I changed it to
+> >         len = scnprintf(buf, PAGE_SIZE, "%*pb", STM_ENTITY_MAX,
+> >                         drvdata->entities);
+> >
+> > to get this file to compile. (On x86_64, that is, but please don't tell
+> > anybody!)
+> 
+> I was not aware that "bitmap_scnprintf()" had disappeared - thanks for
+> pointing this out.  Did you mean cross-compile from an x86_64 host or
+> compile for a x86_64 target?  I don't get how you could have in the
+> latter case.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+I compiled for the x86_64 target! I used a hack, not sure where it's
+documented, to build object files by bypassing most of the build
+infrastructure:
+     make drivers/coresight/coresight-stm.o
+
+But, since in this case that doesn't handle <linux/coresight-stm.h>
+correctly, I used an ever bigger hack:
+    make EXTRA_CFLAGS="-DCONFIG_CORESIGHT_STM" drivers/coresight/coresight-stm.o
+
+This only works as long as the code doesn't use stuff that can't
+possibly be reached in x86_64 (eg, it doesn't use platform specific
+headers). It's a quick and dirty way to test changes to files normally
+not compiled for your target.
+
+
+Paul Bolle
