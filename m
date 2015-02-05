@@ -1,84 +1,108 @@
-From: rshitrit@annapurnalabs.com (Ronen Shitrit)
-Date: Thu, 5 Feb 2015 14:33:03 +0200
-Subject: [PATCH v4 0/6] Introducing the Alpine platform.
-In-Reply-To: <2737362.aK8nBa7Wi3@wuerfel>
-References: <54d0cd21.WWf8LEKnly7HnqEK%tsahee@annapurnalabs.com>
- <4902057.1c5MpYALGg@wuerfel>
- <CAC9K06yaA30e+HnRH50QJeF0=a_oCeWaaT_sYuS+OVcq1ZnVzg@mail.gmail.com>
- <2737362.aK8nBa7Wi3@wuerfel>
-Message-ID: <CAC9K06wPzHw1XGMq6tCK1aCiYz7NX3GrV+BaYmi6w5YJjzaHSw@mail.gmail.com>
+From: gg@slimlogic.co.uk (Graeme Gregory)
+Date: Thu, 5 Feb 2015 12:52:08 +0000
+Subject: [PATCH v8 02/21] acpi: fix acpi_os_ioremap for arm64
+In-Reply-To: <20150205120720.GD18158@e104818-lin.cambridge.arm.com>
+References: <1422984576.18187.82.camel@deneb.redhat.com>
+ <20150204112508.GB26006@e104818-lin.cambridge.arm.com>
+ <1423066107.18187.99.camel@deneb.redhat.com>
+ <20150204175734.GI26006@e104818-lin.cambridge.arm.com>
+ <1423076294.18187.103.camel@deneb.redhat.com>
+ <20150205104149.GA18158@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu-tqY4C0eaRvp5FAzx9PqOGMg+sFNzxr2f25omdJKr7JA@mail.gmail.com>
+ <20150205105945.GC18158@e104818-lin.cambridge.arm.com>
+ <20150205111443.GC24474@xora-haswell.xora.org.uk>
+ <20150205120720.GD18158@e104818-lin.cambridge.arm.com>
+Message-ID: <20150205125208.GE24474@xora-haswell.xora.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 February 2015 at 14:21, Arnd Bergmann <arnd@arndb.de> wrote:
->
-> On Thursday 05 February 2015 10:28:02 Ronen Shitrit wrote:
-> > On 4 February 2015 at 14:33, Arnd Bergmann <arnd@arndb.de> wrote:
-> > > On Wednesday 04 February 2015 13:19:04 Tsahee Zidenberg wrote:
->
-> > > I understand where you are coming from, as this is something that
-> > > everyone gets wrong at first.
-> >
-> > In order to bring up a completely new silicon with lots of
-> > technologies challenges in such short time and take it to production,
-> > with multi discipline environments, few OSs support and small software
-> > group, we had to share code as much as possible == hal.
->
-> I think the most important part for you to understand is not to call
-> something a hal (or os abstraction, which would be worse), as that
-> is universally hated. ;-)
-Tnx for the tip :)
+On Thu, Feb 05, 2015 at 12:07:20PM +0000, Catalin Marinas wrote:
+> On Thu, Feb 05, 2015 at 11:14:43AM +0000, Graeme Gregory wrote:
+> > On Thu, Feb 05, 2015 at 10:59:45AM +0000, Catalin Marinas wrote:
+> > > On Thu, Feb 05, 2015 at 10:47:23AM +0000, Ard Biesheuvel wrote:
+> > > > On 5 February 2015 at 10:41, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > > > > On Wed, Feb 04, 2015 at 06:58:14PM +0000, Mark Salter wrote:
+> > > > >> On Wed, 2015-02-04 at 17:57 +0000, Catalin Marinas wrote:
+> > > > >> > On Wed, Feb 04, 2015 at 04:08:27PM +0000, Mark Salter wrote:
+> > > > >> > > acpi_os_remap() is used to map ACPI tables. These tables may be in ram
+> > > > >> > > which are already included in the kernel's linear RAM mapping. So we
+> > > > >> > > need ioremap_cache to avoid two mappings to the same physical page
+> > > > >> > > having different caching attributes.
+> > > > >> >
+> > > > >> > What's the call path to acpi_os_ioremap() on such tables already in the
+> > > > >> > linear mapping? I can see an acpi_map() function which already takes
+> > > > >> > care of the RAM mapping case but there are other cases where
+> > > > >> > acpi_os_ioremap() is called directly. For example,
+> > > > >> > acpi_os_read_memory(), can it be called on both RAM and I/O?
+> > > > >>
+> > > > >> acpi_map() is the one I've seen.
+> > > > >
+> > > > > By default, if should_use_kmap() is not patched for arm64, it translates
+> > > > > to page_is_ram(); acpi_map() would simply use a kmap() which returns the
+> > > > > current kernel linear mapping on arm64.
+> > > > >
+> > > > >> I'm not sure about others.
+> > > > >
+> > > > > Question for the ARM ACPI guys: what happens if you implement
+> > > > > acpi_os_ioremap() on arm64 as just ioremap()? Do you get any WARN_ON()
+> > > > > (__ioremap_caller() checks whether the memory is RAM)?
+> > > > 
+> > > > Regardless of whether you hit any WARN_ON()s now,
+> > > 
+> > > Actually following the WARN_ON(), ioremap() returns NULL, so it may not
+> > > go entirely unnoticed.
+> > > 
+> > > > we still need to distinguish between MMIO ranges with device
+> > > > semantics, and ACPI or other tables whose data may not be naturally
+> > > > aligned all the time, and hence requiring memory semantics.
+> > > > acpi_os_ioremap() may be used for both, afaik
+> > > 
+> > > Is acpi_os_ioremap() called directly (outside acpi_map()) to map RAM
+> > > that already part of the kernel linear memory? If yes, then I agree that
+> > > we need to do such check.
+> > > 
+> > > Another question, can we distinguish, in the ACPI core code, whether the
+> > > mapping is for an ACPI table in RAM or some I/O space?
+> > 
+> > Yes I think we do,
+> > 
+> > acpi_os_map_memory() is called to map tables
+> > 
+> > acpi_os_map_iomem() is called to map device IO
+> > 
+> > currently both end up in acpi_map but I guess they do not have to or
+> > we can add extra arguments as its an internal API.
+> 
+> Ending up in acpi_map() is ok as this function checks whether it should
+> use kmap() or acpi_os_ioremap().
+> 
+> > But I have not checked that no user sneaks in direct calls.
+> 
+> Grep'ing for acpi_os_ioremap():
+> 
+> suspend_nvs_save() - we don't care about this yet for arm64 as the
+> function is only compiled in if CONFIG_ACPI_SLEEP
+> 
+> acpi_os_read_memory() and acpi_os_write_memory() - do you know what kind
+> of memory are these used on?
+> 
 
->
-> > We were aware from first day of the obstacles of merging hal code to
-> > the mainline, that why we implemented it using linux coding style,
-> > trying to minimize the "resistance", and we hoped (and still are :) to
-> > find a path to keep part of our low level code into the mainline.
-> > If it wont work out, we will rewrite it...
->
-> It's not as bad if something is contained within one driver:
-We tried to keep this concept across our low level drivers...
+They are used when an operating region is set to SystemMemory type.
 
-> if you have
-> e.g. a network driver that consists of a low-level part that talks to
-> the hardware and a high-level part that talks to linux, that can
-> be ok. What you should avoid is having interfaces that span across
-> multiple driver components and use a global header file for the
-> interface but are specific to one SoC family.
->
-> > >However, you will not be able to merge
-> > > the drivers with a HAL like this. The kernel abstracts all the
-> > > components of typical SoCs already and I suspect you just did not
-> > > use the right abstraction because you either didn't find it, or it
-> > > was not there at the time you started the work.
-> > >
-> > > For example, a DMA subsystem that is used by multiple slave drivers
-> > > should use a driver in drivers/dma that registers to the slave-dma API,
-> >
-> > If you are referring to the dma-engine api, than this is a good
-> > example where we don't want to use the generic framework as its
-> > overhead on performance is unacceptable.
->
-> It also illustrates my point: When we introduce a second interface
-> in parallel to the existing one, this puts a burden on us upstream
-> maintainers which now have to understand and maintain both. We used
-> to have all sorts of interfaces per SoC and are almost done consolidating
-> them to all use dmaengine for this reason.
-> I do realize that the dmaengine API is not perfect though, so if you
-> have specific problems with it, we expect you to help figure out what
-> they are and what we can do about them so that everybody benefits.
-Understand, not sure if it can work out but we will give it a try...
+>From table 19-326
 
->
-> To a certain extent, this is how we make progress in the kernel with
-> generic interfaces: someone has a particular need and it's up to them
-> to implement the groundwork. In return they get all the features of
-> the kernel that someone else needed and implemented already.
->
->         Arnd
+Region Type: SystemMemory
+Permitted Access Type: ByteAcc, WordAcc, DWordAcc, QWordAcc, or AnyAcc
+Description: All access allowed
 
+Graeme
 
-
-
--- 
-Ronen Shitrit
+> couple of intel drm files that are not used on arm.
+> 
+> -- 
+> Catalin
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
