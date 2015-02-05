@@ -1,78 +1,69 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 5 Feb 2015 12:01:06 -0600
-Subject: [RFC/PATCH 2/2] of: allow for boolean flags to have value
-In-Reply-To: <1423159266-25561-1-git-send-email-balbi@ti.com>
-References: <1423159266-25561-1-git-send-email-balbi@ti.com>
-Message-ID: <1423159266-25561-2-git-send-email-balbi@ti.com>
+Date: Thu, 5 Feb 2015 12:01:05 -0600
+Subject: [RFC/PATCH 1/2] of: move of_property_read_bool further down
+Message-ID: <1423159266-25561-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-allowing values to boolean flags lets us setup
-defaults on DTSI which can get disabled later
-at board DTS if, for whatever reason, board can't
-use that default.
-
-One such example is DM81xx EVM where we can't use
-MUSB's multipoint feature even though SoC supports
-it. Something at the board level prevents us from
-using the feature.
-
-Instead of removing "multipoint;" from DTSI and
-adding it to all board DTS just so we can remove
-it from our quirky board seems like overkill when
-we could just add:
-
-	multipoint = <0>;
-
-to that quirky board's DTS.
-
-Note that the description here is but one example
-and it's likely many others have faced something
-similar.
+A follow-up patch will make use of of_property_read_u32()
+to allow for boolean properties to have a value, this
+is just in preparation for that patch in order to make
+review easier.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- include/linux/of.h | 22 ++++++++++++++++++++--
- 1 file changed, 20 insertions(+), 2 deletions(-)
+ include/linux/of.h | 32 ++++++++++++++++----------------
+ 1 file changed, 16 insertions(+), 16 deletions(-)
 
 diff --git a/include/linux/of.h b/include/linux/of.h
-index 76c055b20fef..c5ee9320f237 100644
+index dfde07e77a63..76c055b20fef 100644
 --- a/include/linux/of.h
 +++ b/include/linux/of.h
-@@ -792,14 +792,32 @@ static inline int of_property_read_u32(const struct device_node *np,
-  * @propname:	name of the property to be searched.
-  *
-  * Search for a property in a device node.
-- * Returns true if the property exist false otherwise.
-+ * Returns true if the property exist and has a value greater than zero,
-+ * fals otherwise.
-  */
- static inline bool of_property_read_bool(const struct device_node *np,
- 					 const char *propname)
- {
- 	struct property *prop = of_find_property(np, propname, NULL);
-+	int rc;
-+	u32 val;
- 
--	return prop ? true : false;
-+	if (!prop)
-+		return false;
-+
-+	rc = of_property_read_u32(np, propname, &val);
-+
-+	/*
-+	 * if property doesn't have a value, or prop->length == 0 and
-+	 * we overflow, treat it as simple value-less flag.
-+	 */
-+	if (rc == -ENODATA || rc == -EOVERFLOW)
-+		return true;
-+	if (WARN(rc < 0, "failed to read '%s' value -> %d\n",
-+				propname, rc))
-+		return false;
-+
-+	return !!val;
+@@ -765,22 +765,6 @@ static inline int of_property_read_string_index(struct device_node *np,
+ 	return rc < 0 ? rc : 0;
  }
  
+-/**
+- * of_property_read_bool - Findfrom a property
+- * @np:		device node from which the property value is to be read.
+- * @propname:	name of the property to be searched.
+- *
+- * Search for a property in a device node.
+- * Returns true if the property exist false otherwise.
+- */
+-static inline bool of_property_read_bool(const struct device_node *np,
+-					 const char *propname)
+-{
+-	struct property *prop = of_find_property(np, propname, NULL);
+-
+-	return prop ? true : false;
+-}
+-
+ static inline int of_property_read_u8(const struct device_node *np,
+ 				       const char *propname,
+ 				       u8 *out_value)
+@@ -802,6 +786,22 @@ static inline int of_property_read_u32(const struct device_node *np,
+ 	return of_property_read_u32_array(np, propname, out_value, 1);
+ }
+ 
++/**
++ * of_property_read_bool - Findfrom a property
++ * @np:		device node from which the property value is to be read.
++ * @propname:	name of the property to be searched.
++ *
++ * Search for a property in a device node.
++ * Returns true if the property exist false otherwise.
++ */
++static inline bool of_property_read_bool(const struct device_node *np,
++					 const char *propname)
++{
++	struct property *prop = of_find_property(np, propname, NULL);
++
++	return prop ? true : false;
++}
++
  static inline int of_property_read_s32(const struct device_node *np,
+ 				       const char *propname,
+ 				       s32 *out_value)
 -- 
 2.3.0-rc1
