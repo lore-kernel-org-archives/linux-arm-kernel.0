@@ -1,51 +1,41 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 5 Feb 2015 18:20:31 +0800
-Subject: [RFC] mmc: sdhci: implement light and heavy runtime pm resume
-Message-ID: <20150205182031.1a47d726@xhacker>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 05 Feb 2015 19:27:30 +0900
+Subject: Kexec and KVM not working gracefully together
+In-Reply-To: <20150205094317.43f8554a@arm.com>
+References: <CAHt6W4cuRi3bfj5mryFouhOLGAAWuNXKVvz4K-rAjQnwiegL-Q@mail.gmail.com>	<54C7ADF0.8090102@arm.com>	<54D30AE0.5050101@linaro.org>
+ <20150205094317.43f8554a@arm.com>
+Message-ID: <54D34592.9010903@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On 02/05/2015 06:43 PM, Marc Zyngier wrote:
+> On Thu, 5 Feb 2015 06:17:04 +0000
+> AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
+>
+>> Frediano
+>> Cc: Marc
+>>
+>> Are you going to fix this issue on arm?
+>> As I'm now working on the same issue on arm64,
+>> we should share the idea and some code.
+>
+> Just to be perfectly clear: KVM support for Kexec on arm and arm64
+> should be exactly the same, with the exception of some (very
+> limited) assembly code for the MMU teardown.
 
-Most sdhci_runtime_resume_host() users just gate their clocks in their runtime
-suspend implementation, so the sdhci_runtime_resume_host() is too heavy, we only
-need to restore interrupts registers.
+Yep, that's exactly what I meant.
 
-The change is something as following:
+> And I'd like to see both architectures addressed at the same time,
+> without statements such as "we'll do that as a next step". As such, I'd
+> very much recommend that Frediano and you work together to address this
+> problem.
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index 0ad412a..9d5bdde 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -2856,7 +2856,7 @@ int sdhci_runtime_suspend_host(struct sdhci_host *host)
- }
- EXPORT_SYMBOL_GPL(sdhci_runtime_suspend_host);
- 
--int sdhci_runtime_resume_host(struct sdhci_host *host)
-+static void sdhci_runtime_resume_reinit(struct sdhci_host *host)
- {
- 	unsigned long flags;
- 	int host_flags = host->flags;
-@@ -2880,6 +2880,15 @@ int sdhci_runtime_resume_host(struct sdhci_host *host)
- 		sdhci_enable_preset_value(host, true);
- 		spin_unlock_irqrestore(&host->lock, flags);
- 	}
-+}
-+
-+int sdhci_runtime_resume_host(struct sdhci_host *host, bool power_keeped)
-+{
-+	unsigned long flags;
-+	int host_flags = host->flags;
-+
-+	if (!power_keeped)
-+		sdhci_runtime_resume_reinit(host);
- 
- 	/* Set the re-tuning expiration flag */
- 	if (host->flags & SDHCI_USING_RETUNING_TIMER)
+I hope so.
 
+Thanks,
+-Takahiro AKASHI
 
-It's ugly, but per my test on marvell BG2Q platforms, this change can improve
-the resume latency from 5500us to 11us. Is there any better solution?
-
-Thanks in advance,
-Jisheng
+> Thanks,
+>
+>          M.
+>
