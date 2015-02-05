@@ -1,38 +1,52 @@
-From: j.uzycki@elproma.com.pl (=?UTF-8?B?SmFudXN6IFXFvHlja2k=?=)
-Date: Thu, 05 Feb 2015 16:17:22 +0100
-Subject: arm: kprobe compilation error
-Message-ID: <54D38982.6000100@elproma.com.pl>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu,  5 Feb 2015 16:25:30 +0100
+Subject: [PATCH v3] MediaTek PMIC support
+Message-ID: <1423149938-14471-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This series adds initial support for the MediaTek MT6397 PMIC and the
+necessary infrastructure to attach it on the MT8135 / MT8173 SoCs.
 
-I got the compilation error on next-20150204:
+The infrastructure includes:
 
-   CC      arch/arm/probes/kprobes/actions-arm.o
-In file included from arch/arm/probes/kprobes/actions-common.c:18:
-arch/arm/probes/kprobes/core.h:43: error: '[*]' not allowed in other 
-than a declaration
-make[2]: *** [arch/arm/probes/kprobes/actions-common.o] B??d 1
-make[2]: *** Oczekiwanie na niezako?czone zadania....
-In file included from arch/arm/probes/kprobes/actions-arm.c:66:
-arch/arm/probes/kprobes/core.h:43: error: '[*]' not allowed in other 
-than a declaration
-make[2]: *** [arch/arm/probes/kprobes/actions-arm.o] B??d 1
-In file included from arch/arm/probes/kprobes/core.c:37:
-arch/arm/probes/kprobes/core.h:43: error: '[*]' not allowed in other 
-than a declaration
-make[2]: *** [arch/arm/probes/kprobes/core.o] B??d 1
-make[1]: *** [arch/arm/probes/kprobes] B??d 2
-make: *** [arch/arm/probes] B??d 2
+- pericfg / infracfg controller support
+  The pericfg / infracfg controllers contain miscellaneous registers for
+  reset controllers and clocks.
 
-reason is *[*]:
-const struct decode_checker *[*]);
-                                                      ^
+- PMIC wrapper support
+  On MediaTek MT8135, MT8173 and other SoCs the PMIC is connected via
+  SPI. The SPI master interface is not directly visible to the CPU, but
+  only through the PMIC wrapper inside the SoC. The communication between
+  the SoC and the PMIC can optionally be encrypted. Also a non standard
+  Dual IO SPI mode can be used to increase speed. The MT8135 also supports
+  a special feature named "IP Pairing". With IP Pairing the pins of some
+  SoC internal peripherals can be on the PMIC. The signals of these pins
+  are routed over the SPI bus using the pwrap bridge. Because of these
+  optional non SPI conform features the PMIC driver is not implemented as
+  a SPI bus master driver.
 
-target: mxs (arm926)
-gcc version 4.2.4
+The MT6397 PMIC itself is implemented as a regular mfd device driver which
+uses regmap to access the PMIC registers.
 
+This series also adds regulator support for the MT6397 PMIC.
 
-best regards
-Janusz
+The first 6 patches can be merged through the ARM SoC tree. The mfd
+patch is independent of the first 6 patches and can be merged through the
+mfd maintainer trees.
+
+changes since v2:
+
+- put device tree docs into a separate patch
+- Fix lockdep issues in irq mt6397 handler
+- cosmetic changes
+
+Changes since v1:
+
+- document reset bindings for infracfg/pericfg
+- fix base addresses in infracfg binding example
+- Remove more Email addresses from Flora Fu (She is not working at
+  MediaTek anymore, her address is no longer valid)
+- drop Regulator support patch, it's already in next
+
+Sascha
