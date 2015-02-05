@@ -1,83 +1,98 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 05 Feb 2015 08:23:22 +0100
-Subject: [PATCH v3 3/3] ARM: EXYNOS: Remove left over 'extra_save'
-In-Reply-To: <1423121002-25117-1-git-send-email-k.kozlowski@samsung.com>
-References: <1423121002-25117-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1423121002-25117-3-git-send-email-k.kozlowski@samsung.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Thu, 5 Feb 2015 15:35:13 +0800
+Subject: [PATCH] ASoC: wm8731: let codec to manage clock by itself
+Message-ID: <1423121713-19434-1-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since 32b0aa9aaeb4 ("ARM: EXYNOS: Remove i2c sys configuration related
-code") the Exynos 5250 no longer saves additional registers under
-'exynos_pm_data.extra_save' field.
+Let the wm8731 codec to manage clock by itself.
 
-No one else uses this code so get rid of it making also 'exynos_pm_data'
-const everywhere.
-
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
+Signed-off-by: Bo Shen <voice.shen@atmel.com>
 ---
-Changes since v2:
-2. Remove also 'num_extra_save' field (suggested by Pankaj Dubey).
 
-Changes since v1:
-1. New patch.
----
- arch/arm/mach-exynos/suspend.c | 14 ++------------
- 1 file changed, 2 insertions(+), 12 deletions(-)
+ sound/soc/codecs/wm8731.c | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
-index e6c961126087..71e2ba6dbc3d 100644
---- a/arch/arm/mach-exynos/suspend.c
-+++ b/arch/arm/mach-exynos/suspend.c
-@@ -63,8 +63,6 @@ static struct sleep_save exynos_core_save[] = {
+diff --git a/sound/soc/codecs/wm8731.c b/sound/soc/codecs/wm8731.c
+index b115ed8..ecd8424 100644
+--- a/sound/soc/codecs/wm8731.c
++++ b/sound/soc/codecs/wm8731.c
+@@ -13,6 +13,7 @@
+  * published by the Free Software Foundation.
+  */
  
- struct exynos_pm_data {
- 	const struct exynos_wkup_irq *wkup_irq;
--	struct sleep_save *extra_save;
--	int num_extra_save;
- 	unsigned int wake_disable_mask;
- 	unsigned int *release_ret_regs;
++#include <linux/clk.h>
+ #include <linux/module.h>
+ #include <linux/moduleparam.h>
+ #include <linux/init.h>
+@@ -45,6 +46,7 @@ static const char *wm8731_supply_names[WM8731_NUM_SUPPLIES] = {
+ /* codec private data */
+ struct wm8731_priv {
+ 	struct regmap *regmap;
++	struct clk *mclk;
+ 	struct regulator_bulk_data supplies[WM8731_NUM_SUPPLIES];
+ 	const struct snd_pcm_hw_constraint_list *constraints;
+ 	unsigned int sysclk;
+@@ -389,6 +391,9 @@ static int wm8731_set_dai_sysclk(struct snd_soc_dai *codec_dai,
+ 	switch (clk_id) {
+ 	case WM8731_SYSCLK_XTAL:
+ 	case WM8731_SYSCLK_MCLK:
++		if (IS_ENABLED(CONFIG_COMMON_CLK))
++			if (clk_set_rate(wm8731->mclk, freq))
++				return -EINVAL;
+ 		wm8731->sysclk_type = clk_id;
+ 		break;
+ 	default:
+@@ -490,6 +495,9 @@ static int wm8731_set_bias_level(struct snd_soc_codec *codec,
  
-@@ -75,7 +73,7 @@ struct exynos_pm_data {
- 	int (*cpu_suspend)(unsigned long);
- };
+ 	switch (level) {
+ 	case SND_SOC_BIAS_ON:
++		if (IS_ENABLED(CONFIG_COMMON_CLK))
++			if (clk_prepare_enable(wm8731->mclk))
++				return -EINVAL;
+ 		break;
+ 	case SND_SOC_BIAS_PREPARE:
+ 		break;
+@@ -508,6 +516,8 @@ static int wm8731_set_bias_level(struct snd_soc_codec *codec,
+ 		snd_soc_write(codec, WM8731_PWR, reg | 0x0040);
+ 		break;
+ 	case SND_SOC_BIAS_OFF:
++		if (IS_ENABLED(CONFIG_COMMON_CLK))
++			clk_disable_unprepare(wm8731->mclk);
+ 		snd_soc_write(codec, WM8731_PWR, 0xffff);
+ 		regulator_bulk_disable(ARRAY_SIZE(wm8731->supplies),
+ 				       wm8731->supplies);
+@@ -666,6 +676,15 @@ static int wm8731_spi_probe(struct spi_device *spi)
+ 	if (wm8731 == NULL)
+ 		return -ENOMEM;
  
--static struct exynos_pm_data *pm_data;
-+static const struct exynos_pm_data *pm_data;
++	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
++		wm8731->mclk = devm_clk_get(&spi->dev, "mclk");
++		if (IS_ERR(wm8731->mclk)) {
++			ret = PTR_ERR(wm8731->mclk);
++			dev_err(&spi->dev, "Failed to get MCLK\n");
++			return ret;
++		}
++	}
++
+ 	mutex_init(&wm8731->lock);
  
- static int exynos5420_cpu_state;
- static unsigned int exynos_pmu_spare3;
-@@ -240,10 +238,6 @@ static void exynos_pm_prepare(void)
+ 	wm8731->regmap = devm_regmap_init_spi(spi, &wm8731_regmap);
+@@ -717,6 +736,15 @@ static int wm8731_i2c_probe(struct i2c_client *i2c,
+ 	if (wm8731 == NULL)
+ 		return -ENOMEM;
  
- 	s3c_pm_do_save(exynos_core_save, ARRAY_SIZE(exynos_core_save));
++	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
++		wm8731->mclk = devm_clk_get(&i2c->dev, "mclk");
++		if (IS_ERR(wm8731->mclk)) {
++			ret = PTR_ERR(wm8731->mclk);
++			dev_err(&i2c->dev, "Failed to get MCLK\n");
++			return ret;
++		}
++	}
++
+ 	mutex_init(&wm8731->lock);
  
--	 if (pm_data->extra_save)
--		s3c_pm_do_save(pm_data->extra_save,
--				pm_data->num_extra_save);
--
- 	exynos_pm_enter_sleep_mode();
- 
- 	/* ensure at least INFORM0 has the resume address */
-@@ -362,10 +356,6 @@ static void exynos_pm_resume(void)
- 	/* For release retention */
- 	exynos_pm_release_retention();
- 
--	if (pm_data->extra_save)
--		s3c_pm_do_restore_core(pm_data->extra_save,
--					pm_data->num_extra_save);
--
- 	s3c_pm_do_restore_core(exynos_core_save, ARRAY_SIZE(exynos_core_save));
- 
- 	if (cpuid == ARM_CPU_PART_CORTEX_A9)
-@@ -618,7 +608,7 @@ void __init exynos_pm_init(void)
- 		pr_err("Failed to find PMU node\n");
- 		return;
- 	}
--	pm_data = (struct exynos_pm_data *) match->data;
-+	pm_data = (const struct exynos_pm_data *) match->data;
- 
- 	/* Platform-specific GIC callback */
- 	gic_arch_extn.irq_set_wake = exynos_irq_set_wake;
+ 	wm8731->regmap = devm_regmap_init_i2c(i2c, &wm8731_regmap);
 -- 
-1.9.1
+2.3.0.rc0
