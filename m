@@ -1,67 +1,64 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 5 Feb 2015 11:54:16 +0000
-Subject: [PATCH 1/4] arm64: dts: fix PMU IRQ ordering for Juno
-In-Reply-To: <20150205114642.GG11344@leverpostej>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 5 Feb 2015 11:56:01 +0000
+Subject: [PATCH 2/4] arm64: pmu: add support for interrupt-affinity
+ property
+In-Reply-To: <1422294858-28100-2-git-send-email-will.deacon@arm.com>
 References: <1422294858-28100-1-git-send-email-will.deacon@arm.com>
- <20150205114642.GG11344@leverpostej>
-Message-ID: <20150205115416.GE23241@arm.com>
+ <1422294858-28100-2-git-send-email-will.deacon@arm.com>
+Message-ID: <20150205115601.GH11344@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 05, 2015 at 11:46:42AM +0000, Mark Rutland wrote:
-> On Mon, Jan 26, 2015 at 05:54:15PM +0000, Will Deacon wrote:
-> > diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
-> > index cb3073e4e7a8..4ed9287aaef1 100644
-> > --- a/arch/arm64/boot/dts/arm/juno.dts
-> > +++ b/arch/arm64/boot/dts/arm/juno.dts
-> > @@ -107,11 +107,11 @@
-> >  	pmu {
-> >  		compatible = "arm,armv8-pmuv3";
-> >  		interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
-> > +			     <GIC_SPI 02 IRQ_TYPE_LEVEL_HIGH>,
-> > +			     <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>,
-> >  			     <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>,
-> >  			     <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>,
-> > -			     <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>,
-> > -			     <GIC_SPI 02 IRQ_TYPE_LEVEL_HIGH>,
-> > -			     <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>;
-> > +			     <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
-> >  	};
+On Mon, Jan 26, 2015 at 05:54:16PM +0000, Will Deacon wrote:
+> Historically, the PMU devicetree bindings have expected SPIs to be
+> listed in order of *logical* CPU number. This is problematic for
+> bootloaders, especially when the boot CPU (logical ID 0) isn't listed
+> first in the devicetree.
 > 
-> I am very much not keen on this. While this may get things working
-> today, it completely relies on Linux-internal details (the order of CPU
-> bringup, which in this case is different from the order of entries in
-> /cpus).
+> This patch adds a new optional property, interrupt-affinity, to the
+> PMU node which allows the interrupt affinity to be described using
+> a list of phandled to CPU nodes, with each entry in the list
+> corresponding to the SPI at the same index in the interrupts property.
 > 
-> In all other dts that I am aware of, the order of entries in /cpus
-> aligns with the order of interrupts in the PMU node, and the first entry
-> is the boot CPU.
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  Documentation/devicetree/bindings/arm/pmu.txt |  6 +++
+>  arch/arm64/include/asm/pmu.h                  |  1 +
+>  arch/arm64/kernel/perf_event.c                | 57 +++++++++++++++++++++++++--
+>  3 files changed, 60 insertions(+), 4 deletions(-)
 > 
-> I think that we should ensure that the ordering of CPU nodes matches the
-> order of interrupts here. That way we can fall back to that ordering (if
-> not explicitly overridden), and even after an arbitrary logical
-> renumbering (e.g. after a kexec) the relationship should stay intact.
+> diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
+> index 75ef91d08f3b..a9281fc48743 100644
+> --- a/Documentation/devicetree/bindings/arm/pmu.txt
+> +++ b/Documentation/devicetree/bindings/arm/pmu.txt
+> @@ -24,6 +24,12 @@ Required properties:
+>  
+>  Optional properties:
+>  
+> +- interrupt-affinity : Valid only when using SPIs, specifies a list of phandles
+> +                       to CPU nodes corresponding directly to the affinity of
+> +		       the SPIs listed in the interrupts property. If absent,
+> +		       the interrupts are assumed to be listed in logical CPU
+> +		       order.
 
-There are a few problems with reordering the CPU nodes:
+This covers the case we care about today, but it's problematic in cases
+where the number of interrupts is not equal to the number of CPUs affine
+to that interrupt. For example:
 
-  (1) It breaks any existing users of taskset to pin on big/little
-      clusters.
+* PPIs in big.LITTLE systems, where we may need a node per cluster, and
+  will need a way of associating a PMU node with a subset of all CPUs,
+  despite having only one interrupt.
 
-  (2) It's not generally possible if, for example, the bootloader decides
-      to boot Linux on a different CPU then we have no choice but to
-      change the PMU interrupt order.
+* Muxed SPIs per-cluster (is this likely to happen?)
 
-  (3) I didn't think that the ordering of CPU nodes was guaranteed to be
-      preserved by dtc, whereas the order of the interrupts will be.
+The former can be covered by allowing multiple entries in
+interrupt-affintiy for PPIs. I'm not sure if the latter is something we
+need to cater for. If we do, then perhaps we need an interruptN-affinity
+property per interrupt (though that's ugly and painful to deal with).
 
-> This DT has clearly never worked (nor been tested), and I think having
-> this as an intermediary step only adds to the long term support burden
-> by having the juno dts arbitrarily different to all other dts files (by
-> relying on a logical order that's different to the /cpus order).
-> 
-> Longer term we must ensure we have a more explicit ordering, as with
-> your later patches.
+It would be nice to have a solution now that's not radically different
+to what needs to come next.
 
-Agreed. This is intended as something simpler for -stable.
-
-Will
+Thanks,
+Mark.
