@@ -1,78 +1,51 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 05 Feb 2015 18:16:15 +0800
-Subject: [PATCH v8 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <54D2812E.9060804@codeaurora.org>
-References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
- <54D2812E.9060804@codeaurora.org>
-Message-ID: <54D342EF.40606@linaro.org>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 5 Feb 2015 18:20:31 +0800
+Subject: [RFC] mmc: sdhci: implement light and heavy runtime pm resume
+Message-ID: <20150205182031.1a47d726@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?02?05? 04:29, Timur Tabi wrote:
-> On 02/02/2015 06:45 AM, Hanjun Guo wrote:
->> Hi,
->>
->> This is the v8 of ACPI core patches for ARM64 based on ACPI 5.1, there
->> are
->> some updates since v7:
->
-> All 21 patches:
->
-> Tested-by: Timur Tabi <timur@codeaurora.org>
+Hi all,
 
-Hi Timur, thank you very much :)
+Most sdhci_runtime_resume_host() users just gate their clocks in their runtime
+suspend implementation, so the sdhci_runtime_resume_host() is too heavy, we only
+need to restore interrupts registers.
 
->
-> I no longer need to use "acpi=force", so that's nice.
->
->>
->>   - Add two more documantation to explain why we need ACPI in ARM64
->> servers
->
-> "documentation"
->
->
->>     by Grant, and recommendations and prohibitions on the use of the
->> numerous
->>     ACPI tables and objects by Al Stone.
->>
->>   - Add two patches which is need to map acpi tables after
->> acpi_gbl_permanent_mmap
->>     is set
->>
->>   - Add another patch "dt / chosen: Add linux,uefi-stub-generated-dtb
->> property"
->>     to address that if firmware providing no dtb, we can try ACPI
->> configuration data
->>     even if no "acpi=force" is passed in early parameters. (I think
->> ACPI for XEN and
->>     kexec need consider sperately as disscussed, correct me if I'm
->> wrong).
->
-> "need to be considered separately", "discussed"
->
->>
->>   - Add CC in the patch to the subsystem maintainers and modify the
->> subject
->>     of the patch to explicitly show the subsystem touched by this
->> patch set,
->>     please help us to review and ack them if they make sense, thanks.
->>
->>   - Add Tested-by from Qualcomm and Redhat;
->>
->>   - Make ACPI depends on PCI suggested by Catalin;
->>
->>   - Clean up SMP init function as Lorenzo suggested, remove physical
->>     CPU hot-plug code in the patch;
->>
->>   - Address some comments from Marc and explicitly state that will
->>     implment statcked irqdomain and GIC init framework when GICv3 and
->
-> "implement", "stacked"
+The change is something as following:
 
-Sorry for that, I'm not a native English speaker but I'm glad that you
-you got the meaning of what I said :)
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index 0ad412a..9d5bdde 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -2856,7 +2856,7 @@ int sdhci_runtime_suspend_host(struct sdhci_host *host)
+ }
+ EXPORT_SYMBOL_GPL(sdhci_runtime_suspend_host);
+ 
+-int sdhci_runtime_resume_host(struct sdhci_host *host)
++static void sdhci_runtime_resume_reinit(struct sdhci_host *host)
+ {
+ 	unsigned long flags;
+ 	int host_flags = host->flags;
+@@ -2880,6 +2880,15 @@ int sdhci_runtime_resume_host(struct sdhci_host *host)
+ 		sdhci_enable_preset_value(host, true);
+ 		spin_unlock_irqrestore(&host->lock, flags);
+ 	}
++}
++
++int sdhci_runtime_resume_host(struct sdhci_host *host, bool power_keeped)
++{
++	unsigned long flags;
++	int host_flags = host->flags;
++
++	if (!power_keeped)
++		sdhci_runtime_resume_reinit(host);
+ 
+ 	/* Set the re-tuning expiration flag */
+ 	if (host->flags & SDHCI_USING_RETUNING_TIMER)
 
-Thank you again for the test.
 
-Hanjun
+It's ugly, but per my test on marvell BG2Q platforms, this change can improve
+the resume latency from 5500us to 11us. Is there any better solution?
+
+Thanks in advance,
+Jisheng
