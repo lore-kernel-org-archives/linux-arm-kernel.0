@@ -1,126 +1,79 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Thu, 5 Feb 2015 14:02:09 +0800
-Subject: [PATCH 3/3] pm: at91: Workaround DDRSDRC self-refresh bug with LPDDR1
- memories.
-In-Reply-To: <1423115977-5852-1-git-send-email-wenyou.yang@atmel.com>
-References: <1423115977-5852-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1423116129-6026-1-git-send-email-wenyou.yang@atmel.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 05 Feb 2015 15:17:04 +0900
+Subject: Kexec and KVM not working gracefully together
+In-Reply-To: <54C7ADF0.8090102@arm.com>
+References: <CAHt6W4cuRi3bfj5mryFouhOLGAAWuNXKVvz4K-rAjQnwiegL-Q@mail.gmail.com>
+ <54C7ADF0.8090102@arm.com>
+Message-ID: <54D30AE0.5050101@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Peter Rosin <peda@axentia.se>
+Frediano
+Cc: Marc
 
-The DDRSDR controller fails miserably to put LPDDR1 memories in
-self-refresh. Force the controller to think it has DDR2 memories
-during the self-refresh period, as the DDR2 self-refresh spec is
-equivalent to LPDDR1, and is correctly implemented in the
-controller.
+Are you going to fix this issue on arm?
+As I'm now working on the same issue on arm64,
+we should share the idea and some code.
 
-Assume that the second controller has the same fault, but that is
-untested.
+Hopefully I will talk to Marc at Linaro Connect next week,
+then submit my own patch (or merge it into Geoff's) soon.
 
-Signed-off-by: Peter Rosin <peda@axentia.se>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/mach-at91/pm_slowclock.S  |   43 +++++++++++++++++++++++++++++++-----
- include/soc/at91/at91sam9_ddrsdr.h |    2 +-
- 2 files changed, 39 insertions(+), 6 deletions(-)
+Thanks,
+-Takahiro AKASHI
 
-diff --git a/arch/arm/mach-at91/pm_slowclock.S b/arch/arm/mach-at91/pm_slowclock.S
-index 75d8b19..487ae1e 100644
---- a/arch/arm/mach-at91/pm_slowclock.S
-+++ b/arch/arm/mach-at91/pm_slowclock.S
-@@ -109,6 +109,16 @@ ddr_sr_enable:
- 	cmp	memctrl, #AT91_MEMCTRL_DDRSDR
- 	bne	sdr_sr_enable
- 
-+	/* LPDDR1 --> force DDR2 mode during self-refresh */
-+	ldr	tmp1, [sdramc, #AT91_DDRSDRC_MDR]
-+	str	tmp1, .saved_sam9_mdr
-+	bic	tmp1, tmp1, #~AT91_DDRSDRC_MD
-+	cmp	tmp1, #AT91_DDRSDRC_MD_LOW_POWER_DDR
-+	ldreq	tmp1, [sdramc, #AT91_DDRSDRC_MDR]
-+	biceq	tmp1, tmp1, #AT91_DDRSDRC_MD
-+	orreq	tmp1, tmp1, #AT91_DDRSDRC_MD_DDR2
-+	streq	tmp1, [sdramc, #AT91_DDRSDRC_MDR]
-+
- 	/* prepare for DDRAM self-refresh mode */
- 	ldr	tmp1, [sdramc, #AT91_DDRSDRC_LPR]
- 	str	tmp1, .saved_sam9_lpr
-@@ -117,14 +127,26 @@ ddr_sr_enable:
- 
- 	/* figure out if we use the second ram controller */
- 	cmp	ramc1, #0
--	ldrne	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
--	strne	tmp2, .saved_sam9_lpr1
--	bicne	tmp2, #AT91_DDRSDRC_LPCB
--	orrne	tmp2, #AT91_DDRSDRC_LPCB_SELF_REFRESH
-+	beq	ddr_no_2nd_ctrl
-+
-+	ldr	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
-+	str	tmp2, .saved_sam9_mdr1
-+	bic	tmp2, tmp2, #~AT91_DDRSDRC_MD
-+	cmp	tmp2, #AT91_DDRSDRC_MD_LOW_POWER_DDR
-+	ldreq	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
-+	biceq	tmp2, tmp2, #AT91_DDRSDRC_MD
-+	orreq	tmp2, tmp2, #AT91_DDRSDRC_MD_DDR2
-+	streq	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
-+
-+	ldr	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
-+	str	tmp2, .saved_sam9_lpr1
-+	bic	tmp2, #AT91_DDRSDRC_LPCB
-+	orr	tmp2, #AT91_DDRSDRC_LPCB_SELF_REFRESH
- 
- 	/* Enable DDRAM self-refresh mode */
-+	str	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
-+ddr_no_2nd_ctrl:
- 	str	tmp1, [sdramc, #AT91_DDRSDRC_LPR]
--	strne	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
- 
- 	b	sdr_sr_done
- 
-@@ -236,12 +258,17 @@ sdr_sr_done:
- 	 */
- 	cmp	memctrl, #AT91_MEMCTRL_DDRSDR
- 	bne	sdr_en_restore
-+	/* Restore MDR in case of LPDDR1 */
-+	ldr	tmp1, .saved_sam9_mdr
-+	str	tmp1, [sdramc, #AT91_DDRSDRC_MDR]
- 	/* Restore LPR on AT91 with DDRAM */
- 	ldr	tmp1, .saved_sam9_lpr
- 	str	tmp1, [sdramc, #AT91_DDRSDRC_LPR]
- 
- 	/* if we use the second ram controller */
- 	cmp	ramc1, #0
-+	ldrne	tmp2, .saved_sam9_mdr1
-+	strne	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
- 	ldrne	tmp2, .saved_sam9_lpr1
- 	strne	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
- 
-@@ -272,5 +299,11 @@ ram_restored:
- .saved_sam9_lpr1:
- 	.word 0
- 
-+.saved_sam9_mdr:
-+	.word 0
-+
-+.saved_sam9_mdr1:
-+	.word 0
-+
- ENTRY(at91_slow_clock_sz)
- 	.word .-at91_slow_clock
-diff --git a/include/soc/at91/at91sam9_ddrsdr.h b/include/soc/at91/at91sam9_ddrsdr.h
-index 0210797..dc10c52 100644
---- a/include/soc/at91/at91sam9_ddrsdr.h
-+++ b/include/soc/at91/at91sam9_ddrsdr.h
-@@ -92,7 +92,7 @@
- #define		AT91_DDRSDRC_UPD_MR	(3 << 20)	 /* Update load mode register and extended mode register */
- 
- #define AT91_DDRSDRC_MDR	0x20	/* Memory Device Register */
--#define		AT91_DDRSDRC_MD		(3 << 0)		/* Memory Device Type */
-+#define		AT91_DDRSDRC_MD		(7 << 0)	/* Memory Device Type */
- #define			AT91_DDRSDRC_MD_SDR		0
- #define			AT91_DDRSDRC_MD_LOW_POWER_SDR	1
- #define			AT91_DDRSDRC_MD_LOW_POWER_DDR	3
--- 
-1.7.9.5
+On 01/28/2015 12:25 AM, Marc Zyngier wrote:
+> Hi Frediano,
+>
+> On 27/01/15 15:07, Frediano Ziglio wrote:
+>> Hi,
+>>    I was trying to make kexec (software reset) work on an ARM platform
+>> and I realized that the kernel launched with kexec cannot use KVM.
+>> Looking for message I get from kernel and code the situation is this:
+>> 1- kernel start in HYP mode but then kvm code switch to SVC mode and
+>> initialize HYP mode with its code;
+>> 2- kexec call reboot with LINUX_REBOOT_CMD_KEXEC
+>> 3- kernel call kernel_exec;
+>> 4- kernel_exec calls machine_kexec;
+>> 5- machine_kexec calls soft_restart passing physical entry point for
+>> next in memory kernel;
+>> 6- soft_restart calls __soft_restart changing stack;
+>> 7- __soft_restart calls cpu_reset (which in my case is defined as cpu_v7_reset);
+>> 8- cpu_v7_reset just disable MMU (it's in an identity memory) and
+>> calls next kernel entry point.
+>>
+>>  From point 3 to 8 kernel is always in SVC mode so next kernel is
+>> launched in SVC mode too but initial kernel was launched in HYP mode.
+>>
+>> I used kernel 3.14 but looking at 3.19 rc code there is the same issue
+>> (code didn't change).
+>>
+>> Using hvc instruction you can execute arbitrary functions however
+>> these function must be in a very restricted range as HYP code MMU has
+>> very limited paged configured and cpu_v7_reset is not one of these
+>> functions.
+>>
+>> My idea to fix the issue is before calling cpu_reset call a new
+>> kvm_exit or similar that turn into HYP mode with MMU set as SVC mode.
+>>
+>> Is this a known issue? Should I try to fix the problem or somebody can
+>> easily fix it?
+>
+> This has been known for a while, and so far people dealing with Kexec
+> have preferred sidestepping the issue. This is moderately easy to fix if
+> you're happy dealing with page tables. What is missing is the code that
+> switches back to an idmap, restore the HYP stubs, and let Kexec install
+> its own stubs for jumping to the next kernel.
+>
+> Most of the infrastructure is already there, it is "just" a matter of
+> getting it right.
+>
+> If you feel like giving it a go, I suggest you have a look at how we
+> actually install KVM (the transitions from no MMU to idmap to trampoline
+> page to final layout is rather entertaining). Once you understand that,
+> it should be rather straightforward to perform this in the reverse
+> order, and we can assist you getting it right.
+>
+> Thanks,
+>
+> 	M.
+>
