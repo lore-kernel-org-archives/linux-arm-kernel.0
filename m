@@ -1,37 +1,65 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 5 Feb 2015 11:59:51 +0100
-Subject: imx_v6_v7_defconfig needs lzop
-In-Reply-To: <CAMuHMdXJCh32e-+7rqNzCdbYX4AH3qfBQ3uZ_t9kC_8+1P1jJQ@mail.gmail.com>
-References: <CAMuHMdVjqp52BQqH32Ut7kxDYzmyY4+JEVuhXgTqU8V24kQyZA@mail.gmail.com>
- <CAOMZO5Dh0Wv61Y0J_Ue1G=Y8vc23yM2Fxq6CqhpmNBHa-2Lkvg@mail.gmail.com>
- <CAMuHMdXJCh32e-+7rqNzCdbYX4AH3qfBQ3uZ_t9kC_8+1P1jJQ@mail.gmail.com>
-Message-ID: <20150205105951.GU10842@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 5 Feb 2015 10:59:45 +0000
+Subject: [PATCH v8 02/21] acpi: fix acpi_os_ioremap for arm64
+In-Reply-To: <CAKv+Gu-tqY4C0eaRvp5FAzx9PqOGMg+sFNzxr2f25omdJKr7JA@mail.gmail.com>
+References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
+ <1422881149-8177-3-git-send-email-hanjun.guo@linaro.org>
+ <2422968.Es7R0p3loO@vostro.rjw.lan>
+ <1422984576.18187.82.camel@deneb.redhat.com>
+ <20150204112508.GB26006@e104818-lin.cambridge.arm.com>
+ <1423066107.18187.99.camel@deneb.redhat.com>
+ <20150204175734.GI26006@e104818-lin.cambridge.arm.com>
+ <1423076294.18187.103.camel@deneb.redhat.com>
+ <20150205104149.GA18158@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu-tqY4C0eaRvp5FAzx9PqOGMg+sFNzxr2f25omdJKr7JA@mail.gmail.com>
+Message-ID: <20150205105945.GC18158@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Wed, Feb 04, 2015 at 03:41:45PM +0100, Geert Uytterhoeven wrote:
-> On Wed, Feb 4, 2015 at 3:32 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> > On Wed, Feb 4, 2015 at 12:21 PM, Geert Uytterhoeven
-> > <geert@linux-m68k.org> wrote:
-> >> http://kisskb.ellerman.id.au/kisskb/buildresult/12358024/
+On Thu, Feb 05, 2015 at 10:47:23AM +0000, Ard Biesheuvel wrote:
+> On 5 February 2015 at 10:41, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Wed, Feb 04, 2015 at 06:58:14PM +0000, Mark Salter wrote:
+> >> On Wed, 2015-02-04 at 17:57 +0000, Catalin Marinas wrote:
+> >> > On Wed, Feb 04, 2015 at 04:08:27PM +0000, Mark Salter wrote:
+> >> > > acpi_os_remap() is used to map ACPI tables. These tables may be in ram
+> >> > > which are already included in the kernel's linear RAM mapping. So we
+> >> > > need ioremap_cache to avoid two mappings to the same physical page
+> >> > > having different caching attributes.
+> >> >
+> >> > What's the call path to acpi_os_ioremap() on such tables already in the
+> >> > linear mapping? I can see an acpi_map() function which already takes
+> >> > care of the RAM mapping case but there are other cases where
+> >> > acpi_os_ioremap() is called directly. For example,
+> >> > acpi_os_read_memory(), can it be called on both RAM and I/O?
 > >>
-> >> /bin/sh: 1: lzop: not found
-> >> cat: write error: Broken pipe
-> >> make[3]: *** [arch/arm/boot/compressed/piggy.lzo] Error 1
+> >> acpi_map() is the one I've seen.
 > >
-> > Isn't this error happening due to the lack of 'lzop' package installed
-> > on the host machine?
+> > By default, if should_use_kmap() is not patched for arm64, it translates
+> > to page_is_ram(); acpi_map() would simply use a kmap() which returns the
+> > current kernel linear mapping on arm64.
+> >
+> >> I'm not sure about others.
+> >
+> > Question for the ARM ACPI guys: what happens if you implement
+> > acpi_os_ioremap() on arm64 as just ioremap()? Do you get any WARN_ON()
+> > (__ioremap_caller() checks whether the memory is RAM)?
 > 
-> Indeed.
-I guess you don't want to ask for help or report a build breakage, but
-question if it's sensible to let a defconfig depend on a host tool that
-isn't commonly installed, right?
+> Regardless of whether you hit any WARN_ON()s now,
 
-Best regards
-Uwe
+Actually following the WARN_ON(), ioremap() returns NULL, so it may not
+go entirely unnoticed.
+
+> we still need to distinguish between MMIO ranges with device
+> semantics, and ACPI or other tables whose data may not be naturally
+> aligned all the time, and hence requiring memory semantics.
+> acpi_os_ioremap() may be used for both, afaik
+
+Is acpi_os_ioremap() called directly (outside acpi_map()) to map RAM
+that already part of the kernel linear memory? If yes, then I agree that
+we need to do such check.
+
+Another question, can we distinguish, in the ACPI core code, whether the
+mapping is for an ACPI table in RAM or some I/O space?
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Catalin
