@@ -1,51 +1,41 @@
-From: bintian.wang@huawei.com (Bintian Wang)
-Date: Thu, 5 Feb 2015 17:24:35 +0800
-Subject: [PATCH 1/3] arm64: Enable Hisilicon ARMv8 SoC family in Kconfig and
- defconfig
-In-Reply-To: <1423128277-10297-1-git-send-email-bintian.wang@huawei.com>
-References: <1423128277-10297-1-git-send-email-bintian.wang@huawei.com>
-Message-ID: <1423128277-10297-2-git-send-email-bintian.wang@huawei.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Thu, 05 Feb 2015 10:26:02 +0100
+Subject: [PATCH] coresight-stm: adding driver for CoreSight STM component
+In-Reply-To: <1423088550-15780-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1423088550-15780-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1423128362.27378.12.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces ARCH_HISI to enable Hisilicon SoC family in
-Kconfig and defconfig.
+On Wed, 2015-02-04 at 15:22 -0700, mathieu.poirier at linaro.org wrote:
+> From: Pratik Patel <pratikp@codeaurora.org>
+> 
+> This driver adds support for the STM CoreSight IP block,
+> allowing any system compoment (HW or SW) to log and
+> aggregate messages via a single entity.
+> 
+> The STM exposes an application defined number of channels
+> called stimulus port.  Configuration is done using entries
+> in sysfs and channels made available to userspace via devfs.
+> 
+> Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>[...]
+> +/**
+> + * struct stm_node - aggregation of channel information for userspace access
+> + * @channel_id:		the channel number associated to this file descriptor.
+> + * @options:		options for this channel - none, timestamped,
+> +i			guaranteed.
 
-Signed-off-by: Bintian Wang <bintian.wang@huawei.com>
-Reviewed-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-Reviewed-by: Wei Xu <xuwei5@hisilicon.com>
----
- arch/arm64/Kconfig           |    5 +++++
- arch/arm64/configs/defconfig |    1 +
- 2 files changed, 6 insertions(+)
+Did you perhaps use vim?
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index b1f9a20..78cd41c8 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -173,6 +173,11 @@ config ARCH_XGENE
- 	help
- 	  This enables support for AppliedMicro X-Gene SOC Family
- 
-+config ARCH_HISI
-+	bool "Hisilicon SoC Family"
-+	help
-+	  This enables support for Hisilicon ARMv8 Family of SoCs.
-+
- endmenu
- 
- menu "Bus support"
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 5376d90..a829774 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -34,6 +34,7 @@ CONFIG_MODULE_UNLOAD=y
- CONFIG_ARCH_THUNDER=y
- CONFIG_ARCH_VEXPRESS=y
- CONFIG_ARCH_XGENE=y
-+CONFIG_ARCH_HISI=y
- CONFIG_PCI=y
- CONFIG_PCI_MSI=y
- CONFIG_PCI_XGENE=y
--- 
-1.7.9.5
+> + * @drvdata:		STM driver specifics.
+> + */
+> +struct stm_node {
+> +	int			channel_id;
+> +	u32			options;
+> +	struct stm_drvdata	*drvdata;
+> +};
+
+
+Paul Bolle
