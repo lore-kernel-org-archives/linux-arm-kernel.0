@@ -1,54 +1,45 @@
-From: ddutile@redhat.com (Don Dutile)
-Date: Thu, 05 Feb 2015 13:46:39 -0500
-Subject: [PATCH] arm64: Change 'Call trace' to 'Call Trace' for tool
- scanners
-In-Reply-To: <20150205183029.GT8656@n2100.arm.linux.org.uk>
-References: <1423157427-41997-1-git-send-email-ddutile@redhat.com>
- <20150205173718.GS8656@n2100.arm.linux.org.uk> <54D3B3E5.4010505@redhat.com>
- <20150205183029.GT8656@n2100.arm.linux.org.uk>
-Message-ID: <54D3BA8F.6050200@redhat.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 5 Feb 2015 11:02:06 -0800
+Subject: [PATCH 0/3] arm64,hi6220: Enable Hisilicon Hi6220 SoC
+In-Reply-To: <CANMBJr685FzZzQ660Z1aNJX+Kzkw1OqM6RJAviARbL+5a=MJ2A@mail.gmail.com>
+References: <1423128277-10297-1-git-send-email-bintian.wang@huawei.com>
+ <CANMBJr685FzZzQ660Z1aNJX+Kzkw1OqM6RJAviARbL+5a=MJ2A@mail.gmail.com>
+Message-ID: <CAOesGMgjv9iLnLmpLADQYoAw=oUkJDAJs72Q5q=DQ75paQ+A-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/2015 01:30 PM, Russell King - ARM Linux wrote:
-> On Thu, Feb 05, 2015 at 01:18:13PM -0500, Don Dutile wrote:
->> On 02/05/2015 12:37 PM, Russell King - ARM Linux wrote:
->>> On Thu, Feb 05, 2015 at 12:30:27PM -0500, Donald Dutile wrote:
->>>> Receiving reports from service folks that arm64 uses
->>>> 'Call trace' when dumping stack, instead of the more familiar
->>>> 'Call Trace'; the former is not being seen by tools that
->>>> scan for the latter text.  Checking various arches,
->>>> it appears the mainstream server arches (ia64, mips, ppc,
->>>> s390, sparc, x86) use 'Call Trace'.
->>>> This kernel tools script scans for the latter text string as well
->>>>    tools/testing/selftests/rcutorture/bin/parse-console.sh
->>>> so it doesn't appear to be arch or vendor specific.
->>>
->>> That script should also be changed to accept "Backtrace" which we've had
->>> for eons on ARM.  I would not be happy to change that given that ARM has
->>> used "Backtrace" there for a very long time now (not far off 20 years.)
->>>
->> So you're saying:
->> (a) you want 'Backtrace' added to parse-console.sh
+On Thu, Feb 5, 2015 at 10:46 AM, Tyler Baker <tyler.baker@linaro.org> wrote:
+> Hi Bintian,
 >
-> Correct
+> On 5 February 2015 at 01:24, Bintian Wang <bintian.wang@huawei.com> wrote:
+>> Hello,
+>>
+>> Hi6220 is one mobile solution of Hisilicon, this patchset contains
+>> initial support for Hi6220 SoC and HiKey development board, which
+>> is based on ARM Cortex A53 architecture. Initial support is minimal
+>> and includes just the arch configuration, clock driver, device tree
+>> configuration.
+>>
+>> Many peripheral drivers will be submitted later.
+>>
+>> Any comments will be appreciated!
+>>
+>> Thanks,
+>>
+>> Bintian Wang (3):
+>>   arm64: Enable Hisilicon ARMv8 SoC family in Kconfig and defconfig
+>>   clk: hi6220: Clock driver support for Hisilicon hi6220 SoC
+>>   arm64: dts: Add dts files for Hisilicon Hi6220 SoC
 >
->> (b) 'not happy to change that' .. where 'that' == ?
->
-> that = "Backtrace" in the ARM code.
->
+> Thanks for posting these! I've applied this series on top of
+> next-20150204, however there was some fuzz that needed to be cleaned
+> up on 3/3 [1]. I've confirmed the platform is booting to a basic user
+> space without issue.
 
-Thanks for clarification.
-I found the use of 'Backtrace' in parisc, unicore32, tile & arm.
+>From ramdisk only, right? Given the timing of the posting of this
+patch set, I'm not going to merge it for 3.20. Hopefully for 3.21
+there will be some more peripheral support as well -- at least some
+sort of storage device.
 
-This patch isn't trying to resolve it for arm (or other) arch(es),
-just arm64.
 
-As I stated, I was trying to get the change done before
-arm64 systems are (much more) common, and dump tools used for
-other arches that scan for 'Call Trace' start to be exercised commonly on arm64.
-
-So, if arm(32) has a similar need, it can be done via another
-patch (set).
-
-- dd
+-Olof
