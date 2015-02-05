@@ -1,78 +1,33 @@
-From: wangnan0@huawei.com (Wang Nan)
-Date: Thu, 5 Feb 2015 09:59:45 +0800
-Subject: [PATCH -tip/urgent  0/2]kprobes bugfixes around optprobe
-In-Reply-To: <54D1FC10.1020505@huawei.com>
-References: <20150123064217.30731.49156.stgit@localhost.localdomain>
- <54C5D2CE.5030402@huawei.com> <54D1FC10.1020505@huawei.com>
-Message-ID: <54D2CE91.7020704@huawei.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 5 Feb 2015 02:02:18 +0000
+Subject: [PATCH v8 21/21] arm64: ACPI: additions of ACPI documentation
+ for arm64
+In-Reply-To: <54D26DA6.9000700@linaro.org>
+References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
+ <1422881149-8177-22-git-send-email-hanjun.guo@linaro.org>
+ <54D16A74.3030206@linaro.org>
+ <20150204181229.GB21293@sirena.org.uk>
+ <54D26DA6.9000700@linaro.org>
+Message-ID: <20150205020218.GR21293@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+On Wed, Feb 04, 2015 at 12:06:14PM -0700, Al Stone wrote:
 
-These 2 perf related bugfixs has been acked by Masami Hiramatsu and cc-ed to Ingo
-serval weeks ago, but he is not responsive. Could you please help us collect them
-into your tree?
+> I guess what I'm trying to figure out is: how specific does this need to be?
+> Does it need to be a step-by-step description, something like
+> Documentation/bindings/submitting-patches.txt, or something far more detailed
+> than that, with templates to fill out, and circles and arrows and a paragraph
+> on the back explaining each one [0] :)?
 
-Thank you.
-
-On 2015/2/4 19:01, Wang Nan wrote:
-> Hi Ingo (and others),
-> 
-> These 2 bugs still exist in mainline kernel. Could you please have a look at them?
-> 
-> Thanks!
-> 
-> On 2015/1/26 13:38, Wang Nan wrote:
->> Hi Ingo,
->>
->> Is there any problem on these patches? I'm unable to find them in upstream kernel
->> and -tip repository.
->>
->> Thank you.
->>
->> On 2015/1/23 14:42, Masami Hiramatsu wrote:
->>> Hi Ingo,
->>>
->>> Here are two patches for fixing bugs in kprobes, related to
->>> optprobe and enable/disable kprobe knob.
->>>
->>> These are reported and fixed by Wang Nan.
->>> https://lkml.org/lkml/2015/1/5/270
->>> https://lkml.org/lkml/2015/1/19/680
->>>
->>> Thank you,
->>>
->>>
->>> ---
->>>
->>> Wang Nan (2):
->>>       [BUGFIX]kprobes: set kprobes_all_disarmed earlier to enable re-optimization.
->>>       [BUGFIX]kprobes: makes kprobes/enabled works correctly for optimized kprobes.
->>>
->>>
->>>  kernel/kprobes.c |   18 +++++++++++++++---
->>>  1 file changed, 15 insertions(+), 3 deletions(-)
->>>
->>> --
->>> Masami HIRAMATSU
->>> Software Platform Research Dpt. Linux Technology Center
->>> Hitachi, Ltd., Yokohama Research Laboratory
->>> E-mail: masami.hiramatsu.pt at hitachi.com
->>>
->>
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
+I'd say it should have a reference to where someone can learn how to do
+the right thing; explicitly going through every single thing here sounds
+like overkill and duplication but it's also bad if nobody can tell how
+they're supposed to diligently follow the instructions.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150205/b001aba9/attachment-0001.sig>
