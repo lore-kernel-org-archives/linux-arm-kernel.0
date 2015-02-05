@@ -1,68 +1,69 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Thu, 5 Feb 2015 23:54:49 +0800
-Subject: [PATCH v3 05/15] drm: bridge/dw_hdmi: combine
- hdmi_set_clock_regenerator_n() and hdmi_regenerate_cts()
-In-Reply-To: <1422976340-30118-1-git-send-email-ykk@rock-chips.com>
-References: <1422975418-13302-1-git-send-email-ykk@rock-chips.com>
- <1422976340-30118-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <CAGS+omC_vWBdoWvzy96A5kFOKEeqaKRcPzNhNc20--+MoAPHyA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 5 Feb 2015 15:58:59 +0000
+Subject: (AArch64) NR_CPUS limit
+In-Reply-To: <CANMBJr45rUdK0AKQ6OY3OS8XMAUQvosuDuvBxtxWE7sYOABR-w@mail.gmail.com>
+References: <54D27FBF.8040909@redhat.com>
+ <CANMBJr45rUdK0AKQ6OY3OS8XMAUQvosuDuvBxtxWE7sYOABR-w@mail.gmail.com>
+Message-ID: <20150205155859.GB20735@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 3, 2015 at 11:12 PM, Yakir Yang <ykk@rock-chips.com> wrote:
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+On Thu, Feb 05, 2015 at 05:49:02AM +0000, Tyler Baker wrote:
+> Hi Jon,
+> 
+> On 4 February 2015 at 12:23, Jon Masters <jcm@redhat.com> wrote:
+> > Hi Folks,
+> >
+> > We're currently patching our kernels with a (much) higher maximum for
+> > NR_CPUS. There are some very large ARM systems coming soon - any
+> > objections to increasing this to something like 1024 or 4096?
 
-Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+There's already a patch out there going for 4096:
 
-> ---
-> Changes in v3:
-> - Combine hdmi_set_clock_regenerator_n() and hdmi_regenerate_cts()
->
-> Changes in v2: None
->
->  drivers/gpu/drm/bridge/dw_hdmi.c | 16 ++++++----------
->  1 file changed, 6 insertions(+), 10 deletions(-)
->
-> diff --git a/drivers/gpu/drm/bridge/dw_hdmi.c b/drivers/gpu/drm/bridge/dw_hdmi.c
-> index 7b5b664..262163f 100644
-> --- a/drivers/gpu/drm/bridge/dw_hdmi.c
-> +++ b/drivers/gpu/drm/bridge/dw_hdmi.c
-> @@ -196,19 +196,16 @@ static void hdmi_mask_writeb(struct dw_hdmi *hdmi, u8 data, unsigned int reg,
->         hdmi_modb(hdmi, data << shift, mask, reg);
->  }
->
-> -static void hdmi_set_clock_regenerator_n(struct dw_hdmi *hdmi,
-> -                                        unsigned int value)
-> +static void hdmi_set_clock_regenerator(struct dw_hdmi *hdmi,
-> +                                      unsigned int n, unsigned int cts)
->  {
-> -       hdmi_writeb(hdmi, value & 0xff, HDMI_AUD_N1);
-> -       hdmi_writeb(hdmi, (value >> 8) & 0xff, HDMI_AUD_N2);
-> -       hdmi_writeb(hdmi, (value >> 16) & 0x0f, HDMI_AUD_N3);
-> +       hdmi_writeb(hdmi, n & 0xff, HDMI_AUD_N1);
-> +       hdmi_writeb(hdmi, (n >> 8) & 0xff, HDMI_AUD_N2);
-> +       hdmi_writeb(hdmi, (n >> 16) & 0x0f, HDMI_AUD_N3);
->
->         /* nshift factor = 0 */
->         hdmi_modb(hdmi, 0, HDMI_AUD_CTS3_N_SHIFT_MASK, HDMI_AUD_CTS3);
-> -}
->
-> -static void hdmi_regenerate_cts(struct dw_hdmi *hdmi, unsigned int cts)
-> -{
->         /* Must be set/cleared first */
->         hdmi_modb(hdmi, 0, HDMI_AUD_CTS3_CTS_MANUAL, HDMI_AUD_CTS3);
->
-> @@ -374,8 +371,7 @@ static void hdmi_set_clk_regenerator(struct dw_hdmi *hdmi,
->                 __func__, hdmi->sample_rate, hdmi->ratio,
->                 pixel_clk, clk_n, clk_cts);
->
-> -       hdmi_set_clock_regenerator_n(hdmi, clk_n);
-> -       hdmi_regenerate_cts(hdmi, clk_cts);
-> +       hdmi_set_clock_regenerator(hdmi, clk_n, clk_cts);
->  }
->
->  static void hdmi_init_clk_regenerator(struct dw_hdmi *hdmi)
-> --
-> 2.1.2
->
->
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/318853.html
+
+That seems large enough to cater for everyone. I see x86_64 will go up
+to 8192 CPUs in some configurations, and if anyone wants NR_CPUS parity,
+now is the time to speak...
+
+Do we have an idea as to what the memory footprint and/or runtime
+performance hit looks like going from NR_CPUS=64 to NR_CPUS=4096? It
+would be nice to know if there's a scalability problem anywhere in the
+arch code.
+
+We also want defconfig to work on as many systems as possible, and it
+would be nice to know whether or not bumping the default is feasible.
+
+> FWIW, I have a few ARMv7 systems complaining about this issue as well.
+> 
+> [    0.000000] WARNING: CPU: 0 PID: 0 at
+> ../arch/arm/kernel/devtree.c:144 arm_dt_init_cpu_maps+0x118/0x1e8()
+> [    0.000000] DT /cpu 9 nodes greater than max cores 8, capping them
+> [    0.000000] Modules linked in:
+> [    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted
+> 3.19.0-rc7-00032-g5ee0e962603e #1
+> [    0.000000] Hardware name: Hisilicon HiP04 (Flattened Device Tree)
+> [    0.000000] [<c0215d94>] (unwind_backtrace) from [<c021165c>]
+> (show_stack+0x10/0x14)
+> [    0.000000] [<c021165c>] (show_stack) from [<c091841c>]
+> (dump_stack+0x78/0x94)
+> [    0.000000] [<c091841c>] (dump_stack) from [<c0247bc8>]
+> (warn_slowpath_common+0x74/0xb0)
+> [    0.000000] [<c0247bc8>] (warn_slowpath_common) from [<c0247c98>]
+> (warn_slowpath_fmt+0x30/0x40)
+> [    0.000000] [<c0247c98>] (warn_slowpath_fmt) from [<c0c624b4>]
+> (arm_dt_init_cpu_maps+0x118/0x1e8)
+> [    0.000000] [<c0c624b4>] (arm_dt_init_cpu_maps) from [<c0c613a8>]
+> (setup_arch+0x714/0xa98)
+> [    0.000000] [<c0c613a8>] (setup_arch) from [<c0c5e940>]
+> (start_kernel+0x94/0x3d4)
+> [    0.000000] [<c0c5e940>] (start_kernel) from [<10208084>] (0x10208084)
+> [    0.000000] ---[ end trace cb88537fdc8fa200 ]---
+> 
+> Is there an advantage (other than convenience) to increasing this
+> default, then say using the nr_cpu[1] kernel parameter?
+
+NR_CPUS >= nr_cpus due to compile-time allocations relying on NR_CPUS.
+You can't allocate more space for these at runtime...
+
+Mark.
