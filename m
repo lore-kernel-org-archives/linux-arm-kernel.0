@@ -1,103 +1,37 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 05 Feb 2015 11:59:18 +0100
-Subject: [PATCH v2] ARM: Don't use complete() during __cpu_die
-In-Reply-To: <20150205105327.GC11344@leverpostej>
-References: <1423131270-24047-1-git-send-email-k.kozlowski@samsung.com>
- <20150205105327.GC11344@leverpostej>
-Message-ID: <1423133958.25197.7.camel@AMDC1943>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 5 Feb 2015 11:59:51 +0100
+Subject: imx_v6_v7_defconfig needs lzop
+In-Reply-To: <CAMuHMdXJCh32e-+7rqNzCdbYX4AH3qfBQ3uZ_t9kC_8+1P1jJQ@mail.gmail.com>
+References: <CAMuHMdVjqp52BQqH32Ut7kxDYzmyY4+JEVuhXgTqU8V24kQyZA@mail.gmail.com>
+ <CAOMZO5Dh0Wv61Y0J_Ue1G=Y8vc23yM2Fxq6CqhpmNBHa-2Lkvg@mail.gmail.com>
+ <CAMuHMdXJCh32e-+7rqNzCdbYX4AH3qfBQ3uZ_t9kC_8+1P1jJQ@mail.gmail.com>
+Message-ID: <20150205105951.GU10842@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On czw, 2015-02-05 at 10:53 +0000, Mark Rutland wrote:
-> On Thu, Feb 05, 2015 at 10:14:30AM +0000, Krzysztof Kozlowski wrote:
-> > The complete() should not be used on offlined CPU. Rewrite the
-> > wait-complete mechanism with wait_on_bit_timeout().
-> > 
-> > The CPU triggering hot unplug (e.g. CPU0) will loop until some bit is
-> > cleared. In each iteration schedule_timeout() is used with initial sleep
-> > time of 1 ms. Later it is increased to 10 ms.
-> > 
-> > The dying CPU will clear the bit which is safe in that context.
-> > 
-> > This fixes following RCU warning on ARMv8 (Exynos 4412, Trats2) during
-> > suspend to RAM:
+Hello,
+
+On Wed, Feb 04, 2015 at 03:41:45PM +0100, Geert Uytterhoeven wrote:
+> On Wed, Feb 4, 2015 at 3:32 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> > On Wed, Feb 4, 2015 at 12:21 PM, Geert Uytterhoeven
+> > <geert@linux-m68k.org> wrote:
+> >> http://kisskb.ellerman.id.au/kisskb/buildresult/12358024/
+> >>
+> >> /bin/sh: 1: lzop: not found
+> >> cat: write error: Broken pipe
+> >> make[3]: *** [arch/arm/boot/compressed/piggy.lzo] Error 1
+> >
+> > Isn't this error happening due to the lack of 'lzop' package installed
+> > on the host machine?
 > 
-> Nit: isn't Exynos4412 a quad-A9 (ARMv7 rather than ARMv8)?
+> Indeed.
+I guess you don't want to ask for help or report a build breakage, but
+question if it's sensible to let a defconfig depend on a host tool that
+isn't commonly installed, right?
 
-Yes, it should be ARMv7. However still this should be fixed for both
-architectures.
+Best regards
+Uwe
 
-> 
-> > [   31.113925] ===============================
-> > [   31.113928] [ INFO: suspicious RCU usage. ]
-> > [   31.113935] 3.19.0-rc7-next-20150203 #1914 Not tainted
-> > [   31.113938] -------------------------------
-> > [   31.113943] kernel/sched/fair.c:4740 suspicious rcu_dereference_check() usage!
-> > [   31.113946]
-> > [   31.113946] other info that might help us debug this:
-> > [   31.113946]
-> > [   31.113952]
-> > [   31.113952] RCU used illegally from offline CPU!
-> > [   31.113952] rcu_scheduler_active = 1, debug_locks = 0
-> > [   31.113957] 3 locks held by swapper/1/0:
-> > [   31.113988]  #0:  ((cpu_died).wait.lock){......}, at: [<c005a114>] complete+0x14/0x44
-> > [   31.114012]  #1:  (&p->pi_lock){-.-.-.}, at: [<c004a790>] try_to_wake_up+0x28/0x300
-> > [   31.114035]  #2:  (rcu_read_lock){......}, at: [<c004f1b8>] select_task_rq_fair+0x5c/0xa04
-> > [   31.114038]
-> > [   31.114038] stack backtrace:
-> > [   31.114046] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 3.19.0-rc7-next-20150203 #1914
-> > [   31.114050] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
-> > [   31.114076] [<c0014ce4>] (unwind_backtrace) from [<c0011c30>] (show_stack+0x10/0x14)
-> > [   31.114091] [<c0011c30>] (show_stack) from [<c04dc048>] (dump_stack+0x70/0xbc)
-> > [   31.114105] [<c04dc048>] (dump_stack) from [<c004f83c>] (select_task_rq_fair+0x6e0/0xa04)
-> > [   31.114118] [<c004f83c>] (select_task_rq_fair) from [<c004a83c>] (try_to_wake_up+0xd4/0x300)
-> > [   31.114129] [<c004a83c>] (try_to_wake_up) from [<c00598a0>] (__wake_up_common+0x4c/0x80)
-> > [   31.114140] [<c00598a0>] (__wake_up_common) from [<c00598e8>] (__wake_up_locked+0x14/0x1c)
-> > [   31.114150] [<c00598e8>] (__wake_up_locked) from [<c005a134>] (complete+0x34/0x44)
-> > [   31.114167] [<c005a134>] (complete) from [<c04d6ca4>] (cpu_die+0x24/0x84)
-> > [   31.114179] [<c04d6ca4>] (cpu_die) from [<c005a508>] (cpu_startup_entry+0x328/0x358)
-> > [   31.114189] [<c005a508>] (cpu_startup_entry) from [<40008784>] (0x40008784)
-> > [   31.114226] CPU1: shutdown
-> > 
-> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > 
-> > ---
-> > Changes since v1:
-> > 1. Use adaptive sleep time when waiting for CPU die (idea and code
-> >    from Paul E. McKenney). Paul also acked the patch but I made evem more
-> >    changes.
-> > 
-> > 2. Add another bit (CPU_DIE_TIMEOUT_BIT) for synchronizing power down
-> >    failure in case:
-> >     CPU0 (killing)                           CPUx (killed)
-> >      wait_for_cpu_die
-> >      timeout
-> >                                               cpu_die()
-> >                                                clear_bit()
-> >                                                self power down
-> > 
-> >    In this case the bit would be cleared and CPU would be powered down
-> >    introducing wrong behavior in next power down sequence (CPU0 would
-> >    see the bit cleared).
-> >    I think that such race is still possible but was narrowed to very
-> >    short time frame. Any CPU up will reset the bit to proper values.
-> 
-> In the case of shutting down 2 CPUs in quick succession (without an
-> intervening boot of a CPU), surely this does not solve the potential
-> race on the wait_cpu_die variable?
-
-Right, the race is not fully fixed.
-
-> 
-> I think we instead need a percpu synchronisation variable, which would
-> prevent racing on the value between CPUs, and a CPU would have to be
-> brought up before we could decide to kill it again. With that I think we
-> only need a single bit, too.
-
-You mean a single bit-value per cpu?
-
-Best regards,
-Krzysztof
-> 
-> Thanks,
-> Mark.
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
