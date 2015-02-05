@@ -1,126 +1,150 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu,  5 Feb 2015 11:11:23 +0100
-Subject: [PATCH v5 0/5] drivers: bus: Add Simple Power-Managed Bus
-Message-ID: <1423131088-7835-1-git-send-email-geert+renesas@glider.be>
+Date: Thu,  5 Feb 2015 11:11:28 +0100
+Subject: [PATCH v5 5/5] drivers: bus: Add Simple Power-Managed Bus Driver
+In-Reply-To: <1423131088-7835-1-git-send-email-geert+renesas@glider.be>
+References: <1423131088-7835-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1423131088-7835-6-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-        Hi all,
+Add a driver for transparent busses that don't need a real driver, but
+where the bus controller is part of a PM domain, or under the control of
+a functional clock.  Typically, the bus controller's PM domain and/or
+clock must be enabled for child devices connected to the bus (either
+on-SoC or externally) to function.
 
-The Renesas Bus State Controller (BSC) provides an external bus for
-connecting multiple external devices to an SoC, driving several chip
-select lines, for e.g. NOR FLASH, Ethernet and USB.
-On the kzm9g and ape6evm development boards, an smsc9220 Ethernet
-controller is connnected to the BSC of an SH-Mobile AG5 (sh73a0) resp.
-R-Mobile APE6 (r8a73a4) SoC.
+Hence the sole purpose of this driver is to enable its clock and PM
+domain (if exist(s)), which are specified in the DT and managed from
+platform and PM domain code, and to probe for child devices.
 
-The BSC is a fairly simple memory-mapped bus, hence a "simple-bus"
-compatibility seems suitable.  However, the BSC is special in two
-ways:
-  1. It is part of a PM domain (A4S on sh73a0),
-  2. It has a gateable functional clock (ZB).
-Before a device connected to the BSC can be accessed, the PM domain
-containing the BSC must be powered on, and the functional clock
-driving the BSC must be enabled.
+Due to the child-parent relationship with devices connected to the bus,
+PM domain and clock state transitions are handled in the correct order.
 
-Both special properties can be described in DT in a standardized way
-("power-domains = <&pd_a4s>" and "clocks = <&zb_clk>", cfr. the
-example in the DT binding documentation).  Externally connected
-devices are described as children of the BSC node.
-
-Unfortunately this doesn't mean everything will work out-of-the-box.
-There are two problems:
-  1. Without a device driver bound to the bus device, this device is
-     not attached to the PM domain. And although a child device is
-     present and active, the PM domain may be powered down, as it's
-     considered unused by the PM domain core.
-  2. Without a device driver calling pm_runtime_enable(), its
-     functional clock is not enabled. Once runtime PM is enabled, the
-     R-Mobile PM domain platform driver manages the functional clock
-     using runtime PM.
-
-As none of the above is really bus hardware-specific (PM domains and
-functional clocks in clock domains are handled from genpd and platform
-code), this series adds a Simple Power-Managed Bus driver for
-transparent busses, which matches against "simple-pm-bus", enables
-runtime PM for the bus device, and calls of_platform_populate() to
-probe for child devices.
-Due to the child-parent relationship of devices connected to the bus,
-as long as the device drivers for the child devices are runtime PM
-enabled, the bus's PM domain will be powered, and the bus's clock will
-be enabled automatically when needed, for both runtime PM and s2ram.
-
-This was tested on sh73a0/kzm9g-multiplatform (by me), and (v3) on
-r8a73a4/ape6evm-multiplatform (by Ulrich Hecht). Without this,
-Ethernet doesn't work, as the ZB clock is disabled by
-clk_disable_unused().
-
-Felipe: It looks like drivers/usb/musb/musb_am335x.c can be removed, if
-"ti,am33xx-usb" claims compatibility with "simple-pm-bus"?
-
-As drivers/bus doesn't have a maintainer, and this driver is needed to
-move two shmobile platforms away from legacy to multiplatform, I think
-this can go in through Simon's shmobile tree.
-
-Changes compared to v4:
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Tested-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+Reviewed-by: Kevin Hilman <khilman@linaro.org>
+---
+v5:
   - Add Reviewed-by,
-  - "simple-pm-bus" is not an extension of "simple-bus",
-  - "compatible" must not contain "simple-bus",
-  - Add reference to clock/PM domain provider binding docs.
 
-Changes compared to v3:
-  - Replace "simple-bus" by "simple-pm-bus" in the bindings,
-  - Move the "renesas,bsc" bindings to a separate document,
+v4:
   - Bind against the generic "simple-pm-bus" instead of "renesas,bsc",
   - Explicitly call of_platform_populate() after pm_runtime_enable() to
     enforce ordering, instead of depending on claimed compatibility with
-    "simple-bus".
+    "simple-bus",
 
-Changes compared to v2:
-  - Document required properties inherited from "simple-bus",
-  - Document required "reg" property for "renesas,bsc",
-  - Move "ranges" before "reg" in the example,
+v3:
   - Add Tested-by,
-  - Split-off sh73a0/kzm9g and r8a73a4/ape6evm DTS updates.
 
-Changes compared to v1 (more detailed change logs in the individual
-patches):
-  - Added sorting of drivers/bus Kconfig and Makefile entries,
-  - Added DT binding documentation,
+v2:
   - Rename from "Renesas Bus State Controller Driver" (renesas-bsc) to
     "Simple Power-Managed Bus Driver" (simple-pm-bus),
-  - Postponed adding power-domains properties to the dtsi,
-  - Added updates for r8a73a4/ape6evm.
-
-Thanks!
-
-Geert Uytterhoeven (5):
-  drivers: bus: Sort Kconfig entries alphabetically
-  drivers: bus: Sort Makefile entries alphabetically
-  drivers: bus: Add Simple Power-Managed Bus DT Bindings
-  drivers: bus: Add Renesas Bus State Controller (BSC) DT Bindings
-  drivers: bus: Add Simple Power-Managed Bus Driver
-
- .../devicetree/bindings/bus/renesas,bsc.txt        | 46 +++++++++++++++++
- .../devicetree/bindings/bus/simple-pm-bus.txt      | 44 ++++++++++++++++
- drivers/bus/Kconfig                                | 53 ++++++++++++--------
- drivers/bus/Makefile                               | 15 +++---
- drivers/bus/simple-pm-bus.c                        | 58 ++++++++++++++++++++++
- 5 files changed, 189 insertions(+), 27 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/bus/renesas,bsc.txt
- create mode 100644 Documentation/devicetree/bindings/bus/simple-pm-bus.txt
+  - Change module license to GPL v2,
+  - Change email address to geert+renesas at glider.be.
+---
+ drivers/bus/Kconfig         | 13 ++++++++++
+ drivers/bus/Makefile        |  1 +
+ drivers/bus/simple-pm-bus.c | 58 +++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 72 insertions(+)
  create mode 100644 drivers/bus/simple-pm-bus.c
 
+diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+index 626960819e6df16c..7e9c2674af81d6e9 100644
+--- a/drivers/bus/Kconfig
++++ b/drivers/bus/Kconfig
+@@ -58,6 +58,19 @@ config OMAP_OCP2SCP
+ 	  OCP2SCP and in OMAP5, both USB PHY and SATA PHY is connected via
+ 	  OCP2SCP.
+ 
++config SIMPLE_PM_BUS
++	bool "Simple Power-Managed Bus Driver"
++	depends on OF && PM
++	depends on ARCH_SHMOBILE || COMPILE_TEST
++	help
++	  Driver for transparent busses that don't need a real driver, but
++	  where the bus controller is part of a PM domain, or under the control
++	  of a functional clock, and thus relies on runtime PM for managing
++	  this PM domain and/or clock.
++	  An example of such a bus controller is the Renesas Bus State
++	  Controller (BSC, sometimes called "LBSC within Bus Bridge", or
++	  "External Bus Interface") as found on several Renesas ARM SoCs.
++
+ config VEXPRESS_CONFIG
+ 	bool "Versatile Express configuration bus"
+ 	default y if ARCH_VEXPRESS
+diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
+index 3cfaf2c7f25ac4f0..e023a2bec664d900 100644
+--- a/drivers/bus/Makefile
++++ b/drivers/bus/Makefile
+@@ -14,4 +14,5 @@ obj-$(CONFIG_MVEBU_MBUS) 	+= mvebu-mbus.o
+ obj-$(CONFIG_OMAP_INTERCONNECT)	+= omap_l3_smx.o omap_l3_noc.o
+ 
+ obj-$(CONFIG_OMAP_OCP2SCP)	+= omap-ocp2scp.o
++obj-$(CONFIG_SIMPLE_PM_BUS)	+= simple-pm-bus.o
+ obj-$(CONFIG_VEXPRESS_CONFIG)	+= vexpress-config.o
+diff --git a/drivers/bus/simple-pm-bus.c b/drivers/bus/simple-pm-bus.c
+new file mode 100644
+index 0000000000000000..c5eb46cbf388b507
+--- /dev/null
++++ b/drivers/bus/simple-pm-bus.c
+@@ -0,0 +1,58 @@
++/*
++ * Simple Power-Managed Bus Driver
++ *
++ * Copyright (C) 2014-2015 Glider bvba
++ *
++ * This file is subject to the terms and conditions of the GNU General Public
++ * License.  See the file "COPYING" in the main directory of this archive
++ * for more details.
++ */
++
++#include <linux/module.h>
++#include <linux/of_platform.h>
++#include <linux/platform_device.h>
++#include <linux/pm_runtime.h>
++
++
++static int simple_pm_bus_probe(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++
++	dev_dbg(&pdev->dev, "%s\n", __func__);
++
++	pm_runtime_enable(&pdev->dev);
++
++	if (np)
++		of_platform_populate(np, NULL, NULL, &pdev->dev);
++
++	return 0;
++}
++
++static int simple_pm_bus_remove(struct platform_device *pdev)
++{
++	dev_dbg(&pdev->dev, "%s\n", __func__);
++
++	pm_runtime_disable(&pdev->dev);
++	return 0;
++}
++
++static const struct of_device_id simple_pm_bus_of_match[] = {
++	{ .compatible = "simple-pm-bus", },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, simple_pm_bus_of_match);
++
++static struct platform_driver simple_pm_bus_driver = {
++	.probe = simple_pm_bus_probe,
++	.remove = simple_pm_bus_remove,
++	.driver = {
++		.name = "simple-pm-bus",
++		.of_match_table = simple_pm_bus_of_match,
++	},
++};
++
++module_platform_driver(simple_pm_bus_driver);
++
++MODULE_DESCRIPTION("Simple Power-Managed Bus Driver");
++MODULE_AUTHOR("Geert Uytterhoeven <geert+renesas@glider.be>");
++MODULE_LICENSE("GPL v2");
 -- 
 1.9.1
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
