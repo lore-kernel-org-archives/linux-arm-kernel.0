@@ -1,87 +1,191 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Thu, 5 Feb 2015 15:01:06 -0800
-Subject: [PATCH v7 1/4] Documentation: dt: add common bindings for
- hwspinlock
-In-Reply-To: <54CFE71E.20905@ti.com>
-References: <1421269101-51105-1-git-send-email-s-anna@ti.com>
- <1421269101-51105-2-git-send-email-s-anna@ti.com>
- <20150115135201.GG16217@leverpostej>
- <20150115135556.GH16217@leverpostej>
- <CAL_JsqL2LZAooMk-V8+xeF2g6acZE21M+-OBRw8aEVa-5wVHuQ@mail.gmail.com>
- <CAK=WgbYQ=BbinqJ5fsw2Y+FKdy=nasLsw9mX8pw6S_o3owy9-g@mail.gmail.com>
- <20150116101746.GA21809@leverpostej>
- <CAK=WgbYBqPoUm9byx0du_g5ZmHdYaUVLpSPZYHoCVzNoatNKpw@mail.gmail.com>
- <CAJAp7Og+-KQd7bygWQjTS72Kye3fkp3s3ry+2bw7Gcv7aPF5AQ@mail.gmail.com>
- <CAK=WgbZ2986xxuAFvMSoyQLaPAxdUpZ8e5g-mSjyETfvd4KKHw@mail.gmail.com>
- <CAJAp7OjVULNRd113TtOEwaa6QO-XCDa0oxBm2H5NPvp_kLTSpA@mail.gmail.com>
- <54CFE71E.20905@ti.com>
-Message-ID: <CAJAp7OiHfaMrVqaZ1r6ZN0aMMpE4OUnvLhODHQJeb6EJMa+o8A@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 5 Feb 2015 15:12:39 -0800
+Subject: [PATCH v5 3/5] x86: Split syscall_trace_enter into two phases
+In-Reply-To: <CALCETrXFzcXngHsX=_72hYZqms32Zf7oFYDBgC3XNw7zOGdDCA@mail.gmail.com>
+References: <cover.1409954077.git.luto@amacapital.net>
+ <2df320a600020fda055fccf2b668145729dd0c04.1409954077.git.luto@amacapital.net>
+ <20150205211916.GA31367@altlinux.org>
+ <CAGXu5j+aXxt55LsxxbNkfGGF719ubXBZ2JAFwUPNARwKMVFgng@mail.gmail.com>
+ <20150205214027.GB31367@altlinux.org>
+ <CALCETrXFzcXngHsX=_72hYZqms32Zf7oFYDBgC3XNw7zOGdDCA@mail.gmail.com>
+Message-ID: <CAGXu5jJtHT9o8WMoynifN13=uZoARt4G9iVcgZsc9xYOBEwWsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 2, 2015 at 1:07 PM, Suman Anna <s-anna@ti.com> wrote:
-> On 02/01/2015 11:55 AM, Bjorn Andersson wrote:
->> On Fri, Jan 30, 2015 at 9:41 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
->>> On Sat, Jan 31, 2015 at 1:29 AM, Bjorn Andersson <bjorn@kryo.se> wrote:
->>>> In a system where you have two hwlock blocks lckA and lckB, each
->>>> consisting of 8 locks and you have dspB that can only access lckB
+On Thu, Feb 5, 2015 at 1:52 PM, Andy Lutomirski <luto@amacapital.net> wrote:
+> On Thu, Feb 5, 2015 at 1:40 PM, Dmitry V. Levin <ldv@altlinux.org> wrote:
+>> On Thu, Feb 05, 2015 at 01:27:16PM -0800, Kees Cook wrote:
+>>> On Thu, Feb 5, 2015 at 1:19 PM, Dmitry V. Levin <ldv@altlinux.org> wrote:
+>>> > Hi,
+>>> >
+>>> > On Fri, Sep 05, 2014 at 03:13:54PM -0700, Andy Lutomirski wrote:
+>>> >> This splits syscall_trace_enter into syscall_trace_enter_phase1 and
+>>> >> syscall_trace_enter_phase2.  Only phase 2 has full pt_regs, and only
+>>> >> phase 2 is permitted to modify any of pt_regs except for orig_ax.
+>>> >
+>>> > This breaks ptrace, see below.
+>>> >
+>>> >> The intent is that phase 1 can be called from the syscall fast path.
+>>> >>
+>>> >> In this implementation, phase1 can handle any combination of
+>>> >> TIF_NOHZ (RCU context tracking), TIF_SECCOMP, and TIF_SYSCALL_AUDIT,
+>>> >> unless seccomp requests a ptrace event, in which case phase2 is
+>>> >> forced.
+>>> >>
+>>> >> In principle, this could yield a big speedup for TIF_NOHZ as well as
+>>> >> for TIF_SECCOMP if syscall exit work were similarly split up.
+>>> >>
+>>> >> Signed-off-by: Andy Lutomirski <luto@amacapital.net>
+>>> >> ---
+>>> >>  arch/x86/include/asm/ptrace.h |   5 ++
+>>> >>  arch/x86/kernel/ptrace.c      | 157 +++++++++++++++++++++++++++++++++++-------
+>>> >>  2 files changed, 138 insertions(+), 24 deletions(-)
+>>> >>
+>>> >> diff --git a/arch/x86/include/asm/ptrace.h b/arch/x86/include/asm/ptrace.h
+>>> >> index 6205f0c434db..86fc2bb82287 100644
+>>> >> --- a/arch/x86/include/asm/ptrace.h
+>>> >> +++ b/arch/x86/include/asm/ptrace.h
+>>> >> @@ -75,6 +75,11 @@ convert_ip_to_linear(struct task_struct *child, struct pt_regs *regs);
+>>> >>  extern void send_sigtrap(struct task_struct *tsk, struct pt_regs *regs,
+>>> >>                        int error_code, int si_code);
+>>> >>
+>>> >> +
+>>> >> +extern unsigned long syscall_trace_enter_phase1(struct pt_regs *, u32 arch);
+>>> >> +extern long syscall_trace_enter_phase2(struct pt_regs *, u32 arch,
+>>> >> +                                    unsigned long phase1_result);
+>>> >> +
+>>> >>  extern long syscall_trace_enter(struct pt_regs *);
+>>> >>  extern void syscall_trace_leave(struct pt_regs *);
+>>> >>
+>>> >> diff --git a/arch/x86/kernel/ptrace.c b/arch/x86/kernel/ptrace.c
+>>> >> index bbf338a04a5d..29576c244699 100644
+>>> >> --- a/arch/x86/kernel/ptrace.c
+>>> >> +++ b/arch/x86/kernel/ptrace.c
+>>> >> @@ -1441,20 +1441,126 @@ void send_sigtrap(struct task_struct *tsk, struct pt_regs *regs,
+>>> >>       force_sig_info(SIGTRAP, &info, tsk);
+>>> >>  }
+>>> >>
+>>> >> +static void do_audit_syscall_entry(struct pt_regs *regs, u32 arch)
+>>> >> +{
+>>> >> +#ifdef CONFIG_X86_64
+>>> >> +     if (arch == AUDIT_ARCH_X86_64) {
+>>> >> +             audit_syscall_entry(arch, regs->orig_ax, regs->di,
+>>> >> +                                 regs->si, regs->dx, regs->r10);
+>>> >> +     } else
+>>> >> +#endif
+>>> >> +     {
+>>> >> +             audit_syscall_entry(arch, regs->orig_ax, regs->bx,
+>>> >> +                                 regs->cx, regs->dx, regs->si);
+>>> >> +     }
+>>> >> +}
+>>> >> +
+>>> >>  /*
+>>> >> - * We must return the syscall number to actually look up in the table.
+>>> >> - * This can be -1L to skip running any syscall at all.
+>>> >> + * We can return 0 to resume the syscall or anything else to go to phase
+>>> >> + * 2.  If we resume the syscall, we need to put something appropriate in
+>>> >> + * regs->orig_ax.
+>>> >> + *
+>>> >> + * NB: We don't have full pt_regs here, but regs->orig_ax and regs->ax
+>>> >> + * are fully functional.
+>>> >> + *
+>>> >> + * For phase 2's benefit, our return value is:
+>>> >> + * 0:                        resume the syscall
+>>> >> + * 1:                        go to phase 2; no seccomp phase 2 needed
+>>> >> + * anything else:    go to phase 2; pass return value to seccomp
+>>> >>   */
+>>> >> -long syscall_trace_enter(struct pt_regs *regs)
+>>> >> +unsigned long syscall_trace_enter_phase1(struct pt_regs *regs, u32 arch)
+>>> >>  {
+>>> >> -     long ret = 0;
+>>> >> +     unsigned long ret = 0;
+>>> >> +     u32 work;
+>>> >> +
+>>> >> +     BUG_ON(regs != task_pt_regs(current));
+>>> >> +
+>>> >> +     work = ACCESS_ONCE(current_thread_info()->flags) &
+>>> >> +             _TIF_WORK_SYSCALL_ENTRY;
+>>> >>
+>>> >>       /*
+>>> >>        * If TIF_NOHZ is set, we are required to call user_exit() before
+>>> >>        * doing anything that could touch RCU.
+>>> >>        */
+>>> >> -     if (test_thread_flag(TIF_NOHZ))
+>>> >> +     if (work & _TIF_NOHZ) {
+>>> >>               user_exit();
+>>> >> +             work &= ~TIF_NOHZ;
+>>> >> +     }
+>>> >> +
+>>> >> +#ifdef CONFIG_SECCOMP
+>>> >> +     /*
+>>> >> +      * Do seccomp first -- it should minimize exposure of other
+>>> >> +      * code, and keeping seccomp fast is probably more valuable
+>>> >> +      * than the rest of this.
+>>> >> +      */
+>>> >> +     if (work & _TIF_SECCOMP) {
+>>> >> +             struct seccomp_data sd;
+>>> >> +
+>>> >> +             sd.arch = arch;
+>>> >> +             sd.nr = regs->orig_ax;
+>>> >> +             sd.instruction_pointer = regs->ip;
+>>> >> +#ifdef CONFIG_X86_64
+>>> >> +             if (arch == AUDIT_ARCH_X86_64) {
+>>> >> +                     sd.args[0] = regs->di;
+>>> >> +                     sd.args[1] = regs->si;
+>>> >> +                     sd.args[2] = regs->dx;
+>>> >> +                     sd.args[3] = regs->r10;
+>>> >> +                     sd.args[4] = regs->r8;
+>>> >> +                     sd.args[5] = regs->r9;
+>>> >> +             } else
+>>> >> +#endif
+>>> >> +             {
+>>> >> +                     sd.args[0] = regs->bx;
+>>> >> +                     sd.args[1] = regs->cx;
+>>> >> +                     sd.args[2] = regs->dx;
+>>> >> +                     sd.args[3] = regs->si;
+>>> >> +                     sd.args[4] = regs->di;
+>>> >> +                     sd.args[5] = regs->bp;
+>>> >> +             }
+>>> >> +
+>>> >> +             BUILD_BUG_ON(SECCOMP_PHASE1_OK != 0);
+>>> >> +             BUILD_BUG_ON(SECCOMP_PHASE1_SKIP != 1);
+>>> >> +
+>>> >> +             ret = seccomp_phase1(&sd);
+>>> >> +             if (ret == SECCOMP_PHASE1_SKIP) {
+>>> >> +                     regs->orig_ax = -1;
+>>> >
+>>> > How the tracer is expected to get the correct syscall number after that?
 >>>
->>> This is a good example - thanks. To be able to cope with such cases we
->>> will have to pass a hwlock block reference and its relative lock id.
->>>
+>>> There shouldn't be a tracer if a skip is encountered. (A seccomp skip
+>>> would skip ptrace.) This behavior hasn't changed, but maybe I don't
+>>> see what you mean? (I haven't encountered any problems with syscall
+>>> tracing as a result of these changes.)
 >>
->> Correct, so the #hwlock-cells and hwlock part from the proposal are
->> the important one. Having an optional hwlock-names will make things
->> easier to read as well, but is not necessary.
->
-> Right, if anything, it would be useful only for the clients, but the
-> hwspinlock core itself would not need it. So, I would forgo adding the
-> hwlock-names for now.
->
+>> SECCOMP_RET_ERRNO leads to SECCOMP_PHASE1_SKIP, and if there is a tracer,
+>> it will get -1 as a syscall number.
 >>
->>> The DT binding should definitely be prepared for such cases (just kill
->>> the base-id field?), but let's see what it means about the Linux
->>> implementation.
->>>
+>> I've found this while testing a strace parser for
+>> SECCOMP_MODE_FILTER/SECCOMP_SET_MODE_FILTER, so the problem is quite real.
 >>
->> From the dt binding PoV, we should be able to skip num-locks as well.
->> It seems most hwlock blocks have a fixed amount of locks provided and
->> the drivers are reporting this to the core when registering.
+>>
 >
-> I added this originally based on the initial MSM HW Mutex block bindings.
->
+> Hasn't it always been this way?
 
-It's not entirely correct to have this in DT for the MSM HW, as the
-hardware has a fixed number of mutexes. As soon as we have the binding
-sorted out I will follow up with a new revision of the tcsr/sfpb-mutex
-driver.
+As far as I know, yes, it's always been this way. The point is to the
+skip the syscall, which is what the -1 signals. Userspace then reads
+back the errno.
 
->>
->> So I think we can reduce the binding to:
->>
->> Providers:
->> #hwlock-cells
->>
->> Consumers:
->> hwlocks
->> hwlock-names
->>
->> For the hardware where number of locks is actually variable (e.g.
->> different variants of same block) there can be driver specific entries
->> for this.
->
-> Right, we should be able to drop this and use the driver match data. As
-> it is, the field is used during registration of the block with the
-> hwspinlock core.
->
+> I admit that I kind of wish this worked the other way -- that is, I
+> think it would be nice to have a mode in which ptrace runs before
+> seccomp, which would close the ptrace hole (where ptrace can do things
+> that seccomp would disallow) and maybe have more comprehensible
+> results.
 
-If we have certain systems where it actually is a property to be
-configured then they can have individual properties, extending the
-standard set. Either way, it's not a dynamic property shared by all
-hwlock drivers, so it should not be in the common binding.
+I prefer keeping the seccomp attack surface as tiny as possible. I
+would not like to ptrace happening before seccomp.
 
-Will you send out a new revision of the binding? I would love to get
-this integrated so I can move on with the dependents.
+-Kees
 
-Regards,
-Bjorn
+-- 
+Kees Cook
+Chrome OS Security
