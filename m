@@ -1,30 +1,76 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Fri, 6 Feb 2015 01:03:52 +0800
-Subject: [baohua:sirf-3.18 2573/2782] sound/soc/sirf/atlas7-iacc.c:168:24:
- sparse: symbol 'atlas7_iacc_dai_ops' was not declared. Should it be static?
-Message-ID: <201502060130.hszyNa1F%fengguang.wu@intel.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 5 Feb 2015 18:05:43 +0100
+Subject: [PATCH v3] MediaTek PMIC support
+In-Reply-To: <1423149938-14471-1-git-send-email-s.hauer@pengutronix.de>
+References: <1423149938-14471-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <CABuKBeK-EuWqsCkZcGgLpuL2_FsZwd1T6PwkZB5+kudKxfPZfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux sirf-3.18
-head:   d61ca44a1d96f134d35d31522ca8efb19a6e1451
-commit: 81aba96393135459ac811ce78fe8f91a8b767b82 [2573/2782] ASoC: sirf: atlas7: Add internal audio codec controller driver
-reproduce:
-  # apt-get install sparse
-  git checkout 81aba96393135459ac811ce78fe8f91a8b767b82
-  make ARCH=x86_64 allmodconfig
-  make C=1 CF=-D__CHECK_ENDIAN__
+Hi Sascha,
+
+2015-02-05 16:25 GMT+01:00 Sascha Hauer <s.hauer@pengutronix.de>:
+> This series adds initial support for the MediaTek MT6397 PMIC and the
+> necessary infrastructure to attach it on the MT8135 / MT8173 SoCs.
+>
+> The infrastructure includes:
+>
+> - pericfg / infracfg controller support
+>   The pericfg / infracfg controllers contain miscellaneous registers for
+>   reset controllers and clocks.
+>
+> - PMIC wrapper support
+>   On MediaTek MT8135, MT8173 and other SoCs the PMIC is connected via
+>   SPI. The SPI master interface is not directly visible to the CPU, but
+>   only through the PMIC wrapper inside the SoC. The communication between
+>   the SoC and the PMIC can optionally be encrypted. Also a non standard
+>   Dual IO SPI mode can be used to increase speed. The MT8135 also supports
+>   a special feature named "IP Pairing". With IP Pairing the pins of some
+>   SoC internal peripherals can be on the PMIC. The signals of these pins
+>   are routed over the SPI bus using the pwrap bridge. Because of these
+>   optional non SPI conform features the PMIC driver is not implemented as
+>   a SPI bus master driver.
+>
+> The MT6397 PMIC itself is implemented as a regular mfd device driver which
+> uses regmap to access the PMIC registers.
+>
+> This series also adds regulator support for the MT6397 PMIC.
+>
+> The first 6 patches can be merged through the ARM SoC tree. The mfd
+> patch is independent of the first 6 patches and can be merged through the
+> mfd maintainer trees.
+
+As clock driver and reset controller registers are mixed together in
+Mediatek SoCs I would pretty like to see the reset driver in the clock
+driver. This is also the way other SoCs handle this case.
+As syscon is available at this time, both the clock and the reset
+driver should use this (via syscon_node_to_regmap). For your reset
+driver, this should be a minimal change as you already use regmap.
+
+Please coordinate with James and Henry to get this into one series using syscon.
+
+Thanks,
+Matthias
+
+>
+> changes since v2:
+>
+> - put device tree docs into a separate patch
+> - Fix lockdep issues in irq mt6397 handler
+> - cosmetic changes
+>
+> Changes since v1:
+>
+> - document reset bindings for infracfg/pericfg
+> - fix base addresses in infracfg binding example
+> - Remove more Email addresses from Flora Fu (She is not working at
+>   MediaTek anymore, her address is no longer valid)
+> - drop Regulator support patch, it's already in next
+>
+> Sascha
+>
 
 
-sparse warnings: (new ones prefixed by >>)
 
->> sound/soc/sirf/atlas7-iacc.c:168:24: sparse: symbol 'atlas7_iacc_dai_ops' was not declared. Should it be static?
-   sound/soc/sirf/atlas7-iacc.c:482:27: sparse: incorrect type in initializer (incompatible argument 4 (different address spaces))
-   sound/soc/sirf/atlas7-iacc.c:482:27:    expected int ( *copy )( ... )
-   sound/soc/sirf/atlas7-iacc.c:482:27:    got int ( static [toplevel] *<noident> )( ... )
-
-Please review and possibly fold the followup patch.
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-http://lists.01.org/mailman/listinfo/kbuild                 Intel Corporation
+-- 
+motzblog.wordpress.com
