@@ -1,140 +1,106 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 5 Feb 2015 09:12:01 -0800
-Subject: [PATCH] ARM: dts: Fix USB dts configuration for dm816x
-Message-ID: <20150205171201.GG25198@atomide.com>
+From: tsahee@annapurnalabs.com (Tsahee Zidenberg)
+Date: Thu, 05 Feb 2015 19:15:51 +0200
+Subject: [PATCH v5 0/6] Introducing the Alpine platform.
+Message-ID: <54d3a547.NQxNj5/x3ZikQiQS%tsahee@annapurnalabs.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 7800064ba507 ("ARM: dts: Add basic dm816x device tree
-configuration") added basic devices for dm816x, but I was not able
-to test the USB completely because of a unconfigure USB phy, and
-I only tested it to make sure the Mentor chips are detected and
-clocked without a phy.
+If possible to introduce this into 3.20 - I would really appreciate it. If any 
+action by me can make it happen - please let me know.
 
-After testing the USB with actual devices I noticed a few issues
-that should be tested to avoid confusion:
+Thank you!
 
-- The USB id pin on dm8168-evm is hardwired and can be changed
-  only by software. As there are two USB-A type connectors, let's
-  start both in host mode instead of otg.
+---
+Annapurna Labs(TM) is a technology company providing innovative solutions
+including chips, software, and systems for the datacenter and enterprise
+infrastructure.
 
-- The Mentor core is configured in such a way on dm8168-evm that
-  it's not capable for multipoint at least on revision c board
-  that I have.
+Alpine(TM) is one of Annapurna Labs? chip products targeting storage and
+networking applications. It is a complete Platform-On-Chip,
+integrating 2-4 cortex-A15 cores and multiple innovations to provide
+a seamless networking and storage fabric for enterprise and datacenter
+equipment.
 
-- We need ranges for the syscon to properly set up the phy as
-  children of the SCM syscon area.
+This patchset provides initial support for the Alpine platform.
 
-- Let's not disable the second interface, the board specific
-  dts files can do that if really needed. Most boards should
-  just keep it enabled to ensure the device is idled properly.
+Patch #1 contains minimal, single-cpu architecture support.
 
-Note that also a phy and several musb fixes are still needed to
-make the USB to work properly in addition to this fix.
+Patch #2 adds early-debug capabilities via Alpine UART 0.
 
-Cc: Brian Hutchinson <b.hutchman@gmail.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+Patch #3 adds smp-support and a secondary cpu enable-method for the platform.
 
---- a/arch/arm/boot/dts/dm8168-evm.dts
-+++ b/arch/arm/boot/dts/dm8168-evm.dts
-@@ -35,6 +35,18 @@
- 			DM816X_IOPAD(0x0aac, PIN_INPUT | MUX_MODE0)	/* SPI_D1 */
- 		>;
- 	};
-+
-+	usb0_pins: pinmux_usb0_pins {
-+		pinctrl-single,pins = <
-+			DM816X_IOPAD(0x0d00, MUX_MODE0)			/* USB0_DRVVBUS */
-+		>;
-+	};
-+
-+	usb1_pins: pinmux_usb0_pins {
-+		pinctrl-single,pins = <
-+			DM816X_IOPAD(0x0d04, MUX_MODE0)			/* USB1_DRVVBUS */
-+		>;
-+	};
- };
- 
- &i2c1 {
-@@ -127,3 +139,16 @@
- &mmc1 {
- 	vmmc-supply = <&vmmcsd_fixed>;
- };
-+
-+/* At least dm8168-evm rev c won't support multipoint, later may */
-+&usb0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&usb0_pins>;
-+	mentor,multipoint = <0>;
-+};
-+
-+&usb1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&usb1_pins>;
-+	mentor,multipoint = <0>;
-+};
---- a/arch/arm/boot/dts/dm816x.dtsi
-+++ b/arch/arm/boot/dts/dm816x.dtsi
-@@ -97,10 +97,31 @@
- 
- 			/* Device Configuration Registers */
- 			scm_conf: syscon at 600 {
--				compatible = "syscon";
-+				compatible = "syscon", "simple-bus";
- 				reg = <0x600 0x110>;
- 				#address-cells = <1>;
- 				#size-cells = <1>;
-+				ranges = <0 0x600 0x110>;
-+
-+				usb_phy0: usb-phy at 20 {
-+					compatible = "ti,dm8168-usb-phy";
-+					reg = <0x20 0x8>;
-+					reg-names = "phy";
-+					clocks = <&main_fapll 6>;
-+					clock-names = "refclk";
-+					#phy-cells = <0>;
-+					syscon = <&scm_conf>;
-+				};
-+
-+				usb_phy1: usb-phy at 28 {
-+					compatible = "ti,dm8168-usb-phy";
-+					reg = <0x28 0x8>;
-+					reg-names = "phy";
-+					clocks = <&main_fapll 6>;
-+					clock-names = "refclk";
-+					#phy-cells = <0>;
-+					syscon = <&scm_conf>;
-+				};
- 			};
- 
- 			scrm_clocks: clocks {
-@@ -357,7 +378,10 @@
- 				reg-names = "mc", "control";
- 				interrupts = <18>;
- 				interrupt-names = "mc";
--				dr_mode = "otg";
-+				dr_mode = "host";
-+				interface-type = <0>;
-+				phys = <&usb_phy0>;
-+				phy-names = "usb2-phy";
- 				mentor,multipoint = <1>;
- 				mentor,num-eps = <16>;
- 				mentor,ram-bits = <12>;
-@@ -366,13 +390,15 @@
- 
- 			usb1: usb at 47401800 {
- 				compatible = "ti,musb-am33xx";
--				status = "disabled";
- 				reg = <0x47401c00 0x400
- 				       0x47401800 0x200>;
- 				reg-names = "mc", "control";
- 				interrupts = <19>;
- 				interrupt-names = "mc";
--				dr_mode = "otg";
-+				dr_mode = "host";
-+				interface-type = <0>;
-+				phys = <&usb_phy1>;
-+				phy-names = "usb2-phy";
- 				mentor,multipoint = <1>;
- 				mentor,num-eps = <16>;
- 				mentor,ram-bits = <12>;
+Patch #4 provides documentation for the available device-tree nodes.
+
+Patch #5 provides a device-tree for Alpine soc and development board.
+
+Patch #6 adds an entry to MAINTAINERS file.
+
+The patchset was tested with multi_v7_defconfig, adding CONFIG_ARCH_ALPINE
+
+---
+V2:
+* map physical cpu-id from logical on cpu wakeup
+* use syscon/regmap for sysfabric_service implementation
+* devicetree format:
+**  split between .dtsi and dts
+**  dual license
+**  node and manufacturer naming
+* intoduce devicetree in two separate patches
+* multiple format fixes
+* rebased on d932006 (for-next)
+
+---
+V3:
+* small format changes
+* rebased on f9db7e2 (for-next)
+
+---
+V4:
+* removed unnecessary "compatible" property
+* added entry to MAINTAINERS file, in a separate patch.
+
+---
+V5:
+* static, __init, const changes
+* add "syscon" to dt documentation
+
+Tsahee Zidenberg (6):
+  ARM: Alpine: Initial support for Alpine platform
+  ARM: Alpine: early-debug print support
+  ARM: Alpine: smp support
+  ARM: dts: Alpine platform binding documentation
+  ARM: dts: Alpine platform devicetree
+  MAINTAINERS: add maintainer for Alpine Arm machine
+
+ .../devicetree/bindings/arm/al,alpine.txt          |  88 +++++++++++++
+ .../bindings/arm/cpu-enable-method/al,alpine-smp   |  52 ++++++++
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ MAINTAINERS                                        |   5 +
+ arch/arm/Kconfig                                   |   2 +
+ arch/arm/Kconfig.debug                             |  12 +-
+ arch/arm/Makefile                                  |   1 +
+ arch/arm/boot/dts/Makefile                         |   4 +
+ arch/arm/boot/dts/alpine-db.dts                    |  35 +++++
+ arch/arm/boot/dts/alpine.dtsi                      | 141 +++++++++++++++++++++
+ arch/arm/mach-alpine/Kconfig                       |  10 ++
+ arch/arm/mach-alpine/Makefile                      |   2 +
+ arch/arm/mach-alpine/alpine_cpu_pm.c               |  70 ++++++++++
+ arch/arm/mach-alpine/alpine_cpu_pm.h               |  26 ++++
+ arch/arm/mach-alpine/alpine_cpu_resume.h           |  38 ++++++
+ arch/arm/mach-alpine/alpine_machine.c              |  28 ++++
+ arch/arm/mach-alpine/platsmp.c                     |  49 +++++++
+ 17 files changed, 563 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/al,alpine.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/cpu-enable-method/al,alpine-smp
+ create mode 100644 arch/arm/boot/dts/alpine-db.dts
+ create mode 100644 arch/arm/boot/dts/alpine.dtsi
+ create mode 100644 arch/arm/mach-alpine/Kconfig
+ create mode 100644 arch/arm/mach-alpine/Makefile
+ create mode 100644 arch/arm/mach-alpine/alpine_cpu_pm.c
+ create mode 100644 arch/arm/mach-alpine/alpine_cpu_pm.h
+ create mode 100644 arch/arm/mach-alpine/alpine_cpu_resume.h
+ create mode 100644 arch/arm/mach-alpine/alpine_machine.c
+ create mode 100644 arch/arm/mach-alpine/platsmp.c
+
+-- 
+1.9.1
