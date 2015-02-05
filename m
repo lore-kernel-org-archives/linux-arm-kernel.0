@@ -1,23 +1,50 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 4 Feb 2015 23:13:03 -0800
-Subject: [RESEND PATCH v2 0/4] dmaengine: at_xdmac: several improvements
-In-Reply-To: <1422372632-21659-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1422372632-21659-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20150205071302.GR4489@intel.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 05 Feb 2015 08:23:21 +0100
+Subject: [PATCH v3 2/3] ARM: EXYNOS: Constify exynos_pm_data and of_device_id
+ array
+In-Reply-To: <1423121002-25117-1-git-send-email-k.kozlowski@samsung.com>
+References: <1423121002-25117-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1423121002-25117-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 27, 2015 at 04:30:28PM +0100, Ludovic Desroches wrote:
-> Hi,
-> 
-> This series is based on vkoul/slave-dma/topic/slave_caps_device_control_fix
-> branch.
-> 
-> Changes from v1:
-> - put save_cc field addition in a single patch
-> - update commit log of patch 3/4
-> - remove AT_XDMAC_CUR_CFG since it is no more used
-Applied, thanks
+The 'exynos5420_pm_data' and of_device_id array are not modified and can
+be made const.
 
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Reviewed-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+
+---
+Changes since v2:
+1. Add Pankaj's reviewed-by.
+
+Changes since v1:
+1. New patch.
+---
+ arch/arm/mach-exynos/suspend.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
+index 77cc39bdad47..e6c961126087 100644
+--- a/arch/arm/mach-exynos/suspend.c
++++ b/arch/arm/mach-exynos/suspend.c
+@@ -572,7 +572,7 @@ static const struct exynos_pm_data exynos5250_pm_data = {
+ 	.cpu_suspend	= exynos_cpu_suspend,
+ };
+ 
+-static struct exynos_pm_data exynos5420_pm_data = {
++static const struct exynos_pm_data exynos5420_pm_data = {
+ 	.wkup_irq	= exynos5250_wkup_irq,
+ 	.wake_disable_mask = (0x7F << 7) | (0x1F << 1),
+ 	.release_ret_regs = exynos5420_release_ret_regs,
+@@ -583,7 +583,7 @@ static struct exynos_pm_data exynos5420_pm_data = {
+ 	.cpu_suspend	= exynos5420_cpu_suspend,
+ };
+ 
+-static struct of_device_id exynos_pmu_of_device_ids[] = {
++static const struct of_device_id exynos_pmu_of_device_ids[] = {
+ 	{
+ 		.compatible = "samsung,exynos3250-pmu",
+ 		.data = &exynos3250_pm_data,
 -- 
-~Vinod
+1.9.1
