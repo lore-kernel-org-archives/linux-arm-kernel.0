@@ -1,168 +1,155 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Thu, 5 Feb 2015 23:46:29 +0800
-Subject: [PATCH v3 04/15] drm: bridge/dw_hdmi: add indentification
- registers parse and record
-In-Reply-To: <1422976283-30071-1-git-send-email-ykk@rock-chips.com>
-References: <1422975418-13302-1-git-send-email-ykk@rock-chips.com>
- <1422976283-30071-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <CAGS+omCiGh0-4BbPjPS+KqMW9-OpJ8Je7o37Web06w1CR7RPgw@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 5 Feb 2015 08:51:51 -0700
+Subject: [PATCH] coresight-stm: adding driver for CoreSight STM component
+In-Reply-To: <1423135651.27378.32.camel@x220>
+References: <1423088550-15780-1-git-send-email-mathieu.poirier@linaro.org>
+ <1423135651.27378.32.camel@x220>
+Message-ID: <CANLsYkx-XeiWAMxgMs=dAZc5oMf0NmF_2_6TzYXQtd1JdL5LrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 3, 2015 at 11:11 PM, Yakir Yang <ykk@rock-chips.com> wrote:
-> By parsing the indentification registers we can know what functions
-> are present on the hdmi ip.
+On 5 February 2015 at 04:27, Paul Bolle <pebolle@tiscali.nl> wrote:
+> On Wed, 2015-02-04 at 15:22 -0700, mathieu.poirier at linaro.org wrote:
+>> From: Pratik Patel <pratikp@codeaurora.org>
+>>
+>> This driver adds support for the STM CoreSight IP block,
+>> allowing any system compoment (HW or SW) to log and
+>> aggregate messages via a single entity.
+>>
+>> The STM exposes an application defined number of channels
+>> called stimulus port.  Configuration is done using entries
+>> in sysfs and channels made available to userspace via devfs.
+>>
+>> Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
+>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 >
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> ---
-> Changes in v3:
-> - Add ID registers parse and record
->
-> Changes in v2: None
->
->  drivers/gpu/drm/bridge/dw_hdmi.c | 59 ++++++++++++++++++++++++++++++++++++++++
->  drivers/gpu/drm/bridge/dw_hdmi.h | 23 ++++++++++++++++
->  2 files changed, 82 insertions(+)
->
-> diff --git a/drivers/gpu/drm/bridge/dw_hdmi.c b/drivers/gpu/drm/bridge/dw_hdmi.c
-> index 08f10da..7b5b664 100644
-> --- a/drivers/gpu/drm/bridge/dw_hdmi.c
-> +++ b/drivers/gpu/drm/bridge/dw_hdmi.c
-> @@ -79,6 +79,23 @@ static const u16 csc_coeff_rgb_in_eitu709[3][4] = {
->         { 0x6756, 0x78ab, 0x2000, 0x0200 }
->  };
->
-> +struct hdmi_id {
-> +       u8 design;
-> +       u8 revision;
-> +
-> +       bool prepen;
-> +       bool audspdif;
-> +       bool audi2s;
-> +       bool hdmi14;
-> +       bool csc;
-> +       bool hdcp;
-> +       bool hdmi20;
-> +       bool confapb;
-> +       bool ahbauddma;
-> +       bool gpaud;
-> +       u8 phy_type;
-> +};
-> +
->  struct hdmi_vmode {
->         bool mdvi;
->         bool mhsyncpolarity;
-> @@ -111,6 +128,8 @@ struct dw_hdmi {
->         struct clk *isfr_clk;
->         struct clk *iahb_clk;
->
-> +       struct hdmi_id id;
-> +
->         struct hdmi_data_info hdmi_data;
->         const struct dw_hdmi_plat_data *plat_data;
->
-> @@ -1259,6 +1278,36 @@ static int dw_hdmi_setup(struct dw_hdmi *hdmi, struct drm_display_mode *mode)
->         return 0;
->  }
->
-> +static void hdmi_parse_id(struct dw_hdmi *hdmi)
-> +{
-> +       u8 config0_id, config1_id, config2_id, config3_id;
-> +
-> +       config0_id = hdmi_readb(hdmi, HDMI_CONFIG0_ID);
-> +       config1_id = hdmi_readb(hdmi, HDMI_CONFIG1_ID);
-> +       config2_id = hdmi_readb(hdmi, HDMI_CONFIG2_ID);
-> +       config3_id = hdmi_readb(hdmi, HDMI_CONFIG3_ID);
-> +
-> +       hdmi->id.prepen = config0_id & HDMI_CONFIG0_ID_PREPEN ? true : false;
+> This needs "coresight: Adding coresight support for arm64
+> architecture" (https://lkml.org/lkml/2015/2/3/677 ) in order to get
+> applied. Perhaps that's obvious to the people working on this.
 
-These could all be "!!(A & B)", but perhaps that is just a matter of
-personal preference.
+Right, in my tree the code is tailored to use the other patch you're
+referencing but having received no 'ack' for it yet I made this set
+for 32 bit only (aside from the 64bit flags in Kconfig).  As such you
+don't need https://lkml.org/lkml/2015/2/3/677 for this to compile and
+run.
 
-> +       hdmi->id.audi2s = config0_id & HDMI_CONFIG0_ID_AUDI2S ? true : false;
-> +       hdmi->id.hdmi14 = config0_id & HDMI_CONFIG0_ID_HDMI14 ? true : false;
-> +       hdmi->id.hdcp = config0_id & HDMI_CONFIG0_ID_HDCP ? true : false;
-> +       hdmi->id.csc = config0_id & HDMI_CONFIG0_ID_CSC ? true : false;
-> +       hdmi->id.audspdif = config0_id & HDMI_CONFIG0_ID_AUDSPDIF ?
-> +                           true : false;
-> +
-> +       hdmi->id.confapb = config1_id & HDMI_CONFIG1_ID_CONFAPB ? true : false;
-> +       hdmi->id.hdmi20 = config1_id & HDMI_CONFIG1_ID_HDMI20 ? true : false;
-> +
-> +       hdmi->id.phy_type = config2_id & HDMI_CONFIG2_ID;
-
-HDMI_CONFIG2_ID is a register offset, not a mask.
-
-> +
-> +       hdmi->id.gpaud = config3_id & HDMI_CONFIG3_ID_GPAUD ? true : false;
-> +       hdmi->id.ahbauddma = config3_id & HDMI_CONFIG3_ID_AHBAUDDMA ?
-> +                            true : false;
-> +
-> +       hdmi->id.design = hdmi_readb(hdmi, HDMI_DESIGN_ID);
-> +       hdmi->id.revision = hdmi_readb(hdmi, HDMI_REVISION_ID);
-> +}
-> +
->  /* Wait until we are registered to enable interrupts */
->  static int dw_hdmi_fb_registered(struct dw_hdmi *hdmi)
->  {
-> @@ -1670,6 +1719,16 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
->                  hdmi_readb(hdmi, HDMI_PRODUCT_ID0),
->                  hdmi_readb(hdmi, HDMI_PRODUCT_ID1));
 >
-> +       /* Config IDs */
-> +       dev_info(dev,
-> +                "Detected HDMI config_id 0x%x:0x%x:0x%x:0x%x\n",
-> +                hdmi_readb(hdmi, HDMI_CONFIG0_ID),
-> +                hdmi_readb(hdmi, HDMI_CONFIG1_ID),
-> +                hdmi_readb(hdmi, HDMI_CONFIG2_ID),
-> +                hdmi_readb(hdmi, HDMI_CONFIG3_ID));
-> +
-> +       hdmi_parse_id(hdmi);
+> A few comments follow.
+>
+>> ---
+>>  .../ABI/testing/sysfs-bus-coresight-devices-stm    |   62 ++
+>>  Documentation/trace/coresight.txt                  |   88 +-
+>>  drivers/coresight/Kconfig                          |   10 +
+>>  drivers/coresight/Makefile                         |    1 +
+>>  drivers/coresight/coresight-stm.c                  | 1090 ++++++++++++++++++++
+>>  include/linux/coresight-stm.h                      |   35 +
+>>  include/uapi/linux/coresight-stm.h                 |   23 +
+>>  7 files changed, 1307 insertions(+), 2 deletions(-)
+>>  create mode 100644 Documentation/ABI/testing/sysfs-bus-coresight-devices-stm
+>>  create mode 100644 drivers/coresight/coresight-stm.c
+>>  create mode 100644 include/linux/coresight-stm.h
+>>  create mode 100644 include/uapi/linux/coresight-stm.h
+>>
+>>[...]
+>> diff --git a/drivers/coresight/Kconfig b/drivers/coresight/Kconfig
+>> index fc1f1ae7a49d..08806cc7d737 100644
+>> --- a/drivers/coresight/Kconfig
+>> +++ b/drivers/coresight/Kconfig
+>> @@ -58,4 +58,14 @@ config CORESIGHT_SOURCE_ETM3X
+>>         which allows tracing the instructions that a processor is executing
+>>         This is primarily useful for instruction level tracing.  Depending
+>>         the ETM version data tracing may also be available.
+>> +
+>> +config CORESIGHT_STM
+>> +     bool "CoreSight System Trace Macrocell driver"
+>> +     depends on (ARM && !(CPU_32v4 || CPU_32v4T)) || ARM64 || (64BIT && COMPILE_TEST)
+>
+> I'm _guessing_ that CPU_32v4 and CPU_32v4T are needed for the ldrd and
+> strd assembler instructions. If that's right a next _guess_ would be
+> that you also need to mention CPU_32v3 here.
+>
+> Furthermore, this file is only sourced by arch/arm/Kconfig.debug and
+> arch/arm64/Kconfig.debug. So 64BIT should always be equal to ARM64 and
+> the
+>      || (64BIT && COMPILE_TEST)
+>
+> part shouldn't be needed, isn't it?
 
-It seems a bit silly to read the regs once to print them, and then
-again in hdmi_parse_id().
-Perhaps move the dev_info() inside hdmi_parse_id().
-It would also be nice to print a full summary of all of the parsed fields.
+Things have changed in the driver (and accessor functions) since I
+wrote this Kconfig condition - Let me think on the above 2 comments.
 
-> +
->         initialize_hdmi_ih_mutes(hdmi);
 >
->         ret = devm_request_threaded_irq(dev, irq, dw_hdmi_hardirq,
-> diff --git a/drivers/gpu/drm/bridge/dw_hdmi.h b/drivers/gpu/drm/bridge/dw_hdmi.h
-> index 175dbc8..e4ba634 100644
-> --- a/drivers/gpu/drm/bridge/dw_hdmi.h
-> +++ b/drivers/gpu/drm/bridge/dw_hdmi.h
-> @@ -545,6 +545,29 @@
->  #define HDMI_I2CM_FS_SCL_LCNT_0_ADDR            0x7E12
+>> +     select CORESIGHT_LINKS_AND_SINKS
+>> +     help
+>> +       This driver provides support for hardware assisted software
+>> +       instrumentation based tracing. This is primarily used for
+>> +       logging useful software events or data coming from various entities
+>> +       in the system, possibly running different OSs
+>>  endif
+>>[...]
+>> diff --git a/drivers/coresight/coresight-stm.c b/drivers/coresight/coresight-stm.c
+>> new file mode 100644
+>> index 000000000000..e59b0fe01d87
+>> --- /dev/null
+>> +++ b/drivers/coresight/coresight-stm.c
+>> @@ -0,0 +1,1090 @@
+>>[...]
+>> +#ifndef CONFIG_64BIT
+>> +static inline void __raw_writeq(u64 val, volatile void __iomem *addr)
+>> +{
+>> +     asm volatile("strd %1, %0"
+>> +                  : "+Qo" (*(volatile u64 __force *)addr)
+>> +                  : "r" (val));
+>> +}
+>> +
+>> +static inline u64 __raw_readq(const volatile void __iomem *addr)
+>> +{
+>> +     u64 val;
+>> +
+>> +     asm volatile("ldrd %1, %0"
+>> +                  : "+Qo" (*(volatile u64 __force *)addr),
+>> +                    "=r" (val));
+>> +     return val;
+>> +}
+>> +
+>> +#undef readq_relaxed
+>> +#define readq_relaxed(c) ({ u64 __r = le64_to_cpu((__force __le64) \
+>> +                                     __raw_readq(c)); __r; })
 >
->  enum {
-> +/* HDMI_CONFIG0_ID */
-> +       HDMI_CONFIG0_ID_PREPEN = 0x80,
-> +       HDMI_CONFIG0_ID_AUDSPDIF = 0x20,
-> +       HDMI_CONFIG0_ID_AUDI2S = 0x10,
-> +       HDMI_CONFIG0_ID_HDMI14 = 0x08,
-> +       HDMI_CONFIG0_ID_CSC = 0x04,
-> +       HDMI_CONFIG0_ID_HDCP = 0x01,
-> +
-> +/* HDMI_CONFIG1_ID */
-> +       HDMI_CONFIG1_ID_HDMI20 = 0x20,
-> +       HDMI_CONFIG1_ID_CONFAPB = 0x02,
-> +
-> +/* HDMI_CONFIG2_ID */
-> +       HDMI_CONFIG2_ID_PHY_GEN2 = 0xf2,
-> +       HDMI_CONFIG2_ID_PHY_GEN2_HECA = 0xe2,
-> +       HDMI_CONFIG2_ID_PHY_HDMI_MHL = 0xc2,
-> +       HDMI_CONFIG2_ID_PHY_HDMI_MHL_HECA = 0xb2,
-> +       HDMI_CONFIG2_ID_LEGACY_PHY = 0x00,
-> +
-> +/* HDMI_CONFIG3_ID */
-> +       HDMI_CONFIG3_ID_AHBAUDDMA = 0x02,
-> +       HDMI_CONFIG3_ID_GPAUD = 0x01,
-> +
->  /* IH_FC_INT2 field values */
->         HDMI_IH_FC_INT2_OVERFLOW_MASK = 0x03,
->         HDMI_IH_FC_INT2_LOW_PRIORITY_OVERFLOW = 0x02,
-> --
-> 2.1.2
+> I spotted no users of readq_relaxed. Is it needed?
 >
+>> +#undef writeq_relaxed
+>> +#define writeq_relaxed(v, c) __raw_writeq((__force u64) cpu_to_le64(v), c)
+>> +#endif
+>> +
+>> [...]
+>
+>> +static ssize_t entities_show(struct device *dev,
+>> +                          struct device_attribute *attr, char *buf)
+>> +{
+>> +     struct stm_drvdata *drvdata = dev_get_drvdata(dev->parent);
+>> +     ssize_t len;
+>> +
+>> +     len = bitmap_scnprintf(buf, PAGE_SIZE, drvdata->entities,
+>> +                            STM_ENTITY_MAX);
+>> +
+>
+> bitmap_scnprintf is gone in current linux-next. I changed it to
+>         len = scnprintf(buf, PAGE_SIZE, "%*pb", STM_ENTITY_MAX,
+>                         drvdata->entities);
+>
+> to get this file to compile. (On x86_64, that is, but please don't tell
+> anybody!)
+
+I was not aware that "bitmap_scnprintf()" had disappeared - thanks for
+pointing this out.  Did you mean cross-compile from an x86_64 host or
+compile for a x86_64 target?  I don't get how you could have in the
+latter case.
+
+Thanks for the review,
+Mathieu
+
+>
+>
+> Paul Bolle
 >
