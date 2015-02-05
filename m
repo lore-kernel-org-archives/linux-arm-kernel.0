@@ -1,62 +1,32 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Wed, 4 Feb 2015 21:49:02 -0800
-Subject: (AArch64) NR_CPUS limit
-In-Reply-To: <54D27FBF.8040909@redhat.com>
-References: <54D27FBF.8040909@redhat.com>
-Message-ID: <CANMBJr45rUdK0AKQ6OY3OS8XMAUQvosuDuvBxtxWE7sYOABR-w@mail.gmail.com>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Thu, 5 Feb 2015 13:59:36 +0800
+Subject: [PATCH 0/3] at91-3.19: pm fixes
+Message-ID: <1423115977-5852-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+Hi Nicolas,
 
-On 4 February 2015 at 12:23, Jon Masters <jcm@redhat.com> wrote:
-> Hi Folks,
->
-> We're currently patching our kernels with a (much) higher maximum for
-> NR_CPUS. There are some very large ARM systems coming soon - any
-> objections to increasing this to something like 1024 or 4096?
+The patch serial is to fix the pm issue.
 
-FWIW, I have a few ARMv7 systems complaining about this issue as well.
+It is based on the branch: at91-3.19-fixes
+git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git
 
-[    0.000000] WARNING: CPU: 0 PID: 0 at
-../arch/arm/kernel/devtree.c:144 arm_dt_init_cpu_maps+0x118/0x1e8()
-[    0.000000] DT /cpu 9 nodes greater than max cores 8, capping them
-[    0.000000] Modules linked in:
-[    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted
-3.19.0-rc7-00032-g5ee0e962603e #1
-[    0.000000] Hardware name: Hisilicon HiP04 (Flattened Device Tree)
-[    0.000000] [<c0215d94>] (unwind_backtrace) from [<c021165c>]
-(show_stack+0x10/0x14)
-[    0.000000] [<c021165c>] (show_stack) from [<c091841c>]
-(dump_stack+0x78/0x94)
-[    0.000000] [<c091841c>] (dump_stack) from [<c0247bc8>]
-(warn_slowpath_common+0x74/0xb0)
-[    0.000000] [<c0247bc8>] (warn_slowpath_common) from [<c0247c98>]
-(warn_slowpath_fmt+0x30/0x40)
-[    0.000000] [<c0247c98>] (warn_slowpath_fmt) from [<c0c624b4>]
-(arm_dt_init_cpu_maps+0x118/0x1e8)
-[    0.000000] [<c0c624b4>] (arm_dt_init_cpu_maps) from [<c0c613a8>]
-(setup_arch+0x714/0xa98)
-[    0.000000] [<c0c613a8>] (setup_arch) from [<c0c5e940>]
-(start_kernel+0x94/0x3d4)
-[    0.000000] [<c0c5e940>] (start_kernel) from [<10208084>] (0x10208084)
-[    0.000000] ---[ end trace cb88537fdc8fa200 ]---
+Peter Rosin (1):
+  pm: at91: Workaround DDRSDRC self-refresh bug with LPDDR1 memories.
 
-Is there an advantage (other than convenience) to increasing this
-default, then say using the nr_cpu[1] kernel parameter?
+Sylvain Rochet (2):
+  pm: at91: pm_slowclock: fix suspend/resume hang up in timeouts
+  pm: at91: pm_slowclock: remove clocks which are already stopped when
+    entering slow clock mode
 
->
-> (If not I'll send Catalin the trivial patch)
->
-> Jon.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+ arch/arm/mach-at91/pm.c            |   12 +++++
+ arch/arm/mach-at91/pm_slowclock.S  |  105 ++++++++++++++----------------------
+ include/soc/at91/at91sam9_ddrsdr.h |    2 +-
+ 3 files changed, 54 insertions(+), 65 deletions(-)
 
-Cheers,
+-- 
+1.7.9.5
 
-Tyler
-
-[1] https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/kernel-parameters.txt#n2473
+Best Regards,
+Wenyou Yang
