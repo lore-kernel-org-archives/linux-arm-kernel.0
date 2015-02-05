@@ -1,80 +1,60 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 05 Feb 2015 23:13:58 +0100
-Subject: [PATCH] ARM: dts: mvebu: add ethernet to the cm-a510 board
-In-Reply-To: <54CE354F.5090106@gmail.com>
-References: <E1YH5bU-0005mG-3L@bombadil.infradead.org>
- <54CB5267.5060004@gmail.com> <20150130113118.5523ed68@armhf>
- <54CB6440.1010002@gmail.com> <20150130124144.501cf81d@armhf>
- <54CB732F.7010409@gmail.com> <20150130133913.083d1ade@armhf>
- <54CB7E33.3080909@gmail.com> <54CE354F.5090106@gmail.com>
-Message-ID: <54D3EB26.9020909@gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 5 Feb 2015 22:16:03 +0000
+Subject: [Linaro-acpi] [PATCH v8 02/21] acpi: fix acpi_os_ioremap for arm64
+In-Reply-To: <20150205174826.GD21970@e104818-lin.cambridge.arm.com>
+References: <1422881149-8177-3-git-send-email-hanjun.guo@linaro.org>
+ <2422968.Es7R0p3loO@vostro.rjw.lan>
+ <1422984576.18187.82.camel@deneb.redhat.com>
+ <20150204112508.GB26006@e104818-lin.cambridge.arm.com>
+ <1423066107.18187.99.camel@deneb.redhat.com>
+ <20150204175734.GI26006@e104818-lin.cambridge.arm.com>
+ <1423076294.18187.103.camel@deneb.redhat.com>
+ <20150205104149.GA18158@e104818-lin.cambridge.arm.com>
+ <1423144447.18187.110.camel@deneb.redhat.com>
+ <54D39D6B.5090304@linaro.org>
+ <20150205174826.GD21970@e104818-lin.cambridge.arm.com>
+Message-ID: <CAKv+Gu922UwYRN7ZgFNTR7yGGKPLTU8Us7KbvXX-Q8=rqLKNog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01.02.2015 15:16, Gabriel Dobato wrote:
->> I'd be happy to take over, but I admit that my current lack of spare
->> time would only allow me to support Gabriel and you.
+On 5 February 2015 at 17:48, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Thu, Feb 05, 2015 at 04:42:19PM +0000, Al Stone wrote:
+>> On 02/05/2015 06:54 AM, Mark Salter wrote:
+>> > On Thu, 2015-02-05 at 10:41 +0000, Catalin Marinas wrote:
+>> >> On Wed, Feb 04, 2015 at 06:58:14PM +0000, Mark Salter wrote:
+>> >>> On Wed, 2015-02-04 at 17:57 +0000, Catalin Marinas wrote:
+>> >>>> On Wed, Feb 04, 2015 at 04:08:27PM +0000, Mark Salter wrote:
+>> >>>>> acpi_os_remap() is used to map ACPI tables. These tables may be in ram
+>> >>>>> which are already included in the kernel's linear RAM mapping. So we
+>> >>>>> need ioremap_cache to avoid two mappings to the same physical page
+>> >>>>> having different caching attributes.
+>> >>>>
+>> >>>> What's the call path to acpi_os_ioremap() on such tables already in the
+>> >>>> linear mapping? I can see an acpi_map() function which already takes
+>> >>>> care of the RAM mapping case but there are other cases where
+>> >>>> acpi_os_ioremap() is called directly. For example,
+>> >>>> acpi_os_read_memory(), can it be called on both RAM and I/O?
+>> >>>
+>> >>> acpi_map() is the one I've seen.
+>> >>
+>> >> By default, if should_use_kmap() is not patched for arm64, it translates
+>> >> to page_is_ram(); acpi_map() would simply use a kmap() which returns the
+>> >> current kernel linear mapping on arm64.
+>> >
+>> > The problem with kmap() is that it only maps a single page. I've seen
+>> > tables over 4k which is why I patched acpi_map() not to use kmap() on
+>> > arm64.
 >>
->> Let's wait for Gabriel's response on how he can help improving
->> Dove mainline with his cm-a510 and baseboard.
+>> Right.  Mark replied to this before I could; using kmap() enforced a 4k
+>> (one page) limit that we kept breaking with some ACPI tables being larger
+>> than that (DSDTs and SSDTs, fwiw).  This would lead to some very odd behaviors
+>> when most but not all of a device definition was within the page; using the
+>> table checksums was one way of detecting the issues.
 >
-> First of all, I would like to give thanks all people like you for all
-> your help and support. I really appreciate it.
+> OK. So I think Mark's original patch was ok, assuming that the System
+> Memory cases mentioned by Graeme are detected with page_is_ram().
 >
-> DT is new for me, I have never worked using this kind of hardware
-> description, so I am involving in many issues due to my lack of skills
-> in this kind of structure.
->
-> At this moment, I am focusing in the update of the version of the kernel
-> on the CM-A510 board (from 2.6 to 3.1x)in order to give more features to
-> the system, but as I said before, I have lots of problems.
->
-> Thanks to the help and support of Jean-Francois Moine, I have achieved
-> to boot the kernel completely and to mount the rootfs via NFS. I have a
-> prompt, what has been a very big step for me.
 
-Gabriel,
-
-great you can boot a recent kernel. I guess you had to quite heavily
-modify current dove-cm-a510.dts? Can you upload the one you use now
-to any pastebin and send the link?
-
->> Nope. One dove.dtsi, one dove-cm-a510.dtsi, and one baseboard.dts
->> including dove-cm-a510.dtsi for every baseboard we stumble upon.
->
-> In reference to the structure of .dts and .dtsi files, I agree with this
-> kind of structure, of course, nobody as you can consider it better. I
-> think the idea of make a dove-cm-a510.dtsi file and different
-> baseboards.dts depending of the peripherals used is great. But as I say,
-> maybe I am not the right person to decide it, Jean-Froncois Moine and
-> you have better criteria.So, whatever you decide I would very happy to help.
-
-You didn't mention if you really use the sb-a510, i.e. the Compulab
-reference baseboard. Is it what you are using with your cm-a510?
-
-> At this moment, I am trying to configure the framebuffer, but as Moine
-> told me,it seems there is not video driver support for this board in
-> DT... :( .
-
-Not quite true. Video is made up of at least 4 different devices:
-Framebuffer, GPU, Decode engine, and usually DVI/HDMI transmitter or
-VGA.
-
-We do have a driver for the framebuffer (armada_drm) and there is great
-work from Russell King and others on the GPU and Decode engine (IIRC).
-
-If you are using the sb-a510, I can see from the manual, that DVI
-transmitter is SIL164.. AFAIS there is a driver for it, that maybe
-needs some polishing. Nobody ever tested VGA, but it shouldn't be too
-hard to add support for it as it is directly supported by the
-framebuffer HW.
-
-One quite important driver at least for Dove is a clock source for
-video. Internal clock generators for video are way to limited with
-respect to frequencies to allow any useful resolution.
-
-I'll see if I can have a look at the dts stuff this weekend.. that
-way we'll have at least the basic done before moving to the other
-devices.
-
-Sebastian
+page_is_ram() returns whether a pfn is covered by the linear mapping,
+so memory before the kernel or after a mem= limit will be
+misidentified.
