@@ -1,36 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 5 Feb 2015 13:50:37 +0000
-Subject: [PATCH 2/4] rtc: sa1100: convert to run-time register mapping
-In-Reply-To: <CAL_JsqLiiKvzxQqE=bEx7qoLSZXLZOegt87A=+pR3PJuSBK95w@mail.gmail.com>
-References: <1423005775-26457-1-git-send-email-robh@kernel.org>
- <1423005775-26457-3-git-send-email-robh@kernel.org>
- <87h9v1a8k2.fsf@free.fr>
- <CAL_JsqLiiKvzxQqE=bEx7qoLSZXLZOegt87A=+pR3PJuSBK95w@mail.gmail.com>
-Message-ID: <20150205135037.GP8656@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 5 Feb 2015 14:53:34 +0100
+Subject: [PATCH] pinctrl: pinctrl-imx: don't use invalid value of conf_reg
+In-Reply-To: <20150203190141.GE10842@pengutronix.de>
+References: <1422399025-25636-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CACRpkdbtpGU57-tPn9Z0rNvY4zLk+QE6A9Pd87vLUHOmRiB2yg@mail.gmail.com>
+ <20150203190141.GE10842@pengutronix.de>
+Message-ID: <CACRpkdYXW5X7bSiRPTC3uHT=s+hjxj+jS0YJCBWrcmzHWkpqHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 05, 2015 at 07:34:50AM -0600, Rob Herring wrote:
-> > And just for your information, both rtc-sa1100 and rtc-pxa can be used at the
-> > same time in a pxa kernel.
-> 
-> Yes, I know. I find that a bit odd. We'll have a bit of a problem
-> supporting that with DT BTW.
+On Tue, Feb 3, 2015 at 8:01 PM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> On Tue, Feb 03, 2015 at 02:01:09PM +0100, Linus Walleij wrote:
+>> On Tue, Jan 27, 2015 at 11:50 PM, Uwe Kleine-K?nig
+>> <u.kleine-koenig@pengutronix.de> wrote:
+>>
+>> > The right check for conf_reg to be invalid it testing against -1 not 0
+>> > as is done in the rest of the driver.
+>> >
+>> > This fixes an oops that can be triggered by:
+>> >
+>> >         cat /sys/kernel/debug/pinctrl/43fac000.iomuxc/*
+>> >
+>> > Fixes: ae75ff814538 ("pinctrl: pinctrl-imx: add imx pinctrl core driver")
+>> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>>
+>> Patch applied.
+>>
+>> But...
+>>
+>> > -       if (!pin_reg || !pin_reg->conf_reg) {
+>> > +       if (!pin_reg || pin_reg->conf_reg == -1) {
+>>
+>> I can see that the other code checks for -1 in this variable.
+>> But where is conf_reg ever set to -1?
+>>
+>> freescale]$ git grep "\-1"
+>> pinctrl-imx.c:          if (pin_reg->mux_reg == -1) {
+>> pinctrl-imx.c:  if (pin_reg->mux_reg == -1)
+>> pinctrl-imx.c:  if (pin_reg->mux_reg == -1)
+>> pinctrl-imx.c:  if (pin_reg->conf_reg == -1) {
+>> pinctrl-imx.c:  if (pin_reg->conf_reg == -1) {
+>> pinctrl-imx.c:  if (!pin_reg || pin_reg->conf_reg == -1) {
+> Uah, ugly. This member gets -1 by means of:
+>
+>         memset(info->pin_regs, 0xff, sizeof(*info->pin_regs) * info->npins);
 
-I think you're close to that problem without DT anyway.  You modify
-rtc-sa1100 to use devm_ioremap_resource(), which claims the memory
-resource exclusively, thus marking the memory region exclusive.
+OMG. Uwe can you make a patch changing that initialization
+code to something sane? We can't have it like this.
 
-Luckily, rtc-pxa uses devm_ioremap() without claiming the memory
-resource - which is the only saving grace for why it still works.
-If rtc-pxa were to be converted to use devm_ioremap_resource(), then
-they'll become mutually exclusive.
-
-Also note that by including the resource in rtc-sa1100's platform
-device resource list, you'll have stacked resources between the two
-platform devices appearing in /proc/iomem (you did look at that
-before posting the patches, right?)
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Yours,
+Linus Walleij
