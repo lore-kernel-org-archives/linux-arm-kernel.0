@@ -1,106 +1,105 @@
 From: tsahee@annapurnalabs.com (Tsahee Zidenberg)
-Date: Thu, 05 Feb 2015 19:15:51 +0200
-Subject: [PATCH v5 0/6] Introducing the Alpine platform.
-Message-ID: <54d3a547.NQxNj5/x3ZikQiQS%tsahee@annapurnalabs.com>
+Date: Thu, 05 Feb 2015 19:15:53 +0200
+Subject: [PATCH v5 1/6] ARM: Alpine: Initial support for Alpine platform
+Message-ID: <54d3a549.0GyD9wARyHVLV8QC%tsahee@annapurnalabs.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If possible to introduce this into 3.20 - I would really appreciate it. If any 
-action by me can make it happen - please let me know.
+This patch introduces initial architecture and device-tree support.
 
-Thank you!
-
+Signed-off-by: Saeed Bishara <saeed@annapurnalabs.com>
+Signed-off-by: Tsahee Zidenberg <tsahee@annapurnalabs.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
-Annapurna Labs(TM) is a technology company providing innovative solutions
-including chips, software, and systems for the datacenter and enterprise
-infrastructure.
-
-Alpine(TM) is one of Annapurna Labs? chip products targeting storage and
-networking applications. It is a complete Platform-On-Chip,
-integrating 2-4 cortex-A15 cores and multiple innovations to provide
-a seamless networking and storage fabric for enterprise and datacenter
-equipment.
-
-This patchset provides initial support for the Alpine platform.
-
-Patch #1 contains minimal, single-cpu architecture support.
-
-Patch #2 adds early-debug capabilities via Alpine UART 0.
-
-Patch #3 adds smp-support and a secondary cpu enable-method for the platform.
-
-Patch #4 provides documentation for the available device-tree nodes.
-
-Patch #5 provides a device-tree for Alpine soc and development board.
-
-Patch #6 adds an entry to MAINTAINERS file.
-
-The patchset was tested with multi_v7_defconfig, adding CONFIG_ARCH_ALPINE
-
----
-V2:
-* map physical cpu-id from logical on cpu wakeup
-* use syscon/regmap for sysfabric_service implementation
-* devicetree format:
-**  split between .dtsi and dts
-**  dual license
-**  node and manufacturer naming
-* intoduce devicetree in two separate patches
-* multiple format fixes
-* rebased on d932006 (for-next)
-
----
-V3:
-* small format changes
-* rebased on f9db7e2 (for-next)
-
----
-V4:
-* removed unnecessary "compatible" property
-* added entry to MAINTAINERS file, in a separate patch.
-
----
-V5:
-* static, __init, const changes
-* add "syscon" to dt documentation
-
-Tsahee Zidenberg (6):
-  ARM: Alpine: Initial support for Alpine platform
-  ARM: Alpine: early-debug print support
-  ARM: Alpine: smp support
-  ARM: dts: Alpine platform binding documentation
-  ARM: dts: Alpine platform devicetree
-  MAINTAINERS: add maintainer for Alpine Arm machine
-
- .../devicetree/bindings/arm/al,alpine.txt          |  88 +++++++++++++
- .../bindings/arm/cpu-enable-method/al,alpine-smp   |  52 ++++++++
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- MAINTAINERS                                        |   5 +
- arch/arm/Kconfig                                   |   2 +
- arch/arm/Kconfig.debug                             |  12 +-
- arch/arm/Makefile                                  |   1 +
- arch/arm/boot/dts/Makefile                         |   4 +
- arch/arm/boot/dts/alpine-db.dts                    |  35 +++++
- arch/arm/boot/dts/alpine.dtsi                      | 141 +++++++++++++++++++++
- arch/arm/mach-alpine/Kconfig                       |  10 ++
- arch/arm/mach-alpine/Makefile                      |   2 +
- arch/arm/mach-alpine/alpine_cpu_pm.c               |  70 ++++++++++
- arch/arm/mach-alpine/alpine_cpu_pm.h               |  26 ++++
- arch/arm/mach-alpine/alpine_cpu_resume.h           |  38 ++++++
- arch/arm/mach-alpine/alpine_machine.c              |  28 ++++
- arch/arm/mach-alpine/platsmp.c                     |  49 +++++++
- 17 files changed, 563 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/arm/al,alpine.txt
- create mode 100644 Documentation/devicetree/bindings/arm/cpu-enable-method/al,alpine-smp
- create mode 100644 arch/arm/boot/dts/alpine-db.dts
- create mode 100644 arch/arm/boot/dts/alpine.dtsi
+ arch/arm/Kconfig                      |  2 ++
+ arch/arm/Makefile                     |  1 +
+ arch/arm/mach-alpine/Kconfig          |  8 ++++++++
+ arch/arm/mach-alpine/Makefile         |  1 +
+ arch/arm/mach-alpine/alpine_machine.c | 28 ++++++++++++++++++++++++++++
+ 5 files changed, 40 insertions(+)
  create mode 100644 arch/arm/mach-alpine/Kconfig
  create mode 100644 arch/arm/mach-alpine/Makefile
- create mode 100644 arch/arm/mach-alpine/alpine_cpu_pm.c
- create mode 100644 arch/arm/mach-alpine/alpine_cpu_pm.h
- create mode 100644 arch/arm/mach-alpine/alpine_cpu_resume.h
  create mode 100644 arch/arm/mach-alpine/alpine_machine.c
- create mode 100644 arch/arm/mach-alpine/platsmp.c
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index f5dd6e9..c74441b 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -842,6 +842,8 @@ config ARCH_VIRT
+ #
+ source "arch/arm/mach-mvebu/Kconfig"
+ 
++source "arch/arm/mach-alpine/Kconfig"
++
+ source "arch/arm/mach-asm9260/Kconfig"
+ 
+ source "arch/arm/mach-at91/Kconfig"
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index c1785ee..bcc4113 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -143,6 +143,7 @@ textofs-$(CONFIG_ARCH_AXXIA) := 0x00308000
+ 
+ # Machine directory name.  This list is sorted alphanumerically
+ # by CONFIG_* macro name.
++machine-$(CONFIG_ARCH_ALPINE)		+= alpine
+ machine-$(CONFIG_ARCH_AT91)		+= at91
+ machine-$(CONFIG_ARCH_AXXIA)		+= axxia
+ machine-$(CONFIG_ARCH_BCM)		+= bcm
+diff --git a/arch/arm/mach-alpine/Kconfig b/arch/arm/mach-alpine/Kconfig
+new file mode 100644
+index 0000000..44b9a8f
+--- /dev/null
++++ b/arch/arm/mach-alpine/Kconfig
+@@ -0,0 +1,8 @@
++config ARCH_ALPINE
++	bool "Annapurna Labs Alpine platform" if ARCH_MULTI_V7
++	select ARM_AMBA
++	select ARM_GIC
++	select GENERIC_IRQ_CHIP
++	select HAVE_ARM_ARCH_TIMER
++	help
++	  This enables support for the Annapurna Labs Alpine V1 boards.
+diff --git a/arch/arm/mach-alpine/Makefile b/arch/arm/mach-alpine/Makefile
+new file mode 100644
+index 0000000..b7dbb12
+--- /dev/null
++++ b/arch/arm/mach-alpine/Makefile
+@@ -0,0 +1 @@
++obj-y				+= alpine_machine.o
+diff --git a/arch/arm/mach-alpine/alpine_machine.c b/arch/arm/mach-alpine/alpine_machine.c
+new file mode 100644
+index 0000000..b8e2145
+--- /dev/null
++++ b/arch/arm/mach-alpine/alpine_machine.c
+@@ -0,0 +1,28 @@
++/*
++ * Machine declaration for Alpine platforms.
++ *
++ * Copyright (C) 2015 Annapurna Labs Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/of_platform.h>
++
++#include <asm/mach/arch.h>
++
++static const char * const al_match[] __initconst = {
++	"al,alpine",
++	NULL,
++};
++
++DT_MACHINE_START(AL_DT, "Annapurna Labs Alpine")
++	.dt_compat	= al_match,
++MACHINE_END
 -- 
 1.9.1
