@@ -1,99 +1,153 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 5 Feb 2015 14:47:43 -0600
-Subject: [PATCH 2/4] rtc: sa1100: convert to run-time register mapping
-In-Reply-To: <8761bg9ngy.fsf@free.fr>
-References: <1423005775-26457-1-git-send-email-robh@kernel.org>
- <1423005775-26457-3-git-send-email-robh@kernel.org> <87h9v1a8k2.fsf@free.fr>
- <CAL_JsqLiiKvzxQqE=bEx7qoLSZXLZOegt87A=+pR3PJuSBK95w@mail.gmail.com>
- <20150205135037.GP8656@n2100.arm.linux.org.uk> <8761bg9ngy.fsf@free.fr>
-Message-ID: <CAL_JsqJ5Ju98adz5Y2Ow2JDnvFdKhCRvpH8Xg1OfMYOhJaUUFw@mail.gmail.com>
+From: ldv@altlinux.org (Dmitry V. Levin)
+Date: Fri, 6 Feb 2015 00:19:16 +0300
+Subject: [PATCH v5 3/5] x86: Split syscall_trace_enter into two phases
+In-Reply-To: <2df320a600020fda055fccf2b668145729dd0c04.1409954077.git.luto@amacapital.net>
+References: <cover.1409954077.git.luto@amacapital.net>
+ <2df320a600020fda055fccf2b668145729dd0c04.1409954077.git.luto@amacapital.net>
+Message-ID: <20150205211916.GA31367@altlinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 5, 2015 at 1:18 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
->
->> On Thu, Feb 05, 2015 at 07:34:50AM -0600, Rob Herring wrote:
->>> > And just for your information, both rtc-sa1100 and rtc-pxa can be used at the
->>> > same time in a pxa kernel.
->>>
->>> Yes, I know. I find that a bit odd. We'll have a bit of a problem
->>> supporting that with DT BTW.
->>
->> I think you're close to that problem without DT anyway.  You modify
->> rtc-sa1100 to use devm_ioremap_resource(), which claims the memory
->> resource exclusively, thus marking the memory region exclusive.
-> Ah yes, I have not caught that one.
+Hi,
 
-Yes, I was aware of this.
+On Fri, Sep 05, 2014 at 03:13:54PM -0700, Andy Lutomirski wrote:
+> This splits syscall_trace_enter into syscall_trace_enter_phase1 and
+> syscall_trace_enter_phase2.  Only phase 2 has full pt_regs, and only
+> phase 2 is permitted to modify any of pt_regs except for orig_ax.
 
->> Luckily, rtc-pxa uses devm_ioremap() without claiming the memory
->> resource - which is the only saving grace for why it still works.
->> If rtc-pxa were to be converted to use devm_ioremap_resource(), then
->> they'll become mutually exclusive.
-> True.
->
-> Since the pxa-rtc begin ([1] and [2]), the idea was that both rtc-pxa and
-> rtc-sa1100 could work in the same kernel, each handling a part of RTC
-> functionality.
->
-> Retrospectively, I think I made an error there, when I agreed the pxa2xx had 2
-> distinct RTC IPs. The sharing of ioresource as well of the IRQ should have made
-> me decide it was a _single_ IP.
+This breaks ptrace, see below.
 
-It is also shared registers.
+> The intent is that phase 1 can be called from the syscall fast path.
+> 
+> In this implementation, phase1 can handle any combination of
+> TIF_NOHZ (RCU context tracking), TIF_SECCOMP, and TIF_SYSCALL_AUDIT,
+> unless seccomp requests a ptrace event, in which case phase2 is
+> forced.
+> 
+> In principle, this could yield a big speedup for TIF_NOHZ as well as
+> for TIF_SECCOMP if syscall exit work were similarly split up.
+> 
+> Signed-off-by: Andy Lutomirski <luto@amacapital.net>
+> ---
+>  arch/x86/include/asm/ptrace.h |   5 ++
+>  arch/x86/kernel/ptrace.c      | 157 +++++++++++++++++++++++++++++++++++-------
+>  2 files changed, 138 insertions(+), 24 deletions(-)
+> 
+> diff --git a/arch/x86/include/asm/ptrace.h b/arch/x86/include/asm/ptrace.h
+> index 6205f0c434db..86fc2bb82287 100644
+> --- a/arch/x86/include/asm/ptrace.h
+> +++ b/arch/x86/include/asm/ptrace.h
+> @@ -75,6 +75,11 @@ convert_ip_to_linear(struct task_struct *child, struct pt_regs *regs);
+>  extern void send_sigtrap(struct task_struct *tsk, struct pt_regs *regs,
+>  			 int error_code, int si_code);
+>  
+> +
+> +extern unsigned long syscall_trace_enter_phase1(struct pt_regs *, u32 arch);
+> +extern long syscall_trace_enter_phase2(struct pt_regs *, u32 arch,
+> +				       unsigned long phase1_result);
+> +
+>  extern long syscall_trace_enter(struct pt_regs *);
+>  extern void syscall_trace_leave(struct pt_regs *);
+>  
+> diff --git a/arch/x86/kernel/ptrace.c b/arch/x86/kernel/ptrace.c
+> index bbf338a04a5d..29576c244699 100644
+> --- a/arch/x86/kernel/ptrace.c
+> +++ b/arch/x86/kernel/ptrace.c
+> @@ -1441,20 +1441,126 @@ void send_sigtrap(struct task_struct *tsk, struct pt_regs *regs,
+>  	force_sig_info(SIGTRAP, &info, tsk);
+>  }
+>  
+> +static void do_audit_syscall_entry(struct pt_regs *regs, u32 arch)
+> +{
+> +#ifdef CONFIG_X86_64
+> +	if (arch == AUDIT_ARCH_X86_64) {
+> +		audit_syscall_entry(arch, regs->orig_ax, regs->di,
+> +				    regs->si, regs->dx, regs->r10);
+> +	} else
+> +#endif
+> +	{
+> +		audit_syscall_entry(arch, regs->orig_ax, regs->bx,
+> +				    regs->cx, regs->dx, regs->si);
+> +	}
+> +}
+> +
+>  /*
+> - * We must return the syscall number to actually look up in the table.
+> - * This can be -1L to skip running any syscall at all.
+> + * We can return 0 to resume the syscall or anything else to go to phase
+> + * 2.  If we resume the syscall, we need to put something appropriate in
+> + * regs->orig_ax.
+> + *
+> + * NB: We don't have full pt_regs here, but regs->orig_ax and regs->ax
+> + * are fully functional.
+> + *
+> + * For phase 2's benefit, our return value is:
+> + * 0:			resume the syscall
+> + * 1:			go to phase 2; no seccomp phase 2 needed
+> + * anything else:	go to phase 2; pass return value to seccomp
+>   */
+> -long syscall_trace_enter(struct pt_regs *regs)
+> +unsigned long syscall_trace_enter_phase1(struct pt_regs *regs, u32 arch)
+>  {
+> -	long ret = 0;
+> +	unsigned long ret = 0;
+> +	u32 work;
+> +
+> +	BUG_ON(regs != task_pt_regs(current));
+> +
+> +	work = ACCESS_ONCE(current_thread_info()->flags) &
+> +		_TIF_WORK_SYSCALL_ENTRY;
+>  
+>  	/*
+>  	 * If TIF_NOHZ is set, we are required to call user_exit() before
+>  	 * doing anything that could touch RCU.
+>  	 */
+> -	if (test_thread_flag(TIF_NOHZ))
+> +	if (work & _TIF_NOHZ) {
+>  		user_exit();
+> +		work &= ~TIF_NOHZ;
+> +	}
+> +
+> +#ifdef CONFIG_SECCOMP
+> +	/*
+> +	 * Do seccomp first -- it should minimize exposure of other
+> +	 * code, and keeping seccomp fast is probably more valuable
+> +	 * than the rest of this.
+> +	 */
+> +	if (work & _TIF_SECCOMP) {
+> +		struct seccomp_data sd;
+> +
+> +		sd.arch = arch;
+> +		sd.nr = regs->orig_ax;
+> +		sd.instruction_pointer = regs->ip;
+> +#ifdef CONFIG_X86_64
+> +		if (arch == AUDIT_ARCH_X86_64) {
+> +			sd.args[0] = regs->di;
+> +			sd.args[1] = regs->si;
+> +			sd.args[2] = regs->dx;
+> +			sd.args[3] = regs->r10;
+> +			sd.args[4] = regs->r8;
+> +			sd.args[5] = regs->r9;
+> +		} else
+> +#endif
+> +		{
+> +			sd.args[0] = regs->bx;
+> +			sd.args[1] = regs->cx;
+> +			sd.args[2] = regs->dx;
+> +			sd.args[3] = regs->si;
+> +			sd.args[4] = regs->di;
+> +			sd.args[5] = regs->bp;
+> +		}
+> +
+> +		BUILD_BUG_ON(SECCOMP_PHASE1_OK != 0);
+> +		BUILD_BUG_ON(SECCOMP_PHASE1_SKIP != 1);
+> +
+> +		ret = seccomp_phase1(&sd);
+> +		if (ret == SECCOMP_PHASE1_SKIP) {
+> +			regs->orig_ax = -1;
 
-> And it's only a matter of time until rtc-pxa claims the resources too I think,
-> probably by some device-tree push.
+How the tracer is expected to get the correct syscall number after that?
 
-Blame DT for enforcing proper kernel driver design... ;)
 
-> As a consequence, I'm pretty much in favor of :
->  - making rtc-pxa and rtc-sa1100 exclusive
-
-+1
-
->  - adding to rtc-pxa driver :
->    - a new rtc device (ie. it will register 2 rtc devices, one of the sa1100
->      kind, one of the pxa specific kind)
-
-I fail to see what the rtc-pxa gets us? Something to do with which
-counter has correct time at boot? It has a rollover longer than ~126
-years is all I see. Otherwise, it looks like over-engineered h/w to
-me.
-
-> This has flaws :
->  - a bit of code will be duplicated between rtc-pxa and rtc-sa1100
-
-That can probably be mitigated with a common file of shared functions.
-
->  - the ordering in rtc-pxa between the 2 rtc devices will be important, as if I
->  remember correctly /dev/rtc points to the first /dev/rtc0 registered
->
-> But it opens up :
->  - DT path to both drivers
->  - isolation between sa1100 architecture changes and pxa architecture changes
->  - Rob's current patches can remain almost the same
->
->> Also note that by including the resource in rtc-sa1100's platform
->> device resource list, you'll have stacked resources between the two
->> platform devices appearing in /proc/iomem (you did look at that
->> before posting the patches, right?)
-> I must admit I don't know if there are nasty consequences, I think I need to
-> follow up the code to have a clear idea.
-
-I don't follow either. The resources don't appear unless requested and
-we only have 1 driver requesting it.
-
-Rob
-
-> Cheers.
->
-> --
-> Robert
->
-> A bit of history for sa1100/pxa-rtc split :
-> [1]
->  http://archive.arm.linux.org.uk/lurker/message/20081001.191833.4d220566.en.html
-> [2]
->  http://archive.arm.linux.org.uk/lurker/message/20081010.072816.93bd675d.en.html
+-- 
+ldv
