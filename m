@@ -1,77 +1,69 @@
-From: gg@slimlogic.co.uk (Graeme Gregory)
-Date: Thu, 5 Feb 2015 11:14:43 +0000
-Subject: [PATCH v8 02/21] acpi: fix acpi_os_ioremap for arm64
-In-Reply-To: <20150205105945.GC18158@e104818-lin.cambridge.arm.com>
-References: <1422881149-8177-3-git-send-email-hanjun.guo@linaro.org>
- <2422968.Es7R0p3loO@vostro.rjw.lan>
- <1422984576.18187.82.camel@deneb.redhat.com>
- <20150204112508.GB26006@e104818-lin.cambridge.arm.com>
- <1423066107.18187.99.camel@deneb.redhat.com>
- <20150204175734.GI26006@e104818-lin.cambridge.arm.com>
- <1423076294.18187.103.camel@deneb.redhat.com>
- <20150205104149.GA18158@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-tqY4C0eaRvp5FAzx9PqOGMg+sFNzxr2f25omdJKr7JA@mail.gmail.com>
- <20150205105945.GC18158@e104818-lin.cambridge.arm.com>
-Message-ID: <20150205111443.GC24474@xora-haswell.xora.org.uk>
+From: addy.ke@rock-chips.com (Addy Ke)
+Date: Thu,  5 Feb 2015 19:13:21 +0800
+Subject: [PATCH] mmc: dw_mmc: fix bug that cause 'Timeout sending command'
+Message-ID: <1423134801-23219-1-git-send-email-addy.ke@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 05, 2015 at 10:59:45AM +0000, Catalin Marinas wrote:
-> On Thu, Feb 05, 2015 at 10:47:23AM +0000, Ard Biesheuvel wrote:
-> > On 5 February 2015 at 10:41, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > > On Wed, Feb 04, 2015 at 06:58:14PM +0000, Mark Salter wrote:
-> > >> On Wed, 2015-02-04 at 17:57 +0000, Catalin Marinas wrote:
-> > >> > On Wed, Feb 04, 2015 at 04:08:27PM +0000, Mark Salter wrote:
-> > >> > > acpi_os_remap() is used to map ACPI tables. These tables may be in ram
-> > >> > > which are already included in the kernel's linear RAM mapping. So we
-> > >> > > need ioremap_cache to avoid two mappings to the same physical page
-> > >> > > having different caching attributes.
-> > >> >
-> > >> > What's the call path to acpi_os_ioremap() on such tables already in the
-> > >> > linear mapping? I can see an acpi_map() function which already takes
-> > >> > care of the RAM mapping case but there are other cases where
-> > >> > acpi_os_ioremap() is called directly. For example,
-> > >> > acpi_os_read_memory(), can it be called on both RAM and I/O?
-> > >>
-> > >> acpi_map() is the one I've seen.
-> > >
-> > > By default, if should_use_kmap() is not patched for arm64, it translates
-> > > to page_is_ram(); acpi_map() would simply use a kmap() which returns the
-> > > current kernel linear mapping on arm64.
-> > >
-> > >> I'm not sure about others.
-> > >
-> > > Question for the ARM ACPI guys: what happens if you implement
-> > > acpi_os_ioremap() on arm64 as just ioremap()? Do you get any WARN_ON()
-> > > (__ioremap_caller() checks whether the memory is RAM)?
-> > 
-> > Regardless of whether you hit any WARN_ON()s now,
-> 
-> Actually following the WARN_ON(), ioremap() returns NULL, so it may not
-> go entirely unnoticed.
-> 
-> > we still need to distinguish between MMIO ranges with device
-> > semantics, and ACPI or other tables whose data may not be naturally
-> > aligned all the time, and hence requiring memory semantics.
-> > acpi_os_ioremap() may be used for both, afaik
-> 
-> Is acpi_os_ioremap() called directly (outside acpi_map()) to map RAM
-> that already part of the kernel linear memory? If yes, then I agree that
-> we need to do such check.
-> 
-> Another question, can we distinguish, in the ACPI core code, whether the
-> mapping is for an ACPI table in RAM or some I/O space?
-> 
+Because of some uncertain factors, such as worse card or worse hardware,
+DAT[3:0](the data lines) may be pulled down by card, and mmc controller
+will be in busy state. This should not happend when mmc controller
+send command to update card clocks. If this happends, mci_send_cmd will
+be failed and we will get 'Timeout sending command', and then system will
+be blocked. To avoid this, we need reset mmc controller.
 
-Yes I think we do,
+Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+---
+ drivers/mmc/host/dw_mmc.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-acpi_os_map_memory() is called to map tables
-
-acpi_os_map_iomem() is called to map device IO
-
-currently both end up in acpi_map but I guess they do not have to or
-we can add extra arguments as its an internal API.
-
-But I have not checked that no user sneaks in direct calls.
-
-Graeme
+diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+index 4d2e3c2..b1d6dfb 100644
+--- a/drivers/mmc/host/dw_mmc.c
++++ b/drivers/mmc/host/dw_mmc.c
+@@ -100,6 +100,7 @@ struct idmac_desc {
+ };
+ #endif /* CONFIG_MMC_DW_IDMAC */
+ 
++static int dw_mci_card_busy(struct mmc_host *mmc);
+ static bool dw_mci_reset(struct dw_mci *host);
+ static bool dw_mci_ctrl_reset(struct dw_mci *host, u32 reset);
+ 
+@@ -888,6 +889,26 @@ static void mci_send_cmd(struct dw_mci_slot *slot, u32 cmd, u32 arg)
+ 		cmd, arg, cmd_status);
+ }
+ 
++static void dw_mci_wait_busy(struct dw_mci_slot *slot)
++{
++	struct dw_mci *host = slot->host;
++	unsigned long timeout = jiffies + msecs_to_jiffies(500);
++
++	while (time_before(jiffies, timeout)) {
++		if (!dw_mci_card_busy(slot->mmc))
++			return;
++	}
++	dev_err(host->dev, "Data busy (status %#x)\n",
++		mci_readl(slot->host, STATUS));
++
++	/*
++	 * Data busy, this should not happend when mmc controller send command
++	 * to update card clocks in non-volt-switch state. If it happends, we
++	 * should reset controller to avoid getting "Timeout sending command".
++	 */
++	dw_mci_ctrl_reset(host, SDMMC_CTRL_ALL_RESET_FLAGS);
++}
++
+ static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
+ {
+ 	struct dw_mci *host = slot->host;
+@@ -899,6 +920,8 @@ static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
+ 	/* We must continue to set bit 28 in CMD until the change is complete */
+ 	if (host->state == STATE_WAITING_CMD11_DONE)
+ 		sdmmc_cmd_bits |= SDMMC_CMD_VOLT_SWITCH;
++	else
++		dw_mci_wait_busy(slot);
+ 
+ 	if (!clock) {
+ 		mci_writel(host, CLKENA, 0);
+-- 
+1.8.3.2
