@@ -1,168 +1,115 @@
-From: ldv@altlinux.org (Dmitry V. Levin)
-Date: Fri, 6 Feb 2015 00:40:27 +0300
-Subject: [PATCH v5 3/5] x86: Split syscall_trace_enter into two phases
-In-Reply-To: <CAGXu5j+aXxt55LsxxbNkfGGF719ubXBZ2JAFwUPNARwKMVFgng@mail.gmail.com>
-References: <cover.1409954077.git.luto@amacapital.net>
- <2df320a600020fda055fccf2b668145729dd0c04.1409954077.git.luto@amacapital.net>
- <20150205211916.GA31367@altlinux.org>
- <CAGXu5j+aXxt55LsxxbNkfGGF719ubXBZ2JAFwUPNARwKMVFgng@mail.gmail.com>
-Message-ID: <20150205214027.GB31367@altlinux.org>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Thu, 5 Feb 2015 16:42:27 -0500
+Subject: [PATCH v4 3/6] of: fix size when dma-range is not used
+In-Reply-To: <20150202121843.GD22661@e104818-lin.cambridge.arm.com>
+References: <1422052359-12384-1-git-send-email-m-karicheri2@ti.com>
+ <1422052359-12384-4-git-send-email-m-karicheri2@ti.com>
+ <54C77616.80301@arm.com> <54C7DF13.20402@ti.com>
+ <20150128110523.GC6646@e104818-lin.cambridge.arm.com>
+ <54C9068D.8050701@arm.com>
+ <20150128173048.GE31752@e104818-lin.cambridge.arm.com>
+ <54CBC823.3020905@ti.com>
+ <20150202121843.GD22661@e104818-lin.cambridge.arm.com>
+Message-ID: <54D3E3C3.1040104@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 05, 2015 at 01:27:16PM -0800, Kees Cook wrote:
-> On Thu, Feb 5, 2015 at 1:19 PM, Dmitry V. Levin <ldv@altlinux.org> wrote:
-> > Hi,
-> >
-> > On Fri, Sep 05, 2014 at 03:13:54PM -0700, Andy Lutomirski wrote:
-> >> This splits syscall_trace_enter into syscall_trace_enter_phase1 and
-> >> syscall_trace_enter_phase2.  Only phase 2 has full pt_regs, and only
-> >> phase 2 is permitted to modify any of pt_regs except for orig_ax.
-> >
-> > This breaks ptrace, see below.
-> >
-> >> The intent is that phase 1 can be called from the syscall fast path.
-> >>
-> >> In this implementation, phase1 can handle any combination of
-> >> TIF_NOHZ (RCU context tracking), TIF_SECCOMP, and TIF_SYSCALL_AUDIT,
-> >> unless seccomp requests a ptrace event, in which case phase2 is
-> >> forced.
-> >>
-> >> In principle, this could yield a big speedup for TIF_NOHZ as well as
-> >> for TIF_SECCOMP if syscall exit work were similarly split up.
-> >>
-> >> Signed-off-by: Andy Lutomirski <luto@amacapital.net>
-> >> ---
-> >>  arch/x86/include/asm/ptrace.h |   5 ++
-> >>  arch/x86/kernel/ptrace.c      | 157 +++++++++++++++++++++++++++++++++++-------
-> >>  2 files changed, 138 insertions(+), 24 deletions(-)
-> >>
-> >> diff --git a/arch/x86/include/asm/ptrace.h b/arch/x86/include/asm/ptrace.h
-> >> index 6205f0c434db..86fc2bb82287 100644
-> >> --- a/arch/x86/include/asm/ptrace.h
-> >> +++ b/arch/x86/include/asm/ptrace.h
-> >> @@ -75,6 +75,11 @@ convert_ip_to_linear(struct task_struct *child, struct pt_regs *regs);
-> >>  extern void send_sigtrap(struct task_struct *tsk, struct pt_regs *regs,
-> >>                        int error_code, int si_code);
-> >>
-> >> +
-> >> +extern unsigned long syscall_trace_enter_phase1(struct pt_regs *, u32 arch);
-> >> +extern long syscall_trace_enter_phase2(struct pt_regs *, u32 arch,
-> >> +                                    unsigned long phase1_result);
-> >> +
-> >>  extern long syscall_trace_enter(struct pt_regs *);
-> >>  extern void syscall_trace_leave(struct pt_regs *);
-> >>
-> >> diff --git a/arch/x86/kernel/ptrace.c b/arch/x86/kernel/ptrace.c
-> >> index bbf338a04a5d..29576c244699 100644
-> >> --- a/arch/x86/kernel/ptrace.c
-> >> +++ b/arch/x86/kernel/ptrace.c
-> >> @@ -1441,20 +1441,126 @@ void send_sigtrap(struct task_struct *tsk, struct pt_regs *regs,
-> >>       force_sig_info(SIGTRAP, &info, tsk);
-> >>  }
-> >>
-> >> +static void do_audit_syscall_entry(struct pt_regs *regs, u32 arch)
-> >> +{
-> >> +#ifdef CONFIG_X86_64
-> >> +     if (arch == AUDIT_ARCH_X86_64) {
-> >> +             audit_syscall_entry(arch, regs->orig_ax, regs->di,
-> >> +                                 regs->si, regs->dx, regs->r10);
-> >> +     } else
-> >> +#endif
-> >> +     {
-> >> +             audit_syscall_entry(arch, regs->orig_ax, regs->bx,
-> >> +                                 regs->cx, regs->dx, regs->si);
-> >> +     }
-> >> +}
-> >> +
-> >>  /*
-> >> - * We must return the syscall number to actually look up in the table.
-> >> - * This can be -1L to skip running any syscall at all.
-> >> + * We can return 0 to resume the syscall or anything else to go to phase
-> >> + * 2.  If we resume the syscall, we need to put something appropriate in
-> >> + * regs->orig_ax.
-> >> + *
-> >> + * NB: We don't have full pt_regs here, but regs->orig_ax and regs->ax
-> >> + * are fully functional.
-> >> + *
-> >> + * For phase 2's benefit, our return value is:
-> >> + * 0:                        resume the syscall
-> >> + * 1:                        go to phase 2; no seccomp phase 2 needed
-> >> + * anything else:    go to phase 2; pass return value to seccomp
-> >>   */
-> >> -long syscall_trace_enter(struct pt_regs *regs)
-> >> +unsigned long syscall_trace_enter_phase1(struct pt_regs *regs, u32 arch)
-> >>  {
-> >> -     long ret = 0;
-> >> +     unsigned long ret = 0;
-> >> +     u32 work;
-> >> +
-> >> +     BUG_ON(regs != task_pt_regs(current));
-> >> +
-> >> +     work = ACCESS_ONCE(current_thread_info()->flags) &
-> >> +             _TIF_WORK_SYSCALL_ENTRY;
-> >>
-> >>       /*
-> >>        * If TIF_NOHZ is set, we are required to call user_exit() before
-> >>        * doing anything that could touch RCU.
-> >>        */
-> >> -     if (test_thread_flag(TIF_NOHZ))
-> >> +     if (work & _TIF_NOHZ) {
-> >>               user_exit();
-> >> +             work &= ~TIF_NOHZ;
-> >> +     }
-> >> +
-> >> +#ifdef CONFIG_SECCOMP
-> >> +     /*
-> >> +      * Do seccomp first -- it should minimize exposure of other
-> >> +      * code, and keeping seccomp fast is probably more valuable
-> >> +      * than the rest of this.
-> >> +      */
-> >> +     if (work & _TIF_SECCOMP) {
-> >> +             struct seccomp_data sd;
-> >> +
-> >> +             sd.arch = arch;
-> >> +             sd.nr = regs->orig_ax;
-> >> +             sd.instruction_pointer = regs->ip;
-> >> +#ifdef CONFIG_X86_64
-> >> +             if (arch == AUDIT_ARCH_X86_64) {
-> >> +                     sd.args[0] = regs->di;
-> >> +                     sd.args[1] = regs->si;
-> >> +                     sd.args[2] = regs->dx;
-> >> +                     sd.args[3] = regs->r10;
-> >> +                     sd.args[4] = regs->r8;
-> >> +                     sd.args[5] = regs->r9;
-> >> +             } else
-> >> +#endif
-> >> +             {
-> >> +                     sd.args[0] = regs->bx;
-> >> +                     sd.args[1] = regs->cx;
-> >> +                     sd.args[2] = regs->dx;
-> >> +                     sd.args[3] = regs->si;
-> >> +                     sd.args[4] = regs->di;
-> >> +                     sd.args[5] = regs->bp;
-> >> +             }
-> >> +
-> >> +             BUILD_BUG_ON(SECCOMP_PHASE1_OK != 0);
-> >> +             BUILD_BUG_ON(SECCOMP_PHASE1_SKIP != 1);
-> >> +
-> >> +             ret = seccomp_phase1(&sd);
-> >> +             if (ret == SECCOMP_PHASE1_SKIP) {
-> >> +                     regs->orig_ax = -1;
-> >
-> > How the tracer is expected to get the correct syscall number after that?
-> 
-> There shouldn't be a tracer if a skip is encountered. (A seccomp skip
-> would skip ptrace.) This behavior hasn't changed, but maybe I don't
-> see what you mean? (I haven't encountered any problems with syscall
-> tracing as a result of these changes.)
+On 02/02/2015 07:18 AM, Catalin Marinas wrote:
+> On Fri, Jan 30, 2015 at 06:06:27PM +0000, Murali Karicheri wrote:
+>> On 01/28/2015 12:30 PM, Catalin Marinas wrote:
+>>> I think we can remove this check altogether (we leaved without it for a
+>>> while) but we need to add 1 when calculating the mask:
+>>>
+>>> 	dev->coherent_dma_mask = min(DMA_BIT_MASK(32),
+>>> 				     DMA_BIT_MASK(ilog2(size + 1)));
+>>>
+>> For Keystone, the dma_addr is to be taken care as well to determine the
+>> mask. The above will not work.
+>
+> This was discussed before (not on this thread) and dma_addr should not
+> affect the mask, it only affects the pfn offset.
+>
+>> Based on the discussion so far, this is the function I have come up with
+>> incorporating the suggestions. Please review this and see if I have
+>> missed out any. This works fine on Keystone.
+>>
+>> void of_dma_configure(struct device *dev, struct device_node *np)
+>> {
+>> 	u64 dma_addr = 0, paddr, size;
+>> 	int ret;
+>> 	bool coherent;
+>> 	unsigned long offset = 0;
+>> 	struct iommu_ops *iommu;
+>>
+>> 	/*
+>> 	 * Set default size to cover the 32-bit. Drivers are expected to setup
+>> 	 * the correct size and dma_mask.
+>>     	 */
+>> 	size = 1ULL<<  32;
+>>
+>> 	ret = of_dma_get_range(np,&dma_addr,&paddr,&size);
+>> 	if (!ret) {
+>> 		offset = PFN_DOWN(paddr - dma_addr);
+>> 		if (!size) {
+>> 			dev_err(dev, "Invalid size (%llx)\n",
+>> 				size);
+>> 			return;
+>> 		}
+>> 		if (size&  1) {
+>> 			size = size + 1;
+>> 			dev_warn(dev, "Incorrect usage of size (%llx)\n",
+>> 				 size);
+>> 		}
+>> 		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
+>> 	}
+>> 	dev->dma_pfn_offset = offset;
+>>
+>> 	/*
+>> 	 * Coherent DMA masks larger than 32-bit must be explicitly set by the
+>> 	 * driver.
+>> 	 */
+>> 	dev->coherent_dma_mask = min(DMA_BIT_MASK(32),
+>> 				     DMA_BIT_MASK(ilog2(dma_addr + size)));
+>
+> That's not correct, coherent_dma_mask should still be calculated solely
+> based on size, not dma_addr.
+>
+> Functions like swiotlb_dma_supported() use phys_to_dma() which on ARM
+> (32-bit) subtracts the dma_pfn_offset, so the mask based on size works
+> fine.
+>
+> In the arm64 tree, we haven't taken dma_pfn_offset into account for
+> phys_to_dma() yet but if needed for a SoC, we'll add it.
+>
+Catalin,
 
-SECCOMP_RET_ERRNO leads to SECCOMP_PHASE1_SKIP, and if there is a tracer,
-it will get -1 as a syscall number.
+The size based dma mask calculation itself can be a separate topic 
+patch. This series is adding important fix to get the PCI driver 
+functional and I would like to get this merged as soon as possible. I 
+also want to hear from Arnd about yout comment as we had discussed this 
+in the initial discussion of this patch series and 8/8 is essentially 
+added based on that discussion. I will add a simple check to catch and 
+warn the incorrect size setting in DT for dma-range as suggested by Rob 
+Herring and create a new patch to for size based mask calculation. I 
+will be sending v6 (expected to be merged soon) today and will work to 
+add a new patch. Before that we need to agree on what is the content of 
+the patch.
 
-I've found this while testing a strace parser for
-SECCOMP_MODE_FILTER/SECCOMP_SET_MODE_FILTER, so the problem is quite real.
+1. On keystone, DMA address start at 0x8000_0000 and DMA-able memory is 
+2G from the above base address. So without taking into account the 
+dma_addr, mask calculated will be 0x7fff_ffff where as we need that to 
+be 0xffff_ffff for keystone. So need to use this in the calculation.
+
+2. W.r.t arm_pfn_offset, this was added to support Keystone as the DDR 
+physical address for LPAE startes at 0x8_0000_0000 and the pfn offset is 
+calculated as the PFN of (0x8_0000_0000 - 0x8000_0000) to do the dma 
+address to DDR address translation. I haven't looked at 
+swiotlb_dma_supported() but will do so.
+
+Murali
+
 
 
 -- 
-ldv
+Murali Karicheri
+Linux Kernel, Texas Instruments
