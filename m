@@ -1,41 +1,44 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 05 Feb 2015 19:27:30 +0900
-Subject: Kexec and KVM not working gracefully together
-In-Reply-To: <20150205094317.43f8554a@arm.com>
-References: <CAHt6W4cuRi3bfj5mryFouhOLGAAWuNXKVvz4K-rAjQnwiegL-Q@mail.gmail.com>	<54C7ADF0.8090102@arm.com>	<54D30AE0.5050101@linaro.org>
- <20150205094317.43f8554a@arm.com>
-Message-ID: <54D34592.9010903@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 5 Feb 2015 10:41:49 +0000
+Subject: [PATCH v8 02/21] acpi: fix acpi_os_ioremap for arm64
+In-Reply-To: <1423076294.18187.103.camel@deneb.redhat.com>
+References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
+ <1422881149-8177-3-git-send-email-hanjun.guo@linaro.org>
+ <2422968.Es7R0p3loO@vostro.rjw.lan>
+ <1422984576.18187.82.camel@deneb.redhat.com>
+ <20150204112508.GB26006@e104818-lin.cambridge.arm.com>
+ <1423066107.18187.99.camel@deneb.redhat.com>
+ <20150204175734.GI26006@e104818-lin.cambridge.arm.com>
+ <1423076294.18187.103.camel@deneb.redhat.com>
+Message-ID: <20150205104149.GA18158@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/2015 06:43 PM, Marc Zyngier wrote:
-> On Thu, 5 Feb 2015 06:17:04 +0000
-> AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
->
->> Frediano
->> Cc: Marc
->>
->> Are you going to fix this issue on arm?
->> As I'm now working on the same issue on arm64,
->> we should share the idea and some code.
->
-> Just to be perfectly clear: KVM support for Kexec on arm and arm64
-> should be exactly the same, with the exception of some (very
-> limited) assembly code for the MMU teardown.
+On Wed, Feb 04, 2015 at 06:58:14PM +0000, Mark Salter wrote:
+> On Wed, 2015-02-04 at 17:57 +0000, Catalin Marinas wrote:
+> > On Wed, Feb 04, 2015 at 04:08:27PM +0000, Mark Salter wrote:
+> > > acpi_os_remap() is used to map ACPI tables. These tables may be in ram
+> > > which are already included in the kernel's linear RAM mapping. So we
+> > > need ioremap_cache to avoid two mappings to the same physical page
+> > > having different caching attributes.
+> > 
+> > What's the call path to acpi_os_ioremap() on such tables already in the
+> > linear mapping? I can see an acpi_map() function which already takes
+> > care of the RAM mapping case but there are other cases where
+> > acpi_os_ioremap() is called directly. For example,
+> > acpi_os_read_memory(), can it be called on both RAM and I/O?
+> 
+> acpi_map() is the one I've seen.
 
-Yep, that's exactly what I meant.
+By default, if should_use_kmap() is not patched for arm64, it translates
+to page_is_ram(); acpi_map() would simply use a kmap() which returns the
+current kernel linear mapping on arm64.
 
-> And I'd like to see both architectures addressed at the same time,
-> without statements such as "we'll do that as a next step". As such, I'd
-> very much recommend that Frediano and you work together to address this
-> problem.
+> I'm not sure about others.
 
-I hope so.
+Question for the ARM ACPI guys: what happens if you implement
+acpi_os_ioremap() on arm64 as just ioremap()? Do you get any WARN_ON()
+(__ioremap_caller() checks whether the memory is RAM)?
 
-Thanks,
--Takahiro AKASHI
-
-> Thanks,
->
->          M.
->
+-- 
+Catalin
