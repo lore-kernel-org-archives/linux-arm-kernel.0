@@ -1,54 +1,56 @@
-From: mfuzzey@parkeon.com (Martin Fuzzey)
-Date: Thu, 05 Feb 2015 18:43:26 +0100
-Subject: [REGRESSION] w1: mxc_w1 bus search failing after update 3.16->3.18
-Message-ID: <54D3ABBE.1040607@parkeon.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 5 Feb 2015 17:48:27 +0000
+Subject: [Linaro-acpi] [PATCH v8 02/21] acpi: fix acpi_os_ioremap for arm64
+In-Reply-To: <54D39D6B.5090304@linaro.org>
+References: <1422881149-8177-3-git-send-email-hanjun.guo@linaro.org>
+ <2422968.Es7R0p3loO@vostro.rjw.lan>
+ <1422984576.18187.82.camel@deneb.redhat.com>
+ <20150204112508.GB26006@e104818-lin.cambridge.arm.com>
+ <1423066107.18187.99.camel@deneb.redhat.com>
+ <20150204175734.GI26006@e104818-lin.cambridge.arm.com>
+ <1423076294.18187.103.camel@deneb.redhat.com>
+ <20150205104149.GA18158@e104818-lin.cambridge.arm.com>
+ <1423144447.18187.110.camel@deneb.redhat.com>
+ <54D39D6B.5090304@linaro.org>
+Message-ID: <20150205174826.GD21970@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Feb 05, 2015 at 04:42:19PM +0000, Al Stone wrote:
+> On 02/05/2015 06:54 AM, Mark Salter wrote:
+> > On Thu, 2015-02-05 at 10:41 +0000, Catalin Marinas wrote:
+> >> On Wed, Feb 04, 2015 at 06:58:14PM +0000, Mark Salter wrote:
+> >>> On Wed, 2015-02-04 at 17:57 +0000, Catalin Marinas wrote:
+> >>>> On Wed, Feb 04, 2015 at 04:08:27PM +0000, Mark Salter wrote:
+> >>>>> acpi_os_remap() is used to map ACPI tables. These tables may be in ram
+> >>>>> which are already included in the kernel's linear RAM mapping. So we
+> >>>>> need ioremap_cache to avoid two mappings to the same physical page
+> >>>>> having different caching attributes.
+> >>>>
+> >>>> What's the call path to acpi_os_ioremap() on such tables already in the
+> >>>> linear mapping? I can see an acpi_map() function which already takes
+> >>>> care of the RAM mapping case but there are other cases where
+> >>>> acpi_os_ioremap() is called directly. For example,
+> >>>> acpi_os_read_memory(), can it be called on both RAM and I/O?
+> >>>
+> >>> acpi_map() is the one I've seen.
+> >>
+> >> By default, if should_use_kmap() is not patched for arm64, it translates
+> >> to page_is_ram(); acpi_map() would simply use a kmap() which returns the
+> >> current kernel linear mapping on arm64.
+> > 
+> > The problem with kmap() is that it only maps a single page. I've seen
+> > tables over 4k which is why I patched acpi_map() not to use kmap() on
+> > arm64.
+> 
+> Right.  Mark replied to this before I could; using kmap() enforced a 4k
+> (one page) limit that we kept breaking with some ACPI tables being larger
+> than that (DSDTs and SSDTs, fwiw).  This would lead to some very odd behaviors
+> when most but not all of a device definition was within the page; using the
+> table checksums was one way of detecting the issues.
 
-The commit f80b258  w1: mxc_w1: Optimize mxc_w1_ds2_touch_bit()
-introduced in 3.18 is causing w1 bus scanning to fail on my board with:
+OK. So I think Mark's original patch was ok, assuming that the System
+Memory cases mentioned by Graeme are detected with page_is_ram().
 
-w1_master_driver w1_bus_master1: w1_search: max_slave_count 64 reached, 
-will continue next search.
-
-The problem appears to be the use of jiffies to implement a 200us delay 
-in this code:
-
-static u8 mxc_w1_ds2_touch_bit(void *data, u8 bit)
-{
-     struct mxc_w1_device *dev = data;
-     unsigned long timeout;
-
-     writeb(MXC_W1_CONTROL_WR(bit), dev->regs + MXC_W1_CONTROL);
-
-     /* Wait for read/write bit (60us, Max 120us), use 200us for sure */
-     timeout = jiffies + usecs_to_jiffies(200);
-
-     udelay(60);
-
-     do {
-         u8 ctrl = readb(dev->regs + MXC_W1_CONTROL);
-
-         /* RDST bit is valid after the WR1/RD bit is self-cleared */
-         if (!(ctrl & MXC_W1_CONTROL_WR(bit)))
-             return !!(ctrl & MXC_W1_CONTROL_RDST);
-     } while (time_is_after_jiffies(timeout));
-
-     return 0;
-}
-
-
-My HZ value is 100
-usecs_to_jiffies(200) returns 1 but I don't think time_is_after_jiffies 
-is accurate for timeout = jiffies + 1?
-
-Adding one jiffy to timeout "fixes" it but that's probably not the right 
-way.
-
-Should this be reverted or a hrtimer used?
-
-Regards,
-
-Martin
+-- 
+Catalin
