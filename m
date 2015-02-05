@@ -1,79 +1,219 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu,  5 Feb 2015 16:25:35 +0100
-Subject: [PATCH 5/8] ARM: dts: mt8135: Add pericfg,
- infracfg and pmic wrapper nodes
+Date: Thu,  5 Feb 2015 16:25:32 +0100
+Subject: [PATCH 2/8] soc: Add MediaTek pericfg controller support
 In-Reply-To: <1423149938-14471-1-git-send-email-s.hauer@pengutronix.de>
 References: <1423149938-14471-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1423149938-14471-6-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1423149938-14471-3-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the perisys, infracfg and pmic wrapper nodes to the
-MediaTek MT8135 dtsi file.
+This adds support for the MediaTek pericfg controller found
+on the MT8135/MT8173 SoCs. The pericfg controller contains
+miscellaneous registers for controlling peripheral resets and
+clocks.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/boot/dts/mt8135.dtsi | 34 ++++++++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+ .../devicetree/bindings/soc/mediatek/pericfg.txt   |  29 +++++
+ drivers/soc/mediatek/Kconfig                       |  10 ++
+ drivers/soc/mediatek/Makefile                      |   1 +
+ drivers/soc/mediatek/mtk-pericfg.c                 | 127 +++++++++++++++++++++
+ 4 files changed, 167 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/mediatek/pericfg.txt
+ create mode 100644 drivers/soc/mediatek/mtk-pericfg.c
 
-diff --git a/arch/arm/boot/dts/mt8135.dtsi b/arch/arm/boot/dts/mt8135.dtsi
-index 7d56a98..14ba41d 100644
---- a/arch/arm/boot/dts/mt8135.dtsi
-+++ b/arch/arm/boot/dts/mt8135.dtsi
-@@ -14,6 +14,7 @@
- 
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/reset-controller/mt8135-resets.h>
- #include "skeleton64.dtsi"
- 
- / {
-@@ -86,6 +87,12 @@
- 			clock-frequency = <32000>;
- 			#clock-cells = <0>;
- 		};
+diff --git a/Documentation/devicetree/bindings/soc/mediatek/pericfg.txt b/Documentation/devicetree/bindings/soc/mediatek/pericfg.txt
+new file mode 100644
+index 0000000..3996e171
+--- /dev/null
++++ b/Documentation/devicetree/bindings/soc/mediatek/pericfg.txt
+@@ -0,0 +1,29 @@
++MediaTek pericfg Controller
++===========================
 +
-+		clk_26m: clk26m {
-+			compatible = "fixed-clock";
-+			clock-frequency = <26000000>;
-+			#clock-cells = <0>;
-+		};
- 	};
- 
- 	soc {
-@@ -94,6 +101,33 @@
- 		compatible = "simple-bus";
- 		ranges;
- 
-+		infracfg: infracfg at 10001000 {
-+			#reset-cells = <1>;
-+			#clock-cells = <1>;
-+			compatible = "mediatek,mt8135-infracfg";
-+			reg = <0 0x10001000 0 0x1000>;
-+		};
++The pericfg controller contains miscellaneous registers for controlling
++clocks, resets and bus settings.
 +
-+		pericfg: pericfg at 10003000 {
-+			#reset-cells = <1>;
-+			#clock-cells = <1>;
-+			compatible = "mediatek,mt8135-pericfg";
-+			reg = <0 0x10003000 0 0x1000>;
-+		};
++Required properties:
++- compatible: must be one of:
++	mediatek,mt8135-pericfg
++	mediatek,mt8173-pericfg
++- reg: Address range for the pericfg controller
++- #reset-cells: 1, see below
 +
-+		pwrap: pwrap at 1000f000 {
-+			compatible = "mediatek,mt8135-pwrap";
-+			reg = <0 0x1000f000 0 0x1000>,
-+				<0 0x11017000 0 0x1000>;
-+			reg-names = "pwrap-base", "pwrap-bridge-base";
-+			interrupts = <GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH>;
-+			resets = <&infracfg MT8135_INFRA_PMIC_WRAP_RST>,
-+					<&pericfg MT8135_PERI_PWRAP_BRIDGE_SW_RST>;
-+			reset-names = "pwrap", "pwrap-bridge";
-+			clocks = <&clk_26m>, <&clk_26m>;
-+			clock-names = "spi", "wrap";
-+		};
++Specifying reset lines connected to the pericfg controller
++==========================================================
 +
- 		timer: timer at 10008000 {
- 			compatible = "mediatek,mt8135-timer",
- 					"mediatek,mt6577-timer";
++The infracfg controller provides various reset sources to other modules.
++Device nodes using these reset sources should specify the reset lines in
++a property containing a phandle to the infracfg node and a reset index.
++See include/dt-bindings/reset-controller/<soc>-resets.h for a list of valid
++indices.
++
++Example:
++
++	pericfg: pericfg at 10003000 {
++		#reset-cells = <1>;
++		compatible = "mediatek,mt8135-pericfg";
++		reg = <0 0x10003000 0 0x1000>;
++	};
+diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
+index 3ad39fe..9bdb88f 100644
+--- a/drivers/soc/mediatek/Kconfig
++++ b/drivers/soc/mediatek/Kconfig
+@@ -10,3 +10,13 @@ config MTK_INFRACFG
+ 	  contains several miscellaneous registers for clock, reset and bus
+ 	  settings. Say yes here if you want to run your kernel on one of these
+ 	  SoCs.
++
++config MTK_PERICFG
++	tristate "MediaTek pericfg controller support"
++	depends on ARCH_MEDIATEK || COMPILE_TEST
++	select REGMAP
++	help
++	  The MediaTek pericfg controller found on MT8135 and MT8173 SoCs
++	  contains several miscellaneous registers for clock, reset and bus
++	  settings. Say yes here if you want to run your kernel on one of these
++	  SoCs.
+diff --git a/drivers/soc/mediatek/Makefile b/drivers/soc/mediatek/Makefile
+index dbeb627..e67be7c 100644
+--- a/drivers/soc/mediatek/Makefile
++++ b/drivers/soc/mediatek/Makefile
+@@ -1 +1,2 @@
+ obj-$(CONFIG_MTK_INFRACFG) += mtk-infracfg.o
++obj-$(CONFIG_MTK_PERICFG) += mtk-pericfg.o
+diff --git a/drivers/soc/mediatek/mtk-pericfg.c b/drivers/soc/mediatek/mtk-pericfg.c
+new file mode 100644
+index 0000000..aa9a7eb
+--- /dev/null
++++ b/drivers/soc/mediatek/mtk-pericfg.c
+@@ -0,0 +1,127 @@
++/*
++ * Copyright (c) 2014 MediaTek Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/mfd/syscon.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/regmap.h>
++#include <linux/reset-controller.h>
++
++struct mtk_pericfg {
++	struct regmap *regmap;
++	struct reset_controller_dev rcdev;
++};
++
++static int mtk_pericfg_reset_assert(struct reset_controller_dev *rcdev,
++			      unsigned long id)
++{
++	struct mtk_pericfg *data = container_of(rcdev, struct mtk_pericfg, rcdev);
++
++	return regmap_update_bits(data->regmap, (id / 32) << 2, BIT(id % 32), ~0);
++}
++
++static int mtk_pericfg_reset_deassert(struct reset_controller_dev *rcdev,
++				unsigned long id)
++{
++	struct mtk_pericfg *data = container_of(rcdev, struct mtk_pericfg, rcdev);
++
++	return regmap_update_bits(data->regmap, (id / 32) << 2, BIT(id % 32), 0);
++}
++
++static int mtk_pericfg_reset(struct reset_controller_dev *rcdev,
++			      unsigned long id)
++{
++	int ret;
++
++	ret = mtk_pericfg_reset_assert(rcdev, id);
++	if (ret)
++		return ret;
++
++	return mtk_pericfg_reset_deassert(rcdev, id);
++}
++
++static struct reset_control_ops mtk_pericfg_reset_ops = {
++	.assert = mtk_pericfg_reset_assert,
++	.deassert = mtk_pericfg_reset_deassert,
++	.reset = mtk_pericfg_reset,
++};
++
++static struct regmap_config mtk_pericfg_regmap_config = {
++	.reg_bits = 32,
++	.val_bits = 32,
++	.reg_stride = 4,
++};
++
++static int mtk_pericfg_probe(struct platform_device *pdev)
++{
++	struct mtk_pericfg *data;
++	struct resource *res;
++	void __iomem *base;
++
++	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
++	if (!data)
++		return -ENOMEM;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(base))
++		return PTR_ERR(base);
++
++	data->regmap = devm_regmap_init_mmio(&pdev->dev, base,
++                                        &mtk_pericfg_regmap_config);
++	if (IS_ERR(data->regmap))
++		return PTR_ERR(data->regmap);
++
++	data->rcdev.owner = THIS_MODULE;
++	data->rcdev.nr_resets = 64;
++	data->rcdev.ops = &mtk_pericfg_reset_ops;
++	data->rcdev.of_node = pdev->dev.of_node;
++
++	return reset_controller_register(&data->rcdev);
++}
++
++static int mtk_pericfg_remove(struct platform_device *pdev)
++{
++	struct mtk_pericfg *data = platform_get_drvdata(pdev);
++
++	reset_controller_unregister(&data->rcdev);
++
++	return 0;
++}
++
++static const struct of_device_id mtk_pericfg_dt_ids[] = {
++	{
++		.compatible = "mediatek,mt8173-pericfg",
++	}, {
++		.compatible = "mediatek,mt8135-pericfg",
++	}, {
++		/* sentinel */
++	},
++};
++MODULE_DEVICE_TABLE(of, mtk_pericfg_dt_ids);
++
++static struct platform_driver mtk_pericfg_driver = {
++	.probe = mtk_pericfg_probe,
++	.remove = mtk_pericfg_remove,
++	.driver = {
++		.name = "mtk-pericfg",
++		.of_match_table = mtk_pericfg_dt_ids,
++	},
++};
++
++module_platform_driver(mtk_pericfg_driver);
++
++MODULE_AUTHOR("Sascha Hauer <s.hauer@pengutronix.de>");
++MODULE_DESCRIPTION("MediaTek pericfg controller");
++MODULE_LICENSE("GPL");
 -- 
 2.1.4
