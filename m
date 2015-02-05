@@ -1,48 +1,52 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu,  5 Feb 2015 16:25:32 +0100
-Subject: [PATCH 2/8] soc: Add MediaTek pericfg controller support
+Date: Thu,  5 Feb 2015 16:25:31 +0100
+Subject: [PATCH 1/8] soc: Add MediaTek infracfg controller support
 In-Reply-To: <1423149938-14471-1-git-send-email-s.hauer@pengutronix.de>
 References: <1423149938-14471-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1423149938-14471-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1423149938-14471-2-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for the MediaTek pericfg controller found
-on the MT8135/MT8173 SoCs. The pericfg controller contains
+This adds support for the MediaTek infracfg controller found
+on the MT8135/MT8173 SoCs. The infracfg controller contains
 miscellaneous registers for controlling peripheral resets and
 clocks.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- .../devicetree/bindings/soc/mediatek/pericfg.txt   |  29 +++++
- drivers/soc/mediatek/Kconfig                       |  10 ++
+ .../devicetree/bindings/soc/mediatek/infracfg.txt  |  29 +++++
+ drivers/soc/Kconfig                                |   1 +
+ drivers/soc/Makefile                               |   1 +
+ drivers/soc/mediatek/Kconfig                       |  12 ++
  drivers/soc/mediatek/Makefile                      |   1 +
- drivers/soc/mediatek/mtk-pericfg.c                 | 127 +++++++++++++++++++++
- 4 files changed, 167 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/soc/mediatek/pericfg.txt
- create mode 100644 drivers/soc/mediatek/mtk-pericfg.c
+ drivers/soc/mediatek/mtk-infracfg.c                | 127 +++++++++++++++++++++
+ 6 files changed, 171 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/mediatek/infracfg.txt
+ create mode 100644 drivers/soc/mediatek/Kconfig
+ create mode 100644 drivers/soc/mediatek/Makefile
+ create mode 100644 drivers/soc/mediatek/mtk-infracfg.c
 
-diff --git a/Documentation/devicetree/bindings/soc/mediatek/pericfg.txt b/Documentation/devicetree/bindings/soc/mediatek/pericfg.txt
+diff --git a/Documentation/devicetree/bindings/soc/mediatek/infracfg.txt b/Documentation/devicetree/bindings/soc/mediatek/infracfg.txt
 new file mode 100644
-index 0000000..3996e171
+index 0000000..1912b83
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/soc/mediatek/pericfg.txt
++++ b/Documentation/devicetree/bindings/soc/mediatek/infracfg.txt
 @@ -0,0 +1,29 @@
-+MediaTek pericfg Controller
-+===========================
++MediaTek infracfg Controller
++============================
 +
-+The pericfg controller contains miscellaneous registers for controlling
++The infracfg controller contains miscellaneous registers for controlling
 +clocks, resets and bus settings.
 +
 +Required properties:
 +- compatible: must be one of:
-+	mediatek,mt8135-pericfg
-+	mediatek,mt8173-pericfg
-+- reg: Address range for the pericfg controller
++	mediatek,mt8135-infracfg
++	mediatek,mt8173-infracfg
++- reg: Address range for the infracfg controller
 +- #reset-cells: 1, see below
 +
-+Specifying reset lines connected to the pericfg controller
-+==========================================================
++Specifying reset lines connected to the infracfg controller
++===========================================================
 +
 +The infracfg controller provides various reset sources to other modules.
 +Device nodes using these reset sources should specify the reset lines in
@@ -52,41 +56,64 @@ index 0000000..3996e171
 +
 +Example:
 +
-+	pericfg: pericfg at 10003000 {
++	infracfg: infracfg at 10001000 {
 +		#reset-cells = <1>;
-+		compatible = "mediatek,mt8135-pericfg";
-+		reg = <0 0x10003000 0 0x1000>;
++		compatible = "mediatek,mt8135-infracfg";
++		reg = <0 0x10001000 0 0x1000>;
 +	};
+diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
+index 76d6bd4..d8bde82f0 100644
+--- a/drivers/soc/Kconfig
++++ b/drivers/soc/Kconfig
+@@ -1,5 +1,6 @@
+ menu "SOC (System On Chip) specific Drivers"
+ 
++source "drivers/soc/mediatek/Kconfig"
+ source "drivers/soc/qcom/Kconfig"
+ source "drivers/soc/ti/Kconfig"
+ source "drivers/soc/versatile/Kconfig"
+diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
+index 063113d..70042b2 100644
+--- a/drivers/soc/Makefile
++++ b/drivers/soc/Makefile
+@@ -2,6 +2,7 @@
+ # Makefile for the Linux Kernel SOC specific device drivers.
+ #
+ 
++obj-$(CONFIG_ARCH_MEDIATEK)	+= mediatek/
+ obj-$(CONFIG_ARCH_QCOM)		+= qcom/
+ obj-$(CONFIG_ARCH_TEGRA)	+= tegra/
+ obj-$(CONFIG_SOC_TI)		+= ti/
 diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
-index 3ad39fe..9bdb88f 100644
---- a/drivers/soc/mediatek/Kconfig
+new file mode 100644
+index 0000000..3ad39fe
+--- /dev/null
 +++ b/drivers/soc/mediatek/Kconfig
-@@ -10,3 +10,13 @@ config MTK_INFRACFG
- 	  contains several miscellaneous registers for clock, reset and bus
- 	  settings. Say yes here if you want to run your kernel on one of these
- 	  SoCs.
-+
-+config MTK_PERICFG
-+	tristate "MediaTek pericfg controller support"
+@@ -0,0 +1,12 @@
++#
++# MediaTek SoC drivers
++#
++config MTK_INFRACFG
++	tristate "MediaTek infracfg controller support"
 +	depends on ARCH_MEDIATEK || COMPILE_TEST
 +	select REGMAP
 +	help
-+	  The MediaTek pericfg controller found on MT8135 and MT8173 SoCs
++	  The MediaTek infracfg controller found on MT8135 and MT8173 SoCs
 +	  contains several miscellaneous registers for clock, reset and bus
 +	  settings. Say yes here if you want to run your kernel on one of these
 +	  SoCs.
 diff --git a/drivers/soc/mediatek/Makefile b/drivers/soc/mediatek/Makefile
-index dbeb627..e67be7c 100644
---- a/drivers/soc/mediatek/Makefile
-+++ b/drivers/soc/mediatek/Makefile
-@@ -1 +1,2 @@
- obj-$(CONFIG_MTK_INFRACFG) += mtk-infracfg.o
-+obj-$(CONFIG_MTK_PERICFG) += mtk-pericfg.o
-diff --git a/drivers/soc/mediatek/mtk-pericfg.c b/drivers/soc/mediatek/mtk-pericfg.c
 new file mode 100644
-index 0000000..aa9a7eb
+index 0000000..dbeb627
 --- /dev/null
-+++ b/drivers/soc/mediatek/mtk-pericfg.c
++++ b/drivers/soc/mediatek/Makefile
+@@ -0,0 +1 @@
++obj-$(CONFIG_MTK_INFRACFG) += mtk-infracfg.o
+diff --git a/drivers/soc/mediatek/mtk-infracfg.c b/drivers/soc/mediatek/mtk-infracfg.c
+new file mode 100644
+index 0000000..3bbd39b
+--- /dev/null
++++ b/drivers/soc/mediatek/mtk-infracfg.c
 @@ -0,0 +1,127 @@
 +/*
 + * Copyright (c) 2014 MediaTek Inc.
@@ -108,54 +135,54 @@ index 0000000..aa9a7eb
 +#include <linux/regmap.h>
 +#include <linux/reset-controller.h>
 +
-+struct mtk_pericfg {
++struct mtk_infracfg {
 +	struct regmap *regmap;
 +	struct reset_controller_dev rcdev;
 +};
 +
-+static int mtk_pericfg_reset_assert(struct reset_controller_dev *rcdev,
++static int mtk_infracfg_reset_assert(struct reset_controller_dev *rcdev,
 +			      unsigned long id)
 +{
-+	struct mtk_pericfg *data = container_of(rcdev, struct mtk_pericfg, rcdev);
++	struct mtk_infracfg *data = container_of(rcdev, struct mtk_infracfg, rcdev);
 +
-+	return regmap_update_bits(data->regmap, (id / 32) << 2, BIT(id % 32), ~0);
++	return regmap_update_bits(data->regmap, 0x30 + ((id / 32) << 2), BIT(id % 32), ~0u);
 +}
 +
-+static int mtk_pericfg_reset_deassert(struct reset_controller_dev *rcdev,
++static int mtk_infracfg_reset_deassert(struct reset_controller_dev *rcdev,
 +				unsigned long id)
 +{
-+	struct mtk_pericfg *data = container_of(rcdev, struct mtk_pericfg, rcdev);
++	struct mtk_infracfg *data = container_of(rcdev, struct mtk_infracfg, rcdev);
 +
-+	return regmap_update_bits(data->regmap, (id / 32) << 2, BIT(id % 32), 0);
++	return regmap_update_bits(data->regmap, 0x30 + ((id / 32) << 2), BIT(id % 32), 0);
 +}
 +
-+static int mtk_pericfg_reset(struct reset_controller_dev *rcdev,
++static int mtk_infracfg_reset(struct reset_controller_dev *rcdev,
 +			      unsigned long id)
 +{
 +	int ret;
 +
-+	ret = mtk_pericfg_reset_assert(rcdev, id);
++	ret = mtk_infracfg_reset_assert(rcdev, id);
 +	if (ret)
 +		return ret;
 +
-+	return mtk_pericfg_reset_deassert(rcdev, id);
++	return mtk_infracfg_reset_deassert(rcdev, id);
 +}
 +
-+static struct reset_control_ops mtk_pericfg_reset_ops = {
-+	.assert = mtk_pericfg_reset_assert,
-+	.deassert = mtk_pericfg_reset_deassert,
-+	.reset = mtk_pericfg_reset,
++static struct reset_control_ops mtk_infracfg_reset_ops = {
++	.assert = mtk_infracfg_reset_assert,
++	.deassert = mtk_infracfg_reset_deassert,
++	.reset = mtk_infracfg_reset,
 +};
 +
-+static struct regmap_config mtk_pericfg_regmap_config = {
++static struct regmap_config mtk_infracfg_regmap_config = {
 +	.reg_bits = 32,
 +	.val_bits = 32,
 +	.reg_stride = 4,
 +};
 +
-+static int mtk_pericfg_probe(struct platform_device *pdev)
++static int mtk_infracfg_probe(struct platform_device *pdev)
 +{
-+	struct mtk_pericfg *data;
++	struct mtk_infracfg *data;
 +	struct resource *res;
 +	void __iomem *base;
 +
@@ -169,51 +196,51 @@ index 0000000..aa9a7eb
 +		return PTR_ERR(base);
 +
 +	data->regmap = devm_regmap_init_mmio(&pdev->dev, base,
-+                                        &mtk_pericfg_regmap_config);
++                                        &mtk_infracfg_regmap_config);
 +	if (IS_ERR(data->regmap))
 +		return PTR_ERR(data->regmap);
 +
 +	data->rcdev.owner = THIS_MODULE;
 +	data->rcdev.nr_resets = 64;
-+	data->rcdev.ops = &mtk_pericfg_reset_ops;
++	data->rcdev.ops = &mtk_infracfg_reset_ops;
 +	data->rcdev.of_node = pdev->dev.of_node;
 +
 +	return reset_controller_register(&data->rcdev);
 +}
 +
-+static int mtk_pericfg_remove(struct platform_device *pdev)
++static int mtk_infracfg_remove(struct platform_device *pdev)
 +{
-+	struct mtk_pericfg *data = platform_get_drvdata(pdev);
++	struct mtk_infracfg *data = platform_get_drvdata(pdev);
 +
 +	reset_controller_unregister(&data->rcdev);
 +
 +	return 0;
 +}
 +
-+static const struct of_device_id mtk_pericfg_dt_ids[] = {
++static const struct of_device_id mtk_infracfg_dt_ids[] = {
 +	{
-+		.compatible = "mediatek,mt8173-pericfg",
++		.compatible = "mediatek,mt8173-infracfg",
 +	}, {
-+		.compatible = "mediatek,mt8135-pericfg",
++		.compatible = "mediatek,mt8135-infracfg",
 +	}, {
 +		/* sentinel */
 +	},
 +};
-+MODULE_DEVICE_TABLE(of, mtk_pericfg_dt_ids);
++MODULE_DEVICE_TABLE(of, mtk_infracfg_dt_ids);
 +
-+static struct platform_driver mtk_pericfg_driver = {
-+	.probe = mtk_pericfg_probe,
-+	.remove = mtk_pericfg_remove,
++static struct platform_driver mtk_infracfg_driver = {
++	.probe = mtk_infracfg_probe,
++	.remove = mtk_infracfg_remove,
 +	.driver = {
-+		.name = "mtk-pericfg",
-+		.of_match_table = mtk_pericfg_dt_ids,
++		.name = "mtk-infracfg",
++		.of_match_table = mtk_infracfg_dt_ids,
 +	},
 +};
 +
-+module_platform_driver(mtk_pericfg_driver);
++module_platform_driver(mtk_infracfg_driver);
 +
 +MODULE_AUTHOR("Sascha Hauer <s.hauer@pengutronix.de>");
-+MODULE_DESCRIPTION("MediaTek pericfg controller");
++MODULE_DESCRIPTION("MediaTek infracfg controller");
 +MODULE_LICENSE("GPL");
 -- 
 2.1.4
