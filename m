@@ -1,41 +1,83 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Thu, 05 Feb 2015 10:26:02 +0100
-Subject: [PATCH] coresight-stm: adding driver for CoreSight STM component
-In-Reply-To: <1423088550-15780-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1423088550-15780-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1423128362.27378.12.camel@x220>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 05 Feb 2015 17:27:15 +0800
+Subject: [PATCH v8 14/21] ACPI / processor: Make it possible to get CPU
+ hardware ID via GICC
+In-Reply-To: <20150204112105.GA26006@e104818-lin.cambridge.arm.com>
+References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
+ <1422881149-8177-15-git-send-email-hanjun.guo@linaro.org>
+ <20150203141749.GA32536@leverpostej>
+ <20150203200936.GA21731@e104818-lin.cambridge.arm.com>
+ <54D1EAD5.4080105@linaro.org>
+ <20150204112105.GA26006@e104818-lin.cambridge.arm.com>
+Message-ID: <54D33773.5090000@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-02-04 at 15:22 -0700, mathieu.poirier at linaro.org wrote:
-> From: Pratik Patel <pratikp@codeaurora.org>
-> 
-> This driver adds support for the STM CoreSight IP block,
-> allowing any system compoment (HW or SW) to log and
-> aggregate messages via a single entity.
-> 
-> The STM exposes an application defined number of channels
-> called stimulus port.  Configuration is done using entries
-> in sysfs and channels made available to userspace via devfs.
-> 
-> Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->[...]
-> +/**
-> + * struct stm_node - aggregation of channel information for userspace access
-> + * @channel_id:		the channel number associated to this file descriptor.
-> + * @options:		options for this channel - none, timestamped,
-> +i			guaranteed.
+On 2015?02?04? 19:21, Catalin Marinas wrote:
+> On Wed, Feb 04, 2015 at 09:48:05AM +0000, Hanjun Guo wrote:
+>> On 2015?02?04? 04:09, Catalin Marinas wrote:
+>>> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+>>> index ea4d2b35c57b..4fafd62b1b86 100644
+>>> --- a/arch/arm64/include/asm/acpi.h
+>>> +++ b/arch/arm64/include/asm/acpi.h
+>>> @@ -49,33 +49,12 @@ static inline void enable_acpi(void)
+>>>    	acpi_noirq = 0;
+>>>    }
+>>>
+>>> -/* MPIDR value provided in GICC structure is 64 bits, but the
+>>> - * existing phys_id (CPU hardware ID) using in acpi processor
+>>> - * driver is 32-bit, to conform to the same datatype we need
+>>> - * to repack the GICC structure MPIDR.
+>>> - *
+>>> - * bits other than following 32 bits are defined as 0, so it
+>>> - * will be no information lost after repacked.
+>>> - *
+>>> - * Bits [0:7] Aff0;
+>>> - * Bits [8:15] Aff1;
+>>> - * Bits [16:23] Aff2;
+>>> - * Bits [32:39] Aff3;
+>>> - */
+>>> -static inline u32 pack_mpidr(u64 mpidr)
+>>> -{
+>>> -	return (u32) ((mpidr & 0xff00000000) >> 8) | mpidr;
+>>> -}
+>>> -
+>>>    /*
+>>>     * The ACPI processor driver for ACPI core code needs this macro
+>>>     * to find out this cpu was already mapped (mapping from CPU hardware
+>>>     * ID to CPU logical ID) or not.
+>>> - *
+>>> - * cpu_logical_map(cpu) is the mapping of MPIDR and the logical cpu,
+>>> - * and MPIDR is the cpu hardware ID we needed to pack.
+>>>     */
+>>> -#define cpu_physical_id(cpu) pack_mpidr(cpu_logical_map(cpu))
+>>> +#define cpu_physical_id(cpu) cpu_logical_map(cpu)
+>>>
+>>>    /*
+>>>     * It's used from ACPI core in kdump to boot UP system with SMP kernel,
+>>> diff --git a/arch/arm64/include/asm/smp_plat.h b/arch/arm64/include/asm/smp_plat.h
+>>> index 59e282311b58..a492276e008d 100644
+>>> --- a/arch/arm64/include/asm/smp_plat.h
+>>> +++ b/arch/arm64/include/asm/smp_plat.h
+>>> @@ -40,4 +40,6 @@ static inline u32 mpidr_hash_size(void)
+>>>    extern u64 __cpu_logical_map[NR_CPUS];
+>>>    #define cpu_logical_map(cpu)    __cpu_logical_map[cpu]
+>>>
+>>> +typedef u64 cpuid_t;
+>>
+>> I think cpuid_t is a little confused because people may recognize
+>> it as cpu logical id, its original meaning is the physical cpu ID,
+>> so how about:
+>>
+>> typedef u64 phys_id_t; ?
+>
+> I would keep "cpu" somewhere in the name as "phys" is too generic, maybe
+> phys_cpuid_t.
 
-Did you perhaps use vim?
+This is pretty fine to me too :)
 
-> + * @drvdata:		STM driver specifics.
-> + */
-> +struct stm_node {
-> +	int			channel_id;
-> +	u32			options;
-> +	struct stm_drvdata	*drvdata;
-> +};
+x86 and IA64 use 32 bit cpu phys_id (apic_id) everywhere in the arch
+code, but I think I don't need to touch them in this patch.
 
-
-Paul Bolle
+Thanks
+Hanjun
