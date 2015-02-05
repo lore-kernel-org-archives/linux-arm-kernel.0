@@ -1,114 +1,78 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Thu, 5 Feb 2015 09:54:31 -0800
-Subject: [PATCH v2] ARM: Don't use complete() during __cpu_die
-In-Reply-To: <20150205173440.GR8656@n2100.arm.linux.org.uk>
-References: <1423131270-24047-1-git-send-email-k.kozlowski@samsung.com>
- <20150205105035.GL8656@n2100.arm.linux.org.uk>
- <20150205142918.GA10634@linux.vnet.ibm.com>
- <20150205161100.GQ8656@n2100.arm.linux.org.uk>
- <20150205170228.GZ5370@linux.vnet.ibm.com>
- <20150205173440.GR8656@n2100.arm.linux.org.uk>
-Message-ID: <20150205175431.GH5370@linux.vnet.ibm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 5 Feb 2015 12:01:06 -0600
+Subject: [RFC/PATCH 2/2] of: allow for boolean flags to have value
+In-Reply-To: <1423159266-25561-1-git-send-email-balbi@ti.com>
+References: <1423159266-25561-1-git-send-email-balbi@ti.com>
+Message-ID: <1423159266-25561-2-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 05, 2015 at 05:34:40PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Feb 05, 2015 at 09:02:28AM -0800, Paul E. McKenney wrote:
-> > On Thu, Feb 05, 2015 at 04:11:00PM +0000, Russell King - ARM Linux wrote:
-> > > On Thu, Feb 05, 2015 at 06:29:18AM -0800, Paul E. McKenney wrote:
-> > > > Works for me, assuming no hidden uses of RCU in the IPI code.  ;-)
-> > > 
-> > > Sigh... I kind'a new it wouldn't be this simple.  The gic code which
-> > > actually raises the IPI takes a raw spinlock, so it's not going to be
-> > > this simple - there's a small theoretical window where we have taken
-> > > this lock, written the register to send the IPI, and then dropped the
-> > > lock - the update to the lock to release it could get lost if the
-> > > CPU power is quickly cut at that point.
-> > > 
-> > > Also, we _do_ need the second cache flush in place to ensure that the
-> > > unlock is seen to other CPUs.
-> > > 
-> > > We could work around that by taking and releasing the lock in the IPI
-> > > processing function... but this is starting to look less attractive
-> > > as the lock is private to irq-gic.c.
-> > > 
-> > > Well, we're very close to 3.19, we're too close to be trying to sort
-> > > this out, so I'm hoping that your changes which cause this RCU error
-> > > are *not* going in during this merge window, because we seem to have
-> > > something of a problem right now which needs more time to resolve.
-> > 
-> > Most likely into the 3.20 merge window.  But please keep in mind that
-> > RCU is just the messenger here -- the current code will break if any
-> > CPU for whatever reason takes more than a jiffy to get from its
-> > _stop_machine() handler to the end of its last RCU read-side critical
-> > section on its way out.  A jiffy may sound like a lot, but it is not
-> > hard to exceed this limit, especially in virtualized environments.
-> 
-> What I'm saying is that we can't likely get a good fix prepared before
-> the 3.20 merge window opens.
+allowing values to boolean flags lets us setup
+defaults on DTSI which can get disabled later
+at board DTS if, for whatever reason, board can't
+use that default.
 
-And I cannot count.  Or cannot type.  Or something.
+One such example is DM81xx EVM where we can't use
+MUSB's multipoint feature even though SoC supports
+it. Something at the board level prevents us from
+using the feature.
 
-I meant do say "Most likely into the 3.21 merge window."  I agree that
-this stuff is not ready for next week's merge window.  For one thing,
-there are similar issues with a number of other architectures as well.
+Instead of removing "multipoint;" from DTSI and
+adding it to all board DTS just so we can remove
+it from our quirky board seems like overkill when
+we could just add:
 
-> I don't term the set_bit/clear_bit solution a "good fix" because it is
-> far too complex - I've not done a thorough review on it, but the idea
-> of setting and clearing a couple of bits in unison, making sure that
-> their state is set appropriately through multiple different code paths
-> does not strike me as a provably correct replacement for this completion.
-> The reason for that complexity is because there is no pre-notification
-> to arch code that a CPU might be going down, so there's no way for the
-> "CPU is dead" flag to be properly reset (which is why there's all the
-> manipulation in lots of possible failure paths.)
-> 
-> The idea that we could reset it in the CPU up code doesn't fly - that
-> would only work if we had one secondary CPU (which would guarantee a
-> strict up/down/up ordering on it) but as soon as you have more than one
-> CPU, that doesn't hold true.
-> 
-> We could hook into the CPU hotplug notifiers - which would be quite a
-> lot of additional code to achieve the reset early enough in the hot
-> unplug path, though it would probably be the most reliable solution to
-> the wait-for-bit solution.
-> 
-> However, any of those solutions needs writing and thorough testing,
-> which, if Linus opens the merge window on Sunday, isn't going to
-> happen before hand (and we know Linus doesn't like extra development
-> appearing which wasn't in -next prior to the merge window - he's taken
-> snapshots of -next to check during the merge window in the past - so
-> it's not something I'm going to be adding during that time, not even
-> as a "fix" because we know about the problem right now, before the
-> merge window.  To me, to treat this as a "fix" would be wilfully
-> deceitful.)
-> 
-> I don't think the existing code is a big problem at the moment - it's
-> been like this for about 10 years, and no one has ever reported an
-> issue with it, although there have been changes over that time:
-> 
-> aa033810461ee56abbef6cef10aabd6b97f5caee
-> ARM: smp: Drop RCU_NONIDLE usage in cpu_die()
-> 
-> 	This removed the RCU_NONIDLE() from the completion() call.
-> 
-> ff081e05bfba3461119cd280201d163b6858eda2
-> ARM: 7457/1: smp: Fix suspicious RCU originating from cpu_die()
-> 
-> 	This added the RCU_NONIDLE() to the completion() call.
-> 
-> 3c030beabf937b1d3b4ecaedfd1fb2f1e2aa0c70
-> ARM: CPU hotplug: move cpu_killed completion to core code
-> 
-> 	This moved the completion code from Realview (and other ARM
-> 	platforms) into core ARM code.
-> 
-> and 97a63ecff4bd06da5d8feb8c0394a4d020f2d34d
-> [ARM SMP] Add CPU hotplug support for Realview MPcore
-> 
-> 	The earliest current introduction of CPU hotplug in 2005.
+	multipoint = <0>;
 
-Agreed.  It does need to be fixed, but it makes sense to take a few
-weeks and get a fix that is more likely to be correct.
+to that quirky board's DTS.
 
-							Thanx, Paul
+Note that the description here is but one example
+and it's likely many others have faced something
+similar.
+
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ include/linux/of.h | 22 ++++++++++++++++++++--
+ 1 file changed, 20 insertions(+), 2 deletions(-)
+
+diff --git a/include/linux/of.h b/include/linux/of.h
+index 76c055b20fef..c5ee9320f237 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -792,14 +792,32 @@ static inline int of_property_read_u32(const struct device_node *np,
+  * @propname:	name of the property to be searched.
+  *
+  * Search for a property in a device node.
+- * Returns true if the property exist false otherwise.
++ * Returns true if the property exist and has a value greater than zero,
++ * fals otherwise.
+  */
+ static inline bool of_property_read_bool(const struct device_node *np,
+ 					 const char *propname)
+ {
+ 	struct property *prop = of_find_property(np, propname, NULL);
++	int rc;
++	u32 val;
+ 
+-	return prop ? true : false;
++	if (!prop)
++		return false;
++
++	rc = of_property_read_u32(np, propname, &val);
++
++	/*
++	 * if property doesn't have a value, or prop->length == 0 and
++	 * we overflow, treat it as simple value-less flag.
++	 */
++	if (rc == -ENODATA || rc == -EOVERFLOW)
++		return true;
++	if (WARN(rc < 0, "failed to read '%s' value -> %d\n",
++				propname, rc))
++		return false;
++
++	return !!val;
+ }
+ 
+ static inline int of_property_read_s32(const struct device_node *np,
+-- 
+2.3.0-rc1
