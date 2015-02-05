@@ -1,130 +1,64 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 05 Feb 2015 02:24:24 +0100
-Subject: [PATCH v8 02/21] acpi: fix acpi_os_ioremap for arm64
-In-Reply-To: <1422984576.18187.82.camel@deneb.redhat.com>
-References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
- <2422968.Es7R0p3loO@vostro.rjw.lan>
- <1422984576.18187.82.camel@deneb.redhat.com>
-Message-ID: <24983147.QcR5BoZPKE@vostro.rjw.lan>
+From: long.wanglong@huawei.com (long.wanglong)
+Date: Thu, 5 Feb 2015 09:09:30 +0800
+Subject: [PATCH] SAMPLES: kprobe_example: Make it print something on ARM.
+In-Reply-To: <54D18F41.4070207@hitachi.com>
+References: <1423018585-4005-1-git-send-email-long.wanglong@huawei.com>
+ <54D18F41.4070207@hitachi.com>
+Message-ID: <54D2C2CA.7070705@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, February 03, 2015 12:29:36 PM Mark Salter wrote:
-> On Mon, 2015-02-02 at 23:14 +0100, Rafael J. Wysocki wrote:
-> > On Monday, February 02, 2015 08:45:30 PM Hanjun Guo wrote:
-> > > From: Mark Salter <msalter@redhat.com>
-> > > 
-> > > The acpi_os_ioremap() function may be used to map normal RAM or IO
-> > > regions. The current implementation simply uses ioremap_cache(). This
-> > > will work for some architectures, but arm64 ioremap_cache() cannot be
-> > > used to map IO regions which don't support caching. So for arm64, use
-> > > ioremap() for non-RAM regions.
-> > > 
-> > > CC: Rafael J Wysocki <rjw@rjwysocki.net>
-> > > Signed-off-by: Mark Salter <msalter@redhat.com>
-> > > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> > > ---
-> > >  include/acpi/acpi_io.h | 6 ++++++
-> > >  1 file changed, 6 insertions(+)
-> > > 
-> > > diff --git a/include/acpi/acpi_io.h b/include/acpi/acpi_io.h
-> > > index 444671e..9d573db 100644
-> > > --- a/include/acpi/acpi_io.h
-> > > +++ b/include/acpi/acpi_io.h
-> > > @@ -1,11 +1,17 @@
-> > >  #ifndef _ACPI_IO_H_
-> > >  #define _ACPI_IO_H_
-> > >  
-> > > +#include <linux/mm.h>
-> > >  #include <linux/io.h>
-> > >  
-> > >  static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
-> > >  					    acpi_size size)
-> > >  {
-> > > +#ifdef CONFIG_ARM64
-> > > +	if (!page_is_ram(phys >> PAGE_SHIFT))
-> > > +		return ioremap(phys, size);
-> > > +#endif
-> > 
-> > I don't want to see #ifdef CONFIG_ARM64 in this file.
-> > 
+On 2015/2/4 11:17, Masami Hiramatsu wrote:
+> (2015/02/04 11:56), Wang Long wrote:
+>> This KProbes example is a little useless if it doesn't print anything.
+>> For ARM print similar messages to those produced on x86 and PPC.
 > 
-> How about something like:
-> 
-> From: Mark Salter <msalter@redhat.com>
-> Date: Tue, 3 Feb 2015 10:51:16 -0500
-> Subject: [PATCH] acpi: fix acpi_os_ioremap for arm64
-> 
-> The acpi_os_ioremap() function may be used to map normal RAM or IO
-> regions. The current implementation simply uses ioremap_cache(). This
-> will work for some architectures, but arm64 ioremap_cache() cannot be
-> used to map IO regions which don't support caching. So for arm64, use
-> ioremap() for non-RAM regions.
-> 
-> CC: Rafael J Wysocki <rjw@rjwysocki.net>
-> Signed-off-by: Mark Salter <msalter@redhat.com>
-> ---
->  arch/arm64/include/asm/acpi.h | 14 ++++++++++++++
->  include/acpi/acpi_io.h        |  3 +++
->  2 files changed, 17 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-> index ea4d2b3..db82bc3 100644
-> --- a/arch/arm64/include/asm/acpi.h
-> +++ b/arch/arm64/include/asm/acpi.h
-> @@ -14,6 +14,7 @@
->  
->  #include <linux/irqchip/arm-gic-acpi.h>
->  
-> +#include <linux/mm.h>
->  #include <asm/smp_plat.h>
->  
->  /* Basic configuration for ACPI */
-> @@ -100,4 +101,17 @@ static inline bool acpi_psci_use_hvc(void) { return false; }
->  static inline void acpi_init_cpus(void) { }
->  #endif /* CONFIG_ACPI */
->  
-> +/*
-> + * ACPI table mapping
-> + */
-> +static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
-> +					    acpi_size size)
-> +{
-> +	if (!page_is_ram(phys >> PAGE_SHIFT))
-> +		return ioremap(phys, size);
-> +
-> +       return ioremap_cache(phys, size);
-> +}
-> +#define acpi_os_ioremap acpi_os_ioremap
-
-Actually, I see that we use similar #defines in other places too, so the
-patch is fine by me as is (modulo the other concerns that people seem to
-have about this).
-
-> +
->  #endif /*_ASM_ACPI_H*/
-> diff --git a/include/acpi/acpi_io.h b/include/acpi/acpi_io.h
-> index 444671e..48f504a 100644
-> --- a/include/acpi/acpi_io.h
-> +++ b/include/acpi/acpi_io.h
-> @@ -2,12 +2,15 @@
->  #define _ACPI_IO_H_
->  
->  #include <linux/io.h>
-> +#include <asm/acpi.h>
->  
-> +#ifndef acpi_os_ioremap
->  static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
->  					    acpi_size size)
->  {
->         return ioremap_cache(phys, size);
->  }
-> +#endif
->  
->  void __iomem *__init_refok
->  acpi_os_map_iomem(acpi_physical_address phys, acpi_size size);
+> BTW, I guess similar update required for s390, doesn't it?
 > 
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+yes, because i am not familiar with s390, someone else may update this example for s390.
+
+Best Regards
+Wang Long
+
+>>
+>> Signed-off-by: Wang Long <long.wanglong@huawei.com>
+> 
+> Acked-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+> 
+> Thank you!
+> 
+>> ---
+>>  samples/kprobes/kprobe_example.c | 9 +++++++++
+>>  1 file changed, 9 insertions(+)
+>>
+>> diff --git a/samples/kprobes/kprobe_example.c b/samples/kprobes/kprobe_example.c
+>> index 366db1a..eba9f1a 100644
+>> --- a/samples/kprobes/kprobe_example.c
+>> +++ b/samples/kprobes/kprobe_example.c
+>> @@ -42,6 +42,11 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs)
+>>  			" ex1 = 0x%lx\n",
+>>  		p->addr, regs->pc, regs->ex1);
+>>  #endif
+>> +#ifdef CONFIG_ARM
+>> +	printk(KERN_INFO "pre_handler: p->addr = 0x%p, ARM_pc = 0x%lx,"
+>> +			" ARM_cpsr = 0x%lx\n",
+>> +		p->addr, regs->ARM_pc, regs->ARM_cpsr);
+>> +#endif
+>>  
+>>  	/* A dump_stack() here will give a stack backtrace */
+>>  	return 0;
+>> @@ -67,6 +72,10 @@ static void handler_post(struct kprobe *p, struct pt_regs *regs,
+>>  	printk(KERN_INFO "post_handler: p->addr = 0x%p, ex1 = 0x%lx\n",
+>>  		p->addr, regs->ex1);
+>>  #endif
+>> +#ifdef CONFIG_ARM
+>> +	printk(KERN_INFO "post_handler: p->addr = 0x%p, ARM_cpsr = 0x%lx\n",
+>> +		p->addr, regs->ARM_cpsr);
+>> +#endif
+>>  }
+>>  
+>>  /*
+>>
+> 
+> 
