@@ -1,38 +1,91 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 5 Feb 2015 12:08:29 +0000
-Subject: [PATCH v5 2/7] mailbox: arm_mhu: add driver for ARM MHU controller
-In-Reply-To: <CAJe_Zhf_WuRK2EE0Sj9ksXDDe5VA=DJ+H3eS4YRKpDZLdRRfow@mail.gmail.com>
-References: <1422955310-6542-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <3540319.u6RL7AO77m@wuerfel>
- <CAJe_ZhcXR4oaBKZx3n0ckCzXgbREoezUXjizJ09QXQVqEQ3G_g@mail.gmail.com>
- <2790199.44Rvt91EcZ@wuerfel>
- <CAJe_Zhf_WuRK2EE0Sj9ksXDDe5VA=DJ+H3eS4YRKpDZLdRRfow@mail.gmail.com>
-Message-ID: <20150205120829.GO8656@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 5 Feb 2015 12:09:20 +0000
+Subject: [PATCH 1/4] arm64: dts: fix PMU IRQ ordering for Juno
+In-Reply-To: <20150205115933.GI11344@leverpostej>
+References: <1422294858-28100-1-git-send-email-will.deacon@arm.com>
+ <20150205114642.GG11344@leverpostej>
+ <20150205115416.GE23241@arm.com>
+ <20150205115933.GI11344@leverpostej>
+Message-ID: <20150205120920.GF23241@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 05, 2015 at 05:32:39PM +0530, Jassi Brar wrote:
-> On Feb 5, 2015 5:13 PM, "Arnd Bergmann" <arnd@arndb.de> wrote:
-> >
-> > >
-> > > I know typedef's are frowned upon, but how bad is the following option?
-> > >        typedef void*  mbox_data_info
-> > >        int mbox_send_message(struct mbox_chan *chan, mbox_data_info
-> data);
-> >
-> > I don't see how that would help.
-> >
-> If it's abuse because the argument is a void*... What if we called it
-> mbox_data_info?  To say platforms are free to pass data as a pointer or a
-> value :)
+On Thu, Feb 05, 2015 at 11:59:33AM +0000, Mark Rutland wrote:
+> On Thu, Feb 05, 2015 at 11:54:16AM +0000, Will Deacon wrote:
+> > On Thu, Feb 05, 2015 at 11:46:42AM +0000, Mark Rutland wrote:
+> > > On Mon, Jan 26, 2015 at 05:54:15PM +0000, Will Deacon wrote:
+> > > > diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+> > > > index cb3073e4e7a8..4ed9287aaef1 100644
+> > > > --- a/arch/arm64/boot/dts/arm/juno.dts
+> > > > +++ b/arch/arm64/boot/dts/arm/juno.dts
+> > > > @@ -107,11 +107,11 @@
+> > > >  	pmu {
+> > > >  		compatible = "arm,armv8-pmuv3";
+> > > >  		interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
+> > > > +			     <GIC_SPI 02 IRQ_TYPE_LEVEL_HIGH>,
+> > > > +			     <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>,
+> > > >  			     <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>,
+> > > >  			     <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>,
+> > > > -			     <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>,
+> > > > -			     <GIC_SPI 02 IRQ_TYPE_LEVEL_HIGH>,
+> > > > -			     <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>;
+> > > > +			     <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
+> > > >  	};
+> > > 
+> > > I am very much not keen on this. While this may get things working
+> > > today, it completely relies on Linux-internal details (the order of CPU
+> > > bringup, which in this case is different from the order of entries in
+> > > /cpus).
+> > > 
+> > > In all other dts that I am aware of, the order of entries in /cpus
+> > > aligns with the order of interrupts in the PMU node, and the first entry
+> > > is the boot CPU.
+> > > 
+> > > I think that we should ensure that the ordering of CPU nodes matches the
+> > > order of interrupts here. That way we can fall back to that ordering (if
+> > > not explicitly overridden), and even after an arbitrary logical
+> > > renumbering (e.g. after a kexec) the relationship should stay intact.
+> > 
+> > There are a few problems with reordering the CPU nodes:
+> > 
+> >   (1) It breaks any existing users of taskset to pin on big/little
+> >       clusters.
+> 
+> This is unfortunate, but this is also the case if the boot CPU is
+> different.
 
-Using a typedef really doesn't change anything.  If you read the kernel
-coding style, you'll realise that typedefs are a reason to reject
-patches - especially to use them in the way you are proposing.
+Right, so don't change the boot CPU. In that vain, we also shouldn't change
+the CPU order in the .dts -- the current .dts is working for taskset and
+we shouldn't break people's scripts just because they want to use the PMU.
 
-Try the solution I suggested (which I notice was seemingly totally
-ignored.)
+> >   (2) It's not generally possible if, for example, the bootloader decides
+> >       to boot Linux on a different CPU then we have no choice but to
+> >       change the PMU interrupt order.
+> 
+> In that case _this_ patch is broken.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Why? I'm not denying that changing the boot CPU causes problems, I'm saying
+that you *can't* fix that by changing the CPU node order. You still have
+to change the interrupt order in that case, so why not just localise the
+changes there in the first place?
+
+> If we associate the interrupt with a CPU by node order, the relationship
+> is preserved regardless of which CPU is the boot CPU (whether it was the
+> bootloader's choice, kexec, or whatever).
+
+Sure, and that requires code changes. If we're going to change the code,
+then I'd much rather we make the binding explicit, like I did in the
+follow-up patches to this one. As I mentioned before, this is a .dts fix
+to get things working with the current code. It's really too late to argue
+about the existing binding, even if it sucks.
+
+> >   (3) I didn't think that the ordering of CPU nodes was guaranteed to be
+> >       preserved by dtc, whereas the order of the interrupts will be.
+> 
+> The order of nodes is presently preserved.
+
+It's not about the present behaviour; I need a _guarantee_ that dtc/libfdt
+will *never* reorder CPU nodes. Today's working .dts file needs to continue
+to work with future tools.
+
+Will
