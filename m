@@ -1,80 +1,52 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 5 Feb 2015 12:28:23 +0100
-Subject: [PATCHv6 2/5] USB: gadget: atmel_usba_udc: Request an auto
- disabled
- Vbus signal IRQ instead of an auto enabled IRQ request followed by IRQ disable
-In-Reply-To: <1421945805-31129-3-git-send-email-sylvain.rochet@finsecur.com>
-References: <1421945805-31129-1-git-send-email-sylvain.rochet@finsecur.com>
- <1421945805-31129-3-git-send-email-sylvain.rochet@finsecur.com>
-Message-ID: <54D353D7.9050401@atmel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 5 Feb 2015 11:28:05 +0000
+Subject: [PATCH v2] ARM: Don't use complete() during __cpu_die
+In-Reply-To: <20150205105035.GL8656@n2100.arm.linux.org.uk>
+References: <1423131270-24047-1-git-send-email-k.kozlowski@samsung.com>
+ <20150205105035.GL8656@n2100.arm.linux.org.uk>
+Message-ID: <20150205112805.GE11344@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 22/01/2015 17:56, Sylvain Rochet a ?crit :
-> Vbus IRQ handler needs a started UDC driver to work because it uses
-> udc->driver, which is set by the UDC start handler. The previous way
-> chosen was to return from interrupt if udc->driver is NULL using a
-> spinlock around the check.
-> 
-> We now request an auto disabled (IRQ_NOAUTOEN) Vbus signal IRQ instead
-> of an auto enabled IRQ followed by disable_irq(). This way we remove the
-> very small timeslot of enabled IRQ which existed previously between
-> request() and disable(). We don't need anymore to check if udc->driver
-> is NULL in IRQ handler.
-> 
-> Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
-> Suggested-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Hi Russell,
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-> ---
->  drivers/usb/gadget/udc/atmel_usba_udc.c | 9 ++-------
->  1 file changed, 2 insertions(+), 7 deletions(-)
+On Thu, Feb 05, 2015 at 10:50:35AM +0000, Russell King - ARM Linux wrote:
+> On Thu, Feb 05, 2015 at 11:14:30AM +0100, Krzysztof Kozlowski wrote:
+> > The complete() should not be used on offlined CPU. Rewrite the
+> > wait-complete mechanism with wait_on_bit_timeout().
 > 
-> diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-> index 40e5fc7..f9f305f 100644
-> --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
-> +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-> @@ -1745,10 +1745,6 @@ static irqreturn_t usba_vbus_irq(int irq, void *devid)
->  
->  	spin_lock(&udc->lock);
->  
-> -	/* May happen if Vbus pin toggles during probe() */
-> -	if (!udc->driver)
-> -		goto out;
-> -
->  	vbus = vbus_is_present(udc);
->  	if (vbus != udc->vbus_prev) {
->  		if (vbus) {
-> @@ -1769,7 +1765,6 @@ static irqreturn_t usba_vbus_irq(int irq, void *devid)
->  		udc->vbus_prev = vbus;
->  	}
->  
-> -out:
->  	spin_unlock(&udc->lock);
->  
->  	return IRQ_HANDLED;
-> @@ -2109,6 +2104,8 @@ static int usba_udc_probe(struct platform_device *pdev)
->  
->  	if (gpio_is_valid(udc->vbus_pin)) {
->  		if (!devm_gpio_request(&pdev->dev, udc->vbus_pin, "atmel_usba_udc")) {
-> +			irq_set_status_flags(gpio_to_irq(udc->vbus_pin),
-> +					IRQ_NOAUTOEN);
->  			ret = devm_request_irq(&pdev->dev,
->  					gpio_to_irq(udc->vbus_pin),
->  					usba_vbus_irq, 0,
-> @@ -2118,8 +2115,6 @@ static int usba_udc_probe(struct platform_device *pdev)
->  				dev_warn(&udc->pdev->dev,
->  					 "failed to request vbus irq; "
->  					 "assuming always on\n");
-> -			} else {
-> -				disable_irq(gpio_to_irq(udc->vbus_pin));
->  			}
->  		} else {
->  			/* gpio_request fail so use -EINVAL for gpio_is_valid */
+> Yuck.
 > 
+> I think that the IPI idea would be far better, and a much smaller patch.
+> We can continue using the completions, but instead of running the
+> completion on the dying CPU, the dying CPU triggers an IPI which does
+> the completion on the requesting CPU.
 
+This does look _much_ nicer than the bitmask approach.
 
--- 
-Nicolas Ferre
+[...]
+
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index 194df2f1aa87..c623e27a9c85 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -73,6 +73,9 @@ enum ipi_msg_type {
+>  	IPI_IRQ_WORK,
+>  	IPI_COMPLETION,
+>  	IPI_CPU_BACKTRACE,
+> +#ifdef CONFIG_HOTPLUG_CPU
+> +	IPI_CPU_DEAD,
+> +#endif
+>  };
+
+[...]
+
+>  static const char *ipi_types[NR_IPI] __tracepoint_string = {
+>  #define S(x,s)	[x] = s
+>  	S(IPI_WAKEUP, "CPU wakeup interrupts"),
+
+We'll probably want to add an entry here ("CPU teardown interrupts"?),
+and bump NR_IPI in asm/hardirq.h.
+
+Thanks,
+Mark.
