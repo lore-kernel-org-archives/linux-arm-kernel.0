@@ -1,56 +1,67 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 5 Feb 2015 17:48:27 +0000
-Subject: [Linaro-acpi] [PATCH v8 02/21] acpi: fix acpi_os_ioremap for arm64
-In-Reply-To: <54D39D6B.5090304@linaro.org>
-References: <1422881149-8177-3-git-send-email-hanjun.guo@linaro.org>
- <2422968.Es7R0p3loO@vostro.rjw.lan>
- <1422984576.18187.82.camel@deneb.redhat.com>
- <20150204112508.GB26006@e104818-lin.cambridge.arm.com>
- <1423066107.18187.99.camel@deneb.redhat.com>
- <20150204175734.GI26006@e104818-lin.cambridge.arm.com>
- <1423076294.18187.103.camel@deneb.redhat.com>
- <20150205104149.GA18158@e104818-lin.cambridge.arm.com>
- <1423144447.18187.110.camel@deneb.redhat.com>
- <54D39D6B.5090304@linaro.org>
-Message-ID: <20150205174826.GD21970@e104818-lin.cambridge.arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 5 Feb 2015 17:49:04 +0000
+Subject: [Linaro-acpi] [PATCH v8 11/21] ARM64 / ACPI: Get PSCI flags in
+ FADT for PSCI init
+In-Reply-To: <54D3A443.7050303@linaro.org>
+References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
+ <1422881149-8177-12-git-send-email-hanjun.guo@linaro.org>
+ <20150204164328.GF22035@red-moon> <54D3A443.7050303@linaro.org>
+Message-ID: <20150205174904.GA24468@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 05, 2015 at 04:42:19PM +0000, Al Stone wrote:
-> On 02/05/2015 06:54 AM, Mark Salter wrote:
-> > On Thu, 2015-02-05 at 10:41 +0000, Catalin Marinas wrote:
-> >> On Wed, Feb 04, 2015 at 06:58:14PM +0000, Mark Salter wrote:
-> >>> On Wed, 2015-02-04 at 17:57 +0000, Catalin Marinas wrote:
-> >>>> On Wed, Feb 04, 2015 at 04:08:27PM +0000, Mark Salter wrote:
-> >>>>> acpi_os_remap() is used to map ACPI tables. These tables may be in ram
-> >>>>> which are already included in the kernel's linear RAM mapping. So we
-> >>>>> need ioremap_cache to avoid two mappings to the same physical page
-> >>>>> having different caching attributes.
-> >>>>
-> >>>> What's the call path to acpi_os_ioremap() on such tables already in the
-> >>>> linear mapping? I can see an acpi_map() function which already takes
-> >>>> care of the RAM mapping case but there are other cases where
-> >>>> acpi_os_ioremap() is called directly. For example,
-> >>>> acpi_os_read_memory(), can it be called on both RAM and I/O?
-> >>>
-> >>> acpi_map() is the one I've seen.
+Hi Al,
+
+On Thu, Feb 05, 2015 at 05:11:31PM +0000, Al Stone wrote:
+> On 02/04/2015 09:43 AM, Lorenzo Pieralisi wrote:
+> > On Mon, Feb 02, 2015 at 12:45:39PM +0000, Hanjun Guo wrote:
+> >> From: Graeme Gregory <graeme.gregory@linaro.org>
 > >>
-> >> By default, if should_use_kmap() is not patched for arm64, it translates
-> >> to page_is_ram(); acpi_map() would simply use a kmap() which returns the
-> >> current kernel linear mapping on arm64.
+> >> There are two flags: PSCI_COMPLIANT and PSCI_USE_HVC. When set,
+> >> the former signals to the OS that the firmware is PSCI compliant.
+> >> The latter selects the appropriate conduit for PSCI calls by
+> >> toggling between Hypervisor Calls (HVC) and Secure Monitor Calls
+> >> (SMC).
+> >>
+> >> FADT table contains such information in ACPI 5.1, FADT table was
+> >> parsed in ACPI table init and copy to struct acpi_gbl_FADT, so
+> >> use the flags in struct acpi_gbl_FADT for PSCI init.
 > > 
-> > The problem with kmap() is that it only maps a single page. I've seen
-> > tables over 4k which is why I patched acpi_map() not to use kmap() on
-> > arm64.
+> > So you do rely on a global FADT being available, if you use it for PSCI
+> > detection you can use it for ACPI revision detection too, right ?
+> > 
+> > Point is, either we should not use the global FADT table, or we use
+> > it consistently, or there is something I am unaware of that prevents
+> > you from using in some code paths and I would like to understand
+> > why.
 > 
-> Right.  Mark replied to this before I could; using kmap() enforced a 4k
-> (one page) limit that we kept breaking with some ACPI tables being larger
-> than that (DSDTs and SSDTs, fwiw).  This would lead to some very odd behaviors
-> when most but not all of a device definition was within the page; using the
-> table checksums was one way of detecting the issues.
+> The FADT is a required table for arm64, as noted in the documentation
+> and the SBBR.  While unfortunately the spec does not say it is mandatory,
+> even x86 systems are pretty useless without it.  So yes, we rely on it
+> being available, not only for the PSCI info, but other flags such as
+> HW_REDUCED_ACPI.
+> 
+> I suppose it does not have to be globally scoped.  However, the FADT is
+> frequently used, especially on x86, so it makes sense to me from an
+> efficiency standpoint to have a global reference to it.
+> 
+> I'm not sure I understand what is meant by using FADT for ACPI revision
+> detection; there are fields in the FADT that provide a major and minor
+> number for the FADT itself, but I don't believe there's any guarantee
+> those will be the same as the level of the specification that is being
+> supported by the kernel (chances are they will, but it's not mandatory).
+> 
+> I've probably just missed a part of a thread somewhere; could you point
+> me to where the inconsistency lies?  I'm just not understanding right this
+> second....
 
-OK. So I think Mark's original patch was ok, assuming that the System
-Memory cases mentioned by Graeme are detected with page_is_ram().
+Yes, it is my fault, I was referring to another thread/patch (9), where you
+need to check the FADT revision to "validate it" (ie >= 5.1) for the arm64
+kernel. What I am saying is: if the global FADT is there to parse PSCI
+info, it is there to check the FADT revision too, I do not necessarily
+see the need for calling acpi_table_parse() again to do it, the FADT
+revision checking can be carried out as for PSCI, that's all I wanted
+to say.
 
--- 
-Catalin
+Thanks,
+Lorenzo
