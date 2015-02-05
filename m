@@ -1,27 +1,27 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 05 Feb 2015 08:46:06 +0100
+Date: Thu, 05 Feb 2015 08:54:15 +0100
 Subject: [PATCH] ARM: Don't use complete() during __cpu_die
-In-Reply-To: <20150204175731.GH5370@linux.vnet.ibm.com>
+In-Reply-To: <54D2A06B.70507@codeaurora.org>
 References: <1423068835-25470-1-git-send-email-k.kozlowski@samsung.com>
- <20150204175731.GH5370@linux.vnet.ibm.com>
-Message-ID: <1423122366.29408.9.camel@AMDC1943>
+ <54D2A06B.70507@codeaurora.org>
+Message-ID: <1423122855.29408.13.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ?ro, 2015-02-04 at 09:57 -0800, Paul E. McKenney wrote:
-> On Wed, Feb 04, 2015 at 05:53:55PM +0100, Krzysztof Kozlowski wrote:
+On ?ro, 2015-02-04 at 14:42 -0800, Stephen Boyd wrote:
+> On 02/04/15 08:53, Krzysztof Kozlowski wrote:
 > > The complete() should not be used on offlined CPU. Rewrite the
 > > wait-complete mechanism with wait_on_bit_timeout().
-> > 
+> >
 > > The CPU triggering hot unplug (e.g. CPU0) will loop until some bit is
 > > cleared. In each iteration schedule_timeout() is used with initial sleep
 > > time of 1 ms.  Later it is increased to 10 ms.
-> > 
+> >
 > > The dying CPU will clear the bit which is safe in that context.
-> > 
+> >
 > > This fixes following RCU warning on ARMv8 (Exynos 4412, Trats2) during
 > > suspend to RAM:
-> > 
+> >
 > > [   31.113925] ===============================
 > > [   31.113928] [ INFO: suspicious RCU usage. ]
 > > [   31.113935] 3.19.0-rc7-next-20150203 #1914 Not tainted
@@ -52,58 +52,33 @@ On ?ro, 2015-02-04 at 09:57 -0800, Paul E. McKenney wrote:
 > > [   31.114179] [<c04d6ca4>] (cpu_die) from [<c005a508>] (cpu_startup_entry+0x328/0x358)
 > > [   31.114189] [<c005a508>] (cpu_startup_entry) from [<40008784>] (0x40008784)
 > > [   31.114226] CPU1: shutdown
-> > 
+> >
 > > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> 
-> One suggestion below, but either way:
-> 
-> Acked-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-
-Thanks!
-
-> (If you would rather that I carried the patch, please let me know.)
-
-I'll send the patch through Russell's patch system.
-> 
 > > ---
+> 
+> Would it be better to use IPIs instead? The IPI handler could even call
+> complete() as long as we IPI off the dying CPU to the killing CPU. I
+> suppose this could be an extension of the current IPI_COMPLETION that we
+> already have.
+
+That sounds good. I wonder where register_ipi_completion() should be
+put. This must execute before cpu_die() of dying CPU (if I get it
+right). So it cannot be __cpu_die(). One candidate is __cpu_disable()
+but it may not be called always. Any ideas?
+
+
+> 
 > >  arch/arm/kernel/smp.c | 52 ++++++++++++++++++++++++++++++++++++++++++++++++---
 > >  1 file changed, 49 insertions(+), 3 deletions(-)
-> > 
+> >
 > > diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
 > > index 86ef244c5a24..bb8ff465975f 100644
 > > --- a/arch/arm/kernel/smp.c
 > > +++ b/arch/arm/kernel/smp.c
-> > @@ -26,6 +26,7 @@
-> >  #include <linux/completion.h>
-> >  #include <linux/cpufreq.h>
-> >  #include <linux/irq_work.h>
-> > +#include <linux/wait.h>
-> > 
-> >  #include <linux/atomic.h>
-> >  #include <asm/smp.h>
-> > @@ -76,6 +77,9 @@ enum ipi_msg_type {
-> > 
-> >  static DECLARE_COMPLETION(cpu_running);
-> > 
-> > +#define CPU_DIE_WAIT_BIT		0
-> > +static unsigned long wait_cpu_die;
-> > +
-> >  static struct smp_operations smp_ops;
-> > 
-> >  void __init smp_set_ops(struct smp_operations *ops)
-> > @@ -133,6 +137,8 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
-> >  		pr_err("CPU%u: failed to boot: %d\n", cpu, ret);
-> >  	}
-> > 
-> > +	set_bit(CPU_DIE_WAIT_BIT, &wait_cpu_die);
-> > +	smp_mb__after_atomic();
-> > 
-> >  	memset(&secondary_data, 0, sizeof(secondary_data));
-> >  	return ret;
 > > @@ -213,7 +219,40 @@ int __cpu_disable(void)
 > >  	return 0;
 > >  }
-> > 
+> >  
 > > -static DECLARE_COMPLETION(cpu_died);
 > > +/*
 > > + * Wait for 5000*1 ms for 'wait_cpu_die' bit to be cleared.
@@ -133,75 +108,25 @@ I'll send the patch through Russell's patch system.
 > > +			retries = 400;
 > > +			sleep_ms = 10;
 > > +		}
-> 
-> Another approach that gets roughly the same response times with fewer
-> wakeups (and a bit less code) would be something like this:
-> 
-> 	int ms_left = 5000, sleep_ms = 1, ret = 0;
-> 
-> 	might_sleep();
-> 
-> 	smp_mb__before_atomic();
-> 	while (test_bit(CPU_DIE_WAIT_BIT, &wait_cpu_die)) {
-> 		ret = out_of_line_wait_on_bit_timeout(&wait_cpu_die,
-> 				CPU_DIE_WAIT_BIT, bit_wait_timeout,
-> 				TASK_UNINTERRUPTIBLE,
-> 				msecs_to_jiffies(sleep_ms));
-> 		ms_left -= sleep_ms;
-> 		if (!ret || (ms_left <= 0))
-> 			break;
-> 		sleep_ms = DIV_ROUND_UP(sleep_ms * 11, 10);
-> 
-> This would result in less than 50 wakeups compared to more than 4000,
-> with little added latency in the common case.
-> 
-> But either way works for me.
-
-It looks better. I'll use it although Stephen Boyd had an other idea
-which could be smaller and more schedule-friendly.
-
-Thanks for review,
-Krzysztof
-
-> 
 > > +
 > > +		smp_mb__before_atomic(); /* For next test_bit() in loop */
 > > +	}
 > > +
 > > +	return ret;
 > > +}
-> > 
-> >  /*
-> >   * called on the thread which is asking for a CPU to be shutdown -
-> > @@ -221,7 +260,7 @@ static DECLARE_COMPLETION(cpu_died);
-> >   */
-> >  void __cpu_die(unsigned int cpu)
-> >  {
-> > -	if (!wait_for_completion_timeout(&cpu_died, msecs_to_jiffies(5000))) {
-> > +	if (wait_for_cpu_die()) {
-> >  		pr_err("CPU%u: cpu didn't die\n", cpu);
-> >  		return;
-> >  	}
-> > @@ -236,6 +275,10 @@ void __cpu_die(unsigned int cpu)
-> >  	 */
-> >  	if (!platform_cpu_kill(cpu))
-> >  		pr_err("CPU%u: unable to kill\n", cpu);
-> > +
-> > +	/* Prepare the bit for some next CPU die */
-> > +	set_bit(CPU_DIE_WAIT_BIT, &wait_cpu_die);
-> > +	smp_mb__after_atomic();
-> >  }
-> > 
-> >  /*
-> > @@ -250,6 +293,8 @@ void __ref cpu_die(void)
-> >  {
-> >  	unsigned int cpu = smp_processor_id();
-> > 
-> > +	WARN_ON(!test_bit(CPU_DIE_WAIT_BIT, &wait_cpu_die));
-> > +
-> >  	idle_task_exit();
-> > 
-> >  	local_irq_disable();
+> >  
+> 
+> Is there any reason we test the bit before testing it again in
+> out_of_line_wait_on_bit_timeout()? Why can't we just call that function
+> in a loop and let it handle checking the bit?
+
+I think there is no strong reason. Maybe except that if bit was cleared
+already then we skip the wait preparation steps. I followed the
+convention of wait_on_bit in include/linux/wait.h.
+
+I'll remove the test.
+
+> 
 > > @@ -267,7 +312,8 @@ void __ref cpu_die(void)
 > >  	 * this returns, power and/or clocks can be removed at any point
 > >  	 * from this CPU and its cache by platform_cpu_kill().
@@ -209,9 +134,13 @@ Krzysztof
 > > -	complete(&cpu_died);
 > > +	clear_bit(CPU_DIE_WAIT_BIT, &wait_cpu_die);
 > > +	smp_mb__after_atomic();
-> > 
+> >  
 > >  	/*
 > >  	 * Ensure that the cache lines associated with that completion are
-> > -- 
-> > 1.9.1
-> > 
+> 
+> This comment here should be updated because the completion is gone.
+
+Yes, indeed. I'll update it.
+
+Thanks for feedback,
+Krzysztof
