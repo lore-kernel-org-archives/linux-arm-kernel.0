@@ -1,22 +1,14 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 5 Feb 2015 16:52:58 -0500
-Subject: [PATCH v6 6/7] PCI: update dma configuration from DT
+Date: Thu, 5 Feb 2015 16:52:56 -0500
+Subject: [PATCH v6 4/7] PCI: add helper functions
+ pci_get[put]_host_bridge_device()
 In-Reply-To: <1423173179-10227-1-git-send-email-m-karicheri2@ti.com>
 References: <1423173179-10227-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1423173179-10227-7-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1423173179-10227-5-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If there is a DT node available for the root bridge's parent device,
-use the dma configuration from that device node. For example, keystone
-PCI devices would require dma_pfn_offset to be set correctly in the
-device structure of the pci device in order to have the correct dma mask.
-The DT node will have dma-ranges defined for this. Also support using
-the DT property dma-coherent to allow coherent DMA operation by the
-PCI device.
-
-This patch use the new helper function of_pci_dma_configure() to update
-the device dma configuration.
+Add a helper function to get/put the root bus's host bridge device.
 
 Cc: Joerg Roedel <joro@8bytes.org>
 Cc: Grant Likely <grant.likely@linaro.org>
@@ -29,28 +21,48 @@ Cc: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 ---
- drivers/pci/probe.c |    2 ++
- 1 file changed, 2 insertions(+)
+ drivers/pci/host-bridge.c |   14 ++++++++++++++
+ include/linux/pci.h       |    3 +++
+ 2 files changed, 17 insertions(+)
 
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 23212f8..d7dcd6c 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -6,6 +6,7 @@
- #include <linux/delay.h>
- #include <linux/init.h>
- #include <linux/pci.h>
-+#include <linux/of_pci.h>
- #include <linux/pci_hotplug.h>
- #include <linux/slab.h>
- #include <linux/module.h>
-@@ -1520,6 +1521,7 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
- 	dev->dev.dma_mask = &dev->dma_mask;
- 	dev->dev.dma_parms = &dev->dma_parms;
- 	dev->dev.coherent_dma_mask = 0xffffffffull;
-+	of_pci_dma_configure(dev);
+diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
+index 0e5f3c9..f58e05b 100644
+--- a/drivers/pci/host-bridge.c
++++ b/drivers/pci/host-bridge.c
+@@ -23,6 +23,20 @@ static struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus)
+ 	return to_pci_host_bridge(root_bus->bridge);
+ }
  
- 	pci_set_dma_max_seg_size(dev, 65536);
- 	pci_set_dma_seg_boundary(dev, 0xffffffff);
++struct device *pci_get_host_bridge_device(struct pci_dev *dev)
++{
++	struct pci_bus *root_bus = find_pci_root_bus(dev->bus);
++	struct device *bridge = root_bus->bridge;
++
++	kobject_get(&bridge->kobj);
++	return bridge;
++}
++
++void  pci_put_host_bridge_device(struct device *dev)
++{
++	kobject_put(&dev->kobj);
++}
++
+ void pci_set_host_bridge_release(struct pci_host_bridge *bridge,
+ 				 void (*release_fn)(struct pci_host_bridge *),
+ 				 void *release_data)
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 9603094..d677c66 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -513,6 +513,9 @@ static inline struct pci_dev *pci_upstream_bridge(struct pci_dev *dev)
+ 	return dev->bus->self;
+ }
+ 
++struct device *pci_get_host_bridge_device(struct pci_dev *dev);
++void pci_put_host_bridge_device(struct device *dev);
++
+ #ifdef CONFIG_PCI_MSI
+ static inline bool pci_dev_msi_enabled(struct pci_dev *pci_dev)
+ {
 -- 
 1.7.9.5
