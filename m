@@ -1,30 +1,80 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 05 Feb 2015 12:43:09 +0100
-Subject: [PATCH v5 2/7] mailbox: arm_mhu: add driver for ARM MHU controller
-In-Reply-To: <CAJe_ZhcXR4oaBKZx3n0ckCzXgbREoezUXjizJ09QXQVqEQ3G_g@mail.gmail.com>
-References: <1422955310-6542-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <3540319.u6RL7AO77m@wuerfel>
- <CAJe_ZhcXR4oaBKZx3n0ckCzXgbREoezUXjizJ09QXQVqEQ3G_g@mail.gmail.com>
-Message-ID: <2790199.44Rvt91EcZ@wuerfel>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 5 Feb 2015 11:46:42 +0000
+Subject: [PATCH 1/4] arm64: dts: fix PMU IRQ ordering for Juno
+In-Reply-To: <1422294858-28100-1-git-send-email-will.deacon@arm.com>
+References: <1422294858-28100-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20150205114642.GG11344@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 05 February 2015 10:38:16 Jassi Brar wrote:
-> Passing pointer to a structure on stack will be automatically punished
-> as a random crash/behavior.
-> We just need to make sure no client passes a value directly in 'void
-> *data', right?
+Hi Will,
 
-Yes.
-
+On Mon, Jan 26, 2015 at 05:54:15PM +0000, Will Deacon wrote:
+> For better or worse, perf expects the per-cpu SPI PMU interrupts to be
+> listed in order of logical CPU. This patch fixes the Juno .dts to
+> satisfy that requirement.
 > 
-> I know typedef's are frowned upon, but how bad is the following option?
->        typedef void*  mbox_data_info
->        int mbox_send_message(struct mbox_chan *chan, mbox_data_info data);
+> Without this patch, I see unhandled IRQs in mainline:
+> 
+>   irq 9: nobody cared (try booting with the "irqpoll" option)
+>   CPU: 3 PID: 2830 Comm: cc1 Not tainted 3.19.0-rc6+ #1
+>   Hardware name: ARM Juno development board (r0) (DT)
+> 
+>   [...]
+> 
+>   handlers:
+>   [<ffffffc00009447c>] armv8pmu_handle_irq
+>   Disabling IRQ #9
+> 
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+> 
+> This is an immediate fix for mainline, with the remaining patches in the
+> series solving this by extending the binding.
+> 
+>  arch/arm64/boot/dts/arm/juno.dts | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+> index cb3073e4e7a8..4ed9287aaef1 100644
+> --- a/arch/arm64/boot/dts/arm/juno.dts
+> +++ b/arch/arm64/boot/dts/arm/juno.dts
+> @@ -107,11 +107,11 @@
+>  	pmu {
+>  		compatible = "arm,armv8-pmuv3";
+>  		interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 02 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>,
+>  			     <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>,
+>  			     <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>,
+> -			     <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>,
+> -			     <GIC_SPI 02 IRQ_TYPE_LEVEL_HIGH>,
+> -			     <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>;
+> +			     <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
+>  	};
 
-I don't see how that would help. I believe typedefs for pointer types
-are particularly bad because they hide what is going on. If we want to
-enforce the use of pointers to point to data, having the pointer in 
-the function prototype should be enough as a hint to driver developers ;-)
+I am very much not keen on this. While this may get things working
+today, it completely relies on Linux-internal details (the order of CPU
+bringup, which in this case is different from the order of entries in
+/cpus).
 
-	Arnd
+In all other dts that I am aware of, the order of entries in /cpus
+aligns with the order of interrupts in the PMU node, and the first entry
+is the boot CPU.
+
+I think that we should ensure that the ordering of CPU nodes matches the
+order of interrupts here. That way we can fall back to that ordering (if
+not explicitly overridden), and even after an arbitrary logical
+renumbering (e.g. after a kexec) the relationship should stay intact.
+
+This DT has clearly never worked (nor been tested), and I think having
+this as an intermediary step only adds to the long term support burden
+by having the juno dts arbitrarily different to all other dts files (by
+relying on a logical order that's different to the /cpus order).
+
+Longer term we must ensure we have a more explicit ordering, as with
+your later patches.
+
+Thanks,
+Mark.
