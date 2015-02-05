@@ -1,79 +1,35 @@
 From: rjui@broadcom.com (Ray Jui)
-Date: Wed, 4 Feb 2015 16:54:59 -0800
-Subject: [PATCH v5 0/6] Add common clock support for Broadcom iProc
- architecture
-In-Reply-To: <Ray Jui <rjui@broadcom.com>
+Date: Wed, 4 Feb 2015 16:55:03 -0800
+Subject: [PATCH v5 4/6] clk: Change bcm clocks build dependency
+In-Reply-To: <1423097705-22939-1-git-send-email-rjui@broadcom.com>
 References: <Ray Jui <rjui@broadcom.com>
-Message-ID: <1423097705-22939-1-git-send-email-rjui@broadcom.com>
+ <1423097705-22939-1-git-send-email-rjui@broadcom.com>
+Message-ID: <1423097705-22939-5-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset contains the initial common clock support for Broadcom's iProc
-family of SoCs. The iProc clock architecture comprises of various PLLs, e.g.,
-ARMPLL, GENPLL, LCPLL0, MIPIPLL, and etc. An onboard crystal serves as the
-basic reference clock for these PLLs. Each PLL may have several leaf clocks.
-One special group of clocks is the ASIU clocks, which are dervied directly
-from the crystal reference clock.
+The clock code under drivers/clk/bcm now contains code for both the
+Broadcom mobile SoCs and the iProc SoCs. Change the the makefile
+dependency to be under config flag CONFIG_ARCH_BCM that's enabled for
+both families of SoCs
 
-This patchset also contains the basic clock support for the Broadcom Cygnus
-SoC, which implements the iProc clock architecture
+Signed-off-by: Ray Jui <rjui@broadcom.com>
+---
+ drivers/clk/Makefile |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Changes from v4:
- - Add of_clk_get_parent_rate helper function into the clock framework
- - Switch to use of_clk_get_parent_rate in the iProc PLL clock driver
-
-Changes from v3:
- - Fix incorrect use of passing in of_clk_src_onecell_get when adding ARM PLL
-   and other iProc PLLs as clock provider. These PLLs have zero cells in DT and
-   thefore of_clk_src_simple_get should be used instead
- - Rename Cygnus MIPI PLL Channel 2 clock from BCM_CYGNUS_MIPIPLL_CH2_UNUSED
-   to BCM_CYGNUS_MIPIPLL_CH2_V3D, since a 3D graphic rendering engine has been
-   integrated into Cygnus revision B0 and has its core clock running off
-   MIPI PLL Channel 2
- - Changed default MIPI PLL VCO frequency from 1.75 GHz to 2.1 GHz. This allows
-   us to derive 300 MHz V3D clock from channel 2 through the post divisor
-
-Changes from v2:
- - Re-arrange Cygnus clock/pll init functions so each init function is right
-   next to its clock table
- - Removed #defines for number of clocks in Cygnus. Have the number of clocks
-   automatically determined based on array size of the clock table
-
-Changes from v1:
- - Separate drivers/clk/Makefile change for drivers/clk/bcm out to a standalone patch
-
-Ray Jui (6):
-  clk: add of_clk_get_parent_rate function
-  clk: iproc: define Broadcom iProc clock binding
-  clk: iproc: add initial common clock support
-  clk: Change bcm clocks build dependency
-  clk: cygnus: add clock support for Broadcom Cygnus
-  ARM: dts: enable clock support for Broadcom Cygnus
-
- arch/arm/boot/dts/bcm-cygnus-clock.dtsi |  110 ++++++--
- arch/arm/boot/dts/bcm-cygnus.dtsi       |    2 +-
- brcm,iproc-clocks.txt                   |  178 ++++++++++++
- drivers/clk/Makefile                    |    2 +-
- drivers/clk/bcm/Kconfig                 |    9 +
- drivers/clk/bcm/Makefile                |    2 +
- drivers/clk/bcm/clk-cygnus.c            |  277 +++++++++++++++++++
- drivers/clk/bcm/clk-iproc-armpll.c      |  282 +++++++++++++++++++
- drivers/clk/bcm/clk-iproc-asiu.c        |  275 ++++++++++++++++++
- drivers/clk/bcm/clk-iproc-clk.c         |  238 ++++++++++++++++
- drivers/clk/bcm/clk-iproc-pll.c         |  461 +++++++++++++++++++++++++++++++
- drivers/clk/bcm/clk-iproc.h             |  157 +++++++++++
- drivers/clk/clk.c                       |   17 ++
- include/dt-bindings/clock/bcm-cygnus.h  |   65 +++++
- include/linux/clk-provider.h            |    6 +-
- 15 files changed, 2053 insertions(+), 28 deletions(-)
- create mode 100644 brcm,iproc-clocks.txt
- create mode 100644 drivers/clk/bcm/clk-cygnus.c
- create mode 100644 drivers/clk/bcm/clk-iproc-armpll.c
- create mode 100644 drivers/clk/bcm/clk-iproc-asiu.c
- create mode 100644 drivers/clk/bcm/clk-iproc-clk.c
- create mode 100644 drivers/clk/bcm/clk-iproc-pll.c
- create mode 100644 drivers/clk/bcm/clk-iproc.h
- create mode 100644 include/dt-bindings/clock/bcm-cygnus.h
-
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index d5fba5b..eff0213 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -41,7 +41,7 @@ obj-$(CONFIG_ARCH_VT8500)		+= clk-vt8500.o
+ obj-$(CONFIG_COMMON_CLK_WM831X)		+= clk-wm831x.o
+ obj-$(CONFIG_COMMON_CLK_XGENE)		+= clk-xgene.o
+ obj-$(CONFIG_COMMON_CLK_AT91)		+= at91/
+-obj-$(CONFIG_ARCH_BCM_MOBILE)		+= bcm/
++obj-$(CONFIG_ARCH_BCM)			+= bcm/
+ obj-$(CONFIG_ARCH_BERLIN)		+= berlin/
+ obj-$(CONFIG_ARCH_HI3xxx)		+= hisilicon/
+ obj-$(CONFIG_ARCH_HIP04)		+= hisilicon/
 -- 
 1.7.9.5
