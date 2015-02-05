@@ -1,60 +1,54 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 5 Feb 2015 10:34:12 -0800
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 5 Feb 2015 19:39:14 +0100
 Subject: [RFC/PATCH 2/2] of: allow for boolean flags to have value
-In-Reply-To: <20150205182240.GD20735@leverpostej>
+In-Reply-To: <1423159266-25561-2-git-send-email-balbi@ti.com>
 References: <1423159266-25561-1-git-send-email-balbi@ti.com>
  <1423159266-25561-2-git-send-email-balbi@ti.com>
- <20150205182240.GD20735@leverpostej>
-Message-ID: <20150205183411.GC25235@atomide.com>
+Message-ID: <20150205183914.GV10842@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mark Rutland <mark.rutland@arm.com> [150205 10:26]:
-> On Thu, Feb 05, 2015 at 06:01:06PM +0000, Felipe Balbi wrote:
-> > allowing values to boolean flags lets us setup
-> > defaults on DTSI which can get disabled later
-> > at board DTS if, for whatever reason, board can't
-> > use that default.
-> > 
-> > One such example is DM81xx EVM where we can't use
-> > MUSB's multipoint feature even though SoC supports
-> > it. Something at the board level prevents us from
-> > using the feature.
-> > 
-> > Instead of removing "multipoint;" from DTSI and
-> > adding it to all board DTS just so we can remove
-> > it from our quirky board seems like overkill when
-> > we could just add:
-> > 
-> > 	multipoint = <0>;
-> > 
-> > to that quirky board's DTS.
-> > 
-> > Note that the description here is but one example
-> > and it's likely many others have faced something
-> > similar.
-> > 
+On Thu, Feb 05, 2015 at 12:01:06PM -0600, Felipe Balbi wrote:
+> allowing values to boolean flags lets us setup
+> defaults on DTSI which can get disabled later
+> at board DTS if, for whatever reason, board can't
+> use that default.
 > 
-> While I appreciate that adding and removing properties in this way is
-> painful, I think that this must be dealt with at DTB compile-time rather
-> than kernel run-time.
+> One such example is DM81xx EVM where we can't use
+> MUSB's multipoint feature even though SoC supports
+> it. Something at the board level prevents us from
+> using the feature.
 > 
-> There are codebases other than Linux which parse DTs, and not all
-> drivers call of_property_read_bool to parse boolean properties, an awful
-> lot still just check of_find_property. Additionally, some bindings
-> _explicitly_ state boolean properties are empty and have no value, which
-> this extension would break.
+> Instead of removing "multipoint;" from DTSI and
+> adding it to all board DTS just so we can remove
+> it from our quirky board seems like overkill when
+> we could just add:
 > 
-> I think that this patch only adds to the inconsistency we currently
-> have, and given that, I would rather not have this extension to
-> of_property_read_bool.
+> 	multipoint = <0>;
 > 
-> Arguably of_proeprty_read_bool should warn if it encounters a non-empty
-> property.
+> to that quirky board's DTS.
+> 
+> Note that the description here is but one example
+> and it's likely many others have faced something
+> similar.
+And others even came up with solutions, too: The right thing to do in
+this case is
 
-How about a WARN_ON there as in that case the value will always
-be set to 1 in kernel even if specified as 0 in the .dts file?
+	/delete-property/ multipoint;
 
-Regards,
+This works since
 
-Tony
+	cd296721a964 (dtc: import latest upstream dtc)
+
+which is in 3.7-rc1. See
+
+http://permalink.gmane.org/gmane.linux.drivers.devicetree/19170
+
+for the related discussion.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
