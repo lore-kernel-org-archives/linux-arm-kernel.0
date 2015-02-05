@@ -1,52 +1,60 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Thu, 5 Feb 2015 17:22:40 +0400
-Subject: [PATCH v2 0/5] ARM: sa1100: implement irq driver as proper
- irqchip driver
-In-Reply-To: <CACRpkdbstAkL0Tyt6UHrzwkccMteOehoPwGROJxoUbpDJ1yxjg@mail.gmail.com>
-References: <1422648066-7897-1-git-send-email-dbaryshkov@gmail.com>
- <CACRpkdbstAkL0Tyt6UHrzwkccMteOehoPwGROJxoUbpDJ1yxjg@mail.gmail.com>
-Message-ID: <CALT56yPLS-OAuZ1ipt3jKWPSH6W0Nc7qOBmRMcgugEhPYXOCFA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 5 Feb 2015 14:21:42 +0100
+Subject: MUSB dual-role on AM335x behaving weirdly
+In-Reply-To: <54C0A8C9.3040201@visionsystems.de>
+References: <20150121160631.GH4367@lukather>
+ <CADYTM3b40_u4Twt27PBVH4dC9ErDnFEi0AUzs_aJRM3mMHaBCQ@mail.gmail.com>
+ <54C0A8C9.3040201@visionsystems.de>
+Message-ID: <20150205132142.GD2079@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi,
 
-2015-02-04 15:19 GMT+03:00 Linus Walleij <linus.walleij@linaro.org>:
-> On Fri, Jan 30, 2015 at 9:01 PM, Dmitry Eremin-Solenikov
-> <dbaryshkov@gmail.com> wrote:
->
->> This is a second attempt to move Intel StrongARM SA-11x0 IRQ driver
->> to drivers/irqchip/ place.
->>
->> Changes since V1:
->>
->>  - Added soc/sa1100/pwer.h header containing sa11x0_*_set_wake()
->>    prototypes.
->>
->>  - Removed spinlock from mask/unmask functions
->>
->>  - Minor whitespace changes.
->>
->> The patches are based on my previous sa1100 patches that can be found
->> in Russell's for-next branch or in linux-next tree.
->
-> I have applied it and tested on the Compaq iPaq h3600:
-> Tested-by: Linus Walleij <linus.walleij@linaro.org>
+On Thu, Jan 22, 2015 at 08:37:45AM +0100, Yegor Yefremov wrote:
+> I have the same experience with 3.15. The switching is working when
+> CONFIG_USB_MUSB_DUAL_ROLE is set and dr_mode = "otg". But since 3.16
+> it seems to be broken. Still had no time to bisect this.
 
-Thank you. I'll probably wait for a couple more days for more feedback.
-Especially from IRQ CHIP maintainers.
+I've been giving a few versions (from v3.15 to Tuesday's linux-next) a
+try, and I always see the same behaviour now:
 
-Thomas, Jason: any feedback on this version? If no, can you ack it
-so that the patches can be merged through Russell's tree? If so, I
-can maybe squash last two patches, so that the new driver will
-be tied to old one through git internals?
+  - Booting as a gadget (ie, with a USB cable plugged in), and
+    swapping the cable for a (real, this time) USB OTG cable with a
+    USB key never works. When the device is plugged, all I get is
 
-Russell:any comments from your side?
+[  262.944846] usb 1-1: new high-speed USB device number 2 using musb-hdrc
+[  278.064748] usb 1-1: device descriptor read/64, error -110
 
->
-> Very nice to see the SC and GPIO offsets in /proc/interrupts
-> and very clean code, good work!
+    Putting in back in gadget results with a load of continuous:
+[  315.258839] musb_bus_suspend 2484: trying to suspend as a_wait_vfall while active
+
+  - Booting as a host, or with nothing connected to it actually work,
+    up to a few plug-a-device-then-plug-a-host cycles, where you end
+    up with the following logs when disconnecting the device (somehow,
+    it always happens when it is set in host mode).
+
+[   12.969075] CAUTION: musb: Babble Interrupt Occurred
+[   12.974445] CAUTION: musb: Babble Interrupt Occurred
+[   12.979637] musb_stage0_irq 789: unhandled DISCONNECT transition (a_wait_bcon)
+[   12.988498] usb 1-1: USB disconnect, device number 2
+[   13.071849] musb-hdrc musb-hdrc.0.auto: Restarting MUSB to recover from Babble
+
+    Plugging back our USB cable, with the AM335x acting as a device
+    work once. Then, when it switches to the host mode, we end up with
+    the same scenario than in the coldplug as gadget case: USB read
+    error, before then having all the a_wait_vfall messages.
+
+Maxime
 
 -- 
-With best wishes
-Dmitry
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150205/2d577670/attachment.sig>
