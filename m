@@ -1,29 +1,36 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Thu, 5 Feb 2015 21:37:15 +0530
-Subject: [PATCH v3 3/3] ARM: EXYNOS: Remove left over 'extra_save'
-In-Reply-To: <1423121002-25117-3-git-send-email-k.kozlowski@samsung.com>
-References: <1423121002-25117-1-git-send-email-k.kozlowski@samsung.com>
- <1423121002-25117-3-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <CAGcde9GiJRWFwtObWCOZeOo1Ax2MfjtaOEv0iNPNo5W9UDjTFw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 5 Feb 2015 16:11:00 +0000
+Subject: [PATCH v2] ARM: Don't use complete() during __cpu_die
+In-Reply-To: <20150205142918.GA10634@linux.vnet.ibm.com>
+References: <1423131270-24047-1-git-send-email-k.kozlowski@samsung.com>
+ <20150205105035.GL8656@n2100.arm.linux.org.uk>
+ <20150205142918.GA10634@linux.vnet.ibm.com>
+Message-ID: <20150205161100.GQ8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof
+On Thu, Feb 05, 2015 at 06:29:18AM -0800, Paul E. McKenney wrote:
+> Works for me, assuming no hidden uses of RCU in the IPI code.  ;-)
 
-On 5 February 2015 at 12:53, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
->
-> Since 32b0aa9aaeb4 ("ARM: EXYNOS: Remove i2c sys configuration related
-> code") the Exynos 5250 no longer saves additional registers under
-> 'exynos_pm_data.extra_save' field.
->
-> No one else uses this code so get rid of it making also 'exynos_pm_data'
-> const everywhere.
->
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->
+Sigh... I kind'a new it wouldn't be this simple.  The gic code which
+actually raises the IPI takes a raw spinlock, so it's not going to be
+this simple - there's a small theoretical window where we have taken
+this lock, written the register to send the IPI, and then dropped the
+lock - the update to the lock to release it could get lost if the
+CPU power is quickly cut at that point.
 
-Reviewed-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Also, we _do_ need the second cache flush in place to ensure that the
+unlock is seen to other CPUs.
 
-Thanks,
-Pankaj Dubey
+We could work around that by taking and releasing the lock in the IPI
+processing function... but this is starting to look less attractive
+as the lock is private to irq-gic.c.
+
+Well, we're very close to 3.19, we're too close to be trying to sort
+this out, so I'm hoping that your changes which cause this RCU error
+are *not* going in during this merge window, because we seem to have
+something of a problem right now which needs more time to resolve.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
