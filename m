@@ -1,105 +1,36 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 05 Feb 2015 13:49:43 +0000
-Subject: [PATCH RFC 1/2] Documentation: arm: define DT bindings for system
- suspend
-In-Reply-To: <20150205133230.GM11344@leverpostej>
-References: <1421840155-18990-1-git-send-email-sudeep.holla@arm.com>
- <1421840155-18990-2-git-send-email-sudeep.holla@arm.com>
- <20150204161006.GD6592@leverpostej> <54D37000.8000006@arm.com>
- <20150205133230.GM11344@leverpostej>
-Message-ID: <54D374F7.90307@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 5 Feb 2015 13:50:37 +0000
+Subject: [PATCH 2/4] rtc: sa1100: convert to run-time register mapping
+In-Reply-To: <CAL_JsqLiiKvzxQqE=bEx7qoLSZXLZOegt87A=+pR3PJuSBK95w@mail.gmail.com>
+References: <1423005775-26457-1-git-send-email-robh@kernel.org>
+ <1423005775-26457-3-git-send-email-robh@kernel.org>
+ <87h9v1a8k2.fsf@free.fr>
+ <CAL_JsqLiiKvzxQqE=bEx7qoLSZXLZOegt87A=+pR3PJuSBK95w@mail.gmail.com>
+Message-ID: <20150205135037.GP8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Feb 05, 2015 at 07:34:50AM -0600, Rob Herring wrote:
+> > And just for your information, both rtc-sa1100 and rtc-pxa can be used at the
+> > same time in a pxa kernel.
+> 
+> Yes, I know. I find that a bit odd. We'll have a bit of a problem
+> supporting that with DT BTW.
 
+I think you're close to that problem without DT anyway.  You modify
+rtc-sa1100 to use devm_ioremap_resource(), which claims the memory
+resource exclusively, thus marking the memory region exclusive.
 
-On 05/02/15 13:32, Mark Rutland wrote:
-> On Thu, Feb 05, 2015 at 01:28:32PM +0000, Sudeep Holla wrote:
->>
->>
->> On 04/02/15 16:10, Mark Rutland wrote:
->>> Hi Sudeep,
->>>
->>> On Wed, Jan 21, 2015 at 11:35:54AM +0000, Sudeep Holla wrote:
->>>> ARM based platforms implement unique ways to enter system suspend
->>>> (i.e. Suspend to RAM). The mechanism and the parameters defining the
->>>> system state vary on a per-platform basis forcing the OS to handle it
->>>> in very platform specific way.
->>>>
->>>> Since ARM 32-bit systems had machine specific code, no attempts to
->>>> standardize are being made as it provides easy way to implement suspend
->>>> operations in a platform specific manner. However, this approach not
->>>> only makes maintainance more difficult as the number of platforms
->>>> supported increases but also not feasible for ARM64.
->>>>
->>>> This DT binding aims at standardizing the system suspend for ARM
->>>> platforms. ARM64 platforms mandates entry-method property in DT for
->>>> this system suspend node.
->>>>
->>>> On system implementing PSCI as an enable-method to enter system suspend,
->>>> the PSCI CPU suspend method is used on versions upto v0.2 and requires
->>>> the power_state parameter to be passed to the PSCI CPU suspend function.
->>>>
->>>> This parameter is platform specific, therefore must be provided by
->>>> firmware to the OS in order to enable proper call sequence.
->>>>
->>>> This ARM system suspend DT bindings rely on a property
->>>> (i.e. arm,psci-suspend-param) in the PSCI DT bindings that describes
->>>> how the PSCI CPU suspend power_state parameter should be defined in DT.
->>>
->>> A short while ago (after this posting), the PSCI 1.0 spec [1] was
->>> released, featuring the new (optional) SYSTEM_SUSPEND mechanism intended
->>> for suspend to RAM. This has a standard ID, and its presence can be
->>> detected via the new standard PSCI_FEATURES call.
->>>
->>> The fundamental mechanism is identical. We would hot unplug all but one
->>> CPU, and from this remaining CPU we would make a SYSTEM_SUSPEND call.
->>> The major differences are that SYSTEM_SUSPEND can be detected via
->>> PSCI_FEATURES, and doesn't need a state parameter.
->>>
->>> Given that the only mandatory addition in PSCI 1.0 over PSCI 0.2 is the
->>> PSCI_FEATURES call (used to detect the presence of SYSTEM_SUSPEND), I do
->>> not believe that implementing this should be a signficant overhead
->>> compared to implementing the CPU_SUSPEND based approach with PSCI 0.2.
->>>
->>> So I'd very much prefer that we require a minimal PSCI 1.0 with
->>> SYSTEM_SUSPEND rather than extending CPU_SUSPEND in this manner. Is
->>> anyone attempting to implement suspend to RAM with PSCI 0.1?
->>>
->>
->> I too prefer have PSCI v1.0 for SYSTEM SUSPEND support, which eliminates
->> the need for this binding. But the question is: are silicon vendors
->> ready to upgrade their firmware to PSCI v1.0 for system system feature
->> especially since it's one of the fundamental feature needed in Android
->> systems.
->
-> Sure. That's the question I'd like to know the answer to.
->
+Luckily, rtc-pxa uses devm_ioremap() without claiming the memory
+resource - which is the only saving grace for why it still works.
+If rtc-pxa were to be converted to use devm_ioremap_resource(), then
+they'll become mutually exclusive.
 
-Right, I too hope to get response here.
+Also note that by including the resource in rtc-sa1100's platform
+device resource list, you'll have stacked resources between the two
+platform devices appearing in /proc/iomem (you did look at that
+before posting the patches, right?)
 
-> If they're bringing up PSCIv0.2 now, the delta to PSCIv0.1 is not large.
->
-
-That's true.
-
-> If they already have an implementation baked, then that's a different
-> scenario.
->
-> Regardless, what constitutes a wakeup device is a fundamental question
-
-IIUC individual devices can expose if they are wake-up capable. E.g.
-RTC can be wakeup capable and if it's enabled(sysfs entry exists, I did
-use it to test on Juno), it's interrupt is kept unmasked in suspend path
-while other devices keep their interrupts masked(can be both at GIC and
-source).
-
-> to answer, along with what in the system (e.g.  peripherals) the kernel
-> must save/restore the state of.
->
-
-Ideally individual drivers need to take care of saving and restoring 
-their state. However there will be always exceptions :)
-
-Regards,
-Sudeep
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
