@@ -1,32 +1,106 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Thu, 5 Feb 2015 13:59:36 +0800
-Subject: [PATCH 0/3] at91-3.19: pm fixes
-Message-ID: <1423115977-5852-1-git-send-email-wenyou.yang@atmel.com>
+Date: Thu, 5 Feb 2015 14:00:37 +0800
+Subject: [PATCH 1/3] pm: at91: pm_slowclock: fix suspend/resume hang up in
+ timeouts
+In-Reply-To: <1423115977-5852-1-git-send-email-wenyou.yang@atmel.com>
+References: <1423115977-5852-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1423116037-5921-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+From: Sylvain Rochet <sylvain.rochet@finsecur.com>
 
-The patch serial is to fix the pm issue.
+Removed timeout on XTAL, PLL lock and Master Clock Ready, hang if
+something went wrong instead of continuing in unknown condition. There
+is not much we can do if a PLL lock never ends, we are running in SRAM
+and we will not be able to connect back the sdram or ddram in order to
+be able to fire up a message or just panic.
 
-It is based on the branch: at91-3.19-fixes
-git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git
+As a bonus, not decounting the timeout register in slow clock mode
+reduce cumulated suspend time and resume time from ~17ms to ~15ms.
 
-Peter Rosin (1):
-  pm: at91: Workaround DDRSDRC self-refresh bug with LPDDR1 memories.
+Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+Acked-by: Wenyou.Yang <wenyou.yang@atmel.com>
+---
+ arch/arm/mach-at91/pm_slowclock.S |   33 ++++-----------------------------
+ 1 file changed, 4 insertions(+), 29 deletions(-)
 
-Sylvain Rochet (2):
-  pm: at91: pm_slowclock: fix suspend/resume hang up in timeouts
-  pm: at91: pm_slowclock: remove clocks which are already stopped when
-    entering slow clock mode
-
- arch/arm/mach-at91/pm.c            |   12 +++++
- arch/arm/mach-at91/pm_slowclock.S  |  105 ++++++++++++++----------------------
- include/soc/at91/at91sam9_ddrsdr.h |    2 +-
- 3 files changed, 54 insertions(+), 65 deletions(-)
-
+diff --git a/arch/arm/mach-at91/pm_slowclock.S b/arch/arm/mach-at91/pm_slowclock.S
+index 2001877..79dfdbe 100644
+--- a/arch/arm/mach-at91/pm_slowclock.S
++++ b/arch/arm/mach-at91/pm_slowclock.S
+@@ -34,11 +34,6 @@
+  */
+ #undef SLOWDOWN_MASTER_CLOCK
+ 
+-#define MCKRDY_TIMEOUT		1000
+-#define MOSCRDY_TIMEOUT 	1000
+-#define PLLALOCK_TIMEOUT	1000
+-#define PLLBLOCK_TIMEOUT	1000
+-
+ pmc	.req	r0
+ sdramc	.req	r1
+ ramc1	.req	r2
+@@ -50,56 +45,36 @@ tmp2	.req	r5
+  * Wait until master clock is ready (after switching master clock source)
+  */
+ 	.macro wait_mckrdy
+-	mov	tmp2, #MCKRDY_TIMEOUT
+-1:	sub	tmp2, tmp2, #1
+-	cmp	tmp2, #0
+-	beq	2f
+-	ldr	tmp1, [pmc, #AT91_PMC_SR]
++1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
+ 	tst	tmp1, #AT91_PMC_MCKRDY
+ 	beq	1b
+-2:
+ 	.endm
+ 
+ /*
+  * Wait until master oscillator has stabilized.
+  */
+ 	.macro wait_moscrdy
+-	mov	tmp2, #MOSCRDY_TIMEOUT
+-1:	sub	tmp2, tmp2, #1
+-	cmp	tmp2, #0
+-	beq	2f
+-	ldr	tmp1, [pmc, #AT91_PMC_SR]
++1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
+ 	tst	tmp1, #AT91_PMC_MOSCS
+ 	beq	1b
+-2:
+ 	.endm
+ 
+ /*
+  * Wait until PLLA has locked.
+  */
+ 	.macro wait_pllalock
+-	mov	tmp2, #PLLALOCK_TIMEOUT
+-1:	sub	tmp2, tmp2, #1
+-	cmp	tmp2, #0
+-	beq	2f
+-	ldr	tmp1, [pmc, #AT91_PMC_SR]
++1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
+ 	tst	tmp1, #AT91_PMC_LOCKA
+ 	beq	1b
+-2:
+ 	.endm
+ 
+ /*
+  * Wait until PLLB has locked.
+  */
+ 	.macro wait_pllblock
+-	mov	tmp2, #PLLBLOCK_TIMEOUT
+-1:	sub	tmp2, tmp2, #1
+-	cmp	tmp2, #0
+-	beq	2f
+-	ldr	tmp1, [pmc, #AT91_PMC_SR]
++1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
+ 	tst	tmp1, #AT91_PMC_LOCKB
+ 	beq	1b
+-2:
+ 	.endm
+ 
+ 	.text
 -- 
 1.7.9.5
-
-Best Regards,
-Wenyou Yang
