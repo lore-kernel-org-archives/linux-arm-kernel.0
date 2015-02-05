@@ -1,79 +1,63 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 05 Feb 2015 15:17:04 +0900
-Subject: Kexec and KVM not working gracefully together
-In-Reply-To: <54C7ADF0.8090102@arm.com>
-References: <CAHt6W4cuRi3bfj5mryFouhOLGAAWuNXKVvz4K-rAjQnwiegL-Q@mail.gmail.com>
- <54C7ADF0.8090102@arm.com>
-Message-ID: <54D30AE0.5050101@linaro.org>
+From: vigneshr@ti.com (Vignesh R)
+Date: Thu, 5 Feb 2015 11:51:25 +0530
+Subject: [PATCH v6 3/6] mfd: ti_am335x_tscadc: Remove unwanted reg_se_cache
+ save
+In-Reply-To: <54BF7C14.1080907@ti.com>
+References: <1420609779-11156-1-git-send-email-vigneshr@ti.com>
+ <1420609779-11156-4-git-send-email-vigneshr@ti.com>
+ <20150120115325.GK13701@x1> <54BE4CD1.1020709@ti.com>
+ <20150120160410.GL13701@x1> <54BF7C14.1080907@ti.com>
+Message-ID: <54D30BE5.4070906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Frediano
-Cc: Marc
 
-Are you going to fix this issue on arm?
-As I'm now working on the same issue on arm64,
-we should share the idea and some code.
 
-Hopefully I will talk to Marc at Linaro Connect next week,
-then submit my own patch (or merge it into Geoff's) soon.
+On Wednesday 21 January 2015 03:44 PM, Vignesh R wrote:
+> On Tuesday 20 January 2015 09:34 PM, Lee Jones wrote:
+>> On Tue, 20 Jan 2015, R, Vignesh wrote:
+>>> On 1/20/2015 5:23 PM, Lee Jones wrote:
+>>>> On Wed, 07 Jan 2015, Vignesh R wrote:
+>>>>
+>>>>> In one shot mode, sequencer automatically disables all enabled steps at
+>>>>> the end of each cycle. (both ADC steps and TSC steps) Hence these steps
+>>>>> need not be saved in reg_se_cache for clearing these steps at a later
+>>>>> stage.
+>>>>> Also, when ADC wakes up Sequencer should not be busy executing any of the
+>>>>> config steps except for the charge step. Previously charge step was 1 ADC
+>>>>> clock cycle and hence it was ignored.
+>>>>> TSC steps are always disabled at the end of each conversion cycle, hence
+>>>>> there is no need to explicitly disable TSC steps by writing 0 to REG_SE.
+>>>>>
+>>>>> Signed-off-by: Vignesh R <vigneshr@ti.com>
+>>>>> ---
+>>>>>
+>>>>> v5:
+>>>>>  - Remove unnecessary clearing of REG_SE
+>>>>>
+>>>>>  drivers/mfd/ti_am335x_tscadc.c       | 13 +++++--------
+>>>>>  include/linux/mfd/ti_am335x_tscadc.h |  1 +
+>>>>>  2 files changed, 6 insertions(+), 8 deletions(-)
+>>>>
+>>>> Looks fine.
+>>>>
+>>>> For my own reference:
+>>>>   Acked-by: Lee Jones <lee.jones@linaro.org>
+>>>>
+>>>> Can this patch be applied on its own?
+>>>>
+>>>
+>>> I prefer to wait until input patches are picked up.
+>>
+>> I have no problem with that, but is there a technical reason why?
+>>
+> 
+> Nothing, in particular. This patch alone has no impact on the
+> performance of TSC/ADC unit. Patch 2/6 is necessary to observe the
+> changes caused by this series. Hence, please wait until those patches
+> are picked up.
 
-Thanks,
--Takahiro AKASHI
+Input maintainer has applied other patches. You can pick this one.
 
-On 01/28/2015 12:25 AM, Marc Zyngier wrote:
-> Hi Frediano,
->
-> On 27/01/15 15:07, Frediano Ziglio wrote:
->> Hi,
->>    I was trying to make kexec (software reset) work on an ARM platform
->> and I realized that the kernel launched with kexec cannot use KVM.
->> Looking for message I get from kernel and code the situation is this:
->> 1- kernel start in HYP mode but then kvm code switch to SVC mode and
->> initialize HYP mode with its code;
->> 2- kexec call reboot with LINUX_REBOOT_CMD_KEXEC
->> 3- kernel call kernel_exec;
->> 4- kernel_exec calls machine_kexec;
->> 5- machine_kexec calls soft_restart passing physical entry point for
->> next in memory kernel;
->> 6- soft_restart calls __soft_restart changing stack;
->> 7- __soft_restart calls cpu_reset (which in my case is defined as cpu_v7_reset);
->> 8- cpu_v7_reset just disable MMU (it's in an identity memory) and
->> calls next kernel entry point.
->>
->>  From point 3 to 8 kernel is always in SVC mode so next kernel is
->> launched in SVC mode too but initial kernel was launched in HYP mode.
->>
->> I used kernel 3.14 but looking at 3.19 rc code there is the same issue
->> (code didn't change).
->>
->> Using hvc instruction you can execute arbitrary functions however
->> these function must be in a very restricted range as HYP code MMU has
->> very limited paged configured and cpu_v7_reset is not one of these
->> functions.
->>
->> My idea to fix the issue is before calling cpu_reset call a new
->> kvm_exit or similar that turn into HYP mode with MMU set as SVC mode.
->>
->> Is this a known issue? Should I try to fix the problem or somebody can
->> easily fix it?
->
-> This has been known for a while, and so far people dealing with Kexec
-> have preferred sidestepping the issue. This is moderately easy to fix if
-> you're happy dealing with page tables. What is missing is the code that
-> switches back to an idmap, restore the HYP stubs, and let Kexec install
-> its own stubs for jumping to the next kernel.
->
-> Most of the infrastructure is already there, it is "just" a matter of
-> getting it right.
->
-> If you feel like giving it a go, I suggest you have a look at how we
-> actually install KVM (the transitions from no MMU to idmap to trampoline
-> page to final layout is rather entertaining). Once you understand that,
-> it should be rather straightforward to perform this in the reverse
-> order, and we can assist you getting it right.
->
-> Thanks,
->
-> 	M.
->
+Regards
+Vignesh R
