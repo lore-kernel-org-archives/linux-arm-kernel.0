@@ -1,65 +1,75 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu,  5 Feb 2015 11:11:27 +0100
-Subject: [PATCH v5 4/5] drivers: bus: Add Renesas Bus State Controller (BSC)
- DT Bindings
+Date: Thu,  5 Feb 2015 11:11:26 +0100
+Subject: [PATCH v5 3/5] drivers: bus: Add Simple Power-Managed Bus DT Bindings
 In-Reply-To: <1423131088-7835-1-git-send-email-geert+renesas@glider.be>
 References: <1423131088-7835-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1423131088-7835-5-git-send-email-geert+renesas@glider.be>
+Message-ID: <1423131088-7835-4-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The bindings for the BSC extend the bindings for "simple-pm-bus".
-
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Tested-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 Reviewed-by: Kevin Hilman <khilman@linaro.org>
 ---
 v5:
   - Add Reviewed-by,
+  - "simple-pm-bus" is not an extension of "simple-bus",
+  - "compatible" must not contain "simple-bus",
+  - Add reference to clock/PM domain provider binding docs,
 
 v4:
-  - New, extracted from simple-pm-bus.txt in v3.
----
- .../devicetree/bindings/bus/renesas,bsc.txt        | 46 ++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/bus/renesas,bsc.txt
+  - Replace "simple-bus" by "simple-pm-bus",
+  - Remove the "renesas,bsc" bindings. They will be specified in a
+    separate document.
 
-diff --git a/Documentation/devicetree/bindings/bus/renesas,bsc.txt b/Documentation/devicetree/bindings/bus/renesas,bsc.txt
+v3:
+  - Add Tested-by,
+  - Document required properties inherited from "simple-bus",
+  - Document required "reg" property for "renesas,bsc",
+  - Move "ranges" before "reg" in the example,
+
+v2:
+  - New.
+---
+ .../devicetree/bindings/bus/simple-pm-bus.txt      | 44 ++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/bus/simple-pm-bus.txt
+
+diff --git a/Documentation/devicetree/bindings/bus/simple-pm-bus.txt b/Documentation/devicetree/bindings/bus/simple-pm-bus.txt
 new file mode 100644
-index 0000000000000000..90e94726943772c4
+index 0000000000000000..d032237512c271f2
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/bus/renesas,bsc.txt
-@@ -0,0 +1,46 @@
-+Renesas Bus State Controller (BSC)
-+==================================
++++ b/Documentation/devicetree/bindings/bus/simple-pm-bus.txt
+@@ -0,0 +1,44 @@
++Simple Power-Managed Bus
++========================
 +
-+The Renesas Bus State Controller (BSC, sometimes called "LBSC within Bus
-+Bridge", or "External Bus Interface") can be found in several Renesas ARM SoCs.
-+It provides an external bus for connecting multiple external devices to the
-+SoC, driving several chip select lines, for e.g. NOR FLASH, Ethernet and USB.
++A Simple Power-Managed Bus is a transparent bus that doesn't need a real
++driver, as it's typically initialized by the boot loader.
 +
-+While the BSC is a fairly simple memory-mapped bus, it may be part of a PM
-+domain, and may have a gateable functional clock.
-+Before a device connected to the BSC can be accessed, the PM domain
-+containing the BSC must be powered on, and the functional clock
-+driving the BSC must be enabled.
++However, its bus controller is part of a PM domain, or under the control of a
++functional clock.  Hence, the bus controller's PM domain and/or clock must be
++enabled for child devices connected to the bus (either on-SoC or externally)
++to function.
 +
-+The bindings for the BSC extend the bindings for "simple-pm-bus".
++While "simple-pm-bus" follows the "simple-bus" set of properties, as specified
++in ePAPR, it is not an extension of "simple-bus".
 +
 +
-+Required properties
-+  - compatible: Must contain an SoC-specific value, and "renesas,bsc" and
-+		"simple-pm-bus" as fallbacks.
-+                SoC-specific values can be:
-+		"renesas,bsc-r8a73a4" for R-Mobile APE6 (r8a73a4)
-+		"renesas,bsc-sh73a0" for SH-Mobile AG5 (sh73a0)
++Required properties:
++  - compatible: Must contain at least "simple-pm-bus".
++		Must not contain "simple-bus".
++		It's recommended to let this be preceded by one or more
++		vendor-specific compatible values.
 +  - #address-cells, #size-cells, ranges: Must describe the mapping between
 +		parent address and child address spaces.
-+  - reg: Must contain the base address and length to access the bus controller.
 +
-+Optional properties:
-+  - interrupts: Must contain a reference to the BSC interrupt, if available.
-+  - clocks: Must contain a reference to the functional clock, if available.
-+  - power-domains: Must contain a reference to the PM domain, if available.
++Optional platform-specific properties for clock or PM domain control (at least
++one of them is required):
++  - clocks: Must contain a reference to the functional clock(s),
++  - power-domains: Must contain a reference to the PM domain.
++Please refer to the binding documentation for the clock and/or PM domain
++providers for more details.
 +
 +
 +Example:
