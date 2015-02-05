@@ -1,68 +1,77 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 05 Feb 2015 13:21:56 +0100
-Subject: [PATCH v4 0/6] Introducing the Alpine platform.
-In-Reply-To: <CAC9K06yaA30e+HnRH50QJeF0=a_oCeWaaT_sYuS+OVcq1ZnVzg@mail.gmail.com>
-References: <54d0cd21.WWf8LEKnly7HnqEK%tsahee@annapurnalabs.com>
- <4902057.1c5MpYALGg@wuerfel>
- <CAC9K06yaA30e+HnRH50QJeF0=a_oCeWaaT_sYuS+OVcq1ZnVzg@mail.gmail.com>
-Message-ID: <2737362.aK8nBa7Wi3@wuerfel>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 5 Feb 2015 12:23:11 +0000
+Subject: [PATCH 2/4] arm64: pmu: add support for interrupt-affinity
+ property
+In-Reply-To: <20150205121224.GG23241@arm.com>
+References: <1422294858-28100-1-git-send-email-will.deacon@arm.com>
+ <1422294858-28100-2-git-send-email-will.deacon@arm.com>
+ <20150205115601.GH11344@leverpostej>
+ <20150205121224.GG23241@arm.com>
+Message-ID: <20150205122311.GK11344@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 05 February 2015 10:28:02 Ronen Shitrit wrote:
-> On 4 February 2015 at 14:33, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Wednesday 04 February 2015 13:19:04 Tsahee Zidenberg wrote:
-
-> > I understand where you are coming from, as this is something that
-> > everyone gets wrong at first.
+On Thu, Feb 05, 2015 at 12:12:25PM +0000, Will Deacon wrote:
+> On Thu, Feb 05, 2015 at 11:56:01AM +0000, Mark Rutland wrote:
+> > On Mon, Jan 26, 2015 at 05:54:16PM +0000, Will Deacon wrote:
+> > > Historically, the PMU devicetree bindings have expected SPIs to be
+> > > listed in order of *logical* CPU number. This is problematic for
+> > > bootloaders, especially when the boot CPU (logical ID 0) isn't listed
+> > > first in the devicetree.
+> > > 
+> > > This patch adds a new optional property, interrupt-affinity, to the
+> > > PMU node which allows the interrupt affinity to be described using
+> > > a list of phandled to CPU nodes, with each entry in the list
+> > > corresponding to the SPI at the same index in the interrupts property.
+> > > 
+> > > Cc: Mark Rutland <mark.rutland@arm.com>
+> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > > ---
+> > >  Documentation/devicetree/bindings/arm/pmu.txt |  6 +++
+> > >  arch/arm64/include/asm/pmu.h                  |  1 +
+> > >  arch/arm64/kernel/perf_event.c                | 57 +++++++++++++++++++++++++--
+> > >  3 files changed, 60 insertions(+), 4 deletions(-)
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
+> > > index 75ef91d08f3b..a9281fc48743 100644
+> > > --- a/Documentation/devicetree/bindings/arm/pmu.txt
+> > > +++ b/Documentation/devicetree/bindings/arm/pmu.txt
+> > > @@ -24,6 +24,12 @@ Required properties:
+> > >  
+> > >  Optional properties:
+> > >  
+> > > +- interrupt-affinity : Valid only when using SPIs, specifies a list of phandles
+> > > +                       to CPU nodes corresponding directly to the affinity of
+> > > +		       the SPIs listed in the interrupts property. If absent,
+> > > +		       the interrupts are assumed to be listed in logical CPU
+> > > +		       order.
+> > 
+> > This covers the case we care about today, but it's problematic in cases
+> > where the number of interrupts is not equal to the number of CPUs affine
+> > to that interrupt. For example:
+> > 
+> > * PPIs in big.LITTLE systems, where we may need a node per cluster, and
+> >   will need a way of associating a PMU node with a subset of all CPUs,
+> >   despite having only one interrupt.
+> > 
+> > * Muxed SPIs per-cluster (is this likely to happen?)
+> > 
+> > The former can be covered by allowing multiple entries in
+> > interrupt-affintiy for PPIs.
 > 
-> In order to bring up a completely new silicon with lots of
-> technologies challenges in such short time and take it to production,
-> with multi discipline environments, few OSs support and small software
-> group, we had to share code as much as possible == hal.
-
-I think the most important part for you to understand is not to call
-something a hal (or os abstraction, which would be worse), as that
-is universally hated. ;-)
-
-> We were aware from first day of the obstacles of merging hal code to
-> the mainline, that why we implemented it using linux coding style,
-> trying to minimize the "resistance", and we hoped (and still are :) to
-> find a path to keep part of our low level code into the mainline.
-> If it wont work out, we will rewrite it...
-
-It's not as bad if something is contained within one driver: if you have
-e.g. a network driver that consists of a low-level part that talks to
-the hardware and a high-level part that talks to linux, that can
-be ok. What you should avoid is having interfaces that span across
-multiple driver components and use a global header file for the
-interface but are specific to one SoC family.
-
-> >However, you will not be able to merge
-> > the drivers with a HAL like this. The kernel abstracts all the
-> > components of typical SoCs already and I suspect you just did not
-> > use the right abstraction because you either didn't find it, or it
-> > was not there at the time you started the work.
-> >
-> > For example, a DMA subsystem that is used by multiple slave drivers
-> > should use a driver in drivers/dma that registers to the slave-dma API,
+> Yes, that sounds like a sensible extension in the future if we have to
+> support such a platform.
 > 
-> If you are referring to the dma-engine api, than this is a good
-> example where we don't want to use the generic framework as its
-> overhead on performance is unacceptable.
+> > I'm not sure if the latter is something we need to cater for. If we do,
+> > then perhaps we need an interruptN-affinity property per interrupt (though
+> > that's ugly and painful to deal with).
+> 
+> I'm not keen to handle this, so I'd rather defer it to whoever ends up
+> building it. Trying to design for every possibility is usually impossible
+> in my experience and you just end up carrying something that isn't useful.
 
-It also illustrates my point: When we introduce a second interface
-in parallel to the existing one, this puts a burden on us upstream
-maintainers which now have to understand and maintain both. We used
-to have all sorts of interfaces per SoC and are almost done consolidating
-them to all use dmaengine for this reason.
-I do realize that the dmaengine API is not perfect though, so if you
-have specific problems with it, we expect you to help figure out what
-they are and what we can do about them so that everybody benefits.
+I suspected that would be the case. Just thought I should raise it as a
+potential problem.
 
-To a certain extent, this is how we make progress in the kernel with
-generic interfaces: someone has a particular need and it's up to them
-to implement the groundwork. In return they get all the features of
-the kernel that someone else needed and implemented already.
-
-	Arnd
+Thanks,
+Mark.
