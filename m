@@ -1,64 +1,55 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Fri, 6 Feb 2015 00:33:45 -0800
-Subject: [PATCH v2 1/2] mtd: nand: pxa3xx: Fix PIO FIFO draining
-In-Reply-To: <20150206091307.1162b123@bbrezillon>
-References: <1422284164-16867-1-git-send-email-maxime.ripard@free-electrons.com>
- <1422284164-16867-2-git-send-email-maxime.ripard@free-electrons.com>
- <20150204111028.2f0bd376@bbrezillon>
- <20150206010835.GB30781@ld-irv-0074>
- <20150206091307.1162b123@bbrezillon>
-Message-ID: <20150206083345.GE4434@norris-Latitude-E6410>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 6 Feb 2015 09:37:33 +0100
+Subject: cpuidle vs suspend vs something else
+In-Reply-To: <54D43143.2010403@free.fr>
+References: <54D43143.2010403@free.fr>
+Message-ID: <CAJKOXPdOu3AUFv50i_WJ-JxGErJxi1RRXD6j2uqYpZ3t1WOMzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 06, 2015 at 09:13:07AM +0100, Boris Brezillon wrote:
-> Hi Brian,
-> 
-> On Thu, 5 Feb 2015 17:08:35 -0800
-> Brian Norris <computersforpeace@gmail.com> wrote:
-> > On Wed, Feb 04, 2015 at 11:10:28AM +0100, Boris Brezillon wrote:
-> > > On Mon, 26 Jan 2015 15:56:03 +0100
-> > > Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> > > > +			/*
-> > > > +			 * According to the datasheet, when reading
-> > > > +			 * from NDDB with BCH enabled, after each 32
-> > > > +			 * bits reads, we have to make sure that the
-> > > > +			 * NDSR.RDDREQ bit is set
-> > > > +			 */
-> > > 
-> > > I know the datasheet says this bit should be checked after each
-> > > transfer, but I wonder if we shouldn't check it before reading the data.
-> > > What happens if you drain all the data available in the FIFO ? Is the
-> > > controller still setting the RDDREQ bit ?
-> > > 
-> > > Moreover, the datasheet says this RDDREQ bit should be checked after
-> > > each 32 bytes (not 32 bits) transfer.
-> > > Testing it after each readl call shouldn't hurt though.
-> > 
-> > Seems like that could quite possibly kill performance unnecessarily,
-> > couldn't it? But then, PIO is probably not that fast in the first
-> > place...
-> 
-> Absolutety, my point was, it shouldn't hurt from a functional POV, but
-> yes it will definitely impact performances.
+2015-02-06 4:13 GMT+01:00 Mason <mpeg.blue@free.fr>:
+> Hello everyone,
+>
+> I've been reading about related sub-systems (cpuidle and suspend)
+> and I'm not sure I understand how they relate / interact.
+>
+> If I understand correctly (please do point out any misconceptions)
+> on ARM Cortex A9, the first level of power saving is WFI, which is
+> typically called from the idle loop.
+>
+> This places the core in low-power mode ("Standby mode" in ARM docs).
+> "RAM arrays" (don't know what they are), "processor logic", and
+> "data engine" (not sure what any of these exactly refers to, guess
+> I have more reading to do) are still powered-up, but most of the
+> clocks are disabled.
+>
+> In ARM's exact words, "WFI and WFE Standby modes disable most of the
+> clocks in a processor, while keeping its logic powered up. This reduces
+> the power drawn to the static leakage current, leaving a tiny clock
+> power overhead requirement to enable the device to wake up."
+>
+> Some CPUs like Intel's have several levels of sleep (deeper levels
+> mean less power, but have a higher wake-up latency). AFAIU, cpuidle
+> is used to describe and manage these levels?
+>
+> Isn't suspend somewhat like the deepest level of sleep?
+> (Or is it different in that things like RAM state are only a concern
+> for suspend, not cpuidle?)
 
-OK.
+Actually on some ARM SoCs the deeper cpuidle states behave like
+suspend. For example there isn't a deeper low power mode for one core
+on Exynos but there are low power modes for whole SoC. Entering most
+of these modes is controlled by cpuidle subsystem. The deepest mode is
+sleep which on Linux is entered during Suspend to RAM. So actually to
+answer your question - it depends on SoC and how you integrate it with
+Linux.
 
-> But that's not the first thing I would rework of if you're concerned
-> about performances: when doing PIO read/write, the page read/write
-> operations (I mean the part reading the internal fifo) are all done in
-> interrupt context (called from pxa3xx_nand_irq), and doing this will
-> prevent any other interrupt from taking place while you are
-> draining/filling the FIFO :-(.
+I am not that familiar with other SoCs but I think on Qualcomm each
+CPU may enter standalone low power mode?
 
-...which reminds me; the jiffies-based timeout in this patch isn't going
-to work in interrupt context. So it needs to be replaced either with a
-tight udelay() loop, or it needs to be moved out of the ISR.
+> Are both subsystems still actively used?
 
-> An alternative would be to move this part into the read/write_buf
-> functions, but that's a lot of work...
+Yes, both are used: cpuidle and suspend.
 
-Yeah, that probably would be preferable, but I suppose it's not urgent
-either.
-
-Brian
+Best regards,
+Krzysztof
