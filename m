@@ -1,54 +1,82 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Fri, 6 Feb 2015 12:12:41 -0800
-Subject: [PATCH v5 3/5] x86: Split syscall_trace_enter into two phases
-In-Reply-To: <CAGXu5jJXspS_34KBJ5VxvyKuj4bA+zg267dNiEkqR1LuvjoA1Q@mail.gmail.com>
-References: <cover.1409954077.git.luto@amacapital.net>
- <2df320a600020fda055fccf2b668145729dd0c04.1409954077.git.luto@amacapital.net>
- <20150205211916.GA31367@altlinux.org>
- <CAGXu5j+aXxt55LsxxbNkfGGF719ubXBZ2JAFwUPNARwKMVFgng@mail.gmail.com>
- <20150205214027.GB31367@altlinux.org>
- <CALCETrXFzcXngHsX=_72hYZqms32Zf7oFYDBgC3XNw7zOGdDCA@mail.gmail.com>
- <CAGXu5jJtHT9o8WMoynifN13=uZoARt4G9iVcgZsc9xYOBEwWsg@mail.gmail.com>
- <20150205233945.GA31540@altlinux.org>
- <CAGXu5jLTH+mUF0JxeR2qA_r=ocWjPHPSK2OPgE0Fu_JKoQyQ9w@mail.gmail.com>
- <CALCETrXsCUje+_V=Ud+TB4A2jH2M7yqyoCFMLEyxOD6pd7Di5w@mail.gmail.com>
- <20150206023249.GB31540@altlinux.org>
- <CALCETrWTnqKDoatK+5FN=yYDOeENoW5=r5YMToYKhZ8Zfv5wWA@mail.gmail.com>
- <CAGXu5j+nopAMFukwMu=Cy0GOapziOLTb-ryJhA-aywk_uerg9A@mail.gmail.com>
- <CALCETrVaF+3ETn5nfcbvyWKUYb71jNXK-zo9V6uOK0cEW4TCNQ@mail.gmail.com>
- <CAGXu5jJXspS_34KBJ5VxvyKuj4bA+zg267dNiEkqR1LuvjoA1Q@mail.gmail.com>
-Message-ID: <CALCETrUmMA9sK4SJCSiF24iAiPLMBf=-JBw6TcLV+aLt_eN=Sw@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 06 Feb 2015 21:14:22 +0100
+Subject: Continuing kallsyms failures - large kernels, XIP kernels, and
+ large XIP kernels
+In-Reply-To: <20150204094414.GC8656@n2100.arm.linux.org.uk>
+References: <20150130145642.GK26493@n2100.arm.linux.org.uk>
+ <20150130153414.GM26493@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1501301224180.1322@knanqh.ubzr>
+ <20150131002253.GR26493@n2100.arm.linux.org.uk>
+ <20150204000307.GA8656@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1502032054460.1322@knanqh.ubzr>
+ <20150204094414.GC8656@n2100.arm.linux.org.uk>
+Message-ID: <ab203441a4046ecb67a090c6b2d79c56@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 6, 2015 at 12:07 PM, Kees Cook <keescook@chromium.org> wrote:
-> On Fri, Feb 6, 2015 at 11:32 AM, Andy Lutomirski <luto@amacapital.net> wrote:
->> On Fri, Feb 6, 2015 at 11:23 AM, Kees Cook <keescook@chromium.org> wrote:
->>> And especially since a ptracer
->>> can change syscalls during syscall-enter-stop to any syscall it wants,
->>> bypassing seccomp. This condition is already documented.
+On 2015-02-04 10:44, Russell King - ARM Linux wrote:
+> On Tue, Feb 03, 2015 at 08:59:15PM -0500, Nicolas Pitre wrote:
+>> On Wed, 4 Feb 2015, Russell King - ARM Linux wrote:
 >>
->> If a ptracer (using PTRACE_SYSCALL) were to get the entry callback
->> before seccomp, then this oddity would go away, which might be a good
->> thing.  A ptracer could change the syscall, but seccomp would based on
->> what the ptracer changed the syscall to.
->
-> I want kill events to trigger immediately. I don't want to leave the
-> ptrace surface available on a SECCOMP_RET_KILL. So maybe it can be
-> seccomp phase 1, then ptrace, then seccomp phase 2? And pass more
-> information between phases to determine how things should behave
-> beyond just "skip"?
+>> > It looks like we have cases where this falsely triggers.  Consider EFM32:
+>> >
+>> > CONFIG_DRAM_BASE=0x88000000
+>> > CONFIG_DRAM_SIZE=0x00400000
+>> > CONFIG_FLASH_MEM_BASE=0x8c000000
+>> > CONFIG_FLASH_SIZE=0x01000000
+>> >
+>> > This means that we quite legally end up with the .data section below the
+>> > .text section, which makes:
+>> >
+>> > ASSERT((_data >= __data_loc), "Text section oversize")
+>> >
+>> > falsely trigger.
+>> >
+>> > The linker has the capacity to specify regions of ROM and RAM in the
+>> > linker file, I wonder if we should be using those for XIP.  Merely
+>> > adding the MEMORY table to the linker file is not good enough - we
+>> > also need to explicitly tell the linker which memory regions to place
+>> > the output sections, otherwise the linker ends up making assumptions.
+>> >
+>> > What that means is... asm-generic/vmlinux.lds.h breaks for us.
+>> >
+>> > Any ideas?  I think using the MEMORY table would be the best approach,
+>> > because that should allow us to properly verify that the resulting
+>> > binary should fit in the memory regions.
+>>
+>> Maybe simply having an assert() on the size of the .text section could
+>> be all that is needed.  We already know the maximum size in advance.
+> 
+> That doesn't work, it's not just the .text section but also .rodata,
+> __bug_table, __ksymtab, __ksymtab_gpl, __kcrctab, __kcrctab_gpl,
+> __ksymtab_strings, __param, __modver, __ex_table, .notes, .vectors,
+> .stubs, .init.text, maybe .exit.text, .init.arch.info, .init.tagtable,
+> .init.smpalt, .init.pv_table, and apparently .init.data (which is
+> surely wrong?)  The following is from Arnd's failing configuration:
+> 
+>  18 .init.tagtable 00000040  80073a9c  80073a9c  0100ba9c  2**2
+>                   CONTENTS, ALLOC, LOAD, READONLY, DATA
+>  19 .init.data    000010e8  80073adc  80073adc  0100badc  2**2
+>                   CONTENTS, ALLOC, LOAD, DATA
+>  20 .data         003552c4  80008000  80074bc4  01010000  2**8
+>                   CONTENTS, ALLOC, LOAD, DATA
+> 
+> Hmm, if .init.data is contained in the flash section (which it seemingly
+> is), it seems that XIP support is currently broken - that section is
+> definitely a read/write section.  No one has seemingly noticed that it's
+> broken and it's been broken for a long time, so maybe the simple answer
+> then is just to rip XIP support out?
 
-I thought so too, originally, but I'm far less convinced now, for two reasons:
+Hi Russell,
 
-1. I think that a lot of filters these days use RET_ERRNO heavily, so
-this won't benefit them.
+I noticed that kallsyms resolution fails with XIP kernel in my patchset
+to support Vybrids Cortex-M4, see
+http://article.gmane.org/gmane.linux.drivers.devicetree/101196
 
-2. I'm not convinced it really reduces the attack surface for anyone.
-Unless your filter is literally "return SECCOMP_RET_KILL", then the
-seccomp-filtered task can always cause the ptracer to get a pair of
-syscall notifications.  Also, the task can send itself signals (using
-page faults, breakpoints, etc) and cause ptrace events via other
-paths.
+Fwiw, although that platform has enough memory to use a normal kernel
+too, the Cortex-M4 architecture has a dedicated code bus. I used the XIP
+kernel to make use of the code bus for the kernel code at least.
+However, there might be better ways to archive this.
 
---Andy
+--
+Stefan  
