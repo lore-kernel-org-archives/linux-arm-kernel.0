@@ -1,75 +1,83 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Fri, 6 Feb 2015 13:49:29 +0800
-Subject: [PATCH 2/4] Documentation: dt-bindings: add dt binding info for
- hi6220
-In-Reply-To: <54D3B541.1070404@cogentembedded.com>
-References: <1423147620-5760-1-git-send-email-zhangfei.gao@linaro.org>
- <1423147620-5760-3-git-send-email-zhangfei.gao@linaro.org>
- <54D3B541.1070404@cogentembedded.com>
-Message-ID: <CABQgh9Hx7_-vNg2nbju_mPEZMj6KB4Sj37mk6jqnj7AS2zOMLw@mail.gmail.com>
+From: gautamvivek1987@gmail.com (Vivek Gautam)
+Date: Fri, 6 Feb 2015 11:22:34 +0530
+Subject: [PATCH v5 0/2] mmc: dw_mmc: exynos: Add HS400 support
+In-Reply-To: <54D41654.8030702@samsung.com>
+References: <1422499318-13726-1-git-send-email-alim.akhtar@samsung.com>
+ <54D41654.8030702@samsung.com>
+Message-ID: <CAFp+6iEGCEiGf5WooHJyh=cnJF_c7j=n_YhHLowfwjpLiXUPiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 February 2015 at 02:24, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
->> diff --git a/Documentation/devicetree/bindings/usb/hi6220-usb.txt
->> b/Documentation/devicetree/bindings/usb/hi6220-usb.txt
->> new file mode 100644
->> index 0000000..e926364
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/usb/hi6220-usb.txt
->> @@ -0,0 +1,50 @@
->> +Hisilicon hi6220  SoC USB controlle
+Hi Jaehoon,
+
+
+On Fri, Feb 6, 2015 at 6:48 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+> Hi, Alim.
 >
->
->    Controller.
-Yes, my mistake.
-To prevent spelling error next time, will paste to google doc first
-for the auto spelling check.
+> On my board, this patch isn't working fine.
+> So when i complete to test on my board(exynos5), i will reply with comments.
+> Sorry for late testing.
+
+I tested this series on linux-next, on Exynos5800-peach-pi board, and HS400
+seems to be working fine.
+I can see the card getting detected as HS400, and then i ran iozone as well.
+The iozone numbers are also as required.
+
+On peach-pit board too, the HS200 mode seems to be working good.
+
+What are the observations you saw on your board ?
 
 >
->> +-----------------------------
->> +
->> +usb controller is inherited from dwc2, refer dwc2.txt
->> +-----
->> +
->> +Required properties:
->> +- compatible: "hisilicon,hi6220-usb-phy"
+> Best Regards,
+> Jaehoon Chung
 >
+> On 01/29/2015 11:41 AM, Alim Akhtar wrote:
+>> This adds HS400 mode support for exynos dw_mmc host controller.
+>>
+>> Currently tested on Exynos5800-peach-pi and Exyons7 platform for HS400 mode.
+>> Tested HS200 mode with this series applied, HS200 still works.
+>>
+>> Appreciate testing on other exynos5/7 platform which supports emmc5.0
+>>
+>> Changes in V5:
+>>       * Enable HS400 on Exynos5800-peach-pi boards
+>>       * Addressed other review comments from Jaehoon Chung
+>>
+>> Changes in V4:
+>>       * drop the idea of changing existing binding for ciu_div as per [1]
+>>         * addressed comments from Jaehoon Chung [2]
+>>
+>> [1] http://www.spinics.net/lists/linux-samsung-soc/msg40923.html
+>> [2] http://www.spinics.net/lists/devicetree/msg64373.html
+>>
+>> Changes in V3:
+>>       rebased on ulf's next (commit: 607b448 mmc: core: Make tuning block patterns static)
+>>
+>> Seungwon Jeon (2):
+>>   mmc: dw_mmc: exynos: Support eMMC's HS400 mode
+>>   ARM: dts: Add HS400 support for exynos5420 and exynos5800
+>>
+>>  .../devicetree/bindings/mmc/exynos-dw-mshc.txt     |    7 +
+>>  arch/arm/boot/dts/exynos5420-peach-pit.dts         |    4 +-
+>>  arch/arm/boot/dts/exynos5420-pinctrl.dtsi          |    7 +
+>>  arch/arm/boot/dts/exynos5420-smdk5420.dts          |    4 +-
+>>  arch/arm/boot/dts/exynos5800-peach-pi.dts          |    7 +-
+>>  drivers/mmc/host/dw_mmc-exynos.c                   |  185 ++++++++++++++++----
+>>  drivers/mmc/host/dw_mmc-exynos.h                   |   19 +-
+>>  drivers/mmc/host/dw_mmc.c                          |   16 +-
+>>  drivers/mmc/host/dw_mmc.h                          |    2 +
+>>  9 files changed, 213 insertions(+), 38 deletions(-)
+>>
 >
->    PHY? I thought you were describing the USB controller.
-my bad
-should be compatible: "hisilicon,hi6220-usb"
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
->
->> +Refer to dwc2.txt for dwc2 usb properties
->> +
->> +
->> +phy:
-change to PHY:
->> +-----
->> +
->> +Required properties:
->> +- compatible: "hisilicon,hi6220-usb-phy"
->> +- vcc-supply: phandle to the regulator that provides power to the PHY.
->> +- clocks: phandle to the PHY clock. Use as per Documentation/devicetree
->
->
->    Actually, it's phandle and clock specifier.
-Change to
- - clocks: phandle and clock specifier of the PHY clock.
 
->
->> +  /bindings/clock/clock-bindings.txt
->> +- hisilicon,peripheral-syscon: phandle of syscon used to control
->> peripheral.
->> +- hisilicon,gpio_vbus_det: gpio of detecting vbus.
->> +- hisilicon,gpio_id_det: gpio of detecting id.
->
->
->    Hyphens are preferred over underscores in the prop names.
-Change to
-- hisilicon,gpio-vbus-det: gpio of detecting vbus.
-- hisilicon,gpio-id-det: gpio of detecting id.
 
-Thanks Sergei
+-- 
+Best Regards
+Vivek Gautam
+Samsung R&D Institute, Bangalore
+India
