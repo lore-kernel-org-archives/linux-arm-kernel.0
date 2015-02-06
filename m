@@ -1,64 +1,48 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 06 Feb 2015 13:18:53 +0900
-Subject: [PATCH 7/8] arm64/kexec: Add checks for KVM
-In-Reply-To: <1423181494.16019.2.camel@infradead.org>
-References: <cover.1421449714.git.geoff@infradead.org>		
- <a3353cf2ac47f49c20bbbb88405301cbaa359805.1421449714.git.geoff@infradead.org>		
- <20150126191942.GQ23313@leverpostej> <54CA041C.6020403@linaro.org>		
- <54CA12A1.8090508@arm.com> <20150129184747.GV17721@leverpostej>		
- <54CB206D.7040705@linaro.org> <1422647304.21823.31.camel@infradead.org>	
- <54CF32CB.1060507@linaro.org> <1423181494.16019.2.camel@infradead.org>
-Message-ID: <54D440AD.2030608@linaro.org>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 5 Feb 2015 20:27:44 -0800
+Subject: [PATCH v4 02/10] mtd: st_spi_fsm: Fetch boot device locations
+ from DT match tables
+In-Reply-To: <1421853868-8262-3-git-send-email-lee.jones@linaro.org>
+References: <1421853868-8262-1-git-send-email-lee.jones@linaro.org>
+ <1421853868-8262-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <20150206042744.GK18140@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/2015 09:11 AM, Geoff Levand wrote:
-> Hi Takahiro,
->
-> On Mon, 2015-02-02 at 17:18 +0900, AKASHI Takahiro wrote:
->> On 01/31/2015 04:48 AM, Geoff Levand wrote:
->>> As an initial implementation we can hook into the CPU_DYING_FROZEN
->>> notifier sent to hyp_init_cpu_notify().  The longer term solution
->>> should use kvm_arch_hardware_enable() and kvm_arch_hardware_disable().
->>
->> Are these two different approaches?
->
-> Yes, these are two different solutions,  One initial work-around, and a
-> more involved proper solution.  Hooking into the CPU_DYING_FROZEN
-> notifier would be a initial fix.  The proper solution would be to move
-> the KVM setup to kvm_arch_hardware_enable(), and the shutdown to
-> kvm_arch_hardware_disable().
->
->
->> kernel_exec() -> machine_shutdown() -> disable_nonboot_cpu()
->>      -> _cpu_down() -> cpu_notify_nofail(CPU_DEAD|...)
->>
->> On the other hand, kvm already has a hook into kvm_arch_hardware_disable():
->>     (ignoring kvm_usage_count here)
->> kvm_cpu_hotplug(CPU_DYING) -> hardware_disable()
->>      -> hardware_disable_nolock() -> kvm_arch_hardware_disable()
->>
->> So it seems that we don't have to add a new hook at hyp_init_cpu_notify()
->> if kvm_arch_hardware_disable() is properly implemented.
->
-> Yes, that is correct.  But, as above, you would also need to update the
-> KVM startup to use kvm_arch_hardware_enable().
->
->> disable_nonboot_cpu() will not inovke cpu hotplug on *boot* cpu, and
->> we should handle it in a separate way though.
->
-> IIRC, the secondary cpus go through PSCI on shutdown, and that path
-> is working OK.  Maybe I am mistaken though.
+On Wed, Jan 21, 2015 at 03:24:20PM +0000, Lee Jones wrote:
+> To trim down on the amount of properties used by this driver and to conform
+> to the newly agreed method of acquiring syscfg registers/offsets, we now
+> obtain this information using match tables.
 
-If so, why should we add a hook at hyp_init_cpu_notify() as initial work-around?
+Where did this agreement happen? Are you only referring to the previous
+patch?
 
-> The primary cpu shutdown (hyp stubs restored) is what is missing.  The
-> primary cpu goes through cpu_soft_restart(), and that is what is
-> currently failing.
+I think I asked this previously, and I didn't get an answer.
 
-Yeah, we will call teardown function manually in soft_restart();
+Also, I realized that all this boot device / syscfg gymnastics is just
+for one simple fact; your driver is trying to hide the fact that your
+system can't reliably handle 4-byte addressing for the boot device. Even
+if you try your best at toggling 4-byte addressing before/after each
+read/write/erase, you still are vulnerable to power cuts during the
+operation. This is a bad design, and we have consistently agreed that we
+aren't going to work around that in Linux.
 
--Takahiro AKASHI
->
-> -Geoff
->
+Better solutions: hook up a reset line to your flash; improve your boot
+ROM / bootloader to handle 4-byte addressing for large flash.
+
+What's the possibility of dropping all this 4-byte address toggling
+shenanigans? This will be a blocker to merging with spi-nor.c.
+
+> In the process we are deprecating the old generic compatible string and
+> providing 3 shiny new ones for each of the support platforms.  The
+> deprecated compatible string will be removed in due course.
+
+Aren't you already removing the compatible string? (You changed this in
+the latest revision.)
+
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+
+[snip]
+
+Brian
