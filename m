@@ -1,79 +1,36 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Fri, 6 Feb 2015 03:28:45 -0800
-Subject: [PATCH 1/20] mtd: s3c2410: fix misspelling of current function
- in string
-In-Reply-To: <54856C75.1050309@nod.at>
-References: <1417980062-25151-1-git-send-email-Julia.Lawall@lip6.fr>
- <1417980062-25151-2-git-send-email-Julia.Lawall@lip6.fr>
- <CAFLxGvyiqxQ6U6p-A-JW8Nv8OvXFGsna93afUu-Gek0EV3gATA@mail.gmail.com>
- <alpine.DEB.2.02.1412080809400.2100@localhost6.localdomain6>
- <54856C75.1050309@nod.at>
-Message-ID: <20150206112845.GF4434@norris-Latitude-E6410>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 6 Feb 2015 11:46:20 +0000
+Subject: [PATCH 2/9] regulator: core: Introduce set_optimum_mode op
+In-Reply-To: <CAJAp7Ogi9WePGgopCYmUYzhNtV_E8+StquK+yM1cu91e7eQNfg@mail.gmail.com>
+References: <1422413199-17273-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1422413199-17273-3-git-send-email-bjorn.andersson@sonymobile.com>
+ <20150128195204.GN21293@sirena.org.uk>
+ <20150130000741.GP11960@sonymobile.com>
+ <CAJAp7Ogi9WePGgopCYmUYzhNtV_E8+StquK+yM1cu91e7eQNfg@mail.gmail.com>
+Message-ID: <20150206114620.GS21293@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 08, 2014 at 10:16:37AM +0100, Richard Weinberger wrote:
-> Am 08.12.2014 um 08:11 schrieb Julia Lawall:
-> >>> diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
-> >>> index 35aef5e..0a9c41f 100644
-> >>> --- a/drivers/mtd/nand/s3c2410.c
-> >>> +++ b/drivers/mtd/nand/s3c2410.c
-> >>> @@ -948,7 +948,7 @@ static int s3c24xx_nand_probe(struct platform_device *pdev)
-> >>>
-> >>>         cpu_type = platform_get_device_id(pdev)->driver_data;
-> >>>
-> >>> -       pr_debug("s3c2410_nand_probe(%p)\n", pdev);
-> >>> +       pr_debug("%s(%p)\n", __func__, pdev);
-> >>
-> >> I think we can drop the line completely.
-> >> We have ftrace to trace function calls...
-> > 
-> > Should the "initialised ok" at the end of the function be remove as well?
-> > 
-> > Will it be confusing if this cleanup is done in this function, but not in 
-> > others where it may be useful?  Perhaps s3c2410_nand_update_chip, for 
-> > example?
-> 
-> Hmm, this driver seems to have a lot of debugging printks().
-> IMHO we can remove them.
-> Let's see what Brain says.
+On Thu, Feb 05, 2015 at 02:16:54PM -0800, Bjorn Andersson wrote:
 
-I'm a little late for this one, but I can apply this instead:
+> > I think this covers your concern about patch 3-7 as well, please let me
+> > know what you think.
 
-From: Brian Norris <computersforpeace@gmail.com>
-Date: Fri, 6 Feb 2015 03:25:28 -0800
-Subject: [PATCH] mtd: s3c2410: drop useless / misspelled debug prints
+> Mark, any suggestions on this?
 
-s3c2410_nand_probe is not the name of the function.
+> I need a way to pass the expected current consumption from the mmc
+> framework through our regulator driver to the RPM to make our eMMC
+> stable.
+> We can discuss the proposed "cleanups" next time we meet if you prefer.
 
-These prints have little utility, so let's just kill them.
-
-Reported-by: Julia Lawall <Julia.Lawall@lip6.fr>
-Signed-off-by: Brian Norris <computersforpeace@gmail.com>
----
- drivers/mtd/nand/s3c2410.c | 3 ---
- 1 file changed, 3 deletions(-)
-
-diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
-index 35aef5edb588..0e02be47ce1d 100644
---- a/drivers/mtd/nand/s3c2410.c
-+++ b/drivers/mtd/nand/s3c2410.c
-@@ -948,8 +948,6 @@ static int s3c24xx_nand_probe(struct platform_device *pdev)
- 
- 	cpu_type = platform_get_device_id(pdev)->driver_data;
- 
--	pr_debug("s3c2410_nand_probe(%p)\n", pdev);
--
- 	info = devm_kzalloc(&pdev->dev, sizeof(*info), GFP_KERNEL);
- 	if (info == NULL) {
- 		err = -ENOMEM;
-@@ -1045,7 +1043,6 @@ static int s3c24xx_nand_probe(struct platform_device *pdev)
- 		s3c2410_nand_clk_set_state(info, CLOCK_SUSPEND);
- 	}
- 
--	pr_debug("initialised ok\n");
- 	return 0;
- 
-  exit_error:
--- 
-2.3.0
+Could you be a little more specific about what suggestions you're
+looking for?  You've quoted a rather large e-mail there where you
+seemed to say you were going to send a new version of the series so I
+think I was expecting something to review here.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150206/b87c5bd8/attachment.sig>
