@@ -1,61 +1,137 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri,  6 Feb 2015 17:55:47 +0100
-Subject: [PATCH 1/1] ARM: dts: Add mclk entry for Snow and Peach Pit/Pi boards
-Message-ID: <1423241747-15032-1-git-send-email-javier.martinez@collabora.co.uk>
+From: tthayer@opensource.altera.com (Thor Thayer)
+Date: Fri, 6 Feb 2015 11:03:32 -0600
+Subject: [RESEND PATCHv6 5/5] arm: dts: Add Altera L2 Cache and OCRAM EDAC
+ entries
+In-Reply-To: <1420772036-3112-6-git-send-email-tthayer@opensource.altera.com>
+References: <1420772036-3112-1-git-send-email-tthayer@opensource.altera.com>
+ <1420772036-3112-6-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <54D4F3E4.9040700@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tushar Behera <tushar.b@samsung.com>
+Hi Device Tree Maintainers,
 
-On Snow, Peach Pit and Peach Pi boards, the Exynos SoC XCLKOUT output pin
-provides the master clock (mclk) to codecs. So make them a clock consumer.
+On 01/08/2015 08:53 PM, tthayer at opensource.altera.com wrote:
+> From: Thor Thayer <tthayer@opensource.altera.com>
+>
+> Adding the device tree entries and bindings needed to support
+> the Altera L2 cache and On-Chip RAM EDAC. This patch relies upon
+> an earlier patch to declare and setup On-chip RAM properly.
+> http://www.spinics.net/lists/devicetree/msg51117.html
+>
+> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+> ---
+> v2: Remove OCRAM declaration and reference prior patch.
+>
+> v3-5: No Change
+>
+> v6: Change to nested EDAC device nodes based on community
+>      feedback. Remove L2 syscon. Use consolidated binding.
 
-Signed-off-by: Tushar Behera <tushar.b@samsung.com>
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
----
- arch/arm/boot/dts/exynos5250-snow.dts      | 2 ++
- arch/arm/boot/dts/exynos5420-peach-pit.dts | 2 ++
- arch/arm/boot/dts/exynos5800-peach-pi.dts  | 2 ++
- 3 files changed, 6 insertions(+)
+I'm requesting comments on this patch series. The changes in this patch 
+series are based upon feedback from Mark Rutland for patch series 
+version 5 on December 2, 2014.
 
-diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-index fc64a0066325..ece8bdb40c0a 100644
---- a/arch/arm/boot/dts/exynos5250-snow.dts
-+++ b/arch/arm/boot/dts/exynos5250-snow.dts
-@@ -191,6 +191,8 @@
- 		samsung,model = "DAISYI2S";
- 		samsung,i2s-controller = <&i2s0>;
- 		samsung,audio-codec = <&max98095>;
-+		clocks = <&pmu_system_controller 0>;
-+		clock-names = "mclk";
- 	};
- 
- 	usb3_vbus_reg: regulator-usb3 {
-diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-index c9a0e170a0f0..30014e6c6799 100644
---- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-+++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-@@ -491,6 +491,8 @@
- 		interrupt-parent = <&gpx0>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&max98090_irq>;
-+		clocks = <&pmu_system_controller 0>;
-+		clock-names = "mclk";
- 	};
- 
- 	light-sensor at 44 {
-diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-index a80ceeac4ec8..a415ad88bc0c 100644
---- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-+++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-@@ -490,6 +490,8 @@
- 		interrupt-parent = <&gpx0>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&max98091_irq>;
-+		clocks = <&pmu_system_controller 0>;
-+		clock-names = "mclk";
- 	};
- 
- 	light-sensor at 44 {
--- 
-2.1.3
+I believe this patch set addresses the concerns that Mark had with my 
+previous patch. Primarily, syscon was removed from the L2 cache and a 
+top level device tree node with L2 and OCRAM children is used instead of 
+individual top level nodes. Some concerns were addressed in an email 
+reply on December 2, 2014.
+
+This change also created a new edac parent probe function which is in 
+[PATCHv6 4/5] which should be reviewed along with this device tree change.
+
+Thanks,
+
+Thor
+
+> ---
+>   .../bindings/arm/altera/socfpga-edac.txt           |   46 ++++++++++++++++++++
+>   arch/arm/boot/dts/socfpga.dtsi                     |   20 +++++++++
+>   2 files changed, 66 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-edac.txt
+>
+> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-edac.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-edac.txt
+> new file mode 100644
+> index 0000000..4bf32e1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-edac.txt
+> @@ -0,0 +1,46 @@
+> +Altera SoCFPGA Error Detection and Correction [EDAC]
+> +
+> +Required Properties:
+> +- compatible : Should be "altr,edac"
+> +- #address-cells: must be 1
+> +- #size-cells: must be 1
+> +- ranges : standard definition, should translate from local addresses
+> +
+> +Subcomponents:
+> +
+> +L2 Cache ECC
+> +Required Properties:
+> +- compatible : Should be "altr,l2-edac"
+> +- reg : Address and size for ECC error interrupt clear registers.
+> +- interrupts : Should be single bit error interrupt, then double bit error
+> +	interrupt. Note the rising edge type.
+> +
+> +On Chip RAM ECC
+> +Required Properties:
+> +- compatible : Should be "altr,ocram-edac"
+> +- reg : Address and size for ECC error interrupt clear registers.
+> +- iram : phandle to On-Chip RAM definition.
+> +- interrupts : Should be single bit error interrupt, then double bit error
+> +	interrupt. Note the rising edge type.
+> +
+> +Example:
+> +
+> +	soc_ecc {
+> +		compatible = "altr,edac";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		l2edac at ffd08140 {
+> +			compatible = "altr,l2-edac";
+> +			reg = <0xffd08140 0x4>;
+> +			interrupts = <0 36 1>, <0 37 1>;
+> +		};
+> +
+> +		ocramedac at ffd08144 {
+> +			compatible = "altr,ocram-edac";
+> +			reg = <0xffd08144 0x4>;
+> +			iram = <&ocram>;
+> +			interrupts = <0 178 1>, <0 179 1>;
+> +		};
+> +	};
+> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+> index 252c3d1..e546e47 100644
+> --- a/arch/arm/boot/dts/socfpga.dtsi
+> +++ b/arch/arm/boot/dts/socfpga.dtsi
+> @@ -618,6 +618,26 @@
+>   			interrupts = <0 39 4>;
+>   		};
+>
+> +		soc_ecc {
+> +			compatible = "altr,edac";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges;
+> +
+> +			l2edac at ffd08140 {
+> +				compatible = "altr,l2-edac";
+> +				reg = <0xffd08140 0x4>;
+> +				interrupts = <0 36 1>, <0 37 1>;
+> +			};
+> +
+> +			ocramedac at ffd08144 {
+> +				compatible = "altr,ocram-edac";
+> +				reg = <0xffd08144 0x4>;
+> +				iram = <&ocram>;
+> +				interrupts = <0 178 1>, <0 179 1>;
+> +			};
+> +		};
+> +
+>   		L2: l2-cache at fffef000 {
+>   			compatible = "arm,pl310-cache";
+>   			reg = <0xfffef000 0x1000>;
+>
