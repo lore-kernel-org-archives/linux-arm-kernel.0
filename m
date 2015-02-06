@@ -1,98 +1,119 @@
-From: wangbintian@gmail.com (Brent Wang)
-Date: Fri, 6 Feb 2015 15:32:13 +0800
-Subject: [PATCH 2/3] clk: hi6220: Clock driver support for Hisilicon
- hi6220 SoC
-In-Reply-To: <20150205192533.GE20735@leverpostej>
-References: <1423128277-10297-1-git-send-email-bintian.wang@huawei.com>
- <1423128277-10297-3-git-send-email-bintian.wang@huawei.com>
- <20150205192533.GE20735@leverpostej>
-Message-ID: <CAAS=xmjURtR6Nhubg7JptXgtUGtZs8090FHJutnCaau4GzqZzg@mail.gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 06 Feb 2015 15:56:07 +0800
+Subject: [Linaro-acpi] [PATCH v8 11/21] ARM64 / ACPI: Get PSCI flags in
+ FADT for PSCI init
+In-Reply-To: <54D3BE8D.7010401@linaro.org>
+References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
+ <1422881149-8177-12-git-send-email-hanjun.guo@linaro.org>
+ <20150204164328.GF22035@red-moon> <54D3A443.7050303@linaro.org>
+ <20150205174904.GA24468@red-moon> <54D3BE8D.7010401@linaro.org>
+Message-ID: <54D47397.8020904@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Lorenzo, Al,
 
-2015-02-06 3:25 GMT+08:00 Mark Rutland <mark.rutland@arm.com>:
-> On Thu, Feb 05, 2015 at 09:24:36AM +0000, Bintian Wang wrote:
->> Add clock drivers for hi6220 SoC, this driver controls the SoC
->> registers to supply different clocks to different IPs in the SoC.
->>
->> We add one divider clock for hi6220 because the divider in hi6220
->> also has a mask bit but it doesnot obey the rule defined by flag
->> "CLK_DIVIDER_HIWORD_MASK", we can not get index of the mask bit by
->> left shift fixed bits (e.g. 16 bits), so we add this divider clock
->> to handle it.
->>
->> This patch also enables this clock driver for ARCH_HISI and document
->> devicetree bindings.
->>
->> Signed-off-by: Bintian Wang <bintian.wang@huawei.com>
->> Reviewed-by: Haojian Zhuang <haojian.zhuang@linaro.org>
->> Reviewed-by: Zhangfei Gao <zhangfei.gao@linaro.org>
->> ---
->>  .../devicetree/bindings/clock/hi6220-clock.txt     |   30 +++
->>  arch/arm64/Kconfig                                 |    1 +
->>  drivers/clk/Kconfig                                |    2 +
->>  drivers/clk/Makefile                               |    4 +-
->>  drivers/clk/hisilicon/Kconfig                      |    5 +
->>  drivers/clk/hisilicon/Makefile                     |    1 +
->>  drivers/clk/hisilicon/clk-hi6220.c                 |  284 ++++++++++++++++++++
->>  drivers/clk/hisilicon/clk.c                        |   29 ++
->>  drivers/clk/hisilicon/clk.h                        |   17 ++
->>  drivers/clk/hisilicon/clkdivider-hi6220.c          |  273 +++++++++++++++++++
->>  include/dt-bindings/clock/hi6220-clock.h           |  172 ++++++++++++
->>  11 files changed, 815 insertions(+), 3 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/clock/hi6220-clock.txt
->>  create mode 100644 drivers/clk/hisilicon/Kconfig
->>  create mode 100644 drivers/clk/hisilicon/clk-hi6220.c
->>  create mode 100644 drivers/clk/hisilicon/clkdivider-hi6220.c
->>  create mode 100644 include/dt-bindings/clock/hi6220-clock.h
->>
->> diff --git a/Documentation/devicetree/bindings/clock/hi6220-clock.txt b/Documentation/devicetree/bindings/clock/hi6220-clock.txt
->> new file mode 100644
->> index 0000000..a3ddda1
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/clock/hi6220-clock.txt
->> @@ -0,0 +1,30 @@
->> +* Hisilicon Hi6220 Clock Controller
->> +
->> +The hi6220 clock controller generates and supplies clock to various
->> +controllers within the hi6220 SoC.
->> +
->> +Required Properties:
->> +
->> +- compatible: should be one of the following:
->> +  - "hisilicon,hi6220-clock-ao" - controller for those clocks under SoC
->> +     power always on(AO) domain, it is the sub node of SoC power AO
->> +     controller in dts file.
->> +  - "hisilicon,hi6220-clock-sys" - controller for those clocks under SoC
->> +     system control domain, it is the sub node of SoC system controller
->> +     in dts file.
->> +  - "hisilicon,hi6220-clock-media" - controller for those clocks under
->> +     SoC media control domain, it is the sub node of SoC media controller
->> +     in dts file.
->> +  - "hisilicon,hi6220-clock-power" - controller for those clocks under
->> +     SoC power control domain, it is the sub node of SoC power controller
->> +     in dts file.
+On 2015?02?06? 03:03, Al Stone wrote:
+> On 02/05/2015 10:49 AM, Lorenzo Pieralisi wrote:
+>> Hi Al,
 >
-> These all refer to things which aren't documented (yet).
+> Howdy, Lorenzo.
 >
-> Please sort out your patches so that any documentation you depend on
-> comes earlier.
+>> On Thu, Feb 05, 2015 at 05:11:31PM +0000, Al Stone wrote:
+>>> On 02/04/2015 09:43 AM, Lorenzo Pieralisi wrote:
+>>>> On Mon, Feb 02, 2015 at 12:45:39PM +0000, Hanjun Guo wrote:
+>>>>> From: Graeme Gregory <graeme.gregory@linaro.org>
+>>>>>
+>>>>> There are two flags: PSCI_COMPLIANT and PSCI_USE_HVC. When set,
+>>>>> the former signals to the OS that the firmware is PSCI compliant.
+>>>>> The latter selects the appropriate conduit for PSCI calls by
+>>>>> toggling between Hypervisor Calls (HVC) and Secure Monitor Calls
+>>>>> (SMC).
+>>>>>
+>>>>> FADT table contains such information in ACPI 5.1, FADT table was
+>>>>> parsed in ACPI table init and copy to struct acpi_gbl_FADT, so
+>>>>> use the flags in struct acpi_gbl_FADT for PSCI init.
+>>>>
+>>>> So you do rely on a global FADT being available, if you use it for PSCI
+>>>> detection you can use it for ACPI revision detection too, right ?
+>>>>
+>>>> Point is, either we should not use the global FADT table, or we use
+>>>> it consistently, or there is something I am unaware of that prevents
+>>>> you from using in some code paths and I would like to understand
+>>>> why.
+>>>
+>>> The FADT is a required table for arm64, as noted in the documentation
+>>> and the SBBR.  While unfortunately the spec does not say it is mandatory,
+>>> even x86 systems are pretty useless without it.  So yes, we rely on it
+>>> being available, not only for the PSCI info, but other flags such as
+>>> HW_REDUCED_ACPI.
+>>>
+>>> I suppose it does not have to be globally scoped.  However, the FADT is
+>>> frequently used, especially on x86, so it makes sense to me from an
+>>> efficiency standpoint to have a global reference to it.
+>>>
+>>> I'm not sure I understand what is meant by using FADT for ACPI revision
+>>> detection; there are fields in the FADT that provide a major and minor
+>>> number for the FADT itself, but I don't believe there's any guarantee
+>>> those will be the same as the level of the specification that is being
+>>> supported by the kernel (chances are they will, but it's not mandatory).
+>>>
+>>> I've probably just missed a part of a thread somewhere; could you point
+>>> me to where the inconsistency lies?  I'm just not understanding right this
+>>> second....
+>>
+>> Yes, it is my fault, I was referring to another thread/patch (9), where you
+>> need to check the FADT revision to "validate it" (ie >= 5.1) for the arm64
+>> kernel. What I am saying is: if the global FADT is there to parse PSCI
+>> info, it is there to check the FADT revision too, I do not necessarily
+>> see the need for calling acpi_table_parse() again to do it, the FADT
+>> revision checking can be carried out as for PSCI, that's all I wanted
+>> to say.
 >
-> Please also separate documentation from code. Note that dt includes are
-> _bindings_ and should be added with the relevant documentation.
-Thanks for help to review, I also think separate documentation from
-code is better
-way, it will be fixed in next version.
+> Aha.  I understand now.  Another colleague was also trying to explain this
+> to me and I think I just hadn't had enough coffee yet.  The underlying ACPI
+> code maps tables into the kernel in two phases; it may be that when the code
+> in patch 9 is run, the global table is not yet available, while here it is;
+> I don't recall off-hand.
+>
+> I'll take a look at this and talk it over with Hanjun.  If the global table
+> is available, it would indeed make sense to be consistent.
 
-Thanks,
+I had dig into the code and found out that struct acpi_gbl_FADT will be
+available with correct value only if FADT is presented by firmware.
 
-Bintian
-> Thanks,
-> Mark.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+acpi_table_init() will be called before parsing FADT for PSCI flag in
+this patch set.
+
+In acpi_table_init()
+    acpi_initialize_tables()
+       acpi_tb_parse_root_table()
+
+In acpi_tb_parse_root_table()
+
+if (ACPI_SUCCESS(status) &&
+    ACPI_COMPARE_NAME(&acpi_gbl_root_table_list.
+      tables[table_index].signature,
+      ACPI_SIG_FADT)) {
+	acpi_tb_parse_fadt(table_index);
+}
+
+And acpi_tb_parse_fadt(table_index) will copy the
+fadt table to global struct acpi_gbl_FADT.
+
+so it seems that we can use global struct acpi_gbl_FADT directly to
+check the FADT revision, but it is only available with firmware
+presented the FADT table, so check for the FADT table is still needed
+for some bad firmware without FADT.
+
+Why PSCI flag can be used without any check for the availability
+of FADT? because we already disable ACPI if 
+(acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt))
+failed (no FADT tabled found), and PSCI flag will not be used
+later.
+
+So I think we can keep the code as it is for now, and I think
+it is the safest way to do it, does it make sense?
+
+Thanks
+Hanjun
