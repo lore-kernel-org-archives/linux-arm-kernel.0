@@ -1,33 +1,83 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 6 Feb 2015 19:32:05 +0100
-Subject: [PATCH 0/2] ARM: omap2+: omap_hwmod: Fix false lockdep warning
-In-Reply-To: <54D4E64C.7060208@ti.com>
-References: <1423226916-18804-1-git-send-email-peter.ujfalusi@ti.com>
- <20150206141346.GP21418@twins.programming.kicks-ass.net>
- <54D4E64C.7060208@ti.com>
-Message-ID: <20150206183205.GS21418@twins.programming.kicks-ass.net>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Fri, 6 Feb 2015 13:36:57 -0500
+Subject: [PATCH v6 0/7] PCI: get DMA configuration from parent device
+In-Reply-To: <CAErSpo6GOXHeKKfU8s5jCS3+Mui=HupZd=jpkLEyWAE94Ory5w@mail.gmail.com>
+References: <1423173179-10227-1-git-send-email-m-karicheri2@ti.com>
+ <20150206151542.GD23190@e104818-lin.cambridge.arm.com>
+ <54D4DD95.7000303@ti.com>
+ <CAErSpo6GOXHeKKfU8s5jCS3+Mui=HupZd=jpkLEyWAE94Ory5w@mail.gmail.com>
+Message-ID: <54D509C9.9010204@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 06, 2015 at 06:05:32PM +0200, Peter Ujfalusi wrote:
-> Certainly looks much simpler, but it adds quite a bit of data to the
-> omap_hwmod struct, and we have a _lot_ of them for omap2plus configuration.
-> 
-> ls -al vmlinux
-> 
-> w/o any the lockdep warning fixes:
-> 110109168
-> 
-> With my series applied:
-> 110112031 (base + 2863)
-> 
-> With setting individual lockdep class:
-> 110114275 (base + 5107)
-> 
-> I certainly like the lockdep_set_class() way since it is cleaner, but it adds
-> almost double amount of bytes to the kernel.
+On 02/06/2015 12:53 PM, Bjorn Helgaas wrote:
+> On Fri, Feb 6, 2015 at 9:28 AM, Murali Karicheri<m-karicheri2@ti.com>  wrote:
+>> On 02/06/2015 10:15 AM, Catalin Marinas wrote:
+>>>
+>>> On Thu, Feb 05, 2015 at 09:52:52PM +0000, Murali Karicheri wrote:
+>>>>
+>>>> This patch add an important capability to PCI driver on Keystone. I hope
+>>>> to
+>>>> have this merged to the upstream branch so that it is available for
+>>>> v3.20.
+>>>
+>>> It's very late for 3.20 and the code hasn't been in linux-next at all
+>>> (but it's not me who's merging this code), unless you can squeeze it in
+>>> as a bug-fix.
+>>
+>> This is in fact a bug fix as PCI on Keystone is broken without this.
+>
+> Oh, sorry, I didn't realize that this was so urgent.  I guess I read
+> "this adds an important capability" in the cover letter and concluded
+> that it was new functionality.
+Bjorn,
 
-Yeah, I've never really bothered with data too much, its a debug
-feature. So lock_class_key is 8 bytes, and strictly speaking you could
-union them over other fields, all we really need is unique addresses, we
-don't actually use the storage.
+Thanks for responding.
+
+Let me give you some context on this without which my explanation won't 
+be complete. For using PCI driver on Keystone, I had submitted patches 
+related to machine and DTS to the arm mailing list to enable the driver 
+on Keystone. Subsequenty one of the patch from my series  was Nack-ed 
+and I was asked to implememented in a different way and started this 
+series. You can refer to the discussion of this at
+
+http://www.gossamer-threads.com/lists/linux/kernel/2024591
+
+The PCI driver enablement on Keystone is still a working in progress and 
+I am trying to get it fully functional on the upstream. Another missing 
+piece is the SerDes phy driver patch. We have started working on the 
+other part (SerDes phy driver) already as the initial one was not 
+accepted. So it is fine if we are too late for the v3.20 merge window to 
+merge this series and this can be applied to the next branch for v3.21.
+
+>
+> Anyway, if it's broken, presumably PCI on Keystone *did* work at one
+> point.  Can you identify the commit that broke it and requires these
+> fixes, so we can figure out how far the fixes need to be backported?
+>
+
+I am trying to get this driver enabled on Keystone by adding the missing 
+pieces as described above. So I guess we don't have to back port 
+anything here.
+
+> If I merge it, I would like to get into my for-linus branch and get a
+> little time in -next before asking Linus to pull it.  The merge window
+> is a little wrinkle there -- I don't like to add new things to the mix
+> during the window.  But if it's an important fix we can still get it
+> in before the final v3.20.
+
+Please apply this to next branch for v3.21. It currently apply cleanly 
+to v3.19-rc7. If you want me rebase to another branch, let me know I can 
+apply and send you an updated patch.
+
+Thanks
+
+Murali
+
+>
+> Bjorn
+
+
+-- 
+Murali Karicheri
+Linux Kernel, Texas Instruments
