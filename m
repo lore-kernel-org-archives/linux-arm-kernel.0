@@ -1,68 +1,98 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Thu, 05 Feb 2015 23:06:26 -0800
-Subject: [PATCH 7/8] arm64/kexec: Add checks for KVM
-In-Reply-To: <54D440AD.2030608@linaro.org>
-References: <cover.1421449714.git.geoff@infradead.org>
- <a3353cf2ac47f49c20bbbb88405301cbaa359805.1421449714.git.geoff@infradead.org>
- <20150126191942.GQ23313@leverpostej> <54CA041C.6020403@linaro.org>
- <54CA12A1.8090508@arm.com> <20150129184747.GV17721@leverpostej>
- <54CB206D.7040705@linaro.org> <1422647304.21823.31.camel@infradead.org>
- <54CF32CB.1060507@linaro.org> <1423181494.16019.2.camel@infradead.org>
- <54D440AD.2030608@linaro.org>
-Message-ID: <1423206386.10035.1.camel@infradead.org>
+From: wangbintian@gmail.com (Brent Wang)
+Date: Fri, 6 Feb 2015 15:32:13 +0800
+Subject: [PATCH 2/3] clk: hi6220: Clock driver support for Hisilicon
+ hi6220 SoC
+In-Reply-To: <20150205192533.GE20735@leverpostej>
+References: <1423128277-10297-1-git-send-email-bintian.wang@huawei.com>
+ <1423128277-10297-3-git-send-email-bintian.wang@huawei.com>
+ <20150205192533.GE20735@leverpostej>
+Message-ID: <CAAS=xmjURtR6Nhubg7JptXgtUGtZs8090FHJutnCaau4GzqZzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-02-06 at 13:18 +0900, AKASHI Takahiro wrote:
-> On 02/06/2015 09:11 AM, Geoff Levand wrote:
-> > Hi Takahiro,
-> >
-> > On Mon, 2015-02-02 at 17:18 +0900, AKASHI Takahiro wrote:
-> >> On 01/31/2015 04:48 AM, Geoff Levand wrote:
-> >>> As an initial implementation we can hook into the CPU_DYING_FROZEN
-> >>> notifier sent to hyp_init_cpu_notify().  The longer term solution
-> >>> should use kvm_arch_hardware_enable() and kvm_arch_hardware_disable().
-> >>
-> >> Are these two different approaches?
-> >
-> > Yes, these are two different solutions,  One initial work-around, and a
-> > more involved proper solution.  Hooking into the CPU_DYING_FROZEN
-> > notifier would be a initial fix.  The proper solution would be to move
-> > the KVM setup to kvm_arch_hardware_enable(), and the shutdown to
-> > kvm_arch_hardware_disable().
-> >
-> >
-> >> kernel_exec() -> machine_shutdown() -> disable_nonboot_cpu()
-> >>      -> _cpu_down() -> cpu_notify_nofail(CPU_DEAD|...)
-> >>
-> >> On the other hand, kvm already has a hook into kvm_arch_hardware_disable():
-> >>     (ignoring kvm_usage_count here)
-> >> kvm_cpu_hotplug(CPU_DYING) -> hardware_disable()
-> >>      -> hardware_disable_nolock() -> kvm_arch_hardware_disable()
-> >>
-> >> So it seems that we don't have to add a new hook at hyp_init_cpu_notify()
-> >> if kvm_arch_hardware_disable() is properly implemented.
-> >
-> > Yes, that is correct.  But, as above, you would also need to update the
-> > KVM startup to use kvm_arch_hardware_enable().
-> >
-> >> disable_nonboot_cpu() will not inovke cpu hotplug on *boot* cpu, and
-> >> we should handle it in a separate way though.
-> >
-> > IIRC, the secondary cpus go through PSCI on shutdown, and that path
-> > is working OK.  Maybe I am mistaken though.
-> 
-> If so, why should we add a hook at hyp_init_cpu_notify() as initial work-around?
+Hi Mark,
 
-To tear down KVM on the primary cpu.
+2015-02-06 3:25 GMT+08:00 Mark Rutland <mark.rutland@arm.com>:
+> On Thu, Feb 05, 2015 at 09:24:36AM +0000, Bintian Wang wrote:
+>> Add clock drivers for hi6220 SoC, this driver controls the SoC
+>> registers to supply different clocks to different IPs in the SoC.
+>>
+>> We add one divider clock for hi6220 because the divider in hi6220
+>> also has a mask bit but it doesnot obey the rule defined by flag
+>> "CLK_DIVIDER_HIWORD_MASK", we can not get index of the mask bit by
+>> left shift fixed bits (e.g. 16 bits), so we add this divider clock
+>> to handle it.
+>>
+>> This patch also enables this clock driver for ARCH_HISI and document
+>> devicetree bindings.
+>>
+>> Signed-off-by: Bintian Wang <bintian.wang@huawei.com>
+>> Reviewed-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+>> Reviewed-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>> ---
+>>  .../devicetree/bindings/clock/hi6220-clock.txt     |   30 +++
+>>  arch/arm64/Kconfig                                 |    1 +
+>>  drivers/clk/Kconfig                                |    2 +
+>>  drivers/clk/Makefile                               |    4 +-
+>>  drivers/clk/hisilicon/Kconfig                      |    5 +
+>>  drivers/clk/hisilicon/Makefile                     |    1 +
+>>  drivers/clk/hisilicon/clk-hi6220.c                 |  284 ++++++++++++++++++++
+>>  drivers/clk/hisilicon/clk.c                        |   29 ++
+>>  drivers/clk/hisilicon/clk.h                        |   17 ++
+>>  drivers/clk/hisilicon/clkdivider-hi6220.c          |  273 +++++++++++++++++++
+>>  include/dt-bindings/clock/hi6220-clock.h           |  172 ++++++++++++
+>>  11 files changed, 815 insertions(+), 3 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/clock/hi6220-clock.txt
+>>  create mode 100644 drivers/clk/hisilicon/Kconfig
+>>  create mode 100644 drivers/clk/hisilicon/clk-hi6220.c
+>>  create mode 100644 drivers/clk/hisilicon/clkdivider-hi6220.c
+>>  create mode 100644 include/dt-bindings/clock/hi6220-clock.h
+>>
+>> diff --git a/Documentation/devicetree/bindings/clock/hi6220-clock.txt b/Documentation/devicetree/bindings/clock/hi6220-clock.txt
+>> new file mode 100644
+>> index 0000000..a3ddda1
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/clock/hi6220-clock.txt
+>> @@ -0,0 +1,30 @@
+>> +* Hisilicon Hi6220 Clock Controller
+>> +
+>> +The hi6220 clock controller generates and supplies clock to various
+>> +controllers within the hi6220 SoC.
+>> +
+>> +Required Properties:
+>> +
+>> +- compatible: should be one of the following:
+>> +  - "hisilicon,hi6220-clock-ao" - controller for those clocks under SoC
+>> +     power always on(AO) domain, it is the sub node of SoC power AO
+>> +     controller in dts file.
+>> +  - "hisilicon,hi6220-clock-sys" - controller for those clocks under SoC
+>> +     system control domain, it is the sub node of SoC system controller
+>> +     in dts file.
+>> +  - "hisilicon,hi6220-clock-media" - controller for those clocks under
+>> +     SoC media control domain, it is the sub node of SoC media controller
+>> +     in dts file.
+>> +  - "hisilicon,hi6220-clock-power" - controller for those clocks under
+>> +     SoC power control domain, it is the sub node of SoC power controller
+>> +     in dts file.
+>
+> These all refer to things which aren't documented (yet).
+>
+> Please sort out your patches so that any documentation you depend on
+> comes earlier.
+>
+> Please also separate documentation from code. Note that dt includes are
+> _bindings_ and should be added with the relevant documentation.
+Thanks for help to review, I also think separate documentation from
+code is better
+way, it will be fixed in next version.
 
-> > The primary cpu shutdown (hyp stubs restored) is what is missing.  The
-> > primary cpu goes through cpu_soft_restart(), and that is what is
-> > currently failing.
-> 
-> Yeah, we will call teardown function manually in soft_restart();
+Thanks,
 
-I think the KVM tear down should happen independent of soft_restart().
-When soft_restart() is called, KVM should have already been torn down.
-
--Geoff
+Bintian
+> Thanks,
+> Mark.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
