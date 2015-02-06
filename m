@@ -1,85 +1,49 @@
-From: mpeg.blue@free.fr (Mason)
-Date: Fri, 06 Feb 2015 10:37:32 -0800
-Subject: Delays, clocks, timers, hrtimers, etc
-In-Reply-To: <20150203120925.GM8656@n2100.arm.linux.org.uk>
-References: <54C8E125.3070905@free.fr>
- <20150203120925.GM8656@n2100.arm.linux.org.uk>
-Message-ID: <54D509EC.7020708@free.fr>
+From: ddutile@redhat.com (Don Dutile)
+Date: Fri, 06 Feb 2015 13:43:26 -0500
+Subject: [PATCH] arm64: Change 'Call trace' to 'Call Trace' for tool
+ scanners
+In-Reply-To: <20150206153459.GE23190@e104818-lin.cambridge.arm.com>
+References: <1423157427-41997-1-git-send-email-ddutile@redhat.com>
+ <20150206153459.GE23190@e104818-lin.cambridge.arm.com>
+Message-ID: <54D50B4E.1050403@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
-
-First of all, thanks for the insight you've been providing. It helps a lot.
-(And thanks to everyone who's been answering some of my questions.)
-
-Russell King - ARM Linux wrote:
-
-> On Wed, Jan 28, 2015 at 02:16:21PM +0100, Mason wrote:
+On 02/06/2015 10:34 AM, Catalin Marinas wrote:
+> On Thu, Feb 05, 2015 at 05:30:27PM +0000, Donald Dutile wrote:
+>> Receiving reports from service folks that arm64 uses
+>> 'Call trace' when dumping stack, instead of the more familiar
+>> 'Call Trace'; the former is not being seen by tools that
+>> scan for the latter text.  Checking various arches,
+>> it appears the mainstream server arches (ia64, mips, ppc,
+>> s390, sparc, x86) use 'Call Trace'.
+>> This kernel tools script scans for the latter text string as well
+>>    tools/testing/selftests/rcutorture/bin/parse-console.sh
+>> so it doesn't appear to be arch or vendor specific.
+>>
+>> Expecting there aren't a significant number of arm64 dump
+>> scanners matching on 'Call trace' so recommend making this change
+>> now to minimize changes to dump scanning tools for arm64 servers.
 >
->> [snip udelay discussion]
->>
->> Q2. Cortex A9 global and private timers
->>
->> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0407f/CIHGECHJ.html
->>
->> (What are private timers used for?)
+> Can you not fix the scripts to check for "Call trace" as well? There are
+> 4 more architectures in the kernel using this string (avr32, c6x, metag,
+> sh). I also wouldn't count kernel logs as user ABI.
 >
-> The per-cpu private timers are mostly scheduling of threads.
+I could, but I first received this report from other tools used within RH
+that scan for 'Call Trace'.   I pointed to parse-console.sh to show
+that RH tools weren't the only ones that were wired with that expectation.
 
-Hmmm, I'm confused (again).
+So, adding 'Call trace' to parse-console.sh won't resolve all the other
+(primarily server crash) tools that currently match on 'Call Trace'.
 
-CONFIG_CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK means "use the global timer
-for the scheduler clock", right? In that case, are the local timers
-unused by Linux?
+I agree with you that I don't consider kernel logs as user ABI, but
+as I said, the majority of the heavy, server arches have it that way,
+and the tools used on those servers have leaned on this expectation to date.
 
-#ifdef CONFIG_CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
-   sched_clock_register(gt_sched_clock_read, 64, gt_clk_rate);
-#endif
+I didn't modify the other arch's b/c they aren't heavy server arches.
 
-Is there generic code to set up local timers? (If so, where?)
-sched_clock_register only seems to appear in machine-specific code.
+We could carry a patch in our downstream, but then the tools don't resolve
+the same way when we do upstream<->downstream comparisons which typically
+occur with knarly crash scenarios, which this string would likely show up in.
 
-What are the pros/cons of global timer vs local timers?
-Or is such a question irrelevant?
-(Because they are used for different purposes?)
-
->> In my platform-specific code, there is a config option to choose between
->>
->> 1) the ARM global timer
->> 2) a platform-specific timer (timer0)
->
-> Most platforms implement their own timer, because its really sexy for
-> hardware engineers to create yet another different timer implementation
-> which is soo much better than every other timer implementation that has
-> already been created.  You wouldn't believe how many different ways that
-> there are to create a timer - and we still have people coming up with
-> new novel implementations!
-
-There is trouble in paradise. I was planning to give the global timer a try,
-instead of the platform-specific timer, until I noticed: "The global timer
-is clocked by PERIPHCLK." And it turns PERIPHCLK is connected to the SoC's
-CPU_CLK (the clock that drives the CPU cores); the same clock that is managed
-by cpufreq. I imagine it's double plus ungood for precise time-keeping to
-have frequency changes of the clocksource input?
-
->> Q3. Using the generic global timer implementation
->>
->> So, how do I use that implementation?
->> (Is someone other than STMicro using it?)
-
-To answer that question:
-
-$ grep -rn ARM_GLOBAL_TIMER | grep -v SCHED_CLOCK
-arch/arm/mach-vexpress/Kconfig:7:	select ARM_GLOBAL_TIMER
-arch/arm/mach-bcm/Kconfig:87:	select ARM_GLOBAL_TIMER
-arch/arm/mach-bcm/Kconfig:108:	select ARM_GLOBAL_TIMER
-arch/arm/mach-rockchip/Kconfig:14:	select ARM_GLOBAL_TIMER
-arch/arm/mach-sti/Kconfig:4:	select ARM_GLOBAL_TIMER
-arch/arm/mach-zynq/Kconfig:6:	select ARM_GLOBAL_TIMER if !CPU_FREQ
-
-There are indeed a few users; also I wonder why mach-zynq enables
-ARM_GLOBAL_TIMER only if !CPU_FREQ. (Could it be that they have
-the CPU CLOCK driving PERIPHCLK?)
-
-Regards.
+Cheers, Don
