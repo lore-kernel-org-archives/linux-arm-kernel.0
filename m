@@ -1,137 +1,120 @@
-From: tthayer@opensource.altera.com (Thor Thayer)
-Date: Fri, 6 Feb 2015 11:03:32 -0600
-Subject: [RESEND PATCHv6 5/5] arm: dts: Add Altera L2 Cache and OCRAM EDAC
- entries
-In-Reply-To: <1420772036-3112-6-git-send-email-tthayer@opensource.altera.com>
-References: <1420772036-3112-1-git-send-email-tthayer@opensource.altera.com>
- <1420772036-3112-6-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <54D4F3E4.9040700@opensource.altera.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 6 Feb 2015 18:05:21 +0100
+Subject: [PATCH 03/10] devicetree: bindings: add Device Tree bindings for
+ Armada 39x pin-muxing controller
+In-Reply-To: <1423238276-9206-4-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1423238276-9206-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1423238276-9206-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20150206170521.GX25985@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Device Tree Maintainers,
-
-On 01/08/2015 08:53 PM, tthayer at opensource.altera.com wrote:
-> From: Thor Thayer <tthayer@opensource.altera.com>
->
-> Adding the device tree entries and bindings needed to support
-> the Altera L2 cache and On-Chip RAM EDAC. This patch relies upon
-> an earlier patch to declare and setup On-chip RAM properly.
-> http://www.spinics.net/lists/devicetree/msg51117.html
->
-> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+On Fri, Feb 06, 2015 at 04:57:49PM +0100, Thomas Petazzoni wrote:
+> This commit adds the Device Tree binding documentation to describe the
+> pin-muxing controller of the Marvell Armada 39x processors. Two
+> variants are supported for the moment: the 88F6920 (Armada 390) and
+> 88F6928 (Armada 398).
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > ---
-> v2: Remove OCRAM declaration and reference prior patch.
->
-> v3-5: No Change
->
-> v6: Change to nested EDAC device nodes based on community
->      feedback. Remove L2 syscon. Use consolidated binding.
-
-I'm requesting comments on this patch series. The changes in this patch 
-series are based upon feedback from Mark Rutland for patch series 
-version 5 on December 2, 2014.
-
-I believe this patch set addresses the concerns that Mark had with my 
-previous patch. Primarily, syscon was removed from the L2 cache and a 
-top level device tree node with L2 and OCRAM children is used instead of 
-individual top level nodes. Some concerns were addressed in an email 
-reply on December 2, 2014.
-
-This change also created a new edac parent probe function which is in 
-[PATCHv6 4/5] which should be reviewed along with this device tree change.
-
-Thanks,
-
-Thor
-
-> ---
->   .../bindings/arm/altera/socfpga-edac.txt           |   46 ++++++++++++++++++++
->   arch/arm/boot/dts/socfpga.dtsi                     |   20 +++++++++
->   2 files changed, 66 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-edac.txt
->
-> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-edac.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-edac.txt
+>  .../pinctrl/marvell,armada-39x-pinctrl.txt         | 78 ++++++++++++++++++++++
+>  1 file changed, 78 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,armada-39x-pinctrl.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,armada-39x-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,armada-39x-pinctrl.txt
 > new file mode 100644
-> index 0000000..4bf32e1
+> index 0000000..5b1a9dc
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-edac.txt
-> @@ -0,0 +1,46 @@
-> +Altera SoCFPGA Error Detection and Correction [EDAC]
+> +++ b/Documentation/devicetree/bindings/pinctrl/marvell,armada-39x-pinctrl.txt
+> @@ -0,0 +1,78 @@
+> +* Marvell Armada 39x SoC pinctrl driver for mpp
 > +
-> +Required Properties:
-> +- compatible : Should be "altr,edac"
-> +- #address-cells: must be 1
-> +- #size-cells: must be 1
-> +- ranges : standard definition, should translate from local addresses
+> +Please refer to marvell,mvebu-pinctrl.txt in this directory for common binding
+> +part and usage.
 > +
-> +Subcomponents:
+> +Required properties:
+> +- compatible: "marvell,88f6920-pinctrl", "marvell,88f6928-pinctrl"
+> +  depending on the specific variant of the SoC being used.
+> +- reg: register specifier of MPP registers
 > +
-> +L2 Cache ECC
-> +Required Properties:
-> +- compatible : Should be "altr,l2-edac"
-> +- reg : Address and size for ECC error interrupt clear registers.
-> +- interrupts : Should be single bit error interrupt, then double bit error
-> +	interrupt. Note the rising edge type.
+> +Available mpp pins/groups and functions:
+> +Note: brackets (x) are not part of the mpp name for marvell,function and given
+> +only for more detailed description in this document.
 > +
-> +On Chip RAM ECC
-> +Required Properties:
-> +- compatible : Should be "altr,ocram-edac"
-> +- reg : Address and size for ECC error interrupt clear registers.
-> +- iram : phandle to On-Chip RAM definition.
-> +- interrupts : Should be single bit error interrupt, then double bit error
-> +	interrupt. Note the rising edge type.
+> +name    pins    functions
+> +================================================================================
+> +mpp0	0	gpio, ua0(rxd)
+> +mpp1	1	gpio, ua0(txd)
+> +mpp2	2	gpio, i2c0(sck)
+> +mpp3	3	gpio, i2c0(sda)
+> +mpp4	4	gpio, ua1(txd), ua0(rts), smi(mdc)
+> +mpp5	5	gpio, ua1(rxd), ua0(cts), smi(mdio)
+> +mpp6	6	gpio, dev(cs3), xsmi(mdio)
+> +mpp7	7	gpio, dev(ad9), xsmi(mdc)
+> +mpp8	8	gpio, dev(ad10), ptp(trig)
+> +mpp9	9	gpio, dev(ad11), ptp(clk)
+
+Hi Thomas
+
+I wondering if there should be an explanation for the less common
+names here. I'm guessing dev is a device bus of some sort? What is
+xsmi? Some sort of extended System Management Interface? And m?
+
+Thanks
+	Andrewy
+
+> +mpp10	10	gpio, dev(ad12), ptp(event)
+> +mpp11	11	gpio, dev(ad13), led(clk)
+> +mpp12	12	gpio, pcie0(rstout), dev(ad14), led(stb)
+> +mpp13	13	gpio, dev(ad15), led(data)
+> +mpp14	14	gpio, m(vtt), dev(wen1), ua1(txd)
+> +mpp15	15	gpio, pcie0(rstout), spi0(mosi), i2c1(sck)
+> +mpp16	16	gpio, m(decc), spi0(miso), i2c1(sda)
+> +mpp17	17	gpio, ua1(rxd), spi0(sck), smi(mdio)
+> +mpp18	18	gpio, ua1(txd), spi0(cs0), i2c2(sck)
+> +mpp19	19	gpio, sata1(present) [1], ua0(cts), ua1(rxd), i2c2(sda)
+> +mpp20	20	gpio, sata0(present) [1], ua0(rts), ua1(txd), smi(mdc)
+> +mpp21	21	gpio, spi0(cs1), sata0(present) [1], sd(cmd), dev(bootcs), ge(rxd0)
+> +mpp22	22	gpio, spi0(mosi), dev(ad0)
+> +mpp23	23	gpio, spi0(sck), dev(ad2)
+> +mpp24	24	gpio, spi0(miso), ua0(cts), ua1(rxd), sd(d4), dev(readyn)
+> +mpp25	25	gpio, spi0(cs0), ua0(rts), ua1(txd), sd(d5), dev(cs0)
+> +mpp26	26	gpio, spi0(cs2), i2c1(sck), sd(d6), dev(cs1)
+> +mpp27	27	gpio, spi0(cs3), i2c1(sda), sd(d7), dev(cs2), ge(txclkout)
+> +mpp28	28	gpio, sd(clk), dev(ad5), ge(txd0)
+> +mpp29	29	gpio, dev(ale0), ge(txd1)
+> +mpp30	30	gpio, dev(oen), ge(txd2)
+> +mpp31	31	gpio, dev(ale1), ge(txd3)
+> +mpp32	32	gpio, dev(wen0), ge(txctl)
+> +mpp33	33	gpio, m(decc), dev(ad3)
+> +mpp34	34	gpio, dev(ad1)
+> +mpp35	35	gpio, ref(clk), dev(a1)
+> +mpp36	36	gpio, dev(a0)
+> +mpp37	37	gpio, sd(d3), dev(ad8), ge(rxclk)
+> +mpp38	38	gpio, ref(clk), sd(d0), dev(ad4), ge(rxd1)
+> +mpp39	39	gpio, i2c1(sck), ua0(cts), sd(d1), dev(a2), ge(rxd2)
+> +mpp40	40	gpio, i2c1(sda), ua0(rts), sd(d2), dev(ad6), ge(rxd3)
+> +mpp41	41	gpio, ua1(rxd), ua0(cts), spi1(cs3), dev(burstn), nd(rbn0), ge(rxctl)
+> +mpp42	42	gpio, ua1(txd), ua0(rts), dev(ad7)
+> +mpp43	43	gpio, pcie0(clkreq), m(vtt), m(decc), spi1(cs2), dev(clkout), nd(rbn1)
+> +mpp44	44	gpio, sata0(present) [1], sata1(present) [1], led(clk)
+> +mpp45	45	gpio, ref(clk), pcie0(rstout), ua1(rxd)
+> +mpp46	46	gpio, ref(clk), pcie0(rstout), ua1(txd), led(stb)
+> +mpp47	47	gpio, sata0(present) [1], sata1(present) [1], led(data)
+> +mpp48	48	gpio, sata0(present) [1], m(vtt), tdm(pclk) [1], audio(mclk) [1], sd(d4), pcie0(clkreq), ua1(txd)
+> +mpp49	49	gpio, tdm(fsync) [1], audio(lrclk) [1], sd(d5), ua2(rxd)
+> +mpp50	50	gpio, pcie0(rstout), tdm(drx) [1], audio(extclk) [1], sd(cmd), ua2(rxd)
+> +mpp51	51	gpio, tdm(dtx) [1], audio(sdo) [1], m(decc), ua2(txd)
+> +mpp52	52	gpio, pcie0(rstout), tdm(intn) [1], audio(sdi) [1], sd(d6), i2c3(sck)
+> +mpp53	53	gpio, sata1(present) [1], sata0(present) [1], tdm(rstn) [1], audio(bclk) [1], sd(d7), i2c3(sda)
+> +mpp54	54	gpio, sata0(present) [1], sata1(present) [1], pcie0(rstout), sd(d3), ua3(txd)
+> +mpp55	55	gpio, ua1(cts), spi1(cs1), sd(d0), ua1(rxd), ua3(rxd)
+> +mpp56	56	gpio, ua1(rts), m(decc), spi1(mosi), ua1(txd)
+> +mpp57	57	gpio, spi1(sck), sd(clk), ua1(txd)
+> +mpp58	58	gpio, i2c1(sck), pcie2(clkreq), spi1(miso), sd(d1), ua1(rxd)
+> +mpp59	59	gpio, pcie0(rstout), i2c1(sda), spi1(cs0), sd(d2)
 > +
-> +Example:
-> +
-> +	soc_ecc {
-> +		compatible = "altr,edac";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		l2edac at ffd08140 {
-> +			compatible = "altr,l2-edac";
-> +			reg = <0xffd08140 0x4>;
-> +			interrupts = <0 36 1>, <0 37 1>;
-> +		};
-> +
-> +		ocramedac at ffd08144 {
-> +			compatible = "altr,ocram-edac";
-> +			reg = <0xffd08144 0x4>;
-> +			iram = <&ocram>;
-> +			interrupts = <0 178 1>, <0 179 1>;
-> +		};
-> +	};
-> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> index 252c3d1..e546e47 100644
-> --- a/arch/arm/boot/dts/socfpga.dtsi
-> +++ b/arch/arm/boot/dts/socfpga.dtsi
-> @@ -618,6 +618,26 @@
->   			interrupts = <0 39 4>;
->   		};
->
-> +		soc_ecc {
-> +			compatible = "altr,edac";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges;
-> +
-> +			l2edac at ffd08140 {
-> +				compatible = "altr,l2-edac";
-> +				reg = <0xffd08140 0x4>;
-> +				interrupts = <0 36 1>, <0 37 1>;
-> +			};
-> +
-> +			ocramedac at ffd08144 {
-> +				compatible = "altr,ocram-edac";
-> +				reg = <0xffd08144 0x4>;
-> +				iram = <&ocram>;
-> +				interrupts = <0 178 1>, <0 179 1>;
-> +			};
-> +		};
-> +
->   		L2: l2-cache at fffef000 {
->   			compatible = "arm,pl310-cache";
->   			reg = <0xfffef000 0x1000>;
->
+> +[1]: only available on 88F6928
+> -- 
+> 2.1.0
+> 
