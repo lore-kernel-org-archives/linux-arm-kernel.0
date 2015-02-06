@@ -1,84 +1,87 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 6 Feb 2015 14:16:31 +0000
-Subject: [Linaro-acpi] [PATCH v8 02/21] acpi: fix acpi_os_ioremap for arm64
-In-Reply-To: <CAKv+Gu_ExGUkr0AJS4uSHLuz3LxO+x8sxnsnmDAYfVRAgHGXBA@mail.gmail.com>
-References: <1423066107.18187.99.camel@deneb.redhat.com>
- <20150204175734.GI26006@e104818-lin.cambridge.arm.com>
- <1423076294.18187.103.camel@deneb.redhat.com>
- <20150205104149.GA18158@e104818-lin.cambridge.arm.com>
- <1423144447.18187.110.camel@deneb.redhat.com>
- <54D39D6B.5090304@linaro.org>
- <20150205174826.GD21970@e104818-lin.cambridge.arm.com>
- <CAKv+Gu922UwYRN7ZgFNTR7yGGKPLTU8Us7KbvXX-Q8=rqLKNog@mail.gmail.com>
- <20150206103653.GA23190@e104818-lin.cambridge.arm.com>
- <CAKv+Gu_ExGUkr0AJS4uSHLuz3LxO+x8sxnsnmDAYfVRAgHGXBA@mail.gmail.com>
-Message-ID: <20150206141631.GA20549@localhost>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 6 Feb 2015 15:16:51 +0100
+Subject: [PATCH] MAINTAINERS: Add dts entries for mvebu and dove
+In-Reply-To: <1423225810-5504-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1423225810-5504-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20150206141651.GQ25985@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 06, 2015 at 11:08:51AM +0000, Ard Biesheuvel wrote:
-> On 6 February 2015 at 10:36, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Thu, Feb 05, 2015 at 10:16:03PM +0000, Ard Biesheuvel wrote:
-> >> On 5 February 2015 at 17:48, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> >> > On Thu, Feb 05, 2015 at 04:42:19PM +0000, Al Stone wrote:
-> >> >> On 02/05/2015 06:54 AM, Mark Salter wrote:
-> >> >> > On Thu, 2015-02-05 at 10:41 +0000, Catalin Marinas wrote:
-> >> >> >> On Wed, Feb 04, 2015 at 06:58:14PM +0000, Mark Salter wrote:
-> >> >> >>> On Wed, 2015-02-04 at 17:57 +0000, Catalin Marinas wrote:
-> >> >> >>>> On Wed, Feb 04, 2015 at 04:08:27PM +0000, Mark Salter wrote:
-> >> >> >>>>> acpi_os_remap() is used to map ACPI tables. These tables may be in ram
-> >> >> >>>>> which are already included in the kernel's linear RAM mapping. So we
-> >> >> >>>>> need ioremap_cache to avoid two mappings to the same physical page
-> >> >> >>>>> having different caching attributes.
-> >> >> >>>>
-> >> >> >>>> What's the call path to acpi_os_ioremap() on such tables already in the
-> >> >> >>>> linear mapping? I can see an acpi_map() function which already takes
-> >> >> >>>> care of the RAM mapping case but there are other cases where
-> >> >> >>>> acpi_os_ioremap() is called directly. For example,
-> >> >> >>>> acpi_os_read_memory(), can it be called on both RAM and I/O?
-> >> >> >>>
-> >> >> >>> acpi_map() is the one I've seen.
-> >> >> >>
-> >> >> >> By default, if should_use_kmap() is not patched for arm64, it translates
-> >> >> >> to page_is_ram(); acpi_map() would simply use a kmap() which returns the
-> >> >> >> current kernel linear mapping on arm64.
-> >> >> >
-> >> >> > The problem with kmap() is that it only maps a single page. I've seen
-> >> >> > tables over 4k which is why I patched acpi_map() not to use kmap() on
-> >> >> > arm64.
-> >> >>
-> >> >> Right.  Mark replied to this before I could; using kmap() enforced a 4k
-> >> >> (one page) limit that we kept breaking with some ACPI tables being larger
-> >> >> than that (DSDTs and SSDTs, fwiw).  This would lead to some very odd behaviors
-> >> >> when most but not all of a device definition was within the page; using the
-> >> >> table checksums was one way of detecting the issues.
-> >> >
-> >> > OK. So I think Mark's original patch was ok, assuming that the System
-> >> > Memory cases mentioned by Graeme are detected with page_is_ram().
-> >>
-> >> page_is_ram() returns whether a pfn is covered by the linear mapping,
-> >> so memory before the kernel or after a mem= limit will be
-> >> misidentified.
-> >
-> > OK. So in conclusion acpi_os_ioremap() may need to create a cacheable
-> > mapping even when !page_is_ram() but it has no way of knowing that
-> > unless we change the core ACPI code to differentiate between
-> > ioremap_cache and ioremap_nocache. Did I get it right?
+On Fri, Feb 06, 2015 at 01:30:10PM +0100, Gregory CLEMENT wrote:
+> Since many releases, the modifications of the mvebu device tree files
+> are merged through the mvebu subsystem. This patch makes it official
+> in order to help the contributors using the get_maintainer.pl to find
+> the accurate people.
 > 
-> Yes and no. Your analysis about the core issue is correct, but it is
-> something we can fix on our end if we like.
-> This issue has been on our radar for a while, and we proposed a way to
-> fix it here
+> In the same time, updated the mvebu description which now includes the
+> kirkwood SoCs and new Armada SoCs.
 > 
-> http://thread.gmane.org/gmane.linux.kernel.efi/5133
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-I looked at it briefly but it had ACPI in the subject and decided it's
-not urgent ;).
+Apart from the minor problems Jason pointed out,
 
-IIUC, it relies on the EFI system table to be available and the kernel
-will register the appropriate "System RAM" resources. This assumes in
-general that the kernel is booted via the EFI stub. Do we expect Xen or
-kexec to pass an EFI system table when not booting via EFI stub?
+Acked-by: Andrew Lunn <andrew@lunn.ch>
 
--- 
-Catalin
+	  Andrew
+
+
+> ---
+> Hi Jason, Andrew and Sebastian
+> 
+> This last patch [1] showed that if people follow the recommendation to
+> submit patch (using get_maintainer.pl script), we don't receive
+> them. So I propose to amend MAINTAINERS with this patch.
+> 
+> What do you think about it?
+> 
+> If you agree then we can merged it in our next-merge windows (3.21).
+> 
+> Thanks,
+> 
+> Gregory
+> 
+> [1]: http://thread.gmane.org/gmane.linux.drivers.devicetree/109387
+> 
+> 
+> 
+>  MAINTAINERS | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 5d9db6b445bc..d96daf53533c 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1149,7 +1149,7 @@ ARM/MAGICIAN MACHINE SUPPORT
+>  M:	Philipp Zabel <philipp.zabel@gmail.com>
+>  S:	Maintained
+>  
+> -ARM/Marvell Armada 370 and Armada XP SOC support
+> +ARM/Marvell Kirkwood and Armada 370, 375, 38x, XP SOC support
+>  M:	Jason Cooper <jason@lakedaemon.net>
+>  M:	Andrew Lunn <andrew@lunn.ch>
+>  M:	Gregory Clement <gregory.clement@free-electrons.com>
+> @@ -1158,6 +1158,8 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>  S:	Maintained
+>  F:	arch/arm/mach-mvebu/
+>  F:	drivers/rtc/armada38x-rtc
+> +F:	arch/arm/boot/dts/armada*.dts
+> +F:	arch/arm/boot/dts/kirkwood*.dts
+>  
+>  ARM/Marvell Berlin SoC support
+>  M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> @@ -1175,6 +1177,7 @@ F:	arch/arm/mach-dove/
+>  F:	arch/arm/mach-mv78xx0/
+>  F:	arch/arm/mach-orion5x/
+>  F:	arch/arm/plat-orion/
+> +F:	arch/arm/boot/dts/dove*.dts
+>  
+>  ARM/Orion SoC/Technologic Systems TS-78xx platform support
+>  M:	Alexander Clouter <alex@digriz.org.uk>
+> -- 
+> 2.1.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
