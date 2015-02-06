@@ -1,30 +1,26 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 6 Feb 2015 00:00:05 -0800
-Subject: [GIT PULL] at91: cleanup/soc for 3.20 #4 (bis)
-In-Reply-To: <1422905274-9303-1-git-send-email-nicolas.ferre@atmel.com>
-References: <CAOesGMhycUD4ZfQccjD=zzRB901u0YT1NqCuA7chNTnvgt7Fsg@mail.gmail.com>
- <1422905274-9303-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20150206080005.GA23582@quad.lixom.net>
+Date: Fri, 6 Feb 2015 00:02:36 -0800
+Subject: [GIT PULL] Fix git repositories for Broadcom SoCs (v3.20)
+In-Reply-To: <1422574286-3423-1-git-send-email-f.fainelli@gmail.com>
+References: <1422574286-3423-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <20150206080236.GB23582@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 02, 2015 at 08:27:54PM +0100, Nicolas Ferre wrote:
-> Arnd, Olof, Kevin,
+On Thu, Jan 29, 2015 at 03:31:26PM -0800, Florian Fainelli wrote:
+> The following changes since commit 33a5b8838e4973a2f6c4ec4a9b8b26f4589bc07a:
 > 
-> As advised by Olof, here is a second attempt with this pull-request but this
-> time with the at91-3.19-fixes branch as a base. Here is how I did it:
-> - took v3.19-rc4
-> - merged my at91-3.19-fixes branch that is now in Linus' tree
-> - merged my at91-cleanup3 tag that you already have in your "soc" branch. These
->   patches obviously depend on this tag.
-> - stacked the contend of this cleanup/soc pull-request.
+>   ARM: pxa: fix broken isa interrupts for zeus and viper (2015-01-27 14:53:07 -0800)
+> 
+> are available in the git repository at:
+> 
+>   http://github.com/broadcom/stblinux tags/arm-soc/for-3.20/maintainer
+> 
+> for you to fetch changes up to eb6725d03027a9375a25d3089b48be1b8c845972:
+> 
+>   MAINTAINERS: fix git repositories for Broadcom SoCs (2015-01-29 15:29:11 -0800)
 
-Yep -- only tweak is that next time you could either start with your cleanup3
-tag and just merge fixes, or start with fixes and merge cleanup3 -- no need to
-do an explicit merge of fixes on top of mainline.
-
-Anyway, that's just a very minor detail. I've merged this now, thanks for
-respinning!
+Great, thanks for respinning. Merged now.
 
 
 -Olof
