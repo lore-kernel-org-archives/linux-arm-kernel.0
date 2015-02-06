@@ -1,60 +1,45 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 06 Feb 2015 09:07:10 +0000
-Subject: [PATCH 3/3] arm64: dts: Add dts files for Hisilicon Hi6220 SoC
-In-Reply-To: <CAAS=xmgsuY=c8-n_pDiZjLe2u+SPX7msRje7h0sNkRtT3HLfQA@mail.gmail.com>
-References: <1423128277-10297-1-git-send-email-bintian.wang@huawei.com>
- <1423128277-10297-4-git-send-email-bintian.wang@huawei.com>
- <20150205193017.GF20735@leverpostej>
- <CAAS=xmgsuY=c8-n_pDiZjLe2u+SPX7msRje7h0sNkRtT3HLfQA@mail.gmail.com>
-Message-ID: <54D4843E.7060201@arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 6 Feb 2015 01:07:53 -0800
+Subject: [GIT PULL 3/3] Samsung CPUIdle updates for v3.20
+In-Reply-To: <54D22D4E.3080703@kernel.org>
+References: <54D22D4E.3080703@kernel.org>
+Message-ID: <20150206090753.GL23582@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/02/15 08:42, Brent Wang wrote:
+On Wed, Feb 04, 2015 at 11:31:42PM +0900, Kukjin Kim wrote:
+> Hi,
+> 
+> This is cpuidle update for v3.20.
+> Please pull.
+> 
+> Thanks,
+> Kukjin
+> 
+> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+> 
+>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> tags/samsung-cpuidle
+> 
+> for you to fetch changes up to 712eddf70225ab5ae65e946e22d2dfe6b93e8dd1:
+> 
+>   cpuidle: exynos: add coupled cpuidle support for exynos4210
+> (2015-01-30 08:39:15 +0900)
+> 
+> ----------------------------------------------------------------
+> Samsung CPUIdle updates for v3.20
+> 
+> - adds coupled cpuidle support for exynos4210
+>   : fix for Exynos platform PM code preparing it for the coupled
+>   cpuidle support and adds coupled cpuidle AFTR mode on exynos4210
+> 
+> Note this is mostrly based on earlier cpuidle-exynos4210 driver
+> from Daniel Lezcano and Bart updated.
 
-[...]
+Merged, thanks.
 
->>
->>> +                   <0x0 0xf6802000 0x0 0x2000>, /* GICC */
->>> +                   <0x0 0xf6804000 0x0 0x2000>, /* GICH */
->>> +                   <0x0 0xf6806000 0x0 0x2000>; /* GICV */
->>
->> I guess no-one's bothered to consider 64k pages?
->>
->> Given GICH and GICV, I hope that this platform is booted at EL2?
-> Transfer from EL3 to EL1 directly, keep these two just for future use.
-
-That's a real shame, as it keeps users away from some key aspects of the
-ARMv8 architecture.
-
->>
->>> +             #interrupt-cells = <3>;
->>> +             #address-cells = <0>;
->>> +             interrupt-controller;
-
-And if you're keeping GICH/GICV, where is the maintenance interrupt?
-
->>> +     };
->>> +
->>> +
->>> +     timer {
->>> +             compatible = "arm,armv8-timer";
->>> +             interrupt-parent = <&gic>;
->>> +             interrupts = <1 13 0xff08>,
->>> +                          <1 14 0xff08>,
->>> +                          <1 11 0xff08>,
->>> +                          <1 10 0xff08>;
->>> +             clock-frequency = <1200000>;
->>> +     };
->>
->> NAK. Fix your firmware to configure CNTFRQ, on all CPUs.
-> Fix in next version, maybe it will take some time to change firmware.
-
-While you're at it, make sure CNTVOFF_EL2 is set to zero on all CPUs
-before dropping to EL1. This tends to be overlooked.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+-Olof
