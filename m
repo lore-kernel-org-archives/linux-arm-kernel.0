@@ -1,40 +1,83 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 06 Feb 2015 11:41:22 -0800
-Subject: [PATCH v13 3/6] clk: Make clk API return per-user struct clk
- instances
-In-Reply-To: <20150206193702.GD8670@n2100.arm.linux.org.uk>
-References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
- <1422011024-32283-4-git-send-email-tomeu.vizoso@collabora.com>
- <54D3C803.30706@samsung.com> <54D3CD6A.1010209@codeaurora.org>
- <54D3EB29.4090007@codeaurora.org>
- <20150206004210.GB8670@n2100.arm.linux.org.uk>
- <54D41A60.8040702@codeaurora.org>
- <20150206133920.GC8670@n2100.arm.linux.org.uk>
- <54D5164A.30503@codeaurora.org>
- <20150206193702.GD8670@n2100.arm.linux.org.uk>
-Message-ID: <54D518E2.8060405@codeaurora.org>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri,  6 Feb 2015 20:51:25 +0100
+Subject: [PATCH v5 2/3] irqchip: vf610-mscm: dt-bindings: add MSCM bindings
+In-Reply-To: <1423252286-17814-1-git-send-email-stefan@agner.ch>
+References: <1423252286-17814-1-git-send-email-stefan@agner.ch>
+Message-ID: <1423252286-17814-3-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/15 11:37, Russell King - ARM Linux wrote:
-> On Fri, Feb 06, 2015 at 11:30:18AM -0800, Stephen Boyd wrote:
->> Why don't we make the legacy lookup more specific and actually indicate
->> "internal" for the con_id? Then the external clock would fail to be
->> found, but we can detect that case and figure out that it's not due to
->> probe defer, but instead due to the fact that there really isn't any
->> mapping. It looks like the code is already prepared for this anyway.
-> We _could_, and that would solve this specific issue, but I'd suggest
-> coccinelle is used to locate any other similar instances of this.
->
-> As I'm allergic to coccinelle (or coccinelle is allergic to me since
-> I never seem to be able to get it to do what I want...)
->
+Add binding documentation for CPU configuration and interrupt router
+submodule of the Miscellaneous System Control Module. The MSCM is
+used in all variants of Freescale Vybrid SoC's.
 
-Great. I'd like to avoid adding clk_equal() until we actually need it,
-and I hope we don't ever need it. We've already got coccinelle in the
-works to find similar issues and it seems you and I have the same
-allergies because I can't get it to work for me right now.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ .../arm/freescale/fsl,vf610-mscm-cpucfg.txt        | 14 +++++++++
+ .../bindings/arm/freescale/fsl,vf610-mscm-ir.txt   | 33 ++++++++++++++++++++++
+ 2 files changed, 47 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm-cpucfg.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm-ir.txt
 
+diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm-cpucfg.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm-cpucfg.txt
+new file mode 100644
+index 0000000..44aa3c4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm-cpucfg.txt
+@@ -0,0 +1,14 @@
++Freescale Vybrid Miscellaneous System Control - CPU Configuration
++
++The MSCM IP contains multiple sub modules, this binding describes the first
++block of registers which contains CPU configuration information.
++
++Required properties:
++- compatible:	"fsl,vf610-mscm-cpucfg", "syscon"
++- reg:		the register range of the MSCM CPU configuration registers
++
++Example:
++	mscm_cpucfg: cpucfg at 40001000 {
++		compatible = "fsl,vf610-mscm-cpucfg", "syscon";
++		reg = <0x40001000 0x800>;
++	}
+diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm-ir.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm-ir.txt
+new file mode 100644
+index 0000000..669808b2a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm-ir.txt
+@@ -0,0 +1,33 @@
++Freescale Vybrid Miscellaneous System Control - Interrupt Router
++
++The MSCM IP contains multiple sub modules, this binding describes the second
++block of registers which control the interrupt router. The interrupt router
++allows to configure the recipient of each peripheral interrupt. Furthermore
++it controls the directed processor interrupts. The module is available in all
++Vybrid SoC's but is only really useful in dual core configurations (VF6xx
++which comes with a Cortex-A5/Cortex-M4 combination).
++
++Required properties:
++- compatible:		"fsl,vf610-mscm-ir"
++- reg:			the register range of the MSCM Interrupt Router
++- fsl,cpucfg:		The handle to the MSCM CPU configuration node, required
++			to get the current CPU ID
++- interrupt-controller:	Identifies the node as an interrupt controller
++- #interrupt-cells:	Two cells, interrupt number and cells.
++			The hardware interrupt number according to interrupt
++			assignment of the interrupt router is required.
++			Flags get passed only when using GIC as parent. Flags
++			encoding as documented by the GIC bindings.
++- interrupt-parent:	Should be the phandle for the interrupt controller of
++			the CPU the device tree is intended to be used on. This
++			is either the node of the GIC or NVIC controller.
++
++Example:
++	mscm_ir: interrupt-controller at 40001800 {
++		compatible = "fsl,vf610-mscm-ir";
++		reg = <0x40001800 0x400>;
++		fsl,cpucfg = <&mscm_cpucfg>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++		interrupt-parent = <&intc>;
++	}
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.3.0
