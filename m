@@ -1,149 +1,237 @@
 From: tthayer@opensource.altera.com (Thor Thayer)
-Date: Fri, 6 Feb 2015 16:05:39 -0600
-Subject: [PATCHv6 2/5] arm: socfpga: Enable OCRAM ECC on startup.
-In-Reply-To: <20150206184544.GC10324@leverpostej>
+Date: Fri, 6 Feb 2015 16:09:41 -0600
+Subject: [PATCHv6 4/5] edac: altera: Add Altera L2 Cache and OCRAM EDAC
+ Support
+In-Reply-To: <20150206191758.GE10324@leverpostej>
 References: <1420772036-3112-1-git-send-email-tthayer@opensource.altera.com>
- <1420772036-3112-3-git-send-email-tthayer@opensource.altera.com>
- <20150206184544.GC10324@leverpostej>
-Message-ID: <54D53AB3.6040205@opensource.altera.com>
+ <1420772036-3112-5-git-send-email-tthayer@opensource.altera.com>
+ <20150206191758.GE10324@leverpostej>
+Message-ID: <54D53BA5.2020908@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
 
-On 02/06/2015 12:45 PM, Mark Rutland wrote:
-> On Fri, Jan 09, 2015 at 02:53:53AM +0000, tthayer at opensource.altera.com wrote:
+
+On 02/06/2015 01:17 PM, Mark Rutland wrote:
+> On Fri, Jan 09, 2015 at 02:53:55AM +0000, tthayer at opensource.altera.com wrote:
 >> From: Thor Thayer <tthayer@opensource.altera.com>
 >>
->> This patch enables the ECC for On-Chip RAM on machine
->> startup.  The ECC has to be enabled before data is
->> is stored in memory otherwise the ECC will fail on
->> reads.
+>> Adding L2 Cache and On-Chip RAM EDAC support for the
+>> Altera SoCs using the EDAC device  model. The SDRAM
+>> controller is using the Memory Controller model.
+>>
+>> Each type of ECC is individually configurable.
+>>
+>> The SDRAM ECC is a separate Kconfig option because:
+>> 1) the SDRAM preparation can take almost 2 seconds on boot and some
+>> customers need a faster boot time.
+>> 2) the SDRAM has an ECC initialization dependency on the preloader
+>> which is outside the kernel. It is desirable to be able to turn the
+>> SDRAM on & off separately.
+>>
+>> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+>> ---
+>> v2: Fix L2 dependency comments.
+>>
+>> v3: Move OCRAM and L2 cache EDAC functions into altera_edac.c
+>>      instead of separate files.
+>>
+>> v4: Change mask defines to use BIT().
+>>      Fix comment style to agree with kernel coding style.
+>>      Better printk description for read != write in trigger.
+>>      Remove SysFS debugging message.
+>>      Better dci->mod_name
+>>      Move gen_pool pointer assignment to end of function.
+>>      Invert logic to reduce indent in ocram depenency check.
+>>      Change from dev_err() to edac_printk()
+>>      Replace magic numbers with defines & comments.
+>>      Improve error injection test.
+>>      Change Makefile intermediary name to altr (from alt)
+>>
+>> v5: No change.
+>>
+>> v6: Convert to nested EDAC in device tree. Force L2 cache
+>>      on for L2Cache ECC & remove L2 cache syscon for checking
+>>      enable bit. Update year in header.
+>> ---
+>>   drivers/edac/Kconfig       |   16 ++
+>>   drivers/edac/Makefile      |    5 +-
+>>   drivers/edac/altera_edac.c |  506 +++++++++++++++++++++++++++++++++++++++++++-
+>>   3 files changed, 524 insertions(+), 3 deletions(-)
 >
-> Where else is this OCRAM used?
+> [...]
 >
-> If we need the ECC to be enabled before use, a module_init call that
-> seems to be unrelated to any other usage doesn't seem right to me.
-> Hopefully I've just misunderstood something here.
+>> +/************************* EDAC Parent Probe *************************/
+>> +
+>> +static const struct of_device_id altr_edac_device_of_match[];
+>
+> Huh? What's this for?
+
+I needed this as a parameter for the of_platform_populate() function in 
+altr_edac_probe(). I will change the naming to prevent misunderstanding.
+
+>
+>> +static const struct of_device_id altr_edac_of_match[] = {
+>> +       { .compatible = "altr,edac" },
+>> +       {},
+>> +};
+>> +MODULE_DEVICE_TABLE(of, altr_edac_of_match);
+>
+> I know it may seem like a minor thing, but the documentation really
+> should have come in an earlier patch. It's painful to review a patch
+> series when you have to randomly just to the end of hte series to see
+> the documentation.
+>
+> The name is _very_ generic here. Do we not have a more specific name for
+> the EDAC block in your SoC?
+>
+> Is there actually a specific EDAC device, or are you just grouping some
+> portions of HW blocks into an EDAC device to match what the Linux EDAC
+> framework wants?
+>
+> [...]
 >
 
-Thank you for reviewing this.
+Yes, I can move the documentation - I understand better from the 5/5 
+email what you are looking for.
 
-The OCRAM will be used to store data and functions for putting and 
-removing the SoC from sleep. However, in this scenario, we won't have 
-the ECC enabled.
+I can change the name to ECC Manager. There are a group of consecutive 
+registers to enable and disable ECC for peripherals. Unfortunately, the 
+SDRAM register is in a completely different area (not grouped with these 
+peripherals) and seems better suited to the Memory Controller EDAC 
+instead of a device EDAC for the peripherals.
 
-To initialize ECC, the OCRAM needs to enable ECC then clear the entire 
-memory to zero before using it. Doing this early in the startup sequence 
-seemed appropriate. Maybe I'm misunderstanding your concern.
+There is not a specific EDAC device. I grouped these HW blocks into 
+different instances of an EDAC device to match what I though the Linux 
+EDAC framework wanted.
 
-< snip>
-
->> +static int __init socfpga_init_ocram_ecc(void)
+>> +ssize_t altr_edac_device_trig(struct edac_device_ctl_info *edac_dci,
+>> +                             const char *buffer, size_t count)
 >> +{
->> +	struct device_node *np;
->> +	struct resource    res;
->> +	u32                iram_addr;
->> +	void __iomem       *mapped_ocr_edac_addr;
->> +	resource_size_t    size;
->> +	struct gen_pool    *gp;
->> +	int                ret;
->> +
->> +	/* Get the size of the on-chip RAM */
->> +	np = of_find_compatible_node(NULL, NULL, "mmio-sram");
->> +	if (!np) {
->> +		pr_err("%s: Unable to find mmio-sram in dtb\n", __func__);
->> +		return -ENODEV;
->> +	}
->> +
->> +	ret = of_address_to_resource(np, 0, &res);
->> +	if (ret) {
->> +		of_node_put(np);
->> +		pr_err("%s: Problem getting SRAM address in dtb\n", __func__);
->> +		return -ENODEV;
->> +	}
->> +	size = resource_size(&res);
->> +	of_node_put(np);
->> +
->> +	/* Find the OCRAM EDAC device tree node */
->> +	np = of_find_compatible_node(NULL, NULL, "altr,ocram-edac");
->> +	if (!np) {
->> +		pr_err("%s: Unable to find altr,ocram-edac\n", __func__);
->> +		return -ENODEV;
->> +	}
->> +
->> +	mapped_ocr_edac_addr = of_iomap(np, 0);
->> +	if (!mapped_ocr_edac_addr) {
->> +		of_node_put(np);
->> +		pr_err("%s: Unable to map OCRAM ecc regs.\n", __func__);
->> +		return -ENODEV;
->> +	}
->> +
->> +	gp = of_get_named_gen_pool(np, "iram", 0);
->> +	if (!gp) {
->> +		of_node_put(np);
->> +		pr_err("%s: OCRAM cannot find gen pool\n", __func__);
->> +		return -ENODEV;
->> +	}
->> +	of_node_put(np);
->> +
->> +	iram_addr = gen_pool_alloc(gp, size / sizeof(size_t));
+>> +       u32 *ptemp, i, error_mask;
+>> +       int result = 0;
+>> +       unsigned long flags;
+>> +       struct altr_edac_device_dev *drvdata = edac_dci->pvt_info;
+>> +       const struct edac_device_prv_data *priv = drvdata->data;
+>> +       void *generic_ptr = edac_dci->dev;
 >
-> Why divide by sizeof(size_t) here? As far as I am aware, resource_size
-> gives you a size in bytes...
+> Huh? What's hidden behind this "generic_ptr"?
 >
 
-Yes, you are right. I shouldn't have changed this - for some reason when 
-I re-read the function prototype, I thought this function was allocating 
-integers. Thank you.
+There are 2 memory allocation functions (ocram & L2) that return a 
+pointer to the data. The OCRAM allocation function returns the gen_pool 
+pointer in the generic_ptr so that it can be freed later.
 
+>> +
+>> +       if (!priv->alloc_mem)
+>> +               return -ENOMEM;
+>> +
+>> +       /*
+>> +        * Note that generic_ptr is initialized to the device * but in
+>> +        * some alloc_functions, this is overridden and returns data.
+>> +        */
+>> +       ptemp = priv->alloc_mem(priv->trig_alloc_sz, &generic_ptr);
+>> +       if (!ptemp) {
+>> +               edac_printk(KERN_ERR, EDAC_DEVICE,
+>> +                           "Inject: Buffer Allocation error\n");
+>> +               return -ENOMEM;
+>> +       }
+>> +
+>> +       if (buffer[0] == ALTR_UE_TRIGGER_CHAR)
+>> +               error_mask = priv->ue_set_mask;
+>> +       else
+>> +               error_mask = priv->ce_set_mask;
+>> +
+>> +       edac_printk(KERN_ALERT, EDAC_DEVICE,
+>> +                   "Trigger Error Mask (0x%X)\n", error_mask);
+>> +
+>> +       local_irq_save(flags);
+>> +       /* write ECC corrupted data out. */
+>> +       for (i = 0; i < (priv->trig_alloc_sz / sizeof(*ptemp)); i++) {
+>> +               /* Read data so we're in the correct state */
+>> +               rmb();
+>> +               if (ACCESS_ONCE(ptemp[i]))
+>> +                       result = -1;
+>
+> Perhaps s/result/err/? You could even have an err_count, which would
+> give you slightly more useful output.
 
->> +	if (iram_addr == 0) {
->> +		pr_err("%s: cannot alloc from gen pool\n", __func__);
->> +		return -ENODEV;
->> +	}
->> +
->> +	/* Clear any pending OCRAM ECC interrupts, then enable ECC */
->> +	writel(ALTR_OCRAM_CLEAR_ECC, mapped_ocr_edac_addr);
->> +	writel(ALTR_OCRAM_ECC_EN, mapped_ocr_edac_addr);
->> +
->> +	memset((void *)iram_addr, 0, size);
+No problem.
+
 >
-> ...and here we write size bytes, not (size / sizeof(size_t)) bytes, so
-> we're poking memory we weren't allocated.
+>> +               /* Toggle Error bit (it is latched), leave ECC enabled */
+>> +               writel(error_mask, drvdata->base);
+>> +               writel(priv->ecc_enable_mask, drvdata->base);
+>> +               ptemp[i] = i;
+>> +       }
+>> +       /* Ensure it has been written out */
+
+<snip>
+
+>> +
+>> +       sram_addr = (void *)gen_pool_alloc(gp, size / sizeof(size_t));
 >
-> How is this memory mapped exactly? Is memset safe?
+> I'm still very much confused by this sizeof(size_t) division, but
+> hopefully your response to my earlier query will answer that.
+>
+> [...]
+
+Yes, my mistake.
+
+>
+>> +static void *l2_alloc_mem(size_t size, void **other)
+>> +{
+>> +       struct device *dev = *other;
+>> +       void *ptemp = devm_kzalloc(dev, size, GFP_KERNEL);
+>> +
+>> +       if (!ptemp)
+>> +               return NULL;
+>> +
+>> +       /* Make sure everything is written out */
+>> +       wmb();
+>> +
+>> +       /*
+>> +        * Clean all cache levels up to LoC (includes L2)
+>> +        * This ensures the corrupted data is written into
+>> +        * L2 cache for readback test (which causes ECC error).
+>> +        */
+>> +       flush_cache_all();
+>
+> I'm a little confused by this comment (especially w.r.t. the L2 being
+> before the LoC). Are we attempting to flush everything _to_ the L2, or
+> beyond/out-of the L2? As far as I can see flush_cache_all will only
+> achieve the former, and not the latter, as it doesn't seem to perform
+> any outer cache operations.
+>
+> Per the architecture, Set/Way maintenance of this form won't always act
+> as you expect (though I believe that for Cortex-A9 it does).
+>
+
+Yes, these functions are for triggering an ECC error for testing L2 
+cache reads. I need to ensure the cleared data is written to L2 cache 
+because that is what I'm testing. The PL310 manual said the L2 cache was 
+included in the LoC.
+
+Our SoC is a Cortex-A9 but if there is a better way, I'm open to it.
+
+>> +
+>> +       return ptemp;
+>> +}
+>> +
+>> +static void l2_free_mem(void *p, size_t size, void *other)
+>> +{
+>> +       struct device *dev = other;
+>> +
+>> +       if (dev && p)
+>> +               devm_kfree(dev, p);
+>
+> Is this ever called in that case?
+
+Yes, in altr_edac_device_trig(), the memory is allocated, the ECC errors 
+are injected, the data is read back causing ECC error interrupts and the 
+memory is freed. Would the standard kzalloc() and kfree() be betteer?
+
 >
 > Thanks,
 > Mark.
 >
-
-Yes, thank you for catching that.
-
-OK. I think I understand your point now. I need to enable the OCRAM ECC 
-before the gen_pool_create() which is called by the 
-"ocram:sram at ffff0000" node.
-
-In that case, I should move this OCRAM ECC enable into the same place as 
-L2 ecc is enabled.
-
-Thor
-
->> +
->> +	gen_pool_free(gp, iram_addr, size / sizeof(size_t));
->> +
->> +	iounmap(mapped_ocr_edac_addr);
->> +
->> +	return 0;
->> +}
->> +
->> +static void __exit socfpga_exit_ocram_ecc(void)
->> +{
->> +}
->> +
->> +module_init(socfpga_init_ocram_ecc);
->> +module_exit(socfpga_exit_ocram_ecc);
->> --
->> 1.7.9.5
->>
->>
