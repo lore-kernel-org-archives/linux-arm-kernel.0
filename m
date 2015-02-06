@@ -1,134 +1,62 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 6 Feb 2015 16:21:20 +0000
-Subject: [Linaro-acpi] [PATCH v8 11/21] ARM64 / ACPI: Get PSCI flags in
- FADT for PSCI init
-In-Reply-To: <54D47397.8020904@linaro.org>
-References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
- <1422881149-8177-12-git-send-email-hanjun.guo@linaro.org>
- <20150204164328.GF22035@red-moon> <54D3A443.7050303@linaro.org>
- <20150205174904.GA24468@red-moon> <54D3BE8D.7010401@linaro.org>
- <54D47397.8020904@linaro.org>
-Message-ID: <20150206162120.GA32566@red-moon>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 06 Feb 2015 17:26:25 +0100
+Subject: [PATCH 2/4] rtc: sa1100: convert to run-time register mapping
+In-Reply-To: <CAL_JsqJ5Ju98adz5Y2Ow2JDnvFdKhCRvpH8Xg1OfMYOhJaUUFw@mail.gmail.com>
+ (Rob Herring's message of "Thu, 5 Feb 2015 14:47:43 -0600")
+References: <1423005775-26457-1-git-send-email-robh@kernel.org>
+ <1423005775-26457-3-git-send-email-robh@kernel.org>
+ <87h9v1a8k2.fsf@free.fr>
+ <CAL_JsqLiiKvzxQqE=bEx7qoLSZXLZOegt87A=+pR3PJuSBK95w@mail.gmail.com>
+ <20150205135037.GP8656@n2100.arm.linux.org.uk>
+ <8761bg9ngy.fsf@free.fr>
+ <CAL_JsqJ5Ju98adz5Y2Ow2JDnvFdKhCRvpH8Xg1OfMYOhJaUUFw@mail.gmail.com>
+Message-ID: <87vbjf80r2.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 06, 2015 at 07:56:07AM +0000, Hanjun Guo wrote:
-> Hi Lorenzo, Al,
-> 
-> On 2015?02?06? 03:03, Al Stone wrote:
-> > On 02/05/2015 10:49 AM, Lorenzo Pieralisi wrote:
-> >> Hi Al,
-> >
-> > Howdy, Lorenzo.
-> >
-> >> On Thu, Feb 05, 2015 at 05:11:31PM +0000, Al Stone wrote:
-> >>> On 02/04/2015 09:43 AM, Lorenzo Pieralisi wrote:
-> >>>> On Mon, Feb 02, 2015 at 12:45:39PM +0000, Hanjun Guo wrote:
-> >>>>> From: Graeme Gregory <graeme.gregory@linaro.org>
-> >>>>>
-> >>>>> There are two flags: PSCI_COMPLIANT and PSCI_USE_HVC. When set,
-> >>>>> the former signals to the OS that the firmware is PSCI compliant.
-> >>>>> The latter selects the appropriate conduit for PSCI calls by
-> >>>>> toggling between Hypervisor Calls (HVC) and Secure Monitor Calls
-> >>>>> (SMC).
-> >>>>>
-> >>>>> FADT table contains such information in ACPI 5.1, FADT table was
-> >>>>> parsed in ACPI table init and copy to struct acpi_gbl_FADT, so
-> >>>>> use the flags in struct acpi_gbl_FADT for PSCI init.
-> >>>>
-> >>>> So you do rely on a global FADT being available, if you use it for PSCI
-> >>>> detection you can use it for ACPI revision detection too, right ?
-> >>>>
-> >>>> Point is, either we should not use the global FADT table, or we use
-> >>>> it consistently, or there is something I am unaware of that prevents
-> >>>> you from using in some code paths and I would like to understand
-> >>>> why.
-> >>>
-> >>> The FADT is a required table for arm64, as noted in the documentation
-> >>> and the SBBR.  While unfortunately the spec does not say it is mandatory,
-> >>> even x86 systems are pretty useless without it.  So yes, we rely on it
-> >>> being available, not only for the PSCI info, but other flags such as
-> >>> HW_REDUCED_ACPI.
-> >>>
-> >>> I suppose it does not have to be globally scoped.  However, the FADT is
-> >>> frequently used, especially on x86, so it makes sense to me from an
-> >>> efficiency standpoint to have a global reference to it.
-> >>>
-> >>> I'm not sure I understand what is meant by using FADT for ACPI revision
-> >>> detection; there are fields in the FADT that provide a major and minor
-> >>> number for the FADT itself, but I don't believe there's any guarantee
-> >>> those will be the same as the level of the specification that is being
-> >>> supported by the kernel (chances are they will, but it's not mandatory).
-> >>>
-> >>> I've probably just missed a part of a thread somewhere; could you point
-> >>> me to where the inconsistency lies?  I'm just not understanding right this
-> >>> second....
-> >>
-> >> Yes, it is my fault, I was referring to another thread/patch (9), where you
-> >> need to check the FADT revision to "validate it" (ie >= 5.1) for the arm64
-> >> kernel. What I am saying is: if the global FADT is there to parse PSCI
-> >> info, it is there to check the FADT revision too, I do not necessarily
-> >> see the need for calling acpi_table_parse() again to do it, the FADT
-> >> revision checking can be carried out as for PSCI, that's all I wanted
-> >> to say.
-> >
-> > Aha.  I understand now.  Another colleague was also trying to explain this
-> > to me and I think I just hadn't had enough coffee yet.  The underlying ACPI
-> > code maps tables into the kernel in two phases; it may be that when the code
-> > in patch 9 is run, the global table is not yet available, while here it is;
-> > I don't recall off-hand.
-> >
-> > I'll take a look at this and talk it over with Hanjun.  If the global table
-> > is available, it would indeed make sense to be consistent.
-> 
-> I had dig into the code and found out that struct acpi_gbl_FADT will be
-> available with correct value only if FADT is presented by firmware.
-> 
-> acpi_table_init() will be called before parsing FADT for PSCI flag in
-> this patch set.
-> 
-> In acpi_table_init()
->     acpi_initialize_tables()
->        acpi_tb_parse_root_table()
-> 
-> In acpi_tb_parse_root_table()
-> 
-> if (ACPI_SUCCESS(status) &&
->     ACPI_COMPARE_NAME(&acpi_gbl_root_table_list.
->       tables[table_index].signature,
->       ACPI_SIG_FADT)) {
-> 	acpi_tb_parse_fadt(table_index);
-> }
-> 
-> And acpi_tb_parse_fadt(table_index) will copy the
-> fadt table to global struct acpi_gbl_FADT.
-> 
-> so it seems that we can use global struct acpi_gbl_FADT directly to
-> check the FADT revision, but it is only available with firmware
-> presented the FADT table, so check for the FADT table is still needed
-> for some bad firmware without FADT.
-> 
-> Why PSCI flag can be used without any check for the availability
-> of FADT? because we already disable ACPI if 
-> (acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt))
-> failed (no FADT tabled found), and PSCI flag will not be used
-> later.
-> 
-> So I think we can keep the code as it is for now, and I think
-> it is the safest way to do it, does it make sense?
+Rob Herring <robh@kernel.org> writes:
 
-Understood. Basically, given current ACPI code, you have to call
-acpi_table_parse() to make sure FADT is there, even if the handler
-to parse it can be left to a void empty function, and while at it
-within the handler passed to acpi_table_parse() you check the
-revision; it makes sense but we end up having disable_acpi() scattered
-all over the place.
+>>  - adding to rtc-pxa driver :
+>>    - a new rtc device (ie. it will register 2 rtc devices, one of the sa1100
+>>      kind, one of the pxa specific kind)
+>
+> I fail to see what the rtc-pxa gets us? Something to do with which
+> counter has correct time at boot? It has a rollover longer than ~126
+> years is all I see. Otherwise, it looks like over-engineered h/w to
+> me.
+Compatibility with other OSes, for multi-OS boots, which is the main reason
+rtc-pxa was developped. Of course the other OS is using the other registers,
+*and* resets RCNR to 0 on boot.
 
-You can leave your code as it is, or we check with Rafael if
-acpi_table_parse() can be made to propagate the handler return value,
-my fear is that the acpi_table_parse() is not expected to return
-failure if the handler fails, only if table is not found, I will have
-a look into this.
+>> This has flaws :
+>>  - a bit of code will be duplicated between rtc-pxa and rtc-sa1100
+>
+> That can probably be mitigated with a common file of shared functions.
+Oh yeah, I like that. Would it mean that in the future you'd have time to help
+with that task ?
 
-Thanks,
-Lorenzo
+>>  - the ordering in rtc-pxa between the 2 rtc devices will be important, as if I
+>>  remember correctly /dev/rtc points to the first /dev/rtc0 registered
+>>
+>> But it opens up :
+>>  - DT path to both drivers
+>>  - isolation between sa1100 architecture changes and pxa architecture changes
+>>  - Rob's current patches can remain almost the same
+>>
+>>> Also note that by including the resource in rtc-sa1100's platform
+>>> device resource list, you'll have stacked resources between the two
+>>> platform devices appearing in /proc/iomem (you did look at that
+>>> before posting the patches, right?)
+>> I must admit I don't know if there are nasty consequences, I think I need to
+>> follow up the code to have a clear idea.
+>
+> I don't follow either. The resources don't appear unless requested and
+> we only have 1 driver requesting it.
+There's only one small test to do to understand, as soon as I'm finished with my
+zylonite's ethernet interrupts, I will make the test to understand what Russell
+said, I might learn something in the test :)
+
+Cheers.
+
+-- 
+Robert
