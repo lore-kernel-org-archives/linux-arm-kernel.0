@@ -1,80 +1,223 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 6 Feb 2015 19:14:19 +0000
-Subject: Delays, clocks, timers, hrtimers, etc
-In-Reply-To: <54D509EC.7020708@free.fr>
-References: <54C8E125.3070905@free.fr>
- <20150203120925.GM8656@n2100.arm.linux.org.uk>
- <54D509EC.7020708@free.fr>
-Message-ID: <20150206191419.GA8656@n2100.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 6 Feb 2015 19:17:58 +0000
+Subject: [PATCHv6 4/5] edac: altera: Add Altera L2 Cache and OCRAM EDAC
+ Support
+In-Reply-To: <1420772036-3112-5-git-send-email-tthayer@opensource.altera.com>
+References: <1420772036-3112-1-git-send-email-tthayer@opensource.altera.com>
+ <1420772036-3112-5-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <20150206191758.GE10324@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 06, 2015 at 10:37:32AM -0800, Mason wrote:
-> Hmmm, I'm confused (again).
+On Fri, Jan 09, 2015 at 02:53:55AM +0000, tthayer at opensource.altera.com wrote:
+> From: Thor Thayer <tthayer@opensource.altera.com>
 > 
-> CONFIG_CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK means "use the global timer
-> for the scheduler clock", right? In that case, are the local timers
-> unused by Linux?
+> Adding L2 Cache and On-Chip RAM EDAC support for the
+> Altera SoCs using the EDAC device  model. The SDRAM
+> controller is using the Memory Controller model.
 > 
-> #ifdef CONFIG_CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
->   sched_clock_register(gt_sched_clock_read, 64, gt_clk_rate);
-> #endif
+> Each type of ECC is individually configurable.
 > 
-> Is there generic code to set up local timers? (If so, where?)
-> sched_clock_register only seems to appear in machine-specific code.
+> The SDRAM ECC is a separate Kconfig option because:
+> 1) the SDRAM preparation can take almost 2 seconds on boot and some
+> customers need a faster boot time.
+> 2) the SDRAM has an ECC initialization dependency on the preloader
+> which is outside the kernel. It is desirable to be able to turn the
+> SDRAM on & off separately.
 > 
-> What are the pros/cons of global timer vs local timers?
-> Or is such a question irrelevant?
-> (Because they are used for different purposes?)
-
-Correct.
-
-The sched_clock itself is about providing the scheduler with a stable,
-monotonically increasing 64-bit nanosecond value which it can use to
-account for the passing of time (so it can accurately measure how long
-a thread is running for, and make a decision when to pre-empt it.)
-
-Local timers are used to set "alarms" to cause an interrupt at a certain
-point in time to do something (like, run the scheduler to switch from
-the current thread to another thread.)  It can also be used to update
-the current time of day as well.
-
-Global timers are used as a fallback when local timers are not available,
-and are less efficient - the CPU receiving the global timer interrupt
-has to broadcast the interrupt to other CPUs, and it also has to take
-account of the earliest event across all CPUs.
-
-There is a fourth "timer" which is used as a monotonically incrementing
-counter - this is called the "clocksource".  This is used to maintain
-the kernel's time-of-day.  This may be the same as the sched_clock.
-
-> There is trouble in paradise. I was planning to give the global timer a try,
-> instead of the platform-specific timer, until I noticed: "The global timer
-> is clocked by PERIPHCLK." And it turns PERIPHCLK is connected to the SoC's
-> CPU_CLK (the clock that drives the CPU cores); the same clock that is managed
-> by cpufreq. I imagine it's double plus ungood for precise time-keeping to
-> have frequency changes of the clocksource input?
-
-Yes and no.  You can use that for local timers and/or a global timer, but
-you really don't want to use that for the sched_clock nor clocksource as
-these are really the fundamentals of time keeping.  I'd advise against
-using a timer derived from the CPU clock in general though, but if you
-have no other possible timers, then it has to do.
-
-> $ grep -rn ARM_GLOBAL_TIMER | grep -v SCHED_CLOCK
-> arch/arm/mach-vexpress/Kconfig:7:	select ARM_GLOBAL_TIMER
-> arch/arm/mach-bcm/Kconfig:87:	select ARM_GLOBAL_TIMER
-> arch/arm/mach-bcm/Kconfig:108:	select ARM_GLOBAL_TIMER
-> arch/arm/mach-rockchip/Kconfig:14:	select ARM_GLOBAL_TIMER
-> arch/arm/mach-sti/Kconfig:4:	select ARM_GLOBAL_TIMER
-> arch/arm/mach-zynq/Kconfig:6:	select ARM_GLOBAL_TIMER if !CPU_FREQ
+> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+> ---
+> v2: Fix L2 dependency comments.
 > 
-> There are indeed a few users; also I wonder why mach-zynq enables
-> ARM_GLOBAL_TIMER only if !CPU_FREQ. (Could it be that they have
-> the CPU CLOCK driving PERIPHCLK?)
+> v3: Move OCRAM and L2 cache EDAC functions into altera_edac.c
+>     instead of separate files.
+> 
+> v4: Change mask defines to use BIT().
+>     Fix comment style to agree with kernel coding style.
+>     Better printk description for read != write in trigger.
+>     Remove SysFS debugging message.
+>     Better dci->mod_name
+>     Move gen_pool pointer assignment to end of function.
+>     Invert logic to reduce indent in ocram depenency check.
+>     Change from dev_err() to edac_printk()
+>     Replace magic numbers with defines & comments.
+>     Improve error injection test.
+>     Change Makefile intermediary name to altr (from alt)
+> 
+> v5: No change.
+> 
+> v6: Convert to nested EDAC in device tree. Force L2 cache
+>     on for L2Cache ECC & remove L2 cache syscon for checking
+>     enable bit. Update year in header.
+> ---
+>  drivers/edac/Kconfig       |   16 ++
+>  drivers/edac/Makefile      |    5 +-
+>  drivers/edac/altera_edac.c |  506 +++++++++++++++++++++++++++++++++++++++++++-
+>  3 files changed, 524 insertions(+), 3 deletions(-)
 
-I'm afraid I don't know.
+[...]
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+> +/************************* EDAC Parent Probe *************************/
+> +
+> +static const struct of_device_id altr_edac_device_of_match[];
+
+Huh? What's this for?
+
+> +static const struct of_device_id altr_edac_of_match[] = {
+> +       { .compatible = "altr,edac" },
+> +       {},
+> +};
+> +MODULE_DEVICE_TABLE(of, altr_edac_of_match);
+
+I know it may seem like a minor thing, but the documentation really
+should have come in an earlier patch. It's painful to review a patch
+series when you have to randomly just to the end of hte series to see
+the documentation.
+
+The name is _very_ generic here. Do we not have a more specific name for
+the EDAC block in your SoC?
+
+Is there actually a specific EDAC device, or are you just grouping some
+portions of HW blocks into an EDAC device to match what the Linux EDAC
+framework wants?
+
+[...]
+
+> +ssize_t altr_edac_device_trig(struct edac_device_ctl_info *edac_dci,
+> +                             const char *buffer, size_t count)
+> +{
+> +       u32 *ptemp, i, error_mask;
+> +       int result = 0;
+> +       unsigned long flags;
+> +       struct altr_edac_device_dev *drvdata = edac_dci->pvt_info;
+> +       const struct edac_device_prv_data *priv = drvdata->data;
+> +       void *generic_ptr = edac_dci->dev;
+
+Huh? What's hidden behind this "generic_ptr"?
+
+> +
+> +       if (!priv->alloc_mem)
+> +               return -ENOMEM;
+> +
+> +       /*
+> +        * Note that generic_ptr is initialized to the device * but in
+> +        * some alloc_functions, this is overridden and returns data.
+> +        */
+> +       ptemp = priv->alloc_mem(priv->trig_alloc_sz, &generic_ptr);
+> +       if (!ptemp) {
+> +               edac_printk(KERN_ERR, EDAC_DEVICE,
+> +                           "Inject: Buffer Allocation error\n");
+> +               return -ENOMEM;
+> +       }
+> +
+> +       if (buffer[0] == ALTR_UE_TRIGGER_CHAR)
+> +               error_mask = priv->ue_set_mask;
+> +       else
+> +               error_mask = priv->ce_set_mask;
+> +
+> +       edac_printk(KERN_ALERT, EDAC_DEVICE,
+> +                   "Trigger Error Mask (0x%X)\n", error_mask);
+> +
+> +       local_irq_save(flags);
+> +       /* write ECC corrupted data out. */
+> +       for (i = 0; i < (priv->trig_alloc_sz / sizeof(*ptemp)); i++) {
+> +               /* Read data so we're in the correct state */
+> +               rmb();
+> +               if (ACCESS_ONCE(ptemp[i]))
+> +                       result = -1;
+
+Perhaps s/result/err/? You could even have an err_count, which would
+give you slightly more useful output.
+
+> +               /* Toggle Error bit (it is latched), leave ECC enabled */
+> +               writel(error_mask, drvdata->base);
+> +               writel(priv->ecc_enable_mask, drvdata->base);
+> +               ptemp[i] = i;
+> +       }
+> +       /* Ensure it has been written out */
+> +       wmb();
+> +       local_irq_restore(flags);
+> +
+> +       if (result)
+> +               edac_printk(KERN_ERR, EDAC_DEVICE, "Mem Not Cleared\n");
+> +
+> +       /* Read out written data. ECC error caused here */
+> +       for (i = 0; i < ALTR_TRIGGER_READ_WRD_CNT; i++)
+> +               if (ACCESS_ONCE(ptemp[i]) != i)
+> +                       edac_printk(KERN_ERR, EDAC_DEVICE,
+> +                                   "Read doesn't match written data\n");
+> +
+> +       if (priv->free_mem)
+> +               priv->free_mem(ptemp, priv->trig_alloc_sz, generic_ptr);
+> +
+> +       return count;
+> +}
+
+[...]
+
+> +static void *ocram_alloc_mem(size_t size, void **other)
+> +{
+> +       struct device_node *np;
+> +       struct gen_pool *gp;
+> +       void *sram_addr;
+> +
+> +       np = of_find_compatible_node(NULL, NULL, "altr,ocram-edac");
+> +       if (!np)
+> +               return NULL;
+> +
+> +       gp = of_get_named_gen_pool(np, "iram", 0);
+> +       if (!gp) {
+> +               of_node_put(np);
+> +               return NULL;
+> +       }
+> +       of_node_put(np);
+> +
+> +       sram_addr = (void *)gen_pool_alloc(gp, size / sizeof(size_t));
+
+I'm still very much confused by this sizeof(size_t) division, but
+hopefully your response to my earlier query will answer that.
+
+[...]
+
+> +static void *l2_alloc_mem(size_t size, void **other)
+> +{
+> +       struct device *dev = *other;
+> +       void *ptemp = devm_kzalloc(dev, size, GFP_KERNEL);
+> +
+> +       if (!ptemp)
+> +               return NULL;
+> +
+> +       /* Make sure everything is written out */
+> +       wmb();
+> +
+> +       /*
+> +        * Clean all cache levels up to LoC (includes L2)
+> +        * This ensures the corrupted data is written into
+> +        * L2 cache for readback test (which causes ECC error).
+> +        */
+> +       flush_cache_all();
+
+I'm a little confused by this comment (especially w.r.t. the L2 being
+before the LoC). Are we attempting to flush everything _to_ the L2, or
+beyond/out-of the L2? As far as I can see flush_cache_all will only
+achieve the former, and not the latter, as it doesn't seem to perform
+any outer cache operations.
+
+Per the architecture, Set/Way maintenance of this form won't always act
+as you expect (though I believe that for Cortex-A9 it does).
+
+> +
+> +       return ptemp;
+> +}
+> +
+> +static void l2_free_mem(void *p, size_t size, void *other)
+> +{
+> +       struct device *dev = other;
+> +
+> +       if (dev && p)
+> +               devm_kfree(dev, p);
+
+Is this ever called in that case?
+
+Thanks,
+Mark.
