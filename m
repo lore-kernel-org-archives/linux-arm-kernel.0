@@ -1,160 +1,33 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 06 Feb 2015 18:31:02 +0000
-Subject: [PATCH/RFC 4/4] iommu/arm-smmu: Support deferred probing
-In-Reply-To: <1423182722-16646-5-git-send-email-lauraa@codeaurora.org>
-References: <1423182722-16646-1-git-send-email-lauraa@codeaurora.org>
- <1423182722-16646-5-git-send-email-lauraa@codeaurora.org>
-Message-ID: <54D50866.8000505@arm.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 6 Feb 2015 19:32:05 +0100
+Subject: [PATCH 0/2] ARM: omap2+: omap_hwmod: Fix false lockdep warning
+In-Reply-To: <54D4E64C.7060208@ti.com>
+References: <1423226916-18804-1-git-send-email-peter.ujfalusi@ti.com>
+ <20150206141346.GP21418@twins.programming.kicks-ass.net>
+ <54D4E64C.7060208@ti.com>
+Message-ID: <20150206183205.GS21418@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laura,
+On Fri, Feb 06, 2015 at 06:05:32PM +0200, Peter Ujfalusi wrote:
+> Certainly looks much simpler, but it adds quite a bit of data to the
+> omap_hwmod struct, and we have a _lot_ of them for omap2plus configuration.
+> 
+> ls -al vmlinux
+> 
+> w/o any the lockdep warning fixes:
+> 110109168
+> 
+> With my series applied:
+> 110112031 (base + 2863)
+> 
+> With setting individual lockdep class:
+> 110114275 (base + 5107)
+> 
+> I certainly like the lockdep_set_class() way since it is cleaner, but it adds
+> almost double amount of bytes to the kernel.
 
-As a heads up, I'm still vainly hoping to move the ARM SMMU driver 
-entirely over to the generic framework - there's an iommu/dev branch on 
-top of the iommu/dma branch I pushed earlier[1] which you might want to 
-take a peek at to check if we're likely to end up pulling in different 
-directions.
-
-[1]:http://article.gmane.org/gmane.linux.kernel.iommu/8773
-
-On 06/02/15 00:32, Laura Abbott wrote:
->
-> With the addition of clocks in the SMMU driver, the driver
-> now may need to be deferred if the clocks are not ready. Apart from
-> just the probe function though, we may need to defer attachment as
-> well. Support both of these.
->
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> ---
-> I went with the simplest approach ('started_probe') to indicate
-> we should defer probing. Another possibility I considered was to have
-> a 'masters added before probe completed' list and keep all masters
-> there until probe completes at which point we can bind the masters
-> to the SMMUs.
-
-I think this looks OK for the single-distributed-SMMU case MMU-500 
-allows; the Juno case with multiple MMU-401 instances is more awkward, 
-but I have a feeling there's a really neat way to slot this approach to 
-deferral into my per-instance stuff. I'll give this series a spin and 
-see what falls out.
-
-Thanks,
-Robin.
-
-> ---
->   drivers/iommu/arm-smmu.c | 37 +++++++++++++++++++++++++++++++++++--
->   1 file changed, 35 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index d9f7cf48..7e8194c 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -43,6 +43,8 @@
->   #include <linux/platform_device.h>
->   #include <linux/slab.h>
->   #include <linux/spinlock.h>
-> +#include <linux/of_iommu.h>
-> +#include <linux/of_platform.h>
->
->   #include <linux/amba/bus.h>
->
-> @@ -330,6 +332,7 @@ static int force_stage;
->   module_param_named(force_stage, force_stage, int, S_IRUGO | S_IWUSR);
->   MODULE_PARM_DESC(force_stage,
->   	"Force SMMU mappings to be installed at a particular stage of translation. A value of '1' or '2' forces the corresponding stage. All other values are ignored (i.e. no stage is forced). Note that selecting a specific stage will disable support for nested translation.");
-> +static bool started_probe;
->
->   enum arm_smmu_arch_version {
->   	ARM_SMMU_V1 = 1,
-> @@ -1284,7 +1287,7 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
->   	smmu = find_smmu_for_device(dev);
->   	if (!smmu) {
->   		dev_err(dev, "cannot attach to SMMU, is it on the same bus?\n");
-> -		return -ENXIO;
-> +		return started_probe ? -EPROBE_DEFER : -ENXIO;
->   	}
->
->   	if (dev->archdata.iommu) {
-> @@ -1677,7 +1680,7 @@ static int arm_smmu_add_device(struct device *dev)
->
->   	smmu = find_smmu_for_device(dev);
->   	if (!smmu)
-> -		return -ENODEV;
-> +		return started_probe ? -EPROBE_DEFER : -ENODEV;
->
->   	group = iommu_group_alloc();
->   	if (IS_ERR(group)) {
-> @@ -1761,6 +1764,11 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
->   	}
->   }
->
-> +static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *spec)
-> +{
-> +	return arm_smmu_add_device(dev);
-> +}
-> +
->   static int arm_smmu_enable_resources(struct iommu_domain *domain)
->   {
->   	struct arm_smmu_domain *smmu_domain = domain->priv;
-> @@ -1814,6 +1822,7 @@ static const struct iommu_ops arm_smmu_ops = {
->   	.pgsize_bitmap		= (SECTION_SIZE |
->   				   ARM_SMMU_PTE_CONT_SIZE |
->   				   PAGE_SIZE),
-> +	.of_xlate		= arm_smmu_of_xlate,
->   	.enable_resources	= arm_smmu_enable_resources,
->   	.disable_resources	= arm_smmu_disable_resources,
->   };
-> @@ -2108,6 +2117,8 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
->   	struct of_phandle_args masterspec;
->   	int num_irqs, i, err;
->
-> +	started_probe = true;
-> +
->   	smmu = devm_kzalloc(dev, sizeof(*smmu), GFP_KERNEL);
->   	if (!smmu) {
->   		dev_err(dev, "failed to allocate arm_smmu_device\n");
-> @@ -2282,6 +2293,8 @@ static struct platform_driver arm_smmu_driver = {
->   	.remove	= arm_smmu_device_remove,
->   };
->
-> +static int init_done;
-> +
->   static int __init arm_smmu_init(void)
->   {
->   	struct device_node *np;
-> @@ -2316,6 +2329,7 @@ static int __init arm_smmu_init(void)
->   		bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
->   #endif
->
-> +	init_done = true;
->   	return 0;
->   }
->
-> @@ -2327,6 +2341,25 @@ static void __exit arm_smmu_exit(void)
->   subsys_initcall(arm_smmu_init);
->   module_exit(arm_smmu_exit);
->
-> +static int __init arm_smmu_of_setup(struct device_node *np)
-> +{
-> +	struct platform_device *pdev;
-> +
-> +	if (!init_done)
-> +		arm_smmu_init();
-> +
-> +	pdev = of_platform_device_create(np, NULL, platform_bus_type.dev_root);
-> +	if (IS_ERR(pdev))
-> +		return PTR_ERR(pdev);
-> +
-> +	of_iommu_set_ops(np, &arm_smmu_ops);
-> +	return 0;
-> +}
-> +
-> +IOMMU_OF_DECLARE(arm_smmu_of, "arm,mmu-500",
-> +		 arm_smmu_of_setup);
-> +
-> +
->   MODULE_DESCRIPTION("IOMMU API for ARM architected SMMU implementations");
->   MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
->   MODULE_LICENSE("GPL v2");
->
+Yeah, I've never really bothered with data too much, its a debug
+feature. So lock_class_key is 8 bytes, and strictly speaking you could
+union them over other fields, all we really need is unique addresses, we
+don't actually use the storage.
