@@ -1,235 +1,328 @@
 From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Fri,  6 Feb 2015 19:27:44 +0530
-Subject: [PATCH v2 1/3] clk: samsung: exynos7: add clocks for CPU block
+Date: Fri,  6 Feb 2015 19:27:45 +0530
+Subject: [PATCH v2 2/3] clk: samsung: add cpu clock support for Exynos7
 In-Reply-To: <1423231066-7341-1-git-send-email-a.kesavan@samsung.com>
 References: <1423231066-7341-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <1423231066-7341-2-git-send-email-a.kesavan@samsung.com>
+Message-ID: <1423231066-7341-3-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clock support for the Atlas CPU block in Exynos7.
+The divider and mux register offsets and bits are different on
+Exynos7 from the older SoCs. Add new pre/post rate change callbacks
+for Exynos7 to handle these differences. To do this:
+	- Add a new exynos_cpuclk_soc_data structure that will hold
+	the SoC-specific pre/post rate change call-backs
+	- Modify exynos_register_cpu_clock() prototype to include a
+	node pointer
 
 Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
 ---
- .../devicetree/bindings/clock/exynos7-clock.txt    |    6 +
- drivers/clk/samsung/clk-exynos7.c                  |  121 ++++++++++++++++++++
- include/dt-bindings/clock/exynos7-clk.h            |   20 +++-
- 3 files changed, 146 insertions(+), 1 deletion(-)
+ drivers/clk/samsung/clk-cpu.c        |  147 +++++++++++++++++++++++++++++++++-
+ drivers/clk/samsung/clk-cpu.h        |   33 +++++++-
+ drivers/clk/samsung/clk-exynos4.c    |    2 +-
+ drivers/clk/samsung/clk-exynos5250.c |    2 +-
+ drivers/clk/samsung/clk-exynos5420.c |    4 +-
+ 5 files changed, 180 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/exynos7-clock.txt b/Documentation/devicetree/bindings/clock/exynos7-clock.txt
-index 6bf1e74..bcf274b5 100644
---- a/Documentation/devicetree/bindings/clock/exynos7-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/exynos7-clock.txt
-@@ -28,6 +28,7 @@ Required Properties for Clock Controller:
- 	- "samsung,exynos7-clock-topc"
- 	- "samsung,exynos7-clock-top0"
- 	- "samsung,exynos7-clock-top1"
-+	- "samsung,exynos7-clock-atlas"
- 	- "samsung,exynos7-clock-ccore"
- 	- "samsung,exynos7-clock-peric0"
- 	- "samsung,exynos7-clock-peric1"
-@@ -64,6 +65,11 @@ Input clocks for top1 clock controller:
- 	- dout_sclk_cc_pll
- 	- dout_sclk_mfc_pll
+diff --git a/drivers/clk/samsung/clk-cpu.c b/drivers/clk/samsung/clk-cpu.c
+index 009a21b..7cccc43 100644
+--- a/drivers/clk/samsung/clk-cpu.c
++++ b/drivers/clk/samsung/clk-cpu.c
+@@ -51,6 +51,13 @@
+ #define DIV_MASK_ALL		0xffffffff
+ #define MUX_MASK		7
  
-+Input clocks for atlas clock controller:
-+	- fin_pll
-+	- fout_atlas_pll
-+	- mout_sclk_bus0_pll_atlas
++#define EXYNOS7_SRC_CPU		0x208
++#define EXYNOS7_STAT_CPU	0x408
++#define EXYNOS7_DIV_CPU0	0x600
++#define EXYNOS7_DIV_CPU1	0x604
++#define EXYNOS7_DIV_STAT_CPU0	0x700
++#define EXYNOS7_DIV_STAT_CPU1	0x704
 +
- Input clocks for ccore clock controller:
- 	- fin_pll
- 	- dout_aclk_ccore_133
-diff --git a/drivers/clk/samsung/clk-exynos7.c b/drivers/clk/samsung/clk-exynos7.c
-index b61724b..cec026c 100644
---- a/drivers/clk/samsung/clk-exynos7.c
-+++ b/drivers/clk/samsung/clk-exynos7.c
-@@ -36,6 +36,34 @@
- #define DIV_TOPC3		0x060C
- #define ENABLE_ACLK_TOPC1	0x0804
+ /*
+  * Helper function to wait until divider(s) have stabilized after the divider
+  * value has changed.
+@@ -232,6 +239,105 @@ static int exynos_cpuclk_post_rate_change(struct clk_notifier_data *ndata,
+ 	return 0;
+ }
  
-+static const struct samsung_pll_rate_table pll1450x_24mhz_tbl[] = {
-+	/* rate, m, p, s */
-+	PLL_35XX_RATE(2496000000, 208, 2, 0),
-+	PLL_35XX_RATE(2400000000, 200, 2, 0),
-+	PLL_35XX_RATE(2304000000, 192, 2, 0),
-+	PLL_35XX_RATE(2200000000, 275, 3, 0),
-+	PLL_35XX_RATE(2100000000, 175, 2, 0),
-+	PLL_35XX_RATE(2000000000, 250, 3, 0),
-+	PLL_35XX_RATE(1896000000, 158, 2, 0),
-+	PLL_35XX_RATE(1800000000, 150, 2, 0),
-+	PLL_35XX_RATE(1704000000, 142, 2, 0),
-+	PLL_35XX_RATE(1600000000, 200, 3, 0),
-+	PLL_35XX_RATE(1500000000, 250, 2, 1),
-+	PLL_35XX_RATE(1400000000, 350, 3, 1),
-+	PLL_35XX_RATE(1300000000, 325, 3, 1),
-+	PLL_35XX_RATE(1200000000, 200, 2, 1),
-+	PLL_35XX_RATE(1100000000, 275, 3, 1),
-+	PLL_35XX_RATE(1000000000, 250, 3, 1),
-+	PLL_35XX_RATE(900000000, 150, 2, 1),
-+	PLL_35XX_RATE(800000000, 200, 3, 1),
-+	PLL_35XX_RATE(700000000, 350, 3, 2),
-+	PLL_35XX_RATE(600000000, 200, 2, 2),
-+	PLL_35XX_RATE(500000000, 250, 3, 2),
-+	PLL_35XX_RATE(400000000, 200, 3, 2),
-+	PLL_35XX_RATE(300000000, 200, 2, 3),
-+	PLL_35XX_RATE(200000000, 200, 3, 3),
-+};
-+
- static struct samsung_fixed_factor_clock topc_fixed_factor_clks[] __initdata = {
- 	FFACTOR(0, "ffac_topc_bus0_pll_div2", "mout_bus0_pll_ctrl", 1, 2, 0),
- 	FFACTOR(0, "ffac_topc_bus0_pll_div4",
-@@ -57,6 +85,8 @@ PNAME(mout_bus1_pll_ctrl_p)	= { "fin_pll", "fout_bus1_pll" };
- PNAME(mout_cc_pll_ctrl_p)	= { "fin_pll", "fout_cc_pll" };
- PNAME(mout_mfc_pll_ctrl_p)	= { "fin_pll", "fout_mfc_pll" };
- 
-+PNAME(mout_topc_group1)	= { "mout_bus0_pll_ctrl", "ffac_topc_bus0_pll_div2",
-+	 "mout_bus1_pll_ctrl", "mout_cc_pll_ctrl" };
- PNAME(mout_topc_group2) = { "mout_sclk_bus0_pll_cmuc",
- 	"mout_sclk_bus1_pll_cmuc", "mout_sclk_cc_pll_cmuc",
- 	"mout_sclk_mfc_pll_cmuc" };
-@@ -111,6 +141,8 @@ static struct samsung_mux_clock topc_mux_clks[] __initdata = {
- 
- 	MUX(0, "mout_sclk_bus0_pll_out", mout_sclk_bus0_pll_out_p,
- 		MUX_SEL_TOPC1, 16, 1),
-+	MUX(MOUT_SCLK_BUS0_PLL_ATLAS, "mout_sclk_bus0_pll_atlas",
-+		mout_topc_group1, MUX_SEL_TOPC1, 4, 2),
- 	MUX(0, "mout_aud_pll_ctrl", mout_aud_pll_ctrl_p, MUX_SEL_TOPC1, 0, 1),
- 
- 	MUX(0, "mout_aclk_ccore_133", mout_topc_group2,	MUX_SEL_TOPC2, 4, 2),
-@@ -504,6 +536,95 @@ static void __init exynos7_clk_top1_init(struct device_node *np)
- CLK_OF_DECLARE(exynos7_clk_top1, "samsung,exynos7-clock-top1",
- 	exynos7_clk_top1_init);
- 
-+/* Register Offset definitions for CMU_ATLAS (0x11800000) */
-+#define	ATLAS_PLL_LOCK			0x0000
-+#define	ATLAS_PLL_CON0			0x0100
-+#define	MUX_SEL_ATLAS0			0x0200
-+#define	MUX_SEL_ATLAS1			0x0204
-+#define	MUX_SEL_ATLAS2			0x0208
-+#define	DIV_ATLAS0			0x0600
-+#define	DIV_ATLAS1			0x0604
-+#define	ENABLE_SCLK_ATLAS		0x0A00
-+
-+/* List of parent clocks for Muxes in CMU_ATLAS */
-+PNAME(mout_atlas_pll_ctrl_p) = { "fin_pll", "fout_atlas_pll" };
-+PNAME(mout_bus_pll_atlas_p) = { "fin_pll", "mout_sclk_bus0_pll_atlas" };
-+PNAME(mout_atlas_p) = { "mout_atlas_pll_ctrl", "mout_bus_pll_atlas" };
-+
-+static unsigned long atlas_clk_regs[] __initdata = {
-+	ATLAS_PLL_LOCK,
-+	ATLAS_PLL_CON0,
-+	MUX_SEL_ATLAS0,
-+	MUX_SEL_ATLAS1,
-+	MUX_SEL_ATLAS2,
-+	DIV_ATLAS0,
-+	DIV_ATLAS1,
-+	ENABLE_SCLK_ATLAS,
-+};
-+
-+static struct samsung_mux_clock atlas_mux_clks[] __initdata = {
-+	MUX_F(MOUT_ATLAS_PLL_CTRL, "mout_atlas_pll_ctrl", mout_atlas_pll_ctrl_p,
-+		MUX_SEL_ATLAS0, 0, 1, CLK_SET_RATE_PARENT, 0),
-+	MUX_F(MOUT_BUS_PLL_ATLAS, "mout_bus_pll_atlas", mout_bus_pll_atlas_p,
-+		MUX_SEL_ATLAS1, 0, 1, CLK_SET_RATE_PARENT, 0),
-+	MUX_F(MOUT_ATLAS, "mout_atlas", mout_atlas_p,
-+		MUX_SEL_ATLAS2, 0, 1, CLK_SET_RATE_PARENT, 0),
-+};
-+
-+static struct samsung_div_clock atlas_div_clks[] __initdata = {
-+	DIV(DOUT_PCLK_DBG_CLK_ATLAS, "dout_pclk_dbg_clk_atlas", "dout_atlas2",
-+		DIV_ATLAS0, 26, 6),
-+	DIV(DOUT_ATCLK_ATLAS, "dout_atclk_atlas", "dout_atlas2",
-+		DIV_ATLAS0, 20, 6),
-+	DIV(DOUT_PCLK_ATLAS, "dout_pclk_atlas", "dout_atlas2",
-+		DIV_ATLAS0, 12, 6),
-+	DIV(DOUT_ACLK_ATLAS, "dout_aclk_atlas", "dout_atlas2",
-+		DIV_ATLAS0, 8, 3),
-+	DIV(DOUT_ATLAS2, "dout_atlas2", "dout_atlas1",
-+		DIV_ATLAS0, 4, 3),
-+	DIV(DOUT_ATLAS1, "dout_atlas1", "mout_atlas",
-+		DIV_ATLAS0, 0, 3),
-+
-+	DIV(DOUT_CNTCLK_ATLAS, "dout_cntclk_atlas", "dout_atlas2",
-+		DIV_ATLAS1, 8, 4),
-+	DIV(DOUT_SCLK_HPM_ATLAS, "dout_sclk_hpm_atlas", "mout_atlas",
-+		DIV_ATLAS1, 4, 3),
-+	DIV(DOUT_ATLAS_PLL, "dout_atlas_pll", "mout_atlas",
-+		DIV_ATLAS1, 0, 3),
-+};
-+
-+static struct samsung_gate_clock atlas_gate_clks[] __initdata = {
-+	GATE(CLK_ATLAS, "atlas", "dout_atlas2",
-+		ENABLE_SCLK_ATLAS, 0, 0, 0),
-+};
-+
-+static struct samsung_pll_clock atlas_pll_clks[] __initdata = {
-+	PLL(pll_1450x, FOUT_ATLAS_PLL, "fout_atlas_pll", "fin_pll",
-+		ATLAS_PLL_LOCK, ATLAS_PLL_CON0,
-+		pll1450x_24mhz_tbl),
-+};
-+
-+static struct samsung_cmu_info atlas_cmu_info __initdata = {
-+	.pll_clks		= atlas_pll_clks,
-+	.nr_pll_clks		= ARRAY_SIZE(atlas_pll_clks),
-+	.mux_clks		= atlas_mux_clks,
-+	.nr_mux_clks		= ARRAY_SIZE(atlas_mux_clks),
-+	.div_clks		= atlas_div_clks,
-+	.nr_div_clks		= ARRAY_SIZE(atlas_div_clks),
-+	.gate_clks		= atlas_gate_clks,
-+	.nr_gate_clks		= ARRAY_SIZE(atlas_gate_clks),
-+	.nr_clk_ids		= ATLAS_NR_CLK,
-+	.clk_regs		= atlas_clk_regs,
-+	.nr_clk_regs		= ARRAY_SIZE(atlas_clk_regs),
-+};
-+
-+static void __init exynos7_clk_atlas_init(struct device_node *np)
++/* Exynos7 helper function to set the 'safe' dividers for the CPU clock. The
++ * parameters div and mask contain the divider value and the register bit mask
++ * of the dividers to be programmed.
++ */
++static void exynos7_set_safe_div(void __iomem *base, unsigned long div,
++					unsigned long mask)
 +{
-+	samsung_cmu_register_one(np, &atlas_cmu_info);
++	unsigned long div1;
++
++	div1 = readl(base + EXYNOS7_DIV_CPU1);
++	div1 = (div1 & ~mask) | (div & mask);
++	writel(div1, base + EXYNOS7_DIV_CPU1);
++	wait_until_divider_stable(base + EXYNOS7_DIV_STAT_CPU1, mask);
 +}
 +
-+CLK_OF_DECLARE(exynos7_clk_atlas, "samsung,exynos7-clock-atlas",
-+		exynos7_clk_atlas_init);
- /* Register Offset definitions for CMU_CCORE (0x105B0000) */
- #define MUX_SEL_CCORE			0x0200
- #define DIV_CCORE			0x0600
-diff --git a/include/dt-bindings/clock/exynos7-clk.h b/include/dt-bindings/clock/exynos7-clk.h
-index 6fad139..6b9465c 100644
---- a/include/dt-bindings/clock/exynos7-clk.h
-+++ b/include/dt-bindings/clock/exynos7-clk.h
-@@ -21,7 +21,8 @@
- #define ACLK_MSCL_532			8
- #define DOUT_SCLK_AUD_PLL		9
- #define FOUT_AUD_PLL			10
--#define TOPC_NR_CLK			11
-+#define MOUT_SCLK_BUS0_PLL_ATLAS	11
-+#define TOPC_NR_CLK			12
- 
- /* TOP0 */
- #define DOUT_ACLK_PERIC1		1
-@@ -51,6 +52,23 @@
- #define CLK_SCLK_MMC0			8
- #define TOP1_NR_CLK			9
- 
-+/* ATLAS */
-+#define FOUT_ATLAS_PLL			1
-+#define MOUT_ATLAS_PLL_CTRL		2
-+#define MOUT_BUS_PLL_ATLAS		3
-+#define MOUT_ATLAS			4
-+#define DOUT_PCLK_DBG_CLK_ATLAS		5
-+#define DOUT_ATCLK_ATLAS		6
-+#define DOUT_PCLK_ATLAS			7
-+#define DOUT_ACLK_ATLAS			8
-+#define DOUT_ATLAS2			9
-+#define DOUT_ATLAS1			10
-+#define DOUT_CNTCLK_ATLAS		11
-+#define CLK_ATLAS			12
-+#define DOUT_SCLK_HPM_ATLAS		13
-+#define DOUT_ATLAS_PLL			14
-+#define ATLAS_NR_CLK			15
++/* Exynos7 handler for pre-rate change notification from parent clock */
++static int exynos7_cpuclk_pre_rate_change(struct clk_notifier_data *ndata,
++			struct exynos_cpuclk *cpuclk, void __iomem *base)
++{
++	const struct exynos_cpuclk_cfg_data *cfg_data = cpuclk->cfg;
++	unsigned long alt_prate = clk_get_rate(cpuclk->alt_parent);
++	unsigned long alt_div = 0, alt_div_mask = DIV_MASK;
++	unsigned long div0, div1 = 0, mux_reg;
 +
- /* CCORE */
- #define PCLK_RTC			1
- #define CCORE_NR_CLK			2
++	/* find out the divider values to use for clock data */
++	while ((cfg_data->prate * 1000) != ndata->new_rate) {
++		if (cfg_data->prate == 0)
++			return -EINVAL;
++		cfg_data++;
++	}
++
++	spin_lock(cpuclk->lock);
++
++	div0 = cfg_data->div0;
++	div1 = cfg_data->div1;
++
++	/*
++	 * If the new and old parent clock speed is less than the clock speed
++	 * of the alternate parent, then it should be ensured that at no point
++	 * the armclk speed is more than the old_prate until the dividers are
++	 * set.
++	 */
++	if (alt_prate > ndata->old_rate) {
++		alt_div =  DIV_ROUND_UP(alt_prate, ndata->old_rate) - 1;
++		WARN_ON(alt_div >= MAX_DIV);
++		alt_div |= E4210_DIV1_HPM_MASK;
++		alt_div_mask |= E4210_DIV1_HPM_MASK;
++
++		exynos7_set_safe_div(base, alt_div, alt_div_mask);
++		div1 |= alt_div;
++	}
++
++	/* select mout_bus0_pll_atlas as the alternate parent */
++	mux_reg = readl(base + EXYNOS7_SRC_CPU);
++	writel(mux_reg | (1 << 0), base + EXYNOS7_SRC_CPU);
++	wait_until_mux_stable(base + EXYNOS7_STAT_CPU, 0, 1);
++
++	/* alternate parent is active now. set the dividers */
++	writel(div0, base + EXYNOS7_DIV_CPU0);
++	wait_until_divider_stable(base + EXYNOS7_DIV_STAT_CPU0, DIV_MASK_ALL);
++
++	writel(div1, base + EXYNOS7_DIV_CPU1);
++	wait_until_divider_stable(base + EXYNOS7_DIV_STAT_CPU1,
++			DIV_MASK_ALL);
++
++	spin_unlock(cpuclk->lock);
++	return 0;
++}
++
++/* Exynos7 handler for post-rate change notification from parent clock */
++static int exynos7_cpuclk_post_rate_change(struct clk_notifier_data *ndata,
++			struct exynos_cpuclk *cpuclk, void __iomem *base)
++{
++	const struct exynos_cpuclk_cfg_data *cfg_data = cpuclk->cfg;
++	unsigned long div = 0, div_mask = DIV_MASK;
++	unsigned long mux_reg;
++
++	spin_lock(cpuclk->lock);
++
++	/* select mout_atlas_pll as the alternate parent */
++	mux_reg = readl(base + EXYNOS7_SRC_CPU);
++	writel(mux_reg & ~(1 << 0), base + EXYNOS7_SRC_CPU);
++	wait_until_mux_stable(base + EXYNOS7_STAT_CPU, 0, 0);
++
++	/* find out the divider values to use for clock data */
++	while ((cfg_data->prate * 1000) != ndata->new_rate) {
++		if (cfg_data->prate == 0)
++			return -EINVAL;
++		cfg_data++;
++	}
++
++	div |= (cfg_data->div1 & E4210_DIV1_HPM_MASK);
++	div_mask |= E4210_DIV1_HPM_MASK;
++
++	exynos7_set_safe_div(base, div, div_mask);
++	spin_unlock(cpuclk->lock);
++	return 0;
++}
++
+ /*
+  * This notifier function is called for the pre-rate and post-rate change
+  * notifications of the parent clock of cpuclk.
+@@ -248,25 +354,58 @@ static int exynos_cpuclk_notifier_cb(struct notifier_block *nb,
+ 	base = cpuclk->ctrl_base;
+ 
+ 	if (event == PRE_RATE_CHANGE)
+-		err = exynos_cpuclk_pre_rate_change(ndata, cpuclk, base);
++		err = cpuclk->pre_rate_cb(ndata, cpuclk, base);
+ 	else if (event == POST_RATE_CHANGE)
+-		err = exynos_cpuclk_post_rate_change(ndata, cpuclk, base);
++		err = cpuclk->post_rate_cb(ndata, cpuclk, base);
+ 
+ 	return notifier_from_errno(err);
+ }
+ 
++static const struct exynos_cpuclk_soc_data e4210_clk_soc_data __initconst = {
++	.pre_rate_cb = exynos_cpuclk_pre_rate_change,
++	.post_rate_cb = exynos_cpuclk_post_rate_change,
++};
++
++static const struct exynos_cpuclk_soc_data e7_clk_soc_data __initconst = {
++	.pre_rate_cb = exynos7_cpuclk_pre_rate_change,
++	.post_rate_cb = exynos7_cpuclk_post_rate_change,
++};
++
++static const struct of_device_id exynos_cpuclk_ids[] __initconst = {
++	{ .compatible = "samsung,exynos4210-clock",
++			.data = &e4210_clk_soc_data, },
++	{ .compatible = "samsung,exynos5250-clock",
++			.data = &e4210_clk_soc_data, },
++	{ .compatible = "samsung,exynos5420-clock",
++			.data = &e4210_clk_soc_data, },
++	{ .compatible = "samsung,exynos7-clock-atlas",
++			.data = &e7_clk_soc_data, },
++	{ },
++};
++
+ /* helper function to register a CPU clock */
+ int __init exynos_register_cpu_clock(struct samsung_clk_provider *ctx,
+ 		unsigned int lookup_id, const char *name, const char *parent,
+ 		const char *alt_parent, unsigned long offset,
+ 		const struct exynos_cpuclk_cfg_data *cfg,
+-		unsigned long num_cfgs, unsigned long flags)
++		unsigned long num_cfgs, unsigned long flags,
++		struct device_node *np)
+ {
++	const struct of_device_id *match;
++	const struct exynos_cpuclk_soc_data *data = NULL;
+ 	struct exynos_cpuclk *cpuclk;
+ 	struct clk_init_data init;
+ 	struct clk *clk;
+ 	int ret = 0;
+ 
++	if (!np)
++		return -EINVAL;
++
++	match = of_match_node(exynos_cpuclk_ids, np);
++	if (!match)
++		return -EINVAL;
++	data = match->data;
++
+ 	cpuclk = kzalloc(sizeof(*cpuclk), GFP_KERNEL);
+ 	if (!cpuclk)
+ 		return -ENOMEM;
+@@ -281,6 +420,8 @@ int __init exynos_register_cpu_clock(struct samsung_clk_provider *ctx,
+ 	cpuclk->ctrl_base = ctx->reg_base + offset;
+ 	cpuclk->lock = &ctx->lock;
+ 	cpuclk->flags = flags;
++	cpuclk->pre_rate_cb = data->pre_rate_cb;
++	cpuclk->post_rate_cb = data->post_rate_cb;
+ 	cpuclk->clk_nb.notifier_call = exynos_cpuclk_notifier_cb;
+ 
+ 	cpuclk->alt_parent = __clk_lookup(alt_parent);
+diff --git a/drivers/clk/samsung/clk-cpu.h b/drivers/clk/samsung/clk-cpu.h
+index 42e1905..24e844e 100644
+--- a/drivers/clk/samsung/clk-cpu.h
++++ b/drivers/clk/samsung/clk-cpu.h
+@@ -60,6 +60,10 @@ struct exynos_cpuclk_cfg_data {
+  * @num_cfgs: number of array elements in @cfg array.
+  * @clk_nb: clock notifier registered for changes in clock speed of the
+  *	primary parent clock.
++ * @pre_rate_cb: callback function to handle PRE_RATE_CHANGE notification
++ *	of the primary parent clock.
++ * @post_rate_cb: callback function to handle POST_RATE_CHANGE notification
++ *	of the primary parent clock.
+  * @flags: configuration flags for the CPU clock.
+  *
+  * This structure holds information required for programming the CPU clock for
+@@ -73,6 +77,12 @@ struct exynos_cpuclk {
+ 	const struct exynos_cpuclk_cfg_data	*cfg;
+ 	const unsigned long			num_cfgs;
+ 	struct notifier_block			clk_nb;
++	int			(*pre_rate_cb)(struct clk_notifier_data *,
++					struct exynos_cpuclk *,
++					void __iomem *base);
++	int			(*post_rate_cb)(struct clk_notifier_data *,
++					struct exynos_cpuclk *,
++					void __iomem *base);
+ 	unsigned long				flags;
+ 
+ /* The CPU clock registers has DIV1 configuration register */
+@@ -81,11 +91,32 @@ struct exynos_cpuclk {
+ #define CLK_CPU_NEEDS_DEBUG_ALT_DIV	(1 << 1)
+ };
+ 
++/**
++ * struct exynos_cpuclk_soc_data: soc specific data for cpu clocks.
++ * @pre_rate_cb: callback function to handle PRE_RATE_CHANGE notification
++ *	of the primary parent clock.
++ * @post_rate_cb: callback function to handle POST_RATE_CHANGE notification
++ *	of the primary parent clock.
++ *
++ * This structure provides SoC specific data for CPU clocks. Based on
++ * the compatible value of the clock controller node, the value of the
++ * fields in this structure can be populated.
++ */
++struct exynos_cpuclk_soc_data {
++	int			(*pre_rate_cb)(struct clk_notifier_data *,
++					struct exynos_cpuclk *,
++					void __iomem *base);
++	int			(*post_rate_cb)(struct clk_notifier_data *,
++					struct exynos_cpuclk *,
++					void __iomem *base);
++};
++
+ extern int __init exynos_register_cpu_clock(struct samsung_clk_provider *ctx,
+ 			unsigned int lookup_id, const char *name,
+ 			const char *parent, const char *alt_parent,
+ 			unsigned long offset,
+ 			const struct exynos_cpuclk_cfg_data *cfg,
+-			unsigned long num_cfgs, unsigned long flags);
++			unsigned long num_cfgs, unsigned long flags,
++			struct device_node *np);
+ 
+ #endif /* __SAMSUNG_CLK_CPU_H */
+diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
+index 5fb4ab1..29655a4 100644
+--- a/drivers/clk/samsung/clk-exynos4.c
++++ b/drivers/clk/samsung/clk-exynos4.c
+@@ -1473,7 +1473,7 @@ static void __init exynos4_clk_init(struct device_node *np,
+ 		exynos_register_cpu_clock(ctx, CLK_ARM_CLK, "armclk",
+ 			mout_core_p4210[0], mout_core_p4210[1], 0x14200,
+ 			e4210_armclk_d, ARRAY_SIZE(e4210_armclk_d),
+-			CLK_CPU_NEEDS_DEBUG_ALT_DIV | CLK_CPU_HAS_DIV1);
++			CLK_CPU_NEEDS_DEBUG_ALT_DIV | CLK_CPU_HAS_DIV1, np);
+ 	} else {
+ 		samsung_clk_register_mux(ctx, exynos4x12_mux_clks,
+ 			ARRAY_SIZE(exynos4x12_mux_clks));
+diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
+index 1d958f1..56b4147b 100644
+--- a/drivers/clk/samsung/clk-exynos5250.c
++++ b/drivers/clk/samsung/clk-exynos5250.c
+@@ -824,7 +824,7 @@ static void __init exynos5250_clk_init(struct device_node *np)
+ 	exynos_register_cpu_clock(ctx, CLK_ARM_CLK, "armclk",
+ 			mout_cpu_p[0], mout_cpu_p[1], 0x200,
+ 			exynos5250_armclk_d, ARRAY_SIZE(exynos5250_armclk_d),
+-			CLK_CPU_HAS_DIV1);
++			CLK_CPU_HAS_DIV1, np);
+ 
+ 	/*
+ 	 * Enable arm clock down (in idle) and set arm divider
+diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+index 44c1df8..c95be96 100644
+--- a/drivers/clk/samsung/clk-exynos5420.c
++++ b/drivers/clk/samsung/clk-exynos5420.c
+@@ -1359,10 +1359,10 @@ static void __init exynos5x_clk_init(struct device_node *np,
+ 
+ 	exynos_register_cpu_clock(ctx, CLK_ARM_CLK, "armclk",
+ 		mout_cpu_p[0], mout_cpu_p[1], 0x200,
+-		exynos5420_eglclk_d, ARRAY_SIZE(exynos5420_eglclk_d), 0);
++		exynos5420_eglclk_d, ARRAY_SIZE(exynos5420_eglclk_d), 0, np);
+ 	exynos_register_cpu_clock(ctx, CLK_KFC_CLK, "kfcclk",
+ 		mout_kfc_p[0], mout_kfc_p[1], 0x28200,
+-		exynos5420_kfcclk_d, ARRAY_SIZE(exynos5420_kfcclk_d), 0);
++		exynos5420_kfcclk_d, ARRAY_SIZE(exynos5420_kfcclk_d), 0, np);
+ 
+ 	exynos5420_clk_sleep_init();
+ 
 -- 
 1.7.9.5
