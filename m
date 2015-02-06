@@ -1,30 +1,113 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 6 Feb 2015 00:10:03 -0800
-Subject: [GIT PULL] omap device tree changes for v3.20, part 3
-In-Reply-To: <20150130235535.GD16250@atomide.com>
-References: <20150130235535.GD16250@atomide.com>
-Message-ID: <20150206081003.GD23582@quad.lixom.net>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 6 Feb 2015 09:13:07 +0100
+Subject: [PATCH v2 1/2] mtd: nand: pxa3xx: Fix PIO FIFO draining
+In-Reply-To: <20150206010835.GB30781@ld-irv-0074>
+References: <1422284164-16867-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1422284164-16867-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20150204111028.2f0bd376@bbrezillon>
+ <20150206010835.GB30781@ld-irv-0074>
+Message-ID: <20150206091307.1162b123@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 30, 2015 at 03:55:35PM -0800, Tony Lindgren wrote:
-> The following changes since commit 1f43c45df7afb706470f7d81d983dd7763a9452f:
-> 
->   ARM: dts: dra72-evm: Add qspi device (2015-01-20 10:07:25 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.20/dt-pt3-v2
-> 
-> for you to fetch changes up to 726806ad9ba10f8ba8d26ba8154d98a7c9b89a12:
-> 
->   ARM: dts: am57xx-beagle-x15: Fix USB2 mode (2015-01-30 15:48:39 -0800)
-> 
-> ----------------------------------------------------------------
-> Device tree related chages for omaps to fix dm816x syscon,
-> fix various devices for gta04, and add USB nodes for am57xx
-> and dra7.
+Hi Brian,
 
-Merged, thanks.
+On Thu, 5 Feb 2015 17:08:35 -0800
+Brian Norris <computersforpeace@gmail.com> wrote:
 
--Olof
+> + Rob
+> 
+> This patch has conflicts with an ARM64-preparation from Rob. I'd like to
+> get this patch in first, as it's a bugfix. But I'd like to settle
+> Boris's comments first.
+> 
+> (Regarding the request to get this into 3.19: not likely. Judging by the
+> age of the "bug", it's not massively critical, and we have no time. It
+> can get out through -stable once it's gotten proper review and testing.)
+> 
+> On Wed, Feb 04, 2015 at 11:10:28AM +0100, Boris Brezillon wrote:
+> > On Mon, 26 Jan 2015 15:56:03 +0100
+> > Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> > 
+> > > The NDDB register holds the data that are needed by the read and write
+> > > commands.
+> > > 
+> > > However, during a read PIO access, the datasheet specifies that after each 32
+> > > bits read in that register, when BCH is enabled, we have to make sure that the
+> > > RDDREQ bit is set in the NDSR register.
+> > > 
+> > > This fixes an issue that was seen on the Armada 385, and presumably other mvebu
+> > > SoCs, when a read on a newly erased page would end up in the driver reporting a
+> > > timeout from the NAND.
+> > > 
+> > > Cc: <stable@vger.kernel.org> # v3.14
+> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > > ---
+> > >  drivers/mtd/nand/pxa3xx_nand.c | 45 ++++++++++++++++++++++++++++++++++++------
+> > >  1 file changed, 39 insertions(+), 6 deletions(-)
+> > > 
+> > > diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+> > > index 96b0b1d27df1..e6918befb951 100644
+> > > --- a/drivers/mtd/nand/pxa3xx_nand.c
+> > > +++ b/drivers/mtd/nand/pxa3xx_nand.c
+> > > @@ -23,6 +23,7 @@
+> > >  #include <linux/mtd/partitions.h>
+> > >  #include <linux/io.h>
+> > >  #include <linux/irq.h>
+> > > +#include <linux/jiffies.h>
+> > >  #include <linux/slab.h>
+> > >  #include <linux/of.h>
+> > >  #include <linux/of_device.h>
+> > > @@ -480,6 +481,38 @@ static void disable_int(struct pxa3xx_nand_info *info, uint32_t int_mask)
+> > >  	nand_writel(info, NDCR, ndcr | int_mask);
+> > >  }
+> > >  
+> > > +static void drain_fifo(struct pxa3xx_nand_info *info, void *data, int len)
+> > > +{
+> > > +	u32 *dst = (u32 *)data;
+> > > +
+> > > +	if (info->ecc_bch) {
+> > > +		while (len--) {
+> > > +			u32 timeout;
+> > > +
+> > > +			*dst++ = nand_readl(info, NDDB);
+> > > +
+> > > +			/*
+> > > +			 * According to the datasheet, when reading
+> > > +			 * from NDDB with BCH enabled, after each 32
+> > > +			 * bits reads, we have to make sure that the
+> > > +			 * NDSR.RDDREQ bit is set
+> > > +			 */
+> > 
+> > I know the datasheet says this bit should be checked after each
+> > transfer, but I wonder if we shouldn't check it before reading the data.
+> > What happens if you drain all the data available in the FIFO ? Is the
+> > controller still setting the RDDREQ bit ?
+> > 
+> > Moreover, the datasheet says this RDDREQ bit should be checked after
+> > each 32 bytes (not 32 bits) transfer.
+> > Testing it after each readl call shouldn't hurt though.
+> 
+> Seems like that could quite possibly kill performance unnecessarily,
+> couldn't it? But then, PIO is probably not that fast in the first
+> place...
+
+Absolutety, my point was, it shouldn't hurt from a functional POV, but
+yes it will definitely impact performances.
+But that's not the first thing I would rework of if you're concerned
+about performances: when doing PIO read/write, the page read/write
+operations (I mean the part reading the internal fifo) are all done in
+interrupt context (called from pxa3xx_nand_irq), and doing this will
+prevent any other interrupt from taking place while you are
+draining/filling the FIFO :-(.
+An alternative would be to move this part into the read/write_buf
+functions, but that's a lot of work...
+
+Best Regards,
+
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
