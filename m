@@ -1,62 +1,45 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 06 Feb 2015 17:26:25 +0100
-Subject: [PATCH 2/4] rtc: sa1100: convert to run-time register mapping
-In-Reply-To: <CAL_JsqJ5Ju98adz5Y2Ow2JDnvFdKhCRvpH8Xg1OfMYOhJaUUFw@mail.gmail.com>
- (Rob Herring's message of "Thu, 5 Feb 2015 14:47:43 -0600")
-References: <1423005775-26457-1-git-send-email-robh@kernel.org>
- <1423005775-26457-3-git-send-email-robh@kernel.org>
- <87h9v1a8k2.fsf@free.fr>
- <CAL_JsqLiiKvzxQqE=bEx7qoLSZXLZOegt87A=+pR3PJuSBK95w@mail.gmail.com>
- <20150205135037.GP8656@n2100.arm.linux.org.uk>
- <8761bg9ngy.fsf@free.fr>
- <CAL_JsqJ5Ju98adz5Y2Ow2JDnvFdKhCRvpH8Xg1OfMYOhJaUUFw@mail.gmail.com>
-Message-ID: <87vbjf80r2.fsf@free.fr>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri,  6 Feb 2015 17:30:56 +0100
+Subject: [PATCH] pinctrl: imx: do not implicitly set pin regs to -1
+Message-ID: <1423240256-27210-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob Herring <robh@kernel.org> writes:
+Commit 3dac1918a491 ("pinctrl: imx: detect uninitialized pins") needs
+the values in struct imx_pin_reg to be -1. This has been done in a
+rather unorthodox way by setting the memory to 0xff using memset...
+Use a proper for loop to initialize the whole array with -1.
 
->>  - adding to rtc-pxa driver :
->>    - a new rtc device (ie. it will register 2 rtc devices, one of the sa1100
->>      kind, one of the pxa specific kind)
->
-> I fail to see what the rtc-pxa gets us? Something to do with which
-> counter has correct time at boot? It has a rollover longer than ~126
-> years is all I see. Otherwise, it looks like over-engineered h/w to
-> me.
-Compatibility with other OSes, for multi-OS boots, which is the main reason
-rtc-pxa was developped. Of course the other OS is using the other registers,
-*and* resets RCNR to 0 on boot.
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ drivers/pinctrl/freescale/pinctrl-imx.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
->> This has flaws :
->>  - a bit of code will be duplicated between rtc-pxa and rtc-sa1100
->
-> That can probably be mitigated with a common file of shared functions.
-Oh yeah, I like that. Would it mean that in the future you'd have time to help
-with that task ?
-
->>  - the ordering in rtc-pxa between the 2 rtc devices will be important, as if I
->>  remember correctly /dev/rtc points to the first /dev/rtc0 registered
->>
->> But it opens up :
->>  - DT path to both drivers
->>  - isolation between sa1100 architecture changes and pxa architecture changes
->>  - Rob's current patches can remain almost the same
->>
->>> Also note that by including the resource in rtc-sa1100's platform
->>> device resource list, you'll have stacked resources between the two
->>> platform devices appearing in /proc/iomem (you did look at that
->>> before posting the patches, right?)
->> I must admit I don't know if there are nasty consequences, I think I need to
->> follow up the code to have a clear idea.
->
-> I don't follow either. The resources don't appear unless requested and
-> we only have 1 driver requesting it.
-There's only one small test to do to understand, as soon as I'm finished with my
-zylonite's ethernet interrupts, I will make the test to understand what Russell
-said, I might learn something in the test :)
-
-Cheers.
-
+diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c b/drivers/pinctrl/freescale/pinctrl-imx.c
+index 52f2b94..95041b6 100644
+--- a/drivers/pinctrl/freescale/pinctrl-imx.c
++++ b/drivers/pinctrl/freescale/pinctrl-imx.c
+@@ -645,7 +645,7 @@ int imx_pinctrl_probe(struct platform_device *pdev,
+ {
+ 	struct imx_pinctrl *ipctl;
+ 	struct resource *res;
+-	int ret;
++	int ret, i;
+ 
+ 	if (!info || !info->pins || !info->npins) {
+ 		dev_err(&pdev->dev, "wrong pinctrl info\n");
+@@ -662,7 +662,11 @@ int imx_pinctrl_probe(struct platform_device *pdev,
+ 				      info->npins, GFP_KERNEL);
+ 	if (!info->pin_regs)
+ 		return -ENOMEM;
+-	memset(info->pin_regs, 0xff, sizeof(*info->pin_regs) * info->npins);
++
++	for (i = 0; i < info->npins; i++) {
++		info->pin_regs[i].mux_reg = -1;
++		info->pin_regs[i].conf_reg = -1;
++	}
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	ipctl->base = devm_ioremap_resource(&pdev->dev, res);
 -- 
-Robert
+2.2.2
