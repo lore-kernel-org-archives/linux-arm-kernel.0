@@ -1,109 +1,83 @@
-From: gautamvivek1987@gmail.com (Vivek Gautam)
-Date: Fri, 6 Feb 2015 11:37:35 +0530
-Subject: [PATCH v5 0/2] mmc: dw_mmc: exynos: Add HS400 support
-In-Reply-To: <54D4593D.3000007@samsung.com>
-References: <1422499318-13726-1-git-send-email-alim.akhtar@samsung.com>
- <54D41654.8030702@samsung.com>
- <CAFp+6iEGCEiGf5WooHJyh=cnJF_c7j=n_YhHLowfwjpLiXUPiQ@mail.gmail.com>
- <54D4593D.3000007@samsung.com>
-Message-ID: <CAFp+6iGtJgzSO4Qr6JHqKSC34BVVeURjiUbkbYHkrnRcK8qaJg@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 5 Feb 2015 22:18:17 -0800
+Subject: [PATCH 0/3] arm64,hi6220: Enable Hisilicon Hi6220 SoC
+In-Reply-To: <CAAS=xmhj8UMwooYrXQBqzR=J5ernj+EWGV1AqEtHHoWiBgw8gA@mail.gmail.com>
+References: <1423128277-10297-1-git-send-email-bintian.wang@huawei.com>
+ <CANMBJr685FzZzQ660Z1aNJX+Kzkw1OqM6RJAviARbL+5a=MJ2A@mail.gmail.com>
+ <CAOesGMgjv9iLnLmpLADQYoAw=oUkJDAJs72Q5q=DQ75paQ+A-g@mail.gmail.com>
+ <CANMBJr7wx=BwDK9inc-2LdXQhyv-tZZry86Ojr=oH8z53Un76Q@mail.gmail.com>
+ <CAAS=xmhj8UMwooYrXQBqzR=J5ernj+EWGV1AqEtHHoWiBgw8gA@mail.gmail.com>
+Message-ID: <CAOesGMhKRtcGwE-5ZKsZC42ZCBYtLV9A0RT0mEySwsU2uk5cSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-
-On Fri, Feb 6, 2015 at 11:33 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
-> Hi, Vivek.
+On Thu, Feb 5, 2015 at 8:21 PM, Brent Wang <wangbintian@gmail.com> wrote:
+> Hello Olof and Tyler,
 >
-> On 02/06/2015 02:52 PM, Vivek Gautam wrote:
->> Hi Jaehoon,
+> 2015-02-06 7:52 GMT+08:00 Tyler Baker <tyler.baker@linaro.org>:
 >>
+>> On 5 February 2015 at 11:02, Olof Johansson <olof@lixom.net> wrote:
+>> > On Thu, Feb 5, 2015 at 10:46 AM, Tyler Baker <tyler.baker@linaro.org>
+>> > wrote:
+>> >> Hi Bintian,
+>> >>
+>> >> On 5 February 2015 at 01:24, Bintian Wang <bintian.wang@huawei.com>
+>> >> wrote:
+>> >>> Hello,
+>> >>>
+>> >>> Hi6220 is one mobile solution of Hisilicon, this patchset contains
+>> >>> initial support for Hi6220 SoC and HiKey development board, which
+>> >>> is based on ARM Cortex A53 architecture. Initial support is minimal
+>> >>> and includes just the arch configuration, clock driver, device tree
+>> >>> configuration.
+>> >>>
+>> >>> Many peripheral drivers will be submitted later.
+>> >>>
+>> >>> Any comments will be appreciated!
+>> >>>
+>> >>> Thanks,
+>> >>>
+>> >>> Bintian Wang (3):
+>> >>>   arm64: Enable Hisilicon ARMv8 SoC family in Kconfig and defconfig
+>> >>>   clk: hi6220: Clock driver support for Hisilicon hi6220 SoC
+>> >>>   arm64: dts: Add dts files for Hisilicon Hi6220 SoC
+>> >>
+>> >> Thanks for posting these! I've applied this series on top of
+>> >> next-20150204, however there was some fuzz that needed to be cleaned
+>> >> up on 3/3 [1]. I've confirmed the platform is booting to a basic user
+>> >> space without issue.
+>> >
+>> > From ramdisk only, right?
 >>
->> On Fri, Feb 6, 2015 at 6:48 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
->>> Hi, Alim.
->>>
->>> On my board, this patch isn't working fine.
->>> So when i complete to test on my board(exynos5), i will reply with comments.
->>> Sorry for late testing.
+>> Correct, ramdisk only.
 >>
->> I tested this series on linux-next, on Exynos5800-peach-pi board, and HS400
->> seems to be working fine.
->> I can see the card getting detected as HS400, and then i ran iozone as well.
->> The iozone numbers are also as required.
+>> > Given the timing of the posting of this
+>> > patch set, I'm not going to merge it for 3.20. Hopefully for 3.21
+>> > there will be some more peripheral support as well -- at least some
+>> > sort of storage device.
 >>
->> On peach-pit board too, the HS200 mode seems to be working good.
->>
->> What are the observations you saw on your board ?
+>> Seem fair to me. I also hope to see more patches posted shortly.
 >
-> Thanks for testing on your board. I have exynos5422 and exynos5433.(One is eMMC5.0, other is eMMC5.1)
-> I want to see that it's working fine on my board.
-> I should miss something..so i will check more detail after complete my other job, or on this weekend.
-> (It failed for hs400 tuning sequence..I needs to check that it has the board dependency)
-
-Ok
-Thanks for testing it on your side.
-
->
-> Best Regards,
-> Jaehoon Chung
->
->>
->>>
->>> Best Regards,
->>> Jaehoon Chung
->>>
->>> On 01/29/2015 11:41 AM, Alim Akhtar wrote:
->>>> This adds HS400 mode support for exynos dw_mmc host controller.
->>>>
->>>> Currently tested on Exynos5800-peach-pi and Exyons7 platform for HS400 mode.
->>>> Tested HS200 mode with this series applied, HS200 still works.
->>>>
->>>> Appreciate testing on other exynos5/7 platform which supports emmc5.0
->>>>
->>>> Changes in V5:
->>>>       * Enable HS400 on Exynos5800-peach-pi boards
->>>>       * Addressed other review comments from Jaehoon Chung
->>>>
->>>> Changes in V4:
->>>>       * drop the idea of changing existing binding for ciu_div as per [1]
->>>>         * addressed comments from Jaehoon Chung [2]
->>>>
->>>> [1] http://www.spinics.net/lists/linux-samsung-soc/msg40923.html
->>>> [2] http://www.spinics.net/lists/devicetree/msg64373.html
->>>>
->>>> Changes in V3:
->>>>       rebased on ulf's next (commit: 607b448 mmc: core: Make tuning block patterns static)
->>>>
->>>> Seungwon Jeon (2):
->>>>   mmc: dw_mmc: exynos: Support eMMC's HS400 mode
->>>>   ARM: dts: Add HS400 support for exynos5420 and exynos5800
->>>>
->>>>  .../devicetree/bindings/mmc/exynos-dw-mshc.txt     |    7 +
->>>>  arch/arm/boot/dts/exynos5420-peach-pit.dts         |    4 +-
->>>>  arch/arm/boot/dts/exynos5420-pinctrl.dtsi          |    7 +
->>>>  arch/arm/boot/dts/exynos5420-smdk5420.dts          |    4 +-
->>>>  arch/arm/boot/dts/exynos5800-peach-pi.dts          |    7 +-
->>>>  drivers/mmc/host/dw_mmc-exynos.c                   |  185 ++++++++++++++++----
->>>>  drivers/mmc/host/dw_mmc-exynos.h                   |   19 +-
->>>>  drivers/mmc/host/dw_mmc.c                          |   16 +-
->>>>  drivers/mmc/host/dw_mmc.h                          |    2 +
->>>>  9 files changed, 213 insertions(+), 38 deletions(-)
->>>>
->>>
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
->>
->>
->
+> Yes, the mmc and sd drivers will be submitted soon, should they be included
+> in this patchset?  I have thought submitting this patch first for review, if
+> there
+> is no problem for this patchset and then submit other drivers, you know,
+> other
+> drivers will depend on this patchset.
 
 
+The drivers should ideally not depend on the SoC patchset -- the
+driver can go in independently. The DTS updates to specify the
+hardware should go in through arm-soc even if the driver itself (and
+the binding document update) should go in through the driver subsystem
+instead.
 
--- 
-Best Regards
-Vivek Gautam
-Samsung R&D Institute, Bangalore
-India
+
+So, you can choose if you want to post everything as a long series,
+and cc different maintainers on the various parts of the series -- or
+you can post each driver or subsystem as a patchset on its own and let
+that get merged through respective maintainer. The latter is most
+common these days.
+
+
+-Olof
