@@ -1,56 +1,85 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Thu, 05 Feb 2015 16:11:34 -0800
-Subject: [PATCH 7/8] arm64/kexec: Add checks for KVM
-In-Reply-To: <54CF32CB.1060507@linaro.org>
-References: <cover.1421449714.git.geoff@infradead.org>
- <a3353cf2ac47f49c20bbbb88405301cbaa359805.1421449714.git.geoff@infradead.org>
- <20150126191942.GQ23313@leverpostej> <54CA041C.6020403@linaro.org>
- <54CA12A1.8090508@arm.com> <20150129184747.GV17721@leverpostej>
- <54CB206D.7040705@linaro.org> <1422647304.21823.31.camel@infradead.org>
- <54CF32CB.1060507@linaro.org>
-Message-ID: <1423181494.16019.2.camel@infradead.org>
+From: s-anna@ti.com (Suman Anna)
+Date: Thu, 5 Feb 2015 18:11:38 -0600
+Subject: [PATCH v7 1/4] Documentation: dt: add common bindings for
+ hwspinlock
+In-Reply-To: <CAJAp7OiHfaMrVqaZ1r6ZN0aMMpE4OUnvLhODHQJeb6EJMa+o8A@mail.gmail.com>
+References: <1421269101-51105-1-git-send-email-s-anna@ti.com>	<1421269101-51105-2-git-send-email-s-anna@ti.com>	<20150115135201.GG16217@leverpostej>	<20150115135556.GH16217@leverpostej>	<CAL_JsqL2LZAooMk-V8+xeF2g6acZE21M+-OBRw8aEVa-5wVHuQ@mail.gmail.com>	<CAK=WgbYQ=BbinqJ5fsw2Y+FKdy=nasLsw9mX8pw6S_o3owy9-g@mail.gmail.com>	<20150116101746.GA21809@leverpostej>	<CAK=WgbYBqPoUm9byx0du_g5ZmHdYaUVLpSPZYHoCVzNoatNKpw@mail.gmail.com>	<CAJAp7Og+-KQd7bygWQjTS72Kye3fkp3s3ry+2bw7Gcv7aPF5AQ@mail.gmail.com>	<CAK=WgbZ2986xxuAFvMSoyQLaPAxdUpZ8e5g-mSjyETfvd4KKHw@mail.gmail.com>	<CAJAp7OjVULNRd113TtOEwaa6QO-XCDa0oxBm2H5NPvp_kLTSpA@mail.gmail.com>	<54CFE71E.20905@ti.com>
+ <CAJAp7OiHfaMrVqaZ1r6ZN0aMMpE4OUnvLhODHQJeb6EJMa+o8A@mail.gmail.com>
+Message-ID: <54D406BA.6060403@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Takahiro,
+Hi Bjorn,
 
-On Mon, 2015-02-02 at 17:18 +0900, AKASHI Takahiro wrote:
-> On 01/31/2015 04:48 AM, Geoff Levand wrote:
-> > As an initial implementation we can hook into the CPU_DYING_FROZEN
-> > notifier sent to hyp_init_cpu_notify().  The longer term solution
-> > should use kvm_arch_hardware_enable() and kvm_arch_hardware_disable().
+On 02/05/2015 05:01 PM, Bjorn Andersson wrote:
+> On Mon, Feb 2, 2015 at 1:07 PM, Suman Anna <s-anna@ti.com> wrote:
+>> On 02/01/2015 11:55 AM, Bjorn Andersson wrote:
+>>> On Fri, Jan 30, 2015 at 9:41 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+>>>> On Sat, Jan 31, 2015 at 1:29 AM, Bjorn Andersson <bjorn@kryo.se> wrote:
+>>>>> In a system where you have two hwlock blocks lckA and lckB, each
+>>>>> consisting of 8 locks and you have dspB that can only access lckB
+>>>>
+>>>> This is a good example - thanks. To be able to cope with such cases we
+>>>> will have to pass a hwlock block reference and its relative lock id.
+>>>>
+>>>
+>>> Correct, so the #hwlock-cells and hwlock part from the proposal are
+>>> the important one. Having an optional hwlock-names will make things
+>>> easier to read as well, but is not necessary.
+>>
+>> Right, if anything, it would be useful only for the clients, but the
+>> hwspinlock core itself would not need it. So, I would forgo adding the
+>> hwlock-names for now.
+>>
+>>>
+>>>> The DT binding should definitely be prepared for such cases (just kill
+>>>> the base-id field?), but let's see what it means about the Linux
+>>>> implementation.
+>>>>
+>>>
+>>> From the dt binding PoV, we should be able to skip num-locks as well.
+>>> It seems most hwlock blocks have a fixed amount of locks provided and
+>>> the drivers are reporting this to the core when registering.
+>>
+>> I added this originally based on the initial MSM HW Mutex block bindings.
+>>
 > 
-> Are these two different approaches? 
-
-Yes, these are two different solutions,  One initial work-around, and a
-more involved proper solution.  Hooking into the CPU_DYING_FROZEN
-notifier would be a initial fix.  The proper solution would be to move
-the KVM setup to kvm_arch_hardware_enable(), and the shutdown to
-kvm_arch_hardware_disable().
-
-
-> kernel_exec() -> machine_shutdown() -> disable_nonboot_cpu()
->     -> _cpu_down() -> cpu_notify_nofail(CPU_DEAD|...)
+> It's not entirely correct to have this in DT for the MSM HW, as the
+> hardware has a fixed number of mutexes. As soon as we have the binding
+> sorted out I will follow up with a new revision of the tcsr/sfpb-mutex
+> driver.
 > 
-> On the other hand, kvm already has a hook into kvm_arch_hardware_disable():
->    (ignoring kvm_usage_count here)
-> kvm_cpu_hotplug(CPU_DYING) -> hardware_disable()
->     -> hardware_disable_nolock() -> kvm_arch_hardware_disable()
+>>>
+>>> So I think we can reduce the binding to:
+>>>
+>>> Providers:
+>>> #hwlock-cells
+>>>
+>>> Consumers:
+>>> hwlocks
+>>> hwlock-names
+>>>
+>>> For the hardware where number of locks is actually variable (e.g.
+>>> different variants of same block) there can be driver specific entries
+>>> for this.
+>>
+>> Right, we should be able to drop this and use the driver match data. As
+>> it is, the field is used during registration of the block with the
+>> hwspinlock core.
+>>
 > 
-> So it seems that we don't have to add a new hook at hyp_init_cpu_notify()
-> if kvm_arch_hardware_disable() is properly implemented.
+> If we have certain systems where it actually is a property to be
+> configured then they can have individual properties, extending the
+> standard set. Either way, it's not a dynamic property shared by all
+> hwlock drivers, so it should not be in the common binding.
+> 
+> Will you send out a new revision of the binding? I would love to get
+> this integrated so I can move on with the dependents.
 
-Yes, that is correct.  But, as above, you would also need to update the
-KVM startup to use kvm_arch_hardware_enable().
+Yep, will do as soon as I hear from Ohad on what to do with the patch
+"hwspinlock/core: maintain a list of registered hwspinlock banks" that I
+dropped from v7. Without that and dropping hwlock-base-id, I can't get
+the translations done.
 
-> disable_nonboot_cpu() will not inovke cpu hotplug on *boot* cpu, and
-> we should handle it in a separate way though.
-
-IIRC, the secondary cpus go through PSCI on shutdown, and that path
-is working OK.  Maybe I am mistaken though.
-
-The primary cpu shutdown (hyp stubs restored) is what is missing.  The
-primary cpu goes through cpu_soft_restart(), and that is what is
-currently failing.
-
--Geoff
+regards
+Suman
