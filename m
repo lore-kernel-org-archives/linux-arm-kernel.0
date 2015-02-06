@@ -1,67 +1,206 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 6 Feb 2015 10:36:53 +0000
-Subject: [Linaro-acpi] [PATCH v8 02/21] acpi: fix acpi_os_ioremap for arm64
-In-Reply-To: <CAKv+Gu922UwYRN7ZgFNTR7yGGKPLTU8Us7KbvXX-Q8=rqLKNog@mail.gmail.com>
-References: <1422984576.18187.82.camel@deneb.redhat.com>
- <20150204112508.GB26006@e104818-lin.cambridge.arm.com>
- <1423066107.18187.99.camel@deneb.redhat.com>
- <20150204175734.GI26006@e104818-lin.cambridge.arm.com>
- <1423076294.18187.103.camel@deneb.redhat.com>
- <20150205104149.GA18158@e104818-lin.cambridge.arm.com>
- <1423144447.18187.110.camel@deneb.redhat.com>
- <54D39D6B.5090304@linaro.org>
- <20150205174826.GD21970@e104818-lin.cambridge.arm.com>
- <CAKv+Gu922UwYRN7ZgFNTR7yGGKPLTU8Us7KbvXX-Q8=rqLKNog@mail.gmail.com>
-Message-ID: <20150206103653.GA23190@e104818-lin.cambridge.arm.com>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Fri, 6 Feb 2015 18:30:55 +0800
+Subject: [RFC PATCH] x86: kprobes: enable optmize relative call insn
+In-Reply-To: <54B540A8.1020804@hitachi.com>
+References: <54B540A8.1020804@hitachi.com>
+Message-ID: <1423218655-30394-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 05, 2015 at 10:16:03PM +0000, Ard Biesheuvel wrote:
-> On 5 February 2015 at 17:48, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Thu, Feb 05, 2015 at 04:42:19PM +0000, Al Stone wrote:
-> >> On 02/05/2015 06:54 AM, Mark Salter wrote:
-> >> > On Thu, 2015-02-05 at 10:41 +0000, Catalin Marinas wrote:
-> >> >> On Wed, Feb 04, 2015 at 06:58:14PM +0000, Mark Salter wrote:
-> >> >>> On Wed, 2015-02-04 at 17:57 +0000, Catalin Marinas wrote:
-> >> >>>> On Wed, Feb 04, 2015 at 04:08:27PM +0000, Mark Salter wrote:
-> >> >>>>> acpi_os_remap() is used to map ACPI tables. These tables may be in ram
-> >> >>>>> which are already included in the kernel's linear RAM mapping. So we
-> >> >>>>> need ioremap_cache to avoid two mappings to the same physical page
-> >> >>>>> having different caching attributes.
-> >> >>>>
-> >> >>>> What's the call path to acpi_os_ioremap() on such tables already in the
-> >> >>>> linear mapping? I can see an acpi_map() function which already takes
-> >> >>>> care of the RAM mapping case but there are other cases where
-> >> >>>> acpi_os_ioremap() is called directly. For example,
-> >> >>>> acpi_os_read_memory(), can it be called on both RAM and I/O?
-> >> >>>
-> >> >>> acpi_map() is the one I've seen.
-> >> >>
-> >> >> By default, if should_use_kmap() is not patched for arm64, it translates
-> >> >> to page_is_ram(); acpi_map() would simply use a kmap() which returns the
-> >> >> current kernel linear mapping on arm64.
-> >> >
-> >> > The problem with kmap() is that it only maps a single page. I've seen
-> >> > tables over 4k which is why I patched acpi_map() not to use kmap() on
-> >> > arm64.
-> >>
-> >> Right.  Mark replied to this before I could; using kmap() enforced a 4k
-> >> (one page) limit that we kept breaking with some ACPI tables being larger
-> >> than that (DSDTs and SSDTs, fwiw).  This would lead to some very odd behaviors
-> >> when most but not all of a device definition was within the page; using the
-> >> table checksums was one way of detecting the issues.
-> >
-> > OK. So I think Mark's original patch was ok, assuming that the System
-> > Memory cases mentioned by Graeme are detected with page_is_ram().
-> 
-> page_is_ram() returns whether a pfn is covered by the linear mapping,
-> so memory before the kernel or after a mem= limit will be
-> misidentified.
+In reply to Masami Hiramatsu's question on my previous early kprobe
+patch series at:
 
-OK. So in conclusion acpi_os_ioremap() may need to create a cacheable
-mapping even when !page_is_ram() but it has no way of knowing that
-unless we change the core ACPI code to differentiate between
-ioremap_cache and ioremap_nocache. Did I get it right?
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/315771.html
 
+that on x86, early kprobe's applications range is limited by the type of
+optimizable instructions, I made this patch, which enables optimizing
+relative call instructions by introducing specific template for them.
+Such instructions make up about 7% of the kernel. In addition, when
+ftrace is enabled, funtion entry will be it, so early kprobe will be
+much useful than before.
+
+The relationship between ftrace and kprobe is interesting. Under normal
+circumstances, kprobe utilizes ftrace. However, under early case,
+there's no way to tell whether the probing instruction is an ftrace
+entry. Another possible method on that is to move part of ftrace init
+ahead. However, to allow optimize more instructions should also be
+good for performance.
+
+Masami, I'd like to hear your reply on it. Do you think this patch is
+also useful for the normal cases?
+
+Signed-off-by: Wang Nan <wangnan0@huawei.com>
+---
+ arch/x86/include/asm/kprobes.h | 17 +++++++--
+ arch/x86/kernel/kprobes/opt.c  | 82 ++++++++++++++++++++++++++++++++++++++++--
+ 2 files changed, 94 insertions(+), 5 deletions(-)
+
+diff --git a/arch/x86/include/asm/kprobes.h b/arch/x86/include/asm/kprobes.h
+index 017f4bb..3627694 100644
+--- a/arch/x86/include/asm/kprobes.h
++++ b/arch/x86/include/asm/kprobes.h
+@@ -31,6 +31,7 @@
+ #define RELATIVEJUMP_OPCODE 0xe9
+ #define RELATIVEJUMP_SIZE 5
+ #define RELATIVECALL_OPCODE 0xe8
++#define RELATIVECALL_SIZE 5
+ #define RELATIVE_ADDR_SIZE 4
+ #define MAX_STACK_SIZE 64
+ #define MAX_OPTIMIZED_LENGTH (MAX_INSN_SIZE + RELATIVE_ADDR_SIZE)
+@@ -38,8 +39,10 @@
+ #ifdef __ASSEMBLY__
+ 
+ #define KPROBE_OPCODE_SIZE     1
++#define OPT_CALL_TEMPLATE_SIZE (optprobe_call_template_end - \
++		optprobe_call_template_entry)
+ #define MAX_OPTINSN_SIZE ((optprobe_template_end - optprobe_template_entry) + \
+-	MAX_OPTIMIZED_LENGTH + RELATIVEJUMP_SIZE)
++	MAX_OPTIMIZED_LENGTH + RELATIVEJUMP_SIZE + OPT_CALL_TEMPLATE_SIZE)
+ 
+ #ifdef CONFIG_EARLY_KPROBES
+ # define EARLY_KPROBES_CODES_AREA					\
+@@ -81,10 +84,20 @@ extern __visible kprobe_opcode_t optprobe_template_entry;
+ extern __visible kprobe_opcode_t optprobe_template_val;
+ extern __visible kprobe_opcode_t optprobe_template_call;
+ extern __visible kprobe_opcode_t optprobe_template_end;
++
++extern __visible kprobe_opcode_t optprobe_call_template_entry;
++extern __visible kprobe_opcode_t optprobe_call_template_val_destaddr;
++extern __visible kprobe_opcode_t optprobe_call_template_val_retaddr;
++extern __visible kprobe_opcode_t optprobe_call_template_end;
++
++#define OPT_CALL_TEMPLATE_SIZE				\
++	((unsigned long)&optprobe_call_template_end -	\
++	 (unsigned long)&optprobe_call_template_entry)
+ #define MAX_OPTINSN_SIZE 				\
+ 	(((unsigned long)&optprobe_template_end -	\
+ 	  (unsigned long)&optprobe_template_entry) +	\
+-	 MAX_OPTIMIZED_LENGTH + RELATIVEJUMP_SIZE)
++	 MAX_OPTIMIZED_LENGTH + RELATIVEJUMP_SIZE +	\
++	 OPT_CALL_TEMPLATE_SIZE)
+ 
+ extern const int kretprobe_blacklist_size;
+ 
+diff --git a/arch/x86/kernel/kprobes/opt.c b/arch/x86/kernel/kprobes/opt.c
+index dc5fccb..05dd06f 100644
+--- a/arch/x86/kernel/kprobes/opt.c
++++ b/arch/x86/kernel/kprobes/opt.c
+@@ -39,6 +39,23 @@
+ 
+ #include "common.h"
+ 
++static inline bool
++is_relcall(u8 *addr)
++{
++	return (*(u8 *)(addr) == RELATIVECALL_OPCODE);
++}
++
++static inline void *
++get_relcall_target(u8 *addr)
++{
++	struct __arch_relative_insn {
++		u8 op;
++		s32 raddr;
++	} __packed *insn;
++	insn = (struct __arch_relative_insn *)addr;
++	return (void *)((unsigned long)addr + RELATIVECALL_SIZE + insn->raddr);
++}
++
+ unsigned long __recover_optprobed_insn(kprobe_opcode_t *buf, unsigned long addr)
+ {
+ 	struct optimized_kprobe *op;
+@@ -89,6 +106,48 @@ static void synthesize_set_arg1(kprobe_opcode_t *addr, unsigned long val)
+ }
+ 
+ asm (
++#ifdef CONFIG_X86_64
++			".global optprobe_call_template_entry\n"
++			"optprobe_call_template_entry:"
++			"pushq %rdi\n"
++			".global optprobe_call_template_val_destaddr\n"
++			"optprobe_call_template_val_destaddr:"
++			ASM_NOP5
++			ASM_NOP5
++			"pushq %rdi\n"
++			".global optprobe_call_template_val_retaddr\n"
++			"optprobe_call_template_val_retaddr:"
++			ASM_NOP5
++			ASM_NOP5
++			"xchgq %rdi, 8(%rsp)\n"
++			"retq\n"
++#else /* CONFIG_X86_32 */
++			".global optprobe_call_template_entry\n"
++			"optprobe_call_template_entry:"
++			"push %edi\n"
++			".global optprobe_call_template_val_destaddr\n"
++			"optprobe_call_template_val_destaddr:"
++			ASM_NOP5
++			"push %edi\n"
++			".global optprobe_call_template_val_retaddr\n"
++			"optprobe_call_template_val_retaddr:"
++			ASM_NOP5
++			"xchg %edi, 4(%esp)\n"
++			"ret\n"
++#endif
++			".global optprobe_call_template_end\n"
++			"optprobe_call_template_end:\n"
++);
++
++#define __OPTCALL_TMPL_MOVE_DESTADDR_IDX \
++	((long)&optprobe_call_template_val_destaddr - (long)&optprobe_call_template_entry)
++#define __OPTCALL_TMPL_MOVE_RETADDR_IDX \
++	((long)&optprobe_call_template_val_retaddr - (long)&optprobe_call_template_entry)
++#define __OPTCALL_TMPL_END_IDX \
++	((long)&optprobe_call_template_end - (long)&optprobe_call_template_entry)
++#define OPTCALL_TMPL_SIZE	__OPTCALL_TMPL_END_IDX
++
++asm (
+ 			".global optprobe_template_entry\n"
+ 			"optprobe_template_entry:\n"
+ #ifdef CONFIG_X86_64
+@@ -135,6 +194,10 @@ asm (
+ #define TMPL_END_IDX \
+ 	((long)&optprobe_template_end - (long)&optprobe_template_entry)
+ 
++#define TMPL_OPTCALL_MOVE_DESTADDR_IDX	(TMPL_END_IDX + __OPTCALL_TMPL_MOVE_DESTADDR_IDX)
++#define TMPL_OPTCALL_MOVE_RETADDR_IDX	(TMPL_END_IDX + __OPTCALL_TMPL_MOVE_RETADDR_IDX)
++#define TMPL_OPTCALL_END_IDX	(TMPL_END_IDX + __OPTCALL_TMPL_END_IDX)
++
+ #define INT3_SIZE sizeof(kprobe_opcode_t)
+ 
+ /* Optimized kprobe call back function: called from optinsn */
+@@ -175,6 +238,12 @@ static int copy_optimized_instructions(u8 *dest, u8 *src)
+ {
+ 	int len = 0, ret;
+ 
++	if (is_relcall(src)) {
++		memcpy(dest, &optprobe_call_template_entry,
++				OPTCALL_TMPL_SIZE);
++		return OPTCALL_TMPL_SIZE;
++	}
++
+ 	while (len < RELATIVEJUMP_SIZE) {
+ 		ret = __copy_instruction(dest + len, src + len);
+ 		if (!ret || !can_boost(dest + len))
+@@ -365,9 +434,16 @@ int arch_prepare_optimized_kprobe(struct optimized_kprobe *op,
+ 	/* Set probe function call */
+ 	synthesize_relcall(buf + TMPL_CALL_IDX, optimized_callback);
+ 
+-	/* Set returning jmp instruction@the tail of out-of-line buffer */
+-	synthesize_reljump(buf + TMPL_END_IDX + op->optinsn.size,
+-			   (u8 *)op->kp.addr + op->optinsn.size);
++	if (!is_relcall(op->kp.addr)) {
++		/* Set returning jmp instruction at the tail of out-of-line buffer */
++		synthesize_reljump(buf + TMPL_END_IDX + op->optinsn.size,
++				(u8 *)op->kp.addr + op->optinsn.size);
++	} else {
++		synthesize_set_arg1(buf + TMPL_OPTCALL_MOVE_DESTADDR_IDX,
++				(unsigned long)(get_relcall_target(op->kp.addr)));
++		synthesize_set_arg1(buf + TMPL_OPTCALL_MOVE_RETADDR_IDX,
++				(unsigned long)(op->kp.addr + RELATIVECALL_SIZE));
++	}
+ 
+ 	flush_icache_range((unsigned long) buf,
+ 			   (unsigned long) buf + TMPL_END_IDX +
 -- 
-Catalin
+1.8.4
