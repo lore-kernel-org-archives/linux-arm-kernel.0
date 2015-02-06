@@ -1,45 +1,50 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 6 Feb 2015 01:07:53 -0800
-Subject: [GIT PULL 3/3] Samsung CPUIdle updates for v3.20
-In-Reply-To: <54D22D4E.3080703@kernel.org>
-References: <54D22D4E.3080703@kernel.org>
-Message-ID: <20150206090753.GL23582@quad.lixom.net>
+From: julia.lawall@lip6.fr (Julia Lawall)
+Date: Fri, 6 Feb 2015 10:12:22 +0100 (CET)
+Subject: [Cocci] [PATCH v13 3/6] clk: Make clk API return per-user struct
+ clk instances
+In-Reply-To: <54D482EE.6050004@gmail.com>
+References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1422011024-32283-4-git-send-email-tomeu.vizoso@collabora.com>
+ <20150201212432.22722.70917@quantum> <54CFE1FE.7040404@codeaurora.org>
+ <alpine.DEB.2.02.1502022230110.2045@localhost6.localdomain6>
+ <54CFFBCF.90706@codeaurora.org> <20150202225036.421.43421@quantum>
+ <54D0F179.1040906@gmail.com> <54D2AA9B.7010800@codeaurora.org>
+ <54D3900A.9060200@gmail.com> <54D423C3.9030105@codeaurora.org>
+ <54D482EE.6050004@gmail.com>
+Message-ID: <alpine.DEB.2.10.1502061009320.2538@hadrien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 04, 2015 at 11:31:42PM +0900, Kukjin Kim wrote:
-> Hi,
-> 
-> This is cpuidle update for v3.20.
-> Please pull.
-> 
-> Thanks,
-> Kukjin
-> 
-> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
-> 
->   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> tags/samsung-cpuidle
-> 
-> for you to fetch changes up to 712eddf70225ab5ae65e946e22d2dfe6b93e8dd1:
-> 
->   cpuidle: exynos: add coupled cpuidle support for exynos4210
-> (2015-01-30 08:39:15 +0900)
-> 
-> ----------------------------------------------------------------
-> Samsung CPUIdle updates for v3.20
-> 
-> - adds coupled cpuidle support for exynos4210
->   : fix for Exynos platform PM code preparing it for the coupled
->   cpuidle support and adds coupled cpuidle AFTR mode on exynos4210
-> 
-> Note this is mostrly based on earlier cpuidle-exynos4210 driver
-> from Daniel Lezcano and Bart updated.
 
-Merged, thanks.
 
--Olof
+On Fri, 6 Feb 2015, Quentin Lambert wrote:
+
+>
+> On 06/02/2015 03:15, Stephen Boyd wrote:
+> > Thanks for the coccinelle patch. Thinking more about it, I don't think
+> > we care if the pointer is dereferenced because that would require a
+> > definition of struct clk and that is most likely not the case outside of
+> > the clock framework. Did you scan the entire kernel?
+> No I haven't.
+> > I'm running it now
+> > but it seems to be taking a while.
+> >
+> Yes, that's why, as a first step, I chose to limit the scan to the arm
+> directory.
+
+Are you sure to be using all of the options provided:
+
+// Options: --recursive-includes --relax-include-path
+// Options: --include-headers-for-types
+
+And are you using 1.0.0-rc23 or 1.0.0-rc24?  Those should save parsed
+header files so that they don't have to be parsed over and over.
+
+If you are using rc24, then you can use the -j option for parallelism.
+But then you should also use an option like --chunksize 10 (I don't know
+what number would be good), because the default is chunksize 1, and in
+that case the saved parsed header files are not reused, because the fies
+are all processed individually.  In general, it is only the files within a
+chunk that will share parsed header files.
+
+julia
