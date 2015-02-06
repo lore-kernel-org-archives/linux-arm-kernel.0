@@ -1,89 +1,28 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 6 Feb 2015 15:12:10 +0000
-Subject: [PATCH v6 3/7] of: fix size when dma-range is not used
-In-Reply-To: <54D4D59F.6050408@ti.com>
+Date: Fri, 6 Feb 2015 15:15:42 +0000
+Subject: [PATCH v6 0/7] PCI: get DMA configuration from parent device
+In-Reply-To: <1423173179-10227-1-git-send-email-m-karicheri2@ti.com>
 References: <1423173179-10227-1-git-send-email-m-karicheri2@ti.com>
- <1423173179-10227-4-git-send-email-m-karicheri2@ti.com>
- <20150206143812.GB20549@localhost> <54D4D59F.6050408@ti.com>
-Message-ID: <20150206151210.GC23190@e104818-lin.cambridge.arm.com>
+Message-ID: <20150206151542.GD23190@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 06, 2015 at 02:54:23PM +0000, Murali Karicheri wrote:
-> On 02/06/2015 09:38 AM, Catalin Marinas wrote:
-> > On Thu, Feb 05, 2015 at 09:52:55PM +0000, Murali Karicheri wrote:
-> >> Fix the dma-range size when the DT attribute is missing. i.e  set size to
-> >> dev->coherent_dma_mask + 1 instead of dev->coherent_dma_mask. Also add
-> >> code to check invalid values of size configured in DT and log error.
-> >>
-> >> Cc: Joerg Roedel<joro@8bytes.org>
-> >> Cc: Grant Likely<grant.likely@linaro.org>
-> >> Cc: Rob Herring<robh+dt@kernel.org>
-> >> Cc: Bjorn Helgaas<bhelgaas@google.com>
-> >> Cc: Will Deacon<will.deacon@arm.com>
-> >> Cc: Russell King<linux@arm.linux.org.uk>
-> >> Cc: Arnd Bergmann<arnd@arndb.de>
-> >> Cc: Suravee Suthikulpanit<Suravee.Suthikulpanit@amd.com>
-> >>
-> >> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
-> >> ---
-> >>   drivers/of/device.c |   17 ++++++++++++++++-
-> >>   1 file changed, 16 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/drivers/of/device.c b/drivers/of/device.c
-> >> index 2de320d..314c8a9 100644
-> >> --- a/drivers/of/device.c
-> >> +++ b/drivers/of/device.c
-> >> @@ -105,9 +105,24 @@ void of_dma_configure(struct device *dev, struct device_node *np)
-> >>   	ret = of_dma_get_range(np,&dma_addr,&paddr,&size);
-> >>   	if (ret<  0) {
-> >>   		dma_addr = offset = 0;
-> >> -		size = dev->coherent_dma_mask;
-> >> +		size = dev->coherent_dma_mask + 1;
-> >>   	} else {
-> >>   		offset = PFN_DOWN(paddr - dma_addr);
-> >> +
-> >> +		/*
-> >> +		 * Add a work around to treat the size as mask + 1 in case
-> >> +		 * it is defined in DT as a mask.
-> >> +		 */
-> >> +		if (size&  1) {
-> >> +			dev_warn(dev, "Invalid size 0x%llx for dma-range\n",
-> >> +				 size);
-> >> +			size = size + 1;
-> >> +		}
-> >> +
-> >> +		if (!size) {
-> >> +			dev_err(dev, "Adjusted size 0x%llx invalid\n", size);
-> >> +			return;
-> >> +		}
-> >
-> > Would it make sense to set coherent_dma_mask to 0 here to make this more
-> > noticeable? It can be done together with the mask calculation from size.
->
-> I guess you are the following in the code.
-> 
-> if (!size) {
-> 		dev->coherent_dma_mask = 0;
-> 		dev_err(dev, "Adjusted size 0x%llx invalid\n", size);
-> 		return;
-> }
-> 
-> Not sure how this is going to help and how this get handled by the 
-> caller and subsequent logic. Probably it will cause probe to fail, with 
-> some helpful error code.
+On Thu, Feb 05, 2015 at 09:52:52PM +0000, Murali Karicheri wrote:
+> This patch add an important capability to PCI driver on Keystone. I hope to
+> have this merged to the upstream branch so that it is available for v3.20.
 
-Not sure how it will fail, maybe the driver figures out that DMA isn't
-available and say something or switch to PIO. I guess you can leave it
-as 32-bit mask by default for now even in case of size == 0.
+It's very late for 3.20 and the code hasn't been in linux-next at all
+(but it's not me who's merging this code), unless you can squeeze it in
+as a bug-fix.
 
-BTW, since pci_device_add() already sets coherent_dma_mask, you could
-add another check at the beginning of of_dma_configure():
+But the good part is that there is more time to fix the dma mask setting
+as well ;).
 
-	if (!dev->coherent_dma_mask)
-		dev->coherent_dma_mask = DMA_BIT_MASK(32);
+> PCI devices on Keystone doesn't have correct dma_pfn_offset set. This patch
+> add capability to set the dma configuration such as dma-mask, dma_pfn_offset,
+> and dma ops etc using the information from DT. The prior RFCs and discussions
+> are available at [1] and [2] below.
 
-That's more of a nitpick as the values are both the same.
+For the series, you can add:
 
--- 
-Catalin
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
