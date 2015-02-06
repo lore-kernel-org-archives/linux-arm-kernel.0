@@ -1,55 +1,65 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Fri, 06 Feb 2015 10:18:12 +0900
-Subject: [PATCH v5 0/2] mmc: dw_mmc: exynos: Add HS400 support
-In-Reply-To: <1422499318-13726-1-git-send-email-alim.akhtar@samsung.com>
-References: <1422499318-13726-1-git-send-email-alim.akhtar@samsung.com>
-Message-ID: <54D41654.8030702@samsung.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 5 Feb 2015 17:25:28 -0800
+Subject: [PATCH 5/9] mtd: pxa3xx_nand: add support for the Marvell Berlin
+ nand controller
+In-Reply-To: <54C7A3C0.6020507@free-electrons.com>
+References: <1422367816-4257-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1422367816-4257-6-git-send-email-antoine.tenart@free-electrons.com>
+ <54C7A3C0.6020507@free-electrons.com>
+Message-ID: <20150206012528.GD30781@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Alim.
+On Tue, Jan 27, 2015 at 11:42:08AM -0300, Ezequiel Garcia wrote:
+> On 01/27/2015 11:10 AM, Antoine Tenart wrote:
+> > --- a/drivers/mtd/nand/pxa3xx_nand.c
+> > +++ b/drivers/mtd/nand/pxa3xx_nand.c
+...
+> > @@ -244,10 +254,13 @@ module_param(use_dma, bool, 0444);
+> >  MODULE_PARM_DESC(use_dma, "enable DMA for data transferring to/from NAND HW");
+> >  
+> >  static struct pxa3xx_nand_timing timing[] = {
+> > -	{ 40, 80, 60, 100, 80, 100, 90000, 400, 40, },
+> > -	{ 10,  0, 20,  40, 30,  40, 11123, 110, 10, },
+> > -	{ 10, 25, 15,  25, 15,  30, 25000,  60, 10, },
+> > -	{ 10, 35, 15,  25, 15,  25, 25000,  60, 10, },
+> > +	{ 40, 80, 60, 100, 80, 100,  90000, 400, 40, },
+> > +	{ 10,  0, 20,  40, 30,  40,  11123, 110, 10, },
+> > +	{ 10, 25, 15,  25, 15,  30,  25000,  60, 10, },
+> > +	{ 10, 35, 15,  25, 15,  25,  25000,  60, 10, },
+> > +	{  5, 20, 10,  12, 10,  12,  60000,  60, 10, },
+> > +	{  5, 20, 10,  12, 10,  12, 200000, 120, 10, },
+> > +	{  5, 15, 10,  15, 10,  15,  60000,  60, 10, },
+> >  };
+> >  
+> >  static struct pxa3xx_nand_flash builtin_flash_types[] = {
+> > @@ -260,6 +273,20 @@ static struct pxa3xx_nand_flash builtin_flash_types[] = {
+> >  { "512MiB 8-bit",  0xdc2c,  64, 2048,  8,  8, 4096, &timing[2] },
+> >  { "512MiB 16-bit", 0xcc2c,  64, 2048, 16, 16, 4096, &timing[2] },
+> >  { "256MiB 16-bit", 0xba20,  64, 2048, 16, 16, 2048, &timing[3] },
+> > +{ },
+> > +};
+> > +
+> > +static struct pxa3xx_nand_flash berlin_builtin_flash_types[] = {
+> > +{ "2GiB 8-bit",    0xd5ec, 128, 8192,  8,  8, 2048, &timing[4] },
+> > +{ "2GiB 8-bit",    0xd598, 128, 8192,  8,  8, 2048, &timing[5] },
+> > +{ "2GiB 8-bit",    0x482c, 256, 4096,  8,  8, 2048, &timing[6] },
+> > +{ "4GiB 8-bit",    0xd7ec, 128, 8192,  8,  8, 4096, &timing[5] },
+> > +{ "8GiB 8-bit",    0xdeec, 128, 8192,  8,  8, 4096, &timing[5] },
+> > +{ "4GiB 8-bit",    0xd7ad, 256, 8192,  8,  8, 2048, &timing[5] },
+> > +{ "4GiB 8-bit",    0x682c, 256, 4096,  8,  8, 4096, &timing[6] },
+> > +{ "8GiB 8-bit",    0x882c, 256, 8192,  8,  8, 4096, &timing[6] },
+> > +{ "8GiB 8-bit",    0xdead, 256, 8192,  8,  8, 4096, &timing[6] },
+> > +{ },
+> >  };
+> >  
+> 
+> IMO, this sucks. I was hoping to see this old style probing go away,
+> instead of be augmented.
+> 
+> There are proper ways to set timings.
 
-On my board, this patch isn't working fine.
-So when i complete to test on my board(exynos5), i will reply with comments.
-Sorry for late testing.
+Agreed. I'm not taking any additions to this table. Please rewrite the
+code to use the onfi_async_timing_mode_to_sdr_timings() helpers.
 
-Best Regards,
-Jaehoon Chung
-
-On 01/29/2015 11:41 AM, Alim Akhtar wrote:
-> This adds HS400 mode support for exynos dw_mmc host controller.
-> 
-> Currently tested on Exynos5800-peach-pi and Exyons7 platform for HS400 mode.
-> Tested HS200 mode with this series applied, HS200 still works.
-> 
-> Appreciate testing on other exynos5/7 platform which supports emmc5.0
-> 
-> Changes in V5:
-> 	* Enable HS400 on Exynos5800-peach-pi boards
-> 	* Addressed other review comments from Jaehoon Chung
-> 
-> Changes in V4:
-> 	* drop the idea of changing existing binding for ciu_div as per [1]
->         * addressed comments from Jaehoon Chung [2]
-> 
-> [1] http://www.spinics.net/lists/linux-samsung-soc/msg40923.html
-> [2] http://www.spinics.net/lists/devicetree/msg64373.html
-> 
-> Changes in V3:
-> 	rebased on ulf's next (commit: 607b448 mmc: core: Make tuning block patterns static)
-> 
-> Seungwon Jeon (2):
->   mmc: dw_mmc: exynos: Support eMMC's HS400 mode
->   ARM: dts: Add HS400 support for exynos5420 and exynos5800
-> 
->  .../devicetree/bindings/mmc/exynos-dw-mshc.txt     |    7 +
->  arch/arm/boot/dts/exynos5420-peach-pit.dts         |    4 +-
->  arch/arm/boot/dts/exynos5420-pinctrl.dtsi          |    7 +
->  arch/arm/boot/dts/exynos5420-smdk5420.dts          |    4 +-
->  arch/arm/boot/dts/exynos5800-peach-pi.dts          |    7 +-
->  drivers/mmc/host/dw_mmc-exynos.c                   |  185 ++++++++++++++++----
->  drivers/mmc/host/dw_mmc-exynos.h                   |   19 +-
->  drivers/mmc/host/dw_mmc.c                          |   16 +-
->  drivers/mmc/host/dw_mmc.h                          |    2 +
->  9 files changed, 213 insertions(+), 38 deletions(-)
-> 
+Brian
