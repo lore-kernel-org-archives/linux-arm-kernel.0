@@ -1,83 +1,85 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Fri, 6 Feb 2015 13:36:57 -0500
-Subject: [PATCH v6 0/7] PCI: get DMA configuration from parent device
-In-Reply-To: <CAErSpo6GOXHeKKfU8s5jCS3+Mui=HupZd=jpkLEyWAE94Ory5w@mail.gmail.com>
-References: <1423173179-10227-1-git-send-email-m-karicheri2@ti.com>
- <20150206151542.GD23190@e104818-lin.cambridge.arm.com>
- <54D4DD95.7000303@ti.com>
- <CAErSpo6GOXHeKKfU8s5jCS3+Mui=HupZd=jpkLEyWAE94Ory5w@mail.gmail.com>
-Message-ID: <54D509C9.9010204@ti.com>
+From: mpeg.blue@free.fr (Mason)
+Date: Fri, 06 Feb 2015 10:37:32 -0800
+Subject: Delays, clocks, timers, hrtimers, etc
+In-Reply-To: <20150203120925.GM8656@n2100.arm.linux.org.uk>
+References: <54C8E125.3070905@free.fr>
+ <20150203120925.GM8656@n2100.arm.linux.org.uk>
+Message-ID: <54D509EC.7020708@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/2015 12:53 PM, Bjorn Helgaas wrote:
-> On Fri, Feb 6, 2015 at 9:28 AM, Murali Karicheri<m-karicheri2@ti.com>  wrote:
->> On 02/06/2015 10:15 AM, Catalin Marinas wrote:
->>>
->>> On Thu, Feb 05, 2015 at 09:52:52PM +0000, Murali Karicheri wrote:
->>>>
->>>> This patch add an important capability to PCI driver on Keystone. I hope
->>>> to
->>>> have this merged to the upstream branch so that it is available for
->>>> v3.20.
->>>
->>> It's very late for 3.20 and the code hasn't been in linux-next at all
->>> (but it's not me who's merging this code), unless you can squeeze it in
->>> as a bug-fix.
+Hello Russell,
+
+First of all, thanks for the insight you've been providing. It helps a lot.
+(And thanks to everyone who's been answering some of my questions.)
+
+Russell King - ARM Linux wrote:
+
+> On Wed, Jan 28, 2015 at 02:16:21PM +0100, Mason wrote:
+>
+>> [snip udelay discussion]
 >>
->> This is in fact a bug fix as PCI on Keystone is broken without this.
+>> Q2. Cortex A9 global and private timers
+>>
+>> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0407f/CIHGECHJ.html
+>>
+>> (What are private timers used for?)
 >
-> Oh, sorry, I didn't realize that this was so urgent.  I guess I read
-> "this adds an important capability" in the cover letter and concluded
-> that it was new functionality.
-Bjorn,
+> The per-cpu private timers are mostly scheduling of threads.
 
-Thanks for responding.
+Hmmm, I'm confused (again).
 
-Let me give you some context on this without which my explanation won't 
-be complete. For using PCI driver on Keystone, I had submitted patches 
-related to machine and DTS to the arm mailing list to enable the driver 
-on Keystone. Subsequenty one of the patch from my series  was Nack-ed 
-and I was asked to implememented in a different way and started this 
-series. You can refer to the discussion of this at
+CONFIG_CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK means "use the global timer
+for the scheduler clock", right? In that case, are the local timers
+unused by Linux?
 
-http://www.gossamer-threads.com/lists/linux/kernel/2024591
+#ifdef CONFIG_CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
+   sched_clock_register(gt_sched_clock_read, 64, gt_clk_rate);
+#endif
 
-The PCI driver enablement on Keystone is still a working in progress and 
-I am trying to get it fully functional on the upstream. Another missing 
-piece is the SerDes phy driver patch. We have started working on the 
-other part (SerDes phy driver) already as the initial one was not 
-accepted. So it is fine if we are too late for the v3.20 merge window to 
-merge this series and this can be applied to the next branch for v3.21.
+Is there generic code to set up local timers? (If so, where?)
+sched_clock_register only seems to appear in machine-specific code.
 
+What are the pros/cons of global timer vs local timers?
+Or is such a question irrelevant?
+(Because they are used for different purposes?)
+
+>> In my platform-specific code, there is a config option to choose between
+>>
+>> 1) the ARM global timer
+>> 2) a platform-specific timer (timer0)
 >
-> Anyway, if it's broken, presumably PCI on Keystone *did* work at one
-> point.  Can you identify the commit that broke it and requires these
-> fixes, so we can figure out how far the fixes need to be backported?
->
+> Most platforms implement their own timer, because its really sexy for
+> hardware engineers to create yet another different timer implementation
+> which is soo much better than every other timer implementation that has
+> already been created.  You wouldn't believe how many different ways that
+> there are to create a timer - and we still have people coming up with
+> new novel implementations!
 
-I am trying to get this driver enabled on Keystone by adding the missing 
-pieces as described above. So I guess we don't have to back port 
-anything here.
+There is trouble in paradise. I was planning to give the global timer a try,
+instead of the platform-specific timer, until I noticed: "The global timer
+is clocked by PERIPHCLK." And it turns PERIPHCLK is connected to the SoC's
+CPU_CLK (the clock that drives the CPU cores); the same clock that is managed
+by cpufreq. I imagine it's double plus ungood for precise time-keeping to
+have frequency changes of the clocksource input?
 
-> If I merge it, I would like to get into my for-linus branch and get a
-> little time in -next before asking Linus to pull it.  The merge window
-> is a little wrinkle there -- I don't like to add new things to the mix
-> during the window.  But if it's an important fix we can still get it
-> in before the final v3.20.
+>> Q3. Using the generic global timer implementation
+>>
+>> So, how do I use that implementation?
+>> (Is someone other than STMicro using it?)
 
-Please apply this to next branch for v3.21. It currently apply cleanly 
-to v3.19-rc7. If you want me rebase to another branch, let me know I can 
-apply and send you an updated patch.
+To answer that question:
 
-Thanks
+$ grep -rn ARM_GLOBAL_TIMER | grep -v SCHED_CLOCK
+arch/arm/mach-vexpress/Kconfig:7:	select ARM_GLOBAL_TIMER
+arch/arm/mach-bcm/Kconfig:87:	select ARM_GLOBAL_TIMER
+arch/arm/mach-bcm/Kconfig:108:	select ARM_GLOBAL_TIMER
+arch/arm/mach-rockchip/Kconfig:14:	select ARM_GLOBAL_TIMER
+arch/arm/mach-sti/Kconfig:4:	select ARM_GLOBAL_TIMER
+arch/arm/mach-zynq/Kconfig:6:	select ARM_GLOBAL_TIMER if !CPU_FREQ
 
-Murali
+There are indeed a few users; also I wonder why mach-zynq enables
+ARM_GLOBAL_TIMER only if !CPU_FREQ. (Could it be that they have
+the CPU CLOCK driving PERIPHCLK?)
 
->
-> Bjorn
-
-
--- 
-Murali Karicheri
-Linux Kernel, Texas Instruments
+Regards.
