@@ -1,87 +1,119 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 6 Feb 2015 15:16:51 +0100
-Subject: [PATCH] MAINTAINERS: Add dts entries for mvebu and dove
-In-Reply-To: <1423225810-5504-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1423225810-5504-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20150206141651.GQ25985@lunn.ch>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Fri, 06 Feb 2015 11:17:15 -0300
+Subject: [PATCH v2 1/2] mtd: nand: pxa3xx: Fix PIO FIFO draining
+In-Reply-To: <20150206091307.1162b123@bbrezillon>
+References: <1422284164-16867-1-git-send-email-maxime.ripard@free-electrons.com>	<1422284164-16867-2-git-send-email-maxime.ripard@free-electrons.com>	<20150204111028.2f0bd376@bbrezillon>	<20150206010835.GB30781@ld-irv-0074>
+ <20150206091307.1162b123@bbrezillon>
+Message-ID: <54D4CCEB.5090009@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 06, 2015 at 01:30:10PM +0100, Gregory CLEMENT wrote:
-> Since many releases, the modifications of the mvebu device tree files
-> are merged through the mvebu subsystem. This patch makes it official
-> in order to help the contributors using the get_maintainer.pl to find
-> the accurate people.
+On 02/06/2015 05:13 AM, Boris Brezillon wrote:
+> Hi Brian,
 > 
-> In the same time, updated the mvebu description which now includes the
-> kirkwood SoCs and new Armada SoCs.
+> On Thu, 5 Feb 2015 17:08:35 -0800
+> Brian Norris <computersforpeace@gmail.com> wrote:
 > 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> + Rob
+>>
+>> This patch has conflicts with an ARM64-preparation from Rob. I'd like to
+>> get this patch in first, as it's a bugfix. But I'd like to settle
+>> Boris's comments first.
+>>
+>> (Regarding the request to get this into 3.19: not likely. Judging by the
+>> age of the "bug", it's not massively critical, and we have no time. It
+>> can get out through -stable once it's gotten proper review and testing.)
+>>
+>> On Wed, Feb 04, 2015 at 11:10:28AM +0100, Boris Brezillon wrote:
+>>> On Mon, 26 Jan 2015 15:56:03 +0100
+>>> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+>>>
+>>>> The NDDB register holds the data that are needed by the read and write
+>>>> commands.
+>>>>
+>>>> However, during a read PIO access, the datasheet specifies that after each 32
+>>>> bits read in that register, when BCH is enabled, we have to make sure that the
+>>>> RDDREQ bit is set in the NDSR register.
+>>>>
+>>>> This fixes an issue that was seen on the Armada 385, and presumably other mvebu
+>>>> SoCs, when a read on a newly erased page would end up in the driver reporting a
+>>>> timeout from the NAND.
+>>>>
+>>>> Cc: <stable@vger.kernel.org> # v3.14
+>>>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>>> ---
+>>>>  drivers/mtd/nand/pxa3xx_nand.c | 45 ++++++++++++++++++++++++++++++++++++------
+>>>>  1 file changed, 39 insertions(+), 6 deletions(-)
+>>>>
+>>>> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+>>>> index 96b0b1d27df1..e6918befb951 100644
+>>>> --- a/drivers/mtd/nand/pxa3xx_nand.c
+>>>> +++ b/drivers/mtd/nand/pxa3xx_nand.c
+>>>> @@ -23,6 +23,7 @@
+>>>>  #include <linux/mtd/partitions.h>
+>>>>  #include <linux/io.h>
+>>>>  #include <linux/irq.h>
+>>>> +#include <linux/jiffies.h>
+>>>>  #include <linux/slab.h>
+>>>>  #include <linux/of.h>
+>>>>  #include <linux/of_device.h>
+>>>> @@ -480,6 +481,38 @@ static void disable_int(struct pxa3xx_nand_info *info, uint32_t int_mask)
+>>>>  	nand_writel(info, NDCR, ndcr | int_mask);
+>>>>  }
+>>>>  
+>>>> +static void drain_fifo(struct pxa3xx_nand_info *info, void *data, int len)
+>>>> +{
+>>>> +	u32 *dst = (u32 *)data;
+>>>> +
+>>>> +	if (info->ecc_bch) {
+>>>> +		while (len--) {
+>>>> +			u32 timeout;
+>>>> +
+>>>> +			*dst++ = nand_readl(info, NDDB);
+>>>> +
+>>>> +			/*
+>>>> +			 * According to the datasheet, when reading
+>>>> +			 * from NDDB with BCH enabled, after each 32
+>>>> +			 * bits reads, we have to make sure that the
+>>>> +			 * NDSR.RDDREQ bit is set
+>>>> +			 */
+>>>
+>>> I know the datasheet says this bit should be checked after each
+>>> transfer, but I wonder if we shouldn't check it before reading the data.
+>>> What happens if you drain all the data available in the FIFO ? Is the
+>>> controller still setting the RDDREQ bit ?
+>>>
+>>> Moreover, the datasheet says this RDDREQ bit should be checked after
+>>> each 32 bytes (not 32 bits) transfer.
+>>> Testing it after each readl call shouldn't hurt though.
+>>
+>> Seems like that could quite possibly kill performance unnecessarily,
+>> couldn't it? But then, PIO is probably not that fast in the first
+>> place...
+> 
+> Absolutety, my point was, it shouldn't hurt from a functional POV, but
+> yes it will definitely impact performances.
+> But that's not the first thing I would rework of if you're concerned
+> about performances: when doing PIO read/write, the page read/write
+> operations (I mean the part reading the internal fifo) are all done in
+> interrupt context (called from pxa3xx_nand_irq), and doing this will
+> prevent any other interrupt from taking place while you are
+> draining/filling the FIFO :-(.
 
-Apart from the minor problems Jason pointed out,
+But NAND operations are serialized, and there won't be any other
+interrupt for the controller until it's has drained the FIFO. So this
+doesn't really seem to hit performance to me.
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+Or am I missing anything here?
 
-	  Andrew
+> An alternative would be to move this part into the read/write_buf
+> functions, but that's a lot of work...
+> 
 
+Yeah, indeed. This also has other benefits. As we discussed on IRC, it
+would allow to support raw writes (i.e. ECC off).
 
-> ---
-> Hi Jason, Andrew and Sebastian
-> 
-> This last patch [1] showed that if people follow the recommendation to
-> submit patch (using get_maintainer.pl script), we don't receive
-> them. So I propose to amend MAINTAINERS with this patch.
-> 
-> What do you think about it?
-> 
-> If you agree then we can merged it in our next-merge windows (3.21).
-> 
-> Thanks,
-> 
-> Gregory
-> 
-> [1]: http://thread.gmane.org/gmane.linux.drivers.devicetree/109387
-> 
-> 
-> 
->  MAINTAINERS | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 5d9db6b445bc..d96daf53533c 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1149,7 +1149,7 @@ ARM/MAGICIAN MACHINE SUPPORT
->  M:	Philipp Zabel <philipp.zabel@gmail.com>
->  S:	Maintained
->  
-> -ARM/Marvell Armada 370 and Armada XP SOC support
-> +ARM/Marvell Kirkwood and Armada 370, 375, 38x, XP SOC support
->  M:	Jason Cooper <jason@lakedaemon.net>
->  M:	Andrew Lunn <andrew@lunn.ch>
->  M:	Gregory Clement <gregory.clement@free-electrons.com>
-> @@ -1158,6 +1158,8 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->  S:	Maintained
->  F:	arch/arm/mach-mvebu/
->  F:	drivers/rtc/armada38x-rtc
-> +F:	arch/arm/boot/dts/armada*.dts
-> +F:	arch/arm/boot/dts/kirkwood*.dts
->  
->  ARM/Marvell Berlin SoC support
->  M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> @@ -1175,6 +1177,7 @@ F:	arch/arm/mach-dove/
->  F:	arch/arm/mach-mv78xx0/
->  F:	arch/arm/mach-orion5x/
->  F:	arch/arm/plat-orion/
-> +F:	arch/arm/boot/dts/dove*.dts
->  
->  ARM/Orion SoC/Technologic Systems TS-78xx platform support
->  M:	Alexander Clouter <alex@digriz.org.uk>
-> -- 
-> 2.1.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
