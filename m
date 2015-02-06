@@ -1,119 +1,75 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 06 Feb 2015 11:17:15 -0300
-Subject: [PATCH v2 1/2] mtd: nand: pxa3xx: Fix PIO FIFO draining
-In-Reply-To: <20150206091307.1162b123@bbrezillon>
-References: <1422284164-16867-1-git-send-email-maxime.ripard@free-electrons.com>	<1422284164-16867-2-git-send-email-maxime.ripard@free-electrons.com>	<20150204111028.2f0bd376@bbrezillon>	<20150206010835.GB30781@ld-irv-0074>
- <20150206091307.1162b123@bbrezillon>
-Message-ID: <54D4CCEB.5090009@free-electrons.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 6 Feb 2015 15:20:35 +0100
+Subject: [PATCH v4 0/7] clk: Add common clock support for Mediatek MT8135
+ and MT8173.
+In-Reply-To: <20150206103033.GS18908@pengutronix.de>
+References: <1422594798-13375-1-git-send-email-henryc.chen@mediatek.com>
+ <CABuKBeJSH3WzG3QC=9OoPzXE6fd9W2U67V4c19NzWcPxWR7VDg@mail.gmail.com>
+ <20150206103033.GS18908@pengutronix.de>
+Message-ID: <CABuKBeJBp115aD_xb7_2471h=iyr5Wc33m2EX715MxNc=_1p2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/2015 05:13 AM, Boris Brezillon wrote:
-> Hi Brian,
-> 
-> On Thu, 5 Feb 2015 17:08:35 -0800
-> Brian Norris <computersforpeace@gmail.com> wrote:
-> 
->> + Rob
+2015-02-06 11:30 GMT+01:00 Sascha Hauer <s.hauer@pengutronix.de>:
+> On Thu, Feb 05, 2015 at 06:24:54PM +0100, Matthias Brugger wrote:
+>> Hi Henry,
 >>
->> This patch has conflicts with an ARM64-preparation from Rob. I'd like to
->> get this patch in first, as it's a bugfix. But I'd like to settle
->> Boris's comments first.
+>> 2015-01-30 6:13 GMT+01:00 Henry Chen <henryc.chen@mediatek.com>:
+>> > This patchset contains the initial common clock support for Mediatek SoCs.
+>> > Mediatek SoC's clock architecture comprises of various PLLs, dividers, muxes and clock gates.
+>> >
+>> > This patchset also contains a basic clock support for Mediatek MT8135 and MT8173.
+>> >
+>> > This driver is based on 3.19-rc1 + MT8135 and MT8173 basic support.
+>> >
+>> > Changes in v2:
+>> > - Re-ordered patchset. Fold include/dt-bindings and DT document in 1st patch.
+>> >
+>> > Changes in v3:
+>> > - Rebase to 3.19-rc1.
+>> > - Refine code. Remove unneed functions, debug logs and comments, and fine tune error logs.
+>> >
+>> > Changes in v4:
+>> > - Support MT8173 platform.
+>> > - Re-ordered patchset. driver/clk/Makefile in 2nd patch.
+>> > - Extract the common part definition(mtk_gate/mtk_pll/mtk_mux) from clk-mt8135.c/clk-mt8173.c to clk-mtk.c.
+>> > - Refine code. Rmove unnessacary debug information and unsed defines, add prefix "mtk_" for static functions.
+>> > - Remove flag CLK_IGNORE_UNUSED and set flag CLK_SET_RATE_PARENT on gate/mux/fixed-factor.
+>> > - Use spin_lock_irqsave(&clk_ops_lock, flags) instead of mtk_clk_lock.
+>> > - Example above include a node for the clock controller itself, followed by the i2c controller example above.
 >>
->> (Regarding the request to get this into 3.19: not likely. Judging by the
->> age of the "bug", it's not massively critical, and we have no time. It
->> can get out through -stable once it's gotten proper review and testing.)
->>
->> On Wed, Feb 04, 2015 at 11:10:28AM +0100, Boris Brezillon wrote:
->>> On Mon, 26 Jan 2015 15:56:03 +0100
->>> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
->>>
->>>> The NDDB register holds the data that are needed by the read and write
->>>> commands.
->>>>
->>>> However, during a read PIO access, the datasheet specifies that after each 32
->>>> bits read in that register, when BCH is enabled, we have to make sure that the
->>>> RDDREQ bit is set in the NDSR register.
->>>>
->>>> This fixes an issue that was seen on the Armada 385, and presumably other mvebu
->>>> SoCs, when a read on a newly erased page would end up in the driver reporting a
->>>> timeout from the NAND.
->>>>
->>>> Cc: <stable@vger.kernel.org> # v3.14
->>>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->>>> ---
->>>>  drivers/mtd/nand/pxa3xx_nand.c | 45 ++++++++++++++++++++++++++++++++++++------
->>>>  1 file changed, 39 insertions(+), 6 deletions(-)
->>>>
->>>> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
->>>> index 96b0b1d27df1..e6918befb951 100644
->>>> --- a/drivers/mtd/nand/pxa3xx_nand.c
->>>> +++ b/drivers/mtd/nand/pxa3xx_nand.c
->>>> @@ -23,6 +23,7 @@
->>>>  #include <linux/mtd/partitions.h>
->>>>  #include <linux/io.h>
->>>>  #include <linux/irq.h>
->>>> +#include <linux/jiffies.h>
->>>>  #include <linux/slab.h>
->>>>  #include <linux/of.h>
->>>>  #include <linux/of_device.h>
->>>> @@ -480,6 +481,38 @@ static void disable_int(struct pxa3xx_nand_info *info, uint32_t int_mask)
->>>>  	nand_writel(info, NDCR, ndcr | int_mask);
->>>>  }
->>>>  
->>>> +static void drain_fifo(struct pxa3xx_nand_info *info, void *data, int len)
->>>> +{
->>>> +	u32 *dst = (u32 *)data;
->>>> +
->>>> +	if (info->ecc_bch) {
->>>> +		while (len--) {
->>>> +			u32 timeout;
->>>> +
->>>> +			*dst++ = nand_readl(info, NDDB);
->>>> +
->>>> +			/*
->>>> +			 * According to the datasheet, when reading
->>>> +			 * from NDDB with BCH enabled, after each 32
->>>> +			 * bits reads, we have to make sure that the
->>>> +			 * NDSR.RDDREQ bit is set
->>>> +			 */
->>>
->>> I know the datasheet says this bit should be checked after each
->>> transfer, but I wonder if we shouldn't check it before reading the data.
->>> What happens if you drain all the data available in the FIFO ? Is the
->>> controller still setting the RDDREQ bit ?
->>>
->>> Moreover, the datasheet says this RDDREQ bit should be checked after
->>> each 32 bytes (not 32 bits) transfer.
->>> Testing it after each readl call shouldn't hurt though.
->>
->> Seems like that could quite possibly kill performance unnecessarily,
->> couldn't it? But then, PIO is probably not that fast in the first
->> place...
-> 
-> Absolutety, my point was, it shouldn't hurt from a functional POV, but
-> yes it will definitely impact performances.
-> But that's not the first thing I would rework of if you're concerned
-> about performances: when doing PIO read/write, the page read/write
-> operations (I mean the part reading the internal fifo) are all done in
-> interrupt context (called from pxa3xx_nand_irq), and doing this will
-> prevent any other interrupt from taking place while you are
-> draining/filling the FIFO :-(.
+>> You use pericfg and infracfg which will be used by other drivers as
+>> well. So please use syscon for this driver. As it is no longer a
+>> platform device it is present early in boot.
+>> The changes should look something like the patch beneath. Please
+>> beware that it does only show the general concept and may not even
+>> compile. I asked Sascha to implement the reset controller as part of
+>> the clk driver, as the registers addresses are mixed between both,
+>> clock and reset controller. Please coordinate with him to get them
+>> integrated (even as one series or as incremental series).
+>
+> I don't really understand the "as part of the clk driver part". I now
+> have replaced the devm_regmap_init_mmio with syscon_node_to_regmap
+> in the pericfg / infracfg drivers. Is that all that you want or do you
+> want me to move the source code to drivers/clk/mediatek?
 
-But NAND operations are serialized, and there won't be any other
-interrupt for the controller until it's has drained the FIFO. So this
-doesn't really seem to hit performance to me.
+Yes, I propose to move the source code to drivers/clk/mediatek.
+Please have a look on other clock drivers which implement the reset
+controller, e.g. rockchip.
 
-Or am I missing anything here?
+Thanks,
+Matthias
 
-> An alternative would be to move this part into the read/write_buf
-> functions, but that's a lot of work...
-> 
+>
+> Sascha
+>
+> --
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
 
-Yeah, indeed. This also has other benefits. As we discussed on IRC, it
-would allow to support raw writes (i.e. ECC off).
+
 
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+motzblog.wordpress.com
