@@ -1,59 +1,76 @@
-From: mpeg.blue@free.fr (Mason)
-Date: Thu, 05 Feb 2015 19:13:07 -0800
-Subject: cpuidle vs suspend vs something else
-Message-ID: <54D43143.2010403@free.fr>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 6 Feb 2015 04:10:48 +0100
+Subject: [PATCHv6 0/2] Driver for TI tlc591xx 8/16 Channel i2c LED driver
+In-Reply-To: <1422367161-16487-1-git-send-email-andrew@lunn.ch>
+References: <1422367161-16487-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20150206031048.GA9614@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello everyone,
+On Tue, Jan 27, 2015 at 02:59:19PM +0100, Andrew Lunn wrote:
+> This patchset is a driver for the TI tlc59116 16 Channel i2c LED
+> driver and tlc59108 8 Channel i2c LED driver. This driver is used on
+> the Belkin WRT1900AC access point and the C code is derived from code
+> Belkin contributed to OpenWRT.  However it has been extensively
+> re-written, and a device tree binding added to replace platform data.
 
-I've been reading about related sub-systems (cpuidle and suspend)
-and I'm not sure I understand how they relate / interact.
+Hi Bryan
 
-If I understand correctly (please do point out any misconceptions)
-on ARM Cortex A9, the first level of power saving is WFI, which is
-typically called from the idle loop.
+Do you have any further comments on this driver? Are you likely to
+queue it up for the next merge window?
 
-This places the core in low-power mode ("Standby mode" in ARM docs).
-"RAM arrays" (don't know what they are), "processor logic", and
-"data engine" (not sure what any of these exactly refers to, guess
-I have more reading to do) are still powered-up, but most of the
-clocks are disabled.
+      Thanks
+	Andrew
 
-In ARM's exact words, "WFI and WFE Standby modes disable most of the
-clocks in a processor, while keeping its logic powered up. This reduces
-the power drawn to the static leakage current, leaving a tiny clock
-power overhead requirement to enable the device to wake up."
 
-Some CPUs like Intel's have several levels of sleep (deeper levels
-mean less power, but have a higher wake-up latency). AFAIU, cpuidle
-is used to describe and manage these levels?
-
-Isn't suspend somewhat like the deepest level of sleep?
-(Or is it different in that things like RAM state are only a concern
-for suspend, not cpuidle?)
-
-Are both subsystems still actively used?
-
-I saw plans to merge cpufreq into cpuidle / scheduler decisions.
-
-LCA14: LCA14-306: CPUidle & CPUfreq integration with scheduler
-http://www.slideshare.net/linaroorg/lca14-306-cpuidlecpufreqintegrationwithscheduler
-
-This presentation doesn't mention suspend, I think.
-
-ARM has a mode called "Dormant Mode". Is suspend typically
-used to put the SoC in that mode?
-
-I think I need to read this document carefully:
-Power Management In The Linux Kernel -- Current Status And Future
-http://events.linuxfoundation.org/sites/events/files/slides/kernel_PM_plain.pdf
-
-There's also an older document that may prove insightful:
-CPUIdle versus Suspend
-http://www.linuxplumbersconf.org/2010/ocw/proposals/789
-
-But things move so fast in kernel-land, that I don't know how relevant
-a 4 year-old document can be.
-
-Regards.
+> 
+> Cc: Matthew.Fatheree at belkin.com
+> 
+> Since v5:
+>       Hard code number of LEDs, rather than #define
+>       Moved common fields from led into priv
+>       Moved reg_ledout into priv, removed helper functions
+>       Cache brightness to avoid race conditions
+>       tlc591xx_led_set -> tlc591xx_set_brightness
+>       Be paranoid with of_match_device() and client->dev.of_node
+> 
+> Since v4:
+>       Fix Oops on module unload reported by Vignesh R
+> 
+> Since v3:
+>       Generalized and added support for tlc59108
+>       brightness == 0 and brightness == LED_FULL disable PWM and used
+>         fixed OFF/ON mode
+> 
+> Since v2:
+>       Remove incorrect /* Mode register ? */ comment
+>       Parenthesis around the macro arguments
+>       Converted many signed variables into unsigned
+>       Saved an initialization
+> 
+> 
+> Since v1:
+>       s/uint8_t/u8/g
+>       Remove empty line
+>       Removed #gpio-cells
+>       Added select REGMAP_I2C
+>       Sorted #includes into alphabetic order
+>       Added missing MODULE_DEVICE_TABLE(of, ...)
+>       Check return value of regmap_write()
+>       Simplified tlc59116_set_mode()
+> 
+> Andrew Lunn (2):
+>   leds: tlc59116: Document binding for the TI 16 Channel i2c LED driver
+>   leds: tlc59116: Driver for the TI 16 Channel i2c LED driver
+> 
+>  .../devicetree/bindings/leds/leds-tlc59116.txt     |  41 ++++
+>  drivers/leds/Kconfig                               |   7 +
+>  drivers/leds/Makefile                              |   1 +
+>  drivers/leds/leds-tlc59116.c                       | 253 +++++++++++++++++++++
+>  4 files changed, 302 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/leds/leds-tlc59116.txt
+>  create mode 100644 drivers/leds/leds-tlc59116.c
+> 
+> -- 
+> 2.1.3
+> 
