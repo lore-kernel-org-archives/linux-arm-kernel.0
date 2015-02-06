@@ -1,83 +1,79 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 6 Feb 2015 11:08:51 +0000
-Subject: [Linaro-acpi] [PATCH v8 02/21] acpi: fix acpi_os_ioremap for arm64
-In-Reply-To: <20150206103653.GA23190@e104818-lin.cambridge.arm.com>
-References: <1422984576.18187.82.camel@deneb.redhat.com>
- <20150204112508.GB26006@e104818-lin.cambridge.arm.com>
- <1423066107.18187.99.camel@deneb.redhat.com>
- <20150204175734.GI26006@e104818-lin.cambridge.arm.com>
- <1423076294.18187.103.camel@deneb.redhat.com>
- <20150205104149.GA18158@e104818-lin.cambridge.arm.com>
- <1423144447.18187.110.camel@deneb.redhat.com>
- <54D39D6B.5090304@linaro.org>
- <20150205174826.GD21970@e104818-lin.cambridge.arm.com>
- <CAKv+Gu922UwYRN7ZgFNTR7yGGKPLTU8Us7KbvXX-Q8=rqLKNog@mail.gmail.com>
- <20150206103653.GA23190@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu_ExGUkr0AJS4uSHLuz3LxO+x8sxnsnmDAYfVRAgHGXBA@mail.gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Fri, 6 Feb 2015 03:28:45 -0800
+Subject: [PATCH 1/20] mtd: s3c2410: fix misspelling of current function
+ in string
+In-Reply-To: <54856C75.1050309@nod.at>
+References: <1417980062-25151-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1417980062-25151-2-git-send-email-Julia.Lawall@lip6.fr>
+ <CAFLxGvyiqxQ6U6p-A-JW8Nv8OvXFGsna93afUu-Gek0EV3gATA@mail.gmail.com>
+ <alpine.DEB.2.02.1412080809400.2100@localhost6.localdomain6>
+ <54856C75.1050309@nod.at>
+Message-ID: <20150206112845.GF4434@norris-Latitude-E6410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 February 2015 at 10:36, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Thu, Feb 05, 2015 at 10:16:03PM +0000, Ard Biesheuvel wrote:
->> On 5 February 2015 at 17:48, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> > On Thu, Feb 05, 2015 at 04:42:19PM +0000, Al Stone wrote:
->> >> On 02/05/2015 06:54 AM, Mark Salter wrote:
->> >> > On Thu, 2015-02-05 at 10:41 +0000, Catalin Marinas wrote:
->> >> >> On Wed, Feb 04, 2015 at 06:58:14PM +0000, Mark Salter wrote:
->> >> >>> On Wed, 2015-02-04 at 17:57 +0000, Catalin Marinas wrote:
->> >> >>>> On Wed, Feb 04, 2015 at 04:08:27PM +0000, Mark Salter wrote:
->> >> >>>>> acpi_os_remap() is used to map ACPI tables. These tables may be in ram
->> >> >>>>> which are already included in the kernel's linear RAM mapping. So we
->> >> >>>>> need ioremap_cache to avoid two mappings to the same physical page
->> >> >>>>> having different caching attributes.
->> >> >>>>
->> >> >>>> What's the call path to acpi_os_ioremap() on such tables already in the
->> >> >>>> linear mapping? I can see an acpi_map() function which already takes
->> >> >>>> care of the RAM mapping case but there are other cases where
->> >> >>>> acpi_os_ioremap() is called directly. For example,
->> >> >>>> acpi_os_read_memory(), can it be called on both RAM and I/O?
->> >> >>>
->> >> >>> acpi_map() is the one I've seen.
->> >> >>
->> >> >> By default, if should_use_kmap() is not patched for arm64, it translates
->> >> >> to page_is_ram(); acpi_map() would simply use a kmap() which returns the
->> >> >> current kernel linear mapping on arm64.
->> >> >
->> >> > The problem with kmap() is that it only maps a single page. I've seen
->> >> > tables over 4k which is why I patched acpi_map() not to use kmap() on
->> >> > arm64.
->> >>
->> >> Right.  Mark replied to this before I could; using kmap() enforced a 4k
->> >> (one page) limit that we kept breaking with some ACPI tables being larger
->> >> than that (DSDTs and SSDTs, fwiw).  This would lead to some very odd behaviors
->> >> when most but not all of a device definition was within the page; using the
->> >> table checksums was one way of detecting the issues.
->> >
->> > OK. So I think Mark's original patch was ok, assuming that the System
->> > Memory cases mentioned by Graeme are detected with page_is_ram().
->>
->> page_is_ram() returns whether a pfn is covered by the linear mapping,
->> so memory before the kernel or after a mem= limit will be
->> misidentified.
->
-> OK. So in conclusion acpi_os_ioremap() may need to create a cacheable
-> mapping even when !page_is_ram() but it has no way of knowing that
-> unless we change the core ACPI code to differentiate between
-> ioremap_cache and ioremap_nocache. Did I get it right?
->
+On Mon, Dec 08, 2014 at 10:16:37AM +0100, Richard Weinberger wrote:
+> Am 08.12.2014 um 08:11 schrieb Julia Lawall:
+> >>> diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
+> >>> index 35aef5e..0a9c41f 100644
+> >>> --- a/drivers/mtd/nand/s3c2410.c
+> >>> +++ b/drivers/mtd/nand/s3c2410.c
+> >>> @@ -948,7 +948,7 @@ static int s3c24xx_nand_probe(struct platform_device *pdev)
+> >>>
+> >>>         cpu_type = platform_get_device_id(pdev)->driver_data;
+> >>>
+> >>> -       pr_debug("s3c2410_nand_probe(%p)\n", pdev);
+> >>> +       pr_debug("%s(%p)\n", __func__, pdev);
+> >>
+> >> I think we can drop the line completely.
+> >> We have ftrace to trace function calls...
+> > 
+> > Should the "initialised ok" at the end of the function be remove as well?
+> > 
+> > Will it be confusing if this cleanup is done in this function, but not in 
+> > others where it may be useful?  Perhaps s3c2410_nand_update_chip, for 
+> > example?
+> 
+> Hmm, this driver seems to have a lot of debugging printks().
+> IMHO we can remove them.
+> Let's see what Brain says.
 
-Yes and no. Your analysis about the core issue is correct, but it is
-something we can fix on our end if we like.
-This issue has been on our radar for a while, and we proposed a way to
-fix it here
+I'm a little late for this one, but I can apply this instead:
 
-http://thread.gmane.org/gmane.linux.kernel.efi/5133
+From: Brian Norris <computersforpeace@gmail.com>
+Date: Fri, 6 Feb 2015 03:25:28 -0800
+Subject: [PATCH] mtd: s3c2410: drop useless / misspelled debug prints
 
-(The 'other series' the cover letter refers to is the virtmap series
-you pulled for 3.20)
+s3c2410_nand_probe is not the name of the function.
 
-There is a known issue on APM with this series, reported by Dave
-Young, and I was hoping digging into that next week at Connect.
+These prints have little utility, so let's just kill them.
 
+Reported-by: Julia Lawall <Julia.Lawall@lip6.fr>
+Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+---
+ drivers/mtd/nand/s3c2410.c | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
+index 35aef5edb588..0e02be47ce1d 100644
+--- a/drivers/mtd/nand/s3c2410.c
++++ b/drivers/mtd/nand/s3c2410.c
+@@ -948,8 +948,6 @@ static int s3c24xx_nand_probe(struct platform_device *pdev)
+ 
+ 	cpu_type = platform_get_device_id(pdev)->driver_data;
+ 
+-	pr_debug("s3c2410_nand_probe(%p)\n", pdev);
+-
+ 	info = devm_kzalloc(&pdev->dev, sizeof(*info), GFP_KERNEL);
+ 	if (info == NULL) {
+ 		err = -ENOMEM;
+@@ -1045,7 +1043,6 @@ static int s3c24xx_nand_probe(struct platform_device *pdev)
+ 		s3c2410_nand_clk_set_state(info, CLOCK_SUSPEND);
+ 	}
+ 
+-	pr_debug("initialised ok\n");
+ 	return 0;
+ 
+  exit_error:
 -- 
-Ard.
+2.3.0
