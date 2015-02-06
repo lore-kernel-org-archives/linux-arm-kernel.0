@@ -1,184 +1,152 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 6 Feb 2015 11:23:44 -0800
-Subject: [PATCH v5 3/5] x86: Split syscall_trace_enter into two phases
-In-Reply-To: <CALCETrWTnqKDoatK+5FN=yYDOeENoW5=r5YMToYKhZ8Zfv5wWA@mail.gmail.com>
-References: <cover.1409954077.git.luto@amacapital.net>
- <2df320a600020fda055fccf2b668145729dd0c04.1409954077.git.luto@amacapital.net>
- <20150205211916.GA31367@altlinux.org>
- <CAGXu5j+aXxt55LsxxbNkfGGF719ubXBZ2JAFwUPNARwKMVFgng@mail.gmail.com>
- <20150205214027.GB31367@altlinux.org>
- <CALCETrXFzcXngHsX=_72hYZqms32Zf7oFYDBgC3XNw7zOGdDCA@mail.gmail.com>
- <CAGXu5jJtHT9o8WMoynifN13=uZoARt4G9iVcgZsc9xYOBEwWsg@mail.gmail.com>
- <20150205233945.GA31540@altlinux.org>
- <CAGXu5jLTH+mUF0JxeR2qA_r=ocWjPHPSK2OPgE0Fu_JKoQyQ9w@mail.gmail.com>
- <CALCETrXsCUje+_V=Ud+TB4A2jH2M7yqyoCFMLEyxOD6pd7Di5w@mail.gmail.com>
- <20150206023249.GB31540@altlinux.org>
- <CALCETrWTnqKDoatK+5FN=yYDOeENoW5=r5YMToYKhZ8Zfv5wWA@mail.gmail.com>
-Message-ID: <CAGXu5j+nopAMFukwMu=Cy0GOapziOLTb-ryJhA-aywk_uerg9A@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 6 Feb 2015 19:24:44 +0000
+Subject: [PATCHv6 5/5] arm: dts: Add Altera L2 Cache and OCRAM EDAC entries
+In-Reply-To: <1420772036-3112-6-git-send-email-tthayer@opensource.altera.com>
+References: <1420772036-3112-1-git-send-email-tthayer@opensource.altera.com>
+ <1420772036-3112-6-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <20150206192444.GF10324@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 5, 2015 at 6:38 PM, Andy Lutomirski <luto@amacapital.net> wrote:
-> On Thu, Feb 5, 2015 at 6:32 PM, Dmitry V. Levin <ldv@altlinux.org> wrote:
->> On Thu, Feb 05, 2015 at 04:09:06PM -0800, Andy Lutomirski wrote:
->>> On Thu, Feb 5, 2015 at 3:49 PM, Kees Cook <keescook@chromium.org> wrote:
->>> > On Thu, Feb 5, 2015 at 3:39 PM, Dmitry V. Levin <ldv@altlinux.org> wrote:
->> [...]
->>> >> There is a clear difference: before these changes, SECCOMP_RET_ERRNO used
->>> >> to keep the syscall number unchanged and suppress syscall-exit-stop event,
->>> >> which was awful because userspace cannot distinguish syscall-enter-stop
->>> >> from syscall-exit-stop and therefore relies on the kernel that
->>> >> syscall-enter-stop is followed by syscall-exit-stop (or tracee's death, etc.).
->>> >>
->>> >> After these changes, SECCOMP_RET_ERRNO no longer causes syscall-exit-stop
->>> >> events to be suppressed, but now the syscall number is lost.
->>> >
->>> > Ah-ha! Okay, thanks, I understand now. I think this means seccomp
->>> > phase1 should not treat RET_ERRNO as a "skip" event. Andy, what do you
->>> > think here?
->>>
->>> I still don't quite see how this change caused this.
->>
->> I have a test for this at
->> http://sourceforge.net/p/strace/code/ci/HEAD/~/tree/test/seccomp.c
->>
->>> I can play with
->>> it a bit more.  But RET_ERRNO *has* to be some kind of skip event,
->>> because it needs to skip the syscall.
->>>
->>> We could change this by treating RET_ERRNO as an instruction to enter
->>> phase 2 and then asking for a skip in phase 2 without changing
->>> orig_ax, but IMO this is pretty ugly.
->>>
->>> I think this all kind of sucks.  We're trying to run ptrace after
->>> seccomp, so ptrace is seeing the syscalls as transformed by seccomp.
->>> That means that if we use RET_TRAP, then ptrace will see the
->>> possibly-modified syscall, if we use RET_ERRNO, then ptrace is (IMO
->>> correctly given the current design) showing syscall -1, and if we use
->>> RET_KILL, then ptrace just sees the process mysteriously die.
->>
->> Userspace is usually not prepared to see syscall -1.
->> For example, strace had to be patched, otherwise it just skipped such
->> syscalls as "not a syscall" events or did other improper things:
->> http://sourceforge.net/p/strace/code/ci/c3948327717c29b10b5e00a436dc138b4ab1a486
->> http://sourceforge.net/p/strace/code/ci/8e398b6c4020fb2d33a5b3e40271ebf63199b891
->>
->
-> The x32 thing is a legit ABI bug, I'd argue.  I'd be happy to submit a
-> patch to fix that (clear the x32 bit if we're not x32).
->
->> A slightly different but related story: userspace is also not prepared
->> to handle large errno values produced by seccomp filters like this:
->> BPF_STMT(BPF_RET, SECCOMP_RET_ERRNO | SECCOMP_RET_DATA)
->>
->> For example, glibc assumes that syscalls do not return errno values greater than 0xfff:
->> https://sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/unix/sysv/linux/x86_64/sysdep.h#l55
->> https://sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/unix/sysv/linux/x86_64/syscall.S#l20
+On Fri, Jan 09, 2015 at 02:53:56AM +0000, tthayer at opensource.altera.com wrote:
+> From: Thor Thayer <tthayer@opensource.altera.com>
+> 
+> Adding the device tree entries and bindings needed to support
+> the Altera L2 cache and On-Chip RAM EDAC. This patch relies upon
+> an earlier patch to declare and setup On-chip RAM properly.
+> http://www.spinics.net/lists/devicetree/msg51117.html
+> 
+> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+> ---
+> v2: Remove OCRAM declaration and reference prior patch.
+> 
+> v3-5: No Change
+> 
+> v6: Change to nested EDAC device nodes based on community
+>     feedback. Remove L2 syscon. Use consolidated binding.
+> ---
+>  .../bindings/arm/altera/socfpga-edac.txt           |   46 ++++++++++++++++++++
+>  arch/arm/boot/dts/socfpga.dtsi                     |   20 +++++++++
+>  2 files changed, 66 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-edac.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-edac.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-edac.txt
+> new file mode 100644
+> index 0000000..4bf32e1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-edac.txt
+> @@ -0,0 +1,46 @@
+> +Altera SoCFPGA Error Detection and Correction [EDAC]
+> +
+> +Required Properties:
+> +- compatible : Should be "altr,edac"
 
-To save others the link reading: "Linus said he will make sure the no
-syscall returns a value in -1 .. -4095 as a valid result so we can
-savely test with -4095."
+Is there a single large EDAC block that happens to perform EDAC
+functions for various components, or various small EDAC blocks that
+happen to be close to each other in the MMIO space?
 
-Strictly speaking (ISO C, "man 3 errno"), errno is supposed to be a
-full int, though digging around I find this in include/linux/err.h:
+> +- #address-cells: must be 1
+> +- #size-cells: must be 1
+> +- ranges : standard definition, should translate from local addresses
 
-/*
- * Kernel pointers have redundant information, so we can use a
- * scheme where we can return either an error code or a normal
- * pointer with the same return value.
- *
- * This should be a per-architecture thing, to allow different
- * error and pointer decisions.
- */
-#define MAX_ERRNO       4095
+Surely these just need to be suitable for mapping the child nodes, and
+you shouldn't care about their precise values?
 
-#ifndef __ASSEMBLY__
+> +
+> +Subcomponents:
+> +
+> +L2 Cache ECC
+> +Required Properties:
+> +- compatible : Should be "altr,l2-edac"
+> +- reg : Address and size for ECC error interrupt clear registers.
+> +- interrupts : Should be single bit error interrupt, then double bit error
+> +	interrupt. Note the rising edge type.
+> +
+> +On Chip RAM ECC
+> +Required Properties:
+> +- compatible : Should be "altr,ocram-edac"
+> +- reg : Address and size for ECC error interrupt clear registers.
+> +- iram : phandle to On-Chip RAM definition.
+> +- interrupts : Should be single bit error interrupt, then double bit error
+> +	interrupt. Note the rising edge type.
 
-#define IS_ERR_VALUE(x) unlikely((x) >= (unsigned long)-MAX_ERRNO)
+Do these actually differ in programming interface, or just w.r.t. the
+component they are used to monitor?
 
-But no architecture overrides this.
+It would be good to have an explicit link to what they monitor rather
+than relying on there being single instances with particular compatible
+strings. That will make this easier to generalise for multiple instances
+in future SoCs that may reuse the EDAC block.
 
->> If it isn't too late, I'd recommend changing SECCOMP_RET_DATA mask
->> applied in SECCOMP_RET_ERRNO case from current 0xffff to 0xfff.
+This doesn't look too bad, but I'd like to hear some response to this
+and my other queries before I can say whether this is a good way of
+describing the hardware; it all looks a bit vague.
 
-I'm not opposed to this. I would want to more explicitly document the
-4095 max value in man pages, though.
+As an aside, please place the documentation at the start of the series,
+before the driver rework. The dts patches can come after the docs and
+code patches.
 
-> I think this is solidly in the "don't do that" category.  Seccomp lets
-> you tamper with syscalls.  If you tamper wrong, then you lose.
->
-> Kees, what do you think about reversing the whole thing so that
-> ptracers always see the original syscall?
+Thanks,
+Mark.
 
-What do you mean by "reversing"? The interactions I see here are:
-
-PTRACE_SYSCALL
-SECCOMP_RET_ERRNO
-SECCOMP_RET_TRACE
-SECCOMP_RET_TRAP
-
-Both ptrace and seccomp will trigger via _TIF_WORK_SYSCALL_ENTRY. Only
-ptrace will trigger via _TIF_WORK_SYSCALL_EXIT.
-
-For SECCOMP_RET_ERRNO to work, we must skip the syscall, as mentioned earlier:
-
-arch/x86/kernel/entry_32.S ...
-syscall_trace_entry:
-        movl $-ENOSYS,PT_EAX(%esp)
-        movl %esp, %eax
-        call syscall_trace_enter
-        /* What it returned is what we'll actually use.  */
-        cmpl $(NR_syscalls), %eax
-        jnae syscall_call
-        jmp syscall_exit
-END(syscall_trace_entry)
-
-Both before and after the 2-phase change, syscall_trace_enter would
-return -1 if it hit SECCOMP_RET_ERRNO, before calling
-tracehook_report_syscall_entry. On exit, if PTRACE_SYSCALL, we'd hit
-tracehook_report_syscall_exit during syscall_trace_leave, which means
-a ptracer will see a syscall-exit-stop without a matching
-syscall-enter-stop.
-
-Using SECCOMP_RET_TRACE with PTRACE_SYSCALL in place seems totally
-crazy, as the ptracer would need to be the same program, and if it
-chose to skip a syscall, it would be in the same place: it would see
-PTRACE_EVENT_SECCOMP, then no syscall-enter-stop, then a
-syscall-exit-stop. I think we can ignore this pathological case.
-
-Using SECCOMP_RET_TRAP with PTRACE_SYSCALL also results in a skip,
-which produces the same "only syscall-exit-stop seen" problem.
-
-In the SECCOMP_RET_ERRNO case, the syscall nr doesn't change (and
-isn't executed). In the SECCOMP_RET_TRAP case, the syscall nr doesn't
-change (and isn't executed). In the SECCOMP_RET_TRACE, the syscall nr
-_could_ change, but the ptracer would be doing it, so the crazy
-situation around PTRACE_SYSCALL is probably safe to ignore (as long as
-we document what is expected to happen).
-
-So, the question is: should PTRACE_SYSCALL see a syscall that is _not_
-being executed (due to seccomp)? Audit doesn't see it currently, and
-neither does ptrace. I would argue that it should continue to not see
-the syscall. That said, if it shouldn't be shown, we also shouldn't
-trigger syscall-exit-stop. If you can convince me it should see
-syscall-enter-stop, then I have two questions:
-
-1) Do we accept that a ptracer can interfere with SECCOMP_RET_ERRNO? I
-think we probably must, since it can already interfere via
-syscall-exit-stop and change the errno. And especially since a ptracer
-can change syscalls during syscall-enter-stop to any syscall it wants,
-bypassing seccomp. This condition is already documented.
-
-2) What do we do with audit? Suddenly we have ptrace seeing a syscall
-that audit doesn't?
-
-And an unrelated thought:
-
-3) Can't we find some way to fix the inability of a ptracer to
-distinguish between syscall-enter-stop and syscall-exit-stop?
-
--Kees
-
--- 
-Kees Cook
-Chrome OS Security
+> +
+> +Example:
+> +
+> +	soc_ecc {
+> +		compatible = "altr,edac";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		l2edac at ffd08140 {
+> +			compatible = "altr,l2-edac";
+> +			reg = <0xffd08140 0x4>;
+> +			interrupts = <0 36 1>, <0 37 1>;
+> +		};
+> +
+> +		ocramedac at ffd08144 {
+> +			compatible = "altr,ocram-edac";
+> +			reg = <0xffd08144 0x4>;
+> +			iram = <&ocram>;
+> +			interrupts = <0 178 1>, <0 179 1>;
+> +		};
+> +	};
+> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+> index 252c3d1..e546e47 100644
+> --- a/arch/arm/boot/dts/socfpga.dtsi
+> +++ b/arch/arm/boot/dts/socfpga.dtsi
+> @@ -618,6 +618,26 @@
+>  			interrupts = <0 39 4>;
+>  		};
+>  
+> +		soc_ecc {
+> +			compatible = "altr,edac";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges;
+> +
+> +			l2edac at ffd08140 {
+> +				compatible = "altr,l2-edac";
+> +				reg = <0xffd08140 0x4>;
+> +				interrupts = <0 36 1>, <0 37 1>;
+> +			};
+> +
+> +			ocramedac at ffd08144 {
+> +				compatible = "altr,ocram-edac";
+> +				reg = <0xffd08144 0x4>;
+> +				iram = <&ocram>;
+> +				interrupts = <0 178 1>, <0 179 1>;
+> +			};
+> +		};
+> +
+>  		L2: l2-cache at fffef000 {
+>  			compatible = "arm,pl310-cache";
+>  			reg = <0xfffef000 0x1000>;
+> -- 
+> 1.7.9.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
