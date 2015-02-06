@@ -1,60 +1,121 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Fri, 6 Feb 2015 11:39:46 +0100
-Subject: [BUG] ARM: socfpga: L2 cache init
-Message-ID: <20150206103946.GM15692@pengutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 6 Feb 2015 10:44:20 +0000
+Subject: [PATCH 3/3] arm64: dts: Add dts files for Hisilicon Hi6220 SoC
+In-Reply-To: <CAAS=xmgsuY=c8-n_pDiZjLe2u+SPX7msRje7h0sNkRtT3HLfQA@mail.gmail.com>
+References: <1423128277-10297-1-git-send-email-bintian.wang@huawei.com>
+ <1423128277-10297-4-git-send-email-bintian.wang@huawei.com>
+ <20150205193017.GF20735@leverpostej>
+ <CAAS=xmgsuY=c8-n_pDiZjLe2u+SPX7msRje7h0sNkRtT3HLfQA@mail.gmail.com>
+Message-ID: <20150206104420.GB9921@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Fri, Feb 06, 2015 at 08:42:22AM +0000, Brent Wang wrote:
+> Hello Mark,
+> 
+> 2015-02-06 3:30 GMT+08:00 Mark Rutland <mark.rutland@arm.com>:
+> > On Thu, Feb 05, 2015 at 09:24:37AM +0000, Bintian Wang wrote:
+> >> Add initial dtsi file to support Hisilicon Hi6220 SoC with
+> >> support of Octal core CPUs in two clusters and each cluster
+> >> has quard Cortex-A53.
+> >>
+> >> We now use the "spin-table" method for SMP, and it will be
+> >> changed to PSCI later.
+> >
+> > If that's the case, please don't place the enable-method and related
+> > properties in this file. Get your bootloader to add the appropriate
+> > properties for its boot protocol.
+> >
+> > When is PSCI likely to appear?
+> PSCI is under development.
 
-I have run into a bug on the Socfpga platform. My boards sometimes fail to boot
-when I have the commit
+Sure. Do you have an estimate as to when it will appear?
 
-	commit 8b5c18f05621394eb108d3fbc9bf98b05e8162db
-	Author: Russell King <rmk+kernel@arm.linux.org.uk>
-	Date:   Mon Apr 28 15:55:59 2014 +0100
+What are you using for your PSCI implementation? The ARM Trusted
+Firmware?
 
-	ARM: l2c: socfpga: convert to generic l2c OF initialisation
+How are you testing it?
 
-	Remove the explicit call to l2x0_of_init(), converting to the generic
-	infrastructure instead.
+> > Are we certain of the split between components the PSCI implementation
+> > must touch and those the kernel must touch?
+> >
+> >> Also add dts file to support HiKey development board which
+> >> based on Hi6220 SoC and document the devicetree bindings.
+> >>
+> >> These dts files will be changed later and more nodes will be
+> >> added to describe other devices.
+> >
+> > How is this going to be changed other than the addition of nodes?
+> >
+> > Will this DTB continue to work in future? Or do you intend to make
+> > changes that will break support?
+> My original idea is: use spin-table for SMP now, when firmware is OK to
+> support PSCI, we submit another patch to replace the spin-table with PSCI.
 
-	Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+For any users who have not updated their FW, this will break booting.
 
-in my tree. I don't really understand why this would change anything, but I can
-reproduce the problem with the following ktest.pl tests:
+This is why I suggest having hte bootloader/FW fill this in as it should
+know what enable-method the FW supports.
 
+> If DTB should continue to work in the future, we really need to remove
+> the spin-table
+> from current dts file, how about just enable one core now?
+> 
+> Which one do you favor or any other suggestion?
 
-TEST_START ITERATE 20
-TEST_TYPE = boot
-CHECKOUT = v3.19-rc7
-BUILD_TYPE = socfpga_defconfig
-POST_BUILD =
-BUILD_NOCLEAN = 1
+If spin-table is just for testing while you await PSCI, drop spin-table
+from the dts for now.
 
-TEST_START ITERATE 20
-TEST_TYPE = boot
-CHECKOUT = v3.19-rc7
-PRE_BUILD = git revert --no-edit 8b5c18f05621394eb108d3fbc9bf98b05e8162db
-BUILD_TYPE = socfpga_defconfig
-POST_BUILD =
-BUILD_NOCLEAN = 1
+[...]
 
+> >> +     timer {
+> >> +             compatible = "arm,armv8-timer";
+> >> +             interrupt-parent = <&gic>;
+> >> +             interrupts = <1 13 0xff08>,
+> >> +                          <1 14 0xff08>,
+> >> +                          <1 11 0xff08>,
+> >> +                          <1 10 0xff08>;
+> >> +             clock-frequency = <1200000>;
+> >> +     };
+> >
+> > NAK. Fix your firmware to configure CNTFRQ, on all CPUs.
+> Fix in next version, maybe it will take some time to change firmware.
 
-The first test fails in 3-6 cases and the second one is always successful.
-Failing means: I don't see anything. From my understanding the generic l2x0_of_init
-runs before console_init(), so that is why I don't see any messages from the kernel
-at all, even with earlyprintk.
-The bug can be reproduced on a Sockit, Socrates and a custom board. So, it all looks
-like a common socfpga problem, that should be reproducable on other boards as well.
+Thanks. This _must_ be fixed.
 
-Help for understanding and fixing the problem is much appreciated.
+[...]
+
+> >> +             pm_ctrl: pm_ctrl {
+> >> +                     compatible = "hisilicon,pmctrl", "syscon";
+> >> +                     #address-cells = <1>;
+> >> +                     #size-cells = <1>;
+> >> +                     reg = <0x0 0xf7032000 0x0 0x1000>;
+> >> +                     ranges = <0 0x0 0xf7032000 0x1000>;
+> >> +
+> >> +                     clock_power: clock3 at 0 {
+> >> +                             compatible = "hisilicon,hi6220-clock-power";
+> >> +                             reg = <0 0x1000>;
+> >> +                             #clock-cells = <1>;
+> >> +                     };
+> >> +             };
+> >
+> > I really doesn't see the point in having a sub-device that covers the
+> > entirely of the register space of the containing node, and that being
+> > the case I am extremely concerned that the containers are marked as
+> > syscon compatible.
+> The SoC clocks are designed and placed under different system controllers,
+> so I define corresponding nodes under different controllers for clock operation.
+
+What I'm concerned wit hhere is that the pm_ctrl node and the clock3 at 0
+sub-node have the _exact_ same register space.
+
+Given this should mean that the clock3 at 0 node owns that register space,
+having the container node export this as syscon does not make sense. And
+the split between pm_ctrl and clock3@) doesn't seem to make sense given
+they cover the same space.
+
+As I asked before, why is pm_ctrl marked as a syscon, and what's the
+point of the separate sub-node?
 
 Thanks,
-Steffen Trumtrar
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Mark.
