@@ -1,85 +1,63 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Thu, 5 Feb 2015 18:11:38 -0600
-Subject: [PATCH v7 1/4] Documentation: dt: add common bindings for
- hwspinlock
-In-Reply-To: <CAJAp7OiHfaMrVqaZ1r6ZN0aMMpE4OUnvLhODHQJeb6EJMa+o8A@mail.gmail.com>
-References: <1421269101-51105-1-git-send-email-s-anna@ti.com>	<1421269101-51105-2-git-send-email-s-anna@ti.com>	<20150115135201.GG16217@leverpostej>	<20150115135556.GH16217@leverpostej>	<CAL_JsqL2LZAooMk-V8+xeF2g6acZE21M+-OBRw8aEVa-5wVHuQ@mail.gmail.com>	<CAK=WgbYQ=BbinqJ5fsw2Y+FKdy=nasLsw9mX8pw6S_o3owy9-g@mail.gmail.com>	<20150116101746.GA21809@leverpostej>	<CAK=WgbYBqPoUm9byx0du_g5ZmHdYaUVLpSPZYHoCVzNoatNKpw@mail.gmail.com>	<CAJAp7Og+-KQd7bygWQjTS72Kye3fkp3s3ry+2bw7Gcv7aPF5AQ@mail.gmail.com>	<CAK=WgbZ2986xxuAFvMSoyQLaPAxdUpZ8e5g-mSjyETfvd4KKHw@mail.gmail.com>	<CAJAp7OjVULNRd113TtOEwaa6QO-XCDa0oxBm2H5NPvp_kLTSpA@mail.gmail.com>	<54CFE71E.20905@ti.com>
- <CAJAp7OiHfaMrVqaZ1r6ZN0aMMpE4OUnvLhODHQJeb6EJMa+o8A@mail.gmail.com>
-Message-ID: <54D406BA.6060403@ti.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Thu,  5 Feb 2015 16:31:58 -0800
+Subject: [PATCH/RFC 0/4] Probe deferral for IOMMU DT integration
+Message-ID: <1423182722-16646-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+Hi,
 
-On 02/05/2015 05:01 PM, Bjorn Andersson wrote:
-> On Mon, Feb 2, 2015 at 1:07 PM, Suman Anna <s-anna@ti.com> wrote:
->> On 02/01/2015 11:55 AM, Bjorn Andersson wrote:
->>> On Fri, Jan 30, 2015 at 9:41 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
->>>> On Sat, Jan 31, 2015 at 1:29 AM, Bjorn Andersson <bjorn@kryo.se> wrote:
->>>>> In a system where you have two hwlock blocks lckA and lckB, each
->>>>> consisting of 8 locks and you have dspB that can only access lckB
->>>>
->>>> This is a good example - thanks. To be able to cope with such cases we
->>>> will have to pass a hwlock block reference and its relative lock id.
->>>>
->>>
->>> Correct, so the #hwlock-cells and hwlock part from the proposal are
->>> the important one. Having an optional hwlock-names will make things
->>> easier to read as well, but is not necessary.
->>
->> Right, if anything, it would be useful only for the clients, but the
->> hwspinlock core itself would not need it. So, I would forgo adding the
->> hwlock-names for now.
->>
->>>
->>>> The DT binding should definitely be prepared for such cases (just kill
->>>> the base-id field?), but let's see what it means about the Linux
->>>> implementation.
->>>>
->>>
->>> From the dt binding PoV, we should be able to skip num-locks as well.
->>> It seems most hwlock blocks have a fixed amount of locks provided and
->>> the drivers are reporting this to the core when registering.
->>
->> I added this originally based on the initial MSM HW Mutex block bindings.
->>
-> 
-> It's not entirely correct to have this in DT for the MSM HW, as the
-> hardware has a fixed number of mutexes. As soon as we have the binding
-> sorted out I will follow up with a new revision of the tcsr/sfpb-mutex
-> driver.
-> 
->>>
->>> So I think we can reduce the binding to:
->>>
->>> Providers:
->>> #hwlock-cells
->>>
->>> Consumers:
->>> hwlocks
->>> hwlock-names
->>>
->>> For the hardware where number of locks is actually variable (e.g.
->>> different variants of same block) there can be driver specific entries
->>> for this.
->>
->> Right, we should be able to drop this and use the driver match data. As
->> it is, the field is used during registration of the block with the
->> hwspinlock core.
->>
-> 
-> If we have certain systems where it actually is a property to be
-> configured then they can have individual properties, extending the
-> standard set. Either way, it's not a dynamic property shared by all
-> hwlock drivers, so it should not be in the common binding.
-> 
-> Will you send out a new revision of the binding? I would love to get
-> this integrated so I can move on with the dependents.
+On the heels of Exynos integrating SMMU in to the DT for probing,
+this series attempts to add support to make SMMU drivers work with
+deferred probing. This has been referenced before[1] but this is
+some actual code to use as a starting point for discussion.
 
-Yep, will do as soon as I hear from Ohad on what to do with the patch
-"hwspinlock/core: maintain a list of registered hwspinlock banks" that I
-dropped from v7. Without that and dropping hwlock-base-id, I can't get
-the translations done.
+The requirement for this is based on a previous patch to add clock
+support to the ARM SMMU driver[2]. Once we have clock support, it's
+possible that the driver itself may need to be defered which breaks
+a bunch of assumptions about how SMMU probing is supposed to work.
+The concept here is to have the driver call of_dma_configure which
+may return -EPROBE_DEFER. of_dma_configure could possibly be moved
+up to probe level. The existing method of initialization still needs
+to be done as well which might mean we have the worst of both worlds.
 
-regards
-Suman
+Open questions:
+- This still doesn't really address Arnd's concerns[3] about disabling
+IOMMUs
+- Currently tested where we knew the driver was going to be deferring.
+Probably need some logic for calling of_dma_configure again.
+
+This is based on Robin Murphy's work for dma mapping[4] and a few
+patches from Murali Kaicheri[5] for of_dma_configure.
+
+
+[1] http://lists.linuxfoundation.org/pipermail/iommu/2015-January/011764.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/279036.html
+[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/311579.html
+[4] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/315459.html
+[5] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/319390.html
+
+Laura Abbott (3):
+  dma-mapping: Make arch_setup_dma_ops return an error code
+  of: Return error codes from of_dma_configure
+  iommu/arm-smmu: Support deferred probing
+
+Mitchel Humpherys (1):
+  iommu/arm-smmu: add support for specifying clocks
+
+ arch/arm/include/asm/dma-mapping.h   |   2 +-
+ arch/arm/mm/dma-mapping.c            |   4 +-
+ arch/arm64/include/asm/dma-mapping.h |   2 +-
+ arch/arm64/mm/dma-mapping.c          |  16 +--
+ drivers/iommu/arm-smmu.c             | 186 +++++++++++++++++++++++++++++++++--
+ drivers/iommu/iommu.c                |  49 ++++++++-
+ drivers/iommu/of_iommu.c             |  14 ++-
+ drivers/of/device.c                  |   9 +-
+ include/linux/dma-mapping.h          |   7 +-
+ include/linux/iommu.h                |   2 +
+ include/linux/of_device.h            |   4 +-
+ 11 files changed, 268 insertions(+), 27 deletions(-)
+
+-- 
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
