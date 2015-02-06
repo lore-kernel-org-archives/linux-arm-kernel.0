@@ -1,39 +1,40 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri,  6 Feb 2015 23:48:16 +0100
-Subject: [PATCH v2 4/5] ARM: dts: pxa: add pxa27x-keypad to pxa27x
+Date: Fri,  6 Feb 2015 23:48:17 +0100
+Subject: [PATCH v2 5/5] ARM: dts: pxa: add pxa-timer to pxa27x
 In-Reply-To: <1423262897-24044-1-git-send-email-robert.jarzmik@free.fr>
 References: <1423262897-24044-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1423262897-24044-4-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1423262897-24044-5-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Each pxa27x has an embedded keypad controller. Add it in the pxa27x
-device-tree description.
+Each pxa has an embedded OS Timers IP. The kernel cannot work without a
+valid clocksource, and this adds the OS Timers to the pxa device-tree
+description.
 
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- arch/arm/boot/dts/pxa27x.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+Since v1: removed clocksource node, pxa-timer being directly under
+          pxabus (Rob's comment).
+---
+ arch/arm/boot/dts/pxa27x.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
 diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
-index 979560c..7f93828 100644
+index 7f93828..473f9d8 100644
 --- a/arch/arm/boot/dts/pxa27x.dtsi
 +++ b/arch/arm/boot/dts/pxa27x.dtsi
-@@ -73,6 +73,15 @@
- 			status = "disabled";
+@@ -97,5 +97,12 @@
+ 			status = "okay";
  		};
- 
-+		keypad: keypad at 41500000 {
-+			compatible = "marvell,pxa27x-keypad";
-+			reg = <0x41500000 0x4c>;
-+			interrupts = <4>;
-+			clocks = <&pxa2xx_clks CLK_KEYPAD>;
-+			status = "disabled";
-+		};
-+	};
+ 	};
 +
- 	clocks {
- 	       /*
- 		* The muxing of external clocks/internal dividers for osc* clock
++	pxa-timer at 40a00000 {
++		compatible = "marvell,pxa-timer";
++		reg = <0x40a00000 0x20>;
++		interrupts = <26>;
++		clocks = <&pxa2xx_clks CLK_OSTIMER>;
++		status = "okay";
+ 	};
+ };
 -- 
 2.1.0
