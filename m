@@ -1,85 +1,84 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 6 Feb 2015 15:13:46 +0100
-Subject: [PATCH 0/2] ARM: omap2+: omap_hwmod: Fix false lockdep warning
-In-Reply-To: <1423226916-18804-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1423226916-18804-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20150206141346.GP21418@twins.programming.kicks-ass.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 6 Feb 2015 14:16:31 +0000
+Subject: [Linaro-acpi] [PATCH v8 02/21] acpi: fix acpi_os_ioremap for arm64
+In-Reply-To: <CAKv+Gu_ExGUkr0AJS4uSHLuz3LxO+x8sxnsnmDAYfVRAgHGXBA@mail.gmail.com>
+References: <1423066107.18187.99.camel@deneb.redhat.com>
+ <20150204175734.GI26006@e104818-lin.cambridge.arm.com>
+ <1423076294.18187.103.camel@deneb.redhat.com>
+ <20150205104149.GA18158@e104818-lin.cambridge.arm.com>
+ <1423144447.18187.110.camel@deneb.redhat.com>
+ <54D39D6B.5090304@linaro.org>
+ <20150205174826.GD21970@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu922UwYRN7ZgFNTR7yGGKPLTU8Us7KbvXX-Q8=rqLKNog@mail.gmail.com>
+ <20150206103653.GA23190@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu_ExGUkr0AJS4uSHLuz3LxO+x8sxnsnmDAYfVRAgHGXBA@mail.gmail.com>
+Message-ID: <20150206141631.GA20549@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 06, 2015 at 02:48:34PM +0200, Peter Ujfalusi wrote:
-> Hi,
+On Fri, Feb 06, 2015 at 11:08:51AM +0000, Ard Biesheuvel wrote:
+> On 6 February 2015 at 10:36, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Thu, Feb 05, 2015 at 10:16:03PM +0000, Ard Biesheuvel wrote:
+> >> On 5 February 2015 at 17:48, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> >> > On Thu, Feb 05, 2015 at 04:42:19PM +0000, Al Stone wrote:
+> >> >> On 02/05/2015 06:54 AM, Mark Salter wrote:
+> >> >> > On Thu, 2015-02-05 at 10:41 +0000, Catalin Marinas wrote:
+> >> >> >> On Wed, Feb 04, 2015 at 06:58:14PM +0000, Mark Salter wrote:
+> >> >> >>> On Wed, 2015-02-04 at 17:57 +0000, Catalin Marinas wrote:
+> >> >> >>>> On Wed, Feb 04, 2015 at 04:08:27PM +0000, Mark Salter wrote:
+> >> >> >>>>> acpi_os_remap() is used to map ACPI tables. These tables may be in ram
+> >> >> >>>>> which are already included in the kernel's linear RAM mapping. So we
+> >> >> >>>>> need ioremap_cache to avoid two mappings to the same physical page
+> >> >> >>>>> having different caching attributes.
+> >> >> >>>>
+> >> >> >>>> What's the call path to acpi_os_ioremap() on such tables already in the
+> >> >> >>>> linear mapping? I can see an acpi_map() function which already takes
+> >> >> >>>> care of the RAM mapping case but there are other cases where
+> >> >> >>>> acpi_os_ioremap() is called directly. For example,
+> >> >> >>>> acpi_os_read_memory(), can it be called on both RAM and I/O?
+> >> >> >>>
+> >> >> >>> acpi_map() is the one I've seen.
+> >> >> >>
+> >> >> >> By default, if should_use_kmap() is not patched for arm64, it translates
+> >> >> >> to page_is_ram(); acpi_map() would simply use a kmap() which returns the
+> >> >> >> current kernel linear mapping on arm64.
+> >> >> >
+> >> >> > The problem with kmap() is that it only maps a single page. I've seen
+> >> >> > tables over 4k which is why I patched acpi_map() not to use kmap() on
+> >> >> > arm64.
+> >> >>
+> >> >> Right.  Mark replied to this before I could; using kmap() enforced a 4k
+> >> >> (one page) limit that we kept breaking with some ACPI tables being larger
+> >> >> than that (DSDTs and SSDTs, fwiw).  This would lead to some very odd behaviors
+> >> >> when most but not all of a device definition was within the page; using the
+> >> >> table checksums was one way of detecting the issues.
+> >> >
+> >> > OK. So I think Mark's original patch was ok, assuming that the System
+> >> > Memory cases mentioned by Graeme are detected with page_is_ram().
+> >>
+> >> page_is_ram() returns whether a pfn is covered by the linear mapping,
+> >> so memory before the kernel or after a mem= limit will be
+> >> misidentified.
+> >
+> > OK. So in conclusion acpi_os_ioremap() may need to create a cacheable
+> > mapping even when !page_is_ram() but it has no way of knowing that
+> > unless we change the core ACPI code to differentiate between
+> > ioremap_cache and ioremap_nocache. Did I get it right?
 > 
-> In case when hwmods are used in nested way the lockdep validator will print out
-> a warning message about possible deadlock situation:
+> Yes and no. Your analysis about the core issue is correct, but it is
+> something we can fix on our end if we like.
+> This issue has been on our radar for a while, and we proposed a way to
+> fix it here
 > 
-> [    4.514882] =============================================
-> [    4.520530] [ INFO: possible recursive locking detected ]
-> [    4.526176] 3.14.30-00289-ge44872fdca8f-dirty #198 Not tainted
-> [    4.532285] ---------------------------------------------
-> [    4.537936] kworker/u4:1/18 is trying to acquire lock:
-> [    4.543317]  (&(&oh->_lock)->rlock){......}, at: [<c002d2dc>] omap_hwmod_enable+0x2c/0x58
-> [    4.552109] 
-> [    4.552109] but task is already holding lock:
-> [    4.558216]  (&(&oh->_lock)->rlock){......}, at: [<c002d2dc>] omap_hwmod_enable+0x2c/0x58
-> [    4.566999] 
-> [    4.566999] other info that might help us debug this:
-> [    4.573831]  Possible unsafe locking scenario:
-> [    4.573831] 
-> [    4.580025]        CPU0
-> [    4.582584]        ----
-> [    4.585142]   lock(&(&oh->_lock)->rlock);
-> [    4.589544]   lock(&(&oh->_lock)->rlock);
-> [    4.593945] 
-> [    4.593945]  *** DEADLOCK ***
-> [    4.593945] 
-> [    4.600146]  May be due to missing lock nesting notation
-> 
-> What lockdep did not realizes is that the two oh is not the same hwmod object
-> and we have taken different locks.
-> 
-> One example of nested hwmod usage is on DRA7xx platforms, where McASP can be
-> configured to use ATL clock as it's functional clock. In this case the
-> pm_runtime_get/put_sync call will enable the mcasp hwmod and as part of this
-> operation it will enable the needed clocks. Since ATL clock is needed, we will
-> have another pm_runtime operation from the ATL clock enable callback which
-> will take the atl hwmod's lock. This will be seen by lockdep as possible
-> deadlock situation.
-> 
-> In order to notify lockdep about this, we need to switch using _nested
-> version of locking function and assign different subclass to those hwmods which
-> could be used in nested way.
+> http://thread.gmane.org/gmane.linux.kernel.efi/5133
 
-IFF struct omap_hwmod is always statically allocated; as I think the
-__init on _register() mandates, you can use the below annotation.
+I looked at it briefly but it had ACPI in the subject and decided it's
+not urgent ;).
 
----
- arch/arm/mach-omap2/omap_hwmod.c | 1 +
- arch/arm/mach-omap2/omap_hwmod.h | 2 ++
- 2 files changed, 3 insertions(+)
+IIUC, it relies on the EFI system table to be available and the kernel
+will register the appropriate "System RAM" resources. This assumes in
+general that the kernel is booted via the EFI stub. Do we expect Xen or
+kexec to pass an EFI system table when not booting via EFI stub?
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 9025ffffd2dc..222d654ad6fd 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2698,6 +2698,7 @@ static int __init _register(struct omap_hwmod *oh)
- 	INIT_LIST_HEAD(&oh->master_ports);
- 	INIT_LIST_HEAD(&oh->slave_ports);
- 	spin_lock_init(&oh->_lock);
-+	lockdep_set_class(&oh->_lock, &oh->hwmod_key);
- 
- 	oh->_state = _HWMOD_STATE_REGISTERED;
- 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.h b/arch/arm/mach-omap2/omap_hwmod.h
-index 5b42fafcaf55..754bdfb3f811 100644
---- a/arch/arm/mach-omap2/omap_hwmod.h
-+++ b/arch/arm/mach-omap2/omap_hwmod.h
-@@ -689,6 +689,8 @@ struct omap_hwmod {
- 	u8				_state;
- 	u8				_postsetup_state;
- 	struct omap_hwmod		*parent_hwmod;
-+
-+	struct lock_class_key		hwmod_key;
- };
- 
- struct omap_hwmod *omap_hwmod_lookup(const char *name);
+-- 
+Catalin
