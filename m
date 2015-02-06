@@ -1,122 +1,79 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 06 Feb 2015 14:29:39 +0100
-Subject: [PATCH] MAINTAINERS: Add dts entries for mvebu and dove
-In-Reply-To: <54D4BF09.2030708@lakedaemon.net>
-References: <1423225810-5504-1-git-send-email-gregory.clement@free-electrons.com>
- <54D4BF09.2030708@lakedaemon.net>
-Message-ID: <54D4C1C3.1010209@free-electrons.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 6 Feb 2015 13:39:20 +0000
+Subject: [PATCH v13 3/6] clk: Make clk API return per-user struct clk
+ instances
+In-Reply-To: <54D41A60.8040702@codeaurora.org>
+References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1422011024-32283-4-git-send-email-tomeu.vizoso@collabora.com>
+ <54D3C803.30706@samsung.com> <54D3CD6A.1010209@codeaurora.org>
+ <54D3EB29.4090007@codeaurora.org>
+ <20150206004210.GB8670@n2100.arm.linux.org.uk>
+ <54D41A60.8040702@codeaurora.org>
+Message-ID: <20150206133920.GC8670@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason, Sebastian,
-
-On 06/02/2015 14:18, Jason Cooper wrote:
-> Hey Gregory,
+On Thu, Feb 05, 2015 at 05:35:28PM -0800, Stephen Boyd wrote:
+> On 02/05/15 16:42, Russell King - ARM Linux wrote:
+> > On Thu, Feb 05, 2015 at 02:14:01PM -0800, Stephen Boyd wrote:
+> >> Actually we can bury the __clk_create_clk() inside
+> >> __of_clk_get_from_provider(). We should also move __clk_get() into there
+> >> because right now we have a hole where whoever calls
+> >> of_clk_get_from_provider() never calls __clk_get() on the clk, leading
+> >> to possible badness. v2 coming soon.
+> > There's some other issues here too...
+> >
+> > sound/soc/kirkwood/kirkwood-i2s.c:
+> >
+> >         priv->clk = devm_clk_get(&pdev->dev, np ? "internal" : NULL);
+> > ...
+> >         priv->extclk = devm_clk_get(&pdev->dev, "extclk");
+> >         if (IS_ERR(priv->extclk)) {
+> > ...
+> > 	} else {
+> >                 if (priv->extclk == priv->clk) {
+> >                         devm_clk_put(&pdev->dev, priv->extclk);
+> >                         priv->extclk = ERR_PTR(-EINVAL);
+> >                 } else {
+> >                         dev_info(&pdev->dev, "found external clock\n");
+> >                         clk_prepare_enable(priv->extclk);
+> >                         soc_dai = kirkwood_i2s_dai_extclk;
+> >                 }
+> >
+> > It should be fine provided your "trick" is only done for DT clocks,
+> > but not for legacy - with legacy, a NULL in the clkdev tables will
+> > match both these requests, hence the need to compare the clk_get()
+> > return value to tell whether we get the same clock.
+> >
 > 
-> On 2/6/15 7:30 AM, Gregory CLEMENT wrote:
->> Since many releases, the modifications of the mvebu device tree files
->> are merged through the mvebu subsystem. This patch makes it official
->> in order to help the contributors using the get_maintainer.pl to find
->> the accurate people.
->>
->> In the same time, updated the mvebu description which now includes the
->> kirkwood SoCs and new Armada SoCs.
->>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> ---
->> Hi Jason, Andrew and Sebastian
->>
->> This last patch [1] showed that if people follow the recommendation to
->> submit patch (using get_maintainer.pl script), we don't receive
->> them. So I propose to amend MAINTAINERS with this patch.
->>
->> What do you think about it?
-> 
-> I had a patch somewhere to do similar, but since you seem to have this 
-> in the top of your queue, let's go with this one.
-> 
->>
->> If you agree then we can merged it in our next-merge windows (3.21).
->>
->> Thanks,
->>
->> Gregory
->>
->> [1]: http://thread.gmane.org/gmane.linux.drivers.devicetree/109387
->>
->>
->>
->>   MAINTAINERS | 5 ++++-
->>   1 file changed, 4 insertions(+), 1 deletion(-)
->>
->> diff --git a/MAINTAINERS b/MAINTAINERS
->> index 5d9db6b445bc..d96daf53533c 100644
->> --- a/MAINTAINERS
->> +++ b/MAINTAINERS
->> @@ -1149,7 +1149,7 @@ ARM/MAGICIAN MACHINE SUPPORT
->>   M:	Philipp Zabel <philipp.zabel@gmail.com>
->>   S:	Maintained
->>
->> -ARM/Marvell Armada 370 and Armada XP SOC support
->> +ARM/Marvell Kirkwood and Armada 370, 375, 38x, XP SOC support
->>   M:	Jason Cooper <jason@lakedaemon.net>
->>   M:	Andrew Lunn <andrew@lunn.ch>
->>   M:	Gregory Clement <gregory.clement@free-electrons.com>
->> @@ -1158,6 +1158,8 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->>   S:	Maintained
->>   F:	arch/arm/mach-mvebu/
->>   F:	drivers/rtc/armada38x-rtc
->> +F:	arch/arm/boot/dts/armada*.dts
->> +F:	arch/arm/boot/dts/kirkwood*.dts
-> 
-> This doesn't match the dtsi's.  Maybe just kirkwood*, armada* ?
+> Are we still talking about of_clk_get_from_provider()? Or are we talking
+> about comparing struct clk pointers?
 
-Yes we want also to match these files.
+Comparing struct clk pointers, and the implications of the patch changing
+the clk_get() et.al. to be unique struct clk pointers.
 
->>
->>   ARM/Marvell Berlin SoC support
->>   M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> 
-> It's just in the context, but I'm sure Sebastian wouldn't mind
-> if we did berlin as well in this patch.
+> From what I can tell this code is
+> now broken because we made all clk getting functions (there's quite a
+> few...) return unique pointers every time they're called. It seems that
+> the driver wants to know if extclk and clk are the same so it can do
+> something differently in kirkwood_set_rate(). Do we need some sort of
+> clk_equal(struct clk *a, struct clk *b) function for drivers like this?
 
-Sebastian,
-if you agree I will add your entries, and rename the patch to
+Well, the clocks in question are the SoC internal clock (which is more or
+less fixed, but has a programmable divider) and an externally supplied
+clock, and the IP has a multiplexer on its input which allows us to select
+between those two sources.
 
-[PATCH] MAINTAINERS: Add dts entries for some of the Marvell Socs
+If it were possible to bind both to the same clock, it wouldn't be a
+useful configuration - nothing would be gained from doing so in terms of
+available rates.
 
-> 
->> @@ -1175,6 +1177,7 @@ F:	arch/arm/mach-dove/
->>   F:	arch/arm/mach-mv78xx0/
->>   F:	arch/arm/mach-orion5x/
->>   F:	arch/arm/plat-orion/
->> +F:	arch/arm/boot/dts/dove*.dts
-> 
-> We should add orion5x here.  And same comment as above re matching.
-
-OK. I am waiting for Sebastian agreement and then I will send
-a new version.
-
-Thanks,
-
-Gregory
-
-
-
-> 
-> thx,
-> 
-> Jason.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-
+What the comparison is there for is to catch the case with legacy lookups
+where a clkdev lookup entry with a NULL connection ID results in matching
+any connection ID passed to clk_get().  If the patch changes this, then
+we will have a regression - and this is something which needs fixing
+_before_ we do this "return unique clocks".
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
