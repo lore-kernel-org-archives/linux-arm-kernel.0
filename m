@@ -1,110 +1,35 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri,  6 Feb 2015 23:48:14 +0100
-Subject: [PATCH v2 2/5] ARM: dts: pxa: add clocks
-In-Reply-To: <1423262897-24044-1-git-send-email-robert.jarzmik@free.fr>
-References: <1423262897-24044-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1423262897-24044-2-git-send-email-robert.jarzmik@free.fr>
+From: dtor@chromium.org (Dmitry Torokhov)
+Date: Fri, 6 Feb 2015 14:48:31 -0800
+Subject: [v7,2/3] i2c: iproc: Add Broadcom iProc I2C Driver
+In-Reply-To: <20150206223149.GB345@google.com>
+References: <1421704310-26857-3-git-send-email-rjui@broadcom.com>
+ <20150206223149.GB345@google.com>
+Message-ID: <CAE_wzQ-POweLLmTyHoMvs_NESjW5UmPxh2ZQCaW4-W74MsrHag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clocks to the IPs already described in the pxa device-tree
-files. There are more clocks in the clock tree than IPs described in the
-current pxa device-tree.
+On Fri, Feb 6, 2015 at 2:31 PM, Kevin Cernekee <cernekee@chromium.org> wrote:
+> On Mon, Jan 19, 2015 at 01:51:49PM -0800, Ray Jui wrote:
+>> +
+>> +     dev_dbg(iproc_i2c->device, "xfer %c, addr=0x%02x, len=%d\n",
+>> +             (msg->flags & I2C_M_RD) ? 'R' : 'W', msg->addr,
+>> +             msg->len);
+>> +     dev_dbg(iproc_i2c->device, "**** data start ****\n");
+>> +     for (i = 0; i < msg->len; i++)
+>> +             dev_dbg(iproc_i2c->device, "0x%02x ",  msg->buf[i]);
+>> +     dev_dbg(iproc_i2c->device, "**** data end ****\n");
+>
+> It might be simpler to just do:
+>
+>     print_hex_dump_bytes("iproc_i2c:", DUMP_PREFIX_NONE, msg->buf, msg->len);
+>
+> although you'd lose the ability to see the I2C device name.
 
-This patch ensures that :
- - the current description is correct
- - the clocks are actually claimed, so that clock framework doesn't
-   disable them automatically (unused clocks shutdown)
+We can also do:
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
- arch/arm/boot/dts/pxa27x.dtsi | 36 ++++++++++++++++++++++++++++++++----
- 1 file changed, 32 insertions(+), 4 deletions(-)
+dev_dbg(iproc_i2c->device, "*** data: %*ph\n", msg->len, msg->buf);
 
-diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
-index 80fc5d7..7cbf36f 100644
---- a/arch/arm/boot/dts/pxa27x.dtsi
-+++ b/arch/arm/boot/dts/pxa27x.dtsi
-@@ -1,6 +1,6 @@
- /* The pxa3xx skeleton simply augments the 2xx version */
- #include "pxa2xx.dtsi"
--#include "dt-bindings/clock/pxa2xx-clock.h"
-+#include "dt-bindings/clock/pxa-clock.h"
- 
- / {
- 	model = "Marvell PXA27x familiy SoC";
-@@ -12,30 +12,58 @@
- 			marvell,intc-nr-irqs = <34>;
- 		};
- 
-+		gpio: gpio at 40e00000 {
-+			compatible = "intel,pxa27x-gpio";
-+			clocks = <&pxa2xx_clks CLK_NONE>;
-+		};
-+
-+		ffuart: uart at 40100000 {
-+			clocks = <&pxa2xx_clks CLK_FFUART>;
-+		};
-+
-+		btuart: uart at 40200000 {
-+			clocks = <&pxa2xx_clks CLK_BTUART>;
-+		};
-+
-+		stuart: uart at 40700000 {
-+			clocks = <&pxa2xx_clks CLK_STUART>;
-+		};
-+
- 		pwm0: pwm at 40b00000 {
- 			compatible = "marvell,pxa270-pwm", "marvell,pxa250-pwm";
- 			reg = <0x40b00000 0x10>;
- 			#pwm-cells = <1>;
-+			clocks = <&pxa2xx_clks CLK_PWM0>;
- 		};
- 
- 		pwm1: pwm at 40b00010 {
- 			compatible = "marvell,pxa270-pwm", "marvell,pxa250-pwm";
- 			reg = <0x40b00010 0x10>;
- 			#pwm-cells = <1>;
-+			clocks = <&pxa2xx_clks CLK_PWM1>;
- 		};
- 
- 		pwm2: pwm at 40c00000 {
- 			compatible = "marvell,pxa270-pwm", "marvell,pxa250-pwm";
- 			reg = <0x40c00000 0x10>;
- 			#pwm-cells = <1>;
-+			clocks = <&pxa2xx_clks CLK_PWM0>;
- 		};
- 
- 		pwm3: pwm at 40c00010 {
- 			compatible = "marvell,pxa270-pwm", "marvell,pxa250-pwm";
- 			reg = <0x40c00010 0x10>;
- 			#pwm-cells = <1>;
-+			clocks = <&pxa2xx_clks CLK_PWM1>;
-+		};
-+
-+		pwri2c: i2c at 40f000180 {
-+			clocks = <&pxa2xx_clks CLK_PWRI2C>;
-+		};
-+
-+		pxai2c1: i2c at 40301680 {
-+			clocks = <&pxa2xx_clks CLK_I2C>;
- 		};
--	};
- 
- 	clocks {
- 	       /*
-@@ -47,10 +75,10 @@
- 		ranges;
- 
- 		pxa2xx_clks: pxa2xx_clks at 41300004 {
--			compatible = "marvell,pxa-clocks";
-+			compatible = "marvell,pxa270-clocks";
- 			#clock-cells = <1>;
- 			status = "okay";
- 		};
- 	};
--
-+	};
- };
--- 
-2.1.0
+if we are OK with limiting output to 64 bytes.
+
+Thanks,
+Dmitry
