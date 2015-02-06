@@ -1,75 +1,35 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 6 Feb 2015 15:20:35 +0100
-Subject: [PATCH v4 0/7] clk: Add common clock support for Mediatek MT8135
- and MT8173.
-In-Reply-To: <20150206103033.GS18908@pengutronix.de>
-References: <1422594798-13375-1-git-send-email-henryc.chen@mediatek.com>
- <CABuKBeJSH3WzG3QC=9OoPzXE6fd9W2U67V4c19NzWcPxWR7VDg@mail.gmail.com>
- <20150206103033.GS18908@pengutronix.de>
-Message-ID: <CABuKBeJBp115aD_xb7_2471h=iyr5Wc33m2EX715MxNc=_1p2A@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 6 Feb 2015 15:20:33 +0100
+Subject: Continuing kallsyms failures - large kernels, XIP kernels, and
+ large XIP kernels
+In-Reply-To: <20150205084323.GS10842@pengutronix.de>
+References: <20150130145642.GK26493@n2100.arm.linux.org.uk>
+ <20150130153414.GM26493@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1501301224180.1322@knanqh.ubzr>
+ <20150131002253.GR26493@n2100.arm.linux.org.uk>
+ <20150204000307.GA8656@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1502032054460.1322@knanqh.ubzr>
+ <20150204094414.GC8656@n2100.arm.linux.org.uk>
+ <20150205084323.GS10842@pengutronix.de>
+Message-ID: <20150206142033.GB10842@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-02-06 11:30 GMT+01:00 Sascha Hauer <s.hauer@pengutronix.de>:
-> On Thu, Feb 05, 2015 at 06:24:54PM +0100, Matthias Brugger wrote:
->> Hi Henry,
->>
->> 2015-01-30 6:13 GMT+01:00 Henry Chen <henryc.chen@mediatek.com>:
->> > This patchset contains the initial common clock support for Mediatek SoCs.
->> > Mediatek SoC's clock architecture comprises of various PLLs, dividers, muxes and clock gates.
->> >
->> > This patchset also contains a basic clock support for Mediatek MT8135 and MT8173.
->> >
->> > This driver is based on 3.19-rc1 + MT8135 and MT8173 basic support.
->> >
->> > Changes in v2:
->> > - Re-ordered patchset. Fold include/dt-bindings and DT document in 1st patch.
->> >
->> > Changes in v3:
->> > - Rebase to 3.19-rc1.
->> > - Refine code. Remove unneed functions, debug logs and comments, and fine tune error logs.
->> >
->> > Changes in v4:
->> > - Support MT8173 platform.
->> > - Re-ordered patchset. driver/clk/Makefile in 2nd patch.
->> > - Extract the common part definition(mtk_gate/mtk_pll/mtk_mux) from clk-mt8135.c/clk-mt8173.c to clk-mtk.c.
->> > - Refine code. Rmove unnessacary debug information and unsed defines, add prefix "mtk_" for static functions.
->> > - Remove flag CLK_IGNORE_UNUSED and set flag CLK_SET_RATE_PARENT on gate/mux/fixed-factor.
->> > - Use spin_lock_irqsave(&clk_ops_lock, flags) instead of mtk_clk_lock.
->> > - Example above include a node for the clock controller itself, followed by the i2c controller example above.
->>
->> You use pericfg and infracfg which will be used by other drivers as
->> well. So please use syscon for this driver. As it is no longer a
->> platform device it is present early in boot.
->> The changes should look something like the patch beneath. Please
->> beware that it does only show the general concept and may not even
->> compile. I asked Sascha to implement the reset controller as part of
->> the clk driver, as the registers addresses are mixed between both,
->> clock and reset controller. Please coordinate with him to get them
->> integrated (even as one series or as incremental series).
->
-> I don't really understand the "as part of the clk driver part". I now
-> have replaced the devm_regmap_init_mmio with syscon_node_to_regmap
-> in the pericfg / infracfg drivers. Is that all that you want or do you
-> want me to move the source code to drivers/clk/mediatek?
+Hello Russell,
 
-Yes, I propose to move the source code to drivers/clk/mediatek.
-Please have a look on other clock drivers which implement the reset
-controller, e.g. rockchip.
+On Thu, Feb 05, 2015 at 09:43:23AM +0100, Uwe Kleine-K?nig wrote:
+> An unmodified 3.19.0-rc6 + efm32_defconfig boots just fine with XIP (and
+> has to little RAM for holding the kernel image in it's 4 MiB RAM).
+And btw next fails to build because of your patch
+51f36035999ca403d08304176bdfa288a549b50e. Maybe you can limit it to MMU
+configs only to prevent false positives?
 
-Thanks,
-Matthias
+51f36035999ca403d08304176bdfa288a549b50e^ builds and boots just fine on
+my efm32 board.
 
->
-> Sascha
->
-> --
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
-
-
+Best regards
+Uwe
 
 -- 
-motzblog.wordpress.com
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
