@@ -1,70 +1,33 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri,  6 Feb 2015 13:30:10 +0100
-Subject: [PATCH] MAINTAINERS: Add dts entries for mvebu and dove
-Message-ID: <1423225810-5504-1-git-send-email-gregory.clement@free-electrons.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 6 Feb 2015 14:48:36 +0200
+Subject: [PATCH 2/2] ARM: DRA7: hwmod_data: Change locked_class for atl hwmod
+In-Reply-To: <1423226916-18804-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1423226916-18804-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1423226916-18804-3-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since many releases, the modifications of the mvebu device tree files
-are merged through the mvebu subsystem. This patch makes it official
-in order to help the contributors using the get_maintainer.pl to find
-the accurate people.
+The ATL hwmod can be used in nested way when it is selected to be the
+functional clock for McASP. For this lockdep validator will trigger false
+positive warning.
+By assigning separate class to atl locking will sort this out.
 
-In the same time, updated the mvebu description which now includes the
-kirkwood SoCs and new Armada SoCs.
-
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
-Hi Jason, Andrew and Sebastian
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-This last patch [1] showed that if people follow the recommendation to
-submit patch (using get_maintainer.pl script), we don't receive
-them. So I propose to amend MAINTAINERS with this patch.
-
-What do you think about it?
-
-If you agree then we can merged it in our next-merge windows (3.21).
-
-Thanks,
-
-Gregory
-
-[1]: http://thread.gmane.org/gmane.linux.drivers.devicetree/109387
-
-
-
- MAINTAINERS | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 5d9db6b445bc..d96daf53533c 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1149,7 +1149,7 @@ ARM/MAGICIAN MACHINE SUPPORT
- M:	Philipp Zabel <philipp.zabel@gmail.com>
- S:	Maintained
- 
--ARM/Marvell Armada 370 and Armada XP SOC support
-+ARM/Marvell Kirkwood and Armada 370, 375, 38x, XP SOC support
- M:	Jason Cooper <jason@lakedaemon.net>
- M:	Andrew Lunn <andrew@lunn.ch>
- M:	Gregory Clement <gregory.clement@free-electrons.com>
-@@ -1158,6 +1158,8 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/mach-mvebu/
- F:	drivers/rtc/armada38x-rtc
-+F:	arch/arm/boot/dts/armada*.dts
-+F:	arch/arm/boot/dts/kirkwood*.dts
- 
- ARM/Marvell Berlin SoC support
- M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-@@ -1175,6 +1177,7 @@ F:	arch/arm/mach-dove/
- F:	arch/arm/mach-mv78xx0/
- F:	arch/arm/mach-orion5x/
- F:	arch/arm/plat-orion/
-+F:	arch/arm/boot/dts/dove*.dts
- 
- ARM/Orion SoC/Technologic Systems TS-78xx platform support
- M:	Alexander Clouter <alex@digriz.org.uk>
+diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+index e8692e7675b8..87f259e8c574 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+@@ -185,6 +185,7 @@ static struct omap_hwmod dra7xx_atl_hwmod = {
+ 	.class		= &dra7xx_atl_hwmod_class,
+ 	.clkdm_name	= "atl_clkdm",
+ 	.main_clk	= "atl_gfclk_mux",
++	.lockdep_class	= HWMOD_LOCKDEP_SUBCLASS_CLASS1,
+ 	.prcm = {
+ 		.omap4 = {
+ 			.clkctrl_offs = DRA7XX_CM_ATL_ATL_CLKCTRL_OFFSET,
 -- 
-2.1.0
+2.2.2
