@@ -1,40 +1,302 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 05 Feb 2015 18:15:31 -0800
-Subject: [Cocci] [PATCH v13 3/6] clk: Make clk API return per-user struct
- clk instances
-In-Reply-To: <54D3900A.9060200@gmail.com>
-References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
- <1422011024-32283-4-git-send-email-tomeu.vizoso@collabora.com>
- <20150201212432.22722.70917@quantum> <54CFE1FE.7040404@codeaurora.org>
- <alpine.DEB.2.02.1502022230110.2045@localhost6.localdomain6>
- <54CFFBCF.90706@codeaurora.org> <20150202225036.421.43421@quantum>
- <54D0F179.1040906@gmail.com> <54D2AA9B.7010800@codeaurora.org>
- <54D3900A.9060200@gmail.com>
-Message-ID: <54D423C3.9030105@codeaurora.org>
+From: vincent.yang.fujitsu@gmail.com (Vincent Yang)
+Date: Fri,  6 Feb 2015 10:16:04 +0800
+Subject: [PATCH v6 7/7] ARM: MB86S7x: Add configs
+In-Reply-To: <1423188007-17047-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+References: <1423188007-17047-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+Message-ID: <1423188965-17343-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/15 07:45, Quentin Lambert wrote:
->
-> On 05/02/2015 00:26, Stephen Boyd wrote:
->>> If you want me to I can enlarge the search to other directories.
->> Yes please do. And if you could share the coccinelle patch that would be
->> great. Thanks.
->>
-> structclk.cocci is the coccinelle patch
-> structclk-arm.patch is the result I got when applying it to the
-> arch/arm directory
->
-> Is there anything else I can do to help?
->
->
+From: Jassi Brar <jaswinder.singh@linaro.org>
 
-Thanks for the coccinelle patch. Thinking more about it, I don't think
-we care if the pointer is dereferenced because that would require a
-definition of struct clk and that is most likely not the case outside of
-the clock framework. Did you scan the entire kernel? I'm running it now
-but it seems to be taking a while.
+Fujitsu's ARCH_MB86S7X is multi_v7 compatible, so add options to
+multi_v7_defconfig. Also add a new defconfig for MB86S7X for those
+who want the kernel built specifically for ARCH_MB86S7X.
 
+Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+Signed-off-by: Andy Green <andy.green@linaro.org>
+Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
+Signed-off-by: Tetsuya Nuriya <nuriya.tetsuya@jp.fujitsu.com>
+---
+ arch/arm/configs/fujitsu_defconfig  | 232 ++++++++++++++++++++++++++++++++++++
+ arch/arm/configs/multi_v7_defconfig |   5 +
+ 2 files changed, 237 insertions(+)
+ create mode 100644 arch/arm/configs/fujitsu_defconfig
+
+diff --git a/arch/arm/configs/fujitsu_defconfig b/arch/arm/configs/fujitsu_defconfig
+new file mode 100644
+index 0000000..2d922e4
+--- /dev/null
++++ b/arch/arm/configs/fujitsu_defconfig
+@@ -0,0 +1,232 @@
++# CONFIG_LOCALVERSION_AUTO is not set
++CONFIG_DEFAULT_HOSTNAME="MB86S7x"
++CONFIG_SYSVIPC=y
++CONFIG_POSIX_MQUEUE=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_IKCONFIG=y
++CONFIG_IKCONFIG_PROC=y
++CONFIG_NAMESPACES=y
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_RD_BZIP2=y
++CONFIG_RD_LZMA=y
++CONFIG_RD_XZ=y
++CONFIG_RD_LZO=y
++CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++CONFIG_EXPERT=y
++# CONFIG_COMPAT_BRK is not set
++CONFIG_SLAB=y
++CONFIG_PROFILING=y
++CONFIG_MODULES=y
++CONFIG_MODULE_UNLOAD=y
++CONFIG_ARCH_MB86S7X=y
++CONFIG_ARM_LPAE=y
++CONFIG_ARM_ERRATA_754322=y
++CONFIG_ARM_ERRATA_754327=y
++CONFIG_ARM_ERRATA_764369=y
++CONFIG_ARM_ERRATA_775420=y
++CONFIG_ARM_ERRATA_798181=y
++CONFIG_PCI=y
++CONFIG_SMP=y
++CONFIG_SCHED_MC=y
++CONFIG_SCHED_SMT=y
++CONFIG_VMSPLIT_2G=y
++CONFIG_PREEMPT=y
++CONFIG_THUMB2_KERNEL=y
++CONFIG_HIGHMEM=y
++CONFIG_CMA=y
++CONFIG_CMA_AREAS=8
++# CONFIG_ATAGS is not set
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_CMDLINE="mem=2048M console=ttyS0,115200 root=/dev/mmcblk1p1 rootfstype=ext4 rootwait rw"
++CONFIG_KEXEC=y
++CONFIG_CPU_FREQ=y
++CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
++CONFIG_CPUFREQ_DT=m
++CONFIG_CPU_IDLE=y
++CONFIG_VFP=y
++CONFIG_NEON=y
++CONFIG_PM_WAKELOCKS=y
++CONFIG_PM_RUNTIME=y
++CONFIG_PM_DEBUG=y
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_MULTICAST=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_IP_PNP_BOOTP=y
++# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
++# CONFIG_INET_XFRM_MODE_TUNNEL is not set
++# CONFIG_INET_XFRM_MODE_BEET is not set
++# CONFIG_INET_LRO is not set
++# CONFIG_IPV6 is not set
++# CONFIG_WIRELESS is not set
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_DMA_CMA=y
++CONFIG_CMA_SIZE_MBYTES=192
++CONFIG_MTD=y
++CONFIG_MTD_CMDLINE_PARTS=y
++CONFIG_MTD_BLOCK=y
++CONFIG_MTD_CFI=y
++CONFIG_MTD_CFI_ADV_OPTIONS=y
++CONFIG_MTD_CFI_AMDSTD=y
++CONFIG_MTD_ROM=y
++CONFIG_MTD_COMPLEX_MAPPINGS=y
++CONFIG_MTD_PHYSMAP=y
++CONFIG_MTD_PHYSMAP_OF=y
++CONFIG_MTD_PLATRAM=y
++CONFIG_MTD_M25P80=y
++CONFIG_MTD_SPI_NOR=y
++CONFIG_BLK_DEV_LOOP=m
++CONFIG_BLK_DEV_CRYPTOLOOP=m
++CONFIG_BLK_DEV_RAM=y
++CONFIG_BLK_DEV_RAM_COUNT=2
++CONFIG_BLK_DEV_RAM_SIZE=1024
++CONFIG_BLK_DEV_SD=m
++CONFIG_ATA=m
++# CONFIG_ATA_VERBOSE_ERROR is not set
++# CONFIG_SATA_PMP is not set
++CONFIG_SATA_AHCI_PLATFORM=m
++# CONFIG_ATA_SFF is not set
++CONFIG_NETDEVICES=y
++CONFIG_TUN=m
++# CONFIG_NET_CADENCE is not set
++# CONFIG_NET_VENDOR_BROADCOM is not set
++# CONFIG_NET_VENDOR_CIRRUS is not set
++# CONFIG_NET_VENDOR_FARADAY is not set
++# CONFIG_NET_VENDOR_INTEL is not set
++# CONFIG_NET_VENDOR_MARVELL is not set
++# CONFIG_NET_VENDOR_MICREL is not set
++# CONFIG_NET_VENDOR_MICROCHIP is not set
++# CONFIG_NET_VENDOR_NATSEMI is not set
++# CONFIG_NET_VENDOR_SEEQ is not set
++# CONFIG_NET_VENDOR_SMSC is not set
++# CONFIG_NET_VENDOR_STMICRO is not set
++# CONFIG_NET_VENDOR_WIZNET is not set
++CONFIG_PHYLIB=y
++# CONFIG_WLAN is not set
++# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
++CONFIG_INPUT_MOUSEDEV_SCREEN_X=800
++CONFIG_INPUT_MOUSEDEV_SCREEN_Y=480
++CONFIG_INPUT_EVDEV=m
++# CONFIG_KEYBOARD_ATKBD is not set
++CONFIG_KEYBOARD_GPIO_POLLED=y
++# CONFIG_MOUSE_PS2 is not set
++CONFIG_MOUSE_GPIO=m
++CONFIG_INPUT_TOUCHSCREEN=y
++CONFIG_TOUCHSCREEN_EGALAX=m
++CONFIG_TOUCHSCREEN_ILI210X=m
++# CONFIG_SERIO_SERPORT is not set
++CONFIG_LEGACY_PTY_COUNT=16
++# CONFIG_DEVKMEM is not set
++CONFIG_SERIAL_8250=y
++# CONFIG_SERIAL_8250_DEPRECATED_OPTIONS is not set
++CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_8250_EXTENDED=y
++CONFIG_SERIAL_8250_DW=y
++CONFIG_SERIAL_OF_PLATFORM=y
++# CONFIG_HW_RANDOM is not set
++# CONFIG_I2C_COMPAT is not set
++CONFIG_I2C_CHARDEV=m
++# CONFIG_I2C_HELPER_AUTO is not set
++CONFIG_SPI=y
++CONFIG_GPIO_SYSFS=y
++CONFIG_GPIO_MB86S7X=y
++CONFIG_GPIO_MCP23S08=m
++# CONFIG_HWMON is not set
++CONFIG_REGULATOR=y
++CONFIG_REGULATOR_GPIO=y
++# CONFIG_VGA_ARB is not set
++CONFIG_DRM=y
++CONFIG_FB=y
++CONFIG_FIRMWARE_EDID=y
++CONFIG_FB_MODE_HELPERS=y
++CONFIG_FB_TILEBLITTING=y
++CONFIG_BACKLIGHT_LCD_SUPPORT=y
++CONFIG_FRAMEBUFFER_CONSOLE=y
++CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
++CONFIG_FRAMEBUFFER_CONSOLE_ROTATION=y
++CONFIG_LOGO=y
++# CONFIG_LOGO_LINUX_MONO is not set
++# CONFIG_LOGO_LINUX_VGA16 is not set
++CONFIG_SOUND=m
++CONFIG_SND=m
++CONFIG_SND_DYNAMIC_MINORS=y
++# CONFIG_SND_SUPPORT_OLD_API is not set
++# CONFIG_SND_VERBOSE_PROCFS is not set
++# CONFIG_SND_ARM is not set
++# CONFIG_SND_SPI is not set
++CONFIG_SND_SOC=m
++CONFIG_HID=m
++CONFIG_HID_PID=y
++CONFIG_USB_HIDDEV=y
++CONFIG_USB=m
++CONFIG_USB_OTG=y
++CONFIG_USB_XHCI_HCD=m
++CONFIG_USB_EHCI_HCD=m
++CONFIG_USB_EHCI_HCD_PLATFORM=m
++CONFIG_USB_OHCI_HCD=m
++# CONFIG_USB_OHCI_HCD_PCI is not set
++CONFIG_USB_OHCI_HCD_PLATFORM=m
++CONFIG_USB_ACM=m
++CONFIG_USB_STORAGE=m
++CONFIG_USB_DWC3=m
++CONFIG_USB_DWC3_HOST=y
++CONFIG_USB_DWC3_DEBUG=y
++CONFIG_USB_GADGET=m
++CONFIG_USB_MASS_STORAGE=m
++CONFIG_USB_G_MULTI=m
++CONFIG_MMC=y
++CONFIG_MMC_CLKGATE=y
++CONFIG_MMC_SDHCI=y
++CONFIG_MMC_SDHCI_PLTFM=y
++CONFIG_MMC_SDHCI_F_SDH30=y
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_GPIO=y
++CONFIG_LEDS_TRIGGERS=y
++CONFIG_LEDS_TRIGGER_TIMER=y
++CONFIG_LEDS_TRIGGER_HEARTBEAT=y
++CONFIG_LEDS_TRIGGER_BACKLIGHT=m
++CONFIG_LEDS_TRIGGER_CPU=y
++CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
++CONFIG_LEDS_TRIGGER_TRANSIENT=m
++CONFIG_DMADEVICES=y
++CONFIG_STAGING=y
++CONFIG_ANDROID=y
++CONFIG_ANDROID_BINDER_IPC=y
++CONFIG_ASHMEM=y
++CONFIG_ANDROID_LOGGER=m
++CONFIG_ANDROID_LOW_MEMORY_KILLER=y
++CONFIG_ION=y
++CONFIG_ARM_MHU=y
++CONFIG_ARM_SMMU=y
++CONFIG_EXT4_FS=y
++CONFIG_EXT4_FS_POSIX_ACL=y
++CONFIG_EXT4_FS_SECURITY=y
++CONFIG_VFAT_FS=m
++CONFIG_TMPFS=y
++CONFIG_JFFS2_FS=m
++CONFIG_CRAMFS=y
++CONFIG_ROMFS_FS=y
++CONFIG_ROMFS_BACKED_BY_BOTH=y
++# CONFIG_NETWORK_FILESYSTEMS is not set
++CONFIG_NLS_CODEPAGE_437=m
++CONFIG_NLS_ISO8859_1=m
++CONFIG_PRINTK_TIME=y
++CONFIG_DEBUG_INFO=y
++CONFIG_DEBUG_FS=y
++CONFIG_MAGIC_SYSRQ=y
++CONFIG_DEBUG_MEMORY_INIT=y
++# CONFIG_DEBUG_PREEMPT is not set
++# CONFIG_RCU_CPU_STALL_VERBOSE is not set
++# CONFIG_FTRACE is not set
++CONFIG_DEBUG_USER=y
++# CONFIG_CRYPTO_ANSI_CPRNG is not set
++# CONFIG_CRYPTO_HW is not set
++CONFIG_FONTS=y
++CONFIG_FONT_SUN8x16=y
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index bc393b7..102e457 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -49,6 +49,7 @@ CONFIG_SOC_AM43XX=y
+ CONFIG_SOC_DRA7XX=y
+ CONFIG_ARCH_QCOM=y
+ CONFIG_ARCH_MEDIATEK=y
++CONFIG_ARCH_MB86S7X=y
+ CONFIG_ARCH_MSM8X60=y
+ CONFIG_ARCH_MSM8960=y
+ CONFIG_ARCH_MSM8974=y
+@@ -259,6 +260,7 @@ CONFIG_GPIO_TWL4030=y
+ CONFIG_GPIO_PALMAS=y
+ CONFIG_GPIO_TPS6586X=y
+ CONFIG_GPIO_TPS65910=y
++CONFIG_GPIO_MB86S7X=y
+ CONFIG_BATTERY_SBS=y
+ CONFIG_CHARGER_TPS65090=y
+ CONFIG_POWER_RESET_AS3722=y
+@@ -370,6 +372,7 @@ CONFIG_MMC_SDHCI_SPEAR=y
+ CONFIG_MMC_SDHCI_S3C=y
+ CONFIG_MMC_SDHCI_S3C_DMA=y
+ CONFIG_MMC_SDHCI_BCM_KONA=y
++CONFIG_MMC_SDHCI_F_SDH30=y
+ CONFIG_MMC_SDHCI_ST=y
+ CONFIG_MMC_OMAP=y
+ CONFIG_MMC_OMAP_HS=y
+@@ -457,6 +460,8 @@ CONFIG_TI_PIPE3=y
+ CONFIG_PHY_MIPHY365X=y
+ CONFIG_PHY_STIH41X_USB=y
+ CONFIG_PHY_SUN4I_USB=y
++CONFIG_MAILBOX=y
++CONFIG_ARM_MHU=y
+ CONFIG_EXT4_FS=y
+ CONFIG_AUTOFS4_FS=y
+ CONFIG_MSDOS_FS=y
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.9.0
