@@ -1,76 +1,95 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  6 Feb 2015 16:57:51 +0100
-Subject: [PATCH 05/10] clk: mvebu: extend common code to allow an optional
- refclk
+Date: Fri,  6 Feb 2015 16:57:54 +0100
+Subject: [PATCH 08/10] ARM: mvebu: add core support for Armada 39x
 In-Reply-To: <1423238276-9206-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1423238276-9206-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1423238276-9206-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1423238276-9206-9-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 39x, contrary to its predecessor, has a configurable
-reference clock frequency, of either 25 Mhz, or 40 Mhz. For the
-previous SoCs, it was fixed to 25 Mhz and described directly as such
-in the Device Tree.
+This commit adds the core support for Armada 39x, which is quite
+simple:
 
-For Armada 39x, we need to read certain registers to know whether the
-frequency is 25 or 40 Mhz. Therefore, this commit extends the common
-mvebu clock code to allow the SoC-specific code to say it wants to
-register a reference clock, by giving a non-NULL ->get_refclk_freq()
-function pointer in its coreclk_soc_desc structure.
+ - a new Kconfig option which selects the appropriate clock and
+   pinctrl drivers as well as other common features (GIC, L2 cache,
+   SMP, etc.)
+
+ - a new DT_MACHINE_START which references the top-level compatible
+   strings supported for the Marvell Armada 39x.
+
+ - a new SMP enable-method. The mechanism to enable CPUs for Armada
+   39x appears to be the same as Armada 38x. However, we do want to
+   use marvell,armada-380-smp in the Device Tree, in the case of the
+   discovery of a subtle difference in the future, which would require
+   changing the Device Tree. And the enable-method isn't a compatible
+   string: you can't specify several values and expect a fallback on
+   the second string if the first one isn't supported. Therefore, we
+   simply declare the SMP enable method "marvell,armada-390-smp" as
+   doing the same thing as the "marvell,armada-380-smp" one.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/clk/mvebu/common.c | 17 +++++++++++++++++
- drivers/clk/mvebu/common.h |  1 +
- 2 files changed, 18 insertions(+)
+ arch/arm/mach-mvebu/Kconfig      | 14 ++++++++++++++
+ arch/arm/mach-mvebu/board-v7.c   | 14 ++++++++++++++
+ arch/arm/mach-mvebu/platsmp-a9.c |  2 ++
+ 3 files changed, 30 insertions(+)
 
-diff --git a/drivers/clk/mvebu/common.c b/drivers/clk/mvebu/common.c
-index 0d4d121..15b370f 100644
---- a/drivers/clk/mvebu/common.c
-+++ b/drivers/clk/mvebu/common.c
-@@ -121,6 +121,11 @@ void __init mvebu_coreclk_setup(struct device_node *np,
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index c1e4567..9747316 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -64,6 +64,20 @@ config MACH_ARMADA_38X
+ 	  Say 'Y' here if you want your kernel to support boards based
+ 	  on the Marvell Armada 380/385 SoC with device tree.
  
- 	/* Allocate struct for TCLK, cpu clk, and core ratio clocks */
- 	clk_data.clk_num = 2 + desc->num_ratios;
++config MACH_ARMADA_39X
++	bool "Marvell Armada 39x boards" if ARCH_MULTI_V7
++	select ARM_GIC
++	select ARMADA_39X_CLK
++	select CACHE_L2X0
++	select HAVE_ARM_SCU
++	select HAVE_ARM_TWD if SMP
++	select HAVE_SMP
++	select MACH_MVEBU_V7
++	select PINCTRL_ARMADA_39X
++	help
++	  Say 'Y' here if you want your kernel to support boards based
++	  on the Marvell Armada 39x SoC with device tree.
 +
-+	/* One more clock for the optional refclk */
-+	if (desc->get_refclk_freq)
-+		clk_data.clk_num += 1;
+ config MACH_ARMADA_XP
+ 	bool "Marvell Armada XP boards" if ARCH_MULTI_V7
+ 	select ARMADA_XP_CLK
+diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
+index 89a139e..d88438f 100644
+--- a/arch/arm/mach-mvebu/board-v7.c
++++ b/arch/arm/mach-mvebu/board-v7.c
+@@ -232,3 +232,17 @@ DT_MACHINE_START(ARMADA_38X_DT, "Marvell Armada 380/385 (Device Tree)")
+ 	.restart	= mvebu_restart,
+ 	.dt_compat	= armada_38x_dt_compat,
+ MACHINE_END
 +
- 	clk_data.clks = kzalloc(clk_data.clk_num * sizeof(struct clk *),
- 				GFP_KERNEL);
- 	if (WARN_ON(!clk_data.clks)) {
-@@ -162,6 +167,18 @@ void __init mvebu_coreclk_setup(struct device_node *np,
- 		WARN_ON(IS_ERR(clk_data.clks[2+n]));
- 	};
- 
-+	/* Register optional refclk */
-+	if (desc->get_refclk_freq) {
-+		const char *name = "refclk";
-+		of_property_read_string_index(np, "clock-output-names",
-+					      2 + desc->num_ratios, &name);
-+		rate = desc->get_refclk_freq(base);
-+		clk_data.clks[2 + desc->num_ratios] =
-+			clk_register_fixed_rate(NULL, name, NULL,
-+						CLK_IS_ROOT, rate);
-+		WARN_ON(IS_ERR(clk_data.clks[2 + desc->num_ratios]));
-+	}
++static const char * const armada_39x_dt_compat[] = {
++	"marvell,armada390",
++	"marvell,armada398",
++	NULL,
++};
 +
- 	/* SAR register isn't needed anymore */
- 	iounmap(base);
- 
-diff --git a/drivers/clk/mvebu/common.h b/drivers/clk/mvebu/common.h
-index 783b563..f0de6c8 100644
---- a/drivers/clk/mvebu/common.h
-+++ b/drivers/clk/mvebu/common.h
-@@ -30,6 +30,7 @@ struct coreclk_soc_desc {
- 	u32 (*get_tclk_freq)(void __iomem *sar);
- 	u32 (*get_cpu_freq)(void __iomem *sar);
- 	void (*get_clk_ratio)(void __iomem *sar, int id, int *mult, int *div);
-+	u32 (*get_refclk_freq)(void __iomem *sar);
- 	bool (*is_sscg_enabled)(void __iomem *sar);
- 	u32 (*fix_sscg_deviation)(u32 system_clk);
- 	const struct coreclk_ratio *ratios;
++DT_MACHINE_START(ARMADA_39X_DT, "Marvell Armada 39x (Device Tree)")
++	.l2c_aux_val	= 0,
++	.l2c_aux_mask	= ~0,
++	.init_irq       = mvebu_init_irq,
++	.restart	= mvebu_restart,
++	.dt_compat	= armada_39x_dt_compat,
++MACHINE_END
+diff --git a/arch/arm/mach-mvebu/platsmp-a9.c b/arch/arm/mach-mvebu/platsmp-a9.c
+index 2ec1a42..df0a9cc 100644
+--- a/arch/arm/mach-mvebu/platsmp-a9.c
++++ b/arch/arm/mach-mvebu/platsmp-a9.c
+@@ -110,3 +110,5 @@ CPU_METHOD_OF_DECLARE(mvebu_armada_375_smp, "marvell,armada-375-smp",
+ 		      &mvebu_cortex_a9_smp_ops);
+ CPU_METHOD_OF_DECLARE(mvebu_armada_380_smp, "marvell,armada-380-smp",
+ 		      &armada_38x_smp_ops);
++CPU_METHOD_OF_DECLARE(mvebu_armada_390_smp, "marvell,armada-390-smp",
++		      &armada_38x_smp_ops);
 -- 
 2.1.0
