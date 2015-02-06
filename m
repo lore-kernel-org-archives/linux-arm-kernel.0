@@ -1,85 +1,59 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Thu, 5 Feb 2015 18:38:51 -0800
-Subject: [PATCH v5 3/5] x86: Split syscall_trace_enter into two phases
-In-Reply-To: <20150206023249.GB31540@altlinux.org>
-References: <cover.1409954077.git.luto@amacapital.net>
- <2df320a600020fda055fccf2b668145729dd0c04.1409954077.git.luto@amacapital.net>
- <20150205211916.GA31367@altlinux.org>
- <CAGXu5j+aXxt55LsxxbNkfGGF719ubXBZ2JAFwUPNARwKMVFgng@mail.gmail.com>
- <20150205214027.GB31367@altlinux.org>
- <CALCETrXFzcXngHsX=_72hYZqms32Zf7oFYDBgC3XNw7zOGdDCA@mail.gmail.com>
- <CAGXu5jJtHT9o8WMoynifN13=uZoARt4G9iVcgZsc9xYOBEwWsg@mail.gmail.com>
- <20150205233945.GA31540@altlinux.org>
- <CAGXu5jLTH+mUF0JxeR2qA_r=ocWjPHPSK2OPgE0Fu_JKoQyQ9w@mail.gmail.com>
- <CALCETrXsCUje+_V=Ud+TB4A2jH2M7yqyoCFMLEyxOD6pd7Di5w@mail.gmail.com>
- <20150206023249.GB31540@altlinux.org>
-Message-ID: <CALCETrWTnqKDoatK+5FN=yYDOeENoW5=r5YMToYKhZ8Zfv5wWA@mail.gmail.com>
+From: mpeg.blue@free.fr (Mason)
+Date: Thu, 05 Feb 2015 19:13:07 -0800
+Subject: cpuidle vs suspend vs something else
+Message-ID: <54D43143.2010403@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 5, 2015 at 6:32 PM, Dmitry V. Levin <ldv@altlinux.org> wrote:
-> On Thu, Feb 05, 2015 at 04:09:06PM -0800, Andy Lutomirski wrote:
->> On Thu, Feb 5, 2015 at 3:49 PM, Kees Cook <keescook@chromium.org> wrote:
->> > On Thu, Feb 5, 2015 at 3:39 PM, Dmitry V. Levin <ldv@altlinux.org> wrote:
-> [...]
->> >> There is a clear difference: before these changes, SECCOMP_RET_ERRNO used
->> >> to keep the syscall number unchanged and suppress syscall-exit-stop event,
->> >> which was awful because userspace cannot distinguish syscall-enter-stop
->> >> from syscall-exit-stop and therefore relies on the kernel that
->> >> syscall-enter-stop is followed by syscall-exit-stop (or tracee's death, etc.).
->> >>
->> >> After these changes, SECCOMP_RET_ERRNO no longer causes syscall-exit-stop
->> >> events to be suppressed, but now the syscall number is lost.
->> >
->> > Ah-ha! Okay, thanks, I understand now. I think this means seccomp
->> > phase1 should not treat RET_ERRNO as a "skip" event. Andy, what do you
->> > think here?
->>
->> I still don't quite see how this change caused this.
->
-> I have a test for this at
-> http://sourceforge.net/p/strace/code/ci/HEAD/~/tree/test/seccomp.c
->
->> I can play with
->> it a bit more.  But RET_ERRNO *has* to be some kind of skip event,
->> because it needs to skip the syscall.
->>
->> We could change this by treating RET_ERRNO as an instruction to enter
->> phase 2 and then asking for a skip in phase 2 without changing
->> orig_ax, but IMO this is pretty ugly.
->>
->> I think this all kind of sucks.  We're trying to run ptrace after
->> seccomp, so ptrace is seeing the syscalls as transformed by seccomp.
->> That means that if we use RET_TRAP, then ptrace will see the
->> possibly-modified syscall, if we use RET_ERRNO, then ptrace is (IMO
->> correctly given the current design) showing syscall -1, and if we use
->> RET_KILL, then ptrace just sees the process mysteriously die.
->
-> Userspace is usually not prepared to see syscall -1.
-> For example, strace had to be patched, otherwise it just skipped such
-> syscalls as "not a syscall" events or did other improper things:
-> http://sourceforge.net/p/strace/code/ci/c3948327717c29b10b5e00a436dc138b4ab1a486
-> http://sourceforge.net/p/strace/code/ci/8e398b6c4020fb2d33a5b3e40271ebf63199b891
->
+Hello everyone,
 
-The x32 thing is a legit ABI bug, I'd argue.  I'd be happy to submit a
-patch to fix that (clear the x32 bit if we're not x32).
+I've been reading about related sub-systems (cpuidle and suspend)
+and I'm not sure I understand how they relate / interact.
 
-> A slightly different but related story: userspace is also not prepared
-> to handle large errno values produced by seccomp filters like this:
-> BPF_STMT(BPF_RET, SECCOMP_RET_ERRNO | SECCOMP_RET_DATA)
->
-> For example, glibc assumes that syscalls do not return errno values greater than 0xfff:
-> https://sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/unix/sysv/linux/x86_64/sysdep.h#l55
-> https://sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/unix/sysv/linux/x86_64/syscall.S#l20
->
-> If it isn't too late, I'd recommend changing SECCOMP_RET_DATA mask
-> applied in SECCOMP_RET_ERRNO case from current 0xffff to 0xfff.
+If I understand correctly (please do point out any misconceptions)
+on ARM Cortex A9, the first level of power saving is WFI, which is
+typically called from the idle loop.
 
-I think this is solidly in the "don't do that" category.  Seccomp lets
-you tamper with syscalls.  If you tamper wrong, then you lose.
+This places the core in low-power mode ("Standby mode" in ARM docs).
+"RAM arrays" (don't know what they are), "processor logic", and
+"data engine" (not sure what any of these exactly refers to, guess
+I have more reading to do) are still powered-up, but most of the
+clocks are disabled.
 
-Kees, what do you think about reversing the whole thing so that
-ptracers always see the original syscall?
+In ARM's exact words, "WFI and WFE Standby modes disable most of the
+clocks in a processor, while keeping its logic powered up. This reduces
+the power drawn to the static leakage current, leaving a tiny clock
+power overhead requirement to enable the device to wake up."
 
---Andy
+Some CPUs like Intel's have several levels of sleep (deeper levels
+mean less power, but have a higher wake-up latency). AFAIU, cpuidle
+is used to describe and manage these levels?
+
+Isn't suspend somewhat like the deepest level of sleep?
+(Or is it different in that things like RAM state are only a concern
+for suspend, not cpuidle?)
+
+Are both subsystems still actively used?
+
+I saw plans to merge cpufreq into cpuidle / scheduler decisions.
+
+LCA14: LCA14-306: CPUidle & CPUfreq integration with scheduler
+http://www.slideshare.net/linaroorg/lca14-306-cpuidlecpufreqintegrationwithscheduler
+
+This presentation doesn't mention suspend, I think.
+
+ARM has a mode called "Dormant Mode". Is suspend typically
+used to put the SoC in that mode?
+
+I think I need to read this document carefully:
+Power Management In The Linux Kernel -- Current Status And Future
+http://events.linuxfoundation.org/sites/events/files/slides/kernel_PM_plain.pdf
+
+There's also an older document that may prove insightful:
+CPUIdle versus Suspend
+http://www.linuxplumbersconf.org/2010/ocw/proposals/789
+
+But things move so fast in kernel-land, that I don't know how relevant
+a 4 year-old document can be.
+
+Regards.
