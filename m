@@ -1,65 +1,62 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 6 Feb 2015 15:25:30 +0100
-Subject: Continuing kallsyms failures - large kernels, XIP kernels, and
- large XIP kernels
-In-Reply-To: <20150131002253.GR26493@n2100.arm.linux.org.uk>
-References: <20150130145642.GK26493@n2100.arm.linux.org.uk>
- <20150130153414.GM26493@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1501301224180.1322@knanqh.ubzr>
- <20150131002253.GR26493@n2100.arm.linux.org.uk>
-Message-ID: <20150206142530.GC10842@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 6 Feb 2015 14:38:12 +0000
+Subject: [PATCH v6 3/7] of: fix size when dma-range is not used
+In-Reply-To: <1423173179-10227-4-git-send-email-m-karicheri2@ti.com>
+References: <1423173179-10227-1-git-send-email-m-karicheri2@ti.com>
+ <1423173179-10227-4-git-send-email-m-karicheri2@ti.com>
+Message-ID: <20150206143812.GB20549@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 31, 2015 at 12:22:53AM +0000, Russell King - ARM Linux wrote:
-> On Fri, Jan 30, 2015 at 12:29:30PM -0500, Nicolas Pitre wrote:
-> > On Fri, 30 Jan 2015, Russell King - ARM Linux wrote:
-> > > +#ifdef CONFIG_XIP_KERNEL
-> > > +/*
-> > > + * __data_loc is not only the LMA of the data section, but also the VMA of
-> > > + * the end of the .rodata section.  This must not overlap the VMA of the
-> > > + * data section.  Since the .text section starts in module space, and that
-> > > + * is always below the .data section, this should be sufficient.
-> > > + */
-> > > +ASSERT((_data >= __data_loc), "Text section oversize")
-> > > +#endif
-> > 
-> > I agree with this patch.
-> > 
-> > Acked-by: Nicolas Pitre <nico@linaro.org>
-> > 
-> > This might not prevent a config leading to this from happening, but at 
-> > least it makes the issue much clearer.  XIP kernel was created for 
-> > systems where the total amount of RAM is often smaller than the imposed
-> > size limit here.
+On Thu, Feb 05, 2015 at 09:52:55PM +0000, Murali Karicheri wrote:
+> Fix the dma-range size when the DT attribute is missing. i.e  set size to
+> dev->coherent_dma_mask + 1 instead of dev->coherent_dma_mask. Also add
+> code to check invalid values of size configured in DT and log error.
 > 
-> Yes, I expect more of Arnd's randconfigs to fail with this patch applied.
+> Cc: Joerg Roedel <joro@8bytes.org>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 > 
-> I did also notice that we still have swapper_pg_dir at _data - 0x4000
-> for XIP kernels - so the above check is slightly too lenient.  A better
-> threshold for __data_loc might be MODULES_END, since we can't allow the
-> XIP part to overlap into RAM.
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> ---
+>  drivers/of/device.c |   17 ++++++++++++++++-
+>  1 file changed, 16 insertions(+), 1 deletion(-)
 > 
-> #ifdef CONFIG_HIGHMEM
-> #define MODULES_END             (PAGE_OFFSET - PMD_SIZE)
-> #else
-> #define MODULES_END             (PAGE_OFFSET)
-> #endif
-BTW, on no-MMU MODULES_END is defined as
+> diff --git a/drivers/of/device.c b/drivers/of/device.c
+> index 2de320d..314c8a9 100644
+> --- a/drivers/of/device.c
+> +++ b/drivers/of/device.c
+> @@ -105,9 +105,24 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+>  	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
+>  	if (ret < 0) {
+>  		dma_addr = offset = 0;
+> -		size = dev->coherent_dma_mask;
+> +		size = dev->coherent_dma_mask + 1;
+>  	} else {
+>  		offset = PFN_DOWN(paddr - dma_addr);
+> +
+> +		/*
+> +		 * Add a work around to treat the size as mask + 1 in case
+> +		 * it is defined in DT as a mask.
+> +		 */
+> +		if (size & 1) {
+> +			dev_warn(dev, "Invalid size 0x%llx for dma-range\n",
+> +				 size);
+> +			size = size + 1;
+> +		}
+> +
+> +		if (!size) {
+> +			dev_err(dev, "Adjusted size 0x%llx invalid\n", size);
+> +			return;
+> +		}
 
-	#define END_MEM                 (UL(CONFIG_DRAM_BASE) + CONFIG_DRAM_SIZE)
-	#define MODULES_END             (END_MEM)
-
-I'd like to get rid of CONFIG_DRAM_SIZE because it's stupid to have that
-fixed in .config. MODULES_END is hardly used on no-MMU apart from
-printing the (IIRC wrong) memory layout during boot.
-
-If we define END_MEM to 0xffffffff on no-MMU this should effectively nop
-the assertion which at least prevents false positives?!
-
-Best regards
-Uwe
+Would it make sense to set coherent_dma_mask to 0 here to make this more
+noticeable? It can be done together with the mask calculation from size.
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Catalin
