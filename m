@@ -1,156 +1,97 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 06 Feb 2015 21:25:44 +0100
-Subject: Delays, clocks, timers, hrtimers, etc
-In-Reply-To: <54C8E125.3070905@free.fr>
-References: <54C8E125.3070905@free.fr>
-Message-ID: <e028a4eb604a491f4438557f4a1373ef@agner.ch>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Fri, 6 Feb 2015 15:26:55 -0500
+Subject: [PATCH v6 3/7] of: fix size when dma-range is not used
+In-Reply-To: <20150206151210.GC23190@e104818-lin.cambridge.arm.com>
+References: <1423173179-10227-1-git-send-email-m-karicheri2@ti.com>
+ <1423173179-10227-4-git-send-email-m-karicheri2@ti.com>
+ <20150206143812.GB20549@localhost> <54D4D59F.6050408@ti.com>
+ <20150206151210.GC23190@e104818-lin.cambridge.arm.com>
+Message-ID: <54D5238F.4030608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-01-28 14:16, Mason wrote:
-> Hello,
-> 
-> I am swimming in a sea of confusion, and am hoping someone would toss
-> me a life-jacket (of enlightenment). Please forgive me if some of my
-> questions are poorly asked or appear in seemingly random order.
-> 
-> Working on a Cortex A9 based SoC, I set out to "clean up" the platform
-> specific timer code, by using as much generic framework as possible.
-> (Right now, there's a lot of "redundant" code in the mach dir.)
-> 
-> 
-> Q1. the {n,u,m}delay function family
-> 
-> arch/arm/include/asm/delay.h mentions
-> "Delay routines, using a pre-computed "loops_per_second" value."
-> *BUT* if the frequency changes dynamically (thanks to cpufreq)
-> the "loops_per_second" value cannot be pre-computed, as it would
-> change dynamically too, right?
-> 
-> Looking at arch/arm/lib/delay.c it seems the default implementation
-> is a busy loop (in delay-loop.S) which looks up "loops_per_jiffy"
-> in the prolog to determine the number of times to loop, right?
-> 
-> http://lxr.free-electrons.com/source/arch/arm/lib/delay-loop.S
-> 
-> (Side issue, why is the loop unrolled in __loop_delay? What is the
-> point of unrolling a busy loop? This is commented code however.)
-> 
-> What happens if loops_per_jiffy changes while one core is in the
-> busy loop? It seems we might exit the loop too early, which could
-> break some drivers with some weird heisenbug, no?
-> 
-> Also, is the update of loops_per_jiffy atomic? Is it possible that
-> if one core reads it while another updates it, we get garbage?
-> 
-> I suppose this is one reason why the default functions are overridden
-> by register_current_timer_delay(&arch_delay_timer) right? I think the
-> property of a timer is that its frequency doesn't change, even if the
-> CPU's frequency changes? So we are still busy looping, but we are
-> checking the actual time spent in the loop, whatever the cpufreq?
-> 
-> Reference
-> https://www.kernel.org/doc/Documentation/timers/timers-howto.txt
-> 
-> 
-> Q2. Cortex A9 global and private timers
-> 
-> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0407f/CIHGECHJ.html
-> 
-> (What are private timers used for?)
-> 
-> In my platform-specific code, there is a config option to choose between
-> 
-> 1) the ARM global timer
-> 2) a platform-specific timer (timer0)
-> 
-> I noticed that there is generic code to support the global timer in
-> drivers/clocksource/arm_global_timer.c
-> 
-> config ARM_GLOBAL_TIMER
-> bool
-> select CLKSRC_OF if OF
-> help
->   This options enables support for the ARM global timer unit
-> 
-> config CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
-> bool
-> depends on ARM_GLOBAL_TIMER
-> default y
-> help
->  Use ARM global timer clock source as sched_clock
-> 
-> I was thinking it would be better to use the "standard" option (ARM
-> global timer)
-> as it is "officially" supported in the vanilla kernel. So less code to write and
-> to debug, and it has likely received more testing. Why would one rely on
-> platform-specific timers then?
-> 
-> Are high-resolution timers supported with the global timer?
-> 
-> 
-> Q3. Using the generic global timer implementation
-> 
-> So, how do I use that implementation?
-> (Is someone other than STMicro using it?)
-> 
-> I see:
-> 
-> static void __init global_timer_of_register(struct device_node *np)
-> CLOCKSOURCE_OF_DECLARE(arm_gt, "arm,cortex-a9-global-timer",
-> global_timer_of_register);
-> 
-> OF stands for open firmware, yes?
-> So is this related to device tree?
-> 
-> http://lxr.free-electrons.com/source/Documentation/devicetree/bindings/arm/global_timer.txt
-> 
-> This file makes no sense to me.
-> 
-> - interrupts : One interrupt to each core
-> interrupts = <1 13 0xf01>;
-> what are 1 13 0xf01 ??
-> 
-> - clocks : Should be phandle to a clock.
-> clocks = <&arm_periph_clk>;
-> 
-> For my (old) 3.14 kernel, I found this:
-> 
->     /*
->      * ARM Peripheral clock for timers
->      */
->     arm_periph_clk: arm_periph_clk {
->       #clock-cells = <0>;
->       compatible = "fixed-clock";
->       clock-frequency = <600000000>;
->     };
-> 
-> But it looks like the definitions have moved around since then?
+On 02/06/2015 10:12 AM, Catalin Marinas wrote:
+> On Fri, Feb 06, 2015 at 02:54:23PM +0000, Murali Karicheri wrote:
+>> On 02/06/2015 09:38 AM, Catalin Marinas wrote:
+>>> On Thu, Feb 05, 2015 at 09:52:55PM +0000, Murali Karicheri wrote:
+>>>> Fix the dma-range size when the DT attribute is missing. i.e  set size to
+>>>> dev->coherent_dma_mask + 1 instead of dev->coherent_dma_mask. Also add
+>>>> code to check invalid values of size configured in DT and log error.
+>>>>
+>>>> Cc: Joerg Roedel<joro@8bytes.org>
+>>>> Cc: Grant Likely<grant.likely@linaro.org>
+>>>> Cc: Rob Herring<robh+dt@kernel.org>
+>>>> Cc: Bjorn Helgaas<bhelgaas@google.com>
+>>>> Cc: Will Deacon<will.deacon@arm.com>
+>>>> Cc: Russell King<linux@arm.linux.org.uk>
+>>>> Cc: Arnd Bergmann<arnd@arndb.de>
+>>>> Cc: Suravee Suthikulpanit<Suravee.Suthikulpanit@amd.com>
+>>>>
+>>>> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
+>>>> ---
+>>>>    drivers/of/device.c |   17 ++++++++++++++++-
+>>>>    1 file changed, 16 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/drivers/of/device.c b/drivers/of/device.c
+>>>> index 2de320d..314c8a9 100644
+>>>> --- a/drivers/of/device.c
+>>>> +++ b/drivers/of/device.c
+>>>> @@ -105,9 +105,24 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+>>>>    	ret = of_dma_get_range(np,&dma_addr,&paddr,&size);
+>>>>    	if (ret<   0) {
+>>>>    		dma_addr = offset = 0;
+>>>> -		size = dev->coherent_dma_mask;
+>>>> +		size = dev->coherent_dma_mask + 1;
+>>>>    	} else {
+>>>>    		offset = PFN_DOWN(paddr - dma_addr);
+>>>> +
+>>>> +		/*
+>>>> +		 * Add a work around to treat the size as mask + 1 in case
+>>>> +		 * it is defined in DT as a mask.
+>>>> +		 */
+>>>> +		if (size&   1) {
+>>>> +			dev_warn(dev, "Invalid size 0x%llx for dma-range\n",
+>>>> +				 size);
+>>>> +			size = size + 1;
+>>>> +		}
+>>>> +
+>>>> +		if (!size) {
+>>>> +			dev_err(dev, "Adjusted size 0x%llx invalid\n", size);
+>>>> +			return;
+>>>> +		}
+>>>
+>>> Would it make sense to set coherent_dma_mask to 0 here to make this more
+>>> noticeable? It can be done together with the mask calculation from size.
+>>
+>> I guess you are the following in the code.
+>>
+>> if (!size) {
+>> 		dev->coherent_dma_mask = 0;
+>> 		dev_err(dev, "Adjusted size 0x%llx invalid\n", size);
+>> 		return;
+>> }
+>>
+>> Not sure how this is going to help and how this get handled by the
+>> caller and subsequent logic. Probably it will cause probe to fail, with
+>> some helpful error code.
+>
+> Not sure how it will fail, maybe the driver figures out that DMA isn't
+> available and say something or switch to PIO. I guess you can leave it
+> as 32-bit mask by default for now even in case of size == 0.
+>
+> BTW, since pci_device_add() already sets coherent_dma_mask, you could
+> add another check at the beginning of of_dma_configure():
+>
+> 	if (!dev->coherent_dma_mask)
+> 		dev->coherent_dma_mask = DMA_BIT_MASK(32);
+>
+> That's more of a nitpick as the values are both the same.
+>
+Catalin,
 
-Hi Mason,
+Just posted a patch for size based dma mask with title "of: calculate 
+masks of the device based on dma-range size". Please review and comment
 
-Just recently I added support of ARM global timer as clocksource for
-Vybrid SoC. This SoC doesn't use cpufreq, hence it is safe to use the
-ARM global timer. The nice thing of device tree is, the patch to add
-support for that did not change a single line of code:
-
-http://thread.gmane.org/gmane.linux.kernel/1794460
-
---
-Stefan
-
-> 
-> This device tree concept is too much to swallow in a single serving.
-> Please tell me if I'm going down the correct rabbit hole, and I'll
-> do some LWN readings to try to wrap my mind around the concept.
-> 
-> 
-> Anyway, if anyone can help me out on some of these topics, I'd be
-> eternally grateful.
-> 
-> Regards.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Murali Karicheri
+Linux Kernel, Texas Instruments
