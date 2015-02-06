@@ -1,38 +1,76 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  6 Feb 2015 16:57:56 +0100
-Subject: [PATCH 10/10] Documentation: arm: update supported Marvell EBU
- processors
+Date: Fri,  6 Feb 2015 16:57:51 +0100
+Subject: [PATCH 05/10] clk: mvebu: extend common code to allow an optional
+ refclk
 In-Reply-To: <1423238276-9206-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1423238276-9206-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1423238276-9206-11-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1423238276-9206-6-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we support Armada 39x, let's add this family of SoC to the
-Marvell documentation, and a reference to a link with more details
-about those processors. Unfortunately, no datasheet is publicly
-available at this time.
+The Armada 39x, contrary to its predecessor, has a configurable
+reference clock frequency, of either 25 Mhz, or 40 Mhz. For the
+previous SoCs, it was fixed to 25 Mhz and described directly as such
+in the Device Tree.
+
+For Armada 39x, we need to read certain registers to know whether the
+frequency is 25 or 40 Mhz. Therefore, this commit extends the common
+mvebu clock code to allow the SoC-specific code to say it wants to
+register a reference clock, by giving a non-NULL ->get_refclk_freq()
+function pointer in its coreclk_soc_desc structure.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- Documentation/arm/Marvell/README | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/clk/mvebu/common.c | 17 +++++++++++++++++
+ drivers/clk/mvebu/common.h |  1 +
+ 2 files changed, 18 insertions(+)
 
-diff --git a/Documentation/arm/Marvell/README b/Documentation/arm/Marvell/README
-index 1745379..18a775d 100644
---- a/Documentation/arm/Marvell/README
-+++ b/Documentation/arm/Marvell/README
-@@ -96,6 +96,11 @@ EBU Armada family
- 	88F6820
- 	88F6828
+diff --git a/drivers/clk/mvebu/common.c b/drivers/clk/mvebu/common.c
+index 0d4d121..15b370f 100644
+--- a/drivers/clk/mvebu/common.c
++++ b/drivers/clk/mvebu/common.c
+@@ -121,6 +121,11 @@ void __init mvebu_coreclk_setup(struct device_node *np,
  
-+  Armada 390/398 Flavors:
-+	88F6920
-+	88F6928
-+    Product infos: http://www.marvell.com/embedded-processors/armada-39x/
+ 	/* Allocate struct for TCLK, cpu clk, and core ratio clocks */
+ 	clk_data.clk_num = 2 + desc->num_ratios;
 +
-   Armada XP Flavors:
-         MV78230
-         MV78260
++	/* One more clock for the optional refclk */
++	if (desc->get_refclk_freq)
++		clk_data.clk_num += 1;
++
+ 	clk_data.clks = kzalloc(clk_data.clk_num * sizeof(struct clk *),
+ 				GFP_KERNEL);
+ 	if (WARN_ON(!clk_data.clks)) {
+@@ -162,6 +167,18 @@ void __init mvebu_coreclk_setup(struct device_node *np,
+ 		WARN_ON(IS_ERR(clk_data.clks[2+n]));
+ 	};
+ 
++	/* Register optional refclk */
++	if (desc->get_refclk_freq) {
++		const char *name = "refclk";
++		of_property_read_string_index(np, "clock-output-names",
++					      2 + desc->num_ratios, &name);
++		rate = desc->get_refclk_freq(base);
++		clk_data.clks[2 + desc->num_ratios] =
++			clk_register_fixed_rate(NULL, name, NULL,
++						CLK_IS_ROOT, rate);
++		WARN_ON(IS_ERR(clk_data.clks[2 + desc->num_ratios]));
++	}
++
+ 	/* SAR register isn't needed anymore */
+ 	iounmap(base);
+ 
+diff --git a/drivers/clk/mvebu/common.h b/drivers/clk/mvebu/common.h
+index 783b563..f0de6c8 100644
+--- a/drivers/clk/mvebu/common.h
++++ b/drivers/clk/mvebu/common.h
+@@ -30,6 +30,7 @@ struct coreclk_soc_desc {
+ 	u32 (*get_tclk_freq)(void __iomem *sar);
+ 	u32 (*get_cpu_freq)(void __iomem *sar);
+ 	void (*get_clk_ratio)(void __iomem *sar, int id, int *mult, int *div);
++	u32 (*get_refclk_freq)(void __iomem *sar);
+ 	bool (*is_sscg_enabled)(void __iomem *sar);
+ 	u32 (*fix_sscg_deviation)(u32 system_clk);
+ 	const struct coreclk_ratio *ratios;
 -- 
 2.1.0
