@@ -1,47 +1,86 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Fri, 6 Feb 2015 20:55:12 +0800
-Subject: Recommendations for a new MFD device driver?
-In-Reply-To: <20150206115418.GV21293@sirena.org.uk>
-References: <20150206101006.GK12209@pengutronix.de>
- <20150206115418.GV21293@sirena.org.uk>
-Message-ID: <1423227312.31210.286.camel@mtksdaap41>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 06 Feb 2015 08:18:01 -0500
+Subject: [PATCH] MAINTAINERS: Add dts entries for mvebu and dove
+In-Reply-To: <1423225810-5504-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1423225810-5504-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <54D4BF09.2030708@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-02-06 at 11:54 +0000, Mark Brown wrote:
-> On Fri, Feb 06, 2015 at 11:10:06AM +0100, Sascha Hauer wrote:
-> 
-> > 1) Put it into the RTC device driver.
-> > 2) Put it into the .resource field of struct mfd_cell
-> > 3) Put it into the device tree using standard reg, interrupt properties and
-> >    a) Let the RTC driver interpret these
-> >    b) Let the MFD driver create resources in the .resource field of struct
-> >       mfd_cell
-> >    c) Let the MFD core create the resources
-> 
-> > I have a tendency to 3, but I'm afraid that the resource informations
-> > are duplicated too much in the device tree source files, because every
-> > user would have to carry a full description of the mfd device. Maybe
-> > that duplication could be reduced with some CPP magic, I don't know.
-> 
-> > Maybe this is a solved problem and I'm just not picking a good example
-> > from drivers/mfd.
-> 
-> The wm831x drivers take option 2 but are pre-DT, it still seems the most
-> sensible thing to me though - no need for the user to have to repeat
-> this information in every DT and easy to add new stuff if we need it.
-> You could use a .dtsi like we use for SoCs to reduce the duplication
-> required if you do decide to put things in the DT.
+Hey Gregory,
 
-Hi,
+On 2/6/15 7:30 AM, Gregory CLEMENT wrote:
+> Since many releases, the modifications of the mvebu device tree files
+> are merged through the mvebu subsystem. This patch makes it official
+> in order to help the contributors using the get_maintainer.pl to find
+> the accurate people.
+>
+> In the same time, updated the mvebu description which now includes the
+> kirkwood SoCs and new Armada SoCs.
+>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+> Hi Jason, Andrew and Sebastian
+>
+> This last patch [1] showed that if people follow the recommendation to
+> submit patch (using get_maintainer.pl script), we don't receive
+> them. So I propose to amend MAINTAINERS with this patch.
+>
+> What do you think about it?
 
-I think we should create a dtsi file, say mt6397.dtsi, the regulator
-device nodes are already too much to duplicate into every board using
-mt6397.
+I had a patch somewhere to do similar, but since you seem to have this 
+in the top of your queue, let's go with this one.
 
-But a new problem is where should we put it? MT6397 is used in both
-mt8135-evbp1(armv7) & mt8173-evb(armv8) boards, so they both need
-mt6397.dtsi. Should we put them in include/dt-bindings to avoid
-duplicate it into both arch/arm/boot/dts and arch/arm64/boot/dts?
+>
+> If you agree then we can merged it in our next-merge windows (3.21).
+>
+> Thanks,
+>
+> Gregory
+>
+> [1]: http://thread.gmane.org/gmane.linux.drivers.devicetree/109387
+>
+>
+>
+>   MAINTAINERS | 5 ++++-
+>   1 file changed, 4 insertions(+), 1 deletion(-)
+>
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 5d9db6b445bc..d96daf53533c 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1149,7 +1149,7 @@ ARM/MAGICIAN MACHINE SUPPORT
+>   M:	Philipp Zabel <philipp.zabel@gmail.com>
+>   S:	Maintained
+>
+> -ARM/Marvell Armada 370 and Armada XP SOC support
+> +ARM/Marvell Kirkwood and Armada 370, 375, 38x, XP SOC support
+>   M:	Jason Cooper <jason@lakedaemon.net>
+>   M:	Andrew Lunn <andrew@lunn.ch>
+>   M:	Gregory Clement <gregory.clement@free-electrons.com>
+> @@ -1158,6 +1158,8 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>   S:	Maintained
+>   F:	arch/arm/mach-mvebu/
+>   F:	drivers/rtc/armada38x-rtc
+> +F:	arch/arm/boot/dts/armada*.dts
+> +F:	arch/arm/boot/dts/kirkwood*.dts
 
-Joe.C
+This doesn't match the dtsi's.  Maybe just kirkwood*, armada* ?
+>
+>   ARM/Marvell Berlin SoC support
+>   M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+
+It's just in the context, but I'm sure Sebastian wouldn't mind
+if we did berlin as well in this patch.
+
+> @@ -1175,6 +1177,7 @@ F:	arch/arm/mach-dove/
+>   F:	arch/arm/mach-mv78xx0/
+>   F:	arch/arm/mach-orion5x/
+>   F:	arch/arm/plat-orion/
+> +F:	arch/arm/boot/dts/dove*.dts
+
+We should add orion5x here.  And same comment as above re matching.
+
+thx,
+
+Jason.
