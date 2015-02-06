@@ -1,60 +1,65 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 6 Feb 2015 11:30:33 +0100
-Subject: [PATCH v4 0/7] clk: Add common clock support for Mediatek MT8135
- and MT8173.
-In-Reply-To: <CABuKBeJSH3WzG3QC=9OoPzXE6fd9W2U67V4c19NzWcPxWR7VDg@mail.gmail.com>
-References: <1422594798-13375-1-git-send-email-henryc.chen@mediatek.com>
- <CABuKBeJSH3WzG3QC=9OoPzXE6fd9W2U67V4c19NzWcPxWR7VDg@mail.gmail.com>
-Message-ID: <20150206103033.GS18908@pengutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 6 Feb 2015 10:31:12 +0000
+Subject: [PATCH 3/3] arm64: dts: Add dts files for Hisilicon Hi6220 SoC
+In-Reply-To: <54D4843E.7060201@arm.com>
+References: <1423128277-10297-1-git-send-email-bintian.wang@huawei.com>
+ <1423128277-10297-4-git-send-email-bintian.wang@huawei.com>
+ <20150205193017.GF20735@leverpostej>
+ <CAAS=xmgsuY=c8-n_pDiZjLe2u+SPX7msRje7h0sNkRtT3HLfQA@mail.gmail.com>
+ <54D4843E.7060201@arm.com>
+Message-ID: <20150206103111.GA9921@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 05, 2015 at 06:24:54PM +0100, Matthias Brugger wrote:
-> Hi Henry,
+On Fri, Feb 06, 2015 at 09:07:10AM +0000, Marc Zyngier wrote:
+> On 06/02/15 08:42, Brent Wang wrote:
 > 
-> 2015-01-30 6:13 GMT+01:00 Henry Chen <henryc.chen@mediatek.com>:
-> > This patchset contains the initial common clock support for Mediatek SoCs.
-> > Mediatek SoC's clock architecture comprises of various PLLs, dividers, muxes and clock gates.
-> >
-> > This patchset also contains a basic clock support for Mediatek MT8135 and MT8173.
-> >
-> > This driver is based on 3.19-rc1 + MT8135 and MT8173 basic support.
-> >
-> > Changes in v2:
-> > - Re-ordered patchset. Fold include/dt-bindings and DT document in 1st patch.
-> >
-> > Changes in v3:
-> > - Rebase to 3.19-rc1.
-> > - Refine code. Remove unneed functions, debug logs and comments, and fine tune error logs.
-> >
-> > Changes in v4:
-> > - Support MT8173 platform.
-> > - Re-ordered patchset. driver/clk/Makefile in 2nd patch.
-> > - Extract the common part definition(mtk_gate/mtk_pll/mtk_mux) from clk-mt8135.c/clk-mt8173.c to clk-mtk.c.
-> > - Refine code. Rmove unnessacary debug information and unsed defines, add prefix "mtk_" for static functions.
-> > - Remove flag CLK_IGNORE_UNUSED and set flag CLK_SET_RATE_PARENT on gate/mux/fixed-factor.
-> > - Use spin_lock_irqsave(&clk_ops_lock, flags) instead of mtk_clk_lock.
-> > - Example above include a node for the clock controller itself, followed by the i2c controller example above.
+> [...]
 > 
-> You use pericfg and infracfg which will be used by other drivers as
-> well. So please use syscon for this driver. As it is no longer a
-> platform device it is present early in boot.
-> The changes should look something like the patch beneath. Please
-> beware that it does only show the general concept and may not even
-> compile. I asked Sascha to implement the reset controller as part of
-> the clk driver, as the registers addresses are mixed between both,
-> clock and reset controller. Please coordinate with him to get them
-> integrated (even as one series or as incremental series).
+> >>
+> >>> +                   <0x0 0xf6802000 0x0 0x2000>, /* GICC */
+> >>> +                   <0x0 0xf6804000 0x0 0x2000>, /* GICH */
+> >>> +                   <0x0 0xf6806000 0x0 0x2000>; /* GICV */
+> >>
+> >> I guess no-one's bothered to consider 64k pages?
+> >>
+> >> Given GICH and GICV, I hope that this platform is booted at EL2?
+> > Transfer from EL3 to EL1 directly, keep these two just for future use.
+> 
+> That's a real shame, as it keeps users away from some key aspects of the
+> ARMv8 architecture.
 
-I don't really understand the "as part of the clk driver part". I now
-have replaced the devm_regmap_init_mmio with syscon_node_to_regmap
-in the pericfg / infracfg drivers. Is that all that you want or do you
-want me to move the source code to drivers/clk/mediatek?
+More importantly (and regardless of whether you wish to use the features
+provided by EL2), booting at EL2 means that the FW/bootloader needs to
+set up far less, and that the kernel can fix up some issues that might
+not be immediately apparent...
 
-Sascha
+[...]
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> >>> +     timer {
+> >>> +             compatible = "arm,armv8-timer";
+> >>> +             interrupt-parent = <&gic>;
+> >>> +             interrupts = <1 13 0xff08>,
+> >>> +                          <1 14 0xff08>,
+> >>> +                          <1 11 0xff08>,
+> >>> +                          <1 10 0xff08>;
+> >>> +             clock-frequency = <1200000>;
+> >>> +     };
+> >>
+> >> NAK. Fix your firmware to configure CNTFRQ, on all CPUs.
+> > Fix in next version, maybe it will take some time to change firmware.
+> 
+> While you're at it, make sure CNTVOFF_EL2 is set to zero on all CPUs
+> before dropping to EL1. This tends to be overlooked.
+
+...like differing values of CNTVOFF_EL2.
+
+There seems to be a common misconception that booting at EL2 is a bad
+thing to do, when in reality booting at EL1 is more likely to result in
+bugs we can't work around.
+
+Is there any reason that you do not wish to boot at EL2, or were you
+simply unaware that booting at EL2 was possible/preferred?
+
+Thanks,
+Mark.
