@@ -1,63 +1,140 @@
 From: lauraa@codeaurora.org (Laura Abbott)
-Date: Thu,  5 Feb 2015 16:31:58 -0800
-Subject: [PATCH/RFC 0/4] Probe deferral for IOMMU DT integration
-Message-ID: <1423182722-16646-1-git-send-email-lauraa@codeaurora.org>
+Date: Thu,  5 Feb 2015 16:32:02 -0800
+Subject: [PATCH/RFC 4/4] iommu/arm-smmu: Support deferred probing
+In-Reply-To: <1423182722-16646-1-git-send-email-lauraa@codeaurora.org>
+References: <1423182722-16646-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <1423182722-16646-5-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On the heels of Exynos integrating SMMU in to the DT for probing,
-this series attempts to add support to make SMMU drivers work with
-deferred probing. This has been referenced before[1] but this is
-some actual code to use as a starting point for discussion.
+With the addition of clocks in the SMMU driver, the driver
+now may need to be deferred if the clocks are not ready. Apart from
+just the probe function though, we may need to defer attachment as
+well. Support both of these.
 
-The requirement for this is based on a previous patch to add clock
-support to the ARM SMMU driver[2]. Once we have clock support, it's
-possible that the driver itself may need to be defered which breaks
-a bunch of assumptions about how SMMU probing is supposed to work.
-The concept here is to have the driver call of_dma_configure which
-may return -EPROBE_DEFER. of_dma_configure could possibly be moved
-up to probe level. The existing method of initialization still needs
-to be done as well which might mean we have the worst of both worlds.
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+---
+I went with the simplest approach ('started_probe') to indicate
+we should defer probing. Another possibility I considered was to have
+a 'masters added before probe completed' list and keep all masters
+there until probe completes at which point we can bind the masters
+to the SMMUs.
+---
+ drivers/iommu/arm-smmu.c | 37 +++++++++++++++++++++++++++++++++++--
+ 1 file changed, 35 insertions(+), 2 deletions(-)
 
-Open questions:
-- This still doesn't really address Arnd's concerns[3] about disabling
-IOMMUs
-- Currently tested where we knew the driver was going to be deferring.
-Probably need some logic for calling of_dma_configure again.
-
-This is based on Robin Murphy's work for dma mapping[4] and a few
-patches from Murali Kaicheri[5] for of_dma_configure.
-
-
-[1] http://lists.linuxfoundation.org/pipermail/iommu/2015-January/011764.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/279036.html
-[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/311579.html
-[4] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/315459.html
-[5] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/319390.html
-
-Laura Abbott (3):
-  dma-mapping: Make arch_setup_dma_ops return an error code
-  of: Return error codes from of_dma_configure
-  iommu/arm-smmu: Support deferred probing
-
-Mitchel Humpherys (1):
-  iommu/arm-smmu: add support for specifying clocks
-
- arch/arm/include/asm/dma-mapping.h   |   2 +-
- arch/arm/mm/dma-mapping.c            |   4 +-
- arch/arm64/include/asm/dma-mapping.h |   2 +-
- arch/arm64/mm/dma-mapping.c          |  16 +--
- drivers/iommu/arm-smmu.c             | 186 +++++++++++++++++++++++++++++++++--
- drivers/iommu/iommu.c                |  49 ++++++++-
- drivers/iommu/of_iommu.c             |  14 ++-
- drivers/of/device.c                  |   9 +-
- include/linux/dma-mapping.h          |   7 +-
- include/linux/iommu.h                |   2 +
- include/linux/of_device.h            |   4 +-
- 11 files changed, 268 insertions(+), 27 deletions(-)
-
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index d9f7cf48..7e8194c 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -43,6 +43,8 @@
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+ #include <linux/spinlock.h>
++#include <linux/of_iommu.h>
++#include <linux/of_platform.h>
+ 
+ #include <linux/amba/bus.h>
+ 
+@@ -330,6 +332,7 @@ static int force_stage;
+ module_param_named(force_stage, force_stage, int, S_IRUGO | S_IWUSR);
+ MODULE_PARM_DESC(force_stage,
+ 	"Force SMMU mappings to be installed at a particular stage of translation. A value of '1' or '2' forces the corresponding stage. All other values are ignored (i.e. no stage is forced). Note that selecting a specific stage will disable support for nested translation.");
++static bool started_probe;
+ 
+ enum arm_smmu_arch_version {
+ 	ARM_SMMU_V1 = 1,
+@@ -1284,7 +1287,7 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+ 	smmu = find_smmu_for_device(dev);
+ 	if (!smmu) {
+ 		dev_err(dev, "cannot attach to SMMU, is it on the same bus?\n");
+-		return -ENXIO;
++		return started_probe ? -EPROBE_DEFER : -ENXIO;
+ 	}
+ 
+ 	if (dev->archdata.iommu) {
+@@ -1677,7 +1680,7 @@ static int arm_smmu_add_device(struct device *dev)
+ 
+ 	smmu = find_smmu_for_device(dev);
+ 	if (!smmu)
+-		return -ENODEV;
++		return started_probe ? -EPROBE_DEFER : -ENODEV;
+ 
+ 	group = iommu_group_alloc();
+ 	if (IS_ERR(group)) {
+@@ -1761,6 +1764,11 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
+ 	}
+ }
+ 
++static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *spec)
++{
++	return arm_smmu_add_device(dev);
++}
++
+ static int arm_smmu_enable_resources(struct iommu_domain *domain)
+ {
+ 	struct arm_smmu_domain *smmu_domain = domain->priv;
+@@ -1814,6 +1822,7 @@ static const struct iommu_ops arm_smmu_ops = {
+ 	.pgsize_bitmap		= (SECTION_SIZE |
+ 				   ARM_SMMU_PTE_CONT_SIZE |
+ 				   PAGE_SIZE),
++	.of_xlate		= arm_smmu_of_xlate,
+ 	.enable_resources	= arm_smmu_enable_resources,
+ 	.disable_resources	= arm_smmu_disable_resources,
+ };
+@@ -2108,6 +2117,8 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 	struct of_phandle_args masterspec;
+ 	int num_irqs, i, err;
+ 
++	started_probe = true;
++
+ 	smmu = devm_kzalloc(dev, sizeof(*smmu), GFP_KERNEL);
+ 	if (!smmu) {
+ 		dev_err(dev, "failed to allocate arm_smmu_device\n");
+@@ -2282,6 +2293,8 @@ static struct platform_driver arm_smmu_driver = {
+ 	.remove	= arm_smmu_device_remove,
+ };
+ 
++static int init_done;
++
+ static int __init arm_smmu_init(void)
+ {
+ 	struct device_node *np;
+@@ -2316,6 +2329,7 @@ static int __init arm_smmu_init(void)
+ 		bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
+ #endif
+ 
++	init_done = true;
+ 	return 0;
+ }
+ 
+@@ -2327,6 +2341,25 @@ static void __exit arm_smmu_exit(void)
+ subsys_initcall(arm_smmu_init);
+ module_exit(arm_smmu_exit);
+ 
++static int __init arm_smmu_of_setup(struct device_node *np)
++{
++	struct platform_device *pdev;
++
++	if (!init_done)
++		arm_smmu_init();
++
++	pdev = of_platform_device_create(np, NULL, platform_bus_type.dev_root);
++	if (IS_ERR(pdev))
++		return PTR_ERR(pdev);
++
++	of_iommu_set_ops(np, &arm_smmu_ops);
++	return 0;
++}
++
++IOMMU_OF_DECLARE(arm_smmu_of, "arm,mmu-500",
++		 arm_smmu_of_setup);
++
++
+ MODULE_DESCRIPTION("IOMMU API for ARM architected SMMU implementations");
+ MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
+ MODULE_LICENSE("GPL v2");
 -- 
 Qualcomm Innovation Center, Inc.
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
