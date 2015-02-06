@@ -1,47 +1,64 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 6 Feb 2015 00:33:41 -0800
-Subject: [GIT PULL] ARM: mvebu: DT changes for v3.20 (round 3)
-In-Reply-To: <54D0ECF2.9050104@free-electrons.com>
-References: <54D0ECF2.9050104@free-electrons.com>
-Message-ID: <20150206083341.GI23582@quad.lixom.net>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Fri, 6 Feb 2015 00:33:45 -0800
+Subject: [PATCH v2 1/2] mtd: nand: pxa3xx: Fix PIO FIFO draining
+In-Reply-To: <20150206091307.1162b123@bbrezillon>
+References: <1422284164-16867-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1422284164-16867-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20150204111028.2f0bd376@bbrezillon>
+ <20150206010835.GB30781@ld-irv-0074>
+ <20150206091307.1162b123@bbrezillon>
+Message-ID: <20150206083345.GE4434@norris-Latitude-E6410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 03, 2015 at 04:44:50PM +0100, Gregory CLEMENT wrote:
-> Hi Olof, Arnd,
+On Fri, Feb 06, 2015 at 09:13:07AM +0100, Boris Brezillon wrote:
+> Hi Brian,
 > 
-> This is the third incremental pull request for mvebu/dt. I now it
-> comes very late, but as explained in my email series it should not
-> introduce any regression as all the change are made inside the comment
-> blocks, so for the stability it should be safe to take them.
+> On Thu, 5 Feb 2015 17:08:35 -0800
+> Brian Norris <computersforpeace@gmail.com> wrote:
+> > On Wed, Feb 04, 2015 at 11:10:28AM +0100, Boris Brezillon wrote:
+> > > On Mon, 26 Jan 2015 15:56:03 +0100
+> > > Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> > > > +			/*
+> > > > +			 * According to the datasheet, when reading
+> > > > +			 * from NDDB with BCH enabled, after each 32
+> > > > +			 * bits reads, we have to make sure that the
+> > > > +			 * NDSR.RDDREQ bit is set
+> > > > +			 */
+> > > 
+> > > I know the datasheet says this bit should be checked after each
+> > > transfer, but I wonder if we shouldn't check it before reading the data.
+> > > What happens if you drain all the data available in the FIFO ? Is the
+> > > controller still setting the RDDREQ bit ?
+> > > 
+> > > Moreover, the datasheet says this RDDREQ bit should be checked after
+> > > each 32 bytes (not 32 bits) transfer.
+> > > Testing it after each readl call shouldn't hurt though.
+> > 
+> > Seems like that could quite possibly kill performance unnecessarily,
+> > couldn't it? But then, PIO is probably not that fast in the first
+> > place...
 > 
-> My main motivation for having this series merged in 3.20 is to avoid
-> asking each author of the dts(i) patches if he agrees with the dual
-> license during the next cycle. At the end it is not something
-> essential but it will make our life easier.
-> 
-> Thanks,
-> 
-> Gregory
-> 
-> The following changes since commit 6cc082a84e13f3a0078973a08adf22f1404acc3d:
-> 
->   ARM: mvebu: make DTS comments reflect DEBUG_LL changes (2015-01-21 18:36:14 -0600)
-> 
-> are available in the git repository at:
-> 
->   ssh://git.infradead.org/srv/git/linux-mvebu.git tags/mvebu-dt-3.20-3
-> 
-> for you to fetch changes up to 3c21b5fa897ae4b594d6b76a4572741fea7824b7:
-> 
->   ARM: mvebu: armada-xp-synology-ds414: Relicense the device tree under GPLv2+/X11 (2015-01-26 19:28:13 -0600)
-> 
-> ----------------------------------------------------------------
-> Relicense all Armada dts{i} files under dual license of GPLv2+ and
-> X11. This should make it easier to reuse these files with other
-> operating systems and boot loaders.
+> Absolutety, my point was, it shouldn't hurt from a functional POV, but
+> yes it will definitely impact performances.
 
-Thanks, merged!
+OK.
 
+> But that's not the first thing I would rework of if you're concerned
+> about performances: when doing PIO read/write, the page read/write
+> operations (I mean the part reading the internal fifo) are all done in
+> interrupt context (called from pxa3xx_nand_irq), and doing this will
+> prevent any other interrupt from taking place while you are
+> draining/filling the FIFO :-(.
 
--Olof
+...which reminds me; the jiffies-based timeout in this patch isn't going
+to work in interrupt context. So it needs to be replaced either with a
+tight udelay() loop, or it needs to be moved out of the ISR.
+
+> An alternative would be to move this part into the read/write_buf
+> functions, but that's a lot of work...
+
+Yeah, that probably would be preferable, but I suppose it's not urgent
+either.
+
+Brian
