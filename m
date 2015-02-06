@@ -1,44 +1,30 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 6 Feb 2015 00:08:52 -0800
-Subject: [GIT PULL] ARM: rockchip: third (and last) batch of dts updates
- for 3.20
-In-Reply-To: <1557277.LNNjscMhd1@diego>
-References: <1557277.LNNjscMhd1@diego>
-Message-ID: <20150206080852.GC23582@quad.lixom.net>
+Date: Fri, 6 Feb 2015 00:10:03 -0800
+Subject: [GIT PULL] omap device tree changes for v3.20, part 3
+In-Reply-To: <20150130235535.GD16250@atomide.com>
+References: <20150130235535.GD16250@atomide.com>
+Message-ID: <20150206081003.GD23582@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 30, 2015 at 09:39:28PM +0100, Heiko St?bner wrote:
-> Hi Arnd, Olof,
+On Fri, Jan 30, 2015 at 03:55:35PM -0800, Tony Lindgren wrote:
+> The following changes since commit 1f43c45df7afb706470f7d81d983dd7763a9452f:
 > 
-> if it is not to late, I have accumulated some more dts changes during the
-> last days.
+>   ARM: dts: dra72-evm: Add qspi device (2015-01-20 10:07:25 -0800)
 > 
-> The most interesting change is probably enabling the display nodes on
-> both the rk3288-firefly and rk3288-evb. I was sucessfully able to reach a
-> framebuffer console on both boards using the hdmi output.
+> are available in the git repository at:
 > 
-> To reach an actual X-session, a further patch to the drm driver is
-> necessary [0], but still the general framebuffer output is working
-> nonetheless.
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.20/dt-pt3-v2
 > 
+> for you to fetch changes up to 726806ad9ba10f8ba8d26ba8154d98a7c9b89a12:
 > 
-> Second most interesting change is the addition of cpu and gpu regulators
-> to the act8846 variant of the evb which I was able to realize and test with
-> the help of Daniel Lezcano yesterday.
+>   ARM: dts: am57xx-beagle-x15: Fix USB2 mode (2015-01-30 15:48:39 -0800)
 > 
-> 
-> And finally adding a clock node to the rk3288 watchdog, as the dw_wdt
-> driver needs to read the actual clock rate at times. This brings with it a
-> stable shared branch with the clock tree to hold the new dt clock ids,
-> which Mike merged into the clock-tree half an hour after I send the
-> second pull request some days ago.
-> 
-> 
-> So if it's not to late, please pull
+> ----------------------------------------------------------------
+> Device tree related chages for omaps to fix dm816x syscon,
+> fix various devices for gta04, and add USB nodes for am57xx
+> and dra7.
 
-This seems reasonably self-contained and doesn't seem to be high risk. Merged
-in now even though it's a bit close to the merge window.
-
+Merged, thanks.
 
 -Olof
