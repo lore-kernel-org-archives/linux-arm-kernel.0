@@ -1,120 +1,63 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 6 Feb 2015 18:05:21 +0100
-Subject: [PATCH 03/10] devicetree: bindings: add Device Tree bindings for
- Armada 39x pin-muxing controller
-In-Reply-To: <1423238276-9206-4-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1423238276-9206-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1423238276-9206-4-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20150206170521.GX25985@lunn.ch>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 06 Feb 2015 09:15:51 -0800
+Subject: [Cocci] [PATCH v13 3/6] clk: Make clk API return per-user struct
+ clk instances
+In-Reply-To: <alpine.DEB.2.10.1502061009320.2538@hadrien>
+References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1422011024-32283-4-git-send-email-tomeu.vizoso@collabora.com>
+ <20150201212432.22722.70917@quantum> <54CFE1FE.7040404@codeaurora.org>
+ <alpine.DEB.2.02.1502022230110.2045@localhost6.localdomain6>
+ <54CFFBCF.90706@codeaurora.org> <20150202225036.421.43421@quantum>
+ <54D0F179.1040906@gmail.com> <54D2AA9B.7010800@codeaurora.org>
+ <54D3900A.9060200@gmail.com> <54D423C3.9030105@codeaurora.org>
+ <54D482EE.6050004@gmail.com> <alpine.DEB.2.10.1502061009320.2538@hadrien>
+Message-ID: <54D4F6C7.2020007@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 06, 2015 at 04:57:49PM +0100, Thomas Petazzoni wrote:
-> This commit adds the Device Tree binding documentation to describe the
-> pin-muxing controller of the Marvell Armada 39x processors. Two
-> variants are supported for the moment: the 88F6920 (Armada 390) and
-> 88F6928 (Armada 398).
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  .../pinctrl/marvell,armada-39x-pinctrl.txt         | 78 ++++++++++++++++++++++
->  1 file changed, 78 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,armada-39x-pinctrl.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,armada-39x-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,armada-39x-pinctrl.txt
-> new file mode 100644
-> index 0000000..5b1a9dc
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pinctrl/marvell,armada-39x-pinctrl.txt
-> @@ -0,0 +1,78 @@
-> +* Marvell Armada 39x SoC pinctrl driver for mpp
-> +
-> +Please refer to marvell,mvebu-pinctrl.txt in this directory for common binding
-> +part and usage.
-> +
-> +Required properties:
-> +- compatible: "marvell,88f6920-pinctrl", "marvell,88f6928-pinctrl"
-> +  depending on the specific variant of the SoC being used.
-> +- reg: register specifier of MPP registers
-> +
-> +Available mpp pins/groups and functions:
-> +Note: brackets (x) are not part of the mpp name for marvell,function and given
-> +only for more detailed description in this document.
-> +
-> +name    pins    functions
-> +================================================================================
-> +mpp0	0	gpio, ua0(rxd)
-> +mpp1	1	gpio, ua0(txd)
-> +mpp2	2	gpio, i2c0(sck)
-> +mpp3	3	gpio, i2c0(sda)
-> +mpp4	4	gpio, ua1(txd), ua0(rts), smi(mdc)
-> +mpp5	5	gpio, ua1(rxd), ua0(cts), smi(mdio)
-> +mpp6	6	gpio, dev(cs3), xsmi(mdio)
-> +mpp7	7	gpio, dev(ad9), xsmi(mdc)
-> +mpp8	8	gpio, dev(ad10), ptp(trig)
-> +mpp9	9	gpio, dev(ad11), ptp(clk)
+On 02/06/15 01:12, Julia Lawall wrote:
+>
+> On Fri, 6 Feb 2015, Quentin Lambert wrote:
+>
+>> On 06/02/2015 03:15, Stephen Boyd wrote:
+>>> Thanks for the coccinelle patch. Thinking more about it, I don't think
+>>> we care if the pointer is dereferenced because that would require a
+>>> definition of struct clk and that is most likely not the case outside of
+>>> the clock framework. Did you scan the entire kernel?
+>> No I haven't.
+>>> I'm running it now
+>>> but it seems to be taking a while.
+>>>
+>> Yes, that's why, as a first step, I chose to limit the scan to the arm
+>> directory.
+> Are you sure to be using all of the options provided:
+>
+> // Options: --recursive-includes --relax-include-path
+> // Options: --include-headers-for-types
+>
+> And are you using 1.0.0-rc23 or 1.0.0-rc24?  Those should save parsed
+> header files so that they don't have to be parsed over and over.
+>
+> If you are using rc24, then you can use the -j option for parallelism.
+> But then you should also use an option like --chunksize 10 (I don't know
+> what number would be good), because the default is chunksize 1, and in
+> that case the saved parsed header files are not reused, because the fies
+> are all processed individually.  In general, it is only the files within a
+> chunk that will share parsed header files.
 
-Hi Thomas
+Thanks for the info.
 
-I wondering if there should be an explanation for the less common
-names here. I'm guessing dev is a device bus of some sort? What is
-xsmi? Some sort of extended System Management Interface? And m?
+$ spatch --version
+spatch version 1.0.0-rc22 with Python support and with PCRE support
 
-Thanks
-	Andrewy
+so I guess I need to update. I tried throwing it into
+scripts/coccinelle/misc and then did
 
-> +mpp10	10	gpio, dev(ad12), ptp(event)
-> +mpp11	11	gpio, dev(ad13), led(clk)
-> +mpp12	12	gpio, pcie0(rstout), dev(ad14), led(stb)
-> +mpp13	13	gpio, dev(ad15), led(data)
-> +mpp14	14	gpio, m(vtt), dev(wen1), ua1(txd)
-> +mpp15	15	gpio, pcie0(rstout), spi0(mosi), i2c1(sck)
-> +mpp16	16	gpio, m(decc), spi0(miso), i2c1(sda)
-> +mpp17	17	gpio, ua1(rxd), spi0(sck), smi(mdio)
-> +mpp18	18	gpio, ua1(txd), spi0(cs0), i2c2(sck)
-> +mpp19	19	gpio, sata1(present) [1], ua0(cts), ua1(rxd), i2c2(sda)
-> +mpp20	20	gpio, sata0(present) [1], ua0(rts), ua1(txd), smi(mdc)
-> +mpp21	21	gpio, spi0(cs1), sata0(present) [1], sd(cmd), dev(bootcs), ge(rxd0)
-> +mpp22	22	gpio, spi0(mosi), dev(ad0)
-> +mpp23	23	gpio, spi0(sck), dev(ad2)
-> +mpp24	24	gpio, spi0(miso), ua0(cts), ua1(rxd), sd(d4), dev(readyn)
-> +mpp25	25	gpio, spi0(cs0), ua0(rts), ua1(txd), sd(d5), dev(cs0)
-> +mpp26	26	gpio, spi0(cs2), i2c1(sck), sd(d6), dev(cs1)
-> +mpp27	27	gpio, spi0(cs3), i2c1(sda), sd(d7), dev(cs2), ge(txclkout)
-> +mpp28	28	gpio, sd(clk), dev(ad5), ge(txd0)
-> +mpp29	29	gpio, dev(ale0), ge(txd1)
-> +mpp30	30	gpio, dev(oen), ge(txd2)
-> +mpp31	31	gpio, dev(ale1), ge(txd3)
-> +mpp32	32	gpio, dev(wen0), ge(txctl)
-> +mpp33	33	gpio, m(decc), dev(ad3)
-> +mpp34	34	gpio, dev(ad1)
-> +mpp35	35	gpio, ref(clk), dev(a1)
-> +mpp36	36	gpio, dev(a0)
-> +mpp37	37	gpio, sd(d3), dev(ad8), ge(rxclk)
-> +mpp38	38	gpio, ref(clk), sd(d0), dev(ad4), ge(rxd1)
-> +mpp39	39	gpio, i2c1(sck), ua0(cts), sd(d1), dev(a2), ge(rxd2)
-> +mpp40	40	gpio, i2c1(sda), ua0(rts), sd(d2), dev(ad6), ge(rxd3)
-> +mpp41	41	gpio, ua1(rxd), ua0(cts), spi1(cs3), dev(burstn), nd(rbn0), ge(rxctl)
-> +mpp42	42	gpio, ua1(txd), ua0(rts), dev(ad7)
-> +mpp43	43	gpio, pcie0(clkreq), m(vtt), m(decc), spi1(cs2), dev(clkout), nd(rbn1)
-> +mpp44	44	gpio, sata0(present) [1], sata1(present) [1], led(clk)
-> +mpp45	45	gpio, ref(clk), pcie0(rstout), ua1(rxd)
-> +mpp46	46	gpio, ref(clk), pcie0(rstout), ua1(txd), led(stb)
-> +mpp47	47	gpio, sata0(present) [1], sata1(present) [1], led(data)
-> +mpp48	48	gpio, sata0(present) [1], m(vtt), tdm(pclk) [1], audio(mclk) [1], sd(d4), pcie0(clkreq), ua1(txd)
-> +mpp49	49	gpio, tdm(fsync) [1], audio(lrclk) [1], sd(d5), ua2(rxd)
-> +mpp50	50	gpio, pcie0(rstout), tdm(drx) [1], audio(extclk) [1], sd(cmd), ua2(rxd)
-> +mpp51	51	gpio, tdm(dtx) [1], audio(sdo) [1], m(decc), ua2(txd)
-> +mpp52	52	gpio, pcie0(rstout), tdm(intn) [1], audio(sdi) [1], sd(d6), i2c3(sck)
-> +mpp53	53	gpio, sata1(present) [1], sata0(present) [1], tdm(rstn) [1], audio(bclk) [1], sd(d7), i2c3(sda)
-> +mpp54	54	gpio, sata0(present) [1], sata1(present) [1], pcie0(rstout), sd(d3), ua3(txd)
-> +mpp55	55	gpio, ua1(cts), spi1(cs1), sd(d0), ua1(rxd), ua3(rxd)
-> +mpp56	56	gpio, ua1(rts), m(decc), spi1(mosi), ua1(txd)
-> +mpp57	57	gpio, spi1(sck), sd(clk), ua1(txd)
-> +mpp58	58	gpio, i2c1(sck), pcie2(clkreq), spi1(miso), sd(d1), ua1(rxd)
-> +mpp59	59	gpio, pcie0(rstout), i2c1(sda), spi1(cs0), sd(d2)
-> +
-> +[1]: only available on 88F6928
-> -- 
-> 2.1.0
-> 
+make O=../obj/ coccicheck
+COCCI=../kernel/scripts/coccinelle/misc/structclk.cocci
+
+at the toplevel but it didn't find anything.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
