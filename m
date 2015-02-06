@@ -1,56 +1,30 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Fri, 6 Feb 2015 08:58:55 +0100
-Subject: [PATCH] ARM: dts: mvebu: add ethernet to the cm-a510 board
-In-Reply-To: <54D3EB26.9020909@gmail.com>
-References: <E1YH5bU-0005mG-3L@bombadil.infradead.org>
- <54CB5267.5060004@gmail.com> <20150130113118.5523ed68@armhf>
- <54CB6440.1010002@gmail.com> <20150130124144.501cf81d@armhf>
- <54CB732F.7010409@gmail.com> <20150130133913.083d1ade@armhf>
- <54CB7E33.3080909@gmail.com> <54CE354F.5090106@gmail.com>
- <54D3EB26.9020909@gmail.com>
-Message-ID: <20150206085855.7b8d494b@armhf>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 6 Feb 2015 00:00:05 -0800
+Subject: [GIT PULL] at91: cleanup/soc for 3.20 #4 (bis)
+In-Reply-To: <1422905274-9303-1-git-send-email-nicolas.ferre@atmel.com>
+References: <CAOesGMhycUD4ZfQccjD=zzRB901u0YT1NqCuA7chNTnvgt7Fsg@mail.gmail.com>
+ <1422905274-9303-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20150206080005.GA23582@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 05 Feb 2015 23:13:58 +0100
-Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
-
-> > At this moment, I am trying to configure the framebuffer, but as Moine
-> > told me,it seems there is not video driver support for this board in
-> > DT... :( .  
+On Mon, Feb 02, 2015 at 08:27:54PM +0100, Nicolas Ferre wrote:
+> Arnd, Olof, Kevin,
 > 
-> Not quite true. Video is made up of at least 4 different devices:
-> Framebuffer, GPU, Decode engine, and usually DVI/HDMI transmitter or
-> VGA.
-> 
-> We do have a driver for the framebuffer (armada_drm) and there is great
-> work from Russell King and others on the GPU and Decode engine (IIRC).
+> As advised by Olof, here is a second attempt with this pull-request but this
+> time with the at91-3.19-fixes branch as a base. Here is how I did it:
+> - took v3.19-rc4
+> - merged my at91-3.19-fixes branch that is now in Linus' tree
+> - merged my at91-cleanup3 tag that you already have in your "soc" branch. These
+>   patches obviously depend on this tag.
+> - stacked the contend of this cleanup/soc pull-request.
 
-Yes, but it has no DT support. Mine has.
+Yep -- only tweak is that next time you could either start with your cleanup3
+tag and just merge fixes, or start with fixes and merge cleanup3 -- no need to
+do an explicit merge of fixes on top of mainline.
 
-> If you are using the sb-a510, I can see from the manual, that DVI
-> transmitter is SIL164.. AFAIS there is a driver for it, that maybe
-> needs some polishing. Nobody ever tested VGA, but it shouldn't be too
-> hard to add support for it as it is directly supported by the
-> framebuffer HW.
+Anyway, that's just a very minor detail. I've merged this now, thanks for
+respinning!
 
-This asks for some VGA encoder/connector module.
 
-Actually, as Gabriel told me that his screen is directly connected to
-the RGB LCD output, I wrote a simple panel for him. This module just
-gets the display timings from the DT.
-
-> One quite important driver at least for Dove is a clock source for
-> video. Internal clock generators for video are way to limited with
-> respect to frequencies to allow any useful resolution.
-
->From my previous tests with the si5351 in the Cubox, most video modes
-should work without external clocks.
-
-> I'll see if I can have a look at the dts stuff this weekend.. that
-> way we'll have at least the basic done before moving to the other
-> devices.
-
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+-Olof
