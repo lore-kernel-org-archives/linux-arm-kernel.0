@@ -1,36 +1,41 @@
-From: cernekee@chromium.org (Kevin Cernekee)
-Date: Fri, 6 Feb 2015 15:01:15 -0800
-Subject: [v7,2/3] i2c: iproc: Add Broadcom iProc I2C Driver
-In-Reply-To: <CAE_wzQ-POweLLmTyHoMvs_NESjW5UmPxh2ZQCaW4-W74MsrHag@mail.gmail.com>
-References: <1421704310-26857-3-git-send-email-rjui@broadcom.com>
- <20150206223149.GB345@google.com>
- <CAE_wzQ-POweLLmTyHoMvs_NESjW5UmPxh2ZQCaW4-W74MsrHag@mail.gmail.com>
-Message-ID: <CAJzqFtaVJFPpFN17CTXNhjYrsPKn3AS00tMufw3yF=VqxQX6zw@mail.gmail.com>
+From: ldv@altlinux.org (Dmitry V. Levin)
+Date: Sat, 7 Feb 2015 02:17:20 +0300
+Subject: a method to distinguish between syscall-enter/exit-stop
+In-Reply-To: <CAGXu5jJXspS_34KBJ5VxvyKuj4bA+zg267dNiEkqR1LuvjoA1Q@mail.gmail.com>
+References: <CALCETrXFzcXngHsX=_72hYZqms32Zf7oFYDBgC3XNw7zOGdDCA@mail.gmail.com>
+ <CAGXu5jJtHT9o8WMoynifN13=uZoARt4G9iVcgZsc9xYOBEwWsg@mail.gmail.com>
+ <20150205233945.GA31540@altlinux.org>
+ <CAGXu5jLTH+mUF0JxeR2qA_r=ocWjPHPSK2OPgE0Fu_JKoQyQ9w@mail.gmail.com>
+ <CALCETrXsCUje+_V=Ud+TB4A2jH2M7yqyoCFMLEyxOD6pd7Di5w@mail.gmail.com>
+ <20150206023249.GB31540@altlinux.org>
+ <CALCETrWTnqKDoatK+5FN=yYDOeENoW5=r5YMToYKhZ8Zfv5wWA@mail.gmail.com>
+ <CAGXu5j+nopAMFukwMu=Cy0GOapziOLTb-ryJhA-aywk_uerg9A@mail.gmail.com>
+ <CALCETrVaF+3ETn5nfcbvyWKUYb71jNXK-zo9V6uOK0cEW4TCNQ@mail.gmail.com>
+ <CAGXu5jJXspS_34KBJ5VxvyKuj4bA+zg267dNiEkqR1LuvjoA1Q@mail.gmail.com>
+Message-ID: <20150206231720.GB3829@altlinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 6, 2015 at 2:48 PM, Dmitry Torokhov <dtor@chromium.org> wrote:
-> On Fri, Feb 6, 2015 at 2:31 PM, Kevin Cernekee <cernekee@chromium.org> wrote:
->> On Mon, Jan 19, 2015 at 01:51:49PM -0800, Ray Jui wrote:
->>> +
->>> +     dev_dbg(iproc_i2c->device, "xfer %c, addr=0x%02x, len=%d\n",
->>> +             (msg->flags & I2C_M_RD) ? 'R' : 'W', msg->addr,
->>> +             msg->len);
->>> +     dev_dbg(iproc_i2c->device, "**** data start ****\n");
->>> +     for (i = 0; i < msg->len; i++)
->>> +             dev_dbg(iproc_i2c->device, "0x%02x ",  msg->buf[i]);
->>> +     dev_dbg(iproc_i2c->device, "**** data end ****\n");
->>
->> It might be simpler to just do:
->>
->>     print_hex_dump_bytes("iproc_i2c:", DUMP_PREFIX_NONE, msg->buf, msg->len);
->>
->> although you'd lose the ability to see the I2C device name.
->
-> We can also do:
->
-> dev_dbg(iproc_i2c->device, "*** data: %*ph\n", msg->len, msg->buf);
->
-> if we are OK with limiting output to 64 bytes.
+On Fri, Feb 06, 2015 at 12:07:03PM -0800, Kees Cook wrote:
+> On Fri, Feb 6, 2015 at 11:32 AM, Andy Lutomirski <luto@amacapital.net> wrote:
+> > On Fri, Feb 6, 2015 at 11:23 AM, Kees Cook <keescook@chromium.org> wrote:
+[...]
+> >> And an unrelated thought:
+> >>
+> >> 3) Can't we find some way to fix the inability of a ptracer to
+> >> distinguish between syscall-enter-stop and syscall-exit-stop?
+> >
+> > Couldn't we add PTRACE_O_TRACESYSENTRY and PTRACE_O_TRACESYSEXIT along
+> > the lines of PTRACE_O_TRACESYSGOOD?
+> 
+> That might be a nice idea. I haven't written a test to see, but what
+> does PTRACE_GETEVENTMSG return on syscall-enter/exit-stop?
 
-msg->len is capped at 63 due to hardware limits, so that should work.
+The value returned by PTRACE_GETEVENTMSG is the value set along with the
+latest PTRACE_EVENT_*.
+In case of syscall-enter/exit-stop (which is not a PTRACE_EVENT_*),
+there is no particular value set for PTRACE_GETEVENTMSG.
+
+
+-- 
+ldv
