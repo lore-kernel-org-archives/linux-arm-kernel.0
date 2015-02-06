@@ -1,89 +1,55 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 5 Feb 2015 17:08:35 -0800
-Subject: [PATCH v2 1/2] mtd: nand: pxa3xx: Fix PIO FIFO draining
-In-Reply-To: <20150204111028.2f0bd376@bbrezillon>
-References: <1422284164-16867-1-git-send-email-maxime.ripard@free-electrons.com>
- <1422284164-16867-2-git-send-email-maxime.ripard@free-electrons.com>
- <20150204111028.2f0bd376@bbrezillon>
-Message-ID: <20150206010835.GB30781@ld-irv-0074>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Fri, 06 Feb 2015 10:18:12 +0900
+Subject: [PATCH v5 0/2] mmc: dw_mmc: exynos: Add HS400 support
+In-Reply-To: <1422499318-13726-1-git-send-email-alim.akhtar@samsung.com>
+References: <1422499318-13726-1-git-send-email-alim.akhtar@samsung.com>
+Message-ID: <54D41654.8030702@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Rob
+Hi, Alim.
 
-This patch has conflicts with an ARM64-preparation from Rob. I'd like to
-get this patch in first, as it's a bugfix. But I'd like to settle
-Boris's comments first.
+On my board, this patch isn't working fine.
+So when i complete to test on my board(exynos5), i will reply with comments.
+Sorry for late testing.
 
-(Regarding the request to get this into 3.19: not likely. Judging by the
-age of the "bug", it's not massively critical, and we have no time. It
-can get out through -stable once it's gotten proper review and testing.)
+Best Regards,
+Jaehoon Chung
 
-On Wed, Feb 04, 2015 at 11:10:28AM +0100, Boris Brezillon wrote:
-> On Mon, 26 Jan 2015 15:56:03 +0100
-> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+On 01/29/2015 11:41 AM, Alim Akhtar wrote:
+> This adds HS400 mode support for exynos dw_mmc host controller.
 > 
-> > The NDDB register holds the data that are needed by the read and write
-> > commands.
-> > 
-> > However, during a read PIO access, the datasheet specifies that after each 32
-> > bits read in that register, when BCH is enabled, we have to make sure that the
-> > RDDREQ bit is set in the NDSR register.
-> > 
-> > This fixes an issue that was seen on the Armada 385, and presumably other mvebu
-> > SoCs, when a read on a newly erased page would end up in the driver reporting a
-> > timeout from the NAND.
-> > 
-> > Cc: <stable@vger.kernel.org> # v3.14
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  drivers/mtd/nand/pxa3xx_nand.c | 45 ++++++++++++++++++++++++++++++++++++------
-> >  1 file changed, 39 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-> > index 96b0b1d27df1..e6918befb951 100644
-> > --- a/drivers/mtd/nand/pxa3xx_nand.c
-> > +++ b/drivers/mtd/nand/pxa3xx_nand.c
-> > @@ -23,6 +23,7 @@
-> >  #include <linux/mtd/partitions.h>
-> >  #include <linux/io.h>
-> >  #include <linux/irq.h>
-> > +#include <linux/jiffies.h>
-> >  #include <linux/slab.h>
-> >  #include <linux/of.h>
-> >  #include <linux/of_device.h>
-> > @@ -480,6 +481,38 @@ static void disable_int(struct pxa3xx_nand_info *info, uint32_t int_mask)
-> >  	nand_writel(info, NDCR, ndcr | int_mask);
-> >  }
-> >  
-> > +static void drain_fifo(struct pxa3xx_nand_info *info, void *data, int len)
-> > +{
-> > +	u32 *dst = (u32 *)data;
-> > +
-> > +	if (info->ecc_bch) {
-> > +		while (len--) {
-> > +			u32 timeout;
-> > +
-> > +			*dst++ = nand_readl(info, NDDB);
-> > +
-> > +			/*
-> > +			 * According to the datasheet, when reading
-> > +			 * from NDDB with BCH enabled, after each 32
-> > +			 * bits reads, we have to make sure that the
-> > +			 * NDSR.RDDREQ bit is set
-> > +			 */
+> Currently tested on Exynos5800-peach-pi and Exyons7 platform for HS400 mode.
+> Tested HS200 mode with this series applied, HS200 still works.
 > 
-> I know the datasheet says this bit should be checked after each
-> transfer, but I wonder if we shouldn't check it before reading the data.
-> What happens if you drain all the data available in the FIFO ? Is the
-> controller still setting the RDDREQ bit ?
+> Appreciate testing on other exynos5/7 platform which supports emmc5.0
 > 
-> Moreover, the datasheet says this RDDREQ bit should be checked after
-> each 32 bytes (not 32 bits) transfer.
-> Testing it after each readl call shouldn't hurt though.
-
-Seems like that could quite possibly kill performance unnecessarily,
-couldn't it? But then, PIO is probably not that fast in the first
-place...
-
-Brian
+> Changes in V5:
+> 	* Enable HS400 on Exynos5800-peach-pi boards
+> 	* Addressed other review comments from Jaehoon Chung
+> 
+> Changes in V4:
+> 	* drop the idea of changing existing binding for ciu_div as per [1]
+>         * addressed comments from Jaehoon Chung [2]
+> 
+> [1] http://www.spinics.net/lists/linux-samsung-soc/msg40923.html
+> [2] http://www.spinics.net/lists/devicetree/msg64373.html
+> 
+> Changes in V3:
+> 	rebased on ulf's next (commit: 607b448 mmc: core: Make tuning block patterns static)
+> 
+> Seungwon Jeon (2):
+>   mmc: dw_mmc: exynos: Support eMMC's HS400 mode
+>   ARM: dts: Add HS400 support for exynos5420 and exynos5800
+> 
+>  .../devicetree/bindings/mmc/exynos-dw-mshc.txt     |    7 +
+>  arch/arm/boot/dts/exynos5420-peach-pit.dts         |    4 +-
+>  arch/arm/boot/dts/exynos5420-pinctrl.dtsi          |    7 +
+>  arch/arm/boot/dts/exynos5420-smdk5420.dts          |    4 +-
+>  arch/arm/boot/dts/exynos5800-peach-pi.dts          |    7 +-
+>  drivers/mmc/host/dw_mmc-exynos.c                   |  185 ++++++++++++++++----
+>  drivers/mmc/host/dw_mmc-exynos.h                   |   19 +-
+>  drivers/mmc/host/dw_mmc.c                          |   16 +-
+>  drivers/mmc/host/dw_mmc.h                          |    2 +
+>  9 files changed, 213 insertions(+), 38 deletions(-)
+> 
