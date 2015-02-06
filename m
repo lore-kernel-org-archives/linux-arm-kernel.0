@@ -1,36 +1,40 @@
-From: vincent.yang.fujitsu@gmail.com (Vincent Yang)
-Date: Fri,  6 Feb 2015 10:15:03 +0800
-Subject: [PATCH v6 6/7] of: add Fujitsu vendor prefix
-In-Reply-To: <1423188007-17047-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
-References: <1423188007-17047-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
-Message-ID: <1423188903-17301-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 05 Feb 2015 18:15:31 -0800
+Subject: [Cocci] [PATCH v13 3/6] clk: Make clk API return per-user struct
+ clk instances
+In-Reply-To: <54D3900A.9060200@gmail.com>
+References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1422011024-32283-4-git-send-email-tomeu.vizoso@collabora.com>
+ <20150201212432.22722.70917@quantum> <54CFE1FE.7040404@codeaurora.org>
+ <alpine.DEB.2.02.1502022230110.2045@localhost6.localdomain6>
+ <54CFFBCF.90706@codeaurora.org> <20150202225036.421.43421@quantum>
+ <54D0F179.1040906@gmail.com> <54D2AA9B.7010800@codeaurora.org>
+ <54D3900A.9060200@gmail.com>
+Message-ID: <54D423C3.9030105@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jassi Brar <jaswinder.singh@linaro.org>
+On 02/05/15 07:45, Quentin Lambert wrote:
+>
+> On 05/02/2015 00:26, Stephen Boyd wrote:
+>>> If you want me to I can enlarge the search to other directories.
+>> Yes please do. And if you could share the coccinelle patch that would be
+>> great. Thanks.
+>>
+> structclk.cocci is the coccinelle patch
+> structclk-arm.patch is the result I got when applying it to the
+> arch/arm directory
+>
+> Is there anything else I can do to help?
+>
+>
 
-Add 'fujitsu' as the vendor prefix for Fujitsu Semiconductor Ltd.
+Thanks for the coccinelle patch. Thinking more about it, I don't think
+we care if the pointer is dereferenced because that would require a
+definition of struct clk and that is most likely not the case outside of
+the clock framework. Did you scan the entire kernel? I'm running it now
+but it seems to be taking a while.
 
-Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
-Signed-off-by: Andy Green <andy.green@linaro.org>
-Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Tetsuya Nuriya <nuriya.tetsuya@jp.fujitsu.com>
----
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index d443279..e0ac020 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -59,6 +59,7 @@ everest	Everest Semiconductor Co. Ltd.
- excito	Excito
- fcs	Fairchild Semiconductor
- fsl	Freescale Semiconductor
-+fujitsu Fujitsu Semiconductor Ltd.
- GEFanuc	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
- gef	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
- geniatech	Geniatech, Inc.
 -- 
-1.9.0
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
