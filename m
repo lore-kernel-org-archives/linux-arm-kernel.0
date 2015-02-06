@@ -1,89 +1,80 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Fri, 6 Feb 2015 15:15:20 -0500
-Subject: [PATCH] of: calculate masks of the device based on dma-range size
-Message-ID: <1423253720-2785-1-git-send-email-m-karicheri2@ti.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 6 Feb 2015 12:16:17 -0800
+Subject: [PATCH v5 3/5] x86: Split syscall_trace_enter into two phases
+In-Reply-To: <CALCETrUmMA9sK4SJCSiF24iAiPLMBf=-JBw6TcLV+aLt_eN=Sw@mail.gmail.com>
+References: <cover.1409954077.git.luto@amacapital.net>
+ <2df320a600020fda055fccf2b668145729dd0c04.1409954077.git.luto@amacapital.net>
+ <20150205211916.GA31367@altlinux.org>
+ <CAGXu5j+aXxt55LsxxbNkfGGF719ubXBZ2JAFwUPNARwKMVFgng@mail.gmail.com>
+ <20150205214027.GB31367@altlinux.org>
+ <CALCETrXFzcXngHsX=_72hYZqms32Zf7oFYDBgC3XNw7zOGdDCA@mail.gmail.com>
+ <CAGXu5jJtHT9o8WMoynifN13=uZoARt4G9iVcgZsc9xYOBEwWsg@mail.gmail.com>
+ <20150205233945.GA31540@altlinux.org>
+ <CAGXu5jLTH+mUF0JxeR2qA_r=ocWjPHPSK2OPgE0Fu_JKoQyQ9w@mail.gmail.com>
+ <CALCETrXsCUje+_V=Ud+TB4A2jH2M7yqyoCFMLEyxOD6pd7Di5w@mail.gmail.com>
+ <20150206023249.GB31540@altlinux.org>
+ <CALCETrWTnqKDoatK+5FN=yYDOeENoW5=r5YMToYKhZ8Zfv5wWA@mail.gmail.com>
+ <CAGXu5j+nopAMFukwMu=Cy0GOapziOLTb-ryJhA-aywk_uerg9A@mail.gmail.com>
+ <CALCETrVaF+3ETn5nfcbvyWKUYb71jNXK-zo9V6uOK0cEW4TCNQ@mail.gmail.com>
+ <CAGXu5jJXspS_34KBJ5VxvyKuj4bA+zg267dNiEkqR1LuvjoA1Q@mail.gmail.com>
+ <CALCETrUmMA9sK4SJCSiF24iAiPLMBf=-JBw6TcLV+aLt_eN=Sw@mail.gmail.com>
+Message-ID: <CAGXu5jKuLUCwptoL=5Hcz7ME-SKdVcuYoRPw+JJ2nktz5273-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch update of_dma_configure() API to calculate the
-masks (dma_mask and coherent_dma_mask) based on the dma-range
-values set in DT for the device. Also limit the mask to lower
-of the default mask and mask calculated.
+On Fri, Feb 6, 2015 at 12:12 PM, Andy Lutomirski <luto@amacapital.net> wrote:
+> On Fri, Feb 6, 2015 at 12:07 PM, Kees Cook <keescook@chromium.org> wrote:
+>> On Fri, Feb 6, 2015 at 11:32 AM, Andy Lutomirski <luto@amacapital.net> wrote:
+>>> On Fri, Feb 6, 2015 at 11:23 AM, Kees Cook <keescook@chromium.org> wrote:
+>>>> And especially since a ptracer
+>>>> can change syscalls during syscall-enter-stop to any syscall it wants,
+>>>> bypassing seccomp. This condition is already documented.
+>>>
+>>> If a ptracer (using PTRACE_SYSCALL) were to get the entry callback
+>>> before seccomp, then this oddity would go away, which might be a good
+>>> thing.  A ptracer could change the syscall, but seccomp would based on
+>>> what the ptracer changed the syscall to.
+>>
+>> I want kill events to trigger immediately. I don't want to leave the
+>> ptrace surface available on a SECCOMP_RET_KILL. So maybe it can be
+>> seccomp phase 1, then ptrace, then seccomp phase 2? And pass more
+>> information between phases to determine how things should behave
+>> beyond just "skip"?
+>
+> I thought so too, originally, but I'm far less convinced now, for two reasons:
+>
+> 1. I think that a lot of filters these days use RET_ERRNO heavily, so
+> this won't benefit them.
+>
+> 2. I'm not convinced it really reduces the attack surface for anyone.
+> Unless your filter is literally "return SECCOMP_RET_KILL", then the
+> seccomp-filtered task can always cause the ptracer to get a pair of
+> syscall notifications.  Also, the task can send itself signals (using
+> page faults, breakpoints, etc) and cause ptrace events via other
+> paths.
 
-Cc: Joerg Roedel <joro@8bytes.org>
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+What are you thinking for a solution?
 
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
----
- drivers/of/device.c |   27 ++++++++++++++++++++-------
- 1 file changed, 20 insertions(+), 7 deletions(-)
+As for capping SECCOMP_RET_ERRNO to MAX_ERRNO, how about this (sorry
+if gmail butchers the paste):
 
-diff --git a/drivers/of/device.c b/drivers/of/device.c
-index 314c8a9..44209fa 100644
---- a/drivers/of/device.c
-+++ b/drivers/of/device.c
-@@ -83,17 +83,18 @@ int of_device_add(struct platform_device *ofdev)
-  */
- void of_dma_configure(struct device *dev, struct device_node *np)
- {
--	u64 dma_addr, paddr, size;
-+	u64 dma_addr = 0, paddr, size;
- 	int ret;
- 	bool coherent;
--	unsigned long offset;
-+	unsigned long offset = 0;
- 	struct iommu_ops *iommu;
- 
- 	/*
- 	 * Set default dma-mask to 32 bit. Drivers are expected to setup
- 	 * the correct supported dma_mask.
- 	 */
--	dev->coherent_dma_mask = DMA_BIT_MASK(32);
-+	if (!dev->coherent_dma_mask)
-+		dev->coherent_dma_mask = DMA_BIT_MASK(32);
- 
- 	/*
- 	 * Set it to coherent_dma_mask by default if the architecture
-@@ -102,11 +103,14 @@ void of_dma_configure(struct device *dev, struct device_node *np)
- 	if (!dev->dma_mask)
- 		dev->dma_mask = &dev->coherent_dma_mask;
- 
-+	/*
-+	 * Set default size to cover the 32-bit. Drivers are expected to setup
-+	 * the correct size and dma_mask.
-+	 */
-+	size = 1ULL << 32;
-+
- 	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
--	if (ret < 0) {
--		dma_addr = offset = 0;
--		size = dev->coherent_dma_mask + 1;
--	} else {
-+	if (!ret) {
- 		offset = PFN_DOWN(paddr - dma_addr);
- 
- 		/*
-@@ -128,6 +132,15 @@ void of_dma_configure(struct device *dev, struct device_node *np)
- 
- 	dev->dma_pfn_offset = offset;
- 
-+	/*
-+	 * Limit coherent and dma mask based on size and default mask
-+	 * set by the driver.
-+	 */
-+	dev->coherent_dma_mask = min(dev->coherent_dma_mask,
-+				     DMA_BIT_MASK(ilog2(dma_addr + size)));
-+	*dev->dma_mask = min((*dev->dma_mask),
-+			     DMA_BIT_MASK(ilog2(dma_addr + size)));
-+
- 	coherent = of_dma_is_coherent(np);
- 	dev_dbg(dev, "device is%sdma coherent\n",
- 		coherent ? " " : " not ");
+diff --git a/kernel/seccomp.c b/kernel/seccomp.c
+index 4ef9687ac115..c88148d20bd5 100644
+--- a/kernel/seccomp.c
++++ b/kernel/seccomp.c
+@@ -629,7 +629,9 @@ static u32 __seccomp_phase1_filter(int this_syscall, struct
+
+        switch (action) {
+        case SECCOMP_RET_ERRNO:
+-               /* Set the low-order 16-bits as a errno. */
++               /* Set the low-order bits as a errno. */
++               if (data > MAX_ERRNO)
++                       data = MAX_ERRNO;
+                syscall_set_return_value(current, task_pt_regs(current),
+                                         -data, 0);
+                goto skip;
+
+
 -- 
-1.7.9.5
+Kees Cook
+Chrome OS Security
