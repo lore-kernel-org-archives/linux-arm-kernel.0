@@ -1,28 +1,53 @@
-From: lambert.quentin@gmail.com (Quentin Lambert)
-Date: Fri, 06 Feb 2015 10:01:34 +0100
-Subject: [Cocci] [PATCH v13 3/6] clk: Make clk API return per-user struct
- clk instances
-In-Reply-To: <54D423C3.9030105@codeaurora.org>
-References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
- <1422011024-32283-4-git-send-email-tomeu.vizoso@collabora.com>
- <20150201212432.22722.70917@quantum> <54CFE1FE.7040404@codeaurora.org>
- <alpine.DEB.2.02.1502022230110.2045@localhost6.localdomain6>
- <54CFFBCF.90706@codeaurora.org> <20150202225036.421.43421@quantum>
- <54D0F179.1040906@gmail.com> <54D2AA9B.7010800@codeaurora.org>
- <54D3900A.9060200@gmail.com> <54D423C3.9030105@codeaurora.org>
-Message-ID: <54D482EE.6050004@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 06 Feb 2015 09:02:09 +0000
+Subject: [PATCH v3 1/3] genirq: Allow the irqchip state of an IRQ to be
+ save/restored
+In-Reply-To: <CAJAp7Oju0yD14Y53T7xC2D9oHUANyUs2BT42S4g=iJ1md76TGg@mail.gmail.com>
+References: <1420653062-23361-1-git-send-email-marc.zyngier@arm.com>	<1420653062-23361-2-git-send-email-marc.zyngier@arm.com>
+ <CAJAp7Oju0yD14Y53T7xC2D9oHUANyUs2BT42S4g=iJ1md76TGg@mail.gmail.com>
+Message-ID: <54D48311.7040305@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 05/02/15 23:33, Bjorn Andersson wrote:
+> On Wed, Jan 7, 2015 at 9:51 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> There is a number of cases where a kernel subsystem may want to
+>> introspect the state of an interrupt at the irqchip level:
+>>
+>> - When a peripheral is shared between virtual machines,
+>>   its interrupt state becomes part of the guest's state,
+>>   and must be switched accordingly. KVM on arm/arm64 requires
+>>   this for its guest-visible timer
+>> - Some GPIO controllers seem to require peeking into the
+>>   interrupt controller they are connected to to report
+>>   their internal state
+>>
+>> This seem to be a pattern that is common enough for the core code
+>> to try and support this without too many horrible hacks. Introduce
+>> a pair of accessors (irq_get_irqchip_state/irq_set_irqchip_state)
+>> to retrieve the bits that can be of interest to another subsystem:
+>> pending, active, and masked.
+>>
+>> - irq_get_irqchip_state returns the state of the interrupt according
+>>   to a parameter set to IRQCHIP_STATE_PENDING, IRQCHIP_STATE_ACTIVE,
+>>   IRQCHIP_STATE_MASKED or IRQCHIP_STATE_LINE_LEVEL.
+>> - irq_set_irqchip_state similarly sets the state of the interrupt.
+>>
+>> Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+>> Tested-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> Any update on the status of this?
+> 
+> I would like to be able to move ahead with the pinctrl driver for the
+> Qualcomm PM8921 pmic, that depends on this being in place.
 
-On 06/02/2015 03:15, Stephen Boyd wrote:
-> Thanks for the coccinelle patch. Thinking more about it, I don't think
-> we care if the pointer is dereferenced because that would require a
-> definition of struct clk and that is most likely not the case outside of
-> the clock framework. Did you scan the entire kernel?
-No I haven't.
-> I'm running it now
-> but it seems to be taking a while.
->
-Yes, that's why, as a first step, I chose to limit the scan to the arm 
-directory.
+None so far.
+
+Thomas, do you have any comment on this one?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
