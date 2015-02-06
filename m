@@ -1,51 +1,47 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Thu, 05 Feb 2015 16:41:19 -0800
-Subject: [PATCH] ARM: print cma-reserved pages from show_mem
-In-Reply-To: <1423092164-9145-1-git-send-email-gregory.0xf0@gmail.com>
-References: <1423092164-9145-1-git-send-email-gregory.0xf0@gmail.com>
-Message-ID: <54D40DAF.4080609@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 6 Feb 2015 00:42:10 +0000
+Subject: [PATCH v13 3/6] clk: Make clk API return per-user struct clk
+ instances
+In-Reply-To: <54D3EB29.4090007@codeaurora.org>
+References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1422011024-32283-4-git-send-email-tomeu.vizoso@collabora.com>
+ <54D3C803.30706@samsung.com> <54D3CD6A.1010209@codeaurora.org>
+ <54D3EB29.4090007@codeaurora.org>
+Message-ID: <20150206004210.GB8670@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/4/2015 3:22 PM, Gregory Fong wrote:
-> Add cma reserved information to the ARM-specific show_mem.  It was
-> added to the generic implementation by commit
-> 49abd8c28046adf77c5ce1949549aa64d7221881 "lib/show_mem.c: add cma
-> reserved information".
->
-> Signed-off-by: Gregory Fong <gregory.0xf0@gmail.com>
-> ---
->   arch/arm/mm/init.c | 4 ++++
->   1 file changed, 4 insertions(+)
->
-> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> index 2495c8c..da77507 100644
-> --- a/arch/arm/mm/init.c
-> +++ b/arch/arm/mm/init.c
-> @@ -22,6 +22,7 @@
->   #include <linux/memblock.h>
->   #include <linux/dma-contiguous.h>
->   #include <linux/sizes.h>
-> +#include <linux/cma.h>
->
->   #include <asm/cp15.h>
->   #include <asm/mach-types.h>
-> @@ -130,6 +131,9 @@ void show_mem(unsigned int filter)
->   	printk("%d pages of RAM\n", total);
->   	printk("%d free pages\n", free);
->   	printk("%d reserved pages\n", reserved);
-> +#ifdef CONFIG_CMA
-> +	printk("%lu cma reserved pages\n", totalcma_pages);
-> +#endif
+On Thu, Feb 05, 2015 at 02:14:01PM -0800, Stephen Boyd wrote:
+> Actually we can bury the __clk_create_clk() inside
+> __of_clk_get_from_provider(). We should also move __clk_get() into there
+> because right now we have a hole where whoever calls
+> of_clk_get_from_provider() never calls __clk_get() on the clk, leading
+> to possible badness. v2 coming soon.
 
-Nit: 'cma reserved pages' is a bit unclear. Are there some CMA
-pages that aren't reserved? Dropping the reserved might be
-clearer.
+There's some other issues here too...
 
-Thanks,
-Laura
+sound/soc/kirkwood/kirkwood-i2s.c:
+
+        priv->clk = devm_clk_get(&pdev->dev, np ? "internal" : NULL);
+...
+        priv->extclk = devm_clk_get(&pdev->dev, "extclk");
+        if (IS_ERR(priv->extclk)) {
+...
+	} else {
+                if (priv->extclk == priv->clk) {
+                        devm_clk_put(&pdev->dev, priv->extclk);
+                        priv->extclk = ERR_PTR(-EINVAL);
+                } else {
+                        dev_info(&pdev->dev, "found external clock\n");
+                        clk_prepare_enable(priv->extclk);
+                        soc_dai = kirkwood_i2s_dai_extclk;
+                }
+
+It should be fine provided your "trick" is only done for DT clocks,
+but not for legacy - with legacy, a NULL in the clkdev tables will
+match both these requests, hence the need to compare the clk_get()
+return value to tell whether we get the same clock.
 
 -- 
-Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
