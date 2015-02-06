@@ -1,44 +1,60 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 6 Feb 2015 01:05:57 -0800
-Subject: [GIT PULL 2/3] Samsung 4th DT updates for v3.20
-In-Reply-To: <54D22D45.2090000@kernel.org>
-References: <54D22D45.2090000@kernel.org>
-Message-ID: <20150206090557.GK23582@quad.lixom.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 06 Feb 2015 09:07:10 +0000
+Subject: [PATCH 3/3] arm64: dts: Add dts files for Hisilicon Hi6220 SoC
+In-Reply-To: <CAAS=xmgsuY=c8-n_pDiZjLe2u+SPX7msRje7h0sNkRtT3HLfQA@mail.gmail.com>
+References: <1423128277-10297-1-git-send-email-bintian.wang@huawei.com>
+ <1423128277-10297-4-git-send-email-bintian.wang@huawei.com>
+ <20150205193017.GF20735@leverpostej>
+ <CAAS=xmgsuY=c8-n_pDiZjLe2u+SPX7msRje7h0sNkRtT3HLfQA@mail.gmail.com>
+Message-ID: <54D4843E.7060201@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 04, 2015 at 11:31:33PM +0900, Kukjin Kim wrote:
-> Hi,
-> 
-> Here is 4th DT updates for v3.20.
-> Please pull.
-> 
-> Note there are several dt updates in my tree which has a dependency with
-> driver side for v3.20 and I hope it can be sent to upstream via arm-soc
-> during late merge window. If it is OK to you guys, I'll send a pull
-> request soon. (example tmu, asoc and devfreq)
+On 06/02/15 08:42, Brent Wang wrote:
 
-Why do they have driver dependencies? Can't the dts contents be merged
-separately, such that the drivers just work once they land?
+[...]
 
-Or are you redefining bindings in an incompatible manner?
+>>
+>>> +                   <0x0 0xf6802000 0x0 0x2000>, /* GICC */
+>>> +                   <0x0 0xf6804000 0x0 0x2000>, /* GICH */
+>>> +                   <0x0 0xf6806000 0x0 0x2000>; /* GICV */
+>>
+>> I guess no-one's bothered to consider 64k pages?
+>>
+>> Given GICH and GICV, I hope that this platform is booted at EL2?
+> Transfer from EL3 to EL1 directly, keep these two just for future use.
 
-> The following changes since commit ea08de16eb1ba2052ce2db4b58b62a2ec33357a3:
-> 
->   ARM: dts: Add DISP1 power domain for exynos5420 (2015-01-29 08:52:23
-> +0900)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> tags/samsung-dt-4
-> 
-> for you to fetch changes up to 7808cae3e97140781eb3f712084caf4e44c126c9:
-> 
->   ARM: dts: Add PPMU node for exynos4412-trats2 (2015-02-04 08:11:52 +0900)
+That's a real shame, as it keeps users away from some key aspects of the
+ARMv8 architecture.
 
+>>
+>>> +             #interrupt-cells = <3>;
+>>> +             #address-cells = <0>;
+>>> +             interrupt-controller;
 
-Merged.
+And if you're keeping GICH/GICV, where is the maintenance interrupt?
 
+>>> +     };
+>>> +
+>>> +
+>>> +     timer {
+>>> +             compatible = "arm,armv8-timer";
+>>> +             interrupt-parent = <&gic>;
+>>> +             interrupts = <1 13 0xff08>,
+>>> +                          <1 14 0xff08>,
+>>> +                          <1 11 0xff08>,
+>>> +                          <1 10 0xff08>;
+>>> +             clock-frequency = <1200000>;
+>>> +     };
+>>
+>> NAK. Fix your firmware to configure CNTFRQ, on all CPUs.
+> Fix in next version, maybe it will take some time to change firmware.
 
--Olof
+While you're at it, make sure CNTVOFF_EL2 is set to zero on all CPUs
+before dropping to EL1. This tends to be overlooked.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
