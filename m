@@ -1,51 +1,51 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Thu, 5 Feb 2015 16:34:06 -0800
-Subject: [PATCH v7 1/4] Documentation: dt: add common bindings for
- hwspinlock
-In-Reply-To: <54D406BA.6060403@ti.com>
-References: <1421269101-51105-1-git-send-email-s-anna@ti.com>
- <1421269101-51105-2-git-send-email-s-anna@ti.com>
- <20150115135201.GG16217@leverpostej>
- <20150115135556.GH16217@leverpostej>
- <CAL_JsqL2LZAooMk-V8+xeF2g6acZE21M+-OBRw8aEVa-5wVHuQ@mail.gmail.com>
- <CAK=WgbYQ=BbinqJ5fsw2Y+FKdy=nasLsw9mX8pw6S_o3owy9-g@mail.gmail.com>
- <20150116101746.GA21809@leverpostej>
- <CAK=WgbYBqPoUm9byx0du_g5ZmHdYaUVLpSPZYHoCVzNoatNKpw@mail.gmail.com>
- <CAJAp7Og+-KQd7bygWQjTS72Kye3fkp3s3ry+2bw7Gcv7aPF5AQ@mail.gmail.com>
- <CAK=WgbZ2986xxuAFvMSoyQLaPAxdUpZ8e5g-mSjyETfvd4KKHw@mail.gmail.com>
- <CAJAp7OjVULNRd113TtOEwaa6QO-XCDa0oxBm2H5NPvp_kLTSpA@mail.gmail.com>
- <54CFE71E.20905@ti.com>
- <CAJAp7OiHfaMrVqaZ1r6ZN0aMMpE4OUnvLhODHQJeb6EJMa+o8A@mail.gmail.com>
- <54D406BA.6060403@ti.com>
-Message-ID: <CAJAp7Ojud6UM97eDYdUhZxzzjNRw_47e5kqh4UxwDBMwFZpuoQ@mail.gmail.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Thu, 05 Feb 2015 16:41:19 -0800
+Subject: [PATCH] ARM: print cma-reserved pages from show_mem
+In-Reply-To: <1423092164-9145-1-git-send-email-gregory.0xf0@gmail.com>
+References: <1423092164-9145-1-git-send-email-gregory.0xf0@gmail.com>
+Message-ID: <54D40DAF.4080609@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 5, 2015 at 4:11 PM, Suman Anna <s-anna@ti.com> wrote:
-> Hi Bjorn,
+On 2/4/2015 3:22 PM, Gregory Fong wrote:
+> Add cma reserved information to the ARM-specific show_mem.  It was
+> added to the generic implementation by commit
+> 49abd8c28046adf77c5ce1949549aa64d7221881 "lib/show_mem.c: add cma
+> reserved information".
 >
-> On 02/05/2015 05:01 PM, Bjorn Andersson wrote:
-[..]
->> Will you send out a new revision of the binding? I would love to get
->> this integrated so I can move on with the dependents.
+> Signed-off-by: Gregory Fong <gregory.0xf0@gmail.com>
+> ---
+>   arch/arm/mm/init.c | 4 ++++
+>   1 file changed, 4 insertions(+)
 >
-> Yep, will do as soon as I hear from Ohad on what to do with the patch
-> "hwspinlock/core: maintain a list of registered hwspinlock banks" that I
-> dropped from v7. Without that and dropping hwlock-base-id, I can't get
-> the translations done.
+> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> index 2495c8c..da77507 100644
+> --- a/arch/arm/mm/init.c
+> +++ b/arch/arm/mm/init.c
+> @@ -22,6 +22,7 @@
+>   #include <linux/memblock.h>
+>   #include <linux/dma-contiguous.h>
+>   #include <linux/sizes.h>
+> +#include <linux/cma.h>
 >
+>   #include <asm/cp15.h>
+>   #include <asm/mach-types.h>
+> @@ -130,6 +131,9 @@ void show_mem(unsigned int filter)
+>   	printk("%d pages of RAM\n", total);
+>   	printk("%d free pages\n", free);
+>   	printk("%d reserved pages\n", reserved);
+> +#ifdef CONFIG_CMA
+> +	printk("%lu cma reserved pages\n", totalcma_pages);
+> +#endif
 
-My suggestion is to replace the global id-tree with a list of hwlocks
-and iterate over these if we ever get more than one driver registered.
-As long as #hwlock-drivers < log(#total-hwlocks) this should be
-faster.
+Nit: 'cma reserved pages' is a bit unclear. Are there some CMA
+pages that aren't reserved? Dropping the reserved might be
+clearer.
 
-I would however argue that clients that would notice any kind of
-difference are using the API incorrectly.
+Thanks,
+Laura
 
-
-Unfortunately this is a somewhat larger change than just slapping DT
-support on the framework :/
-
-Regards,
-Bjorn
+-- 
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
