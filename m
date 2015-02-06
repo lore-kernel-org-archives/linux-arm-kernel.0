@@ -1,355 +1,64 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 06 Feb 2015 13:13:06 +0900
-Subject: Kexec and KVM not working gracefully together
-In-Reply-To: <CAHt6W4eQ3iC+sqWAn5LkkfC-XBgGWR0i6TXjWvzEsUqFh75fwQ@mail.gmail.com>
-References: <CAHt6W4cuRi3bfj5mryFouhOLGAAWuNXKVvz4K-rAjQnwiegL-Q@mail.gmail.com>	<54C7ADF0.8090102@arm.com>	<54D30AE0.5050101@linaro.org>	<20150205094317.43f8554a@arm.com>	<54D34592.9010903@linaro.org>	<CAHt6W4dS-fv0U+=ch1-=X36EpyE5FA89aY8LVqbFP0+R3GvLqw@mail.gmail.com>	<54D37108.9020103@arm.com>	<CAHt6W4cckuuK+=1ZHNUEEW5BuiyiGNc2CeuP9O7MaC0WpScZoA@mail.gmail.com>
- <CAHt6W4eQ3iC+sqWAn5LkkfC-XBgGWR0i6TXjWvzEsUqFh75fwQ@mail.gmail.com>
-Message-ID: <54D43F52.7030606@linaro.org>
+Date: Fri, 06 Feb 2015 13:18:53 +0900
+Subject: [PATCH 7/8] arm64/kexec: Add checks for KVM
+In-Reply-To: <1423181494.16019.2.camel@infradead.org>
+References: <cover.1421449714.git.geoff@infradead.org>		
+ <a3353cf2ac47f49c20bbbb88405301cbaa359805.1421449714.git.geoff@infradead.org>		
+ <20150126191942.GQ23313@leverpostej> <54CA041C.6020403@linaro.org>		
+ <54CA12A1.8090508@arm.com> <20150129184747.GV17721@leverpostej>		
+ <54CB206D.7040705@linaro.org> <1422647304.21823.31.camel@infradead.org>	
+ <54CF32CB.1060507@linaro.org> <1423181494.16019.2.camel@infradead.org>
+Message-ID: <54D440AD.2030608@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Frediano
-[add Geoff to cc]
-
-I still have to compare my code with yours, but please note that
-some files in arch/arm/kvm are shared with arm64, especially
-arm.c, mmu.c and related headers.
-
-So can you please
-- submit your new patch without including old e-mail threads.
-   (don't forget RFC or PATCH.)
-- break it up into two pieces, one for common, the other for arm
-
-and a few more comments below:
-
-On 02/06/2015 01:56 AM, Frediano Ziglio wrote:
-
-[snip]
-
-> New version. Changes:
-> - removed saved value and test again
-> - remove vm flush, useless
-> - correct compile check on header
-> - try KVM enabled and not, compile link and tests
-> - rewrite comments, add more where necessary
-> - remove code to free and allocate again boot PGD and related, keep in
-> memory if KEXEC is enabled
+On 02/06/2015 09:11 AM, Geoff Levand wrote:
+> Hi Takahiro,
 >
-> Still not trying SMP. Still to be considered RFC. I tried different
-> compile options (KEXEC and KVM turned on/off). I realized that I
-> should test if kernel is started with SVC mode code still works
-> correctly. ARM_VIRT_EXT is always turned on for V7 CPU.
+> On Mon, 2015-02-02 at 17:18 +0900, AKASHI Takahiro wrote:
+>> On 01/31/2015 04:48 AM, Geoff Levand wrote:
+>>> As an initial implementation we can hook into the CPU_DYING_FROZEN
+>>> notifier sent to hyp_init_cpu_notify().  The longer term solution
+>>> should use kvm_arch_hardware_enable() and kvm_arch_hardware_disable().
+>>
+>> Are these two different approaches?
+>
+> Yes, these are two different solutions,  One initial work-around, and a
+> more involved proper solution.  Hooking into the CPU_DYING_FROZEN
+> notifier would be a initial fix.  The proper solution would be to move
+> the KVM setup to kvm_arch_hardware_enable(), and the shutdown to
+> kvm_arch_hardware_disable().
 >
 >
-> diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-> index 3a67bec..985f0a3 100644
-> --- a/arch/arm/include/asm/kvm_asm.h
-> +++ b/arch/arm/include/asm/kvm_asm.h
-> @@ -97,7 +97,19 @@ extern char __kvm_hyp_code_end[];
->   extern void __kvm_flush_vm_context(void);
->   extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
+>> kernel_exec() -> machine_shutdown() -> disable_nonboot_cpu()
+>>      -> _cpu_down() -> cpu_notify_nofail(CPU_DEAD|...)
+>>
+>> On the other hand, kvm already has a hook into kvm_arch_hardware_disable():
+>>     (ignoring kvm_usage_count here)
+>> kvm_cpu_hotplug(CPU_DYING) -> hardware_disable()
+>>      -> hardware_disable_nolock() -> kvm_arch_hardware_disable()
+>>
+>> So it seems that we don't have to add a new hook at hyp_init_cpu_notify()
+>> if kvm_arch_hardware_disable() is properly implemented.
 >
-> +extern void __kvm_set_vectors(unsigned long phys_vector_base);
-> +
->   extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
-> +
-> +#ifndef CONFIG_ARM_VIRT_EXT
+> Yes, that is correct.  But, as above, you would also need to update the
+> KVM startup to use kvm_arch_hardware_enable().
+>
+>> disable_nonboot_cpu() will not inovke cpu hotplug on *boot* cpu, and
+>> we should handle it in a separate way though.
+>
+> IIRC, the secondary cpus go through PSCI on shutdown, and that path
+> is working OK.  Maybe I am mistaken though.
 
-Arm64 doesn't have CONFIG_ARM_VIRT_EXT. Why don't use CONFIG_KVM?
-I'd rather put this conditional into the place where the function is
-actually called for flexible implementation. (See below)
+If so, why should we add a hook at hyp_init_cpu_notify() as initial work-around?
 
-> +static void kvm_cpu_reset(void (*phys_reset)(void *), void *addr)
-> +{
-> +    phys_reset(addr);
-> +}
-> +#else
-> +extern void kvm_cpu_reset(void (*phys_reset)(void *), void *addr);
-> +#endif
-> +
->   #endif
->
->   #endif /* __ARM_KVM_ASM_H__ */
-> diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
-> index 2a55373..30339ad 100644
-> --- a/arch/arm/kernel/hyp-stub.S
-> +++ b/arch/arm/kernel/hyp-stub.S
-> @@ -164,13 +164,63 @@ ARM_BE8(orr    r7, r7, #(1 << 25))     @ HSCTLR.EE
->       bx    lr            @ The boot CPU mode is left in r4.
->   ENDPROC(__hyp_stub_install_secondary)
->
-> +#undef CPU_RESET
-> +#if defined(CONFIG_ARM_VIRT_EXT) && !defined(CONFIG_KVM) && !defined(ZIMAGE)
-> +#  define CPU_RESET 1
-> +#endif
-> +
->   __hyp_stub_do_trap:
-> +#ifdef CPU_RESET
-> +    cmp    r0, #-2
-> +    bne    1f
-> +
-> +    mrc    p15, 4, r0, c1, c0, 0    @ HSCR
-> +    ldr    r2, =0x40003807
-> +    bic    r0, r0, r2
-> +    mcr    p15, 4, r0, c1, c0, 0    @ HSCR
-> +    isb
-> +
-> +    @ Disable MMU, caches and Thumb in SCTLR
-> +    mrc    p15, 0, r0, c1, c0, 0    @ SCTLR
-> +    bic    r0, r0, r2
-> +    mcr    p15, 0, r0, c1, c0, 0
-> +
-> +    bx    r1
-> +    .ltorg
-> +1:
-> +#endif
->       cmp    r0, #-1
->       mrceq    p15, 4, r0, c12, c0, 0    @ get HVBAR
->       mcrne    p15, 4, r0, c12, c0, 0    @ set HVBAR
->       __ERET
->   ENDPROC(__hyp_stub_do_trap)
->
-> +#ifdef CPU_RESET
-> +/*
-> + * r0 cpu_reset function
-> + * r1 address to jump to
-> + */
-> +ENTRY(kvm_cpu_reset)
-> +    mov    r2, r0
-> +
-> +    @ __boot_cpu_mode should be HYP_MODE
-> +    adr    r0, .L__boot_cpu_mode_offset
-> +    ldr    r3, [r0]
-> +    ldr    r0, [r0, r3]
-> +    cmp    r0, #HYP_MODE
-> +    beq    reset_to_hyp
-> +
-> +    @ Call SVC mode cpu_reset
-> +    mov    r0, r1
-> +THUMB(    orr    r2, r2, 1    )
-> +    bx    r2
-> +
-> +reset_to_hyp:
-> +    mov    r0, #-2
-> +    b    __hyp_set_vectors
-> +ENDPROC(kvm_cpu_reset)
-> +#endif
-> +
->   /*
->    * __hyp_set_vectors: Call this after boot to set the initial hypervisor
->    * vectors as part of hypervisor installation.  On an SMP system, this should
-> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-> index fdfa3a7..c018719 100644
-> --- a/arch/arm/kernel/process.c
-> +++ b/arch/arm/kernel/process.c
-> @@ -41,6 +41,7 @@
->   #include <asm/system_misc.h>
->   #include <asm/mach/time.h>
->   #include <asm/tls.h>
-> +#include <asm/kvm_asm.h>
->
->   #ifdef CONFIG_CC_STACKPROTECTOR
->   #include <linux/stackprotector.h>
-> @@ -60,7 +61,7 @@ static const char *isa_modes[] __maybe_unused = {
->   };
->
->   extern void call_with_stack(void (*fn)(void *), void *arg, void *sp);
-> -typedef void (*phys_reset_t)(unsigned long);
-> +typedef void (*phys_reset_t)(void *);
->
->   /*
->    * A temporary stack to use for CPU reset. This is static so that we
-> @@ -89,7 +90,8 @@ static void __soft_restart(void *addr)
->
->       /* Switch to the identity mapping. */
->       phys_reset = (phys_reset_t)(unsigned long)virt_to_phys(cpu_reset);
-> -    phys_reset((unsigned long)addr);
-> +
-> +    kvm_cpu_reset(phys_reset, addr);
+> The primary cpu shutdown (hyp stubs restored) is what is missing.  The
+> primary cpu goes through cpu_soft_restart(), and that is what is
+> currently failing.
 
-How about this?
-#ifdef CONFIG_KVM
-	kvm_cpu_reset(...);
-#endif
-	phys_reset(addr);
+Yeah, we will call teardown function manually in soft_restart();
 
-It will clearify the purpose of kvm_cpu_reset().
-The name of kvm_cpu_reset() might better be cpu_*de*init_hyp_mode or similar
-given that the function would be called in hyp_init_cpu_notify()
-once kvm supports cpu hotplug in the future.
-
->       /* Should never get here. */
->       BUG();
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index 0b0d58a..e4d4a2b 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -1009,7 +1009,7 @@ static int init_hyp_mode(void)
->       if (err)
->           goto out_free_mappings;
->
-> -#ifndef CONFIG_HOTPLUG_CPU
-> +#if !defined(CONFIG_HOTPLUG_CPU) && !defined(CONFIG_KEXEC)
->       free_boot_hyp_pgd();
->   #endif
->
-> @@ -1079,6 +1079,53 @@ out_err:
->       return err;
->   }
->
-> +void kvm_cpu_reset(void (*phys_reset)(void *), void *addr)
-
-I'm not sure, but it might be better to put this code into arm/kernel/init.S
-as it is a counterpart of _do_hyp_init from cpu_init_hyp_mode().
-
-> +{
-> +    unsigned long vector;
-> +
-> +    if (!is_hyp_mode_available()) {
-> +        phys_reset(addr);
-> +        return;
-> +    }
-> +
-> +    vector = (unsigned long) kvm_get_idmap_vector();
-> +
-> +    /*
-> +     * Set vectors so we call initialization routines.
-> +     * trampoline is mapped at TRAMPOLINE_VA but not at its physical
-> +     * address so we don't have an identity map to be able to
-> +     * disable MMU. We need to set exception vector at trampoline
-> +     * at TRAMPOLINE_VA address which is mapped.
-> +     */
-> +    kvm_call_hyp(__kvm_set_vectors,(unsigned long) (TRAMPOLINE_VA +
-> (vector & (PAGE_SIZE-1))));
-> +
-> +    /*
-> +     * Set HVBAR to physical address, page table to identity to do the switch
-> +     */
-> +    kvm_call_hyp((void*) 4, (unsigned long) vector, kvm_mmu_get_boot_httbr());
-> +
-> +    /*
-> +     * Flush to make sure code after the cache are disabled see updated values
-> +     */
-> +    flush_cache_all();
-> +
-> +    /*
-> +     * Turn off caching on Hypervisor mode
-> +     */
-> +    kvm_call_hyp((void*) 1);
-> +
-> +    /*
-> +     * Flush to make sude code don't see old cached values after cache is
-> +     * enabled
-> +     */
-> +    flush_cache_all();
-> +
-> +    /*
-> +     * Restore execution
-> +     */
-> +    kvm_call_hyp((void*) 3, addr);
-> +}
-> +
-
-If you like kvm_call_hyp-like sequences, please specify what each kvm_call_hyp() should do.
-(we can do all in one kvm_call_hyp() though.)
-
-Thanks,
 -Takahiro AKASHI
-
->   /* NOP: Compiling as a module not supported */
->   void kvm_arch_exit(void)
->   {
-> diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
-> index 3988e72..c2f1d4d 100644
-> --- a/arch/arm/kvm/init.S
-> +++ b/arch/arm/kvm/init.S
-> @@ -68,6 +68,12 @@ __kvm_hyp_init:
->       W(b)    .
 >
->   __do_hyp_init:
-> +    @ check for special values, odd numbers can't be a stack pointer
-> +    cmp    r0, #1
-> +    beq    cpu_proc_fin
-> +    cmp    r0, #3
-> +    beq    restore
-> +
->       cmp    r0, #0            @ We have a SP?
->       bne    phase2            @ Yes, second stage init
->
-> @@ -151,6 +157,33 @@ target:    @ We're now in the trampoline code,
-> switch page tables
->
->       eret
->
-> +cpu_proc_fin:
-> +    mrc    p15, 4, r0, c1, c0, 0        @ ctrl register
-> +    bic    r0, r0, #0x1000            @ ...i............
-> +    bic    r0, r0, #0x0006            @ .............ca.
-> +    mcr    p15, 4, r0, c1, c0, 0        @ disable caches
-> +    eret
-> +
-> +restore:
-> +    @ Disable MMU, caches and Thumb in HSCTLR
-> +    mrc    p15, 4, r0, c1, c0, 0    @ HSCR
-> +    ldr    r2, =0x40003807
-> +    bic    r0, r0, r2
-> +    mcr    p15, 4, r0, c1, c0, 0    @ HSCR
-> +    isb
-> +
-> +    @ Invalidate old TLBs
-> +    mcr    p15, 4, r0, c8, c7, 0    @ TLBIALLH
-> +    isb
-> +    dsb    ish
-> +
-> +    @ Disable MMU, caches and Thumb in SCTLR
-> +    mrc    p15, 0, r0, c1, c0, 0   @ SCTLR
-> +    bic    r0, r0, r2
-> +    mcr    p15, 0, r0, c1, c0, 0
-> +
-> +    bx    r1
-> +
->       .ltorg
->
->       .globl __kvm_hyp_init_end
-> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-> index 01dcb0e..449e7dd 100644
-> --- a/arch/arm/kvm/interrupts.S
-> +++ b/arch/arm/kvm/interrupts.S
-> @@ -87,6 +87,18 @@ ENDPROC(__kvm_flush_vm_context)
->
->
->   /********************************************************************
-> + * Set HVBAR
-> + *
-> + * void __kvm_set_vectors(unsigned long phys_vector_base);
-> + */
-> +ENTRY(__kvm_set_vectors)
-> +    mcr    p15, 4, r0, c12, c0, 0    @ set HVBAR
-> +    dsb    ish
-> +    isb
-> +    bx    lr
-> +ENDPROC(__kvm_set_vectors)
-> +
-> +/********************************************************************
->    *  Hypervisor world-switch code
->    *
->    *
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index 1366625..f853858 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -369,6 +369,11 @@ void free_boot_hyp_pgd(void)
->       free_page((unsigned long)init_bounce_page);
->       init_bounce_page = NULL;
->
-> +    /* avoid to reuse possibly invalid values if bounce page is freed */
-> +    hyp_idmap_start = 0;
-> +    hyp_idmap_end = 0;
-> +    hyp_idmap_vector = 0;
-> +
->       mutex_unlock(&kvm_hyp_pgd_mutex);
->   }
->
->
-> Frediano
+> -Geoff
 >
