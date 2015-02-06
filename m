@@ -1,91 +1,111 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Fri, 6 Feb 2015 12:20:20 -0800
-Subject: [PATCH v5 3/5] x86: Split syscall_trace_enter into two phases
-In-Reply-To: <CAGXu5jKuLUCwptoL=5Hcz7ME-SKdVcuYoRPw+JJ2nktz5273-w@mail.gmail.com>
-References: <cover.1409954077.git.luto@amacapital.net>
- <2df320a600020fda055fccf2b668145729dd0c04.1409954077.git.luto@amacapital.net>
- <20150205211916.GA31367@altlinux.org>
- <CAGXu5j+aXxt55LsxxbNkfGGF719ubXBZ2JAFwUPNARwKMVFgng@mail.gmail.com>
- <20150205214027.GB31367@altlinux.org>
- <CALCETrXFzcXngHsX=_72hYZqms32Zf7oFYDBgC3XNw7zOGdDCA@mail.gmail.com>
- <CAGXu5jJtHT9o8WMoynifN13=uZoARt4G9iVcgZsc9xYOBEwWsg@mail.gmail.com>
- <20150205233945.GA31540@altlinux.org>
- <CAGXu5jLTH+mUF0JxeR2qA_r=ocWjPHPSK2OPgE0Fu_JKoQyQ9w@mail.gmail.com>
- <CALCETrXsCUje+_V=Ud+TB4A2jH2M7yqyoCFMLEyxOD6pd7Di5w@mail.gmail.com>
- <20150206023249.GB31540@altlinux.org>
- <CALCETrWTnqKDoatK+5FN=yYDOeENoW5=r5YMToYKhZ8Zfv5wWA@mail.gmail.com>
- <CAGXu5j+nopAMFukwMu=Cy0GOapziOLTb-ryJhA-aywk_uerg9A@mail.gmail.com>
- <CALCETrVaF+3ETn5nfcbvyWKUYb71jNXK-zo9V6uOK0cEW4TCNQ@mail.gmail.com>
- <CAGXu5jJXspS_34KBJ5VxvyKuj4bA+zg267dNiEkqR1LuvjoA1Q@mail.gmail.com>
- <CALCETrUmMA9sK4SJCSiF24iAiPLMBf=-JBw6TcLV+aLt_eN=Sw@mail.gmail.com>
- <CAGXu5jKuLUCwptoL=5Hcz7ME-SKdVcuYoRPw+JJ2nktz5273-w@mail.gmail.com>
-Message-ID: <CALCETrW5Vfj2-yEDyr26xof_gY_U-OW9tzUQStWUYnKM1vwskA@mail.gmail.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Fri,  6 Feb 2015 21:22:53 +0100
+Subject: [PATCH] ARM: shmobile: r8a73a4: Move pfc node to work around probe
+ ordering bug
+Message-ID: <1423254173-31852-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 6, 2015 at 12:16 PM, Kees Cook <keescook@chromium.org> wrote:
-> On Fri, Feb 6, 2015 at 12:12 PM, Andy Lutomirski <luto@amacapital.net> wrote:
->> On Fri, Feb 6, 2015 at 12:07 PM, Kees Cook <keescook@chromium.org> wrote:
->>> On Fri, Feb 6, 2015 at 11:32 AM, Andy Lutomirski <luto@amacapital.net> wrote:
->>>> On Fri, Feb 6, 2015 at 11:23 AM, Kees Cook <keescook@chromium.org> wrote:
->>>>> And especially since a ptracer
->>>>> can change syscalls during syscall-enter-stop to any syscall it wants,
->>>>> bypassing seccomp. This condition is already documented.
->>>>
->>>> If a ptracer (using PTRACE_SYSCALL) were to get the entry callback
->>>> before seccomp, then this oddity would go away, which might be a good
->>>> thing.  A ptracer could change the syscall, but seccomp would based on
->>>> what the ptracer changed the syscall to.
->>>
->>> I want kill events to trigger immediately. I don't want to leave the
->>> ptrace surface available on a SECCOMP_RET_KILL. So maybe it can be
->>> seccomp phase 1, then ptrace, then seccomp phase 2? And pass more
->>> information between phases to determine how things should behave
->>> beyond just "skip"?
->>
->> I thought so too, originally, but I'm far less convinced now, for two reasons:
->>
->> 1. I think that a lot of filters these days use RET_ERRNO heavily, so
->> this won't benefit them.
->>
->> 2. I'm not convinced it really reduces the attack surface for anyone.
->> Unless your filter is literally "return SECCOMP_RET_KILL", then the
->> seccomp-filtered task can always cause the ptracer to get a pair of
->> syscall notifications.  Also, the task can send itself signals (using
->> page faults, breakpoints, etc) and cause ptrace events via other
->> paths.
->
-> What are you thinking for a solution?
->
+Currently the pin function controller (which is also a GPIO controller)
+is instantiated before the interrupt controllers due to the order in the
+DTS. At that time, the irq domains for the interrupt controllers
+referenced by its interrupts-extended property cannot be found yet:
 
-I'm writing a patch now.  It's an ABI break, but this thread seems to
-show that the ABI was somewhat useless before the split-phase changes,
-and it's differently broken now, so I would be surprised if the change
-broke anything that was currently working.  I'll send it later today,
-hopefully.
+    irq: no irq domain found for /interrupt-controller at e61c0000 !
 
-> As for capping SECCOMP_RET_ERRNO to MAX_ERRNO, how about this (sorry
-> if gmail butchers the paste):
->
-> diff --git a/kernel/seccomp.c b/kernel/seccomp.c
-> index 4ef9687ac115..c88148d20bd5 100644
-> --- a/kernel/seccomp.c
-> +++ b/kernel/seccomp.c
-> @@ -629,7 +629,9 @@ static u32 __seccomp_phase1_filter(int this_syscall, struct
->
->         switch (action) {
->         case SECCOMP_RET_ERRNO:
-> -               /* Set the low-order 16-bits as a errno. */
-> +               /* Set the low-order bits as a errno. */
-> +               if (data > MAX_ERRNO)
-> +                       data = MAX_ERRNO;
->                 syscall_set_return_value(current, task_pt_regs(current),
->                                          -data, 0);
->                 goto skip;
->
+Nevertheless, the core OF probing code ignores this failure, besides a
+debug message that's not normally printed:
 
-I'm fine with this, but I'm not entirely convinced it solves a
-problem.  SECCOMP_RET_ERRNO | 5000 didn't work before, and it doesn't
-work now.  Admittedly, the new failure mode is possibly better.
+    not all legacy IRQ resources mapped for pfc
 
---Andy
+and continues initialization of the device. Then, the sh-pfc driver
+cannot find any IRQ resources, and thinks no interrupts are available,
+causing gpio-keys to fail later:
+
+    gpio-keys keyboard: Unable to claim irq 0; error -22
+    gpio-keys: probe of keyboard failed with error -22
+
+Move the pin function controller node after the interrupt controller
+nodes it references to work around the bug in the core OF probing code.
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+Notes:
+  - It seems several people tried to solve this in the core OF probing
+    code before, but the final solution never went in?
+  - This can be reproduced on other SoCs (e.g. sh73a0 and r8a7740) by
+    moving their pfc nodes before their interrupt controller nodes.
+  - This patch is against my working tree, so it doesn't apply to
+    Simon's repository, but you get the idea....
+---
+ arch/arm/boot/dts/r8a73a4.dtsi | 48 +++++++++++++++++++++---------------------
+ 1 file changed, 24 insertions(+), 24 deletions(-)
+
+diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
+index 8a23442f0c70359d..47b657de4f68f56c 100644
+--- a/arch/arm/boot/dts/r8a73a4.dtsi
++++ b/arch/arm/boot/dts/r8a73a4.dtsi
+@@ -259,30 +259,6 @@
+ 		};
+ 	};
+ 
+-	pfc: pfc at e6050000 {
+-		compatible = "renesas,pfc-r8a73a4";
+-		reg = <0 0xe6050000 0 0x9000>;
+-		gpio-controller;
+-		#gpio-cells = <2>;
+-		interrupts-extended =
+-			<&irqc0  0 0>, <&irqc0  1 0>, <&irqc0  2 0>, <&irqc0  3 0>,
+-			<&irqc0  4 0>, <&irqc0  5 0>, <&irqc0  6 0>, <&irqc0  7 0>,
+-			<&irqc0  8 0>, <&irqc0  9 0>, <&irqc0 10 0>, <&irqc0 11 0>,
+-			<&irqc0 12 0>, <&irqc0 13 0>, <&irqc0 14 0>, <&irqc0 15 0>,
+-			<&irqc0 16 0>, <&irqc0 17 0>, <&irqc0 18 0>, <&irqc0 19 0>,
+-			<&irqc0 20 0>, <&irqc0 21 0>, <&irqc0 22 0>, <&irqc0 23 0>,
+-			<&irqc0 24 0>, <&irqc0 25 0>, <&irqc0 26 0>, <&irqc0 27 0>,
+-			<&irqc0 28 0>, <&irqc0 29 0>, <&irqc0 30 0>, <&irqc0 31 0>,
+-			<&irqc1  0 0>, <&irqc1  1 0>, <&irqc1  2 0>, <&irqc1  3 0>,
+-			<&irqc1  4 0>, <&irqc1  5 0>, <&irqc1  6 0>, <&irqc1  7 0>,
+-			<&irqc1  8 0>, <&irqc1  9 0>, <&irqc1 10 0>, <&irqc1 11 0>,
+-			<&irqc1 12 0>, <&irqc1 13 0>, <&irqc1 14 0>, <&irqc1 15 0>,
+-			<&irqc1 16 0>, <&irqc1 17 0>, <&irqc1 18 0>, <&irqc1 19 0>,
+-			<&irqc1 20 0>, <&irqc1 21 0>, <&irqc1 22 0>, <&irqc1 23 0>,
+-			<&irqc1 24 0>, <&irqc1 25 0>;
+-		power-domains = <&pd_c5>;
+-	};
+-
+ 	i2c5: i2c at e60b0000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -382,6 +358,30 @@
+ 		power-domains = <&pd_c4>;
+ 	};
+ 
++	pfc: pfc at e6050000 {
++		compatible = "renesas,pfc-r8a73a4";
++		reg = <0 0xe6050000 0 0x9000>;
++		gpio-controller;
++		#gpio-cells = <2>;
++		interrupts-extended =
++			<&irqc0  0 0>, <&irqc0  1 0>, <&irqc0  2 0>, <&irqc0  3 0>,
++			<&irqc0  4 0>, <&irqc0  5 0>, <&irqc0  6 0>, <&irqc0  7 0>,
++			<&irqc0  8 0>, <&irqc0  9 0>, <&irqc0 10 0>, <&irqc0 11 0>,
++			<&irqc0 12 0>, <&irqc0 13 0>, <&irqc0 14 0>, <&irqc0 15 0>,
++			<&irqc0 16 0>, <&irqc0 17 0>, <&irqc0 18 0>, <&irqc0 19 0>,
++			<&irqc0 20 0>, <&irqc0 21 0>, <&irqc0 22 0>, <&irqc0 23 0>,
++			<&irqc0 24 0>, <&irqc0 25 0>, <&irqc0 26 0>, <&irqc0 27 0>,
++			<&irqc0 28 0>, <&irqc0 29 0>, <&irqc0 30 0>, <&irqc0 31 0>,
++			<&irqc1  0 0>, <&irqc1  1 0>, <&irqc1  2 0>, <&irqc1  3 0>,
++			<&irqc1  4 0>, <&irqc1  5 0>, <&irqc1  6 0>, <&irqc1  7 0>,
++			<&irqc1  8 0>, <&irqc1  9 0>, <&irqc1 10 0>, <&irqc1 11 0>,
++			<&irqc1 12 0>, <&irqc1 13 0>, <&irqc1 14 0>, <&irqc1 15 0>,
++			<&irqc1 16 0>, <&irqc1 17 0>, <&irqc1 18 0>, <&irqc1 19 0>,
++			<&irqc1 20 0>, <&irqc1 21 0>, <&irqc1 22 0>, <&irqc1 23 0>,
++			<&irqc1 24 0>, <&irqc1 25 0>;
++		power-domains = <&pd_c5>;
++	};
++
+ 	thermal at e61f0000 {
+ 		compatible = "renesas,thermal-r8a73a4", "renesas,rcar-thermal";
+ 		reg = <0 0xe61f0000 0 0x14>, <0 0xe61f0100 0 0x38>,
+-- 
+1.9.1
