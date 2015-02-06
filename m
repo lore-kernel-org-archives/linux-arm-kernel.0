@@ -1,34 +1,67 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri,  6 Feb 2015 18:42:47 +0100
-Subject: [PATCH 1/1] ARM: exynos_defconfig: Enable HDMI support
-Message-ID: <1423244567-24463-1-git-send-email-javier.martinez@collabora.co.uk>
+Date: Fri,  6 Feb 2015 18:52:51 +0100
+Subject: [PATCH v2 1/1] ARM: dts: Add mclk entry for Snow and Peach Pit/Pi
+ boards
+Message-ID: <1423245171-25485-1-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many Exynos boards have an HDMI port so enable Exynos DRM HDMI support.
+From: Tushar Behera <tushar.b@samsung.com>
 
+On Snow, Peach Pit and Peach Pi boards, the Exynos SoC XCLKOUT output pin
+provides the master clock (mclk) to codecs. So make them a clock consumer.
+
+Signed-off-by: Tushar Behera <tushar.b@samsung.com>
 Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 ---
 
-Exynos DRM HDMI has some issues that were fixed by Andrzej's [0] series.
-So now is safe to HDMI support for Exynos boards.
+Changes since v1:
+ - Rebased on top of Kukjin's for-next branch since v1 made on top of
+   3.19-rc7 doesn't apply cleanly on that branch. Sorry for the noise.
 
-[0]: https://lkml.org/lkml/2015/2/5/265
+ arch/arm/boot/dts/exynos5250-snow.dts      | 2 ++
+ arch/arm/boot/dts/exynos5420-peach-pit.dts | 2 ++
+ arch/arm/boot/dts/exynos5800-peach-pi.dts  | 2 ++
+ 3 files changed, 6 insertions(+)
 
- arch/arm/configs/exynos_defconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-index 70e5d0bdb4e4..e44da52e5223 100644
---- a/arch/arm/configs/exynos_defconfig
-+++ b/arch/arm/configs/exynos_defconfig
-@@ -120,6 +120,7 @@ CONFIG_REGULATOR_S2MPS11=y
- CONFIG_REGULATOR_S5M8767=y
- CONFIG_REGULATOR_TPS65090=y
- CONFIG_DRM=y
-+CONFIG_DRM_EXYNOS_HDMI=y
- CONFIG_DRM_BRIDGE=y
- CONFIG_DRM_PTN3460=y
- CONFIG_DRM_PS8622=y
+diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+index 5be966df7603..6096d6b02dd8 100644
+--- a/arch/arm/boot/dts/exynos5250-snow.dts
++++ b/arch/arm/boot/dts/exynos5250-snow.dts
+@@ -206,6 +206,8 @@
+ 		samsung,model = "Snow-I2S-MAX98095";
+ 		samsung,i2s-controller = <&i2s0>;
+ 		samsung,audio-codec = <&max98095>;
++		clocks = <&pmu_system_controller 0>;
++		clock-names = "mclk";
+ 	};
+ 
+ 	usb3_vbus_reg: regulator-usb3 {
+diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+index ec86d9523935..1d4db3b0676e 100644
+--- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
++++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+@@ -594,6 +594,8 @@
+ 		interrupt-parent = <&gpx0>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&max98090_irq>;
++		clocks = <&pmu_system_controller 0>;
++		clock-names = "mclk";
+ 	};
+ 
+ 	light-sensor at 44 {
+diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+index 06737c60d333..6f2fc3445bd5 100644
+--- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
++++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+@@ -581,6 +581,8 @@
+ 		interrupt-parent = <&gpx0>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&max98091_irq>;
++		clocks = <&pmu_system_controller 0>;
++		clock-names = "mclk";
+ 	};
+ 
+ 	light-sensor at 44 {
 -- 
 2.1.3
