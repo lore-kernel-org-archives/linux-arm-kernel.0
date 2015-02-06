@@ -1,173 +1,136 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 6 Feb 2015 18:45:44 +0000
-Subject: [PATCHv6 2/5] arm: socfpga: Enable OCRAM ECC on startup.
-In-Reply-To: <1420772036-3112-3-git-send-email-tthayer@opensource.altera.com>
-References: <1420772036-3112-1-git-send-email-tthayer@opensource.altera.com>
- <1420772036-3112-3-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <20150206184544.GC10324@leverpostej>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 06 Feb 2015 10:49:45 -0800
+Subject: cpuidle vs suspend vs something else
+In-Reply-To: <54D43143.2010403@free.fr>
+References: <54D43143.2010403@free.fr>
+Message-ID: <20150206184945.421.74720@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 09, 2015 at 02:53:53AM +0000, tthayer at opensource.altera.com wrote:
-> From: Thor Thayer <tthayer@opensource.altera.com>
+Quoting Mason (2015-02-05 19:13:07)
+> Hello everyone,
 > 
-> This patch enables the ECC for On-Chip RAM on machine
-> startup.  The ECC has to be enabled before data is
-> is stored in memory otherwise the ECC will fail on
-> reads.
+> I've been reading about related sub-systems (cpuidle and suspend)
+> and I'm not sure I understand how they relate / interact.
+> 
+> If I understand correctly (please do point out any misconceptions)
+> on ARM Cortex A9, the first level of power saving is WFI, which is
+> typically called from the idle loop.
+> 
+> This places the core in low-power mode ("Standby mode" in ARM docs).
+> "RAM arrays" (don't know what they are), "processor logic", and
+> "data engine" (not sure what any of these exactly refers to, guess
+> I have more reading to do) are still powered-up, but most of the
+> clocks are disabled.
+> 
+> In ARM's exact words, "WFI and WFE Standby modes disable most of the
+> clocks in a processor, while keeping its logic powered up. This reduces
+> the power drawn to the static leakage current, leaving a tiny clock
+> power overhead requirement to enable the device to wake up."
+> 
+> Some CPUs like Intel's have several levels of sleep (deeper levels
+> mean less power, but have a higher wake-up latency). AFAIU, cpuidle
+> is used to describe and manage these levels?
 
-Where else is this OCRAM used?
+(warning: over-simplification below. Please be kind if you decide to
+blow it up)
 
-If we need the ECC to be enabled before use, a module_init call that
-seems to be unrelated to any other usage doesn't seem right to me.
-Hopefully I've just misunderstood something here.
+Hello Mason,
+
+A critical thing to understand is that you are talking about two classes
+of idle behavior or power-saving behavior.
+
+First there are the physical idle states and low-power states that the
+*hardware* (silicon) can achieve. These vary in how much power they save
+with trade-offs such increased wake-up latency, loss of context/cache,
+etc.
+
+WFI is the gateway to low-power states in ARM hardware (from the
+perspective of the Linux kernel). A plain WFI without any extra steps
+will gate the CPUs clocks. With some extra steps (programming target
+power domain state, etc) then WFI can trigger lower voltages supplied by
+the PMIC/regulators, or total power gating for power domains/island
+resulting in increased energy savings but costlier wake-up time and loss
+of context.
+
+The second behavior is what the *software* (Linux OS) tries to do to
+save power. You mentioned two such behaviors above:
+
+1) CPUidle tries to save power by programming the hardware to a low
+power idle state (see above) during moments of idleness. What is idle
+time? It is when no work is scheduled to be run Right Now and the
+scheduler enters the idle thread/loop. Note that CPUidle does not aim to
+affect the schedulability (new word!) of the Linux scheduler. E.g. it
+ideally should not impact performance, as it is only going to target a
+low power hardware idle state opportunistically based on naturally
+occurring idle time from the scheduler.
+
+2) Suspend is very different from CPUidle. It *forces* idleness upon the
+OS until a wake-up event resumes the OS from suspend. Imagine closing
+the lid on your laptop while it is running. That is suspend. Processes
+are frozen regardless of whether we have lots of work scheduled or not.
+Suspend forces the OS to be idle. Typically this software idleness
+corresponds to the deepest hardware idle state, but it doesn't have to.
+
+That last point is why it is important to understand the different
+between idling in software and idling in hardware. More on that below.
 
 > 
-> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
-> ---
-> v2: Split OCRAM ECC portion separately. Addition of iounmap()
->     and reorganization of gen_pool_free. Remove defconfig from patch.
+> Isn't suspend somewhat like the deepest level of sleep?
+> (Or is it different in that things like RAM state are only a concern
+> for suspend, not cpuidle?)
+>
+
+There is nothing stopping a platform from suspending to RAM and leaving
+everything powered up and only clock gating the CPUs with a WFI. That is
+a brain-dead thing to do but it is possible and illustrates the
+separation of software and hardware idling.
+
+Regarding CPUidle, if you predict that you will be idle for a long
+enough period of time then it is perfectly valid for you to hit your
+deepest sleep state in the CPUidle path.
+
+OMAP3 did this quite well: it had a CHIP OFF state that was utilized
+both by suspend/hibernate as well CPUidle (when CPUidle thought that
+there was sufficient idle time to go to that state without adversely
+affecting performance).
+
+However, these days it does seem more common for suspend to target a
+deeper hardware sleep state than the deepest possible CPUidle state for
+a given platform.
+
+Finally, the idle states (C-states) available to CPUidle drivers in the
+mainline Linux kernel are often a poor representation of what the
+hardware can really do to save power. Look at vendor git tree for
+whatever platform you are hacking on and usually you will see that there
+are lots more C-states in those trees than what is merged upstream.
+Maybe we'll fix that problem some day.
+
+Regards,
+Mike
+
+> Are both subsystems still actively used?
 > 
-> v3/4: No change
+> I saw plans to merge cpufreq into cpuidle / scheduler decisions.
 > 
-> v5: Remove ocram.h, use io.h instead of clk-provider.h
->     Check prop in correct place. Add ECC EN defines.
+> LCA14: LCA14-306: CPUidle & CPUfreq integration with scheduler
+> http://www.slideshare.net/linaroorg/lca14-306-cpuidlecpufreqintegrationwithscheduler
 > 
-> v6: Implement OCRAM discovery changes from community. Add
->     of_node_put(). Remove be32_to_cpup(). Use __init() which
->     allows removal of .init_machine(). Update year in header.
-> ---
->  arch/arm/mach-socfpga/Makefile |    1 +
->  arch/arm/mach-socfpga/ocram.c  |   97 ++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 98 insertions(+)
->  create mode 100644 arch/arm/mach-socfpga/ocram.c
+> This presentation doesn't mention suspend, I think.
 > 
-> diff --git a/arch/arm/mach-socfpga/Makefile b/arch/arm/mach-socfpga/Makefile
-> index 142609e..1552ca5 100644
-> --- a/arch/arm/mach-socfpga/Makefile
-> +++ b/arch/arm/mach-socfpga/Makefile
-> @@ -5,3 +5,4 @@
->  obj-y					:= socfpga.o
->  obj-$(CONFIG_SMP)	+= headsmp.o platsmp.o
->  obj-$(CONFIG_EDAC_ALTERA_L2C) += l2_cache.o
-> +obj-$(CONFIG_EDAC_ALTERA_OCRAM) += ocram.o
-> diff --git a/arch/arm/mach-socfpga/ocram.c b/arch/arm/mach-socfpga/ocram.c
-> new file mode 100644
-> index 0000000..1f12a38
-> --- /dev/null
-> +++ b/arch/arm/mach-socfpga/ocram.c
-> @@ -0,0 +1,97 @@
-> +/*
-> + * Copyright Altera Corporation (C) 2015. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +#include <linux/io.h>
-> +#include <linux/genalloc.h>
-> +#include <linux/module.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_platform.h>
-> +
-> +#define ALTR_OCRAM_CLEAR_ECC          0x00000018
-> +#define ALTR_OCRAM_ECC_EN             0x00000019
-> +
-> +static int __init socfpga_init_ocram_ecc(void)
-> +{
-> +	struct device_node *np;
-> +	struct resource    res;
-> +	u32                iram_addr;
-> +	void __iomem       *mapped_ocr_edac_addr;
-> +	resource_size_t    size;
-> +	struct gen_pool    *gp;
-> +	int                ret;
-> +
-> +	/* Get the size of the on-chip RAM */
-> +	np = of_find_compatible_node(NULL, NULL, "mmio-sram");
-> +	if (!np) {
-> +		pr_err("%s: Unable to find mmio-sram in dtb\n", __func__);
-> +		return -ENODEV;
-> +	}
-> +
-> +	ret = of_address_to_resource(np, 0, &res);
-> +	if (ret) {
-> +		of_node_put(np);
-> +		pr_err("%s: Problem getting SRAM address in dtb\n", __func__);
-> +		return -ENODEV;
-> +	}
-> +	size = resource_size(&res);
-> +	of_node_put(np);
-> +
-> +	/* Find the OCRAM EDAC device tree node */
-> +	np = of_find_compatible_node(NULL, NULL, "altr,ocram-edac");
-> +	if (!np) {
-> +		pr_err("%s: Unable to find altr,ocram-edac\n", __func__);
-> +		return -ENODEV;
-> +	}
-> +
-> +	mapped_ocr_edac_addr = of_iomap(np, 0);
-> +	if (!mapped_ocr_edac_addr) {
-> +		of_node_put(np);
-> +		pr_err("%s: Unable to map OCRAM ecc regs.\n", __func__);
-> +		return -ENODEV;
-> +	}
-> +
-> +	gp = of_get_named_gen_pool(np, "iram", 0);
-> +	if (!gp) {
-> +		of_node_put(np);
-> +		pr_err("%s: OCRAM cannot find gen pool\n", __func__);
-> +		return -ENODEV;
-> +	}
-> +	of_node_put(np);
-> +
-> +	iram_addr = gen_pool_alloc(gp, size / sizeof(size_t));
-
-Why divide by sizeof(size_t) here? As far as I am aware, resource_size
-gives you a size in bytes...
-
-> +	if (iram_addr == 0) {
-> +		pr_err("%s: cannot alloc from gen pool\n", __func__);
-> +		return -ENODEV;
-> +	}
-> +
-> +	/* Clear any pending OCRAM ECC interrupts, then enable ECC */
-> +	writel(ALTR_OCRAM_CLEAR_ECC, mapped_ocr_edac_addr);
-> +	writel(ALTR_OCRAM_ECC_EN, mapped_ocr_edac_addr);
-> +
-> +	memset((void *)iram_addr, 0, size);
-
-...and here we write size bytes, not (size / sizeof(size_t)) bytes, so
-we're poking memory we weren't allocated.
-
-How is this memory mapped exactly? Is memset safe?
-
-Thanks,
-Mark.
-
-> +
-> +	gen_pool_free(gp, iram_addr, size / sizeof(size_t));
-> +
-> +	iounmap(mapped_ocr_edac_addr);
-> +
-> +	return 0;
-> +}
-> +
-> +static void __exit socfpga_exit_ocram_ecc(void)
-> +{
-> +}
-> +
-> +module_init(socfpga_init_ocram_ecc);
-> +module_exit(socfpga_exit_ocram_ecc);
-> -- 
-> 1.7.9.5
+> ARM has a mode called "Dormant Mode". Is suspend typically
+> used to put the SoC in that mode?
 > 
+> I think I need to read this document carefully:
+> Power Management In The Linux Kernel -- Current Status And Future
+> http://events.linuxfoundation.org/sites/events/files/slides/kernel_PM_plain.pdf
+> 
+> There's also an older document that may prove insightful:
+> CPUIdle versus Suspend
+> http://www.linuxplumbersconf.org/2010/ocw/proposals/789
+> 
+> But things move so fast in kernel-land, that I don't know how relevant
+> a 4 year-old document can be.
+> 
+> Regards.
 > 
