@@ -1,65 +1,92 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 6 Feb 2015 10:31:12 +0000
-Subject: [PATCH 3/3] arm64: dts: Add dts files for Hisilicon Hi6220 SoC
-In-Reply-To: <54D4843E.7060201@arm.com>
-References: <1423128277-10297-1-git-send-email-bintian.wang@huawei.com>
- <1423128277-10297-4-git-send-email-bintian.wang@huawei.com>
- <20150205193017.GF20735@leverpostej>
- <CAAS=xmgsuY=c8-n_pDiZjLe2u+SPX7msRje7h0sNkRtT3HLfQA@mail.gmail.com>
- <54D4843E.7060201@arm.com>
-Message-ID: <20150206103111.GA9921@leverpostej>
+From: graeme.gregory@linaro.org (G Gregory)
+Date: Fri, 6 Feb 2015 10:34:21 +0000
+Subject: [PATCH v8 08/21] dt / chosen: Add linux,
+ uefi-stub-generated-dtb property
+In-Reply-To: <20150202163253.GG21175@leverpostej>
+References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
+ <1422881149-8177-9-git-send-email-hanjun.guo@linaro.org>
+ <20150202134033.GR4278@bivouac.eciton.net>
+ <20150202135051.GA3825@xora-haswell.xora.org.uk>
+ <20150202163253.GG21175@leverpostej>
+Message-ID: <CAGCh1+nL7YMXYp42ekWAqmw_m5cy=s_7NszLDAXj=bUr2aZVig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 06, 2015 at 09:07:10AM +0000, Marc Zyngier wrote:
-> On 06/02/15 08:42, Brent Wang wrote:
-> 
-> [...]
-> 
-> >>
-> >>> +                   <0x0 0xf6802000 0x0 0x2000>, /* GICC */
-> >>> +                   <0x0 0xf6804000 0x0 0x2000>, /* GICH */
-> >>> +                   <0x0 0xf6806000 0x0 0x2000>; /* GICV */
-> >>
-> >> I guess no-one's bothered to consider 64k pages?
-> >>
-> >> Given GICH and GICV, I hope that this platform is booted at EL2?
-> > Transfer from EL3 to EL1 directly, keep these two just for future use.
-> 
-> That's a real shame, as it keeps users away from some key aspects of the
-> ARMv8 architecture.
+On 2 February 2015 at 16:32, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Mon, Feb 02, 2015 at 01:50:52PM +0000, Graeme Gregory wrote:
+>> On Mon, Feb 02, 2015 at 01:40:33PM +0000, Leif Lindholm wrote:
+>> > On Mon, Feb 02, 2015 at 08:45:36PM +0800, Hanjun Guo wrote:
+>> > > When system supporting both DT and ACPI but firmware providing
+>> > > no dtb, we can use this linux,uefi-stub-generated-dtb property
+>> > > to let kernel know that we can try ACPI configuration data even
+>> > > if no "acpi=force" is passed in early parameters.
+>> > >
+>> > > CC: Mark Rutland <mark.rutland@arm.com>
+>> > > CC: Jonathan Corbet <corbet@lwn.net>
+>> > > CC: Catalin Marinas <catalin.marinas@arm.com>
+>> > > CC: Will Deacon <will.deacon@arm.com>
+>> > > CC: Leif Lindholm <leif.lindholm@linaro.org>
+>> > > CC: Grant Likely <grant.likely@linaro.org>
+>> > > CC: Matt Fleming <matt.fleming@intel.com>
+>> > > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> > > ---
+>> > >  Documentation/arm/uefi.txt         |  3 +++
+>> > >  arch/arm64/include/asm/acpi.h      |  1 +
+>> > >  arch/arm64/kernel/setup.c          | 30 ++++++++++++++++++++++++++++++
+>> > >  drivers/firmware/efi/libstub/fdt.c |  8 ++++++++
+>> > >  4 files changed, 42 insertions(+)
+>> > >
+>> > > diff --git a/Documentation/arm/uefi.txt b/Documentation/arm/uefi.txt
+>> > > index d60030a..5f86eae 100644
+>> > > --- a/Documentation/arm/uefi.txt
+>> > > +++ b/Documentation/arm/uefi.txt
+>> > > @@ -60,5 +60,8 @@ linux,uefi-mmap-desc-ver  | 32-bit | Version of the mmap descriptor format.
+>> > >  --------------------------------------------------------------------------------
+>> > >  linux,uefi-stub-kern-ver  | string | Copy of linux_banner from build.
+>> > >  --------------------------------------------------------------------------------
+>> > > +linux,uefi-stub-generated-dtb  | bool | Indication for no DTB provided by
+>> > > +                        |      | firmware.
+>> > > +--------------------------------------------------------------------------------
+>> >
+>> > Apologies for the late bikeshedding, but the discussion on this topic
+>> > previsously was lively enough that I thought I'd let it die down a bit
+>> > before seeing if I had anything to add.
+>> >
+>> > That, and I just realised something:
+>> > One alternative to this added DT entry is that we could treat the
+>> > absence of a registered UEFI configuration table as the indication
+>> > that no HW description was provided from firmware, since the stub does
+>> > not call InstallConfigurationTable() on the DT it generates. This does
+>> > move the ability to detect to after efi_init(), but this should be
+>> > fine for ACPI-purposes.
+>> >
+>> That would not work as expected in the kexec/Xen use case though as they
+>> may genuinely boot with DT from an ACPI host without UEFI.
+>
+> I'm a little concerned by this case. How do we intend to pass stuff from
+> Xen to the kernel in this case? When we initially discussed the stub
+> prior to merging, we weren't quite sure if ACPI without UEFI was
+> entirely safe.
+>
+> The linux,uefi-stub-kern-ver property was originally intended as a
+> sanity-check feature to ensure nothing (including Xen) masqueraded as
+> the stub, but for some reason the actual sanity check was never
+> implemented.
+>
+>> > If that is deemed undesirable, I would still prefer Catalin's
+>> > suggested name ("linux,bare-dtb"), which describes the state rather
+>> > than the route we took to get there.
+>> >
+>> I agree.
+>
+> I guess this would be ok, though it would be nice to know which agent
+> generated the DTB.
+>
 
-More importantly (and regardless of whether you wish to use the features
-provided by EL2), booting at EL2 means that the FW/bootloader needs to
-set up far less, and that the kernel can fix up some issues that might
-not be immediately apparent...
+The most obvious scheme then is
 
-[...]
+linux,bare-dtb = "uefi-stub";
 
-> >>> +     timer {
-> >>> +             compatible = "arm,armv8-timer";
-> >>> +             interrupt-parent = <&gic>;
-> >>> +             interrupts = <1 13 0xff08>,
-> >>> +                          <1 14 0xff08>,
-> >>> +                          <1 11 0xff08>,
-> >>> +                          <1 10 0xff08>;
-> >>> +             clock-frequency = <1200000>;
-> >>> +     };
-> >>
-> >> NAK. Fix your firmware to configure CNTFRQ, on all CPUs.
-> > Fix in next version, maybe it will take some time to change firmware.
-> 
-> While you're at it, make sure CNTVOFF_EL2 is set to zero on all CPUs
-> before dropping to EL1. This tends to be overlooked.
+otherwise we generate a new binding for every component in the boot path.
 
-...like differing values of CNTVOFF_EL2.
-
-There seems to be a common misconception that booting at EL2 is a bad
-thing to do, when in reality booting at EL1 is more likely to result in
-bugs we can't work around.
-
-Is there any reason that you do not wish to boot at EL2, or were you
-simply unaware that booting at EL2 was possible/preferred?
-
-Thanks,
-Mark.
+Graeme
