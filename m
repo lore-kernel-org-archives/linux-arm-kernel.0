@@ -1,49 +1,41 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Fri, 6 Feb 2015 09:16:11 +0100
-Subject: [PATCH] drm: atmel-hlcdc: Atomic mode-setting conversion
-In-Reply-To: <20150205163756.74a1bde0@bbrezillon>
-References: <1423081251-11062-1-git-send-email-boris.brezillon@free-electrons.com>
- <20150205130832.GU14009@phenom.ffwll.local>
- <20150205163756.74a1bde0@bbrezillon>
-Message-ID: <20150206081611.GA14009@phenom.ffwll.local>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 6 Feb 2015 00:27:16 -0800
+Subject: [GIT PULL 1/2] soc: ti: Keystone Navigator SOC driver updates
+ for 3.20
+In-Reply-To: <1422910993-4634-1-git-send-email-santosh.shilimkar@oracle.com>
+References: <1422910993-4634-1-git-send-email-santosh.shilimkar@oracle.com>
+Message-ID: <20150206082716.GF23582@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 05, 2015 at 04:37:56PM +0100, Boris Brezillon wrote:
-> On Thu, 5 Feb 2015 14:08:32 +0100
-> Daniel Vetter <daniel@ffwll.ch> wrote:
+On Mon, Feb 02, 2015 at 01:03:12PM -0800, Santosh Shilimkar wrote:
+> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
 > 
-> > On Wed, Feb 04, 2015 at 09:20:51PM +0100, Boris Brezillon wrote:
-> > > Convert the HLCDC driver to atomic mode-setting.
-> > > 
-> > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > 
-> > Just a quick comment: dpms isn't yet converted over, and from experience
-> > with tegra/msm that probably will yield some surprises. Since only with
-> > dpms will it be obvious how strict the added requirements from the atomic
-> > helpers are ;-)
+>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
 > 
-> Yes, I noticed I was not using the appropriate dpms helper in the
-> connector funcs just after sending this patch.
+> are available in the git repository at:
 > 
-> Would this patch [1] address what you're talking about, or am I still
-> missing something ?
+>   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/drivers-soc-ti
 > 
-> Thanks,
+> for you to fetch changes up to a68094c67bf1fa86630bd011d2d212899c41e1bc:
 > 
-> Boris
+>   soc: ti: knav_qmss_queue: change knav_range_setup_acc_irq to static (2015-01-29 13:23:51 -0800)
 > 
-> [1]http://code.bulix.org/l70xf4-87827
+> ----------------------------------------------------------------
+> Keystone Navigator SOC driver updates for 3.20
+> 
+> 	- Makefile tweak so that knav_qmss and knav_dma can be made loadable
+> 		modules without depedency issues.
+> 	- Few more exports to support ARM allmodconfig.
+> 	- Marking knav_range_setup_acc_irq() local function as static.
+> 
+> ----------------------------------------------------------------
+> Murali Karicheri (3):
+>       soc: ti: knav_qmss_queue: export API calls for use by user driver
+>       soc: ti: knav_qmss_queue: makefile tweak to build as dynamic module
+>       soc: ti: knav_qmss_queue: change knav_range_setup_acc_irq to static
 
-You should be able to bin all your dpms implementations too, at least if
-you switch to the new enable/disable hooks for crtc/encoder.
-prepare/commit/dpms are all depcrecated (for both crtc and encoder) and
-shouldn't be needed any more.  Same with crtc_funcs->mode_set.
+Merged, thanks.
 
-But yeah the functional change should be all there is, if it still works
-you're all set.
--Daniel
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+
+-Olof
