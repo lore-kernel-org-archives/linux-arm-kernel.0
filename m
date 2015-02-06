@@ -1,37 +1,31 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri,  6 Feb 2015 16:33:09 +0100
-Subject: [PATCH] drm: atmel-hlcdc: reset layer A2Q and UPDATE bits when
- disabling it
-Message-ID: <1423236789-6859-1-git-send-email-boris.brezillon@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 6 Feb 2015 15:34:59 +0000
+Subject: [PATCH] arm64: Change 'Call trace' to 'Call Trace' for tool
+ scanners
+In-Reply-To: <1423157427-41997-1-git-send-email-ddutile@redhat.com>
+References: <1423157427-41997-1-git-send-email-ddutile@redhat.com>
+Message-ID: <20150206153459.GE23190@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A2Q (Add To Queue) and UPDATE bits are left in their previous state
-when resetting the layer.
-This lead to weird behavior when enabling the plane again: the framebuffer
-previously queued is dequeued and we end up with access to an old memory
-region.
+On Thu, Feb 05, 2015 at 05:30:27PM +0000, Donald Dutile wrote:
+> Receiving reports from service folks that arm64 uses
+> 'Call trace' when dumping stack, instead of the more familiar
+> 'Call Trace'; the former is not being seen by tools that
+> scan for the latter text.  Checking various arches,
+> it appears the mainstream server arches (ia64, mips, ppc,
+> s390, sparc, x86) use 'Call Trace'.
+> This kernel tools script scans for the latter text string as well
+>   tools/testing/selftests/rcutorture/bin/parse-console.sh
+> so it doesn't appear to be arch or vendor specific.
+> 
+> Expecting there aren't a significant number of arm64 dump
+> scanners matching on 'Call trace' so recommend making this change
+> now to minimize changes to dump scanning tools for arm64 servers.
 
-Reset those bits when resetting the channel.
+Can you not fix the scripts to check for "Call trace" as well? There are
+4 more architectures in the kernel using this string (avr32, c6x, metag,
+sh). I also wouldn't count kernel logs as user ABI.
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.c
-index 063d2a7..e79bd9b 100644
---- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.c
-+++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.c
-@@ -311,7 +311,8 @@ int atmel_hlcdc_layer_disable(struct atmel_hlcdc_layer *layer)
- 
- 	/* Disable the layer */
- 	regmap_write(regmap, desc->regs_offset + ATMEL_HLCDC_LAYER_CHDR,
--		     ATMEL_HLCDC_LAYER_RST);
-+		     ATMEL_HLCDC_LAYER_RST | ATMEL_HLCDC_LAYER_A2Q |
-+		     ATMEL_HLCDC_LAYER_UPDATE);
- 
- 	/* Clear all pending interrupts */
- 	regmap_read(regmap, desc->regs_offset + ATMEL_HLCDC_LAYER_ISR, &isr);
 -- 
-1.9.1
+Catalin
