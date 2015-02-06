@@ -1,133 +1,47 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 6 Feb 2015 14:48:35 +0200
-Subject: [PATCH 1/2] ARM: omap2+: omap_hwmod: Use _nested version of spinlock
- for oh->_lock
-In-Reply-To: <1423226916-18804-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1423226916-18804-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1423226916-18804-2-git-send-email-peter.ujfalusi@ti.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Fri, 6 Feb 2015 20:55:12 +0800
+Subject: Recommendations for a new MFD device driver?
+In-Reply-To: <20150206115418.GV21293@sirena.org.uk>
+References: <20150206101006.GK12209@pengutronix.de>
+ <20150206115418.GV21293@sirena.org.uk>
+Message-ID: <1423227312.31210.286.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add lockdep_class member to struct omap_hwmod and use this number to
-specify the subclass of the given hwmod's lock.
-When defining the hwmods the lockdep_level can be initialized to indicate
-that this lock might be used in a nested fashion.
-DRA7x's ATL hwmod is one example for this since McASP can select ATL clock
-as functional clock, which will trigger nested oh->_lock usage. This will
-trigger false warning from lockdep validator since it is dealing with
-classes and for it all hwmod clocks are the same class.
+On Fri, 2015-02-06 at 11:54 +0000, Mark Brown wrote:
+> On Fri, Feb 06, 2015 at 11:10:06AM +0100, Sascha Hauer wrote:
+> 
+> > 1) Put it into the RTC device driver.
+> > 2) Put it into the .resource field of struct mfd_cell
+> > 3) Put it into the device tree using standard reg, interrupt properties and
+> >    a) Let the RTC driver interpret these
+> >    b) Let the MFD driver create resources in the .resource field of struct
+> >       mfd_cell
+> >    c) Let the MFD core create the resources
+> 
+> > I have a tendency to 3, but I'm afraid that the resource informations
+> > are duplicated too much in the device tree source files, because every
+> > user would have to carry a full description of the mfd device. Maybe
+> > that duplication could be reduced with some CPP magic, I don't know.
+> 
+> > Maybe this is a solved problem and I'm just not picking a good example
+> > from drivers/mfd.
+> 
+> The wm831x drivers take option 2 but are pre-DT, it still seems the most
+> sensible thing to me though - no need for the user to have to repeat
+> this information in every DT and easy to add new stuff if we need it.
+> You could use a .dtsi like we use for SoCs to reduce the duplication
+> required if you do decide to put things in the DT.
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod.c | 16 ++++++++--------
- arch/arm/mach-omap2/omap_hwmod.h |  5 +++++
- 2 files changed, 13 insertions(+), 8 deletions(-)
+Hi,
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 92afb723dcfc..b5afde560054 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -3334,7 +3334,7 @@ int omap_hwmod_enable(struct omap_hwmod *oh)
- 	if (!oh)
- 		return -EINVAL;
- 
--	spin_lock_irqsave(&oh->_lock, flags);
-+	spin_lock_irqsave_nested(&oh->_lock, flags, oh->lockdep_class);
- 	r = _enable(oh);
- 	spin_unlock_irqrestore(&oh->_lock, flags);
- 
-@@ -3355,7 +3355,7 @@ int omap_hwmod_idle(struct omap_hwmod *oh)
- 	if (!oh)
- 		return -EINVAL;
- 
--	spin_lock_irqsave(&oh->_lock, flags);
-+	spin_lock_irqsave_nested(&oh->_lock, flags, oh->lockdep_class);
- 	_idle(oh);
- 	spin_unlock_irqrestore(&oh->_lock, flags);
- 
-@@ -3377,7 +3377,7 @@ int omap_hwmod_shutdown(struct omap_hwmod *oh)
- 	if (!oh)
- 		return -EINVAL;
- 
--	spin_lock_irqsave(&oh->_lock, flags);
-+	spin_lock_irqsave_nested(&oh->_lock, flags, oh->lockdep_class);
- 	_shutdown(oh);
- 	spin_unlock_irqrestore(&oh->_lock, flags);
- 
-@@ -3667,7 +3667,7 @@ int omap_hwmod_enable_wakeup(struct omap_hwmod *oh)
- 	unsigned long flags;
- 	u32 v;
- 
--	spin_lock_irqsave(&oh->_lock, flags);
-+	spin_lock_irqsave_nested(&oh->_lock, flags, oh->lockdep_class);
- 
- 	if (oh->class->sysc &&
- 	    (oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP)) {
-@@ -3700,7 +3700,7 @@ int omap_hwmod_disable_wakeup(struct omap_hwmod *oh)
- 	unsigned long flags;
- 	u32 v;
- 
--	spin_lock_irqsave(&oh->_lock, flags);
-+	spin_lock_irqsave_nested(&oh->_lock, flags, oh->lockdep_class);
- 
- 	if (oh->class->sysc &&
- 	    (oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP)) {
-@@ -3735,7 +3735,7 @@ int omap_hwmod_assert_hardreset(struct omap_hwmod *oh, const char *name)
- 	if (!oh)
- 		return -EINVAL;
- 
--	spin_lock_irqsave(&oh->_lock, flags);
-+	spin_lock_irqsave_nested(&oh->_lock, flags, oh->lockdep_class);
- 	ret = _assert_hardreset(oh, name);
- 	spin_unlock_irqrestore(&oh->_lock, flags);
- 
-@@ -3762,7 +3762,7 @@ int omap_hwmod_deassert_hardreset(struct omap_hwmod *oh, const char *name)
- 	if (!oh)
- 		return -EINVAL;
- 
--	spin_lock_irqsave(&oh->_lock, flags);
-+	spin_lock_irqsave_nested(&oh->_lock, flags, oh->lockdep_class);
- 	ret = _deassert_hardreset(oh, name);
- 	spin_unlock_irqrestore(&oh->_lock, flags);
- 
-@@ -3836,7 +3836,7 @@ int omap_hwmod_set_postsetup_state(struct omap_hwmod *oh, u8 state)
- 	    state != _HWMOD_STATE_IDLE)
- 		return -EINVAL;
- 
--	spin_lock_irqsave(&oh->_lock, flags);
-+	spin_lock_irqsave_nested(&oh->_lock, flags, oh->lockdep_class);
- 
- 	if (oh->_state != _HWMOD_STATE_REGISTERED) {
- 		ret = -EINVAL;
-diff --git a/arch/arm/mach-omap2/omap_hwmod.h b/arch/arm/mach-omap2/omap_hwmod.h
-index 9d4bec6ee742..260d3e9c9f6d 100644
---- a/arch/arm/mach-omap2/omap_hwmod.h
-+++ b/arch/arm/mach-omap2/omap_hwmod.h
-@@ -606,6 +606,9 @@ struct omap_hwmod_link {
- 	struct list_head		node;
- };
- 
-+#define HWMOD_LOCKDEP_SUBCLASS_NORMAL	0
-+#define HWMOD_LOCKDEP_SUBCLASS_CLASS1	1	/* might be used as nested */
-+
- /**
-  * struct omap_hwmod - integration data for OMAP hardware "modules" (IP blocks)
-  * @name: name of the hwmod
-@@ -632,6 +635,7 @@ struct omap_hwmod_link {
-  * @_postsetup_state: internal-use state to leave the hwmod in after _setup()
-  * @flags: hwmod flags (documented below)
-  * @_lock: spinlock serializing operations on this hwmod
-+ * @lockdep_class: subclass to use with spin_lock_irqsave_nested()
-  * @node: list node for hwmod list (internal use)
-  * @parent_hwmod: (temporary) a pointer to the hierarchical parent of this hwmod
-  *
-@@ -674,6 +678,7 @@ struct omap_hwmod {
- 	u32				_sysc_cache;
- 	void __iomem			*_mpu_rt_va;
- 	spinlock_t			_lock;
-+	unsigned int			lockdep_class;
- 	struct list_head		node;
- 	struct omap_hwmod_ocp_if	*_mpu_port;
- 	unsigned int			(*xlate_irq)(unsigned int);
--- 
-2.2.2
+I think we should create a dtsi file, say mt6397.dtsi, the regulator
+device nodes are already too much to duplicate into every board using
+mt6397.
+
+But a new problem is where should we put it? MT6397 is used in both
+mt8135-evbp1(armv7) & mt8173-evb(armv8) boards, so they both need
+mt6397.dtsi. Should we put them in include/dt-bindings to avoid
+duplicate it into both arch/arm/boot/dts and arch/arm64/boot/dts?
+
+Joe.C
