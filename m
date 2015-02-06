@@ -1,82 +1,89 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 06 Feb 2015 21:14:22 +0100
-Subject: Continuing kallsyms failures - large kernels, XIP kernels, and
- large XIP kernels
-In-Reply-To: <20150204094414.GC8656@n2100.arm.linux.org.uk>
-References: <20150130145642.GK26493@n2100.arm.linux.org.uk>
- <20150130153414.GM26493@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1501301224180.1322@knanqh.ubzr>
- <20150131002253.GR26493@n2100.arm.linux.org.uk>
- <20150204000307.GA8656@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1502032054460.1322@knanqh.ubzr>
- <20150204094414.GC8656@n2100.arm.linux.org.uk>
-Message-ID: <ab203441a4046ecb67a090c6b2d79c56@agner.ch>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Fri, 6 Feb 2015 15:15:20 -0500
+Subject: [PATCH] of: calculate masks of the device based on dma-range size
+Message-ID: <1423253720-2785-1-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-02-04 10:44, Russell King - ARM Linux wrote:
-> On Tue, Feb 03, 2015 at 08:59:15PM -0500, Nicolas Pitre wrote:
->> On Wed, 4 Feb 2015, Russell King - ARM Linux wrote:
->>
->> > It looks like we have cases where this falsely triggers.  Consider EFM32:
->> >
->> > CONFIG_DRAM_BASE=0x88000000
->> > CONFIG_DRAM_SIZE=0x00400000
->> > CONFIG_FLASH_MEM_BASE=0x8c000000
->> > CONFIG_FLASH_SIZE=0x01000000
->> >
->> > This means that we quite legally end up with the .data section below the
->> > .text section, which makes:
->> >
->> > ASSERT((_data >= __data_loc), "Text section oversize")
->> >
->> > falsely trigger.
->> >
->> > The linker has the capacity to specify regions of ROM and RAM in the
->> > linker file, I wonder if we should be using those for XIP.  Merely
->> > adding the MEMORY table to the linker file is not good enough - we
->> > also need to explicitly tell the linker which memory regions to place
->> > the output sections, otherwise the linker ends up making assumptions.
->> >
->> > What that means is... asm-generic/vmlinux.lds.h breaks for us.
->> >
->> > Any ideas?  I think using the MEMORY table would be the best approach,
->> > because that should allow us to properly verify that the resulting
->> > binary should fit in the memory regions.
->>
->> Maybe simply having an assert() on the size of the .text section could
->> be all that is needed.  We already know the maximum size in advance.
-> 
-> That doesn't work, it's not just the .text section but also .rodata,
-> __bug_table, __ksymtab, __ksymtab_gpl, __kcrctab, __kcrctab_gpl,
-> __ksymtab_strings, __param, __modver, __ex_table, .notes, .vectors,
-> .stubs, .init.text, maybe .exit.text, .init.arch.info, .init.tagtable,
-> .init.smpalt, .init.pv_table, and apparently .init.data (which is
-> surely wrong?)  The following is from Arnd's failing configuration:
-> 
->  18 .init.tagtable 00000040  80073a9c  80073a9c  0100ba9c  2**2
->                   CONTENTS, ALLOC, LOAD, READONLY, DATA
->  19 .init.data    000010e8  80073adc  80073adc  0100badc  2**2
->                   CONTENTS, ALLOC, LOAD, DATA
->  20 .data         003552c4  80008000  80074bc4  01010000  2**8
->                   CONTENTS, ALLOC, LOAD, DATA
-> 
-> Hmm, if .init.data is contained in the flash section (which it seemingly
-> is), it seems that XIP support is currently broken - that section is
-> definitely a read/write section.  No one has seemingly noticed that it's
-> broken and it's been broken for a long time, so maybe the simple answer
-> then is just to rip XIP support out?
+This patch update of_dma_configure() API to calculate the
+masks (dma_mask and coherent_dma_mask) based on the dma-range
+values set in DT for the device. Also limit the mask to lower
+of the default mask and mask calculated.
 
-Hi Russell,
+Cc: Joerg Roedel <joro@8bytes.org>
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 
-I noticed that kallsyms resolution fails with XIP kernel in my patchset
-to support Vybrids Cortex-M4, see
-http://article.gmane.org/gmane.linux.drivers.devicetree/101196
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+---
+ drivers/of/device.c |   27 ++++++++++++++++++++-------
+ 1 file changed, 20 insertions(+), 7 deletions(-)
 
-Fwiw, although that platform has enough memory to use a normal kernel
-too, the Cortex-M4 architecture has a dedicated code bus. I used the XIP
-kernel to make use of the code bus for the kernel code at least.
-However, there might be better ways to archive this.
-
---
-Stefan  
+diff --git a/drivers/of/device.c b/drivers/of/device.c
+index 314c8a9..44209fa 100644
+--- a/drivers/of/device.c
++++ b/drivers/of/device.c
+@@ -83,17 +83,18 @@ int of_device_add(struct platform_device *ofdev)
+  */
+ void of_dma_configure(struct device *dev, struct device_node *np)
+ {
+-	u64 dma_addr, paddr, size;
++	u64 dma_addr = 0, paddr, size;
+ 	int ret;
+ 	bool coherent;
+-	unsigned long offset;
++	unsigned long offset = 0;
+ 	struct iommu_ops *iommu;
+ 
+ 	/*
+ 	 * Set default dma-mask to 32 bit. Drivers are expected to setup
+ 	 * the correct supported dma_mask.
+ 	 */
+-	dev->coherent_dma_mask = DMA_BIT_MASK(32);
++	if (!dev->coherent_dma_mask)
++		dev->coherent_dma_mask = DMA_BIT_MASK(32);
+ 
+ 	/*
+ 	 * Set it to coherent_dma_mask by default if the architecture
+@@ -102,11 +103,14 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+ 	if (!dev->dma_mask)
+ 		dev->dma_mask = &dev->coherent_dma_mask;
+ 
++	/*
++	 * Set default size to cover the 32-bit. Drivers are expected to setup
++	 * the correct size and dma_mask.
++	 */
++	size = 1ULL << 32;
++
+ 	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
+-	if (ret < 0) {
+-		dma_addr = offset = 0;
+-		size = dev->coherent_dma_mask + 1;
+-	} else {
++	if (!ret) {
+ 		offset = PFN_DOWN(paddr - dma_addr);
+ 
+ 		/*
+@@ -128,6 +132,15 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+ 
+ 	dev->dma_pfn_offset = offset;
+ 
++	/*
++	 * Limit coherent and dma mask based on size and default mask
++	 * set by the driver.
++	 */
++	dev->coherent_dma_mask = min(dev->coherent_dma_mask,
++				     DMA_BIT_MASK(ilog2(dma_addr + size)));
++	*dev->dma_mask = min((*dev->dma_mask),
++			     DMA_BIT_MASK(ilog2(dma_addr + size)));
++
+ 	coherent = of_dma_is_coherent(np);
+ 	dev_dbg(dev, "device is%sdma coherent\n",
+ 		coherent ? " " : " not ");
+-- 
+1.7.9.5
