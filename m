@@ -1,42 +1,52 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 6 Feb 2015 11:53:35 -0600
-Subject: [PATCH v6 0/7] PCI: get DMA configuration from parent device
-In-Reply-To: <54D4DD95.7000303@ti.com>
-References: <1423173179-10227-1-git-send-email-m-karicheri2@ti.com>
- <20150206151542.GD23190@e104818-lin.cambridge.arm.com>
- <54D4DD95.7000303@ti.com>
-Message-ID: <CAErSpo6GOXHeKKfU8s5jCS3+Mui=HupZd=jpkLEyWAE94Ory5w@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri,  6 Feb 2015 19:04:04 +0100
+Subject: [PATCH] ARM: mvebu: Disable CPU Idle on Armada 38x
+Message-ID: <1423245844-28701-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 6, 2015 at 9:28 AM, Murali Karicheri <m-karicheri2@ti.com> wrote:
-> On 02/06/2015 10:15 AM, Catalin Marinas wrote:
->>
->> On Thu, Feb 05, 2015 at 09:52:52PM +0000, Murali Karicheri wrote:
->>>
->>> This patch add an important capability to PCI driver on Keystone. I hope
->>> to
->>> have this merged to the upstream branch so that it is available for
->>> v3.20.
->>
->> It's very late for 3.20 and the code hasn't been in linux-next at all
->> (but it's not me who's merging this code), unless you can squeeze it in
->> as a bug-fix.
->
-> This is in fact a bug fix as PCI on Keystone is broken without this.
+On Armada 38x SoCs, under heavy I/O load, the system hangs when CPU
+Idle is enabled. Waiting for a solution to this issue, this patch
+disables the CPU Idle support for this SoC.
 
-Oh, sorry, I didn't realize that this was so urgent.  I guess I read
-"this adds an important capability" in the cover letter and concluded
-that it was new functionality.
+As CPU Hot plug support also uses some of the CPU Idle functions it is
+also affected by the same issue. This patch disables it also for the
+Armada 38x SoCs.
 
-Anyway, if it's broken, presumably PCI on Keystone *did* work at one
-point.  Can you identify the commit that broke it and requires these
-fixes, so we can figure out how far the fixes need to be backported?
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Cc: <stable@vger.kernel.org> # v3.17 +
+---
+ arch/arm/mach-mvebu/pmsu.c | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
 
-If I merge it, I would like to get into my for-linus branch and get a
-little time in -next before asking Linus to pull it.  The merge window
-is a little wrinkle there -- I don't like to add new things to the mix
-during the window.  But if it's an important fix we can still get it
-in before the final v3.20.
-
-Bjorn
+diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+index d8ab605a44fa..05c8625bbc40 100644
+--- a/arch/arm/mach-mvebu/pmsu.c
++++ b/arch/arm/mach-mvebu/pmsu.c
+@@ -476,12 +476,22 @@ static int __init mvebu_v7_cpu_pm_init(void)
+ 		return 0;
+ 	of_node_put(np);
+ 
++	/*
++	 * Currently the CPU Idle support for Armada 38x is broken, as
++	 * the CPU Hotplug uses some of the CPU Idle functions it is
++	 * broken too, so let's disable it
++	 */
++	if (of_machine_is_compatible("marvell,armada380")) {
++		cpu_hotplug_disable();
++		pr_warn("CPU Hotplug support is currently broken on Armada 38x: disabling");
++	}
++
+ 	if (of_machine_is_compatible("marvell,armadaxp"))
+ 		ret = armada_xp_cpuidle_init();
+ 	else if (of_machine_is_compatible("marvell,armada370"))
+ 		ret = armada_370_cpuidle_init();
+-	else if (of_machine_is_compatible("marvell,armada380"))
+-		ret = armada_38x_cpuidle_init();
++	else if (of_machine_is_compatible("marvell,armada380")
++		 pr_warn("CPU Idle is currently broken on Armada 38x: disabling");
+ 	else
+ 		return 0;
+ 
+-- 
+2.1.0
