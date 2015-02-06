@@ -1,92 +1,67 @@
-From: graeme.gregory@linaro.org (G Gregory)
-Date: Fri, 6 Feb 2015 10:34:21 +0000
-Subject: [PATCH v8 08/21] dt / chosen: Add linux,
- uefi-stub-generated-dtb property
-In-Reply-To: <20150202163253.GG21175@leverpostej>
-References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
- <1422881149-8177-9-git-send-email-hanjun.guo@linaro.org>
- <20150202134033.GR4278@bivouac.eciton.net>
- <20150202135051.GA3825@xora-haswell.xora.org.uk>
- <20150202163253.GG21175@leverpostej>
-Message-ID: <CAGCh1+nL7YMXYp42ekWAqmw_m5cy=s_7NszLDAXj=bUr2aZVig@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 6 Feb 2015 10:36:53 +0000
+Subject: [Linaro-acpi] [PATCH v8 02/21] acpi: fix acpi_os_ioremap for arm64
+In-Reply-To: <CAKv+Gu922UwYRN7ZgFNTR7yGGKPLTU8Us7KbvXX-Q8=rqLKNog@mail.gmail.com>
+References: <1422984576.18187.82.camel@deneb.redhat.com>
+ <20150204112508.GB26006@e104818-lin.cambridge.arm.com>
+ <1423066107.18187.99.camel@deneb.redhat.com>
+ <20150204175734.GI26006@e104818-lin.cambridge.arm.com>
+ <1423076294.18187.103.camel@deneb.redhat.com>
+ <20150205104149.GA18158@e104818-lin.cambridge.arm.com>
+ <1423144447.18187.110.camel@deneb.redhat.com>
+ <54D39D6B.5090304@linaro.org>
+ <20150205174826.GD21970@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu922UwYRN7ZgFNTR7yGGKPLTU8Us7KbvXX-Q8=rqLKNog@mail.gmail.com>
+Message-ID: <20150206103653.GA23190@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 February 2015 at 16:32, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Mon, Feb 02, 2015 at 01:50:52PM +0000, Graeme Gregory wrote:
->> On Mon, Feb 02, 2015 at 01:40:33PM +0000, Leif Lindholm wrote:
->> > On Mon, Feb 02, 2015 at 08:45:36PM +0800, Hanjun Guo wrote:
->> > > When system supporting both DT and ACPI but firmware providing
->> > > no dtb, we can use this linux,uefi-stub-generated-dtb property
->> > > to let kernel know that we can try ACPI configuration data even
->> > > if no "acpi=force" is passed in early parameters.
->> > >
->> > > CC: Mark Rutland <mark.rutland@arm.com>
->> > > CC: Jonathan Corbet <corbet@lwn.net>
->> > > CC: Catalin Marinas <catalin.marinas@arm.com>
->> > > CC: Will Deacon <will.deacon@arm.com>
->> > > CC: Leif Lindholm <leif.lindholm@linaro.org>
->> > > CC: Grant Likely <grant.likely@linaro.org>
->> > > CC: Matt Fleming <matt.fleming@intel.com>
->> > > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> > > ---
->> > >  Documentation/arm/uefi.txt         |  3 +++
->> > >  arch/arm64/include/asm/acpi.h      |  1 +
->> > >  arch/arm64/kernel/setup.c          | 30 ++++++++++++++++++++++++++++++
->> > >  drivers/firmware/efi/libstub/fdt.c |  8 ++++++++
->> > >  4 files changed, 42 insertions(+)
->> > >
->> > > diff --git a/Documentation/arm/uefi.txt b/Documentation/arm/uefi.txt
->> > > index d60030a..5f86eae 100644
->> > > --- a/Documentation/arm/uefi.txt
->> > > +++ b/Documentation/arm/uefi.txt
->> > > @@ -60,5 +60,8 @@ linux,uefi-mmap-desc-ver  | 32-bit | Version of the mmap descriptor format.
->> > >  --------------------------------------------------------------------------------
->> > >  linux,uefi-stub-kern-ver  | string | Copy of linux_banner from build.
->> > >  --------------------------------------------------------------------------------
->> > > +linux,uefi-stub-generated-dtb  | bool | Indication for no DTB provided by
->> > > +                        |      | firmware.
->> > > +--------------------------------------------------------------------------------
->> >
->> > Apologies for the late bikeshedding, but the discussion on this topic
->> > previsously was lively enough that I thought I'd let it die down a bit
->> > before seeing if I had anything to add.
->> >
->> > That, and I just realised something:
->> > One alternative to this added DT entry is that we could treat the
->> > absence of a registered UEFI configuration table as the indication
->> > that no HW description was provided from firmware, since the stub does
->> > not call InstallConfigurationTable() on the DT it generates. This does
->> > move the ability to detect to after efi_init(), but this should be
->> > fine for ACPI-purposes.
->> >
->> That would not work as expected in the kexec/Xen use case though as they
->> may genuinely boot with DT from an ACPI host without UEFI.
->
-> I'm a little concerned by this case. How do we intend to pass stuff from
-> Xen to the kernel in this case? When we initially discussed the stub
-> prior to merging, we weren't quite sure if ACPI without UEFI was
-> entirely safe.
->
-> The linux,uefi-stub-kern-ver property was originally intended as a
-> sanity-check feature to ensure nothing (including Xen) masqueraded as
-> the stub, but for some reason the actual sanity check was never
-> implemented.
->
->> > If that is deemed undesirable, I would still prefer Catalin's
->> > suggested name ("linux,bare-dtb"), which describes the state rather
->> > than the route we took to get there.
->> >
->> I agree.
->
-> I guess this would be ok, though it would be nice to know which agent
-> generated the DTB.
->
+On Thu, Feb 05, 2015 at 10:16:03PM +0000, Ard Biesheuvel wrote:
+> On 5 February 2015 at 17:48, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Thu, Feb 05, 2015 at 04:42:19PM +0000, Al Stone wrote:
+> >> On 02/05/2015 06:54 AM, Mark Salter wrote:
+> >> > On Thu, 2015-02-05 at 10:41 +0000, Catalin Marinas wrote:
+> >> >> On Wed, Feb 04, 2015 at 06:58:14PM +0000, Mark Salter wrote:
+> >> >>> On Wed, 2015-02-04 at 17:57 +0000, Catalin Marinas wrote:
+> >> >>>> On Wed, Feb 04, 2015 at 04:08:27PM +0000, Mark Salter wrote:
+> >> >>>>> acpi_os_remap() is used to map ACPI tables. These tables may be in ram
+> >> >>>>> which are already included in the kernel's linear RAM mapping. So we
+> >> >>>>> need ioremap_cache to avoid two mappings to the same physical page
+> >> >>>>> having different caching attributes.
+> >> >>>>
+> >> >>>> What's the call path to acpi_os_ioremap() on such tables already in the
+> >> >>>> linear mapping? I can see an acpi_map() function which already takes
+> >> >>>> care of the RAM mapping case but there are other cases where
+> >> >>>> acpi_os_ioremap() is called directly. For example,
+> >> >>>> acpi_os_read_memory(), can it be called on both RAM and I/O?
+> >> >>>
+> >> >>> acpi_map() is the one I've seen.
+> >> >>
+> >> >> By default, if should_use_kmap() is not patched for arm64, it translates
+> >> >> to page_is_ram(); acpi_map() would simply use a kmap() which returns the
+> >> >> current kernel linear mapping on arm64.
+> >> >
+> >> > The problem with kmap() is that it only maps a single page. I've seen
+> >> > tables over 4k which is why I patched acpi_map() not to use kmap() on
+> >> > arm64.
+> >>
+> >> Right.  Mark replied to this before I could; using kmap() enforced a 4k
+> >> (one page) limit that we kept breaking with some ACPI tables being larger
+> >> than that (DSDTs and SSDTs, fwiw).  This would lead to some very odd behaviors
+> >> when most but not all of a device definition was within the page; using the
+> >> table checksums was one way of detecting the issues.
+> >
+> > OK. So I think Mark's original patch was ok, assuming that the System
+> > Memory cases mentioned by Graeme are detected with page_is_ram().
+> 
+> page_is_ram() returns whether a pfn is covered by the linear mapping,
+> so memory before the kernel or after a mem= limit will be
+> misidentified.
 
-The most obvious scheme then is
+OK. So in conclusion acpi_os_ioremap() may need to create a cacheable
+mapping even when !page_is_ram() but it has no way of knowing that
+unless we change the core ACPI code to differentiate between
+ioremap_cache and ioremap_nocache. Did I get it right?
 
-linux,bare-dtb = "uefi-stub";
-
-otherwise we generate a new binding for every component in the boot path.
-
-Graeme
+-- 
+Catalin
