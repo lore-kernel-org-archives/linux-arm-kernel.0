@@ -1,35 +1,65 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 6 Feb 2015 15:20:33 +0100
-Subject: Continuing kallsyms failures - large kernels, XIP kernels, and
- large XIP kernels
-In-Reply-To: <20150205084323.GS10842@pengutronix.de>
-References: <20150130145642.GK26493@n2100.arm.linux.org.uk>
- <20150130153414.GM26493@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1501301224180.1322@knanqh.ubzr>
- <20150131002253.GR26493@n2100.arm.linux.org.uk>
- <20150204000307.GA8656@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1502032054460.1322@knanqh.ubzr>
- <20150204094414.GC8656@n2100.arm.linux.org.uk>
- <20150205084323.GS10842@pengutronix.de>
-Message-ID: <20150206142033.GB10842@pengutronix.de>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 06 Feb 2015 15:23:50 +0100
+Subject: [PATCH] pinctrl: pinctrl-imx: don't use invalid value of
+ =?UTF-8?Q?conf=5Freg?=
+In-Reply-To: <CACRpkdYXW5X7bSiRPTC3uHT=s+hjxj+jS0YJCBWrcmzHWkpqHg@mail.gmail.com>
+References: <1422399025-25636-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CACRpkdbtpGU57-tPn9Z0rNvY4zLk+QE6A9Pd87vLUHOmRiB2yg@mail.gmail.com>
+ <20150203190141.GE10842@pengutronix.de>
+ <CACRpkdYXW5X7bSiRPTC3uHT=s+hjxj+jS0YJCBWrcmzHWkpqHg@mail.gmail.com>
+Message-ID: <8c67105fcfe76ae1dd86e8c65954275d@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+On 2015-02-05 14:53, Linus Walleij wrote:
+> On Tue, Feb 3, 2015 at 8:01 PM, Uwe Kleine-K?nig
+> <u.kleine-koenig@pengutronix.de> wrote:
+>> On Tue, Feb 03, 2015 at 02:01:09PM +0100, Linus Walleij wrote:
+>>> On Tue, Jan 27, 2015 at 11:50 PM, Uwe Kleine-K?nig
+>>> <u.kleine-koenig@pengutronix.de> wrote:
+>>>
+>>> > The right check for conf_reg to be invalid it testing against -1 not 0
+>>> > as is done in the rest of the driver.
+>>> >
+>>> > This fixes an oops that can be triggered by:
+>>> >
+>>> >         cat /sys/kernel/debug/pinctrl/43fac000.iomuxc/*
+>>> >
+>>> > Fixes: ae75ff814538 ("pinctrl: pinctrl-imx: add imx pinctrl core driver")
 
-On Thu, Feb 05, 2015 at 09:43:23AM +0100, Uwe Kleine-K?nig wrote:
-> An unmodified 3.19.0-rc6 + efm32_defconfig boots just fine with XIP (and
-> has to little RAM for holding the kernel image in it's 4 MiB RAM).
-And btw next fails to build because of your patch
-51f36035999ca403d08304176bdfa288a549b50e. Maybe you can limit it to MMU
-configs only to prevent false positives?
+This was actually introduce by me in 3dac1918a491 ("pinctrl: imx: detect
+uninitialized pins").
 
-51f36035999ca403d08304176bdfa288a549b50e^ builds and boots just fine on
-my efm32 board.
+>>> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>>>
+>>> Patch applied.
+>>>
+>>> But...
+>>>
+>>> > -       if (!pin_reg || !pin_reg->conf_reg) {
+>>> > +       if (!pin_reg || pin_reg->conf_reg == -1) {
+>>>
+>>> I can see that the other code checks for -1 in this variable.
+>>> But where is conf_reg ever set to -1?
+>>>
+>>> freescale]$ git grep "\-1"
+>>> pinctrl-imx.c:          if (pin_reg->mux_reg == -1) {
+>>> pinctrl-imx.c:  if (pin_reg->mux_reg == -1)
+>>> pinctrl-imx.c:  if (pin_reg->mux_reg == -1)
+>>> pinctrl-imx.c:  if (pin_reg->conf_reg == -1) {
+>>> pinctrl-imx.c:  if (pin_reg->conf_reg == -1) {
+>>> pinctrl-imx.c:  if (!pin_reg || pin_reg->conf_reg == -1) {
+>> Uah, ugly. This member gets -1 by means of:
+>>
+>>         memset(info->pin_regs, 0xff, sizeof(*info->pin_regs) * info->npins);
+> 
+> OMG. Uwe can you make a patch changing that initialization
+> code to something sane? We can't have it like this.
 
-Best regards
-Uwe
+Oh sorry, this was actually me, in the commit mentioned above. That's
+ugly, I agree. I'm wondering how I came to that idea....
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Will send a patch for that.
+
+--
+Stefan
