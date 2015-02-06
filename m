@@ -1,129 +1,44 @@
-From: Ying.Liu@freescale.com (Liu Ying)
-Date: Fri, 6 Feb 2015 16:13:20 +0800
-Subject: [PATCH RFC v8 11/21] Documentation: dt-bindings: Add bindings
- for Synopsys DW MIPI DSI DRM bridge driver
-In-Reply-To: <1423131004.3207.27.camel@pengutronix.de>
-References: <1420014219-915-1-git-send-email-Ying.Liu@freescale.com>
- <1420014219-915-12-git-send-email-Ying.Liu@freescale.com>
- <1423131004.3207.27.camel@pengutronix.de>
-Message-ID: <20150206081318.GA15088@victor>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 6 Feb 2015 00:08:52 -0800
+Subject: [GIT PULL] ARM: rockchip: third (and last) batch of dts updates
+ for 3.20
+In-Reply-To: <1557277.LNNjscMhd1@diego>
+References: <1557277.LNNjscMhd1@diego>
+Message-ID: <20150206080852.GC23582@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 05, 2015 at 11:10:04AM +0100, Philipp Zabel wrote:
-> Am Mittwoch, den 31.12.2014, 16:23 +0800 schrieb Liu Ying:
-> > This patch adds device tree bindings for Synopsys DesignWare MIPI DSI
-> > host controller DRM bridge driver.
-> > 
-> > Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
-> > ---
-> > v7->v8:
-> >  * None.
-> > 
-> > v6->v7:
-> >  * None.
-> > 
-> > v5->v6:
-> >  * Add the #address-cells and #size-cells properties in the example 'ports'
-> >    node.
-> >  * Remove the useless input-port properties from the example port at 0 and port at 1
-> >    nodes.
-> > 
-> > v4->v5:
-> >  * None.
-> > 
-> > v3->v4:
-> >  * Newly introduced in v4.  This is separated from the relevant driver patch
-> >    in v3 to address Stefan Wahren's comment.
-> > 
-> >  .../devicetree/bindings/drm/bridge/dw_mipi_dsi.txt | 73 ++++++++++++++++++++++
-> >  1 file changed, 73 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/drm/bridge/dw_mipi_dsi.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/drm/bridge/dw_mipi_dsi.txt b/Documentation/devicetree/bindings/drm/bridge/dw_mipi_dsi.txt
-> > new file mode 100644
-> > index 0000000..f88a8d6
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/drm/bridge/dw_mipi_dsi.txt
-> > @@ -0,0 +1,73 @@
-> > +Device-Tree bindings for Synopsys DesignWare MIPI DSI host controller
-> > +
-> > +The controller is a digital core that implements all protocol functions
-> > +defined in the MIPI DSI specification, providing an interface between
-> > +the system and the MIPI DPHY, and allowing communication with a MIPI DSI
-> > +compliant display.
-> > +
-> > +Required properties:
-> > + - #address-cells: Should be <1>.
-> > + - #size-cells: Should be <0>.
-> > + - compatible: The compatible string should be "fsl,imx6q-mipi-dsi" for
-> > +   i.MX6q/sdl SoCs.  For other SoCs, please refer to their specific
-> > +   device tree binding documentations.
+On Fri, Jan 30, 2015 at 09:39:28PM +0100, Heiko St?bner wrote:
+> Hi Arnd, Olof,
 > 
-> I think the compatible property should additionally contain
-> "snps,dw-mipi-dsi". Also I think other SoCs using the same IP core
-> should eventually list their compatibles here, but that's for later.
+> if it is not to late, I have accumulated some more dts changes during the
+> last days.
 > 
-> How about:
-> + - compatible: The compatible string contain "fsl,imx6q-mipi-dsi" for
-> +   i.MX6q/sdl SoCs.  For other SoCs, please refer to their specific
-> +   device tree binding documentations. A common compatible string
-> +   "snps,dw-mipi-dsi" should be appended for all SoCs.
-
-I'm not sure if "snps,dw-mipi-dsi" should be appended.
-
-Is it a compatible string that SoC specific drivers should actually use to
-bind a device?
-
-As Andy mentioned in [1], DW MIPI DSI embedded in RK618 is configured via I2C
-bus, while i.MX6Q/DL is configured via ARM bus...
-
-Another concern is that if users only specify "snps,dw-mipi-dsi" in their
-device tree sources and use a kernel which supports multiple platforms,
-say ARM multi v7 platforms, could several enabled SoC specific drivers be
-probed for a single DW MIPI DSI device?
-
-[1] http://lists.freedesktop.org/archives/dri-devel/2014-December/074344.html
-
+> The most interesting change is probably enabling the display nodes on
+> both the rk3288-firefly and rk3288-evb. I was sucessfully able to reach a
+> framebuffer console on both boards using the hdmi output.
 > 
-> > + - reg: Represent the physical address range of the controller.
-> > + - interrupts: Represent the controller's interrupt to the CPU(s).
-> > + - clocks, clock-names: Phandles to the controller pll reference and
-> > +   core configuration clocks, as described in [1].
+> To reach an actual X-session, a further patch to the drm driver is
+> necessary [0], but still the general framebuffer output is working
+> nonetheless.
 > 
-> From the MIPI CSI-2 datasheets it looks like the D-PHY has a refclk and
-> a cfg_clk input. So I suspect from the name of the "core_cfg" clock,
-> that it actually represents two clock inputs, the "cfg_clk" wired to the
-> D-PHY and a core clock wired to the MIPI DSI host controller. I am not
-> sure if there are designs that control those clocks separately, but I
-> think it'd be safer to split this into two clocks in the device tree.
-
-What MIPI CSI-2 datasheets do you refer to?
-I don't find the refclk and cfg_clk in the MIPI CSI chapter of the i.MX6DQ
-Reference Manual v2[2].
-
-I think we need to know the design philosophy of DW MIPI DSI clock sources
-to settle down the documentation here.  I've asked our internal MIPI DSI
-SoC owner for ideas.  But, someone from Synopsys might be the right
-person, perhaps.
-
-[2] http://cache.freescale.com/files/32bit/doc/ref_manual/IMX6DQRM.pdf?fasp=1&WT_TYPE=Reference%20Manuals&WT_VENDOR=FREESCALE&WT_FILE_FORMAT=pdf&WT_ASSET=Documentation&fileExt=.pdf
-
 > 
-> Also I am not sure which input to the MIPI DSI host controller the core
-> clock represents. The i.MX6DQ Reference Manual v2 calls the remaining
-> clock inputs gated by mipi_core_cfg_clk_enable "ac_clk_125m" and
-> "ips_clk" (I think the latter is the ABP clock driving the register
-> bank, just called "pclk" in the MIPI CSI-2 documentation).
-
-The same MIPI CSI-2 documentation you mentioned above?
-
-I'm also puzzled about the clocks.
-
-Regards,
-Liu Ying
-
+> Second most interesting change is the addition of cpu and gpu regulators
+> to the act8846 variant of the evb which I was able to realize and test with
+> the help of Daniel Lezcano yesterday.
 > 
-> regards
-> Philipp
 > 
+> And finally adding a clock node to the rk3288 watchdog, as the dw_wdt
+> driver needs to read the actual clock rate at times. This brings with it a
+> stable shared branch with the clock tree to hold the new dt clock ids,
+> which Mike merged into the clock-tree half an hour after I send the
+> second pull request some days ago.
+> 
+> 
+> So if it's not to late, please pull
+
+This seems reasonably self-contained and doesn't seem to be high risk. Merged
+in now even though it's a bit close to the merge window.
+
+
+-Olof
