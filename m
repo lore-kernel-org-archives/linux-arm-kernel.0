@@ -1,30 +1,40 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 06 Feb 2015 20:40:43 +0100
-Subject: [PATCH] pinctrl: imx: do not implicitly set pin regs to -1
-In-Reply-To: <20150206192121.GD10842@pengutronix.de>
-References: <1423240256-27210-1-git-send-email-stefan@agner.ch>
- <20150206192121.GD10842@pengutronix.de>
-Message-ID: <93e8f8135f2c459b7694ef1a22636f7b@agner.ch>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 06 Feb 2015 11:41:22 -0800
+Subject: [PATCH v13 3/6] clk: Make clk API return per-user struct clk
+ instances
+In-Reply-To: <20150206193702.GD8670@n2100.arm.linux.org.uk>
+References: <1422011024-32283-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1422011024-32283-4-git-send-email-tomeu.vizoso@collabora.com>
+ <54D3C803.30706@samsung.com> <54D3CD6A.1010209@codeaurora.org>
+ <54D3EB29.4090007@codeaurora.org>
+ <20150206004210.GB8670@n2100.arm.linux.org.uk>
+ <54D41A60.8040702@codeaurora.org>
+ <20150206133920.GC8670@n2100.arm.linux.org.uk>
+ <54D5164A.30503@codeaurora.org>
+ <20150206193702.GD8670@n2100.arm.linux.org.uk>
+Message-ID: <54D518E2.8060405@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-02-06 20:21, Uwe Kleine-K?nig wrote:
-> Hallo Stefan,
-> 
-> On Fri, Feb 06, 2015 at 05:30:56PM +0100, Stefan Agner wrote:
->> -	memset(info->pin_regs, 0xff, sizeof(*info->pin_regs) * info->npins);
->> +
->> +	for (i = 0; i < info->npins; i++) {
->> +		info->pin_regs[i].mux_reg = -1;
->> +		info->pin_regs[i].conf_reg = -1;
->> +	}
-> looks definitely better. Just out of interest, did you check if it
-> changes the generated code?
+On 02/06/15 11:37, Russell King - ARM Linux wrote:
+> On Fri, Feb 06, 2015 at 11:30:18AM -0800, Stephen Boyd wrote:
+>> Why don't we make the legacy lookup more specific and actually indicate
+>> "internal" for the con_id? Then the external clock would fail to be
+>> found, but we can detect that case and figure out that it's not due to
+>> probe defer, but instead due to the fact that there really isn't any
+>> mapping. It looks like the code is already prepared for this anyway.
+> We _could_, and that would solve this specific issue, but I'd suggest
+> coccinelle is used to locate any other similar instances of this.
+>
+> As I'm allergic to coccinelle (or coccinelle is allergic to me since
+> I never seem to be able to get it to do what I want...)
+>
 
-Just checked quickly, before it branched to memset. The object file is
-24 bytes larger. I guess memset might be a bit faster due to optimized
-memory access. But not worth for some error handling relevant
-initialization code IMHO...
+Great. I'd like to avoid adding clk_equal() until we actually need it,
+and I hope we don't ever need it. We've already got coccinelle in the
+works to find similar issues and it seems you and I have the same
+allergies because I can't get it to work for me right now.
 
---
-Stefan
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
