@@ -1,28 +1,35 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 6 Feb 2015 15:15:42 +0000
-Subject: [PATCH v6 0/7] PCI: get DMA configuration from parent device
-In-Reply-To: <1423173179-10227-1-git-send-email-m-karicheri2@ti.com>
-References: <1423173179-10227-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <20150206151542.GD23190@e104818-lin.cambridge.arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 6 Feb 2015 16:15:42 +0100
+Subject: [PATCH v4 0/7] clk: Add common clock support for Mediatek MT8135
+ and MT8173.
+In-Reply-To: <CABuKBeJBp115aD_xb7_2471h=iyr5Wc33m2EX715MxNc=_1p2A@mail.gmail.com>
+References: <1422594798-13375-1-git-send-email-henryc.chen@mediatek.com>
+ <CABuKBeJSH3WzG3QC=9OoPzXE6fd9W2U67V4c19NzWcPxWR7VDg@mail.gmail.com>
+ <20150206103033.GS18908@pengutronix.de>
+ <CABuKBeJBp115aD_xb7_2471h=iyr5Wc33m2EX715MxNc=_1p2A@mail.gmail.com>
+Message-ID: <20150206151542.GO12209@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 05, 2015 at 09:52:52PM +0000, Murali Karicheri wrote:
-> This patch add an important capability to PCI driver on Keystone. I hope to
-> have this merged to the upstream branch so that it is available for v3.20.
+On Fri, Feb 06, 2015 at 03:20:35PM +0100, Matthias Brugger wrote:
+> > I don't really understand the "as part of the clk driver part". I now
+> > have replaced the devm_regmap_init_mmio with syscon_node_to_regmap
+> > in the pericfg / infracfg drivers. Is that all that you want or do you
+> > want me to move the source code to drivers/clk/mediatek?
+> 
+> Yes, I propose to move the source code to drivers/clk/mediatek.
+> Please have a look on other clock drivers which implement the reset
+> controller, e.g. rockchip.
 
-It's very late for 3.20 and the code hasn't been in linux-next at all
-(but it's not me who's merging this code), unless you can squeeze it in
-as a bug-fix.
+Ok, I'm halfway through implementing this, but let's have weekend first.
 
-But the good part is that there is more time to fix the dma mask setting
-as well ;).
+Henry, If you're fine with this I'll change your clock series according
+to Matthias suggestions.
 
-> PCI devices on Keystone doesn't have correct dma_pfn_offset set. This patch
-> add capability to set the dma configuration such as dma-mask, dma_pfn_offset,
-> and dma ops etc using the information from DT. The prior RFCs and discussions
-> are available at [1] and [2] below.
+Sascha
 
-For the series, you can add:
-
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
