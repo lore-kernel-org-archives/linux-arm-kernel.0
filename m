@@ -1,49 +1,83 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 6 Feb 2015 11:05:57 +0000
-Subject: [BUG] ARM: socfpga: L2 cache init
-In-Reply-To: <20150206103946.GM15692@pengutronix.de>
-References: <20150206103946.GM15692@pengutronix.de>
-Message-ID: <20150206110557.GY8656@n2100.arm.linux.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 6 Feb 2015 11:08:51 +0000
+Subject: [Linaro-acpi] [PATCH v8 02/21] acpi: fix acpi_os_ioremap for arm64
+In-Reply-To: <20150206103653.GA23190@e104818-lin.cambridge.arm.com>
+References: <1422984576.18187.82.camel@deneb.redhat.com>
+ <20150204112508.GB26006@e104818-lin.cambridge.arm.com>
+ <1423066107.18187.99.camel@deneb.redhat.com>
+ <20150204175734.GI26006@e104818-lin.cambridge.arm.com>
+ <1423076294.18187.103.camel@deneb.redhat.com>
+ <20150205104149.GA18158@e104818-lin.cambridge.arm.com>
+ <1423144447.18187.110.camel@deneb.redhat.com>
+ <54D39D6B.5090304@linaro.org>
+ <20150205174826.GD21970@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu922UwYRN7ZgFNTR7yGGKPLTU8Us7KbvXX-Q8=rqLKNog@mail.gmail.com>
+ <20150206103653.GA23190@e104818-lin.cambridge.arm.com>
+Message-ID: <CAKv+Gu_ExGUkr0AJS4uSHLuz3LxO+x8sxnsnmDAYfVRAgHGXBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 06, 2015 at 11:39:46AM +0100, Steffen Trumtrar wrote:
-> I have run into a bug on the Socfpga platform. My boards sometimes fail
-> to boot when I have the commit
-> 
-> 	commit 8b5c18f05621394eb108d3fbc9bf98b05e8162db
-> 	Author: Russell King <rmk+kernel@arm.linux.org.uk>
-> 	Date:   Mon Apr 28 15:55:59 2014 +0100
-> 
-> 	ARM: l2c: socfpga: convert to generic l2c OF initialisation
-> 
-> 	Remove the explicit call to l2x0_of_init(), converting to the generic
-> 	infrastructure instead.
-> 
-> 	Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
+On 6 February 2015 at 10:36, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Thu, Feb 05, 2015 at 10:16:03PM +0000, Ard Biesheuvel wrote:
+>> On 5 February 2015 at 17:48, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> > On Thu, Feb 05, 2015 at 04:42:19PM +0000, Al Stone wrote:
+>> >> On 02/05/2015 06:54 AM, Mark Salter wrote:
+>> >> > On Thu, 2015-02-05 at 10:41 +0000, Catalin Marinas wrote:
+>> >> >> On Wed, Feb 04, 2015 at 06:58:14PM +0000, Mark Salter wrote:
+>> >> >>> On Wed, 2015-02-04 at 17:57 +0000, Catalin Marinas wrote:
+>> >> >>>> On Wed, Feb 04, 2015 at 04:08:27PM +0000, Mark Salter wrote:
+>> >> >>>>> acpi_os_remap() is used to map ACPI tables. These tables may be in ram
+>> >> >>>>> which are already included in the kernel's linear RAM mapping. So we
+>> >> >>>>> need ioremap_cache to avoid two mappings to the same physical page
+>> >> >>>>> having different caching attributes.
+>> >> >>>>
+>> >> >>>> What's the call path to acpi_os_ioremap() on such tables already in the
+>> >> >>>> linear mapping? I can see an acpi_map() function which already takes
+>> >> >>>> care of the RAM mapping case but there are other cases where
+>> >> >>>> acpi_os_ioremap() is called directly. For example,
+>> >> >>>> acpi_os_read_memory(), can it be called on both RAM and I/O?
+>> >> >>>
+>> >> >>> acpi_map() is the one I've seen.
+>> >> >>
+>> >> >> By default, if should_use_kmap() is not patched for arm64, it translates
+>> >> >> to page_is_ram(); acpi_map() would simply use a kmap() which returns the
+>> >> >> current kernel linear mapping on arm64.
+>> >> >
+>> >> > The problem with kmap() is that it only maps a single page. I've seen
+>> >> > tables over 4k which is why I patched acpi_map() not to use kmap() on
+>> >> > arm64.
+>> >>
+>> >> Right.  Mark replied to this before I could; using kmap() enforced a 4k
+>> >> (one page) limit that we kept breaking with some ACPI tables being larger
+>> >> than that (DSDTs and SSDTs, fwiw).  This would lead to some very odd behaviors
+>> >> when most but not all of a device definition was within the page; using the
+>> >> table checksums was one way of detecting the issues.
+>> >
+>> > OK. So I think Mark's original patch was ok, assuming that the System
+>> > Memory cases mentioned by Graeme are detected with page_is_ram().
+>>
+>> page_is_ram() returns whether a pfn is covered by the linear mapping,
+>> so memory before the kernel or after a mem= limit will be
+>> misidentified.
+>
+> OK. So in conclusion acpi_os_ioremap() may need to create a cacheable
+> mapping even when !page_is_ram() but it has no way of knowing that
+> unless we change the core ACPI code to differentiate between
+> ioremap_cache and ioremap_nocache. Did I get it right?
+>
 
-That should only result in the L2 cache being turned on earlier (before
-the secondary CPUs come up.)  I wonder if there's a bug in the secondary
-CPU code which is being tickled by it.
+Yes and no. Your analysis about the core issue is correct, but it is
+something we can fix on our end if we like.
+This issue has been on our radar for a while, and we proposed a way to
+fix it here
 
-What we need is some information on the failure - and as you've noticed,
-the failure occurs before the console is initialised.  There's two
-solutions to that:
+http://thread.gmane.org/gmane.linux.kernel.efi/5133
 
-1. Enable early printk support (and hope that works)
-2. Enable DEBUG_LL support, selecting the DEBUG_SOCFPGA_UART option,
-   and add:
+(The 'other series' the cover letter refers to is the virtmap series
+you pulled for 3.20)
 
-{ extern void printascii(const char *); printascii(text); }
-
-after the vscnprintf() in kernel/printk/printk.c.
-
-(I've always used method 2, since that existed long before early printk
-support was merged - so I've never used method 1 myself.)
-
-Thanks.
+There is a known issue on APM with this series, reported by Dave
+Young, and I was hoping digging into that next week at Connect.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Ard.
