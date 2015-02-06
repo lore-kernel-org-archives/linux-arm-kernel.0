@@ -1,111 +1,156 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri,  6 Feb 2015 21:22:53 +0100
-Subject: [PATCH] ARM: shmobile: r8a73a4: Move pfc node to work around probe
- ordering bug
-Message-ID: <1423254173-31852-1-git-send-email-geert+renesas@glider.be>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 06 Feb 2015 21:25:44 +0100
+Subject: Delays, clocks, timers, hrtimers, etc
+In-Reply-To: <54C8E125.3070905@free.fr>
+References: <54C8E125.3070905@free.fr>
+Message-ID: <e028a4eb604a491f4438557f4a1373ef@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the pin function controller (which is also a GPIO controller)
-is instantiated before the interrupt controllers due to the order in the
-DTS. At that time, the irq domains for the interrupt controllers
-referenced by its interrupts-extended property cannot be found yet:
+On 2015-01-28 14:16, Mason wrote:
+> Hello,
+> 
+> I am swimming in a sea of confusion, and am hoping someone would toss
+> me a life-jacket (of enlightenment). Please forgive me if some of my
+> questions are poorly asked or appear in seemingly random order.
+> 
+> Working on a Cortex A9 based SoC, I set out to "clean up" the platform
+> specific timer code, by using as much generic framework as possible.
+> (Right now, there's a lot of "redundant" code in the mach dir.)
+> 
+> 
+> Q1. the {n,u,m}delay function family
+> 
+> arch/arm/include/asm/delay.h mentions
+> "Delay routines, using a pre-computed "loops_per_second" value."
+> *BUT* if the frequency changes dynamically (thanks to cpufreq)
+> the "loops_per_second" value cannot be pre-computed, as it would
+> change dynamically too, right?
+> 
+> Looking at arch/arm/lib/delay.c it seems the default implementation
+> is a busy loop (in delay-loop.S) which looks up "loops_per_jiffy"
+> in the prolog to determine the number of times to loop, right?
+> 
+> http://lxr.free-electrons.com/source/arch/arm/lib/delay-loop.S
+> 
+> (Side issue, why is the loop unrolled in __loop_delay? What is the
+> point of unrolling a busy loop? This is commented code however.)
+> 
+> What happens if loops_per_jiffy changes while one core is in the
+> busy loop? It seems we might exit the loop too early, which could
+> break some drivers with some weird heisenbug, no?
+> 
+> Also, is the update of loops_per_jiffy atomic? Is it possible that
+> if one core reads it while another updates it, we get garbage?
+> 
+> I suppose this is one reason why the default functions are overridden
+> by register_current_timer_delay(&arch_delay_timer) right? I think the
+> property of a timer is that its frequency doesn't change, even if the
+> CPU's frequency changes? So we are still busy looping, but we are
+> checking the actual time spent in the loop, whatever the cpufreq?
+> 
+> Reference
+> https://www.kernel.org/doc/Documentation/timers/timers-howto.txt
+> 
+> 
+> Q2. Cortex A9 global and private timers
+> 
+> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0407f/CIHGECHJ.html
+> 
+> (What are private timers used for?)
+> 
+> In my platform-specific code, there is a config option to choose between
+> 
+> 1) the ARM global timer
+> 2) a platform-specific timer (timer0)
+> 
+> I noticed that there is generic code to support the global timer in
+> drivers/clocksource/arm_global_timer.c
+> 
+> config ARM_GLOBAL_TIMER
+> bool
+> select CLKSRC_OF if OF
+> help
+>   This options enables support for the ARM global timer unit
+> 
+> config CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
+> bool
+> depends on ARM_GLOBAL_TIMER
+> default y
+> help
+>  Use ARM global timer clock source as sched_clock
+> 
+> I was thinking it would be better to use the "standard" option (ARM
+> global timer)
+> as it is "officially" supported in the vanilla kernel. So less code to write and
+> to debug, and it has likely received more testing. Why would one rely on
+> platform-specific timers then?
+> 
+> Are high-resolution timers supported with the global timer?
+> 
+> 
+> Q3. Using the generic global timer implementation
+> 
+> So, how do I use that implementation?
+> (Is someone other than STMicro using it?)
+> 
+> I see:
+> 
+> static void __init global_timer_of_register(struct device_node *np)
+> CLOCKSOURCE_OF_DECLARE(arm_gt, "arm,cortex-a9-global-timer",
+> global_timer_of_register);
+> 
+> OF stands for open firmware, yes?
+> So is this related to device tree?
+> 
+> http://lxr.free-electrons.com/source/Documentation/devicetree/bindings/arm/global_timer.txt
+> 
+> This file makes no sense to me.
+> 
+> - interrupts : One interrupt to each core
+> interrupts = <1 13 0xf01>;
+> what are 1 13 0xf01 ??
+> 
+> - clocks : Should be phandle to a clock.
+> clocks = <&arm_periph_clk>;
+> 
+> For my (old) 3.14 kernel, I found this:
+> 
+>     /*
+>      * ARM Peripheral clock for timers
+>      */
+>     arm_periph_clk: arm_periph_clk {
+>       #clock-cells = <0>;
+>       compatible = "fixed-clock";
+>       clock-frequency = <600000000>;
+>     };
+> 
+> But it looks like the definitions have moved around since then?
 
-    irq: no irq domain found for /interrupt-controller at e61c0000 !
+Hi Mason,
 
-Nevertheless, the core OF probing code ignores this failure, besides a
-debug message that's not normally printed:
+Just recently I added support of ARM global timer as clocksource for
+Vybrid SoC. This SoC doesn't use cpufreq, hence it is safe to use the
+ARM global timer. The nice thing of device tree is, the patch to add
+support for that did not change a single line of code:
 
-    not all legacy IRQ resources mapped for pfc
+http://thread.gmane.org/gmane.linux.kernel/1794460
 
-and continues initialization of the device. Then, the sh-pfc driver
-cannot find any IRQ resources, and thinks no interrupts are available,
-causing gpio-keys to fail later:
+--
+Stefan
 
-    gpio-keys keyboard: Unable to claim irq 0; error -22
-    gpio-keys: probe of keyboard failed with error -22
-
-Move the pin function controller node after the interrupt controller
-nodes it references to work around the bug in the core OF probing code.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-Notes:
-  - It seems several people tried to solve this in the core OF probing
-    code before, but the final solution never went in?
-  - This can be reproduced on other SoCs (e.g. sh73a0 and r8a7740) by
-    moving their pfc nodes before their interrupt controller nodes.
-  - This patch is against my working tree, so it doesn't apply to
-    Simon's repository, but you get the idea....
----
- arch/arm/boot/dts/r8a73a4.dtsi | 48 +++++++++++++++++++++---------------------
- 1 file changed, 24 insertions(+), 24 deletions(-)
-
-diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
-index 8a23442f0c70359d..47b657de4f68f56c 100644
---- a/arch/arm/boot/dts/r8a73a4.dtsi
-+++ b/arch/arm/boot/dts/r8a73a4.dtsi
-@@ -259,30 +259,6 @@
- 		};
- 	};
- 
--	pfc: pfc at e6050000 {
--		compatible = "renesas,pfc-r8a73a4";
--		reg = <0 0xe6050000 0 0x9000>;
--		gpio-controller;
--		#gpio-cells = <2>;
--		interrupts-extended =
--			<&irqc0  0 0>, <&irqc0  1 0>, <&irqc0  2 0>, <&irqc0  3 0>,
--			<&irqc0  4 0>, <&irqc0  5 0>, <&irqc0  6 0>, <&irqc0  7 0>,
--			<&irqc0  8 0>, <&irqc0  9 0>, <&irqc0 10 0>, <&irqc0 11 0>,
--			<&irqc0 12 0>, <&irqc0 13 0>, <&irqc0 14 0>, <&irqc0 15 0>,
--			<&irqc0 16 0>, <&irqc0 17 0>, <&irqc0 18 0>, <&irqc0 19 0>,
--			<&irqc0 20 0>, <&irqc0 21 0>, <&irqc0 22 0>, <&irqc0 23 0>,
--			<&irqc0 24 0>, <&irqc0 25 0>, <&irqc0 26 0>, <&irqc0 27 0>,
--			<&irqc0 28 0>, <&irqc0 29 0>, <&irqc0 30 0>, <&irqc0 31 0>,
--			<&irqc1  0 0>, <&irqc1  1 0>, <&irqc1  2 0>, <&irqc1  3 0>,
--			<&irqc1  4 0>, <&irqc1  5 0>, <&irqc1  6 0>, <&irqc1  7 0>,
--			<&irqc1  8 0>, <&irqc1  9 0>, <&irqc1 10 0>, <&irqc1 11 0>,
--			<&irqc1 12 0>, <&irqc1 13 0>, <&irqc1 14 0>, <&irqc1 15 0>,
--			<&irqc1 16 0>, <&irqc1 17 0>, <&irqc1 18 0>, <&irqc1 19 0>,
--			<&irqc1 20 0>, <&irqc1 21 0>, <&irqc1 22 0>, <&irqc1 23 0>,
--			<&irqc1 24 0>, <&irqc1 25 0>;
--		power-domains = <&pd_c5>;
--	};
--
- 	i2c5: i2c at e60b0000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -382,6 +358,30 @@
- 		power-domains = <&pd_c4>;
- 	};
- 
-+	pfc: pfc at e6050000 {
-+		compatible = "renesas,pfc-r8a73a4";
-+		reg = <0 0xe6050000 0 0x9000>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		interrupts-extended =
-+			<&irqc0  0 0>, <&irqc0  1 0>, <&irqc0  2 0>, <&irqc0  3 0>,
-+			<&irqc0  4 0>, <&irqc0  5 0>, <&irqc0  6 0>, <&irqc0  7 0>,
-+			<&irqc0  8 0>, <&irqc0  9 0>, <&irqc0 10 0>, <&irqc0 11 0>,
-+			<&irqc0 12 0>, <&irqc0 13 0>, <&irqc0 14 0>, <&irqc0 15 0>,
-+			<&irqc0 16 0>, <&irqc0 17 0>, <&irqc0 18 0>, <&irqc0 19 0>,
-+			<&irqc0 20 0>, <&irqc0 21 0>, <&irqc0 22 0>, <&irqc0 23 0>,
-+			<&irqc0 24 0>, <&irqc0 25 0>, <&irqc0 26 0>, <&irqc0 27 0>,
-+			<&irqc0 28 0>, <&irqc0 29 0>, <&irqc0 30 0>, <&irqc0 31 0>,
-+			<&irqc1  0 0>, <&irqc1  1 0>, <&irqc1  2 0>, <&irqc1  3 0>,
-+			<&irqc1  4 0>, <&irqc1  5 0>, <&irqc1  6 0>, <&irqc1  7 0>,
-+			<&irqc1  8 0>, <&irqc1  9 0>, <&irqc1 10 0>, <&irqc1 11 0>,
-+			<&irqc1 12 0>, <&irqc1 13 0>, <&irqc1 14 0>, <&irqc1 15 0>,
-+			<&irqc1 16 0>, <&irqc1 17 0>, <&irqc1 18 0>, <&irqc1 19 0>,
-+			<&irqc1 20 0>, <&irqc1 21 0>, <&irqc1 22 0>, <&irqc1 23 0>,
-+			<&irqc1 24 0>, <&irqc1 25 0>;
-+		power-domains = <&pd_c5>;
-+	};
-+
- 	thermal at e61f0000 {
- 		compatible = "renesas,thermal-r8a73a4", "renesas,rcar-thermal";
- 		reg = <0 0xe61f0000 0 0x14>, <0 0xe61f0100 0 0x38>,
--- 
-1.9.1
+> 
+> This device tree concept is too much to swallow in a single serving.
+> Please tell me if I'm going down the correct rabbit hole, and I'll
+> do some LWN readings to try to wrap my mind around the concept.
+> 
+> 
+> Anyway, if anyone can help me out on some of these topics, I'd be
+> eternally grateful.
+> 
+> Regards.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
