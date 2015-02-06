@@ -1,91 +1,109 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Fri, 06 Feb 2015 15:03:41 +0900
+From: gautamvivek1987@gmail.com (Vivek Gautam)
+Date: Fri, 6 Feb 2015 11:37:35 +0530
 Subject: [PATCH v5 0/2] mmc: dw_mmc: exynos: Add HS400 support
-In-Reply-To: <CAFp+6iEGCEiGf5WooHJyh=cnJF_c7j=n_YhHLowfwjpLiXUPiQ@mail.gmail.com>
+In-Reply-To: <54D4593D.3000007@samsung.com>
 References: <1422499318-13726-1-git-send-email-alim.akhtar@samsung.com>
  <54D41654.8030702@samsung.com>
  <CAFp+6iEGCEiGf5WooHJyh=cnJF_c7j=n_YhHLowfwjpLiXUPiQ@mail.gmail.com>
-Message-ID: <54D4593D.3000007@samsung.com>
+ <54D4593D.3000007@samsung.com>
+Message-ID: <CAFp+6iGtJgzSO4Qr6JHqKSC34BVVeURjiUbkbYHkrnRcK8qaJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Vivek.
+Hi,
 
-On 02/06/2015 02:52 PM, Vivek Gautam wrote:
-> Hi Jaehoon,
-> 
-> 
-> On Fri, Feb 6, 2015 at 6:48 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
->> Hi, Alim.
->>
->> On my board, this patch isn't working fine.
->> So when i complete to test on my board(exynos5), i will reply with comments.
->> Sorry for late testing.
-> 
-> I tested this series on linux-next, on Exynos5800-peach-pi board, and HS400
-> seems to be working fine.
-> I can see the card getting detected as HS400, and then i ran iozone as well.
-> The iozone numbers are also as required.
-> 
-> On peach-pit board too, the HS200 mode seems to be working good.
-> 
-> What are the observations you saw on your board ?
 
-Thanks for testing on your board. I have exynos5422 and exynos5433.(One is eMMC5.0, other is eMMC5.1)
-I want to see that it's working fine on my board.
-I should miss something..so i will check more detail after complete my other job, or on this weekend.
-(It failed for hs400 tuning sequence..I needs to check that it has the board dependency)
+On Fri, Feb 6, 2015 at 11:33 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+> Hi, Vivek.
+>
+> On 02/06/2015 02:52 PM, Vivek Gautam wrote:
+>> Hi Jaehoon,
+>>
+>>
+>> On Fri, Feb 6, 2015 at 6:48 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+>>> Hi, Alim.
+>>>
+>>> On my board, this patch isn't working fine.
+>>> So when i complete to test on my board(exynos5), i will reply with comments.
+>>> Sorry for late testing.
+>>
+>> I tested this series on linux-next, on Exynos5800-peach-pi board, and HS400
+>> seems to be working fine.
+>> I can see the card getting detected as HS400, and then i ran iozone as well.
+>> The iozone numbers are also as required.
+>>
+>> On peach-pit board too, the HS200 mode seems to be working good.
+>>
+>> What are the observations you saw on your board ?
+>
+> Thanks for testing on your board. I have exynos5422 and exynos5433.(One is eMMC5.0, other is eMMC5.1)
+> I want to see that it's working fine on my board.
+> I should miss something..so i will check more detail after complete my other job, or on this weekend.
+> (It failed for hs400 tuning sequence..I needs to check that it has the board dependency)
 
-Best Regards,
-Jaehoon Chung
+Ok
+Thanks for testing it on your side.
 
-> 
+>
+> Best Regards,
+> Jaehoon Chung
+>
 >>
->> Best Regards,
->> Jaehoon Chung
+>>>
+>>> Best Regards,
+>>> Jaehoon Chung
+>>>
+>>> On 01/29/2015 11:41 AM, Alim Akhtar wrote:
+>>>> This adds HS400 mode support for exynos dw_mmc host controller.
+>>>>
+>>>> Currently tested on Exynos5800-peach-pi and Exyons7 platform for HS400 mode.
+>>>> Tested HS200 mode with this series applied, HS200 still works.
+>>>>
+>>>> Appreciate testing on other exynos5/7 platform which supports emmc5.0
+>>>>
+>>>> Changes in V5:
+>>>>       * Enable HS400 on Exynos5800-peach-pi boards
+>>>>       * Addressed other review comments from Jaehoon Chung
+>>>>
+>>>> Changes in V4:
+>>>>       * drop the idea of changing existing binding for ciu_div as per [1]
+>>>>         * addressed comments from Jaehoon Chung [2]
+>>>>
+>>>> [1] http://www.spinics.net/lists/linux-samsung-soc/msg40923.html
+>>>> [2] http://www.spinics.net/lists/devicetree/msg64373.html
+>>>>
+>>>> Changes in V3:
+>>>>       rebased on ulf's next (commit: 607b448 mmc: core: Make tuning block patterns static)
+>>>>
+>>>> Seungwon Jeon (2):
+>>>>   mmc: dw_mmc: exynos: Support eMMC's HS400 mode
+>>>>   ARM: dts: Add HS400 support for exynos5420 and exynos5800
+>>>>
+>>>>  .../devicetree/bindings/mmc/exynos-dw-mshc.txt     |    7 +
+>>>>  arch/arm/boot/dts/exynos5420-peach-pit.dts         |    4 +-
+>>>>  arch/arm/boot/dts/exynos5420-pinctrl.dtsi          |    7 +
+>>>>  arch/arm/boot/dts/exynos5420-smdk5420.dts          |    4 +-
+>>>>  arch/arm/boot/dts/exynos5800-peach-pi.dts          |    7 +-
+>>>>  drivers/mmc/host/dw_mmc-exynos.c                   |  185 ++++++++++++++++----
+>>>>  drivers/mmc/host/dw_mmc-exynos.h                   |   19 +-
+>>>>  drivers/mmc/host/dw_mmc.c                          |   16 +-
+>>>>  drivers/mmc/host/dw_mmc.h                          |    2 +
+>>>>  9 files changed, 213 insertions(+), 38 deletions(-)
+>>>>
+>>>
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 >>
->> On 01/29/2015 11:41 AM, Alim Akhtar wrote:
->>> This adds HS400 mode support for exynos dw_mmc host controller.
->>>
->>> Currently tested on Exynos5800-peach-pi and Exyons7 platform for HS400 mode.
->>> Tested HS200 mode with this series applied, HS200 still works.
->>>
->>> Appreciate testing on other exynos5/7 platform which supports emmc5.0
->>>
->>> Changes in V5:
->>>       * Enable HS400 on Exynos5800-peach-pi boards
->>>       * Addressed other review comments from Jaehoon Chung
->>>
->>> Changes in V4:
->>>       * drop the idea of changing existing binding for ciu_div as per [1]
->>>         * addressed comments from Jaehoon Chung [2]
->>>
->>> [1] http://www.spinics.net/lists/linux-samsung-soc/msg40923.html
->>> [2] http://www.spinics.net/lists/devicetree/msg64373.html
->>>
->>> Changes in V3:
->>>       rebased on ulf's next (commit: 607b448 mmc: core: Make tuning block patterns static)
->>>
->>> Seungwon Jeon (2):
->>>   mmc: dw_mmc: exynos: Support eMMC's HS400 mode
->>>   ARM: dts: Add HS400 support for exynos5420 and exynos5800
->>>
->>>  .../devicetree/bindings/mmc/exynos-dw-mshc.txt     |    7 +
->>>  arch/arm/boot/dts/exynos5420-peach-pit.dts         |    4 +-
->>>  arch/arm/boot/dts/exynos5420-pinctrl.dtsi          |    7 +
->>>  arch/arm/boot/dts/exynos5420-smdk5420.dts          |    4 +-
->>>  arch/arm/boot/dts/exynos5800-peach-pi.dts          |    7 +-
->>>  drivers/mmc/host/dw_mmc-exynos.c                   |  185 ++++++++++++++++----
->>>  drivers/mmc/host/dw_mmc-exynos.h                   |   19 +-
->>>  drivers/mmc/host/dw_mmc.c                          |   16 +-
->>>  drivers/mmc/host/dw_mmc.h                          |    2 +
->>>  9 files changed, 213 insertions(+), 38 deletions(-)
->>>
 >>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> 
-> 
+>>
+>
+
+
+
+-- 
+Best Regards
+Vivek Gautam
+Samsung R&D Institute, Bangalore
+India
