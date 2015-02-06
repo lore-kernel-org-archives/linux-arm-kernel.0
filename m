@@ -1,51 +1,31 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 6 Feb 2015 22:21:09 +0100
-Subject: cpuidle vs suspend vs something else
-In-Reply-To: <54D43143.2010403@free.fr>
-References: <54D43143.2010403@free.fr>
-Message-ID: <20150206212109.GB25967@amd>
+From: nathan.sullivan@ni.com (Nathan Sullivan)
+Date: Fri, 6 Feb 2015 15:31:03 -0600
+Subject: [PATCH] clocksource: mark sched_clock_read functions notrace
+In-Reply-To: <20150203201326.GH11832@jcartwri.amer.corp.natinst.com>
+References: <1422643216-26673-1-git-send-email-nathan.sullivan@ni.com>
+ <20150203201326.GH11832@jcartwri.amer.corp.natinst.com>
+Message-ID: <20150206213103.GB15156@nathan3500-linux-VM>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> I've been reading about related sub-systems (cpuidle and suspend)
-> and I'm not sure I understand how they relate / interact.
+On Tue, Feb 03, 2015 at 02:13:26PM -0600, Josh Cartwright wrote:
+> > diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> > index 095c177..df5af55 100644
+> > --- a/drivers/clocksource/arm_arch_timer.c
+> > +++ b/drivers/clocksource/arm_arch_timer.c
+> > @@ -405,7 +405,7 @@ u32 arch_timer_get_rate(void)
+> >  	return arch_timer_rate;
+> >  }
+> >  
+> > -static u64 arch_counter_get_cntvct_mem(void)
+> > +static u64 notrace arch_counter_get_cntvct_mem(void)
 > 
-> If I understand correctly (please do point out any misconceptions)
-> on ARM Cortex A9, the first level of power saving is WFI, which is
-> typically called from the idle loop.
+> Assuming you're trying to mark all sched_clock() implementations
+> notrace, then you missed a few: arch_counter_get_cntvct and
+> arch_counter_get_cntpct.
 > 
-> This places the core in low-power mode ("Standby mode" in ARM docs).
-> "RAM arrays" (don't know what they are), "processor logic", and
-> "data engine" (not sure what any of these exactly refers to, guess
-> I have more reading to do) are still powered-up, but most of the
-> clocks are disabled.
-> 
-> In ARM's exact words, "WFI and WFE Standby modes disable most of the
-> clocks in a processor, while keeping its logic powered up. This reduces
-> the power drawn to the static leakage current, leaving a tiny clock
-> power overhead requirement to enable the device to wake up."
-> 
-> Some CPUs like Intel's have several levels of sleep (deeper levels
-> mean less power, but have a higher wake-up latency). AFAIU, cpuidle
-> is used to describe and manage these levels?
-> 
-> Isn't suspend somewhat like the deepest level of sleep?
-> (Or is it different in that things like RAM state are only a concern
-> for suspend, not cpuidle?)
+>   Josh
 
-Somewhat.
+Hmm, those are inlined.  Should I still mark them notrace?
 
-> Are both subsystems still actively used?
-
-Yes.
-
-Idle is "oh, the computer is not doing anything, it can save power".
-
-Suspend is "I don't want my computer to do anything until I press
-power button, save power".
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+    Nathan
