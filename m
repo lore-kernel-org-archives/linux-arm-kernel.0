@@ -1,67 +1,42 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri,  6 Feb 2015 18:52:51 +0100
-Subject: [PATCH v2 1/1] ARM: dts: Add mclk entry for Snow and Peach Pit/Pi
- boards
-Message-ID: <1423245171-25485-1-git-send-email-javier.martinez@collabora.co.uk>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Fri, 6 Feb 2015 11:53:35 -0600
+Subject: [PATCH v6 0/7] PCI: get DMA configuration from parent device
+In-Reply-To: <54D4DD95.7000303@ti.com>
+References: <1423173179-10227-1-git-send-email-m-karicheri2@ti.com>
+ <20150206151542.GD23190@e104818-lin.cambridge.arm.com>
+ <54D4DD95.7000303@ti.com>
+Message-ID: <CAErSpo6GOXHeKKfU8s5jCS3+Mui=HupZd=jpkLEyWAE94Ory5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tushar Behera <tushar.b@samsung.com>
+On Fri, Feb 6, 2015 at 9:28 AM, Murali Karicheri <m-karicheri2@ti.com> wrote:
+> On 02/06/2015 10:15 AM, Catalin Marinas wrote:
+>>
+>> On Thu, Feb 05, 2015 at 09:52:52PM +0000, Murali Karicheri wrote:
+>>>
+>>> This patch add an important capability to PCI driver on Keystone. I hope
+>>> to
+>>> have this merged to the upstream branch so that it is available for
+>>> v3.20.
+>>
+>> It's very late for 3.20 and the code hasn't been in linux-next at all
+>> (but it's not me who's merging this code), unless you can squeeze it in
+>> as a bug-fix.
+>
+> This is in fact a bug fix as PCI on Keystone is broken without this.
 
-On Snow, Peach Pit and Peach Pi boards, the Exynos SoC XCLKOUT output pin
-provides the master clock (mclk) to codecs. So make them a clock consumer.
+Oh, sorry, I didn't realize that this was so urgent.  I guess I read
+"this adds an important capability" in the cover letter and concluded
+that it was new functionality.
 
-Signed-off-by: Tushar Behera <tushar.b@samsung.com>
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
----
+Anyway, if it's broken, presumably PCI on Keystone *did* work at one
+point.  Can you identify the commit that broke it and requires these
+fixes, so we can figure out how far the fixes need to be backported?
 
-Changes since v1:
- - Rebased on top of Kukjin's for-next branch since v1 made on top of
-   3.19-rc7 doesn't apply cleanly on that branch. Sorry for the noise.
+If I merge it, I would like to get into my for-linus branch and get a
+little time in -next before asking Linus to pull it.  The merge window
+is a little wrinkle there -- I don't like to add new things to the mix
+during the window.  But if it's an important fix we can still get it
+in before the final v3.20.
 
- arch/arm/boot/dts/exynos5250-snow.dts      | 2 ++
- arch/arm/boot/dts/exynos5420-peach-pit.dts | 2 ++
- arch/arm/boot/dts/exynos5800-peach-pi.dts  | 2 ++
- 3 files changed, 6 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-index 5be966df7603..6096d6b02dd8 100644
---- a/arch/arm/boot/dts/exynos5250-snow.dts
-+++ b/arch/arm/boot/dts/exynos5250-snow.dts
-@@ -206,6 +206,8 @@
- 		samsung,model = "Snow-I2S-MAX98095";
- 		samsung,i2s-controller = <&i2s0>;
- 		samsung,audio-codec = <&max98095>;
-+		clocks = <&pmu_system_controller 0>;
-+		clock-names = "mclk";
- 	};
- 
- 	usb3_vbus_reg: regulator-usb3 {
-diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-index ec86d9523935..1d4db3b0676e 100644
---- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-+++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-@@ -594,6 +594,8 @@
- 		interrupt-parent = <&gpx0>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&max98090_irq>;
-+		clocks = <&pmu_system_controller 0>;
-+		clock-names = "mclk";
- 	};
- 
- 	light-sensor at 44 {
-diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-index 06737c60d333..6f2fc3445bd5 100644
---- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-+++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-@@ -581,6 +581,8 @@
- 		interrupt-parent = <&gpx0>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&max98091_irq>;
-+		clocks = <&pmu_system_controller 0>;
-+		clock-names = "mclk";
- 	};
- 
- 	light-sensor at 44 {
--- 
-2.1.3
+Bjorn
