@@ -1,136 +1,112 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 06 Feb 2015 10:49:45 -0800
-Subject: cpuidle vs suspend vs something else
-In-Reply-To: <54D43143.2010403@free.fr>
-References: <54D43143.2010403@free.fr>
-Message-ID: <20150206184945.421.74720@quantum>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 6 Feb 2015 18:52:02 +0000
+Subject: [PATCHv6 1/5] arm: socfpga: Enable L2 Cache ECC on startup.
+In-Reply-To: <1420772036-3112-2-git-send-email-tthayer@opensource.altera.com>
+References: <1420772036-3112-1-git-send-email-tthayer@opensource.altera.com>
+ <1420772036-3112-2-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <20150206185202.GD10324@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Mason (2015-02-05 19:13:07)
-> Hello everyone,
+On Fri, Jan 09, 2015 at 02:53:52AM +0000, tthayer at opensource.altera.com wrote:
+> From: Thor Thayer <tthayer@opensource.altera.com>
 > 
-> I've been reading about related sub-systems (cpuidle and suspend)
-> and I'm not sure I understand how they relate / interact.
-> 
-> If I understand correctly (please do point out any misconceptions)
-> on ARM Cortex A9, the first level of power saving is WFI, which is
-> typically called from the idle loop.
-> 
-> This places the core in low-power mode ("Standby mode" in ARM docs).
-> "RAM arrays" (don't know what they are), "processor logic", and
-> "data engine" (not sure what any of these exactly refers to, guess
-> I have more reading to do) are still powered-up, but most of the
-> clocks are disabled.
-> 
-> In ARM's exact words, "WFI and WFE Standby modes disable most of the
-> clocks in a processor, while keeping its logic powered up. This reduces
-> the power drawn to the static leakage current, leaving a tiny clock
-> power overhead requirement to enable the device to wake up."
-> 
-> Some CPUs like Intel's have several levels of sleep (deeper levels
-> mean less power, but have a higher wake-up latency). AFAIU, cpuidle
-> is used to describe and manage these levels?
+> This patch enables the ECC for L2 cache on machine
+> startup.  The ECC has to be enabled before data is
+> is stored in memory otherwise the ECC will fail on
+> reads.
 
-(warning: over-simplification below. Please be kind if you decide to
-blow it up)
-
-Hello Mason,
-
-A critical thing to understand is that you are talking about two classes
-of idle behavior or power-saving behavior.
-
-First there are the physical idle states and low-power states that the
-*hardware* (silicon) can achieve. These vary in how much power they save
-with trade-offs such increased wake-up latency, loss of context/cache,
-etc.
-
-WFI is the gateway to low-power states in ARM hardware (from the
-perspective of the Linux kernel). A plain WFI without any extra steps
-will gate the CPUs clocks. With some extra steps (programming target
-power domain state, etc) then WFI can trigger lower voltages supplied by
-the PMIC/regulators, or total power gating for power domains/island
-resulting in increased energy savings but costlier wake-up time and loss
-of context.
-
-The second behavior is what the *software* (Linux OS) tries to do to
-save power. You mentioned two such behaviors above:
-
-1) CPUidle tries to save power by programming the hardware to a low
-power idle state (see above) during moments of idleness. What is idle
-time? It is when no work is scheduled to be run Right Now and the
-scheduler enters the idle thread/loop. Note that CPUidle does not aim to
-affect the schedulability (new word!) of the Linux scheduler. E.g. it
-ideally should not impact performance, as it is only going to target a
-low power hardware idle state opportunistically based on naturally
-occurring idle time from the scheduler.
-
-2) Suspend is very different from CPUidle. It *forces* idleness upon the
-OS until a wake-up event resumes the OS from suspend. Imagine closing
-the lid on your laptop while it is running. That is suspend. Processes
-are frozen regardless of whether we have lots of work scheduled or not.
-Suspend forces the OS to be idle. Typically this software idleness
-corresponds to the deepest hardware idle state, but it doesn't have to.
-
-That last point is why it is important to understand the different
-between idling in software and idling in hardware. More on that below.
+I take it you mean before the L2 cache is enabled (and its memories are
+used), rather than before main memory is in use?
 
 > 
-> Isn't suspend somewhat like the deepest level of sleep?
-> (Or is it different in that things like RAM state are only a concern
-> for suspend, not cpuidle?)
->
+> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+> ---
+> v2: Split OCRAM initialization into separate patch.
+> 
+> v3/4: No change
+> 
+> v5: Remove l2cache.h, use io.h instead of clk-provider.h
+>     Make copyright header inclusive. Remove MAINTAINERS entry.
+> 
+> v6: Remove pr_debug() & update year in header.
+> ---
+>  arch/arm/mach-socfpga/Makefile   |    1 +
+>  arch/arm/mach-socfpga/core.h     |    2 ++
+>  arch/arm/mach-socfpga/l2_cache.c |   39 ++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-socfpga/socfpga.c  |    4 +++-
+>  4 files changed, 45 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/mach-socfpga/l2_cache.c
+> 
+> diff --git a/arch/arm/mach-socfpga/Makefile b/arch/arm/mach-socfpga/Makefile
+> index 6dd7a93..142609e 100644
+> --- a/arch/arm/mach-socfpga/Makefile
+> +++ b/arch/arm/mach-socfpga/Makefile
+> @@ -4,3 +4,4 @@
+>  
+>  obj-y					:= socfpga.o
+>  obj-$(CONFIG_SMP)	+= headsmp.o platsmp.o
+> +obj-$(CONFIG_EDAC_ALTERA_L2C) += l2_cache.o
+> diff --git a/arch/arm/mach-socfpga/core.h b/arch/arm/mach-socfpga/core.h
+> index 483cb46..28c8a15 100644
+> --- a/arch/arm/mach-socfpga/core.h
+> +++ b/arch/arm/mach-socfpga/core.h
+> @@ -47,4 +47,6 @@ extern unsigned long socfpga_cpu1start_addr;
+>  
+>  #define SOCFPGA_SCU_VIRT_BASE   0xfffec000
+>  
+> +void socfpga_init_l2_ecc(void);
+> +
+>  #endif
+> diff --git a/arch/arm/mach-socfpga/l2_cache.c b/arch/arm/mach-socfpga/l2_cache.c
+> new file mode 100644
+> index 0000000..047759d
+> --- /dev/null
+> +++ b/arch/arm/mach-socfpga/l2_cache.c
+> @@ -0,0 +1,39 @@
+> +/*
+> + * Copyright Altera Corporation (C) 2015. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along with
+> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +#include <linux/io.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/of_address.h>
+> +
+> +void socfpga_init_l2_ecc(void)
+> +{
+> +	struct device_node *np;
+> +	void __iomem  *mapped_l2_edac_addr;
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "altr,l2-edac");
+> +	if (!np) {
+> +		pr_err("SOCFPGA: Unable to find altr,l2-edac in dtb\n");
+> +		return;
+> +	}
+> +
+> +	mapped_l2_edac_addr = of_iomap(np, 0);
+> +	if (!mapped_l2_edac_addr) {
+> +		pr_err("SOCFPGA: Unable to find L2 ECC mapping in dtb\n");
+> +		return;
+> +	}
+> +
+> +	/* Enable ECC */
+> +	writel(0x01, mapped_l2_edac_addr);
 
-There is nothing stopping a platform from suspending to RAM and leaving
-everything powered up and only clock gating the CPUs with a WFI. That is
-a brain-dead thing to do but it is possible and illustrates the
-separation of software and hardware idling.
+Missing of_node_put(np)?
 
-Regarding CPUidle, if you predict that you will be idle for a long
-enough period of time then it is perfectly valid for you to hit your
-deepest sleep state in the CPUidle path.
+Surely you're leaking the mapping here? It's locally scoped and you
+never unmap it.
 
-OMAP3 did this quite well: it had a CHIP OFF state that was utilized
-both by suspend/hibernate as well CPUidle (when CPUidle thought that
-there was sufficient idle time to go to that state without adversely
-affecting performance).
-
-However, these days it does seem more common for suspend to target a
-deeper hardware sleep state than the deepest possible CPUidle state for
-a given platform.
-
-Finally, the idle states (C-states) available to CPUidle drivers in the
-mainline Linux kernel are often a poor representation of what the
-hardware can really do to save power. Look at vendor git tree for
-whatever platform you are hacking on and usually you will see that there
-are lots more C-states in those trees than what is merged upstream.
-Maybe we'll fix that problem some day.
-
-Regards,
-Mike
-
-> Are both subsystems still actively used?
-> 
-> I saw plans to merge cpufreq into cpuidle / scheduler decisions.
-> 
-> LCA14: LCA14-306: CPUidle & CPUfreq integration with scheduler
-> http://www.slideshare.net/linaroorg/lca14-306-cpuidlecpufreqintegrationwithscheduler
-> 
-> This presentation doesn't mention suspend, I think.
-> 
-> ARM has a mode called "Dormant Mode". Is suspend typically
-> used to put the SoC in that mode?
-> 
-> I think I need to read this document carefully:
-> Power Management In The Linux Kernel -- Current Status And Future
-> http://events.linuxfoundation.org/sites/events/files/slides/kernel_PM_plain.pdf
-> 
-> There's also an older document that may prove insightful:
-> CPUIdle versus Suspend
-> http://www.linuxplumbersconf.org/2010/ocw/proposals/789
-> 
-> But things move so fast in kernel-land, that I don't know how relevant
-> a 4 year-old document can be.
-> 
-> Regards.
-> 
+Thanks,
+Mark.
