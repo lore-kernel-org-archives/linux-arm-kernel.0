@@ -1,50 +1,30 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 06 Feb 2015 08:46:35 -0500
-Subject: [PATCH] MAINTAINERS: Add dts entries for mvebu and dove
-In-Reply-To: <54D4C4DC.4070208@gmail.com>
-References: <1423225810-5504-1-git-send-email-gregory.clement@free-electrons.com>
- <54D4BF09.2030708@lakedaemon.net> <54D4C1C3.1010209@free-electrons.com>
- <54D4C4DC.4070208@gmail.com>
-Message-ID: <54D4C5BB.50101@lakedaemon.net>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 6 Feb 2015 14:49:53 +0100
+Subject: [PATCH v3 20/20] arm: mach-pxa: Decrement the power supply's
+ device reference counter
+In-Reply-To: <1422629278-12202-21-git-send-email-k.kozlowski@samsung.com>
+References: <1422629278-12202-1-git-send-email-k.kozlowski@samsung.com>
+ <1422629278-12202-21-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20150206134953.GA25683@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/6/15 8:42 AM, Sebastian Hesselbarth wrote:
-> On 06.02.2015 14:29, Gregory CLEMENT wrote:
->> On 06/02/2015 14:18, Jason Cooper wrote:
->>> On 2/6/15 7:30 AM, Gregory CLEMENT wrote:
->>>> Since many releases, the modifications of the mvebu device tree files
->>>> are merged through the mvebu subsystem. This patch makes it official
->>>> in order to help the contributors using the get_maintainer.pl to find
->>>> the accurate people.
->>>>
->>>> In the same time, updated the mvebu description which now includes the
->>>> kirkwood SoCs and new Armada SoCs.
->>>>
->>>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->>>>    ARM/Marvell Berlin SoC support
->>>>    M:    Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->>>
->>> It's just in the context, but I'm sure Sebastian wouldn't mind
->>> if we did berlin as well in this patch.
->>
->> Sebastian,
->> if you agree I will add your entries, and rename the patch to
->>
->> [PATCH] MAINTAINERS: Add dts entries for some of the Marvell Socs
->
-> Gregory,
->
-> yes, I agree. Feel free to add my
->
-> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->
-> for the updated patch already.
+On Fri 2015-01-30 15:47:58, Krzysztof Kozlowski wrote:
+> Use power_supply_put() to decrement the power supply's device reference
+> counter.
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Reviewed-by: Sebastian Reichel <sre@kernel.org>
 
-Oops.  I forgot.  With the changes I suggested,
+11,13,20 nothing obviously wrong. But I'm not sure if I studied them
+closely enough to warrant an ACK.
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+It would be good to get this into kernel -- I seen no bad comments,
+and it is not going to improve without merge into mainline.
 
-thx,
-
-Jason.
+									Pavel
+									
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
