@@ -1,48 +1,29 @@
-From: daniel@zonque.org (Daniel Mack)
-Date: Sat, 07 Feb 2015 23:32:00 +0100
-Subject: [PATCH] ARM: pxa: pxa27x skip default device initialization with
- DT
-In-Reply-To: <1423343914-32342-1-git-send-email-robert.jarzmik@free.fr>
-References: <1423343914-32342-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <54D69260.3020204@zonque.org>
+From: arnd@arndb.de (arnd at arndb.de)
+Date: Sat, 7 Feb 2015 23:41:24 +0100 (CET)
+Subject: [PATCH/RFC 0/4] Probe deferral for IOMMU DT integration
+In-Reply-To: <1423182722-16646-1-git-send-email-lauraa@codeaurora.org>
+References: <1423182722-16646-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <2115835102.210232.1423348884955.JavaMail.open-xchange@oxbaltgw04.schlund.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/07/2015 10:18 PM, Robert Jarzmik wrote:
-> When booting via DT, the default PXA devices must not have been probed
-> before, otherwise the augmented information from the device tree is
-> ignored.
-> 
-> This is the twin commit of commit 82ce44d104dc ("ARM: pxa3xx: skip
-> default device initialization when booting via DT").
-> 
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-
-Looks good to me - thanks!
-
-Acked-by: Daniel Mack <daniel@zonque.org>
-
-> ---
->  arch/arm/mach-pxa/pxa27x.c | 8 ++++++--
->  1 file changed, 6 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
-> index 0485248..b5abdeb 100644
-> --- a/arch/arm/mach-pxa/pxa27x.c
-> +++ b/arch/arm/mach-pxa/pxa27x.c
-> @@ -307,8 +307,12 @@ static int __init pxa27x_init(void)
->  		register_syscore_ops(&pxa_irq_syscore_ops);
->  		register_syscore_ops(&pxa2xx_mfp_syscore_ops);
->  
-> -		pxa_register_device(&pxa27x_device_gpio, &pxa27x_gpio_info);
-> -		ret = platform_add_devices(devices, ARRAY_SIZE(devices));
-> +		if (!of_have_populated_dt()) {
-> +			pxa_register_device(&pxa27x_device_gpio,
-> +					    &pxa27x_gpio_info);
-> +			ret = platform_add_devices(devices,
-> +						   ARRAY_SIZE(devices));
-> +		}
->  	}
->  
->  	return ret;
-> 
+Laura Abbott <lauraa@codeaurora.org> hat am 6. Februar 2015 um 01:31
+geschrieben:
+>
+> The requirement for this is based on a previous patch to add clock
+> support to the ARM SMMU driver[2]. Once we have clock support, it's
+> possible that the driver itself may need to be defered which breaks
+> a bunch of assumptions about how SMMU probing is supposed to work.
+ 
+Hi Laura,
+ 
+I was hoping that we would not need this, and instead treat the iommu in
+the same way as timers and SMP initialization, both
+of which need to be run early at boot time but may rely on clock controllers
+to be initialized first.
+ 
+Is there a specific requirement that makes this impossible here, or is your
+intention to solve the problem more nicely by allowing deferred probing
+over forcing the input clocks of the iommu to be early?
+ 
+      Arnd
