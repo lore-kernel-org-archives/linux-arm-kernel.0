@@ -1,34 +1,139 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 07 Feb 2015 20:30:38 +0300
-Subject: [PATCH v3 2/5] ARM: dts: pxa: add clocks
-In-Reply-To: <87a90p9815.fsf@free.fr>
-References: <1423312760-15871-1-git-send-email-robert.jarzmik@free.fr>	<1423312760-15871-2-git-send-email-robert.jarzmik@free.fr>	<54D60B79.5060206@cogentembedded.com>
- <87a90p9815.fsf@free.fr>
-Message-ID: <54D64BBE.9080704@cogentembedded.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sat, 7 Feb 2015 18:50:39 +0100
+Subject: [PATCH v8 2/3] i2c: iproc: Add Broadcom iProc I2C Driver
+In-Reply-To: <1423272507-18459-3-git-send-email-rjui@broadcom.com>
+References: <rjui@broadcom.com>
+ <1423272507-18459-1-git-send-email-rjui@broadcom.com>
+ <1423272507-18459-3-git-send-email-rjui@broadcom.com>
+Message-ID: <20150207175039.GB6263@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Ray,
 
-On 02/07/2015 04:16 PM, Robert Jarzmik wrote:
+On Fri, Feb 06, 2015 at 05:28:26PM -0800, Ray Jui wrote:
+> Add initial support to the Broadcom iProc I2C controller found in the
+> iProc family of SoCs.
+> 
+> The iProc I2C controller has separate internal TX and RX FIFOs, each has
+> a size of 64 bytes. The iProc I2C controller supports two bus speeds
+> including standard mode (100kHz) and fast mode (400kHz)
 
->>> +		stuart: uart at 40700000 {
->>> +			clocks = <&pxa2xx_clks CLK_STUART>;
->>> +		};
->>> +
+Mostly looking good.
 
->>     The ePAPR standard tells to call such nodes "serial", not "uart".
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/i2c.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/io.h>
+> +#include <linux/slab.h>
+> +#include <linux/delay.h>
 
-> Good to know, but not for this patch.
+Please sort the includes.
 
-> The naming is coming from pxa2xx.dtsi.
+> +static bool bcm_iproc_i2c_bus_busy(struct bcm_iproc_i2c_dev *iproc_i2c)
+> +{
+> +	if (readl(iproc_i2c->base + M_CMD_OFFSET) &
+> +	    (1 << M_CMD_START_BUSY_SHIFT))
+> +		return true;
+> +	else
+> +		return false;
+> +}
 
-    Ah, I was wondering why the node descriptions included only one prop.
+Minor: return !!(readl(...))? You decide.
 
- > And you're very welcome to post a patch to fix that ;)
+> +
+> +static int bcm_iproc_i2c_format_addr(struct bcm_iproc_i2c_dev *iproc_i2c,
+> +				     struct i2c_msg *msg, u8 *addr)
+> +{
+> +	*addr = msg->addr << 1;
+> +
+> +	if (msg->flags & I2C_M_RD)
+> +		*addr |= 1;
+> +
+> +	return 0;
+> +}
 
-    In my copious free time... :-)
+I'd suggest a oneliner.
 
-> Cheers.
+*addr = msg->addr << 1 | (msg->flags & I2C_M_RD ? 1 : 0)
 
-WBR, Sergei
+Or use !! like above.
+
+Don't do an extra function for that. It is only used once and it also
+doesn't need to be int since it can't fail anyhow.
+
+(Note to self: I should make a macro for that in i2c.h)
+
+> +	/* need to reserve one byte in the FIFO for the slave address */
+> +	if (msg->len > M_TX_RX_FIFO_SIZE - 1) {
+> +		dev_err(iproc_i2c->device,
+> +			"only support data length up to %u bytes\n",
+> +			M_TX_RX_FIFO_SIZE - 1);
+> +		return -EINVAL;
+
+-EOPNOTSUPP
+
+Is it really a HW limitation? Could the driver later be extended to
+continue filling the FIFO if a certain threshold is reached?
+
+> +	dev_dbg(iproc_i2c->device, "xfer %c, addr=0x%02x, len=%d\n",
+> +		(msg->flags & I2C_M_RD) ? 'R' : 'W', msg->addr,
+> +		msg->len);
+> +	dev_dbg(iproc_i2c->device, "*** data: %*ph\n", msg->len, msg->buf);
+
+Not really needed. We have tracing for that.
+
+> +	if (bus_speed < 100000) {
+> +		dev_err(iproc_i2c->device, "%d Hz bus speed not supported\n",
+> +			bus_speed);
+> +		dev_err(iproc_i2c->device,
+> +			"valid speeds are 100khz and 400khz\n");
+> +		return -EINVAL;
+> +	} else if (bus_speed < 400000) {
+> +		bus_speed = 100000;
+> +		speed_bit = 0;
+> +	} else {
+> +		bus_speed = 400000;
+> +		speed_bit = 1;
+> +	}
+> +
+> +	val = readl(iproc_i2c->base + TIM_CFG_OFFSET);
+> +	val &= ~(1 << TIM_CFG_MODE_400_SHIFT);
+> +	val |= speed_bit << TIM_CFG_MODE_400_SHIFT;
+
+val |= (bus_speed == 400000) ...
+
+and skip speed_bit? You decide.
+
+> +static void bcm_iproc_i2c_enable(struct bcm_iproc_i2c_dev *iproc_i2c)
+> +{
+> +	u32 val;
+> +
+> +	val = readl(iproc_i2c->base + CFG_OFFSET);
+> +	val |= 1 << CFG_EN_SHIFT;
+> +	writel(val, iproc_i2c->base + CFG_OFFSET);
+> +}
+> +
+> +static void bcm_iproc_i2c_disable(struct bcm_iproc_i2c_dev *iproc_i2c)
+> +{
+> +	u32 val;
+> +
+> +	val = readl(iproc_i2c->base + CFG_OFFSET);
+> +	val &= ~(1 << CFG_EN_SHIFT);
+> +	writel(val, iproc_i2c->base + CFG_OFFSET);
+> +}
+
+Extra functions? They are self explaining and only used once. You
+decide.
+
+Rest looks fine, thanks!
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150207/e4a4fb2e/attachment-0001.sig>
