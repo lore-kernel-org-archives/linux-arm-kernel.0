@@ -1,36 +1,31 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Sat, 07 Feb 2015 09:38:04 +0100
-Subject: [PATCH 0/4] ASoC: samsung: clean up references to outdated
- Kconfig symbols
-In-Reply-To: <20150206235044.GO31311@finisterre.sirena.org.uk>
-References: <1421664067.9655.51.camel@x220>
- <20150206235044.GO31311@finisterre.sirena.org.uk>
-Message-ID: <1423298284.2246.5.camel@x220>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 7 Feb 2015 09:51:35 +0000
+Subject: Delays, clocks, timers, hrtimers, etc
+In-Reply-To: <54D576B1.4000001@free.fr>
+References: <54C8E125.3070905@free.fr>
+ <e028a4eb604a491f4438557f4a1373ef@agner.ch>
+ <54D52F84.9050600@free.fr>
+ <266c7b1ff2d1a8ba0ae4866f4fb4eca5@agner.ch>
+ <54D576B1.4000001@free.fr>
+Message-ID: <20150207095135.GB8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2015-02-07 at 07:50 +0800, Mark Brown wrote:
-> On Mon, Jan 19, 2015 at 11:41:07AM +0100, Paul Bolle wrote:
-> > A few series of ARM cleanups regarding S5PC100 and S5PV210 were included
-> > in v3.17. These series removed these five Kconfig symbols:
-> >     MACH_AQUILA
-> >     MACH_GONI
-> >     MACH_SMDKC100
-> >     MACH_SMDKC110
-> >     MACH_SMDKV210
-> > 
-> > This series, done on top of next-20150119, removes the remaining
-> 
-> If you are posting a patch series please ensure that all the patches in
-> the series are threaded in reply to the cover letter (or first patch if
-> there isn't one) so that mail clients can see to display them as a
-> series.
+On Fri, Feb 06, 2015 at 06:21:37PM -0800, Mason wrote:
+> Also, reading arch/arm/kernel/smp_twd.c, I see that frequency changes
+> due to cpufreq are properly accounted for. (Although I imagine they do
+> introduce a small error in time-keeping because moving from freq_A to
+> freq_B is not instantaneous, so the exact time elapsed in-between is
+> impossible to determine.)
 
-Patches 2/4, 3/4, and 4/4 didn't apply. Locally I carry them in a tree
-that constantly rebases on top of linux-next. So locally I carry these
-patches on top of next-20150204.
+TWD is not used for time keeping as such.  As I explained in one of my
+previous emails, local timers are used to signal events.
 
-What tree would you like me to rebase this onto?
+The active clocksource is used to determine the passing of time-of-day,
+and sched_clock is used to account for process time by the scheduler.
 
+An early/late/missed local timer interrupt has no impact on time keeping.
 
-Paul Bolle
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
