@@ -1,61 +1,53 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat,  7 Feb 2015 22:54:02 +0100
-Subject: [PATCH 1/2] ARM: pxa: convert eseries to clock framework
-In-Reply-To: <1423346043-7391-1-git-send-email-robert.jarzmik@free.fr>
-References: <1423346043-7391-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1423346043-7391-2-git-send-email-robert.jarzmik@free.fr>
+Date: Sat,  7 Feb 2015 22:54:01 +0100
+Subject: [PATCH 0/2] Switch pxa architecture to clock framework
+Message-ID: <1423346043-7391-1-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As pxa architecture transitions to clock framework, the previously
-available INIT_CLKREG is no more. Use the fixed clock rate initializer
-to declare the "fake" CLK_CK32K in eseries.
+This is it, everything looks ready for the leap of faith.
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
- arch/arm/mach-pxa/eseries.c | 21 ++-------------------
- 1 file changed, 2 insertions(+), 19 deletions(-)
+This serie removes all legacy clock code, and pxa25x, pxa27x and pxa3xx are
+migrated to clock framework. This serie was tested on lubbock (pxa250), mioa701
+(pxa270) and zylonite (pxa310). I plan to test also cm-x300 and mainstone in the
+near future.
 
-diff --git a/arch/arm/mach-pxa/eseries.c b/arch/arm/mach-pxa/eseries.c
-index d8fc9a3..9522265 100644
---- a/arch/arm/mach-pxa/eseries.c
-+++ b/arch/arm/mach-pxa/eseries.c
-@@ -12,6 +12,7 @@
- 
- #include <linux/kernel.h>
- #include <linux/init.h>
-+#include <linux/clk-provider.h>
- #include <linux/gpio.h>
- #include <linux/delay.h>
- #include <linux/platform_device.h>
-@@ -125,27 +126,9 @@ struct resource eseries_tmio_resources[] = {
- };
- 
- /* Some e-series hardware cannot control the 32K clock */
--static void clk_32k_dummy(struct clk *clk)
--{
--}
--
--static const struct clkops clk_32k_dummy_ops = {
--	.enable         = clk_32k_dummy,
--	.disable        = clk_32k_dummy,
--};
--
--static struct clk tmio_dummy_clk = {
--	.ops	= &clk_32k_dummy_ops,
--	.rate	= 32768,
--};
--
--static struct clk_lookup eseries_clkregs[] = {
--	INIT_CLKREG(&tmio_dummy_clk, NULL, "CLK_CK32K"),
--};
--
- static void __init eseries_register_clks(void)
- {
--	clkdev_add_table(eseries_clkregs, ARRAY_SIZE(eseries_clkregs));
-+	clk_register_fixed_rate(NULL, "CLK_CK32K", NULL, CLK_IS_ROOT, 32768);
- }
- 
- #ifdef CONFIG_MACH_E330
+This has the potential to break many pxa boards. The more test it receives, the
+better. I'd like this to hit v3.21.
+
+All this work is available here :
+  git fetch https://github.com/rjarzmik/linux.git work/clocks-pxa
+
+Cheers.
+
+--
+Robert
+
+Robert Jarzmik (2):
+  ARM: pxa: convert eseries to clock framework
+  ARM: pxa: Transition pxa25x, pxa27x, pxa3xx to clk framework
+
+ arch/arm/Kconfig                 |   2 +-
+ arch/arm/mach-pxa/Makefile       |   2 +-
+ arch/arm/mach-pxa/clock-pxa2xx.c |  55 ----------
+ arch/arm/mach-pxa/clock-pxa3xx.c | 212 ---------------------------------------
+ arch/arm/mach-pxa/clock.c        |  86 ----------------
+ arch/arm/mach-pxa/clock.h        |  80 ---------------
+ arch/arm/mach-pxa/eseries.c      |  22 +---
+ arch/arm/mach-pxa/generic.c      |   2 +
+ arch/arm/mach-pxa/generic.h      |   1 +
+ arch/arm/mach-pxa/lubbock.c      |   1 -
+ arch/arm/mach-pxa/pxa25x.c       |   1 -
+ arch/arm/mach-pxa/pxa300.c       |  20 +---
+ arch/arm/mach-pxa/pxa320.c       |  10 --
+ arch/arm/mach-pxa/pxa3xx.c       |  59 -----------
+ arch/arm/mach-pxa/raumfeld.c     |   1 -
+ arch/arm/mach-pxa/tosa.c         |   1 -
+ 16 files changed, 8 insertions(+), 547 deletions(-)
+ delete mode 100644 arch/arm/mach-pxa/clock-pxa2xx.c
+ delete mode 100644 arch/arm/mach-pxa/clock-pxa3xx.c
+ delete mode 100644 arch/arm/mach-pxa/clock.c
+ delete mode 100644 arch/arm/mach-pxa/clock.h
+
 -- 
 2.1.0
