@@ -1,47 +1,61 @@
-From: arnd@arndb.de (arnd at arndb.de)
-Date: Sat, 7 Feb 2015 22:24:35 +0100 (CET)
-Subject: [PATCH] kvmtool: don't use PCI config space IRQ line field
-In-Reply-To: <20150206190719.GG24099@arm.com>
-References: <4324891.mqG6Yyfi6J@wuerfel>
- <1423064390-15269-1-git-send-email-andre.przywara@arm.com>
- <20150206185527.GC24099@arm.com>
- <CAFEAcA_zKisc6YOm_4vqpOWCkG5aeyfha1u_-8=DeT6CCRJUwQ@mail.gmail.com>
- <20150206190719.GG24099@arm.com>
-Message-ID: <375964521.209613.1423344275182.JavaMail.open-xchange@oxbaltgw04.schlund.de>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat,  7 Feb 2015 22:54:02 +0100
+Subject: [PATCH 1/2] ARM: pxa: convert eseries to clock framework
+In-Reply-To: <1423346043-7391-1-git-send-email-robert.jarzmik@free.fr>
+References: <1423346043-7391-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1423346043-7391-2-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Will Deacon <will.deacon@arm.com> hat am 6. Februar 2015 um 20:07 geschrieben:
-> On Fri, Feb 06, 2015 at 07:02:25PM +0000, Peter Maydell wrote:
-> > On 6 February 2015 at 18:55, Will Deacon <will.deacon@arm.com> wrote:
-> > > On Wed, Feb 04, 2015 at 03:39:50PM +0000, Andre Przywara wrote:
-> > >> In PCI config space there is an interrupt line field (offset 0x3f),
-> > >> which is used to initially communicate the IRQ line number from
-> > >> firmware to the OS. _Hardware_ should never use this information,
-> > >> as the OS is free to write any information in there.
-> > >
-> > > Is this true even with probe-only? I appreciate that this isn't a BAR,
-> > > but it still feels odd for Linux to write this in that case.
-> >
-> > The hardware (model) shouldn't be doing anything with the value
-> > in this register anyway, so I think this change to kvmtool is
-> > correct regardless of Linux's behaviour.
->
-> Well, kvmtool is also pretending to be firmware in this case, which is why
-> it passes things like probe-only and PSCI nodes.
+As pxa architecture transitions to clock framework, the previously
+available INIT_CLKREG is no more. Use the fixed clock rate initializer
+to declare the "fake" CLK_CK32K in eseries.
 
-And this means that we should expect kvmtool to initialize these fields to
-a meaningful value, but not care if the OS writes something else to them.
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ arch/arm/mach-pxa/eseries.c | 21 ++-------------------
+ 1 file changed, 2 insertions(+), 19 deletions(-)
 
-An interesting question is what value kvmtool should write in there. IIRC,
-SBSA says that the each interrupt line on the PCI should be an SPI of the
-primary GIC, so I suppose we could write the SPI number, although that would
-be different of the traditional Linux interrupt number user for that SPI,
-which has an offset added to it.
-
-Of course for any hardware that is not SBSA compliant in this regard and
-connects the interrupt line to a secondary irqchip (e.g. gpio), there is
-no good 8-bit number we can write in here. Also, Linux does not care,
-because it gets the number from DT rather than the PCI config space.
-
-     Arnd
+diff --git a/arch/arm/mach-pxa/eseries.c b/arch/arm/mach-pxa/eseries.c
+index d8fc9a3..9522265 100644
+--- a/arch/arm/mach-pxa/eseries.c
++++ b/arch/arm/mach-pxa/eseries.c
+@@ -12,6 +12,7 @@
+ 
+ #include <linux/kernel.h>
+ #include <linux/init.h>
++#include <linux/clk-provider.h>
+ #include <linux/gpio.h>
+ #include <linux/delay.h>
+ #include <linux/platform_device.h>
+@@ -125,27 +126,9 @@ struct resource eseries_tmio_resources[] = {
+ };
+ 
+ /* Some e-series hardware cannot control the 32K clock */
+-static void clk_32k_dummy(struct clk *clk)
+-{
+-}
+-
+-static const struct clkops clk_32k_dummy_ops = {
+-	.enable         = clk_32k_dummy,
+-	.disable        = clk_32k_dummy,
+-};
+-
+-static struct clk tmio_dummy_clk = {
+-	.ops	= &clk_32k_dummy_ops,
+-	.rate	= 32768,
+-};
+-
+-static struct clk_lookup eseries_clkregs[] = {
+-	INIT_CLKREG(&tmio_dummy_clk, NULL, "CLK_CK32K"),
+-};
+-
+ static void __init eseries_register_clks(void)
+ {
+-	clkdev_add_table(eseries_clkregs, ARRAY_SIZE(eseries_clkregs));
++	clk_register_fixed_rate(NULL, "CLK_CK32K", NULL, CLK_IS_ROOT, 32768);
+ }
+ 
+ #ifdef CONFIG_MACH_E330
+-- 
+2.1.0
