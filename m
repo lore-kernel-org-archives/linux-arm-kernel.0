@@ -1,177 +1,65 @@
-From: ykk@rock-chips.com (yakir)
-Date: Sat, 07 Feb 2015 11:33:27 +0800
-Subject: [PATCH v3 04/15] drm: bridge/dw_hdmi: add indentification
- registers parse and record
-In-Reply-To: <CAGS+omCiGh0-4BbPjPS+KqMW9-OpJ8Je7o37Web06w1CR7RPgw@mail.gmail.com>
-References: <1422975418-13302-1-git-send-email-ykk@rock-chips.com>
- <1422976283-30071-1-git-send-email-ykk@rock-chips.com>
- <CAGS+omCiGh0-4BbPjPS+KqMW9-OpJ8Je7o37Web06w1CR7RPgw@mail.gmail.com>
-Message-ID: <54D58787.8040400@rock-chips.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Sat, 07 Feb 2015 11:36:42 +0800
+Subject: [PATCH v8 08/21] dt / chosen: Add linux,uefi-stub-generated-dtb
+ property
+In-Reply-To: <CAGCh1+nL7YMXYp42ekWAqmw_m5cy=s_7NszLDAXj=bUr2aZVig@mail.gmail.com>
+References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>	<1422881149-8177-9-git-send-email-hanjun.guo@linaro.org>	<20150202134033.GR4278@bivouac.eciton.net>	<20150202135051.GA3825@xora-haswell.xora.org.uk>	<20150202163253.GG21175@leverpostej>
+ <CAGCh1+nL7YMXYp42ekWAqmw_m5cy=s_7NszLDAXj=bUr2aZVig@mail.gmail.com>
+Message-ID: <54D5884A.6050009@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 02/05/2015 11:46 PM, Daniel Kurtz wrote:
-> On Tue, Feb 3, 2015 at 11:11 PM, Yakir Yang <ykk@rock-chips.com> wrote:
->> By parsing the indentification registers we can know what functions
->> are present on the hdmi ip.
+On 2015?02?06? 18:34, G Gregory wrote:
+[...]
+>>>>>   --------------------------------------------------------------------------------
+>>>>>   linux,uefi-stub-kern-ver  | string | Copy of linux_banner from build.
+>>>>>   --------------------------------------------------------------------------------
+>>>>> +linux,uefi-stub-generated-dtb  | bool | Indication for no DTB provided by
+>>>>> +                        |      | firmware.
+>>>>> +--------------------------------------------------------------------------------
+>>>>
+>>>> Apologies for the late bikeshedding, but the discussion on this topic
+>>>> previsously was lively enough that I thought I'd let it die down a bit
+>>>> before seeing if I had anything to add.
+>>>>
+>>>> That, and I just realised something:
+>>>> One alternative to this added DT entry is that we could treat the
+>>>> absence of a registered UEFI configuration table as the indication
+>>>> that no HW description was provided from firmware, since the stub does
+>>>> not call InstallConfigurationTable() on the DT it generates. This does
+>>>> move the ability to detect to after efi_init(), but this should be
+>>>> fine for ACPI-purposes.
+>>>>
+>>> That would not work as expected in the kexec/Xen use case though as they
+>>> may genuinely boot with DT from an ACPI host without UEFI.
 >>
->> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
->> ---
->> Changes in v3:
->> - Add ID registers parse and record
+>> I'm a little concerned by this case. How do we intend to pass stuff from
+>> Xen to the kernel in this case? When we initially discussed the stub
+>> prior to merging, we weren't quite sure if ACPI without UEFI was
+>> entirely safe.
 >>
->> Changes in v2: None
+>> The linux,uefi-stub-kern-ver property was originally intended as a
+>> sanity-check feature to ensure nothing (including Xen) masqueraded as
+>> the stub, but for some reason the actual sanity check was never
+>> implemented.
 >>
->>   drivers/gpu/drm/bridge/dw_hdmi.c | 59 ++++++++++++++++++++++++++++++++++++++++
->>   drivers/gpu/drm/bridge/dw_hdmi.h | 23 ++++++++++++++++
->>   2 files changed, 82 insertions(+)
+>>>> If that is deemed undesirable, I would still prefer Catalin's
+>>>> suggested name ("linux,bare-dtb"), which describes the state rather
+>>>> than the route we took to get there.
+>>>>
+>>> I agree.
 >>
->> diff --git a/drivers/gpu/drm/bridge/dw_hdmi.c b/drivers/gpu/drm/bridge/dw_hdmi.c
->> index 08f10da..7b5b664 100644
->> --- a/drivers/gpu/drm/bridge/dw_hdmi.c
->> +++ b/drivers/gpu/drm/bridge/dw_hdmi.c
->> @@ -79,6 +79,23 @@ static const u16 csc_coeff_rgb_in_eitu709[3][4] = {
->>          { 0x6756, 0x78ab, 0x2000, 0x0200 }
->>   };
->>
->> +struct hdmi_id {
->> +       u8 design;
->> +       u8 revision;
->> +
->> +       bool prepen;
->> +       bool audspdif;
->> +       bool audi2s;
->> +       bool hdmi14;
->> +       bool csc;
->> +       bool hdcp;
->> +       bool hdmi20;
->> +       bool confapb;
->> +       bool ahbauddma;
->> +       bool gpaud;
->> +       u8 phy_type;
->> +};
->> +
->>   struct hdmi_vmode {
->>          bool mdvi;
->>          bool mhsyncpolarity;
->> @@ -111,6 +128,8 @@ struct dw_hdmi {
->>          struct clk *isfr_clk;
->>          struct clk *iahb_clk;
->>
->> +       struct hdmi_id id;
->> +
->>          struct hdmi_data_info hdmi_data;
->>          const struct dw_hdmi_plat_data *plat_data;
->>
->> @@ -1259,6 +1278,36 @@ static int dw_hdmi_setup(struct dw_hdmi *hdmi, struct drm_display_mode *mode)
->>          return 0;
->>   }
->>
->> +static void hdmi_parse_id(struct dw_hdmi *hdmi)
->> +{
->> +       u8 config0_id, config1_id, config2_id, config3_id;
->> +
->> +       config0_id = hdmi_readb(hdmi, HDMI_CONFIG0_ID);
->> +       config1_id = hdmi_readb(hdmi, HDMI_CONFIG1_ID);
->> +       config2_id = hdmi_readb(hdmi, HDMI_CONFIG2_ID);
->> +       config3_id = hdmi_readb(hdmi, HDMI_CONFIG3_ID);
->> +
->> +       hdmi->id.prepen = config0_id & HDMI_CONFIG0_ID_PREPEN ? true : false;
-> These could all be "!!(A & B)", but perhaps that is just a matter of
-> personal preference.
-Okay, "!!(A & B)" looks good, I will modify it.
-
-Thanks.  : )
->> +       hdmi->id.audi2s = config0_id & HDMI_CONFIG0_ID_AUDI2S ? true : false;
->> +       hdmi->id.hdmi14 = config0_id & HDMI_CONFIG0_ID_HDMI14 ? true : false;
->> +       hdmi->id.hdcp = config0_id & HDMI_CONFIG0_ID_HDCP ? true : false;
->> +       hdmi->id.csc = config0_id & HDMI_CONFIG0_ID_CSC ? true : false;
->> +       hdmi->id.audspdif = config0_id & HDMI_CONFIG0_ID_AUDSPDIF ?
->> +                           true : false;
->> +
->> +       hdmi->id.confapb = config1_id & HDMI_CONFIG1_ID_CONFAPB ? true : false;
->> +       hdmi->id.hdmi20 = config1_id & HDMI_CONFIG1_ID_HDMI20 ? true : false;
->> +
->> +       hdmi->id.phy_type = config2_id & HDMI_CONFIG2_ID;
-> HDMI_CONFIG2_ID is a register offset, not a mask.
-
-Thanks, I will correct it.
-
->> +
->> +       hdmi->id.gpaud = config3_id & HDMI_CONFIG3_ID_GPAUD ? true : false;
->> +       hdmi->id.ahbauddma = config3_id & HDMI_CONFIG3_ID_AHBAUDDMA ?
->> +                            true : false;
->> +
->> +       hdmi->id.design = hdmi_readb(hdmi, HDMI_DESIGN_ID);
->> +       hdmi->id.revision = hdmi_readb(hdmi, HDMI_REVISION_ID);
->> +}
->> +
->>   /* Wait until we are registered to enable interrupts */
->>   static int dw_hdmi_fb_registered(struct dw_hdmi *hdmi)
->>   {
->> @@ -1670,6 +1719,16 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
->>                   hdmi_readb(hdmi, HDMI_PRODUCT_ID0),
->>                   hdmi_readb(hdmi, HDMI_PRODUCT_ID1));
->>
->> +       /* Config IDs */
->> +       dev_info(dev,
->> +                "Detected HDMI config_id 0x%x:0x%x:0x%x:0x%x\n",
->> +                hdmi_readb(hdmi, HDMI_CONFIG0_ID),
->> +                hdmi_readb(hdmi, HDMI_CONFIG1_ID),
->> +                hdmi_readb(hdmi, HDMI_CONFIG2_ID),
->> +                hdmi_readb(hdmi, HDMI_CONFIG3_ID));
->> +
->> +       hdmi_parse_id(hdmi);
-> It seems a bit silly to read the regs once to print them, and then
-> again in hdmi_parse_id().
-> Perhaps move the dev_info() inside hdmi_parse_id().
-> It would also be nice to print a full summary of all of the parsed fields.
-Okay, I will warp them into hdmi_parse_id().
-
-Thanks.  : )
-
->> +
->>          initialize_hdmi_ih_mutes(hdmi);
->>
->>          ret = devm_request_threaded_irq(dev, irq, dw_hdmi_hardirq,
->> diff --git a/drivers/gpu/drm/bridge/dw_hdmi.h b/drivers/gpu/drm/bridge/dw_hdmi.h
->> index 175dbc8..e4ba634 100644
->> --- a/drivers/gpu/drm/bridge/dw_hdmi.h
->> +++ b/drivers/gpu/drm/bridge/dw_hdmi.h
->> @@ -545,6 +545,29 @@
->>   #define HDMI_I2CM_FS_SCL_LCNT_0_ADDR            0x7E12
->>
->>   enum {
->> +/* HDMI_CONFIG0_ID */
->> +       HDMI_CONFIG0_ID_PREPEN = 0x80,
->> +       HDMI_CONFIG0_ID_AUDSPDIF = 0x20,
->> +       HDMI_CONFIG0_ID_AUDI2S = 0x10,
->> +       HDMI_CONFIG0_ID_HDMI14 = 0x08,
->> +       HDMI_CONFIG0_ID_CSC = 0x04,
->> +       HDMI_CONFIG0_ID_HDCP = 0x01,
->> +
->> +/* HDMI_CONFIG1_ID */
->> +       HDMI_CONFIG1_ID_HDMI20 = 0x20,
->> +       HDMI_CONFIG1_ID_CONFAPB = 0x02,
->> +
->> +/* HDMI_CONFIG2_ID */
->> +       HDMI_CONFIG2_ID_PHY_GEN2 = 0xf2,
->> +       HDMI_CONFIG2_ID_PHY_GEN2_HECA = 0xe2,
->> +       HDMI_CONFIG2_ID_PHY_HDMI_MHL = 0xc2,
->> +       HDMI_CONFIG2_ID_PHY_HDMI_MHL_HECA = 0xb2,
->> +       HDMI_CONFIG2_ID_LEGACY_PHY = 0x00,
->> +
->> +/* HDMI_CONFIG3_ID */
->> +       HDMI_CONFIG3_ID_AHBAUDDMA = 0x02,
->> +       HDMI_CONFIG3_ID_GPAUD = 0x01,
->> +
->>   /* IH_FC_INT2 field values */
->>          HDMI_IH_FC_INT2_OVERFLOW_MASK = 0x03,
->>          HDMI_IH_FC_INT2_LOW_PRIORITY_OVERFLOW = 0x02,
->> --
->> 2.1.2
->>
+>> I guess this would be ok, though it would be nice to know which agent
+>> generated the DTB.
 >>
 >
+> The most obvious scheme then is
 >
+> linux,bare-dtb = "uefi-stub";
+>
+> otherwise we generate a new binding for every component in the boot path.
+
+Leif, Mark, any comments on this?
+
+Thanks
+Hanjun
