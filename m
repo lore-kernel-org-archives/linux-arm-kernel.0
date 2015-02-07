@@ -1,146 +1,628 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 7 Feb 2015 00:25:50 +0000 (UTC)
-Subject: [PATCH] ARM: omap1_defconfig: drop obsolete Kconfig symbols
-Message-ID: <alpine.DEB.2.02.1502070024030.3767@utopia.booyaka.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Fri, 6 Feb 2015 16:54:24 -0800
+Subject: [v7,2/3] i2c: iproc: Add Broadcom iProc I2C Driver
+In-Reply-To: <20150206223149.GB345@google.com>
+References: <1421704310-26857-3-git-send-email-rjui@broadcom.com>
+ <20150206223149.GB345@google.com>
+Message-ID: <54D56240.1060909@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-scripts/checkkconfigsymbols.py indicates that omap1_defconfig
-references the following obsolete Kconfig symbols:
 
-CONFIG_BT_L2CAP
-CONFIG_BT_SCO
-CONFIG_DEBUG_ERRORS
-CONFIG_EXPERIMENTAL
-CONFIG_FB_OMAP_BOOTLOADER_INIT
-CONFIG_LEDS_CPU
-CONFIG_MACH_OMAP_HTCWIZARD
-CONFIG_MTD_CHAR
-CONFIG_MTD_DEBUG
-CONFIG_MTD_DEBUG_VERBOSE
-CONFIG_MTD_PARTITIONS
-CONFIG_NET_ETHERNET
-CONFIG_RCU_CPU_STALL_DETECTOR
-CONFIG_SCSI_MULTI_LUN
-CONFIG_USB_DEVICE_CLASS
-CONFIG_VIDEO_OUTPUT_CONTROL
+On 2/6/2015 2:31 PM, Kevin Cernekee wrote:
+> On Mon, Jan 19, 2015 at 01:51:49PM -0800, Ray Jui wrote:
+>> Add initial support to the Broadcom iProc I2C controller found in the
+>> iProc family of SoCs.
+>>
+>> The iProc I2C controller has separate internal TX and RX FIFOs, each has
+>> a size of 64 bytes. The iProc I2C controller supports two bus speeds
+>> including standard mode (100kHz) and fast mode (400kHz)
+>>
+>> Signed-off-by: Ray Jui <rjui <at> broadcom.com>
+>> Reviewed-by: Scott Branden <sbranden <at> broadcom.com>
+>> ---
+>>  drivers/i2c/busses/Kconfig         |   10 +
+>>  drivers/i2c/busses/Makefile        |    1 +
+>>  drivers/i2c/busses/i2c-bcm-iproc.c |  505 ++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 516 insertions(+)
+>>  create mode 100644 drivers/i2c/busses/i2c-bcm-iproc.c
+>>
+>> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+>> index 31e8308..af76d23 100644
+>> --- a/drivers/i2c/busses/Kconfig
+>> +++ b/drivers/i2c/busses/Kconfig
+>>  <at>  <at>  -372,6 +372,16  <at>  <at>  config I2C_BCM2835
+>>  	  This support is also available as a module.  If so, the module
+>>  	  will be called i2c-bcm2835.
+>>
+>> +config I2C_BCM_IPROC
+>> +	tristate "Broadcom iProc I2C controller"
+>> +	depends on ARCH_BCM_IPROC || COMPILE_TEST
+>> +	default ARCH_BCM_IPROC
+>> +	help
+>> +	  If you say yes to this option, support will be included for the
+>> +	  Broadcom iProc I2C controller.
+>> +
+>> +	  If you don't know what to do here, say N.
+>> +
+>>  config I2C_BCM_KONA
+>>  	tristate "BCM Kona I2C adapter"
+>>  	depends on ARCH_BCM_MOBILE
+>> diff --git a/drivers/i2c/busses/Makefile b/drivers/i2c/busses/Makefile
+>> index 56388f6..d93b509 100644
+>> --- a/drivers/i2c/busses/Makefile
+>> +++ b/drivers/i2c/busses/Makefile
+>>  <at>  <at>  -33,6 +33,7  <at>  <at>  obj-$(CONFIG_I2C_AT91)		+= i2c-at91.o
+>>  obj-$(CONFIG_I2C_AU1550)	+= i2c-au1550.o
+>>  obj-$(CONFIG_I2C_AXXIA)		+= i2c-axxia.o
+>>  obj-$(CONFIG_I2C_BCM2835)	+= i2c-bcm2835.o
+>> +obj-$(CONFIG_I2C_BCM_IPROC)	+= i2c-bcm-iproc.o
+>>  obj-$(CONFIG_I2C_BLACKFIN_TWI)	+= i2c-bfin-twi.o
+>>  obj-$(CONFIG_I2C_CADENCE)	+= i2c-cadence.o
+>>  obj-$(CONFIG_I2C_CBUS_GPIO)	+= i2c-cbus-gpio.o
+>> diff --git a/drivers/i2c/busses/i2c-bcm-iproc.c b/drivers/i2c/busses/i2c-bcm-iproc.c
+>> new file mode 100644
+>> index 0000000..64c622f
+>> --- /dev/null
+>> +++ b/drivers/i2c/busses/i2c-bcm-iproc.c
+>>  <at>  <at>  -0,0 +1,505  <at>  <at> 
+>> +/*
+>> + * Copyright (C) 2014 Broadcom Corporation
+>> + *
+>> + * This program is free software; you can redistribute it and/or
+>> + * modify it under the terms of the GNU General Public License as
+>> + * published by the Free Software Foundation version 2.
+>> + *
+>> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+>> + * kind, whether express or implied; without even the implied warranty
+>> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +#include <linux/kernel.h>
+>> +#include <linux/module.h>
+>> +#include <linux/i2c.h>
+>> +#include <linux/interrupt.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/io.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/delay.h>
+>> +
+>> +#define CFG_OFFSET                   0x00
+>> +#define CFG_RESET_SHIFT              31
+>> +#define CFG_EN_SHIFT                 30
+>> +#define CFG_M_RETRY_CNT_SHIFT        16
+>> +#define CFG_M_RETRY_CNT_MASK         0x0f
+>> +
+>> +#define TIM_CFG_OFFSET               0x04
+>> +#define TIM_CFG_MODE_400_SHIFT       31
+>> +
+>> +#define M_FIFO_CTRL_OFFSET           0x0c
+>> +#define M_FIFO_RX_FLUSH_SHIFT        31
+>> +#define M_FIFO_TX_FLUSH_SHIFT        30
+>> +#define M_FIFO_RX_CNT_SHIFT          16
+>> +#define M_FIFO_RX_CNT_MASK           0x7f
+>> +#define M_FIFO_RX_THLD_SHIFT         8
+>> +#define M_FIFO_RX_THLD_MASK          0x3f
+>> +
+>> +#define M_CMD_OFFSET                 0x30
+>> +#define M_CMD_START_BUSY_SHIFT       31
+>> +#define M_CMD_STATUS_SHIFT           25
+>> +#define M_CMD_STATUS_MASK            0x07
+>> +#define M_CMD_STATUS_SUCCESS         0x0
+>> +#define M_CMD_STATUS_LOST_ARB        0x1
+>> +#define M_CMD_STATUS_NACK_ADDR       0x2
+>> +#define M_CMD_STATUS_NACK_DATA       0x3
+>> +#define M_CMD_STATUS_TIMEOUT         0x4
+>> +#define M_CMD_PROTOCOL_SHIFT         9
+>> +#define M_CMD_PROTOCOL_MASK          0xf
+>> +#define M_CMD_PROTOCOL_BLK_WR        0x7
+>> +#define M_CMD_PROTOCOL_BLK_RD        0x8
+>> +#define M_CMD_PEC_SHIFT              8
+>> +#define M_CMD_RD_CNT_SHIFT           0
+>> +#define M_CMD_RD_CNT_MASK            0xff
+>> +
+>> +#define IE_OFFSET                    0x38
+>> +#define IE_M_RX_FIFO_FULL_SHIFT      31
+>> +#define IE_M_RX_THLD_SHIFT           30
+>> +#define IE_M_START_BUSY_SHIFT        28
+>> +
+>> +#define IS_OFFSET                    0x3c
+>> +#define IS_M_RX_FIFO_FULL_SHIFT      31
+>> +#define IS_M_RX_THLD_SHIFT           30
+>> +#define IS_M_START_BUSY_SHIFT        28
+>> +
+>> +#define M_TX_OFFSET                  0x40
+>> +#define M_TX_WR_STATUS_SHIFT         31
+>> +#define M_TX_DATA_SHIFT              0
+>> +#define M_TX_DATA_MASK               0xff
+>> +
+>> +#define M_RX_OFFSET                  0x44
+>> +#define M_RX_STATUS_SHIFT            30
+>> +#define M_RX_STATUS_MASK             0x03
+>> +#define M_RX_PEC_ERR_SHIFT           29
+>> +#define M_RX_DATA_SHIFT              0
+>> +#define M_RX_DATA_MASK               0xff
+>> +
+>> +#define I2C_TIMEOUT_MESC             100
+>> +#define M_TX_RX_FIFO_SIZE            64
+>> +
+>> +enum bus_speed_index {
+>> +	I2C_SPD_100K = 0,
+>> +	I2C_SPD_400K,
+>> +};
+>> +
+>> +struct bcm_iproc_i2c_dev {
+>> +	struct device *device;
+>> +	int irq;
+>> +
+>> +	void __iomem *base;
+>> +
+>> +	struct i2c_adapter adapter;
+>> +
+>> +	struct completion done;
+>> +	int xfer_is_done;
+>> +};
+>> +
+>> +/*
+>> + * Can be expanded in the future if more interrupt status bits are utilized
+>> + */
+>> +#define ISR_MASK (1 << IS_M_START_BUSY_SHIFT)
+>> +
+>> +static irqreturn_t bcm_iproc_i2c_isr(int irq, void *data)
+>> +{
+>> +	struct bcm_iproc_i2c_dev *iproc_i2c = data;
+>> +	u32 status = readl(iproc_i2c->base + IS_OFFSET);
+>> +
+>> +	status &= ISR_MASK;
+>> +
+>> +	if (!status)
+>> +		return IRQ_NONE;
+>> +
+>> +	writel(status, iproc_i2c->base + IS_OFFSET);
+>> +	iproc_i2c->xfer_is_done = 1;
+>> +	complete_all(&iproc_i2c->done);
+>> +
+>> +	return IRQ_HANDLED;
+>> +}
+>> +
+>> +static bool bcm_iproc_i2c_bus_busy(struct bcm_iproc_i2c_dev *iproc_i2c)
+>> +{
+>> +	if (readl(iproc_i2c->base + M_CMD_OFFSET) &
+>> +	    (1 << M_CMD_START_BUSY_SHIFT))
+>> +		return true;
+>> +	else
+>> +		return false;
+>> +}
+>> +
+>> +static int bcm_iproc_i2c_format_addr(struct bcm_iproc_i2c_dev *iproc_i2c,
+>> +				     struct i2c_msg *msg, u8 *addr)
+>> +{
+>> +
+>> +	if (msg->flags & I2C_M_TEN) {
+>> +		dev_err(iproc_i2c->device, "no support for 10-bit address\n");
+>> +		return -EINVAL;
+>> +	}
+> 
+> This looks harmless, but might be redundant since you aren't advertising I2C_FUNC_10BIT_ADDR anyway.
+> 
 
-Drop them from omap1_defconfig.
+Okay I'll remove that.
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Paul Bolle <pebolle@tiscali.nl>
-Cc: Valentin Rothberg <valentinrothberg@gmail.com>
-Cc: Stefan Hengelein <stefan.hengelein@fau.de>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-omap at vger.kernel.org
----
+>> +
+>> +	*addr = msg->addr << 1;
+>> +
+>> +	if (msg->flags & I2C_M_RD)
+>> +		*addr |= 1;
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int bcm_iproc_i2c_check_status(struct bcm_iproc_i2c_dev *iproc_i2c,
+>> +				      struct i2c_msg *msg)
+>> +{
+>> +	u32 val;
+>> +
+>> +	val = readl(iproc_i2c->base + M_CMD_OFFSET);
+>> +	val = (val >> M_CMD_STATUS_SHIFT) & M_CMD_STATUS_MASK;
+>> +
+>> +	switch (val) {
+>> +	case M_CMD_STATUS_SUCCESS:
+>> +		return 0;
+>> +
+>> +	case M_CMD_STATUS_LOST_ARB:
+>> +		dev_dbg(iproc_i2c->device, "lost bus arbitration\n");
+>> +		return -EAGAIN;
+>> +
+>> +	case M_CMD_STATUS_NACK_ADDR:
+>> +		dev_dbg(iproc_i2c->device, "NAK addr:0x%02x\n", msg->addr);
+>> +		return -ENXIO;
+>> +
+>> +	case M_CMD_STATUS_NACK_DATA:
+>> +		dev_dbg(iproc_i2c->device, "NAK data\n");
+>> +		return -ENXIO;
+>> +
+>> +	case M_CMD_STATUS_TIMEOUT:
+>> +		dev_dbg(iproc_i2c->device, "bus timeout\n");
+>> +		return -ETIMEDOUT;
+>> +
+>> +	default:
+>> +		dev_dbg(iproc_i2c->device, "unknown error code=%d\n", val);
+>> +		return -EIO;
+>> +	}
+>> +}
+>> +
+>> +static int bcm_iproc_i2c_xfer_single_msg(struct bcm_iproc_i2c_dev *iproc_i2c,
+>> +					 struct i2c_msg *msg)
+>> +{
+>> +	int ret, i;
+>> +	u8 addr;
+>> +	u32 val;
+>> +	unsigned long time_left = msecs_to_jiffies(I2C_TIMEOUT_MESC);
+>> +
+>> +	if (msg->len > M_TX_RX_FIFO_SIZE - 1) {
+>> +		dev_err(iproc_i2c->device,
+>> +			"only support data length up to %u bytes\n",
+>> +			M_TX_RX_FIFO_SIZE - 1);
+>> +		return -EINVAL;
+>> +	}
+> 
+> If the FIFO is 64 bytes, are we limited to 63 bytes of data because the slave address consumes 1 byte of FIFO space?  If so, it might be helpful to add a comment to that effect.
+> 
+Yeah I'll add a comment to explain this.
 
-Non-critical.  Targeted for v3.20-rc1 or v3.21-rc1.
+>> +
+>> +	if (bcm_iproc_i2c_bus_busy(iproc_i2c)) {
+>> +		dev_warn(iproc_i2c->device, "bus is busy\n");
+>> +		return -EBUSY;
+>> +	}
+>> +
+>> +	ret = bcm_iproc_i2c_format_addr(iproc_i2c, msg, &addr);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	/* load slave address into the TX FIFO */
+>> +	writel(addr, iproc_i2c->base + M_TX_OFFSET);
+>> +
+>> +	/* for a write transaction, load data into the TX FIFO */
+>> +	if (!(msg->flags & I2C_M_RD)) {
+>> +		for (i = 0; i < msg->len; i++) {
+>> +			val = msg->buf[i];
+>> +
+>> +			/* mark the last byte */
+>> +			if (i == msg->len - 1)
+>> +				val |= 1 << M_TX_WR_STATUS_SHIFT;
+>> +
+>> +			writel(val, iproc_i2c->base + M_TX_OFFSET);
+>> +		}
+> 
+> If msg->len == 1 and msg->buf[0] == 0x00, we will writel(0x80000000, iproc_i2c->base + M_TX_OFFSET);
+> 
+>> +
+>> +		if (msg->len == 0)
+>> +			writel(1 << M_TX_WR_STATUS_SHIFT,
+>> +			       iproc_i2c->base + M_TX_OFFSET);
+> 
+> ...so if msg->len == 0, does that mean this sends a dummy 0x00 data byte out on the wire?
+> 
+> If that's a hardware limitation (M_TX_WR_STATUS_SHIFT prohibited on the address byte), it's probably worth leaving a note in the code.
+> 
 
-I'm unable to boot test it since I don't have any OMAP1 devices currently 
-active in the testbed, but it least compiles and deals with the Kconfig
-checker warnings:
+In fact, I made a mistake here. The if statement should be completely
+removed. Thanks for catching this!
 
-http://www.pwsan.com/omap/testlogs/fix-omap-warnings-v3.21/20150206154619/
+>> +	}
+>> +
+>> +	/* mark as incomplete before starting the transaction */
+>> +	reinit_completion(&iproc_i2c->done);
+>> +	iproc_i2c->xfer_is_done = 0;
+>> +
+>> +	/*
+>> +	 * Enable the "start busy" interrupt, which will be triggered after the
+>> +	 * transaction is done, i.e., the internal start_busy bit, transitions
+>> +	 * from 1 to 0.
+>> +	 */
+>> +	writel(1 << IE_M_START_BUSY_SHIFT, iproc_i2c->base + IE_OFFSET);
+>> +
+>> +	/*
+>> +	 * Now we can activate the transfer. For a read operation, specify the
+>> +	 * number of bytes to read
+>> +	 */
+>> +	val = 1 << M_CMD_START_BUSY_SHIFT;
+>> +	if (msg->flags & I2C_M_RD) {
+>> +		val |= (M_CMD_PROTOCOL_BLK_RD << M_CMD_PROTOCOL_SHIFT) |
+>> +		       (msg->len << M_CMD_RD_CNT_SHIFT);
+>> +	} else {
+>> +		val |= (M_CMD_PROTOCOL_BLK_WR << M_CMD_PROTOCOL_SHIFT);
+>> +	}
+>> +	writel(val, iproc_i2c->base + M_CMD_OFFSET);
+>> +
+>> +	time_left = wait_for_completion_timeout(&iproc_i2c->done, time_left);
+>> +
+>> +	/* disable all interrupts */
+>> +	writel(0, iproc_i2c->base + IE_OFFSET);
+>> +	/* read it back to flush the write */
+>> +	readl(iproc_i2c->base + IE_OFFSET);
+>> +
+>> +	/* make sure the interrupt handler isn't running */
+>> +	synchronize_irq(iproc_i2c->irq);
+>> +
+>> +	if (!time_left && !iproc_i2c->xfer_is_done) {
+>> +		dev_err(iproc_i2c->device, "transaction timed out\n");
+>> +
+>> +		/* flush FIFOs */
+>> +		val = (1 << M_FIFO_RX_FLUSH_SHIFT) |
+>> +		      (1 << M_FIFO_TX_FLUSH_SHIFT);
+>> +		writel(val, iproc_i2c->base + M_FIFO_CTRL_OFFSET);
+>> +		return -ETIMEDOUT;
+>> +	}
+>> +
+>> +	ret = bcm_iproc_i2c_check_status(iproc_i2c, msg);
+>> +	if (ret) {
+>> +		/* flush both TX/RX FIFOs */
+>> +		val = (1 << M_FIFO_RX_FLUSH_SHIFT) |
+>> +		      (1 << M_FIFO_TX_FLUSH_SHIFT);
+>> +		writel(val, iproc_i2c->base + M_FIFO_CTRL_OFFSET);
+>> +		return ret;
+>> +	}
+>> +
+>> +	/*
+>> +	 * For a read operation, we now need to load the data from FIFO
+>> +	 * into the memory buffer
+>> +	 */
+>> +	if (msg->flags & I2C_M_RD) {
+>> +		for (i = 0; i < msg->len; i++) {
+>> +			msg->buf[i] = (readl(iproc_i2c->base + M_RX_OFFSET) >>
+>> +				      M_RX_DATA_SHIFT) & M_RX_DATA_MASK;
+>> +		}
+>> +	}
+>> +
+>> +	dev_dbg(iproc_i2c->device, "xfer %c, addr=0x%02x, len=%d\n",
+>> +		(msg->flags & I2C_M_RD) ? 'R' : 'W', msg->addr,
+>> +		msg->len);
+>> +	dev_dbg(iproc_i2c->device, "**** data start ****\n");
+>> +	for (i = 0; i < msg->len; i++)
+>> +		dev_dbg(iproc_i2c->device, "0x%02x ",  msg->buf[i]);
+>> +	dev_dbg(iproc_i2c->device, "**** data end ****\n");
+> 
+> It might be simpler to just do:
+> 
+>     print_hex_dump_bytes("iproc_i2c:", DUMP_PREFIX_NONE, msg->buf, msg->len);
+> 
+> although you'd lose the ability to see the I2C device name.
+> 
 
- arch/arm/configs/omap1_defconfig | 16 ----------------
- 1 file changed, 16 deletions(-)
+Great! I'll change this to:
+dev_dbg(iproc_i2c->device, "*** data: %*ph\n", msg->len, msg->buf);
+per discussions between you and Dmitry.
 
-diff --git a/arch/arm/configs/omap1_defconfig b/arch/arm/configs/omap1_defconfig
-index a7dce674f1be..0c8a78734536 100644
---- a/arch/arm/configs/omap1_defconfig
-+++ b/arch/arm/configs/omap1_defconfig
-@@ -1,4 +1,3 @@
--CONFIG_EXPERIMENTAL=y
- # CONFIG_SWAP is not set
- CONFIG_SYSVIPC=y
- CONFIG_POSIX_MQUEUE=y
-@@ -34,7 +33,6 @@ CONFIG_ARCH_OMAP16XX=y
- CONFIG_MACH_OMAP_INNOVATOR=y
- CONFIG_MACH_OMAP_H2=y
- CONFIG_MACH_OMAP_H3=y
--CONFIG_MACH_OMAP_HTCWIZARD=y
- CONFIG_MACH_HERALD=y
- CONFIG_MACH_OMAP_OSK=y
- CONFIG_MACH_OMAP_PERSEUS2=y
-@@ -55,7 +53,6 @@ CONFIG_HIGH_RES_TIMERS=y
- CONFIG_PREEMPT=y
- CONFIG_AEABI=y
- CONFIG_LEDS=y
--CONFIG_LEDS_CPU=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_CMDLINE="root=1f03 rootfstype=jffs2"
-@@ -80,8 +77,6 @@ CONFIG_IP_PNP_BOOTP=y
- CONFIG_IPV6=y
- CONFIG_NETFILTER=y
- CONFIG_BT=y
--CONFIG_BT_L2CAP=y
--CONFIG_BT_SCO=y
- CONFIG_BT_RFCOMM=y
- CONFIG_BT_RFCOMM_TTY=y
- CONFIG_BT_BNEP=y
-@@ -92,11 +87,7 @@ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_CONNECTOR=y
- # CONFIG_PROC_EVENTS is not set
- CONFIG_MTD=y
--CONFIG_MTD_DEBUG=y
--CONFIG_MTD_DEBUG_VERBOSE=3
--CONFIG_MTD_PARTITIONS=y
- CONFIG_MTD_CMDLINE_PARTS=y
--CONFIG_MTD_CHAR=y
- CONFIG_MTD_BLOCK=y
- CONFIG_MTD_CFI=y
- CONFIG_MTD_CFI_INTELEXT=y
-@@ -113,11 +104,9 @@ CONFIG_BLK_DEV_SD=y
- CONFIG_CHR_DEV_ST=y
- CONFIG_BLK_DEV_SR=y
- CONFIG_CHR_DEV_SG=y
--CONFIG_SCSI_MULTI_LUN=y
- CONFIG_NETDEVICES=y
- CONFIG_TUN=y
- CONFIG_PHYLIB=y
--CONFIG_NET_ETHERNET=y
- CONFIG_SMC91X=y
- CONFIG_USB_CATC=y
- CONFIG_USB_KAWETH=y
-@@ -158,7 +147,6 @@ CONFIG_SPI_OMAP_UWIRE=y
- CONFIG_WATCHDOG=y
- CONFIG_WATCHDOG_NOWAYOUT=y
- CONFIG_OMAP_WATCHDOG=y
--CONFIG_VIDEO_OUTPUT_CONTROL=y
- CONFIG_FB=y
- CONFIG_FIRMWARE_EDID=y
- CONFIG_FB_MODE_HELPERS=y
-@@ -168,7 +156,6 @@ CONFIG_FB_OMAP_LCDC_EXTERNAL=y
- CONFIG_FB_OMAP_LCDC_HWA742=y
- CONFIG_FB_OMAP_MANUAL_UPDATE=y
- CONFIG_FB_OMAP_LCD_MIPID=y
--CONFIG_FB_OMAP_BOOTLOADER_INIT=y
- CONFIG_BACKLIGHT_LCD_SUPPORT=y
- CONFIG_LCD_CLASS_DEVICE=y
- CONFIG_FRAMEBUFFER_CONSOLE=y
-@@ -194,7 +181,6 @@ CONFIG_SND_OMAP_SOC=y
- # CONFIG_USB_HID is not set
- CONFIG_USB=y
- CONFIG_USB_PHY=y
--# CONFIG_USB_DEVICE_CLASS is not set
- CONFIG_USB_MON=y
- CONFIG_USB_OHCI_HCD=y
- CONFIG_USB_STORAGE=y
-@@ -261,9 +247,7 @@ CONFIG_DEBUG_SPINLOCK=y
- CONFIG_DEBUG_MUTEXES=y
- # CONFIG_DEBUG_BUGVERBOSE is not set
- CONFIG_DEBUG_INFO=y
--# CONFIG_RCU_CPU_STALL_DETECTOR is not set
- CONFIG_DEBUG_USER=y
--CONFIG_DEBUG_ERRORS=y
- CONFIG_SECURITY=y
- CONFIG_CRYPTO_ECB=y
- CONFIG_CRYPTO_PCBC=y
--- 
-2.1.4
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int bcm_iproc_i2c_xfer(struct i2c_adapter *adapter,
+>> +			      struct i2c_msg msgs[], int num)
+>> +{
+>> +	struct bcm_iproc_i2c_dev *iproc_i2c = i2c_get_adapdata(adapter);
+>> +	int ret, i;
+>> +
+>> +	/* go through all messages */
+>> +	for (i = 0; i < num; i++) {
+>> +		ret = bcm_iproc_i2c_xfer_single_msg(iproc_i2c, &msgs[i]);
+>> +		if (ret) {
+>> +			dev_err(iproc_i2c->device, "xfer failed\n");
+>> +			return ret;
+>> +		}
+>> +	}
+>> +
+>> +	return num;
+>> +}
+>> +
+>> +static uint32_t bcm_iproc_i2c_functionality(struct i2c_adapter *adap)
+>> +{
+>> +	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
+>> +}
+>> +
+>> +static const struct i2c_algorithm bcm_iproc_algo = {
+>> +	.master_xfer = bcm_iproc_i2c_xfer,
+>> +	.functionality = bcm_iproc_i2c_functionality,
+>> +};
+>> +
+>> +static int bcm_iproc_i2c_cfg_speed(struct bcm_iproc_i2c_dev *iproc_i2c)
+>> +{
+>> +	unsigned int bus_speed, speed_bit;
+>> +	u32 val;
+>> +	int ret = of_property_read_u32(iproc_i2c->device->of_node,
+>> +				       "clock-frequency", &bus_speed);
+>> +	if (ret < 0) {
+>> +		dev_info(iproc_i2c->device,
+>> +			"unable to interpret clock-frequency DT property\n");
+>> +		bus_speed = 100000;
+>> +	}
+>> +
+>> +	if (bus_speed < 100000) {
+>> +		dev_err(iproc_i2c->device, "%d Hz bus speed not supported\n",
+>> +			bus_speed);
+>> +		dev_err(iproc_i2c->device,
+>> +			"valid speeds are 100khz and 400khz\n");
+>> +		return -EINVAL;
+>> +	} else if (bus_speed < 400000) {
+>> +		speed_bit = 0;
+>> +	} else {
+>> +		/* bus_speed >= 400000 */
+>> +		speed_bit = 1;
+>> +	}
+>> +
+>> +	val = readl(iproc_i2c->base + TIM_CFG_OFFSET);
+>> +	val &= ~(1 << TIM_CFG_MODE_400_SHIFT);
+>> +	val |= speed_bit << TIM_CFG_MODE_400_SHIFT;
+>> +	writel(val, iproc_i2c->base + TIM_CFG_OFFSET);
+>> +
+>> +	dev_info(iproc_i2c->device, "bus set to %u Hz\n", bus_speed);
+> 
+> The message would be more accurate if it reported 100 kHz or 400 kHz, since the driver isn't able to support arbitrary speeds.  Somebody could be surprised if they ask for 200 kHz but the transactions run at 100 kHz.
+> 
+Right. I'll update bus_speed to the real speed that it got set to in the
+above code.
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int bcm_iproc_i2c_init(struct bcm_iproc_i2c_dev *iproc_i2c)
+>> +{
+>> +	u32 val;
+>> +
+>> +	/* put controller in reset */
+>> +	val = readl(iproc_i2c->base + CFG_OFFSET);
+>> +	val |= 1 << CFG_RESET_SHIFT;
+>> +	val &= ~(1 << CFG_EN_SHIFT);
+>> +	writel(val, iproc_i2c->base + CFG_OFFSET);
+>> +
+>> +	/* wait 100 usec per spec */
+>> +	udelay(100);
+>> +
+>> +	/* bring controller out of reset */
+>> +	val &= ~(1 << CFG_RESET_SHIFT);
+>> +	writel(val, iproc_i2c->base + CFG_OFFSET);
+>> +
+>> +	/* flush TX/RX FIFOs and set RX FIFO threshold to zero */
+>> +	val = (1 << M_FIFO_RX_FLUSH_SHIFT) | (1 << M_FIFO_TX_FLUSH_SHIFT);
+>> +	writel(val, iproc_i2c->base + M_FIFO_CTRL_OFFSET);
+>> +
+>> +	/* disable all interrupts */
+>> +	writel(0, iproc_i2c->base + IE_OFFSET);
+>> +
+>> +	/* clear all pending interrupts */
+>> +	writel(0xffffffff, iproc_i2c->base + IS_OFFSET);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static void bcm_iproc_i2c_enable(struct bcm_iproc_i2c_dev *iproc_i2c)
+>> +{
+>> +	u32 val;
+>> +
+>> +	val = readl(iproc_i2c->base + CFG_OFFSET);
+>> +	val |= 1 << CFG_EN_SHIFT;
+>> +	writel(val, iproc_i2c->base + CFG_OFFSET);
+>> +}
+>> +
+>> +static void bcm_iproc_i2c_disable(struct bcm_iproc_i2c_dev *iproc_i2c)
+>> +{
+>> +	u32 val;
+>> +
+>> +	val = readl(iproc_i2c->base + CFG_OFFSET);
+>> +	val &= ~(1 << CFG_EN_SHIFT);
+>> +	writel(val, iproc_i2c->base + CFG_OFFSET);
+>> +}
+>> +
+>> +static int bcm_iproc_i2c_probe(struct platform_device *pdev)
+>> +{
+>> +	int irq, ret = 0;
+>> +	struct bcm_iproc_i2c_dev *iproc_i2c;
+>> +	struct i2c_adapter *adap;
+>> +	struct resource *res;
+>> +
+>> +	iproc_i2c = devm_kzalloc(&pdev->dev, sizeof(*iproc_i2c),
+>> +				 GFP_KERNEL);
+>> +	if (!iproc_i2c)
+>> +		return -ENOMEM;
+>> +
+>> +	platform_set_drvdata(pdev, iproc_i2c);
+>> +	iproc_i2c->device = &pdev->dev;
+>> +	init_completion(&iproc_i2c->done);
+>> +
+>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +	iproc_i2c->base = devm_ioremap_resource(iproc_i2c->device, res);
+>> +	if (IS_ERR(iproc_i2c->base))
+>> +		return PTR_ERR(iproc_i2c->base);
+>> +
+>> +	ret = bcm_iproc_i2c_init(iproc_i2c);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	ret = bcm_iproc_i2c_cfg_speed(iproc_i2c);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	irq = platform_get_irq(pdev, 0);
+>> +	if (irq <= 0) {
+>> +		dev_err(iproc_i2c->device, "no irq resource\n");
+>> +		return irq;
+>> +	}
+> 
+> AFAICT platform_get_irq() can return IRQ 0 on success.  Unlike irq_of_parse_and_map().
+>
+In fact, irq_create_of_mapping (platform_get_irq -> of_irq_get ->
+irq_create_of_mapping) can return 0 when failed.
+
+
+> Other than that it looks fine to me, so for all three patches in the series:
+> 
+> Reviewed-by: Kevin Cernekee <cernekee@chromium.org>
+> 
+> 
+Thank you so much for the review!
+
+>> +	iproc_i2c->irq = irq;
+>> +
+>> +	ret = devm_request_irq(iproc_i2c->device, irq, bcm_iproc_i2c_isr, 0,
+>> +			       pdev->name, iproc_i2c);
+>> +	if (ret < 0) {
+>> +		dev_err(iproc_i2c->device, "unable to request irq %i\n", irq);
+>> +		return ret;
+>> +	}
+>> +
+>> +	bcm_iproc_i2c_enable(iproc_i2c);
+>> +
+>> +	adap = &iproc_i2c->adapter;
+>> +	i2c_set_adapdata(adap, iproc_i2c);
+>> +	strlcpy(adap->name, "Broadcom iProc I2C adapter", sizeof(adap->name));
+>> +	adap->algo = &bcm_iproc_algo;
+>> +	adap->dev.parent = &pdev->dev;
+>> +	adap->dev.of_node = pdev->dev.of_node;
+>> +
+>> +	ret = i2c_add_adapter(adap);
+>> +	if (ret) {
+>> +		dev_err(iproc_i2c->device, "failed to add adapter\n");
+>> +		return ret;
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int bcm_iproc_i2c_remove(struct platform_device *pdev)
+>> +{
+>> +	struct bcm_iproc_i2c_dev *iproc_i2c = platform_get_drvdata(pdev);
+>> +
+>> +	/* make sure there's no pending interrupt when we remove the adapter */
+>> +	writel(0, iproc_i2c->base + IE_OFFSET);
+>> +	readl(iproc_i2c->base + IE_OFFSET);
+>> +	synchronize_irq(iproc_i2c->irq);
+>> +
+>> +	i2c_del_adapter(&iproc_i2c->adapter);
+>> +	bcm_iproc_i2c_disable(iproc_i2c);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static const struct of_device_id bcm_iproc_i2c_of_match[] = {
+>> +	{ .compatible = "brcm,iproc-i2c" },
+>> +	{ /* sentinel */ }
+>> +};
+>> +MODULE_DEVICE_TABLE(of, bcm_iproc_i2c_of_match);
+>> +
+>> +static struct platform_driver bcm_iproc_i2c_driver = {
+>> +	.driver = {
+>> +		.name = "bcm-iproc-i2c",
+>> +		.of_match_table = bcm_iproc_i2c_of_match,
+>> +	},
+>> +	.probe = bcm_iproc_i2c_probe,
+>> +	.remove = bcm_iproc_i2c_remove,
+>> +};
+>> +module_platform_driver(bcm_iproc_i2c_driver);
+>> +
+>> +MODULE_AUTHOR("Ray Jui <rjui <at> broadcom.com>");
+>> +MODULE_DESCRIPTION("Broadcom iProc I2C Driver");
+>> +MODULE_LICENSE("GPL v2");
