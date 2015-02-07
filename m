@@ -1,47 +1,87 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 6 Feb 2015 17:07:41 -0800
-Subject: a method to distinguish between syscall-enter/exit-stop
-In-Reply-To: <20150206231720.GB3829@altlinux.org>
-References: <CALCETrXFzcXngHsX=_72hYZqms32Zf7oFYDBgC3XNw7zOGdDCA@mail.gmail.com>
- <CAGXu5jJtHT9o8WMoynifN13=uZoARt4G9iVcgZsc9xYOBEwWsg@mail.gmail.com>
- <20150205233945.GA31540@altlinux.org>
- <CAGXu5jLTH+mUF0JxeR2qA_r=ocWjPHPSK2OPgE0Fu_JKoQyQ9w@mail.gmail.com>
- <CALCETrXsCUje+_V=Ud+TB4A2jH2M7yqyoCFMLEyxOD6pd7Di5w@mail.gmail.com>
- <20150206023249.GB31540@altlinux.org>
- <CALCETrWTnqKDoatK+5FN=yYDOeENoW5=r5YMToYKhZ8Zfv5wWA@mail.gmail.com>
- <CAGXu5j+nopAMFukwMu=Cy0GOapziOLTb-ryJhA-aywk_uerg9A@mail.gmail.com>
- <CALCETrVaF+3ETn5nfcbvyWKUYb71jNXK-zo9V6uOK0cEW4TCNQ@mail.gmail.com>
- <CAGXu5jJXspS_34KBJ5VxvyKuj4bA+zg267dNiEkqR1LuvjoA1Q@mail.gmail.com>
- <20150206231720.GB3829@altlinux.org>
-Message-ID: <CAGXu5jKHkJcnpbiuYY8BVX0-wOEUDFMx7r8_HJJe2ZDT8p3uvQ@mail.gmail.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Fri, 6 Feb 2015 17:28:24 -0800
+Subject: [PATCH v8 0/3] Add I2C support to Broadcom iProc
+In-Reply-To: <Ray Jui <rjui@broadcom.com>
+References: <Ray Jui <rjui@broadcom.com>
+Message-ID: <1423272507-18459-1-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 6, 2015 at 3:17 PM, Dmitry V. Levin <ldv@altlinux.org> wrote:
-> On Fri, Feb 06, 2015 at 12:07:03PM -0800, Kees Cook wrote:
->> On Fri, Feb 6, 2015 at 11:32 AM, Andy Lutomirski <luto@amacapital.net> wrote:
->> > On Fri, Feb 6, 2015 at 11:23 AM, Kees Cook <keescook@chromium.org> wrote:
-> [...]
->> >> And an unrelated thought:
->> >>
->> >> 3) Can't we find some way to fix the inability of a ptracer to
->> >> distinguish between syscall-enter-stop and syscall-exit-stop?
->> >
->> > Couldn't we add PTRACE_O_TRACESYSENTRY and PTRACE_O_TRACESYSEXIT along
->> > the lines of PTRACE_O_TRACESYSGOOD?
->>
->> That might be a nice idea. I haven't written a test to see, but what
->> does PTRACE_GETEVENTMSG return on syscall-enter/exit-stop?
->
-> The value returned by PTRACE_GETEVENTMSG is the value set along with the
-> latest PTRACE_EVENT_*.
-> In case of syscall-enter/exit-stop (which is not a PTRACE_EVENT_*),
-> there is no particular value set for PTRACE_GETEVENTMSG.
+This patchset contains the initial I2C support for Broadcom iProc family of
+SoCs.
 
-Could we define one to help distinguish?
+The iProc I2C controller has separate internal TX and RX FIFOs, each has a
+size of 64 bytes. The iProc I2C controller supports two bus speeds including
+standard mode (100 kHz) and fast mode (400 kHz)
 
--Kees
+Changes from v7:
+ - Remove redundant 10-bit address check in the driver
+ - Fix the driver that accidentally emits 1-byte of data with zero content in
+   the case of SMBUS quick command
+ - Improve debugging prints in the driver
+ - Other minor improvements
+
+Changes from v6:
+ - Get rid of unnecessary atomic variable usage in the driver
+ - Improve the "waiting for transaction to complete" logic further by making
+   sure there's no pending/ongoing interrupt by the time when flag
+   'xfer_is_done' is checked
+ - After disabling interrupt with 'writel', add 'readl' to the same register
+   to flush the bus to ensure the write has gone through
+
+Changes from v5:
+ - Improve the "waiting for transaction to be complete" logic to take care of
+   the corner case when an interrupt fires after wait_for_completion_timeout
+   times out
+ - Improve the logic to disable I2C interrupt in the remove function. Make it
+   more generic so it works for both dedicated and shared interrupt
+
+Changes from v4:
+ - Remove redundant header file includes
+ - Change the logic that waits for the host controller to be idle to
+   simply return -EBUSY
+ - Use proper print level and error codes in the driver
+ - Allow zero length message in the driver to support I2C_SMBUS_QUICK
+ - Change back to use devm_request_irq. Disable interrupt in the remove
+   function so there's no outstanding I2C interrupt when the driver is
+   being removed from the framework
+ - Other minor miscellaneous improvements and fixes
+
+Changes from v3:
+ - Add config dependency to COMPILE_TEST to allow the driver to be build tested
+   by other platforms
+ - Improve CPU utilization efficiency in the loop of waiting for bus to idle
+ - Add more comment in the driver to clarify the way how the "start busy"
+   interrupt is triggered from the I2C controller
+ - Fix inconsistent coding style and format
+ - Improve the bus speed validation logic in the driver
+ - Add code to free the interrupt line in driver's remove function. Also
+   change to use non-devm API to request the interrupt line
+ - Other miscellaneous improvements and fixes
+
+Changes from v2:
+ - Have the I2C driver default to y so it does not need to be selected from
+   ARCH_BCM_IPROC. This also helps to get rid of one patch. The driver still
+   depends on ARCH_BCM_IPROC
+ - Get rid of redundant check on resource returned by platform_get_resource
+
+Changes from v1:
+ - Fix function argument parenthesis
+ - Get rid of redundant driver owner field
+
+Ray Jui (3):
+  i2c: iProc: define Broadcom iProc I2C binding
+  i2c: iproc: Add Broadcom iProc I2C Driver
+  ARM: dts: add I2C device nodes for Broadcom Cygnus
+
+ .../devicetree/bindings/i2c/brcm,iproc-i2c.txt     |   37 ++
+ arch/arm/boot/dts/bcm-cygnus.dtsi                  |   20 +
+ drivers/i2c/busses/Kconfig                         |   10 +
+ drivers/i2c/busses/Makefile                        |    1 +
+ drivers/i2c/busses/i2c-bcm-iproc.c                 |  494 ++++++++++++++++++++
+ 5 files changed, 562 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt
+ create mode 100644 drivers/i2c/busses/i2c-bcm-iproc.c
 
 -- 
-Kees Cook
-Chrome OS Security
+1.7.9.5
