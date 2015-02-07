@@ -1,781 +1,1053 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat,  7 Feb 2015 22:54:03 +0100
-Subject: [PATCH 2/2] ARM: pxa: Transition pxa25x, pxa27x,
- pxa3xx to clk framework
-In-Reply-To: <1423346043-7391-1-git-send-email-robert.jarzmik@free.fr>
-References: <1423346043-7391-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1423346043-7391-3-git-send-email-robert.jarzmik@free.fr>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Sun, 8 Feb 2015 06:05:54 +0800
+Subject: [PATCH 2/3] clk: hi6220: Clock driver support for Hisilicon
+ hi6220 SoC
+In-Reply-To: <CAAS=xmikcM=7c6c8wHPB=qtL2HWqm3V=DZET24dkgD3k=rKt+A@mail.gmail.com>
+References: <1423128277-10297-1-git-send-email-bintian.wang@huawei.com>
+ <1423128277-10297-3-git-send-email-bintian.wang@huawei.com>
+ <CANMBJr4Jnuooogi7rhn2MRNKuRP9=9fr5NFUtEMg_1JNCg3sig@mail.gmail.com>
+ <CAAS=xmikcM=7c6c8wHPB=qtL2HWqm3V=DZET24dkgD3k=rKt+A@mail.gmail.com>
+Message-ID: <CANMBJr4NTLXz-1yJD8=EV2bXkMXT_K670j=Jtovqt5S2ihvffQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Transition the PXA25x, PXA27x and PXA3xx CPUs to the clock framework.
-This transition still enables legacy platforms to run without device
-tree as before, ie relying on platform data encoded in board specific
-files.
+Hi Bintian,
 
-This is the last step of clock framework transition for pxa
-platforms. It was tested on lubbock (pxa25x), mioa701 (pxa27x) and
-zylonite (pxa3xx).
+On 7 February 2015 at 10:05, Brent Wang <wangbintian@gmail.com> wrote:
+> Hello Tyler,
+>
+> Thank you very much for helping test this patchset!
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
- arch/arm/Kconfig                 |   2 +-
- arch/arm/mach-pxa/Makefile       |   2 +-
- arch/arm/mach-pxa/clock-pxa2xx.c |  55 ----------
- arch/arm/mach-pxa/clock-pxa3xx.c | 212 ---------------------------------------
- arch/arm/mach-pxa/clock.c        |  86 ----------------
- arch/arm/mach-pxa/clock.h        |  80 ---------------
- arch/arm/mach-pxa/eseries.c      |   1 -
- arch/arm/mach-pxa/generic.c      |   2 +
- arch/arm/mach-pxa/generic.h      |   1 +
- arch/arm/mach-pxa/lubbock.c      |   1 -
- arch/arm/mach-pxa/pxa25x.c       |   1 -
- arch/arm/mach-pxa/pxa300.c       |  20 +---
- arch/arm/mach-pxa/pxa320.c       |  10 --
- arch/arm/mach-pxa/pxa3xx.c       |  59 -----------
- arch/arm/mach-pxa/raumfeld.c     |   1 -
- arch/arm/mach-pxa/tosa.c         |   1 -
- 16 files changed, 6 insertions(+), 528 deletions(-)
- delete mode 100644 arch/arm/mach-pxa/clock-pxa2xx.c
- delete mode 100644 arch/arm/mach-pxa/clock-pxa3xx.c
- delete mode 100644 arch/arm/mach-pxa/clock.c
- delete mode 100644 arch/arm/mach-pxa/clock.h
+Not a problem.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 0eede73..bb358d2 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -613,7 +613,7 @@ config ARCH_PXA
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARM_CPU_SUSPEND if PM
- 	select AUTO_ZRELADDR
--	select COMMON_CLK if PXA27x || PXA25x
-+	select COMMON_CLK
- 	select CLKDEV_LOOKUP
- 	select CLKSRC_MMIO
- 	select CLKSRC_OF
-diff --git a/arch/arm/mach-pxa/Makefile b/arch/arm/mach-pxa/Makefile
-index 1566a27..4591c11 100644
---- a/arch/arm/mach-pxa/Makefile
-+++ b/arch/arm/mach-pxa/Makefile
-@@ -11,7 +11,7 @@ obj-$(CONFIG_PM)		+= pm.o sleep.o standby.o
- # SoC-specific code
- obj-$(CONFIG_PXA25x)		+= mfp-pxa2xx.o pxa2xx.o pxa25x.o
- obj-$(CONFIG_PXA27x)		+= mfp-pxa2xx.o pxa2xx.o pxa27x.o
--obj-$(CONFIG_PXA3xx)		+= mfp-pxa3xx.o clock.o clock-pxa3xx.o pxa3xx.o smemc.o pxa3xx-ulpi.o
-+obj-$(CONFIG_PXA3xx)		+= mfp-pxa3xx.o pxa3xx.o smemc.o pxa3xx-ulpi.o
- obj-$(CONFIG_CPU_PXA300)	+= pxa300.o
- obj-$(CONFIG_CPU_PXA320)	+= pxa320.o
- obj-$(CONFIG_CPU_PXA930)	+= pxa930.o
-diff --git a/arch/arm/mach-pxa/clock-pxa2xx.c b/arch/arm/mach-pxa/clock-pxa2xx.c
-deleted file mode 100644
-index 9ee2ad6..0000000
---- a/arch/arm/mach-pxa/clock-pxa2xx.c
-+++ /dev/null
-@@ -1,55 +0,0 @@
--/*
-- * linux/arch/arm/mach-pxa/clock-pxa2xx.c
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#include <linux/module.h>
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/io.h>
--#include <linux/syscore_ops.h>
--
--#include <mach/pxa2xx-regs.h>
--
--#include "clock.h"
--
--void clk_pxa2xx_cken_enable(struct clk *clk)
--{
--	CKEN |= 1 << clk->cken;
--}
--
--void clk_pxa2xx_cken_disable(struct clk *clk)
--{
--	CKEN &= ~(1 << clk->cken);
--}
--
--const struct clkops clk_pxa2xx_cken_ops = {
--	.enable		= clk_pxa2xx_cken_enable,
--	.disable	= clk_pxa2xx_cken_disable,
--};
--
--#ifdef CONFIG_PM
--static uint32_t saved_cken;
--
--static int pxa2xx_clock_suspend(void)
--{
--	saved_cken = CKEN;
--	return 0;
--}
--
--static void pxa2xx_clock_resume(void)
--{
--	CKEN = saved_cken;
--}
--#else
--#define pxa2xx_clock_suspend	NULL
--#define pxa2xx_clock_resume	NULL
--#endif
--
--struct syscore_ops pxa2xx_clock_syscore_ops = {
--	.suspend	= pxa2xx_clock_suspend,
--	.resume		= pxa2xx_clock_resume,
--};
-diff --git a/arch/arm/mach-pxa/clock-pxa3xx.c b/arch/arm/mach-pxa/clock-pxa3xx.c
-deleted file mode 100644
-index d4e9499..0000000
---- a/arch/arm/mach-pxa/clock-pxa3xx.c
-+++ /dev/null
-@@ -1,212 +0,0 @@
--/*
-- * linux/arch/arm/mach-pxa/clock-pxa3xx.c
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#include <linux/module.h>
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/io.h>
--#include <linux/syscore_ops.h>
--
--#include <mach/smemc.h>
--#include <mach/pxa3xx-regs.h>
--
--#include "clock.h"
--
--/* Crystal clock: 13MHz */
--#define BASE_CLK	13000000
--
--/* Ring Oscillator Clock: 60MHz */
--#define RO_CLK		60000000
--
--#define ACCR_D0CS	(1 << 26)
--#define ACCR_PCCE	(1 << 11)
--
--/* crystal frequency to HSIO bus frequency multiplier (HSS) */
--static unsigned char hss_mult[4] = { 8, 12, 16, 24 };
--
--/*
-- * Get the clock frequency as reflected by CCSR and the turbo flag.
-- * We assume these values have been applied via a fcs.
-- * If info is not 0 we also display the current settings.
-- */
--unsigned int pxa3xx_get_clk_frequency_khz(int info)
--{
--	unsigned long acsr, xclkcfg;
--	unsigned int t, xl, xn, hss, ro, XL, XN, CLK, HSS;
--
--	/* Read XCLKCFG register turbo bit */
--	__asm__ __volatile__("mrc\tp14, 0, %0, c6, c0, 0" : "=r"(xclkcfg));
--	t = xclkcfg & 0x1;
--
--	acsr = ACSR;
--
--	xl  = acsr & 0x1f;
--	xn  = (acsr >> 8) & 0x7;
--	hss = (acsr >> 14) & 0x3;
--
--	XL = xl * BASE_CLK;
--	XN = xn * XL;
--
--	ro = acsr & ACCR_D0CS;
--
--	CLK = (ro) ? RO_CLK : ((t) ? XN : XL);
--	HSS = (ro) ? RO_CLK : hss_mult[hss] * BASE_CLK;
--
--	if (info) {
--		pr_info("RO Mode clock: %d.%02dMHz (%sactive)\n",
--			RO_CLK / 1000000, (RO_CLK % 1000000) / 10000,
--			(ro) ? "" : "in");
--		pr_info("Run Mode clock: %d.%02dMHz (*%d)\n",
--			XL / 1000000, (XL % 1000000) / 10000, xl);
--		pr_info("Turbo Mode clock: %d.%02dMHz (*%d, %sactive)\n",
--			XN / 1000000, (XN % 1000000) / 10000, xn,
--			(t) ? "" : "in");
--		pr_info("HSIO bus clock: %d.%02dMHz\n",
--			HSS / 1000000, (HSS % 1000000) / 10000);
--	}
--
--	return CLK / 1000;
--}
--
--/*
-- * Return the current AC97 clock frequency.
-- */
--static unsigned long clk_pxa3xx_ac97_getrate(struct clk *clk)
--{
--	unsigned long rate = 312000000;
--	unsigned long ac97_div;
--
--	ac97_div = AC97_DIV;
--
--	/* This may loose precision for some rates but won't for the
--	 * standard 24.576MHz.
--	 */
--	rate /= (ac97_div >> 12) & 0x7fff;
--	rate *= (ac97_div & 0xfff);
--
--	return rate;
--}
--
--/*
-- * Return the current HSIO bus clock frequency
-- */
--static unsigned long clk_pxa3xx_hsio_getrate(struct clk *clk)
--{
--	unsigned long acsr;
--	unsigned int hss, hsio_clk;
--
--	acsr = ACSR;
--
--	hss = (acsr >> 14) & 0x3;
--	hsio_clk = (acsr & ACCR_D0CS) ? RO_CLK : hss_mult[hss] * BASE_CLK;
--
--	return hsio_clk;
--}
--
--/* crystal frequency to static memory controller multiplier (SMCFS) */
--static unsigned int smcfs_mult[8] = { 6, 0, 8, 0, 0, 16, };
--static unsigned int df_clkdiv[4] = { 1, 2, 4, 1 };
--
--static unsigned long clk_pxa3xx_smemc_getrate(struct clk *clk)
--{
--	unsigned long acsr = ACSR;
--	unsigned long memclkcfg = __raw_readl(MEMCLKCFG);
--
--	return BASE_CLK * smcfs_mult[(acsr >> 23) & 0x7] /
--			df_clkdiv[(memclkcfg >> 16) & 0x3];
--}
--
--void clk_pxa3xx_cken_enable(struct clk *clk)
--{
--	unsigned long mask = 1ul << (clk->cken & 0x1f);
--
--	if (clk->cken < 32)
--		CKENA |= mask;
--	else if (clk->cken < 64)
--		CKENB |= mask;
--	else
--		CKENC |= mask;
--}
--
--void clk_pxa3xx_cken_disable(struct clk *clk)
--{
--	unsigned long mask = 1ul << (clk->cken & 0x1f);
--
--	if (clk->cken < 32)
--		CKENA &= ~mask;
--	else if (clk->cken < 64)
--		CKENB &= ~mask;
--	else
--		CKENC &= ~mask;
--}
--
--const struct clkops clk_pxa3xx_cken_ops = {
--	.enable		= clk_pxa3xx_cken_enable,
--	.disable	= clk_pxa3xx_cken_disable,
--};
--
--const struct clkops clk_pxa3xx_hsio_ops = {
--	.enable		= clk_pxa3xx_cken_enable,
--	.disable	= clk_pxa3xx_cken_disable,
--	.getrate	= clk_pxa3xx_hsio_getrate,
--};
--
--const struct clkops clk_pxa3xx_ac97_ops = {
--	.enable		= clk_pxa3xx_cken_enable,
--	.disable	= clk_pxa3xx_cken_disable,
--	.getrate	= clk_pxa3xx_ac97_getrate,
--};
--
--const struct clkops clk_pxa3xx_smemc_ops = {
--	.enable		= clk_pxa3xx_cken_enable,
--	.disable	= clk_pxa3xx_cken_disable,
--	.getrate	= clk_pxa3xx_smemc_getrate,
--};
--
--static void clk_pout_enable(struct clk *clk)
--{
--	OSCC |= OSCC_PEN;
--}
--
--static void clk_pout_disable(struct clk *clk)
--{
--	OSCC &= ~OSCC_PEN;
--}
--
--const struct clkops clk_pxa3xx_pout_ops = {
--	.enable		= clk_pout_enable,
--	.disable	= clk_pout_disable,
--};
--
--#ifdef CONFIG_PM
--static uint32_t cken[2];
--static uint32_t accr;
--
--static int pxa3xx_clock_suspend(void)
--{
--	cken[0] = CKENA;
--	cken[1] = CKENB;
--	accr = ACCR;
--	return 0;
--}
--
--static void pxa3xx_clock_resume(void)
--{
--	ACCR = accr;
--	CKENA = cken[0];
--	CKENB = cken[1];
--}
--#else
--#define pxa3xx_clock_suspend	NULL
--#define pxa3xx_clock_resume	NULL
--#endif
--
--struct syscore_ops pxa3xx_clock_syscore_ops = {
--	.suspend	= pxa3xx_clock_suspend,
--	.resume		= pxa3xx_clock_resume,
--};
-diff --git a/arch/arm/mach-pxa/clock.c b/arch/arm/mach-pxa/clock.c
-deleted file mode 100644
-index 4d46610..0000000
---- a/arch/arm/mach-pxa/clock.c
-+++ /dev/null
-@@ -1,86 +0,0 @@
--/*
-- *  linux/arch/arm/mach-sa1100/clock.c
-- */
--#include <linux/module.h>
--#include <linux/kernel.h>
--#include <linux/clk.h>
--#include <linux/spinlock.h>
--#include <linux/delay.h>
--#include <linux/clkdev.h>
--
--#include "clock.h"
--
--static DEFINE_SPINLOCK(clocks_lock);
--
--int clk_enable(struct clk *clk)
--{
--	unsigned long flags;
--
--	spin_lock_irqsave(&clocks_lock, flags);
--	if (clk->enabled++ == 0)
--		clk->ops->enable(clk);
--	spin_unlock_irqrestore(&clocks_lock, flags);
--
--	if (clk->delay)
--		udelay(clk->delay);
--
--	return 0;
--}
--EXPORT_SYMBOL(clk_enable);
--
--void clk_disable(struct clk *clk)
--{
--	unsigned long flags;
--
--	WARN_ON(clk->enabled == 0);
--
--	spin_lock_irqsave(&clocks_lock, flags);
--	if (--clk->enabled == 0)
--		clk->ops->disable(clk);
--	spin_unlock_irqrestore(&clocks_lock, flags);
--}
--EXPORT_SYMBOL(clk_disable);
--
--unsigned long clk_get_rate(struct clk *clk)
--{
--	unsigned long rate;
--
--	rate = clk->rate;
--	if (clk->ops->getrate)
--		rate = clk->ops->getrate(clk);
--
--	return rate;
--}
--EXPORT_SYMBOL(clk_get_rate);
--
--int clk_set_rate(struct clk *clk, unsigned long rate)
--{
--	unsigned long flags;
--	int ret = -EINVAL;
--
--	if (clk->ops->setrate) {
--		spin_lock_irqsave(&clocks_lock, flags);
--		ret = clk->ops->setrate(clk, rate);
--		spin_unlock_irqrestore(&clocks_lock, flags);
--	}
--
--	return ret;
--}
--EXPORT_SYMBOL(clk_set_rate);
--
--void clk_dummy_enable(struct clk *clk)
--{
--}
--
--void clk_dummy_disable(struct clk *clk)
--{
--}
--
--const struct clkops clk_dummy_ops = {
--	.enable		= clk_dummy_enable,
--	.disable	= clk_dummy_disable,
--};
--
--struct clk clk_dummy = {
--	.ops		= &clk_dummy_ops,
--};
-diff --git a/arch/arm/mach-pxa/clock.h b/arch/arm/mach-pxa/clock.h
-deleted file mode 100644
-index 1f65d32..0000000
---- a/arch/arm/mach-pxa/clock.h
-+++ /dev/null
-@@ -1,80 +0,0 @@
--#include <linux/clkdev.h>
--#include <linux/syscore_ops.h>
--
--struct clkops {
--	void			(*enable)(struct clk *);
--	void			(*disable)(struct clk *);
--	unsigned long		(*getrate)(struct clk *);
--	int			(*setrate)(struct clk *, unsigned long);
--};
--
--struct clk {
--	const struct clkops	*ops;
--	unsigned long		rate;
--	unsigned int		cken;
--	unsigned int		delay;
--	unsigned int		enabled;
--};
--
--void clk_dummy_enable(struct clk *);
--void clk_dummy_disable(struct clk *);
--
--extern const struct clkops clk_dummy_ops;
--extern struct clk clk_dummy;
--
--#define INIT_CLKREG(_clk,_devname,_conname)		\
--	{						\
--		.clk		= _clk,			\
--		.dev_id		= _devname,		\
--		.con_id		= _conname,		\
--	}
--
--#define DEFINE_CK(_name, _cken, _ops)			\
--struct clk clk_##_name = {				\
--		.ops	= _ops,				\
--		.cken	= CKEN_##_cken,			\
--	}
--
--#define DEFINE_CLK(_name, _ops, _rate, _delay)		\
--struct clk clk_##_name = {				\
--		.ops	= _ops, 			\
--		.rate	= _rate,			\
--		.delay	= _delay,			\
--	}
--
--#define DEFINE_PXA2_CKEN(_name, _cken, _rate, _delay)	\
--struct clk clk_##_name = {				\
--		.ops	= &clk_pxa2xx_cken_ops,		\
--		.rate	= _rate,			\
--		.cken	= CKEN_##_cken,			\
--		.delay	= _delay,			\
--	}
--
--extern const struct clkops clk_pxa2xx_cken_ops;
--
--void clk_pxa2xx_cken_enable(struct clk *clk);
--void clk_pxa2xx_cken_disable(struct clk *clk);
--
--extern struct syscore_ops pxa2xx_clock_syscore_ops;
--
--#if defined(CONFIG_PXA3xx)
--#define DEFINE_PXA3_CKEN(_name, _cken, _rate, _delay)	\
--struct clk clk_##_name = {				\
--		.ops	= &clk_pxa3xx_cken_ops,		\
--		.rate	= _rate,			\
--		.cken	= CKEN_##_cken,			\
--		.delay	= _delay,			\
--	}
--
--extern const struct clkops clk_pxa3xx_cken_ops;
--extern const struct clkops clk_pxa3xx_hsio_ops;
--extern const struct clkops clk_pxa3xx_ac97_ops;
--extern const struct clkops clk_pxa3xx_pout_ops;
--extern const struct clkops clk_pxa3xx_smemc_ops;
--
--extern void clk_pxa3xx_cken_enable(struct clk *);
--extern void clk_pxa3xx_cken_disable(struct clk *);
--
--extern struct syscore_ops pxa3xx_clock_syscore_ops;
--
--#endif
-diff --git a/arch/arm/mach-pxa/eseries.c b/arch/arm/mach-pxa/eseries.c
-index 9522265..11863be 100644
---- a/arch/arm/mach-pxa/eseries.c
-+++ b/arch/arm/mach-pxa/eseries.c
-@@ -40,7 +40,6 @@
- 
- #include "devices.h"
- #include "generic.h"
--#include "clock.h"
- 
- /* Only e800 has 128MB RAM */
- void __init eseries_fixup(struct tag *tags, char **cmdline)
-diff --git a/arch/arm/mach-pxa/generic.c b/arch/arm/mach-pxa/generic.c
-index d988c53..ec510ec 100644
---- a/arch/arm/mach-pxa/generic.c
-+++ b/arch/arm/mach-pxa/generic.c
-@@ -67,6 +67,8 @@ void __init pxa_timer_init(void)
- 		pxa25x_clocks_init();
- 	if (cpu_is_pxa27x())
- 		pxa27x_clocks_init();
-+	if (cpu_is_pxa3xx())
-+		pxa3xx_clocks_init();
- 	pxa_timer_nodt_init(IRQ_OST0, io_p2v(0x40a00000),
- 			    get_clock_tick_rate());
- }
-diff --git a/arch/arm/mach-pxa/generic.h b/arch/arm/mach-pxa/generic.h
-index 149087c..0b1dbb5 100644
---- a/arch/arm/mach-pxa/generic.h
-+++ b/arch/arm/mach-pxa/generic.h
-@@ -39,6 +39,7 @@ extern void __init pxa27x_init_irq(void);
- extern void __init pxa27x_map_io(void);
- 
- #define pxa3xx_handle_irq ichp_handle_irq
-+extern int __init pxa3xx_clocks_init(void);
- extern void __init pxa3xx_dt_init_irq(void);
- extern void __init pxa3xx_init_irq(void);
- extern void __init pxa3xx_map_io(void);
-diff --git a/arch/arm/mach-pxa/lubbock.c b/arch/arm/mach-pxa/lubbock.c
-index b742708..53b1d25 100644
---- a/arch/arm/mach-pxa/lubbock.c
-+++ b/arch/arm/mach-pxa/lubbock.c
-@@ -56,7 +56,6 @@
- #include <mach/smemc.h>
- 
- #include "generic.h"
--#include "clock.h"
- #include "devices.h"
- 
- static unsigned long lubbock_pin_config[] __initdata = {
-diff --git a/arch/arm/mach-pxa/pxa25x.c b/arch/arm/mach-pxa/pxa25x.c
-index 70e6d0e..23a90c6 100644
---- a/arch/arm/mach-pxa/pxa25x.c
-+++ b/arch/arm/mach-pxa/pxa25x.c
-@@ -38,7 +38,6 @@
- 
- #include "generic.h"
- #include "devices.h"
--#include "clock.h"
- 
- /*
-  * Various clock factors driven by the CCCR register.
-diff --git a/arch/arm/mach-pxa/pxa300.c b/arch/arm/mach-pxa/pxa300.c
-index 17cbc0c..28c5b56 100644
---- a/arch/arm/mach-pxa/pxa300.c
-+++ b/arch/arm/mach-pxa/pxa300.c
-@@ -22,7 +22,6 @@
- 
- #include "generic.h"
- #include "devices.h"
--#include "clock.h"
- 
- static struct mfp_addr_map pxa300_mfp_addr_map[] __initdata = {
- 
-@@ -84,32 +83,15 @@ static struct mfp_addr_map pxa310_mfp_addr_map[] __initdata = {
- 	MFP_ADDR_END,
- };
- 
--static DEFINE_PXA3_CKEN(common_nand, NAND, 156000000, 0);
--static DEFINE_PXA3_CKEN(gcu, PXA300_GCU, 0, 0);
--
--static struct clk_lookup common_clkregs[] = {
--	INIT_CLKREG(&clk_common_nand, "pxa3xx-nand", NULL),
--	INIT_CLKREG(&clk_gcu, "pxa3xx-gcu", NULL),
--};
--
--static DEFINE_PXA3_CKEN(pxa310_mmc3, MMC3, 19500000, 0);
--
--static struct clk_lookup pxa310_clkregs[] = {
--	INIT_CLKREG(&clk_pxa310_mmc3, "pxa2xx-mci.2", NULL),
--};
--
- static int __init pxa300_init(void)
- {
- 	if (cpu_is_pxa300() || cpu_is_pxa310()) {
- 		mfp_init_base(io_p2v(MFPR_BASE));
- 		mfp_init_addr(pxa300_mfp_addr_map);
--		clkdev_add_table(ARRAY_AND_SIZE(common_clkregs));
- 	}
- 
--	if (cpu_is_pxa310()) {
-+	if (cpu_is_pxa310())
- 		mfp_init_addr(pxa310_mfp_addr_map);
--		clkdev_add_table(ARRAY_AND_SIZE(pxa310_clkregs));
--	}
- 
- 	return 0;
- }
-diff --git a/arch/arm/mach-pxa/pxa320.c b/arch/arm/mach-pxa/pxa320.c
-index 6dc99d4..2f55bb4 100644
---- a/arch/arm/mach-pxa/pxa320.c
-+++ b/arch/arm/mach-pxa/pxa320.c
-@@ -22,7 +22,6 @@
- 
- #include "generic.h"
- #include "devices.h"
--#include "clock.h"
- 
- static struct mfp_addr_map pxa320_mfp_addr_map[] __initdata = {
- 
-@@ -78,20 +77,11 @@ static struct mfp_addr_map pxa320_mfp_addr_map[] __initdata = {
- 	MFP_ADDR_END,
- };
- 
--static DEFINE_PXA3_CKEN(pxa320_nand, NAND, 104000000, 0);
--static DEFINE_PXA3_CKEN(gcu, PXA320_GCU, 0, 0);
--
--static struct clk_lookup pxa320_clkregs[] = {
--	INIT_CLKREG(&clk_pxa320_nand, "pxa3xx-nand", NULL),
--	INIT_CLKREG(&clk_gcu, "pxa3xx-gcu", NULL),
--};
--
- static int __init pxa320_init(void)
- {
- 	if (cpu_is_pxa320()) {
- 		mfp_init_base(io_p2v(MFPR_BASE));
- 		mfp_init_addr(pxa320_mfp_addr_map);
--		clkdev_add_table(ARRAY_AND_SIZE(pxa320_clkregs));
- 	}
- 
- 	return 0;
-diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
-index edcbd9c..bd4cbef 100644
---- a/arch/arm/mach-pxa/pxa3xx.c
-+++ b/arch/arm/mach-pxa/pxa3xx.c
-@@ -37,67 +37,11 @@
- 
- #include "generic.h"
- #include "devices.h"
--#include "clock.h"
- 
- #define PECR_IE(n)	((1 << ((n) * 2)) << 28)
- #define PECR_IS(n)	((1 << ((n) * 2)) << 29)
- 
- extern void __init pxa_dt_irq_init(int (*fn)(struct irq_data *, unsigned int));
--
--static DEFINE_PXA3_CKEN(pxa3xx_ffuart, FFUART, 14857000, 1);
--static DEFINE_PXA3_CKEN(pxa3xx_btuart, BTUART, 14857000, 1);
--static DEFINE_PXA3_CKEN(pxa3xx_stuart, STUART, 14857000, 1);
--static DEFINE_PXA3_CKEN(pxa3xx_i2c, I2C, 32842000, 0);
--static DEFINE_PXA3_CKEN(pxa3xx_udc, UDC, 48000000, 5);
--static DEFINE_PXA3_CKEN(pxa3xx_usbh, USBH, 48000000, 0);
--static DEFINE_PXA3_CKEN(pxa3xx_u2d, USB2, 48000000, 0);
--static DEFINE_PXA3_CKEN(pxa3xx_keypad, KEYPAD, 32768, 0);
--static DEFINE_PXA3_CKEN(pxa3xx_ssp1, SSP1, 13000000, 0);
--static DEFINE_PXA3_CKEN(pxa3xx_ssp2, SSP2, 13000000, 0);
--static DEFINE_PXA3_CKEN(pxa3xx_ssp3, SSP3, 13000000, 0);
--static DEFINE_PXA3_CKEN(pxa3xx_ssp4, SSP4, 13000000, 0);
--static DEFINE_PXA3_CKEN(pxa3xx_pwm0, PWM0, 13000000, 0);
--static DEFINE_PXA3_CKEN(pxa3xx_pwm1, PWM1, 13000000, 0);
--static DEFINE_PXA3_CKEN(pxa3xx_mmc1, MMC1, 19500000, 0);
--static DEFINE_PXA3_CKEN(pxa3xx_mmc2, MMC2, 19500000, 0);
--static DEFINE_PXA3_CKEN(pxa3xx_gpio, GPIO, 13000000, 0);
--
--static DEFINE_CK(pxa3xx_lcd, LCD, &clk_pxa3xx_hsio_ops);
--static DEFINE_CK(pxa3xx_smemc, SMC, &clk_pxa3xx_smemc_ops);
--static DEFINE_CK(pxa3xx_camera, CAMERA, &clk_pxa3xx_hsio_ops);
--static DEFINE_CK(pxa3xx_ac97, AC97, &clk_pxa3xx_ac97_ops);
--static DEFINE_CLK(pxa3xx_pout, &clk_pxa3xx_pout_ops, 13000000, 70);
--
--static struct clk_lookup pxa3xx_clkregs[] = {
--	INIT_CLKREG(&clk_pxa3xx_pout, NULL, "CLK_POUT"),
--	/* Power I2C clock is always on */
--	INIT_CLKREG(&clk_dummy, "pxa3xx-pwri2c.1", NULL),
--	INIT_CLKREG(&clk_pxa3xx_lcd, "pxa2xx-fb", NULL),
--	INIT_CLKREG(&clk_pxa3xx_camera, NULL, "CAMCLK"),
--	INIT_CLKREG(&clk_pxa3xx_ac97, NULL, "AC97CLK"),
--	INIT_CLKREG(&clk_pxa3xx_ffuart, "pxa2xx-uart.0", NULL),
--	INIT_CLKREG(&clk_pxa3xx_btuart, "pxa2xx-uart.1", NULL),
--	INIT_CLKREG(&clk_pxa3xx_stuart, "pxa2xx-uart.2", NULL),
--	INIT_CLKREG(&clk_pxa3xx_stuart, "pxa2xx-ir", "UARTCLK"),
--	INIT_CLKREG(&clk_pxa3xx_i2c, "pxa2xx-i2c.0", NULL),
--	INIT_CLKREG(&clk_pxa3xx_udc, "pxa27x-udc", NULL),
--	INIT_CLKREG(&clk_pxa3xx_usbh, "pxa27x-ohci", NULL),
--	INIT_CLKREG(&clk_pxa3xx_u2d, "pxa3xx-u2d", NULL),
--	INIT_CLKREG(&clk_pxa3xx_keypad, "pxa27x-keypad", NULL),
--	INIT_CLKREG(&clk_pxa3xx_ssp1, "pxa3xx-ssp.0", NULL),
--	INIT_CLKREG(&clk_pxa3xx_ssp2, "pxa3xx-ssp.1", NULL),
--	INIT_CLKREG(&clk_pxa3xx_ssp3, "pxa3xx-ssp.2", NULL),
--	INIT_CLKREG(&clk_pxa3xx_ssp4, "pxa3xx-ssp.3", NULL),
--	INIT_CLKREG(&clk_pxa3xx_pwm0, "pxa27x-pwm.0", NULL),
--	INIT_CLKREG(&clk_pxa3xx_pwm1, "pxa27x-pwm.1", NULL),
--	INIT_CLKREG(&clk_pxa3xx_mmc1, "pxa2xx-mci.0", NULL),
--	INIT_CLKREG(&clk_pxa3xx_mmc2, "pxa2xx-mci.1", NULL),
--	INIT_CLKREG(&clk_pxa3xx_smemc, "pxa2xx-pcmcia", NULL),
--	INIT_CLKREG(&clk_pxa3xx_gpio, "pxa3xx-gpio", NULL),
--	INIT_CLKREG(&clk_pxa3xx_gpio, "pxa93x-gpio", NULL),
--	INIT_CLKREG(&clk_dummy, "sa1100-rtc", NULL),
--};
--
- #ifdef CONFIG_PM
- 
- #define ISRAM_START	0x5c000000
-@@ -476,8 +420,6 @@ static int __init pxa3xx_init(void)
- 		 */
- 		ASCR &= ~(ASCR_RDH | ASCR_D1S | ASCR_D2S | ASCR_D3S);
- 
--		clkdev_add_table(pxa3xx_clkregs, ARRAY_SIZE(pxa3xx_clkregs));
--
- 		if ((ret = pxa_init_dma(IRQ_DMA, 32)))
- 			return ret;
- 
-@@ -485,7 +427,6 @@ static int __init pxa3xx_init(void)
- 
- 		register_syscore_ops(&pxa_irq_syscore_ops);
- 		register_syscore_ops(&pxa3xx_mfp_syscore_ops);
--		register_syscore_ops(&pxa3xx_clock_syscore_ops);
- 
- 		if (of_have_populated_dt())
- 			return 0;
-diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
-index a762b23..2bc9a3f 100644
---- a/arch/arm/mach-pxa/raumfeld.c
-+++ b/arch/arm/mach-pxa/raumfeld.c
-@@ -56,7 +56,6 @@
- 
- #include "generic.h"
- #include "devices.h"
--#include "clock.h"
- 
- /* common GPIO	definitions */
- 
-diff --git a/arch/arm/mach-pxa/tosa.c b/arch/arm/mach-pxa/tosa.c
-index 7780d1fa..93bf4ef 100644
---- a/arch/arm/mach-pxa/tosa.c
-+++ b/arch/arm/mach-pxa/tosa.c
-@@ -58,7 +58,6 @@
- #include <asm/mach/sharpsl_param.h>
- 
- #include "generic.h"
--#include "clock.h"
- #include "devices.h"
- 
- static unsigned long tosa_pin_config[] = {
--- 
-2.1.0
+>
+> 2015-02-07 2:10 GMT+08:00 Tyler Baker <tyler.baker@linaro.org>:
+>> Hi Bintian,
+>>
+>> This patch applied to next-20150204 is producing build failures on
+>> various ARM defconfigs[1]. I received the following error in all
+>> cases:
+>>
+>> drivers/built-in.o: In function `hi6220_clk_register_divider':
+>> :(.init.text+0x1a84c): undefined reference to `hi6220_register_clkdiv'
+>> Makefile:925: recipe for target 'vmlinux' failed
+>> make: *** [vmlinux] Error 1
+> It's my fault, I just test on ARM64, The following patch can fix this error:
+> =====================
+> diff --git a/drivers/clk/hisilicon/Makefile b/drivers/clk/hisilicon/Makefile
+> index bbf0539..48f0116 100644
+> --- a/drivers/clk/hisilicon/Makefile
+> +++ b/drivers/clk/hisilicon/Makefile
+> @@ -2,9 +2,9 @@
+>  # Hisilicon Clock specific Makefile
+>  #
+>
+> -obj-y  += clk.o clkgate-separated.o
+> +obj-y  += clk.o clkgate-separated.o clkdivider-hi6220.o
+>
+>  obj-$(CONFIG_ARCH_HI3xxx)      += clk-hi3620.o
+>  obj-$(CONFIG_ARCH_HIP04)       += clk-hip04.o
+>  obj-$(CONFIG_ARCH_HIX5HD2)     += clk-hix5hd2.o
+> -obj-$(CONFIG_COMMON_CLK_HI6220)        += clkdivider-hi6220.o clk-hi6220.o
+> +obj-$(CONFIG_COMMON_CLK_HI6220)        += clk-hi6220.o
+> ======================
+>
+> I will fix this problem in next version.
+
+Great, thank you. I quickly tested your change above, and it gets the
+ARM defconfigs building again.
+
+>
+> Thanks,
+>
+> Bintian
+>
+>
+>>
+>> On 5 February 2015 at 01:24, Bintian Wang <bintian.wang@huawei.com> wrote:
+>>> Add clock drivers for hi6220 SoC, this driver controls the SoC
+>>> registers to supply different clocks to different IPs in the SoC.
+>>>
+>>> We add one divider clock for hi6220 because the divider in hi6220
+>>> also has a mask bit but it doesnot obey the rule defined by flag
+>>> "CLK_DIVIDER_HIWORD_MASK", we can not get index of the mask bit by
+>>> left shift fixed bits (e.g. 16 bits), so we add this divider clock
+>>> to handle it.
+>>>
+>>> This patch also enables this clock driver for ARCH_HISI and document
+>>> devicetree bindings.
+>>>
+>>> Signed-off-by: Bintian Wang <bintian.wang@huawei.com>
+>>> Reviewed-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+>>> Reviewed-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>>> ---
+>>>  .../devicetree/bindings/clock/hi6220-clock.txt     |   30 +++
+>>>  arch/arm64/Kconfig                                 |    1 +
+>>>  drivers/clk/Kconfig                                |    2 +
+>>>  drivers/clk/Makefile                               |    4 +-
+>>>  drivers/clk/hisilicon/Kconfig                      |    5 +
+>>>  drivers/clk/hisilicon/Makefile                     |    1 +
+>>>  drivers/clk/hisilicon/clk-hi6220.c                 |  284 ++++++++++++++++++++
+>>>  drivers/clk/hisilicon/clk.c                        |   29 ++
+>>>  drivers/clk/hisilicon/clk.h                        |   17 ++
+>>>  drivers/clk/hisilicon/clkdivider-hi6220.c          |  273 +++++++++++++++++++
+>>>  include/dt-bindings/clock/hi6220-clock.h           |  172 ++++++++++++
+>>>  11 files changed, 815 insertions(+), 3 deletions(-)
+>>>  create mode 100644 Documentation/devicetree/bindings/clock/hi6220-clock.txt
+>>>  create mode 100644 drivers/clk/hisilicon/Kconfig
+>>>  create mode 100644 drivers/clk/hisilicon/clk-hi6220.c
+>>>  create mode 100644 drivers/clk/hisilicon/clkdivider-hi6220.c
+>>>  create mode 100644 include/dt-bindings/clock/hi6220-clock.h
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/clock/hi6220-clock.txt b/Documentation/devicetree/bindings/clock/hi6220-clock.txt
+>>> new file mode 100644
+>>> index 0000000..a3ddda1
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/clock/hi6220-clock.txt
+>>> @@ -0,0 +1,30 @@
+>>> +* Hisilicon Hi6220 Clock Controller
+>>> +
+>>> +The hi6220 clock controller generates and supplies clock to various
+>>> +controllers within the hi6220 SoC.
+>>> +
+>>> +Required Properties:
+>>> +
+>>> +- compatible: should be one of the following:
+>>> +  - "hisilicon,hi6220-clock-ao" - controller for those clocks under SoC
+>>> +     power always on(AO) domain, it is the sub node of SoC power AO
+>>> +     controller in dts file.
+>>> +  - "hisilicon,hi6220-clock-sys" - controller for those clocks under SoC
+>>> +     system control domain, it is the sub node of SoC system controller
+>>> +     in dts file.
+>>> +  - "hisilicon,hi6220-clock-media" - controller for those clocks under
+>>> +     SoC media control domain, it is the sub node of SoC media controller
+>>> +     in dts file.
+>>> +  - "hisilicon,hi6220-clock-power" - controller for those clocks under
+>>> +     SoC power control domain, it is the sub node of SoC power controller
+>>> +     in dts file.
+>>> +
+>>> +- reg: physical base address of the controller and length of memory mapped
+>>> +  region.
+>>> +
+>>> +- #clock-cells: should be 1.
+>>> +
+>>> +Each clock is assigned an identifier and client nodes use this identifier
+>>> +to specify the clock which they consume.
+>>> +
+>>> +All these identifier could be found in <dt-bindings/clock/hi6220-clock.h>.
+>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>>> index 78cd41c8..6efc3e3 100644
+>>> --- a/arch/arm64/Kconfig
+>>> +++ b/arch/arm64/Kconfig
+>>> @@ -175,6 +175,7 @@ config ARCH_XGENE
+>>>
+>>>  config ARCH_HISI
+>>>         bool "Hisilicon SoC Family"
+>>> +       select COMMON_CLK_HI6220
+>>>         help
+>>>           This enables support for Hisilicon ARMv8 Family of SoCs.
+>>>
+>>> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+>>> index 3f44f29..b52c95c 100644
+>>> --- a/drivers/clk/Kconfig
+>>> +++ b/drivers/clk/Kconfig
+>>> @@ -136,6 +136,8 @@ config COMMON_CLK_PXA
+>>>
+>>>  source "drivers/clk/qcom/Kconfig"
+>>>
+>>> +source "drivers/clk/hisilicon/Kconfig"
+>>> +
+>>>  endmenu
+>>>
+>>>  source "drivers/clk/bcm/Kconfig"
+>>> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+>>> index d5fba5b..c58703b 100644
+>>> --- a/drivers/clk/Makefile
+>>> +++ b/drivers/clk/Makefile
+>>> @@ -43,9 +43,7 @@ obj-$(CONFIG_COMMON_CLK_XGENE)                += clk-xgene.o
+>>>  obj-$(CONFIG_COMMON_CLK_AT91)          += at91/
+>>>  obj-$(CONFIG_ARCH_BCM_MOBILE)          += bcm/
+>>>  obj-$(CONFIG_ARCH_BERLIN)              += berlin/
+>>> -obj-$(CONFIG_ARCH_HI3xxx)              += hisilicon/
+>>> -obj-$(CONFIG_ARCH_HIP04)               += hisilicon/
+>>> -obj-$(CONFIG_ARCH_HIX5HD2)             += hisilicon/
+>>> +obj-$(CONFIG_ARCH_HISI)                        += hisilicon/
+>>>  obj-$(CONFIG_COMMON_CLK_KEYSTONE)      += keystone/
+>>>  ifeq ($(CONFIG_COMMON_CLK), y)
+>>>  obj-$(CONFIG_ARCH_MMP)                 += mmp/
+>>> diff --git a/drivers/clk/hisilicon/Kconfig b/drivers/clk/hisilicon/Kconfig
+>>> new file mode 100644
+>>> index 0000000..e3ead46
+>>> --- /dev/null
+>>> +++ b/drivers/clk/hisilicon/Kconfig
+>>> @@ -0,0 +1,5 @@
+>>> +config COMMON_CLK_HI6220
+>>> +       tristate "Hi6220 Clock Driver"
+>>> +       depends on OF && ARCH_HISI
+>>> +       help
+>>> +         Build the Hisilicon Hi6220 clock driver based on the common clock framework.
+>>> diff --git a/drivers/clk/hisilicon/Makefile b/drivers/clk/hisilicon/Makefile
+>>> index 038c02f..bbf0539 100644
+>>> --- a/drivers/clk/hisilicon/Makefile
+>>> +++ b/drivers/clk/hisilicon/Makefile
+>>> @@ -7,3 +7,4 @@ obj-y   += clk.o clkgate-separated.o
+>>>  obj-$(CONFIG_ARCH_HI3xxx)      += clk-hi3620.o
+>>>  obj-$(CONFIG_ARCH_HIP04)       += clk-hip04.o
+>>>  obj-$(CONFIG_ARCH_HIX5HD2)     += clk-hix5hd2.o
+>>> +obj-$(CONFIG_COMMON_CLK_HI6220)        += clkdivider-hi6220.o clk-hi6220.o
+>>> diff --git a/drivers/clk/hisilicon/clk-hi6220.c b/drivers/clk/hisilicon/clk-hi6220.c
+>>> new file mode 100644
+>>> index 0000000..01d0c46
+>>> --- /dev/null
+>>> +++ b/drivers/clk/hisilicon/clk-hi6220.c
+>>> @@ -0,0 +1,284 @@
+>>> +/*
+>>> + * Hisilicon Hi6220 clock driver
+>>> + *
+>>> + * Copyright (c) 2015 Hisilicon Limited.
+>>> + *
+>>> + * Author: Bintian Wang <bintian.wang@huawei.com>
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or modify
+>>> + * it under the terms of the GNU General Public License version 2 as
+>>> + * published by the Free Software Foundation.
+>>> + */
+>>> +
+>>> +#include <linux/kernel.h>
+>>> +#include <linux/clk-provider.h>
+>>> +#include <linux/clkdev.h>
+>>> +#include <linux/io.h>
+>>> +#include <linux/of.h>
+>>> +#include <linux/of_address.h>
+>>> +#include <linux/of_device.h>
+>>> +#include <linux/slab.h>
+>>> +#include <linux/clk.h>
+>>> +
+>>> +#include <dt-bindings/clock/hi6220-clock.h>
+>>> +
+>>> +#include "clk.h"
+>>> +
+>>> +
+>>> +/* clocks in AO (always on) controller */
+>>> +static struct hisi_fixed_rate_clock hi6220_fixed_rate_clks[] __initdata = {
+>>> +       { HI6220_REF32K,        "ref32k",       NULL, CLK_IS_ROOT, 32764,     },
+>>> +       { HI6220_CLK_TCXO,      "clk_tcxo",     NULL, CLK_IS_ROOT, 19200000,  },
+>>> +       { HI6220_MMC1_PAD,      "mmc1_pad",     NULL, CLK_IS_ROOT, 100000000, },
+>>> +       { HI6220_MMC2_PAD,      "mmc2_pad",     NULL, CLK_IS_ROOT, 100000000, },
+>>> +       { HI6220_MMC0_PAD,      "mmc0_pad",     NULL, CLK_IS_ROOT, 200000000, },
+>>> +       { HI6220_PLL_BBP,       "bbppll0",      NULL, CLK_IS_ROOT, 245760000, },
+>>> +       { HI6220_PLL_GPU,       "gpupll",       NULL, CLK_IS_ROOT, 1000000000,},
+>>> +       { HI6220_PLL1_DDR,      "ddrpll1",      NULL, CLK_IS_ROOT, 1066000000,},
+>>> +       { HI6220_PLL_SYS,       "syspll",       NULL, CLK_IS_ROOT, 1200000000,},
+>>> +       { HI6220_PLL_SYS_MEDIA, "media_syspll", NULL, CLK_IS_ROOT, 1200000000,},
+>>> +       { HI6220_DDR_SRC,       "ddr_sel_src",  NULL, CLK_IS_ROOT, 1200000000,},
+>>> +       { HI6220_PLL_MEDIA,     "media_pll",    NULL, CLK_IS_ROOT, 1440000000,},
+>>> +       { HI6220_PLL_DDR,       "ddrpll0",      NULL, CLK_IS_ROOT, 1600000000,},
+>>> +};
+>>> +
+>>> +static struct hisi_fixed_factor_clock hi6220_fixed_factor_clks[] __initdata = {
+>>> +       { HI6220_300M,         "clk_300m",    "syspll",          1, 4, 0, },
+>>> +       { HI6220_150M,         "clk_150m",    "clk_300m",        1, 2, 0, },
+>>> +       { HI6220_PICOPHY_SRC,  "picophy_src", "clk_150m",        1, 4, 0, },
+>>> +       { HI6220_MMC0_SRC_SEL, "mmc0srcsel",  "mmc0_sel",        1, 8, 0, },
+>>> +       { HI6220_MMC1_SRC_SEL, "mmc1srcsel",  "mmc1_sel",        1, 8, 0, },
+>>> +       { HI6220_MMC2_SRC_SEL, "mmc2srcsel",  "mmc2_sel",        1, 8, 0, },
+>>> +       { HI6220_VPU_CODEC,    "vpucodec",    "codec_jpeg_aclk", 1, 2, 0, },
+>>> +       { HI6220_MMC0_SMP,     "mmc0_sample", "mmc0_sel",        1, 8, 0, },
+>>> +       { HI6220_MMC1_SMP,     "mmc1_sample", "mmc1_sel",        1, 8, 0, },
+>>> +       { HI6220_MMC2_SMP,     "mmc2_sample", "mmc2_sel",        1, 8, 0, },
+>>> +};
+>>> +
+>>> +static struct hisi_gate_clock hi6220_separated_gate_clks_ao[] __initdata = {
+>>> +       { HI6220_WDT0_PCLK,   "wdt0_pclk",   "clk_tcxo", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 12, 0, },
+>>> +       { HI6220_WDT1_PCLK,   "wdt1_pclk",   "clk_tcxo", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 13, 0, },
+>>> +       { HI6220_WDT2_PCLK,   "wdt2_pclk",   "clk_tcxo", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 14, 0, },
+>>> +       { HI6220_TIMER0_PCLK, "timer0_pclk", "clk_tcxo", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 15, 0, },
+>>> +       { HI6220_TIMER1_PCLK, "timer1_pclk", "clk_tcxo", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 16, 0, },
+>>> +       { HI6220_TIMER2_PCLK, "timer2_pclk", "clk_tcxo", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 17, 0, },
+>>> +       { HI6220_TIMER3_PCLK, "timer3_pclk", "clk_tcxo", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 18, 0, },
+>>> +       { HI6220_TIMER4_PCLK, "timer4_pclk", "clk_tcxo", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 19, 0, },
+>>> +       { HI6220_TIMER5_PCLK, "timer5_pclk", "clk_tcxo", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 20, 0, },
+>>> +       { HI6220_TIMER6_PCLK, "timer6_pclk", "clk_tcxo", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 21, 0, },
+>>> +       { HI6220_TIMER7_PCLK, "timer7_pclk", "clk_tcxo", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 22, 0, },
+>>> +       { HI6220_TIMER8_PCLK, "timer8_pclk", "clk_tcxo", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 23, 0, },
+>>> +       { HI6220_UART0_PCLK,  "uart0_pclk",  "clk_tcxo", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x630, 24, 0, },
+>>> +};
+>>> +
+>>> +static void __init hi6220_clk_ao_init(struct device_node *np)
+>>> +{
+>>> +       struct hisi_clock_data *clk_data;
+>>> +
+>>> +       clk_data = hisi_clk_init(np, HI6220_AO_NR_CLKS);
+>>> +       if (!clk_data)
+>>> +               return;
+>>> +
+>>> +       hisi_clk_register_fixed_rate(hi6220_fixed_rate_clks,
+>>> +                               ARRAY_SIZE(hi6220_fixed_rate_clks), clk_data);
+>>> +
+>>> +       hisi_clk_register_fixed_factor(hi6220_fixed_factor_clks,
+>>> +                               ARRAY_SIZE(hi6220_fixed_factor_clks), clk_data);
+>>> +
+>>> +       hisi_clk_register_gate_sep(hi6220_separated_gate_clks_ao,
+>>> +                               ARRAY_SIZE(hi6220_separated_gate_clks_ao), clk_data);
+>>> +}
+>>> +CLK_OF_DECLARE(hi6220_clk_ao, "hisilicon,hi6220-clock-ao", hi6220_clk_ao_init);
+>>> +
+>>> +
+>>> +/* clocks in sysctrl */
+>>> +static const char *mmc0_mux0_p[] __initconst = { "pll_ddr_gate", "syspll", };
+>>> +static const char *mmc0_mux1_p[] __initconst = { "mmc0_mux0", "pll_media_gate", };
+>>> +static const char *mmc0_src_p[] __initconst = { "mmc0srcsel", "mmc0_div", };
+>>> +static const char *mmc1_mux0_p[] __initconst = { "pll_ddr_gate", "syspll", };
+>>> +static const char *mmc1_mux1_p[] __initconst = { "mmc1_mux0", "pll_media_gate", };
+>>> +static const char *mmc1_src_p[]  __initconst = { "mmc1srcsel", "mmc1_div", };
+>>> +static const char *mmc2_mux0_p[] __initconst = { "pll_ddr_gate", "syspll", };
+>>> +static const char *mmc2_mux1_p[] __initconst = { "mmc2_mux0", "pll_media_gate", };
+>>> +static const char *mmc2_src_p[]  __initconst = { "mmc2srcsel", "mmc2_div", };
+>>> +static const char *mmc0_sample_in[] __initconst = { "mmc0_sample", "mmc0_pad", };
+>>> +static const char *mmc1_sample_in[] __initconst = { "mmc1_sample", "mmc1_pad", };
+>>> +static const char *mmc2_sample_in[] __initconst = { "mmc2_sample", "mmc2_pad", };
+>>> +static const char *uart1_src[] __initconst = { "clk_tcxo", "clk_150m", };
+>>> +static const char *uart2_src[] __initconst = { "clk_tcxo", "clk_150m", };
+>>> +static const char *uart3_src[] __initconst = { "clk_tcxo", "clk_150m", };
+>>> +static const char *uart4_src[] __initconst = { "clk_tcxo", "clk_150m", };
+>>> +static const char *hifi_src[] __initconst = { "syspll", "pll_media_gate", };
+>>> +
+>>> +static struct hisi_gate_clock hi6220_separated_gate_clks_sys[] __initdata = {
+>>> +       { HI6220_MMC0_CLK,      "mmc0_clk",      "mmc0_src",       CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x200, 0,  0, },
+>>> +       { HI6220_MMC0_CIUCLK,   "mmc0_ciuclk",   "mmc0_smp_in",    CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x200, 0,  0, },
+>>> +       { HI6220_MMC1_CLK,      "mmc1_clk",      "mmc1_src",       CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x200, 1,  0, },
+>>> +       { HI6220_MMC1_CIUCLK,   "mmc1_ciuclk",   "mmc1_smp_in",    CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x200, 1,  0, },
+>>> +       { HI6220_MMC2_CLK,      "mmc2_clk",      "mmc2_src",       CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x200, 2,  0, },
+>>> +       { HI6220_MMC2_CIUCLK,   "mmc2_ciuclk",   "mmc2_smp_in",    CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x200, 2,  0, },
+>>> +       { HI6220_USBOTG_HCLK,   "usbotg_hclk",   "clk_bus",        CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x200, 4,  0, },
+>>> +       { HI6220_CLK_PICOPHY,   "clk_picophy",   "cs_dapb",        CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x200, 5,  0, },
+>>> +       { HI6220_HIFI,          "hifi_clk",      "hifi_div",       CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x210, 0,  0, },
+>>> +       { HI6220_DACODEC_PCLK,  "dacodec_pclk",  "clk_bus",        CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x210, 5,  0, },
+>>> +       { HI6220_EDMAC_ACLK,    "edmac_aclk",    "clk_bus",        CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x220, 2,  0, },
+>>> +       { HI6220_CS_ATB,        "cs_atb",        "cs_atb_div",     CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x230, 0,  0, },
+>>> +       { HI6220_I2C0_CLK,      "i2c0_clk",      "clk_150m",       CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x230, 1,  0, },
+>>> +       { HI6220_I2C1_CLK,      "i2c1_clk",      "clk_150m",       CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x230, 2,  0, },
+>>> +       { HI6220_I2C2_CLK,      "i2c2_clk",      "clk_150m",       CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x230, 3,  0, },
+>>> +       { HI6220_I2C3_CLK,      "i2c3_clk",      "clk_150m",       CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x230, 4,  0, },
+>>> +       { HI6220_UART1_PCLK,    "uart1_pclk",    "uart1_src",      CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x230, 5,  0, },
+>>> +       { HI6220_UART2_PCLK,    "uart2_pclk",    "uart2_src",      CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x230, 6,  0, },
+>>> +       { HI6220_UART3_PCLK,    "uart3_pclk",    "uart3_src",      CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x230, 7,  0, },
+>>> +       { HI6220_UART4_PCLK,    "uart4_pclk",    "uart4_src",      CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x230, 8,  0, },
+>>> +       { HI6220_SPI_CLK,       "spi_clk",       "clk_150m",       CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x230, 9,  0, },
+>>> +       { HI6220_MMU_CLK,       "mmu_clk",       "ddrc_axi1",      CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x240, 11, 0, },
+>>> +       { HI6220_HIFI_SEL,      "hifi_sel",      "hifi_src",       CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x270, 0,  0, },
+>>> +       { HI6220_MMC0_SYSPLL,   "mmc0_syspll",   "syspll",         CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x270, 1,  0, },
+>>> +       { HI6220_MMC1_SYSPLL,   "mmc1_syspll",   "syspll",         CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x270, 2,  0, },
+>>> +       { HI6220_MMC2_SYSPLL,   "mmc2_syspll",   "syspll",         CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x270, 3,  0, },
+>>> +       { HI6220_MMC0_SEL,      "mmc0_sel",      "mmc0_mux1",      CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x270, 6,  0, },
+>>> +       { HI6220_MMC1_SEL,      "mmc1_sel",      "mmc1_mux1",      CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x270, 7,  0, },
+>>> +       { HI6220_BBPPLL_SEL,    "bbppll_sel",    "pll0_bbp_gate",  CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x270, 9,  0, },
+>>> +       { HI6220_MEDIA_PLL_SRC, "media_pll_src", "pll_media_gate", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x270, 10, 0, },
+>>> +       { HI6220_MMC2_SEL,      "mmc2_sel",      "mmc2_mux1",      CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x270, 11, 0, },
+>>> +       { HI6220_CS_ATB_SYSPLL, "cs_atb_syspll", "syspll",         CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x270, 12, 0, },
+>>> +};
+>>> +
+>>> +static struct hisi_mux_clock hi6220_mux_clks_sys[] __initdata = {
+>>> +       { HI6220_MMC0_SRC,    "mmc0_src",    mmc0_src_p,     ARRAY_SIZE(mmc0_src_p),     CLK_SET_RATE_PARENT, 0x4,   0,  1, 0, },
+>>> +       { HI6220_MMC0_SMP_IN, "mmc0_smp_in", mmc0_sample_in, ARRAY_SIZE(mmc0_sample_in), CLK_SET_RATE_PARENT, 0x4,   0,  1, 0, },
+>>> +       { HI6220_MMC1_SRC,    "mmc1_src",    mmc1_src_p,     ARRAY_SIZE(mmc1_src_p),     CLK_SET_RATE_PARENT, 0x4,   2,  1, 0, },
+>>> +       { HI6220_MMC1_SMP_IN, "mmc1_smp_in", mmc1_sample_in, ARRAY_SIZE(mmc1_sample_in), CLK_SET_RATE_PARENT, 0x4,   2,  1, 0, },
+>>> +       { HI6220_MMC2_SRC,    "mmc2_src",    mmc2_src_p,     ARRAY_SIZE(mmc2_src_p),     CLK_SET_RATE_PARENT, 0x4,   4,  1, 0, },
+>>> +       { HI6220_MMC2_SMP_IN, "mmc2_smp_in", mmc2_sample_in, ARRAY_SIZE(mmc2_sample_in), CLK_SET_RATE_PARENT, 0x4,   4,  1, 0, },
+>>> +       { HI6220_HIFI_SRC,    "hifi_src",    hifi_src,       ARRAY_SIZE(hifi_src),       CLK_SET_RATE_PARENT, 0x400, 0,  1, CLK_MUX_HIWORD_MASK,},
+>>> +       { HI6220_UART1_SRC,   "uart1_src",   uart1_src,      ARRAY_SIZE(uart1_src),      CLK_SET_RATE_PARENT, 0x400, 1,  1, CLK_MUX_HIWORD_MASK,},
+>>> +       { HI6220_UART2_SRC,   "uart2_src",   uart2_src,      ARRAY_SIZE(uart2_src),      CLK_SET_RATE_PARENT, 0x400, 2,  1, CLK_MUX_HIWORD_MASK,},
+>>> +       { HI6220_UART3_SRC,   "uart3_src",   uart3_src,      ARRAY_SIZE(uart3_src),      CLK_SET_RATE_PARENT, 0x400, 3,  1, CLK_MUX_HIWORD_MASK,},
+>>> +       { HI6220_UART4_SRC,   "uart4_src",   uart4_src,      ARRAY_SIZE(uart4_src),      CLK_SET_RATE_PARENT, 0x400, 4,  1, CLK_MUX_HIWORD_MASK,},
+>>> +       { HI6220_MMC0_MUX0,   "mmc0_mux0",   mmc0_mux0_p,    ARRAY_SIZE(mmc0_mux0_p),    CLK_SET_RATE_PARENT, 0x400, 5,  1, CLK_MUX_HIWORD_MASK,},
+>>> +       { HI6220_MMC1_MUX0,   "mmc1_mux0",   mmc1_mux0_p,    ARRAY_SIZE(mmc1_mux0_p),    CLK_SET_RATE_PARENT, 0x400, 11, 1, CLK_MUX_HIWORD_MASK,},
+>>> +       { HI6220_MMC2_MUX0,   "mmc2_mux0",   mmc2_mux0_p,    ARRAY_SIZE(mmc2_mux0_p),    CLK_SET_RATE_PARENT, 0x400, 12, 1, CLK_MUX_HIWORD_MASK,},
+>>> +       { HI6220_MMC0_MUX1,   "mmc0_mux1",   mmc0_mux1_p,    ARRAY_SIZE(mmc0_mux1_p),    CLK_SET_RATE_PARENT, 0x400, 13, 1, CLK_MUX_HIWORD_MASK,},
+>>> +       { HI6220_MMC1_MUX1,   "mmc1_mux1",   mmc1_mux1_p,    ARRAY_SIZE(mmc1_mux1_p),    CLK_SET_RATE_PARENT, 0x400, 14, 1, CLK_MUX_HIWORD_MASK,},
+>>> +       { HI6220_MMC2_MUX1,   "mmc2_mux1",   mmc2_mux1_p,    ARRAY_SIZE(mmc2_mux1_p),    CLK_SET_RATE_PARENT, 0x400, 15, 1, CLK_MUX_HIWORD_MASK,},
+>>> +};
+>>> +
+>>> +static struct hi6220_divider_clock hi6220_div_clks_sys[] __initdata = {
+>>> +       { HI6220_CLK_BUS,     "clk_bus",     "clk_300m",      CLK_SET_RATE_PARENT, 0x490, 0,  4, 7, },
+>>> +       { HI6220_MMC0_DIV,    "mmc0_div",    "mmc0_syspll",   CLK_SET_RATE_PARENT, 0x494, 0,  6, 7, },
+>>> +       { HI6220_MMC1_DIV,    "mmc1_div",    "mmc1_syspll",   CLK_SET_RATE_PARENT, 0x498, 0,  6, 7, },
+>>> +       { HI6220_MMC2_DIV,    "mmc2_div",    "mmc2_syspll",   CLK_SET_RATE_PARENT, 0x49c, 0,  6, 7, },
+>>> +       { HI6220_HIFI_DIV,    "hifi_div",    "hifi_sel",      CLK_SET_RATE_PARENT, 0x4a0, 0,  4, 7, },
+>>> +       { HI6220_BBPPLL0_DIV, "bbppll0_div", "bbppll_sel",    CLK_SET_RATE_PARENT, 0x4a0, 8,  6, 15,},
+>>> +       { HI6220_CS_DAPB,     "cs_dapb",     "picophy_src",   CLK_SET_RATE_PARENT, 0x4a0, 24, 2, 31,},
+>>> +       { HI6220_CS_ATB_DIV,  "cs_atb_div",  "cs_atb_syspll", CLK_SET_RATE_PARENT, 0x4a4, 0,  4, 7, },
+>>> +};
+>>> +
+>>> +static void __init hi6220_clk_sys_init(struct device_node *np)
+>>> +{
+>>> +       struct hisi_clock_data *clk_data;
+>>> +
+>>> +       clk_data = hisi_clk_init(np, HI6220_SYS_NR_CLKS);
+>>> +       if (!clk_data)
+>>> +               return;
+>>> +
+>>> +       hisi_clk_register_gate_sep(hi6220_separated_gate_clks_sys,
+>>> +                       ARRAY_SIZE(hi6220_separated_gate_clks_sys), clk_data);
+>>> +
+>>> +       hisi_clk_register_mux(hi6220_mux_clks_sys,
+>>> +                       ARRAY_SIZE(hi6220_mux_clks_sys), clk_data);
+>>> +
+>>> +       hi6220_clk_register_divider(hi6220_div_clks_sys,
+>>> +                       ARRAY_SIZE(hi6220_div_clks_sys), clk_data);
+>>> +}
+>>> +CLK_OF_DECLARE(hi6220_clk_sys, "hisilicon,hi6220-clock-sys", hi6220_clk_sys_init);
+>>> +
+>>> +
+>>> +/* clocks in media controller */
+>>> +static const char *clk_1000_1200_src[] __initconst = { "pll_gpu_gate", "media_syspll_src", };
+>>> +static const char *clk_1440_1200_src[] __initconst = { "media_syspll_src", "media_pll_src", };
+>>> +static const char *clk_1000_1440_src[] __initconst = { "pll_gpu_gate", "media_pll_src", };
+>>> +
+>>> +static struct hisi_gate_clock hi6220_separated_gate_clks_media[] __initdata = {
+>>> +       { HI6220_DSI_PCLK,       "dsi_pclk",         "vpucodec",      CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x520, 0,  0, },
+>>> +       { HI6220_G3D_PCLK,       "g3d_pclk",         "vpucodec",      CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x520, 1,  0, },
+>>> +       { HI6220_ACLK_CODEC_VPU, "aclk_codec_vpu",   "ade_core_src",  CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x520, 3,  0, },
+>>> +       { HI6220_ISP_SCLK,       "isp_sclk",         "isp_sclk_src",  CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x520, 5,  0, },
+>>> +       { HI6220_ADE_CORE,       "ade_core",         "ade_core_src",  CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x520, 6,  0, },
+>>> +       { HI6220_MED_MMU,        "media_mmu",        "mmu_clk",       CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x520, 8,  0, },
+>>> +       { HI6220_CFG_CSI4PHY,    "cfg_csi4phy",      "clk_tcxo",      CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x520, 9,  0, },
+>>> +       { HI6220_CFG_CSI2PHY,    "cfg_csi2phy",      "clk_tcxo",      CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x520, 10, 0, },
+>>> +       { HI6220_ISP_SCLK_GATE,  "isp_sclk_gate",    "media_pll_src", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x520, 11, 0, },
+>>> +       { HI6220_ISP_SCLK_GATE1, "isp_sclk_gate1",   "media_pll_src", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x520, 12, 0, },
+>>> +       { HI6220_ADE_CORE_GATE,  "ade_core_gate",    "media_pll_src", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x520, 14, 0, },
+>>> +       { HI6220_CODEC_VPU_GATE, "codec_vpu_gate",   "clk_1000_1440", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x520, 15, 0, },
+>>> +       { HI6220_MED_SYSPLL,     "media_syspll_src", "media_syspll",  CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x520, 17, 0, },
+>>> +};
+>>> +
+>>> +static struct hisi_mux_clock hi6220_mux_clks_media[] __initdata = {
+>>> +       { HI6220_1440_1200, "clk_1440_1200", clk_1440_1200_src, ARRAY_SIZE(clk_1440_1200_src), CLK_SET_RATE_PARENT, 0x51c, 0, 1, 0, },
+>>> +       { HI6220_1000_1200, "clk_1000_1200", clk_1000_1200_src, ARRAY_SIZE(clk_1000_1200_src), CLK_SET_RATE_PARENT, 0x51c, 1, 1, 0, },
+>>> +       { HI6220_1000_1440, "clk_1000_1440", clk_1000_1440_src, ARRAY_SIZE(clk_1000_1440_src), CLK_SET_RATE_PARENT, 0x51c, 6, 1, 0, },
+>>> +};
+>>> +
+>>> +static struct hi6220_divider_clock hi6220_div_clks_media[] __initdata = {
+>>> +       { HI6220_CODEC_JPEG,    "codec_jpeg_aclk", "media_pll_src",  CLK_SET_RATE_PARENT, 0xcbc, 0,  4, 23, },
+>>> +       { HI6220_ISP_SCLK_SRC,  "isp_sclk_src",    "isp_sclk_gate",  CLK_SET_RATE_PARENT, 0xcbc, 8,  4, 15, },
+>>> +       { HI6220_ISP_SCLK1,     "isp_sclk1",       "isp_sclk_gate1", CLK_SET_RATE_PARENT, 0xcbc, 24, 4, 31, },
+>>> +       { HI6220_ADE_CORE_SRC,  "ade_core_src",    "ade_core_gate",  CLK_SET_RATE_PARENT, 0xcc0, 16, 3, 23, },
+>>> +       { HI6220_ADE_PIX_SRC,   "ade_pix_src",     "clk_1440_1200",  CLK_SET_RATE_PARENT, 0xcc0, 24, 6, 31, },
+>>> +       { HI6220_G3D_CLK,       "g3d_clk",         "clk_1000_1200",  CLK_SET_RATE_PARENT, 0xcc4, 8,  4, 15, },
+>>> +       { HI6220_CODEC_VPU_SRC, "codec_vpu_src",   "codec_vpu_gate", CLK_SET_RATE_PARENT, 0xcc4, 24, 6, 31, },
+>>> +};
+>>> +
+>>> +static void __init hi6220_clk_media_init(struct device_node *np)
+>>> +{
+>>> +       struct hisi_clock_data *clk_data;
+>>> +
+>>> +       clk_data = hisi_clk_init(np, HI6220_MEDIA_NR_CLKS);
+>>> +       if (!clk_data)
+>>> +               return;
+>>> +
+>>> +       hisi_clk_register_gate_sep(hi6220_separated_gate_clks_media,
+>>> +                               ARRAY_SIZE(hi6220_separated_gate_clks_media), clk_data);
+>>> +
+>>> +       hisi_clk_register_mux(hi6220_mux_clks_media,
+>>> +                               ARRAY_SIZE(hi6220_mux_clks_media), clk_data);
+>>> +
+>>> +       hi6220_clk_register_divider(hi6220_div_clks_media,
+>>> +                               ARRAY_SIZE(hi6220_div_clks_media), clk_data);
+>>> +}
+>>> +CLK_OF_DECLARE(hi6220_clk_media, "hisilicon,hi6220-clock-media", hi6220_clk_media_init);
+>>> +
+>>> +
+>>> +/* clocks in pmctrl */
+>>> +static struct hisi_gate_clock hi6220_gate_clks_power[] __initdata = {
+>>> +       { HI6220_PLL_GPU_GATE,   "pll_gpu_gate",   "gpupll",    CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x8,  0,  0, },
+>>> +       { HI6220_PLL1_DDR_GATE,  "pll1_ddr_gate",  "ddrpll1",   CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x10, 0,  0, },
+>>> +       { HI6220_PLL_DDR_GATE,   "pll_ddr_gate",   "ddrpll0",   CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x18, 0,  0, },
+>>> +       { HI6220_PLL_MEDIA_GATE, "pll_media_gate", "media_pll", CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x38, 0,  0, },
+>>> +       { HI6220_PLL0_BBP_GATE,  "pll0_bbp_gate",  "bbppll0",   CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x48, 0,  0, },
+>>> +};
+>>> +
+>>> +static struct hi6220_divider_clock hi6220_div_clks_power[] __initdata = {
+>>> +       { HI6220_DDRC_SRC,  "ddrc_src",  "ddr_sel_src", CLK_SET_RATE_PARENT, 0x5a8, 0, 4, 0, },
+>>> +       { HI6220_DDRC_AXI1, "ddrc_axi1", "ddrc_src",    CLK_SET_RATE_PARENT, 0x5a8, 8, 2, 0, },
+>>> +};
+>>> +
+>>> +static void __init hi6220_clk_power_init(struct device_node *np)
+>>> +{
+>>> +       struct hisi_clock_data *clk_data;
+>>> +
+>>> +       clk_data = hisi_clk_init(np, HI6220_POWER_NR_CLKS);
+>>> +       if (!clk_data)
+>>> +               return;
+>>> +
+>>> +       hisi_clk_register_gate(hi6220_gate_clks_power,
+>>> +                               ARRAY_SIZE(hi6220_gate_clks_power), clk_data);
+>>> +
+>>> +       hi6220_clk_register_divider(hi6220_div_clks_power,
+>>> +                               ARRAY_SIZE(hi6220_div_clks_power), clk_data);
+>>> +}
+>>> +CLK_OF_DECLARE(hi6220_clk_power, "hisilicon,hi6220-clock-power", hi6220_clk_power_init);
+>>> diff --git a/drivers/clk/hisilicon/clk.c b/drivers/clk/hisilicon/clk.c
+>>> index a078e84..5d2305c 100644
+>>> --- a/drivers/clk/hisilicon/clk.c
+>>> +++ b/drivers/clk/hisilicon/clk.c
+>>> @@ -232,3 +232,32 @@ void __init hisi_clk_register_gate_sep(struct hisi_gate_clock *clks,
+>>>                 data->clk_data.clks[clks[i].id] = clk;
+>>>         }
+>>>  }
+>>> +
+>>> +void __init hi6220_clk_register_divider(struct hi6220_divider_clock *clks,
+>>> +                                         int nums, struct hisi_clock_data *data)
+>>> +{
+>>> +       struct clk *clk;
+>>> +       void __iomem *base = data->base;
+>>> +       int i;
+>>> +
+>>> +       for (i = 0; i < nums; i++) {
+>>> +               clk = hi6220_register_clkdiv(NULL, clks[i].name,
+>>> +                                               clks[i].parent_name,
+>>> +                                               clks[i].flags,
+>>> +                                               base + clks[i].offset,
+>>> +                                               clks[i].shift,
+>>> +                                               clks[i].width,
+>>> +                                               clks[i].mask_bit,
+>>> +                                               &hisi_clk_lock);
+>>> +               if (IS_ERR(clk)) {
+>>> +                       pr_err("%s: failed to register clock %s\n",
+>>> +                              __func__, clks[i].name);
+>>> +                       continue;
+>>> +               }
+>>> +
+>>> +               if (clks[i].alias)
+>>> +                       clk_register_clkdev(clk, clks[i].alias, NULL);
+>>> +
+>>> +               data->clk_data.clks[clks[i].id] = clk;
+>>> +       }
+>>> +}
+>>> diff --git a/drivers/clk/hisilicon/clk.h b/drivers/clk/hisilicon/clk.h
+>>> index 31083ff..462a570 100644
+>>> --- a/drivers/clk/hisilicon/clk.h
+>>> +++ b/drivers/clk/hisilicon/clk.h
+>>> @@ -79,6 +79,18 @@ struct hisi_divider_clock {
+>>>         const char              *alias;
+>>>  };
+>>>
+>>> +struct hi6220_divider_clock {
+>>> +       unsigned int            id;
+>>> +       const char              *name;
+>>> +       const char              *parent_name;
+>>> +       unsigned long           flags;
+>>> +       unsigned long           offset;
+>>> +       u8                      shift;
+>>> +       u8                      width;
+>>> +       u32                     mask_bit;
+>>> +       const char              *alias;
+>>> +};
+>>> +
+>>>  struct hisi_gate_clock {
+>>>         unsigned int            id;
+>>>         const char              *name;
+>>> @@ -94,6 +106,9 @@ struct clk *hisi_register_clkgate_sep(struct device *, const char *,
+>>>                                 const char *, unsigned long,
+>>>                                 void __iomem *, u8,
+>>>                                 u8, spinlock_t *);
+>>> +struct clk *hi6220_register_clkdiv(struct device *dev, const char *name,
+>>> +       const char *parent_name, unsigned long flags, void __iomem *reg,
+>>> +       u8 shift, u8 width, u32 mask_bit, spinlock_t *lock);
+>>>
+>>>  struct hisi_clock_data __init *hisi_clk_init(struct device_node *, int);
+>>>  void __init hisi_clk_register_fixed_rate(struct hisi_fixed_rate_clock *,
+>>> @@ -108,4 +123,6 @@ void __init hisi_clk_register_gate(struct hisi_gate_clock *,
+>>>                                         int, struct hisi_clock_data *);
+>>>  void __init hisi_clk_register_gate_sep(struct hisi_gate_clock *,
+>>>                                         int, struct hisi_clock_data *);
+>>> +void __init hi6220_clk_register_divider(struct hi6220_divider_clock *,
+>>> +                                       int, struct hisi_clock_data *);
+>>>  #endif /* __HISI_CLK_H */
+>>> diff --git a/drivers/clk/hisilicon/clkdivider-hi6220.c b/drivers/clk/hisilicon/clkdivider-hi6220.c
+>>> new file mode 100644
+>>> index 0000000..9e3825b
+>>> --- /dev/null
+>>> +++ b/drivers/clk/hisilicon/clkdivider-hi6220.c
+>>> @@ -0,0 +1,273 @@
+>>> +/*
+>>> + * Hisilicon hi6220 SoC divider clock driver
+>>> + *
+>>> + * Copyright (c) 2015 Hisilicon Limited.
+>>> + *
+>>> + * Author: Bintian Wang <bintian.wang@huawei.com>
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or modify
+>>> + * it under the terms of the GNU General Public License version 2 as
+>>> + * published by the Free Software Foundation.
+>>> + *
+>>> + */
+>>> +
+>>> +#include <linux/kernel.h>
+>>> +#include <linux/clk-provider.h>
+>>> +#include <linux/slab.h>
+>>> +#include <linux/io.h>
+>>> +#include <linux/err.h>
+>>> +
+>>> +#define div_mask(width)        ((1 << (width)) - 1)
+>>> +
+>>> +/*
+>>> + * The reverse of DIV_ROUND_UP: The maximum number which
+>>> + * divided by m is r
+>>> + */
+>>> +#define MULT_ROUND_UP(r, m) ((r) * (m) + (m) - 1)
+>>> +
+>>> +/**
+>>> + * struct hi6220_clk_divider - divider clock for hi6220
+>>> + *
+>>> + * @hw:                handle between common and hardware-specific interfaces
+>>> + * @reg:       register containing divider
+>>> + * @shift:     shift to the divider bit field
+>>> + * @width:     width of the divider bit field
+>>> + * @mask:      mask for setting divider rate
+>>> + * @table:     the div table that the divider supports
+>>> + * @lock:      register lock
+>>> + */
+>>> +struct hi6220_clk_divider {
+>>> +       struct clk_hw   hw;
+>>> +       void __iomem    *reg;
+>>> +       u8              shift;
+>>> +       u8              width;
+>>> +       u32             mask;
+>>> +       const struct clk_div_table *table;
+>>> +       spinlock_t      *lock;
+>>> +};
+>>> +
+>>> +#define to_hi6220_clk_divider(_hw)     \
+>>> +       container_of(_hw, struct hi6220_clk_divider, hw)
+>>> +
+>>> +static unsigned int hi6220_get_table_maxdiv(const struct clk_div_table *table)
+>>> +{
+>>> +       unsigned int maxdiv = 0;
+>>> +       const struct clk_div_table *clkt;
+>>> +
+>>> +       for (clkt = table; clkt->div; clkt++)
+>>> +               if (clkt->div > maxdiv)
+>>> +                       maxdiv = clkt->div;
+>>> +       return maxdiv;
+>>> +}
+>>> +
+>>> +static unsigned int hi6220_get_table_div(const struct clk_div_table *table,
+>>> +                                       unsigned int val)
+>>> +{
+>>> +       const struct clk_div_table *clkt;
+>>> +
+>>> +       for (clkt = table; clkt->div; clkt++)
+>>> +               if (clkt->val == val)
+>>> +                       return clkt->div;
+>>> +
+>>> +       return 0;
+>>> +}
+>>> +
+>>> +static unsigned int hi6220_get_table_val(const struct clk_div_table *table,
+>>> +                                       unsigned int div)
+>>> +{
+>>> +       const struct clk_div_table *clkt;
+>>> +
+>>> +       for (clkt = table; clkt->div; clkt++)
+>>> +               if (clkt->div == div)
+>>> +                       return clkt->val;
+>>> +       return 0;
+>>> +}
+>>> +
+>>> +static unsigned long hi6220_clkdiv_recalc_rate(struct clk_hw *hw,
+>>> +                                       unsigned long parent_rate)
+>>> +{
+>>> +       unsigned int div, val;
+>>> +       struct hi6220_clk_divider *dclk = to_hi6220_clk_divider(hw);
+>>> +
+>>> +       val = readl_relaxed(dclk->reg) >> dclk->shift;
+>>> +       val &= div_mask(dclk->width);
+>>> +
+>>> +       div = hi6220_get_table_div(dclk->table, val);
+>>> +       if (!div) {
+>>> +               pr_warn("%s: Invalid divisor for clock %s\n", __func__,
+>>> +                          __clk_get_name(hw->clk));
+>>> +               return parent_rate;
+>>> +       }
+>>> +
+>>> +       return parent_rate / div;
+>>> +}
+>>> +
+>>> +static bool hi6220_is_valid_div(const struct clk_div_table *table,
+>>> +                               unsigned int div)
+>>> +{
+>>> +       const struct clk_div_table *clkt;
+>>> +
+>>> +       for (clkt = table; clkt->div; clkt++)
+>>> +               if (clkt->div == div)
+>>> +                       return true;
+>>> +       return false;
+>>> +}
+>>> +
+>>> +static int hi6220_clkdiv_bestdiv(struct clk_hw *hw, unsigned long rate,
+>>> +                                unsigned long *best_parent_rate)
+>>> +{
+>>> +       unsigned int i, bestdiv = 0;
+>>> +       unsigned long parent_rate, best = 0, now, maxdiv;
+>>> +
+>>> +       struct hi6220_clk_divider *dclk = to_hi6220_clk_divider(hw);
+>>> +       struct clk *clk_parent = __clk_get_parent(hw->clk);
+>>> +
+>>> +       maxdiv = hi6220_get_table_maxdiv(dclk->table);
+>>> +
+>>> +       if (!(__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT)) {
+>>> +               parent_rate = *best_parent_rate;
+>>> +               bestdiv = DIV_ROUND_UP(parent_rate, rate);
+>>> +               bestdiv = (bestdiv == 0) ? 1 : bestdiv;
+>>> +               bestdiv = (bestdiv > maxdiv) ? maxdiv : bestdiv;
+>>> +               return bestdiv;
+>>> +       }
+>>> +
+>>> +       /*
+>>> +        * The maximum divider we can use without overflowing
+>>> +        * unsigned long in rate * i below
+>>> +        */
+>>> +       maxdiv = min(ULONG_MAX / rate, maxdiv);
+>>> +
+>>> +       for (i = 1; i <= maxdiv; i++) {
+>>> +               if (!hi6220_is_valid_div(dclk->table, i))
+>>> +                       continue;
+>>> +               parent_rate = __clk_round_rate(clk_parent,
+>>> +                                       MULT_ROUND_UP(rate, i));
+>>> +               now = parent_rate / i;
+>>> +               if (now <= rate && now > best) {
+>>> +                       bestdiv = i;
+>>> +                       best = now;
+>>> +                       *best_parent_rate = parent_rate;
+>>> +               }
+>>> +       }
+>>> +
+>>> +       if (!bestdiv) {
+>>> +               bestdiv = hi6220_get_table_maxdiv(dclk->table);
+>>> +               *best_parent_rate = __clk_round_rate(clk_parent, 1);
+>>> +       }
+>>> +
+>>> +       return bestdiv;
+>>> +}
+>>> +
+>>> +static long hi6220_clkdiv_round_rate(struct clk_hw *hw, unsigned long rate,
+>>> +                                       unsigned long *prate)
+>>> +{
+>>> +       int div;
+>>> +
+>>> +       if (!rate)
+>>> +               rate = 1;
+>>> +
+>>> +       div = hi6220_clkdiv_bestdiv(hw, rate, prate);
+>>> +
+>>> +       return *prate / div;
+>>> +}
+>>> +
+>>> +static int hi6220_clkdiv_set_rate(struct clk_hw *hw, unsigned long rate,
+>>> +                                       unsigned long parent_rate)
+>>> +{
+>>> +       unsigned int div, value;
+>>> +       unsigned long flags = 0;
+>>> +       u32 data;
+>>> +       struct hi6220_clk_divider *dclk = to_hi6220_clk_divider(hw);
+>>> +
+>>> +       div = parent_rate / rate;
+>>> +
+>>> +       if (!hi6220_is_valid_div(dclk->table, div))
+>>> +               return -EINVAL;
+>>> +
+>>> +       value = hi6220_get_table_val(dclk->table, div);
+>>> +
+>>> +       if (value > div_mask(dclk->width))
+>>> +               value = div_mask(dclk->width);
+>>> +
+>>> +       if (dclk->lock)
+>>> +               spin_lock_irqsave(dclk->lock, flags);
+>>> +
+>>> +       data = readl_relaxed(dclk->reg);
+>>> +       data &= ~(div_mask(dclk->width) << dclk->shift);
+>>> +       data |= value << dclk->shift;
+>>> +       data |= dclk->mask;
+>>> +
+>>> +       writel_relaxed(data, dclk->reg);
+>>> +
+>>> +       if (dclk->lock)
+>>> +               spin_unlock_irqrestore(dclk->lock, flags);
+>>> +
+>>> +       return 0;
+>>> +}
+>>> +
+>>> +static struct clk_ops hi6220_clkdiv_ops = {
+>>> +       .recalc_rate = hi6220_clkdiv_recalc_rate,
+>>> +       .round_rate = hi6220_clkdiv_round_rate,
+>>> +       .set_rate = hi6220_clkdiv_set_rate,
+>>> +};
+>>> +
+>>> +struct clk *hi6220_register_clkdiv(struct device *dev, const char *name,
+>>> +       const char *parent_name, unsigned long flags, void __iomem *reg,
+>>> +       u8 shift, u8 width, u32 mask_bit, spinlock_t *lock)
+>>> +{
+>>> +       struct hi6220_clk_divider *div;
+>>> +       struct clk *clk;
+>>> +       struct clk_init_data init;
+>>> +       struct clk_div_table *table;
+>>> +       u32 max_div, min_div;
+>>> +       int i;
+>>> +
+>>> +       /* allocate the divider */
+>>> +       div = kzalloc(sizeof(struct hi6220_clk_divider), GFP_KERNEL);
+>>> +       if (!div) {
+>>> +               pr_err("%s: could not allocate divider clk\n", __func__);
+>>> +               return ERR_PTR(-ENOMEM);
+>>> +       }
+>>> +
+>>> +       /* Init the divider table */
+>>> +       max_div = div_mask(width) + 1;
+>>> +       min_div = 1;
+>>> +
+>>> +       table = kzalloc(sizeof(struct clk_div_table) * (max_div + 1), GFP_KERNEL);
+>>> +       if (!table) {
+>>> +               kfree(div);
+>>> +               pr_err("%s: failed to alloc divider table!\n", __func__);
+>>> +               return ERR_PTR(-ENOMEM);
+>>> +       }
+>>> +
+>>> +       for (i = 0; i < max_div; i++) {
+>>> +               table[i].div = min_div + i;
+>>> +               table[i].val = table[i].div - 1;
+>>> +       }
+>>> +
+>>> +       init.name = name;
+>>> +       init.ops = &hi6220_clkdiv_ops;
+>>> +       init.flags = flags | CLK_IS_BASIC;
+>>> +       init.parent_names = parent_name ? &parent_name : NULL;
+>>> +       init.num_parents = parent_name ? 1 : 0;
+>>> +
+>>> +       /* struct hi6220_clk_divider assignments */
+>>> +       div->reg = reg;
+>>> +       div->shift = shift;
+>>> +       div->width = width;
+>>> +       div->mask = mask_bit ? BIT(mask_bit) : 0;
+>>> +       div->lock = lock;
+>>> +       div->hw.init = &init;
+>>> +       div->table = table;
+>>> +
+>>> +       /* register the clock */
+>>> +       clk = clk_register(dev, &div->hw);
+>>> +
+>>> +       if (IS_ERR(clk)) {
+>>> +               kfree(table);
+>>> +               kfree(div);
+>>> +       }
+>>> +
+>>> +       return clk;
+>>> +}
+>>> diff --git a/include/dt-bindings/clock/hi6220-clock.h b/include/dt-bindings/clock/hi6220-clock.h
+>>> new file mode 100644
+>>> index 0000000..05033e7
+>>> --- /dev/null
+>>> +++ b/include/dt-bindings/clock/hi6220-clock.h
+>>> @@ -0,0 +1,172 @@
+>>> +/*
+>>> + * Copyright (c) 2015 Hisilicon Limited.
+>>> + *
+>>> + * Author: Bintian Wang <bintian.wang@huawei.com>
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or modify
+>>> + * it under the terms of the GNU General Public License version 2 as
+>>> + * published by the Free Software Foundation.
+>>> + */
+>>> +
+>>> +#ifndef __DT_BINDINGS_CLOCK_HI6220_H
+>>> +#define __DT_BINDINGS_CLOCK_HI6220_H
+>>> +
+>>> +/* clk in AO (always on) controller */
+>>> +#define HI6220_NONE_CLOCK      0
+>>> +
+>>> +/* fixed rate clocks */
+>>> +#define HI6220_REF32K          1
+>>> +#define HI6220_CLK_TCXO                2
+>>> +#define HI6220_MMC1_PAD                3
+>>> +#define HI6220_MMC2_PAD                4
+>>> +#define HI6220_MMC0_PAD                5
+>>> +#define HI6220_PLL_BBP         6
+>>> +#define HI6220_PLL_GPU         7
+>>> +#define HI6220_PLL1_DDR                8
+>>> +#define HI6220_PLL_SYS         9
+>>> +#define HI6220_PLL_SYS_MEDIA   10
+>>> +#define HI6220_DDR_SRC         11
+>>> +#define HI6220_PLL_MEDIA       12
+>>> +#define HI6220_PLL_DDR         13
+>>> +
+>>> +/* fixed factor clocks */
+>>> +#define HI6220_300M            16
+>>> +#define HI6220_150M            17
+>>> +#define HI6220_PICOPHY_SRC     18
+>>> +#define HI6220_MMC0_SRC_SEL    19
+>>> +#define HI6220_MMC1_SRC_SEL    20
+>>> +#define HI6220_MMC2_SRC_SEL    21
+>>> +#define HI6220_VPU_CODEC       22
+>>> +#define HI6220_MMC0_SMP                23
+>>> +#define HI6220_MMC1_SMP                24
+>>> +#define HI6220_MMC2_SMP                25
+>>> +
+>>> +/* gate clocks */
+>>> +#define HI6220_WDT0_PCLK       28
+>>> +#define HI6220_WDT1_PCLK       29
+>>> +#define HI6220_WDT2_PCLK       30
+>>> +#define HI6220_TIMER0_PCLK     31
+>>> +#define HI6220_TIMER1_PCLK     32
+>>> +#define HI6220_TIMER2_PCLK     33
+>>> +#define HI6220_TIMER3_PCLK     34
+>>> +#define HI6220_TIMER4_PCLK     35
+>>> +#define HI6220_TIMER5_PCLK     36
+>>> +#define HI6220_TIMER6_PCLK     37
+>>> +#define HI6220_TIMER7_PCLK     38
+>>> +#define HI6220_TIMER8_PCLK     39
+>>> +#define HI6220_UART0_PCLK      40
+>>> +
+>>> +#define HI6220_AO_NR_CLKS      48
+>>> +
+>>> +/* clk in systrl */
+>>> +/* gate clock */
+>>> +#define HI6220_MMC0_CLK                1
+>>> +#define HI6220_MMC0_CIUCLK     2
+>>> +#define HI6220_MMC1_CLK                3
+>>> +#define HI6220_MMC1_CIUCLK     4
+>>> +#define HI6220_MMC2_CLK                5
+>>> +#define HI6220_MMC2_CIUCLK     6
+>>> +#define HI6220_USBOTG_HCLK     7
+>>> +#define HI6220_CLK_PICOPHY     8
+>>> +#define HI6220_HIFI            9
+>>> +#define HI6220_DACODEC_PCLK    10
+>>> +#define HI6220_EDMAC_ACLK      11
+>>> +#define HI6220_CS_ATB          12
+>>> +#define HI6220_I2C0_CLK                13
+>>> +#define HI6220_I2C1_CLK                14
+>>> +#define HI6220_I2C2_CLK                15
+>>> +#define HI6220_I2C3_CLK                16
+>>> +#define HI6220_UART1_PCLK      17
+>>> +#define HI6220_UART2_PCLK      18
+>>> +#define HI6220_UART3_PCLK      19
+>>> +#define HI6220_UART4_PCLK      20
+>>> +#define HI6220_SPI_CLK         21
+>>> +#define HI6220_MMU_CLK         22
+>>> +#define HI6220_HIFI_SEL                23
+>>> +#define HI6220_MMC0_SYSPLL     24
+>>> +#define HI6220_MMC1_SYSPLL     25
+>>> +#define HI6220_MMC2_SYSPLL     26
+>>> +#define HI6220_MMC0_SEL                27
+>>> +#define HI6220_MMC1_SEL                28
+>>> +#define HI6220_BBPPLL_SEL      29
+>>> +#define HI6220_MEDIA_PLL_SRC   30
+>>> +#define HI6220_MMC2_SEL                31
+>>> +#define HI6220_CS_ATB_SYSPLL   32
+>>> +
+>>> +/* mux clocks */
+>>> +#define HI6220_MMC0_SRC                35
+>>> +#define HI6220_MMC0_SMP_IN     36
+>>> +#define HI6220_MMC1_SRC                37
+>>> +#define HI6220_MMC1_SMP_IN     38
+>>> +#define HI6220_MMC2_SRC                39
+>>> +#define HI6220_MMC2_SMP_IN     40
+>>> +#define HI6220_HIFI_SRC                41
+>>> +#define HI6220_UART1_SRC       42
+>>> +#define HI6220_UART2_SRC       43
+>>> +#define HI6220_UART3_SRC       44
+>>> +#define HI6220_UART4_SRC       45
+>>> +#define HI6220_MMC0_MUX0       46
+>>> +#define HI6220_MMC1_MUX0       47
+>>> +#define HI6220_MMC2_MUX0       48
+>>> +#define HI6220_MMC0_MUX1       49
+>>> +#define HI6220_MMC1_MUX1       50
+>>> +#define HI6220_MMC2_MUX1       51
+>>> +
+>>> +/* divider clocks */
+>>> +#define HI6220_CLK_BUS         54
+>>> +#define HI6220_MMC0_DIV                55
+>>> +#define HI6220_MMC1_DIV                56
+>>> +#define HI6220_MMC2_DIV                57
+>>> +#define HI6220_HIFI_DIV                58
+>>> +#define HI6220_BBPPLL0_DIV     59
+>>> +#define HI6220_CS_DAPB         60
+>>> +#define HI6220_CS_ATB_DIV      61
+>>> +
+>>> +#define HI6220_SYS_NR_CLKS     64
+>>> +
+>>> +/* clk in media controller */
+>>> +/* gate clocks */
+>>> +#define HI6220_DSI_PCLK                1
+>>> +#define HI6220_G3D_PCLK                2
+>>> +#define HI6220_ACLK_CODEC_VPU  3
+>>> +#define HI6220_ISP_SCLK                4
+>>> +#define HI6220_ADE_CORE                5
+>>> +#define HI6220_MED_MMU         6
+>>> +#define HI6220_CFG_CSI4PHY     7
+>>> +#define HI6220_CFG_CSI2PHY     8
+>>> +#define HI6220_ISP_SCLK_GATE   9
+>>> +#define HI6220_ISP_SCLK_GATE1  10
+>>> +#define HI6220_ADE_CORE_GATE   11
+>>> +#define HI6220_CODEC_VPU_GATE  12
+>>> +#define HI6220_MED_SYSPLL      13
+>>> +
+>>> +/* mux clocks */
+>>> +#define HI6220_1440_1200       20
+>>> +#define HI6220_1000_1200       21
+>>> +#define HI6220_1000_1440       22
+>>> +
+>>> +/* divider clocks */
+>>> +#define HI6220_CODEC_JPEG      30
+>>> +#define HI6220_ISP_SCLK_SRC    31
+>>> +#define HI6220_ISP_SCLK1       32
+>>> +#define HI6220_ADE_CORE_SRC    33
+>>> +#define HI6220_ADE_PIX_SRC     34
+>>> +#define HI6220_G3D_CLK         35
+>>> +#define HI6220_CODEC_VPU_SRC   36
+>>> +
+>>> +#define HI6220_MEDIA_NR_CLKS   40
+>>> +
+>>> +/* clk in power controller */
+>>> +/* gate clocks */
+>>> +#define HI6220_PLL_GPU_GATE    1
+>>> +#define HI6220_PLL1_DDR_GATE   2
+>>> +#define HI6220_PLL_DDR_GATE    3
+>>> +#define HI6220_PLL_MEDIA_GATE  4
+>>> +#define HI6220_PLL0_BBP_GATE   5
+>>> +
+>>> +/* divider clocks */
+>>> +#define HI6220_DDRC_SRC                10
+>>> +#define HI6220_DDRC_AXI1       11
+>>> +
+>>> +#define HI6220_POWER_NR_CLKS   16
+>>> +#endif
+>>> --
+>>> 1.7.9.5
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>> Cheers,
+>>
+>> - Tyler
+>>
+>> [1] http://kernelci.org/build/tbaker/kernel/v3.19-rc7-8241-g7b08f7b75c01/
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> Please read the FAQ at  http://www.tux.org/lkml/
+>
+>
+>
+> --
+> Best Regards,
+>
+> Bintian
+> ===========================
+> Don't be nervous, just be happy!
+
+Cheers,
+
+- Tyler
