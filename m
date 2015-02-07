@@ -1,51 +1,47 @@
-From: dirk.behme@gmail.com (Dirk Behme)
-Date: Sat, 07 Feb 2015 08:16:08 +0100
-Subject: coresignt etm/etb usage
-In-Reply-To: <CAHrpEqR0kPAPCvuFK0XdP9RTojH85xoATt1esbfGTCSPkPu0Tw@mail.gmail.com>
-References: <CAHrpEqR0kPAPCvuFK0XdP9RTojH85xoATt1esbfGTCSPkPu0Tw@mail.gmail.com>
-Message-ID: <54D5BBB8.20905@gmail.com>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Sat, 07 Feb 2015 16:22:47 +0900
+Subject: arm: kprobe compilation error
+In-Reply-To: <54D38982.6000100@elproma.com.pl>
+References: <54D38982.6000100@elproma.com.pl>
+Message-ID: <54D5BD47.4040107@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06.02.2015 22:56, Zhi Li wrote:
-> mathieu:
->
-> I try to enable etm/etb in our freescale platform.
+(2015/02/06 0:17), Janusz U?ycki wrote:
+> Hi,
+> 
+> I got the compilation error on next-20150204:
+> 
+>    CC      arch/arm/probes/kprobes/actions-arm.o
+> In file included from arch/arm/probes/kprobes/actions-common.c:18:
+> arch/arm/probes/kprobes/core.h:43: error: '[*]' not allowed in other 
+> than a declaration
+> make[2]: *** [arch/arm/probes/kprobes/actions-common.o] B??d 1
+> make[2]: *** Oczekiwanie na niezako?czone zadania....
+> In file included from arch/arm/probes/kprobes/actions-arm.c:66:
+> arch/arm/probes/kprobes/core.h:43: error: '[*]' not allowed in other 
+> than a declaration
+> make[2]: *** [arch/arm/probes/kprobes/actions-arm.o] B??d 1
+> In file included from arch/arm/probes/kprobes/core.c:37:
+> arch/arm/probes/kprobes/core.h:43: error: '[*]' not allowed in other 
+> than a declaration
+> make[2]: *** [arch/arm/probes/kprobes/core.o] B??d 1
+> make[1]: *** [arch/arm/probes/kprobes] B??d 2
+> make: *** [arch/arm/probes] B??d 2
+> 
+> reason is *[*]:
+> const struct decode_checker *[*]);
+
+Thank you for reporting!
+
+I think there is a typo, it should be "const struct decode_checker *[]".
 
 
-About which Freescale platform are you talking?
-
-I've tried using the patches for the Freescale i.MX6 some month ago. 
-I've managed to get the nodes like below, too. But never managed to 
-get the ETM tracing data into the ETB. Only with attached HW JTAG 
-debugger trace data has been recorded. And I never figured out which 
-additional configuration the HW JTAG is doing compared to the SW only 
-solution.
-
-Best regards
-
-Dirk
+Thank you,
 
 
-> I have ported your patches into our tree.
-> coresign node already created in /sys/devices.
->
-> 30041000.funnel  31001000.interrupt-controller  platform       software
-> 3007c000.etm     backlight.7                    regulators.10  system
-> 3007d000.etm     breakpoint                     replicator.1   timer.0
-> 30084000.etb     gpio-keys.9                    soc.2          virtual
-> 30087000.tpiu    max7322-reset.8                soc0
->
->
-> But my problem is how to test it.
-> Do you have document to show how to use it?
->
->
-> best regards
-> Frank Li
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+-- 
+Masami HIRAMATSU
+Software Platform Research Dept. Linux Technology Research Center
+Hitachi, Ltd., Yokohama Research Laboratory
+E-mail: masami.hiramatsu.pt at hitachi.com
