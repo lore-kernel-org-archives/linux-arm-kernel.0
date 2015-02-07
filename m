@@ -1,122 +1,226 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 7 Feb 2015 10:02:25 +0000
-Subject: [PATCHv6 4/5] edac: altera: Add Altera L2 Cache and OCRAM EDAC
- Support
-In-Reply-To: <1420772036-3112-5-git-send-email-tthayer@opensource.altera.com>
-References: <1420772036-3112-1-git-send-email-tthayer@opensource.altera.com>
- <1420772036-3112-5-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <20150207100225.GC8656@n2100.arm.linux.org.uk>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Sat, 07 Feb 2015 19:08:04 +0900
+Subject: [RFC PATCH] x86: kprobes: enable optmize relative call insn
+In-Reply-To: <1423218655-30394-1-git-send-email-wangnan0@huawei.com>
+References: <54B540A8.1020804@hitachi.com>
+ <1423218655-30394-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <54D5E404.7080505@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 08, 2015 at 08:53:55PM -0600, tthayer at opensource.altera.com wrote:
-> +static int altr_edac_device_probe(struct platform_device *pdev)
+(2015/02/06 19:30), Wang Nan wrote:
+> In reply to Masami Hiramatsu's question on my previous early kprobe
+> patch series at:
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/315771.html
+> 
+> that on x86, early kprobe's applications range is limited by the type of
+> optimizable instructions, I made this patch, which enables optimizing
+> relative call instructions by introducing specific template for them.
+> Such instructions make up about 7% of the kernel. In addition, when
+> ftrace is enabled, funtion entry will be it, so early kprobe will be
+> much useful than before.
+
+Sorry, I couldn't understand this part. If you put kprobe on ftrace site
+after ftrace enabled, it uses ftrace directly, instead of int3 or jump.
+Anyway, ftrace-site instruction should be controlled by ftrace, not kprobes.
+
+> 
+> The relationship between ftrace and kprobe is interesting. Under normal
+> circumstances, kprobe utilizes ftrace. However, under early case,
+> there's no way to tell whether the probing instruction is an ftrace
+> entry. Another possible method on that is to move part of ftrace init
+> ahead. However, to allow optimize more instructions should also be
+> good for performance.
+> 
+> Masami, I'd like to hear your reply on it. Do you think this patch is
+> also useful for the normal cases?
+
+Expanding "optimizability" is good, but I don't like add new asm-templates
+which reduces maintainability less. Perhaps, we'd better start with reviewing
+can_boost table again...
+
+Thank you,
+
+> 
+> Signed-off-by: Wang Nan <wangnan0@huawei.com>
+> ---
+>  arch/x86/include/asm/kprobes.h | 17 +++++++--
+>  arch/x86/kernel/kprobes/opt.c  | 82 ++++++++++++++++++++++++++++++++++++++++--
+>  2 files changed, 94 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/x86/include/asm/kprobes.h b/arch/x86/include/asm/kprobes.h
+> index 017f4bb..3627694 100644
+> --- a/arch/x86/include/asm/kprobes.h
+> +++ b/arch/x86/include/asm/kprobes.h
+> @@ -31,6 +31,7 @@
+>  #define RELATIVEJUMP_OPCODE 0xe9
+>  #define RELATIVEJUMP_SIZE 5
+>  #define RELATIVECALL_OPCODE 0xe8
+> +#define RELATIVECALL_SIZE 5
+>  #define RELATIVE_ADDR_SIZE 4
+>  #define MAX_STACK_SIZE 64
+>  #define MAX_OPTIMIZED_LENGTH (MAX_INSN_SIZE + RELATIVE_ADDR_SIZE)
+> @@ -38,8 +39,10 @@
+>  #ifdef __ASSEMBLY__
+>  
+>  #define KPROBE_OPCODE_SIZE     1
+> +#define OPT_CALL_TEMPLATE_SIZE (optprobe_call_template_end - \
+> +		optprobe_call_template_entry)
+>  #define MAX_OPTINSN_SIZE ((optprobe_template_end - optprobe_template_entry) + \
+> -	MAX_OPTIMIZED_LENGTH + RELATIVEJUMP_SIZE)
+> +	MAX_OPTIMIZED_LENGTH + RELATIVEJUMP_SIZE + OPT_CALL_TEMPLATE_SIZE)
+>  
+>  #ifdef CONFIG_EARLY_KPROBES
+>  # define EARLY_KPROBES_CODES_AREA					\
+> @@ -81,10 +84,20 @@ extern __visible kprobe_opcode_t optprobe_template_entry;
+>  extern __visible kprobe_opcode_t optprobe_template_val;
+>  extern __visible kprobe_opcode_t optprobe_template_call;
+>  extern __visible kprobe_opcode_t optprobe_template_end;
+> +
+> +extern __visible kprobe_opcode_t optprobe_call_template_entry;
+> +extern __visible kprobe_opcode_t optprobe_call_template_val_destaddr;
+> +extern __visible kprobe_opcode_t optprobe_call_template_val_retaddr;
+> +extern __visible kprobe_opcode_t optprobe_call_template_end;
+> +
+> +#define OPT_CALL_TEMPLATE_SIZE				\
+> +	((unsigned long)&optprobe_call_template_end -	\
+> +	 (unsigned long)&optprobe_call_template_entry)
+>  #define MAX_OPTINSN_SIZE 				\
+>  	(((unsigned long)&optprobe_template_end -	\
+>  	  (unsigned long)&optprobe_template_entry) +	\
+> -	 MAX_OPTIMIZED_LENGTH + RELATIVEJUMP_SIZE)
+> +	 MAX_OPTIMIZED_LENGTH + RELATIVEJUMP_SIZE +	\
+> +	 OPT_CALL_TEMPLATE_SIZE)
+>  
+>  extern const int kretprobe_blacklist_size;
+>  
+> diff --git a/arch/x86/kernel/kprobes/opt.c b/arch/x86/kernel/kprobes/opt.c
+> index dc5fccb..05dd06f 100644
+> --- a/arch/x86/kernel/kprobes/opt.c
+> +++ b/arch/x86/kernel/kprobes/opt.c
+> @@ -39,6 +39,23 @@
+>  
+>  #include "common.h"
+>  
+> +static inline bool
+> +is_relcall(u8 *addr)
 > +{
-> +	struct edac_device_ctl_info *dci;
-> +	struct altr_edac_device_dev *drvdata;
-> +	struct resource *r;
-> +	int res = 0;
-> +	struct device_node *np = pdev->dev.of_node;
-> +	char *ecc_name = (char *)np->name;
-> +	static int dev_instance;
+> +	return (*(u8 *)(addr) == RELATIVECALL_OPCODE);
+> +}
 > +
-> +	if (!devres_open_group(&pdev->dev, NULL, GFP_KERNEL)) {
-> +		edac_printk(KERN_ERR, EDAC_DEVICE,
-> +			    "Unable to open devm\n");
-> +		return -ENOMEM;
+> +static inline void *
+> +get_relcall_target(u8 *addr)
+> +{
+> +	struct __arch_relative_insn {
+> +		u8 op;
+> +		s32 raddr;
+> +	} __packed *insn;
+> +	insn = (struct __arch_relative_insn *)addr;
+> +	return (void *)((unsigned long)addr + RELATIVECALL_SIZE + insn->raddr);
+> +}
+> +
+>  unsigned long __recover_optprobed_insn(kprobe_opcode_t *buf, unsigned long addr)
+>  {
+>  	struct optimized_kprobe *op;
+> @@ -89,6 +106,48 @@ static void synthesize_set_arg1(kprobe_opcode_t *addr, unsigned long val)
+>  }
+>  
+>  asm (
+> +#ifdef CONFIG_X86_64
+> +			".global optprobe_call_template_entry\n"
+> +			"optprobe_call_template_entry:"
+> +			"pushq %rdi\n"
+> +			".global optprobe_call_template_val_destaddr\n"
+> +			"optprobe_call_template_val_destaddr:"
+> +			ASM_NOP5
+> +			ASM_NOP5
+> +			"pushq %rdi\n"
+> +			".global optprobe_call_template_val_retaddr\n"
+> +			"optprobe_call_template_val_retaddr:"
+> +			ASM_NOP5
+> +			ASM_NOP5
+> +			"xchgq %rdi, 8(%rsp)\n"
+> +			"retq\n"
+> +#else /* CONFIG_X86_32 */
+> +			".global optprobe_call_template_entry\n"
+> +			"optprobe_call_template_entry:"
+> +			"push %edi\n"
+> +			".global optprobe_call_template_val_destaddr\n"
+> +			"optprobe_call_template_val_destaddr:"
+> +			ASM_NOP5
+> +			"push %edi\n"
+> +			".global optprobe_call_template_val_retaddr\n"
+> +			"optprobe_call_template_val_retaddr:"
+> +			ASM_NOP5
+> +			"xchg %edi, 4(%esp)\n"
+> +			"ret\n"
+> +#endif
+> +			".global optprobe_call_template_end\n"
+> +			"optprobe_call_template_end:\n"
+> +);
+> +
+> +#define __OPTCALL_TMPL_MOVE_DESTADDR_IDX \
+> +	((long)&optprobe_call_template_val_destaddr - (long)&optprobe_call_template_entry)
+> +#define __OPTCALL_TMPL_MOVE_RETADDR_IDX \
+> +	((long)&optprobe_call_template_val_retaddr - (long)&optprobe_call_template_entry)
+> +#define __OPTCALL_TMPL_END_IDX \
+> +	((long)&optprobe_call_template_end - (long)&optprobe_call_template_entry)
+> +#define OPTCALL_TMPL_SIZE	__OPTCALL_TMPL_END_IDX
+> +
+> +asm (
+>  			".global optprobe_template_entry\n"
+>  			"optprobe_template_entry:\n"
+>  #ifdef CONFIG_X86_64
+> @@ -135,6 +194,10 @@ asm (
+>  #define TMPL_END_IDX \
+>  	((long)&optprobe_template_end - (long)&optprobe_template_entry)
+>  
+> +#define TMPL_OPTCALL_MOVE_DESTADDR_IDX	(TMPL_END_IDX + __OPTCALL_TMPL_MOVE_DESTADDR_IDX)
+> +#define TMPL_OPTCALL_MOVE_RETADDR_IDX	(TMPL_END_IDX + __OPTCALL_TMPL_MOVE_RETADDR_IDX)
+> +#define TMPL_OPTCALL_END_IDX	(TMPL_END_IDX + __OPTCALL_TMPL_END_IDX)
+> +
+>  #define INT3_SIZE sizeof(kprobe_opcode_t)
+>  
+>  /* Optimized kprobe call back function: called from optinsn */
+> @@ -175,6 +238,12 @@ static int copy_optimized_instructions(u8 *dest, u8 *src)
+>  {
+>  	int len = 0, ret;
+>  
+> +	if (is_relcall(src)) {
+> +		memcpy(dest, &optprobe_call_template_entry,
+> +				OPTCALL_TMPL_SIZE);
+> +		return OPTCALL_TMPL_SIZE;
 > +	}
-
-Why are you opening a devres group here?  The device model already opens
-a devres group ready for the ->probe callback, which is released when
-the device is unbound... hmm, see below though...
-
 > +
-> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!r) {
-> +		edac_printk(KERN_ERR, EDAC_DEVICE,
-> +			    "Unable to get mem resource\n");
-> +		return -EPROBE_DEFER;
-
-Why EPROBE_DEFER for a missing resource?
-
+>  	while (len < RELATIVEJUMP_SIZE) {
+>  		ret = __copy_instruction(dest + len, src + len);
+>  		if (!ret || !can_boost(dest + len))
+> @@ -365,9 +434,16 @@ int arch_prepare_optimized_kprobe(struct optimized_kprobe *op,
+>  	/* Set probe function call */
+>  	synthesize_relcall(buf + TMPL_CALL_IDX, optimized_callback);
+>  
+> -	/* Set returning jmp instruction at the tail of out-of-line buffer */
+> -	synthesize_reljump(buf + TMPL_END_IDX + op->optinsn.size,
+> -			   (u8 *)op->kp.addr + op->optinsn.size);
+> +	if (!is_relcall(op->kp.addr)) {
+> +		/* Set returning jmp instruction at the tail of out-of-line buffer */
+> +		synthesize_reljump(buf + TMPL_END_IDX + op->optinsn.size,
+> +				(u8 *)op->kp.addr + op->optinsn.size);
+> +	} else {
+> +		synthesize_set_arg1(buf + TMPL_OPTCALL_MOVE_DESTADDR_IDX,
+> +				(unsigned long)(get_relcall_target(op->kp.addr)));
+> +		synthesize_set_arg1(buf + TMPL_OPTCALL_MOVE_RETADDR_IDX,
+> +				(unsigned long)(op->kp.addr + RELATIVECALL_SIZE));
 > +	}
-> +
-> +	if (!devm_request_mem_region(&pdev->dev, r->start, resource_size(r),
-> +				     dev_name(&pdev->dev))) {
-> +		edac_printk(KERN_ERR, EDAC_DEVICE,
-> +			    "%s:Error requesting mem region\n", ecc_name);
-> +		return -EBUSY;
-> +	}
-> +
-> +	dci = edac_device_alloc_ctl_info(sizeof(*drvdata), ecc_name,
-> +					 1, ecc_name, 1, 0, NULL, 0,
-> +					 dev_instance++);
-> +
-> +	if (!dci) {
-> +		edac_printk(KERN_ERR, EDAC_DEVICE,
-> +			    "%s: Unable to allocate EDAC device\n", ecc_name);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	drvdata = dci->pvt_info;
-> +	dci->dev = &pdev->dev;
-> +	platform_set_drvdata(pdev, dci);
-> +	drvdata->edac_dev_name = ecc_name;
-> +
-> +	drvdata->base = devm_ioremap(&pdev->dev, r->start, resource_size(r));
-> +	if (!drvdata->base)
-> +		goto err;
+>  
+>  	flush_icache_range((unsigned long) buf,
+>  			   (unsigned long) buf + TMPL_END_IDX +
+> 
 
-You could use devm_ioremap_resource() to simplify the mapping, resource
-allocation and resource error handling.
-
-> +
-> +	/* Get driver specific data for this EDAC device */
-> +	drvdata->data = of_match_node(altr_edac_device_of_match, np)->data;
-> +
-> +	/* Check specific dependencies for the module */
-> +	if (drvdata->data->setup) {
-> +		res = drvdata->data->setup(pdev, drvdata->base);
-> +		if (res < 0)
-> +			goto err;
-> +	}
-> +
-> +	drvdata->sb_irq = platform_get_irq(pdev, 0);
-> +	res = devm_request_irq(&pdev->dev, drvdata->sb_irq,
-> +			       altr_edac_device_handler,
-> +			       0, dev_name(&pdev->dev), dci);
-> +	if (res < 0)
-> +		goto err;
-> +
-> +	drvdata->db_irq = platform_get_irq(pdev, 1);
-> +	res = devm_request_irq(&pdev->dev, drvdata->db_irq,
-> +			       altr_edac_device_handler,
-> +			       0, dev_name(&pdev->dev), dci);
-> +	if (res < 0)
-> +		goto err;
-> +
-> +	dci->mod_name = "Altera EDAC Memory";
-> +	dci->dev_name = drvdata->edac_dev_name;
-> +
-> +	altr_set_sysfs_attr(dci, drvdata->data);
-> +
-> +	if (edac_device_add_device(dci))
-> +		goto err;
-> +
-> +	devres_close_group(&pdev->dev, NULL);
-> +
-> +	return 0;
-> +err:
-> +	edac_printk(KERN_ERR, EDAC_DEVICE,
-> +		    "%s:Error setting up EDAC device: %d\n", ecc_name, res);
-> +	devres_release_group(&pdev->dev, NULL);
-> +	edac_device_free_ctl_info(dci);
-
-Hmm, I guess this is why you're using devm groups - it seems like
-edac allocation/freeing needs to be improved to work cooperatively
-with devm_* APIs rather than having to add devm group complexity
-into drivers.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Masami HIRAMATSU
+Software Platform Research Dept. Linux Technology Research Center
+Hitachi, Ltd., Yokohama Research Laboratory
+E-mail: masami.hiramatsu.pt at hitachi.com
