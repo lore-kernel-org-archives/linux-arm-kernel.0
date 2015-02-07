@@ -1,118 +1,245 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 7 Feb 2015 10:42:53 +0000
-Subject: Delays, clocks, timers, hrtimers, etc
-In-Reply-To: <54D52C17.8000402@free.fr>
-References: <54C8E125.3070905@free.fr>
- <20150203120925.GM8656@n2100.arm.linux.org.uk>
- <54D509EC.7020708@free.fr>
- <20150206191419.GA8656@n2100.arm.linux.org.uk>
- <54D52C17.8000402@free.fr>
-Message-ID: <20150207104253.GD8656@n2100.arm.linux.org.uk>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Sat, 7 Feb 2015 18:42:31 +0800
+Subject: [RFC PATCH] x86: kprobes: enable optmize relative call insn
+In-Reply-To: <54D5E404.7080505@hitachi.com>
+References: <54B540A8.1020804@hitachi.com>
+ <1423218655-30394-1-git-send-email-wangnan0@huawei.com>
+ <54D5E404.7080505@hitachi.com>
+Message-ID: <54D5EC17.4010704@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 06, 2015 at 01:03:19PM -0800, Mason wrote:
-> Russell King - ARM Linux wrote:
+On 2015/2/7 18:08, Masami Hiramatsu wrote:
+> (2015/02/06 19:30), Wang Nan wrote:
+>> In reply to Masami Hiramatsu's question on my previous early kprobe
+>> patch series at:
+>>
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/315771.html
+>>
+>> that on x86, early kprobe's applications range is limited by the type of
+>> optimizable instructions, I made this patch, which enables optimizing
+>> relative call instructions by introducing specific template for them.
+>> Such instructions make up about 7% of the kernel. In addition, when
+>> ftrace is enabled, funtion entry will be it, so early kprobe will be
+>> much useful than before.
 > 
-> >Mason wrote:
-> >
-> >>Hmmm, I'm confused (again).
-> >>
-> >>CONFIG_CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK means "use the global timer
-> >>for the scheduler clock", right? In that case, are the local timers
-> >>unused by Linux?
-> >>
-> >>#ifdef CONFIG_CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
-> >>   sched_clock_register(gt_sched_clock_read, 64, gt_clk_rate);
-> >>#endif
-> >>
-> >>Is there generic code to set up local timers? (If so, where?)
-> >>sched_clock_register only seems to appear in machine-specific code.
-> >>
-> >>What are the pros/cons of global timer vs local timers?
-> >>Or is such a question irrelevant?
-> >>(Because they are used for different purposes?)
-> >
-> >Correct.
-> >
-> >The sched_clock itself is about providing the scheduler with a stable,
-> >monotonically increasing 64-bit nanosecond value which it can use to
-> >account for the passing of time (so it can accurately measure how long
-> >a thread is running for, and make a decision when to pre-empt it.)
-> >
-> >Local timers are used to set "alarms" to cause an interrupt at a certain
-> >point in time to do something (like, run the scheduler to switch from
-> >the current thread to another thread.)  It can also be used to update
-> >the current time of day as well.
-> >
-> >Global timers are used as a fallback when local timers are not available,
-> >and are less efficient - the CPU receiving the global timer interrupt
-> >has to broadcast the interrupt to other CPUs, and it also has to take
-> >account of the earliest event across all CPUs.
-> >
-> >There is a fourth "timer" which is used as a monotonically incrementing
-> >counter - this is called the "clocksource".  This is used to maintain
-> >the kernel's time-of-day.  This may be the same as the sched_clock.
+> Sorry, I couldn't understand this part. If you put kprobe on ftrace site
+> after ftrace enabled, it uses ftrace directly, instead of int3 or jump.
+> Anyway, ftrace-site instruction should be controlled by ftrace, not kprobes.
 > 
-> Where is this sched_clock set up?
 
-What do you mean "set up" ?
+I agree with you. Let ftrace control ftrace things.
 
-> I see sched_clock_register() in kernel/time/sched_clock.c
+The goal of this patch is to expand early kprobe's use. I posted early kprobe
+patch series serval weeks before.
 
-Correct, and most users use sched_clock_register() rather than
-setup_sched_clock().
+Early kprobe relies on kprobeopt: it directly optimizes probed instruction to
+avoid exception, so we can use it before exception handler installed, and definitely
+before ftrace_init() (that function converts function entries to NOP from CALL when
+ftrace is on).
 
-> setup_sched_clock() wraps sched_clock_register() but I only see one
-> user of setup_sched_clock() -- arch/arm/mach-footbridge
+As you pointed out, on x86, this strategy is not good because not so many instructions
+can be optimized. In my opinion, the most intolerable thing is that we are unable to
+optimize 'call' instruction, so we are unable to probe function entries before ftrace_init().
 
-Probably hasn't been converted to use sched_clock_register() yet.
+After this patch my early kprobe is able to probe function entries. I thought you may
+allow 'CALL' to be a special case which deserve a new template for early kprobe. Anyway,
+thank you for your quick response so I won't spent my time on it.
 
-> sched_clock_postinit() is used to set up an acceptable default,
-> I suppose? (i.e. jiffy_sched_clock_read)
+My next plan is to split ftrace_init() into two parts: converting 'CALL' to 'NOP' before
+early kprobe and doing other thing at its current place.
 
-That's to finish off the sched clock initialisation at a point where we
-can do so (which should be after sched_clock_register() has been called.)
-
-> But this still needs a time source (an actual crystal). I must be
-> missing something important from the big picture.
-
-All that sched_clock cares about is reading a value from a counter which
-increments (or decrements) at a single, uniform, known rate, and the
-code internal to sched_clock() converts that to a 64-bit nanosecond
-value.
-
+>>
+>> The relationship between ftrace and kprobe is interesting. Under normal
+>> circumstances, kprobe utilizes ftrace. However, under early case,
+>> there's no way to tell whether the probing instruction is an ftrace
+>> entry. Another possible method on that is to move part of ftrace init
+>> ahead. However, to allow optimize more instructions should also be
+>> good for performance.
+>>
+>> Masami, I'd like to hear your reply on it. Do you think this patch is
+>> also useful for the normal cases?
 > 
-> >>There is trouble in paradise. I was planning to give the global timer a try,
-> >>instead of the platform-specific timer, until I noticed: "The global timer
-> >>is clocked by PERIPHCLK." And it turns PERIPHCLK is connected to the SoC's
-> >>CPU_CLK (the clock that drives the CPU cores); the same clock that is managed
-> >>by cpufreq. I imagine it's double plus ungood for precise time-keeping to
-> >>have frequency changes of the clocksource input?
-> >
-> >Yes and no.  You can use that for local timers and/or a global timer, but
-> >you really don't want to use that for the sched_clock nor clocksource as
-> >these are really the fundamentals of time keeping.  I'd advise against
-> >using a timer derived from the CPU clock in general though, but if you
-> >have no other possible timers, then it has to do.
+> Expanding "optimizability" is good, but I don't like add new asm-templates
+> which reduces maintainability less. Perhaps, we'd better start with reviewing
+> can_boost table again...
 > 
-> I do have several platform-specific timers available, but I was
-> considering using "standard" architected resources to minimize
-> the code needed for the port.
+> Thank you,
 > 
-> Also, reading Cortex-A9 MPCore Technical Reference Manual, section
-> 5.1 Clocks, I see that, by definition, PERIPHCLK is tied to CLK
-> (the main clock). This means that, by definition, when using cpufreq,
-> CLK will change, thus PERIPHCLK will necessarily be variable too.
+>>
+>> Signed-off-by: Wang Nan <wangnan0@huawei.com>
+>> ---
+>>  arch/x86/include/asm/kprobes.h | 17 +++++++--
+>>  arch/x86/kernel/kprobes/opt.c  | 82 ++++++++++++++++++++++++++++++++++++++++--
+>>  2 files changed, 94 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/arch/x86/include/asm/kprobes.h b/arch/x86/include/asm/kprobes.h
+>> index 017f4bb..3627694 100644
+>> --- a/arch/x86/include/asm/kprobes.h
+>> +++ b/arch/x86/include/asm/kprobes.h
+>> @@ -31,6 +31,7 @@
+>>  #define RELATIVEJUMP_OPCODE 0xe9
+>>  #define RELATIVEJUMP_SIZE 5
+>>  #define RELATIVECALL_OPCODE 0xe8
+>> +#define RELATIVECALL_SIZE 5
+>>  #define RELATIVE_ADDR_SIZE 4
+>>  #define MAX_STACK_SIZE 64
+>>  #define MAX_OPTIMIZED_LENGTH (MAX_INSN_SIZE + RELATIVE_ADDR_SIZE)
+>> @@ -38,8 +39,10 @@
+>>  #ifdef __ASSEMBLY__
+>>  
+>>  #define KPROBE_OPCODE_SIZE     1
+>> +#define OPT_CALL_TEMPLATE_SIZE (optprobe_call_template_end - \
+>> +		optprobe_call_template_entry)
+>>  #define MAX_OPTINSN_SIZE ((optprobe_template_end - optprobe_template_entry) + \
+>> -	MAX_OPTIMIZED_LENGTH + RELATIVEJUMP_SIZE)
+>> +	MAX_OPTIMIZED_LENGTH + RELATIVEJUMP_SIZE + OPT_CALL_TEMPLATE_SIZE)
+>>  
+>>  #ifdef CONFIG_EARLY_KPROBES
+>>  # define EARLY_KPROBES_CODES_AREA					\
+>> @@ -81,10 +84,20 @@ extern __visible kprobe_opcode_t optprobe_template_entry;
+>>  extern __visible kprobe_opcode_t optprobe_template_val;
+>>  extern __visible kprobe_opcode_t optprobe_template_call;
+>>  extern __visible kprobe_opcode_t optprobe_template_end;
+>> +
+>> +extern __visible kprobe_opcode_t optprobe_call_template_entry;
+>> +extern __visible kprobe_opcode_t optprobe_call_template_val_destaddr;
+>> +extern __visible kprobe_opcode_t optprobe_call_template_val_retaddr;
+>> +extern __visible kprobe_opcode_t optprobe_call_template_end;
+>> +
+>> +#define OPT_CALL_TEMPLATE_SIZE				\
+>> +	((unsigned long)&optprobe_call_template_end -	\
+>> +	 (unsigned long)&optprobe_call_template_entry)
+>>  #define MAX_OPTINSN_SIZE 				\
+>>  	(((unsigned long)&optprobe_template_end -	\
+>>  	  (unsigned long)&optprobe_template_entry) +	\
+>> -	 MAX_OPTIMIZED_LENGTH + RELATIVEJUMP_SIZE)
+>> +	 MAX_OPTIMIZED_LENGTH + RELATIVEJUMP_SIZE +	\
+>> +	 OPT_CALL_TEMPLATE_SIZE)
+>>  
+>>  extern const int kretprobe_blacklist_size;
+>>  
+>> diff --git a/arch/x86/kernel/kprobes/opt.c b/arch/x86/kernel/kprobes/opt.c
+>> index dc5fccb..05dd06f 100644
+>> --- a/arch/x86/kernel/kprobes/opt.c
+>> +++ b/arch/x86/kernel/kprobes/opt.c
+>> @@ -39,6 +39,23 @@
+>>  
+>>  #include "common.h"
+>>  
+>> +static inline bool
+>> +is_relcall(u8 *addr)
+>> +{
+>> +	return (*(u8 *)(addr) == RELATIVECALL_OPCODE);
+>> +}
+>> +
+>> +static inline void *
+>> +get_relcall_target(u8 *addr)
+>> +{
+>> +	struct __arch_relative_insn {
+>> +		u8 op;
+>> +		s32 raddr;
+>> +	} __packed *insn;
+>> +	insn = (struct __arch_relative_insn *)addr;
+>> +	return (void *)((unsigned long)addr + RELATIVECALL_SIZE + insn->raddr);
+>> +}
+>> +
+>>  unsigned long __recover_optprobed_insn(kprobe_opcode_t *buf, unsigned long addr)
+>>  {
+>>  	struct optimized_kprobe *op;
+>> @@ -89,6 +106,48 @@ static void synthesize_set_arg1(kprobe_opcode_t *addr, unsigned long val)
+>>  }
+>>  
+>>  asm (
+>> +#ifdef CONFIG_X86_64
+>> +			".global optprobe_call_template_entry\n"
+>> +			"optprobe_call_template_entry:"
+>> +			"pushq %rdi\n"
+>> +			".global optprobe_call_template_val_destaddr\n"
+>> +			"optprobe_call_template_val_destaddr:"
+>> +			ASM_NOP5
+>> +			ASM_NOP5
+>> +			"pushq %rdi\n"
+>> +			".global optprobe_call_template_val_retaddr\n"
+>> +			"optprobe_call_template_val_retaddr:"
+>> +			ASM_NOP5
+>> +			ASM_NOP5
+>> +			"xchgq %rdi, 8(%rsp)\n"
+>> +			"retq\n"
+>> +#else /* CONFIG_X86_32 */
+>> +			".global optprobe_call_template_entry\n"
+>> +			"optprobe_call_template_entry:"
+>> +			"push %edi\n"
+>> +			".global optprobe_call_template_val_destaddr\n"
+>> +			"optprobe_call_template_val_destaddr:"
+>> +			ASM_NOP5
+>> +			"push %edi\n"
+>> +			".global optprobe_call_template_val_retaddr\n"
+>> +			"optprobe_call_template_val_retaddr:"
+>> +			ASM_NOP5
+>> +			"xchg %edi, 4(%esp)\n"
+>> +			"ret\n"
+>> +#endif
+>> +			".global optprobe_call_template_end\n"
+>> +			"optprobe_call_template_end:\n"
+>> +);
+>> +
+>> +#define __OPTCALL_TMPL_MOVE_DESTADDR_IDX \
+>> +	((long)&optprobe_call_template_val_destaddr - (long)&optprobe_call_template_entry)
+>> +#define __OPTCALL_TMPL_MOVE_RETADDR_IDX \
+>> +	((long)&optprobe_call_template_val_retaddr - (long)&optprobe_call_template_entry)
+>> +#define __OPTCALL_TMPL_END_IDX \
+>> +	((long)&optprobe_call_template_end - (long)&optprobe_call_template_entry)
+>> +#define OPTCALL_TMPL_SIZE	__OPTCALL_TMPL_END_IDX
+>> +
+>> +asm (
+>>  			".global optprobe_template_entry\n"
+>>  			"optprobe_template_entry:\n"
+>>  #ifdef CONFIG_X86_64
+>> @@ -135,6 +194,10 @@ asm (
+>>  #define TMPL_END_IDX \
+>>  	((long)&optprobe_template_end - (long)&optprobe_template_entry)
+>>  
+>> +#define TMPL_OPTCALL_MOVE_DESTADDR_IDX	(TMPL_END_IDX + __OPTCALL_TMPL_MOVE_DESTADDR_IDX)
+>> +#define TMPL_OPTCALL_MOVE_RETADDR_IDX	(TMPL_END_IDX + __OPTCALL_TMPL_MOVE_RETADDR_IDX)
+>> +#define TMPL_OPTCALL_END_IDX	(TMPL_END_IDX + __OPTCALL_TMPL_END_IDX)
+>> +
+>>  #define INT3_SIZE sizeof(kprobe_opcode_t)
+>>  
+>>  /* Optimized kprobe call back function: called from optinsn */
+>> @@ -175,6 +238,12 @@ static int copy_optimized_instructions(u8 *dest, u8 *src)
+>>  {
+>>  	int len = 0, ret;
+>>  
+>> +	if (is_relcall(src)) {
+>> +		memcpy(dest, &optprobe_call_template_entry,
+>> +				OPTCALL_TMPL_SIZE);
+>> +		return OPTCALL_TMPL_SIZE;
+>> +	}
+>> +
+>>  	while (len < RELATIVEJUMP_SIZE) {
+>>  		ret = __copy_instruction(dest + len, src + len);
+>>  		if (!ret || !can_boost(dest + len))
+>> @@ -365,9 +434,16 @@ int arch_prepare_optimized_kprobe(struct optimized_kprobe *op,
+>>  	/* Set probe function call */
+>>  	synthesize_relcall(buf + TMPL_CALL_IDX, optimized_callback);
+>>  
+>> -	/* Set returning jmp instruction at the tail of out-of-line buffer */
+>> -	synthesize_reljump(buf + TMPL_END_IDX + op->optinsn.size,
+>> -			   (u8 *)op->kp.addr + op->optinsn.size);
+>> +	if (!is_relcall(op->kp.addr)) {
+>> +		/* Set returning jmp instruction at the tail of out-of-line buffer */
+>> +		synthesize_reljump(buf + TMPL_END_IDX + op->optinsn.size,
+>> +				(u8 *)op->kp.addr + op->optinsn.size);
+>> +	} else {
+>> +		synthesize_set_arg1(buf + TMPL_OPTCALL_MOVE_DESTADDR_IDX,
+>> +				(unsigned long)(get_relcall_target(op->kp.addr)));
+>> +		synthesize_set_arg1(buf + TMPL_OPTCALL_MOVE_RETADDR_IDX,
+>> +				(unsigned long)(op->kp.addr + RELATIVECALL_SIZE));
+>> +	}
+>>  
+>>  	flush_icache_range((unsigned long) buf,
+>>  			   (unsigned long) buf + TMPL_END_IDX +
+>>
 > 
-> So the question I am trying to answer is: how do other SoCs use the
-> Cortex A9 global timer and local timers, along with cpufreq, and
-> make everything work correctly?
-
-You can use them for local and global timers, provided you have a stable
-clocksource and sched_clock (which can both be derived from the same
-counter.)
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+> 
