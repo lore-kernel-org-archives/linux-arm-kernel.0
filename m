@@ -1,139 +1,61 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sat, 7 Feb 2015 18:50:39 +0100
-Subject: [PATCH v8 2/3] i2c: iproc: Add Broadcom iProc I2C Driver
-In-Reply-To: <1423272507-18459-3-git-send-email-rjui@broadcom.com>
-References: <rjui@broadcom.com>
- <1423272507-18459-1-git-send-email-rjui@broadcom.com>
- <1423272507-18459-3-git-send-email-rjui@broadcom.com>
-Message-ID: <20150207175039.GB6263@katana>
+From: sylvain.rochet@finsecur.com (Sylvain Rochet)
+Date: Sat, 7 Feb 2015 20:37:23 +0100
+Subject: [PATCHv6 4/5] USB: gadget: atmel_usba_udc: Prepare for IRQ
+ single edge support
+In-Reply-To: <54D3A63B.6040209@atmel.com>
+References: <1421945805-31129-1-git-send-email-sylvain.rochet@finsecur.com>
+ <1421945805-31129-5-git-send-email-sylvain.rochet@finsecur.com>
+ <20150122181422.1ba305f1@bbrezillon> <54D3A63B.6040209@atmel.com>
+Message-ID: <20150207193723.GA32213@gradator.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ray,
+Hello Nicolas,
 
-On Fri, Feb 06, 2015 at 05:28:26PM -0800, Ray Jui wrote:
-> Add initial support to the Broadcom iProc I2C controller found in the
-> iProc family of SoCs.
+
+On Thu, Feb 05, 2015 at 06:19:55PM +0100, Nicolas Ferre wrote:
+> Le 22/01/2015 18:14, Boris Brezillon a ?crit :
+> > On Thu, 22 Jan 2015 17:56:44 +0100
+> > Sylvain Rochet <sylvain.rochet@finsecur.com> wrote:
+> > 
+> > > -static const struct usba_udc_errata at91sam9g45_errata = {
+> > > +static const struct usba_udc_caps at91sam9g45_caps = {
+> > >  	.pulse_bias = at91sam9g45_pulse_bias,
+> > > +	.irq_single_edge_support = true,
 > 
-> The iProc I2C controller has separate internal TX and RX FIFOs, each has
-> a size of 64 bytes. The iProc I2C controller supports two bus speeds
-> including standard mode (100kHz) and fast mode (400kHz)
+> Nope! at91sam9g45 doesn't have this property. You'll have to create
+> another compatible string and capabilities structure
+> ("atmel,at91sam9x5-udc")
 
-Mostly looking good.
+Oops.
 
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/i2c.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/io.h>
-> +#include <linux/slab.h>
-> +#include <linux/delay.h>
 
-Please sort the includes.
+> But still, I don't know if it's the proper approach. The possibility to
+> trigger an IRQ on both edges or a single edge is a capacity of the gpio
+> controller, not the USBA IP. So, it's a little bit strange to have this
+> capability here.
 
-> +static bool bcm_iproc_i2c_bus_busy(struct bcm_iproc_i2c_dev *iproc_i2c)
-> +{
-> +	if (readl(iproc_i2c->base + M_CMD_OFFSET) &
-> +	    (1 << M_CMD_START_BUSY_SHIFT))
-> +		return true;
-> +	else
-> +		return false;
-> +}
+I agree.
 
-Minor: return !!(readl(...))? You decide.
 
-> +
-> +static int bcm_iproc_i2c_format_addr(struct bcm_iproc_i2c_dev *iproc_i2c,
-> +				     struct i2c_msg *msg, u8 *addr)
-> +{
-> +	*addr = msg->addr << 1;
-> +
-> +	if (msg->flags & I2C_M_RD)
-> +		*addr |= 1;
-> +
-> +	return 0;
-> +}
+> I don't know if it's actually feasible but trying to configure the IRQ
+> on a single edge, testing if it's accepted by the GPIO irq controller
+> and if not, falling back to a "both edge" pattern. Doesn't it look like
+> a way to workaround this issue nicely? Can you give it a try?
 
-I'd suggest a oneliner.
+Tried, it works, but it displays the following message from 
+__irq_set_trigger() [1] during devm_request_threaded_irq(?, 
+IRQF_TRIGGER_RISING, ?) on boards which does not support single-edge 
+IRQ:
 
-*addr = msg->addr << 1 | (msg->flags & I2C_M_RD ? 1 : 0)
+genirq: Setting trigger mode 1 for irq 176 failed (gpio_irq_type+0x0/0x34)
 
-Or use !! like above.
+Is it acceptable ?
+If not, is udc->caps->irq_single_edge_support boolean acceptable ?
+If not, I am ok to drop the feature, this is only a bonus.
 
-Don't do an extra function for that. It is only used once and it also
-doesn't need to be int since it can't fail anyhow.
 
-(Note to self: I should make a macro for that in i2c.h)
+Sylvain
 
-> +	/* need to reserve one byte in the FIFO for the slave address */
-> +	if (msg->len > M_TX_RX_FIFO_SIZE - 1) {
-> +		dev_err(iproc_i2c->device,
-> +			"only support data length up to %u bytes\n",
-> +			M_TX_RX_FIFO_SIZE - 1);
-> +		return -EINVAL;
 
--EOPNOTSUPP
-
-Is it really a HW limitation? Could the driver later be extended to
-continue filling the FIFO if a certain threshold is reached?
-
-> +	dev_dbg(iproc_i2c->device, "xfer %c, addr=0x%02x, len=%d\n",
-> +		(msg->flags & I2C_M_RD) ? 'R' : 'W', msg->addr,
-> +		msg->len);
-> +	dev_dbg(iproc_i2c->device, "*** data: %*ph\n", msg->len, msg->buf);
-
-Not really needed. We have tracing for that.
-
-> +	if (bus_speed < 100000) {
-> +		dev_err(iproc_i2c->device, "%d Hz bus speed not supported\n",
-> +			bus_speed);
-> +		dev_err(iproc_i2c->device,
-> +			"valid speeds are 100khz and 400khz\n");
-> +		return -EINVAL;
-> +	} else if (bus_speed < 400000) {
-> +		bus_speed = 100000;
-> +		speed_bit = 0;
-> +	} else {
-> +		bus_speed = 400000;
-> +		speed_bit = 1;
-> +	}
-> +
-> +	val = readl(iproc_i2c->base + TIM_CFG_OFFSET);
-> +	val &= ~(1 << TIM_CFG_MODE_400_SHIFT);
-> +	val |= speed_bit << TIM_CFG_MODE_400_SHIFT;
-
-val |= (bus_speed == 400000) ...
-
-and skip speed_bit? You decide.
-
-> +static void bcm_iproc_i2c_enable(struct bcm_iproc_i2c_dev *iproc_i2c)
-> +{
-> +	u32 val;
-> +
-> +	val = readl(iproc_i2c->base + CFG_OFFSET);
-> +	val |= 1 << CFG_EN_SHIFT;
-> +	writel(val, iproc_i2c->base + CFG_OFFSET);
-> +}
-> +
-> +static void bcm_iproc_i2c_disable(struct bcm_iproc_i2c_dev *iproc_i2c)
-> +{
-> +	u32 val;
-> +
-> +	val = readl(iproc_i2c->base + CFG_OFFSET);
-> +	val &= ~(1 << CFG_EN_SHIFT);
-> +	writel(val, iproc_i2c->base + CFG_OFFSET);
-> +}
-
-Extra functions? They are self explaining and only used once. You
-decide.
-
-Rest looks fine, thanks!
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150207/e4a4fb2e/attachment-0001.sig>
+[1] http://lxr.free-electrons.com/source/kernel/irq/manage.c#L619
