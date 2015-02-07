@@ -1,88 +1,51 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Sat, 07 Feb 2015 14:51:45 +0800
-Subject: [PATCH v8 08/21] dt / chosen: Add linux,uefi-stub-generated-dtb
- property
-In-Reply-To: <CAKv+Gu-oDRjYPC3SxSDVZ7rV7eG9DCct=kNS0xBVd28YoV5fSg@mail.gmail.com>
-References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>	<1422881149-8177-9-git-send-email-hanjun.guo@linaro.org>	<20150202134033.GR4278@bivouac.eciton.net>	<20150202135051.GA3825@xora-haswell.xora.org.uk>	<20150202163253.GG21175@leverpostej>	<CAGCh1+nL7YMXYp42ekWAqmw_m5cy=s_7NszLDAXj=bUr2aZVig@mail.gmail.com>	<54D5884A.6050009@linaro.org>
- <CAKv+Gu-oDRjYPC3SxSDVZ7rV7eG9DCct=kNS0xBVd28YoV5fSg@mail.gmail.com>
-Message-ID: <54D5B601.60807@linaro.org>
+From: dirk.behme@gmail.com (Dirk Behme)
+Date: Sat, 07 Feb 2015 08:16:08 +0100
+Subject: coresignt etm/etb usage
+In-Reply-To: <CAHrpEqR0kPAPCvuFK0XdP9RTojH85xoATt1esbfGTCSPkPu0Tw@mail.gmail.com>
+References: <CAHrpEqR0kPAPCvuFK0XdP9RTojH85xoATt1esbfGTCSPkPu0Tw@mail.gmail.com>
+Message-ID: <54D5BBB8.20905@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?02?07? 13:03, Ard Biesheuvel wrote:
-> On 7 February 2015 at 03:36, Hanjun Guo <hanjun.guo@linaro.org> wrote:
->> On 2015?02?06? 18:34, G Gregory wrote:
->> [...]
->>
->>>>>>>
->>>>>>> --------------------------------------------------------------------------------
->>>>>>>    linux,uefi-stub-kern-ver  | string | Copy of linux_banner from
->>>>>>> build.
->>>>>>>
->>>>>>> --------------------------------------------------------------------------------
->>>>>>> +linux,uefi-stub-generated-dtb  | bool | Indication for no DTB
->>>>>>> provided by
->>>>>>> +                        |      | firmware.
->>>>>>>
->>>>>>> +--------------------------------------------------------------------------------
->>>>>>
->>>>>>
->>>>>> Apologies for the late bikeshedding, but the discussion on this topic
->>>>>> previsously was lively enough that I thought I'd let it die down a bit
->>>>>> before seeing if I had anything to add.
->>>>>>
->>>>>> That, and I just realised something:
->>>>>> One alternative to this added DT entry is that we could treat the
->>>>>> absence of a registered UEFI configuration table as the indication
->>>>>> that no HW description was provided from firmware, since the stub does
->>>>>> not call InstallConfigurationTable() on the DT it generates. This does
->>>>>> move the ability to detect to after efi_init(), but this should be
->>>>>> fine for ACPI-purposes.
->>>>>>
->>>>> That would not work as expected in the kexec/Xen use case though as they
->>>>> may genuinely boot with DT from an ACPI host without UEFI.
->>>>
->>>>
->>>> I'm a little concerned by this case. How do we intend to pass stuff from
->>>> Xen to the kernel in this case? When we initially discussed the stub
->>>> prior to merging, we weren't quite sure if ACPI without UEFI was
->>>> entirely safe.
->>>>
->>>> The linux,uefi-stub-kern-ver property was originally intended as a
->>>> sanity-check feature to ensure nothing (including Xen) masqueraded as
->>>> the stub, but for some reason the actual sanity check was never
->>>> implemented.
->>>>
->>>>>> If that is deemed undesirable, I would still prefer Catalin's
->>>>>> suggested name ("linux,bare-dtb"), which describes the state rather
->>>>>> than the route we took to get there.
->>>>>>
->>>>> I agree.
->>>>
->>>>
->>>> I guess this would be ok, though it would be nice to know which agent
->>>> generated the DTB.
->>>>
->>>
->>> The most obvious scheme then is
->>>
->>> linux,bare-dtb = "uefi-stub";
->>>
->>> otherwise we generate a new binding for every component in the boot path.
->>
->>
->> Leif, Mark, any comments on this?
->>
+On 06.02.2015 22:56, Zhi Li wrote:
+> mathieu:
 >
-> As far as I remember, we did not finalize the decision to go with a
-> stub generated property instead of some other means to infer that the
-> device tree is not suitable for booting and ACPI should be preferred.
+> I try to enable etm/etb in our freescale platform.
+
+
+About which Freescale platform are you talking?
+
+I've tried using the patches for the Freescale i.MX6 some month ago. 
+I've managed to get the nodes like below, too. But never managed to 
+get the ETM tracing data into the ETB. Only with attached HW JTAG 
+debugger trace data has been recorded. And I never figured out which 
+additional configuration the HW JTAG is doing compared to the SW only 
+solution.
+
+Best regards
+
+Dirk
+
+
+> I have ported your patches into our tree.
+> coresign node already created in /sys/devices.
 >
-> We will be discussing the 'stub<->kernel interface as a boot protocol'
-> topic this week at Connect, so let's discuss it in that context before
-> signing off on patches like these.
-
-OK, see you guys in Hongkong.
-
-Thanks
-Hanjun
+> 30041000.funnel  31001000.interrupt-controller  platform       software
+> 3007c000.etm     backlight.7                    regulators.10  system
+> 3007d000.etm     breakpoint                     replicator.1   timer.0
+> 30084000.etb     gpio-keys.9                    soc.2          virtual
+> 30087000.tpiu    max7322-reset.8                soc0
+>
+>
+> But my problem is how to test it.
+> Do you have document to show how to use it?
+>
+>
+> best regards
+> Frank Li
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
