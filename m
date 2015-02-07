@@ -1,60 +1,37 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 07 Feb 2015 15:56:25 +0300
-Subject: [PATCH v3 2/5] ARM: dts: pxa: add clocks
-In-Reply-To: <1423312760-15871-2-git-send-email-robert.jarzmik@free.fr>
-References: <1423312760-15871-1-git-send-email-robert.jarzmik@free.fr>
- <1423312760-15871-2-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <54D60B79.5060206@cogentembedded.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 07 Feb 2015 14:13:40 +0100
+Subject: [PATCH v2,
+ RFC] RTC: PXA: Fix regression of interrupt before ioremap
+In-Reply-To: <54D3D444.30008@tul.cz> (Petr Cvek's message of "Thu, 05 Feb 2015
+ 21:36:20 +0100")
+References: <54CA1ECA.8050000@tul.cz> <87fvatnzl7.fsf@free.fr>
+ <54CF90F1.4020703@tul.cz> <87a90wb1uq.fsf@free.fr>
+ <54D0D034.1060204@tul.cz> <87siemalt6.fsf@free.fr>
+ <54D3D444.30008@tul.cz>
+Message-ID: <87egq19857.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Petr Cvek <petr.cvek@tul.cz> writes:
 
-On 2/7/2015 3:39 PM, Robert Jarzmik wrote:
+> I was thinking more about setting alarm, ending the OS (and all processes),
+> powering down DRAM, SRAM etc. and then waiting for alarm (like x86 BIOS alarm)
+> to restart.
+Ah yes, this is a case I have not considered before.
+Yet I fail to see what the open/close removal patch fixes.
 
-> Add clocks to the IPs already described in the pxa device-tree
-> files. There are more clocks in the clock tree than IPs described in the
-> current pxa device-tree.
-
-> This patch ensures that :
->   - the current description is correct
->   - the clocks are actually claimed, so that clock framework doesn't
->     disable them automatically (unused clocks shutdown)
-
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> ---
->   arch/arm/boot/dts/pxa27x.dtsi | 31 ++++++++++++++++++++++++++++---
->   1 file changed, 28 insertions(+), 3 deletions(-)
-
-> diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
-> index 98b560e..e8d5097 100644
-> --- a/arch/arm/boot/dts/pxa27x.dtsi
-> +++ b/arch/arm/boot/dts/pxa27x.dtsi
-[...]
-> @@ -12,36 +12,62 @@
->   			marvell,intc-nr-irqs = <34>;
->   		};
+>> Yes, true, yet how do you set on a specific RTC block the alarm if you have many
+>> of them on the system ?
 >
-> +		gpio: gpio at 40e00000 {
-> +			compatible = "intel,pxa27x-gpio";
-> +			clocks = <&pxa2xx_clks CLK_NONE>;
-> +		};
-> +
-> +		ffuart: uart at 40100000 {
-> +			clocks = <&pxa2xx_clks CLK_FFUART>;
-> +		};
-> +
-> +		btuart: uart at 40200000 {
-> +			clocks = <&pxa2xx_clks CLK_BTUART>;
-> +		};
-> +
-> +		stuart: uart at 40700000 {
-> +			clocks = <&pxa2xx_clks CLK_STUART>;
-> +		};
-> +
+> I thought it should be possible with ioctl with appropriate /dev/rtcX opened or /sys/class/rtc/rtcX/wakealarm . 
+>
+> It seems driver still does not work properly (with reverted patch). For first
+> run the /sys/class/rtc/rtcX/wakealarm file is not created, but it is created for
+> next reload of rtc-pxa module. And it seems that it is caused by .can_wakeup
+> somewhere.
+Do you know why, and would you have a patch for that ?
 
-    The ePAPR standard tells to call such nodes "serial", not "uart".
+Cheers.
 
-[...]
-
-WBR, Sergei
+-- 
+Robert
