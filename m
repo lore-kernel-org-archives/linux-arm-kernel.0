@@ -1,34 +1,31 @@
 From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Sat,  7 Feb 2015 12:56:02 +0800
-Subject: [PATCH v2 0/4] add usb support for hi6220
-Message-ID: <1423284966-3485-1-git-send-email-zhangfei.gao@linaro.org>
+Date: Sat,  7 Feb 2015 12:56:03 +0800
+Subject: [PATCH v2 1/4] Documentation: dt-bindings: add dt binding info for
+ hi6220 dwc2
+In-Reply-To: <1423284966-3485-1-git-send-email-zhangfei.gao@linaro.org>
+References: <1423284966-3485-1-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <1423284966-3485-2-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v2:
-address comments from Sergei and Peter
-add hi6220_phy_setup(false) code
+Add necessary dwc2 binding documentation for Hisilicon soc: hi6220
 
-v1:
-hi6220 usb controller is inherited from dwc2
-add phy accordingly
-support otg gadget/host
+Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+---
+ Documentation/devicetree/bindings/usb/dwc2.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-Zhangfei Gao (4):
-  Documentation: dt-bindings: add dt binding info for hi6220 dwc2
-  Documentation: dt-bindings: add dt binding info for hi6220
-  usb: dwc2: platform: add hi6220 support
-  usb: phy: add phy-hi6220-usb
-
- Documentation/devicetree/bindings/usb/dwc2.txt     |   1 +
- .../devicetree/bindings/usb/hi6220-usb.txt         |  49 ++++
- drivers/usb/dwc2/platform.c                        |  30 +++
- drivers/usb/phy/Kconfig                            |   9 +
- drivers/usb/phy/Makefile                           |   1 +
- drivers/usb/phy/phy-hi6220-usb.c                   | 297 +++++++++++++++++++++
- 6 files changed, 387 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/usb/hi6220-usb.txt
- create mode 100644 drivers/usb/phy/phy-hi6220-usb.c
-
+diff --git a/Documentation/devicetree/bindings/usb/dwc2.txt b/Documentation/devicetree/bindings/usb/dwc2.txt
+index fd132cb..2213682 100644
+--- a/Documentation/devicetree/bindings/usb/dwc2.txt
++++ b/Documentation/devicetree/bindings/usb/dwc2.txt
+@@ -4,6 +4,7 @@ Platform DesignWare HS OTG USB 2.0 controller
+ Required properties:
+ - compatible : One of:
+   - brcm,bcm2835-usb: The DWC2 USB controller instance in the BCM2835 SoC.
++  - hisilicon,hi6220-usb: The DWC2 USB controller instance in the hi6220 SoC.
+   - rockchip,rk3066-usb: The DWC2 USB controller instance in the rk3066 Soc;
+   - "rockchip,rk3188-usb", "rockchip,rk3066-usb", "snps,dwc2": for rk3188 Soc;
+   - "rockchip,rk3288-usb", "rockchip,rk3066-usb", "snps,dwc2": for rk3288 Soc;
 -- 
 1.9.1
