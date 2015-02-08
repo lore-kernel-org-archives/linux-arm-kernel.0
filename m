@@ -1,75 +1,81 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sun,  8 Feb 2015 19:23:42 +0100
-Subject: [PATCH] pinctrl: at91: move lock/unlock_as_irq calls into
- request/release resources methods
-Message-ID: <1423419822-6258-1-git-send-email-boris.brezillon@free-electrons.com>
+Date: Sun, 8 Feb 2015 20:55:05 +0100
+Subject: [PATCH 2/9] mtd: pxa3xx_nand: add a non mandatory ECC clock
+In-Reply-To: <20150128141451.GA11705@kwain>
+References: <1422367816-4257-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1422367816-4257-3-git-send-email-antoine.tenart@free-electrons.com>
+ <20150127155047.GB16546@lunn.ch> <20150128141451.GA11705@kwain>
+Message-ID: <20150208205505.316f2624@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gpiochip_lock_as_irq call can fail and return an error, while the
-irq_startup is not expected to fail (returns an unsigned int which is not
-checked by irq core code).
+Hi Antoine,
 
-irq_request/release_resources functions have been created to address this
-problem.
+On Wed, 28 Jan 2015 15:14:51 +0100
+Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
 
-Move gpiochip_lock/unlock_as_irq calls into
-irq_request/release_resources functions to prevent using a gpio as an irq
-if the gpiochip_lock_as_irq call failed.
+> Hi Andrew,
+> 
+> On Tue, Jan 27, 2015 at 04:50:47PM +0100, Andrew Lunn wrote:
+> > On Tue, Jan 27, 2015 at 03:10:09PM +0100, Antoine Tenart wrote:
+> > > Some controllers (as the coming Berlin nand controller) need to enable
+> > > an ECC clock. Add support for this clock in the pxa3xx nand driver, and
+> > > leave it as non mandatory.
+> > 
+> > It would be good to document this clock in the device tree binding.
+> 
+> Yes! I'll add the ECC clock into the documentation.
+> 
+> > 
+> > > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> > > ---
+> > >  drivers/mtd/nand/pxa3xx_nand.c | 26 +++++++++++++++++++-------
+> > >  1 file changed, 19 insertions(+), 7 deletions(-)
+> > > 
+> > > diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+> > > index d00ac392d1c4..2681ec4abafa 100644
+> > > --- a/drivers/mtd/nand/pxa3xx_nand.c
+> > > +++ b/drivers/mtd/nand/pxa3xx_nand.c
+> > > @@ -180,7 +180,7 @@ struct pxa3xx_nand_info {
+> > >  	struct nand_hw_control	controller;
+> > >  	struct platform_device	 *pdev;
+> > >  
+> > > -	struct clk		*clk;
+> > > +	struct clk		*clk, *ecc_clk;
+> > >  	void __iomem		*mmio_base;
+> > >  	unsigned long		mmio_phys;
+> > >  	struct completion	cmd_complete, dev_ready;
+> > > @@ -1608,7 +1608,7 @@ static int alloc_nand_resource(struct platform_device *pdev)
+> > >  
+> > >  	spin_lock_init(&chip->controller->lock);
+> > >  	init_waitqueue_head(&chip->controller->wq);
+> > > -	info->clk = devm_clk_get(&pdev->dev, NULL);
+> > > +	info->clk = devm_clk_get(&pdev->dev, "nfc");
+> > 
+> > Does this keep backwards compatibility? Not all the existing users
+> > have there clocks named. What i think happens here is that
+> > of_clk_get_by_name() calls of_property_match_string(np, "clock-names",
+> > name); That returns -EINVAL, and then we ask of_clk_get() to get the
+> > -EINVAL'th clock. I don't think that is going to end well.
+> > 
+> > I think you need to keep the NULL here, but should use "ecc" for the
+> > second clock and require the use of the clock-names property when an
+> > ecc clock is required.
+> 
+> I agree, I'll go back to NULL in v2.
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- drivers/pinctrl/pinctrl-at91.c | 17 +++++++----------
- 1 file changed, 7 insertions(+), 10 deletions(-)
+I'd rather try with "nfc", and if it fails try with NULL as the name
+argument, because passing NULL in all cases will enforce the clock
+declaration order (which is not something we usually do when naming
+clocks).
+If you keep the NULL name, please document the clock order in your DT
+documentation.
 
-diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-index f4cd0b9..a481406 100644
---- a/drivers/pinctrl/pinctrl-at91.c
-+++ b/drivers/pinctrl/pinctrl-at91.c
-@@ -1477,28 +1477,25 @@ static void gpio_irq_ack(struct irq_data *d)
- 	/* the interrupt is already cleared before by reading ISR */
- }
- 
--static unsigned int gpio_irq_startup(struct irq_data *d)
-+static int gpio_irq_request_res(struct irq_data *d)
- {
- 	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
- 	unsigned	pin = d->hwirq;
- 	int ret;
- 
- 	ret = gpiochip_lock_as_irq(&at91_gpio->chip, pin);
--	if (ret) {
-+	if (ret)
- 		dev_err(at91_gpio->chip.dev, "unable to lock pind %lu IRQ\n",
- 			d->hwirq);
--		return ret;
--	}
--	gpio_irq_unmask(d);
--	return 0;
-+
-+	return ret;
- }
- 
--static void gpio_irq_shutdown(struct irq_data *d)
-+static void gpio_irq_release_res(struct irq_data *d)
- {
- 	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
- 	unsigned	pin = d->hwirq;
- 
--	gpio_irq_mask(d);
- 	gpiochip_unlock_as_irq(&at91_gpio->chip, pin);
- }
- 
-@@ -1577,8 +1574,8 @@ void at91_pinctrl_gpio_resume(void)
- static struct irq_chip gpio_irqchip = {
- 	.name		= "GPIO",
- 	.irq_ack	= gpio_irq_ack,
--	.irq_startup	= gpio_irq_startup,
--	.irq_shutdown	= gpio_irq_shutdown,
-+	.irq_request_resources = gpio_irq_request_res,
-+	.irq_release_resources = gpio_irq_release_res,
- 	.irq_disable	= gpio_irq_mask,
- 	.irq_mask	= gpio_irq_mask,
- 	.irq_unmask	= gpio_irq_unmask,
+Best Regards,
+
+Boris
+
 -- 
-1.9.1
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
