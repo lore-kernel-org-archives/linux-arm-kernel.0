@@ -1,168 +1,98 @@
 From: rjui@broadcom.com (Ray Jui)
-Date: Sat, 7 Feb 2015 21:08:13 -0800
-Subject: [PATCH v8 2/3] i2c: iproc: Add Broadcom iProc I2C Driver
-In-Reply-To: <20150207175039.GB6263@katana>
-References: <rjui@broadcom.com>
- <1423272507-18459-1-git-send-email-rjui@broadcom.com>
- <1423272507-18459-3-git-send-email-rjui@broadcom.com>
- <20150207175039.GB6263@katana>
-Message-ID: <54D6EF3D.4030302@broadcom.com>
+Date: Sat, 7 Feb 2015 21:25:23 -0800
+Subject: [PATCH v9 0/3] Add I2C support to Broadcom iProc
+In-Reply-To: <Ray Jui <rjui@broadcom.com>
+References: <Ray Jui <rjui@broadcom.com>
+Message-ID: <1423373126-30024-1-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patchset contains the initial I2C support for Broadcom iProc family of
+SoCs.
 
+The iProc I2C controller has separate internal TX and RX FIFOs, each has a
+size of 64 bytes. The iProc I2C controller supports two bus speeds including
+standard mode (100 kHz) and fast mode (400 kHz)
 
-On 2/7/2015 9:50 AM, Wolfram Sang wrote:
-> Hi Ray,
-> 
-> On Fri, Feb 06, 2015 at 05:28:26PM -0800, Ray Jui wrote:
->> Add initial support to the Broadcom iProc I2C controller found in the
->> iProc family of SoCs.
->>
->> The iProc I2C controller has separate internal TX and RX FIFOs, each has
->> a size of 64 bytes. The iProc I2C controller supports two bus speeds
->> including standard mode (100kHz) and fast mode (400kHz)
-> 
-> Mostly looking good.
-> 
->> +#include <linux/kernel.h>
->> +#include <linux/module.h>
->> +#include <linux/i2c.h>
->> +#include <linux/interrupt.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/io.h>
->> +#include <linux/slab.h>
->> +#include <linux/delay.h>
-> 
-> Please sort the includes.
-> 
+Synced code base to Linux 3.19-rc7
 
-Will do.
+Changes from v8:
+ - Sort header includes in alphabetical order
+ - Use correct error code
+ - Get rid of redundant functions and combine functions to make driver more
+   slim
+ - Get rid of redundant debugging prints that are already available from the
+   I2C framework
+ - Other minor improvements
 
->> +static bool bcm_iproc_i2c_bus_busy(struct bcm_iproc_i2c_dev *iproc_i2c)
->> +{
->> +	if (readl(iproc_i2c->base + M_CMD_OFFSET) &
->> +	    (1 << M_CMD_START_BUSY_SHIFT))
->> +		return true;
->> +	else
->> +		return false;
->> +}
-> 
-> Minor: return !!(readl(...))? You decide.
-> 
+Changes from v7:
+ - Remove redundant 10-bit address check in the driver
+ - Fix the driver that accidentally emits 1-byte of data with zero content in
+   the case of SMBUS quick command
+ - Improve debugging prints in the driver
+ - Other minor improvements
 
-Okay will do that. Will also remove this function since now it becomes
-one line and is used only once.
+Changes from v6:
+ - Get rid of unnecessary atomic variable usage in the driver
+ - Improve the "waiting for transaction to complete" logic further by making
+   sure there's no pending/ongoing interrupt by the time when flag
+   'xfer_is_done' is checked
+ - After disabling interrupt with 'writel', add 'readl' to the same register
+   to flush the bus to ensure the write has gone through
 
->> +
->> +static int bcm_iproc_i2c_format_addr(struct bcm_iproc_i2c_dev *iproc_i2c,
->> +				     struct i2c_msg *msg, u8 *addr)
->> +{
->> +	*addr = msg->addr << 1;
->> +
->> +	if (msg->flags & I2C_M_RD)
->> +		*addr |= 1;
->> +
->> +	return 0;
->> +}
-> 
-> I'd suggest a oneliner.
-> 
-> *addr = msg->addr << 1 | (msg->flags & I2C_M_RD ? 1 : 0)
-> 
-> Or use !! like above.
-> 
-> Don't do an extra function for that. It is only used once and it also
-> doesn't need to be int since it can't fail anyhow.
-> 
-> (Note to self: I should make a macro for that in i2c.h)
-> 
+Changes from v5:
+ - Improve the "waiting for transaction to be complete" logic to take care of
+   the corner case when an interrupt fires after wait_for_completion_timeout
+   times out
+ - Improve the logic to disable I2C interrupt in the remove function. Make it
+   more generic so it works for both dedicated and shared interrupt
 
-Yes will change. Thanks.
+Changes from v4:
+ - Remove redundant header file includes
+ - Change the logic that waits for the host controller to be idle to
+   simply return -EBUSY
+ - Use proper print level and error codes in the driver
+ - Allow zero length message in the driver to support I2C_SMBUS_QUICK
+ - Change back to use devm_request_irq. Disable interrupt in the remove
+   function so there's no outstanding I2C interrupt when the driver is
+   being removed from the framework
+ - Other minor miscellaneous improvements and fixes
 
->> +	/* need to reserve one byte in the FIFO for the slave address */
->> +	if (msg->len > M_TX_RX_FIFO_SIZE - 1) {
->> +		dev_err(iproc_i2c->device,
->> +			"only support data length up to %u bytes\n",
->> +			M_TX_RX_FIFO_SIZE - 1);
->> +		return -EINVAL;
-> 
-> -EOPNOTSUPP
-> 
-> Is it really a HW limitation? Could the driver later be extended to
-> continue filling the FIFO if a certain threshold is reached?
-> 
+Changes from v3:
+ - Add config dependency to COMPILE_TEST to allow the driver to be build tested
+   by other platforms
+ - Improve CPU utilization efficiency in the loop of waiting for bus to idle
+ - Add more comment in the driver to clarify the way how the "start busy"
+   interrupt is triggered from the I2C controller
+ - Fix inconsistent coding style and format
+ - Improve the bus speed validation logic in the driver
+ - Add code to free the interrupt line in driver's remove function. Also
+   change to use non-devm API to request the interrupt line
+ - Other miscellaneous improvements and fixes
 
-Will return -EOPNOTSUPP. This really depends on whether or not we expect
-one sequence of START + SLV ADDR + DATA + STOP per i2c message. I can
-later extend the driver to refill/re-drain the FIFO for data size >= 64
-bytes, if one sequence of SATRT...STOP per message is not a requirement.
+Changes from v2:
+ - Have the I2C driver default to y so it does not need to be selected from
+   ARCH_BCM_IPROC. This also helps to get rid of one patch. The driver still
+   depends on ARCH_BCM_IPROC
+ - Get rid of redundant check on resource returned by platform_get_resource
 
->> +	dev_dbg(iproc_i2c->device, "xfer %c, addr=0x%02x, len=%d\n",
->> +		(msg->flags & I2C_M_RD) ? 'R' : 'W', msg->addr,
->> +		msg->len);
->> +	dev_dbg(iproc_i2c->device, "*** data: %*ph\n", msg->len, msg->buf);
-> 
-> Not really needed. We have tracing for that.
-> 
+Changes from v1:
+ - Fix function argument parenthesis
+ - Get rid of redundant driver owner field
 
-Will remove.
+Ray Jui (3):
+  i2c: iProc: define Broadcom iProc I2C binding
+  i2c: iproc: Add Broadcom iProc I2C Driver
+  ARM: dts: add I2C device nodes for Broadcom Cygnus
 
->> +	if (bus_speed < 100000) {
->> +		dev_err(iproc_i2c->device, "%d Hz bus speed not supported\n",
->> +			bus_speed);
->> +		dev_err(iproc_i2c->device,
->> +			"valid speeds are 100khz and 400khz\n");
->> +		return -EINVAL;
->> +	} else if (bus_speed < 400000) {
->> +		bus_speed = 100000;
->> +		speed_bit = 0;
->> +	} else {
->> +		bus_speed = 400000;
->> +		speed_bit = 1;
->> +	}
->> +
->> +	val = readl(iproc_i2c->base + TIM_CFG_OFFSET);
->> +	val &= ~(1 << TIM_CFG_MODE_400_SHIFT);
->> +	val |= speed_bit << TIM_CFG_MODE_400_SHIFT;
-> 
-> val |= (bus_speed == 400000) ...
-> 
-> and skip speed_bit? You decide.
-> 
+ .../devicetree/bindings/i2c/brcm,iproc-i2c.txt     |   37 ++
+ arch/arm/boot/dts/bcm-cygnus.dtsi                  |   20 +
+ drivers/i2c/busses/Kconfig                         |   10 +
+ drivers/i2c/busses/Makefile                        |    1 +
+ drivers/i2c/busses/i2c-bcm-iproc.c                 |  461 ++++++++++++++++++++
+ 5 files changed, 529 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt
+ create mode 100644 drivers/i2c/busses/i2c-bcm-iproc.c
 
-Okay, I'll get rid of speed_bit.
-
->> +static void bcm_iproc_i2c_enable(struct bcm_iproc_i2c_dev *iproc_i2c)
->> +{
->> +	u32 val;
->> +
->> +	val = readl(iproc_i2c->base + CFG_OFFSET);
->> +	val |= 1 << CFG_EN_SHIFT;
->> +	writel(val, iproc_i2c->base + CFG_OFFSET);
->> +}
->> +
->> +static void bcm_iproc_i2c_disable(struct bcm_iproc_i2c_dev *iproc_i2c)
->> +{
->> +	u32 val;
->> +
->> +	val = readl(iproc_i2c->base + CFG_OFFSET);
->> +	val &= ~(1 << CFG_EN_SHIFT);
->> +	writel(val, iproc_i2c->base + CFG_OFFSET);
->> +}
-> 
-> Extra functions? They are self explaining and only used once. You
-> decide.
-
-In fact I'll keep the function, since it will likely be needed later
-when we add suspend/resume support to the driver. But I'll combine the
-two functions and make it a single function called
-bcm_iproc_i2c_enable_disable.
-
-> 
-> Rest looks fine, thanks!
-> 
-
-Thanks for the review!
-
-Ray
+-- 
+1.7.9.5
