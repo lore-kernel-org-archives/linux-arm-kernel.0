@@ -1,207 +1,103 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Sun, 8 Feb 2015 00:42:25 -0800
-Subject: [PATCH v8 1/2] mtd: hisilicon: add a new NAND controller driver
- for hisilicon hip04 Soc
-In-Reply-To: <1422183194-10148-2-git-send-email-wangzhou1@hisilicon.com>
-References: <1422183194-10148-1-git-send-email-wangzhou1@hisilicon.com>
- <1422183194-10148-2-git-send-email-wangzhou1@hisilicon.com>
-Message-ID: <20150208084225.GE3670@norris-Latitude-E6410>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Sun, 8 Feb 2015 10:24:39 +0100
+Subject: [PATCHv6 4/5] USB: gadget: atmel_usba_udc: Prepare for IRQ
+ single edge support
+In-Reply-To: <20150207193723.GA32213@gradator.net>
+References: <1421945805-31129-1-git-send-email-sylvain.rochet@finsecur.com>
+ <1421945805-31129-5-git-send-email-sylvain.rochet@finsecur.com>
+ <20150122181422.1ba305f1@bbrezillon> <54D3A63B.6040209@atmel.com>
+ <20150207193723.GA32213@gradator.net>
+Message-ID: <20150208102439.5be43f78@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Zhou,
+On Sat, 7 Feb 2015 20:37:23 +0100
+Sylvain Rochet <sylvain.rochet@finsecur.com> wrote:
 
-On Sun, Jan 25, 2015 at 06:53:13PM +0800, Zhou Wang wrote:
-> diff --git a/drivers/mtd/nand/hisi504_nand.c b/drivers/mtd/nand/hisi504_nand.c
-> new file mode 100644
-> index 0000000..484e1db
-> --- /dev/null
-> +++ b/drivers/mtd/nand/hisi504_nand.c
-...
-> +static uint8_t hisi_nfc_read_byte(struct mtd_info *mtd)
-> +{
-> +	struct nand_chip *chip = mtd->priv;
-> +	struct hinfc_host *host = chip->priv;
-> +
-> +	if (host->command == NAND_CMD_STATUS)
-> +		return *(uint8_t *)(host->mmio);
-> +
-> +	host->offset++;
-> +
-> +	if (host->command == NAND_CMD_READID)
-> +		return *(uint8_t *)(host->mmio + host->offset - 1);
-> +
-> +	return *(uint8_t *)(host->buffer + host->offset - 1);
-> +}
-> +
-> +static u16 hisi_nfc_read_word(struct mtd_info *mtd)
-> +{
-> +	struct nand_chip *chip = mtd->priv;
-> +	struct hinfc_host *host = chip->priv;
-> +
-> +	host->offset += 2;
-> +	return *(u16 *)(host->buffer + host->offset - 2);
-> +}
-> +
-> +static void
-> +hisi_nfc_write_buf(struct mtd_info *mtd, const uint8_t *buf, int len)
-> +{
-> +	struct nand_chip *chip = mtd->priv;
-> +	struct hinfc_host *host = chip->priv;
-> +
-> +	memcpy(host->buffer + host->offset, buf, len);
-> +	host->offset += len;
-> +}
-> +
-> +static void hisi_nfc_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
-> +{
-> +	struct nand_chip *chip = mtd->priv;
-> +	struct hinfc_host *host = chip->priv;
-> +
-> +	memcpy(buf, host->buffer + host->offset, len);
-> +	host->offset += len;
-> +}
+> Hello Nicolas,
+> 
+> 
+> On Thu, Feb 05, 2015 at 06:19:55PM +0100, Nicolas Ferre wrote:
+> > Le 22/01/2015 18:14, Boris Brezillon a ?crit :
+> > > On Thu, 22 Jan 2015 17:56:44 +0100
+> > > Sylvain Rochet <sylvain.rochet@finsecur.com> wrote:
+> > > 
+> > > > -static const struct usba_udc_errata at91sam9g45_errata = {
+> > > > +static const struct usba_udc_caps at91sam9g45_caps = {
+> > > >  	.pulse_bias = at91sam9g45_pulse_bias,
+> > > > +	.irq_single_edge_support = true,
+> > 
+> > Nope! at91sam9g45 doesn't have this property. You'll have to create
+> > another compatible string and capabilities structure
+> > ("atmel,at91sam9x5-udc")
+> 
+> Oops.
+> 
+> 
+> > But still, I don't know if it's the proper approach. The possibility to
+> > trigger an IRQ on both edges or a single edge is a capacity of the gpio
+> > controller, not the USBA IP. So, it's a little bit strange to have this
+> > capability here.
+> 
+> I agree.
 
-...
+Me too (even if I'm the one who proposed this approach in the first
+place ;-)).
 
-> +static int hisi_nfc_probe(struct platform_device *pdev)
-> +{
-> +	int ret = 0, irq, buswidth, flag, max_chips = HINFC504_MAX_CHIP;
-> +	struct device *dev = &pdev->dev;
-> +	struct hinfc_host *host;
-> +	struct nand_chip  *chip;
-> +	struct mtd_info   *mtd;
-> +	struct resource	  *res;
-> +	struct device_node *np = dev->of_node;
-> +	struct mtd_part_parser_data ppdata;
-> +
-> +	host = devm_kzalloc(dev, sizeof(*host), GFP_KERNEL);
-> +	if (!host)
-> +		return -ENOMEM;
-> +	host->dev = dev;
-> +
-> +	platform_set_drvdata(pdev, host);
-> +	chip = &host->chip;
-> +	mtd  = &host->mtd;
-> +
-> +	irq = platform_get_irq(pdev, 0);
-> +	if (irq < 0) {
-> +		dev_err(dev, "no IRQ resource defined\n");
-> +		ret = -ENXIO;
-> +		goto err_res;
-> +	}
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	host->iobase = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(host->iobase)) {
-> +		ret = PTR_ERR(host->iobase);
-> +		goto err_res;
-> +	}
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-> +	host->mmio = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(host->mmio)) {
-> +		ret = PTR_ERR(host->mmio);
-> +		dev_err(dev, "devm_ioremap_resource[1] fail\n");
-> +		goto err_res;
-> +	}
-> +
-> +	mtd->priv		= chip;
-> +	mtd->owner		= THIS_MODULE;
-> +	mtd->name		= "hisi_nand";
-> +	mtd->dev.parent         = &pdev->dev;
-> +
-> +	chip->priv		= host;
-> +	chip->cmdfunc		= hisi_nfc_cmdfunc;
-> +	chip->select_chip	= hisi_nfc_select_chip;
-> +	chip->read_byte		= hisi_nfc_read_byte;
-> +	chip->read_word		= hisi_nfc_read_word;
-> +	chip->write_buf		= hisi_nfc_write_buf;
-> +	chip->read_buf		= hisi_nfc_read_buf;
-> +	chip->chip_delay	= HINFC504_CHIP_DELAY;
-> +
-> +	chip->ecc.mode = of_get_nand_ecc_mode(np);
-> +
-> +	buswidth = of_get_nand_bus_width(np);
-> +	if (buswidth == 16)
-> +		chip->options |= NAND_BUSWIDTH_16;
-> +
-> +	hisi_nfc_host_init(host);
-> +
-> +	ret = devm_request_irq(dev, irq, hinfc_irq_handle, IRQF_DISABLED,
-> +				"nandc", host);
-> +	if (ret) {
-> +		dev_err(dev, "failed to request IRQ\n");
-> +		goto err_res;
-> +	}
-> +
-> +	ret = nand_scan_ident(mtd, max_chips, NULL);
-> +	if (ret) {
-> +		ret = -ENODEV;
-> +		goto err_res;
-> +	}
-> +
-> +	host->buffer = dmam_alloc_coherent(dev, mtd->writesize + mtd->oobsize,
-> +		&host->dma_buffer, GFP_KERNEL);
+> 
+> 
+> > I don't know if it's actually feasible but trying to configure the IRQ
+> > on a single edge, testing if it's accepted by the GPIO irq controller
+> > and if not, falling back to a "both edge" pattern. Doesn't it look like
+> > a way to workaround this issue nicely? Can you give it a try?
+> 
+> Tried, it works, but it displays the following message from 
+> __irq_set_trigger() [1] during devm_request_threaded_irq(?, 
+> IRQF_TRIGGER_RISING, ?) on boards which does not support single-edge 
+> IRQ:
+> 
+> genirq: Setting trigger mode 1 for irq 176 failed (gpio_irq_type+0x0/0x34)
+> 
+> Is it acceptable ?
 
-You allocate this buffer after nand_scan_ident() (which is necessary, if
-you want to use the page and OOB size), but note that this buffer is
-used for everything but the READ_ID and STATUS commands, right? So there
-is some potential for a NULL dereference in read_byte/read_buf, above.
-Fortunately, there aren't many other commands used in nand_scan_ident(),
-but I think you might run across one problem; what if an ONFI or JEDEC
-compatible NAND is used? Then nand_scan_ident() might run a
-PARAMETER_READ command.
+IMHO it's not.
 
-Anyway, I see that PARAMETER_READ is not implemented in this driver, so
-I guess that's not a big deal. Just FYI.
+> If not, is udc->caps->irq_single_edge_support boolean acceptable ?
 
-> +	if (!host->buffer) {
-> +		ret = -ENOMEM;
-> +		goto err_res;
-> +	}
-> +
-> +	host->dma_oob = host->dma_buffer + mtd->writesize;
-> +	memset(host->buffer, 0xff, mtd->writesize + mtd->oobsize);
-> +
-> +	flag = hinfc_read(host, HINFC504_CON);
-> +	flag &= ~(HINFC504_CON_PAGESIZE_MASK << HINFC504_CON_PAGEISZE_SHIFT);
-> +	switch (mtd->writesize) {
-> +	case 2048:
-> +		flag |= (0x001 << HINFC504_CON_PAGEISZE_SHIFT); break;
-> +	/*
-> +	 * TODO: add more pagesize support,
-> +	 * default pagesize has been set in hisi_nfc_host_init
-> +	 */
-> +	default:
-> +		dev_err(dev, "NON-2KB page size nand flash\n");
-> +		ret = -EINVAL;
-> +		goto err_res;
-> +	}
-> +	hinfc_write(host, flag, HINFC504_CON);
-> +
-> +	if (chip->ecc.mode == NAND_ECC_HW)
-> +		hisi_nfc_ecc_probe(host);
-> +
-> +	ret = nand_scan_tail(mtd);
-> +	if (ret) {
-> +		dev_err(dev, "nand_scan_tail failed: %d\n", ret);
-> +		goto err_res;
-> +	}
-> +
-> +	ppdata.of_node = np;
-> +	ret = mtd_device_parse_register(mtd, NULL, &ppdata, NULL, 0);
-> +	if (ret) {
-> +		dev_err(dev, "Err MTD partition=%d\n", ret);
-> +		goto err_mtd;
-> +	}
-> +
-> +	return 0;
-> +
-> +err_mtd:
-> +	nand_release(mtd);
-> +err_res:
-> +	return ret;
-> +}
+Do you mean keeping the current approach ?
+If you do, then maybe you can rework a bit the way you detect the GPIO
+controller you depends on: instead of linking this information to the
+usba compatible string you could link it to the gpio controller
+compatible string.
 
-Brian
+You can find the gpio controller node thanks to your "vbus-gpio"
+property: use the phandle defined in this property to find the gpio
+controller node, and once you have the device_node referencing the gpio
+controller you can match it with your internal device_id table
+(containing 2 entries: one for the at91rm9200 IP and the other for the
+at91sam9x5 IP).
+
+Another solution would be to add an irq_try_set_irq_type function that
+would not complain when it fails to set the requested trigger.
+
+Thomas, I know you did not follow the whole thread, but would you mind
+adding this irq_try_set_irq_type function (here is a reference
+implementation [1]), to prevent this error trace from happening when
+we're just trying a configuration ?
+
+> If not, I am ok to drop the feature, this is only a bonus.
+
+That could be a short term solution, to get this series accepted. We
+could then find a proper way to support that optimization.
+
+
+Best Regards,
+
+Boris
+
+[1]http://code.bulix.org/z4bu9k-87846
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
