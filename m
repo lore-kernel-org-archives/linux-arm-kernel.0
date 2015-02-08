@@ -1,103 +1,48 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sun, 8 Feb 2015 10:24:39 +0100
-Subject: [PATCHv6 4/5] USB: gadget: atmel_usba_udc: Prepare for IRQ
- single edge support
-In-Reply-To: <20150207193723.GA32213@gradator.net>
-References: <1421945805-31129-1-git-send-email-sylvain.rochet@finsecur.com>
- <1421945805-31129-5-git-send-email-sylvain.rochet@finsecur.com>
- <20150122181422.1ba305f1@bbrezillon> <54D3A63B.6040209@atmel.com>
- <20150207193723.GA32213@gradator.net>
-Message-ID: <20150208102439.5be43f78@bbrezillon>
+From: hofrat@osadl.org (Nicholas Mc Guire)
+Date: Sun,  8 Feb 2015 05:43:52 -0500
+Subject: [PATCH] i2c: wmt: match return type of wait_for_completion_timeout
+Message-ID: <1423392232-12937-1-git-send-email-hofrat@osadl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 7 Feb 2015 20:37:23 +0100
-Sylvain Rochet <sylvain.rochet@finsecur.com> wrote:
+return type of wait_for_completion_timeout is unsigned long not int. as 
+wait_result is only used for wait_for_completion_timeout here the type 
+is simply changed to unsigned long.
 
-> Hello Nicolas,
-> 
-> 
-> On Thu, Feb 05, 2015 at 06:19:55PM +0100, Nicolas Ferre wrote:
-> > Le 22/01/2015 18:14, Boris Brezillon a ?crit :
-> > > On Thu, 22 Jan 2015 17:56:44 +0100
-> > > Sylvain Rochet <sylvain.rochet@finsecur.com> wrote:
-> > > 
-> > > > -static const struct usba_udc_errata at91sam9g45_errata = {
-> > > > +static const struct usba_udc_caps at91sam9g45_caps = {
-> > > >  	.pulse_bias = at91sam9g45_pulse_bias,
-> > > > +	.irq_single_edge_support = true,
-> > 
-> > Nope! at91sam9g45 doesn't have this property. You'll have to create
-> > another compatible string and capabilities structure
-> > ("atmel,at91sam9x5-udc")
-> 
-> Oops.
-> 
-> 
-> > But still, I don't know if it's the proper approach. The possibility to
-> > trigger an IRQ on both edges or a single edge is a capacity of the gpio
-> > controller, not the USBA IP. So, it's a little bit strange to have this
-> > capability here.
-> 
-> I agree.
+Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
+---
 
-Me too (even if I'm the one who proposed this approach in the first
-place ;-)).
+Patch was only compile tested with vt8500_v6_v7_defconfig
+(implies CONFIG_I2C_WMT=y)
 
-> 
-> 
-> > I don't know if it's actually feasible but trying to configure the IRQ
-> > on a single edge, testing if it's accepted by the GPIO irq controller
-> > and if not, falling back to a "both edge" pattern. Doesn't it look like
-> > a way to workaround this issue nicely? Can you give it a try?
-> 
-> Tried, it works, but it displays the following message from 
-> __irq_set_trigger() [1] during devm_request_threaded_irq(?, 
-> IRQF_TRIGGER_RISING, ?) on boards which does not support single-edge 
-> IRQ:
-> 
-> genirq: Setting trigger mode 1 for irq 176 failed (gpio_irq_type+0x0/0x34)
-> 
-> Is it acceptable ?
+Patch is against 3.19.0-rc7 (localversion-next is -next-20150204)
 
-IMHO it's not.
+ drivers/i2c/busses/i2c-wmt.c |    6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-> If not, is udc->caps->irq_single_edge_support boolean acceptable ?
-
-Do you mean keeping the current approach ?
-If you do, then maybe you can rework a bit the way you detect the GPIO
-controller you depends on: instead of linking this information to the
-usba compatible string you could link it to the gpio controller
-compatible string.
-
-You can find the gpio controller node thanks to your "vbus-gpio"
-property: use the phandle defined in this property to find the gpio
-controller node, and once you have the device_node referencing the gpio
-controller you can match it with your internal device_id table
-(containing 2 entries: one for the at91rm9200 IP and the other for the
-at91sam9x5 IP).
-
-Another solution would be to add an irq_try_set_irq_type function that
-would not complain when it fails to set the requested trigger.
-
-Thomas, I know you did not follow the whole thread, but would you mind
-adding this irq_try_set_irq_type function (here is a reference
-implementation [1]), to prevent this error trace from happening when
-we're just trying a configuration ?
-
-> If not, I am ok to drop the feature, this is only a bonus.
-
-That could be a short term solution, to get this series accepted. We
-could then find a proper way to support that optimization.
-
-
-Best Regards,
-
-Boris
-
-[1]http://code.bulix.org/z4bu9k-87846
-
+diff --git a/drivers/i2c/busses/i2c-wmt.c b/drivers/i2c/busses/i2c-wmt.c
+index 82ea349..464600a 100644
+--- a/drivers/i2c/busses/i2c-wmt.c
++++ b/drivers/i2c/busses/i2c-wmt.c
+@@ -128,7 +128,8 @@ static int wmt_i2c_write(struct i2c_adapter *adap, struct i2c_msg *pmsg,
+ {
+ 	struct wmt_i2c_dev *i2c_dev = i2c_get_adapdata(adap);
+ 	u16 val, tcr_val;
+-	int ret, wait_result;
++	int ret;
++	unsigned long wait_result;
+ 	int xfer_len = 0;
+ 
+ 	if (!(pmsg->flags & I2C_M_NOSTART)) {
+@@ -218,7 +219,8 @@ static int wmt_i2c_read(struct i2c_adapter *adap, struct i2c_msg *pmsg,
+ {
+ 	struct wmt_i2c_dev *i2c_dev = i2c_get_adapdata(adap);
+ 	u16 val, tcr_val;
+-	int ret, wait_result;
++	int ret;
++	unsigned long wait_result;
+ 	u32 xfer_len = 0;
+ 
+ 	if (!(pmsg->flags & I2C_M_NOSTART)) {
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.7.10.4
