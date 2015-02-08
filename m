@@ -1,37 +1,36 @@
-From: hofrat@osadl.org (Nicholas Mc Guire)
-Date: Sun,  8 Feb 2015 07:55:55 -0500
-Subject: [PATCH] i2c: cadence: match return type of wait_for_completion_timeout
-Message-ID: <1423400155-28078-1-git-send-email-hofrat@osadl.org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sun, 8 Feb 2015 23:59:56 +0900
+Subject: [PATCH v3] pinctrl: exynos: Add support for Exynos5433
+In-Reply-To: <CACRpkdYq-1ztF5baHjB9aBUNspD5vRXrpnEd1zdWsADmwrhuWw@mail.gmail.com>
+References: <1421822591-10536-1-git-send-email-cw00.choi@samsung.com>
+ <CACRpkdYq-1ztF5baHjB9aBUNspD5vRXrpnEd1zdWsADmwrhuWw@mail.gmail.com>
+Message-ID: <CA+Ln22E1xpdj+LZAR6uf7sCEBR_TEN=CaTVznsKM490a8AzGww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-return type of wait_for_completion_timeout is unsigned long not int. as
-ret is only used for wait_for_completion_timeout anyway the type is simply 
-changed to unsigned long.
+Hi,
 
-Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
----
+2015-01-29 18:48 GMT+09:00 Linus Walleij <linus.walleij@linaro.org>:
+> On Wed, Jan 21, 2015 at 7:43 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+>
+>> This patch adds driver data for Exynos5433 SoC. Exynos5433 includes 228 multi-
+>> functional input/output port pins and 135 memory port pins. There are 41 general
+>> port groups and 2 memory port groups.
+>>
+>> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+>> Cc: Thomas Abraham <thomas.abraham@linaro.org>
+>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Acked-by: Inki Dae <inki.dae@samsung.com>
+>> ---
+>> Changes from v2:
+>> - Rebase it on v3.19-rc5
+>
+> Waiting for Tomasz to review this.
 
-Patch was only compile tested with multi_v7_defconfig
-(implies CONFIG_I2C_CADENCE=y)
+Thanks Linus. Looks good to me.
 
-Patch is against 3.19.0-rc7 (localversion-next is -next-20150204)
+Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
 
- drivers/i2c/busses/i2c-cadence.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
-index 7d7a14c..5fbffe0 100644
---- a/drivers/i2c/busses/i2c-cadence.c
-+++ b/drivers/i2c/busses/i2c-cadence.c
-@@ -475,7 +475,7 @@ static void cdns_i2c_master_reset(struct i2c_adapter *adap)
- static int cdns_i2c_process_msg(struct cdns_i2c *id, struct i2c_msg *msg,
- 		struct i2c_adapter *adap)
- {
--	int ret;
-+	unsigned long ret;
- 	u32 reg;
- 
- 	id->p_msg = msg;
--- 
-1.7.10.4
+Best regards,
+Tomasz
