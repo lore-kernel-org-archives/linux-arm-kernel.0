@@ -1,18 +1,13 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sun, 8 Feb 2015 22:06:33 +0100
+Date: Mon, 9 Feb 2015 00:55:03 +0100
 Subject: [PATCH 5/9] mtd: pxa3xx_nand: add support for the Marvell
  Berlin nand controller
 In-Reply-To: <1422367816-4257-6-git-send-email-antoine.tenart@free-electrons.com>
 References: <1422367816-4257-1-git-send-email-antoine.tenart@free-electrons.com>
  <1422367816-4257-6-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <20150208220633.5d2c7008@bbrezillon>
+Message-ID: <20150209005503.3fad39c7@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Hi Antoine,
-
-I didn't review the whole patch yet, but I'll come back to this review
-soon.
 
 On Tue, 27 Jan 2015 15:10:12 +0100
 Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
@@ -32,21 +27,7 @@ Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
 > - the SEQIN command is equivalent to a READ0 command
 > - the RNDOUT command must be used to perform a read operation, and the
 >   command is not NAND_CMD_RNDOUT
-
-Really ?
-RNDOUT is only used when you only did a standard page read (READ0 +
-READSTART), and you want to move the data pointer inside the currently
-loaded page (this command only require 2 address cycles).
-I wonder how this can work for a regular read page command (where 5
-address cycles are required).
-Anyway, I trust you if you say you have to do that, but I'm really
-curious (how is the controller hiding this standard read phase).
-
 > - the ERASE1 command is specific (0xd060)
-
-As stated in the following comments, I'm pretty sure it's a standard
-erase command.
-
 > 
 > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 > ---
@@ -90,18 +71,7 @@ erase command.
 > +#define EXT_CMD_TYPE_MONO		0 /* Monolithic read/write */
 > +
 > +#define BERLIN_NAND_CMD_RNDOUT		0x3000
-
-Your specific RNDOUT command looks like a regular READ0 (0x0) +
-READSTART (0x30) sequence, I think this is why you need to do a RNDOUT
-to read your page ;-).
-
 > +#define BERLIN_NAND_CMD_ERASE1		0xd060
-
-Ditto, it's a regular ERASE command sequence: ERASE1 (0x60) + ERASE2
-(0xd0).
-
-
-
 >  
 >  /* macros for registers read/write */
 >  #define nand_writel(info, off, val)	\
@@ -150,14 +120,6 @@ Ditto, it's a regular ERASE command sequence: ERASE1 (0x60) + ERASE2
 > +{ "8GiB 8-bit",    0xdead, 256, 8192,  8,  8, 4096, &timing[6] },
 > +{ },
 >  };
-
-As already stated by Brian and Ezequiel, this should be handled with
-the new API for timing retrieval.
-However, IMHO, this should be part of another series reworking the pxa
-driver, and I know you plan to do that, so I don't mind if this
-table is added to support your IP (as long as you're taking care of
-reworking that ;-)).
-
 >  
 >  static u8 bbt_pattern[] = {'M', 'V', 'B', 'b', 't', '0' };
 > @@ -320,6 +347,18 @@ static struct nand_ecclayout ecc_layout_4KB_bch8bit = {
@@ -176,15 +138,6 @@ reworking that ;-)).
 > +        .oobfree = { {.offset = 2, .length = 78} }
 > +};
 > +
-
-Okay, this is only my opinion, but I think all the ECC layouts defined
-in this driver should be built dynamically (depending on the requested
-ECC strength/block-size).
-Take a look at the sunxi driver if you need an example.
-
-Again, these are mid term changes, and I won't ask you to change that
-in this series.
-
 >  /* Define a default flash type setting serve as flash detecting only */
 >  #define DEFAULT_FLASH_TYPE (&builtin_flash_types[0])
 >  
@@ -220,6 +173,16 @@ in this series.
 > +			nand_writel(info, NDCB0,
 > +					info->chunk_size + info->oob_size);
 > +
+
+Why don't you reuse the following if statement (which is doing the
+exact same thing, except for the size being stored in ndbc3 when
+the command is created).
+
+Moreover, I'm pretty sure you don't want to add oob_size on the 2nd
+chunk, but only on the last one.
+Doing that will only work for 4K pages (2 * max_chunk_size), and you
+add support for 8K pages NANDs in this patch.
+
 >  		/* NDCB3 register is available in NFCv2 (Armada 370/XP SoC) */
 >  		if (info->variant == PXA3XX_NAND_VARIANT_ARMADA370)
 >  			nand_writel(info, NDCB0, info->ndcb3);
@@ -236,11 +199,6 @@ in this series.
 > +			command = NAND_CMD_READ0;
 > +		else if (command == NAND_CMD_RNDOUT)
 > +			command = BERLIN_NAND_CMD_RNDOUT;
-
-As stated above your BERLIN_NAND_CMD_RNDOUT is just a regular READ0 +
-READSTART command, are there any differences between a RNDOUT and a
-regular READ in your driver ?
-
 > +		else if (command == NAND_CMD_ERASE1)
 > +			command = BERLIN_NAND_CMD_ERASE1;
 > +	}
@@ -260,6 +218,14 @@ regular READ in your driver ?
 > +						| NDCB0_DBC
 > +						| 0xff
 > +						| (0x1080 & (0xff << 8));
+
+You can replace the last 2 lines by:
+                                                | 0x10ff);
+
+But the 0xff is really weird, cause 0xff is the RESET command...
+
+
+
 > +			} else if (ext_cmd_type == EXT_CMD_TYPE_CHUNK_PAGEPROG) {
 > +				info->ndcb0 |= NDCB0_CMD_TYPE(0x1)
 > +						| NDCB0_CMD_XTYPE(0x5)
@@ -267,6 +233,10 @@ regular READ in your driver ?
 > +						| NDCB0_AUTO_RS
 > +						| NDCB0_LEN_OVRD
 > +						| (0x1080 & 0xff);
+
+and this line by
+                                                | 0x80);
+
 > +			} else {
 > +				info->ndcb0 |= NDCB0_CMD_TYPE(0x1)
 > +						| NDCB0_CMD_XTYPE(0x4)
@@ -275,6 +245,17 @@ regular READ in your driver ?
 > +						| NDCB0_LEN_OVRD
 > +						| addr_cycle
 > +						| (0x1080 & 0xff);
+
+Ditto.
+
+Anyway, are you sure this shouldn't be:
+						| 0x1080);
+
+or even better:
+
+						| (NAND_CMD_PAGEPROG<<8)
+						| NAND_CMD_SEQIN);
+
 > +			}
 > +
 > +			break;
@@ -329,22 +310,230 @@ regular READ in your driver ?
 > +		if (command == NAND_CMD_ERASE1)
 > +			info->ndcb0 |= (NAND_CMD_ERASE2 << 8);
 > +
+>  		break;
+>  	case NAND_CMD_RESET:
+>  		info->ndcb0 |= NDCB0_CMD_TYPE(5)
+> @@ -1078,6 +1196,102 @@ static int pxa3xx_nand_write_page_hwecc(struct mtd_info *mtd,
+>  	return 0;
+>  }
+>  
+> +static void nand_cmdfunc_berlin(struct mtd_info *mtd, const unsigned command,
+> +		int column, int page_addr)
+> +{
+> +	struct pxa3xx_nand_host *host = mtd->priv;
+> +	struct pxa3xx_nand_info *info = host->info_data;
+> +	unsigned long timeout;
+> +	unsigned int oob_size = info->oob_size;
+> +	int exec_cmd, ext_cmd_type = 0;
+> +	unsigned cmd = command;
+> +
+> +	if (info->reg_ndcr & NDCR_DWIDTH_M)
+> +		column /= 2;
+> +
+> +	/*
+> +	 * There may be different NAND chip hooked to
+> +	 * different chip select, so check whether
+> +	 * chip select has been changed, if yes, reset the timing
+> +	 */
+> +	if (info->cs != host->cs) {
+> +		info->cs = host->cs;
+> +		nand_writel(info, NDTR0CS0, info->ndtr0cs0);
+> +		nand_writel(info, NDTR1CS0, info->ndtr1cs0);
+> +	}
+> +
+> +	prepare_start_command(info, cmd);
+> +
+> +	info->need_wait = 1;
+> +	init_completion(&info->dev_ready);
+> +
+> +	pxa3xx_nand_start(info);
+> +
+> +	do {
+> +		init_completion(&info->cmd_complete);
+> +		info->state = STATE_PREPARED;
+> +		exec_cmd = prepare_set_command(info, cmd, ext_cmd_type,
+> +				column, page_addr);
+> +
+> +		if (cmd == NAND_CMD_READ0) {
+> +			cmd = NAND_CMD_RNDOUT;
+> +			continue;
+> +		}
+> +
+> +		if (!exec_cmd) {
+> +			info->need_wait = 0;
+> +			complete(&info->dev_ready);
+> +			break;
+> +		}
+> +
+> +		/* no IRQ, poll */
+> +		timeout = jiffies + CHIP_DELAY_TIMEOUT;
+> +		do {
+> +			pxa3xx_nand_irq(0, info);
+> +
+> +			if (cmd == NAND_CMD_PAGEPROG &&
+> +					ext_cmd_type != EXT_CMD_TYPE_LAST_PAGEPROG)
+> +				break;
+> +
+> +			if (time_after(jiffies, timeout))
+> +				goto berlin_timeout;
+> +		} while (!completion_done(&info->cmd_complete));
+> +
+> +		/* sequence completed */
+> +		if (info->data_size == 0)
+> +			break;
+> +
+> +		if (cmd == NAND_CMD_PAGEPROG &&
+> +				ext_cmd_type == EXT_CMD_TYPE_LAST_PAGEPROG) {
+> +			complete(&info->dev_ready);
+> +			break;
+> +		}
+> +
+> +		if (cmd == NAND_CMD_RNDOUT) {
+> +			/* last command */
+> +			if (info->data_size == info->chunk_size * 2) {
+> +				ext_cmd_type = EXT_CMD_TYPE_LAST_RNDOUT;
+> +				info->oob_size = oob_size;
+> +			} else {
+> +				ext_cmd_type = EXT_CMD_TYPE_CHUNK_RNDOUT;
+> +			}
+> +		}
+> +
+> +		if (cmd == NAND_CMD_PAGEPROG) {
+> +			/* last command */
+> +			if (info->data_size == info->chunk_size * 2) {
+> +				ext_cmd_type = EXT_CMD_TYPE_LAST_PAGEPROG;
+> +				info->oob_size = oob_size;
+> +			} else {
+> +				ext_cmd_type = EXT_CMD_TYPE_CHUNK_PAGEPROG;
+> +			}
+> +		}
+> +	} while (1);
+> +
+> +berlin_timeout:
+> +	info->state = STATE_IDLE;
+> +}
+> +
+>  static int pxa3xx_nand_read_page_hwecc(struct mtd_info *mtd,
+>  		struct nand_chip *chip, uint8_t *buf, int oob_required,
+>  		int page)
+> @@ -1193,8 +1407,10 @@ static int pxa3xx_nand_config_flash(struct pxa3xx_nand_info *info,
+>  	struct pxa3xx_nand_host *host = info->host[info->cs];
+>  	uint32_t ndcr = 0x0; /* enable all interrupts */
+>  
+> -	if (f->page_size != 2048 && f->page_size != 512) {
+> -		dev_err(&pdev->dev, "Current only support 2048 and 512 size\n");
+> +	if (f->page_size != 8192 && f->page_size != 2048
+> +			&& f->page_size != 512) {
+> +		dev_err(&pdev->dev,
+> +			"Current only support 8192, 2048 and 512 size\n");
+>  		return -EINVAL;
+>  	}
+>  
+> @@ -1401,6 +1617,16 @@ static int pxa_ecc_init(struct pxa3xx_nand_info *info,
+>  		ecc->size = info->chunk_size;
+>  		ecc->layout = &ecc_layout_4KB_bch8bit;
+>  		ecc->strength = 16;
+> +	} else if (strength == 48 && ecc_stepsize == 1024 &&
+> +			page_size == 8192) {
+> +		info->ecc_bch = 1;
+> +		info->chunk_size = 2048;
+> +		info->spare_size = 0;
+> +		info->ecc_size = 32;
+> +		ecc->mode = NAND_ECC_HW;
+> +		ecc->size = info->chunk_size;
+> +		ecc->layout = &ecc_layout_oob_128;
+> +		ecc->strength = 48;
+>  	} else {
+>  		dev_err(&info->pdev->dev,
+>  			"ECC strength %d at page size %d is not supported\n",
+> @@ -1420,11 +1646,11 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
+>  	struct platform_device *pdev = info->pdev;
+>  	struct pxa3xx_nand_platform_data *pdata = dev_get_platdata(&pdev->dev);
+>  	struct nand_flash_dev pxa3xx_flash_ids[2], *def = NULL;
+> -	const struct pxa3xx_nand_flash *f = NULL;
+> +	const struct pxa3xx_nand_flash *flash_types = NULL, *f = NULL;
+>  	struct nand_chip *chip = mtd->priv;
+>  	uint32_t id = -1;
+>  	uint64_t chipsize;
+> -	int i, ret, num;
+> +	int i, ret;
+>  	uint16_t ecc_strength, ecc_step;
+>  
+>  	if (pdata->keep_config && !pxa3xx_nand_detect_config(info))
+> @@ -1433,6 +1659,9 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
+>  	/* Set a default chunk size */
+>  	info->chunk_size = 512;
+>  
+> +	if (info->variant == PXA3XX_NAND_VARIANT_BERLIN2)
+> +		chip->cmdfunc = nand_cmdfunc_berlin;
 
-I don't see any difference with the old version:
-you previously set command to BERLIN_NAND_CMD_ERASE1, which, according
-to your definition, is equal to
-(NAND_CMD_ERASE1 | (NAND_CMD_ERASE2 << 8))
+Your cmdfunc looks like the nand_cmdfunc_extended one, and this one is
+only used for NAND chips that have writesize > PAGE_CHUNK_SIZE.
 
-Right ?
+Is your cmdfunc supporting accesses to NAND chips with smaller pages ?
+If you're unsure, maybe you should add a check here, and refuse to
+probe such NAND chips.
 
-Am I missing something obvious ?
+> +
+>  	ret = pxa3xx_nand_sensing(info);
+>  	if (ret) {
+>  		dev_info(&info->pdev->dev, "There is no chip on cs %d!\n",
+> @@ -1452,19 +1681,24 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
+>  		return -EINVAL;
+>  	}
+>  
+> -	num = ARRAY_SIZE(builtin_flash_types) + pdata->num_flash - 1;
+> -	for (i = 0; i < num; i++) {
+> -		if (i < pdata->num_flash)
+> -			f = pdata->flash + i;
+> -		else
+> -			f = &builtin_flash_types[i - pdata->num_flash + 1];
+> +	if (info->variant == PXA3XX_NAND_VARIANT_BERLIN2)
+> +		flash_types = berlin_builtin_flash_types;
+> +	else
+> +		flash_types = builtin_flash_types;
+>  
+> -		/* find the chip in default list */
+> +	for (i = 0; (f = &flash_types[i]); i++)
+>  		if (f->chip_id == id)
+>  			break;
+> +
+> +	if (f == NULL) {
+> +		for (i = 0; i < pdata->num_flash; i++) {
+> +			f = pdata->flash + i;
+> +			if (f->chip_id == id)
+> +				break;
+> +		}
+>  	}
+
+You're changing the matching order here, the initial order was:
+
+1/ pdata definition
+2/ builtin types
+
+and you're now doing:
+
+1/ builtin types
+2/ pdata definition
 
 
-That's all for now :-).
+>  
+> -	if (i >= (ARRAY_SIZE(builtin_flash_types) + pdata->num_flash - 1)) {
+> +	if (f == NULL) {
+>  		dev_err(&info->pdev->dev, "ERROR!! flash not defined!!!\n");
+>  
+>  		return -EINVAL;
+> @@ -1515,7 +1749,8 @@ KEEP_CONFIG:
+>  	 * we are given the right variant and then switch to the extended
+>  	 * (aka splitted) command handling,
+>  	 */
+> -	if (mtd->writesize > PAGE_CHUNK_SIZE) {
+> +	if (mtd->writesize > PAGE_CHUNK_SIZE &&
+> +			info->variant != PXA3XX_NAND_VARIANT_BERLIN2) {
+>  		if (info->variant == PXA3XX_NAND_VARIANT_ARMADA370) {
+>  			chip->cmdfunc = nand_cmdfunc_extended;
+>  		} else {
 
-Best Regards,
-
-Boris
 
 
 -- 
