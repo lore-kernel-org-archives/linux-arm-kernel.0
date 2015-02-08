@@ -1,39 +1,38 @@
 From: rjui@broadcom.com (Ray Jui)
-Date: Sun, 8 Feb 2015 09:56:18 -0800
-Subject: [PATCH v9 2/3] i2c: iproc: Add Broadcom iProc I2C Driver
-In-Reply-To: <20150208162937.GB6033@katana>
+Date: Sun, 8 Feb 2015 10:10:28 -0800
+Subject: [PATCH v8 2/3] i2c: iproc: Add Broadcom iProc I2C Driver
+In-Reply-To: <20150208110325.GA2750@katana>
 References: <rjui@broadcom.com>
- <1423373126-30024-1-git-send-email-rjui@broadcom.com>
- <1423373126-30024-3-git-send-email-rjui@broadcom.com>
- <20150208162937.GB6033@katana>
-Message-ID: <54D7A342.5030200@broadcom.com>
+ <1423272507-18459-1-git-send-email-rjui@broadcom.com>
+ <1423272507-18459-3-git-send-email-rjui@broadcom.com>
+ <20150207175039.GB6263@katana> <54D6EF3D.4030302@broadcom.com>
+ <20150208110325.GA2750@katana>
+Message-ID: <54D7A694.4000903@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 2/8/2015 8:29 AM, Wolfram Sang wrote:
-> On Sat, Feb 07, 2015 at 09:25:25PM -0800, Ray Jui wrote:
->> Add initial support to the Broadcom iProc I2C controller found in the
->> iProc family of SoCs.
->>
->> The iProc I2C controller has separate internal TX and RX FIFOs, each has
->> a size of 64 bytes. The iProc I2C controller supports two bus speeds
->> including standard mode (100kHz) and fast mode (400kHz)
->>
->> Signed-off-by: Ray Jui <rjui@broadcom.com>
->> Reviewed-by: Scott Branden <sbranden@broadcom.com>
->> Reviewed-by: Kevin Cernekee <cernekee@chromium.org>
+On 2/8/2015 3:03 AM, Wolfram Sang wrote:
 > 
-> Looks good. What kind of tests have you done with exactly this version of the
-> driver (not earlier ones)?
+>>> Is it really a HW limitation? Could the driver later be extended to
+>>> continue filling the FIFO if a certain threshold is reached?
+>>>
+>>
+>> Will return -EOPNOTSUPP. This really depends on whether or not we expect
+>> one sequence of START + SLV ADDR + DATA + STOP per i2c message. I can
+>> later extend the driver to refill/re-drain the FIFO for data size >= 64
+>> bytes, if one sequence of SATRT...STOP per message is not a requirement.
 > 
-I did build test and ran i2cdetect on Cygnus BCM958300K combo board with
-the 3.19 rc7 kernel, and then I back ported this driver to our 3.10
-version of the production kernel (where we have complete audio driver
-support), to run some audio playback tests, which involves using the
-wolfson codec (through i2c). The only line I added when back porting to
-the 3.10 kernel is of_i2c_register_devices at the end of probe.
+> It is important to have the terminology clear here: One transfer can
+> consist of multiple messages. The transfer uses START/STOP at the
+> beginning/end, the messages within the transfer only REPEATED_START.
+> 
+Okay. Let me check with our ASIC engineer to see if there's a way to get
+the driver extended to support the case when data size is larger than
+the FIFO size. From my understanding based on the data sheet I have, I
+don't think that can be done with this controller. But if the ASIC
+engineers tells me the opposite, I'll add it as a separate patch later.
 
 Thanks,
 
