@@ -1,46 +1,48 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sun, 8 Feb 2015 21:00:36 +0100
-Subject: [PATCH 3/9] mtd: pxa3xx_nand: set NDCR_PG_PER_BLK if page per
- block is 128
-In-Reply-To: <1422367816-4257-4-git-send-email-antoine.tenart@free-electrons.com>
+Date: Sun, 8 Feb 2015 21:15:08 +0100
+Subject: [PATCH 4/9] mtd: pxa3xx_nand: add a default chunk size
+In-Reply-To: <1422367816-4257-5-git-send-email-antoine.tenart@free-electrons.com>
 References: <1422367816-4257-1-git-send-email-antoine.tenart@free-electrons.com>
- <1422367816-4257-4-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <20150208210036.4ae2978b@bbrezillon>
+ <1422367816-4257-5-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20150208211508.7b7d2632@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Antoine,
-
-On Tue, 27 Jan 2015 15:10:10 +0100
+On Tue, 27 Jan 2015 15:10:11 +0100
 Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
 
-I'm not the one who should say that (I'm often sending patches without
-any commit message), but a short commit message explaining why you're
-doing that would help reviewers ;-).
-
-Best Regards,
-
-Boris
-
+> Add a default chunk size of 512 in the pxa3xx nand driver.
+> 
 > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 > ---
->  drivers/mtd/nand/pxa3xx_nand.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+>  drivers/mtd/nand/pxa3xx_nand.c | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
 > diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-> index 2681ec4abafa..782ae24d6b7d 100644
+> index 782ae24d6b7d..b2783b1f663c 100644
 > --- a/drivers/mtd/nand/pxa3xx_nand.c
 > +++ b/drivers/mtd/nand/pxa3xx_nand.c
-> @@ -1216,7 +1216,8 @@ static int pxa3xx_nand_config_flash(struct pxa3xx_nand_info *info,
+> @@ -1430,6 +1430,9 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
+>  	if (pdata->keep_config && !pxa3xx_nand_detect_config(info))
+>  		goto KEEP_CONFIG;
 >  
->  	ndcr |= (pdata->enable_arbiter) ? NDCR_ND_ARB_EN : 0;
->  	ndcr |= (host->col_addr_cycles == 2) ? NDCR_RA_START : 0;
-> -	ndcr |= (f->page_per_block == 64) ? NDCR_PG_PER_BLK : 0;
-> +	ndcr |= (f->page_per_block == 64 || f->page_per_block == 128) ?
-> +		NDCR_PG_PER_BLK : 0;
->  	ndcr |= (f->page_size == 2048) ? NDCR_PAGE_SZ : 0;
->  	ndcr |= (f->flash_width == 16) ? NDCR_DWIDTH_M : 0;
->  	ndcr |= (f->dfc_width == 16) ? NDCR_DWIDTH_C : 0;
+> +	/* Set a default chunk size */
+
+Could you explain why you need to set this default chunk size ?
+I guess it's because your NAND is not configured by the bootloader, and
+thus you did not specify the keep-config attribute in the DT.
+And I guess you need this field to be initialized before pxa_ecc_init is
+called (for some NAND operations done in the meantime: READID ?).
+
+Moreover, IMHO this should be place in an 'else' statement, otherwise
+you'll overwrite the value set in pxa3xx_nand_detect_config.
+
+
+> +	info->chunk_size = 512;
+> +
+>  	ret = pxa3xx_nand_sensing(info);
+>  	if (ret) {
+>  		dev_info(&info->pdev->dev, "There is no chip on cs %d!\n",
 
 
 
