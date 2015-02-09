@@ -1,185 +1,56 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Tue, 10 Feb 2015 00:00:16 +0800
-Subject: [PATCH v2 4/4] usb: phy: add phy-hi6220-usb
-In-Reply-To: <54D8C391.1080603@linaro.org>
-References: <1423284966-3485-1-git-send-email-zhangfei.gao@linaro.org>
- <1423284966-3485-5-git-send-email-zhangfei.gao@linaro.org>
- <20150209021133.GB3045@shlinux2> <54D8C391.1080603@linaro.org>
-Message-ID: <CABQgh9FVYN8dbg=bx8OyPmRo+atPUT7Qr6YK3+ATe4QXgw8nJQ@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 9 Feb 2015 16:00:55 +0000 (UTC)
+Subject: [PATCH 0/2] ARM: omap2+: omap_hwmod: Fix false lockdep warning
+In-Reply-To: <54D86F74.7070703@ti.com>
+References: <1423226916-18804-1-git-send-email-peter.ujfalusi@ti.com>
+ <20150206141346.GP21418@twins.programming.kicks-ass.net>
+ <54D4E64C.7060208@ti.com>
+ <20150206183205.GS21418@twins.programming.kicks-ass.net>
+ <54D5154F.8080208@ti.com> <54D86F74.7070703@ti.com>
+Message-ID: <alpine.DEB.2.02.1502091557450.3767@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 February 2015 at 22:26, zhangfei <zhangfei.gao@linaro.org> wrote:
->
->
-> On 02/09/2015 10:11 AM, Peter Chen wrote:
->
->>> +static void hi6220_detect_work(struct work_struct *work)
->>> +{
->>> +       struct hi6220_priv *priv =
->>> +               container_of(work, struct hi6220_priv, work.work);
->>> +       int gpio_id, gpio_vubs;
->>
->>
->> %s/gpio_vubs/gpio_vbus
->
->
-> Yes, typo
->
->
->>> +static void hi6220_phy_setup(struct hi6220_priv *priv, bool on)
->>> +{
->>> +       struct regmap *reg = priv->reg;
->>> +       u32 val, mask;
->>> +       int ret;
->>> +
->>> +       if (priv->reg == NULL)
->>> +               return;
->>> +
->>> +       if (on) {
->>> +               val = RST0_USBOTG_BUS | RST0_POR_PICOPHY |
->>> +                     RST0_USBOTG | RST0_USBOTG_32K;
->>> +               mask = val;
->>> +               ret = regmap_update_bits(reg, SC_PERIPH_RSTDIS0, mask,
->>> val);
->>> +               if (ret)
->>> +                       return;
->>> +
->>> +               ret = regmap_read(reg, SC_PERIPH_CTRL5, &val);
->>> +               val = CTRL5_USBOTG_RES_SEL | CTRL5_PICOPHY_ACAENB;
->>> +               mask = val | CTRL5_PICOPHY_BC_MODE;
->>> +               ret = regmap_update_bits(reg, SC_PERIPH_CTRL5, mask,
->>> val);
->>> +               if (ret)
->>> +                       return;
->>> +
->>> +               val =  CTRL4_PICO_VBUSVLDEXT | CTRL4_PICO_VBUSVLDEXTSEL |
->>> +                      CTRL4_OTG_PHY_SEL;
->>> +               mask = val | CTRL4_PICO_SIDDQ | CTRL4_PICO_OGDISABLE;
->>> +               ret = regmap_update_bits(reg, SC_PERIPH_CTRL4, mask,
->>> val);
->>> +               if (ret)
->>> +                       return;
->>> +
->>> +               ret = regmap_write(reg, SC_PERIPH_CTRL8,
->>> EYE_PATTERN_PARA);
->>> +               if (ret)
->>> +                       return;
->>> +       } else {
->>> +               val = CTRL4_PICO_SIDDQ;
->>> +               mask = val;
->>> +               ret = regmap_update_bits(reg, SC_PERIPH_CTRL4, mask,
->>> val);
->>> +               if (ret)
->>> +                       return;
->>> +
->>> +               ret = regmap_read(reg, SC_PERIPH_CTRL4, &val);
->>> +
->>> +               val = RST0_USBOTG_BUS | RST0_POR_PICOPHY |
->>> +                     RST0_USBOTG | RST0_USBOTG_32K;
->>> +               mask = val;
->>> +               ret = regmap_update_bits(reg, SC_PERIPH_RSTEN0, mask,
->>> val);
->>> +               if (ret)
->>> +                       return;
->>> +       }
->>
->>
->> You have return value check for regmap API, but no error message or
->> return value for hi6220_phy_setup, it looks strange.
->
->
-> There was dev_err(priv->dev, "failed to setup phy\n");
-> Then I found priv->dev is the only one place to use, so I remove this for
-> simple.
->
->
->>
->>> +}
->>> +
->>> +static int hi6220_phy_probe(struct platform_device *pdev)
->>> +{
->>> +       struct hi6220_priv *priv;
->>> +       struct usb_otg *otg;
->>> +       struct device_node *np = pdev->dev.of_node;
->>> +       int ret, irq;
->>> +
->>> +       priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
->>> +       if (!priv)
->>> +               return -ENOMEM;
->>> +
->>> +       otg = devm_kzalloc(&pdev->dev, sizeof(*otg), GFP_KERNEL);
->>> +       if (!otg)
->>> +               return -ENOMEM;
->>> +
->>> +       priv->phy.dev = &pdev->dev;
->>> +       priv->phy.otg = otg;
->>> +       priv->phy.label = "hi6220";
->>> +       priv->phy.type = USB_PHY_TYPE_USB2;
->>> +       otg->set_peripheral = hi6220_set_peripheral;
->>> +       platform_set_drvdata(pdev, priv);
->>> +
->>> +       priv->gpio_vbus = of_get_named_gpio(np, "hisilicon,gpio-vbus",
->>> 0);
->>> +       if (priv->gpio_vbus == -EPROBE_DEFER)
->>> +               return -EPROBE_DEFER;
->>> +       if (!gpio_is_valid(priv->gpio_vbus)) {
->>> +               dev_err(&pdev->dev, "invalid gpio %d\n",
->>> priv->gpio_vbus);
->>> +               return -ENODEV;
->>> +       }
->>> +
->>> +       priv->gpio_id = of_get_named_gpio(np, "hisilicon,gpio-id", 0);
->>> +       if (priv->gpio_id == -EPROBE_DEFER)
->>> +               return -EPROBE_DEFER;
->>> +       if (!gpio_is_valid(priv->gpio_id)) {
->>> +               dev_err(&pdev->dev, "invalid gpio %d\n", priv->gpio_id);
->>> +               return -ENODEV;
->>> +       }
->>> +
->>> +       priv->reg = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
->>> +                                       "hisilicon,peripheral-syscon");
->>> +       if (IS_ERR(priv->reg))
->>> +               priv->reg = NULL;
->>> +
->>
->>
->> see my comments at your v1.
->
-> As replied in v1, EPROBE_DEFER does not needed.
-> syscon is register far earlier.
->
->>
->>> +       INIT_DELAYED_WORK(&priv->work, hi6220_detect_work);
->>> +
->>> +       ret = devm_gpio_request_one(&pdev->dev, priv->gpio_vbus,
->>> +                                   GPIOF_IN, "gpio_vbus");
->>> +       if (ret < 0) {
->>> +               dev_err(&pdev->dev, "gpio request failed for
->>> gpio_vbus\n");
->>> +               return ret;
->>> +       }
->>> +
->>> +       ret = devm_gpio_request_one(&pdev->dev, priv->gpio_id,
->>> +                                   GPIOF_IN, "gpio_id");
->>> +       if (ret < 0) {
->>> +               dev_err(&pdev->dev, "gpio request failed for gpio_id\n");
->>> +               return ret;
->>> +       }
->>> +
->>> +       priv->vcc = devm_regulator_get(&pdev->dev, "vcc");
->>> +       if (!IS_ERR(priv->vcc)) {
->>
->>
->> EPROBE_DEFER?
->
-> No, this is not needed, since regulator is registered earlier than device.
->
-> drivers/Makefile
-> # regulators early, since some subsystems rely on them to initialize
-> obj-$(CONFIG_REGULATOR)         += regulator/
->
+On Mon, 9 Feb 2015, Peter Ujfalusi wrote:
 
-After reconsideration, EPROBE_DEFER should be added here in case of module.
+> On 02/06/2015 09:26 PM, Peter Ujfalusi wrote:
+> >> Yeah, I've never really bothered with data too much, its a debug
+> >> feature. So lock_class_key is 8 bytes, and strictly speaking you could
+> >> union them over other fields, all we really need is unique addresses, we
+> >> don't actually use the storage.
+> > 
+> > True. our omap2plus defconfig does not have LOCKDEP enabled so it should not
+> > add anything to the data when running default kernel.
+> > I'll test the lockdep_set_class() method you suggested on Monday (not
+> > tomorrow), but still as first thing.
+> > If it is working as expected I'll send a patch with you as author.
+> 
+> With omap2plus_defconfig my build produces (vmlinux size):
+> Base: 				99905522
+> with my series:			99908385 (base + 2863)
+> with Peter Zijlstra's patch:	99910625 (base + 5103)
+> 
+> The reason for this is that we will only have
+> struct lock_class_key { };
+> in case of !CONFIG_LOCKDEP. On ARM however CONFIG_LOCKDEP is enabled by
+> default, while the CONFIG_DEBUG_LOCKDEP is disabled.
+> 
+> So it does add more data to our default omap2plus config.
+> 
+> Tony: do you have preference on the way we fix this issue?
+> 
+> As I recall there is a plan to remove the hwmod static database and move it or
+> generate it from DT? Not sure when and how this will be done, but will it
+> affect the lockdep_set_class() way?
 
-Thanks
+Well I guess we could see what Tony says, but you do realize that the 
+difference in sizes that you posted above is about .003% of the total 
+binary size, right?  
+
+If there's one thing we can say about the last few years of ARM kernel 
+development, it's that those kind of size increases are utterly dwarfed by 
+other changes in the kernel.  So I'd say, post a patch based on PeterZ's 
+fix and be done with it...
+
+
+- Paul
