@@ -1,83 +1,134 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 9 Feb 2015 14:20:49 +0530
-Subject: [PATCH] ARM: dra7xx: hwmod: drop .modulemode from pcie1/2 hwmods
-In-Reply-To: <1422978684-4826-1-git-send-email-grygorii.strashko@linaro.org>
-References: <1422978684-4826-1-git-send-email-grygorii.strashko@linaro.org>
-Message-ID: <54D874E9.1040302@ti.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 9 Feb 2015 08:58:31 +0000 (UTC)
+Subject: OMAP baseline test results for v3.19
+Message-ID: <alpine.DEB.2.02.1502090856390.3767@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Tuesday 03 February 2015 09:21 PM, grygorii.strashko at linaro.org wrote:
-> From: Grygorii Strashko <grygorii.strashko@linaro.org>
-> 
-> Now DRA7xx pcie1/2 hwmods define PRCM configuration as following:
->   .clkctrl_offs = DRA7XX_CM_PCIE_CLKSTCTRL_OFFSET,
->   .rstctrl_offs = DRA7XX_RM_L3INIT_RSTCTRL_OFFSET,
->   .modulemode   = MODULEMODE_SWCTRL,
-> which is completely wrong because DRA7XX_CM_PCIE_CLKSTCTRL_OFFSET
-> is clockdomain ctrl register and NOT module ctrl register.
-> And they have diffrent allowed values for bits[0,1]:
-> CLKTRCTRL?????????MODULEMODE??????????????????????????????????
-> 0x0:?NO_SLEEP?????0x0:?Module?is?disabled?by?SW.??????????????
-> 0x1:?SW_SLEEP?????0x1:?Module?is?managed?automatically?by?HW??
-> 0x2:?SW_WKUP??????0x2:?Module?is?explicitly?enabled.??????????
-> 0x3:?HW_AUTO??????0x3:?Reserved??
-> 
-> As result, following message can be seen during suspend:
->   "omap_hwmod: pcie1: _wait_target_disable failed"
-> 
-> Fix it by removing .modulemode from pcie1/2 hwmods and, in that
-> way, prevent clockdomain ctrl register writing from HWMOD core.
+Here are some basic OMAP test results for Linux v3.19.
+Logs and other details at:
 
-Looks correct except for one change.
+    http://www.pwsan.com/omap/testlogs/test_v3.19/20150208213625/
 
-Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
-> 
-> Signed-off-by: Grygorii Strashko <Grygorii.Strashko@linaro.org>
-> ---
-> 
-> More over, it looks like pcie1/2 hwmods are fake and have to be dropped at all.
-> The real HWMODs are PCIESS1/2.
 
-Not sure I get this. You mean "dra7xx_pcie1_hwmod" should be replaced with
-"dra7xx_pciess1_hwmod"? Or you mean an entire new hwmod is missing?
+Test summary
+------------
 
-Please note we still have to enable the clock domain and main clock. We've also
-purposefully omitted sysconfig from hwmod data since pcie reset
-(RM_PCIESS_RSTCTRL) should be done before accessing the syconfig register and
-the infrastructure for that is currently not present.
+Build: uImage:
+    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
 
-> Unfortunatelly, not all information on PCIE is public, so
-> I could be wrong here.
-> ---
->  arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 2 --
->  1 file changed, 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> index ffd6604..a428b2d 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> @@ -1478,7 +1478,6 @@ static struct omap_hwmod dra7xx_pcie1_hwmod = {
->  	.prcm = {
->  		.omap4 = {
->  			.clkctrl_offs	= DRA7XX_CM_PCIE_CLKSTCTRL_OFFSET,
-> -			.modulemode	= MODULEMODE_SWCTRL,
+Build: uImage+dtb:
+    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es,
+		  omap2plus_defconfig/omap4-var-som,
+		  omap2plus_defconfig/omap3-evm-37xx,
+		  omap2plus_defconfig_n800_only_a/omap2420-n800,
+		  omap2plus_defconfig/omap2430-sdp,
+		  omap2plus_defconfig/am3517-evm,
+		  omap2plus_defconfig/omap3-beagle,
+		  omap2plus_defconfig/omap3-beagle-xm,
+		  omap2plus_defconfig/omap3-sbc-t3517,
+		  omap2plus_defconfig/omap5-uevm,
+		  omap2plus_defconfig/omap5-sbc-t54
 
-I think the entire .prcm can be removed here.
->  		},
->  	},
->  };
-> @@ -1492,7 +1491,6 @@ static struct omap_hwmod dra7xx_pcie2_hwmod = {
->  	.prcm = {
->  		.omap4 = {
->  			.clkctrl_offs = DRA7XX_CM_PCIE_CLKSTCTRL_OFFSET,
-> -			.modulemode   = MODULEMODE_SWCTRL,
->  		},
->  	},
->  };
-> 
+Build: zImage:
+    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  omap2plus_defconfig_omap5_only,
+		  omap2plus_defconfig_dra7xx_only,
+		  omap2plus_defconfig_am43xx_only,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
 
-Thanks
-Kishon
+Build warnings from toolchain: uImage:
+    FAIL ( 1/ 3): omap1_defconfig_1510innovator_only
+
+Build warnings from toolchain: uImage+dtb:
+    (none)
+
+Build warnings from toolchain: zImage:
+    FAIL ( 2/17): omap2plus_defconfig_no_pm, multi_v7_defconfig
+
+Boot to userspace:
+    FAIL ( 1/17): 2430sdp
+    skip ( 2/17): 5912osk, 3517evm
+    Pass (14/17): am335xbonelt, am335xbone, 4430es2panda, 4460pandaes,
+		  4460varsomom, 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm, cmt3517, 5430es2uevm,
+		  5430es2sbct54, 2420n800
+
+Kernel warnings during boot to userspace:
+    FAIL ( 3/17): 4430es2panda, 4460varsomom, cmt3517
+
+PM: chip retention via suspend:
+    FAIL ( 6/12): am335xbonelt, 4430es2panda, 4460varsomom, 2430sdp,
+		  5430es2uevm, 5430es2sbct54
+    Pass ( 6/12): 4460pandaes, 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm
+
+PM: chip retention via dynamic idle:
+    FAIL ( 7/12): am335xbonelt, 4430es2panda, 4460pandaes,
+		  4460varsomom, 2430sdp, 5430es2uevm, 5430es2sbct54
+    Pass ( 5/12): 37xxevm, 3530es3beagle, 3530es31beagle, 3730beaglexm,
+		  3730es12beaglexm
+
+PM: chip off (except CORE, due to errata) via suspend:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off (except CORE, due to errata) via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730es12beaglexm
+
+PM: chip off via dynamic idle:
+    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730es12beaglexm
+
+Kernel warnings during PM test:
+    FAIL ( 2/17): 4430es2panda, 4460varsomom
+
+Obsolete Kconfig symbols:
+    FAIL ( 3/20): omap1_defconfig, omap2plus_defconfig,
+		  multi_v7_defconfig
+
+
+vmlinux object size
+(delta in bytes from test_v3.19-rc7 (e36f014edff70fc02b3d3d79cead1d58f289332e)):
+   text     data      bss    total  kernel
+   +166     -680        0     -514  omap1_defconfig
+   +134     -648        0     -514  omap1_defconfig_1510innovator_only
+   +134     -680      -32     -578  omap1_defconfig_5912osk_only
+  +1102     -568        0     +534  multi_v7_defconfig
+  +1030     -896        0     +134  omap2plus_defconfig
+   +686     -832        0     -146  omap2plus_defconfig_2430sdp_only
+  +1030     -832        0     +198  omap2plus_defconfig_am33xx_only
+   +970     -896        0      +74  omap2plus_defconfig_am43xx_only
+  +1030     -896        0     +134  omap2plus_defconfig_cpupm
+  +1098     -896        0     +202  omap2plus_defconfig_dra7xx_only
+   +372        0        0     +372  omap2plus_defconfig_n800_multi_omap2xxx
+   +340        0        0     +340  omap2plus_defconfig_n800_only_a
+  +1034     -896        0     +138  omap2plus_defconfig_no_pm
+   +970     -896        0      +74  omap2plus_defconfig_omap2_4_only
+  +1034     -896        0     +138  omap2plus_defconfig_omap3_4_only
+  +5130     -896        0    +4234  omap2plus_defconfig_omap5_only
+   +340        0      +16     +356  rmk_omap3430_ldp_allnoconfig
+   +230     -776        0     -546  rmk_omap3430_ldp_oldconfig
+   +364        0      +24     +388  rmk_omap4430_sdp_allnoconfig
+   +402     -760        0     -358  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.19-rc7 (e36f014edff70fc02b3d3d79cead1d58f289332e))
+  avail  rsrvd   high  freed  board          kconfig
+  (no differences)
