@@ -1,60 +1,72 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 9 Feb 2015 10:29:19 -0800
-Subject: [PATCH] ARM: shmobile: r8a73a4: Move pfc node to work around
- probe ordering bug
-In-Reply-To: <CAMuHMdXsbmcgRacg9CT9N7+KjOrog2F8mmGfORu31P3xyoVviA@mail.gmail.com>
-References: <1423254173-31852-1-git-send-email-geert+renesas@glider.be>
- <20150209162428.GG25235@atomide.com>
- <CAMuHMdXsbmcgRacg9CT9N7+KjOrog2F8mmGfORu31P3xyoVviA@mail.gmail.com>
-Message-ID: <20150209182918.GA2531@atomide.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 9 Feb 2015 18:55:49 +0000 (UTC)
+Subject: [PATCH 0/2] ARM: omap2+: omap_hwmod: Fix false lockdep warning
+In-Reply-To: <20150209173110.GI25235@atomide.com>
+References: <1423226916-18804-1-git-send-email-peter.ujfalusi@ti.com>
+ <20150206141346.GP21418@twins.programming.kicks-ass.net>
+ <54D4E64C.7060208@ti.com>
+ <20150206183205.GS21418@twins.programming.kicks-ass.net>
+ <54D5154F.8080208@ti.com> <54D86F74.7070703@ti.com>
+ <alpine.DEB.2.02.1502091557450.3767@utopia.booyaka.com>
+ <20150209173110.GI25235@atomide.com>
+Message-ID: <alpine.DEB.2.02.1502091835380.3767@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Geert Uytterhoeven <geert@linux-m68k.org> [150209 09:17]:
-> On Mon, Feb 9, 2015 at 5:24 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Geert Uytterhoeven <geert+renesas@glider.be> [150206 12:26]:
-> >> Notes:
-> >>   - It seems several people tried to solve this in the core OF probing
-> >>     code before, but the final solution never went in?
-> >>   - This can be reproduced on other SoCs (e.g. sh73a0 and r8a7740) by
-> >>     moving their pfc nodes before their interrupt controller nodes.
-> >>   - This patch is against my working tree, so it doesn't apply to
-> >>     Simon's repository, but you get the idea....
-> >
-> > No issues with the patch, but here are few comments on the core
-> > reasons (without looking at the code in this case) that might help
-> > fix similar issues.
-> >
-> > In all the cases I've seen these errors are caused by non-standard
-> > custom initcall levels for drivers like i2c bus. The real solution
-> > is to initialize drivers later with standard module_init, and stop
-> > the race to the bottom with custom initcall levels.
-> >
-> > If there is legacy board specific platofrm init code that needs
-> > i2c gpios early, that code can probably be moved to initialize
-> > later on.
+On Mon, 9 Feb 2015, Tony Lindgren wrote:
+
+> * Paul Walmsley <paul@pwsan.com> [150209 08:04]:
+> > On Mon, 9 Feb 2015, Peter Ujfalusi wrote:
+> > 
+> > > On 02/06/2015 09:26 PM, Peter Ujfalusi wrote:
+> > > >> Yeah, I've never really bothered with data too much, its a debug
+> > > >> feature. So lock_class_key is 8 bytes, and strictly speaking you could
+> > > >> union them over other fields, all we really need is unique addresses, we
+> > > >> don't actually use the storage.
+> > > > 
+> > > > True. our omap2plus defconfig does not have LOCKDEP enabled so it should not
+> > > > add anything to the data when running default kernel.
+> > > > I'll test the lockdep_set_class() method you suggested on Monday (not
+> > > > tomorrow), but still as first thing.
+> > > > If it is working as expected I'll send a patch with you as author.
+> > > 
+> > > With omap2plus_defconfig my build produces (vmlinux size):
+> > > Base: 				99905522
+> > > with my series:			99908385 (base + 2863)
+> > > with Peter Zijlstra's patch:	99910625 (base + 5103)
+> > > 
+> > > The reason for this is that we will only have
+> > > struct lock_class_key { };
+> > > in case of !CONFIG_LOCKDEP. On ARM however CONFIG_LOCKDEP is enabled by
+> > > default, while the CONFIG_DEBUG_LOCKDEP is disabled.
+> > > 
+> > > So it does add more data to our default omap2plus config.
+> > > 
+> > > Tony: do you have preference on the way we fix this issue?
+> > > 
+> > > As I recall there is a plan to remove the hwmod static database and move it or
+> > > generate it from DT? Not sure when and how this will be done, but will it
+> > > affect the lockdep_set_class() way?
+> > 
+> > Well I guess we could see what Tony says, but you do realize that the 
+> > difference in sizes that you posted above is about .003% of the total 
+> > binary size, right?  
+> > 
+> > If there's one thing we can say about the last few years of ARM kernel 
+> > development, it's that those kind of size increases are utterly dwarfed by 
+> > other changes in the kernel.  So I'd say, post a patch based on PeterZ's 
+> > fix and be done with it...
 > 
-> In this case no i2c is involved. The drivers for both pinctrl
-> (renesas,pfc-r8a73a4) and irqchip (renesas,irqc) are registered
-> at the same level:
->   - postcore_initcall(sh_pfc_init);
->   - postcore_initcall(irqc_init);
-> Hence the system uses the "natural" order from within the DTS,
-> and decided to instantiate the pfc before the irqchip.
+> Well the thing to consider here is what Peter U is saying about
+> having struct omap_hwmod allocated based on the data from .dts
+> files. If the fix makes the dynamic allocation harder to do later on,
+> we should probably avoid it. If it's relatively easy to do later on,
+> then I don't have a problem with it.
 
-OK
- 
-> > Also, there should not be any need for custom driver initcall
-> > levels from Linux generic framework point of view as for example
-> > irqchip implementing drivers work just fine as a loadable module.
-> 
-> As long as no other device that's instantiated earlier references that
-> irqchip?
+The future destination for that code that makes the most sense to me is 
+for it to become integrated with the OMAP Sonics & Arteris bus drivers and 
+DT data.  So I wouldn't worry too much about it; I don't think the 
+lockdep fix will affect that at all.
 
-Right :) And deferred probe won't still remove the warning in
-that case. From what I remember, that's a valid warning from irq
-framework point of view.
 
-Regards,
-
-Tony
+- Paul
