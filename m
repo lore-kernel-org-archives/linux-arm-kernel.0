@@ -1,146 +1,79 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon, 09 Feb 2015 14:53:31 +0800
-Subject: [PATCH v8 15/21] ARM64 / ACPI: Introduce ACPI_IRQ_MODEL_GIC and
- register device's gsi
-In-Reply-To: <20150209063444.GJ13969@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 9 Feb 2015 06:55:12 +0000
+Subject: [PATCH v8 14/21] ACPI / processor: Make it possible to get CPU
+ hardware ID via GICC
+In-Reply-To: <1422881149-8177-15-git-send-email-hanjun.guo@linaro.org>
 References: <1422881149-8177-1-git-send-email-hanjun.guo@linaro.org>
- <1422881149-8177-16-git-send-email-hanjun.guo@linaro.org>
- <20150209063444.GJ13969@arm.com>
-Message-ID: <54D8596B.1070102@linaro.org>
+ <1422881149-8177-15-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20150209065512.GK13969@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?02?09? 14:34, Will Deacon wrote:
-> On Mon, Feb 02, 2015 at 12:45:43PM +0000, Hanjun Guo wrote:
->> Introduce ACPI_IRQ_MODEL_GIC which is needed for ARM64 as GIC is
->> used, and then register device's gsi with the core IRQ subsystem.
->>
->> acpi_register_gsi() is similar to DT based irq_of_parse_and_map(),
->> since gsi is unique in the system, so use hwirq number directly
->> for the mapping.
->>
->> We are going to implement stacked domains when GICv2m, GICv3, ITS
->> support are added.
->>
->> CC: Marc Zyngier <marc.zyngier@arm.com>
->> Originally-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->> Tested-by: Yijing Wang <wangyijing@huawei.com>
->> Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
->> Tested-by: Jon Masters <jcm@redhat.com>
->> Tested-by: Timur Tabi <timur@codeaurora.org>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> ---
->>   arch/arm64/kernel/acpi.c | 73 ++++++++++++++++++++++++++++++++++++++++++++++++
->>   drivers/acpi/bus.c       |  3 ++
->>   include/linux/acpi.h     |  1 +
->>   3 files changed, 77 insertions(+)
->>
->> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
->> index f80caef..f86a982 100644
->> --- a/arch/arm64/kernel/acpi.c
->> +++ b/arch/arm64/kernel/acpi.c
->> @@ -38,6 +38,12 @@ EXPORT_SYMBOL(acpi_pci_disabled);
->>   static int enabled_cpus;	/* Processors (GICC) with enabled flag in MADT */
->>
->>   /*
->> + * Since we're on ARM, the default interrupt routing model
->> + * clearly has to be GIC.
->> + */
->> +enum acpi_irq_model_id acpi_irq_model = ACPI_IRQ_MODEL_GIC;
->> +
->> +/*
->>    * __acpi_map_table() will be called before page_init(), so early_ioremap()
->>    * or early_memremap() should be called here to for ACPI table mapping.
->>    */
->> @@ -185,6 +191,73 @@ void __init acpi_init_cpus(void)
->>   	pr_info("%d CPUs enabled, %d CPUs total\n", enabled_cpus, total_cpus);
->>   }
->>
->> +int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
->> +{
->> +	*irq = irq_find_mapping(NULL, gsi);
->> +
->> +	return 0;
->> +}
->> +EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
->> +
->> +/*
->> + * success: return IRQ number (>0)
->> + * failure: return =< 0
->> + */
->> +int acpi_register_gsi(struct device *dev, u32 gsi, int trigger, int polarity)
->> +{
->> +	unsigned int irq;
->> +	unsigned int irq_type;
->> +
->> +	/*
->> +	 * ACPI have no bindings to indicate SPI or PPI, so we
->> +	 * use different mappings from DT in ACPI.
->> +	 *
->> +	 * For FDT
->> +	 * PPI interrupt: in the range [0, 15];
->> +	 * SPI interrupt: in the range [0, 987];
->> +	 *
->> +	 * For ACPI, GSI should be unique so using
->> +	 * the hwirq directly for the mapping:
->> +	 * PPI interrupt: in the range [16, 31];
->> +	 * SPI interrupt: in the range [32, 1019];
->> +	 */
->> +
->> +	if (trigger == ACPI_EDGE_SENSITIVE &&
->> +				polarity == ACPI_ACTIVE_LOW)
->> +		irq_type = IRQ_TYPE_EDGE_FALLING;
->> +	else if (trigger == ACPI_EDGE_SENSITIVE &&
->> +				polarity == ACPI_ACTIVE_HIGH)
->> +		irq_type = IRQ_TYPE_EDGE_RISING;
->> +	else if (trigger == ACPI_LEVEL_SENSITIVE &&
->> +				polarity == ACPI_ACTIVE_LOW)
->> +		irq_type = IRQ_TYPE_LEVEL_LOW;
->> +	else if (trigger == ACPI_LEVEL_SENSITIVE &&
->> +				polarity == ACPI_ACTIVE_HIGH)
->> +		irq_type = IRQ_TYPE_LEVEL_HIGH;
->> +	else
->> +		irq_type = IRQ_TYPE_NONE;
->> +
->> +	/*
->> +	 * Since only one GIC is supported in ACPI 5.0, we can
->> +	 * create mapping refer to the default domain
->> +	 */
->> +	irq = irq_create_mapping(NULL, gsi);
->> +	if (!irq)
->> +		return irq;
->> +
->> +	/* Set irq type if specified and different than the current one */
->> +	if (irq_type != IRQ_TYPE_NONE &&
->> +		irq_type != irq_get_trigger_type(irq))
->> +		irq_set_irq_type(irq, irq_type);
->> +	return irq;
->> +}
->> +EXPORT_SYMBOL_GPL(acpi_register_gsi);
->> +
->> +void acpi_unregister_gsi(u32 gsi)
->> +{
->> +}
->> +EXPORT_SYMBOL_GPL(acpi_unregister_gsi);
->> +
->>   static int __init acpi_parse_fadt(struct acpi_table_header *table)
->>   {
->>   	struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
->
-> Does this code *have* to sit under arch/arm64? I can't see anything
-> architecture-specific about it and the bulk of the functions map directly
-> onto irq domain callbacks. I know that the answer is probably "we can fix
-> that in the future", but it doesn't seem like a huge amount of effort to
-> get the right abstractions in place from the beginning so that we don't
-> have to churn this stuff later on.
+On Mon, Feb 02, 2015 at 12:45:42PM +0000, Hanjun Guo wrote:
+> Introduce a new function map_gicc_mpidr() to allow MPIDRs to be obtained
+> from the GICC Structure introduced by ACPI 5.1.
+> 
+> MPIDR is the CPU hardware ID as local APIC ID on x86 platform, so we use
+> MPIDR not the GIC CPU interface ID to identify CPUs.
+> 
+> Further steps would typedef a phys_id_t for in arch code(with
+> appropriate size and a corresponding invalid value, say ~0) and use that
+> instead of an int in drivers/acpi/processor_core.c to store phys_id, then
+> no need for mpidr packing.
+> 
+> CC: Rafael J. Wysocki <rjw@rjwysocki.net>
+> CC: Catalin Marinas <catalin.marinas@arm.com>
+> CC: Will Deacon <will.deacon@arm.com>
+> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> Tested-by: Yijing Wang <wangyijing@huawei.com>
+> Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
+> Tested-by: Jon Masters <jcm@redhat.com>
+> Tested-by: Timur Tabi <timur@codeaurora.org>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  arch/arm64/include/asm/acpi.h | 30 ++++++++++++++++++++++++++++++
+>  drivers/acpi/processor_core.c | 37 +++++++++++++++++++++++++++++++++++++
+>  2 files changed, 67 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index 8984aa5..7e825b9 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -12,6 +12,8 @@
+>  #ifndef _ASM_ACPI_H
+>  #define _ASM_ACPI_H
+>  
+> +#include <asm/smp_plat.h>
+> +
+>  /* Basic configuration for ACPI */
+>  #ifdef	CONFIG_ACPI
+>  #define acpi_strict 1	/* No out-of-spec workarounds on ARM64 */
+> @@ -45,6 +47,34 @@ static inline void enable_acpi(void)
+>  	acpi_noirq = 0;
+>  }
+>  
+> +/* MPIDR value provided in GICC structure is 64 bits, but the
+> + * existing phys_id (CPU hardware ID) using in acpi processor
+> + * driver is 32-bit, to conform to the same datatype we need
+> + * to repack the GICC structure MPIDR.
+> + *
+> + * bits other than following 32 bits are defined as 0, so it
+> + * will be no information lost after repacked.
+> + *
+> + * Bits [0:7] Aff0;
+> + * Bits [8:15] Aff1;
+> + * Bits [16:23] Aff2;
+> + * Bits [32:39] Aff3;
+> + */
+> +static inline u32 pack_mpidr(u64 mpidr)
+> +{
+> +	return (u32) ((mpidr & 0xff00000000) >> 8) | mpidr;
+> +}
 
-Do you mean move acpi_register_gsi()/acpi_unregister_gsi() to irqdomain
-related file?
+I'm a bit puzzled by this packing:
 
-Since x86 and IA64 have their arch specific acpi_register_gsi()
-/acpi_unregister_gsi(), we will got compile errors on x86 and IA64
-platforms.
+  - Bit 31 of the MPIDR is RES1. Do we need to mask it out first?
+  - How does this work for uniprocessor systems where bit 30 is set?
+  - Similarly for mythical multi-threaded implementations with bit 24 set.
 
-Thanks
-Hanjun
+Will
