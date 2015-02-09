@@ -1,48 +1,21 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 09 Feb 2015 08:25:41 +0100
-Subject: [PATCH] exynos: pmu: use PS_HOLD based poweroff for all supported SoCs
-Message-ID: <1423466741-11421-1-git-send-email-m.szyprowski@samsung.com>
+From: addy.ke@rock-chips.com (Addy Ke)
+Date: Mon,  9 Feb 2015 15:25:24 +0800
+Subject: [PATCH v2 0/2] about data busy
+In-Reply-To: <1423134801-23219-1-git-send-email-addy.ke@rock-chips.com>
+References: <1423134801-23219-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <1423466726-20833-1-git-send-email-addy.ke@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PS_HOLD based power off procedure is common for all Exynos SoCs, so use
-it for every Exynos SoC.
+Addy Ke (2):
+  mmc: dw_mmc: fix bug that cause 'Timeout sending command'
+  mmc: dw_mmc: Don't start command while data busy
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- arch/arm/mach-exynos/pmu.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/mmc/host/dw_mmc.c | 35 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
 
-diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
-index c15761ca2f18..e812c1c85624 100644
---- a/arch/arm/mach-exynos/pmu.c
-+++ b/arch/arm/mach-exynos/pmu.c
-@@ -681,7 +681,7 @@ static unsigned int const exynos5420_list_disable_pmu_reg[] = {
- 	EXYNOS5420_CMU_RESET_FSYS_SYS_PWR_REG,
- };
- 
--static void exynos5_power_off(void)
-+static void exynos_power_off(void)
- {
- 	unsigned int tmp;
- 
-@@ -872,8 +872,6 @@ static void exynos5420_pmu_init(void)
- 			EXYNOS5420_ARM_INTR_SPREAD_USE_STANDBYWFI);
- 
- 	pmu_raw_writel(0x1, EXYNOS5420_UP_SCHEDULER);
--
--	pm_power_off = exynos5_power_off;
- 	pr_info("EXYNOS5420 PMU initialized\n");
- }
- 
-@@ -984,6 +982,8 @@ static int exynos_pmu_probe(struct platform_device *pdev)
- 	if (ret)
- 		dev_warn(dev, "can't register restart handler err=%d\n", ret);
- 
-+	pm_power_off = exynos_power_off;
-+
- 	dev_dbg(dev, "Exynos PMU Driver probe done\n");
- 	return 0;
- }
 -- 
-1.9.2
+Changes in v2:
+- add new patch to handle data busy when start command
+- add cpu_relaxed, suggested by Daniel Kurtz <djkurtz@chromium.org>
+1.8.3.2
