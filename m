@@ -1,65 +1,86 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 09 Feb 2015 11:07:12 +0100
-Subject: [PATCH v3 20/20] arm: mach-pxa: Decrement the power supply's
- device reference counter
-In-Reply-To: <20150206145904.GA7872@amd>
-References: <1422629278-12202-1-git-send-email-k.kozlowski@samsung.com>
- <1422629278-12202-21-git-send-email-k.kozlowski@samsung.com>
- <20150206134953.GA25683@amd> <1423233788.31516.5.camel@AMDC1943>
- <20150206145904.GA7872@amd>
-Message-ID: <1423476432.4909.15.camel@AMDC1943>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon,  9 Feb 2015 18:23:20 +0800
+Subject: [PATCH] ARM: sunxi: Have ARCH_SUNXI select RESET_CONTROLLER for clock
+ driver usage
+Message-ID: <1423477400-30520-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On pi?, 2015-02-06 at 15:59 +0100, Pavel Machek wrote:
-> On Fri 2015-02-06 15:43:08, Krzysztof Kozlowski wrote:
-> > On pi?, 2015-02-06 at 14:49 +0100, Pavel Machek wrote:
-> > > On Fri 2015-01-30 15:47:58, Krzysztof Kozlowski wrote:
-> > > > Use power_supply_put() to decrement the power supply's device reference
-> > > > counter.
-> > > > 
-> > > > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > > > Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> > > > Reviewed-by: Sebastian Reichel <sre@kernel.org>
-> > > 
-> > > 11,13,20 nothing obviously wrong. But I'm not sure if I studied them
-> > > closely enough to warrant an ACK.
-> > > 
-> > > It would be good to get this into kernel -- I seen no bad comments,
-> > > and it is not going to improve without merge into mainline.
-> > 
-> > Thanks for looking at patchset. It would be really nice if this could be
-> > tested for some time in linux-next. Such testing would help a lot. But I
-> > need acks from various maintainers for that.
-> 
-> Actually, you don't. The various maintainers clearly don't care at
-> this point. They had enough time. So you select one maintainer you
-> want to push this through, and you push it.
-> 
-> Someone may complain, so you'll solve the feedback...
+As the sunxi usb clocks all contain a reset controller, it is not
+possible to build the sunxi clock driver without RESET_CONTROLLER
+enabled. Doing so results in an undefined symbol error:
 
-I am thinking also on another way of solving this huge-patch problem:
-1. Mark all drivers broken (CONFIG_BROKEN).
-2. Introduce change in power_supply_register() API. Broken drivers
-   will fail to build.
-3. Convert broken drivers to new API incrementally (one driver
-   per patch) marking them also non-broken.
+    drivers/built-in.o: In function `sunxi_gates_clk_setup':
+    linux/drivers/clk/sunxi/clk-sunxi.c:1071: undefined reference to
+	`reset_controller_register'
 
-This would be much easier to review but also this would break
-build-bisectability for drivers and some platforms using them (like
-OLPC, compal-laptop, ACPI).
+This is possible if building a minimal kernel without PHY_SUN4I_USB.
 
-In case of important platforms (like ACPI) I could do the old-way:
-change the driver along with API change.
+The dependency issue is made visible at compile time instead of
+link time by the new A80 mmc clocks, which also use a reset control
+itself.
 
-What do you think about this?
+This patch makes ARCH_SUNXI select ARCH_HAS_RESET_CONTROLLER and
+RESET_CONTROLLER.
 
+Reported-by: Lourens Rozema <ik@lourensrozema.nl>
+Fixes: 559482d1f950 ARM: sunxi: Split the various SoCs support in Kconfig
+Cc: <stable@vger.kernel.org> # 3.16+
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
 
-I pushed the patchset here:
-https://git.linaro.org/people/marek.szyprowski/linux-srpol.git/shortlog/refs/heads/v3.19-next-power-supply-core-ownership
-(actually this is v4: added acks/reviews and minor issue fixed; merge
-window has opened so I'll wait with sending this to LKML).
+Since we don't have Kconfig symbols for the clock driver, I figured
+this should work. Hope we can get it into one of the rc-s before 3.20
+is released.
 
+---
+ arch/arm/mach-sunxi/Kconfig | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
-Best regards,
-Krzysztof
+diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+index a77604fbaf25..81502b90dd91 100644
+--- a/arch/arm/mach-sunxi/Kconfig
++++ b/arch/arm/mach-sunxi/Kconfig
+@@ -1,10 +1,12 @@
+ menuconfig ARCH_SUNXI
+ 	bool "Allwinner SoCs" if ARCH_MULTI_V7
+ 	select ARCH_REQUIRE_GPIOLIB
++	select ARCH_HAS_RESET_CONTROLLER
+ 	select CLKSRC_MMIO
+ 	select GENERIC_IRQ_CHIP
+ 	select PINCTRL
+ 	select SUN4I_TIMER
++	select RESET_CONTROLLER
+ 
+ if ARCH_SUNXI
+ 
+@@ -20,10 +22,8 @@ config MACH_SUN5I
+ config MACH_SUN6I
+ 	bool "Allwinner A31 (sun6i) SoCs support"
+ 	default ARCH_SUNXI
+-	select ARCH_HAS_RESET_CONTROLLER
+ 	select ARM_GIC
+ 	select MFD_SUN6I_PRCM
+-	select RESET_CONTROLLER
+ 	select SUN5I_HSTIMER
+ 
+ config MACH_SUN7I
+@@ -37,16 +37,12 @@ config MACH_SUN7I
+ config MACH_SUN8I
+ 	bool "Allwinner A23 (sun8i) SoCs support"
+ 	default ARCH_SUNXI
+-	select ARCH_HAS_RESET_CONTROLLER
+ 	select ARM_GIC
+ 	select MFD_SUN6I_PRCM
+-	select RESET_CONTROLLER
+ 
+ config MACH_SUN9I
+ 	bool "Allwinner (sun9i) SoCs support"
+ 	default ARCH_SUNXI
+-	select ARCH_HAS_RESET_CONTROLLER
+ 	select ARM_GIC
+-	select RESET_CONTROLLER
+ 
+ endif
+-- 
+2.1.4
