@@ -1,165 +1,159 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Mon, 09 Feb 2015 22:26:25 +0800
-Subject: [PATCH v2 4/4] usb: phy: add phy-hi6220-usb
-In-Reply-To: <20150209021133.GB3045@shlinux2>
-References: <1423284966-3485-1-git-send-email-zhangfei.gao@linaro.org>
- <1423284966-3485-5-git-send-email-zhangfei.gao@linaro.org>
- <20150209021133.GB3045@shlinux2>
-Message-ID: <54D8C391.1080603@linaro.org>
+From: lisovy@gmail.com (Rostislav Lisovy)
+Date: Mon,  9 Feb 2015 15:48:05 +0100
+Subject: [PATCH 3/3] ARM: dts: am335x: Add Chiliboard DTS
+In-Reply-To: <1423493285-4231-1-git-send-email-lisovy@jablotron.cz>
+References: <1423493285-4231-1-git-send-email-lisovy@jablotron.cz>
+Message-ID: <1423493285-4231-3-git-send-email-lisovy@jablotron.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Chiliboard uses ChiliSOM as its base.
 
+Hardware specification:
+* ChiliSOM (am335x, PMIC, DRAM, NAND)
+* Ethernet PHY (id 0)
+* USB host (usb1)
+* microSD slot
+* 2x GPIO LED
 
-On 02/09/2015 10:11 AM, Peter Chen wrote:
+Signed-off-by: Rostislav Lisovy <lisovy@jablotron.cz>
+---
+ arch/arm/boot/dts/Makefile              |   3 +-
+ arch/arm/boot/dts/am335x-chiliboard.dts | 112 ++++++++++++++++++++++++++++++++
+ 2 files changed, 114 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/am335x-chiliboard.dts
 
->> +static void hi6220_detect_work(struct work_struct *work)
->> +{
->> +	struct hi6220_priv *priv =
->> +		container_of(work, struct hi6220_priv, work.work);
->> +	int gpio_id, gpio_vubs;
->
-> %s/gpio_vubs/gpio_vbus
-
-Yes, typo
-
->> +static void hi6220_phy_setup(struct hi6220_priv *priv, bool on)
->> +{
->> +	struct regmap *reg = priv->reg;
->> +	u32 val, mask;
->> +	int ret;
->> +
->> +	if (priv->reg == NULL)
->> +		return;
->> +
->> +	if (on) {
->> +		val = RST0_USBOTG_BUS | RST0_POR_PICOPHY |
->> +		      RST0_USBOTG | RST0_USBOTG_32K;
->> +		mask = val;
->> +		ret = regmap_update_bits(reg, SC_PERIPH_RSTDIS0, mask, val);
->> +		if (ret)
->> +			return;
->> +
->> +		ret = regmap_read(reg, SC_PERIPH_CTRL5, &val);
->> +		val = CTRL5_USBOTG_RES_SEL | CTRL5_PICOPHY_ACAENB;
->> +		mask = val | CTRL5_PICOPHY_BC_MODE;
->> +		ret = regmap_update_bits(reg, SC_PERIPH_CTRL5, mask, val);
->> +		if (ret)
->> +			return;
->> +
->> +		val =  CTRL4_PICO_VBUSVLDEXT | CTRL4_PICO_VBUSVLDEXTSEL |
->> +		       CTRL4_OTG_PHY_SEL;
->> +		mask = val | CTRL4_PICO_SIDDQ | CTRL4_PICO_OGDISABLE;
->> +		ret = regmap_update_bits(reg, SC_PERIPH_CTRL4, mask, val);
->> +		if (ret)
->> +			return;
->> +
->> +		ret = regmap_write(reg, SC_PERIPH_CTRL8, EYE_PATTERN_PARA);
->> +		if (ret)
->> +			return;
->> +	} else {
->> +		val = CTRL4_PICO_SIDDQ;
->> +		mask = val;
->> +		ret = regmap_update_bits(reg, SC_PERIPH_CTRL4, mask, val);
->> +		if (ret)
->> +			return;
->> +
->> +		ret = regmap_read(reg, SC_PERIPH_CTRL4, &val);
->> +
->> +		val = RST0_USBOTG_BUS | RST0_POR_PICOPHY |
->> +		      RST0_USBOTG | RST0_USBOTG_32K;
->> +		mask = val;
->> +		ret = regmap_update_bits(reg, SC_PERIPH_RSTEN0, mask, val);
->> +		if (ret)
->> +			return;
->> +	}
->
-> You have return value check for regmap API, but no error message or
-> return value for hi6220_phy_setup, it looks strange.
-
-There was dev_err(priv->dev, "failed to setup phy\n");
-Then I found priv->dev is the only one place to use, so I remove this 
-for simple.
-
->
->> +}
->> +
->> +static int hi6220_phy_probe(struct platform_device *pdev)
->> +{
->> +	struct hi6220_priv *priv;
->> +	struct usb_otg *otg;
->> +	struct device_node *np = pdev->dev.of_node;
->> +	int ret, irq;
->> +
->> +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
->> +	if (!priv)
->> +		return -ENOMEM;
->> +
->> +	otg = devm_kzalloc(&pdev->dev, sizeof(*otg), GFP_KERNEL);
->> +	if (!otg)
->> +		return -ENOMEM;
->> +
->> +	priv->phy.dev = &pdev->dev;
->> +	priv->phy.otg = otg;
->> +	priv->phy.label = "hi6220";
->> +	priv->phy.type = USB_PHY_TYPE_USB2;
->> +	otg->set_peripheral = hi6220_set_peripheral;
->> +	platform_set_drvdata(pdev, priv);
->> +
->> +	priv->gpio_vbus = of_get_named_gpio(np, "hisilicon,gpio-vbus", 0);
->> +	if (priv->gpio_vbus == -EPROBE_DEFER)
->> +		return -EPROBE_DEFER;
->> +	if (!gpio_is_valid(priv->gpio_vbus)) {
->> +		dev_err(&pdev->dev, "invalid gpio %d\n", priv->gpio_vbus);
->> +		return -ENODEV;
->> +	}
->> +
->> +	priv->gpio_id = of_get_named_gpio(np, "hisilicon,gpio-id", 0);
->> +	if (priv->gpio_id == -EPROBE_DEFER)
->> +		return -EPROBE_DEFER;
->> +	if (!gpio_is_valid(priv->gpio_id)) {
->> +		dev_err(&pdev->dev, "invalid gpio %d\n", priv->gpio_id);
->> +		return -ENODEV;
->> +	}
->> +
->> +	priv->reg = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
->> +					"hisilicon,peripheral-syscon");
->> +	if (IS_ERR(priv->reg))
->> +		priv->reg = NULL;
->> +
->
-> see my comments at your v1.
-As replied in v1, EPROBE_DEFER does not needed.
-syscon is register far earlier.
-
->
->> +	INIT_DELAYED_WORK(&priv->work, hi6220_detect_work);
->> +
->> +	ret = devm_gpio_request_one(&pdev->dev, priv->gpio_vbus,
->> +				    GPIOF_IN, "gpio_vbus");
->> +	if (ret < 0) {
->> +		dev_err(&pdev->dev, "gpio request failed for gpio_vbus\n");
->> +		return ret;
->> +	}
->> +
->> +	ret = devm_gpio_request_one(&pdev->dev, priv->gpio_id,
->> +				    GPIOF_IN, "gpio_id");
->> +	if (ret < 0) {
->> +		dev_err(&pdev->dev, "gpio request failed for gpio_id\n");
->> +		return ret;
->> +	}
->> +
->> +	priv->vcc = devm_regulator_get(&pdev->dev, "vcc");
->> +	if (!IS_ERR(priv->vcc)) {
->
-> EPROBE_DEFER?
-No, this is not needed, since regulator is registered earlier than device.
-
-drivers/Makefile
-# regulators early, since some subsystems rely on them to initialize
-obj-$(CONFIG_REGULATOR)         += regulator/
-
-EPROBE_DEFER should be the last option we rely on.
-
-
-Thanks
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index a1c776b..b316b38 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -401,7 +401,8 @@ dtb-$(CONFIG_SOC_AM33XX) += \
+ 	am335x-evmsk.dtb \
+ 	am335x-nano.dtb \
+ 	am335x-pepper.dtb \
+-	am335x-lxm.dtb
++	am335x-lxm.dtb \
++	am335x-chiliboard.dtb
+ dtb-$(CONFIG_ARCH_OMAP4) += \
+ 	omap4-duovero-parlor.dtb \
+ 	omap4-panda.dtb \
+diff --git a/arch/arm/boot/dts/am335x-chiliboard.dts b/arch/arm/boot/dts/am335x-chiliboard.dts
+new file mode 100644
+index 0000000..2cf8ee2
+--- /dev/null
++++ b/arch/arm/boot/dts/am335x-chiliboard.dts
+@@ -0,0 +1,112 @@
++/*
++ * Copyright (C) 2015 Jablotron s.r.o. -- http://www.jablotron.com/
++ * Author: Rostislav Lisovy <lisovy@jablotron.cz>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++/dts-v1/;
++#include "am335x-chilisom.dtsi"
++
++/ {
++	model = "AM335x Chiliboard";
++	compatible = "grinn,am335x-chiliboard", "grinn,am335x-chilisom",
++		     "ti,am33xx";
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&led_gpio_pins>;
++
++		led0 {
++			label = "led0";
++			gpios = <&gpio3 7 GPIO_ACTIVE_LOW>;
++			default-state = "keep";
++			linux,default-trigger = "heartbeat";
++		};
++
++		led1 {
++			label = "led1";
++			gpios = <&gpio3 8 GPIO_ACTIVE_LOW>;
++			default-state = "keep";
++		};
++	};
++};
++
++&am33xx_pinmux {
++	usb1_drvvbus: usb1_drvvbus {
++		pinctrl-single,pins = <
++			0x234 (PIN_OUTPUT_PULLDOWN | MUX_MODE0) /* usb1_drvvbus.usb1_drvvbus */
++		>;
++	};
++
++	sd_pins: pinmux_sd_card {
++		pinctrl-single,pins = <
++			0xf0 (PIN_INPUT | MUX_MODE0) /* mmc0_dat0.mmc0_dat0 */
++			0xf4 (PIN_INPUT | MUX_MODE0) /* mmc0_dat1.mmc0_dat1 */
++			0xf8 (PIN_INPUT | MUX_MODE0) /* mmc0_dat2.mmc0_dat2 */
++			0xfc (PIN_INPUT | MUX_MODE0) /* mmc0_dat3.mmc0_dat3 */
++			0x100 (PIN_INPUT | MUX_MODE0) /* mmc0_clk.mmc0_clk */
++			0x104 (PIN_INPUT | MUX_MODE0) /* mmc0_cmd.mmc0_cmd */
++			0x160 (PIN_INPUT | MUX_MODE7) /* spi0_cs1.gpio0_6 */
++		>;
++	};
++
++	led_gpio_pins: led_gpio_pins {
++		pinctrl-single,pins = <
++			0x1e4 (PIN_OUTPUT | MUX_MODE7) /* emu0.gpio3_7 */
++			0x1e8 (PIN_OUTPUT | MUX_MODE7) /* emu1.gpio3_8 */
++		>;
++	};
++};
++
++&ldo4_reg {
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++};
++
++/* Ethernet */
++&cpsw_emac0 {
++	phy_id = <&davinci_mdio>, <0>;
++	phy-mode = "rmii";
++};
++
++&phy_sel {
++	rmii-clock-ext;
++};
++
++/* USB */
++&usb {
++	status = "okay";
++};
++
++&usb_ctrl_mod {
++	status = "okay";
++};
++
++&usb1_phy {
++	status = "okay";
++};
++
++&usb1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&usb1_drvvbus>;
++
++	status = "okay";
++	dr_mode = "host";
++};
++
++&cppi41dma  {
++	status = "okay";
++};
++
++/* microSD */
++&mmc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&sd_pins>;
++	vmmc-supply = <&ldo4_reg>;
++	bus-width = <0x4>;
++	cd-gpios = <&gpio0 6 GPIO_ACTIVE_HIGH>;
++	status = "okay";
++};
+-- 
+2.1.0
