@@ -1,107 +1,118 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Mon, 9 Feb 2015 10:25:20 +0000
-Subject: [PATCH v2] ASoC: atmel_ssc_dai: Allow more rates
-In-Reply-To: <54D880E3.7070004@atmel.com>
-References: <1423050745-6372-1-git-send-email-peda@lysator.liu.se>
- <54D824F8.9030804@atmel.com>
- <896ef5e9484a494e9e50cbed38919c5f@EMAIL.axentia.se>
- <54D871E7.40902@atmel.com>
- <5c8e49d8b0b3491b856eae50f4594f4f@EMAIL.axentia.se>
- <54D880E3.7070004@atmel.com>
-Message-ID: <8ce66bb3bcba46358e1283dcf02eb7f9@EMAIL.axentia.se>
+From: grygorii.strashko@linaro.org (Grygorii.Strashko@linaro.org)
+Date: Mon, 09 Feb 2015 18:28:03 +0800
+Subject: [PATCH] ARM: dra7xx: hwmod: drop .modulemode from pcie1/2 hwmods
+In-Reply-To: <54D874E9.1040302@ti.com>
+References: <1422978684-4826-1-git-send-email-grygorii.strashko@linaro.org>
+ <54D874E9.1040302@ti.com>
+Message-ID: <54D88BB3.4060104@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bo Shen wrote:
-> Hi Peter,
+Hi Kishon,
+On 02/09/2015 04:50 PM, Kishon Vijay Abraham I wrote:
+> On Tuesday 03 February 2015 09:21 PM, grygorii.strashko at linaro.org wrote:
+>> From: Grygorii Strashko <grygorii.strashko@linaro.org>
+>>
+>> Now DRA7xx pcie1/2 hwmods define PRCM configuration as following:
+>>    .clkctrl_offs = DRA7XX_CM_PCIE_CLKSTCTRL_OFFSET,
+>>    .rstctrl_offs = DRA7XX_RM_L3INIT_RSTCTRL_OFFSET,
+>>    .modulemode   = MODULEMODE_SWCTRL,
+>> which is completely wrong because DRA7XX_CM_PCIE_CLKSTCTRL_OFFSET
+>> is clockdomain ctrl register and NOT module ctrl register.
+>> And they have diffrent allowed values for bits[0,1]:
+>> CLKTRCTRL?????????MODULEMODE??????????????????????????????????
+>> 0x0:?NO_SLEEP?????0x0:?Module?is?disabled?by?SW.??????????????
+>> 0x1:?SW_SLEEP?????0x1:?Module?is?managed?automatically?by?HW??
+>> 0x2:?SW_WKUP??????0x2:?Module?is?explicitly?enabled.??????????
+>> 0x3:?HW_AUTO??????0x3:?Reserved??
+>>
+>> As result, following message can be seen during suspend:
+>>    "omap_hwmod: pcie1: _wait_target_disable failed"
+>>
+>> Fix it by removing .modulemode from pcie1/2 hwmods and, in that
+>> way, prevent clockdomain ctrl register writing from HWMOD core.
+> 
+> Looks correct except for one change.
+> 
+> Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>
+>> Signed-off-by: Grygorii Strashko <Grygorii.Strashko@linaro.org>
+>> ---
+>>
+>> More over, it looks like pcie1/2 hwmods are fake and have to be dropped at all.
+>> The real HWMODs are PCIESS1/2.
+> 
+> Not sure I get this. You mean "dra7xx_pcie1_hwmod" should be replaced with
+> "dra7xx_pciess1_hwmod"? Or you mean an entire new hwmod is missing?
+> 
+> Please note we still have to enable the clock domain and main clock. We've also
+> purposefully omitted sysconfig from hwmod data since pcie reset
+> (RM_PCIESS_RSTCTRL) should be done before accessing the syconfig register and
+> the infrastructure for that is currently not present.
+
+What I'm trying to say is that now PM control data mixed between "pcieX" and "pcieX-phy" hwmods.
+After this patch "pcieX" hwmods will actually do nothing (I assume that "pciex-phy" will be 
+enabled before "pcieX"), and probably can be removed if "pcie_clkdm" could be attached to "pcieX-phy" hwmod
+instead.
+
+More over, now, "pcie_clkdm" is connected to "pcieX" hwmod while MODULEMODE register is controlled
+by "pciex-phy" hwmod, so when pciess is going to be enabled the "l3init_clkdm" will be waken-up by
+hwmode core and not "pcie_clkdm" - as I can remember this is not good (we should alway wake-up clockdomain
+ and keep it in SWSUP mode while changing MODULEMODE and SYSC registers).
+
+static struct omap_hwmod dra7xx_pcie1_hwmod = {
+	.name		= "pcie1",
+	.class		= &dra7xx_pcie_hwmod_class,
+	.clkdm_name	= "pcie_clkdm",
+	.main_clk	= "l4_root_clk_div",
+
+static struct omap_hwmod dra7xx_pcie1_phy_hwmod = {
+	.name		= "pcie1-phy",
+	.class		= &dra7xx_pcie_phy_hwmod_class,
+	.clkdm_name	= "l3init_clkdm",
+	.main_clk	= "l4_root_clk_div",
+
+So, in my opinion, some rework may be needed here. 
+Am I right?
+
+> 
+>> Unfortunatelly, not all information on PCIE is public, so
+>> I could be wrong here.
+>> ---
+>>   arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 2 --
+>>   1 file changed, 2 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+>> index ffd6604..a428b2d 100644
+>> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+>> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+>> @@ -1478,7 +1478,6 @@ static struct omap_hwmod dra7xx_pcie1_hwmod = {
+>>   	.prcm = {
+>>   		.omap4 = {
+>>   			.clkctrl_offs	= DRA7XX_CM_PCIE_CLKSTCTRL_OFFSET,
+>> -			.modulemode	= MODULEMODE_SWCTRL,
+> 
+> I think the entire .prcm can be removed here.
+
+not sure. I've tried it and Kernel boot failed (on 3.14)
+>>   		},
+>>   	},
+>>   };
+>> @@ -1492,7 +1491,6 @@ static struct omap_hwmod dra7xx_pcie2_hwmod = {
+>>   	.prcm = {
+>>   		.omap4 = {
+>>   			.clkctrl_offs = DRA7XX_CM_PCIE_CLKSTCTRL_OFFSET,
+>> -			.modulemode   = MODULEMODE_SWCTRL,
+>>   		},
+>>   	},
+>>   };
+>>
+> 
+> Thanks
+> Kishon
 > 
 
-Hi!
 
-> On 02/09/2015 05:07 PM, Peter Rosin wrote:
-> > Bo Shen wrote:
-> >> Hi Peter,
-> >>
-> >> On 02/09/2015 04:09 PM, Peter Rosin wrote:
-> >>
-> >> [Snip]
-> >>
-> >>>>>
-> >>>>>     /*-------------------------------------------------------------------------*\
-> >>>>>      * DAI functions
-> >>>>> @@ -200,6 +290,7 @@ static int atmel_ssc_startup(struct
-> >> snd_pcm_substream *substream,
-> >>>>>     	struct atmel_ssc_info *ssc_p = &ssc_info[dai->id];
-> >>>>>     	struct atmel_pcm_dma_params *dma_params;
-> >>>>>     	int dir, dir_mask;
-> >>>>> +	int ret;
-> >>>>>
-> >>>>>     	pr_debug("atmel_ssc_startup: SSC_SR=0x%u\n",
-> >>>>>     		ssc_readl(ssc_p->ssc->regs, SR)); @@ -207,6 +298,7
-> @@
-> >> static
-> >>>>> int atmel_ssc_startup(struct snd_pcm_substream *substream,
-> >>>>>     	/* Enable PMC peripheral clock for this SSC */
-> >>>>>     	pr_debug("atmel_ssc_dai: Starting clock\n");
-> >>>>>     	clk_enable(ssc_p->ssc->clk);
-> >>>>> +	ssc_p->mck_rate = clk_get_rate(ssc_p->ssc->clk) * 2;
-> >>>>
-> >>>> Why the mck_rate is calculated in this form?
-> >>>
-> >>> What did you have in mind? Add another clock to the ssc node in the
-> >>> device tree?
-> >>>
-> >>> IIUC, the device tree (at least normally) has the ssc clk as the
-> >>> peripheral clock divided by 2, but the ssc specifies (when capturing
-> >>> in the CBM/CFS
-> >>> case) the rate limit as the peripheral clock divided by 3 (i.e. ssc clk / 1.5).
-> >>> Since the SSC spec expresses the rate limit in terms of the
-> >>> peripheral clock, this was what I came up with. I didn't want to require dt
-> changes...
-> >>
-> >> You make a misunderstand for the mck for ssc peripheral. The mck here
-> >> is not the system mck, it only related with the ssc, it is the PMC output.
-> >> For example, in device tree, the ssc clock divided by 2, then the pmc
-> >> output for ssc is "system mck / 2", so the ssc mck is "system mck / 2".
-> >> If divided by 4, then the ssc mck is "system / 4"
-> >
-> > I think the reason for my misunderstanding might be that in the
-> > 3.10-at91 tree, the ssc clk is twice the rate compared to what it is
-> > in the 3.18-at91 tree. This made me assume that the ssc clk had
-> 
-> I think maybe you didn't use the latest linux-3.10-at91 code. In that code, we
-> also divided by 2 in device tree.
-
-That's a rather confusing statement. The clock tree isn't even managed
-by the device tree in linux-3.10-at91. Sure, there's the 12MHz system
-master clock in sama5d3.dtsi, but that's about it. The rest of the clocks
-are in arch/arm/mach-at91/sama5d3.c. And the part about ssc0/ssc1
-hasn't been updated since it was added in 3.9. What am I missing?
-
-> > been changed to mean the rate after the fixed divider by two that is
-> > activated as soon as the ssc clock divider (given by SSC_CMR) is
-> > activated, and that it was a simple matter of multiplying by two to
-> > get to the MCK rate. I further assumed that "Master Clock" in the
-> > "Serial Clock Ratio Considerations" section was this MCK. Maybe the
-> > mistake was to involve the peripheral clock at all?
-> >
-> > Ok, so I may have misunderstood, but in that case what does that mean
-> > in terms of finding the "Master Clock" rate that is mentioned in the
-> > "Serial Clock Ratio Considerations" section? Is it perhaps the rate of
-> > the parent clock of the given ssc clk? Or, given the above
-> > explanation, is it correct to simply multiply by two as I have done?
-> 
-> The "Master Clock" actually is the same as "Peripheral clock".
-> 
-> Thanks for your information, I will send this to our datasheet team to update
-> this part.
-
-You are still not saying how to get to the "Master Clock" rate (i.e. the
-"Master Clock" that is mentioned in the "Serial Clock Ratio Considerations"
-section. You are only implying that multiplying the ssc clock rate with 2 is
-wrong for some reason.
-
-Are you saying that the ssc clock is supposed to be this "Master Clock"?
-
-Cheers,
-Peter
+-- 
+regards,
+-grygorii
