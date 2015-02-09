@@ -1,97 +1,83 @@
-From: dt.tangr@gmail.com (Daniel Tang)
-Date: Mon,  9 Feb 2015 19:41:57 +1100
-Subject: [PATCH] devicetree: Add TI-NSPIRE USB OTG support to device tree
-Message-ID: <1423471317-38119-1-git-send-email-dt.tangr@gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 9 Feb 2015 14:20:49 +0530
+Subject: [PATCH] ARM: dra7xx: hwmod: drop .modulemode from pcie1/2 hwmods
+In-Reply-To: <1422978684-4826-1-git-send-email-grygorii.strashko@linaro.org>
+References: <1422978684-4826-1-git-send-email-grygorii.strashko@linaro.org>
+Message-ID: <54D874E9.1040302@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Daniel Tang <dt.tangr@gmail.com>
----
- arch/arm/boot/dts/nspire-classic.dtsi |  5 +++++
- arch/arm/boot/dts/nspire-cx.dts       |  4 ++++
- arch/arm/boot/dts/nspire.dtsi         | 21 +++++++++++++++++++++
- 3 files changed, 30 insertions(+)
+Hi,
 
-diff --git a/arch/arm/boot/dts/nspire-classic.dtsi b/arch/arm/boot/dts/nspire-classic.dtsi
-index 9565199..4907c50 100644
---- a/arch/arm/boot/dts/nspire-classic.dtsi
-+++ b/arch/arm/boot/dts/nspire-classic.dtsi
-@@ -51,6 +51,11 @@
- 	compatible = "lsi,nspire-classic-ahb-divider";
- };
- 
-+
-+&vbus_reg {
-+	gpio = <&gpio 5 0>;
-+};
-+
- / {
- 	memory {
- 		device_type = "memory";
-diff --git a/arch/arm/boot/dts/nspire-cx.dts b/arch/arm/boot/dts/nspire-cx.dts
-index 375b924..08e0b81 100644
---- a/arch/arm/boot/dts/nspire-cx.dts
-+++ b/arch/arm/boot/dts/nspire-cx.dts
-@@ -69,6 +69,10 @@
- 	0x0709001d 	0x070a0033 	>;
- };
- 
-+&vbus_reg {
-+	gpio = <&gpio 2 0>;
-+};
-+
- / {
- 	model = "TI-NSPIRE CX";
- 	compatible = "ti,nspire-cx";
-diff --git a/arch/arm/boot/dts/nspire.dtsi b/arch/arm/boot/dts/nspire.dtsi
-index a22ffe6..390c91a 100644
---- a/arch/arm/boot/dts/nspire.dtsi
-+++ b/arch/arm/boot/dts/nspire.dtsi
-@@ -54,6 +54,20 @@
- 		clocks = <&ahb_clk>;
- 	};
- 
-+	usb_phy: usb_phy {
-+		compatible = "usb-nop-xceiv";
-+	};
-+
-+	vbus_reg: vbus_reg {
-+		compatible = "regulator-fixed";
-+
-+		regulator-name = "USB VBUS output";
-+		regulator-type = "voltage";
-+
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+	};
-+
- 	ahb {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
-@@ -65,8 +79,12 @@
- 		};
- 
- 		usb0: usb at B0000000 {
-+			compatible = "lsi,zevio-usb";
- 			reg = <0xB0000000 0x1000>;
- 			interrupts = <8>;
-+
-+			usb-phy = <&usb_phy>;
-+			vbus-supply = <&vbus_reg>;
- 		};
- 
- 		usb1: usb at B4000000 {
-@@ -105,8 +123,11 @@
- 			ranges;
- 
- 			gpio: gpio at 90000000 {
-+				compatible = "lsi,zevio-gpio";
- 				reg = <0x90000000 0x1000>;
- 				interrupts = <7>;
-+				gpio-controller;
-+				#gpio-cells = <2>;
- 			};
- 
- 			fast_timer: timer at 90010000 {
--- 
-2.1.3
+On Tuesday 03 February 2015 09:21 PM, grygorii.strashko at linaro.org wrote:
+> From: Grygorii Strashko <grygorii.strashko@linaro.org>
+> 
+> Now DRA7xx pcie1/2 hwmods define PRCM configuration as following:
+>   .clkctrl_offs = DRA7XX_CM_PCIE_CLKSTCTRL_OFFSET,
+>   .rstctrl_offs = DRA7XX_RM_L3INIT_RSTCTRL_OFFSET,
+>   .modulemode   = MODULEMODE_SWCTRL,
+> which is completely wrong because DRA7XX_CM_PCIE_CLKSTCTRL_OFFSET
+> is clockdomain ctrl register and NOT module ctrl register.
+> And they have diffrent allowed values for bits[0,1]:
+> CLKTRCTRL?????????MODULEMODE??????????????????????????????????
+> 0x0:?NO_SLEEP?????0x0:?Module?is?disabled?by?SW.??????????????
+> 0x1:?SW_SLEEP?????0x1:?Module?is?managed?automatically?by?HW??
+> 0x2:?SW_WKUP??????0x2:?Module?is?explicitly?enabled.??????????
+> 0x3:?HW_AUTO??????0x3:?Reserved??
+> 
+> As result, following message can be seen during suspend:
+>   "omap_hwmod: pcie1: _wait_target_disable failed"
+> 
+> Fix it by removing .modulemode from pcie1/2 hwmods and, in that
+> way, prevent clockdomain ctrl register writing from HWMOD core.
+
+Looks correct except for one change.
+
+Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
+> 
+> Signed-off-by: Grygorii Strashko <Grygorii.Strashko@linaro.org>
+> ---
+> 
+> More over, it looks like pcie1/2 hwmods are fake and have to be dropped at all.
+> The real HWMODs are PCIESS1/2.
+
+Not sure I get this. You mean "dra7xx_pcie1_hwmod" should be replaced with
+"dra7xx_pciess1_hwmod"? Or you mean an entire new hwmod is missing?
+
+Please note we still have to enable the clock domain and main clock. We've also
+purposefully omitted sysconfig from hwmod data since pcie reset
+(RM_PCIESS_RSTCTRL) should be done before accessing the syconfig register and
+the infrastructure for that is currently not present.
+
+> Unfortunatelly, not all information on PCIE is public, so
+> I could be wrong here.
+> ---
+>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 2 --
+>  1 file changed, 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> index ffd6604..a428b2d 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> @@ -1478,7 +1478,6 @@ static struct omap_hwmod dra7xx_pcie1_hwmod = {
+>  	.prcm = {
+>  		.omap4 = {
+>  			.clkctrl_offs	= DRA7XX_CM_PCIE_CLKSTCTRL_OFFSET,
+> -			.modulemode	= MODULEMODE_SWCTRL,
+
+I think the entire .prcm can be removed here.
+>  		},
+>  	},
+>  };
+> @@ -1492,7 +1491,6 @@ static struct omap_hwmod dra7xx_pcie2_hwmod = {
+>  	.prcm = {
+>  		.omap4 = {
+>  			.clkctrl_offs = DRA7XX_CM_PCIE_CLKSTCTRL_OFFSET,
+> -			.modulemode   = MODULEMODE_SWCTRL,
+>  		},
+>  	},
+>  };
+> 
+
+Thanks
+Kishon
