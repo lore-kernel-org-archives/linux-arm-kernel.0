@@ -1,95 +1,86 @@
-From: grygorii.strashko@linaro.org (Grygorii.Strashko@linaro.org)
-Date: Mon, 09 Feb 2015 22:52:51 +0800
-Subject: [PATCH] ARM: dra7xx: hwmod: drop .modulemode from pcie1/2 hwmods
-In-Reply-To: <54D8B515.201@ti.com>
-References: <1422978684-4826-1-git-send-email-grygorii.strashko@linaro.org>
- <54D874E9.1040302@ti.com> <54D88BB3.4060104@linaro.org> <54D8B515.201@ti.com>
-Message-ID: <54D8C9C3.5090500@linaro.org>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 9 Feb 2015 22:50:56 +0800
+Subject: [PATCH] pinctrl: at91: move lock/unlock_as_irq calls into
+ request/release resources methods
+In-Reply-To: <1423419822-6258-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1423419822-6258-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <BC36A77B-9986-495E-8F86-C80E9D0F0C63@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09/2015 09:24 PM, Kishon Vijay Abraham I wrote:
-> Hi,
->
-> On Monday 09 February 2015 03:58 PM, Grygorii.Strashko at linaro.org wrote:
->> Hi Kishon,
->> On 02/09/2015 04:50 PM, Kishon Vijay Abraham I wrote:
->>> On Tuesday 03 February 2015 09:21 PM, grygorii.strashko at linaro.org wrote:
->>>> From: Grygorii Strashko <grygorii.strashko@linaro.org>
->>>>
->>>> Now DRA7xx pcie1/2 hwmods define PRCM configuration as following:
->>>>     .clkctrl_offs = DRA7XX_CM_PCIE_CLKSTCTRL_OFFSET,
->>>>     .rstctrl_offs = DRA7XX_RM_L3INIT_RSTCTRL_OFFSET,
->>>>     .modulemode   = MODULEMODE_SWCTRL,
->>>> which is completely wrong because DRA7XX_CM_PCIE_CLKSTCTRL_OFFSET
->>>> is clockdomain ctrl register and NOT module ctrl register.
->>>> And they have diffrent allowed values for bits[0,1]:
->>>> CLKTRCTRL?????????MODULEMODE??????????????????????????????????
->>>> 0x0:?NO_SLEEP?????0x0:?Module?is?disabled?by?SW.??????????????
->>>> 0x1:?SW_SLEEP?????0x1:?Module?is?managed?automatically?by?HW??
->>>> 0x2:?SW_WKUP??????0x2:?Module?is?explicitly?enabled.??????????
->>>> 0x3:?HW_AUTO??????0x3:?Reserved??
->>>>
->>>> As result, following message can be seen during suspend:
->>>>     "omap_hwmod: pcie1: _wait_target_disable failed"
->>>>
->>>> Fix it by removing .modulemode from pcie1/2 hwmods and, in that
->>>> way, prevent clockdomain ctrl register writing from HWMOD core.
->>>
->>> Looks correct except for one change.
->>>
->>> Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
->>>>
->>>> Signed-off-by: Grygorii Strashko <Grygorii.Strashko@linaro.org>
->>>> ---
->>>>
->>>> More over, it looks like pcie1/2 hwmods are fake and have to be dropped at all.
->>>> The real HWMODs are PCIESS1/2.
->>>
->>> Not sure I get this. You mean "dra7xx_pcie1_hwmod" should be replaced with
->>> "dra7xx_pciess1_hwmod"? Or you mean an entire new hwmod is missing?
->>>
->>> Please note we still have to enable the clock domain and main clock. We've also
->>> purposefully omitted sysconfig from hwmod data since pcie reset
->>> (RM_PCIESS_RSTCTRL) should be done before accessing the syconfig register and
->>> the infrastructure for that is currently not present.
->>
->> What I'm trying to say is that now PM control data mixed between "pcieX" and "pcieX-phy" hwmods.
->> After this patch "pcieX" hwmods will actually do nothing (I assume that "pciex-phy" will be
->> enabled before "pcieX"), and probably can be removed if "pcie_clkdm" could be attached to "pcieX-phy" hwmod
->> instead.
->>
->> More over, now, "pcie_clkdm" is connected to "pcieX" hwmod while MODULEMODE register is controlled
->> by "pciex-phy" hwmod, so when pciess is going to be enabled the "l3init_clkdm" will be waken-up by
->> hwmode core and not "pcie_clkdm" - as I can remember this is not good (we should alway wake-up clockdomain
->>   and keep it in SWSUP mode while changing MODULEMODE and SYSC registers).
->>
->> static struct omap_hwmod dra7xx_pcie1_hwmod = {
->> 	.name		= "pcie1",
->> 	.class		= &dra7xx_pcie_hwmod_class,
->> 	.clkdm_name	= "pcie_clkdm",
->> 	.main_clk	= "l4_root_clk_div",
->>
->> static struct omap_hwmod dra7xx_pcie1_phy_hwmod = {
->> 	.name		= "pcie1-phy",
->> 	.class		= &dra7xx_pcie_phy_hwmod_class,
->> 	.clkdm_name	= "l3init_clkdm",
->> 	.main_clk	= "l4_root_clk_div",
->>
->> So, in my opinion, some rework may be needed here.
->> Am I right?
->
-> you are right. We should have a single hwmod like dra7xx_pciess1_hwmod whose
-> clkdm should be "pcie_clkdm" and whose clkctrl_offs should be
-> DRA7XX_CM_L3INIT_PCIESS1_CLKCTRL_OFFSET (for controlling MODULEMODE). PCIE PHY
-> shouldn't have a hwmod entry at all.
->
-> Thanks
-> Kishon
->
 
-Could this patch be applied any way? It fixes real issue for me.
+> On Feb 9, 2015, at 2:23 AM, Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+> 
+> The gpiochip_lock_as_irq call can fail and return an error, while the
+> irq_startup is not expected to fail (returns an unsigned int which is not
+> checked by irq core code).
+> 
+> irq_request/release_resources functions have been created to address this
+> problem.
+> 
+> Move gpiochip_lock/unlock_as_irq calls into
+> irq_request/release_resources functions to prevent using a gpio as an irq
+> if the gpiochip_lock_as_irq call failed.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ?
 
--- 
-regards,
--grygorii
+I?m travelling will take a look end of the week
+
+Best Regards,
+J.
+> drivers/pinctrl/pinctrl-at91.c | 17 +++++++----------
+> 1 file changed, 7 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+> index f4cd0b9..a481406 100644
+> --- a/drivers/pinctrl/pinctrl-at91.c
+> +++ b/drivers/pinctrl/pinctrl-at91.c
+> @@ -1477,28 +1477,25 @@ static void gpio_irq_ack(struct irq_data *d)
+> 	/* the interrupt is already cleared before by reading ISR */
+> }
+> 
+> -static unsigned int gpio_irq_startup(struct irq_data *d)
+> +static int gpio_irq_request_res(struct irq_data *d)
+> {
+> 	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
+> 	unsigned	pin = d->hwirq;
+> 	int ret;
+> 
+> 	ret = gpiochip_lock_as_irq(&at91_gpio->chip, pin);
+> -	if (ret) {
+> +	if (ret)
+> 		dev_err(at91_gpio->chip.dev, "unable to lock pind %lu IRQ\n",
+> 			d->hwirq);
+> -		return ret;
+> -	}
+> -	gpio_irq_unmask(d);
+> -	return 0;
+> +
+> +	return ret;
+> }
+> 
+> -static void gpio_irq_shutdown(struct irq_data *d)
+> +static void gpio_irq_release_res(struct irq_data *d)
+> {
+> 	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
+> 	unsigned	pin = d->hwirq;
+> 
+> -	gpio_irq_mask(d);
+> 	gpiochip_unlock_as_irq(&at91_gpio->chip, pin);
+> }
+> 
+> @@ -1577,8 +1574,8 @@ void at91_pinctrl_gpio_resume(void)
+> static struct irq_chip gpio_irqchip = {
+> 	.name		= "GPIO",
+> 	.irq_ack	= gpio_irq_ack,
+> -	.irq_startup	= gpio_irq_startup,
+> -	.irq_shutdown	= gpio_irq_shutdown,
+> +	.irq_request_resources = gpio_irq_request_res,
+> +	.irq_release_resources = gpio_irq_release_res,
+> 	.irq_disable	= gpio_irq_mask,
+> 	.irq_mask	= gpio_irq_mask,
+> 	.irq_unmask	= gpio_irq_unmask,
+> -- 
+> 1.9.1
+> 
